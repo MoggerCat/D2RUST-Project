@@ -116,6 +116,8 @@ pub struct BodyFake {
     pub components: BTreeMap<(usize, usize), i32>,
     /// The (centre, radius, flags) of every `unit_find` call.
     pub finds: std::cell::RefCell<Vec<FindCall>>,
+    /// Base stats given to every missile `spawn_missile` creates.
+    pub missile_base: Vec<(u16, i32)>,
 }
 
 impl BodyFake {
@@ -649,6 +651,9 @@ impl BodyWorld for BodyFake {
             return None;
         }
         let m = self.c.add(FUnit::new(UnitType::Missile, req.class));
+        for &(s, v) in &self.missile_base {
+            self.c.set(m, s, v);
+        }
         self.pos.insert(m, (req.x, req.y));
         Some(m)
     }
