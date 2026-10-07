@@ -16,35 +16,37 @@
   `sim/intents-events.md` §2 (dispatcher, gate, result codes) +
   `client-messages.tsv` / `server-messages.tsv`; `sim/tick.md` §5
   (timer events); `sim/rng.md` §3, §5.2, §7 (seeds and helpers);
-  `data/fields.tsv` (`hireling`, `monstats`, `npc`); item, monster,
-  mercenary and player specs (Phase 3, not written: item creation and
-  item messages, NPC AI, the mercenary unit, stat messages).
+  `data/fields.tsv` (`hireling`, `monstats`, `npc`); item creation
+  `items/generation.md`, item messages `items/inventory-moves.md`, NPC
+  AI `monsters/ai.md` §9.9, monster data `monsters/init.md`, the
+  mercenary unit `world/hirelings.md`, stat and skill resets
+  `combat/vitals.md` §2.1 / `skills/levels.md` §6.5.
   Machine table: `world/vendors.tsv` (per-NPC roles, shared with
   `vendors.md`).
 
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 50–63 |
-| Inputs | 64–74 |
-| Outputs / state changes | 75–82 |
-| Rules | 83–84 |
-|   1. NPC control and records | 85–139 |
-|   2. Starting an interaction (C→S 0x13) | 140–202 |
-|   3. Chat open and close (C→S 0x2F, 0x30) | 203–221 |
-|   4. Menu actions (C→S 0x38) | 222–259 |
-|   5. Healing on chat open | 260–284 |
-|   6. Cain identify (C→S 0x34) | 285–302 |
-|   7. Mercenaries | 303–404 |
-|   8. NPC services (C→S 0x38, action ∉ {1, 2, 3}) | 405–463 |
-|   9. S→C 0x2A NPC transaction (15 bytes) | 464–497 |
-|   10. Dead code in 1.14d (no caller, no pointer reference) | 498–509 |
-| Constants & data dependencies | 510–522 |
-| Randomness | 523–535 |
-| Edge cases & original bugs | 536–594 |
-| Test vectors | 595–617 |
-| Provenance | 618–662 |
-| Open questions | 663–728 |
+| Summary | 52–65 |
+| Inputs | 66–76 |
+| Outputs / state changes | 77–84 |
+| Rules | 85–86 |
+|   1. NPC control and records | 87–141 |
+|   2. Starting an interaction (C→S 0x13) | 142–213 |
+|   3. Chat open and close (C→S 0x2F, 0x30) | 214–234 |
+|   4. Menu actions (C→S 0x38) | 235–272 |
+|   5. Healing on chat open | 273–300 |
+|   6. Cain identify (C→S 0x34) | 301–318 |
+|   7. Mercenaries | 319–441 |
+|   8. NPC services (C→S 0x38, action ∉ {1, 2, 3}) | 442–520 |
+|   9. S→C 0x2A NPC transaction (15 bytes) | 521–554 |
+|   10. Dead code in 1.14d (no caller, no pointer reference) | 555–566 |
+| Constants & data dependencies | 567–579 |
+| Randomness | 580–592 |
+| Edge cases & original bugs | 593–651 |
+| Test vectors | 652–674 |
+| Provenance | 675–719 |
+| Open questions | 720–785 |
 <!-- /index -->
 
 ## Summary
@@ -147,7 +149,9 @@ Handler `0x0054AA90`: size 9 else 3; unit type (u32 @1) > 5 → 2; then
 2. If the monster's `monstats` row has both `npc` and `interact`: clear
    its path (`0x00648730`), call `0x0058EC00` with 0x28 (AI parameter;
    monster spec), cancel its AI-think events (type 2) and schedule one
-   at frame + 1 (`tick.md` §5.2–5.4). This happens for every distance
+   at frame + 1 (`tick.md` §5.2–5.4). Exact (`0x00548D4F`–`0x00548D70`):
+   cancel `0x00540E60(game, NPC, type 2, 0)`; schedule
+   `0x005417D0(game, NPC, type 2, game frame (+0xA8) + 1, args 0, 0)`. This happens for every distance
    ≤ 50. What the NPC AI then does with param 0 = 40: `monsters/ai.md`
    §9.9 (after "Interaction", "Effect of param 0 := 40").
 3. Distance 9..50: result 0, no interaction. Distance 7..8: approach
@@ -179,7 +183,9 @@ Handler `0x0054AA90`: size 9 else 3; unit type (u32 @1) > 5 → 2; then
    interact unit, no cursor item, player data +0x4C = 0): clear the
    player's path and start (`0x00573020` → `0x00572C10`).
 
-Start (`0x00572C10`):
+Start (`0x00572C10`, through the void wrapper `0x00573020`, which
+drops its result: the 0x13 result of rule 4 is 0 on every path, and
+the results 1 below are internal only):
 
 1. Requires: the player has no interact unit; NPC mode ≠ 0 (death) and ≠
    12 (dead); `0x00535060` ≠ 1; `0x00457490` true (else result 1);
@@ -187,7 +193,12 @@ Start (`0x00572C10`):
    player already in the NPC's list → result 1.
 2. Prepend a node {player, state 0, next} to the NPC's interaction list
    (monster data +0x30 → interaction block; its first field is the list
-   head). States: 0 talking, 1 chatting, 2 trading.
+   head). States: 0 talking, 1 chatting, 2 trading. The block pointer
+   comes from `0x00535E80` (monster with data → data +0x30, else 0) and
+   the start reads its first field before the "already in the list"
+   test of rule 1, so a null block faults; every monster gets a block
+   at init (`0x00572BA0`, `monsters/init.md` §5 step 2), so it is never
+   null here.
 3. `0x00576770`: hire list to the player if the NPC sells mercenaries
    (§7.2), with "first" = the list was empty.
 4. Player interact unit := (type 1, NPC GUID) (`0x00554120`).
@@ -203,7 +214,9 @@ Recorded order in one frame: 0x27, 0x29, 0x28 (frames 746, 798, 1464,
 ### 3. Chat open and close (C→S 0x2F, 0x30)
 
 Both handlers (`0x0054B930`, `0x0054B9F0`): size 9 else 3; the NPC is
-the unit with GUID u32 @5 (bytes 1–4 are not read); missing → 1; not a
+the unit with GUID u32 @5 (bytes 1–4 are not read), looked up in the
+**monster** list only (`0x00552F60` with EDX = 1, `0x0054B954`,
+`0x0054BA12`): a GUID of another unit type is "missing"; missing → 1; not a
 monster with an interaction list → 3; NPC in another act than the player
 (`0x00548A80`) → 2.
 
@@ -275,7 +288,10 @@ nothing unless the player's interact unit is that NPC. Then, in order:
    list: remove it.
 5. Pets (`0x00574DE0` with `0x00578CA0`, pet iteration order of the
    player spec): life to max (no message), curable states (step 4),
-   poison, freeze.
+   poison, freeze. Exact (`0x00578CA0`): life only when total stat 6 <
+   max life `0x00625D10` (a **signed** compare, unlike the player's),
+   then base stat 6 := max (`0x00627260`) and "changed"; each of the
+   other three counts as a change when it removes something.
 6. If anything changed: sound 10 attached to the NPC (`0x00553380`,
    delivered by the unit spec).
 
@@ -349,6 +365,16 @@ name u16 @5)`; NPC missing or not the interact unit → 0x2A code 9. Then
 3. No record → code 9. Name outside first … last of the §7.1 row →
    code 9. Slot (name − first): name differs → 9; hired ≠ 0 → 9. An
    offered = 0 slot is accepted.
+   Exact order (`0x005770E0`): step 1's cap reads the record through
+   its own lookup (`0x00576890`, `vendors.md` §1 rule 6: no record → no
+   cap), then step 2's gates, then the record lookup of step 3. The
+   §7.1 row is looked up again here (`0x00575FF0`, Normal row of the
+   NPC class and the game's version): none → first = last = 0 and
+   hireling class 0 without an assert (only §7.1's caller asserts), so
+   a name ≠ 0 answers code 9 and name 0 reads slot 0 of the record's
+   hire list (a null list faults). The row's +8 (hireling monster
+   class) is the class step 7 creates. All four sellers have records
+   and Normal rows in 1.14d, so only the name tests are reachable.
 4. act = `0x00663750(name)` (act of the hireling row whose name range
    holds it, minus 1).
 5. Hire init `0x006637F0(seed = slot seed, act, difficulty)`; fails (no
@@ -359,7 +385,9 @@ name u16 @5)`; NPC missing or not the interact unit → 0x2A code 9. Then
      version and the same `level` as that first row (`0x00656580`);
    - row = candidates[roll(local, count)];
    - one step of the local seed: L = (lo' mod 5) + player level − 5,
-     at least 2;
+     at least 2 ("player level" = the player's total stat 12,
+     `0x00625480`, read inside `0x006637F0` from EDX = the player:
+     uncapped, not step 1's lvl; edge case 12);
    - price = gold · (100 + 15·(L − row level)) / 100 (signed), at least
      the row's `gold`. Other outputs (life, damage, skills…) belong to
      the mercenary spec.
@@ -401,6 +429,15 @@ offered and not hired becomes hired; S→C 0x50 (`0x0053D7E0`; u16 2 @1,
 u16 name @3; `quests.md` §6.2); mercenary created near the player
 (spawn modes 4, then 6, then 12; all fail → stop, no refill check) and
 initialised; then the §7.3 step 8 refill check.
+Exact (`0x00579180`): no record or no hire list (+0x10 = 0) → nothing.
+No `hireling` row for the game's version, the seller and the game's
+difficulty → fatal assert (line 0xFA2). The walk covers slots 0 … n_d
+− 1, n_d = last − first + 1 of that row (the list itself was built from
+the Normal row, §7.1); the first slot with hired ≠ 1 and offered = 1 is
+taken: hired := 1, then 0x50 with that slot's name, then the creation
+(spawn modes 4, 6, 12; all fail → stop, the slot stays hired, no
+refill check). No such slot → no 0x50, no unit, and the refill check
+`0x00577010` runs.
 
 ### 8. NPC services (C→S 0x38, action ∉ {1, 2, 3})
 
@@ -426,12 +463,18 @@ Gate bit clear or predicate false → refuse.
   refuse); quality 6 (rare), item level = player's base level (stat 12,
   at least 1, `0x00558200`) + 4 if > 5; create (`0x00558D90`, item
   spec); null → 0x58 result 7 (input lost). Else repair (`0x005761C0`,
-  `vendors.md` §8.2), `0x0055FE00`, inventory page 0, name restored,
+  `vendors.md` §8.2; all three services pass no player, so the repair
+  sends no 0x3E), `0x0055FE00`, inventory page 0, name restored,
   place in the inventory or drop at a free spot near the player; quest
   reward hook `0x00591790` (`quests.md`); result 6.
 - **Socket**: duplicate the input into the player (`0x0055A2A0`, `vendors.md` §7.3) and
   remove the input from the cursor (`0x0055EEA0`); either fails →
-  refuse. Flag 0x800; s = max sockets (`0x0062BC20`); quality 4: s :=
+  refuse. Order (`0x0057A319`–`0x0057A36B`): the duplicate first (null
+  → refuse, the input untouched); then the removal; a failed removal
+  refuses through the same path (0x58 result 7, `0x00563C00` on the
+  input) and leaves the duplicate as `0x0055A2A0` made it: a unit in
+  no room and no inventory, never freed (a leak; d2rs frees it, which
+  is not observable). Flag 0x800; s = max sockets (`0x0062BC20`); quality 4: s :=
   roll(item seed of the duplicate, min(s, 2)) + 1 (`rng.md` §7); quality
   5–9: s := 1 if s > 0; other qualities keep s; add s sockets
   (`0x0062BCB0`); repair, `0x0055FE00`, page 0, place or drop; hook
@@ -446,9 +489,12 @@ Gate bit clear or predicate false → refuse.
 
 Hell only (difficulty 2): if slot 1 bit 0 is set and slot 41 bits 1 and
 0 are clear → `0x0058FD20` (sets 41.13, 41.1). Then any difficulty: if
-slot 41 bit 1 is set → reset stats (`0x00570360`) and skills
-(`0x00570C80`) (player spec), sound for the player (`0x00553380`),
-`0x0058FD50` (41.0 set, 41.1 cleared; `quests-act1.md` §10.3).
+slot 41 bit 1 is set → reset skills (`0x00570360`, `skills/levels.md`
+§6.5) then stats (`0x00570C80`, `combat/vitals.md` §2.1), in that order
+(`0x0057A242`, `0x0057A24B`); sound event 2 on the player
+(`0x00553380(player, 2, player)`); `0x0058FD50` (41.0 set, 41.1
+cleared; `quests-act1.md` §10.3). (Earlier text swapped the two
+addresses.)
 
 #### 8.3 Act travel
 
@@ -460,6 +506,17 @@ slot 41 bit 1 is set → reset stats (`0x00570360`) and skills
 | meshif2 264 | 0 | none | `0x0054B830(40, 5)` |
 | tyrael2 367 | 0 | expansion and slot 26 bit 0 | level 109, `0x005467E0(npc, 109, 103)`, waypoint 109 |
 | cain6 520 | 0 | none | `0x0054B830(103, 5)` |
+
+The three calls of a row run in the order listed (`0x0057A67A`,
+`0x0057A688`, `0x0057A696`/`0x0057A6B4` for warriv1; the same for
+meshif1 and tyrael2): the act change first, then act completion
+(`quests.md` §8.1), then the waypoint. Act change `0x0054B830(game,
+player, level, arg)`: level 0 → warp to the town of the player's act
+(`0x0061AB70`) with arg; level in the player's act → a town-portal
+object (class 59) at the player's (x − 5, y) leading to it
+(`0x0056D130`); else the warp `0x0053AEC0(level, arg)`
+(`waypoints.md` §7 rule 5). Every §8.3 destination is in another act,
+so only the warp runs.
 
 ### 9. S→C 0x2A NPC transaction (15 bytes)
 

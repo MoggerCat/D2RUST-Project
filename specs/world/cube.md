@@ -17,26 +17,26 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 42–53 |
-| Inputs | 54–66 |
-| Outputs / state changes | 67–77 |
-| Rules | 78–79 |
-|   1. Routing | 80–96 |
-|   2. Put an item into the cube (C→S 0x2A) | 97–143 |
-|   3. Transmute entry (`0x005665F0`) | 144–156 |
-|   4. Recipe eligibility | 157–171 |
-|   5. Ops | 172–191 |
-|   6. Input matching | 192–260 |
-|   7. Outputs | 261–388 |
-|   8. Commit | 389–451 |
-|   9. Portals | 452–471 |
-|   10. C→S 0x4C is not the cube | 472–486 |
-| Constants & data dependencies | 487–510 |
-| Randomness | 511–529 |
-| Edge cases & original bugs | 530–564 |
-| Test vectors | 565–609 |
-| Provenance | 610–648 |
-| Open questions | 649–757 |
+| Summary | 42–55 |
+| Inputs | 56–68 |
+| Outputs / state changes | 69–79 |
+| Rules | 80–81 |
+|   1. Routing | 82–98 |
+|   2. Put an item into the cube (C→S 0x2A) | 99–145 |
+|   3. Transmute entry (`0x005665F0`) | 146–158 |
+|   4. Recipe eligibility | 159–173 |
+|   5. Ops | 174–193 |
+|   6. Input matching | 194–262 |
+|   7. Outputs | 263–397 |
+|   8. Commit | 398–466 |
+|   9. Portals | 467–486 |
+|   10. C→S 0x4C is not the cube | 487–501 |
+| Constants & data dependencies | 502–525 |
+| Randomness | 526–544 |
+| Edge cases & original bugs | 545–579 |
+| Test vectors | 580–624 |
+| Provenance | 625–663 |
+| Open questions | 664–772 |
 <!-- /index -->
 
 ## Summary
@@ -48,7 +48,9 @@ order, takes the first enabled, eligible record whose seven input slots all
 match, and runs its three output slots. If at least one output succeeds,
 every page-3 item is removed, the transmute sound is attached to the
 player and the outputs are placed in the cube. Item creation itself
-(affixes, quality, unique/set picks) is called, not specified, here.
+(affixes, quality, unique/set picks) is specified by `items/generation.md`
+(the request of §7.4 enters its pipeline, §3 there), `items/quality.md`
+and `items/affixes.md`; this spec fills the request.
 C→S 0x4C is **not** the cube (§10).
 
 ## Inputs
@@ -289,7 +291,7 @@ made for kinds 0–3.
 | Case | Steps |
 |---|---|
 | flags & 0x0001 (`mod`, copy) | it = capture[j].item; page 0xFF, mode 4 (cursor); copy = duplicate(it, fillers = not remove[j]) (`0x0055A2A0`, `world/vendors.md` §7.3; D2MOO `ITEMS_Duplicate`); class by kind: 0xFC slot item; 0xFD type pick (§7.5) with L; 0xFE capture class if ≥ 0 else 0; 0xFF capture class; other 0. If the copy exists its class := that value. Item init `0x00557AB0(game, &copy, 0, 0)` (owner: items) — out[j] = the result; mode 4; it page := 3 |
-| kind 0xFE (`useitem`) | it = capture[j].item; page 0xFF, mode 4; out[j] = duplicate(it, fillers = not remove[j]); mode 4; it page := 3. Capture class (`exc`/`eli`) is **not** used. Quality byte 9: prefix = `0x005C1BC0(out, 1)`, suffix = `0x005C1BC0(out, 0)` (tempered affix rolls, owner: items); both ≠ 0 → quality 9, rare prefix and suffix set (`0x00627EA0`, `0x00628010`, `0x00628070`); else craft := 0 |
+| kind 0xFE (`useitem`) | it = capture[j].item; page 0xFF, mode 4; out[j] = duplicate(it, fillers = not remove[j]); mode 4; it page := 3. Capture class (`exc`/`eli`) is **not** used. Quality byte 9: prefix = `0x005C1BC0(out, 1)`, suffix = `0x005C1BC0(out, 0)` (tempered affix rolls, owner: items; `0x005C1BC0` takes ECX = item, EDX = 1 prefix / 0 suffix and is the rare-name pick by item format: format ≥ 1 → `items/affixes.md` §5 `0x005C1AB0`, format 0 → §12.2 `0x005C19A0`; both picks always run, prefix first (`0x00565EC7`, `0x00565ED3`), the same pair as the tempered case `items/affixes.md` §9, which owns the routine); both ≠ 0 → quality 9, rare prefix and suffix set (`0x00627EA0`, `0x00628010`, `0x00628070`); else craft := 0 |
 | kind 0xFF, 0xFC, 0xFD | create through an item request (§7.4) |
 | any other kind | nothing (out[j] none) |
 
@@ -357,7 +359,8 @@ No candidate → 0 without the second roll (one draw spent).
 In this order:
 
 1. success := 1.
-2. remove[j]: drop the copy's runeword stat list (`0x00558C50`); if
+2. remove[j]: drop the copy's runeword stat list (`0x00558C50`,
+   `items/generation.md` §12.3); if
    flags & 0x0020 (`rem`) and the source item has an inventory: for each
    item in it, duplicate it (fillers on), page 0xFF, mode 4, append to
    fillers. (`uns` alone loses the fillers: the copy was made without
@@ -373,13 +376,19 @@ In this order:
    and skip when lo′ mod 100 > chance. Then add the property {property,
    param, min, max} (param, min, max sign-extended from 16 bits) with
    `0x00660240(out, &prop, game expansion)` (D2MOO
-   `ITEMMODS_AddCraftPropertyList`; owner: items/properties).
+   `ITEMMODS_AddCraftPropertyList`; owner: `items/properties.md` §12).
+   The third argument (game +0x70, pushed at `0x0056626B`) is never
+   read: `0x00660240` uses only the item and the record (it calls the
+   wrapper `0x0065FE10` with ESI = item, EDI = record, mode 7, flags
+   0x40) and pops it (`ret 0xC`). So the craft mods do not depend on
+   the game's expansion flag.
 4. flags & 0x0200 (`rep`): if stackable and quantity ≠ 0 → stat 70
    (quantity) := min(quantity, max stack) where max stack =
    `maxstack` + stat 254, capped at 511 (`0x006295B0`). Then broken (item
-   flag 0x100) → repair `0x0055F900`; else if base stat 72 (durability) <
+   flag 0x100) → repair `0x0055F900` (`items/generation.md` §12.1); else if base stat 72 (durability) <
    stat 73 (max durability) → stat 72 := stat 73.
-5. flags & 0x0400 (`rch`): recharge `0x0055FE80` (owner: items).
+5. flags & 0x0400 (`rch`): recharge `0x0055FE80` (owner: items;
+   `items/generation.md` §12.2, with `0x0065C940`).
 6. flags & 0x0002 (`sock`): if quantity ≠ 0 and stat 194 = 0 and item
    flag 0x800 clear: s = min(max sockets `0x0062BC20`, quantity); quality
    4 or 9 → s ≤ 3; quality 5, 6, 7, 8 → s ≤ 1; s > 0 → set item flag
@@ -397,14 +406,20 @@ is sent; outputs already made in out[] are neither placed nor freed
    5, flags 0x20, page shown as the item's stored page, set to 3 first by
    `0x00628320`); then remove it from the inventory and free it
    (`0x0055DF10(game, player, item, 0)` → `0x00557FD0`). All page-3 items
-   go, matched or not.
+   go, matched or not. `0x0055DF10` (`world/vendors.md` §7.2 rule 9):
+   item unit flag 0x2 cleared, unlink `0x0063AD90`, grid cells cleared
+   `0x0063BCF0`, page := 0xFF, freed; a null game or player, or an
+   unlink that does not return this item, is a fatal assert (no return).
+   The walk passes items of the player's own list, so the unlink never
+   fails here.
 2. Sound event 4 on the player.
 3. For out[0], out[1], out[2] that exist: page := 3; place with
    `0x00560200(game, player, id, 0, 0, 1, 1, 0)`. Failed placement → free
    the unit (`0x00555600`), the output is lost. Placed → item flag 0x10
    (identified) set; if its items record `quest` ≠ 0: code `hst ` →
-   `0x0059E5C0` (Act 2 Horadric Staff hook), `qf2 ` → `0x005B86E0` (Act 3
-   Khalim's Will hook); quest state changes: `world/quests.md`.
+   `0x0059E5C0` (Act 2 Horadric Staff hook, `world/quests-act2.md`
+   §4.9), `qf2 ` → `0x005B86E0` (Act 3 Khalim's Will hook,
+   `world/quests-act3.md` §4.8); quest state changes: `world/quests.md`.
 4. Fillers in order: page 3, place; failure frees, success sets
    identified.
 

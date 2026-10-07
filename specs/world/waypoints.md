@@ -33,18 +33,18 @@
 |   2. Waypoint record ("history") | 115–146 |
 |   3. Save field layout (owner of the save format: the character-save spec) | 147–169 |
 |   4. Which waypoints are known without operating one | 170–189 |
-|   5. Waypoint objects | 190–263 |
-|   6. C→S 0x49 TakeOrCloseWp (`0x0054C5D0`) | 264–308 |
-|   7. Travel (`0x00584F60`) | 309–356 |
-|   8. Timing and message order | 357–378 |
-|   9. Town portals | 379–384 |
-|   10. Object mode change (consequence used above) | 385–392 |
-| Constants & data dependencies | 393–420 |
-| Randomness | 421–444 |
-| Edge cases & original bugs | 445–481 |
-| Test vectors | 482–521 |
-| Provenance | 522–560 |
-| Open questions | 561–608 |
+|   5. Waypoint objects | 190–277 |
+|   6. C→S 0x49 TakeOrCloseWp (`0x0054C5D0`) | 278–322 |
+|   7. Travel (`0x00584F60`) | 323–378 |
+|   8. Timing and message order | 379–400 |
+|   9. Town portals | 401–406 |
+|   10. Object mode change (consequence used above) | 407–414 |
+| Constants & data dependencies | 415–442 |
+| Randomness | 443–466 |
+| Edge cases & original bugs | 467–503 |
+| Test vectors | 504–543 |
+| Provenance | 544–582 |
+| Open questions | 583–630 |
 <!-- /index -->
 
 ## Summary
@@ -246,6 +246,20 @@ Steps, in order:
    (`0x00554120`; ignored if already active). Return 1.
 4. Any other mode: nothing. Return 1.
 
+Result of the 0x13 (2026-10-07, `0x00548B19`–`0x00548BD8`,
+`0x00584540`, `0x00584420`): the handler's object case returns 1 for a
+missing object or distance > 50, 3 for object mode ≥ 8, 0 for the walk
+(not in operate range `0x00623660` or blocked `0x00622B50(…, 0x804)` →
+approach `0x00548A50`), and for the operate itself the result of
+`0x00584540`: 0 → 3, else 0. `0x00584540` returns 0 only when the object
+GUID no longer resolves, 1 when the operate is skipped (a monster
+operator on an object without the monster flag, or out of range), and
+otherwise 1 whatever happens in `0x00584420` (its result slot is set to
+1 and never changed; the operate function's own return, 1 for function
+23, is dropped). So an operate of a waypoint answers 0 in every mode
+and on the busy refusal of step 3. An object class without an
+objects.txt record (`0x00640E90` null) is a fatal assert (line 0x2BF).
+
 1.14d differs from D2MOO 1.10f here: the 10-second hostile check
 (§6.1) is not in the operate function; it moved to the 0x49 handler.
 
@@ -339,7 +353,15 @@ roomless unit passes step 2 against any Act I unit.
    coordinate search and placement: `drlg/levels.md` §10, `sim/path-placement.md` §7, §10, §11.
 7. Arrival message: if the player now has a room and it equals the room
    that `0x00619E50(act of level, level, tile code)` returns (same search
-   without the free-coordinate step): set the player's mode to 2 at its
+   without the free-coordinate step):
+   `0x00619E50(act, level, tile code, &x, &y)` asserts a non-null act
+   (line 0x221) and makes exactly the call `0x0066B2B0(act +0x48,
+   level, tile code, &x, &y)` that rule 6 made, a second time: whatever
+   that search does (level init and room activation when needed, the
+   chosen room) runs again; the room is then already built and active,
+   and no 1.14d waypoint level reaches its drawing branches
+   (Randomness 3), so the second call has no effect beyond its result.
+   Its x, y are discarded; set the player's mode to 2 at its
    own position (`0x005809D0(game, player, no skill, 2, x, y, 0)`), then
    queue S→C 0x0D to the client (`0x0053B4B0`): unit type 0, player GUID,
    1, **x + 3, y + 3**, 0, 0 (x, y = the player's position after

@@ -13,6 +13,31 @@
   `items/inventory-moves.md` §7 (click validation), `ui/controls.md`
   (show-belt and belt keys), `ui/text.md` §8 (hover boxes)
 
+<!-- index -->
+| Section | Lines |
+|---|---|
+| Summary | 41–50 |
+| Inputs | 51–61 |
+| Outputs / state changes | 62–68 |
+| Rules | 69–70 |
+|   1. Grid geometry | 71–87 |
+|   2. Tint colours | 88–115 |
+|   3. Grid items (`0x00483FF0`) | 116–141 |
+|   4. Placement tint (cursor item over a grid) | 142–158 |
+|   5. Hover state (`0x00487000`) | 159–184 |
+|   6. Equipment boxes (`0x004845A0`) | 185–214 |
+|   7. Not drawn here | 215–224 |
+|   8. Item graphic (`0x0046EE80(item, x, top)`; answers OQ 2) | 225–267 |
+|   9. Item checks used by the tints (answers OQ 6) | 268–284 |
+|   B5. `CellGrid` answers (`client/ui.md` §B5) | 285–292 |
+| Constants & data dependencies | 293–302 |
+| Randomness | 303–306 |
+| Edge cases & original bugs | 307–314 |
+| Test vectors | 315–332 |
+| Provenance | 333–342 |
+| Open questions | 343–371 |
+<!-- /index -->
+
 ## Summary
 
 Inside the inventory panel family (`ui/panels.md` §9) the client draws,
@@ -77,7 +102,16 @@ anchor, `0x007BCC20` hovered body location).
 
 2. A tint is a filled rectangle (`0x0046EFD0` → `0x004F6300` → renderer
    slot +0xB8) with draw mode argument 0. Byte order of the palette entry
-   and the blend of mode 0: §Open questions 1.
+   and the blend of mode 0: rule 3 (was §Open questions 1).
+3. **Answers OQ 1 (rules).** The palette at `0x0081E668` holds the
+   first 1,024 bytes of the act's `pal.pl2` as `PALETTEENTRY` (byte 0
+   red, 1 green, 2 blue; `render/composition.md` §4), so the triples of
+   rule 1 are (red, green, blue). Draw mode 0 of a rectangle has blend
+   kind `k` = 2: each pixel becomes `A2[256·d + c]` (the 25 % source
+   alpha table, `d` = destination index, `c` = the tint index;
+   `render/blend-modes.md` §8 r2), over columns `x … x + w − 1`, rows
+   `y … y + h − 1`. The tints are translucent; the pixels stay a capture
+   case (§Test vectors).
 
 ### 3. Grid items (`0x00483FF0`)
 
@@ -134,7 +168,19 @@ anchor, `0x007BCC20` hovered body location).
 2. With a cursor item: the cursor cell is computed from the cursor
    graphic's size and the item's w × h, centred and clamped to the grid
    (`0x00487000` second branch); hover-in-grid := 1, hovered item cleared.
-   Exact formula: §Open questions 3.
+   Exact formula: rule 3 (was §Open questions 3).
+3. **Cursor cell** (answers OQ 3; `0x00487000`, record `R` of §1 r1,
+   mouse (mx, my), cursor item of w × h cells, `gw` × `gh` = its
+   inventory graphic's frame size, `0x004DBEA0`): start with c = (mx −
+   R.left) / cellW and r = (my − R.top) / cellH (u32 division of the
+   wrapped difference, as in §1 r4). If w is even: c = ((gw >> 2) −
+   R.left + mx) / cellW (u32); if h is even: r = ((gh >> 2) − R.top +
+   my) / cellH. If w = gridX: c = gridX >> 1; if h = gridY: r = gridY >>
+   1. If w > 1: c −= w >> 1, c := 0 when negative (signed test), and if
+   w + c > gridX the handler **returns** without any change (the cursor
+   cell and hover flags keep their previous values); the same for h, r,
+   gridY. Then cursor cell := (c, r), hover-in-grid `[0x007BCBE4]` := 1,
+   hovered item and last hovered := 0.
 
 ### 6. Equipment boxes (`0x004845A0`)
 
@@ -169,19 +215,87 @@ anchor, `0x007BCC20` hovered body location).
 ### 7. Not drawn here
 
 Empty-slot pictures, weapon-swap tabs (never drawn in 1.14d) and the
-panel art: `ui/panels.md` §9.3–§9.5. The belt panel (ui 0x1F, toggled by
-`ui/controls.md` command 22) and the cursor item graphic: §Open
-questions 4 and 5.
+panel art: `ui/panels.md` §9.3–§9.5. The cells have no art of their own:
+the grid lines and cell frames are part of the panel background
+(`InvChar6` frames 4–7, `bank` / `TradeStash`, `supertransmogrifier`).
+The belt (boxes, tints, items, key labels) and the belt rows (ui 0x1F):
+`ui/control-panel.md` §5. The cursor item: `ui/panels-3.md` §23 r9. Gold
+line and gold buttons: `ui/panels-2.md` §21.
+
+### 8. Item graphic (`0x0046EE80(item, x, top)`; answers OQ 2)
+
+1. Only for an item unit (type 4); else nothing (returns 0). Arguments:
+   item ECX, left x EDX, top y on the stack (grid §3 r1: the footprint's
+   top-left cell corner; equipment §6 r2; cursor `panels-3.md` §23 r9;
+   belt `ui/control-panel.md` §5 r4).
+2. **File** (`0x004DBB50` → `0x004DB7B0` case 4 → `0x004DABC0`, the
+   item's `items` record by code `0x006335F0`):
+   1. identified (item flag 0x10, `0x006280A0`) set item (quality 5,
+      `0x00627E70`): the `setitems` row of the file index (`0x00483440`)
+      `invfile` (+0x62) when not empty, else the base record's
+      `setinvfile` (+0x60) when not empty;
+   2. else identified unique (quality 7) with file index > 0
+      (`0x00629DA0`): the `uniqueitems` row's `invfile` (+0x5A) when not
+      empty, else the base record's `uniqueinvfile` (+0x40) when not
+      empty (a unique with file index 0 never reaches its row; it uses
+      `uniqueinvfile` only when that is not empty, else falls through);
+   3. else the item type's `VarInvGfx` (itemtypes +0x23, primary type
+      `0x0062B400`) = 0: the base record's `invfile` (+0x20);
+   4. else the type's `InvGfx` `n + 1` (itemtypes +0x24 + 0x20·n) with
+      `n` = the item's gfx variant (item data +0x49, `items/bitstream.md`)
+      clamped to [0, `VarInvGfx` − 1].
+   The file is `<data>\items\<name>.dc6` (`0x005FE610`, format
+   `0x006E35D4` `%s\items\%s.dc6`, data root `DATA\GLOBAL`), frame 0,
+   direction 0.
+   Gold (primary type 4): an amount class 0 (< 100), 1 (100–499), 2
+   (500–4,999), 3 (≥ 5,000) of stat 14 is passed as the cel context's
+   +0x40 value: how it selects the frame of the gold picture: §Open
+   questions 7.
+3. **Visibility**: the cel's extent at (x, top + h) must touch [0, W] ×
+   [0, H] (`0x004DAB40`), else nothing is drawn (returns 0).
+4. **Draw**: `0x004F6480` at (x, top + h) (`h` = the frame height,
+   `0x006018F0`; so the frame's top-left sits at (x, top) for offsets 0),
+   light 0xFF, draw mode 1 when the item flag 0x400000 (ethereal) is set,
+   else 5; remap = the item's inventory color map `0x0062C100(0, item,
+   &byte, 1)` (no unit, so no state color; `render/shading.md` §6 r4 with
+   `inv` ≠ 0: `InvTrans`, set / unique `invtransform`, affix
+   `transformcolor`, gem `transform`).
+5. Then the unit overlay draw `0x0046E300(item, 0xFF, 0, x + w / 2, top +
+   h / 2, 0)` (w, h = frame size, halves rounded down): the item's own
+   overlays centred on the picture (owner: the render overlay spec,
+   `render/draw-order.md`); none for a plain item.
+
+### 9. Item checks used by the tints (answers OQ 6)
+
+1. `0x0062A4E0(item)` "usable state": 1 unless the item data flags
+   (+0x18) have 0x100 or 0x4000.
+2. `0x004C2240(item)`: 1 when the item has state 2 (`0x00625760(item,
+   2)`) or the local player has state 54 `uninterruptable`.
+3. `0x0062A0A0(item)`: the `items` record's `Transmogrify` (+0x139) ≠ 0;
+   read only while the cursor state is 8 (a shop cursor, `ui/panels-3.md`
+   §23 r7), giving tint 0 to a hovered item without it.
+4. `0x0062E6F0` / `0x0062E740`: the item type's `Shoots` (itemtypes
+   +0xC) / `Quiver` (+0xE) link, non-zero for launchers and their ammo.
+5. Quest test `0x00483F80` (item code at item unit +0x80) on the client
+   quest record `0x004B32D0()` (`0x0065C310(record, quest, bit)`): `ass`
+   (Book of Skill) → quest 9 bit 5 clear; `xyz` (Potion of Life) → quest
+   20 bit 5 clear; `tr2` (Scroll of Resistance) → quest 37 bit 8 clear
+   or bit 7 set; any other code → 0. A true test gives tint 0 (§3 r3).
 
 ### B5. `CellGrid` answers (`client/ui.md` §B5)
 
 Cell size and origin: §1 (no gaps: cells are adjacent, pitch = cell
-size). Highlight: the five tints of §2 applied by §3, §4, §6. Item
-graphic placement: §3 r1 and §6 r2 (graphic draw §Open questions 2).
-Cursor item drawing and belt: open (§Open questions 4, 5).
+size). Cell art: none (§7). Highlight: the five tints of §2 (translucent,
+§2 r3) applied by §3, §4, §6. Item graphic: file and draw §8, placement
+§3 r1 and §6 r2. Cursor cell §5 r3; cursor item drawing `ui/panels-3.md`
+§23 r9; belt `ui/control-panel.md` §5.
 
 ## Constants & data dependencies
 
+Item graphic fields: `items` `invfile` +0x20, `uniqueinvfile` +0x40,
+`setinvfile` +0x60, `InvTrans` +0x142, `Transmogrify` +0x139;
+`uniqueitems` `invfile` +0x5A; `setitems` `invfile` +0x62; `itemtypes`
+`VarInvGfx` +0x23, `InvGfx1`–`6` +0x24…; item flag 0x400000 (ethereal).
 Tint triples of §2; bottom margin 0x27; layout records from
 `inventory.bin`; item codes `ass`, `xyz`, `tr2`, `box`; item flags 0x4,
 0x10, 0x100, 0x800.
@@ -208,26 +322,49 @@ None.
 | 2 × 3 armor on cursor over free cells | tint 1 over 2 × 3 | §4 r3 |
 | cursor item over one item it can swap with | tint 3 over that item | §4 r3 |
 | two-handed weapon in right hand | left box tint 0 + ghost item | §6 r3 |
+| tint index 2 over destination index `d` | pixel `A2[256·d + 2]` | §2 r3 |
+| ring with gfx variant 7 (`VarInvGfx` 5) | file `invrin5` | §8 r2 |
+| identified unique, `uniqueitems` `invfile` empty, base `uniqueinvfile` `invxyz` | `invxyz` | §8 r2 |
+| ethereal sword at (419, 315), frame 28 × 84 | mode 1 draw at (419, 399) | §8 r4 |
+| 2 × 3 item on the cursor, graphic 56 × 84, record 16 (left 419, top 315, 29 × 29 cells, 10 × 4), mouse (500, 340) | c = (14 − 419 + 500) / 29 = 3 → 3 − 1 = 2; r = (340 − 315) / 29 = 0 → 0 − 1 → 0; cursor cell (2, 0) | §5 r3 |
+| same, mouse (700, 340) | c = (14 − 419 + 700) / 29 = 10 → 9; 2 + 9 > 10 → no change | §5 r3 |
 | capture: inventory with the cases above, 800 × 600 | identical pixels | (to record) |
 
 ## Provenance
 
 1.14d `Game.exe` `.\UI\inv.cpp` functions `0x00483960`–`0x004845A0`,
+item graphic `0x0046EE80`, `0x004DBB50`, `0x004DB7B0`, `0x004DAA70`,
+`0x004DABC0`, `0x0062E8D0`, `0x0062E920`, `0x006283F0`, `0x004DAB40`,
+`0x005FE610`; checks `0x0062A4E0`, `0x004C2240`, `0x0062A0A0`,
+`0x0062A060`, `0x0062E6F0`, `0x0062E740`, `0x00483F80`;
 `0x00487000`, palette match `0x00605210`, fill `0x004F6300`; register
 arguments checked with `tools/ghidra/disasm.py`. No D2MOO code used.
 
 ## Open questions
 
-1. Palette entry byte order at `0x0081E668` (is byte 0 red?) and the
-   blend of fill mode 0 (opaque or translucent). Needs recording: a
-   capture of an inventory with a blue-tinted item, read the tint pixel.
-2. Item graphic draw `0x0046EE80`: which `invfile` / unique / set graphic
-   and frame, the draw position (arguments in registers), and the palette
+1. **Answered** (2026-10-07, §2 r3: byte 0 is red; mode 0 is the
+   translucent `A2` blend; the pixels stay a capture case, §Test
+   vectors). Was: Palette entry byte order at `0x0081E668` (is byte 0
+   red?) and the blend of fill mode 0 (opaque or translucent). Needs
+   recording: a capture of an inventory with a blue-tinted item, read
+   the tint pixel.
+2. **Answered** (2026-10-07, §8; the gold amount frame: OQ 7). Was: Item
+   graphic draw `0x0046EE80`: which `invfile` / unique / set graphic and
+   frame, the draw position (arguments in registers), and the palette
    shift / colour map for coloured items. Disassembly of `0x0046EE80`.
-3. Cursor-cell formula with a cursor item (`0x00487000` second branch,
-   `0x004DBEA0` graphic size, the even / odd size handling).
-4. Belt panel drawing (ui 0x1F, belt rows) and its slot tint.
-5. Cursor item drawing (position, hotspot) and the gold / other buttons
-   (`ui/panels.md` §Open questions 5).
-6. The checks `0x004C2240`, `0x0062A4E0`, `0x0062A0A0`, `0x0062E6F0`,
-   `0x0062E740`, cursor state 8, and the quest test `0x00483F80`.
+3. **Answered** (2026-10-07, §5 r3). Was: Cursor-cell formula with a
+   cursor item (`0x00487000` second branch, `0x004DBEA0` graphic size,
+   the even / odd size handling).
+4. **Answered** (2026-10-07, `ui/control-panel.md` §5). Was: Belt panel
+   drawing (ui 0x1F, belt rows) and its slot tint.
+5. **Answered** (2026-10-07, `ui/panels-3.md` §23 r9, `ui/panels-2.md`
+   §21). Was: Cursor item drawing (position, hotspot) and the gold /
+   other buttons (`ui/panels.md` §Open questions 5).
+6. **Answered** (2026-10-07, §9). Was: The checks `0x004C2240`,
+   `0x0062A4E0`, `0x0062A0A0`, `0x0062E6F0`, `0x0062E740`, cursor state
+   8, and the quest test `0x00483F80`.
+7. Gold picture frame (§8 r2): how the cel context +0x40 value (gold
+   amount class 0–3) picks the frame inside the cel loader `0x006001F0`
+   (`0x00600CB0` scaling by the frame count), and the frame count of the
+   `gld` inventory file. Disassembly read of `0x00600CB0`; DC6 header of
+   the gold `invfile`.
