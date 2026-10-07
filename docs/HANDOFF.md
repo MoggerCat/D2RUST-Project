@@ -4949,6 +4949,21 @@ one large unit and the unnarrowed `§edge-cases-original-bugs` claims (step 7u
 (e)). NP1 the `wire` and `worldsim` deep groups were not run at full counts;
 GitHub runners may be 1.5–2× slower than the measured 670 s.
 
+### PC 2 recording list (spec answers that need a recording or capture)
+
+Spec writers append here (one line: spec + open question, what to record,
+what to log); PC 2 (Local2) records them and moves each line to §5 Done
+with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
+
+- `drlg/rooms.md` OQ15: client build timer (B, T, cursor) per client
+  update over a level load.
+- `sim/unit-order.md` OQ5: client room unit-list order before each draw
+  sort, one town scene.
+- `client/model.md` OQ9: the client side of the join stream (see the
+  spec).
+- `render/draw-order.md` OQ7: town river-bank cells, capture at `TownE1`
+  tile (950, 933).
+
 ## 8. Lessons (problems met, fixes)
 
 | Problem | Fix |
