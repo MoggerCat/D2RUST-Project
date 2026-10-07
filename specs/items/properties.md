@@ -25,22 +25,22 @@
 |   1. Property record and slots | 74–82 |
 |   2. Modes (`0x0065FEC0`, D2MOO `ITEMMODS_AssignProperty`) | 83–101 |
 |   3. Dispatcher (`0x0065FD70`; wrapper `0x0065FE10` for format ≥ 1) | 102–111 |
-|   4. Shared helpers | 112–144 |
-|   5. Property functions | 145–199 |
-|   6. Superior (mode 1) and affixes (mode 0) | 200–204 |
-|   7. Uniques (mode 3) | 205–208 |
-|   8. Set items | 209–219 |
-|   9. Socket fillers (`0x0055C2C0`) | 220–239 |
-|   10. Runewords | 240–293 |
-|   11. Set bonuses (`0x00660120`) | 294–306 |
-|   12. Craft property lists (`0x00660240`) | 307–312 |
-|   13. Set-item state update (`0x00663CC0`) | 313–368 |
-| Constants & data dependencies | 369–378 |
-| Randomness | 379–384 |
-| Edge cases & original bugs | 385–394 |
-| Test vectors | 395–413 |
-| Provenance | 414–433 |
-| Open questions | 434–481 |
+|   4. Shared helpers | 112–161 |
+|   5. Property functions | 162–216 |
+|   6. Superior (mode 1) and affixes (mode 0) | 217–221 |
+|   7. Uniques (mode 3) | 222–225 |
+|   8. Set items | 226–236 |
+|   9. Socket fillers (`0x0055C2C0`) | 237–256 |
+|   10. Runewords | 257–315 |
+|   11. Set bonuses (`0x00660120`) | 316–328 |
+|   12. Craft property lists (`0x00660240`) | 329–334 |
+|   13. Set-item state update (`0x00663CC0`) | 335–390 |
+| Constants & data dependencies | 391–400 |
+| Randomness | 401–406 |
+| Edge cases & original bugs | 407–416 |
+| Test vectors | 417–435 |
+| Provenance | 436–455 |
+| Open questions | 456–509 |
 <!-- /index -->
 
 ## Summary
@@ -127,6 +127,23 @@ v := value << itemstatcost `valshift`. set ≠ 0 → **set** stat (layer) :=
 v; and for stat 58 (`poisonmaxdam`): if stat 326 (`poison_count`) is 0,
 set it to 1. set = 0 → **add** v; for stat 58 also add 1 to stat 326.
 Return value (unshifted).
+
+Register mapping (1.14d, `disasm.py fn` on `0x0065FE10`, `0x0065FD70`,
+`0x0065EA50`, `0x0065CBF0`, Open question 3): the dispatcher's second
+stack argument is the owner O and its third the item I; every property
+function receives I as its first stack argument (the unit of every
+§4.1 roll and §4.3 reset) and O in EDX, and passes O as `0x0065EA50`'s
+first stack argument with I in ECX, flags in EDX, state as its last
+argument. `0x0065CBF0`(EAX O, EBX flags, I, state): the unit is O when
+O ≠ none, else I; its list of (state, flags) (`0x00625790`: state ≠ 0 →
+the list of that state, state 0 → the first list with those flags);
+none → a new list (that unit's pool, flags, expiry 0, owner type 4,
+that unit's GUID; GUID −1 when I is none too), attached with reset 1,
+state set; a null list is fatal (0x201). Who is O: modes 0–5 and 7 pass
+O = none (the wrapper's second argument is 0; the mode's extra unit
+goes to the dispatcher's last argument), so they write I's own list
+(for a gem or rune: the filler's); §11 passes O = the player; mode 6
+(§10.2) passes O = the socketed item and I = the inserted filler.
 
 #### 4.3 Base reset (`0x0065CCC0`)
 
@@ -289,7 +306,12 @@ A row with `server` ≠ 0 is skipped unless game +0x74 (ladder) ≠ 0. Else,
 if the item has no list with state 171 (`runeword`) and flags 0x40: set
 flag 0x4000000; dispatcher mode 6 for `t1code1`… (stop at the first < 0,
 max 7), owner = the item, state 171, flags 0x40. Then the replenish
-timers (`items/generation.md` §9 step 6).
+timers (`items/generation.md` §9 step 6). The dispatcher's item argument
+is the filler just inserted (`0x00562823`: `0x006600A0(item, filler,
+0)`; `0x006600FE`), so every §4.1 roll of a runeword draws on that
+filler's item seed and every §4.3 reset reads the filler's items row,
+while the stats go into the socketed item's state-171 list (§4.2
+register mapping).
 
 ### 11. Set bonuses (`0x00660120`)
 
@@ -444,8 +466,14 @@ Synthetic, from the rules:
    list of state 165–170 tagged with stat 71 = set id, refilled by §11.
    d2rs's no-op (`docs/handoff/impl-items.md`) differs whenever a set
    item is equipped.
-3. The owner-vs-item list choice in §4.2 is read from `0x0065CBF0`'s two
-   branches and D2MOO; confirm the register mapping (Ghidra request G1).
+3. Answered (2026-10-07, disassembly of the wrapper `0x0065FE10`, the
+   dispatcher `0x0065FD70`, all 23 property functions' roll calls, the
+   add `0x0065EA50` and `0x0065CBF0`): §4.2 "Register mapping". The
+   choice stands as written (owner's list when an owner is given, else
+   the item's). Owners per caller: none in modes 0–5 and 7, the player
+   in §11, the socketed item in mode 6, whose item argument is the
+   inserted filler (§10.2: runeword rolls draw on that filler's item
+   seed).
 4. §10.1 edge: whether the stale class-id slot can ever equal a rune's
    class id in 1.14d (it would let a socketed item take a runeword one
    rune longer than its sockets). Settle: a stack trace of the slot at
