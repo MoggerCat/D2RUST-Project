@@ -5293,7 +5293,10 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
 - `sim/intents-events.md` OQ14: type one chat line (C→S 0x15) in single
   player; log the S→C messages of that frame with callers.
 - `client/bridge.md` OQ6: a 0x2C followed by a 0x0A in one chunk.
-- `render/lighting.md` OQ11: a day-period change with objects in sight.
+- `render/lighting.md` OQ11 (answered statically 2026-10-07: only
+  `EnvEffect` objects change; fire 39 goes to mode 0 without light in
+  the day, mode 1 with light radius 9 otherwise): a day-period change
+  with a fire 39 in sight confirms the mode and light.
 - `client/msg-skills.md` OQ1: equipping a charged item.
 - `client/stat-lists.md` OQ6: a buff (0xA8 bytes).
 - `client/model.md` OQ10: a game with a hireling (0x7A / 0x81).
@@ -5351,6 +5354,51 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
 - `ui/control-panel.md` OQ1 / OQ6 (PC 2 spec-ui pass 3): a globe refilling after a potion, frame by frame (smoothing precision), and the control panel at 640 × 480 and 800 × 600 with the belt popped and the mini panel in its three layouts.
 - `ui/messages.md` OQ1 (PC 2 spec-ui pass 3): chat lines (whisper, whisper echo, broadcast) at 800 × 600; two monsters with overhead text at once (bubble moved); an NPC dialog panel scrolling with frame times; a timed box.
 - `ui/panels-2.md` OQ4 (PC 2 spec-ui): stash open at 800 × 600, expansion and classic: the `GoldMax` line, to confirm its font (static answer: font 1).
+- `client/model.md` OQ14 (§16) + OQ15 (§15): from `tp80-packets.jsonl`
+  (PC 2) list the S→C messages between the town-portal use and the C→S
+  0x4B after tick 2919 (expected: the 0x08 dropping the hireling's room,
+  no 0x0A / 0x15 / 0xAC for GUID 1 before it), and the same window at
+  the second teleport; one shrine use (any shrine) logging 0x0E / 0x4D
+  bytes and the `0x004B9A00` request (id = table +0x10 for the code).
+- `combat/vitals.md` §4.7 (static, unverified): a level ≥ 2 character
+  dies to a monster (Nightmare or Hell), then picks up its corpse; log
+  stat 13 before death, after death, on the corpse at `0x0057F875`, and
+  after pickup (expect + `pct(loss, 75, 100)`); also a Token of
+  Absolution use (§2.1, `skills/levels.md` §6.5: 0x21 per class skill,
+  stat 5 and 4 after).
+- `combat/hit.md` §6.4 / Edge case 8 (static): a player with two
+  `passive_weaponblock` entries (layer 0 and a matching type) blocking
+  in melee; log `0x0057DCA0`'s return.
+- `render/camera.md` OQ5 (static part answered 2026-10-07): log
+  `0x00650840` calls per client update with caller over monster fights
+  (do `0x004AF4C0` and `0x004B13A0` both step one monster in one
+  update?) and a local player's missile's first client update (two
+  steps expected).
+- `sim/tick.md` OQ2 (breakpoint, no new play): `0x005416B0` with EDX = 0
+  over a long run (any timer scheduled without a unit; log the caller).
+- `tools/original-hooks.md` OQ1–OQ4 and `tools/original-hooks-spawn.md`
+  OQ1 (probes, area-5 round 2026-10-07): each OQ names its probe
+  (walk injection at `0x0044F136`, forced start 0x67, seed override
+  chains run twice, save-dir breakpoint `0x00534410`, spawn at
+  `0x0052FD1E` with `record_packets.py`).
+- `render/unit-composite.md` OQ4: a monster's first attack after a mode
+  change to a not-yet-loaded mode; log whether a draw happens before the
+  mode's graphics-ready flag is set. Same session, OQ7: a bone prison, a
+  leaping unit and a missile with creation flag 0x100; log the motion
+  record (gfx +0x30, 0x4C bytes) at creation and per update.
+- `sim/units.md` OQ8: leave and re-enter a wilderness area; log the
+  restore order and GUIDs (`0x00542B40`).
+- `render/camera.md` OQ6: client player seed (`unit +0x20`) at frame
+  start and end over a session with cursor movement and weather.
+- `render/draw-order.md` OQ14: a capture with a panel open (any UI or
+  cursor draw between the world passes `0x00456EE0` … `0x00477980`).
+- `render/lighting.md` OQ10: memory read of `[0x0072DA50]` and
+  `[0x0072A348]` at the first in-game draw, with and without a "Light
+  Quality" registry value.
+- `ui/text.md` OQ5 (memory read of `0x007D6268` on a loading screen)
+  and OQ9 (captures `text-0001`, `text-0002`).
+- `drlg/rooms.md` OQ13 and `drlg/wall-remap.md` OQ1: dump every built
+  room's link chains (five acts) from the original's memory.
 
 **Ninth set (2026-10-07; the 22 notes `impl-ai-acts2-5`, `impl-skill-slots-2`,
 `impl-missile-bodies-2`, `impl-quests-act1-rest`, `impl-quests-act2`,
@@ -6178,6 +6226,7 @@ a monster, a Druid summon, a Clay Golem, a Countess kill, a Cain rescue.
 | The coordinator's union merge of `pub mod` conflicts interleaved two branches' module doc comments (`d2-client/src/lib.rs`, `d2-sim/src/wiring/mod.rs`; 2026-10-06), once leaving a `//!` after an item; caught reading the merged file before the gate | after any union resolve, read the whole resolved file, not only the `mod` lines; inner docs (`//!`) must precede every item (METHODS M21) |
 | A coverage claim on a test that checks only part of a rule overstates the unit tier (10 claims dropped on review, 2026-10-06; rules that are one unit make this easy to repeat) | claim a rule only when the assertions check its outcome, with the narrowest ID that is fully true; consistency checks against a TSV and M08 perturbation tests get no claim (`docs/handoff/coverage-claims.md` §1) |
 | A software Vulkan adapter (Mesa llvmpipe) passes every GPU case, which says nothing about a real driver's integer and texture paths (2026-10-06) | the GPU half of every Phase 6 check stays "unverified" until the local run on a real adapter records its name, backend and driver (§5 C15, C16; METHODS M02) |
+| PC 1's integration merge committed conflict markers in `specs/combat/vitals.md` OQ4 (6a77d80, 2026-10-07): the auto-resolver handled only append lists and section indexes, then committed whatever was left; `spec_index --check` and `coverage --check` do not see markers (caught by a grep after the push; fixed d841c3e) | the fold script (`C:\d2orchold.sh` on PC 1) greps `specs docs crates tools` for `<<<<<<<` / `>>>>>>>` after auto-resolution and aborts before committing; a marker check belongs in CI next to `spec_index --check` (proposal for the cloud; METHODS M07, M21) |
 | Five game-file assertions written without game files (`gaps-data-formats`, 2026-10-06) and two spec facts stated without a measurement (`animdata.md` "second copy in all 9", `dc6.md` "zero-size frames occur") failed on the first local run of C17 | a blind-written game assertion is marked "expected value unconfirmed" in its handoff and is not claimed (`COVERAGE.md` §3) until its first local run; a spec fact names its measurement or is an open question (`specs/README.md` bar 1; METHODS M21) |
 | Both spec branches of 2026-10-06 would have failed a merge gate: `spec-inventory` edited `server-messages.tsv` without `gen-proto`; `spec-path-placement` repeated two rule ids (`coverage.py --check`) and added a `bits:` layout syntax the d2-proto parser rejects (caught by the cloud coordinator) | `specs/README.md` Process: the pre-push checks and the TSV-grammar rule; the local coordinator runs them on every writer branch before reporting it (fixed on `claude/spec-path-placement` `3fe068b`: 0x96 layout moved to `pathing.md` prose; METHODS M21) |
 | Three parallel d2-server handler branches each added `[dev-dependencies] d2-data` and a field/generic to `SimGame`; git merged the two `Cargo.toml` sections silently into a duplicate key and the `SimGame` generics conflicted (2026-10-06, caught by the coordinator's build before the gate) | parallel sessions that extend a shared struct get one named owner per field in their prompts; the coordinator builds the touched crate after each merge, not only after the last (METHODS M21) |

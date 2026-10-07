@@ -12,6 +12,23 @@
   (S→C 0x2C `PlaySound`), `sim/tick.md` (tick numbers),
   `client/assets.md` §A5 (sound budget)
 
+<!-- index -->
+| Section | Lines |
+|---|---|
+| Summary | 32–43 |
+| Inputs | 44–53 |
+| Outputs / state changes | 54–57 |
+| Rules | 58–59 |
+|   A. d2rs design (ours) | 60–182 |
+|   B. Original behavior to reproduce (not specified here) | 183–195 |
+| Constants & data dependencies | 196–200 |
+| Randomness | 201–205 |
+| Edge cases & original bugs | 206–212 |
+| Test vectors | 213–225 |
+| Provenance | 226–236 |
+| Open questions | 237–250 |
+<!-- /index -->
+
 ## Summary
 
 Sounds are decoded to exact i16 samples from the user's archives, started
@@ -102,6 +119,19 @@ Trigger { tick: u32, source: TriggerSource, sound: SoundId,
   `0x007C8A80`) sees it (owner: `audio/sound-table.md` §6.6). Voice-log
   `Stop` ticks of one-shots are therefore excluded from the §A5
   comparison until `audio/sound-table.md` OQ12 fixes a conformance rule.
+- **Seeded choices (conformance input).** 1.14d draws sound variants,
+  NPC greetings and unit sound timers from the local player's client
+  unit seed, which the draw phase also steps once per drawn frame (frames
+  are dropped under load) and the cursor steps on `GetTickCount` time
+  (`audio/sound-table-2.md` §14.3, §14.4; `sim/rng.md` §7). So the seed
+  at a sound draw cannot be replayed from the tick sequence. The
+  conformance check of variant / greeting / timer choices therefore
+  takes, for each sound draw, the seed recorded before it in the 1.14d
+  run (the roll hook of `docs/handoff/local-buddy-q-rec.md` entry 74)
+  as input, sets the d2rs sound RNG to it, and compares the chosen value
+  (and the resulting `VoiceEvent` fields), not the seed sequence. Runs
+  without that input exclude from §A5 the `file` of variant-chosen
+  starts and the ticks of seed-timed starts.
 
 #### A4. Mixer
 
@@ -200,7 +230,9 @@ observations), `data/loading.md` §3.4, `cof.md` events and the S→C
 message table. Bevy audio interface checked in the pinned registry
 source. Original behaviour is owned by the §B specs; the two facts
 below are stated only as inputs to our design. §A3 end-tick and §A4 occlusion inputs (PC 2 request, spec-audio):
-1.14d asm of `0x00516250`, `0x004DF890`, `0x005157B0`. No original behavior is stated here.
+1.14d asm of `0x00516250`, `0x004DF890`, `0x005157B0`. §A3 seeded-choice input (PC 2 request,
+spec-audio pass 2): `0x00470390` (`0x004703E1`, `0x004704DD`, `0x004705B6`, `0x004705D7`) re-read;
+the seed-user list is `audio/sound-table-2.md` §14. No original behavior is stated here.
 
 ## Open questions
 

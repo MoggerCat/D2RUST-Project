@@ -35,31 +35,31 @@
 |   41. Server-hit 31 fire head `0x005ABD70` | 317–333 |
 |   42. Server-hit 32 Cairn Stones `0x005ABE50` | 334–344 |
 |   43. Server-do 18 tower chest spawner `0x005AF300`, server-hit 33 `0x005ABEB0` | 345–381 |
-|   44. Server-do 19 Radament death `0x005B0940` | 382–416 |
-|   45. Server-hit 35 orb mist `0x005ABEE0` | 417–431 |
-|   46. Server-do 20 blade creeper `0x005AF540`, server-do 21 Distraction `0x005AF590`, server-hit 37 `0x005AC020` | 432–459 |
-|   47. Server-hit 39 imp spawn monsters `0x005AC1D0` | 460–486 |
-|   48. Server-hit 40 catapult spike ball `0x005AC250` | 487–515 |
-|   49. Server-hit 43 Healing Vortex `0x005AC350` | 516–530 |
-|   50. Server-hit 47 Molten Boulder `0x005AC550` | 531–552 |
-|   51. Server-hit 48 Molten Boulder emerge `0x005AC6D0` | 553–561 |
-|   52. Server-hit 50 plague vines trail `0x005AC800` | 562–572 |
-|   53. Server-do 27 Tornado `0x005AFA30` | 573–591 |
-|   54. Server-hit 51 volcano debris `0x005AC870` | 592–602 |
-|   55. Server-do 29 recycler delay `0x005AFD70`, server-do 33 vine recycler delay `0x005AFEC0` | 603–619 |
-|   56. Server-do 30 rabies plague `0x005B0010`, server-hit 53 rabies contagion `0x005ACA50` | 620–655 |
-|   57. Server-do 32 Tiger Fury `0x005B03E0` | 656–668 |
-|   58. Server-hit 54 Baal spawn monsters `0x005ACAF0` | 669–680 |
-|   59. Server-hit 55 Baal inferno `0x005ACB60` | 681–691 |
-|   60. Server-do 36 `0x005B0A40`, server-hit 57 `0x005AD970` Baal FX control | 692–707 |
-|   61. Server-hit 59 Baal taunt poison control `0x005ACF20` | 708–719 |
-|   62. Unused bodies: server-do 37 `0x005B0AA0`, server-hit 5 `0x005ABC40`, 6 `0x005AA1C0`, 11 `0x005B0870`, 23 `0x005ACFC0` | 720–746 |
-| Constants & data dependencies | 747–772 |
-| Randomness | 773–792 |
-| Edge cases & original bugs | 793–819 |
-| Test vectors | 820–839 |
-| Provenance | 840–871 |
-| Open questions | 872–905 |
+|   44. Server-do 19 Radament death `0x005B0940` | 382–433 |
+|   45. Server-hit 35 orb mist `0x005ABEE0` | 434–448 |
+|   46. Server-do 20 blade creeper `0x005AF540`, server-do 21 Distraction `0x005AF590`, server-hit 37 `0x005AC020` | 449–476 |
+|   47. Server-hit 39 imp spawn monsters `0x005AC1D0` | 477–503 |
+|   48. Server-hit 40 catapult spike ball `0x005AC250` | 504–532 |
+|   49. Server-hit 43 Healing Vortex `0x005AC350` | 533–547 |
+|   50. Server-hit 47 Molten Boulder `0x005AC550` | 548–569 |
+|   51. Server-hit 48 Molten Boulder emerge `0x005AC6D0` | 570–578 |
+|   52. Server-hit 50 plague vines trail `0x005AC800` | 579–589 |
+|   53. Server-do 27 Tornado `0x005AFA30` | 590–608 |
+|   54. Server-hit 51 volcano debris `0x005AC870` | 609–619 |
+|   55. Server-do 29 recycler delay `0x005AFD70`, server-do 33 vine recycler delay `0x005AFEC0` | 620–636 |
+|   56. Server-do 30 rabies plague `0x005B0010`, server-hit 53 rabies contagion `0x005ACA50` | 637–672 |
+|   57. Server-do 32 Tiger Fury `0x005B03E0` | 673–685 |
+|   58. Server-hit 54 Baal spawn monsters `0x005ACAF0` | 686–697 |
+|   59. Server-hit 55 Baal inferno `0x005ACB60` | 698–708 |
+|   60. Server-do 36 `0x005B0A40`, server-hit 57 `0x005AD970` Baal FX control | 709–724 |
+|   61. Server-hit 59 Baal taunt poison control `0x005ACF20` | 725–736 |
+|   62. Unused bodies: server-do 37 `0x005B0AA0`, server-hit 5 `0x005ABC40`, 6 `0x005AA1C0`, 11 `0x005B0870`, 23 `0x005ACFC0` | 737–763 |
+| Constants & data dependencies | 764–789 |
+| Randomness | 790–809 |
+| Edge cases & original bugs | 810–836 |
+| Test vectors | 837–856 |
+| Provenance | 857–888 |
+| Open questions | 889–922 |
 <!-- /index -->
 
 ## Summary
@@ -410,6 +410,23 @@ Open question 4) with last = 0 for `0x005AD8F0` and 1 for `0x005AD910`.
 
 **Unit find** (`0x0065A950` / `0x0065AC70` / `0x0065AA40`): owned by
 `monsters/umod-callbacks.md` §3.1 (rooms, found order, filter flags).
+The rule ids below are kept; each points to its owner rule.
+
+Collect (`0x0065AC70`):
+
+1. R none → 0 found: umod-callbacks §3.1 collect rule 1.
+2. Rooms (R alone, else R's adjacency array): collect rule 2.
+3. Town-room skip on room flags G & 0x2000, and the never-rejecting
+   overlap test: collect rule 3.
+4. Per-unit test and append; found order: collect rules 4 and 5.
+
+Default filter (`0x0065AA40`):
+
+1. A none / limit reached → reject: filter rule 1.
+2. Distance ≤ r: filter rule 2.
+3. Per-type tests (F & 1/2/4/8/0x10/0x20, dead modes, E): filter rule 3.
+4. Unit flags, town, line and extra tests: filter rule 4.
+5. Accept: filter rule 5.
 
 Corpse effect (flags 0x3002): monsters in mode 12 only, outside towns,
 within r of (x, y), in found order.

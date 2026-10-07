@@ -95,7 +95,7 @@ id	name	size	layout	sender	client_handler	client_unit_handler	produced_by	confir
 0x5D	QuestItemState	6	chain:u8@1 flags:u8@2 status:u8@3 extra:u16@4	0x0053D710	0x0045E540	-	sim	yes
 0x5E	GameQuestAvailability	38		0x0053D830	0x0045E570	-	sim	yes
 0x5F	PortalFlags	5	u32@1	0x0053B400	0x0045E5D0	-	sim	yes
-0x60	TownPortalState	7		0x0053D900	0x0045E610	-	sim	yes
+0x60	TownPortalState	7	flags:u8@1 level:u8@2 guid:u32@3	0x0053D900	0x0045E610	-	sim	yes
 0x61	CanGoToAct	2		0x0053D940	0x0045E660	-	sim	yes
 0x62	MakeUnitTargetable	7		0x0053D6D0	0x0045D390	-	sim	yes
 0x63	WaypointMenu	21	guid:u32@1 magic:u16@5 bits0:u32@7 bits1:u32@11 bits2:u32@15 bits3:u16@19	0x0053D960	0x0045E670	-	sim	yes

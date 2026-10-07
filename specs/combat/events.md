@@ -20,14 +20,14 @@
 | Outputs / state changes | 57–61 |
 | Rules | 62–63 |
 |   1. Shared definitions | 64–82 |
-|   2. Functions | 83–346 |
-|   3. Item cast | 347–395 |
-| Constants & data dependencies | 396–414 |
-| Randomness | 415–431 |
-| Edge cases & original bugs | 432–446 |
-| Test vectors | 447–457 |
-| Provenance | 458–472 |
-| Open questions | 473–481 |
+|   2. Functions | 83–348 |
+|   3. Item cast | 349–397 |
+| Constants & data dependencies | 398–416 |
+| Randomness | 417–433 |
+| Edge cases & original bugs | 434–448 |
+| Test vectors | 449–459 |
+| Provenance | 460–474 |
+| Open questions | 475–485 |
 <!-- /index -->
 
 ## Summary
@@ -333,7 +333,9 @@ class; room R at V's position (`0x00463740`); c has a monstats2 row.
 Clear V's pattern (`0x0064EC10(V's room, V x, V y, V pattern,
 0x8000)`). N := spawn `0x005B2F20(game, R, V x, V y, c, mode 1, −1,
 flags 0x4A)` (`monsters/init.md` §1); none → 0. N flags |= 0x402000E;
-AI init `0x005B0E00(game, N, 0x00541860(N, 0))`; `0x00573780(game,
+AI re-install `0x005B0E00(game, N, N's AI control
+(`0x00541860(N)`), state 0)` (`monsters/ai.md` §3.3 "Re-install on a
+fresh monster"); `0x00573780(game,
 N)`; owner data `0x0058F030(game, N, P GUID, P type, 0, 0)`; leash
 `0x005DD330(N, P)`; delete N's type-2 timers, type-2 timer at F + 25;
 alignment := 2 (`0x005543B0`); N flags |= 0x80000000; state 96
@@ -476,5 +478,7 @@ Draws happen only after the earlier guards pass, in the order above.
    slow, skill-on-hit, damage-to-mana; cast Energy Shield, Bone Armor,
    Iron Maiden; log each event function's entry and return, the seed
    before and after, and the record.
-2. `0x00541860(N, 0)` (the AI argument at a raise) and `0x005B0E00`:
-   owner `monsters/ai.md` §3; the raise relies on them as stated there.
+2. Answered: `0x00541860(N)` is the AI-control getter (`monsters/ai.md`
+   §3.1 end; the 0 was the state argument of `0x005B0E00`), and the
+   second state-0 install on the freshly spawned N is `monsters/ai.md`
+   §3.3 "Re-install on a fresh monster".

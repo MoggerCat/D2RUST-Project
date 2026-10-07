@@ -37,7 +37,7 @@
 | Edge cases & original bugs | 446–463 |
 | Test vectors | 464–492 |
 | Provenance | 493–529 |
-| Open questions | 530–616 |
+| Open questions | 530–625 |
 <!-- /index -->
 
 ## Summary
@@ -548,6 +548,15 @@ command-line handlers `0x004776E0`…`0x00477720`, `composition.md` §1).
    wall block placement; `camera.md` OQ4).
 5. Who reads cell flag 4 (§3 r2). Search the export for reads of the cell
    word.
+   *Answered* (static, `all.asm`): nobody. The cell array (view
+   +0xEAA8, side +0xEAB0) is loaded only by `0x004DCE60`, `0x004DCF10`,
+   `0x004DCF30` (allocation, free), the builder `0x004DDB70` and the
+   passes `0x004DEA70`, `0x004DF1C0`, `0x004DF480` (→ `0x004DEDF0`),
+   `0x004DF510`; the passes read the list heads only (cell +0x10, +0x14,
+   +0x1C, +0x20), and the only `& 4` tests in the draw module
+   (`0x004DC000`–`0x004E0FFF`) are the record-flag tests of the setters
+   `0x004DD180`, `0x004DD350` and the fade-state tests of record +0x24.
+   Cell flag 4 is written and never read in 1.14d; d2rs may drop it.
 6. ~~Fade group mode~~: answered in §8: the group mode is the only live
    mode in 1.14d (`[0x0072A968]` = 1, no writer); record +0x10 is the
    coordinate record of `drlg/levels.md` §11. Open: a capture walking

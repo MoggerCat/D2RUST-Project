@@ -35,7 +35,7 @@
 | Edge cases & original bugs | 307–316 |
 | Test vectors | 317–338 |
 | Provenance | 339–358 |
-| Open questions | 359–404 |
+| Open questions | 359–431 |
 <!-- /index -->
 
 ## Summary
@@ -368,8 +368,10 @@ by the `frames-raw-1` capture runs (`capture.md` Test vectors).
    Still open: the capture under a roof that decides between the two y
    formulas.
 2. ~~Unit culling~~: answered in §7 (no view test; visibility test
-   `0x004DC710`). Open: what `0x00622AA0(player, unit, 2)` and
-   `0x00642840` test (line of sight vs room; owner `draw-order.md`).
+   `0x004DC710`). *Answered* (static): `0x00642840` is the level's
+   `LOSDraw` gate (`render/draw-order-2.md` §15 r1) and
+   `0x00622AA0(player, unit, 2)` the unit collision line with mask 2
+   (`render/draw-order-2.md` §15.1).
 3. *Answered* in `unit-composite.md` §8: the three getters read the
    unit's client motion record (gfx +0x30, `0x0046F060`; 0 without one),
    and missiles add `missiles` xoffset / yoffset + zoffset (+0xA2/+0xA4/
@@ -382,6 +384,31 @@ by the `frames-raw-1` capture runs (`capture.md` Test vectors).
    that unit path positions advance exactly once per tick there (Ghidra
    read), so a capture's state equals the server state after the same
    tick plus the client's own path step.
+   *Partly answered* (static, 1.14d asm): not exactly once for every
+   unit. The
+   update itself runs once per server tick (`client/model.md` §5 r1);
+   the client calls the path step `0x00650840` (`sim/pathing.md` §9.4,
+   base `[0x007A04C4]`, which no instruction writes by absolute address
+   — it is +0x5C of the client record at `0x007A0468`; ≤ 0 → 0x400)
+   from three places:
+   - Players (`0x00463390`, via `0x004807C0`): at most once. Mode-table
+     `0x00711E00` entry 1 → step; entry 2 with a used skill
+     (`0x00620250`) whose flags +0x0C bit 0 is set → step. The two are
+     exclusive.
+   - Monsters (`0x004B13A0`): `0x004AF4C0` steps when the used skill's
+     flags bit 0 is set, then the update steps again when the monster
+     mode table (`0x004AF400`) entry is 1. Both in one update only when
+     both hold (no reader excludes it).
+   - Missiles: each client missile function (table `0x0072A398`) ends
+     in at most one call of the missile step `0x004D30C0` (all 82 call
+     sites are on exclusive return paths). It steps once, then loops a
+     second time in the same update when the missile's owner
+     (`0x004639D0`) is the local player in game types 0, 1, 6, 8, its
+     elapsed frames (`0x0064A3B0`) are 1 and it still has a path: a
+     local player's missile moves two steps (and its frames left drop
+     by 2) on its first client update.
+   Still open (recording): whether a monster ever meets both step
+   conditions in one update.
 6. How the client's copy of the player unit seed (`unit +0x20`) is
    initialised, so d2rs can reproduce shake offsets without recordings.
    Partly answered: at a single-player join it is {0x6AC6935F, 0}

@@ -24,30 +24,32 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 53–70 |
-| Inputs | 71–79 |
-| Outputs / state changes | 80–86 |
-| Rules | 87–88 |
-|   1. Model contents | 89–127 |
-|   2. Unit table | 128–173 |
-|   3. Local player | 174–196 |
-|   4. Receive and the unit message queue | 197–234 |
-|   5. Client update pass | 235–269 |
-|   6. Position check (`0x004804E0`) | 270–309 |
-|   7. Session messages | 310–346 |
-|   8. Mode requests | 347–397 |
-|   9. Room-in-sight messages | 398–432 |
-|   10. Bit reader | 433–447 |
-|   11. Current act and level (join and later) | 448–493 |
-|   12. Client DRLG and the room of a point | 494–535 |
-|   13. Visibility predicate (`0x004DBF20`) | 536–563 |
-|   14. Pet list and the hireling GUID | 564–590 |
-| Constants & data dependencies | 591–603 |
-| Randomness | 604–615 |
-| Edge cases & original bugs | 616–624 |
-| Test vectors | 625–664 |
-| Provenance | 665–706 |
-| Open questions | 707–766 |
+| Summary | 55–72 |
+| Inputs | 73–81 |
+| Outputs / state changes | 82–88 |
+| Rules | 89–90 |
+|   1. Model contents | 91–129 |
+|   2. Unit table | 130–175 |
+|   3. Local player | 176–198 |
+|   4. Receive and the unit message queue | 199–236 |
+|   5. Client update pass | 237–273 |
+|   6. Position check (`0x004804E0`) | 274–313 |
+|   7. Session messages | 314–350 |
+|   8. Mode requests | 351–402 |
+|   9. Room-in-sight messages | 403–437 |
+|   10. Bit reader | 438–452 |
+|   11. Current act and level (join and later) | 453–498 |
+|   12. Client DRLG and the room of a point | 499–540 |
+|   13. Visibility predicate (`0x004DBF20`) | 541–568 |
+|   14. Pet list and the hireling GUID | 569–595 |
+|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 596–662 |
+|   16. C→S 0x4B after a teleport (the hireling case) | 663–697 |
+| Constants & data dependencies | 698–710 |
+| Randomness | 711–722 |
+| Edge cases & original bugs | 723–731 |
+| Test vectors | 732–775 |
+| Provenance | 776–824 |
+| Open questions | 825–892 |
 <!-- /index -->
 
 ## Summary
@@ -266,6 +268,8 @@ position check of the local player.
    0x20; then a client-only unit (flag 0x200000, set C) is removed
    (`0x00465F00` → `0x00465E80`); a server unit stays until the server
    answers.
+   How a server unit (the local player's hireling) gets both bits after
+   a teleport: §16.
 
 ### 6. Position check (`0x004804E0`)
 
@@ -392,6 +396,7 @@ position check of the local player.
    mode change: lights `render/lighting.md` §8), then `0x004BD650` when
    `0x00621B00(U)`; code 0x15 → `0x004BD5C0(record)`; any other code is
    fatal 0x39C.
+   Both codes in detail, with the shrine table: §15.
 6. **Item** (`0x004C1B80`): code 2 → mode := r1 (`0x00624690`), unit
    flag 0x2 := (r0 ≠ 0); other codes do nothing.
 
@@ -588,6 +593,108 @@ player is in", the input of `render/composition.md` §3 step 2
    field written only by 0x7A and 0x81; the hireling GUID is rule 4 on
    it. Neither id occurs in the two recordings (no hireling).
 
+### 15. Object mode requests in detail (codes 3 and 0x15; shrines)
+
+Owner of the client side of S→C 0x0E for objects and of 0x4D in its
+shrine form (`world/objects.md` §14 owns the server side). Object U,
+record r (`msg-units.md` §4 rows 0x0E, 0x4D).
+
+1. **Shrine test** `0x00621B00(U)`: U is type 2 and its objects.txt
+   record's `SubClass` (+0x167, `data/fields.tsv` objects 118) has bit 0.
+   **Shrine data** `0x00621B70(U)`: the shrines.txt record pointer at
+   object data +0x08 (fatal 0xE4E for a null U, 0xE55 for a non-object).
+   Its byte 0 is the shrine `Code`.
+2. **Shrine table** `0x006DA8C0`: 23 entries (count dword `0x0072779C`
+   = 0x17, static) of 20 bytes, indexed by shrine code: +0x00 on-mode
+   function, +0x04 on-use function, +0x08 / +0x0C overlay ids (−1 =
+   none), +0x10 sound id (0 = none). Values read from the image:
+
+   | Code | +0x00 | +0x04 | +0x08, +0x0C | +0x10 |
+   |---|---|---|---|---|
+   | 0 | – | – | – | 0 |
+   | 1, 2 | – | – | – | 0xA71 |
+   | 3 | – | – | – | 0xA70 |
+   | 4, 5 | – | – | – | 0xA6A |
+   | 6, 7, 8 | `0x004BD4A0` | – | (0x3B, 0x39), (0x3C, 0x39), (0x3E, 0x39) | 0xA68, 0xA69, 0xA73 |
+   | 9, 10, 11 | `0x004BD4A0` | – | (0x3F, 0x3A), (0x3D, 0x3A), (0x40, 0x3A) | 0xA72, 0xA74, 0xA75 |
+   | 12, 13, 14, 15 | `0x004BD4A0` | – | (0x41, 0x39), (0x42, 0x3A), (0x43, 0x3A), (0x44, 0x39) | 0xA77, 0xA70, 0xA70, 0xA6B |
+   | 16 | – | `0x004BD090` | – | 0xA76 |
+   | 17, 18 | – | – | – | 0xA6F, 0xA6D |
+   | 19 | – | `0x004BD0C0` | – | 0xA78 |
+   | 20 | – | – | – | 0xA6F |
+   | 21 | – | `0x004BD220` | – | 0xA6C |
+   | 22 | – | `0x004BD360` | – | 0xA6E |
+
+3. **Code 3** (S→C 0x0E with u8@6 = 3; the server writes 3 for every
+   object, `world/objects.md` §14 rule 1): the object mode change
+   `0x004BCF60(U, r)` (r0 = u8@7, r1 = mode u32@8; lights:
+   `render/lighting.md` §8). Then, for a shrine (rule 1), `0x004BD650`:
+   shrine data null → fatal 0x37A; code ≥ 23 → fatal 0x37B; the entry's
+   +0x00 function, if any, runs with (U, shrine data). `0x004BD4A0`
+   (codes 6–15), for each of +0x08 and +0x0C that is not −1:
+   `0x0046F0C0(U, 0, id)`, then, when U is null or U's mode (+0x10) is
+   0, `0x00470390(U, id, 3, 0, 0, 0, 0, 0)` (overlay calls; Phase 6
+   effects).
+4. **Code 0x15** (`0x004BD5C0`, S→C 0x4D for an object): reads only
+   r0 (= u32@6, the operator's GUID in the shrine form). r1 = −1 and
+   r2..r4 (u16@11, u16@13, u8@10) are never read; u16@15 is not copied
+   into the record (`msg-units.md` §4). Steps:
+   1. code := shrine `Code` (rule 1) when U is a shrine, with shrine
+      data D; else code := objects.txt `ShrineFunction` (+0x16F,
+      objects 122) of U's class and D := none.
+   2. P := the player unit with GUID r0 (`0x00463990(r0, 0)`). None →
+      the request ends; nothing else runs.
+   3. 0 < code < 23 and the entry's +0x04 function set → call it with
+      (U, P, D) (codes 16, 19, 21, 22; Phase 6 effects).
+   4. `0x004BD550(U, P)`: shrine data of U null → fatal 0x34D; its code
+      ≥ 23 → fatal 0x34E; entry +0x10 ≠ 0 → sound request
+      `0x004B9A00(id, P, 0, 0, 0)` (request rule: `audio/triggers.md`
+      §1 rule 1; the sound plays on the operator).
+   So a 0x4D code-0x15 request on a non-shrine object whose operator is
+   a known player is fatal 0x34D in 1.14d (a server sends 0x4D for an
+   object only for shrines, `world/objects.md` §14).
+5. d2rs: the model stores the mode request as §8 rule 3; the effects of
+   rules 3–4 are client outputs (`client/bridge.md` §10, rows
+   `ShrineFx` and `ShrineSound`) emitted in the update pass in the
+   order above, with the captured code, object key, player key and
+   overlay or sound ids. The fatal asserts are handler errors
+   (`client/bridge.md` §6 rule 4).
+
+### 16. C→S 0x4B after a teleport (the hireling case)
+
+Answers PC 2's question on `tp80-packets.jsonl` (C→S 0x4B `4b
+01000000 01000000` in the input phase after tick 2919, a town-portal
+teleport while the hireling walked; server answer
+`world/hirelings.md` §6 rule 7).
+
+1. The only setter of unit flag 0x800000 and of flags-2 0x20 is the
+   client active-room free (§5 rule 5, `drlg/rooms.md` §8 rule 4). On
+   the client it runs from exactly two paths:
+   - a DRLG room leaving sight: S→C 0x08 (§9 rule 2) un-propagates;
+     the status-3 unset handler `0x0061B560` recomputes the status, and
+     when it became 4 in a client DRLG (`0x00642A00`) tail-calls
+     `0x0066F1A0(room, 0)`, which removes the room's active room
+     (`0x0061A910` at `0x0066F1CA`, when DRLG room +0x30 is set) and so
+     frees it (`0x0061A840`); `drlg/rooms.md` §4 unset handlers;
+   - the whole client act being freed (`0x0061AFD0`): by the act load
+     `0x0044E100` (§7 rule 4) and by the game teardown `0x0044C890`
+     (called from `0x0044F360`, after its unit clear `0x004659C0`).
+2. Every unit still linked in the freed room gets 0x800000; a unit
+   without flag 0x400000 (a server unit; client-only units carry
+   0x200000 with 0x400000, Constants) also gets flags-2 0x20. The
+   local player's hireling is a server unit (0xAC) that 0x0A never
+   removes (`msg-units.md` Edge cases), so when the player leaves by a
+   town portal and the 0x08 messages for the old rooms take the room
+   holding the hireling to status 4, the hireling is left roomless with
+   both bits.
+3. The next update pass (§5 rules 1, 5) skips the hireling's update and
+   queue, sends C→S 0x4B (type 1, the hireling's GUID) and clears both
+   bits. That is the recorded `4b 01000000 01000000` for type 1, GUID 1.
+4. No 0x4B is sent when the hireling's client unit is no longer in that
+   room when the room is freed (it was placed elsewhere first, or its
+   room stays in sight). Which of these applied at the recording's
+   second teleport is open question 14.
+
 ## Constants & data dependencies
 
 | Constant | Value | Source |
@@ -661,6 +768,10 @@ marked synthetic.
 | 0x7A `7a 01 07 4f01 05000000 21000000` | pets = [{class 0x14F, type 7, pet 0x21, owner 5}] | synthetic, §14 rule 2 |
 | then 0x7A `7a 00 07 4f01 05000000 21000000` with local player GUID 5 | record kept, gone 1; hireling GUID(player 5) = 0x21 | synthetic, §14 rules 2, 4 |
 | hireling GUID with an empty pet list | −1 | synthetic |
+| shrine object (2, 9), shrine `Code` 1, player (0, 1) known; 0x4D `4d 02 09000000 01000000 01 0000 0000 0000` drained | mode request 0x15; no on-use function; outputs [`ShrineSound` 0xA71 on (0, 1)] | synthetic, §15 rule 4 |
+| same, operator GUID 7 unknown | no output | synthetic, §15 rule 4 step 2 |
+| shrine object, `Code` 6; 0x0E `0e 02 09000000 03 00 01000000` drained, U mode 0 | `0x004BCF60` mode change; outputs [`ShrineFx` on-mode code 6, overlays 0x3B, 0x39] | synthetic, §15 rule 3 |
+| hireling (1, 1) in a client room whose last 0x08 drops it to status 4; next ticked update pass | `outgoing` += `4b 01000000 01000000`; hireling skipped, both bits cleared | §16; PC 2 `tp80-packets.jsonl` after tick 2919 |
 
 ## Provenance
 
@@ -703,6 +814,13 @@ visibility `0x004DBF20`, `0x0045AFC0`, `0x0045AFD0`, `0x004709A0`,
 `0x0045CC1D`, `0x0045F42C`, `0x00466375`), handlers `0x0045E860`,
 `0x0045E890`. §11 rule 3's order and the level-1 room checked on
 `-022633` seq 102–219.
+Area 4 session (2026-10-07, PC 2 requests): object requests
+`0x004BD6D0`, `0x004BD5C0`, `0x004BD550`, `0x004BD650`, `0x004BD4A0`,
+`0x00621B00`, `0x00621B70`; shrine table `0x006DA8C0` and count
+`0x0072779C` read from the image; `SubClass` / `ShrineFunction`
+offsets from `data/fields.tsv`. Room free paths: `0x0061B560`,
+`0x0066F1A0` (call `0x0066F1CA`), `0x0061AFD0` (callers `0x0044C8A9`,
+`0x0044E11A`, and the server's `0x0052C887`), `0x0061A840`.
 
 ## Open questions
 
@@ -763,3 +881,11 @@ visibility `0x004DBF20`, `0x0045AFC0`, `0x0045AFD0`, `0x004709A0`,
     (the map seed, unchanged), u16@6 = the new act's town level id,
     u32@8 = game +0x80, followed by 0x53 (§11 rule 1). A recording with
     an act change still confirms the bytes (PC 2 recording list).
+14. `tp80-packets.jsonl` (PC 2's local recording, not in `traces/raw/`):
+    confirm §16 with the S→C order before the 0x4B (the 0x08 that drops
+    the hireling's room, no 0x0A / 0x15 / 0xAC for the hireling before
+    it), and at the second teleport which message moved the hireling
+    out of the freed room (or kept the room in sight).
+15. The on-mode / on-use shrine functions (`0x004BD4A0`, `0x004BD090`,
+    `0x004BD0C0`, `0x004BD220`, `0x004BD360`) and the overlay calls
+    `0x0046F0C0` / `0x00470390` (§15): Phase 6 effects spec.

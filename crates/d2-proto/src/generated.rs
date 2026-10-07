@@ -67,7 +67,7 @@ pub static CLIENT_MESSAGES: [ClientMessage; 113] = [
     ClientMessage { id: 0x37, name: "IdentifyGamble", transport_size: SizeRule::Fixed(5), handler_size: HandlerSize::Exact(5), layout: &[Field { name: "item", ty: FieldType::U32, offset: Some(1) }], handler: Some(0x0054BC30), kind: Kind::Handler, gate: Gate::Alive, request: "identify a gambled item", scope: Scope::Sim, confirmed: Confirmed::Yes },
     ClientMessage { id: 0x38, name: "EntityAction", transport_size: SizeRule::Fixed(13), handler_size: HandlerSize::Exact(13), layout: &[Field { name: "action", ty: FieldType::U32, offset: Some(1) }, Field { name: "npc", ty: FieldType::U32, offset: Some(5) }, Field { name: "item", ty: FieldType::U32, offset: Some(9) }], handler: Some(0x0054BCA0), kind: Kind::Handler, gate: Gate::Alive, request: "NPC menu action (trade, gamble, ...)", scope: Scope::Sim, confirmed: Confirmed::Yes },
     ClientMessage { id: 0x39, name: "PurchaseLife", transport_size: SizeRule::Fixed(5), handler_size: HandlerSize::None, layout: &[], handler: Some(0x0054BD00), kind: Kind::Stub3, gate: Gate::Alive, request: "rejected (handler returns 3)", scope: Scope::None, confirmed: Confirmed::Yes },
-    ClientMessage { id: 0x3A, name: "AddStatPoint", transport_size: SizeRule::Fixed(3), handler_size: HandlerSize::Exact(3), layout: &[Field { name: "stat", ty: FieldType::U16, offset: Some(1) }], handler: Some(0x0054BD10), kind: Kind::Handler, gate: Gate::Alive, request: "spend a stat point", scope: Scope::Sim, confirmed: Confirmed::Yes },
+    ClientMessage { id: 0x3A, name: "AddStatPoint", transport_size: SizeRule::Fixed(3), handler_size: HandlerSize::Exact(3), layout: &[Field { name: "stat", ty: FieldType::U8, offset: Some(1) }, Field { name: "repeat", ty: FieldType::U8, offset: Some(2) }], handler: Some(0x0054BD10), kind: Kind::Handler, gate: Gate::Alive, request: "spend a stat point", scope: Scope::Sim, confirmed: Confirmed::Yes },
     ClientMessage { id: 0x3B, name: "AddSkillPoint", transport_size: SizeRule::Fixed(3), handler_size: HandlerSize::Exact(3), layout: &[Field { name: "skill", ty: FieldType::U16, offset: Some(1) }], handler: Some(0x0054BD90), kind: Kind::Handler, gate: Gate::Alive, request: "spend a skill point", scope: Scope::Sim, confirmed: Confirmed::Yes },
     ClientMessage { id: 0x3C, name: "SelectSkill", transport_size: SizeRule::Fixed(9), handler_size: HandlerSize::Exact(9), layout: &[Field { name: "skill", ty: FieldType::Bits(31), offset: Some(1) }, Field { name: "left", ty: FieldType::Bit(31), offset: Some(1) }, Field { name: "item", ty: FieldType::U32, offset: Some(5) }], handler: Some(0x0054BE70), kind: Kind::Handler, gate: Gate::None, request: "choose the left or right skill", scope: Scope::Sim, confirmed: Confirmed::Yes },
     ClientMessage { id: 0x3D, name: "HighlightDoor", transport_size: SizeRule::Fixed(5), handler_size: HandlerSize::Exact(5), layout: &[Field { name: "id", ty: FieldType::U32, offset: Some(1) }], handler: Some(0x0054BF10), kind: Kind::Handler, gate: Gate::Alive, request: "door highlight hint", scope: Scope::Sim, confirmed: Confirmed::Yes },
@@ -1902,8 +1902,10 @@ pub mod client {
     /// 0x3A AddStatPoint: spend a stat point (3 bytes).
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub struct AddStatPoint {
-        /// `u16` at 1.
-        pub stat: u16,
+        /// `u8` at 1.
+        pub stat: u8,
+        /// `u8` at 2.
+        pub repeat: u8,
     }
 
     impl FixedMessage for AddStatPoint {
@@ -1912,12 +1914,14 @@ pub mod client {
         fn decode(b: &[u8]) -> Result<Self, DecodeError> {
             check(b, Self::ID, Self::SIZE)?;
             Ok(Self {
-                stat: u16_at(b, 1),
+                stat: u8_at(b, 1),
+                repeat: u8_at(b, 2),
             })
         }
         fn write(&self, out: &mut [u8]) {
             start(out, Self::ID, Self::SIZE);
-            put_u16(out, 1, self.stat);
+            put_u8(out, 1, self.stat);
+            put_u8(out, 2, self.repeat);
         }
     }
 
@@ -3316,7 +3320,7 @@ pub static SERVER_MESSAGES: [ServerMessage; 181] = [
     ServerMessage { id: 0x5D, name: "QuestItemState", size: SizeRule::Fixed(6), layout: &[Field { name: "chain", ty: FieldType::U8, offset: Some(1) }, Field { name: "flags", ty: FieldType::U8, offset: Some(2) }, Field { name: "status", ty: FieldType::U8, offset: Some(3) }, Field { name: "extra", ty: FieldType::U16, offset: Some(4) }], senders: &[0x0053D710], client_handler: Some(0x0045E540), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x5E, name: "GameQuestAvailability", size: SizeRule::Fixed(38), layout: &[], senders: &[0x0053D830], client_handler: Some(0x0045E570), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x5F, name: "PortalFlags", size: SizeRule::Fixed(5), layout: &[Field { name: "", ty: FieldType::U32, offset: Some(1) }], senders: &[0x0053B400], client_handler: Some(0x0045E5D0), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
-    ServerMessage { id: 0x60, name: "TownPortalState", size: SizeRule::Fixed(7), layout: &[], senders: &[0x0053D900], client_handler: Some(0x0045E610), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
+    ServerMessage { id: 0x60, name: "TownPortalState", size: SizeRule::Fixed(7), layout: &[Field { name: "flags", ty: FieldType::U8, offset: Some(1) }, Field { name: "level", ty: FieldType::U8, offset: Some(2) }, Field { name: "guid", ty: FieldType::U32, offset: Some(3) }], senders: &[0x0053D900], client_handler: Some(0x0045E610), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x61, name: "CanGoToAct", size: SizeRule::Fixed(2), layout: &[], senders: &[0x0053D940], client_handler: Some(0x0045E660), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x62, name: "MakeUnitTargetable", size: SizeRule::Fixed(7), layout: &[], senders: &[0x0053D6D0], client_handler: Some(0x0045D390), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x63, name: "WaypointMenu", size: SizeRule::Fixed(21), layout: &[Field { name: "guid", ty: FieldType::U32, offset: Some(1) }, Field { name: "magic", ty: FieldType::U16, offset: Some(5) }, Field { name: "bits0", ty: FieldType::U32, offset: Some(7) }, Field { name: "bits1", ty: FieldType::U32, offset: Some(11) }, Field { name: "bits2", ty: FieldType::U32, offset: Some(15) }, Field { name: "bits3", ty: FieldType::U16, offset: Some(19) }], senders: &[0x0053D960], client_handler: Some(0x0045E670), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
@@ -5089,6 +5093,45 @@ pub mod server {
         /// The message bytes; unlisted bytes are 0.
         pub fn encode(&self) -> [u8; 5] {
             let mut b = [0; 5];
+            self.write(&mut b);
+            b
+        }
+    }
+
+    /// 0x60 TownPortalState (7 bytes).
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub struct TownPortalState {
+        /// `u8` at 1.
+        pub flags: u8,
+        /// `u8` at 2.
+        pub level: u8,
+        /// `u32` at 3.
+        pub guid: u32,
+    }
+
+    impl FixedMessage for TownPortalState {
+        const ID: u8 = 0x60;
+        const SIZE: usize = 7;
+        fn decode(b: &[u8]) -> Result<Self, DecodeError> {
+            check(b, Self::ID, Self::SIZE)?;
+            Ok(Self {
+                flags: u8_at(b, 1),
+                level: u8_at(b, 2),
+                guid: u32_at(b, 3),
+            })
+        }
+        fn write(&self, out: &mut [u8]) {
+            start(out, Self::ID, Self::SIZE);
+            put_u8(out, 1, self.flags);
+            put_u8(out, 2, self.level);
+            put_u32(out, 3, self.guid);
+        }
+    }
+
+    impl TownPortalState {
+        /// The message bytes; unlisted bytes are 0.
+        pub fn encode(&self) -> [u8; 7] {
+            let mut b = [0; 7];
             self.write(&mut b);
             b
         }

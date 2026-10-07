@@ -30,14 +30,14 @@
 |   4. Bodies, required level 6 | 832–1041 |
 |   5. Bodies, required level 12 | 1042–1215 |
 |   6. Bodies, required level 18 | 1216–1514 |
-|   7. Bodies, required level 24 | 1515–1802 |
-|   8. Bodies, required level 30 | 1803–2039 |
-| Constants & data dependencies | 2040–2074 |
-| Randomness | 2075–2113 |
-| Edge cases & original bugs | 2114–2183 |
-| Test vectors | 2184–2221 |
-| Provenance | 2222–2237 |
-| Open questions | 2238–2272 |
+|   7. Bodies, required level 24 | 1515–1815 |
+|   8. Bodies, required level 30 | 1816–2052 |
+| Constants & data dependencies | 2053–2087 |
+| Randomness | 2088–2126 |
+| Edge cases & original bugs | 2127–2196 |
+| Test vectors | 2197–2234 |
+| Provenance | 2235–2254 |
+| Open questions | 2255–2289 |
 <!-- /index -->
 
 ## Summary
@@ -1686,6 +1686,19 @@ active on a unit (`0x00625820(T, 0)` = 0). Else 0.
    `bodies.md` §8.9 step 7); `node_insert(game, m, 0, unit +0xD0)`.
    Return 1.
 
+Second caller, game join (added 2026-10-07): when a loaded save carried
+an Iron Golem item, the join step `0x005394A0` (`0x005396C8`–
+`0x0053974C`) finds that item unit, makes it the player's target
+(`0x00620C10`) at the player's position, and calls the do core
+`0x0056F7F0(game, player, 90, L, charge 1, item 0, aim 0)` directly
+(`use.md` §5.4; no start function, no `schedule_periodic`), L = the
+player's skill-90 level with bonuses (`0x006442A0(player, entry, 1)`).
+This body then runs as above with T = the saved item; step 1 re-tests
+§7.11 on it. Iron Golem has a start function and no `usemanaondo` or
+`delay` in 1.14d `skills.txt`, so the join cast spends no mana and sets
+no cooldown (`use.md` §5.4 step 9). Which item, and the client field
+that holds its GUID: `formats/d2s-load.md` §3 (PC 2).
+
 #### 7.13 srvdo 79 Conversion `0x005D0350`
 
 1. R invalid → 0. Unit flags |= 0x40. T none → 0.
@@ -2234,6 +2247,10 @@ steps call them (`bodies.md` Randomness). Draws named here:
   `0x007483B8` (frame records of 6 bytes, event byte +5).
 - Jump tables read from the image: `0x005A5444` (§2.1 element types),
   `0x005C9B34` (§4.2 target types).
+- §7.12 join caller: `0x005394A0` at `0x005396C8`–`0x0053974C`
+  (`0x00552F60`, `0x006439F0`, `0x006442A0`, `0x00620470`,
+  `0x006204C0`, `0x00620C10`, call `0x00539747`); `skills.txt` row 90
+  (`InTown` 1, `srvstfunc` 20, `srvdofunc` 57, `delay` empty).
 
 ## Open questions
 
