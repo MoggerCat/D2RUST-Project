@@ -31,6 +31,13 @@
 //! audio core plays from the sound pool after each bridge frame
 //! ([`super::sound`]; the user's archives with `D2_GAME_DIR`).
 //!
+//! [`run`] turns the play preview on ([`add_preview`], decision D1 of
+//! `docs/PLAN.md`): the feed builds the map from the client DRLG, its DT1
+//! tiles are read from the user's archives (none on synthetic data: every
+//! tile is skipped and logged) and drawn full bright, and the inputs the
+//! model lacks get the labelled fills of `world_view::preview`
+//! (`d2rs-own, unverified`). [`add_game`] alone stays strict.
+//!
 //! With the user's files ([`run`] on live data) the original UI is added
 //! ([`super::ui`]: the `ui/panels.md` panels in the world view's root,
 //! hotkeys from the `dev` bindings, panel art from the archives, the UI
@@ -52,6 +59,8 @@ use crate::bridge::mirror::DynLink;
 use crate::bridge::world::{ClientTables, LevelRow};
 use crate::bridge::{Bridge, BridgeError, BridgePlugin, BridgeResource};
 use crate::world_view::node::NodeRuns;
+use crate::world_view::preview::Preview;
+use crate::world_view::tile_assets::TileAssets;
 use crate::world_view::{
     ModelFeed, NoFeed, Unspecified, ViewAssets, WorldViewPlugin, WorldViewState,
 };
@@ -129,6 +138,23 @@ pub fn add_client_data(app: &mut App, drlg: DrlgSource, levels: Vec<LevelRow>) {
         levels: Some(levels),
         ..ModelFeed::<NoFeed>::default()
     });
+}
+
+/// Turns the play preview on (decision D1, `world_view::preview`): the
+/// model feed with the map from the client DRLG (`draw-order.md` §9),
+/// the DT1 tiles and act shade tables of `tiles`, and the labelled fills
+/// for the inputs the model lacks; a frame that still fails is logged,
+/// not fatal. Nothing it draws is verified against 1.14d (rule 10).
+pub fn add_preview(app: &mut App, levels: Vec<LevelRow>, tiles: TileAssets) {
+    let mut state = app.world_mut().resource_mut::<WorldViewState>();
+    state.feed = Box::new(
+        ModelFeed {
+            levels: Some(levels),
+            ..ModelFeed::<NoFeed>::default()
+        }
+        .with_preview(Preview::new(tiles)),
+    );
+    state.preview = true;
 }
 
 /// One log line every [`LOG_EVERY`] bridge frames.
@@ -214,7 +240,7 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
     }));
     add_game(&mut app, Box::new(link), true)?;
     send_create_game_for(&mut app, &request)?;
-    add_client_data(&mut app, drlg_source, level_rows);
+    add_client_data(&mut app, drlg_source, level_rows.clone());
     app.world_mut()
         .resource_mut::<BridgeResource>()
         .0
@@ -237,11 +263,15 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
             .0
             .set_wall_seconds(wall_seconds);
         let palettes = ActPalettes::live(&archives).map_err(anyhow::Error::msg)?;
+        let tiles = TileAssets::new(Some(archives.clone()), Some(palettes.pl2.clone()));
+        add_preview(&mut app, level_rows, tiles);
         palette::add_act_palettes(&mut app, palettes);
         let parts = ui::UiParts::live(archives.clone()).map_err(anyhow::Error::msg)?;
         ui::add_original_ui(&mut app, parts)?;
         let table = sound::sound_table_live(&archives).map_err(anyhow::Error::msg)?;
         app.insert_resource(GameAudio::new(AudioParts::original(archives, table)));
+    } else {
+        add_preview(&mut app, level_rows, TileAssets::default());
     }
     sound::add_output(&mut app);
     if let Some(frames) = config.exit_after {
