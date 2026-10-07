@@ -21,7 +21,12 @@ fn act_placer_allocates_preset_levels_and_hands_over_their_directions() {
     assert_eq!(d.seed, Seed::new(1406222081, 1674353446));
     let mut order: Vec<u32> = d.level_list().into_iter().map(|l| d.level(l).id).collect();
     order.reverse();
-    assert_eq!(order, [4, 3, 2, 1, 17, 39, 26, 7, 6, 27, 5]);
+    // `levels.md` Test vectors (seq 2425–2452): placer rows, then the
+    // `outdoor.md` §2.7 neighbour-entry walk over 1..17 allocates 8..16.
+    assert_eq!(
+        order,
+        [4, 3, 2, 1, 17, 39, 26, 7, 6, 27, 5, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+    );
     let find = |id| d.find_level(id).unwrap();
     // Preset init `0x00667430`: roll(Files) on the level seed when
     // Files ≠ 0 (Gate 1, Outer Cloister 3); the town has Files 0.

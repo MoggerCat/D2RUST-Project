@@ -29,22 +29,23 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 50–66 |
-| Inputs | 67–75 |
-| Outputs / state changes | 76–82 |
-| Rules | 83–84 |
-|   1. Loop order (single player) | 85–106 |
-|   2. Client → server | 107–273 |
-|   3. Server → client | 274–373 |
-|   4. d2rs mapping and scope | 374–401 |
-|   5. Machine-readable tables | 402–438 |
-|   6. Exact-match comparison | 439–476 |
-| Constants & data dependencies | 477–495 |
-| Randomness | 496–501 |
-| Edge cases & original bugs | 502–524 |
-| Test vectors | 525–570 |
-| Provenance | 571–610 |
-| Open questions | 611–634 |
+| Summary | 51–67 |
+| Inputs | 68–76 |
+| Outputs / state changes | 77–83 |
+| Rules | 84–85 |
+|   1. Loop order (single player) | 86–107 |
+|   2. Client → server | 108–277 |
+|   3. Server → client | 278–377 |
+|   4. d2rs mapping and scope | 378–405 |
+|   5. Machine-readable tables | 406–442 |
+|   6. Exact-match comparison | 443–480 |
+|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 481–666 |
+| Constants & data dependencies | 667–685 |
+| Randomness | 686–691 |
+| Edge cases & original bugs | 692–714 |
+| Test vectors | 715–768 |
+| Provenance | 769–823 |
+| Open questions | 824–857 |
 <!-- /index -->
 
 ## Summary
@@ -220,7 +221,10 @@ of them has a consequence in 1.14d; d2rs keeps them as a diagnostic only.
    `0x005496F0`: size 5; player data (`0x006221A0`) required, else 2;
    target (x, y) must be within 50 subtiles of the player on both axes
    (`0x00548EF0`, Chebyshev test |dx| ≤ 50 and |dy| ≤ 50; position from
-   the dynamic path, or the static path for unit types 2, 4, 5). Out of
+   the dynamic path, or the static path for unit types 2, 4, 5; the
+   message's x, y are zero-extended u16 and a player's dynamic position
+   is a u16 sub-tile word, so the signed 32-bit difference never wraps
+   and the test is exact for every input). Out of
    range → 1, and if more than 25 frames passed since player data +0x168,
    the server queues message 0x15 (reassign player) to resync the client;
    in range → player data +0x168 = frame, accept.
@@ -474,6 +478,192 @@ as in §2.1 rule 5 and §3.1 rule 1.
    take a waypoint if available, exit. Command and expected output:
    `docs/HANDOFF.md` §5.
 
+### 7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`)
+
+The owner of "the unit-update spec" named by `sim/pathing.md` §10 and
+OQ7, `missiles/missiles.md` R2.4 and `items/inventory.md` §6.3: which
+S→C messages a changed unit produces at the end of a tick, and what the
+clean-up resets so that they are sent once.
+
+#### 7.1 Walk (`0x0053A620` → `0x0053A5D0`)
+
+1. Called from the per-client update (`sim/tick.md` §6 rule 5) with
+   (game, client, the client player's room). The client's act (client
+   +0x1AC) must have its pending-update flag (act +0x00) ≠ 0, else
+   nothing. For each room of the room's adjacent-room array
+   (`0x00619790`, array order; `sim/unit-order.md` §9) walk the room's
+   update queue from the head (room +0x1C, link unit +0xE0; next read
+   before the unit runs) and run rule 2 per unit. Queue order:
+   `sim/unit-order.md` §6 (most recently queued first).
+2. **Per unit** `0x0053A500(unit, client, game)`; P := the client's
+   player (`0x00537860(client, 0)`); announced := 0.
+   1. Unit flag (+0xC4) 0x10 ("not yet announced", `sim/units.md`) set
+      and unit ≠ P: a missile stops here (nothing at all is sent for
+      it); any other type gets its add messages (§7.2) and announced :=
+      1.
+   2. By type: player → `0x00580860(game, unit, client, announced)`
+      (§7.3 rule 1); monster → `0x00598220(game, unit, client,
+      announced)` (§7.3 rule 2); object → `0x00581AD0(game, unit,
+      client)` (§7.3 rule 3); missile → nothing; item →
+      `0x0055BF30(unit, client)` (§7.3 rule 4); type ≥ 5 → nothing.
+
+#### 7.2 Add messages (`0x00571F90(game, unit, client)`)
+
+Also called by the room switch (`sim/path-placement.md` §11) and the
+room-change merge (`sim/pathing.md` §9.8). Part A by type:
+
+| Type | Message | Fields / condition |
+|---|---|---|
+| player | 0x59 (`0x0053E8F0`) | GUID, class u8 (+0x04), name (player data), x, y (`0x00620870` position) |
+| monster | 0xAC (`0x0053E2E0`, `monsters/init.md` §24) | skipped when `0x005541B0(unit)` and `0x0063A320(unit)` both hold; then stat 328 := (x + y) & 0xFFFF; class 528 → 0x98 (`0x0053E0A0`); for each `monstats` skill slot i = 0..7 whose bit i of row +0x16C is set and skill id (row +0x170 + 2i) is valid and the unit has that skill: 0x21 (`0x0053C4A0`); then `0x00570E30`, `0x00571CD0` (§7.3 rule 2 steps 3 and 8) |
+| object | 0x51 (`0x0053BD10`, type 2: GUID, class u16, x, y, mode u8 +0x10, interact u8) | then `objects` row +0x167 bit 2 → 0x60 (`0x0053D900`); class 59 → 0x82 (`0x0053DB90`) |
+| missile | 0x73 (`0x0059FEE0`, `missiles/missiles.md` R2.4) | with `0x006486C0(path)` |
+| item | only with unit flag 0x10: mode 3 and unit flag 0x1000 → 0x9C action 2 (`0x0053EC90`), else 0x9C action 0 (`0x0053EC00`) (`items/inventory.md` §6.3) | |
+| other (5) | 0x09 (`0x0053BCD0`: type, GUID, class u8, x, y) | |
+
+Part B by type: player → `0x005489F0`, then a corpse 0x74
+(`0x0053DA40`) when `0x005541B0(unit)` and `0x00639DF0(unit, 7)` hold,
+else `0x00534F80`;
+`0x00570E30`, `0x005484B0`, `0x00571CD0`, `0x00571620`; monster → its
+mode message (§7.4), then `0x00534F80` when `0x00639DF0(unit, 93)` holds or the
+class is 291, 417 or 418; item → `0x0055BED0` (§7.3 rule 4); others nothing.
+
+#### 7.3 Type updates
+
+1. **Player** `0x00580860`: `sim/pathing.md` §10 rules 2–3 (0x15, 0x0F,
+   0x10) and `items/inventory.md` §6.1 rule 2 (item dispatcher, 0x47,
+   0x48).
+2. **Monster** `0x00598220(game, unit, client, announced)`, in order:
+   1. Flag-ex (+0xC8) bit 0x10000: S→C 0x15 (`0x0053BC10`: type, GUID,
+      x, y, flag 1; the dynamic path's cell, a static path's +0x0C /
+      +0x10), then the room-change messages `0x00554670(game, unit, 0)`
+      (`sim/pathing.md` §9.8).
+   2. Unit flag 0x1 (mode changed): the mode message (§7.4); then unit
+      flag 0x80000 := 0.
+   3. `0x00571CD0(unit, client)`: class and hireling messages (senders
+      of 0x9E–0xA2, 0xA3, 0xA4, 0xA5, 0xAB, 0x23; conditions: open
+      question 10).
+   4. Unit flag 0x100: `0x00571620` (0x76 and `0x0053C750`).
+   5. Flag-ex bit 0x1 (inventory changed): if P exists and
+      `0x00572EE0(unit, P)` → `0x00537680` (item dispatcher of
+      `items/inventory.md` §6.1 rule 3 for P); else a hireling class
+      (`0x0063EE90`) whose owner (`0x0058F0D0`) is P →
+      `0x00597890(game, unit, client, 0)`.
+   6. Unit flag 0x400: `0x00571740` (an 8-byte message, `0x0053D780`,
+      to P's own client only).
+   7. Unit flag 0x8000 (hit): S→C 0x0C (`0x00597CF0` → `0x0053B430`).
+   8. announced = 0 and `0x00639F20(unit)`: `0x00571580(unit, client,
+      0)` (`0x00570E30`, `0x005711D0`: stat messages).
+   9. `0x00625A20(unit)`: `0x005715A0` (0x11 `0x0053D850` under state
+      conditions).
+   10. Unit flag 0x800: `0x00597C70` (0x57 `0x0053D880`).
+3. **Object** `0x00581AD0`: unit flag 0x1 → `0x00581A20` (0x0E
+   `0x0053B470`; portal rows → 0x60; a mode-1 case → 0x4D with type 2);
+   flag 0x400 → `0x00571740`; flag 0x100 → `0x00571620`; flag-ex 0x1 →
+   `0x00597890(game, unit, client, 0)`; always `0x00571CD0`.
+4. **Item** `0x0055BF30`: only with unit flag 0x1 → `0x0055BED0`: an
+   item in mode 3 without unit flag 0x10 → 0x9C action 2 when unit flag
+   0x1000, else action 3 (`items/inventory.md` §6.3 part 2).
+
+#### 7.4 Monster mode message (`0x00597E20(game, unit, client)`)
+
+1. Mode row E := table `0x006E1D90` (24 bytes per mode, 16 modes):
+   {use target, target from path, moving, attack, code to point, code
+   to unit}:
+
+   | Mode | E | Mode | E |
+   |---|---|---|---|
+   | 0 DT | 0, 1, 0, 0, 8, 8 | 8 S1 | 1, 1, 0, 1, 12, 13 |
+   | 1 NU | 0, 0, 0, 0, 7, 7 | 9 S2 | 1, 1, 0, 1, 14, 15 |
+   | 2 WL | 1, 1, 1, 0, 1, 0 | 10 S3 | 1, 1, 0, 1, 26, 27 |
+   | 3 GH | 0, 0, 0, 0, 6, 6 | 11 S4 | 1, 1, 0, 1, 28, 29 |
+   | 4 A1 | 1, 1, 0, 1, 11, 10 | 12 DD | 0, 0, 0, 0, 9, 9 |
+   | 5 A2 | 1, 1, 0, 1, 17, 16 | 13 KB | 0, 1, 1, 0, 20, 20 |
+   | 6 BL | 1, 1, 0, 0, 18, 18 | 14 SQ | 1, 1, 0, 1, 12, 13 |
+   | 7 SC | 1, 1, 0, 1, 4, 5 | 15 RN | 1, 1, 1, 0, 23, 24 |
+
+2. Target T := the unit's target (`0x00553540`); T is dropped when E's
+   "use target" is 0 or T's room is not in the client's room list
+   (`0x005387F0`: T's room client array, room +0x48 / count +0x78).
+3. Mode 14, or a skill in use (`0x00620250`: skill list +0xA8 current
+   skill ≠ none): the skill message instead (`0x00597D70`): T kept →
+   0x4C (`0x0053D530`: type 1, unit GUID, skill id, level, T type, T
+   GUID); else 0x4D (`0x0053D4D0`: path target x, y). Both builders
+   send 0x99 / 0x9A instead when their last argument is non-zero; this
+   caller passes 0. No skill → nothing. Stop.
+4. The unit must have a path (fatal 0xE6). With T: id 0x68, code := E
+   code to unit, (a, b) := (T type, T GUID); modes 2 and 15 with path
+   type 5 or 6 (`0x00648E30`) instead id 0x67, code to point, (a, b) :=
+   the path target. Without T: id 0x67, code to point, (a, b) := the
+   path target (`0x00648A40`, `0x00648A60`) when "target from path",
+   else the unit's cell (`0x006488C0`, `0x00648900`).
+5. Per-mode bytes d (direction-like) and e: mode 0 and 12: d := path
+   direction (`0x006487F0`), e := unit +0xB0 for mode 0 and 0 for 12;
+   mode 3: d := `0x005A5650(unit)`, minus 1 when above 1, | 0x80 when
+   `0x005A0180(unit, 0x100)`, e := +0xB0; mode 6 without T: (a, b) :=
+   (0, −1); mode 1: 0x6D (`0x0053BB70`: GUID, unit cell x, y
+   (`0x0045ADF0`, `0x0045AE20`), d := `0x005A5650(unit)`) and stat 328
+   += 1, stop; mode 13 and the
+   moving modes: s := `0x006490A0(path)`.
+6. Send by E: moving → 0x68 (`0x0053B5F0`) or 0x67 (`0x0053B710`)
+   with (code, a, b, s); mode 13 → 0x68 (`0x0053B7F0`) or 0x67
+   (`0x0053B910`); attack → 0x6C (`0x0053BAA0`: code, a, b, d, unit
+   cell) or 0x6B (`0x0053BB00`: code, a, b, d, e, unit cell); else → 0x6A (`0x0053B9F0`: code,
+   a, b, d) or 0x69 (`0x0053BA40`: GUID u32@1, code u8@5, a u16@6, b
+   u16@8, d u8@10, e u8@11).
+7. **Death**: the kill sets mode 0 (flag 0x1), so the next client pass
+   sends 0x69 code 8 at the unit's cell with d, e (mode 0 has no
+   target); when the death animation ends the mode becomes 12 and 0x69
+   code 9 (e = 0) follows. Recorded: `69 13000000 08 9512 5515 38 06`
+   (frame 2724) and `69 13000000 09 9412 5515 38 00` (frame 2748) in
+   `20261006-015956`; 0x69 code 6 (mode 3, get-hit) 15 times.
+
+#### 7.5 Room clean-up (`0x00553220(game, unit)`)
+
+Run by tick step 6 (`sim/tick.md` §3) on every unit of every active
+room's update queue after all clients' updates; it sends nothing. In
+order:
+
+1. The stat list's changed-stat buffer is freed and its counts zeroed
+   when the list has flag 0x80000000 (`0x00625960`: list +0x50, +0x54,
+   +0x56).
+2. The unit's pending event records are freed (`0x00571F40`: list unit
+   +0xEC, +0xF0 := 0).
+3. Unit flags 0x1 and 0x10 := 0; path flag 0x2 (room changed) := 0
+   (`0x00620FA0(unit, 0)`); unit flags 0x400, 0x8000 := 0; flag-ex
+   0x800, 0x1000, 0x10000, 0x200000 := 0.
+4. The unit's state-changed bits are zeroed (`0x00639EE0`).
+5. The update-list reset `0x00597B00` (`items/inventory.md` §6.1 rule
+   4).
+6. Twice: if `0x00625A20(unit)`, `0x00627410(unit)`.
+7. By type: player: stat 29 `lastexp` := −1 (`0x00627260(unit, 29, −1,
+   0)`), unit flag 0x100 := 0, the client record's +0x34 → +4 := 0
+   (`0x0053FA90`); monster: flag 0x100 := 0; flag 0x800 set → cleared
+   and monster data +0x5C bit 0x1 := 0 (`0x00573570`); flag-ex 0x10000
+   := 0; object: flag 0x100 := 0; missile: nothing; item: unit flag
+   0x1000 := 0 and item flags 0x20, 0x2000 := 0 (`0x006280D0`).
+8. So each message of §7.1–§7.4 is sent once per change; a new unit is
+   announced in the first client pass after its creation and never
+   again by §7.1 rule 2.1.
+
+#### 7.6 Missiles, deaths and drops in one tick (e2e order)
+
+For a single-player tick in which a player's missile kills a monster
+that drops gold:
+
+1. The missile itself: no message from §7 (rule 7.1.2.1); the client
+   creates its own missiles from skill messages; 0x73 only through the
+   add messages of a room switch (§7.2).
+2. The monster: 0x69 code 8 (§7.3 rule 2 step 2), then 0x0C when the
+   hit flag 0x8000 is set (step 7).
+3. The gold: a new item (flag 0x10) dropped by the death (`0x00558AA0`
+   sets 0x1000) → 0x9C action 2 in the same pass (§7.1 rule 2.1).
+4. Monster and item are in the same room's update queue: whichever was
+   queued last goes first (`sim/unit-order.md` §6 rule 5); the item is
+   queued at its creation after the kill set the monster's mode, so the
+   item's 0x9C precedes the monster's 0x69 in that room. Open question
+   11 asks for a recording to confirm.
+
 ## Constants & data dependencies
 
 | Constant | Value | Use |
@@ -550,6 +740,14 @@ Synthetic (from the rules; CI-safe):
 | queue 200, 200, 112, 1 | buffers [512], [1] | §3.2 rules 1–2 |
 | client sends `03 10 00 20 00` twice 120 ms apart | second not sent (200 ms window) | §2.1 rule 1 |
 | client sends `0C 10 00 20 00` twice 60 ms apart | both sent (50 ms window) | §2.1 rule 1 |
+| unit update: missile with unit flag 0x10 | nothing sent | §7.1 rule 2.1 |
+| unit update: new item (flag 0x10), mode 3, flag 0x1000 | 0x9C action 2 once; after the clean-up and no change: nothing | §7.1, §7.5 |
+| unit update: monster mode 0 (flag 0x1), no target, cell (4757, 5461), d 0x38, +0xB0 6, GUID 0x13 | `69 13000000 08 9512 5515 38 06` | §7.4; recorded `-015956` frame 2724 |
+| same monster later in mode 12 at (4756, 5461) | `69 13000000 09 9412 5515 38 00` | §7.4; recorded frame 2748 |
+| monster mode 1 (flag 0x1) with GUID 6 at (4634, 4537), d 0x80 | `6d 06000000 1a12 b911 80`; stat 328 += 1 | §7.4 rule 5; recorded `-022633` seq 159 (after its 0xAC) |
+| monster mode 6 (block), no target, GUID 0x22 | `69 22000000 12 0000 ffff 00 00` | §7.4 rule 5; recorded `-015956` seq 264400 |
+| monster with a skill in use, target in the client's rooms | 0x4C, not a mode message | §7.4 rule 3 |
+| clean-up of a player | stat 29 = −1; flags 0x1, 0x10, 0x100, 0x400, 0x8000 clear | §7.5 |
 
 The vectors for size rules are implemented in `check_packets.py`'s
 `size_of` (same inputs, same outputs); `--selftest` runs the packing and
@@ -608,6 +806,21 @@ client ids 0x0C, 0x3A, 0x3B (28 client ids seen in total).
   in bit 31 of a u32 (D2MOO: two u16); 0x1A/0x1B/0x1D/0x1E read a u8
   body location.
 
+Unit-update session (2026-10-06): per-unit update `0x0053A500` (type
+table `0x0053A5B4`), walk `0x0053A620`, `0x0053A5D0`; add messages
+`0x00571F90` (tables `0x005722F8`, `0x0057230C`); monster update
+`0x00598220`; mode message `0x00597E20` (mode table `0x006E1D90`, switch
+`0x00598208` / `0x005981F0` read from the file), skill message
+`0x00597D70`, builders `0x0053D530`, `0x0053D4D0`, `0x0053B710`,
+`0x0053B910`; object update `0x00581AD0`, `0x00581A20`; item update
+`0x0055BF30`, `0x0055BED0`; clean-up `0x00553220` (type table
+`0x00553364`), `0x00625960`, `0x00571F40`, `0x00620FA0`, `0x00639EE0`,
+`0x00573570`, `0x0053FA90`; target in client's rooms `0x005387F0`;
+skill in use `0x00620250`. Stat 29 = `lastexp` (patch_d2
+`itemstatcost.txt` row 29). 0x69 codes 6 / 8 / 9 counted in
+`20261006-015956` (15 / 20 / 24, plus 2 × 0x12) and 0x51 type bytes in
+both recordings (206 × type 2).
+
 ## Open questions
 
 1. R1–R7 on a hosted game and with more message ids (the single-player
@@ -620,7 +833,9 @@ client ids 0x0C, 0x3A, 0x3B (28 client ids seen in total).
    to other hosting modes; unconfirmed.
 4. S→C senders left `-` in the TSV (35 receivable ids, among them 0x16,
    0x26, 0x27, 0x4C, 0x4D, 0x67, 0xA8, 0xAA): settle from the `caller`
-   field of `packets-0001` and later traces.
+   field of `packets-0001` and later traces. Answered in prose (TSV
+   sender cells unchanged): 0x4C / 0x99 `0x0053D530`, 0x4D / 0x9A
+   `0x0053D4D0`, 0x67 `0x0053B710` and `0x0053B910` (§7.4).
 5. S→C field layouts: only the builders in the `layout` column were read;
    every other layout is unconfirmed (one owner per system spec later).
 6. C→S field meanings marked `partial` (0x14, 0x15, 0x26, 0x2F–0x33, 0x35,
@@ -631,3 +846,11 @@ client ids 0x0C, 0x3A, 0x3B (28 client ids seen in total).
 8. 0x0B, 0x2E, 0x42, 0x43: does the 1.14d client ever send them?
 9. Client receive handlers' behaviour (§3.4 rule 3) belongs to client
    specs (Phase 5–6); not covered here.
+10. The conditions inside `0x00571CD0`, `0x00571620`, `0x005715A0`,
+    `0x00570E30` / `0x005711D0` (§7.3 rule 2 steps 3, 4, 8, 9) and which
+    of their senders fire for a plain Act I monster; and the meaning of
+    `0x005A5650` (the d byte, recorded 0x80 on 0x6D) and `0x00572EE0`.
+11. The §7.6 order (item 0x9C before the monster's 0x69 in a kill tick
+    with a drop) and where 0x65 (`0x0053D9C0`, caller `0x0053FB30`,
+    recorded right after 0x69 code 8) is sent from: a recording of a
+    kill that drops an item.

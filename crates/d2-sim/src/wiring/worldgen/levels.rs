@@ -46,11 +46,13 @@ pub struct WorldTypes {
     pub outdoor: BTreeMap<u8, Outdoor>,
     pub preset_data: PresetData,
     pub outdoor_data: OutdoorData,
-    /// Parsed lvlprest DS1 files (no I/O in the sim).
-    pub ds1: Box<dyn Ds1Source>,
+    /// Parsed lvlprest DS1 files (no I/O in the sim). `Send + Sync` so a
+    /// client DRLG copy (`client/model.md` §12 r1) can live in the Bevy
+    /// app's bridge resource.
+    pub ds1: Box<dyn Ds1Source + Send + Sync>,
     pub ds1_cache: Ds1Cache,
     /// Parsed lvlsub DS1 files.
-    pub subs: Box<dyn SubFiles>,
+    pub subs: Box<dyn SubFiles + Send + Sync>,
     /// Level-type errors, in order.
     pub errors: Vec<WorldgenError>,
 }
@@ -75,8 +77,8 @@ impl WorldTypes {
         maze: Maze,
         preset_data: PresetData,
         outdoor_data: OutdoorData,
-        ds1: Box<dyn Ds1Source>,
-        subs: Box<dyn SubFiles>,
+        ds1: Box<dyn Ds1Source + Send + Sync>,
+        subs: Box<dyn SubFiles + Send + Sync>,
     ) -> Self {
         Self {
             drlg_data,
@@ -402,7 +404,8 @@ impl LevelTypes for WorldTypes {
     /// A door cell's preset unit `0x0066D9E0` (`preset.md` §11) in a
     /// preset room.
     // TODO(preset.md §11, rooms.md §9.5.1): the door record's flag 0x20
-    // (`DoorOutcome::Placed`) is the tile code's; the seam returns
+    // (`DoorOutcome::sets_record_flag`: a unit placed or `roll(3)` = 0)
+    // is the tile code's; the seam returns
     // nothing, so it is not set. The call sites create new records (flag
     // clear) or no record, so no call is skipped by it today.
     fn door_unit(

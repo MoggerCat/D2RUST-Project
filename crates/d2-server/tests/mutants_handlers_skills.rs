@@ -33,9 +33,8 @@ use d2_sim::drlg::{
     LevelTypes, RoomGrids, RoomKind as DrlgRoomKind, TileInfo, TileRect, TileSource,
 };
 use d2_sim::game::Game;
-use d2_sim::missiles::MissileParams;
 use d2_sim::rng::Seed;
-use d2_sim::skills::use_::{mode, state, MissileAim, ModeTarget, ServerMsg, UseState};
+use d2_sim::skills::use_::{mode, state, ModeTarget, ServerMsg, UseState};
 use d2_sim::skills::{SkillEntry, SkillTables, LEVEL_CAP_114D};
 use d2_sim::stats::{ClassStats, StatData, StatTable, StateTable};
 use d2_sim::units::hooks::{MonsterInfo, UnitData};
@@ -136,14 +135,14 @@ fn skill_rec() -> Skills {
 
 /// Attack.
 const ATTACK: i32 = 0;
-/// Multiple Shot as `use.md` gives it: srvst 4; mana 4, +1/level, shift 8.
+/// Multiple Shot as `use.md` gives it: srvst 42; mana 4, +1/level, shift 8.
 const MULTI: i32 = 1;
-/// An immediate aura with a do function (srvdo 65), mana 2 (shift 8),
+/// An immediate aura with a do function (srvdo 111), mana 2 (shift 8),
 /// `decquant`, delay = formula 0, aura state 33.
 const MIGHT: i32 = 2;
 /// A non-immediate aura, aura state 40.
 const AURA: i32 = 3;
-/// A start skill (srvst 4) with `srvdofunc` 116 (free while shapeshifted).
+/// A start skill (srvst 42) with `srvdofunc` 116 (free while shapeshifted).
 const WERE: i32 = 4;
 /// Left Hand Swing (`use.md` §2 step 2).
 const LHS: i32 = 5;
@@ -153,9 +152,9 @@ const MELEE: i32 = 6;
 const BOTH: i32 = 7;
 /// A ranged skill.
 const RANGED: i32 = 8;
-/// `TargetableOnly`, srvst 4.
+/// `TargetableOnly`, srvst 42.
 const TARGETED: i32 = 9;
-/// `lineofsight` 4, srvst 4.
+/// `lineofsight` 4, srvst 42.
 const LOS: i32 = 10;
 /// A skill with `interrupt`.
 const INTERRUPT: i32 = 11;
@@ -164,27 +163,31 @@ const INTERRUPT: i32 = 11;
 /// stat 0, total) = strength.
 const DELAY_STRENGTH: [u8; 6] = [0x07, 0, 0x07, 0, 0x01, 0x05];
 
+/// Start slot of the synthetic start skills: srvst 42 (status `mapped`)
+/// stands in for Multiple Shot's srvst 4, whose body (`skills/bodies.md`
+/// §3.4, ammunition) now runs on the wired host; the do slot 66 stands
+/// in for Might's 65 (§4.5) the same way, so the fake's seam answers.
 fn skills() -> SkillTables {
     let mut v: Vec<Skills> = (0..12).map(|_| skill_rec()).collect();
     let m = &mut v[MULTI as usize];
-    (m.srvstfunc, m.mana, m.lvlmana, m.manashift) = (4, 4, 1, 8);
+    (m.srvstfunc, m.mana, m.lvlmana, m.manashift) = (42, 4, 1, 8);
     let m = &mut v[MIGHT as usize];
-    (m.aura, m.immediate, m.srvdofunc, m.aurastate) = (true, true, 65, 33);
+    (m.aura, m.immediate, m.srvdofunc, m.aurastate) = (true, true, 111, 33);
     (m.mana, m.manashift, m.decquant, m.delay) = (2, 8, true, 0);
     let m = &mut v[AURA as usize];
     (m.aura, m.aurastate) = (true, 40);
     let m = &mut v[WERE as usize];
-    (m.srvstfunc, m.srvdofunc, m.mana, m.manashift) = (4, 116, 4, 8);
+    (m.srvstfunc, m.srvdofunc, m.mana, m.manashift) = (42, 116, 4, 8);
     for s in [MELEE, BOTH, RANGED] {
-        v[s as usize].srvstfunc = 4;
+        v[s as usize].srvstfunc = 42;
     }
     v[MELEE as usize].range = 1;
     v[BOTH as usize].range = 3;
     v[RANGED as usize].range = 2;
     let m = &mut v[TARGETED as usize];
-    (m.srvstfunc, m.targetableonly) = (4, true);
+    (m.srvstfunc, m.targetableonly) = (42, true);
     let m = &mut v[LOS as usize];
-    (m.srvstfunc, m.lineofsight) = (4, 4);
+    (m.srvstfunc, m.lineofsight) = (42, 4);
     v[INTERRUPT as usize].interrupt = true;
     let mut code = DELAY_STRENGTH.to_vec();
     code.push(0x00);
@@ -471,9 +474,6 @@ impl UseRest for Book {
             .copied()
             .unwrap_or(UseState::Usable)
     }
-    fn dec_quantity(&mut self, _: UnitId, skill: i32) {
-        self.get().log.push(format!("decquant {skill}"));
-    }
     fn shapeshifted(&self, _: UnitId) -> bool {
         self.get().shapeshifted
     }
@@ -525,7 +525,6 @@ impl UseRest for Book {
             .log
             .push(format!("aura on {state} {skill} {lvl}"));
     }
-    fn skill_missile_fill(&self, _: UnitId, _: bool, _: MissileAim, _: &mut MissileParams) {}
     fn srvst(&mut self, index: u16, _: UnitId, skill: i32, lvl: i32) -> i32 {
         self.get().log.push(format!("srvst {index} {skill} {lvl}"));
         1
@@ -832,7 +831,7 @@ fn unit_validator_in_the_handler() {
     assert!(fx.log().is_empty(), "no use attempt");
     fx.place(m, 0, 150, 100, None);
     assert_eq!(fx.handle(&unit_msg(0x0E, 1, fx.guid(m))), Done);
-    assert_eq!(fx.log(), ["srvst 4 1 10"]);
+    assert_eq!(fx.log(), ["srvst 42 1 10"]);
 }
 
 // ---- use.md §2 step 2: dual wield ---------------------------------------------------------
@@ -921,11 +920,11 @@ fn run_or_use_by_range() {
         (b.melee, b.bow, b.mask) = (false, false, false);
         log
     };
-    assert_eq!(go(&mut fx, MELEE, |b| b.melee = true), ["srvst 4 6 10"]);
+    assert_eq!(go(&mut fx, MELEE, |b| b.melee = true), ["srvst 42 6 10"]);
     assert_eq!(go(&mut fx, MELEE, |_| {}), [format!("{run}{MELEE}")]);
-    assert_eq!(go(&mut fx, BOTH, |b| b.bow = true), ["srvst 4 7 10"]);
+    assert_eq!(go(&mut fx, BOTH, |b| b.bow = true), ["srvst 42 7 10"]);
     assert_eq!(go(&mut fx, BOTH, |_| {}), [format!("{run}{BOTH}")]);
-    assert_eq!(go(&mut fx, RANGED, |_| {}), ["srvst 4 8 10"]);
+    assert_eq!(go(&mut fx, RANGED, |_| {}), ["srvst 42 8 10"]);
     assert_eq!(
         go(&mut fx, RANGED, |b| b.mask = true),
         [format!("{run}{RANGED}")]
@@ -933,7 +932,7 @@ fn run_or_use_by_range() {
     // Shift (0x0E): no run, whatever the range.
     fx.with_skill(MELEE);
     assert_eq!(fx.handle(&unit_msg(0x0E, 1, g)), Done);
-    assert_eq!(fx.log(), ["srvst 4 6 10"]);
+    assert_eq!(fx.log(), ["srvst 42 6 10"]);
 }
 
 /// §3 step 4: a target with state 143 (`attached`) and an owner → the
@@ -980,7 +979,7 @@ fn can_change_mode_gates() {
     fx.sim.game.frame = 995;
     fx.handle(&point(0x0C, 110, 90));
     assert_eq!(fx.mode(), mode::SC, "995 ≤ 990 + 5");
-    assert_eq!(fx.log(), ["srvst 4 1 10"]);
+    assert_eq!(fx.log(), ["srvst 42 1 10"]);
 
     // S1: an Amazon (class 0) cannot leave it, a Paladin (3) can (no
     // used skill: the interrupt gate passes).
@@ -1125,7 +1124,7 @@ fn start_mana() {
     fx.set_mode(p, mode::NU);
     fx.handle(&point(0x0C, 110, 90));
     assert_eq!(fx.mode(), mode::SC, "free while shapeshifted");
-    assert_eq!(fx.log(), ["srvst 4 4 10"]);
+    assert_eq!(fx.log(), ["srvst 42 4 10"]);
 
     // Multiple Shot L10: (4 + 9) << 8 = 3,328; with the shrine L12: 3,840.
     let mut fx = Fx::new(0);
@@ -1135,7 +1134,7 @@ fn start_mana() {
     fx.set_state(p, 134);
     fx.handle(&point(0x0C, 110, 90));
     assert_eq!(fx.stat(8), 4000 - 3840);
-    assert_eq!(fx.log(), ["srvst 4 1 12"]);
+    assert_eq!(fx.log(), ["srvst 42 1 12"]);
 
     // Blood mana: the cost is paid with life.
     let mut fx = Fx::new(0);
@@ -1144,7 +1143,7 @@ fn start_mana() {
     fx.set_stats(p, &[(8, 4000), (6, 4000)]);
     fx.set_state(p, 114);
     fx.handle(&point(0x0C, 110, 90));
-    assert_eq!(fx.log(), ["srvst 4 1 10", "life 3328"]);
+    assert_eq!(fx.log(), ["srvst 42 1 10", "life 3328"]);
 
     // An item skill (owner GUID ≠ −1) with charges.
     let mut fx = Fx::new(0);
@@ -1159,7 +1158,7 @@ fn start_mana() {
         b.right = Some(e);
     }
     fx.handle(&point(0x0C, 110, 90));
-    assert_eq!(fx.log(), ["srvst 4 1 10", "charges 1"]);
+    assert_eq!(fx.log(), ["srvst 42 1 10", "charges 1"]);
 }
 
 // ---- use.md §5.4, §6, §7: do, cooldown, auras (through 0x3C) ---------------------------------
@@ -1176,7 +1175,9 @@ fn immediate_aura_do_and_cooldown() {
     fx.book().list = vec![entry(MIGHT, 1)];
     fx.set_stats(p, &[(0, 30), (8, 1000)]);
     assert_eq!(fx.handle(&select(MIGHT, false)), Done);
-    assert_eq!(fx.log(), ["srvdo 65 2 1", "decquant 2"]);
+    // `decquant`: the quantity body (`bodies.md` §2.5) runs on the
+    // wired host; with no stack in hand it changes nothing.
+    assert_eq!(fx.log(), ["srvdo 111 2 1"]);
     assert_eq!(fx.stat(8), 1000 - 512);
     assert!(fx.has_state(p, state::SKILL_DELAY));
     let mut t = fx.timers();
@@ -1234,7 +1235,7 @@ fn dead_unit_do_charges_nothing() {
     fx.set_stats(p, &[(0, 30), (8, 1000)]);
     fx.set_mode(p, mode::DD);
     assert_eq!(fx.handle(&select(MIGHT, false)), Done);
-    assert_eq!(fx.log(), ["srvdo 65 2 1"]);
+    assert_eq!(fx.log(), ["srvdo 111 2 1"]);
     assert_eq!(fx.stat(8), 1000);
 }
 

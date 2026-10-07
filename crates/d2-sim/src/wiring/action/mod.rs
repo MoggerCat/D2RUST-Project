@@ -4,7 +4,8 @@
 //! combat, units (modes, timer events) and the DRLG (rooms, collision)
 //! ([`missiles`], [`ai`]); DRLG room activation on the act room lists of
 //! [`crate::units::UnitLists`] ([`rooms`]); waypoints on the DRLG levels
-//! ([`waypoints`]); and one dispatcher the tick runs ([`dispatch`]).
+//! ([`waypoints`]); objects on units, timers and the DRLG ([`objects`]);
+//! and one dispatcher the tick runs ([`dispatch`]).
 //!
 //! Ownership: [`ActionSim`] holds a [`crate::units::dispatch::UnitSystem`] (unit records, stat
 //! lists, unit tables) whose hooks are [`ActionHooks`] (DRLG, missile and
@@ -24,10 +25,12 @@ pub mod combat;
 pub mod dispatch;
 pub mod missiles;
 pub mod monsters;
+pub mod objects;
 pub mod pending;
 pub mod reaction;
 pub mod rooms;
 pub mod units;
+pub mod vitals_sync;
 pub mod waypoints;
 
 #[cfg(any(test, feature = "bench-fixtures"))]
@@ -57,6 +60,7 @@ use crate::world::waypoints::WaypointRecords;
 
 pub use dispatch::ActionSim;
 pub use monsters::MonsterWorld;
+pub use objects::{ObjectCase, ObjectReach, ObjectRoute, ObjectState, ObjectView, QuestObjectCall};
 pub use pending::{KillStep, NoPending, Pending, SkillEvent};
 
 /// The tables the action modules read (typed `d2_data` records).
@@ -69,8 +73,8 @@ pub struct ActionTables {
     pub combat: CombatTables,
     /// `levels.txt` rows (AI).
     pub levels: Vec<Levels>,
-    /// `Sk1mode..Sk3mode` per monstats row ([`crate::monsters::ai::skill_modes`]).
-    pub skill_modes: Vec<[u8; 3]>,
+    /// `Sk1mode..Sk8mode` per monstats row ([`crate::monsters::ai::skill_modes`]).
+    pub skill_modes: Vec<[u8; 8]>,
 }
 
 /// The DRLG side of a game: the acts' DRLGs and their services.
@@ -99,6 +103,8 @@ pub enum WiringError {
     Walk(crate::path::walk::WalkError),
     /// A placement fatal assert (`sim/path-placement.md` §7–§12).
     Place(crate::path::place_seams::PlaceError),
+    /// An object fatal assert (`world/objects.md`).
+    Object(crate::world::objects::ObjectError),
 }
 
 /// The [`crate::units::hooks::UnitHooks`] of [`ActionSim`]'s unit system
@@ -124,6 +130,19 @@ pub struct ActionHooks<X> {
     pub items: crate::wiring::economy::ItemStore,
     /// Waypoint records per player (player data +0x1C, `waypoints.md` §2).
     pub waypoints: BTreeMap<UnitId, WaypointRecords>,
+    /// The object control (game +0x10F0, `objects.md` §2), the object
+    /// tables and the host tick ([`objects`]). `None` (the default): not
+    /// created ([`ActionSim::create_objects`]); the object routes keep
+    /// their [`Pending`] answers. Lent to an object call (`None` then).
+    pub objects: Option<ObjectState>,
+    /// The object state is lent out for a call.
+    objects_out: bool,
+    /// Players whose pets follow them after a placement
+    /// (`path-placement.md` §10 rule 6, `0x005754B0`), for the host that
+    /// holds the pet lists (`hirelings.md` §6 rule 1). `None` (the
+    /// default): the call does nothing (no pet list in the action
+    /// wiring).
+    pub pet_follows: Option<Vec<UnitId>>,
     /// The loaded `AnimData.d2` (`formats/animdata.md`, parsed by
     /// `d2-formats`): the records `UnitHooks::anim_record` looks up by
     /// COF name. `None`: no record for any unit (as before the table is
@@ -147,6 +166,18 @@ pub struct ActionHooks<X> {
     /// `None` (the default): the path seams keep their [`Pending`]
     /// answers; [`ActionHooks::enable_paths`] turns the provider on.
     pub paths: Option<Box<crate::wiring::path::PathState>>,
+    /// The table data of the skill bodies (`skills/bodies.md`;
+    /// [`crate::skills::use_::bodies::BodyTables`]). `None`: no
+    /// itemstatcost flags, state groups or overlays (every lookup answers
+    /// "no record").
+    pub bodies: Option<Arc<crate::skills::use_::bodies::BodyTables>>,
+    /// Unit event handler lists (unit +0x90, `bodies.md` §2.13), first =
+    /// head.
+    pub handlers: BTreeMap<UnitId, Vec<crate::skills::use_::bodies::Handler>>,
+    /// The client vitals sync's caches ([`vitals_sync`], `vitals.md` §5).
+    /// `None` (the default): the sync is off;
+    /// [`ActionHooks::enable_vitals_sync`] turns it on.
+    pub sync: Option<vitals_sync::SyncState>,
     /// Seams with no provider yet.
     pub x: X,
     /// Scratch seed handed out for a unit without a record (an error is
@@ -168,12 +199,18 @@ impl<X> ActionHooks<X> {
             game_seed,
             items: crate::wiring::economy::ItemStore::new(),
             waypoints: BTreeMap::new(),
+            objects: None,
+            objects_out: false,
+            pet_follows: None,
             anim_data: None,
             vitals: None,
             mode_target: None,
             monster_world: None,
             monster_world_out: false,
             paths: None,
+            bodies: None,
+            handlers: BTreeMap::new(),
+            sync: None,
             x,
             orphan_seed: Seed::init(),
             errors: Vec::new(),
@@ -187,6 +224,15 @@ impl<X> ActionHooks<X> {
     pub fn enable_paths(&mut self) -> Result<(), crate::path::PathError> {
         self.paths = Some(Box::new(crate::wiring::path::PathState::new()?));
         Ok(())
+    }
+
+    /// Sets the host's `GetTickCount` the object calls read
+    /// (`objects.md` edge case 9: an input of `d2-sim`, never read by
+    /// it). No object state: nothing.
+    pub fn set_host_tick(&mut self, ms: u32) {
+        if let Some(st) = self.objects.as_mut() {
+            st.host_tick = ms;
+        }
     }
 
     /// The missile store (outside a missile call).

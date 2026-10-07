@@ -309,14 +309,16 @@ impl Drlg {
     /// `0x00539DA0` with `new` = none): DRLG statuses (§4.1), level
     /// activity (`levels.md` §9.1), then the client joins every room of
     /// the new adjacency array missing from the old and leaves every room
-    /// of the old array missing from the new.
+    /// of the old array missing from the new. Returns the rooms the
+    /// client joined, in the new array's order (`0x0053A8E0` runs for each:
+    /// `sim/path-placement.md` §11 "Recipients").
     pub fn client_changes_room(
         &mut self,
         svc: &mut Services<'_>,
         client: ClientId,
         old: Option<DrlgRoomId>,
         new: Option<DrlgRoomId>,
-    ) -> Result<(), DrlgError> {
+    ) -> Result<Vec<DrlgRoomId>, DrlgError> {
         self.change_status_room(svc, old, new)?;
         self.update_level_activity(svc.data, svc.types, old, new)?;
         let adj = |d: &Self, r: Option<DrlgRoomId>| {
@@ -326,9 +328,11 @@ impl Drlg {
                 .unwrap_or_default()
         };
         let (old_adj, new_adj) = (adj(self, old), adj(self, new));
+        let mut joined = Vec::new();
         for &r in &new_adj {
             if !old_adj.contains(&r) {
                 self.add_room_client(r, client);
+                joined.push(r);
             }
         }
         for &r in &old_adj {
@@ -336,7 +340,7 @@ impl Drlg {
                 self.remove_room_client(r, client);
             }
         }
-        Ok(())
+        Ok(joined)
     }
 
     /// The active rooms of this DRLG in act-list id order (lookup only).

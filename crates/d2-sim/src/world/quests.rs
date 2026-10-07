@@ -2,7 +2,7 @@
 //! The quest system: flag records (§1), quest control and records (§2),
 //! game entry (§3), event dispatch (§4), the updater and its timers (§5),
 //! status messages (§6), NPC dialog hooks (§7), act transitions and
-//! portals (§8), helpers (§9). Act I state machines are in [`act1`].
+//! portals (§8), helpers (§9). Act I state machines are in [`act1`], Act II's in [`act2`].
 //!
 //! Units, items, NPC chat, monsters and levels belong to other specs and
 //! are reached through [`QuestWorld`]. Message bytes leave through
@@ -11,8 +11,21 @@
 //! `QuestWorld::unhandled` instead of being guessed.
 
 pub mod act1;
+pub mod act2;
+pub mod act3;
+pub mod act4;
+pub mod act5;
+pub mod late;
 pub mod tables;
 
+#[cfg(test)]
+mod act1_rest_misc_tests;
+#[cfg(test)]
+mod act1_rest_q4_tests;
+#[cfg(test)]
+mod act1_tests;
+#[cfg(test)]
+mod act3_tests;
 #[cfg(test)]
 mod gaps_tests;
 #[cfg(test)]
@@ -21,7 +34,7 @@ mod tests;
 use std::collections::BTreeSet;
 
 use crate::rng::Seed;
-use crate::units::UnitId;
+use crate::units::{RoomId, UnitId};
 
 pub use tables::{MessageEntry, QuestRow, QuestTables};
 
@@ -94,6 +107,10 @@ pub enum QuestError {
     Table(#[from] crate::world::TsvError),
     #[error("quests.tsv: {0}")]
     TableShape(&'static str),
+    /// A fatal assert inside a quest callback (`quests.md` §10): the
+    /// function's 1.14d address.
+    #[error("quest callback {0:#x}: fatal assert")]
+    Fatal(u32),
 }
 
 // ------------------------------------------------------------------ §1
@@ -261,6 +278,27 @@ impl QuestRecord {
 pub enum TimerFn {
     /// `0x00590230`: Den of Evil status 5 while state 4; returns 1.
     DenOfEvilStatus,
+    /// `0x00590BF0`: Burial Grounds status 3; returns 1 (§10.5).
+    BurialStatus,
+    /// `0x00593260`: the Tristram Cain removal walk; returns 1 (§10.6).
+    CainRemoval,
+    /// `0x00592D50`: the Tristram portal at the class-17 stone; kept
+    /// until created or the stone is gone (`quests-act1-rest.md` §2.3).
+    TristramPortal,
+    /// `0x005954C0`: Forgotten Tower status 13; returns 1 (§10.7).
+    TowerStatus,
+    /// `0x00596500`: Andariel's portals and status 3 (§10.8).
+    AndarielPortals,
+    /// `0x00596580`: chain 6's sequence timer, state 0 → 1 (§10.8).
+    SlaughterOpen,
+    /// An Act II timer (`world/quests-act2.md`).
+    Act2(act2::Timer),
+    /// An Act III timer (`quests-act3.md`).
+    Act3(act3::Timer),
+    /// Act IV timers (`quests-act4.md`).
+    Act4(act4::Timer),
+    /// Act V timers (`quests-act5.md`, `quests-act5-2.md`).
+    Act5(act5::Timer),
     /// Test probe: logs through `unhandled(chain, tick)`, never removed.
     #[cfg(test)]
     Probe,
@@ -294,6 +332,9 @@ pub struct QuestControl {
     pub rows: Vec<QuestRow>,
     /// NPC message tables.
     pub messages: Vec<MessageEntry>,
+    /// Fatal asserts the callbacks reached ([`QuestError::Fatal`]), in
+    /// order; the original aborts at the first.
+    pub faults: Vec<QuestError>,
 }
 
 /// The seam to the rest of the game. Expected providers in brackets.
@@ -310,7 +351,9 @@ pub trait QuestWorld {
     fn has_act2(&self) -> bool;
 
     // Players and units (units group).
-    /// Every player, in `unit-order.md` §7 order.
+    /// Every player in the walk order of `0x005537D0`
+    /// (`quests-act1-rest.md` §8 item 9: hash buckets 0–127, each from its
+    /// head; players with state 7 skipped).
     fn players(&self) -> Vec<UnitId>;
     /// `0x00539070` / `0x00537860`: the first client's player.
     fn first_client_player(&self) -> Option<UnitId>;
@@ -326,6 +369,8 @@ pub trait QuestWorld {
     /// The unit seed (+0x20).
     fn unit_seed(&mut self, unit: UnitId) -> &mut Seed;
     fn stat(&self, unit: UnitId, stat: u16) -> i32;
+    /// `0x006253B0`: the unit's base stat, layer 0 (A1Q3's level test).
+    fn base_stat(&self, unit: UnitId, stat: u16) -> i32;
     /// `0x006272B0`: add to a stat.
     fn add_stat(&mut self, unit: UnitId, stat: u16, delta: i32);
     /// `0x00553380`.
@@ -341,9 +386,16 @@ pub trait QuestWorld {
     fn monster_by_guid(&self, guid: u32) -> Option<(UnitId, u16)>;
     /// A monster unit's class id (NPC class), if it is a monster.
     fn monster_class(&self, unit: UnitId) -> Option<u16>;
-    /// Players in the unit's room or an adjacent room (A1Q2, D2MOO
-    /// `ACT1Q2_UnitIterate_SetRewardPending`).
+    /// The players P with a room for which A1Q2's J3 test holds
+    /// (§10.5): P's room is the unit's room, or the unit's room is in
+    /// P's room's room list (`0x00619790`, `drlg/rooms.md` §10.4). Empty
+    /// when the unit has no room.
     fn players_near(&self, unit: UnitId) -> Vec<UnitId>;
+    /// `0x00554630` and the party list at game +0x1D2C (§10.4 I3): the
+    /// members of the player's party in list order, GUID lookups that
+    /// fail skipped; `None` when the party id is 0xFFFF (no party; a
+    /// single player is in none, open question 7).
+    fn party_members(&self, player: UnitId) -> Option<Vec<UnitId>>;
 
     // Messages (server transport).
     fn send(&mut self, player: UnitId, msg: &[u8]);
@@ -352,6 +404,8 @@ pub trait QuestWorld {
 
     // Items (items / inventory).
     fn has_item(&self, player: UnitId, code: [u8; 4]) -> bool;
+    /// `0x00628590`: an item unit's code (`None`: not an item).
+    fn item_code(&self, item: UnitId) -> Option<[u8; 4]>;
     /// `0x00544160`: delete the player's item with `code`.
     fn delete_item(&mut self, player: UnitId, code: [u8; 4]);
     /// `0x005466B0` (§9.1): create, place or drop a reward item.
@@ -388,14 +442,705 @@ pub trait QuestWorld {
     fn create_portal(&mut self, player: UnitId, x: i32, y: i32, class: u16, level: u32) -> bool;
     /// Schedule object timer event 7 (QUESTFN) at `frame` (tick).
     fn schedule_quest_event(&mut self, object: UnitId, frame: i32);
-    /// Set a quest object "opened" (objects).
-    fn set_object_opened(&mut self, object: UnitId);
+    /// An object's mode (+0x10); 0 when there is no object (§10.5).
+    fn object_mode(&self, object: UnitId) -> i32;
+    /// `0x00624690`: set an object's mode (objects).
+    fn set_object_mode(&mut self, object: UnitId, mode: i32);
+    /// `0x00552F60` with type 2: the object with this GUID and its class.
+    fn object_by_guid(&self, guid: u32) -> Option<(UnitId, u16)>;
     /// `0x00579180(npc)`: the mercenary reward (NPC spec).
     fn mercenary_reward(&mut self, player: UnitId, npc: u16);
+
+    // Act I quest seams (§10.6–§10.8; paths, rooms, monsters, objects).
+    /// `0x00620870`: the unit's position and room (`None`: no room).
+    fn unit_position(&self, unit: UnitId) -> Option<(i32, i32, RoomId)>;
+    /// `0x00619730`: (x, y) inside the room's tile rectangle, the last
+    /// row and column excluded (§10.6 step 15).
+    fn room_contains(&self, room: RoomId, x: i32, y: i32) -> bool;
+    /// `0x00463740`: the room holding (x, y), searched from `room`.
+    fn room_at(&self, room: RoomId, x: i32, y: i32) -> Option<RoomId>;
+    /// `0x00545340` from a point: a free spot (size, mask, radius, limit).
+    #[allow(clippy::too_many_arguments)]
+    fn free_spot_at(
+        &mut self,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        size: u32,
+        mask: u32,
+        radius: u32,
+        limit: u32,
+    ) -> Option<(i32, i32, RoomId)>;
+    /// `0x005B2F20(game, room, x, y, class, mode, r, 0)`: spawn a monster.
+    #[allow(clippy::too_many_arguments)]
+    fn spawn_monster(
+        &mut self,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        class: u16,
+        mode: u8,
+        r: u32,
+    ) -> Option<UnitId>;
+    /// Unit +0xC4 |= `flags`.
+    fn or_unit_flags(&mut self, unit: UnitId, flags: u32);
+    /// Every monster, in the walk order of `0x005537D0` (type 1).
+    fn monsters(&self) -> Vec<UnitId>;
+    /// `0x00572DC0` / `0x00573180`: the players chatting with `npc`;
+    /// `None` when no chat is open with it.
+    fn npc_chat_clients(&self, npc: UnitId) -> Option<Vec<UnitId>>;
+    /// `0x005A7E60(monster, 0, buf)` + `0x005A7C20(game, buf, 1)`:
+    /// request the monster's removal mode (`monsters/init.md`).
+    fn remove_monster(&mut self, monster: UnitId);
+    /// `0x00543140(game, 1, class, 0)`: drop act `act`'s stored preset
+    /// of monster `class`.
+    fn drop_preset_monster(&mut self, act: u8, class: u16);
+    /// The first object of `class` in the rooms of `object`'s room list
+    /// (§10.6 stone operate).
+    fn find_object_near(&self, object: UnitId, class: u16) -> Option<UnitId>;
+    /// `0x0056EDE0` then `0x0061AED0`: an object of `class` at (x, y),
+    /// its room refreshed.
+    fn create_object(&mut self, room: RoomId, x: i32, y: i32, class: u16) -> Option<UnitId>;
+    /// `0x00640E90`: the object's animation length (>> 8 gives frames).
+    fn object_anim_length(&self, object: UnitId) -> i32;
+    /// `0x005417D0`: schedule object event `ev` at `frame`.
+    fn schedule_object_event(&mut self, object: UnitId, ev: u8, frame: i32);
+    /// `0x005456A0(player, object, msg)`: open quest message `msg`.
+    fn open_quest_message(&mut self, player: UnitId, object: UnitId, msg: u16);
+
+    // Act I remainder seams (`quests-act1-rest.md`).
+    /// `0x005B2F20(game, room, x, y, class, mode, spread, flags)`: spawn a
+    /// monster with spawn flags (`monsters/init.md`).
+    #[allow(clippy::too_many_arguments)]
+    fn spawn_monster_flags(
+        &mut self,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        class: u16,
+        mode: u8,
+        spread: i32,
+        flags: u32,
+    ) -> Option<UnitId>;
+    /// `0x0056D130(game, owner, room, x, y, level, 0, class, exact)`: a
+    /// portal object of `class` to `level`; `exact` = at (x, y) only,
+    /// else a free spot is searched (`quests-act1-rest.md` §1.2, §2.3).
+    #[allow(clippy::too_many_arguments)]
+    fn open_portal(
+        &mut self,
+        owner: Option<UnitId>,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        level: u32,
+        class: u16,
+        exact: bool,
+    ) -> Option<UnitId>;
+    /// `0x0056EDE0(game, owner, skill, level, class, x, y)`
+    /// (`quests-act1-rest.md` §4.1): create a missile.
+    #[allow(clippy::too_many_arguments)]
+    fn create_missile(
+        &mut self,
+        owner: UnitId,
+        skill: u16,
+        level: u8,
+        class: u16,
+        x: i32,
+        y: i32,
+    ) -> Option<UnitId>;
+    /// `0x0064A710` / `0x0064A760`: missile data +0x28 and +0x2C.
+    fn set_missile_target(&mut self, missile: UnitId, a: u32, b: u32);
+    /// `0x0061AED0(room, 0)` on the unit's room.
+    fn refresh_room(&mut self, unit: UnitId);
+    /// `0x00555230(game, 2, class, …, mode)`: allocate an object of
+    /// `class` at (x, y) in `room` with `mode`.
+    fn spawn_object(
+        &mut self,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        class: u16,
+        mode: i32,
+    ) -> Option<UnitId>;
+    /// The save flags (client +0x0A) of the player's client
+    /// (`0x005531C0`); `None`: no client.
+    fn client_save_flags(&self, player: UnitId) -> Option<u16>;
+    fn set_client_save_flags(&mut self, player: UnitId, flags: u16);
+
+    // Act III quest seams (`quests-act3.md`; the Act II seams below are
+    // shared with it). The default bodies report the function through
+    // `unhandled` (chain 0xFF) and do nothing, until a host provides them.
+    /// Game +0xC4: the game has an Act III (DRLG).
+    fn has_act3(&mut self) -> bool {
+        self.unhandled(0xFF, 0x005B_9A30);
+        false
+    }
+    /// `0x005A43E0(game, room, 0, class, 1, 0, 0, 1)` (monster spec).
+    fn spawn_monster_in_room(&mut self, room: RoomId, class: u16) -> Option<UnitId> {
+        let _ = (room, class);
+        self.unhandled(0xFF, 0x005A_43E0);
+        None
+    }
+    /// `0x005B3090`: spawn a monster at a unit in `mode`.
+    fn spawn_monster_at_unit(&mut self, unit: UnitId, class: u16, mode: u8) -> Option<UnitId> {
+        let _ = (unit, class, mode);
+        self.unhandled(0xFF, 0x005B_3090);
+        None
+    }
+    /// `0x005DDFC0` then `0x005DFEE0`: kill a monster (monster spec).
+    fn kill_monster(&mut self, monster: UnitId) {
+        let _ = monster;
+        self.unhandled(0xFF, 0x005D_DFC0);
+    }
+    /// `0x00619DA0`: the room covering (x, y).
+    fn room_covering(&mut self, x: i32, y: i32) -> Option<RoomId> {
+        let _ = (x, y);
+        self.unhandled(0xFF, 0x0061_9DA0);
+        None
+    }
+    /// A unit of type 0 (player) in `room` or a room of its room list
+    /// (`0x00619790`), scanned in list order.
+    fn player_in_rooms(&mut self, room: RoomId) -> bool {
+        let _ = room;
+        self.unhandled(0xFF, 0x0061_9790);
+        false
+    }
+    /// `0x0059D9D0`: the sewer stairs' warp (object spec).
+    fn stairs_warp(&mut self, object: UnitId, player: UnitId) {
+        let _ = (object, player);
+        self.unhandled(0xFF, 0x0059_D9D0);
+    }
+    /// The first player in the object's room unit list closer than
+    /// `dist` (`0x00641530`).
+    fn player_near_object(&mut self, object: UnitId, dist: i32) -> Option<UnitId> {
+        let _ = (object, dist);
+        self.unhandled(0xFF, 0x0064_1530);
+        None
+    }
+    /// `0x005A0180(victim)` or `0x0063E9F0(0, victim)` (unique /
+    /// champion / boss tests, monster spec).
+    fn special_monster(&mut self, victim: UnitId) -> bool {
+        let _ = victim;
+        self.unhandled(0xFF, 0x005A_0180);
+        false
+    }
+    /// `0x006229F0(room, x, y, mask)`: nonzero = blocked.
+    fn blocked(&mut self, room: RoomId, x: i32, y: i32, mask: u32) -> bool {
+        let _ = (room, x, y, mask);
+        self.unhandled(0xFF, 0x0062_29F0);
+        false
+    }
+    /// `0x0063BEF0` on the inventory: the code of the player's weapon.
+    fn weapon_code(&mut self, player: UnitId) -> Option<[u8; 4]> {
+        let _ = player;
+        self.unhandled(0xFF, 0x0063_BEF0);
+        None
+    }
 
     /// A function the spec names but does not specify was reached; the
     /// host logs it (open questions 6–8).
     fn unhandled(&mut self, chain: u8, function: u32);
+
+    // Act II quest seams (`world/quests-act2.md`). Each default reports
+    // the original function through `unhandled` (chain 0xFF) and returns
+    // the neutral value, so hosts that do not provide one yet still build.
+
+    /// `0x005382B0`: the player's client is in act `act` (0-based).
+    fn client_in_act(&mut self, player: UnitId, act: u8) -> bool {
+        let _ = (player, act);
+        self.unhandled(0xFF, 0x0053_82B0);
+        false
+    }
+    /// `0x0061C450`: start the Tainted Sun on act `act` (environment).
+    fn start_tainted_sun(&mut self, act: u8) {
+        let _ = act;
+        self.unhandled(0xFF, 0x0061_C450);
+    }
+    /// `0x0061C4D0`: end the Tainted Sun on Act II (environment).
+    fn end_tainted_sun(&mut self) {
+        self.unhandled(0xFF, 0x0061_C4D0);
+    }
+    /// `0x00545850(op)`: the shared quest-chest gate (object spec).
+    fn quest_chest_gate(&mut self, object: UnitId, player: UnitId) -> bool {
+        let _ = (object, player);
+        self.unhandled(0xFF, 0x0054_5850);
+        false
+    }
+    /// Set the object's (or monster's) drop code to `code`, then
+    /// `0x00559A30(game, unit, quality, &level, 0, −1, droppable)`: one
+    /// item. `level`: the value in the level variable (`None`: the spec
+    /// does not name it, quests-act2 open question). Returns the item.
+    fn quest_drop(
+        &mut self,
+        unit: UnitId,
+        code: [u8; 4],
+        quality: u8,
+        level: Option<i32>,
+        droppable: bool,
+    ) -> Option<UnitId> {
+        let _ = (unit, code, quality, level, droppable);
+        self.unhandled(0xFF, 0x0055_9A30);
+        None
+    }
+    /// `0x006280D0(item, 0x10)`: mark an item identified.
+    fn identify_item(&mut self, item: UnitId) {
+        let _ = item;
+        self.unhandled(0xFF, 0x0062_80D0);
+    }
+    /// `0x00585B90(op, kind)`: the chest's own treasure (object spec).
+    fn object_treasure(&mut self, object: UnitId, kind: u8) {
+        let _ = (object, kind);
+        self.unhandled(0xFF, 0x0058_5B90);
+    }
+    /// `0x00585970(game, object, 'gld ', 2)`: one normal gold pile.
+    fn drop_gold(&mut self, object: UnitId) {
+        let _ = object;
+        self.unhandled(0xFF, 0x0058_5970);
+    }
+    /// `0x0061AED0`: set or clear a room's has-portal flag.
+    fn set_room_portal(&mut self, room: RoomId, on: bool) {
+        let _ = (room, on);
+        self.unhandled(0xFF, 0x0061_AED0);
+    }
+    /// `0x00555230(game, room, x, y, class, flags 1, 0, 0)`: an object
+    /// (the Act II call form; `spawn_object` is the Act I form with a mode).
+    fn spawn_quest_object(&mut self, room: RoomId, x: i32, y: i32, class: u16) -> Option<UnitId> {
+        let _ = (room, x, y, class);
+        self.unhandled(0xFF, 0x0055_5230);
+        None
+    }
+    /// `0x00623830`: free an object's collision.
+    fn free_object_collision(&mut self, object: UnitId) {
+        let _ = object;
+        self.unhandled(0xFF, 0x0062_3830);
+    }
+    /// `0x00535060(player) == 1`: the player is busy.
+    fn player_busy(&mut self, player: UnitId) -> bool {
+        let _ = player;
+        self.unhandled(0xFF, 0x0053_5060);
+        false
+    }
+    /// The player's interact unit (type, GUID), if any.
+    fn interact_unit(&mut self, player: UnitId) -> Option<(u8, u32)> {
+        let _ = player;
+        self.unhandled(0xFF, 0x0055_4120);
+        None
+    }
+    /// `0x00554120(player, type, guid)` (`Some`) / `0x00554190` (`None`).
+    fn set_interact_unit(&mut self, player: UnitId, unit: Option<(u8, u32)>) {
+        let _ = (player, unit);
+        self.unhandled(0xFF, 0x0055_4120);
+    }
+    /// `0x0053D8D0`: S→C 0x58, the orifice insert dialog.
+    fn open_insert_dialog(&mut self, player: UnitId, object: UnitId) {
+        let _ = (player, object);
+        self.unhandled(0xFF, 0x0053_D8D0);
+    }
+    /// `Range` of `missiles.txt` row `row`; `None` when the table has
+    /// no such row.
+    fn missile_range(&mut self, row: u32) -> Option<i32> {
+        let _ = row;
+        self.unhandled(0xFF, 0x0059_DD80);
+        None
+    }
+    /// `0x005678A0`: the player is trading.
+    fn is_trading(&mut self, player: UnitId) -> bool {
+        let _ = player;
+        self.unhandled(0xFF, 0x0056_78A0);
+        false
+    }
+    /// `0x0052E050`: remove a unit.
+    fn remove_unit(&mut self, unit: UnitId) {
+        let _ = unit;
+        self.unhandled(0xFF, 0x0052_E050);
+    }
+    /// `0x00572DC0`, then `0x00573180(0, 1)` when it found an interact
+    /// unit (AI spec): true when it did.
+    fn npc_hold_chat(&mut self, npc: UnitId) -> bool {
+        let _ = npc;
+        self.unhandled(0xFF, 0x0057_2DC0);
+        false
+    }
+    /// `0x0061B060(act, level, kind, …, 3)` then `0x0052D0F0`: a spawn
+    /// location of `kind` in `level`.
+    fn spawn_location(&mut self, act: u8, level: u32, kind: u8) -> Option<(i32, i32, RoomId)> {
+        let _ = (act, level, kind);
+        self.unhandled(0xFF, 0x0061_B060);
+        None
+    }
+    /// `0x0064E7E0`: a free spot from a point (size, mask, radius).
+    fn free_spot_near(
+        &mut self,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        size: u32,
+        mask: u32,
+        radius: u32,
+    ) -> Option<(i32, i32, RoomId)> {
+        let _ = (room, x, y, size, mask, radius);
+        self.unhandled(0xFF, 0x0064_E7E0);
+        None
+    }
+    /// `0x005DC5C0`: distance between two units.
+    fn unit_distance(&mut self, a: UnitId, b: UnitId) -> i32 {
+        let _ = (a, b);
+        self.unhandled(0xFF, 0x005D_C5C0);
+        i32::MAX
+    }
+    /// `0x006416D0`: a living player within `radius` of the unit.
+    fn living_player_within(&mut self, unit: UnitId, radius: i32) -> bool {
+        let _ = (unit, radius);
+        self.unhandled(0xFF, 0x0064_16D0);
+        false
+    }
+    /// `0x005723C0`: the player heard NPC `class`'s intro (chain 38;
+    /// quests-act2 open question 5).
+    fn npc_intro_heard(&mut self, player: UnitId, class: u16) -> bool {
+        let _ = (player, class);
+        self.unhandled(0xFF, 0x0057_23C0);
+        false
+    }
+    /// `0x00572360`: set NPC `class`'s intro bit (chain 38).
+    fn set_npc_intro(&mut self, player: UnitId, class: u16) {
+        let _ = (player, class);
+        self.unhandled(0xFF, 0x0057_2360);
+    }
+
+    // Act IV / V seams. Each has a default that reports the 1.14d
+    // function through `unhandled` (chain 0xFE) so hosts that do not
+    // provide it yet keep building.
+
+    // -- Act IV, Fallen Angel / Hell's Forge / gossip (quests-act4.md §3, §4, §6).
+
+    /// `0x00619DA0` on the DRLG of act `act` (0-based; Act IV's is game
+    /// +0xC8): the room covering (x, y), if any (act4 §3.6, the ghost's
+    /// spawn room).
+    fn room_in_act_at(&mut self, act: u8, x: i32, y: i32) -> Option<RoomId> {
+        let _ = (act, x, y);
+        self.unhandled(0xFE, 0x0061_9DA0);
+        None
+    }
+
+    /// `0x006416D0`: the distance between two units (`None`: not known;
+    /// act4 §3.6 Izual's ghost, act5 §4.6 / §4.10 barbarians; paths
+    /// spec).
+    fn distance_between(&mut self, a: UnitId, b: UnitId) -> Option<i32> {
+        let _ = (a, b);
+        self.unhandled(0xFE, 0x0064_16D0);
+        None
+    }
+
+    /// `0x0063BEF0` and the items record code (+0x80): the code of the
+    /// weapon the player wields; `None` without an inventory or a weapon
+    /// (act4 §4.6, the Hellforge's hammer test).
+    fn wielded_weapon_code(&mut self, player: UnitId) -> Option<[u8; 4]> {
+        let _ = player;
+        self.unhandled(0xFE, 0x0063_BEF0);
+        None
+    }
+    // -- end Act IV q1/q3 seams.
+
+    // -- Act IV, Terror's End (quests-act4.md §5).
+    /// The object's `objects.txt` `FrameCnt1` column value (record
+    /// +0xDC ÷ 256), read by the seal activation `0x005B5630` for its
+    /// end-animation event at f + 2·fc1 (`sim/units.md` §6.4).
+    fn object_frame_count1(&mut self, object: UnitId) -> i32 {
+        let _ = object;
+        self.unhandled(0xFE, 0x005B_5630);
+        0
+    }
+    /// The u16 entry `n` of the data-tables array at +0xAE0 (read
+    /// elsewhere by `0x00586B30`; entries 36–38 = the seal bosses, open
+    /// question 8).
+    fn superunique_id(&mut self, n: u8) -> u16 {
+        let _ = n;
+        self.unhandled(0xFE, 0x0058_6B30);
+        0
+    }
+    /// `0x00545C30(game, dummy, &(x, y), arg, id)`: spawn superunique
+    /// `id` at (x, y) beside the dummy object (`arg` 2 here).
+    fn spawn_superunique(
+        &mut self,
+        dummy: UnitId,
+        x: i32,
+        y: i32,
+        arg: u32,
+        id: u16,
+    ) -> Option<UnitId> {
+        let _ = (dummy, x, y, arg, id);
+        self.unhandled(0xFE, 0x0054_5C30);
+        None
+    }
+    /// The units of type 1 (monsters) of each active room of the Act IV
+    /// DRLG (`0x0061A180(game +0xC8)`, next room +0x7C) whose level is
+    /// `level`, in room-list then unit-list order (+0x74, next +0xE8,
+    /// read before the unit is handled).
+    fn level_monsters(&mut self, level: u32) -> Vec<UnitId> {
+        let _ = level;
+        self.unhandled(0xFE, 0x0061_A180);
+        Vec::new()
+    }
+    /// `0x005541B0`: the unit is dead (≠ 0).
+    fn unit_dead(&mut self, unit: UnitId) -> bool {
+        let _ = unit;
+        self.unhandled(0xFE, 0x0055_41B0);
+        false
+    }
+    /// `0x006259B0`: the unit's alignment (0 = evil).
+    fn alignment(&mut self, unit: UnitId) -> u32 {
+        let _ = unit;
+        self.unhandled(0xFE, 0x0062_59B0);
+        0
+    }
+    /// `0x005351C0`: end the player's interaction (classic end of game).
+    fn end_interaction(&mut self, player: UnitId) {
+        let _ = player;
+        self.unhandled(0xFE, 0x0053_51C0);
+    }
+    /// `0x0053AEC0(game, player, level, arg)`: level warp
+    /// (`drlg/levels.md`).
+    fn warp_to_level(&mut self, player: UnitId, level: u32, arg: u32) {
+        let _ = (player, level, arg);
+        self.unhandled(0xFE, 0x0053_AEC0);
+    }
+    /// `0x00530590(game, 0)`: end the game (host, open question 10).
+    fn end_game(&mut self) {
+        self.unhandled(0xFE, 0x0053_0590);
+    }
+    /// `0x0052E2A0(game)`: the host save pass (acts in game types 1 and
+    /// 2 only; host, open question 10).
+    fn save_pass(&mut self) {
+        self.unhandled(0xFE, 0x0052_E2A0);
+    }
+    /// The player's client exists and `0x00535060` (busy) returns 0
+    /// (`items/inventory.md`).
+    fn client_idle(&mut self, player: UnitId) -> bool {
+        let _ = player;
+        self.unhandled(0xFE, 0x0053_5060);
+        false
+    }
+    /// `0x0054B830(game, player, level, arg)`: act change to `level`.
+    fn act_change(&mut self, player: UnitId, level: u32, arg: u32) {
+        let _ = (player, level, arg);
+        self.unhandled(0xFE, 0x0054_B830);
+    }
+    /// `0x005B4FF0`: the level's waypoint index (`0x00660E00`) set in
+    /// player data +0x1C + 4·`difficulty` (`0x00660EC0`,
+    /// `world/waypoints.md`).
+    fn activate_waypoint(&mut self, player: UnitId, level: u32, difficulty: u8) {
+        let _ = (player, level, difficulty);
+        self.unhandled(0xFE, 0x005B_4FF0);
+    }
+    // -- end Act IV q2 seams.
+
+    // -- Act V part 1 (quests-act5.md).
+    /// `0x00555230(game, 2, class, x, y, room, f0, f1, f2)`: an object
+    /// of `class` at (x, y) in `room` with the three flag arguments the
+    /// spec lists ("flags 1, 1, 0"; object spec). `None`: not created.
+    fn place_object(
+        &mut self,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        class: u16,
+        flags: [u8; 3],
+    ) -> Option<UnitId> {
+        let _ = (room, x, y, class, flags);
+        self.unhandled(0xFE, 0x0055_5230);
+        None
+    }
+    /// The units of every room in `room`'s adjacent-room list
+    /// (`0x00619790`, the room itself included as the list holds it),
+    /// room by room in list order, each room's unit list in order.
+    fn adjacent_units(&mut self, room: RoomId) -> Vec<UnitId> {
+        let _ = room;
+        self.unhandled(0xFE, 0x0061_9790);
+        Vec::new()
+    }
+    /// A unit's mode (+0x10), read inline by `0x00588040`, `0x005888D0`
+    /// and `0x00588E10` (monsters), and as `0x0058D510` reads it for
+    /// players; 0 when there is no unit.
+    fn unit_mode(&mut self, unit: UnitId) -> i32 {
+        let _ = unit;
+        self.unhandled(0xFE, 0x0058_8040);
+        0
+    }
+    /// "Critical spawn" `0x005459A0(game, x, y, room, 1, class)`
+    /// (monster spec).
+    fn critical_spawn(&mut self, room: RoomId, x: i32, y: i32, class: u16) -> Option<UnitId> {
+        let _ = (room, x, y, class);
+        self.unhandled(0xFE, 0x0054_59A0);
+        None
+    }
+    /// "Kill in place" (`quests-act5.md` §1.1): the unit's interaction
+    /// is ended, it is put in mode 12 and removed (`0x005A7E60`,
+    /// `0x005A7C20`, `0x0061A270`, `0x00623830`, `0x0064C370`).
+    fn kill_in_place(&mut self, unit: UnitId) {
+        let _ = unit;
+        self.unhandled(0xFE, 0x005A_7E60);
+    }
+    /// `0x0058F000` then `0x00666120`: apply a stored NPC map AI (the
+    /// map-AI record `map_ai`, a handle the map-AI store passed) to the
+    /// unit. False (nothing applied) when the record's +4 is 0.
+    fn apply_map_ai(&mut self, unit: UnitId, map_ai: u32) -> bool {
+        let _ = (unit, map_ai);
+        self.unhandled(0xFE, 0x0058_F000);
+        false
+    }
+    /// Town cleanup (`0x005893E0`, inline): Anya's interaction ends and
+    /// she leaves her room without dying (monster spec).
+    fn npc_leave_town(&mut self, unit: UnitId) {
+        let _ = unit;
+        self.unhandled(0xFE, 0x0058_93E0);
+    }
+    /// `0x00589340`: Nihlathak killed in town (interaction ended, path
+    /// freed, AI event 2 deleted, stat 6 := 0, mode 12, refresh, unit
+    /// flags |= 1; monster spec).
+    fn kill_in_town(&mut self, unit: UnitId) {
+        let _ = unit;
+        self.unhandled(0xFE, 0x0058_9340);
+    }
+    /// Thaw step 1 (`0x0058AAB0`, inline): the frozen object leaves its
+    /// room (object spec).
+    fn object_leave_room(&mut self, object: UnitId) {
+        let _ = object;
+        self.unhandled(0xFE, 0x0058_AAB0);
+    }
+    /// `0x00558200(player, 0)`: the item level of Anya's rare item
+    /// (item spec; `quests-act5.md` open question 2).
+    fn quest_item_level(&mut self, player: UnitId) -> i32 {
+        let _ = player;
+        self.unhandled(0xFE, 0x0055_8200);
+        0
+    }
+    /// The item's `items.txt` drop sound (record +0x124), read inline by
+    /// `0x00589580`.
+    fn item_drop_sound(&mut self, item: UnitId) -> i32 {
+        let _ = item;
+        self.unhandled(0xFE, 0x0058_9580);
+        0
+    }
+    /// `0x006251F0` + `0x00626E10` + `0x00548520`: a new stat list on
+    /// the player with stats 39, 41, 43, 45 := `v`, the four sent
+    /// (`quests-act5.md` open question 3: stacking).
+    fn add_resist_list(&mut self, player: UnitId, v: i32) {
+        let _ = (player, v);
+        self.unhandled(0xFE, 0x0062_51F0);
+    }
+    /// `0x0054E600`: preset spawn of superunique `superunique`'s monster
+    /// at (x, y) in `room` (monster spec).
+    fn preset_superunique_spawn(
+        &mut self,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        superunique: u16,
+    ) -> Option<UnitId> {
+        let _ = (room, x, y, superunique);
+        self.unhandled(0xFE, 0x0054_E600);
+        None
+    }
+    // -- end Act V part 1 seams.
+
+    // -- Act V part 2 (quests-act5-2.md).
+    /// `0x00660E00` / `0x00660E50` on player data +0x1C + 4·d: the
+    /// player's waypoint of `level` is active (`world/waypoints.md`).
+    fn waypoint_active(&mut self, player: UnitId, level: u32) -> bool {
+        let _ = (player, level);
+        self.unhandled(0xFE, 0x0066_0E50);
+        false
+    }
+    /// `0x00545C30(game, unit, position, 2, superunique)` with the unit's
+    /// own position: spawn the superunique there (monster spec). The same
+    /// function as `spawn_superunique` with an explicit spot; one provider
+    /// serves both.
+    fn spawn_superunique_at_unit(&mut self, at: UnitId, superunique: u16) -> Option<UnitId> {
+        let _ = (at, superunique);
+        self.unhandled(0xFE, 0x0054_5C30);
+        None
+    }
+    /// `0x0058C8D0`: missile `missile` from `from` towards `to` (flags,
+    /// level; missile spec).
+    fn quest_missile(&mut self, from: UnitId, to: UnitId, missile: u16, flags: u32, level: u8) {
+        let _ = (from, to, missile, flags, level);
+        self.unhandled(0xFE, 0x0058_C8D0);
+    }
+    /// `0x0058BEC0`: remove a spawned Ancient (unit state 54 →
+    /// `0x005544B0`; in a room → mode 12, out of the room, collision
+    /// freed; monster spec).
+    fn remove_ancient(&mut self, monster: UnitId) {
+        let _ = monster;
+        self.unhandled(0xFE, 0x0058_BEC0);
+    }
+    /// `0x00611830`: the player class's maximum level.
+    fn max_level(&mut self, player: UnitId) -> i32 {
+        let _ = player;
+        self.unhandled(0xFE, 0x0061_1830);
+        0
+    }
+    /// `0x00611800`: the experience threshold T(level) of the player's
+    /// class.
+    fn experience_threshold(&mut self, player: UnitId, level: i32) -> u32 {
+        let _ = (player, level);
+        self.unhandled(0xFE, 0x0061_1800);
+        0
+    }
+    /// `0x00570880`: level up (character progression spec).
+    fn level_up(&mut self, player: UnitId) {
+        let _ = player;
+        self.unhandled(0xFE, 0x0057_0880);
+    }
+    /// `0x005353F0` then `0x00535430`: close the player's town portal
+    /// if it is in `level`.
+    fn close_town_portal(&mut self, player: UnitId, level: u32) {
+        let _ = (player, level);
+        self.unhandled(0xFE, 0x0053_5430);
+    }
+    /// `0x0059D9D0`: the stairs' warp of `object` for the player (object
+    /// spec).
+    fn object_stairs_warp(&mut self, player: UnitId, object: UnitId) {
+        let _ = (player, object);
+        self.unhandled(0xFE, 0x0059_D9D0);
+    }
+    /// `0x0056EDE0` with type 2: object `class` at the unit's position
+    /// (`flags` the first of the three trailing arguments, then 0, 0).
+    fn create_object_at(&mut self, at: UnitId, class: u16, flags: u32) -> Option<UnitId> {
+        let _ = (at, class, flags);
+        self.unhandled(0xFE, 0x0056_EDE0);
+        None
+    }
+    /// `0x0056EDE0` with the missile type: missile `class` at the unit
+    /// (missile spec).
+    fn create_missile_at(&mut self, at: UnitId, class: u16) -> Option<UnitId> {
+        let _ = (at, class);
+        self.unhandled(0xFE, 0x0056_EDE0);
+        None
+    }
+    /// `0x00538680(client, act, difficulty)`: character progression
+    /// (save spec; `quests-act5-2.md` open question 2).
+    fn character_progression(&mut self, player: UnitId, act: u8, difficulty: u8) {
+        let _ = (player, act, difficulty);
+        self.unhandled(0xFE, 0x0053_8680);
+    }
+    /// `0x0055B030`: a gold pile of `amount` at the unit.
+    fn drop_gold_amount(&mut self, at: UnitId, amount: u32) {
+        let _ = (at, amount);
+        self.unhandled(0xFE, 0x0055_B030);
+    }
+    /// `monstats.txt` row count (datatables +0xA80), read by `0x0058E830`.
+    fn monstats_rows(&mut self) -> u32 {
+        self.unhandled(0xFE, 0x0058_E830);
+        0
+    }
+    /// `monstats.txt` flags byte +0x0E bit 6 of `class` (the zoo test of
+    /// `0x0058E830`; open question 4).
+    fn zoo_eligible(&mut self, class: u32) -> bool {
+        let _ = class;
+        self.unhandled(0xFE, 0x0058_E830);
+        false
+    }
+    // -- end Act V part 2 seams.
 }
 
 /// A unit as the kill parse sees it (§4.4).
@@ -469,6 +1214,8 @@ impl QuestControl {
                 extra: act1::Extra::default(),
             };
             act1::init(&mut r);
+            act2::init(&mut r);
+            act3::init(&mut r);
             made.push(r);
         }
         made.reverse();
@@ -483,6 +1230,7 @@ impl QuestControl {
             fx: 0,
             rows: tables.rows.clone(),
             messages: tables.messages.clone(),
+            faults: Vec::new(),
         })
     }
 
@@ -664,9 +1412,10 @@ impl QuestControl {
         }
     }
 
-    /// `0x005436B0`: add a link for `chain` to the unit (§4.6). The
-    /// special cases for chains 4, 8, 12 (`0x00592F80`, `0x005991B0`,
-    /// `0x0059C3B0`) are reported as unhandled before the link is added.
+    /// `0x005436B0`: add a link for `chain` to the unit (§4.6). `special`
+    /// names the special case the caller found (chain 4 with an object of
+    /// class 61: `0x00592F80`; chains 8 and 12: `ret 4` stubs); it runs
+    /// before the link is added.
     pub fn add_link<W: QuestWorld>(
         &mut self,
         w: &mut W,
@@ -678,7 +1427,11 @@ impl QuestControl {
             return false;
         }
         if let Some(f) = special {
-            w.unhandled(chain, f);
+            match chain {
+                4 => act1::q4::link_object(self, w, Some(unit)),
+                8 | 12 => {}
+                _ => w.unhandled(chain, f),
+            }
         }
         let Some(c) = w.quest_chain(unit) else {
             return false;
@@ -917,9 +1670,8 @@ impl QuestControl {
                 m[5..7].copy_from_slice(&tomb.to_le_bytes());
             }
             if list[36] != 0 {
-                // TODO(quests OQ8): `0x00588C50` (barbarians left, Act V)
-                // is not specified; reported as 0.
-                w.unhandled(32, 0x0058_8C50);
+                let left = act5::barbarians_left(self, w);
+                m[7..9].copy_from_slice(&left.to_le_bytes());
             }
             w.send(player, &m);
         }
@@ -948,10 +1700,7 @@ impl QuestControl {
         let status = self.status_for(w, i, player)?.unwrap_or(r.status);
         let extra = match r.filter {
             1 => act1::den_monsters_left(r),
-            36 => {
-                w.unhandled(32, 0x0058_8C50);
-                0
-            }
+            36 => act5::barbarians_left(self, w),
             _ => 0,
         };
         let mut m = [0u8; 6];
@@ -1071,8 +1820,6 @@ impl QuestControl {
         player: UnitId,
         npc_class: u16,
     ) -> Result<(), QuestError> {
-        // TODO(quests OQ10): the 0x61 byte and the intro-flag act are D2MOO
-        // 1.10f's (2, 3, 5; acts I, II, II); 1.14d's registers are open.
         match npc_class {
             npc::WARRIV1 => {
                 let Some(f) = flags_of(w, player) else {
@@ -1086,12 +1833,20 @@ impl QuestControl {
                     set_intro_flags(w, player, 0);
                 }
                 let f = flags_of(w, player).copied().unwrap_or_default();
-                if f.get(6, 13) && f.get(6, 0) && self.record(6).is_some_and(|r| r.not_intro) {
-                    // Chain 6's callback 3 with these arguments is not
-                    // specified (OQ8).
-                    w.unhandled(6, 0x0059_6010);
+                if f.get(6, 13) && f.get(6, 0) {
+                    if let Some(i) = self.find(6).filter(|&i| self.records[i].not_intro) {
+                        // Chain 6's callback 3 with a = 1, b = 40 (§10.8).
+                        let args = EventArgs {
+                            event: event::CHANGED_LEVEL,
+                            player: Some(player),
+                            a: 1,
+                            b: 40,
+                            ..EventArgs::default()
+                        };
+                        act1::callback(self, w, i, args, None, false);
+                    }
                 }
-                w.unhandled(4, 0x0059_7310);
+                act1::q4::act_change(self, w, player);
             }
             npc::MESHIF1 => {
                 let Some(f) = flags_of(w, player) else {
@@ -1120,12 +1875,11 @@ impl QuestControl {
                 if !f.get(28, 0) && expansion {
                     f.set(28, 0);
                     f.set(28, 13);
+                    // The Act II list (sic, §8.1).
                     set_intro_flags(w, player, 1);
                     send_player_flags(w, player, 6, 0);
                     if w.player_byte_4c(player) != 1 {
-                        // TODO(quests OQ10): the 0x5D sent before 0x61 is
-                        // not specified.
-                        w.unhandled(28, 0x0054_67E0);
+                        w.send(player, &[0x5D, 0x17, 2, 0, 0, 0]);
                         can_go_to_act(w, player, 5);
                     }
                 }
@@ -1139,7 +1893,7 @@ impl QuestControl {
     /// Durance; others go to `0x005BCFD0` (A3Q6, unspecified).
     pub fn object_warp<W: QuestWorld>(&mut self, w: &mut W, player: UnitId, level: u32) {
         if level != 102 {
-            w.unhandled(20, 0x005B_CFD0);
+            act3::durance_warp(self, w);
             return;
         }
         let Some(f) = flags_of(w, player) else { return };
@@ -1172,6 +1926,28 @@ pub fn send_player_flags<W: QuestWorld>(w: &mut W, player: UnitId, unit_type: u8
     m.push(0);
     m.extend_from_slice(&rec.0);
     w.send(player, &m);
+}
+
+/// `0x00538680(client, step, difficulty)` on save flags (client +0x0A;
+/// `quests-act1-rest.md` §5): bits 8–12 hold the progression p; n = m ·
+/// difficulty + step with m = 5 for an expansion character (bit 5), else
+/// 4; p is raised to n, never lowered. n is or-ed in unmasked.
+pub fn progression(flags: u16, step: u8, difficulty: u8) -> u16 {
+    let m = ((u32::from(flags) & 0x20) | 0x80) >> 5;
+    let n = m * u32::from(difficulty) + u32::from(step);
+    let p = (u32::from(flags) >> 8) & 0x1F;
+    if n < p {
+        return flags;
+    }
+    ((u32::from(flags) & 0xE0FF) | (n << 8)) as u16
+}
+
+/// [`progression`] on the player's client (`0x005531C0`); nothing when
+/// the host has no client for it.
+pub fn raise_progression<W: QuestWorld>(w: &mut W, player: UnitId, step: u8, difficulty: u8) {
+    if let Some(f) = w.client_save_flags(player) {
+        w.set_client_save_flags(player, progression(f, step, difficulty));
+    }
 }
 
 /// Player data +0x4C ≠ 1 → set it and send `61 act` (§8.1).
@@ -1300,33 +2076,82 @@ pub fn cow_portal<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, player: Unit
 }
 
 /// `0x00544840` (§9.4): C→S 0x3E read a clue item (after the handler's
-/// item checks). `bkd ` → the Cairn stone order; `trs ` → `0x0059D6A0`.
+/// item checks). `bkd ` → the Cairn stone order (§10.6); `trs ` →
+/// `0x0059D6A0`.
 pub fn read_clue<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, player: UnitId, code: [u8; 4]) {
     match &code {
         b"bkd " => act1::send_stone_order(ctl, w, player),
-        b"trs " => w.unhandled(13, 0x0059_D6A0),
+        b"trs " => true_tomb_clue(ctl, w, player),
         _ => {}
     }
 }
 
-/// `0x005449E0` (§9.5): object timer event 7 by object class.
-pub fn object_event<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: UnitId, class: u16) {
-    match class {
-        act1::WIRT_BODY => act1::wirt_body(ctl, w, object),
-        0x16F
-        | 0xBD
-        | 0x1A
-        | 0x7A
-        | 0x83
-        | 0x155
-        | 0x173
-        | 0x178
-        | 0x1CB..=0x1CD
-        | 0x1DA..=0x1DC => {
-            // TODO(quests §9.5, OQ8): the per-class quest functions other
-            // than Wirt's body are not specified.
-            w.unhandled(0xFF, u32::from(class));
+/// `0x0059D6A0` (§9.4): 0x50 with u16 13 and the true tomb's level − 66
+/// (0 when the level is 0); a nonzero level is kept at chain 13's extra
+/// +0x34. Bytes 5–14 are never written in the original (stack); 0 here.
+fn true_tomb_clue<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, player: UnitId) {
+    let level = w.true_tomb_level();
+    let tomb = if level == 0 { 0 } else { level as i32 - 66 };
+    if level != 0 {
+        if let Some(r) = ctl.record_mut(13) {
+            r.extra.tomb_level = level;
         }
+    }
+    let mut m = [0u8; 15];
+    m[0] = 0x50;
+    m[1..3].copy_from_slice(&13u16.to_le_bytes());
+    m[3..5].copy_from_slice(&(tomb as i16).to_le_bytes());
+    w.send(player, &m);
+}
+
+/// `0x005449E0` (§9.5): object timer event 7 by object class. The Act
+/// II–V functions are catalogued only (§11) and reported.
+pub fn object_event<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: UnitId, class: u16) {
+    // "Record c": no record → nothing.
+    let record = |ctl: &QuestControl, w: &mut W, chain: u8, f: u32| {
+        if ctl.find(chain).is_some() {
+            w.unhandled(chain, f);
+        }
+    };
+    match class {
+        // Cain's gibbet (`quests-act1-rest.md` §1.2).
+        0x1A => act1::q4::gibbet_event(ctl, w, object),
+        0x7A => act2::q4::harem_blocker(ctl, w, object),
+        0x83 => {
+            let Some(level) = w.unit_level(object) else {
+                return;
+            };
+            if w.object_mode(object) == 1 {
+                w.set_object_mode(object, 2);
+            }
+            match level {
+                76 => w.unhandled(0xFF, 0x005B_23C0),
+                108 => act4::q2::dummy_event(ctl, w, object),
+                _ => {}
+            }
+        }
+        0xBD => match (w.unit_act(object), w.unit_level(object)) {
+            (Some(0), _) => record(ctl, w, 4, 0x0059_42C0),
+            (_, Some(l)) if l == 109 || l >= 113 => {
+                if ctl.find(33).is_some() {
+                    act5::q3::portal_event(ctl, w, object);
+                }
+            }
+            _ => {
+                if ctl.find(32).is_some() {
+                    act5::q2::portal_event(ctl, w, object);
+                }
+            }
+        },
+        act1::WIRT_BODY => act1::wirt_body(ctl, w, object),
+        0x155 => act3::bridge_event(ctl, w, object),
+        0x16F => act3::lever_event(ctl, w, object),
+        0x173 => act1::q5::chest_event(ctl, w, object),
+        0x178 if ctl.find(24).is_some() => act4::q3::forge_event(ctl, w, object),
+        0x1CB => act5::q4::temple_portal_event(ctl, w, object),
+        0x1CC => act5::q3::anya_dummy_event(ctl, w, object),
+        0x1CD => act5::q3::nihlathak_dummy_event(ctl, w, object),
+        0x1DA..=0x1DC if ctl.find(35).is_some() => act5::q5::statue_event(ctl, w, object),
         _ => {}
     }
 }

@@ -8,6 +8,7 @@ use std::collections::BTreeMap;
 
 use super::data::DrlgData;
 use super::level::Drlg;
+use super::logic::LogicGrids;
 use super::room::RoomKind;
 use super::seams::{Services, TileInfo, TileSource};
 use super::{room_flags, DrlgError, DrlgRoomId, TileRect};
@@ -220,6 +221,9 @@ pub struct RoomGrids {
     pub animate: bool,
     /// lvlprest AnimSpeed (0 = 80).
     pub anim_speed: u32,
+    /// Preset rooms whose lvlprest `Logicals` ≠ 0: the grids the
+    /// logical-room build reads (`levels.md` §11.2 step 1).
+    pub logicals: Option<LogicGrids>,
 }
 
 /// Index table `0x006EF620` (§9.6) by new tile type.
@@ -575,6 +579,12 @@ impl Drlg {
         }
         if grids.animate {
             self.setup_animation(id, grids.anim_speed)?;
+        }
+        // `levels.md` §11.2: the coordinate lists, after the record-count
+        // freeze. Other room types return above (§11.2 step 3).
+        match (self.room(id).kind, &grids.logicals) {
+            (RoomKind::Preset, Some(g)) => self.build_logic_grid(id, g),
+            _ => self.build_logic_one(id),
         }
         Ok(())
     }
@@ -974,6 +984,8 @@ impl Drlg {
             let r = self.room_mut(id);
             r.flags &= !room_flags::HAS_ROOM;
             r.tiles = None;
+            // `levels.md` §11.2: the info and its records go with the tiles.
+            r.logic = None;
             self.freed_rooms = self.freed_rooms.wrapping_add(1);
             svc.types.free_room_tiles(self, id);
         }

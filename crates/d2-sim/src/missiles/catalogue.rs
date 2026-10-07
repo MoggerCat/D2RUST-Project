@@ -1,15 +1,15 @@
 // Spec: specs/missiles/missiles.md §R9 (catalogues `srvdo.tsv`, `srvhit.tsv`)
 //! The server-do and server-hit function tables (§R9.1) and their
 //! dispatch. Bodies the spec gives in full are implemented; every other
-//! non-null entry is a stub that logs [`Unhandled`] and does nothing.
 //! The address tables below are copied from `srvdo.tsv` / `srvhit.tsv` and
 //! checked against them by `tests::catalogues_match_tsv` (METHODS M05).
 //!
-//! Implemented: server-do 1 (default flight, §R4); the seeded sub-missile
-//! helper `0x005A9820` (§R9.3) that server-do 8, 10, 17 and 25 call.
-//! Stubs: every other server-do (2, 3, 5–37) and every server-hit
-//! (1–29, 31–33, 35–40, 43–45, 47–48, 50–59): their bodies are
-//! `summarized` or `D2MOO-only` in the catalogues.
+//! Implemented: every non-null entry. Server-do 1 is the default flight
+//! (§R4); §R9.5 / §R9.6 bodies are in [`super::bodies`],
+//! `missiles/bodies.md` in [`super::bodies_ext`], `missiles/bodies-2.md`
+//! in [`super::bodies_ext2`]; the seeded sub-missile helper `0x005A9820`
+//! (§R9.3) that server-do 8, 10, 17 and 25 call is here. A null entry
+//! logs [`Unhandled`] and does nothing.
 
 use crate::game::Game;
 use crate::units::UnitId;
@@ -155,9 +155,16 @@ pub const SRVDO_TSV: &str = include_str!("../../../../specs/missiles/srvdo.tsv")
 pub const SRVHIT_TSV: &str = include_str!("../../../../specs/missiles/srvhit.tsv");
 
 /// Server-do indices with a body here.
-pub const SRV_DO_IMPLEMENTED: [i16; 1] = [1];
+pub const SRV_DO_IMPLEMENTED: [i16; 36] = [
+    1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27,
+    28, 29, 30, 31, 32, 33, 34, 35, 36, 37,
+];
 /// Server-hit indices with a body here.
-pub const SRV_HIT_IMPLEMENTED: [i16; 0] = [];
+pub const SRV_HIT_IMPLEMENTED: [i16; 53] = [
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
+    27, 28, 29, 31, 32, 33, 35, 36, 37, 38, 39, 40, 43, 44, 45, 47, 48, 50, 51, 52, 53, 54, 55, 56,
+    57, 58, 59,
+];
 
 /// Whether a server-hit index is called (1…70, §R5 step 6.3).
 pub fn srv_hit_in_range(index: i16) -> bool {
@@ -171,30 +178,139 @@ pub fn run_srv_do<W: MissileWorld + ?Sized>(
     index: i16,
     m: UnitId,
 ) -> i32 {
+    use super::bodies::*;
+    use super::bodies_ext::*;
+    use super::bodies_ext2::*;
     match index {
         1 => default_flight(game, cx, m),
+        2 => srv_do_2(game, cx, m),
+        3 => srv_do_3(game, cx, m),
+        5 => srv_do_5(game, cx, m),
+        6 => srv_do_6(game, cx, m),
+        7 => srv_do_7(game, cx, m),
+        8 => srv_do_8(game, cx, m),
+        9 => srv_do_9(game, cx, m),
+        10 => srv_do_10(game, cx, m),
+        11 => srv_do_11(game, cx, m),
+        12 => srv_do_12(game, cx, m),
+        13 => srv_do_13(game, cx, m),
+        14 => srv_do_14(game, cx, m),
+        15 => srv_do_15(game, cx, m),
+        16 => srv_do_16(game, cx, m),
+        17 => srv_do_17(game, cx, m),
+        18 => srv_do_18(game, cx, m),
+        19 => srv_do_19(game, cx, m),
+        20 => srv_do_20(game, cx, m),
+        21 => srv_do_21(game, cx, m),
+        22 => srv_do_22(game, cx, m),
+        // One function at both entries (`bodies.md` §20).
+        23 | 24 => srv_do_23(game, cx, m),
+        25 => srv_do_25(game, cx, m),
+        26 => srv_do_26(game, cx, m),
+        27 => srv_do_27(game, cx, m),
+        28 => srv_do_28(game, cx, m),
+        29 => srv_do_29(game, cx, m),
+        30 => srv_do_30(game, cx, m),
+        31 => srv_do_31(game, cx, m),
+        32 => srv_do_32(game, cx, m),
+        33 => srv_do_33(game, cx, m),
+        34 => srv_do_34(game, cx, m),
+        35 => srv_do_35(game, cx, m),
+        36 => srv_do_36(game, cx, m),
+        37 => srv_do_37(game, cx, m),
         _ => {
             let entry = SRV_DO.get(index as usize).copied().flatten();
             cx.store.unhandled.push(match entry {
                 Some(_) => Unhandled::SrvDo { index, missile: m },
                 None => Unhandled::NullSrvDo { index, missile: m },
             });
-            // TODO(missiles.md open question 8): stub; the body is not
-            // spec'd. Keeps the missile, does nothing else.
+            // Only null entries reach here (crash in 1.14d): keeps the
+            // missile, does nothing else.
             1
         }
     }
 }
 
 /// Runs server-hit `index` with the handler's current result `c`
-/// (§R5 step 5/6.3; the caller checked 1…70). A stub returns `c`
-/// unchanged, as if the row had no function.
+/// (§R5 step 5/6.3; the caller checked 1…70): the §R9.6 bodies
+/// ([`super::bodies`]) and those of `missiles/bodies.md` /
+/// `bodies-2.md`; a null entry returns `c` unchanged.
 pub fn run_srv_hit<W: MissileWorld + ?Sized>(
-    _game: &mut Game,
+    game: &mut Game,
     cx: &mut Ctx<'_, W>,
     index: i16,
     m: UnitId,
-    _unit: Option<UnitId>,
+    unit: Option<UnitId>,
+    c: i32,
+) -> i32 {
+    use super::bodies::*;
+    use super::bodies_ext::*;
+    use super::bodies_ext2::*;
+    match index {
+        1 => srv_hit_1(game, cx, m, unit),
+        2 => srv_hit_2(game, cx, m, unit),
+        3 => srv_hit_3(game, cx, m, unit),
+        4 => srv_hit_4(game, cx, m, unit),
+        5 => srv_hit_5(game, cx, m),
+        6 => srv_hit_6(game, cx, m),
+        7 => srv_hit_7(game, cx, m, unit),
+        8 => srv_hit_8(game, cx, m, unit),
+        9 => srv_hit_9(game, cx, m, unit),
+        10 => srv_hit_10(game, cx, m, unit),
+        11 => srv_hit_11(game, cx, m, unit),
+        12 => srv_hit_12(game, cx, m, unit),
+        13 => srv_hit_13(game, cx, m, unit),
+        14 => srv_hit_14(game, cx, m, unit),
+        15 => srv_hit_15(game, cx, m),
+        16 => srv_hit_16(game, cx, m, unit),
+        17 => srv_hit_17(game, cx, m, unit),
+        18 => srv_hit_18(game, cx, m, unit),
+        19 => srv_hit_19(game, cx, m, unit),
+        20 => srv_hit_20(game, cx, m),
+        21 => srv_hit_21(game, cx, m, unit),
+        22 => srv_hit_22(game, cx, m),
+        23 => srv_hit_23(game, cx, m, unit),
+        24 => srv_hit_24(game, cx, m, unit),
+        25 => srv_hit_25(game, cx, m, unit),
+        26 => srv_hit_26(game, cx, m),
+        // Returns 1 and does nothing else (`bodies.md` §15).
+        27 => 1,
+        28 => srv_hit_28(game, cx, m, unit),
+        29 => srv_hit_29(game, cx, m),
+        31 => srv_hit_31(game, cx, m, unit),
+        32 => srv_hit_32(game, cx, m, unit),
+        33 => srv_hit_33(game, cx, m, unit),
+        35 => srv_hit_35(game, cx, m, unit),
+        36 => srv_hit_36(game, cx, m, unit),
+        37 => srv_hit_37(unit),
+        38 => srv_hit_38(game, cx, m),
+        39 => srv_hit_39(game, cx, m),
+        40 => srv_hit_40(game, cx, m),
+        43 => srv_hit_43(game, cx, m, unit),
+        44 => srv_hit_44(game, cx, m, unit),
+        45 => srv_hit_45(game, cx, m),
+        47 => srv_hit_47(game, cx, m, unit),
+        48 => srv_hit_48(game, cx, m),
+        50 => srv_hit_50(cx, m, unit),
+        51 => srv_hit_51(game, cx, m),
+        52 => srv_hit_52(game, cx, m),
+        53 => srv_hit_53(game, cx, m, unit),
+        54 => srv_hit_54(game, cx, m, unit),
+        55 => srv_hit_55(game, cx, m, unit),
+        56 => srv_hit_56(game, cx, m),
+        57 => srv_hit_57(game, cx, m, unit),
+        58 => srv_hit_58(game, cx, m),
+        59 => srv_hit_59(game, cx, m),
+        _ => null_srv_hit(cx, index, m, c),
+    }
+}
+
+/// A null server-hit entry (crash in 1.14d): logged, as if the row had no
+/// function.
+fn null_srv_hit<W: MissileWorld + ?Sized>(
+    cx: &mut Ctx<'_, W>,
+    index: i16,
+    m: UnitId,
     c: i32,
 ) -> i32 {
     let entry = SRV_HIT.get(index as usize).copied().flatten();
@@ -202,7 +318,8 @@ pub fn run_srv_hit<W: MissileWorld + ?Sized>(
         Some(_) => Unhandled::SrvHit { index, missile: m },
         None => Unhandled::NullSrvHit { index, missile: m },
     });
-    // TODO(missiles.md open question 8): stub; the body is not spec'd.
+    // Only null entries reach here (crash in 1.14d): as if the row had no
+    // function.
     c
 }
 

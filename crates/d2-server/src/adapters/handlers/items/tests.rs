@@ -731,7 +731,7 @@ fn click_button_closes_the_cube() {
 /// 0x18 with the cube open: the ring in the cube (page 3 of the
 /// player's inventory) matches the recipe; the amulet is created on a
 /// real unit; the ring gets S→C 0x9D action 5 now (`inventory.md` §6.4,
-/// §11: owner the player, empty item bit stream: OQ1; its stored page
+/// §11: owner the player, the ring's item bit stream; its stored page
 /// set to 3), is unlinked and freed; sound 4; the amulet is placed by
 /// §2.4 into the cube (page 3) and identified (§8). Empty cube: nothing
 /// (§3 step 1). Any type-4 GUID transmutes.
@@ -752,7 +752,27 @@ fn click_button_transmutes() {
     x9d.extend_from_slice(&rg.to_le_bytes());
     x9d.push(0);
     x9d.extend_from_slice(&pg.to_le_bytes());
-    assert_eq!(t.frame(&click(0x18)), (ResultCode::Done, vec![x9d]));
+    let lookup_tables = t.host.game.world.tables.clone();
+    let (code, mut sent) = t.frame(&click(0x18));
+    assert_eq!(code, ResultCode::Done);
+    assert_eq!(sent.len(), 1);
+    // The ring's item bit stream (`items/bitstream.md`): its code, in the
+    // cube page (stored page 3 → page + 1 = 4), exact length.
+    let m = sent.pop().unwrap();
+    assert_eq!(usize::from(m[2]), m.len());
+    let bits = d2_proto::item_bits::decode(
+        &m[13..],
+        &crate::adapters::item_bits::TablesLookup(&lookup_tables),
+    )
+    .unwrap();
+    assert_eq!(&bits.code, b"rin ");
+    let Some(d2_proto::item_bits::Location::Slot { page1, .. }) = bits.location else {
+        panic!("{bits:?}");
+    };
+    assert_eq!(page1, 4);
+    x9d[2] = m[2];
+    x9d.extend_from_slice(&m[13..]);
+    assert_eq!(m, x9d);
     assert!(t.pending.take().is_empty());
     assert!(!t.items().contains(ring));
     assert!(t.host.game.game.lists.unit(ring).is_none());

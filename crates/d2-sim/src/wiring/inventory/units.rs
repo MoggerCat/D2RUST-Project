@@ -71,6 +71,9 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MoveUnits for InvDesk<'_, '_, H, R>
     fn unit_class(&self, u: Owner) -> u32 {
         self.rec_of(u).map_or(0, |r| r.class)
     }
+    fn unit_mode(&self, u: Owner) -> u32 {
+        self.rec_of(u).map_or(0, |r| r.mode)
+    }
     /// Items: the item data x, y (§2.2; §9.1 step 3); other units: seam.
     fn pos(&self, u: Owner) -> (i32, i32) {
         if u.ty == Owner::ITEM {
@@ -168,6 +171,23 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MoveUnits for InvDesk<'_, '_, H, R>
     fn is_type(&self, item: Guid, ty: u16) -> bool {
         self.data(item)
             .is_some_and(|d| self.tables.is_type(d.record, ty as i16))
+    }
+    fn primary_type(&self, item: Guid) -> u16 {
+        self.item_rec(item).map_or(0, |r| r.type_ as u16)
+    }
+    fn stackable(&self, item: Guid) -> bool {
+        self.item_rec(item).is_some_and(|r| r.stackable != 0)
+    }
+    /// Itemtypes `autostack` of the primary type (`0x0062E790`).
+    fn autostack(&self, item: Guid) -> bool {
+        self.data(item)
+            .and_then(|d| self.econ.tables.itype_of(d.record))
+            .is_some_and(|t| t.autostack != 0)
+    }
+    fn quiver(&self, item: Guid) -> bool {
+        self.data(item)
+            .and_then(|d| self.tables.itype_of(d.record))
+            .is_some_and(|t| t.quiver != 0)
     }
     fn code(&self, item: Guid) -> [u8; 4] {
         self.item_rec(item).map_or([0; 4], |r| r.code)

@@ -9,6 +9,7 @@
 use super::draw::{ImageRef, ImageRequest, TextRequest, TextStyle, UiDraw, UiDrawSink};
 use super::geom::{Point, Rect, FRAME};
 use super::panel::WidgetId;
+use super::text::TextOpts;
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum WidgetError {
@@ -79,8 +80,9 @@ impl Widget for FrameImage {
     }
 }
 
-/// A text label. Where in the rect the text sits (alignment, baseline)
-/// is `TODO(spec: ui/text.md §B3)`; the request carries the rect origin.
+/// A text label. The request's pen is the bottom row of the first-drawn
+/// line (`ui/text.md` §4.2); where it sits in the rect per panel is
+/// `TODO(spec: ui/panels.md)`: the request carries the rect origin.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Label {
     pub id: WidgetId,
@@ -101,6 +103,7 @@ impl Widget for Label {
             text: self.text.clone(),
             at: self.rect.origin(),
             style: self.style,
+            opts: TextOpts::default(),
             clip: FRAME,
         }));
     }
@@ -294,7 +297,7 @@ impl Widget for ScrollList {
 /// A single-line text field holding UTF-16 code units. Which characters
 /// are accepted and the maximum length come from the owner of the field
 /// (chat: spec open question 3); caret drawing is
-/// `TODO(spec: ui/text.md §B3)`.
+/// `TODO(spec: ui/text.md open question 3)`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TextInput {
     pub id: WidgetId,
@@ -351,6 +354,7 @@ impl Widget for TextInput {
             text: self.text.clone(),
             at: self.rect.origin(),
             style: self.style,
+            opts: TextOpts::default(),
             clip: FRAME,
         }));
     }

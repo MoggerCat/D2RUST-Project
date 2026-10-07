@@ -32,10 +32,10 @@
 |   9. Set item (`0x005C2940` → `0x005C25C0`, format ≥ 1) | 230–243 |
 | Constants & data dependencies | 244–254 |
 | Randomness | 255–267 |
-| Edge cases & original bugs | 268–282 |
-| Test vectors | 283–295 |
-| Provenance | 296–315 |
-| Open questions | 316–322 |
+| Edge cases & original bugs | 268–286 |
+| Test vectors | 287–299 |
+| Provenance | 300–319 |
+| Open questions | 320–326 |
 <!-- /index -->
 
 ## Summary
@@ -279,6 +279,10 @@ Item seed unless noted:
    rows would overflow (1.14d has 8).
 6. A not-forced unique with no candidates stays unique only when items
    `unique` is set (quest-style uniques); otherwise it downgrades.
+7. A treasure drop with magic find ≤ −100 can carry quality 1–3 for a
+   `magic` itemtype (`items/treasure.md` edge case 9); §4 step 3.1 makes
+   it 4 (re-read at `0x005574E6`–`0x00557513`: `magic` type, quest test
+   `0x00628CD0` → 7, else "magic or better" `0x0062A0F0` false → 4).
 
 ## Test vectors
 

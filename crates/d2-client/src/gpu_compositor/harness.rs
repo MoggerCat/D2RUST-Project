@@ -1,10 +1,14 @@
 // Spec: specs/client/render-pipeline.md (A9, A10, Test vectors)
 // Spec: specs/render/composition.md (Test vectors)
+// Spec: specs/render/shading.md (§4), specs/render/blend-modes.md (§2, §6)
 //! CPU = GPU comparison on synthetic cases (repo only, no game data): the
 //! spec's test vectors, an off-center view, two atlas pages and a stress
 //! list; the frame-cycle and pixel-write vectors of `composition.md` (a
 //! persistent base, the BlankScreen and post-draw clears, `L[P[s]]` and
-//! `T[256 × d + P[s]]`) and every blend op with an asymmetric table. C6's verify runner can call [`compare`] with its own cases; the
+//! `T[256 × d + P[s]]`) and every blend op with an asymmetric table; the
+//! per-pixel light gradients of DT1 blocks (`shading.md` §4) and the
+//! transposed translucent-wall read (`blend-modes.md` §2, §6). C6's verify
+//! runner can call [`compare`] with its own cases; the
 //! `gpu_compare` example and an ignored test run [`cases`].
 //!
 //! `--perturb N` (M08): N bytes of the CPU reference are changed before the
@@ -15,8 +19,8 @@ use d2_formats::palette::{Palette, Rgb};
 use super::pack::{pack, AtlasFrames};
 use super::{Gpu, GpuError};
 use crate::scene::{
-    self, order, BlendOp, DrawItem, DrawKey, FrameCycle, FrameId, FrameImage, FramePlan, MapId,
-    MapTable, Rect, ShadeChain,
+    self, order, BlendOp, DrawItem, DrawKey, FrameCycle, FrameId, FrameImage, FramePlan,
+    GradientKind, LightGradient, MapId, MapTable, Rect, ShadeChain,
 };
 
 /// Atlas pages a case may use.
@@ -495,6 +499,9 @@ fn composition_cases() -> Vec<Case> {
     c.base = Some((0..256 * 512u32).map(|i| (i * 13 % 251) as u8).collect());
     out.push(c);
 
+    out.extend(shading_cases());
+    out.push(gdi_case());
+
     // The stress list as one frame of a running cycle: a random previous
     // frame, BlankScreen clear, draws over both the cleared and the kept
     // rows.
@@ -508,6 +515,209 @@ fn composition_cases() -> Vec<Case> {
     c.plan = cycle(true, 0);
     out.push(c);
     out
+}
+
+/// Light gradients and the transposed table read: wall and RLE floor
+/// blocks clipped out of a larger tile image (some blocks partly off the
+/// view), translucent walls over them, and a random list of both.
+fn shading_cases() -> Vec<Case> {
+    let mut out = Vec::new();
+    let mut rng = Lcg(0x5EED);
+    let mut maps = MapTable::new();
+    let mut light = [[0u8; 256]; 32];
+    for (k, row) in light.iter_mut().enumerate() {
+        for (i, v) in row.iter_mut().enumerate() {
+            *v = ((i * (k + 1) / 32 + k * 3) % 256) as u8;
+        }
+    }
+    let light0 = maps.push(light[0]);
+    for row in &light[1..] {
+        maps.push(*row);
+    }
+    let a0 = maps.push_table(&blend_table(6));
+    let a2 = maps.push_table(&blend_table(7));
+    let tile = FrameImage {
+        width: 160,
+        height: 96,
+        pixels: (0..160 * 96u32)
+            .map(|i| {
+                if i % 13 == 5 {
+                    0
+                } else {
+                    (i * 7 % 255 + 1) as u8
+                }
+            })
+            .collect(),
+    };
+    let view = Rect::new(-20, -10, 200, 140);
+    let mut items = vec![DrawItem::new(FrameId(1), view.x, view.y)];
+    // Opaque gradient walls, then RLE floor blocks, then translucent walls
+    // read transposed, each block a clip of the tile image at (-10, -6).
+    let (tx, ty) = (-10, -6);
+    for (n, (kind, op)) in [
+        (GradientKind::Wall, None),
+        (GradientKind::RleFloor, None),
+        (GradientKind::Wall, Some(a0)),
+        (GradientKind::Wall, Some(a2)),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        for bx in 0..5 {
+            let rows = kind.rows() as i32;
+            let (x, y) = (tx + 32 * bx, ty + 24 * n as i32);
+            let mut it = DrawItem::new(FrameId(0), tx, ty);
+            it.clip = Rect::new(x, y, 32, rows as u32);
+            let corners = [0, 1, 2, 3].map(|_| rng.below(256) as u8);
+            it.shade = ShadeChain::new(&[])
+                .expect("chain")
+                .with_gradient(LightGradient {
+                    kind,
+                    x,
+                    y,
+                    corners,
+                    light0,
+                });
+            if let Some(t) = op {
+                it.blend = BlendOp::IndexTableSrcRow(t);
+            }
+            items.push(it);
+        }
+    }
+    let ground = FrameImage {
+        width: 200,
+        height: 140,
+        pixels: (0..200 * 140u32).map(|i| (i * 31 % 256) as u8).collect(),
+    };
+    out.push(case(
+        "shading-blocks",
+        vec![tile.clone(), ground],
+        maps.clone(),
+        items,
+        view,
+    ));
+
+    // Random gradients, chains and ops, both table orientations.
+    let mut items = Vec::new();
+    let remap = maps.push(blend_table(8)[3]);
+    for _ in 0..250 {
+        let kind = if rng.below(2) == 0 {
+            GradientKind::Wall
+        } else {
+            GradientKind::RleFloor
+        };
+        let x = -40 + rng.below(320) as i32;
+        let y = -40 + rng.below(240) as i32;
+        let (bx, by) = (x + rng.below(40) as i32, y + rng.below(30) as i32);
+        let mut it = DrawItem::new(FrameId(0), x, y);
+        // A clip inside the block, sometimes smaller than it.
+        let (cx, cy) = (rng.below(8) as i32, rng.below(4) as i32);
+        it.clip = Rect::new(bx + cx, by + cy, 32 - cx as u32, kind.rows() - cy as u32);
+        let chain = if rng.below(3) == 0 {
+            vec![remap]
+        } else {
+            Vec::new()
+        };
+        it.shade = ShadeChain::new(&chain).expect("chain");
+        if rng.below(4) != 0 {
+            it.shade = it.shade.with_gradient(LightGradient {
+                kind,
+                x: bx,
+                y: by,
+                corners: [0, 1, 2, 3].map(|_| rng.below(256) as u8),
+                light0,
+            });
+        }
+        it.blend = match rng.below(3) {
+            0 => BlendOp::Opaque,
+            1 => BlendOp::IndexTable([a0, a2][rng.below(2) as usize]),
+            _ => BlendOp::IndexTableSrcRow([a0, a2][rng.below(2) as usize]),
+        };
+        items.push(it);
+    }
+    let mut c = case(
+        "shading-stress",
+        vec![tile],
+        maps,
+        items,
+        Rect::new(0, 0, 256, 160),
+    );
+    c.base = Some((0..256 * 160u32).map(|_| rng.below(256) as u8).collect());
+    out.push(c);
+    out
+}
+
+/// GDI lines and rectangles (`blend-modes.md` §8) as built by
+/// `rules::blend`: opaque color lines (color 0 included) clipped to the
+/// surface, and rectangles of every per-mode value `k` (0: color, 1:
+/// `T[d]` through chain `[Z]` and the transposed read, 2: `T[256·d +
+/// color]`) over a varied base.
+fn gdi_case() -> Case {
+    use crate::rules::blend;
+    use crate::rules::camera::FrameSize;
+    use crate::rules::shading::ShadeTables;
+    use d2_formats::palette::Pl2;
+
+    let row = |seed: u32| -> Vec<[u8; 256]> { blend_table(seed).to_vec() };
+    let ident = map_with(&[]);
+    let pl2 = Pl2 {
+        base_palette: distinct_palette(),
+        light_levels: vec![ident; 32],
+        inventory_variations: vec![ident; 16],
+        selected_unit_shift: ident,
+        alpha_blend: vec![row(11), row(12), row(13)],
+        additive_blend: row(14),
+        multiplicative_blend: row(15),
+        hue_variations: vec![ident; 111],
+        red_tones: ident,
+        green_tones: ident,
+        blue_tones: ident,
+        unknown_variations: vec![ident; 14],
+        max_component_blend: row(16),
+        darkened_shift: ident,
+        text_colors: Vec::new(),
+        text_color_shifts: Vec::new(),
+    };
+    let mut maps = MapTable::new();
+    let t = ShadeTables::push(&mut maps, &pl2);
+    let size = FrameSize {
+        width: 96,
+        height: 64,
+    };
+    let mut draws = Vec::new();
+    for (n, mode) in [0u8, 1, 2, 3, 4, 5, 6, 7, 9].into_iter().enumerate() {
+        let c = maps.push(blend::color_row(n as u8 * 29));
+        let x = (n as i32 % 3) * 34 - 6;
+        let y = (n as i32 / 3) * 22 - 3;
+        draws.extend(blend::gdi_rectangle(&t, size, c, x, y, x + 30, y + 20, mode).expect("rect"));
+    }
+    for (n, (x0, y0, x1, y1)) in [
+        (-10, 5, 120, 40),
+        (50, -20, 40, 90),
+        (3, 60, 90, 2),
+        (95, 63, 95, 63),
+        (0, 0, 0, 0),
+        (70, 10, -5, 13),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let c = maps.push(blend::color_row(n as u8 * 41));
+        draws.extend(blend::gdi_line(size, c, x0, y0, x1, y1).expect("line"));
+    }
+    let frames: Vec<FrameImage> = draws.iter().map(|d| d.image.clone()).collect();
+    let items: Vec<DrawItem> = draws
+        .iter()
+        .enumerate()
+        .map(|(i, d)| {
+            let mut it = d.item(FrameId(i as u32));
+            it.key = key(i as u32);
+            it
+        })
+        .collect();
+    let mut c = case("gdi-lines-rects", frames, maps, items, size.rect());
+    c.base = Some((0..96 * 64u32).map(|i| (i * 37 % 253 + 1) as u8).collect());
+    c
 }
 
 /// A 40×40 frame with transparent holes and every index 0..=255.

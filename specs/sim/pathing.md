@@ -24,26 +24,27 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 49–64 |
-| Inputs | 65–74 |
-| Outputs / state changes | 75–81 |
-| Rules | 82–83 |
-|   1. Walk and run requests | 84–176 |
-|   2. Path types | 177–215 |
-|   3. Path compute (`0x00649970(path, unit, town access)`) | 216–261 |
-|   4. Target preparation (flag 0x1000, `0x00648120`) | 262–278 |
-|   5. Toward (type 2, `0x00679C80`) | 279–338 |
-|   6. Straight (type 7, `0x00679ED0`) | 339–348 |
-|   7. A* (type 1, `0x0067B850`) | 349–386 |
-|   8. Velocity, direction vector, facing | 387–453 |
-|   9. Per-tick movement | 454–606 |
-|   10. Messages | 607–629 |
-| Constants & data dependencies | 630–666 |
-| Randomness | 667–677 |
-| Edge cases & original bugs | 678–708 |
-| Test vectors | 709–745 |
-| Provenance | 746–781 |
-| Open questions | 782–817 |
+| Summary | 50–65 |
+| Inputs | 66–75 |
+| Outputs / state changes | 76–82 |
+| Rules | 83–84 |
+|   1. Walk and run requests | 85–229 |
+|   2. Path types | 230–269 |
+|   3. Path compute (`0x00649970(path, unit, town access)`) | 270–336 |
+|   4. Target preparation (flag 0x1000, `0x00648120`) | 337–353 |
+|   5. Toward (type 2, `0x00679C80`) | 354–413 |
+|   6. Straight (type 7, `0x00679ED0`) | 414–423 |
+|   7. A* (type 1, `0x0067B850`) | 424–461 |
+|   8. Velocity, direction vector, facing | 462–544 |
+|   9. Per-tick movement | 545–717 |
+|   10. Messages | 718–740 |
+|   11. Missile paths (`0x00649760`) | 741–790 |
+| Constants & data dependencies | 791–827 |
+| Randomness | 828–838 |
+| Edge cases & original bugs | 839–886 |
+| Test vectors | 887–924 |
+| Provenance | 925–962 |
+| Open questions | 963–1021 |
 <!-- /index -->
 
 ## Summary
@@ -148,8 +149,9 @@ none; `0x005415A0`); frame = game +0xA8.
    frame ≤ E + 5 (E as in §1.3); refuse otherwise.
 5. Flag set: if the unit has state 42 (`0x2A`, concentration): v = stat
    164 of that state's list (`0x00625D00`); **draw `roll(100)` on the
-   unit seed** (unit +0x20, `0x0045C390`); r < v → go to rule 6. Else if
-   state 15 (`0x0F`) → rule 6. Else allow.
+   unit seed** (unit +0x20, `0x0045C390`); r < v → go to rule 6. A
+   failed roll (r ≥ v), or no state 42, goes on to the state 15 test:
+   state 15 (`0x0F`) → rule 6; else allow.
 6. Current mode 1 → re-enter neutral as in rule 4 and allow; else refuse.
 
 #### 1.5 Starting the movement (`0x0057F090(mode)`)
@@ -174,6 +176,57 @@ none; `0x005415A0`); frame = game +0xA8.
 A new request while moving recomputes the path from the current
 precise position (§3); the fraction is kept.
 
+#### 1.6 Client position resync (C→S 0x5F, `0x0054CD50`)
+
+The message (5 bytes: id, x u16, y u16; `sim/client-messages.tsv`)
+carries the position the client believes its player is at. Handler
+`0x0054CD50(game, player, msg, len)`:
+
+1. len ≠ 5 → result 3. The player's client (`0x005531C0`: player data
+   +0x9C) is required (null → fatal).
+2. Ignored (result 0) when a used skill is set (`0x00620250`), the
+   player is dead (`0x005541B0`), or d < 5, where d =
+   `0x006417F0(player, x, y)` = max(|dx|, |dy|) + ⌊min(|dx|, |dy|)/2⌋
+   between the player's sub-tile position and (x, y).
+3. **Walk branch**, when the player has state 108 or d < 15 or d > 45:
+   if the path has a target unit other than the player (`0x00553540`,
+   after its validity check `0x00553490`) → result 0; else the mode
+   request of §1.2–§1.5 (`0x005809D0(no skill, m, x, y, 0)`) with m = 3 if
+   the player's mode is 3 (run), else 2.
+4. **Snap branch**, 15 ≤ d ≤ 45 without state 108:
+   1. Reachability test (`0x0054CB10`): (x, y) must have a room by the
+      cell lookup from the player's room (`sim/path-placement.md` §4
+      rule 1) and the player must have neither state 54 nor 108; else
+      not reachable. Save the path's move-test mask (+0x50), path type
+      (+0x3C), max path distance (+0x91) and target (unit, else point);
+      set mask 0x409, type 15, +0x90 = +0x91 = 77, target := (x, y);
+      compute (§3, `0x00649970` with town access 0). Reachable iff the
+      compute returns non-zero and the last path point (index count −
+      1) equals (x, y). Restore mask, type, the target, and +0x90 =
+      +0x91 := the saved +0x91. The computed points and count are
+      **not** restored.
+   2. Reachable → placement (`0x0054CC40`): `0x00554EA0(room 0, x, y,
+      exact 0, alt 1)` (`sim/path-placement.md` §10); failure → step 3.
+      Success: record the game frame (game +0xA8) in the client's
+      5-slot resync ring (+0x3C0, `0x00539360`: the first slot that is
+      0 or more than 2250 frames old; none → nothing recorded). Delay
+      := 125 frames, unless the ring is full (`0x005393F0`: all five
+      slots non-zero and at most 2250 frames old) and the game type
+      byte (game +0x6A) is 0: then r = `lo' % 100` (one inlined step
+      of the player's unit seed, unit +0x20, `sim/rng.md` §6) picks
+      from table `0x006E1064`
+      (r < 50 → 1500, r < 75 → 3000, else 4500 frames). Set state 108;
+      attach a stat list (`0x006251F0` flags 2, expire = frame +
+      delay; state 108; remove callback `0x0054CC30` clears state 108)
+      and schedule event 12 at frame + delay (`0x005417D0`,
+      `sim/stat-lists.md` §10.4). Result 0.
+   3. Not reachable, or placement failed → S→C 0x15 to the client
+      (`0x00548010(player, client, 0)`, §10). Result 0.
+
+So a player whose client keeps snapping (five snaps within 2250
+frames) is locked to the walk branch for 1500–4500 frames, otherwise
+for 125.
+
 ### 2. Path types
 
 Type table, index = path type (`sim/path-tables.tsv` tables
@@ -185,12 +238,12 @@ Type table, index = path type (`sim/path-tables.tsv` tables
 | 1 | A* | `0x0067B850` | 0x1900 | §7 |
 | 2 | toward | `0x00679C80` | 0 | monsters' default, §5 |
 | 3 | toward (restart) | `0x00679E50` | 0 | |
-| 4 | missile | none (missile code) | 0x60000 | `missiles/missiles.md` |
+| 4 | missile | `0x006492F0` (§11.1) | 0x60000 | `missiles/missiles.md` |
 | 5, 6 | circle CW / CCW | `0x00679C80` | 0 (offset +2 / −2) | monster AI |
 | 7 | straight | `0x00679ED0` | 0x21900 | players, §6 |
 | 8 | knockback (server) | `0x0067A000` | 0x1E600 | player mode 19 |
 | 9 | leap | `0x00679F70` | 0x1E800 | skills |
-| 10, 14 | charged bolt, blessed hammer | none | 0x60000 | missiles |
+| 10, 14 | charged bolt, blessed hammer | `0x0067A240`, `0x0067A140` (§11.2, §11.3) | 0x60000 | missiles |
 | 11 | knockback (client) | `0x00679FD0` | 0x1E604 | |
 | 12 | back-up turn | `0x00679E60` | 0 (offset −4) | monster AI |
 | 13 | toward, finish | `0x00679C80` | 0x100 | monster re-path |
@@ -208,15 +261,16 @@ fatal assert.
 
 Flag meanings used here: 0x100 (no rule in this spec), 0x800 remove the
 target unit's footprint while computing (§3 step 6), 0x1000 prepare a
-blocked target (§4), 0x20000 store saved steps (§9.4). Types without a
-function (4, 10, 14, 17) are fatal if computed by §3. The types used only
+blocked target (§4), 0x20000 store saved steps (§9.4). Types 4, 10 and 14
+carry flag 0x40000 and are computed by §11; reaching §3's function table
+without that flag (it has no entry for 4, 10, 14, 17) is fatal. The types used only
 by monster AI and skills (0, 3, 5, 6, 8, 9, 11, 12, 13, 15, 16) are named
 here and specified with their callers (open question 3).
 
 ### 3. Path compute (`0x00649970(path, unit, town access)`)
 
 1. Path null → result 0. Owner ≠ unit → fatal. Missile flag (0x40000) →
-   missile path (`0x00649760`, missiles spec).
+   missile path (`0x00649760`, §11).
 2. Collided mask (+0x54) := 0. With a target unit whose position is
    (0, any) or (any, 0) → result 0 (nothing reset).
 3. Start = the current sub-tile (x, y); (0, 0) → step 11.
@@ -224,7 +278,7 @@ here and specified with their callers (open question 3).
    with a target unit, target (+0x10/+0x12) := its position; (0, 0) →
    step 11 with r = 0. By the target's type: player or monster: if the
    path lead byte (+0x68) ≠ 0, the target point is moved ahead
-   (`0x00679190`, uses floating point, open question 4), r = 1; object:
+   (`0x00679190`, rule below), r = 1; object:
    doors (`0x00621A70`) shift the target 2 sub-tiles away from the
    door's line toward the unit's side (orientation `0x00621AC0` set:
    y ± 2, else x ± 2; − when the unit's coordinate is smaller) and
@@ -254,6 +308,27 @@ here and specified with their callers (open question 3).
     result = count. If no point remains → step 11.
 11. Index := 0, count := 0.
 12. Flag 0x20 := 0; result 0.
+
+**Target lead** (`0x00679190(path)`, and `0x00679250(out, path)`
+which writes the led target point to `out` and skips the lead when
++0x68 = 0): with the target unit's direction d (`0x006487F0` on the
+target's path, +0x64) and lead L = path +0x68 (u8), a := (8·d −
+256·L) & 0x1FF; target x += trunc(L · T[(a + 0x80) & 0x1FF]), target y
++= trunc(L · T[a]) (16-bit wrapping adds; trunc toward zero, x87
+control word with RC = 11), T = the 512-entry f32 sine table at
+`0x00707800` (`0x0040B330` cosine, `0x0040B350` sine). **In 1.14d L is
+always 0**: the only writer of +0x68 is `0x006490C0` (D2MOO
+`D2Common_10207`, also writes +0x67), which has no call and no
+pointer anywhere in the image (`disasm.py xref`), and the path record
+is zeroed at allocation (`sim/path-placement.md` §2.3). So the lead
+adds 0 and the floating point never affects an outcome; d2rs
+implements "lead = 0" (no table, hard rule 6 holds). Were it needed:
+T is not the f32 rounding of sin(2πi/512) (328 of 512 entries differ
+by one ulp; sha256 of the 2048 bytes
+`22d4615dd85e77c049244da1033035af272eedf66ea63ef3476cb7e397afaf54`),
+and trunc(L·T[i]) is the same under 24-, 53- and 64-bit x87 precision
+for all L ≤ 255 and all i (exhaustive check), so an integer form from
+T's bit patterns would be exact.
 
 Path functions receive a record ("path info", D2MOO `D2PathInfoStrc`):
 start, target, start room, target room, slack r (step 4), max distance
@@ -407,8 +482,11 @@ animation-speed half of it belongs to the future animation-rate spec,
    (truncated), base = charstats `WalkVelocity` × 256 for players,
    monstats `Velocity` × 256 for monsters (`0x00621360`; the mode does
    not change the base).
-3. Setting a different velocity sets +0x38 := 15; max velocity := the
-   new value (`0x00648690`).
+3. Velocity write (`0x00648690`): +0x38 := 15 only when the new value
+   differs from the current velocity; velocity and max velocity (+0x84)
+   := the new value always.
+4. Any other mode (no velocity modifier, not knockback): the routine sets
+   only the animation rate; the velocity keeps its previous value.
 
 #### 8.2 Run
 
@@ -447,9 +525,22 @@ From precise start (sx, sy) to precise point (tx, ty) (`tan` table:
 d &= 63. Unit type 2 or 4, or a missile without path flag 0x40:
 direction := d. A missile with flag 0x40: nothing. Others (players,
 monsters): if d ≠ new direction (+0x65): new direction := d, turn step
-(+0x66) := `dirdiff`[(d − direction) & 63]. Turning the current
-direction toward the new one over time is not part of this spec (open
-question 5).
+(+0x66) := `dirdiff`[(d − direction) & 63]. `0x00648820(path, d)` is
+the same with d ≥ 64 → fatal and a missing owner read as type 6.
+
+Turning the current direction toward the new one (`0x00648640`, D2MOO
+`D2Common_10193`: direction := (direction + turn step) & 63, snapped to
+the new direction once it is passed) is called only from the client's
+unit update (`0x00480810` → `0x00463390` players, `0x004B13A0`
+monsters). **The server never turns**: of the path functions that
+write +0x64 (`0x006485F0`, `0x00648820`, `0x00648640`, `0x006488A0`),
+the only one that changes a player's or monster's direction on the
+server is the snap `0x006488A0(path, d)` (direction := new direction
+:= d & 63; server callers `0x005A65E3`, `0x005C5E30`, `0x005F95DD`).
+Direct writes outside these functions were not searched.
+Server readers of +0x64 (`0x006487F0`): the target lead (`0x006791CF`,
+`0x006792F8`, §3; its lead is always 0), `0x0057CDB2`, `0x00597FE7`,
+`0x00597FFB`, `0x00620139` (owners: their callers' specs).
 
 ### 9. Per-tick movement
 
@@ -467,21 +558,27 @@ mode's end (`0x005A8030`).
    stored type and GUID; if the unit found differs from the stored
    pointer, or is an item in mode 1 or 2 (equipped, belt), target :=
    none (`0x00648B90(0)`).
-2. State 13 (`0x0D`) → `0x005C9D90` (skills spec).
+2. State 13 (`0x0D`) → `0x005C9D90` (skills spec); its result is
+   ignored and the step goes on with step 3.
 3. Mode 3 (run): run drain (rule 9.9); exhausted → restart the
-   movement (§1.5 with mode 3: becomes walk, path recomputed).
+   movement (§1.5 with mode 2: walk, or town walk in a town; path
+   recomputed).
 4. Step (§9.3), result s.
-5. Host-only position history (`sim/path-placement.md` §10 rule 7):
-   when `GetTickCount` > last + 25 ms and the position is more than
-   √45 sub-tiles from the previous record. Not simulated (open
-   question 4 there).
-6. s = 2 (stopped): player data +0x150 ≠ 0 would start a queued action
-   (`0x00548B00` NPC talk, or a skill on a unit through `0x00580A70`);
-   no 1.14d server code stores a non-zero value there (every server
-   write stores 0: `0x00580A70`, `0x00580C20`), so in 1.14d s = 2 always
-   means **neutral start** `0x0057F020`. Result s; `sim/units.md` §4.5
-   then runs the ENDANIM handler, which starts neutral again (edge case
-   6).
+5. Position history (`sim/path-placement.md` §10 rule 7, the owner):
+   when `GetTickCount` > last + 25 ms and the squared distance to the
+   previous record is > 45. Simulated: monster AI reads it.
+6. s = 2 (stopped), a player with player data and +0x150 ≠ 0 (a queued
+   interaction: `0x00460780`, from `0x00641F20`, stores +0x150 := 1,
+   +0x154 := −1, or −2 when its caller passes flag ≠ 0, +0x158 := unit
+   type, +0x15C := GUID; `world/npc.md` §2 C→S 0x13): +0x154 < 0 →
+   **neutral start** `0x0057F020`, then `0x00548B00`(type +0x158, GUID
+   +0x15C, +0x154 = −2, game) (NPC / unit interaction); +0x154 ≥ 0 is a
+   skill id: `0x006439F0` finds the player's skill → `0x00580A70`(skill,
+   its mode `0x00643860`, type, GUID, 0) and result 1; not found →
+   neutral start. Then +0x150 := 0 (`0x00580E88`). Asm
+   `0x00580D94`–`0x00580E88`. +0x150 = 0: neutral start. Result s;
+   `sim/units.md` §4.5 then runs the ENDANIM handler, which starts
+   neutral again (edge case 6).
 
 #### 9.3 Step (`0x00554CA0(game, unit)`)
 
@@ -502,8 +599,8 @@ flag 0x2) → room-change messages (rule 9.8). Result 1 if m, else 2.
       (arithmetic). 
    2. Vector (0, 0) → rule 3.
    3. One step (rule 9.6) → new precise position Q.
-   4. Position := Q (rule 9.6 "set position").
-   5. Not a missile and index < count: velocity and direction toward the
+   4. Position := Q (rule 9.6 "set position", room hint none).
+   5. Path type ≠ 4 and index < count: velocity and direction toward the
       next point (§8.4).
    6. index < count → result 1.
 3. Otherwise: reset (rule 9.7); result 0.
@@ -519,9 +616,13 @@ flag 0x2) → room-change messages (rule 9.8). Result 1 if m, else 2.
    whose refreshed point is more than 5 from the previous target (+0x14)
    on either axis → re-path (finish 1). Otherwise: index < count, or
    position = final target → passes; else re-path (finish 1).
+4. Wherever a rule says "re-path", the check's result is the re-path's
+   result (§9.10): non-zero passes, 0 fails. The movement then tests
+   index < count against the new path.
 
 Unit distance (`0x00641530`): Δ per axis; both < 8 and both sizes < 4:
-d = `dist8_unit`[Δx + 8Δy] (negative → 0); minus 1 if either size is 3
+d = `dist8_unit`[Δx + 8Δy]; a negative entry returns 0 at once, with no
+size adjustment (`0x00641634`); else d minus 1 if either size is 3
 (not below 0); result d + 1 if either size < 2, else d. Otherwise each
 axis Δ − (size1/2 + size2/2) (not below 0), then 2·max + min.
 
@@ -530,7 +631,8 @@ axis Δ − (size1/2 + size2/2) (not below 0), then 2·max + min.
 1. Collided mask := 0; "monster re-path" := the unit is a monster and
    flag 0x10 is set.
 2. Velocity vector 0 → count := index := 0; Q := the current cell
-   centre; done.
+   centre; done. (Dead in 1.14d: the only caller, §9.4 rule 2.2, resets
+   before calling with a (0, 0) vector.)
 3. Δ := velocity vector. Not a missile: R := point[index] centre −
    position; if |R.x| ≤ M and |R.y| ≤ M with M = max(|Δx|, |Δy|): Δ := R
    and "reaches the point".
@@ -598,11 +700,20 @@ add/remove messages.
 
 #### 9.10 Re-path (`0x00650350(unit, finish)`)
 
-No path → 0. Unless flag 0x10: player or monster for which `0x00649120`
-(monster: distance budget) is 0 → 0; else queue for update, unit flags
-|= 1, distance budget −= index. Types 2, 13, 15: finish → type 13; else
+No path → 0. Unless flag 0x10: a monster (type 1) whose re-path
+budget (path +0x94, u8, read by `0x00649120`) is 0 → 0 (players skip
+this test); else queue for update, unit flags (+0xC4) |= 1, and the
+budget += −(current point index +0x24), clamped to 0..255
+(`0x00649140`). The only setter is `0x006490E0` (value > 255 → fatal),
+called with 20 by the monster movement start `0x005A7C20` (after the
+target is set; that function belongs to `monsters/ai.md`), so a monster
+re-paths until it has advanced 20 points in total since that start.
+Types 2, 13, 15: finish → type 13; else
 type 2 and target := final target; compute (§3); non-zero → result;
 else type 15 and compute again. Other types: compute (§3).
+The types are written to path +0x3C directly (not through set type,
+§2: flags and direction offset unchanged). Every compute here passes
+town access 0.
 
 ### 10. Messages
 
@@ -623,9 +734,59 @@ else type 15 and compute again. Other types: compute (§3).
 4. Monsters: the monster update `0x00598220` (owner: the unit-update
    spec) sends 0x67/0x68 for moving monsters.
 5. S→C 0x95 / 0x96 / 0x18 (life, mana, stamina, position) come from the
-   player status routine `0x00548760` in the client pass, not from
-   movement (owner: open question 6).
+   client vitals sync `0x00548760` at each flush, not from movement
+   (owner: `combat/vitals.md` §5).
 6. Layouts of 0x0D, 0x0F, 0x10, 0x15, 0x96 are in `sim/server-messages.tsv`.
+
+### 11. Missile paths (`0x00649760`)
+
+§3 step 1 hands a path with flag 0x40000 to `0x00649760`, by path type
+(+0x3C); any other type is a fatal assert. A non-zero result sets path
+flag 0x20; type 4 with result 0 clears it. The result is the count.
+
+#### 11.1 Type 4, straight missile (`0x006492F0`)
+
+1. Index := 0. With a target unit: target (+0x10 / +0x12) := its
+   sub-tile position (objects, items, tiles: static position; others:
+   the path's cell).
+2. |target x − cell x| ≥ 100, or the same for y, or target x = 0, or
+   target y = 0 → result 0.
+3. points[0] := target; count := 1; +0x38 := 0; velocity and direction
+   toward point 0 (§8.4; a target equal to the position sets velocity 0).
+4. Room-exit flag: the path room exists and the target lies outside its
+   sub-tile rect (x in [room x, room x + w), y likewise, half-open) →
+   flag 0x1. Result count (1).
+
+#### 11.2 Type 10, charged bolt (`0x0067A240`)
+
+1. n := max distance (+0x91) >> 1. d0 := `testdir`[o(cell → target)]
+   first entry (§5.1 rule 1, `0x00678D70`).
+2. Offset table (32 entries): (−1, 0, +1) repeated 10 times, then −1,
+   +1.
+3. c := the current cell. n times: one RNG step on the **unit seed**
+   (unit +0x20, `sim/rng.md` §2; form `lo' & 31`, §6), d := (table[lo'
+   & 31] + d0) & 7; points[k] := c; c += 2 · step(d) (`dir8_toward`).
+4. points[n] := c; count := n + 1 (points[0] is the start cell, dropped
+   by §8.4 rule 1). n draws per compute.
+
+#### 11.3 Type 14, blessed hammer (`0x0067A140`)
+
+1. Start S = the precise position (16.16); previous := S; count := 0;
+   k := 0.
+2. Repeat until count = 77: k += 1; r = 9600 · k (0x2580 per step,
+   converted to float32); a = 16 · k; x = S.x + trunc(cos(a) · r), y =
+   S.y + trunc(sin(a) · r), with sin(a) = float32 table `0x00707800`
+   [a & 0x1FF] (512 entries, sin(2πi/512); `0x0040B350`) and cos(a) =
+   table[(a + 128) & 0x1FF] (`0x0040B330`); the product is x87 and the
+   conversion truncates toward zero. If (x >> 16, y >> 16) differs from
+   the previous point's cell: points[count] := that cell, count += 1,
+   previous := (x, y).
+3. Count := 77. No draw.
+
+The product of two float32 values is exact in 53-bit precision, so d2rs
+can compute it with integers (float32 = mantissa · 2^exponent); whether
+the x87 precision control is 53-bit (compiler default) or 24-bit while
+the game runs is open question 9.
 
 ## Constants & data dependencies
 
@@ -672,8 +833,8 @@ skills `srvdofunc`, `SeqInput`, `interrupt`.
    state 42 (concentration). A walk request has no skill argument, so
    the draw depends on the player's *used* skill, which mode starts
    clear (§1.5 step 4) but skill code sets.
-3. Target lead (§3 step 4) uses x87 floating point (no draw; open
-   question 4).
+3. Target lead (§3 step 4) uses x87 floating point, but its lead byte
+   is never set in 1.14d, so it adds 0 (§3, after the steps).
 
 ## Edge cases & original bugs
 
@@ -687,12 +848,18 @@ Reproduced by default.
    start and the first greedy step turns (vector W9); the duplicate is
    dropped when the unit reaches it (§8.4 rule 1).
 4. Ray test: after a minor-axis step with err = 0 the new cell is not
-   tested.
+   tested; when the next major step is blocked that untested cell is
+   returned, so Toward's P (§5.2 step 2), stored as `points[0]`, can be
+   a colliding cell; a unit walking it is refused at P (edge case 7).
 5. Cell walk: after 10 crossed cells in one tick the rest of the step is
-   not collision-tested (needs a velocity over 10 sub-tiles per tick).
+   not collision-tested. A straight step cannot cross 10: every vector
+   component is a 32-bit product >> 12, so |Δ| < 2^19 (8 sub-tiles) per
+   axis, at most 3 halvings, at most 9 sub-steps. The cut is reached only
+   through the overshoot of edge case 12.
 6. Arrival: the step that reaches the last point also ends movement
    (index = count) in the same tick; the player event then starts
-   neutral twice (§9.2 step 6 and the ENDANIM handler).
+   neutral twice (§9.2 step 6 and the ENDANIM handler) when no
+   interaction is queued.
 7. A blocked cell ends the path (index := count) and the unit stays at
    the last free cell's centre; there is no retry for players.
 8. Request while moving: the path starts from the current cell; the
@@ -705,6 +872,17 @@ Reproduced by default.
     old points cleared and the unit neutral (§3 step 11).
 11. Room recache can leave a non-missile unit without a room when no
     room contains its new cell (§9.6.9); 1.14d continues.
+12. Cell-walk overshoot (§9.6 rule 5): s = Δ halved by arithmetic shifts,
+    so 2^n · s misses Δ by up to 2^n − 1 units (short for positive,
+    past for negative components), and the walk stops only on an exact
+    cell match on both axes. When one axis still needs a sub-step while
+    the other axis's extra sub-step leaves its final cell, the walk runs
+    on past the target cell, moving the footprint each crossing, until
+    the 10th crossing (Q := position + Δ, the footprint stays where the
+    walk ended) or a refused move (Q := centre of the last free cell,
+    beyond the target). Needs a component above 0x10000 (n ≥ 1), a
+    component not divisible by 2^n, and a target position within 2^n − 1
+    units of a cell edge (vector W10).
 
 ## Test vectors
 
@@ -722,6 +900,7 @@ max distance 73.
 | W5 | as W2 | (13,10) → (15,10) | preparation reaches the start: count 0, neutral |
 | W6 | 40×40, walls y = 20, x 10..20 | (14,25) → (15,20) | target (15,22), path [(15,22)] |
 | W9 | 80×80, walls x = 15, y 9..11 | (10,10) → (34,22) | [(14,12), (14,12), (15,13), (17,13), (18,14), (19,14), (20,15), (21,15), (22,16), (23,16), (24,17), (25,17), (26,18), (27,18), (28,19), (29,19), (30,20), (31,20), (32,21), (33,21)] |
+| W10 | open | cell walk (§9.6 rule 5, no collision) from (0x6468D3, 0x6558D3) with Δ = (0x1972D, 0x1972D) | s = (0xCB96, 0xCB96); crossings (101,102), (102,103), …, (110,111): cut at 10; Q = (0x660000, 0x66F000) in cell (102, 102) |
 | D1 | `tan` | direction (0,0) → (10,0) sub-tiles | vector (4096, 0), direction 56 |
 | D2 | `tan` | (0,0) → (0,−10) | (0, −4096), 40 |
 | D3 | `tan` | (0,0) → (5,5) | (2896, 2896), 0 |
@@ -765,7 +944,9 @@ Real (recordings; message side):
   `0x00554670`; monster walk `0x005A8490`; messages `0x0053A500`,
   `0x00580860`, `0x005484B0` (table `0x007319E8`), `0x00548180`,
   `0x00548010`, builders `0x0053B570`, `0x0053B520`, `0x0053BC10`,
-  `0x0053B4B0`, `0x0053C3F0`, `0x0053C320`, `0x0053C230`.
+  `0x0053B4B0`, `0x0053C3F0`, `0x0053C320`, `0x0053C230`; missile paths `0x00649760`,
+  `0x006492F0`, `0x0067A240`, `0x0067A140`, `0x0040B330`, `0x0040B350`
+  (table `0x00707800`); room change `0x005545C0`, `0x00571600`.
 - D2MOO 1.10f as a map (`D2Common_10142`, `PATH_Toward_6FDAA9F0`,
   `PATH_RayTrace`, `PATH_Straight_Compute`, `PATH_AStar_*`,
   `PATH_PreparePathTargetForPathUpdate`,
@@ -792,25 +973,48 @@ Real (recordings; message side):
 3. Path types of monster AI and skills (0, 3, 5, 6, 8, 9, 11, 12, 13,
    15, 16) and `0x00679B30` (direction offset): specify with the AI and
    skill specs (Ghidra on `0x0067AD00`, `0x0067A000`, `0x0067C2D0`).
-4. Target lead (`0x00679190`, `0x00679250` with path +0x68 ≠ 0): x87
-   sine/cosine (`0x0040B330`, `0x0040B350`) on (8·direction − 256·lead)
-   & 0x1FF; who sets +0x68 (monster AI?) and the exact rounding. Settle:
-   Ghidra on `0x00679190`, `0x0040B330`; d2rs needs a bit-exact
-   replacement (hard rule 6).
-5. Server-side facing turn (D2MOO `D2Common_10193`, turning +0x64 toward
-   +0x65 by +0x66): which server code calls it and whether facing feeds
-   any message or outcome. Settle: xref the 1.14d equivalent.
-6. Owner of the player status messages 0x95 / 0x96 / 0x18
-   (`0x00548760`: life/mana/stamina change thresholds, potion-heal
-   prediction states 100/106, position resend after 4 quiet calls when
-   moved ≥ 2): vitals spec or a client-update spec.
-7. Monster movement messages 0x67 / 0x68 and the unit-update pass
-   (`0x00598220`, `0x00571600`, `0x00571F90`): the unit-update spec.
-8. `0x00649120` (monster re-path budget) and `0x00649140`: read only in
-   §9.10; confirm with the AI spec.
+   The missile types 4, 10, 14 are answered in §11.
+4. *Answered:* target lead (`0x00679190`, `0x00679250`): table sine,
+   truncation, and +0x68 has no reachable writer, so the lead is 0
+   (§3, after the steps).
+5. *Answered:* the facing turn `0x00648640` runs only in the client
+   (§8.5); the server direction changes by snap only. What each server
+   reader of +0x64 does with it is its owner's (§8.5 list).
+6. Answered: the status messages 0x95 / 0x96 / 0x18 (`0x00548760`) are
+   owned by `combat/vitals.md` §5 (§10 rule 5).
+7. ~~Monster movement messages 0x67 / 0x68 and the unit-update pass~~:
+   answered in `sim/intents-events.md` §7 (`0x00598220` §7.3, mode
+   messages §7.4, add messages `0x00571F90` §7.2).
+8. *Answered:* `0x00649120` / `0x00649140` read and adjust the monster
+   re-path budget at path +0x94 (not the distance budget +0x90); set to
+   20 by `0x005A7C20` (§9.10).
+9. x87 precision control during §11.3 (53-bit or 24-bit: a 24-bit mode
+   rounds cos · r to float32 before the truncation). Settle: a recording
+   of a Blessed Hammer missile's per-tick positions, or a debugger read
+   of the FPU control word in `0x0067A140`.
 
 Answered handoff questions (`docs/HANDOFF.md` §7):
 
 - PQ1: stat 67 is read as the unit total (`0x00625480` in `0x00623F50`);
   a player's base is 100, so V1–V3 now state stat 67 = 100 / 150 / 150
   and V3's result is 2565; V4 adds the floor of 25 (§8.1).
+- PQ2: a mode without the velocity modifier leaves the velocity
+  unchanged (§8.1 rule 4). PQ3: §8.1 rule 3 as read (`0x00648690`).
+- PQ4: the arrival result is the re-path's (§9.5 rule 4). PQ5: the
+  step continues after `0x005C9D90` (§9.2 step 2; exhaustion restarts
+  with mode 2). PQ6: a failed concentration roll falls through to the
+  state 15 test (§1.4 rule 5). PQ7: town access 0, only monsters check
+  the budget, types written directly (§9.10). PQ8: no room hint (§9.4
+  rule 2.4, `0x0064FB90(Q, 0)`).
+- PQ9: edge case 5 cannot happen through §9.4 (32-bit product bounds Δ
+  below 8 sub-tiles); the cut is reachable only by the overshoot, edge
+  case 12, vector W10.
+- GR1: §9.6 rule 2 is dead in 1.14d (`0x00650660` has one caller, which
+  tests the vector first). PX1: edge case 4 now says P can collide.
+- `world/npc.md` OQ7 (§9.2 rule 6 vs the queued 0x13 interaction):
+  §9.2 rule 6 corrected (`0x00460780` writes +0x150 := 1; the arrival
+  branch runs `0x00548B00` or `0x00580A70`). §9.5 unit distance: a
+  negative `dist8_unit` entry returns 0 directly.
+- OQ3 (missile part), OQ6: §11, `combat/vitals.md` §5. The §9.8
+  add / removal addresses were swapped (fixed: removal `0x00571600`
+  sends 0x0A).

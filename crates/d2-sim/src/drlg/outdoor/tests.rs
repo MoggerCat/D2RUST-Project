@@ -213,14 +213,18 @@ fn act1_placement_matches_recording() {
     assert_eq!(drlg.start_seed, 4014346869);
     // Only the Black Marsh draw (seq 2439) advanced the DRLG seed.
     assert_eq!(drlg.seed, Seed::new(1406222081, 1674353446));
-    // Allocation order 4, 3, 2, 1, 17, 39, 26, 7, 6, 27, 5.
     let mut order: Vec<u32> = drlg
         .level_list()
         .into_iter()
         .map(|l| drlg.level(l).id)
         .collect();
     order.reverse();
-    assert_eq!(order, [4, 3, 2, 1, 17, 39, 26, 7, 6, 27, 5]);
+    // `levels.md` Test vectors (seq 2425–2452): the placer rows, then the
+    // §2.7 neighbour-entry walk over 1..17 allocates 8..16.
+    assert_eq!(
+        order,
+        [4, 3, 2, 1, 17, 39, 26, 7, 6, 27, 5, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+    );
     let rect = |id| drlg.level(drlg.find_level(id).unwrap()).rect;
     assert_eq!(rect(4), TileRect::new(1000, 1000, 80, 80));
     assert_eq!(rect(3), TileRect::new(920, 984, 80, 80));

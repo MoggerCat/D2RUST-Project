@@ -31,9 +31,9 @@ fn tick_length() {
 #[test]
 fn driver_vectors() {
     let at = |last, now, catch_up| {
-        let mut d = TickDriver { last: Some(last) };
+        let mut d = TickDriver { last };
         let ran = d.poll(now, catch_up);
-        (ran, d.last.unwrap())
+        (ran, d.last)
     };
     assert_eq!(at(1000, 1039, true), (false, 1000));
     assert_eq!(at(1000, 1040, true), (true, 1040));
@@ -41,10 +41,10 @@ fn driver_vectors() {
     assert_eq!(at(1000, 1150, false), (true, 1040));
     // After the catch-up the next call at the same time ticks again, then
     // the lag is dropped (rule 3).
-    let mut d = TickDriver { last: Some(1000) };
+    let mut d = TickDriver { last: 1000 };
     assert!(d.poll(1150, true));
     assert!(d.poll(1150, true));
-    assert_eq!(d.last, Some(1150));
+    assert_eq!(d.last, 1150);
     assert!(!d.poll(1150, true));
 }
 
@@ -53,19 +53,51 @@ fn driver_vectors() {
 fn driver_first_use_and_mask() {
     let mut d = TickDriver::new();
     assert!(!d.poll(5000, true));
-    assert_eq!(d.last, Some(5000));
-    // `now & 0x7FFFFFFF` with a signed difference, as §1.2 states: across
-    // the 31-bit wrap the difference is negative and no tick runs
-    // (not an edge case the spec lists; queued in HANDOFF §5).
-    let mut d = TickDriver {
-        last: Some(0x7FFF_FFF0),
-    };
-    assert!(!d.poll(0x8000_0018, true));
-    assert_eq!(d.last, Some(0x7FFF_FFF0));
-    // Without the mask bit the difference is 40: a tick.
-    let mut d = TickDriver { last: Some(0x10) };
+    assert_eq!(d.last, 5000);
+    // Only `now` is masked: bit 31 of the clock is dropped, so the
+    // difference is 40 and a tick runs.
+    let mut d = TickDriver { last: 0x10 };
     assert!(d.poll(0x8000_0038, true));
-    assert_eq!(d.last, Some(0x38));
+    assert_eq!(d.last, 0x38);
+}
+
+// Covers: specs/sim/tick.md §edge-cases-original-bugs r7
+#[test]
+fn driver_clock_wrap_stalls() {
+    // Vector: last = 2147483620, now = 5 (wrapped): no tick, last
+    // unchanged, and no later `now` below 2^31 ticks.
+    let mut d = TickDriver {
+        last: 2_147_483_620,
+    };
+    assert!(!d.poll(5, true));
+    assert_eq!(d.last, 2_147_483_620);
+    for now in [40, 1 << 20, 2_147_483_619, 2_147_483_647, 0xFFFF_FFFF] {
+        assert!(!d.poll(now, true), "now {now}");
+        assert_eq!(d.last, 2_147_483_620);
+    }
+    // Vector: last = 2147483000, now = 100: no tick; first tick again at
+    // now = 2147483040.
+    let mut d = TickDriver {
+        last: 2_147_483_000,
+    };
+    assert!(!d.poll(100, true));
+    assert!(!d.poll(2_147_483_039, true));
+    assert!(d.poll(2_147_483_040, true));
+    assert_eq!(d.last, 2_147_483_040);
+}
+
+// Covers: specs/sim/tick.md §edge-cases-original-bugs r8
+#[test]
+fn driver_zero_clock_reinitialises() {
+    // The masked clock reads 0 on first use: `last` stays 0 and the next
+    // call initialises it again instead of ticking.
+    let mut d = TickDriver::new();
+    assert!(!d.poll(0x8000_0000, true));
+    assert_eq!(d.last, 0);
+    assert!(!d.poll(100, true));
+    assert_eq!(d.last, 100);
+    assert!(d.poll(140, true));
+    assert_eq!(d.last, 140);
 }
 
 // Covers: specs/sim/tick.md §1 r4; specs/sim/intents-events.md §1 r1, §1 r2, §1 r3, §1 r4

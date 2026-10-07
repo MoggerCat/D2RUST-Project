@@ -88,3 +88,74 @@ fn client_room_change_keeps_its_rooms_active() {
     assert_eq!(ar.inactivity, 0);
     fx.assert_clean();
 }
+
+/// The S→C 0x07 the room switch sends for DRLG room `r`.
+fn reveal_of(d: &crate::drlg::Drlg, r: crate::drlg::DrlgRoomId) -> Vec<u8> {
+    let room = d.room(r);
+    crate::wiring::path::place::map_reveal(
+        room.rect.x as u16,
+        room.rect.y as u16,
+        d.level(room.level).id as u8,
+    )
+    .to_vec()
+}
+
+// Covers: specs/sim/path-placement.md §11 text; specs/drlg/rooms.md §4.1
+#[test]
+fn room_switch_reveals_each_joined_room_in_adjacency_order() {
+    // `0x00537B50` → `0x0053A8E0` for each room of the new adjacency
+    // array missing from the old: S→C 0x07 (tile x, tile y, level id) to
+    // the client's player. A, B, C in a row: A's array is {A, B}, C's is
+    // {B, C}; the first switch (no old room) reveals A's whole array, the
+    // switch A → C only C.
+    let mut fx = Fx::with_rooms(&[
+        (LEVEL, TileRect::new(0, 0, 8, 8)),
+        (LEVEL, TileRect::new(8, 0, 8, 8)),
+        (LEVEL, TileRect::new(16, 0, 8, 8)),
+    ]);
+    let a = fx.a;
+    let p = fx.spawn(UnitType::Player, 0, a, 10, 10);
+    fx.game
+        .lists
+        .add_client(Some(p), None, client_state::IN_GAME);
+    fx.sim.sys.hooks.x.sent.clear();
+    fx.tick();
+    let reveals = |fx: &Fx| -> Vec<Vec<u8>> {
+        fx.sim
+            .sys
+            .hooks
+            .x
+            .sent
+            .iter()
+            .filter(|(u, m)| *u == p && m[0] == 0x07)
+            .map(|(_, m)| m.clone())
+            .collect()
+    };
+    let game = &fx.game;
+    let (d, ra) = fx.sim.sys.hooks.drlg.drlg_room(game, a).unwrap();
+    let want: Vec<Vec<u8>> = d
+        .active_room(ra)
+        .unwrap()
+        .adjacency
+        .iter()
+        .map(|&r| reveal_of(d, r))
+        .collect();
+    assert_eq!(want.len(), 2);
+    assert_eq!(reveals(&fx), want);
+    // The third room is active now (B's array streamed it, `rooms.md`
+    // §4.1 status 2); move the player there.
+    let c = act_rooms(&fx)
+        .into_iter()
+        .find(|&r| {
+            fx.sim.sys.hooks.drlg.subtiles(&fx.game, r) == Some(TileRect::new(80, 0, 40, 40))
+        })
+        .expect("room C active");
+    fx.game.lists.change_room(p, c).unwrap();
+    fx.sim.sys.hooks.x.sent.clear();
+    fx.tick();
+    let game = &fx.game;
+    let (d, rc) = fx.sim.sys.hooks.drlg.drlg_room(game, c).unwrap();
+    assert_eq!(reveals(&fx), vec![reveal_of(d, rc)]);
+    assert_eq!(reveal_of(d, rc), [0x07, 16, 0, 0, 0, LEVEL as u8]);
+    fx.assert_clean();
+}

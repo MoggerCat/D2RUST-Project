@@ -1,0 +1,251 @@
+// Spec: specs/client/model.md (§7 rule 4, §9 rules 1–2, §12 rules 1, 2, 5), specs/drlg/levels.md (§2 rule 3), specs/drlg/rooms.md (§4.2, §5 rule 5)
+//! The client DRLG copy (`model.md` §12 rule 1): the `d2-sim` DRLG act
+//! built from S→C 0x03's fields with the client flag, owned by the bridge
+//! and never shared with the server's. 0x07 / 0x08 set and unset its
+//! rooms in sight by coordinates (§9 rules 1–2, `rooms.md` §4.2); a room
+//! in sight is built and becomes an active room, prepended to the act's
+//! room list (`rooms.md` §5 rule 5). [`ClientDrlg::active_rooms`] is that
+//! list in list order, the input of the room of a point (§12 rule 2).
+//!
+//! The DRLG's table view, tile headers and level types are inputs
+//! ([`DrlgSource`]), as the server's are; each act build gets its own
+//! level-type state from the source's factory. Plain Rust, no Bevy.
+
+use std::sync::Arc;
+
+use d2_sim::drlg::{ActRooms, Drlg, DrlgData, DrlgError, LevelTypes, Services, TileSource};
+use d2_sim::rng::Seed;
+use d2_sim::units::RoomId;
+
+use super::world::ActiveRoom;
+
+/// A DRLG room of the client act, by slot (`d2_sim::drlg::DrlgRoomId`).
+pub use d2_sim::drlg::DrlgRoomId;
+
+/// The level types of one client act (`drlg/levels.md` §3 step 7,
+/// `rooms.md` §9.2): its own state, never the server's.
+pub type ClientTypes = Box<dyn LevelTypes + Send + Sync>;
+
+/// Builds the level-type state of a new client act.
+pub type TypesFactory = Arc<dyn Fn() -> ClientTypes + Send + Sync>;
+
+/// What the client DRLG reads that is not model state: the DRLG table
+/// view, the DT1 tile headers and a factory of level-type state (the
+/// same data the server's DRLG reads, `model.md` §12 rule 1).
+#[derive(Clone)]
+pub struct DrlgSource {
+    pub data: Arc<DrlgData>,
+    pub tiles: Arc<dyn TileSource + Send + Sync>,
+    pub types: TypesFactory,
+}
+
+impl std::fmt::Debug for DrlgSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DrlgSource")
+            .field("levels", &self.data.levels.len())
+            .finish_non_exhaustive()
+    }
+}
+
+/// The client act's room list (act +0x10, next active room +0x7C): new
+/// active rooms are prepended, removed ones unlinked in place
+/// (`rooms.md` §5 rule 5, §8; `sim/unit-order.md` §4). Record ids are
+/// never reused.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ActList {
+    /// Head first.
+    pub rooms: Vec<RoomId>,
+    next: u32,
+}
+
+impl ActRooms for ActList {
+    fn create_active_room(&mut self, _act: u8, _flags: u32) -> RoomId {
+        let id = RoomId(self.next);
+        self.next += 1;
+        self.rooms.insert(0, id);
+        id
+    }
+
+    /// The adjacency array lives in the DRLG's active room
+    /// (`rooms.md` §6); the list keeps no copy.
+    fn set_adjacent(&mut self, _room: RoomId, _adjacent: &[RoomId]) {}
+
+    fn remove_active_room(&mut self, room: RoomId) -> u32 {
+        self.rooms.retain(|&r| r != room);
+        0
+    }
+}
+
+/// A client DRLG operation failed.
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+pub enum ClientDrlgError {
+    /// A fatal error of the original's DRLG code, or a level-type error.
+    #[error(transparent)]
+    Drlg(#[from] DrlgError),
+    /// A cloned [`ClientDrlg`] holds no level-type state and cannot
+    /// generate (see [`ClientDrlg`]'s `Clone`).
+    #[error("client DRLG snapshot: no level-type state")]
+    Snapshot,
+}
+
+/// The client DRLG act of `[0x007A0634]` (`model.md` §1, §12 rule 1).
+///
+/// `Clone` makes a snapshot: the DRLG and the room list, without the
+/// level-type state (which is not cloneable); a snapshot answers every
+/// query, and an operation that needs the level types fails with
+/// [`ClientDrlgError::Snapshot`]. Equality is that of the DRLG's whole
+/// state (its `Debug` form) and the room list.
+pub struct ClientDrlg {
+    pub drlg: Drlg,
+    pub list: ActList,
+    types: Option<ClientTypes>,
+    data: Arc<DrlgData>,
+    tiles: Arc<dyn TileSource + Send + Sync>,
+}
+
+impl Clone for ClientDrlg {
+    fn clone(&self) -> Self {
+        Self {
+            drlg: self.drlg.clone(),
+            list: self.list.clone(),
+            types: None,
+            data: self.data.clone(),
+            tiles: self.tiles.clone(),
+        }
+    }
+}
+
+impl PartialEq for ClientDrlg {
+    fn eq(&self, other: &Self) -> bool {
+        self.list == other.list && format!("{:?}", self.drlg) == format!("{:?}", other.drlg)
+    }
+}
+
+impl Eq for ClientDrlg {}
+
+impl std::fmt::Debug for ClientDrlg {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ClientDrlg")
+            .field("act", &self.drlg.act)
+            .field("init_seed", &self.drlg.init_seed)
+            .field("list", &self.list)
+            .finish_non_exhaustive()
+    }
+}
+
+impl ClientDrlg {
+    /// `0x006194A0` with the client flag (`model.md` §7 rule 4,
+    /// `levels.md` §2 rule 3): the DRLG of `act` from `init_seed`
+    /// (0x03 u32@2) and the game's difficulty, town id 0 and DRLG flags 1
+    /// (client copy), so no town is generated (`levels.md` §3 step 8).
+    pub fn build(
+        src: &DrlgSource,
+        act: u8,
+        init_seed: u32,
+        difficulty: u8,
+    ) -> Result<Self, DrlgError> {
+        let mut types = (src.types)();
+        let drlg = Drlg::create(
+            act,
+            init_seed,
+            difficulty,
+            0,
+            true,
+            &src.data,
+            types.as_mut(),
+        )?;
+        Ok(Self {
+            drlg,
+            list: ActList::default(),
+            types: Some(types),
+            data: src.data.clone(),
+            tiles: src.tiles.clone(),
+        })
+    }
+
+    fn split(&mut self) -> Result<(&mut Drlg, Services<'_>), ClientDrlgError> {
+        let types = self.types.as_mut().ok_or(ClientDrlgError::Snapshot)?;
+        Ok((
+            &mut self.drlg,
+            Services {
+                data: &self.data,
+                tiles: &*self.tiles,
+                types: types.as_mut(),
+                rooms: &mut self.list,
+            },
+        ))
+    }
+
+    /// 0x07 (`model.md` §9 rule 1, `0x0061B640`): the room at tile (x, y)
+    /// of level `level` set in sight with propagation when its status-1
+    /// count is 0; `hint` is the local player's DRLG room. `None`: the
+    /// level has no room at the point.
+    pub fn set_in_sight(
+        &mut self,
+        level: u8,
+        x: u16,
+        y: u16,
+        hint: Option<DrlgRoomId>,
+    ) -> Result<Option<DrlgRoomId>, ClientDrlgError> {
+        let (d, mut svc) = self.split()?;
+        Ok(d.set_in_sight_at(&mut svc, level.into(), x.into(), y.into(), hint)?)
+    }
+
+    /// 0x08 (`model.md` §9 rule 2, `0x0061B690`).
+    pub fn unset_in_sight(
+        &mut self,
+        level: u8,
+        x: u16,
+        y: u16,
+        hint: Option<DrlgRoomId>,
+    ) -> Result<Option<DrlgRoomId>, ClientDrlgError> {
+        let (d, mut svc) = self.split()?;
+        Ok(d.unset_in_sight_at(&mut svc, level.into(), x.into(), y.into(), hint)?)
+    }
+
+    /// The act's active rooms in list order (act +0x10, newest first):
+    /// each one's sub-tile rectangle (+0x4C…+0x58), its level id and its
+    /// DRLG room (`model.md` §12 rule 2).
+    pub fn active_rooms(&self) -> Vec<ActiveRoom> {
+        self.list
+            .rooms
+            .iter()
+            .map(|&id| {
+                let room = self
+                    .drlg
+                    .drlg_room_of(id)
+                    .expect("every listed record has its DRLG room");
+                let a = self
+                    .drlg
+                    .active_room(room)
+                    .expect("listed rooms are active");
+                let level = self.drlg.level(self.drlg.room(room).level).id;
+                ActiveRoom {
+                    x0: a.subtiles.x,
+                    y0: a.subtiles.y,
+                    w: a.subtiles.w,
+                    h: a.subtiles.h,
+                    level: level as u16,
+                    room,
+                }
+            })
+            .collect()
+    }
+
+    /// The adjacency array of an active DRLG room (`rooms.md` §6 order;
+    /// it holds the room itself), as DRLG rooms. Empty for a room
+    /// without an active room.
+    pub fn adjacency(&self, room: DrlgRoomId) -> Vec<DrlgRoomId> {
+        self.drlg
+            .active_room(room)
+            .map_or_else(Vec::new, |a| a.adjacency.clone())
+    }
+
+    /// The unit seed of a unit created in `room` (`model.md` §2 rule 6,
+    /// §12 rule 5, Randomness rule 1): the active room's seed (+0x6C) is
+    /// stepped once and the unit seed is `init_low(lo')`. `None` for a
+    /// room without an active room.
+    pub fn unit_seed(&mut self, room: DrlgRoomId) -> Option<Seed> {
+        self.drlg.active_room_seed_mut(room).map(Seed::derive)
+    }
+}

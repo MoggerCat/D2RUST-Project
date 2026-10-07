@@ -83,18 +83,28 @@ impl MazePresets for FakePresets {
 
     fn build_map(
         &mut self,
-        _drlg: &mut Drlg,
+        drlg: &mut Drlg,
         _data: &DrlgData,
-        _level: LevelIdx,
+        level: LevelIdx,
         map: MapId,
         small: bool,
         links: &[MazeLink],
-    ) -> Result<(), DrlgError> {
+    ) -> Result<Option<DrlgRoomId>, DrlgError> {
         let m = &mut self.maps[map.0 as usize];
         m.small = Some(small);
         m.links = links.to_vec();
-        Ok(())
+        Ok(Some(fake_room(drlg, level, m.rect)))
     }
+}
+
+/// The room a fake BuildArea returns: a real DRLG room of `level`, not in
+/// the level list, allocated without spending level-seed draws (the fakes
+/// model no rooms).
+pub(super) fn fake_room(drlg: &mut Drlg, level: LevelIdx, rect: TileRect) -> DrlgRoomId {
+    let seed = drlg.level(level).seed;
+    let r = drlg.alloc_room(level, crate::drlg::RoomKind::Preset, rect);
+    drlg.level_mut(level).seed = seed;
+    r
 }
 
 fn leveldata() -> DrlgData {

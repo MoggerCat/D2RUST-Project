@@ -46,6 +46,8 @@ pub struct MissileParams {
     pub attack_bonus: i32,
     /// +0x4C.
     pub range: i32,
+    /// +0x24 gfx argument (not read by creation; `missiles/bodies.md` §2).
+    pub gfx: i32,
     /// +0x54, +0x58: init callback (opaque id for the skills code) and
     /// its argument.
     pub init: Option<(u32, u32)>,
@@ -238,8 +240,12 @@ pub fn create_missile<W: MissileWorld + ?Sized>(
     // Step 20.
     cx.world.alloc_stat_list(m);
     // Step 21.
-    if let Some((cb, arg)) = p.init {
-        cx.world.init_callback(game, m, cb, arg);
+    // The missile spec's own callback (`zigzag`, `missiles/bodies.md`
+    // §19) runs here; every other one is the skills code's.
+    match p.init {
+        Some((super::bodies_ext::ZIGZAG_CALLBACK, _)) => super::bodies_ext::zigzag(game, cx, m),
+        Some((cb, arg)) => cx.world.init_callback(game, m, cb, arg),
+        None => {}
     }
     // Step 22.
     {

@@ -34,6 +34,7 @@ use d2_server::world_data::{archive, names_file, WorldFiles};
 use d2_sim::combat::vitals::{init_player_stats, VitalsTables};
 use d2_sim::combat::CombatTables;
 use d2_sim::drlg::maze::Maze;
+use d2_sim::drlg::preset::Ds1File;
 use d2_sim::drlg::{Drlg, DrlgData, Dungeon, RoomKind, Services};
 use d2_sim::game::Game;
 use d2_sim::monsters::ai::skill_modes;
@@ -146,8 +147,17 @@ fn every_lvlprest_ds1_parses() {
             if o.flags != 0 {
                 flagged.push(o.flags);
             }
-            if o.kind == 2 && o.id >= 573 {
-                *high_ids.entry(o.id).or_default() += 1;
+        }
+        // `preset.md` §5.3: the ids ≥ 573 the spec measured are object
+        // *class* ids after the object-preset table (`preset-tables.tsv`
+        // `objpreset` holds 580–582), not the stored DS1 ids (< 150 for
+        // v ≥ 6). Counted on the parser's output (`Ds1File::from_input`).
+        let parsed = Ds1File::from_input(f, &l.tables.preset).unwrap_or_else(|e| {
+            panic!("{}: {e:?}", String::from_utf8_lossy(path));
+        });
+        for u in &parsed.units {
+            if u.unit_type == 2 && u.class >= 573 {
+                *high_ids.entry(u.class as u32).or_default() += 1;
             }
         }
         assert!(
@@ -241,7 +251,8 @@ fn every_act1_level_generates() {
     order.reverse();
     assert_eq!(
         order,
-        [4, 3, 2, 1, 17, 39, 26, 7, 6, 27, 5],
+        // `levels.md` Test vectors (seq 2425–2452), the whole list.
+        [4, 3, 2, 1, 17, 39, 26, 7, 6, 27, 5, 8, 9, 10, 11, 12, 13, 14, 15, 16],
         "recorded list"
     );
 

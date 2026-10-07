@@ -27,22 +27,22 @@
 | Inputs | 63–71 |
 | Outputs / state changes | 72–77 |
 | Rules | 78–79 |
-|   1. Structures (1.14d layout, for recorders and checks) | 80–116 |
-|   2. DRLG room creation and seeds (`0x0066B3E0`) | 117–134 |
-|   3. Rooms-near arrays (`0x0066C370`) | 135–178 |
-|   4. Status and activation | 179–279 |
-|   5. Active room creation (`0x006422A0`, `0x00619890`) | 280–302 |
-|   6. Adjacency array order (owner of `unit-order.md` §9) | 303–318 |
-|   7. Room clients and the inactivity counter | 319–339 |
-|   8. Deactivation (tick step 9) | 340–359 |
-|   9. Room tile grid | 360–821 |
-|   10. Collision map from tiles | 822–900 |
-| Constants & data dependencies | 901–913 |
-| Randomness | 914–931 |
-| Edge cases & original bugs | 932–949 |
-| Test vectors | 950–997 |
-| Provenance | 998–1017 |
-| Open questions | 1018–1048 |
+|   1. Structures (1.14d layout, for recorders and checks) | 80–118 |
+|   2. DRLG room creation and seeds (`0x0066B3E0`) | 119–151 |
+|   3. Rooms-near arrays (`0x0066C370`) | 152–195 |
+|   4. Status and activation | 196–296 |
+|   5. Active room creation (`0x006422A0`, `0x00619890`) | 297–319 |
+|   6. Adjacency array order (owner of `unit-order.md` §9) | 320–335 |
+|   7. Room clients and the inactivity counter | 336–356 |
+|   8. Deactivation (tick step 9) | 357–392 |
+|   9. Room tile grid | 393–929 |
+|   10. Collision map from tiles | 930–1008 |
+| Constants & data dependencies | 1009–1023 |
+| Randomness | 1024–1041 |
+| Edge cases & original bugs | 1042–1059 |
+| Test vectors | 1060–1107 |
+| Provenance | 1108–1132 |
+| Open questions | 1133–1177 |
 <!-- /index -->
 
 ## Summary
@@ -83,6 +83,7 @@ DRLG room (0xEC bytes):
 
 | Offset | Field |
 |---|---|
+| +0x00 | link list ("orths"; node 0x18 bytes: +0x00 target room, or the level for a cross-level link, +0x04 direction 0..3, +0x08 extra, +0x0C init flag, +0x10 target box (x, y, w, h), +0x14 next) |
 | +0x04 | `dwInitSeed` (u32) |
 | +0x08, +0x2C | rooms-near array pointer, count |
 | +0x0C | status reference counts, u16 × 4 (statuses 0..3) |
@@ -99,6 +100,7 @@ DRLG room (0xEC bytes):
 | +0x58 | level |
 | +0x5C | preset units |
 | +0x60 | other flags (bit 0: was populated) |
+| +0x64 | logical-room info: coordinate lists (`drlg/levels.md` §11) |
 
 Room flags (+0x28; D2MOO names): 0x10 << i warp toward vis slot i (i =
 0..7); 0x1000–0x8000 sub-shrine rows; 0x10000 waypoint; 0x20000 small
@@ -131,6 +133,21 @@ order:
 So room k of a level (k-th creation) has a seed fixed by the level seed
 and k. Rooms are never re-seeded from the level later: activation resets
 the room seed to `init_low(dwInitSeed)` (§4.4).
+
+#### 2.1 Room free (`0x0066C100`)
+
+No draws. In order: free the warp links (`0x0066B4F0`); free the
+rooms-near array (+0x08, count +0x2C := 0); free the type data (type 1
+`0x0067D610`, type 2 `0x006665B0`); free each preset unit (+0x5C); for
+each link of the room's list (+0x00, list order) with init flag 1 and
+target N: remove from this room's list, then from N's list, the first
+init-1 link whose target is the other room (`0x0066B610`); free the
+remaining links (`0x0066B530`); unlink the room from its level's list
+(level +0x10, next +0x24) and decrement the level's room count (+0x08)
+when it was found; free the tile grid (`0x0066F0B0`) and the logical
+rooms (`drlg/levels.md` §11); free the room. Links without the init
+flag (cross-level links, `drlg/maze.md` §7.1) are dropped from this
+room only.
 
 ### 3. Rooms-near arrays (`0x0066C370`)
 
@@ -350,12 +367,28 @@ A populated room that is removed and built again starts with flag bit 0:
    search; fatal error if absent), fix neighbours' adjacency arrays
    (§6.3), then `0x0066B4C0`: DRLG room +0x30 := 0, other flags := active
    flags & 1, and if flag 0x100000: free the room's tiles (`0x0066F1A0`,
-   §9); then free the active room (`0x0061A840`: every remaining unit
-   gets flag 0x800000 and its path updated, non-client units flag-ex
-   0x20; collision grid freed `0x0064CA10`; removal records freed
-   `0x0061A2C0`; client array and adjacency array freed).
+   §9); then free the active room (`0x0061A840`: rule 4 for every
+   remaining unit; collision grid freed `0x0064CA10`; removal records
+   freed `0x0061A2C0`; client array and adjacency array freed).
 3. The DRLG room keeps its seeds, statuses, rooms-near array and preset
    data; a later build (§4.4) re-derives the same room seed.
+4. Units still in a freed room (`0x0061A840`, 1.14d-confirmed): while
+   the room's first unit (active room +0x74) is not null, for that unit
+   U: if U's flags (unit +0xC4, `sim/units.md` §2) lack 0x400000
+   (D2MOO name `UNITFLAG_ISCLIENTUNIT`), U's flags 2 (+0xC8) |= 0x20; then U's flags |= 0x800000; then
+   U leaves the room (`0x0064C450`), which unlinks it so the next head
+   is the next unit (room list order, `sim/unit-order.md` §5):
+   - player, monster, missile (dynamic path): precise and client x, y
+     := 0 (the constants at `0x006EB7C8` / `0x006EB7CC` are 0 and never
+     written), point count (+0x28) := 0; if the path has a room: previous
+     room (+0x20) := room, room-list remove (`0x0064C370`,
+     `sim/unit-order.md` §5 rule 3), path flag 0x2 (room changed). The
+     path room (+0x1C) itself is not cleared.
+   - object, item, tile (static path): if its room (static +0x00) is
+     set: room-list remove (`0x0064C370`); static room := null.
+   The units are not freed; who reads bits 0x800000 / flags-2 0x20
+   afterwards is open question 12. On the server this only runs for
+   units step 2's compression left behind.
 
 ### 9. Room tile grid
 
@@ -414,8 +447,32 @@ increment the DRLG freed-room counter (drlg +0x468), free the tile grid
 record and its frame array, the grid header), free type data (type 1
 `0x0067D680`, type 2 `0x00666610`), clear the two tile-record list heads
 (+0x0C, +0x14) of every warp entry on room +0x4C; if keep, set flag
-`0x200000`. The only caller is `0x0066B4C0` (server, room leaves the
-active set). The DT1 library (flag `0x1000000`) is **not** released.
+`0x200000`. The DT1 library (flag `0x1000000`) is **not** released.
+
+Callers and the keep argument:
+
+1. `0x0066B4C0(room, client flag, populated)`, called once, from the
+   active-room removal `0x0061A910` (§8) with the act's client flag (act
+   +0x50) and the active room's flags (+0x34): room +0x30 := 0; room
+   "other flags" (+0x60) := populated & 1 (the whole field is
+   overwritten); if flag `0x100000` is set, `0x0066F1A0` with **keep =
+   1 when the act's client flag is 0** (the server), else 0. Because
+   +0x30 is already 0, the "remove from the act" step never runs on this
+   path; keep only decides flag `0x200000` (set on the server).
+2. `0x0061B560` (status-3 unset handler, §4): keep = 0, client copies
+   only.
+
+Type-2 type data free (`0x00666610` → `0x00666520`, no draws): if the
+room has preset room data (+0x20) whose preset map has a DS1 file, it
+releases the room's grid views over the DS1 layers: for each wall layer
+(file wall-layer count) the orientation grid (data +0x60 + 0x14·i) and
+the wall grid (+0x10 + 0x14·i), for each floor layer (file floor-layer
+count) the floor grid (+0xB0 + 0x14·i), then the shadow grid (+0xD8).
+A grid free (`0x0067CD90`) releases the grid's own row-offset array if
+it has one and clears the grid. The DS1 data itself and the preset room
+data stay; the next build's grid init (§9.2 step 3c) makes new views.
+Nothing in the simulation reads these grids between a free and the
+next build.
 
 #### 9.3 Tile library of a room
 
@@ -452,7 +509,12 @@ dropped). The result order is: slot order, then reverse file order.
 A library entry is the DT1 tile header (`formats/dt1.md`): material flags
 at +0x06, orientation +0x14, main +0x18, sub +0x1C, rarity/frame +0x20,
 sub-tile flags +0x28 (accessors `0x00604BC0`, `0x00604B60`, `0x00604B90`,
-`0x00604C50`, `0x00604C20`, `0x00604CE0`).
+`0x00604C50`, `0x00604C20`, `0x00604CE0`, in that order: `0x00604BC0`
+returns the u16 material flags at +0x06, then the u32 fields +0x14,
++0x18, +0x1C, +0x20, and `0x00604CE0` the address of +0x28; each is
+fatal on a null entry). The monster population's water-point search
+tests material bit 0x2: `0x00604BC0(entry) & 2`
+(`0x005B2789`, `monsters/population.md` §9.2).
 
 #### 9.4 Packed cell and tile choice
 
@@ -596,26 +658,45 @@ if the record already has flag 0x20). Record fields (0x30 bytes): screen
 x/y of the tile (`0x00643310` on (wx, wy+1); y + 40), position relative
 to the room, flags, chosen DT1 entry, type, next-in-chain, RGB = 0xFF.
 
-**Door preset units** (`0x0066D9E0`, also from step 3): for the levels
-in the 1.14d table at `0x006EEFD0` (level id, first, last), the door
-table at `0x006EF188` (7 dwords per row: main, sub, right-door flag, unit
-id, unit type, dx, dy) gives a unit at the cell's sub-tile position plus
-(dx, dy), placed when inside the room's sub-tile rectangle. **RNG:**
-object ids 91–92 only: `roll(3)` on the room seed (`0x0066DAC1`), the
-unit is placed unless the result is 0. Placement records belong to
-`drlg/preset.md`; the draw belongs here because it interleaves with the
-tile draws.
+**Door preset units** (`0x0066D9E0`, also from step 3): tables, lookup
+and placement are `drlg/preset.md` §11 (tables transcribed in
+`drlg/preset-tables.tsv`, table `door`). **RNG:** object ids 91–92 only:
+`roll(3)` on the room seed (`0x0066DAC1`), the unit is placed unless the
+result is 0. The draw belongs here because it interleaves with the tile
+draws: it comes before the record's flag rules (wall records) and, for a
+hidden door cell (step 3, no record yet), instead of any tile choice.
 
-**Warp tiles.** Floor warp tiles (`0x0066E360`): room flag `0x800000`;
-find the room's warp entry for the cell's destination; if its lvlwarp
-LitVersion is set: for k = 0..3, choose type 0 with key (main = cell
-sub, sub = k | 4) — 4 choices, 4 draws if rarity > 0 — each a hidden
-floor record at (wx − 1 + dx_k, wy − 1 + dy_k), (dx, dy) = (0,0), (1,0),
-(0,1), (1,1) (`0x006EF554`); then chain every floor record with main =
-cell sub and sub < 4 to the warp entry. Wall warp tiles (`0x0066E260`):
-for sub 0 or 4 add the warp unit first; chain the record; if LitVersion,
-choose (`t`, v with lvlwarp Tiles OR'd into the sub byte) → one extra
-hidden wall record (a draw). Warps themselves: `drlg/levels.md`.
+**Warp tiles.** A warp entry is a record of the room's warp-link list
+(+0x4C, §3.3; prepend order): +0x04 next, +0x0C and +0x14 two tile-record
+chains, +0x10 its lvlwarp record. **Finding the entry for a cell:** W :=
+warp id of slot (cell main index, bits 20–25) of the room's level
+(`0x0066AF30`, `drlg/levels.md` §7 rule 4); the first entry in list order
+whose lvlwarp record's `Id` (record +0x00) equals W. Then
+`0x0066E160(t)`: if the entry's record `Direction` (+0x2C) is neither
+'b' nor the cell's letter (t = 11 → 'r', else 'l'), the entry's record
+is replaced by the lvlwarp row for (`Id`, that letter) (`0x0061F310`,
+`drlg/levels.md` §7 rule 4). LitVersion is lvlwarp +0x24, Tiles +0x28.
+
+- Floor warp tiles (`0x0066E360`; wx, wy, v, t): room flag `0x800000`
+  first; no entry → nothing more. Else re-resolve as above; if
+  LitVersion ≠ 0: for k = 0..3 (`0x006EF554`: (dx, dy) = (0,0), (1,0),
+  (0,1), (1,1)) one floor record at (wx − 1 + dx, wy − 1 + dy) with
+  packed value v_k = (cell sub << 20) | ((k | 4) << 8), tile = choose
+  (0, v_k) — **4 choices, each a draw** when its total rarity is > 0 —
+  record flags from v_k, then 0x8 (hidden); each prepended to the entry's
+  +0x14 chain. Then every floor record of the room so far (array order)
+  whose tile has main = cell sub and sub < 4 is prepended to the entry's
+  +0x0C chain (a record met by two exit cells is re-chained; its +0x20 is
+  overwritten).
+- Wall warp tiles (`0x0066E260`; record R, v, t): no entry → fatal
+  0x2B1. If the cell's sub byte (v bits 8–15) is 0 or 4: the warp unit
+  first (`sim/path-placement.md` §12.1); if it adds none, stop here.
+  Else (and after an added unit): re-resolve as above; R is prepended to
+  the entry's +0x0C chain; if LitVersion ≠ 0: v' = v | (Tiles << 8),
+  **one choice** (t, v') → a new wall record of type t at R's position
+  (§9.5 wall records, prepended to the entry's +0x14 chain), flag 0x8.
+
+Warps themselves: `drlg/levels.md`.
 
 #### 9.6 Tiles shared between rooms (linked cells)
 
@@ -629,33 +710,48 @@ tile record in a neighbour. `0x0066E940` (args: type, packed v, wx, wy):
    list for type 0, the non-floor list otherwise) for a record at (wx,
    wy) whose type is not 4, which is either a shadow or the cell has no
    shadow bit, and whose layer matches (record has no layer bits, or
-   record layer − 1 = cell bits 18–19). First match wins.
+   record layer − 1 = cell bits 18–19). First match wins. Order inside a room:
+   a room has at most one link node per kind (floor, non-floor), found
+   or created on first use and **prepended** to the room's node list
+   (tile grid +0x00; node {+0 floor flag, +4 chain, +8 next}); every
+   record added to a chain is **prepended** (record +0x20 := old head),
+   so a chain lists records newest first, a type-3 record's type-4 half
+   before it.
 2. **Not found** (`0x0066E620`): exits (10/11) outside the room are
    skipped; otherwise get or create this room's link list of that kind
    (head insertion, 12-byte node), choose (type, v) **on this room's
-   seed**, append the record to the list chain (floor / shadow / wall
+   seed**, prepend the record to the node's chain (floor / shadow / wall
    record as in §9.5.1, incl. the type-4 corner half, and the wall warp
    tiles for 10/11).
 3. **Found** (`0x0066E740`, existing record R in neighbour N):
    - R has flag 0x1 (layer above): if R is a door (type 8/9), re-run the
      flag rules on R with v; stop.
-   - If v has no bit 7: compute the merged type with the remap tables
-     (index table `0x006EF620` by new type: 1→0, 2→1, 3→2, 5→3, 6→4,
-     7→5, 8, 9, 13 → "keep", others → "stop"; 6×7 table `0x006EF578`,
-     row = index, column = R's type 1..7 — values identical to D2MOO's
-     `nWallTileTypeRemap`). Door special cases: a new door type keeps
-     its type when (wx, wy) is on this room's top or left edge; a new
-     non-door cell over an existing door stops when (wx, wy) is on N's
-     top or left edge. "stop" (index −1 with R a normal wall) ends here.
-   - Corner handling: R type 3 and merged type ≠ 3: hide R's chained
-     type-4 half (flag 0x8) and update N's collision for it (§10.5).
-     R type ≠ 3 and merged type = 3: R gets flags 0xC008 (layer 3,
+   - Merged type m, starting from m = t (the new cell's type):
+     1. v has bit 7: m = t (no table, no edge test).
+     2. Else t is a door (8/9) and wx = this room's x or wy = this
+        room's y (top or left edge): m = t, skip 3–4.
+     3. Else if t is not a door and R is a door (8/9) and wx = N's x or
+        wy = N's y: **stop** (R unchanged, no flag rules).
+     4. Else the class of t (`drlg/wall-remap.tsv`, read from
+        `0x006EF620` / `0x006EF578`): `table` with R's type ≤ 7 → m =
+        table value for R's type; `table` with R's type > 7 → **stop**;
+        `keep` (t 0, 4, 10–12, 14–19) → m = t; `stop` (t 8, 9 off the
+        edge, 13) → **stop**.
+     Earlier text read the classes inverted (−1 is `keep`, −2 is `stop`).
+   - Corner handling: R type 3 and m ≠ 3: the record **after R in its
+     chain** (R +0x20) gets flag 0x8 and N's collision is updated for it
+     (§10.5). Because the type-4 half is prepended after its type-3
+     record (step 1), R +0x20 is the record chained into N's list just
+     before R, not R's own half (D2MOO: same); if R is the oldest record
+     of its chain (+0x20 null) 1.14d writes through a null pointer
+     (open question 12).
+     R type ≠ 3 and m = 3: R gets flags 0xC008 (layer 3,
      hidden), collision update, then **choose (3, v) on this room's
      seed** and add a new type-3 wall record (plus its type-4 half, a
      second draw) to this room's non-floor link list.
-   - If the merged type differs from R's type, or R is a floor showing
+   - If m differs from R's type, or R is a floor showing
      key (30, 0): **choose (merged type, v) on N's seed** (the
-     neighbour's room seed, `0x0066E8F7` passes N), set R's type and
+     neighbour's room seed, `0x0066E8F7` passes N), set R's type to m and
      tile; if the tile changed and N has an active room, update its
      collision (§10.5).
    - Re-run the flag rules on R with v (flags are OR'd; only bit 0x8 can
@@ -687,6 +783,18 @@ Preset rooms with lvlprest Animate only.
   is appended at the same position with the entry whose rarity = k and
   flag 0x8 (hidden). A missing frame number is fatal (0xB6 for frame 0,
   0xCB for others; D2MOO warns and uses the first entry instead).
+- **Frame record flags.** The packed value v used for the key and for
+  the frame records is the cell of the record's own layer: grid index =
+  (record flag bits 14–16) − 1 in the walls / floors / shadows grid
+  array being processed (`0x0066D4C4`). Frame records k ≥ 1 are added
+  with no chain (+0x20 = 0) and get the full flag rules of §9.5 from v
+  (layer, cell bits, DT1 material of the frame entry), then 0x8. A wall
+  frame of type 3 also gets its type-4 corner half (one more **choice
+  and draw** on the room seed; that half is not hidden and not in the
+  frame array). Frame 0 keeps the original record and its flags; only
+  its tile changes. Shadow records have no layer bits, so their index is
+  −1: the grid slot before the shadow grid (preset room data +0xC4,
+  floor layer 1) is read (open question 13).
 - The rarity choice in §9.4 still ran first for the cell (total = 0 +
   1 + … + (|F|−1), a draw when |F| > 1); its result is overwritten.
 - Tick (`0x0066D410` over the near rooms → `0x0066D3B0`, rooms with flag
@@ -910,6 +1018,8 @@ are D2MOO's.
 | no-removal levels | towns 1, 40, 75, 103, 109 and level 120 (all rooms) | §8.1 |
 | warp-link exception | level 133 | §3.3 |
 | client copy build timer | 5 (client), 7 (server value, unused) | §4.6 |
+| wall remap | `drlg/wall-remap.tsv` (tables `0x006EF620`, `0x006EF578`) | §9.6 |
+| floor warp offsets | `0x006EF554`: (0,0), (1,0), (0,1), (1,1) | §9.5 |
 
 ## Randomness
 
@@ -1014,6 +1124,11 @@ counter (+0x0C), and per level all DRLG rooms in list order; then §3 and
   update (§4.6); handler tables at the addresses above.
 - **Tiles and collision (§9, §10)**: 1.14d: `0x0066D820` (tile choice; draw sites read room +0x14/+0x18), `0x0066E9B0` (cell), `0x0066EC10` (grid walk), `0x0066DC50`/`0x0066DB20`/ `0x0066DDE0`/`0x0066DF40` (records, flags), `0x0066E580`/`0x0066E4C0`/ `0x0066E620`/`0x0066E740`/`0x0066E940` (linking; tables `0x006EF620`, `0x006EF578` read with rd.py), `0x0066E1C0`/`0x0066E260`/`0x0066E360` (warps), `0x0066D9E0` (doors), `0x0066D290`/`0x0066D440`/`0x0066D700`/ `0x0066D3B0`/`0x0066D410`/`0x0066D750` (anim), `0x0066EE40`/`0x0066EE70`/ `0x0066EEA0`/`0x0066EEE0`/`0x0066F050`/`0x0066F0B0`/`0x0066F1A0`/ `0x0066F240` (lifecycle, library), `0x0061B190`/`0x0061B730` (build sequence), `0x00604A40`/`0x00604AE0`/`0x0060D040`/`0x0060CFA0`/ `0x0060CEA0`/`0x0060CF00`/`0x0060A440` (DT1 library), `0x0064C4C0`/ `0x0064C580`/`0x0064C700`/`0x0064C790`/`0x0064C860`/`0x0064C900`/ `0x0064CA10` (collision). D2MOO `DrlgRoomTile.cpp`, `DrlgDrlgAnim.cpp`, `D2Collision.cpp` used as a map; 1.14d differences noted: per-cell function split from the loop, no draw on zero total rarity, fatal missing animation frames, level-133 exclusion of wall warp tiles, all three linked cases through one find-or-add routine. Measurements: `LvlTypes`, `LvlPrest`, `Levels` (patch_d2), Act 1 DT1s and Town DS1s from d2data.mpq. Recording `20261005-232125-rng.jsonl`: per-room counts, first-room vector reproduced by simulation (scratchpad `dt1/simtown.py`).
 - **Recorded**: §Test vectors.
+- **Room free, units left (§8.2 rule 4)**: asm of `0x0061A840`
+  (`0x0061A851`–`0x0061A87F` loop), `0x0064C450` (unit leaves room),
+  `0x0064FC20` (dynamic path reset), `0x0064C370` (room-list remove);
+  `0x006EB7C8` / `0x006EB7CC` read from `Game.exe` (both 0, only
+  readers in `all.asm`). Flag name from D2MOO `Units.h` (hint only).
 
 ## Open questions
 
@@ -1040,8 +1155,22 @@ counter (+0x0C), and per level all DRLG rooms in list order; then §3 and
 9. `map-preview.md` OQ 3 (8 visible-flagged invisible tiles in
    `townN1.ds1`): the tile build does not hide them (§9.10); the cause is
    in the client draw path (Phase 6).
-10. Door tables `0x006EEFD0` / `0x006EF188` (§9.5) not transcribed; needed
-    for levels with door units.
+10. *Answered:* the door tables are transcribed in
+    `drlg/preset-tables.tsv` (table `door`), rules in `drlg/preset.md`
+    §11.
 11. Collision build (§10.4) reads each listed room's grid header: confirm
     the new room's own header is allocated before the loop
     (`0x0064C900`).
+12. §8.2 rule 4: which code reads unit flag 0x800000 and flags-2 0x20
+    after a room free, whether any server unit has flag 0x400000, and
+    whether step 2's compression (`0x005433F0`) can leave a unit in the
+    room at all. Settle: xref bit tests of unit +0xC4 / +0xC8 (byte
+    forms `+0xC6` & 0x80, `+0xC8` & 0x20) and of `0x005433F0`'s exits.
+13. Merge corner case (§9.6 step 3): can R be a type-3 record with no
+    successor in its chain (R +0x20 null) when the merged type is not 3?
+    1.14d then writes through a null pointer. A dump of every link chain
+    of the five acts' built rooms settles whether it occurs.
+14. Animated shadow records (§9.7) read the grid before the shadow grid
+    (floor layer 1). Does any 1.14d DS1 with lvlprest `Animate` have a
+    shadow cell whose tile has material 0x100? Scan the Animate rows'
+    DS1 files with their DT1s.

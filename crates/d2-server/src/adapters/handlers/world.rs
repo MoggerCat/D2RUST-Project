@@ -1,8 +1,9 @@
-// Spec: specs/world/npc.md, specs/world/vendors.md, specs/world/waypoints.md, specs/world/quests.md, specs/sim/intents-events.md §2.4, §3.2
+// Spec: specs/world/npc.md, specs/world/vendors.md, specs/world/waypoints.md, specs/world/quests.md, specs/world/objects.md §7.1, specs/sim/intents-events.md §2.4, §3.2
 //! The world intent handlers: NPC interaction (`world/npc.md` §2–§4, §6,
 //! §7), vendors (`world/vendors.md` §5.5, §7, §8), waypoints
-//! (`world/waypoints.md` §6) and quests (`world/quests.md` §1.7, §6.2,
-//! §7.3).
+//! (`world/waypoints.md` §6), quests (`world/quests.md` §1.7, §6.2,
+//! §7.3) and the C→S 0x13 object case (`world/waypoints.md` §5.2,
+//! `world/objects.md` §7.1).
 //!
 //! The dispatcher has run the gate and the exact-size check
 //! (`intents-events.md` §2.3, §2.4 rule 1) when [`handle`] is called.
@@ -35,7 +36,8 @@ pub use wired::{Parts, TradeRest, WiredWorld};
 
 use d2_sim::game::Game;
 use d2_sim::tick::EventDispatch;
-use d2_sim::units::UnitId;
+use d2_sim::units::{ClientId as SimClient, UnitId};
+use d2_sim::wiring::action::ObjectCase;
 use d2_sim::world::npc::{NpcControl, NpcError, NpcVendors, NpcWorld};
 use d2_sim::world::quests::{QuestControl, QuestError, QuestWorld};
 use d2_sim::world::vendors::gamble::identify_gamble;
@@ -70,14 +72,16 @@ pub enum System {
     Vendors,
     Waypoints,
     Quests,
+    /// The object case of 0x13 (unit type 2; [`route`]).
+    Objects,
 }
 
 /// Every world-related C→S id (`client-messages.tsv`): (id, owner spec
 /// section, status). The order is the id order.
 pub const WORLD_IDS: &[(u8, &str, Status)] = &[
-    // Unit type 1 only (`npc.md` §2); type 2 goes to the
-    // object-interaction spec (not written, `waypoints.md` §5.2), other
-    // types to no written spec: those stay stubs.
+    // Unit type 1 (`npc.md` §2); type 2 is the object case
+    // (`waypoints.md` §5.2 → `objects.md` §7.1, `System::Objects`,
+    // chosen by `route`); other types to no written spec: stubs.
     (0x13, "world/npc.md §2", Status::Implemented(System::Npc)),
     (
         0x2A,
@@ -157,6 +161,17 @@ pub fn system(id: u8) -> Option<System> {
         Status::Implemented(sys) if i == id => Some(sys),
         _ => None,
     })
+}
+
+/// The system of one message: [`system`] of its id, except 0x13 of size
+/// 9 with unit type 2 (u32 @1), the object case ([`System::Objects`],
+/// `waypoints.md` §5.2).
+pub fn route(msg: &[u8]) -> Option<System> {
+    let id = *msg.first()?;
+    if id == 0x13 && msg.len() == 9 && msg[1..5] == 2u32.to_le_bytes() {
+        return Some(System::Objects);
+    }
+    system(id)
 }
 
 /// A fatal assert of the original (or a sink failure) met by a world
@@ -262,6 +277,18 @@ pub trait WorldHost<D> {
     fn quests<C: QuestCall>(&mut self, game: &mut Game, events: &mut D, call: C) -> Option<C::Out> {
         None
     }
+    /// The C→S 0x13 object case (`waypoints.md` §5.2,
+    /// `objects.md` §7.1) by `player` on the object with `guid`, on the
+    /// host's object state.
+    fn objects(
+        &mut self,
+        game: &mut Game,
+        events: &mut D,
+        player: UnitId,
+        guid: u32,
+    ) -> Option<ObjectCase> {
+        None
+    }
     /// The cube (`handlers::items`) on the host's economy.
     fn cube<C: CubeCall>(&mut self, game: &mut Game, events: &mut D, call: C) -> Option<C::Out> {
         None
@@ -279,11 +306,32 @@ pub trait WorldHost<D> {
     fn walk(&mut self, game: &mut Game, events: &mut D, call: WalkCall) -> Option<WalkResult> {
         None
     }
+    /// The client vitals sync (`combat/vitals.md` §5) for one client at
+    /// the end of a flush: the messages to send it, in order. `None`:
+    /// the host has no sync (or it is off), nothing runs. `staged`: the
+    /// host's position of a player without a path record; `queued`: the
+    /// client has a queued buffer (§5.1 rule 2).
+    fn vitals_sync(
+        &mut self,
+        game: &mut Game,
+        events: &mut D,
+        client: SimClient,
+        staged: (u16, u16),
+        queued: bool,
+    ) -> Option<Vec<Vec<u8>>> {
+        None
+    }
     /// The messages the seams sent since the last take, in send order:
     /// (receiving player unit, bytes).
     fn take_sent(&mut self, events: &mut D) -> Vec<(UnitId, Vec<u8>)> {
         Vec::new()
     }
+    /// Runs after the tick's steps, before its sends are taken (the
+    /// quest routes the tick queued, `WiredWorld`).
+    fn after_tick(&mut self, game: &mut Game, events: &mut D) {}
+    /// The host's millisecond clock (`Intents::set_host_tick`): the
+    /// object code's `GetTickCount` input (`objects.md` edge case 9).
+    fn host_tick(&mut self, events: &mut D, ms: u32) {}
     /// Records a fatal path (see [`WorldError`]).
     fn fault(&mut self, fault: WorldFault);
 }
@@ -323,11 +371,11 @@ pub fn handle<D: EventDispatch, W: WorldHost<D>>(
     out: &mut dyn MessageSink,
 ) -> Option<ResultCode> {
     let id = *msg.first()?;
-    let sys = system(id)?;
-    let player = sim.player_of(client)?;
     // Every handled id has a fixed size ≤ 17 (`client-messages.tsv`), so
     // the drained copy is the whole message.
     let msg = &msg[..size.min(msg.len())];
+    let sys = route(msg)?;
+    let player = sim.player_of(client)?;
     let (game, events) = (&mut sim.game, &mut sim.events);
     let run = match sys {
         System::Npc => sim.world.npc(game, events, NpcRun { player, msg }),
@@ -336,6 +384,18 @@ pub fn handle<D: EventDispatch, W: WorldHost<D>>(
             .world
             .waypoints(game, events, WaypointRun { player, msg }),
         System::Quests => sim.world.quests(game, events, QuestRun { player, msg }),
+        System::Objects => {
+            let guid = u32::from_le_bytes([msg[5], msg[6], msg[7], msg[8]]);
+            match sim.world.objects(game, events, player, guid)? {
+                ObjectCase::Code(c) => Some(Ok(Some(c))),
+                // Operate 23 (`waypoints.md` §5.2) on the host's
+                // waypoints; without them the id stays a stub.
+                ObjectCase::Waypoint(_) => {
+                    sim.world
+                        .waypoints(game, events, WaypointOperate { player, guid })
+                }
+            }
+        }
     }?;
     let sent = sim.world.take_sent(&mut sim.events);
     let mut faults = Vec::new();
@@ -462,6 +522,26 @@ impl WaypointCall for WaypointRun<'_> {
             0x49 => Some(data.take_or_close(w, arrivals, self.player, self.msg)?),
             _ => None,
         })
+    }
+}
+
+/// Operate function 23 (`waypoints.md` §5.2) of the 0x13 object case.
+///
+/// TODO(waypoints.md §5.2): the 0x13 result after the operate is not
+/// stated; read as 0.
+struct WaypointOperate {
+    player: UnitId,
+    guid: u32,
+}
+
+impl WaypointCall for WaypointOperate {
+    type Out = Run;
+    fn call<W: WaypointWorld>(self, data: &WaypointData, _: &mut ArrivalList, w: &mut W) -> Run {
+        let Some((object, facts)) = w.object(self.guid) else {
+            return Ok(Some(1));
+        };
+        data.operate(w, object, &facts, self.player)?;
+        Ok(Some(0))
     }
 }
 

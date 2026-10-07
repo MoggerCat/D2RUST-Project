@@ -54,7 +54,7 @@ fn track(world: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerError>
     }
     if let Some(key) = msg.unit {
         if world.units.remove(&key).is_none() {
-            world.units.insert(key, ClientUnit { key });
+            world.units.insert(key, ClientUnit::new(key));
         }
     }
     Ok(())
@@ -96,7 +96,7 @@ fn expect(owned: &[u8], chunk: &[u8], e: &mut Expected) -> bool {
                 e.handled += 1;
                 if let Some(key) = addressed_unit(m) {
                     if e.world.units.remove(&key).is_none() {
-                        e.world.units.insert(key, ClientUnit { key });
+                        e.world.units.insert(key, ClientUnit::new(key));
                     }
                 }
             }

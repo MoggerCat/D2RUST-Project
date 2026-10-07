@@ -1,4 +1,4 @@
-// Spec: specs/drlg/levels.md §3 (act creation), specs/drlg/preset.md §5–§6, specs/drlg/rooms.md §4.1, §9.3–§9.5, specs/sim/units.md §3, specs/combat/vitals.md §1, specs/sim/tick.md §3, specs/sim/intents-events.md §1 (a game on synthetic data)
+// Spec: specs/drlg/levels.md §3 (act creation), specs/drlg/preset.md §5–§6, specs/drlg/rooms.md §4.1, §9.3–§9.5, specs/sim/units.md §3, specs/combat/vitals.md §1, specs/sim/tick.md §3, specs/sim/intents-events.md §1 (a game on synthetic data), specs/sim/path-placement.md §11, §13 (the session join)
 //! A game from the synthetic install, end to end and in CI: the
 //! archives (tables, strings, AnimData and the DRLG's DS1 / DT1 files,
 //! [`test_fixtures::drlg`]) → the loaded and fixed-up set →
@@ -16,6 +16,7 @@ use std::sync::OnceLock;
 
 use d2_data::tables::Objects;
 use d2_server::adapters::handlers::world::ActionWorld;
+use d2_server::adapters::session::{enter_game, Entry, JoinError};
 use d2_server::adapters::{PlayerData, PlayerFields, ProtoSizes, SimGame, UnitFacts};
 use d2_server::host::Host;
 use d2_server::seams::{ClientId, Clock, MessageSink, PlayerGate, Pos, SessionHandler};
@@ -33,8 +34,8 @@ use test_fixtures::{install, synth};
 
 /// The synthetic town (levels row 1, lvlprest Def 0).
 const TOWN: u32 = 1;
-/// Fixture choices: no spec places a joining player (`levels.md` §10 is
-/// not wired at join).
+/// Fixture choices (`run` stages the player at a fixed point; the
+/// session join places it by the spawn search, `join_run`).
 const INIT: u32 = 0x1234_5678;
 const GAME_SEED: u32 = 1234;
 const CLASS: u32 = 3;
@@ -305,9 +306,9 @@ fn run() -> Run {
 #[test]
 fn town_join_and_frames() {
     let a = run();
-    // No spec says what an idle joined client receives at this wiring
-    // stage (no join sequence is wired): the count is printed, and
-    // compared across runs.
+    // This run stages the player in the town room without the session
+    // join (`town_entry_sends_the_join_sequence` runs that): the count of
+    // what the idle client receives is printed, and compared across runs.
     println!(
         "player {:?} at {:?} in {:?}, waypoint {:?}, {} messages",
         a.player,
@@ -318,4 +319,164 @@ fn town_join_and_frames() {
     );
     // Determinism on the synthetic data: a second game is identical.
     assert_eq!(run(), a);
+}
+
+/// The character name of the join test (zero-padded, 0x59 bytes 6..22).
+fn name() -> [u8; 16] {
+    let mut n = [0u8; 16];
+    n[..6].copy_from_slice(b"werwer");
+    n
+}
+
+/// What the client receives from the session join (`enter_game`) and the
+/// next ticks, with the facts the expected bytes are built from.
+#[derive(Debug, PartialEq, Eq)]
+struct Joined {
+    guid: u32,
+    obj_seed: u32,
+    room_rect: (i32, i32, i32, i32),
+    pos: (i32, i32),
+    received: Vec<Vec<u8>>,
+}
+
+/// The town of [`run`] with its waypoint, an unplaced player joined in
+/// state 4, then `enter_game` and `FRAMES` frames.
+fn join_run() -> Joined {
+    let d = data();
+    let (mut sim, _) = d
+        .world_sim(
+            ActCreation::TownOnly,
+            INIT,
+            TOWN,
+            GAME_SEED,
+            Seams::default(),
+        )
+        .unwrap_or_else(|e| panic!("{e}"));
+    let mut game = Game::new();
+    game.lists.ensure_act(0).unwrap();
+    let (room, rect) = sim
+        .action
+        .hooks()
+        .drlg
+        .with_act(0, &mut game.lists, |dr, svc| {
+            let lv = dr.get_or_alloc_level(svc.data, svc.types, TOWN)?;
+            let r = dr.level_rooms(lv)[0];
+            Ok::<_, d2_sim::drlg::DrlgError>((dr.stream_room(svc, r)?, dr.room(r).rect))
+        })
+        .expect("act 0 has a DRLG")
+        .unwrap_or_else(|e| panic!("town: {e:?}"));
+    let room = room.expect("the town room is active");
+    let (_, _, wx, wy) = TOWN_WAYPOINT;
+    let wp_at = (rect.x * SUB + wx as i32, rect.y * SUB + wy as i32);
+    let mut alloc = |ty, class, room, (x, y): (i32, i32)| {
+        let req = AllocRequest {
+            ty,
+            class,
+            room,
+            add: true,
+            fixed_guid: None,
+            mode: 1,
+            allied: ty == UnitType::Player,
+        };
+        sim.action
+            .with(&mut game, |g, v| v.allocate(g, &req, x, y))
+            .expect("allocated")
+    };
+    let objects: Vec<Objects> = d.rows().unwrap();
+    let wp_class = objects
+        .iter()
+        .position(|o| o.operatefn == 23)
+        .expect("the waypoint row") as u32;
+    alloc(UnitType::Object, wp_class, Some(room), wp_at);
+    // The player as the save loader leaves it: no room, at (0, 0).
+    let player = alloc(UnitType::Player, CLASS, None, (0, 0));
+    sim.action.sys.units.get_mut(player).unwrap().mode = 1;
+    let guid = game.lists.unit(player).unwrap().guid;
+    let obj_seed = sim.action.hooks().objects.as_ref().unwrap().obj_seed;
+    let world = ActionWorld {
+        waypoints: Some(d.waypoints().unwrap()),
+        ..ActionWorld::default()
+    };
+    let mut s: Sim = SimGame::with_world(game, sim, world);
+    s.join(CLIENT, Some(player), None, client_state::IN_GAME)
+        .expect("join");
+    let entry = Entry {
+        act: 0,
+        name: name(),
+    };
+    assert_eq!(enter_game(&mut s, CLIENT, &entry), Ok(player));
+    // A second entry of the placed player is refused.
+    assert_eq!(
+        enter_game(&mut s, CLIENT, &entry),
+        Err(JoinError::Placed(player))
+    );
+    let mut host: TestHost = Host::new(s, ProtoSizes, NoSession, Ms(1000));
+    host.connect(CLIENT);
+    host.frame().expect("first frame");
+    let mut received = host.receive(CLIENT);
+    for f in 0..FRAMES {
+        host.clock.0 += 40;
+        host.frame().unwrap_or_else(|e| panic!("frame {f}: {e:?}"));
+        received.extend(host.receive(CLIENT));
+        let s = &host.game;
+        assert!(s.tick_faults.is_empty(), "frame {f}: {:?}", s.tick_faults);
+        assert_eq!(s.events.errors(), Vec::<String>::new(), "frame {f}");
+    }
+    let s = &mut host.game;
+    let pos = s.events.action.hooks().path_position(player);
+    Joined {
+        guid,
+        obj_seed,
+        room_rect: (rect.x, rect.y, rect.w, rect.h),
+        pos,
+        received,
+    }
+}
+
+// Covers: specs/sim/path-placement.md §11, §13 r1, §13 r3; specs/client/model.md §11 r1, §11 r3; specs/sim/intents-events.md §7.2
+#[test]
+fn town_entry_sends_the_join_sequence() {
+    let j = join_run();
+    let (rx, ry, rw, rh) = j.room_rect;
+    // The spawn search put the player in the one town room.
+    let (x, y) = j.pos;
+    assert!(
+        x >= rx * SUB && x < (rx + rw) * SUB && y >= ry * SUB && y < (ry + rh) * SUB,
+        "player at {:?} outside the town room {:?}",
+        j.pos,
+        j.room_rect
+    );
+    let g = j.guid.to_le_bytes();
+    let mut assign = vec![0x59, g[0], g[1], g[2], g[3], CLASS as u8];
+    assign.extend(name());
+    assign.extend([0, 0, 0, 0]);
+    let mut load = vec![0x03, 0];
+    load.extend(INIT.to_le_bytes());
+    load.extend((TOWN as u16).to_le_bytes());
+    load.extend(j.obj_seed.to_le_bytes());
+    let reveal = {
+        let mut b = vec![0x07];
+        b.extend((rx as u16).to_le_bytes());
+        b.extend((ry as u16).to_le_bytes());
+        b.push(TOWN as u8);
+        b
+    };
+    let mut place = vec![0x15, 0, g[0], g[1], g[2], g[3]];
+    place.extend((x as u16).to_le_bytes());
+    place.extend((y as u16).to_le_bytes());
+    place.push(1);
+    let handshake = vec![0x0B, 0, g[0], g[1], g[2], g[3]];
+    // The session part (enter_game), then the first tick's room switch:
+    // one 0x07 per room of the spawn room's adjacency array (the town has
+    // one room, so its own) (`path-placement.md` §11 "Recipients").
+    assert_eq!(
+        j.received[..6].to_vec(),
+        vec![assign, handshake, load, reveal.clone(), place, reveal],
+        "join prefix of {:02x?}",
+        j.received
+    );
+    // No further room comes into sight while the player stands still.
+    assert!(!j.received[6..].iter().any(|m| m[0] == 0x07));
+    // Determinism on the synthetic data.
+    assert_eq!(join_run(), j);
 }

@@ -1,4 +1,4 @@
-// Spec: specs/render/camera.md (§4–§7, §10), specs/render/sprite-placement.md (§5, §7, §8)
+// Spec: specs/render/camera.md (§4–§7, §10), specs/render/sprite-placement.md (§5, §7, §8), specs/render/draw-order.md (§5, §10)
 //! [`OriginalView`]: the world view's placement hooks answered by the
 //! original's rules. `tiles` places map tiles (camera §6, culled by §7,
 //! DT1 images by placement §7/§8), `unit_params` sets the frame clip
@@ -13,11 +13,12 @@ use crate::bridge::world::ClientWorld;
 use crate::bridge::ClientUnit;
 use crate::composite::{ComponentFrame, ComponentRequest, CompositeError, UnitParams};
 use crate::frames::{FrameAnchor, IndexFrame};
-use crate::scene::{BlendOp, DrawKey, Rect, ShadeChain};
+use crate::scene::{BlendOp, DrawKey, LightGradient, Rect, ShadeChain};
 use crate::ui::{ImageRequest, TextRequest};
 use crate::world_view::{TileDraw, UiRules, UiSprite, UnitPose, ViewAssets, ViewError, ViewRules};
 
 use super::camera::{Camera, TileList, UnitPosition};
+use super::draw_order::UnitSlot;
 use super::placement;
 
 /// One DT1 block's rectangle in tile coordinates (`b.x`, `b.y`, size),
@@ -48,6 +49,18 @@ impl BlockRect {
     }
 }
 
+/// The shade and blend of one DT1 block of a tile (`render/shading.md`
+/// §4, `render/lighting.md` §11 r2–r4: each 32-pixel block has its own
+/// light; `render/blend-modes.md` §6: translucent walls per block). A
+/// gradient in `shade` is positioned at the block when the tile is placed
+/// (its `x`, `y` are overwritten).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BlockShade {
+    pub block: BlockRect,
+    pub shade: ShadeChain,
+    pub blend: BlendOp,
+}
+
 /// One map tile to draw, as the map and draw-order owners state it: the
 /// cell, its list (camera §6), its assembled DT1 image, its blocks, and
 /// the draw answers owned elsewhere.
@@ -64,7 +77,7 @@ pub struct MapTile {
     pub shade: ShadeChain,
     /// TODO(spec: render/blend-modes.md) (roof fade, translucent walls).
     pub blend: BlendOp,
-    /// TODO(spec: render/draw-order.md).
+    /// `draw-order.md` §10 (`rules::draw_order::source`).
     pub key: DrawKey,
 }
 
@@ -80,13 +93,31 @@ pub trait ViewSource {
     /// the per-unit extra offsets `(ox, oy)`.
     fn unit_offset(&self, unit: &ClientUnit, pose: &UnitPose) -> Result<(i32, i32), String>;
 
-    /// TODO(spec: render/draw-order.md, DRLG): the tiles of the frame, in
-    /// draw order, each with its list.
+    /// The tiles of the frame, each with its list and draw key. A feed
+    /// with the §9 map-tile feed of `draw-order.md` is wrapped in
+    /// `draw_order::source::OrderedSource`, which answers this; a source
+    /// without one states its tiles directly.
     fn map_tiles(
         &self,
         world: &ClientWorld,
         assets: &ViewAssets,
     ) -> Result<Vec<MapTile>, ViewError>;
+
+    /// The unit's slot in the frame's draw order (`draw-order.md` §3 r4,
+    /// §5, §10). [`UnitSlot::Unordered`] (the default) leaves the unit and
+    /// its keys to the wrapped rules.
+    fn unit_slot(&self, _unit: &ClientUnit) -> UnitSlot {
+        UnitSlot::Unordered
+    }
+
+    /// TODO(spec: render/lighting.md §11 r2–r4, render/shading.md §4,
+    /// render/blend-modes.md §6): the per-block shade and blend of a tile
+    /// (`rules::lighting::draws` and `rules::shading` answer them from the
+    /// frame's light map). Empty (the default) = the tile's own `shade`
+    /// and `blend` for the whole tile.
+    fn tile_blocks(&self, _tile: &MapTile) -> Result<Vec<BlockShade>, ViewError> {
+        Ok(Vec::new())
+    }
 }
 
 /// The original's camera and placement over wrapped rules `R` (pose,
@@ -171,6 +202,51 @@ impl<'a, R: ?Sized, S: ?Sized> OriginalView<'a, R, S> {
         }))
     }
 
+    /// The draws of one tile: [`Self::tile`] when `blocks` is empty, else
+    /// one draw per block, clipped to the block's screen rectangle
+    /// (`placement::block_pixel`) inside the tile's clip, with the block's
+    /// shade (its gradient moved to the block) and blend. Blocks outside
+    /// the tile's clip (culled, camera §7) draw nothing.
+    pub fn tile_draws(
+        &self,
+        tile: &MapTile,
+        image: &IndexFrame,
+        blocks: &[BlockShade],
+    ) -> Result<Vec<TileDraw>, ViewError> {
+        let Some(whole) = self.tile(tile, image)? else {
+            return Ok(Vec::new());
+        };
+        if blocks.is_empty() {
+            return Ok(vec![whole]);
+        }
+        let cam = &self.camera;
+        let origin = cam.block_origin(
+            tile.list,
+            cam.tile_handed(tile.list, tile.cell.0, tile.cell.1),
+        );
+        let mut out = Vec::with_capacity(blocks.len());
+        for b in blocks {
+            let (x, y) = placement::block_pixel(origin, (b.block.x, b.block.y), (0, 0));
+            let Some(clip) = whole
+                .clip
+                .intersect(&Rect::new(x, y, b.block.width, b.block.height))
+            else {
+                continue;
+            };
+            let shade = match b.shade.gradient() {
+                Some(g) => b.shade.with_gradient(LightGradient { x, y, ..*g }),
+                None => b.shade,
+            };
+            out.push(TileDraw {
+                clip,
+                shade,
+                blend: b.blend,
+                ..whole.clone()
+            });
+        }
+        Ok(out)
+    }
+
     /// Camera §7 wall block culling as a clip of the assembled image: the
     /// frame when every block is kept, `None` when none is, else the
     /// bounding box of the kept blocks, which must not touch a culled
@@ -237,12 +313,12 @@ impl<R: ViewRules + ?Sized, S: ViewSource + ?Sized> ViewRules for OriginalView<'
                     index,
                     error: Box::new(e),
                 })?;
-            if let Some(draw) = self.tile(tile, image).map_err(|e| ViewError::Tile {
+            let tile_error = |e| ViewError::Tile {
                 index,
                 error: Box::new(e),
-            })? {
-                out.push(draw);
-            }
+            };
+            let blocks = self.source.tile_blocks(tile).map_err(tile_error)?;
+            out.extend(self.tile_draws(tile, image, &blocks).map_err(tile_error)?);
         }
         Ok(out)
     }
@@ -252,11 +328,15 @@ impl<R: ViewRules + ?Sized, S: ViewSource + ?Sized> ViewRules for OriginalView<'
         world: &ClientWorld,
         unit: &ClientUnit,
     ) -> Result<Option<UnitPose>, ViewError> {
+        if self.source.unit_slot(unit) == UnitSlot::NotDrawn {
+            return Ok(None);
+        }
         self.rules.unit_pose(world, unit)
     }
 
-    /// Draw keys from the wrapped rules (`draw-order.md`); the clip is the
-    /// frame (camera §10: the play area is not a clip).
+    /// Draw keys from the draw order (`draw-order.md` §10) when the
+    /// source has one, else from the wrapped rules; the clip is the frame
+    /// (camera §10: the play area is not a clip).
     fn unit_params(
         &self,
         world: &ClientWorld,
@@ -264,6 +344,11 @@ impl<R: ViewRules + ?Sized, S: ViewSource + ?Sized> ViewRules for OriginalView<'
         pose: &UnitPose,
     ) -> Result<UnitParams, ViewError> {
         let mut params = self.rules.unit_params(world, unit, pose)?;
+        if let UnitSlot::Drawn(at) = self.source.unit_slot(unit) {
+            params.pass = at.pass;
+            params.major = at.major;
+            params.minor = at.minor;
+        }
         params.clip = self.camera.size.rect();
         Ok(params)
     }
@@ -275,6 +360,15 @@ impl<R: ViewRules + ?Sized, S: ViewSource + ?Sized> ViewRules for OriginalView<'
         req: &ComponentRequest<'_>,
     ) -> Result<ComponentFrame, CompositeError> {
         self.rules.component_frame(unit, pose, req)
+    }
+
+    fn component_slot_frame(
+        &self,
+        unit: &ClientUnit,
+        pose: &UnitPose,
+        req: &ComponentRequest<'_>,
+    ) -> Result<Option<ComponentFrame>, CompositeError> {
+        self.rules.component_slot_frame(unit, pose, req)
     }
 
     /// Camera §4 then placement §8. A cel whose rasterizer rows differ from
@@ -338,7 +432,8 @@ impl<R: UiRules + ?Sized, S: ?Sized> UiRules for OriginalView<'_, R, S> {
         self.rules.ui_text(req, assets)
     }
 
+    /// Pass 11: everything after the world draw (`draw-order.md` §10).
     fn ui_pass(&self) -> Result<u32, ViewError> {
-        self.rules.ui_pass()
+        Ok(crate::scene::order::pass::UI)
     }
 }

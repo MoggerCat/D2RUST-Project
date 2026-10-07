@@ -1,10 +1,10 @@
 // Spec: specs/monsters/ai.md (Test vectors, Edge cases)
 use std::collections::{BTreeMap, BTreeSet};
 
-use d2_data::tables::{Levels, Monstats, Monstats2, Record};
+use d2_data::tables::{Levels, Missiles, Monstats, Monstats2, Record, Skills};
 
 use super::functions::IMPLEMENTED;
-use super::table::AI_FUNCTIONS_TSV;
+use super::table::{AI_FUNCTIONS_TSV, SPECD_HERE};
 use super::*;
 use crate::rng::Seed;
 use crate::units::RoomId;
@@ -60,6 +60,71 @@ struct Fake {
     acts: BTreeMap<UnitId, u8>,
     /// `choose_alternative` takes the slot-9 alternative.
     take_alt: bool,
+    /// NPC interaction block (monster data +0x30).
+    npc_block: bool,
+    /// Players in the NPC's interaction list.
+    npc_list: BTreeSet<UnitId>,
+    /// Quest seams (§9.32): setup result, out-of-town spawn result,
+    /// portal coordinates, drehya walk gate.
+    portal_setup_fails: bool,
+    portal_spawn_ok: bool,
+    portal: Option<(i32, i32)>,
+    drehya_wait: bool,
+    /// Path stops (`stop_path` calls).
+    stops: u32,
+    /// Unit stats by (unit, stat) for `stat` / `set_stat`.
+    stats: BTreeMap<(UnitId, u16), i32>,
+    /// Life percent per unit, overriding `life` (Fetish reads T's).
+    life_of: BTreeMap<UnitId, i32>,
+    path_target: Option<UnitId>,
+    footprint: bool,
+    evil_monster: Option<UnitId>,
+    /// Npc class-case quest answers (§9.9 step 2).
+    jerhyn: Option<(i32, i32, bool)>,
+    alkor_bird: bool,
+    ormus_altar: Option<(i32, i32)>,
+    cain_town: Option<(i32, i32)>,
+    /// The Act II–V seams (`AiActs`).
+    x: Acts,
+}
+
+/// Knobs of the `AiActs` fake; actions go to `Fake::log`.
+#[derive(Default)]
+struct Acts {
+    flags: BTreeMap<UnitId, u32>,
+    max_life: BTreeMap<UnitId, i32>,
+    max_mana: BTreeMap<UnitId, i32>,
+    groups: BTreeSet<(UnitId, u8)>,
+    states_count: i32,
+    cursed: BTreeSet<UnitId>,
+    hostile: BTreeSet<UnitId>,
+    owners: BTreeMap<UnitId, UnitId>,
+    owner_record: Option<(i32, u32)>,
+    quest_flag: bool,
+    portal_guid: Option<u32>,
+    component: u8,
+    target_unit: Option<UnitId>,
+    chain_index: i32,
+    skill_level: BTreeMap<i32, i32>,
+    skill_entry: BTreeMap<i32, (i32, u8)>,
+    hand: BTreeMap<(UnitId, bool), (i32, i32)>,
+    param_ok: bool,
+    check_fails: bool,
+    corpse: Option<UnitId>,
+    pattern: i32,
+    place_ok: bool,
+    point_collides: bool,
+    pattern_collides: bool,
+    free_point: Option<(i32, i32)>,
+    free_spot: Option<(i32, i32)>,
+    room_at: Option<RoomId>,
+    path_points: bool,
+    direction: i32,
+    spawn: Option<UnitId>,
+    queen_class: i32,
+    wisps: Vec<UnitId>,
+    waves: BTreeMap<i32, (i32, i32)>,
+    quests: BTreeSet<String>,
 }
 
 impl Fake {
@@ -106,8 +171,8 @@ impl AiUnits for Fake {
     fn monster_level(&self, _: UnitId) -> i32 {
         5
     }
-    fn life_percent(&self, _: UnitId) -> i32 {
-        self.life
+    fn life_percent(&self, unit: UnitId) -> i32 {
+        self.life_of.get(&unit).copied().unwrap_or(self.life)
     }
     fn add_life(&mut self, _: UnitId, amount: i32) {
         self.log.push(format!("life {amount}"));
@@ -140,6 +205,34 @@ impl AiUnits for Fake {
     fn busy(&self, unit: UnitId) -> bool {
         self.busy.contains(&unit)
     }
+    fn has_interaction_block(&self, _: UnitId) -> bool {
+        self.npc_block
+    }
+    fn in_interaction_list(&self, _: UnitId, player: UnitId) -> bool {
+        self.npc_list.contains(&player)
+    }
+    fn set_life(&mut self, unit: UnitId, value: i32) {
+        self.log.push(format!("setlife {} {value}", unit.0));
+    }
+    fn stat(&self, unit: UnitId, stat: u16) -> i32 {
+        self.stats.get(&(unit, stat)).copied().unwrap_or(0)
+    }
+    fn set_stat(&mut self, unit: UnitId, stat: u16, value: i32) {
+        self.stats.insert((unit, stat), value);
+    }
+    fn set_unit_flag(&mut self, _: UnitId, mask: u32) {
+        self.log.push(format!("flag {mask:#x}"));
+    }
+    fn set_state(&mut self, unit: UnitId, state: u16, on: bool) {
+        if on {
+            self.states.insert((unit, state));
+        } else {
+            self.states.remove(&(unit, state));
+        }
+    }
+    fn path_target(&self, _: UnitId) -> Option<UnitId> {
+        self.path_target
+    }
 }
 
 impl AiModes for Fake {
@@ -167,7 +260,9 @@ impl AiModes for Fake {
     fn path_blocked(&self, _: UnitId) -> bool {
         self.blocked_path
     }
-    fn stop_path(&mut self, _: UnitId) {}
+    fn stop_path(&mut self, _: UnitId) {
+        self.stops += 1;
+    }
     fn set_current_skill(&mut self, _: UnitId, skill: i32) -> bool {
         self.log.push(format!("skill {skill}"));
         skill >= 0
@@ -193,6 +288,12 @@ impl AiModes for Fake {
     }
     fn operate_door(&mut self, _: &mut Game, _: UnitId, door: UnitId) {
         self.log.push(format!("door {door:?}"));
+    }
+    fn start_overlay(&mut self, _: UnitId, overlay: i32) {
+        self.log.push(format!("overlay {overlay}"));
+    }
+    fn set_facing(&mut self, _: UnitId, dir: i32) {
+        self.log.push(format!("facing {dir}"));
     }
 }
 
@@ -221,6 +322,10 @@ impl AiWorld for Fake {
     }
     fn last_dead(&self, _: &Game, room: RoomId) -> [Option<UnitId>; 4] {
         self.last_dead.get(&room).copied().unwrap_or([None; 4])
+    }
+    fn footprint_ok(&self, _: &Game, class: i32, _: Option<RoomId>, x: i32, y: i32) -> bool {
+        let _ = (class, x, y);
+        self.footprint
     }
 }
 
@@ -278,12 +383,312 @@ impl AiTargets for Fake {
         self.log.push(format!("corpses {max_sq} {own}"));
         self.corpses
     }
+    fn nearest_evil_monster(&mut self, _: &mut Game, _: UnitId) -> Option<UnitId> {
+        self.log.push("help scan".into());
+        self.evil_monster
+    }
 }
 
 impl AiSkills for Fake {
     fn skill_usable(&mut self, _: &mut Game, _: UnitId, skill: i32, _: UnitId) -> bool {
         self.log.push(format!("usable {skill}"));
         !self.skill_unusable
+    }
+}
+
+impl AiQuests for Fake {
+    fn portal_setup(&mut self, _: &mut Game, _: UnitId, npc: PortalNpc) -> bool {
+        self.log.push(format!("quest setup {npc:?}"));
+        !self.portal_setup_fails
+    }
+    fn spawn_town_portal(&mut self, _: &mut Game, _: UnitId, npc: PortalNpc) {
+        self.log.push(format!("quest town portal {npc:?}"));
+    }
+    fn spawn_outside_portal(&mut self, _: &mut Game, _: UnitId, npc: PortalNpc) -> bool {
+        self.log.push(format!("quest outside portal {npc:?}"));
+        self.portal_spawn_ok
+    }
+    fn portal_coords(&mut self, _: &mut Game, _: UnitId, npc: PortalNpc) -> Option<(i32, i32)> {
+        self.log.push(format!("quest coords {npc:?}"));
+        self.portal
+    }
+    fn drehya_update(&mut self, _: &mut Game) {
+        self.log.push("quest drehya update".into());
+    }
+    fn drehya_wait(&mut self, _: &mut Game) -> bool {
+        self.log.push("quest drehya wait".into());
+        self.drehya_wait
+    }
+    fn jerhyn_palace_active(&mut self, _: &mut Game) -> bool {
+        self.jerhyn.is_some()
+    }
+    fn jerhyn_npc_state(&mut self, _: &mut Game, _: UnitId) -> (i32, i32) {
+        self.jerhyn.map_or((0, 0), |(a, b, _)| (a, b))
+    }
+    fn guard_moving(&mut self, _: &mut Game, _: UnitId) -> bool {
+        self.jerhyn.is_some_and(|j| j.2)
+    }
+    fn alkor_bird(&mut self, _: &mut Game) -> bool {
+        self.alkor_bird
+    }
+    fn alkor_reset(&mut self, _: &mut Game) {
+        self.log.push("quest alkor reset".into());
+    }
+    fn ormus_altar(&mut self, _: &mut Game) -> Option<(i32, i32)> {
+        self.ormus_altar
+    }
+    fn ormus_set_altar_mode(&mut self, _: &mut Game) {
+        self.log.push("quest ormus altar".into());
+    }
+    fn cain_town_coords(&mut self, _: &mut Game, _: UnitId) -> Option<(i32, i32)> {
+        self.cain_town
+    }
+    fn cain_in_town_activated(&mut self, _: &mut Game, _: UnitId) {
+        self.log.push("quest cain activated".into());
+    }
+    fn anya_open_portal(&mut self, _: &mut Game, _: UnitId) {
+        self.log.push("quest anya portal".into());
+    }
+}
+
+impl AiActs for Fake {
+    fn unit_flags(&self, unit: UnitId) -> u32 {
+        self.x.flags.get(&unit).copied().unwrap_or(0)
+    }
+    fn clear_unit_flag(&mut self, unit: UnitId, mask: u32) {
+        self.log.push(format!("unflag {mask:#x}"));
+        *self.x.flags.entry(unit).or_default() &= !mask;
+    }
+    fn max_life(&self, unit: UnitId) -> i32 {
+        self.x.max_life.get(&unit).copied().unwrap_or(0)
+    }
+    fn max_mana(&self, unit: UnitId) -> i32 {
+        self.x.max_mana.get(&unit).copied().unwrap_or(0)
+    }
+    fn has_state_group(&self, unit: UnitId, g: u8) -> bool {
+        self.x.groups.contains(&(unit, g))
+    }
+    fn states_count(&self) -> i32 {
+        self.x.states_count
+    }
+    fn has_list_flag(&self, unit: UnitId, flags: u32) -> bool {
+        flags == 0x20 && self.x.cursed.contains(&unit)
+    }
+    fn hostile(&self, _: &Game, _: UnitId, b: UnitId) -> bool {
+        self.x.hostile.contains(&b)
+    }
+    fn owner(&self, _: &Game, unit: UnitId) -> Option<UnitId> {
+        self.x.owners.get(&unit).copied()
+    }
+    fn owner_record(&self, _: UnitId) -> Option<(i32, u32)> {
+        self.x.owner_record
+    }
+    fn quest_flag(&self, _: UnitId, _: u8, quest: i32, flag: i32) -> bool {
+        self.x.quest_flag && quest == 21 && flag == 0
+    }
+    fn portal_guid(&self, _: UnitId) -> Option<u32> {
+        self.x.portal_guid
+    }
+    fn component(&self, _: UnitId, i: usize) -> u8 {
+        if i == 10 {
+            self.x.component
+        } else {
+            0
+        }
+    }
+    fn target_unit(&self, _: &Game, _: UnitId) -> Option<UnitId> {
+        self.x.target_unit
+    }
+    fn set_target_override(&mut self, _: UnitId, kind: i32, guid: u32) {
+        self.log.push(format!("override {kind} {guid}"));
+    }
+    fn chain_index(&self, _: i32) -> i32 {
+        self.x.chain_index
+    }
+    fn class_for_level(&self, _: &Game, _: Option<RoomId>, class: i32) -> i32 {
+        class + 1000
+    }
+    fn skill_level(&self, _: UnitId, skill: i32, _: bool) -> Option<i32> {
+        self.x.skill_level.get(&skill).copied()
+    }
+    fn skill_entry(&self, _: UnitId, skill: i32) -> Option<(i32, u8)> {
+        self.x.skill_entry.get(&skill).copied()
+    }
+    fn hand_skill(&self, unit: UnitId, right: bool) -> Option<(i32, i32)> {
+        self.x.hand.get(&(unit, right)).copied()
+    }
+    fn add_right_skill(&mut self, _: &mut Game, unit: UnitId, skill: i32, level: i32) {
+        self.log.push(format!("aura {skill} {level}"));
+        self.x.hand.insert((unit, true), (skill, level));
+    }
+    fn assign_skill(&mut self, _: &mut Game, _: UnitId, skill: i32, level: i32) {
+        self.log.push(format!("assign {skill} {level}"));
+    }
+    fn set_skill_param(&mut self, _: UnitId, skill: i32, value: i32) -> bool {
+        self.log.push(format!("skillparam {skill} {value}"));
+        self.x.param_ok
+    }
+    fn skill_check(
+        &mut self,
+        _: &mut Game,
+        _: UnitId,
+        skill: i32,
+        target: Option<UnitId>,
+        x: i32,
+        y: i32,
+    ) -> bool {
+        self.log.push(format!("check {skill} {target:?} {x} {y}"));
+        !self.x.check_fails
+    }
+    fn corpse_search(
+        &mut self,
+        _: &mut Game,
+        _: UnitId,
+        _: Option<UnitId>,
+        skill: i32,
+        level: i32,
+    ) -> Option<UnitId> {
+        self.log.push(format!("corpse search {skill} {level}"));
+        self.x.corpse
+    }
+    fn path_pattern(&self, _: UnitId) -> i32 {
+        self.x.pattern
+    }
+    fn set_path_pattern(&mut self, _: UnitId, pattern: i32) {
+        self.log.push(format!("pattern {pattern}"));
+        self.x.pattern = pattern;
+    }
+    fn set_move_mask(&mut self, _: UnitId, mask: u16) {
+        self.log.push(format!("movemask {mask:#x}"));
+    }
+    fn place_unit(&mut self, _: &mut Game, _: UnitId, _: Option<RoomId>, x: i32, y: i32) -> bool {
+        self.log.push(format!("place {x} {y}"));
+        self.x.place_ok
+    }
+    fn stamp_pattern(
+        &mut self,
+        _: &mut Game,
+        _: Option<RoomId>,
+        x: i32,
+        y: i32,
+        pattern: i32,
+        mask: u16,
+    ) {
+        self.log.push(format!("stamp {x} {y} {pattern} {mask:#x}"));
+    }
+    fn clear_cell(&mut self, _: &mut Game, _: Option<RoomId>, x: i32, y: i32, bits: u16) {
+        self.log.push(format!("clearcell {x} {y} {bits:#x}"));
+    }
+    fn point_collides(&self, _: &Game, _: Option<RoomId>, _: i32, _: i32, _: u16) -> bool {
+        self.x.point_collides
+    }
+    fn pattern_collides(&self, _: &Game, _: UnitId, _: i32, _: u16) -> bool {
+        self.x.pattern_collides
+    }
+    fn free_point(
+        &mut self,
+        _: &mut Game,
+        _: Option<RoomId>,
+        x: i32,
+        y: i32,
+        size: i32,
+    ) -> Option<(i32, i32)> {
+        self.log.push(format!("freepoint {x} {y} {size}"));
+        self.x.free_point
+    }
+    fn free_spot_for(
+        &mut self,
+        _: &mut Game,
+        _: UnitId,
+        class: i32,
+        x: i32,
+        y: i32,
+    ) -> Option<(i32, i32)> {
+        self.log.push(format!("freespot {class} {x} {y}"));
+        self.x.free_spot
+    }
+    fn room_at(&self, _: &Game, _: UnitId, _: i32, _: i32) -> Option<RoomId> {
+        self.x.room_at
+    }
+    fn move_in_radius(
+        &mut self,
+        _: &mut Game,
+        _: UnitId,
+        target: UnitId,
+        mode: u8,
+        a: i32,
+        b: i32,
+    ) -> bool {
+        self.log
+            .push(format!("mode-radius {mode} {} {a} {b}", target.0));
+        true
+    }
+    fn set_path_target(&mut self, _: UnitId, target: UnitId) {
+        self.log.push(format!("pathtarget {}", target.0));
+    }
+    fn path_has_points(&mut self, _: &mut Game, _: UnitId, target: UnitId) -> bool {
+        self.log.push(format!("pathcompute {}", target.0));
+        self.x.path_points
+    }
+    fn direction64(&self, _: UnitId, _: UnitId) -> i32 {
+        self.x.direction
+    }
+    fn stop_unit_path(&mut self, _: UnitId) {
+        self.stops += 1;
+    }
+    fn spawn_monster(
+        &mut self,
+        _: &mut Game,
+        _: RoomId,
+        x: i32,
+        y: i32,
+        class: i32,
+        m: u8,
+        spread: i32,
+        flags: u32,
+    ) -> Option<UnitId> {
+        self.log
+            .push(format!("spawn {class} {x} {y} {m} {spread} {flags:#x}"));
+        self.x.spawn
+    }
+    fn queen_spawn_class(&self, _: UnitId) -> i32 {
+        self.x.queen_class
+    }
+    fn kill(&mut self, _: &mut Game, unit: UnitId, killer: Option<UnitId>) {
+        self.log
+            .push(format!("kill {} {:?}", unit.0, killer.map(|k| k.0)));
+    }
+    fn remove_unit(&mut self, _: &mut Game, unit: UnitId) {
+        self.log.push(format!("remove {}", unit.0));
+    }
+    fn link_clone(&mut self, _: &mut Game, _: UnitId, clone: UnitId) {
+        self.log.push(format!("link {}", clone.0));
+    }
+    fn reinit_class(&mut self, _: &mut Game, _: UnitId, class: i32, m: u8) {
+        self.log.push(format!("reinit {class} {m}"));
+    }
+    fn change_class_list(&mut self, _: &mut Game, _: UnitId, class: i32) {
+        self.log.push(format!("classlist {class}"));
+    }
+    fn wisp_buff(&mut self, _: &mut Game, target: UnitId, value: i32, expire: i32) {
+        self.log.push(format!("buff {} {value} {expire}", target.0));
+    }
+    fn preload_class(&mut self, _: &mut Game, _: UnitId, class: i32) {
+        self.log.push(format!("preload {class}"));
+    }
+    fn wisp_find(&mut self, _: &mut Game, _: UnitId) -> Vec<UnitId> {
+        self.x.wisps.clone()
+    }
+    fn wave(&self, w: i32) -> Option<(i32, i32)> {
+        self.x.waves.get(&w).copied()
+    }
+    fn clear_room_portal_flag(&mut self, _: &mut Game, _: Option<RoomId>) {
+        self.log.push("portalflag".into());
+    }
+    fn quest_call(&mut self, _: &mut Game, _: UnitId, call: QuestCall) -> bool {
+        let name = format!("{call:?}");
+        self.log.push(format!("quest {name}"));
+        self.x.quests.contains(&name)
     }
 }
 
@@ -310,7 +715,9 @@ struct World {
     monstats: Vec<Monstats>,
     monstats2: Vec<Monstats2>,
     levels: Vec<Levels>,
-    modes: Vec<[u8; 3]>,
+    modes: Vec<[u8; 8]>,
+    skills: Vec<Skills>,
+    missiles: Vec<Missiles>,
     room: RoomId,
     mon: UnitId,
     player: UnitId,
@@ -340,7 +747,9 @@ impl World {
             monstats: vec![row],
             monstats2: vec![Monstats2::decode(&vec![0u8; Monstats2::SIZE])],
             levels: vec![Levels::decode(&vec![0u8; Levels::SIZE])],
-            modes: vec![[0; 3]],
+            modes: vec![[0; 8]],
+            skills: Vec::new(),
+            missiles: Vec::new(),
             room,
             mon,
             player,
@@ -357,6 +766,8 @@ impl World {
                 monstats2: &self.monstats2,
                 levels: &self.levels,
                 skill_modes: &self.modes,
+                skills: &self.skills,
+                missiles: &self.missiles,
             },
             info: GameInfo::default(),
             store: &mut self.store,
@@ -636,6 +1047,8 @@ fn aidel_difficulty_gate() {
             monstats2: &w.monstats2,
             levels: &w.levels,
             skill_modes: &w.modes,
+            skills: &w.skills,
+            missiles: &w.missiles,
         },
         info: GameInfo {
             difficulty: 1,
@@ -816,6 +1229,8 @@ fn freeze_drops_thinks_and_type_10_resets() {
                 monstats2: &w.monstats2,
                 levels: &w.levels,
                 skill_modes: &w.modes,
+                skills: &w.skills,
+                missiles: &w.missiles,
             },
             info: GameInfo::default(),
             store: &mut w.store,
@@ -970,15 +1385,20 @@ fn install_sets_think_and_alternate() {
     w.with(|g, cx| install(g, cx, mon, 0));
     let c = w.store.control(mon).unwrap();
     assert_eq!((c.function, c.params), (0x005F_1750, [1, 2, 3]));
-    // An init function is a logged stub; a record without think → Idle.
+    // An init function runs (FoulCrowNest's, §9.17: param 0 := frame);
+    // one without a body is a logged stub (BoneWall, 84).
     let mut w = World::new(monstats(43, [0; 5], 15));
     let mon = w.mon;
-    assert!(w.store.unhandled.contains(&Unhandled::Function {
-        addr: 0x005F_6630,
-        unit: mon
-    }));
+    assert!(w.store.unhandled.is_empty());
+    w.game.frame = 77;
+    w.store.control_mut(mon).unwrap().function = 0;
     w.with(|g, cx| install(g, cx, mon, 0));
-    let _ = w;
+    assert_eq!(w.store.control(mon).unwrap().params, [77, 0, 0]);
+    let w = World::new(monstats(84, [0; 5], 15));
+    assert!(w.store.unhandled.contains(&Unhandled::Function {
+        addr: 0x005E_0390,
+        unit: w.mon
+    }));
     let mut w = World::new(monstats(3, [0; 5], 15));
     let mon = w.mon;
     w.with(|g, cx| install(g, cx, mon, 18)); // state ≥ 18: nothing
@@ -1009,13 +1429,13 @@ fn special_states_10_to_12_need_switchai() {
 
 #[test]
 fn stub_ai_logged() {
-    let mut w = World::new(monstats(32, [0; 5], 15)); // Npc (summarized)
+    let mut w = World::new(monstats(41, [0; 5], 15)); // Towner (unread)
     w.run(false, 0);
     let mon = w.mon;
     assert_eq!(
         w.store.unhandled,
         [Unhandled::Function {
-            addr: 0x005E_7130,
+            addr: 0x005E_7540,
             unit: mon
         }]
     );
@@ -1074,23 +1494,72 @@ fn ai_table_check_catches_perturbations() {
     assert!(err.starts_with("index 15:"), "{err}");
 }
 
+/// Checks [`SPECD_HERE`] against the catalogue's `status` column, row by
+/// row. Returns the first disagreement.
+fn check_specd_here(tsv: &str, specd: &[u8]) -> Result<(), String> {
+    let rows: Vec<&str> = tsv.lines().skip(1).filter(|l| !l.is_empty()).collect();
+    if specd.windows(2).any(|w| w[0] >= w[1]) {
+        return Err("SPECD_HERE not ascending".into());
+    }
+    if let Some(&i) = specd.iter().find(|&&i| usize::from(i) >= rows.len()) {
+        return Err(format!("index {i}: no row"));
+    }
+    for (i, line) in rows.iter().enumerate() {
+        let c: Vec<&str> = line.split('\t').collect();
+        if c.len() != 11 || c[0] != i.to_string() {
+            return Err(format!("row {i}: bad row"));
+        }
+        let tsv = c[10] == "spec'd-here";
+        let ours = specd.contains(&(i as u8));
+        if tsv != ours {
+            return Err(format!("index {i}: status {}, mirror {ours}", c[10]));
+        }
+    }
+    Ok(())
+}
+
+// Covers: specs/monsters/ai.md §10
+#[test]
+fn specd_here_matches_tsv() {
+    check_specd_here(AI_FUNCTIONS_TSV, &SPECD_HERE).unwrap();
+}
+
+#[test]
+fn specd_here_check_catches_perturbations() {
+    // A row's status changed in the catalogue.
+    let row98 = AI_FUNCTIONS_TSV
+        .lines()
+        .find(|l| l.starts_with("98\t"))
+        .unwrap();
+    let bad = AI_FUNCTIONS_TSV.replacen(row98, &row98.replace("\tspec'd-here", "\tsummarized"), 1);
+    let err = check_specd_here(&bad, &SPECD_HERE).unwrap_err();
+    assert!(err.starts_with("index 98:"), "{err}");
+    // An index dropped from, or added to, the mirror.
+    let mut fewer = SPECD_HERE.to_vec();
+    fewer.retain(|&i| i != 60);
+    let err = check_specd_here(AI_FUNCTIONS_TSV, &fewer).unwrap_err();
+    assert!(err.starts_with("index 60:"), "{err}");
+    let mut more = SPECD_HERE.to_vec();
+    more.push(147);
+    let err = check_specd_here(AI_FUNCTIONS_TSV, &more).unwrap_err();
+    assert!(err.starts_with("index 147:"), "{err}");
+}
+
 #[test]
 fn implemented_matches_catalogue() {
-    // Every spec'd-here think has a body here, and only those (Npc, 32,
-    // is `summarized` and stays a stub).
-    let mut spec: Vec<u8> = AI_FUNCTIONS_TSV
-        .lines()
-        .skip(1)
-        .filter(|l| l.ends_with("\tspec'd-here"))
-        .map(|l| l.split('\t').next().unwrap().parse().unwrap())
-        .collect();
-    spec.sort_unstable();
+    // Every spec'd-here think has a body here, and only those.
     let mut ours: Vec<u8> = IMPLEMENTED.iter().map(|&(_, i)| i).collect();
     ours.sort_unstable();
-    assert_eq!(ours, spec);
+    assert_eq!(ours, SPECD_HERE);
     for (addr, i) in IMPLEMENTED {
         assert_eq!(AI_TABLE[i as usize].think, addr, "index {i}");
         assert!(implemented(addr));
     }
 }
+mod act2;
+mod act3;
+mod act4;
+mod act5;
+mod bodies;
+mod npc;
 mod rules;

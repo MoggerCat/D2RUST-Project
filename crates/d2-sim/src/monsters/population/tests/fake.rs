@@ -128,7 +128,7 @@ impl PopWorld for Fake {
     fn populated_level(&self, _room: RoomId) -> i32 {
         self.populated_level.unwrap_or(self.level)
     }
-    fn populated_room_count(&self, _act: u8, _level: i32) -> i32 {
+    fn populated_room_count(&mut self, _act: u8, _level: i32) -> i32 {
         self.room_count
     }
     fn coord_list(&self, _room: RoomId) -> Vec<CoordRect> {
@@ -146,7 +146,7 @@ impl PopWorld for Fake {
     fn warp_points(&self, _room: RoomId) -> Vec<(i32, i32)> {
         self.warps.clone()
     }
-    fn spawn_location(&self, _room: RoomId, kind: u8) -> Option<(i32, i32)> {
+    fn spawn_location(&mut self, _room: RoomId, kind: u8) -> Option<(i32, i32)> {
         assert_eq!(kind, 11);
         self.spawn_loc
     }

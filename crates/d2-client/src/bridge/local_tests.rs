@@ -419,7 +419,7 @@ fn fixture(dispatch: Dispatch) -> Fx {
 /// Synthetic handler: the addressed unit enters the model.
 fn add_unit(world: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerError> {
     let key = msg.unit.ok_or(HandlerError::Invalid("no unit"))?;
-    world.units.insert(key, ClientUnit { key });
+    world.units.insert(key, ClientUnit::new(key));
     Ok(())
 }
 
@@ -512,9 +512,10 @@ fn waypoint_travel_end_to_end() {
     assert_eq!(fx.bridge.world().server_ticks, 1);
 }
 
-// Covers: specs/client/bridge.md §6 r3, §5 r3
+// Covers: specs/client/model.md §4 r1
+// Covers: specs/client/bridge.md §5 r3
 #[test]
-fn spec_table_records_the_server_message_as_unowned() {
+fn spec_table_drops_a_unit_message_for_an_unknown_unit() {
     let mut fx = fixture(Dispatch::from_spec().unwrap());
     fx.bridge.frame().unwrap();
     let (p, wp) = (fx.player, fx.wp);
@@ -529,8 +530,14 @@ fn spec_table_records_the_server_message_as_unowned() {
     let r = fx.bridge.frame().unwrap();
     let guid = fx.guid();
     assert_eq!(fx.bridge.link().chunks, vec![player_stop(guid)]);
-    assert_eq!((r.messages, r.handled, r.unowned), (1, 0, 1));
-    assert_eq!(fx.bridge.log().unowned, BTreeMap::from([(0x0D, 1)]));
+    // 0x0D has a unit handler; the player was never announced (no 0x59),
+    // so the message is dropped at receive.
+    assert_eq!(
+        (r.messages, r.handled, r.queued, r.dropped, r.unowned),
+        (1, 0, 0, 1, 0)
+    );
+    assert_eq!(fx.bridge.log().dropped, BTreeMap::from([(0x0D, 1)]));
+    assert!(fx.bridge.log().unowned.is_empty());
     assert!(fx.bridge.world().units.is_empty());
 }
 
@@ -599,7 +606,7 @@ fn unknown_and_unowned_ids() {
     // An S→C id no client spec owns, sent by the server directly.
     fx.link()
         .host_mut()
-        .send_direct(LOCAL_CLIENT, &[0x1A, 0x07])
+        .send_direct(LOCAL_CLIENT, &[0x61, 0x07])
         .unwrap();
     fx.advance(40);
     let r = fx.bridge.frame().unwrap();
@@ -622,8 +629,8 @@ fn unknown_and_unowned_ids() {
         fx.link().host().session.received,
         vec![(LOCAL_CLIENT, vec![0x6B], 1)]
     );
-    assert_eq!(fx.bridge.link().chunks, vec![vec![0x1A, 0x07]]);
+    assert_eq!(fx.bridge.link().chunks, vec![vec![0x61, 0x07]]);
     assert_eq!((r.chunks, r.unowned, r.handled), (1, 1, 0));
-    assert_eq!(fx.bridge.log().unowned, BTreeMap::from([(0x1A, 1)]));
+    assert_eq!(fx.bridge.log().unowned, BTreeMap::from([(0x61, 1)]));
     assert_eq!(fx.bridge.world().units, BTreeMap::new());
 }

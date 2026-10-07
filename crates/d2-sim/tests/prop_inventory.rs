@@ -133,15 +133,12 @@ struct Props {
     req_percent: i32,
     quality: u8,
     file_index: i32,
-    stack_value: i32,
-    stack_ok: bool,
     sockets: bool,
     damage: [i32; 6],
     quantity: i32,
     probe: u32,
     allowed_loc: bool,
     quiver_kind: bool,
-    auto_allows: bool,
     filled: bool,
 }
 
@@ -241,9 +238,6 @@ impl InvWorld for World {
     fn req_percent(&self, item: UnitId) -> i32 {
         idx(item).map_or(0, |i| self.props[i].req_percent)
     }
-    fn percent_of(&self, value: i32, p: i32) -> i32 {
-        value * p / 100
-    }
     fn item_active_on(&self, item: UnitId, _unit: UnitId) -> bool {
         idx(item).is_some_and(|i| self.props[i].active)
     }
@@ -276,12 +270,6 @@ impl InvWorld for World {
     fn stack_file_index(&self, item: UnitId) -> i32 {
         idx(item).map_or(0, |i| self.props[i].file_index)
     }
-    fn stack_value(&self, item: UnitId) -> i32 {
-        idx(item).map_or(0, |i| self.props[i].stack_value)
-    }
-    fn stack_quality_ok(&self, item: UnitId) -> bool {
-        idx(item).is_some_and(|i| self.props[i].stack_ok)
-    }
     fn has_sockets(&self, item: UnitId) -> bool {
         idx(item).is_some_and(|i| self.props[i].sockets)
     }
@@ -290,9 +278,6 @@ impl InvWorld for World {
     }
     fn quiver_kind(&self, item: UnitId) -> bool {
         idx(item).is_some_and(|i| self.props[i].quiver_kind)
-    }
-    fn auto_equip_allows(&self, _unit: UnitId, item: UnitId, _loc: u8) -> bool {
-        idx(item).is_some_and(|i| self.props[i].auto_allows)
     }
     fn targeting_probe(&self, item: UnitId) -> u32 {
         idx(item).map_or(0, |i| self.props[i].probe)
@@ -449,15 +434,12 @@ fn build(dna: &[u8]) -> (InvTables, World) {
             req_percent: d.pick(&[0, 0, 10, -20, 50]),
             quality: d.below(3),
             file_index: i32::from(d.below(2)),
-            stack_value: i32::from(d.below(2)),
-            stack_ok: d.below(4) != 3,
             sockets: d.below(4) == 3,
             damage: [0; 6].map(|_: i32| i32::from(d.below(2))),
             quantity: i32::from(d.below(3)) - 1,
             probe: u32::from(d.below(2)),
             allowed_loc: d.below(4) != 3,
             quiver_kind: d.below(4) == 3,
-            auto_allows: d.bool(),
             filled: d.bool(),
         });
     }
@@ -565,8 +547,12 @@ impl Model {
     fn occupant(&self, c: &Ctx, w: &World, g: usize, x: i32, y: i32) -> Option<usize> {
         self.at.iter().find_map(|(&i, &(gi, ix, iy))| {
             let (iw, ih) = c.cover(w, i, gi);
-            (gi == g && x >= ix && x < ix + i32::from(iw) && y >= iy && y < iy + i32::from(ih))
-                .then_some(i)
+            (gi == g
+                && x >= ix
+                && x < ix.wrapping_add(i32::from(iw))
+                && y >= iy
+                && y < iy.wrapping_add(i32::from(ih)))
+            .then_some(i)
         })
     }
     /// §2.1 bounds and fit (the moving item's own cells count as taken).
@@ -575,16 +561,18 @@ impl Model {
         let Some((gw, gh)) = c.grid_size(g) else {
             return false;
         };
-        let (x64, y64) = (i64::from(x), i64::from(y));
-        if x < 0
-            || y < 0
-            || x64 + i64::from(iw) > i64::from(gw)
-            || y64 + i64::from(ih) > i64::from(gh)
+        // §2.2: signed 32-bit with wrap; grids 0 and 1 skip the bound test.
+        if g >= 2
+            && (x < 0
+                || y < 0
+                || x.wrapping_add(i32::from(iw)) > i32::from(gw)
+                || y.wrapping_add(i32::from(ih)) > i32::from(gh))
         {
             return false;
         }
-        (y..y + i32::from(ih))
-            .all(|yy| (x..x + i32::from(iw)).all(|xx| self.occupant(c, w, g, xx, yy).is_none()))
+        (y..y.wrapping_add(i32::from(ih))).all(|yy| {
+            (x..x.wrapping_add(i32::from(iw))).all(|xx| self.occupant(c, w, g, xx, yy).is_none())
+        })
     }
     /// §1.4 rule 1 unlink: the cursor is cleared if it was the item, else
     /// the count drops by 1.
@@ -607,6 +595,11 @@ impl Model {
             self.room_removals.push(uid(i));
         }
         self.unlink(i);
+        // The cursor item belongs to this inventory: its unlink clears
+        // the cursor (§1.4 rule 3, §2.2).
+        if self.cursor == Some(i) {
+            self.cursor = None;
+        }
         self.list.push(i);
         self.at.insert(i, (g, x, y));
         self.count = self.count.wrapping_add(1);
@@ -832,9 +825,9 @@ fn ref_stack(c: &Ctx, w: &World, a: usize, b: usize) -> bool {
         && pa.quality == pb.quality
         && pa.file_index == pb.file_index
         && c.t.items[ra].stackable != 0
-        && pa.stack_value == pb.stack_value
-        && pa.stack_ok
-        && pb.stack_ok
+        && (w.items[&uid(a)].flags & iflag::ETHEREAL) == (w.items[&uid(b)].flags & iflag::ETHEREAL)
+        && (1..=3).contains(&pa.quality)
+        && (1..=3).contains(&pb.quality)
         && pa.damage == pb.damage
         && !pa.sockets
         && !pb.sockets
@@ -967,13 +960,36 @@ fn ref_auto_equip(m: &Model, c: &Ctx, w: &World, i: usize, skip: bool) -> Option
     if l1 == l2 {
         return body(l1).is_none().then_some(l1);
     }
-    let allows = w.props[i].auto_allows;
-    match (body(l1).is_some(), body(l2).is_some()) {
-        (false, false) => Some(l1),
-        (false, true) => allows.then_some(l1),
-        (true, false) => allows.then_some(l2),
-        (true, true) => None,
+    match (body(l1), body(l2)) {
+        (None, None) => Some(l1),
+        (None, Some(e)) => ref_compatible(c, w, i, e).then_some(l1),
+        (Some(e), None) => ref_compatible(c, w, i, e).then_some(l2),
+        (Some(_), Some(_)) => None,
     }
+}
+
+/// §4.7 compatibility of the new item `n` with the equipped item `e`
+/// (`0x0055D670` over the `0x0055D560` profiles).
+fn ref_compatible(c: &Ctx, w: &World, n: usize, e: usize) -> bool {
+    let prof = |i: usize| {
+        let is = |t: i16| c.is_type(w, i, t);
+        let dual = match c.owner {
+            UnitKind::Player { class: 4 } => true,
+            UnitKind::Player { class: 6 } => is(T_H2H),
+            _ => false,
+        };
+        let one_hand = is(T_WEAP) && !w.props[i].two_handed;
+        (is(27), is(35), is(5), is(6), is(51), one_hand, dual, is(10))
+    };
+    let (a, b) = (prof(n), prof(e));
+    (a.0 && b.2)
+        || (a.2 && b.0)
+        || (a.1 && b.3)
+        || (a.3 && b.1)
+        || (a.5 && b.4)
+        || (b.5 && a.4)
+        || (a.5 && b.5 && a.6 && b.6)
+        || (a.7 && b.7)
 }
 
 // ------------------------------------------------------------------ ops
@@ -1527,21 +1543,29 @@ impl Harness<'_> {
                 assert!(in_grid.insert(item, g).is_none(), "{item:?} in two grids");
                 let d = w.items[&item];
                 let (iw, ih) = self.c.cover(w, idx(item).unwrap(), g);
+                let (ex, ey) = (
+                    d.x.wrapping_add(i32::from(iw)),
+                    d.y.wrapping_add(i32::from(ih)),
+                );
+                // §2.2 (PN1): an end that wraps past 2^31 passes the bound
+                // test and the item occupies no cell.
+                let wrapped = ex < d.x || ey < d.y;
                 assert!(
                     d.x >= 0
                         && d.y >= 0
-                        && d.x + i32::from(iw) <= i32::from(grid.width)
-                        && d.y + i32::from(ih) <= i32::from(grid.height),
+                        && (wrapped
+                            || (ex <= i32::from(grid.width) && ey <= i32::from(grid.height))),
                     "{item:?} outside grid {g}"
                 );
                 let cells = grid.cells.iter().filter(|&&c| c == Some(item)).count();
-                assert_eq!(
-                    cells,
-                    usize::from(iw) * usize::from(ih),
-                    "{item:?} cell count"
-                );
-                for yy in d.y..d.y + i32::from(ih) {
-                    for xx in d.x..d.x + i32::from(iw) {
+                let want = if wrapped {
+                    0
+                } else {
+                    usize::from(iw) * usize::from(ih)
+                };
+                assert_eq!(cells, want, "{item:?} cell count");
+                for yy in d.y..ey {
+                    for xx in d.x..ex {
                         assert_eq!(grid.cell(xx, yy), Some(item), "{item:?} cell {xx},{yy}");
                     }
                 }
@@ -1623,40 +1647,34 @@ proptest! {
 }
 
 /// Minimized: a 1 × 1 item placed at x or y = `i32::MAX` (0x18 passes a
-/// u32 payload field as i32 to §2.4) overflowed the §2.1 bound `x + w`
-/// in `grid::in_bounds` (debug panic; a release build wrapped and passed
-/// the bound). Now refused with nothing changed.
+/// u32 payload field as i32 to §2.4). §2.2 (PN1): the bound test is
+/// signed 32-bit with wrap, so x + w wrapping past 2^31 passes, and the
+/// fit and cell loops run zero times: the item is placed without a cell.
+/// x + w = `i32::MAX` itself does not wrap and is refused.
 #[test]
 fn regress_place_near_i32_max() {
     let (t, mut w) = build(&[]);
-    let mut inv = Inventory::new(OWNER, w.owner_kind, OWNER_GUID);
-    for (x, y) in [(i32::MAX, 0), (0, i32::MAX), (i32::MAX - 1, i32::MAX)] {
-        assert!(!place_at_page(&mut inv, &mut w, &t, uid(0), 0, x, y));
+    for (x, y, ok) in [
+        (i32::MAX, 0, true),
+        (0, i32::MAX, true),
+        (i32::MAX - 1, i32::MAX, false),
+    ] {
+        let mut inv = Inventory::new(OWNER, w.owner_kind, OWNER_GUID);
         w.items.get_mut(&uid(0)).unwrap().mode = mode::CURSOR;
         w.items.get_mut(&uid(0)).unwrap().page = 0;
-        inv.set_cursor(Some(uid(0)));
-        assert!(!place_in_page(
-            &mut inv,
-            &mut w,
-            &t,
-            Some(uid(0)),
-            x,
-            y,
-            false,
-            true
-        ));
-        assert_eq!(inv.cursor(), Some(uid(0)));
-        assert!(inv.items().is_empty() && inv.update_list().is_empty());
+        inv.put_cursor(&mut w, Some(uid(0)));
+        let got = place_in_page(&mut inv, &mut w, &t, Some(uid(0)), x, y, false, true);
+        assert_eq!(got, ok, "({x}, {y})");
+        if ok {
+            assert_eq!(inv.items(), &[uid(0)]);
+            assert_eq!(inv.cursor(), None);
+            assert!(inv
+                .grid(2)
+                .is_some_and(|g| g.cells.iter().all(Option::is_none)));
+            assert!(inv.unlink(&mut w, uid(0)));
+        } else {
+            assert_eq!(inv.cursor(), Some(uid(0)));
+            assert!(inv.items().is_empty() && inv.update_list().is_empty());
+        }
     }
-    // The same item fits at (0, 0).
-    assert!(place_in_page(
-        &mut inv,
-        &mut w,
-        &t,
-        Some(uid(0)),
-        0,
-        0,
-        false,
-        true
-    ));
 }

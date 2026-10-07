@@ -1462,6 +1462,94 @@ Index: Done · A player · B Ghidra / spec edits · C game files and GPU · Bloc
 
 ### Done (kept for the record)
 
+Done 2026-10-06 (local PC 2, coordinator #2, main `63a706b`, Windows 11
+Pro 26200; `hash-manifest` of the install = `traces/reference-install.toml`
+byte for byte, 19 entries): `cargo build --workspace --release` OK;
+`cargo run -p depcheck` OK; `cargo test --workspace -- --ignored`: 66 pass,
+5 fail, the same five `game_sweep` counts as the entry below (stops at the
+first failing crate, so not a full count). **Second real GPU: AMD Radeon
+RX 9070 XT (Vulkan, DiscreteGpu, driver "AMD proprietary driver 26.8.1
+(LLPC)")**: `d2-client verify` (release) `summary: 11 pass, 0 fail, 0
+error, 0 GPU not wired, 0 no adapter`, map `townN1.ds1` 2,697 draw items,
+view 7840×4112 at −3200,−192, CPU binned / GPU indices / GPU RGBA all 0 of
+32,238,080 differ; `--perturb 7`: all 11 cases FAIL with exactly 7 on each
+of the three comparisons, `0 pass, 11 fail`, exit 1. GPU byte-exactness
+now holds on two real adapters (Intel iGPU and AMD discrete). Fresh table
+dump `traces/raw/20261006-201456-tables` (73 tables, 30 maps, not
+committed). The full LOCAL-RUN batches 1–5 on main `0472619` run as the
+buddy session (`docs/handoff/local-buddy-2026-10-06.md`, branch
+`claude/local-buddy-2026-10-06` `6e406d4`): install identical; batch 3
+(real GPU) all pass incl. `gpu_compare` 18/18; batch 2 has 9 failing rows
+(verbatim there); **`d2-client play --frames 1500` on live data panics at
+`d2-sim/src/drlg/room.rs:144` ("live DRLG room") after ~104 ticks**.
+
+Done 2026-10-06 (local PC 2, coordinator #2; Ghidra 12.1.4 export of the
+1.14d `Game.exe`, 13,048 functions, no community labels: `1.14d-notes`
+absent on this PC). Branches to merge (each verified with `git ls-remote`;
+all from main `0472619`; spec edits pass `spec_index --check` and
+`coverage --check`):
+- `claude/spec-answers-tick-messages` `9b432d3`: `tick.md` §1.2 wrap
+  (signed, only `now` masked), §4 r5 off-tick population (`population.md`
+  OQ1), §5.2 r2 owns expire −1, §5.6 freeze gate; S→C 0x2A, 0x50, 0x58,
+  0x5D, 0x63, 0x91, 0xAC header layouts; C→S 0x3A, 0x4C; classifier
+  table corrected (0x71–0xFE → 3); masked bytes in `intents-events.md` §6
+  r3; `rng.md` §5.3 / §7; `calc-expressions.md` §3.5. Regenerated
+  `d2-proto` (fmt, `cargo check -p d2-client --tests`, `cargo test -p
+  d2-proto` pass). Open: 0x28 byte 6 on the NPC chat path; 0x28 needs a
+  TSV grammar for a fixed-size tail.
+- `claude/spec-answers-inventory` `cce8b7e`: `inventory.md` OQ3–OQ11,
+  OQ14–OQ17, OQ19, IV1–IV8, MV1, WN1–WN3, PN1, GX1, IS1 (part); `cube.md`
+  OQ8. Not done: S→C 0x22 TSV cell (`type:u8@1 unit:u32@3 skill:u16@7
+  quantity:u8@9 body_state:u8@11`, then `gen-proto`).
+- `claude/spec-answers-path` `b4eb5f6`: `path-placement.md` OQ2–OQ6 (new
+  `pathing.md` §1.6 C→S 0x5F resync), `pathing.md` OQ4, OQ5, OQ8; W5, W6
+  (§4 rule 6), `0x0064E840` link.
+- `claude/spec-answers-render` `6b8dc11`: `composition.md` OQ1 / VM1
+  (entry 0 black in all 17 PL2 / `.dat`), OQ3; `sprite-placement.md`
+  OQ1–OQ5; `camera.md` OQ1, OQ2, OQ5–OQ7; `capture.md` OQ3, OQ5;
+  `render-pipeline.md` §A9 wording. `draw-order.md` OQ9 is answered in
+  `camera.md` §7 (for its owner).
+- `claude/spec-answers-units-stats` `9395fa4`: GI3, GI5, GI7; `units.md`
+  §3.1, new §6.6 (unit events), §6.5 replenish; `stat-lists.md` §8.8,
+  §10.4 (endless loop confirmed), OQ2; WE1, WE4, WE6–WE9, W13, W14,
+  `properties.md` G1; `use.md` §1–§7, OQ1, OQ2 (identity), new §5.5 (WI
+  I8); `vitals.md` OQ2 (§4.3 rewritten), OQ3; WI I3 (`npc.md` §8.2).
+  Expect a small conflict with the tick branch in `vitals.md` (adjacent
+  OQ lines + index block).
+- `claude/spec-answers-drlg` `91b4a34`: new `levels.md` §11 (DRLG data
+  population reads: coordinate lists, populated level / room count, warp
+  points, kind-11 spawn), WG1, WG6; `rooms.md` §9.2, §9.5, §9.6 (new
+  `wall-remap.tsv` + `.md`), §9.7, OQ10, new §2.1; `levels.md` §10.2, edge
+  r3; `preset.md` §6 steps 9–10, §11; `maze.md` §2.4, §3.7, §5.5, §7.1,
+  §9; `outdoor.md` §6 r4, §7.5.3 / OQ6 (new `outdoor-path-floor.tsv`),
+  §8.3, OQ8, OQ9. Open: OQ7 jungle placer. `rooms.md` (~64 KB) and
+  `outdoor.md` (~61 KB) are past the split guideline.
+- `claude/spec-formats-wav` `40002d8`: new `formats/wav.md` (all 4,992
+  RIFF blocks are PCM tag 1; no in-file ADPCM; no resampling on load).
+- `claude/spec-audio-sound-table` `3167367`: new `audio/sound-table.md`
+  (closes `client/audio.md` §B3, part of §B8). Design note: 1.14d draws
+  sound variants from the local player's client unit seed, not a separate
+  audio seed (`audio.md` §A2 plans one).
+- `claude/live-c13-ds1-survey` `e8f7e1b`: C13 `preset_ds1_survey` +
+  `preset_ds1_scan_vectors` pass, every stated number exact (C13 done).
+- `claude/live-c20-treasure-dump` `6209859`: C20 pass after fixing TC 0
+  picks 1 → 0 (code + `treasure.md` §1.1–§1.2); 1,012 other TCs, 4,167
+  entries, 45 chest slots identical (C20 done).
+- C2: no new code needed; `game_core::itemstatcost_ops_as_stated` and
+  `itemstatcost_columns_as_stated` pass on live data (perturbation of
+  record 214 byte 0x53 caught). C2's `StatData` part is covered.
+
+Code fixes these spec answers require (implementation sessions; each is an
+escape in §8): `items/inventory` targeting seam passes the player, not the
+item (`inventory/mod.rs:604`, `checks.rs:117`); `path::walk` monster re-path
+budget is path +0x94, monsters only; the position history belongs in
+`d2-sim` (AI reads it, `path-placement.md` §10 r7); `path/warp.rs`
+`EXIT_LEFT` is 10, not 11 (test near line 203 expects the old mapping);
+`mpq-tool formats` name set must ignore case (then re-derive the
+`game_sweep` expected counts, buddy note G1); `render/map-preview.md`
+roofs 80 rows too low (needs a capture under a roof); `units` allocation
+order and the `SUNIT_Add` result (`units.md` §3.1).
+
 Done 2026-10-06 (local, main `63a706b`, `D2_GAME_DIR` = the reference
 install): `cargo run -p depcheck`: OK (8 crates, d2-sim determinism lint
 clean). `cargo test --workspace --no-fail-fast -- --ignored`: 112 pass,
@@ -1584,6 +1672,19 @@ incl. 1,580 missile, 186 snapshots) and melee `...-021854-tick.jsonl`:
 0x3A, 0x3B. Still open: a hosted (multi-client) game.
 
 ### A. Needs the player (record_*.py, Windows, `game/`)
+
+**Draw order 2 (`impl-draw-order-2`, 2026-10-06;
+`docs/handoff/impl-draw-order-2.md`).** (1) `weather-0001`: Rogue
+Encampment in rain, record two frames with the player seed per frame and
+the three weather pools (`capture.md` §3.4 + pools); compare pass 4 / 9
+pixels and count the player-seed draws per frame against the drawn water
+floors (`draw-order-2.md` §11.5: one `roll_range(0, 1000)` each). Also
+note whether splashes appear while int(intensity) is 0 (question W5).
+(2) Walk past the walls of a `Logicals` preset room (Crypt / Mausoleum,
+levels 18, 19) with the frame lists recorded: the group-mode fade
+(`draw-order.md` §8, OQ6) on pixels. (3) Arcane Sanctuary and Arreat
+Summit captures with `[0x00712C4C]` / `[0x00712C50]` recorded
+(`draw-order-2.md` §12).
 
 **RT-R1 (fifth fold, `wire-routing` §7 check 2):** a recording of a unique
 monster with a mode-1 umod dying (e.g. fire enchanted, umod 9), group A:
@@ -1906,6 +2007,14 @@ ones, but they need `traces/raw/`, so local):
   killed **0** of the 149 `d2-sim` mutant survivors today.
 
 ### B. Ghidra / spec edits only (no game run, no player)
+
+**`impl-draw-order-2` questions** (owner `render/draw-order-2.md`, also
+`unit-composite.md`): W1–W7 (weather state, snow spawn draws, snow line
+table, colour ramps, the intensity scale vs observed splashes, flash /
+particle order, initial values), §12 seed width / star tick / palette /
+summit build order, §14 extents and edge-floor keys, §16 missing grid
+cell and r1 stop cell; listed in `docs/handoff/impl-draw-order-2.md`
+"Questions for the spec owner".
 
 **From the 2026-10-06 captures:** the cursor
 draw call and its animation counter (owner `render/capture.md` /
@@ -2635,6 +2744,182 @@ the dev-dependency) and record results here.
     'crates/d2-sim/src/items/**' -- --lib -- items:: --iterate` with
     `D2_GAME_DIR` set and `-- --include-ignored` for those files; expect the
     survivors named in the two notes to be caught. Optional, about an hour.
+65. Act III / Act V on live tables (`impl-drlg-act3-5`): `D2_GAME_DIR=<install>
+    cargo test -p d2-sim --test game_drlg_tables act3_act5 -- --ignored`.
+    Expect `act3_act5_table_values` (the leveldefs / lvlprest values of
+    `outdoor-act3-act5.md` Test vectors "Real 1.14d values") and
+    `act3_act5_placement_on_live_tables` (the derived Act III placement:
+    DRLG seed after {4015082244, 577631236}, rects and block ids of 76..78,
+    Kurast chain; Act V rects of 110, 111, 112, 117) to pass. A mismatch is
+    a finding for `outdoor-act3-act5.md`. Recordings of Act 3 creation and
+    of builds of 76..78, 111, 112, 117 stay `outdoor-act3-act5.md` OQ 1, 3.
+66. **C66 Character saves** (`claude/impl-d2s`, note
+    `docs/handoff/impl-d2s.md` §4; `docs/LOCAL-RUN.md` 2.18 and 6.7).
+    (1) `D2_SAVE_DIR=<Saved Games\Diablo II>` `cargo test --release -p
+    d2s-tool --test real_saves -- --ignored --nocapture`: every 1.14d
+    `.d2s` parses in `formats/d2s.md` §1 order and rewrites byte for
+    byte; record header +0x10..+0x37, +0x88..+0xA7, stats at 0x2FD,
+    `jf`/`kf` bytes (d2s OQ3). (2) The three `d2s-tool new` / `new-stub`
+    characters of LOCAL-RUN 6.7 load in 1.14d; after the game re-saves
+    them, `d2s-tool check` passes and `dump` of ours vs the game's shows
+    no difference outside the save time. A difference in an item record
+    is an `items/bitstream.md` §5 finding.
+67. Lighting tables against `Game.exe` (`impl-lighting-blend`; Ghidra or a
+    hex read of the 1.14d `Game.exe`, no run): `specs/render/env-periods.tsv`
+    = the 18 × 12-byte entries at `0x007443F0`, `0x00744438`, `0x00744480`
+    (start degree, type, color `0x00BBGGRR`), and
+    `specs/render/wall-light-points.tsv` = `0x0072A9E8` / `0x0072ABC8` (9
+    directions × 6 points × 2 tables). Expect identical rows; the repo
+    tests only hold the TSVs to the spec text.
+68. Monster colormap file sizes (`impl-lighting-blend`, `shading.md` §6):
+    `mpq-tool extract` `Data\Global\Monsters\RandTransforms.dat` (expect
+    7,680 bytes = 30 headerless maps), `GreenBlood.dat` (expect 256) and one
+    class's `palshift.dat` (expect 2,048). Another size means
+    `rules::shading::{rand_transforms_map, blood_map}` read the wrong bytes.
+69. Environment per tick (`lighting.md` OQ7, `impl-lighting-blend`): record
+    env `+0x0C` (and R, G, B `+0x18..+0x1A`) every client update over one
+    in-game day and replay `rules::lighting::environment::Environment::update`
+    from the same start; expect equal on every tick. Add the light-map
+    SHA-256 (`LightMap::digest`, 18,432 bytes at `0x007B0E68`) and `q` to the
+    capture key (§12 r3, OQ9).
+70. Captures for the GDI and shadow rules (`impl-lighting-blend`): a weather
+    line or Arcane Sanctuary star (static camera) compared with
+    `rules::blend::gdi_line_pixels` — settles `blend-modes.md` §8 r1's
+    |dx| = |dy| major axis (now `BlendError::LineMajorAxisTie`) and whether
+    the line reaches (x1, y1); the player's shadow on a flat floor against
+    `unit_shadow_position` (blend-modes OQ1).
+
+71. Panel files (`impl-ui-panels` §4): `D2_GAME_DIR=<install> cargo test -p
+    d2-client --test game_panels -- --ignored`. Expect both tests to pass:
+    every quad set of `panel-layout.tsv` (`art0` rows, the seven
+    `skltree_?_back`) has frames f … f + 3 of 256 × 256, 64 × 256, 256 × 176,
+    64 × 176 with offsets 0; the frame counts / sizes of `ui/panels.md`
+    §Constants (`buysellbtn` 23 from `d2exp`, `buyselltabs` 8 × 79 × 31, …).
+    A different count is a finding for the spec (archive order,
+    `client/assets.md`), not a reason to change the test.
+72. WAV on game files (`impl-audio`, `formats/wav.md` Test vectors):
+    `cargo test -p d2-formats --test wav_game -- --ignored`. Expect both
+    tests to pass: the 8 spec files match (source archive, channels, frames,
+    sum, first 8 samples, CRC-32 of `data`), and every `sounds.txt` row whose
+    file exists parses playable: 4,508 resolved, 4,434 mono, 74 stereo. A
+    mismatch is a finding for `wav.md` or `mpq.md` §12.
+73. Sound table on game files (`impl-audio`, `audio/sound-table.md` Test
+    vectors): `cargo test -p d2-client --lib sound_table::tests::game --
+    --ignored`. Expect 4,699 records, song range 4,657–4,684; id 1 →
+    `DATA\GLOBAL\SFX\cursor\pass.wav` (d2sfx, Volume 255, Priority 100);
+    ids 202–204 base 202 (size 3); 309 size 5 compound 4; 314 opens a group
+    of 3; 2934 in d2speech; 4657 `DATA\GLOBAL\MUSIC\act1\caves.wav` (Loop,
+    Stream, 1 block); 4679 2 blocks; 4698 in d2xmusic; 1595 Volume 0 and
+    missing; 4640 missing; 4,508 resolve, 157 `none.wav`, 34 missing, 698
+    group openers, 7 nested. Then write the environment / triggers real-data
+    tests on `SoundTableData::from_txt` (`impl-audio` note §2 step 2).
+74. Sound request log (player; `triggers.md` / `environment.md` "Checks",
+    `record_sound.py` hooks `0x004B9A00`, `0x004B9B50`, `0x004E40A0`,
+    `0x004DCAA0`, `0x004DCD40`, `0x004E42E0`, `0x004B99A0`, `0x004CC270`):
+    town walk, a fight, an NPC talk, item moves, town → wilderness → cave and
+    back, a day change, Blood Raven's death. Expect the d2rs rule functions,
+    fed the same inputs, to give the identical `(C, id, unit, delay, flags,
+    offset)` sequence, volume sets and roll order; then the voice log
+    `(tick, kind, file, vol, pan, looped)` (`client/audio.md` §A5).
+75. Decoded samples (`wav.md` OQ 1–2, `client/audio.md` §B1): dump the
+    DirectSound buffer after `0x515180` (and a `Stream`=1 sound such as
+    `music\act1\crypt.wav`) for the C65 files; expect byte equality with
+    our `data`.
+76. Original UI on game files (`wire-client-staging`): `D2_GAME_DIR=<install>
+    cargo test -p d2-client --test app_original_ui -- --ignored`. Expect the
+    test to pass: `inventory.bin` has 32 records, record 0 `inv` = (320,
+    640, 0, 441), record 16 = (400, 720, 60, 501) (`ui/panels.md` §Test
+    vectors); `sounds.txt` / `soundenviron.txt` compile; for every class
+    0–6 with character + inventory and character + skill tree open, every
+    DC6 the root draws loads (`PanelArtLoader::ensure`). A file in no
+    archive or a frame past a file's end is a finding for
+    `panel-layout.tsv` / `client/assets.md`, not a reason to skip it.
+77. `play` smoke with the UI and sound layer (`wire-client-staging`):
+    `D2_GAME_DIR=<install> cargo run -p d2-client --release -- play
+    --frames 500`, pressing I, C, T a few times. Expect: no error from the
+    world view or audio frames (a `UI image file`, `sound world: …
+    (pending …)` or `SetUIState` error is a finding); the panels toggle per
+    the conflict table (I then T closes the inventory); the image is still
+    black (the frame palette is `unspecified_palette` until the act
+    palette is wired, `play.rs`), so judge by the log only. Then the
+    capture cases `ui-0001` / `ui-0002` (`ui/panels.md` §Test vectors)
+    once a palette is presented.
+78. Quest objects on the wired host (`docs/handoff/wire-world-staging.md`
+    §4; player, Act I, `record_packets.py` + `record_rng.py`): operate a
+    Cairn stone, Cain's gibbet and the Forgotten Tower tome. Expect the
+    S→C 0x0E mode messages at the same tick numbers and bytes as
+    `world/tests/quest_objects.rs` derives (gibbet: mode 1 at the
+    operate, event 7 → mode 3 at operate frame + 17).
+79. Quest init order (`wire-world-staging.md` §3 item 1; `rng.md` §5.3
+    draws): record the RNG while the town-Cain marker object (class 385,
+    init 54) is created after Cain left Tristram. Expect Cain's spawn
+    draw right after the marker's allocation; if other objects of the same
+    room are allocated between them in 1.14d, the drained init order is
+    exact, else the quest control must be lent into the action wiring.
+80. Hireling teleport follow (`hirelings.md` §6 r1, `path-placement.md`
+    §10 r6; packets): teleport with a living hireling; record where the
+    hireling's warp messages fall against the player's room / 0x15
+    messages (d2rs runs the follow when the handler returns).
+81. Client DRLG on the recorded join (`impl-client-drlg`): `D2_GAME_DIR=<install>
+    cargo test -p d2-client --test app_client_drlg -- --ignored`. The test
+    feeds the bridge the join of `client/model.md` §Test vectors
+    (recording `20261006-022633`: 0x03 seq 142, init seed 0x103888C4;
+    0x07 seq 144, level 1 at tile (0x3A0, 0x388); 0x15 seq 154 to
+    (4673, 4548)) with the client DRLG built from the user's tables.
+    Expect a pass: the 0x07 finds a level-1 room of origin tile (928, 904)
+    holding the player (level 1, no message refused), and the five act
+    `pal.pl2` files load. A refused 0x07 (no room at the point) or another
+    origin means the client DRLG's Act 1 town differs from the original
+    (finding for `drlg/levels.md` / `drlg/preset.md` / `drlg/outdoor.md`
+    and the level-type wiring), not a reason to skip.
+82. Act palette in `play` (`impl-client-drlg`): `D2_GAME_DIR=<install>
+    cargo run -p d2-client --release -- play --frames 500`. Expect: no
+    error from `present_act_palette`; the frame palette is act 1's
+    `pal.pl2` from the first frame (`composition.md` §4: act 0 at game
+    start), so the window is no longer all zeros where index 0 differs
+    from black. Since `impl-server-join` the in-process server sends the
+    session join (0x59, 0x0B, 0x03, 0x07, 0x15, then the room switch's
+    0x07s), so the client DRLG is built in this run: expect no 0x07 /
+    0xAC / 0x15 refusal in the log (a `fatal assert 0x13C` / `0x168` or a
+    `TODO(spec: model.md §9` rejection is a finding: see
+    `impl-client-drlg` §3 Q1–Q2).
+83. Client room seeds vs the server's (`client/model.md` OQ 9, §12 r5):
+    with `tools/trace-recorder`, after a join, read the client unit seed
+    (`+0x20`) of the first monster 0xAC adds at a non-zero point and the
+    client active room's seed (`+0x6C`) before and after; record the
+    S→C stream. Expect the bridge (live `DrlgSource`, the recorded stream)
+    to give the same `ClientUnit::seed` and room seed step (one step per
+    creation at a point, `init_low(lo')`); a mismatch is either OQ 9
+    (client rooms created by other draws, e.g. the §4.6 build timer) or
+    object creation not stepping the seed (`impl-client-drlg` §3 Q3).
+84. Server join order (`impl-server-join` §3 Q1; `sim/path-placement.md`
+    §11, R2; `client/model.md` §11 r3): in `20261006-022633-packets.jsonl`
+    frame 1, list every S→C id from 0x59 to 0x15 with its `caller`.
+    `path-placement.md` §11 says game entry sends 0x07 (spawn room) and
+    0x15 "at once" and the other 0x07s come from the first per-client
+    update's room switch, which would give 0x07, 0x15, 0x07 × 9; R2 and
+    `model.md` §11 r3 record 0x07 × 10 then 0x15. d2rs sends the §11 text
+    order. Expect the callers to settle which: the 0x15's caller
+    (`0x005394A0` at once, or the update pass `0x00580860` through flag-ex
+    0x10000) and the nine 0x07s' (`0x0053A8E0`). Also list the ids
+    between 0x0B and 0x03 and after 0x03 (0x53?) with their callers:
+    each is a message d2rs does not send yet (`impl-server-join` §2).
+85. Game +0x80 in 0x03 (`client/model.md` §11 r1, `objects.md` §2 r2):
+    with `tools/trace-recorder`, at a single-player join read the result
+    of `0x00546C60` and game +0x80, and the S→C 0x03 u32@8 (recorded
+    0x9FE0D161 in `-022633`). Expect all three equal (d2rs sends the
+    object control's `lo'`, `ObjectState::obj_seed`; the app's game has
+    no object control and sends 0, a known wiring gap).
+86. The session join on game files (`impl-server-join`):
+    `D2_GAME_DIR=<install> cargo test -p d2-client --test app_client_drlg
+    -- --ignored the_session_join_on_the_install --nocapture`. Expect a
+    pass: no message refused, act 0 with town level 1, the local player
+    in a level-1 room of the client DRLG at the server's spawn point;
+    record the printed 0x07 count and positions (1 from game entry + the
+    spawn room's adjacency array) and compare them with the ten 0x07 of
+    the recorded join (C84: same count, and the first at the spawn room).
+    A spawn search failure (`game entry failed`) is a finding for
+    `drlg/levels.md` §10 / `path-placement.md` §11 on the live town.
 
 Kept entries (unchanged):
 
@@ -4699,5 +4984,11 @@ GitHub runners may be 1.5–2× slower than the measured 670 s.
 | `game_wired_host.rs` (`game-tests-wired-host`) was written on a base without the walk handler and asserts the stub for 0x03; `wire-path-server` merged next and made the assertion false before the test ever ran (2026-10-06, found while folding) | a blind-written game-file test names the handler state it assumes; the coordinator greps the `#[ignore]` tests for stub assertions when a handler lands (§2 step 7u(a)) |
 | A full `cargo mutants` run takes about 2 h per 1,900 mutants with `-j 3` on a 4-core container, a background command is stopped after 2 h, `pgrep -f` / `pkill -f` match their own shell, and a `cargo install` beside the toolchain's first install corrupted the 1.99.0 toolchain (rustup lost `rust-std`, 2026-10-06, `mutants-combat-skills` §6) | start the run detached (`setsid nohup … &`) and use `--iterate` for the survivors; match processes by name (`pgrep -x cargo-mutants`); let `tools/cloud-setup.sh` or the first `cargo` call finish before a second cargo |
 | The first deep nightly run (`ci-nightly-props`, 20,000 cases) found two counterexamples PR CI never reached: the stat-list model failure and `anim_schedule_matches_the_closed_form` aborting with "Too many global rejects" (a `prop_assume!` rejecting too often at high case counts, 2026-10-06) | a `prop_assume!` is a rejection budget: constrain the strategy so it holds at 20,000 cases (`schedule_inputs()`), and run `tools/props-deep.sh` after adding a property |
+| The coordinator merged four local spec branches that change code-mirrored tables (`ai-functions.tsv`, `functions.tsv` / `srvdo.tsv` / `srvhit.tsv`, `bridge-dispatch.tsv`) onto its integration branch before their implementations (2026-10-06): every session based on it saw ~55 red tests (bridge `Dispatch::from_spec` Mismatch, AI / skill catalogue checks) that were not its own | a spec branch marked `CODE-TABLE CHANGE` waits on `claude/specs-staging` and is merged into the integration branch together with (or after) its implementation branch; spec-only branches merge at once |
+| TC 0 `picks` built as 1 in d2rs, 0 in 1.14d memory (made in `treasure/runtime.rs`, spec silent; caught 2026-10-06 by C20's byte compare with the memory dump; `check_treasure.py` checks only TC 430) | whole-table byte compares against `dump_tables.py` dumps for every table d2rs builds (C20 test `game_treasure_dump.rs`) (M21) |
+| Spec text wrong and code built on it, found by disassembly in the 2026-10-06 spec-answer batch: `npc.md` §8.2 stat / skill reset addresses swapped; `pathing.md` §9.10 re-path budget field (+0x94 monsters, not +0x90); position history "never read" (AI reads it); `path-placement.md` §12.1 exit 10 / 11 direction swapped; `inventory.md` targeting probe gets the player, not the item; `0x0055C110` named "charm re-link" from its callers (it handles scroll / tome charges) | name a function only after reading its body; when a spec says "nothing reads X", attach the xref that proves it; test vectors that use both directions / both owner kinds (M21) |
+| `mpq-tool formats` counted a file twice when two listfiles spell it in different case (DC6 1,657 vs 1,653, DT1 260 vs 256), and those counts became `game_sweep`'s expected values and a HANDOFF explanation (caught 2026-10-06 by a spec session's own count) | case-insensitive name sets wherever MPQ names are collected; a count copied into a test names the tool and the method that produced it (M21) |
+| A spec's prose count drifted from the tool (`mpq.md` / `audio.md`: "5,008" `.wav`, `mpq-tool check` 4,992) | counts in spec prose name the command that measures them (README bar 1) |
+| Writers on one PC shared one scratchpad directory; one writer's helper script was overwritten by another's mid-run (2026-10-06) | give each writer its own scratch subfolder in the prompt (M21) |
 | GPU render exactness | R8Uint indices, sRGB palette via `textureLoad`, `Msaa::Off`, `Tonemapping::None`, pixel-aligned quads |
 

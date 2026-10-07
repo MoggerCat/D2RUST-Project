@@ -38,14 +38,11 @@ fn wild(flag: bool, w: &World) -> Answers {
         copy: Some(902),
         owner: Some(Owner::monster(903)),
         share_id: 904,
-        pair: (flag, !flag),
         code: 905,
         bits: vec![9, 0, 6],
         msgs: vec![vec![9, 0, 7]],
-        filler_owner: Some(Owner::monster(908)),
         two_handed: Default::default(),
         gold: false,
-        percent_bias: 0,
         number: 909,
         ammo: Some(910),
         interaction: Some(InteractionTarget::Missing),
@@ -124,7 +121,6 @@ fn forward_pending(flag: bool) {
             (),
             "charm_unlink 1:55 17".to_string()
         );
-        fwd!(d.is_active(m, 18), flag, "is_active 1:55 18".to_string());
         fwd!(
             MovePending::inventory_pass(d, m),
             (),
@@ -149,16 +145,6 @@ fn forward_pending(flag: bool) {
             d.hireling_owner_pass(m),
             (),
             "hireling_owner_pass 1:55".to_string()
-        );
-        fwd!(
-            d.belt_unequip(m, 20),
-            (),
-            "belt_unequip 1:55 20".to_string()
-        );
-        fwd!(
-            d.belt_remove_allowed(m),
-            flag,
-            "belt_remove_allowed 1:55".to_string()
         );
         fwd!(d.sound(m, 21), (), "sound 1:55 21".to_string());
         fwd!(
@@ -216,11 +202,6 @@ fn forward_pending(flag: bool) {
             (),
             "book_count_changed 1:55 37".to_string()
         );
-        fwd!(
-            d.use_grid_item(m, 38, 39, 40),
-            a.pair,
-            "use_grid_item 1:55 38 39 40".to_string()
-        );
         fwd!(d.use_item(m, me, 41), flag, format!("use_item 1:55 {p} 41"));
         fwd!(
             d.charge_update(m, 42),
@@ -228,21 +209,6 @@ fn forward_pending(flag: bool) {
             "charge_update 1:55 42".to_string()
         );
         fwd!(d.remove_used(m, 43), (), "remove_used 1:55 43".to_string());
-        fwd!(
-            d.use_item_action(m, 44, 45),
-            a.pair,
-            "use_item_action 1:55 44 45".to_string()
-        );
-        fwd!(
-            d.swap_1h_with_2h(m, 46, 47),
-            a.pair,
-            "swap_1h_with_2h 1:55 46 47".to_string()
-        );
-        fwd!(
-            d.pickup_special(m, 48),
-            flag,
-            "pickup_special 1:55 48".to_string()
-        );
         fwd!(
             d.equip_picked(m, 49),
             flag,
@@ -255,7 +221,6 @@ fn forward_pending(flag: bool) {
         );
         fwd!(d.runeword(m, 52), flag, "runeword 1:55 52".to_string());
         fwd!(d.hireling(m), a.owner, "hireling 1:55".to_string());
-        fwd!(d.not_dead(m), flag, "not_dead 1:55".to_string());
         fwd!(
             d.owns_hireling(me, m),
             flag,
@@ -273,32 +238,25 @@ fn forward_pending(flag: bool) {
             905,
             "pick_object 1:55 56 1".to_string()
         );
-        fwd!(
-            d.pick_other(m, 2, 57, 1),
-            905,
-            "pick_other 1:55 2 57 1".to_string()
-        );
-        fwd!(d.resync(m), (), "resync 1:55".to_string());
         fwd!(d.send(m, vec![1, 2]), (), "send 1:55 [1, 2]".to_string());
         fwd!(
             d.send_item_stat(m, 58, 59),
             (),
             "send_item_stat 1:55 58 59".to_string()
         );
-        fwd!(
-            d.item_bits(60, 61, 62),
-            a.bits,
-            "item_bits 60 61 62".to_string()
-        );
+        // The item bit stream is the desk's own (`items/bitstream.md`,
+        // `wiring::inventory::bits`): the rest is not asked, and a GUID
+        // without an item unit has no stream.
+        {
+            let before = d.rest.last();
+            assert_eq!(d.item_bits(60, 61, 62), Vec::<u8>::new());
+            assert_eq!(d.rest.last(), before, "item_bits is not forwarded");
+            let _ = &a.bits;
+        }
         fwd!(
             d.store_messages(m, 63),
             a.msgs,
             "store_messages 1:55 63".to_string()
-        );
-        fwd!(
-            d.filler_owner(64),
-            Owner::monster(908),
-            "filler_owner 64".to_string()
         );
     });
 }
@@ -335,11 +293,6 @@ fn forward_inv_world(flag: bool) {
             InvWorld::charm_relink(d, pl, item),
             (),
             format!("charm_relink {p} {g}")
-        );
-        fwd!(
-            InvWorld::active_item(d, pl, item),
-            flag,
-            format!("is_active {p} {g}")
         );
         fwd!(
             InvWorld::stat_refresh(d, pl),
@@ -402,11 +355,6 @@ fn forward_inv_world(flag: bool) {
             format!("ammo_type {g}")
         );
         fwd!(
-            InvWorld::stack_quality_ok(d, item),
-            flag,
-            format!("stack_quality_ok {g}")
-        );
-        fwd!(
             InvWorld::has_allowed_location(d, item),
             flag,
             format!("has_allowed_location {g}")
@@ -415,11 +363,6 @@ fn forward_inv_world(flag: bool) {
             InvWorld::quiver_kind(d, item),
             flag,
             format!("quiver_kind {g}")
-        );
-        fwd!(
-            InvWorld::auto_equip_allows(d, pl, item, 4),
-            flag,
-            format!("auto_equip_allows {p} {g} 4")
         );
         fwd!(
             InvWorld::targeting_probe(d, item),
@@ -456,8 +399,6 @@ fn forward_inv_world(flag: bool) {
             Some(flag),
             format!("player_trade_gate {p}")
         );
-        // Not logged by the fake: the answer alone.
-        assert_eq!(InvWorld::percent_of(d, 300, 50), 150);
         // A unit without a record: type NONE, GUID −1.
         fwd!(
             InvWorld::stat_refresh(d, UnitId(9999)),
@@ -486,9 +427,6 @@ fn inv_rest_defaults() {
     struct Bare;
     impl MovePending for Bare {}
     impl InvRest for Bare {
-        fn percent_of(&self, v: i32, p: i32) -> i32 {
-            v * p / 100
-        }
         fn item_active_on(&self, _: u32, _: Owner) -> bool {
             false
         }
@@ -507,17 +445,11 @@ fn inv_rest_defaults() {
         fn ammo_type(&self, _: u32) -> Option<i16> {
             None
         }
-        fn stack_quality_ok(&self, _: u32) -> bool {
-            true
-        }
         fn has_allowed_location(&self, _: u32) -> bool {
             true
         }
         fn quiver_kind(&self, _: u32) -> bool {
             false
-        }
-        fn auto_equip_allows(&self, _: Owner, _: u32, _: u8) -> bool {
-            true
         }
         fn interaction(&self, _: Owner) -> InteractionTarget {
             InteractionTarget::None

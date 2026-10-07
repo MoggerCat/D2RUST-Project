@@ -1,22 +1,28 @@
-// Spec: specs/monsters/ai.md §1–§9; specs/monsters/init.md §7 (seams `AiUnits`, `AiModes`, `AiWorld`, `AiTargets`, `AiSkills`)
+// Spec: specs/monsters/ai.md §1–§9; specs/monsters/init.md §7; specs/monsters/ai-bodies-2.md..ai-bodies-5.md (seams `AiUnits`, `AiModes`, `AiWorld`, `AiTargets`, `AiSkills`, `AiQuests`, `AiActs`)
 //! Monster AI ↔ units, modes, timer events and the DRLG: [`View`]
 //! implements [`crate::monsters::ai::AiHost`]. Real providers: seeds,
 //! class, mode, states (`stat-lists.md` §9), the state-54 clear of
 //! `0x005544B0`, the dead test, act, level of the room (DRLG), life and
 //! life writes (`stats.md`), mode changes (`units.md` §4.6), the attack
-//! flag 0x40, the town test and collision grids (`rooms.md` §10). Path,
+//! flag 0x40, the town test and collision grids (`rooms.md` §10), the
+//! door operate and `MonsterOK` on the object state (`objects.md` §7.1). Path,
 //! targets, skills, sounds and the monster data the lent monster world
 //! ([`super::monsters`]) does not answer go to [`Pending`].
 
 use crate::game::Game;
-use crate::monsters::ai::{AiModes, AiSkills, AiTargets, AiUnits, AiWorld, ModeTarget};
+use crate::monsters::ai::{
+    AiActs, AiModes, AiQuests, AiSkills, AiTargets, AiUnits, AiWorld, ModeTarget, PortalNpc,
+    QuestCall,
+};
 use crate::rng::Seed;
 use crate::stats::stat;
 use crate::units::record::flags;
 use crate::units::{RoomId, UnitId};
 
+use super::objects::ObjectRoute;
 use super::units::clear_uninterruptable;
 use super::{Pending, View};
+use crate::world::objects::Dispatch;
 
 /// Monster mode 3, get-hit (`ai.md` §1.2).
 const MODE_GETHIT: u32 = 3;
@@ -123,6 +129,38 @@ impl<X: Pending> AiUnits for View<'_, X> {
     fn busy(&self, unit: UnitId) -> bool {
         self.h.x.busy(unit)
     }
+    fn has_interaction_block(&self, unit: UnitId) -> bool {
+        self.h.x.has_interaction_block(unit)
+    }
+    fn in_interaction_list(&self, npc: UnitId, player: UnitId) -> bool {
+        self.h.x.in_interaction_list(npc, player)
+    }
+    /// `0x00627260(unit, 6, value)`: life (stat 6) base := value.
+    fn set_life(&mut self, unit: UnitId, value: i32) {
+        self.set_base(unit, stat::HITPOINTS, value);
+    }
+    fn stat(&self, unit: UnitId, s: u16) -> i32 {
+        View::stat(self, unit, s)
+    }
+    fn set_stat(&mut self, unit: UnitId, s: u16, value: i32) {
+        self.set_base(unit, s, value);
+    }
+    /// Unit flags (unit +0xC4, `units.md` §2).
+    fn set_unit_flag(&mut self, unit: UnitId, mask: u32) {
+        if let Some(r) = self.units.get_mut(unit) {
+            r.flags |= mask;
+        }
+    }
+    /// The state toggle `0x00625A70` (`stat-lists.md` §9.2).
+    ///
+    /// TODO(spec: ai.md §9.26): SandRaider calls `0x00639DB0`; read as the
+    /// state toggle of `stat-lists.md` §9.2.
+    fn set_state(&mut self, unit: UnitId, s: u16, on: bool) {
+        View::set_state(self, unit, s, on);
+    }
+    fn path_target(&self, unit: UnitId) -> Option<UnitId> {
+        self.h.x.path_target(unit)
+    }
 }
 
 impl<X: Pending> AiModes for View<'_, X> {
@@ -184,8 +222,32 @@ impl<X: Pending> AiModes for View<'_, X> {
     ) -> bool {
         self.h.x.walk_in_radius(game, unit, target, a, b)
     }
+    /// The operate entry `0x00584540` (`objects.md` §7.1) with the monster
+    /// as operator on the object state ([`super::objects`]); a quest,
+    /// waypoint or `todo` route goes to [`Pending::object_route`]. A game
+    /// without an object state: [`Pending::operate_door`].
     fn operate_door(&mut self, game: &mut Game, unit: UnitId, door: UnitId) {
-        self.h.x.operate_door(game, unit, door);
+        if self.h.objects.is_none() {
+            self.h.x.operate_door(game, unit, door);
+            return;
+        }
+        let Some(guid) = game.lists.unit(door).map(|e| e.guid) else {
+            return;
+        };
+        if let Some((_, Some(d))) = self.operate_object(game, Some(unit), guid) {
+            if !matches!(d, Dispatch::Done(_)) {
+                let room = game.lists.unit(door).and_then(|e| e.room());
+                let at = self.h.path_position(door);
+                self.object_route(game, ObjectRoute::Operate(d), room, at);
+            }
+        }
+    }
+    /// Overlay `0x00621E40` ([`Pending::overlay`]).
+    fn start_overlay(&mut self, unit: UnitId, overlay: i32) {
+        self.h.x.overlay(unit, overlay);
+    }
+    fn set_facing(&mut self, unit: UnitId, dir: i32) {
+        self.h.x.set_facing(unit, dir);
     }
 }
 
@@ -232,6 +294,9 @@ impl<X: Pending> AiWorld for View<'_, X> {
     fn last_dead(&self, game: &Game, room: RoomId) -> [Option<UnitId>; 4] {
         self.h.x.last_dead(game, room)
     }
+    fn footprint_ok(&self, game: &Game, class: i32, room: Option<RoomId>, x: i32, y: i32) -> bool {
+        self.h.x.footprint_ok(game, class, room, x, y)
+    }
 }
 
 impl<X: Pending> AiTargets for View<'_, X> {
@@ -267,8 +332,11 @@ impl<X: Pending> AiTargets for View<'_, X> {
     fn find_door(&mut self, game: &mut Game, unit: UnitId) -> Option<UnitId> {
         self.h.x.find_door(game, unit)
     }
+    /// objects.txt `MonsterOK` from the object state; without one (or
+    /// without object data for `door`) [`Pending::door_monster_ok`].
     fn door_monster_ok(&self, door: UnitId) -> bool {
-        self.h.x.door_monster_ok(door)
+        self.object_monster_ok(door)
+            .unwrap_or_else(|| self.h.x.door_monster_ok(door))
     }
     fn special_walk_target(&mut self, game: &mut Game, unit: UnitId) -> Option<(UnitId, i32)> {
         self.h.x.special_walk_target(game, unit)
@@ -282,10 +350,304 @@ impl<X: Pending> AiTargets for View<'_, X> {
     ) -> (Option<UnitId>, u32) {
         self.h.x.shaman_corpses(game, unit, max_sq, own_minions)
     }
+    fn nearest_evil_monster(&mut self, game: &mut Game, unit: UnitId) -> Option<UnitId> {
+        self.h.x.nearest_evil_monster(game, unit)
+    }
 }
 
 impl<X: Pending> AiSkills for View<'_, X> {
     fn skill_usable(&mut self, game: &mut Game, unit: UnitId, skill: i32, target: UnitId) -> bool {
         self.h.x.skill_usable(game, unit, skill, target)
+    }
+}
+
+impl<X: Pending> AiQuests for View<'_, X> {
+    fn portal_setup(&mut self, game: &mut Game, unit: UnitId, npc: PortalNpc) -> bool {
+        self.h.x.portal_setup(game, unit, npc)
+    }
+    fn spawn_town_portal(&mut self, game: &mut Game, unit: UnitId, npc: PortalNpc) {
+        self.h.x.spawn_town_portal(game, unit, npc);
+    }
+    fn spawn_outside_portal(&mut self, game: &mut Game, unit: UnitId, npc: PortalNpc) -> bool {
+        self.h.x.spawn_outside_portal(game, unit, npc)
+    }
+    fn portal_coords(
+        &mut self,
+        game: &mut Game,
+        unit: UnitId,
+        npc: PortalNpc,
+    ) -> Option<(i32, i32)> {
+        self.h.x.portal_coords(game, unit, npc)
+    }
+    fn drehya_update(&mut self, game: &mut Game) {
+        self.h.x.drehya_update(game);
+    }
+    fn drehya_wait(&mut self, game: &mut Game) -> bool {
+        self.h.x.drehya_wait(game)
+    }
+    fn jerhyn_palace_active(&mut self, game: &mut Game) -> bool {
+        self.h.x.jerhyn_palace_active(game)
+    }
+    fn jerhyn_npc_state(&mut self, game: &mut Game, unit: UnitId) -> (i32, i32) {
+        self.h.x.jerhyn_npc_state(game, unit)
+    }
+    fn guard_moving(&mut self, game: &mut Game, unit: UnitId) -> bool {
+        self.h.x.guard_moving(game, unit)
+    }
+    fn alkor_bird(&mut self, game: &mut Game) -> bool {
+        self.h.x.alkor_bird(game)
+    }
+    fn alkor_reset(&mut self, game: &mut Game) {
+        self.h.x.alkor_reset(game);
+    }
+    fn ormus_altar(&mut self, game: &mut Game) -> Option<(i32, i32)> {
+        self.h.x.ormus_altar(game)
+    }
+    fn ormus_set_altar_mode(&mut self, game: &mut Game) {
+        self.h.x.ormus_set_altar_mode(game);
+    }
+    fn cain_town_coords(&mut self, game: &mut Game, unit: UnitId) -> Option<(i32, i32)> {
+        self.h.x.cain_town_coords(game, unit)
+    }
+    fn cain_in_town_activated(&mut self, game: &mut Game, unit: UnitId) {
+        self.h.x.cain_in_town_activated(game, unit);
+    }
+    fn anya_open_portal(&mut self, game: &mut Game, unit: UnitId) {
+        self.h.x.anya_open_portal(game, unit);
+    }
+}
+
+/// The Act II–V seams: unit flags, max life, state groups and the states
+/// count are real (`units.md` §2, `stats.md`, `stat-lists.md` §9.3); the
+/// move mask and the path stop go to the path seams of [`Pending`];
+/// everything else to the `ai_*` calls of [`Pending`].
+impl<X: Pending> AiActs for View<'_, X> {
+    fn unit_flags(&self, unit: UnitId) -> u32 {
+        self.units.get(unit).map_or(0, |r| r.flags)
+    }
+    fn clear_unit_flag(&mut self, unit: UnitId, mask: u32) {
+        if let Some(r) = self.units.get_mut(unit) {
+            r.flags &= !mask;
+        }
+    }
+    fn max_life(&self, unit: UnitId) -> i32 {
+        self.stats.max_life(unit)
+    }
+    fn max_mana(&self, unit: UnitId) -> i32 {
+        self.h.x.ai_max_mana(unit)
+    }
+    fn has_state_group(&self, unit: UnitId, g: u8) -> bool {
+        self.stats.has_group(unit, usize::from(g))
+    }
+    fn states_count(&self) -> i32 {
+        self.stats.data().states.count() as i32
+    }
+    fn has_list_flag(&self, unit: UnitId, flags: u32) -> bool {
+        self.h.x.ai_has_list_flag(unit, flags)
+    }
+    fn hostile(&self, game: &Game, a: UnitId, b: UnitId) -> bool {
+        self.h.x.ai_hostile(game, a, b)
+    }
+    fn owner(&self, game: &Game, unit: UnitId) -> Option<UnitId> {
+        self.h.x.ai_owner(game, unit)
+    }
+    fn owner_record(&self, unit: UnitId) -> Option<(i32, u32)> {
+        self.h.x.ai_owner_record(unit)
+    }
+    fn quest_flag(&self, player: UnitId, difficulty: u8, quest: i32, flag: i32) -> bool {
+        self.h.x.ai_quest_flag(player, difficulty, quest, flag)
+    }
+    fn portal_guid(&self, player: UnitId) -> Option<u32> {
+        self.h.x.ai_portal_guid(player)
+    }
+    fn component(&self, unit: UnitId, i: usize) -> u8 {
+        self.h.x.ai_component(unit, i)
+    }
+    fn target_unit(&self, game: &Game, unit: UnitId) -> Option<UnitId> {
+        self.h.x.ai_target_unit(game, unit)
+    }
+    fn set_target_override(&mut self, unit: UnitId, kind: i32, guid: u32) {
+        self.h.x.ai_set_target_override(unit, kind, guid);
+    }
+    fn chain_index(&self, class: i32) -> i32 {
+        self.h.x.ai_chain_index(class)
+    }
+    fn class_for_level(&self, game: &Game, room: Option<RoomId>, class: i32) -> i32 {
+        self.h.x.ai_class_for_level(game, room, class)
+    }
+    fn skill_level(&self, unit: UnitId, skill: i32, highest: bool) -> Option<i32> {
+        self.h.x.ai_skill_level(unit, skill, highest)
+    }
+    fn skill_entry(&self, unit: UnitId, skill: i32) -> Option<(i32, u8)> {
+        self.h.x.ai_skill_entry(unit, skill)
+    }
+    fn hand_skill(&self, unit: UnitId, right: bool) -> Option<(i32, i32)> {
+        self.h.x.ai_hand_skill(unit, right)
+    }
+    fn add_right_skill(&mut self, game: &mut Game, unit: UnitId, skill: i32, level: i32) {
+        self.h.x.ai_add_right_skill(game, unit, skill, level);
+    }
+    fn assign_skill(&mut self, game: &mut Game, unit: UnitId, skill: i32, level: i32) {
+        self.h.x.ai_assign_skill(game, unit, skill, level);
+    }
+    fn set_skill_param(&mut self, unit: UnitId, skill: i32, value: i32) -> bool {
+        self.h.x.ai_set_skill_param(unit, skill, value)
+    }
+    fn skill_check(
+        &mut self,
+        game: &mut Game,
+        unit: UnitId,
+        skill: i32,
+        target: Option<UnitId>,
+        x: i32,
+        y: i32,
+    ) -> bool {
+        self.h.x.ai_skill_check(game, unit, skill, target, x, y)
+    }
+    fn corpse_search(
+        &mut self,
+        game: &mut Game,
+        unit: UnitId,
+        target: Option<UnitId>,
+        skill: i32,
+        level: i32,
+    ) -> Option<UnitId> {
+        self.h.x.ai_corpse_search(game, unit, target, skill, level)
+    }
+    fn path_pattern(&self, unit: UnitId) -> i32 {
+        self.h.x.ai_path_pattern(unit)
+    }
+    fn set_path_pattern(&mut self, unit: UnitId, pattern: i32) {
+        self.h.x.ai_set_path_pattern(unit, pattern);
+    }
+    fn set_move_mask(&mut self, unit: UnitId, mask: u16) {
+        self.h.x.set_move_mask(unit, mask);
+    }
+    fn place_unit(
+        &mut self,
+        game: &mut Game,
+        unit: UnitId,
+        room: Option<RoomId>,
+        x: i32,
+        y: i32,
+    ) -> bool {
+        self.h.x.ai_place_unit(game, unit, room, x, y)
+    }
+    fn stamp_pattern(
+        &mut self,
+        game: &mut Game,
+        room: Option<RoomId>,
+        x: i32,
+        y: i32,
+        pattern: i32,
+        mask: u16,
+    ) {
+        self.h.x.ai_stamp_pattern(game, room, x, y, pattern, mask);
+    }
+    fn clear_cell(&mut self, game: &mut Game, room: Option<RoomId>, x: i32, y: i32, bits: u16) {
+        self.h.x.ai_clear_cell(game, room, x, y, bits);
+    }
+    fn point_collides(&self, game: &Game, room: Option<RoomId>, x: i32, y: i32, mask: u16) -> bool {
+        self.h.x.ai_point_collides(game, room, x, y, mask)
+    }
+    fn pattern_collides(&self, game: &Game, unit: UnitId, pattern: i32, mask: u16) -> bool {
+        self.h.x.ai_pattern_collides(game, unit, pattern, mask)
+    }
+    fn free_point(
+        &mut self,
+        game: &mut Game,
+        room: Option<RoomId>,
+        x: i32,
+        y: i32,
+        size: i32,
+    ) -> Option<(i32, i32)> {
+        self.h.x.ai_free_point(game, room, x, y, size)
+    }
+    fn free_spot_for(
+        &mut self,
+        game: &mut Game,
+        unit: UnitId,
+        class: i32,
+        x: i32,
+        y: i32,
+    ) -> Option<(i32, i32)> {
+        self.h.x.ai_free_spot_for(game, unit, class, x, y)
+    }
+    fn room_at(&self, game: &Game, unit: UnitId, x: i32, y: i32) -> Option<RoomId> {
+        self.h.x.ai_room_at(game, unit, x, y)
+    }
+    fn move_in_radius(
+        &mut self,
+        game: &mut Game,
+        unit: UnitId,
+        target: UnitId,
+        mode: u8,
+        a: i32,
+        b: i32,
+    ) -> bool {
+        self.h.x.ai_move_in_radius(game, unit, target, mode, a, b)
+    }
+    fn set_path_target(&mut self, unit: UnitId, target: UnitId) {
+        self.h.x.ai_set_path_target(unit, target);
+    }
+    fn path_has_points(&mut self, game: &mut Game, unit: UnitId, target: UnitId) -> bool {
+        self.h.x.ai_path_has_points(game, unit, target)
+    }
+    fn direction64(&self, unit: UnitId, target: UnitId) -> i32 {
+        self.h.x.ai_direction64(unit, target)
+    }
+    fn stop_unit_path(&mut self, unit: UnitId) {
+        self.h.x.stop_path(unit);
+    }
+    fn spawn_monster(
+        &mut self,
+        game: &mut Game,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        class: i32,
+        mode: u8,
+        spread: i32,
+        flags: u32,
+    ) -> Option<UnitId> {
+        self.h
+            .x
+            .ai_spawn_monster(game, room, x, y, class, mode, spread, flags)
+    }
+    fn queen_spawn_class(&self, unit: UnitId) -> i32 {
+        self.h.x.ai_queen_spawn_class(unit)
+    }
+    fn kill(&mut self, game: &mut Game, unit: UnitId, killer: Option<UnitId>) {
+        self.h.x.ai_kill(game, unit, killer);
+    }
+    fn remove_unit(&mut self, game: &mut Game, unit: UnitId) {
+        self.h.x.ai_remove_unit(game, unit);
+    }
+    fn link_clone(&mut self, game: &mut Game, unit: UnitId, clone: UnitId) {
+        self.h.x.ai_link_clone(game, unit, clone);
+    }
+    fn reinit_class(&mut self, game: &mut Game, unit: UnitId, class: i32, mode: u8) {
+        self.h.x.ai_reinit_class(game, unit, class, mode);
+    }
+    fn change_class_list(&mut self, game: &mut Game, unit: UnitId, class: i32) {
+        self.h.x.ai_change_class_list(game, unit, class);
+    }
+    fn wisp_buff(&mut self, game: &mut Game, target: UnitId, value: i32, expire: i32) {
+        self.h.x.ai_wisp_buff(game, target, value, expire);
+    }
+    fn preload_class(&mut self, game: &mut Game, unit: UnitId, class: i32) {
+        self.h.x.ai_preload_class(game, unit, class);
+    }
+    fn wisp_find(&mut self, game: &mut Game, unit: UnitId) -> Vec<UnitId> {
+        self.h.x.ai_wisp_find(game, unit)
+    }
+    fn wave(&self, w: i32) -> Option<(i32, i32)> {
+        self.h.x.ai_wave(w)
+    }
+    fn clear_room_portal_flag(&mut self, game: &mut Game, room: Option<RoomId>) {
+        self.h.x.ai_clear_room_portal_flag(game, room);
+    }
+    fn quest_call(&mut self, game: &mut Game, unit: UnitId, call: QuestCall) -> bool {
+        self.h.x.ai_quest_call(game, unit, call)
     }
 }

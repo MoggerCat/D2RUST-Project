@@ -1,10 +1,11 @@
-// Spec: specs/sim/path-placement.md §9–§12; specs/world/waypoints.md §7 rule 5 (wiring of the placement seams)
+// Spec: specs/sim/path-placement.md §9–§13; specs/world/waypoints.md §7 rule 5 (wiring of the placement seams)
 //! The placement seams of `path::place` / `path::warp` on the unit
 //! system and the DRLG: [`CollisionView`], [`PlaceHost`] and
 //! [`LevelView`] on [`Shared`], three handles to one [`PathCtx`] (the
 //! placement code takes them as separate arguments and calls them one
 //! after another, so each call borrows the context for its own
-//! duration). Entry points: [`place_unit`] (`0x00554EA0`), [`level_warp`]
+//! duration). Entry points: [`place_unit`] (`0x00554EA0`), [`game_entry`]
+//! (`0x005394A0`), [`level_warp`]
 //! (the same-act part of `0x0053AEC0`), [`warp_player`] (`0x005550B0`);
 //! on [`Rooms`] (the DRLG alone): [`floor_drop`] (`0x00555DA0` /
 //! `0x0064E810`) and [`coarse_free_box`] (`0x0064E840`).
@@ -106,12 +107,10 @@ impl<X: Pending> CollisionView for Shared<'_, '_, X> {
     fn teleport(&mut self, unit: UnitId, room: RoomId, x: i32, y: i32) {
         self.0.borrow_mut().teleport(unit, Some(room), x, y);
     }
-    /// §2.5 for the game-entry player.
-    ///
-    /// TODO(spec: path-placement.md §11, game entry's `0x00554850` flag):
-    /// the player's path is allocated at the point (§2.4) and the unit
-    /// moved to the room's list; the room-changed flag is left as the
-    /// allocation sets it.
+    /// §2.5 for the game-entry player, `0x00554850(flag 0)`: the
+    /// player's path is allocated at the point (§2.4), the unit moved to
+    /// the room's list, and the room-changed flag (path flag 0x2) set
+    /// (§11).
     fn add_player_to_world(&mut self, unit: UnitId, room: RoomId, x: i32, y: i32) {
         let mut c = self.0.borrow_mut();
         let c = &mut *c;
@@ -125,6 +124,9 @@ impl<X: Pending> CollisionView for Shared<'_, '_, X> {
         }
         let game: &crate::game::Game = c.game;
         c.v.path_place(game, unit, x, y);
+        if let Some(d) = c.v.h.paths.as_mut().and_then(|p| p.dynamic_mut(unit)) {
+            d.flags |= crate::path::record::flags::ROOM_CHANGED;
+        }
     }
 }
 
@@ -137,6 +139,13 @@ pub fn map_reveal(x: u16, y: u16, level: u8) -> [u8; 6] {
 }
 
 impl<X: Pending> PlaceHost<UnitId> for Shared<'_, '_, X> {
+    /// `0x005754B0`: queued for the host holding the pet lists
+    /// ([`super::super::action::ActionHooks::pet_follows`]); none → nothing.
+    fn pets_follow(&mut self, player: UnitId) {
+        if let Some(q) = self.0.borrow_mut().v.h.pet_follows.as_mut() {
+            q.push(player);
+        }
+    }
     fn is_player(&self, unit: UnitId) -> bool {
         self.0
             .borrow()
@@ -206,6 +215,12 @@ impl<X: Pending> PlaceHost<UnitId> for Shared<'_, '_, X> {
             c.v.h
                 .errors
                 .push(WiringError::Unit(crate::units::modes::UnitError::Game(e)));
+        }
+    }
+    /// `0x00554FD0` (§10 rule 7) into [`super::PathState::history`].
+    fn history_write(&mut self, player: UnitId, x: i32, y: i32) {
+        if let Some(p) = self.0.borrow_mut().v.h.paths.as_mut() {
+            p.history.entry(player).or_default().place_write(x, y);
         }
     }
     fn request_walk(&mut self, player: UnitId, x: i32, y: i32) {
@@ -289,6 +304,19 @@ pub fn place_unit<X: Pending>(
     })
 }
 
+/// Game entry `0x005394A0` of a player not yet placed (§11, §13): the
+/// spawn point of act `act`'s town (tile index 0, the unit's size), S→C
+/// 0x07 for the spawn room, `0x00554850(flag 0)`, S→C 0x15 with flag 1,
+/// both to the player's client ([`Pending::send`]). `true` placed; a fatal
+/// assert (no spawn room, no free point, no act) is logged as
+/// [`WiringError::Place`] and gives `false`.
+pub fn game_entry<X: Pending>(c: PathCtx<'_, X>, player: UnitId, act: u8) -> bool {
+    with_shared(c, |cv, host, lv| {
+        let r = crate::path::place::game_entry(cv, host, lv, player, act);
+        log(cv, r).unwrap_or(false)
+    })
+}
+
 /// The same-act level warp of `0x0053AEC0` (§11, `waypoints.md` §7 rule
 /// 5): spawn point (`0x0061B060`) then `0x00554EA0(exact 0, alt 0)`.
 /// `None`: the destination is in another act (act change, owner: the
@@ -310,11 +338,8 @@ pub fn level_warp<X: Pending>(
     if own.is_some_and(|a| a != act) {
         return None;
     }
-    let size = c.v.path_size(player);
     Some(with_shared(c, |cv, host, lv| {
-        let r = crate::path::place::level_warp_place(
-            cv, host, lv, player, act, level, tile_index, size,
-        );
+        let r = crate::path::place::level_warp_place(cv, host, lv, player, act, level, tile_index);
         log(cv, r).unwrap_or(false)
     }))
 }

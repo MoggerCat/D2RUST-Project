@@ -19,15 +19,22 @@
 use std::sync::{Arc, Mutex};
 
 use bevy::prelude::*;
+use d2_data::bin::read_excel;
+use d2_data::txt::TxtTable;
+use d2_formats::mpq::ArchiveSet;
 
 use crate::assets::cache::{Budgets, CacheEvent};
 use crate::assets::path::{CanonicalPath, FileSource, MemorySource};
+use crate::audio::driver::{DriverError, SoundDriver};
 use crate::audio::output::{self, MixerStream};
+use crate::audio::sound_table::{DeviceGain, SoundSystem, SoundTableData};
+use crate::audio::D2Wav;
 use crate::audio::{
     AudioEngine, AudioError, CueSource, GainCurve, Sound, SoundBank, SoundId, SoundPool,
     SoundPoolError, TriggerQueue, UnityGain, Unlimited, VoicePolicy, WavDecoder,
 };
 use crate::bridge::BridgeResource;
+use crate::world_view::UiSounds;
 
 /// Sound ids to archive paths.
 ///
@@ -105,6 +112,9 @@ pub struct AudioParts {
     pub policy: Box<dyn VoicePolicy + Send>,
     /// The `sounds` pool budget (`assets.md` §A5).
     pub budget: u64,
+    /// The sound table (`sound-table.md`): with it the cues come from the
+    /// original sound layer ([`SoundDriver`]) instead of `cues`.
+    pub sounds: Option<SoundTableData>,
 }
 
 impl AudioParts {
@@ -119,6 +129,25 @@ impl AudioParts {
             gain: Box::new(UnityGain),
             policy: Box::new(Unlimited),
             budget: Budgets::default().sounds,
+            sounds: None,
+        }
+    }
+
+    /// The original audio over `source` (`client/audio.md` §B1–§B3): the
+    /// sound table's paths, the 1.14d WAV decoder ([`D2Wav`]), the sound
+    /// layer as the cue source (channels and stealing are its own, so the
+    /// core admits every start, [`Unlimited`]) and the device gain curve
+    /// ([`DeviceGain`], `sound-table.md` §8.3).
+    pub fn original(source: Arc<dyn FileSource>, table: SoundTableData) -> Self {
+        AudioParts {
+            source,
+            decoder: Box::new(D2Wav),
+            table: Box::new(table.paths()),
+            cues: Box::new(NoCues),
+            gain: Box::new(DeviceGain),
+            policy: Box::new(Unlimited),
+            budget: Budgets::default().sounds,
+            sounds: Some(table),
         }
     }
 
@@ -133,7 +162,8 @@ impl AudioParts {
 pub struct AudioStats {
     /// Bridge frame of the last pool frame.
     pub frame: u64,
-    /// Server tick presented last.
+    /// Tick presented last (the sound tick when the sound layer runs,
+    /// else the server tick).
     pub presented: u32,
     /// Files decoded so far.
     pub decodes: u64,
@@ -149,6 +179,8 @@ pub struct GameAudio {
     pub engine: Arc<Mutex<AudioEngine>>,
     pub pool: Arc<Mutex<SoundPool>>,
     cues: Box<dyn CueSource + Send + Sync>,
+    /// The original sound layer, when the parts carry a sound table.
+    pub driver: Option<Mutex<SoundDriver>>,
     errors: Arc<Mutex<Vec<SoundPoolError>>>,
     pub stats: AudioStats,
 }
@@ -166,6 +198,15 @@ impl GameAudio {
             pool: Arc::clone(&pool),
             errors: Arc::clone(&errors),
         };
+        let driver = parts.sounds.map(|table| {
+            let paths = table.paths();
+            let bank = PoolBank {
+                table: Box::new(paths),
+                pool: Arc::clone(&pool),
+                errors: Arc::clone(&errors),
+            };
+            Mutex::new(SoundDriver::new(SoundSystem::new(table, Box::new(bank))))
+        });
         GameAudio {
             engine: Arc::new(Mutex::new(AudioEngine::new(
                 Box::new(bank),
@@ -174,6 +215,7 @@ impl GameAudio {
             ))),
             pool,
             cues: parts.cues,
+            driver,
             errors,
             stats: AudioStats::default(),
         }
@@ -191,6 +233,8 @@ pub enum AudioFrameError {
     Cache(#[from] crate::assets::cache::CacheError),
     #[error(transparent)]
     Audio(#[from] AudioError),
+    #[error(transparent)]
+    Driver(#[from] DriverError),
 }
 
 /// Adds the audio frame (after the bridge frame) and a [`GameAudio`] with
@@ -222,10 +266,13 @@ fn start_output(
     }
 }
 
-/// One audio frame: pool frame, cues, present the frame's server tick.
+/// One audio frame: pool frame, the sound layer's ticks (when it runs:
+/// the UI's sound requests first), cues, present the tick (the sound
+/// tick with the sound layer, else the frame's server tick).
 fn audio_frame(
     bridge: Res<BridgeResource>,
     mut audio: ResMut<GameAudio>,
+    ui_sounds: Option<ResMut<UiSounds>>,
 ) -> std::result::Result<(), BevyError> {
     let audio = &mut *audio;
     let world = bridge.0.world();
@@ -244,12 +291,38 @@ fn audio_frame(
         }
         pool.decodes()
     };
-    let engine_errors = {
-        let mut engine = audio.engine.lock().map_err(|_| AudioFrameError::Poisoned)?;
-        engine.pump(audio.cues.as_mut());
-        engine.present(tick).map_err(AudioFrameError::from)?;
-        engine.take_errors()
+    let requests = ui_sounds.map(|mut s| std::mem::take(&mut s.0));
+    let mut driver = match &audio.driver {
+        Some(d) => Some(d.lock().map_err(|_| AudioFrameError::Poisoned)?),
+        None => None,
     };
+    if let Some(d) = driver.as_deref_mut() {
+        d.frame(
+            world,
+            &bridge.0.inputs().tables.levels,
+            requests.as_deref().unwrap_or_default(),
+        )
+        .map_err(AudioFrameError::from)?;
+        for e in d.take_errors() {
+            warn!("sound layer: {e}");
+        }
+    }
+    let (presented, engine_errors) = {
+        let mut engine = audio.engine.lock().map_err(|_| AudioFrameError::Poisoned)?;
+        let presented = match driver.as_deref_mut() {
+            Some(d) => {
+                engine.pump(d);
+                d.tick()
+            }
+            None => {
+                engine.pump(audio.cues.as_mut());
+                tick
+            }
+        };
+        engine.present(presented).map_err(AudioFrameError::from)?;
+        (presented, engine.take_errors())
+    };
+    drop(driver);
     for e in &engine_errors {
         warn!("audio: {e}");
     }
@@ -260,9 +333,23 @@ fn audio_frame(
     }
     let s = &mut audio.stats;
     s.frame = world.frames;
-    s.presented = tick;
+    s.presented = presented;
     s.decodes = decodes;
     s.load_errors += load_errors.len();
     s.engine_errors += engine_errors.len();
     Ok(())
+}
+
+/// The user's `sounds.txt` and `soundenviron.txt` (`sound-table.md` §1,
+/// §2), read from the archives and compiled; a missing or bad table is an
+/// error, never a fallback.
+pub fn sound_table_live(archives: &ArchiveSet) -> Result<SoundTableData, String> {
+    let txt = |f: &str| -> Result<TxtTable, String> {
+        let (_, b) = read_excel(archives, f)
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| format!("{f}: in no archive"))?;
+        TxtTable::parse(f, &b).map_err(|e| e.to_string())
+    };
+    SoundTableData::from_txt(&txt("sounds.txt")?, &txt("soundenviron.txt")?)
+        .map_err(|e| e.to_string())
 }

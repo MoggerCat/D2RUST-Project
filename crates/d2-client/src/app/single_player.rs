@@ -1,13 +1,17 @@
-// Spec: specs/client/bridge.md (§3), specs/world/waypoints.md (§5.1, §6)
+// Spec: specs/client/bridge.md (§3), specs/world/waypoints.md (§5.1, §6), specs/sim/path-placement.md (§13)
 //! The single-player game of the app: `d2-server`'s [`SimGame`] on the
 //! wired `d2-sim` ([`ActionSim`] with the waypoint world [`ActionWorld`]),
 //! behind the in-process host ([`LocalLink`]), started on its own thread
 //! ([`ThreadLink`], see there why).
 //!
 //! What runs is what the wiring has providers for (`docs/HANDOFF.md` §1
-//! rows 3j, 3k): the tick driver, the timer queue, and the intents whose
-//! handler runs on a real provider (0x49 waypoints). Two acts are created
-//! and one room is streamed in Cold Plains (act 0) and Lut Gholein (act 1).
+//! rows 3j, 3k): the tick driver, the timer queue, the path provider, and
+//! the intents whose handler runs on a real provider (0x49 waypoints). Two
+//! acts are created and one room is streamed in Cold Plains (act 0) and
+//! Lut Gholein (act 1). The local player enters through the session join
+//! (`d2_server::adapters::session::enter_game`, `sim/path-placement.md`
+//! §13): the client receives 0x59, 0x0B, 0x03, 0x07 and 0x15 with the
+//! first tick, then the room switch's 0x07s, and builds its own DRLG.
 //!
 //! [`GameData::Live`] (with `D2_GAME_DIR`, [`LiveData::load`]) takes
 //! everything from the user's own files: the `levels` and `objects` tables
@@ -34,6 +38,7 @@ use std::sync::Arc;
 use d2_data::tables::{decode_all, Levels, Objects, Record};
 use d2_formats::mpq::ArchiveSet;
 use d2_server::adapters::handlers::world::{ActionWorld, Outbox};
+use d2_server::adapters::session::{enter_game, Entry};
 use d2_server::adapters::{PlayerData, PlayerFields, ProtoSizes, SimGame};
 use d2_server::host::Host;
 use d2_server::host::SystemClock;
@@ -59,8 +64,13 @@ use d2_sim::wiring::action::{ActionHooks, ActionSim, ActionTables, DrlgWorld, Pe
 use d2_sim::wiring::worldgen::levels::{SharedTypes, WorldTypes};
 use d2_sim::world::waypoints::{WaypointData, NO_WAYPOINT};
 
+use d2_sim::drlg::outdoor::{SubFile, SubFiles};
+use d2_sim::drlg::preset::{Ds1Input, Ds1Source};
+
 use super::server_thread::{ThreadLink, ThreadStopped};
+use crate::bridge::drlg::DrlgSource;
 use crate::bridge::local::{LocalLink, PendingSession};
+use crate::bridge::world::LevelRow;
 use crate::bridge::LOCAL_CLIENT;
 
 /// The game's dispatch and world host.
@@ -69,18 +79,22 @@ pub type Sim = SimGame<ActionSim<LocalSeams>, ActionWorld>;
 /// The local link over [`Sim`] with clock `C`.
 pub type Link<C = SystemClock> = LocalLink<Sim, ProtoSizes, PendingSession, C>;
 
-/// Cold Plains (act 0) and Lut Gholein (act 1): the two generated levels.
+/// The Rogue Encampment (act 0's town, where game entry places the
+/// player: `sim/path-placement.md` §13 rule 2), Cold Plains (act 0) and
+/// Lut Gholein (act 1).
+pub const ACT1_TOWN: u32 = 1;
 pub const COLD_PLAINS: u32 = 3;
 pub const ACT2_TOWN: u32 = 40;
 /// The default game seed.
 pub const DEFAULT_SEED: u32 = 1234;
-/// Sub-tile x of the waypoint object and of the player, and their y,
-/// from the origin of the first streamed Cold Plains room.
+/// Sub-tile x and y of the waypoint object from the origin of the town's
+/// first room (inside the synthetic 8 × 8-tile room, 40 sub-tiles square).
 pub const WAYPOINT_X: i32 = 20;
-pub const PLAYER_X: i32 = 42;
 pub const UNIT_Y: i32 = 20;
 /// The player's character class (1, sorceress, as in the server tests).
 pub const PLAYER_CLASS: u32 = 1;
+/// The character's name (0x59 bytes 6..22, zero-padded).
+pub const PLAYER_NAME: &[u8] = b"Sorceress";
 
 /// Errors building the game.
 #[derive(Debug, thiserror::Error)]
@@ -364,27 +378,10 @@ impl LevelSource {
     /// The bridge test's synthetic DRLG: one 8×8-tile floor room per
     /// level, no town generated at act creation, init seeds 1 and 2.
     fn synthetic() -> Self {
-        let mut drlg = DrlgData {
-            levels: vec![LevelDef::default(); 150],
-            ..DrlgData::default()
-        };
-        for l in &mut drlg.levels {
-            l.warp = [-1; 8];
-        }
-        let mut files = vec![Vec::new(); 32];
-        files[0] = b"floor.dt1".to_vec();
-        drlg.lvltypes = vec![vec![Vec::new(); 32], files];
-        for id in [COLD_PLAINS, ACT2_TOWN] {
-            drlg.levels[id as usize].drlg_type = 2;
-            drlg.levels[id as usize].level_type = 1;
-        }
         LevelSource {
-            data: Arc::new(drlg),
+            data: Arc::new(synthetic_drlg_data()),
             tiles: Box::new(tiles()),
-            types: Box::new(Types(BTreeMap::from([
-                (COLD_PLAINS, TileRect::new(0, 0, 8, 8)),
-                (ACT2_TOWN, TileRect::new(0, 0, 8, 8)),
-            ]))),
+            types: Box::new(synthetic_types()),
             acts: [(0, 1, 0), (1, 2, 0)],
         }
     }
@@ -414,19 +411,122 @@ impl LevelSource {
     }
 }
 
+/// The synthetic DRLG table view: 150 levels without warps; the Rogue
+/// Encampment, Cold Plains and Lut Gholein are preset levels of tile
+/// library 1 (`floor.dt1`).
+fn synthetic_drlg_data() -> DrlgData {
+    let mut drlg = DrlgData {
+        levels: vec![LevelDef::default(); 150],
+        ..DrlgData::default()
+    };
+    for l in &mut drlg.levels {
+        l.warp = [-1; 8];
+    }
+    let mut files = vec![Vec::new(); 32];
+    files[0] = b"floor.dt1".to_vec();
+    drlg.lvltypes = vec![vec![Vec::new(); 32], files];
+    for id in [ACT1_TOWN, COLD_PLAINS, ACT2_TOWN] {
+        drlg.levels[id as usize].drlg_type = 2;
+        drlg.levels[id as usize].level_type = 1;
+    }
+    drlg
+}
+
+/// The synthetic level types: one 8×8-tile floor room in the Rogue
+/// Encampment (the game entry's town, at tile (16, 0): levels of one act
+/// do not overlap), one in Cold Plains and one in Lut Gholein.
+fn synthetic_types() -> Types {
+    Types(BTreeMap::from([
+        (ACT1_TOWN, TileRect::new(16, 0, 8, 8)),
+        (COLD_PLAINS, TileRect::new(0, 0, 8, 8)),
+        (ACT2_TOWN, TileRect::new(0, 0, 8, 8)),
+    ]))
+}
+
+/// The live DS1 files of the client DRLG's level types, shared with the
+/// game's data (no copy per act build).
+struct LiveDs1(Arc<LiveData>);
+
+impl Ds1Source for LiveDs1 {
+    fn ds1(&self, path: &[u8]) -> Option<&Ds1Input> {
+        self.0.files.ds1.ds1(path)
+    }
+}
+
+/// The live lvlsub files of the client DRLG's level types.
+struct LiveSubs(Arc<LiveData>);
+
+impl SubFiles for LiveSubs {
+    fn sub_file(&self, file: &[u8]) -> Option<&SubFile> {
+        self.0.files.subs.sub_file(file)
+    }
+}
+
+/// What the client DRLG copy is built from (`client/model.md` §12 rule
+/// 1): the same table view, tile headers and level-type data the game's
+/// DRLG reads, with fresh level-type state for every client act (the
+/// client never reads the server's DRLG).
+pub fn client_drlg_source(data: &GameData) -> DrlgSource {
+    match data {
+        GameData::Synthetic => DrlgSource {
+            data: Arc::new(synthetic_drlg_data()),
+            tiles: Arc::new(tiles()),
+            types: Arc::new(|| Box::new(synthetic_types())),
+        },
+        GameData::Live(d) => {
+            let live = d.clone();
+            let drlg = Arc::new(d.levels.drlg.clone());
+            let types_data = drlg.clone();
+            DrlgSource {
+                data: drlg,
+                tiles: Arc::new(d.files.dt1.clone()),
+                types: Arc::new(move || {
+                    Box::new(WorldTypes::new(
+                        types_data.clone(),
+                        Maze::new(live.levels.maze.clone()),
+                        live.levels.preset.clone(),
+                        live.levels.outdoor.clone(),
+                        Box::new(LiveDs1(live.clone())),
+                        Box::new(LiveSubs(live.clone())),
+                    ))
+                }),
+            }
+        }
+    }
+}
+
+/// The `Levels.txt` fields the client reads (`client/model.md` §11
+/// rules 3–4: `Act`, `BlankScreen`; `audio/environment.md` §1 r2:
+/// `SoundEnv`), one row per level id, from the game's `levels` table.
+pub fn client_level_rows(data: &GameData) -> Vec<LevelRow> {
+    data.tables()
+        .levels
+        .iter()
+        .map(|l| LevelRow {
+            act: l.act,
+            blank_screen: l.blankscreen != 0,
+            sound_env: l.soundenv,
+        })
+        .collect()
+}
+
 /// A built game and the units the app and tests address.
 pub struct LocalGame {
     pub sim: Sim,
     pub player: UnitId,
+    /// The player's GUID (0x59, 0x0B).
+    pub player_guid: u32,
     pub waypoint: UnitId,
     /// The waypoint object's GUID.
     pub waypoint_guid: u32,
 }
 
 /// Builds the game on `seed`: the DRLG of both acts, one room streamed
-/// in each generated level, the waypoint object and the local player in
-/// Cold Plains, the player's record joined as [`LOCAL_CLIENT`] (as
-/// `tests/e2e_single_player.rs` joins it).
+/// in the Rogue Encampment, Cold Plains and Lut Gholein, the waypoint
+/// object in the town's room, the path provider on, the local player
+/// allocated without a room, its record joined as [`LOCAL_CLIENT`] and
+/// entered by the session join (`enter_game`: game entry places it at the
+/// town's spawn point, `sim/path-placement.md` §13).
 pub fn build(data: &GameData, seed: u32) -> Result<LocalGame, BuildError> {
     let wp_tables = data.tables();
     let mut levels = match data {
@@ -475,16 +575,21 @@ pub fn build(data: &GameData, seed: u32) -> Result<LocalGame, BuildError> {
         levels: Vec::new(),
         skill_modes: Vec::new(),
     };
-    let hooks = ActionHooks::new(
+    let mut hooks = ActionHooks::new(
         Arc::new(tables),
         world,
         Seed::init_low(seed),
         LocalSeams::default(),
     );
+    // Game entry places through the path provider; on before any unit is
+    // allocated.
+    hooks
+        .enable_paths()
+        .map_err(|e| BuildError::Setup(format!("path tables: {e:?}")))?;
     let mut sim = ActionSim::new(Arc::new(StatData::default()), UnitData::default(), hooks);
     let mut game = Game::new();
     let mut rooms = Vec::new();
-    for (act, level) in [(0u8, COLD_PLAINS), (1, ACT2_TOWN)] {
+    for (act, level) in [(0u8, ACT1_TOWN), (0, COLD_PLAINS), (1, ACT2_TOWN)] {
         game.lists
             .ensure_act(act)
             .map_err(|e| BuildError::Setup(format!("act {act}: {e:?}")))?;
@@ -509,18 +614,16 @@ pub fn build(data: &GameData, seed: u32) -> Result<LocalGame, BuildError> {
             .ok_or_else(|| BuildError::Setup(format!("level {level}: no room streamed")))?;
         rooms.push(r);
     }
-    // Staging, as the server tests do: the units stand in the first
-    // streamed room of Cold Plains, at fixed sub-tile offsets from its
-    // origin (subtile = tile × 5, `levels.md` §1). The original places a
-    // joining player in a spawn room (`levels.md` §10) at a position no
-    // spec states yet: not wired, TODO(spec: unit placement).
+    // The waypoint object stands in the town's first room at a fixed
+    // sub-tile offset from its origin (subtile = tile × 5, `levels.md`
+    // §1), as the server tests stage it.
     let (room0, rect0) = rooms[0];
     let (ox, oy) = (rect0.x * 5, rect0.y * 5);
-    let mut spawn = |ty: UnitType, class: u32, room: RoomId, x: i32, y: i32| {
+    let mut spawn = |ty: UnitType, class: u32, room: Option<RoomId>, x: i32, y: i32| {
         let req = AllocRequest {
             ty,
             class,
-            room: Some(room),
+            room,
             add: true,
             fixed_guid: None,
             mode: 1,
@@ -532,17 +635,12 @@ pub fn build(data: &GameData, seed: u32) -> Result<LocalGame, BuildError> {
     let waypoint = spawn(
         UnitType::Object,
         wp_tables.object_class,
-        room0,
+        Some(room0),
         ox + WAYPOINT_X,
         oy + UNIT_Y,
     )?;
-    let player = spawn(
-        UnitType::Player,
-        PLAYER_CLASS,
-        room0,
-        ox + PLAYER_X,
-        oy + UNIT_Y,
-    )?;
+    // The player as the character load leaves it: no room, at (0, 0).
+    let player = spawn(UnitType::Player, PLAYER_CLASS, None, 0, 0)?;
     if let Some(u) = sim.sys.units.get_mut(player) {
         u.mode = 1;
     }
@@ -565,11 +663,20 @@ pub fn build(data: &GameData, seed: u32) -> Result<LocalGame, BuildError> {
     s.world.waypoints = Some(WaypointData::new(&wp_tables.levels, &wp_tables.objects));
     // No room yet: the first tick's client update sees the player's room
     // differ and runs the room switch (`rooms.md` §4.1), which registers
-    // the client with the DRLG. A client joined with its room already set
-    // skips it, and the room inactivity of tick step 9 then frees the
-    // player's room under the player (`rooms.md` §7.2, §8).
+    // the client with the DRLG and reveals the rooms around the player.
+    // A client joined with its room already set skips it, and the room
+    // inactivity of tick step 9 then frees the player's room under the
+    // player (`rooms.md` §7.2, §8).
+    //
+    // TODO(spec: tick.md §6 rule 4): a joining client is in state 3 until
+    // its room is ready (`0x0061A460`, unspecified), then gets 0x04; the
+    // client joins in state 4 here, so no 0x04 is sent.
     s.join(LOCAL_CLIENT, Some(player), None, client_state::IN_GAME)
         .map_err(|e| BuildError::Setup(e.to_string()))?;
+    let mut name = [0u8; 16];
+    name[..PLAYER_NAME.len()].copy_from_slice(PLAYER_NAME);
+    enter_game(&mut s, LOCAL_CLIENT, &Entry { act: 0, name })
+        .map_err(|e| BuildError::Setup(format!("game entry: {e}")))?;
     s.set_player(
         player,
         PlayerFields {
@@ -580,9 +687,16 @@ pub fn build(data: &GameData, seed: u32) -> Result<LocalGame, BuildError> {
             data: Some(PlayerData { last_accept: 0 }),
         },
     );
+    let player_guid = s
+        .game
+        .lists
+        .unit(player)
+        .ok_or_else(|| BuildError::Setup("player unit missing".into()))?
+        .guid;
     Ok(LocalGame {
         sim: s,
         player,
+        player_guid,
         waypoint,
         waypoint_guid,
     })
@@ -592,6 +706,8 @@ pub fn build(data: &GameData, seed: u32) -> Result<LocalGame, BuildError> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Started {
     pub player: UnitId,
+    /// The player's GUID (0x59, 0x0B).
+    pub player_guid: u32,
     pub waypoint: UnitId,
     pub waypoint_guid: u32,
 }
@@ -608,6 +724,7 @@ pub fn start<C: Clock + Send + 'static>(
         let g = build(&data, seed)?;
         let _ = tx.send(Started {
             player: g.player,
+            player_guid: g.player_guid,
             waypoint: g.waypoint,
             waypoint_guid: g.waypoint_guid,
         });

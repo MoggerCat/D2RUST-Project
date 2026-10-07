@@ -1,45 +1,185 @@
-// Spec: specs/client/ui.md
-//! Text layout entry point (spec §A3).
+// Spec: specs/ui/text.md, specs/client/ui.md (§A3)
+//! UI text (`ui/text.md`): the font table (§1, `text-fonts.tsv`), the
+//! Latin glyph lookup (§3), color codes (§5), the measuring functions
+//! (§6), the draw call and its variants (§7, §9), framed hover text (§8),
+//! word wrap (§10) and the clipping answer (§12, decision CG2).
 //!
-//! [`layout_text`] splits the work in two:
-//! - format-level glyph lookup (ours, from `formats/font-tbl.md`): a code
-//!   unit names the font-table record whose `code` field equals it, and
-//!   that record names the DC6 frame. A code with no record is an error,
-//!   never a fallback glyph;
-//! - everything else (advance, kerning, line height, baseline, word wrap,
-//!   alignment, `ÿc` color codes, the PL2 text-color map) is original
-//!   behavior and lives in one [`TextRules`] implementation:
-//!   TODO(spec: ui/text.md §B3). The placeholder [`NoTextRules`] refuses.
+//! [`layout_text`] splits the work in two: [`TextRules`] place the glyphs
+//! ([`OriginalText`] is the one implementation, §5–§7, §9), then each
+//! placed code unit is resolved to its font record and DC6 frame
+//! ([`GlyphLookup::record`]). The pen is the bottom row of the glyph cell
+//! (§4.2); turning it into a sprite top-left is `sprite-placement.md` §2
+//! (`world_view::text_sprites`).
 //!
-//! Strings stay UTF-16 code units as the string tables hold them
-//! (`tbl.md`): the rules see the caller's slice as given.
+//! Strings stay UTF-16 code units as the string tables hold them; a
+//! string ends at its first NUL unit or at the end of the slice.
 
 use d2_formats::font::FontTable;
 
 use super::draw::TextStyle;
-use super::geom::{Point, Rect};
+use super::geom::Point;
 
-/// Layout options. Which options the original's text drawing takes
-/// (wrap width, alignment, …) is TODO(spec: ui/text.md §B3).
-///
-/// `clip` is the request's clip rect ([`super::draw::TextRequest::clip`]),
-/// handed to the rules now so the field exists before the spec (decision
-/// CG2, 2026-10-06). Nothing reads it yet: whether and how the original's
-/// text call clips is the spec's to say, and the rules decide; until then
-/// it changes no placement. `None` is "no clip given".
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct TextOpts {
-    pub clip: Option<Rect>,
+/// Line feed (§7).
+pub const LF: u16 = 0x000A;
+/// The color-code lead `ÿ` (§5).
+pub const COLOR_LEAD: u16 = 0x00FF;
+/// Text color maps the PL2 loader copies (§4.4); map 0 is never used.
+pub const TEXT_COLORS: usize = 13;
+/// File offset of text-color map 0 in an act `pal.pl2` (§4.4, `0x6B627`).
+pub const TEXT_COLOR_MAP_OFFSET: usize = 439_847;
+/// The draw mode of every glyph of the draw call (§4.1).
+pub const TEXT_DRAW_MODE: u8 = 5;
+/// Line factors in tenths of the font height, English (§6, `0x0072E000`
+/// draw step, `0x0072E004` text height).
+const LINE_STEP_TENTHS: i32 = 16;
+const TEXT_HEIGHT_TENTHS: i32 = 16;
+
+/// One row of `text-fonts.tsv` (§1.3, §Constants).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FontInfo {
+    pub id: u16,
+    /// Name as in the font table at `0x006DC980`.
+    pub name: &'static str,
+    /// Lowercase archive paths (`\` separators).
+    pub tbl_path: &'static str,
+    pub dc6_path: &'static str,
+    /// Archive the DC6 is read from (`client/assets.md` §B1 order).
+    pub dc6_archive: &'static str,
+    /// `.tbl` header byte 10.
+    pub height: u8,
+    /// `trunc(height × 16 / 10)`.
+    pub line_step: i32,
+    /// Size of every DC6 frame of the font.
+    pub frame_w: u32,
+    pub frame_h: u32,
 }
 
-/// One glyph the rules place: the code unit to draw, where and with which
-/// text color. The rules decide which code units are drawn (color codes
-/// are not) and where.
+macro_rules! font {
+    ($id:literal, $name:literal, $file:literal, $arc:literal, $h:literal, $step:literal, $w:literal, $fh:literal) => {
+        FontInfo {
+            id: $id,
+            name: $name,
+            tbl_path: concat!(r"data\local\font\latin\", $file, ".tbl"),
+            dc6_path: concat!(r"data\local\font\latin\", $file, ".dc6"),
+            dc6_archive: $arc,
+            height: $h,
+            line_step: $step,
+            frame_w: $w,
+            frame_h: $fh,
+        }
+    };
+}
+
+/// The 14 fonts of English 1.14d (`text-fonts.tsv`; a test checks this
+/// table against the file).
+pub const FONTS: [FontInfo; 14] = [
+    font!(0, "Font8", "font8", "d2data", 14, 22, 15, 14),
+    font!(1, "Font16", "font16", "d2data", 10, 16, 14, 16),
+    font!(2, "Font30", "font30", "d2data", 19, 30, 29, 30),
+    font!(3, "Font42", "font42", "d2data", 27, 43, 39, 41),
+    font!(4, "FontFormal10", "fontformal10", "d2exp", 15, 24, 15, 15),
+    font!(5, "FontFormal12", "fontformal12", "d2data", 20, 32, 35, 30),
+    font!(6, "Font6", "font6", "d2data", 7, 11, 9, 11),
+    font!(7, "Font24", "font24", "d2data", 15, 24, 22, 26),
+    font!(8, "FontFormal11", "fontformal11", "d2data", 16, 25, 18, 16),
+    font!(9, "FontExocet10", "fontexocet10", "d2data", 10, 16, 17, 18),
+    font!(
+        10,
+        "FontRidiculous",
+        "fontridiculous",
+        "d2data",
+        7,
+        11,
+        12,
+        14
+    ),
+    font!(11, "FontExocet8", "fontexocet8", "d2data", 13, 20, 13, 13),
+    font!(
+        12,
+        "ReallyTheLastSucker",
+        "reallythelastsucker",
+        "d2exp",
+        7,
+        11,
+        9,
+        11
+    ),
+    font!(
+        13,
+        "FontInGameChat",
+        "fontingamechat",
+        "d2data",
+        15,
+        24,
+        16,
+        15
+    ),
+];
+
+/// The font a [`TextStyle::font`] id names (§1.3); `None` past id 13.
+pub fn font_info(id: u16) -> Option<&'static FontInfo> {
+    FONTS.get(usize::from(id))
+}
+
+/// Which text call draws the string (§7, §9; decision CG2: the original
+/// takes no clip rectangle, so none is carried here).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TextOpts {
+    /// `DrawText` (§7) and the mode variant (§9, `0x00501C30`).
+    Draw {
+        centered: bool,
+        /// Centering block width; `None` = max width + 8 (§7). The framed
+        /// variant `0x00502480` passes the max width (§8).
+        block_w: Option<i32>,
+        /// Draw mode of every glyph; 5 for `DrawText` (§4.1).
+        mode: u8,
+    },
+    /// Horizontal window `0x00501FE0` (§9): text-box scroll `s`, width `w`.
+    Horizontal { s: i32, w: i32 },
+    /// Vertical window `0x00501DF0` (§9): its rows are open question 1.
+    Vertical { skip: i32, lines: i32 },
+    // The no-color variant `0x00502190` (§9) is dead code in 1.14d (no
+    // reference to `0x005023A0`): no counterpart.
+}
+
+impl Default for TextOpts {
+    /// `DrawText`, not centered.
+    fn default() -> Self {
+        TextOpts::Draw {
+            centered: false,
+            block_w: None,
+            mode: TEXT_DRAW_MODE,
+        }
+    }
+}
+
+impl TextOpts {
+    /// The draw mode of the call's glyphs (§4.1, §9).
+    pub fn mode(&self) -> u8 {
+        match *self {
+            TextOpts::Draw { mode, .. } => mode,
+            _ => TEXT_DRAW_MODE,
+        }
+    }
+
+    /// `DrawText(.., centered)` with the derived block (§7).
+    pub fn centered() -> Self {
+        TextOpts::Draw {
+            centered: true,
+            block_w: None,
+            mode: TEXT_DRAW_MODE,
+        }
+    }
+}
+
+/// One glyph the rules place: the code unit to draw, the pen (bottom row
+/// of the glyph cell, §4.2) and the text color `k` (§5; may be outside
+/// 0–12, §Edge cases).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct GlyphPlacement {
     pub code: u16,
     pub at: Point,
-    pub color: u16,
+    pub color: i32,
 }
 
 /// A placed glyph resolved to its font record and DC6 frame.
@@ -49,27 +189,24 @@ pub struct GlyphDraw {
     /// Index of the record in [`FontTable::glyphs`].
     pub record: usize,
     /// Frame in the font's DC6 (`font-tbl.md` `frame`).
-    pub frame: u8,
+    pub frame: u16,
     pub at: Point,
-    pub color: u16,
+    pub color: i32,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum TextError {
-    /// TODO(spec: ui/text.md §B3): the original's handling of a code the
-    /// font has no record for is not specified; until it is, an error.
-    #[error("font has no glyph record for code {0:#06x}")]
-    MissingGlyph(u16),
-    /// Two records share one code; which one the original uses is not
-    /// specified (TODO(spec: ui/text.md §B3)).
-    #[error("font has {count} glyph records for code {code:#06x}")]
-    AmbiguousGlyph { code: u16, count: usize },
+    /// The font has fewer records than the lookup names. Every 1.14d Latin
+    /// font has 256 records (§3), so this is malformed input, never a
+    /// fallback glyph.
+    #[error("font has no glyph record {record} (code {code:#06x})")]
+    MissingGlyph { code: u16, record: usize },
     /// A rule the owner spec has not written yet.
     #[error("text layout not specified: TODO(spec: {0})")]
     Unspecified(&'static str),
 }
 
-/// Format-level lookup the rules may use for metrics (`width`, …).
+/// The glyph lookup and metrics of the current font (§3, §6).
 pub struct GlyphLookup<'a> {
     font: &'a FontTable,
 }
@@ -83,30 +220,149 @@ impl<'a> GlyphLookup<'a> {
         self.font
     }
 
-    /// The record whose `code` equals `code` (index into `glyphs`).
+    /// The record of code unit `code`, by position (Latin, §3,
+    /// `0x00501650`): record `code` for `code ≤ 0xFF`, else record 0. The
+    /// record's `code` field is not read. The by-code lookup of other
+    /// locales is out of scope (English, §1.2).
     pub fn record(&self, code: u16) -> Result<usize, TextError> {
-        let mut found = self
-            .font
-            .glyphs
-            .iter()
-            .enumerate()
-            .filter(|(_, g)| g.code == code)
-            .map(|(i, _)| i);
-        let first = found.next().ok_or(TextError::MissingGlyph(code))?;
-        let more = found.count();
-        if more > 0 {
-            return Err(TextError::AmbiguousGlyph {
-                code,
-                count: more + 1,
-            });
+        let record = if code <= 0xFF { usize::from(code) } else { 0 };
+        if record < self.font.glyphs.len() {
+            Ok(record)
+        } else {
+            Err(TextError::MissingGlyph { code, record })
         }
-        Ok(first)
+    }
+
+    /// `adv(c)`: the record's `width` (§6).
+    pub fn adv(&self, code: u16) -> Result<i32, TextError> {
+        Ok(i32::from(self.font.glyphs[self.record(code)?].width))
+    }
+
+    /// Header `height` (§1.6, font height `0x00501A40`).
+    pub fn height(&self) -> i32 {
+        i32::from(self.font.height)
+    }
+
+    /// Line step `trunc(height × 16 / 10)` (§6).
+    pub fn line_step(&self) -> i32 {
+        self.height() * LINE_STEP_TENTHS / 10
     }
 }
 
-/// The original's text layout (spec §A3, §B3).
-///
-/// TODO(spec: ui/text.md §B3): one implementation, written from that spec.
+/// The string up to its first NUL unit (the original's string length).
+pub fn units(text: &[u16]) -> &[u16] {
+    let len = text.iter().position(|&u| u == 0).unwrap_or(text.len());
+    &text[..len]
+}
+
+/// Unit `i` of the NUL-ended string: NUL at and past its end.
+fn at(text: &[u16], i: usize) -> u16 {
+    text.get(i).copied().unwrap_or(0)
+}
+
+/// Width B (`0x005017D0`, §6): the first `n` units, `LF` 0, every other
+/// unit (color codes too) its advance.
+pub fn width_b(g: &GlyphLookup<'_>, text: &[u16], n: usize) -> Result<i32, TextError> {
+    let text = units(text);
+    let mut w = 0;
+    for &u in &text[..n.min(text.len())] {
+        if u != LF {
+            w += g.adv(u)?;
+        }
+    }
+    Ok(w)
+}
+
+/// Width A (`0x00501820`, §6): width B over the whole string.
+pub fn width_a(g: &GlyphLookup<'_>, text: &[u16]) -> Result<i32, TextError> {
+    width_b(g, text, usize::MAX)
+}
+
+/// Width C (`0x00501730`, §6) of the `n` units from `start`, stopping at
+/// a NUL unit (the NUL at the end counts in `n` but adds nothing, so `n`
+/// past the end adds nothing): `LF` 0; `ÿ`, `c`, `0`–`6` skipped only
+/// when the code starts at span index `i` with `i + 3 < n`; every other
+/// unit its advance.
+pub fn width_c(
+    g: &GlyphLookup<'_>,
+    text: &[u16],
+    start: usize,
+    n: usize,
+) -> Result<i32, TextError> {
+    let text = units(text);
+    let mut w = 0;
+    let mut i = 0;
+    while i < n {
+        let u = at(text, start + i);
+        if u == 0 {
+            break;
+        }
+        if u == COLOR_LEAD
+            && i + 3 < n
+            && at(text, start + i + 1) == u16::from(b'c')
+            && (u16::from(b'0')..=u16::from(b'6')).contains(&at(text, start + i + 2))
+        {
+            i += 3;
+            continue;
+        }
+        if u != LF {
+            w += g.adv(u)?;
+        }
+        i += 1;
+    }
+    Ok(w)
+}
+
+/// Line width (`0x00501910`, §6) from unit `start` to the first `LF` or
+/// the end, and the index where it stopped: `ÿ` and the next two units
+/// count 0, plus `adv('m')` if the unit after `ÿ` is `m` or `M`.
+fn line_extent(g: &GlyphLookup<'_>, text: &[u16], start: usize) -> Result<(i32, usize), TextError> {
+    let mut w = 0;
+    let mut i = start;
+    while i < text.len() && text[i] != LF {
+        if text[i] == COLOR_LEAD {
+            if matches!(at(text, i + 1), 0x6D | 0x4D) {
+                w += g.adv(u16::from(b'm'))?;
+            }
+            // The two units are passed over unread: a `LF` among them
+            // does not end the line, a skip past the end ends the walk.
+            i = (i + 3).min(text.len());
+        } else {
+            w += g.adv(text[i])?;
+            i += 1;
+        }
+    }
+    Ok((w, i))
+}
+
+/// Line width (`0x00501910`, §6) of the line starting at unit `start`.
+pub fn line_width(g: &GlyphLookup<'_>, text: &[u16], start: usize) -> Result<i32, TextError> {
+    Ok(line_extent(g, units(text), start)?.0)
+}
+
+/// Max width (`0x00501840`, §6): the widest `LF` line, by line width.
+pub fn max_width(g: &GlyphLookup<'_>, text: &[u16]) -> Result<i32, TextError> {
+    let text = units(text);
+    let mut best = 0;
+    let mut start = 0;
+    loop {
+        let (w, end) = line_extent(g, text, start)?;
+        best = best.max(w);
+        if end >= text.len() {
+            return Ok(best);
+        }
+        start = end + 1;
+    }
+}
+
+/// Text height (`0x005019C0`, §6): `trunc(height × 16 × lines / 10)`,
+/// lines = 1 + number of `LF`.
+pub fn text_height(g: &GlyphLookup<'_>, text: &[u16]) -> i32 {
+    let lines = 1 + units(text).iter().filter(|&&u| u == LF).count() as i32;
+    g.height() * TEXT_HEIGHT_TENTHS * lines / 10
+}
+
+/// The original's text layout (`ui/text.md` §5–§7, §9).
 pub trait TextRules {
     fn place(
         &self,
@@ -118,21 +374,251 @@ pub trait TextRules {
     ) -> Result<Vec<GlyphPlacement>, TextError>;
 }
 
-/// Placeholder until `ui/text.md` exists: every layout is an error.
+/// The draw call and its variants as 1.14d D2Win runs them (§5, §7, §9):
+/// pen moves right by the advance, `LF` moves it up one line step, `ÿc`
+/// codes switch the color, no kerning, tabs or spacing.
 #[derive(Clone, Copy, Debug, Default)]
-pub struct NoTextRules;
+pub struct OriginalText;
 
-impl TextRules for NoTextRules {
+/// What the unit at `i` is under §5.
+enum Unit {
+    /// A color code: the new `k` and the units it takes.
+    Color(i32, usize),
+    /// `ÿ` or `ÿc` at the end: color 0, drawing ends (§5.2).
+    End,
+    /// An ordinary glyph (including `ÿ` + anything else, §5.3).
+    Glyph,
+}
+
+fn color_code(text: &[u16], i: usize) -> Unit {
+    if text[i] != COLOR_LEAD {
+        return Unit::Glyph;
+    }
+    match text.get(i + 1) {
+        None => Unit::End,
+        Some(&c) if c == u16::from(b'c') => match text.get(i + 2) {
+            None => Unit::End,
+            Some(&d) => {
+                let k = i32::from(d) - 0x30;
+                Unit::Color(if k >= TEXT_COLORS as i32 { 0 } else { k }, 3)
+            }
+        },
+        Some(_) => Unit::Glyph,
+    }
+}
+
+impl TextRules for OriginalText {
     fn place(
         &self,
-        _: &GlyphLookup<'_>,
-        _: &[u16],
-        _: Point,
-        _: TextStyle,
-        _: &TextOpts,
+        g: &GlyphLookup<'_>,
+        text: &[u16],
+        origin: Point,
+        style: TextStyle,
+        opts: &TextOpts,
     ) -> Result<Vec<GlyphPlacement>, TextError> {
-        Err(TextError::Unspecified("ui/text.md §B3"))
+        let text = units(text);
+        let Point { x, y } = origin;
+        let (centered, block_w) = match *opts {
+            TextOpts::Draw {
+                centered, block_w, ..
+            } => (centered, block_w),
+            TextOpts::Vertical { skip, .. } if skip < 0 => return Ok(Vec::new()),
+            TextOpts::Vertical { .. } => {
+                return Err(TextError::Unspecified(
+                    "ui/text.md §9 vertical window (open question 1)",
+                ))
+            }
+            TextOpts::Horizontal { .. } => (false, None),
+        };
+        let block = match (centered, block_w) {
+            (false, _) => 0,
+            (true, Some(w)) => w,
+            (true, None) => max_width(g, text)? + 8,
+        };
+        let line_x = |start: usize| -> Result<i32, TextError> {
+            Ok(if centered {
+                x + ((block - line_extent(g, text, start)?.0) >> 1)
+            } else {
+                x
+            })
+        };
+        let step = g.line_step();
+        let mut pen = Point::new(line_x(0)?, y);
+        let mut k = i32::from(style.color);
+        if let TextOpts::Horizontal { s, .. } = *opts {
+            pen.x = x + s;
+        }
+        let mut out = Vec::new();
+        let mut i = 0;
+        while i < text.len() {
+            // Horizontal window: the stop test runs before every unit
+            // (glyph, `ÿ` code or `LF`), §9.
+            if let TextOpts::Horizontal { w, .. } = *opts {
+                if pen.x > x + w {
+                    break;
+                }
+            }
+            let u = text[i];
+            if u == COLOR_LEAD {
+                match color_code(text, i) {
+                    Unit::Color(code, len) => {
+                        k = code;
+                        i += len;
+                        continue;
+                    }
+                    Unit::End => break,
+                    Unit::Glyph => {}
+                }
+            }
+            if u == LF {
+                pen.x = line_x(i + 1)?;
+                pen.y -= step;
+                i += 1;
+                continue;
+            }
+            let draw = match *opts {
+                TextOpts::Horizontal { .. } => pen.x > x,
+                _ => true,
+            };
+            if draw {
+                out.push(GlyphPlacement {
+                    code: u,
+                    at: pen,
+                    color: k,
+                });
+            }
+            pen.x += g.adv(u)?;
+            i += 1;
+        }
+        Ok(out)
     }
+}
+
+/// `D2Client_DrawCenteredUnicodeText` (`0x004A7080`, §7): the x at which
+/// `DrawText(text, x, y, k, 0)` centers `text` in the span `x1..=x2` by
+/// width A (color codes counted).
+pub fn centered_span_x(
+    g: &GlyphLookup<'_>,
+    text: &[u16],
+    x1: i32,
+    x2: i32,
+) -> Result<i32, TextError> {
+    let span = x2 - x1 + 1;
+    let w = width_a(g, text)?;
+    Ok(if w < span { x1 + ((span - w) >> 1) } else { x1 })
+}
+
+/// A framed hover box (§8): the rectangle corners handed to
+/// `D2GFX_DrawRectangle` and the text call inside it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FramedText {
+    /// `(x0, y0)`–`(x1, y1)` as passed to the rectangle draw; its pixels
+    /// are `render/blend-modes.md`.
+    pub rect: (Point, Point),
+    /// Pen of the text call.
+    pub pen: Point,
+    pub opts: TextOpts,
+}
+
+/// `DrawFramedText` (`0x005023B0`, §8) on a `screen` of (Sw, Sh).
+pub fn framed_text(
+    g: &GlyphLookup<'_>,
+    text: &[u16],
+    at: Point,
+    screen: (i32, i32),
+) -> Result<FramedText, TextError> {
+    let (sw, sh) = screen;
+    let w = max_width(g, text)? + 8;
+    let h = text_height(g, text);
+    let x = at.x.max(0).min(sw - w);
+    let y = at.y + 2;
+    let mut b = y.max(h);
+    if b >= sh - 31 {
+        b = sh - 31;
+    }
+    Ok(FramedText {
+        rect: (Point::new(x, b - h), Point::new(x + w, b)),
+        pen: Point::new(x, b - 3 * g.height() / 10),
+        opts: TextOpts::Draw {
+            centered: true,
+            block_w: Some(w),
+            mode: TEXT_DRAW_MODE,
+        },
+    })
+}
+
+/// The framed variant `0x00502480` (§8) on a `screen` of (Sw, Sh).
+pub fn framed_text_tight(
+    g: &GlyphLookup<'_>,
+    text: &[u16],
+    at: Point,
+    screen: (i32, i32),
+) -> Result<FramedText, TextError> {
+    let (sw, sh) = screen;
+    let w = max_width(g, text)?;
+    let x = if at.x + w > sw { sw - w } else { at.x };
+    let mut y = (at.y + 2).min(sh - 31);
+    if y - g.height() < 0 {
+        y *= 2;
+    }
+    Ok(FramedText {
+        rect: (Point::new(x, y - g.height()), Point::new(x + w, y)),
+        pen: Point::new(x, y - 2),
+        opts: TextOpts::Draw {
+            centered: true,
+            block_w: Some(w),
+            mode: TEXT_DRAW_MODE,
+        },
+    })
+}
+
+/// White space of the wrap break test (`0x00526D30`, §10.2.2): `< 0x100`
+/// and CRT `isspace` in the "C" locale.
+fn is_space(u: u16) -> bool {
+    matches!(u, 0x09..=0x0D | 0x20)
+}
+
+/// `Wrap(text, M)` (`0x00502970`, §10) for English: the lines, in order.
+/// A line keeps its trailing white space and any `LF` (drawn as two lines
+/// by §7); a leading white-space unit is dropped.
+pub fn wrap<'t>(
+    g: &GlyphLookup<'_>,
+    text: &'t [u16],
+    max: i32,
+) -> Result<Vec<&'t [u16]>, TextError> {
+    let text = units(text);
+    let l = text.len();
+    let c = |s: usize, e: usize| width_c(g, text, s, e - s + 1);
+    if width_c(g, text, 0, l)? <= max {
+        return Ok(vec![text]);
+    }
+    let shrink = |s: usize| -> Result<usize, TextError> {
+        let mut e = l;
+        while e > s && c(s, e)? > max {
+            e -= 1;
+        }
+        Ok(e)
+    };
+    let mut lines = Vec::new();
+    let mut s = 0;
+    while s <= l {
+        let mut e = shrink(s)?;
+        if e > s && e != l {
+            while e > s && !(is_space(at(text, e)) && !is_space(at(text, e + 1))) {
+                e -= 1;
+            }
+        }
+        if e == s {
+            e = shrink(s)?;
+        }
+        let mut line = &text[s.min(l)..(e + 1).min(l)];
+        if line.first().is_some_and(|&u| is_space(u)) {
+            line = &line[1..];
+        }
+        lines.push(line);
+        s = e + 1;
+    }
+    Ok(lines)
 }
 
 /// Lays out `text` (UTF-16 code units, unchanged) at `origin`: `rules`

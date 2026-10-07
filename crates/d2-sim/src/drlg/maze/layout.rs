@@ -4,7 +4,7 @@
 //! cells (§8) and the build with file choice (§9).
 
 use super::cells::{Extreme, Gen};
-use super::{MazeError, MazeLink, MazePresets, Rotation};
+use super::{LinkTarget, MazeError, MazeLink, MazePresets, Rotation};
 use crate::drlg::data::DrlgData;
 use crate::drlg::{DrlgRoomId, TileRect};
 
@@ -234,6 +234,9 @@ const SPIRAL_OFFSETS: [u32; 15] = [0, 0, 3, 0, 0, 0, 0, 1, 0, 1, 2, 2, 3, 2, 2];
 /// Arcane spiral `0x006719F0` (§5.5).
 pub(super) fn spiral(gen: &mut Gen<'_>, f: DrlgRoomId) -> Result<(), MazeError> {
     let r = gen.level_step() & 3;
+    // The 60-slot record: slot 15·b + k; rejected cells and the dead
+    // ends k = 8, 12 leave it empty.
+    let mut slots: [Option<DrlgRoomId>; 60] = [None; 60];
     for b in 0..4u32 {
         let mut cells: [Option<DrlgRoomId>; 15] = [None; 15];
         for k in 0..15 {
@@ -245,15 +248,16 @@ pub(super) fn spiral(gen: &mut Gen<'_>, f: DrlgRoomId) -> Result<(), MazeError> 
             };
             let parent = parent.ok_or(MazeError::NullCell("arcane spiral"))?;
             cells[k] = gen.grow(parent, ((b + SPIRAL_OFFSETS[k]) % 4) as u8)?;
-        }
-        // TODO(spec: maze.md §5.5): "afterwards" is read as after each
-        // branch; a later branch's merge re-pick (file −1) would undo a
-        // file set before it. Applying all files after the four branches
-        // is the other reading.
-        for (k, c) in cells.iter().enumerate() {
-            if let (false, Some(c)) = (k == 8 || k == 12, c) {
-                gen.cell_mut(*c).file = ((r + b) % 4) as i32;
+            if k != 8 && k != 12 {
+                slots[15 * b as usize + k] = cells[k];
             }
+        }
+    }
+    // After all four branches: file = (r + slot / 15) mod 4, so a file
+    // reset to −1 by a later branch's merge is overwritten.
+    for (slot, c) in slots.iter().enumerate() {
+        if let Some(c) = c {
+            gen.cell_mut(*c).file = ((r + slot as u32 / 15) % 4) as i32;
         }
     }
     gen.cell_mut(f).file = 4;
@@ -749,7 +753,22 @@ pub(super) fn build(
             .copied()
             .filter(|l| l.init)
             .collect();
-        presets.build_map(gen.drlg, data, gen.level, map, small, &links)?;
+        // Step 3 (F = 0 is the provider's), step 4: link the room
+        // BuildArea returned to each init link, list order, then free the
+        // cell, which removes the neighbours' links back to it.
+        let built = presets.build_map(gen.drlg, data, gen.level, map, small, &links)?;
+        if let Some(b) = built {
+            gen.cells.entry(b).or_default();
+            for l in &links {
+                if let LinkTarget::Cell(n) = l.target {
+                    gen.link(b, n, l.dir);
+                }
+            }
+        } else if !links.is_empty() {
+            // The original links a null room (crash); BuildArea builds at
+            // least one room for every cell size lvlmaze has.
+            return Err(MazeError::NullCell("built room"));
+        }
         gen.free_listed(c);
     }
     Ok(())

@@ -19,16 +19,19 @@ pub enum UiError {
     RuleClosedOpening { closed: PanelId },
 }
 
-/// Open/close/stack rules of the original: which panels exclude which,
-/// left/right slots (`TODO(spec: ui/panels.md §B2)`).
+/// Open/close/stack rules for [`UiRoot::open`]. The original's rules
+/// (`ui/panels.md` §2–§4: the conflict gate can refuse, and the call has
+/// side effects) are [`super::states::UiStates`]; a root driven by it
+/// mirrors its flags with [`UiRoot::sync_states`] instead of calling
+/// `open`.
 pub trait PanelRules {
     /// Called before `opening` opens, with the open panels bottom to top;
     /// returns the panels to close first.
     fn on_open(&mut self, opening: PanelId, open: &[PanelId]) -> Vec<PanelId>;
 }
 
-/// The neutral rule set until `ui/panels.md` exists: opening a panel
-/// closes nothing (`TODO(spec: ui/panels.md §B2)`).
+/// The neutral rule set (tests, d2rs-own panels): opening a panel closes
+/// nothing.
 pub struct NoPanelRules;
 
 impl PanelRules for NoPanelRules {
@@ -143,6 +146,18 @@ impl UiRoot {
         }
     }
 
+    /// Mirrors the original's UI flags (`ui/panels.md` §2): every panel
+    /// whose id is a UI state id 0–37 is open exactly when its flag is set.
+    /// Other panels keep their state.
+    pub fn sync_states(&mut self, states: &super::states::UiStates) {
+        for s in &mut self.slots {
+            let id = s.panel.id().0;
+            if usize::from(id) < super::layout::UI_STATE_COUNT {
+                s.open = states.is_open(id as u8);
+            }
+        }
+    }
+
     /// Draws the open panels, bottom-most first (§A2).
     pub fn draw(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
         for s in self.slots.iter().filter(|s| s.open) {
@@ -171,9 +186,9 @@ impl UiRoot {
     /// Routes one event top-most first (§A2). A pointer event is offered
     /// to each open panel whose rect contains its point; other events to
     /// every open panel. The first answer other than `Ignored` ends the
-    /// walk; an intent is queued for [`Self::forward`]. Whether a panel's
-    /// background stops a click reaching the world is the panel's answer
-    /// (`TODO(spec: ui/panels.md §B2)`).
+    /// walk; an intent is queued for [`Self::forward`]. A click inside an
+    /// open original panel's area is consumed by it (`ui/panels.md` §4.4):
+    /// that is the panel's answer.
     pub fn dispatch(&mut self, e: UiEvent, ctx: &UiCtx) -> Routed {
         match e {
             UiEvent::CursorMoved(p) => self.cursor = Some(p),
@@ -209,6 +224,13 @@ impl UiRoot {
     /// Queued intents, oldest first.
     pub fn intents(&self) -> &[ClientIntent] {
         &self.outbox
+    }
+
+    /// Queues an intent a panel handed out beside its [`UiResponse`] (the
+    /// original panels' outputs, [`super::original`]); it leaves with the
+    /// next [`Self::forward`], after the intents queued before it.
+    pub fn queue_intent(&mut self, intent: ClientIntent) {
+        self.outbox.push(intent);
     }
 
     pub fn take_intents(&mut self) -> Vec<ClientIntent> {

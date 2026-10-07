@@ -1,4 +1,4 @@
-// Spec: specs/client/bridge.md §3; specs/sim/pathing.md §1.1, §9, §10; specs/sim/path-placement.md §2.4, §2.5, §10, §11; specs/sim/intents-events.md §2.4; specs/skills/use.md §1, §5.4; specs/missiles/missiles.md §R2.3; specs/items/inventory.md §7.1, §7.3, §8.2; specs/world/npc.md §2; specs/world/vendors.md §3, §4, §7.1, §7.2, §9; specs/world/waypoints.md §6, §7, §8 (end to end)
+// Spec: specs/client/bridge.md §3; specs/sim/pathing.md §1.1, §9, §10; specs/sim/path-placement.md §2.4, §2.5, §10, §11; specs/sim/intents-events.md §2.4; specs/skills/use.md §1, §5.4; specs/missiles/missiles.md §R2.3, §R4; specs/combat/damage.md §5.2, §7.2; specs/combat/vitals.md §3, §4.2; specs/items/treasure.md §3; specs/items/inventory.md §10.1; specs/items/inventory.md §7.1, §7.3, §8.2; specs/world/npc.md §2; specs/world/vendors.md §3, §4, §7.1, §7.2, §9; specs/world/waypoints.md §6, §7, §8 (end to end)
 //! The full single-player loop, end to end, on the wired host with the
 //! path provider on: the bridge (`d2_client::bridge`) on its local link
 //! over the in-process `d2-server` host, whose game is `SimGame` on
@@ -13,14 +13,14 @@
 //! 1. join: the first tick activates the rooms near the player and the
 //!    room pass creates the DS1's monster on its path;
 //! 2. walk (C→S 0x01) toward the monster: per-tick path steps, no S→C;
-//! 3. attack: a right-skill cast (0x0C) runs to the missile's creation,
-//!    then **stops**: the missile's path build is fatal with the path
-//!    provider (no rule sets the missile path flag 0x40000, and the
-//!    missile path `0x00649760` is unwritten); the monster lives, so
-//!    there is no kill, no death drop and no experience;
-//! 4. instead of the drop, a cap the economy wiring makes on the ground:
-//!    run (0x03) to it, pick it up to the cursor (0x16) and place it
-//!    (0x18): 0x9C / 0x47 / 0x48 bytes exact;
+//! 3. attack: a right-skill cast (0x0C) creates the missile; its missile
+//!    path (`pathing.md` §11) flies into the monster's footprint: hit,
+//!    kill, death mode, experience and level-up, the death drop (gold),
+//!    picked up (0x16 cursor 0) into the player's gold. No S→C: the
+//!    per-unit update that announces units is not wired (IS2);
+//! 4. a cap the economy wiring makes on the ground (gold has no cursor
+//!    form): run (0x03) to it, pick it up to the cursor (0x16) and place
+//!    it (0x18): 0x9C / 0x47 / 0x48 bytes exact;
 //! 5. run to Akara (0x04, unit form), talk (0x13: 0x27, 0x29, 0x28),
 //!    trade (0x38), sell the cap (0x33: 0x2A kind 3), buy the store's
 //!    cap (0x32: **stops** at the unwritten item copy, 0x2A code 9);
@@ -36,7 +36,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use d2_client::bridge::dispatch::Dispatch;
 use d2_client::bridge::link::{LinkError, Pumped, SendQueue, Sent, ServerLink};
 use d2_client::bridge::local::{LocalLink, PendingSession};
-use d2_client::bridge::{Bridge, FrameReport};
+use d2_client::bridge::{Bridge, FrameReport, UnitKey};
 use d2_data::bin::BinTable;
 use d2_data::fixup::records::stat_ops;
 use d2_data::tables::{
@@ -71,12 +71,12 @@ use d2_sim::items::inventory::InvItem;
 use d2_sim::items::moves::Owner;
 use d2_sim::items::tables::ItemRec;
 use d2_sim::items::{flag, ty, ItemRequest, ItemTables};
-use d2_sim::missiles::{param_flags, unit_flag, MissileParams};
+use d2_sim::missiles::unit_flag;
 use d2_sim::monsters::init::{GameInfo, MonstatsExtra};
 use d2_sim::monsters::population::PopTables;
 use d2_sim::path::CollisionRooms;
 use d2_sim::rng::Seed;
-use d2_sim::skills::use_::{MissileAim, ModeTarget, ServerMsg, UseState};
+use d2_sim::skills::use_::{ModeTarget, ServerMsg, UseState};
 use d2_sim::skills::{SkillEntry, SkillTables, LEVEL_CAP_114D};
 use d2_sim::stats::{StatData, StatTable};
 use d2_sim::treasure::{ItemData, TcEntry, TreasureClass, TreasureClasses};
@@ -379,7 +379,6 @@ impl UseRest for TestPending {
     fn use_state(&mut self, _: UnitId, _: &SkillEntry) -> UseState {
         UseState::Usable
     }
-    fn dec_quantity(&mut self, _: UnitId, _: i32) {}
     fn shapeshifted(&self, _: UnitId) -> bool {
         false
     }
@@ -421,12 +420,6 @@ impl UseRest for TestPending {
         true
     }
     fn set_aura_state(&mut self, _: UnitId, _: u16, _: i32, _: i32) {}
-    /// The helpers' record fill is not specified: aimed at the cast's
-    /// target point, absolute.
-    fn skill_missile_fill(&self, _: UnitId, _: bool, _: MissileAim, p: &mut MissileParams) {
-        p.flags |= param_flags::TARGET_ABSOLUTE;
-        (p.target_x, p.target_y) = self.aim_at;
-    }
     fn srvst(&mut self, index: u16, u: UnitId, skill: i32, lvl: i32) -> i32 {
         self.book.srvst(index, u, skill, lvl)
     }
@@ -725,7 +718,18 @@ fn monster_class() -> Monstats {
     (m.minion1, m.minion2) = (0xFFFF, 0xFFFF);
     m.enabled = true;
     m.isspawn = true;
+    m.monstatsex = 1;
     m
+}
+
+/// monstats2: row 0 blank (the NPC rows), row 1 the DS1 monster's shape:
+/// `SizeX` 1, so its path has size 1, pattern 1 and a footprint the
+/// missile can collide with (`path-placement.md` §3; size 0 → pattern 0
+/// stamps nothing, §5.1).
+fn monstats2() -> Vec<Monstats2> {
+    let mut m: Monstats2 = blank();
+    m.sizex = 1;
+    vec![blank(), m]
 }
 
 /// levels.txt: no monsters, act by level id; waypoints at [`ISLE`] and
@@ -832,14 +836,15 @@ fn skill_rec() -> Skills {
     s
 }
 
-/// Missile 0: an arrow-like row (default flight, one sub-tile per frame,
-/// collide type 3, kill on collision, to-hit), as the action wiring's
-/// tests use.
+/// Missile 0: an arrow-like row (default flight, `Vel` 16: velocity
+/// 3072 after the 75 % of `missiles.md` §R2.2 step 5, about half a
+/// sub-tile per frame and axis on a diagonal, §R4.1; collide type 3,
+/// kill on collision, to-hit), as the action wiring's tests use.
 fn arrow() -> MissileRow {
     let mut r: MissileRow = blank();
     r.psrvdofunc = 1;
-    r.vel = 1;
-    r.maxvel = 1;
+    r.vel = 16;
+    r.maxvel = 16;
     r.range = 50;
     r.collidetype = 3;
     r.collidekill = 1;
@@ -849,14 +854,16 @@ fn arrow() -> MissileRow {
     r
 }
 
-/// The right skill: start function 4, do function 8 (the Multiple Shot
+/// The right skill: start function 6 (a `mapped` slot standing in for
+/// Multiple Shot's 4, whose body, `skills/bodies.md` §3.4, now runs on
+/// the wired host), do function 8 (the Multiple Shot
 /// slot, body catalogued only), `srvmissile` 0 (the generic missile of
 /// `use.md` §5.4 step 7).
 fn skills() -> SkillTables {
     let mut v = vec![skill_rec(), skill_rec()];
     let m = &mut v[MULTI as usize];
-    (m.srvstfunc, m.mana, m.lvlmana, m.manashift) = (4, 4, 1, 8);
-    (m.srvdofunc, m.srvmissile) = (8, 0);
+    (m.srvstfunc, m.mana, m.lvlmana, m.manashift) = (42, 4, 1, 8);
+    (m.srvdofunc, m.srvmissile) = (3, 0);
     SkillTables {
         skills: v,
         skilldesc: vec![blank::<Skilldesc>()],
@@ -887,7 +894,7 @@ fn combat_tables() -> CombatTables {
         charstats,
         difficultylevels: vec![d; 3],
         monstats,
-        monstats2: vec![blank::<Monstats2>()],
+        monstats2: monstats2(),
         hitclass: vec![*b"none", *b"hth "],
     }
 }
@@ -1133,7 +1140,7 @@ impl Fx {
             skills: skills(),
             combat: combat_tables(),
             levels: levels(),
-            skill_modes: vec![[0; 3]],
+            skill_modes: vec![[0; 8]],
         };
         let book = Book::default();
         let mut hooks = ActionHooks::new(
@@ -1152,14 +1159,14 @@ impl Fx {
         hooks.anim_data = Some(Arc::new(anim_data()));
         hooks.vitals = Some(Arc::new(vitals()));
         let wt = WorldTables {
-            pop: PopTables::from_records(&levels(), &[monster_class()], &[blank()], &[]),
+            pop: PopTables::from_records(&levels(), &[monster_class()], &monstats2(), &[]),
             monstats: vec![monster_class()],
-            monstats2: vec![blank()],
+            monstats2: monstats2(),
             monlvl: vec![blank::<Monlvl>(); 10],
             levels: levels(),
             difficultylevels: vec![blank::<Difficultylevels>(); 3],
             monstats_extra: vec![MonstatsExtra::default()],
-            components: vec![[0; 16]],
+            components: vec![[0; 16]; 2],
             ..WorldTables::default()
         };
         let state = WorldState::new(types, Arc::new(wt), GameInfo::default());
@@ -1238,7 +1245,9 @@ impl Fx {
         rec.get_mut(0).set(ISLE_WP.into()).unwrap();
         rec.get_mut(0).set(GATE_WP.into()).unwrap();
         // Mana and max mana 4000 (1/256 units), gold, dexterity 25; the
-        // velocity percentage 100 and stamina (`pathing.md` §8.2, §9.9;
+        // velocity percentage 100, stamina and max stamina (the
+        // level-up refills stamina to max, `vitals.md` §3 step 5;
+        // `pathing.md` §8.2, §9.9;
         // the player's stat init is not written: synthetic, as
         // `e2e_walk.rs`).
         sim.action.with(&mut game, |_, v| {
@@ -1248,6 +1257,7 @@ impl Fx {
             v.set_base(player, DEXTERITY, 25);
             v.set_base(player, STAT_VELOCITY, 100);
             v.set_base(player, STAT_STAMINA, STAMINA);
+            v.set_base(player, STAT_STAMINA + 1, STAMINA);
         });
         let wp = game.lists.unit(object).unwrap().guid;
 
@@ -1405,6 +1415,22 @@ impl Fx {
             v.set_base(player, 19, 100);
             v.set_base(player, 12, 1);
         });
+    }
+
+    /// The damage setup `0x0059F900` is the skills spec's (`Pending`):
+    /// the missile's damage stats (21, 22, 1/256 points) are set here.
+    fn set_missile_damage(&mut self, m: UnitId, d: i32) {
+        let sim = self.sim();
+        sim.events.action.with(&mut sim.game, |_, v| {
+            v.set_base(m, 21, d);
+            v.set_base(m, 22, d);
+        });
+    }
+
+    /// A copy of the unit's dynamic path record.
+    fn path(&mut self, u: UnitId) -> d2_sim::path::DynamicPath {
+        let h = self.sim().events.action.hooks();
+        h.paths.as_ref().unwrap().dynamic(u).cloned().unwrap()
     }
 
     /// The missile units of the game, in id order.
@@ -1603,14 +1629,65 @@ struct Transcript {
 }
 
 /// A recording bridge frame.
+/// A frame's received messages with each 0x9C / 0x9D item bit stream
+/// (`items/bitstream.md`) checked and cut off (size byte = header size),
+/// so the steps state the §11 headers: the stream must decode to its
+/// exact length with `d2-proto`'s reader on the game's item tables and
+/// carry the item's code when the item is still in the game.
+fn streams(fx: &Fx, msgs: &[Vec<u8>]) -> Vec<Vec<u8>> {
+    use d2_server::adapters::item_bits::TablesLookup;
+    let sim = fx.sim_ref();
+    msgs.iter()
+        .map(|m| {
+            let head = match m[0] {
+                0x9C => 8,
+                0x9D => 13,
+                _ => return m.clone(),
+            };
+            assert_eq!(usize::from(m[2]), m.len(), "size byte {m:?}");
+            let bits = d2_proto::item_bits::decode(&m[head..], &TablesLookup(&sim.world.tables))
+                .unwrap_or_else(|e| panic!("stream of {m:?}: {e}"));
+            let guid = u32::from_le_bytes(m[4..8].try_into().unwrap());
+            let unit = sim
+                .game
+                .lists
+                .find_unit(d2_sim::units::UnitType::Item, guid);
+            if let Some(it) = unit.and_then(|u| sim.events.action.sys.hooks.items.get(u)) {
+                assert_eq!(
+                    bits.code, sim.world.tables.items[it.record].code,
+                    "code of {guid}"
+                );
+            }
+            let mut h = m[..head].to_vec();
+            h[2] = head as u8;
+            h
+        })
+        .collect()
+}
+
+/// S→C 0x07 MapReveal of the room at tile (x, y) of `level`
+/// (`server-messages.tsv`: x u16 @1, y u16 @3, level u8 @5).
+fn map_reveal(x: u16, y: u16, level: u32) -> Vec<u8> {
+    let mut b = vec![0x07];
+    b.extend(x.to_le_bytes());
+    b.extend(y.to_le_bytes());
+    b.push(level as u8);
+    b
+}
+
 fn record(fx: &mut Fx, frames: &mut Vec<Frame>, msgs: Vec<Vec<u8>>) {
-    let before = fx.bridge.log().unowned.values().sum::<u64>();
     let step = fx.step(&msgs);
-    // The bridge has no S→C handler yet (`bridge-dispatch.tsv`: every id
-    // TBD), so each received message is counted unowned.
+    // Each received message is accounted once (`bridge.md` §6,
+    // `client/model.md` §4 rule 1): applied, queued on its unit, dropped
+    // (unit-handler message for a unit the model does not hold), unowned
+    // or rejected. No 0x04 arrives, so no update pass runs.
     let chunks = std::mem::take(&mut fx.bridge.link_mut().chunks);
-    let after = fx.bridge.log().unowned.values().sum::<u64>();
-    assert_eq!(after - before, step.report.messages as u64);
+    let r = &step.report;
+    assert_eq!(
+        r.handled + r.queued + r.dropped + r.unowned + r.rejected,
+        r.messages
+    );
+    assert_eq!(r.drained, 0);
     frames.push((msgs, step, chunks));
 }
 
@@ -1686,11 +1763,19 @@ fn run_with(game_seed: u32) -> Transcript {
     assert!(!r.ticked);
 
     // Frame 2 (tick 1), join: the client's room change activates the
-    // rooms near the player's (`rooms.md` §4.1: 4 rooms); the room pass
-    // creates the DS1's preset monster at its sub-tile (`population.md`
-    // §11.1), placed on its path. No message.
+    // rooms near the player's (`rooms.md` §4.1: 4 rooms) and sends one
+    // S→C 0x07 per room of the player's adjacency array, in its order
+    // (`path-placement.md` §11 "Recipients": tile x, tile y, level); the
+    // room pass creates the DS1's preset monster at its sub-tile
+    // (`population.md` §11.1), placed on its path. This staged game sends
+    // no 0x03, so the client refuses each 0x07 (fatal 0x58A).
     record(&mut fx, &mut frames, vec![]);
-    assert_eq!(frames[0].2, none);
+    assert_eq!(
+        frames[0].2,
+        [(8000, 8000), (8000, 8008), (8008, 8000), (8008, 8008)]
+            .map(|(x, y)| map_reveal(x, y, ISLE))
+            .to_vec()
+    );
     assert_eq!(fx.sim_ref().game.lists.active_rooms(0).len(), 4);
     let monsters = fx.monsters();
     assert_eq!(monsters.len(), 1, "the DS1 preset monster");
@@ -1734,7 +1819,7 @@ fn run_with(game_seed: u32) -> Transcript {
 
     // 5. Right skill at the monster (C→S 0x0C, `use.md` §1) from there:
     // accepted, mana charged at start (3,328 of 4,000), srvst 4, mode SC
-    // (10); the action frame (event 0, 3 frames on) runs srvdo 8 and the
+    // (10); the action frame (event 0, 3 frames on) runs srvdo 3 and the
     // generic `srvmissile` 0 through the real missile creation
     // (`missiles.md` §R2.3) at the player, aimed at the monster.
     fx.stage_combat(monster);
@@ -1753,46 +1838,142 @@ fn run_with(game_seed: u32) -> Transcript {
     }
     assert_eq!(
         fx.book.get().log,
-        ["srvst 4 1 10", "srvdo 8 1 10 true false false"]
+        ["srvst 42 1 10", "srvdo 3 1 10 true false false"]
     );
     let shot = fx.missiles();
     assert_eq!(shot.len(), 1);
     assert_eq!(fx.pos(shot[0]), target, "created at the player");
-    // STOP (the kill): §R2.3 step 16 builds the missile's path
-    // (`0x00649970`). With the path provider the missile path is a
-    // dynamic path of type 4 (`path-placement.md` §2.4) and no written
-    // rule sets the missile path flag 0x40000, so `pathing.md` §3 step 1
-    // does not branch to the missile path `0x00649760` (no spec writes
-    // it) and §3 runs type 4's function: none, fatal (§2 table).
-    // TODO(spec: path-placement.md §2.4 / missiles.md §R2.3 / pathing.md
-    // §3 step 1): who sets path flag 0x40000 for a missile, and the
-    // missile path function `0x00649760` (`pathing.md` OQ3).
-    assert_eq!(
-        fx.errors(),
-        ["Walk(Fatal(\"path type without a function\"))"]
-    );
-    // The missile leaves the game on its next frame without a hit; the
-    // cast ends (event 1) and the monster lives: no death, no drop, no
-    // experience (`damage.md` §5.2, `treasure.md` §3 not reached).
-    for _ in 0..4 {
+    // The damage setup `0x0059F900` is the skills spec's: 10 points.
+    fx.set_missile_damage(shot[0], 2560);
+    fx.pending().log.clear();
+    // §R2.3 step 16 builds the missile's path (`0x00649970`): a missile
+    // path (flag 0x40000, `path-placement.md` §2.4 rule 3) of type 4
+    // (`pathing.md` §11), velocity (Vel 16 · 256) · 75 / 100 = 3072
+    // (§R2.2 step 5): (3072 · 0x400 >> 6) · 2896 >> 12 per axis and
+    // frame (§R4.1), one diagonal sub-tile every one or two frames.
+    let d = fx.path(shot[0]);
+    assert_eq!(d.flags & 0x60000, 0x60000);
+    assert_eq!((d.path_type, d.velocity), (4, 3072));
+    let mut flight = Vec::new();
+    while fx.missiles() == shot {
+        flight.push(fx.pos(shot[0]));
         record(&mut fx, &mut frames, vec![]);
     }
+    flight.dedup();
+    assert_eq!(
+        flight,
+        [
+            (40_016, 40_014),
+            (40_015, 40_013),
+            (40_014, 40_012),
+            (40_013, 40_011)
+        ]
+    );
+    // Frame 32: the step enters the monster's sub-tile, whose footprint
+    // (0x100, size 1: `monstats2()`) the missile move collides with
+    // (move mask 0x184, §R4 steps 6–9): hit (`missiles.md` §R5, to-hit
+    // on the player's seed), damage 10 points ≥ the monster's 5 → life
+    // 0, result 3 (`damage.md` §5.2 steps 11–15: events 10, 9), the
+    // missile removed (collide-kill). The reaction (§7.1) kills the
+    // monster (§7.2): its seam steps in order, the death mode change with
+    // the player as target (mode DT 0, the death start `0x005A6FF0`), the
+    // player's experience (`vitals.md` §4.2: equal levels → 100) and its
+    // level-up event (§4.3).
+    let f_hit = fx.sim_ref().game.frame;
+    assert_eq!(f_hit, f0 + 10);
     assert!(fx.missiles().is_empty());
-    assert_eq!(fx.mode(player), 1);
-    assert_eq!(fx.mode(monster), 1);
-    assert_eq!(fx.stat(monster, 6), 5 << 8);
-    assert!(fx.drops().is_empty());
-    assert_eq!(fx.stat(player, 13), 0);
-    for f in &frames {
+    assert_eq!(fx.mode(player), 1, "event 1 at f0 + 7 → neutral");
+    assert_eq!(fx.stat(monster, 6), 0);
+    assert_eq!(fx.mode(monster), 0);
+    let (p, m) = (player.0, monster.0);
+    assert_eq!(
+        fx.pending().log,
+        [
+            format!("event 0 Some({m})"),
+            format!("event 11 Some({m})"),
+            format!("event 2 Some({m})"),
+            format!("event 10 Some({m})"),
+            format!("event 9 Some({p})"),
+            format!("reaction {p} {m} 0x3"),
+            format!("kill PetCredit {m} {p}"),
+            format!("kill AttackerBookkeeping {m} {p}"),
+            format!("kill FaceAttacker {m} {p}"),
+            format!("death start {m} target Some({p})"),
+            format!("kill QuestKill {m} {p}"),
+            format!("kill BarricadeDoors {m} {p}"),
+            format!("level up {p}"),
+        ]
+    );
+    assert_eq!(fx.stat(player, 13), 100);
+    assert_eq!(fx.stat(player, LEVEL), 2);
+    // The death animation: 4 frames → event 1 four frames on.
+    assert_eq!(fx.timers(monster), [(1, f_hit + 4)]);
+    // The drop (`treasure.md` §3): TC 1 picks gold on the monster's
+    // seed; the item is created on the game seed (`generation.md` §3),
+    // placed at the start spot (x + 2, y + 3, §7 step 2) in mode 3, its
+    // amount (§8) in stat 14.
+    let drops = fx.drops();
+    assert_eq!(drops.len(), 1);
+    let (gold, spot) = drops[0];
+    let mroom = fx.room(monster);
+    assert_eq!(
+        spot,
+        DropSpot {
+            room: mroom,
+            x: mpos.0 + 2,
+            y: mpos.1 + 3
+        }
+    );
+    assert_eq!(fx.room(gold), mroom);
+    assert_eq!(fx.mode(gold), 3);
+    let amount = fx.stat(gold, GOLD);
+    assert!((1..=6).contains(&amount), "roll(5 · 1) + 1: {amount}");
+    // For the transcript (the pile is freed by the pick-up below).
+    let drops = {
+        let r = fx.sim_ref().events.action.sys.units.get(gold).unwrap();
+        vec![(fx.guid(gold), r.seed, spot.x, spot.y, r.mode)]
+    };
+    // No S→C so far but the join's 0x07s (frame 2): the unit-add /
+    // ground messages of the missile, the death and the drop belong to
+    // the per-unit update `0x0053A500`, which the tick wiring does not run
+    // yet (`inventory.md` §6.3; IS2).
+    for f in &frames[1..] {
         assert_eq!(f.2, none, "no S→C up to here");
     }
+    assert!(fx.errors().is_empty(), "{:?}", fx.errors());
 
-    // 6. The death drop cannot land (step 5 stopped), so the pick-up runs
-    // on a ground item the economy wiring makes the way the drop does
-    // (`generation.md` §3, game seed, mode 3 in the player's room): a
-    // cap, identified, its ground position in its item data (§2.2).
-    // TODO(spec): with the kill unblocked, pick up the death drop itself
-    // (the gold of `e2e_single_player.rs` step 5b).
+    // 5b. Pick-up of the kill's gold (C→S 0x16 cursor 0, `inventory.md`
+    // §7.1 → §8.1 → §10.1): the staged distance 3 (< 5, `InvRest::
+    // distance`); gold → §10.1: limit = level 2 × 10000, take = p: stat
+    // 14 += take; the pile leaves its room and is freed. Result 0. No
+    // message: inventory gold reaches the client through the vitals sync
+    // (§10.3, `combat/vitals.md` §5, not wired here).
+    let gold_guid = fx.guid(gold);
+    record(
+        &mut fx,
+        &mut frames,
+        vec![bytes(&PickItem {
+            type_: 4,
+            id: gold_guid,
+            cursor: 0,
+        })],
+    );
+    assert_eq!(frames.last().unwrap().1.codes, [(0x16, done)]);
+    assert_eq!(streams(&fx, &frames.last().unwrap().2), none);
+    assert!(fx.sim_ref().game.lists.unit(gold).is_none(), "freed");
+    let gold_picked = PLAYER_GOLD + amount;
+    assert_eq!(fx.stat(player, GOLD), gold_picked);
+    assert_eq!(
+        fx.inv.with(|r| std::mem::take(&mut r.log)),
+        [format!("pickup_sound {} {gold_guid}", fx.guid(player))]
+    );
+    assert!(fx.errors().is_empty(), "{:?}", fx.errors());
+
+    // 6. The cursor pick-up (C→S 0x16 cursor 1) and placement need an
+    // item that is not gold: a ground item the economy wiring makes the
+    // way the drop does (`generation.md` §3, game seed, mode 3 in the
+    // player's room): a cap, identified, its ground position in its item
+    // data (§2.2).
     let room = fx.room(player);
     let cap = {
         let sim = fx.sim();
@@ -1882,7 +2063,7 @@ fn run_with(game_seed: u32) -> Transcript {
         })],
     );
     assert_eq!(frames.last().unwrap().1.codes, [(0x16, done)]);
-    assert_eq!(frames.last().unwrap().2, pass(x9c(0x01, cg)));
+    assert_eq!(streams(&fx, &frames.last().unwrap().2), pass(x9c(0x01, cg)));
     assert_eq!(fx.mode(cap), 4);
     assert_eq!(fx.room(cap), None);
     // Placed at (8, 0) of page 0 (C→S 0x18, §7.3 → §2.4): 0x9C action 4.
@@ -1897,7 +2078,42 @@ fn run_with(game_seed: u32) -> Transcript {
         })],
     );
     assert_eq!(frames.last().unwrap().1.codes, [(0x18, done)]);
-    assert_eq!(frames.last().unwrap().2, pass(x9c(0x04, cg)));
+    assert_eq!(streams(&fx, &frames.last().unwrap().2), pass(x9c(0x04, cg)));
+    // The client model (`client/msg-stats-items.md` §2 rule 4): the two
+    // 0x9C made one item unit, holding the last message with its item bit
+    // stream (`items/bitstream.md`; placement from the stream is not
+    // wired in the model yet). 0x47 / 0x48 name
+    // the player, which the model does not hold (no 0x59): no change.
+    {
+        use d2_client::bridge::world::{ItemData, ItemRecord, KindData, ITEM};
+        let w = fx.bridge.world();
+        assert_eq!(
+            w.units.keys().copied().collect::<Vec<_>>(),
+            [UnitKey::new(ITEM, cg)]
+        );
+        let item = &w.units[&UnitKey::new(ITEM, cg)];
+        assert_eq!(item.position, None);
+        assert_eq!(
+            item.kind,
+            KindData::Item(ItemData {
+                last: Some(ItemRecord {
+                    id: 0x9C,
+                    action: 4,
+                    category: 0,
+                    owner: None,
+                    stream: frames
+                        .last()
+                        .unwrap()
+                        .2
+                        .iter()
+                        .find(|m| m[0] == 0x9C)
+                        .unwrap()[8..]
+                        .to_vec(),
+                }),
+                flags4: false,
+            })
+        );
+    }
     assert_eq!(fx.mode(cap), 0);
     assert!(fx.inventory().contains(&cap));
     assert_eq!(
@@ -1964,7 +2180,7 @@ fn run_with(game_seed: u32) -> Transcript {
         })],
     );
     assert_eq!(frames.last().unwrap().1.codes, [(0x38, done)]);
-    assert_eq!(frames.last().unwrap().2, none);
+    assert_eq!(streams(&fx, &frames.last().unwrap().2), none);
     let store = {
         let w = &fx.sim_ref().world;
         let rec = &w.state.vendors[w.state.vendor_index(class::AKARA).unwrap()];
@@ -1998,8 +2214,11 @@ fn run_with(game_seed: u32) -> Transcript {
         })],
     );
     assert_eq!(frames.last().unwrap().1.codes, [(0x33, done)]);
-    let gold_now = PLAYER_GOLD + sold;
-    assert_eq!(frames.last().unwrap().2, [tx(3, 1, cg, gold_now)]);
+    let gold_now = gold_picked + sold;
+    assert_eq!(
+        streams(&fx, &frames.last().unwrap().2),
+        [tx(3, 1, cg, gold_now)]
+    );
     assert_eq!(fx.stat(player, GOLD), gold_now);
     assert!(!fx.inventory().contains(&cap));
     assert!(fx.sim_ref().game.lists.unit(cap).is_none(), "freed");
@@ -2023,7 +2242,10 @@ fn run_with(game_seed: u32) -> Transcript {
         frames.last().unwrap().1.codes,
         [(0x32, Some(ResultCode::Refused))]
     );
-    assert_eq!(frames.last().unwrap().2, [tx(0, 9, u32::MAX, gold_now)]);
+    assert_eq!(
+        streams(&fx, &frames.last().unwrap().2),
+        [tx(0, 9, u32::MAX, gold_now)]
+    );
     assert_eq!(fx.stat(player, GOLD), gold_now);
     assert_eq!(fx.inventory(), [fx.buckler, fx.cap]);
 
@@ -2079,49 +2301,70 @@ fn run_with(game_seed: u32) -> Transcript {
         b: 0,
         life_pct: 0,
     };
-    assert_eq!(
-        frames.last().unwrap().2,
-        [reveal.encode().to_vec(), stop.encode().to_vec()]
-    );
+    // Then the tick's room switch: one 0x07 per room of the placement
+    // room's adjacency array (none of them was in the old array, which
+    // held the Isle's rooms), in its order (`path-placement.md` §11).
+    let switch: Vec<Vec<u8>> = {
+        let s = fx.sim_ref();
+        let (d, r) = s
+            .events
+            .action
+            .sys
+            .hooks
+            .drlg
+            .drlg_room(&s.game, room)
+            .unwrap();
+        d.active_room(r)
+            .unwrap()
+            .adjacency
+            .iter()
+            .map(|&a| {
+                let rr = d.room(a);
+                map_reveal(rr.rect.x as u16, rr.rect.y as u16, GATE)
+            })
+            .collect()
+    };
+    assert_eq!(switch.len(), 6);
+    let mut want = vec![reveal.encode().to_vec(), stop.encode().to_vec()];
+    want.extend(switch);
+    assert_eq!(frames.last().unwrap().2, want);
     assert!(!fx.sim_ref().world.rest.interact.contains_key(&player));
     // The next tick: no 0x15 (`docs/handoff/wire-path-server.md` §4
     // finding 1; §8 rule 3's room messages are the unit-update spec's).
     record(&mut fx, &mut frames, vec![]);
-    assert_eq!(frames.last().unwrap().2, none);
+    assert_eq!(streams(&fx, &frames.last().unwrap().2), none);
 
-    // The one error of the run is the missile path's (step 5).
-    assert_eq!(
-        fx.errors(),
-        ["Walk(Fatal(\"path type without a function\"))"]
-    );
+    // The run logs no error (the missile path of step 5 flies, §11).
+    assert!(fx.errors().is_empty(), "{:?}", fx.errors());
     let w = fx.bridge.world();
     let client = (w.frames, w.server_ticks, w.units.len());
     assert_eq!(client.0, frames.len() as u64 + 1);
     let log = fx.bridge.log();
+    // The S→C stream drove the client model (`client/model.md`,
+    // `msg-units.md`, `msg-stats-items.md`): 0x9C ×2, 0x47 ×2, 0x48 ×2
+    // applied; 0x0D dropped (the player was never announced: the server
+    // sends no 0x59 / 0x0B in this staged game); every 0x07 rejected (no
+    // client act: this staged game sends no 0x03, fatal 0x58A): the join's
+    // four, the warp's one and the six of its room switch; the NPC /
+    // quest / trade ids have no owner spec yet.
     assert_eq!(
         log.unowned,
-        BTreeMap::from([
-            (0x07, 1),
-            (0x0D, 1),
-            (0x27, 1),
-            (0x28, 1),
-            (0x29, 1),
-            (0x2A, 2),
-            (0x47, 2),
-            (0x48, 2),
-            (0x9C, 2),
-        ])
+        BTreeMap::from([(0x27, 1), (0x28, 1), (0x29, 1), (0x2A, 2)])
     );
-    assert!(log.rejected.is_empty() && log.discarded.is_empty());
+    assert_eq!(log.handled, 6);
+    assert_eq!(log.dropped, BTreeMap::from([(0x0D, 1)]));
+    assert_eq!((log.queued, log.drained), (0, 0));
+    let rejected: Vec<(u8, String)> = log
+        .rejected
+        .iter()
+        .map(|r| (r.id, r.error.to_string()))
+        .collect();
+    assert_eq!(rejected, vec![(0x07, "fatal assert 0x58A".to_owned()); 11]);
+    assert!(log.discarded.is_empty());
+    // No local player: the world view has no camera (`model.md` §3 rule 3).
+    assert_eq!(w.local_player, None);
+    assert!(w.rooms_in_sight.is_empty() && w.act.is_none());
 
-    let drops = fx
-        .drops()
-        .into_iter()
-        .map(|(u, spot)| {
-            let r = fx.sim_ref().events.action.sys.units.get(u).unwrap();
-            (fx.guid(u), r.seed, spot.x, spot.y, r.mode)
-        })
-        .collect::<Vec<_>>();
     let skill_log = fx.book.get().log.clone();
     let player_stats = [LEVEL, STAT_STAMINA, GOLD]
         .iter()
@@ -2168,19 +2411,19 @@ fn run_with(game_seed: u32) -> Transcript {
     }
 }
 
-// Covers: specs/client/bridge.md §3 r1, §3 r2, §3 r3; specs/sim/pathing.md §1.1, §10 r2; specs/world/waypoints.md §7 r7, §8 r3
+// Covers: specs/client/bridge.md §3 r1, §3 r2, §3 r3; specs/sim/pathing.md §1.1, §10 r2, §11 text; specs/missiles/missiles.md §r4-default-flight-server-do-1-0x005b0bc0-0x005ae1f0 r9; specs/world/waypoints.md §7 r7, §8 r3
 #[test]
 fn full_single_player_loop() {
     let t = run();
     // Frames per walk / run: 20, 50 (the run list is not wired, so the
     // run moves at walk velocity, `wire-path-server.md` §4 finding 4),
-    // 24, 8; 119 recorded frames, one tick each.
+    // 24, 8; 123 recorded frames, one tick each.
     let lens: Vec<usize> = t.walks.iter().map(Vec::len).collect();
     assert_eq!(lens, [20, 50, 24, 8]);
-    assert_eq!(t.frames.len(), 119);
+    assert_eq!(t.frames.len(), 123);
     assert_eq!(t.frames.len() as i32, t.game_frame);
-    // The kill stopped: no experience, no drop.
-    assert_eq!((t.player_exp, t.drops.len()), (0, 0));
+    // The kill: 100 experience, one drop (the gold, picked up).
+    assert_eq!((t.player_exp, t.drops.len()), (100, 1));
     // The picked-up cap sold, the store's cap not bought.
     assert_eq!(t.inventory.len(), 2);
     assert!(t.player_stats[2] > PLAYER_GOLD);

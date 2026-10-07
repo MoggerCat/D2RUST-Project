@@ -1,10 +1,12 @@
-// Spec: specs/monsters/population.md §3, §8, §9, §11 (the PopWorld seam); specs/drlg/rooms.md §5, §9.3, §10; specs/drlg/preset.md §1, §9
+// Spec: specs/monsters/population.md §3, §8, §9, §11 (the PopWorld seam); specs/drlg/levels.md §11.4–§11.6; specs/drlg/rooms.md §5, §9.3, §10; specs/drlg/preset.md §1, §9
 //! Population → DRLG rooms, collision and preset units; units:
 //! [`PopWorld`] on [`WorldHost`]. Seeds are the real ones (game seed of
 //! the action state, the active-room seed +0x6C of the DRLG's active
 //! room, the unit record's seed); rooms, boxes and collision are the act
 //! DRLG's; preset units are the preset room's list. Queries the DRLG
-//! specs do not describe go to [`WorldPending`].
+//! specs do not describe go to [`WorldPending`]. The DRLG data population
+//! reads (coordinate lists, populated level and room count, warp points,
+//! the kind-11 location) are the act DRLG's (`drlg/levels.md` §11.6).
 
 use crate::drlg::DrlgRoomId;
 use crate::monsters::population::{CoordRect, PopWorld, PresetUnit, RoomBox, TileRec};
@@ -12,6 +14,18 @@ use crate::rng::Seed;
 use crate::units::{RoomId, UnitId};
 
 use super::{WorldHost, WorldPending, WorldgenError};
+use crate::drlg::CoordRec;
+use crate::wiring::action::WiringError;
+
+/// A DRLG coordinate record as population reads it: the clipped box
+/// (+0x10), the node flag and the index (`levels.md` §11.1).
+fn coord_rect(c: &CoordRec) -> CoordRect {
+    CoordRect {
+        rect: c.clipped,
+        node_flag: i32::from(c.node),
+        index: c.index as i32,
+    }
+}
 
 impl<X: WorldPending> WorldHost<'_, X> {
     /// The act and DRLG room of an active room.
@@ -60,24 +74,64 @@ impl<X: WorldPending> PopWorld for WorldHost<'_, X> {
         self.room_level_id(room)
     }
 
+    /// `0x0061A1F0` → `0x0066BB20` (`levels.md` §11.5 item 1): 0 for a
+    /// null room or a flag-0x800000 room, else the level id.
     fn populated_level(&self, room: RoomId) -> i32 {
-        self.v.h.x.populated_level(room, self.room_level_id(room))
+        self.v
+            .h
+            .drlg
+            .drlg_room(self.game, room)
+            .map_or(0, |(d, r)| d.populated_level(r) as i32)
     }
 
-    fn populated_room_count(&self, act: u8, level: i32) -> i32 {
-        self.v.h.x.populated_room_count(act, level)
+    /// `0x0061ABF0` → `0x00642BE0` (`levels.md` §11.5 item 2) on the act's
+    /// DRLG: allocates the level when absent. An act without a DRLG, or a
+    /// DRLG error (logged), counts 0.
+    fn populated_room_count(&mut self, act: u8, level: i32) -> i32 {
+        let r = self.v.h.drlg.with_act(act, &mut self.game.lists, |d, svc| {
+            d.populated_room_count(svc.data, svc.types, level as u32)
+        });
+        match r {
+            Some(Ok(n)) => n as i32,
+            Some(Err(e)) => {
+                self.w
+                    .errors
+                    .push(WorldgenError::Wiring(WiringError::Drlg(e)));
+                0
+            }
+            None => 0,
+        }
     }
 
+    /// `0x0061AD50` → `0x0066CF30` (`levels.md` §11.4): the room's
+    /// coordinate records in `next` order; empty without info (fatal
+    /// 0x2CD in the original, unreached in 1.14d, §11.2 step 3).
     fn coord_list(&self, room: RoomId) -> Vec<CoordRect> {
-        self.v.h.x.coord_list(room)
+        self.v
+            .h
+            .drlg
+            .drlg_room(self.game, room)
+            .and_then(|(d, r)| d.coord_first(r).map(|l| l.iter().map(coord_rect).collect()))
+            .unwrap_or_default()
     }
 
+    /// `0x0061AD30` → `0x0066CEB0` (`levels.md` §11.4).
     fn coord_at(&self, room: RoomId, x: i32, y: i32) -> Option<CoordRect> {
-        self.v.h.x.coord_at(room, x, y)
+        let (d, r) = self.v.h.drlg.drlg_room(self.game, room)?;
+        d.coord_at(r, x, y).as_ref().map(coord_rect)
     }
 
+    /// `0x0061B130` → `0x0066CE30` (`levels.md` §11.4): the room holding
+    /// the point among the room and its adjacency array; none → 0; that
+    /// room's record at the point → its index; null record → −1.
+    // TODO(levels.md §11.4): a point outside the room's (W+1) × (H+1)
+    // cells reads outside the grid in the original (no bound check);
+    // here it reads as a null record (−1).
     fn coord_index_at(&self, room: RoomId, x: i32, y: i32) -> i32 {
-        self.v.h.x.coord_index_at(room, x, y)
+        let Some(at) = self.v.h.drlg.find_room(self.game, room, x, y) else {
+            return 0;
+        };
+        self.coord_at(at, x, y).map_or(-1, |c| c.index)
     }
 
     /// `0x00619730`: the active room's sub-tile rectangle (+0x4C).
@@ -94,12 +148,45 @@ impl<X: WorldPending> PopWorld for WorldHost<'_, X> {
             })
     }
 
+    /// `0x0061AC10` → `0x00642380` (`levels.md` §11.5 item 3): the
+    /// warp-room centres of the room's level (sub-tiles); none for a room
+    /// without a DRLG room (fatal 0x5B9 in the original).
     fn warp_points(&self, room: RoomId) -> Vec<(i32, i32)> {
-        self.v.h.x.warp_points(room)
+        self.v
+            .h
+            .drlg
+            .drlg_room(self.game, room)
+            .map_or(Vec::new(), |(d, r)| d.warp_points(r).to_vec())
     }
 
-    fn spawn_location(&self, room: RoomId, kind: u8) -> Option<(i32, i32)> {
-        self.v.h.x.spawn_location(room, kind)
+    /// `0x00619E50(act of the level, level id, kind)` → `0x0066B2B0`
+    /// (`levels.md` §11.5 item 4, §10): the spawn-room choice for the
+    /// room's level with all its effects; tiles, (−1, −1) when no room
+    /// was found. A DRLG error is logged and reads as none.
+    fn spawn_location(&mut self, room: RoomId, kind: u8) -> Option<(i32, i32)> {
+        let level = self.room_level_id(room) as u32;
+        let act = crate::drlg::act_of_level(level);
+        let r = self
+            .v
+            .h
+            .drlg
+            .with_act(act, &mut self.game.lists, |d, svc| {
+                if u32::from(kind) == crate::drlg::level::KIND11_TILE {
+                    d.kind11_location(svc, level)
+                } else {
+                    d.spawn_room(svc, level, u32::from(kind))
+                        .map(|p| (p.x, p.y))
+                }
+            })?;
+        match r {
+            Ok(p) => Some(p),
+            Err(e) => {
+                self.w
+                    .errors
+                    .push(WorldgenError::Wiring(WiringError::Drlg(e)));
+                None
+            }
+        }
     }
 
     /// `0x00463740`: the room holding the point among `room` and its

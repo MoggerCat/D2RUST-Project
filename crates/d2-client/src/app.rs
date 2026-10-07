@@ -9,10 +9,12 @@
 //! single-player game ([`single_player`], on a server thread,
 //! [`server_thread`]) through the bridge and the world view.
 
+pub mod palette;
 pub mod play;
 pub mod server_thread;
 pub mod single_player;
 pub mod sound;
+pub mod ui;
 
 use std::path::PathBuf;
 use std::sync::Arc;

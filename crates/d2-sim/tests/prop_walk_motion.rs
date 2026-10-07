@@ -14,8 +14,9 @@
 //! - A monster (type 2) or a player (type 7) chasing a target unit that
 //!   moves, vanishes or is replaced: target check (§9.2 step 1), the
 //!   arrival check's stop distance and its re-path on a target that moved
-//!   more than 5 (§9.5 rule 3), the re-path budget gate (§9.10: unit flag
-//!   1, update queue, budget −= index; types 2 / 13 / 15 → 13, else 15),
+//!   more than 5 (§9.5 rule 3), the re-path budget gate (§9.10: monsters
+//!   only, path +0x94; unit flag 1, update queue, budget −= index clamped
+//!   to 0..255; types 2 / 13 / 15 → 13, else 15),
 //!   and the distance budget per crossed cell (§9.6 rule 4).
 
 mod walk_rooms_fake;
@@ -240,7 +241,6 @@ proptest! {
     ) {
         let t = tables();
         let mut world = one_room(w, h, &masks, start);
-        world.budget = budget;
         let u = if chaser_monster { M } else { P };
         world.add_walker(u, if chaser_monster { UnitType::Monster } else { UnitType::Player }, start);
         let tty = if target_monster { UnitType::Monster } else { UnitType::Player };
@@ -250,6 +250,8 @@ proptest! {
         world.units.insert(T, tu);
         let n = if chaser_monster {
             let mut p = world.paths[&M].clone();
+            // §9.10: the monster re-path budget lives at path +0x94.
+            p.repath_budget = budget as u8;
             p.velocity = mvel;
             p.stop_distance = stop;
             p.target_unit = Some(d2_sim::path::record::TargetUnit { unit: T, ty: tty, guid: 77 });
@@ -328,8 +330,11 @@ proptest! {
                 break;
             }
             if moved {
-                if budget == 0 {
-                    // §9.10: no budget, no re-path; the arrival fails.
+                if p0.repath_budget == 0 && chaser_monster {
+                    // §9.10: a monster without budget (it starts at
+                    // `budget` and loses the point index at each
+                    // re-path) does not re-path; the arrival fails
+                    // (players skip the budget test).
                     prop_assert_eq!(s, Step::Stopped);
                     prop_assert_eq!((flagged, queued), (0, 0));
                     prop_assert_eq!(p1.path_type, p0.path_type);
@@ -337,7 +342,13 @@ proptest! {
                     break;
                 }
                 prop_assert_eq!((flagged, queued), (1, 1));
-                prop_assert_eq!(p1.dist_budget, step_budget(b0.wrapping_sub(p0.cur_point as u8)));
+                // §9.10: the re-path adjusts the re-path budget (+0x94),
+                // not the distance budget (+0x90).
+                prop_assert_eq!(p1.dist_budget, step_budget(b0));
+                prop_assert_eq!(
+                    p1.repath_budget,
+                    (i32::from(p0.repath_budget) - p0.cur_point as i32).clamp(0, 255) as u8
+                );
                 let ty_ok = if chaser_monster {
                     if s == Step::Moving { p1.path_type == 13 } else { matches!(p1.path_type, 13 | 15) }
                 } else {

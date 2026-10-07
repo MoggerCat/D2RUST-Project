@@ -170,6 +170,29 @@ pub fn town_waypoint(
     panic!("no town preset object with operate function {WAYPOINT_OPERATE}");
 }
 
+/// After the room's tile build: the waypoint unit is on the room's
+/// preset-unit list at the room-relative position (`preset.md` §9).
+fn assert_transferred(
+    types: &SharedTypes,
+    room: DrlgRoomId,
+    rect: d2_sim::drlg::TileRect,
+    (x, y): (i32, i32),
+    class: u32,
+) {
+    let t = types.borrow();
+    let presets = t.act_presets(0).expect("act 0 presets");
+    let units: Vec<(u32, i32, i32, i32)> = presets
+        .room_units(room)
+        .iter()
+        .map(|u| (u.unit_type, u.class, u.x, u.y))
+        .collect();
+    let (rx, ry) = (x - rect.x * SUB, y - rect.y * SUB);
+    assert!(
+        units.contains(&(2, class as i32, rx, ry)),
+        "waypoint {class} at ({rx}, {ry}) not on the streamed room's list {units:?}"
+    );
+}
+
 /// A joined session.
 pub struct Session {
     pub host: TestHost,
@@ -206,7 +229,7 @@ impl Session {
         // streamed.
         let mut game = Game::new();
         game.lists.ensure_act(0).unwrap();
-        let (room, rect, wp_at, wp_class) = sim
+        let (room_id, room, rect, wp_at, wp_class) = sim
             .action
             .hooks()
             .drlg
@@ -217,11 +240,12 @@ impl Session {
                 }
                 let (r, at, c) = town_waypoint(d, dr, &types, &objects, town);
                 let rect = dr.room(r).rect;
-                Ok::<_, d2_sim::drlg::DrlgError>((dr.stream_room(svc, r)?, rect, at, c))
+                Ok::<_, d2_sim::drlg::DrlgError>((r, dr.stream_room(svc, r)?, rect, at, c))
             })
             .expect("act 0 has a DRLG")
             .expect("town generated and streamed");
         let room = room.expect("the waypoint room is active");
+        assert_transferred(&types, room_id, rect, wp_at, wp_class);
         assert_eq!(sim.errors(), Vec::<String>::new(), "game creation");
 
         let inside = |(x, y): (i32, i32)| {

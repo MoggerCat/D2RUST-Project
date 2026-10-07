@@ -41,8 +41,9 @@ impl Clock for SystemClock {
 /// Tick driver `0x0052FC20` (`tick.md` §1 rule 2).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TickDriver {
-    /// `0x00883D58`; set to `now` on first use.
-    pub last: Option<u32>,
+    /// `0x00883D58`; 0 means "first use" (§1 r2: the test is `last == 0`,
+    /// no separate flag), then set to the masked `now`.
+    pub last: u32,
 }
 
 impl Default for TickDriver {
@@ -53,7 +54,7 @@ impl Default for TickDriver {
 
 impl TickDriver {
     pub fn new() -> Self {
-        Self { last: None }
+        Self { last: 0 }
     }
 
     /// True when a tick is due at `now` (`timeGetTime()`), updating
@@ -61,8 +62,14 @@ impl TickDriver {
     /// tick (rule 3).
     pub fn poll(&mut self, now: u32, catch_up: bool) -> bool {
         let now = now & 0x7FFF_FFFF;
-        let last = *self.last.get_or_insert(now);
-        let elapsed = now.wrapping_sub(last) as i32;
+        // Edge case 8: a masked clock of exactly 0 on first use leaves
+        // `last` at 0, so the next call initialises it again.
+        if self.last == 0 {
+            self.last = now;
+        }
+        // Wrapping 32-bit subtraction compared signed (`jge`); after the
+        // 31-bit wrap it is negative and no tick runs (edge case 7).
+        let elapsed = now.wrapping_sub(self.last) as i32;
         if elapsed < TICK_MS as i32 {
             return false;
         }
@@ -70,7 +77,7 @@ impl TickDriver {
         if catch_up && excess >= TICK_MS as i32 {
             excess = TICK_MS as i32;
         }
-        self.last = Some(now.wrapping_sub(excess as u32));
+        self.last = now.wrapping_sub(excess as u32);
         true
     }
 }
@@ -210,6 +217,7 @@ where
     /// tick ran. The clock is read once.
     pub fn frame(&mut self) -> Result<FrameReport, HostError> {
         let now = self.clock.now_ms();
+        self.game.set_host_tick(now);
         let mut report = FrameReport {
             messages: self.drain(now)?,
             ..FrameReport::default()

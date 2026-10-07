@@ -732,8 +732,12 @@ fn waypoint_to_the_town_places_the_player_and_sends_0x0d() {
     // per-client update walks the client's room (still A) adjacency
     // before the room switch (`tick.md` §6.5), and step 6 clears C's
     // queue; the recording R3 (`path-placement.md`) has 0x15 the next
-    // tick. Spec question, not a fix here.
-    for _ in 0..3 {
+    // tick. Spec question, not a fix here. That room switch sends 0x07
+    // for each room of C's adjacency array the client joins
+    // (`path-placement.md` §11 "Recipients"; the one-room town: C), then
+    // nothing.
+    assert_eq!(fx.tick(), vec![(0, reveal.encode().to_vec())]);
+    for _ in 0..2 {
         assert!(fx.tick().is_empty());
     }
     fx.assert_clean();
@@ -1007,4 +1011,133 @@ fn walk_ids_match_client_messages_tsv() {
         problems(&swapped, CLIENT_TSV),
         ["0x04 layout", "0x04 parse"]
     );
+}
+
+// ---- client vitals sync (`combat/vitals.md` §5) ---------------------------------------
+
+const STAT_HITPOINTS: u16 = 6;
+const STAT_MAXHP: u16 = 7;
+
+/// The sync's messages to `client` among a tick's (ids 0x18, 0x95, 0x96).
+fn sync_msgs(sent: &[(ClientId, Vec<u8>)], client: ClientId) -> Vec<Vec<u8>> {
+    sent.iter()
+        .filter(|(c, m)| *c == client && matches!(m[0], 0x18 | 0x95 | 0x96))
+        .map(|(_, m)| m.clone())
+        .collect()
+}
+
+/// With the sync on, the first tick ends the player's client batch with
+/// 0x95 (cache all zero, Δlife ≥ 10 %) at the path record's position;
+/// the second player (no max life: M ≤ 0) gets nothing. While running,
+/// the unforced runs wait (|Δlife| < 10 %); the forced run at the 20th
+/// counted update sends 0x96 with the drained stamina, the path's cell
+/// and its offset to the target, and the counter restarts. Bytes stated
+/// with `d2-proto`'s typed builders (`server-messages.tsv` `bits:`).
+// Covers: specs/combat/vitals.md §5.1 r1, §5.1 r2, §5.2, §5.3 r3
+#[test]
+fn vitals_sync_on_the_host_tick() {
+    use d2_proto::server::{LifeManaUpdate2, WalkVerify};
+    use d2_proto::FixedMessage;
+    let (mut fx, p, _, _) = two_players();
+    fx.sim.events.with(&mut fx.sim.game, |_, v| {
+        v.set_base(p, STAT_HITPOINTS, 40 << 8);
+        v.set_base(p, STAT_MAXHP, 50 << 8);
+    });
+    assert!(sync_msgs(&fx.tick(), 0).is_empty(), "off by default");
+    fx.sim.events.hooks().enable_vitals_sync();
+    let sent = fx.tick();
+    let d = fx.path(p);
+    let want = LifeManaUpdate2 {
+        life: 40,
+        mana: 0,
+        stamina: 100,
+        x: d.x() as u16,
+        y: d.y() as u16,
+        dx: (d.x() as u16).wrapping_sub(d.target_x) as u8,
+        dy: (d.y() as u16).wrapping_sub(d.target_y) as u8,
+    };
+    assert_eq!(sent.last().unwrap(), &(0, want.encode().to_vec()));
+    assert_eq!(sync_msgs(&sent, 0).len(), 1);
+    assert!(sync_msgs(&sent, 1).is_empty());
+    assert_eq!(
+        fx.sim
+            .game
+            .lists
+            .client(fx.sim.sim_client(0).unwrap())
+            .unwrap()
+            .update_count,
+        0
+    );
+
+    assert_eq!(fx.handle(0, &point(0x03, 31, 10)).0, ResultCode::Done);
+    let mut found = None;
+    for k in 1..=25 {
+        let sent = fx.tick();
+        let msgs = sync_msgs(&sent, 0);
+        if !msgs.is_empty() {
+            found = Some((k, msgs));
+            break;
+        }
+    }
+    let (k, msgs) = found.expect("a forced sync within 20 updates");
+    assert_eq!(k, 20, "forced at +0x1B0 = 20");
+    let got = WalkVerify::decode(&msgs[0]).unwrap();
+    let d = fx.path(p);
+    assert_eq!(u32::from(got.stamina), (fx.stamina(p) >> 8) as u32);
+    assert!(got.stamina < 100);
+    assert_eq!((got.x, got.y), (d.x() as u16, d.y() as u16));
+    assert_eq!(got.dx, (d.x() as u16).wrapping_sub(d.target_x) as u8);
+    assert_eq!(
+        fx.sim
+            .game
+            .lists
+            .client(fx.sim.sim_client(0).unwrap())
+            .unwrap()
+            .update_count,
+        0
+    );
+    fx.assert_clean();
+}
+
+impl Fx {
+    /// Everything a walk request could touch, as text: the game, units,
+    /// stats, the path state, the interactions, the player fields, the
+    /// stubs and the errors.
+    fn digest(&self, p: UnitId) -> String {
+        let s = &self.sim.events.sys;
+        format!(
+            "{:?}|{:?}|{:?}|{:?}|{:?}|{:?}{:?}|{:?}{:?}",
+            self.sim.game,
+            s.units,
+            s.stats,
+            s.hooks.paths,
+            s.hooks.x.interact,
+            self.sim.player_fields(p),
+            self.sim.unhandled,
+            s.hooks.errors,
+            s.errors,
+        )
+    }
+}
+
+/// The refusals `pathing.md` §1.2 orders before the rule 4 write (the
+/// target lookup, rule 1; the mode check, rule 2 and §1.3) change
+/// nothing and queue nothing, though they return 0 (§1.1;
+/// `docs/HANDOFF.md` PK1).
+// Covers: specs/sim/pathing.md §1.2 r1, §1.3 r3
+#[test]
+fn early_refusals_change_nothing() {
+    let (mut fx, p, _, _) = two_players();
+    for m in [unit_msg(0x02, 2, 999), unit_msg(0x04, 1, 999)] {
+        let before = fx.digest(p);
+        assert_eq!(fx.handle(0, &m), (ResultCode::Done, vec![]), "{m:02X?}");
+        assert_eq!(fx.digest(p), before, "§1.2 rule 1: {m:02X?}");
+    }
+    fx.sim.events.sys.units.get_mut(p).unwrap().mode = 0;
+    for m in [point(0x01, 31, 10), point(0x03, 31, 10)] {
+        let before = fx.digest(p);
+        assert_eq!(fx.handle(0, &m), (ResultCode::Done, vec![]), "{m:02X?}");
+        assert_eq!(fx.digest(p), before, "§1.3 mode DT: {m:02X?}");
+    }
+    assert!(fx.sim.events.sys.hooks.x.sent.is_empty());
 }

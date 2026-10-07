@@ -2,9 +2,8 @@
 //! Footprint mask change, dead-body footprint and teleport
 //! (`docs/handoff/prop-walk.md` §4 gap 4), on the shared multi-room fake
 //! `walk_rooms_fake` with every room adjacent to every other (so the
-//! unstated lookup room of §5.1 and §6 rule 4, the `footprint.rs` TODOs,
-//! does not change the result) and random cell bits, against models
-//! written from the spec:
+//! lookup room of §5.1 and §6 rule 4 does not change which cell is
+//! found) and random cell bits, against models written from the spec:
 //!
 //! - `set_foot_mask` (§5.3 rule 1): clear with the current pattern (or
 //!   size, missiles) and the old mask (marker only when it is not 0),
@@ -282,20 +281,22 @@ proptest! {
                 if ep.room.is_some() {
                     ew.stamp_size(old, size, foot, false);
                 }
+                ep.collided_mask = 0;
             } else {
                 ep.flags = (ep.flags & !flags::MOVED) | if old != to { flags::MOVED } else { 0 };
-                // Size query at the new point from the path's room (§4).
-                ep.collided_mask = match size {
-                    // §4 rule 3: a centre without a room gives 0x27 alone.
-                    0..=2 if ew.lookup(ep.room, to).is_none() => MISSING,
-                    0..=2 => ew.query(to, size_query_cells(size), movemask),
-                    3 => ref_box(&ew, ep.room, to.x - 1, to.y - 1, to.x + 1, to.y + 1, movemask),
-                    _ => 0xFFFF,
-                };
+                // `0x0064EE70`: clear at old (path room), then the size
+                // query and the stamp at new from the destination room.
                 if ep.room.is_some() {
                     ew.stamp_size(old, size, foot, false);
-                    ew.stamp_size(to, size, foot, true);
                 }
+                ep.collided_mask = match size {
+                    // §4 rule 3: a centre without a room gives 0x27 alone.
+                    0..=2 if ew.lookup(room, to).is_none() => MISSING,
+                    0..=2 => ew.query(to, size_query_cells(size), movemask),
+                    3 => ref_box(&ew, room, to.x - 1, to.y - 1, to.x + 1, to.y + 1, movemask),
+                    _ => 0xFFFF,
+                };
+                ew.stamp_size(to, size, foot, true);
                 ep.saved_count = 1;
                 ep.saved_steps[0] = PathPoint::from_point(to);
             }

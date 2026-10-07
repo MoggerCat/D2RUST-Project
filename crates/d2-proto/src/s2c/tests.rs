@@ -49,6 +49,8 @@ fn built() -> Vec<Layout> {
         NpcWantsInteract,
         NpcGossipAct,
         Unknown9B,
+        GameHandshake,
+        AssignPlayer,
     )
 }
 
@@ -371,6 +373,41 @@ fn recorded_vector_perturbation_is_reported() {
     }
 }
 
+// Covers: specs/client/model.md §3 r1; specs/client/msg-units.md §1.1 r1
+#[test]
+fn recorded_join_messages() {
+    // client/model.md Test vectors: 0x0B seq 113 names player GUID 1.
+    let b = hex("0b 00 01000000");
+    let m = GameHandshake {
+        unit_type: 0,
+        unit_guid: 1,
+    };
+    assert_eq!(m.encode().to_vec(), b);
+    assert_eq!(parse(&b), Ok(Message::GameHandshake(m)));
+    // msg-units.md §1.1 rule 1: GUID @1, class @5, name @6 (16 bytes,
+    // zero-padded), x @0x16, y @0x18; the recorded join's player is at
+    // (0, 0) (model.md §11 rule 3).
+    let mut name = [0u8; 16];
+    name[..6].copy_from_slice(b"werwer");
+    let m = AssignPlayer {
+        guid: 1,
+        class: 1,
+        name,
+        x: 0,
+        y: 0,
+    };
+    let mut want = hex("59 01000000 01 7765727765 72");
+    want.resize(26, 0);
+    assert_eq!(m.encode().to_vec(), want);
+    assert_eq!(parse(&want), Ok(Message::AssignPlayer(m)));
+    let m = AssignPlayer {
+        x: 4673,
+        y: 4548,
+        ..m
+    };
+    assert_eq!(m.encode()[0x16..].to_vec(), hex("4112 c411"));
+}
+
 #[test]
 fn recorded_unbuilt_messages_size_and_refuse() {
     // Recorded, layout not given: sizes agree with the TSV, the parser
@@ -477,6 +514,17 @@ fn samples() -> Vec<Message> {
         Message::WardenRequest(WardenRequest {
             data: vec![1, 2, 3],
         }),
+        Message::GameHandshake(GameHandshake {
+            unit_type: 0,
+            unit_guid: 0x0102_0304,
+        }),
+        Message::AssignPlayer(AssignPlayer {
+            guid: 7,
+            class: 4,
+            name: *b"abcdefghijklmnop",
+            x: 0x1234,
+            y: 0x5678,
+        }),
     ]
 }
 
@@ -498,6 +546,8 @@ fn encode(m: &Message) -> Vec<u8> {
         Message::NpcGossipAct(m) => m.encode().to_vec(),
         Message::Unknown9B(m) => m.encode().to_vec(),
         Message::WardenRequest(m) => m.encode(),
+        Message::GameHandshake(m) => m.encode().to_vec(),
+        Message::AssignPlayer(m) => m.encode().to_vec(),
         other => panic!("not a sample: {other:?}"),
     }
 }

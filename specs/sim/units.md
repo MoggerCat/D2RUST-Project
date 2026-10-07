@@ -27,17 +27,17 @@
 | Rules | 74–75 |
 |   1. Unit kinds | 76–95 |
 |   2. Unit record | 96–134 |
-|   3. Lifecycle | 135–172 |
-|   4. Modes and mode schedules | 173–314 |
-|   5. Event dispatch | 315–329 |
-|   6. Events per kind | 330–410 |
-|   7. Scheduler inventory (`unit-events.tsv`) | 411–432 |
-| Constants & data dependencies | 433–449 |
-| Randomness | 450–457 |
-| Edge cases & original bugs | 458–476 |
-| Test vectors | 477–536 |
-| Provenance | 537–563 |
-| Open questions | 564–586 |
+|   3. Lifecycle | 135–296 |
+|   4. Modes and mode schedules | 297–439 |
+|   5. Event dispatch | 440–454 |
+|   6. Events per kind | 455–535 |
+|   7. Scheduler inventory (`unit-events.tsv`) | 536–557 |
+| Constants & data dependencies | 558–574 |
+| Randomness | 575–582 |
+| Edge cases & original bugs | 583–601 |
+| Test vectors | 602–661 |
+| Provenance | 662–701 |
+| Open questions | 702–731 |
 <!-- /index -->
 
 ## Summary
@@ -170,6 +170,130 @@ quest chain; the kind's free routine (§1, cancels all timers); then
 `0x005C0A90`, `0x00571F40` and the record free `0x00620300`. Removal is
 immediate (`tick.md` §5.5 consequence 3).
 
+#### 3.3 Compress on room deactivation (`0x005433F0`, ECX game, EDX unit)
+
+Run by tick step 9 for each unit of a room being removed
+(`drlg/rooms.md` §8 rule 2). "Store" = keep an inactive record of the
+unit for a later restore (`0x00542E10`; records and restore: §3.4). "Detach" = `0x0064C450`: for a
+dynamic path (`0x0064FC20`) precise and client x / y := 0, point count
+:= 0 and, with a room, previous room := room, the unit leaves the
+room's unit list (`0x0064C370`) and path flag 0x2 is set; the footprint
+is **not** cleared and the unit is not freed. "Free" = §3.2 (footprint
+removed, room and hash unlink, path freed).
+
+S = the room's level has `SaveMonsters` ≠ 0 (leveldefs +0x94,
+`0x00642820`) or unit flag 0x2000000 (+0xC4) is set.
+
+| Type | Rule |
+|---|---|
+| 0 player | has state 7 (`playerbody`, `0x00639DF0`): cancel its type-1 events (`0x00540E60(1, 0)`), flags 2 (+0xC8) \|= 0x100, store, detach; kept. Else: store if S, free |
+| 1 monster | the monster rule below |
+| 2 object | class 59 or 60 (`Portal`): as a player with state 7 (kept). Else store := S, cleared when objects `Restore` (+0x173) = 0 or unit byte +0x78 (`0x005540D0`) has 0x2, or when `RestoreVirgins` (+0x174) ≠ 0 and mode ≠ 0; cancel type-1 events; store if still set; free |
+| 3 missile | free, no store |
+| 4 item | store (`0x00541B10`); not freed here |
+| 5 tile | store, free |
+
+Monster (`0x005431F0`), store flag K := S, then in order:
+
+1. Mode 12 (dead): one step of the room's seed (room +0x6C, the D2
+   step of `sim/rng.md`); K := K and (new low word mod 3 = 0, unsigned).
+2. Dead (`0x005541B0`, §2): K := 0 if `0x0063A770`(unit) ≠ 0 (the
+   unit has a state whose `states` flag `udead` is set: state-flag list
+   33 at data tables `+0x150`, `0x0063A130`) or the alignment
+   (`0x006259B0`) is 2.
+3. Node index (+0xD0) < 8: alive → K := 1, mode set 1
+   (`0x005543B0`), monster data freed (`0x005B1A90`), skip rule 4;
+   dead → K := 0.
+4. Dead and class 0x16B or 0x16C → K := 0.
+5. Monster type flags (monster data +0x16) & 0x18 (unique, minion) and
+   dead → K := 0.
+6. Unit flag bit 31 (+0xC4): K := 0; when the owner (`0x0058F0D0`) is
+   a player, P := its pet test `0x005752B0`.
+7. Unit flag 0x200 → K := 0.
+8. monstats2 `restore` (+0x130, via monstats `MonStatsEx`): 0 or no row
+   → K := 0; 2 → K := 1; 1 → unchanged (1.14d: 18 rows 0, 574 rows 1,
+   17 rows 2, measured).
+9. P set: flags 2 |= 0x100, store if K, detach (kept, footprint kept).
+   Else: store if K, free.
+
+So a monster in a deactivated room is freed with its path and
+footprint, except a player's pet (rule 9), which keeps its footprint
+cells in the grids that outlive the room.
+
+#### 3.4 Inactive records and restore
+
+Records hang off a per-act list of area nodes at game `+0xD8 + 4·act`
+(`act` = `0x006427F0` of the room's level): node (0x18 bytes) = {x, y
+(the DRLG room's origin, `0x00619730`), `+0x08` item records, `+0x0C`
+monster records, `+0x10` other records, `+0x14` next}; the list is kept
+in descending x, a new node going before the first node of smaller x
+(`0x00541D20`, `0x00542E30`). Every store pushes its record at the head
+of its list.
+
+1. **Monster** (`0x00542E10` → `0x005421A0`, 0x5C bytes): first the
+   states of the list at data tables `+0x174` (count `+0x178`) that the
+   unit has are removed with their stat lists, and its type-2 events are
+   cancelled (`0x00540E60(2, 0)`). Fields: `+0x00`/`+0x04` sub-tile x,
+   y; `+0x08` class; `+0x0C` GUID; `+0x10` unit flags; `+0x14` flag-ex;
+   `+0x18` bits: 1 type flag 0x1 (also `0x00544F20`), 2 champion, 4 dead
+   (mode 12 or 0), 8 / 0x10 owner bits, 0x20 minion, 0x40
+   `0x00573540(unit, 2)`, 0x80 / 0x100 / 0x200 alignment 1 / 2 / 0,
+   0x400 node index (`+0xD0`) ≠ 11 (node index < 8 is fatal 0x56A),
+   0x800 superunique; `+0x1C` / `+0x20` owner GUID and value
+   (`0x0058F440`, kept when the owner exists and is of type 1; else
+   `+0x1C` = −1); `+0x28` `0x005B0D60(monster data +0x28)`; `+0x2C`
+   `0x00573520`; `+0x30` u16 `0x005A0140`; `+0x32..+0x3A` the 9 umod
+   bytes; `+0x3C` u16 superunique index; `+0x40` stat 13, `+0x44`
+   `0x00625D10`, `+0x48` stat 6 (life); `+0x54` the game frame; `+0x58`
+   next.
+2. **Item** (`0x00542E30` → `0x00541B10`): the item is serialized with
+   the item bit stream in save form (`0x006313E0(item, buf, 0x400, 1,
+   1, 0)`, `items/bitstream.md`); record = {next, ground expiry
+   (`0x00558A10`, absolute frame, 0 = never), `0x00629F20(item)`, length
+   u16, the bytes}; then its socketed items and the item itself are
+   freed (`0x00555600`). So the item rule of §3.3 ("not freed here")
+   holds for `0x005433F0` only: the store frees it.
+3. **Other types** (`0x00542E30`, 0x34 bytes): x, y, type, class;
+   `+0x10` mode; type 0: `+0x20` GUID; type 2: a mode-1 object whose
+   `objects` byte `+0x109` is 0 and `+0x141` ≠ 0 is first set to mode 2
+   (recorded as 2); with `0x00621B00(unit)` the object's pending event
+   5 time (`0x005415A0`) is kept in `+0x20` (high 16 bits) and `+0x24`
+   (low 16), else classes 59, 60, 100 keep their GUID in `+0x20` and the
+   others the unit byte `+0x78` in `+0x24`; `+0x28` object-data byte
+   `+4`, `+0x2C` unit `+0xB8`. All: `+0x14` game frame, `+0x18` unit
+   flags, `+0x1C` flag-ex, `+0x30` next.
+4. **Restore** (`0x00542B40(game, room)`, from the first population of
+   a room, `monsters/population.md` §1 rule 1): the node of the room is
+   unlinked and the lists are restored in this order, each from its head
+   (so the reverse of store order):
+   1. monsters (`0x005424F0`): a record with flag-ex 0x100 (a kept pet)
+      re-places the existing unit of that GUID (`0x00554A30`) and
+      re-links its owner (`0x0058F350`); else the monster is spawned
+      again **with the stored GUID** (`+0x0C`): minion records through
+      `0x005A46E0`, type-flag-1 records through `0x005A4440` (with the
+      umods, superunique index and champion bit), others through the
+      plain spawn; dead records in mode 12, others in mode 1. Records
+      with flag 0x400 and alignment 1 or 2 (0x80 / 0x100) are skipped. In
+      level 108 with `0x005B5210` true only class 243 records are
+      restored.
+   2. items (`0x00541AC0`): a record whose expiry ≠ 0 and < the current
+      frame is dropped; others are re-created from their stream
+      (`0x00541990`).
+   3. other records: flag-ex 0x100 (kept units: player bodies, portals
+      59/60) → the unit of that type and GUID is placed again
+      (`0x00554A30`) and gets unit flag 0x10; a type-0 one must be in
+      mode 0x11 (else fatal 0x156) and is set to it; a type-2 one gets
+      its object-data byte back. Else a **new unit** (new GUID) is
+      created (`0x005557D0(game, room, type, class, x, y, mode, flags)`;
+      type 1 never occurs here); type 2 then: with `0x00621B00` and a
+      stored time `t` > 0, event 5 at `max(t, frame + 1)`
+      (`0x005417D0`), byte `+4` and `0x00621BB0(unit, 0x006414B0(byte))`;
+      else when `objects` SubClass (`+0x167`) has 0x20 (shrines) the
+      byte regrows by elapsed time over the row's `+0x178` period, capped
+      at `0x00552AA0`, with event-2 re-schedules; else byte `+4`, unit
+      byte `+0x78`, `+0xB8` (when ≠ 0) come back.
+   Every record is freed after use.
+
 ### 4. Modes and mode schedules
 
 #### 4.1 Setting a mode
@@ -177,8 +301,9 @@ immediate (`tick.md` §5.5 consequence 3).
 `0x00553570(game, unit, mode)`: drop the unit's own entries from its
 combat list (`0x0057C980`), then `0x00624690(unit, mode)`: tile: nothing;
 a new mode is written to +0x10, the unit is queued for update
-(`unit-order.md` §6.2), flags |= 1, and the animation fields are
-re-initialised (`0x006272E0`, `0x00624390`); the same mode only queues
+(`unit-order.md` §6.2), flags |= 1, the unit's TEMPONLY stat lists are
+removed (`0x006272E0`, `stat-lists.md` §8.9) and the animation fields
+re-initialised (`0x00624390`); the same mode only queues
 the unit and sets flag 1 (not for a monster staying in mode 1). Setting
 a mode schedules nothing by itself. Mode starts that animate then call,
 in this order: prepare animation `0x005533D0` (action frame := 0;
@@ -546,6 +671,14 @@ AI from AI functions, everything in "not yet observed" (open question 1).
   §4.2 event jump table `0x00553AFC` and the allocation jump table
   `0x005554E8` read from the file image. Source-file families from the
   1.14d path strings (`.\UNIT\SUnit.cpp`, `.\OBJECTS\ObjMode.cpp`, …).
+  §3.3: `0x005433F0` and `0x005431F0` (disassembled: the switch, the
+  mask 0x18 in EDX, `cmp [esi+0xD0], 8`), `0x0064C450`, `0x0064FC20`
+  (globals `0x006EB7C8` / `0x006EB7CC`: 0 in the image, no writer),
+  `0x00642820` (leveldefs +0x94 = `SaveMonsters`, `data/fields.tsv`),
+  `0x00540E60`, `0x005540D0`, `0x0058F0D0`, `0x005A0180`; objects
+  +0x173 / +0x174 and monstats2 +0x130 from `data/fields.tsv`; row
+  counts from the 1.14d `patch_d2` `monstats2.txt`, `objects.txt`,
+  `states.txt`.
 - **D2MOO** (1.10f) `D2Game/src/UNIT/SUnit.cpp` (`sub_6FCBCE70` = main
   form, `sub_6FCBCFD0`, `sub_6FCBD120`, `D2GAME_SKILLS_RewindSkillEx` =
   variants, `sub_6FCBD3A0` = §4.4), `MONSTER/MonsterMode.cpp`,
@@ -560,6 +693,11 @@ AI from AI functions, everything in "not yet observed" (open question 1).
   vectors); `record_tick.py` 0.2.0 adds `site`, `cl`, `m` to `set`
   records and `anim` records (hooks `0x005539CC`, `0x00553B10`,
   `0x00553C70`, `0x00553DC0`) for U4 and U11.
+Ghidra backlog (2026-10-06): store `0x00542E10` (falls through to
+`0x00542E30` for non-monsters), `0x005421A0`, `0x00541B10`, node lists
+`0x00541D20`; restore `0x00542B40` → `0x005424F0`, `0x005418C0`,
+`0x00541AC0`; `0x0063A770` → state-flag list 33 (`udead`, live
+`states.txt`).
 
 ## Open questions
 
@@ -583,3 +721,10 @@ AI from AI functions, everything in "not yet observed" (open question 1).
 7. Game +0x6A and +0x74 (§4.6, edge case 6): which game types set them;
    a Nightmare single-player recording settles which `aidel` column
    single player uses.
+8. Inactive storage: records and restore answered in §3.4 (monster
+   GUIDs are kept; other units come back with new GUIDs; restore order
+   monsters, items, others, each newest first). Open: the meaning of
+   node index (`+0xD0`) 11 and of the fields from `0x005B0D60`,
+   `0x00573520`, `0x005A0140`, `0x00625D10`; whether a restored item
+   keeps its GUID (`0x00541990`); a recording leaving and re-entering a
+   wilderness area confirms the order (`unit-order.md` OQ3).

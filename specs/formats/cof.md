@@ -81,9 +81,18 @@ None.
   1-direction COF with 4 event bytes. The rule above covers it (K = 4,
   F = 1) without hard-coding the size. 1.14d has 3 such files.
 - **Unused junk file:** `data\global\chars\am\cof\amblxbow.cof`
-  (`d2char.mpq`) is 72 bytes of non-COF data. Its name doesn't follow the
-  COF pattern (token + mode + 3-letter weapon class); the real file is
-  `amblxbw.cof`, which parses. It's never loaded and is not supported.
+  (`d2char.mpq`, the only lower-case `chars\am\cof` path in its
+  listfile) is 72 bytes of non-COF data (starts `61 6B 32 FF`). Its name
+  doesn't follow the COF pattern (token + mode + 3-letter weapon class).
+  There is **no** `amblxbw.cof` (an earlier revision of this bullet
+  guessed that name; the `game_sweep` test copied it from here): the
+  Amazon block COFs are exactly `ambl1hs`, `ambl1ht` and `amblhth`
+  (`d2char.mpq`, 544 / 544 / 487 bytes), the same three `AMBL*` records
+  `AnimData.D2` (`d2exp.mpq`, 3,558 records) holds, and `Game.exe` has
+  no `xbow` / `amblx` string (names are composed token + mode + class by
+  `0x0064F5B0`, `render/unit-composite.md`). No archive holds an Amazon
+  block COF for the `bow` or `xbw` class. The junk file is never loaded and is not
+  supported.
 
 - **Game read of the draw order:** 1.14d reads the draw-order rows as if
   the event block were exactly `F` bytes, so the three padded files read
@@ -97,12 +106,15 @@ None.
 | L=1, F=1, D=1, 42 bytes total | K = 4, event = byte 0, 3 padding bytes | §Edge cases |
 | component 16 in a layer | error | §Layer records |
 | every `.cof` in the 1.14d archives | parses | survey |
+| every `data\global\chars\am\cof\ambl*` name in the listfiles | `ambl1hs`, `ambl1ht`, `amblhth` parse; `amblxbow` is the only failure; no `amblxbw` | `mpq-tool list d2char.mpq`, 2026-10-06 |
 
 ## Provenance
 
 Community documentation of COF (Phrozen Keep), cross-checked against
 Riiablo (Apache-2.0) `file/Cof.java`. No Blizzard code or decompiler output
-was consulted.
+was consulted. The `ambl*` facts in Edge cases: `mpq-tool list` of
+`d2char.mpq` / `d2data.mpq` / `d2exp.mpq`, a parse of `AnimData.D2`
+(`d2exp.mpq`) and a byte search of `Game.exe` (1.14d, 2026-10-06).
 
 ## Open questions
 
