@@ -2278,12 +2278,12 @@ fn real_level_stats() {
     assert_eq!((s.min_hp, s.max_hp, s.ac, s.xp), (3238, 4626, 907, 28069));
 }
 
+#[path = "tests_c2mon.rs"]
+mod c2mon;
 mod callbacks;
 mod find;
 mod spawn_tools;
 mod umod_init_bodies;
-#[path = "tests_c2mon.rs"]
-mod c2mon;
 
 // Tests written against surviving mutants (METHODS M08); a child module so
 // they share this module's fakes.

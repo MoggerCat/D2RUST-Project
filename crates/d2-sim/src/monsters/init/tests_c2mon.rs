@@ -16,6 +16,7 @@ fn boss_with_teleport() -> (Fake, UnitId) {
 fn teleport_assigns_skill_184_level_1_and_mode_4() {
     let (mut f, u) = boss_with_teleport();
     let cx = f.cx;
+    f.log.clear();
     run_umod_init(&cx, &mut f, u, 26, true);
     assert_eq!(f.log, vec!["skill 184 1 Some(4)".to_string()]);
 }
