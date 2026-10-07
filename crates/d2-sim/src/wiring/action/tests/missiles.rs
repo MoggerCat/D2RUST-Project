@@ -203,3 +203,37 @@ fn missile_expires_after_range_runs() {
     assert_eq!(runs, 50);
     s.fx.assert_clean();
 }
+
+// Covers: specs/missiles/missiles.md §r6-1-order-1-14d-0x005adf10-step-7 text, §r6-3-server-damage-functions-psrvdmgfunc-1-14d-confirmed-2026-10-08
+#[test]
+fn missile_hit_class_merges_the_element_nibble() {
+    use crate::combat::DamageRecord;
+    use crate::wiring::action::missiles::merge_hit_class;
+    // §R6.3 functions 7 / 9: R +0x60 := 0x60 survives as HitClass | 0x60,
+    // +0x64 := 1.
+    let mut r = DamageRecord {
+        hit_class: 0x60,
+        ..DamageRecord::default()
+    };
+    merge_hit_class(&mut r, 0x03);
+    assert_eq!((r.hit_class, r.hit_class_fixed), (0x63, 1));
+    // The record's low nibble is replaced, not or-ed.
+    let mut r = DamageRecord {
+        hit_class: 0x05,
+        ..DamageRecord::default()
+    };
+    merge_hit_class(&mut r, 0x02);
+    assert_eq!((r.hit_class, r.hit_class_fixed), (0x02, 0));
+    // A HitClass with an element bit sets +0x64 alone (M08: the record's
+    // 0xF0 bits are empty here).
+    let mut r = DamageRecord::default();
+    merge_hit_class(&mut r, 0x41);
+    assert_eq!((r.hit_class, r.hit_class_fixed), (0x41, 1));
+    // Neither has an element bit: +0x64 kept.
+    let mut r = DamageRecord {
+        hit_class_fixed: 1,
+        ..DamageRecord::default()
+    };
+    merge_hit_class(&mut r, 0x01);
+    assert_eq!((r.hit_class, r.hit_class_fixed), (0x01, 1));
+}

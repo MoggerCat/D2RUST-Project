@@ -763,7 +763,15 @@ impl<C: PathWorld + WalkUnits + ?Sized> Wall<'_, '_, C> {
         }
         let t = self.info.target;
         let d2 = |q: Point| (q.x - t.x) * (q.x - t.x) + (q.y - t.y) * (q.y - t.y);
-        let (da, db, ds) = (d2(a.pos), d2(b.pos), d2(self.start));
+        // A follower without points: the dword read as its "last point"
+        // is its own done flag, so (1, 0) when done, else (0, 0).
+        let last = |fl: &Follower| {
+            fl.points
+                .last()
+                .copied()
+                .unwrap_or(Point::new(i32::from(fl.done), 0))
+        };
+        let (da, db, ds) = (d2(last(&a)), d2(last(&b)), d2(self.start));
         let chosen = if db > da {
             (ds >= da).then_some(a)
         } else {

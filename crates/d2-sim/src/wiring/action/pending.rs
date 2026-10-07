@@ -140,18 +140,16 @@ pub trait Pending {
     }
     /// The target point or unit handed to a mode start (AI mode requests).
     fn set_mode_target(&mut self, unit: UnitId, target: ModeTarget) {}
-    /// The path step count (AI).
+    /// The path step count (AI): the stop distance `0x00649070`
+    /// (`ai.md` §7.5 rule 7) without the path provider. Default: nothing.
     fn set_path_steps(&mut self, unit: UnitId, steps: i32) {}
     /// Path flag 0x800 (blocked step).
     fn path_blocked(&self, unit: UnitId) -> bool {
         false
     }
-    /// Stops the unit's path.
+    /// Stops the unit's path (`0x00648730`, `pathing.md` §13.1 rule 3)
+    /// without the path provider. Default: nothing.
     fn stop_path(&mut self, unit: UnitId) {}
-    /// Monster run event 0 `0x005A84F0` (`units.md` §4.6) with the path
-    /// provider on: its body is not described (`pathing.md` §9.1 names
-    /// only walk's). Default: nothing (the monster does not move).
-    fn monster_run_event0(&mut self, unit: UnitId) {}
     /// `0x005DE6D0` → `0x005DE4E0` walk in radius; false = failed.
     fn walk_in_radius(
         &mut self,
@@ -1466,6 +1464,28 @@ pub trait Pending {
         Self: Sized,
     {
         1
+    }
+    /// The skill start `0x0056FAF0` of a monster's attack / skill start
+    /// and sequence start (`units.md` §4.6 rules 7, 10); its result. A
+    /// [`crate::wiring::interaction::UseRest`] value routes it to
+    /// [`crate::wiring::interaction::skill_events::monster_skill_start`]
+    /// (`use.md` §5.3). Default: 0 (no skill pipeline: no used skill).
+    fn monster_skill_start(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, unit: UnitId) -> i32
+    where
+        Self: Sized,
+    {
+        0
+    }
+    /// The skill part of the monster sequence event 0 `0x005A8670`
+    /// (`units.md` §4.6 rule 13, before the animation refresh): E flags,
+    /// the moving skill's step and the do `0x0056FC50` by frame code. A
+    /// [`crate::wiring::interaction::UseRest`] value routes it to
+    /// [`crate::wiring::interaction::skill_events::monster_sequence_frame`].
+    /// Default: nothing.
+    fn monster_sequence_frame(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, unit: UnitId)
+    where
+        Self: Sized,
+    {
     }
 
     // ---- client intents (`sim/intents-events.md` §9; d2-server's

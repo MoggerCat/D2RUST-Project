@@ -7,7 +7,7 @@ use crate::game::Game;
 use crate::units::{UnitId, UnitType};
 
 use super::tactics::*;
-use super::{idle, mode, AiHost, Ctx, ModeTarget, PortalNpc, TickParam};
+use super::{idle, mode, request_mode, AiHost, Ctx, ModeTarget, PortalNpc, TickParam};
 
 /// Command types of §8 used here.
 mod cmd {
@@ -207,8 +207,7 @@ fn leave<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitId, np
     cx.world.spawn_town_portal(game, u, npc);
     cx.world.set_life(u, 0);
     let (x, y) = cx.world.position(u);
-    cx.world
-        .change_mode(game, u, mode::DEAD, ModeTarget::Point(x, y));
+    request_mode(game, cx, u, mode::DEAD, ModeTarget::Point(x, y));
 }
 
 /// §9.32 step 1, the portal setup `0x005E77A0`.
@@ -368,8 +367,7 @@ pub fn npc<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitId, 
         }
         npc_class::ALKOR => {
             if cx.world.alkor_bird(game) {
-                cx.world
-                    .change_mode(game, u, mode::SKILL1, ModeTarget::Point(0, 0));
+                request_mode(game, cx, u, mode::SKILL1, ModeTarget::Point(0, 0));
                 cx.world.alkor_reset(game);
                 return;
             }
@@ -379,8 +377,7 @@ pub fn npc<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitId, 
                 if path_distance(cx, u, x, y) as u32 > 3 {
                     walk_to_point(game, cx, u, x, y);
                 } else {
-                    cx.world
-                        .change_mode(game, u, mode::SKILL1, ModeTarget::Point(0, 0));
+                    request_mode(game, cx, u, mode::SKILL1, ModeTarget::Point(0, 0));
                     cx.world.ormus_set_altar_mode(game);
                 }
                 return;
@@ -503,7 +500,7 @@ pub(super) fn npc_commands<W: AiHost + ?Sized>(
             idle(game, cx, u, 50);
             return true;
         }
-        cx.world.change_mode(game, u, m as u8, ModeTarget::Unit(u));
+        request_mode(game, cx, u, m as u8, ModeTarget::Unit(u));
         set_cmd(cx, u, k, 1, 0);
         return true;
     }

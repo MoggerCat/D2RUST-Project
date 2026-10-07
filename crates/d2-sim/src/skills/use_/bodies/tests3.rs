@@ -815,3 +815,37 @@ fn baal_tentacle_spawn_info_for_other_keys() {
     assert_eq!(b4_more::baal_tentacle(&mut f, &ct, u), 1);
     assert_eq!(spawned(&mut f), vec![(6, 8); n]);
 }
+
+// Covers: specs/skills/bodies-4.md §2.4 r3, §2.5
+#[test]
+fn lightning_fan_with_a_step_of_zero_or_less_stops_and_reports() {
+    // `bodies-4.md` Edge case 1 (d2rs decision): the original never ends
+    // the loop for a step ≤ 0; d2rs creates the i = 0 missile the
+    // original makes first, no further one, and reports the fault.
+    let t = tabs(body_rec(), Code::new(), 600);
+    for (step, ring) in [(0, false), (-3, false), (0, true), (-1, true)] {
+        let (mut f, u) = world();
+        b4_helpers::zigzag(&mut f, &t, u, 5, (10, 10), 1, 1, step, 7, ring);
+        assert_eq!(f.missiles.len(), 1, "step {step}");
+        let (ox, oy) = ring_offset(0);
+        assert_eq!((f.missiles[0].target_x, f.missiles[0].target_y), (ox, oy));
+        let log = f.take_log();
+        let fault = format!(
+            "{:?}",
+            BodyEffect::<usize, usize, usize>::EndlessProgressive {
+                unit: u,
+                skill: 1,
+                step
+            }
+        );
+        assert_eq!(log.last(), Some(&fault), "step {step}");
+    }
+    // M08: a positive step makes 64 / step missiles and no fault.
+    let (mut f, u) = world();
+    b4_helpers::zigzag(&mut f, &t, u, 5, (10, 10), 1, 1, 16, 7, false);
+    assert_eq!(f.missiles.len(), 4);
+    assert!(!f
+        .take_log()
+        .iter()
+        .any(|l| l.starts_with("EndlessProgressive")));
+}

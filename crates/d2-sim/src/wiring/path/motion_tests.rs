@@ -46,6 +46,29 @@ fn fx() -> Fx {
     fx_paths(true)
 }
 
+/// AnimData records for monster class 0 in `modes`: (mode, frames) at
+/// speed 256 (one frame a tick), so a scheduling mode has its events.
+fn with_anims(fx: &mut Fx, modes: &[(u32, u32)]) {
+    use d2_formats::animdata::{self, AnimData, AnimRecord};
+    let mut a = AnimData {
+        buckets: vec![Vec::new(); animdata::BUCKETS],
+    };
+    let h = fx.sim.hooks();
+    for &(mode, frames) in modes {
+        let s = format!("M0{mode:02}HTH");
+        let mut name = [0u8; 8];
+        name[..7].copy_from_slice(s.as_bytes());
+        a.buckets[animdata::hash(&name[..7])].push(AnimRecord {
+            name,
+            frames,
+            speed: 256,
+            events: [0; animdata::EVENTS],
+        });
+        h.x.names.insert((UnitType::Monster, mode), name);
+    }
+    h.anim_data = Some(Arc::new(a));
+}
+
 fn monster(fx: &mut Fx, x: i32, y: i32) -> UnitId {
     let a = fx.a;
     let m = fx.spawn(UnitType::Monster, 0, a, x, y);
@@ -225,18 +248,25 @@ fn without_the_provider_the_monster_does_not_move() {
     assert_eq!(fx.sim.hooks().path_position(m), before);
 }
 
-// Covers: specs/monsters/ai.md §7.1
+// Covers: specs/monsters/ai.md §7.1, §7.5 r4
 #[test]
 fn a_mode_that_does_not_move_targets_the_unit_and_computes_nothing() {
-    // Request byte 100: path type 0, no point; the request's unit is the
-    // path target (`0x00648B90`), so the AI's path target reads it.
+    // Request byte 100: nothing is written to the path (§7.5 rule 4.2:
+    // the type keeps the allocation's, no point); the request's unit is
+    // the path target (`0x00648B90`), so the AI's path target reads it.
     let mut fx = fx();
+    with_anims(&mut fx, &[(6, 8)]);
     let m = monster(&mut fx, 26, 10);
     let a = fx.a;
     let p = fx.spawn(UnitType::Player, 0, a, 28, 10);
+    let b = dynamic(&mut fx, m);
     change(&mut fx, m, BLOCK, ModeTarget::Unit(p));
     let d = dynamic(&mut fx, m);
-    assert_eq!((d.path_type, d.point_count), (0, 0));
+    assert_eq!((d.path_type, d.point_count), (b.path_type, 0));
+    assert_eq!(
+        (d.dist_budget, d.max_distance),
+        (b.dist_budget, b.max_distance)
+    );
     assert_eq!(d.target_unit.map(|t| t.unit), Some(p));
     assert_eq!(d.repath_budget, 20);
     let target = fx.sim.with(&mut fx.game, |_, v| AiUnits::path_target(v, m));
@@ -286,13 +316,14 @@ fn an_attack_end_requests_neutral() {
     // mode, so a mode change to neutral (which schedules the think at
     // f + aidel, `units.md` §4.6).
     let mut fx = fx();
+    with_anims(&mut fx, &[(4, 8)]);
+    fx.sim.sys.data.monsters[0].moves = 0;
     let m = monster(&mut fx, 26, 10);
     let a = fx.a;
     let p = fx.spawn(UnitType::Player, 0, a, 28, 10);
     change(&mut fx, m, ATTACK1, ModeTarget::Unit(p));
-    // The attack start body is not this module's (it leaves the mode):
-    // the mode field is set here.
-    fx.sim.sys.units.get_mut(m).unwrap().mode = 4;
+    // The attack start sets mode 4 (`units.md` §4.6 rule 7).
+    assert_eq!(mode(&fx, m), 4);
     fx.sim.with(&mut fx.game, |g, v| {
         let mut sim = crate::units::hooks::Sim {
             game: g,
@@ -460,4 +491,464 @@ fn every_request_but_get_hit_refills_the_budget_and_retargets() {
     let d = dynamic(&mut fx, m);
     assert_eq!(d.repath_budget, 20);
     assert_eq!((d.target_x, d.target_y, d.target_unit), (27, 11, None));
+}
+
+// Covers: specs/sim/pathing.md §13.1 r1
+#[test]
+fn step_counts_use_the_low_byte_capped_at_77() {
+    use crate::wiring::path::missiles::step_count_byte;
+    // §13.1 rule 1: −1 → 255 → 77, −256 → 0, −200 → 56; 300 → 44 (low
+    // byte); 77 and 50 as given.
+    for (n, b) in [
+        (-1, 77),
+        (-256, 0),
+        (-200, 56),
+        (300, 44),
+        (77, 77),
+        (50, 50),
+        (78, 77),
+    ] {
+        assert_eq!(step_count_byte(n), b, "n {n}");
+    }
+    let mut fx = fx();
+    let a = fx.a;
+    let owner = fx.spawn(UnitType::Monster, 0, a, 41, 30);
+    let m = fire(&mut fx, owner, 79, 30);
+    fx.sim.with(&mut fx.game, |_, v| {
+        crate::missiles::MissileBodies::set_path_distance(v, m, -200)
+    });
+    let d = dynamic(&mut fx, m);
+    assert_eq!((d.dist_budget, d.max_distance), (56, 56));
+}
+
+// Covers: specs/sim/pathing.md §13.2 r1, §13.2 r2, §13.2 r3
+#[test]
+fn target_position_clears_a_stale_target_and_reads_the_point() {
+    use crate::path::TargetUnit;
+    let mut fx = fx();
+    let a = fx.a;
+    let owner = fx.spawn(UnitType::Monster, 0, a, 41, 30);
+    let p = fx.spawn(UnitType::Player, 0, a, 50, 33);
+    let m = fire(&mut fx, owner, 79, 30);
+    let guid = fx.game.lists.unit(p).unwrap().guid;
+    let set_target = |fx: &mut Fx, g: u32| {
+        fx.sim
+            .hooks()
+            .paths
+            .as_mut()
+            .unwrap()
+            .dynamic_mut(m)
+            .unwrap()
+            .target_unit = Some(TargetUnit {
+            unit: p,
+            ty: UnitType::Player,
+            guid: g,
+        });
+    };
+    let pos = |fx: &mut Fx| {
+        fx.sim.with(&mut fx.game, |g, v| {
+            crate::missiles::MissileBodies::target_position(v, g, m)
+        })
+    };
+    // A live target: its position, the target kept.
+    set_target(&mut fx, guid);
+    assert_eq!(pos(&mut fx), Some((50, 33)));
+    assert!(dynamic(&mut fx, m).target_unit.is_some());
+    // A stale one (its GUID no longer resolves to it): cleared, and the
+    // stored point (79, 30) is read instead.
+    set_target(&mut fx, guid.wrapping_add(1000));
+    assert_eq!(pos(&mut fx), Some((79, 30)));
+    assert!(dynamic(&mut fx, m).target_unit.is_none());
+    // A point with x = 0: result 0.
+    fx.sim
+        .hooks()
+        .paths
+        .as_mut()
+        .unwrap()
+        .dynamic_mut(m)
+        .unwrap()
+        .target_x = 0;
+    assert_eq!(pos(&mut fx), None);
+}
+
+// ---- units.md §4.6 rules 5–14: start and event functions ------------------
+
+/// Runs the monster's event 0 (`false`) or event 1 (`true`) function.
+fn mode_event(fx: &mut Fx, m: UnitId, end: bool) {
+    fx.sim.with(&mut fx.game, |g, v| {
+        let mut sim = crate::units::hooks::Sim {
+            game: g,
+            units: &mut *v.units,
+            stats: &mut *v.stats,
+            data: v.data,
+        };
+        crate::units::modes::monster_event(&mut sim, &mut *v.h, m, end).unwrap();
+    });
+}
+
+fn log(fx: &mut Fx) -> Vec<String> {
+    std::mem::take(&mut fx.sim.hooks().x.log)
+}
+
+// Covers: specs/sim/units.md §4.6 r5
+#[test]
+fn a_walk_start_without_a_point_falls_into_neutral() {
+    // Rule 5: the compute (type 13, then 15) finds no point for a target
+    // in no room → the WL start returns 0 → the neutral start: mode 1 and
+    // the think at f + aidel (0 → 15). M08: an open target enters mode 2
+    // (`monster_walks_to_a_point_sub_tile_by_sub_tile`).
+    let mut fx = fx();
+    let m = monster(&mut fx, 26, 10);
+    let f = fx.game.frame;
+    change(&mut fx, m, WALK, ModeTarget::Point(26, 60));
+    assert_eq!(dynamic(&mut fx, m).point_count, 0);
+    assert_eq!(mode(&fx, m), 1);
+    assert!(fx.timers(m).contains(&(event::AI_THINK, f + 15)));
+    fx.assert_clean();
+}
+
+// Covers: specs/sim/units.md §4.6 r5, §4.6 r13; specs/sim/pathing.md §9.1
+#[test]
+fn a_run_moves_on_its_event_0_and_ends_at_the_point() {
+    // Rule 5: RN start with a point → mode 15; rule 13: the RN event 0
+    // `0x005A84F0` steps every tick (WL's body without the state calls)
+    // and its stop runs the mode end. Velocity 0x600 (100 %, no run stat
+    // list for a monster): the walk's 14 ticks to (31, 10).
+    let mut fx = fx();
+    let m = monster(&mut fx, 26, 10);
+    assert!(change(&mut fx, m, 15, ModeTarget::Point(31, 10)));
+    assert_eq!(mode(&fx, m), 15);
+    let t = ticks(&mut fx, m, 15, 20);
+    assert_eq!(t.len(), 14);
+    assert_eq!(t[0].0, 0x1AE000);
+    assert_eq!(t[13], (0x1F8000, 0xA8000, 1));
+    assert_eq!(fx.sim.hooks().path_position(m), (31, 10));
+    fx.assert_clean();
+}
+
+// Covers: specs/sim/units.md §4.6 r6
+#[test]
+fn the_gethit_start_sets_mode_3_unless_dead_or_missing() {
+    let mut fx = fx();
+    with_anims(&mut fx, &[(3, 8)]);
+    let m = monster(&mut fx, 26, 10);
+    change(&mut fx, m, 3, ModeTarget::Point(0, 0));
+    assert_eq!(mode(&fx, m), 3);
+    // In mode 12 (or 0): 1, mode unchanged.
+    fx.sim.sys.units.get_mut(m).unwrap().mode = 12;
+    change(&mut fx, m, 3, ModeTarget::Point(0, 0));
+    assert_eq!(mode(&fx, m), 12);
+    // A class without mode 3: 0 → neutral.
+    fx.sim.sys.units.get_mut(m).unwrap().mode = 1;
+    fx.sim.hooks().x.missing_modes = vec![3];
+    let f = fx.game.frame;
+    change(&mut fx, m, 3, ModeTarget::Point(0, 0));
+    assert_eq!(mode(&fx, m), 1);
+    assert!(fx.timers(m).contains(&(event::AI_THINK, f + 15)));
+    fx.assert_clean();
+}
+
+// Covers: specs/sim/units.md §4.6 r7
+#[test]
+fn the_attack_start_sets_its_mode_and_starts_the_used_skill() {
+    let mut fx = fx();
+    with_anims(&mut fx, &[(4, 8)]);
+    // The fixture's A1 moves (monstats2 `A1mv`); not here.
+    fx.sim.sys.data.monsters[0].moves = 0;
+    let m = monster(&mut fx, 26, 10);
+    let a = fx.a;
+    let p = fx.spawn(UnitType::Player, 0, a, 28, 10);
+    // A non-moving A1 without a used skill: mode 4, no skill start.
+    change(&mut fx, m, ATTACK1, ModeTarget::Unit(p));
+    assert_eq!(mode(&fx, m), 4);
+    assert!(!log(&mut fx).iter().any(|l| l.starts_with("skill start")));
+    // With a used skill: the skill start runs (its result ignored: 0).
+    fx.sim.sys.units.get_mut(m).unwrap().mode = 1;
+    fx.sim
+        .hooks()
+        .x
+        .used
+        .insert(m, crate::skills::SkillEntry::default());
+    change(&mut fx, m, ATTACK1, ModeTarget::Unit(p));
+    assert_eq!(mode(&fx, m), 4);
+    assert_eq!(log(&mut fx), [format!("skill start {}", m.0)]);
+    fx.assert_clean();
+}
+
+// Covers: specs/sim/units.md §4.6 r7
+#[test]
+fn a_moving_attack_without_a_point_fails_except_for_vultures() {
+    // monstats2 `A1mv`: A1 moves. A target in no room gives no point:
+    // the start returns 0 → neutral; BaseId 110 (vulture1) sets the mode
+    // with no skill start. M08: an open target computes again and sets
+    // the mode with the skill start.
+    let setup = |base: u16| {
+        let mut fx = fx();
+        assert_ne!(fx.sim.sys.data.monsters[0].moves & 1 << 4, 0);
+        Arc::make_mut(&mut fx.sim.hooks().tables).combat.monstats[0].baseid = base;
+        let m = monster(&mut fx, 26, 10);
+        fx.sim
+            .hooks()
+            .x
+            .used
+            .insert(m, crate::skills::SkillEntry::default());
+        (fx, m)
+    };
+    let (mut fx, m) = setup(0);
+    change(&mut fx, m, ATTACK1, ModeTarget::Point(26, 60));
+    assert_eq!(mode(&fx, m), 1);
+    assert!(log(&mut fx).is_empty());
+    let (mut fx, m) = setup(110);
+    change(&mut fx, m, ATTACK1, ModeTarget::Point(26, 60));
+    assert_eq!(mode(&fx, m), 4);
+    assert!(log(&mut fx).is_empty());
+    let (mut fx, m) = setup(0);
+    change(&mut fx, m, ATTACK1, ModeTarget::Point(31, 10));
+    assert_eq!(mode(&fx, m), 4);
+    assert!(dynamic(&mut fx, m).point_count >= 1);
+    assert_eq!(log(&mut fx), [format!("skill start {}", m.0)]);
+    fx.assert_clean();
+}
+
+// Covers: specs/sim/units.md §4.6 r8, §4.6 r11, §4.6 r12
+#[test]
+fn block_s3_and_s4_starts() {
+    let mut fx = fx();
+    with_anims(&mut fx, &[(6, 8)]);
+    let m = monster(&mut fx, 26, 10);
+    change(&mut fx, m, BLOCK, ModeTarget::Point(0, 0));
+    assert_eq!(mode(&fx, m), 6);
+    // S3: mode 10, no schedule; its event 0 steps, refreshes and, the
+    // animation complete (no record: 0 frames), sets mode 11.
+    change(&mut fx, m, 10, ModeTarget::Point(0, 0));
+    assert_eq!(mode(&fx, m), 10);
+    assert!(!fx.timers(m).iter().any(|t| t.0 == event::MODE_CHANGE));
+    let r = fx.sim.sys.units.get_mut(m).unwrap();
+    r.anim.frame = r.anim.frame_count;
+    mode_event(&mut fx, m, false);
+    assert_eq!(mode(&fx, m), 11);
+    // S4: mode 11 and the think at f + 15.
+    fx.sim.sys.units.get_mut(m).unwrap().mode = 1;
+    fx.game.frame += 3;
+    let f = fx.game.frame;
+    change(&mut fx, m, 11, ModeTarget::Point(0, 0));
+    assert_eq!(mode(&fx, m), 11);
+    assert!(fx.timers(m).contains(&(event::AI_THINK, f + 15)));
+    fx.assert_clean();
+}
+
+// Covers: specs/sim/units.md §4.6 r9, §4.6 r13, §4.6 r14
+#[test]
+fn knockback_start_event_and_end() {
+    // Rule 9: path type 8, distance budget 5 (10 for BaseId 78), compute,
+    // mode 13. Rule 13: the KB event 0 steps and, the animation complete
+    // (no record), runs KB event 1: the path type reset, then the AI's
+    // knockback end: a class with GH and not BaseId 78 → a GH request.
+    let mut fx = fx();
+    with_anims(&mut fx, &[(3, 8)]);
+    let m = monster(&mut fx, 26, 10);
+    let a = fx.a;
+    let p = fx.spawn(UnitType::Player, 0, a, 24, 10);
+    change(&mut fx, m, 13, ModeTarget::Unit(p));
+    assert_eq!(mode(&fx, m), 13);
+    let d = dynamic(&mut fx, m);
+    assert_eq!(
+        (d.path_type, d.dist_budget),
+        (path_types::KNOCKBACK_SERVER, 5)
+    );
+    fx.tick();
+    assert_eq!(mode(&fx, m), 3);
+    assert_ne!(dynamic(&mut fx, m).path_type, path_types::KNOCKBACK_SERVER);
+    fx.assert_clean();
+    // BaseId 78: budget 10; its KB end thinks at f + 15 (not stunned).
+    let mut fx = fx_paths(true);
+    Arc::make_mut(&mut fx.sim.hooks().tables).combat.monstats[0].baseid = 78;
+    with_anims(&mut fx, &[(0, 8)]);
+    let m = monster(&mut fx, 26, 10);
+    change(&mut fx, m, 13, ModeTarget::Point(30, 10));
+    assert_eq!(dynamic(&mut fx, m).dist_budget, 10);
+    let f = fx.game.frame;
+    mode_event(&mut fx, m, true);
+    assert!(fx.timers(m).contains(&(event::AI_THINK, f + 15)));
+    // In mode 0: 1, unchanged; a class without mode 13: neutral.
+    fx.sim.sys.units.get_mut(m).unwrap().mode = 0;
+    change(&mut fx, m, 13, ModeTarget::Point(30, 10));
+    assert_eq!(mode(&fx, m), 0);
+    fx.sim.sys.units.get_mut(m).unwrap().mode = 1;
+    fx.sim.hooks().x.missing_modes = vec![13];
+    change(&mut fx, m, 13, ModeTarget::Point(30, 10));
+    assert_eq!(mode(&fx, m), 1);
+    fx.assert_clean();
+}
+
+// Covers: specs/sim/units.md §4.6 r10, §4.6 r13
+#[test]
+fn sequence_start_and_event_0() {
+    // Rule 10: mode 14, unit flag 0x40 off, the skill start's result: 0
+    // → neutral. Rule 13: not complete → the skill part, the refresh;
+    // complete → the mode end (neutral).
+    let mut fx = fx();
+    with_anims(&mut fx, &[(14, 8)]);
+    let m = monster(&mut fx, 26, 10);
+    change(&mut fx, m, 14, ModeTarget::Point(0, 0));
+    assert_eq!(mode(&fx, m), 1);
+    assert_eq!(log(&mut fx), [format!("skill start {}", m.0)]);
+    fx.sim.hooks().x.skill_start = 1;
+    fx.sim.sys.units.get_mut(m).unwrap().flags |= 0x40;
+    change(&mut fx, m, 14, ModeTarget::Point(0, 0));
+    assert_eq!(mode(&fx, m), 14);
+    assert_eq!(fx.sim.sys.units.get(m).unwrap().flags & 0x40, 0);
+    log(&mut fx);
+    fx.tick();
+    assert_eq!(log(&mut fx), [format!("sequence frame {}", m.0)]);
+    assert_eq!(mode(&fx, m), 14);
+    let r = fx.sim.sys.units.get_mut(m).unwrap();
+    r.anim.frame = r.anim.frame_count;
+    fx.tick();
+    assert!(log(&mut fx).is_empty());
+    assert_eq!(mode(&fx, m), 1);
+    fx.assert_clean();
+}
+
+// ---- monsters/ai.md §7.5 rules 4–7 -------------------------------------------
+
+fn velocity_request(fx: &mut Fx, m: UnitId) -> crate::monsters::ai::VelocityRequest {
+    fx.sim.hooks().ai_store().entry(m).velocity
+}
+
+fn set_velocity_request(fx: &mut Fx, m: UnitId, method: i32, speed: i32, steps: i32) {
+    fx.sim.hooks().ai_store().entry(m).velocity = crate::monsters::ai::VelocityRequest {
+        method,
+        speed,
+        steps,
+    };
+}
+
+fn setup_of(fx: &mut Fx, m: UnitId) -> crate::wiring::path::monsters::MoveSetup {
+    fx.sim.hooks().paths.as_ref().unwrap().setup[&m]
+}
+
+// Covers: specs/monsters/ai.md §7.5 r4, §7.5 r5
+#[test]
+fn the_movement_set_up_consumes_the_velocity_request() {
+    // Rule 4.1: method 7 replaces the path type, speed 3 → P +0x10, steps
+    // 9 → the step counts (rule 5: `0x00648E70`); the request is zeroed.
+    // Rule 4.4: no target unit → P +0x14 = −1.
+    let mut fx = fx();
+    let m = monster(&mut fx, 26, 10);
+    set_velocity_request(&mut fx, m, 7, 3, 9);
+    change(&mut fx, m, WALK, ModeTarget::Point(31, 10));
+    let d = dynamic(&mut fx, m);
+    assert_eq!(d.path_type, path_types::STRAIGHT);
+    assert_eq!((d.dist_budget, d.max_distance), (9, 9));
+    assert!(d.point_count >= 1);
+    assert_eq!(
+        velocity_request(&mut fx, m),
+        crate::monsters::ai::VelocityRequest::default()
+    );
+    let s = setup_of(&mut fx, m);
+    assert_eq!((s.speed, s.wait), (3, -1));
+    assert_eq!((s.cache_unit, s.cache_x, s.cache_y), (None, 31, 10));
+    // No request: type 13 and the default 5 steps; a target unit with a
+    // type-13 result → P +0x14 = 10.
+    let a = fx.a;
+    let p = fx.spawn(UnitType::Player, 0, a, 30, 12);
+    change(&mut fx, m, WALK, ModeTarget::Unit(p));
+    let d = dynamic(&mut fx, m);
+    assert_eq!(d.path_type, path_types::TOWARD_FINISH);
+    assert_eq!((d.dist_budget, d.max_distance), (5, 5));
+    let s = setup_of(&mut fx, m);
+    assert_eq!((s.speed, s.wait), (0, 10));
+    assert_eq!(s.cache_unit, Some(p));
+    fx.assert_clean();
+}
+
+// Covers: specs/monsters/ai.md §7.5 r1, §7.5 r4
+#[test]
+fn a_velocity_method_paths_even_a_non_moving_request_and_gh_keeps_it() {
+    // Rule 4.1: the method replaces a 100 byte too: BL with method 7
+    // computes a straight path. Rule 1: GH consumes nothing.
+    let mut fx = fx();
+    with_anims(&mut fx, &[(3, 8), (6, 8)]);
+    let m = monster(&mut fx, 26, 10);
+    set_velocity_request(&mut fx, m, 7, 0, 0);
+    change(&mut fx, m, 3, ModeTarget::Point(31, 10));
+    assert_eq!(velocity_request(&mut fx, m).method, 7);
+    change(&mut fx, m, BLOCK, ModeTarget::Point(31, 10));
+    let d = dynamic(&mut fx, m);
+    assert_eq!(d.path_type, path_types::STRAIGHT);
+    assert!(d.point_count >= 1);
+    assert_eq!(velocity_request(&mut fx, m).method, 0);
+    fx.assert_clean();
+}
+
+// Covers: specs/monsters/ai.md §7.5 r4
+#[test]
+fn an_ai_request_inside_a_think_consumes_the_velocity_request() {
+    // The AI store is lent out during AI code: the request reaches the
+    // set-up through the staged copy (`request_mode`) and is zeroed in
+    // the store.
+    let mut fx = fx();
+    let m = monster(&mut fx, 20, 30);
+    install_ai(&mut fx, m);
+    let a = fx.a;
+    let p = fx.spawn(UnitType::Player, 0, a, 30, 30);
+    set_velocity_request(&mut fx, m, 7, 0, 12);
+    fx.sim
+        .ai(&mut fx.game, |g, cx| {
+            crate::monsters::ai::walk_to(g, cx, m, Some(p), 0)
+        })
+        .unwrap();
+    let d = dynamic(&mut fx, m);
+    assert_eq!(d.path_type, path_types::STRAIGHT);
+    assert_eq!((d.dist_budget, d.max_distance), (12, 12));
+    assert_eq!(
+        velocity_request(&mut fx, m),
+        crate::monsters::ai::VelocityRequest::default()
+    );
+    fx.assert_clean();
+}
+
+// Covers: specs/monsters/ai.md §7.5 r6
+#[test]
+fn a_mode_set_without_a_record_target_aims_at_0_0() {
+    let mut fx = fx();
+    let m = monster(&mut fx, 26, 10);
+    let a = fx.a;
+    let p = fx.spawn(UnitType::Player, 0, a, 28, 10);
+    change(&mut fx, m, 1, ModeTarget::Unit(p));
+    assert_eq!(dynamic(&mut fx, m).target_unit.map(|t| t.unit), Some(p));
+    fx.sim.sys.with(&mut fx.game, |sim, hooks| {
+        crate::units::modes::monster_set_mode(sim, hooks, m, 1).unwrap()
+    });
+    let d = dynamic(&mut fx, m);
+    assert_eq!((d.target_x, d.target_y, d.target_unit), (0, 0, None));
+    fx.assert_clean();
+}
+
+// Covers: specs/monsters/ai.md §7.5 r7; specs/sim/pathing.md §13.1 r2, §13.1 r3
+#[test]
+fn path_step_count_is_the_stop_distance_and_stop_path_clears_the_points() {
+    let mut fx = fx();
+    let m = monster(&mut fx, 26, 10);
+    let stop = |fx: &mut Fx, n: i32| {
+        fx.sim
+            .with(&mut fx.game, |_, v| AiModes::set_path_steps(v, m, n));
+        dynamic(fx, m).stop_distance
+    };
+    assert_eq!(stop(&mut fx, 1), 0);
+    assert_eq!(stop(&mut fx, 5), 4);
+    assert_eq!(stop(&mut fx, 19), 18);
+    assert_eq!(stop(&mut fx, 20), 0);
+    assert_eq!(stop(&mut fx, -3), 0);
+    change(&mut fx, m, WALK, ModeTarget::Point(31, 10));
+    let b = dynamic(&mut fx, m);
+    assert!(b.point_count >= 1);
+    fx.sim.with(&mut fx.game, |_, v| AiModes::stop_path(v, m));
+    let d = dynamic(&mut fx, m);
+    assert_eq!((d.point_count, d.flags & flags::ACTIVE), (0, 0));
+    assert_eq!(
+        (d.target_x, d.target_y, d.path_type, d.repath_budget),
+        (b.target_x, b.target_y, b.path_type, b.repath_budget)
+    );
 }
