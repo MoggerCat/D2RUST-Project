@@ -116,6 +116,63 @@ fn from_layout(id: u8, size: usize, values: &[(&str, u32)]) -> Vec<u8> {
     b
 }
 
+/// `msg-ui.md` open question 10 decided as A: the bridge holds what was
+/// queued after 0x28's reserved slot until the UI's case comes back, then
+/// sends 0x31 and the rest in 1.14d order; an unanswered slot is dropped
+/// at the next frame.
+// Covers: specs/client/msg-ui.md §16 r4; specs/client/bridge.md §10 r6
+#[test]
+fn dialog_reply_slot_holds_the_send_order() {
+    use crate::bridge::msg::ui_npc::DialogCase;
+    use crate::bridge::output::Output;
+    use crate::bridge::world::{ClientUnit, MonsterClass, UnitKey, MONSTER};
+    let quest = |g: u32| {
+        let mut m = vec![0x28, 1];
+        m.extend(g.to_le_bytes());
+        m.resize(103, 0);
+        m
+    };
+    let (mut b, link) = bridge();
+    let mut tables = b.inputs.tables.clone();
+    tables.monsters = vec![Some(MonsterClass::default()); 200];
+    tables.monsters[148] = Some(MonsterClass {
+        interact: true,
+        ..MonsterClass::default()
+    });
+    b.set_tables(tables);
+    let k = UnitKey::new(MONSTER, 6);
+    let mut u = ClientUnit::new(k);
+    u.class = 148;
+    b.world_mut().units.insert(k, u);
+    let chunk = [quest(6), quest(7)].concat();
+    link.deliver(false, &[&chunk]);
+    b.frame().unwrap();
+    let x2f = vec![0x2F, 1, 0, 0, 0, 6, 0, 0, 0];
+    let x30 = vec![0x30, 0, 0, 0, 0, 7, 0, 0, 0];
+    assert_eq!(sent(&link), vec![(SendQueue::Game, x2f.clone())]);
+    let outs = b.take_outputs();
+    let Some(Output::NpcDialog(d)) = outs.first() else {
+        panic!("{outs:?}")
+    };
+    assert_eq!(b.npc_dialog_branch(d, DialogCase::B2 { m: 3 }).unwrap(), 2);
+    assert_eq!(
+        sent(&link),
+        vec![
+            (SendQueue::Game, x2f.clone()),
+            (SendQueue::Game, vec![0x31, 6, 0, 0, 0, 3, 0, 0, 0]),
+            (SendQueue::Game, x30.clone()),
+        ]
+    );
+    assert_eq!(b.world().units[&k].mode, 1);
+    // Unanswered: the next frame drops the slot and sends what followed.
+    link.deliver(false, &[&chunk]);
+    b.frame().unwrap();
+    link.deliver(false, &[]);
+    b.frame().unwrap();
+    let s = sent(&link);
+    assert_eq!(s[3..], [(SendQueue::Game, x2f), (SendQueue::Game, x30)]);
+}
+
 // Covers: specs/client/bridge.md §4 r1, §4 r2
 #[test]
 fn intent_bytes_match_layouts() {

@@ -145,6 +145,10 @@ impl<L: ServerLink> Bridge<L> {
     /// processed (a fatal assert in 1.14d). The frame's outputs wait in
     /// the bridge for [`Self::take_outputs`] (spec §10 rule 4).
     pub fn frame(&mut self) -> Result<FrameReport, BridgeError> {
+        // A dialog-reply slot the UI layer did not answer after the last
+        // frame's outputs carries no message (`msg-ui.md` §16 r4.3: no
+        // case was handed back, so no C→S 0x31).
+        self.world.outgoing.retain(|m| !m.is_empty());
         let pumped = self.link.pump()?;
         let mut report = FrameReport {
             ticked: pumped.ticked,
@@ -219,13 +223,35 @@ impl<L: ServerLink> Bridge<L> {
     }
 
     /// Sends the model's own C→S messages (`model.md` §6 rule 8, §7 rule
-    /// 3) through the send path, in order, and clears them.
+    /// 3) through the send path, in order, and clears them, up to the
+    /// first reserved dialog-reply slot (`world::DIALOG_REPLY_SLOT`):
+    /// that slot and what follows wait for [`Self::npc_dialog_branch`].
     pub fn send_outgoing(&mut self) -> Result<usize, BridgeError> {
-        let out = std::mem::take(&mut self.world.outgoing);
+        let n = self
+            .world
+            .outgoing
+            .iter()
+            .position(|m| m.is_empty())
+            .unwrap_or(self.world.outgoing.len());
+        let out: Vec<Vec<u8>> = self.world.outgoing.drain(..n).collect();
         for m in &out {
             self.send_bytes(m)?;
         }
         Ok(out.len())
+    }
+
+    /// The UI layer's answer to an `NpcDialog` output (`msg-ui.md` §16
+    /// r4.3; open question 10 decided as A, `bridge.md` §10 r6): the
+    /// bridge applies the branch's model writes and C→S 0x31 in 1.14d
+    /// order ([`msg::ui_npc::apply_dialog_branch`]), then sends the
+    /// messages that waited behind the slot. Returns how many were sent.
+    pub fn npc_dialog_branch(
+        &mut self,
+        dialog: &output::NpcDialog,
+        case: msg::ui_npc::DialogCase,
+    ) -> Result<usize, BridgeError> {
+        msg::ui_npc::apply_dialog_branch(&mut self.world, dialog, case);
+        self.send_outgoing()
     }
 
     /// The draw's Y sort of a room's unit list written back to the client
@@ -260,6 +286,12 @@ impl<L: ServerLink> Bridge<L> {
 
     pub fn inputs(&self) -> &ModelInputs {
         &self.inputs
+    }
+
+    /// The model, writable (tests only).
+    #[cfg(test)]
+    pub(crate) fn world_mut(&mut self) -> &mut ClientWorld {
+        &mut self.world
     }
 
     pub fn world(&self) -> &ClientWorld {

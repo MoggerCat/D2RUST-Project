@@ -2,7 +2,7 @@
 //! Test vectors of `client/msg-ui.md` §4–§22: "A" = `20261006-015956`,
 //! "B" = `20261006-022633` recordings; the rest synthetic.
 
-use super::super::output::Output;
+use super::super::output::{NpcDialog, Output};
 use super::super::world::{
     ClientWorld, KindData, MonsterClass, PlayerData, SkillRow, UnitKey, ITEM, MONSTER, OBJECT,
     PLAYER,
@@ -298,17 +298,89 @@ fn quest_info_npc_present_a37353() {
     m.recv(&quest_info(1, 6));
     let u = m.unit(k);
     assert_eq!(u.flag_2, Some(true));
-    assert_eq!(m.w.outgoing, [hex("2f 01 00 00 00 06 00 00 00")]);
+    // 0x2F, then the dialog branch's reserved slot (open question 10
+    // decided as A).
+    assert_eq!(m.w.outgoing, [hex("2f 01 00 00 00 06 00 00 00"), vec![]]);
     let [Output::NpcDialog(d)] = &m.out[..] else {
         panic!("{:?}", m.out)
     };
     assert_eq!((d.kind, d.guid, d.unit, d.class), (1, 6, k, 148));
     assert!(d.interact && !d.cursor_item);
     assert_eq!(d.npc_monsters, [k]);
-    // Open question 10: the dialog branch's model writes and C→S 0x31
-    // are not done by the bridge.
-    assert_eq!(m.w.outgoing.len(), 1);
+    // The branch's model writes wait for the UI layer's case.
     assert_eq!(m.unit(k).mode, 0);
+}
+
+/// An NPC (monster 6, class `class`) and the local player (mode 1),
+/// after 0x28 T 1 and a later 0x28 for an absent unit (its 0x30 queued
+/// behind the slot).
+fn dialog(class: u32, interact: bool) -> (Model, NpcDialog) {
+    let mut m = Model::default();
+    let mut rows = vec![Some(MonsterClass::default()); 600];
+    rows[class as usize] = Some(MonsterClass {
+        interact,
+        npc: true,
+        ..MonsterClass::default()
+    });
+    m.inputs.tables.monsters = rows;
+    m.put(UnitKey::new(MONSTER, 6)).class = class;
+    m.put(P1).mode = 1;
+    m.w.local_player = Some(P1);
+    m.recv(&quest_info(1, 6));
+    m.recv(&quest_info(1, 7));
+    let d = match &m.out[0] {
+        Output::NpcDialog(d) => (**d).clone(),
+        o => panic!("{o:?}"),
+    };
+    (m, d)
+}
+
+// Covers: specs/client/msg-ui.md §16 r4, §16 r5
+#[test]
+fn dialog_branch_writes_and_0x31_in_order() {
+    use super::ui_npc::{apply_dialog_branch, DialogCase};
+    let k = UnitKey::new(MONSTER, 6);
+    let x2f = hex("2f 01 00 00 00 06 00 00 00");
+    let x30 = hex("30 00 00 00 00 07 00 00 00");
+    // B2: U mode 1 facing the local player; C→S 0x31 (u32 G, u32 m) in
+    // the slot after 0x2F, before the later 0x30.
+    let (mut m, d) = dialog(148, true);
+    assert_eq!(m.w.outgoing, [x2f.clone(), vec![], x30.clone()]);
+    apply_dialog_branch(&mut m.w, &d, DialogCase::B2 { m: 0x25 });
+    assert_eq!(
+        m.w.outgoing,
+        [x2f.clone(), hex("31 06 00 00 00 25 00 00 00"), x30.clone()]
+    );
+    let u = m.unit(k);
+    assert_eq!(
+        (u.mode, u.turned_toward, u.path_stopped),
+        (1, Some(P1), false)
+    );
+    assert_eq!(u.flag_2, Some(true));
+    assert_eq!(m.unit(P1).turned_toward, None);
+    // B0: only unit flag 0x2 := 0; no 0x31.
+    let (mut m, d) = dialog(148, true);
+    apply_dialog_branch(&mut m.w, &d, DialogCase::B0);
+    assert_eq!(m.w.outgoing, [x2f.clone(), x30.clone()]);
+    let u = m.unit(k);
+    assert_eq!((u.flag_2, u.mode, u.turned_toward), (Some(false), 0, None));
+    // B3–B6: U faces the player, then the player faces U and U's path
+    // stops; no 0x31.
+    let (mut m, d) = dialog(148, true);
+    apply_dialog_branch(&mut m.w, &d, DialogCase::Rest);
+    assert_eq!(m.w.outgoing, [x2f.clone(), x30.clone()]);
+    assert_eq!(m.unit(P1).turned_toward, Some(k));
+    assert!(m.unit(k).path_stopped);
+    assert_eq!(m.unit(k).mode, 1);
+    // Class 527 (no facing either way) and a class without `interact`.
+    let (mut m, d) = dialog(527, true);
+    apply_dialog_branch(&mut m.w, &d, DialogCase::Rest);
+    assert_eq!((m.unit(k).mode, m.unit(P1).turned_toward), (0, None));
+    assert!(m.unit(k).path_stopped);
+    let (mut m, d) = dialog(148, false);
+    apply_dialog_branch(&mut m.w, &d, DialogCase::B1);
+    assert_eq!((m.unit(k).mode, m.unit(k).path_stopped), (0, false));
+    assert_eq!(m.w.outgoing, [x2f, x30]);
 }
 
 // Covers: specs/client/msg-ui.md §17 r1, §17 r2, §17 r3

@@ -191,7 +191,21 @@ pub struct ClientUnit {
     /// The stat list of each state (`client/stat-lists.md` §3 r2):
     /// (stat, param) → value, attached to the unit.
     pub state_lists: BTreeMap<u8, BTreeMap<(u16, u16), i32>>,
+    /// The unit this unit was last turned toward by a model rule
+    /// (`msg-ui.md` §16 r4.3: `0x00649EF0` on its path toward that
+    /// unit's position, `0x00464420` / `0x004644E0`). The model holds no
+    /// client path record, so the turn's input is kept, not the
+    /// direction.
+    pub turned_toward: Option<UnitKey>,
+    /// `0x00648730` (path flag 0x20 cleared, point count := 0) was called
+    /// on the unit's path by a model rule (`msg-ui.md` §16 r4.3).
+    pub path_stopped: bool,
 }
+
+/// The reserved `outgoing` slot of 0x28's dialog branch (`msg-ui.md`
+/// §16 r4, open question 10 decided as A): C→S 0x31 of case B2 goes here,
+/// right after the handler's 0x2F, so the bytes keep 1.14d's order.
+pub const DIALOG_REPLY_SLOT: Vec<u8> = Vec::new();
 
 impl ClientUnit {
     /// A unit with only its key: class 0, mode 0, not placed, no stats,
@@ -213,6 +227,8 @@ impl ClientUnit {
             flag_2: None,
             states: BTreeSet::new(),
             state_lists: BTreeMap::new(),
+            turned_toward: None,
+            path_stopped: false,
         }
     }
 
@@ -445,7 +461,9 @@ pub struct ClientWorld {
     pub exit_requested: bool,
     pub rooms_in_sight: Vec<RoomSight>,
     /// C→S messages the client sends on its own (§6 rule 8, §7 rule 3),
-    /// until the bridge hands them to its send path.
+    /// until the bridge hands them to its send path. An empty entry is a
+    /// reserved slot ([`DIALOG_REPLY_SLOT`]): nothing after it is sent
+    /// until the UI's answer fills or clears it.
     pub outgoing: Vec<Vec<u8>>,
     /// 0x3F's use-item cursor.
     pub use_cursor: Option<UseCursor>,

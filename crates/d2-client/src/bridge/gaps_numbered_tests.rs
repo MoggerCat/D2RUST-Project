@@ -250,8 +250,12 @@ fn client_world_holds_only_stated_fields() {
         flag_2,
         states,
         state_lists,
+        // `client/msg-ui.md` §16 r4.3 (open question 10 decided as A).
+        turned_toward,
+        path_stopped,
     } = ClientUnit::new(key);
     assert!(skills.is_none() && !quest_untargetable);
+    assert!(turned_toward.is_none() && !path_stopped);
     assert!(flag_2.is_none() && states.is_empty() && state_lists.is_empty());
     assert_eq!(k, key);
     assert_eq!((class, mode, position, server_point), (0, 0, None, (0, 0)));

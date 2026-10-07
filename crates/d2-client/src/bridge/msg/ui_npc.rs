@@ -6,7 +6,9 @@
 
 use super::super::dispatch::{HandlerError, Message};
 use super::super::output::{NpcDialog, Output};
-use super::super::world::{ClientWorld, KindData, UnitKey, MONSTER, OBJECT};
+use super::super::world::{
+    ClientWorld, KindData, UnitKey, DIALOG_REPLY_SLOT, MONSTER, OBJECT, PLAYER,
+};
 use super::Bytes;
 
 fn len(msg: &Message<'_>, n: usize, what: &'static str) -> Result<(), HandlerError> {
@@ -55,6 +57,10 @@ pub fn quest_info(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerE
     m.extend(le(u32::from(t)));
     m.extend(le(g));
     w.outgoing.push(m);
+    // Open question 10, decided as A: the dialog branch's C→S 0x31 keeps
+    // its place right after 0x2F; the bridge fills the slot when the UI
+    // hands back its case ([`apply_dialog_branch`]).
+    w.outgoing.push(DIALOG_REPLY_SLOT);
     // The captured inputs of the UI branch.
     let monsters = &msg.inputs.tables.monsters;
     let row = |c: u32| monsters.get(c as usize).copied().flatten();
@@ -68,12 +74,10 @@ pub fn quest_info(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerE
         .filter(|u| u.key.unit_type == MONSTER && row(u.class).is_some_and(|r| r.npc))
         .map(|u| u.key)
         .collect();
-    // TODO(spec: client/msg-ui.md open question 10): the dialog branch
-    // (§16 r4.3) decides on UI state and four of its effects write the
-    // model (unit flag 0x2 := 0 in B0, U's mode and facing, the local
-    // player's facing, U's path stop) and B2 sends C→S 0x31. Until the
-    // question is settled the bridge does none of these; the UI layer
-    // gets the captured inputs only.
+    // The dialog branch (§16 r4.3) decides on UI state: the UI layer
+    // evaluates it and hands the case back; its model writes and C→S
+    // 0x31 are the bridge's ([`apply_dialog_branch`], open question 10
+    // decided as A: `bridge.md` §10 r6 stands).
     msg.out.push(Output::NpcDialog(Box::new(NpcDialog {
         kind: t,
         guid: g,
@@ -86,6 +90,82 @@ pub fn quest_info(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerE
         npc_monsters,
     })));
     Ok(())
+}
+
+/// The case of 0x28's dialog branch the UI layer chose (§16 r4.3; the
+/// first that holds). B3–B6 write the model alike.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DialogCase {
+    /// `[0x007C0C68]` ≠ 0.
+    B0,
+    /// The local player has a cursor item.
+    B1,
+    /// m = `0x00661400(txt, 0)` ≠ 0xFFFF: C→S 0x31 with m.
+    B2 { m: u32 },
+    /// B3, B4, B5 or B6.
+    Rest,
+}
+
+/// Classes whose `interact` NPC does not take mode 1 and face the player.
+const NO_FACE: [u32; 4] = [537, 538, 539, 527];
+
+/// The model writes and the C→S 0x31 of 0x28's dialog branch (§16 r4.3,
+/// the bold effects), in 1.14d order, for the case the UI layer chose:
+///
+/// 1. B0: unit flag 0x2 := 0; nothing else.
+/// 2. Otherwise: an `interact` class other than 537, 538, 539, 527 → U's
+///    mode := 1 and U turns toward the local player.
+/// 3. B1: nothing more. B2: C→S 0x31 (`31`, u32 G, u32 m) in the slot
+///    reserved after 0x2F.
+/// 4. B3–B6: class ≠ 527 and the local player in mode 1 or 5 → the
+///    local player turns toward U; U's path stops.
+///
+/// The slot is cleared in every case but B2. A unit no longer present
+/// takes no model write (a later message of the frame removed it).
+pub fn apply_dialog_branch(w: &mut ClientWorld, d: &NpcDialog, case: DialogCase) {
+    let mut reply = None;
+    let local = w.local_player;
+    if case == DialogCase::B0 {
+        if let Some(u) = w.units.get_mut(&d.unit) {
+            u.flag_2 = Some(false);
+        }
+    } else {
+        if d.interact && !NO_FACE.contains(&d.class) {
+            if let Some(u) = w.units.get_mut(&d.unit) {
+                u.mode = 1;
+                u.turned_toward = local;
+            }
+        }
+        match case {
+            DialogCase::B2 { m } => {
+                let mut b = vec![0x31];
+                b.extend(le(d.guid));
+                b.extend(le(m));
+                reply = Some(b);
+            }
+            DialogCase::Rest => {
+                if d.class != 527 {
+                    if let Some(l) = local.and_then(|k| w.units.get_mut(&k)) {
+                        if l.key.unit_type == PLAYER && matches!(l.mode, 1 | 5) {
+                            l.turned_toward = Some(d.unit);
+                        }
+                    }
+                }
+                if let Some(u) = w.units.get_mut(&d.unit) {
+                    u.path_stopped = true;
+                }
+            }
+            _ => {}
+        }
+    }
+    if let Some(i) = w.outgoing.iter().position(|m| m.is_empty()) {
+        match reply {
+            Some(b) => w.outgoing[i] = b,
+            None => {
+                w.outgoing.remove(i);
+            }
+        }
+    }
 }
 
 /// 0x62 MakeUnitTargetable (§17): type T u8@1, GUID u32@2.
