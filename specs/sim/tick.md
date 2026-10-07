@@ -31,15 +31,15 @@
 |   3. Tick steps in order | 143–173 |
 |   4. Room pass (step 3) | 174–209 |
 |   5. Timer events (step 4) | 210–376 |
-|   6. Client pass (step 5) | 377–436 |
-|   7. Periodic steps, summary | 437–446 |
-|   8. Wall-clock and host-only parts | 447–459 |
-| Constants & data dependencies | 460–473 |
-| Randomness | 474–481 |
-| Edge cases & original bugs | 482–513 |
-| Test vectors | 514–602 |
-| Provenance | 603–633 |
-| Open questions | 634–681 |
+|   6. Client pass (step 5) | 377–440 |
+|   7. Periodic steps, summary | 441–450 |
+|   8. Wall-clock and host-only parts | 451–463 |
+| Constants & data dependencies | 464–477 |
+| Randomness | 478–485 |
+| Edge cases & original bugs | 486–517 |
+| Test vectors | 518–606 |
+| Provenance | 607–637 |
+| Open questions | 638–685 |
 <!-- /index -->
 
 ## Summary
@@ -380,9 +380,13 @@ Owned by `units.md`; confirmed on the recordings by `check_units.py`
 
 1. Asserts the game's arena record (`0x0053FCA0`).
 2. Heartbeat (`0x0052D350`): host-only, wall-clock (§8).
-3. If frame % 8192 == 0 and no client was dropped by the heartbeat: for
-   each client, save its character (`0x00532400`) and report it to the
-   host callbacks (`0x0052CA10`). Host-only (§8).
+3. If frame % 8192 == 0 and no client was dropped by the heartbeat:
+   `0x0052CA10(game)` (`0x0052D4BD`; no host-callback gate on the
+   call): for each client (client-list order, next saved first) with a
+   player, save its character (`0x00532400`). This runs in single
+   player too. Only the ladder report after each save is host-only: it
+   needs host callbacks, a callback at +0x28 and game +0x74 (ladder).
+   Corrected 2026-10-08: the whole step was called host-only.
 4. For each client in client-list order (`unit-order.md` §7; next saved
    before the body), by client state (client +0x04):
    - 3 (joining): per-client update (`0x005380D0`); when the client's room

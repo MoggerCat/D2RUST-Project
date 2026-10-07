@@ -34,24 +34,24 @@
 |   4. Receive and the unit message queue | 205–242 |
 |   5. Client update pass | 243–291 |
 |   6. Position check (`0x004804E0`) | 292–331 |
-|   7. Session messages | 332–443 |
-|   8. Mode requests | 444–528 |
-|   9. Room-in-sight messages | 529–563 |
-|   10. Bit reader | 564–578 |
-|   11. Current act and level (join and later) | 579–624 |
-|   12. Client DRLG and the room of a point | 625–666 |
-|   13. Visibility predicate (`0x004DBF20`) | 667–694 |
-|   14. Pet list and the hireling GUID | 695–721 |
-|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 722–788 |
-|   16. C→S 0x4B after a teleport (the hireling case) | 789–823 |
-|   17. Model writes made by 1.14d UI code | 824–941 |
-|   18. Audio driver inputs and the client object functions | 942–972 |
-| Constants & data dependencies | 973–985 |
-| Randomness | 986–997 |
-| Edge cases & original bugs | 998–1006 |
-| Test vectors | 1007–1054 |
-| Provenance | 1055–1126 |
-| Open questions | 1127–1209 |
+|   7. Session messages | 332–442 |
+|   8. Mode requests | 443–527 |
+|   9. Room-in-sight messages | 528–562 |
+|   10. Bit reader | 563–577 |
+|   11. Current act and level (join and later) | 578–623 |
+|   12. Client DRLG and the room of a point | 624–665 |
+|   13. Visibility predicate (`0x004DBF20`) | 666–693 |
+|   14. Pet list and the hireling GUID | 694–720 |
+|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 721–787 |
+|   16. C→S 0x4B after a teleport (the hireling case) | 788–822 |
+|   17. Model writes made by 1.14d UI code | 823–940 |
+|   18. Audio driver inputs and the client object functions | 941–971 |
+| Constants & data dependencies | 972–984 |
+| Randomness | 985–996 |
+| Edge cases & original bugs | 997–1005 |
+| Test vectors | 1006–1053 |
+| Provenance | 1054–1125 |
+| Open questions | 1126–1208 |
 <!-- /index -->
 
 ## Summary
@@ -435,9 +435,8 @@ position check of the local player.
    @0x2C = 0, the language id. PROVISIONAL: a classic character sends
    0x00000004 (because the server reads only bit 20 for expansion and
    bits 1–2 for its check, and the builder's default sets bit 2; the
-   menu writer of C +0x209 is UI code not read here); settled by a new
-   capture: C→S 0x67 of a single-player start with a classic
-   character. Bytes after a
+   menu writer of C +0x209 is UI code not read here); settled by
+   REC-46. Bytes after a
    name's NUL: zero (the original's stack contents are not
    reproducible and no reader uses them).
 

@@ -5741,12 +5741,19 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 - Output: `pc2rec-r45-{packets,tick}.jsonl`.
 - Compare: the tick of the mode 1 → 2 change against the speed and the frame rule of `objects-client.md` §26. Fold: close §26.15.
 
+##### REC-46 [MANUAL] Classic single-player start (C→S 0x67 of a classic character)
+- Priority 3 (manual play; the forced start makes an expansion game and refuses a classic character, so it cannot be `--auto`).
+- Settles: `client/model.md` §7 r9 PROVISIONAL (the creation flags u32@0x27 a classic character sends; expected 0x00000004, the builder's default without bit 20), and the classic game type and flags the server stores (`sim/intents-events.md` §2.5, §8.1; `monsters/init.md` OQ1 is answered statically).
+- Steps: a new classic character made in the menu (Single Player → classic), start it at Normal; `record_packets.py --seconds 60` plain from the menu through the first frames in town; Save and Exit.
+- Output: `pc2rec-r46-packets.jsonl`.
+- Compare: the client_out 0x67 (seq 1) bytes @0x11–@0x14, @0x25, @0x27, @0x2B–@0x2D against §7 r9's table; S→C 0x01 u32@2 = u32@0x27 & 0x3179C7 and u8@6 = 0 (`intents-events.md` §8.1). Fold: replace the PROVISIONAL in `client/model.md` §7 r9.
+
 #### Deferred (not recorded; outside Phases 0–6)
 - IT-1 `formats/d2s.md` OQ1 (legacy loader `0x00534020`, pre-1.09 saves), IT-2 OQ2 (item records of save versions 0x5C–0x5F), `formats/d2s-legacy.md` and `items/bitstream-legacy.md` Pending lines (1.07 / 1.08 / 1.00–1.06 saves): need sample files and are only needed if old saves must load. Record only if the user opens that scope.
 - **REC-44** legacy saves, cited by the specs as the capture: `formats/d2s-legacy.md` OQ2 (load one 1.07 / 1.08 save, version 0x57 / 0x59, in 1.14d and compare the unit (stats, skills, items, hireling) with the rules), `items/bitstream-legacy.md` OQ1 (the same 1.07 / 1.08 save: every item against §2–§4, affix ids after the offset of §2 rule 3) and OQ2 (a 1.00–1.06 save, version 0x47, holding a stored, equipped, belt, cursor and socketed item, an ear and a corpse with an equipped item: compare with §6–§8 and edge cases 7–9). No such save exists on this PC; record only if the user opens that scope (steps: place the save in `%USERPROFILE%\Saved Games\Diablo II`, `record_packets.py --seconds 60` plain, then `tools/d2s_check.py`).
 
 #### [NO] Not reachable with the current setup (and why)
-- A classic game (`monsters/init.md` OQ1 0x67 in classic SP; `client/model.md` §7 r8 / §17 r6 (a) joining a classic game with an expansion character; `quests-act4.md` OQ2 classic end; REC-29's classic part): the forced start always makes an expansion game; a classic character is refused. Needs a manual classic start.
+- A classic game (REC-46; `monsters/init.md` OQ1 0x67 in classic SP; `client/model.md` §7 r8 / §17 r6 (a) joining a classic game with an expansion character; `quests-act4.md` OQ2 classic end; REC-29's classic part): the forced start always makes an expansion game; a classic character is refused. Needs a manual classic start.
 - Two-client games (a second client sees the owner's hireling, REC-10 / `hirelings.md` OQ7 and R1 on a hosted game; the Alkor broadcast of REC-28; the uncredited player of `quests-act4.md` OQ2): needs a second client joined over TCP/IP; not attempted.
 - Act V (levels 109–132, REC-30, REC-31 GH, and the Act V parts of REC-38 / REC-40): the waypoint panel of `TestSor` has tabs I–IV only.
 - Fights, kills, quest chains, hireling events: the input script has no combat loop, so these are [MANUAL] / [ASSISTED] (REC-07…11, 23…34) and never `--auto`.
