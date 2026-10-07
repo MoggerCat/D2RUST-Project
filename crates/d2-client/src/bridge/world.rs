@@ -1,4 +1,4 @@
-// Spec: specs/client/model.md (§1, §2, §5 rule 4), specs/client/bridge.md (§5)
+// Spec: specs/client/model.md (§1, §2, §5 rule 4), specs/client/bridge.md (§5), specs/client/stat-lists.md (§1 rule 3)
 //! Client world model: what the S→C messages have told the client. Plain
 //! Rust, no Bevy. Not game state: `d2-sim` on the server is.
 //!
@@ -11,6 +11,8 @@
 use std::collections::BTreeMap;
 
 use super::drlg::{ClientDrlg, DrlgRoomId, DrlgSource};
+use super::skills::SkillList;
+use crate::rules::lighting::environment::Environment;
 use d2_proto::transport::server_message;
 
 /// Unit types (`sim/unit-order.md` §1 rule 1).
@@ -134,6 +136,12 @@ pub struct ClientUnit {
     pub queue: Vec<Vec<u8>>,
     pub last_mode_request: Option<ModeRequest>,
     pub kind: KindData,
+    /// The skill list (+0xA8, `msg-skills.md` §1 rule 1); `None` = no
+    /// list.
+    pub skills: Option<SkillList>,
+    /// Unit flag +0xC4 bit 0x2 cleared by S→C 0x5D (`msg-ui.md` §1
+    /// rule 4).
+    pub quest_untargetable: bool,
 }
 
 impl ClientUnit {
@@ -151,6 +159,8 @@ impl ClientUnit {
             queue: Vec::new(),
             last_mode_request: None,
             kind: KindData::None,
+            skills: None,
+            quest_untargetable: false,
         }
     }
 
@@ -284,7 +294,7 @@ pub struct ClientWorld {
     /// The pet list, newest first (§14 rule 5).
     pub pets: Vec<PetRecord>,
     /// The act whose palette is loaded (§11 rules 2, 4): the act of 0x03,
-    /// replaced by the Levels `Act` of the new level on a room change.
+    /// replaced by the Levels `Pal` of the new level on a room change.
     pub palette_act: Option<u8>,
     /// The client DRLG act (`[0x007A0634]`, §12 rule 1): built by 0x03
     /// from [`ModelInputs::drlg`], rooms set in sight by 0x07 / 0x08.
@@ -296,6 +306,17 @@ pub struct ClientWorld {
     /// headless configuration of `ModelInputs::default`), so a placement
     /// is taken as in a room and the level is unknown.
     pub active_rooms: Option<Vec<ActiveRoom>>,
+    /// The environment record of the client act (act +0x04,
+    /// `render/lighting.md` §9.1, §9.2 r4): created with the act by 0x03,
+    /// set by 0x53.
+    pub environment: Option<Environment>,
+    /// The eclipse pending flag `[0x007A060E]` (`render/lighting.md`
+    /// §9.2 r3): set by 0x5D without a client act.
+    pub eclipse_pending: bool,
+    /// The skill-tree flag `[0x007C0C3C]`: `Some(0)` once 0x21 cleared it
+    /// (`msg-skills.md` §4 rule 2); no other model rule writes it
+    /// (`msg-skills.md` open question 3).
+    pub skill_tree_flag: Option<u32>,
 }
 
 impl ClientWorld {
@@ -390,6 +411,29 @@ impl ClientWorld {
         self.active_rooms = self.drlg.as_ref().map(ClientDrlg::active_rooms);
     }
 
+    /// `base(unit, stat, layer)` (`0x006253B0`, `client/stat-lists.md`
+    /// §1 rule 3): the unit's base value. The model holds the layer-0
+    /// base array (`ClientUnit::stats`); every base write is layer 0, so
+    /// another layer has no entry (0). A unit not in S reads 0 (a null
+    /// unit, `sim/stats.md` §4.2).
+    pub fn base(&self, key: UnitKey, stat: u16, layer: u16) -> i32 {
+        match self.units.get(&key) {
+            Some(u) if layer == 0 => u.stat(stat),
+            _ => 0,
+        }
+    }
+
+    /// `total(unit, stat, layer)` (`0x00625480`, `client/stat-lists.md`
+    /// §1 rule 3): the full array of the unit's list. It equals the base
+    /// until a client rule attaches a list (§2–§4), and none does yet:
+    /// item lists wait for the item stream (`stat-lists.md` open question
+    /// 2), state lists for 0xA7–0xA9 (§3 rule 5, ids `TBD`), and a
+    /// passive skill's list is refused as pending
+    /// (`super::skills::SkillError::PassiveState`).
+    pub fn total(&self, key: UnitKey, stat: u16, layer: u16) -> i32 {
+        self.base(key, stat, layer)
+    }
+
     /// The local player's level (§11 rules 3, 5): the level id of its
     /// room; none while it has no room.
     pub fn player_level(&self) -> Option<u16> {
@@ -473,13 +517,32 @@ pub struct ClientTables {
     pub stats: Vec<StatSend>,
     /// One entry per `Levels.txt` row, by level id (§11 rule 4).
     pub levels: Vec<LevelRow>,
+    /// One entry per `skills` row, by skill id (`msg-skills.md` Inputs);
+    /// the skill count is the row count.
+    pub skills: Vec<SkillRow>,
+}
+
+/// The `skills` fields the client skill list reads (`msg-skills.md`
+/// Inputs, §2; `skills/levels.md` §6).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SkillRow {
+    /// +0x10 `anim`.
+    pub anim: u8,
+    /// +0x11 `monanim`.
+    pub monanim: u8,
+    /// +0x94 `passivestate` (read signed; > 0 = a passive state).
+    pub passivestate: u16,
+    /// `maxlvl` (u16 at 300, read signed).
+    pub maxlvl: u16,
 }
 
 /// The `Levels.txt` fields the client reads of the player's level
 /// (§11 rules 3–4; `audio/environment.md` §1 r2).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct LevelRow {
-    /// `Act`.
+    /// `Pal` (+0x02): the palette act of the room change (§11 rule 4).
+    pub pal: u8,
+    /// `Act` (+0x03).
     pub act: u8,
     /// `BlankScreen` (record +0x218, `render/composition.md` §3 step 2).
     pub blank_screen: bool,

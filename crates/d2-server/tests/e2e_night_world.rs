@@ -293,6 +293,9 @@ impl Pending for TestPending {
         }
         true
     }
+    fn set_entry_param_of(&mut self, _: UnitId, e: &SkillEntry, i: u8, v: i32) {
+        self.book.param(e, i, v);
+    }
 }
 
 /// The free-spot search `0x0064E810` (collision spec, not written): the
@@ -484,6 +487,11 @@ impl Book {
         } else {
             7
         }
+    }
+    /// The used entry's param `i` := v (srvst 53 writes param 1 := frame +
+    /// level): logged.
+    fn param(&self, e: &SkillEntry, i: u8, v: i32) {
+        self.get().log.push(format!("param{i} {} {v}", e.skill));
     }
     fn srvst(&self, index: u16, _: UnitId, skill: i32, lvl: i32) -> i32 {
         self.get().log.push(format!("srvst {index} {skill} {lvl}"));
@@ -952,6 +960,7 @@ fn the_hireling_follows_a_waypoint_teleport() {
     let w = &mut fx.sim().world;
     w.state.hireling_tables = Some(HirelingTables {
         rows,
+        exp_ratios: Default::default(),
         max_level: 99,
         pet_flags: HirelingTables::WARP,
         pet_basemax: 1,
@@ -994,8 +1003,11 @@ fn the_hireling_follows_a_waypoint_teleport() {
     // itself (leave the old room list, place at the target,
     // `0x00650BE0`) is the rest's `warp_to`, which has no provider: the
     // unit keeps its old position.
+    // The bit is set by rule 5 and cleared again by the end-of-tick room
+    // clean-up (`intents-events.md` §7.5 rule 3: flag-ex 0x10000 := 0),
+    // which the tick now runs; after the step it reads 0.
     let f2 = fx.sim().events.action.sys.units.get(merc).unwrap().flags2;
-    assert_eq!(f2 & hflags::WARP2, hflags::WARP2);
+    assert_eq!(f2 & hflags::WARP2, 0);
     assert_eq!(fx.pos(merc), merc_at, "warp_to is Pending");
     assert_eq!(fx.sim().events.action.hooks().pet_follows, Some(vec![]));
     fx.assert_clean();
@@ -1131,15 +1143,20 @@ fn a_population_monster_killed_with_a_missile() {
     // 1 `0x005A72B0`) has no written body (monster spec): the wired host
     // runs nothing there (`UnitHooks::monster_mode_function` default), so
     // the monster stays in mode 0 instead of reaching DD (12).
+    // The AI think the client's room join scheduled
+    // (`intents-events.md` §7.8 rule 2.3, `0x00573780`; Idle → 203) is
+    // still pending beside it.
     let timers = fx.timers(monster);
-    assert_eq!(timers.len(), 1, "{timers:?}");
+    assert_eq!(timers.len(), 2, "{timers:?}");
+    assert_eq!(timers[1], (2, 203));
     let (ev, end) = timers[0];
     assert_eq!(ev, 1);
     while fx.host.game.game.frame < end + 2 {
         transcript.extend(fx.step(&[]).1);
     }
-    assert!(fx.timers(monster).is_empty());
-    assert_eq!(fx.mode(monster), 0, "the DT end function is Pending");
+    assert_eq!(fx.timers(monster), [(2, 203)]);
+    // `impl-monster-death`: DT event 1 (`0x005A72B0`) now sets mode 12 (DD).
+    assert_eq!(fx.mode(monster), 12, "the DT end sets DD");
     // `intents-events.md` §7.4 rule 7 states the death messages (0x69
     // code 8 at the kill, code 9 when the death animation ends) and §7.6
     // the drop's 0x9C. Both come from the client pass's per-unit update
@@ -1147,5 +1164,11 @@ fn a_population_monster_killed_with_a_missile() {
     // nothing is sent for the cast, the missile, the kill or the drop.
     // When it is wired this transcript must hold the §7.4 / §7.6 bytes.
     assert_eq!(transcript, Vec::<Vec<u8>>::new());
-    fx.assert_clean();
+    // The cast's S→C 0x4C / 0x4D skill message has no written layout
+    // (`docs/handoff/impl-monster-death.md` §3): the host logs it as a
+    // gap, once per cast message; nothing else may be logged.
+    assert_eq!(
+        fx.errors(),
+        vec!["ModeMessage(SkillMessage { unit: UnitId(4), to_unit: false })".to_string(); 2]
+    );
 }

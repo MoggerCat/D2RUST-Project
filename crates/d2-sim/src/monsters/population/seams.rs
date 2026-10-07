@@ -161,8 +161,8 @@ pub trait MonsterInit {
     fn barricade_object(&mut self, unit: UnitId, class: i32);
     /// `0x0058F000`, then `0x00666120` when the preset has data.
     fn preset_created(&mut self, unit: UnitId, preset: &PresetUnit);
-    /// `0x005417D0`: event 7 at frame + 250 + `roll(50)`. TODO(spec:
-    /// population.md §11.5 r4): the seed of the `roll(50)` is not stated.
+    /// `0x005417D0`: event 7 at frame + 250 + `roll(50)` on the
+    /// monster's own seed (§11.5 r4; `unit-events.tsv` `0x0054ea84`).
     fn schedule_monumod(&mut self, unit: UnitId);
     /// `0x005B1990(game, unit, a, b)` (open question 7).
     fn change_alignment(&mut self, unit: UnitId, a: i32, b: i32);

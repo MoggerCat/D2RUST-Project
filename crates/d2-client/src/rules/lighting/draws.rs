@@ -32,9 +32,10 @@ pub const MATERIAL_UNLIT: u32 = 0x100;
 /// error naming it, never a made-up value (M07).
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum DrawLightError {
-    /// Wall direction 0: the original passes six uninitialized stack
-    /// words (Edge case 7, Open question 8). Pending: no value exists.
-    #[error("wall direction 0 has no light points: the original reads uninitialized stack (render/lighting.md Edge case 7, OQ8)")]
+    /// Wall direction 0 (never in 1.14d tiles) as the first wall of its
+    /// pass: no earlier record left light words in the pass's array, so
+    /// the original's values are undefined (fatal; Edge case 7, OQ8).
+    #[error("wall direction 0 with no earlier wall in the pass: the original's light words are undefined (render/lighting.md Edge case 7, OQ8)")]
     WallDirection0,
     /// A direction outside the 1…9 the point tables hold.
     #[error(
@@ -187,8 +188,8 @@ impl WallPoints {
     }
 
     /// The six `(dx, dy)` of a wall with DT1 `direction` (header `+0x00`)
-    /// in `table`. Direction 0 is [`DrawLightError::WallDirection0`] (Edge
-    /// case 7).
+    /// in `table`. Direction 0 has no points: [`DrawLightError::WallDirection0`]
+    /// here; [`WallPass`] gives it the previous record's words.
     pub fn offsets(
         &self,
         direction: u32,
@@ -230,6 +231,35 @@ pub fn wall_light_words(
     let offsets = wall_points().offsets(direction, PointTable::of_fade(fade))?;
     let (x, y) = (8 * origin_sub_tile.0, 8 * origin_sub_tile.1);
     Ok(offsets.map(|(dx, dy)| map.read(x + 8 * dx, y + 8 * dy).word()))
+}
+
+/// The light array of one wall pass (`0x004DF1C0` loop, §11 r2, OQ8):
+/// one array for the whole pass, so a record with direction 0 (no light
+/// points; never in 1.14d tiles) keeps the words the previous record of
+/// the pass wrote. Start a new one per pass.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct WallPass {
+    last: Option<[u32; WALL_POINTS]>,
+}
+
+impl WallPass {
+    /// [`wall_light_words`] for the next record of the pass; direction 0
+    /// reuses the previous record's words, and is
+    /// [`DrawLightError::WallDirection0`] when it is the pass's first.
+    pub fn words(
+        &mut self,
+        map: &LightMap,
+        origin_sub_tile: (i32, i32),
+        direction: u32,
+        fade: u32,
+    ) -> Result<[u32; WALL_POINTS], DrawLightError> {
+        if direction == 0 {
+            return self.last.ok_or(DrawLightError::WallDirection0);
+        }
+        let w = wall_light_words(map, origin_sub_tile, direction, fade)?;
+        self.last = Some(w);
+        Ok(w)
+    }
 }
 
 /// The corners `c0…c3` of the wall block at block x `block_x` (§11 r2):

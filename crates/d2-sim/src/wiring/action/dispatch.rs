@@ -1,4 +1,4 @@
-// Spec: specs/sim/tick.md §3, §5.5, §5.6; specs/world/objects.md §2, §14; specs/sim/units.md §5; specs/drlg/rooms.md §4.1, §7, §8; specs/drlg/levels.md §9
+// Spec: specs/sim/tick.md §3, §5.5, §5.6; specs/sim/intents-events.md §7.3, §7.5; specs/world/objects.md §2, §14; specs/sim/units.md §5; specs/drlg/rooms.md §4.1, §7, §8; specs/drlg/levels.md §9
 //! [`ActionSim`]: the one dispatcher the tick runs. Timer events go to
 //! the unit dispatch (`units.md` §5: the per-kind handler tables and the
 //! monster freeze drop of `tick.md` §5.6), whose hooks run the missile
@@ -251,10 +251,12 @@ impl<X: Pending> TickHooks for ActionSim<X> {
 
     /// Per-client update (`tick.md` §6.5, `0x0053A5D0`): with the path
     /// provider on, a player's movement messages (`pathing.md` §10 rules
-    /// 2–3, [`crate::wiring::path::walk::update_messages`]). Other units'
-    /// update messages (the unit-update spec) are not written, except
-    /// objects: the object update pass `0x00581AD0` (`objects.md` §14,
-    /// [`View::object_update`]) to the client's player.
+    /// 2–3, [`crate::wiring::path::walk::update_messages`]) and a
+    /// monster's mode message (`intents-events.md` §7.3 rule 2 step 2,
+    /// [`View::monster_update`]); objects: the object update pass
+    /// `0x00581AD0` (`objects.md` §14, [`View::object_update`]) to the
+    /// client's player. Without the provider no unit has a path record,
+    /// so no player or monster message is built.
     fn send_unit_update(&mut self, game: &mut Game, client: ClientId, unit: UnitId) {
         let s = &mut self.sys;
         let mut v = View::of(&mut s.units, &mut s.stats, &s.data, &mut s.hooks);
@@ -271,59 +273,54 @@ impl<X: Pending> TickHooks for ActionSim<X> {
         if v.h.paths.is_none() {
             return;
         }
+        if game
+            .lists
+            .unit(unit)
+            .is_some_and(|e| e.ty == UnitType::Monster)
+        {
+            v.monster_update(game, client, unit);
+            return;
+        }
         crate::wiring::path::walk::update_messages(&mut v, game, client, unit);
     }
 
+    /// Step 6 (`0x00553220`, `intents-events.md` §7.5): the flag part of
+    /// the room clean-up ([`View::room_cleanup`]).
+    fn unit_update(&mut self, _: &mut Game, unit: UnitId) {
+        let s = &mut self.sys;
+        View::of(&mut s.units, &mut s.stats, &s.data, &mut s.hooks).room_cleanup(unit);
+    }
+
     /// Per-client update (`tick.md` §6.5): the player's room differs from
-    /// the client's. The room switch `0x00537B50` (`rooms.md` §4.1,
-    /// `levels.md` §9.1) runs on the DRLG and the client's room becomes
-    /// the player's. For each room the client joins (new adjacency order)
-    /// `0x0053A8E0` sends S→C 0x07 for it to the client's player
-    /// (`sim/path-placement.md` §11 "Recipients", [`Pending::send`]).
-    ///
-    /// TODO(spec: intents-events.md §7.2): `0x0053A8E0` then sends the add
-    /// messages (`0x00571F90`) of every unit in the room but the player;
-    /// part B of those messages is not specified, so none is sent. The
-    /// leave side (`0x0053A9B0`) sends nothing here: no spec names a
-    /// message for it (S→C 0x08's server sender is not specified).
+    /// the client's: the room switch `0x00537B50` to the player's room
+    /// ([`View::room_switch`], `intents-events.md` §7.8).
     ///
     /// TODO(tick.md §6.5): the level-change calls `0x00543B90`,
-    /// `0x00537340` are not specified; a change between acts (act change,
-    /// `waypoints.md` open question 1) is not handled: the client keeps
-    /// its room.
+    /// `0x00537340` are not specified.
     fn client_level_change(&mut self, game: &mut Game, client: ClientId) {
-        let Some(e) = game.lists.client(client) else {
-            return;
-        };
-        let (old, player) = (e.room, e.player);
-        let new = player
+        let new = game
+            .lists
+            .client(client)
+            .and_then(|e| e.player)
             .and_then(|p| game.lists.unit(p))
             .and_then(|u| u.room());
-        let act_of = |r: Option<RoomId>| r.and_then(|r| game.lists.room(r)).map(|r| r.act);
-        let (old_act, new_act) = (act_of(old), act_of(new));
-        let act = match (old_act, new_act) {
-            (Some(a), Some(b)) if a != b => return,
-            (Some(a), _) | (None, Some(a)) => a,
-            (None, None) => return,
-        };
-        let r = self
-            .sys
-            .hooks
-            .drlg
-            .client_changes_room(&mut game.lists, act, client, old, new);
-        match (r, player) {
-            (Ok(joined), Some(player)) => {
-                for (x, y, level) in joined {
-                    let msg =
-                        crate::wiring::path::place::map_reveal(x as u16, y as u16, level as u8);
-                    self.sys.hooks.x.send(player, &msg);
-                }
-            }
-            (Ok(_), None) => {}
-            (Err(e), _) => self.sys.hooks.errors.push(e),
-        }
-        if let Some(e) = game.lists.client_mut(client) {
-            e.room = new;
+        self.with(game, |g, v| v.room_switch(g, client, new));
+    }
+
+    /// Step 5 (`0x0061A460`, `tick.md` §6 rule 6): the client's room is
+    /// ready ([`View::client_room_ready`]).
+    fn client_room_ready(&mut self, game: &mut Game, client: ClientId) -> bool {
+        self.with(game, |g, v| v.client_room_ready(g, client))
+    }
+
+    /// Step 5: S→C 0x04 LoadComplete (`0x0053B320(client, 4)`, `tick.md`
+    /// §6 rule 6) to the client's player.
+    fn send_load_complete(&mut self, game: &mut Game, client: ClientId) {
+        if let Some(p) = game.lists.client(client).and_then(|e| e.player) {
+            self.sys
+                .hooks
+                .x
+                .send(p, &crate::units::messages::LOAD_COMPLETE);
         }
     }
 }

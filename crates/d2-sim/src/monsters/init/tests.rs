@@ -405,9 +405,6 @@ impl InitHost for Fake {
         let s = self.fresh_seed();
         Some(self.monster(req.class, s))
     }
-    fn run_ai_tick(&mut self, unit: UnitId) {
-        self.log.push(format!("ai_tick {}", unit.0));
-    }
 }
 
 fn fake(monstats: Vec<Monstats>) -> Fake {
@@ -1581,18 +1578,26 @@ fn dispatcher_and_event7() {
     // Empty list: nothing.
     dispatch(&cx, &mut f, u, None, 1);
     assert!(f.store.unhandled.is_empty());
-    // Every slot, even after a 0.
+    // Every slot, even after a 0: two umod-41 runs, each a think restart
+    // (mode NU: type 2 cancelled, event 2 at F + 2) and event 7 at F + 75.
     f.store.entry(u).umods = [41, 0, 41, 0, 0, 0, 0, 0, 0];
     handle_event7(&cx, &mut f, u);
-    let ticks = f.log.iter().filter(|l| l.starts_with("ai_tick")).count();
-    assert_eq!(ticks, 2);
-    assert_eq!(f.game.timers.unit_timers(u).len(), 2);
+    let types = |f: &Fake| -> Vec<u8> {
+        let t = &f.game.timers;
+        let mut v: Vec<u8> = t
+            .unit_timers(u)
+            .into_iter()
+            .filter_map(|id| t.event(id).map(|e| e.0))
+            .collect();
+        v.sort_unstable();
+        v
+    };
+    assert_eq!(types(&f), [2, 7, 7]);
     // Dead: the 41 handler does nothing.
     f.units.get_mut(u).unwrap().mode = mode::DEATH;
     f.store.entry(u).umods = [41, 0, 0, 0, 0, 0, 0, 0, 0];
-    f.log.clear();
     handle_event7(&cx, &mut f, u);
-    assert!(f.log.is_empty());
+    assert_eq!(types(&f), [2, 7, 7]);
     // Mode 1, new mode 0: 9 needs unique; 10 does not; 18 needs unique.
     for (umod, unique, n) in [
         (9, false, 0),
@@ -1621,19 +1626,13 @@ fn dispatcher_and_event7() {
     f.store.entry(v).type_flags = type_flag::UNIQUE;
     dispatch(&cx, &mut f, v, None, 1);
     assert_eq!(f.game.timers.unit_timers(v).len(), 1);
-    // Unread callbacks are logged; mode 5 passes the missile.
+    // Every callback of the table has a body (`umod-callbacks.md`):
+    // nothing is recorded as unhandled; mode 5 hands the callbacks the
+    // missile (here a monster, which multishot ignores).
     let w = f.monster(0, 1);
     f.store.entry(v).umods = [29, 0, 0, 0, 0, 0, 0, 0, 0];
     dispatch(&cx, &mut f, v, Some(w), 5);
-    assert_eq!(
-        f.store.unhandled.last(),
-        Some(&Unhandled::Callback {
-            addr: 0x005A_3610,
-            unit: w,
-            umod: 29,
-            mode: 5
-        })
-    );
+    assert!(f.store.unhandled.is_empty());
 }
 
 // Covers: specs/monsters/init.md §22
@@ -1730,14 +1729,9 @@ fn check_umods(tsv: &str, table: &[UmodRow]) -> Result<(), String> {
 #[test]
 fn umods_match_tsv() {
     check_umods(UMODS_TSV, &UMODS).unwrap();
-    // The implemented callbacks are the ones §22 names.
-    for a in [
-        callback::FIRE_MODE,
-        callback::LIGHTNING_MODE,
-        callback::DEATH_MODE,
-        callback::AI_AFTER_DEATH,
-        callback::ALWAYS_RUN_AI,
-    ] {
+    // Every implemented callback is one of the table's
+    // (`callbacks::every_table_callback_has_a_body` checks the converse).
+    for a in callback::ALL {
         assert!(UMODS.iter().any(|r| r.callbacks.contains(&a)), "{a:#x}");
     }
 }
@@ -1939,6 +1933,8 @@ fn real_level_stats() {
     let s = stats_by_level(&ms[5], &ml, false, 2, l);
     assert_eq!((s.min_hp, s.max_hp, s.ac, s.xp), (3238, 4626, 907, 28069));
 }
+
+mod callbacks;
 
 // Tests written against surviving mutants (METHODS M08); a child module so
 // they share this module's fakes.

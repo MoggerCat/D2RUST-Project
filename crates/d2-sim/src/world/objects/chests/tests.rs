@@ -10,6 +10,8 @@ use crate::rng::Seed;
 
 impl ChestWorld for Fake {}
 
+mod mutant_tests;
+
 const OBJ: UnitId = UnitId(10);
 const PLAYER: UnitId = UnitId(20);
 const ROOM: RoomId = RoomId(3);

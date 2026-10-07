@@ -1,4 +1,4 @@
-// Spec: specs/sim/units.md §3, §4.1, §4.3, §4.5, §4.6, §5, §6; specs/monsters/init.md §5, §22; specs/formats/animdata.md §3–§5; specs/sim/stat-lists.md §4, §8, §9; specs/monsters/ai.md §1; specs/missiles/missiles.md §R3
+// Spec: specs/sim/units.md §3, §4.1, §4.3, §4.5, §4.6, §5, §6; specs/monsters/init.md §5, §22; specs/monsters/umod-callbacks.md §2; specs/formats/animdata.md §3–§5; specs/sim/stat-lists.md §4, §8, §9; specs/monsters/ai.md §1; specs/missiles/missiles.md §R3
 //! The unit side of the wiring: the unit hooks of [`ActionHooks`] (the
 //! missile class handler for missile events, the AI think and reset for
 //! monster events 2 and 10, the state-54 rule before a think is
@@ -118,13 +118,16 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
 
     /// Monster mode functions (`units.md` §4.6): the death start
     /// `0x005A6FF0` goes to [`Pending::monster_death_start`] with the
-    /// mode change's target; every other function keeps the default
-    /// (started, nothing done: monster spec).
+    /// mode change's target; DT's event functions `0x005A7350` /
+    /// `0x005A72B0` end the death in mode 12 (`intents-events.md` §7.7
+    /// rule 3, [`super::unit_update::death_function`]); every other
+    /// function keeps the default (started, nothing done: monster spec).
     fn monster_mode_function(&mut self, sim: &mut Sim<'_>, unit: UnitId, address: u32) -> bool {
         if address == MONSTER_MODES[0].start {
             let target = self.mode_target;
             return X::monster_death_start(self, sim, unit, target);
         }
+        super::unit_update::death_function(self, sim, unit, address);
         true
     }
 
@@ -187,6 +190,12 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
             ai::think(sim.game, &mut cx, unit);
         }
         self.ai = Some(store);
+    }
+
+    /// The mode-set sites of the umod dispatcher (`umod-callbacks.md`
+    /// §2 rules 1–2) on the lent monster world; without one, nothing.
+    fn monster_umods(&mut self, sim: &mut Sim<'_>, unit: UnitId, mode: u8) {
+        self.run_umods(sim, unit, None, mode);
     }
 
     /// Event 7 `0x005A4370` → the umod dispatcher in mode 2 (`init.md`
@@ -483,16 +492,10 @@ impl<X: Pending> View<'_, X> {
         }
     }
 
-    /// A monster mode change (`units.md` §4.6, `0x005A7C20`), then its
-    /// umod callbacks: the dispatcher in mode 0 (`0x005A4350`) and mode
-    /// 1 (`0x005A4360`) on the lent monster world (`init.md` §22).
-    ///
-    /// TODO(init.md §22, units.md §4.6): where in `0x005A7C20` the two
-    /// dispatcher calls sit is not stated (the mode-1 callbacks read the
-    /// new mode, so they follow the start function). Both run here after
-    /// the whole mode set (start, animation, schedule), mode 0 first: a
-    /// type-7 event they schedule follows the mode's animation events in
-    /// the timer queue.
+    /// A monster mode change (`units.md` §4.6, `0x005A7C20`). Its umod
+    /// callbacks run inside it ([`UnitHooks::monster_umods`]: mode 0
+    /// before the start function, mode 1 after the animation prepare,
+    /// `umod-callbacks.md` §2) on the lent monster world.
     pub fn monster_set_mode(&mut self, game: &mut Game, u: UnitId, mode: u32) -> bool {
         let mut sim = Sim {
             game,
@@ -502,12 +505,7 @@ impl<X: Pending> View<'_, X> {
         };
         let r = crate::units::modes::monster_set_mode(&mut sim, &mut *self.h, u, mode);
         match r {
-            Ok(()) => {
-                for m in [umod_mode::MODE_CHANGE, umod_mode::MODE_SET] {
-                    self.h.run_umods(&mut sim, u, None, m);
-                }
-                true
-            }
+            Ok(()) => true,
             Err(e) => {
                 self.unit_error(e);
                 false

@@ -45,16 +45,20 @@ fn assign_merc_layout() {
     );
 }
 
-// Covers: specs/world/hirelings.md §13 r2
+// Covers: specs/world/hirelings.md §13 r2; specs/sim/pets.md §8
 #[test]
 fn pet_action_vector() {
-    // add, pet GUID 5, owner 1, class 363, type 4, in the confirmed
-    // `server-messages.tsv` layout (pet @5, owner @9; `hirelings.md` §13
-    // rule 2). `pets.md`'s vector puts them the other way round: a spec
-    // conflict, reported in `docs/handoff/impl-hirelings.md`.
+    // `pets.md` Test vector: add, pet GUID 5, owner 1, class 363, type 4
+    // → owner @5, pet @9.
     assert_eq!(
         pet_action(1, 4, 363, 5, 1),
-        [0x7A, 0x01, 0x04, 0x6B, 0x01, 0x05, 0, 0, 0, 0x01, 0, 0, 0]
+        [0x7A, 0x01, 0x04, 0x6B, 0x01, 0x01, 0, 0, 0, 0x05, 0, 0, 0]
+    );
+    // Recorded (`hirelings.md` Test vectors, Save And Exit with the merc
+    // alive): the remove carries only the pet GUID, @9.
+    assert_eq!(
+        remove_msg(0x0D),
+        [0x7A, 0, 0, 0, 0, 0, 0, 0, 0, 0x0D, 0, 0, 0]
     );
 }
 

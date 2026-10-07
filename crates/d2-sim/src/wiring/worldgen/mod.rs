@@ -37,6 +37,7 @@ pub mod monster_world;
 pub mod outdoor_presets;
 pub mod population;
 pub mod population_init;
+pub mod umod_host;
 
 #[cfg(test)]
 #[path = "tests/routing.rs"]
@@ -60,6 +61,7 @@ use crate::game::Game;
 use crate::monsters::init::{self, InitTables, MonstatsExtra, MonsterStore, NamedIds};
 use crate::monsters::population::{self as pop, CoordRect, OwnerKey, PopState, PopTables, Regions};
 use crate::rng::Seed;
+use crate::stats::ListId;
 use crate::units::{RoomId, UnitId};
 
 use super::action::{Pending, View, WiringError};
@@ -137,10 +139,58 @@ pub trait WorldPending: Pending {
     fn superunique_owner_data(&mut self, boss: UnitId) {}
     /// `0x005B24E0` (`population.md` open question 4).
     fn group_spawn(&mut self, boss: UnitId, class: i32, a: i32, b: i32, c: i32, flags: u16) {}
-    /// `0x005417D0`: event 7 at frame + 250 + `roll(50)` (seed not stated).
-    fn schedule_monumod(&mut self, unit: UnitId) {}
     /// `0x005B1990`.
     fn change_alignment(&mut self, unit: UnitId, a: i32, b: i32) {}
+
+    // ---- umod callbacks (`monsters/umod-callbacks.md`) -------------------
+    //
+    // The calls of the callback bodies whose provider is a system the
+    // world host does not reach (skill use, AI params, quests, items,
+    // pets). [`init::InitHost`] on [`WorldHost`] answers the rest itself
+    // (`umod_host.rs`).
+
+    /// Target `skills/bodies.md` §2.1 (§17, §19).
+    fn umod_target(&self, unit: UnitId) -> Option<UnitId> {
+        None
+    }
+    /// Target position `0x0056D2C0` (`skills/bodies.md` §2.4; §5, the
+    /// missile fallback of §2.4).
+    fn umod_target_position(&self, unit: UnitId) -> Option<(i32, i32)> {
+        None
+    }
+    /// `apply_state` (`skills/bodies.md` §2.7; §5).
+    fn umod_apply_state(&mut self, req: init::callbacks::StateApply) -> Option<ListId> {
+        None
+    }
+    /// Owner data `0x0058F030(game, unit, −1, 1, 0, 0)` (`ai.md`; §9).
+    fn clear_owner_data(&mut self, unit: UnitId) {}
+    /// Pet remove `0x005750E0(game, owner, GUID, 1)` (`sim/pets.md` §6;
+    /// §14).
+    fn remove_pet(&mut self, owner: UnitId, pet: UnitId) {}
+    /// A quest death call (§15; `umod-callbacks.md` OQ4).
+    fn quest_death(&mut self, unit: UnitId, call: u32) {}
+    /// Umod 24's belt steal (§17 steps 3–4; unreachable in 1.14d).
+    fn steal_belt_item(&mut self, unit: UnitId, target: UnitId) {}
+    /// `0x005B2490(game, unit, class, mode, spread, flags)` (§25).
+    fn spawn_near(&mut self, unit: UnitId, class: u32, mode: u32, spread: i32, flags: u32) {}
+    /// AI param 0 (`0x0058EC50(unit, 1)`; §23.2).
+    fn ai_param0(&mut self, unit: UnitId) -> i32 {
+        0
+    }
+    /// `0x0058EC00`: AI param 0 := v (§23.2).
+    fn set_ai_param0(&mut self, unit: UnitId, v: i32) {}
+    /// The raise test `0x00645510(unit, 0)` (`skills/bodies.md` §3.6;
+    /// §23.2).
+    fn can_raise(&mut self, unit: UnitId) -> bool {
+        false
+    }
+    /// `0x005DEAD0(game, unit, mode, skill, 0, 0, 0)` (`ai.md`; §23.2).
+    fn ai_use_skill(&mut self, unit: UnitId, mode: u32, skill: u16) {}
+    /// The level of the unit's skill entry (`0x006439F0`,
+    /// `0x006442A0(unit, entry, 1)`; §27).
+    fn skill_level(&mut self, unit: UnitId, skill: u16) -> Option<i32> {
+        None
+    }
 
     // ---- objects and units restore ---------------------------------------
 

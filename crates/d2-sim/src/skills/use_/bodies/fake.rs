@@ -5,7 +5,7 @@
 //! are kept here. Every effect is logged into `c.log` in call order.
 
 use super::effects::{BodyEffect, PathOp};
-use super::{BodyStat, BodyWorld, Handler, MissileRequest, ProgressiveMsg, ScanRoom};
+use super::{BodyStat, BodyWorld, Handler, MissileRequest, MonsterSpawn, ProgressiveMsg, ScanRoom};
 use crate::combat::{CombatEntry, DamageRecord, RoomKind};
 use crate::rng::Seed;
 use crate::skills::fake::{FUnit, Fake};
@@ -87,6 +87,24 @@ pub struct BodyFake {
     pub allies: BTreeSet<(usize, usize)>,
     pub sequence: Option<Vec<[u8; 6]>>,
     pub frames: Option<i32>,
+    // ---- batch 4
+    /// `dir64` answers by target point (default 0).
+    pub dirs: BTreeMap<(i32, i32), i32>,
+    pub action: BTreeMap<usize, i32>,
+    pub seq_speed: BTreeMap<usize, i32>,
+    pub anim_speed: BTreeMap<usize, i32>,
+    /// Missile unit → (total, left).
+    pub mframes: BTreeMap<usize, (i32, i32)>,
+    pub seq_frames: Option<i32>,
+    pub seq_events: BTreeMap<i32, i32>,
+    pub anim_data: Option<(u32, Vec<u8>)>,
+    pub action_event: bool,
+    pub chains: BTreeMap<i32, i32>,
+    pub books: BTreeMap<usize, (i32, i32)>,
+    pub inv_nodes: Vec<(usize, i32)>,
+    pub found: Vec<usize>,
+    pub point_collide: bool,
+    pub components: BTreeMap<(usize, usize), i32>,
 }
 
 impl BodyFake {
@@ -861,6 +879,81 @@ impl BodyWorld for BodyFake {
     }
     fn attack_frames(&self, _: usize, _: usize) -> Option<i32> {
         self.frames
+    }
+    fn dir64(&self, _: usize, at: (i32, i32)) -> i32 {
+        self.dirs.get(&at).copied().unwrap_or(0)
+    }
+    fn action_frame(&self, u: usize) -> i32 {
+        self.action.get(&u).copied().unwrap_or(0)
+    }
+    fn set_action_frame(&mut self, u: usize, v: i32) {
+        self.action.insert(u, v);
+    }
+    fn set_seq_speed(&mut self, u: usize, v: i32) {
+        self.seq_speed.insert(u, v);
+    }
+    fn anim_speed(&self, u: usize) -> i32 {
+        self.anim_speed.get(&u).copied().unwrap_or(0)
+    }
+    fn set_anim_speed(&mut self, u: usize, v: i32) {
+        self.anim_speed.insert(u, v);
+    }
+    fn missile_frames(&self, m: usize) -> i32 {
+        self.mframes.get(&m).map_or(0, |f| f.0)
+    }
+    fn set_missile_frames(&mut self, m: usize, total: i32, left: i32) {
+        self.mframes.insert(m, (total, left));
+    }
+    fn sequence_frames(&self, _: usize) -> Option<i32> {
+        self.seq_frames
+    }
+    fn sequence_event(&self, _: usize, f: i32) -> i32 {
+        self.seq_events.get(&f).copied().unwrap_or(0)
+    }
+    fn anim_data(&self, _: usize) -> Option<(u32, Vec<u8>)> {
+        self.anim_data.clone()
+    }
+    fn action_event_between(&self, _: usize, _: i32, _: i32) -> bool {
+        self.action_event
+    }
+    fn chain_position(&self, class: i32) -> i32 {
+        self.chains.get(&class).copied().unwrap_or(0)
+    }
+    fn book_skills(&self, i: usize) -> Option<(i32, i32)> {
+        self.books.get(&i).copied()
+    }
+    fn inventory_nodes(&self, _: usize) -> Vec<(usize, i32)> {
+        self.inv_nodes.clone()
+    }
+    fn unit_find(&self, _: usize, _: (i32, i32), _: i32, _: u32) -> Vec<usize> {
+        self.found.clone()
+    }
+    fn point_collides(&self, _: usize, _: (i32, i32), _: u32) -> bool {
+        self.point_collide
+    }
+    fn spawn_monster(&mut self, q: MonsterSpawn<usize, usize>) -> Option<usize> {
+        self.log(format!("{q:?}"));
+        if self.no_monsters {
+            return None;
+        }
+        let (class, at) = match q {
+            MonsterSpawn::At { x, y, class, .. }
+            | MonsterSpawn::Leader { x, y, class, .. }
+            | MonsterSpawn::Minion { x, y, class, .. } => (class, (x, y)),
+            MonsterSpawn::Near { unit, class, .. }
+            | MonsterSpawn::NearLevel { unit, class, .. } => {
+                (class, self.pos.get(&unit).copied().unwrap_or((0, 0)))
+            }
+        };
+        Some(self.add(FUnit::new(UnitType::Monster, class), at))
+    }
+    fn place_unit_flag(&mut self, u: usize, r: Option<usize>, at: (i32, i32), a: i32) -> bool {
+        self.log(format!("place {u} {r:?} {at:?} {a}"));
+        self.pos.insert(u, at);
+        true
+    }
+    fn component(&self, u: usize, k: usize) -> i32 {
+        self.components.get(&(u, k)).copied().unwrap_or(0)
     }
 }
 

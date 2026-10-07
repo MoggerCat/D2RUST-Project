@@ -319,6 +319,21 @@ impl Drlg {
         old: Option<DrlgRoomId>,
         new: Option<DrlgRoomId>,
     ) -> Result<Vec<DrlgRoomId>, DrlgError> {
+        self.client_switches_room(svc, client, old, new)
+            .map(|(joined, _)| joined)
+    }
+
+    /// [`Drlg::client_changes_room`] returning both sides: the rooms the
+    /// client joined (new array order) and the rooms it left (old array
+    /// order; `0x0053A9B0` runs for each, `sim/intents-events.md` §7.8
+    /// rule 3).
+    pub fn client_switches_room(
+        &mut self,
+        svc: &mut Services<'_>,
+        client: ClientId,
+        old: Option<DrlgRoomId>,
+        new: Option<DrlgRoomId>,
+    ) -> Result<(Vec<DrlgRoomId>, Vec<DrlgRoomId>), DrlgError> {
         self.change_status_room(svc, old, new)?;
         self.update_level_activity(svc.data, svc.types, old, new)?;
         let adj = |d: &Self, r: Option<DrlgRoomId>| {
@@ -335,12 +350,27 @@ impl Drlg {
                 joined.push(r);
             }
         }
+        let mut left = Vec::new();
         for &r in &old_adj {
             if !new_adj.contains(&r) {
                 self.remove_room_client(r, client);
+                left.push(r);
             }
         }
-        Ok(joined)
+        Ok((joined, left))
+    }
+
+    /// Room ready `0x0061A460(R)` (`sim/tick.md` §6 rule 6) of the active
+    /// room `room`: its adjacency count equals its DRLG room's rooms-near
+    /// count and every room of its adjacency array is populated (active
+    /// room +0x34 bit 0, `populated`). `None`: not an active room of this
+    /// DRLG.
+    pub fn room_ready(&self, room: RoomId, populated: impl Fn(RoomId) -> bool) -> Option<bool> {
+        let id = self.drlg_room_of(room)?;
+        let r = self.room(id);
+        let a = r.active.as_ref()?;
+        let near = r.near.as_ref().map_or(0, Vec::len);
+        Some(a.adjacency.len() == near && self.adjacent_rooms(id).into_iter().all(populated))
     }
 
     /// The active rooms of this DRLG in act-list id order (lookup only).

@@ -191,18 +191,20 @@ fn skill_rec() -> Skills {
     s
 }
 
-/// Attack (0), Multiple Shot (1: srvst 42, mana), Might (2: aura), a
+/// Attack (0), Multiple Shot (1: srvst 52, mana), Might (2: aura), a
 /// learnable skill (3: max level 3).
-/// Start slot of the synthetic start skills: srvst 42 (status `mapped`)
+/// Start slot of the synthetic start skills: srvst 52 (Emerge,
+/// `skills/bodies-3.md` §5.23: flags |= 0xE, returns 1, as the seam did)
 /// stands in for Multiple Shot's srvst 4, whose body (`skills/bodies.md`
-/// §3.4, ammunition) now runs on the wired host; the do slot 66 stands
-/// in for Might's 65 (§4.5) the same way, so the fake's seam answers.
+/// §3.4, ammunition) needs items; every filled start slot has a body
+/// since batch 4. The do slot 53 (filled, `unreferenced`, no body) stands
+/// in for Might's 65 (§4.5), so the fake's seam answers.
 fn skills() -> SkillTables {
     let mut v: Vec<Skills> = (0..4).map(|_| skill_rec()).collect();
     let m = &mut v[1];
-    (m.srvstfunc, m.mana, m.lvlmana, m.manashift) = (42, 4, 1, 8);
+    (m.srvstfunc, m.mana, m.lvlmana, m.manashift) = (52, 4, 1, 8);
     let m = &mut v[2];
-    (m.aura, m.immediate, m.perdelay, m.srvdofunc, m.aurastate) = (true, true, 0, 111, 33);
+    (m.aura, m.immediate, m.perdelay, m.srvdofunc, m.aurastate) = (true, true, 0, 53, 33);
     v[3].maxlvl = 3;
     SkillTables {
         skills: v,

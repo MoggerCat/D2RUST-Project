@@ -100,6 +100,10 @@ pub struct InteractionState {
     /// The hireling tables (`hirelings.md` §1, `pettype` row 7); `None`:
     /// the mercenary calls only report [`InteractionError::NoHirelingTables`].
     pub hireling_tables: Option<HirelingTables>,
+    /// The hireling stat records queued on each unit's message list
+    /// (`hirelings.md` §13 rule 4, `0x005718C0`), in queue order, for the
+    /// client pass's flush ([`InteractionState::unit_stat_messages`]).
+    pub unit_stats: BTreeMap<UnitId, Vec<(u16, u32)>>,
 }
 
 impl InteractionState {
@@ -117,7 +121,30 @@ impl InteractionState {
             errors: Vec::new(),
             hirelings: HirelingState::default(),
             hireling_tables: None,
+            unit_stats: BTreeMap::new(),
         }
+    }
+
+    /// The flush `0x00571CD0(unit, client)` of the queued hireling stats
+    /// (`hirelings.md` §13 rule 4): the messages for one client update of
+    /// `unit` (GUID `guid`). The queue stays until
+    /// [`InteractionState::free_unit_stats`] (the room update step,
+    /// `sim/tick.md` §5 step 6), so every client updating the unit in the
+    /// pass gets them.
+    pub fn unit_stat_messages(
+        &self,
+        unit: UnitId,
+        guid: u32,
+    ) -> Result<Vec<Vec<u8>>, crate::world::hirelings::HirelingError> {
+        match self.unit_stats.get(&unit) {
+            Some(q) => crate::world::hirelings::level::flush_stats(guid, q),
+            None => Ok(Vec::new()),
+        }
+    }
+
+    /// `0x00553220` → `0x00571F40`: the unit's queued records freed.
+    pub fn free_unit_stats(&mut self, unit: UnitId) {
+        self.unit_stats.remove(&unit);
     }
 
     /// The interaction list of an `interact` NPC (monster init embeds it,

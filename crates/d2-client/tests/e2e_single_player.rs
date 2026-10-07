@@ -901,6 +901,11 @@ struct Transcript {
 /// A recording bridge frame.
 /// S→C 0x07 MapReveal of the room at tile (x, y) of `level`
 /// (`server-messages.tsv`: x u16 @1, y u16 @3, level u8 @5).
+/// S→C 0x51 AssignObject (`intents-events.md` §7.2 part A).
+fn assign_object(guid: u32, class: u16, (x, y): (i32, i32), mode: u8, interact: u8) -> Vec<u8> {
+    d2_sim::units::messages::assign_object(guid, class, x as u16, y as u16, mode, interact).to_vec()
+}
+
 fn map_reveal(x: u16, y: u16, level: u32) -> Vec<u8> {
     let mut b = vec![0x07];
     b.extend(x.to_le_bytes());
@@ -988,14 +993,18 @@ fn run_with(game_seed: u32) -> Transcript {
     // near the player's (`rooms.md` §4.1: 4 rooms) and sends one S→C 0x07
     // per room of the player's adjacency array, in its order
     // (`path-placement.md` §11 "Recipients"); the room pass creates the
-    // DS1's preset monster at its sub-tile (`population.md` §11.1).
+    // DS1's preset monster at its sub-tile (`population.md` §11.1). Each
+    // joined room's 0x07 is followed by the add messages of its units
+    // (`intents-events.md` §7.8 rule 2): the waypoint's 0x51 (type 2,
+    // class 0, its position, mode 1, interact 0: no object data in this
+    // game) after its room's; the monster and the client's own player
+    // send none (§7.2 monster part: not specified).
     record(&mut fx, &mut frames, vec![]);
-    assert_eq!(
-        frames[0].2,
-        [(8000, 8000), (8000, 8008), (8008, 8000), (8008, 8008)]
-            .map(|(x, y)| map_reveal(x, y, ISLE))
-            .to_vec()
-    );
+    let mut want: Vec<Vec<u8>> = [(8000, 8000), (8000, 8008), (8008, 8000), (8008, 8008)]
+        .map(|(x, y)| map_reveal(x, y, ISLE))
+        .to_vec();
+    want.insert(1, assign_object(wp, 0, WP_AT, 1, 0));
+    assert_eq!(frames[0].2, want);
     assert_eq!(fx.sim_ref().game.lists.active_rooms(0).len(), 4);
     let monsters = fx.monsters();
     assert_eq!(monsters.len(), 1, "the DS1 preset monster");
@@ -1028,13 +1037,17 @@ fn run_with(game_seed: u32) -> Transcript {
     assert_eq!(frames[1].2, none);
     assert_eq!(fx.mode(player), 10);
     assert_eq!(fx.stat(player, 8), 4000 - 3328);
-    assert_eq!(fx.book.get().log, ["srvst 42 1 10"]);
+    // The start (srvst 53, `bodies-3.md` §4.1) ran with skill 1 at level
+    // 10: the used entry's param 1 := frame + 10, at the dispatch frame
+    // (1: messages run before the frame's tick, which makes it 2).
+    let started = format!("param1 1 {}", fx.sim_ref().game.frame - 1 + 10);
+    assert_eq!(fx.book.get().log, [started.clone()]);
     assert_eq!(fx.player_timers(), [(0, 5), (1, 9)]);
     assert!(fx.errors().is_empty(), "{:?}", fx.errors());
 
     // Frames 3–5. On frame 5 the action frame `0x00580460` runs the used
-    // skill's do function (`use.md` §5.2, §5.4): srvdo 3 (body
-    // catalogued only, `use.md` OQ10: the seam), then the generic
+    // skill's do function (`use.md` §5.2, §5.4): srvdo 53 (no body,
+    // `unreferenced`, `use.md` OQ10: the seam), then the generic
     // `srvmissile` 0 through the real missile creation (`missiles.md`
     // §R2) at the player, aimed at the cast point.
     for _ in 3..=5 {
@@ -1047,7 +1060,7 @@ fn run_with(game_seed: u32) -> Transcript {
     );
     assert_eq!(
         fx.book.get().log,
-        ["srvst 42 1 10", "srvdo 3 1 10 true false false"]
+        [started, "srvdo 53 1 10 true false false".to_string()]
     );
     assert_eq!(fx.player_timers(), [(1, 9)]);
     let shot = fx.missiles();
@@ -1095,8 +1108,11 @@ fn run_with(game_seed: u32) -> Transcript {
         ]
     );
     assert_eq!(fx.stat(player, 13), 100);
-    // The death animation: 4 frames → event 1 at 19.
-    assert_eq!(fx.timers(monster), [(1, 19)]);
+    // The death animation: 4 frames → event 1 at 19. Tick 1's room
+    // switch woke the monster created by that tick's room pass
+    // (`intents-events.md` §7.8 rule 2.3, `0x00573780`: think at frame
+    // 1 + 2; Idle → the next think at 203), which is still pending.
+    assert_eq!(fx.timers(monster), [(1, 19), (2, 203)]);
 
     // 5a. The drop (`treasure.md` §3): the death start's gate passes
     // (no flag 0x20000, no wall / door at the monster's sub-tile); TC 1
@@ -1585,13 +1601,16 @@ fn run_with(game_seed: u32) -> Transcript {
     // made the three items it names; 0x9D needs the local player, which
     // this staged game never announces (no 0x59 / 0x0B), so it changes
     // nothing (§2 rule 3); the join's four 0x07 (frame 2) are rejected,
-    // fatal 0x58A (no client act: this staged game sends no 0x03);
+    // fatal 0x58A (no client act: this staged game sends no 0x03); the
+    // join's 0x51 made the waypoint (`intents-events.md` §7.8 rule 2);
     // nothing discarded.
     let w = fx.bridge.world();
     let client = (w.frames, w.server_ticks, w.units.len());
-    assert_eq!(client, (37, 36, 3));
+    assert_eq!(client, (37, 36, 4));
     assert_eq!(w.local_player, None);
-    for (k, u) in &w.units {
+    let object = d2_client::bridge::world::UnitKey::new(d2_client::bridge::world::OBJECT, wp);
+    assert!(w.units.contains_key(&object));
+    for (k, u) in w.units.iter().filter(|(k, _)| **k != object) {
         assert_eq!(k.unit_type, d2_client::bridge::world::ITEM);
         let d2_client::bridge::world::KindData::Item(d) = &u.kind else {
             panic!("item data");
@@ -1603,7 +1622,7 @@ fn run_with(game_seed: u32) -> Transcript {
         log.unowned,
         BTreeMap::from([(0x27, 1), (0x28, 1), (0x29, 1), (0x2A, 4)])
     );
-    assert_eq!(log.handled, 31);
+    assert_eq!(log.handled, 32);
     let rejected: Vec<(u8, String)> = log
         .rejected
         .iter()

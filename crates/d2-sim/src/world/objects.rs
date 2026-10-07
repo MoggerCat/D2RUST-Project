@@ -1183,3 +1183,6 @@ pub fn update_messages<W: ObjectWorld>(
     }
     Ok(out)
 }
+
+#[cfg(test)]
+mod mutant_tests;

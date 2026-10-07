@@ -22,6 +22,7 @@ use d2_sim::tick::{EventDispatch, TickHooks};
 use d2_sim::units::{ClientId as SimClient, RoomId, UnitId, UnitType};
 
 use super::handlers;
+use super::handlers::player::{HotKey, HOTKEY_SLOTS};
 use super::handlers::world::{self as world_handlers, NoWorld, WorldError, WorldHost};
 use crate::seams::{
     ClientId, Intents, MessageSink, PlayerGate, PlayerLookup, PointState, Pos, ResultCode, Tick,
@@ -105,6 +106,10 @@ pub struct SimGame<D = Unspecified, W = NoWorld> {
     pub world: W,
     /// Messages sent during a tick that could not be queued, in order.
     pub tick_faults: Vec<(ClientId, WorldError)>,
+    /// The hot-key slots of each client (client +0x3DC, 16 × 8 bytes;
+    /// written by C→S 0x51, `intents-events.md` §9 rule 12; read by the
+    /// join's S→C 0x7B, §8.2 rule 3.6).
+    hotkeys: BTreeMap<ClientId, [HotKey; HOTKEY_SLOTS]>,
 }
 
 /// [`SimGame`]'s fields borrowed apart (for a handler).
@@ -144,6 +149,7 @@ impl<D: EventDispatch, W> SimGame<D, W> {
             unhandled: Vec::new(),
             world,
             tick_faults: Vec::new(),
+            hotkeys: BTreeMap::new(),
         }
     }
 
@@ -172,6 +178,7 @@ impl<D: EventDispatch, W> SimGame<D, W> {
             .remove(&client)
             .ok_or(AdapterError::NotJoined(client))?;
         self.transport_ids.remove(&id);
+        self.hotkeys.remove(&client);
         self.game.lists.remove_client(id)?;
         Ok(())
     }
@@ -201,6 +208,30 @@ impl<D: EventDispatch, W> SimGame<D, W> {
         let id = self.clients.get(&client)?;
         let unit = self.game.lists.client(*id)?.player?;
         (self.game.lists.unit(unit)?.ty == UnitType::Player).then_some(unit)
+    }
+
+    /// The client's hot-key slots (client +0x3DC; a slot never bound is
+    /// [`HotKey::UNBOUND`]).
+    pub fn hotkeys(&self, client: ClientId) -> [HotKey; HOTKEY_SLOTS] {
+        self.hotkeys
+            .get(&client)
+            .copied()
+            .unwrap_or([HotKey::UNBOUND; HOTKEY_SLOTS])
+    }
+
+    /// Stores one hot-key slot (`0x005390A0`); `slot` < 16.
+    pub fn set_hotkey(&mut self, client: ClientId, slot: usize, key: HotKey) {
+        if slot < HOTKEY_SLOTS {
+            self.hotkeys
+                .entry(client)
+                .or_insert([HotKey::UNBOUND; HOTKEY_SLOTS])[slot] = key;
+        }
+    }
+
+    /// The staged position of the client's player ([`UnitFacts`]).
+    pub fn player_pos(&self, client: ClientId) -> Option<Pos> {
+        let unit = self.player_unit(client)?;
+        Some(self.units.get(&unit)?.pos)
     }
 
     /// The client's player unit (unit type 0), for the handlers.
@@ -344,6 +375,9 @@ impl<D: EventDispatch, W: WorldHost<D>> Intents for SimGame<D, W> {
             return code;
         }
         if let Some(code) = handlers::walk::handle(self, client, msg, out) {
+            return code;
+        }
+        if let Some(code) = handlers::player::handle(self, client, msg, size, out) {
             return code;
         }
         self.unhandled.push((client, msg[0], size));

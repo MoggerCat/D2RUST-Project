@@ -1,4 +1,4 @@
-// Spec: specs/skills/bodies.md §6–§8, specs/skills/bodies-2.md §2–§5, specs/skills/bodies-2b.md §6–§8
+// Spec: specs/skills/bodies.md §6–§8, specs/skills/bodies-2.md §2–§5, specs/skills/bodies-2b.md §6–§8, specs/skills/bodies-3.md §3–§5, specs/skills/bodies-4.md §2–§4
 //! The calls of the batch 2 and 3 bodies into systems other specs own
 //! that return nothing the bodies read: one [`BodyEffect`] per 1.14d
 //! callee, sent through [`super::BodyWorld::effect`], and the path
@@ -166,7 +166,67 @@ pub enum BodyEffect<U, I, R> {
         y: i32,
         u: U,
         mask: u32,
+    }, // ---- batch 4 (`bodies-3.md`, `bodies-4.md`)
+    /// Pattern stamp `0x0064EA90(room, x, y, pattern, mask)` with a fixed
+    /// pattern number.
+    PatternStampN {
+        room: R,
+        x: i32,
+        y: i32,
+        pattern: i32,
+        mask: u32,
     },
+    /// Pattern clear `0x0064EC10(room, x, y, pattern, mask)` with a fixed
+    /// pattern number.
+    PatternClearN {
+        room: R,
+        x: i32,
+        y: i32,
+        pattern: i32,
+        mask: u32,
+    },
+    /// Dead-body footprint `0x00649F70(u, 1)` (`bodies-3.md` §3.9).
+    DeadFootprint(U),
+    /// Evil-killed counter − 1 `0x00547E90(game +0xF0, u)`
+    /// (`monsters/population.md` §16).
+    EvilCounterDec(U),
+    /// Quest chain link `0x00545CD0(game, u, room, 0)` (`world/quests.md`
+    /// §4.6).
+    QuestChainLink { u: U, room: R },
+    /// Kill `0x0057CCB0(game, u, killer, b)` (`combat/damage.md` §7.2).
+    KillBy { u: U, killer: Option<U>, b: i32 },
+    /// Pet remove `0x005750E0(game, owner, GUID, kill)` (`sim/pets.md`
+    /// §6).
+    PetRemove { owner: U, guid: i32, kill: bool },
+    /// Item use by node kind: 1 → `0x0055E170(game, u, I GUID, I x, I y,
+    /// &out)` (`items/inventory.md` §7.11), 2 → `0x00562390(…, 0)` (§7.17).
+    UseItem { u: U, item: I, kind: i32 },
+    /// Monster mode request built `0x005A7E60(m, mode, &req)`.
+    ModeRequestBuild { m: U, mode: i32 },
+    /// The built request sent `0x005A7C20(game, &req, flag)`.
+    ModeRequestSend { m: U, flag: bool },
+    /// AI command {+0x08 kind, +0x0C type, +0x10 GUID, +0x14 frame, +0x18
+    /// unwritten} copied to every minion of `unit`'s minion owner
+    /// (`0x0058F730`, `monsters/ai.md` §8).
+    MinionCommand {
+        unit: U,
+        kind: i32,
+        ty: i32,
+        guid: u32,
+        frame: i32,
+    },
+    /// Class change `0x00574370(game, t, class, mode)` (`monsters/init.md`
+    /// §3–§6).
+    ClassChange { t: U, class: i32, mode: i32 },
+    /// Think in `frames` frames `0x005DE0F0(game, m, frames)`
+    /// (`monsters/ai-bodies-2.md` "wait N").
+    WaitThink { m: U, frames: i32 },
+    /// Every-tick event `0x00541650(game, u, kind, a1, a2)` (`sim/tick.md`
+    /// §5.3).
+    EveryTick { u: U, kind: i32, a1: i32, a2: i32 },
+    /// The unit's path takes `from`'s precise position and room
+    /// (`0x006505E0(u, from)` → `0x0064FB90`).
+    PathFollow { u: U, from: U },
 }
 
 /// A path operation (`sim/pathing.md`) on the unit's path (+0x2C).
@@ -201,4 +261,6 @@ pub enum PathOp<U> {
     Face(i32, i32),
     /// Path reset `0x00649CA0` (`client/msg-units.md` §3).
     Reset,
+    /// Turn toward (x, y) `0x00649EF0(P, x, y, 0)` → `0x006485F0`.
+    TurnToward(i32, i32),
 }
