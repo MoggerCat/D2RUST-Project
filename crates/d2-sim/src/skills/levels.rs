@@ -1400,6 +1400,15 @@ pub trait LearnUnits: SkillUnits {
     /// refreshes (`0x00646F20`), toggles the passive state and calls
     /// `0x00646D60` (§6.4 step 4); refunds on failure.
     fn add_skill_level(&mut self, u: Self::Unit, skill: i32, cost: i32);
+    /// Message 0x21 (`0x0053C4A0`, skill 0, base level 1, remove 0) to
+    /// the player's client: the client re-assigns Attack at level 1
+    /// (`client/msg-skills.md` §4).
+    // TODO(wiring): the d2-server handler (`handlers/skills/wired.rs`) does
+    // not call `add_skill_point` yet; until it does these stay no-ops there.
+    fn send_attack_reset(&mut self, _u: Self::Unit) {}
+    /// The handler's tail `0x0055F4F0(…, 1)` and `0x0056DE40(unit)`
+    /// (§6.4 step 5).
+    fn point_client_updates(&mut self, _u: Self::Unit) {}
 }
 
 /// Outcome of the 0x3B validator `0x00549490` (§6.4 step 2–3).
@@ -1460,4 +1469,28 @@ pub fn spend_skill_point<W: LearnUnits>(
     }
     w.add_skill_level(u, skill, cost);
     true
+}
+
+/// Message 0x3B AddSkillPoint handler `0x0054BD90` (§6.4): the result is
+/// 0 (a level was added), 2 (bad id, at maximum level or a failed spend)
+/// or 3 (not a class skill, or a requirement fails). Validator 2 and the
+/// maximum-level case send message 0x21; 3 and a failed spend send
+/// nothing.
+// TODO(levels.md §6.4 step 5): whether the tail updates also run after a
+// failed spend is not stated; they run only after a successful one here.
+pub fn add_skill_point<W: LearnUnits>(w: &mut W, t: &SkillTables, u: W::Unit, skill: i32) -> i32 {
+    match check_skill_point(w, t, u, skill) {
+        SkillPointCheck::Code2 => {
+            w.send_attack_reset(u);
+            2
+        }
+        SkillPointCheck::Code3 => 3,
+        SkillPointCheck::Ok => {
+            if !spend_skill_point(w, t, u, skill) {
+                return 2;
+            }
+            w.point_client_updates(u);
+            0
+        }
+    }
 }

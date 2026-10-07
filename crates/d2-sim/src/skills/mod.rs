@@ -15,6 +15,7 @@
 pub mod calc;
 pub mod levels;
 pub mod special;
+pub mod stat_cb;
 pub mod use_;
 
 use crate::rng::Seed;
@@ -191,6 +192,8 @@ pub(crate) mod fake;
 mod levels_gap_tests;
 #[cfg(test)]
 mod mutant_tests;
+#[cfg(test)]
+mod stat_cb_tests;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
