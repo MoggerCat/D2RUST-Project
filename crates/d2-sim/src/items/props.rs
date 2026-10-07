@@ -611,17 +611,38 @@ pub fn apply_socket_filler<S: ItemStats>(t: &ItemTables, filler: &mut Item<S>, a
 }
 
 /// §10.1: the first runes row the item and its fillers (items combined
-/// indices, insertion order) match.
+/// indices, insertion order) match. An item without an inventory (items
+/// `hasinv` = 0: none is ever created for it) has no runeword.
 pub fn runeword_match<S: ItemStats>(
     t: &ItemTables,
     item: &Item<S>,
     fillers: &[usize],
 ) -> Option<usize> {
-    let r = t.item(item.record)?;
-    if (q::MAGIC..=q::TEMPERED).contains(&item.quality) || r.quest != 0 || r.hasinv == 0 {
+    if t.item(item.record)?.hasinv == 0 {
         return None;
     }
-    if fillers.len() > 6 || item.stats.stat(stat::NUMSOCKETS, 0) != fillers.len() as i32 {
+    let sockets = item.stats.stat(stat::NUMSOCKETS, 0) as u8;
+    runeword_row(t, item.record, item.quality, sockets, fillers)
+}
+
+/// §10.1 exact form (`0x0062BED0`) on the item's parts: items class
+/// `record`, quality (item data +0x00), the socket count (`0x006299B0`,
+/// u8) and the class ids of the items in the item's own inventory, in
+/// list order (empty: no inventory or an empty one, step 1).
+pub fn runeword_row(
+    t: &ItemTables,
+    record: usize,
+    quality: u8,
+    sockets: u8,
+    fillers: &[usize],
+) -> Option<usize> {
+    let r = t.item(record)?;
+    if (q::MAGIC..=q::TEMPERED).contains(&quality) || r.quest != 0 || fillers.is_empty() {
+        return None;
+    }
+    // Step 3: c ≠ the socket count (more than 6 fillers never matches a
+    // u8 count of a 6-socket item either; the rune slots stop at 6).
+    if fillers.len() > 6 || usize::from(sockets) != fillers.len() {
         return None;
     }
     let n = fillers.len();
@@ -629,8 +650,9 @@ pub fn runeword_match<S: ItemStats>(
         if w.complete == 0 {
             return false;
         }
-        // TODO(items OQ-P3): "cover at least the socket count" read with
-        // every listed rune compared to a filler, so the list length is n.
+        // Step 4: rune i + 1 is compared with class-id slot i; i ≥ c
+        // reads a slot step 2 never wrote, read as "no class" (no match;
+        // §10.1 edge, OQ 4).
         let mut count = 0;
         for &rune in w.runes.iter().take_while(|&&x| x >= 1) {
             if count >= n || fillers[count] as i32 != rune {
@@ -641,7 +663,7 @@ pub fn runeword_match<S: ItemStats>(
         if count < n {
             return false;
         }
-        let is = |x: i16| t.is_type(item.record, x);
+        let is = |x: i16| t.is_type(record, x);
         if w.etype.iter().take_while(|&&e| e >= 1).any(|&e| is(e)) {
             return false;
         }

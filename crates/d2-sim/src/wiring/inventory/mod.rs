@@ -44,9 +44,11 @@ pub mod units;
 #[cfg(test)]
 mod tests;
 
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 
 use super::economy::{Economy, EconomyError, ItemSpawn};
+use crate::items::bitstream::WriteBack;
 use crate::items::inventory::{InteractionTarget, InvItem, InvTables, Inventory, UnitKind};
 use crate::items::moves::{deferred, Guid, MovePending, Owner};
 use crate::items::ItemRequest;
@@ -86,6 +88,10 @@ pub struct InvState {
     /// Owner refreshes asked by the inventory functions during a call;
     /// run (`items::moves::owner_refresh`) when the call returns.
     refresh: Vec<UnitId>,
+    /// The bit-stream writer's changes to items (`items/bitstream.md`
+    /// §4.1 rule 8, §4.3 rule 7), queued by the read-only stream seam and
+    /// written by [`InvDesk::apply_write_backs`].
+    write_backs: RefCell<Vec<(UnitId, WriteBack)>>,
 }
 
 impl InvState {
@@ -221,6 +227,7 @@ impl<'d, 'a, H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'d, 'a, H, R> {
             state,
             rest,
         };
+        d.apply_write_backs();
         d.sync_in();
         d
     }
@@ -276,8 +283,10 @@ impl<'d, 'a, H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'d, 'a, H, R> {
         self.state.items.retain(|u, _| live.contains(u));
     }
 
-    /// Writes the copied fields back to their owners.
+    /// Writes the copied fields back to their owners (and the queued
+    /// bit-stream write-backs).
     pub fn sync_out(&mut self) {
+        self.apply_write_backs();
         for (&u, d) in &self.state.items {
             if let Some(r) = self.econ.units.get_mut(u) {
                 r.mode = u32::from(d.mode);
@@ -315,6 +324,7 @@ impl<'d, 'a, H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'d, 'a, H, R> {
     /// room clean-up `0x00553220` ([`deferred::room_cleanup`]) are the
     /// tick wiring's (`tick.md` §3 step 6).
     pub fn update_done(&mut self, owner: Owner) {
+        self.apply_write_backs();
         deferred::update_list_reset(self, owner);
     }
 

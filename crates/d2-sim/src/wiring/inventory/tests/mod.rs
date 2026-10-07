@@ -7,6 +7,7 @@
 //! which logs every call.
 
 mod belt;
+mod bits;
 mod buffer;
 mod equip;
 mod gold;

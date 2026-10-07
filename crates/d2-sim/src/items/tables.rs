@@ -474,6 +474,19 @@ pub struct RuneRec {
     /// Items combined indices.
     pub runes: [i32; 6],
     pub props: [PropRec; 7],
+    /// The name's string id (u16 +0x82, written by the loader's fix-up,
+    /// `data/fixups.md` §7; sent by `items/bitstream.md` §4.4 rule 1).
+    pub name_id: u16,
+}
+
+impl RuneRec {
+    /// From the typed record and its raw bytes (after the fix-ups).
+    pub fn from_record(r: &Runes, raw: &[u8]) -> Self {
+        RuneRec {
+            name_id: u16::from_le_bytes([raw[0x82], raw[0x83]]),
+            ..RuneRec::from(r)
+        }
+    }
 }
 
 impl From<&Runes> for RuneRec {
@@ -493,6 +506,8 @@ impl From<&Runes> for RuneRec {
                 PropRec::of(r.t1code6, r.t1param6, r.t1min6, r.t1max6),
                 PropRec::of(r.t1code7, r.t1param7, r.t1min7, r.t1max7),
             ],
+            // Not a typed column: [`RuneRec::from_record`] reads it.
+            name_id: 0,
         }
     }
 }
@@ -687,7 +702,11 @@ impl ItemTables {
             setitems,
             sets,
             gems: typed::<Gems>(f)?.iter().map(GemRec::from).collect(),
-            runes: typed::<Runes>(f)?.iter().map(RuneRec::from).collect(),
+            runes: typed::<Runes>(f)?
+                .iter()
+                .zip(get(f, Runes::TABLE)?.iter())
+                .map(|(r, raw)| RuneRec::from_record(r, raw))
+                .collect(),
         })
     }
 
