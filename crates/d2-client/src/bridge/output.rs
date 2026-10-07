@@ -555,6 +555,7 @@ pub fn check(table: &[TableRow], code: &[Row]) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::bridge::objects::{ObjFx, ObjSound};
 
     const SPEC: &str = include_str!("../../../../specs/client/bridge.md");
 
@@ -644,5 +645,208 @@ mod tests {
             ["audio", "ui", "audio", "effects"]
         );
         assert_eq!(seen.into_iter().map(|s| s.1).collect::<Vec<_>>(), list);
+    }
+
+    fn every_variant() -> Vec<Output> {
+        let k = UnitKey::new(1, 9);
+        let obj = crate::bridge::objects::ObjUnit {
+            key: k,
+            client_only: false,
+        };
+        vec![
+            Output::ServerSound {
+                unit: k,
+                class: 1,
+                event: 2,
+            },
+            Output::QuestUi {
+                chain: 0,
+                flags: 0,
+                status: 0,
+                extra: 0,
+            },
+            Output::WaypointMenu {
+                guid: 1,
+                record: [0; 16],
+            },
+            Output::TradeAction { code: 0 },
+            Output::ChatLine {
+                kind: 0,
+                lang: 0,
+                unit: k,
+                b8: 0,
+                b9: 0,
+                name: vec![],
+                text: vec![],
+                present: false,
+                player_name: None,
+            },
+            Output::NpcText {
+                bytes: [0; 40],
+                present: false,
+                object_class: 0,
+            },
+            Output::HireOffer { name: 0, seed: 0 },
+            Output::HireListReset,
+            Output::QuestSpecial {
+                code: 0,
+                words: [0; 6],
+            },
+            Output::OpenUi {
+                guid: 0,
+                code: 0,
+                arg: 0,
+            },
+            Output::TradePartner {
+                name: [0; 16],
+                guid: 0,
+            },
+            Output::NpcInteract {
+                unit: k,
+                present: false,
+                class: 0,
+                mdata_3c: None,
+                blocker_open: false,
+            },
+            Output::NpcIntro { slots: [0; 12] },
+            Output::GameQuestFlags { record: [0; 96] },
+            Output::QuestLog { status: [0; 41] },
+            Output::QuestAvailability { bytes: [0; 37] },
+            Output::MercRevive { state: 0, value: 0 },
+            Output::SkillEvent {
+                unit: k,
+                skill: 0,
+                level: 0,
+                target: SkillTarget::Point(0, 0),
+                w: 0,
+            },
+            Output::SkillDo {
+                unit: k,
+                target: None,
+                skill: 0,
+                level: 0,
+                x: 0,
+                y: 0,
+                v: 0,
+            },
+            Output::ShrineFx {
+                kind: ShrineFxKind::OnMode,
+                code: 0,
+                object: k,
+                player: None,
+                overlays: [-1, -1],
+            },
+            Output::ShrineSound {
+                sound: 0,
+                player: k,
+            },
+            Output::UnitOverlay {
+                unit: k,
+                overlay: 0,
+                mode: 0,
+                sound: 0,
+            },
+            Output::UmodFx {
+                unit: k,
+                umods: [0; 9],
+                flag8: false,
+            },
+            Output::ClientMissile {
+                owner: None,
+                class: 0,
+                f07: 0,
+                f0b: 0,
+                f0f: 0,
+                f13: 0,
+                f17: 0,
+                source: k,
+                f1e: 0,
+                f1f: 0,
+            },
+            Output::CommonCof { act: 0 },
+            Output::MonsterPreload { class: 0 },
+            Output::RosterChanged { roster: vec![] },
+            Output::SkillEndFx {
+                unit: k,
+                skill: 0,
+                srvdofunc: 0,
+            },
+            Output::QuestFlags { record: [0; 96] },
+            Output::NpcGone { guid: 0 },
+            Output::NpcDialog(Box::new(NpcDialog {
+                kind: 0,
+                guid: 0,
+                quest_flags: [0; 96],
+                unit: k,
+                class: 0,
+                interact: false,
+                f4b1a10: None,
+                cursor_item: false,
+                npc_monsters: vec![],
+            })),
+            Output::NpcDialogEnd { kind: 0 },
+            Output::NpcTransaction {
+                bytes: [0; 15],
+                gold: 0,
+            },
+            Output::EventText {
+                bytes: [0; 40],
+                local_name: None,
+            },
+            Output::ActVideo { video: 0 },
+            Output::OverheadClear { unit: k },
+            Output::HotkeyAssign {
+                slot: 0,
+                skill: 0,
+                left: false,
+                item: 0,
+            },
+            Output::JoinRefused { error: 0 },
+            Output::TownExit {
+                player: k,
+                monsters: vec![],
+            },
+            Output::StateFx {
+                unit: k,
+                state: 0,
+                phase: StatePhase::On,
+                was_set: false,
+                dead: false,
+                hook: 0,
+                values: [0; 2],
+            },
+            Output::ObjectSound(ObjSound::Request { id: 0, unit: obj }),
+            Output::ObjectFx(ObjFx::GfxLoad { class: 0, flag: 0 }),
+        ]
+    }
+
+    // Covers: specs/client/bridge.md §10 r1, §10 row1, §10 row2, §10 row3, §10 row4, §10 row5, §10 row6, §10 row7, §10 row8, §10 row9, §10 row10, §10 row11, §10 row12, §10 row13, §10 row14, §10 row15, §10 row16, §10 row17, §10 row18, §10 row19, §10 row20, §10 row21, §10 row22, §10 row23, §10 row24, §10 row25, §10 row26, §10 row27, §10 row28, §10 row29, §10 row30, §10 row31, §10 row32, §10 row33, §10 row34, §10 row35, §10 row36, §10 row37, §10 row38, §10 row39, §10 row40, §10 row41, §10 row42
+    #[test]
+    fn each_table_row_is_one_variant_with_its_producer_and_consumer() {
+        let table = parse_table(SPEC).unwrap();
+        let all = every_variant();
+        assert_eq!(all.len(), 42);
+        assert_eq!(table.len(), 42);
+        for (i, (o, t)) in all.iter().zip(&table).enumerate() {
+            // The variant's Debug name is the table's variant name.
+            let dbg = format!("{o:?}");
+            let name: String = dbg.chars().take_while(|c| c.is_alphanumeric()).collect();
+            assert_eq!(name, t.variant, "row {}", i + 1);
+            let r = o.row();
+            assert_eq!(r.variant, t.variant, "row {}", i + 1);
+            assert_eq!(
+                (r.producer, o.consumer()),
+                (t.producer, t.consumer),
+                "row {}",
+                i + 1
+            );
+        }
+        // §10 r1: handlers append to the sink; the list keeps their order.
+        let sink = Outputs::default();
+        for o in &all {
+            sink.push(o.clone());
+        }
+        assert_eq!(sink.take(), all);
+        assert!(sink.take().is_empty());
     }
 }
