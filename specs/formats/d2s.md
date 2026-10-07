@@ -13,7 +13,9 @@
   also matches the saves measured for `world/waypoints.md`. Still
   unmeasured: a classic character, a hireling's items, an Iron Golem
   item (Open questions). A corpse was measured on the final `bdDead`
-  save (§8.3 rules 6–7).
+  save (§8.3 rules 6–7). A live hired rogue's header block and its
+  empty `jf` list were measured on `bdMercTwo`, and a Clay Golem's
+  empty `kf` on `bdGolem` (§2.5 rule 3, §8.4 rule 5, §8.5 rule 4).
 - **Target version:** 1.14d
 - **Crate/module:** `d2-formats::d2s` (byte layout, checksum, section
   framing); the load effects (§9) belong to `d2-server` character
@@ -33,26 +35,26 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 58–72 |
-| Inputs | 73–82 |
-| Outputs / state changes | 83–88 |
-| Rules | 89–90 |
-|   1. File layout and framing | 91–136 |
-|   2. Header (335 bytes) | 137–340 |
-|   3. Checksum (`0x00411130`) | 341–351 |
-|   4. Quest section (298 bytes at 0x14F) | 352–367 |
-|   5. Waypoint section (80 bytes at 0x279) | 368–373 |
-|   6. NPC flag section (52 bytes at 0x2C9) | 374–412 |
-|   7. Stats and skills | 413–505 |
-|   8. Item sections | 506–641 |
-|   9. Load sequence (`0x0056B180`) | 642–661 |
-|   10. Errors | 662–708 |
-| Constants & data dependencies | 709–728 |
-| Randomness | 729–733 |
-| Edge cases & original bugs | 734–770 |
-| Test vectors | 771–805 |
-| Provenance | 806–874 |
-| Open questions | 875–931 |
+| Summary | 60–74 |
+| Inputs | 75–84 |
+| Outputs / state changes | 85–90 |
+| Rules | 91–92 |
+|   1. File layout and framing | 93–138 |
+|   2. Header (335 bytes) | 139–348 |
+|   3. Checksum (`0x00411130`) | 349–359 |
+|   4. Quest section (298 bytes at 0x14F) | 360–375 |
+|   5. Waypoint section (80 bytes at 0x279) | 376–381 |
+|   6. NPC flag section (52 bytes at 0x2C9) | 382–420 |
+|   7. Stats and skills | 421–513 |
+|   8. Item sections | 514–656 |
+|   9. Load sequence (`0x0056B180`) | 657–676 |
+|   10. Errors | 677–723 |
+| Constants & data dependencies | 724–743 |
+| Randomness | 744–748 |
+| Edge cases & original bugs | 749–787 |
+| Test vectors | 788–823 |
+| Provenance | 824–901 |
+| Open questions | 902–957 |
 <!-- /index -->
 
 ## Summary
@@ -303,6 +305,12 @@ softcore death too (the setter is not traced).
    `world/hirelings.md` §10. Written and read in classic and
    expansion games alike; only the hireling's items (§8.4) are
    expansion-only.
+3. Measured on `bdMercTwo` (Provenance; a live Act I rogue hired from
+   Kashya, hireling class 271): flags = 0; seed non-zero and equal to
+   the seed of that hireling's S→C 0x81 message; name index 21 (name
+   "Diane"); `Id` = 0 (the first `hireling.txt` row: Act I Rogue Scout,
+   subtype Fire - Normal, class 271); experience = 39,482; +0xBF..+0xCE all 0. The block
+   holds no level, life or GUID (the 0x81 GUID is not saved).
 
 #### 2.6 New-character stub
 
@@ -621,6 +629,10 @@ them); this list is a measurement, not a constant.
 3. After the list: `world/hirelings.md` §10 rule 8.
 4. Measured: an expansion save without a hireling (hireling block
    zero) has `6A 66` and no list.
+5. Measured (`bdMercTwo`): an expansion save with a live hireling that
+   carries no items has `6A 66` followed by an empty item list
+   `4A 4D 00 00` (count 0), then `kf`; the list is present because the
+   hireling exists, not because it has items.
 
 #### 8.5 Iron Golem item (`kf`, expansion only)
 
@@ -638,6 +650,9 @@ them); this list is a measurement, not a constant.
    Open question 15). The cursor moves past the u8 even when g = 0.
 3. Measured: a save without an Iron Golem ends `6B 66 00`; that 0 is
    the file's last byte.
+4. Measured (`bdGolem`): a Necromancer saved with a live Clay Golem
+   (class 289, skill 75) writes g = 0 and the file ends `6B 66 00`, as
+   rule 1 requires (class ≠ 0x123): a Clay Golem is not saved.
 
 ### 9. Load sequence (`0x0056B180`)
 
@@ -767,6 +782,8 @@ draws.
 12. The corpse's x and y can be saved as 0 even though the corpse lies
     in Blood Moor (§8.3 rules 6–7); the loader never reads them, so
     the corpse's saved position carries no information.
+13. A Clay Golem is not saved: `kf` count 0 (§8.5 rule 4); only an
+    Iron Golem's item is kept, so no other summon survives a save.
 
 ## Test vectors
 
@@ -794,6 +811,7 @@ save.
 | expansion, no hireling, no golem | `6A 66 6B 66 00` | §8.4, §8.5 |
 | hotkey: skill 36, left flag, no item | `24 80 00 00` | §2.4 rule 1 |
 | hotkey: none | `FF FF 00 00`; decodes to skill −1, item −1 | §2.4 rules 1, 4 |
+| expansion, hireling present with no items, no golem | `6A 66 4A 4D 00 00 6B 66 00` | §8.4 rules 2, 5; §8.5 |
 
 Real-save checks (`#[ignore]`, `D2_GAME_DIR` or the user's save
 folder): every 1.14d `.d2s` passes §3 and §2.2 rule 2, its sections
@@ -856,6 +874,15 @@ and prints every field; it holds no save data.
   (ends 0x328 vs 0x323): it carries experience (stat 13, 32-bit
   value; 41 more bits) after a fight; Kashya's first-talk bit is set
   in NPC field A (§6 rule 3).
+  `bdMercTwo` 1,079 bytes (Barbarian level 8, live rogue hired from
+  Kashya: S→C 0x81 class 271, GUID 13, name Diane), 24 pass / 0 fail:
+  hireling block flags 0, seed = the 0x81 seed, name index 21, `Id` 0,
+  experience 39,482, 16 zero bytes; `jf` then a count-0 list; `kf`
+  g = 0 — §2.5 rule 3, §8.4 rule 5 confirmed on bdMercTwo (1.14d,
+  hired rogue). `bdGolem` 967 bytes (Necromancer level 6, saved with a
+  live Clay Golem, class 289), 23 pass / 0 fail: hireling block zero,
+  `jf` without a list, `kf` g = 0 — §8.5 rule 4, edge case 13. Both
+  have status 0x0028 (each died once).
   Checked with `tools/d2s_check.py` and the 1.14d `patch_d2` tables:
   all pass every structural check (§1 rule 7); field values in §2.1,
   §2.4 rule 7, §2.6, §6 rules 3 and 5, §7.1 rule 8, §7.2 rule 5,
@@ -884,14 +911,12 @@ and prints every field; it holds no save data.
    matched. Still open: a classic (non-expansion) character, to see
    status without 0x20 and a file ending after the corpse section
    with no `jf`/`kf`.
-4. Hireling block and `jf`: a character with a hired rogue (Kashya)
-   and one with a dead hireling (flags 0x10000) — confirms §2.5 and
-   §8.4 (`world/hirelings.md` Open question 1). Still missing: a save
-   of a character with a hired rogue. `bdMerc` has none: a fresh
-   level-1 character only gets Talk/Cancel from Kashya, since hiring
-   needs the Sisters' Burial Grounds (Blood Raven) quest plus the
-   gold, or level 8 (`world/npc.md` §7.3), so it was not produced
-   automatically.
+4. **Answered** (confirmed on bdMercTwo (1.14d, hired rogue); §2.5
+   rule 3, §8.4 rule 5): a live Act I rogue writes flags 0, its seed,
+   name index, `Id` 0 and experience, and `jf` carries a count-0 list
+   (`world/hirelings.md` Open question 1). Still missing: a dead
+   hireling (flags 0x10000) and a hireling carrying items (the `jf`
+   item records).
 5. Item index stability (edge case 3): a save with a hotkeyed Tome of
    Town Portal and an equipped weapon, saved, reloaded and saved again.
 6. **Answered** (§8.3 rules 6–7, edge case 12; bdDead, 1.14d): a
@@ -925,6 +950,7 @@ and prints every field; it holds no save data.
     Settle: a Necromancer with an Iron Golem made from an item. Still
     missing: that save; none was produced automatically because it
     needs a Necromancer able to cast Iron Golem (skill points and
-    level well past a fresh character).
+    level well past a fresh character). A Clay Golem save (`bdGolem`)
+    writes `kf` count 0 (§8.5 rule 4), so it does not settle this.
 16. Result texts: the strings shown for results 1–26 (character
     select error dialog).
