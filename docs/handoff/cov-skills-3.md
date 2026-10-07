@@ -28,3 +28,8 @@ None. (The bodies-3 §3.3 r6 throw-mastery gate was already on the base.)
 - bodies-3 §3.9 (dead-body footprint): the body only emits `BodyEffect::DeadFootprint`; the host side is a Pending seam in `wiring::body_effect`. Needs the wired host.
 - bodies-3 §5.31 text: generic pattern spawn `0x005B3270` and prison placement probe `0x005B34C0` need new seams (`MonsterSpawn::Leader` arg, creation-request variant, owner-data seam). The four-piece case is tested inline via `diab_prison`. Opus session.
 - Not run: nothing is verified against recordings; all stay "unverified".
+
+## Gate
+
+`sh tools/gate.sh --no-client`: all PASS except `test d2-sim`: `world::objects::tests::routes_match_function_table` and `route_check_catches_perturbations` fail (objects init/operate routes 35–40, 60); this branch changes nothing under `specs/` or `world/`, so it is on the base (not mine). The d2-client steps could not run: apt cannot install the Wayland/ALSA/udev dev libs in this container (signature error), so the full gate's client steps fail at build.
+`levels::LearnUnits::{send_attack_reset, point_client_updates}` default to no-ops because `d2-server/src/adapters/handlers/skills/wired.rs` has its own `LearnUnits` impl and does not call `add_skill_point` yet.

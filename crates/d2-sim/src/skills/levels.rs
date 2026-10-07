@@ -1403,10 +1403,12 @@ pub trait LearnUnits: SkillUnits {
     /// Message 0x21 (`0x0053C4A0`, skill 0, base level 1, remove 0) to
     /// the player's client: the client re-assigns Attack at level 1
     /// (`client/msg-skills.md` §4).
-    fn send_attack_reset(&mut self, u: Self::Unit);
+    // TODO(wiring): the d2-server handler (`handlers/skills/wired.rs`) does
+    // not call `add_skill_point` yet; until it does these stay no-ops there.
+    fn send_attack_reset(&mut self, _u: Self::Unit) {}
     /// The handler's tail `0x0055F4F0(…, 1)` and `0x0056DE40(unit)`
     /// (§6.4 step 5).
-    fn point_client_updates(&mut self, u: Self::Unit);
+    fn point_client_updates(&mut self, _u: Self::Unit) {}
 }
 
 /// Outcome of the 0x3B validator `0x00549490` (§6.4 step 2–3).
