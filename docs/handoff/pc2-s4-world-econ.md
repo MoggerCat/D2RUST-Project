@@ -88,3 +88,36 @@ differs**).
   (`0x0057A696`); change to "after the act change call".
 - `items/inventory.md` §1.4 / `0x0055C5C0` ("weapon bookkeeping") has no
   body; `items/generation.md` §12.1 repair calls it last.
+
+## Follow-up (C→S 0x4F buttons, worktree w-econ2)
+
+### Written
+- `world/vendors-2.md` §10 (new): server side of C→S 0x4F
+  (`0x0054C7C0` → `0x00568060`). §10.1 dispatch (no player → 1; no
+  active interaction → 0x77 0x0C; 0x12–0x14 need interaction type 2
+  else result 1; 0x17/0x18 → cube; others need type 0 else 0x77 0x0D,
+  result 3; switch table `0x00568620`, buttons 2–8). §10.2 stash
+  (`0x00564D50`): common checks (object class 267, both rooms in town);
+  0x12 close (reset interaction `0x00554190`, recount `0x0055FA40`, no
+  message); 0x13 withdraw (signed checks, carried cap level × 10000,
+  over cap → 0x2C event 19 only); 0x14 deposit (stash cap = constant
+  2,500,000 `0x00623460`, partial fill when it would overflow, no
+  message); clamped add `0x0053FF00` (over cap → 0). §10.3 player-trade
+  buttons 2, 3, 4, 7, 8 one line each (5, 6 nothing). §10.4 edge cases
+  and test vectors.
+
+### Pending
+- §10.3 player trade has no owner spec (`sim/unit-events.tsv` rows say
+  "future trade spec"); the table is the switch as read. `0x00597A20`,
+  `0x005679E0`, `0x00566B30`, `0x00567020`, `0x00567C70` unspecified.
+
+### Cross-file requests
+- `ui/panels.md` OQ 6: mark Answered (2026-10-07, `world/vendors-2.md`
+  §10: `0x00568060` → `0x00564D50`; 0x12 resets the type-2 interaction
+  and recounts, sends nothing; trade buttons §10.3).
+- `ui/panels-2.md` §21 rule 8 last line ("Server meaning … `panels.md`
+  OQ 6"): point to `world/vendors-2.md` §10.2 (0x50 DropGold stays open
+  there unless owned elsewhere).
+- `specs/client/msg-ui.md` §3 table row 0x0C "Sent … by": add
+  `world/vendors-2.md` §10.1 (also the second stash-close 0x12, and trade
+  failures of button 3).

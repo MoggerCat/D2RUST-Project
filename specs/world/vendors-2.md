@@ -1,24 +1,40 @@
-# Spec: World — Vendors part 2 (the item copy `0x0055A2A0`)
+# Spec: World — Vendors part 2 (the item copy `0x0055A2A0`; C→S 0x4F buttons)
 
 - **Status:** draft: read from the 1.14d `Game.exe` (addresses inline);
   the two recorded copies (buy GUID 0x36, sell GUID 0x35) fit rule 3's
   GUID numbering. Moved out of `world/vendors.md` (size), text and
-  numbers unchanged.
+  numbers unchanged. §10 (C→S 0x4F buttons) read from `0x00568060`,
+  `0x00564D50`, `0x0053FF00` (disassembly); not recorded.
 - **Target version:** 1.14d
-- **Crate/module:** `d2-sim::world::vendors` (copy provider)
+- **Crate/module:** `d2-sim::world::vendors` (copy provider; §10 the 0x4F button handler, stash gold)
 - **Related specs:** `world/vendors.md` (part 1; its Constants,
   Randomness, Edge cases, Provenance and Open questions (8, 9) also cover
   this part); `items/bitstream.md`, `items/generation.md` §1.4, §9,
   `items/inventory-moves.md` §6.1, §7.19, `sim/units.md` §2, §6.5,
-  `sim/rng.md` §5.3. A § number without a file name (§7.1, §7.2, §8.2)
-  is `world/vendors.md`'s, except §7.3 and §7.3.1.
+  `sim/rng.md` §5.3; §10: `ui/panels-2.md` §20, §21,
+  `world/objects-2.md` §16.10, `world/cube.md` §1, `client/msg-ui.md` §3,
+  `audio/triggers-2.md` §14, `sim/intents-events.md` §9 rule 15. A § number without a file name (§7.1, §7.2, §8.2)
+  is `world/vendors.md`'s, except §7.3, §7.3.1 and §10.
+
+<!-- index -->
+| Section | Lines |
+|---|---|
+| Summary | 29–38 |
+| Rules | 39–40 |
+|   7.3 Item copy (`0x0055A2A0`, ECX game, EDX source S, owner, fillers) | 41–99 |
+|   7.3.1 Fields the decoder rebuilds (Open question 8) | 100–147 |
+|   10. C→S 0x4F buttons (`0x0054C7C0` → `0x00568060`; answers `ui/panels.md` OQ 6) | 148–262 |
+<!-- /index -->
 
 ## Summary
 
 `0x0055A2A0` makes a second item equal to an existing one by writing
 the source as a save-format stream and decoding it into a new item unit
 (§7.3); §7.3.1 lists the fields the decoder rebuilds instead of reading,
-so the copy can differ from its source there.
+so the copy can differ from its source there. §10 is the server side of
+C→S 0x4F ClickButton: the stash gold buttons (withdraw 0x13, deposit
+0x14), stash close (0x12), and the routing of the cube and player-trade
+buttons.
 
 ## Rules
 
@@ -128,3 +144,118 @@ The low-quality missile floors differ from creation (creation 159 ≥ 2,
 Recorded: the buy of rule 10 creates the copy GUID 0x36 from store item
 0x12; the sell of §7.2 creates GUID 0x35 from GUID 7 (each the next
 item GUID; `sim/units.md` numbering).
+
+### 10. C→S 0x4F buttons (`0x0054C7C0` → `0x00568060`; answers `ui/panels.md` OQ 6)
+
+The server side of C→S 0x4F ClickButton [button u16@1][p1 u16@3][p2
+u16@5] (`sim/client-messages.tsv`; size ≠ 7 → result 3,
+`sim/intents-events.md` §9 rule 15). The entry passes `v` = (p1 << 16)
+| p2 as one u32 to `0x00568060(game, player P, button, v)`; the client
+senders build p1 = `v >> 16`, p2 = `v & 0xFFFF` (`ui/panels-2.md` §21
+rule 8). "Interaction" is P's interact record (`0x00554100`: GUID +0x64,
+type +0x68, active byte +0x6C). Results: `sim/intents-events.md`
+(1 and 2 enqueue, 3 drops).
+
+#### 10.1 Dispatch (`0x00568060`)
+
+1. No P → result 1, nothing else.
+2. Interaction not active → S→C 0x77 code 0x0C to P's client
+   (`0x005531C0`, `0x0053CAB0`; `client/msg-ui.md` §3: close trade);
+   result 0. This comes before the button test: a stash, cube or trade
+   button with no interaction gets 0x77 0x0C.
+3. Button 0x12, 0x13 or 0x14 (u16 compare `button − 0x12 ≤ 2`):
+   interaction type ≠ 2 → result 1, nothing sent. Type 2 → §10.2
+   (`0x00564D50`, ECX = v, EAX = the interaction GUID, ESI = P, stack
+   game, button); result 0 whatever §10.2 does.
+4. Button 0x17 or 0x18: the cube (`world/cube.md` §1: type ≠ 4 →
+   result 3; else `0x00566AE0`, result 0).
+5. Any other button: interaction type ≠ 0 → S→C 0x77 code 0x0D to P
+   (`0x005531C0`; close trade(1)), result 3. Type 0
+   (player trade): partner Q := the player unit (type 0) with the
+   interaction GUID (`0x00552F60`). No Q → `0x00597A20(game, P)` ≠ 0 →
+   result 0; else 0x77 0x0C to P, result 0. Else the trade switch
+   (§10.3) on button − 2 (table `0x00568620`, 7 entries for buttons
+   2–8); result 0. Buttons 0, 1, 9–0x11, 0x15, 0x16 and ≥ 0x19 reach
+   this rule and, after its checks, do nothing.
+
+#### 10.2 Stash buttons (`0x00564D50`)
+
+Common checks (any failure → nothing, no message): the stash object O
+:= the object unit (type 2) with the interaction GUID (`0x00552F60`)
+exists and has class 0x10B (267, `world/objects-2.md` §16.10); P's room
+(`0x00620BB0`) exists and is in a town level (`0x0061AB00`); O's room
+the same. Then by button:
+
+1. **0x12 stash close.** If the interaction is active and of type 2
+   (always true here): reset it (GUID −1, type 6, active 0;
+   `0x00554190`). Then the scroll / tome recount (`0x0055FA40`,
+   `items/inventory.md` §5.5). Nothing is sent: the client has already
+   closed its panel (`ui/panels-2.md` §20), and no 0x77 0x11 follows.
+   v is not read. A second 0x12 (the client sends two, `ui/panels-2.md`
+   §20 rule 7) finds the interaction inactive and gets 0x77 0x0C
+   (§10.1 rule 2).
+2. **0x13 withdraw v.** All compares signed. v ≤ 0 → nothing. v >
+   stat 15 `goldbank` (full value, `0x00625480(P, 15, 0)`) → nothing.
+   stat 14 `gold` + v > the carried cap (`0x00622E70`: stat 12 `level`
+   × 10000) → S→C 0x2C event 19 (`impossible`) on P with target P
+   (`0x00553380`, `audio/triggers-2.md` §14), nothing else. Else: gold
+   += v through Receive (`0x0055B060`, `world/vendors.md` §9.1; with
+   the cap checked it never drops a pile here), then goldbank −= v
+   through the clamped add (rule 4).
+3. **0x14 deposit v.** v ≤ 0 → nothing (signed). v > gold (signed) →
+   nothing. cap := the stash cap (`0x00623460`): the constant
+   **2,500,000** in 1.14d, not level-dependent. s := goldbank. Unsigned
+   s + v ≤ cap → gold −= v, then goldbank += v. Else, when s < cap
+   (unsigned): goldbank += cap − s, then gold −= cap − s (a partial
+   deposit filling the stash). Else (stash full) nothing. No sound or
+   message in any case.
+4. **Clamped add** (`0x0053FF00(unit, stat, d)`): n := current full
+   value + d (signed). n < 0 → stat := 0 (base set `0x00627260(unit,
+   stat, 0, 0)`). Else, unit a player: stat 14 with n > level × 10000,
+   or stat 15 with n > 2,500,000 → stat := **0** (not the cap). Else
+   base add d (`0x006272B0(unit, stat, d, 0)`). The rule-2 and rule-3
+   checks keep both writes in range, so the zeroing never fires from a
+   stash button.
+
+The stat changes reach P's client through the ordinary player stat
+updates (`sim/intents-events.md` §7); the stash buttons send no
+dedicated message.
+
+#### 10.3 Player-trade buttons (no owner spec; one line each)
+
+Player data D_P, D_Q (`0x006221A0`): trade state +0x50, tick +0x58,
+gold record +0x5C. `0x005679E0(Q, D_P, D_Q, code)` ends or answers the
+trade with a 0x77 code (its unit events are `sim/unit-events.tsv` rows
+`0x00567ad1`, `0x00567aea`); `0x00597A20(game, unit)` ≠ 0 skips the
+answer. Pending: the player-trade flow has no spec (rows say "future
+trade spec"); what is below is the switch as read, not a full rule set.
+
+| Button | Behaviour (1.14d) |
+|---|---|
+| 2 decline | both states in {1, 2}, or `0x00597A20` = 0 for P and Q → `0x005679E0(…, 9)`, both ticks := `GetTickCount` |
+| 3 accept request | `0x00597A20` ≠ 0 for P or Q: P state 7 → 0xE, 8 → 0xF, else `0x005679E0(…, 0xC)`. Else classic gate `0x005B5810` ≠ 0 → code 9; states ≠ (P 2, Q 1) → code 0xC; else start (`0x00567020`), then `0x00566B30` for P, then for Q (Q failing first undoes P, `0x00566BF0(game, P)`): a failure → 0x77 0x0C to P and to Q; both pass → S→C 0x78 (`0x0053CAD0`) to P with Q's client name and GUID, then to Q with P's |
+| 4 commit | `0x00597A20` ≠ 0 → 0x77 0x06 (assert 0xBEE); `0x005B5810` ≠ 0 → code 9; P state ≠ 3 → 0x77 0x06 (0xBD2); P has a cursor item (`0x0063C1E0`) → 0x77 0x06 (0xBD7); else 0x77 0x05 to Q, P state := 4, and when Q's state is 4 too → exchange (`0x00567C70`), both ticks := `GetTickCount` |
+| 5, 6 | nothing |
+| 7 uncommit | each state 4 → 3; 0x77 0x06 to P and to Q |
+| 8 gold offer v | v > P's gold (unsigned) → code 9 unless `0x00597A20` ≠ 0; else v := min(v, Q's cap − Q's gold) (unsigned), and when D_P +0x5C exists: its +0xC := v, S→C 0x79 (`0x0053CBE0`) (0, v) to Q and (1, v) to P |
+
+#### 10.4 Edge cases and test vectors
+
+1. A 0x12 while P is out of town or the stash object is gone leaves the
+   interaction set (the common checks fail before the reset); a later
+   0x4F of any button other than 0x12–0x14 then gets 0x77 0x0D, result 3.
+2. p1 ≥ 0x8000 makes v negative: 0x13 and 0x14 do nothing.
+3. Opening the cube while at the stash clears the type-2 interaction
+   itself (`world/cube.md` §1); a later 0x12 gets result 1.
+
+| Input (P level 10, gold g, goldbank s; interaction (2, stash)) | Result |
+|---|---|
+| 0x13 v = 50,000, g = 60,000, s = 100,000 | 0x2C event 19; g, s unchanged (60,000 + 50,000 > 100,000) |
+| 0x13 v = 40,000, g = 60,000, s = 100,000 | g = 100,000, s = 60,000 |
+| 0x13 v = 100,001, s = 100,000 | nothing |
+| 0x14 v = 30,000, g = 30,000, s = 2,490,000 | g = 20,000, s = 2,500,000 (partial 10,000) |
+| 0x14 v = 1, s = 2,500,000 | nothing |
+| 0x14 v = 0x00010000 (p1 1, p2 0), g = 70,000, s = 0 | g = 4,464, s = 65,536 |
+| 0x12, interaction (2, stash) in town | interaction (−1, 6, inactive); recount; no message; result 0 |
+| 0x12 sent twice | second: 0x77 0x0C, result 0 |
+| 0x13 with interaction type 4 (cube) | result 1, nothing |
