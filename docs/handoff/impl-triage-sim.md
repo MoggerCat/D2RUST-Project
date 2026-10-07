@@ -83,6 +83,14 @@ plain code (owner data, group spawn, barricade objects 571/572);
 - `monsters::population::tests::superunique_presets`, `monsters::mutant_tests::population::superunique_hcidx_spawns`:
   log lines (`group`, `barricade`, `suowner`) → real units / objects / owner data (population.md OQ3, OQ4).
 
+- `missiles::tests::flight_without_record_is_an_expiry_hit`: now `should_panic` in debug
+  builds (§R5 step 1: a missing record is unreachable and asserted); release unchanged.
+- `d2-client` `e2e_full_loop` (3 tests): the join now carries each monster's add
+  messages (0xAC, 0xAA, 0x6D; intents-events.md §7.2) after the waypoint's 0x51;
+  client log handled 20 → 24, dropped gains 0x6D ×1 (the client creates nothing
+  from 0xAC yet: no `ClientTables` monster rows), queued 0 → 1 (Akara's 0x6D).
+- Coverage claims of the skills worker's new tests reformatted (`;` between specs).
+
 ## PROVISIONAL list (code: `// PROVISIONAL (<spec ref>)`)
 RNG-order / wire / saved bytes first (HIGH PRIORITY captures):
 1. monsters/ai.md §2.3 can-walk = collision test only (target.rs) — wander-draw recording. RNG.
