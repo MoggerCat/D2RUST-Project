@@ -12,6 +12,23 @@
   (S→C 0x2C `PlaySound`), `sim/tick.md` (tick numbers),
   `client/assets.md` §A5 (sound budget)
 
+<!-- index -->
+| Section | Lines |
+|---|---|
+| Summary | 32–43 |
+| Inputs | 44–53 |
+| Outputs / state changes | 54–57 |
+| Rules | 58–59 |
+|   A. d2rs design (ours) | 60–182 |
+|   B. Original behavior to reproduce (not specified here) | 183–195 |
+| Constants & data dependencies | 196–200 |
+| Randomness | 201–205 |
+| Edge cases & original bugs | 206–212 |
+| Test vectors | 213–225 |
+| Provenance | 226–236 |
+| Open questions | 237–250 |
+<!-- /index -->
+
 ## Summary
 
 Sounds are decoded to exact i16 samples from the user's archives, started
@@ -91,6 +108,30 @@ Trigger { tick: u32, source: TriggerSource, sound: SoundId,
   scheduler exposes a `VoicePolicy` hook for them.
 - Stops (unit death, area change, loop end) are also tick-stamped
   events and are logged.
+- **One-shot end tick (d2rs model).** A non-looped voice started at
+  tick `t0` ends at the first presented tick `t` with
+  `(t − t0) × 40 ms ≥ duration` (duration = sample count / file rate, in
+  integer ms; compared as `(t − t0) × 40 × rate ≥ samples × 1000`). 1.14d
+  is not tick-exact here: a 50 ms wall-clock service thread
+  (`0x00516250`, a `WaitForSingleObject` loop with timeout 0x32, started
+  through the pointer at `0x00516558`) notices the end, and the next
+  sound-tick upkeep (`0x004DF890`, 16 slots of 0x20 bytes from
+  `0x007C8A80`) sees it (owner: `audio/sound-table.md` §6.6). Voice-log
+  `Stop` ticks of one-shots are therefore excluded from the §A5
+  comparison until `audio/sound-table.md` OQ12 fixes a conformance rule.
+- **Seeded choices (conformance input).** 1.14d draws sound variants,
+  NPC greetings and unit sound timers from the local player's client
+  unit seed, which the draw phase also steps once per drawn frame (frames
+  are dropped under load) and the cursor steps on `GetTickCount` time
+  (`audio/sound-table-2.md` §14.3, §14.4; `sim/rng.md` §7). So the seed
+  at a sound draw cannot be replayed from the tick sequence. The
+  conformance check of variant / greeting / timer choices therefore
+  takes, for each sound draw, the seed recorded before it in the 1.14d
+  run (the roll hook of `docs/handoff/local-buddy-q-rec.md` entry 74)
+  as input, sets the d2rs sound RNG to it, and compares the chosen value
+  (and the resulting `VoiceEvent` fields), not the seed sequence. Runs
+  without that input exclude from §A5 the `file` of variant-chosen
+  starts and the ticks of seed-timed starts.
 
 #### A4. Mixer
 
@@ -102,6 +143,19 @@ Trigger { tick: u32, source: TriggerSource, sound: SoundId,
 - Gain: `out = (s × vol × pan_l) >> shift` in i32, summed per block in
   i32, saturated to i16. Pan and volume curves are tables from §B3, not
   formulas we invent.
+- `GainCurve(v, pan, occ)`: the occlusion `occ` is an input next to
+  volume `v` (0..=255) and pan. 1.14d's device gain is
+  `trunc((1 − occ) × trunc(v × G / 255)) / 255` with `G` = 255 in game
+  (global at `0x0072F9B0`; `0x005157B0` divides by 255 with the
+  0x80808081 reciprocal, then applies `1 − occ` from voice +0x3C only
+  for voices with flag 0x4 at +0x34 and when `0x00513B90` ≠ 2). `occ`
+  moves toward targets 0 or 0.5 in steps of 0.05 (owner:
+  `audio/sound-table.md` §8.3 rule 3). The product is x87 arithmetic
+  on the f32 `1 − occ` and is truncated (`0x00682FD0`), so an integer
+  rewrite in hundredths is not equal by construction ((1 − 0.05f) × 200
+  truncates to 189, not 190): `GainCurve` reproduces the f32 occlusion
+  state and product exactly, or uses a table over the occlusion states
+  that `audio/sound-table.md` §8.3 enumerates (open question 4).
 - The mixer is pure: `mix(voices, block) -> [i16; 1024]`; golden tests
   hash the output of scripted voice sets (determinism, not fidelity).
 - Output: one custom `rodio::Source` registered through Bevy's
@@ -174,7 +228,11 @@ it.
 Design decided 2026-10-06 (architecture session) from `mpq.md` (ADPCM,
 observations), `data/loading.md` §3.4, `cof.md` events and the S→C
 message table. Bevy audio interface checked in the pinned registry
-source. No original behavior is stated here.
+source. Original behaviour is owned by the §B specs; the two facts
+below are stated only as inputs to our design. §A3 end-tick and §A4 occlusion inputs (PC 2 request, spec-audio):
+1.14d asm of `0x00516250`, `0x004DF890`, `0x005157B0`. §A3 seeded-choice input (PC 2 request,
+spec-audio pass 2): `0x00470390` (`0x004703E1`, `0x004704DD`, `0x004705B6`, `0x004705D7`) re-read;
+the seed-user list is `audio/sound-table-2.md` §14. No original behavior is stated here.
 
 ## Open questions
 
@@ -184,3 +242,8 @@ source. No original behavior is stated here.
 3. Whether 44,100 Hz suits all devices or the device rate should be used
    directly: ours to decide after first use; no effect on either
    exactness check.
+4. §A4 occlusion: the set of f32 values the occlusion state takes (steps
+   of 0.05 accumulated up from 0 and down from 0.5 may give different
+   f32 values) and so whether a fixed table can replace the f32 product.
+   Settle by enumerating both step paths in f32 against
+   `audio/sound-table.md` §8.3.

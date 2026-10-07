@@ -42,7 +42,7 @@
 | Edge cases & original bugs | 397–416 |
 | Test vectors | 417–466 |
 | Provenance | 467–515 |
-| Open questions | 516–536 |
+| Open questions | 516–549 |
 <!-- /index -->
 
 ## Summary
@@ -521,6 +521,19 @@ register arguments. D2MOO (1.10f) supplied field names only.
 2. With a `KAMAP` table loaded (`0x00882B2C` ≠ 0) the miss text length is
    counted in characters (`0x005276E0`); whether the last character is
    still dropped. Irrelevant for ENG.
+   *Answered* (static, 1.14d asm of `0x00524AC0`, `0x00527D50`,
+   `0x005276E0`, `0x00526320`, `0x00526100`): yes, for every key whose
+   bytes the table treats as single-byte. The miss path measures L =
+   strlen(key) + strlen(suffix) bytes, then the capacity n =
+   `0x00527D50(text, L)`: L without KAMAP; with KAMAP the number of
+   characters in the first L bytes, a byte ≥ 0x20 outside every
+   single-byte range of the table (`[0x00882B28]`, `[0x00882B22]`
+   ranges) counting as a 2-byte character. The converter `0x00526320`
+   (UTF-8 decoding through `0x00526100`, table `0x007309B8`, with or
+   without KAMAP) writes at most n − 1 characters and a 0. With every
+   byte single-byte, n = L and the final `w` is dropped as without
+   KAMAP; each byte counted as a lead byte lowers n by one and cuts one
+   more character from the end.
 3. Whether anything reads gems +0x2C (always 0); if a reader expects the
    gem name id, the bug's visible effect is unknown.
 4. Whether runtime code checks the set list or +0x2E for a set item that

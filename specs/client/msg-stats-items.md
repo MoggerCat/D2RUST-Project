@@ -19,23 +19,26 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 40–52 |
-| Inputs | 53–59 |
-| Outputs / state changes | 60–64 |
-| Rules | 65–66 |
-|   1. Local player stats: 0x19–0x1F (`0x0045D780`) | 67–96 |
-|   2. Item actions: 0x9C ItemActionWorld (`0x0045EB10`), 0x9D ItemActionOwned (`0x0045EC70`) | 97–167 |
-|   3. Other item messages | 168–197 |
-| Constants & data dependencies | 198–206 |
-| Randomness | 207–210 |
-| Edge cases & original bugs | 211–220 |
-| Test vectors | 221–248 |
-| Provenance | 249–263 |
-| Open questions | 264–285 |
+| Summary | 43–55 |
+| Inputs | 56–62 |
+| Outputs / state changes | 63–68 |
+| Rules | 69–70 |
+|   1. Local player stats: 0x19–0x1F (`0x0045D780`) | 71–100 |
+|   2. Item actions: 0x9C ItemActionWorld (`0x0045EB10`), 0x9D ItemActionOwned (`0x0045EC70`) | 101–171 |
+|   3. Other item messages | 172–201 |
+|   4. Hireling stats: 0x9E–0xA2 (`0x0045D540`) | 202–217 |
+|   5. Item state messages: 0x3E, 0x40, 0x7C, 0x7D, 0x92, 0x97, 0xA6 | 218–303 |
+| Constants & data dependencies | 304–312 |
+| Randomness | 313–316 |
+| Edge cases & original bugs | 317–332 |
+| Test vectors | 333–371 |
+| Provenance | 372–395 |
+| Open questions | 396–421 |
 <!-- /index -->
 
 Owned ids: 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F, 0x20, 0x3F, 0x42,
-0x47, 0x48, 0x9C, 0x9D.
+0x47, 0x48, 0x9C, 0x9D, 0x9E, 0x9F, 0xA0, 0xA1, 0xA2; §5: 0x3E, 0x40,
+0x7C, 0x7D, 0x92, 0x97, 0xA6.
 
 ## Summary
 
@@ -60,7 +63,8 @@ specify first.
 ## Outputs / state changes
 
 Unit stats (layer 0 base values), item records on item units, removal
-of the cursor item (0x42), item flag 4 (0x3F).
+of the cursor item (0x42), item flag 4 (0x3F); item stats and flags,
+stat-list links, `weapon_set`, the runtime item table (§5). No outputs.
 
 ## Rules
 
@@ -195,6 +199,108 @@ of the cursor item (0x42), item flag 4 (0x3F).
    `0x006280D0(item, 0x4000, …)`); the rule body is open question 4.
    Model: no field until then.
 
+### 4. Hireling stats: 0x9E–0xA2 (`0x0045D540`)
+
+1. Layout (`sim/server-messages.tsv`; senders `0x0053BEE0`,
+   `0x0053BFD0`): stat u8@1, GUID u32@2, value @6: 0x9E u8 (set), 0x9F
+   u16 (set), 0xA0 u32 (set), 0xA1 u8 (add), 0xA2 u16 (add) (jump
+   table `0x0045D5C4`, read from the image).
+2. Look up (1, GUID) (monsters only, whatever the sender's unit;
+   `client/model.md` §2 rule 2); none → nothing.
+3. Stat 12 (level) → first the requirement refresh of 0x47 on that
+   unit (`0x0045D3B0`: it builds `47 <type> 00 <GUID>` and calls
+   `0x004C1BC0`, §3 rule 3).
+4. Then set (`0x00627260(unit, stat, value, 0)`, base layer 0) for
+   0x9E–0xA0, or add (`0x006272B0`, same arguments) for 0xA1, 0xA2
+   (`sim/stat-lists.md` §5 rules 2, 3). No hook (contrast §1 rule 5).
+5. Model: the unit's `stats` entry for the stat.
+
+### 5. Item state messages: 0x3E, 0x40, 0x7C, 0x7D, 0x92, 0x97, 0xA6
+
+1. **0x3E** UpdateItemStats (`0x0045E130` → `0x004C1F30`; size u8@1,
+   min 2). The bit reader (`client/model.md` §10) runs over bytes
+   2 … size − 1, fields in order:
+
+   | Field | Bits |
+   |---|---|
+   | item GUID | 1 bit a; a = 0 → 8 bits; else 1 bit b: 16 (b = 0) or 32 |
+   | set flag | 1 |
+   | stat | 9 |
+   | value | as the GUID: 8, 16 or 32 |
+   | param | 1 bit c: 8 (c = 0) or 16 |
+
+   Item (4, GUID) absent → nothing.
+   1. stat 204 (`item_charged_skill`): only with a local player:
+      `0x004C1E40(item, skill = param >> [data +0xC6C], level = param &
+      [data +0xC70], charges = value & 0xFF)`: key := (skill <<
+      [+0xC6C]) + level; in the item's stat lists with flag 0x40
+      (`0x00625760` / `0x00625730`, list order) the first stat-204
+      entry with layer key: max := entry >> 8; max in 1 … 255 → entry
+      := max << 8 | min(charges, max) (charges < 1 → 0)
+      (`0x00627220(list, 204, v, key, item)`) and stop; max 0 or > 255
+      → stop with nothing written. No entry → the same search on each
+      item of the item's own inventory (+0x60), in node order, until one
+      writes.
+   2. Any other stat: set flag = 1 → base stat := value
+      (`0x00627260(item, stat, value, 0)`; param unused). Then, with a
+      local player: stat ≠ 70 (`quantity`) → the requirement refresh
+      `0x004C1350` on the **local player** (§3 r3); stat 70 and value > 0
+      → item flags 4 and 0x4000 := 0 (`0x006280D0`).
+   Model: the item's stats, item flags 4 / 0x4000, the refresh's item
+   flags.
+2. **0x40** ItemFlags (`0x0045E240` → `0x004C2020`, 13 bytes): GUID
+   u32@1, mask u32@5, value u32@9. Item (4, GUID) present → item flags
+   (item data +0x18): value ≠ 0 → |= mask, else &= ~mask (`0x006280D0`).
+   Model: item flags.
+3. **0x7C** UseScroll (`0x0045E910` → `0x004C51B0`, 6 bytes): type
+   u8@1, GUID u32@2. Unit present → `0x004C2180(unit)` (also run by
+   0x3F's rule 2.1): its state-54 stat list (`0x006256B0(unit, 54)`)
+   present → state 54 off (`0x00639DB0(unit, 54, 0)`), the list
+   unlinked (`0x006277E0`) and freed (`0x00626CD0`), then the unit's
+   stats refreshed (`0x00623F50`). Model: the unit's states and stat
+   lists (`client/stat-lists.md`).
+4. **0x7D** SetItemState (`0x0045E930` → `0x004C2270`, 18 bytes):
+   owner type u8@1, owner GUID u32@2, item GUID u32@6, code u32@10,
+   value u32@14. Item (4, u32@6) or owner absent → nothing. loc := the
+   item's body location on the owner (`0x00623D60`).
+   - code 0x100: item flag 0x100 := value (`0x006280D0`); the owner's
+     gfx and body slot refreshed (`0x0046F950`, `0x004C1290(loc)`,
+     `0x00470610(owner, 0)`); the item's stats linked to the owner
+     (`0x00663CC0(owner, item, 1, 1)`); requirement refresh
+     `0x004C1350(owner)`.
+   - code 0x200: item flag 0x100 := 0; `0x004C12F0(owner, item, the
+     item's mode, loc)`; stats unlinked (`0x00663CC0(owner, item, 0,
+     0)`); `0x004C1350(owner)`.
+   - other codes: nothing.
+   Model: item flag 0x100, the owner's stat-list links
+   (`sim/stat-lists.md`), item flags of the refresh. The gfx calls are
+   render (`render/unit-composite.md` reads the model).
+5. **0x92** RemoveItemsDisplay (`0x0045E5B0` → `0x004C23E0`, 6 bytes):
+   type u8@1, GUID u32@2. Unit U with an inventory: for each node in
+   order whose kind is 3 (body), or 1 when `0x0062FF70(item, U)` holds:
+   gfx refresh (`0x0046F950`), the item unlinked (`0x0063D2B0`) and
+   re-added (`0x0063AD90`; none → fatal 0xD5A, another item → fatal
+   0xD5B); kind 3 → its body slot cleared (`0x0063C110`,
+   `0x0063BE30`); stats linked (`0x00663CC0(U, item, 1, 1)`); a player
+   (type 0) → `0x0063BEF0(inventory)`; item flag 0x100 clear →
+   `0x006277F0(U, item)`; `0x004C1350`. A node without an item is
+   fatal 0xD4F. Finally `0x0063E0B0(inventory)`. Model: U's inventory
+   and stat links (helpers: `items/inventory.md`).
+6. **0x97** WeaponSwitch (`0x0045EAD0`, 1 byte; id byte ≠ 0x97 is fatal
+   0xF46, unreachable): `0x0048A700`: when the `d2exp.mpq` check
+   (`0x00408F20`) and the expansion flag `[0x007A04F4]` (`0x0044DCC0`)
+   are both non-zero, the active weapon set `[0x007BCC4C]` := 1 − itself.
+   Model: `weapon_set` (0 / 1) of the local player.
+7. **0xA6** (`0x0045EDC0`; size u16@2, min 4; sender `0x0053E1C0`): code
+   u8@1, index u16@4, record @6. Code ≠ 0 → nothing. Code 0 →
+   `0x00639CC0(index, record)`: 0x120 bytes are copied from @6 into
+   entry `index` of the runtime item table `[0x0096CA9C]` (count
+   `[0x0096CA98]`; index ≥ count → the table is reallocated to index + 1
+   entries, the new ones zeroed, count := index + 1). The copy is always
+   0x120 bytes, whatever the message size. Model: that table
+   (`item_table_ext`), read through `0x00639D60(i)` (0 < i < count,
+   else fatal 0x972); meaning open question 7.
+
 ## Constants & data dependencies
 
 | Item | Value | Source |
@@ -217,6 +323,12 @@ None.
 - 0x20 looks up players only (type 0), whatever unit it was meant for.
 - An item action > 0x17 is silently ignored; an unlisted action in range
   is fatal.
+- 0x3E's set flag 0 changes nothing for stats other than 204 except the
+  refresh; stat 204 ignores the flag.
+- 0xA6 copies 0x120 bytes from the message whatever its size (a short
+  message reads past its end in 1.14d; d2rs: a message shorter than
+  0x126 bytes is a handler error).
+- 0x97 toggles; two 0x97 in one frame cancel out.
 
 ## Test vectors
 
@@ -245,8 +357,22 @@ From `traces/raw/20261006-022633-packets.jsonl` ("B") and
 | `3f ff 05 00 00 00 ff ff` with item (4, 5) | item flag 4 := 0; use cursor none | synthetic |
 | `3f 04 05 00 00 00 ff ff` with item (4, 5) | item flag 4 := 1; use cursor {(4, 5), 4} | synthetic |
 | `47 00 00 01 00 00 00 00 00 00 00` | (0, 1) found → requirement refresh | A 76132 |
+| `9e 07 0a000000 05`, monster (1, 10) | stat 7 := 5 | synthetic, §4 |
+| `a2 0d 0a000000 6400`, (1, 10) stat 13 = 1000 | stat 13 = 1100 | synthetic, §4 |
+| `a0 0c 0a000000 0b000000`, (1, 10) | requirement refresh, then stat 12 := 11 | §4 rule 3 |
+| `9e 07 0a000000 05`, only player (0, 10) | nothing | §4 rule 2 |
+| 0x40 `40 07000000 00010000 01000000`, item (4, 7) | item flag 0x100 set | synthetic, §5 r2 |
+| 0x40 same with value 0 | item flag 0x100 cleared | synthetic |
+| 0x3E bits: a 0, GUID (8 bits) 7, flag 1, stat 70, value: a 0, 8 bits = 3; param: c 0, 8 bits = 0; item (4, 7), local player present | quantity := 3; item flags 4, 0x4000 cleared | synthetic, §5 r1.2 |
+| 0x3E stat 204, key matches an entry with max 10, charges 12 | entry := 0x0A0A | synthetic, §5 r1.1 |
+| 0x97 twice, expansion game | `weapon_set` back to its start value | synthetic, §5 r6 |
+| 0x7D code 0x300 | nothing | synthetic, §5 r4 |
+| 0xA6 code 0, index 3, count 2 | table count 4, entry 2 zero, entry 3 = bytes 6…0x125 | synthetic, §5 r7 |
 
 ## Provenance
+
+§4 (2026-10-07): `0x0045D540` (table `0x0045D5C4`), `0x0045D3B0`,
+`0x004C1BC0`, `0x00627260`, `0x006272B0`.
 
 1.14d `Game.exe`: stats `0x0045D780` (jump table `0x0045D85C`, 7
 entries), `0x0045D880`, hook `0x0045D4B0`; items `0x0045EB10` (byte
@@ -260,6 +386,12 @@ both recordings (join: 0x1D / 0x1E for stats 0, 1, 2, 3, 7, 9, 11, 12;
 0x1B experience). Cursor (join-update session, 2026-10-06): `0x004C20B0`,
 `0x004C2650`, `0x0063C180` (callers listed in §2 rule 5, found by a
 scan for calls to it).
+
+Area 4 session (2026-10-07): §5 from `0x0045E130`, `0x004C1F30`
+(tail `0x004C1F95`–`0x004C2012`), `0x004C1E40`, `0x0045E240` →
+`0x004C2020`, `0x004C51B0`, `0x004C2180`, `0x004C2270`, `0x004C23E0`,
+`0x0045EAD0` → `0x0048A700`, `0x0045EDC0` → `0x00639CC0`, `0x00639D60`;
+stat names from `itemstatcost`.
 
 ## Open questions
 
@@ -282,3 +414,7 @@ scan for calls to it).
    handler, whether it passes the action's item, a swapped-out item or
    0 to `0x0063C180`; with the header byte +8 of the GroundToCursor
    test named (open question 3's header spec).
+7. The runtime item table of 0xA6 (`[0x0096CA9C]`, 0x120-byte entries,
+   built at load by `0x006394A0`, read by `0x00639D60` and
+   `0x0062BED0`): which table it is and whether a single-player server
+   ever sends 0xA6 (no static caller of `0x0053E1C0` found).
