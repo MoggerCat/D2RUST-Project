@@ -351,3 +351,80 @@ fn an_ai_walk_to_a_unit_moves_then_rethinks_at_the_path_end() {
     assert!(fx.timers(m).contains(&(event::AI_THINK, f + 200)));
     fx.assert_clean();
 }
+
+// Covers: specs/missiles/bodies.md §19 l4 r1, §19 l4 r2, §19 l4 r3; specs/sim/pathing.md §11.2 r1, §11.2 r3, §11.2 r4
+#[test]
+fn zigzag_init_rebuilds_a_charged_bolt_path_on_the_provider() {
+    // The `zigzag` init callback (`missiles.md` §R2.3 step 21) on the
+    // wired seams: seed := init_low(target x), type 10, step counts :=
+    // min(total 50, 77), rebuild: n = 50 >> 1 = 25 draws, 26 points from
+    // the start cell, each two sub-tiles in one of 8 directions.
+    let fire_zig = |tx: i32| {
+        let mut fx = fx();
+        let a = fx.a;
+        let owner = fx.spawn(UnitType::Monster, 0, a, 41, 30);
+        let p = MissileParams {
+            owner: Some(owner),
+            origin: Some(owner),
+            class: 0,
+            flags: param_flags::TARGET_ABSOLUTE,
+            target_x: tx,
+            target_y: 30,
+            init: Some((crate::missiles::bodies_ext::ZIGZAG_CALLBACK, 0)),
+            ..MissileParams::default()
+        };
+        let m = fx
+            .sim
+            .missiles(&mut fx.game, |g, cx| create_missile(g, cx, &p))
+            .unwrap()
+            .expect("created");
+        fx.assert_clean();
+        let d = dynamic(&mut fx, m);
+        let seed = fx.sim.sys.units.get(m).unwrap().seed;
+        (d, seed)
+    };
+    let (d, seed) = fire_zig(79);
+    assert_eq!(d.path_type, 10);
+    assert_eq!((d.dist_budget, d.max_distance), (50, 50));
+    assert_eq!(d.point_count, 26);
+    assert_eq!((d.point(0).x, d.point(0).y), (41, 30));
+    for k in 1..26 {
+        let (p, q) = (d.point(k - 1), d.point(k));
+        let (dx, dy) = (q.x - p.x, q.y - p.y);
+        assert!(
+            matches!(dx, -2 | 0 | 2) && matches!(dy, -2 | 0 | 2) && (dx, dy) != (0, 0),
+            "point {k}: ({dx}, {dy})"
+        );
+    }
+    let mut want = crate::rng::Seed::init_low(79);
+    for _ in 0..25 {
+        want.step();
+    }
+    assert_eq!(seed, want);
+    // M08: another target x re-seeds differently.
+    let (d2, _) = fire_zig(78);
+    assert_ne!(
+        (0..26).map(|k| d.point(k)).collect::<Vec<_>>(),
+        (0..26).map(|k| d2.point(k)).collect::<Vec<_>>()
+    );
+}
+
+// Covers: specs/sim/path-placement.md §6 r4; specs/missiles/bodies-2.md §46 r2
+#[test]
+fn missile_body_teleport_moves_the_path_and_clears_the_points() {
+    let mut fx = fx();
+    let (a, b) = (fx.a, fx.b);
+    let owner = fx.spawn(UnitType::Monster, 0, a, 41, 30);
+    let m = fire(&mut fx, owner, 79, 30);
+    assert_eq!(dynamic(&mut fx, m).point_count, 1);
+    fx.sim.with(&mut fx.game, |g, v| {
+        crate::missiles::MissileBodies::path_teleport(v, g, m, Some(b), 50, 32)
+    });
+    let d = dynamic(&mut fx, m);
+    assert_eq!((d.x(), d.y(), d.room, d.point_count), (50, 32, Some(b), 0));
+    let target = fx.sim.with(&mut fx.game, |_, v| {
+        crate::missiles::MissileBodies::path_target_point(v, m)
+    });
+    assert_eq!(target, (79, 30));
+    fx.assert_clean();
+}

@@ -674,6 +674,34 @@ impl<X: Pending> crate::missiles::MissileBodies for View<'_, X> {
     fn room_seed(&mut self, _: &mut Game, room: RoomId) -> Option<&mut crate::rng::Seed> {
         self.h.drlg.active_seed_mut(room)
     }
+    /// Path target point (`0x00648A00` / `0x00648A10`) with the path
+    /// provider ([`crate::wiring::path::missiles`]); (0, 0) without it.
+    fn path_target_point(&self, unit: UnitId) -> (i32, i32) {
+        self.path_target_xy(unit).unwrap_or((0, 0))
+    }
+    /// `0x0056D2C0` with the path provider; none without it.
+    fn target_position(&mut self, game: &Game, unit: UnitId) -> Option<(i32, i32)> {
+        self.path_target_position(game, unit).flatten()
+    }
+    /// Set type `0x00648CF0` with the path provider.
+    fn set_path_type(&mut self, unit: UnitId, ty: i32) {
+        let _ = View::path_set_type(self, unit, ty);
+    }
+    /// Step counts `0x00648E70` with the path provider.
+    fn set_path_distance(&mut self, unit: UnitId, d: i32) {
+        let _ = self.path_set_step_counts(unit, d);
+    }
+    /// Teleport `0x00650BE0` with the path provider.
+    fn path_teleport(
+        &mut self,
+        game: &mut Game,
+        unit: UnitId,
+        room: Option<RoomId>,
+        x: i32,
+        y: i32,
+    ) {
+        let _ = self.path_teleport_to(game, unit, room, x, y);
+    }
     /// The active room's sub-tile rectangle on the DRLG (`bodies-2.md`
     /// §44 unit find step 2).
     fn room_subtiles(&self, _: &Game, room: RoomId) -> Option<(i32, i32, i32, i32)> {

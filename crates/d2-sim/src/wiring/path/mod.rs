@@ -14,6 +14,8 @@
 //!   (`PathWorld` + `WalkUnits`) and `path::footprint::PathMotion`;
 //!   the walk request, the per-tick player step (`tick.md` §3 step 4,
 //!   event 0) and the unit step.
+//! - [`missiles`]: the missile bodies' path seams (target point and
+//!   position, set type, step counts, teleport).
 //! - [`monsters`]: monster walk / run: the path part of the monster mode
 //!   set, a monster mode's velocity, the walk event 0 and the mode end.
 //! - [`place`]: `CollisionView`, `PlaceHost` and `LevelView` on a shared
@@ -28,6 +30,7 @@
 //! and tests that fake positions). Nothing here decides game behaviour:
 //! each adapter maps one seam call to one call of the path code.
 
+pub mod missiles;
 pub mod monsters;
 pub mod place;
 pub mod rooms;
