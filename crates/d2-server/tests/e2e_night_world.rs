@@ -68,7 +68,7 @@ use d2_sim::world::quests::{PlayerQuests, QuestControl, QuestTables};
 mod e2e_support;
 #[path = "../../d2-client/tests/e2e_support/world.rs"]
 mod e2e_world;
-use e2e_support::{blank, item_tables, tx, vendor_tables, Rest, N_MONSTATS};
+use e2e_support::{blank, item_tables, vendor_tables, Rest, N_MONSTATS};
 use e2e_world::*;
 
 // ---- constants ------------------------------------------------------------------------
@@ -854,7 +854,7 @@ fn interact(unit_type: u8, guid: u32) -> Vec<u8> {
 
 // Covers: specs/world/npc.md §7.1 r1, §7.1 r2, §7.1 r3, §7.1 r4, §7.2, §7.3 r5, §7.3 r6, §7.3 r7, §9
 #[test]
-fn hiring_at_greiz_stops_at_the_unit_spawn() {
+fn hiring_at_greiz_spawns_the_mercenary() {
     let mut fx = Fx::new();
     let (p, ng) = (fx.player, fx.guid(fx.npc));
     // §7.1 by hand on a copy of the NPC-control seed: one step per slot
@@ -907,11 +907,18 @@ fn hiring_at_greiz_stops_at_the_unit_spawn() {
     assert_eq!(codes, [ResultCode::Done]);
     let gold = PLAYER_GOLD - want.price as i32;
     assert_eq!(fx.stat(p, GOLD), gold);
-    assert_eq!(got, [tx(0, code::NOT_PLACED, u32::MAX, gold)]);
-    // No unit, no pet node; the slot is not marked hired.
-    let w = &fx.sim().world;
-    assert!(w.state.hirelings.list(p).is_none_or(|l| l.nodes.is_empty()));
-    let slots = &w
+    // The unit spawn is `LifecycleHooks::spawn_near` (stitch-hireling): the
+    // client is told of the new monster (S→C 0xAC) and of the hire
+    // (0x2A code 5 with the mercenary's GUID).
+    assert!(got.iter().any(|m| m[0] == 0xAC), "{got:02x?}");
+    assert!(
+        got.iter().any(|m| m[0] == 0x2A && m[2] == code::MERC),
+        "{got:02x?}"
+    );
+    assert!(!got.iter().any(|m| m[0] == 0x2A && m[2] == code::NOT_PLACED));
+    let slots = &fx
+        .sim()
+        .world
         .npc
         .record(class::GREIZ)
         .unwrap()
@@ -919,8 +926,9 @@ fn hiring_at_greiz_stops_at_the_unit_spawn() {
         .as_ref()
         .unwrap()
         .slots;
-    assert!(!slots[k].hired);
-    fx.assert_clean();
+    assert!(slots[k].hired);
+    // The fixture holds no hireling tables, so the merc init reports
+    // `NoHirelingTables` (the live host loads them): not `assert_clean`.
 }
 
 // ---- 2. the hireling follows a waypoint teleport ---------------------------------------

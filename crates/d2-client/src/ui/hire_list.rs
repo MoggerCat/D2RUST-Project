@@ -27,7 +27,7 @@ use super::panels::npc_menu::{
     STR_BACK, STR_YOUR_GOLD,
 };
 use super::text::TextOpts;
-use super::{PointerButton, StringLookup};
+use super::PointerButton;
 use crate::bridge::output::Output;
 use crate::bridge::world::{ClientWorld, KindData};
 
@@ -384,7 +384,7 @@ mod tests {
         root.dispatch(e, &ctx);
     }
 
-    // Covers: specs/ui/menus.md §3.1, §3.3, §3.4 (first branch).
+    // Covers: specs/ui/menus.md §3 r4
     #[test]
     fn the_server_list_opens_for_the_nearest_seller_and_a_row_sends_0x36() {
         let w = world();
