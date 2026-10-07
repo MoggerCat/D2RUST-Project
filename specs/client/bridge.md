@@ -364,9 +364,9 @@ model state: 1.14d's handler calls a UI or sound function directly
 | Variant | Payload | Producer | Consumer | Owner (what the consumer does) |
 |---|---|---|---|---|
 | `ServerSound` | unit key (type, GUID), unit class, event u16 | 0x2C | audio | `audio/triggers.md` §2 r4 |
-| `QuestUi` | chain u8, flags u8, status u8, extra i16 | 0x5D (every case except the eclipse) | UI | `client/msg-ui.md` §1 |
+| `QuestUi` | chain u8, flags u8, status u8, extra i16 | 0x5D (the rows marked output in `client/msg-ui.md` §1 r2; none for model rows or "nothing" rows, §1 r5) | UI | `client/msg-ui.md` §1 |
 | `WaypointMenu` | object GUID u32, record 16 bytes (as received) | 0x63 | UI | `client/msg-ui.md` §2 |
-| `TradeAction` | code u8 | 0x77 | UI | `client/msg-ui.md` §3 |
+| `TradeAction` | code u8, local player absent or dead (`0x00463DF0`, captured) | 0x77 | UI | `client/msg-ui.md` §3 |
 | `ChatLine` | the 0x26 record (type, lang, unit type, GUID, u8@8, u8@9, name, text); unit present; a player unit's name | 0x26 | UI | `client/msg-ui.md` §4 |
 | `NpcText` | the 40 bytes; unit present; object class (type 2) | 0x27 | UI | `client/msg-ui.md` §5 |
 | `HireOffer` | name u16, seed u32 | 0x4E | UI | `client/msg-ui.md` §6 |
