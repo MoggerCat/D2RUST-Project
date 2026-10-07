@@ -26,26 +26,32 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 51–63 |
-| Inputs | 64–73 |
-| Outputs / state changes | 74–80 |
-| Rules | 81–82 |
-|   1. Scope and order | 83–102 |
-|   2. Shared pet helpers | 103–208 |
-|   3. NecroPet (67) `0x005E4CF0` | 209–257 |
-|   4. MinionSpawner (121) `0x005E2BD0`, init `0x005F6630` | 258–277 |
-|   5. Towner (41) `0x005E7540` | 278–291 |
-|   6. EvilHole (76) `0x005FB410` | 292–319 |
-|   7. Hireable (61) `0x005E52D0`, alternate `0x005E5280` | 320–438 |
-|   8. QuillMother (75) `0x005FB2A0` | 439–453 |
-|   9. BaalTentacle (139) `0x005EF820` | 454–467 |
-|   10. ElementalBeast (46) `0x005F6B70` | 468–486 |
-| Constants & data dependencies | 487–500 |
-| Randomness | 501–509 |
-| Edge cases & original bugs | 510–518 |
-| Test vectors | 519–536 |
-| Provenance | 537–556 |
-| Open questions | 557–564 |
+| Summary | 57–69 |
+| Inputs | 70–79 |
+| Outputs / state changes | 80–86 |
+| Rules | 87–88 |
+|   1. Scope and order | 89–114 |
+|   2. Shared pet helpers | 115–220 |
+|   3. NecroPet (67) `0x005E4CF0` | 221–269 |
+|   4. MinionSpawner (121) `0x005E2BD0`, init `0x005F6630` | 270–289 |
+|   5. Towner (41) `0x005E7540` | 290–303 |
+|   6. EvilHole (76) `0x005FB410` | 304–331 |
+|   7. Hireable (61) `0x005E52D0`, alternate `0x005E5280` | 332–450 |
+|   8. QuillMother (75) `0x005FB2A0` | 451–465 |
+|   9. BaalTentacle (139) `0x005EF820` | 466–479 |
+|   10. ElementalBeast (46) `0x005F6B70` | 480–498 |
+|   11. NpcStationary (54) `0x005E73A0` | 499–526 |
+|   12. MosquitoNest (83) `0x005E0260` | 527–544 |
+|   13. DesertTurret (94) `0x005E0980` | 545–583 |
+|   14. AssassinSentry (101) `0x005EA3D0`, init `0x005EA290` | 584–618 |
+|   15. Catapult (123) `0x005E34C0` | 619–623 |
+|   16. CatapultSpotter (126) `0x005EE040` | 624–662 |
+| Constants & data dependencies | 663–681 |
+| Randomness | 682–690 |
+| Edge cases & original bugs | 691–699 |
+| Test vectors | 700–720 |
+| Provenance | 721–743 |
+| Open questions | 744–751 |
 <!-- /index -->
 
 ## Summary
@@ -96,6 +102,12 @@ index, rows, section:
 | QuillMother (75) | 5 | §8 |
 | BaalTentacle (139) | 5 | §9 |
 | ElementalBeast (46) | 4 | §10 |
+| NpcStationary (54) | 4 | §11 |
+| MosquitoNest (83) | 4 | §12 |
+| DesertTurret (94) | 4 | §13 |
+| AssassinSentry (101) | 4 | §14 |
+| Catapult (123) | 4 | §15 |
+| CatapultSpotter (126) | 4 | §16 |
 
 (Continued as the bodies are written; the remaining `unread` rows stay
 listed in `ai-functions.tsv`.)
@@ -484,6 +496,170 @@ Brackets: firebeast [20, 16, 20]; firebeast and iceglobe have
 So a beast wakes with S1 when a target comes within aip2, chases, casts
 S1 again on contact and dies on the next think. 1.14d-confirmed.
 
+### 11. NpcStationary (54) `0x005E73A0`
+
+Target mode 0. Rows: tyrael1 (251), tyrael2, izualghost (406), tyrael3.
+AI param 1 = greeting countdown g.
+
+1. P := the nearest interacting player within 15 (`0x005DDF20(game,
+   unit, &close)`, `ai.md` §5.3; the NPC itself when none).
+2. P = 0 or P = the unit (nobody near):
+   - class 251: quest seam `0x0059DF50(game, unit)` ≠ 0 and "free"
+     `0x005E7350` (below) → mode 0 at (0, 0) again, quest seam
+     `0x0059C750(game)`; return (nothing scheduled).
+   - class 406: quest seam `0x005B43F0(game, unit)` ≠ 0 and free →
+     mode 0 at (0, 0) again, quest seam `0x005B4440(game)`; return.
+   - Otherwise idle 20. End.
+   **Free** `0x005E7350`: the unit's interaction list is empty
+   (`0x00572DC0`, `world/npc.md` §2) → mode 0 (death: the NPC leaves)
+   at (0, 0), return 1; else 0.
+3. d := full-size distance unit→P. P is a player and `0x00535060(P)`
+   = 1 → idle 10. End. The interaction list (monster data +0x30) is not
+   empty → idle 10. End.
+4. d ≥ 24: g ≤ 0 → g := 60; g −= 1; idle 20. End.
+5. g ≠ 0 → g −= 1; idle 20. End. g = 0 → g := 60; P a player → sound 18
+   on the unit toward P (`0x00553380(unit, 18, P)`); idle 20.
+
+No draws. The quest seams are `world/quests-act2.md` (Tyrael, class
+251) and `world/quests-act4.md` (Izual's ghost, class 406).
+1.14d-confirmed.
+
+### 12. MosquitoNest (83) `0x005E0260`
+
+No init: AI params start at 0. Brackets: suckernest1 [16, 25, 200];
+`Skill1` Nest (`seq_mosquitonest`). Params: 0 = next frame f, 1 =
+summons made n.
+
+1. D > aip2 [25; 26, 27] → idle 25. End.
+2. n > aip1 [16; 17, 21] → unit flag 0x20000 (no drop); mode 0 (death)
+   at (0, 0). End.
+3. `Skill1` ≥ 0, frame > f and the footprint test `0x005FD350(334
+   suckernest1 (−1 when monstats is too short), room, x, y, 0)` passes
+   (`monsters/population.md` §9.3: point (x − 2, y − 2), mask 0x1C0) →
+   n += 1; f := frame + aip3 [200]; `Skill1` at T. End.
+4. Idle 25.
+
+No draws. Like FoulCrowNest (`ai.md` §9.17) but with a range gate and
+a cooldown instead of a quota-and-idle. 1.14d-confirmed.
+
+### 13. DesertTurret (94) `0x005E0980`
+
+Brackets: turret1 [10, 5, 120, 30, 5]; `Skill1` DesertTurret
+(`seq_desertturret`). Params: 0 = next frame f, 1 = shots n, 2 = aim
+index j (0..7).
+
+1. `Skill1` ≥ 0 and f = 0 → `0x005DEAD0(Sk1mode, Skill1, 0, 0, 0)`
+   (the deploy, no target); j := 0; f := frame. End.
+2. frame < f → idle 10. End.
+3. D > aip4 [30] → n > 0 → n −= 1; idle 15. End.
+4. e := the 64-step direction from the unit to T's position reduced to
+   8 (`0x00621DC0`, table `0x00745600`, `ai-bodies-4.md` §2); j :=
+   J[e][j mod 8] (table `0x006E33E0`, below); Q := own position + aip5
+   [5] × V[j] (table `0x006E33A0`). Path target unit := T
+   (`0x00620C10`).
+5. `Skill1` ≥ 0, the skill check `0x005FD470(Skill1, T, Q)` ≠ 0 and
+   the check at the own position ≠ 0 (`ai.md` §7.4) → `0x005DEAD0(Sk1mode,
+   Skill1, 0, Q.x, Q.y)`; path target point := Q (`0x00648AD0`); n += 1;
+   n > aip2 [5; 6, 7] → f := frame + aip3 [120; 100, 80], n := 0; else
+   f := frame + aip1 [10; 7, 3]. End.
+6. n > 0 → n −= 1. Idle 10.
+
+V[0..7] = (1, 1) (0, 1) (−1, 1) (−1, 0) (−1, −1) (0, −1) (1, −1) (1, 0).
+J[e][j] (the aim turns at most a step or two toward e; read from the
+file):
+
+| e \ j | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+|---|---|---|---|---|---|---|---|---|
+| 0 | 0 | 0 | 1 | 2 | 5 | 6 | 7 | 0 |
+| 1 | 1 | 1 | 1 | 2 | 3 | 6 | 7 | 0 |
+| 2 | 1 | 2 | 2 | 2 | 3 | 4 | 7 | 0 |
+| 3 | 1 | 2 | 3 | 3 | 3 | 4 | 5 | 6 |
+| 4 | 1 | 2 | 3 | 4 | 4 | 4 | 5 | 6 |
+| 5 | 7 | 2 | 3 | 4 | 5 | 5 | 5 | 6 |
+| 6 | 7 | 0 | 3 | 4 | 5 | 6 | 6 | 6 |
+| 7 | 7 | 0 | 1 | 4 | 5 | 6 | 7 | 7 |
+
+No draws. 1.14d-confirmed.
+
+### 14. AssassinSentry (101) `0x005EA3D0`, init `0x005EA290`
+
+Target mode 0. Rows: wakeofdestruction, chargeboltsentry,
+lightningsentry, infernosentry (the assassin traps). Brackets:
+lightningsentry [100, 10, 15, 25]. Init: AI param 0 := frame, param 1
+:= −1. Param 1 = charges c (−1 = not yet counted).
+
+**Charges** `0x005EA2B0(game, unit, tick, use)` → 1 when the trap was
+removed:
+
+1. The minion owner (`0x0058F0D0`) missing, without a room, or in a
+   town room → mode 0 (death) at (0, 0); return 1.
+2. c < 0: `Skill1`'s row missing → death, return 1. E := the unit's
+   entry of `Skill1` (`0x006439F0`); none → death, return 1. c := the
+   skill's `calc4` (skills +0x144) evaluated at E's level
+   (`0x00646CA0(unit, calc4, Skill1, 0x006442A0(unit, E, 1))`,
+   `data/calc-expressions.md`).
+3. c > 0: use ≠ 0 → c −= 1; return 0.
+4. c ≤ 0 → death; return 1.
+
+Think:
+
+1. Charges (use 0) = 1 → end.
+2. E := the unit's entry of `Skill1`; none → death at (0, 0). End.
+3. State 12 → off.
+4. S, E2 := `0x005DDC30(unit)` (`ai.md` §5.3). S = 0 or E2 ≥ aip4
+   [25] → idle aip3 [15]. End.
+5. `roll(100)` ≥ aip1 [100] → idle aip2 [10]. End.
+6. Charges (use 1) = 1 → end.
+7. Delete the unit's thinks; `0x005DEAD0(E's mode (entry +0x08,
+   `0x00644360`), Skill1, S, 0, 0)`.
+
+So each shot spends a charge and the trap dies on the think after the
+last one, or as soon as its owner leaves for town. 1.14d-confirmed.
+
+### 15. Catapult (123) `0x005E34C0`
+
+Brackets: catapult1 [20; 22, 25]. Draw < aip1 → A1 (mode 4) with no
+target (`0x005DDF90(4, 0)`); else idle 15. 1.14d-confirmed.
+
+### 16. CatapultSpotter (126) `0x005EE040`
+
+Brackets: catapultspotter1 [8, 25, 25, 10, 10]; skills 287 Catapult
+Charged Ball, 288 Catapult Spike Ball, 303 CatapultBlizzard, 304
+CatapultPlague, 305 CatapultMeteor (table `0x006E3514`, first 5 of 8
+entries). Params: 0 = ammo index a, 1 = volley count v, 2 = last shot
+frame f (0 before the first think).
+
+1. f = 0, or a draw ≤ 2 (drawn only when f ≠ 0): **catapult check**
+   (below) ≠ 0 → mode 0 (death) at T (`0x005DDF90(0, T)`). End.
+2. f = 0 → f := 1.
+3. frame − f < aip2 [25] → idle aip2. End.
+4. T = 0, or a draw ≥ aip1 [8; 12, 16] → idle aip2. End.
+5. v < 1 → a := `roll(5)`, v := aip5 [10]. Else v −= 1.
+6. x := own x + `roll(2·aip4)` − aip4 [10], then y := own y +
+   `roll(2·aip4)` − aip4.
+7. Free point near (x, y) in the unit's room (`0x0064E7E0(room, &pt,
+   2, 0x805, 3)`, `sim/path-placement.md`); none → idle 15. End.
+8. `0x005DEAD0(4, skill[a], 0, x, y)` (no target, at the point); f :=
+   frame.
+
+**Catapult check** `0x005EDF70(game, unit)` → 1 when the spotter's
+catapult is dead: R := the unit's room (none → fatal); (rx, ry, w, h)
+:= R's sub-tile box (`0x00619730`, `drlg/levels.md`); (dx, dy) :=
+−table `0x006EA9D0`[p] with p the class's chain position (monstats
++0x4B, `0x006510C0`, `data/fixups.md`; spotter1..4 → 0..3; p outside
+0..3 → fatal): table (0, 1), (1, 0), (1, 0), (−1, 0); class c := the
+unit's class − 19 (catapultspotter1 516 → catapult1 497). For k = 1..3:
+(rx, ry) += (w·dx, h·dy); `0x005429B0(game, R, rx, ry, c)` ≠ 0 →
+return 1. Return 0.
+`0x005429B0`: the room at (rx, ry) (from R, else from the act's room
+list, `0x00619DA0`): a monster of class c in its unit list that is dead
+(`0x005541B0`) → 1; else an inactive monster record of class c with
+the dead bit (+0x18 & 4) in the area node of rx (`0x00541D20`,
+`sim/units.md` §3.4) → 1; else 0.
+
+Draws, in order: step 1's draw (when f ≠ 0), step 4's, `roll(5)` (step
+5, when v < 1), the two point draws. 1.14d-confirmed.
+
 ## Constants & data dependencies
 
 | Item | Value | Source |
@@ -496,6 +672,11 @@ S1 again on contact and dies on the next think. 1.14d-confirmed.
 | hireling | range 24 / 16 / 5 or 2p / p / p >> 1 (17 ≤ p ≤ 19); D 100; attack chance 98 or p + 40 + 2·level ≤ 95; p += 10 on a miss; skill weights from hireling.txt `DefaultChance`, `Chance*`, `ChancePerLvl*` / 4; Inferno reach level / 2 + 4 | `0x005E52D0`, `0x005E5050`, `0x005E4D30` |
 | hireling move | k 1 speed `roll(15)` + 50 | `0x005E3930` |
 | BaalTentacle | life (`roll(aip3)` + aip3) × 25 frames | `0x005EF820` |
+| NpcStationary | greeting countdown 60, range 24, sound 18 | `0x005E73A0` |
+| MosquitoNest | footprint class 334 at (x − 2, y − 2), mask 0x1C0 | `0x005E0260` |
+| DesertTurret | aim tables J (8 × 8) and V (8) | `0x006E33E0`, `0x006E33A0` |
+| sentry charges | skills `calc4` at the entry's level | `0x005EA2B0` |
+| spotter | skills 287, 288, 303, 304, 305; check 3 % of thinks; catapult class − 19; 3 rooms back along table `0x006EA9D0` | `0x005EE040`, `0x005EDF70` |
 | EvilHole | modes 1 → 10 → 11 → spawn → 0; trigger D ≤ 5; spawn classes 19 / 712; flags 0x04020000; state 184, overlay 202 for class 711 | `0x005FB410`, `0x0063EFA0` |
 
 ## Randomness
@@ -530,6 +711,9 @@ Synthetic (CI-safe), draws given as `lo' % 100`:
 | QuillMother, C = 1, quillbear1 Normal, no AI state | 59 (< 60) | A1 at T |
 | BaalTentacle, e = 0, frame 1000, baaltentacle1 | `roll(10)` = 3 | e := 1325 |
 | ElementalBeast, s = 0, D = 10, firebeast Normal | none | S1 at T, s := 1 |
+| DesertTurret, turret1 Normal, f = 0, `Skill1` ≥ 0 | none | deploy, j := 0, f := frame |
+| CatapultSpotter, f = 500, frame 510, T ≠ 0 | 50 (> 2: no check) | idle 25 (510 − 500 < 25) |
+| AssassinSentry, c = 1, S at E2 10, lightningsentry | 40 (< 100) | c := 0, shot; next think: death |
 | Hireable, act2hire, p = 0, level 20, S at d = 2 in melee range, draw 79 | 79 (< 98) | p := 0; hireling skill |
 
 Game-file vectors: Open question 1.
@@ -543,8 +727,11 @@ Game-file vectors: Open question 1.
   `0x0063EFA0` (cases 0x141, 0x220, default), `0x00621E40`, `0x005E52D0`,
   `0x005E5050`, `0x005E4D30`, `0x005E3930` (jump table `0x005E3E7C`),
   `0x00574BD0`, `0x005DED00`, `0x005FB2A0`, `0x0058F730`, `0x005EF820`,
-  `0x005F6B70`; tables
-  `0x006E34F8`, `0x006E34F0` read from the file. Decompiler text read first; every
+  `0x005F6B70`, `0x005E73A0`, `0x005E7350`, `0x005E0260`, `0x005FD350`,
+  `0x005E0980`, `0x005EA3D0`, `0x005EA290`, `0x005EA2B0`, `0x00646CA0`,
+  `0x005E34C0`, `0x005EE040`, `0x005EDF70`, `0x005429B0`, `0x0063EE10`; tables
+  `0x006E34F8`, `0x006E34F0`, `0x006E33E0`, `0x006E33A0`, `0x006E3514`,
+  `0x006EA9D0` read from the file. Decompiler text read first; every
   call's register and stack arguments checked in the disassembly
   (`tools/ghidra/disasm.py`).
 - Live data (`patch_d2`): monstats.txt (`AI`, `aip*`, skills, `spawn`,
