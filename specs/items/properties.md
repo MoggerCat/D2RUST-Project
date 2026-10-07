@@ -40,7 +40,7 @@
 | Edge cases & original bugs | 407–416 |
 | Test vectors | 417–435 |
 | Provenance | 436–455 |
-| Open questions | 456–509 |
+| Open questions | 456–539 |
 <!-- /index -->
 
 ## Summary
@@ -479,6 +479,36 @@ Synthetic, from the rules:
    rune longer than its sockets). Settle: a stack trace of the slot at
    `0x0062BFBA` for a 2-socket item of a 3-rune word, or accept d2rs's
    "no match".
+   Partly answered (2026-10-07, frame layouts from the disassembly): the
+   buffer is 6 dwords at ebp−0x2C of `0x0062BED0` (slot k at ebp−0x2C +
+   4k; ebp−0x14 is the runes-table pointer, written after the walk), and
+   the function has five callers: `0x0053379A` (legacy save reader
+   `0x005335E0`), `0x00562802` and `0x006600A9` (insertion and
+   activation, §10.2), `0x0056AD78` (character load `0x0056ACE0`),
+   `0x0063087E` (bit-stream writer `0x0062FFF0`). For the insertion pair
+   the stale slots are fixed by the calls just before them (the
+   filler's mode set `0x00624690(filler, 6)`, whose mode change runs
+   `0x00624390`):
+   - `0x00562802`, slot c for c = 1 … 5: the filler pointer (saved ESI
+     of `0x00624390`), the game pointer (saved EBX), the filler's class
+     id (`0x00624390`'s local ebp−8, set from unit +4 and left as is by
+     `0x00645270` for a unit without a transform state), the unit type
+     4 (its local ebp−4), a stack address (its saved EBP).
+   - `0x006600A9` (same caller depth, 0x1C bytes deeper): left by the
+     first match's own frame and callees: saved EDI / ESI of
+     `0x00562660` (filler, item pointers), pushed item pointers or type
+     ids of the `0x00629BB0` tests, return and stack addresses.
+   So only one stale slot can hold a rune's class id there: slot 3 of a
+   3-filler item = the last filler's class id; it matches only a row
+   whose 4th rune equals its 3rd. No complete row of the live
+   `runes.txt` has that (rows with two equal adjacent runes: Sanctuary
+   r18 r18 (runes 1–2), Bone r22 r22 (runes 2–3), Phoenix r26 r26
+   (runes 1–2)), so on insertion 1.14d behaves as "no match" with 1.14d
+   data. Still open: the three load / save / writer callers, whose slots
+   hold whatever deeper frames of earlier calls left (for the load
+   loops possibly the filler class ids of a previous item matched at
+   the same depth); settle with a stack trace at `0x0062BFBA` on those
+   paths, or keep d2rs's "no match" as a Ruleset choice.
 5. Answered (handoff `impl-items` OQ-P1): §5 rules 8 and 9 "**set**" is
    not §4.2. Functions 18 (`0x0065F870`) and 19 (`0x0065F6A0`) take the
    list through the same owner-or-item lookup as §4.2 (`0x0065CBF0`,
