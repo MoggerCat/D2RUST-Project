@@ -13,7 +13,7 @@ use super::helpers3::JitterMissile;
 use super::{callback, init_cb, BodyWorld, MissileRequest};
 use crate::combat::{apply_melee, bonuses, start_combat, CombatTables, CombatWorld, DamageRecord};
 use crate::rng::Seed;
-use crate::skills::{phys_max, phys_min, roll_elemental, weapon_mastery, SkillTables};
+use crate::skills::{phys_max, phys_min, roll_elemental, SkillTables};
 use crate::units::UnitType;
 use d2_data::tables::Skills;
 
@@ -281,18 +281,35 @@ pub fn throw<W: BodyWorld>(
     let mm = skill_missile_unit(w, m, u, skill, lvl, (0, 0), (0, 0), true, lob);
     // Post-throw `0x0056C600(unit, M, I)`.
     if let Some(mm) = mm {
-        // TODO(spec: bodies-3.md §3.3 step 6): `0x00645720` is the throw
-        // path of `weapon_mastery` (`levels.md` §3.5); what it gives for
-        // an item that fails the throw test is not stated: read through
-        // `weapon_mastery` (stats 342 / 343 then).
-        let h = weapon_mastery(w, t, Some(u), Some(i), None, 0);
-        let d = weapon_mastery(w, t, Some(u), Some(i), None, 1);
+        let h = throw_mastery(w, t, u, i, 0);
+        let d = throw_mastery(w, t, u, i, 1);
         let v = w.stat(mm, sid::TOHIT, 0).wrapping_add(h);
         w.set_stat(mm, sid::TOHIT, v);
         let v = w.stat(mm, sid::DAMAGEPERCENT, 0).wrapping_add(d);
         w.set_stat(mm, sid::DAMAGEPERCENT, v);
     }
     1
+}
+
+/// Throw mastery `0x00645720(unit, item, 0, type, 0)` (`bodies-3.md` §3.3
+/// step 6, `levels.md` §3.5): gated on the item being `throwable`, the
+/// used skill's `itypea1` being `thro` (48) and its range being 2, else 0
+/// (no fall-through to stats 342 / 343); `type` 0 reads stat 345, 1 stat
+/// 346.
+fn throw_mastery<W: BodyWorld>(w: &W, t: &SkillTables, u: W::Unit, i: W::Item, ty: u16) -> i32 {
+    let gated = w.item_flag_throw(i)
+        && w.used_skill(u)
+            .and_then(|e| t.skill(e.skill))
+            .is_some_and(|r| {
+                r.range == 2 && r.itypea1 != 0xFFFF && w.itype_is(i32::from(r.itypea1), 48)
+            });
+    if !gated {
+        return 0;
+    }
+    w.stat_entries(u, 345 + ty, 32)
+        .into_iter()
+        .filter(|&(layer, _)| w.item_is(i, i32::from(layer)))
+        .fold(0, |m, (_, v)| m.max(v))
 }
 
 // ---------------------------------------------------------------- 3.4
