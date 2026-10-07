@@ -109,6 +109,8 @@ pub struct BodyFake {
     pub item_stats: BTreeMap<(usize, u16), i32>,
     /// `inventory_busy` answers this.
     pub busy: bool,
+    /// `item_missile_type` by item (default 0).
+    pub item_missiles: BTreeMap<usize, i32>,
 }
 
 impl BodyFake {
@@ -876,8 +878,8 @@ impl BodyWorld for BodyFake {
     fn shield_damage(&self, i: usize) -> Option<(i32, i32)> {
         Some(self.c.items[i].damage)
     }
-    fn item_missile_type(&self, _: usize) -> i32 {
-        0
+    fn item_missile_type(&self, i: usize) -> i32 {
+        self.item_missiles.get(&i).copied().unwrap_or(0)
     }
     fn golem_item(&self, t: usize) -> bool {
         self.c.unit_type(t) == UnitType::Item
