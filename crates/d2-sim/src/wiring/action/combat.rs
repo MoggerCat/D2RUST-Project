@@ -20,6 +20,18 @@ use super::{Pending, View};
 /// Hireling monster classes (`0x0063EE90`, `monsters/init.md` §6 step 4).
 pub const HIRELING_CLASSES: [u32; 5] = [271, 338, 359, 560, 561];
 
+/// The unit event iteration `0x005C0C30(game, event, unit, other,
+/// record)` (`skills/bodies.md` §2.18) installed in
+/// [`super::ActionHooks::unit_events`]: the last matching function's
+/// result, 0 when none matched.
+pub type UnitEventFn<X> = fn(
+    &mut CombatView<'_, X>,
+    u8,
+    Option<UnitId>,
+    Option<UnitId>,
+    Option<&mut DamageRecord>,
+) -> i32;
+
 /// Combat's view of a game: the game (frame, lists, timers) and a
 /// [`View`] of the unit side.
 pub struct CombatView<'a, X> {
@@ -35,6 +47,26 @@ impl<X: Pending> CombatView<'_, X> {
             .map(|e| e.ty)
             .or_else(|| self.v.units.get(u).map(|r| r.ty))
             .unwrap_or(UnitType::Tile)
+    }
+}
+
+impl<X: Pending> CombatView<'_, X> {
+    /// `0x005C0C30(game, event, unit, other, record)`: the registry
+    /// ([`super::ActionHooks::unit_events`]) when installed, else
+    /// [`Pending::unit_event`].
+    pub fn fire_unit_event(
+        &mut self,
+        event: u8,
+        unit: Option<UnitId>,
+        other: Option<UnitId>,
+        record: Option<&mut DamageRecord>,
+    ) {
+        match self.v.h.unit_events {
+            Some(run) => {
+                run(self, event, unit, other, record);
+            }
+            None => self.v.h.x.unit_event(event, unit, other, record),
+        }
     }
 }
 
@@ -242,10 +274,7 @@ impl<X: Pending> CombatWorld for CombatView<'_, X> {
         self.v.set_base(u, stat, value);
     }
     fn unit_event(&mut self, event: u8, unit: UnitId, other: UnitId, record: &mut DamageRecord) {
-        self.v
-            .h
-            .x
-            .unit_event(event, Some(unit), Some(other), Some(record));
+        self.fire_unit_event(event, Some(unit), Some(other), Some(record));
     }
     fn set_state(&mut self, u: UnitId, state: u16, on: bool) {
         self.v.set_state(u, state, on);

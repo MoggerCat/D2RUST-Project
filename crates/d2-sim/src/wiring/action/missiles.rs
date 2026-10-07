@@ -404,8 +404,9 @@ impl<X: Pending> MissileCombat for View<'_, X> {
         damage.result = rec.result.into();
     }
     /// Unit event 0 (`0x005C0C30`), also with no unit.
-    fn hit_by_missile_event(&mut self, _: &mut Game, missile: UnitId, unit: Option<UnitId>) {
-        self.h.x.unit_event(0, unit, Some(missile), None);
+    fn hit_by_missile_event(&mut self, game: &mut Game, missile: UnitId, unit: Option<UnitId>) {
+        self.combat(game)
+            .fire_unit_event(0, unit, Some(missile), None);
     }
     /// `missiles.md` §R6.2: stat 121 for demons, 122 for undead, 180 by
     /// monster type (entries whose layer matches the unit's montype), on

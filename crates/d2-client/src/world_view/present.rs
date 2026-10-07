@@ -1,4 +1,4 @@
-// Spec: specs/client/render-pipeline.md (A1 stages 4–5, A9 presentation), specs/client/ui.md (A4), specs/render/camera.md (§3, §9), specs/render/composition.md (§3), specs/client/bridge.md (§10 rules 4–5)
+// Spec: specs/client/render-pipeline.md (A1 stages 4–5, A9 presentation), specs/client/ui.md (A4), specs/render/camera.md (§3, §9), specs/render/composition.md (§3), specs/client/bridge.md (§10 rules 4–5), specs/client/msg-ui.md (§16 r4.3, open question 10)
 //! Bevy edge of the world view: after the bridge frame (`PreUpdate`,
 //! `bridge.md` §8), one `Update` system runs UI → [`super::build_frame`]
 //! (the frame's camera from the [`super::ViewFeed`], then the original's
@@ -44,9 +44,10 @@ use bevy::window::PrimaryWindow;
 use std::sync::Arc;
 
 use crate::audio::driver::SoundRequest;
-use crate::bridge::mirror::bridge_frame;
+use crate::bridge::link::ServerLink;
+use crate::bridge::mirror::{bridge_frame, mirror_units};
 use crate::bridge::output::{dispatch, Output};
-use crate::bridge::{BridgeResource, FrameOutputs};
+use crate::bridge::{Bridge, BridgeError, BridgeResource, FrameOutputs};
 use crate::controls::Bindings;
 use crate::frames::atlas::AtlasPage;
 use crate::ui::original::OriginalUi;
@@ -222,6 +223,7 @@ impl Plugin for WorldViewPlugin {
                 PreUpdate,
                 deliver_outputs
                     .after(bridge_frame)
+                    .before(mirror_units)
                     .run_if(resource_exists::<BridgeResource>),
             )
             .add_systems(
@@ -239,16 +241,17 @@ impl Plugin for WorldViewPlugin {
 pub enum DeliverError {
     #[error(transparent)]
     Ui(#[from] crate::ui::original::OriginalUiError),
+    /// The bridge could not send the answer of 0x28's dialog branch.
+    #[error(transparent)]
+    Bridge(#[from] BridgeError),
 }
 
-/// The output dispatcher (`client/bridge.md` §10 rules 4–5): the last
-/// bridge frame's outputs in list order, UI outputs to the original UI
-/// (its sounds appended at once, so the request order is the call order),
-/// sound outputs to [`UiSounds`], effect outputs to the (not yet
-/// written) effect layer. Without the original UI the UI outputs
+/// The output dispatcher system (`client/bridge.md` §10 rules 4–5): the
+/// last bridge frame's outputs through [`deliver`]; the sound requests
+/// are appended to [`UiSounds`]. Without the original UI the UI outputs
 /// have no consumer and are dropped with a log line.
 pub fn deliver_outputs(
-    bridge: Res<BridgeResource>,
+    mut bridge: ResMut<BridgeResource>,
     outputs: Option<ResMut<FrameOutputs>>,
     ui: Option<NonSendMut<WorldViewUi>>,
     sounds: Option<ResMut<UiSounds>>,
@@ -260,18 +263,45 @@ pub fn deliver_outputs(
     if list.is_empty() {
         return Ok(());
     }
-    let world = bridge.0.world();
-    let mut original = ui.map(|u| u.into_inner()).and_then(|u| u.original.as_mut());
+    let original = ui.map(|u| u.into_inner()).and_then(|u| u.original.as_mut());
+    let requests = deliver(&mut bridge.0, &list, original)?;
+    if let Some(mut s) = sounds {
+        s.0.extend(requests);
+    }
+    Ok(())
+}
+
+/// Applies one bridge frame's outputs in list order (`client/bridge.md`
+/// §10 rules 4–5): UI outputs to the original UI (its sounds appended at
+/// once, so the request order is the call order), sound outputs as
+/// requests, effect outputs to the (not yet written) effect layer.
+/// Returns the sound requests in order.
+///
+/// When the UI chose the case of 0x28's dialog branch
+/// ([`OriginalUi::take_dialog_answer`]), the bridge applies it at once,
+/// before the next output (`client/msg-ui.md` §16 r4.3, open question 10
+/// decided as A): its model writes, then C→S 0x31 in the slot after
+/// 0x28's 0x2F and the sends that waited behind it, in the same frame as
+/// the 0x28 (an unanswered slot is dropped at the next bridge frame).
+pub fn deliver<L: ServerLink>(
+    bridge: &mut Bridge<L>,
+    list: &[Output],
+    mut original: Option<&mut OriginalUi>,
+) -> Result<Vec<SoundRequest>, DeliverError> {
     let requests = std::cell::RefCell::new(Vec::new());
+    let bridge = std::cell::RefCell::new(bridge);
     dispatch::<DeliverError>(
-        &list,
+        list,
         &mut |o| {
             match original.as_deref_mut() {
                 Some(ui) => {
-                    ui.apply_output(o, world)?;
+                    ui.apply_output(o, bridge.borrow().world())?;
                     requests.borrow_mut().extend(ui.take_sounds());
                     for s in ui.take_skipped() {
                         debug!("ui output {o:?}: skipped {s}");
+                    }
+                    if let Some((d, case)) = ui.take_dialog_answer() {
+                        bridge.borrow_mut().npc_dialog_branch(&d, case)?;
                     }
                 }
                 None => debug!("ui output {o:?}: no original UI"),
@@ -295,10 +325,7 @@ pub fn deliver_outputs(
             Ok(())
         },
     )?;
-    if let Some(mut s) = sounds {
-        s.0.extend(requests.into_inner());
-    }
-    Ok(())
+    Ok(requests.into_inner())
 }
 
 /// Creates the GPU path once, when the node exists.

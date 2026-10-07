@@ -11,6 +11,7 @@ mod regen;
 mod skill_bodies;
 mod skill_events;
 mod skill_use;
+mod unit_events;
 mod vendors;
 mod vitals;
 

@@ -259,3 +259,125 @@ fn trade_codes() {
     u.apply_output(&s, &w).unwrap();
     assert_eq!(u.take_outcome(), UiOutcome::default());
 }
+
+fn npc_text(t: u8, count: u8, kind0: u8, str0: u16) -> Output {
+    let mut bytes = [0u8; 40];
+    bytes[0] = 0x27;
+    bytes[1] = t;
+    bytes[2] = 6;
+    bytes[6] = count;
+    bytes[8] = kind0;
+    bytes[10..12].copy_from_slice(&str0.to_le_bytes());
+    Output::NpcText {
+        bytes,
+        present: true,
+        object_class: 0,
+    }
+}
+
+fn npc_dialog(cursor_item: bool) -> NpcDialog {
+    NpcDialog {
+        kind: 1,
+        guid: 6,
+        quest_flags: [0; 96],
+        unit: UnitKey::new(1, 6),
+        class: 148,
+        interact: true,
+        f4b1a10: None,
+        cursor_item,
+        npc_monsters: vec![UnitKey::new(1, 6)],
+    }
+}
+
+// Covers: specs/client/msg-ui.md §5 r2
+#[test]
+fn npc_text_list() {
+    let w = world(false);
+    let mut u = ui();
+    assert_eq!(u.npc_text(), None);
+    // A seq 37351: type 1, one entry (kind 0, string 0x25): rebuilt.
+    u.apply_output(&npc_text(1, 1, 0, 0x25), &w).unwrap();
+    let l = *u.npc_text().unwrap();
+    assert_eq!((l.count(), l.kind(0), l.string(0)), (1, 0, 0x25));
+    assert_eq!(l.first_m(), Some(0x25));
+    // r2.1 overhead number and r2.2 type 2: the list stays.
+    u.apply_output(&npc_text(1, 1, 3, 37), &w).unwrap();
+    u.apply_output(&npc_text(2, 1, 0, 9), &w).unwrap();
+    assert_eq!(u.npc_text(), Some(&l));
+    assert_eq!(u.take_outcome().skipped, [skip::NPC_TEXT_SHOW; 3]);
+    // r2.3: any other type frees it.
+    u.apply_output(&npc_text(4, 1, 0, 9), &w).unwrap();
+    assert_eq!(u.npc_text(), None);
+}
+
+// Covers: specs/client/msg-ui.md §16 r4
+#[test]
+fn npc_dialog_case() {
+    use crate::bridge::msg::ui_npc::DialogCase;
+    let list = |count, kind0, str0| match npc_text(1, count, kind0, str0) {
+        Output::NpcText { bytes, .. } => NpcTextList::from_record(&bytes),
+        _ => unreachable!(),
+    };
+    let d = npc_dialog(false);
+    let l = list(1, 0, 0x25);
+    // B0 first, even without a list.
+    assert_eq!(dialog_case(1, None, &d).unwrap(), Some(DialogCase::B0));
+    // No list: fatal 0x1060.
+    assert!(matches!(
+        dialog_case(0, None, &d),
+        Err(OriginalUiError::NoNpcText)
+    ));
+    // B1 before B2; B2 with m; m = 0xFFFF → B3–B6.
+    assert_eq!(
+        dialog_case(0, Some(&l), &npc_dialog(true)).unwrap(),
+        Some(DialogCase::B1)
+    );
+    assert_eq!(
+        dialog_case(0, Some(&l), &d).unwrap(),
+        Some(DialogCase::B2 { m: 0x25 })
+    );
+    assert_eq!(
+        dialog_case(0, Some(&list(1, 0, 0xFFFF)), &d).unwrap(),
+        Some(DialogCase::Rest)
+    );
+    // An m no spec gives: no case; B1 does not need m.
+    let l2 = list(2, 0, 0x25);
+    assert_eq!(dialog_case(0, Some(&l2), &d).unwrap(), None);
+    assert_eq!(
+        dialog_case(0, Some(&l2), &npc_dialog(true)).unwrap(),
+        Some(DialogCase::B1)
+    );
+}
+
+// Covers: specs/client/msg-ui.md §16 r4
+#[test]
+fn npc_dialog_answer_is_kept_for_the_bridge() {
+    use crate::bridge::msg::ui_npc::DialogCase;
+    let w = world(false);
+    let mut u = ui();
+    let d = npc_dialog(false);
+    // Without a 0x27 first: fatal 0x1060.
+    assert!(matches!(
+        u.apply_output(&Output::NpcDialog(Box::new(d.clone())), &w),
+        Err(OriginalUiError::NoNpcText)
+    ));
+    u.apply_output(&npc_text(1, 1, 0, 0x25), &w).unwrap();
+    u.take_outcome();
+    u.apply_output(&Output::NpcDialog(Box::new(d.clone())), &w)
+        .unwrap();
+    assert_eq!(
+        u.take_dialog_answer(),
+        Some((Box::new(d.clone()), DialogCase::B2 { m: 0x25 }))
+    );
+    assert_eq!(u.take_dialog_answer(), None);
+    assert_eq!(u.take_outcome().skipped, [skip::NPC_DIALOG_UI]);
+    // A list whose m is not given: no answer, named.
+    u.apply_output(&npc_text(1, 2, 0, 0x25), &w).unwrap();
+    u.take_outcome();
+    u.apply_output(&Output::NpcDialog(Box::new(d)), &w).unwrap();
+    assert_eq!(u.take_dialog_answer(), None);
+    assert_eq!(
+        u.take_outcome().skipped,
+        [skip::NPC_DIALOG_UI, skip::NPC_DIALOG_M]
+    );
+}

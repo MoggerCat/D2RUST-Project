@@ -25,6 +25,9 @@ use super::combat::CombatView;
 use super::units::STATE_DEATH_DELAY;
 use super::{KillStep, Pending, View};
 
+/// Unit event 12 `levelup` (`vitals.md` §4.5).
+pub const EV_LEVELUP: u8 = 12;
+
 /// Result flag 2, "will die" (`damage.md` §1).
 pub const RESULT_WILL_DIE: u32 = 2;
 
@@ -116,7 +119,7 @@ pub fn kill<X: Pending>(cv: &mut CombatView<'_, X>, d: UnitId, a: UnitId) {
     // Step 2: A is present at every caller here.
     if flags & UNIT_FLAG_NO_EXPERIENCE == 0 {
         if let Some(t) = cv.v.h.vitals.clone() {
-            distribute(&mut cv.v, &t, a, d);
+            distribute(cv, &t, a, d);
         }
     }
     let game = &mut *cv.game;
@@ -152,6 +155,72 @@ impl<X: Pending> ExpShare for View<'_, X> {
     }
     fn party_members(&self, p: UnitId, defender: UnitId) -> Vec<UnitId> {
         self.h.x.kill_party_members(p, defender)
+    }
+}
+
+/// The distribution on combat's view: [`View`]'s calls, with the game
+/// for unit event 12.
+impl<X: Pending> ExpShare for CombatView<'_, X> {
+    fn credited_player(&self, attacker: UnitId, defender: UnitId) -> Option<UnitId> {
+        self.v.credited_player(attacker, defender)
+    }
+    fn hireling_share(&mut self, p: UnitId, attacker: UnitId, defender: UnitId, e: i32) {
+        self.v.hireling_share(p, attacker, defender, e);
+    }
+    fn in_party(&self, p: UnitId) -> bool {
+        self.v.in_party(p)
+    }
+    fn party_members(&self, p: UnitId, defender: UnitId) -> Vec<UnitId> {
+        self.v.party_members(p, defender)
+    }
+}
+
+/// [`View`]'s vitals calls; unit event 12 (`vitals.md` §4.5,
+/// `0x005C0C30(game, 12, U, 0, 0)`) through the event registry
+/// ([`CombatView::fire_unit_event`]).
+impl<X: Pending> VitalsUnits for CombatView<'_, X> {
+    type Unit = UnitId;
+
+    fn unit_type(&self, u: UnitId) -> UnitType {
+        VitalsUnits::unit_type(&self.v, u)
+    }
+    fn class_id(&self, u: UnitId) -> i32 {
+        VitalsUnits::class_id(&self.v, u)
+    }
+    fn base_stat(&self, u: UnitId, s: u16) -> i32 {
+        VitalsUnits::base_stat(&self.v, u, s)
+    }
+    fn stat(&self, u: UnitId, s: u16) -> i32 {
+        VitalsUnits::stat(&self.v, u, s)
+    }
+    fn set_base_stat(&mut self, u: UnitId, s: u16, v: i32) {
+        self.v.set_base_stat(u, s, v);
+    }
+    fn add_base_stat(&mut self, u: UnitId, s: u16, v: i32) {
+        self.v.add_base_stat(u, s, v);
+    }
+    fn max_life(&self, u: UnitId) -> i32 {
+        VitalsUnits::max_life(&self.v, u)
+    }
+    fn max_mana(&self, u: UnitId) -> i32 {
+        VitalsUnits::max_mana(&self.v, u)
+    }
+    fn max_stamina(&self, u: UnitId) -> i32 {
+        VitalsUnits::max_stamina(&self.v, u)
+    }
+    fn refresh(&mut self, u: UnitId) {
+        VitalsUnits::refresh(&mut self.v, u);
+    }
+    fn level_up_notify(&mut self, u: UnitId) {
+        self.v.level_up_notify(u);
+    }
+    /// Without the registry: [`Pending::level_up_event`].
+    fn level_up_event(&mut self, u: UnitId) {
+        if self.v.h.unit_events.is_some() {
+            self.fire_unit_event(EV_LEVELUP, Some(u), None, None);
+        } else {
+            self.v.h.x.level_up_event(u);
+        }
     }
 }
 
@@ -197,6 +266,8 @@ impl<X: Pending> VitalsUnits for View<'_, X> {
     fn level_up_notify(&mut self, u: UnitId) {
         self.h.x.level_up_notify(u);
     }
+    /// Without a game: [`Pending::level_up_event`] (the kill's
+    /// distribution runs on [`CombatView`], which fires the event).
     fn level_up_event(&mut self, u: UnitId) {
         self.h.x.level_up_event(u);
     }
