@@ -717,3 +717,42 @@ fn schema_rules() {
     assert_eq!(get("skills").lists.len(), 2);
     assert_eq!(get("pettype").key_field.as_deref(), Some(&b"pet type"[..]));
 }
+
+// Covers: specs/data/patch-layers.md §11
+#[test]
+fn versioning_and_determinism() {
+    // Version 1 is read; a newer one is P03 / S02; unknown statements are
+    // never ignored (P04).
+    assert!(parse_codes("d2patch 1\n").is_empty());
+    assert_eq!(parse_codes("d2patch 2\n"), ["P03 1:9"]);
+    assert_eq!(p3("remove axe"), ["P04 3:1"]);
+    let (_, f) = parse_stack("s", b"d2stack 2\n");
+    assert_eq!(f[0].code, Code::S02);
+    // Applying twice, and with the statements permuted, gives identical
+    // cells and digests (order independence of a valid layer).
+    let stmts = [
+        "set axe lvl 1 -> 4",
+        "set #1 clb lvl 1 -> 7",
+        "set #2 ax2 lvl 5 -> 6",
+    ];
+    let digest = |order: &[usize]| {
+        let body = order
+            .iter()
+            .map(|&i| stmts[i])
+            .collect::<Vec<_>>()
+            .join(" / ");
+        let (d, f) = one(&body);
+        (d.digest(), d.table("items").unwrap().render(), codes(&f))
+    };
+    let a = digest(&[0, 1, 2]);
+    assert_eq!(a, digest(&[0, 1, 2]));
+    assert_eq!(a, digest(&[2, 0, 1]));
+    assert_eq!(a, digest(&[1, 2, 0]));
+    // Failing layers fail under every order.
+    let bad = |first: &str, second: &str| one(&format!("{first} / {second}")).1.len();
+    assert_eq!(
+        bad("set axe lvl 1 -> 4", "set axe lvl 1 -> 5"),
+        bad("set axe lvl 1 -> 5", "set axe lvl 1 -> 4")
+    );
+    assert!(bad("set axe lvl 1 -> 4", "set axe lvl 1 -> 5") > 0);
+}

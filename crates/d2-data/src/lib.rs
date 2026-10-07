@@ -33,6 +33,8 @@ pub mod tables;
 pub mod txt;
 
 #[cfg(test)]
+mod cov_loading_tests;
+#[cfg(test)]
 mod gaps_loading_tests;
 #[cfg(test)]
 mod gaps_patch_fixup_tests;
