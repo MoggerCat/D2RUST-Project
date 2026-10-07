@@ -31,14 +31,14 @@
 |   18. Inventory close button and click area (`panels.md` §9; answers UP-7, UP-8) | 361–385 |
 |   19. Skill tree input and draw order (`panels.md` §10; answers UP-21, UP-22, UP-23) | 386–456 |
 |   20. Stash and cube buttons (`panels.md` §11, §12; answers UP-10, `panels.md` OQ 13) | 457–524 |
-|   21. Gold amounts, gold buttons and the gold dialog (`panels.md` §9 r6, §11 r6; answers `panels.md` OQ 5) | 525–612 |
-|   22. d2rs widget answers (`client/ui.md` §B1, §B2; code `TODO(spec: ui/panels.md …)`) | 613–670 |
-| Constants & data dependencies | 671–685 |
-| Randomness | 686–690 |
-| Edge cases & original bugs | 691–711 |
-| Test vectors | 712–737 |
-| Provenance | 738–766 |
-| Open questions | 767–792 |
+|   21. Gold amounts, gold buttons and the gold dialog (`panels.md` §9 r6, §11 r6; answers `panels.md` OQ 5) | 525–615 |
+|   22. d2rs widget answers (`client/ui.md` §B1, §B2; code `TODO(spec: ui/panels.md …)`) | 616–673 |
+| Constants & data dependencies | 674–688 |
+| Randomness | 689–693 |
+| Edge cases & original bugs | 694–714 |
+| Test vectors | 715–740 |
+| Provenance | 741–769 |
+| Open questions | 770–795 |
 <!-- /index -->
 
 ## Summary
@@ -609,6 +609,9 @@ flag `[0x007C0A38 + 4i]` (−1 = not learnable, 0, 1 pressed), remap
 
    Sound 0xDD = `0x004B9A00(0xDD, 0, 0, 0)` (`audio/triggers.md` §1 r1).
    Server meaning of 0x4F 0x13 / 0x14 and of 0x50: `panels.md` OQ 6.
+   Server side of 0x4F 0x13 / 0x14 (withdraw / deposit checks; the
+   stash maximum is a flat 2,500,000; carried gold over level × 10000 →
+   S→C 0x2C event 19 only): `world/vendors-2.md` §10.2.
 
 ### 22. d2rs widget answers (`client/ui.md` §B1, §B2; code `TODO(spec: ui/panels.md …)`)
 

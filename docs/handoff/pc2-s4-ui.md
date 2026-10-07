@@ -82,3 +82,12 @@ None.
   from the stash) and 0x14 (deposit `v`), p1 = `v >> 16`, p2 = `v &
   0xFFFF` (`ui/panels-2.md` §21 r8), and 0x12 (stash close,
   `ui/panels.md` OQ 6).
+
+## Follow-up (lane `ui-2`, branch `claude/spec-ui-s4`)
+
+### Written
+
+| Spec § | Behaviour | 1.14d addresses |
+|---|---|---|
+| `controls.md` §6 r8–r10 (OQ 8 partly answered) | world-click decision order (unit / point split, corpse and item-skill tests, "act on it", town gates, press-only monster walk), every sender (interact by unit type with reach 4 / 2 / 5 / 3, NPC stop C→S 0x59, town-portal `just_portaled` gate, warp 500-unit throttle; attack with melee test, Inferno / Arctic Blast approach; object; town player), use check and refusal sound, walk clamp (min step, 7-update held throttle), client hostility test, target re-pick | `0x004625B0`, `0x004621D0`, `0x004610C0`, `0x00461DC0` (table `0x004621AC`), `0x00461C70`, `0x00461B40`, `0x00461890`, `0x004619E0`, `0x00461840`, `0x004623C0`, `0x00465C60`, `0x00467880` |
+| `panels.md` OQ 6; `panels-2.md` §21 r8 | links to `world/vendors-2.md` §10.2 (orchestrator relay) | — |

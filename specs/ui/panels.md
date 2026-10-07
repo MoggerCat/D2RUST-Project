@@ -52,7 +52,7 @@
 | Edge cases & original bugs | 798–818 |
 | Test vectors | 819–857 |
 | Provenance | 858–898 |
-| Open questions | 899–975 |
+| Open questions | 899–977 |
 <!-- /index -->
 
 ## Summary
@@ -933,7 +933,9 @@ repo; HANDOFF §5 C71 found frame 1 at (−205, 17)); cube close
    §6; the dialog's generic controls: `panels-2.md` OQ 6). Was: Stash
    gold buttons, gold dialog and the inventory gold button
    (`0x004845A0`, `0x00489580`, `0x004891xx`). Ghidra read.
-6. Server meaning of C→S 0x4F button 0x12 (stash close) and of the
+6. **Answered** (2026-10-07, `world/vendors-2.md` §10.2: button 0x12
+   closes the stash interaction and recounts scrolls / tomes; it sends
+   nothing). Was: Server meaning of C→S 0x4F button 0x12 (stash close) and of the
    player-trade buttons 2, 4, 7, 8: `0x0054C7C0` → `0x00568060`.
 7. **Answered** (2026-10-07, `ui/menus.md` §1: `0x0049D160` mouse down,
    `0x0049D010` mouse up, `0x0049C490` tab hit, `0x0049C510` row hit,
