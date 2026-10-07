@@ -412,3 +412,39 @@ fn wall_records_point_at_the_record_grid() {
     let bare = room(&mut d, l, 50, 20, 2, 2);
     assert_eq!(d.wall_coord(bare, 0, 0), None);
 }
+
+// Covers: specs/drlg/levels.md §11.3 r2
+#[test]
+fn tree_marks_change_nothing() {
+    // A wall record with flag 0x4 and no layer bits (0x1C000 clear) is
+    // the tree-mark case; its mark lands in a grid nothing reads again,
+    // and it is no blocker (blockers need layer bits exactly 0x4000).
+    let (mut d, l, _) = world();
+    let plain = room(&mut d, l, 10, 20, 2, 2);
+    let tree = room(&mut d, l, 30, 20, 2, 2);
+    d.room_mut(tree).tiles.as_mut().unwrap().walls = vec![rec(1, 1, 1, 0x4)];
+    for id in [plain, tree] {
+        d.build_logic_grid(id, &LogicGrids::default());
+    }
+    let (a, b) = (d.room(plain).logic().unwrap(), d.room(tree).logic().unwrap());
+    assert_eq!(a.index_grid.len(), b.index_grid.len());
+    // The counter runs on through the second room; compare the shapes.
+    let strip = |g: &[u32]| g.iter().map(|&v| v & !0x00FF_FFFF).collect::<Vec<_>>();
+    assert_eq!(strip(&a.index_grid), strip(&b.index_grid));
+    assert_eq!(a.list.len(), b.list.len());
+}
+
+// Covers: specs/drlg/levels.md §11.6 r3
+#[test]
+fn coordinate_indexes_follow_the_build_order() {
+    // The same two rooms, built in the other order, get other indexes.
+    let build = |first: usize| {
+        let (mut d, l, _) = world();
+        let rooms = [room(&mut d, l, 0, 0, 2, 2), room(&mut d, l, 10, 0, 2, 2)];
+        d.build_logic_grid(rooms[first], &LogicGrids::default());
+        d.build_logic_grid(rooms[1 - first], &LogicGrids::default());
+        (indexes(&d, rooms[0]), indexes(&d, rooms[1]))
+    };
+    assert_eq!(build(0), (vec![2, 0], vec![5, 0]));
+    assert_eq!(build(1), (vec![5, 0], vec![2, 0]));
+}

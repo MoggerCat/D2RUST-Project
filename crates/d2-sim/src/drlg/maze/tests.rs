@@ -663,7 +663,7 @@ fn lava_cross_and_fill_blanks() {
     assert_eq!(g.count(), 3 + 7 + 5);
 }
 
-// Covers: specs/drlg/maze.md §4 r3, §edge-cases-original-bugs r7
+// Covers: specs/drlg/maze.md §4 r3, §edge-cases-original-bugs r7; specs/drlg/levels.md §6 r2
 #[test]
 fn normalize_rules() {
     let md = mdata();
