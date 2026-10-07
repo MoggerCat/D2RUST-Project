@@ -69,3 +69,35 @@ fn empty_corpse_header_and_golem_tail_and_zero_skills() {
     // §8.5 r4: g = 0 and the file ends `6B 66 00`.
     assert_eq!(&f[f.len() - 3..], &[0x6B, 0x66, 0x00]);
 }
+
+// Covers: specs/formats/d2s.md §edge-cases-original-bugs r16
+#[test]
+fn file_ending_after_kf_marker_is_rejected_with_23() {
+    let mut s = empty_body();
+    s.body.as_mut().unwrap().hireling_items = Some(None);
+    let mut f = write(&s, &NoItems).unwrap();
+    // Drop the g byte, then re-store size and checksum.
+    f.pop();
+    assert_eq!(&f[f.len() - 2..], &[0x6B, 0x66]);
+    finish(&mut f);
+    let o = ReadOptions {
+        expansion: true,
+        game: None,
+    };
+    let e = read(&f, &o, &NoItems).unwrap_err();
+    assert_eq!(e.internal(), Some(23));
+}
+
+// Covers: specs/formats/d2s.md §edge-cases-original-bugs r4
+#[test]
+fn short_skills_section_is_rejected_with_19() {
+    let mut s = empty_body();
+    s.header.skill_count = 30;
+    s.body.as_mut().unwrap().skills = vec![0; 5];
+    let f = write(&s, &NoItems).unwrap();
+    let o = ReadOptions {
+        expansion: false,
+        game: None,
+    };
+    assert_eq!(read(&f, &o, &NoItems).unwrap_err().internal(), Some(19));
+}
