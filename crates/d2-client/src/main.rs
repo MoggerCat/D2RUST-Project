@@ -1,7 +1,7 @@
 //! d2-client entry point.
 //!
 //! Usage:
-//!   d2-client [play]     [--seed N] [--frames N] [--synthetic] [--save FILE.d2s | --new CLASS NAME] [--native DIR] [--source native|mpq]
+//!   d2-client [play]     [--seed N] [--frames N] [--synthetic] [--save FILE.d2s | --new CLASS NAME [--save-dir DIR]] [--native DIR] [--source native|mpq]
 //!   d2-client view       [--ds1 PATH] [--wall-base N] [--frames N]
 //!   d2-client verify     [--case NAME]... [--cases DIR] [--perturb N]
 //!   d2-client verify     [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out DIR] [--perturb N]
@@ -81,6 +81,8 @@ struct Options {
     native: Option<PathBuf>,
     /// `play --source native|mpq` (`mpq`: debug builds only, §5 r5).
     source: Option<String>,
+    /// `play --new`: the folder the new character's `<name>.d2s` goes in.
+    save_dir: Option<PathBuf>,
 }
 
 fn parse_view(s: &str) -> Result<cpu::View> {
@@ -118,6 +120,7 @@ fn parse_options(args: &[String]) -> Result<Options> {
         new: None,
         native: None,
         source: None,
+        save_dir: None,
     };
     let mut it = args.iter();
     while let Some(flag) = it.next() {
@@ -139,6 +142,7 @@ fn parse_options(args: &[String]) -> Result<Options> {
             "--save" => o.save = Some(PathBuf::from(value()?)),
             "--native" => o.native = Some(PathBuf::from(value()?)),
             "--source" => o.source = Some(value()?.clone()),
+            "--save-dir" => o.save_dir = Some(PathBuf::from(value()?)),
             "--new" => {
                 let class = value()?.clone();
                 let name = it
@@ -416,6 +420,13 @@ fn play(o: Options) -> Result<()> {
         ),
         single_player::GameData::Synthetic => println!("play: synthetic tables and levels"),
     }
+    // Before the window opens: a bad folder or a name taken stops here.
+    let save_path = d2_client::app::save::save_path(
+        o.save.as_deref(),
+        o.new.as_ref().map(|(_, name)| name.as_str()),
+        o.save_dir.as_deref(),
+        dir.as_deref(),
+    )?;
     let character = match (&o.save, &o.new) {
         (Some(path), _) => {
             let c = single_player::load_character(&data, path)?;
@@ -424,7 +435,7 @@ fn play(o: Options) -> Result<()> {
         }
         (None, Some((class, name))) => {
             let c = single_player::new_character(class, name)?;
-            println!("play: new character {name} ({class}), not saved");
+            println!("play: new character {name} ({class})");
             c
         }
         (None, None) => single_player::Character::New,
@@ -434,6 +445,7 @@ fn play(o: Options) -> Result<()> {
         seed: o.seed,
         character,
         exit_after: o.frames,
+        save_path: save_path.clone(),
     })?;
     match result {
         bevy::app::AppExit::Success => Ok(()),
@@ -448,7 +460,7 @@ fn main() -> Result<()> {
         Some("verify") => verify(parse_options(&args[1..])?),
         Some("play") | None => play(parse_options(args.get(1..).unwrap_or(&[]))?),
         Some("view") => view(parse_options(&args[1..])?),
-        _ => bail!("usage: d2-client [view|verify|cpu-render|play] [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out PATH] [--case NAME] [--cases DIR] [--perturb N] [--seed N] [--frames N] [--synthetic] [--save FILE.d2s | --new CLASS NAME] [--native DIR] [--source native|mpq]"),
+        _ => bail!("usage: d2-client [view|verify|cpu-render|play] [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out PATH] [--case NAME] [--cases DIR] [--perturb N] [--seed N] [--frames N] [--synthetic] [--save FILE.d2s | --new CLASS NAME [--save-dir DIR]] [--native DIR] [--source native|mpq]"),
     }
 }
 

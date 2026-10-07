@@ -51,6 +51,7 @@ use d2_formats::palette::{Palette, Rgb};
 use d2_server::host::SystemClock;
 
 use super::palette::{self, ActPalettes};
+use super::save;
 use super::single_player::{self, GameData};
 use super::sound::{self, AudioParts, GameAudio};
 use super::ui;
@@ -211,6 +212,9 @@ pub struct PlayConfig {
     pub character: single_player::Character,
     /// Close after this many frames (smoke test).
     pub exit_after: Option<u32>,
+    /// Where the character is saved on exit (`app::save::save_path`);
+    /// `None`: not saved.
+    pub save_path: Option<std::path::PathBuf>,
 }
 
 #[derive(Resource)]
@@ -243,6 +247,12 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
     let object_rows = single_player::client_object_rows(&config.data);
     let request = config.character.clone();
     let speeds = single_player::walk_speeds(&config.data, &config.character)?;
+    let save_base = save::base_save(&config.character);
+    let save_tables: Option<std::sync::Arc<dyn d2_formats::d2s::SaveTables + Send + Sync>> =
+        match &config.data {
+            GameData::Live(d) => Some(std::sync::Arc::new(d.save.clone())),
+            GameData::Synthetic => None,
+        };
     let (link, started) = single_player::start_with(
         config.data,
         config.seed,
@@ -262,7 +272,22 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
         }),
         ..default()
     }));
-    let (link, tap) = predict_link(Box::new(link));
+    let (link, saver): (DynLink, Option<save::SaveHandle>) = match (config.save_path, save_tables) {
+        (Some(path), Some(tables)) => {
+            let (link, handle) = save::share(link, save_base, tables, path);
+            (Box::new(link), Some(handle))
+        }
+        (path, _) => {
+            if path.is_some() {
+                println!("play: no save tables (synthetic data): the character is not saved");
+            }
+            (Box::new(link), None)
+        }
+    };
+    let (link, tap) = predict_link(link);
+    if let Some(h) = &saver {
+        app.insert_resource(h.clone());
+    }
     add_game(&mut app, link, true)?;
     send_create_game_for(&mut app, &request)?;
     add_client_data(&mut app, drlg_source, level_rows.clone());
@@ -306,5 +331,12 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
         app.insert_resource(ExitAfter(frames))
             .add_systems(Update, exit_after);
     }
-    Ok(app.run())
+    let exit = app.run();
+    if let Some(h) = saver {
+        match h.save() {
+            Ok(()) => println!("play: saved the character to {}", h.path().display()),
+            Err(e) => eprintln!("play: the character was NOT saved: {e}"),
+        }
+    }
+    Ok(exit)
 }
