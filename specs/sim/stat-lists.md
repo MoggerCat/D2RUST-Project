@@ -31,14 +31,14 @@
 |   7. Value-change notification | 287–317 |
 |   8. Chain operations | 318–417 |
 |   9. States | 418–449 |
-|   10. Timer event handlers | 450–525 |
-|   11. Mod array and stat messages | 526–543 |
-| Constants & data dependencies | 544–555 |
-| Randomness | 556–559 |
-| Edge cases & original bugs | 560–578 |
-| Test vectors | 579–615 |
-| Provenance | 616–639 |
-| Open questions | 640–662 |
+|   10. Timer event handlers | 450–530 |
+|   11. Mod array and stat messages | 531–548 |
+| Constants & data dependencies | 549–560 |
+| Randomness | 561–564 |
+| Edge cases & original bugs | 565–583 |
+| Test vectors | 584–620 |
+| Provenance | 621–644 |
+| Open questions | 645–667 |
 <!-- /index -->
 
 ## Summary
@@ -462,6 +462,11 @@ changed. 1.14d-confirmed (asm of `0x00639DB0`).
    256; set stat 6 := hp. Then f := life fraction (`stats.md` §9.3); if
    |f − (stat 352 & 0xFF)| > 4: message `0x00571A10`(unit, f) and set
    stat 352 := f.
+   Both the life write and the fraction update are inside "r ≠ 0" (r =
+   0 jumps straight to the return). `0x00580610` returns 1 on every
+   path (`0x005806DD`), so the "regenerate if `0x00580610`" test of
+   `units.md` §6.1 never stops steps 4 and 5 (2026-10-07, implementation
+   question in `docs/handoff/impl-units-stats.md` §5 item 3).
 4. Stamina (`0x00580500`): s := total(10), b := total(28). By unit mode:
    1, 5 → shift 8; 2 → shift 9, but only if s & 0xFFFFFF00 ≠ 0; 6 →
    shift 9; any other mode → only if b ≥ 1000, shift 8. Else stop.
