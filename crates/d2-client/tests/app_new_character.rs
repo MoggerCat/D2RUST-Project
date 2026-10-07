@@ -1,0 +1,57 @@
+// Spec: specs/sim/intents-events.md (§8.2), specs/client/model.md (§7 r9)
+//! `play --new <class> <name>` (decision D3): the join loads a new
+//! character of the request's class and name on the synthetic game,
+//! held in memory only.
+
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::Arc;
+
+use d2_client::app::single_player::{self, GameData, DEFAULT_SEED};
+use d2_client::bridge::link::{SendQueue, ServerLink};
+
+struct StepClock(Arc<AtomicU32>);
+
+impl d2_server::seams::Clock for StepClock {
+    fn now_ms(&mut self) -> u32 {
+        self.0.load(Ordering::SeqCst)
+    }
+}
+
+/// The stub load (`intents-events.md` §8.2 r7: 0x5F after 0x0B) of a
+/// `--new` barbarian named "Conan".
+// Covers: specs/sim/intents-events.md §8.2 r2, §8.2 r7
+#[test]
+fn the_join_creates_the_named_character() {
+    let ms = Arc::new(AtomicU32::new(1000));
+    let character = single_player::new_character("barbarian", "Conan").unwrap();
+    let (mut link, _) = single_player::start_with(
+        GameData::Synthetic,
+        DEFAULT_SEED,
+        character.clone(),
+        StepClock(ms.clone()),
+    )
+    .unwrap();
+    let req = single_player::create_request_for(&character);
+    link.send(SendQueue::System, &req.encode()).unwrap();
+    link.pump().unwrap();
+    ms.fetch_add(40, Ordering::SeqCst);
+    link.pump().unwrap();
+    link.receive();
+    link.send(SendQueue::System, &[0x6B]).unwrap();
+    ms.fetch_add(40, Ordering::SeqCst);
+    assert!(link.pump().unwrap().ticked);
+    let ids: Vec<u8> = link.receive().iter().map(|c| c[0]).collect();
+    assert!(ids.windows(2).any(|w| w == [0x0B, 0x5F]), "{ids:02X?}");
+    let (class, name) = link
+        .with(|l| {
+            let sim = &l.host().game;
+            let (p, _) = single_player::local_player(sim).expect("joined");
+            (
+                sim.events.action.sys.units.get(p).map(|u| u.class),
+                sim.world.rest.names.get(&p).cloned(),
+            )
+        })
+        .unwrap();
+    assert_eq!(class, Some(4));
+    assert_eq!(name.as_deref(), Some(&b"Conan"[..]));
+}
