@@ -82,9 +82,9 @@ pub trait HirelingRest {
     /// `hirelings-2.md` §16 rule 5: unit +0x60 = 0 → `0x0063ABD0` (the
     /// inventory model is the inventory wiring's, not the desk's).
     ///
-    /// TODO(hirelings-2.md §16 r5): the default does nothing; a host with
-    /// the inventory parts creates the inventory. Only the save restore
-    /// calls it, which has no caller yet (`d2-server` character load).
+    /// The default does nothing; a host with the inventory parts creates
+    /// the inventory (`d2-server` `WiredWorld::restore_hireling` does,
+    /// on its inventory model).
     fn ensure_inventory(&mut self, unit: UnitId) {
         let _ = unit;
     }

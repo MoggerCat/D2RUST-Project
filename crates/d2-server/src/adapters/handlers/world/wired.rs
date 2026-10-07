@@ -1,4 +1,4 @@
-// Spec: specs/world/npc.md §1.1, §2–§4, §7.5; specs/world/vendors.md §1, §3, §4, §7; specs/world/quests.md §1.7, §6.2, §7.3; specs/world/quests-act1.md §10.2; specs/world/cube.md §1, §2; specs/world/waypoints.md §6; specs/world/hirelings.md §6 r1, §8 r1; specs/world/hirelings-2.md §15, §19
+// Spec: specs/world/npc.md §1.1, §2–§4, §7.5; specs/world/vendors.md §1, §3, §4, §7; specs/world/quests.md §1.7, §6.2, §7.3; specs/world/quests-act1.md §10.2; specs/world/cube.md §1, §2; specs/world/waypoints.md §6; specs/world/hirelings.md §6 r1, §8 r1, §11; specs/world/hirelings-2.md §15, §17, §19
 //! [`WiredWorld`]: the wired single-player host. The NPC, vendor, quest
 //! and cube systems on their `d2-sim` providers
 //! (`d2_sim::wiring::interaction`: [`Desk`] for `NpcWorld +
@@ -198,7 +198,7 @@ impl<R, S> WiredWorld<R, S> {
 
     /// Runs `f` on the desk over [`Self::with_economy`]'s economy and
     /// this world, with the NPC control block and the inventory model.
-    fn desk<D: ActionEvents, T>(
+    pub(super) fn desk<D: ActionEvents, T>(
         &mut self,
         game: &mut Game,
         events: &mut D,
@@ -554,6 +554,7 @@ where
         let run = HostWaypointRun { call, difficulty };
         let out = WorldHost::<D>::waypoints(&mut self.action, game, events, run);
         self.pet_deaths(game, events);
+        self.hireling_calls(game, events);
         self.pet_follows(game, events);
         out
     }
@@ -592,6 +593,7 @@ where
     fn after_tick(&mut self, game: &mut Game, events: &mut D) {
         self.desk(game, events, |desk, ctl, _| quest_objects(desk, ctl));
         self.pet_deaths(game, events);
+        self.hireling_calls(game, events);
         self.pet_follows(game, events);
     }
 
@@ -633,7 +635,15 @@ where
     /// out of the world for the call).
     fn moves<C: MoveCall>(&mut self, game: &mut Game, events: &mut D, call: C) -> Option<C::Out> {
         let mut inv = self.inventory.take()?;
+        // The hireling lists lent for the 0x61 give's hireling, owner
+        // test and swap (`d2_sim::wiring::inventory::merc`), read only.
+        inv.state.hirelings = self
+            .state
+            .hireling_tables
+            .is_some()
+            .then(|| self.state.hirelings.clone());
         let out = self.with_economy(game, events, |econ, _| call.call(econ, &mut inv));
+        inv.state.hirelings = None;
         self.inventory = Some(inv);
         Some(out)
     }
@@ -657,6 +667,7 @@ where
         };
         let out = WorldHost::<D>::skill(&mut self.action, call);
         self.pet_deaths(game, events);
+        self.hireling_calls(game, events);
         self.pet_follows(game, events);
         out
     }
@@ -679,6 +690,7 @@ where
         });
         let facts = HostFacts { hireling };
         let out = player::action::run(game, events, &run, facts);
+        self.hireling_calls(game, events);
         self.pet_follows(game, events);
         Some(out)
     }
@@ -686,6 +698,7 @@ where
     fn walk(&mut self, game: &mut Game, events: &mut D, call: WalkCall) -> Option<WalkResult> {
         let out = self.lend_quests(events, |a, ev| WorldHost::<D>::walk(a, game, ev, call));
         self.pet_deaths(game, events);
+        self.hireling_calls(game, events);
         self.pet_follows(game, events);
         out
     }
@@ -732,6 +745,7 @@ where
         h.pet_follows.get_or_insert_with(Vec::new);
         h.pet_deaths.get_or_insert_with(Vec::new);
         h.owner_deaths.get_or_insert_with(Vec::new);
+        h.hireling_calls.get_or_insert_with(Vec::new);
         WorldHost::<D>::host_tick(&mut self.action, events, ms);
     }
 
