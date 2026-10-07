@@ -45,7 +45,7 @@
 | Edge cases & original bugs | 679–695 |
 | Test vectors | 696–729 |
 | Provenance | 730–773 |
-| Open questions | 774–840 |
+| Open questions | 774–861 |
 <!-- /index -->
 
 ## Summary
@@ -833,6 +833,27 @@ data: `states` setfunc, `missiles` rows 191/288, `objects` row 17,
     the day period changes): which object classes change (lights,
     torches, mode) and how; owner: the client object spec. A recording
     across a day-period change with objects in sight settles it.
+    *Answered* (static, 1.14d asm of `0x004BC5E0`; ECX object, EDX
+    flag): only objects whose objects `EnvEffect` (+0x139) ≠ 0 change;
+    others return 0. `p` := the act's period type (`0x0061C100(act,
+    0)` returns env +0x04, `env-periods.tsv` `type`: 0 day, 1–3 the
+    others). `p` 1–3: object mode 0 → mode := 1, the graphics refresh
+    `0x00470610(object)` (flag 0 only), the animation re-init
+    `0x00624390(object)` and client unit flag 0x2 (+0xC4) := objects
+    `Selectable1` ≠ 0; then, whatever the mode, the object light
+    `0x004BC580` with radius `Lit<mode>` / 2 and `Red`/`Green`/`Blue`
+    (§8 object row). `p` 0: mode 1 or 2 → mode := 0, the same refresh
+    and re-init, the light with `Lit0` (0 → removed), flag 0x2 :=
+    `Selectable0` ≠ 0; mode 0 → nothing (returns 0). `p` > 3 → fatal
+    0x66. Live data (`patch_d2` `objects.txt`, 574 rows): 4 rows have
+    `EnvEffect` 1 — `fire` (39: `Lit` 0, 19, 19, color 255, 236, 176,
+    never selectable), `AmbientSound` (45) and two `Dummy` (71, 72),
+    whose `Lit` and `Selectable` are all 0. So a day period puts fire 39
+    in mode 0 with no light; dusk, night and dawn put it in mode 1 with
+    light radius 9. Callers: the day refresh (§9.2 r4 step 4, flag 0),
+    `0x004BC720` (flag 1) and `0x004BDCC0` (flag 0, when the wall-clock
+    tick count exceeds object +0xD4); those two belong to the client
+    object spec.
 12. *Answered* (`impl-lighting-blend` "Not wired" 3): the eclipse branch
     of the 0x53 setter is the period reset `0x0061BDF0` (§9.2 r2): type
     and ticks from the eclipse table's entry of the index, discarding the

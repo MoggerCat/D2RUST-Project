@@ -39,7 +39,7 @@
 | Edge cases & original bugs | 468–499 |
 | Test vectors | 500–588 |
 | Provenance | 589–617 |
-| Open questions | 618–658 |
+| Open questions | 618–665 |
 <!-- /index -->
 
 ## Summary
@@ -632,6 +632,13 @@ equal the implementation's lists (`unit-order.md`, Test vectors).
    only calls with the monster itself. Open: a register-held unit that
    is null at run time at one of the other sites (a breakpoint on
    `0x005416B0` with EDX = 0 over a long run settles it).
+   Static narrowing (2026-10-07, the 266 sites `disasm.py xref` finds
+   for both wrappers, 0x60 bytes before each call): 70 load EDX from a
+   register that the preceding code dereferences or tests; 65 load it
+   from memory (mostly a record's +4 unit field); 126 from a register
+   with no such local evidence; 5 set EDX before the window. No local
+   read proves the other 196 non-null, so the breakpoint stays the
+   check (PC 2 list, `docs/HANDOFF.md` §7).
 3. Settled for the observed combinations by `units.md` (U1–U10 on the
    three recordings); per-site confirmation needs a `record_tick.py`
    0.2.0 recording (`units.md` open question 1).

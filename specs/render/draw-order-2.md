@@ -21,18 +21,18 @@
 | Inputs | 49–59 |
 | Outputs / state changes | 60–65 |
 | Rules | 66–67 |
-|   11. Weather (passes 4 and 9; water floors) | 68–311 |
-|   12. Level backgrounds (pass 1) | 312–351 |
-|   13. Pass 8 (`0x00475B20`) | 352–360 |
-|   14. Edge floors (`0x004DE6C0`, `0x004DE630`) | 361–386 |
-|   15. Sight test (`draw-order.md` §5 r3) | 387–403 |
-|   16. Line test (`0x0064E260`) | 404–433 |
-| Constants & data dependencies | 434–444 |
-| Randomness | 445–456 |
-| Edge cases & original bugs | 457–473 |
-| Test vectors | 474–495 |
-| Provenance | 496–524 |
-| Open questions | 525–582 |
+|   11. Weather (passes 4 and 9; water floors) | 68–344 |
+|   12. Level backgrounds (pass 1) | 345–384 |
+|   13. Pass 8 (`0x00475B20`) | 385–393 |
+|   14. Edge floors (`0x004DE6C0`, `0x004DE630`) | 394–419 |
+|   15. Sight test (`draw-order.md` §5 r3) | 420–466 |
+|   16. Line test (`0x0064E260`) | 467–496 |
+| Constants & data dependencies | 497–507 |
+| Randomness | 508–519 |
+| Edge cases & original bugs | 520–536 |
+| Test vectors | 537–558 |
+| Provenance | 559–590 |
+| Open questions | 591–650 |
 <!-- /index -->
 
 ## Summary
@@ -121,7 +121,7 @@ it): always 0.
 3. `c` := client update count. No local player: fatal 0x547. If `c` >
    mark: mark := `c`; if `r` = 0: intensity := 0.0 (the target is
    kept); else, on the player's
-   seed: move the particles if any are live (`0x004732C0`), update the
+   seed: move the particles if any are live (`0x004732C0`, §11.9), update the
    splashes (§11.5), run the rain cycle (§11.3, `0x00473E50`), top up
    particles and wind (§11.4, `0x004737B0`). Then, if `m` ≠ 0, update the
    bubbles (§11.5).
@@ -309,6 +309,39 @@ on the player's seed:
 120, 121 goal (28, 28), wind and goal 28, peak := 256; other levels keep
 the peak, lightning off, and in rain mode one raw step. Target := peak.
 
+#### 11.9 Particle move (`0x004732C0`, §11.2 r3)
+
+`Wt` is the 512-float sine table of §11.7 r3 (`0x00707800`); `Wc(a)` =
+`Wt[(a + 128) & 511]` (`0x0040B330`), `Ws(a)` = `Wt[a & 511]`
+(`0x0040B350`); `w` = the wind (`[0x007A89C4]`); trunc = the CRT
+truncating conversion `0x00682FD0`; `dX`, `dY` = the camera delta of
+the last drawn frame (`[0x007A0678]`, `[0x007A067C]`, Inputs table).
+
+1. Speed factor `f` (float32): snow mode: max(|`Wc(w)`|, 0.25)
+   (`0x006D6E70`); rain mode: float32(intensity × 0.15 + 0.85)
+   (doubles `0x006D6E68`, `0x006D6E60`; intensity §11.1).
+2. For each slot 0 … pool `+0x110` (highest used index), in index
+   order, skipping free slots (tag 0):
+   1. `A` := trunc(+0x14 × `f`); `ux` := trunc(`Wc(w)` × `A`); `uy` :=
+      trunc(`Ws(w)` × `A`).
+   2. y += `uy` − `dY`. y > ground y (+0x0C) → landed (+0x1C) := 1.
+   3. Landed: bounce count (+0x20) = 0 → free the slot (`0x006BCCD0`)
+      and, if the live count (+0x114) < target (`[0x007A89E0]`),
+      spawn one particle (`0x00473090`, §11.4 r5; draws on the player
+      seed). Bounce count ≠ 0 → `ux` := 0, +0x14 := 0, bounce count −1.
+   4. Slot still live (tag ≠ 0): snow mode and not landed → `ux` +=
+      trunc(2 × `Ws`((`F` × 512) / 25 + phase (+0x18))), with `F` =
+      `[0x007A8A34]` and the product and quotient unsigned 32-bit (wraps).
+      Then x += `ux` − `dX`; x ≥ `W` (`[0x0071146C]`) → x −= `W`; x < 0 →
+      x += `W` (one correction each).
+3. `F` += 1 (every call, even with an empty pool). `F` is `.bss` (0 at
+   program start) and has no other writer: it never resets.
+
+Spawn reuse: the spawn takes the lowest free slot (§11.1), which can be
+the slot just freed; the loop then treats the new particle in step 2.4
+with the freed particle's `ux` and,
+in snow mode, the sway of its own phase. Reproduce.
+
 ### 12. Level backgrounds (pass 1)
 
 Drawn first in the world draw (`draw-order.md` §1 row 1) when the local
@@ -390,16 +423,46 @@ order and each reads the extents as left by the strips before it.
    player's level (`levels.txt`; 83 levels in 1.14d, all indoor: caves,
    crypts, Monastery and Catacombs, sewers, tombs, Arcane Sanctuary,
    Act III dungeons and temples, Act V ice caves). 0 → every unit passes.
-2. **Unit line** `0x00622AA0(a = local player, b = unit, mask 2)`: no
-   room for `a` → passes (0). Else with sub-tile positions (`0x0045ADF0`,
-   `0x0045AE20`) `(ax, ay)`, `(bx, by)` and sizes `sa`, `sb`
-   (`sim/path-placement.md` §3 size, values ≥ 3 → 2): `dx` = |`bx − ax`|,
-   `dy` = |`by − ay`|; `dx + dy` < `sa + sb` → passes. Otherwise, unless
-   both sizes are 0, the ends are pulled toward each other: if `dy` ≤
-   `dx`, `ax` moves `sa` toward `bx` and `bx` moves `sb` toward `ax`; if
-   `dy` ≥ `dx`, the same on y (both when `dx` = `dy`). The result is the
-   line test (§16) from `a`'s room, `(ax, ay)` → `(bx, by)`, mask 2
-   (collision bit 0x0002, `drlg/rooms.md` §10.6): blocked → hidden.
+2. **Unit line** `0x00622AA0(a = local player, b = unit, mask 2)`
+   (§15.1; mask 2 = collision bit 0x0002, `drlg/rooms.md` §10.6):
+   blocked → hidden.
+
+#### 15.1 Collision line between two units (`0x00622AA0(a, b, mask)`)
+
+Answers 0 (clear) or 1 (blocked). D2MOO name
+`UNITS_TestCollisionWithUnit`; 1.14d read below.
+
+1. `a` or `b` null → fatal error (lines 0x1290 / 0x1291 of the unit
+   source, then exit). Room of `a` (`0x00620BB0`) null → 0 (clear).
+2. Positions `(ax, ay)`, `(bx, by)`: sub-tile x / y (`0x0045ADF0` /
+   `0x0045AE20`): objects, items and tiles (kinds 2, 4, 5) read the
+   static path's x, y (+0x0C, +0x10); other kinds the dynamic path's
+   current sub-tile (`0x006488C0` / `0x00648900`, high words of the
+   precise position, `sim/path-placement.md` §1, §2.3); no path → 0.
+3. Sizes `sa`, `sb` = `sim/path-placement.md` §3 size (`0x00620510`;
+   a monster's `SizeX` is signed); each value > 2 becomes 2 (negative
+   values are kept).
+4. `dx` = |`bx − ax`|, `dy` = |`by − ay`| (signed 32-bit). `dx + dy` <
+   `sa + sb` → 0 (touching units are never blocked).
+5. Unless `sa` = `sb` = 0, pull the ends toward each other
+   (`0x00622920`): if `dy` ≤ `dx`: when `ax` < `bx`, `ax` += `sa` and
+   `bx` −= `sb`, else `ax` −= `sa` and `bx` += `sb`. If `dy` ≥ `dx`: the
+   same on y (`ay` < `by` → `ay` += `sa`, `by` −= `sb`, else the
+   reverse). `dx` = `dy` moves both axes.
+6. Result = the line test §16 (`0x0064E260`)
+   from `a`'s room, `(ax, ay)` → `(bx, by)`, with `mask` (collision
+   bits, `drlg/rooms.md` §10.6). The stop cell it writes back is
+   discarded.
+
+Callers (16 sites in 1.14d) and the mask each pushes:
+
+| Mask | Sites (function) | Use |
+|---|---|---|
+| 2 | `0x004B98CD` (`0x004B9890`), `0x004BA2F5` (`0x004BA020`) | client sound volume (`audio/sound-table.md`) |
+| 2 | `0x004DC780` (`0x004DC710`) | client unit draw sight test (§15 r2) |
+| 4 | `0x005DCB1B`, `0x005DCC27`, `0x005DCCA5`, `0x005DD294`, `0x005DD678`, three in `0x005DD7F0`, `0x005E4B9F`, `0x005EBE36`, `0x005F7C63` | monster AI line of sight (`monsters/ai.md` function table, `ai-bodies-*.md`) |
+| 6 | `0x005F8D8B` (`0x005F8C80`, UberIzual) | `monsters/ai-bodies-7.md` §25 |
+| 0x804 | `0x00622CD9` (`0x00622C40`) | melee range (`combat/hit.md` §7.2) |
 
 ### 16. Line test (`0x0064E260`)
 
@@ -507,7 +570,10 @@ rate `0x00477980`; lightning start `0x00472C50`; backgrounds
 `0x004769B0`, `0x004F68B0`; edge floors `0x004DE6C0`, `0x004DE630`,
 `0x00619720`, `0x00643260`; sight `0x004DC710`, `0x00642840` (leveldefs
 +0x98 = `LOSDraw`, `data/fields.tsv`), `0x00622AA0`, `0x00622920`,
-`0x0064E260`. Register arguments (`roll_range` min in EDX, seed in ECX)
+`0x0064E260`; §15.1 (2026-10-07) also `0x0045ADF0`, `0x0045AE20`,
+`0x00620510`, the register order of the `0x00622920` call, and the 16
+call sites with their pushed masks (`disasm.py xref`, `all.asm`).
+Register arguments (`roll_range` min in EDX, seed in ECX)
 read from the disassembly, not the decompile. 2026-10-07 (answers
 W1–W7): `0x004DE730` (`fmul [0x006DB9D0]` before `0x00682FD0`, the
 `last_s` store before the `k` test), `0x00473F50` (rain off: `fldz` into
@@ -544,6 +610,8 @@ Encampment): splash ripples on the river, drop lines.
    the drop vector of §11.7 r3 and the splash threshold of §11.5 are
    now exact. Open: the particle move `0x004732C0` (its FPU values from
    `0x0040B330` / `0x0040B350`); an asm read of it settles it.
+   *Answered* (static, asm of `0x004732C0`, `0x0040B330`, `0x0040B350`;
+   constants read from `Game.exe`): §11.9.
 4. Which event calls `0x004E3C50` (lightning start, sound flag 0) — a
    table-dispatched client handler; search the pointer tables for it.
    *Answered* (static): its only reference is entry 84 (`0x00727CF8`) of

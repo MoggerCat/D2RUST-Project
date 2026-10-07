@@ -21,23 +21,24 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 43–58 |
-| Inputs | 59–67 |
-| Outputs / state changes | 68–73 |
-| Rules | 74–75 |
-|   1. Unit kinds | 76–95 |
-|   2. Unit record | 96–134 |
-|   3. Lifecycle | 135–296 |
-|   4. Modes and mode schedules | 297–557 |
-|   5. Event dispatch | 558–572 |
-|   6. Events per kind | 573–667 |
-|   7. Scheduler inventory (`unit-events.tsv`) | 668–689 |
-| Constants & data dependencies | 690–706 |
-| Randomness | 707–714 |
-| Edge cases & original bugs | 715–735 |
-| Test vectors | 736–795 |
-| Provenance | 796–846 |
-| Open questions | 847–912 |
+| Summary | 44–59 |
+| Inputs | 60–68 |
+| Outputs / state changes | 69–74 |
+| Rules | 75–76 |
+|   1. Unit kinds | 77–96 |
+|   2. Unit record | 97–135 |
+|   3. Lifecycle | 136–297 |
+|   4. Modes and mode schedules | 298–558 |
+|   5. Event dispatch | 559–573 |
+|   6. Events per kind | 574–668 |
+|   7. Scheduler inventory (`unit-events.tsv`) | 669–690 |
+|   8. Collision line between two units | 691–695 |
+| Constants & data dependencies | 696–712 |
+| Randomness | 713–720 |
+| Edge cases & original bugs | 721–741 |
+| Test vectors | 742–801 |
+| Provenance | 802–852 |
+| Open questions | 853–918 |
 <!-- /index -->
 
 ## Summary
@@ -686,6 +687,11 @@ All 269 call sites of the public scheduling functions in 1.14d
 
 Counts by type: 0: 20, 1: 60, 2: 30, 3: 18, 4: 1, 5: 6, 6: 6, 7: 45,
 8: 7, 9: 7, 10: 3, 11: 3, 12: 42, 13: 20, 14: 1.
+
+### 8. Collision line between two units
+
+Owned by `render/draw-order-2.md` §15.1 (`0x00622AA0`, every caller
+and mask) and §16 (the line test).
 
 ## Constants & data dependencies
 

@@ -4972,7 +4972,10 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
 - `sim/intents-events.md` OQ14: type one chat line (C→S 0x15) in single
   player; log the S→C messages of that frame with callers.
 - `client/bridge.md` OQ6: a 0x2C followed by a 0x0A in one chunk.
-- `render/lighting.md` OQ11: a day-period change with objects in sight.
+- `render/lighting.md` OQ11 (answered statically 2026-10-07: only
+  `EnvEffect` objects change; fire 39 goes to mode 0 without light in
+  the day, mode 1 with light radius 9 otherwise): a day-period change
+  with a fire 39 in sight confirms the mode and light.
 - `client/msg-skills.md` OQ1: equipping a charged item.
 - `client/stat-lists.md` OQ6: a buff (0xA8 bytes).
 - `client/model.md` OQ10: a game with a hireling (0x7A / 0x81).
@@ -5192,6 +5195,36 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
 - `combat/hit.md` §6.4 / Edge case 8 (static): a player with two
   `passive_weaponblock` entries (layer 0 and a matching type) blocking
   in melee; log `0x0057DCA0`'s return.
+- `render/camera.md` OQ5 (static part answered 2026-10-07): log
+  `0x00650840` calls per client update with caller over monster fights
+  (do `0x004AF4C0` and `0x004B13A0` both step one monster in one
+  update?) and a local player's missile's first client update (two
+  steps expected).
+- `sim/tick.md` OQ2 (breakpoint, no new play): `0x005416B0` with EDX = 0
+  over a long run (any timer scheduled without a unit; log the caller).
+- `tools/original-hooks.md` OQ1–OQ4 and `tools/original-hooks-spawn.md`
+  OQ1 (probes, area-5 round 2026-10-07): each OQ names its probe
+  (walk injection at `0x0044F136`, forced start 0x67, seed override
+  chains run twice, save-dir breakpoint `0x00534410`, spawn at
+  `0x0052FD1E` with `record_packets.py`).
+- `render/unit-composite.md` OQ4: a monster's first attack after a mode
+  change to a not-yet-loaded mode; log whether a draw happens before the
+  mode's graphics-ready flag is set. Same session, OQ7: a bone prison, a
+  leaping unit and a missile with creation flag 0x100; log the motion
+  record (gfx +0x30, 0x4C bytes) at creation and per update.
+- `sim/units.md` OQ8: leave and re-enter a wilderness area; log the
+  restore order and GUIDs (`0x00542B40`).
+- `render/camera.md` OQ6: client player seed (`unit +0x20`) at frame
+  start and end over a session with cursor movement and weather.
+- `render/draw-order.md` OQ14: a capture with a panel open (any UI or
+  cursor draw between the world passes `0x00456EE0` … `0x00477980`).
+- `render/lighting.md` OQ10: memory read of `[0x0072DA50]` and
+  `[0x0072A348]` at the first in-game draw, with and without a "Light
+  Quality" registry value.
+- `ui/text.md` OQ5 (memory read of `0x007D6268` on a loading screen)
+  and OQ9 (captures `text-0001`, `text-0002`).
+- `drlg/rooms.md` OQ13 and `drlg/wall-remap.md` OQ1: dump every built
+  room's link chains (five acts) from the original's memory.
 
 ## 8. Lessons (problems met, fixes)
 

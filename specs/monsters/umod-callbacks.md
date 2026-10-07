@@ -43,27 +43,27 @@
 |   12. Umod 19 hireable | 452–467 |
 |   13. Umod 20 scarab | 468–478 |
 |   14. Umod 21 killself: mode 2 `0x005A3AA0` | 479–489 |
-|   15. Umod 22 questcomplete: mode 1 `0x005A3250` | 490–509 |
-|   16. Umod 23 poisonhit: mode 0 `0x005A3490` | 510–514 |
-|   17. Umod 24 thief: mode 3 `0x005A30E0` | 515–531 |
-|   18. Umod 27 spectralhit | 532–552 |
-|   19. Umod 29 multishot: mode 5 `0x005A3610` | 553–574 |
-|   20. Umod 31 goboom: mode 2 `0x005A2840` | 575–581 |
-|   21. Umod 32 firespike_explode: mode 2 `0x005A3D20` | 582–592 |
-|   22. Umod 33 suicideminion_explode | 593–617 |
-|   23. Umod 34 ai_after_death | 618–643 |
-|   24. Umod 35 shatter_on_death: mode 1 `0x005A3A80` | 644–647 |
-|   25. Umod 40 worms_on_death: mode 1 `0x005A4200` | 648–654 |
-|   26. Umod 41 always_run_ai: mode 2 `0x005A4230` | 655–660 |
-|   27. Umod 42 lightningdeath: mode 2 `0x005A2910` | 661–674 |
-| Constants & data dependencies | 675–690 |
-| Randomness | 691–709 |
-| Edge cases & original bugs | 710–739 |
-| Test vectors | 740–741 |
-|   Synthetic (CI-safe) | 742–766 |
-|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 767–774 |
-| Provenance | 775–814 |
-| Open questions | 815–850 |
+|   15. Umod 22 questcomplete: mode 1 `0x005A3250` | 490–535 |
+|   16. Umod 23 poisonhit: mode 0 `0x005A3490` | 536–540 |
+|   17. Umod 24 thief: mode 3 `0x005A30E0` | 541–557 |
+|   18. Umod 27 spectralhit | 558–578 |
+|   19. Umod 29 multishot: mode 5 `0x005A3610` | 579–600 |
+|   20. Umod 31 goboom: mode 2 `0x005A2840` | 601–607 |
+|   21. Umod 32 firespike_explode: mode 2 `0x005A3D20` | 608–618 |
+|   22. Umod 33 suicideminion_explode | 619–643 |
+|   23. Umod 34 ai_after_death | 644–669 |
+|   24. Umod 35 shatter_on_death: mode 1 `0x005A3A80` | 670–673 |
+|   25. Umod 40 worms_on_death: mode 1 `0x005A4200` | 674–680 |
+|   26. Umod 41 always_run_ai: mode 2 `0x005A4230` | 681–686 |
+|   27. Umod 42 lightningdeath: mode 2 `0x005A2910` | 687–700 |
+| Constants & data dependencies | 701–716 |
+| Randomness | 717–735 |
+| Edge cases & original bugs | 736–765 |
+| Test vectors | 766–767 |
+|   Synthetic (CI-safe) | 768–792 |
+|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 793–800 |
+| Provenance | 801–845 |
+| Open questions | 846–883 |
 <!-- /index -->
 
 ## Summary
@@ -504,8 +504,34 @@ tested directly. When the unit's mode is 0, call (ECX game, EDX unit):
 | 540–542 ancientbarb1–3 | `0x005E0060` |
 | 704, 705, 709 ubermephisto, uberdiablo, uberbaal | `0x005E0070` |
 
-Other classes and other modes: nothing. The callee bodies (quest death
-effects) belong to the quests specs (Open question 4).
+Other classes and other modes: nothing. Each callee is reached only
+from this callback (1.14d rel32 scan), so this spec owns them.
+
+#### 15.1 Minion purge `0x005DFBF0(r, min, max, undead)` (ECX game, EBX boss)
+
+1. `max` = 0 → fatal 0x20; `max` ≤ `min` → fatal 0x21.
+2. Unit find (§3.1) around the boss's position (room, x, y), radius
+   `r`, filter flags 0x583, boss as the source.
+3. For each found unit in found order: a monster (type 1) with
+   alignment (`0x006259B0`) 0, undead (`0x0063E990`) when `undead` ≠ 0,
+   and class ≠ 333 (`diabloclone`): event 7 at F + `min` +
+   rnd(`max` − `min`) on the **boss's** unit seed (`0x0045C3E0`,
+   `sim/rng.md` range rule), then umod 21 `killself` (`0x005A4850`,
+   whose event-7 handler kills it, §14).
+4. Free the find (`0x0065AA00`).
+
+#### 15.2 Bodies
+
+| Callee | Effect |
+|---|---|
+| `0x005DFD90` bloodraven | purge (35, 25, 125, undead) |
+| `0x005DFE00` andariel | purge (35, 1, 51, 0) |
+| `0x005DFE20` radament | purge (35, 40, `m`, 0) with `m` = max(missile 348 `radamenthandofgod` `Range` − 100, 100) = 100 in 1.14d (21 − 100 < 100; with fewer than 349 missile rows the read goes through a null record); then `0x0056EDE0(game, radament, 0, 1, 347, x, y)` (`skills/bodies.md` §6.13): missile 347 `radamentdeath` at Radament's position, skill 0, level 1 |
+| `0x005E0020` izual | purge (105, 1, 2, 0) |
+| `0x005E0040` overseer1 | purge (35, 25, 125, 0) |
+| `0x005E0060` ancientbarb1–3 | nothing (empty function) |
+| `0x005DFDB0` mephisto | missile 299 `mephistodeathcontrol` (`0x0059FA30`, `missiles/missiles.md` R2.1 record: flags 0x8000, owner and origin Mephisto, level 1, range 100) |
+| `0x005E0070` ubermephisto / uberdiablo / uberbaal | class 704 → game +0x1DF0 := 1, 705 → +0x1DEC, 709 → +0x1DE8, any other class fatal 0xE6. When all three are set (this and every later uber death): the unit's item code +0xB8 := `cm2 `, drop helper `0x00559A30(game, unit, 7, …)` (`world/quests-act1-rest.md` item 1), `0x0055FE80(game, 0, item)`; then +0xB8 := `std ` and the drop helper with 2, game +0x8C times |
 
 ### 16. Umod 23 poisonhit: mode 0 `0x005A3490`
 
@@ -795,6 +821,11 @@ Per callback, in order (U = the monster's seed unless named):
   (type-3 guard), `0x00573780` (jump table `0x00573830` / `0x00573838`
   decoded: 110, 118, 136, 247), `0x00463860`, `0x005B2490`; the reaction
   `0x0057CEE0` branches around `0x0057D0B2`–`0x0057D12D`.
+- §15.1–§15.2 (2026-10-07): `0x005DFBF0`, `0x005DFD90`, `0x005DFDB0`,
+  `0x005DFE00`, `0x005DFE20`, `0x005E0020`, `0x005E0040`,
+  `0x005E0060`, `0x005E0070` (rel32 scan: each called only from
+  `0x005A3250`); missile and monster names from `patch_d2`
+  `missiles.txt` / `monstats.txt`.
 - Fire step 4 arithmetic: d = 1 uses `imul 0x55555555; sub; sar 1;
   add sign` = signed division by −3, checked numerically for −4 … 302.
 - Assign sites of `0x005A4850` (all 52 scanned for immediate umods):
@@ -831,6 +862,8 @@ Per callback, in order (U = the monster's seed unless named):
 4. Quest death effects `0x005DFD90`, `0x005DFDB0`, `0x005DFE00`,
    `0x005DFE20`, `0x005E0020`, `0x005E0040`, `0x005E0060`,
    `0x005E0070` (§15) have no spec: the quests specs should own them.
+   *Answered* (static, 1.14d asm; each is reached only from §15):
+   §15.1–§15.2 (owner: this spec).
 5. Answered (2026-10-07): no fixed site assigns 40 or 41. The
    table-driven assigns of `0x005B21B0` give 14, 33, 34, 35 and 22
    (`init.md` §14.1), the boss mods 6, 8, 12, 17, 18, 22, 23, 29, 30, 31

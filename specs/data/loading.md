@@ -42,7 +42,7 @@
 | d2-data policy | 696–722 |
 | Test vectors | 723–756 |
 | Provenance | 757–845 |
-| Open questions | 846–903 |
+| Open questions | 846–915 |
 <!-- /index -->
 
 ## Summary
@@ -879,6 +879,18 @@ the 1.14d data files. Addresses are virtual addresses in `Game.exe`.
    (call `0x0061941D`) and calls the DS1 loader `0x00665F40` only when it
    is non-zero (`0x0061EFAD`; `drlg/preset.md` OQ 6). The `lvlsub` loader
    (`0x0061F130`) takes no such input; its abort 0x3C8 is still open.
+   *Answered* (static, 1.14d asm; correction: `0x0061F130` is the
+   `lvlwarp` loader, the `lvlsub` loader is `0x0061F500`, call
+   `0x00619438`): the `lvlsub` loader gets input 2 in EDX and input 3
+   on the stack. Only when one of them is non-zero does it allocate a
+   slot array (one pointer per row) and, for each row in order whose
+   `Expansion` (+0x158) is 0 or with d2exp present (`0x00408F20`),
+   load the row's DS1 (`0x00665F40`, `drlg/preset.md` §5) and abort
+   with 0x3C8 when that DS1 record's group count (+0x4C) is 0. Input 2
+   is always 0 and input 3 is 1 only when config +0x19 (`-gametype`,
+   `tools/original-hooks.md` §5.1) is 6, so in single player (game type
+   0) no `lvlsub` DS1 is preloaded and the abort cannot occur; d2rs
+   omits the preload.
 10. `0x00653DB0`, a generic 2-byte-record loader, has no callers (dead
     code); not part of the load.
 11. Record layouts of the sound tables (142 and 88 bytes). Answered for
