@@ -139,7 +139,7 @@ decompiler output was consulted.
    `trees.ds1` is v12, so even its whole groups have no variant value
    (`drlg/outdoor-tilesub.md` OQ 4). A memory read settles both (PC 2
    recording list).
-   PROVISIONAL: 0 for the missing fields of a truncated group (because d2rs uses 0, `drlg/preset.md` §5.2 OQ 2); settled by: new capture — memory read of the slack bytes after the DS1 buffer (`0x00517079`) and which lvlsub group `trees.ds1`'s 14th group picks.
+   PROVISIONAL: 0 for the missing fields of a truncated group (because d2rs uses 0, `drlg/preset.md` §5.2 OQ 2); settled by REC-35.
 4. **Trailing data in v12–13 files.** 54 files (v12/v13) end with 4 zero
    bytes after the last documented section. `ACT1\OUTDOORS\swamp2.ds1` (v13,
    tag_type 1) ends with the u32s `[1, 5, 3, 3, 0, 15, 0, 0, 0, 0, 0, 0]`.

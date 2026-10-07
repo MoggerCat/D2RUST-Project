@@ -5615,7 +5615,7 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 
 ##### REC-35 [AUTO] DRLG extra probes: Trees substitution DS1, river units, room-entry returns
 - Priority 2 (unattended; the Cold Plains walk of REC-04 can carry the same hooks).
-- Settles: `formats/ds1.md` OQ3 + `drlg/preset.md` OQ2 (after the Trees substitution DS1 loads: its 14 group records, 0x18 bytes each, and the 0x320 bytes of slack after the file buffer), `drlg/outdoor-tilesub.md` OQ4 (the same Trees group records, +0x14 of each; OQ2 of that spec is already folded), `drlg/preset.md` OQ3 (a level whose river / navi units are added at first activation: the §8 adds against the §9 transfers per room), `drlg/rooms.md` OQ7 (the value `0x0066D820` returns for RNG sequence 6822–6835 of the RNG recording's run).
+- Settles: `formats/ds1.md` OQ3 + `drlg/preset.md` OQ2 (after the Trees substitution DS1 loads: its 14 group records, 0x18 bytes each, and the 0x320 bytes of slack after the file buffer), `drlg/outdoor-tilesub.md` OQ4 (the same Trees group records, +0x14 of each; OQ2 of that spec is already folded), `drlg/preset.md` OQ3 (a level whose river / navi units are added at first activation: the §8 adds against the §9 transfers per room), `drlg/rooms.md` OQ7 (the value `0x0066D820` returns for RNG sequence 6822–6835 of the RNG recording's run), `formats/ds1.md` OQ3 second half (a memory read of the slack bytes after the DS1 buffer, `0x00517079`, and which lvlsub group `trees.ds1`'s 14th group picks).
 - Steps: `py tools/trace-recorder/record_rng.py --seconds 400 --auto TestSor --seed 644409375 --input "<T12>; <Cold Plains by waypoint>; wait 20; <Stony Field by waypoint>; wait 20; end" --out traces/raw/pc2rec-r35-rng.jsonl` (same character, seed and waypoint list as pc2rec-d3 so the sequence numbers 6822–6835 match; take the header `args` of that raw file). NEW HOOKS: a memory read of the Trees DS1's 14 group records and the 0x320 slack at the point its load finishes (names in `ds1.md` OQ3); INT3 at the §8 add and §9 transfer sites of `preset.md` logging room and unit; entry and return of `0x0066D820` with the RNG sequence number.
 - Output: `pc2rec-r35-rng.jsonl` (+ the dump files beside it).
 - Compare: `check_rng` passes; the group records against `ds1.md` §3; the add / transfer counts per room against `preset.md` §8 / §9. Fold: close ds1 OQ3, preset OQ2 / OQ3, tilesub OQ4, rooms OQ7.
@@ -5734,8 +5734,16 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 - Output: `pc2rec-r42-{rng,tick}.jsonl`.
 - Compare: per event the record bytes and the seed before / after against `events.md`. Fold: close OQ1.
 
+##### REC-45 [MANUAL] Baal's portal opening (level 131 to 132)
+- Priority 3 (manual play; needs REC-30's Act V save at the Worldstone Chamber).
+- Settles: `world/objects-client.md` §26.15 (does the generic step reach mode 2 itself at the end of mode 1: the object speed +0x4C in mode 1 and the frame of the mode-2 change, for Baal's portal opening, level 131 → 132; REC-30 covers the Act V levels but not this object).
+- Steps: an Act V save with the Worldstone Chamber reachable (`d2s-tool` quest bits); `record_packets.py --seconds 300` and `record_tick.py --seconds 300` on the same actions: finish the Baal wave quest, wait for the portal to open, read the object's S→C 0x51 mode and the +0x4C speed per client update (NEW HOOK: log the object's +0x4C and mode at each client update).
+- Output: `pc2rec-r45-{packets,tick}.jsonl`.
+- Compare: the tick of the mode 1 → 2 change against the speed and the frame rule of `objects-client.md` §26. Fold: close §26.15.
+
 #### Deferred (not recorded; outside Phases 0–6)
 - IT-1 `formats/d2s.md` OQ1 (legacy loader `0x00534020`, pre-1.09 saves), IT-2 OQ2 (item records of save versions 0x5C–0x5F), `formats/d2s-legacy.md` and `items/bitstream-legacy.md` Pending lines (1.07 / 1.08 / 1.00–1.06 saves): need sample files and are only needed if old saves must load. Record only if the user opens that scope.
+- **REC-44** legacy saves, cited by the specs as the capture: `formats/d2s-legacy.md` OQ2 (load one 1.07 / 1.08 save, version 0x57 / 0x59, in 1.14d and compare the unit (stats, skills, items, hireling) with the rules), `items/bitstream-legacy.md` OQ1 (the same 1.07 / 1.08 save: every item against §2–§4, affix ids after the offset of §2 rule 3) and OQ2 (a 1.00–1.06 save, version 0x47, holding a stored, equipped, belt, cursor and socketed item, an ear and a corpse with an equipped item: compare with §6–§8 and edge cases 7–9). No such save exists on this PC; record only if the user opens that scope (steps: place the save in `%USERPROFILE%\Saved Games\Diablo II`, `record_packets.py --seconds 60` plain, then `tools/d2s_check.py`).
 
 #### [NO] Not reachable with the current setup (and why)
 - A classic game (`monsters/init.md` OQ1 0x67 in classic SP; `client/model.md` §7 r8 / §17 r6 (a) joining a classic game with an expansion character; `quests-act4.md` OQ2 classic end; REC-29's classic part): the forced start always makes an expansion game; a classic character is refused. Needs a manual classic start.

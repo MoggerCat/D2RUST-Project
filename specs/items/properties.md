@@ -585,7 +585,7 @@ Synthetic, from the rules:
    paths, or keep d2rs's "no match" as a Ruleset choice. Struck for the
    binary (2026-10-07: stack contents of earlier frames); recording list
    `docs/handoff/pc2-rec-pc2-items.md` IT-10.
-   PROVISIONAL: "no match" for the unwritten slot on every path (because the unwritten slot holds frames left by earlier calls); settled by: new capture — stack trace at `0x0062BFBA` on the load / save / writer paths (IT-10, `docs/handoff/pc2-rec-pc2-items.md`; in recording-list REC-34 text).
+   PROVISIONAL: "no match" for the unwritten slot on every path (because the unwritten slot holds frames left by earlier calls); settled by REC-34.
    Status (2026-10-07): Pending for fidelity only; d2rs keeps "no match"
    for the unwritten slot on every path (§10.1 Edge), so no code waits
    on it.

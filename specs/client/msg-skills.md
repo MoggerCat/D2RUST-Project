@@ -432,7 +432,7 @@ bit 17 `enhanceable`, mask table `0x006CE268`), `0x00643AD0`,
    no direct caller in the export; find the client path (item equip,
    `client/stat-lists.md` §2) and the message that carries charges.
    Settle with a recording equipping a charged item.
-   PROVISIONAL: the client takes charges from the item's own stat list when the item is equipped, with no separate charge message (because the S→C item stream already carries the item's stats, `client/stat-lists.md` §2, and no charge message exists in this file's tables); settled by: new capture — equip a charged item, log the S→C messages and the `0x00643B70` call path.
+   PROVISIONAL: the client takes charges from the item's own stat list when the item is equipped, with no separate charge message (because the S→C item stream already carries the item's stats, `client/stat-lists.md` §2, and no charge message exists in this file's tables); settled by REC-09.
 2. *Answered (2026-10-08)*: §2 rule 7 (all writers, the split level,
    when each runs). Original question: the level bonus +0x2C on the client: writers `0x00647AA0` (set,
    called from `0x004C6140` and `0x004D88A0`) and `0x00647B20` (add,

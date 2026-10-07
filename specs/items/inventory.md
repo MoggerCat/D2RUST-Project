@@ -919,7 +919,7 @@ size and fallback pushes at `0x00563B9C` / `0x00563C83`), `0x005628C0`.
    0x9C / 0x9D streams).
 2. Order of 0x9C/0x9D relative to other per-player update messages in
    one client pass (life, stats, 0x47/0x48). Settle: R1–R3 packet order.
-   PROVISIONAL: 0x9C/0x9D are sent in the order the server produces them within the pass, with no reordering against the life/stats/0x47/0x48 messages (because the spec's rules (§4–§5) emit each message where its owner runs and state no sorting); settled by: new capture — packets recording of R1–R3 (pick up, store, equip) with message order per frame.
+   PROVISIONAL: 0x9C/0x9D are sent in the order the server produces them within the pass, with no reordering against the life/stats/0x47/0x48 messages (because the spec's rules (§4–§5) emit each message where its owner runs and state no sorting); settled by REC-08.
 3. Answered: §3 rule 7 (no `numboxes` check server-side; slot ≤ 15).
 4. Answered: §4.2 step 2 (`pct`, `combat/damage.md` §0).
 5. Answered: §4.8.

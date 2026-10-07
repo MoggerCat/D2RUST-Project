@@ -367,4 +367,4 @@ D2MOO not used.
    **Answered**: `items/bitstream-legacy.md` §6 (record `0x00532F30`),
    §7 (request `0x00530F40`), §8 (placement `0x00531040`,
    `0x00531390`); the list itself is §8 rule 2.
-2. PROVISIONAL: the rules above for 1.07/1.08 saves (version 0x57 / 0x59) (because they are read from the loader binary); settled by: new capture — load one 1.07/1.08 save in 1.14d and compare the unit (stats, skills, items, hireling) with these rules (recording-list Deferred).
+2. PROVISIONAL: the rules above for 1.07/1.08 saves (version 0x57 / 0x59) (because they are read from the loader binary); settled by REC-44 (Deferred).

@@ -325,7 +325,7 @@ tests, `0x0046E100`), so in mode 0 a new overlay record is added every
 
 Mode = 1 and frame = `Start1` × 256 exactly (+0x12A, shifted) → write
 mode 2, frame := 0, `refresh(U)`, `reinit(U)`. Returns 1.
-PROVISIONAL: the generic step reaches mode 2 itself at the end of mode 1 (because the rule cannot hold after the step has advanced the frame at a non-zero speed); settled by: new capture — Baal's portal opening (level 131 → 132), object speed +0x4C in mode 1 (REC-30 covers the Act V levels but not this object).
+PROVISIONAL: the generic step reaches mode 2 itself at the end of mode 1 (because the rule cannot hold after the step has advanced the frame at a non-zero speed); settled by REC-45.
 Pending: at call site A the generic step `0x004BCBB0` has already
 advanced the frame in the same update, so with a non-zero speed the
 frame is past `Start1` × 256 (live `Start1` 0, `FrameDelta1` 256) and
