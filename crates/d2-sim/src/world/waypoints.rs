@@ -587,6 +587,10 @@ impl WaypointData {
             _ => return Ok(()),
         }
         world.reset_interact(player);
+        // Rule 2: level 0 or the object's own level is the whole "close".
+        if level == 0 || obj.level == Some(level) {
+            return Ok(());
+        }
         let d = world.difficulty();
         let Some(idx) = self.map.index_of_level(level) else {
             return Ok(());

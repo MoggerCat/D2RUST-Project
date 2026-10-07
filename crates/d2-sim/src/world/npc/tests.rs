@@ -1422,6 +1422,24 @@ fn hire_refusals() {
     assert!(w.sent.is_empty());
 }
 
+// Covers: specs/world/npc.md §edge-cases-original-bugs r12
+#[test]
+fn hire_cap_feeds_only_the_kashya_gate() {
+    let mut c = control(0);
+    let mut w = Fake::new();
+    let kashya = w.npc(class::KASHYA, 12);
+    talk(&mut c, &mut w, kashya);
+    w.set(PLAYER, stat::LEVEL, 30);
+    w.set(PLAYER, stat::GOLD, 100_000);
+    // Capped level 12 is not < 8: the gate passes without slot 2 bit 0.
+    let seed = c.record(class::KASHYA).unwrap().hire.clone().unwrap().slots[5].seed;
+    let uncapped = hire_init(&c.hirelings, 100, seed, 0, 0, 30).unwrap();
+    let capped = hire_init(&c.hirelings, 100, seed, 0, 0, 12).unwrap();
+    assert_ne!(uncapped.price, capped.price);
+    assert_eq!(c.hire(&mut w, PLAYER, &msg36(12, 1005)).unwrap(), 0);
+    assert_eq!(w.get(PLAYER, stat::GOLD), 100_000 - uncapped.price);
+}
+
 // ------------------------------------------------------------ §7.4
 
 // Covers: specs/world/npc.md §7.4 text, §7.4 r1, §7.4 r2, §7.4 r3, §7.4 r4; specs/world/hirelings.md §9 r2

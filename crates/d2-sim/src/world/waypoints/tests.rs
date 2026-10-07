@@ -175,7 +175,7 @@ fn load_and_out_copy() {
     assert_eq!(bad.out_copy(), Err(WaypointError::BadMagic(0x0103)));
 }
 
-// Covers: specs/world/waypoints.md §3 text, §3 r1, §3 r2
+// Covers: specs/world/waypoints.md §3 text, §3 r1, §3 r2, §3 r3
 #[test]
 fn save_section() {
     let mut recs = WaypointRecords::default();
@@ -455,7 +455,7 @@ fn operate_busy_sets_bit_only() {
     assert!(f.records[&P].0[2].test(2).unwrap());
 }
 
-// Covers: specs/world/waypoints.md §6 text, §6.2, §6.3 r1
+// Covers: specs/world/waypoints.md §6 text, §6.2, §6.3 r1, §7 r2, §edge-cases-original-bugs r6
 #[test]
 fn close_and_validation() {
     let d = data();
@@ -470,7 +470,7 @@ fn close_and_validation() {
     // Same level closes too (edge case 6).
     let mut f = fake();
     assert_eq!(d.take_or_close(&mut f, &mut arr, P, &msg49(0x0b, 1)), Ok(0));
-    assert_eq!(f.log, ["reset", "warp 1 13"]);
+    assert_eq!(f.log, ["reset"]);
     // Amazon |dx| = 11 → 1.
     let mut f = fake();
     f.player.as_mut().unwrap().x = 5011;
@@ -633,4 +633,23 @@ fn init17() {
     o3.level = Some(1);
     d.init_object(&mut f, &mut ArrivalList::default(), u, &o3);
     assert_eq!(f.log, ["mode 50 2"]);
+}
+
+// Covers: specs/world/waypoints.md §edge-cases-original-bugs r11
+#[test]
+fn act5_bits_survive_load_and_pass_validation() {
+    // A record from an edited save keeps its act-5 bit (index 38 is in byte 6) and validation checks neither act nor
+    // expansion of the destination.
+    let src = rec("0201 0100 0000 0000 0000 0000 0000 0000");
+    let mut r = WaypointRecords::default();
+    let mut raw = src;
+    raw[6] = 0x40; // index 38 = byte 2 + 4, bit 6
+    r.0[0] = WaypointRecord::load_copy(&raw).unwrap();
+    assert!(r.0[0].test(38).unwrap());
+    assert_eq!(r.0[0].out_copy().unwrap()[6], 0x40);
+    let d = data();
+    let level = d.map.level_of_index(38).unwrap();
+    let mut f = fake();
+    f.records.insert(P, r);
+    assert_eq!(d.validate(&mut f, P, 0x0b, level), Ok(0));
 }
