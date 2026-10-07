@@ -830,10 +830,8 @@ pub fn scan_point<W: BodyWorld>(
 // ---------------------------------------------------------------- §2.13
 
 /// The event function table `0x007325B0` (`combat/damage.md` §8): entry
-/// 0 is null, 1–31 are filled.
-// TODO(spec: bodies.md §2.13): register accepts func ≤ 49 but the table
-// has 32 entries; what 1.14d reads for 32–49 is not stated. d2rs refuses
-// them like a null entry.
+/// 0 is null, 1–31 are filled; slots 32–49 of the 50-slot table are null
+/// (`bodies.md` §2.13), so register returns 0 for them.
 pub fn event_func_filled(func: i32) -> bool {
     (1..=31).contains(&func)
 }
@@ -998,8 +996,8 @@ pub fn charges_after<W: BodyWorld>(
                 if etype == 4 && matches!(n, 2 | 3) && p2 != 0 {
                     record.freeze_len = record.freeze_len.wrapping_add(record.cold_len / p2);
                 }
-                // TODO(spec: bodies.md §2.14): whether `result |= 0x4000`
-                // belongs to the freeze clause; read as unconditional.
+                // §2.14: `result |= 0x4000` follows the freeze clause
+                // (unconditional).
                 record.result |= 0x4000;
             }
             _ => {
@@ -1007,7 +1005,7 @@ pub fn charges_after<W: BodyWorld>(
                 if etype == 4 && n == 3 && p5 != 0 {
                     record.freeze_len = record.freeze_len.wrapping_add(record.cold_len / p5);
                 }
-                // TODO(spec: bodies.md §2.14): as for prgdam 3.
+                // §2.14: unconditional, as for prgdam 3.
                 record.result |= 0x4000;
                 let mut pc = eval(w, t, u, calc1, k, lvl);
                 if pc > 0 {

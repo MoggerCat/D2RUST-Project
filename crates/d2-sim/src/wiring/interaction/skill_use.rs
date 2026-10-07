@@ -1198,6 +1198,10 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
     fn chain_position(&self, class: i32) -> i32 {
         self.x().ai_chain_index(class)
     }
+    /// [`Pending::ai_class_for_level`] (`0x0063EC70`).
+    fn class_for_level(&self, room: Option<RoomId>, class: i32) -> i32 {
+        self.x().ai_class_for_level(self.cv.game, room, class)
+    }
     fn book_skills(&self, i: UnitId) -> Option<(i32, i32)> {
         self.x().body_book_skills(i)
     }

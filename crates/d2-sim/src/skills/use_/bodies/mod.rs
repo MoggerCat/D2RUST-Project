@@ -741,6 +741,9 @@ pub trait BodyWorld: UseWorld + KickItems {
     /// `0x006510C0(class, 0, &v)`: the monstats chain position (+0x4B,
     /// `data/fixups.md`); 0 for an invalid class.
     fn chain_position(&self, class: i32) -> i32;
+    /// `0x0063EC70(room, class)`: the class of `class`'s chain for the
+    /// room's level (`monsters/population.md` §11.6).
+    fn class_for_level(&self, room: Option<Self::Room>, class: i32) -> i32;
     /// The books row of an item's spell index (item data +0x3E,
     /// `0x00627F80` → `0x006374B0`): (`scrollskill`, `bookskill`).
     fn book_skills(&self, i: Self::Item) -> Option<(i32, i32)>;

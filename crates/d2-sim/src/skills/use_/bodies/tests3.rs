@@ -6,7 +6,7 @@ use super::tests2::{body_rec, monster, tabs, world, Code};
 use super::*;
 use crate::combat::DamageRecord;
 use crate::rng::Seed;
-use crate::skills::fake::{blank, combat_tables, monster_rec, FItem};
+use crate::skills::fake::{blank, combat_tables, monster_rec, FItem, FUnit};
 use crate::skills::SkillUnits;
 use crate::units::UnitType;
 use d2_data::tables::Monstats2;
@@ -657,4 +657,161 @@ fn whirlwind_start_in_melee_range_swings() {
         .take_log()
         .iter()
         .any(|s| s.starts_with("UnitModeRequest")));
+}
+
+// ---------------------------------------------------------------- spec answers (bodies-3.md §2, bodies-4.md)
+
+// Covers: specs/skills/bodies-3.md §2 answer 8 (bodies-2b.md §6.8)
+#[test]
+fn vengeance_negative_index_keeps_c_remainder() {
+    let t = tabs(body_rec(), Code::new(), 1);
+    let ct = combat_tables(vec![monster_rec()]);
+    let (mut f, u) = world();
+    let e = f.c.units[u].used.unwrap();
+    let m = monster(&mut f, (1, 0));
+    f.targets.insert(u, m);
+    f.c.in_range = true;
+    f.c.hostile = true;
+    f.c.set(u, 12, 99);
+    f.c.set(u, 19, 100_000);
+    f.c.set(m, 12, 1);
+    f.set_entry_param_of(u, &e, 1, -2);
+    let mut class = None;
+    for _ in 0..64 {
+        f.c.units[u].combat.clear();
+        b3_lvl18::vengeance(&mut f, &t, &ct, u, 1, 1);
+        if f.entry_param(u, &e, 1) != -2 {
+            class = f.c.units[u].combat.first().map(|x| x.record.hit_class);
+            break;
+        }
+    }
+    // k = −2: no hit class; E param 1 := (−1) rem 3 = −1 (not 2).
+    assert_eq!(class, Some(0));
+    assert_eq!(f.entry_param(u, &e, 1), -1);
+}
+
+// Covers: specs/skills/bodies-3.md §2 answer 8 (bodies-2b.md §7.2 step 8)
+#[test]
+fn strafe_rewinds_only_with_a_next_target() {
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.srvmissilea = 0;
+    r.aurarangecalc = c.f(10);
+    r.param6 = 3;
+    let t = tabs(r, c, 1);
+    let ct = combat_tables(vec![monster_rec()]);
+    let (mut f, u) = world();
+    let e = f.c.units[u].used.unwrap();
+    let k = monster(&mut f, (2, 0));
+    f.c.units[k].guid = 5;
+    f.set_entry_param_of(u, &e, 1, 3);
+    f.set_entry_param_of(u, &e, 2, 1);
+    f.set_entry_param_of(u, &e, 3, 5);
+    // No other unit: no K2, no rewind; the body still returns 1.
+    assert_eq!(b3_lvl24::strafe(&mut f, &t, &ct, u, 1, 1), 1);
+    assert!(!f.take_log().iter().any(|s| s.starts_with("rewind")));
+    let k2 = monster(&mut f, (3, 0));
+    f.c.units[k2].guid = 9;
+    f.c.units[k2].flags = 0xC;
+    f.c.hostile = true;
+    f.scan = vec![k2];
+    assert_eq!(b3_lvl24::strafe(&mut f, &t, &ct, u, 1, 1), 1);
+    let log = f.take_log();
+    assert!(log.iter().any(|s| s == &format!("rewind {u} 3")), "{log:?}");
+}
+
+// Covers: specs/skills/bodies-2.md §2.16
+#[test]
+fn burst_rings_follow_the_steps() {
+    let t = tabs(body_rec(), Code::new(), 1);
+    let (mut f, u) = world();
+    assert_eq!(burst(&mut f, &t, u, u, 0, 1, 1, (2, 4, 0)), 1);
+    // Ring 1: i = 0, 4, 8, 12; ring 2: i = 0, 2, …, 14.
+    assert_eq!(f.missiles.len(), 4 + 8);
+}
+
+// Covers: specs/skills/bodies-3.md §2 answer 8 (a negative step is a fatal assertion)
+#[cfg(debug_assertions)]
+#[test]
+#[should_panic(expected = "negative burst step2")]
+fn burst_negative_step_is_fatal() {
+    let t = tabs(body_rec(), Code::new(), 1);
+    let (mut f, u) = world();
+    burst(&mut f, &t, u, u, 0, 1, 1, (-1, 4, 0));
+}
+
+// Covers: specs/skills/bodies-3.md §2 answer 5 (bodies.md §6.15)
+#[cfg(debug_assertions)]
+#[test]
+#[should_panic(expected = "negative skeleton mastery level")]
+fn skeleton_negative_mastery_is_fatal() {
+    let t = tabs(body_rec(), Code::new(), 1);
+    let (mut f, u) = world();
+    let m = f.add(FUnit::new(UnitType::Monster, 363), (1, 1));
+    f.c.units[u].states.push(97);
+    let mut l = super::fake::FList {
+        state: 97,
+        unit: Some(u),
+        ..Default::default()
+    };
+    l.stats.insert(351, -1);
+    f.lists.push(l);
+    components(&mut f, &t, u, m, 1, 1);
+}
+
+// Covers: specs/skills/bodies-4.md §3.24 step 3, Open question 6
+#[test]
+fn imp_teleport_riding_uses_the_written_point() {
+    let mut r = body_rec();
+    r.aurastate = 143;
+    let t = tabs(r, Code::new(), 1);
+    let ct = combat_tables(vec![monster_rec()]);
+    let (mut f, o) = world();
+    let imp = monster(&mut f, (1, 1));
+    f.c8.insert(imp, 0x400);
+    f.missile_owners.insert(imp, o);
+    // No target unit: the path's target point, even with a 0 coordinate.
+    f.path_target = (7, 0);
+    assert_eq!(b4_more::imp_teleport(&mut f, &t, &ct, imp, 1, 1), 1);
+    assert!(f.take_log().contains(&format!("place {imp} None (7, 0)")));
+}
+
+// Covers: specs/skills/bodies-4.md §3.22 step 3, Open question 4 (monsters/ai-bodies-2.md §13.1)
+#[test]
+fn baal_tentacle_spawn_info_for_other_keys() {
+    let mut rows = vec![monster_rec(); 300];
+    for (i, m) in rows.iter_mut().enumerate() {
+        m.baseid = i as u16;
+        m.nextinclass = 0xFFFF;
+    }
+    rows[15].nextinclass = 16;
+    rows[16].baseid = 15;
+    rows[50].baseid = 206;
+    rows[51].baseid = 267;
+    let ct = combat_tables(rows);
+    let spawned = |f: &mut BodyFake| -> Vec<(i32, i32)> {
+        f.take_log()
+            .iter()
+            .filter_map(|s| {
+                let s = s.strip_prefix("At { ")?;
+                let class = s.split("class: ").nth(1)?.split(',').next()?.parse().ok()?;
+                let mode = s.split("mode: ").nth(1)?.split(',').next()?.parse().ok()?;
+                Some((class, mode))
+            })
+            .collect()
+    };
+    let (mut f, _) = world();
+    // 206 crownest1: chain(15 foulcrow1) at the unit's chain position 1.
+    let u = f.add(FUnit::new(UnitType::Monster, 50), (0, 0));
+    f.chains.insert(50, 1);
+    let mut s = f.c.units[u].seed;
+    let n = (s.step() % 3) as usize + 2;
+    assert_eq!(b4_more::baal_tentacle(&mut f, &ct, u), 1);
+    assert_eq!(spawned(&mut f), vec![(16, 1); n]);
+    // 267 bloodraven: clamp(6), mode 8.
+    let u = f.add(FUnit::new(UnitType::Monster, 51), (0, 0));
+    let mut s = f.c.units[u].seed;
+    let n = (s.step() % 3) as usize + 2;
+    assert_eq!(b4_more::baal_tentacle(&mut f, &ct, u), 1);
+    assert_eq!(spawned(&mut f), vec![(6, 8); n]);
 }
