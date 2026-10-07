@@ -186,6 +186,23 @@ impl<X: WorldPending> MonsterInit for WorldHost<'_, X> {
         }
     }
 
+    /// An object preset on the action wiring's object state
+    /// ([`crate::wiring::action::View::create_object`]: allocation in the
+    /// preset mode, classes 574–582 through `0x0054F490`). No object
+    /// state: nothing.
+    fn create_preset_object(
+        &mut self,
+        room: RoomId,
+        class: i32,
+        x: i32,
+        y: i32,
+        mode: u8,
+    ) -> Option<UnitId> {
+        let c = u32::try_from(class).ok()?;
+        self.v.h.objects.as_ref()?;
+        self.v.create_object(self.game, room, c, x, y, mode)
+    }
+
     fn preset_created(&mut self, unit: UnitId, preset: &PresetUnit) {
         self.v.h.x.preset_created(unit, preset);
     }

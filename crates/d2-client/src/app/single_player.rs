@@ -716,17 +716,12 @@ impl LevelSource {
     /// the server's town level ids 1 and 40 (`levels.md` §2 step 2) and
     /// the game's init seed (game +0x7C, the same for every act). TODO
     /// (spec: game creation): what sets game +0x7C is not specified; the
-    /// app passes its `--seed`.
-    fn live(d: &LiveData, init_seed: u32) -> Self {
-        let data = Arc::new(d.levels.drlg.clone());
-        let types = SharedTypes::new(WorldTypes::new(
-            data.clone(),
-            Maze::new(d.levels.maze.clone()),
-            d.levels.preset.clone(),
-            d.levels.outdoor.clone(),
-            Box::new(d.files.ds1.clone()),
-            Box::new(d.files.subs.clone()),
-        ));
+    /// app passes its `--seed`. `types` is the game's one level-type
+    /// handle ([`live_types`]): the act DRLGs generate into it and the
+    /// world state's population reads the generated preset rooms through
+    /// a clone of it (`SharedTypes`).
+    fn live(d: &LiveData, init_seed: u32, types: SharedTypes) -> Self {
+        let data = types.borrow().drlg_data.clone();
         LevelSource {
             data,
             tiles: Box::new(d.files.dt1.clone()),
@@ -1149,15 +1144,18 @@ impl GameParts {
     }
 
     /// The user's tables (`GameTables`), the drop and hireling tables of
-    /// [`LiveData`], the world state's level types over the live data.
-    fn live(d: &LiveData) -> Result<Self, BuildError> {
+    /// [`LiveData`], and `types` as the world state's level types: the
+    /// handle the act DRLGs generate into ([`LevelSource::live`]), so
+    /// population finds the generated preset rooms and their units
+    /// (`monsters/population.md` §11.1).
+    fn live(d: &LiveData, types: SharedTypes) -> Result<Self, BuildError> {
         let t = &d.tables;
         Ok(GameParts {
             action: t.action_tables()?,
             stats: t.stat_data()?,
             units: t.unit_data(GAME_SETUP.expansion)?,
             world: t.world_tables()?,
-            world_types: live_types(d),
+            world_types: types,
             objects: t.object_tables()?,
             monstats: t.rows()?,
             hire_rows: t.hire_rows()?,
@@ -1201,7 +1199,10 @@ fn empty_action_tables() -> ActionTables {
 }
 
 /// The level-type dispatcher over the live data (`WorldTypes`, as
-/// drlg-data's game-file tests build it).
+/// drlg-data's game-file tests build it). Built once per game and shared
+/// by the act DRLGs and the world state: a second instance holds no
+/// generated rooms, so population would find no preset units (no town
+/// NPCs, no town objects).
 fn live_types(d: &LiveData) -> SharedTypes {
     SharedTypes::new(WorldTypes::new(
         Arc::new(d.levels.drlg.clone()),
@@ -1233,7 +1234,14 @@ pub fn build_with(
     let wp_tables = data.tables();
     let (mut levels, parts) = match data {
         GameData::Synthetic => (LevelSource::synthetic(), GameParts::synthetic(&wp_tables)?),
-        GameData::Live(d) => (LevelSource::live(d, seed), GameParts::live(d)?),
+        GameData::Live(d) => {
+            // One level-type handle for the act DRLGs and the world state.
+            let types = live_types(d);
+            (
+                LevelSource::live(d, seed, types.clone()),
+                GameParts::live(d, types)?,
+            )
+        }
     };
     let mut dungeon = Dungeon::default();
     for (act, init_seed, town) in levels.acts {

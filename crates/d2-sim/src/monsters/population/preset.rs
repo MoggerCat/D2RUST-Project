@@ -307,13 +307,28 @@ pub fn check_special_table(tsv: &str, table: &[SpecialPreset]) -> Result<(), Str
     Ok(())
 }
 
-/// §11.1: the monster pass of `0x005559A0` over the room's presets.
+/// §11.1: `0x005559A0` over the room's presets: the object pass, then
+/// the monster pass.
 pub fn place_presets<H: PopHost + ?Sized>(cx: &mut Ctx<'_, H>, room: RoomId) {
     if cx.host.room_level(room) == LEVEL_NO_MONSTER_PASS {
         return;
     }
     let b = cx.host.room_box(room);
-    for p in cx.host.preset_units(room) {
+    let presets = cx.host.preset_units(room);
+    // PROVISIONAL (population.md §11.1 first pass): type-2 presets whose
+    // done bit is clear, in list order, through `0x005557D0` in the
+    // preset mode (`world/objects-2.md` §22 r1), flags 0x3000000; other
+    // types and level 136's special cases are not placed.
+    for p in &presets {
+        if p.unit_type != 2 || p.done {
+            continue;
+        }
+        let (x, y) = (p.x + b.x, p.y + b.y);
+        if let Some(u) = cx.host.create_preset_object(room, p.class, x, y, p.mode) {
+            cx.host.set_unit_flags(u, 0x300_0000);
+        }
+    }
+    for p in presets {
         if p.unit_type != 1 || p.done {
             continue;
         }

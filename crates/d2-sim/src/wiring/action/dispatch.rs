@@ -308,6 +308,16 @@ impl<X: Pending> TickHooks for ActionSim<X> {
             .is_some_and(|e| e.ty == UnitType::Object)
         {
             if let Some(receiver) = game.lists.client(client).and_then(|c| c.player) {
+                // `intents-events.md` §7.1 rule 2.1: a unit not yet
+                // announced (flag 0x10) gets its add messages (§7.2,
+                // S→C 0x51) before the object update (§7.3 rule 3).
+                let unannounced = v
+                    .units
+                    .get(unit)
+                    .is_some_and(|r| r.flags & crate::units::record::flags::SEED_SET != 0);
+                if unannounced && unit != receiver {
+                    v.add_messages(game, receiver, unit);
+                }
                 v.object_update(game, receiver, unit);
                 // `objects.md` §14 rule 2: flag 0x400 → `0x00571740`.
                 if let Some(m) = crate::units::sound::sound_message(game, unit, receiver) {

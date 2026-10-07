@@ -147,6 +147,18 @@ pub trait MonsterInit {
     fn superunique_init(&mut self, boss: UnitId, su: i32);
     /// `0x00555230(type 2, class, …)`: an object.
     fn create_object(&mut self, room: RoomId, class: i32, x: i32, y: i32);
+    /// `0x005557D0` for an object preset (§11.1 first pass): an object
+    /// of `class` at (x, y) allocated in the preset's `mode`
+    /// (`world/objects-2.md` §22 r1), classes 574–582 through
+    /// `0x0054F490` (`world/objects.md` §6). `None`: nothing created.
+    fn create_preset_object(
+        &mut self,
+        room: RoomId,
+        class: i32,
+        x: i32,
+        y: i32,
+        mode: u8,
+    ) -> Option<UnitId>;
     /// `0x0058F000`, then `0x00666120` when the preset has data.
     fn preset_created(&mut self, unit: UnitId, preset: &PresetUnit);
     /// `0x005417D0`: event 7 at frame + 250 + `roll(50)` on the

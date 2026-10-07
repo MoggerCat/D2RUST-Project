@@ -470,3 +470,79 @@ fn the_create_request_has_the_builder_layout() {
         assert_eq!(r.flags, flags, "status {status:#x}");
     }
 }
+
+/// The game on the user's files: the world state's level types are the
+/// handle the act DRLGs generate into (`SharedTypes`), so population
+/// sees the town's generated preset rooms and their units; after the
+/// join the town's preset NPCs and objects reach the client. The local
+/// run of 2026-10-07 built a second, empty `WorldTypes` for the world
+/// state: no preset units, so no NPCs and no town objects.
+/// `D2_GAME_DIR=<install> cargo test -p d2-client --test app_single_player -- --ignored town_presets`
+// Covers: specs/monsters/population.md §11.1; specs/sim/intents-events.md §7.1 r2.1, §7.2
+#[test]
+#[ignore = "needs the game files in D2_GAME_DIR"]
+fn live_join_sends_the_town_presets() {
+    use d2_client::bridge::link::SendQueue;
+    use std::sync::atomic::{AtomicU32, Ordering};
+    let dir = std::env::var("D2_GAME_DIR").expect("D2_GAME_DIR");
+    let data = GameData::select(Some(dir.as_ref()), false).unwrap();
+    let GameData::Live(live) = &data else {
+        panic!("live data")
+    };
+    let waypoint = WaypointTables::live(&live.archives).unwrap().object_class;
+
+    // The town (generated at act creation) is visible through the world
+    // state's handle.
+    let g = single_player::build(&data, DEFAULT_SEED).unwrap();
+    assert!(
+        g.sim.events.world.types.borrow().act_presets(0).is_some(),
+        "the world state shares the act DRLGs' level types"
+    );
+    drop(g);
+
+    let ms = std::sync::Arc::new(AtomicU32::new(1000));
+    let (mut link, _) = single_player::start(data, DEFAULT_SEED, StepClock(ms.clone())).unwrap();
+    link.send(SendQueue::System, &single_player::create_request().encode())
+        .unwrap();
+    link.pump().unwrap();
+    ms.fetch_add(40, Ordering::SeqCst);
+    link.pump().unwrap();
+    link.receive();
+    link.send(SendQueue::System, &[0x6B]).unwrap();
+    let (mut ids, mut objects) = (Vec::new(), Vec::new());
+    for _ in 0..3 {
+        ms.fetch_add(40, Ordering::SeqCst);
+        link.pump().unwrap();
+        for c in link.receive() {
+            ids.push(c[0]);
+            if c[0] == 0x51 && c.len() >= 8 {
+                objects.push(u16::from_le_bytes([c[6], c[7]]));
+            }
+        }
+    }
+    let (errors, preset_units) = link
+        .with(|l| {
+            let sim = &l.host().game.events;
+            let types = sim.world.types.borrow();
+            let d = sim.action.sys.hooks.drlg.dungeon.acts[0].as_ref().unwrap();
+            let town = d.find_level(1).unwrap();
+            let units = types.act_presets(0).map_or(0, |p| {
+                d.level_rooms(town)
+                    .into_iter()
+                    .map(|r| p.room_units(r).len())
+                    .sum::<usize>()
+            });
+            (sim.errors(), units)
+        })
+        .unwrap();
+    assert_eq!(errors, Vec::<String>::new());
+    assert!(preset_units > 0, "the streamed town rooms' preset units");
+    // NPCs (S→C 0xAC) and objects (0x51), the town's waypoint among them
+    // (0x51: type u8@1, GUID u32@2, class u16@6).
+    assert!(ids.contains(&0xAC), "{ids:02X?}");
+    let wp = waypoint as u16;
+    assert!(
+        objects.iter().any(|c| c == &wp),
+        "waypoint object {wp} sent; objects {objects:?}"
+    );
+}

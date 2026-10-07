@@ -1402,10 +1402,16 @@ fn preset_pass_and_ranges() {
         preset(-1, 5, 5),
     ];
     room_step(&mut ctx(&t, &mut st, &mut f), R0, true);
-    assert_eq!(f.allocs(), [7]);
-    assert_eq!((f.units[0].x, f.units[0].y), (103, 204));
+    // The object pass first (PROVISIONAL first pass): the type-2 preset
+    // in its mode, flags 0x3000000; then the monster pass.
+    assert_eq!(f.allocs(), [5, 7]);
+    assert_eq!((f.units[0].x, f.units[0].y, f.units[0].mode), (101, 201, 1));
     assert_eq!(f.units[0].unit_flags, 0x300_0000);
-    assert!(f.log.contains(&"preset 0 true".to_string()));
+    assert!(f.log.contains(&"preset object 5 101 201 1".to_string()));
+    assert_eq!((f.units[1].x, f.units[1].y), (103, 204));
+    assert_eq!(f.units[1].unit_flags, 0x300_0000);
+    assert!(f.log.contains(&"preset 1 true".to_string()));
+    assert_eq!(f.calls("preset object"), 1, "the object is not a monster");
     // Order: presets, restore, objects, population (§1.1).
     let i = |p: &str| f.log.iter().position(|l| l.starts_with(p)).unwrap();
     assert!(i("preset") < i("restore") && i("restore") < i("objects"));
@@ -1418,9 +1424,15 @@ fn preset_pass_and_ranges() {
     // Level 136: no monster pass.
     let mut f = Fake::new();
     f.level = 136;
-    f.presets = vec![preset(7, 3, 4)];
+    f.presets = vec![
+        preset(7, 3, 4),
+        PresetUnit {
+            unit_type: 2,
+            ..preset(5, 1, 1)
+        },
+    ];
     place_presets(&mut ctx(&t, &mut st, &mut f), R0);
-    assert!(f.units.is_empty());
+    assert!(f.units.is_empty() && f.log.is_empty());
     // Ranges: M = 600, S = 10 → 600..610 superunique, ≥ 610 special.
     let mut f = Fake::new();
     let mut cx = ctx(&t, &mut st, &mut f);
