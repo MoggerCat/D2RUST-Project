@@ -37,7 +37,7 @@
 | Edge cases & original bugs | 567–581 |
 | Test vectors | 582–602 |
 | Provenance | 603–650 |
-| Open questions | 651–704 |
+| Open questions | 651–711 |
 <!-- /index -->
 
 ## Summary
@@ -700,4 +700,11 @@ gfxclass / bossinv columns of `patch_d2`.
 13. Overlay files and their back/front split: the split, order,
     position and blend are answered in §5 r4; the creation of overlay
     records (who adds which `overlay.txt` row, frame advance) stays with
-    the overlay owner (no spec yet; `0x00470390`).
+    the overlay owner (no spec yet; `0x00470390`). That spec must own
+    the three draws of `0x00470390` on the **local player's** client
+    unit seed (unit from `0x00463DD0`, +0x20; for any unit's overlay):
+    type 6 `roll(frames)` → +0x18 (`0x004704DD`); argument a ≠ 0
+    `roll(a × 256)` → +0x18 (`0x004705B6`); argument b ≠ 0
+    `roll(b × 16)` added to +0x14 (`0x004705D7`). They share the sound
+    seed (`sim/rng.md` §7; stated meanwhile in `audio/sound-table-2.md`
+    §14.3, PC 2).

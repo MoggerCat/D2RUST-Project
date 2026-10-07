@@ -32,8 +32,8 @@
 | Randomness | 274–278 |
 | Edge cases & original bugs | 279–291 |
 | Test vectors | 292–340 |
-| Provenance | 341–373 |
-| Open questions | 374–409 |
+| Provenance | 341–378 |
+| Open questions | 379–414 |
 <!-- /index -->
 
 ## Summary
@@ -252,7 +252,7 @@ Offset forms are computed in 32-bit wrapping arithmetic and read as i32.
 | DRLG layouts, mazes, outdoor presets | level seed | `0x006714D0`–`0x006735F0`, `0x006744F0`–`0x00674E40`, `0x0067EED0`–`0x00681240` |
 | DRLG tiles | DRLG room seed | `0x0066D820`, `0x0066F690`, `0x00670170` |
 | client weather, particles, missiles, light colour | client seeds (§5.3, §5.5) | `0x00473090`, `0x00476190`, `0x004CDDB0`–`0x004D8260`, `0x004ACC70` |
-| sound variants, NPC greetings, unit sound timers, ambience cues | local player's client unit seed (unit `[0x007A6A70]` +0x20, §5.3) | `0x004E40A0` (a third copy of `roll`) from `0x00482680`, `0x004E0590` and the trigger code; owners `audio/sound-table.md` §4, `audio/triggers.md` Randomness, `audio/environment.md` §7 |
+| sound variants, NPC greetings, unit sound timers, ambience cues | local player's client unit seed (unit `[0x007A6A70]` +0x20, §5.3) | `0x004E40A0` (a third copy of `roll`) from `0x00482680`, `0x004E0590` and the trigger code; owners `audio/sound-table.md` §4, `audio/triggers.md` Randomness, `audio/environment.md` §7. The same seed is also stepped outside audio (full list and order: `audio/sound-table-2.md` §14, PC 2): the overlay create `0x00470390` for **any** unit's overlay (it takes the local player from `0x00463DD0`; type 6: `roll(frames)` at `0x004704DD`; argument a ≠ 0: `roll(a × 256)` at `0x004705B6`; argument b ≠ 0: `roll(b × 16)` at `0x004705D7`; owner `render/unit-composite.md` OQ 13); the client skill do functions of table `0x00727BA8` (`cltdofunc`) entries 5, 24, 32, 34, 54, 56, 63, 71, 77, 82, 86, 87, 89, 90, which step the caster's seed, so a cast by the local player steps it; and draw-phase users (cursor step `0x004681C0` on `GetTickCount` time, screen shake `0x00476D40`, weather `0x00473F50`, water floors `0x004DE410`, lightning `0x00473910`), whose count depends on drawn frames |
 
 Helper call sites: `roll` 476 (mostly AI, skills, items, missiles),
 `roll_range` 37, `mask` 14 (server AI/skills), `step` 1, `mask_range` 0.
@@ -370,6 +370,11 @@ and applies each `op` in order; `value` and `state` must match.
   match D2MOO.
 - **Static survey** of all 428 drawing functions and their callers
   (seed owners, offsets, consumer forms) for §5–§7.
+- §7 sound-seed row, non-audio users (PC 2 request, 2026-10-07):
+  `0x00470390` read in `tools/ghidra/disasm.py` (`0x004703E1` local
+  player, steps at `0x004704DD`, `0x004705B6`, `0x004705D7`); table
+  `0x00727BA8` entries read from the image with `pefile`; the rest as
+  surveyed in `audio/sound-table-2.md` §14.
 
 ## Open questions
 
