@@ -1159,18 +1159,29 @@ fn a_stub_starts_a_new_character_before_the_join_sequence() {
         m
     };
     let flags = initial_portal_flags(&portals).to_le_bytes();
-    let ids: Vec<u8> = j.received.iter().take(10).map(|m| m[0]).collect();
-    assert_eq!(
-        ids,
-        [0x01, 0x00, 0x02, 0x59, 0xAA, 0x76, 0x23, 0x0B, 0x5F, 0x23]
-    );
+    let ids: Vec<u8> = j.received.iter().take(9).map(|m| m[0]).collect();
+    assert_eq!(ids, [0x01, 0x00, 0x02, 0x59, 0xAA, 0x76, 0x23, 0x0B, 0x5F]);
     assert_eq!(j.received[6], hand(0, k, [0xFF; 4]));
     assert_eq!(
         j.received[8],
         [0x5F, flags[0], flags[1], flags[2], flags[3]]
     );
-    assert_eq!(j.received[9], hand(1, [0, 0], [0; 4]));
-    assert_eq!(j.received[10], hand(0, k, [0; 4]));
+    // Rules 3.4 and 3.8: the stat messages of the mod array (the start
+    // stats' `Saved` base values, `stat-lists.md` §11), before and after
+    // the two hands, the same both times; strength among them.
+    let stats: Vec<&Vec<u8>> = j.received[9..]
+        .iter()
+        .take_while(|m| (0x1D..=0x1F).contains(&m[0]))
+        .collect();
+    let n = stats.len();
+    assert!(
+        stats.contains(&&vec![0x1D, 0, cs.str as u8]),
+        "{stats:02X?}"
+    );
+    assert_eq!(j.received[9 + n], hand(1, [0, 0], [0; 4]));
+    assert_eq!(j.received[10 + n], hand(0, k, [0; 4]));
+    let again: Vec<&Vec<u8>> = j.received[11 + n..11 + 2 * n].iter().collect();
+    assert_eq!(again, stats);
     let steps: Vec<_> = r.unapplied.iter().map(|u| u.step).collect();
     assert_eq!(
         steps,
