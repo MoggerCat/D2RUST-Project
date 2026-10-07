@@ -1628,3 +1628,73 @@ fn can_switch_follows_the_original_conditions() {
     let p = f.add(FUnit::new(UnitType::Player, 0), (1, 1));
     assert!(!dos::can_switch(&mut f, &ct, p, 19));
 }
+
+// ---------------------------------------------------------------- §5
+
+// Covers: specs/skills/bodies.md §5 text, §5 r1, §5 r2, §5 r3, §5 r4, §5 r5
+#[test]
+fn srvmissile_path_of_the_do_core() {
+    use crate::skills::use_::tests::{caster, tables, F, U};
+    use crate::skills::use_::{do_core, MissileAim};
+    let t = tables(
+        4,
+        &[
+            (1, &|r| r.srvmissile = 0),
+            (2, &|r| {
+                r.srvmissile = 0;
+                r.lob = true;
+            }),
+            (3, &|r| r.srvmissile = 5),
+        ],
+    );
+    // r1: srvmissile < 0 or without a missiles record: skipped (the
+    // result is the do function's, here none → 0).
+    for skill in [0, 3] {
+        let mut f = F::new();
+        let p = caster(&mut f, skill, 1, 0);
+        assert_eq!(do_core(&mut f, &t, p, skill, 1, false, false, false), 0);
+        assert!(f.units[p].flags & 0x40 == 0 && f.take_log().is_empty());
+    }
+    // r2, r4, r5: flags |= 0x40, the straight / lob creation, result 1
+    // whatever the creation gave (the seam returns nothing).
+    for (skill, lob) in [(1, false), (2, true)] {
+        let mut f = F::new();
+        let p = caster(&mut f, skill, 1, 0);
+        assert_eq!(do_core(&mut f, &t, p, skill, 1, false, false, false), 1);
+        assert_eq!(f.units[p].flags & 0x40, 0x40);
+        assert_eq!(
+            f.take_log(),
+            [format!("missile {p} {skill} 1 0 {lob} None")]
+        );
+    }
+    // r3: item and aim: the target position gives the offset and the aim
+    // point (2 × target − unit); no item or no aim → position 0.
+    let mut f = F::new();
+    let p = caster(&mut f, 1, 1, 0);
+    let mut tg = U::new(UnitType::Monster, 0);
+    tg.pos = (140, 160);
+    let tg = f.add(tg);
+    f.units[p].target = Some(tg);
+    f.units[p].pos = (100, 100);
+    for (item, aim, at) in [
+        (
+            true,
+            true,
+            MissileAim::At {
+                offset: (40, 60),
+                aim: (180, 220),
+            },
+        ),
+        (true, false, MissileAim::None),
+        (false, true, MissileAim::None),
+    ] {
+        f.take_log();
+        assert_eq!(do_core(&mut f, &t, p, 1, 1, false, item, aim), 1);
+        assert_eq!(f.take_log(), [format!("missile {p} 1 1 0 false {at:?}")]);
+    }
+    // A target position with a 0 coordinate fails (`0x0056D2C0`).
+    f.units[tg].pos = (0, 160);
+    f.take_log();
+    do_core(&mut f, &t, p, 1, 1, false, true, true);
+    assert_eq!(f.take_log(), [format!("missile {p} 1 1 0 false None")]);
+}
