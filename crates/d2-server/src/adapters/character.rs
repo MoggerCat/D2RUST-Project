@@ -654,13 +654,13 @@ pub trait StartItemWorld {
     /// (created if missing).
     fn set_single_skill(&mut self, item: UnitId, skill: u16);
     /// §1.3 stackable.
-    fn stackable(&self, item: UnitId) -> bool;
+    fn stackable(&mut self, item: UnitId) -> bool;
     /// Step 2.4: stat 70 := the total max stack.
     fn fill_stack(&mut self, item: UnitId);
     /// Step 2.5: item flag 0x20000; body location := `loc`.
     fn mark_start(&mut self, item: UnitId, loc: u8);
     /// `inventory.md` §3 rule 3.
-    fn beltable(&self, item: UnitId) -> bool;
+    fn beltable(&mut self, item: UnitId) -> bool;
     /// Belt placement (`0x0055E9B0`, slot = item x, find 1).
     fn place_belt(&mut self, item: UnitId) -> bool;
     /// Inventory placement (`0x00534B30`: page 0, find free, send 1).
@@ -668,7 +668,7 @@ pub trait StartItemWorld {
     /// Equip at `loc` (`0x005606B0`, skip 1).
     fn equip(&mut self, item: UnitId, loc: u8) -> bool;
     /// Itemtype 5 (`bowq`).
-    fn quiver(&self, item: UnitId) -> bool;
+    fn quiver(&mut self, item: UnitId) -> bool;
     /// Stat 70 := `n`.
     fn set_quantity(&mut self, item: UnitId, n: i32);
     /// Stat 72 := the max durability (`0x00625E00`).
@@ -847,7 +847,7 @@ mod start_items_tests {
         fn set_single_skill(&mut self, item: UnitId, skill: u16) {
             self.say(item, &format!("skill{skill}"));
         }
-        fn stackable(&self, item: UnitId) -> bool {
+        fn stackable(&mut self, item: UnitId) -> bool {
             matches!(&self.code(item), b"jav " | b"bowq")
         }
         fn fill_stack(&mut self, item: UnitId) {
@@ -856,7 +856,7 @@ mod start_items_tests {
         fn mark_start(&mut self, item: UnitId, loc: u8) {
             self.say(item, &format!("start{loc}"));
         }
-        fn beltable(&self, item: UnitId) -> bool {
+        fn beltable(&mut self, item: UnitId) -> bool {
             &self.code(item) == b"hp1 "
         }
         fn place_belt(&mut self, item: UnitId) -> bool {
@@ -871,7 +871,7 @@ mod start_items_tests {
             self.say(item, &format!("equip{loc}"));
             !self.equip_fails
         }
-        fn quiver(&self, item: UnitId) -> bool {
+        fn quiver(&mut self, item: UnitId) -> bool {
             &self.code(item) == b"bowq"
         }
         fn set_quantity(&mut self, item: UnitId, n: i32) {

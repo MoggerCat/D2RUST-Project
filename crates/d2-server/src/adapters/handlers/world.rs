@@ -47,14 +47,22 @@ use d2_sim::world::vendors::trade::{buy, repair, sell, BuyMsg, RepairMsg, SellMs
 use d2_sim::world::vendors::{VendorRecord, VendorTables, VendorWorld};
 use d2_sim::world::waypoints::{ArrivalList, WaypointData, WaypointError, WaypointWorld};
 
+use super::super::character::{self, StartItemWorld, StartPlace};
 use super::super::SimGame;
 use super::items::moves::MoveCall;
+use super::items::moves::{take_sent as inv_take_sent, InvParts};
 use super::items::CubeCall;
 use super::player::{Outcome as PlayerOutcome, Run as PlayerRun};
 use super::skills::{Call as SkillCall, Handled as SkillHandled};
 use super::walk::{WalkCall, WalkResult};
 use crate::buffers::QueueError;
 use crate::seams::{ClientId, MessageSink, ResultCode};
+use d2_sim::items::inventory::UnitKind;
+use d2_sim::items::moves::{InventoryOps, MoveUnits, Owner};
+use d2_sim::items::{flag, q, stat as istat, ItemStats, ListKey};
+use d2_sim::units::lifecycle::LifecycleHooks;
+use d2_sim::wiring::economy::quest_reward::create_reward;
+use d2_sim::wiring::economy::{find_list, Economy, StatCtx, UnitStats};
 
 /// Where a world-related C→S id's behaviour is specified.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -624,5 +632,201 @@ impl QuestCall for QuestRun<'_> {
             0x58 => Some(ctl.quest_completed(w, p, m)),
             _ => None,
         })
+    }
+}
+
+/// What the start items (`items/generation.md` §10.3) did on the wired
+/// host ([`WiredWorld::start_items`]).
+#[derive(Debug, Default)]
+pub struct StartItems {
+    /// Each created item and where it went, in creation order.
+    pub items: Vec<(UnitId, StartPlace)>,
+    /// What the inventory placements queued (receiving unit, bytes), in
+    /// send order. Not sent by the join (`intents-events.md` §8.2 rule
+    /// 3.5 is not wired); the caller decides.
+    pub sent: Vec<(UnitId, Vec<u8>)>,
+    /// Why no item was made: no charstats row, no inventory model, or an
+    /// item creation error.
+    pub faults: Vec<String>,
+}
+
+impl<R, S> WiredWorld<R, S> {
+    /// The start items `0x00534F10` (`items/generation.md` §10.3) of
+    /// `player` on this host's economy and inventory model
+    /// ([`character::start_items`] over [`WiredStart`]). The player's
+    /// inventory is added to the model when it has none (the 1.14d unit
+    /// allocation makes it; here the first item user does).
+    pub fn start_items<D: ActionEvents>(
+        &mut self,
+        game: &mut Game,
+        events: &mut D,
+        player: UnitId,
+    ) -> StartItems {
+        let mut r = StartItems::default();
+        let Some(mut inv) = self.inventory.take() else {
+            r.faults
+                .push("no inventory model (WiredWorld::inventory is None)".into());
+            return r;
+        };
+        self.with_economy(game, events, |econ, _| {
+            let Some((class, guid)) = econ.units.get(player).map(|u| (u.class, u.guid)) else {
+                r.faults.push(format!("no player unit {player:?}"));
+                return;
+            };
+            let Some(vitals) = econ.hooks.vitals.clone() else {
+                r.faults
+                    .push("no vitals tables (charstats) on the action wiring".into());
+                return;
+            };
+            let Some(cs) = vitals.charstats(class as i32) else {
+                // §10.3: no row → nothing.
+                return;
+            };
+            let slots = character::start_slots(cs);
+            let skills = econ.hooks.tables.skills.skills.len();
+            let start_skill = Some(cs.startskill).filter(|&k| usize::from(k) < skills);
+            // d2rs-own, unverified: the play host never adds the player's
+            // inventory (unit allocation `0x0063ABD0` has no caller there).
+            if !inv.state.inventories.contains_key(&player) {
+                inv.state
+                    .add_inventory(player, UnitKind::Player { class: class as u8 }, guid);
+            }
+            let mut w = WiredStart {
+                econ,
+                inv: &mut inv,
+                player,
+                owner: Owner::player(guid),
+                faults: Vec::new(),
+            };
+            r.items = character::start_items(&mut w, &slots, start_skill);
+            r.faults.append(&mut w.faults);
+            let mut d = inv.desk(econ);
+            d.sync_out();
+            r.sent = inv_take_sent(&mut d)
+                .into_iter()
+                .filter_map(|(u, b)| Some((u?, b)))
+                .collect();
+        });
+        self.inventory = Some(inv);
+        r
+    }
+}
+
+/// [`StartItemWorld`] on the wired host's economy and inventory model:
+/// creation through the quest reward's `create_reward` (§10.1, §10.2 with
+/// §10.3's arguments), the stat writes through the item's stat lists,
+/// placement through an inventory desk per call.
+pub struct WiredStart<'e, 'a, H> {
+    pub econ: &'e mut Economy<'a, H>,
+    pub inv: &'e mut InvParts,
+    pub player: UnitId,
+    pub owner: Owner,
+    pub faults: Vec<String>,
+}
+
+impl<H: LifecycleHooks> WiredStart<'_, '_, H> {
+    fn guid(&self, item: UnitId) -> u32 {
+        self.econ.units.get(item).map_or(u32::MAX, |u| u.guid)
+    }
+    fn set_stat(&mut self, item: UnitId, id: u16, v: i32) {
+        self.econ
+            .with_stats(|ctx| UnitStats::new(ctx, item).set_base(id, 0, v));
+    }
+}
+
+impl<H: LifecycleHooks> StartItemWorld for WiredStart<'_, '_, H> {
+    fn create(&mut self, code: [u8; 4]) -> Option<UnitId> {
+        // `create_reward`: level 0 → the player's base level (≥ 1),
+        // quality 2, spawn mode 4, no sockets, not ethereal, no seeds, then
+        // durability := max and page 0 (step 2.6 sets 72 again after the
+        // placement, the same value).
+        match create_reward(self.econ, self.player, code, 0, q::NORMAL) {
+            Ok(i) => i,
+            Err(e) => {
+                self.faults.push(format!("start item {code:?}: {e:?}"));
+                None
+            }
+        }
+    }
+    fn drop_class_skill_list(&mut self, item: UnitId) {
+        self.econ.with_stats(|ctx| {
+            let mut c = ctx.borrow_mut();
+            let StatCtx { lists, host } = &mut *c;
+            if let Some(l) = find_list(lists, item, ListKey::ITEM) {
+                lists.unit_detach(*host, l);
+                lists.free_plain(*host, l);
+            }
+        });
+    }
+    fn set_single_skill(&mut self, item: UnitId, skill: u16) {
+        self.econ.with_stats(|ctx| {
+            UnitStats::new(ctx, item).list_set(ListKey::ITEM, istat::ITEM_SINGLESKILL, skill, 1)
+        });
+    }
+    fn stackable(&mut self, item: UnitId) -> bool {
+        let g = self.guid(item);
+        self.inv.desk(self.econ).stackable(g)
+    }
+    fn fill_stack(&mut self, item: UnitId) {
+        let g = self.guid(item);
+        let n = self.inv.desk(self.econ).max_stack(g);
+        self.set_stat(item, istat::QUANTITY, n);
+    }
+    fn mark_start(&mut self, item: UnitId, loc: u8) {
+        if let Some(i) = self.econ.items.get_mut(item) {
+            i.flags |= flag::STARTITEM;
+        }
+        let d = self.inv.desk(self.econ);
+        if let Some(i) = d.state.items.get_mut(&item) {
+            i.body_loc = loc;
+        }
+    }
+    fn beltable(&mut self, item: UnitId) -> bool {
+        let g = self.guid(item);
+        InventoryOps::beltable(&self.inv.desk(self.econ), g)
+    }
+    fn place_belt(&mut self, item: UnitId) -> bool {
+        // d2rs-own, unverified: `0x0055E9B0(item, slot = item x, find 1)`
+        // (`inventory-moves.md` §7.14) read as the free-slot search (§3.5)
+        // then the slot placement (§3.7); the item's x is not read.
+        let (o, g) = (self.owner, self.guid(item));
+        let mut d = self.inv.desk(self.econ);
+        match d.belt_free_slot(o, g) {
+            Some(s) => d.belt_place(o, g, u32::from(s)),
+            None => false,
+        }
+    }
+    fn place_inventory(&mut self, item: UnitId) -> bool {
+        if let Some(i) = self.econ.items.get_mut(item) {
+            i.inv_page = 0;
+        }
+        let p = self.player;
+        self.inv.desk(self.econ).place(p, item, (0, 0), true, true)
+    }
+    fn equip(&mut self, item: UnitId, loc: u8) -> bool {
+        let (o, g) = (self.owner, self.guid(item));
+        self.inv
+            .desk(self.econ)
+            .equip_from_cursor(o, g, loc, true)
+            .0
+    }
+    fn quiver(&mut self, item: UnitId) -> bool {
+        let g = self.guid(item);
+        self.inv.desk(self.econ).quiver(g)
+    }
+    fn set_quantity(&mut self, item: UnitId, n: i32) {
+        self.set_stat(item, istat::QUANTITY, n);
+    }
+    fn fill_durability(&mut self, item: UnitId) {
+        // `0x00625E00`: 0 without a base stat 73, else its total.
+        let max = self.econ.with_stats(|ctx| {
+            let s = UnitStats::new(ctx, item);
+            if s.base(istat::MAXDURABILITY, 0) == 0 {
+                0
+            } else {
+                s.stat(istat::MAXDURABILITY, 0)
+            }
+        });
+        self.set_stat(item, istat::DURABILITY, max);
     }
 }
