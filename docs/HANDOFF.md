@@ -3011,6 +3011,12 @@ the dev-dependency) and record results here.
     REC-61. Findings for the owners: fix the enumeration or re-derive the
     count from `mpq-tool formats`, never just edit the numbers. (2), (3) not
     run. Same run: `d2-sim --test game_core` **12 passed**.
+    **Follow-up (fix-sweep-counts, `6233461`):** the expected 2,456 DS1 and
+    110,259 RLE blocks came from the old case-sensitive `mpq-tool`, which
+    double-counted; the names now come from one source (`d2_formats::mpq::names`).
+    Next local run: `cargo run -p mpq-tool -- formats` on the install, then
+    the sweep rerun; update the expected counts only from that measurement
+    (`docs/handoff/fix-sweep-counts.md`).
 47. Composition on a real GPU (`render-composition` C-rc1): `cargo run -p
     d2-client --example gpu_compare` → 18/18 `0 differing bytes`; `-- --perturb
     7` → every case FAIL with exactly 7 / 7, exit 1; `cargo test -p d2-client
