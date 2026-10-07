@@ -33,7 +33,7 @@
 | Edge cases & original bugs | 326–340 |
 | Test vectors | 341–373 |
 | Provenance | 374–402 |
-| Open questions | 403–428 |
+| Open questions | 403–429 |
 <!-- /index -->
 
 ## Summary
@@ -404,14 +404,15 @@ rectangle's unchecked negative width read in the disassembly of
 
 1. ~~Unit shadow position~~: answered in §5 r3–r4 (`0x00471620`,
    `0x00471450`). A capture of the player's shadow on a flat floor
-   confirms.
-2. Capture check of the orientation on an asymmetric table: a blended
+   confirms (recording list `pc2-rec-pc2-render-audio.md` RA-B1).
+2. ~~Capture check of the orientation on an asymmetric table: a blended
    unit shadow or a ghostly / Fade / ethereal unit over a known
    background with a static camera (the Town Portal is additive and
    cannot decide it); and of §6 with a wall fading as the player walks
-   behind it.
-3. What the Blended Shadows registry value was on the recording machine
-   (default 1): read `[0x0072DA5C]` in the recorder.
+   behind it.~~ Moved to the recording list (RA-B1, RA-B2).
+3. ~~What the Blended Shadows registry value was on the recording machine
+   (default 1): read `[0x0072DA5C]` in the recorder.~~ Moved to the
+   recording list (RA-B3).
 4. ~~Monster inventory test of §3 r1~~: answered in §3 r1 (the
    monster's own inventory item list).
 5. Cross-spec: `draw-order.md` §6 r3 says shadow tiles use "draw mode 4";
@@ -424,4 +425,4 @@ rectangle's unchecked negative width read in the disassembly of
 6. *Answered* (`impl-lighting-blend` "Not wired" 3): a 45° GDI line is
    x-major (§8 r1, with the closed form and vectors); a GDI rectangle
    with x1 < x0 crashes in 1.14d and is fatal in d2rs (§8 r2). A weather
-   or Arcane-star capture still confirms the pixels.
+   or Arcane-star capture still confirms the pixels (RA-B4).
