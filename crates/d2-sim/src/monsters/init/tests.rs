@@ -2282,6 +2282,8 @@ mod callbacks;
 mod find;
 mod spawn_tools;
 mod umod_init_bodies;
+#[path = "tests_c2mon.rs"]
+mod c2mon;
 
 // Tests written against surviving mutants (METHODS M08); a child module so
 // they share this module's fakes.
