@@ -498,7 +498,7 @@ At the end of the update, if the tick advanced:
    tick otherwise. Non-`Solo` voices are scaled by it (§8 r3).
 2. **State duck** `0x00727564` (0–100): −5 per tick while the
    condition at `0x004BA640` (`0x0044DB30`, `0x00453A90`) holds, +5
-   otherwise (open question 6). Scales every voice except ids 1–15,
+   otherwise. Scales every voice except ids 1–15,
    52–71 and 4657–4698. (Answered: the condition is the pause of
    §6.1: game type `[0x007A0610]` is 0 or 1 (single player) and UI
    state 9 (ESC menu) or 11 (options) is open (`[0x007A27E4]` or

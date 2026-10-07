@@ -8,13 +8,11 @@ game. The coordinator merges this file into `docs/HANDOFF.md` §7.
 Common set-up: Windows, `game/Game.exe` with the reference hash
 (`docs/LOCAL-RUN.md` §0.1), recorders of `tools/trace-recorder`
 (`README.md`). Frame captures: `record_frames.py` (`render/capture.md`
-§8); packets: `record_packets.py`. **Audio entries (RA-A*) need a recorder
-extension first (M10):** a `record_sound.py` subclass of
-`record_tick.py`'s `TickRecorder` with the breakpoints each entry names
-(read registers and the listed memory at the breakpoint, log one JSON line
-with the client frame and the last server tick). Until it exists, the same
-reads can be taken by hand with x32dbg (conditional breakpoint "log
-without break", the log text given per entry). **Audio recordings must run
+§8); packets: `record_packets.py`. Audio entries use `record_sound.py` (on
+`origin/claude/local-buddy-q-rec-2026-10-07`; request hook `0x004B9A00`,
+roll hook `0x004E40A0`); the audio recordings already queued by the
+spec-audio passes are in `docs/HANDOFF.md` §7 (PC 2 recording list) and
+are not repeated here. **Audio recordings must run
 with sound on:** the recorders default to `-w -ns`, and `-ns` (config
 +0x220) disables sound; pass the game arguments explicitly (`-- -w`).
 Master and Music Volume at their defaults unless an entry says otherwise.
@@ -31,3 +29,4 @@ Master and Music Volume at their defaults unless an entry says otherwise.
 | RA-B4 | `render/blend-modes.md` OQ6 (GDI lines) | `record_frames.py --seconds 60 --draws-every 1`. Act 1 Cold Plains during rain (weather on: frames' `weather.rain` = 1), stand still 30 s; or a Sorceress casting Arcane-star overlays. | Rain line pixels equal §8 r1 (x-major at 45°, endpoints as given) for the logged line draws. |
 | RA-S1 | `render/shading.md` OQ1 (floor light gradient, §4 floors r4) | `record_frames.py --seconds 60 --draws-every 1 --draws-light` (full light grids). Blood Moor at night (wait until the frames' `env` color is (125, 144, 243): normal period 5, type 2, `render/env-periods.tsv`), player standing 20 s on open floor near the Rogue Encampment exit with no other light in view; then 20 s with a torch-lit object (a camp fire) at the screen edge. | CPU reference render of each `FloorTileDraw` from its logged 768-byte light grid equals the captured block pixels (§4 floors r1–r4: per-row `a`, `b`, column maps). |
 | RA-S2 | `render/shading.md` OQ4 (item colormaps, §6 r4) | `record_frames.py --seconds 60 --draws-every 1`. A `d2s-tool` save (`docs/LOCAL-RUN.md` §6.7) holding: a unique and a set item whose `chrtransform` ≠ 0, a magic item with a `transformcolor` affix, a socketed normal item with a gem in socket 1. In the Rogue Encampment drop each on open floor, stand 5 s; open the inventory 5 s (`inv` path, `invtransform`). | Ground and inventory pixels equal the CPU render with the map `0x00600C20(t, c)` chosen by the §6 r4 table for each item. |
+| RA-T1 | `audio/triggers.md` OQ12 (UI control → §11 request site) | `record_sound.py -- -w` (branch `origin/claude/local-buddy-q-rec-2026-10-07`) with its request hook `0x004B9A00` logging the return address (caller site) for ids 1–6, 15, 16. New Sorceress, Rogue Encampment: hover then click every button of the mini-panel, each panel (inventory, character, skill tree incl. a point spend, quest log, automap toggle, party, message log, Esc menu and Options), the belt and a run/walk toggle; pick up and drop an item onto an invalid spot (error), onto the ground, swap two items; talk to Akara and Charsi and hover/click every NPC menu row, trade window tabs, buy, sell, repair (id 15); hover a monster outside town (id 16). Write each action in a side log with the wall-clock time. | One row per (control, action) → (id, caller site); every site of §11's counts (24, 7, 4, 26, 1, 8, 1, 1) appears at least once or is named as unreached. |

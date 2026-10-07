@@ -39,14 +39,14 @@
 |   9. Items | 532–555 |
 |   10. NPC speech | 556–618 |
 |   11. UI sounds | 619–642 |
-|   12. Other fixed requests | 643–708 |
-| Constants & data dependencies | 709–725 |
-| Randomness | 726–749 |
-| Edge cases & original bugs | 750–766 |
-| Test vectors | 767–798 |
-|   Checks (hook addresses for `record_sound.py`, `client/audio.md` §B7) | 799–812 |
-| Provenance | 813–840 |
-| Open questions | 841–950 |
+|   12. Other fixed requests | 643–706 |
+| Constants & data dependencies | 707–723 |
+| Randomness | 724–747 |
+| Edge cases & original bugs | 748–764 |
+| Test vectors | 765–796 |
+|   Checks (hook addresses for `record_sound.py`, `client/audio.md` §B7) | 797–810 |
+| Provenance | 811–838 |
+| Open questions | 839–950 |
 <!-- /index -->
 
 ## Summary
@@ -638,7 +638,7 @@ S→C 0x5D (`0x004A2CB0`, flags byte f, code c, value v): f bit 0 and c
 = 33 → 237 `item_potion`; f bit 1: c = 4 → 241 `item_ring`; c ∈ {8,
 15, 18, 22, 35} → 7 `cursor_level_up`; c = 32 → 217 `item_gem`; c = 33
 → 243 `item_scroll`; f = 0x10: c = 10 → 2,456 then 2,474; c = 33 → id
-v. All none (open question 9).
+v. All none (full dispatch: `client/msg-ui.md` §1).
 
 ### 12. Other fixed requests
 
@@ -656,9 +656,8 @@ v. All none (open question 9).
 | 2,517 | `barbarian_leap_land` (+ a running footstep) | `0x004C8970` | yes |
 | 1,830 | `spider_web_1` | `0x004E2D40` | yes |
 
-Their conditions are the owning features' (open question 10).
-
-Conditions found (third pass, partly answers open question 10):
+Their conditions (open question 10, answered here and in
+`triggers-2.md` §13):
 
 1. 396 / 397: `0x00464E50(U, overlay o, n)` (from the monster mode
    machine `0x004AFF60`, 5 sites) first creates overlay o on U (type 1
@@ -688,11 +687,10 @@ Conditions found (third pass, partly answers open question 10):
    `0x0072A398`, missile 372 `diablo appears`): at frames left 150 a
    screen shake (`0x00476A80`), at frames left 50 the request, no unit.
 
-Still open: 2,458 (`0x004AD0C0`, `0x004AD1A0`, `0x004ADCE0`, reached
+The rest — 2,458 (`0x004AD0C0`, `0x004AD1A0`, `0x004ADCE0`, reached
 through tables `0x0072509C`, `0x00724EE4` and `0x004D93A0`), the
 `0x004AFF60` death sounds, 2,517 (`0x004C8970`) and 1,830
-(`0x004E2D40`, from `0x004807E9`). Answered (fourth pass):
-`audio/triggers-2.md` §13.
+(`0x004E2D40`, from `0x004807E9`) — is `audio/triggers-2.md` §13.
 
 **Thunder, draws** (`0x00473910`, weather; the timer and when it runs
 are the weather spec's): at a thunder step (`0x004739B4`) the code draws
@@ -938,8 +936,10 @@ entry 74 (id-0 requests).
     `0x00466730` belongs to `client/model.md`.
 12. UI control → site mapping for §11 (owner `client/ui.md` §B8).
     Partly answered: the seven options-menu sites (`triggers-2.md`
-    §17, `sound-table-2.md` §15 r5); the rest is `client/ui.md`'s
-    (cross-file request).
+    §17, `sound-table-2.md` §15 r5). ~~The other 65 sites of §11~~
+    (more than two reads): moved to the recording list
+    (`docs/handoff/pc2-rec-pc2-render-audio.md` RA-T1); the result goes
+    to `client/ui.md` §B8 and the panel specs.
 13. COF/AnimData frame event 3 ("sound", `formats/cof.md`): none of
     the 222 request sites reads it; mode sounds use the fixed delays of
     §4. A request log of an attack whose animation has event 3 settles
