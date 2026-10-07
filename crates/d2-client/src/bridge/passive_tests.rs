@@ -70,7 +70,7 @@ fn world(base: i32) -> ClientWorld {
     w
 }
 
-// Covers: specs/client/msg-skills.md §2 r4
+// Covers: specs/client/msg-skills.md §2 r4; specs/client/stat-lists.md §1 r3, §4 r1, §4 r3
 #[test]
 fn refresh_fills_the_passive_state_list() {
     let i = inputs();
@@ -98,7 +98,7 @@ fn refresh_fills_the_passive_state_list() {
     refresh(&mut w, &i, P, 0).unwrap();
 }
 
-// Covers: specs/client/msg-skills.md §2 r4
+// Covers: specs/client/msg-skills.md §2 r4; specs/client/stat-lists.md §4 r3
 #[test]
 fn refresh_frees_the_list_without_an_entry_or_with_level_0() {
     let i = inputs();
@@ -131,7 +131,7 @@ fn refresh_frees_the_list_without_an_entry_or_with_level_0() {
     assert!(refresh(&mut w, &ModelInputs::default(), P, 1).is_err());
 }
 
-// Covers: specs/client/msg-skills.md §2 r1, §2 r4; specs/client/stat-lists.md §1 r2
+// Covers: specs/client/msg-skills.md §2 r1, §2 r4; specs/client/stat-lists.md §1 r2, §4 r1, §4 r4
 #[test]
 fn owed_effects_apply_in_order_and_refresh_all_needs_the_state() {
     let i = inputs();

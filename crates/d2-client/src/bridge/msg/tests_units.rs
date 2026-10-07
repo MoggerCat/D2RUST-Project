@@ -50,7 +50,7 @@ fn assign_player_b102() {
     assert_eq!(&p.name[..7], b"werwer\0");
 }
 
-// Covers: specs/client/msg-units.md §1.2 r1, §1.2 r2, §1.2 r3, §1.2 r5
+// Covers: specs/client/msg-units.md §1.2 r1, §1.2 r2, §1.2 r3, §1.2 r5, §1.2 r7
 #[test]
 fn assign_monster_b157() {
     let mut m = with_monsters();
@@ -94,7 +94,7 @@ fn pack(fields: &[(u32, u32)]) -> Vec<u8> {
     out
 }
 
-// Covers: specs/client/msg-units.md §1.2 r1, §1.2 r4
+// Covers: specs/client/msg-units.md §1.2 r1, §1.2 r4, §1.2 r7
 #[test]
 fn assign_monster_bit_stream_synthetic() {
     let mut m = Model::default();
