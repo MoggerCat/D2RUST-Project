@@ -22,15 +22,15 @@
 | Outputs / state changes | 51–56 |
 | Rules | 57–58 |
 |   1. Conventions | 59–67 |
-|   2. Shared helpers, batch 4 (continued) | 68–192 |
-|   3. Bodies used by one monster skill (continued) | 193–509 |
-|   4. Bodies used by no monster skill row | 510–638 |
-| Constants & data dependencies | 639–650 |
-| Randomness | 651–666 |
-| Edge cases & original bugs | 667–691 |
-| Test vectors | 692–702 |
-| Provenance | 703–713 |
-| Open questions | 714–735 |
+|   2. Shared helpers, batch 4 (continued) | 68–198 |
+|   3. Bodies used by one monster skill (continued) | 199–515 |
+|   4. Bodies used by no monster skill row | 516–644 |
+| Constants & data dependencies | 645–656 |
+| Randomness | 657–672 |
+| Edge cases & original bugs | 673–697 |
+| Test vectors | 698–708 |
+| Provenance | 709–719 |
+| Open questions | 720–741 |
 <!-- /index -->
 
 ## Summary
@@ -139,7 +139,13 @@ Callback `0x005D4680` (ECX M, EDX argument a; M none → nothing):
    Y = (0, 2, 2, 2, 0, −2, −2, −2) (`0x006E328C`); point i := (px, py)
    (u16 each). i mod 15 (`0x00741B0C`) = 0 → s := −s and k := (`lo'` of
    one more step of M's seed mod 3) + 2.
-6. P's point count := n (`0x00648790`).
+6. P's point count := n (`0x00648790`, path +0x28, capped 77).
+
+Nothing else of P is written: no compute-path call (unlike
+`bodies-2.md` §2.3 step 3), the current point index (path +0x24) keeps
+its creation value, and the flags (+0x34) change only through the
+path-type setter of step 2 (`0x00648CF0`, `sim/pathing.md` §2). Answered
+(2026-10-08, impl-missile-init MI4).
 
 The path is written point by point: each missile zigzags from its ring
 direction.

@@ -23,12 +23,12 @@
 |   2. Create (`0x00470390`: ECX = U, EDX = id; stack: kind, a, A, B, C, b) | 84–120 |
 |   3. Per-update advance (`0x00470C30`) | 121–192 |
 |   4. Randomness | 193–205 |
-|   5. Create call sites (1.14d) | 206–231 |
-| Constants & data dependencies | 232–243 |
-| Edge cases & original bugs | 244–257 |
-| Test vectors | 258–269 |
-| Provenance | 270–282 |
-| Open questions | 283–291 |
+|   5. Create call sites (1.14d) | 206–232 |
+| Constants & data dependencies | 233–244 |
+| Edge cases & original bugs | 245–258 |
+| Test vectors | 259–270 |
+| Provenance | 271–283 |
+| Open questions | 284–292 |
 <!-- /index -->
 
 ## Summary
@@ -218,6 +218,7 @@ A create that stops at §2 r1–r5 draws nothing. The follow-up creates of
 | `0x004BCF60` | 3 | 71 | `client/model.md` §15 |
 | `0x004C1AD0` | 6, a = 8 | 70 | `client/model.md` (item update) |
 | `0x004C4C70` | 2 | 70 | `client/msg-stats-items.md` |
+| `0x004BDCF0` (`ClientFn` 15) | 3 | 72 | `world/objects-client.md` §26.15: object 558 in mode 0, every 500 ms; other modes remove it. Create has no duplicate test for kind 3, so each call adds a record; a kind-3 overlay loops (§3) until removed |
 | `0x004C6140`, `0x004C6680`, `0x004C6930`, `0x004C6AC0`, `0x004CA060` | 2 | skill row | `client/msg-skills.md` |
 | `0x004C8970` | 2 | 80 | — |
 | `0x004CF3C0`, `0x004CF800` | 2 | per site | client missile functions (pointers `0x0072A52C`, `0x0072A548`) |

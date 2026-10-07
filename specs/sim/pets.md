@@ -27,13 +27,13 @@
 |   7. Dismiss `0x00574450` (GUID in EBX, game in EDI) | 161–169 |
 |   8. Broadcast and message 0x7A | 170–183 |
 |   9. Lookup `0x00574A20(player, GUID)` | 184–190 |
-|   10. Creation, free and maximum resync | 191–230 |
-| Constants & data dependencies | 231–240 |
-| Randomness | 241–244 |
-| Edge cases & original bugs | 245–261 |
-| Test vectors | 262–270 |
-| Provenance | 271–316 |
-| Open questions | 317–331 |
+|   10. Creation, free and maximum resync | 191–237 |
+| Constants & data dependencies | 238–247 |
+| Randomness | 248–251 |
+| Edge cases & original bugs | 252–268 |
+| Test vectors | 269–277 |
+| Provenance | 278–323 |
+| Open questions | 324–338 |
 <!-- /index -->
 
 ## Summary
@@ -189,6 +189,13 @@ with this GUID → return t. Not found → 0. Used by Unsummon
 (`skills/bodies.md` §3.3) and Remove (§6).
 
 ### 10. Creation, free and maximum resync
+
+**Player death** (2026-10-08, PC 2 `world/hirelings-2.md` §15): the
+player mode-17 start `0x0057FCA0` calls `0x00575BC0` at `0x0057FD25` in
+every game type: every pet of a type other than 7 is killed
+(`0x00574450`) and its node freed with count and max decremented; then
+`0x00575900` recomputes the maxima. Hirelings (type 7):
+`world/hirelings-2.md` §15.
 
 **Create** `0x00575AF0(game, player)`, called once from the player
 type init `0x005348C0` (allocator, `sim/units.md` §3.1): player data

@@ -27,15 +27,15 @@
 | Rules | 64–65 |
 |   1. Conventions | 66–93 |
 |   2. Implementation questions answered | 94–190 |
-|   3. Shared helpers, batch 4 | 191–347 |
-|   4. Bodies used by several monster skills | 348–536 |
-|   5. Bodies used by one monster skill | 537–975 |
-| Constants & data dependencies | 976–1011 |
-| Randomness | 1012–1028 |
-| Edge cases & original bugs | 1029–1068 |
-| Test vectors | 1069–1083 |
-| Provenance | 1084–1106 |
-| Open questions | 1107–1136 |
+|   3. Shared helpers, batch 4 | 191–355 |
+|   4. Bodies used by several monster skills | 356–544 |
+|   5. Bodies used by one monster skill | 545–983 |
+| Constants & data dependencies | 984–1019 |
+| Randomness | 1020–1036 |
+| Edge cases & original bugs | 1037–1076 |
+| Test vectors | 1077–1091 |
+| Provenance | 1092–1114 |
+| Open questions | 1115–1144 |
 <!-- /index -->
 
 ## Summary
@@ -325,6 +325,14 @@ monstats2 record → 1. k = monstats2 `ResurrectSkill` (+0x10C, u16) in
 
 - `dir64(unit, x, y)` = `0x00621DC0`: the 64-step direction from the
   unit's position to (x, y) (`0x0064FDC0`, `sim/pathing.md` §8.3).
+  The unit position is its sub-tile: unit types 2, 4, 5 → static path
+  +0x0C / +0x10; else dynamic path sub-tile (`0x006488C0` /
+  `0x00648900`, path u16 +2 / +6); no path → 0. `0x0064FDC0(ux, uy, x,
+  y)` hands §8.3 start (ux·0x10000 + 0x8000, uy·0x10000 + 0x8000) and
+  point (x·0x10000 + 0x8000, y·0x10000 + 0x8000): sub-tile centres, no
+  path fraction. It returns §8.3 steps 1–3 only: rule 4 (flag 0x200,
+  `0x0064FED5`) lies in `0x0064FE40` (§8.4), not on this route.
+  Answered (2026-10-08, impl-missile-init MI1).
 - `dir8(d)` = table `0x00745600`: ((d + 4) >> 3) & 7 for d in 0…63.
 - Offset pair e (`0x0063E7E0(e, &dx, &dy)`): dx = table `0x006EA998`
   [e], dy = `0x006EA978`[e] (signed bytes; 32 entries, read from the

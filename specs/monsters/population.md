@@ -35,20 +35,20 @@
 |   4. Monster pick (`0x005BDE80(game, region, room, &record, chance, umon)`) | 310–336 |
 |   5. Boss or pack (`0x005BE020(region, room)`) | 337–354 |
 |   6. Random boss (champion or unique) | 355–427 |
-|   7. Packs (`0x0054DF80(game, room, cl, min, max)`, class in EBX) | 428–451 |
-|   8. Spawn point in a coordinate rectangle (`0x0054DC40`) | 452–487 |
-|   9. Placement search and creation call (`0x005B2A00`) | 488–602 |
-|   10. Party minions (monstats minion columns, `0x005B2830`) | 603–646 |
-|   11. Preset monsters (DS1 presets) | 647–782 |
-|   12. Ambient (wandering) spawns (`0x0054F060(game, room)`) | 783–807 |
-|   13. Region bookkeeping | 808–840 |
-|   14. Other table-driven and AI spawns | 841–865 |
-| Constants & data dependencies | 866–936 |
-| Randomness | 937–980 |
-| Edge cases & original bugs | 981–1021 |
-| Test vectors | 1022–1093 |
-| Provenance | 1094–1116 |
-| Open questions | 1117–1170 |
+|   7. Packs (`0x0054DF80(game, room, cl, min, max)`, class in EBX) | 428–454 |
+|   8. Spawn point in a coordinate rectangle (`0x0054DC40`) | 455–490 |
+|   9. Placement search and creation call (`0x005B2A00`) | 491–605 |
+|   10. Party minions (monstats minion columns, `0x005B2830`) | 606–649 |
+|   11. Preset monsters (DS1 presets) | 650–785 |
+|   12. Ambient (wandering) spawns (`0x0054F060(game, room)`) | 786–810 |
+|   13. Region bookkeeping | 811–843 |
+|   14. Other table-driven and AI spawns | 844–868 |
+| Constants & data dependencies | 869–939 |
+| Randomness | 940–983 |
+| Edge cases & original bugs | 984–1024 |
+| Test vectors | 1025–1096 |
+| Provenance | 1097–1119 |
+| Open questions | 1120–1173 |
 <!-- /index -->
 
 ## Summary
@@ -439,7 +439,10 @@ gets its party (§10).
    included, §10). Failure → no pack.
 6. If the class has the monstats2 `objCol` flag (`0x004638A0`, flag
    index 18) and it is 528 (evilhut): object 562 (0x232) is created at the
-   leader's position (`0x00555230`, objects spec).
+   leader's position (`0x00555230`, objects spec), allocated in mode 0
+   with flag 1 and GUID 0 (`world/objects-2.md` §22 rule 4; the same for
+   the barricade-door objects of classes 571 / 572, `0x0054E5AA` /
+   `0x0054E5EA`).
 7. Members: n = `roll(max − min + 1)` + (min − 1) on the **leader's unit
    seed** (+0x20). Each member: `0x005B2F70(game, cl, leader, class,
    mode 1, r 3, flags 0)`.
