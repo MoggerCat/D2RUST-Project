@@ -268,6 +268,8 @@ def find_inline_sites(exe_bytes):
 # --- The debugger -----------------------------------------------------------
 
 class Recorder:
+    auto = None  # autostart.AutoStart (unattended start, input script)
+
     def __init__(self, exe, args, out, seconds, with_inline, max_events):
         self.exe, self.args, self.out_path = exe, args, out
         self.seconds, self.with_inline, self.max_events = seconds, with_inline, max_events
@@ -632,6 +634,9 @@ class Recorder:
     def loop(self, deadline):
         ev = DEBUG_EVENT()
         while True:
+            if self.auto is not None and self.auto.poll(self):
+                self.notes.append("autostart: input script ended the recording")
+                return
             if time.perf_counter() > deadline:
                 self.notes.append(f"time limit {self.seconds}s reached")
                 return
@@ -698,6 +703,7 @@ class Recorder:
 
 
 def main():
+    import autostart  # unattended start, input script
     here = os.path.dirname(os.path.abspath(__file__))
     repo = os.path.normpath(os.path.join(here, "..", ".."))
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
@@ -710,11 +716,14 @@ def main():
     ap.add_argument("--out", default=None, help="output .jsonl (default traces/raw/<time>-rng.jsonl)")
     ap.add_argument("game_args", nargs="*", default=["-w", "-ns"],
                     help="Game.exe arguments (default: -w -ns)")
+    autostart.add_options(ap)
     a = ap.parse_args()
+    gargs, auto = autostart.setup(a, a.game_args or ["-w", "-ns"])
     out = a.out or os.path.join(
         repo, "traces", "raw", datetime.datetime.now().strftime("%Y%m%d-%H%M%S") + "-rng.jsonl")
-    r = Recorder(os.path.abspath(a.game), a.game_args or ["-w", "-ns"], out, a.seconds,
+    r = Recorder(os.path.abspath(a.game), gargs, out, a.seconds,
                  not a.no_inline, a.max_events)
+    r.auto = auto
     try:
         counts = r.run()
     except KeyboardInterrupt:

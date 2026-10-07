@@ -430,8 +430,8 @@ fn killed<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, args: Even
     };
     let k = statue_index(statue).expect("statue class");
     x(ctl, i).respawn[k] = true;
-    // TODO(quests-act5-2 OQ6): a statue that no longer resolves gets no
-    // missile here; the spec does not say what `0x0058C8D0` does then.
+    // `0x0058C8D0` looks the statue up by GUID first; none → nothing
+    // (`quests-helpers.md` §4.1 step 1).
     if let Some((s, _)) = w.object_by_guid(xr(ctl, i).statue_guids[k]) {
         w.quest_missile(victim, s, MISSILE, MISSILE_FLAGS, 1);
     }
@@ -695,10 +695,7 @@ pub fn altar_operate<W: QuestWorld>(
     let (not_intro, state) = (ctl.records[i].not_intro, ctl.records[i].state);
     if !not_intro || state < 4 {
         if xr(ctl, i).portals > 0 {
-            // `0x0058D2C0`.
-            for p in w.players() {
-                w.close_town_portal(p, SUMMIT);
-            }
+            close_summit_portals(ctl, w);
         }
         w.open_quest_message(player, object, MSG_ALTAR);
         if not_intro {
@@ -715,6 +712,22 @@ pub fn altar_operate<W: QuestWorld>(
     w.set_object_mode(object, 1);
     x(ctl, i).altar_mode = 2;
     0
+}
+
+/// `0x0058D2C0`: each player's town portal (`0x005353F0`) whose room's
+/// level is 120 is closed (`0x00535430`, `quests-helpers.md` §7).
+fn close_summit_portals<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W) {
+    for p in w.players() {
+        let Some(g) = w.town_portal_guid(p) else {
+            continue;
+        };
+        let in_summit = w
+            .object_by_guid(g)
+            .is_some_and(|(o, _)| w.unit_level(o) == Some(SUMMIT));
+        if in_summit {
+            crate::world::quests::helpers::close_town_portal(ctl, w, p);
+        }
+    }
 }
 
 /// Statue inits 63–65 (`0x0058D150`, `0x0058D190`, `0x0058D110` →
@@ -803,9 +816,8 @@ pub fn summit_door_operate<W: QuestWorld>(
             w.set_object_mode(object, 1);
             x(ctl, i).door_mode = 2;
         }
-        // TODO(quests-act5-2 §7.8): "defeated → warp" names no function
-        // (door 547's is `0x0059D9D0`); reported, nothing done.
-        (0, true) => w.unhandled(CHAIN, 0x0058_D6A0),
+        // The warp (`0x0058D758`) is `0x0059D9D0`, as door 547's.
+        (0, true) => w.object_stairs_warp(player, object),
         (1, false) => {
             w.attach_sound(player, SOUND_REFUSED);
             w.set_object_mode(object, 2);

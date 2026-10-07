@@ -5,8 +5,8 @@
   `objects.txt` 16 waypoint classes, the `Game.exe` flag table); menu,
   close and two same-act travels match the recordings
   `20261006-015956-packets.jsonl` and `20261006-022633-packets.jsonl`
-  byte for byte; cross-act travel and first activation are not recorded
-  yet (open questions 1, 2).
+  byte for byte; cross-act travel matches `pc2rec-p1-packets` (open
+  question 1); first activation is not recorded yet (open question 2).
 - **Target version:** 1.14d
 - **Crate/module:** `d2-sim::world::waypoints` (index mapping, waypoint
   data, operate function 23, init function 17, 0x49 handler, travel);
@@ -33,18 +33,18 @@
 |   2. Waypoint record ("history") | 115–146 |
 |   3. Save field layout (owner of the save format: the character-save spec) | 147–169 |
 |   4. Which waypoints are known without operating one | 170–189 |
-|   5. Waypoint objects | 190–277 |
-|   6. C→S 0x49 TakeOrCloseWp (`0x0054C5D0`) | 278–322 |
-|   7. Travel (`0x00584F60`) | 323–378 |
-|   8. Timing and message order | 379–400 |
-|   9. Town portals | 401–406 |
-|   10. Object mode change (consequence used above) | 407–414 |
-| Constants & data dependencies | 415–442 |
-| Randomness | 443–466 |
-| Edge cases & original bugs | 467–503 |
-| Test vectors | 504–543 |
-| Provenance | 544–582 |
-| Open questions | 583–630 |
+|   5. Waypoint objects | 190–279 |
+|   6. C→S 0x49 TakeOrCloseWp (`0x0054C5D0`) | 280–329 |
+|   7. Travel (`0x00584F60`) | 330–385 |
+|   8. Timing and message order | 386–407 |
+|   9. Town portals | 408–413 |
+|   10. Object mode change (consequence used above) | 414–421 |
+| Constants & data dependencies | 422–449 |
+| Randomness | 450–473 |
+| Edge cases & original bugs | 474–517 |
+| Test vectors | 518–557 |
+| Provenance | 558–596 |
+| Open questions | 597–675 |
 <!-- /index -->
 
 ## Summary
@@ -237,7 +237,9 @@ Steps, in order:
    (§2 rule 3). This happens on every operate, in every mode.
 2. Object mode 0 (or object null): set mode 1 (`0x00624690`), schedule
    ENDANIM (type 1) at frame + (`FrameCnt1` >> 8) + 1 (`0x005417D0`).
-   No menu. Return 1.
+   No menu. Return 1. When the ENDANIM runs (here and in §5.1), the
+   object goes from mode 1 to mode 2 by a direct write with no message
+   and no draw (`0x00581490`, `sim/units.md` §6.4 handler 1).
 3. Mode 1 or 2: if the player is busy (`0x00535060`: interact info
    active, an item on the cursor, or player data +0x4C ≠ 0) → nothing.
    Else build 0x63 (§5.3) with the object's GUID and the record (out
@@ -284,11 +286,16 @@ at +1, level = u16 at +5.
 
 `0x0055B6C0(player, 0)` returns player data +0x160 (`GetTickCount` value
 stored when this player last declared hostility, `0x0055B720`, only
-caller `0x005A5E50`). If `GetTickCount()` < that + 10000: attach sound
+caller `0x005A5E50`; the player data block is zeroed at allocation,
+`0x00621F90` memset of 0x16C bytes, so a fresh player has 0). If
+`GetTickCount()` < that + 10000 (unsigned, `0x0054C601`–`0x0054C612`;
+with 0 stored this fires only while the host tick count is below
+10000): attach sound
 0x13 to the player (`0x00553380`: unit +0x6E = 0x13, +0x70 = target,
 update flag 0x400), reset the interact info (`0x00554190`), return 1.
 d2rs: hostility needs a second player (out of Phase 0–6 scope); the
-value stays 0 and this branch never fires (open question 6).
+value stays 0, and the host clock input (`GetTickCount` in ms) decides
+the branch exactly as above.
 
 #### 6.2 Validation (`0x00549570`, returns the result code)
 
@@ -492,8 +499,15 @@ Reproduced by default.
 7. **Busy:** with the interact info active (menu already open, NPC
    chat), operating any object does nothing (`0x00584420`), so the bit is
    not set either.
-8. **Hostile delay** uses wall-clock `GetTickCount`; it is host-only and
-   cannot fire in single player (§6.1).
+8. **Hostile delay** uses wall-clock `GetTickCount`; it is host-only. In
+   single player (+0x160 = 0) it fires only while the host tick count
+   is below 10000 ms (§6.1).
+11. **Classic game, act-5 index:** no classic-game path sets an act-5
+    bit (the §4 setters for 109 are expansion-gated, operate fn 23 needs
+    an act-5 waypoint object), but the save load copies all 16 record
+    bytes unmasked (§2 rule 5, `0x0056A3E0` → `0x00661030`), so a
+    record from an edited or expansion save keeps its act-5 bits, and
+    validation (§6.2) never checks the destination act or expansion.
 9. **Index ≥ 0x70** in a modded `levels.txt` → fatal assert at the first
    bit test or set.
 10. **Town portal delay differs:** operate function 15 (`0x00584870`)
@@ -584,13 +598,30 @@ Save: the test character with Cold Plains has the section `5753
 
 1. Cross-act waypoint travel: message order (0x05/0x03/0x53 …) and
    whether §7 rule 7 sends 0x0D. Settle: record a 0x49 to another act.
+   *Answered* (recording `pc2rec-p1-packets`, PC 2 recording lane
+   `docs/handoff/pc2-rec-lane.md` P1; `TestSor`, `-seed 644409375`;
+   `check_packets.py` OK): every message of a cross-act travel is sent
+   inside the dispatch of the C→S 0x49 (input phase, before the
+   result), in this order: the old act's removals, S→C 0x0A (unit
+   remove, `0x0053BDC2`) and 0x08 (room remove, `0x0053BCB6`)
+   interleaved; then 0x05 (`0x0053B330`), 0x03 (`0x0053B3BC`, act
+   number, init seed 644409375, town level), 0x53 (`0x0053C922`), nine
+   0x07 (room add, `0x0053BC76`), and last 0x0D (`0x0053B513`) with the
+   player at x + 3, y + 3 (arrival (5068, 5083) → 0x0D (5071, 5086)), so
+   §7 rule 7 sends 0x0D after an act change too. The new act's units
+   (0xAC, 0xAA, 0x6D, 0x51, 0x0E …) follow in the next frame's tick.
+   Act I → II (frame 441) had one S→C 0x5D (`0x0053D72C`, bytes `5d 04
+   00 0c 00 00`) before the removals; Act II → I (frame 611) had none.
+   Further recording: R-NV-11 (`docs/handoff/pc2-rec-npc-vendors.md`).
 2. First activation of a neutral waypoint: confirm no 0x63, the 0x0E/0x51
    mode messages and the ENDANIM frame. Settle: record operating a new
    waypoint twice.
+   Recording R-NV-12.
 3. Why the recorded town waypoint after travel is mode 2: init 17 with no
    arrival match, or a waypoint restored from inactive storage without
    init. Settle: trace `0x00547210` entry/result and the arrival list
    during a town arrival.
+   Recording R-NV-13.
 4. Object ENDANIM handler `0x00581490` (not in the exports): D2MOO sets
    mode 1 → 2 directly when `Mode2` ≠ 0, without the anim setup. Settle:
    Ghidra function at `0x00581490`.
@@ -602,6 +633,7 @@ Save: the test character with Cold Plains has the section `5753
    +0x122 (`HasCollision2`) = 0, the footprint is freed (`0x00623830`).
    Waypoint classes have `Mode2` = 1, so a waypoint in mode 1 is in mode
    2 after its ENDANIM fires.
+   (`sim/units.md` §6.4 handler 1; §5 rule 1.)
 5. Is player data +0x160 zero for a fresh player in 1.14d (allocation
    zeroes it)? Settle: read it in a running single-player game.
    Answered (2026-10-07): yes. Player data (0x16C bytes) is allocated
@@ -611,8 +643,11 @@ Save: the test character with Cold Plains has the section `5753
    (`GetTickCount`), reached only from `0x005A5F51` (hostility). The
    other `mov [reg + 0x160]` sites are client code (`0x00421E10`,
    `0x004B83A0`).
+   (§6.1.)
 6. Multiplayer conversion of the 10 s wall-clock hostile delay to ticks
    (Phase 7 decision, not a fidelity fact).
+   Out of scope: multiplayer hostility is Phase 7+ (`CLAUDE.md` scope);
+   for Phases 0–6 §6.1 runs on the host clock as written.
 7. Classic (non-expansion) games: nothing in the waypoint path blocks an
    act-5 index; whether a classic record can ever hold one. Settle: grep
    the save-load path for expansion masking.
@@ -627,3 +662,13 @@ Save: the test character with Cold Plains has the section `5753
    six callers of `0x00660EC0` (`0x0057A6B4`, `0x0057A739`, `0x0057A7BC`,
    `0x005847FC`, `0x00584E7C`, `0x005B501C`); whether a classic game can
    reach one with an act-5 index belongs to their owners.
+   Other PC 2 session: edge case 11 (no masking on load; no
+   classic-game setter: the §4 setters for 109 are expansion-gated).
+8. Waypoint panel display (owner: the waypoint UI spec): with a record
+   whose bits are all set (S→C 0x63 `63 0b000000 0201 ffffffff7f 00…`,
+   recording `pc2rec-p1-packets` frame 356, character `TestSor` made by
+   `d2s-tool new --waypoints all`), the panel draws every entry except
+   the current act's town as inactive (grey icon), yet a click on a grey
+   entry travels (Lut Gholein, Kurast Docks, Pandemonium Fortress,
+   back to the Rogue Encampment). Which client state decides the icon
+   (the 0x63 record, a client copy of it, or another flag) is not known.

@@ -32,6 +32,9 @@ import struct
 import sys
 import zlib
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import autostart  # noqa: E402  (unattended start, input script)
+
 sys.dont_write_bytecode = True
 
 TOOL = "trace-recorder record_frames 0.2.0"
@@ -526,7 +529,9 @@ def main():
     ap.add_argument("--out", default=None, help="output file (default traces/raw/<time>-frames.jsonl)")
     ap.add_argument("--selftest", action="store_true", help="check the PNG writer and the readers, exit")
     ap.add_argument("game_args", nargs="*", default=["-w", "-ns"], help="Game.exe arguments (default: -w -ns)")
+    autostart.add_options(ap)
     a = ap.parse_args()
+    gargs, auto = autostart.setup(a, a.game_args or ["-w", "-ns"])
     if a.selftest:
         selftest()
         return
@@ -541,9 +546,10 @@ def main():
                  FRAME_START: FRAME_START_BYTES, CEL_LOADED: CEL_LOADED_BYTES,
                  UNIT_DRAW: UNIT_DRAW_BYTES, **{d: b"\x55\x8B\xEC" for d in DRAWS}}
     rt.FORMAT, rt.TOOL = FORMAT, TOOL
-    r = make_recorder(rt)(os.path.abspath(a.game), a.game_args or ["-w", "-ns"], out, a.seconds,
+    r = make_recorder(rt)(os.path.abspath(a.game), gargs, out, a.seconds,
                           a.ticks, img_dir, max(1, a.every), a.max_frames, a.allow_any_size,
                           max(0, a.draws_every), a.draws_light)
+    r.auto = auto
     try:
         r.run()
     except KeyboardInterrupt:

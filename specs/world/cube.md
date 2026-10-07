@@ -21,22 +21,22 @@
 | Inputs | 56–68 |
 | Outputs / state changes | 69–79 |
 | Rules | 80–81 |
-|   1. Routing | 82–98 |
-|   2. Put an item into the cube (C→S 0x2A) | 99–145 |
-|   3. Transmute entry (`0x005665F0`) | 146–158 |
-|   4. Recipe eligibility | 159–173 |
-|   5. Ops | 174–193 |
-|   6. Input matching | 194–262 |
-|   7. Outputs | 263–397 |
-|   8. Commit | 398–466 |
-|   9. Portals | 467–486 |
-|   10. C→S 0x4C is not the cube | 487–501 |
-| Constants & data dependencies | 502–525 |
-| Randomness | 526–544 |
-| Edge cases & original bugs | 545–579 |
-| Test vectors | 580–624 |
-| Provenance | 625–663 |
-| Open questions | 664–772 |
+|   1. Routing | 82–99 |
+|   2. Put an item into the cube (C→S 0x2A) | 100–146 |
+|   3. Transmute entry (`0x005665F0`) | 147–159 |
+|   4. Recipe eligibility | 160–174 |
+|   5. Ops | 175–194 |
+|   6. Input matching | 195–263 |
+|   7. Outputs | 264–398 |
+|   8. Commit | 399–467 |
+|   9. Portals | 468–487 |
+|   10. C→S 0x4C is not the cube | 488–502 |
+| Constants & data dependencies | 503–526 |
+| Randomness | 527–561 |
+| Edge cases & original bugs | 562–596 |
+| Test vectors | 597–644 |
+| Provenance | 645–683 |
+| Open questions | 684–801 |
 <!-- /index -->
 
 ## Summary
@@ -50,7 +50,7 @@ every page-3 item is removed, the transmute sound is attached to the
 player and the outputs are placed in the cube. Item creation itself
 (affixes, quality, unique/set picks) is specified by `items/generation.md`
 (the request of §7.4 enters its pipeline, §3 there), `items/quality.md`
-and `items/affixes.md`; this spec fills the request.
+and `items/affixes.md`; this spec fills the request and calls it.
 C→S 0x4C is **not** the cube (§10).
 
 ## Inputs
@@ -83,10 +83,11 @@ C→S 0x4C is **not** the cube (§10).
 
 | Event | 1.14d | Behaviour |
 |---|---|---|
-| open cube (use the cube item) | `0x005BF0C0` (`SkillItem.cpp`, item-use table entry `0x007417CC`; `misc.txt` `box` `pSpell` = 7) | If the player is interacting with the stash object (type 2, class 0x10B): clear the interaction (`0x00554190`), run `0x0055FA40`, queue 0x77 with 0x11. Then set interaction (type 4, cube GUID) through `0x00554120` (only if no interaction is active), queue 0x77 with 0x15, run `0x0055FA40`. |
+| open cube (use the cube item) | `0x005BF0C0` (`SkillItem.cpp`). Item-use table at `0x00741790`: 31 entries (count at `0x0074178C`) of 8 bytes {check function, use function}, indexed by the item record's `pSpell` (+0x94, read at `0x005BF2C9`); live `misc.bin` row 41 `box ` has `pSpell` 7 → entry 7 = {none, `0x005BF0C0`} at `0x007417C8` / `0x007417CC` | If the player is interacting with the stash object (type 2, class 0x10B): clear the interaction (`0x00554190`), run `0x0055FA40`, queue 0x77 with 0x11. Then set interaction (type 4, cube GUID) through `0x00554120` (only if no interaction is active), queue 0x77 with 0x15, run `0x0055FA40`. |
 | C→S 0x4F, any button | `0x00568060` | No active interaction (player +0x6C = 0): queue 0x77 with 0x0C, result 0. |
 | C→S 0x4F button 0x17 | `0x00568060` → `0x00566AE0` | Interaction type ≠ 4 → result 3. Else reset it (GUID −1, type 6, active 0, `0x00554190`), then `0x0055FA40`; result 0. |
 | C→S 0x4F button 0x18 | `0x00568060` → `0x00566AE0` → `0x005665F0` | Interaction type ≠ 4 → result 3. Type 4: transmute (§3); result 0. The GUID is not checked: any interaction of type 4 transmutes page 3. |
+| C→S 0x4F buttons 0x12–0x14 (stash) | `0x00568060` → `0x00564D50` | Interaction type ≠ 2 → nothing (result 0). Type 2: the interaction unit must be an object of class 0x10B (stash) and the player's and the stash's rooms must be town levels (`0x0061AB00`), else nothing. Amount a = the u32 of §1 of `sim/intents-events.md` rule 15 (p1 high, p2 low). **0x12** (close): end the interaction (`0x00554190`, type 2 only), `0x0055FA40`. **0x13** (withdraw): a > 0, a ≤ stash gold (stat 15) and inventory gold (stat 14) + a ≤ the gold limit (`0x00622E70`, level × 10,000): stat 14 += a (`0x0055B060`), then stat 15 −= a (`0x0053FF00(player, 15, −a)`; `0x0053FF00` adds a delta to a stat, clamping a negative result to 0 and, for a player, stat 14 / 15 above the gold limit / stash cap to 0); over the limit → `0x00553380` (refusal), nothing moves; a ≤ 0 or a > stash gold → nothing. **0x14** (deposit): a > 0 and a ≤ stat 14: if stat 15 + a ≤ the stash cap (`0x00623460`) stat 14 −= a, stat 15 += a; else if stat 15 < cap, stat 15 += cap − stat 15 and stat 14 −= the same; else nothing (`0x0053FF00` pairs). Client side: `ui/inventory.md` §11. |
 | C→S 0x2A | `0x0054B790` → `0x005628C0` | §2 |
 | C→S 0x4C | `0x0054C760` | body-part transmogrify, not the cube (§10) |
 
@@ -535,10 +536,26 @@ Draws the cube code makes, in order, per output slot a → b → c:
 
 Order inside a slot: copy path = duplicate (its draws) → type pick →
 item init (its draws); create path = type pick → item request (its
-draws); then mod chances m = 1 … 5. Draws inside duplicate, item init,
-item creation, tempered rolls, recharge, unit allocation (`sim/rng.md`
-§5.3: game-seed steps per unit and item) and the Cow portal path belong
-to their owners (question 4). The 1.14d data has no mod chance (all 133
+draws); then mod chances m = 1 … 5. Draws of the called routines, by
+owner:
+
+- unit allocation `0x00555230` (every item made or copied): two
+  game-seed steps, unit seed (`0x00552DF0` at `0x0055530E`) then item
+  seed (`0x00552E90` at `0x0055532A`); a non-item unit takes the first
+  only (`sim/rng.md` §5.3);
+- duplicate `0x0055A2A0`: no draw of its own; the allocation's two
+  steps for the copy and for each child read (`world/vendors.md`
+  §7.3);
+- item init `0x00557AB0`: unit-seed draws, `items/generation.md` §4;
+- item request `0x00558D90`: `items/generation.md` §3 (allocation,
+  base stats, quality dispatch on the item seed);
+- free-spot search `0x00545340`: no draw (`world/quests-act1-rest.md`
+  §9 item 7.2);
+- Cow portal `0x0056D130`: the allocation's game-seed step and init
+  12's draws (`world/objects.md` §5.5, Randomness).
+
+The recorded draw order of a transmute stays on the recording list
+(R-NV-10). The 1.14d data has no mod chance (all 133
 mods have chance 0) and one item-type output (record 19), so in practice
 the cube's own draws are record 19's two game-seed rolls.
 
@@ -580,8 +597,10 @@ All reproduced by default.
 ## Test vectors
 
 Synthetic and live-data cases. "Live" = 1.14d `cubemain` record numbers
-(0-based, = data line − 2); game = expansion, single player, Normal, game
-type 0, ladder 0 unless stated.
+(0-based, = data line − 2); game = expansion, Normal, game type 0
+(not single player), ladder 0 unless stated. Single player is game
+type 3, ladder 0 (`sim/units.md` OQ7), so §4 test 3 passes there for
+every record.
 
 | # | Cube contents / state | Expected | Source |
 |---|---|---|---|
@@ -602,6 +621,7 @@ type 0, ladder 0 unless stated.
 | V15 | type pick, N = 5, qualifying {1, 2, 4}, first roll 3 | stop 2; scan 3, 4, 0, 1 → [4, 1]; second roll(2) = 1 → item 1 (item 2 never seen) | synthetic |
 | V16 | type pick, first roll 0, qualifying {4} | stop 4; scan 0–3 → none → item 0 | synthetic |
 | V17 | 3 × `r14` + `gcg`, game type 0, ladder 0 | record 104 skipped (ladder); nothing | live rec 104 |
+| V17b | same, single player (game type 3, ladder 0) | record 104 eligible (§4 test 3: type ≠ 0) → output `r15`; the 21 ladder records are usable in single player | live rec 104 |
 | V18 | disabled record 142 (`armo,hiq,nos` + `jew` + `r08`) | skipped | live rec 142 |
 | V19 | `msf` (stat 356 = 0) + `vip` (356 = 0), Nightmare | op 28: 0 < 1 → slot fails; nothing. Normal → `hst`, quest hook `0x0059E5C0` | live rec 0 |
 | V20 | `pk1` + `pk2` + `pk3` | record 148 matches; portal stub → success 0; nothing changes | live rec 148 |
@@ -669,11 +689,13 @@ jump table, `0x00566AA8` op jump table, the two Pandemonium stubs at
    (`0x00560200`), removal (`0x0055DF10` → `0x00557FD0`) and freeing
    (`0x00555600`) queue. Settle: packet recording of V1 (record 23) and
    V22.
+   Recording R-NV-10 (`docs/handoff/pc2-rec-npc-vendors.md`).
 2. Answered from the code (§8 "Exact", item 3: S→C 0x2C in the
    player's unit update, to the acting player's client). Original text:
    Which message carries the attached sound events 4/19/20 and in which
    tick pass. Settle: same recording (expect it with the player's unit
    update).
+   Recording R-NV-10.
 3. Single-player values of game +0x6A and +0x74 (ladder records usable or
    not). Settle: V17 in a recorded SP game, or read the game struct after
    creation.
@@ -687,6 +709,8 @@ jump table, `0x00566AA8` op jump table, the two Pandemonium stubs at
    single player +0x6A = 3 and +0x74 = 0: §4's test 3 passes through
    its first term, so `ladder` cube records are usable in single
    player.
+   Also (other PC 2 session): `sim/units.md` OQ7: `0x00477CA0` →
+   `0x00530CFF`; default flags 0x100004; V17b.
 4. RNG draws inside duplicate `0x0055A2A0`, item init `0x00557AB0`, item
    request `0x00558D90`, free-spot `0x00545340` and portal creation
    `0x0056D130`. Settle: rng trace (`check_rng.py`) of V1, record 19 and
@@ -746,6 +770,9 @@ jump table, `0x00566AA8` op jump table, the two Pandemonium stubs at
    `0x0052D0F0`. The failure paths free object 1 (`0x00555600`), whose
    draws are that function's. All five functions of this question are
    now answered.
+   Randomness section (allocation `0x00555230` two game-seed steps per
+   item; duplicate none of its own; free-spot none; the rest by owner).
+   The recorded order of a whole transmute: R-NV-10.
 5. Answered by the inventory spec: link order (`items/inventory.md`
    §1.4 rule 1: `0x0063AF20` appends at the tail). Original text:
    Inventory list order of `0x0063B2C0`/`0x0063DFA0` (decides capture
@@ -768,4 +795,6 @@ jump table, `0x00566AA8` op jump table, the two Pandemonium stubs at
    second word (`0x007417CC`). `box`
    is the only live `misc.txt` row with `pSpell` 7, so the cube-open
    routine is exactly entry 7, word 2.
+   See §1 routing (table `0x00741790`, count `0x0074178C`, index
+   `pSpell`; `box ` → 7 → `0x005BF0C0`).
 8. Answered: `0x0055FA40` recounts the scroll/tome skill quantities (stored items on page 0 only); `items/inventory.md` §5.5.

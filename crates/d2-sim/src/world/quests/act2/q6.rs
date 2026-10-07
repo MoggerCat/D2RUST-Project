@@ -506,11 +506,6 @@ fn staff_done<W: QuestWorld>(w: &mut W, p: UnitId, delete: bool) {
 
 /// Handing in the staff (`0x0059DD80`, §8.7). `object` is the orifice.
 pub fn hand_in<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, player: UnitId, object: UnitId) {
-    let Some(i) = ctl.find(CHAIN) else {
-        // TODO(quests-act2 §8.7): the spec does not say what happens
-        // without a chain-13 record; reported.
-        return w.unhandled(CHAIN, 0x0059_DD80);
-    };
     staff_done(w, player, true);
     for m in party(w, player) {
         if !in_act2(w, m) || pf(w, m).get(STAFF_SLOT, bit::REWARD_GRANTED) {
@@ -520,6 +515,12 @@ pub fn hand_in<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, player: UnitId,
         staff_done(w, m, !trading);
     }
     ctl.unique_event(w, FX_ORIFICE);
+    // Chain 13's record is read without a null test after the bits, the
+    // deletions, the party step and the FX (`0x0059DE53`): absent is a
+    // null read (unreachable: every record exists from game start).
+    let Some(i) = ctl.find(CHAIN) else {
+        return ctl.faults.push(QuestError::Fatal(0x0059_DE53));
+    };
     let e = x(ctl, i);
     e.objects_update = true;
     e.staff_removed = true;
@@ -657,9 +658,9 @@ pub fn lair_warp_open(ctl: &QuestControl) -> Option<bool> {
 // ------------------------------------------------------------ §8.9
 
 /// §8.9 first use: the six base entries whose index ≠ staff tomb − 66,
-/// in order. TODO(quests-act2 §8.9): a tomb outside 66–72 skips nothing;
-/// the spec does not say what the original copies then (the first six
-/// here).
+/// in order. A tomb outside 66–72 skips no entry: the copy loop runs 7
+/// times and stops copying at six, so the first six are kept
+/// (`0x0059D756`–`0x0059D784`).
 pub fn arcane_list(tomb: u32) -> [u16; 6] {
     let skip = tomb.wrapping_sub(FIRST_TOMB) as usize;
     let mut out = [0u16; 6];
@@ -1021,8 +1022,11 @@ pub fn tyrael_portal_hook(ctl: &QuestControl) -> bool {
     !not_intro_state(ctl).is_some_and(|s| s < 4)
 }
 
-/// `0x0059DF50` (Tyrael's AI): completed before → true; portal opened →
-/// true when no living player is within 12 of Tyrael; else false.
+/// `0x0059DF50` (Tyrael's AI, §10): chain 13 absent → false; completed
+/// before → true; portal opened → every player without state 7
+/// (`0x005538D0`, callback `0x0059DF30`) is tested with the size-adjusted
+/// distance `0x006416D0(player, Tyrael)` < 12, and the result is true
+/// when none is that close; else false.
 pub fn tyrael_leave_hook<W: QuestWorld>(ctl: &QuestControl, w: &mut W, tyrael: UnitId) -> bool {
     let Some(r) = ctl.record(CHAIN) else {
         return false;
@@ -1031,7 +1035,16 @@ pub fn tyrael_leave_hook<W: QuestWorld>(ctl: &QuestControl, w: &mut W, tyrael: U
     if e.completed_before {
         return true;
     }
-    e.portal_opened && !w.living_player_within(tyrael, 12)
+    if !e.portal_opened {
+        return false;
+    }
+    let mut near = false;
+    for p in w.players() {
+        if w.distance_between(p, tyrael).is_some_and(|d| d < 12) {
+            near = true;
+        }
+    }
+    !near
 }
 
 /// `0x0059C750` (Tyrael's AI): the flag iterate for every player.

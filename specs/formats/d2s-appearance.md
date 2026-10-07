@@ -30,12 +30,12 @@
 |   4. Helm and hand items (`0x0063DA70`) | 121–144 |
 |   5. Body armour (composite branch of `0x0063E510`) | 145–156 |
 |   6. Colour byte (`0x0062C100`(player, item, &byte, 0)) | 157–185 |
-| Constants & data dependencies | 186–196 |
-| Randomness | 197–200 |
-| Edge cases & original bugs | 201–219 |
-| Test vectors | 220–231 |
-| Provenance | 232–247 |
-| Open questions | 248–260 |
+| Constants & data dependencies | 186–199 |
+| Randomness | 200–203 |
+| Edge cases & original bugs | 204–222 |
+| Test vectors | 223–234 |
+| Provenance | 235–250 |
+| Open questions | 251–265 |
 <!-- /index -->
 
 ## Summary
@@ -191,8 +191,11 @@ pre-1.08 numbering; only its is-a `weap` / `armo` test is used);
 `2hs` 5, `2ht` 6, `xbw` 7, `ht1` 12; count 8 at `0x007446E0`); the
 data-table offsets of Inputs. In 1.14d `states.txt` the rows with an
 `itemtype` are `enchant` (`weap`, `cred`) and `venomclaws` (`mele`,
-`cgrn`); that the list at +0x18C holds exactly these is not traced
-(Open question 1).
+`cgrn`). The list at +0x18C (`0x0096BDBC`, count u16 `0x0096BDC0`) is
+built by the states loader (`0x00618100` → `0x00611E60`(list, count,
+0x2A)): the row ids, in row order, of every `states` row (stride 0x3C)
+whose `itemtype` (+0x2A, signed 16-bit) is > 0; so in 1.14d it holds
+exactly those two rows (Open question 1).
 
 ## Randomness
 
@@ -247,13 +250,15 @@ values of the Test vectors; saves read with `tools/d2s_check.py`
 
 ## Open questions
 
-1. The builder of the state-colour list (data tables +0x18C / +0x190)
-   is not traced; rule 6.1 is exact given the list. Settle: the writer
-   of +0x18C (`0x00538380` writes some +0x18C, unchecked) or a save made
-   while Enchant is active on a weapon (colour 5 = 0x00 expected when
-   the weapon's `Transform` is 1, 2 or 5–8).
+1. **Answered** (Constants, `0x00618100`, `0x00611E60`; data tables
+   base `[0x00744304]` = `0x0096BC30`, +0x18C = `0x0096BDBC`): the list
+   is every `states` row with `itemtype` > 0, in row order. A save made
+   while Enchant is active (colour 5 = 0x00 expected for a weapon
+   `Transform` of 1, 2 or 5–8) stays a useful check: recording list
+   `docs/handoff/pc2-rec-pc2-items.md` IT-6.
 2. Not measured: any colour byte other than 0xFF (needs a save with a
    magic, set, unique or gem-socketed coloured item equipped), and any
    body armour or helm (none of this PC's saves has one equipped).
    Needs a local save, not a recording: one character with a helm, a
-   body armour and a coloured magic or unique item equipped.
+   body armour and a coloured magic or unique item equipped (recording
+   list IT-6).

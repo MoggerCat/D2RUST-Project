@@ -31,24 +31,24 @@
 | Inputs | 69–107 |
 | Outputs / state changes | 108–120 |
 | Rules | 121–122 |
-|   1. Conventions | 123–228 |
-|   2. Seeds | 229–247 |
-|   3. Pipeline (`0x00558D90`, D2MOO `D2GAME_CreateItemEx`) | 248–269 |
-|   4. Base stats (`0x00557AB0`, D2MOO `D2GAME_InitItemStats`) | 270–317 |
-|   5. Special item kinds | 318–328 |
-|   6. Normal quality and class skill mods | 329–375 |
-|   7. Sockets | 376–407 |
-|   8. Ethereal | 408–428 |
-|   9. Forced requests, ears, names, timers | 429–462 |
-|   10. Items from a code: the create wrapper and start items | 463–533 |
-|   11. Format-0 branches (legacy items) | 534–579 |
-|   12. Repair, recharge and runeword removal | 580–643 |
-| Constants & data dependencies | 644–666 |
-| Randomness | 667–685 |
-| Edge cases & original bugs | 686–700 |
-| Test vectors | 701–716 |
-| Provenance | 717–743 |
-| Open questions | 744–834 |
+|   1. Conventions | 123–230 |
+|   2. Seeds | 231–249 |
+|   3. Pipeline (`0x00558D90`, D2MOO `D2GAME_CreateItemEx`) | 250–271 |
+|   4. Base stats (`0x00557AB0`, D2MOO `D2GAME_InitItemStats`) | 272–319 |
+|   5. Special item kinds | 320–330 |
+|   6. Normal quality and class skill mods | 331–377 |
+|   7. Sockets | 378–409 |
+|   8. Ethereal | 410–430 |
+|   9. Forced requests, ears, names, timers | 431–464 |
+|   10. Items from a code: the create wrapper and start items | 465–535 |
+|   11. Format-0 branches (legacy items) | 536–581 |
+|   12. Repair, recharge and runeword removal | 582–645 |
+| Constants & data dependencies | 646–668 |
+| Randomness | 669–687 |
+| Edge cases & original bugs | 688–702 |
+| Test vectors | 703–718 |
+| Provenance | 719–745 |
+| Open questions | 746–836 |
 <!-- /index -->
 
 ## Summary
@@ -194,6 +194,8 @@ socket step), `items/quality.md` §10 (quality roll, low quality
 | 0x80000 | init | every creation; also **set** on every item created from a save-format record (`0x00558CB0`, `0x00558D37`–`0x00558D3F`; the same callers and the copy `0x0055A2A0`), after the reader `0x0062E430` stored the record's flags with 0x80000 removed. So a saved 0x00A02010 loads as 0x00A80010 in the item and is written back as 0x00A00010 (the writer drops 0x80000 and forces 0x800000, `items/bitstream.md` §2 rule 1) |
 | 0x400000 | ethereal | §8 |
 | 0x1000000 | personalized | (read: §9 step 5) |
+| 0x2000000 | (header only) | set in the stream header F for alt-code items (`items/bitstream.md` §2), not stored by creation |
+| 0x8000000 | copy source (no D2MOO name) | the item copy sets it on the **source** (`world/vendors.md` §7.3 step 6, `0x0055A476`); no reader in `Game.exe` (the only other `0x8000000` immediates are file-API flags and non-item fields); it travels in every later stream of the item (header F) |
 | 0x4000000 | runeword | `items/properties.md` §10 |
 
 #### 1.5 Request flags (flags2)
@@ -430,7 +432,7 @@ draw. Also used by property function 23 and craft lists
 
 1. Forced (§3 step 7): flag 0x10 := flags1 & 0x10; flag 0x1000 := flags1
    & 0x1000.
-2. Format 0 only: forced socket count (§1.2; the step is given below). Then flag
+2. Format 0 only: forced socket count (§1.2; the socket step below). Then flag
    0x800 := flags1 & 0x800; 0x100 := flags1 & 0x100; 0x20000 := flags1 &
    0x20000.
    Scope (handoff `impl-items` OQ-G2, `gaps-items-stats` question 1,

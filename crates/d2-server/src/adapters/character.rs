@@ -530,10 +530,13 @@ impl<X: Pending> CharacterWorld for ActionCharacter<'_, '_, X> {
             // `world/hirelings.md` §10 rule 1: no hireling.
             return Ok(());
         }
+        // `hirelings-2.md` §16: `d2_sim::world::hirelings::life`
+        // `restore_plan` / `restore` / `restore_tail` and
+        // `level::restore_experience` implement the restore.
         unapplied(
             "hireling",
-            "the unit creation of `hirelings.md` §10 rule 3 needs a place (not stated) and the \
-             hireling state is the host's",
+            "the roomless monster allocation of `hirelings-2.md` §16 rule 3 and the hireling \
+             state are the wired host's (WiredWorld), not this load world's",
         )
     }
     fn hireling_items_loaded(&mut self) -> Result<(), Unapplied> {

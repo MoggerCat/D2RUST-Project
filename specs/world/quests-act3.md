@@ -45,7 +45,7 @@
 | Edge cases & original bugs | 903–950 |
 | Test vectors | 951–968 |
 | Provenance | 969–995 |
-| Open questions | 996–1022 |
+| Open questions | 996–1023 |
 <!-- /index -->
 
 ## Summary
@@ -340,7 +340,7 @@ Chat end (`0x005B8020`): cain3 with +0x01 = 1: status 1 to all (chain
 | 406 brain | `0x005B8A20` | `qbr ` | +0x14, +0x25 |
 | 407 eye | `0x005B8940` | `qey ` | +0x10, +0x24 |
 
-Each: passes the quest-chest gate `0x00545850` or returns 0; one
+Each: passes the quest-chest gate `0x00545850` (`quests-act2.md` §1.3) or returns 0; one
 quest-seed step: n = (lo' mod 5) + 5 piles of gold (`0x00585970(game,
 object, 'gld ', 2)`) **before** the items; drop code := the part; with
 chain 16: +0x0C := 0, for each player (from the operating player) that
@@ -1016,6 +1016,7 @@ quest code draws.
 7. Answered (cross-file request to PC 2 quests-core,
    `docs/handoff/pc2-spec-quests-act3.md`): `quests.tsv` rows 17–24 and
    39, column `spec` := `specified`; owner of those rows is this file.
-8. Record a full Act III run (packets + RNG, `docs/HANDOFF.md` §5):
+8. ~~Record a full Act III run (packets + RNG, `docs/HANDOFF.md` §5):
    chest drops, the Alkor reward broadcast, council kills, the orb, the
-   Hellgate and Natalya's spawn.
+   Hellgate and Natalya's spawn.~~ Needs recording: R-PQ-10
+   (`docs/handoff/pc2-rec-pc2-quests.md`, = HANDOFF §5 S9-A3 Act III).

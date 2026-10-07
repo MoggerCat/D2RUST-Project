@@ -522,7 +522,7 @@ tested for none; L is written into the skip argument's slot after step
 1. When each caller tries it: `inventory-moves.md` §8.1 step 5 (after §4.3), `world/vendors.md`
 §7.1.1 (buy), and `0x00562F30` (the corpse take-back of `0x0057FB70`,
 `inventory-moves.md` §7.1 step 2; the take-back is `inventory-moves.md`
-§12).
+§12 and §8.5 rule 2.2).
 
 ### 5. Shared checks
 

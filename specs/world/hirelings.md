@@ -39,19 +39,19 @@
 |   5. Owner link and pet list | 315–376 |
 |   6. Following the player | 377–454 |
 |   7. Experience and level-up | 455–520 |
-|   8. Death (`0x0057CCB0` → `0x005751A0`) | 521–575 |
-|   9. Revive | 576–613 |
-|   10. Restoring from a save | 614–651 |
-|   11. Items (expansion) | 652–709 |
-|   12. Services (links) | 710–713 |
-|   13. Messages | 714–780 |
-|   14. Skill pick of the Hireable AI (`0x005E4D30`) | 781–787 |
-| Constants & data dependencies | 788–811 |
-| Randomness | 812–822 |
-| Edge cases & original bugs | 823–873 |
-| Test vectors | 874–924 |
-| Provenance | 925–981 |
-| Open questions | 982–1066 |
+|   8. Death (`0x0057CCB0` → `0x005751A0`) | 521–583 |
+|   9. Revive | 584–621 |
+|   10. Restoring from a save | 622–659 |
+|   11. Items (expansion) | 660–717 |
+|   12. Services (links) | 718–721 |
+|   13. Messages | 722–788 |
+|   14. Skill pick of the Hireable AI (`0x005E4D30`) | 789–795 |
+| Constants & data dependencies | 796–819 |
+| Randomness | 820–830 |
+| Edge cases & original bugs | 831–882 |
+| Test vectors | 883–933 |
+| Provenance | 934–990 |
+| Open questions | 991–1081 |
 <!-- /index -->
 
 ## Summary
@@ -569,7 +569,15 @@ gain may carry it past the player's level.
    `0x00554670` sends it to the clients of the new room). The only
    instruction that clears flags 2 0x100 is `0x00554A86` in the
    inactive-storage restore `0x00554A30`, which a hireling never goes
-   through, so a revived hireling keeps the bit (open question 10).
+   through, so a revived hireling keeps the bit. The bit has no effect
+   on it: its only readers are the pet dismiss `0x00574450` (bit set →
+   fatal assert 0x5A, `sim/pets.md` §7) and the summon finish
+   `0x0056D840` (the owner's skill-linked unit: bit set → freed instead
+   of killed, `skills/bodies.md` §6.2), and no 1.14d path dismisses a
+   hireling with a kill (replace removes without kill, §3.2 rule 4; set
+   maximum skips type 7; `hireable` has no `group`; its `warp` bit sends
+   the follow to the warp, not the range kill `0x00575380`) or links it
+   as a summon (open question 10).
 6. The owner's death kills the hireling too (player mode 17,
    `world/hirelings-2.md` §15).
 
@@ -869,7 +877,8 @@ Reproduced by default.
     search ends in the fallback (step 7.6). Not
     reproducible in 1.14d; recorded so the deviation is explicit.
 13. A dead hireling whose room is deactivated is kept without a room
-    (§8 rule 5) and keeps flags 2 bit 0x100 after a revive.
+    (§8 rule 5) and keeps flags 2 bit 0x100 after a revive (no reader
+    reaches it, open question 10).
 
 ## Test vectors
 
@@ -1063,3 +1072,9 @@ Pass 2 B):
     0x100 in the image.
     **Answered** 2026-10-07 from the binary: the bit changes nothing
     for a hireling (`world/hirelings-2.md` §18 rule 4).
+    **Answered** 2026-10-07 (§8 rule 5): a scan of `all.asm` for every
+    +0xC8 bit-0x100 access finds the setters `0x005433AD`,
+    `0x005434E3`, the clear `0x00554A86` and two readers, `0x0057446E`
+    (dismiss: fatal assert) and `0x0056D881` (summon link: free); no
+    1.14d path takes a hireling to either, so the kept bit changes
+    nothing.

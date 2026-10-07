@@ -1,4 +1,4 @@
-// Spec: specs/world/hirelings.md §3, §5, §9; specs/world/npc.md §7.3, §7.4, §7.5 (wiring of the mercenary calls)
+// Spec: specs/world/hirelings.md §3, §5, §9; specs/world/hirelings-2.md §15, §16, §18, §19; specs/world/npc.md §7.3, §7.4, §7.5 (wiring of the mercenary calls)
 //! The hireling rules ([`crate::world::hirelings`]) on the desk's
 //! providers: [`HirelingWorld`] on the unit records (GUID, type, class,
 //! mode, flags, room), the unit lists (GUID lookup, the players), the
@@ -58,7 +58,9 @@ pub trait HirelingRest {
     fn free_unit(&mut self, unit: UnitId);
     /// `0x0061A270` alone.
     fn queue_room_removal(&mut self, unit: UnitId);
-    /// The death event of a unit (unit events).
+    /// The death mode request on a unit in a room (`hirelings-2.md` §15
+    /// rule 3 step 3: `0x005A7E60(unit, 0, &req)` with the `0x00552FD0`
+    /// target, then `0x005A7C20(game, &req, 1)`; monster mode request).
     fn death_event(&mut self, unit: UnitId);
     /// `0x00574450` (`sim/pets.md` §7: kill or death mode request).
     fn dismiss(&mut self, unit: UnitId);
@@ -68,6 +70,24 @@ pub trait HirelingRest {
     fn level_events(&mut self, player: UnitId, merc: UnitId);
     /// `0x00577470` (item stats).
     fn reapply_item_stats(&mut self, merc: UnitId);
+    /// The unit's position as `hirelings-2.md` §18 rule 1 reads it (the
+    /// path's x / y, an object's static path; no path → (0, 0)): the path
+    /// records are the action wiring's, not the desk's. The default
+    /// answers (0, 0) ("no path"); only the `range` follow branch reads
+    /// it, which 1.14d `pettype` row 7 (`range` 0) never takes.
+    fn hireling_position(&self, unit: UnitId) -> (i32, i32) {
+        let _ = unit;
+        (0, 0)
+    }
+    /// `hirelings-2.md` §16 rule 5: unit +0x60 = 0 → `0x0063ABD0` (the
+    /// inventory model is the inventory wiring's, not the desk's).
+    ///
+    /// TODO(hirelings-2.md §16 r5): the default does nothing; a host with
+    /// the inventory parts creates the inventory. Only the save restore
+    /// calls it, which has no caller yet (`d2-server` character load).
+    fn ensure_inventory(&mut self, unit: UnitId) {
+        let _ = unit;
+    }
 }
 
 /// The hireling world of one call: the desk without its hireling state
@@ -157,6 +177,9 @@ impl<H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> HirelingWorld
             .unit(unit)
             .is_some_and(|e| e.room().is_some())
     }
+    fn position(&self, unit: UnitId) -> (i32, i32) {
+        self.desk.rest.hireling_position(unit)
+    }
     fn stat(&self, unit: UnitId, stat: u16) -> i32 {
         self.desk.econ.stats.unit_total(unit, stat, 0)
     }
@@ -211,6 +234,15 @@ impl<H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> HirelingWorld
     }
     fn death_event(&mut self, unit: UnitId) {
         self.desk.rest.death_event(unit);
+    }
+    /// `0x00540E60` on the game's timer queue (`tick.md` §5); a = 0: any
+    /// argument.
+    fn cancel_timers(&mut self, unit: UnitId, ty: u8, a: u32) {
+        let arg = (a != 0).then_some(a);
+        self.desk.econ.game.timers.cancel_unit_events(unit, ty, arg);
+    }
+    fn ensure_inventory(&mut self, unit: UnitId) {
+        self.desk.rest.ensure_inventory(unit);
     }
     fn dismiss(&mut self, unit: UnitId) {
         self.desk.rest.dismiss(unit);

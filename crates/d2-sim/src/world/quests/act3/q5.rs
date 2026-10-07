@@ -461,7 +461,10 @@ pub fn orb_operate<W: QuestWorld>(
     }
     let g = x(ctl, i).orb_guid;
     if let Some((m, _)) = w.monster_by_guid(g) {
-        w.kill_monster(m);
+        // `0x005DDFC0(game, M, 0, 0, 0)`, then the orb missile
+        // `0x005DFEE0` (`quests-helpers.md` §4.3).
+        w.monster_mode_at(m, 0, 0, 0);
+        crate::world::quests::helpers::orb_missile(ctl, w, m);
     }
     w.set_object_mode(object, 1);
     let at = w.frame() + (w.object_anim_length(object) >> 8);

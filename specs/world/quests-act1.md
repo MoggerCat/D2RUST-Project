@@ -9,8 +9,8 @@
   Test vectors). Act I quests are specified at the level of their
   triggers, flags, rewards, timers and draws; A1Q1 (§10.4) and the
   sequence functions (§10.1) are specified callback by callback from
-  the 1.14d disassembly; Acts II–V are catalogued only (`quests.tsv`
-  column `spec`).
+  the 1.14d disassembly; Acts II–V are specified in their act files
+  (`quests.md` §2.4 owner list; every `quests.tsv` row `specified`).
 - **Target version:** 1.14d
 - **Crate/module:** `d2-sim::world::quests::act1`
 - **Related specs:** `world/quests.md` (owner of the shared machinery §1–§9 and §11, its Constants, Randomness, Edge cases, Test vectors, Provenance and Open questions; this file holds §10 moved out of it unchanged, rule ids kept); `world/quests-act1-rest.md`; `world/quests.tsv`, `world/quest-messages.tsv`.

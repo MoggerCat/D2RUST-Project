@@ -67,6 +67,17 @@ pub trait MonsterWorld<X> {
     fn forget(&mut self, unit: UnitId);
     /// The monster data (unit +0x14) of `unit`, if it has one.
     fn monster(&self, unit: UnitId) -> Option<&MonsterData>;
+    /// The classes of the first `+0x10` entries of the level's monster
+    /// region (`monsters/population.md` §2.2; the object trap monster id,
+    /// `world/objects.md` §8.3). Default: no region.
+    fn region_classes(&self, level: u32) -> Option<Vec<i32>> {
+        let _ = level;
+        None
+    }
+    /// The `monstats` row count. Default 0.
+    fn monstats_count(&self) -> u32 {
+        0
+    }
     /// The concrete state back (the lender downcasts it).
     fn into_any(self: Box<Self>) -> Box<dyn Any>;
 }

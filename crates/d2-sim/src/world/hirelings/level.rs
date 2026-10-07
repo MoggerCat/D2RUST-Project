@@ -1,4 +1,4 @@
-// Spec: specs/world/hirelings.md §4, §7, §10 r5, §10 r6, §13 r4, §13 r5, §13 r6
+// Spec: specs/world/hirelings.md §4, §7, §10 r5, §10 r6, §13 r4, §13 r5, §13 r6; specs/world/hirelings-2.md §16 r4
 //! Level stats (§4), experience and level-up (§7), the restore level
 //! (§10 rules 5–6) and the stat / experience / speech messages (§13
 //! rules 4–6).
@@ -416,29 +416,36 @@ pub fn kill_share<W: HirelingWorld>(
 /// §10 rule 6: the level of a restored hireling: from 1, while next =
 /// level + 1 ≤ MaxLvl and threshold(next) ≤ experience (unsigned, `Exp/Lvl`
 /// of the row at the current level): level := next. Reaches 99 (edge
-/// case 6). A missing row stops the walk.
-pub fn restore_level(t: &HirelingTables, id: u32, experience: u32, expansion: bool) -> i32 {
+/// case 6). The row (`Id`, level) is looked up once per step
+/// (`0x006562F0`); `None`: a step found no row (`hirelings-2.md` §16
+/// rule 4; live rows never give one).
+pub fn restore_level(t: &HirelingTables, id: u32, experience: u32, expansion: bool) -> Option<i32> {
     let mut level = 1i32;
     loop {
         let next = level.wrapping_add(1);
         if next > t.max_level {
             break;
         }
-        let Some(r) = t.rows.row_at(expansion, id, level) else {
-            break;
-        };
+        let r = t.rows.row_at(expansion, id, level)?;
         if threshold(t.rows.rows[r].exp_lvl, next) as u32 > experience {
             break;
         }
         level = next;
     }
-    level
+    Some(level)
 }
 
 /// §10 rules 5–6 for the restored `merc`: experience (stat 13) := `saved`
 /// if higher (unsigned), the level from it (rule 6) and §4 at that level;
 /// stat 13 is queued on the unit by rule 5 (§13 rule 4, its value at
 /// rule 5; flushed by the client pass), the §4 speech is sent at once.
+///
+/// A null row in the level loop (`hirelings-2.md` §16 rule 4): the ≥
+/// 0x5C loader (`old` false) ends the loop, frees the unit (`0x00555600`)
+/// and restores no hireling (`Ok(false)`, no error; the pet node is left
+/// as it is); the old loader fails fatally (string 0x1660). `Ok(true)`:
+/// the hireling is restored. No node of the merc's GUID: nothing
+/// (`Ok(true)`).
 pub fn restore_experience<W: HirelingWorld>(
     w: &mut W,
     t: &HirelingTables,
@@ -446,9 +453,10 @@ pub fn restore_experience<W: HirelingWorld>(
     player: UnitId,
     merc: UnitId,
     saved: u32,
-) -> Result<(), HirelingError> {
+    old: bool,
+) -> Result<bool, HirelingError> {
     let Some(node) = st.node_by_guid(player, w.guid(merc)).copied() else {
-        return Ok(());
+        return Ok(true);
     };
     // Rule 5.
     if saved > w.stat(merc, stat::EXPERIENCE) as u32 {
@@ -457,7 +465,17 @@ pub fn restore_experience<W: HirelingWorld>(
     let exp = w.stat(merc, stat::EXPERIENCE) as u32;
     w.queue_stat(merc, stat::EXPERIENCE, exp);
     // Rule 6.
-    let level = restore_level(t, node.id, exp, w.expansion());
+    let Some(level) = restore_level(t, node.id, exp, w.expansion()) else {
+        if old {
+            return Err(HirelingError::Fatal(FATAL_LEVEL_ROW));
+        }
+        w.free_unit(merc);
+        return Ok(false);
+    };
     apply_level(w, t, st, player, Some(merc), level);
-    Ok(())
+    Ok(true)
 }
+
+/// Fatal string of a null row in the old loader's level loop
+/// (`hirelings-2.md` §16 rule 4).
+pub const FATAL_LEVEL_ROW: u16 = 0x1660;

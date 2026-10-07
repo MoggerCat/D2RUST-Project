@@ -24,18 +24,18 @@
 | Rules | 70–71 |
 |   1. Binding table | 72–90 |
 |   2. Key files | 91–123 |
-|   3. Commands and default keys | 124–194 |
-|   4. Dispatch | 195–264 |
-|   5. Key-config screen assignment | 265–280 |
-|   6. World clicks (left / right button; answers OQ 2 in part) | 281–596 |
-|   7. Gates and belt use (answers OQ 3, OQ 4, OQ 5) | 597–638 |
-|   B4. Original-defaults check (`client/ui.md` §B4) | 639–648 |
-| Constants & data dependencies | 649–655 |
-| Randomness | 656–659 |
-| Edge cases & original bugs | 660–672 |
-| Test vectors | 673–697 |
-| Provenance | 698–716 |
-| Open questions | 717–758 |
+|   3. Commands and default keys | 124–225 |
+|   4. Dispatch | 226–295 |
+|   5. Key-config screen assignment | 296–311 |
+|   6. World clicks (left / right button; answers OQ 2 in part) | 312–627 |
+|   7. Gates and belt use (answers OQ 3, OQ 4, OQ 5) | 628–669 |
+|   B4. Original-defaults check (`client/ui.md` §B4) | 670–692 |
+| Constants & data dependencies | 693–699 |
+| Randomness | 700–703 |
+| Edge cases & original bugs | 704–716 |
+| Test vectors | 717–744 |
+| Provenance | 745–763 |
+| Open questions | 764–811 |
 <!-- /index -->
 
 ## Summary
@@ -125,11 +125,16 @@ effects of §3; files of §2.
 
 Read from `0x00712220` (bindings) and `0x00712698` (handlers). "Gate"
 = the handler does nothing while `0x0044DA30` or `0x00463DF0` returns
-non-zero (meaning: §Open questions 3). `SetUIState(ui, mode, jump)` modes
-0 on / 1 off / 2 toggle (`ui/panels.md` §2). Labels are the
-`string.tbl` / `expansionstring.tbl` keys of the key-config screen,
-matched by effect (§Open questions 1). Keys in slot 1 / slot 0;
-"—" = unbound. M2 = flag of §1 r4.
+non-zero: `0x0044DA30` returns the client's exit flag `[0x007A0620]`
+(`client/model.md` §1), `0x00463DF0` is true when there is no local
+player or its mode is 0x11 (dead). `0x0044DB30` (command 2) returns the
+game type `[0x007A0610]` (0 = single player, `client/msg-ui.md`), so the
+party screen key works only in multiplayer games; `0x0044DCC0` is the
+expansion flag `[0x007A04F4]`. `SetUIState(ui, mode, jump)` modes
+0 on / 1 off / 2 toggle (`ui/panels.md` §2). Labels are the string keys
+of the key-config screen's menu tables (§3.3). Keys in slot 1 / slot 0;
+"—" = unbound. M2 = flag of §1 r4. The same data in machine form:
+`key-commands.tsv` (§3.4).
 
 <!-- rows -->
 | Cmd | Label (tbl key) | Slot 1 | Slot 0 | Down handler → effect | Up handler | M2 |
@@ -143,9 +148,9 @@ matched by effect (§Open questions 1). Keys in slot 1 / slot 0;
 | 6 | CfgHelp | H | — | `0x004689D0`: gate; SetUIState(0x21, toggle, 0); registry `Diablo II\Help Menu` := 1 if absent or 0 | — | 0 |
 | 7 | CfgAutoMap | Tab | middle button | `0x00468A30`: SetUIState(0xA, toggle, 0); if ui 0xA is now closed: `0x00457640(0)` | — | 0 |
 | 8 | CfgAutoMapCenter | F9 | — | `0x00468A60`: `0x00457640(1)` | — | 0 |
-| 9 | ? | F10 | — | `0x00468A70`: value `0x004576C0` := (value + 1) mod 4 (`0x004576F0`) | — | 0 |
-| 10 | ? | F11 | — | `0x00468A90`: toggle `0x004577B0` / `0x004577C0` | — | 0 |
-| 11 | ? | F12 | — | `0x00468AB0`: toggle `0x004577E0` / `0x004577F0` | — | 0 |
+| 9 | CfgAutoMapFade | F10 | — | `0x00468A70`: value `0x004576C0` := (value + 1) mod 4 (`0x004576F0`) | — | 0 |
+| 10 | CfgAutoMapParty | F11 | — | `0x00468A90`: toggle `0x004577B0` / `0x004577C0` | — | 0 |
+| 11 | CfgAutoMapNames | F12 | — | `0x00468AB0`: toggle `0x004577E0` / `0x004577F0` | — | 0 |
 | 12 | CfgSkillTree | T | — | `0x00468AF0`: SetUIState(4, toggle, 1) | — | 0 |
 | 13 | CfgSkillPick | S | — | `0x00468B00`: SetUIState(3, toggle, 0); `0x004A8CE0(0)` | — | 0 |
 | 14–21 | CfgSkill1–8 | F1–F8 | — | `0x00468B90` + 0x30·k (k = 0–7; cmd 21 at `0x00468CE0`): gate; hotkey k (§3.1) | — | 0 |
@@ -159,15 +164,15 @@ matched by effect (§Open questions 1). Keys in slot 1 / slot 0;
 | 38 | CfgClearScreen | Space | — | `0x004690A0` → `0x0044C6B0` | — | 0 |
 | 39 | Cfgskillup | wheel up | — | `0x00469100`: gate; `0x004AA740(−1)` | — | 0 |
 | 40 | Cfgskilldown | wheel down | — | `0x00469120`: gate; `0x004AA740(+1)` | — | 0 |
-| 41 | ? | N | — | `0x004691B0` → `0x004A01E0` | — | 1 |
+| 41 | Cfgcleartextmsg | N | — | `0x004691B0` → `0x004A01E0` | — | 1 |
 | 42 | CfgSnapshot | Print Screen | — | none | `0x004FA7A0` | 1 |
-| 43 | ? | Z | — | `0x00493840` | — | 0 |
+| 43 | CfgTogglePortraits | Z | — | `0x00493840` | — | 0 |
 | 44 | Cfgswapweapons | W | — | `0x00469140`: unless ui 0xC, 0x17 or 0x19 is open: `0x0048A730` | — | 1 |
-| 45 | CfgToggleminimap? | V | — | `0x00468AD0`: toggle `0x00457770` / `0x00457780` | — | 1 |
+| 45 | CfgToggleminimap | V | — | `0x00468AD0`: toggle `0x00457770` / `0x00457780` | — | 1 |
 | 46–53 | CfgSkill9–16 | — | — | `0x00468D10` + 0x40·k (k = 0–7): expansion only (`0x0044DCC0`); gate; hotkey 8 + k | — | 0 |
 | 54 | Cfghireling | O | — | `0x00469170`: expansion only; if the player has a hireling (`0x00478F20(P, 7)` ≠ −1) and `0x00408F20`: SetUIState(0x24, toggle, 1) | — | 0 |
-| 55 | CfgSay7 | NumPad 7 | — | `0x00468FF0`: send C→S 0x3F with value 0x20 | — | 1 |
-| 56 | ? | Esc | — | `0x004690B0`: unless `0x004B34A0` or `0x004A0000`: if ui 9 is open `0x0047E200(1)`; else if `0x00456300(0, 1)` = 0: `0x0047E090(1, 0)` | — | 0 |
+| 55 | CfgSay7X | NumPad 7 | — | `0x00468FF0`: send C→S 0x3F with value 0x20 | — | 1 |
+| 56 | — (not listed) | Esc | — | `0x004690B0`: unless `0x004B34A0` or `0x004A0000`: if ui 9 is open `0x0047E200(1)`; else if `0x00456300(0, 1)` = 0: `0x0047E090(1, 0)` | — | 0 |
 
 Every slot-0 entry not named above is 0xFFFF. In table order the bindings
 of command 21 (F8) sit at entries 90–91, after command 45; order is not
@@ -191,6 +196,32 @@ otherwise significant except for the first-match rules of §4.1.
    column c and "Shift down" = `GetAsyncKeyState(VK_SHIFT) & 0x8000`.
    Which item of the column is used and what Shift does: §Open
    questions 4 (belt slot numbering: `items/inventory.md` §3).
+
+#### 3.3 Key-config menu tables
+
+The key-config screen lists commands from one of two tables of 10-byte
+rows (i32 command, u16 string id, i32 0; command 57 = separator row with
+no text), chosen by `0x004A43E0`: expansion game → `0x00724468`, 62 rows
+(separators at rows 7, 28, 35, 42, 49, 58); classic → `0x00724268`, 51
+rows (separators at 6, 19, 25, 32, 38, 47); the row count goes to
+`[0x007C0274]` and the table pointer to `[0x00724264]`. Commands 44–54
+are listed only in the expansion table; command 56 (Esc) is in neither.
+String ids: `string.tbl` 3924–3985, `patchstring.tbl` (1.14d
+`Patch_D2.mpq` copy) 10833 `CfgSkillPick` and 11083 `CfgSay7X`,
+`expansionstring.tbl` 22717–22727 (decoded from the English 1.14d
+tables). `CfgMiniMap` ("Micromap", 3932), `CfgSkill*`-free ids 3951–3958
+(`CfgBelt5`–`12`) and 21804 `CfgSay7` are in no menu row: unused.
+
+#### 3.4 `key-commands.tsv`
+
+One row per command 0–56: `cmd`; `string_id`, `string_key` (§3.3, `-`
+for 56); `key1`, `key2` (default key of slot 1 / slot 0 as
+`0xNNN:Name`, `-` = none); `down`, `up` (handler addresses of
+`0x00712698`, `-` = none); `full_ok` (the M2 flag); `file_pos` (position
+of the command's two entries in the default table: entries 2p (slot 1)
+and 2p + 1 (slot 0)); `menu_classic`, `menu_exp` (row in the §3.3
+tables, `-` = not listed). Generated from the 1.14d binary; the §B4
+check reads it.
 
 ### 4. Dispatch
 
@@ -641,10 +672,23 @@ otherwise significant except for the first-match rules of §4.1.
 The `original` preset of `d2-client::controls` must list the 57 commands
 of §3 with exactly the slot-1 / slot-0 keys of the §3 table (114
 bindings, compiled table `0x00712220`), mapping VK codes and 0x100–0x104
-to the portable `Key` names. The check compares the preset with a fresh
-read of `0x00712220` (§Test vectors). The other §B4 items: pointer
-button meanings and modifiers §7 r5; events no panel takes → world
-intents §6; repeat while held §6 r6 (send ticks: §Open questions 2).
+to the portable `Key` names; our `Action` names are the `string_key`
+column of `key-commands.tsv` (command 56: `GameMenu`). Runnable check:
+
+1. Unit (CI): build the 1140-byte table from `key-commands.tsv` (entries
+   in `file_pos` order, slot 1 then slot 0; i32 cmd, u16 key or 0xFFFF,
+   i32 slot) and compare with the preset's bindings.
+2. Game file (`#[ignore]`, `D2_GAME_DIR`): the same 1140 bytes equal
+   `Game.exe` bytes at file offset 0x312220 (`.data` raw offset 0x305000
+   + 0xD220; SHA-256
+   `a711045f3efb1de993c3890c6dbf1f7dad5750df857370cfe1fb0f1d1241cfdd`).
+   Measured 2026-10-07: equal; the install's `default.key` equals header
+   + table, and the 16 character `.key` files of the test machine equal
+   version + table.
+
+The other §B4 items: pointer button meanings and modifiers §7 r5;
+events no panel takes → world intents §6; repeat while held §6 r6
+(send ticks: §Open questions 2).
 
 ## Constants & data dependencies
 
@@ -694,6 +738,9 @@ None.
 | left down with an item on the cursor over the ground | C→S 0x17 `[item GUID]` | §6 r4 |
 | key 1, column ready, Shift, hireling present, healing potion | C→S 0x26 `[GUID][0x8000][0]` | §7 r3 |
 | key 1, classic game, Shift | C→S 0x26 `[GUID][0][0]` | §7 r3 |
+| `key-commands.tsv` written as a table (§B4 r1) | 1140 bytes, SHA-256 `a711045f…cfdd`; entry 0 = `00 00 00 00 41 00 01 00 00 00`; entries 90–91 = command 21 (F8, slot 1; none, slot 0) | §B4, §3.4 |
+| expansion game, key-config menu | 62 rows, row 3 = `Cfghireling` (command 54) | §3.3 |
+| classic game, key-config menu | 51 rows, no Swap Weapons / Hireling / Skill 9–16 rows | §3.3 |
 
 ## Provenance
 
@@ -712,36 +759,42 @@ gates `0x0044DA30`, `0x00463DF0`, `0x0044DB30`; belt `0x00498C50`,
 UI hooks `0x00455720` / `0x00455AE0` (jump tables `0x00455A40` /
 `0x00455E80` read from the binary; `index/switches.tsv` renumbers their
 cases). Labels from the 1.14d `string.tbl` / `expansionstring.tbl`;
-archive `default.key` headers measured. No D2MOO code used.
+archive `default.key` headers measured. Menu tables `0x00724268` / `0x00724468` and selector `0x004A43E0`, string ids decoded from the English 1.14d `string.tbl`, `expansionstring.tbl` and the `Patch_D2.mpq` `patchstring.tbl`; the compiled table compared byte for byte with the install's `default.key` and 16 character `.key` files (2026-10-07, `claude/pc2-ui`). No D2MOO code used.
 
 ## Open questions
 
-1. Command → label mapping of the key-config screen (its row table was
-   not found): commands 9, 10, 11, 41, 43, 45, 56 are unnamed, and
-   `CfgMiniMap` ("Micromap") vs `CfgToggleminimap` is unassigned. Read
-   the config-screen draw `0x004A5270` / `0x004A47C0`.
+1. **Answered** (2026-10-07, §3.3: the menu tables `0x00724268` /
+   `0x00724468` give every label; `CfgMiniMap` is unused). Was: command
+   → label mapping of the key-config screen.
 2. *Partly answered* (2026-10-07, §6: action kinds, click record,
    filters, held repeat per loop pass, codes → C→S ids; open: §Open
-   questions 8 and the send ticks). Was: Left / right button semantics:
-   `0x00462D00`'s first argument, what a click on a unit / the ground /
-   with Shift does, the held-button repeat and its tick; which C→S
-   messages go out. Needs a read of `0x00462D00`, `0x0044C2C0`,
-   `0x0044F046` plus a packet trace of a scripted click (`client/ui.md`
-   §B4 "send ticks"): Needs recording.
-3. **Answered** (2026-10-07, §7 r1). Was: The gates `0x0044DA30` and
-   `0x00463DF0` (likely game-paused / player not controllable) and
-   `0x0044DB30` (party screen condition).
+   questions 8 and the send ticks). Was: ~~Left / right button
+   semantics: `0x00462D00`'s first argument, what a click on a unit /
+   the ground / with Shift does, the held-button repeat and its tick;
+   which C→S messages go out.~~ The send ticks need recording
+   `controls-0001` (`docs/handoff/pc2-rec-pc2-ui.md`; `client/ui.md`
+   §B4 "send ticks").
+3. **Answered** (2026-10-07, §7 r1; §3 intro): `0x0044DA30` = exit flag,
+   `0x00463DF0` = no player or player dead, `0x0044DB30` = game type
+   (multiplayer). Was: The gates `0x0044DA30` and `0x00463DF0` (likely
+   game-paused / player not controllable) and `0x0044DB30` (party
+   screen condition).
 4. **Answered** (2026-10-07, §7 r2–r3; the writers of `[0x007BEFB0 +
    c]`: `client/msg-stats-items.md`). Was: Belt use `0x00498A90`: which
    slot of column c, the Shift branch (give to hireling?), and the byte
    `0x007BEFB0`.
 5. **Answered** (2026-10-07, §7 r4: the gold dialog, `ui/panels-2.md`
-   §21). Was: Key-mode 0 from `0x00454150` and 1 from `0x00453EE0`
-   around the latch `0x007A27B4`: which UI state that is.
-6. When the key-config screen's Accept writes the files (no caller of
-   `0x00469780` other than the load path was found).
-7. Which of slot 0 / slot 1 the config screen shows as "Key/Button One"
-   (`CfgPrimaryKey`).
+   §21): the latch `[0x007A27B4]` marks the gold amount dialog
+   (`0x00454150` opens it and sets key mode 0, key-up kept;
+   `0x00453EE0` closes it and sets 1; `ui/inventory.md` §11). Was:
+   Key-mode 0 from `0x00454150` and 1 from `0x00453EE0` around the
+   latch `0x007A27B4`: which UI state that is.
+6. ~~When the key-config screen's Accept writes the files (no caller of
+   `0x00469780` other than the load path).~~ Recording `controls-0002`
+   (file times of `<save>\<name>.key` and `default.key` after Accept).
+7. ~~Which of slot 0 / slot 1 the config screen shows as "Key/Button
+   One" (`CfgPrimaryKey`).~~ The display sort `0x00469450` puts slot ≠ 0
+   first; the column is settled by capture `controls-0002`.
 8. World-click predicates (§6 r5): the exact condition order of
    `0x004625B0` and of the senders `0x00461DC0`, `0x00461C70`,
    `0x00461890`, `0x004619E0`, `0x00461840` (which target types

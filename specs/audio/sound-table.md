@@ -36,20 +36,20 @@
 |   3. File path | 174–190 |
 |   4. Groups and variants | 191–233 |
 |   5. Requests | 234–310 |
-|   6. Sound tick | 311–518 |
-|   7. Starting on a channel | 519–601 |
-|   8. Volume and pan | 602–737 |
-|   9. Settings | 738–757 |
-|   10. Sample cache | 758–806 |
-|   11. Live data (1.14d) | 807–823 |
-|   12. Edge cases kept | 824–839 |
-|   13. d2rs mapping | 840–850 |
-| Constants & data dependencies | 851–858 |
-| Randomness | 859–869 |
-| Edge cases & original bugs | 870–874 |
-| Test vectors | 875–919 |
-| Provenance | 920–964 |
-| Open questions | 965–1045 |
+|   6. Sound tick | 311–558 |
+|   7. Starting on a channel | 559–641 |
+|   8. Volume and pan | 642–777 |
+|   9. Settings | 778–797 |
+|   10. Sample cache | 798–846 |
+|   11. Live data (1.14d) | 847–863 |
+|   12. Edge cases kept | 864–879 |
+|   13. d2rs mapping | 880–890 |
+| Constants & data dependencies | 891–898 |
+| Randomness | 899–909 |
+| Edge cases & original bugs | 910–914 |
+| Test vectors | 915–959 |
+| Provenance | 960–1004 |
+| Open questions | 1005–1085 |
 <!-- /index -->
 
 ## Summary
@@ -447,6 +447,46 @@ when Music Volume is 0. `max` = the falloff maximum (§8 r2).
    else 0 (`0x004B9890`).
 3. Occlusion reaches the output only as the buffer's occlusion value
    (`0x00515A90`); in mixer mode 0 its effect is open question 5.
+4. **Step arithmetic** (`0x004BA333`–`0x004BA398`; `client/audio.md`
+   OQ4). Occlusion `occ` is an f32 (request +0x20); a unit request
+   starts at its unit's value (`0x004B9ABC`). Target `t` = f32(sum of
+   the units' values, added in f32 in list order, divided by the unit
+   count). `occ` < `t` → `occ` := min(f32(`occ` + `s`), `t`); otherwise
+   `occ` := max(f32(`occ` − `s`), `t`); `s` = the double at
+   `0x006DA6B0`, 0.05000000074505806 (= f32 0.05); f32() rounds to
+   nearest even. The sum of `s` and an f32 `occ` of this range is exact
+   in 53 bits, so the x87 precision control changes nothing (checked at
+   24, 53 and 64 bits). With targets 0 and 0.5 only (one unit, thunder)
+   the reachable values are these 23 f32 (bit patterns; one step toward
+   0.5 / toward 0):
+
+   | `occ` | toward 0.5 | toward 0 |
+   |---|---|---|
+   | `00000000` | `3d4ccccd` | — |
+   | `32000000` | `3d4ccccf` | `00000000` |
+   | `3d4cccc3` | `3dccccc8` | `00000000` |
+   | `3d4ccccd` | `3dcccccd` | `00000000` |
+   | `3d4ccccf` | `3dccccce` | `32000000` |
+   | `3dccccc8` | `3e199997` | `3d4cccc3` |
+   | `3dcccccd` | `3e19999a` | `3d4ccccd` |
+   | `3dccccce` | `3e19999a` | `3d4ccccf` |
+   | `3e199997` | `3e4cccca` | `3dccccc8` |
+   | `3e19999a` | `3e4ccccd` | `3dccccce` |
+   | `3e4cccca` | `3e7ffffd` | `3e199997` |
+   | `3e4ccccd` | `3e800000` | `3e19999a` |
+   | `3e7ffffd` | `3e999998` | `3e4cccca` |
+   | `3e800000` | `3e99999a` | `3e4ccccd` |
+   | `3e999998` | `3eb33332` | `3e7ffffd` |
+   | `3e99999a` | `3eb33334` | `3e800000` |
+   | `3eb33332` | `3ecccccc` | `3e999998` |
+   | `3eb33334` | `3eccccce` | `3e99999a` |
+   | `3ecccccc` | `3ee66666` | `3eb33332` |
+   | `3eccccce` | `3ee66668` | `3eb33334` |
+   | `3ee66666` | `3f000000` | `3ecccccc` |
+   | `3ee66668` | `3f000000` | `3eccccce` |
+   | `3f000000` | — | `3ee66666` |
+
+   Mean targets of several units add values.
 
 #### 6.5 Ducking
 
@@ -457,7 +497,7 @@ At the end of the update, if the tick advanced:
    tick otherwise. Non-`Solo` voices are scaled by it (§8 r3).
 2. **State duck** `0x00727564` (0–100): −5 per tick while the
    condition at `0x004BA640` (`0x0044DB30`, `0x00453A90`) holds, +5
-   otherwise (open question 6). Scales every voice except ids 1–15,
+   otherwise. Scales every voice except ids 1–15,
    52–71 and 4657–4698. (Answered: the condition is the pause of
    §6.1: game type `[0x007A0610]` is 0 or 1 (single player) and UI
    state 9 (ESC menu) or 11 (options) is open (`[0x007A27E4]` or

@@ -133,8 +133,8 @@ fn darken<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize) -> bool {
 
 /// Event 3 `0x0059EE00` (a = old level, b = new level).
 fn changed_level<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, args: EventArgs) {
-    // TODO(quests-act2 §5.3): the three items are read as independent
-    // tests in spec order (a waypoint jump 40 → 44 meets two of them).
+    // Three independent tests in this order (`0x0059EE0E`, `0x0059EE37`,
+    // `0x0059EE66`): one level change can meet two of them.
     if DARKEN_LEVELS.contains(&args.b) {
         let r = &ctl.records[i];
         if r.state == 0 && r.not_intro && !r.extra.a2.q3.darken_timer {

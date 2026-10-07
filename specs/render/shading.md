@@ -34,7 +34,7 @@
 | Edge cases & original bugs | 345–352 |
 | Test vectors | 353–379 |
 | Provenance | 380–405 |
-| Open questions | 406–457 |
+| Open questions | 406–458 |
 <!-- /index -->
 
 ## Summary
@@ -406,7 +406,8 @@ from the file; shift index writers `0x0046EBB0`, `0x0046F220` (from
 ## Open questions
 
 1. ~~Per-pixel light of isometric floor blocks~~: answered in §4,
-   floors r4 (`0x004F6BB0`). Capture of a lit floor at night confirms.
+   floors r4 (`0x004F6BB0`). Capture of a lit floor at night confirms
+   (recording list `pc2-rec-pc2-render-audio.md` RA-S1).
 2. ~~Monster palette shift~~: answered in §6 r6 (`0x0046F250` reads gfx
    `+0x38`, set by `0x00466360`; `+0x804` set; classes 363 / 364;
    `[0x007BB380]`).
@@ -417,7 +418,7 @@ from the file; shift index writers `0x0046EBB0`, `0x0046F220` (from
    *Answered* (static, asm of `0x0062C100`, `0x0062A250`; table
    `0x0062C57C` read from the file image; item type 20 = `gem` in
    `itemtypes.txt`): §6 r4 table. A capture of a colored item on the
-   ground remains the conformance check.
+   ground remains the conformance check (RA-S2).
 5. Readers of the darkened shift (block `+0x110`) and of `R` (`+0x11C`)
    outside the GDI cel and tile paths (D2Win, automap, UI). Ghidra xref
    on `[0x007C9150]` users.

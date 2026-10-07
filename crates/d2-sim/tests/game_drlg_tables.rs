@@ -264,12 +264,6 @@ fn lvlmaze_rows_as_stated() {
     }
 }
 
-/// `maze.md` §1, §3.3, §3.6, §4–§7 fixed defs (HANDOFF §5 C12).
-const MAZE_FIXED_DEFS: [u32; 29] = [
-    167, 288, 289, 290, 333, 336, 444, 445, 446, 447, 480, 735, 736, 737, 738, 836, 852, 853, 854,
-    855, 856, 1038, 1039, 1040, 1041, 1074, 1075, 1076, 1077,
-];
-
 // Spec: specs/drlg/maze.md §1 (lvlmaze row), §3.3 (pick-shape def), §3.6 + specs/drlg/maze-specials.tsv (special defs), §4–§7 (fixed defs), Constants (lvlprest `Files` +64)
 // Intended claim (unconfirmed until the first local run): specs/drlg/maze.md §1 r1, §3.3 (every def the maze code can name exists in the live lvlprest with Files >= 1)
 #[test]
@@ -315,7 +309,7 @@ fn maze_defs_exist_in_live_lvlprest() {
             missing.extend(check(r.special, format!("special {k}[{i}]")));
         }
     }
-    for &def in &MAZE_FIXED_DEFS {
+    for &def in MAZE_FIXED_DEFS {
         missing.extend(check(def, "fixed def".to_string()));
     }
     println!(
@@ -574,4 +568,145 @@ fn act3_act5_placement_on_live_tables() {
     assert_eq!(rect(&drlg, 111), TileRect::new(600, 968, 160, 64));
     assert_eq!(rect(&drlg, 112), TileRect::new(440, 968, 160, 64));
     assert_eq!(rect(&drlg, 117), TileRect::new(2000, 1896, 160, 64));
+}
+
+// ---- maze defs against lvlprest ----------------------------------------------------
+
+/// The fixed defs of `maze.md` §4–§7 (HANDOFF §5 C12).
+const MAZE_FIXED_DEFS: &[u32] = &[
+    167, 288, 289, 290, 333, 336, 444, 445, 446, 447, 480, 735, 736, 737, 738, 836, 852, 853, 854,
+    855, 856, 1038, 1039, 1040, 1041, 1074, 1075, 1076, 1077,
+];
+
+/// The maze level types `shape_def` (§3.3) knows.
+const MAZE_LEVEL_TYPES: [u32; 20] = [
+    3, 4, 7, 8, 10, 13, 14, 15, 17, 18, 19, 22, 23, 24, 25, 28, 32, 33, 34, 35,
+];
+
+/// The defs of `wanted` that have no lvlprest row or whose `Files` is
+/// below 1 (sorted, each once).
+fn defs_without_files(maze: &MazeData, wanted: impl IntoIterator<Item = u32>) -> Vec<u32> {
+    let bad: BTreeSet<u32> = wanted
+        .into_iter()
+        .filter(|&d| maze.prest_files.get(&d).is_none_or(|&f| f < 1))
+        .collect();
+    bad.into_iter().collect()
+}
+
+/// Every non-zero def `shape_def` returns (each maze level type, mask
+/// 1..15, both `Rooms` cases, after the per-level overrides), every
+/// special def of `maze-specials.tsv` and the fixed defs of §4–§7.
+fn maze_defs_wanted(maze: &MazeData) -> Vec<u32> {
+    use d2_sim::drlg::maze::cells::{shape_def, shape_override};
+    let mut wanted = Vec::new();
+    for t in MAZE_LEVEL_TYPES {
+        for mask in 1..=15 {
+            for rooms_one in [false, true] {
+                let def = shape_def(t, mask, rooms_one).expect("known maze level type");
+                if def != 0 {
+                    wanted.push(def);
+                    for level in 0..137 {
+                        wanted.push(shape_override(level, def).0);
+                    }
+                }
+            }
+        }
+    }
+    for kind in maze.specials.kinds() {
+        for r in maze.specials.table(kind).unwrap() {
+            wanted.push(r.special);
+        }
+    }
+    wanted.extend_from_slice(MAZE_FIXED_DEFS);
+    wanted
+}
+
+/// `maze.md` §3.3, §3.6, §4–§7, §9: the live lvlmaze / lvlprest views: 81
+/// lvlmaze records, every DrlgType 1 level has a record, and every def the
+/// maze code can ask for has an lvlprest row with `Files` of at least 1.
+// Covers: specs/drlg/maze.md §1 r1, §1 r3, §3 text, §9 r2
+#[test]
+#[ignore = "needs original game files in D2_GAME_DIR"]
+fn maze_defs_exist_in_lvlprest() {
+    let data = drlg_data();
+    let maze = MazeData::from_tables(&rows::<Lvlmaze>(), &rows::<Lvlprest>());
+    assert_eq!(maze.rows.len(), 81);
+    for (id, l) in data.levels.iter().enumerate().skip(1) {
+        if l.drlg_type == 1 {
+            maze.row_index(id as u32)
+                .unwrap_or_else(|e| panic!("maze level {id}: {e:?}"));
+        }
+    }
+    let wanted = maze_defs_wanted(&maze);
+    assert!(wanted.len() > 1000, "{} defs", wanted.len());
+    // Every def has an lvlprest row (`NoPrest` otherwise).
+    let missing: Vec<u32> = wanted
+        .iter()
+        .copied()
+        .filter(|d| maze.files(*d).is_err())
+        .collect();
+    assert_eq!(missing, Vec::<u32>::new(), "defs without an lvlprest row");
+    // Measured on 1.14d: the rows with `Files` 0 among them. HANDOFF §5 C12
+    // expected every def at `Files` >= 1; the live set has these 15 at 0
+    // (Ice `Rooms` 1 shapes 1-3, the Barracks Court Connect def 167, and 12
+    // of the type 19 shapes), none of them in a rotation range (§9 step 2).
+    let zero: Vec<u32> = defs_without_files(&maze, wanted.iter().copied());
+    assert_eq!(
+        zero,
+        [1, 2, 3, 167, 512, 514, 515, 516, 518, 519, 520, 521, 522, 523, 524]
+    );
+    // Rotation ranges (B' < def < B' + 16, §9 step 2) and the special defs
+    // all have `Files` >= 1.
+    use d2_sim::drlg::maze::{cells::shape_def, layout::rotation_base};
+    let mut ranged = Vec::new();
+    for t in MAZE_LEVEL_TYPES {
+        if let Some(b) = rotation_base(t) {
+            for mask in 1..=15 {
+                for one in [false, true] {
+                    let d = shape_def(t, mask, one).unwrap();
+                    if d > b && d < b + 16 {
+                        ranged.push(d);
+                    }
+                }
+            }
+        }
+    }
+    assert!(!ranged.is_empty());
+    assert_eq!(defs_without_files(&maze, ranged), Vec::<u32>::new());
+    let specials: Vec<u32> = maze
+        .specials
+        .kinds()
+        .flat_map(|k| maze.specials.table(k).unwrap().iter().map(|r| r.special))
+        .collect();
+    assert_eq!(defs_without_files(&maze, specials), Vec::<u32>::new());
+    // The find defs of the special tables are shapes: report the ones
+    // without a row (observation only, not asserted by the entry).
+    let find: Vec<u32> = maze
+        .specials
+        .kinds()
+        .flat_map(|k| maze.specials.table(k).unwrap().iter().map(|r| r.find))
+        .collect();
+    eprintln!(
+        "special find defs without Files >= 1: {:?}",
+        defs_without_files(&maze, find)
+    );
+}
+
+/// M08: the check reports exactly the def that is removed or zeroed.
+#[test]
+fn maze_defs_check_reports_a_perturbed_def() {
+    let mut maze = MazeData::from_tables(&[], &[]);
+    for d in MAZE_FIXED_DEFS {
+        maze.prest_files.insert(*d, 1);
+    }
+    assert_eq!(
+        defs_without_files(&maze, MAZE_FIXED_DEFS.iter().copied()),
+        Vec::<u32>::new()
+    );
+    maze.prest_files.remove(&336);
+    maze.prest_files.insert(1077, 0);
+    assert_eq!(
+        defs_without_files(&maze, MAZE_FIXED_DEFS.iter().copied()),
+        [336, 1077]
+    );
 }

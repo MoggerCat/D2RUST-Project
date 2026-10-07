@@ -428,7 +428,11 @@ fn forgotten_tower_through_every_state() {
     m.extend_from_slice(&127u16.to_le_bytes());
     m.extend_from_slice(&[0, 0]);
     let (_, got) = send(&mut f.h, &m);
-    assert_eq!(got, [hex("5d 05 00 01 0000")]);
+    // The tome's scroll text 127 (`0x005456A0`, S→C 0x27 type 2,
+    // `quests-act2-2.md` §5.4) left with the operate, then the status.
+    let mut scroll = hex("27 02 03000000 01 00 00 00 7f00");
+    scroll.resize(40, 0);
+    assert_eq!(got, [scroll, hex("5d 05 00 01 0000")]);
     assert_eq!(word(&f, 5), 0x0004);
     // The tower (status 1 → 4), Tower Cellar 5 (state 3, status 2).
     assert_eq!(level_change(&mut f, 3, 20), [hex("5d 05 00 04 0000")]);

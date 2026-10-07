@@ -256,6 +256,8 @@ fn scroll_reward() {
     f.objects.insert(DUMMY_U, (0x60, 459, 0));
     f.pos.insert(DUMMY_U, (7, 8, RoomId(2)));
     f.pos.insert(DREHYA_U, (7, 8, RoomId(2)));
+    // The room covering her position (`0x00463740`).
+    f.rooms.insert(RoomId(2), (0, 0, 100, 100));
     f.a5_crits = vec![Some(DREHYA_U)];
     f.a5_places = vec![Some(PORTAL_U)];
     f.objects.insert(PORTAL_U, (0x62, 189, 1));
@@ -278,8 +280,10 @@ fn scroll_reward() {
     assert!(e.town_portal && e.town_portal_guid == 0x62);
     // Status 6 is not sent with 37.9.
     assert_eq!(ctl.record(CHAIN).unwrap().status, 0);
-    // No frozen Anya monster: its inactive node is dropped; an Anya
-    // chatting reports `0x00589070`.
+    // No frozen Anya monster: its inactive node is dropped. An iced Anya
+    // someone talks to: `0x00573180` with `0x00589070` (0x62 (1, her
+    // GUID), interaction cleared, S5D(33, 0x20, 0) to each chatting
+    // player, the list freed); +0xE3 stays 0, so the drop step runs too.
     let (mut ctl, _) = control();
     let mut f = fake();
     f.monsters.remove(&ICED_U);
@@ -294,7 +298,30 @@ fn scroll_reward() {
     bits(&mut f, 0, &[1, 9]);
     x(&mut ctl).anya = 1;
     say(&mut ctl, &mut f, Some((MALAH_U, MALAH)), 20132);
-    assert_eq!(f.log, ["reward tr2  0 2", "unhandled 33 0x589070"]);
+    assert_eq!(
+        f.log,
+        [
+            "reward tr2  0 2",
+            "interact 1 None",
+            "clear chats 66",
+            "preset 4 527"
+        ]
+    );
+    assert!(!x(&mut ctl).iced_found);
+    let tail: Vec<_> = f
+        .sent
+        .iter()
+        .filter(|m| m.1[0] != 0x28)
+        .skip(1)
+        .cloned()
+        .collect();
+    assert_eq!(
+        tail,
+        [
+            (P1, hex("62 01 42000000 00")),
+            (P1, hex("5D 21 20 00 0000"))
+        ]
+    );
     // Again later (37.0, 37.8, not used, none held): once per game.
     let (mut ctl, _) = control();
     let mut f = fake();
@@ -785,9 +812,15 @@ fn town_dummies_and_cleanup() {
     f.pos.insert(nd, (9, 9, RoomId(1)));
     nihlathak_temple_dummy_init(&mut ctl, &mut f, nd);
     assert!(f.log.is_empty());
-    // Dummy 461's event 7 stays reported (its "back" test is open).
+    // Dummy 461's event 7 (`0x00589540`): "back" = a monster with GUID
+    // +0x9C exists; then `0x00589340` again. +0x9C = 0 here: nothing.
     nihlathak_dummy_event(&mut ctl, &mut f, nd);
-    assert_eq!(f.log, ["unhandled 255 0x589540"]);
+    assert!(f.log.is_empty());
+    x(&mut ctl).nihlathak_guid = 0x43;
+    f.monsters
+        .insert(NIHL_U, (0x43, NIHLATHAK, kind(NIHLATHAK)));
+    nihlathak_dummy_event(&mut ctl, &mut f, nd);
+    assert_eq!(f.log, ["kill in town 67"]);
 }
 
 // ------------------------------------------------------------ §5.10

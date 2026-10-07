@@ -274,14 +274,17 @@ fn game_start_restores_progress() {
     assert_eq!((r.state, r.status, r.flags), (3, 2, 0x40));
     assert!(r.extra.a5.q4.portal_wanted);
     assert_eq!(f.sent, [(P1, hex("5D 22 40 02 0000"))]);
-    // 38.2: +0x87, status 1 (byte only), state 2.
+    // 38.2: +0x87, status 1 to all with the flags byte kept
+    // (`0x0058BA86`), state 2.
     let (mut ctl, _) = control();
     let mut f = fake();
+    ctl.records[i].flags = 0x40;
     f.p(P1).quests.flags[0].set(38, 2);
     super::callback(&mut ctl, &mut f, i, args, None);
     let r = &ctl.records[i];
-    assert_eq!((r.state, r.status), (2, 1));
-    assert!(r.extra.a5.q4.portal_wanted && f.sent.is_empty());
+    assert_eq!((r.state, r.status, r.flags), (2, 1, 0x40));
+    assert!(r.extra.a5.q4.portal_wanted);
+    assert_eq!(f.sent, [(P1, hex("5D 22 40 01 0000"))]);
     // 38.1 set: nothing.
     let (mut ctl, _) = control();
     let mut f = fake();

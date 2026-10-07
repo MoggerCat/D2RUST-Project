@@ -215,11 +215,13 @@ fn bird_boss_never_flying() {
     // The other bits of the byte do not matter.
     act3::choose_bird_boss(&mut ctl, &mut f, MON, 100, Some(0xBF));
     assert!(ctl.record(18).unwrap().extra.act3.q4.chosen);
-    // No monstats row: not stated (reported, nothing linked).
+    // No monstats row: the whole test fails (`0x00544ED3`), nothing is
+    // chosen or linked, nothing reported.
     let (mut ctl, mut f) = bird_setup();
     act3::choose_bird_boss(&mut ctl, &mut f, MON, 100, None);
     assert!(!ctl.record(18).unwrap().extra.act3.q4.chosen);
-    assert_eq!(unhandled(&f), ["unhandled 18 0x544e80"]);
+    assert!(f.f.chains.get(&MON).is_none_or(|c| c.0.is_empty()));
+    assert!(unhandled(&f).is_empty());
 }
 
 // Covers: specs/world/quests-act3-2.md §11.4; specs/world/quests-act3.md §edge-cases-original-bugs r19

@@ -281,7 +281,7 @@ Table `0x0072A2C4`: 14 records of (10 level ids, quest q, event e):
    + e − 33, delay per that rule).
 3. The flags are set even when r2 plays nothing, so a line skipped
    because the hero spoke within 62 updates is lost for that game
-   (flags cleared: open question 6).
+   (flags cleared: r4).
 4. **Reset** (answers open question 6): sound init (§2 r9, every game
    start) calls `0x004CA280`, which zeroes 4,096 bytes from
    `0x007C78B8` (the 1,024 level flags) and the idle globals of

@@ -21,10 +21,8 @@ const SHRINE_CLASS: [u8; 23] = [
 /// other row, which makes ids 13, 19 and 22 (the vectors' accepted picks)
 /// pass at level 2.
 ///
-/// TODO(objects.md §5.1 test vectors): the first vector says pick 4 is id
-/// 8, but the §2 class-4 list {1, 6, 7, …, 15} holds id 9 at index 4 (id
-/// 8 is index 3). Id 9 gets `LevelMin` 5 so the vector's draws (4, 8) and
-/// result (id 13) hold under either reading; the spec's id needs a fix.
+/// The §5.1 vector's pick 4 is id 9 (fixed in the spec, `objects.md`
+/// Test vectors); id 9 gets `LevelMin` 5 so the draws (4, 8) give id 13.
 fn shrines() -> Vec<Shrines> {
     SHRINE_CLASS
         .iter()
@@ -110,6 +108,8 @@ fn tables() -> ObjectTables {
         objects,
         shrines: shrines(),
         levels,
+        objgroup: Vec::new(),
+        leveldefs: Vec::new(),
     }
 }
 
@@ -164,8 +164,14 @@ fn control_build_seed_regions_and_shrine_lists() {
             ctl.regions[id],
             Some(Region {
                 act,
+                counted: 0,
                 w08: 0x7FFF_FFFF,
-                w1c: -1
+                health: 0,
+                shrines: 0,
+                wells: 0,
+                w1c: -1,
+                well_points: [(0, 0); 4],
+                shrine_points: [(0, 0); 10],
             })
         );
     }
@@ -262,7 +268,7 @@ fn create_routes_inits_owned_elsewhere() {
     assert_eq!(ctl.seed, Seed::init(), "a quest init draws nothing here");
     for (n, route) in [
         (17, Route::Waypoint),
-        (8, Route::NotCovered),
+        (8, Route::Here),
         (0, Route::Null),
         (35, Route::Null),
     ] {
@@ -326,7 +332,8 @@ fn selectable_uses_mode_before_init() {
 #[test]
 fn anim_vector_and_sync() {
     let mut t = tables();
-    let mut f = fake(0, 2);
+    // From mode 1 (a set to the current mode runs no setup, §4 rule 5).
+    let mut f = fake(1, 2);
     f.seeds.insert(O, Seed::new(12345, 666));
     set_mode(&t, &mut f, O, ANIM, 0, true).unwrap();
     let mut u = Seed::new(12345, 666);
@@ -342,7 +349,7 @@ fn anim_vector_and_sync() {
     );
     // Sync ≠ 0: speed = d, no draw.
     t.objects[ANIM as usize].sync = 1;
-    let mut f = fake(0, 2);
+    let mut f = fake(1, 2);
     set_mode(&t, &mut f, O, ANIM, 0, false).unwrap();
     assert_eq!(f.seeds[&O], Seed::init());
     assert_eq!(f.calls[1], Call::Anim(O, 20 * 256, 768, 256));
@@ -353,6 +360,13 @@ fn anim_vector_and_sync() {
     set_mode(&t, &mut f, O, ANIM, 1, true).unwrap();
     assert_eq!(f.seeds[&O], Seed::init());
     assert_eq!(f.calls[1], Call::Anim(O, 0, 0, 0));
+    // §4 rule 5 / `objects-2.md` §24 rule 1: the same mode only writes
+    // (queue, flag 0x1): no animation setup, no draw.
+    let mut f = fake(0, 2);
+    f.seeds.insert(O, Seed::new(12345, 666));
+    set_mode(&t, &mut f, O, ANIM, 0, true).unwrap();
+    assert_eq!(f.calls, vec![Call::Mode(O, 0, true)]);
+    assert_eq!(f.seeds[&O], Seed::new(12345, 666));
     // Mode ≥ 8: fatal.
     assert_eq!(
         set_mode(&t, &mut f, O, ANIM, 8, true),
@@ -816,7 +830,7 @@ fn dispatch_table_rules() {
         (100, Dispatch::Done(0)),
         (23, Dispatch::Waypoint(op(23))),
         (6, Dispatch::Quest(op(6))),
-        (13, Dispatch::NotCovered(op(13))),
+        (13, Dispatch::Done(0)),
         (11, Dispatch::Done(1)),
     ] {
         t.objects[100].operatefn = n;
@@ -858,7 +872,7 @@ fn route_mismatches(text: &str) -> Result<Vec<(String, u32)>, TsvError> {
         let address = tsv_num(tn, line, "address", c[2])?;
         let want = match (c[5], address) {
             ("-", 0) => Some(Route::Null),
-            ("world/quests.md", a) if a != 0 => Some(Route::Quest),
+            (o, a) if o.starts_with("world/quests") && a != 0 => Some(Route::Quest),
             ("world/waypoints.md", a) if a != 0 => Some(Route::Waypoint),
             ("todo", a) if a != 0 => Some(Route::NotCovered),
             (o, a) if o.starts_with('§') && a != 0 => Some(Route::Here),
@@ -923,7 +937,12 @@ fn end_anim_and_delayed_portal_events() {
         Ok(EventRun::Done)
     );
     assert_eq!(f.modes[&O], 2);
-    assert_eq!(f.calls[0], Call::Mode(O, 2, false), "no update queued");
+    // `objects-2.md` §18.6: a direct write (no mode set, no queue).
+    assert_eq!(
+        f.calls[0],
+        Call::Other(format!("store {} 2", O.0)),
+        "no update queued"
+    );
     assert_eq!(f.calls.last(), Some(&Call::Free(O)));
     // HasCollision2 ≠ 0: footprint kept; not mode 1: nothing.
     t.objects[TORCH as usize].hascollision2 = 1;
@@ -953,12 +972,15 @@ fn end_anim_and_delayed_portal_events() {
         object_event(&mut ctl, &t, &mut f, O, oevent::QUEST),
         Ok(EventRun::Quest)
     );
+    // Events 0, 3, 8, 9, 10 run `objects-2.md` §18 (`mech` tests); an
+    // event type with no handler is handed back.
     for e in [0, 3, 8, 9, 10] {
-        assert_eq!(
-            object_event(&mut ctl, &t, &mut f, O, e),
-            Ok(EventRun::NotCovered(e))
-        );
+        assert_eq!(object_event(&mut ctl, &t, &mut f, O, e), Ok(EventRun::Done));
     }
+    assert_eq!(
+        object_event(&mut ctl, &t, &mut f, O, 13),
+        Ok(EventRun::NotCovered(13))
+    );
 }
 
 // ------------------------------------------------------------------ §14
@@ -1001,14 +1023,24 @@ fn update_message_bytes() {
     // Mode 0 or no operator: no 0x4D.
     f.modes.insert(O, 0);
     assert_eq!(update_messages(&ctl, &t, &f, O).unwrap().len(), 1);
-    // Subclass bit 2: the portal message instead.
+    // Subclass bit 2: the portal message instead (flags, destination,
+    // GUID).
+    assert_eq!(
+        portal_message(&ObjectData {
+            guid: 0x0403_0201,
+            portal_flags: 3,
+            interact: 40,
+            ..ObjectData::default()
+        }),
+        [0x60, 3, 40, 1, 2, 3, 4]
+    );
     f.modes.insert(O, 1);
     t.objects[SHRINE3 as usize].subclass = 5;
     assert_eq!(
         update_messages(&ctl, &t, &f, O),
         Ok(vec![
             UpdateMessage::State(state_message(0x1234, true, 1)),
-            UpdateMessage::Portal(O),
+            UpdateMessage::Portal(portal_message(ctl.get(O).unwrap())),
         ])
     );
 }
@@ -1040,6 +1072,7 @@ fn object_data_fields_and_flags() {
             guid: 7,
             class: 1,
             interact: 0x88,
+            portal_flags: 3,
             shrine: Some(3),
             operator: 21,
             spark: 2,

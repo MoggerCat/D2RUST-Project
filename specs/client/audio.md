@@ -19,14 +19,14 @@
 | Inputs | 44–53 |
 | Outputs / state changes | 54–57 |
 | Rules | 58–59 |
-|   A. d2rs design (ours) | 60–182 |
-|   B. Original behavior to reproduce (owners) | 183–197 |
-| Constants & data dependencies | 198–202 |
-| Randomness | 203–207 |
-| Edge cases & original bugs | 208–214 |
-| Test vectors | 215–227 |
-| Provenance | 228–238 |
-| Open questions | 239–252 |
+|   A. d2rs design (ours) | 60–186 |
+|   B. Original behavior to reproduce (owners) | 187–201 |
+| Constants & data dependencies | 202–206 |
+| Randomness | 207–211 |
+| Edge cases & original bugs | 212–218 |
+| Test vectors | 219–231 |
+| Provenance | 232–242 |
+| Open questions | 243–262 |
 <!-- /index -->
 
 ## Summary
@@ -147,15 +147,19 @@ Trigger { tick: u32, source: TriggerSource, sound: SoundId,
   volume `v` (0..=255) and pan. 1.14d's device gain is
   `trunc((1 − occ) × trunc(v × G / 255)) / 255` with `G` = 255 in game
   (global at `0x0072F9B0`; `0x005157B0` divides by 255 with the
-  0x80808081 reciprocal, then applies `1 − occ` from voice +0x3C only
-  for voices with flag 0x4 at +0x34 and when `0x00513B90` ≠ 2). `occ`
-  moves toward targets 0 or 0.5 in steps of 0.05 (owner:
-  `audio/sound-table.md` §8.3 rule 3). The product is x87 arithmetic
-  on the f32 `1 − occ` and is truncated (`0x00682FD0`), so an integer
-  rewrite in hundredths is not equal by construction ((1 − 0.05f) × 200
-  truncates to 189, not 190): `GainCurve` reproduces the f32 occlusion
-  state and product exactly, or uses a table over the occlusion states
-  that `audio/sound-table.md` §8.3 enumerates (open question 4).
+  0x80808081 reciprocal, then applies `1 − occ` from voice +0x3C to
+  every voice except one with flag 0x4 at +0x34 while `0x00513B90`
+  returns 2, the EAX case: `0x005157DF`–`0x005157F0`). `occ` moves
+  toward its target in steps of 0.05 (owner: `audio/sound-table.md`
+  §6.4, §8.3 rule 3). The product is x87 arithmetic on the f32 `1 −
+  occ` and is truncated (`0x00682FD0`), so an integer rewrite in
+  hundredths is not equal by construction ((1 − 0.05f) × 200 truncates
+  to 189, not 190). The occlusion state is an f32 whose exact step rule and reachable
+  values are `audio/sound-table.md` §6.4 r4 (answers open question 4):
+  `GainCurve` keeps that f32 state and computes `floor((1 − occ) × v1)`
+  exactly (both factors and the product are exact in f64 for v1 ≤ 255),
+  not a table; 492 of the 23 × 256 (state, v1) cells of the one-unit
+  states differ from an integer hundredths rewrite.
 - The mixer is pure: `mix(voices, block) -> [i16; 1024]`; golden tests
   hash the output of scripted voice sets (determinism, not fidelity).
 - Output: one custom `rodio::Source` registered through Bevy's
@@ -184,16 +188,16 @@ VoiceEvent { tick: u32, kind: Start | Stop | Param, file: CanonicalPath,
 
 Owners (2026-10-08): B1 `formats/wav.md` §5; B3, B8 `audio/sound-table.md` (+ `audio/sound-table-2.md` §16–§17); B2, B6 `audio/triggers.md`, `audio/triggers-2.md`; B4, B5 `audio/environment.md`; B7 the Checks tables of those specs.
 
-| # | Behavior | Owner spec (to write) | Measure | Comparison |
+| # | Behavior | Owner spec | Measure | Comparison |
 |---|---|---|---|---|
-| B1 | WAV subset in 1.14d archives (format tags, bit depths, rates, channels, chunk order) and the samples 1.14d passes to its sound output | `formats/wav.md` | survey of every live `.wav` (`mpq-tool formats` extension); debugger dump of buffers at the sound output | identical i16 samples per file |
-| B2 | Which sim events make sounds: S→C 0x2C fields (`server-messages.tsv`, status partial), unit mode changes, COF frame event 3, missiles, skills (`skills.txt` sound columns), monsters (`monsounds`), items (drop/use sounds), objects | `audio/triggers.md` (draft: all causes; COF event 3 unused, OQ 13) | packet + sound-call trace on a recorded game | identical (tick, file) sequence |
-| B3 | `sounds.txt` semantics: volume, pan from listener distance, falloff, priority, groups and variants (and their RNG), loop, repeat suppression, voice limit and stealing | `audio/sound-table.md` (draft: §1–§8, §10–§11) | sound path; traces with known positions | identical (vol, pan, looped) per voice event |
-| B4 | Environment and ambient sound: `soundenviron.txt` by level, day/night, random ambient cues | `audio/environment.md` (draft §1, §5–§8) | traces while walking between areas | identical voice log |
-| B5 | Music: which track per level, transitions, loop | `audio/environment.md` (draft §2–§4) | traces | identical (tick, file) |
-| B6 | UI and speech sounds (NPC dialog, quests, item pickup, panel clicks) | `audio/triggers.md` (draft §9–§11) | traces | identical voice log |
-| B7 | Recording the original's sound calls with tick numbers | `tools/trace-recorder` (`record_sound.py`) + `traces/FORMAT.md` | debugger hooks on the sound-output entry points | a static scene recorded twice gives identical logs (stability first) |
-| B8 | Volume settings (sound/music sliders) to integer volume | `audio/sound-table.md` §9, §8.2 (draft; slider → 0–100 open) | traces at known slider settings | identical vol |
+| B1 | WAV subset in 1.14d archives (format tags, bit depths, rates, channels, chunk order) and the samples 1.14d passes to its sound output | `formats/wav.md` (written; sample dump queued, its OQ1) | survey of every live `.wav` (`mpq-tool formats` extension); debugger dump of buffers at the sound output | identical i16 samples per file |
+| B2 | Which sim events make sounds: S→C 0x2C fields (`server-messages.tsv`, status partial), unit mode changes, COF frame event 3, missiles, skills (`skills.txt` sound columns), monsters (`monsounds`), items (drop/use sounds), objects | `audio/triggers.md`, `audio/triggers-2.md` (all causes; COF event 3 runs the skill do, `triggers-2.md` §15) | packet + sound-call trace on a recorded game | identical (tick, file) sequence |
+| B3 | `sounds.txt` semantics: volume, pan from listener distance, falloff, priority, groups and variants (and their RNG), loop, repeat suppression, voice limit and stealing | `audio/sound-table.md`, `audio/sound-table-2.md` | sound path; traces with known positions | identical (vol, pan, looped) per voice event |
+| B4 | Environment and ambient sound: `soundenviron.txt` by level, day/night, random ambient cues | `audio/environment.md` §1, §5–§8 | traces while walking between areas | identical voice log |
+| B5 | Music: which track per level, transitions, loop | `audio/environment.md` §2–§4 (front end §9) | traces | identical (tick, file) |
+| B6 | UI and speech sounds (NPC dialog, quests, item pickup, panel clicks) | `audio/triggers.md` §9–§11, `triggers-2.md` §17 | traces | identical voice log |
+| B7 | Recording the original's sound calls with tick numbers | `tools/trace-recorder` (`record_sound.py`, on `origin/claude/local-buddy-q-rec-2026-10-07`) + `traces/FORMAT.md` | debugger hooks on the sound-output entry points | a static scene recorded twice gives identical logs (stability first) |
+| B8 | Volume settings (sound/music sliders) to integer volume | `audio/sound-table.md` §9, §8.2; slider → 0–100 `sound-table-2.md` §15 | traces at known slider settings | identical vol |
 
 ## Constants & data dependencies
 
@@ -238,14 +242,20 @@ the seed-user list is `audio/sound-table-2.md` §14. No original behavior is sta
 
 ## Open questions
 
-1. §B1–§B8.
-2. If the original changes playback rate per voice (pitch variation),
-   the mixer gains a rate field and the voice log a rate column (§B3).
-3. Whether 44,100 Hz suits all devices or the device rate should be used
-   directly: ours to decide after first use; no effect on either
-   exactness check.
-4. §A4 occlusion: the set of f32 values the occlusion state takes (steps
-   of 0.05 accumulated up from 0 and down from 0.5 may give different
-   f32 values) and so whether a fixed table can replace the f32 product.
-   Settle by enumerating both step paths in f32 against
-   `audio/sound-table.md` §8.3.
+1. ~~§B1–§B8~~: every row has its owner spec (§B table); their own
+   open questions and the recordings queued in `docs/HANDOFF.md` §7
+   (PC 2 recording list) remain.
+2. *Answered* (static): no per-voice rate change. No code in the sound
+   driver (`0x00513000`–`0x00517FFF`) or the Storm stream player
+   (`0x00413000`–`0x0041CFFF`) calls the buffer's `SetFrequency` (vtable
+   +0x44 of the DirectSound buffer; the only +0x44 slot call there,
+   `0x005161E7`, is on the 3D-buffer interface at voice +0x0C); a
+   buffer plays at its file's rate (`formats/wav.md`). The mixer needs
+   no rate field.
+3. ~~Whether 44,100 Hz suits all devices~~: a d2rs decision, not a
+   fidelity question (no effect on either exactness check); decided
+   when the output is first used.
+4. *Answered* (`0x004BA333`–`0x004BA398`, constants `0x006DA6B0`,
+   `0x006DA690`; enumeration by a scratch script over the step rule at
+   24, 53 and 64-bit precision): §A4 "Occlusion state". No fixed
+   table: mean targets add states; keep the f32 state.

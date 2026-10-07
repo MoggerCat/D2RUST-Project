@@ -425,15 +425,28 @@ fn scroll_reward<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, p: 
             if w.monster_class(m) != Some(DREHYAICED) {
                 continue;
             }
-            if w.npc_chat_clients(m).is_some() {
-                // TODO(quests-act5 §5.7): `0x00589070` ends the
-                // interaction and sends S5D(33, 0x20, 0); to which
-                // player is not stated.
-                w.unhandled(CHAIN, 0x0058_9070);
-            } else {
-                w.kill_in_place(m);
+            match w.npc_chat_clients(m) {
+                // `0x00573180(game, 527, 0x00589070, 0)`: for each entry
+                // of the NPC's interaction list, in list order, 0x62 (1,
+                // the NPC's GUID), the interaction cleared, then
+                // `0x00589070`: S5D(33, 0x20, 0) to that player; the
+                // entries are freed and the list emptied. +0xE3 stays 0
+                // (edge case 9: iced Anya stays, the drop step still
+                // runs).
+                Some(chatting) => {
+                    let g = w.guid(m);
+                    for q in chatting {
+                        w.send(q, &crate::world::quests::helpers::msg_end_interaction(1, g));
+                        w.set_interact_unit(q, None);
+                        s5d(w, q, CHAIN, 0x20, 0);
+                    }
+                    w.clear_npc_chats(m);
+                }
+                None => {
+                    w.kill_in_place(m);
+                    x(ctl, i).iced_found = true;
+                }
             }
-            x(ctl, i).iced_found = true;
             break;
         }
         if !x(ctl, i).iced_found {
@@ -861,21 +874,30 @@ fn anya_to_town<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize) {
     let Some((dummy, _)) = w.object_by_guid(e.town_dummy_guid) else {
         return;
     };
-    if !x(ctl, i).anya_in_town {
-        if let Some((dx, dy, room)) = w.unit_position(dummy) {
-            if let Some(a) = w.critical_spawn(room, dx, dy, DREHYA) {
-                let g = w.guid(a);
-                let e = x(ctl, i);
-                e.anya_guid = g;
-                e.anya_in_town = true;
-                apply_map_ai(ctl, w, i, a, false);
-            }
-        }
+    // The portal and the seq fn run only after a successful spawn in
+    // this call (`0x0058926C`, `0x0058928F`): +0x91 already set, or a
+    // failed spawn, returns.
+    if x(ctl, i).anya_in_town {
+        return;
     }
-    let anya = w.monster_by_guid(x(ctl, i).anya_guid).map(|m| m.0);
-    if let Some((ax, ay, room)) = anya.and_then(|a| w.unit_position(a)) {
-        // TODO(quests-act5 §5.9): the flag arguments of this portal
-        // are not stated; the other Anya portal's (1, 1, 0) are used.
+    let Some((dx, dy, room)) = w.unit_position(dummy) else {
+        return;
+    };
+    let Some(a) = w.critical_spawn(room, dx, dy, DREHYA) else {
+        return;
+    };
+    let g = w.guid(a);
+    let e = x(ctl, i);
+    e.anya_guid = g;
+    e.anya_in_town = true;
+    apply_map_ai(ctl, w, i, a, false);
+    // The portal: the room covering her position (`0x00463740` from her
+    // room), object 189 there with flags (1, 1, 0) (`0x00589313`); no
+    // room or no object → no portal, the seq fn still runs.
+    let at = w
+        .unit_position(a)
+        .and_then(|(ax, ay, own)| w.room_at(own, ax, ay).map(|r| (ax, ay, r)));
+    if let Some((ax, ay, room)) = at {
         if let Some(o) = w.place_object(room, ax, ay, PORTAL, [1, 1, 0]) {
             let g = w.guid(o);
             let e = x(ctl, i);
@@ -953,11 +975,15 @@ pub fn town_cleanup<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize) 
 }
 
 /// `0x00589540`: object event 7 of dummy 461 (Nihlathak in town, §5.9).
-/// TODO(quests-act5 §5.9): the spec says only that it "kills him again
-/// if he is back"; the test for "back" is not stated.
+/// "Back" = a monster unit with GUID +0x9C still exists
+/// (`0x00552F60(game, 1, +0x9C)`); then `0x00589340` runs on it again.
+/// No other test (not +0x93, not his mode); +0x9C is never cleared.
 pub fn nihlathak_dummy_event<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: UnitId) {
-    let _ = (ctl, object);
-    w.unhandled(0xFF, 0x0058_9540);
+    let _ = object;
+    let Some(i) = ctl.find(CHAIN) else { return };
+    if let Some((n, _)) = w.monster_by_guid(x(ctl, i).nihlathak_guid) {
+        w.kill_in_town(n);
+    }
 }
 
 #[cfg(test)]

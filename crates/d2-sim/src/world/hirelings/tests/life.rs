@@ -1,11 +1,11 @@
-// Spec: specs/world/hirelings.md §3.2, §6, §8, §9, §10 (tests)
+// Spec: specs/world/hirelings.md §3.2, §6, §8, §9, §10; specs/world/hirelings-2.md §15, §16, §18 (tests)
 //! Init, replace, death, revive, follow, the classic act change and the
 //! restore.
 
 use super::fake::{row, tables, Fake};
 use crate::units::UnitId;
 use crate::world::hirelings::life::{
-    self, RestorePlan, RestoreSkip, SavedHireling, MODE_DEAD, MODE_NEUTRAL,
+    self, Loader, RestorePlan, RestoreSkip, SavedHireling, MODE_DEAD, MODE_NEUTRAL,
 };
 use crate::world::hirelings::pets::{assign_merc, merc_dead_message, pet_action};
 use crate::world::hirelings::{
@@ -302,7 +302,7 @@ fn follow_warps_living_only() {
     assert_eq!(st.list(p).unwrap().nodes.len(), 2);
 }
 
-// Covers: specs/world/hirelings.md §6 r1
+// Covers: specs/world/hirelings.md §6 r1; specs/world/hirelings-2.md §18 r2
 #[test]
 fn follow_without_warp_or_range_frees_nodes() {
     let (mut w, p, _, m) = world();
@@ -311,8 +311,9 @@ fn follow_without_warp_or_range_frees_nodes() {
     let mut st = with_nodes(p, vec![node(M_GUID, false)]);
     life::follow(&mut w, &t, &mut st, p);
     assert!(st.list(p).unwrap().nodes.is_empty());
-    assert!(w.log.is_empty());
-    assert!(w.units.contains_key(&m));
+    // `hirelings-2.md` §18 rule 2: freed with its unit.
+    assert_eq!(w.log, vec!["free 10".to_string()]);
+    assert!(!w.units.contains_key(&m));
 }
 
 // Covers: specs/world/hirelings.md §6 r4, §9 r1, §edge-cases-original-bugs r11
@@ -354,10 +355,14 @@ fn restore_plan_clamps_name_and_checks_act() {
         experience: 26460,
     };
     assert_eq!(
-        life::restore_plan(&t, true, &saved, 3),
+        life::restore_plan(&t, true, 0, &saved, 3, Loader::Current),
         Ok(RestorePlan {
             name: 105,
-            mode: MODE_NEUTRAL
+            mode: MODE_NEUTRAL,
+            class: 271,
+            id: 1,
+            seller: 150,
+            loader: Loader::Current,
         })
     );
     // 100 + 40 = NameLast stays; 100 + 41 → NameFirst.
@@ -365,17 +370,26 @@ fn restore_plan_clamps_name_and_checks_act() {
         name_index: 40,
         ..saved
     };
-    assert_eq!(life::restore_plan(&t, true, &last, 0).unwrap().name, 140);
+    assert_eq!(
+        life::restore_plan(&t, true, 0, &last, 0, Loader::Current)
+            .unwrap()
+            .name,
+        140
+    );
     let above = SavedHireling {
         name_index: 41,
         dead: true,
         ..saved
     };
     assert_eq!(
-        life::restore_plan(&t, true, &above, 0),
+        life::restore_plan(&t, true, 0, &above, 0, Loader::Current),
         Ok(RestorePlan {
             name: 100,
-            mode: MODE_DEAD
+            mode: MODE_DEAD,
+            class: 271,
+            id: 1,
+            seller: 150,
+            loader: Loader::Current,
         })
     );
     // Rule 1.
@@ -385,14 +399,19 @@ fn restore_plan_clamps_name_and_checks_act() {
         ..SavedHireling::default()
     };
     assert_eq!(
-        life::restore_plan(&t, true, &none, 0),
+        life::restore_plan(&t, true, 0, &none, 0, Loader::Current),
         Err(RestoreSkip::NoHireling)
     );
     // Rule 2: no row of the Id.
     let bad = SavedHireling { id: 9, ..saved };
     assert_eq!(
-        life::restore_plan(&t, true, &bad, 0),
+        life::restore_plan(&t, true, 0, &bad, 0, Loader::Current),
         Err(RestoreSkip::NoRow)
+    );
+    // The old loader fails the load instead (`hirelings-2.md` §16 r4).
+    assert_eq!(
+        life::restore_plan(&t, true, 0, &bad, 0, Loader::Old),
+        Err(RestoreSkip::LoadFailed)
     );
     // Rule 3: classic, only in the name's act (act 0).
     let classic = tables(
@@ -402,16 +421,18 @@ fn restore_plan_clamps_name_and_checks_act() {
             .collect(),
     );
     assert_eq!(
-        life::restore_plan(&classic, false, &saved, 1),
+        life::restore_plan(&classic, false, 0, &saved, 1, Loader::Current),
         Err(RestoreSkip::OtherAct)
     );
     assert_eq!(
-        life::restore_plan(&classic, false, &saved, 0).unwrap().name,
+        life::restore_plan(&classic, false, 0, &saved, 0, Loader::Current)
+            .unwrap()
+            .name,
         105
     );
 }
 
-// Covers: specs/world/hirelings.md §10 r3, §10 r4, §10 r7
+// Covers: specs/world/hirelings.md §10 r3, §10 r4, §10 r7; specs/world/hirelings-2.md §16 r6
 #[test]
 fn restore_sets_node_values_and_dead() {
     let (mut w, p, _, m) = world();
@@ -424,7 +445,7 @@ fn restore_sets_node_values_and_dead() {
         id: 1,
         experience: 26460,
     };
-    let plan = life::restore_plan(&t, true, &saved, 0).unwrap();
+    let plan = life::restore_plan(&t, true, 0, &saved, 0, Loader::Current).unwrap();
     assert!(life::restore(&mut w, &t, &mut st, p, m, &plan, &saved).unwrap());
     let want = PetNode {
         dead: false,
@@ -449,6 +470,8 @@ fn restore_sets_node_values_and_dead() {
         w.sent_to(p),
         vec![merc_dead_message(105, 6750).to_vec(), remove_msg(M_GUID)]
     );
+    // `hirelings-2.md` §16 rule 6: `0x005738D0` after the mode.
+    assert_in_order(&w.log, &["mode 10 12", "cancel 10 2 0", "cancel 10 3 0"]);
 }
 
 // Covers: specs/world/hirelings.md §8 r3, §8 r4, §11 r7
@@ -474,4 +497,200 @@ fn death_leaves_the_corpse_with_its_stats() {
     life::restore_dead(&mut w, &mut st, p, m);
     assert_eq!(w.unit(m).flags, flags::OWNED | flags::DEAD);
     assert!(w.units.contains_key(&m));
+}
+
+// Covers: specs/world/hirelings-2.md §15 r1, §15 r2, §15 r3, §15 r5, §edge-cases-original-bugs r1, §edge-cases-original-bugs r2
+#[test]
+fn player_death_kills_the_hireling_in_every_game_type() {
+    // Test vector: living hireling L 20 in a room, name id 4000.
+    for expansion in [true, false] {
+        let (mut w, p, q, m) = world();
+        w.expansion = expansion;
+        w.set(m, stat::LEVEL, 20);
+        let mut st = with_nodes(
+            p,
+            vec![PetNode {
+                name: 4000,
+                ..node(M_GUID, false)
+            }],
+        );
+        life::player_death(&mut w, &mut st, p);
+        assert!(st.list(p).unwrap().nodes[0].dead);
+        // Room notice then the death mode request; the unit is not freed.
+        assert_eq!(
+            w.log,
+            vec!["room_remove 10".to_string(), "death_event 10".to_string()]
+        );
+        assert!(w.units.contains_key(&m));
+        let dead = merc_dead_message(4000, 3000).to_vec();
+        assert_eq!(dead, [0x9b, 0xa0, 0x0f, 0xb8, 0x0b, 0x00, 0x00]);
+        assert_eq!(w.sent_to(p), vec![remove_msg(M_GUID), dead]);
+        assert_eq!(w.sent_to(q), vec![remove_msg(M_GUID)]);
+    }
+}
+
+// Covers: specs/world/hirelings-2.md §15 r3
+#[test]
+fn player_death_with_a_dead_or_missing_hireling() {
+    // Already dead: 0x7A and the room notice only.
+    let (mut w, p, _, _) = world();
+    let mut st = with_nodes(p, vec![node(M_GUID, true)]);
+    life::player_death(&mut w, &mut st, p);
+    assert_eq!(w.log, vec!["room_remove 10".to_string()]);
+    assert_eq!(w.sent_to(p), vec![remove_msg(M_GUID)]);
+    // Living but out of any room: no death mode request, 0x9B still sent.
+    let (mut w, p, _, m) = world();
+    w.unit_mut(m).in_room = false;
+    let mut st = with_nodes(p, vec![node(M_GUID, false)]);
+    life::player_death(&mut w, &mut st, p);
+    assert_eq!(w.log, vec!["room_remove 10".to_string()]);
+    assert_eq!(w.sent_to(p).len(), 2);
+    assert!(st.list(p).unwrap().nodes[0].dead);
+    // No unit for the GUID: the node is left as it is.
+    let (mut w, p, _, _) = world();
+    let mut st = with_nodes(p, vec![node(0x77, false)]);
+    life::player_death(&mut w, &mut st, p);
+    assert!(w.log.is_empty() && w.sent.is_empty());
+    assert_eq!(st.list(p).unwrap().nodes, vec![node(0x77, false)]);
+}
+
+// Covers: specs/world/hirelings-2.md §18 r3
+#[test]
+fn owner_kill_makes_the_living_node_the_head() {
+    let (mut w, p, _, _) = world();
+    w.add(11, 1, 271, OLD_GUID);
+    let mut st = with_nodes(p, vec![node(OLD_GUID, true), node(M_GUID, false)]);
+    life::kill_with_owner(&mut w, &mut st, p);
+    assert_eq!(st.list(p).unwrap().nodes, vec![node(M_GUID, true)]);
+    assert_eq!(st.list(p).unwrap().max, 2);
+}
+
+// Covers: specs/world/hirelings-2.md §18 r1
+#[test]
+fn range_pets_farther_than_1600_are_removed_with_kill() {
+    assert_eq!(life::range_distance((100, 100), (130, 125)), 1525);
+    assert_eq!(life::range_distance((100, 100), (141, 100)), 1681);
+    let mut t = act1_tables();
+    t.pet_flags = HirelingTables::RANGE;
+    // 1525 ≤ 1600: kept.
+    let (mut w, p, _, m) = world();
+    w.unit_mut(m).pos = (100, 100);
+    w.unit_mut(p).pos = (130, 125);
+    let mut st = with_nodes(p, vec![node(M_GUID, false)]);
+    life::follow(&mut w, &t, &mut st, p);
+    assert!(w.log.is_empty() && w.sent.is_empty());
+    assert_eq!(st.list(p).unwrap().nodes.len(), 1);
+    // 1681 > 1600: removed with kill (unlink 0x7A, dismiss, 0x7A again).
+    w.unit_mut(p).pos = (141, 100);
+    life::follow(&mut w, &t, &mut st, p);
+    assert!(st.list(p).unwrap().nodes.is_empty());
+    assert_eq!(w.log, vec!["dismiss 10".to_string()]);
+    assert_eq!(
+        w.sent_to(p),
+        vec![remove_msg(M_GUID), remove_msg(M_GUID), remove_msg(M_GUID)]
+    );
+    // A dead node is not tested.
+    let (mut w, p, _, m) = world();
+    w.unit_mut(p).pos = (1000, 1000);
+    let mut st = with_nodes(p, vec![node(M_GUID, true)]);
+    life::follow(&mut w, &t, &mut st, p);
+    assert!(w.log.is_empty());
+    assert!(w.units.contains_key(&m));
+}
+
+// Covers: specs/world/hirelings-2.md §16 r3
+#[test]
+fn join_follow_only_with_a_living_hireling() {
+    let t = act1_tables();
+    let (mut w, p, _, _) = world();
+    let mut st = with_nodes(p, vec![node(M_GUID, true)]);
+    life::join_follow(&mut w, &t, &mut st, p);
+    assert!(w.log.is_empty());
+    let mut st = with_nodes(p, vec![node(M_GUID, false)]);
+    life::join_follow(&mut w, &t, &mut st, p);
+    assert_eq!(w.log, vec!["warp 10 1".to_string()]);
+}
+
+// Covers: specs/world/hirelings-2.md §16 r1, §16 r2, §16 r7, §edge-cases-original-bugs r3
+#[test]
+fn version_47_restore_is_a_class_0_new_hire() {
+    let t = act1_tables();
+    let saved = SavedHireling {
+        dead: true,
+        seed: 0x1234,
+        name_index: 105,
+        id: 1,
+        experience: 26460,
+    };
+    let plan = life::restore_plan(&t, true, 0, &saved, 0, Loader::OldV47).unwrap();
+    assert_eq!(
+        plan,
+        RestorePlan {
+            name: 105,
+            mode: MODE_NEUTRAL,
+            class: 0,
+            id: NEW_HIRE,
+            seller: 150,
+            loader: Loader::OldV47,
+        }
+    );
+    // Seed or name word 0: no hireling.
+    for s in [
+        SavedHireling { seed: 0, ..saved },
+        SavedHireling {
+            name_index: 0,
+            ..saved
+        },
+    ] {
+        assert_eq!(
+            life::restore_plan(&t, true, 0, &s, 0, Loader::OldV47),
+            Err(RestoreSkip::NoHireling)
+        );
+    }
+    // No candidate of (expansion, act, difficulty): fatal 0x744.
+    assert_eq!(
+        life::restore_plan(&t, true, 1, &saved, 0, Loader::OldV47),
+        Err(RestoreSkip::Fatal(0x744))
+    );
+    // The init takes the new-hire branch: the node keeps the offer's
+    // values (no saved node write).
+    let (mut w, p, _, m) = world();
+    let mut st = HirelingState::default();
+    assert!(life::restore(&mut w, &t, &mut st, p, m, &plan, &saved).unwrap());
+    let n = st.list(p).unwrap().nodes[0];
+    assert_eq!((n.seed, n.name, n.dead), (0x1234, 105, false));
+    let offer = t
+        .rows
+        .offer(true, 10, 0x1234, 0, 0)
+        .expect("an offer for act 1");
+    assert_eq!(n.id, offer.id);
+    assert_eq!(w.base(m, stat::EXPERIENCE), offer.experience);
+}
+
+// Covers: specs/world/hirelings-2.md §16 r5
+#[test]
+fn restore_tail_order_per_loader() {
+    let (mut w, p, _, m) = world();
+    let mut st = with_nodes(p, vec![node(M_GUID, false)]);
+    life::restore_tail(&mut w, &mut st, p, m, true, Loader::Current);
+    assert_eq!(
+        w.log,
+        vec![
+            "mode 10 12".to_string(),
+            "cancel 10 2 0".to_string(),
+            "cancel 10 3 0".to_string(),
+            "inventory 10".to_string(),
+        ]
+    );
+    let (mut w, p, _, m) = world();
+    let mut st = with_nodes(p, vec![node(M_GUID, false)]);
+    life::restore_tail(&mut w, &mut st, p, m, true, Loader::Old);
+    assert_eq!(w.log[0], "inventory 10");
+    assert_eq!(w.log.len(), 4);
+    // Alive: the inventory step only.
+    let (mut w, p, _, m) = world();
+    let mut st = with_nodes(p, vec![node(M_GUID, false)]);
+    life::restore_tail(&mut w, &mut st, p, m, false, Loader::Current);
+    assert_eq!(w.log, vec!["inventory 10".to_string()]);
+    assert!(!st.list(p).unwrap().nodes[0].dead);
 }

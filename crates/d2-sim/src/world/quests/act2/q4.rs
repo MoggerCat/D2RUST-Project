@@ -342,7 +342,7 @@ pub fn tome_operate<W: QuestWorld>(
         w.schedule_object_event(object, 1, at);
     }
     let Some(i) = ctl.find(CHAIN) else { return };
-    // TODO(quests-act2 OQ4): the 0x27 type-2 bytes belong to the seam.
+    // `0x005456A0`: S→C 0x27 type 2 (`quests-act2-2.md` §5.4).
     w.open_quest_message(player, object, MSG_TOME);
     let room = w.unit_position(object).map(|p| p.2);
     x4(ctl, i).tome_room = room;
@@ -437,14 +437,14 @@ pub fn portal_init<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: Uni
         Some(CELLAR3) => &mut x.portal_mode_cellar,
         _ => return,
     };
-    // TODO(quests-act2 §6.9): "that value … becomes 2" is read as the
-    // stored mode and the object's mode both becoming 2.
+    // The object's mode is set to the stored value first; only the stored
+    // u16 becomes 2 (`0x0059BA6B`–`0x0059BAE6`): the object stays in mode
+    // 1 until its ENDANIM event.
     let was = *slot;
     if was == 1 {
         *slot = 2;
     }
-    let mode = *slot;
-    w.set_object_mode(object, i32::from(mode));
+    w.set_object_mode(object, i32::from(was));
     if was == 1 {
         let at = w.frame() + (w.object_anim_length(object) >> 8) + 1;
         w.schedule_object_event(object, 1, at);
@@ -576,10 +576,11 @@ pub fn start_jerhyn_init<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, objec
     };
     // `0x00545340`: size 2, mask 0x100, sixth argument 10 (never read),
     // limit 100.
+    // No free spot: the spawn is still made with room 0 at the object's
+    // own (x, y) (`quests-act2-2.md` §2 item 1), and a null-room spawn
+    // returns null before any allocation or draw (`quests-act1-rest.md`
+    // §9 item 1): nothing is spawned.
     let Some((sx, sy, spot_room)) = w.free_spot_at(room, ox, oy, 2, 0x100, 10, 100) else {
-        // TODO(quests-act2-2 §2.1): what init 18 does when no free spot is
-        // found is not in the spec; reported.
-        w.unhandled(CHAIN, 0x0059_F380);
         return;
     };
     if let Some(j) = w.spawn_monster_flags(spot_room, sx, sy, JERHYN, 1, -1, 0) {
@@ -671,8 +672,8 @@ pub(crate) fn arcane_hook<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W) {
     if !ctl.records[i].not_intro {
         return open_palace(ctl, w, i);
     }
-    // TODO(quests-act2 §4.9): the state and status tests are read as
-    // independent.
+    // Two independent tests (`0x0059B67A`, `0x0059B696`); the status
+    // step clears the flags byte before the iterate.
     if ctl.records[i].state == 0 {
         ctl.records[i].state = 1;
     }
@@ -721,29 +722,39 @@ pub fn blocker_open(ctl: &QuestControl) -> bool {
         .is_some_and(|r| r.extra.a2.q4.blocker_mode == 2)
 }
 
-/// Jerhyn / palace NPC hook `0x0059B820` (from `0x0059F580`, §10): a
-/// player without 14.0 and 14.1 within 30 of the blocker (`0x005DC5C0`
-/// < 31) → +0x1A := 1, +0x1C := its GUID.
+/// Jerhyn / palace NPC hook `0x0059B820` (from `0x0059F580`, §10):
+/// +0x1A := 0, +0x1C := 0 (`0x0059F75F`), then the player walk
+/// `0x005537D0`: the **first** player without 14.0 and 14.1 within 30 of
+/// the stored blocker point +0x20 / +0x24 (`0x005DC5C0`, unsigned ≤ 30)
+/// → +0x1A := 1, +0x1C := its GUID, and the walk stops.
 pub fn jerhyn_near_blocker<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W) {
     let Some(i) = ctl.find(CHAIN) else { return };
-    let guid = ctl.records[i].extra.a2.q4.blocker_guid;
-    let Some((blocker, _)) = w.object_by_guid(guid) else {
-        return;
-    };
-    // TODO(quests-act2 §10): with several players in range, every one is
-    // read as writing +0x1C in iteration order (the last one stays).
+    let x = x4(ctl, i);
+    x.near_blocker = false;
+    x.near_guid = 0;
+    let (bx, by) = (x.blocker_x, x.blocker_y);
     for p in w.players() {
         let f = pf(w, p);
         if f.get(14, bit::REWARD_GRANTED) || f.get(14, bit::REWARD_PENDING) {
             continue;
         }
-        if w.unit_distance(p, blocker) < 31 {
+        let Some(at) = w.unit_xy(p) else { continue };
+        if path_distance(at, bx, by) <= 30 {
             let g = w.guid(p);
             let x = x4(ctl, i);
             x.near_blocker = true;
             x.near_guid = g;
+            return;
         }
     }
+}
+
+/// `0x005DC5C0(unit, x, y)` (`monsters/ai.md` §6): dx, dy = |Δ| on the
+/// unit's path position; (2·max + min) / 2, truncated.
+fn path_distance(at: (i32, i32), x: i32, y: i32) -> u32 {
+    let dx = at.0.abs_diff(x);
+    let dy = at.1.abs_diff(y);
+    (2 * dx.max(dy) + dx.min(dy)) / 2
 }
 
 /// Monster class hook `0x0059B6C0` (jerhyn, from `0x005447A0`): a bare

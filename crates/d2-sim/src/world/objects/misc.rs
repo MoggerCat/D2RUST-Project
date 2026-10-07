@@ -1,11 +1,11 @@
 // Spec: specs/world/objects.md §10–§13, §14 rule 2
 //! Doors (§10), wells (§11, event 2), portals (§12) and torches (§13).
 
-use crate::units::UnitId;
+use crate::units::{RoomId, UnitId};
 
 use super::{
-    clear_selectable, oflags, set_mode, set_object_mode, sound, ObjectControl, ObjectError,
-    ObjectHost, ObjectTables, ObjectWorld, Operate, Operator,
+    clear_selectable, oflags, schedule_endanim, set_mode, set_object_mode, sound, ObjectControl,
+    ObjectError, ObjectHost, ObjectTables, ObjectWorld, Operate, Operator,
 };
 
 #[cfg(test)]
@@ -20,6 +20,13 @@ pub const DOOR_CLEAR_MASK: u16 = 0x8180;
 pub const DOOR_CORPSE_MASK: u16 = 0x8000;
 /// Portal hostile delay in host ticks (§12 rule 2, `0x005848C1`).
 pub const PORTAL_HOSTILE_DELAY: u32 = 5000;
+/// Town portal and permanent portal classes (§12).
+pub const TOWN_PORTAL_CLASS: u16 = 59;
+pub const PERMANENT_PORTAL_CLASS: u16 = 60;
+/// The arrival free-point mask (§12 rule 10).
+pub const PORTAL_SPOT_MASK: u32 = 0x1C09;
+/// State 102 duration (§12 rule 13).
+pub const JUST_PORTALED_FRAMES: i32 = 75;
 
 /// Stat ids the well heal reads (§11 rule 2; `combat/vitals.md`).
 pub mod stat {
@@ -85,13 +92,61 @@ pub trait MiscWorld: ObjectWorld {
     fn hostile_time(&self, player: UnitId) -> u32 {
         0
     }
-    /// §12 rule 3 (open question 7): the portal's party, quest-flag and
-    /// owner checks and the travel itself. Returns the operate function's
-    /// result, or `None` when the steps are not run (default: the spec
-    /// does not state them yet).
-    fn portal_travel(&mut self, object: UnitId, player: UnitId) -> Option<i32> {
+    /// `0x00554630`: the unit's party id (0xFFFF = none).
+    fn party_id(&self, unit: UnitId) -> u16 {
+        0xFFFF
+    }
+    /// `0x00553720(game, O)` (§12 rule 6): the partner portal at the
+    /// destination point (object data +0x18, +0x1C) in the act of
+    /// `InteractType`, streaming and populating the room there when
+    /// absent; then the unit of type O +0x94 and GUID O +0x98 when it is
+    /// an object.
+    fn portal_partner(&mut self, object: UnitId) -> Option<UnitId> {
         None
     }
+    /// P's quest record for the game difficulty exists (player data +0x10
+    /// + 4 · game +0x6D; §12 rule 7).
+    fn has_quest_record(&self, player: UnitId) -> bool {
+        false
+    }
+    /// The game is an expansion game (game +0x70 ≠ 0).
+    fn expansion(&self) -> bool {
+        false
+    }
+    /// `0x0065C310(Q, q, bit)`: the bit of quest `q` in P's quest record.
+    fn player_quest_bit(&self, player: UnitId, quest: u32, bit: u8) -> bool {
+        false
+    }
+    /// `0x005353F0`: player data +0x48 (D2MOO `dwUniqueId`), the GUID of
+    /// the player's own portal.
+    fn player_portal_guid(&self, player: UnitId) -> u32 {
+        0
+    }
+    /// `0x0061B060(game +0xBC + 4 · act, level, 0, &x, &y, 3)`: the
+    /// level's spawn point for tile index 0 and free-point size 3
+    /// (`sim/path-placement.md` §11).
+    fn level_spawn_point(&mut self, level: u32) -> Option<(RoomId, i32, i32)> {
+        None
+    }
+    /// `0x00543B90(game, from, to, P)`: the quest change-level hook
+    /// (`world/quests.md`).
+    fn quest_level_change(&mut self, player: UnitId, from: u32, to: u32) {}
+    /// Unit size `0x00620510` of the player.
+    fn player_size(&self, player: UnitId) -> i32 {
+        2
+    }
+    /// `0x005809D0(game, P, 0, 2, x, y, 0)`: the player's walk-mode
+    /// request toward (x, y) (player-mode spec).
+    fn player_mode_xy(&mut self, player: UnitId, mode: u8, x: i32, y: i32) {}
+    /// Remove a portal: `0x0061A270(room, 2, GUID)`, free `0x00555600`,
+    /// `0x0061AED0(room, 1)` (§12 rule 12).
+    fn remove_portal(&mut self, object: UnitId) {}
+    /// `0x0058CF50(game, L)`: the Act V quest hook on the partner.
+    fn portal_act5_hook(&mut self, partner: UnitId) {}
+    /// §12 rule 13: state 102 (`just_portaled`) on P until `expire`
+    /// (stat list `0x006251F0(pool, 2, expire, 0, P's type)`, event 12 on
+    /// P at `expire`, remove callback `0x0056E900`, attach).
+    fn just_portaled(&mut self, player: UnitId, expire: i32) {}
 }
 
 /// Operate 8 `0x00581D40` (§10).
@@ -103,8 +158,7 @@ pub fn door<W: ObjectHost>(
 ) -> Result<i32, ObjectError> {
     let obj = op.object;
     // Rule 1 (host clock, edge case 9).
-    // TODO(objects.md §10 rule 1): the sum is read as a wrapping u32 and
-    // the compare as unsigned (`GetTickCount` is a DWORD).
+    // §10: unsigned 32-bit compare against (+0xD4 + 500) mod 2^32.
     let now = w.host_tick();
     if now < ctl.get(obj)?.last_tick.wrapping_add(DOOR_DEBOUNCE) {
         return Ok(1);
@@ -114,17 +168,14 @@ pub fn door<W: ObjectHost>(
     match mode {
         0 => open_door(ctl, t, w, obj, now)?,
         6 => {
-            // TODO(objects.md §10 rule 2): read as the key test function
-            // `0x0055F140` alone; the assassin exemption of §8.1 rule 2 is
-            // in the chest code and not applied. No operator: no key.
-            let pass = match op.operator {
-                Some(p) => w.key_test(p),
-                None => false,
+            // §10: the key test with no assassin exemption; with no
+            // operator it is fatal as for chests (`objects-2.md` §24 rule 6,
+            // unreachable with live data).
+            let Some(p) = op.operator else {
+                return Err(ObjectError::KeyTestNoUnit);
             };
-            if !pass {
-                if let Some(p) = op.operator {
-                    w.sound(p, sound::LOCKED, None, false);
-                }
+            if !w.key_test(p) {
+                w.sound(p, sound::LOCKED, None, false);
                 return Ok(1);
             }
             open_door(ctl, t, w, obj, now)?;
@@ -182,23 +233,23 @@ pub fn torch<W: ObjectHost>(
     Ok(1)
 }
 
-/// Operate 15 `0x00584870` (§12). `Ok(None)`: rules 1–2 passed and rule 3
-/// (open question 7) was not run by the host ([`MiscWorld::portal_travel`]).
+/// Operate 15 `0x00584870` (§12 rules 1–14). Every path returns 0; a
+/// result is always given (`Some`).
 pub fn portal<W: ObjectHost>(
     ctl: &mut ObjectControl,
-    _t: &ObjectTables,
+    t: &ObjectTables,
     w: &mut W,
     op: &Operate,
 ) -> Result<Option<i32>, ObjectError> {
     let obj = op.object;
-    // TODO(objects.md §12): the rules name a player operator; a monster or
-    // no operator is read as refused (result 0).
-    let Some(p) = op.operator else {
-        return Ok(Some(0));
+    // Rule 5: P must exist and be a player, else fatal (`0x0058494F`);
+    // monsters are stopped by §7.1 (`MonsterOK` 0) before this.
+    let Some(p) = op
+        .operator
+        .filter(|&p| matches!(w.operator(p), Operator::Player(_)))
+    else {
+        return Err(ObjectError::PortalOperator);
     };
-    if !matches!(w.operator(p), Operator::Player(_)) {
-        return Ok(Some(0));
-    }
     // Rule 1: busy `0x00535060` (`items/inventory.md` §5.2: interact info,
     // cursor item, player data +0x4C).
     if w.interact_active(p) || w.cursor_item(p) || w.player_busy(p) {
@@ -212,15 +263,128 @@ pub fn portal<W: ObjectHost>(
         }
     }
     // Rule 2 (host clock, edge case 9).
-    // TODO(objects.md §12 rule 2): wrapping u32 sum, unsigned compare.
+    // §10 last paragraph: (hostile + 5000) mod 2^32, unsigned compare.
     if w.host_tick() < w.hostile_time(p).wrapping_add(PORTAL_HOSTILE_DELAY) {
         w.sound(p, sound::PORTAL_REFUSED, None, false);
         return Ok(Some(0));
     }
-    // Rule 3.
-    // TODO(objects.md open question 7): the travel steps are not specified;
-    // they are left to the host seam.
-    Ok(w.portal_travel(obj, p))
+    portal_travel(ctl, t, w, op.class, obj, p).map(Some)
+}
+
+/// The refusal of §12 rules 4 and 7: sound 19 on P (target P), 0.
+fn refuse<W: ObjectHost>(w: &mut W, p: UnitId) -> i32 {
+    w.sound(p, sound::PORTAL_REFUSED, Some(p), false);
+    0
+}
+
+/// §12 rules 4–13 (open question 7 answered).
+fn portal_travel<W: ObjectHost>(
+    ctl: &mut ObjectControl,
+    t: &ObjectTables,
+    w: &mut W,
+    class: u16,
+    obj: UnitId,
+    p: UnitId,
+) -> Result<i32, ObjectError> {
+    // Rule 4: the owner gate.
+    let o = ctl.get(obj)?.owner.unwrap_or(-1);
+    if o != -1 && o != w.guid(p) as i32 {
+        let party = w.party_id(p);
+        if party == 0xFFFF {
+            return Ok(refuse(w, p));
+        }
+        if let Some(owner) = w.find_player(o as u32) {
+            if w.party_id(owner) != party {
+                return Ok(refuse(w, p));
+            }
+        }
+    }
+    // Rule 6.
+    let partner = w.portal_partner(obj);
+    let dest = u32::from(ctl.get(obj)?.interact);
+    let u = w.player_portal_guid(p);
+    // Rule 7, only when O has a room.
+    if w.room(obj).is_some() {
+        if !w.has_quest_record(p) {
+            return Ok(refuse(w, p));
+        }
+        let Some(d) = t.leveldefs.get(dest as usize) else {
+            return Ok(refuse(w, p));
+        };
+        if class == TOWN_PORTAL_CLASS {
+            if let Some(l) = partner {
+                if u != w.guid(obj) && u != w.guid(l) {
+                    let q = if w.expansion() {
+                        d.questflagex
+                    } else {
+                        d.questflag
+                    };
+                    if q > 0 && !w.player_quest_bit(p, q, 0) {
+                        return Ok(refuse(w, p));
+                    }
+                }
+            }
+        }
+    }
+    // Rule 8: the destination.
+    let (room, x, y) = match partner {
+        Some(l) => {
+            let (x, y) = w.position(l);
+            let room = w.room(l).ok_or(ObjectError::NoPortalDestination(obj))?;
+            (room, x, y)
+        }
+        None => w
+            .level_spawn_point(dest)
+            .ok_or(ObjectError::NoPortalDestination(obj))?,
+    };
+    // Rule 9.
+    ctl.get_mut(obj)?.portal_flags |= 5;
+    if let Some(pr) = w.room(p) {
+        if w.in_town(pr) {
+            let from = w.level(p).unwrap_or(0);
+            let to = w.room_level(room).unwrap_or(0);
+            w.quest_level_change(p, from, to);
+        }
+    }
+    // Rule 10.
+    let size = w.player_size(p);
+    let Some((room, x, y)) = w.free_point(room, x, y, size, PORTAL_SPOT_MASK) else {
+        return Ok(0);
+    };
+    // Rule 11.
+    if !w.place_unit(p, room, x, y) {
+        return Err(ObjectError::PortalPlacement(p));
+    }
+    w.sound(p, sound::PORTAL, None, false);
+    w.player_mode_xy(p, 2, x + 5, y + 5);
+    let msg = crate::path::walk::messages::player_stop(
+        0,
+        w.guid(p),
+        1,
+        (x + 5) as u16,
+        (y + 5) as u16,
+        0,
+        0,
+    );
+    w.send(p, &msg);
+    // Rule 12.
+    match partner {
+        Some(l) if class != PERMANENT_PORTAL_CLASS && u == w.guid(l) => {
+            w.remove_portal(obj);
+            w.portal_act5_hook(l);
+            w.remove_portal(l);
+        }
+        Some(_) if class == TOWN_PORTAL_CLASS => {}
+        _ => {
+            if w.mode(obj) == 1 {
+                schedule_endanim(w, t.object(class)?, obj);
+            }
+        }
+    }
+    // Rule 13.
+    let expire = w.frame() + JUST_PORTALED_FRAMES;
+    w.just_portaled(p, expire);
+    Ok(0)
 }
 
 /// The well mode rule (§11 rule 3, event 2): `c ≤ M` and `c mod (M / 2) =
@@ -242,7 +406,7 @@ fn well_mode(c: u32, parm2: u32) -> Result<Option<u8>, ObjectError> {
 }
 
 /// `0x00585720` (§11 rule 2): heal one vital stat. Returns whether it
-/// changed.
+/// wrote (the total was below its maximum).
 fn heal_vital<W: ObjectHost>(w: &mut W, p: UnitId, id: u16, max_id: u16, parm1: u32) -> bool {
     let cur = w.vital_stat(p, id);
     let max = w.vital_stat(p, max_id);
@@ -251,8 +415,9 @@ fn heal_vital<W: ObjectHost>(w: &mut W, p: UnitId, id: u16, max_id: u16, parm1: 
     }
     let v = cur.wrapping_add(max.wrapping_mul(parm1) >> 8).min(max);
     w.set_vital_stat(p, id, v);
-    // TODO(objects.md §11 rule 2): "changed" read as the value differing.
-    v != cur
+    // `objects-2.md` §24 rule 5: "used" is set by the write, also when the
+    // value is unchanged.
+    true
 }
 
 /// Operate 22 `0x005858A0` (§11). Returns 0 always (edge case 10).
@@ -319,9 +484,9 @@ pub fn well_refill<W: ObjectHost>(
         return Err(ObjectError::WellCharges(c as u8));
     }
     if let Some(mode) = well_mode(c, parm2)? {
-        // TODO(objects.md §11 event 2): the mode set is read as not
-        // queueing; the explicit queue below does.
-        set_mode(t, w, obj, class, mode, false)?;
+        // `objects-2.md` §24 rule 7: the ordinary mode set (queues, flag
+        // 0x1); the explicit queue and flag below repeat it.
+        set_mode(t, w, obj, class, mode, true)?;
     }
     ctl.get_mut(obj)?.interact = c as u8;
     w.queue_update(obj);

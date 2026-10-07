@@ -536,13 +536,13 @@ fn jerhyn_start_init() {
     f.spot = Some((0, 0));
     start(&mut ctl, &mut f);
     assert!(!x4(&ctl, i).jerhyn_start);
-    // Not found: not in the spec, reported.
-    let (mut ctl, mut f, _) = setup();
+    // Not found: the spawn runs with room 0, which returns null before
+    // any allocation (`quests-act2-2.md` §2 item 1, `quests-act1-rest.md`
+    // §9 item 1): nothing is spawned or stored.
+    let (mut ctl, mut f, i) = setup();
     start(&mut ctl, &mut f);
-    assert_eq!(
-        f.log,
-        ["spot at 30 40 2 0x100 10 100", "unhandled 11 0x59f380"]
-    );
+    assert_eq!(f.log, ["spot at 30 40 2 0x100 10 100"]);
+    assert!(!x4(&ctl, i).jerhyn_start);
     // Each guard alone stops it.
     for case in 0..5 {
         let (mut ctl, mut f, i) = setup();
@@ -676,12 +676,13 @@ fn sanctuary_portal() {
     q4::portal_operate(&mut ctl, &mut f, 54);
     let x = x4(&ctl, i);
     assert_eq!((x.portal_mode_sanctuary, x.portal_mode_cellar), (2, 1));
-    // Init in the cellar: 1 → 2 with the end-animation event at frame +
-    // 16 + 1.
+    // Init in the cellar: the object takes the stored 1 (it stays in mode
+    // 1 until its ENDANIM), the stored value becomes 2, end-animation
+    // event at frame + 16 + 1.
     f.unit_levels.insert(PORTAL, 54);
     f.frame = 10;
     q4::portal_init(&mut ctl, &mut f, PORTAL);
-    assert_eq!(f.log, ["mode 82 2", "event1 82 27"]);
+    assert_eq!(f.log, ["mode 82 1", "event1 82 27"]);
     assert_eq!(x4(&ctl, i).portal_mode_cellar, 2);
     // Init in the Sanctuary (2): the mode only.
     f.unit_levels.insert(PORTAL, 74);
@@ -808,18 +809,33 @@ fn palace_hooks() {
     assert!(q4::blocker_open(&ctl));
     ctl.records[i].extra.a2.q4.blocker_mode = 0;
     assert!(!q4::blocker_open(&ctl));
-    // `0x0059B820`: P2 within 30 of the blocker, P1 has 14.1.
-    f.objects.insert(BLOCKER, (0x51, 318, 0));
-    ctl.records[i].extra.a2.q4.blocker_guid = 0x51;
+    // `0x0059B820`: +0x1A / +0x1C reset, then the first player without
+    // 14.0 / 14.1 within 30 (`0x005DC5C0`: (2·max + min) / 2) of the
+    // stored blocker point +0x20 / +0x24 is stored and the walk stops.
+    // P1 has 14.1.
+    ctl.records[i].extra.a2.q4.blocker_x = 100;
+    ctl.records[i].extra.a2.q4.blocker_y = 100;
     add_player(&mut f, P2, 40);
-    f.distances.insert((P1, BLOCKER), 5);
-    f.distances.insert((P2, BLOCKER), 31);
+    add_player(&mut f, UnitId(3), 40);
+    f.xy.insert(P1, (100, 100));
+    f.xy.insert(P2, (131, 100));
+    f.xy.insert(UnitId(3), (100, 200));
     f.p(P1).quests.flags[0].set(14, 1);
     q4::jerhyn_near_blocker(&mut ctl, &mut f);
     assert!(!x4(&ctl, i).near_blocker);
-    f.distances.insert((P2, BLOCKER), 30);
+    // (2·30 + 1) / 2 = 30: in range.
+    f.xy.insert(P2, (130, 101));
     q4::jerhyn_near_blocker(&mut ctl, &mut f);
     assert!(x4(&ctl, i).near_blocker && x4(&ctl, i).near_guid == 2);
+    // A later qualifying player does not replace the first.
+    f.xy.insert(UnitId(3), (100, 100));
+    q4::jerhyn_near_blocker(&mut ctl, &mut f);
+    assert_eq!(x4(&ctl, i).near_guid, 2);
+    // Nobody in range: both fields are reset first.
+    f.xy.insert(P2, (300, 300));
+    f.xy.insert(UnitId(3), (300, 300));
+    q4::jerhyn_near_blocker(&mut ctl, &mut f);
+    assert!(!x4(&ctl, i).near_blocker && x4(&ctl, i).near_guid == 0);
     // `0x0059B6C0` / `0x0059B6D0`: bare `ret`.
     q4::jerhyn_class_hook();
     q4::guard_class_hook();

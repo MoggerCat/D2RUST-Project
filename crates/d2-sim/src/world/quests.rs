@@ -16,6 +16,7 @@ pub mod act2;
 pub mod act3;
 pub mod act4;
 pub mod act5;
+pub mod helpers;
 pub mod late;
 pub mod tables;
 
@@ -338,6 +339,22 @@ pub struct QuestControl {
     /// Fatal asserts the callbacks reached ([`QuestError::Fatal`]), in
     /// order; the original aborts at the first.
     pub faults: Vec<QuestError>,
+    /// Host calls the quest rules raised, in call order
+    /// (`quests-helpers.md` §6): the host (`d2-server`) runs them after
+    /// the current frame's quest step ([`Self::take_host_requests`]).
+    pub host_requests: Vec<HostRequest>,
+}
+
+/// A host call raised by a quest rule (`quests-helpers.md` §6): `d2-sim`
+/// changes no game state for it; the host runs it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HostRequest {
+    /// `0x00530590(game, 0)`: end the game (§6: drop the last in-game
+    /// client passing `0x00539030`, else the first in-game client).
+    EndGame,
+    /// `0x0052E2A0(game)`: the host save pass (`quests-act5-2.md` open
+    /// question 3).
+    SavePass,
 }
 
 /// The seam to the rest of the game. Expected providers in brackets.
@@ -597,9 +614,11 @@ pub trait QuestWorld {
         self.unhandled(0xFF, 0x005B_3090);
         None
     }
-    /// `0x005DDFC0` then `0x005DFEE0`: kill a monster (monster spec).
-    fn kill_monster(&mut self, monster: UnitId) {
-        let _ = monster;
+    /// `0x005DDFC0(game, monster, mode, x, y)`: the AI mode request at a
+    /// point (`monsters/ai.md` §7.1; the orb kill of `quests-act3.md` §6
+    /// passes mode 0 at (0, 0), then runs [`helpers::orb_missile`]).
+    fn monster_mode_at(&mut self, monster: UnitId, mode: u8, x: i32, y: i32) {
+        let _ = (monster, mode, x, y);
         self.unhandled(0xFF, 0x005D_DFC0);
     }
     /// `0x00619DA0`: the room covering (x, y).
@@ -615,10 +634,11 @@ pub trait QuestWorld {
         self.unhandled(0xFF, 0x0061_9790);
         false
     }
-    /// `0x0059D9D0`: the sewer stairs' warp (object spec).
+    /// `0x0059D9D0`: the stairs' warp (`quests-act3.md` §4.7): every
+    /// type-5 warp tile of the object's room gets `0x005550B0` for the
+    /// player. The same function as [`Self::object_stairs_warp`].
     fn stairs_warp(&mut self, object: UnitId, player: UnitId) {
-        let _ = (object, player);
-        self.unhandled(0xFF, 0x0059_D9D0);
+        self.object_stairs_warp(player, object);
     }
     /// The first player in the object's room unit list closer than
     /// `dist` (`0x00641530`).
@@ -670,11 +690,11 @@ pub trait QuestWorld {
     fn end_tainted_sun(&mut self) {
         self.unhandled(0xFF, 0x0061_C4D0);
     }
-    /// `0x00545850(op)`: the shared quest-chest gate (object spec).
+    /// `0x00545850(op)`: the shared quest-chest gate
+    /// (`quests-act2-2.md` §5.1, [`helpers::quest_chest_gate`]).
     fn quest_chest_gate(&mut self, object: UnitId, player: UnitId) -> bool {
-        let _ = (object, player);
-        self.unhandled(0xFF, 0x0054_5850);
-        false
+        let _ = player;
+        helpers::quest_chest_gate(self, object)
     }
     /// Set the object's (or monster's) drop code to `code`, then
     /// `0x00559A30(game, unit, quality, &level, 0, −1, droppable)`: one
@@ -794,18 +814,6 @@ pub trait QuestWorld {
         self.unhandled(0xFF, 0x0064_E7E0);
         None
     }
-    /// `0x005DC5C0`: distance between two units.
-    fn unit_distance(&mut self, a: UnitId, b: UnitId) -> i32 {
-        let _ = (a, b);
-        self.unhandled(0xFF, 0x005D_C5C0);
-        i32::MAX
-    }
-    /// `0x006416D0`: a living player within `radius` of the unit.
-    fn living_player_within(&mut self, unit: UnitId, radius: i32) -> bool {
-        let _ = (unit, radius);
-        self.unhandled(0xFF, 0x0064_16D0);
-        false
-    }
     /// `0x005723C0`: the player heard NPC `class`'s intro (chain 38;
     /// quests-act2 open question 5).
     fn npc_intro_heard(&mut self, player: UnitId, class: u16) -> bool {
@@ -879,7 +887,8 @@ pub trait QuestWorld {
         0
     }
     /// `0x00545C30(game, dummy, &(x, y), arg, id)`: spawn superunique
-    /// `id` at (x, y) beside the dummy object (`arg` 2 here).
+    /// `id` at (x, y) beside the dummy object (`arg` 2 here;
+    /// `quests-helpers.md` §3, [`helpers::spawn_superunique`]).
     fn spawn_superunique(
         &mut self,
         dummy: UnitId,
@@ -888,9 +897,7 @@ pub trait QuestWorld {
         arg: u32,
         id: u16,
     ) -> Option<UnitId> {
-        let _ = (dummy, x, y, arg, id);
-        self.unhandled(0xFE, 0x0054_5C30);
-        None
+        helpers::spawn_superunique(self, dummy, x, y, arg, id)
     }
     /// The units of type 1 (monsters) of each active room of the Act IV
     /// DRLG (`0x0061A180(game +0xC8)`, next room +0x7C) whose level is
@@ -913,25 +920,16 @@ pub trait QuestWorld {
         self.unhandled(0xFE, 0x0062_59B0);
         0
     }
-    /// `0x005351C0`: end the player's interaction (classic end of game).
+    /// `0x005351C0`: end the player's interaction (classic end of game;
+    /// `quests-helpers.md` §5, [`helpers::end_interaction`]).
     fn end_interaction(&mut self, player: UnitId) {
-        let _ = player;
-        self.unhandled(0xFE, 0x0053_51C0);
+        helpers::end_interaction(self, player);
     }
     /// `0x0053AEC0(game, player, level, arg)`: level warp
     /// (`drlg/levels.md`).
     fn warp_to_level(&mut self, player: UnitId, level: u32, arg: u32) {
         let _ = (player, level, arg);
         self.unhandled(0xFE, 0x0053_AEC0);
-    }
-    /// `0x00530590(game, 0)`: end the game (host, open question 10).
-    fn end_game(&mut self) {
-        self.unhandled(0xFE, 0x0053_0590);
-    }
-    /// `0x0052E2A0(game)`: the host save pass (acts in game types 1 and
-    /// 2 only; host, open question 10).
-    fn save_pass(&mut self) {
-        self.unhandled(0xFE, 0x0052_E2A0);
     }
     /// The player's client exists and `0x00535060` (busy) returns 0
     /// (`items/inventory.md`).
@@ -987,11 +985,9 @@ pub trait QuestWorld {
         0
     }
     /// "Critical spawn" `0x005459A0(game, x, y, room, 1, class)`
-    /// (monster spec).
+    /// (`quests-helpers.md` §2, [`helpers::critical_spawn`]).
     fn critical_spawn(&mut self, room: RoomId, x: i32, y: i32, class: u16) -> Option<UnitId> {
-        let _ = (room, x, y, class);
-        self.unhandled(0xFE, 0x0054_59A0);
-        None
+        helpers::critical_spawn(self, room, x, y, class)
     }
     /// "Kill in place" (`quests-act5.md` §1.1): the unit's interaction
     /// is ended, it is put in mode 12 and removed (`0x005A7E60`,
@@ -1072,19 +1068,17 @@ pub trait QuestWorld {
         false
     }
     /// `0x00545C30(game, unit, position, 2, superunique)` with the unit's
-    /// own position: spawn the superunique there (monster spec). The same
-    /// function as `spawn_superunique` with an explicit spot; one provider
-    /// serves both.
+    /// own position: spawn the superunique there (`quests-helpers.md` §3).
+    /// The same function as `spawn_superunique` with an explicit spot.
     fn spawn_superunique_at_unit(&mut self, at: UnitId, superunique: u16) -> Option<UnitId> {
-        let _ = (at, superunique);
-        self.unhandled(0xFE, 0x0054_5C30);
-        None
+        let (x, y) = self.unit_xy(at)?;
+        helpers::spawn_superunique(self, at, x, y, 2, superunique)
     }
-    /// `0x0058C8D0`: missile `missile` from `from` towards `to` (flags,
-    /// level; missile spec).
+    /// `0x0058C8D0`: missile `missile` from `from` towards the statue
+    /// `to` (flags 0x420, level 1; `quests-helpers.md` §4.1,
+    /// [`helpers::quest_missile`]).
     fn quest_missile(&mut self, from: UnitId, to: UnitId, missile: u16, flags: u32, level: u8) {
-        let _ = (from, to, missile, flags, level);
-        self.unhandled(0xFE, 0x0058_C8D0);
+        helpers::quest_missile(self, from, to, missile, flags, level);
     }
     /// `0x0058BEC0`: remove a spawned Ancient (unit state 54 →
     /// `0x005544B0`; in a room → mode 12, out of the room, collision
@@ -1111,31 +1105,27 @@ pub trait QuestWorld {
         let _ = player;
         self.unhandled(0xFE, 0x0057_0880);
     }
-    /// `0x005353F0` then `0x00535430`: close the player's town portal
-    /// if it is in `level`.
-    fn close_town_portal(&mut self, player: UnitId, level: u32) {
-        let _ = (player, level);
-        self.unhandled(0xFE, 0x0053_5430);
-    }
-    /// `0x0059D9D0`: the stairs' warp of `object` for the player (object
-    /// spec).
+    /// `0x0059D9D0`: the stairs' warp of `object` for the player
+    /// (`quests-act3.md` §4.7, `quests-act5-2.md` §7.8): for each unit of
+    /// the object's room unit list of type 5 (warp tile), `0x005550B0(game,
+    /// player, tile)` (`sim/path-placement.md` §12.2).
     fn object_stairs_warp(&mut self, player: UnitId, object: UnitId) {
-        let _ = (player, object);
-        self.unhandled(0xFE, 0x0059_D9D0);
+        helpers::stairs_warp(self, player, object);
     }
-    /// `0x0056EDE0` with type 2: object `class` at the unit's position
-    /// (`flags` the first of the three trailing arguments, then 0, 0).
+    /// The object allocation `0x00555230` (type 2) of object `class` at
+    /// the unit's position with flags (`flags`, 0, 0) (`quests-act5-2.md`
+    /// §7.6, object 561). Not `0x0056EDE0`, which is the missile wrapper
+    /// (`quests-helpers.md` §4.2). Default: [`Self::place_object`] in the
+    /// unit's room.
     fn create_object_at(&mut self, at: UnitId, class: u16, flags: u32) -> Option<UnitId> {
-        let _ = (at, class, flags);
-        self.unhandled(0xFE, 0x0056_EDE0);
-        None
+        let (x, y, room) = self.unit_position(at)?;
+        self.place_object(room, x, y, class, [flags as u8, 0, 0])
     }
-    /// `0x0056EDE0` with the missile type: missile `class` at the unit
-    /// (missile spec).
+    /// `0x0056EDE0(game, at, skill 0, level 1, class, x, y)` at the unit's
+    /// position (`quests-helpers.md` §4.2; Baal's missile 625).
     fn create_missile_at(&mut self, at: UnitId, class: u16) -> Option<UnitId> {
-        let _ = (at, class);
-        self.unhandled(0xFE, 0x0056_EDE0);
-        None
+        let (x, y) = self.unit_xy(at).unwrap_or((0, 0));
+        self.create_missile(at, 0, 1, class, x, y)
     }
     /// `0x00538680(client, act, difficulty)`: character progression
     /// (save spec; `quests-act5-2.md` open question 2).
@@ -1161,6 +1151,142 @@ pub trait QuestWorld {
         false
     }
     // -- end Act V part 2 seams.
+
+    // -- Narrow seams of the shared helpers (`quests-helpers.md`,
+    // `quests-act2-2.md` §5; [`helpers`]). Each default reports its 1.14d
+    // function through `unhandled` (chain 0xFE) and returns the neutral
+    // value.
+
+    /// `0x00619730`: the room's sub-tile box (X, Y, W, H). `None`: not
+    /// known (the helpers then use the all-zero box `0x00619730` returns
+    /// for a null room).
+    fn room_box(&mut self, room: RoomId) -> Option<crate::drlg::TileRect> {
+        let _ = room;
+        self.unhandled(0xFE, 0x0061_9730);
+        None
+    }
+    /// `0x0064D800(room, x, y, size, size, mask)` ≠ 0: some cell of the
+    /// box has collision bits in `mask`. Default: collides.
+    fn box_collides(&mut self, room: RoomId, x: i32, y: i32, size: i32, mask: u32) -> bool {
+        let _ = (room, x, y, size, mask);
+        self.unhandled(0xFE, 0x0064_D800);
+        true
+    }
+    /// `0x0059FA30` (`missiles/missiles.md` §R2): create a missile from a
+    /// zeroed creation record.
+    fn spawn_missile(&mut self, rec: helpers::QuestMissile) -> Option<UnitId> {
+        let _ = rec;
+        self.unhandled(0xFE, 0x0059_FA30);
+        None
+    }
+    /// `0x0064A710`: missile data +0x28 := `v` (+0x2C untouched).
+    fn set_missile_guid(&mut self, missile: UnitId, v: u32) {
+        let _ = (missile, v);
+        self.unhandled(0xFE, 0x0064_A710);
+    }
+    /// `0x0056D2C0`: the position of the unit's path target unit
+    /// (`0x00553540`; `quests-helpers.md` §4.2 step 2). `None`: none.
+    fn path_target_xy(&mut self, unit: UnitId) -> Option<(i32, i32)> {
+        let _ = unit;
+        self.unhandled(0xFE, 0x0056_D2C0);
+        None
+    }
+    /// `0x00552F60(game, kind, guid)`: the unit of that type and GUID.
+    /// Default: the player, monster and object lookups; other types
+    /// reported.
+    fn unit_by_guid(&mut self, kind: u8, guid: u32) -> Option<UnitId> {
+        match kind {
+            0 => self.player_by_guid(guid),
+            1 => self.monster_by_guid(guid).map(|m| m.0),
+            2 => self.object_by_guid(guid).map(|o| o.0),
+            _ => {
+                self.unhandled(0xFE, 0x0055_2F60);
+                None
+            }
+        }
+    }
+    /// `0x00568060(game, player, button, 0)`: the C→S 0x4F trade body
+    /// (`sim/intents-events.md` rule 15; button 6 = cancel).
+    fn trade_button(&mut self, player: UnitId, button: u8) {
+        let _ = (player, button);
+        self.unhandled(0xFE, 0x0056_8060);
+    }
+    /// `0x00572E00`: unlink and free the player's chat node from the NPC's
+    /// interaction list (monster data +0x30; nothing for a non-monster).
+    fn free_chat_node(&mut self, npc: UnitId, player: UnitId) {
+        let _ = (npc, player);
+        self.unhandled(0xFE, 0x0057_2E00);
+    }
+    /// `0x00573180`'s end: every chat node of the NPC freed and its
+    /// interaction list emptied (after the per-player 0x62, interaction
+    /// reset and callback, `quests-act5.md` §5.7).
+    fn clear_npc_chats(&mut self, npc: UnitId) {
+        let _ = npc;
+        self.unhandled(0xFE, 0x0057_3180);
+    }
+    /// `0x005852E0(game, player GUID, object GUID, 0, 2)`: the obelisk's
+    /// C→S 0x44 body (`quests-act2-2.md` §3.2).
+    fn obelisk_close(&mut self, player: UnitId, object: UnitId) {
+        let _ = (player, object);
+        self.unhandled(0xFE, 0x0058_52E0);
+    }
+    /// `0x00584820`: the Steeg Stone's object data +0 := −1 when it holds
+    /// the player's GUID.
+    fn steeg_release(&mut self, object: UnitId, player: UnitId) {
+        let _ = (object, player);
+        self.unhandled(0xFE, 0x0058_4820);
+    }
+    /// `0x00567330` → `0x0055FA40`: close the player's Horadric Cube
+    /// (`world/cube.md` button 0x17).
+    fn close_cube(&mut self, player: UnitId) {
+        let _ = player;
+        self.unhandled(0xFE, 0x0056_7330);
+    }
+    /// `objects.txt` `Mode1` (record +0x140) of the object's class ≠ 0.
+    fn object_mode1(&mut self, object: UnitId) -> Option<bool> {
+        let _ = object;
+        self.unhandled(0xFF, 0x0064_0E90);
+        None
+    }
+    /// Unit +0xC4 &= !`flags`.
+    fn clear_unit_flags(&mut self, unit: UnitId, flags: u32) {
+        let _ = (unit, flags);
+        self.unhandled(0xFF, 0x0054_5850);
+    }
+    /// The units of type 5 (warp tiles) of the object's room unit list
+    /// (+0x74, next +0xE8), in list order; none without a room.
+    fn room_warp_tiles(&mut self, object: UnitId) -> Vec<UnitId> {
+        let _ = object;
+        self.unhandled(0xFE, 0x0059_D9D0);
+        Vec::new()
+    }
+    /// `0x005550B0(game, player, tile)` (`sim/path-placement.md` §12.2).
+    fn warp_through(&mut self, player: UnitId, tile: UnitId) {
+        let _ = (player, tile);
+        self.unhandled(0xFE, 0x0055_50B0);
+    }
+    /// `0x005353F0(player)`: the GUID of the player's town portal (player
+    /// data +0x48). `None`: no player data.
+    fn town_portal_guid(&mut self, player: UnitId) -> Option<u32> {
+        let _ = player;
+        self.unhandled(0xFE, 0x0053_53F0);
+        None
+    }
+    /// `0x00553720`: the portal's partner (the room at its destination
+    /// streamed in, then the unit of type / GUID +0x94 / +0x98).
+    fn portal_partner(&mut self, portal: UnitId) -> Option<UnitId> {
+        let _ = portal;
+        self.unhandled(0xFE, 0x0055_3720);
+        None
+    }
+    /// `quests-helpers.md` §7 step 4: the portal leaves its room
+    /// (`0x0061A270`), is freed (`0x00555600`) and its room (possibly
+    /// null) is refreshed with `0x0061AED0(room, 1)`.
+    fn free_portal_object(&mut self, portal: UnitId) {
+        let _ = portal;
+        self.unhandled(0xFE, 0x0055_5600);
+    }
+    // -- end helper seams.
 }
 
 /// A unit as the kill parse sees it (§4.4).
@@ -1251,6 +1377,7 @@ impl QuestControl {
             rows: tables.rows.clone(),
             messages: tables.messages.clone(),
             faults: Vec::new(),
+            host_requests: Vec::new(),
         })
     }
 
@@ -1269,7 +1396,25 @@ impl QuestControl {
             rows: Vec::new(),
             messages: Vec::new(),
             faults: Vec::new(),
+            host_requests: Vec::new(),
         }
+    }
+
+    /// `0x00530590(game, 0)` (`quests-helpers.md` §6): raised as a host
+    /// request.
+    pub fn end_game(&mut self) {
+        self.host_requests.push(HostRequest::EndGame);
+    }
+
+    /// `0x0052E2A0(game)` (`quests-helpers.md` §6): raised as a host
+    /// request.
+    pub fn save_pass(&mut self) {
+        self.host_requests.push(HostRequest::SavePass);
+    }
+
+    /// The host requests raised so far, in call order (emptied).
+    pub fn take_host_requests(&mut self) -> Vec<HostRequest> {
+        std::mem::take(&mut self.host_requests)
     }
 
     /// `0x00543640`: the record index of `chain`.
@@ -1733,9 +1878,10 @@ impl QuestControl {
         if w.unit_act(player) != Some(r.act) {
             return Ok(());
         }
-        // TODO(quests §6.3): a status function returning false leaves the
-        // status byte undefined; d2rs sends the record's status byte.
-        let status = self.status_for(w, i, player)?.unwrap_or(r.status);
+        // The status byte starts at 0 and takes the function's out byte
+        // only when it returns 1 (`0x005442AF`): a status function
+        // returning 0 sends status 0.
+        let status = self.status_for(w, i, player)?.unwrap_or(0);
         let extra = match r.filter {
             1 => act1::den_monsters_left(r),
             36 => act5::barbarians_left(self, w),
@@ -2116,9 +2262,8 @@ pub fn cow_portal<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, player: Unit
             }
         }
     }
-    // TODO(quests §8.4): the spec names the sound for the refusal tests;
-    // that a failed spot search or portal creation also plays it is
-    // `world/cube.md` §9's reading ("on failure").
+    // Every failure (a refusal test, no free spot at `0x00594211`, no
+    // portal at `0x0059422F`) takes the exit `0x0059424B`: the sound.
     w.attach_sound(player, u16::from(crate::world::cube::SOUND_COW_REFUSED));
     false
 }

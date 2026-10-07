@@ -1,7 +1,7 @@
-// Spec: specs/world/hirelings.md §11 (tests)
+// Spec: specs/world/hirelings.md §11; specs/world/hirelings-2.md §17 (tests)
 //! The item swap `0x0054CED0` against a recording [`HirelingItems`].
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::items::moves::{Guid, Owner};
 use crate::world::hirelings::class;
@@ -31,6 +31,8 @@ struct Fake {
     body: BTreeMap<u8, Guid>,
     req_pass: bool,
     next_guid: Guid,
+    /// Items whose duplicate fails (`hirelings-2.md` §17 rule 2).
+    dup_fails: BTreeSet<Guid>,
 }
 
 impl Fake {
@@ -81,17 +83,21 @@ impl HirelingItems for Fake {
     fn body_item(&self, _unit: Owner, loc: u8) -> Option<Guid> {
         self.body.get(&loc).copied()
     }
-    fn duplicate(&mut self, owner: Owner, item: Guid) -> Guid {
+    fn duplicate(&mut self, owner: Owner, item: Guid) -> Option<Guid> {
+        if self.dup_fails.contains(&item) {
+            self.note(format!("duplicate {} {item} -> none", u(owner)));
+            return None;
+        }
         let g = self.next_guid;
         self.next_guid += 1;
         self.note(format!("duplicate {} {item} -> {g}", u(owner)));
-        g
+        Some(g)
     }
     fn set_mode(&mut self, item: Guid, mode: u8) {
         self.note(format!("mode {item} {mode}"));
     }
-    fn notice(&mut self, unit: Owner, a: u32, b: u32) {
-        self.note(format!("notice {} {a} {b}", u(unit)));
+    fn cancel_timers(&mut self, unit: Owner, ty: u8, a: Guid) {
+        self.note(format!("cancel {} {ty} {a}", u(unit)));
     }
     fn equip_from_cursor(&mut self, unit: Owner, item: Guid, loc: u8, skip: bool) {
         self.note(format!("equip {} {item} {loc} {skip}", u(unit)));
@@ -133,7 +139,8 @@ impl HirelingItems for Fake {
     fn call_00621000(&mut self, unit: Owner, arg: u32) {
         self.note(format!("00621000 {} {arg}", u(unit)));
     }
-    fn become_cursor(&mut self, player: Owner, item: Guid) {
+    fn become_cursor(&mut self, player: Owner, item: Option<Guid>) {
+        let item = item.map_or("none".to_string(), |g| g.to_string());
         self.note(format!("become_cursor {} {item}", u(player)));
     }
     fn put_back(&mut self, unit: Owner, item: Guid, page: u8, loc: u8) {
@@ -152,8 +159,8 @@ fn rule3(copy: Guid, loc: u8) -> Vec<String> {
     vec![
         format!("duplicate M {C} -> {copy}"),
         format!("mode {copy} 4"),
-        format!("notice M 9 {C}"),
-        format!("notice P 9 {C}"),
+        format!("cancel M 9 {C}"),
+        format!("cancel P 9 {C}"),
         format!("equip M {copy} {loc} true"),
         format!("consume {C}"),
         "cursor none P".into(),
@@ -164,9 +171,47 @@ fn rule3_tail() -> Vec<String> {
     vec![
         "0055DF00 M".into(),
         "0055F4F0 M 0".into(),
-        "notice M 3 0".into(),
+        "cancel M 3 0".into(),
         "event M 3 +1".into(),
     ]
+}
+
+// Covers: specs/world/hirelings-2.md §17 r1, §17 r2, §edge-cases-original-bugs r4
+#[test]
+fn failed_duplicate_loses_the_item() {
+    // Empty target: no mode, no equip; the cancels, the consume, the
+    // cursor clear and the tail run; result 1.
+    let mut f = Fake::new();
+    f.dup_fails.insert(C);
+    assert_eq!(swap(&mut f, true, PLAYER, MERC, C), res::SWAPPED);
+    let mut want: Vec<String> = vec![
+        format!("duplicate M {C} -> none"),
+        format!("cancel M 9 {C}"),
+        format!("cancel P 9 {C}"),
+        format!("consume {C}"),
+        "cursor none P".into(),
+    ];
+    want.extend(rule3_tail());
+    assert_eq!(f.log, want);
+
+    // Occupied target, C fails and old's copy fails too: old's copy step
+    // still runs with none (cursor := none).
+    let mut f = Fake::new();
+    f.body.insert(4, OLD);
+    f.dup_fails.extend([C, OLD]);
+    assert_eq!(swap(&mut f, true, PLAYER, MERC, C), res::SWAPPED);
+    let tail: Vec<String> = f.log[8..].to_vec();
+    let mut want: Vec<String> = vec![
+        format!("duplicate M {C} -> none"),
+        format!("cancel M 9 {C}"),
+        format!("cancel P 9 {C}"),
+        format!("consume {C}"),
+        "cursor none P".into(),
+        format!("duplicate P {OLD} -> none"),
+        "become_cursor P none".into(),
+    ];
+    want.extend(rule3_tail());
+    assert_eq!(tail, want);
 }
 
 // Covers: specs/world/hirelings.md §11 r1
@@ -193,7 +238,7 @@ fn no_player_inventory_is_0_and_missing_merc_inventory_is_created() {
     assert_eq!(f.log[0], "create_inventory M");
 }
 
-// Covers: specs/world/hirelings.md §11 text, §11 r2, §11 r3
+// Covers: specs/world/hirelings.md §11 text, §11 r2, §11 r3; specs/world/hirelings-2.md §17 r1
 #[test]
 fn empty_target_duplicates_equips_and_consumes() {
     let mut f = Fake::new();
