@@ -1361,3 +1361,245 @@ fn bone_prison_start_needs_a_field_target() {
     f.town.insert(2);
     assert_eq!(b3_lvl24::bone_prison_start(&mut f, u), 0);
 }
+
+// ---------------------------------------------------------------- §7.12
+
+fn golem_world() -> (
+    crate::skills::SkillTables,
+    crate::combat::CombatTables,
+    BodyFake,
+    usize,
+    usize,
+) {
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.summon = 0;
+    r.summode = 1;
+    r.pettype = 3;
+    r.petmax = c.f(2);
+    let t = tabs(r, c, 1);
+    let ct = combat_tables(vec![monster_rec()]);
+    let (mut f, u) = world();
+    let item = f.add(FUnit::new(UnitType::Item, 0), (6, 4));
+    f.targets.insert(u, item);
+    (t, ct, f, u, item)
+}
+
+// Covers: specs/skills/bodies-2b.md §7.12 text, §7.12 r1, §7.12 r2
+#[test]
+fn iron_golem_needs_the_item_and_flags_the_unit() {
+    let (t, ct, mut f, u, _) = golem_world();
+    assert_eq!(b3_lvl24::iron_golem_start(&mut f, u), 1);
+    f.targets.clear();
+    assert_eq!(b3_lvl24::iron_golem_start(&mut f, u), 0);
+    assert_eq!(b3_lvl24::iron_golem(&mut f, &t, &ct, u, 1, 1), 0);
+    assert_eq!(f.c.units[u].flags & FLAG_40, 0);
+    // A non-item target fails the start test too.
+    let m = monster(&mut f, (1, 1));
+    f.targets.insert(u, m);
+    assert_eq!(b3_lvl24::iron_golem(&mut f, &t, &ct, u, 1, 1), 0);
+    // The item: the flag is set (even when a later step refuses).
+    let (t, ct, mut f, u, _) = golem_world();
+    assert_eq!(b3_lvl24::iron_golem(&mut f, &t, &ct, u, 0, 1), 0);
+    assert_eq!(f.c.units[u].flags & FLAG_40, FLAG_40);
+    let _ = (t, ct);
+}
+
+// Covers: specs/skills/bodies-2b.md §7.12 r3
+#[test]
+fn iron_golem_summon_class_and_pettype() {
+    let (t, ct, mut f, u, _) = golem_world();
+    assert_eq!(b3_lvl24::iron_golem(&mut f, &t, &ct, u, 9, 1), 0);
+    let mut t2 = t.clone();
+    t2.skills[1].summon = 0xFFFF;
+    assert_eq!(b3_lvl24::iron_golem(&mut f, &t2, &ct, u, 1, 1), 0);
+    // pettype >= count is a refusal here (unlike Dopplezon).
+    let mut t3 = t.clone();
+    t3.skills[1].pettype = 15;
+    assert_eq!(b3_lvl24::iron_golem(&mut f, &t3, &ct, u, 1, 1), 0);
+    assert!(!f.take_log().iter().any(|s| s.starts_with("monster")));
+}
+
+// Covers: specs/skills/bodies-2b.md §7.12 r4, §7.12 r5, §7.12 r6
+#[test]
+fn iron_golem_wears_the_item() {
+    let (t, ct, mut f, u, item) = golem_world();
+    f.no_monsters = true;
+    assert_eq!(b3_lvl24::iron_golem(&mut f, &t, &ct, u, 1, 1), 0);
+    f.no_monsters = false;
+    assert_eq!(b3_lvl24::iron_golem(&mut f, &t, &ct, u, 1, 1), 1);
+    let m = f.c.units.len() - 1;
+    let log = f.take_log();
+    // Flags 1: at T's position, pet type 3, max 2.
+    assert!(log.iter().any(|s| s.starts_with("monster 1 (6, 4) 0 1")));
+    assert!(log
+        .iter()
+        .any(|s| s.starts_with("PetAdd") && s.contains("t: 3") && s.contains("max: 2")));
+    let at = |p: String| log.iter().position(|s| *s == p);
+    let leave = at(format!("ItemLeaveRoom({item})")).expect("T leaves its room");
+    let mode = at(format!("ItemMode {{ item: {item}, mode: 4 }}")).expect("mode 4");
+    let equip = at(format!("Equip {{ m: {m}, item: {item}, loc: 4 }}")).expect("equip");
+    assert!(leave < mode && mode < equip);
+    assert!(log.contains(&format!("AllyInfo {{ u: {u}, m: {m} }}")));
+}
+
+// ---------------------------------------------------------------- §7.13
+
+fn conv_world(
+    p: i16,
+) -> (
+    crate::skills::SkillTables,
+    crate::combat::CombatTables,
+    BodyFake,
+    usize,
+    usize,
+) {
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.auratargetstate = 53;
+    r.calc1 = c.f(p);
+    r.auralencalc = c.f(100);
+    let t = tabs(r, c, 1);
+    let mut ms = monster_rec();
+    ms.switchai = true;
+    let ct = combat_tables(vec![ms]);
+    let (mut f, u) = world();
+    let m = monster(&mut f, (1, 0));
+    f.targets.insert(u, m);
+    f.c.in_range = true;
+    f.c.hostile = true;
+    f.c.set(m, 6, 10_000_000);
+    stored(
+        &mut f,
+        u,
+        m,
+        DamageRecord {
+            result: 1,
+            ..DamageRecord::default()
+        },
+    );
+    (t, ct, f, u, m)
+}
+
+// Covers: specs/skills/bodies-2b.md §7.13 r1
+#[test]
+fn conversion_refusals() {
+    let (t, ct, mut f, u, _) = conv_world(100);
+    assert_eq!(b3_lvl24::conversion_do(&mut f, &t, &ct, u, 9, 1), 0);
+    assert_eq!(f.c.units[u].flags & FLAG_40, 0);
+    f.targets.clear();
+    f.tpos.clear();
+    assert_eq!(b3_lvl24::conversion_do(&mut f, &t, &ct, u, 1, 1), 0);
+    assert_eq!(f.c.units[u].flags & FLAG_40, FLAG_40);
+}
+
+// Covers: specs/skills/bodies-2b.md §7.13 r2, §7.13 r3
+#[test]
+fn conversion_chance_gates_the_state() {
+    // p = 100: roll(100) < 100 always.
+    let (t, ct, mut f, u, m) = conv_world(100);
+    assert_eq!(b3_lvl24::conversion_do(&mut f, &t, &ct, u, 1, 1), 1);
+    assert!(f.list_of(m, 53).is_some());
+    // p = 0: never; the stored hit is applied instead.
+    let (t, ct, mut f, u, m) = conv_world(0);
+    assert_eq!(b3_lvl24::conversion_do(&mut f, &t, &ct, u, 1, 1), 1);
+    assert!(f.list_of(m, 53).is_none());
+    assert!(f.c.units[u].combat.is_empty(), "apply_melee consumed it");
+    // No pair record: ok = 0 with no draw.
+    let (t, ct, mut f, u, m) = conv_world(100);
+    f.c.units[u].combat.clear();
+    let seed = f.c.units[u].seed;
+    assert_eq!(b3_lvl24::conversion_do(&mut f, &t, &ct, u, 1, 1), 1);
+    assert!(f.list_of(m, 53).is_none());
+    assert_eq!(f.c.units[u].seed, seed);
+    // The target tests: a hireling, a non-switchable monster, an invalid
+    // target state.
+    let (t, ct, mut f, u, m) = conv_world(100);
+    f.c.units[m].hireling = true;
+    b3_lvl24::conversion_do(&mut f, &t, &ct, u, 1, 1);
+    assert!(f.list_of(m, 53).is_none());
+    let (t, mut ct, mut f, u, m) = conv_world(100);
+    ct.monstats[0].switchai = false;
+    b3_lvl24::conversion_do(&mut f, &t, &ct, u, 1, 1);
+    assert!(f.list_of(m, 53).is_none());
+    let (mut t, ct, mut f, u, m) = conv_world(100);
+    t.skills[1].auratargetstate = 0xFFFF;
+    assert_eq!(b3_lvl24::conversion_do(&mut f, &t, &ct, u, 1, 1), 1);
+    assert!(f.list_of(m, 53).is_none());
+}
+
+// Covers: specs/skills/bodies-2b.md §7.13 r4, §7.13 r5
+#[test]
+fn conversion_expiry_and_callback() {
+    let (t, ct, mut f, u, m) = conv_world(100);
+    f.c.frame = 50;
+    assert_eq!(b3_lvl24::conversion_do(&mut f, &t, &ct, u, 1, 1), 1);
+    let l = f.list_of(m, 53).unwrap();
+    assert_eq!((l.expire, l.callback), (150, callback::CONVERSION));
+    assert!(!f.c.units[u].combat.is_empty(), "the stored hit is not applied");
+    // A zero length still lasts one frame.
+    let (mut t, ct, mut f, u, m) = conv_world(100);
+    t.skills[1].auralencalc = 0xFFFF_FFFF;
+    f.c.frame = 50;
+    b3_lvl24::conversion_do(&mut f, &t, &ct, u, 1, 1);
+    assert_eq!(f.list_of(m, 53).unwrap().expire, 51);
+}
+
+// ---------------------------------------------------------------- §7.14
+
+// Covers: specs/skills/bodies-2b.md §7.14
+#[test]
+fn holy_shield_start_needs_a_shield() {
+    let (mut f, u) = world();
+    assert_eq!(b3_lvl24::holy_shield_start(&mut f, u), 0);
+    f.inventory = true;
+    assert_eq!(b3_lvl24::holy_shield_start(&mut f, u), 0);
+    f.shield = Some(0);
+    assert_eq!(b3_lvl24::holy_shield_start(&mut f, u), 1);
+    f.inventory = false;
+    assert_eq!(b3_lvl24::holy_shield_start(&mut f, u), 0);
+}
+
+// ---------------------------------------------------------------- §7.15
+
+// Covers: specs/skills/bodies-2b.md §7.15 r1, §7.15 r2, §7.15 r3
+#[test]
+fn frenzy_even_and_odd_frames() {
+    let mut r = body_rec();
+    r.srvmissilea = 0;
+    let t = tabs(r, Code::new(), 1);
+    let ct = combat_tables(vec![monster_rec()]);
+    let (mut f, u) = world();
+    // T none.
+    assert_eq!(b3_lvl24::frenzy(&mut f, &t, &ct, u, 1, 1), 0);
+    let m = monster(&mut f, (1, 0));
+    let m2 = monster(&mut f, (2, 0));
+    for x in [m, m2] {
+        f.c.units[x].mode = 1;
+        f.c.units[x].flags = 0xC;
+    }
+    f.scan = vec![m, m2];
+    f.c.hostile = true;
+    f.targets.insert(u, m);
+    f.c.in_range = true;
+    f.c.set(u, 12, 99);
+    f.c.set(u, 19, 100_000);
+    f.c.set(m, 12, 1);
+    // Even: the unit's combat records for T are freed, cleanup, swing on T.
+    f.frame_index.insert(u, 2);
+    assert_eq!(b3_lvl24::frenzy(&mut f, &t, &ct, u, 1, 1), 1);
+    let log = f.take_log();
+    assert!(log.contains(&format!("FreeCombat {{ u: {u}, target: {m} }}")));
+    assert!(log.contains(&format!("attackcleanup {u}")));
+    assert!(log.contains(&format!("weaponcleanup {u}")));
+    assert!(log.contains(&format!("path {u} TargetUnit(Some({m}))")));
+    assert_eq!(f.c.units[u].flags & FLAG_40, 0);
+    // Odd: the flag, no free, swing on the next unit by GUID.
+    f.frame_index.insert(u, 3);
+    assert_eq!(b3_lvl24::frenzy(&mut f, &t, &ct, u, 1, 1), 1);
+    let log = f.take_log();
+    assert_eq!(f.c.units[u].flags & FLAG_40, FLAG_40);
+    assert!(!log.iter().any(|s| s.starts_with("FreeCombat")));
+    assert!(log.contains(&format!("attackcleanup {u}")));
+    assert!(log.contains(&format!("path {u} TargetUnit(Some({m2}))")));
+}
