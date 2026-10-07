@@ -32,20 +32,20 @@
 |   3. Ambient fill (`0x00474610`) | 112–143 |
 |   4. Blocks-light flags (`0x004756D0`) | 144–152 |
 |   5. Light quality and the draw rate | 153–178 |
-|   6. Light records | 179–261 |
-|   7. Contribution of one record | 262–341 |
-|   8. Light sources | 342–406 |
-|   9. Environment (day and night) | 407–488 |
-|   10. Scripted ambient overrides (`0x0046BDD0`) | 489–542 |
-|   11. Light values handed to the draws | 543–573 |
-|   12. Captures (answers `capture.md` Open question 5) | 574–611 |
-|   13. d2rs answers | 612–622 |
-| Constants & data dependencies | 623–634 |
-| Randomness | 635–641 |
-| Edge cases & original bugs | 642–656 |
-| Test vectors | 657–689 |
-| Provenance | 690–732 |
-| Open questions | 733–764 |
+|   6. Light records | 179–262 |
+|   7. Contribution of one record | 263–342 |
+|   8. Light sources | 343–407 |
+|   9. Environment (day and night) | 408–489 |
+|   10. Scripted ambient overrides (`0x0046BDD0`) | 490–543 |
+|   11. Light values handed to the draws | 544–574 |
+|   12. Captures (answers `capture.md` Open question 5) | 575–612 |
+|   13. d2rs answers | 613–623 |
+| Constants & data dependencies | 624–635 |
+| Randomness | 636–642 |
+| Edge cases & original bugs | 643–657 |
+| Test vectors | 658–690 |
+| Provenance | 691–733 |
+| Open questions | 734–766 |
 <!-- /index -->
 
 ## Summary
@@ -246,17 +246,18 @@ order.
    cached contribution (§7.4, building the cache first when invalid);
    else the plain contribution with `q` (§7.2).
 
-A room leaving the client (`0x00475930`, ECX = the room, registered by
-`0x00475B40` through `0x0061AF60`) walks the list; for each kind-2
-record: owner type 6 or owner not found (§6.4 r1 lookup) is fatal
-0x591. With `R` = the owner's room (`0x00620BB0`): `R` = the leaving
-room → nothing. Else, with `(ux, uy)` the owner's sub-tile (objects,
+A new client active room (`0x00475930`, ECX = the room just created;
+registered by `0x00475B40` through `0x0061AF60` as the act callback and
+called only by the active-room creation, `drlg/rooms.md` §5 rules 8–9)
+walks the list; for each kind-2 record: owner type 6 or owner not found
+(§6.4 r1 lookup) is fatal 0x591. With `R` = the owner's room
+(`0x00620BB0`): `R` = the new room → nothing. Else, with `(ux, uy)` the owner's sub-tile (objects,
 items and tiles, types 2, 4, 5: static path `+0x0C`, `+0x10`; types 0,
 1, 3: dynamic path `0x006488C0` / `0x00648900`, 0 without a path) and
 `m` = radius (`+0x18`) `>> 3`, the cell lookup `0x00463740(R, x, y)`
 (`client/model.md` §2) is run on `(ux + m, uy)`, `(ux − m, uy)`,
 `(ux, uy + m)`, `(ux, uy − m)` in this order; the first that returns the
-leaving room sets cache valid (`+0x2C`) := 0 (the cache memory is kept)
+new room sets cache valid (`+0x2C`) := 0 (the cache memory is kept)
 and ends the record's tests.
 
 ### 7. Contribution of one record
@@ -719,7 +720,7 @@ reader, same-key pairs diffed and grouped into 8-connected blobs (gap 3),
 palette and light maps from act 1 `pal.pl2`. D2MOO not used; riiablo not
 needed.
 Ghidra backlog (2026-10-06): lookups `0x00463990`/`0x004639B0`/
-`0x00463940`; room unload `0x00475930`; monster light `0x004AE210`,
+`0x00463940`; new-room callback `0x00475930` (called at `0x00619954`); monster light `0x004AE210`,
 `0x0063EBD0`, umod hooks `0x004AD020`/`0x004ACC70` (tables `0x00724D78`,
 `0x006DA4C8` read from the file); cast light `0x004C5680` (caller
 `0x004C6140`), `cltdofunc` table `0x00727BA8` entry 30 = `0x004F3530`;
@@ -734,7 +735,8 @@ data: `states` setfunc, `missiles` rows 191/288, `objects` row 17,
 
 1. ~~Which unit tables `0x00463990` / `0x004639B0` search~~: answered in
    §6.4 r1 (sets S and C).
-2. ~~The room-unload test of `0x00475930`~~: answered in §6.4.
+2. ~~The room-unload test of `0x00475930`~~: answered in §6.4 (it runs
+   for a new active room, not an unloaded one: `drlg/rooms.md` §5 rule 9).
 3. ~~Monster light inputs~~: answered in §8 r1–r2 and the monster row
    (`Align`, client-only flag, umod 3 hook).
 4. ~~Radius-1 missile light paths, `+0x50`, flags 0x300~~: answered in

@@ -31,18 +31,18 @@
 |   2. DRLG room creation and seeds (`0x0066B3E0`) | 119–151 |
 |   3. Rooms-near arrays (`0x0066C370`) | 152–195 |
 |   4. Status and activation | 196–334 |
-|   5. Active room creation (`0x006422A0`, `0x00619890`) | 335–357 |
-|   6. Adjacency array order (owner of `unit-order.md` §9) | 358–373 |
-|   7. Room clients and the inactivity counter | 374–394 |
-|   8. Deactivation (tick step 9) | 395–430 |
-|   9. Room tile grid | 431–967 |
-|   10. Collision map from tiles | 968–1046 |
-| Constants & data dependencies | 1047–1061 |
-| Randomness | 1062–1079 |
-| Edge cases & original bugs | 1080–1097 |
-| Test vectors | 1098–1145 |
-| Provenance | 1146–1176 |
-| Open questions | 1177–1226 |
+|   5. Active room creation (`0x006422A0`, `0x00619890`) | 335–368 |
+|   6. Adjacency array order (owner of `unit-order.md` §9) | 369–384 |
+|   7. Room clients and the inactivity counter | 385–405 |
+|   8. Deactivation (tick step 9) | 406–441 |
+|   9. Room tile grid | 442–978 |
+|   10. Collision map from tiles | 979–1057 |
+| Constants & data dependencies | 1058–1072 |
+| Randomness | 1073–1090 |
+| Edge cases & original bugs | 1091–1108 |
+| Test vectors | 1109–1156 |
+| Provenance | 1157–1187 |
+| Open questions | 1188–1243 |
 <!-- /index -->
 
 ## Summary
@@ -351,6 +351,17 @@ The same client update also runs the level free of `drlg/levels.md`
 7. Collision grid (`0x0064C900`, §10).
 8. Act callback (act +0x4C) if set: only the client sets one
    (`0x0061AF60` from `0x00475B40`).
+9. The callback is called with ECX = the new active room, after step 7,
+   at `0x00619954` (the only call through act +0x4C in `Game.exe`). The
+   client registers `0x00475930` in the 0x03 act load (`0x0044E100` →
+   `0x00475B40`, right after the act is built, `client/model.md` §7
+   rule 4), so it runs for every client active room. Its effect is
+   owned by `render/lighting.md` §6.4 (last paragraph): kind-2 light
+   records whose radius reaches into the new room drop their cached
+   contribution. No DRLG state, no RNG draw, no unit change; the
+   automap has its own callbacks (`0x00459150` / `0x004591A0`, drlg
+   +0x454). d2rs: the client DRLG reports each new active room to the
+   light cache; the server registers nothing.
 
 A populated room that is removed and built again starts with flag bit 0:
 `tick.md` §4 then restores its inactive units instead of populating it.
@@ -1223,3 +1234,9 @@ counter (+0x0C), and per level all DRLG rooms in list order; then §3 and
     C and each timed build per client update (memory read of the client
     DRLG +0x98, +0x45C, +0x460) confirms the order on live data; the
     recording that built all 35 town rooms is consistent with it.
+16. *Answered:* the act room callback (`impl-client-drlg` §3 Q4): §5
+    rule 9 (`0x00475930`, the light-cache invalidation of
+    `render/lighting.md` §6.4; not automap). Also settled: the "act's
+    unset callback `[0x00744398]`" of `client/model.md` §9 rule 2 is
+    entry 1 of the unset-handler table at `0x00744394` (§4, unset
+    handler 1), not an act field.
