@@ -371,7 +371,7 @@ by the `frames-raw-1` capture runs (`capture.md` Test vectors).
    `0x004DC710`). *Answered* (static): `0x00642840` is the level's
    `LOSDraw` gate (`render/draw-order-2.md` §15 r1) and
    `0x00622AA0(player, unit, 2)` the unit collision line with mask 2
-   (`sim/units.md` §8).
+   (`render/draw-order-2.md` §15.1).
 3. *Answered* in `unit-composite.md` §8: the three getters read the
    unit's client motion record (gfx +0x30, `0x0046F060`; 0 without one),
    and missiles add `missiles` xoffset / yoffset + zoffset (+0xA2/+0xA4/

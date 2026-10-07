@@ -32,13 +32,13 @@
 |   5. Event dispatch | 559–573 |
 |   6. Events per kind | 574–668 |
 |   7. Scheduler inventory (`unit-events.tsv`) | 669–690 |
-|   8. Collision line between two units (`0x00622AA0(a, b, mask)`) | 691–727 |
-| Constants & data dependencies | 728–744 |
-| Randomness | 745–752 |
-| Edge cases & original bugs | 753–773 |
-| Test vectors | 774–833 |
-| Provenance | 834–886 |
-| Open questions | 887–952 |
+|   8. Collision line between two units | 691–695 |
+| Constants & data dependencies | 696–712 |
+| Randomness | 713–720 |
+| Edge cases & original bugs | 721–741 |
+| Test vectors | 742–801 |
+| Provenance | 802–852 |
+| Open questions | 853–918 |
 <!-- /index -->
 
 ## Summary
@@ -688,42 +688,10 @@ All 269 call sites of the public scheduling functions in 1.14d
 Counts by type: 0: 20, 1: 60, 2: 30, 3: 18, 4: 1, 5: 6, 6: 6, 7: 45,
 8: 7, 9: 7, 10: 3, 11: 3, 12: 42, 13: 20, 14: 1.
 
-### 8. Collision line between two units (`0x00622AA0(a, b, mask)`)
+### 8. Collision line between two units
 
-Answers 0 (clear) or 1 (blocked). D2MOO name
-`UNITS_TestCollisionWithUnit`; 1.14d read below.
-
-1. `a` or `b` null → fatal error (lines 0x1290 / 0x1291 of the unit
-   source, then exit). Room of `a` (`0x00620BB0`) null → 0 (clear).
-2. Positions `(ax, ay)`, `(bx, by)`: sub-tile x / y (`0x0045ADF0` /
-   `0x0045AE20`): objects, items and tiles (kinds 2, 4, 5) read the
-   static path's x, y (+0x0C, +0x10); other kinds the dynamic path's
-   current sub-tile (`0x006488C0` / `0x00648900`, high words of the
-   precise position, `sim/path-placement.md` §1, §2.3); no path → 0.
-3. Sizes `sa`, `sb` = `sim/path-placement.md` §3 size (`0x00620510`;
-   a monster's `SizeX` is signed); each value > 2 becomes 2 (negative
-   values are kept).
-4. `dx` = |`bx − ax`|, `dy` = |`by − ay`| (signed 32-bit). `dx + dy` <
-   `sa + sb` → 0 (touching units are never blocked).
-5. Unless `sa` = `sb` = 0, pull the ends toward each other
-   (`0x00622920`): if `dy` ≤ `dx`: when `ax` < `bx`, `ax` += `sa` and
-   `bx` −= `sb`, else `ax` −= `sa` and `bx` += `sb`. If `dy` ≥ `dx`: the
-   same on y (`ay` < `by` → `ay` += `sa`, `by` −= `sb`, else the
-   reverse). `dx` = `dy` moves both axes.
-6. Result = the line test `render/draw-order-2.md` §16 (`0x0064E260`)
-   from `a`'s room, `(ax, ay)` → `(bx, by)`, with `mask` (collision
-   bits, `drlg/rooms.md` §10.6). The stop cell it writes back is
-   discarded.
-
-Callers (16 sites in 1.14d) and the mask each pushes:
-
-| Mask | Sites (function) | Use |
-|---|---|---|
-| 2 | `0x004B98CD` (`0x004B9890`), `0x004BA2F5` (`0x004BA020`) | client sound volume (`audio/sound-table.md`) |
-| 2 | `0x004DC780` (`0x004DC710`) | client unit draw sight test (`render/draw-order-2.md` §15) |
-| 4 | `0x005DCB1B`, `0x005DCC27`, `0x005DCCA5`, `0x005DD294`, `0x005DD678`, three in `0x005DD7F0`, `0x005E4B9F`, `0x005EBE36`, `0x005F7C63` | monster AI line of sight (`monsters/ai.md` function table, `ai-bodies-*.md`) |
-| 6 | `0x005F8D8B` (`0x005F8C80`, UberIzual) | `monsters/ai-bodies-7.md` §25 |
-| 0x804 | `0x00622CD9` (`0x00622C40`) | melee range (`combat/hit.md` §7.2) |
+Owned by `render/draw-order-2.md` §15.1 (`0x00622AA0`, every caller
+and mask) and §16 (the line test).
 
 ## Constants & data dependencies
 
@@ -880,9 +848,7 @@ Ghidra backlog (2026-10-06): store `0x00542E10` (falls through to
 checked zero through `0x006E8FDC`), jump tables `0x00623C04` /
 `0x00623C10`, `0x00623AFC`; stat and state names from live
 `itemstatcost.txt` / `states.txt`. Open question 3: scan of all.asm for
-`+0xA8 + 8·i` accesses. §8 (2026-10-07): 1.14d asm of `0x00622AA0`,
-`0x00622920`, `0x0045ADF0`, `0x0045AE20`, `0x00620510`; call sites from
-`disasm.py xref` and the mask each pushes from `all.asm`.
+`+0xA8 + 8·i` accesses.
 
 ## Open questions
 

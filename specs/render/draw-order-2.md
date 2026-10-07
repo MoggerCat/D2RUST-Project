@@ -25,14 +25,14 @@
 |   12. Level backgrounds (pass 1) | 312–351 |
 |   13. Pass 8 (`0x00475B20`) | 352–360 |
 |   14. Edge floors (`0x004DE6C0`, `0x004DE630`) | 361–386 |
-|   15. Sight test (`draw-order.md` §5 r3) | 387–396 |
-|   16. Line test (`0x0064E260`) | 397–426 |
-| Constants & data dependencies | 427–437 |
-| Randomness | 438–449 |
-| Edge cases & original bugs | 450–466 |
-| Test vectors | 467–488 |
-| Provenance | 489–517 |
-| Open questions | 518–575 |
+|   15. Sight test (`draw-order.md` §5 r3) | 387–433 |
+|   16. Line test (`0x0064E260`) | 434–463 |
+| Constants & data dependencies | 464–474 |
+| Randomness | 475–486 |
+| Edge cases & original bugs | 487–503 |
+| Test vectors | 504–525 |
+| Provenance | 526–557 |
+| Open questions | 558–615 |
 <!-- /index -->
 
 ## Summary
@@ -391,8 +391,45 @@ order and each reads the extents as left by the strips before it.
    crypts, Monastery and Catacombs, sewers, tombs, Arcane Sanctuary,
    Act III dungeons and temples, Act V ice caves). 0 → every unit passes.
 2. **Unit line** `0x00622AA0(a = local player, b = unit, mask 2)`
-   (`sim/units.md` §8; mask 2 = collision bit 0x0002, `drlg/rooms.md`
-   §10.6): blocked → hidden.
+   (§15.1; mask 2 = collision bit 0x0002, `drlg/rooms.md` §10.6):
+   blocked → hidden.
+
+#### 15.1 Collision line between two units (`0x00622AA0(a, b, mask)`)
+
+Answers 0 (clear) or 1 (blocked). D2MOO name
+`UNITS_TestCollisionWithUnit`; 1.14d read below.
+
+1. `a` or `b` null → fatal error (lines 0x1290 / 0x1291 of the unit
+   source, then exit). Room of `a` (`0x00620BB0`) null → 0 (clear).
+2. Positions `(ax, ay)`, `(bx, by)`: sub-tile x / y (`0x0045ADF0` /
+   `0x0045AE20`): objects, items and tiles (kinds 2, 4, 5) read the
+   static path's x, y (+0x0C, +0x10); other kinds the dynamic path's
+   current sub-tile (`0x006488C0` / `0x00648900`, high words of the
+   precise position, `sim/path-placement.md` §1, §2.3); no path → 0.
+3. Sizes `sa`, `sb` = `sim/path-placement.md` §3 size (`0x00620510`;
+   a monster's `SizeX` is signed); each value > 2 becomes 2 (negative
+   values are kept).
+4. `dx` = |`bx − ax`|, `dy` = |`by − ay`| (signed 32-bit). `dx + dy` <
+   `sa + sb` → 0 (touching units are never blocked).
+5. Unless `sa` = `sb` = 0, pull the ends toward each other
+   (`0x00622920`): if `dy` ≤ `dx`: when `ax` < `bx`, `ax` += `sa` and
+   `bx` −= `sb`, else `ax` −= `sa` and `bx` += `sb`. If `dy` ≥ `dx`: the
+   same on y (`ay` < `by` → `ay` += `sa`, `by` −= `sb`, else the
+   reverse). `dx` = `dy` moves both axes.
+6. Result = the line test §16 (`0x0064E260`)
+   from `a`'s room, `(ax, ay)` → `(bx, by)`, with `mask` (collision
+   bits, `drlg/rooms.md` §10.6). The stop cell it writes back is
+   discarded.
+
+Callers (16 sites in 1.14d) and the mask each pushes:
+
+| Mask | Sites (function) | Use |
+|---|---|---|
+| 2 | `0x004B98CD` (`0x004B9890`), `0x004BA2F5` (`0x004BA020`) | client sound volume (`audio/sound-table.md`) |
+| 2 | `0x004DC780` (`0x004DC710`) | client unit draw sight test (§15 r2) |
+| 4 | `0x005DCB1B`, `0x005DCC27`, `0x005DCCA5`, `0x005DD294`, `0x005DD678`, three in `0x005DD7F0`, `0x005E4B9F`, `0x005EBE36`, `0x005F7C63` | monster AI line of sight (`monsters/ai.md` function table, `ai-bodies-*.md`) |
+| 6 | `0x005F8D8B` (`0x005F8C80`, UberIzual) | `monsters/ai-bodies-7.md` §25 |
+| 0x804 | `0x00622CD9` (`0x00622C40`) | melee range (`combat/hit.md` §7.2) |
 
 ### 16. Line test (`0x0064E260`)
 
@@ -500,7 +537,10 @@ rate `0x00477980`; lightning start `0x00472C50`; backgrounds
 `0x004769B0`, `0x004F68B0`; edge floors `0x004DE6C0`, `0x004DE630`,
 `0x00619720`, `0x00643260`; sight `0x004DC710`, `0x00642840` (leveldefs
 +0x98 = `LOSDraw`, `data/fields.tsv`), `0x00622AA0`, `0x00622920`,
-`0x0064E260`. Register arguments (`roll_range` min in EDX, seed in ECX)
+`0x0064E260`; §15.1 (2026-10-07) also `0x0045ADF0`, `0x0045AE20`,
+`0x00620510`, the register order of the `0x00622920` call, and the 16
+call sites with their pushed masks (`disasm.py xref`, `all.asm`).
+Register arguments (`roll_range` min in EDX, seed in ECX)
 read from the disassembly, not the decompile. 2026-10-07 (answers
 W1–W7): `0x004DE730` (`fmul [0x006DB9D0]` before `0x00682FD0`, the
 `last_s` store before the `k` test), `0x00473F50` (rain off: `fldz` into
