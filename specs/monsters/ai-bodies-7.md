@@ -24,42 +24,43 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 65–74 |
-| Inputs | 75–79 |
-| Outputs / state changes | 80–85 |
-| Rules | 86–87 |
-|   1. Scope and order | 88–120 |
-|   2. Sarcophagus (45) `0x005F6A10`, init `0x005F6630` | 121–136 |
-|   3. FlyingScimitar (47) `0x005F6CA0` | 137–147 |
-|   4. GargoyleTrap (63) `0x005F9490` | 148–169 |
-|   5. Trap-RightArrow (78) `0x005FB6C0`, Trap-LeftArrow (79) `0x005FB7E0` | 170–190 |
-|   6. Trap-Poison (80) `0x005FB900`, Trap-Nova (92) `0x005FB9B0` | 191–204 |
-|   7. JarJar (81) `0x005E7590` | 205–238 |
-|   8. InvisoSpawner (82) `0x005E0160` | 239–256 |
-|   9. BoneWall (84) `0x005E0400`, init `0x005E0390` | 257–263 |
-|   10. Trap-Melee (87) `0x005FBA60` | 264–268 |
-|   11. 7TIllusion (88) `0x005EA080` | 269–277 |
-|   12. DarkWanderer (91) `0x005EA130` | 278–294 |
-|   13. ArcaneTower (93) `0x005E0F60` | 295–310 |
-|   14. Spirit (97) `0x005E3840` | 311–320 |
-|   15. BladeCreeper (102) `0x005EA540`, init `0x005EA510` | 321–350 |
-|   16. InvisoPet (103) `0x005EA7A0` | 351–365 |
-|   17. DeathSentry (104) `0x005EA980`, init `0x005EA290` | 366–388 |
-|   18. ShadowWarrior (105) `0x005EAFA0`, init `0x005EAF50` | 389–461 |
-|   19. Raven (107) `0x005ECC10`, init `0x005ECB70` | 462–499 |
-|   20. Vines (110) `0x005EC6C0`, init `0x005EC6A0` | 500–520 |
-|   21. DruidBear (112) `0x005ED730` | 521–547 |
-|   22. SiegeTower (113) `0x005E1860` | 548–562 |
-|   23. GenericSpawner (129) `0x005E61B0`, init `0x005E6190` | 563–591 |
-|   24. Wussie (131) `0x005EE3C0` | 592–619 |
-|   25. UberIzual (144) `0x005F8C80` | 620–635 |
-|   26. UberBaal (145), UberMephisto (146), UberDiablo (147) | 636–649 |
-| Constants & data dependencies | 650–671 |
-| Randomness | 672–679 |
-| Edge cases & original bugs | 680–688 |
-| Test vectors | 689–706 |
-| Provenance | 707–727 |
-| Open questions | 728–737 |
+| Summary | 66–75 |
+| Inputs | 76–80 |
+| Outputs / state changes | 81–86 |
+| Rules | 87–88 |
+|   1. Scope and order | 89–122 |
+|   2. Sarcophagus (45) `0x005F6A10`, init `0x005F6630` | 123–138 |
+|   3. FlyingScimitar (47) `0x005F6CA0` | 139–149 |
+|   4. GargoyleTrap (63) `0x005F9490` | 150–171 |
+|   5. Trap-RightArrow (78) `0x005FB6C0`, Trap-LeftArrow (79) `0x005FB7E0` | 172–192 |
+|   6. Trap-Poison (80) `0x005FB900`, Trap-Nova (92) `0x005FB9B0` | 193–206 |
+|   7. JarJar (81) `0x005E7590` | 207–240 |
+|   8. InvisoSpawner (82) `0x005E0160` | 241–258 |
+|   9. BoneWall (84) `0x005E0400`, init `0x005E0390` | 259–265 |
+|   10. Trap-Melee (87) `0x005FBA60` | 266–270 |
+|   11. 7TIllusion (88) `0x005EA080` | 271–279 |
+|   12. DarkWanderer (91) `0x005EA130` | 280–296 |
+|   13. ArcaneTower (93) `0x005E0F60` | 297–312 |
+|   14. Spirit (97) `0x005E3840` | 313–322 |
+|   15. BladeCreeper (102) `0x005EA540`, init `0x005EA510` | 323–352 |
+|   16. InvisoPet (103) `0x005EA7A0` | 353–367 |
+|   17. DeathSentry (104) `0x005EA980`, init `0x005EA290` | 368–390 |
+|   18. ShadowWarrior (105) `0x005EAFA0`, init `0x005EAF50` | 391–463 |
+|   19. Raven (107) `0x005ECC10`, init `0x005ECB70` | 464–501 |
+|   20. Vines (110) `0x005EC6C0`, init `0x005EC6A0` | 502–522 |
+|   21. DruidBear (112) `0x005ED730` | 523–549 |
+|   22. SiegeTower (113) `0x005E1860` | 550–564 |
+|   23. GenericSpawner (129) `0x005E61B0`, init `0x005E6190` | 565–593 |
+|   24. Wussie (131) `0x005EE3C0` | 594–621 |
+|   25. UberIzual (144) `0x005F8C80` | 622–637 |
+|   26. UberBaal (145), UberMephisto (146), UberDiablo (147) | 638–651 |
+|   27. ShadowMaster (106) `0x005EB970`, init `0x005EB490`; ShadowMasterNoInit (143), init `0x005EB5C0` | 652–786 |
+| Constants & data dependencies | 787–809 |
+| Randomness | 810–817 |
+| Edge cases & original bugs | 818–834 |
+| Test vectors | 835–852 |
+| Provenance | 853–876 |
+| Open questions | 877–886 |
 <!-- /index -->
 
 ## Summary
@@ -117,6 +118,7 @@ equal to `ai-functions.tsv` `monstats_rows`), by AI index:
 | Wussie (131) | act5pow | §24 |
 | UberIzual (144) | uberizual | §25 |
 | UberBaal (145), UberMephisto (146), UberDiablo (147) | uberbaal, ubermephisto, uberdiablo | §26 |
+| ShadowMaster (106), ShadowMasterNoInit (143) | shadowmaster; none | §27 |
 
 ### 2. Sarcophagus (45) `0x005F6A10`, init `0x005F6630`
 
@@ -647,6 +649,141 @@ around a unit through `0x005B23C0`) sits beside the UberDiablo stub
 with no caller found. 1.14d-confirmed (bytes at the three addresses,
 AI table `0x0073CA18` records 145–147).
 
+### 27. ShadowMaster (106) `0x005EB970`, init `0x005EB490`; ShadowMasterNoInit (143), init `0x005EB5C0`
+
+Target mode 2. Row shadowmaster (the Assassin's Shadow Master; AI 143
+shares the think and has no live row). Most aips are read at **fixed
+column offsets**, whatever the difficulty: A1n := aip1 (+0x56) [20],
+A1m := aip1(N) (+0x58) [10], A1h := aip1(H) (+0x5A) [10], A2n := aip2
+(+0x5C) [20], A2m := aip2(N) (+0x5E) [36], A2h := aip2(H) (+0x60)
+[36], K0 := aip8 (+0x80) [279 Shadow Master]; only aip3 [60] is read by
+difficulty. AI params: 0 = forced follow-up count, 1 = forced skill, 2
+= λ (the owner's level of skill K0). O := the minion owner. "Use (s,
+X, x, y)" = the use helper `0x005EB8B0` (below) with M := melee range
+unit→X (`0x00622C40`).
+
+**Init 106** `0x005EB490`: params 0, 1 := 0; λ := 1. O a player: λ :=
+O's level of K0 with bonus when O has it; the unit gets skill 0
+(Attack) at level 1 when it lacks it; its left and right skills := skill
+0 (`0x00643BC0`, `0x00643C50`); then for each skill s of O's class
+skill list (data tables +0xBA4 counts, +0xBAC ids by class,
+`0x00646140` / `0x006460F0`) that passes the pet test of §18
+(`0x005EAB20`): give the unit s at level clamp(v / 2 + λ / 2, 1, 24),
+v := O's base level of s (`0x006442A0(O, entry, 0)`, 1 when O lacks
+it) (`0x005EB420`). **Init 143** `0x005EB5C0`: λ := 1 / O's level of
+K0; skill 0 ensured; left and right := 0; no class skills.
+
+**Think:**
+
+1. The unit has no skill list (+0xA8) → idle 100. End.
+2. Delete the unit's thinks. O ≠ 0 and squared distance unit→O > A2h²
+   [1296] → pet follow (0, O, C, quiet 0, n 6) ≠ 0 → end.
+3. param 0 > 0: the unit's path target unit (`0x00553540`), when set,
+   replaces T. T = 0 → params 0, 1 := 0. Else param 0 −= 1; use
+   (param 1, T, 0, 0) with the dispatch C as M ≠ 0 → end.
+4. D > A2m [36] → T := 0. T = 0 → **buff pass** over the unit's skills
+   (list order, `0x00643910` / `0x006438F0`):
+   - `aitype` 1, `aurastate` > 0, the unit lacks it, and (no state of
+     the same `group` (states +0x1E) is active, `0x005EB7F0`, or
+     `roll(100)` < 4): draw < 60 and the unit's entry E of the skill
+     exists → its `range` is 1 (melee) and C = 0 → run to unit 0 with
+     flags 4 (`0x005DED00(0, 4)`); else `0x005DEAD0(E's mode, s, 0, 0,
+     0)`. Started → end.
+   - `aitype` 6, the unit has no left skill and draw < 20 → left skill
+     := s.
+5. X := 0. O ≠ 0: X := O's path target unit; X dead or not hostile to
+   the unit (`0x00554200`) → X := 0; else T := X. Squared distance
+   unit→O ≤ 144 → pet follow (T, O, C, quiet 0, n 6) ≠ 0 → end.
+6. T = 0 → idle 25. End.
+7. q := aip3 − 2 × max(λ, 1), clamped 5..100. C and `roll(100)` < q →
+   use (0, T, 0, 0) with M := C ≠ 0 → end.
+8. **Scan**: scan 1, callback `0x005EB6D0`, arg {O, best 0, dist
+   0x7FFFFFFF, near 0, bestO 0, distO 0x7FFFFFFF, nearO 0, n 0, shadows
+   0, boss 0}. For each U ≠ the unit, alive: U a monster with the unit's
+   alignment pairing and `BaseId` 410–413, 415 or 416 (the assassin
+   traps) → shadows += 1, next. Else U with unit flag 0x4 and hostile
+   to the unit: O ≠ 0 → dO := squared distance O→U; dO ≤ 100 → nearO +=
+   1; dO < distO → bestO := U, distO := dO. dU := squared distance
+   unit→U ≤ 1024 → n += 1; dU ≤ 100 → near += 1; dU < dist → best := U,
+   dist := dU; U is "notable" (below) → boss := U.
+9. C = 0: T := X if set, else bestO if set, else boss when its squared
+   distance < 1024. Then T not notable, T's minion owner (`0x0058F0D0(T)`)
+   alive and within squared distance 1024 → T := that leader.
+10. L := own life percent; dT := squared distance unit→T; pg := A1h ≥ 1
+    and the unit has a `pgsv` state (state flag bit 4, `0x0063A2B0`);
+    clear := the line unit→T is clear (`0x00622AA0(unit, T, 4)` = 0).
+11. near > 3 and `roll(32)` < 2·near: O ≠ 0 and squared distance
+    unit→O > 36 → run to O (`0x005DED20`). End. Else run away from T by
+    8 with think delete (`0x005DF140`) started → end.
+12. **Scoring.** Candidates: slot 0 := {T, skill 0, score 0}; a skill
+    is appended only when its score s is strictly greater than the last
+    appended score. For each skill k of the unit's list in list order
+    (lvl := its level with bonus; skip a missing row): base := `aibonus`
+    (skills +0x232) + `reqlevel` (+0x174) / 4 + lvl − R / 10, R := T's
+    resist for the skill's `EType` (+0x1DC): 0 → stat 36, 1 → 39, 2 →
+    41, 3 → 37, 4 and 12 → 43, 5 → 45, else 0 (all divisions signed,
+    toward 0). "Pick" := `roll(A2n)` + base. The candidate's target is T
+    unless noted. By `aitype` (+0x230):
+    - 1: `aurastate` > 0 and the unit lacks it → s := 0. dist ≤ 25 → −6.
+      Same-group state active (`0x005EB7F0`) → −10, else +10. s := pick;
+      target := **the unit**.
+    - 2: the unit has `aurastate` (> 0) or T has `auratargetstate` (> 0)
+      → s := 0. Else dist ≤ 25 → −10; s := pick.
+    - 3: shadows > 5 → −2·shadows; dist ≤ 25 → −7; n < 3 → −10; s :=
+      pick + 3n − 9.
+    - 4 and 12 (12 only when T is not a monster (`0x0044BE50`), or T's
+      monstats `Drain` of the difficulty (+0xA0 + d, through the monster
+      data's record pointer `0x0055B7E0`) ≥ 25; else s := 0):
+      dT > A1n² → −10; + A1m; C or dT ≤ 25 → +10. The skill
+      `progressive` (flags +4 bit 2): the unit has `aurastate` (> 0)
+      with a stat list holding `aurastat1` = v → charges += v, v ≥ 3 →
+      s := 0; otherwise (4) + A1h, s := pick; (12) s := pick, +8 when L <
+      75, +12 more when L < 50. Not progressive (4 only): A1h > 0 and
+      not pg → −10, else + 4·charges + 3; s := pick.
+    - 5 and 11: clear, and (`srvmissile` ≥ 0, or `srvmissilea` < 0, or
+      its missile row missing, or dT < (missile `Range` − 1)²);
+      otherwise s := 0. dist ≤ 25 → −5; dT ≤ 25 → −5; pg → −5. (5) s :=
+      pick; (11) s := pick + 3n.
+    - 6: no score (s := 0); the unit has no left skill → `roll(100)` <
+      20 → left skill := k; has one → `roll(100)` < 6 → left skill := k.
+    - 7: s := pick; L > 66 → s := 0, else target := none, and when O = 0
+      two `roll(40)` steps are drawn and discarded (the point they would
+      give is never stored); s += 10, +10 more when L < 45.
+    - 8: r := pick; L > 66 → s := 0; else target := **the unit**, s :=
+      2r, 4r when L < 45.
+    - 13: + A1m; A1h > 0 and not pg → −5, else + charges. (L < 50 or
+      near > 3), bestO ≠ 0, nearO < 4 and squared distance unit→bestO >
+      25 → +20, target := bestO. Else dT < 25 → s := 0; dT > 324 → +10.
+      s := pick.
+    - 9, 10, other: s := 0.
+    "dist" is the scan's best squared distance; "charges" accumulates
+    over the list.
+13. **Choice**: from the last candidate back to slot 0, each with one
+    step `lo' & 3` ≠ 0 (3/4): use (skill, target, 0, 0). The first that
+    starts ends the think; when its skill's `srvdofunc` (+0x2E) is 19:
+    param 1 := that skill, param 0 := 25.
+14. T ≠ 0 → use (0, T, 0, 0) ≠ 0 → end. Idle 15.
+
+**Use helper** `0x005EB8B0(game, O, unit, s, M, X, x, y)`: X ≠ 0 and X
+= O or X = the unit → 0 (so the self-target candidates of aitypes 1
+and 8 never fire: bug kept). E := the unit's entry of s (owner −1);
+none → 0. X ≠ 0 and (X lacks unit flag 0x4, or the unit's room is in
+town) → 0. The skill's `range` (§18) is 1 and M = 0 → run to X with
+flags 4 (`0x005DED00(X, 4)`). Else `0x005DEAD0(E's mode, s, X, x, y)`.
+Returns the started result.
+
+**Notable** `0x005EB650(unit, U)`: U a living monster ≠ the unit whose
+class lacks the monstats `npc` bit and has `killable`, and that is a
+boss (`0x0063E9F0`), or `primeevil` (`0x0063EDC0`), or of monster type
+flags 0x0E (`0x005A0180`, `monsters/init.md`).
+
+Draws, in order: step 4's `roll(100)` and draws; step 7; step 11's
+`roll(32)`; per scored skill its pick roll (and case 6's, case 7's two
+`roll(40)`); step 13's steps; the helpers'. 1.14d-confirmed
+(`0x005EB970`, jump tables `0x005EC634` / `0x005EC650` (`EType`) and
+`0x005EC660` (`aitype`), `0x005EB490`, `0x005EB5C0`, `0x005EB420`,
+`0x005EB6D0`, `0x005EB650`, `0x005EB7F0`, `0x005EB8B0`, `0x0063A2B0`).
+
 ## Constants & data dependencies
 
 | Item | Value | Source |
@@ -668,6 +805,7 @@ AI table `0x0073CA18` records 145–147).
 | generic spawner | footprint 528 at (x + 2, y + 4); skill 167; spawn class: region entry with `genericSpawn`, else 496 | `0x005E61B0`, `0x005E6020` |
 | barbarians | portal reach 4; help message 0x8A at 10 % | `0x005EE3C0` |
 | Ubers 145–147 | empty thinks | `0x005FD200`, `0x005F81C0`, `0x005E9DF0` |
+| shadow master | fixed aip columns; owner leash 36²; ignore range 36; scan radii² 100 / 1024; escape when > 3 near (`roll(32)`); scores by `aitype` with `aibonus`, `reqlevel` / 4, level, −resist / 10, `roll(aip2)`; 3/4 per candidate; follow-up 25 thinks for `srvdofunc` 19 | `0x005EB970` |
 
 ## Randomness
 
@@ -685,6 +823,14 @@ Spawns, free spots and quest seams have their own draws.
    already scheduled; step 3.4 can request three things in one think.
 4. The trap kind (§5) is drawn on the first trap's seed of a level and
    cached in the level's monster region for every later trap.
+5. ShadowMaster §27: candidates of `aitype` 1 and 8 target the unit
+   itself and the use helper refuses self targets, so they never fire
+   (they still take part in the choice draws); `aitype` 7 draws two
+   `roll(40)` steps for a point it never stores.
+6. ShadowWarrior §18 and ShadowMaster §27 read aip8's three columns
+   (and ShadowMaster aip1 / aip2's) as fixed constants whatever the
+   difficulty.
+7. Uber Mephisto, Diablo and Baal think functions are empty (§26).
 
 ## Test vectors
 
@@ -717,8 +863,11 @@ Game-file vectors: Open question 1.
   `0x005ECBC0`, `0x005DE6F0`, `0x004EFCB0`, `0x005EC6A0`, `0x005EC6C0`,
   `0x005ED730`, `0x005E1860`, `0x005E6190`, `0x005E61B0`, `0x005E6020`,
   `0x00573520`, `0x005EE3C0`, `0x005F8C80`, `0x005FD200`, `0x005F81C0`,
-  `0x005E9DF0`, `0x005E9DD0`; tables `0x006E353C`, `0x006E3540` read
-  from the file. Decompiler text read first; every call's register and
+  `0x005E9DF0`, `0x005E9DD0`, `0x005EB970`, `0x005EB490`, `0x005EB5C0`,
+  `0x005EB420`, `0x005EB6D0`, `0x005EB650`, `0x005EB7F0`, `0x005EB8B0`,
+  `0x0063A2B0`, `0x0044BE50`, `0x0055B7E0`; tables `0x006E353C`, `0x006E3540` read
+  from the file; jump tables `0x005EC634`, `0x005EC650`, `0x005EC660`
+  read from the file. Decompiler text read first; every call's register and
   stack arguments checked in the disassembly (`tools/ghidra/disasm.py`).
 - Live data (`patch_d2`): monstats.txt (`AI`, `aip*`, skills, missiles),
   skills.txt (rows named) — read by a throwaway script (scratch, not
