@@ -933,14 +933,14 @@ fn world(t: &mut TableSet) {
                 ("EntryFile", name),
                 (
                     "Waypoint",
-                    if town {
-                        if i == 1 {
-                            "0"
-                        } else {
-                            "1"
-                        }
-                    } else {
-                        "255"
+                    // Index 0 the act 0 town, 1 the act 1 town, 2 the keep
+                    // (the second act 0 waypoint level, so a travel can
+                    // leave the town's level, `waypoints.md` §7 rule 2).
+                    match i {
+                        1 => "0",
+                        5 => "1",
+                        4 => "2",
+                        _ => "255",
                     },
                 ),
                 ("MonLvl1", if town { "" } else { "2" }),

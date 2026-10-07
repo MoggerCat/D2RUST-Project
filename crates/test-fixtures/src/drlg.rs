@@ -75,6 +75,21 @@ pub fn town() -> Ds1 {
     d
 }
 
+/// The keep (level 4): one room and a waypoint, the second act 0
+/// waypoint level.
+pub fn keep() -> Ds1 {
+    let mut d = preset_room(0);
+    let (kind, id, x, y) = TOWN_WAYPOINT;
+    d.objects.push(Ds1Object {
+        kind,
+        id,
+        x,
+        y,
+        flags: 0,
+    });
+    d
+}
+
 /// The lvlsub file: 3 × 3, tag type 1 (tag layer and groups), one
 /// 2 × 2 group with one variant.
 pub fn substitution() -> Ds1 {
@@ -100,7 +115,7 @@ pub fn files() -> Vec<(String, Vec<u8>)> {
         (archive_name(PRESET_DS1[0]), crate::ds1::write(&town())),
         (
             archive_name(PRESET_DS1[1]),
-            crate::ds1::write(&preset_room(0)),
+            crate::ds1::write(&keep()),
         ),
         (
             archive_name(PRESET_DS1[2]),

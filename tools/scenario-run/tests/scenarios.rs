@@ -112,13 +112,14 @@ fn every_starter_runs_twice_identically() {
     }
 }
 
-/// A run that sends S→C messages: waypoint travel within the synthetic
-/// town (level 1, the one waypoint level of the synthetic set).
+/// A run that sends S→C messages: waypoint travel from the synthetic
+/// town (level 1) to the keep (level 4, the second act 0 waypoint level
+/// of the synthetic set).
 fn travel() -> Scenario {
     let text = std::fs::read_to_string(scenarios_dir().join("waypoint-travel.scenario")).unwrap();
     Scenario::parse(
         &text
-            .replace("level=3", "level=1")
+            .replace("level=3", "level=4")
             .replace("name waypoint-travel", "name travel"),
     )
     .unwrap()
