@@ -26,16 +26,16 @@
 | Outputs / state changes | 58–63 |
 | Rules | 64–65 |
 |   1. Conventions | 66–93 |
-|   2. Implementation questions answered | 94–188 |
-|   3. Shared helpers, batch 4 | 189–340 |
-|   4. Bodies used by several monster skills | 341–529 |
-|   5. Bodies used by one monster skill | 530–943 |
-| Constants & data dependencies | 944–979 |
-| Randomness | 980–996 |
-| Edge cases & original bugs | 997–1036 |
-| Test vectors | 1037–1051 |
-| Provenance | 1052–1070 |
-| Open questions | 1071–1090 |
+|   2. Implementation questions answered | 94–190 |
+|   3. Shared helpers, batch 4 | 191–342 |
+|   4. Bodies used by several monster skills | 343–531 |
+|   5. Bodies used by one monster skill | 532–945 |
+| Constants & data dependencies | 946–981 |
+| Randomness | 982–998 |
+| Edge cases & original bugs | 999–1038 |
+| Test vectors | 1039–1053 |
+| Provenance | 1054–1072 |
+| Open questions | 1073–1092 |
 <!-- /index -->
 
 ## Summary
@@ -97,12 +97,14 @@ Answers to `docs/handoff/impl-skill-slots-2.md` Open questions (numbers
 kept). Rules owned by `bodies.md` / `bodies-2.md` are corrected here and
 those files point to this section.
 
-1. Answered (rule owner `sim/pets.md` §8, not edited here): the add
-   record of `0x00575D90` is {+0 pet GUID, +4 owner GUID, +8 class u16,
-   +0xC pet type} and `0x0053CB30` writes record +0 at message byte 5 and
-   +4 at byte 9: S→C 0x7A carries the **pet** GUID at +5 and the
-   **owner** GUID at +9, as `sim/server-messages.tsv`. `pets.md` §8 and
-   its test vector have them swapped.
+1. Answered (rule owner `sim/pets.md` §8 and its Provenance, not
+   edited here): the add record of `0x00575D90` is {+0 pet GUID, +4
+   owner GUID, +8 class u16, +0xC pet type}; the callers `0x00574930`,
+   `0x00574410`, `0x00574F80` push record +0 (pet) as stack argument 2
+   and +4 (owner) as argument 3, and `0x0053CB30` writes argument 3 at
+   message byte 5 and argument 2 at byte 9: S→C 0x7A carries the
+   **owner** GUID at +5 and the **pet** GUID at +9, as `pets.md` §8
+   states.
 2. Answered (owner `sim/pets.md` §6–§7, not edited here): Remove with
    kill ≠ 0 of a GUID whose unit exists broadcasts 0x7A three times
    (unlink, the dismiss it calls, Remove step 4); twice when the unit is
