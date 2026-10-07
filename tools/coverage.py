@@ -8,7 +8,7 @@ Usage (from the repo root; Python 3.8+, standard library only):
     py tools/coverage.py                # per-spec and total table, uncovered rules
     py tools/coverage.py --summary      # table only
     py tools/coverage.py --rules SPEC   # list the rule IDs of one spec
-    py tools/coverage.py --check        # exit 1 on a bad claim or rule ID (CI); never on low coverage
+    py tools/coverage.py --check        # exit 1 on a bad claim, rule ID or exemption (CI); never on low coverage
     py tools/coverage.py --selftest     # perturbation tests (METHODS M08)
 """
 
@@ -264,34 +264,85 @@ def coverage(specs, claims):
     return cov
 
 
+EXEMPT_FILE = "docs/coverage-exempt.tsv"
+
+
+def load_exempt(root, specs):
+    """({(spec, leaf): reason}, errors) from docs/coverage-exempt.tsv (docs/COVERAGE.md §5).
+
+    Columns: spec, rule (any claimable ID: a section exempts every unit
+    inside it; `*` is the whole spec), reason. Lines starting with `#` and blank lines are skipped.
+    """
+    exempt, errors = {}, []
+    path = root / EXEMPT_FILE
+    if not path.exists():
+        return exempt, errors
+    for no, line in enumerate(path.read_text(encoding="utf-8").split("\n"), 1):
+        if not line.strip() or line.startswith("#"):
+            continue
+        where = f"{EXEMPT_FILE}:{no}: "
+        cols = line.split("\t")
+        if len(cols) != 3 or not all(c.strip() for c in cols):
+            errors.append(where + "want three tab-separated columns: spec, rule, reason")
+            continue
+        spec, rule, reason = (c.strip() for c in cols)
+        rule = " ".join(rule.split())
+        if spec not in specs:
+            errors.append(where + f"exempt entry names no spec {spec}")
+        elif rule == "*":  # the whole spec
+            for leaf in specs[spec].leaves:
+                exempt.setdefault((spec, leaf), reason)
+        elif not RULE_REF.match(rule):
+            errors.append(where + f"malformed rule {rule!r}")
+        elif rule not in specs[spec].rules:
+            errors.append(where + f"exempt entry names a rule that does not exist: {spec} has no rule {rule}")
+        else:
+            for leaf in specs[spec].rules[rule]["leaves"]:
+                exempt.setdefault((spec, leaf), reason)
+    return exempt, errors
+
+
+def check_exempt(specs, exempt, claims):
+    """Errors for every exempt unit that is also claimed: it must be one or the other."""
+    errors = []
+    for f, line, _, spec, rule in claims:
+        both = [u for u in specs[spec].rules[rule]["leaves"] if (spec, u) in exempt]
+        if both:
+            shown = ", ".join(both[:3]) + (f" (+{len(both) - 3} more)" if len(both) > 3 else "")
+            errors.append(f"{f}:{line}: {spec} {rule} claims exempt rule(s) {shown}: remove the claim or the exemption")
+    return errors
+
+
 def pct(n, d):
     return f"{100 * n / d:5.1f}%" if d else "    -"
 
 
-def report(specs, claims, errors, summary):
+def report(specs, claims, errors, summary, exempt):
     cov = coverage(specs, claims)
-    head = ("spec", "rules", "unit", "game", "trace", "verified", "any")
-    rows, tot = [], [0] * 6
-    for s, leaves in cov.items():
-        n = len(leaves)
-        counts = [n] + [sum(t in v for v in leaves.values()) for t in TIERS]
+    head = ("spec", "rules", "exempt", "unit", "game", "trace", "verified", "any")
+    rows, tot = [], [0] * 7
+    for s, all_leaves in cov.items():
+        leaves = {k: v for k, v in all_leaves.items() if (s, k) not in exempt}
+        counts = [len(leaves), len(all_leaves) - len(leaves)]
+        counts += [sum(t in v for v in leaves.values()) for t in TIERS]
         counts.append(sum(bool(v & {"game", "trace"}) for v in leaves.values()))
         counts.append(sum(bool(v) for v in leaves.values()))
         tot = [a + b for a, b in zip(tot, counts)]
         rows.append((s, *counts))
     w = max(len(r[0]) for r in rows)
-    print(f"{head[0]:<{w}}  " + "  ".join(f"{h:>14}" for h in head[1:]))
+    print(f"{head[0]:<{w}}  {head[1]:>7}  {head[2]:>6}  " + "  ".join(f"{h:>14}" for h in head[3:]))
     for r in rows + [("total", *tot)]:
-        cells = [f"{r[1]:>14}"] + [f"{c:>6} {pct(c, r[1])}" for c in r[2:]]
-        print(f"{r[0]:<{w}}  " + "  ".join(cells))
+        cells = [f"{c:>6} {pct(c, r[1])}" for c in r[3:]]
+        print(f"{r[0]:<{w}}  {r[1]:>7}  {r[2]:>6}  " + "  ".join(cells))
     print(
-        f"\n{len(claims)} claims. verified = game-file or trace checks against 1.14d"
-        f" (CLAUDE.md hard rule 10): {tot[4]}/{tot[0]} rules ({pct(tot[4], tot[0]).strip()})."
+        f"\n{len(claims)} claims. Claimable rules {tot[0]} (+{tot[1]} exempt, {EXEMPT_FILE}); covered by any tier"
+        f" {tot[6]}/{tot[0]} ({pct(tot[6], tot[0]).strip()}). verified = game-file or trace checks against 1.14d"
+        f" (CLAUDE.md hard rule 10): {tot[5]}/{tot[0]} rules ({pct(tot[5], tot[0]).strip()})."
     )
     if not summary:
         print("\nUncovered rules:")
         for s, leaves in cov.items():
-            miss = [leaf for leaf, v in leaves.items() if not v]
+            miss = [leaf for leaf, v in leaves.items() if not v and (s, leaf) not in exempt]
             if miss:
                 print(f"{s} ({len(miss)}): " + ", ".join(miss))
     for e in errors:
@@ -397,6 +448,47 @@ def selftest():
         assert load_specs(root)["specs/x/r.md"].errors == [
             "specs/x/r.md:7: row marker is not directly above a table"
         ]
+    # Exemptions (docs/COVERAGE.md §5): a missing rule, a bad row and a rule
+    # that is both exempt and claimed are each reported exactly; a good list
+    # removes the units from the denominator.
+    with tempfile.TemporaryDirectory() as d:
+        root = Path(d)
+        (root / "specs/x").mkdir(parents=True)
+        (root / "crates/c/src").mkdir(parents=True)
+        (root / "docs").mkdir()
+        (root / "specs/x/s.md").write_text(spec, encoding="utf-8")
+        specs = load_specs(root)
+        ex = root / EXEMPT_FILE
+        w = EXEMPT_FILE + ":"
+        cases = {
+            "specs/x/s.md\t§1\twhy\n": [],
+            "# c\n\nspecs/x/s.md\t§header-4-bytes l2 r1\twhy\n": [],
+            "specs/x/s.md\t§9\twhy\n": [w + "1: exempt entry names a rule that does not exist: specs/x/s.md has no rule §9"],
+            "specs/x/s.md\t§1 r3\twhy\n": [w + "1: exempt entry names a rule that does not exist: specs/x/s.md has no rule §1 r3"],
+            "specs/x/t.md\t§1\twhy\n": [w + "1: exempt entry names no spec specs/x/t.md"],
+            "specs/x/s.md\t*\twhy\n": [],
+            "specs/x/s.md\t§1\n": [w + "1: want three tab-separated columns: spec, rule, reason"],
+            "specs/x/s.md\t1 r1\twhy\n": [w + "1: malformed rule '1 r1'"],
+        }
+        for text, want in cases.items():
+            ex.write_text(text, encoding="utf-8")
+            assert load_exempt(root, specs)[1] == want, (text, load_exempt(root, specs)[1])
+        ex.write_text("specs/x/s.md\t§1\twhy\n", encoding="utf-8")
+        exempt, _ = load_exempt(root, specs)
+        assert sorted(exempt) == [("specs/x/s.md", "§1 r1"), ("specs/x/s.md", "§1 r2")], exempt
+        ex.write_text("specs/x/s.md\t*\twhy\n", encoding="utf-8")
+        assert len(load_exempt(root, specs)[0]) == len(specs["specs/x/s.md"].leaves)
+        ex.write_text("specs/x/s.md\t§1\twhy\n", encoding="utf-8")
+        src = root / "crates/c/src/lib.rs"
+        for rule, want in {
+            "§2": [],
+            "§1 r2": ["crates/c/src/lib.rs:3: specs/x/s.md §1 r2 claims exempt rule(s) §1 r2: remove the claim or the exemption"],
+            "§1": ["crates/c/src/lib.rs:3: specs/x/s.md §1 claims exempt rule(s) §1 r1, §1 r2: remove the claim or the exemption"],
+        }.items():
+            src.write_text(test.format(rule=rule), encoding="utf-8")
+            claims, errs = scan(root, specs, [src])
+            assert not errs, errs
+            assert check_exempt(specs, exempt, claims) == want, (rule, check_exempt(specs, exempt, claims))
     # The real repository: rename one claimed rule; exactly that claim is reported.
     specs = load_specs(ROOT)
     claims, errors = scan(ROOT, specs)
@@ -428,13 +520,15 @@ def main():
             print(f"{sp.rules[rid]['line']:>5}  {rid}")
         return
     claims, errors = scan(ROOT, specs)
-    errors = [e for sp in specs.values() for e in sp.errors] + errors
+    exempt, exempt_errors = load_exempt(ROOT, specs)
+    errors = [e for sp in specs.values() for e in sp.errors] + errors + exempt_errors
+    errors += check_exempt(specs, exempt, claims)
     if "--check" in args:
         for e in errors:
             print("error: " + e)
         print(f"coverage: {len(claims)} claims, {len(errors)} errors")
         sys.exit(1 if errors else 0)
-    report(specs, claims, errors, "--summary" in args)
+    report(specs, claims, errors, "--summary" in args, exempt)
     sys.exit(1 if errors else 0)
 
 

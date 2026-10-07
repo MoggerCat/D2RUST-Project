@@ -105,6 +105,9 @@ Per spec and in total, the number of units covered by each tier, plus:
 - **any**: covered by any tier (a rule with only `unit` claims is
   implemented and unverified, M02).
 
+Exempt rules (§5) are left out of every denominator: "rules" in the
+table is the claimable count, and the exempt count has its own column.
+
 A claim says what a check covers; that the check passes comes from
 running it. `unit` checks run in CI. `game` and `trace` checks run
 locally (`docs/HANDOFF.md` §4–§5); a claim on one counts as verified
@@ -122,7 +125,33 @@ already runs Python before Cargo).
 | `py tools/coverage.py` | per-spec and total table, then the uncovered units of each spec |
 | `py tools/coverage.py --summary` | the table only |
 | `py tools/coverage.py --rules specs/<file>.md` | every unit ID of one spec with its line |
-| `py tools/coverage.py --check` | exit 1 on a dangling claim (no such spec or rule), a malformed claim, a claim on a non-check, or a repeated ID in a spec; never on low coverage (CI) |
-| `py tools/coverage.py --selftest` | perturbation tests (M08): a synthetic spec and test file, each perturbed claim reported exactly; then a real claim of the repository renamed to a missing rule and reported at its file and line |
+| `py tools/coverage.py --check` | exit 1 on a dangling claim (no such spec or rule), a malformed claim, a claim on a non-check, a repeated ID in a spec, a bad exemption (§5), or a rule that is both exempt and claimed; never on low coverage (CI) |
+| `py tools/coverage.py --selftest` | perturbation tests (M08): a synthetic spec and test file, each perturbed claim reported exactly; then exemption cases (missing rule, bad row, exempt and claimed), then a real claim of the repository renamed to a missing rule and reported at its file and line |
 
 Strict (M07): unknown claim syntax is an error, never skipped.
+
+## 5. Exemptions
+
+The target counts only rules that code can claim. A rule no code can
+claim (provenance or narration prose, a heading's intro text, notes and
+pointers, recorder-side tooling, legacy save formats outside Phases 0–6,
+out-of-scope trade) is listed in `docs/coverage-exempt.tsv`:
+
+```
+<spec path><TAB><rule><TAB><reason>
+```
+
+`rule` is any claimable ID of §1; a section ID exempts every unit inside
+it, and `*` exempts the whole spec. Blank lines and lines starting with
+`#` are skipped. Exempt units are reported in their own column and left
+out of the uncovered list and of the denominators.
+
+Strict (M07): `--check` fails when an entry names a spec or rule that does
+not exist (a renumbered heading must be fixed here too) or is malformed,
+and when a unit is both exempt and claimed by a `Covers:` line: it is one
+or the other. `--selftest` perturbs both cases (M08).
+
+Be conservative: when in doubt a rule stays claimable. Edge cases that
+describe behaviour d2rs reproduces are never exempt; only narration with
+no behaviour is. Un-exempt a rule (delete its line) the moment code can
+claim it.
