@@ -71,6 +71,8 @@ pub struct BodyFake {
     pub missiles: Vec<MissileRequest<usize>>,
     pub no_missiles: bool,
     pub no_monsters: bool,
+    /// The next `n` `spawn_monster` calls fail.
+    pub fail_spawns: u32,
     pub c8: BTreeMap<usize, u32>,
     pub node: BTreeMap<usize, i32>,
     pub frame_index: BTreeMap<usize, i32>,
@@ -943,6 +945,10 @@ impl BodyWorld for BodyFake {
     }
     fn spawn_monster(&mut self, q: MonsterSpawn<usize, usize>) -> Option<usize> {
         self.log(format!("{q:?}"));
+        if self.fail_spawns > 0 {
+            self.fail_spawns -= 1;
+            return None;
+        }
         if self.no_monsters {
             return None;
         }

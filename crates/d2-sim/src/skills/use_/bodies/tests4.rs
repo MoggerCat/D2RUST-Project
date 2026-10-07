@@ -1649,8 +1649,18 @@ fn impregnate_refusals() {
     assert_eq!(try_with(&|f, t| f.c.units[t].class = 546), (0, false));
     assert_eq!(try_with(&|f, t| f.c.units[t].class = 551), (0, false));
     assert_eq!(try_with(&|f, t| f.c.units[t].states.push(110)), (0, false));
-    assert_eq!(try_with(&|f, t| drop(f.c.aligned.insert(t, 2))), (0, false));
-    assert_eq!(try_with(&|f, t| drop(f.dead.insert(t))), (0, false));
+    assert_eq!(
+        try_with(&|f, t| {
+            f.c.aligned.insert(t, 2);
+        }),
+        (0, false)
+    );
+    assert_eq!(
+        try_with(&|f, t| {
+            f.dead.insert(t);
+        }),
+        (0, false)
+    );
     assert_eq!(
         try_with(&|f, t| f.c.units[t].kind = UnitType::Player),
         (0, false)
@@ -1723,4 +1733,450 @@ fn pregnant_remove_releases_a_summon_when_dead() {
     b4_more::remove_pregnant(&mut f, &t2, &ct, tg, 110, 0);
     assert!(spawned(&mut f)[0].contains("class: 551, mode: 1"));
     let _ = u;
+}
+
+// ---------------------------------------------------------------- §3.17
+
+fn stomp_tabs(m: u16, resultflags: u16) -> SkillTables {
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.srvmissilea = m;
+    r.mindam = 10;
+    r.maxdam = 40;
+    r.resultflags = resultflags as _;
+    r.aurarangecalc = c.f(30);
+    tab1(r, c, 4)
+}
+
+/// A stomp world: the caster at (0, 0), a hostile monster in range and
+/// one out of it.
+fn stomp_world() -> (BodyFake, usize, usize, usize) {
+    let (mut f, u) = mworld();
+    f.c.hostile = true;
+    let near = mon(&mut f, 0, (10, 0));
+    let far = mon(&mut f, 0, (50, 0));
+    f.c.units[near].flags = 0xE;
+    f.c.units[far].flags = 0xE;
+    f.c.set(near, 6, 1 << 20);
+    f.c.set(far, 6, 1 << 20);
+    f.scan = vec![near, far];
+    (f, u, near, far)
+}
+
+// Covers: specs/skills/bodies-4.md §3.17 r1, §3.17 text, §edge-cases-original-bugs r5
+#[test]
+fn siege_stomp_needs_a_missile_column() {
+    let ct = ct_ids(2);
+    let (mut f, u, near, _) = stomp_world();
+    assert_eq!(
+        b4_more::siege_stomp(&mut f, &stomp_tabs(2, 1), &ct, u, 99, 1),
+        0
+    );
+    // 1.14d: no srvmissilea (−1, 0 or ≥ count): nothing is stomped.
+    for m in [0xFFFFu16, 0, 4] {
+        let t = stomp_tabs(m, 1);
+        assert_eq!(b4_more::siege_stomp(&mut f, &t, &ct, u, 1, 1), 0, "m = {m}");
+    }
+    assert_eq!(f.c.units[u].flags & 0x40, 0);
+    assert_eq!(f.c.get(near, 6), 1 << 20);
+    assert!(f.c.log.is_empty());
+}
+
+// Covers: specs/skills/bodies-4.md §3.17 r2, §3.17 r3, §3.17 r4, §3.17 r5
+#[test]
+fn siege_stomp_damages_the_area_around_the_beast() {
+    let ct = ct_ids(2);
+    let t = stomp_tabs(2, 1);
+    let (mut f, u, near, far) = stomp_world();
+    assert_eq!(b4_more::siege_stomp(&mut f, &t, &ct, u, 1, 1), 1);
+    assert_eq!(f.c.units[u].flags & 0x40, 0x40);
+    // roll_physical: 10 + roll(30) on the unit's seed; the area range is
+    // eval(aurarangecalc) = 30: the near unit takes it, the far one not.
+    let phys = 10 + Seed::new(1, 0).roll(30) as i32;
+    assert_eq!(f.c.get(near, 6), (1 << 20) - phys);
+    assert_eq!(f.c.get(far, 6), 1 << 20);
+    assert!(logged(&mut f, &format!("reaction {u} {near}")));
+    assert!(!logged(&mut f, &format!("reaction {u} {far}")));
+    // ResultFlags 0 leaves the record's result 0: no hit, no reaction.
+    let (mut f, u, near, _) = stomp_world();
+    let t0 = stomp_tabs(2, 0);
+    assert_eq!(b4_more::siege_stomp(&mut f, &t0, &ct, u, 1, 1), 1);
+    assert_eq!(f.c.get(near, 6), 1 << 20);
+    assert!(!logged(&mut f, &format!("reaction {u} {near}")));
+}
+
+// ---------------------------------------------------------------- §3.18
+
+// Covers: specs/skills/bodies-4.md §3.18
+#[test]
+fn minion_spawner_start_stores_the_spawn_class_untested() {
+    let mut r = body_rec();
+    r.summon = 7;
+    r.summode = 3;
+    let t = tab1(r, Code::new(), 1);
+    let ct = ct_ids(20);
+    let (mut f, u) = world();
+    f.pos.insert(u, (4, 6));
+    let e = entry(&f, u);
+    assert_eq!(b4_more::minion_spawner_start(&mut f, &t, &ct, u, 1), 1);
+    let ps: Vec<i32> = (1..=4).map(|i| f.entry_param(u, &e, i)).collect();
+    assert_eq!(ps, [7, 4, 6, 3], "class, x, y, mode");
+    // R is not tested and c is not tested: an invalid skill stores −1.
+    assert_eq!(b4_more::minion_spawner_start(&mut f, &t, &ct, u, 99), 1);
+    assert_eq!(f.entry_param(u, &e, 1), -1);
+    // E none.
+    f.c.units[u].used = None;
+    assert_eq!(b4_more::minion_spawner_start(&mut f, &t, &ct, u, 1), 0);
+    // A monster spawns by its monstats columns.
+    let mut ct = ct_ids(20);
+    ct.monstats[0].spawn = 9;
+    ct.monstats[0].spawnx = 2;
+    ct.monstats[0].spawny = (-3i8) as _;
+    ct.monstats[0].spawnmode = 5;
+    let (mut f, u) = mworld();
+    f.pos.insert(u, (10, 10));
+    let e = entry(&f, u);
+    b4_more::minion_spawner_start(&mut f, &t, &ct, u, 1);
+    let ps: Vec<i32> = (1..=4).map(|i| f.entry_param(u, &e, i)).collect();
+    assert_eq!(ps, [9, 12, 7, 5]);
+}
+
+// ---------------------------------------------------------------- §3.19
+
+fn spawner_world() -> (BodyFake, usize, SkillTables) {
+    let mut r = body_rec();
+    r.sumoverlay = 9;
+    let t = tab1(r, Code::new(), 1);
+    let (mut f, u) = mworld();
+    let e = entry(&f, u);
+    for (i, v) in [(1, 7), (2, 40), (3, 50), (4, 3)] {
+        f.set_entry_param_of(u, &e, i, v);
+    }
+    (f, u, t)
+}
+
+// Covers: specs/skills/bodies-4.md §3.19 r1, §3.19 r2
+#[test]
+fn minion_spawner_refusals() {
+    let (mut f, u, t) = spawner_world();
+    assert_eq!(b4_more::minion_spawner(&mut f, &t, u, 99), 0, "R invalid");
+    // No room at the stored point.
+    f.point_rooms.insert((40, 50), None);
+    assert_eq!(b4_more::minion_spawner(&mut f, &t, u, 1), 0);
+    f.point_rooms.clear();
+    f.c.units[u].used = None;
+    assert_eq!(b4_more::minion_spawner(&mut f, &t, u, 1), 0, "E none");
+    assert!(f.take_log().iter().all(|l| !l.starts_with("At")));
+}
+
+// Covers: specs/skills/bodies-4.md §3.19 r3, §3.19 r4, §edge-cases-original-bugs r10
+#[test]
+fn minion_spawner_spawns_with_the_stored_class() {
+    let (mut f, u, t) = spawner_world();
+    let n = f.c.units.len();
+    assert_eq!(b4_more::minion_spawner(&mut f, &t, u, 1), 1);
+    let log = f.take_log();
+    assert!(
+        log.contains(
+            &"At { room: 1, x: 40, y: 50, class: 7, mode: 3, spread: -1, flags: 0 }".to_string()
+        ),
+        "{log:?}"
+    );
+    // The monster: flags |= 0x4020000, linked to the unit, overlay.
+    assert_eq!(f.c.units[n].flags, 0x402_0000);
+    assert!(log.contains(&fx(Fx::SourceFields {
+        m: n,
+        owner: Some(u)
+    })));
+    assert!(log.contains(&format!("overlay {n} 9")));
+    // The first try fails: the same with spread 4.
+    f.fail_spawns = 1;
+    assert_eq!(b4_more::minion_spawner(&mut f, &t, u, 1), 1);
+    let log = f.take_log();
+    let at: Vec<&String> = log.iter().filter(|l| l.starts_with("At")).collect();
+    assert_eq!(at.len(), 2);
+    assert!(at[0].contains("spread: -1") && at[1].contains("spread: 4"));
+    // Both fail: 0.
+    f.no_monsters = true;
+    assert_eq!(b4_more::minion_spawner(&mut f, &t, u, 1), 0);
+    // sumoverlay outside 0…count − 1: no overlay.
+    f.no_monsters = false;
+    let mut r = body_rec();
+    r.sumoverlay = 0xFFFF;
+    let t2 = tab1(r, Code::new(), 1);
+    f.take_log();
+    b4_more::minion_spawner(&mut f, &t2, u, 1);
+    assert!(!f.take_log().iter().any(|l| l.starts_with("overlay")));
+}
+
+// ---------------------------------------------------------------- §3.20
+
+fn maul_tabs(calc1: i16) -> SkillTables {
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.srvmissilea = 2;
+    r.calc1 = c.f(calc1);
+    tab1(r, c, 4)
+}
+
+// Covers: specs/skills/bodies-4.md §3.20 r1, §3.20 r2, §3.20 r3
+#[test]
+fn death_maul_refusals() {
+    let (mut f, u) = world();
+    f.tpos.insert(u, (5, 1));
+    assert_eq!(b4_more::death_maul(&mut f, &maul_tabs(0), u, 99, 1), 0);
+    for m in [0u16, 4] {
+        let mut r = body_rec();
+        r.srvmissilea = m;
+        let t = tab1(r, Code::new(), 4);
+        assert_eq!(b4_more::death_maul(&mut f, &t, u, 1, 1), 0, "m = {m}");
+    }
+    // Target position fails: 0 before the flag.
+    f.tpos.insert(u, (0, 0));
+    assert_eq!(b4_more::death_maul(&mut f, &maul_tabs(0), u, 1, 1), 0);
+    assert_eq!(f.c.units[u].flags & 0x40, 0);
+    // No missile made: 0 after the flag.
+    f.tpos.insert(u, (5, 1));
+    f.no_missiles = true;
+    assert_eq!(b4_more::death_maul(&mut f, &maul_tabs(0), u, 1, 1), 0);
+    assert_eq!(f.c.units[u].flags & 0x40, 0x40);
+}
+
+// Covers: specs/skills/bodies-4.md §3.20 r4, §3.20 r5
+#[test]
+fn death_maul_scales_the_missile_frames_by_distance() {
+    // (target, expected frames n) with f = 24 total frames: the test
+    // vectors (distance 5 → 5 + 12, 20 → 40) and a zero distance.
+    for (tp, want) in [((5, 1), 17), ((20, 1), 40), ((3, 3), 13)] {
+        let (mut f, u) = world();
+        f.pos.insert(
+            u,
+            (
+                if tp == (3, 3) { 3 } else { 0 },
+                if tp == (3, 3) { 3 } else { 0 },
+            ),
+        );
+        f.tpos.insert(u, tp);
+        let mm = f.c.units.len();
+        f.mframes.insert(mm, (24, 24));
+        assert_eq!(b4_more::death_maul(&mut f, &maul_tabs(0), u, 1, 1), 1);
+        assert_eq!(f.mframes[&mm], (want, want), "target {tp:?}");
+        assert_eq!(f.c.units[u].flags & 0x40, 0x40);
+        assert!(
+            !f.anim_speed.contains_key(&mm),
+            "calc1 = 0: speed untouched"
+        );
+    }
+    // Animation speed := clamp(calc1, 0, 0x7FFF) when positive.
+    for (a, want) in [(100i16, 100), (i16::MAX, 0x7FFF)] {
+        let (mut f, u) = world();
+        f.tpos.insert(u, (5, 1));
+        let mm = f.c.units.len();
+        b4_more::death_maul(&mut f, &maul_tabs(a), u, 1, 1);
+        assert_eq!(f.anim_speed[&mm], want);
+    }
+    // a < 0: untouched.
+    let (mut f, u) = world();
+    f.tpos.insert(u, (5, 1));
+    let mm = f.c.units.len();
+    b4_more::death_maul(&mut f, &maul_tabs(-5), u, 1, 1);
+    assert!(!f.anim_speed.contains_key(&mm));
+}
+
+// ---------------------------------------------------------------- §3.21
+
+fn rage_tabs(state: u16) -> SkillTables {
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.aurastate = state;
+    r.auralencalc = c.f(20);
+    tab1(r, c, 1)
+}
+
+// Covers: specs/skills/bodies-4.md §3.21 r1, §3.21 r2
+#[test]
+fn fenris_rage_refusals() {
+    let ct = soft_tables();
+    let (mut f, u) = mworld();
+    let c1 = mon(&mut f, 0, (2, 2));
+    f.targets.insert(u, c1);
+    // R invalid, or aurastate invalid: 0 before the flag.
+    assert_eq!(
+        b4_more::fenris_rage(&mut f, &rage_tabs(88), &ct, u, 99, 1),
+        0
+    );
+    assert_eq!(
+        b4_more::fenris_rage(&mut f, &rage_tabs(300), &ct, u, 1, 1),
+        0
+    );
+    assert_eq!(f.c.units[u].flags & 0x40, 0);
+    // T is not a corpse (alive): 0 after the flag.
+    assert_eq!(
+        b4_more::fenris_rage(&mut f, &rage_tabs(88), &ct, u, 1, 1),
+        0
+    );
+    assert_eq!(f.c.units[u].flags & 0x40, 0x40);
+    // A dead monster that is not `soft` is no corpse for the body.
+    f.c.units[c1].mode = 12;
+    let mut hard = soft_tables();
+    hard.monstats2[0].soft = false;
+    assert_eq!(
+        b4_more::fenris_rage(&mut f, &rage_tabs(88), &hard, u, 1, 1),
+        0
+    );
+    // T none.
+    f.targets.clear();
+    assert_eq!(
+        b4_more::fenris_rage(&mut f, &rage_tabs(88), &ct, u, 1, 1),
+        0
+    );
+    assert!(f.lists.is_empty());
+}
+
+// Covers: specs/skills/bodies-4.md §3.21 r3, §3.21 r4, §3.21 text, §edge-cases-original-bugs r6
+#[test]
+fn fenris_rage_eats_the_corpse_and_stacks_a_state_list() {
+    let ct = soft_tables();
+    let t = rage_tabs(88);
+    let (mut f, u) = mworld();
+    let c1 = mon(&mut f, 0, (2, 2));
+    f.c.units[c1].mode = 12;
+    f.targets.insert(u, c1);
+    f.c.frame = 10;
+    assert_eq!(b4_more::fenris_rage(&mut f, &t, &ct, u, 1, 2), 1);
+    assert!(f.c.units[c1].states.contains(&104), "corpse_nodraw");
+    assert!(logged(&mut f, &format!("update {c1}")));
+    let l = f.list_of(u, 88).expect("state list on the unit");
+    assert_eq!((l.expire, l.skill, l.lvl, l.owner), (30, 0, 0, Some(u)));
+    // A second corpse: one more list of the state.
+    assert_eq!(b4_more::fenris_rage(&mut f, &t, &ct, u, 1, 2), 1);
+    let n = f
+        .lists
+        .iter()
+        .filter(|l| l.unit == Some(u) && l.state == 88)
+        .count();
+    assert_eq!(n, 2);
+}
+
+// ---------------------------------------------------------------- §3.23
+
+// Covers: specs/skills/bodies-4.md §3.23 r1, §3.23 r2, §3.23 r3, §3.23 r4
+#[test]
+fn baal_cold_missiles_aim_the_perpendicular() {
+    let mut r = body_rec();
+    r.srvmissilea = 2;
+    let t = tab1(r, Code::new(), 4);
+    let (mut f, u) = world();
+    f.pos.insert(u, (10, 20));
+    assert_eq!(b4_more::baal_cold_missiles(&mut f, &t, u, 99, 1), 0);
+    for m in [0u16, 4] {
+        let mut r = body_rec();
+        r.srvmissilea = m;
+        let t = tab1(r, Code::new(), 4);
+        assert_eq!(b4_more::baal_cold_missiles(&mut f, &t, u, 1, 1), 0);
+        assert_eq!(f.c.units[u].flags & 0x40, 0);
+    }
+    // Target position fails: 0, after the flag.
+    assert_eq!(b4_more::baal_cold_missiles(&mut f, &t, u, 1, 1), 0);
+    assert_eq!(f.c.units[u].flags & 0x40, 0x40);
+    f.tpos.insert(u, (40, 35));
+    let mm = f.c.units.len();
+    assert_eq!(b4_more::baal_cold_missiles(&mut f, &t, u, 1, 3), 1);
+    let q = &f.missiles[0];
+    assert_eq!((q.class, q.flags, q.skill, q.level), (2, 0x21, 1, 3));
+    let log = f.take_log();
+    assert!(log.contains(&fx(Fx::MissileData28 {
+        missile: mm,
+        v: -15
+    })));
+    assert!(log.contains(&fx(Fx::MissileData2C { missile: mm, v: 30 })));
+    // No missile: 0.
+    f.no_missiles = true;
+    assert_eq!(b4_more::baal_cold_missiles(&mut f, &t, u, 1, 3), 0);
+}
+
+// ---------------------------------------------------------------- §3.25, §3.26
+
+fn component_tabs(m: u16, lob: bool) -> SkillTables {
+    let mut r = body_rec();
+    r.srvmissilea = m;
+    r.lob = lob;
+    tab1(r, Code::new(), 10)
+}
+
+// Covers: specs/skills/bodies-4.md §3.25 r1, §3.25 r2
+#[test]
+fn doom_knight_missile_refusals() {
+    let (mut f, u) = mworld();
+    f.tpos.insert(u, (30, 40));
+    let tg = mon(&mut f, 0, (2, 2));
+    let t = component_tabs(2, false);
+    assert_eq!(
+        b4_more::component_missile(&mut f, &t, u, 99, 1, 3),
+        0,
+        "R invalid"
+    );
+    assert_eq!(
+        b4_more::component_missile(&mut f, &t, u, 1, 1, 3),
+        0,
+        "T none"
+    );
+    f.targets.insert(u, tg);
+    // m < 0.
+    assert_eq!(
+        b4_more::component_missile(&mut f, &component_tabs(0xFFFF, false), u, 1, 1, 3),
+        0
+    );
+    // m + S3 ≥ count.
+    f.components.insert((u, 3), 8);
+    assert_eq!(b4_more::component_missile(&mut f, &t, u, 1, 1, 3), 0);
+    assert!(f.missiles.is_empty());
+    assert_eq!(f.c.units[u].flags & 0x40, 0);
+}
+
+// Covers: specs/skills/bodies-4.md §3.25 r3, §3.25 r4
+#[test]
+fn doom_knight_missile_adds_the_component_byte() {
+    let (mut f, u) = mworld();
+    f.tpos.insert(u, (30, 40));
+    let tg = mon(&mut f, 0, (2, 2));
+    f.targets.insert(u, tg);
+    f.components.insert((u, 3), 3);
+    assert_eq!(
+        b4_more::component_missile(&mut f, &component_tabs(2, false), u, 1, 2, 3),
+        1
+    );
+    assert_eq!(f.c.units[u].flags & 0x40, 0x40);
+    let q = &f.missiles[0];
+    assert_eq!((q.class, q.flags, q.skill, q.level), (5, 0x21, 1, 2));
+    // `lob` → the lob missile.
+    assert_eq!(
+        b4_more::component_missile(&mut f, &component_tabs(2, true), u, 1, 2, 3),
+        1
+    );
+    assert_eq!((f.missiles[1].class, f.missiles[1].flags), (5, 0x420));
+    // A player adds no component byte.
+    let (mut f, p) = world();
+    f.tpos.insert(p, (30, 40));
+    let tg = mon(&mut f, 0, (2, 2));
+    f.targets.insert(p, tg);
+    f.components.insert((p, 3), 3);
+    b4_more::component_missile(&mut f, &component_tabs(2, false), p, 1, 2, 3);
+    assert_eq!(f.missiles[0].class, 2);
+}
+
+// Covers: specs/skills/bodies-4.md §3.26
+#[test]
+fn necromage_missile_uses_component_s4() {
+    let (mut f, u) = mworld();
+    f.tpos.insert(u, (30, 40));
+    let tg = mon(&mut f, 0, (2, 2));
+    f.targets.insert(u, tg);
+    f.components.insert((u, 3), 3);
+    f.components.insert((u, 4), 6);
+    assert_eq!(
+        b4_more::component_missile(&mut f, &component_tabs(2, false), u, 1, 2, 4),
+        1
+    );
+    assert_eq!(f.missiles[0].class, 8, "m + S4, not S3");
 }
