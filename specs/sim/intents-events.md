@@ -35,19 +35,19 @@
 | Rules | 86–87 |
 |   1. Loop order (single player) | 88–109 |
 |   2. Client → server | 110–279 |
-|   3. Server → client | 280–444 |
-|   4. d2rs mapping and scope | 445–476 |
-|   5. Machine-readable tables | 477–513 |
-|   6. Exact-match comparison | 514–604 |
-|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 605–987 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 988–1132 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1133–1277 |
-| Constants & data dependencies | 1278–1296 |
-| Randomness | 1297–1302 |
-| Edge cases & original bugs | 1303–1336 |
-| Test vectors | 1337–1423 |
-| Provenance | 1424–1525 |
-| Open questions | 1526–1623 |
+|   3. Server → client | 280–446 |
+|   4. d2rs mapping and scope | 447–478 |
+|   5. Machine-readable tables | 479–515 |
+|   6. Exact-match comparison | 516–606 |
+|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 607–989 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 990–1134 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1135–1279 |
+| Constants & data dependencies | 1280–1298 |
+| Randomness | 1299–1304 |
+| Edge cases & original bugs | 1305–1338 |
+| Test vectors | 1339–1425 |
+| Provenance | 1426–1527 |
+| Open questions | 1528–1625 |
 <!-- /index -->
 
 ## Summary
@@ -408,12 +408,14 @@ Queue 2 (id 0xFF, 16 bytes, `0x0052CC20`) runs only when host callbacks
    | 0x53 | `0x0053C900` | `0x0052D7B0` (`0x0052D800`), `0x0053ABE0` (`0x0053AC4F`), `0x0059A100` (`0x0059A12A`), `0x0059A170` (`0x0059A19C`) | 6 | `0x0053ABE0` takes the values from `0x0061C330(act)`; `render/lighting.md` §9.2 |
    | 0x58 | `0x0053D8D0` | `0x00579D60` (`0x00579F52`, `0x0057A28B`, `0x0057A4B3`: codes 6, 7), `0x00582610` (`0x005826D9`: 0), `0x005852E0` (`0x00585348`: 1, 4, 5), `0x0059DC70` (`0x0059DD54`: 0) | 0 | GUID u32@1 (−1 without a unit); u8@6 written only with code 5 (`0x005853CD` := 1, or `0x005853E4` := the result of `0x00585240`) |
    | 0x5D | `0x0053D710` | 18 call sites, `world/quests.md` §6.3 | 1 | |
+   | 0x5A | `0x0053C850` | its callers build all 40 bytes: `0x00549A60` (code 0x0E, u8@2 1, rest 0; `skills/use.md` §2 step 6), `0x0054A5D0` (codes 0x0D, 4, §9 rule 16) | 0 | a copier: queues 40 bytes from the caller's buffer; asserts the name at @8 is shorter than 16 chars (fatal 0x5DA). Code u8@1, u8@2, u32@3, name @8 |
    | 0x63 | `0x0053D960` | `0x00584E30` (`0x00584EEA`) | 3 | `world/waypoints.md` §5.3 |
    | 0x78 | `0x0053CAD0` | `0x00568060` (`0x005682F7`) | 0 | the other player's client name (`0x00538830`, 16 bytes, byte 16 := 0), u32@17 = the other player's GUID; trade only |
    | 0x89 | `0x0053DFE0` | `0x005456F0` (`0x00545700`), `0x00546270` (`0x00546687`, event 0) | 0 | `world/quests.md` §6.5 |
    | 0x8A | `0x0053DFF0` | `0x00544590` (`0x005446EE`), `0x005EE3C0` (`0x005EE57B`) | 136 | type 1, GUID = unit +0x0C; `world/quests.md` §6.4 |
    | 0x91 | `0x0053E060` | `0x00545100` (`0x00545172`) | 0 | `world/quests.md` §6.7 |
    | 0x94 | `0x0053C5D0` | itself (`0x0053C65F`); called at `0x00532F03` (join) and `0x0056A7B7` | 4 | `client/msg-skills.md` §3 |
+   | 0xA5 | `0x0053C190` | itself | 0 | 8 bytes, zeroed first: unit type u8@1 (DL), GUID u32@2, skill u16@6 (stack); `skills/bodies-2.md` §2.13 |
    | 0xA8 | `0x0053E8D0` | `0x005711D0` (`0x00571359`) | 5 | rule 6 |
    | 0xAA | `0x0053E8D0` | `0x00570E30` | 269 | §7.9 rule 1 |
 
