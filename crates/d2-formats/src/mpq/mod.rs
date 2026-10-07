@@ -21,6 +21,7 @@ mod huffman_tests;
 mod mutant_tests_archive;
 #[cfg(test)]
 mod mutant_tests_codecs;
+pub mod names;
 #[cfg(test)]
 mod robust_tests;
 mod set;
