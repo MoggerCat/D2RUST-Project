@@ -207,6 +207,26 @@ stat-list links, `weapon_set`, the runtime item table (§5). No outputs.
       Model: `cursor_item` of the inventory's unit := the item's key (set)
       or none (clear). Outside the item actions: 0x42 (§3 rule 1) and 0x58
       code 5 (`client/msg-ui.md` §8) clear it.
+6. **Belt column-ready bytes** `ready[0..4]` (`[0x007BEFB0 + c]`, u8;
+   read by the belt keys, `ui/controls.md` §7 r2; 2026-10-08). The only
+   writer is `0x00498D50(c, v)`, which writes when c < 4 (unsigned) and
+   ignores larger c. c is the item's x (its belt slot, 0–15), so only
+   the bottom-row slots 0–3 write; slots 4–15 never touch a byte. It is
+   called from three action handlers, nothing else (no init or clear;
+   the static bytes start 0):
+
+   | Action (handler, call) | Write |
+   |---|---|
+   | 0x0E PutInBelt (`0x004C4130`, `0x004C4276`) | after the belt placement: ready[x] := 1, x = the placed item's x (an item, type 4, reads its static path +0x0C; types 0, 1, 3 would read `0x006488C0`) |
+   | 0x0F RemoveFromBelt (`0x004C42A0`, `0x004C433F`) | the item found in P's belt is removed (`0x0063C550(inventory, item, x)`), then ready[x] := 0, x = the stream header's x (header +4 u16) |
+   | 0x15 UpdateStats, header mode 2 (`0x004C4C70`, `0x004C500A`, `0x004C50E7`) | the old (4, GUID) present: removed from P's belt, ready[old x] := 0 (x `0x0045ADF0`), old unit freed; the item re-created (mode 2 required, else fatal 0xC69) and put in the belt, then ready[new x] := 1 |
+
+   No other code writes a byte (the four calls above are all the
+   references to `0x00498D50`): 0x10 SwapInBelt, the client belt use
+   and item removals by other messages (e.g. 0x0A's removal, a unit
+   remove) leave the bytes unchanged, so a byte stays 1 after its slot
+   empties by any path but 0x0F / 0x15 mode 2. d2rs:
+   `ClientWorld.belt_ready: [bool; 4]`, written only by these three rows.
 
 ### 3. Other item messages
 
@@ -476,6 +496,12 @@ Area 4 session (2026-10-07): §5 from `0x0045E130`, `0x004C1F30`
 `0x004C2020`, `0x004C51B0`, `0x004C2180`, `0x004C2270`, `0x004C23E0`,
 `0x0045EAD0` → `0x0048A700`, `0x0045EDC0` → `0x00639CC0`, `0x00639D60`;
 stat names from `itemstatcost`.
+
+§2 r6 (2026-10-08, PC 2 request from spec-ui-s4): `0x00498D50` and its
+xrefs (`0x004C4276`, `0x004C433F`, `0x004C500A`, `0x004C50E7`), an
+all.asm scan of `0x007BEFB0`; disassembly of `0x004C4130`
+(`0x004C4245`–`0x004C4276`), `0x004C42A0` (`0x004C4329`–`0x004C433F`),
+`0x004C4C70` (`0x004C4FBE`–`0x004C50E7`).
 
 ## Open questions
 

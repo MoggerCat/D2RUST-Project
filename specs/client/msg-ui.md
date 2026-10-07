@@ -582,6 +582,28 @@ layer.
    mode, the local player's data +0x150…+0x15C. They are stated as
    model rules in `client/model.md` §17; the UI layer's request reaches
    the model through the bridge (`client/bridge.md` §10 r10).
+7. **The client quest record `[0x007C0D43]`, all writers** (2026-10-08,
+   open question 4; read by `0x004B32D0` for `ui/panels-3.md` §26 r4 and
+   `ui/inventory.md` §9 r5). The global holds a pointer to a 96-byte
+   quest flag record (`0x0065C430`: allocated, all bytes 0). Every
+   instruction of `Game.exe` that writes or passes it is one of:
+   - **create** (`0x004B23E0`, UI-state init): pointer := a new zeroed
+     record (with the game record `[0x007C0D47]`); run by the game UI
+     start `0x00456970` and by `0x004B32F0`;
+   - **destroy** (`0x004B24A0`): both records freed (`0x0065C490`),
+     pointers := 0; run by the game UI end `0x00456D80` and by
+     `0x004B32F0`;
+   - **reset** `0x004B32F0` = destroy then create (so all 96 bytes 0),
+     run only from `0x00453DE0`, i.e. when the local player is replaced
+     or freed (`client/model.md` §2 rule 5, §3 rule 1);
+   - **copy** of 0x28's Q (r2 with T = 6, r4 with T ≠ 6 and U present:
+     `0x0065C4D0(record, Q, 0x60, 0)`).
+   Every other reference (`0x004B1680`, `0x004B2AD0`, `0x004B3380`,
+   `0x004B3870`, `0x004B4830`, `0x004B66B0`, `0x004B32D0`) only reads
+   it, through the flag test `0x0065C310`. No other S→C message writes
+   it (0x29 writes `[0x007C0D47]`; 0x52 / 0x5E write quest-log bytes).
+   d2rs: the UI layer's 96-byte quest record, zeroed at game UI start and
+   on a local-player change, overwritten only by 0x28 as above.
 
 ### 17. 0x62 NPC dialog end (`0x0045D390` → `0x004B5320`)
 
@@ -785,6 +807,11 @@ re-read on the 1.14d export): §5 r3 `0x004A1600` (`0x004A167A`,
 `0x00478700`; §9 r4 `0x004B3380`; OQ7 all.asm scan of the writes of
 `0x007C0D25` / `0x007C0D29`; OQ9 `0x0049E3A0` (`0x0049E4D9`–
 `0x0049E52D`).
+§16 r7 (2026-10-08, PC 2 request from spec-ui-s4): all.asm scan of
+`[0x007C0D43]` (19 references in 10 functions, the call after each
+read), `0x004B23E0`, `0x004B24A0`, `0x004B32F0`, `0x0065C430`,
+`0x0065C310`, `0x004B6DD0`; callers `0x00456995`, `0x00456E22`,
+`0x00453DF9`, `0x004B32F9`, `0x004B32FE`.
 
 ## Open questions
 
@@ -800,7 +827,9 @@ re-read on the 1.14d export): §5 r3 `0x004A1600` (`0x004A167A`,
 3. Who resets the quest-log latch `[0x007BF298]` and the meaning of
    `[0x007BF2A4]`, `[0x007BF2AC]`, `[0x007BF2B9]` in the quest-log draw
    (Phase 6 quest-log spec).
-4. The client quest flags record `[0x007C0D43]`: which messages write it
+4. ~~The client quest flags record `[0x007C0D43]`~~: answered in §16
+   r7 (all writers: create / destroy / reset on a local-player change,
+   0x28 copies). Original text: which messages write it
    (0x28 / 0x29 / 0x52 / 0x5E are unowned) — needed by §1 r7 and §2
    r2.3. *Partly answered* (§12–§14): 0x29 writes the game record
    `[0x007C0D47]`, 0x52 and 0x5E write quest-log bytes, not the record.
