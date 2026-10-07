@@ -317,13 +317,22 @@ impl NpcControl {
         let Some(slot) = slot.filter(|s| s.name == name && !s.hired) else {
             return refuse(w, code::REFUSED);
         };
-        // `0x00663750(name)`: the act of the row whose range holds it − 1.
+        // `0x00663750(expansion, 0, name)` (`hirelings.md` §1.2 rule 3):
+        // the first row of the game's version with `Class` 0, else the
+        // first whose name range holds the name; its act − 1, none → 0.
+        let v = self.version();
         let act = self
             .hirelings
             .iter()
-            .find(|r| (r.name_first..=r.name_last).contains(&name))
-            .map_or(0, |r| r.act)
-            .wrapping_sub(1);
+            .filter(|r| r.version == v)
+            .find(|r| r.class == 0)
+            .or_else(|| {
+                self.hirelings
+                    .iter()
+                    .filter(|r| r.version == v)
+                    .find(|r| r.name_first <= name && name <= r.name_last)
+            })
+            .map_or(0, |r| r.act.wrapping_sub(1));
         // TODO(npc §7.3 step 5): "player level" read as stat 12 (not
         // step 1's capped lvl).
         let level = w.stat(player, stat::LEVEL);
@@ -394,6 +403,15 @@ impl NpcControl {
             send_code(w, player, code::REFUSED, u32::MAX);
             return 0;
         };
+        // Step 2, d2rs policy (edge case 11; `hirelings.md` §9 rule 3,
+        // edge case 5): 1.14d does not test the dead bit and revives (and
+        // frees) a living hireling; a living node is answered like a
+        // missing one, before the cost. The `(7, 1)` node is living
+        // exactly when `(7, 0)` returns the same unit.
+        if w.pet(player, PET_HIRELING, 0) == Some(merc) {
+            send_code(w, player, code::REFUSED, u32::MAX);
+            return 0;
+        }
         let cost = resurrect_cost(w.stat(merc, stat::LEVEL));
         if !w.pay(player, cost) {
             send_code(w, player, code::NO_GOLD, u32::MAX);

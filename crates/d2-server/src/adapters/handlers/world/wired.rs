@@ -313,6 +313,37 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
             })
         });
     }
+
+    /// The hireling deaths the kill queued (`ActionHooks::pet_deaths`, on
+    /// from the first frame): `hirelings.md` §8 rule 1 → `0x005751A0`
+    /// ([`life::on_kill`] with flag 1) for each killed monster with a
+    /// player owner and a hireling node. Without hireling tables the
+    /// game has no hireling: the queue is dropped.
+    ///
+    /// TODO(hirelings.md §8 r1): in 1.14d `0x005751A0` runs inside the
+    /// kill, before the killer bookkeeping and the death mode; here it
+    /// runs when the handler or tick that killed returns, so its 0x9B /
+    /// 0x7A follow the kill's other messages.
+    pub fn pet_deaths<D: ActionEvents>(&mut self, game: &mut Game, events: &mut D) {
+        let q = events
+            .action()
+            .sys
+            .hooks
+            .pet_deaths
+            .as_mut()
+            .map(std::mem::take)
+            .unwrap_or_default();
+        if q.is_empty() || self.state.hireling_tables.is_none() {
+            return;
+        }
+        self.desk(game, events, |desk, _, _| {
+            desk.with_hirelings(|w, _, st| {
+                for m in q {
+                    life::on_kill(w, st, m, true);
+                }
+            })
+        });
+    }
 }
 
 /// The parts of a [`WiredWorld`] beside the economy, borrowed for one
@@ -487,6 +518,7 @@ where
             difficulty,
         };
         let out = WorldHost::<D>::waypoints(&mut self.action, game, events, run);
+        self.pet_deaths(game, events);
         self.pet_follows(game, events);
         out
     }
@@ -511,6 +543,7 @@ where
     /// ([`quest_objects`]), before the tick's sends are taken.
     fn after_tick(&mut self, game: &mut Game, events: &mut D) {
         self.desk(game, events, |desk, ctl, _| quest_objects(desk, ctl));
+        self.pet_deaths(game, events);
         self.pet_follows(game, events);
     }
 
@@ -576,6 +609,7 @@ where
             staged,
         };
         let out = WorldHost::<D>::skill(&mut self.action, call);
+        self.pet_deaths(game, events);
         self.pet_follows(game, events);
         out
     }
@@ -608,6 +642,7 @@ where
 
     fn walk(&mut self, game: &mut Game, events: &mut D, call: WalkCall) -> Option<WalkResult> {
         let out = WorldHost::<D>::walk(&mut self.action, game, events, call);
+        self.pet_deaths(game, events);
         self.pet_follows(game, events);
         out
     }
@@ -652,6 +687,7 @@ where
         events.action().route_quest_objects();
         let h = &mut events.action().sys.hooks;
         h.pet_follows.get_or_insert_with(Vec::new);
+        h.pet_deaths.get_or_insert_with(Vec::new);
         WorldHost::<D>::host_tick(&mut self.action, events, ms);
     }
 

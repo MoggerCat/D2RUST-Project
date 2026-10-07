@@ -106,6 +106,8 @@ pub struct Rest {
     /// The item the next `reward_item` creates (placed in the player's
     /// staged inventory).
     pub reward: Option<UnitId>,
+    /// Staged monster owners (`0x0058F0D0`: GUID, unit type).
+    pub owners: BTreeMap<UnitId, (u32, u8)>,
 }
 
 impl Outbox for Rest {
@@ -226,8 +228,8 @@ impl HirelingRest for Rest {
     }
     fn set_skill_level(&mut self, _: UnitId, _: u32, _: i32) {}
     fn set_owner(&mut self, _: UnitId, _: u32, _: u8) {}
-    fn owner(&self, _: UnitId) -> Option<(u32, u8)> {
-        None
+    fn owner(&self, merc: UnitId) -> Option<(u32, u8)> {
+        self.owners.get(&merc).copied()
     }
     fn join_team(&mut self, _: UnitId, _: UnitId) {}
     fn hireling_ai(&mut self, _: UnitId) {}

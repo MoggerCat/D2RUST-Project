@@ -10,20 +10,30 @@
 //! a character that reached the level by experience alone.
 //!
 //! Pending (not specified; refused or written as noted):
-//! - "all quests complete": `world/quests.md` §1.2 names the bits but
-//!   not the pattern each quest leaves when completed; `--quests all` is
-//!   refused. `acts=N` sets only the bits the act transitions of §8.1
+//! - "all quests complete": a played completion leaves no single bit
+//!   pattern per quest (`world/quests.md` §1.8 rule 3, its Open question
+//!   14); `--quests all` is refused. `acts=N` sets only the bits the act transitions of §8.1
 //!   set (bit 0; bit 13 is cleared on load, §1.6).
-//! - the appearance bytes +0x88..+0xA7 of a full save (`0x0063E510`, not
-//!   specified): written as the creation stub's (§2.6).
+//! - the appearance bytes +0x88..+0xA7 (§2.8): the writer fills them
+//!   with 0xFF and each equipped item (mode 1) changes some; the mapping
+//!   is Open question 17. With no equipped item (every file `new`
+//!   writes) they are 32 × 0xFF, as the game writes them; `set` on a
+//!   save with an equipped item keeps the file's bytes and says so.
+//!
+//! Game-equivalent re-save (`set`, [`resave`]): a save the game writes
+//! after loading a file holds every item without flag 0x2000 (§8.2 rule
+//! 7, edge case 17) and the appearance bytes of §2.8; `new` and `set`
+//! write the same.
 
 use std::collections::BTreeMap;
 
 use anyhow::{anyhow, bail, Context, Result};
+use d2_formats::d2s::ItemEntry;
 use d2_formats::d2s::{
     clamp_stat, status, Body, D2s, Golem, Header, Npcs, Quests, SaveTables, StatEntry, Stats,
-    Waypoints, STUB_COMPONENTS,
+    Waypoints, ITEM_FLAG_INSTORE,
 };
+use d2_proto::item_bits::SaveEntry;
 use d2_sim::combat::vitals::{self, VitalsTables, VitalsUnits};
 use d2_sim::units::UnitType;
 
@@ -319,8 +329,8 @@ pub fn new_save(e: &Edits, t: &Tables) -> Result<D2s> {
     let class = e.class.context("--class is required")?;
     let level = e.level.unwrap_or(1);
     let time = e.time.unwrap_or_else(now);
+    // §2.8 rule 2: no equipped item → 32 × 0xFF (the default).
     let mut h = Header {
-        components: STUB_COMPONENTS,
         create_time: time,
         save_time: time,
         map_seed: e.map_seed.unwrap_or(time),
@@ -560,8 +570,10 @@ fn apply_quests(q: &mut Quests, spec: &QuestSpec, expansion: bool) -> Result<()>
     match spec {
         QuestSpec::None => q.records = [[0; 96]; 3],
         QuestSpec::All => bail!(
-            "--quests all is Pending: world/quests.md §1.2 does not specify the bits a completed \
-             quest leaves; use acts=N (the §8.1 act transitions) or explicit slot.bit items"
+            "--quests all is Pending: a played completion leaves no single bit pattern per quest \
+             (world/quests.md §1.8 rule 3, Open question 14); use acts=N (the §8.1 act \
+             transitions) or explicit slot.bit items (bit 0 is what every completion reader \
+             accepts, §1.8 rule 4)"
         ),
         QuestSpec::Items(items) => {
             for it in items {
@@ -614,4 +626,77 @@ fn apply_waypoints(w: &mut Waypoints, spec: &WpSpec, t: &Tables) {
             }
         }
     }
+}
+
+/// The record offsets of an entry's item and its children, depth first
+/// (each child's entry follows its parent's own padded stream).
+fn record_offsets(e: &SaveEntry, at: usize, out: &mut Vec<usize>) {
+    out.push(at);
+    let own = e.len - e.children.iter().map(|c| c.len).sum::<usize>();
+    let mut o = at + own;
+    for c in &e.children {
+        record_offsets(c, o, out);
+        o += c.len;
+    }
+}
+
+/// Item flag 0x2000 cleared in every record of `entry`, children
+/// included (§8.2 rule 7). Returns whether the entry has an equipped
+/// (mode 1) top-level item.
+fn clear_instore(entry: &mut ItemEntry, t: &Tables) -> Result<bool> {
+    let e = t
+        .decode_entry(&entry.bytes)
+        .map_err(|err| anyhow!("item entry: {err}"))?;
+    let mut offs = Vec::new();
+    record_offsets(&e, 0, &mut offs);
+    for at in offs {
+        let f = entry
+            .record_flags(at)
+            .with_context(|| format!("item record at +{at} has no JM marker"))?;
+        entry
+            .set_record_flags(at, f & !ITEM_FLAG_INSTORE)
+            .expect("checked above");
+    }
+    Ok(e.item.mode == 1)
+}
+
+/// What the game's next save of a loaded file holds where it differs from
+/// the file without any change in play: every item record (player list,
+/// corpse, hireling and golem item, children) without flag 0x2000 (§8.2
+/// rule 7, edge case 17), and the appearance bytes rebuilt (§2.8): 32 ×
+/// 0xFF when no player item is equipped. With an equipped item the bytes
+/// are kept (their mapping is Open question 17) and a note says so.
+/// Returns the notes.
+pub fn resave(save: &mut D2s, t: &Tables) -> Result<Vec<String>> {
+    let mut notes = Vec::new();
+    let Some(b) = save.body.as_mut() else {
+        return Ok(notes);
+    };
+    let mut equipped = false;
+    for it in &mut b.items {
+        equipped |= clear_instore(it, t)?;
+    }
+    for c in &mut b.corpses {
+        for it in &mut c.items {
+            clear_instore(it, t)?;
+        }
+    }
+    if let Some(Some(list)) = &mut b.hireling_items {
+        for it in list {
+            clear_instore(it, t)?;
+        }
+    }
+    if let Some(Golem { item: Some(it), .. }) = &mut b.golem {
+        clear_instore(it, t)?;
+    }
+    if equipped {
+        notes.push(
+            "appearance bytes +0x88..+0xA7 kept: an item is equipped and the per-item mapping \
+             is not specified (d2s.md §2.8 rule 3, Open question 17)"
+                .into(),
+        );
+    } else {
+        save.header.reset_appearance();
+    }
+    Ok(notes)
 }

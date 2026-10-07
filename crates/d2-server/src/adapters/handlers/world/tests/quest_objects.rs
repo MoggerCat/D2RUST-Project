@@ -228,6 +228,7 @@ fn a_queued_pet_follow_warps_the_living_hireling_after_the_tick() {
     let w = fx.world();
     w.state.hireling_tables = Some(HirelingTables {
         rows: Default::default(),
+        exp_ratios: Default::default(),
         max_level: 99,
         pet_flags: HirelingTables::WARP,
         pet_basemax: 1,
@@ -257,4 +258,63 @@ fn a_queued_pet_follow_warps_the_living_hireling_after_the_tick() {
     assert_eq!(f2(&mut fx, merc) & flags::WARP2, flags::WARP2);
     assert_eq!(f2(&mut fx, dead) & flags::WARP2, 0);
     assert_eq!(fx.h.game.events.hooks().pet_follows, Some(vec![]));
+}
+
+// ---- the hireling's death -----------------------------------------------------------------
+
+// Covers: specs/world/hirelings.md §8 r1, §8 r2
+#[test]
+fn a_queued_kill_marks_the_player_owned_hireling_dead_after_the_tick() {
+    use d2_sim::world::hirelings::{HirelingTables, PetNode};
+    let mut fx = fixture();
+    let req = AllocRequest {
+        ty: UnitType::Monster,
+        class: 0,
+        room: None,
+        add: true,
+        fixed_guid: None,
+        mode: 1,
+        allied: false,
+    };
+    let s = &mut fx.h.game;
+    let merc = s
+        .events
+        .with(&mut s.game, |g, v| v.allocate(g, &req, 0, 0))
+        .unwrap();
+    let gm = fx.guid(merc);
+    let p = fx.player;
+    let pg = fx.guid(p);
+    let w = fx.world();
+    w.state.hireling_tables = Some(HirelingTables {
+        rows: Default::default(),
+        exp_ratios: Default::default(),
+        max_level: 99,
+        pet_flags: HirelingTables::WARP,
+        pet_basemax: 1,
+    });
+    w.state.hirelings.list_mut(p).nodes = vec![PetNode {
+        guid: gm,
+        name: 0x0D68,
+        ..PetNode::default()
+    }];
+    w.rest.owners.insert(merc, (pg, 0));
+    // The kill queues the defender (`ActionHooks::pet_deaths`, on from
+    // the first frame); here staged.
+    let q = fx.h.game.events.hooks().pet_deaths.as_mut().unwrap();
+    assert!(q.is_empty());
+    q.push(merc);
+    fx.h.connect(0);
+    fx.frames(1);
+    assert!(fx.world().state.hirelings.list(p).unwrap().nodes[0].dead);
+    // 0x9B (name 0x0D68, cost at level 0 = 0) to the owner, then the
+    // 0x7A remove with the pet GUID @9.
+    let mut remove = vec![0x7A, 0, 0, 0, 0, 0, 0, 0, 0];
+    remove.extend_from_slice(&gm.to_le_bytes());
+    let to_p: Vec<Vec<u8>> =
+        fx.h.receive(0)
+            .into_iter()
+            .filter(|m| m[0] == 0x9B || m[0] == 0x7A)
+            .collect();
+    assert_eq!(to_p, vec![vec![0x9B, 0x68, 0x0D, 0, 0, 0, 0], remove]);
+    assert_eq!(fx.h.game.events.hooks().pet_deaths, Some(vec![]));
 }
