@@ -26,17 +26,17 @@
 |   2. Cells, sides and links | 92–122 |
 |   3. Cell primitives | 123–242 |
 |   4. Generation sequence (`0x00673B30`, D2MOO `DRLGMAZE_GenerateLevel`) | 243–285 |
-|   5. Layout builders | 286–363 |
-|   6. Special cells by level | 364–446 |
-|   7. Placement against a neighbouring preset level | 447–495 |
-|   8. Theme cells (`0x006735F0`, D2MOO `RollAct_1_2_3_BasicPresets`) | 496–513 |
-|   9. Building cells and file choice (`0x00673A60`, `0x006738C0`) | 514–546 |
-| Constants & data dependencies | 547–560 |
-| Randomness | 561–596 |
-| Edge cases & original bugs | 597–622 |
-| Test vectors | 623–637 |
-| Provenance | 638–690 |
-| Open questions | 691–704 |
+|   5. Layout builders | 286–369 |
+|   6. Special cells by level | 370–452 |
+|   7. Placement against a neighbouring preset level | 453–504 |
+|   8. Theme cells (`0x006735F0`, D2MOO `RollAct_1_2_3_BasicPresets`) | 505–522 |
+|   9. Building cells and file choice (`0x00673A60`, `0x006738C0`) | 523–555 |
+| Constants & data dependencies | 556–569 |
+| Randomness | 570–605 |
+| Edge cases & original bugs | 606–631 |
+| Test vectors | 632–646 |
+| Provenance | 647–699 |
+| Open questions | 700–719 |
 <!-- /index -->
 
 ## Summary
@@ -332,7 +332,13 @@ are dead ends: the next cell grows from the previous parent (9 from 7,
 15·b + k; rejected cells and k = 8, 12 leave 0). **After all four
 branches** a separate pass gives every recorded cell file = (r + slot /
 15) mod 4 = (r + b) mod 4, then F gets file 4. A file reset to −1 by a
-later branch's merge is therefore overwritten for every recorded cell. Cells 8 and
+later branch's merge is therefore overwritten for every recorded cell.
+No cross-branch merge happens in 1.14d: on a grid in cell units (all
+cells have the Arcane lvlmaze size), the 60 kept positions of the four
+branches never share an edge with a cell of another branch (only F
+touches the four k = 0 cells), so a merge (§3.4, edge-touching only)
+only joins cells of one branch; placing the file pass after each branch
+instead would give the same files. Cells 8 and
 12 keep file −1. A rejected grow leaves a null parent (crash; never
 happens). Total 1 + 60 cells = lvlmaze `Rooms` 61.
 
@@ -465,7 +471,10 @@ from the second on, that it precedes, where a precedes b when a.dir <
 b.dir, or the directions are equal and by box: dir 0 a.y < b.y, dir 1
 a.x > b.x, dir 2 a.y > b.y, dir 3 a.x < b.x; an empty list takes it as
 head; with one record it goes before or after the head by the
-comparator; with more, the head is never displaced. Being init 0 it is
+comparator; with more, the head is never displaced, and a record that
+precedes none of the records after the head goes at the tail
+(`0x0066B720`: the walk keeps the last record visited and links the new
+one after it with next := 0). Being init 0 it is
 never copied to a built room (§9 step 4) nor removed from a neighbour
 on free; halves truncate toward
 zero; SizeX/SizeY are the Barracks lvlmaze sizes (10 × 14). A null C
@@ -701,3 +710,9 @@ sites; level seed writes at 0x642B62 for levels 8–12).
 4. The level rect used by normalization and by the first-cell centring
    (`0x00642D10`, `drlg/levels.md`) must give Den of Evil (1500, 1000,
    200, 200) for the first vector; confirm there.
+5. *Answered* (`impl-drlg-act3-5` Q10): the cross-level sorted insert
+   puts a record that precedes no later record at the tail (§7.1).
+6. *Answered* (`impl-drlg-act3-5` Q13): the spiral's branches are never
+   edge-adjacent, so the after-all-branches file pass and a per-branch
+   pass give the same files in 1.14d; the code order is after all
+   branches (§5.5, enumeration of the 61 cell positions).

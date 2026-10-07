@@ -28,20 +28,20 @@
 |   3. DrlgType 2 levels | 115–171 |
 |   4. Allocating a preset map (`0x00666ED0`; all level types) | 172–188 |
 |   5. Loading a DS1 (`0x00665F40`, parser `0x00665950`) | 189–271 |
-|   6. Building a preset area (`0x00667ED0`, scan `0x00667970`) | 272–343 |
-|   7. Unit filter (`0x00667620`) | 344–368 |
-|   8. First activation of a preset room (`0x00667890`) | 369–405 |
-|   9. Preset room grids and unit transfer (`0x006667D0`) | 406–435 |
-|   10. Tile fill switches (`0x00666AC0`) | 436–448 |
-|   11. Door preset units (`0x0066D9E0`) | 449–473 |
-|   12. Pops at run time (presentation) | 474–486 |
-|   13. lvlprest columns (1.14d use) | 487–507 |
-| Constants & data dependencies | 508–539 |
-| Randomness | 540–562 |
-| Edge cases & original bugs | 563–580 |
-| Test vectors | 581–606 |
-| Provenance | 607–648 |
-| Open questions | 649–673 |
+|   6. Building a preset area (`0x00667ED0`, scan `0x00667970`) | 272–352 |
+|   7. Unit filter (`0x00667620`) | 353–377 |
+|   8. First activation of a preset room (`0x00667890`) | 378–414 |
+|   9. Preset room grids and unit transfer (`0x006667D0`) | 415–444 |
+|   10. Tile fill switches (`0x00666AC0`) | 445–457 |
+|   11. Door preset units (`0x0066D9E0`) | 458–482 |
+|   12. Pops at run time (presentation) | 483–495 |
+|   13. lvlprest columns (1.14d use) | 496–516 |
+| Constants & data dependencies | 517–548 |
+| Randomness | 549–571 |
+| Edge cases & original bugs | 572–589 |
+| Test vectors | 590–615 |
+| Provenance | 616–657 |
+| Open questions | 658–685 |
 <!-- /index -->
 
 ## Summary
@@ -90,7 +90,7 @@ at the room's preset-unit record; spawning units is
 | Record | Size | Fields (offset: meaning) |
 |---|---|---|
 | level preset info | 8 | +0 map, +4 direction |
-| preset map | 0x58 | +0x00 lvlprest index (Def), +0x04 picked file, +0x08 lvlprest record, +0x0C DS1 file record, +0x10/+0x14/+0x18/+0x1C x, y, width, height (tiles), +0x20 per-8×8-cell link grid (set by outdoor code), +0x38 preset-unit list, +0x3C "hardcoded units pending" (1 at alloc), +0x40 pop count, +0x44/+0x48/+0x4C/+0x50 pop group, pop sub index, pop timer, pop rectangle (16 bytes), +0x54 next map |
+| preset map | 0x58 | +0x00 lvlprest index (Def), +0x04 picked file, +0x08 lvlprest record, +0x0C DS1 file record, +0x10/+0x14/+0x18/+0x1C x, y, width, height (tiles), +0x20 "has link grid" pointer (freed as a vertex list, `0x0067D1E0`) and +0x24 per-8×8-cell link grid (20-byte grid; never filled in 1.14d, §6 step 10), +0x38 preset-unit list, +0x3C "hardcoded units pending" (1 at alloc), +0x40 pop count, +0x44/+0x48/+0x4C/+0x50 pop group, pop sub index, pop timer, pop rectangle (16 bytes), +0x54 next map |
 | DS1 file record | 0x5C | +0x00 tag type, +0x04 file buffer, +0x0C width−1, +0x10 height−1 (as stored in the DS1), +0x14 wall count, +0x18 floor count, +0x1C..+0x2B orientation layers 0–3, +0x2C..+0x3B wall layers 0–3, +0x3C/+0x40 floor layers 0–1, +0x44 shadow layer, +0x48 tag layer, +0x4C group count, +0x50 groups (24 bytes each), +0x54 preset-unit list |
 | preset unit | 0x20 | +0x00 mode, +0x04 class id, +0x08 x, +0x0C next, +0x10 path, +0x14 unit type, +0x18 y, +0x1C flags |
 | path | 8 | +0 point count, +4 points (12 bytes each: action, x, y) |
@@ -333,13 +333,22 @@ generation (§3.2: F = 0, multi-room), `drlg/maze.md` (`0x00673A60`),
     DRLG room (`0x0066B3E0`: **one level-seed step** plus its room seed,
     `drlg/rooms.md` §2); room flags |= F-derived cell value; DT1 mask :=
     lvlprest `Dt1Mask`; rectangle; preset data: map, lvlprest index,
-    preset room flags, link (if non-zero, link +0x0C |= 1); if
+    preset room flags, link (if non-zero, link +0x0C |= 1; preset room
+    data +0xEC := link); if
     `Populate` = 0: room flag 0x800000; add the room to the level
     (`0x0066B970`: **head insert**: room next (+0x24) := level first
     room (+0x10), level first room := room, level room count (+0x08) +=
     1). So the level list holds the rooms in reverse creation order
     (multi-room: the last row's last column first). BuildArea returns
     the last room.
+    The link is always 0 in 1.14d: `0x00667ED0` reads the map's link
+    grid (+0x24) only when map +0x20 is non-zero (`0x00668071`–
+    `0x0066808A`), and nothing writes map +0x20 after the allocation's
+    zeroing memset (`0x00666F09`; the writes of +0x20 in the DRLG code
+    `0x00665000`–`0x00682000` target rooms, levels, tile grids, outdoor
+    room data and path nodes). So no room gets a link, "+0x0C |= 1" never
+    runs and preset room data +0xEC stays 0; no link-record type is
+    needed.
 
 ### 7. Unit filter (`0x00667620`)
 
@@ -670,3 +679,6 @@ the disassembly). Function map (D2MOO 1.10f names as hints):
 7. Does any lvlprest DS1 with `Scan` ≠ 0 have a waypoint object outside
    its map (§6 step 9 writes without a bound check)? Scan the waypoint
    objects (objects `SubClass` bit 0x40) of those DS1s against w, h.
+8. *Answered* (`impl-drlg-act3-5` Q12, link bit 0): the §6 step 10 link
+   is always 0 in 1.14d (map +0x20 is never set), so the bit is never
+   written and needs no record type (§6 step 10).
