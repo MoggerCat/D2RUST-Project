@@ -5,7 +5,11 @@
 //!
 //! The play preview (D1, `docs/PLAN.md` "First playable preview") fills
 //! what the model lacks, each fill marked `d2rs-own, unverified`:
-//! - direction: `dir64` = 0 (the model holds no client path record);
+//! - direction: the model holds no client path record; `dir64` is the
+//!   unit art's preview facing (`UnitArt::dir64`: the predicted facing of
+//!   the local player, else the facing toward the walk target or the last
+//!   position change, else 0), mapped to the COF row with §3 r3's
+//!   expected count (`UnitArt::expected_directions`);
 //! - frame: the model's +0x44 frame when set, else the COF's animation
 //!   rate advanced by the server tick count (the client model runs no
 //!   animation yet);
@@ -49,11 +53,6 @@ impl<R> UnitRules<R> {
         // d2rs-own, unverified (D1): 8.8 animation rate per tick.
         ((world.server_ticks.wrapping_mul(u64::from(rate)) >> 8) % frames as u64) as usize
     }
-
-    /// `dir64` of the unit (d2rs-own, unverified: 0).
-    fn dir64(_: &ClientUnit) -> u8 {
-        0
-    }
 }
 
 fn unresolved(req: &ComponentRequest<'_>, what: &'static str, message: String) -> CompositeError {
@@ -88,8 +87,8 @@ impl<R: ViewRules> ViewRules for UnitRules<R> {
             return Ok(None);
         };
         let dead = name.kind != CompositeKind::Object && unit.is_dead();
-        let Ok(dir) = unit_direction(cof.directions, cof.directions, Self::dir64(unit), dead)
-        else {
+        let n = art.expected_directions(unit, name.kind, cof.directions);
+        let Ok(dir) = unit_direction(cof.directions, n, art.dir64(unit), dead) else {
             return Ok(None);
         };
         Ok(Some(UnitPose {
@@ -145,13 +144,9 @@ impl<R: ViewRules> ViewRules for UnitRules<R> {
         let Some(Some((path, facts))) = art.files.get(&codes.name()) else {
             return Ok(None);
         };
-        let dir = unit_direction(
-            req.cof.directions,
-            req.cof.directions,
-            Self::dir64(unit),
-            false,
-        )
-        .map_err(|e| unresolved(req, "direction", e.to_string()))?;
+        let n = art.expected_directions(unit, name.kind, req.cof.directions);
+        let dir = unit_direction(req.cof.directions, n, art.dir64(unit), false)
+            .map_err(|e| unresolved(req, "direction", e.to_string()))?;
         // d2rs-own, unverified (D1): a cel past the file is skipped, not
         // a frame error.
         Ok(component_cel(path, facts.directions, facts.frames, dir.dir64, req.frame).ok())
