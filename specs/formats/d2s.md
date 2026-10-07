@@ -23,7 +23,7 @@
 - **Crate/module:** `d2-formats::d2s` (byte layout, checksum, section
   framing); the load effects (§9) belong to `d2-server` character
   storage.
-- **Related specs:** `formats/d2s-load.md` (new-character start and load
+- **Related specs:** `formats/d2s-appearance.md` (header +0x88..+0xA7, §2.8); `formats/d2s-load.md` (new-character start and load
   effects, §9 rules 6–7); `items/bitstream.md` (one item record, the
   per-item `JM` marker and socketed children); `world/quests.md` §1
   (quest flag records, load normalisation §1.6, NPC intro bits §6.7);
@@ -44,21 +44,21 @@
 | Outputs / state changes | 89–94 |
 | Rules | 95–96 |
 |   1. File layout and framing | 97–142 |
-|   2. Header (335 bytes) | 143–374 |
-|   3. Checksum (`0x00411130`) | 375–385 |
-|   4. Quest section (298 bytes at 0x14F) | 386–406 |
-|   5. Waypoint section (80 bytes at 0x279) | 407–412 |
-|   6. NPC flag section (52 bytes at 0x2C9) | 413–458 |
-|   7. Stats and skills | 459–551 |
-|   8. Item sections | 552–736 |
-|   9. Load sequence (`0x0056B180`) | 737–761 |
-|   10. Errors | 762–808 |
-| Constants & data dependencies | 809–828 |
-| Randomness | 829–833 |
-| Edge cases & original bugs | 834–900 |
-| Test vectors | 901–940 |
-| Provenance | 941–1020 |
-| Open questions | 1021–1095 |
+|   2. Header (335 bytes) | 143–377 |
+|   3. Checksum (`0x00411130`) | 378–388 |
+|   4. Quest section (298 bytes at 0x14F) | 389–409 |
+|   5. Waypoint section (80 bytes at 0x279) | 410–415 |
+|   6. NPC flag section (52 bytes at 0x2C9) | 416–461 |
+|   7. Stats and skills | 462–554 |
+|   8. Item sections | 555–739 |
+|   9. Load sequence (`0x0056B180`) | 740–764 |
+|   10. Errors | 765–811 |
+| Constants & data dependencies | 812–831 |
+| Randomness | 832–836 |
+| Edge cases & original bugs | 837–903 |
+| Test vectors | 904–943 |
+| Provenance | 944–1023 |
+| Open questions | 1024–1107 |
 <!-- /index -->
 
 ## Summary
@@ -371,6 +371,9 @@ character's file was also 335 bytes before its first save).
    recompute these bytes from the equipped items, not copy them from
    the loaded file. The per-item byte mapping (`0x0063DA70` and the
    composite branch of `0x0063E510`) is Open question 17.
+4. The per-item mapping (token table, hand owners, body armour parts,
+   colour byte) is `formats/d2s-appearance.md` (Open question 17,
+   answered).
 
 ### 3. Checksum (`0x00411130`)
 
@@ -1092,3 +1095,12 @@ and prints every field; it holds no save data.
     against saves with a weapon, a shield, a helm, a body armour and
     dyed or coloured items equipped. Needed for a d2rs writer to
     reproduce +0x88..+0xA7; the loader never reads them.
+    **Answered** (`formats/d2s-appearance.md`, from `0x0063E510`,
+    `0x0063DA70`, `0x0063D710`/`0x0063D900`, `0x0062C100`): component
+    byte = index of the item's `alternategfx`/`code` (body armour: the
+    `armtype` token of each of its six part bytes) in a 255-entry token
+    table built once from the item tables; helm → part 0, the hand items
+    → 5 (one-hander in use, or `component` 5) / 6, others their
+    `component`; colour = (`Transform` × 32 + colour) mod 256 + 1, or
+    0xFF. The rule reproduces all eight measured component values;
+    colours and armour still unmeasured (that file's Open question 2).
