@@ -261,7 +261,7 @@ fn dispatch_request_quality_wins() {
 }
 
 /// Step 3: the four overrides, in order.
-// Covers: specs/items/quality.md §4 r3
+// Covers: specs/items/quality.md §4 r3, §edge-cases-original-bugs r7
 #[test]
 fn dispatch_overrides() {
     let mut t = tables();
@@ -284,6 +284,7 @@ fn dispatch_overrides() {
     // crafted charm drops to normal, not to magic); quest → 7.
     assert_eq!(quality(&t, charm, q::NORMAL).0, q::MAGIC);
     assert_eq!(quality(&t, charm, q::LOW).0, q::MAGIC);
+    assert_eq!(quality(&t, charm, q::SUPERIOR).0, q::MAGIC);
     assert_eq!(quality(&t, charm, q::CRAFTED).0, q::NORMAL);
     assert_eq!(quality(&t, quest_charm, q::NORMAL).0, q::UNIQUE);
     // 2. itemtype rare = 0 and rare → magic directly (no downgrade: the
