@@ -110,6 +110,10 @@ pub struct Fake {
     pub range_needed: Option<i32>,
     /// Every unit is shapeshifted (`ManaUnits::shapeshifted`).
     pub shifted: bool,
+    /// Units `is_dead` reports as dead.
+    pub dead_units: std::collections::BTreeSet<usize>,
+    /// Units' alignment (default 0).
+    pub aligned: BTreeMap<usize, i32>,
     pub log: Vec<String>,
 }
 
@@ -260,8 +264,8 @@ impl CombatWorld for Fake {
     fn is_revived(&self, u: usize) -> bool {
         self.units[u].revived
     }
-    fn alignment(&self, _u: usize) -> i32 {
-        0
+    fn alignment(&self, u: usize) -> i32 {
+        self.aligned.get(&u).copied().unwrap_or(0)
     }
     fn hostile(&self, _a: usize, _d: usize) -> bool {
         self.hostile
@@ -290,8 +294,8 @@ impl CombatWorld for Fake {
     fn room(&self, u: usize) -> RoomKind {
         self.units[u].room
     }
-    fn is_dead(&self, _u: usize) -> bool {
-        false
+    fn is_dead(&self, u: usize) -> bool {
+        self.dead_units.contains(&u)
     }
     fn monster_has_mode(&self, _u: usize, _mode: i32) -> bool {
         true

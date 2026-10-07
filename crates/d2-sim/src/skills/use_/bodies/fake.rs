@@ -109,6 +109,8 @@ pub struct BodyFake {
     pub found: Vec<usize>,
     pub point_collide: bool,
     pub components: BTreeMap<(usize, usize), i32>,
+    /// The (centre, radius, flags) of every `unit_find` call.
+    pub finds: std::cell::RefCell<Vec<((i32, i32), i32, u32)>>,
 }
 
 impl BodyFake {
@@ -932,7 +934,8 @@ impl BodyWorld for BodyFake {
     fn inventory_nodes(&self, _: usize) -> Vec<(usize, i32)> {
         self.inv_nodes.clone()
     }
-    fn unit_find(&self, _: usize, _: (i32, i32), _: i32, _: u32) -> Vec<usize> {
+    fn unit_find(&self, _: usize, at: (i32, i32), r: i32, f: u32) -> Vec<usize> {
+        self.finds.borrow_mut().push((at, r, f));
         self.found.clone()
     }
     fn point_collides(&self, _: usize, _: (i32, i32), _: u32) -> bool {
