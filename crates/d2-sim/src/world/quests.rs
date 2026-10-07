@@ -1422,6 +1422,18 @@ impl QuestControl {
         self.records.iter().position(|r| r.chain == chain)
     }
 
+    /// `0x005444B0(game, chain)` (§2.3 rule 4): the not-intro test the
+    /// monster population and missile bodies call. The quest set must
+    /// be picked (else the fatal 0x7C5, [`QuestError::NotPicked`]); a
+    /// chain with no record is true; else the record's not-intro byte.
+    /// No draw.
+    pub fn not_intro_test(&self, chain: u8) -> Result<bool, QuestError> {
+        if !self.picked {
+            return Err(QuestError::NotPicked);
+        }
+        Ok(self.record(chain).is_none_or(|r| r.not_intro))
+    }
+
     pub fn record(&self, chain: u8) -> Option<&QuestRecord> {
         self.find(chain).map(|i| &self.records[i])
     }

@@ -1906,3 +1906,23 @@ fn restore_from_bits() {
     // Slot 6 has bit 15: switched off (§3) and not restored.
     assert_eq!(st(6), (0, 0));
 }
+
+// Covers: specs/world/quests.md §2.3 r4
+#[test]
+fn not_intro_test_0x005444b0() {
+    let (mut ctl, _) = control();
+    // The quest set is not picked: the fatal (control +0x08 = 0).
+    assert_eq!(ctl.not_intro_test(1), Err(QuestError::NotPicked));
+    ctl.picked = true;
+    // A quest row: its not-intro byte (+0x09) is 1; an intro record
+    // (chains 37–40): 0; a chain without a record: true. No draw.
+    let seed = ctl.seed;
+    assert_eq!(ctl.not_intro_test(1), Ok(true));
+    assert_eq!(ctl.not_intro_test(37), Ok(false));
+    assert_eq!(ctl.not_intro_test(40), Ok(false));
+    assert_eq!(ctl.not_intro_test(200), Ok(true));
+    // The byte itself is what is read.
+    ctl.record_mut(1).unwrap().not_intro = false;
+    assert_eq!(ctl.not_intro_test(1), Ok(false));
+    assert_eq!(ctl.seed, seed);
+}
