@@ -412,7 +412,7 @@ Synthetic, from the rules (`sim/rng.md` generator):
      drops inline in `0x005830E0` / `0x00583410` (+0x30 := 0 at
      `0x00583216` / `0x00583546`, `world/objects.md` "Potion drop");
      cube outputs without a quality byte (`0x00565AB0`, +0x30 := the
-     slot byte, `world/cube.md` §7).
+     slot byte, `world/cube.md` §7.4).
    - Never 0: the other 32 `0x00559A30` sites (2 or 7); the other eight
      `0x00585970` sites (2); `0x0056DAB0` (one site, 2, the potion drop
      of `skills/bodies-2.md` §2.4); the TC walk `0x0055A550` (Q or
