@@ -515,3 +515,37 @@ fn altar_init_reaches_state_3() {
     q3::altar_init(&mut ctl, &mut f, ALTAR);
     assert!(f.log.is_empty());
 }
+
+// Covers: specs/world/quests-act2.md §5.1
+#[test]
+fn extra_data_at_init_and_the_event_10_list() {
+    let (mut ctl, mut f, i) = setup();
+    // Init: everything off, altar mode 0 (neutral), the list empty.
+    let e = &ctl.records[i].extra.a2.q3;
+    assert_eq!(e, &q3::Extra::default());
+    assert_eq!((e.altar_mode, e.list.0.len()), (0, 0));
+    add_player(&mut f, P3, 40);
+    for g in [P1.0, P3.0] {
+        ctl.records[i].extra.a2.q3.list.add(g);
+    }
+    // Other events leave the +0x14 list alone.
+    level(&mut ctl, &mut f, i, 40, 41);
+    level(&mut ctl, &mut f, i, 41, 40);
+    let start = EventArgs {
+        event: event::PLAYER_STARTED_GAME,
+        player: Some(P3),
+        target: Some(P3),
+        ..EventArgs::default()
+    };
+    assert!(ev(&mut ctl, &mut f, i, start));
+    assert_eq!(ctl.records[i].extra.a2.q3.list.0, [P1.0, P3.0]);
+    // Event 10 removes the leaving player.
+    let leave = EventArgs {
+        event: event::PLAYER_LEAVES_GAME,
+        player: Some(P1),
+        target: Some(P1),
+        ..EventArgs::default()
+    };
+    assert!(ev(&mut ctl, &mut f, i, leave));
+    assert_eq!(ctl.records[i].extra.a2.q3.list.0, [P3.0]);
+}

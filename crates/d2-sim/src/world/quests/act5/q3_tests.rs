@@ -903,3 +903,18 @@ fn status_function() {
     ctl.record_mut(CHAIN).unwrap().not_intro = false;
     assert_eq!(status(&ctl, &mut f, &fx(&[14])), Some(0));
 }
+
+// Covers: specs/world/quests-act5.md §5.1
+#[test]
+fn extra_data_at_init() {
+    // Anya frozen (0), Nihlathak in town, no thaw step, the GUID list
+    // empty; init clears stale data.
+    let (mut ctl, _) = control();
+    let r = ctl.record_mut(33).unwrap();
+    assert_eq!(r.extra.a5.q3, super::Extra::default());
+    assert_eq!(r.extra.a5.q3.anya, 0);
+    r.extra.a5.q3.anya = 2;
+    r.extra.a5.q3.guids.add(7);
+    super::init(r);
+    assert_eq!(r.extra.a5.q3, super::Extra::default());
+}

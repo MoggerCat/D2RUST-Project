@@ -124,7 +124,7 @@ fn act4_ctl() -> QuestControl {
     ctl
 }
 
-// Covers: specs/world/quests-act4.md §3.3 text, §3.3 r1, §3.3 r2, §3.3 r3, §3.3 r4
+// Covers: specs/world/quests-act4.md §3.3 text, §3.3 r1, §3.3 r2, §3.3 r3, §3.3 r4, §1.2, §edge-cases-original-bugs r4
 #[test]
 fn chat_lines() {
     let mut ctl = act4_ctl();
@@ -505,7 +505,7 @@ fn ghost_and_izual_ai_hooks() {
     assert_eq!(f.chains[&mss].0, [22]);
 }
 
-// Covers: specs/world/quests-act4.md §3.7
+// Covers: specs/world/quests-act4.md §3.7, §1.1
 #[test]
 fn level_change_leave_and_start() {
     let mut ctl = act4_ctl();

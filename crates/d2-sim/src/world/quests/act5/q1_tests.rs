@@ -242,7 +242,7 @@ fn larzuk_20077_and_chat_end() {
     assert!(g.flags(P1).get(SLOT, 4) && !g.flags(P1).get(SLOT, 3));
 }
 
-// Covers: specs/world/quests-act5.md §3.3
+// Covers: specs/world/quests-act5.md §3.3, §1.2
 #[test]
 fn chat_tables_and_active() {
     let (mut ctl, _) = control();
@@ -295,7 +295,7 @@ fn chat_tables_and_active() {
     assert!(!act(&ctl, &mut f, LARZUK));
 }
 
-// Covers: specs/world/quests-act5.md §3.5
+// Covers: specs/world/quests-act5.md §3.5, §1.1
 #[test]
 fn level_changes() {
     let lvl = |ctl: &mut QuestControl, f: &mut Fake, a, b| {
@@ -578,4 +578,42 @@ fn status_function() {
     ctl.record_mut(CHAIN).unwrap().not_intro = false;
     assert_eq!(status(&ctl, &mut f, &fx(&[14])), Some(0));
     assert_eq!(status(&ctl, &mut f, &fx(&[1, 0])), Some(3));
+}
+
+// Covers: specs/world/quests-act5.md §2
+#[test]
+fn records_init() {
+    let (ctl, _) = control();
+    // (chain, init_no, seq_id) of the §2 table; state 0 and active.
+    for (chain, init_no, seq) in [
+        (31, 4, Some(32)),
+        (32, 4, Some(33)),
+        (33, 5, Some(34)),
+        (34, 4, Some(35)),
+        (35, 4, Some(36)),
+        (36, 4, Some(37)),
+    ] {
+        let r = ctl.record(chain).unwrap();
+        assert_eq!(
+            (r.state, r.init_no, r.seq_id),
+            (0, init_no, seq),
+            "chain {chain}"
+        );
+        assert!(r.active, "chain {chain}");
+    }
+    let e = &ctl.record(31).unwrap().extra.a5;
+    assert_eq!(e.q1, super::Extra::default());
+    let e = &ctl.record(32).unwrap().extra.a5;
+    assert!(e.q2.guids.0.is_empty());
+    let e = &ctl.record(33).unwrap().extra.a5;
+    assert!(e.q3.guids.0.is_empty());
+    let e = &ctl.record(34).unwrap().extra.a5;
+    assert!(e.q4.guids.0.is_empty());
+    // Eve of Destruction: +0x94 := 1, +0x9C := 1, list reset.
+    let q6 = &ctl.record(36).unwrap().extra.a5.q6;
+    assert_eq!((q6.portal_mode, q6.last_portal_mode), (1, 1));
+    assert!(q6.guids.0.is_empty());
+    // The intro record: state 0, active, no sequence.
+    let r = ctl.record(40).unwrap();
+    assert!(r.active && r.state == 0 && r.seq_id.is_none());
 }

@@ -99,7 +99,7 @@ fn death_sends_name_and_cost() {
     assert!(!life::death(&mut w, &mut st, p, other));
 }
 
-// Covers: specs/world/hirelings.md §3.2 r1, §3.2 r2, §3.2 r3, §3.2 r4, §3.2 r6, §3.2 r7, §3.2 r8, §3.2 r10, §3.2 r11, §13 r3
+// Covers: specs/world/hirelings.md §3.2 r1, §3.2 r2, §3.2 r3, §3.2 r4, §3.2 r6, §3.2 r7, §3.2 r8, §3.2 r10, §3.2 r11, §5 r1, §11 r7, §13 r3
 #[test]
 fn init_replaces_the_old_hireling() {
     let (mut w, p, q, m) = world();
@@ -161,7 +161,7 @@ fn init_replaces_the_old_hireling() {
     );
 }
 
-// Covers: specs/world/hirelings.md §3.2 r5, §3.2 r9
+// Covers: specs/world/hirelings.md §3.2 r5, §3.2 r9, §4 text
 #[test]
 fn init_new_hire_sets_offer_experience_and_level() {
     let (mut w, p, _, m) = world();
@@ -313,7 +313,7 @@ fn classic_act_change_marks_dead() {
     assert_eq!(st.list(p).unwrap().nodes.len(), 1);
 }
 
-// Covers: specs/world/hirelings.md §10 r1, §10 r2, §10 r3
+// Covers: specs/world/hirelings.md §3.1 r3, §10 text, §10 r1, §10 r2, §10 r3
 #[test]
 fn restore_plan_clamps_name_and_checks_act() {
     let t = act1_tables();
@@ -420,4 +420,29 @@ fn restore_sets_node_values_and_dead() {
         w.sent_to(p),
         vec![merc_dead_message(105, 6750).to_vec(), remove_msg(M_GUID)]
     );
+}
+
+// Covers: specs/world/hirelings.md §8 r3, §8 r4, §11 r7
+#[test]
+fn death_leaves_the_corpse_with_its_stats() {
+    let (mut w, p, _, m) = world();
+    w.set(m, stat::LEVEL, 30);
+    w.set(m, stat::EXPERIENCE, 1_000_000);
+    w.unit_mut(m).flags = flags::OWNED;
+    w.unit_mut(m).mode = 0;
+    let mut st = with_nodes(p, vec![node(M_GUID, false)]);
+    assert!(life::death(&mut w, &mut st, p, m));
+    // The unit stays (no free, no kill, nothing dropped), with its level
+    // and experience; the dead flag and mode are the death mode's, not
+    // this path's.
+    assert!(w.units.contains_key(&m));
+    assert!(w.log.is_empty(), "{:?}", w.log);
+    assert_eq!(w.base(m, stat::LEVEL), 30);
+    assert_eq!(w.base(m, stat::EXPERIENCE), 1_000_000);
+    assert_eq!((w.unit(m).flags, w.unit(m).mode), (flags::OWNED, 0));
+    // The restore path sets the dead flag itself (§10 rule 7).
+    let mut st = with_nodes(p, vec![node(M_GUID, false)]);
+    life::restore_dead(&mut w, &mut st, p, m);
+    assert_eq!(w.unit(m).flags, flags::OWNED | flags::DEAD);
+    assert!(w.units.contains_key(&m));
 }
