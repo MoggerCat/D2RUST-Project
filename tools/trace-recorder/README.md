@@ -290,7 +290,8 @@ lasts until `--seconds`, so a person or script can walk somewhere, spawn,
 fight and spawn again), `--status FILE` (every 10 server frames a JSON
 snapshot: player subtile position, level id, life, experience, character
 level, the monsters within 40 subtiles with GUID / class / mode / hp, and
-the rects of the act's levels from level +0x1C..+0x28), and `--packets
+the rects of the act's levels from level +0x1C..+0x28; objects (type 2) within 60
+and room tiles (type 5) within 120 subtiles, GUID / class / mode / static-path point), and `--packets
 [FILE]` (the 13 `record_packets.py` hooks armed from the start, written
 to a `packets-raw-1` side file, default `<out>-packets.jsonl`, that
 `check_packets.py` reads; a run of `drain` records is cut to its first,
