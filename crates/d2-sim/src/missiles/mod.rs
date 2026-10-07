@@ -216,9 +216,10 @@ pub const COLLIDE_MODES: [CollideMode; 9] = [
     },
 ];
 
-/// The collide-type entry of a mode. `None` past the table: no live row
-/// has a `CollideType` ≥ 9 and the original would read past the table.
-/// TODO(spec gap): not modelled; callers treat it as "no callback, mask 0".
+/// The collide-type entry of a mode (§R4.2: table `0x0073C720`, modes
+/// 0–8). `None` past the table: no live row has a `CollideType` ≥ 9 (the
+/// original would read past the table); callers treat it as "no
+/// callback, mask 0".
 pub fn collide_mode(mode: u8) -> Option<CollideMode> {
     COLLIDE_MODES.get(mode as usize).copied()
 }

@@ -91,15 +91,16 @@ impl<X: Pending> ActionHooks<X> {
     /// type 13 computed, and once more with type 15 when that finds no
     /// point.
     ///
-    /// TODO(spec: ai.md §7.1): the request record reaches the mode set
-    /// only from the AI's mode changes (staged in
-    /// [`super::PathState::mode_request`]) and the kill's death change
-    /// ([`ActionHooks::mode_target`]); other callers (quests, pets, skill
-    /// bodies) do not pass theirs, so the target is left as it was.
-    /// TODO(spec: ai.md §7.1): whether the movement set-up writes the
-    /// type through set type `0x00648CF0` or directly is not stated; set
-    /// type is used. The compute's town-access argument is not stated: 0
-    /// (as the re-path, `pathing.md` §9.10).
+    /// The request record is built per AI mode change (`ai.md` §7.1,
+    /// §7.5; staged in [`super::PathState::mode_request`], with the
+    /// AI's path-byte override in [`super::PathState::mode_request_byte`])
+    /// and by the kill's death change ([`ActionHooks::mode_target`]);
+    /// other mode-set callers pass no record, so the target is left as
+    /// it was.
+    // PROVISIONAL (monsters/ai.md §7.1): the movement set-up `0x005A63F0`
+    // writes the type through set type `0x00648CF0` (not directly), and
+    // its compute passes town access 0 (as the re-path, `pathing.md`
+    // §9.10); settled by a bin read of `0x005A63F0` and a path trace.
     pub(crate) fn monster_path_setup(&mut self, sim: &mut Sim<'_>, unit: UnitId, mode: u32) {
         let Some(p) = self.paths.as_mut() else {
             return;
@@ -111,6 +112,13 @@ impl<X: Pending> ActionHooks<X> {
             Some((u, t)) if u == unit => {
                 p.mode_request = None;
                 Some(t)
+            }
+            _ => None,
+        };
+        let byte_override = match p.mode_request_byte {
+            Some((u, b)) if u == unit => {
+                p.mode_request_byte = None;
+                Some(b)
             }
             _ => None,
         };
@@ -130,7 +138,8 @@ impl<X: Pending> ActionHooks<X> {
         let r = (|| -> Result<(), WiringError> {
             d.set_repath_budget(MONSTER_REPATH_BUDGET)
                 .map_err(WiringError::Path)?;
-            let Some(ty) = path_type_of(request_path_byte(moves)) else {
+            let byte = byte_override.unwrap_or_else(|| request_path_byte(moves));
+            let Some(ty) = path_type_of(byte) else {
                 d.set_path_type(&tables, false, 0)
                     .map_err(WiringError::Path)?;
                 return Ok(());
@@ -209,11 +218,11 @@ impl<X: Pending> ActionHooks<X> {
     }
 
     /// Walk / run start `0x005A7520` / `0x005A7550`.
-    ///
-    /// TODO(spec: units.md §4.6): the start bodies are not described;
-    /// `umod-callbacks.md` §2 rule 2 states that the mode field holds the
-    /// new mode after the start function, read as the mode set
-    /// `0x00553570` (§4.1) with the requested mode, started.
+    // PROVISIONAL (sim/units.md §4.6): the start bodies are not
+    // described; `umod-callbacks.md` §2 rule 2 has the mode field hold
+    // the new mode after the start function: the mode set `0x00553570`
+    // (§4.1) with the requested mode, started; settled by a bin read of
+    // `0x005A7520` / `0x005A7550` (spec work).
     fn monster_move_start(&mut self, sim: &mut Sim<'_>, unit: UnitId, mode: u32) -> bool {
         match crate::units::modes::set_mode(sim, self, unit, mode) {
             Ok(()) => true,
@@ -228,9 +237,10 @@ impl<X: Pending> ActionHooks<X> {
     /// `0x005C9D90`, state 22 → `0x005CE4F0` (skills spec: seams), the
     /// step (§9.3); result 2 → the mode end `0x005A8030`.
     ///
-    /// TODO(spec: pathing.md §9.1): whether the two state calls' results
-    /// gate the step is not stated; the step runs after them (as the
-    /// player's state 13, §9.2 step 2).
+    // PROVISIONAL (sim/pathing.md §9.1): the two state calls' results
+    // do not gate the step; the step runs after them (as the player's
+    // state 13, §9.2 step 2); settled by a tick recording of a monster
+    // walk under state 13 / 22.
     fn monster_walk_event0(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
         let stopped = {
             let mut v = View::of(sim.units, sim.stats, sim.data, self);
@@ -280,9 +290,15 @@ impl<X: Pending> ActionHooks<X> {
 
 /// Stages the AI's mode request (the record's target fields, `ai.md`
 /// §7.1) for the monster mode set that follows.
-pub(crate) fn stage_request<X: Pending>(h: &mut ActionHooks<X>, unit: UnitId, target: ModeTarget) {
+pub(crate) fn stage_request<X: Pending>(
+    h: &mut ActionHooks<X>,
+    unit: UnitId,
+    target: ModeTarget,
+    path_byte: Option<u8>,
+) {
     if let Some(p) = h.paths.as_mut() {
         p.mode_request = Some((unit, target));
+        p.mode_request_byte = path_byte.map(|b| (unit, b));
     }
 }
 

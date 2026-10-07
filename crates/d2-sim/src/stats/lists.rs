@@ -50,10 +50,10 @@ const MOD_EXCLUDED: [u16; 5] = [6, 8, 10, 13, 14];
 /// list: the public readers and writers treat it as the original treats
 /// a null list pointer (`stats.md` §4.2 reads 0; §5 writes do nothing;
 /// §8.4 a missing item list does nothing), and every other operation
-/// does nothing and answers 0 / none / empty. TODO(spec: stat-lists.md
-/// §1): the spec gives no null rule for the chain operations (attach,
-/// detach, free, toggles) nor the field accessors; the original's
-/// callers never pass a freed list (handoff `prop-fixes` Q1).
+/// does nothing and answers 0 / none / empty. `stat-lists.md` §1 rule 4:
+/// 1.14d never passes a freed list again, so only the null list has
+/// original behaviour; a stale handle is outside fidelity (a replay that
+/// reaches one is a mismatch to report).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ListId {
     index: u32,
@@ -1541,6 +1541,29 @@ impl StatLists {
         self.chain(head)
             .into_iter()
             .find(|&c| self.l(c).flags & flags != 0)
+    }
+
+    /// By state and flags `0x006257D0`(unit, s, flags) (§9.3): the unit's
+    /// list missing or not extended → none; the parked chain when flags
+    /// has SET, else the active chain; the first list whose state is `s`
+    /// and, when the flags without SET are non-zero, whose flags share a
+    /// bit with them.
+    pub fn list_by_state_flags(&self, unit: UnitId, state: u32, flags: u32) -> Option<ListId> {
+        let r = self.unit_list(unit)?;
+        if !self.is_extended(r) {
+            return None;
+        }
+        let (active, parked) = self.heads(r);
+        let head = if flags & flag::SET != 0 {
+            parked
+        } else {
+            active
+        };
+        let f = flags & !flag::SET;
+        self.chain(head).into_iter().find(|&c| {
+            let l = self.l(c);
+            l.state == state && (f == 0 || l.flags & f != 0)
+        })
     }
 
     /// The owner (type, GUID) of the unit's list of `state`, if any.

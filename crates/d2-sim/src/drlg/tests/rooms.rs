@@ -529,7 +529,7 @@ fn client_in_sight_by_coordinates() {
     assert_eq!(d.room(r[1]).counts, [0; 4]);
 }
 
-// Covers: specs/drlg/rooms.md §4.6 r2, §4.6 r4, §4.6 r5, §4.6 r6, §4.6 r7, §4.6 r8
+// Covers: specs/drlg/rooms.md §4.6 r2, §4.6 r4, §4.6 r5, §4.6 r6, §4.6 r7, §4.6 r8, §4.6 r9
 #[test]
 fn client_build_timer_builds_status_2_rooms_one_per_run_out() {
     let mut dat = data();
@@ -543,7 +543,7 @@ fn client_build_timer_builds_status_2_rooms_one_per_run_out() {
     let mut w = World::new(dat, types);
     let mut d = Drlg::create(0, INIT, 0, 0, true, &w.data, &mut w.types).unwrap();
     // Zero at allocation; R = 5 on a client copy.
-    assert_eq!((d.build_timer, d.build_cursor), (0, None));
+    assert_eq!((d.build_timer, d.build_cursor), (0, BuildCursor::None));
     assert_eq!(d.build_timer_reset(), 5);
     let mut svc = w.svc();
     d.set_in_sight_at(&mut svc, 2, 8, 0, None).unwrap();
@@ -566,7 +566,7 @@ fn client_build_timer_builds_status_2_rooms_one_per_run_out() {
     assert_eq!(run(&mut d), [r[0]]);
     assert!(d.active_room(r[0]).is_some() && d.active_room(r[2]).is_none());
     assert_eq!((d.build_timer, d.builds_since_update), (5, 0));
-    assert_eq!(d.build_cursor, Some(r[2]));
+    assert_eq!(d.build_cursor, BuildCursor::Room(r[2]));
     // Statuses are unchanged by a timed build.
     assert_eq!(d.status_list(2), &two[..]);
     // Calls 6–10: the cursor's room is built; C := the head node.
@@ -574,15 +574,24 @@ fn client_build_timer_builds_status_2_rooms_one_per_run_out() {
         assert!(run(&mut d).is_empty());
     }
     assert_eq!(run(&mut d), [r[2]]);
-    assert_eq!(d.build_cursor, None);
-    // Calls 11–15: nothing left to build; the walk goes once round the
-    // list and C ends on its start.
+    assert_eq!(d.build_cursor, BuildCursor::Head);
+    // Calls 11–15: nothing left to build. The head node reads status 2
+    // (rule 9), so the walk starts on it, goes once round the list and C
+    // ends on its start, the head node.
     for _ in 0..4 {
         assert!(run(&mut d).is_empty());
     }
     assert!(run(&mut d).is_empty());
-    assert_eq!(d.build_cursor, Some(r[0]));
+    assert_eq!(d.build_cursor, BuildCursor::Head);
     assert_eq!(d.build_timer, 5);
+    // Rule 9, B = 1 on entry with C on the head node: the walk examines
+    // the head only and stops; C := the first room, B := 0.
+    d.builds_since_update = 1;
+    for _ in 0..5 {
+        assert!(run(&mut d).is_empty());
+    }
+    assert_eq!(d.build_cursor, BuildCursor::Room(r[0]));
+    assert_eq!(d.builds_since_update, 0);
 }
 
 // Covers: specs/drlg/rooms.md §4.6 r2, §4.6 r4, §4.6 r5

@@ -209,7 +209,10 @@ impl Regions {
         if old == 0 && matches!(new, 1 | 2) {
             r.evil_spawned = r.evil_spawned.wrapping_sub(1);
         } else if new == 0 && old != 4 {
-            // TODO(spec: population.md open question 6): what alignment 4 is.
+            // Old = 4 is not an alignment: the setter passes it when the
+            // unit has no alignment state list yet, so the first set
+            // (already counted at creation) is skipped (population.md
+            // open question 6).
             r.evil_spawned = r.evil_spawned.wrapping_add(1);
         }
     }

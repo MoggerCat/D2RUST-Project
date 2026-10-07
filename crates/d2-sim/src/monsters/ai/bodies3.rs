@@ -514,7 +514,7 @@ pub fn fetish_shaman<W: AiHost + ?Sized>(
     }
     // 3.
     if cx.world.has_state(u, STATE_INFERNO) {
-        cx.world.set_state(u, STATE_INFERNO, false);
+        cx.world.set_state(game, u, STATE_INFERNO, false);
     }
     // 4.
     let h = cx.aip(p, 2);
@@ -572,7 +572,7 @@ pub fn fetish_shaman<W: AiHost + ?Sized>(
 /// §7 FetishShaman's alternate `0x005F9950`: no draws.
 pub fn fetish_shaman_alt<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitId) {
     if cx.world.has_state(u, STATE_INFERNO) {
-        cx.world.set_state(u, STATE_INFERNO, false);
+        cx.world.set_state(game, u, STATE_INFERNO, false);
     }
     reinstall(game, cx, u);
     idle(game, cx, u, 1);
@@ -638,17 +638,14 @@ pub fn high_priest<W: AiHost + ?Sized>(
             let k = cx.world.seed(u).mask(4) as usize;
             let (tx, ty) = t.map_or((0, 0), |t| cx.world.position(t));
             let (ox, oy) = HYDRA[k];
-            // TODO(spec: ai-bodies-3.md §8 step 1.3): the request carries
-            // both T and the point; a mode request holds one target here,
-            // the point (the hydra's place).
-            use_skill(
-                game,
-                cx,
-                u,
-                m1,
-                s1,
-                ModeTarget::Point(tx.wrapping_add(ox), ty.wrapping_add(oy)),
-            );
+            // The request holds T and the hydra's point at once; the mode
+            // set aims at T whenever T ≠ 0 and uses the point only for T =
+            // 0 (`ai.md` §7.1 mode request record, open question 13).
+            let at = match t {
+                Some(t) => ModeTarget::Unit(t),
+                None => ModeTarget::Point(tx.wrapping_add(ox), ty.wrapping_add(oy)),
+            };
+            use_skill(game, cx, u, m1, s1, at);
             set_param(cx, u, 1, frame.wrapping_add(100));
             return;
         }
