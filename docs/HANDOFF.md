@@ -5319,6 +5319,7 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
 - `audio/environment.md` (PC 2 spec-audio, entry 74 rest): the town → wilderness → cave walk and Blood Raven's death with `record_sound.py` (without `-ns`).
 - `world/npc.md` OQ6 rest (PC 2 spec-hirelings pass 3): resurrect, heal at Akara, Cain identify (3 items and none), imbue / socket / personalize, act travel (OQ6 a–d, expected messages in the spec).
 - `world/hirelings.md` §8 rule 5 (optional confirmation, PC 2 spec-hirelings pass 3): hireling dies in the wilderness, player goes to town and waits > 11 room passes (132 frames) so the room is freed, then resurrects: expected 0x81, the merc's 0xAC at the player, `9b ffff 00000000`, 0x2A code 5, and no 0x4B / error.
+- `world/quests-status.md` OQ1 (PC 2 spec-quests-status): open the quest log in several states of one quest (e.g. Den of Evil: started; D = 3 monsters left; just completed; completed in an earlier game) and record the screen plus packets: drawn text, icon frame, and the C→S 0x58 sent after the completion animation.
 
 **Ninth set (2026-10-07; the 22 notes `impl-ai-acts2-5`, `impl-skill-slots-2`,
 `impl-missile-bodies-2`, `impl-quests-act1-rest`, `impl-quests-act2`,
