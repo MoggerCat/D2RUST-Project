@@ -38,16 +38,16 @@
 |   2. Act IV records | 160–181 |
 |   3. A4Q1 The Fallen Angel (chain 22, slot 25) | 182–302 |
 |   4. A4Q3 Hell's Forge (chain 24, slot 27) | 303–450 |
-|   5. A4Q2 Terror's End (chain 23, slot 26) | 451–698 |
-|   6. Act IV gossip records | 699–725 |
-|   7. Multiplayer and party rules | 726–738 |
-|   8. Hooks called from other systems | 739–776 |
-| Constants & data dependencies | 777–797 |
-| Randomness | 798–811 |
-| Edge cases & original bugs | 812–870 |
-| Test vectors | 871–888 |
-| Provenance | 889–926 |
-| Open questions | 927–1016 |
+|   5. A4Q2 Terror's End (chain 23, slot 26) | 451–700 |
+|   6. Act IV gossip records | 701–727 |
+|   7. Multiplayer and party rules | 728–740 |
+|   8. Hooks called from other systems | 741–778 |
+| Constants & data dependencies | 779–799 |
+| Randomness | 800–813 |
+| Edge cases & original bugs | 814–872 |
+| Test vectors | 873–890 |
+| Provenance | 891–928 |
+| Open questions | 929–1018 |
 <!-- /index -->
 
 ## Summary
@@ -650,20 +650,22 @@ stack (Open question 3). Expansion games run the timer to step 1 too but
 skip the warp and the game end. `0x005B4A30` (warp and `5D 17 01`) has
 no caller.
 
-Host calls. `0x00530590(game, flag)` (only caller `0x005B4C9D`, flag
-0) looks the game up in the host's game list (`0x0052DED0`) and closes
-it (`0x00538590`, `0x005303D0`): host game teardown; the timer then
-returns 1. `0x0052E2A0(game)` (the
+Host calls. `0x00530590(game, c = 0)` (only caller `0x005B4C9D`) picks
+one client as `quests-helpers.md` §6 gives (the last in-game client
+passing `0x00539030`, i.e. client +0x3D4 bit 5, else the first in-game
+client) and hands it to the host removal `0x005303D0(0x00538590(C), 0)`.
+That removal reads the bit once for the picked client: set → after
+dropping it, it keeps taking the game's head client (game +0x88,
+`0x00539070`) and drops it until the list is empty (whole-game
+teardown); clear → only that client is dropped. So the end is a
+whole-game teardown exactly when some in-game client has the bit, else
+a one-client drop (supersedes both merged readings, "closes the game"
+and "drops one client"). The timer then returns 1. `0x0052E2A0(game)` (the
 Act V save pass, `quests-act5-2.md` open question 3) saves and uploads
 characters: host save / transport code. Both are owned by `d2-server`
 (hard rule 6: `d2-sim` has no I/O); `d2-sim` emits a host request (end
 game; save pass) at the 1.14d call point, in call order with the
 frame's other outputs, and continues as if the call returned.
-`quests-helpers.md` §6 gives the more specific 1.14d read of
-`0x00530590` (drops one client: the last in-game client passing
-`0x00539030`, else the first in-game one; not a whole-game teardown).
-Other PC 2 session read: "looks the game up and closes it (host game
-teardown)" — to reconcile (staging-6 merge).
 
 #### 5.9 The portal to Harrogath (object 566, expansion)
 
