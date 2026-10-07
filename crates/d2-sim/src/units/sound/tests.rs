@@ -26,7 +26,7 @@ fn message_layout() {
 /// §14 rule 1: the last event and target before the flush win; the unit
 /// is queued for update. Rule 2: target none → every client's player;
 /// target P → P's client only. Removal clears the slot.
-// Covers: specs/audio/triggers-2.md §14 r1, §14 r2
+// Covers: specs/audio/triggers-2.md §14 r1, §14 r2, §edge-cases-original-bugs r1
 #[test]
 fn queue_overwrite_and_target() {
     let (mut g, p, q, room) = game();
