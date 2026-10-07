@@ -33,7 +33,7 @@
 | Edge cases & original bugs | 417–436 |
 | Test vectors | 437–475 |
 | Provenance | 476–505 |
-| Open questions | 506–533 |
+| Open questions | 506–539 |
 <!-- /index -->
 
 Owned ids: 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F, 0x20, 0x3F, 0x42,
@@ -512,7 +512,13 @@ all.asm scan of `0x007BEFB0`; disassembly of `0x004C4130`
    2).
 2. `0x0045D3B0`, `0x0045D3E0`, `0x004C1C10` (level and attribute
    hooks): UI and requirement effects; Phase 6 UI spec.
-3. The item stream header (`0x0062E410`) and each action handler's
+3. *Answered (2026-10-08)*: `0x0062E410(stream, bytes, save, out)`
+   is `0x0062AE20(stream, bytes, save 0, out, version 0x60)`, the
+   record peek of `items/bitstream-legacy.md` §1 rule 1 (flags
+   +0x0C, mode +0x08, x / y +0x04 / +0x06 or body location +0x11 and
+   page +0x10, class +0x00, child count +0x14; no 0x4D4A word since
+   save = 0); the per-handler placement is §2 rule 5.3. Original
+   question: the item stream header (`0x0062E410`) and each action handler's
    placement rule: after `items/inventory.md` open question 1, a client
    item spec takes §2 rule 3 to the bar.
 4. *Answered (2026-10-08)*: §3 rule 3.1. Original question:

@@ -586,7 +586,7 @@ Synthetic, from the rules:
    binary (2026-10-07: stack contents of earlier frames); recording list
    `docs/handoff/pc2-rec-pc2-items.md` IT-10.
    PROVISIONAL: "no match" for the unwritten slot on every path (because the unwritten slot holds frames left by earlier calls); settled by REC-34.
-   Status (2026-10-07): Pending for fidelity only; d2rs keeps "no match"
+   Status (2026-10-07): open for fidelity only (REC-34); d2rs keeps "no match"
    for the unwritten slot on every path (§10.1 Edge), so no code waits
    on it.
 5. Answered (handoff `impl-items` OQ-P1): §5 rules 8 and 9 "**set**" is

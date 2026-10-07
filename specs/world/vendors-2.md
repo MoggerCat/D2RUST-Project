@@ -21,9 +21,9 @@
 |---|---|
 | Summary | 29–38 |
 | Rules | 39–40 |
-|   7.3 Item copy (`0x0055A2A0`, ECX game, EDX source S, owner, fillers) | 41–113 |
-|   7.3.1 Fields the decoder rebuilds (Open question 8) | 114–161 |
-|   10. C→S 0x4F buttons (`0x0054C7C0` → `0x00568060`; answers `ui/panels.md` OQ 6) | 162–276 |
+|   7.3 Item copy (`0x0055A2A0`, ECX game, EDX source S, owner, fillers) | 41–116 |
+|   7.3.1 Fields the decoder rebuilds (Open question 8) | 117–170 |
+|   10. C→S 0x4F buttons (`0x0054C7C0` → `0x00568060`; answers `ui/panels.md` OQ 6) | 171–286 |
 <!-- /index -->
 
 ## Summary
@@ -77,8 +77,11 @@ socketing (`world/npc.md` §8.1); 17 call sites. The owner argument (stack
    order: read it as in step 3 with no room (failure → result none;
    the copy and the children read so far are not freed); child mode
    := 4; socket it into the copy through `0x00562660(child GUID, copy
-   GUID, &out, 0, 1, 0, 0)` (`items/inventory-moves.md` §7.19; result 0 →
-   fatal assert, line 0xDD4); child item flags 0x80000 set, 0x2000
+   GUID, &out, 0, 1, 0, 0)` with EDX = the copy (`items/inventory-moves.md`
+   §7.19 rule 4: no target mode test; the copy's inventory cursor
+   cleared; a runeword match runs the runeword stats without
+   `0x0055FE80` and then the tail; no match returns before the tail;
+   result 0 → fatal assert, line 0xDD4); child item flags 0x80000 set, 0x2000
    cleared; child command flag 0x1 cleared (`0x00628170`).
    fillers = 0: the children are not read; the copy keeps the stream's
    socket flags and its stat lists but has no fillers.
@@ -141,6 +144,12 @@ stream but rebuilt:
 5. Compact record (`0x0062A970`): item level := 1, quality := 2, unit
    seed field +0x28 := 0 and the item seed initialised from it
    (`0x00650E40`), suffix slot 0 := 0 for `tsc ` and 1 for `isc `.
+6. Stat lists (`0x0062CBE0`, list loop end): for each set bit i of the
+   5-bit mask the list of state S_i (table `0x006E90B8`) is looked up and,
+   when missing, created with flags **0x2040** (`0x00625790(item, S_i,
+   0x2040)`); a stored list of S with flags 0x40 only therefore comes
+   back as 0x2040. The runeword list is state 171, flags 0x40; the main
+   list state 0, flags 0x40 (`items/bitstream.md` §4.6).
 
 So a copy differs from S (whose base values come from
 `items/generation.md` §6 and `items/quality.md` §6) in: the item level
@@ -241,8 +250,9 @@ Player data D_P, D_Q (`0x006221A0`): trade state +0x50, tick +0x58,
 gold record +0x5C. `0x005679E0(Q, D_P, D_Q, code)` ends or answers the
 trade with a 0x77 code (its unit events are `sim/unit-events.tsv` rows
 `0x00567ad1`, `0x00567aea`); `0x00597A20(game, unit)` ≠ 0 skips the
-answer. Pending: the player-trade flow has no spec (rows say "future
-trade spec"); what is below is the switch as read, not a full rule set.
+answer. Out of scope (Phases 0–6): the player-trade flow (multiplayer
+player trade; `sim/unit-events.tsv` rows 55–63, event 13); what is below
+is the switch as read, not a full rule set.
 
 | Button | Behaviour (1.14d) |
 |---|---|

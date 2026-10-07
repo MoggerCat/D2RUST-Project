@@ -5467,6 +5467,36 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 - How to report: one line per entry appended to `docs/handoff/xpc-to-pc1.md`: `REC-nn | DONE / PARTIAL / BLOCKED | raw file(s) + sha256 | check result | one-line finding per question id (matches / differs: what) | what was not recorded`. PC 1 reads the line, edits the spec (closes the OQ) and strikes the line with the commit. Already done and folded (not repeated): pc2rec-d1 / d3 / d4-rng, pc2rec-p1 / p2-packets (waypoints OQ1 incl. cross-act travel, drlg levels OQ1 / OQ3, outdoor OQ1 / OQ4 / OQ5 / OQ7, outdoor-tilesub OQ2, maze OQ1, intents-events OQ14 chat line, Act III jungle ids).
 
 
+#### Priority 0 (high-priority captures: RNG draw order or wire / saved byte layout; run these first)
+
+##### REC-81 [AUTO] population.md §11.4 hcIdx 10 (Radament)
+- Priority P0 (RNG draw order).
+- Settles: population.md §11.4 hcIdx 10 (Radament).
+- Steps: Act II save at the Sewers Level 3 waypoint; `record_rng.py --seconds 120` + `record_tick.py --seconds 120` with a hook on `0x005A49B0` / `0x005B23C0`; walk into Radament's room so he spawns.
+- Output: seed (unit vs room) and caller of the `roll(5)` draw, mode argument of each `0x005B23C0` call.
+- Compare: boss unit seed, mode 1. Fold: write the result into the cited rule and drop its PROVISIONAL line.
+
+##### REC-82 [AUTO] ai-bodies-7.md §27 step 12 (aitype 1 / 12)
+- Priority P0 (RNG draw order).
+- Settles: ai-bodies-7.md §27 step 12 (aitype 1 / 12).
+- Steps: `d2s-tool` Assassin with Shadow Master and a few aitype-1 / aitype-12 skills; `record_rng.py --seconds 240` + `record_tick.py --seconds 240` while the Shadow Master fights in the Blood Moor; log unit-seed steps with caller inside `0x005EB970` per think.
+- Output: draw sequence per skill in list order.
+- Compare: no `roll(A2n)` for an aitype-1 skill whose aurastate the unit lacks; aitype 12 non-progressive scored with the aitype 4 rule. Fold: write the result into the cited rule and drop its PROVISIONAL line.
+
+##### REC-62 [MANUAL] render/camera.md §8 (which missiles / skills reach `0x004D2610`, `0x004D3D30`, `0x004D5310
+- Priority P0 (RNG draw order: each shake draws 2 values per frame on the client player seed).
+- Settles: render/camera.md §8 (which missiles / skills reach `0x004D2610`, `0x004D3D30`, `0x004D5310`, `0x004D6680`, `0x004D6820`, `0x004D7400`, `0x004D8000`, `0x004F0710`, and the computed (A, t1, t2, t3)).
+- Steps: NEW HOOK at `0x00476A80` entry logging return address, ECX, EDX, [esp+4], [esp+8], client update count, local player seed before / after; run during the REC-31 skill / missile sitting and the REC-29 Act IV run (Diablo).
+- Output: `pc2rec-r62-shake.jsonl`.
+- Compare: per site the parameters against the §8 table, the triggering class, 2 draws per frame while a ≠ 0. Fold: write the result into the cited rule and drop its PROVISIONAL line.
+
+##### REC-51 [AUTO] client/model.md OQ1 and OQ2, client/msg-ui.md OQ2 (0x10000 per-caller conditions)
+- Priority P0 (RNG draw order in the client animation).
+- Settles: client/model.md OQ1 and OQ2, client/msg-ui.md OQ2 (0x10000 per-caller conditions).
+- Steps: `record_frames.py --seconds 120` + `record_rng.py --seconds 120` on one character in the Blood Moor: walk, run, fight 3+ monsters until one dies; hooks: entry/exit of 0x004AFF60 (unit type, GUID, mode +0x10, seed +0x20/+0x24); 0x00464810 and 0x004647D0 (caller, unit, mode); 0x00463390 (local player path x/y); per frame log `[0x007A0498]`, the server tick, the local player's client and server positions.
+- Output: `pc2rec-r51-frames.jsonl`, `pc2rec-r51-rng.jsonl`.
+- Compare: client seed draws per frame against the message-driven draws in client/msg-units.md; every 0x004AFF60 mode change against that frame's S→C messages; local position against server position (any lead = prediction). Fold: write the result into the cited rule and drop its PROVISIONAL line.
+
 #### Priority 1
 
 ##### REC-01 [AUTO, no run] Analysis of two existing raw files
@@ -5545,6 +5575,13 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 - Steps: a new Normal expansion character; play the listed quest points in order, one packets + RNG + tick run per part (`record_packets.py --seconds 300`, `record_rng.py --seconds 300`, `record_tick.py` for the Cain rescue), `record_frames.py --seconds 120` for the quest log opens. Use a `d2s-tool` save with the quest state pre-set for (a) of OQ3 and OQ5.
 - Output: `pc2rec-r11-*.jsonl`.
 - Compare: each listed byte / frame / draw against the OQ's expectation. Fold: close the OQs.
+
+##### REC-80 [NO RUN] population.md §6.3, §10.3, §11.5 rule 6
+- Priority P1.
+- Settles: population.md §6.3, §10.3, §11.5 rule 6; ai-bodies-7.md §27 step 8.
+- Steps: (Ghidra read, no game run) `py tools/ghidra/disasm.py fn 0x005A09E0`, `fn 0x005B2570`, `fn 0x0054E600` (+ the preset-id switch of `0x005559A0`), `fn 0x005EB6D0`.
+- Output: creation-call mode and room args; any SetBoss / flag test before `0x0058F030` / `0x0058F100`; the default case of the preset-id switch; branch structure of the callback's counters.
+- Compare: the PROVISIONAL text in each section. Fold: write the result into the cited rule and drop its PROVISIONAL line.
 
 #### Priority 2 (unattended, cheapest first)
 
@@ -5632,6 +5669,34 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 - Settles: R2-46 last clause: re-export Ghidra with labels once `1.14d-notes` is on the PC.
 - Steps: as `tools/ghidra/README.md`.
 - Output: the export named there; one line in the xpc report.
+
+##### REC-60 [AUTO] ui/text.md §15 r6 (scroll window, caret-inside-window case)
+- Priority P2.
+- Settles: ui/text.md §15 r6 (scroll window, caret-inside-window case).
+- Steps: `record_frames.py --seconds 40 --auto ScnSor --seed 1234 --draws-every 1 --input "wait 3; key ENTER; text <60 chars longer than the chat box>; key HOME; key RIGHT x5; key END; key LEFT x10; key SHIFT+LEFT x5; key BACKSPACE; key DELETE; key RIGHT x20; key ESC; end"` + NEW HOOK at `0x004FE7C0` exit logging E +0x25C, +0x4C, +0x50.
+- Output: `pc2rec-r60-frames.jsonl` + hook log.
+- Compare: §15 r5 / r6 per key: caret, selection ends, first / last window. Fold: write the result into the cited rule and drop its PROVISIONAL line.
+
+##### REC-61 [NO RUN] render/camera.md OQ1 (roof block count
+- Priority P2.
+- Settles: render/camera.md OQ1 (roof block count; roof y multiple of 8) and OQ7 (wall-block file / block count; x, y ≡ 0 mod 32).
+- Steps: (no game run) `mpq-tool extract d2data.mpq "data\global\tiles\*.dt1"` and the same for d2exp.mpq; keep the files a `LvlTypes` File column names (exclude the 6 unused); over orientation-15 tiles count tiles and blocks and list block y ∉ {0, 8, …, 64}; over orientations ∉ {0, 13, 15} count files and blocks and list blocks with x or y ≢ 0 (mod 32).
+- Output: counts + exception lists.
+- Compare: 13,432 vs 15,432 roof blocks; 104,780 / 251 vs 104,767 / 250; zero exceptions expected. Fold: write the result into the cited rule and drop its PROVISIONAL line.
+
+##### REC-90 [AUTO] sim/path-placement.md §10 rule 1 (static-path unit passed to `0x00554EA0`)
+- Priority P2.
+- Settles: sim/path-placement.md §10 rule 1 (static-path unit passed to `0x00554EA0`).
+- Steps: `py tools/trace-recorder/record_tick.py --seconds 300 --auto TestSor --seed 644409375` + NEW INT3 hook on `0x00554EA0` entry logging caller return address, unit type (unit +0x00) and path pointer +0x2C over a waypoint walk, a town portal, a Teleport cast and an item / object placement.
+- Output: `traces/raw/pc2rec-r90-tick.jsonl`.
+- Compare: no entry with unit type 2, 4 or 5 expected; if one shows up, write the 1.14d effect into §10 r1 and drop the d2rs static-set choice. Fold: write the result into the cited rule and drop its PROVISIONAL line.
+
+##### REC-50 [NO RUN] client/stat-lists.md §6 r6.5 setfunc 15 (+0xC4 bit 0x80000000 reader), client/model.md §14
+- Priority P2.
+- Settles: client/stat-lists.md §6 r6.5 setfunc 15 (+0xC4 bit 0x80000000 reader), client/model.md §14 r3 / OQ10 (reader of pet record +0x1C).
+- Steps: (no game run) Ghidra scan of client code 0x00400000–0x0051FFFF with `py tools/ghidra/disasm.py`: every read of unit +0xC4 followed by a sign test (`js`/`jns`/`test reg,reg`, `shr 0x1f`, `and 0x80000000`) and every read of [record+0x1C] where the record comes from the pet list `[0x007BB5BC]` (walkers 0x00478E40 / 0x00478F20 and callers).
+- Output: a list of reading functions and their conditions.
+- Compare: none found → the provisionals stand; otherwise write each reader's rule into the spec. Fold: write the result into the cited rule and drop its PROVISIONAL line.
 
 #### Priority 3 (manual / assisted)
 
