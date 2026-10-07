@@ -118,7 +118,7 @@ fn check_tables(t: &QuestTables) -> Vec<String> {
 #[test]
 fn tables_parse_and_check() {
     let t = QuestTables::load().unwrap();
-    assert_eq!(t.messages.len(), 779);
+    assert_eq!(t.messages.len(), 794);
     assert_eq!(check_tables(&t), Vec::<String>::new());
     let r1 = &t.rows[1];
     assert_eq!(
@@ -127,10 +127,49 @@ fn tables_parse_and_check() {
     );
     assert_eq!(r1.callbacks.len(), 7);
     assert!(r1.specified && r1.status_fn.is_none());
-    assert!(t.rows[40].unknown && t.rows[40].callbacks.is_empty());
+    // Row 40 (Act V intro, `0x0058EA50`) is specified (open question 6).
+    let r40 = &t.rows[40];
+    assert!(!r40.unknown && r40.specified);
+    assert_eq!(r40.callbacks, [(0, 0x0058_6B50), (11, 0x0058_E990)]);
     // Chains 25 and 30 share Flavie's table (edge case 2).
     assert_eq!(t.rows[7].msgs, t.rows[29].msgs);
     assert_eq!(t.rows[24].filter, Some(16)); // edge case 4
+}
+
+/// The Act V intro's own init and table (`act5::intro`) equal row 40
+/// and the table `0x00732FF8` of the TSVs (M05).
+// Covers: specs/world/quests.md §2.4, specs/world/quests-act5-2.md §9
+#[test]
+fn act5_intro_matches_its_rows() {
+    use super::act5::intro;
+    let t = QuestTables::load().unwrap();
+    let row = &t.rows[40];
+    let ctl = QuestControl::new(&t, &mut Seed::new(1, 2)).unwrap();
+    let r = ctl.record(40).unwrap();
+    let cbs: Vec<u8> = row.callbacks.iter().map(|c| c.0).collect();
+    for ev in 0..16u8 {
+        assert_eq!(
+            r.callbacks & (1 << ev) != 0,
+            cbs.contains(&ev),
+            "event {ev}"
+        );
+    }
+    assert_eq!(
+        (r.status_fn, r.active_fn, r.msgs, Some(r.filter)),
+        (row.status_fn, row.active_fn, row.msgs, row.filter)
+    );
+    let tsv: Vec<(u8, u16, u16)> = t
+        .messages
+        .iter()
+        .filter(|m| m.table == intro::TABLE_ADDR)
+        .map(|m| (m.state, m.npc, m.string))
+        .collect();
+    assert_eq!(tsv, intro::TABLE);
+    assert!(t
+        .messages
+        .iter()
+        .filter(|m| m.table == intro::TABLE_ADDR)
+        .all(|m| m.menu == 0));
 }
 
 /// M08: the checks report a changed cell.

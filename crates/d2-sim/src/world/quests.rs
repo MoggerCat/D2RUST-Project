@@ -1202,9 +1202,9 @@ impl QuestControl {
                 init_no: row.init_no.unwrap_or(0),
                 seq_id: row.seq_id,
                 flags: 0,
-                // TODO(quests OQ6): row 40's init (Act V intro) is not
-                // disassembled; its filter is taken as the intros' 42.
-                filter: row.filter.unwrap_or(42),
+                // Every row states its filter (row 40 since `quests.md`
+                // open question 6 was answered); `-` would be 0.
+                filter: row.filter.unwrap_or(0),
                 flag2: row.flag2,
                 guids: GuidList::default(),
                 callbacks: row.callbacks.iter().fold(0, |m, &(ev, _)| m | 1 << ev),
