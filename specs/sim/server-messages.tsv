@@ -109,17 +109,17 @@ id	name	size	layout	sender	client_handler	client_unit_handler	produced_by	confir
 0x6B	MonsterAction	16	guid:u32@1 code:u8@5 a:u16@6 b:u16@8 d:u8@10 e:u8@11 x:u16@12 y:u16@14	0x0053BB00	0x0045C900	0x0045CF40	sim	yes
 0x6C	MonsterAttack	16	guid:u32@1 code:u8@5 target_type:u8@6 target:u32@7 d:u8@11 x:u16@12 y:u16@14	0x0053BAA0	0x0045C900	0x0045CFB0	sim	yes
 0x6D	MonsterStop	10	guid:u32@1 x:u16@5 y:u16@7 life:u8@9	0x0053BB70	0x0045C900	0x0045D010	sim	yes
-0x6E	Unknown6E	1		-	0x0045C900	0x0045D0A0	sim	partial
-0x6F	Unknown6F	1		-	0x0045C900	0x0045D0B0	sim	partial
-0x70	Unknown70	1		-	0x0045C900	0x0045D0C0	sim	partial
-0x71	Unknown71	1		-	0x0045C900	0x0045D0D0	sim	partial
-0x72	Unknown72	1		-	0x0045C900	0x0045D0E0	sim	partial
+0x6E	Unknown6E	1		-	0x0045C900	0x0045D0A0	none	yes
+0x6F	Unknown6F	1		-	0x0045C900	0x0045D0B0	none	yes
+0x70	Unknown70	1		-	0x0045C900	0x0045D0C0	none	yes
+0x71	Unknown71	1		-	0x0045C900	0x0045D0D0	none	yes
+0x72	Unknown72	1		-	0x0045C900	0x0045D0E0	none	yes
 0x73	Unknown73	32		0x0053DA10	0x0045E6D0	-	sim	yes
 0x74	PlayerCorpseAssign	10		0x0053DA40	0x0045E7B0	-	sim	yes
 0x75	PlayerPartyInfo	13		0x0053DA90	0x0045E7E0	-	out	yes
 0x76	PlayerInProximity	6		0x0053B3D0	0x0045E050	-	sim	yes
 0x77	TradeAction	2		0x0053CAB0	0x0045E800	-	sim	yes
-0x78	TradeAccepted	21		-	0x0045E810	-	out	partial
+0x78	TradeAccepted	21	name:cstr16@1 guid:u32@17	0x0053CAD0	0x0045E810	-	out	yes
 0x79	GoldInTrade	6		0x0053CBE0	0x0045E850	-	out	yes
 0x7A	PetAction	13	action:u8@1 pet_type:u8@2 class:u16@3 owner:u32@5 pet:u32@9	0x0053CB30	0x0045E860	-	sim	yes
 0x7B	AssignHotkey	8	slot:u8@1 skill:u16@2 item:u32@4	0x0053DB20	0x0045E8D0	-	sim	yes
