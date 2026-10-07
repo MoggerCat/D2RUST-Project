@@ -273,6 +273,8 @@ pub struct OriginalUi {
     /// `NpcDialog`, for the bridge (`client/msg-ui.md` §16 r4.3, open
     /// question 10 decided as A).
     dialog_answer: Option<(Box<NpcDialog>, DialogCase)>,
+    /// The hire list (`ui/hire_list.rs`, `menus.md` §3).
+    pub(super) hire: super::hire_list::SharedHire,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -325,6 +327,7 @@ impl OriginalUi {
             more: MsgUiMore::default(),
             npc_text: None,
             dialog_answer: None,
+            hire: super::hire_list::SharedHire::default(),
         })
     }
 
@@ -346,9 +349,15 @@ impl OriginalUi {
             panel: CharacterPanel::default(),
         }))?;
         root.add(Box::new(BorderUi { sh: sh.clone() }))?;
+        root.add(Box::new(super::hire_list::HireListUi {
+            st: self.hire.clone(),
+        }))?;
+        root.open(super::hire_list::HIRE_PANEL)?;
         // Not a UI state: open for good.
         root.open(BORDER_PANEL)?;
         root.sync_states(&sh.borrow().states);
+        let sc = sh.borrow().config.screen;
+        self.hire.borrow_mut().screen = (sc.w, sc.h);
         Ok(())
     }
 

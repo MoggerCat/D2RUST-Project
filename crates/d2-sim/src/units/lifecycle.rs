@@ -50,6 +50,20 @@ pub trait LifecycleHooks: UnitHooks {
     /// The free routine's other calls (§1 table) and `0x005C0A90`,
     /// `0x00571F40` at removal. Provider: the kind's spec.
     fn free_kind(&mut self, sim: &mut Sim<'_>, unit: UnitId) {}
+
+    /// The monster of `class` allocated beside `near` in its room
+    /// (`npc.md` §7.3 step 7, `hirelings.md` §3.1: the mercenary's
+    /// creation). Provider: the host that owns the path code; `None`
+    /// (the default) leaves the creation to the NPC rest.
+    fn spawn_near(
+        &mut self,
+        sim: &mut Sim<'_>,
+        near: UnitId,
+        class: u32,
+        mode: u8,
+    ) -> Option<UnitId> {
+        None
+    }
 }
 
 /// `0x00555230` (§3.1): [`allocate_unlinked`] (steps 1–7), then
