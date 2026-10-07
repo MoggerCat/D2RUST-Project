@@ -42,7 +42,7 @@
 | Edge cases & original bugs | 839–868 |
 | Test vectors | 869–891 |
 | Provenance | 892–930 |
-| Open questions | 931–961 |
+| Open questions | 931–985 |
 <!-- /index -->
 
 ## Summary
@@ -933,9 +933,23 @@ Min 1 Max 1 MagicMin 1 MagicMax 1 MagicLvl 1).
 1. `0x00625560` (stat "bonus" used by §9.2 (B)): exact definition
    belongs to the stat-list spec; confirm with one recorded magic-item
    price.
+   Answered (definition; 2026-10-07): `sim/stats.md` §4.2 "unit
+   bonus": `0x00625560(unit, s, layer)` = 0 when unit +0x5C (the stat
+   list) is null, else the list total `0x00625420` minus the list base
+   `0x00625350`, both with layer and each with its own minimum rule
+   (disassembled). The recorded price check stays under OQ6.
 2. Item format field (item data +0x30) that selects the gamble-cost
    column (§9.4): when it is 0 in an expansion game; check items created
    by §5.1.
+   Answered (2026-10-07): never for a gamble-list item. §5.1 creates
+   each item through `0x00559CE0` (`0x005789F9`, game = the list
+   builder's ECX), which zeroes its request and stores the game's
+   format (u16 game +0x78) at request +0x2A (`0x00559D28`–`0x00559D2E`);
+   the creation pipeline copies +0x2A to item data +0x30
+   (`items/bitstream.md` §3 rule 1), i.e. 101 in an expansion game, 2
+   in a classic game (`items/generation.md` §1.2). So §9.4's format-0
+   branch (`gamble cost`) is taken only for a format-0 item (one decoded
+   from an old save), which no store list holds.
 3. Answered from the code: §7.1.1 (`0x00577D18`). A recording still
    confirms it: buy `aqv` with a bow, then with a crossbow equipped, and
    a helm with the head slot empty (expect 0x9D action 6, no 0x9C
@@ -958,3 +972,13 @@ Min 1 Max 1 MagicMin 1 MagicMax 1 MagicLvl 1).
 9. §7.3 step 6: S's item flag 0x8000000 (set on every copied source)
    has no name in `items/generation.md` §1.4. Settle: the readers of
    item flag 0x8000000.
+   Answered (2026-10-07): 1.14d has no reader. The only use of the
+   immediate 0x8000000 on an item is this setter (`0x0055A476`,
+   `0x006280D0(S, 0x8000000, 1)`); a scan of `all.asm` finds every other
+   0x8000000 operand in MPQ / file-open flags (`0x00412E97`,
+   `CreateFile` pushes), DRLG room flags (`0x0066D290`–`0x0066FC7B`)
+   and the CRT, and no `test` / `and` / `push` immediate with bit 27
+   set in the server range `0x00530000`–`0x0063FFFF` other than
+   `0x0055A476` and masks that keep every high bit (`0x0053E66D` and
+   0x8FFFFFFF). The bit is only carried in the item flags word (saved
+   and streamed with it). d2rs keeps it as an opaque flag bit.

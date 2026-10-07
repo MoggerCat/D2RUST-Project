@@ -46,7 +46,7 @@
 | Edge cases & original bugs | 572–586 |
 | Test vectors | 587–602 |
 | Provenance | 603–629 |
-| Open questions | 630–664 |
+| Open questions | 630–701 |
 <!-- /index -->
 
 ## Summary
@@ -632,6 +632,20 @@ Real 1.14d vectors need the recording in Open questions 2.
 1. Format-0 generation branches (legacy items) are unspecified; confirm
    that no 1.14d creation path passes format 0 (check the 20 callers of
    `0x00558D90` for the value written at request +0x2A).
+   Partly answered (2026-10-07, disassembly of the 20 callers): 19
+   store the game's u16 +0x78 at request +0x2A (101 / 2, §1.2): 18
+   directly (`0x00559273`, `0x0055942F`, `0x005595B4`, `0x005597B6`,
+   `0x005599B3`, `0x00559C42`, `0x00559D2E`, `0x0055A5F6`, `0x0056601E`,
+   `0x0056D6D1`, `0x0056DB3A`, `0x0057A04E`, `0x00582B43`, `0x00583206`,
+   `0x00583536`, `0x005859FA`, `0x00585B1E`, `0x005AF4D0`), and
+   `0x00563FE0` through its request builder `0x0055E8E0`. The one
+   exception is `0x00530F40`, the legacy save path (version 0x47,
+   `items/bitstream.md` Open question 4): it copies +0x2A from the
+   legacy record's +0x42, which `0x00532F30` sets to 0 for records
+   without flag 0x100000 and to an 8-bit value read from the stream
+   otherwise. So format 0 is passed only for items of a version-0x47
+   save, as §1.2 states; the format-0 branches themselves stay
+   unspecified.
 2. No recording confirms any rule here. Needed: an item-creation trace
    (request R1 in the session report): every unit-seed and item-seed
    draw between the allocation and the return of `0x00558D90`, plus a
@@ -644,6 +658,29 @@ Real 1.14d vectors need the recording in Open questions 2.
    `0x00532590` (D2MOO: the new-character branch), and what
    `0x005345A0` and `0x0056B180` are (character creation, ladder or
    realm paths).
+   Answered (2026-10-07, disassembly): no loaded character of a
+   current save gets start items. The three ways to `0x00534F10`:
+   - `0x0056B180` (load sequence of saves ≥ 0x5C, `formats/d2s.md` §9)
+     → `0x00569F80` only for the 335-byte new-character stub (result 2
+     with the cursor at the end; `formats/d2s-load.md` §1).
+   - `0x005345A0` (player creation, only caller `0x00539804` in
+     `0x00539760`) → `0x00532590` when its load flag (second stack
+     argument, `0x005345BF` / `0x005345E2`) is 0. `0x00539760` passes
+     its own first stack argument: 1 from the join `0x005301E4`; 0 from
+     `0x0053A3D4` (`0x0053A2F0`) and `0x0053A4CF` (`0x0053A420`), two
+     act-change re-creations that have no callers in 1.14d (dead code).
+   - `0x00534020` (save versions ≤ 0x5B, `tools/original-hooks.md` §5.3)
+     → `0x00532590` when the header reader `0x00532690` (only caller
+     `0x00534080`) sets its out flag (third stack argument, kept at
+     ebp−0xA8): to 1 when bit 0 of the legacy header's status dword
+     (+0x18) is set (`0x005329A2`–`0x005329B2`; the bit is then cleared
+     in the copy), and, only with host callbacks (`0x00883D50` ≠ 0),
+     for a wrong magic (`0x00532738`), a header size ≠ 0x82
+     (`0x0053276D`) or a version outside 0x47..0x60 (`0x00532BBC`); a
+     name mismatch clears it (`0x005327EA`). In single player
+     (`0x00883D50` = 0) only the legacy status bit 0 makes the legacy
+     loader start a new character (with start items) instead of reading
+     the file's sections.
 5. Answered (handoff `impl-items` OQ-G2, `gaps-items-stats` question 1):
    §9 rule 2, only the socket count is format-0; the flag copies run for
    every forced request (`0x00558F80`–`0x00558FB4`).
