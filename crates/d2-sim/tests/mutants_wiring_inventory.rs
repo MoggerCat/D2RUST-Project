@@ -16,9 +16,10 @@
 #[path = "mutants_wiring_inventory/fixture.rs"]
 mod fixture;
 
-use d2_sim::items::inventory::{InteractionTarget, InvWorld};
+use d2_sim::items::inventory::{InteractionTarget, InvWorld, UnitKind};
 use d2_sim::items::moves::{InventoryOps, MovePending, MoveUnits, Owner, Spot};
-use d2_sim::units::UnitId;
+use d2_sim::units::hooks::MonsterInfo;
+use d2_sim::units::{UnitId, UnitType};
 
 use fixture::*;
 
@@ -48,7 +49,6 @@ fn wild(flag: bool, w: &World) -> Answers {
         ammo: Some(910),
         interaction: Some(InteractionTarget::Missing),
         trade_gate: Some(flag),
-        probe: 911,
         open_ok: flag,
         code2: 912,
         level_req: 913,
@@ -366,11 +366,6 @@ fn forward_inv_world(flag: bool) {
             format!("quiver_kind {g}")
         );
         fwd!(
-            InvWorld::targeting_probe(d, item),
-            911,
-            format!("targeting_probe {g}")
-        );
-        fwd!(
             InvWorld::interaction(d, pl),
             InteractionTarget::Missing,
             format!("interaction {p}")
@@ -481,7 +476,6 @@ fn inv_rest_defaults() {
     assert!(!InvRest::socket_filler(&b, 1));
     assert_eq!(InvRest::spell(&b, 1), 0);
     InvRest::trade_hook(&mut b, o, 1);
-    assert_eq!(InvRest::targeting_probe(&b, 1), 1);
 }
 
 // ---- spec outcomes ------------------------------------------------------
@@ -715,32 +709,56 @@ fn stored_cap(w: &mut World) -> u32 {
     g
 }
 
-/// §5.3: every item of the player's list with item flag 0x4 loses it;
-/// when `0x0044BE50` returns 0, S→C 0x3F (code 0xFF, the item's GUID,
-/// 0xFFFF; §11) is queued to the player.
+/// §5.3: every item of the owner's list with item flag 0x4 loses it;
+/// `0x0044BE50` is asked about the owner, never the item: a player owner
+/// queues S→C 0x3F (code 0xFF, the item's GUID, 0xFFFF; §11) for each
+/// item, a mercenary (monster) owner none.
 // Covers: specs/items/inventory.md §5.3
 #[test]
 fn targeting_reset_clears_and_queues_0x3f() {
-    for probe in [0u32, 1] {
-        let mut w = World::new();
-        let g = stored_cap(&mut w);
-        let u = w.unit(g).unwrap();
-        w.items.get_mut(u).unwrap().flags |= 0x4 | 0x100;
-        w.rest.a.probe = probe;
-        w.rest.sent.clear();
-        let me = w.me();
-        w.desk(|d| d.targeting_reset(me));
-        assert_eq!(w.items.get(u).unwrap().flags & 0x104, 0x100);
-        let mut want = vec![0x3F, 0xFF];
-        want.extend_from_slice(&g.to_le_bytes());
-        want.extend_from_slice(&[0xFF, 0xFF]);
-        let sent: Vec<_> = w.rest.sent.clone();
-        if probe == 0 {
-            assert_eq!(sent, [(me, want)]);
-        } else {
-            assert!(sent.is_empty());
-        }
-    }
+    let mut w = World::new();
+    let g = stored_cap(&mut w);
+    let u = w.unit(g).unwrap();
+    w.items.get_mut(u).unwrap().flags |= 0x4 | 0x100;
+    w.rest.sent.clear();
+    let me = w.me();
+    w.desk(|d| d.targeting_reset(me));
+    assert_eq!(w.items.get(u).unwrap().flags & 0x104, 0x100);
+    let mut want = vec![0x3F, 0xFF];
+    want.extend_from_slice(&g.to_le_bytes());
+    want.extend_from_slice(&[0xFF, 0xFF]);
+    let sent: Vec<_> = w.rest.sent.clone();
+    assert_eq!(sent, [(me, want)]);
+
+    // `0x0044BE50` is the unit's type: player 0, monster 1, item 4,
+    // missing unit 6.
+    // A desert mercenary (monstats row 338, enabled).
+    w.data.monsters = vec![MonsterInfo::default(); 339];
+    w.data.monsters[338].enabled = true;
+    let merc = w.alloc(UnitType::Monster, 338);
+    let p = w.player;
+    w.desk(|d| {
+        assert_eq!(InvWorld::targeting_probe(d, p), 0);
+        assert_eq!(InvWorld::targeting_probe(d, merc), 1);
+        assert_eq!(InvWorld::targeting_probe(d, u), 4);
+        assert_eq!(InvWorld::targeting_probe(d, UnitId(9999)), 6);
+    });
+
+    // The same flagged item in a mercenary's inventory: the flag is
+    // cleared, nothing is queued (the item is not the probed unit).
+    let mguid = w.units.get(merc).unwrap().guid;
+    w.state
+        .add_inventory(merc, UnitKind::Monster { class: 338 }, mguid);
+    let c = w.cursor_item(CAP);
+    let cu = w.unit(c).unwrap();
+    assert!(w.desk(|d| d.remove(p, cu)));
+    assert!(w.desk(|d| d.place(merc, cu, (0, 0), true, false)));
+    assert!(w.state.holds(merc, cu));
+    w.items.get_mut(cu).unwrap().flags |= 0x4;
+    w.rest.sent.clear();
+    w.desk(|d| d.reset_targeting(merc));
+    assert_eq!(w.items.get(cu).unwrap().flags & 0x4, 0);
+    assert!(w.rest.sent.is_empty());
 }
 
 /// §5.1 ground or owned, mode 3: an item in another act than the player

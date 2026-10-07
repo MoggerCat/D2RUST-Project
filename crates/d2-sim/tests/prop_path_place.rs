@@ -1253,7 +1253,7 @@ proptest! {
         let rect = TileRect { x: rx, y: ry, w: rw, h: rh };
         let mut d = Drlg { rect, recs: recs.clone(), added: Vec::new() };
         let got = warp_tile_preset(&mut d, 0, t, rx + dx, ry + dy, v);
-        let letter = if t == 11 { b'l' } else { b'r' };
+        let letter = if t == 10 { b'l' } else { b'r' };
         let slot = warp_slot(v);
         prop_assert_eq!(slot, (v >> 20) & 0x3F);
         match recs.iter().find(|(s, l, _)| *s == slot && *l == letter) {

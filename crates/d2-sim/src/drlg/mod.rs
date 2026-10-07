@@ -45,7 +45,7 @@ use thiserror::Error;
 
 pub use active::ActiveRoom;
 pub use collision::CollisionGrid;
-pub use data::{DoorTables, DrlgData, LevelDef, WallRemap, WarpDef};
+pub use data::{DoorTables, DrlgData, LevelDef, WallClass, WallRemap, WarpDef};
 pub use level::{Drlg, Dungeon, Level, SpawnTile, WarpRecord};
 pub use logic::{CoordRec, LogicGrids, LogicInfo};
 pub use room::{DrlgRoom, RoomKind, WarpLink};
@@ -157,8 +157,8 @@ pub enum DrlgError {
     NoTile,
     #[error("missing animation frame {0} (fatal 0xB6 / 0xCB)")]
     MissingFrame(u32),
-    #[error("tile-type remap tables not supplied (rooms.md §9.6, open question)")]
-    MissingWallRemap,
+    #[error("linked cell type {0} beyond the wall-remap index table (wall-remap.md §2)")]
+    WallRemapType(u32),
     #[error("level has no waypoint room for spawn-tile index 13")]
     NoWaypointRoom,
     #[error("level has no rooms to spawn in")]

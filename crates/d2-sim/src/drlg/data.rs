@@ -1,9 +1,10 @@
 // Spec: specs/drlg/levels.md, specs/drlg/rooms.md
 //! The table view the DRLG reads, built from `d2_data::tables` records
 //! (`leveldefs`, `lvlwarp`, `lvltypes`, `objects`). Only the columns the
-//! two specs name are kept. Plus the code tables of `rooms.md` §9.5–§9.6
-//! that the spec has not transcribed yet ([`WallRemap`], [`DoorTables`]):
-//! inputs with no built-in values (open questions in the notes).
+//! two specs name are kept. Plus the code tables of `rooms.md` §9.5–§9.6:
+//! [`WallRemap`] embedded from `specs/drlg/wall-remap.tsv`
+//! (`drlg/wall-remap.md`), and [`DoorTables`], not transcribed yet (an
+//! input with no built-in values; open question in the notes).
 
 use d2_data::tables::{text, Leveldefs, Lvltypes, Lvlwarp, Objects};
 
@@ -83,15 +84,108 @@ impl WarpDef {
     }
 }
 
-/// Wall-type remap of linked cells (`rooms.md` §9.6): the 6×7 table
-/// `0x006EF578` (row = the index of the new type from table `0x006EF620`,
-/// which the spec gives and [`super::tiles`] holds; column = existing
-/// record type 1..7). The values are not transcribed in the spec
-/// ("identical to D2MOO's `nWallTileTypeRemap`"): supplied by the caller.
+/// `specs/drlg/wall-remap.tsv` (`drlg/wall-remap.md` §1).
+pub const WALL_REMAP_TSV: &str = include_str!("../../../../specs/drlg/wall-remap.tsv");
+
+/// Number of new cell types the index table `0x006EF620` covers
+/// (`wall-remap.md` §2 rule 1).
+pub const WALL_REMAP_TYPES: usize = 20;
+
+/// The class of a new cell type (`wall-remap.md` §1, column `class`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WallClass {
+    /// Merged type = entry `R.type` (columns `r0`..`r7`) when R's type is
+    /// ≤ 7, else stop.
+    Table([u32; 8]),
+    /// Merged type = the new type, whatever R's type.
+    Keep,
+    /// No merge: the record is left as it is, no flag rules.
+    Stop,
+}
+
+/// Wall-type remap of linked cells (`rooms.md` §9.6 step 3 rule 4): the
+/// index table `0x006EF620` and the 6×7 table `0x006EF578` as
+/// `drlg/wall-remap.md` transcribes them, one class per new type 0..19.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WallRemap {
-    /// Merged type for row `i`, column `R.type − 1`.
-    pub table: [[u32; 7]; 6],
+    /// Row = new cell type.
+    pub classes: [WallClass; WALL_REMAP_TYPES],
+}
+
+impl Default for WallRemap {
+    /// The 1.14d table ([`WallRemap::original`]).
+    fn default() -> Self {
+        Self::original()
+    }
+}
+
+impl WallRemap {
+    /// The 1.14d table, parsed from [`WALL_REMAP_TSV`].
+    pub fn original() -> Self {
+        Self::parse(WALL_REMAP_TSV).expect("specs/drlg/wall-remap.tsv is well-formed")
+    }
+
+    /// Strict parse of the `wall-remap.tsv` layout (`wall-remap.md`
+    /// "Constants"): the header, then 20 rows of 10 columns, `new_type`
+    /// equal to the row index; `table` rows carry 8 values, `keep` and
+    /// `stop` rows 8 empty cells.
+    pub fn parse(text: &str) -> Result<Self, String> {
+        let mut lines = text.lines();
+        let header = "new_type\tclass\tr0\tr1\tr2\tr3\tr4\tr5\tr6\tr7";
+        if lines.next() != Some(header) {
+            return Err("bad header".into());
+        }
+        let mut classes = [WallClass::Stop; WALL_REMAP_TYPES];
+        let mut n = 0;
+        for line in lines {
+            let f: Vec<&str> = line.split('\t').collect();
+            if f.len() != 10 {
+                return Err(format!("row {n}: {} columns", f.len()));
+            }
+            if n >= WALL_REMAP_TYPES || f[0] != n.to_string() {
+                return Err(format!("row {n}: new_type {:?}", f[0]));
+            }
+            let empty = f[2..].iter().all(|c| c.is_empty());
+            classes[n] = match f[1] {
+                "keep" if empty => WallClass::Keep,
+                "stop" if empty => WallClass::Stop,
+                "table" => {
+                    let mut r = [0u32; 8];
+                    for (v, c) in r.iter_mut().zip(&f[2..]) {
+                        *v = c.parse().map_err(|_| format!("row {n}: value {c:?}"))?;
+                    }
+                    WallClass::Table(r)
+                }
+                c => return Err(format!("row {n}: class {c:?}")),
+            };
+            n += 1;
+        }
+        if n != WALL_REMAP_TYPES {
+            return Err(format!("{n} rows"));
+        }
+        Ok(Self { classes })
+    }
+
+    /// The 1.14d classes with `table` as the 6×7 table `0x006EF578`
+    /// (rows for new types 1, 2, 3, 5, 6, 7; column = R's type − 1), `r0`
+    /// read as the dword before the row (`wall-remap.md` §2 rule 3).
+    #[cfg(test)]
+    pub(crate) fn with_rows(table: [[u32; 7]; 6]) -> Self {
+        let mut m = Self::original();
+        let mut before = 0;
+        for (i, t) in [1, 2, 3, 5, 6, 7].into_iter().enumerate() {
+            let mut r = [before; 8];
+            r[1..].copy_from_slice(&table[i]);
+            before = table[i][6];
+            m.classes[t] = WallClass::Table(r);
+        }
+        m
+    }
+
+    /// The class of new cell type `t`; `None` beyond the 20 rows.
+    pub fn class(&self, t: u32) -> Option<WallClass> {
+        self.classes.get(t as usize).copied()
+    }
 }
 
 /// Door unit tables `0x006EEFD0` / `0x006EF18C` (`rooms.md` §9.5,
@@ -116,8 +210,8 @@ pub struct DrlgData {
     pub lvltypes: Vec<Vec<Vec<u8>>>,
     /// `objects` subclass per object class (row).
     pub object_subclass: Vec<u8>,
-    /// See [`WallRemap`]; `None` until a spec transcribes it.
-    pub wall_remap: Option<WallRemap>,
+    /// See [`WallRemap`] (the 1.14d table by default).
+    pub wall_remap: WallRemap,
     /// See [`DoorTables`].
     pub doors: DoorTables,
 }
@@ -135,7 +229,7 @@ impl DrlgData {
             warps: lvlwarp.iter().map(WarpDef::from_record).collect(),
             lvltypes: lvltypes.iter().map(lvltype_files).collect(),
             object_subclass: objects.iter().map(|o| o.subclass).collect(),
-            wall_remap: None,
+            wall_remap: WallRemap::original(),
             doors: DoorTables::default(),
         }
     }

@@ -137,7 +137,6 @@ struct Props {
     sockets: bool,
     damage: [i32; 6],
     quantity: i32,
-    probe: u32,
     allowed_loc: bool,
     quiver_kind: bool,
     filled: bool,
@@ -280,8 +279,14 @@ impl InvWorld for World {
     fn quiver_kind(&self, item: UnitId) -> bool {
         idx(item).is_some_and(|i| self.props[i].quiver_kind)
     }
-    fn targeting_probe(&self, item: UnitId) -> u32 {
-        idx(item).map_or(0, |i| self.props[i].probe)
+    /// `0x0044BE50`: the unit's type (player 0, monster 1), 6 for any
+    /// unit but the owner.
+    fn targeting_probe(&self, unit: UnitId) -> u32 {
+        match self.unit_kind(unit) {
+            Some(UnitKind::Player { .. }) => 0,
+            Some(_) => 1,
+            None => 6,
+        }
     }
     fn queue_untarget(&mut self, _player: UnitId, item_guid: u32) {
         self.untargets.push(item_guid);
@@ -438,7 +443,6 @@ fn build(dna: &[u8]) -> (InvTables, World) {
             sockets: d.below(4) == 3,
             damage: [0; 6].map(|_: i32| i32::from(d.below(2))),
             quantity: i32::from(d.below(3)) - 1,
-            probe: u32::from(d.below(2)),
             allowed_loc: d.below(4) != 3,
             quiver_kind: d.below(4) == 3,
             filled: d.bool(),
@@ -617,7 +621,7 @@ impl Model {
         for &i in &self.list {
             if w.items[&uid(i)].flags & iflag::TARGETING != 0 {
                 flagged.push(i);
-                if w.props[i].probe == 0 {
+                if matches!(w.owner_kind, UnitKind::Player { .. }) {
                     self.untargets.push(guid(i));
                 }
             }

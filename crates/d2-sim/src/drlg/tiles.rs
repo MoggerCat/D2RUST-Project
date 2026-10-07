@@ -6,7 +6,7 @@
 
 use std::collections::BTreeMap;
 
-use super::data::DrlgData;
+use super::data::{DrlgData, WallClass};
 use super::level::Drlg;
 use super::logic::LogicGrids;
 use super::room::RoomKind;
@@ -227,27 +227,6 @@ pub struct RoomGrids {
     /// Preset rooms whose lvlprest `Logicals` ≠ 0: the grids the
     /// logical-room build reads (`levels.md` §11.2 step 1).
     pub logicals: Option<LogicGrids>,
-}
-
-/// Index table `0x006EF620` (§9.6) by new tile type.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Remap {
-    Row(usize),
-    Keep,
-    Stop,
-}
-
-fn remap_index(t: u32) -> Remap {
-    match t {
-        1 => Remap::Row(0),
-        2 => Remap::Row(1),
-        3 => Remap::Row(2),
-        5 => Remap::Row(3),
-        6 => Remap::Row(4),
-        7 => Remap::Row(5),
-        8 | 9 | 13 => Remap::Keep,
-        _ => Remap::Stop,
-    }
 }
 
 fn is_door(t: u32) -> bool {
@@ -775,16 +754,9 @@ impl Drlg {
         }
     }
 
-    /// Merged type of a linked cell over an existing record (§9.6 step 3).
-    /// `None` = stop.
-    ///
-    /// TODO(rooms.md §9.6): the spec states the index table, "keep",
-    /// "stop with R a normal wall" and the door edge cases without their
-    /// full case analysis. Reading used here: a new door on this room's
-    /// top/left edge keeps the new type; a non-door over a door on N's
-    /// top/left edge stops; "keep" keeps R's type; a row with R's type in
-    /// 1..7 takes the table value, else R's type; "stop" stops for R a
-    /// normal wall (types 1..7), else keeps R's type.
+    /// Merged type m of a linked cell of type `t` over an existing record
+    /// of type `r_kind` (§9.6 step 3 rules 2–4; rule 1, v bit 7, is the
+    /// caller's). `None` = stop.
     #[allow(clippy::too_many_arguments)]
     fn merged_type(
         &self,
@@ -803,19 +775,18 @@ impl Drlg {
         if !is_door(t) && is_door(r_kind) && on_top_left(self.room(n).rect) {
             return Ok(None);
         }
-        let normal_wall = (1..=7).contains(&r_kind);
-        Ok(match remap_index(t) {
-            Remap::Keep => Some(r_kind),
-            Remap::Stop => (!normal_wall).then_some(r_kind),
-            Remap::Row(i) if normal_wall => {
-                let table = data
-                    .wall_remap
-                    .as_ref()
-                    .ok_or(DrlgError::MissingWallRemap)?;
-                Some(table.table[i][r_kind as usize - 1])
-            }
-            Remap::Row(_) => Some(r_kind),
-        })
+        // Rule 4 (`drlg/wall-remap.tsv`).
+        Ok(
+            match data
+                .wall_remap
+                .class(t)
+                .ok_or(DrlgError::WallRemapType(t))?
+            {
+                WallClass::Table(row) => row.get(r_kind as usize).copied(),
+                WallClass::Keep => Some(t),
+                WallClass::Stop => None,
+            },
+        )
     }
 
     /// Found `0x0066E740` (§9.6 step 3).
@@ -854,13 +825,15 @@ impl Drlg {
         }
         let rect = self.room(id).rect;
         let (wx, wy) = (rect.x + x, rect.y + y);
-        let mut merged = r.kind;
-        if v & cell::LAYER_ABOVE == 0 {
+        // Rule 1: v bit 7 → m = t, no table, no edge test.
+        let merged = if v & cell::LAYER_ABOVE != 0 {
+            t
+        } else {
             match self.merged_type(svc.data, id, n, r.kind, wx, wy, t)? {
-                Some(m) => merged = m,
+                Some(m) => m,
                 None => return Ok(()),
             }
-        }
+        };
         // Corner handling.
         if r.kind == 3 && merged != 3 {
             if let Some(h) = r.half {
