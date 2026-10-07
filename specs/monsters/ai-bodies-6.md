@@ -53,15 +53,15 @@
 |   21. Vendor (42) `0x005E9E00` | 758–763 |
 |   22. Trap-Missile (77) `0x005FB5B0` | 764–776 |
 |   23. TrappedSoul (99) `0x005E9F10` | 777–793 |
-|   24. DruidWolf (108) `0x005ED710` | 794–867 |
-|   25. CycleOfLife (111) `0x005EC8C0`, init `0x005EC6A0` | 868–896 |
-|   26. NpcBarb (127) `0x005EDC50`, init `0x005EDC40` | 897–917 |
-| Constants & data dependencies | 918–942 |
-| Randomness | 943–951 |
-| Edge cases & original bugs | 952–960 |
-| Test vectors | 961–985 |
-| Provenance | 986–1012 |
-| Open questions | 1013–1020 |
+|   24. DruidWolf (108) `0x005ED710` | 794–873 |
+|   25. CycleOfLife (111) `0x005EC8C0`, init `0x005EC6A0` | 874–902 |
+|   26. NpcBarb (127) `0x005EDC50`, init `0x005EDC40` | 903–923 |
+| Constants & data dependencies | 924–948 |
+| Randomness | 949–957 |
+| Edge cases & original bugs | 958–966 |
+| Test vectors | 967–991 |
+| Provenance | 992–1018 |
+| Open questions | 1019–1026 |
 <!-- /index -->
 
 ## Summary
@@ -816,7 +816,9 @@ Common start (both):
 4. S, E, M := search capped (unit, control, r). T0 := the main search
    for O with the unit's control (as §3).
 
-**Wolf:**
+#### 24.1 Wolf `0x005ECEE0`
+
+After the common start of §24:
 
 5. S ≠ 0 and not directly reachable (`0x005DC640(unit, S)` = 0) → S :=
    0. Then, when S is now 0: T0 ≠ 0, full-size distance unit→T0 < r and
@@ -833,7 +835,9 @@ Common start (both):
    in radius of O (`0x005DE6D0(O, 8, 6)`). End. Else idle 15. End.
 9. `roll(100)` < aip2 [20] → wander 10; else idle 15.
 
-**Fenris:**
+#### 24.2 Fenris `0x005ED2A0`
+
+After the common start of §24:
 
 5. S ≠ 0 and not directly reachable → S := 0. When S is now 0: T0 ≠ 0,
    T0's search distance (from O) < r and T0 directly reachable → S :=
@@ -848,7 +852,7 @@ Common start (both):
 9. Pet follow (S, O, M, quiet 1, n 6) ≠ 0 → end.
 10. Rage: `Skill1` < 0, or the unit has state 138, or (`roll(100)` ≥
     aip3 [25], S ≠ 0 and param 0 = 0) → param 0 := 0, step 11. Else K
-    := the corpse search `0x005D2F80(game, unit, O, 10)` (below); K and
+    := the corpse search `0x005D2F80(game, unit, O, 10)` (§24.3); K and
     `0x006416D0(K, unit)` < r / 2 (signed halving): the unit in melee
     range of K → param 0 := 0, `Skill1` at K, end; else M = 0 → run to
     K, param 0 := 1, param 1 := K's GUID, end; else step 11's A1 branch.
@@ -856,14 +860,16 @@ Common start (both):
 11. M ≠ 0 → A1 at S; wait aip1. End. S ≠ 0 → velocity (0, v, 0); run
     to S. End. `roll(100)` < aip2 → wander 10; else idle 15.
 
-**Corpse search** `0x005D2F80(game, U, X, n)`: X is not read. Unit find
+#### 24.3 Corpse search `0x005D2F80(game, U, X, n)`
+
+X is not read. Unit find
 (`0x0065A950` init, `0x0065AC70` collect, `0x0065AA00` free; flags
 0x1002, size n, around U's position, U's room; `ai-bodies-3.md` open
 question 3) → the first found unit that passes the corpse test
 `0x00623600` (skills spec) and the hostility test `0x00554200(game, U,
 ·)` (`combat/hit.md`); else 0. No draws.
 
-1.14d-confirmed (all three functions).
+1.14d-confirmed (all four functions).
 
 ### 25. CycleOfLife (111) `0x005EC8C0`, init `0x005EC6A0`
 
@@ -879,7 +885,7 @@ owner.
 4. K := 0, dK := 0. `Skill1` > 0, its row exists and the unit has its
    entry: n := the skill's `aurarangecalc` (skills +0x64) at the entry's
    level (`0x00646CA0`), clamped to 5..50; K := corpse search (game,
-   unit, O, n) (§24); K → dK := `0x006416D0(unit, K)`.
+   unit, O, n) (§24.3); K → dK := `0x006416D0(unit, K)`.
 5. dK < aip2 [20]: K → mK := melee range unit→K. Else K := 0.
 6. Pet follow (K, O, mK, quiet 0, n 6) ≠ 0 → end.
 7. need := 1; class 426: need := O's life (stat 6) < O's max life
