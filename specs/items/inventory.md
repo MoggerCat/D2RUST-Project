@@ -36,13 +36,13 @@
 |   2. Grid placement | 182–277 |
 |   3. Belt | 278–335 |
 |   4. Equipping | 336–520 |
-|   5. Shared checks | 521–649 |
-| Constants & data dependencies | 650–672 |
-| Randomness | 673–685 |
-| Edge cases & original bugs | 686–730 |
-| Test vectors | 731–779 |
-| Provenance | 780–836 |
-| Open questions | 837–926 |
+|   5. Shared checks | 521–645 |
+| Constants & data dependencies | 646–668 |
+| Randomness | 669–682 |
+| Edge cases & original bugs | 683–727 |
+| Test vectors | 728–776 |
+| Provenance | 777–833 |
+| Open questions | 834–933 |
 <!-- /index -->
 
 ## Summary
@@ -546,12 +546,8 @@ interaction is with a player unit that exists (multiplayer only).
 #### 5.3 Targeting reset
 
 `0x0055BF50`: for every item in the player's item list with item flag
-0x4: clear it; then, if the **targeted unit** (the argument of
-`0x0055BF50`, the player) is a player, queue S→C 0x3F (code 0xFF, the
-item's GUID, 0xFFFF; `inventory-moves.md` §11). `0x0044BE50(unit)` returns the unit's type
-(unit +0x00), or 6 for a null unit; 0 = player. It is called with the
-same unit for every item, never with the item, so for a player owner
-every flagged item sends a 0x3F and for any other owner none does. Runs first in most item routines (cited as
+0x4: clear it; if `0x0044BE50` returns 0 queue S→C 0x3F (code 0xFF, the
+item's GUID, 0xFFFF; `inventory-moves.md` §11). Runs first in most item routines (cited as
 "targeting reset").
 
 #### 5.4 Item-move gate
@@ -678,7 +674,8 @@ happen only inside the systems these paths call, in handler order:
 1. 0x50 drop gold and `inventory-moves.md` §10.1 rest piles: item creation of each `gld` pile
    (`items/generation.md` §3), pile by pile.
 2. 0x61 take from hireling: the duplicate `0x0055A2A0`
-   (`world/cube.md` OQ4).
+   (`world/cube.md` OQ4): two game-seed steps per item unit it allocates,
+   2 · (1 + k) with k fillers (`world/vendors.md` §7.3).
 3. Item use (0x20, 0x26, potions on the hireling): item-use spec.
 4. Free-spot searches (`inventory-moves.md` §9.1, §10.2): `sim/path-placement.md` (whether
    `0x0064E810` draws is that spec's to state).
@@ -864,6 +861,16 @@ size and fallback pushes at `0x00563B9C` / `0x00563C83`), `0x005628C0`.
 19. Answered: `inventory-moves.md` §8.4 step 6 (full pair list; second list = corpses).
 20. Does the 1.14d client send C→S 0x4F button 0x18 (transmute) while
     an item is on the cursor (edge case 12)? Settle: recording R7.
+    Answered from the client code (2026-10-07; `ui/panels-2.md` cube
+    mouse down / up): the button is armed only on a mouse down with an
+    empty cursor (`0x004927C0`: `0x004680A0` ≠ 0 at `0x00492883` skips
+    the pressed flag), and the release `0x0048A190` sends 0x4F 0x18
+    (`0x0048A28B`) only when armed. So an unmodified client sends it
+    with an item on the cursor only if the cursor gains an item between
+    that press and release (a server message; no input of the same
+    button can); the server's edge-case-12 path is reached by such a
+    case or by a client that sends the message itself. R7 still
+    confirms on live data.
 21. ~~Readers of inventory +0x28 at `0x005697F0` and `0x0048C060`~~:
     answered in edge case 11 (socket and corpse inventories only).
 
