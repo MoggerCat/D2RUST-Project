@@ -118,7 +118,7 @@ id	name	size	layout	sender	client_handler	client_unit_handler	produced_by	confir
 0x74	PlayerCorpseAssign	10		0x0053DA40	0x0045E7B0	-	sim	yes
 0x75	PlayerPartyInfo	13		0x0053DA90	0x0045E7E0	-	out	yes
 0x76	PlayerInProximity	6		0x0053B3D0	0x0045E050	-	sim	yes
-0x77	TradeAction	2		0x0053CAB0	0x0045E800	-	out	yes
+0x77	TradeAction	2		0x0053CAB0	0x0045E800	-	sim	yes
 0x78	TradeAccepted	21		-	0x0045E810	-	out	partial
 0x79	GoldInTrade	6		0x0053CBE0	0x0045E850	-	out	yes
 0x7A	PetAction	13	action:u8@1 pet_type:u8@2 class:u16@3 owner:u32@5 pet:u32@9	0x0053CB30	0x0045E860	-	sim	yes

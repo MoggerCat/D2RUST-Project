@@ -38,16 +38,16 @@
 |   8. Mode requests | 347–397 |
 |   9. Room-in-sight messages | 398–432 |
 |   10. Bit reader | 433–447 |
-|   11. Current act and level (join and later) | 448–491 |
-|   12. Client DRLG and the room of a point | 492–533 |
-|   13. Visibility predicate (`0x004DBF20`) | 534–561 |
-|   14. Pet list and the hireling GUID | 562–588 |
-| Constants & data dependencies | 589–601 |
-| Randomness | 602–613 |
-| Edge cases & original bugs | 614–622 |
-| Test vectors | 623–662 |
-| Provenance | 663–704 |
-| Open questions | 705–755 |
+|   11. Current act and level (join and later) | 448–493 |
+|   12. Client DRLG and the room of a point | 494–535 |
+|   13. Visibility predicate (`0x004DBF20`) | 536–563 |
+|   14. Pet list and the hireling GUID | 564–590 |
+| Constants & data dependencies | 591–603 |
+| Randomness | 604–615 |
+| Edge cases & original bugs | 616–624 |
+| Test vectors | 625–664 |
+| Provenance | 665–706 |
+| Open questions | 707–757 |
 <!-- /index -->
 
 ## Summary
@@ -480,8 +480,10 @@ player is in", the input of `render/composition.md` §3 step 2
    order (the "…" between 0x0B and 0x03, 0x53 after 0x03, the 0x7E after
    0x15, and the units before 0x04) is `sim/intents-events.md` §8.
 4. **Room change** (`0x004654C0`, `msg-units.md` §3 rule 4.4): when the
-   local player moves to a room whose level's Levels `Act` byte differs
-   from the old room's, the act palette switches (`0x004FB480`); the
+   local player moves to a room whose level's Levels `Pal` byte (+0x02;
+   not `Act`, +0x03, which differs for levels 125–127 and 133–136)
+   differs from the old room's, the palette switches to `Pal`
+   (`0x004FB480`, `msg-units.md` §3 rule 4.4); the
    first placement (no old room) does not switch.
 5. d2rs: `ViewFeed` level := the level id of the local player's room
    (§12 rule 2 on the local player's `position`), none while the local

@@ -47,19 +47,19 @@
 |   19. Umod init functions | 494–573 |
 |   20. Superuniques (`0x005A49B0`) | 574–597 |
 |   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 598–612 |
-|   22. Umod callbacks and the type-7 event | 613–654 |
-|   23. Unique names (client) | 655–664 |
-|   24. Monster assign message | 665–677 |
-|   25. Calling the spawn functions outside population (tools) | 678–768 |
-| Constants & data dependencies | 769–790 |
-| Randomness | 791–826 |
-| Edge cases & original bugs | 827–852 |
-| Test vectors | 853–854 |
-|   Synthetic (CI-safe) | 855–877 |
-|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 878–908 |
-|   Recorded checks (monster assign 0xAC) | 909–921 |
-| Provenance | 922–984 |
-| Open questions | 985–1008 |
+|   22. Umod callbacks and the type-7 event | 613–660 |
+|   23. Unique names (client) | 661–670 |
+|   24. Monster assign message | 671–683 |
+|   25. Calling the spawn functions outside population (tools) | 684–774 |
+| Constants & data dependencies | 775–796 |
+| Randomness | 797–832 |
+| Edge cases & original bugs | 833–858 |
+| Test vectors | 859–860 |
+|   Synthetic (CI-safe) | 861–883 |
+|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 884–914 |
+|   Recorded checks (monster assign 0xAC) | 915–927 |
+| Provenance | 928–990 |
+| Open questions | 991–1018 |
 <!-- /index -->
 
 ## Summary
@@ -652,6 +652,12 @@ rule 28). Callbacks: 19 hireable `0x005A2E00`, 27 spectralhit
 What the remaining callbacks do (death explosions, curses, hit effects)
 is outside init (open question 8); addresses in `umods.tsv`.
 
+Callback bodies and the exact places where the dispatcher runs (mode 0
+before the start function and never for GH, mode 1 after it and before
+the animation schedule, mode 4 on the defender in the reaction) are
+owned by `monsters/umod-callbacks.md`; the short forms above summarise
+its §4, §6.1, §10.1, §23 and §26.
+
 ### 23. Unique names (client)
 
 The server stores only the 16-bit name seed. The client (`0x004AC870`)
@@ -1005,3 +1011,7 @@ Bosses, Normal, Blood Moor (L-flag 1):
 9. Whether `0x00573780` (umod 41 event) draws RNG.
 10. The client name draw order of §23 assumes the C argument order seen
     in `0x004AC870`; confirm with a client RNG trace showing a unique.
+
+Answered 2026-10-07: 8 → every callback body is in
+`monsters/umod-callbacks.md` (owner). 9 → `0x00573780` draws nothing
+(`umod-callbacks.md` §3.5).

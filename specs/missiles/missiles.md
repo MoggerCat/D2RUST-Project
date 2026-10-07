@@ -33,18 +33,18 @@
 |   R3. Per-tick dispatch | 282–311 |
 |   R4. Default flight (server-do 1, `0x005B0BC0` → `0x005AE1F0`) | 312–432 |
 |   R5. Hit handler (`0x005ADF10`, D2MOO `MISSMODE_SrvDmgHitHandler`) | 433–482 |
-|   R6. Damage stage (missile-owned part) | 483–536 |
-|   R7. Lifetime and expiry | 537–560 |
-|   R8. Pierce | 561–586 |
-|   R9. Server-do and server-hit catalogues | 587–812 |
-|   R10. Behaviour of the recorded missiles | 813–846 |
-|   R11. `missiles.txt` columns and their server use | 847–881 |
-| Constants & data dependencies | 882–908 |
-| Randomness | 909–941 |
-| Edge cases & original bugs | 942–965 |
-| Test vectors | 966–1045 |
-| Provenance | 1046–1088 |
-| Open questions | 1089–1134 |
+|   R6. Damage stage (missile-owned part) | 483–548 |
+|   R7. Lifetime and expiry | 549–572 |
+|   R8. Pierce | 573–598 |
+|   R9. Server-do and server-hit catalogues | 599–828 |
+|   R10. Behaviour of the recorded missiles | 829–862 |
+|   R11. `missiles.txt` columns and their server use | 863–897 |
+| Constants & data dependencies | 898–924 |
+| Randomness | 925–957 |
+| Edge cases & original bugs | 958–981 |
+| Test vectors | 982–1061 |
+| Provenance | 1062–1104 |
+| Open questions | 1105–1157 |
 <!-- /index -->
 
 ## Summary
@@ -534,6 +534,18 @@ with a unit: damage percent 25 (+121 demon, +122 undead, +180 by monster
 type), floored at −90, `phys += phys × pct / 100`; deadly strike 141 ≠ 0
 → crit flag and phys × 2; 103/104/106 bypass flags.
 
+The record is the 0x70-byte damage record itself (`combat/damage.md`
+§1; `0x005A89A0` zeroes all 0x70 bytes first), so an area helper takes
+it unchanged. Fields written: physical +0x08, fire +0x10, magic +0x20,
+lightning +0x1C, cold +0x24, cold length +0x30 (stat 56), poison +0x28,
+poison length +0x2C (stat 59, ÷ stat 326 when > 1), mana leech +0x3C
+(62), life leech +0x38 (60), stamina leech +0x40 (64), burn +0x14,
+burn length +0x18 (315), stun length +0x44 (66). Deadly strike: result
+flags (u16 +0x04) |= 0x2000 and +0x08 × 2. Bypass: stat 103 → hit flags
+(+0x00) |= 0x100, 104 → 0x200, 106 → 0x400 (`combat/damage.md` §1:
+undead / demons / beasts). Nothing else is set (freeze length +0x34
+stays 0).
+
 ### R7. Lifetime and expiry
 
 1. The every-tick event is prepended to the missile class list. A
@@ -745,7 +757,11 @@ result bits per §R5. Helpers:
   64 (no roll); 9 → stun length +0x44 = stat 66; 10 and > 12 → nothing;
   11 burn (316/317, 329) → +0x14, burn length +0x18 = stat 315; 12
   freeze (54/55, 331) → +0x24, freeze length +0x34 = stat 56. Unlike
-  §R6.2 there is no `damage_vs_montype` term.
+  §R6.2 there is no `damage_vs_montype` term. **Return value** (a
+  rolled amount, 8.8 like the record; not the `EType`): 0 → the final
+  physical (after the percent and the ×2); 1 / 2 / 3 / 4 / 12 → the
+  fire / lightning / magic / cold / cold (freeze) roll; 5 → poison × 25;
+  11 → burn × 25; 6–10 and > 12 → 0 (6 still stores the life leech).
 - `elem_len(record, len)` = `0x005A8F20` by `EType`: 4 cold length, 5
   poison length, 9 stun length, 11 burn length, 12 freeze length :=
   len; others nothing.
@@ -1131,3 +1147,10 @@ Reading:
     `0x0067A140`'s x87 sine/cosine spiral (77 points). Settle: asm read
     of both and of their callers; d2rs needs a bit-exact replacement of
     the x87 part (hard rule 6).
+13. *Answered* (`impl-missile-bodies-2` Q2): `elem_roll` returns the
+    rolled amount of its element, not the `EType` (§R9.6 return list;
+    `0x005A8C70`).
+14. *Answered* (`impl-missile-bodies-2` Q3): the full roll writes the
+    0x70-byte damage record directly: crit → result flags 0x2000,
+    bypass 103 / 104 / 106 → hit flags 0x100 / 0x200 / 0x400 (§R6.2;
+    `0x005A89A0`).
