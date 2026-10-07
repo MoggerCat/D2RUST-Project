@@ -105,6 +105,10 @@ pub struct BodyFake {
     pub found: Vec<usize>,
     pub point_collide: bool,
     pub components: BTreeMap<(usize, usize), i32>,
+    /// `place_unit` refuses (the placement of `path-placement.md` §10 fails).
+    pub place_fails: bool,
+    /// Item stat values by (item, stat) (`item_stat_of`).
+    pub item_stats: BTreeMap<(usize, u16), i32>,
 }
 
 impl BodyFake {
@@ -612,8 +616,8 @@ impl BodyWorld for BodyFake {
     fn item_stackable(&self, i: usize) -> bool {
         self.c.items[i].throw
     }
-    fn item_stat_of(&self, _: usize, _: u16) -> i32 {
-        0
+    fn item_stat_of(&self, i: usize, s: u16) -> i32 {
+        self.item_stats.get(&(i, s)).copied().unwrap_or(0)
     }
     fn set_item_stat(&mut self, i: usize, s: u16, v: i32) {
         self.log(format!("itemstat {i} {s} {v}"));
@@ -801,6 +805,9 @@ impl BodyWorld for BodyFake {
     }
     fn place_unit(&mut self, u: usize, r: Option<usize>, at: (i32, i32)) -> bool {
         self.log(format!("place {u} {r:?} {at:?}"));
+        if self.place_fails {
+            return false;
+        }
         self.pos.insert(u, at);
         true
     }
