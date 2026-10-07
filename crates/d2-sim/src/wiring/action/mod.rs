@@ -143,6 +143,11 @@ pub struct ActionHooks<X> {
     /// default): the call does nothing (no pet list in the action
     /// wiring).
     pub pet_follows: Option<Vec<UnitId>>,
+    /// Monsters killed by the kill `0x0057CCB0` with flag 1 (every
+    /// caller but the expired-pet kill), for the host that holds the
+    /// hireling lists: `hirelings.md` §8 rule 1 (`0x005751A0` when the
+    /// owner is a player). `None` (the default): nothing is recorded.
+    pub pet_deaths: Option<Vec<UnitId>>,
     /// The loaded `AnimData.d2` (`formats/animdata.md`, parsed by
     /// `d2-formats`): the records `UnitHooks::anim_record` looks up by
     /// COF name. `None`: no record for any unit (as before the table is
@@ -202,6 +207,7 @@ impl<X> ActionHooks<X> {
             objects: None,
             objects_out: false,
             pet_follows: None,
+            pet_deaths: None,
             anim_data: None,
             vitals: None,
             mode_target: None,

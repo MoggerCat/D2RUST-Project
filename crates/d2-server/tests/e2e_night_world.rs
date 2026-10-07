@@ -952,6 +952,7 @@ fn the_hireling_follows_a_waypoint_teleport() {
     let w = &mut fx.sim().world;
     w.state.hireling_tables = Some(HirelingTables {
         rows,
+        exp_ratios: Default::default(),
         max_level: 99,
         pet_flags: HirelingTables::WARP,
         pet_basemax: 1,

@@ -342,6 +342,23 @@ struct Joined {
 /// The town of [`run`] with its waypoint, an unplaced player joined in
 /// state 4, then `enter_game` and `FRAMES` frames.
 fn join_run() -> Joined {
+    join_with(|s, player| {
+        let entry = Entry {
+            act: 0,
+            name: name(),
+        };
+        assert_eq!(enter_game(s, CLIENT, &entry), Ok(player));
+        // A second entry of the placed player is refused.
+        assert_eq!(
+            enter_game(s, CLIENT, &entry),
+            Err(JoinError::Placed(player))
+        );
+    })
+}
+
+/// [`join_run`] with the entry step `enter` (the client is joined, its
+/// player unplaced).
+fn join_with(enter: impl FnOnce(&mut Sim, UnitId)) -> Joined {
     let d = data();
     let (mut sim, _) = d
         .world_sim(
@@ -400,16 +417,7 @@ fn join_run() -> Joined {
     let mut s: Sim = SimGame::with_world(game, sim, world);
     s.join(CLIENT, Some(player), None, client_state::IN_GAME)
         .expect("join");
-    let entry = Entry {
-        act: 0,
-        name: name(),
-    };
-    assert_eq!(enter_game(&mut s, CLIENT, &entry), Ok(player));
-    // A second entry of the placed player is refused.
-    assert_eq!(
-        enter_game(&mut s, CLIENT, &entry),
-        Err(JoinError::Placed(player))
-    );
+    enter(&mut s, player);
     let mut host: TestHost = Host::new(s, ProtoSizes, NoSession, Ms(1000));
     host.connect(CLIENT);
     host.frame().expect("first frame");
@@ -479,4 +487,119 @@ fn town_entry_sends_the_join_sequence() {
     assert!(!j.received[6..].iter().any(|m| m[0] == 0x07));
     // Determinism on the synthetic data.
     assert_eq!(join_run(), j);
+}
+
+/// A save whose name is the fixture's player name, act 0 of Normal.
+fn save_named() -> d2_formats::d2s::D2s {
+    let mut h = d2_formats::d2s::Header::default();
+    let n = name();
+    let len = n.iter().position(|&c| c == 0).unwrap_or(15);
+    h.set_name(&n[..len]).unwrap();
+    h.class = CLASS as u8;
+    h.towns = [0x80, 0, 0];
+    d2_formats::d2s::D2s {
+        header: h,
+        body: Some(d2_formats::d2s::Body::default()),
+    }
+}
+
+// Covers: specs/formats/d2s-load.md §2 r1; specs/formats/d2s.md §9 r4, §2.2 r8
+#[test]
+fn a_full_save_loads_before_the_join_sequence() {
+    use d2_formats::d2s::{StatEntry, Stats};
+    use d2_server::adapters::character::LoadContext;
+    use d2_server::adapters::session::enter_game_from_save;
+    let mut save = save_named();
+    let st = |id, value| StatEntry {
+        id,
+        layer: 0,
+        value,
+    };
+    // Level 2, gold over the carry limit (2 × 10,000), life and mana.
+    save.body.as_mut().unwrap().stats = Stats::Bits(vec![
+        st(6, 50 << 8),
+        st(7, 60 << 8),
+        st(8, 9 << 8),
+        st(10, 1),
+        st(11, 70 << 8),
+        st(12, 2),
+        st(14, 20_001),
+    ]);
+    let mut report = None;
+    let mut life = None;
+    let j = join_with(|s, player| {
+        let (p, r) = enter_game_from_save(s, CLIENT, &save, &LoadContext::default())
+            .expect("loaded and placed");
+        assert_eq!(p, player);
+        let v = &s.events.action.sys.stats;
+        assert_eq!(v.unit_base(player, 14, 0), 0, "gold over the limit → 0");
+        assert_eq!(v.unit_base(player, 12, 0), 2);
+        // Stamina := maxstamina (§9 rule 4). (Stats 30 and 67–69 are past
+        // the synthetic itemstatcost's 16 rows: not observable here.)
+        assert_eq!(v.unit_base(player, 10, 0), v.unit_total(player, 11, 0));
+        assert_eq!(v.unit_base(player, 10, 0), 70 << 8);
+        life = Some((v.unit_base(player, 6, 0), v.unit_base(player, 8, 0)));
+        report = Some(r);
+    });
+    assert_eq!(life, Some((50 << 8, 9 << 8)));
+    let r = report.unwrap();
+    assert!(!r.new_character);
+    assert_eq!(r.act, 0);
+    // The steps without a provider are named, in order.
+    let steps: Vec<_> = r.unapplied.iter().map(|u| u.step).collect();
+    assert_eq!(
+        steps,
+        [
+            "header",
+            "quests",
+            "waypoints",
+            "npc fields",
+            "item indices",
+            "quest entry"
+        ]
+    );
+    // The join sequence follows the load unchanged.
+    assert_eq!(j.received[0][0], 0x59);
+    assert_eq!(j.received[1][0], 0x0B);
+    assert_eq!(j.received[2][0], 0x03);
+}
+
+// Covers: specs/formats/d2s-load.md §1 r1
+#[test]
+fn a_stub_starts_a_new_character_before_the_join_sequence() {
+    use d2_server::adapters::character::LoadContext;
+    use d2_server::adapters::session::enter_game_from_save;
+    let n = name();
+    let len = n.iter().position(|&c| c == 0).unwrap_or(15);
+    let stub = d2_formats::d2s::D2s::new_stub(&n[..len], CLASS as u8, 0, 1).unwrap();
+    let vitals = data().vitals().unwrap();
+    let cs = vitals
+        .charstats(CLASS as i32)
+        .expect("charstats row")
+        .clone();
+    let mut report = None;
+    join_with(|s, player| {
+        if s.events.action.hooks().vitals.is_none() {
+            s.events.action.hooks().vitals = Some(std::sync::Arc::new(vitals.clone()));
+        }
+        let (_, r) = enter_game_from_save(s, CLIENT, &stub, &LoadContext::default())
+            .expect("started and placed");
+        let v = &s.events.action.sys.stats;
+        // The creation stats (`vitals.md` §1).
+        assert_eq!(v.unit_base(player, 0, 0), i32::from(cs.str));
+        report = Some(r);
+    });
+    let r = report.unwrap();
+    assert!(r.new_character);
+    let steps: Vec<_> = r.unapplied.iter().map(|u| u.step).collect();
+    assert_eq!(
+        steps,
+        [
+            "new character set-up",
+            "start items",
+            "has skill",
+            "mouse skills",
+            "quest entry"
+        ]
+    );
 }
