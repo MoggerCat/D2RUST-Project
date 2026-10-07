@@ -35,19 +35,19 @@
 | Rules | 86–87 |
 |   1. Loop order (single player) | 88–109 |
 |   2. Client → server | 110–279 |
-|   3. Server → client | 280–446 |
-|   4. d2rs mapping and scope | 447–478 |
-|   5. Machine-readable tables | 479–515 |
-|   6. Exact-match comparison | 516–606 |
-|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 607–989 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 990–1134 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1135–1279 |
-| Constants & data dependencies | 1280–1298 |
-| Randomness | 1299–1304 |
-| Edge cases & original bugs | 1305–1338 |
-| Test vectors | 1339–1425 |
-| Provenance | 1426–1527 |
-| Open questions | 1528–1625 |
+|   3. Server → client | 280–447 |
+|   4. d2rs mapping and scope | 448–479 |
+|   5. Machine-readable tables | 480–516 |
+|   6. Exact-match comparison | 517–607 |
+|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 608–990 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 991–1135 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1136–1280 |
+| Constants & data dependencies | 1281–1299 |
+| Randomness | 1300–1305 |
+| Edge cases & original bugs | 1306–1339 |
+| Test vectors | 1340–1426 |
+| Provenance | 1427–1528 |
+| Open questions | 1529–1634 |
 <!-- /index -->
 
 ## Summary
@@ -415,6 +415,7 @@ Queue 2 (id 0xFF, 16 bytes, `0x0052CC20`) runs only when host callbacks
    | 0x8A | `0x0053DFF0` | `0x00544590` (`0x005446EE`), `0x005EE3C0` (`0x005EE57B`) | 136 | type 1, GUID = unit +0x0C; `world/quests.md` §6.4 |
    | 0x91 | `0x0053E060` | `0x00545100` (`0x00545172`) | 0 | `world/quests.md` §6.7 |
    | 0x94 | `0x0053C5D0` | itself (`0x0053C65F`); called at `0x00532F03` (join) and `0x0056A7B7` | 4 | `client/msg-skills.md` §3 |
+   | 0xA3 | `0x0053C0E0` | itself; record from `0x00571AA0` (`skills/bodies-2.md` §2.21) | 0 | 24 bytes, zeroed: v u8@1 (DL), skill u16@2, level u16@4, unit type u8@6, GUID u32@7, target type u8@0xB, target GUID u32@0xC, x u32@0x10, y u32@0x14; one caller `0x00571DEC` (§7.9 rule 2) |
    | 0xA5 | `0x0053C190` | itself | 0 | 8 bytes, zeroed first: unit type u8@1 (DL), GUID u32@2, skill u16@6 (stack); `skills/bodies-2.md` §2.13 |
    | 0xA8 | `0x0053E8D0` | `0x005711D0` (`0x00571359`) | 5 | rule 6 |
    | 0xAA | `0x0053E8D0` | `0x00570E30` | 269 | §7.9 rule 1 |
@@ -1622,3 +1623,11 @@ Handlers of §9: `0x0054A260`, `0x0054A290` (with `0x00661110`,
     `0x004B3510`; skill events 0x99 / 0x9A → `0x004CA200` /
     `0x004CA230` → `0x004CA060`): owners the `ui/*` specs (requested in
     `docs/handoff/xpc-to-pc2.md`) and a client skill-event spec.
+    *Answered* (2026-10-07, `client/bridge-dispatch.tsv`): client model
+    side and `client/bridge.md` §10 outputs in `client/msg-ui.md` §4
+    (0x26), §5 (0x27), §6 (0x4E, 0x4F), §7 (0x50), §8 (0x58), §9 (0x8A),
+    §10 (0x91), §11 (0x78) and `client/msg-skills.md` §7 (0x99, 0x9A),
+    §8 (0xA3); 0x89 is `render/lighting.md` §10 r4. Model writes: 0x50
+    code 23 (C→S 0x69, `exit_requested`), 0x58 code 5 (`cursor_item`);
+    the rest is UI or effect state. Display rules stay with `ui/*`
+    (`docs/handoff/xpc-to-pc2.md`).

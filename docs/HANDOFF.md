@@ -5063,6 +5063,17 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
   after); Conversion on a higher-level monster (stats 12, 6, 7 during
   and after); Holy Freeze pulses (state 107, target seed); Whirlwind
   with one and two weapons (E param 4, hits per do).
+- `client/msg-ui.md` §4–§11 (client side, no new play beyond the
+  §3.5 line above): in the same session log the client handlers'
+  inputs: type one chat line and one whisper to the own name (0x26
+  forms 1, 2, 6; overhead form 5 from C→S 0x14), talk to Akara (0x27
+  count, kinds), open and close the hire list (0x4F, 0x4E × n, 0x50
+  code 2); breakpoint `0x0049F410` (overhead set: unit, text, lang) and
+  `0x004A1600` (record bytes).
+- `client/msg-skills.md` OQ4 / `client/msg-ui.md` OQ7: a pet summon with
+  a pending skill (0x99 / 0x9A, line above) — log whether any later
+  message of the same receive changes the 0x99 unit (0x0A, 0x15,
+  0xA8 / 0xA9 state 118).
 
 ## 8. Lessons (problems met, fixes)
 
