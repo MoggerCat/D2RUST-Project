@@ -5,8 +5,8 @@
   `objects.txt` 16 waypoint classes, the `Game.exe` flag table); menu,
   close and two same-act travels match the recordings
   `20261006-015956-packets.jsonl` and `20261006-022633-packets.jsonl`
-  byte for byte; cross-act travel and first activation are not recorded
-  yet (open questions 1, 2).
+  byte for byte; cross-act travel matches `pc2rec-p1-packets` (open
+  question 1); first activation is not recorded yet (open question 2).
 - **Target version:** 1.14d
 - **Crate/module:** `d2-sim::world::waypoints` (index mapping, waypoint
   data, operate function 23, init function 17, 0x49 handler, travel);
@@ -44,7 +44,7 @@
 | Edge cases & original bugs | 445–481 |
 | Test vectors | 482–521 |
 | Provenance | 522–560 |
-| Open questions | 561–608 |
+| Open questions | 561–630 |
 <!-- /index -->
 
 ## Summary
@@ -562,6 +562,20 @@ Save: the test character with Cold Plains has the section `5753
 
 1. Cross-act waypoint travel: message order (0x05/0x03/0x53 …) and
    whether §7 rule 7 sends 0x0D. Settle: record a 0x49 to another act.
+   *Answered* (recording `pc2rec-p1-packets`, PC 2 recording lane
+   `docs/handoff/pc2-rec-lane.md` P1; `TestSor`, `-seed 644409375`;
+   `check_packets.py` OK): every message of a cross-act travel is sent
+   inside the dispatch of the C→S 0x49 (input phase, before the
+   result), in this order: the old act's removals, S→C 0x0A (unit
+   remove, `0x0053BDC2`) and 0x08 (room remove, `0x0053BCB6`)
+   interleaved; then 0x05 (`0x0053B330`), 0x03 (`0x0053B3BC`, act
+   number, init seed 644409375, town level), 0x53 (`0x0053C922`), nine
+   0x07 (room add, `0x0053BC76`), and last 0x0D (`0x0053B513`) with the
+   player at x + 3, y + 3 (arrival (5068, 5083) → 0x0D (5071, 5086)), so
+   §7 rule 7 sends 0x0D after an act change too. The new act's units
+   (0xAC, 0xAA, 0x6D, 0x51, 0x0E …) follow in the next frame's tick.
+   Act I → II (frame 441) had one S→C 0x5D (`0x0053D72C`, bytes `5d 04
+   00 0c 00 00`) before the removals; Act II → I (frame 611) had none.
 2. First activation of a neutral waypoint: confirm no 0x63, the 0x0E/0x51
    mode messages and the ENDANIM frame. Settle: record operating a new
    waypoint twice.
@@ -605,3 +619,11 @@ Save: the test character with Cold Plains has the section `5753
    six callers of `0x00660EC0` (`0x0057A6B4`, `0x0057A739`, `0x0057A7BC`,
    `0x005847FC`, `0x00584E7C`, `0x005B501C`); whether a classic game can
    reach one with an act-5 index belongs to their owners.
+8. Waypoint panel display (owner: the waypoint UI spec): with a record
+   whose bits are all set (S→C 0x63 `63 0b000000 0201 ffffffff7f 00…`,
+   recording `pc2rec-p1-packets` frame 356, character `TestSor` made by
+   `d2s-tool new --waypoints all`), the panel draws every entry except
+   the current act's town as inactive (grey icon), yet a click on a grey
+   entry travels (Lut Gholein, Kurast Docks, Pandemonium Fortress,
+   back to the Rogue Encampment). Which client state decides the icon
+   (the 0x63 record, a client copy of it, or another flag) is not known.
