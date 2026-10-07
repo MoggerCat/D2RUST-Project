@@ -10,6 +10,7 @@ mod belt;
 mod bits;
 mod buffer;
 mod copy;
+mod corpse;
 mod equip;
 mod gold;
 mod ground;
@@ -245,9 +246,22 @@ pub fn inv_tables() -> InvTables {
 }
 
 #[derive(Default)]
-pub struct Hooks;
+pub struct Hooks {
+    /// The corpse pickups `0x0057FB70` the desk handed over (player,
+    /// corpse).
+    pub corpse_pickups: Vec<(UnitId, UnitId)>,
+}
 impl StatHost for Hooks {}
-impl UnitHooks for Hooks {}
+impl UnitHooks for Hooks {
+    fn player_corpse_pickup(
+        &mut self,
+        _: &mut crate::units::hooks::Sim<'_>,
+        player: UnitId,
+        corpse: UnitId,
+    ) {
+        self.corpse_pickups.push((player, corpse));
+    }
+}
 impl LifecycleHooks for Hooks {}
 
 /// The seams without a provider: answers set by the test, every call
@@ -467,7 +481,7 @@ impl World {
                 expansion: true,
                 ..UnitData::default()
             },
-            hooks: Hooks,
+            hooks: Hooks::default(),
             fields: GameFields::new(Seed::init_low(GAME_SEED), true),
             tables: item_tables(),
             items: ItemStore::new(),

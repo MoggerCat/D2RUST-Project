@@ -86,6 +86,11 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
     fn player_corpse(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
         self.corpse_creation(sim, unit);
     }
+    /// `0x0057FB70` ([`super::death`]; the experience it returns is not
+    /// read by the 0x16 caller).
+    fn player_corpse_pickup(&mut self, sim: &mut Sim<'_>, player: UnitId, corpse: UnitId) {
+        self.corpse_pickup(sim, player, corpse);
+    }
     /// `0x00620F00`: the AnimData record of the unit's mode
     /// (`units.md` §4.1, `animdata.md` §5).
     fn anim_record(&mut self, sim: &Sim<'_>, unit: UnitId) -> Option<AnimRecord> {
