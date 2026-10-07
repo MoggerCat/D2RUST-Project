@@ -17,25 +17,26 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 41–55 |
-| Inputs | 56–64 |
-| Outputs / state changes | 65–71 |
-| Rules | 72–73 |
-|   1. Terms | 74–85 |
-|   2. Drop quality (owned by `items/treasure.md` §6) | 86–91 |
-|   3. Quality roll (`0x00556F60`, D2MOO `ITEMS_RollItemQuality`) | 92–112 |
+| Summary | 42–56 |
+| Inputs | 57–65 |
+| Outputs / state changes | 66–72 |
+| Rules | 73–74 |
+|   1. Terms | 75–86 |
+|   2. Drop quality (owned by `items/treasure.md` §6) | 87–92 |
+|   3. Quality roll (`0x00556F60`, D2MOO `ITEMS_RollItemQuality`) | 93–112 |
 |   4. Quality dispatch (`0x00557450`) | 113–148 |
 |   5. Downgrade (`0x005572A0` normal, `0x00557320` superior, `0x00557380` magic, `0x005573F0` rare) | 149–165 |
 |   6. Low quality (`0x005C2FB0` → `0x005C2D40`, format ≥ 1) | 166–179 |
 |   7. Superior (`0x005C2AD0` → `0x005C2970`) | 180–198 |
 |   8. Unique (`0x005566B0`) | 199–229 |
 |   9. Set item (`0x005C2940` → `0x005C25C0`, format ≥ 1) | 230–243 |
-| Constants & data dependencies | 244–254 |
-| Randomness | 255–267 |
-| Edge cases & original bugs | 268–286 |
-| Test vectors | 287–299 |
-| Provenance | 300–319 |
-| Open questions | 320–352 |
+|   10. Format-0 branches (legacy items) | 244–303 |
+| Constants & data dependencies | 304–314 |
+| Randomness | 315–327 |
+| Edge cases & original bugs | 328–346 |
+| Test vectors | 347–359 |
+| Provenance | 360–379 |
+| Open questions | 380–412 |
 <!-- /index -->
 
 ## Summary
@@ -104,8 +105,7 @@ Item seed draws (`roll`, `sim/rng.md` §3).
    `UniqueDivisor`), (`Rare`, …), (`Set`, …), (`Magic`, …), (`HiQuality`,
    …), (`Normal`, …): c := base − L / divisor (signed, toward zero);
    c < 1 → return q without a draw; else roll(c) = 0 → return q.
-   (Format 0 uses L unadjusted, no divisor for unique/rare/set and clamps
-   c to ≥ 1; unspecified beyond this, `items/generation.md` §1.2.)
+   (Format 0: §10.1.)
 6. None hit: return 3 if request flags2 & 0x40, else 1.
 
 The `*Min` columns are not used here.
@@ -198,7 +198,7 @@ of: T = 2 and `shield`; 24 and `scepter`; 25 and `wand`; 26 and `staff`;
 
 ### 8. Unique (`0x005566B0`)
 
-1. Format 0 only: durability × 5 (not specified further).
+1. Format 0 only: durability × 5 (§10.3).
 2. **Forced request:** idx := request index; outside the uniqueitems
    table → return 0. File index := idx. If the row's `code` ≠ the item
    code → return 1 without properties. Else clear identified, unique
@@ -240,6 +240,66 @@ else set the bit, success. A test on idx > 4096 reads "dropped".
    `items/properties.md` §8); return 1.
 
 No unique-style dropped bits exist for sets.
+
+### 10. Format-0 branches (legacy items)
+
+Format 0 is reached only by items of version-0x47 saves
+(`items/generation.md` §1.2, Open question 1 there); each rule below is
+the branch taken when `0x0062A670` (item format, u16) is 0.
+
+#### 10.1 Quality roll (`0x00556F60`)
+
+Step 1 does not apply: the roll runs even when the request has a
+quality (the dispatch then overrides the result, §4 step 2, but the
+draws are made). Ratio row with version limit 0. `quest` → 2. L :=
+request ilvl, not adjusted. For q in the §3 order with c := `Unique` −
+L, `Rare` − L, `Set` − L (no divisor), `Magic` − L / `MagicDivisor`,
+`HiQuality` − L / `HiQualityDivisor`, `Normal` − L / `NormalDivisor`
+(signed, toward zero): c < 1 → c := 1 (so q is still drawn); roll(c) =
+0 → return q. None → §3 step 6.
+
+#### 10.2 Low quality (`0x005C2FB0` → `0x005C2AF0`)
+
+1. No lowqualityitems table (`0x006375B0`) or no items row → return 0.
+   File index := roll(count) (item seed).
+2. Item with durability: m := items `durability` / 3, 0 → 1; stat 72 :=
+   roll(m >> 1) on the **unit seed** + (m >> 1), 0 → 1; stat 73 := m.
+3. Weapon: base 22 := max(22 × 75 / 100, 2), 21 := max(…, 1), 24 :=
+   max(…, 2), 23 := max(…, 1) (signed); throwable: 159 := max(total 159
+   × 75 / 100, 2), 160 := max(total 160 × 75 / 100, 1) (`0x005C0D40`).
+   Return 1.
+4. Else armor: 31 := max(base 31 × 75 / 100, 1). Return 1.
+5. Else return 0. No class skill mods (unlike §6 rule 6).
+
+#### 10.3 Unique (`0x005566B0`)
+
+1. Item with durability (`0x00629930`): stat 72 := min(total 72 × 5,
+   255), stat 73 := min(base 73 × 5, 255) (base set; before step 2).
+2. Forced request: as §8 step 2.
+3. Not forced (unreachable: format 0 comes only with a forced request):
+   the first uniqueitems row i, in order, with `version` < 100,
+   `enabled` (row byte +0x2C & 1), not `ladder` (& 8) unless game +0x6A
+   or +0x74 ≠ 0, `code` = the item code, and (unique-dropped bit i
+   clear (`0x005564A0`) or items `quest` ≠ 0) → file index := i, clear
+   identified, unique properties (mode 3), return 1. No `lvl` test, no
+   weights, no draw, no marking of the dropped bit. None → return 0.
+
+#### 10.4 Set item (`0x005C2940` → `0x005C2740`)
+
+1. No items row → return 0. s0 := the item seed's low word (`0x00650E50`).
+2. stat 72 := min(total 72 × 2, 255), stat 73 := min(base 73 × 2, 255)
+   (no durability test).
+3. n := the number of sets rows from the start whose `version` (+0x04)
+   < 100, counting up to the first that is not. k := roll(n) (one
+   item-seed step; n ≤ 0 → 0 and no step).
+4. For j = 0 … n − 1, set row (k + j) mod n: each of its setitems
+   (+0x110 list, count +0x0C) whose `item` code (+0x28) is the item
+   code: found := that setitems row's index (+0x00); the first match of
+   a set ends that set's scan, later sets overwrite found.
+5. None found → item seed := {s0, 666} (`0x00650E40`: only the low word
+   is restored), return 0. Else file index := found, clear identified,
+   set properties (mode 4: `prop1`–`prop2` only, `items/properties.md`
+   §2), return 1. No request index, no `lvl`, no weights.
 
 ## Constants & data dependencies
 

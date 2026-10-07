@@ -18,29 +18,30 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 46–57 |
-| Inputs | 58–65 |
-| Outputs / state changes | 66–71 |
-| Rules | 72–73 |
-|   1. Property record and slots | 74–82 |
-|   2. Modes (`0x0065FEC0`, D2MOO `ITEMMODS_AssignProperty`) | 83–101 |
-|   3. Dispatcher (`0x0065FD70`; wrapper `0x0065FE10` for format ≥ 1) | 102–111 |
-|   4. Shared helpers | 112–161 |
-|   5. Property functions | 162–216 |
-|   6. Superior (mode 1) and affixes (mode 0) | 217–221 |
-|   7. Uniques (mode 3) | 222–225 |
-|   8. Set items | 226–236 |
-|   9. Socket fillers (`0x0055C2C0`) | 237–256 |
-|   10. Runewords | 257–315 |
-|   11. Set bonuses (`0x00660120`) | 316–328 |
-|   12. Craft property lists (`0x00660240`) | 329–334 |
-|   13. Set-item state update (`0x00663CC0`) | 335–390 |
-| Constants & data dependencies | 391–400 |
-| Randomness | 401–406 |
-| Edge cases & original bugs | 407–416 |
-| Test vectors | 417–435 |
-| Provenance | 436–455 |
-| Open questions | 456–539 |
+| Summary | 47–58 |
+| Inputs | 59–66 |
+| Outputs / state changes | 67–72 |
+| Rules | 73–74 |
+|   1. Property record and slots | 75–83 |
+|   2. Modes (`0x0065FEC0`, D2MOO `ITEMMODS_AssignProperty`) | 84–103 |
+|   3. Dispatcher (`0x0065FD70`; wrapper `0x0065FE10` for format ≥ 1) | 104–113 |
+|   4. Shared helpers | 114–163 |
+|   5. Property functions | 164–218 |
+|   6. Superior (mode 1) and affixes (mode 0) | 219–223 |
+|   7. Uniques (mode 3) | 224–227 |
+|   8. Set items | 228–238 |
+|   9. Socket fillers (`0x0055C2C0`) | 239–258 |
+|   10. Runewords | 259–317 |
+|   11. Set bonuses (`0x00660120`) | 318–330 |
+|   12. Craft property lists (`0x00660240`) | 331–336 |
+|   13. Set-item state update (`0x00663CC0`) | 337–392 |
+|   14. Format-0 property functions (legacy table `0x00745B58`) | 393–460 |
+| Constants & data dependencies | 461–470 |
+| Randomness | 471–476 |
+| Edge cases & original bugs | 477–486 |
+| Test vectors | 487–505 |
+| Provenance | 506–525 |
+| Open questions | 526–609 |
 <!-- /index -->
 
 ## Summary
@@ -96,7 +97,8 @@ Arguments: mode, extra unit, item, source row, property set, apply type.
 Mode 3/4 do nothing when the file index is outside the table. Every
 mode targets the item's own stat list with state 0 and flags 0x40
 (owner none), except the set partial records (§8.1). Mode 4 on a format-0
-item runs only `prop1`–`prop2` (not specified further). Modes 6
+item runs only `prop1`–`prop2` (`0x0065FF6C`: format 0 → two records,
+no partial records), each through §14. Modes 6
 (runeword, §10) and 7 (craft list, §12) call the dispatcher directly.
 
 ### 3. Dispatcher (`0x0065FD70`; wrapper `0x0065FE10` for format ≥ 1)
@@ -387,6 +389,74 @@ the client equip (`client/stat-lists.md`) (0, 0).
    remove-all; the list is new); r < 0 → nothing. Return 1.
    So each equipped set has one owner list (states 165–170, at most six
    sets at once) tagged with stat 71 = the set id, which §11 refills.
+
+### 14. Format-0 property functions (legacy table `0x00745B58`)
+
+The wrapper `0x0065FE10` (every mode except 6, and §11) sends an item
+of format 0 (`0x0062A670` < 1) here instead of §3 (format 0: items of
+version-0x47 saves only, `items/generation.md` §1.2). No record →
+fatal 0x66D. `code` = −1, < 0 or ≥ the properties count (table +0xAC,
+268 rows in 1.14d) → nothing. Else (f, s) := the 8-byte entry `code` of
+the legacy table (function, stat); f = 0 → nothing; else f(ECX mode,
+EDX owner; item, record, s, n, state, flags, extra), where n is the
+wrapper's sixth argument (`0x0065FEC0`'s apply-type argument; 0 from
+§11 and §12) and owner, state, flags as in §4.2. One function per property code: there are no slots
+and no prev value.
+
+The legacy table has 244 entries (codes 0–243); entry 244 is the first
+word of the §3 table at `0x007462F8`. So codes 244–267 read §3's
+function words as (function, stat) pairs: codes 244 and 257–261 meet a
+null function and do nothing; every other code 245–267 calls an address
+that is not a legacy function (a §3 property function, which takes nine
+arguments, or data), which corrupts the stack: a crash. 1.14d data
+gives such codes only to expansion rows, which format-0 rolls skip
+(`version` < 100), but a forced unique or set index could still reach
+one.
+
+Helpers, all on the item seed and the item (`ECX`/item argument):
+
+- R(min, max): min = max → min, no draw. Else lo := min(min, max), hi
+  := max(min, max), n := hi − lo, plus 1 when format ≥ 1; result lo +
+  roll(n) (`0x0045C3E0`; n < 1 → 0 with no draw). So for format 0 the
+  value max is never rolled (n = hi − lo), and a span of 1 still draws.
+- A(stat, v) (`0x0065D070`): base reset §4.3 of the stat when mode = 1
+  (or when the caller forces it); v = 0 → return 0. v := v × 256 for
+  stats 6–11, 216, 217 (`0x0065CE40`). List as §4.2 (`0x0065CBF0`; none
+  → fatal 0x2C5). n ≠ 0 → add −(the list's current value) instead of
+  v. Add (`0x00627030`, layer 0). Returns 1.
+- `0x0065CF40`(stat, kind): v := R(record min, max); base reset §4.3 of
+  the stat when kind ≠ 0 or mode = 1; then A(stat, v), and for stat 58
+  also add 1 to stat 326. Returns 1.
+
+Functions (code → stat as stored in the table):
+
+| Function | Codes → stats | Effect |
+|---|---|---|
+| `0x0065D1C0` | 0→31, 1→32, 2→33, 3→34, 4→36, 6→35, 7→0, 8→2, 9→3, 10→1, 11→9, 13→7, 15→19, 16→20, 17→54, 18→55, 19→56, 20→48, 21→49, 22→50, 23→51, 24→57, 25→58, 26→59, 31→39, 32→40, 33→41, 34→42, 35→43, 36→44, 37→37, 38→38, 39→45, 40→46, 43…50→142…149, 51→73, 53→74, 54→78, 58→79, 59→80, 60→81, 63→11, 64→82, 65→62, 66→60, 72…75→88…91, 88…91→110…113, 92…95→115…118, 97→120, 100…102→123…125, 105→128, 106…113→134…141, 114→150, 115…120→153…158, 181→254 | `0x0065CF40`(s, kind 0) |
+| `0x0065D2B0` | 5→16, 12→77, 14→76, 30→114, 52→75, 61→28, 62→27, 96→119, 98→121, 99→122 | `0x0065CF40`(s, kind 1) |
+| `0x0065DB90` | 104 → 127 | `0x0065CF40`(127, kind 0) |
+| `0x0065E450` | 55–57→93, 76–78→96, 79–81→99, 82–84→102, 85–87→105 | A(s, R) |
+| `0x0065D110` | 141–177→214–250, 179→252, 180→253 | v := `param` (0 → return 0); base reset when s is 16–18 or mode = 1; A(s, v) |
+| `0x0065DD80` | 195–230 → 268–303 | as function 18 (§5 rule 8) but min > max, `param` > 3, min + 256 or max + 256 > 0x3FF (unsigned) are fatal (0x444, 0x44C, 0x44D, 0x44E) instead of clamped; list set; returns 1 |
+| `0x0065E2D0` | 67–71→83–87, 121→179, 122→180 | v := R (0 → return 0); add stat **83** with layer 0–4 for s 83–87, 5 for 179, 6 for 180 |
+| `0x0065E230` | 103 → 126 | v := R (0 → 0); add stat 126, layer 1 |
+| `0x0065E170` | 123 → 107 | v := R; skill := `param` (outside skills → 0); add stat 107, layer skill |
+| `0x0065E070` | 137 → 54, 138 → 57 | no roll: add s := `min`, s + 1 := `max`, s + 2 := `param` (n: negatives of the current values); s = 57 → stat 326 + 1 |
+| `0x0065DE40` | 134→48, 135→50, 136→52, 139→159 | no roll: add s := `min`, s + 1 := `max` (n as above) |
+| `0x0065DE40` | 140 → 21 | no roll; items row of the owner if it is an item, else of the item: 21 := `min`, 22 := `max` unless (weapon, `maxdam` = 0, `2handmaxdam` ≠ 0); 23 := `min`, 24 := `max` unless (weapon, `2handmaxdam` = 0, `mindam` ≠ 0); throwable → 159 := `min`, 160 := `max` (each A) |
+| `0x0065D650` | 27 → 21 | v := R; same items row; A(21, v) unless (weapon, `mindam` = 0, `2handmindam` ≠ 0); A(23, v) unless (weapon, `2handmindam` = 0, `mindam` ≠ 0); A(159, v) when not a weapon or throwable (no floors, unlike §5 rule 1) |
+| `0x0065D7D0` | 28 → 22 | the same with 22 (`maxdam` = 0, `2handmaxdam` ≠ 0), 24 (`2handmaxdam` = 0, `mindam` ≠ 0) and 160 |
+| `0x0065D950` | 29 | format 0: `0x0065CF40`(17, kind 1), then (18, kind 1): two rolls, base reset each |
+| `0x0065D310` | 41 | format 0: `0x0065CF40`(39), (41), (43), (45), kind 0: four rolls |
+| `0x0065D4B0` | 42 | format 0: `0x0065CF40`(40), (42), (44), (46), kind 0 |
+| `0x0065D220` | 133 → 194 | set flag 0x800 and the socket count := `param` (`0x0062BE00`; no cap, unlike §5 rule 6) |
+| `0x0065D270` | 242 | the extra unit if it is an item, else the item: base stats 73 and 72 := 0 |
+| `0x0065DBC0` | 243 → 204 | function 19 (§5 rule 9) with the same formulas (charges, level, roll(c − c / 8)), list set; returns 1 |
+| `0x0065E440` | 124–132, 178, 182–194, 231–241 | nothing (returns 1) |
+
+(`0x0065D950`, `0x0065D310`, `0x0065D4B0` test the format again and
+have a format ≥ 1 branch, unreachable since the table is used only for
+format 0.)
 
 ## Constants & data dependencies
 

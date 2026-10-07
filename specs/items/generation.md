@@ -27,26 +27,27 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 52–66 |
-| Inputs | 67–105 |
-| Outputs / state changes | 106–118 |
-| Rules | 119–120 |
-|   1. Conventions | 121–224 |
-|   2. Seeds | 225–243 |
-|   3. Pipeline (`0x00558D90`, D2MOO `D2GAME_CreateItemEx`) | 244–265 |
-|   4. Base stats (`0x00557AB0`, D2MOO `D2GAME_InitItemStats`) | 266–313 |
-|   5. Special item kinds | 314–324 |
-|   6. Normal quality and class skill mods | 325–371 |
-|   7. Sockets | 372–403 |
-|   8. Ethereal | 404–424 |
-|   9. Forced requests, ears, names, timers | 425–458 |
-|   10. Items from a code: the create wrapper and start items | 459–529 |
-| Constants & data dependencies | 530–552 |
-| Randomness | 553–571 |
-| Edge cases & original bugs | 572–586 |
-| Test vectors | 587–602 |
-| Provenance | 603–629 |
-| Open questions | 630–701 |
+| Summary | 53–67 |
+| Inputs | 68–106 |
+| Outputs / state changes | 107–119 |
+| Rules | 120–121 |
+|   1. Conventions | 122–227 |
+|   2. Seeds | 228–246 |
+|   3. Pipeline (`0x00558D90`, D2MOO `D2GAME_CreateItemEx`) | 247–268 |
+|   4. Base stats (`0x00557AB0`, D2MOO `D2GAME_InitItemStats`) | 269–316 |
+|   5. Special item kinds | 317–327 |
+|   6. Normal quality and class skill mods | 328–374 |
+|   7. Sockets | 375–406 |
+|   8. Ethereal | 407–427 |
+|   9. Forced requests, ears, names, timers | 428–461 |
+|   10. Items from a code: the create wrapper and start items | 462–532 |
+|   11. Format-0 branches (legacy items) | 533–578 |
+| Constants & data dependencies | 579–601 |
+| Randomness | 602–620 |
+| Edge cases & original bugs | 621–635 |
+| Test vectors | 636–651 |
+| Provenance | 652–678 |
+| Open questions | 679–756 |
 <!-- /index -->
 
 ## Summary
@@ -137,10 +138,12 @@ The format is a u16 on the item. Generated items take the game's value
 **101 in an expansion game, 2 in a classic game**. Rules below test
 "format ≥ 1" (all generated items), "format ≥ 100" (expansion) and
 "format = 0". Format 0 occurs only on items decoded from old saves; the
-format-0 branches of the generation code (D2MOO's "Old" functions:
-`0x005C12F0`, `0x005C0D70`, `0x005C19A0`, `0x005C1E80`, `0x005C2740`,
-`0x005C2AF0`, `0x00556D80`, the old property table `0x00745B58`) are not
-specified (open question 1).
+format-0 branches of the generation code (D2MOO's "Old" functions) are
+§11 here (normal routine `0x00556D80`, class skill mods `0x005C0D70`,
+socket step), `items/quality.md` §10 (quality roll, low quality
+`0x005C2AF0`, unique, set `0x005C2740`), `items/affixes.md` §12
+(`0x005C12F0`, `0x005C19A0`, `0x005C1E80`) and `items/properties.md`
+§14 (the old property table `0x00745B58`).
 
 #### 1.3 Item record and type tests
 
@@ -527,6 +530,52 @@ placement of step 2.6 (find free). The start-item flag (step 2.5) is
 set only for charstats items. Placement at a given cell uses
 `0x00560200` with find free 0 and (x, y) (`items/inventory.md` §2.4).
 
+### 11. Format-0 branches (legacy items)
+
+Only `0x00530F40` (the version-0x47 save path) creates a format-0
+item, always with a forced request (Open question 1). In the pipeline
+the format-0 steps are: §9 rule 2's socket step; the quality roll
+(`items/quality.md` §10.1, drawn even though the request has a
+quality); the dispatched routine by quality (normal §11.1, low, unique,
+set: `items/quality.md` §10; magic, rare, crafted: `items/affixes.md`
+§12; superior and the magic routine itself have no format-0 branch of
+their own beyond the roller); every property application (§14 of
+`items/properties.md`); no ethereal roll and no automagic (format ≥
+100 only, `items/quality.md` §4 step 5).
+
+#### 11.1 Normal-quality routine (`0x00556F30` → `0x00556D80`)
+
+One branch, by the **primary** type (`0x0062B400`, no equivalence;
+jump table `0x00556E44` / `0x00556E5C`):
+
+1. `play` (7): file index := the request unit's class id if a request
+   unit is given, else request `index`; flag 0x10000.
+2. `char` (13): charm affixes (`items/affixes.md` §10).
+3. `book` (18): suffix slot 0 := the `books` row of `BookSpellCode`
+   (`0x005C2540`, EDX 0).
+4. `scro` (22): the same with `ScrollSpellCode` (EDX 1).
+5. `body` (40): file index as in 1, no flag.
+6. Any other type: class skill mods (§11.2 through `0x005C1260`), then
+   the socket roll (§7.1, `0x00556B60`). The finishing step runs §7.1
+   again for quality 2, so such an item draws the socket roll twice.
+
+#### 11.2 Class skill mods (`0x005C1260` → `0x005C0D70`)
+
+After `0x005C1260`'s class and skill-count tests (§6.2 step 1),
+format 0 calls `0x005C0D70`(item, request ilvl, first skill id), all on
+the item seed ("pct" = one step, lo′ mod 100):
+
+1. Count: pct ≥ 91 → 3; ≥ 71 → 2; ≥ 31 → 1; else stop. (No request
+   bonus.)
+2. Tier: ilvl ≥ 25 → 4; ≥ 19 → 3; ≥ 12 → 2; else 1 (no tier 5).
+3. For each mod: pct ≥ 81 → tier + 1; ≥ 31 → tier; ≥ 11 → tier − 1;
+   else tier − 2; < 1 → 1. Then draw skill := first + 5 × (t − 1) +
+   (lo′ mod 5), one step each, until it is not 73 and not a skill
+   already chosen by this call (no try limit, no `itypea1` test).
+   Value: pct ≥ 90 → 3; ≥ 60 → 2; else 1. **Set** stat 107 layer skill
+   := value in the item's (state 0, flags 0x40) list (`0x006257D0`,
+   created if missing).
+
 ## Constants & data dependencies
 
 | Constant | Value | Where |
@@ -646,6 +695,12 @@ Real 1.14d vectors need the recording in Open questions 2.
    otherwise. So format 0 is passed only for items of a version-0x47
    save, as §1.2 states; the format-0 branches themselves stay
    unspecified.
+   Answered (2026-10-07, disassembly of every format-0 branch): §11
+   (pipeline list, normal routine `0x00556D80`, class skill mods
+   `0x005C0D70`), `items/quality.md` §10 (quality roll, low quality,
+   unique, set), `items/affixes.md` §12 (affix roller, rare names, rare
+   routine, crafted rolls) and `items/properties.md` §14 (legacy
+   property table: 244 codes; codes 245–267 crash).
 2. No recording confirms any rule here. Needed: an item-creation trace
    (request R1 in the session report): every unit-seed and item-seed
    draw between the allocation and the return of `0x00558D90`, plus a
