@@ -40,7 +40,7 @@ in `C:\Users\zffit\Desktop\D2test\scratch-audio\` (outside the repo).
 | EN-A | `environment.md` §5 r2 | As implemented: `0x004BA950(a, 64 if weather active else 0)`, `0x004BA9D0(ev, 0)`; "raining" = this tick's weather-active flag, not the intensity. |
 | EN-B | `environment.md` §6 r4 | Wrong in the impl: a gone handle reads volume 0, then min(6, v) is written to nothing and the stale handle is kept; rain stays silent until v = 0 or weather off. Also previous := 64 on every active tick (even at intensity 0). |
 | EN-C | `environment.md` §3 r1 | As implemented (resume −1 → offset 0xFFFFFFFF), and the stream then starts at 0xFFFFFFFC mod data size (deterministic). |
-| EN-D | `environment.md` §2 r10 | Listed per test: unsigned differences (75, 62, gap, C − P+0x7C), unsigned absolute compares (T > Ts + 125, C ≥ tM / tS, C < tH), signed play-position compares. |
+| EN-D | `environment.md` §2 r11 | Listed per test: unsigned differences (75, 62, gap, C − P+0x7C), unsigned absolute compares (T > Ts + 125, C ≥ tM / tS, C < tH), signed play-position compares. |
 | EN-E | `environment.md` §4 r1 | last checked := L before the flag test (after the count and equality tests). |
 | EN-F (OQ 3) | `environment.md` §1 r3 | Day phase = lighting period index (act env +0x00); day = 1–3; entries 69 / 74 confirm (bed 70 → 71 at the period-4 start, with the §7 draws). |
 | env OQ 2, 6, 7 | `environment.md` | Positions in frames; level flags reset per game, last checked never (bug kept); +0x220 = `-ns`. EAX call order corrected (before the cues). |

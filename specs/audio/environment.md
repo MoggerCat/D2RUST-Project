@@ -145,7 +145,13 @@ announced level `[0x007C8A04]`, resume table `resume[song]`
    `0x0044F4DB`, before the client game init `0x0044F4E0`), and
    `0x00482EF0` at its two exits (`0x0044F637`, `0x0044F687`) and from
    `0x004B9324`.
-10. **Time tests, exact** (answers EN-D). Unsigned differences: r3 `T −
+10. Live: 28 song rows, all `Loop`, `Stream`, `Stereo`, `Music Vol`,
+    `Defer Inst`, `Volume` 110, `Fade In`/`Fade Out` 125, `Priority`
+    255; `Block 1` set on 19 of them, `Block 2` on 4
+    (`sound-table.md` §11). Row 4,668 `music_options` (front end,
+    open question 5) is in the range but no environment names it; the
+    other 27 songs are each named by at least one row.
+11. **Time tests, exact** (answers EN-D). Unsigned differences: r3 `T −
     Tl ≥ 75` (`jb` at `0x004DCB34`), r7 `T − Tl ≥ 62` (`0x004DCC8F`).
     Unsigned absolute compares, no difference: r8 `T > Ts + 125`
     (`jbe` at `0x004DCCBB`, the sum wrapping), §3 r4 `C ≥ tM`, `C ≥ tS`,
@@ -154,12 +160,6 @@ announced level `[0x007C8A04]`, resume table `resume[song]`
     match and a negative position matches nothing). Ambience §7 r3 `T −
     last ≥ gap` is an unsigned difference (`0x004E456F`); §4 r2 `C −
     P+0x7C > 62` unsigned (`0x004CC35E`).
-10. Live: 28 song rows, all `Loop`, `Stream`, `Stereo`, `Music Vol`,
-    `Defer Inst`, `Volume` 110, `Fade In`/`Fade Out` 125, `Priority`
-    255; `Block 1` set on 19 of them, `Block 2` on 4
-    (`sound-table.md` §11). Row 4,668 `music_options` (front end,
-    open question 5) is in the range but no environment names it; the
-    other 27 songs are each named by at least one row.
 
 ### 3. Quest stingers (`0x004DCD40(M, dM, H, k, S, dS, play)`)
 
