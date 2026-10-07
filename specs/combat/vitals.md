@@ -30,14 +30,14 @@
 |   1. Creation values | 73–103 |
 |   2. Spending stat points (message 0x3A) | 104–156 |
 |   3. Level-up `0x00570880` (D2MOO `PLAYERSTATS_LevelUp`) | 157–178 |
-|   4. Experience | 179–368 |
-|   5. Client vitals sync (`0x00548760`) | 369–505 |
-| Constants & data dependencies | 506–522 |
-| Randomness | 523–526 |
-| Edge cases & original bugs | 527–538 |
-| Test vectors | 539–559 |
-| Provenance | 560–586 |
-| Open questions | 587–623 |
+|   4. Experience | 179–369 |
+|   5. Client vitals sync (`0x00548760`) | 370–506 |
+| Constants & data dependencies | 507–523 |
+| Randomness | 524–527 |
+| Edge cases & original bugs | 528–539 |
+| Test vectors | 540–560 |
+| Provenance | 561–587 |
+| Open questions | 588–624 |
 <!-- /index -->
 
 ## Summary
@@ -350,7 +350,8 @@ three `+0x508` references to the client record in `all.asm`).
    zero); then client +0x508 := 0. A death with no experience loss
    (pvp killer, level 1, `DeathExpPenalty` 0) leaves the field 0, so
    C holds 0.
-2. **Corpse pickup** `0x0057FB70(game, player P, corpse C)`
+2. **Corpse pickup** `0x0057FB70(game, player P, corpse C)` (the item
+   take-back `0x00562F30`: `items/inventory-moves.md` §12)
    (the 0x16 PickItem path on a dead player, `items/inventory.md`
    §7.1 rule 2): C must have state 7
    (`playerbody`) and P must be allowed to take it (`0x0057FAF0`: C's

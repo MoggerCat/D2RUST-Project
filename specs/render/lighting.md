@@ -45,7 +45,7 @@
 | Edge cases & original bugs | 694–710 |
 | Test vectors | 711–744 |
 | Provenance | 745–788 |
-| Open questions | 789–884 |
+| Open questions | 789–886 |
 <!-- /index -->
 
 ## Summary
@@ -418,7 +418,7 @@ Measured: 100 `monstats2` rows have `Light` > 0 (e.g. `fallenshaman1`–`5`:
 | +0x10 | `GetTickCount()` at creation |
 | +0x18..+0x1A | R, G, B |
 | +0x1C, +0x20, +0x24 | floats: −cos θ, 0, the sine term `s` (§9.3) |
-| +0x28 | speed (ticks per degree) = `[0x007443E4 + 4 · (+0x2C)]` (128, 4, 8); +0x2C has no writer, so 128 |
+| +0x28 | speed (ticks per degree) = `[0x007443E4 + 4 · (+0x2C)]` (128, 4, 8); +0x2C: 0 (128) except during the Tainted Sun: its start `0x0061C450` writes 1 (speed `[0x007443E8]` = 4, `0x0061C465`), its end `0x0061C4D0` writes 0 (`world/quests-act2-2.md` §5.2) |
 | +0x30 | eclipse flag |
 | +0x34 | last reported hour (server, `0x0061C040`) |
 
@@ -848,6 +848,8 @@ data: `states` setfunc, `missiles` rows 191/288, `objects` row 17,
     the day period changes): which object classes change (lights,
     torches, mode) and how; owner: the client object spec. A recording
     across a day-period change with objects in sight settles it.
+    Also run every 500 ms for object class 39 through `ClientFn` 14
+    (`0x004BDCC0`, `world/objects-client.md` §26.14).
     *Answered* (static, 1.14d asm of `0x004BC5E0`; ECX object, EDX
     flag): only objects whose objects `EnvEffect` (+0x139) ≠ 0 change;
     others return 0. `p` := the act's period type (`0x0061C100(act,

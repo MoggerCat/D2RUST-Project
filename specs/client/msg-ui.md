@@ -40,21 +40,21 @@
 |   11. 0x78 trade partner (`0x0045E810` → `0x004B9010`) | 479–487 |
 |   12. 0x29 game quest flags (`0x0045D3A0` → `0x004B2620`) | 488–497 |
 |   13. 0x52 quest log status (`0x0045CC00` → `0x004A40D0`) | 498–510 |
-|   14. 0x5E game quest availability (`0x0045E570` → `0x004B92B0`) | 511–518 |
-|   15. 0x9B hireling revive state (`0x0045EAC0` → `0x004B6980`) | 519–529 |
-|   16. 0x28 NPC dialog start and quest flags (`0x0045D370` → `0x004B6DD0`) | 530–584 |
-|   17. 0x62 NPC dialog end (`0x0045D390` → `0x004B5320`) | 585–597 |
-|   18. 0x2A NPC transaction (`0x0045E0D0` → `0x004B6390`) | 598–608 |
-|   19. 0x5A event text (`0x0045E070` → `0x0049EB10`) | 609–628 |
-|   20. 0x61 act video (`0x0045E660`) | 629–636 |
-|   21. 0x76 overhead clear (`0x0045E050` → `0x0049F8C0`) | 637–644 |
-|   22. 0x7B skill hotkey (`0x0045E8D0` → `0x004AA0C0`) | 645–654 |
-| Constants & data dependencies | 655–666 |
-| Randomness | 667–671 |
-| Edge cases & original bugs | 672–688 |
-| Test vectors | 689–736 |
-| Provenance | 737–787 |
-| Open questions | 788–884 |
+|   14. 0x5E game quest availability (`0x0045E570` → `0x004B92B0`) | 511–519 |
+|   15. 0x9B hireling revive state (`0x0045EAC0` → `0x004B6980`) | 520–530 |
+|   16. 0x28 NPC dialog start and quest flags (`0x0045D370` → `0x004B6DD0`) | 531–585 |
+|   17. 0x62 NPC dialog end (`0x0045D390` → `0x004B5320`) | 586–598 |
+|   18. 0x2A NPC transaction (`0x0045E0D0` → `0x004B6390`) | 599–609 |
+|   19. 0x5A event text (`0x0045E070` → `0x0049EB10`) | 610–629 |
+|   20. 0x61 act video (`0x0045E660`) | 630–637 |
+|   21. 0x76 overhead clear (`0x0045E050` → `0x0049F8C0`) | 638–645 |
+|   22. 0x7B skill hotkey (`0x0045E8D0` → `0x004AA0C0`) | 646–655 |
+| Constants & data dependencies | 656–667 |
+| Randomness | 668–672 |
+| Edge cases & original bugs | 673–689 |
+| Test vectors | 690–737 |
+| Provenance | 738–788 |
+| Open questions | 789–885 |
 <!-- /index -->
 
 Owned ids: 0x26, 0x27, 0x29, 0x4E, 0x4F, 0x50, 0x52, 0x58, 0x5D, 0x5E,
@@ -380,7 +380,7 @@ layer.
    | 6 | `0x004B25C0`: does nothing (code ≠ 3) | – |
    | 13 | `0x0049FF60`: does nothing (code ≠ 4) | – |
    | 23 (0x17) | C→S **0x69** (`0x00477EE0`; appended to `outgoing`, system queue; in single player, game type `[0x007A0610]` = 0, it writes nothing else); `[0x0070EE8C]` := 0 (`0x0044B880`), `[0x007A0674]` := 1 (`0x0044C860`); `exit_requested` := 1 (`0x0044D520`) | model: the send and `exit_requested`; output: the two flags |
-   | 36 (0x24) | `[0x007C025F]` := 1, `[0x007C0265]` := u16@3 (`0x004A3100`) | output |
+   | 36 (0x24) | `[0x007C025F]` := 1, `[0x007C0265]` := u16@3 (`0x004A3100`); the latch drives the client chickens (class 149, `world/objects-client.md` §26.17) | output |
    | other | nothing | – |
 
 3. The handler performs the model part at receive; codes 1, 2, 3, 4,
@@ -513,8 +513,9 @@ layer.
 1. Layout (38 bytes; server `0x0053D830`): 37 bytes @1. Model state
    written: none. One `QuestAvailability` output {37 bytes}.
 2. The UI layer: `[0x007C0EA4..0x007C0EC8]` := the 37 bytes,
-   `[0x007C0ECC]` := 1. Their meaning: `ui/*` (PC 2) and
-   `world/quests.md`.
+   `[0x007C0ECC]` := 1. The 37 bytes are the not-intro quest bytes in
+   init-table row order (`world/quests.md` §3 step 5); their only reader
+   is `world/quests-status.md` §12 (`0x004A4180`).
 
 ### 15. 0x9B hireling revive state (`0x0045EAC0` → `0x004B6980`)
 
