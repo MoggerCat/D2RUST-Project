@@ -18,7 +18,7 @@ use std::cell::RefCell;
 use crate::audio::sound_table::{SoundSystem, SoundWorld};
 use crate::audio::triggers::{ui, Ctx, Globals};
 use crate::audio::{CueSource, TriggerQueue};
-use crate::bridge::world::{ClientWorld, UnitKey};
+use crate::bridge::world::{ClientWorld, LevelRow, UnitKey};
 use d2_sim::rng::Seed;
 
 /// Trigger feeds not wired, each with the input it lacks (M02).
@@ -49,8 +49,10 @@ pub const PENDING: &[(&str, &str)] = &[
     ),
     (
         "ambience, rain, music (`environment.md`)",
-        "the sound environment of the player's level (no client DRLG, so no level), the day \
-         phase and weather (`render/lighting.md`, `draw-order-2.md` §11 state not in the model)",
+        "the player's level and its sound environment are known now (`model.md` §11 r5, \
+         `environment.md` §1 r2), but every tick of the machines also reads the day phase \
+         (`environment.md` open question 3: the act environment, S→C 0x53 unhandled) and the \
+         weather (open question 4, `draw-order-2.md` §11 state not in the model)",
     ),
 ];
 
@@ -66,14 +68,25 @@ pub enum DriverError {
 /// `asked` and answered neutrally; [`SoundDriver::frame`] then fails.
 pub struct ModelSoundWorld<'a> {
     pub world: &'a ClientWorld,
+    /// The `Levels.txt` rows by level id (`SoundEnv`).
+    pub levels: &'a [LevelRow],
+    /// `Indoors` of each `soundenviron` row (`sound-table.md` §2).
+    pub env_indoors: &'a [u8],
     /// Pending questions asked, in order.
     pub asked: RefCell<Vec<&'static str>>,
 }
 
 impl<'a> ModelSoundWorld<'a> {
+    /// A view without level or environment rows.
     pub fn new(world: &'a ClientWorld) -> Self {
+        Self::with_env(world, &[], &[])
+    }
+
+    pub fn with_env(world: &'a ClientWorld, levels: &'a [LevelRow], env_indoors: &'a [u8]) -> Self {
         Self {
             world,
+            levels,
+            env_indoors,
             asked: RefCell::new(Vec::new()),
         }
     }
@@ -102,11 +115,23 @@ impl SoundWorld for ModelSoundWorld<'_> {
         false
     }
 
-    /// `Indoors` of the sound environment of the player's level: no level
-    /// without the client DRLG: pending.
+    /// `Indoors` of the current sound environment: the `soundenviron`
+    /// row `SoundEnv` of the local player's level (`model.md` §11 r5,
+    /// `audio/environment.md` §1 r2; a row outside the table reads 0).
+    /// With no level (no local player or no room) the current environment
+    /// is not stated: pending.
     fn indoors(&self) -> bool {
-        self.ask("sound environment Indoors (§6.4 r2): no player level");
-        false
+        let Some(level) = self.world.player_level() else {
+            self.ask("sound environment Indoors (§6.4 r2): no player level");
+            return false;
+        };
+        let Some(row) = self.levels.get(usize::from(level)) else {
+            self.ask("sound environment Indoors (§6.4 r2): no Levels row for the player's level");
+            return false;
+        };
+        self.env_indoors
+            .get(usize::from(row.sound_env))
+            .is_some_and(|&v| v != 0)
     }
 
     /// The `0x004BA640` condition (open question 6: a game state, likely
@@ -129,6 +154,8 @@ impl SoundWorld for ModelSoundWorld<'_> {
 /// the audio core.
 pub struct SoundDriver {
     system: SoundSystem,
+    /// `Indoors` of each `soundenviron` row, copied from the table.
+    env_indoors: Vec<u8>,
     globals: Globals,
     cues: TriggerQueue,
     /// The last server tick a sound tick ran for.
@@ -138,6 +165,7 @@ pub struct SoundDriver {
 impl SoundDriver {
     pub fn new(system: SoundSystem) -> Self {
         Self {
+            env_indoors: system.table().env_indoors().to_vec(),
             system,
             globals: Globals::default(),
             cues: TriggerQueue::new(),
@@ -158,14 +186,20 @@ impl SoundDriver {
     /// one sound tick per server tick since the last frame (none before
     /// the first server tick). A pending [`SoundWorld`] question fails
     /// the frame after the tick that asked it.
-    pub fn frame(&mut self, world: &ClientWorld, ui_sounds: &[i32]) -> Result<(), DriverError> {
+    /// `levels` are the `Levels.txt` rows by level id (`SoundEnv`).
+    pub fn frame(
+        &mut self,
+        world: &ClientWorld,
+        levels: &[LevelRow],
+        ui_sounds: &[i32],
+    ) -> Result<(), DriverError> {
         let now = world.server_ticks;
         let ticks = match self.last_server_tick {
             _ if now == 0 => 0,
             None => 1,
             Some(last) => now.saturating_sub(last),
         };
-        let mut sw = ModelSoundWorld::new(world);
+        let mut sw = ModelSoundWorld::with_env(world, levels, &self.env_indoors);
         if !ui_sounds.is_empty() {
             // C: one client update per server tick (§1 r5).
             let c = now as u32;
@@ -246,13 +280,13 @@ mod tests {
     #[test]
     fn one_sound_tick_per_server_tick() {
         let mut d = driver();
-        d.frame(&at_tick(0), &[]).unwrap();
+        d.frame(&at_tick(0), &[], &[]).unwrap();
         assert_eq!(d.tick(), 0, "no server tick, no sound tick");
-        d.frame(&at_tick(1), &[]).unwrap();
+        d.frame(&at_tick(1), &[], &[]).unwrap();
         assert_eq!(d.tick(), 1);
-        d.frame(&at_tick(1), &[]).unwrap();
+        d.frame(&at_tick(1), &[], &[]).unwrap();
         assert_eq!(d.tick(), 1, "a frame without a server tick");
-        d.frame(&at_tick(4), &[]).unwrap();
+        d.frame(&at_tick(4), &[], &[]).unwrap();
         assert_eq!(d.tick(), 4);
     }
 
@@ -260,7 +294,7 @@ mod tests {
     #[test]
     fn ui_sounds_are_requested_and_their_cues_reach_the_core() {
         let mut d = driver();
-        d.frame(&at_tick(1), &[1]).unwrap();
+        d.frame(&at_tick(1), &[], &[1]).unwrap();
         let mut q = TriggerQueue::new();
         d.drain_cues(&mut q);
         assert!(!q.is_empty(), "the request's channel start is a cue");
@@ -275,7 +309,7 @@ mod tests {
         let mut d = driver();
         // Id 2 heads a group: the variant roll needs the client seed.
         assert_eq!(
-            d.frame(&at_tick(1), &[2]),
+            d.frame(&at_tick(1), &[], &[2]),
             Err(DriverError::Pending(
                 "local player client seed (§4 r5): read-only model seed"
             ))
@@ -300,5 +334,52 @@ mod tests {
         assert!(!sw.blocked(key) && !sw.indoors() && sw.client_seed().is_none());
         assert_eq!(sw.asked.borrow().len(), 3);
         assert!(PENDING.len() >= 7);
+    }
+
+    // Covers: specs/audio/sound-table.md §6.4 r2; specs/audio/environment.md §1 r2
+    #[test]
+    fn indoors_is_the_player_levels_environment() {
+        use crate::bridge::drlg::DrlgRoomId;
+        use crate::bridge::world::ActiveRoom;
+        let mut w = ClientWorld::default();
+        let key = UnitKey::new(PLAYER, 7);
+        let mut u = ClientUnit::new(key);
+        u.position = Some((45, 5));
+        w.units.insert(key, u);
+        w.local_player = Some(key);
+        let room = |level| ActiveRoom {
+            x0: 40,
+            y0: 0,
+            w: 40,
+            h: 40,
+            level,
+            room: DrlgRoomId(0),
+        };
+        // Level 1: SoundEnv 1 (Indoors 1); level 2: SoundEnv 0 (Indoors
+        // 0); level 3: SoundEnv 9, outside the two rows (reads 0).
+        let levels = [
+            LevelRow::default(),
+            LevelRow {
+                sound_env: 1,
+                ..LevelRow::default()
+            },
+            LevelRow::default(),
+            LevelRow {
+                sound_env: 9,
+                ..LevelRow::default()
+            },
+        ];
+        let env = [0u8, 1];
+        for (level, indoors) in [(1, true), (2, false), (3, false)] {
+            w.active_rooms = Some(vec![room(level)]);
+            let sw = ModelSoundWorld::with_env(&w, &levels, &env);
+            assert_eq!(sw.indoors(), indoors, "level {level}");
+            assert!(sw.asked.borrow().is_empty());
+        }
+        // A level past the Levels rows: pending, not guessed.
+        w.active_rooms = Some(vec![room(40)]);
+        let sw = ModelSoundWorld::with_env(&w, &levels, &env);
+        assert!(!sw.indoors());
+        assert_eq!(sw.asked.borrow().len(), 1);
     }
 }

@@ -1,12 +1,14 @@
-// Spec: specs/client/model.md (§3 rule 1, §7, §9, §11 rule 2)
+// Spec: specs/client/model.md (§3 rule 1, §7, §9, §11 rule 2, §12 rule 1)
 //! Session messages (0x00–0x06), the local player message (0x0B) and the
-//! room-in-sight messages (0x07, 0x08). The UI, automap, sound and
-//! client-DRLG set-ups these handlers also run in 1.14d are Phase 6
-//! client behaviour and change no model field.
+//! room-in-sight messages (0x07, 0x08). 0x03 builds the client DRLG act
+//! and 0x07 / 0x08 set its rooms in sight ([`super::super::drlg`]); the
+//! UI, automap and sound set-ups these handlers also run in 1.14d are
+//! Phase 6 client behaviour and change no model field.
 
 use d2_proto::s2c::{parse, Message as S2c};
 
 use super::super::dispatch::{HandlerError, Message};
+use super::super::drlg::{ClientDrlg, ClientDrlgError};
 use super::super::world::{ActLoad, ClientWorld, RoomSight, UnitKey};
 use super::Bytes;
 
@@ -40,8 +42,9 @@ pub fn load_successful(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Han
     Ok(())
 }
 
-/// 0x03 LoadAct (§7 rule 4). TODO(spec: model.md open question 5): the
-/// client DRLG act built from these values is not in the model.
+/// 0x03 LoadAct (§7 rule 4, §12 rule 1): an existing client act is
+/// freed, then the client DRLG of the act is built from the init seed
+/// u32@2 with the client flag (no client DRLG without a DRLG source).
 pub fn load_act(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerError> {
     let S2c::LoadAct(m) = parsed(msg)? else {
         return Err(HandlerError::Invalid("not 0x03"));
@@ -55,6 +58,13 @@ pub fn load_act(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerErr
     // §11 rule 2: the act of 0x03 is the palette act. u16@6 is the act's
     // town, never the player's level (§11 rules 1, 5).
     w.palette_act = Some(m.act);
+    w.drlg = None;
+    w.active_rooms = None;
+    if let Some(src) = &msg.inputs.drlg {
+        w.drlg =
+            Some(ClientDrlg::build(src, m.act, m.f2, w.difficulty).map_err(ClientDrlgError::from)?);
+        w.refresh_active_rooms();
+    }
     Ok(())
 }
 
@@ -100,6 +110,25 @@ fn room_sight(w: &mut ClientWorld, msg: &Message<'_>, show: bool) -> Result<(), 
         return Err(HandlerError::Fatal(if show { 0x58A } else { 0x59E }));
     }
     w.rooms_in_sight.push(sight);
+    // §9 rules 1–2 on the client DRLG; the local player's DRLG room is
+    // the hint (used only when it is in that level).
+    let hint = w.local_room().map(|r| r.room);
+    let Some(drlg) = w.drlg.as_mut() else {
+        return Ok(());
+    };
+    let found = if show {
+        drlg.set_in_sight(sight.level, sight.x, sight.y, hint)?
+    } else {
+        drlg.unset_in_sight(sight.level, sight.x, sight.y, hint)?
+    };
+    w.refresh_active_rooms();
+    if found.is_none() {
+        // TODO(spec: model.md §9 rules 1–2): what 1.14d does when the
+        // level has no DRLG room at the point is not stated.
+        return Err(HandlerError::Unspecified(
+            "model.md §9 r1–r2: 0x07 / 0x08 at a point in no room of the level",
+        ));
+    }
     Ok(())
 }
 

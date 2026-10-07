@@ -84,6 +84,9 @@ pub struct SoundEntry {
 pub struct SoundTableData {
     entries: Vec<SoundEntry>,
     song_range: Option<(i32, i32)>,
+    /// `Indoors` (+0x18) of each `soundenviron` record (§2), the input of
+    /// the thunder occlusion (§6.4 r2).
+    indoors: Vec<u8>,
 }
 
 impl SoundTableData {
@@ -129,7 +132,13 @@ impl SoundTableData {
         SoundTableData {
             entries,
             song_range,
+            indoors: environ.iter().map(|r| r.indoors).collect(),
         }
+    }
+
+    /// `Indoors` of each `soundenviron` record, by row (§2).
+    pub fn env_indoors(&self) -> &[u8] {
+        &self.indoors
     }
 
     /// Compiles `sounds.txt` and `soundenviron.txt` (§1, §2) with the

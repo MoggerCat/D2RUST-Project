@@ -40,10 +40,13 @@ use d2_formats::palette::{Palette, Rgb};
 
 use d2_server::host::SystemClock;
 
+use super::palette::{self, ActPalettes};
 use super::single_player::{self, GameData};
 use super::sound::{self, AudioParts, GameAudio};
 use super::ui;
+use crate::bridge::drlg::DrlgSource;
 use crate::bridge::mirror::DynLink;
+use crate::bridge::world::{ClientTables, LevelRow};
 use crate::bridge::{Bridge, BridgeError, BridgePlugin, BridgeResource};
 use crate::world_view::node::NodeRuns;
 use crate::world_view::{
@@ -81,6 +84,24 @@ pub fn add_game(app: &mut App, link: DynLink, gpu: bool) -> Result<(), BridgeErr
         .add_systems(Last, log_progress);
     sound::add_audio(app, AudioParts::empty());
     Ok(())
+}
+
+/// The client data of the game (`client/model.md` §11, §12 rule 1): the
+/// client DRLG's source and the `Levels.txt` rows go to the bridge; the
+/// rows also answer BlankScreen in the world view's feed.
+pub fn add_client_data(app: &mut App, drlg: DrlgSource, levels: Vec<LevelRow>) {
+    let world = app.world_mut();
+    let mut bridge = world.resource_mut::<BridgeResource>();
+    bridge.0.set_drlg_source(Some(drlg));
+    bridge.0.set_tables(ClientTables {
+        levels: levels.clone(),
+        ..ClientTables::default()
+    });
+    let mut state = world.resource_mut::<WorldViewState>();
+    state.feed = Box::new(ModelFeed {
+        levels: Some(levels),
+        ..ModelFeed::<NoFeed>::default()
+    });
 }
 
 /// One log line every [`LOG_EVERY`] bridge frames.
@@ -131,6 +152,8 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
         GameData::Live(d) => Some(d.archives.clone()),
         GameData::Synthetic => None,
     };
+    let drlg_source = single_player::client_drlg_source(&config.data);
+    let level_rows = single_player::client_level_rows(&config.data);
     let (link, started) = single_player::start(config.data, config.seed, SystemClock::default())?;
     // Before the app exists, so not through Bevy's log.
     println!(
@@ -146,7 +169,10 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
         ..default()
     }));
     add_game(&mut app, Box::new(link), true)?;
+    add_client_data(&mut app, drlg_source, level_rows);
     if let Some(archives) = archives {
+        let palettes = ActPalettes::live(&archives).map_err(anyhow::Error::msg)?;
+        palette::add_act_palettes(&mut app, palettes);
         let parts = ui::UiParts::live(archives.clone()).map_err(anyhow::Error::msg)?;
         ui::add_original_ui(&mut app, parts)?;
         let table = sound::sound_table_live(&archives).map_err(anyhow::Error::msg)?;

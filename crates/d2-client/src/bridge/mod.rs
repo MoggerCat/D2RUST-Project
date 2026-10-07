@@ -16,6 +16,7 @@
 pub mod bits;
 pub mod check;
 pub mod dispatch;
+pub mod drlg;
 pub mod intent;
 pub mod link;
 pub mod local;
@@ -199,6 +200,12 @@ impl<L: ServerLink> Bridge<L> {
     /// The tables the message rules read (`msg-units.md` Inputs).
     pub fn set_tables(&mut self, tables: ClientTables) {
         self.inputs.tables = tables;
+    }
+
+    /// What the client DRLG of 0x03 is built from (`model.md` §12 rule
+    /// 1); `None`: no client DRLG.
+    pub fn set_drlg_source(&mut self, source: Option<drlg::DrlgSource>) {
+        self.inputs.drlg = source;
     }
 
     /// The visibility predicate of the position check (`model.md` §6
