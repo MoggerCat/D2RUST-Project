@@ -74,7 +74,7 @@ Additions a coordinator should know when merging other branches:
 | World-state free for removals made inside the action adapters (missile collide-kill, future corpse code) | same reason: they call `ActionHooks::free_kind`. Only `WorldSim::remove_unit` and removals during a `WorldSim` timer event reach `WorldState::forget` |
 | Action `Pending` monster-data queries (`monster_flag`, level, AI state …) → `WorldState::monsters` | same reason (no world state in `ActionHooks`) |
 | Event 10 `ai_reset` (`0x00573120`) | monster-data reset not specified |
-| Umod 41's `InitHost::run_ai_tick` (`0x00573780`) | `WorldHost` keeps the default (nothing); `ai.md` §1 names it, the think vs tick split is not stated |
+| Umod 41's `InitHost::run_ai_tick` (`0x00573780`) | `WorldHost` keeps the default (nothing); `ai.md` §1 names it, the think vs tick split is not stated. **Answered 2026-10-07:** body in `monsters/umod-callbacks.md` §3.5 (think restart: cancels type-2 events, re-schedules a think at F + 2 for mode NU and base classes 110, 118, 136, 247; no draws) |
 | The kill → `kill_experience` | the kill `0x0057CCB0` is call-level only (`damage.md` §7.2) and experience distribution is `damage.md` OQ7 / `vitals.md` OQ2 |
 | `TickHooks` environment, presets (non-population), messages, items, compress units | no spec body (`wire-action.md` §4) |
 | `NpcRest`, `VendorRest`, `UseRest`, `VitalsRest`, `CubeRest`, `QuestRest` members | unchanged from `wire-interaction.md` §6 / `wire-economy.md` §5 (unwritten owner specs) |
