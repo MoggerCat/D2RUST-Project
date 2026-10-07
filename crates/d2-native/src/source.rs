@@ -203,14 +203,14 @@ impl NativeSource {
         let text = std::fs::read_to_string(root.join("manifest.toml"))
             .map_err(|e| fail(format!("manifest.toml: {e}")))?;
         let manifest =
-            Manifest::from_toml(&text).map_err(|e| fail(format!("manifest.toml: {e}")))?;
+            Manifest::from_toml(&text).map_err(|e| fail(e.to_string()))?;
         let known: BTreeMap<String, u32> = KNOWN_KINDS
             .iter()
             .map(|&(k, v)| (k.to_owned(), v))
             .collect();
         manifest
             .check_loadable(&known)
-            .map_err(|e| fail(format!("manifest.toml: {e}")))?;
+            .map_err(|e| fail(e.to_string()))?;
         let tsv =
             std::fs::read(root.join("files.tsv")).map_err(|e| fail(format!("files.tsv: {e}")))?;
         if sha256_hex(&tsv) != manifest.files_sha256 {
