@@ -59,8 +59,13 @@ use d2_sim::wiring::action::{ActionHooks, ActionSim, ActionTables, DrlgWorld, Pe
 use d2_sim::wiring::worldgen::levels::{SharedTypes, WorldTypes};
 use d2_sim::world::waypoints::{WaypointData, NO_WAYPOINT};
 
+use d2_sim::drlg::outdoor::{SubFile, SubFiles};
+use d2_sim::drlg::preset::{Ds1Input, Ds1Source};
+
 use super::server_thread::{ThreadLink, ThreadStopped};
+use crate::bridge::drlg::DrlgSource;
 use crate::bridge::local::{LocalLink, PendingSession};
+use crate::bridge::world::LevelRow;
 use crate::bridge::LOCAL_CLIENT;
 
 /// The game's dispatch and world host.
@@ -364,27 +369,10 @@ impl LevelSource {
     /// The bridge test's synthetic DRLG: one 8×8-tile floor room per
     /// level, no town generated at act creation, init seeds 1 and 2.
     fn synthetic() -> Self {
-        let mut drlg = DrlgData {
-            levels: vec![LevelDef::default(); 150],
-            ..DrlgData::default()
-        };
-        for l in &mut drlg.levels {
-            l.warp = [-1; 8];
-        }
-        let mut files = vec![Vec::new(); 32];
-        files[0] = b"floor.dt1".to_vec();
-        drlg.lvltypes = vec![vec![Vec::new(); 32], files];
-        for id in [COLD_PLAINS, ACT2_TOWN] {
-            drlg.levels[id as usize].drlg_type = 2;
-            drlg.levels[id as usize].level_type = 1;
-        }
         LevelSource {
-            data: Arc::new(drlg),
+            data: Arc::new(synthetic_drlg_data()),
             tiles: Box::new(tiles()),
-            types: Box::new(Types(BTreeMap::from([
-                (COLD_PLAINS, TileRect::new(0, 0, 8, 8)),
-                (ACT2_TOWN, TileRect::new(0, 0, 8, 8)),
-            ]))),
+            types: Box::new(synthetic_types()),
             acts: [(0, 1, 0), (1, 2, 0)],
         }
     }
@@ -412,6 +400,102 @@ impl LevelSource {
             acts: [(0, init_seed, 1), (1, init_seed, ACT2_TOWN)],
         }
     }
+}
+
+/// The synthetic DRLG table view: 150 levels without warps; Cold Plains
+/// and Lut Gholein are preset levels of tile library 1 (`floor.dt1`).
+fn synthetic_drlg_data() -> DrlgData {
+    let mut drlg = DrlgData {
+        levels: vec![LevelDef::default(); 150],
+        ..DrlgData::default()
+    };
+    for l in &mut drlg.levels {
+        l.warp = [-1; 8];
+    }
+    let mut files = vec![Vec::new(); 32];
+    files[0] = b"floor.dt1".to_vec();
+    drlg.lvltypes = vec![vec![Vec::new(); 32], files];
+    for id in [COLD_PLAINS, ACT2_TOWN] {
+        drlg.levels[id as usize].drlg_type = 2;
+        drlg.levels[id as usize].level_type = 1;
+    }
+    drlg
+}
+
+/// The synthetic level types: one 8×8-tile floor room in Cold Plains and
+/// one in Lut Gholein.
+fn synthetic_types() -> Types {
+    Types(BTreeMap::from([
+        (COLD_PLAINS, TileRect::new(0, 0, 8, 8)),
+        (ACT2_TOWN, TileRect::new(0, 0, 8, 8)),
+    ]))
+}
+
+/// The live DS1 files of the client DRLG's level types, shared with the
+/// game's data (no copy per act build).
+struct LiveDs1(Arc<LiveData>);
+
+impl Ds1Source for LiveDs1 {
+    fn ds1(&self, path: &[u8]) -> Option<&Ds1Input> {
+        self.0.files.ds1.ds1(path)
+    }
+}
+
+/// The live lvlsub files of the client DRLG's level types.
+struct LiveSubs(Arc<LiveData>);
+
+impl SubFiles for LiveSubs {
+    fn sub_file(&self, file: &[u8]) -> Option<&SubFile> {
+        self.0.files.subs.sub_file(file)
+    }
+}
+
+/// What the client DRLG copy is built from (`client/model.md` §12 rule
+/// 1): the same table view, tile headers and level-type data the game's
+/// DRLG reads, with fresh level-type state for every client act (the
+/// client never reads the server's DRLG).
+pub fn client_drlg_source(data: &GameData) -> DrlgSource {
+    match data {
+        GameData::Synthetic => DrlgSource {
+            data: Arc::new(synthetic_drlg_data()),
+            tiles: Arc::new(tiles()),
+            types: Arc::new(|| Box::new(synthetic_types())),
+        },
+        GameData::Live(d) => {
+            let live = d.clone();
+            let drlg = Arc::new(d.levels.drlg.clone());
+            let types_data = drlg.clone();
+            DrlgSource {
+                data: drlg,
+                tiles: Arc::new(d.files.dt1.clone()),
+                types: Arc::new(move || {
+                    Box::new(WorldTypes::new(
+                        types_data.clone(),
+                        Maze::new(live.levels.maze.clone()),
+                        live.levels.preset.clone(),
+                        live.levels.outdoor.clone(),
+                        Box::new(LiveDs1(live.clone())),
+                        Box::new(LiveSubs(live.clone())),
+                    ))
+                }),
+            }
+        }
+    }
+}
+
+/// The `Levels.txt` fields the client reads (`client/model.md` §11
+/// rules 3–4: `Act`, `BlankScreen`; `audio/environment.md` §1 r2:
+/// `SoundEnv`), one row per level id, from the game's `levels` table.
+pub fn client_level_rows(data: &GameData) -> Vec<LevelRow> {
+    data.tables()
+        .levels
+        .iter()
+        .map(|l| LevelRow {
+            act: l.act,
+            blank_screen: l.blankscreen != 0,
+            sound_env: l.soundenv,
+        })
+        .collect()
 }
 
 /// A built game and the units the app and tests address.

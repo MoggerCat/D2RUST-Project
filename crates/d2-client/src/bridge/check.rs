@@ -21,6 +21,8 @@ pub enum Checked {
     Asked,
     /// Another unit moved to (x, y) (rule 8).
     Moved,
+    /// Rule 8 found no room for (x, y) in the client DRLG: nothing.
+    NoRoom,
 }
 
 /// `L` of rule 4: `([0x007A04A4] + 0x32) >> 7` with the global 0
@@ -134,9 +136,16 @@ pub fn check(
     }
 }
 
-/// Rule 8. TODO(spec: model.md open question 5): the room lookup (none →
-/// nothing) needs the client DRLG; the model takes the room as found.
+/// Rule 8: room' := the cell lookup from U's room, else the act lookup
+/// (`model.md` §12 rule 2); none → nothing. Without a client DRLG (no
+/// DRLG source) the room is taken as found.
 fn correct(world: &mut ClientWorld, key: UnitKey, x: u16, y: u16) -> Checked {
+    if world.active_rooms.is_some() {
+        let start = world.unit_room(key).copied();
+        if world.room_from(start.as_ref(), x, y).is_none() {
+            return Checked::NoRoom;
+        }
+    }
     if world.local_player == Some(key) {
         // C→S 0x5F with the unit's own position.
         let (cx, cy) = world.units[&key].cell();

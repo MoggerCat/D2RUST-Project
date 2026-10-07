@@ -297,8 +297,12 @@ fn audio_frame(
         None => None,
     };
     if let Some(d) = driver.as_deref_mut() {
-        d.frame(world, requests.as_deref().unwrap_or_default())
-            .map_err(AudioFrameError::from)?;
+        d.frame(
+            world,
+            &bridge.0.inputs().tables.levels,
+            requests.as_deref().unwrap_or_default(),
+        )
+        .map_err(AudioFrameError::from)?;
         for e in d.take_errors() {
             warn!("sound layer: {e}");
         }

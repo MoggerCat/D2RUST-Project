@@ -60,28 +60,33 @@ pub fn unit_position(unit: &ClientUnit) -> Result<UnitPosition, String> {
 /// leaves them to `inner` ([`NoFeed`]: none).
 pub const PENDING: &[(&str, &str)] = &[
     (
-        "ClientWorld::active_rooms",
-        "no client DRLG on the base: the act of `model.md` §12 r1 is not built from the 0x03 \
-         seed, so no room becomes active from 0x07 (§9 r1)",
+        "ViewFeed::near_rooms (room unit lists)",
+        "the near-room array (`draw-order.md` §3, §9) lists each room's units (room +0x74) in the \
+         client's list order; which client code links a client unit into a room, and the Y sort \
+         `0x0064C0C0` the draw path calls through `0x00619EA0` (`sim/unit-order.md` §5 r5), are \
+         not specified (`unit-order.md` §5 is the server's lists)",
     ),
     (
-        "ViewFeed::near_rooms, ViewSource::map_tiles, ViewFeed::tile_art",
-        "the tiles come from the client DRLG's rooms (`draw-order.md` §9): none",
+        "ViewFeed::near_rooms, ViewSource::map_tiles (tile records)",
+        "the client DRLG builds the rooms in sight and their tile records (`model.md` §12 r1), \
+         but a record's DT1 roof height (+0x04) and height (+0x08) (`draw-order.md` §9) are not \
+         in `d2_sim::drlg::TileInfo`, and the record → DT1 file mapping is `draw-order.md` open \
+         question 12",
     ),
     (
-        "ViewSource::tile_blocks",
-        "no map tiles (above); walls also need the wall direction and fade state",
+        "ViewFeed::tile_art, ViewSource::tile_blocks",
+        "no ordered map tiles (above); walls also need the wall direction and fade state",
     ),
     (
         "ViewFeed::light",
-        "the light map needs room ambients and collision (no client rooms), the act environment \
-         (S→C 0x53 has no client handler), light records and the per-unit look inputs (fade, \
-         ghostly, hover, items, remaps); none is in the model",
+        "the light map needs the act environment (S→C 0x53 has no client handler), light \
+         records and the per-unit look inputs (fade, ghostly, hover, items, remaps); none is in \
+         the model",
     ),
     (
         "ViewFeed::weather_frame",
-        "the weather state needs the player's level presets (no level without active rooms) and \
-         no water floor is drawn without tiles; passes 4 / 9 have no art path yet",
+        "the player's level is known now (`model.md` §11 r5), but no water floor is drawn \
+         without the near rooms (above) and passes 4 / 9 have no art path yet",
     ),
     (
         "ViewFeed::player_seed, ViewFeed::shake",
@@ -258,7 +263,7 @@ mod tests {
 
     /// The pending hooks answer "nothing" through the app's feed, never a
     /// guess (M02).
-    // Covers: specs/client/model.md §12 r1, §9 r4
+    // Covers: specs/client/model.md §9 r4
     #[test]
     fn pending_hooks_answer_nothing() {
         let mut feed = ModelFeed::<NoFeed>::default();

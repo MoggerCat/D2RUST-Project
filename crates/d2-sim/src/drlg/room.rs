@@ -536,6 +536,70 @@ impl Drlg {
         Ok(())
     }
 
+    // ---- client in sight by coordinates (§4.2) ----------------------------
+
+    /// The room lookup of `0x0061B640` / `0x0061B690` (§4.2,
+    /// `client/model.md` §9 r1): get-or-allocate the level `level_id`
+    /// (`0x00642BB0`), then the room at tile (x, y) in it (`0x00642C30`)
+    /// with `hint` as the hint room only when it is in that level.
+    fn sight_room(
+        &mut self,
+        svc: &mut Services<'_>,
+        level_id: u32,
+        x: i32,
+        y: i32,
+        hint: Option<DrlgRoomId>,
+    ) -> Result<Option<DrlgRoomId>, DrlgError> {
+        let l = self.get_or_alloc_level(svc.data, svc.types, level_id)?;
+        let hint = hint.filter(|&h| self.try_room(h).is_some_and(|r| r.level == l));
+        self.room_at(svc.data, svc.types, x, y, hint, Some(l))
+    }
+
+    /// Set client in sight by coordinates `0x0061B640` (§4.2,
+    /// `client/model.md` §9 r1): if the room's status-1 count (+0x0E) is
+    /// 0, set-and-propagate it with status 1. Returns the room, `None`
+    /// when the level has no room at the point.
+    pub fn set_in_sight_at(
+        &mut self,
+        svc: &mut Services<'_>,
+        level_id: u32,
+        x: i32,
+        y: i32,
+        hint: Option<DrlgRoomId>,
+    ) -> Result<Option<DrlgRoomId>, DrlgError> {
+        let Some(id) = self.sight_room(svc, level_id, x, y, hint)? else {
+            return Ok(None);
+        };
+        if self.room(id).counts[1] == 0 {
+            self.set_and_propagate(svc, id, 1)?;
+        }
+        Ok(Some(id))
+    }
+
+    /// Unset client in sight by coordinates `0x0061B690` (§4.2,
+    /// `client/model.md` §9 r2): the same lookup; a room whose status-1
+    /// count is not 0 gets count − 1, unset handler 1 and
+    /// unpropagate(room, 2). Returns the room, `None` as for
+    /// [`Drlg::set_in_sight_at`].
+    pub fn unset_in_sight_at(
+        &mut self,
+        svc: &mut Services<'_>,
+        level_id: u32,
+        x: i32,
+        y: i32,
+        hint: Option<DrlgRoomId>,
+    ) -> Result<Option<DrlgRoomId>, DrlgError> {
+        let Some(id) = self.sight_room(svc, level_id, x, y, hint)? else {
+            return Ok(None);
+        };
+        if self.room(id).counts[1] != 0 {
+            self.room_mut(id).counts[1] -= 1;
+            self.unset_handler(svc, id, 1);
+            self.unpropagate(svc, id, 2);
+        }
+        Ok(Some(id))
+    }
+
     // ---- streaming and build (§4.3, §4.4, §9.2) ---------------------------
 
     /// DT1 load and preset units (§9.2 steps 1–2; handler 3).

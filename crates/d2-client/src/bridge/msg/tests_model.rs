@@ -515,6 +515,7 @@ fn levels() -> Vec<LevelRow> {
     v[1] = LevelRow {
         act: 0,
         blank_screen: true,
+        sound_env: 0,
     };
     v[40].act = 1;
     v
@@ -527,6 +528,8 @@ fn room(x0: i32, y0: i32, w: i32, h: i32, level: u16) -> ActiveRoom {
         w,
         h,
         level,
+        // No client DRLG in these tests: the id only names the room.
+        room: d2_sim::drlg::DrlgRoomId(x0 as u32),
     }
 }
 

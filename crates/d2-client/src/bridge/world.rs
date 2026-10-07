@@ -10,6 +10,7 @@
 
 use std::collections::BTreeMap;
 
+use super::drlg::{ClientDrlg, DrlgRoomId, DrlgSource};
 use d2_proto::transport::server_message;
 
 /// Unit types (`sim/unit-order.md` §1 rule 1).
@@ -126,8 +127,8 @@ pub struct ClientUnit {
     /// Stat list layer 0 base values.
     pub stats: BTreeMap<u16, i32>,
     /// Client copy of the unit seed {lo, hi} (§2 rule 6). `None` when it
-    /// was derived from a client room's seed, which the model does not
-    /// hold yet (open question 5).
+    /// was derived from a client room's seed with no client DRLG in the
+    /// model (no DRLG source).
     pub seed: Option<(u32, u32)>,
     /// Queued unit-handler messages (§4).
     pub queue: Vec<Vec<u8>>,
@@ -199,8 +200,8 @@ pub struct RoomSight {
 }
 
 /// One active room of the client act (§12 rule 2): its sub-tile
-/// rectangle (active room +0x4C, +0x50, +0x54, +0x58) and the id of its
-/// level (§11 rule 3).
+/// rectangle (active room +0x4C, +0x50, +0x54, +0x58), the id of its
+/// level (§11 rule 3) and its DRLG room (active room +0x10).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ActiveRoom {
     pub x0: i32,
@@ -208,6 +209,7 @@ pub struct ActiveRoom {
     pub w: i32,
     pub h: i32,
     pub level: u16,
+    pub room: DrlgRoomId,
 }
 
 impl ActiveRoom {
@@ -284,11 +286,15 @@ pub struct ClientWorld {
     /// The act whose palette is loaded (§11 rules 2, 4): the act of 0x03,
     /// replaced by the Levels `Act` of the new level on a room change.
     pub palette_act: Option<u8>,
-    /// The active rooms of the client act in list order (§12 rules 1–2).
-    /// `None`: the client DRLG is not built (TODO(spec: model.md §12 rule
-    /// 1): the `d2-sim` DRLG act from the 0x03 seed is not wired into the
-    /// bridge yet), so a placement is taken as in a room and the level is
-    /// unknown.
+    /// The client DRLG act (`[0x007A0634]`, §12 rule 1): built by 0x03
+    /// from [`ModelInputs::drlg`], rooms set in sight by 0x07 / 0x08.
+    /// `None` before 0x03 or without a DRLG source.
+    pub drlg: Option<ClientDrlg>,
+    /// The active rooms of the client act in list order (§12 rules 1–2),
+    /// derived from `drlg` and refreshed by the handlers that change it
+    /// (0x03, 0x07, 0x08). `None`: no client DRLG (no DRLG source: the
+    /// headless configuration of `ModelInputs::default`), so a placement
+    /// is taken as in a room and the level is unknown.
     pub active_rooms: Option<Vec<ActiveRoom>>,
 }
 
@@ -333,8 +339,55 @@ impl ClientWorld {
     /// The local player's room (§12 rule 2 on its position); `None` with
     /// no client DRLG, no local player or an unplaced one.
     pub fn local_room(&self) -> Option<&ActiveRoom> {
-        let (x, y) = self.local()?.position?;
+        self.unit_room(self.local_player?)
+    }
+
+    /// Room of a point (`0x00465420`, §2 rule 7, §12 rule 2) for a point
+    /// other than (0, 0): the lookup of [`ClientWorld::room_from`] from
+    /// the local player's room. `None` when no room is found (fatal 0x13C
+    /// for the caller) or with no client DRLG.
+    pub fn room_at(&self, x: u16, y: u16) -> Option<ActiveRoom> {
+        self.room_from(self.local_room(), x, y)
+    }
+
+    /// (a) The cell lookup from `start` (`sim/path-placement.md` §4 rule
+    /// 1: that room if it contains the point, else the first room of its
+    /// adjacency array that does), then (b) the act lookup over the
+    /// active rooms in list order (§12 rule 2). `None` when neither finds
+    /// one or with no client DRLG.
+    pub fn room_from(&self, start: Option<&ActiveRoom>, x: u16, y: u16) -> Option<ActiveRoom> {
+        let rooms = self.active_rooms.as_deref()?;
+        let (x, y) = (i32::from(x), i32::from(y));
+        if let Some(own) = start {
+            if own.contains(x, y) {
+                return Some(*own);
+            }
+            let adjacency = self
+                .drlg
+                .as_ref()
+                .map_or_else(Vec::new, |d| d.adjacency(own.room));
+            let found = adjacency
+                .iter()
+                .filter_map(|&n| rooms.iter().find(|r| r.room == n))
+                .find(|r| r.contains(x, y));
+            if let Some(r) = found {
+                return Some(*r);
+            }
+        }
+        room_of_point(rooms, x, y).copied()
+    }
+
+    /// The room of a unit: the active room containing its position (the
+    /// model holds no unit → room pointer); `None` when it is not placed
+    /// or with no client DRLG.
+    pub fn unit_room(&self, key: UnitKey) -> Option<&ActiveRoom> {
+        let (x, y) = self.units.get(&key)?.position?;
         room_of_point(self.active_rooms.as_deref()?, i32::from(x), i32::from(y))
+    }
+
+    /// Refreshes [`ClientWorld::active_rooms`] from the client DRLG.
+    pub fn refresh_active_rooms(&mut self) {
+        self.active_rooms = self.drlg.as_ref().map(ClientDrlg::active_rooms);
     }
 
     /// The local player's level (§11 rules 3, 5): the level id of its
@@ -422,13 +475,17 @@ pub struct ClientTables {
     pub levels: Vec<LevelRow>,
 }
 
-/// The `Levels.txt` fields the model reads (§11 rules 3–4).
+/// The `Levels.txt` fields the client reads of the player's level
+/// (§11 rules 3–4; `audio/environment.md` §1 r2).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct LevelRow {
     /// `Act`.
     pub act: u8,
     /// `BlankScreen` (record +0x218, `render/composition.md` §3 step 2).
     pub blank_screen: bool,
+    /// `SoundEnv`: the `soundenviron` row of the level
+    /// (`audio/environment.md` §1 r2).
+    pub sound_env: u8,
 }
 
 /// Inputs of the message rules that are not model state.
@@ -437,4 +494,7 @@ pub struct ModelInputs {
     pub tables: ClientTables,
     /// `None`: the check (§6 rule 6) refuses when it needs visibility.
     pub visible: Option<VisibleFn>,
+    /// What the client DRLG of 0x03 is built from (§12 rule 1). `None`:
+    /// no client DRLG is built (`ClientWorld::drlg` stays `None`).
+    pub drlg: Option<DrlgSource>,
 }
