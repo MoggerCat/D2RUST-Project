@@ -36,7 +36,7 @@
 | Edge cases & original bugs | 530–564 |
 | Test vectors | 565–609 |
 | Provenance | 610–648 |
-| Open questions | 649–754 |
+| Open questions | 649–757 |
 <!-- /index -->
 
 ## Summary
@@ -744,10 +744,13 @@ jump table, `0x00566AA8` op jump table, the two Pandemonium stubs at
    Answered (2026-10-07, `0x005BF240` disassembled, table read from the
    binary): the item-use table is at `0x00741790`, 31 entries
    (`0x0074178C`) of two words (first use, second use); the index is
-   items `pSpell` (+0x94; for `book` / `scro` items the `books` row's
-   value instead, `0x006374B0`), used only when 0 < index < 31. Entry 7
+   items `pSpell` (+0x94; for `book` / `scro` items the +0x04 word of
+   the `books` row named by suffix slot 0 (`0x006374B0`) when it is >
+   0), used only when 0 < index < 31. A first word is called while item
+   flag 0x4 is clear; otherwise, or when it is 0, the second word is
+   called after setting flag 0x4. Entry 7
    = (0, `0x005BF0C0`): the first word is 0, so the dispatcher takes the
-   second word (`0x007417CC`), sets item flag 0x4 and calls it. `box`
+   second word (`0x007417CC`). `box`
    is the only live `misc.txt` row with `pSpell` 7, so the cube-open
    routine is exactly entry 7, word 2.
 8. Answered: `0x0055FA40` recounts the scroll/tome skill quantities (stored items on page 0 only); `items/inventory.md` §5.5.
