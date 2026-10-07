@@ -321,7 +321,7 @@ fn gamble_price_parts() {
     assert_eq!(gp((3, 170, 1), 99, parts.0, parts.1), 57986);
     // L = 6: L' = 6.
     assert_eq!(
-        gamble_price(&t, &hax, 6, 0),
+        gamble_price(&t, &hax, 6, 0).unwrap(),
         gp((3, 170, 1), 6, parts.0, parts.1)
     );
     // Level 50 and stacks 10..30 (st 20), no upgrade codes.
@@ -332,7 +332,7 @@ fn gamble_price_parts() {
     t.items.push(r);
     let h = ident(&t, "hlv");
     assert_eq!(
-        gamble_price(&t, &h, 60, 0),
+        gamble_price(&t, &h, 60, 0).unwrap(),
         gp((50, 1000, 20), 60, None, None)
     );
     // ubercode `0   ` is no upgrade even when an item has that code.
@@ -340,7 +340,7 @@ fn gamble_price_parts() {
     let i = index(&t, "hlv");
     t.items[i].ubercode = *b"0   ";
     assert_eq!(
-        gamble_price(&t, &h, 60, 0),
+        gamble_price(&t, &h, 60, 0).unwrap(),
         gp((50, 1000, 20), 60, None, None)
     );
 }

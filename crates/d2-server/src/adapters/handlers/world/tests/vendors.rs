@@ -57,12 +57,10 @@ fn buy_refusals_before_the_price() {
     h.game.world.w.interact.insert(p, (1, CHARSI));
     let (code, got) = send(&mut h, &hex("32 06000000 99000000 00000000 38000000"));
     assert_eq!((code, got), (ResultCode::Refused, vec![tx(7, 0x99, 500)]));
-    // Not in the store (t = 0) → code 7, GUID −1 (TODO in the module).
+    // Not in the store (t = 0) → code 7 with the requested GUID (§7.1
+    // rule 2, V10).
     let (code, got) = send(&mut h, &hex("32 06000000 08000000 00000000 38000000"));
-    assert_eq!(
-        (code, got),
-        (ResultCode::Refused, vec![tx(7, u32::MAX, 500)])
-    );
+    assert_eq!((code, got), (ResultCode::Refused, vec![tx(7, 8, 500)]));
     assert_clean(&h);
 }
 
@@ -99,7 +97,7 @@ fn sell_refusals_before_the_price() {
 #[test]
 fn repair_refusals() {
     let (mut h, p) = setup(false);
-    // NPC not the interact unit → code 9 (result 0, module TODO V12).
+    // NPC not the interact unit → code 9 (handler result 0, rule 7).
     let (code, got) = send(&mut h, &hex("35 06000000 07000000 0000 0000 00000000"));
     assert_eq!((code, got), (ResultCode::Done, vec![tx(9, u32::MAX, 500)]));
     // Akara does not repair → code 9.

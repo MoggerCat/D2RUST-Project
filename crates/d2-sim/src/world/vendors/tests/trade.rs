@@ -128,12 +128,9 @@ fn buy_refusals() {
     );
     assert_eq!(
         run(&mut w, buy_msg(other, 0, false)),
-        (1, tr(0, 7, NO_GUID, 10))
+        (1, tr(0, 7, other, 10))
     );
-    assert_eq!(
-        run(&mut w, buy_msg(dgr, 2, false)),
-        (1, tr(0, 7, NO_GUID, 10))
-    );
+    assert_eq!(run(&mut w, buy_msg(dgr, 2, false)), (1, tr(0, 7, dgr, 10)));
     assert_eq!(
         run(&mut w, buy_msg(dgr, 0, false)),
         (0, tr(0, 12, NO_GUID, 10))
@@ -572,9 +569,9 @@ fn repair_one() {
     assert_eq!(w.sent, vec![tr(1, 2, NO_GUID, 88)]);
     assert_eq!(w.get(lax, stat::DURABILITY), 20);
     assert_eq!(w.stat_msgs, vec![(lax, stat::DURABILITY)]);
-    // Full: code 9. Unidentified: code 9.
+    // Full: code 9, routine result 1 (rule 7). Unidentified: code 9.
     w.sent.clear();
-    assert_eq!(repair(&t, &mut w, p(), &m), Ok(0));
+    assert_eq!(repair(&t, &mut w, p(), &m), Ok(1));
     assert_eq!(w.sent[0].code, 9);
     w.set(lax, stat::DURABILITY, 3);
     w.units.get_mut(&lax).unwrap().flags = 0;

@@ -719,7 +719,9 @@ fn run_with(game_seed: u32, gold: i32) -> Transcript {
     assert_eq!(sell, want);
     let f = fx.step(&[sell]);
     assert_eq!(f.codes, [(0x33, done)]);
-    assert_eq!(f.received, [tx(3, 1, pg, gold + buc_sold)]);
+    // The stored buckler leaves with S→C 0x9D action 5 (rule 9) before the
+    // 0x2A (§7 "Message order").
+    assert_stored_sale(&f.received, pg, tx(3, 1, pg, gold + buc_sold));
     frames.push(f);
     let gold = gold + buc_sold;
     assert_eq!(fx.stat(player, GOLD), gold);
@@ -753,7 +755,7 @@ fn run_with(game_seed: u32, gold: i32) -> Transcript {
     });
     let f = fx.step(&[sell]);
     assert_eq!(f.codes, [(0x33, done)]);
-    assert_eq!(f.received, [tx(3, 1, eg, gold + sold)]);
+    assert_stored_sale(&f.received, eg, tx(3, 1, eg, gold + sold));
     frames.push(f);
     assert_eq!(fx.stat(player, GOLD), gold + sold);
     assert_eq!(fx.inventory(), [bought]);
@@ -827,8 +829,9 @@ fn one_gold_more_changes_only_the_gold_fields() {
             }
         }
     }
-    // Frames 4–6 (steps 5–7), the one 0x2A each, its gold's low byte.
-    assert_eq!(diffs, [(4, 0, 11), (5, 0, 11), (6, 0, 11)]);
+    // Frames 4–6 (steps 5–7), the one 0x2A each (after the sales' 0x9D
+    // action 5 in frames 5 and 6), its gold's low byte.
+    assert_eq!(diffs, [(4, 0, 11), (5, 1, 11), (6, 1, 11)]);
 }
 
 /// Another game seed gives other store items (unit and item seeds from

@@ -701,18 +701,17 @@ where
         WorldHost::<D>::vitals_sync(&mut self.action, game, events, client, staged, queued)
     }
 
-    /// The action wiring's sends (waypoints, tick paths), then the rest's
-    /// (NPC, vendor and quest messages), then what the inventory rules
-    /// queued in vendor calls; one system runs per message, so the
-    /// systems never interleave.
-    ///
-    /// TODO(spec: vendors.md §7): the order of a vendor call's inventory
-    /// messages (a targeting reset's 0x3F) against its 0x2A is not
-    /// written; they follow it.
+    /// The action wiring's sends (waypoints, tick paths), then what the
+    /// inventory rules queued in vendor calls, then the rest's (NPC,
+    /// vendor and quest messages); one system runs per message, so the
+    /// systems never interleave. A vendor call's inventory messages (a
+    /// targeting reset's 0x3F, placement and 0x9D sends) come before its
+    /// 0x2A, the last call of each buy pass, sell or repair (`vendors.md`
+    /// §7 "Message order").
     fn take_sent(&mut self, events: &mut D) -> Vec<(UnitId, Vec<u8>)> {
         let mut sent = events.action().hooks().x.take_sent();
-        sent.extend(self.rest.take_sent());
         sent.append(&mut self.inv_sent);
+        sent.extend(self.rest.take_sent());
         sent
     }
 

@@ -265,7 +265,7 @@ fn lvlmaze_rows_as_stated() {
 }
 
 // Spec: specs/drlg/maze.md §1 (lvlmaze row), §3.3 (pick-shape def), §3.6 + specs/drlg/maze-specials.tsv (special defs), §4–§7 (fixed defs), Constants (lvlprest `Files` +64)
-// Intended claim (unconfirmed until the first local run): specs/drlg/maze.md §1 r1, §3.3 (every def the maze code can name exists in the live lvlprest with Files >= 1)
+// Intended claim: specs/drlg/maze.md §1 r1, §3.3 (every def the maze code can name exists in the live lvlprest; the 15 with Files 0 are the live run's list)
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn maze_defs_exist_in_live_lvlprest() {
@@ -273,9 +273,13 @@ fn maze_defs_exist_in_live_lvlprest() {
     let maze = MazeData::from_tables(&rows::<Lvlmaze>(), &rows::<Lvlprest>());
     assert_eq!(maze.rows.len(), 81, "lvlmaze records");
     let mut missing = Vec::new();
-    let check = |def: u32, what: String| match maze.files(def) {
+    let mut files_zero = BTreeSet::new();
+    let mut check = |def: u32, what: String| match maze.files(def) {
         Ok(f) if f >= 1 => None,
-        Ok(f) => Some(format!("{what}: def {def} Files {f}")),
+        Ok(_) => {
+            files_zero.insert(def);
+            None
+        }
         Err(e) => Some(format!("{what}: def {def} {e:?}")),
     };
     let mut maze_types = BTreeSet::new();
@@ -318,10 +322,19 @@ fn maze_defs_exist_in_live_lvlprest() {
     );
     assert!(
         missing.is_empty(),
-        "{} defs missing or Files 0, first: {:?}",
+        "{} defs missing, first: {:?}",
         missing.len(),
         &missing[..missing.len().min(20)]
     );
+    // Live 1.14d (PC 2 local run, C12): these 15 defs exist with Files 0
+    // (type 19 masks 3, 5, 6, 7, 9–15; type 33 with Rooms = 1 masks 1–3;
+    // fixed def 167). A Files-0 map takes file 0 without a draw
+    // (`drlg/preset.md` §3 rule 3).
+    let want: BTreeSet<u32> = [1, 2, 3, 167, 512, 514, 515, 516]
+        .into_iter()
+        .chain(518..=524)
+        .collect();
+    assert_eq!(files_zero, want, "defs with Files 0");
 }
 
 // ---- lvlsub --------------------------------------------------------------------------
