@@ -465,3 +465,206 @@ fn towner_runs_the_commands_then_the_map_ai_then_idles_12() {
     w.think_with(None, 0, false);
     assert_eq!(w.thinks(), [12]);
 }
+
+// ---- §10, §11, §14, §17, §20 ------------------------------------------------
+
+// Covers: specs/monsters/ai-bodies-6.md §10 r5
+#[test]
+fn elemental_beast_chases_or_wanders_by_aip1() {
+    // s = 1 (awake), no contact: `roll(100)` < aip1 [20] → walk to T with
+    // flags 0; else wander 8.
+    let lo = seed_with(1, |v| v[0] < 20);
+    let mut w = world(act_row(46, &[20, 16, 20]));
+    set_param_of(&mut w, 0, 1);
+    w.seed(lo);
+    w.think_with(Some(w.player), 10, false);
+    assert_eq!(w.fake.modes(), [unit_mode(mode::WALK, w.player)]);
+    let lo = seed_with(1, |v| v[0] >= 20);
+    let mut w = world(act_row(46, &[20, 16, 20]));
+    set_param_of(&mut w, 0, 1);
+    w.seed(lo);
+    w.think_with(Some(w.player), 10, false);
+    assert_eq!(w.fake.modes(), [wander_at(lo, 1, (100, 100), 8)]);
+}
+
+// Covers: specs/monsters/ai-bodies-6.md §11 r3
+#[test]
+fn npc_stationary_waits_while_the_player_or_the_npc_is_busy() {
+    // P is the nearest interacting player; P busy (`0x00535060` = 1) or the
+    // NPC's own interaction list non-empty → idle 10 (not 20), the
+    // greeting countdown untouched.
+    let near = |busy: bool, interacting: bool| {
+        let mut w = world(act_row(54, &[]));
+        w.fake.nearest = Some((w.player, true));
+        if busy {
+            w.fake.busy.insert(w.player);
+        }
+        w.fake.interacting = interacting;
+        set_param_of(&mut w, 1, 5);
+        w.think_with(None, 0, false);
+        w
+    };
+    for (busy, interacting) in [(true, false), (false, true)] {
+        let w = near(busy, interacting);
+        assert_eq!(w.thinks(), [10], "busy {busy} interacting {interacting}");
+        assert_eq!(param_of(&w, 1), 5);
+    }
+    // Neither: the countdown (g ≠ 0 → g − 1) and idle 20.
+    let w = near(false, false);
+    assert_eq!((w.thinks(), param_of(&w, 1)), (vec![20], 4));
+}
+
+/// A sentry with an owner outside town, `c` charges and `Skill1` 5 in
+/// mode 10.
+fn sentry(c: i32) -> World {
+    let mut w = world(act_row(101, &[100, 10, 15, 25]));
+    give_skill(&mut w, 1, 5, 10);
+    own(&mut w);
+    set_param_of(&mut w, 1, c);
+    w
+}
+
+// Covers: specs/monsters/ai-bodies-6.md §14 l2 r2, §14 l2 r3
+#[test]
+fn sentry_without_its_skill_entry_dies_and_clears_state_12() {
+    // Charges left (c = 3) so step 1 passes; the unit has no entry of
+    // Skill1: death at (0, 0).
+    let mut w = sentry(3);
+    w.think_with(None, 0, false);
+    assert_eq!(w.fake.modes(), [point_mode(mode::DEATH, 0, 0)]);
+    // With the entry: state 12 is switched off, then the secondary search
+    // (none) idles aip3.
+    let mut w = sentry(3);
+    w.fake.x.skill_entry.insert(5, (5, 10));
+    w.fake.states.insert((w.mon, 12));
+    w.think_with(None, 0, false);
+    assert!(!w.fake.states.contains(&(w.mon, 12)));
+    assert_eq!(w.thinks(), [15]);
+    assert!(w.fake.modes().is_empty());
+}
+
+// Covers: specs/monsters/ai-bodies-6.md §17 r2
+#[test]
+fn tentacle_kills_itself_with_its_dead_owners_target_as_killer() {
+    // O in mode 12 and draw < 40: kill with killer O's path target unit.
+    let lo = seed_with(1, |v| v[0] < 40);
+    let mut w = world(act_row(56, &[70, 5, 16, 12, 20, 12]));
+    give_skill(&mut w, 1, 20, 14);
+    own(&mut w);
+    let killer = w.add_unit(UnitType::Monster, (120, 100));
+    w.fake.path_target = Some(killer);
+    w.fake.anim.insert(w.player, mode::DEAD);
+    w.seed(lo);
+    w.think_with(Some(w.player), 5, false);
+    assert!(logged(&w, &format!("kill {} Some({})", w.mon.0, killer.0)));
+    assert_eq!(steps_since(&w, lo), 1);
+    // A draw ≥ 40: the think goes on (s = 0: submerge).
+    let lo = seed_with(1, |v| v[0] >= 40);
+    let mut w = world(act_row(56, &[70, 5, 16, 12, 20, 12]));
+    give_skill(&mut w, 1, 20, 14);
+    own(&mut w);
+    w.fake.anim.insert(w.player, mode::DEAD);
+    w.seed(lo);
+    w.think_with(Some(w.player), 5, false);
+    assert!(!w.fake.log.iter().any(|l| l.starts_with("kill")));
+    assert_eq!(param_of(&w, 2), 1);
+}
+
+/// A Totem owned by the player, brackets [20, 30, 30, 20].
+fn totem() -> World {
+    let mut w = world(act_row(109, &[20, 30, 30, 20]));
+    own(&mut w);
+    w.fake.pos.insert(w.player, (103, 100));
+    w
+}
+
+// Covers: specs/monsters/ai-bodies-6.md §20 r2
+#[test]
+fn totem_escapes_a_monster_in_contact() {
+    // M ≠ 0 and S ≠ 0 (the evil search finds the player at 3, in melee
+    // range): a draw < aip1 [20] with an escape from S by 6 that starts →
+    // end (one draw).
+    let setup = || {
+        let mut w = totem();
+        w.fake.nodes = vec![vec![w.player]];
+        w.fake.align = 0;
+        w.fake.melee.insert(w.player);
+        w
+    };
+    let lo = seed_with(1, |v| v[0] < 20);
+    let mut w = setup();
+    w.seed(lo);
+    w.think_with(None, 0, false);
+    assert_eq!(w.fake.modes(), [point_mode(mode::WALK, 94, 100)]);
+    assert_eq!(steps_since(&w, lo), 1);
+    // A draw ≥ 20: no escape; the think goes on (step 3's draw, ...).
+    let lo = seed_with(1, |v| v[0] >= 20);
+    let mut w = setup();
+    w.seed(lo);
+    w.think_with(None, 0, false);
+    assert!(w
+        .fake
+        .modes()
+        .iter()
+        .all(|m| m != &point_mode(mode::WALK, 94, 100)));
+    assert!(steps_since(&w, lo) >= 2);
+}
+
+// Covers: specs/monsters/ai-bodies-6.md §20 r3, §20 r6, §20 r7
+#[test]
+fn totem_may_forget_its_target_then_follows_or_idles_25() {
+    // S = the player at 3 (no contact, so step 2 draws nothing). Step 3's
+    // draw < aip2 [30] clears S: the follow (no S, O 2 away, loud k 2)
+    // loiters with idle 15 and ends the think (r6). A draw ≥ 30 keeps S:
+    // the follow returns 0 (S set, out of town, D ≤ 80) → idle 25 (r7).
+    let setup = || {
+        let mut w = totem();
+        w.fake.nodes = vec![vec![w.player]];
+        w.fake.align = 0;
+        w
+    };
+    let lo = seed_with(2, |v| v[0] < 30 && v[1] >= 10);
+    let mut w = setup();
+    w.seed(lo);
+    w.think_with(None, 0, false);
+    assert_eq!(w.thinks(), [15]);
+    let lo = seed_with(1, |v| v[0] >= 30);
+    let mut w = setup();
+    w.seed(lo);
+    w.think_with(None, 0, false);
+    assert_eq!(w.thinks(), [25]);
+    assert_eq!(steps_since(&w, lo), 1, "only step 3's draw");
+}
+
+// Covers: specs/monsters/ai-bodies-6.md §20 r5
+#[test]
+fn totem_catches_up_with_a_walking_or_running_owner() {
+    // d > aip4 [20], O walking (mode 2): pet move k 0 (0, 0, 0) started →
+    // end; O running (mode 3): k 0 with speed 60; O neutral: no move.
+    for (om, speed) in [(2u8, 0), (3, 60)] {
+        let mut w = totem();
+        w.fake.pos.insert(w.player, (124, 100));
+        w.fake.y.final_point.insert(w.player, (124, 100));
+        w.fake.anim.insert(w.player, om);
+        w.seed(1);
+        w.think_with(None, 0, false);
+        assert_eq!(
+            w.fake.modes(),
+            [point_mode(mode::WALK, 124, 108)],
+            "O mode {om}"
+        );
+        assert_eq!(w.vel_request().speed, speed, "O mode {om}");
+    }
+    let mut w = totem();
+    w.fake.pos.insert(w.player, (124, 100));
+    w.fake.y.final_point.insert(w.player, (124, 100));
+    w.seed(1);
+    w.think_with(None, 0, false);
+    assert!(
+        w.fake
+            .modes()
+            .iter()
+            .all(|m| m != &point_mode(mode::WALK, 124, 108)),
+        "a neutral owner is not chased by k 0"
+    );
+}
