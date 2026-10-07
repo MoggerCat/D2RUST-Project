@@ -157,11 +157,11 @@ id	name	owner
 0x9B	Unknown9B	specs/client/msg-ui.md
 0x9C	ItemActionWorld	specs/client/msg-stats-items.md
 0x9D	ItemActionOwned	specs/client/msg-stats-items.md
-0x9E	MercStatByte	TBD
-0x9F	MercStatWord	TBD
-0xA0	MercStatDword	TBD
-0xA1	MercAddExpByte	TBD
-0xA2	MercAddExpWord	TBD
+0x9E	MercStatByte	specs/client/msg-stats-items.md
+0x9F	MercStatWord	specs/client/msg-stats-items.md
+0xA0	MercStatDword	specs/client/msg-stats-items.md
+0xA1	MercAddExpByte	specs/client/msg-stats-items.md
+0xA2	MercAddExpWord	specs/client/msg-stats-items.md
 0xA3	UnknownA3	specs/client/msg-skills.md
 0xA4	BaalWave	TBD
 0xA5	UnknownA5	TBD
