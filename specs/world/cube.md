@@ -36,7 +36,7 @@
 | Edge cases & original bugs | 530–564 |
 | Test vectors | 565–609 |
 | Provenance | 610–648 |
-| Open questions | 649–735 |
+| Open questions | 649–745 |
 <!-- /index -->
 
 ## Summary
@@ -662,6 +662,16 @@ jump table, `0x00566AA8` op jump table, the two Pandemonium stubs at
 3. Single-player values of game +0x6A and +0x74 (ladder records usable or
    not). Settle: V17 in a recorded SP game, or read the game struct after
    creation.
+   Answered (2026-10-07, `0x00530BF0` disassembled, plus the recorded
+   single-player games of `sim/intents-events.md` §8.1 and its
+   recording notes): game creation writes +0x6A := its game-type
+   argument (`0x00530CFF`, the byte of C→S 0x67) and +0x74 := bit 21
+   (0x200000) of its game-flags argument (`0x00530D4C`–`0x00530D59`;
+   +0x70 = bit 20). The recorded single-player games show game type 3
+   on every tick and S→C 0x01 u8@7 = 0 (u8@7 = (+0x74 ≠ 0)), so in
+   single player +0x6A = 3 and +0x74 = 0: §2's test 3 passes through
+   its first term, so `ladder` cube records are usable in single
+   player.
 4. RNG draws inside duplicate `0x0055A2A0`, item init `0x00557AB0`, item
    request `0x00558D90`, free-spot `0x00545340` and portal creation
    `0x0056D130`. Settle: rng trace (`check_rng.py`) of V1, record 19 and
