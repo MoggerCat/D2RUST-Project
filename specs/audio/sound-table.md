@@ -14,7 +14,8 @@
   `VoicePolicy`, `GainCurve` hooks of `client/audio.md` §A2–§A4; §13
   below maps each rule to a hook). The table is parsed with the
   `d2-data` `.txt` reader.
-- **Related specs:** `client/audio.md` (design; this spec owns its §B3
+- **Related specs:** `audio/sound-table-2.md` (part 2: §14, the other
+  users of the sound seed), `client/audio.md` (design; this spec owns its §B3
   and §B8), `data/loading.md` §3.4 (the two runtime `.txt` files),
   `data/txt-format.md` §5–§7 and `data/field-types.md` §3 (parsing and
   cell types), `data/fields.tsv` row `sounds` (the compile-only name
@@ -27,29 +28,29 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 55–69 |
-| Inputs | 70–80 |
-| Outputs / state changes | 81–88 |
-| Rules | 89–90 |
-|   1. Loading the table | 91–153 |
-|   2. Sound environment table (load only) | 154–173 |
-|   3. File path | 174–190 |
-|   4. Groups and variants | 191–233 |
-|   5. Requests | 234–310 |
-|   6. Sound tick | 311–485 |
-|   7. Starting on a channel | 486–567 |
-|   8. Volume and pan | 568–685 |
-|   9. Settings | 686–705 |
-|   10. Sample cache | 706–753 |
-|   11. Live data (1.14d) | 754–770 |
-|   12. Edge cases kept | 771–786 |
-|   13. d2rs mapping | 787–797 |
-| Constants & data dependencies | 798–805 |
-| Randomness | 806–813 |
-| Edge cases & original bugs | 814–818 |
-| Test vectors | 819–863 |
-| Provenance | 864–899 |
-| Open questions | 900–948 |
+| Summary | 56–70 |
+| Inputs | 71–81 |
+| Outputs / state changes | 82–89 |
+| Rules | 90–91 |
+|   1. Loading the table | 92–154 |
+|   2. Sound environment table (load only) | 155–174 |
+|   3. File path | 175–191 |
+|   4. Groups and variants | 192–234 |
+|   5. Requests | 235–311 |
+|   6. Sound tick | 312–519 |
+|   7. Starting on a channel | 520–601 |
+|   8. Volume and pan | 602–737 |
+|   9. Settings | 738–757 |
+|   10. Sample cache | 758–805 |
+|   11. Live data (1.14d) | 806–822 |
+|   12. Edge cases kept | 823–838 |
+|   13. d2rs mapping | 839–849 |
+| Constants & data dependencies | 850–857 |
+| Randomness | 858–868 |
+| Edge cases & original bugs | 869–873 |
+| Test vectors | 874–918 |
+| Provenance | 919–963 |
+| Open questions | 964–1037 |
 <!-- /index -->
 
 ## Summary
@@ -343,6 +344,19 @@ advancing once per loop pass (frame rate, not 40 ms); C does not.
    order decides channel stealing (§7 r3).
 2. Requests with the stop flag and no fade (or a fade to non-zero):
    waiting → ended; playing → its channel is stopped.
+3. **`soundchaosdebug`** (before r1, `0x004BA036`–`0x004BA071`): while
+   the flag `[0x007C5468]` is set (image value 0), every update whose
+   sound tick T has T mod 3 = 0 (`0x00481820` returns T) first makes a
+   request `uniform(2,934, 4,656)` (`0x004E4100`, one sound-seed draw)
+   with no unit, delay 0, flags 0, offset 0: a random speech line. The
+   flag is toggled only by typing `soundchaosdebug` (case-insensitive)
+   as a chat line (`0x0047C420`, string compare at `0x0047C53D`; the line is
+   consumed, not sent; any game type). Turning it off (`0x004BABC0` →
+   `0x004BAA50`) sets the stop flag (written as a dword at +0x3D) on
+   every active request with id 2,934–4,656 and, for those playing
+   (state 1) whose record's `Fade Out` is non-zero, fades them to 0
+   over `Fade Out` ticks (§5 r7, delay 0). Original debug behaviour,
+   reproduced; off unless typed.
 
 #### 6.3 Per request, in list order
 
@@ -482,6 +496,26 @@ At the end of the update, if the tick advanced:
    `docs/handoff/impl-audio.md` ST4); whether the original's
    end tick fits that model (and by how much it jitters) is open
    question 12 (Needs recording).
+4. **Device side of the natural end** (ST-4 remainder, `0x005153C0`,
+   `0x005155D0`, `0x00515180`, `0x00515300`, `0x00516250`). Each
+   in-memory voice is a looping DirectSound buffer of 0x20000 bytes
+   (mono) or 0x40000 (stereo), refilled by halves. At start the voice's
+   played-byte counter (+0x20) and written-byte counter (+0x24) are
+   reset (`0x00516140`) and the buffer is filled from the sample; past
+   the end of the data the fill writes zero bytes (silence, all live
+   samples being 16-bit, `formats/wav.md`), and once the whole sample
+   is written (+0x2C set) each half the cursor leaves is cleared to
+   zero. Every service pass reads the play cursor (`GetCurrentPosition`)
+   and adds the distance moved, modulo the buffer size, to the played
+   counter; the voice ends when played > data size (strict, unsigned,
+   `0x0051648A`): the thread stops the buffer and clears the playing
+   flag. So the audible output is exactly the sample followed by
+   silence; only the tick at which the request becomes ended lags
+   behind the true end: by the time to the next service pass (each
+   pass follows a 50 ms wait), then to the next upkeep. The
+   service wait is `WaitForSingleObject(event, 50)`; any return other
+   than a timeout ends the thread (shutdown). Which tick that is stays
+   open question 12.
 
 ### 7. Starting on a channel
 
@@ -682,6 +716,24 @@ values.
    sent every update that sends a volume (§8.2 r7 compares it too).
    The voice log keeps `v` (the argument); `GainCurve` must apply G
    and occlusion.
+4. **Writers of G** (answers open question 14). `G` is written only by
+   `0x00515CE0(g)` (`0x00515D07`; g > 255 fatal `0x3B9`; a change
+   re-sends every voice's volume through `0x005157B0`). Its 15 call
+   sites: 255 at device init (`0x00514DD3`, `0x00514449`) and sound
+   init (`0x0048228C`); 0 at device shutdown (`0x0051406B`); 0 then
+   255 around each Bink video close (`0x0050FFE2` / `0x00510002`,
+   `0x005139D9` / `0x005139F9`, `0x006BBED9` / `0x006BBEF9`); 0 then
+   255 inside the stop-all `0x004DF800` (`0x004DF80C` / `0x004DF861`,
+   from channel re-setup `0x004DFA60` and sound shutdown `0x00481830`,
+   `0x00482940`); and the fade `0x00515F50(ms)` (`0x00515FC0`), which
+   lowers G to 0 in 20 ms `Sleep` steps of G / (ms / 20) inside one
+   call, used with ms = 180 then followed by G := 255 at the Battle.net
+   entry `0x00431600` and in the client loop (`0x0044F264`–`0x0044F273`:
+   on every in-game pass while the device-layer stream voice
+   `[0x00881794]` (created at device init, `0x00514780`) is playing, `0x00514840`: fade, stop it
+   `0x00514930`, G := 255). Each 0 is restored to 255 before the
+   function returns and no sound tick runs inside these calls, so G =
+   255 at every volume send of a game sound tick.
 
 ### 9. Settings
 
@@ -809,6 +861,9 @@ One draw source: `roll` on the local player's client unit seed (§4 r5).
 Per start without flag bit 0: if `Group Size` is 2 or 3, one `roll(n +
 1)`; then one `roll(n)` per attempt until accepted. `Group Size ≤ 1`:
 no draw. Environment cues draw from the same seed (`audio/environment.md`).
+Non-audio users of the same seed and their phases: `audio/sound-table-2.md`
+§14. `soundchaosdebug` (§6.2 r3): one `uniform(2,934, 4,656)` per update
+with T mod 3 = 0 while on.
 The draw order across one tick follows the request list order (§6.2).
 
 ## Edge cases & original bugs
@@ -897,6 +952,15 @@ thread `0x00516250`, voice calls `0x005153C0`, `0x005155D0`,
 `mpq-tool` (scratch). Recording facts: `docs/handoff/local-buddy-q-rec.md`
 entry 74 (roll interleave, open question 3).
 
+Third pass (2026-10-07, disassembly only): `soundchaosdebug` `0x004BA020`,
+`0x004BABC0`, `0x004BAA50`, chat commands `0x0047C420` (string
+`0x006D7358`) from `0x0047CA70`; device buffers `0x005153C0`,
+`0x005155D0`, `0x00515180`, `0x00515300`, `0x00516140`, `0x00516070`,
+service thread `0x00516250`; gain writer `0x00515CE0` and its 15 call
+sites, fade `0x00515F50`, front-end stream `0x00514780`, `0x00514840`,
+`0x00514930`; async reads `0x0040A620`, `0x0040A390`, `0x0040A7F0`,
+`0x0041AAD0`. Seed users: `audio/sound-table-2.md` Provenance.
+
 ## Open questions
 
 1. Voice-log conformance: record 0x004E01B0 starts and the values passed
@@ -913,6 +977,18 @@ entry 74 (roll interleave, open question 3).
    1,502 (part 1) and 2,539 of 5,750 (part 2) found the seed already
    stepped by another user in between. Which users, and their order
    within a tick, still needs the seed-address trace above.
+   Answered (static, `audio/sound-table-2.md` §14): inside the sound
+   tick only the sound draws step it (§14.1, `0x004E40A0` is the only
+   step site in the tick's call closure); between ticks the receive,
+   the client update and the drawn frame step it (§14.2,
+   `0x0044EFA0`), through the users listed in §14.3: cursor, screen
+   shake, weather and water-floor drawing, lightning, room-change
+   weather, Den lights, every overlay create of type 6 or with random
+   offsets (`0x00470390`), NPC code, and skill casts of the local
+   player (`cltdofunc` entries). The draw-phase users depend on frame
+   count and wall-clock time, so the interleave is not tick-exact in
+   1.14d (§14.4); a conformance check gives the recorded seed before
+   each sound draw as input.
 4. Answered (§6.1): the paused path (single player, ESC menu or options
    open); one sound tick per loop pass, no client update.
 5. Answered (§8.3 r3): volume × (1 − occlusion) at the device in modes
@@ -935,12 +1011,25 @@ entry 74 (roll interleave, open question 3).
     start and the tick of the `0x004DF890` natural end (hook the store of
     state 2 at `0x004DF8D2`, with T), over a few hundred starts; settles
     whether end tick − start tick = ceil(frames / 882) (40 ms of 22,050
-    Hz) or something else, and its spread.
+    Hz) or something else, and its spread. The device side is settled
+    (§6.6 r4: strict played > size test per service pass, output
+    padded with silence); only the tick offset needs the recording.
 13. Needs recording (ST-7, §10 r6): for `Async Only` sounds, the tick of
     the first start attempt (async read started, `0x00482AE4` path) and
     of the collecting preload pass (`0x00482BF0`, T); settles whether the
-    read is always finished by the next pass at T ≡ 0 (mod 25).
-14. Writers of the device gain `G` (`[0x0072F9B0]`, §8.3 r3) other than
+    read is always finished by the next pass at T ≡ 0 (mod 25). Binary
+    facts: the load asks for an asynchronous read (`0x00482AE4`, first
+    argument 1) and asynchronous mode is on in every run (`0x0040A390`
+    with ECX = 1 at `0x00405C6C` sets `[0x0075AF94]` = 1), so the job
+    goes to Storm's read `0x0041AAD0` with an event; that function either
+    reads at once and sets the event before returning or queues the
+    sector reads (`0x00419790`) and the event is set later, depending on
+    the file's archive state. Which branch the sound files take is not
+    settled statically.
+14. Answered (§8.3 r4): G = 255 at every send in game; the other
+    writers are init, shutdown, video close, stop-all and the 180 ms
+    stream-voice fade, each restoring 255 before returning.
+    Original text: writers of the device gain `G` (`[0x0072F9B0]`, §8.3 r3) other than
     sound init and the client loop: `0x00515CE0` callers `0x00431600`,
     `0x004DF800`, `0x0050FDF0`, `0x005137E0`, `0x00514060` (front end,
     cinematics, focus?); a memory read of `G` during a game (expected
