@@ -30,7 +30,7 @@
 | Edge cases & original bugs | 664–688 |
 | Test vectors | 689–699 |
 | Provenance | 700–710 |
-| Open questions | 711–730 |
+| Open questions | 711–727 |
 <!-- /index -->
 
 ## Summary
@@ -457,7 +457,7 @@ Each eaten corpse adds one more list of the state (Edge case 6).
 1. Unit none → 0. (R is not tested.)
 2. One step of the unit's seed: n = (`lo'` mod 3) + difficulty + 2.
 3. Spawn info `0x0063EFA0(unit, &c, &x0, &y0, &mode, difficulty, 0)`
-   (`monsters/ai-bodies-2.md` §3; x0, y0 unused). For Baal (`BaseId` 544)
+   (`monsters/ai-bodies-2.md` §13.1; x0, y0 unused). For Baal (`BaseId` 544)
    it compares the incoming c (an uninitialised local here, Edge case 7)
    with 570; otherwise: c := `0x0054DA60(562 baaltentacle1, roll(2) +
    difficulty)`, two `roll(24)` draws for its own x, y, mode := 4 (three
@@ -716,13 +716,10 @@ The riding imp (§2.3) follows its tower or siege beast every tick.
    class (§3.14).
 3. Recording: imps riding a barricade tower: state 143, the type-5 event
    and the release at low life (§2.3, §3.24, §4.10).
-4. Answered: the Baal (`BaseId` 544) case of the spawn info
-   `0x0063EFA0` is stated in `monsters/ai-bodies-5.md` §21.3 (clone
-   paragraph: class 570 kept with mode 1, else `roll(2)` + difficulty
-   into `0x0054DA60(562, …)` and mode 4; then two `roll(24)` point
-   draws), and `0x0054DA60` (`BaseId` then n `NextInClass` steps) in
-   `monsters/population.md` §11.5 rule 3; both agree with §3.22. The
-   other cases (`ai-bodies-2.md` Open question 4) do not affect §3.22.
+4. Answered: the spawn info `0x0063EFA0` is `monsters/ai-bodies-2.md`
+   §13.1 (all keys, Baal `BaseId` 544 included; it names §3.22 as a
+   caller), `0x0054DA60` is `monsters/population.md` §11.5 rule 3; both
+   agree with §3.22.
 5. Answered: `0x0056B9C0` (area-damage unit step) is specified in
    `missiles/missiles.md` (`area_damage` callback) and `0x0064CB30`
    (point collision) in `sim/path-placement.md` §4 (query table, rule

@@ -703,12 +703,12 @@ Mechanical check (M05, to add with the code): `skillcalc.tsv` and
    `range` i8 +0x14; no direct caller in the export); the effective
    range used by the game is `0x00645460(unit, entry)` (`skills/use.md`
    §3 step 6: value 3 resolves to 1 or 2).
-7. Partly answered: `0x00625EF0` / `0x00625E60` are specified in §3.3;
+7. Answered: `0x00625EF0` / `0x00625E60` are specified in §3.3;
    `0x0063D340` (grip / wield type) is owned by
-   `render/unit-composite.md` and `combat/damage.md`. Open:
-   `0x00623990(unit, 0)` (the weapon a skill uses: skill weapon kind
-   via `0x00644140` +0x168, hands 4 / 5 through `0x0063C050`, item type
-   45 tests `0x00629BB0`, `0x0062A4E0`): owner `items/inventory.md`.
+   `render/unit-composite.md` and `combat/damage.md`; the attack weapon
+   `0x00623990(unit, flag)` (by the skill's `weapsel` +0x168) is
+   `sim/units.md` §4.7, with the dual-wield stat toggle `0x00623C80`
+   and the frame bonus `0x00623B10` there.
 8. Answered: blood-mana life payment `0x005D2B60` is specified in §4
    (`pay_with_life`).
 9. Answered: no 1.14d user has `b < a`. `skills.txt` uses dm 86 times
