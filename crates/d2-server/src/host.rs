@@ -9,7 +9,7 @@ use std::time::Instant;
 
 use crate::buffers::{ClientBuffers, Inbox, QueueError};
 use crate::dispatch::{process_game_message, ClientRecord, DispatchError, Outcome};
-use crate::seams::{ClientId, Clock, Intents, MessageSizes, SessionHandler, Tick};
+use crate::seams::{ClientId, Clock, Intents, MessageSink, MessageSizes, SessionHandler, Tick};
 use crate::transport::{Classified, DuplicateFilter, Queue, SendError, ServerQueues};
 
 /// Ticks per second (`tick.md` §1 rule 1; global `0x00731014`).
@@ -238,10 +238,17 @@ where
         for d in self.queues.drain() {
             let handled = match d.queue {
                 Queue::System => {
-                    // The game's session part first (`Intents::session_message`).
+                    // The game's session part first (`Intents::session_message`),
+                    // with the direct send and the client flush of the leave
+                    // (§2.5 rule 2).
+                    let mut sink = SystemSink {
+                        buffers: &mut self.buffers,
+                        inboxes: &mut self.inboxes,
+                        sizes: &self.sizes,
+                    };
                     if !self
                         .game
-                        .session_message(d.client, &d.msg, d.size, &mut self.buffers)
+                        .session_message(d.client, &d.msg, d.size, &mut sink)
                     {
                         self.session
                             .system_message(d.client, &d.msg, d.size, &mut self.buffers);
@@ -304,5 +311,35 @@ where
             .get_mut(&client)
             .map(Inbox::receive)
             .unwrap_or_default()
+    }
+}
+
+/// The sink of the system-queue drain: queued sends go to the client's
+/// buffers; direct sends (§3.3 rule 5) and a client flush (`0x0052E320`)
+/// go to its receive lists.
+struct SystemSink<'a, S> {
+    buffers: &'a mut ClientBuffers,
+    inboxes: &'a mut BTreeMap<ClientId, Inbox>,
+    sizes: &'a S,
+}
+
+impl<S: MessageSizes> MessageSink for SystemSink<'_, S> {
+    fn queue(&mut self, client: ClientId, msg: &[u8]) -> Result<(), QueueError> {
+        self.buffers.queue(client, msg)
+    }
+    fn has_queued(&self, client: ClientId) -> bool {
+        self.buffers.has_queued(client)
+    }
+    fn send_direct(&mut self, client: ClientId, msg: &[u8]) -> Result<(), QueueError> {
+        self.inboxes.entry(client).or_default().push(msg)
+    }
+    fn flush_client(&mut self, client: ClientId) -> Result<(), QueueError> {
+        while let Some(buf) = self.buffers.pop(client) {
+            self.inboxes
+                .entry(client)
+                .or_default()
+                .deliver(self.sizes, &buf)?;
+        }
+        Ok(())
     }
 }

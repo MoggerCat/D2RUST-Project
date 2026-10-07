@@ -707,12 +707,11 @@ pub trait Pending {
     ) {
     }
     /// The global layer split of the item event registrations (data
-    /// +0xC6C shift, +0xC70 mask; `items/properties.md` §5 rule 9).
-    ///
-    /// TODO(spec: sim/stats.md): the values are not written; default
-    /// (0, 0) (every item event reads skill = layer, level 0).
+    /// +0xC6C shift, +0xC70 mask; `items/properties.md` §5 rule 9):
+    /// `stuff` from itemstatcost record 0 and (1 << stuff) − 1
+    /// (`data/runtime-maps.md` §3); the 1.14d values (6, 0x3F) by default.
     fn event_layer_split(&self) -> (u32, u32) {
-        (0, 0)
+        (6, 0x3F)
     }
     /// Terror install `0x005DDD00(game, source, unit, skill, a, b)`
     /// (`monsters/ai.md`; `combat/events.md` §2.8).

@@ -76,7 +76,7 @@ use d2_formats::d2s::{self, D2s, ReadOptions};
 use d2_formats::mpq::ArchiveSet;
 use d2_server::adapters::character::LoadContext;
 use d2_server::adapters::handlers::world::{ActionEvents, ActionWorld, Outbox, WiredWorld};
-use d2_server::adapters::session::{load_save, Entry, GameSetup};
+use d2_server::adapters::session::{load_new_character, load_save, GameSetup};
 use d2_server::adapters::session_flow::{
     create_flags, CharacterLoader, CreateGame, Loaded, SessionFlow,
 };
@@ -1067,10 +1067,7 @@ pub fn build_with(
     // state 3). The next tick populates the town's rooms, the client's room
     // is ready and the client pass sends 0x04 (`tick.md` §6 rule 6).
     let cold_plains_wp = wp_tables.waypoint(COLD_PLAINS);
-    s.set_session(SessionFlow::new(
-        GAME_SETUP.arena_flags,
-        loader(character, cold_plains_wp),
-    ));
+    s.set_session(SessionFlow::new(loader(character, cold_plains_wp)));
     Ok(LocalGame {
         sim: s,
         waypoint,
@@ -1134,7 +1131,17 @@ fn loader(
                             .push(format!("join: waypoint {index}: {e:?}"));
                     }
                 }
-                Entry::new(0, r.char_name)
+                // §8.2 rule 7: the stub path (start stats, `StartSkill`),
+                // so the join sends 0x5F and the two 0x23.
+                let (entry, report) = load_new_character(s, player, r.char_name);
+                let log = &mut s.events.action.hooks().x.log;
+                log.extend(
+                    report
+                        .unapplied
+                        .iter()
+                        .map(|u| format!("join: new character: {u:?}")),
+                );
+                entry
             }
             Character::Save(save, ctx) => match load_save(s, player, save, ctx) {
                 Ok((entry, report)) => {

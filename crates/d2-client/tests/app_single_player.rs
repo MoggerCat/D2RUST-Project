@@ -94,7 +94,7 @@ impl d2_server::seams::Clock for StepClock {
 /// loader runs only at the 0x6B: it creates a player of the request's
 /// class (sorceress), knowing Cold Plains' waypoint, with its player
 /// fields; the join's 0x59 … 0x7E and 0x04 follow with tick 2's flush.
-// Covers: specs/sim/intents-events.md §8.1, §8.2 r2, §8.2 r3
+// Covers: specs/sim/intents-events.md §8.1, §8.2 r2, §8.2 r3, §8.2 r7
 #[test]
 fn the_session_flow_creates_the_game_then_loads_the_character_at_the_join() {
     use d2_client::bridge::link::SendQueue;
@@ -151,6 +151,11 @@ fn the_session_flow_creates_the_game_then_loads_the_character_at_the_join() {
     let got = ids(chunks);
     assert_eq!(got.first(), Some(&0x59), "{got:02X?}");
     assert_eq!(got.last(), Some(&0x04), "{got:02X?}");
+    // A new character has its player record (§8.2 rule 7): 0x5F after
+    // 0x0B and the two 0x23 (no `StartSkill` without the vitals tables, so
+    // no load 0x23).
+    assert!(got.windows(2).any(|w| w == [0x0B, 0x5F]), "{got:02X?}");
+    assert_eq!(got.iter().filter(|&&i| i == 0x23).count(), 2, "{got:02X?}");
     let (class, fields, knows, faults, log) = link
         .with(|l| {
             let sim = &mut l.host_mut().game;
@@ -174,7 +179,28 @@ fn the_session_flow_creates_the_game_then_loads_the_character_at_the_join() {
         "the synthetic Cold Plains waypoint (index 1)"
     );
     assert_eq!(faults, Some(0));
-    assert!(log.is_empty(), "{log:?}");
+    // The new character is the stub load (`intents-events.md` §8.2 rule
+    // 7, `formats/d2s-load.md` §1): its steps without a provider in the
+    // synthetic game are named, nothing else is logged.
+    let steps: Vec<&str> = log
+        .iter()
+        .map(|l| {
+            l.strip_prefix("join: new character: Unapplied { step: \"")
+                .and_then(|r| r.split('"').next())
+                .unwrap_or(l)
+        })
+        .collect();
+    assert_eq!(
+        steps,
+        [
+            "new character set-up",
+            "start stats",
+            "start items",
+            "start skill",
+            "mouse skills",
+            "quest entry"
+        ]
+    );
 }
 
 /// M08 for the test above: the same 0x67 without flag bits 1 and 2 is

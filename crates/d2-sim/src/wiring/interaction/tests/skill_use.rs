@@ -664,3 +664,14 @@ fn cooldown_list_and_its_expiry_timer_are_real() {
     assert!(gone);
     fx.assert_clean();
 }
+
+// Covers: specs/data/runtime-maps.md §3; specs/items/properties.md §5 r9
+#[test]
+fn item_event_layer_split_is_the_1_14d_stuff() {
+    // `stuff` 6, mask (1 << 6) − 1: a registration layer (skill << 6) +
+    // level splits back into skill and level.
+    let (shift, mask) = Open::default().event_layer_split();
+    assert_eq!((shift, mask), (6, 0x3F));
+    let layer = (54u32 << shift) + 13;
+    assert_eq!((layer >> shift, layer & mask), (54, 13));
+}
