@@ -42,7 +42,7 @@
 | Edge cases & original bugs | 683–727 |
 | Test vectors | 728–776 |
 | Provenance | 777–833 |
-| Open questions | 834–923 |
+| Open questions | 834–933 |
 <!-- /index -->
 
 ## Summary
@@ -861,6 +861,16 @@ size and fallback pushes at `0x00563B9C` / `0x00563C83`), `0x005628C0`.
 19. Answered: `inventory-moves.md` §8.4 step 6 (full pair list; second list = corpses).
 20. Does the 1.14d client send C→S 0x4F button 0x18 (transmute) while
     an item is on the cursor (edge case 12)? Settle: recording R7.
+    Answered from the client code (2026-10-07; `ui/panels-2.md` cube
+    mouse down / up): the button is armed only on a mouse down with an
+    empty cursor (`0x004927C0`: `0x004680A0` ≠ 0 at `0x00492883` skips
+    the pressed flag), and the release `0x0048A190` sends 0x4F 0x18
+    (`0x0048A28B`) only when armed. So an unmodified client sends it
+    with an item on the cursor only if the cursor gains an item between
+    that press and release (a server message; no input of the same
+    button can); the server's edge-case-12 path is reached by such a
+    case or by a client that sends the message itself. R7 still
+    confirms on live data.
 21. ~~Readers of inventory +0x28 at `0x005697F0` and `0x0048C060`~~:
     answered in edge case 11 (socket and corpse inventories only).
 
