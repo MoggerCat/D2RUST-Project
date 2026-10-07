@@ -16,6 +16,7 @@
 pub mod bits;
 pub mod check;
 pub mod click;
+pub mod combat;
 pub mod dispatch;
 pub mod drlg;
 pub mod hover;
@@ -26,6 +27,7 @@ pub mod mirror;
 pub mod modes;
 #[cfg(test)]
 mod modes_tests;
+pub mod motion;
 pub mod msg;
 pub mod objects;
 pub mod output;
@@ -450,6 +452,12 @@ impl<L: ServerLink> Bridge<L> {
 
     pub fn world(&self) -> &ClientWorld {
         &self.world
+    }
+
+    /// The play preview's monster motion on the model (d2rs-own,
+    /// unverified; [`motion`]).
+    pub fn preview_motion(&mut self, m: &mut motion::MonsterMotion) {
+        m.frame(&mut self.world);
     }
 
     pub fn log(&self) -> &ReceiveLog {

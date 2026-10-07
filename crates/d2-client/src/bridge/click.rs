@@ -8,12 +8,13 @@
 //!
 //! What the model does not hold yet is answered by a stated reading,
 //! each marked:
-//! - no hover model (`0x00467A10`, `client/model.md` hover): no unit is
-//!   hovered, so every click is a click on the ground;
+//! - no hover model (`0x00467A10`, `client/model.md` hover): the play
+//!   preview hovers monsters near the click ([`super::combat`], d2rs-own,
+//!   unverified); hostility and melee range are its answers too;
 //! - no client path record: see [`ModelClick::walk_path`];
-//! - the `skills.txt` flag columns and `range` are not in the client
-//!   tables: [`ModelClick::skill_row`] answers `None`, which §6 r8.2 reads
-//!   as a point click.
+//! - [`ModelClick::skill_row`] reads the client `skills` rows' flag
+//!   columns and `range`; an id outside the table answers `None`, which
+//!   §6 r8.2 reads as a point click.
 //!
 //! The `mods` word of §4.3 r1 comes from [`RunMods`] (commands 34–36).
 //! In the `play` preview the local player's position the dispatcher reads
@@ -180,11 +181,15 @@ impl ClickWorld for ModelClick<'_> {
     }
     fn hover(&self) -> Option<UnitKey> {
         // TODO(spec: client/model.md hover `0x00467A10`): no hover model;
-        // the preview's pick is d2rs-own, unverified.
-        if !self.view.pick {
-            return None;
+        // The preview's pick (any unit under the cursor, screen space) and,
+        // without it, the monster hover; both d2rs-own, unverified.
+        if self.view.pick {
+            if let Some(k) = super::hover::pick(self.world, &self.camera()?, self.view.mouse) {
+                return Some(k);
+            }
         }
-        super::hover::pick(self.world, &self.camera()?, self.view.mouse)
+        let (x, y) = self.view.mouse;
+        super::combat::hover_at(self.world, self.inputs, self.to_world(x, y))
     }
     fn to_world(&self, x: i32, y: i32) -> (i32, i32) {
         self.camera().map_or((0, 0), |c| screen_to_world(&c, x, y))
@@ -235,15 +240,15 @@ impl ClickWorld for ModelClick<'_> {
                 mode: e.mode,
             })
     }
-    fn skill_row(&self, _id: u16) -> Option<SkillRowFacts> {
-        // TODO(spec: ui/controls.md §6 r8): the client `skills` rows hold
-        // no flag columns or `range` yet. d2rs-own, unverified (D1): the
-        // preview answers a row with no flags and range 0, so a click on
-        // a picked unit takes the unit path (§6 r8.3 → 3.6 interact).
-        self.view.pick.then(SkillRowFacts::default)
+    fn skill_row(&self, id: u16) -> Option<SkillRowFacts> {
+        // The client `skills` row when the table has it; otherwise the
+        // preview's flag-less row (ui/controls.md §6 r8: a click on a picked
+        // unit takes the unit path). d2rs-own, unverified (D1).
+        super::combat::row_facts(self.inputs, id)
+            .or_else(|| self.view.pick.then(SkillRowFacts::default))
     }
-    fn range(&self, _skill: SkillRef) -> u8 {
-        click::range::NONE
+    fn range(&self, skill: SkillRef) -> u8 {
+        super::combat::range_of(self.inputs, skill.id)
     }
     fn use_state(&self, _skill: SkillRef) -> u32 {
         // TODO(spec: skills/use.md §2 `0x00647960`): the client use state
@@ -277,8 +282,8 @@ impl ClickWorld for ModelClick<'_> {
     fn selectable(&self, u: UnitKey) -> bool {
         self.world.units.get(&u).is_some_and(|u| u.flag_4)
     }
-    fn hostile(&self, _u: UnitKey) -> bool {
-        false
+    fn hostile(&self, u: UnitKey) -> bool {
+        super::combat::hostile(self.world, self.inputs, u)
     }
     /// The `monstats` `npc` / `interact` bits of U's class
     /// ([`super::world::MonsterClass`]); no row: neither.
@@ -320,8 +325,8 @@ impl ClickWorld for ModelClick<'_> {
     fn just_portaled(&self) -> bool {
         self.world.local().is_some_and(|p| p.states.contains(&102))
     }
-    fn melee_range(&self, _u: UnitKey) -> bool {
-        false
+    fn melee_range(&self, u: UnitKey) -> bool {
+        super::combat::melee_range(self.world, u)
     }
     fn moving(&self) -> bool {
         false
@@ -588,6 +593,57 @@ mod tests {
             ..RunMods::default()
         };
         assert_eq!(press(ss.word(), at, None), None);
+    }
+
+    // Covers: specs/ui/controls.md §6 r8
+    #[test]
+    fn left_click_on_a_hostile_monster_sends_the_skill_on_the_unit() {
+        use crate::bridge::world::{SkillRow, MONSTER};
+        let mut w = world();
+        let m = UnitKey::new(MONSTER, 9);
+        let mut u = ClientUnit::new(m);
+        u.position = Some((104, 104));
+        u.flag_4 = true;
+        u.mode = 1;
+        w.units.insert(m, u);
+        // Attack: anim A1 (mode 7), range h2h (synthetic rows).
+        if let Some(e) = w.units.get_mut(&UnitKey::new(PLAYER, 1)) {
+            e.skills.as_mut().unwrap().entries[0].mode = 7;
+        }
+        let mut inputs = ModelInputs::default();
+        inputs.tables.skills = vec![SkillRow {
+            anim: 7,
+            range: 1,
+            ..SkillRow::default()
+        }];
+        // The mouse on the monster's feet.
+        let cam = ModelClick {
+            world: &w,
+            inputs: &inputs,
+            view: view((0, 0)),
+            local_at: None,
+        }
+        .camera()
+        .unwrap();
+        let at = (0..800)
+            .flat_map(|x| (0..550).map(move |y| (x, y)))
+            .find(|&(x, y)| screen_to_world(&cam, x, y) == (104, 104))
+            .expect("the monster is on screen");
+        let mut st = ClickState::default();
+        world_click(
+            &mut w,
+            &inputs,
+            &mut st,
+            view(at),
+            Kind::LeftDown,
+            Some(at),
+            0,
+        )
+        .unwrap();
+        let mut want = vec![0x06];
+        want.extend_from_slice(&1u32.to_le_bytes());
+        want.extend_from_slice(&9u32.to_le_bytes());
+        assert_eq!(w.outgoing, vec![want], "C→S 0x06 [type 1][guid 9]");
     }
 
     #[test]

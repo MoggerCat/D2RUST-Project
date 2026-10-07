@@ -179,6 +179,7 @@ pub fn add_walk(app: &mut App, tap: WalkTap, speeds: Option<crate::bridge::predi
         .get_resource::<ui::UnitArt>()
         .map(|a| a.0.art.clone());
     add_preview_walk(app, walk);
+    crate::world_view::monster_walk::add_monster_walk(app);
 }
 
 /// One log line every [`LOG_EVERY`] bridge frames.

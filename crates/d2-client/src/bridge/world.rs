@@ -1067,6 +1067,12 @@ pub struct SkillRow {
     pub skilldesc: u16,
     /// `EType` (+0x1DC).
     pub etype: u8,
+    /// `range` (+0x14, the `@range` index: 0 none, 1 h2h, 2 rng, 3 both,
+    /// 4 loc; `ui/controls.md` §6 r4, `skills/use.md` §3 r6).
+    pub range: u8,
+    /// The flag columns `ui/controls.md` §6 r8 reads, by `skills.txt`
+    /// bit (`controls::click::skill_flag`).
+    pub flags: u32,
 }
 
 /// The `Levels.txt` fields the client reads of the player's level
