@@ -5163,6 +5163,13 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
   Uber Tristram run also log every mode change of the three with its
   caller and every `0x005B0E00` call on them; expect no attack or skill
   mode started by AI code (only gethit / knockback / death).
+- `sim/units.md` OQ7 (answered statically 2026-10-07: single player has
+  game +0x6A = 3, so the difficulty's `aidel` column): a Nightmare
+  single-player game; log monster event-2 sets (U10) and check the
+  delay = Nightmare `aidel` (0 → 15).
+- `monsters/init.md` §27: kill a fetish shaman (Act III); log the
+  `0x00574370` call (class 278–282 → 141–145, mode 1) and its rng draws
+  with callers.
 
 ## 8. Lessons (problems met, fixes)
 
