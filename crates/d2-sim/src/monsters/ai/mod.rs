@@ -465,14 +465,31 @@ fn reschedule<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, unit: Un
     schedule_think(game, cx, unit, at);
 }
 
+/// An AI mode request (`0x005A7E60` + `0x005A7C20`, §7.1, §7.5): the
+/// mode change with the monster's velocity request (§7.3), which the
+/// mode set's movement set-up consumes (§7.5 rule 4.1).
+pub fn request_mode<W: AiHost + ?Sized>(
+    game: &mut Game,
+    cx: &mut Ctx<'_, W>,
+    unit: UnitId,
+    m: u8,
+    target: ModeTarget,
+) -> bool {
+    let mut v = cx.store.get(unit).map(|e| e.velocity).unwrap_or_default();
+    let ok = cx.world.change_mode_with(game, unit, m, target, &mut v);
+    if let Some(e) = cx.store.units.get_mut(&unit) {
+        e.velocity = v;
+    }
+    ok
+}
+
 /// `0x005DE080` `AITACTICS_IdleInNeutralMode` ("idle N", §1.2): N 0 → 1;
 /// a non-neutral unit first gets a mode change to neutral targeting
 /// itself; then delete + schedule.
 pub fn idle<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, unit: UnitId, n: i32) {
     let n = if n == 0 { 1 } else { n };
     if cx.world.anim_mode(unit) != mode::NEUTRAL {
-        cx.world
-            .change_mode(game, unit, mode::NEUTRAL, ModeTarget::Unit(unit));
+        request_mode(game, cx, unit, mode::NEUTRAL, ModeTarget::Unit(unit));
     }
     reschedule(game, cx, unit, n);
 }
@@ -654,8 +671,7 @@ pub fn mode_end<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, unit: 
         }
         return;
     }
-    cx.world
-        .change_mode(game, unit, mode::NEUTRAL, ModeTarget::Unit(unit));
+    request_mode(game, cx, unit, mode::NEUTRAL, ModeTarget::Unit(unit));
 }
 
 /// Installing an AI `0x005B0E00` (§3.3).

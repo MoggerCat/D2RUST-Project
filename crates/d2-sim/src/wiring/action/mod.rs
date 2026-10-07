@@ -191,6 +191,10 @@ pub struct ActionHooks<X> {
     /// player's DT start (`0x00580A70`'s unit target, [`death`]): the
     /// host that starts it sets it.
     pub mode_target: Option<UnitId>,
+    /// The mode of the monster mode change running now (the record's
+    /// mode, `units.md` §4.6), for the start functions that read it (the
+    /// attack / skill start `0x005A75C0`, rule 7).
+    pub monster_request: u32,
     /// The monster state (monster data, umods, monster init) lent by the
     /// host that owns it ([`monsters`]: `WorldSim` lends its world state
     /// around its timer events and tick hooks). `None`: the monster
@@ -275,6 +279,7 @@ impl<X> ActionHooks<X> {
             anim_data: None,
             vitals: None,
             mode_target: None,
+            monster_request: 0,
             monster_world: None,
             monster_world_out: false,
             quest_host: None,

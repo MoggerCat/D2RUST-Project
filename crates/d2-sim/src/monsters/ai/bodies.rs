@@ -9,8 +9,8 @@ use crate::units::{UnitId, UnitType};
 
 use super::tactics::*;
 use super::{
-    delete_thinks, idle, idle_if_later, install, mode, AiCommand, AiHost, Ctx, ModeTarget,
-    TickParam,
+    delete_thinks, idle, idle_if_later, install, mode, request_mode, AiCommand, AiHost, Ctx,
+    ModeTarget, TickParam,
 };
 
 pub(super) fn param<W: AiHost + ?Sized>(cx: &Ctx<'_, W>, u: UnitId, n: usize) -> i32 {
@@ -216,8 +216,7 @@ pub fn foul_crow_nest<W: AiHost + ?Sized>(
     // 2.
     if param(cx, u, 1) >= cx.aip(p, 3) {
         cx.world.set_unit_flag(u, FLAG_NO_DROP);
-        cx.world
-            .change_mode(game, u, mode::DEATH, ModeTarget::Point(0, 0));
+        request_mode(game, cx, u, mode::DEATH, ModeTarget::Point(0, 0));
         return;
     }
     // 3.

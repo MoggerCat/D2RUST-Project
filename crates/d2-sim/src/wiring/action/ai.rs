@@ -181,21 +181,47 @@ impl<X: Pending> AiModes for View<'_, X> {
         crate::wiring::path::monsters::stage_request(self.h, unit, target);
         self.monster_set_mode(game, unit, u32::from(mode))
     }
+    /// The mode change with the velocity request (`ai.md` §7.5 rule
+    /// 4.1): every mode but GH consumes it (staged for the movement
+    /// set-up of [`crate::wiring::path::monsters`]; dropped without the
+    /// provider, which has no path to give it to).
+    fn change_mode_with(
+        &mut self,
+        game: &mut Game,
+        unit: UnitId,
+        mode: u8,
+        target: ModeTarget,
+        velocity: &mut crate::monsters::ai::VelocityRequest,
+    ) -> bool {
+        if u32::from(mode) != MODE_GETHIT {
+            let v = std::mem::take(velocity);
+            crate::wiring::path::monsters::stage_velocity(self.h, unit, v);
+        }
+        self.change_mode(game, unit, mode, target)
+    }
     /// The anim mode (unit +0x10) without a mode change.
     fn set_anim_mode(&mut self, unit: UnitId, mode: u8) {
         if let Some(r) = self.units.get_mut(unit) {
             r.mode = u32::from(mode);
         }
     }
+    /// The path step count: the stop distance `0x00649070` (`ai.md`
+    /// §7.5 rule 7, `pathing.md` §13.1 rule 2) with the path provider.
     fn set_path_steps(&mut self, unit: UnitId, steps: i32) {
-        self.h.x.set_path_steps(unit, steps);
+        if crate::wiring::path::monsters::set_stop_distance(self.h, unit, steps).is_none() {
+            self.h.x.set_path_steps(unit, steps);
+        }
     }
     fn path_blocked(&self, unit: UnitId) -> bool {
         crate::wiring::path::monsters::path_blocked(self.h, unit)
             .unwrap_or_else(|| self.h.x.path_blocked(unit))
     }
+    /// Stop the path `0x00648730` (`ai.md` §7.5 rule 7, `pathing.md`
+    /// §13.1 rule 3) with the path provider.
     fn stop_path(&mut self, unit: UnitId) {
-        self.h.x.stop_path(unit);
+        if crate::wiring::path::monsters::stop_path(self.h, unit).is_none() {
+            self.h.x.stop_path(unit);
+        }
     }
     fn set_current_skill(&mut self, unit: UnitId, skill: i32) -> bool {
         self.h.x.set_current_skill(unit, skill)
@@ -604,7 +630,7 @@ impl<X: Pending> AiActs for View<'_, X> {
         self.h.x.ai_direction64(unit, target)
     }
     fn stop_unit_path(&mut self, unit: UnitId) {
-        self.h.x.stop_path(unit);
+        AiModes::stop_path(self, unit);
     }
     fn spawn_monster(
         &mut self,

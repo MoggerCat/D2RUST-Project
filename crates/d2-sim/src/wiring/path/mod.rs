@@ -77,6 +77,13 @@ pub struct PathState {
     /// (the request record's target, `monsters/ai.md` §7.1), taken by
     /// [`ActionHooks::monster_path_setup`](crate::wiring::action::ActionHooks).
     pub mode_request: Option<(UnitId, crate::monsters::ai::ModeTarget)>,
+    /// The monster's velocity request (`monsters/ai.md` §7.3) staged by
+    /// an AI mode request for the movement set-up that consumes it
+    /// (§7.5 rule 4.1; the AI store is lent out during the think).
+    pub mode_velocity: Option<(UnitId, crate::monsters::ai::VelocityRequest)>,
+    /// The movement set-up's fields of the AI param record (monster data
+    /// +0x2C, `monsters/ai.md` §7.5 rules 4–5), per monster.
+    pub setup: BTreeMap<UnitId, monsters::MoveSetup>,
 }
 
 impl PathState {
@@ -88,6 +95,8 @@ impl PathState {
             field: None,
             history: BTreeMap::new(),
             mode_request: None,
+            mode_velocity: None,
+            setup: BTreeMap::new(),
         })
     }
 

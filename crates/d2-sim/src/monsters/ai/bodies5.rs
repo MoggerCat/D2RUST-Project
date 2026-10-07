@@ -16,8 +16,8 @@ use super::bodies4::{
 use super::common::*;
 use super::tactics::*;
 use super::{
-    delete_thinks, idle, install, mode, state, AiHost, Ctx, ModeTarget, QuestCall, TickParam,
-    UnitRef,
+    delete_thinks, idle, install, mode, request_mode, state, AiHost, Ctx, ModeTarget, QuestCall,
+    TickParam, UnitRef,
 };
 
 // ---- §2 Minion ---------------------------------------------------------
@@ -714,8 +714,7 @@ fn talic<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitId, p:
         cx.world.set_path_steps(u, 1);
         // TODO(spec: ai-bodies-5.md §12 A step 3): the request byte +0x15
         // := 100 has no field in the mode request here.
-        cx.world
-            .change_mode(game, u, m1, ModeTarget::Point(tx + dx, ty + dy));
+        request_mode(game, cx, u, m1, ModeTarget::Point(tx + dx, ty + dy));
         return;
     }
     // 4.

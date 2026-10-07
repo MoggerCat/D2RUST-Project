@@ -142,6 +142,7 @@ impl<X: Pending> ActionHooks<X> {
         }
         p.records.remove(&unit);
         p.history.remove(&unit);
+        p.setup.remove(&unit);
     }
 }
 

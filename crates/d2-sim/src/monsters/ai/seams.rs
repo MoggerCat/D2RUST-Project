@@ -95,6 +95,22 @@ pub trait AiModes {
     /// Requests a mode change; false when the mode start failed (which
     /// then falls into the neutral start, [`super::neutral_mode_start`]).
     fn change_mode(&mut self, game: &mut Game, unit: UnitId, mode: u8, target: ModeTarget) -> bool;
+    /// [`AiModes::change_mode`] with the monster's pending velocity
+    /// request (`ai.md` §7.3), which the mode set's movement set-up
+    /// consumes for every mode but GH (§7.5 rule 4.1): a provider that
+    /// runs the set-up takes it and leaves `velocity` zeroed. Default:
+    /// the plain change, the request kept.
+    fn change_mode_with(
+        &mut self,
+        game: &mut Game,
+        unit: UnitId,
+        mode: u8,
+        target: ModeTarget,
+        velocity: &mut super::VelocityRequest,
+    ) -> bool {
+        let _ = velocity;
+        self.change_mode(game, unit, mode, target)
+    }
     /// Sets the anim mode without a mode change (inline thinks, §1.4).
     fn set_anim_mode(&mut self, unit: UnitId, mode: u8);
     /// The path step count.
