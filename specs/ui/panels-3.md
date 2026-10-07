@@ -29,14 +29,14 @@
 |   24. Character panel inputs (`panels.md` §8.7–§8.9; the `PENDING` character values) | 162–206 |
 |   25. Skill tree inputs (`panels.md` §10.3–§10.5; the `PENDING` icons and levels) | 207–242 |
 |   26. Waypoint rows (`panels.md` §13 r2–r7; the `PENDING` waypoint panel) | 243–277 |
-|   27. Scroll and other panels (`panels.md` OQ 9) | 278–325 |
-|   28. Gold dialog box and controls (`panels-2.md` §21 r9; answers `panels-2.md` OQ 6) | 326–486 |
-| Constants & data dependencies | 487–501 |
-| Randomness | 502–507 |
-| Edge cases & original bugs | 508–521 |
-| Test vectors | 522–545 |
-| Provenance | 546–573 |
-| Open questions | 574–589 |
+|   27. Scroll and other panels (`panels.md` OQ 9) | 278–351 |
+|   28. Gold dialog box and controls (`panels-2.md` §21 r9; answers `panels-2.md` OQ 6) | 352–512 |
+| Constants & data dependencies | 513–527 |
+| Randomness | 528–533 |
+| Edge cases & original bugs | 534–547 |
+| Test vectors | 548–571 |
+| Provenance | 572–599 |
+| Open questions | 600–616 |
 <!-- /index -->
 
 ## Summary
@@ -305,7 +305,7 @@ waypoint row table `[0x007BF03C]`.
    mode 3. `X1`, `Y1` (`0x00722EB8`): (242, 104), (255, 222), (148, 310),
    (47, 222), (75, 104); `X2`, `Y2` (`0x00722EE0`): (303, 161), (322,
    242), (254, 290), (190, 238), (211, 162). The writers of
-   `[0x007BF098]` and `[0x007BF254]`: §Open questions 1.
+   `[0x007BF098]` and `[0x007BF254]`: §Open questions 1 (answered: r7).
 4. **Recipe scroll** (ui 0x25, left; `0x0048BC10`, expansion game and ui
    0x25 open): `0x0048BBE0(text, color)` (from the 0x26 type 7 consumer
    `0x0049F490`, `ui/messages.md` §4) copies the text to `[0x007BCEA8]`,
@@ -317,11 +317,37 @@ waypoint row table `[0x007BF03C]`.
 5. **Guild states** 0x1B, 0x1C, 0x1D, 0x20 (full slot, `panels.md` §4.1)
    have no draw call of their own in the UI pass (`panels.md` §5); 0x1C
    and 0x1D only make the inventory family draw (§5 step 5). No opener
-   of them was found: §Open questions 2.
+   of them was found: §Open questions 2 (answered: r8).
 6. **Anvil** (ui 0x0E, `0x004C01E0`) is the item-socket dialog of
    `ui/messages.md` §11. **Player trade** (ui 0x17, inventory mode 0x0B,
    `%s\ui\panel\trade`, `0x004B8730`) is multiplayer only and not
    specified (Phases 7+): §Open questions 3.
+
+7. **Scroll reading and the symbol slots** (answers §Open questions 1).
+   The scroll item is set only by `0x0049FF90(u ECX, item EDX)` (callers: the
+   inventory use `0x00487963` and the belt use `0x00498A77`):
+   `[0x007BF228]` := item; ui 0x10 is toggled (`SetUIState(0x10, toggle, 0)`);
+   `0x0044DA40`; then for code `bkd ` the flag `[0x007BF254]` := 1, C→S
+   **0x3E** [u's GUID u32, −1 when u is none] (`0x00478680`,
+   `ActivateInifussScroll`) and `[0x007BF1E0]` := 0; any other code:
+   flag := 0, `[0x007BF1E0]` := 1. No other instruction writes the flag
+   (its only reader is the r1 test), and no instruction writes the
+   symbol slots `[0x007BF098]`–`[0x007BF0A1]` (scan of every absolute
+   reference in the image; the one block clear of the area, `0x0049D440`,
+   zeroes `0x007BF1B0`–`0x007BF24E`, item and counters included, not the
+   slots or the flag). The slots are zero-initialized data, so every
+   slot reads 0. Consequence in 1.14d: a `bkd` scroll is always drawn
+   with flag 1, i.e. the base only; `bks` draws the base only (r1); the
+   symbol pass of r3 is unreachable. d2rs draws the base for both and
+   keeps r3 only for fidelity of the code path (slots 0).
+8. **Guild states 0x1B, 0x1C, 0x1D, 0x20 are never opened** (answers
+   §Open questions 2). All 136 `SetUIState` call sites resolve to a
+   constant ui id (register tracking over each call's set-up) except the
+   gate's own close (`0x00453A4F`, mode 1 off, `panels.md` §3). None
+   passes 0x1B, 0x1C, 0x1D or 0x20; the only other writer of their flags
+   (`0x007A282C`, `0x007A2830`, `0x007A2834`, `0x007A2840`) is the
+   reset `0x00456970` (stores 0). They stay closed in 1.14d; d2rs need
+   not draw or open them.
 
 ### 28. Gold dialog box and controls (`panels-2.md` §21 r9; answers `panels-2.md` OQ 6)
 
@@ -573,11 +599,12 @@ numbers of `data/fields.tsv` for all ten wrappers. No D2MOO code used.
 
 ## Open questions
 
-1. Who writes the deciphered-scroll symbol slots `[0x007BF098]` (5 × u16)
+1. **Answered** (2026-10-07, §27 r7: no writer; the flag is set to 1
+   for every `bkd` read, so the symbol pass is unreachable). Was: Who writes the deciphered-scroll symbol slots `[0x007BF098]` (5 × u16)
    and the flag `[0x007BF254]` (§27 r3): no direct store was found;
    likely a block copy in a quest message handler. Read the S→C quest /
    0x5D-family handlers for a copy into `0x007BF090`–`0x007BF260`.
-2. Whether any 1.14d path opens ui 0x1B, 0x1C, 0x1D or 0x20 (§27 r5):
+2. **Answered** (2026-10-07, §27 r8: none does). Was: Whether any 1.14d path opens ui 0x1B, 0x1C, 0x1D or 0x20 (§27 r5):
    the 136 `SetUIState` call sites pass most ui ids in registers set
    earlier; a register-tracking scan settles it.
 3. Player trade panel (ui 0x17, §27 r6): art, both players' names and
