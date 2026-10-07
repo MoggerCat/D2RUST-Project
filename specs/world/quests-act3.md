@@ -994,7 +994,7 @@ quest code draws.
 ## Open questions
 
 1. Status meanings per Act III quest (client quest log): settle with
-   `quests.md` open question 1.
+   `quests.md` open question 1. **Answered** (2026-10-07): `world/quests-status.md`: the client (0x52 `0x0045CC00` → `0x004A40D0` stores the list; row build `0x004A1950`, tables `0x00723F30` and the per-quest status tables) maps each status to a description string id, a replay speech id and an icon state (§4, §5); Act III tables §9; Blade (q 19) and Blackened Temple (q 21) exceptions §6.
 2. Answered (`quests-act3-2.md` §11.3): `&level` is an output, written at `0x00559AF8`
    before any read; the item level is the source monster's stat 12 or
    the object's area level. Confirmed again 2026-10-07 (QD-3, `quests-act4.md`

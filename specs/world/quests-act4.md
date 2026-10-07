@@ -911,7 +911,7 @@ Act IV quest code draws.
 ## Open questions
 
 1. Status meanings per Act IV quest (client quest log): settle with
-   `quests.md` open question 1.
+   `quests.md` open question 1. **Answered** (2026-10-07): `world/quests-status.md`: the client (0x52 `0x0045CC00` → `0x004A40D0` stores the list; row build `0x004A1950`, tables `0x00723F30` and the per-quest status tables) maps each status to a description string id, a replay speech id and an icon state (§4, §5); Act IV tables §10; Fallen Angel and Hell's Forge exceptions §6.
 2. The classic end-of-game schedule reads `GetTickCount` (§5.8), an
    outcome driven by wall-clock time, against `sim/tick.md` §8. Chosen
    until settled: `d2-sim` uses elapsed game time = 40 ms × frames since

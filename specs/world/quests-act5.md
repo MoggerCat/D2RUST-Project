@@ -748,7 +748,7 @@ other Act V part-1 quest code draws.
 ## Open questions
 
 1. Status meanings per Act V quest (client quest log): settle with
-   `quests.md` open question 1.
+   `quests.md` open question 1. **Answered** (2026-10-07): `world/quests-status.md`: the client (0x52 `0x0045CC00` → `0x004A40D0` stores the list; row build `0x004A1950`, tables `0x00723F30` and the per-quest status tables) maps each status to a description string id, a replay speech id and an icon state (§4, §5); Act V tables §11; Siege, Rescue, Prison of Ice, Betrayal exceptions §6.
 2. `0x00558200(player, 0)`, the item level of Anya's rare item: item
    spec. **Answered** (2026-10-07): `0x00558200(unit, level)` (ECX unit,
    EDX level id): player → base stat 12 (`0x006253B0`), monster → total

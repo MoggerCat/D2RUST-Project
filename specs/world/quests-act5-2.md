@@ -643,7 +643,7 @@ Spawned Ancients, Tyrael and the missiles draw from their own code
 ## Open questions
 
 1. Status meanings per quest (client quest log): `quests.md` open
-   question 1.
+   question 1. **Answered** (2026-10-07): `world/quests-status.md`: the client (0x52 `0x0045CC00` → `0x004A40D0` stores the list; row build `0x004A1950`, tables `0x00723F30` and the per-quest status tables) maps each status to a description string id, a replay speech id and an icon state (§4, §5); Act V tables §11 (Rite of Passage, Eve of Destruction).
 2. `0x00538680(client, 5, difficulty)`: which save progression field
    (save spec; with `quests-act3.md` open question 5). **Answered**
    (2026-10-07): `quests-act1-rest.md` §5 (client +0x0A bits 8–12 raised

@@ -932,7 +932,7 @@ their own item seeds. No other Act II quest code draws.
 ## Open questions
 
 1. Status meanings 1–13 per Act II quest (client quest log): settle with
-   `quests.md` open question 1.
+   `quests.md` open question 1. **Answered** (2026-10-07): `world/quests-status.md`: the client (0x52 `0x0045CC00` → `0x004A40D0` stores the list; row build `0x004A1950`, tables `0x00723F30` and the per-quest status tables) maps each status to a description string id, a replay speech id and an icon state (§4, §5); Act II tables §8; Seven Tombs rows 5–7 and the tomb symbol §4 rule 2, §5 rule 6.
 2. `0x00545850` (quest-chest gate) and `0x00585B90` (chest treasure):
    their exact tests and draws belong to the object spec; until written,
    record one chest opening (packets + RNG).

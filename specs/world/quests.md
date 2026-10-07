@@ -990,7 +990,7 @@ item and path-placement specs).
 ## Open questions
 
 1. Status byte meanings 1–11 per quest (client quest-log text): settle
-   from the client's quest log code (`0x0045CC00` 0x52 handler).
+   from the client's quest log code (`0x0045CC00` 0x52 handler). **Answered** (2026-10-07): `world/quests-status.md`: the client (0x52 `0x0045CC00` → `0x004A40D0` stores the list; row build `0x004A1950`, tables `0x00723F30` and the per-quest status tables) maps each status to a description string id, a replay speech id and an icon state (§4, §5); per-quest tables §7–§11, Act I in §7, special cases §6.
 2. Does Flavie's chat really draw twice from the player seed and list
    two lines? Settle with an RNG + packets recording of one Flavie chat.
 3. (Settled: the cow portal is reached through the cube's thunk table,
