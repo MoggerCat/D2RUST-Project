@@ -129,7 +129,7 @@ don't open it.
 
 ## Working rules
 
-Every method in `docs/METHODS.md` applies (21 entries; each one's **Here**
+Every method in `docs/METHODS.md` applies (22 entries; each one's **Here**
 line is its binding in this project, with the model/effort table and the
 token budget). Read it at the start of a session, after this file. New
 methods go there (`py tools/methods.py new "Title"`), not here. Project-only
