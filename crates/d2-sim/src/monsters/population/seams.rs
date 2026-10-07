@@ -137,9 +137,6 @@ pub trait MonsterInit {
     fn transfer_modifiers(&mut self, boss: UnitId, minion: UnitId);
     /// `0x0058F030(game, unit, owner, a, b, c)`.
     fn set_owner_data(&mut self, unit: UnitId, owner: OwnerKey, a: i32, b: i32, c: i32);
-    /// `0x0058F030` for a unique's minion (§6.5 step 4). TODO(spec:
-    /// population.md §6.5 r4): the arguments are not stated.
-    fn unique_minion_owner_data(&mut self, boss: UnitId, minion: UnitId);
     /// `0x0058F100`: add to the leader's minion list.
     fn add_minion(&mut self, leader: UnitId, minion: UnitId);
     /// `0x005DD330`: owner GUID and type.
@@ -148,17 +145,8 @@ pub trait MonsterInit {
     fn boss_quest_hook(&mut self, boss: UnitId);
     /// `0x005A0200` and the rest of superunique init (§11.4 step 4).
     fn superunique_init(&mut self, boss: UnitId, su: i32);
-    /// Owner data of the hcIdx 60 boss. TODO(spec: population.md §11.4
-    /// r6): the arguments are not stated.
-    fn superunique_owner_data(&mut self, boss: UnitId);
-    /// `0x005B24E0(boss, class, a, b, c, flags)`. TODO(spec: population.md
-    /// open question 4): argument meaning not read.
-    fn group_spawn(&mut self, boss: UnitId, class: i32, a: i32, b: i32, c: i32, flags: u16);
     /// `0x00555230(type 2, class, …)`: an object.
     fn create_object(&mut self, room: RoomId, class: i32, x: i32, y: i32);
-    /// The object of a barricade door (§11.3 step 3). TODO(spec:
-    /// population.md open question 3): object ids not read.
-    fn barricade_object(&mut self, unit: UnitId, class: i32);
     /// `0x0058F000`, then `0x00666120` when the preset has data.
     fn preset_created(&mut self, unit: UnitId, preset: &PresetUnit);
     /// `0x005417D0`: event 7 at frame + 250 + `roll(50)` on the

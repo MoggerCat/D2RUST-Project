@@ -38,22 +38,22 @@
 |   2. Cell picker (`0x0061FFF0`) | 128–143 |
 |   3. Adding a tile record (`0x00457CF0`, room R, record T) | 144–156 |
 |   4. Adding units (`0x00458DC0`, room R) | 157–175 |
-|   5. Reveal | 176–204 |
-|   6. Town art (`0x004591A0`, DRLG callback +0x488) | 205–223 |
-|   7. Persistence (`.map`, `.ma0`–`.ma3`) | 224–259 |
-|   8. State, keys and options | 260–295 |
-|   9. View geometry | 296–315 |
-|   10. Cell draw pass | 316–354 |
-|   11. Unit markers (`0x0045AC90` → `0x0045A860`) | 355–394 |
-|   12. Party roster markers (`0x0045AB60`) | 395–406 |
-|   13. Header text | 407–421 |
-|   14. Lifetime | 422–428 |
-| Constants & data dependencies | 429–442 |
-| Randomness | 443–450 |
-| Edge cases & original bugs | 451–466 |
-| Test vectors | 467–502 |
-| Provenance | 503–523 |
-| Open questions | 524–544 |
+|   5. Reveal | 176–207 |
+|   6. Town art (`0x004591A0`, DRLG callback +0x488) | 208–226 |
+|   7. Persistence (`.map`, `.ma0`–`.ma3`) | 227–262 |
+|   8. State, keys and options | 263–298 |
+|   9. View geometry | 299–321 |
+|   10. Cell draw pass | 322–360 |
+|   11. Unit markers (`0x0045AC90` → `0x0045A860`) | 361–402 |
+|   12. Party roster markers (`0x0045AB60`) | 403–414 |
+|   13. Header text | 415–431 |
+|   14. Lifetime | 432–438 |
+| Constants & data dependencies | 439–452 |
+| Randomness | 453–460 |
+| Edge cases & original bugs | 461–476 |
+| Test vectors | 477–512 |
+| Provenance | 513–533 |
+| Open questions | 534–552 |
 <!-- /index -->
 
 ## Summary
@@ -197,7 +197,10 @@ writer in `Game.exe`: 0):
 4. **Countdown**: the unit placement `0x004654C0` sets it to 2
    (`0x00459140`, after the teleport step succeeds,
    `client/msg-units.md` §3 r4), so the first two frames after a
-   placement reveal nothing.
+   placement reveal nothing. Every placed unit resets it, not only the
+   local player: `0x00459140` is called for any unit that reaches the
+   teleport step (units in a death mode, or with flag 0x10000, return
+   before it), before the local-player check (`0x00465692`).
 5. S→C 0x07 / 0x08 (room sight, `client/model.md` §9) add no cells
    themselves: a room's tiles only become cells after they were drawn
    and r1 runs.
@@ -302,6 +305,9 @@ H − 40), div = `[0x00711254]`; divisions are C signed division.
    the result of `0x00492C10` changed, or `Left` changed since the last
    frame: store them and re-centre (force 0). Mini origin (mx, my) =
    (2W/3, 78) when `Left` = 0, else (0, 96 if `0x00492C10` ≠ 0 else 0).
+   `0x00492C10` is `[0x007BEECC]` ≠ 2: the party-portrait state of
+   `ui/messages.md` (portrait pass skipped at 2), so the left mini map
+   moves down 96 px whenever the portraits are not hidden.
    Rectangle: mini [mx − 8, W/3 + mx] × [my, H/3 + my] (H = display
    height); full [−16, W] × [−16, H]. (`[0x007A51C8]`–`[0x007A51D4]`.)
 2. **Panel side** (`0x00459700`): open mode 1 forces `Left` := 1
@@ -358,7 +364,9 @@ For each room of the local player's near-room list, each unit of its
 list (+0x74, next +0xE8):
 
 1. Skipped when it is a player and `0x00464820` ≠ 0 and it has no state
-   7 (`0x00639DF0`); skipped when §11 r3 gives no colour.
+   7 (`0x00639DF0`); `0x00464820` = "dead": unit +0xC4 bit 16
+   (0x10000) set, or a player in mode 0 / 17, or a monster in mode 0 /
+   12 (other types: only the flag); skipped when §11 r3 gives no colour.
 2. Position: X = px / div − Ax + 8, Y = py / div − Ay − 8 ((px, py) as
    §4 r4); drawn only inside the marker rectangle (§9 r1).
 3. **Colour** (`0x00459BC0`; palette indices `nearest(r, g, b)` of
@@ -370,7 +378,7 @@ list (+0x74, next +0xE8):
    | player, mode ≠ 17, same party id as the local player (≠ −1, `0x00465400`) | B3 = (0, 255, 0) |
    | other player, mode ≠ 17 | B1 = (255, 0, 0) |
    | player, mode 17, whose inventory owner (`0x0063D450`) is itself | B2 = (255, 0, 255) |
-   | monster, mode ≠ 12, flag +0xC4 bit 21 clear, without `monstats` `interact`: disguised as a player with state 0x25 and an owner: owner same party → B4, else B1; else by `0x00478D90` relation: 1 → B4 = (0x44, 0x70, 0x74); 2 → B5 = (0x48, 0xA0, 0x34) when `AutoMap Party`; 0, 3 → none | |
+   | monster, mode ≠ 12, flag +0xC4 bit 21 clear, without `monstats` `interact`: disguised as a player with state 0x25 and an owner: owner same party → B4, else B1; else by `0x00478D90(owner id)` relation (owner unit +0x0C, −1 without an owner; the client roster list `[0x007BB5BC]`, next +0x30, matched on entry +0x08: none → 0; entry +0x04 outside the levels table or its level flag byte without a `[0x006CE278]` bit → 3; entry +0x0C = the local player's roster +0x0C (`0x00463DD0`) → 1; the two `0x00479BC0` party ids equal and ≠ −1 → 2; else 0; in single player the local player's own pets and hireling give 1): 1 → B4 (the owner flag test `0x00451F30(owner, 0x200)` that follows picks B4 on both branches, so it has no effect) = (0x44, 0x70, 0x74); 2 → B5 = (0x48, 0xA0, 0x34) when `AutoMap Party`; 0, 3 → none | |
    | monster as above with `interact`, class not 537–539 | B6 = (0xF4, 0xF4, 0xF4) |
    | object 59 (town portal) | B8 = (0xF4, 0xF4, 0) |
    | object 60 (portal) unless its target level is 111, 112, 117, 125, 126 or 127 | B8 |
@@ -417,6 +425,8 @@ Font 1, colour 4, right-aligned at x = W − width − 16; line y starts at
 4. Difficulty (`0x0044DCD0` = 1 or 2): string 4183 + string 5154
    (Nightmare) or 5155 (Hell); total length > 299 is fatal 0xB2A.
 5. Game type 6 or 8 (`0x0044DB30`): `0x0040DF60` text (300 chars).
+   Out of scope (Phases 0–6): game types 6 / 8 are TCP/IP games;
+   `0x0040DF60` writes the host's IP address text (`gethostbyname`).
 6. Expansion: string 22730 (0x58CA).
 
 ### 14. Lifetime
@@ -523,16 +533,14 @@ bit 9, `monstats2` +0x118, `objects` +0x1BC matched to
 
 ## Open questions
 
-1. Pending: `0x00492C10` (what moves the mini map down 96 px) and
-   `0x00464820` (the player-marker gate of §11 r1); one read each.
-2. Pending: the relation codes of `0x00478D90` (§11 r3: which pets and
-   hirelings are 1 vs 2) and `0x00451F30(unit, 0x200)`; read both.
-3. Pending: labels of strings 4181–4183, 5154, 5155, 22730, 0xCF3 and
-   the source of `0x0040DF60` / game types 6, 8 (§13); a `string.tbl` /
-   `expansionstring.tbl` lookup.
-4. Pending: whether `0x004654C0` sets the countdown for every placed
-   unit or only the local player (§5 r4); read the branch before
-   `0x00465692`.
+1. *Answered* (2026-10-08, static): `0x00492C10` in §9 r1,
+   `0x00464820` in §11 r1.
+2. *Answered* (2026-10-08, static): §11 r3 (relation codes; the 0x200
+   test has no effect).
+3. *Answered* (2026-10-08): the header draws the table text of each id
+   (`ui/text.md` §2), so no label is needed by the rule; game types 6 /
+   8 and `0x0040DF60` are out of scope (Phases 0–6), §13 r5.
+4. *Answered* (2026-10-08, static): every placed unit, §5 r4.
 5. PROVISIONAL: the `.ma` record header field order and chain link
    (§7 r2–r3) are read from the save/load call sequence; settled by
    automap-0003.

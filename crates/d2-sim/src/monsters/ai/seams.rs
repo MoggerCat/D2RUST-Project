@@ -82,8 +82,10 @@ pub trait AiUnits {
     /// Sets bits of the unit flags (unit +0xC4; FoulCrowNest's 0x20000).
     fn set_unit_flag(&mut self, unit: UnitId, mask: u32);
     /// State on / off (`0x00639DB0(unit, state, on)`, `stat-lists.md`
-    /// §9.2; SandRaider's states 90, 91).
-    fn set_state(&mut self, unit: UnitId, state: u16, on: bool);
+    /// §9.2; SandRaider's states 90, 91): a state outside 0 … count − 1
+    /// does nothing; else the toggle, then the unit's update-queue insert
+    /// whether or not the bit changed.
+    fn set_state(&mut self, game: &mut Game, unit: UnitId, state: u16, on: bool);
     /// `0x00553540`: the unit's path target unit (`None` when there is
     /// none).
     fn path_target(&self, unit: UnitId) -> Option<UnitId>;
@@ -95,21 +97,41 @@ pub trait AiModes {
     /// Requests a mode change; false when the mode start failed (which
     /// then falls into the neutral start, [`super::neutral_mode_start`]).
     fn change_mode(&mut self, game: &mut Game, unit: UnitId, mode: u8, target: ModeTarget) -> bool;
-    /// [`AiModes::change_mode`] with the monster's pending velocity
-    /// request (`ai.md` §7.3), which the mode set's movement set-up
-    /// consumes for every mode but GH (§7.5 rule 4.1): a provider that
-    /// runs the set-up takes it and leaves `velocity` zeroed. Default:
-    /// the plain change, the request kept.
+    /// [`Self::change_mode`] with the request record's path-type byte
+    /// (+0x15, §7.1) overwritten with `path_byte` after the builder set
+    /// it (100 = no path, 101 = type 13, else the path type). Default:
+    /// the plain request.
+    fn change_mode_path_byte(
+        &mut self,
+        game: &mut Game,
+        unit: UnitId,
+        mode: u8,
+        target: ModeTarget,
+        path_byte: u8,
+    ) -> bool {
+        let _ = path_byte;
+        self.change_mode(game, unit, mode, target)
+    }
+    /// [`AiModes::change_mode`] (or, with a path byte,
+    /// [`AiModes::change_mode_path_byte`]) with the monster's pending
+    /// velocity request (`ai.md` §7.3), which the mode set's movement
+    /// set-up consumes for every mode but GH (§7.5 rule 4.1): a provider
+    /// that runs the set-up takes it and leaves `velocity` zeroed.
+    /// Default: the plain change, the request kept.
     fn change_mode_with(
         &mut self,
         game: &mut Game,
         unit: UnitId,
         mode: u8,
         target: ModeTarget,
+        path_byte: Option<u8>,
         velocity: &mut super::VelocityRequest,
     ) -> bool {
         let _ = velocity;
-        self.change_mode(game, unit, mode, target)
+        match path_byte {
+            Some(b) => self.change_mode_path_byte(game, unit, mode, target, b),
+            None => self.change_mode(game, unit, mode, target),
+        }
     }
     /// Sets the anim mode without a mode change (inline thinks, §1.4).
     fn set_anim_mode(&mut self, unit: UnitId, mode: u8);

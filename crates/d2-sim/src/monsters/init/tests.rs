@@ -214,6 +214,8 @@ struct Fake {
     minions: BTreeMap<UnitId, Vec<UnitId>>,
     region_bosses: u32,
     next_seed: u32,
+    /// Extra (type, parent) nestings for `montype_is` beyond equality.
+    montype_nest: BTreeSet<(u16, u16)>,
 }
 
 impl Fake {
@@ -237,6 +239,7 @@ impl Fake {
             log: Vec::new(),
             inventory: false,
             items_at: BTreeSet::new(),
+            montype_nest: BTreeSet::new(),
             region: Vec::new(),
             level_id: 2,
             minions: BTreeMap::new(),
@@ -287,6 +290,9 @@ impl Fake {
 impl InitHost for Fake {
     fn game(&mut self) -> &mut Game {
         &mut self.game
+    }
+    fn montype_is(&mut self, montype: u16, ty: u16) -> bool {
+        montype == ty || self.montype_nest.contains(&(montype, ty))
     }
     fn units(&mut self) -> &mut Units {
         &mut self.units
@@ -1536,6 +1542,23 @@ fn eligibility() {
     assert!(e(&mut f, 36));
 }
 
+// Covers: specs/monsters/init.md §17.3 r2
+#[test]
+fn eligibility_exclude_is_the_matrix_row() {
+    // Spec vectors: type 2 has equiv1 1. Class MonType 1, exclude 2 →
+    // excluded (2 is a sub-type of 1); MonType 2, exclude 1 → not.
+    let mut t = boss_tables();
+    t.monumod[5].exclude1 = 2;
+    t.monumod[6].exclude1 = 1;
+    t.monstats[0].montype = 1;
+    t.monstats[1].montype = 2;
+    let mut f = fake_with(t);
+    f.montype_nest.insert((2, 1));
+    let cx = f.cx;
+    assert!(!eligible(&cx, &mut f, 0, 5));
+    assert!(eligible(&cx, &mut f, 1, 6));
+}
+
 // Covers: specs/monsters/init.md §18 text, §18 r1, §18 r2, §edge-cases-original-bugs r6
 #[test]
 fn unique_boss_with_minions() {
@@ -2098,6 +2121,15 @@ fn assign_fields() {
     c[0] = 2;
     let f = components_field(&c, &[3; 16]).unwrap();
     assert_eq!(f[0], (2, 2));
+    // §24 rule 3: one presence bit, then the components (here 16 × 2 bits).
+    let mut w = BitWriter::new();
+    write_components(&mut w, &[0; 16], &[3; 16]);
+    assert_eq!((w.bits, w.bytes.clone()), (1, vec![0]));
+    let mut w = BitWriter::new();
+    write_components(&mut w, &c, &[3; 16]);
+    assert_eq!(w.bits, 1 + 16 * 2);
+    // Bit 0 = 1 (present), bits 1–2 = component 0 (2).
+    assert_eq!(w.bytes[0] & 0b111, 0b101);
     // Boss section: none without umods.
     let mut w = BitWriter::new();
     assert!(!write_boss_section(&mut w, &MonsterData::default()));

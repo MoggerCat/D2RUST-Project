@@ -71,12 +71,12 @@ pub(super) fn skill_at<W: AiHost + ?Sized>(
     use_skill(game, cx, u, m, s, target);
 }
 
-/// Life percent of a unit (`0x00621F20`); 0 for no unit.
-///
-/// TODO(spec gap): Fetish reads T's life percent; with no T (target
-/// mode 1 always has one) 0 is used.
+/// T's life percent (`0x00621F20`) in Fetish (target mode 1). T = 0 is
+/// unreachable (`ai.md` §2.3 "Target 0 in mode-1 and mode-4 bodies"):
+/// asserted, not handled.
 fn life_of<W: AiHost + ?Sized>(cx: &Ctx<'_, W>, t: Option<UnitId>) -> i32 {
-    t.map_or(0, |t| cx.world.life_percent(t))
+    let t = t.expect("Fetish think without a target (ai.md §2.3)");
+    cx.world.life_percent(t)
 }
 
 /// `Run` × 100 / `Velocity` − 100 (monstats +52, +50, signed,
@@ -167,11 +167,11 @@ pub fn skeleton_bow<W: AiHost + ?Sized>(
     // 3.
     let Some(s) = s.filter(|_| e < 20) else {
         if cx.chance(u, cx.aip(p, 3)) {
-            // TODO(spec gap): walk in radius of target 0 does nothing.
-            if let Some(tt) = t {
-                let (a, b) = (cx.aip(p, 4), cx.aip(p, 5));
-                cx.world.walk_in_radius(game, u, tt, a, b);
-            }
+            // T = 0 is unreachable (target mode 1, `ai.md` §2.3):
+            // asserted, not handled.
+            let tt = t.expect("SkeletonBow think without a target (ai.md §2.3)");
+            let (a, b) = (cx.aip(p, 4), cx.aip(p, 5));
+            cx.world.walk_in_radius(game, u, tt, a, b);
         } else {
             idle(game, cx, u, 20);
         }
@@ -277,8 +277,9 @@ pub fn blood_raven<W: AiHost + ?Sized>(
     if let Some(k) = home {
         let hp = command_mut(cx, u, k).map_or([0; 5], |c| c.params);
         let (hx, hy) = (hp[1], hp[2]);
-        // TODO(spec gap): h for target 0 (target mode 1 always has one).
-        h = t.map_or(0, |t| half_size_distance(cx, t, hx, hy));
+        // T = 0 is unreachable (target mode 1, `ai.md` §2.3): asserted.
+        let tt = t.expect("BloodRaven think without a target (ai.md §2.3)");
+        h = half_size_distance(cx, tt, hx, hy);
         if d > 45 {
             idle(game, cx, u, 5);
             return;
@@ -328,8 +329,9 @@ pub fn blood_raven<W: AiHost + ?Sized>(
         if cx.world.seed(u).step() & 1 == 1 {
             dy = -dy;
         }
-        // TODO(spec gap): the raise point around target 0 uses (0, 0).
-        let (tx, ty) = t.map_or((0, 0), |t| cx.world.position(t));
+        // T = 0 is unreachable (target mode 1, `ai.md` §2.3): asserted.
+        let tt = t.expect("BloodRaven think without a target (ai.md §2.3)");
+        let (tx, ty) = cx.world.position(tt);
         use_skill(
             game,
             cx,
@@ -895,8 +897,8 @@ pub fn sand_raider<W: AiHost + ?Sized>(
     };
     // 1.
     if param(cx, u, 0) == 0 {
-        cx.world.set_state(u, 90, false);
-        cx.world.set_state(u, 91, false);
+        cx.world.set_state(game, u, 90, false);
+        cx.world.set_state(game, u, 91, false);
         set_param(cx, u, 1, 0);
     }
     // 2.
@@ -919,7 +921,8 @@ pub fn sand_raider<W: AiHost + ?Sized>(
     }
     // 3.
     if n > aip5 {
-        cx.world.set_state(u, if blue { 90 } else { 91 }, true);
+        cx.world
+            .set_state(game, u, if blue { 90 } else { 91 }, true);
         set_param(cx, u, 1, 1);
     }
     // 4.
@@ -1121,8 +1124,8 @@ pub fn sand_maggot<W: AiHost + ?Sized>(
         }
         return;
     }
-    // TODO(spec: ai-bodies.md §9.28): states above 3 are not stated; they take
-    // the above-ground steps.
+    // A state above 3 (never written here) takes the above-ground steps
+    // whatever T and S are (`ai-bodies.md` §9.28).
     // 3.1.
     if cx.world.life_percent(u) < 25
         && s2 >= 0

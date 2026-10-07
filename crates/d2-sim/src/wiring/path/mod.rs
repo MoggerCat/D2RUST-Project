@@ -84,6 +84,9 @@ pub struct PathState {
     /// The movement set-up's fields of the AI param record (monster data
     /// +0x2C, `monsters/ai.md` §7.5 rules 4–5), per monster.
     pub setup: BTreeMap<UnitId, monsters::MoveSetup>,
+    /// The staged request's path-type byte (+0x15) when the AI
+    /// overwrote the builder's value (`ai.md` §7.1).
+    pub mode_request_byte: Option<(UnitId, u8)>,
 }
 
 impl PathState {
@@ -97,6 +100,7 @@ impl PathState {
             mode_request: None,
             mode_velocity: None,
             setup: BTreeMap::new(),
+            mode_request_byte: None,
         })
     }
 

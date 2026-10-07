@@ -194,6 +194,13 @@ impl<X: Pending> ActionHooks<X> {
             }
             _ => None,
         };
+        let byte_override = match p.mode_request_byte {
+            Some((u, b)) if u == unit => {
+                p.mode_request_byte = None;
+                Some(b)
+            }
+            _ => None,
+        };
         let staged_velocity = match p.mode_velocity {
             Some((u, v)) if u == unit => {
                 p.mode_velocity = None;
@@ -239,7 +246,9 @@ impl<X: Pending> ActionHooks<X> {
                 speed,
                 steps,
             } = velocity;
-            let mut t = u32::from(request_path_byte(moves));
+            // The record's byte +0x15: the builder's, or the AI's
+            // override (`ai.md` §7.1).
+            let mut t = u32::from(byte_override.unwrap_or_else(|| request_path_byte(moves)));
             let mut v = 0i32;
             let mut n = 0i32;
             if method != 0 {
@@ -645,9 +654,15 @@ impl<X: Pending> ActionHooks<X> {
 
 /// Stages the AI's mode request (the record's target fields, `ai.md`
 /// §7.1) for the monster mode set that follows.
-pub(crate) fn stage_request<X: Pending>(h: &mut ActionHooks<X>, unit: UnitId, target: ModeTarget) {
+pub(crate) fn stage_request<X: Pending>(
+    h: &mut ActionHooks<X>,
+    unit: UnitId,
+    target: ModeTarget,
+    path_byte: Option<u8>,
+) {
     if let Some(p) = h.paths.as_mut() {
         p.mode_request = Some((unit, target));
+        p.mode_request_byte = path_byte.map(|b| (unit, b));
     }
 }
 

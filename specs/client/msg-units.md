@@ -29,13 +29,13 @@
 |   5. Local player vitals: 0x18, 0x95, 0x96 | 356–377 |
 |   6. Unit states: 0xA7, 0xA8, 0xA9, 0xAA | 378–408 |
 |   7. Other unit messages (general handlers, act at receive) | 409–524 |
-|   8. Player roster (0x5B, 0x5C, 0x65, 0x82, 0x8E; life from 0x0D, 0xAB) | 525–602 |
-| Constants & data dependencies | 603–614 |
-| Randomness | 615–622 |
-| Edge cases & original bugs | 623–645 |
-| Test vectors | 646–696 |
-| Provenance | 697–739 |
-| Open questions | 740–774 |
+|   8. Player roster (0x5B, 0x5C, 0x65, 0x82, 0x8E; life from 0x0D, 0xAB) | 525–605 |
+| Constants & data dependencies | 606–617 |
+| Randomness | 618–625 |
+| Edge cases & original bugs | 626–648 |
+| Test vectors | 649–699 |
+| Provenance | 700–742 |
+| Open questions | 743–777 |
 <!-- /index -->
 
 Owned ids: 0x0A, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x15, 0x18, 0x4C, 0x4D,
@@ -551,7 +551,10 @@ The player roster (§8). Outputs (`client/bridge.md` §10): `UnitOverlay`
    min 34): GUID u32@3, class u8@7, name @8 (16 bytes), u16@0x18,
    u16@0x1A, u16@0x1C, u16@0x1E, u16@0x20, string 1 @0x22, string 2
    after string 1's NUL. GUID −1 → fatal 0xB3. A record found by GUID
-   or by name (`0x00479360`, active list) is updated in place; else an
+   or by name (`0x00479360`, active list `[0x007BB5C0]`, next +0x80:
+   the first record whose GUID +0x10 equals the GUID, or whose name at
+   +0x00 equals the message name byte for byte up to and including the
+   NUL (case-sensitive, no length bound); 2026-10-08 read) is updated in place; else an
    inactive record with that GUID is moved out of the inactive list,
    else a new record is allocated (first 0x84 bytes zeroed); +0x34 :=
    a new handle; fields filled (`0x004793C0`): name, GUID, class,

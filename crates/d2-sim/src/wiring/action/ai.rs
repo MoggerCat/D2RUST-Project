@@ -21,7 +21,7 @@ use crate::units::{RoomId, UnitId};
 
 use super::objects::ObjectRoute;
 use super::units::clear_uninterruptable;
-use super::{Pending, View};
+use super::{Pending, View, WiringError};
 use crate::world::objects::Dispatch;
 
 /// Monster mode 3, get-hit (`ai.md` §1.2).
@@ -153,12 +153,22 @@ impl<X: Pending> AiUnits for View<'_, X> {
             r.flags |= mask;
         }
     }
-    /// The state toggle `0x00625A70` (`stat-lists.md` §9.2).
-    ///
-    /// TODO(spec: ai-bodies.md §9.26): SandRaider calls `0x00639DB0`; read as the
-    /// state toggle of `stat-lists.md` §9.2.
-    fn set_state(&mut self, unit: UnitId, s: u16, on: bool) {
+    /// `0x00639DB0(unit, s, on)` (`ai-bodies.md` §9.26, `stat-lists.md`
+    /// §9.2): s outside 0 … states count − 1 → nothing; else the toggle
+    /// `0x00625A70`, then the update-queue insert `0x0064C040`
+    /// (`unit-order.md` §6.2) whether or not the bit changed.
+    fn set_state(&mut self, game: &mut Game, unit: UnitId, s: u16, on: bool) {
+        if usize::from(s) >= self.stats.data().states.count() {
+            return;
+        }
         View::set_state(self, unit, s, on);
+        if let Err(e) = game.lists.queue_update(unit) {
+            self.h
+                .errors
+                .push(WiringError::Unit(crate::units::modes::UnitError::Game(
+                    e.into(),
+                )));
+        }
     }
     fn path_target(&self, unit: UnitId) -> Option<UnitId> {
         if self.h.paths.is_some() {
@@ -178,7 +188,19 @@ impl<X: Pending> AiModes for View<'_, X> {
     /// (state 54, bad mode).
     fn change_mode(&mut self, game: &mut Game, unit: UnitId, mode: u8, target: ModeTarget) -> bool {
         self.h.x.set_mode_target(unit, target);
-        crate::wiring::path::monsters::stage_request(self.h, unit, target);
+        crate::wiring::path::monsters::stage_request(self.h, unit, target, None);
+        self.monster_set_mode(game, unit, u32::from(mode))
+    }
+    fn change_mode_path_byte(
+        &mut self,
+        game: &mut Game,
+        unit: UnitId,
+        mode: u8,
+        target: ModeTarget,
+        path_byte: u8,
+    ) -> bool {
+        self.h.x.set_mode_target(unit, target);
+        crate::wiring::path::monsters::stage_request(self.h, unit, target, Some(path_byte));
         self.monster_set_mode(game, unit, u32::from(mode))
     }
     /// The mode change with the velocity request (`ai.md` §7.5 rule
@@ -191,13 +213,17 @@ impl<X: Pending> AiModes for View<'_, X> {
         unit: UnitId,
         mode: u8,
         target: ModeTarget,
+        path_byte: Option<u8>,
         velocity: &mut crate::monsters::ai::VelocityRequest,
     ) -> bool {
         if u32::from(mode) != MODE_GETHIT {
             let v = std::mem::take(velocity);
             crate::wiring::path::monsters::stage_velocity(self.h, unit, v);
         }
-        self.change_mode(game, unit, mode, target)
+        match path_byte {
+            Some(b) => self.change_mode_path_byte(game, unit, mode, target, b),
+            None => self.change_mode(game, unit, mode, target),
+        }
     }
     /// The anim mode (unit +0x10) without a mode change.
     fn set_anim_mode(&mut self, unit: UnitId, mode: u8) {

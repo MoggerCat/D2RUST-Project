@@ -36,16 +36,16 @@
 |   7. Contribution of one record | 269–348 |
 |   8. Light sources | 349–413 |
 |   9. Environment (day and night) | 414–571 |
-|   10. Scripted ambient overrides (`0x0046BDD0`) | 572–625 |
-|   11. Light values handed to the draws | 626–656 |
-|   12. Captures (answers `capture.md` Open question 5) | 657–694 |
-|   13. d2rs answers | 695–705 |
-| Constants & data dependencies | 706–717 |
-| Randomness | 718–724 |
-| Edge cases & original bugs | 725–741 |
-| Test vectors | 742–775 |
-| Provenance | 776–824 |
-| Open questions | 825–933 |
+|   10. Scripted ambient overrides (`0x0046BDD0`) | 572–629 |
+|   11. Light values handed to the draws | 630–660 |
+|   12. Captures (answers `capture.md` Open question 5) | 661–698 |
+|   13. d2rs answers | 699–709 |
+| Constants & data dependencies | 710–721 |
+| Randomness | 722–728 |
+| Edge cases & original bugs | 729–745 |
+| Test vectors | 746–779 |
+| Provenance | 780–828 |
+| Open questions | 829–937 |
 <!-- /index -->
 
 ## Summary
@@ -614,7 +614,11 @@ By the room's level id:
    fields); 12 → `0x0046B290` (levels 107/108 flag := 1; in level 108
    also client missile 372 at the local player and
    `0x0046F870(243, 1)`); 13 → `0x0046B3A0` (counter `[0x007129D0]` :=
-   0, `[0x007A7464]` := a draw from `0x00410A80` + 90); 3, 6, 14, 16, 17,
+   0, `[0x007A7464]` := `0x00410A80()` + 90; `0x00410A80` is no RNG
+   draw: it returns wall-clock seconds, a `time()` base plus
+   (`GetTickCount` − base tick) / 1000, re-based on `time(NULL)` when
+   more than 30,000 ms passed since the base (2026-10-08, static read);
+   client-only, so the wall clock is allowed); 3, 6, 14, 16, 17,
    19 have other client effects (`0x0046B100`, `0x0046B1E0`,
    `0x0046B300`, `0x0046B440`, `0x0046B4A0`, `0x0046B520`); the rest
    none. Server senders of ids 12 / 13: `0x005B5230` / `0x005B52E0` (A4Q2

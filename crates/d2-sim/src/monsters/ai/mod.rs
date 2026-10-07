@@ -173,16 +173,28 @@ pub struct AiStore {
     pub unhandled: Vec<Unhandled>,
     /// The Npc command counter G (`0x0088CADC`, §9.9 commands step 1).
     ///
-    /// TODO(spec: ai.md open question 12): G is process-wide in 1.14d and
-    /// never reset between games; `d2-sim` has no process state, so it is
-    /// kept with the game's AI store (equal to 1.14d for the first game of
-    /// a fresh process).
+    /// G is process-wide in 1.14d: it counts from 0 at process start
+    /// across every game of the process and is never reset or saved
+    /// (`ai.md` open question 12). `d2-sim` has no process state, so G is
+    /// a host input: the host (one per server process) hands the value
+    /// left by its previous game to the next game's store
+    /// ([`AiStore::with_npc_walk_counter`]) and reads it back from here
+    /// when the game ends. A fresh process starts at 0 ([`AiStore::new`]).
     pub npc_walk_counter: u32,
 }
 
 impl AiStore {
+    /// The store of the first game of a fresh process (G = 0).
     pub fn new() -> Self {
         Self::default()
+    }
+    /// The store of a later game of the same process: G continues from
+    /// `g`, the value the previous game left (`ai.md` open question 12).
+    pub fn with_npc_walk_counter(g: u32) -> Self {
+        Self {
+            npc_walk_counter: g,
+            ..Self::default()
+        }
     }
     pub fn get(&self, u: UnitId) -> Option<&MonsterAi> {
         self.units.get(&u)
@@ -475,8 +487,23 @@ pub fn request_mode<W: AiHost + ?Sized>(
     m: u8,
     target: ModeTarget,
 ) -> bool {
+    request_mode_byte(game, cx, unit, m, target, None)
+}
+
+/// [`request_mode`] with the request's path-type byte overwritten
+/// (`path_byte`, §7.1).
+pub fn request_mode_byte<W: AiHost + ?Sized>(
+    game: &mut Game,
+    cx: &mut Ctx<'_, W>,
+    unit: UnitId,
+    m: u8,
+    target: ModeTarget,
+    path_byte: Option<u8>,
+) -> bool {
     let mut v = cx.store.get(unit).map(|e| e.velocity).unwrap_or_default();
-    let ok = cx.world.change_mode_with(game, unit, m, target, &mut v);
+    let ok = cx
+        .world
+        .change_mode_with(game, unit, m, target, path_byte, &mut v);
     if let Some(e) = cx.store.units.get_mut(&unit) {
         e.velocity = v;
     }
@@ -642,8 +669,10 @@ pub fn frozen<W: AiHost + ?Sized>(cx: &Ctx<'_, W>, unit: UnitId) -> bool {
 /// the `SplEndGeneric` cases run the think inline; every other case
 /// requests a mode change to neutral.
 ///
-/// TODO(spec gap): for the `SplEndGeneric` cases the spec does not say
-/// whether the anim mode is set to neutral first; it is not set here.
+// PROVISIONAL (monsters/ai.md §1.4): the `SplEndGeneric` cases run the
+// think inline without setting the anim mode to neutral first (the spec
+// lists neutral only for the table-1 modes); settled by a bin read of
+// 0x005A8030 / a think schedule recording.
 pub fn mode_end<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, unit: UnitId, ended: u8) {
     const INLINE: [u8; 16] = [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
     if INLINE.get(ended as usize) == Some(&1) {

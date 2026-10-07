@@ -25,6 +25,7 @@ pub mod combat;
 pub mod death;
 pub mod dispatch;
 pub mod missiles;
+pub mod monster_add;
 pub mod monsters;
 pub mod objects;
 pub mod pending;

@@ -26,6 +26,8 @@ use super::{ActionHooks, Pending, View, WiringError};
 
 /// Stat 67 `velocitypercent` (§7.7 rule 4).
 const STAT_VELOCITY: u16 = 67;
+/// Stat 29 `lastexp` (§7.5 step 7).
+const STAT_LASTEXP: u16 = 29;
 /// Stat 328, the position stat (§7.4 rule 5, mode 1).
 const STAT_POSITION: u16 = 328;
 /// Stat 6 `hitpoints`.
@@ -82,10 +84,10 @@ impl<X: Pending> View<'_, X> {
     ///    := 0;
     /// 4. unit flag 0x100: the overhead message `0x00571620` (§7.9 rule 3).
     ///
-    /// TODO(spec: intents-events.md §7.1 rule 2.1, §7.2): a monster
-    /// with unit flag 0x10 (not yet announced) first gets its add
-    /// messages (0xAC, 0x98, 0x21, part B with a second mode message);
-    /// they are not sent here. Of rule 2, step 3 has nothing to send
+    /// First (§7.1 rule 2.1): a monster with unit flag 0x10 (not yet
+    /// announced) gets its add messages (§7.2, [`View::monster_add`]:
+    /// 0xAC, 0x98, 0x21, 0xAA, part B with a mode message). Of rule 2,
+    /// step 3 has nothing to send
     /// (d2rs keeps no pending event records, §7.9 rule 2) and steps 5–10
     /// are not sent: step 5 needs the item world, step 6's `0x00571740`
     /// (unit +0x6E), step 7's 0x0C fields (`0x00597CF0`), step 8's test
@@ -103,6 +105,10 @@ impl<X: Pending> View<'_, X> {
             return;
         }
         let (unit_flags, flags_ex, guid) = (r.flags, r.flags2, r.guid);
+        // §7.1 rule 2.1 (announced := 1 feeds only step 8, not sent).
+        if unit_flags & flags::SEED_SET != 0 && unit != receiver {
+            self.monster_add(game, receiver, unit);
+        }
         // Step 1.
         if flags_ex & REASSIGN_EX != 0 {
             let (x, y) = self.h.path_position(unit);
@@ -129,6 +135,21 @@ impl<X: Pending> View<'_, X> {
     /// §7.3 rule 2 step 2: the mode message (§7.4), then unit flag
     /// 0x80000 := 0.
     fn mode_update(&mut self, game: &Game, client: ClientId, receiver: UnitId, unit: UnitId) {
+        self.mode_message(game, client, receiver, unit);
+        if let Some(r) = self.units.get_mut(unit) {
+            r.flags &= !flags::MODE_CHANGING;
+        }
+    }
+
+    /// The mode message `0x00597E20` (§7.4) of `unit` to `receiver`, the
+    /// player of `client`.
+    pub(super) fn mode_message(
+        &mut self,
+        game: &Game,
+        client: ClientId,
+        receiver: UnitId,
+        unit: UnitId,
+    ) {
         if let Some(input) = self.mode_input(game, client, unit) {
             match mode_message::mode_message(&input) {
                 ModeMessage::Send(b) => self.h.x.send(receiver, &b),
@@ -148,9 +169,6 @@ impl<X: Pending> View<'_, X> {
                 }
                 ModeMessage::Nothing => {}
             }
-        }
-        if let Some(r) = self.units.get_mut(unit) {
-            r.flags &= !flags::MODE_CHANGING;
         }
     }
 
@@ -223,28 +241,38 @@ impl<X: Pending> View<'_, X> {
             .then_some((tu.ty as u8, tu.guid))
     }
 
-    /// The flag part of the room clean-up `0x00553220(game, unit)` (§7.5):
-    /// step 3 (unit flags 0x1, 0x10, 0x400, 0x8000; the path's
-    /// room-changed flag `0x00620FA0(unit, 0)`; flag-ex 0x800, 0x1000,
-    /// 0x10000, 0x200000) and the flag bits of step 7 (players, monsters
-    /// and objects: unit flag 0x100; a monster's flag 0x800 and flag-ex
-    /// 0x10000; an item's unit flag 0x1000).
-    ///
-    /// TODO(spec: intents-events.md §7.5): not run here: step 1 (the
-    /// changed-stat buffer, `stat-lists.md` §11.3), step 2 (the pending
-    /// event records: no model), step 4 (state-changed bits), step 5 (the
-    /// update-list reset: the server's item update pass runs it after
-    /// the tick, `d2-server` `handlers::items::moves::update_pass`), step
-    /// 6 (overlay removal), and of step 7 the player's stat 29 := −1, the
-    /// client record's +0x34 → +4, the monster data +0x5C bit 0x1 and the
-    /// item flags 0x20 / 0x2000 (the item pass reads them after the tick).
+    /// The room clean-up `0x00553220(game, unit)` (§7.5), in order:
+    /// 1. the changed-stat (mod) array emptied (`0x00625960`,
+    ///    `stat-lists.md` §11.3; only an extended list has one);
+    /// 2. the pending event records: d2rs keeps none (§7.9 rule 2);
+    /// 3. unit flags 0x1, 0x10, 0x400, 0x8000; the path's room-changed
+    ///    flag (`0x00620FA0(unit, 0)`); flag-ex 0x800, 0x1000, 0x10000,
+    ///    0x200000;
+    /// 4. the state-changed bits zeroed (`0x00639EE0`);
+    /// 5. the update-list reset `0x00597B00`: run by the server's item
+    ///    update pass after the tick (`d2-server`
+    ///    `handlers::items::moves::update_pass`), which also reads and
+    ///    clears the item flags 0x20 / 0x2000 of step 7;
+    /// 6. twice: the list has 0x100 (`0x00625A20`) → overlay removal
+    ///    `0x00627410` (`stat-lists.md` §8.8.2);
+    /// 7. player: stat 29 `lastexp` := −1, unit flag 0x100 := 0 (the
+    ///    client record's +0x34 → +4 := 0 is [`Pending::client_cleanup`]);
+    ///    monster: flag 0x100 := 0, flag 0x800 set → cleared and monster
+    ///    data +0x5C bit 0x1 := 0 (`0x00573570`), flag-ex 0x10000 := 0;
+    ///    object: flag 0x100 := 0; item: unit flag 0x1000 := 0.
     pub fn room_cleanup(&mut self, unit: UnitId) {
+        // Step 1.
+        self.stats.clear_mods(unit);
         let Some(r) = self.units.get_mut(unit) else {
             return;
         };
+        // Step 3.
+        let flags_before = r.flags;
         r.flags &= !cleanup::UNIT_FLAGS;
         r.flags2 &= !cleanup::FLAGS_EX;
-        match r.ty {
+        let ty = r.ty;
+        // Step 7 (flags).
+        match ty {
             UnitType::Player | UnitType::Object => r.flags &= !cleanup::FLAG_100,
             UnitType::Monster => {
                 r.flags &= !(cleanup::FLAG_100 | cleanup::MONSTER_800);
@@ -257,6 +285,35 @@ impl<X: Pending> View<'_, X> {
             Some(UnitPath::Dynamic(d)) => d.flags &= !path_flags::ROOM_CHANGED,
             Some(UnitPath::Static(s)) => s.room_changed = 0,
             None => {}
+        }
+        // Step 4.
+        self.stats.clear_states_changed(unit);
+        // Step 6.
+        for _ in 0..2 {
+            let flagged = self.stats.unit_list(unit).is_some_and(|l| {
+                self.stats.flags(l) & crate::stats::lists::flag::REMOVE_OVERLAY != 0
+            });
+            if flagged {
+                self.stats.remove_overlay(&mut *self.h, unit);
+            }
+        }
+        // Step 7 (the rest).
+        match ty {
+            UnitType::Player => {
+                self.stats.unit_set(&mut *self.h, unit, STAT_LASTEXP, -1, 0);
+                self.h.x.client_cleanup(unit);
+            }
+            UnitType::Monster if flags_before & cleanup::MONSTER_800 != 0 => {
+                if let Some(m) = self
+                    .h
+                    .monster_world
+                    .as_mut()
+                    .and_then(|w| w.monster_mut(unit))
+                {
+                    m.data_flag1 = false;
+                }
+            }
+            _ => {}
         }
     }
 }
@@ -325,11 +382,9 @@ impl<X: Pending> ActionHooks<X> {
     /// "Sets mode 12" of §7.7 rule 3 as the mode set `0x00553570`
     /// (`units.md` §4.1): mode, unit flag 0x1, the update queue.
     ///
-    /// TODO(spec: intents-events.md §7.7 rule 3): the setter the two DT
-    /// functions call is not named (`0x00553570` or the monster mode set
-    /// `0x005A7C20`, whose DD start `0x005A7390` has no written body).
-    /// Both give mode 12, flag 0x1 and the queueing the message reads;
-    /// the second also prepares the animation and cancels events 0 / 1.
+    /// Mode 12 is always set by the plain mode set `0x00553570`
+    /// (`sim/units.md` §4.6 "Death and dead functions"), never by
+    /// `0x005A7C20`.
     fn death_mode(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
         if let Err(e) = modes::set_mode(sim, self, unit, monster_mode::DD) {
             self.errors.push(WiringError::Unit(e));

@@ -40,16 +40,16 @@
 |   7. Nearest free point (`0x0064DEA0`) | 417–481 |
 |   8. Coarse free-box search (`0x0064E840`) | 482–514 |
 |   9. Floor drop placement (`0x00555DA0`) | 515–537 |
-|   10. Placing a unit at a point (`0x00554EA0`) | 538–594 |
-|   11. Level spawn point (`0x0061B060`) and game entry | 595–642 |
-|   12. Warp tiles and warp arrival | 643–703 |
-|   13. Where a joining character stands at tick 0 | 704–748 |
-| Constants & data dependencies | 749–767 |
-| Randomness | 768–777 |
-| Edge cases & original bugs | 778–813 |
-| Test vectors | 814–851 |
-| Provenance | 852–886 |
-| Open questions | 887–976 |
+|   10. Placing a unit at a point (`0x00554EA0`) | 538–595 |
+|   11. Level spawn point (`0x0061B060`) and game entry | 596–643 |
+|   12. Warp tiles and warp arrival | 644–704 |
+|   13. Where a joining character stands at tick 0 | 705–749 |
+| Constants & data dependencies | 750–768 |
+| Randomness | 769–778 |
+| Edge cases & original bugs | 779–814 |
+| Test vectors | 815–852 |
+| Provenance | 853–887 |
+| Open questions | 888–977 |
 <!-- /index -->
 
 ## Summary
@@ -544,10 +544,11 @@ query is a single cell against 0x3E01.
    unit +0x2C goes to the dynamic teleport `0x00650BE0` (rule 4)
    whatever the type (`0x00554ED9`, `0x00554F5C`), so a unit with a
    static path (objects, items, tiles; 0x20 bytes, §2.2) would be read
-   and written as a 0x200-byte dynamic path in 1.14d. Pending: whether
-   any of the 20 callers passes a static-path unit; d2rs does the
-   static set (`0x00620AE0`) with the footprint removed and stamped
-   again for such a unit (design choice).
+   and written as a 0x200-byte dynamic path in 1.14d. PROVISIONAL: no
+   caller passes a static-path unit; d2rs does the static set
+   (`0x00620AE0`) with the footprint removed and stamped again for such
+   a unit (design choice, because a 0x200-byte write over a 0x20-byte
+   path is not a behaviour to copy); settled by REC-90.
 2. Room null: cell lookup with a null hint (always none, dead code), then
    from the unit's current room; none → 0.
 3. Unless `exact`: free point (§7, `0x0064E7B0`, size of the unit, mask

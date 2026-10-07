@@ -2153,7 +2153,10 @@ fn server_do_result_two_removes() {
 }
 
 // Covers: specs/missiles/missiles.md §r4-default-flight-server-do-1-0x005b0bc0-0x005ae1f0 r1
+// The state is unreachable (§R5 step 1: creation fails without a
+// record); the hit handler asserts the record.
 #[test]
+#[cfg_attr(debug_assertions, should_panic(expected = "no missiles.txt record"))]
 fn flight_without_record_is_an_expiry_hit() {
     let mut w = World::new(row());
     let m = w.create(&w.params()).unwrap();

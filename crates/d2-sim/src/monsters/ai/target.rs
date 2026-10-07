@@ -204,8 +204,8 @@ pub fn main_search_with<W: AiHost + ?Sized>(
     }
     if let Some((a, ad)) = alt {
         if cx.world.choose_alternative(game, unit, chosen, a) {
-            // TODO(spec gap): the distance reported for a chosen
-            // alternative; here its own no-size distance.
+            // Accepted: B := the alternative's own no-size distance, so
+            // step 7 reports it (§5.2 step 5.3).
             chosen = Some(a);
             best = ad;
         }
@@ -283,10 +283,10 @@ pub(super) fn find_mode1<W: AiHost + ?Sized>(
 }
 
 /// `0x005DE9D0` (§2.3), target modes 4 and 5.
-///
-/// TODO(spec gap): "same collision test → wander 5": whether the
-/// can-walk test of `0x005DE890` also applies; here only the collision
-/// test.
+// PROVISIONAL (monsters/ai.md §2.3): "same collision test → wander 5" is
+// the collision test only (no can-walk test of 0x005DE890); settled by a
+// bin read of 0x005DE9D0 and a wander-draw recording. HIGH-PRIORITY
+// CAPTURE (RNG draw order: wander 5 draws).
 fn find_mode45<W: AiHost + ?Sized>(
     game: &mut Game,
     cx: &mut Ctx<'_, W>,

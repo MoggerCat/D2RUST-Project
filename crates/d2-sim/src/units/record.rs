@@ -162,8 +162,9 @@ pub struct UnitRecord {
     /// +0xD0.
     pub node_index: u32,
     /// +0x64 / +0x68 / +0x6C ([`InteractInfo`]).
-    // TODO(spec: sim/units.md §2): the allocation values of +0x64 / +0x68
-    // are not written; the record starts inactive (no getter reads them).
+    // PROVISIONAL (sim/units.md §2): allocation writes the reset values
+    // (GUID −1, type 6, inactive; `0x00554190`); settled by a bin read of
+    // `0x00555230` (no getter reads them while inactive).
     pub interact: InteractInfo,
 }
 
@@ -185,7 +186,11 @@ impl UnitRecord {
             flags: 0,
             flags2: 0,
             node_index: INITIAL_NODE_INDEX,
-            interact: InteractInfo::default(),
+            interact: InteractInfo {
+                guid: u32::MAX,
+                ty: INTERACT_RESET_TYPE,
+                active: false,
+            },
         }
     }
 

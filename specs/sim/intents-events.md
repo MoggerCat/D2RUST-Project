@@ -45,14 +45,14 @@
 |   5. Machine-readable tables | 628–664 |
 |   6. Exact-match comparison | 665–772 |
 |   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 773–1195 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1196–1403 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1404–1555 |
-| Constants & data dependencies | 1556–1574 |
-| Randomness | 1575–1580 |
-| Edge cases & original bugs | 1581–1626 |
-| Test vectors | 1627–1713 |
-| Provenance | 1714–1830 |
-| Open questions | 1831–1950 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1196–1410 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1411–1567 |
+| Constants & data dependencies | 1568–1586 |
+| Randomness | 1587–1592 |
+| Edge cases & original bugs | 1593–1638 |
+| Test vectors | 1639–1725 |
+| Provenance | 1726–1842 |
+| Open questions | 1843–1962 |
 <!-- /index -->
 
 ## Summary
@@ -1303,6 +1303,13 @@ rule 3), drained in a later frame (recorded: after tick 1).
       flag u8 at +2, item u32 at +4) whose skill is in 0..skills count
       − 1: **S→C 0x7B** (`0x0053DB20`, 8 bytes: slot u8@1 = i, u16@2 =
       skill & 0xFFF, | 0x8000 when the flag is set, u32@4 = item).
+      Slots come only from the save or `0x005390A0` (the sole direct
+      writer of +0x3DC). PROVISIONAL: a brand-new character's client
+      record holds skill −1 in all 16 slots, so no 0x7B is sent
+      (because a d2s stores unbound slots as 0xFFFF and the recorded
+      join of a character with no hot key sends none; a zero-filled
+      record would instead send 16 × 0x7B with skill 0); settled by
+      REC-02 (count of S→C 0x7B in its new-character runs).
    7. When `0x006221A0(P)` gives a record: two **S→C 0x23**
       (`0x0053C590`, 13 bytes: type u8@1, GUID u32@2, hand u8@6, skill
       u16@7, item u32@9): hand 1 with record +0x74 / +0x7C, then hand 0
@@ -1457,7 +1464,8 @@ owned it yet, and states the handlers that are only message handling.
    else 3; player missing or mode ≠ 0x11 → 0. Client flag 4
    (`0x00538670`, hardcore) → drop the client (`0x0052CAF0(game,
    client, 3)`, `tools/original-hooks.md` §6.1 rule 3), 0. Else in
-   order: `0x0053FDF0` (returns 0; its value is the warp's last
+   order: `0x0053FDF0` (returns 0, no other effect: its whole body is
+   `return 0`; its value is the warp's last
    argument); passive skill states re-applied (`0x0056DFA0`: each skill
    of the player with a passive state gets the state on and
    `0x00646D60`); stats 6, 8, 10 (life, mana, stamina) := their maxima
@@ -1489,7 +1497,11 @@ owned it yet, and states the handlers that are only message handling.
    command 0x0C; 0x47: a = x, b = y, command 0x0D): no monster with the
    merc GUID → 1; it is not the player's hireling (`0x00574EC0(game,
    player, 7, 0)`) → 1; else free its AI commands (`0x0058EDE0`), add
-   the command {command, a, b} (`0x0058EF40`), sound event 15 on the
+   the command {command, a, b} (`0x0058EF40`; it copies five dwords,
+   record +0x08..+0x18, from a 0x1C-byte stack record of which
+   `0x0054C430` writes only +0x08 command, +0x0C a, +0x10 b: params 3
+   and 4, +0x14 / +0x18, are uninitialized stack bytes; d2rs stores 0,
+   0), sound event 15 on the
    merc toward the player (`0x00553380`), 0. 0x47 returns 0 whatever
    `0x0054C430` returns; 0x46 returns its result.
 9. **0x48** (`0x0054C590`): size 1 else 3; player data +0x4C (busy,
