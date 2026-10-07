@@ -16,7 +16,7 @@ fn world() -> Fake {
     f
 }
 
-// Covers: specs/world/quests-helpers.md §1, §test-vectors r1, §test-vectors r2, §test-vectors r3
+// Covers: specs/world/quests-helpers.md §1
 #[test]
 fn free_spot_lattice() {
     // Everything free: ring k = 1 tests the corner (48, 50) only → spot
@@ -48,7 +48,7 @@ fn free_spot_never_accepts_outside_the_row_room() {
     assert_eq!(free_spot(&mut f, R1, 100, 100, 2, 0, 3), None);
 }
 
-// Covers: specs/world/quests-helpers.md §2, §test-vectors r4, §edge-cases-original-bugs r3
+// Covers: specs/world/quests-helpers.md §2, §edge-cases-original-bugs r3
 #[test]
 fn critical_spawn_ladder() {
     // R's box (0, 0, 10, 10), x 20, y 3: the inside walk fails, so the
@@ -82,7 +82,7 @@ fn critical_spawn_ladder() {
     );
 }
 
-// Covers: specs/world/quests-helpers.md §3, §test-vectors r5
+// Covers: specs/world/quests-helpers.md §3
 #[test]
 fn superunique_at_point() {
     let mut f = world();
@@ -103,7 +103,7 @@ fn superunique_at_point() {
     assert_eq!(f.log, ["unhandled 254 0x659b80"]);
 }
 
-// Covers: specs/world/quests-helpers.md §4.1, §4.2, §test-vectors r6
+// Covers: specs/world/quests-helpers.md §4.1, §4.2
 #[test]
 fn quest_missiles() {
     let mut f = world();
@@ -163,7 +163,7 @@ fn orb_missile_and_its_fallback() {
     assert!(ctl.faults.is_empty());
 }
 
-// Covers: specs/world/quests-helpers.md §5, §test-vectors r7, §edge-cases-original-bugs r4
+// Covers: specs/world/quests-helpers.md §5, §edge-cases-original-bugs r4
 #[test]
 fn end_interaction_by_kind() {
     let npc = UnitId(0x07);

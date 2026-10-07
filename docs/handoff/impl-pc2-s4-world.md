@@ -89,6 +89,16 @@ expect the 40-byte 0x27.
 
 ## 4. Gate
 
-See the coordinator message for the result on the pushed head.
-`d2-server::prop_unified_items item_moves_keep_one_place` failed once on
-the base too (items area, not this branch); it passed on the next run.
+Head after the staging-6 merge (`8858c4c`): `CARGO_INCREMENTAL=0 sh
+tools/gate.sh` passes every step except `test d2-client`; the coverage
+step's 7 dangling `§test-vectors rN` claims were fixed after the run
+(`coverage --check`: 0 errors). `test d2-client`: every `Bridge::new`
+test fails with `Table(Mismatch([NoHandler { id: 180 }]))`; the same test
+fails on `origin/claude/specs-staging-6` @ 8858c4c without this branch
+(checked: `bridge::tests::version_mismatch_is_refused`), so it is inherited
+(S→C 0xB4 has no client handler row); not fixed here.
+
+Local run queue item (game files): the d2-server `GameTables::object_tables`
+and `test-fixtures` `object_tables` now load `objgroup` and `leveldefs`;
+run the ignored game-file tests that build them (e.g. `cargo test -p
+d2-server -- --ignored`) and check they load.
