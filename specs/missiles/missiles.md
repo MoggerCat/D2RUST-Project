@@ -29,22 +29,22 @@
 | Outputs / state changes | 80–93 |
 | Rules | 94–95 |
 |   R1. Data the server keeps per missile | 96–140 |
-|   R2. Creation | 141–283 |
-|   R3. Per-tick dispatch | 284–313 |
-|   R4. Default flight (server-do 1, `0x005B0BC0` → `0x005AE1F0`) | 314–444 |
-|   R5. Hit handler (`0x005ADF10`, D2MOO `MISSMODE_SrvDmgHitHandler`) | 445–497 |
-|   R6. Damage stage (missile-owned part) | 498–611 |
-|   R7. Lifetime and expiry | 612–635 |
-|   R8. Pierce | 636–662 |
-|   R9. Server-do and server-hit catalogues | 663–893 |
-|   R10. Behaviour of the recorded missiles | 894–927 |
-|   R11. `missiles.txt` columns and their server use | 928–968 |
-| Constants & data dependencies | 969–995 |
-| Randomness | 996–1028 |
-| Edge cases & original bugs | 1029–1055 |
-| Test vectors | 1056–1135 |
-| Provenance | 1136–1178 |
-| Open questions | 1179–1248 |
+|   R2. Creation | 141–284 |
+|   R3. Per-tick dispatch | 285–314 |
+|   R4. Default flight (server-do 1, `0x005B0BC0` → `0x005AE1F0`) | 315–445 |
+|   R5. Hit handler (`0x005ADF10`, D2MOO `MISSMODE_SrvDmgHitHandler`) | 446–498 |
+|   R6. Damage stage (missile-owned part) | 499–612 |
+|   R7. Lifetime and expiry | 613–636 |
+|   R8. Pierce | 637–663 |
+|   R9. Server-do and server-hit catalogues | 664–894 |
+|   R10. Behaviour of the recorded missiles | 895–928 |
+|   R11. `missiles.txt` columns and their server use | 929–969 |
+| Constants & data dependencies | 970–996 |
+| Randomness | 997–1029 |
+| Edge cases & original bugs | 1030–1056 |
+| Test vectors | 1057–1136 |
+| Provenance | 1137–1179 |
+| Open questions | 1180–1249 |
 <!-- /index -->
 
 ## Summary
@@ -246,7 +246,8 @@ Missile-owned helpers: `0x005A9720` (D2MOO
 20. Allocate the missile's stat list (`0x00626D40`).
 21. Init callback, if any (record +0x54, argument +0x58). Four 1.14d
     callbacks re-seed the new missile (`rng.md` §5.3): `0x005C9290`,
-    `0x005CD110` (path first point x + a caller value), `0x005D40F0`,
+    `0x005CD110` (seed from path target x (+0x10) + a; `skills/bodies-3.md`
+    §5.28 owns it), `0x005D40F0`,
     `0x005D4680`; they belong to the skills spec.
 22. Skill (clamped ≥ 0), level.
 23. Damage setup `0x0059F900` (owner, origin, missile, level): the skills
