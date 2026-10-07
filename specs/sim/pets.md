@@ -31,8 +31,8 @@
 | Randomness | 185–188 |
 | Edge cases & original bugs | 189–198 |
 | Test vectors | 199–207 |
-| Provenance | 208–216 |
-| Open questions | 217–227 |
+| Provenance | 208–227 |
+| Open questions | 228–238 |
 <!-- /index -->
 
 ## Summary
@@ -211,6 +211,17 @@ None.
   `0x00575C70`, `0x005750E0`, `0x00574850`, `0x00574450`, `0x00574A20`,
   `0x00574EC0`, `0x005747B0`, `0x00574540`, `0x00574930`, `0x00574410`,
   `0x0053CB30`; `pettype.txt` values from the 1.14d `patch_d2` tables.
+- §8 layout re-checked 2026-10-07 (spec-client-msgs-3) against the
+  conflicting `world/hirelings.md` §13 r2 and `sim/server-messages.tsv`
+  (pet @5, owner @9; both corrected): record built by `0x00575D90` at
+  `0x00575E42`–`0x00575E73` (+0x00 pet GUID, +0x04 owner GUID, +0x08
+  class, +0x0C type); `0x00574930` / `0x00574410` push +0x08, +0x04,
+  +0x00, +0x0C; `0x0053CB30` stores the third argument (+0x04) at @5 and
+  the second (+0x00) at @9. The client handler `0x0045E860` passes u32@9
+  as the pet GUID (record +0x08, the field the hireling lookup
+  `0x00478F20` returns) and u32@5 as the owner (`client/model.md` §14).
+  No 0x7A occurs in the two recordings (`traces/raw/20261006-015956`,
+  `-022633`).
 - D2MOO 1.10f `PlayerPets.cpp` names (`PLAYERPET_*`) used as hints only;
   every step above is from 1.14d.
 
