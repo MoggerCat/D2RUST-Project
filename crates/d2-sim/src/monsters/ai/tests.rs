@@ -1838,3 +1838,7 @@ mod act7;
 mod bodies;
 mod npc;
 mod rules;
+mod forced;
+mod install_cov;
+mod scans;
+mod skill_check;
