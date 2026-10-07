@@ -38,13 +38,13 @@
 |   6. Refresh | 361–392 |
 |   7. Buying and selling | 393–586 |
 |   8. Repair | 587–641 |
-|   9. Prices | 642–835 |
-| Constants & data dependencies | 836–855 |
-| Randomness | 856–871 |
-| Edge cases & original bugs | 872–901 |
-| Test vectors | 902–924 |
-| Provenance | 925–963 |
-| Open questions | 964–1036 |
+|   9. Prices | 642–838 |
+| Constants & data dependencies | 839–858 |
+| Randomness | 859–877 |
+| Edge cases & original bugs | 878–914 |
+| Test vectors | 915–937 |
+| Provenance | 938–976 |
+| Open questions | 977–1061 |
 <!-- /index -->
 
 ## Summary
@@ -122,7 +122,7 @@ spec; recorded action 11 = shown in a store, 12 = taken out of a store,
 5. Record flags set at the same time: has gamble list (+0x0C := 1) for
    gheed, elzix, alkor, jamella, drehya, nihlathak; +0x24 and +0x25 := 1
    for gheed, charsi, fara, hratli, asheara, halbu, jamella, larzuk,
-   drehya (no reader found, `npc.md` Open question 3). A record whose
+   drehya (no reader in 1.14d, `npc.md` Open question 3). A record whose
    NPC table byte "trader" is 0 gets empty lists.
 6. **Record lookup** (`0x00535F10(game, NPC unit, &index)` →
    `npc.md` §1.1 lookup by the unit's class; a null unit looks up
@@ -811,7 +811,10 @@ discount from then on in that difficulty (edge case 6).
 #### 9.4 Gamble price
 
 t = 2 (rule 1): if the item's format field (item data +0x30) is 0 →
-`gamble cost` (u32 +212) of the item's normal-code record. Else the
+`gamble cost` (u32 +212) of the item's normal-code record (never for a
+gamble-list item: §5.1 creates through `0x00559CE0`, whose request
+takes the game's format, 101 expansion / 2 classic, `items/generation.md`
+§1.2–1.3; format 0 only comes from old saves). Else the
 record of the item's normal code (`0x00629370`), L = player level:
 ("normal code" = `0x006287D0`: items `normcode` (+0x84) when ≠ 0, else
 `code`. Handoff `impl-vendors` V6: a normal code missing from the code
@@ -867,7 +870,10 @@ game, in this order:
 
 range() and roll() never draw for an empty range (`rng.md` §3 rule 1).
 Item creation draws from item seeds (game-seed derived, `rng.md` §5.3).
-Buying, selling and repairing draw nothing.
+Buying, selling and repairing draw nothing from the NPC-control seed;
+every buy and every sell that copies an item (§7.3) takes two
+game-seed steps per allocated unit (copy and fillers). Repair draws
+nothing.
 
 ## Edge cases & original bugs
 
@@ -877,7 +883,14 @@ Reproduced by default.
    trade action, so it is only visible to tools.
 2. Selling to an interacting NPC without an `npc.txt` row (e.g. Kashya,
    Warriv) reaches the fatal assert of §9.2 rule 9 (0x2A is never sent;
-   the original process exits). d2rs: Open question 5.
+   the original process exits). Only a crafted 0x33 (or a crafted 0x32
+   with t ∉ {0, 2}, edge case 3) gets there: the client offers no trade
+   at those NPCs. Not reproduced. d2rs policy (Ruleset::Original): a
+   cost() call for a class without an `npc.txt` row is a handler error;
+   the handler stops at that step (§7.2 step 6, before any state
+   change) with no message and the game goes on. Other PC 2 session
+   decided (Open question 5): the server ends that game, as the
+   original's process exit does — to reconcile (staging-6 merge).
 3. Buy with t ∉ {0, 2} skips the "item is offered" test: any existing
    item GUID is copied and priced with cost(t) (t = 1 gives the sell
    price).
@@ -971,6 +984,7 @@ Min 1 Max 1 MagicMin 1 MagicMax 1 MagicLvl 1).
    list) is null, else the list total `0x00625420` minus the list base
    `0x00625350`, both with layer and each with its own minimum rule
    (disassembled). The recorded price check stays under OQ6.
+   End-to-end check: recording R-NV-5 (`docs/handoff/pc2-rec-npc-vendors.md`).
 2. Item format field (item data +0x30) that selects the gamble-cost
    column (§9.4): when it is 0 in an expansion game; check items created
    by §5.1.
@@ -983,13 +997,16 @@ Min 1 Max 1 MagicMin 1 MagicMax 1 MagicLvl 1).
    in a classic game (`items/generation.md` §1.2). So §9.4's format-0
    branch (`gamble cost`) is taken only for a format-0 item (one decoded
    from an old save), which no store list holds.
+   Also §9.4 (`0x00578790` creates only through `0x00559CE0`).
 3. Answered from the code: §7.1.1 (`0x00577D18`). A recording still
    confirms it: buy `aqv` with a bow, then with a crossbow equipped, and
    a helm with the head slot empty (expect 0x9D action 6, no 0x9C
    action 4).
+   Confirming recording: R-NV-6.
 4. Order of §6 rule 1 versus the player's room change: the code passes
    the current room as `to`; confirm with a recording that leaving town
    and returning gives a new Charsi store.
+   Recording R-NV-7.
 5. Fatal path of edge case 2: decide d2rs behaviour (end the game like
    the original, or reject); a Ruleset decision, not a fidelity fact.
    **Decided** (2026-10-07, the conservative reading, recorded for the
@@ -1001,10 +1018,15 @@ Min 1 Max 1 MagicMin 1 MagicMax 1 MagicLvl 1).
    drops them). Other fatal asserts of this spec reached by a crafted
    message are handled the same way. A rejecting variant belongs to
    `Ruleset::Mod`.
+   Other PC 2 session read (edge case 2): the handler stops at §7.2
+   step 6 with no message and the game goes on — to reconcile
+   (staging-6 merge).
 6. Price of a magic / rare / unique item: record a buy and a sell of
    one to confirm §9.2 rules 4–5 end to end.
+   Recording R-NV-5.
 7. Gamble list: record one gamble open (14 items, ring then amulet
    first) and one gamble purchase + 0x37.
+   Recording R-NV-8.
 8. §7.3 step 3: the decoder `0x0062E430` (full record `0x0062CBE0`, compact
    record `0x0062A970`) is read only as "the inverse of
    `items/bitstream.md`"; a field it rebuilds instead of reading (base
@@ -1020,6 +1042,8 @@ Min 1 Max 1 MagicMin 1 MagicMax 1 MagicLvl 1).
    1, a unique index past the table → −1, and for compact items item
    level 1, quality 2 and a seed from 0. The differences from S that
    follow are listed there; a recorded buy still confirms them.
+   Recording R-NV-9 (whether the stream's own entries for those stats
+   override the rebuilt values, and any other rebuilt field).
 9. §7.3 step 6: S's item flag 0x8000000 (set on every copied source)
    has no name in `items/generation.md` §1.4. Settle: the readers of
    item flag 0x8000000.
@@ -1033,3 +1057,4 @@ Min 1 Max 1 MagicMin 1 MagicMax 1 MagicLvl 1).
    `0x0055A476` and masks that keep every high bit (`0x0053E66D` and
    0x8FFFFFFF). The bit is only carried in the item flags word (saved
    and streamed with it). d2rs keeps it as an opaque flag bit.
+   (`items/generation.md` §1.4; §7.3 step 6.)
