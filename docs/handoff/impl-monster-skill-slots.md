@@ -60,18 +60,49 @@ Stopped early on a coordinator budget cut: see "Left".
 - clippy -D warnings, fmt, `coverage.py --check`, `spec_index.py --check`:
   clean.
 
-## Left (red because of this branch; next session)
+## Fixture follow-up (merged `claude/specs-staging-2` d5cac41)
 
-1. d2-server integration fixtures still use srvst 42 / srvdo 3 / srvdo 111
-   as seam stand-ins, which now run bodies:
-   `tests/mutants_handlers_skills.rs` (10 tests), `tests/prop_handle.rs`,
-   `tests/e2e_night_world.rs::a_population_monster_killed_with_a_missile`
-   (via `d2-sim::wiring::action::tests::fight::skills`, srvst 42 / srvdo
-   3), and d2-client `e2e_full_loop.rs` / `e2e_single_player.rs`. No
-   start slot without a body exists any more: the "srvst N skill lvl"
-   log assertions need another observation (proposal: srvst 52 + used
-   entry + mana for the level, or a test `Pending` override that logs a
-   body's effect); do slots can move to srvdo 53. Do not weaken them.
+Every referenced slot has a body now, so the fixtures that used srvst
+42 / srvdo 3 / srvdo 111 as "seam" stand-ins moved:
+
+- Do stand-in → srvdo 53 (filled, `unreferenced`, no body: the seam
+  still answers and logs).
+- Start stand-in → srvst 53 (MonInferno start, `bodies-3.md` §4.1) with
+  `calc2` = formula `04 10 00` (`lvl`): it sets the used entry's param 1
+  := frame + max(level, 1) and returns 1; the fakes log
+  `Pending::set_entry_param_of` as `param1 <skill> <value>`, so skill and
+  level stay observed. (prop_handle's seam returned 1 without a log:
+  srvst 52 Emerge, which returns 1.)
+
+Changed expectations (old → new):
+
+- `d2-sim/src/wiring/action/tests/fight.rs` `skills()` (shared with
+  `bench_fixtures::combat`): srvst 42 → 53, srvdo 3 → 53, `calc2` 0,
+  `skills_code` `04 10 00`.
+- `d2-server/tests/mutants_handlers_skills.rs`: `"srvst 42 S L"` →
+  `started(frame, S, L)` = `"param1 S <frame + L>"` (10 sites: skills 1,
+  4, 6, 7, 8; levels 10 and 12); `"srvdo 111 2 1"` → `"srvdo 53 2 1"` (2).
+- `d2-server/tests/prop_handle.rs`: srvst 42 → 52, srvdo 111 → 53 (no
+  expectation changed).
+- `d2-server/tests/e2e_night_world.rs`: through `fight::skills` (no
+  expectation changed; its fake logs params).
+- `d2-client/tests/e2e_single_player.rs`: `["srvst 42 1 10"]` →
+  `["param1 1 11"]` (dispatch frame 1 + 10); `["srvst 42 1 10", "srvdo 3
+  1 10 true false false"]` → `["param1 1 11", "srvdo 53 1 10 true false
+  false"]`.
+- `d2-client/tests/e2e_full_loop.rs`: own `skills()` as `fight`;
+  `["srvst 42 1 10", "srvdo 3 …"]` → `["param1 1 <f0 − 1 + 10>", "srvdo
+  53 1 10 true false false"]`.
+- `d2-server/src/adapters/handlers/skills/tests.rs` (earlier commit):
+  srvst 42 → 52 (flags 0xE checked, log empty), srvdo 111 → 53.
+
+Gate: `CARGO_INCREMENTAL=0 cargo test --workspace --no-fail-fast`: only
+`world::quests::tests::tables_parse_and_check` and d2-server
+`tests::gaps::out_of_scope_rows` red.
+
+## Left
+
+1. (done above)
 2. No unit tests yet for the batch 4 bodies (spec test vectors:
    `bodies-3.md` / `bodies-4.md` Test vectors); coverage claims are
    missing for those rule units.

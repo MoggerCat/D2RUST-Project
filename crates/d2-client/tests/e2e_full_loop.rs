@@ -1870,7 +1870,9 @@ fn run_with(game_seed: u32) -> Transcript {
     assert_eq!(
         fx.book.get().log,
         [
-            format!("param1 1 {}", f0 + 10),
+            // srvst 53 ran at the dispatch frame f0 − 1 (before the tick)
+            // with level 10: param 1 := f0 − 1 + 10.
+            format!("param1 1 {}", f0 - 1 + 10),
             "srvdo 53 1 10 true false false".to_string()
         ]
     );

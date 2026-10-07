@@ -946,11 +946,20 @@ fn run_or_use_by_range() {
         (b.melee, b.bow, b.mask) = (false, false, false);
         log
     };
-    assert_eq!(go(&mut fx, MELEE, |b| b.melee = true), [started(fx.sim.game.frame, 6, 10)]);
+    assert_eq!(
+        go(&mut fx, MELEE, |b| b.melee = true),
+        [started(fx.sim.game.frame, 6, 10)]
+    );
     assert_eq!(go(&mut fx, MELEE, |_| {}), [format!("{run}{MELEE}")]);
-    assert_eq!(go(&mut fx, BOTH, |b| b.bow = true), [started(fx.sim.game.frame, 7, 10)]);
+    assert_eq!(
+        go(&mut fx, BOTH, |b| b.bow = true),
+        [started(fx.sim.game.frame, 7, 10)]
+    );
     assert_eq!(go(&mut fx, BOTH, |_| {}), [format!("{run}{BOTH}")]);
-    assert_eq!(go(&mut fx, RANGED, |_| {}), [started(fx.sim.game.frame, 8, 10)]);
+    assert_eq!(
+        go(&mut fx, RANGED, |_| {}),
+        [started(fx.sim.game.frame, 8, 10)]
+    );
     assert_eq!(
         go(&mut fx, RANGED, |b| b.mask = true),
         [format!("{run}{RANGED}")]
@@ -1169,7 +1178,10 @@ fn start_mana() {
     fx.set_stats(p, &[(8, 4000), (6, 4000)]);
     fx.set_state(p, 114);
     fx.handle(&point(0x0C, 110, 90));
-    assert_eq!(fx.log(), [started(fx.sim.game.frame, 1, 10), "life 3328".to_string()]);
+    assert_eq!(
+        fx.log(),
+        [started(fx.sim.game.frame, 1, 10), "life 3328".to_string()]
+    );
 
     // An item skill (owner GUID ≠ −1) with charges.
     let mut fx = Fx::new(0);
@@ -1184,7 +1196,10 @@ fn start_mana() {
         b.right = Some(e);
     }
     fx.handle(&point(0x0C, 110, 90));
-    assert_eq!(fx.log(), [started(fx.sim.game.frame, 1, 10), "charges 1".to_string()]);
+    assert_eq!(
+        fx.log(),
+        [started(fx.sim.game.frame, 1, 10), "charges 1".to_string()]
+    );
 }
 
 // ---- use.md §5.4, §6, §7: do, cooldown, auras (through 0x3C) ---------------------------------

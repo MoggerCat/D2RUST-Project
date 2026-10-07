@@ -1029,8 +1029,9 @@ fn run_with(game_seed: u32) -> Transcript {
     assert_eq!(fx.mode(player), 10);
     assert_eq!(fx.stat(player, 8), 4000 - 3328);
     // The start (srvst 53, `bodies-3.md` §4.1) ran with skill 1 at level
-    // 10: the used entry's param 1 := frame + 10.
-    let started = format!("param1 1 {}", fx.sim_ref().game.frame + 10);
+    // 10: the used entry's param 1 := frame + 10, at the dispatch frame
+    // (1: messages run before the frame's tick, which makes it 2).
+    let started = format!("param1 1 {}", fx.sim_ref().game.frame - 1 + 10);
     assert_eq!(fx.book.get().log, [started.clone()]);
     assert_eq!(fx.player_timers(), [(0, 5), (1, 9)]);
     assert!(fx.errors().is_empty(), "{:?}", fx.errors());
