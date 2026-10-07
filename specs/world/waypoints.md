@@ -33,18 +33,18 @@
 |   2. Waypoint record ("history") | 115–146 |
 |   3. Save field layout (owner of the save format: the character-save spec) | 147–169 |
 |   4. Which waypoints are known without operating one | 170–189 |
-|   5. Waypoint objects | 190–263 |
-|   6. C→S 0x49 TakeOrCloseWp (`0x0054C5D0`) | 264–302 |
-|   7. Travel (`0x00584F60`) | 303–350 |
-|   8. Timing and message order | 351–372 |
-|   9. Town portals | 373–378 |
-|   10. Object mode change (consequence used above) | 379–386 |
-| Constants & data dependencies | 387–414 |
-| Randomness | 415–438 |
-| Edge cases & original bugs | 439–475 |
-| Test vectors | 476–515 |
-| Provenance | 516–554 |
-| Open questions | 555–576 |
+|   5. Waypoint objects | 190–265 |
+|   6. C→S 0x49 TakeOrCloseWp (`0x0054C5D0`) | 266–309 |
+|   7. Travel (`0x00584F60`) | 310–357 |
+|   8. Timing and message order | 358–379 |
+|   9. Town portals | 380–385 |
+|   10. Object mode change (consequence used above) | 386–393 |
+| Constants & data dependencies | 394–421 |
+| Randomness | 422–445 |
+| Edge cases & original bugs | 446–489 |
+| Test vectors | 490–529 |
+| Provenance | 530–568 |
+| Open questions | 569–587 |
 <!-- /index -->
 
 ## Summary
@@ -237,7 +237,9 @@ Steps, in order:
    (§2 rule 3). This happens on every operate, in every mode.
 2. Object mode 0 (or object null): set mode 1 (`0x00624690`), schedule
    ENDANIM (type 1) at frame + (`FrameCnt1` >> 8) + 1 (`0x005417D0`).
-   No menu. Return 1.
+   No menu. Return 1. When the ENDANIM runs (here and in §5.1), the
+   object goes from mode 1 to mode 2 by a direct write with no message
+   and no draw (`0x00581490`, `sim/units.md` §6.4 handler 1).
 3. Mode 1 or 2: if the player is busy (`0x00535060`: interact info
    active, an item on the cursor, or player data +0x4C ≠ 0) → nothing.
    Else build 0x63 (§5.3) with the object's GUID and the record (out
@@ -270,11 +272,16 @@ at +1, level = u16 at +5.
 
 `0x0055B6C0(player, 0)` returns player data +0x160 (`GetTickCount` value
 stored when this player last declared hostility, `0x0055B720`, only
-caller `0x005A5E50`). If `GetTickCount()` < that + 10000: attach sound
+caller `0x005A5E50`; the player data block is zeroed at allocation,
+`0x00621F90` memset of 0x16C bytes, so a fresh player has 0). If
+`GetTickCount()` < that + 10000 (unsigned, `0x0054C601`–`0x0054C612`;
+with 0 stored this fires only while the host tick count is below
+10000): attach sound
 0x13 to the player (`0x00553380`: unit +0x6E = 0x13, +0x70 = target,
 update flag 0x400), reset the interact info (`0x00554190`), return 1.
 d2rs: hostility needs a second player (out of Phase 0–6 scope); the
-value stays 0 and this branch never fires (open question 6).
+value stays 0, and the host clock input (`GetTickCount` in ms) decides
+the branch exactly as above.
 
 #### 6.2 Validation (`0x00549570`, returns the result code)
 
@@ -464,8 +471,15 @@ Reproduced by default.
 7. **Busy:** with the interact info active (menu already open, NPC
    chat), operating any object does nothing (`0x00584420`), so the bit is
    not set either.
-8. **Hostile delay** uses wall-clock `GetTickCount`; it is host-only and
-   cannot fire in single player (§6.1).
+8. **Hostile delay** uses wall-clock `GetTickCount`; it is host-only. In
+   single player (+0x160 = 0) it fires only while the host tick count
+   is below 10000 ms (§6.1).
+11. **Classic game, act-5 index:** no classic-game path sets an act-5
+    bit (the §4 setters for 109 are expansion-gated, operate fn 23 needs
+    an act-5 waypoint object), but the save load copies all 16 record
+    bytes unmasked (§2 rule 5, `0x0056A3E0` → `0x00661030`), so a
+    record from an edited or expansion save keeps its act-5 bits, and
+    validation (§6.2) never checks the destination act or expansion.
 9. **Index ≥ 0x70** in a modded `levels.txt` → fatal assert at the first
    bit test or set.
 10. **Town portal delay differs:** operate function 15 (`0x00584870`)
@@ -554,22 +568,19 @@ Save: the test character with Cold Plains has the section `5753
 
 ## Open questions
 
-1. Cross-act waypoint travel: message order (0x05/0x03/0x53 …) and
-   whether §7 rule 7 sends 0x0D. Settle: record a 0x49 to another act.
-2. First activation of a neutral waypoint: confirm no 0x63, the 0x0E/0x51
-   mode messages and the ENDANIM frame. Settle: record operating a new
-   waypoint twice.
-3. Why the recorded town waypoint after travel is mode 2: init 17 with no
-   arrival match, or a waypoint restored from inactive storage without
-   init. Settle: trace `0x00547210` entry/result and the arrival list
-   during a town arrival.
-4. Object ENDANIM handler `0x00581490` (not in the exports): D2MOO sets
-   mode 1 → 2 directly when `Mode2` ≠ 0, without the anim setup. Settle:
-   Ghidra function at `0x00581490`.
-5. Is player data +0x160 zero for a fresh player in 1.14d (allocation
-   zeroes it)? Settle: read it in a running single-player game.
-6. Multiplayer conversion of the 10 s wall-clock hostile delay to ticks
-   (Phase 7 decision, not a fidelity fact).
-7. Classic (non-expansion) games: nothing in the waypoint path blocks an
-   act-5 index; whether a classic record can ever hold one. Settle: grep
-   the save-load path for expansion masking.
+1. ~~Cross-act travel message order (0x05 / 0x03 / 0x53 …) and whether
+   §7 rule 7 sends 0x0D.~~ Recording R-NV-11
+   (`docs/handoff/pc2-rec-npc-vendors.md`).
+2. ~~First activation of a neutral waypoint: no 0x63, the 0x0E / 0x51
+   mode messages and the ENDANIM frame.~~ Recording R-NV-12.
+3. ~~Why the town waypoint after travel is mode 2 (init 17 with no
+   arrival match, or restored without init).~~ Recording R-NV-13.
+4. Answered: `sim/units.md` §6.4 handler 1 (`0x00581490`): mode 1 and
+   `Mode2` ≠ 0 → mode field := 2 by a direct write (no mode message, no
+   anim setup, no draw), then `HasCollision2` = 0 → footprint freed
+   (`0x00623830`). Waypoints have `Mode2` = 1 (§5 rule 1).
+5. Answered: yes; player data is zeroed at allocation (`0x00621F90`,
+   0x16C bytes) and only `0x0055B720` writes +0x160 (§6.1).
+6. Out of scope: multiplayer hostility is Phase 7+ (`CLAUDE.md` scope);
+   for Phases 0–6 §6.1 runs on the host clock as written.
+7. Answered: edge case 11 (no masking on load; no classic-game setter).
