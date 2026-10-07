@@ -45,6 +45,8 @@ was at the 60 KB limit).
 | `panels.md` OQ 11, 12, 13 | `panels.md` OQ; `panels-2.md` §17.10, §20.4 | Mode 3 = additive (blend-modes §1); draw order; cube-gone close sends **two** 0x4F 0x17. |
 | `menus.md` OQ 1, 2, 3 | `menus.md` §3.5, §4.4, §4.5 | Hire row text; confirm dialog; click callers (wParam = flags, Shift → 0x32 bit 31 on quick paths). |
 | Split | `panels.md` §14 → `panels-2.md` §14 | panels.md 61.0 → 58.9 KB; §14 had no coverage claims. |
+| xpc-to-pc2 `ui/*` lines (0x26, 0x27, 0x4E, 0x50, 0x58, 0x8A, 0x91 consumers) | new `ui/messages.md` §1–§14 | Screen message list (add / wrap / 18-line cap / 10 s expiry / draw), chat line formats of types 1, 2, 4, 6 (+ 5, 7: recipe scroll), overhead bubbles (text pass, per-unit placement, 16-slot overlap search, bubble draw), NPC text list (sorted list, talk topic box, caption table), dialog panel (open, speed line, scroll, speech wait, end, skip input, 0x31 on close), timed box, hire popup (`SetUIState(0x23)`, `PopupHireling` → hireling panel once), 0x50 code effects (3 dead, 4 Inifuss stones), item-socket dialog (state 0x0E: orifice / imbue / sockets / personalize, 0x44 / 0x38 sends), 0x8A balloon overlay, intro table +0x12 (return greeting + C→S 0x4D). |
+| `client/msg-ui.md` OQ7 (writer part) | `ui/messages.md` §14 | All 12 writes of `[0x007C0D25]` / `[0x007C0D29]` are UI code (`0x004B1640`, `0x004B66B0`, `0x004B6DD0`, `0x004B3C20`, `0x004B3E10`): UI state; the bridge needs a UI-keyed lookup rule (cross-file request). |
 
 ## Still open
 
@@ -53,6 +55,8 @@ was at the 60 KB limit).
 - UP-28 (control panel overlays): not reached; needs its own spec (`ui/control-panel.md`).
 - `panels-2.md` OQ 1 (descdam / descatt functions), OQ 2 (skill-tree tab captions), OQ 3 (result note caption), OQ 5 (button fields +0x0A, +0x10).
 - `panels.md` OQ 8 rest (runtime inserts), `menus.md` OQ 4 (captures).
+
+- `ui/messages.md` OQ 1–6 (recording; allocator state of the bubble box; binding 7; gossip text records; 0x50 code 36; inventory handlers / item checks of the socket dialog).
 
 ## CODE-TABLE CHANGE commits
 
@@ -71,7 +75,16 @@ None (no TSV changed; the per-class close offsets are prose, the
 - to PC 2 vendors (`world/vendors.md` §7.1): the 1.14d client puts the item's mode (unit +0x10) in bits 16–31 of the 0x32 u32 @9 (`0x004B2760`–`0x004B2763`); with store items in mode 0 the bytes are 0, but the "unused (bits 16–30)" wording should say what the client writes. §8.1: the client's 0x35 one-item u32 @13 is the item's stat 72 value (`0x004B27F1`), so bit 31 is clear unless durability ≥ 2³¹.
 - to PC 2 npc / hirelings (`world/npc.md` §4): the client sends 0x38 action 3 when the NPC menu opens for classes 252, 198, 515, 150, with the player's GUID (−1 without a player) in the u32 @9 (`0x004B48C9`–`0x004B48E8`); 0x36 merc id is sent as a u32 (u16 zero-extended, `0x004B1E94`).
 
+- to PC 1 (`client/msg-ui.md` OQ7, `client/bridge.md` §10 r3): every writer of the interact NPC `[0x007C0D25]` / `[0x007C0D29]` is UI code (`ui/messages.md` §14: `0x004B1640`, `0x004B66B0`, `0x004B6DD0`, `0x004B3C20`, `0x004B3E10`), so it stays UI state: add the bridge rule for UI-keyed lookups at delivery (0x50 code 3, 0x8A) and mark OQ7 answered.
+- to PC 1 (`client/msg-ui.md` §7 code 2): `0x004939B0` never reads the hire-table entry `0x004B3340` leaves in EAX; the UI effect is `SetUIState(0x23, on)` + the `PopupHireling` flag (`ui/messages.md` §9 r2). Code 3: `[0x007C0D39]` / `[0x007C0D3D]` have no reader in `Game.exe` (§10).
+- to PC 1 (`client/msg-ui.md` §5 r2.3): with a type other than 1 or 2 the list is freed without a null test (`0x004A170D` → `0x006612A0`, reads [0 + 8]); note the 1.14d crash and the d2rs choice (`ui/messages.md` §Edge cases).
+- to PC 1 (`client/model.md` / `client/msg-ui.md`, model writes inside UI code): the interaction end `0x004B3C20` sets the NPC's unit flag +0xC4 |= 2 (`0x004B3CAE`) and clears the local player's data +0x150…+0x15C (`0x004B3C42`–`0x004B3C60`); the NPC menu open `0x004B66B0` clears +0xC4 bit 1 (`0x004B6794`) and sets it again when state 8 cannot open (`0x004B6890`).
+- to PC 1 (`client/msg-ui.md` §8 code 0): the "dialog" is the item-socket dialog, UI state 0x0E; refusal sends C→S 0x44 [player GUID or −1][object GUID][0][2] (`0x004C03F4`), `ui/messages.md` §11.
+- to PC 1 (`client/msg-ui.md` OQ9): the filter object's method +0x18 also receives every one-line color-4 screen message as 8-bit text (`0x0049E4E6`–`0x0049E52D`, `ui/messages.md` §2 r2).
+
 ## Recording list
+
+- Chat lines (whisper, whisper echo, broadcast) at 800 × 600; two monsters with overhead text at once (bubble moved); an NPC dialog panel scrolling with frame times; a timed box (`ui/messages.md` OQ 1).
 
 - Stash open at 800 × 600, expansion and classic: the `GoldMax` line, to identify its font (`panels-2.md` OQ 4).
 
