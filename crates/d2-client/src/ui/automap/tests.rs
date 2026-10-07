@@ -294,7 +294,7 @@ fn picker_without_a_range_gives_minus_one_without_a_draw() {
     ));
 }
 
-// Covers: specs/ui/automap.md §2 r2, §2 r3, §2 text
+// Covers: specs/ui/automap.md §2 r2, §2 r3
 #[test]
 fn picker_takes_the_first_match_and_rolls_its_cels() {
     let p = picker();
@@ -458,7 +458,7 @@ fn unit_cels_and_object_exceptions() {
     assert_eq!(unit_cel(&u(4, 5, 0), l, &Cels), None);
 }
 
-// Covers: specs/ui/automap.md §4 r1, §4 text
+// Covers: specs/ui/automap.md §4 r1
 #[test]
 fn units_are_added_once_after_they_were_drawn() {
     let mut units = vec![
@@ -861,7 +861,7 @@ fn only_unsaved_cells_are_written_and_teardown_saves() {
 
 // ------------------------------------------------------------------ §8
 
-// Covers: specs/ui/automap.md §8 text, §8 r1
+// Covers: specs/ui/automap.md §8 r1
 #[test]
 fn options_init_and_setters() {
     let d = Options::init(&MemoryStore::default());
@@ -951,7 +951,7 @@ fn cel_file_names() {
 
 // ------------------------------------------------------------------ §9
 
-// Covers: specs/ui/automap.md §9 text, §9 r1
+// Covers: specs/ui/automap.md §9 r1
 #[test]
 fn marker_rectangle_and_mini_origin() {
     let mut f = frame();
@@ -1464,7 +1464,7 @@ fn texts(out: &[AutomapDraw]) -> Vec<(Label, u16, i32, i32)> {
         .collect()
 }
 
-// Covers: specs/ui/automap.md §11 r1, §11 r2, §11 text
+// Covers: specs/ui/automap.md §11 r1, §11 r2
 #[test]
 fn marker_gate_and_rectangle() {
     let mut c = ctx();
@@ -1605,7 +1605,7 @@ fn roster_crosses_for_party_members_without_units() {
 
 // ------------------------------------------------------------------ §13
 
-// Covers: specs/ui/automap.md §13 text, §13 r1, §13 r2, §13 r3, §13 r4, §13 r5, §13 r6
+// Covers: specs/ui/automap.md §13 r1, §13 r2, §13 r3, §13 r4, §13 r5, §13 r6
 #[test]
 fn header_lines() {
     let s = |t: &str| t.encode_utf16().collect::<Vec<u16>>();
