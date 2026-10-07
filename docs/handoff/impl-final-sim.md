@@ -109,4 +109,16 @@ init 143; population.md §3.1 / §4 null region.
   reading, not stated text.
 - `ai/mod.rs` `TODO(monsters/init.md)` (no control at install) remains.
 - The hooks without a data model above.
-- `prop_walk_motion::chase_a_moving_target` flake: see below.
+
+## `prop_walk_motion::chase_a_moving_target` (coordinator item)
+Reported flaky on 740449b and later: "type 15 after re-path (Moving)".
+Root cause: the property, not the code. Up to 740449b it required a
+monster that is still `Moving` after a re-path to have type 13. pathing.md
+§9.10 says types 2/13/15 re-path as type 13 (finish) or 2, compute, and when
+that compute gives 0, type 15 and **compute again**; a non-zero second
+compute leaves the unit moving with type 15 (§12.8 wall follow). The code
+does exactly that (`path/walk/step.rs` `repath`). impl-triage-sim's
+4c391149 (in this branch's base) changed the property to "13 or 15"
+whatever the step result, which is what §9.10 allows and no weaker (a
+player still must be type 7; a monster type 2 still fails). Checked here:
+4 × 20,000 cases and 8 × 256 cases, no failure. No code change.
