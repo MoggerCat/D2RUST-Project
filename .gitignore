@@ -20,3 +20,8 @@
 __pycache__/
 *.pyc
 mutants.out/
+
+# cargo-fuzz (fuzz/): corpora are built from live Blizzard files, never committed
+/fuzz/target
+/fuzz/corpus/
+/fuzz/artifacts/
