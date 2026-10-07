@@ -23,19 +23,19 @@
 |   1. Sound environment | 78–128 |
 |   2. Music (`0x004DCAA0(T)`) | 129–184 |
 |   3. Quest stingers (`0x004DCD40(M, dM, H, k, S, dS, play)`) | 185–244 |
-|   4. Level-entry lines (`0x004CC270`) | 245–291 |
-|   5. Ambience loop (`0x004E42E0(T)`, first part) | 292–313 |
-|   6. Rain (`0x004E42E0`, second part) | 314–344 |
-|   7. Event cues (`0x004E42E0`, third part) | 345–369 |
-|   8. Sample pins on level change (`0x004E42E0`, last part) | 370–377 |
-|   9. Front-end music (`Options Music`; answers open question 5) | 378–427 |
-| Constants & data dependencies | 428–437 |
-| Randomness | 438–446 |
-| Edge cases & original bugs | 447–456 |
-| Test vectors | 457–483 |
-|   Checks (hook addresses for `record_sound.py`) | 484–493 |
-| Provenance | 494–517 |
-| Open questions | 518–555 |
+|   4. Level-entry lines (`0x004CC270`) | 245–293 |
+|   5. Ambience loop (`0x004E42E0(T)`, first part) | 294–315 |
+|   6. Rain (`0x004E42E0`, second part) | 316–346 |
+|   7. Event cues (`0x004E42E0`, third part) | 347–371 |
+|   8. Sample pins on level change (`0x004E42E0`, last part) | 372–379 |
+|   9. Front-end music (`Options Music`; answers open question 5) | 380–429 |
+| Constants & data dependencies | 430–439 |
+| Randomness | 440–448 |
+| Edge cases & original bugs | 449–458 |
+| Test vectors | 459–485 |
+|   Checks (hook addresses for `record_sound.py`) | 486–495 |
+| Provenance | 496–519 |
+| Open questions | 520–557 |
 <!-- /index -->
 
 ## Summary
@@ -274,7 +274,9 @@ Table `0x0072A2C4`: 14 records of (10 level ids, quest q, event e):
 2. The first record holding L: flag every level of that record. Then,
    if q = 0 or the client quest check `0x004A4180(q)` passes (quest q
    open and not done in the client quest state, owner
-   `world/quests.md`), and C − P+0x7C > 62, and `any_speech` is false:
+   `world/quests-status.md` §12: q is a chain id for the quest-log entry
+   lookup but indexes the 0x5E bytes by init-table row, so Act II lines
+   q 12 / 13 read the byte of chain 11 / 12), and C − P+0x7C > 62, and `any_speech` is false:
    player event e on P (`audio/triggers.md` §3 r4: the class line base
    + e − 33, delay per that rule).
 3. The flags are set even when r2 plays nothing, so a line skipped
