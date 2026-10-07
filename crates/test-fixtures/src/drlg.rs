@@ -113,10 +113,7 @@ pub fn files() -> Vec<(String, Vec<u8>)> {
     use crate::dt1::{file, tile, write};
     let mut out = vec![
         (archive_name(PRESET_DS1[0]), crate::ds1::write(&town())),
-        (
-            archive_name(PRESET_DS1[1]),
-            crate::ds1::write(&keep()),
-        ),
+        (archive_name(PRESET_DS1[1]), crate::ds1::write(&keep())),
         (
             archive_name(PRESET_DS1[2]),
             crate::ds1::write(&preset_room(0)),

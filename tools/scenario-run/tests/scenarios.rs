@@ -120,6 +120,7 @@ fn travel() -> Scenario {
     Scenario::parse(
         &text
             .replace("level=3", "level=4")
+            .replace("char waypoint 3", "char waypoint 4")
             .replace("name waypoint-travel", "name travel"),
     )
     .unwrap()
