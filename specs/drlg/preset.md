@@ -41,7 +41,7 @@
 | Edge cases & original bugs | 572–589 |
 | Test vectors | 590–615 |
 | Provenance | 616–657 |
-| Open questions | 658–688 |
+| Open questions | 658–699 |
 <!-- /index -->
 
 ## Summary
@@ -660,6 +660,17 @@ the disassembly). Function map (D2MOO 1.10f names as hints):
 1. What reads the room flag `0x10 << style` from warp markers and the
    level tile-info list (warp placement, `drlg/levels.md`)? Needed to
    confirm the scan output is complete.
+   *Answered* (static, `all.asm` scan for tests of room +0x28 against
+   0xFF0 or a register mask built as `0x10 << i` / `1 << (i + 4)`):
+   five readers, all already specified: warp-room centres `0x006423D0`
+   (`levels.md` §5 r4), the spawn-room fallback `0x0066B1F0`
+   (`levels.md` §10), the rooms-near build `0x0066C370` with the warp
+   links `0x0066C220` / `0x0066BE80` (`rooms.md` §3 r3) and the level
+   free test `0x00643060` (`levels.md` §9 r3). Each tests only whether
+   bit `0x10 << i` is set (with the slot's warp id); none reads which
+   cell or tile set it. `0x0066B030` also builds the mask but has no
+   caller. So the scan's per-room flag set is the whole output the
+   readers need.
 2. 1.14d content of a truncated group's missing fields (trees.ds1 group
    14): the bytes come from the uninitialized 0x320 slack after the file
    buffer (`0x00517079`, Fog allocator, no clear). d2rs uses 0; settle by

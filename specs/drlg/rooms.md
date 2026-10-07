@@ -42,7 +42,7 @@
 | Edge cases & original bugs | 1156–1173 |
 | Test vectors | 1174–1221 |
 | Provenance | 1222–1265 |
-| Open questions | 1266–1343 |
+| Open questions | 1266–1355 |
 <!-- /index -->
 
 ## Summary
@@ -1279,6 +1279,18 @@ counter (+0x0C), and per level all DRLG rooms in list order; then §3 and
 4. Client array order (§7.1): which server code iterates a room's client
    array (message fan-out?) and whether address order can change an
    outcome; with one client (single player) it cannot.
+   *Answered* (static, `all.asm`: every function reading both +0x48 and
+   +0x78 of one register, then each read): besides add / remove / sort
+   (`0x0061A660`, `0x0061A700`, `0x0061A5A0`) and their null-entry check
+   `0x0061A550` (fatal 0x453), two readers: the membership test
+   `0x005387F0` (is client C in unit U's room; order-free) and the
+   room-change messages `0x00554670` (`sim/pathing.md` §9.8), which
+   merge-walks the old and new rooms' arrays and relies on both being
+   sorted by address. Each client gets either the removal or the add
+   messages, so the address order changes only the order in which
+   different clients' queues are written, never what one client
+   receives. `0x0061A7E0` (array subset test) has no caller. No outcome
+   depends on the order.
 5. Maximum near-candidate count over all 1.14d levels (§3.1, 30 slots):
    measure from generated layouts once the type specs are implemented.
 6. Unit-order open question 3 (inactive-unit compress/restore order) is
