@@ -39,6 +39,7 @@ use super::{cel, emit_static_draws, text, PanelEnv, PanelOutput, PanelTables, Te
 use crate::ui::draw::UiDrawSink;
 use crate::ui::geom::{Point, Rect};
 use crate::ui::layout::{Cond, FrameSpec, LayoutRow, PanelKey, RowKind, Screen};
+use crate::ui::messages::msg_u32s;
 use crate::ui::panel::{ClientIntent, StringLookup};
 
 /// UI state id of the waypoint menu (§4.1).
@@ -133,6 +134,9 @@ pub struct WaypointPanel {
     pub guid: u32,
     /// Self-close message sent `[0x007BF085]`.
     close_sent: bool,
+    /// No player or no room for it (`0x00620BB0`): the latched level-0
+    /// send needs both (`ui/menus.md` §1.5).
+    pub no_player_room: bool,
 }
 
 impl WaypointPanel {
@@ -159,52 +163,82 @@ impl WaypointPanel {
     }
 
     /// Choosing row `row` of the current tab: C→S 0x49 `[GUID][level]`
-    /// (§13.7, `0x0049D0F3`). Nothing for a row that is not there.
-    pub fn choose_row(&self, view: &dyn WaypointView, row: usize) -> Vec<PanelOutput> {
+    /// (§13.7, `0x0049D0F3`). Nothing for a row that is not there. The row
+    /// choice sets the close latch too (`ui/menus.md` §1.5), so the close
+    /// that follows sends no level-0 message.
+    pub fn choose_row(&mut self, view: &dyn WaypointView, row: usize) -> Vec<PanelOutput> {
         let rows = view.rows(self.tab);
         match rows.get(row).filter(|_| row < MAX_ROWS) {
-            Some(r) => vec![self.msg(r.level)],
+            Some(r) => {
+                let m = self.msg(r.level);
+                self.close_sent = true;
+                vec![m]
+            }
             None => Vec::new(),
         }
     }
 
-    /// The close paths `0x0049CEC0` / `0x0049D160` (§13.7, §4.3): 0x49
-    /// with level 0, then `SetUIState(0x14, off, jump = 1)`.
-    pub fn close(&mut self) -> Vec<PanelOutput> {
-        self.close_pressed = false;
-        vec![
-            self.msg(0),
-            PanelOutput::SetUi {
-                ui: UI_WAYPOINT,
-                mode: 1,
-                jump: true,
-            },
-        ]
+    /// The latched level-0 send (`ui/menus.md` §1.5): it needs the latch
+    /// clear and a player with its room (`0x00620BB0`), and sets the
+    /// latch.
+    fn latched_close_msg(&mut self) -> Vec<PanelOutput> {
+        if self.close_sent || self.no_player_room {
+            return Vec::new();
+        }
+        self.close_sent = true;
+        vec![self.msg(0)]
     }
 
-    /// The close hook `0x0049CF50` (§2.6, §13.7): 0x49 with level 0.
+    /// The close paths `0x0049CEC0` / `0x0049D160` (§13.7, §4.3): the
+    /// latched 0x49 with level 0, then `SetUIState(0x14, off, jump = 1)`.
+    pub fn close(&mut self) -> Vec<PanelOutput> {
+        self.close_pressed = false;
+        let mut out = self.latched_close_msg();
+        out.push(PanelOutput::SetUi {
+            ui: UI_WAYPOINT,
+            mode: 1,
+            jump: true,
+        });
+        out
+    }
+
+    /// The close hook `0x0049CF50` (§2.6, §13.7): the latched 0x49 with
+    /// level 0.
     pub fn close_hook(&mut self) -> Vec<PanelOutput> {
         self.close_pressed = false;
-        vec![self.msg(0)]
+        self.latched_close_msg()
     }
 
     /// The draw-time check (§13.1): with the player gone (or in a state
     /// `0x00463DF0` rejects) the menu closes itself and sends 0x49 level 0
     /// once (latch).
     pub fn self_close(&mut self, player_ok: bool) -> Vec<PanelOutput> {
+        self.self_close_checked(true, player_ok).outputs
+    }
+
+    /// `0x0049C9C0`, start of the draw (`ui/menus.md` §1.7): with no
+    /// player or its mode 0x11 (`player_ok` false), `SetUIState(0x14, off,
+    /// 0)` (its close hook sends the latched level 0, which needs a player
+    /// and its room: `has_player_room`), then the latched send (nothing
+    /// left). The draw **continues** for that frame.
+    pub fn self_close_checked(&mut self, has_player_room: bool, player_ok: bool) -> SelfClose {
         if player_ok {
-            return Vec::new();
+            return SelfClose {
+                outputs: Vec::new(),
+                draw_continues: false,
+            };
         }
-        let mut out = vec![PanelOutput::SetUi {
+        self.no_player_room = !has_player_room;
+        let mut outputs = vec![PanelOutput::SetUi {
             ui: UI_WAYPOINT,
             mode: 1,
             jump: false,
         }];
-        if !self.close_sent {
-            self.close_sent = true;
-            out.push(self.msg(0));
+        outputs.extend(self.latched_close_msg());
+        SelfClose {
+            outputs,
+            draw_continues: true,
         }
-        out
     }
 
     /// Draws the menu (§13.2–§13.6): background, tabs, close button, rows,
@@ -307,6 +341,238 @@ impl WaypointPanel {
                 color,
             ));
         }
+    }
+}
+
+// ---------------------------------------------------------------------
+// specs/ui/menus.md §1: the waypoint menu input (ui 0x14).
+// ---------------------------------------------------------------------
+
+/// A `SelfClose` result (`ui/menus.md` §1.7).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SelfClose {
+    pub outputs: Vec<PanelOutput>,
+    /// The draw then **continues** for that frame (reproduced).
+    pub draw_continues: bool,
+}
+
+/// What the menu input produces, in the original's order.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum WpEffect {
+    Out(PanelOutput),
+    /// `0x004B9A00(id, 0, 0, 0)`.
+    Sound(u32),
+    /// The row rebuild `0x0049C7F0`.
+    RebuildRows,
+}
+
+/// Sounds of §1.2 and §1.6.
+pub const SOUND_TAB: u32 = 6;
+pub const SOUND_PRESS: u32 = 4;
+pub const SOUND_TRAVEL: u32 = 0x8B7;
+
+/// Row hit table: `hy` of the 9 rows (fields +0x10 / +0x14 of
+/// `0x007224E8`; x 17), §1.3.
+pub const ROW_HY: [i32; 9] = [60, 96, 132, 168, 205, 241, 277, 313, 349];
+/// Tab count `[0x007224E4]`.
+pub const TAB_COUNT: u8 = 5;
+/// Quest record whose bit 0 the tab setter tests, by tab 1–4 (§1.4;
+/// the draw tests 26 for tab 4: reproduce).
+pub const TAB_QUEST_RECORD: [u32; 5] = [0, 7, 15, 23, 28];
+/// The records the tab **draw** tests (`ui/panels.md` §13.3): tab 4 on
+/// record 26, the setter on record 28 (`ui/menus.md` §Edge cases).
+pub const TAB_DRAW_QUEST_RECORD: [u32; 5] = [0, 7, 15, 23, 26];
+
+/// The rows of the open menu (`0x007BF03C + 5r` level u32, `0x007BF040
+/// + 5r` used byte).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct WpRows {
+    pub used: [bool; MAX_ROWS],
+    pub level: [u32; MAX_ROWS],
+}
+
+/// The screen facts of the handlers.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct WpEnv {
+    pub w: i32,
+    pub h: i32,
+    pub sx: i32,
+    pub sy: i32,
+    /// The expansion is installed and the game is an expansion game.
+    pub expansion_game: bool,
+}
+
+impl WpEnv {
+    pub fn new(s: &Screen, expansion_game: bool) -> Self {
+        Self {
+            w: s.w,
+            h: s.h,
+            sx: s.sx(),
+            sy: s.sy(),
+            expansion_game,
+        }
+    }
+}
+
+/// `0x0047F210()` (§1.1): ui 0x14 and 0x15 (mini panel) both open and the
+/// mouse strictly inside x (W/2 + a, W/2 + a + 20 n), y (H − 76, H − 50),
+/// with a, n = 56, 7 when `[0x007BC978]` ≠ 0, else 35, 8.
+pub fn mini_panel_blocks(w: i32, h: i32, both_open: bool, bc978: bool, x: i32, y: i32) -> bool {
+    if !both_open {
+        return false;
+    }
+    let (a, n) = if bc978 { (56, 7) } else { (35, 8) };
+    let l = w / 2 + a;
+    l < x && x < l + 20 * n && h - 76 < y && y < h - 50
+}
+
+/// The tab hit (`0x0049C490`, §1.3): none unless y' ≤ 30 and x' ≤ 320;
+/// with the expansion tab 0–3 for x' < 64, 128, 192, 256, else 4;
+/// otherwise 0, 1, 2 for x' < 80, 160, 240, else 3 (no left or top
+/// bound).
+pub fn tab_hit(xp: i32, yp: i32, expansion_game: bool) -> Option<u8> {
+    if yp > 30 || xp > 320 {
+        return None;
+    }
+    let (step, last) = if expansion_game { (64, 4) } else { (80, 3) };
+    Some(
+        (0..last)
+            .find(|&t| xp < step * (i32::from(t) + 1))
+            .unwrap_or(last),
+    )
+}
+
+/// The row hit (`0x0049C510`, §1.3): the first used row r with `17 < x' <
+/// 297` and `hy < y' < hy + 30` (strict).
+pub fn row_hit(xp: i32, yp: i32, rows: &WpRows) -> Option<usize> {
+    (0..MAX_ROWS)
+        .find(|&r| rows.used[r] && 17 < xp && xp < 297 && ROW_HY[r] < yp && yp < ROW_HY[r] + 30)
+}
+
+/// The tab setter (`0x0049C760`, §1.4): `t` ≥ 5 → 0; then, walking down
+/// from `t`: tab 4 needs quest record 28 bit 0, tab 3 record 23, tab 2
+/// record 15, tab 1 record 7; a failed check sets `t` := that tab − 1.
+pub fn set_tab(t: u8, quest_bit0: &dyn Fn(u32) -> bool) -> u8 {
+    if t >= TAB_COUNT {
+        return 0;
+    }
+    let mut t = t;
+    while t > 0 {
+        if quest_bit0(TAB_QUEST_RECORD[usize::from(t)]) {
+            return t;
+        }
+        t -= 1;
+    }
+    0
+}
+
+/// The close button's press rectangle in panel coordinates (§1.2).
+fn in_close_rect(xp: i32, yp: i32) -> bool {
+    (273..=308).contains(&xp) && (387..=420).contains(&yp)
+}
+
+impl WaypointPanel {
+    /// Mouse down (`0x0049D160`, §1.2). Returns the effects and whether
+    /// the event is consumed. `blocked` is [`mini_panel_blocks`].
+    pub fn mouse_down(
+        &mut self,
+        env: &WpEnv,
+        x: i32,
+        y: i32,
+        rows: &WpRows,
+        blocked: bool,
+        quest_bit0: &dyn Fn(u32) -> bool,
+    ) -> (Vec<WpEffect>, bool) {
+        if blocked {
+            return (Vec::new(), false);
+        }
+        let consumed = x <= env.w && y <= env.h - 49;
+        if x > env.w / 2 || y > env.h - 49 {
+            // The latched close, then SetUIState(0x14, off, jump 1).
+            let out = self.close().into_iter().map(WpEffect::Out).collect();
+            return (out, consumed);
+        }
+        let (xp, yp) = (x - env.sx, y + env.sy);
+        let mut e = Vec::new();
+        if let Some(t) = tab_hit(xp, yp, env.expansion_game) {
+            if t != self.tab {
+                e.push(WpEffect::Sound(SOUND_TAB));
+            }
+            self.tab = set_tab(t, quest_bit0);
+            e.push(WpEffect::RebuildRows);
+        }
+        self.selected = None;
+        if in_close_rect(xp, yp) {
+            self.close_pressed = true;
+            e.push(WpEffect::Sound(SOUND_PRESS));
+        } else {
+            self.selected = row_hit(xp, yp, rows).map(|r| r as u8);
+            if self.selected.is_some() {
+                e.push(WpEffect::Sound(SOUND_PRESS));
+            }
+        }
+        (e, consumed)
+    }
+
+    /// Mouse up (`0x0049D010`, §1.6).
+    pub fn mouse_up(
+        &mut self,
+        env: &WpEnv,
+        x: i32,
+        y: i32,
+        rows: &WpRows,
+        blocked: bool,
+    ) -> (Vec<WpEffect>, bool) {
+        if blocked {
+            return (Vec::new(), false);
+        }
+        if x > env.w || y > env.h - 49 {
+            self.close_pressed = false;
+            self.selected = None;
+            return (Vec::new(), false);
+        }
+        let (xp, yp) = (x - env.sx, y + env.sy);
+        let mut e = Vec::new();
+        if self.close_pressed {
+            if in_close_rect(xp, yp) {
+                e.push(WpEffect::Out(PanelOutput::SetUi {
+                    ui: UI_WAYPOINT,
+                    mode: 1,
+                    jump: false,
+                }));
+                // `0x0049C6C0`, the latched send.
+                e.extend(self.latched_close_msg().into_iter().map(WpEffect::Out));
+            }
+        } else if let Some(r) = self.selected.map(usize::from) {
+            if row_hit(xp, yp, rows) == Some(r) {
+                // 0x49 [wp GUID][level of the row u32], latch := 1.
+                e.push(WpEffect::Out(PanelOutput::Intent(msg_u32s(
+                    0x49,
+                    &[self.guid, rows.level[r]],
+                ))));
+                self.close_sent = true;
+                e.extend(self.latched_close_msg().into_iter().map(WpEffect::Out));
+                e.push(WpEffect::Out(PanelOutput::SetUi {
+                    ui: UI_WAYPOINT,
+                    mode: 1,
+                    jump: false,
+                }));
+                e.push(WpEffect::Sound(SOUND_TRAVEL));
+            }
+        }
+        self.close_pressed = false;
+        self.selected = None;
+        (e, true)
+    }
+
+    /// Key close (`0x0049CEC0`, §1.8): any key message except `WM_CHAR`
+    /// with Tab (0x102 / 9) and `WM_SYSKEYDOWN` with F4 (0x104 / 0x73):
+    /// the latched send, `SetUIState(0x14, off, jump 1)`, consumed.
+    pub fn key_close(&mut self, message: u32, wparam: u32) -> (Vec<PanelOutput>, bool) {
+        if (message == 0x102 && wparam == 9) || (message == 0x104 && wparam == 0x73) {
+            return (Vec::new(), false);
+        }
+        (self.close(), true)
     }
 }
 
@@ -609,17 +875,21 @@ mod tests {
         );
         assert!(p.choose_row(&v, 2).is_empty());
         let close = PanelOutput::Intent(ClientIntent(vec![0x49, 0x0B, 0, 0, 0, 0, 0, 0, 0]));
-        assert_eq!(
-            p.close(),
-            vec![
-                close.clone(),
-                PanelOutput::SetUi {
-                    ui: 0x14,
-                    mode: 1,
-                    jump: true
-                }
-            ]
-        );
+        let off = PanelOutput::SetUi {
+            ui: 0x14,
+            mode: 1,
+            jump: true,
+        };
+        // The row choice set the close latch (`ui/menus.md` §1.5): the
+        // close sends no level-0 message after it, and neither does the
+        // hook.
+        assert_eq!(p.close(), vec![off.clone()]);
+        assert!(p.close_hook().is_empty());
+        // Without a row: one level-0 message, then the latch holds.
+        p.open(0x0B);
+        assert_eq!(p.close(), vec![close.clone(), off]);
+        assert!(p.close_hook().is_empty());
+        p.open(0x0B);
         assert_eq!(p.close_hook(), vec![close]);
     }
 
@@ -640,5 +910,325 @@ mod tests {
         assert_eq!(p.self_close(false), vec![off.clone()]);
         p.open(7);
         assert_eq!(p.self_close(false), vec![off, msg]);
+    }
+
+    fn rows_012() -> WpRows {
+        let mut r = WpRows::default();
+        for i in 0..3 {
+            r.used[i] = true;
+            r.level[i] = 10 + i as u32;
+        }
+        r
+    }
+
+    fn open_panel() -> WaypointPanel {
+        let mut p = WaypointPanel::new();
+        p.open(0x0B);
+        p
+    }
+
+    fn off(jump: bool) -> PanelOutput {
+        PanelOutput::SetUi {
+            ui: 0x14,
+            mode: 1,
+            jump,
+        }
+    }
+
+    fn msg49(level: u32) -> PanelOutput {
+        PanelOutput::Intent(ClientIntent(
+            [&[0x49u8, 0x0B, 0, 0, 0][..], &level.to_le_bytes()].concat(),
+        ))
+    }
+
+    fn q_all(_: u32) -> bool {
+        true
+    }
+
+    // Covers: specs/ui/menus.md §1 r1
+    #[test]
+    fn mini_panel_blocks_the_menu_mouse() {
+        // 800 × 600, single player ([0x007BC978] ≠ 0: a 56, n 7): x strictly
+        // inside (456, 596), y (524, 550).
+        assert!(mini_panel_blocks(800, 600, true, true, 457, 525));
+        assert!(mini_panel_blocks(800, 600, true, true, 595, 549));
+        assert!(!mini_panel_blocks(800, 600, true, true, 456, 525));
+        assert!(!mini_panel_blocks(800, 600, true, true, 596, 525));
+        assert!(!mini_panel_blocks(800, 600, true, true, 500, 524));
+        assert!(!mini_panel_blocks(800, 600, true, true, 500, 550));
+        // Multiplayer: a 35, n 8: (435, 595).
+        assert!(mini_panel_blocks(800, 600, true, false, 436, 530));
+        assert!(!mini_panel_blocks(800, 600, true, false, 435, 530));
+        assert!(mini_panel_blocks(800, 600, true, false, 594, 530));
+        assert!(!mini_panel_blocks(800, 600, true, false, 595, 530));
+        // Only with both panels open.
+        assert!(!mini_panel_blocks(800, 600, false, true, 500, 530));
+        // Both handlers ignore the event while it holds.
+        let env = WpEnv::new(&Screen::R800, true);
+        let mut p = open_panel();
+        assert_eq!(
+            p.mouse_down(&env, 300, 80, &rows_012(), true, &q_all),
+            (vec![], false)
+        );
+        assert_eq!(
+            p.mouse_up(&env, 300, 80, &rows_012(), true),
+            (vec![], false)
+        );
+        assert_eq!(p.tab, 0);
+    }
+
+    // Test vectors of §1.3.
+    // Covers: specs/ui/menus.md §1 r3
+    #[test]
+    fn tab_and_row_hit_tests() {
+        // 800 × 600, expansion game, mouse (300, 80): x' = 220, y' = 20 →
+        // tab 3.
+        let env = WpEnv::new(&Screen::R800, true);
+        assert_eq!((300 - env.sx, 80 + env.sy), (220, 20));
+        assert_eq!(tab_hit(220, 20, true), Some(3));
+        // 640 × 480, classic, (100, 10) → tab 1.
+        assert_eq!(tab_hit(100, 10, false), Some(1));
+        // Edges: expansion 63 → 0, 64 → 1, 255 → 3, 256 → 4; classic 79 →
+        // 0, 240 → 3; none for y' > 30 or x' > 320; negative values hit.
+        for (x, t) in [
+            (63, 0),
+            (64, 1),
+            (127, 1),
+            (128, 2),
+            (191, 2),
+            (192, 3),
+            (255, 3),
+            (256, 4),
+        ] {
+            assert_eq!(tab_hit(x, 0, true), Some(t), "x' {x}");
+        }
+        for (x, t) in [(79, 0), (80, 1), (159, 1), (160, 2), (239, 2), (240, 3)] {
+            assert_eq!(tab_hit(x, 0, false), Some(t), "x' {x}");
+        }
+        assert_eq!(tab_hit(-50, -50, true), Some(0));
+        assert_eq!(tab_hit(100, 31, true), None);
+        assert_eq!(tab_hit(321, 30, true), None);
+        assert_eq!(tab_hit(320, 30, true), Some(4));
+        // Rows: 800 × 600, rows 0–2 used, (200, 200): x' = 120, y' = 140 →
+        // row 2 (132 < 140 < 162).
+        assert_eq!((200 - env.sx, 200 + env.sy), (120, 140));
+        let rows = rows_012();
+        assert_eq!(row_hit(120, 140, &rows), Some(2));
+        // Strict bounds and used rows only.
+        assert_eq!(row_hit(17, 70, &rows), None);
+        assert_eq!(row_hit(18, 70, &rows), Some(0));
+        assert_eq!(row_hit(296, 70, &rows), Some(0));
+        assert_eq!(row_hit(297, 70, &rows), None);
+        assert_eq!(row_hit(100, 60, &rows), None);
+        assert_eq!(row_hit(100, 61, &rows), Some(0));
+        assert_eq!(row_hit(100, 89, &rows), Some(0));
+        assert_eq!(row_hit(100, 90, &rows), None);
+        assert_eq!(row_hit(100, 170, &rows), None);
+        // The hy table.
+        assert_eq!(ROW_HY, [60, 96, 132, 168, 205, 241, 277, 313, 349]);
+        let all = WpRows {
+            used: [true; 9],
+            ..Default::default()
+        };
+        assert_eq!(row_hit(100, 350, &all), Some(8));
+    }
+
+    // Covers: specs/ui/menus.md §1 r4
+    #[test]
+    fn tab_setter_walks_down_the_quest_records() {
+        let only = |ok: &'static [u32]| move |r: u32| ok.contains(&r);
+        // t ≥ 5 → 0.
+        assert_eq!(set_tab(5, &q_all), 0);
+        assert_eq!(set_tab(9, &q_all), 0);
+        // Every record set: the tab itself.
+        for t in 0..5 {
+            assert_eq!(set_tab(t, &q_all), t);
+        }
+        // Tab 4 needs record 28 (the draw tests 26: reproduce).
+        assert_eq!(set_tab(4, &only(&[26, 23, 15, 7])), 3);
+        assert_eq!(set_tab(4, &only(&[28])), 4);
+        // A failed check walks down: 3 needs 23, 2 needs 15, 1 needs 7.
+        assert_eq!(set_tab(3, &only(&[15, 7])), 2);
+        assert_eq!(set_tab(3, &only(&[7])), 1);
+        assert_eq!(set_tab(3, &only(&[])), 0);
+        assert_eq!(set_tab(2, &only(&[7])), 1);
+        assert_eq!(TAB_QUEST_RECORD, [0, 7, 15, 23, 28]);
+    }
+
+    // Covers: specs/ui/menus.md §1 r2
+    #[test]
+    fn mouse_down_paths() {
+        let env = WpEnv::new(&Screen::R800, true);
+        let rows = rows_012();
+        // On a tab that differs: sound 6, the tab set, the rows rebuilt;
+        // pressed row cleared.
+        let mut p = open_panel();
+        p.selected = Some(1);
+        let (e, c) = p.mouse_down(&env, 300, 80, &rows, false, &q_all);
+        assert_eq!(e, vec![WpEffect::Sound(6), WpEffect::RebuildRows]);
+        assert!(c);
+        assert_eq!((p.tab, p.selected, p.close_pressed), (3, None, false));
+        // The same tab again: no sound.
+        let (e, _) = p.mouse_down(&env, 300, 80, &rows, false, &q_all);
+        assert_eq!(e, vec![WpEffect::RebuildRows]);
+        // A quest-gated tab falls back (rule 4).
+        let mut p = open_panel();
+        p.mouse_down(&env, 300, 80, &rows, false, &|r| r == 7);
+        assert_eq!(p.tab, 1);
+        // On a row: pressed row set and sound 4.
+        let mut p = open_panel();
+        let (e, c) = p.mouse_down(&env, 200, 200, &rows, false, &q_all);
+        assert_eq!(e, vec![WpEffect::Sound(4)]);
+        assert!(c);
+        assert_eq!(p.selected, Some(2));
+        // On a gap between rows: nothing pressed, no sound.
+        let (e, _) = p.mouse_down(&env, 200, 225, &rows, false, &q_all);
+        assert!(e.is_empty());
+        assert_eq!(p.selected, None);
+        // On the close rectangle: close pressed and sound 4 (x' 273–308,
+        // y' 387–420 → (353…388, 447…480)).
+        let (e, _) = p.mouse_down(&env, 353 + 5, 447 + 5, &rows, false, &q_all);
+        assert_eq!(e, vec![WpEffect::Sound(4)]);
+        assert!(p.close_pressed);
+        // x > W / 2: the latched close and SetUIState(0x14, off, jump 1);
+        // consumed while x ≤ W and y ≤ H − 49.
+        let mut p = open_panel();
+        let (e, c) = p.mouse_down(&env, 401, 100, &rows, false, &q_all);
+        assert_eq!(e, vec![WpEffect::Out(msg49(0)), WpEffect::Out(off(true))]);
+        assert!(c);
+        // y > H − 49 (a click on the control panel): closes, not consumed.
+        let mut p = open_panel();
+        let (e, c) = p.mouse_down(&env, 100, 552, &rows, false, &q_all);
+        assert_eq!(e.len(), 2);
+        assert!(!c);
+        // Beyond the right edge: closes, not consumed.
+        let mut p = open_panel();
+        let (_, c) = p.mouse_down(&env, 801, 100, &rows, false, &q_all);
+        assert!(!c);
+        // 640 × 480 classic: (100, 10) → tab 1.
+        let env = WpEnv::new(&Screen::R640, false);
+        let mut p = open_panel();
+        p.mouse_down(&env, 100, 10, &rows, false, &q_all);
+        assert_eq!(p.tab, 1);
+    }
+
+    // Test vector "waypoint: row chosen, then the close hook runs".
+    // Covers: specs/ui/menus.md §1 r5
+    #[test]
+    fn latch_gives_one_0x49_per_open() {
+        let env = WpEnv::new(&Screen::R800, true);
+        let rows = rows_012();
+        let mut p = open_panel();
+        // Row 2 pressed, released over it: one 0x49 (the row's), the close
+        // hook sends no level-0 message.
+        p.mouse_down(&env, 200, 200, &rows, false, &q_all);
+        let (e, c) = p.mouse_up(&env, 200, 200, &rows, false);
+        assert!(c);
+        let sent: Vec<_> = e
+            .iter()
+            .filter(|e| matches!(e, WpEffect::Out(PanelOutput::Intent(_))))
+            .collect();
+        assert_eq!(sent, vec![&WpEffect::Out(msg49(12))]);
+        assert!(p.close_hook().is_empty());
+        // A new open clears the latch: one level-0 message at most.
+        p.open(0x0B);
+        assert_eq!(p.close_hook(), vec![msg49(0)]);
+        assert!(p.close_hook().is_empty());
+        // No player or no room: the latched send needs both and sends
+        // nothing.
+        let mut p = open_panel();
+        p.no_player_room = true;
+        assert!(p.close_hook().is_empty());
+        assert_eq!(p.close(), vec![off(true)]);
+    }
+
+    // Covers: specs/ui/menus.md §1 r6
+    #[test]
+    fn mouse_up_paths() {
+        let env = WpEnv::new(&Screen::R800, true);
+        let rows = rows_012();
+        // x > W or y > H − 49: clears close pressed and pressed row, not
+        // consumed.
+        let mut p = open_panel();
+        p.close_pressed = true;
+        p.selected = Some(1);
+        let (e, c) = p.mouse_up(&env, 801, 100, &rows, false);
+        assert!(e.is_empty() && !c);
+        assert!(!p.close_pressed && p.selected.is_none());
+        let mut p = open_panel();
+        p.selected = Some(1);
+        assert!(!p.mouse_up(&env, 100, 552, &rows, false).1);
+        // Close pressed and released inside: SetUIState(0x14, off, 0) and
+        // the latched level-0 send.
+        let mut p = open_panel();
+        p.close_pressed = true;
+        let (e, c) = p.mouse_up(&env, 358, 452, &rows, false);
+        assert_eq!(e, vec![WpEffect::Out(off(false)), WpEffect::Out(msg49(0))]);
+        assert!(c && !p.close_pressed);
+        // Close pressed and released outside: nothing, both cleared.
+        let mut p = open_panel();
+        p.close_pressed = true;
+        let (e, c) = p.mouse_up(&env, 200, 200, &rows, false);
+        assert!(e.is_empty() && c && !p.close_pressed);
+        // Row pressed and released over it: 0x49 [GUID][level], close off
+        // (jump 0), sound 0x8B7; the latch is set.
+        let mut p = open_panel();
+        p.selected = Some(2);
+        let (e, c) = p.mouse_up(&env, 200, 200, &rows, false);
+        assert_eq!(
+            e,
+            vec![
+                WpEffect::Out(msg49(12)),
+                WpEffect::Out(off(false)),
+                WpEffect::Sound(0x8B7)
+            ]
+        );
+        assert!(c && p.selected.is_none());
+        // Released over another row: nothing, both cleared, consumed.
+        let mut p = open_panel();
+        p.selected = Some(2);
+        let (e, c) = p.mouse_up(&env, 200, 100, &rows, false);
+        assert!(e.is_empty() && c && p.selected.is_none());
+    }
+
+    // Covers: specs/ui/menus.md §1 r7
+    #[test]
+    fn self_close_keeps_drawing() {
+        let mut p = open_panel();
+        // A player in a good mode: nothing.
+        let r = p.self_close_checked(true, true);
+        assert!(r.outputs.is_empty() && !r.draw_continues);
+        // Dead (mode 0x11): the close hook sends the latched level 0; the
+        // draw continues.
+        let r = p.self_close_checked(true, false);
+        assert_eq!(r.outputs, vec![off(false), msg49(0)]);
+        assert!(r.draw_continues);
+        // The latched send after it has nothing left.
+        assert!(p.close_hook().is_empty());
+        // No player: the menu closes, nothing is sent.
+        let mut p = open_panel();
+        let r = p.self_close_checked(false, false);
+        assert_eq!(r.outputs, vec![off(false)]);
+        assert!(r.draw_continues);
+    }
+
+    // Covers: specs/ui/menus.md §1 r8
+    #[test]
+    fn key_close_keys() {
+        // Any key message closes: latched send, off with jump 1, consumed.
+        let mut p = open_panel();
+        let (e, c) = p.key_close(0x100, 0x1B);
+        assert_eq!(e, vec![msg49(0), off(true)]);
+        assert!(c);
+        // WM_CHAR with Tab and WM_SYSKEYDOWN with F4 pass.
+        let mut p = open_panel();
+        assert_eq!(p.key_close(0x102, 9), (vec![], false));
+        assert_eq!(p.key_close(0x104, 0x73), (vec![], false));
+        // WM_CHAR with another key closes; WM_SYSKEYDOWN with another too.
+        let (_, c) = p.key_close(0x102, 0x41);
+        assert!(c);
+        let mut p = open_panel();
+        let (_, c) = p.key_close(0x104, 0x72);
+        assert!(c);
     }
 }

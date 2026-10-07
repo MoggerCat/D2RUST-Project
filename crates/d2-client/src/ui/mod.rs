@@ -24,6 +24,7 @@ pub mod geom;
 pub mod gold;
 pub mod inv_grid;
 pub mod layout;
+pub mod messages;
 pub mod original;
 pub mod panel;
 pub mod panels;
