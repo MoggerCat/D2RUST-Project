@@ -39,20 +39,20 @@
 | Outputs / state changes | 84–90 |
 | Rules | 91–92 |
 |   1. Loop order (single player) | 93–114 |
-|   2. Client → server | 115–284 |
-|   3. Server → client | 285–384 |
-|   4. d2rs mapping and scope | 385–416 |
-|   5. Machine-readable tables | 417–453 |
-|   6. Exact-match comparison | 454–539 |
-|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 540–922 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 923–1067 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1068–1180 |
-| Constants & data dependencies | 1181–1199 |
-| Randomness | 1200–1205 |
-| Edge cases & original bugs | 1206–1239 |
-| Test vectors | 1240–1315 |
-| Provenance | 1316–1411 |
-| Open questions | 1412–1477 |
+|   2. Client → server | 115–287 |
+|   3. Server → client | 288–396 |
+|   4. d2rs mapping and scope | 397–428 |
+|   5. Machine-readable tables | 429–465 |
+|   6. Exact-match comparison | 466–556 |
+|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 557–939 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 940–1084 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1085–1197 |
+| Constants & data dependencies | 1198–1216 |
+| Randomness | 1217–1222 |
+| Edge cases & original bugs | 1223–1259 |
+| Test vectors | 1260–1335 |
+| Provenance | 1336–1431 |
+| Open questions | 1432–1497 |
 <!-- /index -->
 
 ## Summary
@@ -134,15 +134,18 @@ The host schedule is `tick.md` §1 (owner). Message-relevant facts:
 4. `0x006BF370` asks the classifier `0x0052B100` (registered at
    `0x0052B7A0`, net object `0x00882D08`) for a queue:
 
-   | Classifier step | Result |
+   | Classifier step (in this order) | Result |
    |---|---|
    | size < 1 | 3 (incomplete) |
-   | id 0x71..0xFE | 4 (invalid) |
-   | size rule (`0x0052BC20`, rule 5) gives 0, or > 0x204, or > the given size | 3 |
+   | size rule (`0x0052BC20`, rule 5) gives 0 (this includes ids 0x71..0xFE, entry-0 ids and too few bytes) | 3 |
+   | rule size, low 16 bits compared unsigned, > 0x204 (`0x0052B139`) | 4 (invalid); a **negative** chat size (rule 5) always lands here, since its low 16 bits are ≥ 0x8000 |
+   | rule size (low 16 bits) > the given size | 3 |
    | id < 0x67 | queue 1 (game), result 1 |
    | id 0x67..0x70 | queue 0 (system), result 2 |
    | id 0xFF (rule: 16 bytes) | queue 2, result 1, if the net object's gate `0x006BF6C0` passes; else 4 |
 
+   The classifier's own id test for 0x71..0xFE (result 4) is dead code:
+   the size rule already returned 0 for those ids (result 3).
    Results 1 and 2 enqueue; 3 and 4 **drop the message silently** in
    local mode (network mode: 3 waits for more bytes, 4 bans the sender,
    `0x006C08A0`). The queued copy is the whole given buffer (`size`
@@ -357,6 +360,15 @@ Queue 2 (id 0xFF, 16 bytes, `0x0052CC20`) runs only when host callbacks
 2. Size > 0x204 or ≤ 0 → fatal assert.
 3. Size rule result 0 (unknown id, incomplete) **ends the split**: the
    rest of the buffer is discarded.
+   The split never tests the size against the bytes left (`0x0052AEB0`;
+   the size rule `0x0052B920` checks only each variable id's "needs ≥"
+   prefix, and 0x26 the whole size). A message whose size runs past the
+   buffer's end is copied whole (the bytes after the used part: zero up
+   to the end of the 0x200-byte data area, which is zeroed when the
+   buffer is taken, §3.2 rule 1; past it the buffer record's next field
+   and heap memory), queued with its full size, and ends the split
+   (bytes left ≤ 0). Unreachable while every builder queues the size its
+   id's rule gives (§3.2 rule 2).
 4. Client pop `0x0052B820`: with global `0x00882D10` = 2 (game type 1) a
    node is held until 500 ms after it was queued; with 1 (single player)
    it is returned at once.
@@ -463,7 +475,12 @@ as in §2.1 rule 5 and §3.1 rule 1.
    byte-identical and in the same order.
 2. Flushed buffers are derived from O(F) by §3.2 rules 1–2 and are
    compared too (packing is part of the protocol).
-3. Nothing is ignored by default. Values that come from the clock
+3. Nothing is ignored by default, except bytes no 1.14d builder writes
+   (stack contents of the sender's frame), which are masked: S→C 0x2A
+   bytes 3–6 (`0x0053D740`, `world/npc.md` §9), 0x58 byte 6 (every
+   caller of `0x0053D8D0` leaves it unwritten, `world/npc.md` §8.1), 0x50
+   bytes 12–14 for kind 1 and bytes 13–14 for kind 4
+   (`world/quests.md` §6.2, §10.6). Values that come from the clock
    (ping/pong contents, 0x8F) are transport and excluded with their rows
    (§4). GUIDs are deterministic (`unit-order.md`) and compared.
 4. **Proof, two layers:**
@@ -1213,7 +1230,10 @@ their systems (`rng.md` §7), in dispatch order, before the tick's draws
    full size (§2.1 rule 7).
 4. C→S chat size rule adds the signed byte after the second string's NUL
    (§2.1 rule 5): a well-formed message has 0 there; any other value
-   changes the size.
+   changes the size. A negative size (e.g. `15 01 00 'hi' 00 'bob' 00
+   80` → −117) passes the rule's "needs ≥ size" test and is rejected by
+   the classifier with result 4 (§2.1 rule 4), dropped silently in local
+   mode.
 5. Body-location fields read as u8 inside a 4-byte slot (§2.4 rule 9).
 6. Client duplicate filter (§2.1 rule 1): identical repeated requests
    within 50/200 ms never reach the server; d2rs's client reproduces it so

@@ -28,16 +28,16 @@
 | Outputs / state changes | 67–70 |
 | Rules | 71–72 |
 |   1. Creation values | 73–95 |
-|   2. Spending stat points (message 0x3A) | 96–133 |
-|   3. Level-up `0x00570880` (D2MOO `PLAYERSTATS_LevelUp`) | 134–155 |
-|   4. Experience | 156–195 |
-|   5. Client vitals sync (`0x00548760`) | 196–307 |
-| Constants & data dependencies | 308–324 |
-| Randomness | 325–328 |
-| Edge cases & original bugs | 329–340 |
-| Test vectors | 341–361 |
-| Provenance | 362–382 |
-| Open questions | 383–411 |
+|   2. Spending stat points (message 0x3A) | 96–134 |
+|   3. Level-up `0x00570880` (D2MOO `PLAYERSTATS_LevelUp`) | 135–156 |
+|   4. Experience | 157–196 |
+|   5. Client vitals sync (`0x00548760`) | 197–308 |
+| Constants & data dependencies | 309–325 |
+| Randomness | 326–329 |
+| Edge cases & original bugs | 330–341 |
+| Test vectors | 342–362 |
+| Provenance | 363–383 |
+| Open questions | 384–412 |
 <!-- /index -->
 
 ## Summary
@@ -98,8 +98,9 @@ experience` if positive, through §4.3, which levels up).
 Handler `0x0054BD10`: size must be 3, else 3. Byte +1 is the stat id
 `s`, byte +2 is `count − 1`. `s > 15` or `count − 1 > 99` → 3. Repeat
 `count` times `spend(unit, s)` (`0x00570D60`); the first failure stops
-and returns 2; else 0. (`client-messages.tsv` describes the field as a
-u16 stat: Open question 4.)
+and returns 2; else 0. (`client-messages.tsv` layout `stat:u8@1
+count_minus_one:u8@2`; the handler reads them as one u16 at +1 and
+splits it, `0x0054BD29`.)
 
 `spend(unit, s)`: `statpts(4)` (unit getter) = 0 → fail. By `s`:
 
@@ -393,8 +394,8 @@ stat points: three spends succeed, the fourth fails, result 2.
 3. §4.2 branch for `dlvl > alvl`: confirm the operand roles of the
    `pct(exp, alvl, dlvl)` call (the read gives EAX = defender level,
    EDX = attacker level, ECX = experience).
-4. `client-messages.tsv` row 0x3A says `stat:u16@1`; the handler reads
-   byte +1 as the stat and byte +2 as count − 1.
+4. Answered: `client-messages.tsv` row 0x3A now has `stat:u8@1
+   count_minus_one:u8@2` (§2).
 5. Monster life, mana, attack rating, defense, damage and experience at
    spawn (`monstats` + `monlvl`, champion / unique bonuses, player
    count; D2MOO `D2Common` `Monsters.cpp`, 1.14d `0x0063EFA0` area):

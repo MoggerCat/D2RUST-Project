@@ -40,17 +40,17 @@
 |   3. Game entry: picking the quest set | 336–368 |
 |   4. Events and dispatch | 369–453 |
 |   5. Quest updater and timers (tick step 8) | 454–475 |
-|   6. Status reporting | 476–579 |
-|   7. NPC dialog hooks | 580–612 |
-|   8. Act transitions, warps and portals | 613–694 |
-|   9. Quest items, rewards and helpers | 695–760 |
-|   11. Acts II–V | 761–766 |
-| Constants & data dependencies | 767–781 |
-| Randomness | 782–800 |
-| Edge cases & original bugs | 801–819 |
-| Test vectors | 820–851 |
-| Provenance | 852–873 |
-| Open questions | 874–917 |
+|   6. Status reporting | 476–582 |
+|   7. NPC dialog hooks | 583–615 |
+|   8. Act transitions, warps and portals | 616–697 |
+|   9. Quest items, rewards and helpers | 698–763 |
+|   11. Acts II–V | 764–769 |
+| Constants & data dependencies | 770–784 |
+| Randomness | 785–803 |
+| Edge cases & original bugs | 804–822 |
+| Test vectors | 823–854 |
+| Provenance | 855–876 |
+| Open questions | 877–920 |
 <!-- /index -->
 
 ## Summary
@@ -172,7 +172,7 @@ status functions return false, §6.1).
 
 | Msg | Size | Layout | Sender |
 |---|---|---|---|
-| S→C 0x28 QuestInfo | 103 | u8 0x28, u8 unit type, u32 unit GUID, u8 0, 96 bytes player record (current difficulty) | `0x0053D670` |
+| S→C 0x28 QuestInfo | 103 | u8 0x28, u8 unit type, u32 unit GUID, u8 at 6 (the builder's fourth argument: 0 from quest code; from the NPC chat path `0x00572C10` its own third argument), 96 bytes player record (current difficulty) at 7 | `0x0053D670` |
 | S→C 0x29 GameQuestInfo | 97 | u8 0x29, 96 bytes game record | `0x00544520` → `0x0053D700` |
 
 0x28's unit is the NPC being talked to (type 1, its GUID) when sent by the
@@ -500,8 +500,11 @@ Handler `0x0054C0C0` (size must be 1) calls `0x00546040(game, player)`:
 2. list[41] = 0. For each record (list order) with status ≠ 0: assert
    chain ≤ 40; status from status_fn if set (written to list[filter] only
    if it returns 1), else the default rule into list[filter].
-3. 0x50 (15 bytes: u8 0x50, u16 1, u16 Den of Evil monsters left, i16
-   staff tomb, u16 barbarians left, 6 zero bytes) is sent if list[1] ≠ 0
+3. 0x50 (15 bytes, sender `0x0053D7E0` copying a 15-byte record: u8
+   0x50, u16 kind 1 at 1, u16 Den of Evil monsters left at 3, i16 staff
+   tomb at 5, u16 barbarians left at 7, bytes 9–11 zero; bytes 12–14
+   are never written in `0x00546040` (stack contents, masked in the
+   exact comparison, `sim/intents-events.md` §6 r3)) is sent if list[1] ≠ 0
    (then monsters left = `0x005901E0` of chain 1's record), or list[36] ≠
    0 (barbarians = `0x00588C50` of chain 32's record: 5 for each of
    extra bytes +0x86, +0x87, +0x88 that is 0, plus extra +0xA4 − +0xAC −
@@ -814,8 +817,8 @@ monster specs). Quest-seed sites outside Act I (for later specs):
 6. Timer due values are compared unsigned; the wrap at tick 2^32 − 1
    rewrites them as 0xFFFFFFFF − due.
 7. The Malus needs character level 8 in 1.14d (`quests-act1.md` §10.5).
-8. 0x50's unused fields are 0; the client reads all three counters from
-   one message.
+8. 0x50 kind 1's unused fields 9–11 are 0 and 12–14 unwritten (§6.2);
+   the client reads all three counters from one message.
 
 ## Test vectors
 

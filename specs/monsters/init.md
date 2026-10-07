@@ -49,17 +49,17 @@
 |   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 598–612 |
 |   22. Umod callbacks and the type-7 event | 613–660 |
 |   23. Unique names (client) | 661–670 |
-|   24. Monster assign message | 671–683 |
-|   25. Calling the spawn functions outside population (tools) | 684–774 |
-| Constants & data dependencies | 775–796 |
-| Randomness | 797–832 |
-| Edge cases & original bugs | 833–858 |
-| Test vectors | 859–860 |
-|   Synthetic (CI-safe) | 861–883 |
-|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 884–914 |
-|   Recorded checks (monster assign 0xAC) | 915–927 |
-| Provenance | 928–990 |
-| Open questions | 991–1018 |
+|   24. Monster assign message | 671–686 |
+|   25. Calling the spawn functions outside population (tools) | 687–777 |
+| Constants & data dependencies | 778–799 |
+| Randomness | 800–835 |
+| Edge cases & original bugs | 836–861 |
+| Test vectors | 862–863 |
+|   Synthetic (CI-safe) | 864–886 |
+|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 887–917 |
+|   Recorded checks (monster assign 0xAC) | 918–930 |
+| Provenance | 931–993 |
+| Open questions | 994–1021 |
 <!-- /index -->
 
 ## Summary
@@ -672,7 +672,10 @@ first). Superuniques use their `Name`. Display only; no sim effect.
 
 Creation sends nothing. Message 0xAC (`server-messages.tsv`, built by
 `0x0053E2E0`) goes out with the unit update queues (`sim/unit-order.md`
-§6). Init-owned fields in it: class, life byte (last_sent_hp_pct, 128
+§6). Header (byte offsets): 0 = 0xAC, 1 GUID u32, 5 class u16, 7 x u16,
+9 y u16 (`0x006488C0` / `0x00648900`), 11 life byte (`0x005A5650`), 12 total
+length u8 (written last, `0x0053E818`; the size rule `u8@12`), 13 the
+bit stream below (buffer 0xF4 bytes). Init-owned fields in it: class, life byte (last_sent_hp_pct, 128
 at spawn), mode (only skill1/skill2/death/dead modes are sent, else 1),
 the 16 components (1 bit when the class's choice count is < 3, else
 bit length of count − 1; omitted when all are 0), and, when the monster

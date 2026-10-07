@@ -29,21 +29,21 @@
 | Rules | 82–85 |
 |   1. Where formulas live | 86–176 |
 |   2. Bytecode | 177–222 |
-|   3. Evaluator | 223–328 |
-|   4. Compiler | 329–525 |
-|   5. Code tables (compile-time links, 1.14d) | 526–560 |
-| Constants & data dependencies | 561–578 |
-| Randomness | 579–597 |
-| Edge cases & original bugs | 598–607 |
-| d2rs policy (proposed, not yet logged in `docs/PLAN.md`; 1, 2, 4, 6 implemented) | 608–638 |
-| Test vectors | 639–640 |
-|   Real 1.14d formulas (`#[ignore]`, need `D2_GAME_DIR`) | 641–680 |
-|   Compiler, synthetic (skills family, 1.14d links) | 681–729 |
-|   Compiler, other families | 730–744 |
-|   Evaluator | 745–776 |
-|   Validation | 777–788 |
-| Provenance | 789–846 |
-| Open questions | 847–881 |
+|   3. Evaluator | 223–330 |
+|   4. Compiler | 331–527 |
+|   5. Code tables (compile-time links, 1.14d) | 528–562 |
+| Constants & data dependencies | 563–580 |
+| Randomness | 581–599 |
+| Edge cases & original bugs | 600–609 |
+| d2rs policy (proposed, not yet logged in `docs/PLAN.md`; 1, 2, 4, 6 implemented) | 610–640 |
+| Test vectors | 641–642 |
+|   Real 1.14d formulas (`#[ignore]`, need `D2_GAME_DIR`) | 643–682 |
+|   Compiler, synthetic (skills family, 1.14d links) | 683–731 |
+|   Compiler, other families | 732–746 |
+|   Evaluator | 747–778 |
+|   Validation | 779–790 |
+| Provenance | 791–848 |
+| Open questions | 849–883 |
 <!-- /index -->
 
 ## Summary
@@ -312,8 +312,10 @@ Functions:
   (skills, skilldesc: the caster; items: the unit). Missiles: Open
   question 1.
 - skills `skill(s, c)`: `L` = the context unit's level in skill `s`,
-  bonuses included (Open question 8); 0 if there is no unit or the unit
-  lacks the skill. Result: special value `c` of skill `s` at level `L`.
+  bonuses included (`skills/levels.md` §1); 0 if there is no unit or the
+  unit lacks the skill. Result: special value `c` of skill `s` at level
+  `L`, so a missing skill still gives the level-0 special value (e.g.
+  `par8` returns Param8), not 0 (`0x00646C00`, `skills/levels.md` §2).
 - skills `miss(m, c)`: missile special value `c` (misscalc index) of
   missile `m`, with the context unit as owner and the context level.
 - skills/items `stat(s, mode)`: no unit, `s` < 0 or `s` ≥ itemstatcost
@@ -862,16 +864,16 @@ sign-extended (D2MOO: zero-extended).
    pointer is null; whether the archive read leaves the pointer null (and
    the size defined) on a missing file was not traced. d2rs treats a
    missing code file as a load error (`loading.md` §4.3).
-5. The semantics of the special-value functions (0x646460 skills,
-   0x64B340 missiles) and of the stat getters behind `stat` are not part of
-   this spec (skills, missiles and stats specs).
+5. Answered by `skills/levels.md` §2 (special values `0x00646460`,
+   `0x0064B340`); the stat getters behind `stat` belong to the stats
+   specs.
 6. Items context: no items function reads the second word (the item, in
    the one caller checked); which unit each of the 5 callers passes as
    the first word (the one `stat` and `rand` use) was not traced.
 7. Behavior when a skills special-value code is ≥ 256 (the callee takes
    the low 8 bits): only reachable with hand-made PARAM16 operands.
-8. `skill(s, c)` level: that flag 1 of the 1.14d level getter means "with
-   bonuses" is D2MOO's 1.10f reading, unconfirmed for 1.14d.
+8. Answered by `skills/levels.md` §1: flag 1 of the level getter means
+   "with bonuses" in 1.14d; `skill(s, c)` passes 1.
 9. Stat mode (§4.4): d2rs compares the whole name case-insensitively
    (`basex` → 0); a prefix compare would give 1. 1.14d formulas use only
    `.accr`, so the data cannot decide.

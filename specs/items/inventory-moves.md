@@ -16,11 +16,11 @@
 | Summary | 26–32 |
 | Rules | 33–34 |
 |   6. Deferred item messages | 35–128 |
-|   7. Intents | 129–539 |
-|   8. Pickup from the ground | 540–646 |
-|   9. Drop to the ground | 647–694 |
-|   10. Gold | 695–734 |
-|   11. Message layouts | 735–764 |
+|   7. Intents | 129–540 |
+|   8. Pickup from the ground | 541–647 |
+|   9. Drop to the ground | 648–695 |
+|   10. Gold | 696–735 |
+|   11. Message layouts | 736–765 |
 <!-- /index -->
 
 ## Summary
@@ -483,7 +483,8 @@ the unit looked up by the GUID must be the player itself, else 3; amount
 must be 0 ≤ amount ≤ gold (stat 14) and ≤ the gold limit (level × 10000,
 `0x00622E70`), else 3. Amount 0 → 0. Else cap 2,000,000,000; create up to
 32 gold piles (`0x0055A090`, §10.2); for each pile, in creation order:
-owner := player (`0x00621CE0`, only when `0x0044BE50` is 0); gold :=
+owner := player (`0x00621CE0`, only when `0x0044BE50(player)`, the
+player's unit type, is 0); gold :=
 gold − pile gold (`0x00530EA0`). Result 0.
 
 #### 7.23 0x61 MercItem (`0x0054D430`), expansion only

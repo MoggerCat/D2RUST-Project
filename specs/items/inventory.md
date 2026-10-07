@@ -36,13 +36,13 @@
 |   2. Grid placement | 182–277 |
 |   3. Belt | 278–335 |
 |   4. Equipping | 336–520 |
-|   5. Shared checks | 521–645 |
-| Constants & data dependencies | 646–668 |
-| Randomness | 669–681 |
-| Edge cases & original bugs | 682–726 |
-| Test vectors | 727–775 |
-| Provenance | 776–832 |
-| Open questions | 833–922 |
+|   5. Shared checks | 521–649 |
+| Constants & data dependencies | 650–672 |
+| Randomness | 673–685 |
+| Edge cases & original bugs | 686–730 |
+| Test vectors | 731–779 |
+| Provenance | 780–836 |
+| Open questions | 837–926 |
 <!-- /index -->
 
 ## Summary
@@ -546,8 +546,12 @@ interaction is with a player unit that exists (multiplayer only).
 #### 5.3 Targeting reset
 
 `0x0055BF50`: for every item in the player's item list with item flag
-0x4: clear it; if `0x0044BE50` returns 0 queue S→C 0x3F (code 0xFF, the
-item's GUID, 0xFFFF; `inventory-moves.md` §11). Runs first in most item routines (cited as
+0x4: clear it; then, if the **targeted unit** (the argument of
+`0x0055BF50`, the player) is a player, queue S→C 0x3F (code 0xFF, the
+item's GUID, 0xFFFF; `inventory-moves.md` §11). `0x0044BE50(unit)` returns the unit's type
+(unit +0x00), or 6 for a null unit; 0 = player. It is called with the
+same unit for every item, never with the item, so for a player owner
+every flagged item sends a 0x3F and for any other owner none does. Runs first in most item routines (cited as
 "targeting reset").
 
 #### 5.4 Item-move gate
