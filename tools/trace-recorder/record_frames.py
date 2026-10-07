@@ -34,7 +34,7 @@ import zlib
 
 sys.dont_write_bytecode = True
 
-TOOL = "trace-recorder record_frames 0.2.0"
+TOOL = "trace-recorder record_frames 0.2.1"
 FORMAT = "frames-raw-2"
 
 # capture.md §2: hooks and the in-game caller
@@ -89,6 +89,8 @@ CUR_LAST_STEP, CUR_IDLE_SINCE = 0x7A6AEC, 0x7A6AE8
 LIGHT_QUALITY, DRAW_RATE, LIGHT_OPT_A, LIGHT_OPT_B, RENDER_KIND = (0x7B567C, 0x7A04A8, 0x72DA50,
                                                                   0x72A348, 0x712CCC)
 RAIN_ON, SNOW_ON, LIGHTNING, FLASH, WEATHER_UPDATE = 0x7A8A44, 0x7A8A40, 0x7A89E8, 0x7BB390, 0x7A8A0C
+# render/lighting.md §12 r3 (OQ 9): the light map at frame end, 18,432 bytes
+LIGHT_MAP, LIGHT_MAP_SIZE = 0x7B0E68, 18432
 
 
 def png_bytes(width, height, pixels, palette_rgb):
@@ -430,7 +432,9 @@ def make_recorder(rt):
                 st["cursor"] = c
                 st["cursor_key"] = [c["visible"], c["type"], c["frame"] >> 8, c["x"], c["y"], c["adj"],
                                     c["item"]]
-            st["light_key"] = st["light"]["quality"]
+            # lighting.md §12 r3: the key holds the light map itself (SHA-256 at frame end) and q
+            st["light_map_sha256"] = hashlib.sha256(self.read(LIGHT_MAP, LIGHT_MAP_SIZE)).hexdigest()
+            st["light_key"] = [st["light"]["quality"], st["light_map_sha256"]]
             return st
 
         def handle(self, addr, ctx):
