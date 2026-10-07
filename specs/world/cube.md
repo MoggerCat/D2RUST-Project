@@ -90,8 +90,8 @@ C→S 0x4C is **not** the cube (§10).
 
 `0x0055FA40` (inventory pass over stored items) and the 0x77 byte values
 belong to the UI/inventory owner; listed here for message order only.
-`server-messages.tsv` marks 0x77 `out` (trade), but these paths send it in
-single player.
+`server-messages.tsv` marks 0x77 `sim`: these paths send it in single
+player too (`sim/intents-events.md` §4 rule 4).
 
 ### 2. Put an item into the cube (C→S 0x2A)
 
