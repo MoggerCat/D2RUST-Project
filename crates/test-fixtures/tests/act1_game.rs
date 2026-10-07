@@ -80,7 +80,12 @@ fn placement_matches_the_spec_vector() {
         .map(|l| dr.level(l).id)
         .collect();
     order.reverse();
-    assert_eq!(order, [4, 3, 2, 1, 17, 39, 26, 7, 6, 27, 5]);
+    // The placer rows, then the §2.7 neighbour-entry walk over 1..17
+    // allocates 8..16 (`levels.md` Test vectors, seq 2425–2452).
+    assert_eq!(
+        order,
+        [4, 3, 2, 1, 17, 39, 26, 7, 6, 27, 5, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+    );
     let rect = |id| dr.level(dr.find_level(id).unwrap()).rect;
     assert_eq!(rect(4), TileRect::new(1000, 1000, 80, 80));
     assert_eq!(rect(3), TileRect::new(920, 984, 80, 80));
