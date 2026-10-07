@@ -652,3 +652,30 @@ fn room_change_reads_levels_pal_not_act() {
     assert_eq!(m.w.palette_act, Some(1));
     assert!(m.log.rejected.is_empty());
 }
+
+// Covers: specs/client/model.md §7 r8
+#[test]
+fn join_refused_maps_the_code_and_writes_nothing() {
+    use super::super::output::Output;
+    use super::session::join_refused_error;
+    // The jump table of r8.1, every code.
+    let want: [u8; 28] = [
+        9, 0, 1, 2, 3, 4, 5, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 9, 0x19,
+        0x1A, 0x1C, 0x1B, 9,
+    ];
+    for (c, n) in want.iter().enumerate() {
+        assert_eq!(join_refused_error(c as u32), *n, "code {c}");
+    }
+    assert_eq!(join_refused_error(u32::MAX), 9);
+    // The single-player codes (r8.1).
+    let sp: Vec<u8> = [0x13, 0x14, 0x15, 0x17, 0x18]
+        .map(join_refused_error)
+        .to_vec();
+    assert_eq!(sp, [0x16, 0x17, 0x18, 0x19, 0x1A]);
+    let mut m = Model::default();
+    m.w.in_game = true;
+    m.hex("b4 13 00 00 00");
+    assert!(m.log.rejected.is_empty());
+    assert_eq!(m.out, [Output::JoinRefused { error: 0x16 }]);
+    assert!(m.w.in_game && !m.w.exit_requested);
+}

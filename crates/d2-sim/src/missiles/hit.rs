@@ -1,4 +1,4 @@
-// Spec: specs/missiles/missiles.md §R5 (hit handler), §R6 (damage stage), §R8.2 (pierce at a hit)
+// Spec: specs/missiles/missiles.md §R5 (hit handler), §R6 (damage stage; §R6.3 in `srv_dmg`), §R8.2 (pierce at a hit)
 //! `MISSMODE_SrvDmgHitHandler` (`0x005ADF10`) and the missile-owned part of
 //! the damage stage.
 
@@ -6,6 +6,7 @@ use crate::game::Game;
 use crate::units::{UnitId, UnitType};
 
 use super::{catalogue, stat, state, Ctx, MissileWorld, RowExt, UnitRef, SRV_DMG_COUNT};
+use crate::combat::DamageRecord;
 
 /// Hit result flags set by the missile (`0x005AD730`, §R6.1).
 pub mod result_flag {
@@ -46,6 +47,75 @@ pub struct Damage {
     pub ignore_target_defense: i32,
     /// Result flags of [`result_flag`] (`0x005AD730`).
     pub result: u32,
+    /// Record fields only the server-damage functions write (§R6.3):
+    /// freeze length (+0x34), hit class (+0x60) and result-flag bits of
+    /// the record (`combat::result`, +0x04: soft hit 0x4000, knockback 8).
+    pub freeze_length: i32,
+    pub hit_class: Option<u32>,
+    pub record_result: u16,
+    /// Hit flags (+0x00): the bypass bits of stats 103 / 104 / 106
+    /// (§R6.2), cleared by `clear_elems` (§R6.3).
+    pub hit_flags: u32,
+}
+
+impl Damage {
+    /// The 0x70-byte record (`combat/damage.md` §1) these fields are
+    /// (§R6.2 "the record is the damage record itself"): deadly strike →
+    /// result 0x2000.
+    pub fn to_record(&self) -> DamageRecord {
+        let mut rec = DamageRecord {
+            hit_flags: self.hit_flags,
+            result: self.record_result,
+            physical: self.phys,
+            fire: self.fire,
+            burn: self.burn,
+            burn_len: self.burn_length,
+            lightning: self.light,
+            magic: self.magic,
+            cold: self.cold,
+            poison: self.poison,
+            poison_len: self.poison_length,
+            cold_len: self.cold_length,
+            freeze_len: self.freeze_length,
+            life_leech: self.life_drain,
+            mana_leech: self.mana_drain,
+            stamina_leech: self.stamina_drain,
+            stun_len: self.stun_length,
+            ..DamageRecord::default()
+        };
+        if self.crit {
+            rec.result |= crate::combat::result::CRITICAL;
+        }
+        if let Some(c) = self.hit_class {
+            rec.hit_class = c;
+        }
+        rec
+    }
+
+    /// Takes the fields back from a record a server-damage function
+    /// adjusted (§R6.1 step 2).
+    fn take_record(&mut self, rec: &DamageRecord, hit_class: u32) {
+        self.hit_flags = rec.hit_flags;
+        self.record_result = rec.result & !crate::combat::result::CRITICAL;
+        self.phys = rec.physical;
+        self.fire = rec.fire;
+        self.burn = rec.burn;
+        self.burn_length = rec.burn_len;
+        self.light = rec.lightning;
+        self.magic = rec.magic;
+        self.cold = rec.cold;
+        self.poison = rec.poison;
+        self.poison_length = rec.poison_len;
+        self.cold_length = rec.cold_len;
+        self.freeze_length = rec.freeze_len;
+        self.life_drain = rec.life_leech;
+        self.mana_drain = rec.mana_leech;
+        self.stamina_drain = rec.stamina_leech;
+        self.stun_length = rec.stun_len;
+        if rec.hit_class != hit_class {
+            self.hit_class = Some(rec.hit_class);
+        }
+    }
 }
 
 /// `pct(a, b) = a × b / 100` with the overflow-safe evaluation of
@@ -83,12 +153,9 @@ pub const ELEMENTS: [(u16, u16, u16); 7] = [
 ];
 
 /// `0x005A89A0` (§R6.2): the damage record from the missile's stats, rolled
-/// on the missile's own seed.
-///
-/// TODO(spec gap): the spec does not name the unit the mastery stats are
-/// read from; this reads them from the missile, like the damage stats.
-/// TODO(spec gap): `phys += phys × pct / 100` is computed in 32 bits
-/// (wrapping); the spec does not give the evaluation.
+/// on the missile's own seed. Every stat, the masteries included, is the
+/// missile's own total; `phys += phys × pct / 100` is a wrapping 32-bit
+/// product, then a truncating signed ÷ 100 (`0x005A8BE8`).
 pub fn fill_damage<W: MissileWorld + ?Sized>(
     cx: &mut Ctx<'_, W>,
     m: UnitId,
@@ -141,6 +208,18 @@ pub fn fill_damage<W: MissileWorld + ?Sized>(
         d.ignore_target_ac = w.stat(m, stat::IGNORE_TARGET_AC);
         d.fractional_target_ac = w.stat(m, stat::FRACTIONAL_TARGET_AC);
         d.ignore_target_defense = w.stat(m, stat::IGNORE_TARGET_DEFENSE);
+        // Bypass: 103 → 0x100, 104 → 0x200, 106 → 0x400 (undead, demons,
+        // beasts; `combat/damage.md` §1).
+        use crate::combat::hitflag;
+        for (v, bit) in [
+            (d.ignore_target_ac, hitflag::BYPASS_UNDEAD),
+            (d.fractional_target_ac, hitflag::BYPASS_DEMONS),
+            (d.ignore_target_defense, hitflag::BYPASS_BEASTS),
+        ] {
+            if v != 0 {
+                d.hit_flags |= bit;
+            }
+        }
     }
     d
 }
@@ -187,7 +266,11 @@ fn damage_stage<W: MissileWorld + ?Sized>(
     let srv_dmg = cx.row_of(m).map_or(0, |r| r.srv_dmg());
     if (1..SRV_DMG_COUNT).contains(&srv_dmg) {
         if srv_dmg <= 14 {
-            cx.world.srv_dmg(game, srv_dmg, m, unit, &mut dmg);
+            // §R6.3 on the record itself.
+            let mut rec = dmg.to_record();
+            let class = rec.hit_class;
+            super::srv_dmg::run(game, cx, srv_dmg, m, unit, &mut rec);
+            dmg.take_record(&rec, class);
         } else {
             cx.store.unhandled.push(super::Unhandled::NullSrvDmg {
                 index: srv_dmg,
@@ -207,7 +290,9 @@ pub fn damage_tail<W: MissileWorld + ?Sized>(
     unit: UnitId,
     dmg: &mut Damage,
 ) {
-    dmg.result = result_flags(game, cx, m, unit);
+    // `0x005AD730` adds its flags to the record's (a server-damage soft
+    // hit or knockback stays).
+    dmg.result |= result_flags(game, cx, m, unit);
     let owner = cx.owner(game, m);
     // TODO(skills spec): whether the damage application runs without an
     // owner (`0x005AD730` does nothing then) is the skills spec's.

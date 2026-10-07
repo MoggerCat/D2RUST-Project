@@ -202,6 +202,26 @@ fn creation_in_a_later_act_raises_experience() {
     }
 }
 
+// Covers: specs/combat/vitals.md §1
+#[test]
+fn target_level_needs_a_lower_base_level() {
+    // `0x0057EB10` adds only when the target is above the base level
+    // (stat 12): at level 15 with too little experience, target 15 adds
+    // nothing; target 16 raises the experience to row 17.
+    let t = tables();
+    let mut f = Fake {
+        class: AMAZON,
+        ..Fake::default()
+    };
+    f.base.insert(stat::LEVEL, 15);
+    f.base.insert(stat::EXPERIENCE, 100);
+    set_experience_for_target_level(&mut f, &t, (), 15);
+    assert_eq!(get(&f, stat::EXPERIENCE), 100);
+    assert!(f.log.is_empty());
+    set_experience_for_target_level(&mut f, &t, (), 16);
+    assert_eq!(get(&f, stat::EXPERIENCE) as u32, t.threshold(AMAZON, 16));
+}
+
 // ------------------------------------------------------------ §2
 
 // Covers: specs/combat/vitals.md §2 text

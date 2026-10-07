@@ -325,6 +325,8 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
     /// without the lent world or the object state, keep the default
     /// (nothing).
     fn init_kind(&mut self, sim: &mut Sim<'_>, unit: UnitId, req: &AllocRequest) {
+        // The init's room is the allocation's (r7.2) until step 8.
+        self.alloc_rooms.push((unit, req.room));
         if req.ty == UnitType::Monster {
             self.with_monster_world(|w, h| w.type_init(sim, h, unit));
         } else if req.ty == UnitType::Object {
@@ -336,6 +338,11 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
             }
             View::of(sim.units, sim.stats, sim.data, self).object_init(sim.game, unit);
         }
+    }
+
+    /// Step 8 linked the unit: its room is the list's from now on.
+    fn added(&mut self, _: &mut Sim<'_>, unit: UnitId) {
+        self.alloc_rooms.retain(|&(u, _)| u != unit);
     }
 
     /// The per-kind state of the action modules leaves with the unit:
@@ -463,9 +470,13 @@ impl<X: Pending> View<'_, X> {
                 .is_some_and(|r| HIRELING_CLASSES.contains(&r.class))
     }
 
-    /// Unit allocation `0x00555230` (`units.md` §3.1) on the game seed,
-    /// then the path part of `SUNIT_Add` (`path-placement.md` §2.5,
-    /// [`View::path_place`]; without the path provider [`Pending::place`]).
+    /// Unit allocation `0x00555230` (`units.md` §3.1) on the game seed:
+    /// steps 1–7 with the per-kind init (an object's after the seed step
+    /// is written back), then step 8: `SUNIT_Add`'s list part and its
+    /// path part (`path-placement.md` §2.5, [`View::path_place`]; without
+    /// the path provider [`Pending::place`]). An object allocated from
+    /// inside an object call is left unlinked: its caller runs the init
+    /// (`objects::allocate`) and then [`View::add_allocated`].
     pub fn allocate(
         &mut self,
         game: &mut Game,
@@ -482,26 +493,65 @@ impl<X: Pending> View<'_, X> {
                 stats: self.stats,
                 data: self.data,
             };
-            crate::units::lifecycle::allocate(&mut sim, &mut *self.h, &mut seed, req)
+            crate::units::lifecycle::allocate_unlinked(&mut sim, &mut *self.h, &mut seed, req)
         };
         self.h.game_seed = seed;
-        // The object init is the allocation's last step (`units.md` §3.1;
-        // `quests-act1-rest.md` §9 item 7: after the unit's seed step):
-        // run it now that the step is in the hooks.
+        // The object init is the allocation's last step before `SUNIT_Add`
+        // (`units.md` §3.1 r7; `quests-act1-rest.md` §9 item 7: after the
+        // unit's seed step): run it now that the step is in the hooks.
         let inits = std::mem::replace(&mut self.h.deferred_inits, outer).unwrap_or_default();
         for u in inits {
             self.object_init(game, u);
         }
         match r {
             Ok(Some(u)) => {
-                self.path_place(game, u, x, y);
-                Some(u)
+                if req.ty == UnitType::Object && self.h.objects_out {
+                    return Some(u);
+                }
+                self.add_allocated(game, u, req, x, y).then_some(u)
             }
             Ok(None) => None,
             Err(e) => {
                 self.unit_error(e);
                 None
             }
+        }
+    }
+
+    /// Step 8 of an allocation (`units.md` §3.1): `SUNIT_Add` in the
+    /// allocation's room, then the path part at (x, y). `false`: the add
+    /// failed (logged).
+    pub fn add_allocated(
+        &mut self,
+        game: &mut Game,
+        u: UnitId,
+        req: &AllocRequest,
+        x: i32,
+        y: i32,
+    ) -> bool {
+        let r = {
+            let mut sim = Sim {
+                game,
+                units: self.units,
+                stats: self.stats,
+                data: self.data,
+            };
+            crate::units::lifecycle::add(&mut sim, &mut *self.h, u, req)
+        };
+        if let Err(e) = r {
+            self.unit_error(e);
+            return false;
+        }
+        self.path_place(game, u, x, y);
+        true
+    }
+
+    /// The allocation room of a unit between steps 7 and 8 (`units.md`
+    /// §3.1 r7.2), else the room it stands in.
+    pub fn init_room(&self, game: &Game, u: UnitId) -> Option<crate::units::RoomId> {
+        match self.h.alloc_rooms.iter().rev().find(|&&(v, _)| v == u) {
+            Some(&(_, room)) => room,
+            None => game.lists.unit(u).and_then(|e| e.room()),
         }
     }
 

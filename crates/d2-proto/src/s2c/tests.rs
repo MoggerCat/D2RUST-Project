@@ -409,33 +409,58 @@ fn recorded_join_messages() {
 }
 
 #[test]
-fn recorded_unbuilt_messages_size_and_refuse() {
-    // Recorded, layout not given: sizes agree with the TSV, the parser
-    // refuses them as unbuilt.
-    for (bytes, id, size) in [
-        ("15 00 01000000 1d13 8113 01", 0x15, 11),
-        ("15 00 01000000 5a12 b011 01", 0x15, 11),
-        ("51 02 17000000 7700 1e13 8213 01 00", 0x51, 14),
-        ("51 02 49000000 7700 5b12 b111 02 00", 0x51, 14),
+fn recorded_messages_of_the_layout_batch_parse() {
+    // Recorded 0x15 / 0x51 (waypoints.md Test vectors) and the 0x27
+    // prefix (world/npc.md Test vectors), refused as unbuilt until the
+    // 46-row layout batch (`9d063f2`): sizes agree with the TSV and the
+    // generated layouts read the recorded fields.
+    for (bytes, x, y) in [
+        ("15 00 01000000 1d13 8113 01", 0x131D, 0x1381),
+        ("15 00 01000000 5a12 b011 01", 0x125A, 0x11B0),
     ] {
         let b = hex(bytes);
-        assert_eq!(server_size(&b), Size::Bytes(size));
+        assert_eq!(server_size(&b), Size::Bytes(11));
+        let Ok(Message::ReassignPlayer(m)) = parse(&b) else {
+            panic!("{bytes}");
+        };
+        assert_eq!((m.type_, m.guid, m.x, m.y, m.flag), (0, 1, x, y, 1));
+    }
+    for (bytes, guid, x, y, mode) in [
+        (
+            "51 02 17000000 7700 1e13 8213 01 00",
+            0x17,
+            0x131E,
+            0x1382,
+            1,
+        ),
+        (
+            "51 02 49000000 7700 5b12 b111 02 00",
+            0x49,
+            0x125B,
+            0x11B1,
+            2,
+        ),
+    ] {
+        let b = hex(bytes);
+        assert_eq!(server_size(&b), Size::Bytes(14));
+        let Ok(Message::AssignObject(m)) = parse(&b) else {
+            panic!("{bytes}");
+        };
         assert_eq!(
-            parse(&b),
-            Err(ParseError::Unbuilt {
-                id,
-                status: Status::Partial
-            })
+            (m.type_, m.guid, m.class, m.x, m.y, m.mode, m.interact),
+            (2, guid, 0x77, x, y, mode, 0)
         );
     }
-    // world/npc.md Test vectors: 0x27 prefix, padded to its 40 bytes.
     let mut b = hex("27 01 06000000 01000000 25 00");
     b.resize(40, 0);
-    assert!(matches!(
-        parse(&b),
-        Err(ParseError::Unbuilt { id: 0x27, .. })
-    ));
-    // 0x50 mercenary form (u16 2 at 1).
+    let Ok(Message::NpcInfo(m)) = parse(&b) else {
+        panic!("0x27");
+    };
+    assert_eq!(
+        (m.type_, m.guid, m.count, m.kind0, m.str0),
+        (1, 6, 1, 0, 0x25)
+    );
+    // 0x50 mercenary form (u16 2 at 1): still unbuilt.
     let mut b = vec![0x50, 2, 0, 0x2A, 0];
     b.resize(15, 0);
     assert!(matches!(
@@ -596,10 +621,12 @@ fn parse_rejects_bad_messages() {
             found: 2
         })
     );
+    let mut b = vec![0x12];
+    b.resize(26, 0);
     assert_eq!(
-        parse(&hex("08 00 00 00 00 00")),
+        parse(&b),
         Err(ParseError::Unbuilt {
-            id: 0x08,
+            id: 0x12,
             status: Status::Unspecified
         })
     );

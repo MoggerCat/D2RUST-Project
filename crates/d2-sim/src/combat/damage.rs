@@ -464,8 +464,7 @@ pub fn fill<W: CombatWorld>(
         if rec.hit_flags & hitflag::MANA_DRAIN_PRESET == 0 {
             rec.mana_leech = rec.mana_leech.wrapping_add(w.stat(a, MANADRAINMINDAM, 0));
         }
-        // TODO(damage.md §3.1 step 6): the bypass stats' getter is not
-        // named; the unit getter is the narrowest reading.
+        // Unit getter `0x00625480(attacker, s, 0)` (§3.1 step 6).
         if w.stat(a, BYPASS_UNDEAD, 0) != 0 {
             rec.hit_flags |= hitflag::BYPASS_UNDEAD;
         }
@@ -589,10 +588,8 @@ pub fn monster_crit<W: CombatWorld>(
             ] {
                 *f = f.wrapping_mul(2);
             }
-            // `0x00554650(record, 0x10)`.
-            // TODO(damage.md §3.1 step 13): "the high nibble is free" read
-            // as `hit_class & 0xF0 = 0`; the helper's exact test is not
-            // stated.
+            // `0x00554650(record, 0x10)`: `(+0x60 & 0xF0) ≠ 0` writes
+            // nothing (§3.1 step 13).
             if rec.hit_class & 0xF0 == 0 {
                 rec.hit_class |= 0x10;
                 w.overlay(d, OVERLAY_MONSTER_CRIT);
@@ -872,9 +869,8 @@ fn resist_value<W: CombatWorld>(
             r = r.wrapping_sub(a.map_or(0, |a| w.stat(a, p, 0)));
         }
     }
-    // TODO(damage.md §4.5 step 3): rows without a resist stat (leech
-    // rows) read as "not 36 or 37" and take the penalty; the spec does
-    // not single them out.
+    // Leech rows (no resist stat, −1) are "not 36 or 37" and take the
+    // penalty (§4.5).
     if !def_mon && row.resist != Some(DAMAGERESIST) && row.resist != Some(37) {
         if w.expansion() {
             let pen = ct

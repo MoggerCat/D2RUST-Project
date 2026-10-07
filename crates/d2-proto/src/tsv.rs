@@ -237,7 +237,16 @@ fn field_type(s: &str) -> Result<FieldType, String> {
                 }
                 small(n).map_err(|_| format!("bad field type `{s}`"))
             };
-            if let Some(n) = s.strip_prefix("bit") {
+            if let Some(n) = s.strip_prefix("bytes") {
+                let n: u16 = match n.bytes().all(|c| c.is_ascii_digit())
+                    && !n.is_empty()
+                    && !n.starts_with('0')
+                {
+                    true => n.parse().map_err(|_| format!("bad field type `{s}`"))?,
+                    false => return Err(format!("bad field type `{s}`")),
+                };
+                FieldType::Bytes(n)
+            } else if let Some(n) = s.strip_prefix("bit") {
                 match bits(n)? {
                     n @ 0..=31 => FieldType::Bit(n),
                     _ => return Err(format!("bit out of range `{s}`")),
@@ -262,6 +271,7 @@ pub fn field_bytes(ty: FieldType) -> Option<usize> {
         FieldType::U16 => Some(2),
         FieldType::U32 | FieldType::Bits(_) | FieldType::Bit(_) => Some(4),
         FieldType::Cstr16 => Some(16),
+        FieldType::Bytes(n) => Some(n as usize),
         FieldType::Cstr | FieldType::Tail | FieldType::Packed { .. } => None,
     }
 }

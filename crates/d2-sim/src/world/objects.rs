@@ -352,6 +352,11 @@ pub trait ObjectWorld {
         y: i32,
         mode: u8,
     ) -> Option<UnitId>;
+    /// `SUNIT_Add` (`sim/units.md` §3.1 step 8) of an
+    /// [`Self::allocate_object`] unit whose [`create`] [`allocate`] ran:
+    /// the init comes first (r7.1). A provider that links in
+    /// [`Self::allocate_object`] keeps the default (nothing).
+    fn add_object(&mut self, _obj: UnitId, _room: RoomId, _x: i32, _y: i32) {}
     /// `0x0061AEB0`: the act II staff-tomb level (quest spec).
     fn staff_tomb_level(&self) -> u32;
 }
@@ -828,6 +833,7 @@ pub fn allocate<W: ObjectWorld>(
     if !ctl.data.contains_key(&obj) {
         let guid = w.guid(obj);
         create(ctl, t, w, obj, class, guid, Some(room), mode, x, y)?;
+        w.add_object(obj, room, x, y);
     }
     Ok(Some(obj))
 }

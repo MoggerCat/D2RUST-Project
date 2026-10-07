@@ -57,8 +57,8 @@ generator and are only re-exported here).
   scope, built because its layout is complete). Constants
   `QUEST_RECORD` 96, `WAYPOINT_RECORD` 16, `QUEST_LOG_ENTRIES` 41,
   `GOSSIP_SLOTS` 12, `WARDEN_MAX` 0x1FD.
-- Re-exported generated types (TSV layouts): the 30 `generated` rows of
-  §3.
+- Re-exported generated types (TSV layouts): the 103 `generated` rows of
+  §3 (73 of them since the 46-row layout batch `9d063f2`, impl-pc1-s5).
 - `parse(&[u8]) -> Result<Message, ParseError>`: one whole message (as
   `transport::split_server_buffer` yields it); size by the §3.1 rule
   (`WrongSize`, `Incomplete`, `Invalid`), then the typed decode
@@ -93,23 +93,23 @@ row against `s2c::AUDIT` by `note_table_matches_audit`.
 | 0x05 | UnloadComplete | 1 | generated | `UnloadComplete` | TSV layout |
 | 0x06 | GameExit | 1 | generated | `GameExit` | TSV layout |
 | 0x07 | MapReveal | 6 | generated | `MapReveal` | TSV layout |
-| 0x08 | MapHide | 6 | unspecified | - | size rule only |
-| 0x09 | AssignLevelWarp | 11 | unspecified | - | size rule only |
-| 0x0A | RemoveUnit | 6 | unspecified | - | size rule only |
+| 0x08 | MapHide | 6 | generated | `MapHide` | TSV layout |
+| 0x09 | AssignLevelWarp | 11 | generated | `AssignLevelWarp` | TSV layout |
+| 0x0A | RemoveUnit | 6 | generated | `RemoveUnit` | TSV layout |
 | 0x0B | GameHandshake | 6 | built | `GameHandshake` | model.md §3 r1 (type, GUID) |
 | 0x0C | MonsterHit | 9 | generated | `MonsterHit` | TSV layout |
 | 0x0D | PlayerStop | 13 | built | `PlayerStop` | waypoints.md §7 r7 values + recorded widths |
-| 0x0E | ObjectState | 12 | partial | - | unit address only (type u8 @1, GUID u32 @2; §3.4 r3) |
-| 0x0F | PlayerMove | 16 | partial | - | unit address only (type u8 @1, GUID u32 @2; §3.4 r3) |
-| 0x10 | PlayerToTarget | 16 | partial | - | unit address only (type u8 @1, GUID u32 @2; §3.4 r3) |
-| 0x11 | ReportKill | 8 | unspecified | - | size rule only |
+| 0x0E | ObjectState | 12 | generated | `ObjectState` | TSV layout |
+| 0x0F | PlayerMove | 16 | generated | `PlayerMove` | TSV layout |
+| 0x10 | PlayerToTarget | 16 | generated | `PlayerToTarget` | TSV layout |
+| 0x11 | ReportKill | 8 | generated | `ReportKill` | TSV layout |
 | 0x12 | Unknown12 | 26 | unspecified | - | size rule only |
 | 0x13 | Unknown13 | 14 | unspecified | - | size rule only |
 | 0x14 | Unknown14 | 18 | unspecified | - | size rule only |
-| 0x15 | ReassignPlayer | 11 | partial | - | recorded bytes only (waypoints.md Test vectors); no field list (HANDOFF §7 q8) |
+| 0x15 | ReassignPlayer | 11 | generated | `ReassignPlayer` | TSV layout |
 | 0x16 | UnitPositions | u16@1;min=13 | unspecified | - | size rule only |
 | 0x17 | - | 0 | never | - | size 0: never receivable (§3.1 r3) |
-| 0x18 | LifeManaUpdate | 15 | unspecified | - | size rule only |
+| 0x18 | LifeManaUpdate | 15 | generated | `LifeManaUpdate` | TSV layout |
 | 0x19 | SmallGoldPickup | 2 | generated | `SmallGoldPickup` | TSV layout |
 | 0x1A | AddExpByte | 2 | generated | `AddExpByte` | TSV layout |
 | 0x1B | AddExpWord | 3 | generated | `AddExpWord` | TSV layout |
@@ -117,19 +117,19 @@ row against `s2c::AUDIT` by `note_table_matches_audit`.
 | 0x1D | SetStatByte | 3 | generated | `SetStatByte` | TSV layout |
 | 0x1E | SetStatWord | 4 | generated | `SetStatWord` | TSV layout |
 | 0x1F | SetStatDword | 6 | generated | `SetStatDword` | TSV layout |
-| 0x20 | StatUpdate | 10 | unspecified | - | size rule only |
-| 0x21 | UpdateItemOSkill | 12 | unspecified | - | size rule only |
-| 0x22 | UpdateItemSkill | 12 | unspecified | - | size rule only |
-| 0x23 | SetSkill | 13 | unspecified | - | size rule only |
+| 0x20 | StatUpdate | 10 | generated | `StatUpdate` | TSV layout |
+| 0x21 | UpdateItemOSkill | 12 | generated | `UpdateItemOSkill` | TSV layout |
+| 0x22 | UpdateItemSkill | 12 | generated | `UpdateItemSkill` | TSV layout |
+| 0x23 | SetSkill | 13 | generated | `SetSkill` | TSV layout |
 | 0x24 | Unknown24 | 90 | unspecified | - | size rule only |
 | 0x25 | Unknown25 | 90 | unspecified | - | size rule only |
 | 0x26 | Chat | chat26 | unspecified | - | size rule only |
-| 0x27 | NpcInfo | 40 | partial | - | header given (u8 1, NPC GUID u32 @2; npc.md §2 step 5); the 34-byte text list layout is not |
+| 0x27 | NpcInfo | 40 | generated | `NpcInfo` | TSV layout |
 | 0x28 | QuestInfo | 103 | built | `QuestInfo` | quests.md §1.5 |
 | 0x29 | GameQuestInfo | 97 | built | `GameQuestInfo` | quests.md §1.5 |
 | 0x2A | NpcTransaction | 15 | built | `NpcTransaction` | npc.md §9; bytes 3–6 unwritten |
 | 0x2B | - | 0 | never | - | size 0: never receivable (§3.1 r3) |
-| 0x2C | PlaySound | 8 | unspecified | - | size rule only |
+| 0x2C | PlaySound | 8 | generated | `PlaySound` | TSV layout |
 | 0x2D | - | 0 | never | - | size 0: never receivable (§3.1 r3) |
 | 0x2E | - | 0 | never | - | size 0: never receivable (§3.1 r3) |
 | 0x2F | - | 0 | never | - | size 0: never receivable (§3.1 r3) |
@@ -149,7 +149,7 @@ row against `s2c::AUDIT` by `note_table_matches_audit`.
 | 0x3D | - | 0 | never | - | size 0: never receivable (§3.1 r3) |
 | 0x3E | UpdateItemStats | u8@1;min=2 | unspecified | - | size rule only |
 | 0x3F | UseStackableItem | 8 | generated | `UseStackableItem` | TSV layout; senders: impl-moves (inventory-moves.md §11) |
-| 0x40 | ItemFlags | 13 | unspecified | - | size rule only |
+| 0x40 | ItemFlags | 13 | generated | `ItemFlags` | TSV layout |
 | 0x41 | - | 0 | never | - | size 0: never receivable (§3.1 r3) |
 | 0x42 | ClearCursor | 6 | generated | `ClearCursor` | TSV layout; senders: impl-moves (inventory-moves.md §11) |
 | 0x43 | - | 0 | never | - | size 0: never receivable (§3.1 r3) |
@@ -161,61 +161,61 @@ row against `s2c::AUDIT` by `note_table_matches_audit`.
 | 0x49 | - | 0 | never | - | size 0: never receivable (§3.1 r3) |
 | 0x4A | - | 0 | never | - | size 0: never receivable (§3.1 r3) |
 | 0x4B | - | 0 | never | - | size 0: never receivable (§3.1 r3) |
-| 0x4C | UnitSkillOnUnit | 16 | partial | - | unit address only (type u8 @1, GUID u32 @2; §3.4 r3) |
-| 0x4D | UnitSkillOnPoint | 17 | partial | - | unit address only (type u8 @1, GUID u32 @2; §3.4 r3) |
+| 0x4C | UnitSkillOnUnit | 16 | generated | `UnitSkillOnUnit` | TSV layout |
+| 0x4D | UnitSkillOnPoint | 17 | generated | `UnitSkillOnPoint` | TSV layout |
 | 0x4E | MercForHire | 7 | built | `MercForHire` | npc.md §7.2 |
 | 0x4F | StartMercList | 1 | generated | `StartMercList` | TSV layout |
 | 0x50 | QuestSpecial | 15 | partial | `QuestSpecial` | quest form (u16 1 @1) built as QuestSpecial; mercenary form (u16 2 @1, name u16 @3; npc.md §7.5) has no bytes 5–14 |
-| 0x51 | AssignObject | 14 | partial | - | recorded bytes only (waypoints.md Test vectors); no field list |
+| 0x51 | AssignObject | 14 | generated | `AssignObject` | TSV layout |
 | 0x52 | QuestLogInfo | 42 | built | `QuestLogInfo` | quests.md §6.2 step 4 |
-| 0x53 | Darkness | 10 | unspecified | - | size rule only |
+| 0x53 | Darkness | 10 | generated | `Darkness` | TSV layout |
 | 0x54 | Unknown54 | 3 | unspecified | - | size rule only |
 | 0x55 | - | 0 | never | - | size 0: never receivable (§3.1 r3) |
 | 0x56 | - | 0 | never | - | size 0: never receivable (§3.1 r3) |
-| 0x57 | NpcEnchants | 14 | unspecified | - | size rule only |
+| 0x57 | NpcEnchants | 14 | generated | `NpcEnchants` | TSV layout |
 | 0x58 | OpenUi | 7 | built | `OpenUi` | npc.md §8.1; byte 6 unwritten |
 | 0x59 | AssignPlayer | 26 | built | `AssignPlayer` | msg-units.md §1.1 r1 offsets, intents-events.md §7.2 fields |
-| 0x5A | EventMessage | 40 | partial | - | prefix only (`5A 0E 01 …`, use.md OQ9) |
+| 0x5A | EventMessage | 40 | generated | `EventMessage` | TSV layout |
 | 0x5B | PlayerJoined | u16@1;min=34 | unspecified | - | size rule only |
-| 0x5C | PlayerLeft | 5 | unspecified | - | size rule only |
+| 0x5C | PlayerLeft | 5 | generated | `PlayerLeft` | TSV layout |
 | 0x5D | QuestItemState | 6 | built | `QuestItemState` | quests.md §6.3 |
-| 0x5E | GameQuestAvailability | 38 | unspecified | - | size rule only |
+| 0x5E | GameQuestAvailability | 38 | generated | `GameQuestAvailability` | TSV layout |
 | 0x5F | PortalFlags | 5 | generated | `PortalFlags` | TSV layout |
-| 0x60 | TownPortalState | 7 | unspecified | - | size rule only |
-| 0x61 | CanGoToAct | 2 | unspecified | - | size rule only |
-| 0x62 | MakeUnitTargetable | 7 | unspecified | - | size rule only |
+| 0x60 | TownPortalState | 7 | generated | `TownPortalState` | TSV layout |
+| 0x61 | CanGoToAct | 2 | generated | `CanGoToAct` | TSV layout |
+| 0x62 | MakeUnitTargetable | 7 | generated | `MakeUnitTargetable` | TSV layout |
 | 0x63 | WaypointMenu | 21 | built | `WaypointMenu` | waypoints.md §5.3 |
 | 0x64 | - | 0 | never | - | size 0: never receivable (§3.1 r3) |
-| 0x65 | PlayerKillCount | 7 | unspecified | - | size rule only |
+| 0x65 | PlayerKillCount | 7 | generated | `PlayerKillCount` | TSV layout |
 | 0x66 | Unknown66 | 7 | unspecified | - | size rule only |
-| 0x67 | MonsterMove | 16 | partial | - | unit address only (monster GUID u32 @1; §3.4 r3) |
-| 0x68 | MonsterMoveToTarget | 21 | partial | - | unit address only (monster GUID u32 @1; §3.4 r3) |
-| 0x69 | MonsterState | 12 | partial | - | unit address only (monster GUID u32 @1; §3.4 r3) |
-| 0x6A | Unknown6A | 12 | partial | - | unit address only (monster GUID u32 @1; §3.4 r3) |
-| 0x6B | MonsterAction | 16 | partial | - | unit address only (monster GUID u32 @1; §3.4 r3) |
-| 0x6C | MonsterAttack | 16 | partial | - | unit address only (monster GUID u32 @1; §3.4 r3) |
-| 0x6D | MonsterStop | 10 | partial | - | unit address only (monster GUID u32 @1; §3.4 r3) |
+| 0x67 | MonsterMove | 16 | generated | `MonsterMove` | TSV layout |
+| 0x68 | MonsterMoveToTarget | 21 | generated | `MonsterMoveToTarget` | TSV layout |
+| 0x69 | MonsterState | 12 | generated | `MonsterState` | TSV layout |
+| 0x6A | Unknown6A | 12 | generated | `Unknown6A` | TSV layout |
+| 0x6B | MonsterAction | 16 | generated | `MonsterAction` | TSV layout |
+| 0x6C | MonsterAttack | 16 | generated | `MonsterAttack` | TSV layout |
+| 0x6D | MonsterStop | 10 | generated | `MonsterStop` | TSV layout |
 | 0x6E | Unknown6E | 1 | generated | `Unknown6E` | TSV layout |
 | 0x6F | Unknown6F | 1 | generated | `Unknown6F` | TSV layout |
 | 0x70 | Unknown70 | 1 | generated | `Unknown70` | TSV layout |
 | 0x71 | Unknown71 | 1 | generated | `Unknown71` | TSV layout |
 | 0x72 | Unknown72 | 1 | generated | `Unknown72` | TSV layout |
-| 0x73 | Unknown73 | 32 | unspecified | - | size rule only |
-| 0x74 | PlayerCorpseAssign | 10 | unspecified | - | size rule only |
-| 0x75 | PlayerPartyInfo | 13 | unspecified | - | size rule only |
-| 0x76 | PlayerInProximity | 6 | unspecified | - | size rule only |
+| 0x73 | Unknown73 | 32 | generated | `Unknown73` | TSV layout |
+| 0x74 | PlayerCorpseAssign | 10 | generated | `PlayerCorpseAssign` | TSV layout |
+| 0x75 | PlayerPartyInfo | 13 | generated | `PlayerPartyInfo` | TSV layout |
+| 0x76 | PlayerInProximity | 6 | generated | `PlayerInProximity` | TSV layout |
 | 0x77 | TradeAction | 2 | built | `TradeAction` | cube.md §1 (action byte) |
-| 0x78 | TradeAccepted | 21 | unspecified | - | size rule only |
-| 0x79 | GoldInTrade | 6 | unspecified | - | size rule only |
-| 0x7A | PetAction | 13 | unspecified | - | size rule only |
-| 0x7B | AssignHotkey | 8 | unspecified | - | size rule only |
-| 0x7C | UseScroll | 6 | unspecified | - | size rule only |
+| 0x78 | TradeAccepted | 21 | generated | `TradeAccepted` | TSV layout |
+| 0x79 | GoldInTrade | 6 | generated | `GoldInTrade` | TSV layout |
+| 0x7A | PetAction | 13 | generated | `PetAction` | TSV layout |
+| 0x7B | AssignHotkey | 8 | generated | `AssignHotkey` | TSV layout |
+| 0x7C | UseScroll | 6 | generated | `UseScroll` | TSV layout |
 | 0x7D | SetItemState | 18 | generated | `SetItemState` | TSV layout; senders: impl-moves (inventory-moves.md §11) |
 | 0x7E | Unknown7E | 5 | unspecified | - | size rule only |
-| 0x7F | AllyPartyInfo | 10 | unspecified | - | size rule only |
+| 0x7F | AllyPartyInfo | 10 | generated | `AllyPartyInfo` | TSV layout |
 | 0x80 | - | 0 | never | - | size 0 (client expects 4; never receivable, §3.1 r2) |
-| 0x81 | AssignMerc | 20 | unspecified | - | size rule only |
-| 0x82 | PortalOwnership | 29 | unspecified | - | size rule only |
+| 0x81 | AssignMerc | 20 | generated | `AssignMerc` | TSV layout |
+| 0x82 | PortalOwnership | 29 | generated | `PortalOwnership` | TSV layout |
 | 0x83 | - | 0 | never | - | size 0: never receivable (§3.1 r3) |
 | 0x84 | - | 0 | never | - | size 0: never receivable (§3.1 r3) |
 | 0x85 | - | 0 | never | - | size 0: never receivable (§3.1 r3) |
@@ -224,48 +224,48 @@ row against `s2c::AUDIT` by `note_table_matches_audit`.
 | 0x88 | - | 0 | never | - | size 0: never receivable (§3.1 r3) |
 | 0x89 | UniqueEvent | 2 | built | `UniqueEvent` | quests.md §6.5 |
 | 0x8A | NpcWantsInteract | 6 | built | `NpcWantsInteract` | quests.md §6.4 |
-| 0x8B | PlayerRelationship | 6 | unspecified | - | size rule only |
-| 0x8C | RelationshipUpdate | 11 | unspecified | - | size rule only |
-| 0x8D | AssignPlayerToParty | 7 | unspecified | - | size rule only |
-| 0x8E | CorpseAssign | 10 | unspecified | - | size rule only |
-| 0x8F | Pong | 33 | unspecified | - | size rule only |
-| 0x90 | PartyAutomapInfo | 13 | unspecified | - | size rule only |
+| 0x8B | PlayerRelationship | 6 | generated | `PlayerRelationship` | TSV layout |
+| 0x8C | RelationshipUpdate | 11 | generated | `RelationshipUpdate` | TSV layout |
+| 0x8D | AssignPlayerToParty | 7 | generated | `AssignPlayerToParty` | TSV layout |
+| 0x8E | CorpseAssign | 10 | generated | `CorpseAssign` | TSV layout |
+| 0x8F | Pong | 33 | generated | `Pong` | TSV layout |
+| 0x90 | PartyAutomapInfo | 13 | generated | `PartyAutomapInfo` | TSV layout |
 | 0x91 | NpcGossipAct | 26 | built | `NpcGossipAct` | quests.md §6.7 |
-| 0x92 | RemoveItemsDisplay | 6 | unspecified | - | size rule only |
-| 0x93 | Unknown93 | 8 | unspecified | - | size rule only |
+| 0x92 | RemoveItemsDisplay | 6 | generated | `RemoveItemsDisplay` | TSV layout |
+| 0x93 | Unknown93 | 8 | generated | `Unknown93` | TSV layout |
 | 0x94 | BaseSkillLevels | u8@1*3+6;min=9 | unspecified | - | size rule only |
-| 0x95 | LifeManaUpdate2 | 13 | unspecified | - | size rule only |
-| 0x96 | WalkVerify | 9 | unspecified | - | size rule only |
+| 0x95 | LifeManaUpdate2 | 13 | generated | `LifeManaUpdate2` | TSV layout |
+| 0x96 | WalkVerify | 9 | generated | `WalkVerify` | TSV layout |
 | 0x97 | WeaponSwitch | 1 | generated | `WeaponSwitch` | TSV layout |
-| 0x98 | Unknown98 | 7 | unspecified | - | size rule only |
-| 0x99 | SkillTriggered | 16 | unspecified | - | size rule only |
-| 0x9A | Unknown9A | 17 | unspecified | - | size rule only |
+| 0x98 | Unknown98 | 7 | generated | `Unknown98` | TSV layout |
+| 0x99 | SkillTriggered | 16 | generated | `SkillTriggered` | TSV layout |
+| 0x9A | Unknown9A | 17 | generated | `Unknown9A` | TSV layout |
 | 0x9B | Unknown9B | 7 | built | `Unknown9B` | npc.md §7.3 step 4 |
 | 0x9C | ItemActionWorld | u8@2;min=3 | partial | - | header given (inventory-moves.md §11); item bit stream unspecified (inventory.md OQ1); senders: impl-moves |
 | 0x9D | ItemActionOwned | u8@2;min=3 | partial | - | header given (inventory-moves.md §11); item bit stream unspecified (inventory.md OQ1); senders: impl-moves |
-| 0x9E | MercStatByte | 7 | unspecified | - | size rule only |
-| 0x9F | MercStatWord | 8 | unspecified | - | size rule only |
-| 0xA0 | MercStatDword | 10 | unspecified | - | size rule only |
-| 0xA1 | MercAddExpByte | 7 | unspecified | - | size rule only |
-| 0xA2 | MercAddExpWord | 8 | unspecified | - | size rule only |
-| 0xA3 | UnknownA3 | 24 | unspecified | - | size rule only |
-| 0xA4 | BaalWave | 3 | unspecified | - | size rule only |
-| 0xA5 | UnknownA5 | 8 | unspecified | - | size rule only |
+| 0x9E | MercStatByte | 7 | generated | `MercStatByte` | TSV layout |
+| 0x9F | MercStatWord | 8 | generated | `MercStatWord` | TSV layout |
+| 0xA0 | MercStatDword | 10 | generated | `MercStatDword` | TSV layout |
+| 0xA1 | MercAddExpByte | 7 | generated | `MercAddExpByte` | TSV layout |
+| 0xA2 | MercAddExpWord | 8 | generated | `MercAddExpWord` | TSV layout |
+| 0xA3 | UnknownA3 | 24 | generated | `UnknownA3` | TSV layout |
+| 0xA4 | BaalWave | 3 | generated | `BaalWave` | TSV layout |
+| 0xA5 | UnknownA5 | 8 | generated | `UnknownA5` | TSV layout |
 | 0xA6 | UnknownA6 | u16@2;min=4 | unspecified | - | size rule only |
-| 0xA7 | DelayedState | 7 | unspecified | - | size rule only |
+| 0xA7 | DelayedState | 7 | generated | `DelayedState` | TSV layout |
 | 0xA8 | SetState | u8@6;min=7 | unspecified | - | size rule only |
-| 0xA9 | EndState | 7 | unspecified | - | size rule only |
+| 0xA9 | EndState | 7 | generated | `EndState` | TSV layout |
 | 0xAA | AddUnit | u8@6;min=7 | unspecified | - | size rule only |
-| 0xAB | NpcHeal | 7 | unspecified | - | size rule only |
+| 0xAB | NpcHeal | 7 | generated | `NpcHeal` | TSV layout |
 | 0xAC | AssignMonster | u8@12;min=13 | partial | - | fields listed (init.md §24), not their byte/bit positions |
 | 0xAD | - | 0 | never | - | size 0: never receivable (§3.1 r3) |
 | 0xAE | WardenRequest | u16@1+3;cap=0x1FD;min=3 | built | `WardenRequest` | TSV layout (transport row, out of scope) |
 | 0xAF | ConnectionInfo | af | unspecified | - | size rule only |
 | 0xB0 | ConnectionTerminated | 1 | generated | `ConnectionTerminated` | TSV layout |
 | 0xB1 | GamesInfo | 0 | never | - | size 0: never receivable (§3.1 r3) |
-| 0xB2 | GameList | 53 | unspecified | - | size rule only |
+| 0xB2 | GameList | 53 | generated | `GameList` | TSV layout |
 | 0xB3 | DownloadSave | u8@1+7;min=8 | unspecified | - | size rule only |
-| 0xB4 | ConnectionRefused | 5 | unspecified | - | size rule only |
+| 0xB4 | ConnectionRefused | 5 | generated | `ConnectionRefused` | TSV layout |
 
 Totals (181 ids): 15 built (14 fixed + 0xAE), 30 generated, 20 partial
 (0x50 with its quest form built as `QuestSpecial`), 78 unspecified, 38

@@ -9,6 +9,7 @@ use d2_proto::s2c::{parse, Message as S2c};
 
 use super::super::dispatch::{HandlerError, Message};
 use super::super::drlg::{ClientDrlg, ClientDrlgError};
+use super::super::output::Output;
 use super::super::world::{ActLoad, ClientWorld, RoomSight, UnitKey};
 use super::lighting::{act_load_eclipse, create_environment};
 use super::Bytes;
@@ -100,6 +101,35 @@ pub fn unload_complete(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Han
 pub fn game_exit(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerError> {
     parsed(msg)?;
     w.exit_requested = true;
+    Ok(())
+}
+
+/// The error number of `0x0044E380(n)` for a 0xB4 code c (§7 r8.1,
+/// jump table `0x0045C7E8`): c = 0 or c > 26 → 9.
+pub fn join_refused_error(c: u32) -> u8 {
+    match c {
+        1..=6 => (c - 1) as u8,
+        7..=21 => (c + 3) as u8,
+        22 => 9,
+        23 => 0x19,
+        24 => 0x1A,
+        25 => 0x1C,
+        26 => 0x1B,
+        _ => 9,
+    }
+}
+
+/// 0xB4 load refusal (§7 rule 8; system handler `0x0045C6D0`): code
+/// u32@1 → one `JoinRefused` output {n}; no model write here (the UI
+/// layer returns `exit_requested` / `in_game` as requests, r8.3).
+pub fn join_refused(_: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerError> {
+    if msg.bytes.len() != 5 {
+        return Err(HandlerError::Invalid("0xB4 is 5 bytes"));
+    }
+    let c = Bytes(msg.bytes).u32(1)?;
+    msg.out.push(Output::JoinRefused {
+        error: join_refused_error(c),
+    });
     Ok(())
 }
 

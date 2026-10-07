@@ -3264,8 +3264,8 @@ pub static SERVER_MESSAGES: [ServerMessage; 181] = [
     ServerMessage { id: 0x25, name: "Unknown25", size: SizeRule::Fixed(90), layout: &[], senders: &[], client_handler: Some(0x0045C900), client_unit_handler: None, produced_by: ProducedBy::None, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x26, name: "Chat", size: SizeRule::Chat26, layout: &[Field { name: "type", ty: FieldType::U8, offset: Some(1) }, Field { name: "", ty: FieldType::U8, offset: Some(2) }, Field { name: "unit_type", ty: FieldType::U8, offset: Some(3) }, Field { name: "guid", ty: FieldType::U32, offset: Some(4) }, Field { name: "", ty: FieldType::U8, offset: Some(8) }, Field { name: "", ty: FieldType::U8, offset: Some(9) }, Field { name: "name", ty: FieldType::Cstr, offset: Some(10) }, Field { name: "text", ty: FieldType::Cstr, offset: None }], senders: &[0x0053C750], client_handler: Some(0x0045DFC0), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x27, name: "NpcInfo", size: SizeRule::Fixed(40), layout: &[Field { name: "type", ty: FieldType::U8, offset: Some(1) }, Field { name: "guid", ty: FieldType::U32, offset: Some(2) }, Field { name: "count", ty: FieldType::U8, offset: Some(6) }, Field { name: "kind0", ty: FieldType::U8, offset: Some(8) }, Field { name: "str0", ty: FieldType::U16, offset: Some(10) }, Field { name: "kind1", ty: FieldType::U8, offset: Some(12) }, Field { name: "str1", ty: FieldType::U16, offset: Some(14) }, Field { name: "kind2", ty: FieldType::U8, offset: Some(16) }, Field { name: "str2", ty: FieldType::U16, offset: Some(18) }, Field { name: "kind3", ty: FieldType::U8, offset: Some(20) }, Field { name: "str3", ty: FieldType::U16, offset: Some(22) }, Field { name: "kind4", ty: FieldType::U8, offset: Some(24) }, Field { name: "str4", ty: FieldType::U16, offset: Some(26) }, Field { name: "kind5", ty: FieldType::U8, offset: Some(28) }, Field { name: "str5", ty: FieldType::U16, offset: Some(30) }, Field { name: "kind6", ty: FieldType::U8, offset: Some(32) }, Field { name: "str6", ty: FieldType::U16, offset: Some(34) }, Field { name: "kind7", ty: FieldType::U8, offset: Some(36) }, Field { name: "str7", ty: FieldType::U16, offset: Some(38) }], senders: &[0x0053C8D0], client_handler: Some(0x0045E0A0), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
-    ServerMessage { id: 0x28, name: "QuestInfo", size: SizeRule::Fixed(103), layout: &[Field { name: "type", ty: FieldType::U8, offset: Some(1) }, Field { name: "guid", ty: FieldType::U32, offset: Some(2) }, Field { name: "", ty: FieldType::U8, offset: Some(6) }], senders: &[0x0053D670], client_handler: Some(0x0045D370), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
-    ServerMessage { id: 0x29, name: "GameQuestInfo", size: SizeRule::Fixed(97), layout: &[], senders: &[0x0053D700], client_handler: Some(0x0045D3A0), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
+    ServerMessage { id: 0x28, name: "QuestInfo", size: SizeRule::Fixed(103), layout: &[Field { name: "type", ty: FieldType::U8, offset: Some(1) }, Field { name: "guid", ty: FieldType::U32, offset: Some(2) }, Field { name: "", ty: FieldType::U8, offset: Some(6) }, Field { name: "flags", ty: FieldType::Bytes(96), offset: Some(7) }], senders: &[0x0053D670], client_handler: Some(0x0045D370), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
+    ServerMessage { id: 0x29, name: "GameQuestInfo", size: SizeRule::Fixed(97), layout: &[Field { name: "record", ty: FieldType::Bytes(96), offset: Some(1) }], senders: &[0x0053D700], client_handler: Some(0x0045D3A0), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x2A, name: "NpcTransaction", size: SizeRule::Fixed(15), layout: &[Field { name: "kind", ty: FieldType::U8, offset: Some(1) }, Field { name: "code", ty: FieldType::U8, offset: Some(2) }, Field { name: "guid", ty: FieldType::U32, offset: Some(7) }, Field { name: "gold", ty: FieldType::U32, offset: Some(11) }], senders: &[0x0053D740], client_handler: Some(0x0045E0D0), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x2B, name: "-", size: SizeRule::Fixed(0), layout: &[], senders: &[], client_handler: Some(0x0045C900), client_unit_handler: None, produced_by: ProducedBy::None, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x2C, name: "PlaySound", size: SizeRule::Fixed(8), layout: &[Field { name: "type", ty: FieldType::U8, offset: Some(1) }, Field { name: "guid", ty: FieldType::U32, offset: Some(2) }, Field { name: "event", ty: FieldType::U16, offset: Some(6) }], senders: &[0x0053D780], client_handler: Some(0x0045E110), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
@@ -3306,7 +3306,7 @@ pub static SERVER_MESSAGES: [ServerMessage; 181] = [
     ServerMessage { id: 0x4F, name: "StartMercList", size: SizeRule::Fixed(1), layout: &[], senders: &[0x0053B320], client_handler: Some(0x0045E3C0), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x50, name: "QuestSpecial", size: SizeRule::Fixed(15), layout: &[Field { name: "code", ty: FieldType::U16, offset: Some(1) }, Field { name: "v0", ty: FieldType::U16, offset: Some(3) }, Field { name: "v1", ty: FieldType::U16, offset: Some(5) }, Field { name: "v2", ty: FieldType::U16, offset: Some(7) }, Field { name: "v3", ty: FieldType::U16, offset: Some(9) }, Field { name: "v4", ty: FieldType::U16, offset: Some(11) }], senders: &[0x0053D7E0], client_handler: Some(0x0045E370), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x51, name: "AssignObject", size: SizeRule::Fixed(14), layout: &[Field { name: "type", ty: FieldType::U8, offset: Some(1) }, Field { name: "guid", ty: FieldType::U32, offset: Some(2) }, Field { name: "class", ty: FieldType::U16, offset: Some(6) }, Field { name: "x", ty: FieldType::U16, offset: Some(8) }, Field { name: "y", ty: FieldType::U16, offset: Some(10) }, Field { name: "mode", ty: FieldType::U8, offset: Some(12) }, Field { name: "interact", ty: FieldType::U8, offset: Some(13) }], senders: &[0x0053BD10], client_handler: Some(0x0045CBD0), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
-    ServerMessage { id: 0x52, name: "QuestLogInfo", size: SizeRule::Fixed(42), layout: &[], senders: &[0x0053D840], client_handler: Some(0x0045CC00), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
+    ServerMessage { id: 0x52, name: "QuestLogInfo", size: SizeRule::Fixed(42), layout: &[Field { name: "status", ty: FieldType::Bytes(41), offset: Some(1) }], senders: &[0x0053D840], client_handler: Some(0x0045CC00), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x53, name: "Darkness", size: SizeRule::Fixed(10), layout: &[Field { name: "period", ty: FieldType::U32, offset: Some(1) }, Field { name: "ticks", ty: FieldType::U32, offset: Some(5) }, Field { name: "eclipse", ty: FieldType::U8, offset: Some(9) }], senders: &[0x0053C900], client_handler: Some(0x0045E300), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x54, name: "Unknown54", size: SizeRule::Fixed(3), layout: &[], senders: &[], client_handler: Some(0x0045E3B0), client_unit_handler: None, produced_by: ProducedBy::None, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x55, name: "-", size: SizeRule::Fixed(0), layout: &[], senders: &[], client_handler: Some(0x0045C900), client_unit_handler: None, produced_by: ProducedBy::None, confirmed: Confirmed::Yes },
@@ -3318,7 +3318,7 @@ pub static SERVER_MESSAGES: [ServerMessage; 181] = [
     ServerMessage { id: 0x5B, name: "PlayerJoined", size: SizeRule::Field { width: Width::U16, offset: 1, mul: 1, add: 0, cap: None, min: 34 }, layout: &[Field { name: "size", ty: FieldType::U16, offset: Some(1) }, Field { name: "guid", ty: FieldType::U32, offset: Some(3) }, Field { name: "class", ty: FieldType::U8, offset: Some(7) }, Field { name: "name", ty: FieldType::Cstr16, offset: Some(8) }, Field { name: "level", ty: FieldType::U16, offset: Some(24) }, Field { name: "party", ty: FieldType::U16, offset: Some(26) }, Field { name: "", ty: FieldType::U16, offset: Some(28) }, Field { name: "", ty: FieldType::U16, offset: Some(30) }, Field { name: "", ty: FieldType::U16, offset: Some(32) }, Field { name: "str1", ty: FieldType::Cstr, offset: Some(34) }, Field { name: "str2", ty: FieldType::Cstr, offset: None }], senders: &[0x0053C940], client_handler: Some(0x0045E4E0), client_unit_handler: None, produced_by: ProducedBy::Session, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x5C, name: "PlayerLeft", size: SizeRule::Fixed(5), layout: &[Field { name: "guid", ty: FieldType::U32, offset: Some(1) }], senders: &[0x0053CA90], client_handler: Some(0x0045E530), client_unit_handler: None, produced_by: ProducedBy::Session, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x5D, name: "QuestItemState", size: SizeRule::Fixed(6), layout: &[Field { name: "chain", ty: FieldType::U8, offset: Some(1) }, Field { name: "flags", ty: FieldType::U8, offset: Some(2) }, Field { name: "status", ty: FieldType::U8, offset: Some(3) }, Field { name: "extra", ty: FieldType::U16, offset: Some(4) }], senders: &[0x0053D710], client_handler: Some(0x0045E540), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
-    ServerMessage { id: 0x5E, name: "GameQuestAvailability", size: SizeRule::Fixed(38), layout: &[], senders: &[0x0053D830], client_handler: Some(0x0045E570), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
+    ServerMessage { id: 0x5E, name: "GameQuestAvailability", size: SizeRule::Fixed(38), layout: &[Field { name: "available", ty: FieldType::Bytes(37), offset: Some(1) }], senders: &[0x0053D830], client_handler: Some(0x0045E570), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x5F, name: "PortalFlags", size: SizeRule::Fixed(5), layout: &[Field { name: "", ty: FieldType::U32, offset: Some(1) }], senders: &[0x0053B400], client_handler: Some(0x0045E5D0), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x60, name: "TownPortalState", size: SizeRule::Fixed(7), layout: &[Field { name: "flags", ty: FieldType::U8, offset: Some(1) }, Field { name: "level", ty: FieldType::U8, offset: Some(2) }, Field { name: "guid", ty: FieldType::U32, offset: Some(3) }], senders: &[0x0053D900], client_handler: Some(0x0045E610), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x61, name: "CanGoToAct", size: SizeRule::Fixed(2), layout: &[Field { name: "video", ty: FieldType::U8, offset: Some(1) }], senders: &[0x0053D940], client_handler: Some(0x0045E660), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
@@ -4746,7 +4746,7 @@ pub mod server {
     }
 
     /// 0x28 QuestInfo (103 bytes).
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     pub struct QuestInfo {
         /// `u8` at 1.
         pub type_: u8,
@@ -4754,6 +4754,19 @@ pub mod server {
         pub guid: u32,
         /// `u8` at 6.
         pub f6: u8,
+        /// `bytes96` at 7.
+        pub flags: [u8; 96],
+    }
+
+    impl Default for QuestInfo {
+        fn default() -> Self {
+            Self {
+                type_: Default::default(),
+                guid: Default::default(),
+                f6: Default::default(),
+                flags: [0; 96],
+            }
+        }
     }
 
     impl FixedMessage for QuestInfo {
@@ -4765,6 +4778,7 @@ pub mod server {
                 type_: u8_at(b, 1),
                 guid: u32_at(b, 2),
                 f6: u8_at(b, 6),
+                flags: bytes_at(b, 7),
             })
         }
         fn write(&self, out: &mut [u8]) {
@@ -4772,6 +4786,7 @@ pub mod server {
             put_u8(out, 1, self.type_);
             put_u32(out, 2, self.guid);
             put_u8(out, 6, self.f6);
+            put_bytes(out, 7, &self.flags);
         }
     }
 
@@ -4779,6 +4794,45 @@ pub mod server {
         /// The message bytes; unlisted bytes are 0.
         pub fn encode(&self) -> [u8; 103] {
             let mut b = [0; 103];
+            self.write(&mut b);
+            b
+        }
+    }
+
+    /// 0x29 GameQuestInfo (97 bytes).
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub struct GameQuestInfo {
+        /// `bytes96` at 1.
+        pub record: [u8; 96],
+    }
+
+    impl Default for GameQuestInfo {
+        fn default() -> Self {
+            Self {
+                record: [0; 96],
+            }
+        }
+    }
+
+    impl FixedMessage for GameQuestInfo {
+        const ID: u8 = 0x29;
+        const SIZE: usize = 97;
+        fn decode(b: &[u8]) -> Result<Self, DecodeError> {
+            check(b, Self::ID, Self::SIZE)?;
+            Ok(Self {
+                record: bytes_at(b, 1),
+            })
+        }
+        fn write(&self, out: &mut [u8]) {
+            start(out, Self::ID, Self::SIZE);
+            put_bytes(out, 1, &self.record);
+        }
+    }
+
+    impl GameQuestInfo {
+        /// The message bytes; unlisted bytes are 0.
+        pub fn encode(&self) -> [u8; 97] {
+            let mut b = [0; 97];
             self.write(&mut b);
             b
         }
@@ -5333,6 +5387,45 @@ pub mod server {
         }
     }
 
+    /// 0x52 QuestLogInfo (42 bytes).
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub struct QuestLogInfo {
+        /// `bytes41` at 1.
+        pub status: [u8; 41],
+    }
+
+    impl Default for QuestLogInfo {
+        fn default() -> Self {
+            Self {
+                status: [0; 41],
+            }
+        }
+    }
+
+    impl FixedMessage for QuestLogInfo {
+        const ID: u8 = 0x52;
+        const SIZE: usize = 42;
+        fn decode(b: &[u8]) -> Result<Self, DecodeError> {
+            check(b, Self::ID, Self::SIZE)?;
+            Ok(Self {
+                status: bytes_at(b, 1),
+            })
+        }
+        fn write(&self, out: &mut [u8]) {
+            start(out, Self::ID, Self::SIZE);
+            put_bytes(out, 1, &self.status);
+        }
+    }
+
+    impl QuestLogInfo {
+        /// The message bytes; unlisted bytes are 0.
+        pub fn encode(&self) -> [u8; 42] {
+            let mut b = [0; 42];
+            self.write(&mut b);
+            b
+        }
+    }
+
     /// 0x53 Darkness (10 bytes).
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub struct Darkness {
@@ -5625,6 +5718,45 @@ pub mod server {
         /// The message bytes; unlisted bytes are 0.
         pub fn encode(&self) -> [u8; 6] {
             let mut b = [0; 6];
+            self.write(&mut b);
+            b
+        }
+    }
+
+    /// 0x5E GameQuestAvailability (38 bytes).
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub struct GameQuestAvailability {
+        /// `bytes37` at 1.
+        pub available: [u8; 37],
+    }
+
+    impl Default for GameQuestAvailability {
+        fn default() -> Self {
+            Self {
+                available: [0; 37],
+            }
+        }
+    }
+
+    impl FixedMessage for GameQuestAvailability {
+        const ID: u8 = 0x5E;
+        const SIZE: usize = 38;
+        fn decode(b: &[u8]) -> Result<Self, DecodeError> {
+            check(b, Self::ID, Self::SIZE)?;
+            Ok(Self {
+                available: bytes_at(b, 1),
+            })
+        }
+        fn write(&self, out: &mut [u8]) {
+            start(out, Self::ID, Self::SIZE);
+            put_bytes(out, 1, &self.available);
+        }
+    }
+
+    impl GameQuestAvailability {
+        /// The message bytes; unlisted bytes are 0.
+        pub fn encode(&self) -> [u8; 38] {
+            let mut b = [0; 38];
             self.write(&mut b);
             b
         }

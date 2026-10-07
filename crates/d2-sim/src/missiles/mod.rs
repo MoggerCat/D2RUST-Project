@@ -20,6 +20,7 @@ mod flight;
 mod hit;
 pub mod init_cb;
 pub mod seams;
+pub mod srv_dmg;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]

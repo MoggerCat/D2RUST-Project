@@ -130,15 +130,6 @@ pub trait MissileCombat {
     /// on the owner's seed. Only called with an owner (a missing owner
     /// misses without a draw, R5 step 5).
     fn hit_test(&mut self, game: &mut Game, owner: UnitId, defender: UnitId, tohit: i32) -> bool;
-    /// Server-damage function `index` (1…14; `0x0073C960`).
-    fn srv_dmg(
-        &mut self,
-        game: &mut Game,
-        index: i16,
-        missile: UnitId,
-        unit: UnitId,
-        damage: &mut Damage,
-    );
     /// The rest of `0x005ADCD0` after the missile's result flags: block /
     /// dodge, hit class, hit flags, pierce percent, events and damage
     /// execution (§R6.1).
@@ -363,6 +354,11 @@ pub trait MissileBodies {
     /// The monster's class has the monstats2 `large` flag
     /// (`0x004638A0(class, 11)`).
     fn is_large_monster(&self, unit: UnitId) -> bool {
+        false
+    }
+    /// The monster's class has the monstats2 `small` flag
+    /// (`0x004638A0(class, 10)`; moltenboulder, §R6.3 function 14).
+    fn is_small_monster(&self, unit: UnitId) -> bool {
         false
     }
     /// Pet test `0x005542C0(game, owner, unit, skill)`.

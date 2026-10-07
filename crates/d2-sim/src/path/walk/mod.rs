@@ -1,6 +1,6 @@
 // Spec: specs/sim/pathing.md
 //! Walk and run: the mode request (C→S 0x01–0x04), the position resync
-//! (C→S 0x5F, §1.6), path types 1, 2 and 7, missile paths (§11),
+//! (C→S 0x5F, §1.6), every path type (§2, §5–§7, §12), missile paths (§11),
 //! path compute, target preparation, toward / straight / A*, velocity,
 //! direction and facing, per-tick movement, and the S→C byte builders of
 //! §10.
@@ -21,6 +21,7 @@ pub mod find;
 pub mod geom;
 pub mod messages;
 pub mod missile;
+pub mod other;
 pub mod request;
 pub mod resync;
 pub mod seams;

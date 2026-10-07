@@ -9,9 +9,9 @@
 //! so that their order varies. With either, every cell within two cells
 //! of a room's cell is found from that room (`path-placement.md` §4
 //! rule 1), so the reference views below (one lookup over the union of
-//! the rooms) equal every reading of the unstated lookup room of
-//! `path-placement.md` §5.1 (the `footprint.rs` TODO), as `docs/handoff/prop-walk.md`
-//! §4 notes for the one-room fake.
+//! the rooms) equal the lookup from the room argument that
+//! `path-placement.md` §5.1 states, as `docs/handoff/prop-walk.md` §4
+//! notes for the one-room fake.
 //!
 //! The seams record what they are asked to do (`Ev`) so the properties
 //! can check the room lists, the update queue, the unit flag, the AI
@@ -27,7 +27,7 @@ use d2_sim::path::collision::CollisionRooms;
 use d2_sim::path::coords::to_fp16_center;
 use d2_sim::path::footprint::PathMotion;
 use d2_sim::path::record::{DynamicPath, PathPoint};
-use d2_sim::path::walk::seams::{PathInfo, PathWorld, Point, WalkUnits};
+use d2_sim::path::walk::seams::{PathWorld, Point, WalkUnits};
 use d2_sim::path::walk::Walk;
 use d2_sim::path::PathTables;
 use d2_sim::rng::Seed;
@@ -537,16 +537,6 @@ impl WalkUnits for World {
     }
     fn send_unit_add(&mut self, client: ClientId, unit: UnitId) {
         self.events.push(Ev::Add(client, unit));
-    }
-    /// Type 8 (knockback, function unspecified: pathing.md open question
-    /// 3): the fake's function goes straight to the target point.
-    fn other_path_function(&mut self, path: &mut DynamicPath, info: &PathInfo) -> i32 {
-        if info.path_type == 8 {
-            path.points[0] = PathPoint::from_point(info.target);
-            1
-        } else {
-            0
-        }
     }
 }
 

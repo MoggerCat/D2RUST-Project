@@ -314,9 +314,6 @@ impl MissileCombat for Fake {
     fn hit_test(&mut self, _: &mut Game, _: UnitId, _: UnitId, _: i32) -> bool {
         self.hits.pop_front().unwrap_or(true)
     }
-    fn srv_dmg(&mut self, _: &mut Game, i: i16, _: UnitId, _: UnitId, d: &mut Damage) {
-        self.log.push(format!("srvdmg {i} {}", d.phys));
-    }
     fn apply_damage(
         &mut self,
         _: &mut Game,
@@ -326,6 +323,15 @@ impl MissileCombat for Fake {
         d: &mut Damage,
     ) {
         self.log.push(format!("damage {} {}", unit.0, d.phys));
+        self.log.push(format!(
+            "lengths cold {} freeze {}",
+            d.cold_length, d.freeze_length
+        ));
+        self.log
+            .push(format!("record result {:#x}", d.record_result));
+        self.log
+            .push(format!("stun {} class {:?}", d.stun_length, d.hit_class));
+        self.log.push(format!("fire {}", d.fire));
     }
     fn hit_by_missile_event(&mut self, _: &mut Game, _: UnitId, unit: Option<UnitId>) {
         self.log.push(format!("event0 {:?}", unit.map(|u| u.0)));
@@ -2264,9 +2270,11 @@ fn no_unit_no_a4_skips_to_exit_unless_always_explode() {
 // Covers: specs/missiles/missiles.md §r6-1-order-1-14d-0x005adf10-step-7 r1, §r6-1-order-1-14d-0x005adf10-step-7 r2
 #[test]
 fn damage_stage_fills_then_server_damage() {
+    // Function 4 (iceblast, §R6.3) moves the filled cold length into the
+    // freeze length; null entries 15–30 are unhandled; 0 and ≥ 31 run
+    // nothing.
     let cases = [
-        (5u16, true),
-        (14, true),
+        (4u16, true),
         (15, false),
         (30, false),
         (31, false),
@@ -2280,16 +2288,16 @@ fn damage_stage_fills_then_server_damage() {
         let m = w.create(&w.params()).unwrap();
         w.fake.stats.insert((m, stat::MINDAMAGE), 0x100);
         w.fake.stats.insert((m, stat::MAXDAMAGE), 0x100);
+        w.fake.stats.insert((m, stat::COLDLENGTH), 50);
         let mon = w.monster;
         w.hit(m, Some(mon), false);
         let i = f as i16;
-        // The server-damage function sees the filled record.
-        assert_eq!(
-            w.fake.logged(&format!("srvdmg {i} 256")),
-            usize::from(call),
-            "{f}"
-        );
-        assert_eq!(w.fake.logged("srvdmg"), usize::from(call));
+        let lengths = if call {
+            "lengths cold 0 freeze 50"
+        } else {
+            "lengths cold 50 freeze 0"
+        };
+        assert_eq!(w.fake.logged(lengths), 1, "{f}");
         let null = (15..=30).contains(&i);
         let want = if null {
             vec![Unhandled::NullSrvDmg {
@@ -2662,7 +2670,114 @@ fn null_table_entries_are_flagged() {
             missile: m,
         };
         assert_eq!(w.store.unhandled, [want]);
-        assert_eq!(w.fake.logged("srvdmg"), 0);
+        assert_eq!(w.fake.logged("lengths cold 0 freeze 0"), 1);
+    }
+}
+
+// Covers: specs/missiles/missiles.md §r6-3-server-damage-functions-psrvdmgfunc-1-14d-confirmed-2026-10-08
+#[test]
+fn server_damage_functions_adjust_the_record() {
+    // (function, dParam1, dParam2, setup) → the record the damage
+    // application receives.
+    let run = |f: u16, p1: u32, p2: u32, etype: u8, set: &dyn Fn(&mut World, UnitId)| {
+        let mut r = row();
+        r.psrvdmgfunc = f;
+        r.dparam1 = p1;
+        r.dparam2 = p2;
+        r.etype = etype;
+        let mut w = World::new(r);
+        let m = w.create(&w.params()).unwrap();
+        w.fake.stats.insert((m, stat::MINDAMAGE), 0x1000);
+        w.fake.stats.insert((m, stat::MAXDAMAGE), 0x1000);
+        w.fake.stats.insert((m, stat::COLDLENGTH), 50);
+        set(&mut w, m);
+        let mon = w.monster;
+        w.hit(m, Some(mon), false);
+        w
+    };
+    // 1: c = DmgCalc1 (here 25 %) of the physical moves to the element
+    // (EType 1, fire).
+    let w = run(1, 0, 0, 1, &|w, _| w.fake.mb.calc = 25);
+    let mon = w.monster;
+    assert_eq!(w.fake.logged(&format!("damage {} {}", mon.0, 0xC00)), 1);
+    assert_eq!(w.fake.logged("fire 1024"), 1);
+    // c ≥ 100 converts all of it.
+    let w = run(1, 0, 0, 1, &|w, _| w.fake.mb.calc = 400);
+    assert_eq!(w.fake.logged(&format!("damage {} 0", mon.0)), 1);
+    // 2: freeze := pct(cold length 50, dParam1 150) = 75, cold length 0.
+    let w = run(2, 150, 0, 0, &|_, _| {});
+    assert_eq!(w.fake.logged("lengths cold 0 freeze 75"), 1);
+    // 3: dParam1 128 > every (lo & 0x7F): soft hit 0x4000; 0: never.
+    let w = run(3, 128, 0, 0, &|_, _| {});
+    assert_eq!(w.fake.logged("record result 0x4000"), 1);
+    let w = run(3, 0, 0, 0, &|_, _| {});
+    assert_eq!(w.fake.logged("record result 0x0"), 1);
+    // 7: stun := dParam1 (> 0), hit class 0x60.
+    let w = run(7, 30, 0, 0, &|_, _| {});
+    assert_eq!(w.fake.logged("stun 30 class Some(96)"), 1);
+    // 10: freeze := cold length, cold length kept.
+    let w = run(10, 0, 0, 0, &|_, _| {});
+    assert_eq!(w.fake.logged("lengths cold 50 freeze 50"), 1);
+    // 14: a monster neither small nor large, dParam1 = 1: p = dParam2 =
+    // 100 → knockback 8; a large one with dParam1 = 1: none.
+    let w = run(14, 1, 100, 0, &|_, _| {});
+    assert_eq!(w.fake.logged("record result 0x8"), 1);
+    let w = run(14, 1, 100, 0, &|w, _| {
+        let mon = w.monster;
+        w.fake.mb.large.insert(mon);
+    });
+    assert_eq!(w.fake.logged("record result 0x0"), 1);
+}
+
+// Covers: specs/missiles/missiles.md §r6-3-server-damage-functions-psrvdmgfunc-1-14d-confirmed-2026-10-08
+#[test]
+fn add_elem_and_clear_elems_by_etype() {
+    use crate::combat::DamageRecord;
+    use crate::missiles::srv_dmg::{add_elem, clear_elems};
+    let mut r = DamageRecord::default();
+    for (e, a) in [(0u8, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (6, 7)] {
+        add_elem(&mut r, e, a);
+    }
+    for (e, a) in [(7u8, 8), (8, 9), (9, 10), (11, 11), (10, 99), (13, 99)] {
+        add_elem(&mut r, e, a);
+    }
+    assert_eq!(
+        (r.physical, r.fire, r.lightning, r.magic, r.cold, r.poison),
+        (1, 2, 3, 4, 5, 6)
+    );
+    assert_eq!(
+        (
+            r.life_leech,
+            r.mana_leech,
+            r.stamina_leech,
+            r.stun_len,
+            r.burn
+        ),
+        (7, 8, 9, 10, 11)
+    );
+    // 12 sets cold.
+    add_elem(&mut r, 12, 40);
+    assert_eq!(r.cold, 40);
+    let lengths = |r: &DamageRecord| (r.cold_len, r.poison_len, r.burn_len, r.freeze_len);
+    for (etype, want) in [
+        (4u8, (1, 0, 0, 4)),
+        (12, (1, 0, 0, 4)),
+        (5, (0, 2, 0, 0)),
+        (11, (0, 0, 3, 0)),
+        (0, (0, 0, 0, 0)),
+    ] {
+        let mut c = DamageRecord {
+            hit_flags: 0x701,
+            cold_len: 1,
+            poison_len: 2,
+            burn_len: 3,
+            freeze_len: 4,
+            ..r
+        };
+        clear_elems(&mut c, etype);
+        assert_eq!(lengths(&c), want, "etype {etype}");
+        assert_eq!(c.hit_flags, 1);
+        assert_eq!((c.physical, c.cold, c.stun_len, c.burn), (0, 0, 0, 0));
     }
 }
 

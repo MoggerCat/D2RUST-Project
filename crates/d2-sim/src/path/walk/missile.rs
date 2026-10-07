@@ -87,13 +87,13 @@ fn straight_missile<C: PathWorld + WalkUnits + ?Sized>(
     path.point_count = 1;
     path.field_38 = 0;
     aim(t, path, c.unit_type(unit));
-    // Rule 4.
-    // TODO(spec: pathing.md §11.1 rule 4): whether the flag is cleared
-    // when the target lies inside the room is not stated; it is only set.
-    if let Some(room) = path.room {
-        if !room_contains(&*c, room, target) {
-            path.flags |= flags::OUTSIDE_ROOM;
-        }
+    // Rule 4: no path room, or a target outside it, sets the flag; it is
+    // never cleared here.
+    if path
+        .room
+        .is_none_or(|room| !room_contains(&*c, room, target))
+    {
+        path.flags |= flags::OUTSIDE_ROOM;
     }
     1
 }

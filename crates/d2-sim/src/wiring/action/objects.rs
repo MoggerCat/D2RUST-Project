@@ -323,12 +323,10 @@ impl<X: Pending> View<'_, X> {
     /// object state; a game without one keeps the default (nothing).
     /// A quest, waypoint or `todo` init goes to [`Pending::object_route`].
     ///
-    /// TODO(objects.md §3, units.md §3.1 step 8): d2rs adds the unit to
-    /// the lists before the per-kind init (see `lifecycle::allocate`) and
-    /// places its path after it: an init's footprint stamp sees no path
-    /// record yet. The init's room is the list room; (x, y) the
-    /// allocation's when it went through [`View::create_object`], else
-    /// (0, 0).
+    /// The init runs before `SUNIT_Add` (`units.md` §3.1 r7.1–r7.3): the
+    /// unit is in no list and has no path record yet. Its room is the
+    /// allocation's ([`View::init_room`], r7.2); (x, y) the allocation's
+    /// when it went through [`View::create_object`], else (0, 0).
     pub fn object_init(&mut self, game: &mut Game, unit: UnitId) {
         // An allocation from inside an object call: the caller holds the
         // control and runs §3 itself (`objects::allocate`).
@@ -340,7 +338,7 @@ impl<X: Pending> View<'_, X> {
         };
         let (class, mode) = (r.class, r.mode);
         let guid = r.guid;
-        let room = game.lists.unit(unit).and_then(|e| e.room());
+        let room = self.init_room(game, unit);
         let (x, y) = self
             .h
             .objects
@@ -698,6 +696,19 @@ impl<X: Pending> ObjectWorld for ObjectView<'_, X> {
             allied: false,
         };
         self.v.allocate(self.game, &req, x, y)
+    }
+    /// Step 8 of an [`Self::allocate_object`] unit, after its init.
+    fn add_object(&mut self, obj: UnitId, room: RoomId, x: i32, y: i32) {
+        let req = crate::units::lifecycle::AllocRequest {
+            ty: UnitType::Object,
+            class: 0,
+            room: Some(room),
+            add: true,
+            fixed_guid: None,
+            mode: 0,
+            allied: false,
+        };
+        self.v.add_allocated(self.game, obj, &req, x, y);
     }
     fn staff_tomb_level(&self) -> u32 {
         self.v.h.x.object_staff_tomb()

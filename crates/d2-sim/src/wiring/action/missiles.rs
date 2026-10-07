@@ -313,34 +313,12 @@ pub fn result_bits(missile: u32) -> u16 {
 }
 
 /// A missile damage record (`missiles.md` §R6.2) as the combat damage
-/// record (`damage.md` §1).
-///
-/// TODO(missiles.md §R6.2): where the 103/104/106 bypass flags go in the
-/// record is not stated (the 0x70-byte layout has no field for them);
-/// they are not carried.
+/// record (`damage.md` §1): [`Damage::to_record`] (deadly strike, bypass
+/// hit flags, the §R6.3 fields) with the missile's result flags.
 pub fn damage_record(d: &Damage) -> DamageRecord {
-    let mut result = result_bits(d.result);
-    if d.crit {
-        result |= result::CRITICAL;
-    }
-    DamageRecord {
-        result,
-        physical: d.phys,
-        fire: d.fire,
-        burn: d.burn,
-        burn_len: d.burn_length,
-        lightning: d.light,
-        magic: d.magic,
-        cold: d.cold,
-        poison: d.poison,
-        poison_len: d.poison_length,
-        cold_len: d.cold_length,
-        life_leech: d.life_drain,
-        mana_leech: d.mana_drain,
-        stamina_leech: d.stamina_drain,
-        stun_len: d.stun_length,
-        ..DamageRecord::default()
-    }
+    let mut rec = d.to_record();
+    rec.result |= result_bits(d.result);
+    rec
 }
 
 impl<X: Pending> MissileCombat for View<'_, X> {
@@ -369,16 +347,6 @@ impl<X: Pending> MissileCombat for View<'_, X> {
             tohit,
             true,
         )
-    }
-    fn srv_dmg(
-        &mut self,
-        game: &mut Game,
-        index: i16,
-        missile: UnitId,
-        unit: UnitId,
-        damage: &mut Damage,
-    ) {
-        self.h.x.srv_dmg(game, index, missile, unit, damage);
     }
     /// The rest of `0x005ADCD0` (`missiles.md` §R6.1): the record with the
     /// missile's hit class (`HitClass`) and pierce percent (stat 327),

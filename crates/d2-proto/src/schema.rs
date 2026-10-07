@@ -176,6 +176,9 @@ pub enum FieldType {
     Cstr,
     /// 16-byte string field.
     Cstr16,
+    /// `bytesN`: N raw bytes at the offset (N ≥ 1; a record the message
+    /// carries whole, e.g. S→C 0x29's 96-byte quest record).
+    Bytes(u16),
     /// `uN`: bits 0..N of the u32 at the offset (N not 8, 16, 32).
     Bits(u8),
     /// `bitN`: bit N of the u32 at the offset.

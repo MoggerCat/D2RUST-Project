@@ -43,16 +43,58 @@ pub trait LifecycleHooks: UnitHooks {
     /// kind's spec.
     fn init_kind(&mut self, sim: &mut Sim<'_>, unit: UnitId, req: &AllocRequest) {}
 
+    /// Step 8's list part ([`add`]) linked `unit`: its per-kind init is
+    /// over. Provider: whoever tracks units between steps 7 and 8.
+    fn added(&mut self, sim: &mut Sim<'_>, unit: UnitId) {}
+
     /// The free routine's other calls (§1 table) and `0x005C0A90`,
     /// `0x00571F40` at removal. Provider: the kind's spec.
     fn free_kind(&mut self, sim: &mut Sim<'_>, unit: UnitId) {}
 }
 
-/// `0x00555230` (§3.1). Returns `None` when the class is rejected
-/// (nothing allocated, no RNG draw). `game_seed` is the game seed of
-/// `rng.md` §5.3. An error (unknown room, duplicate GUID) leaves the
-/// game, the seed and the GUID counter as they were.
+/// `0x00555230` (§3.1): [`allocate_unlinked`] (steps 1–7), then
+/// [`add`] (step 8's `SUNIT_Add` list part). Returns `None` when the
+/// class is rejected (nothing allocated, no RNG draw). `game_seed` is
+/// the game seed of `rng.md` §5.3. An error (unknown room, duplicate
+/// GUID) leaves the game, the seed and the GUID counter as they were.
 pub fn allocate<H: LifecycleHooks>(
+    sim: &mut Sim<'_>,
+    hooks: &mut H,
+    game_seed: &mut Seed,
+    req: &AllocRequest,
+) -> Result<Option<UnitId>, UnitError> {
+    let Some(unit) = allocate_unlinked(sim, hooks, game_seed, req)? else {
+        return Ok(None);
+    };
+    add(sim, hooks, unit, req)?;
+    Ok(Some(unit))
+}
+
+/// Step 8's list part: `SUNIT_Add` `0x00554850` (`unit-order.md` §3.1)
+/// of a unit [`allocate_unlinked`] returned, in the allocation's room.
+/// The path settings of step 8 are the path provider's.
+pub fn add<H: LifecycleHooks>(
+    sim: &mut Sim<'_>,
+    hooks: &mut H,
+    unit: UnitId,
+    req: &AllocRequest,
+) -> Result<(), UnitError> {
+    sim.game
+        .lists
+        .link_unit(unit, req.room)
+        .map_err(GameError::from)?;
+    hooks.added(sim, unit);
+    Ok(())
+}
+
+/// Steps 1–7 of `0x00555230` (§3.1): the unit with its seeds, GUID and
+/// per-kind init, in no list (r7.1; [`super::UnitLists::reserve_unit`]):
+/// an init never finds the unit by a hash lookup (r7.4) and reads its
+/// room from the allocation's argument (r7.2). The GUID is tested free
+/// here, so step 8 cannot meet the fatal duplicate (`unit-order.md`
+/// §2.1) after the init ran; that error undoes the draws of steps 4
+/// and 6.
+pub fn allocate_unlinked<H: LifecycleHooks>(
     sim: &mut Sim<'_>,
     hooks: &mut H,
     game_seed: &mut Seed,
@@ -102,16 +144,14 @@ pub fn allocate<H: LifecycleHooks>(
         (UnitType::Monster, Some(g)) => g,
         _ => sim.game.lists.guids.alloc(req.ty),
     };
-    // Step 8 (SUNIT_Add) precedes the per-kind init here: d2rs needs the
-    // list entry to own timers; neither step reads what the other writes.
-    let unit = match sim.game.lists.add_unit(req.ty, guid, req.room, req.allied) {
-        Ok(unit) => unit,
-        Err(e) => {
-            *game_seed = undo.0;
-            sim.game.lists.guids.set(req.ty, undo.1);
-            return Err(GameError::from(e).into());
-        }
-    };
+    // The entry exists from here (it owns timers) but is in no list
+    // until step 8 (r7.1).
+    if let Err(e) = sim.game.lists.check_guid_free(req.ty, guid) {
+        *game_seed = undo.0;
+        sim.game.lists.guids.set(req.ty, undo.1);
+        return Err(GameError::from(e).into());
+    }
+    let unit = sim.game.lists.reserve_unit(req.ty, guid, req.allied);
     // Steps 2 and 5.
     let mut rec = UnitRecord::new(req.ty, req.class, guid);
     rec.act = act;

@@ -134,6 +134,25 @@ fn elemental_min_synergy_gate() {
     assert_eq!(elem_max(&mut f, &t, None, 0, 1, false), 10_240 + 6_553);
 }
 
+// Covers: specs/skills/levels.md §3.1 r3
+#[test]
+fn elemental_min_gate_skips_formula() {
+    // The min's gate is tested before `EDmgSymPerCalc`: a gated-out min
+    // (v = 256, EMinLev1 0) does not evaluate `rand(1, 6)`, so the
+    // caster's seed is not stepped; the max evaluates it and draws.
+    let mut r = skill_rec();
+    (r.emin, r.emax, r.hitshift, r.edmgsympercalc) = (1, 40, 8, 0);
+    let mut t = tables_with(r);
+    t.skills_code = vec![0x07, 1, 0x07, 6, 0x01, 2, 0x00];
+    let mut f = Fake::default();
+    let u = player(&mut f);
+    let before = f.units[u].seed;
+    assert_eq!(elem_min(&mut f, &t, Some(u), 0, 20, false), 256);
+    assert_eq!(f.units[u].seed, before);
+    elem_max(&mut f, &t, Some(u), 0, 1, false);
+    assert_eq!(f.units[u].seed, Seed::new(0x6AC6_90C5, 0));
+}
+
 // Covers: specs/skills/levels.md §2, §3.1 r4
 #[test]
 fn elemental_mastery() {

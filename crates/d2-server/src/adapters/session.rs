@@ -228,8 +228,8 @@ pub fn create_game<D: ActionEvents, W>(
 /// The join of `client` (module docs). Returns the placed player.
 ///
 /// Game +0x80 is the object control's `dwObjSeed`; a game built without
-/// an object control (no game-creation sequence, `rng.md` §5.2 TODO in
-/// `ActionSim::create_objects`) has none, and 0 is sent.
+/// an object control (not created through `WorldSim::create_game`,
+/// `rng.md` §5.2) has none, and 0 is sent.
 pub fn enter_game<D: ActionEvents, W>(
     s: &mut SimGame<D, W>,
     client: ClientId,
