@@ -417,7 +417,7 @@ fn quest_updater_runs_at_tick_step_8() {
 /// `questdiffcheck` not tested), then the inventory list in order with
 /// page 1 skipped (`quest`, `questdiffcheck` and stat 356 tested); none
 /// otherwise.
-// Covers: specs/world/quests-helpers.md §8 text, §8 r2, §8 r3, §8 r4
+// Covers: specs/world/quests-helpers.md §8 r2, §8 r3, §8 r4
 #[test]
 fn find_item_by_code_cursor_then_list() {
     let mut w = World::new();
@@ -475,7 +475,7 @@ fn find_item_by_code_cursor_then_list() {
 /// `quests-act2-2.md` §5.3 (`0x0052E050`): S→C 0x0A (type, GUID) to every
 /// in-game client whose room's adjacent list holds the unit's room (the
 /// client's own room included), then the unit is freed.
-// Covers: specs/world/quests-act2-2.md §5.3 text, §5.3 r1, §5.3 r2
+// Covers: specs/world/quests-act2-2.md §5.3 r1, §5.3 r2
 #[test]
 fn remove_unit_for_everyone_nearby() {
     use crate::units::lists::client_state;

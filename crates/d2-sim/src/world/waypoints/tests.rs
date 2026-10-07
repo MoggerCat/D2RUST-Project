@@ -175,7 +175,7 @@ fn load_and_out_copy() {
     assert_eq!(bad.out_copy(), Err(WaypointError::BadMagic(0x0103)));
 }
 
-// Covers: specs/world/waypoints.md §3 text, §3 r1, §3 r2, §3 r3
+// Covers: specs/world/waypoints.md §3 text, §3 r1, §3 r2
 #[test]
 fn save_section() {
     let mut recs = WaypointRecords::default();
