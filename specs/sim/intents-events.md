@@ -35,19 +35,19 @@
 | Rules | 86–87 |
 |   1. Loop order (single player) | 88–109 |
 |   2. Client → server | 110–279 |
-|   3. Server → client | 280–379 |
-|   4. d2rs mapping and scope | 380–411 |
-|   5. Machine-readable tables | 412–448 |
-|   6. Exact-match comparison | 449–534 |
-|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 535–917 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 918–1062 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1063–1175 |
-| Constants & data dependencies | 1176–1194 |
-| Randomness | 1195–1200 |
-| Edge cases & original bugs | 1201–1234 |
-| Test vectors | 1235–1310 |
-| Provenance | 1311–1406 |
-| Open questions | 1407–1472 |
+|   3. Server → client | 280–444 |
+|   4. d2rs mapping and scope | 445–476 |
+|   5. Machine-readable tables | 477–513 |
+|   6. Exact-match comparison | 514–604 |
+|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 605–987 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 988–1132 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1133–1245 |
+| Constants & data dependencies | 1246–1264 |
+| Randomness | 1265–1270 |
+| Edge cases & original bugs | 1271–1304 |
+| Test vectors | 1305–1391 |
+| Provenance | 1392–1493 |
+| Open questions | 1494–1580 |
 <!-- /index -->
 
 ## Summary
@@ -377,6 +377,71 @@ Queue 2 (id 0xFF, 16 bytes, `0x0052CC20`) runs only when host callbacks
    0x95, 0x96; then the general handler. What each handler does belongs to
    the client specs.
 
+#### 3.5 Senders (the TSV `sender` column)
+
+1. `sender` names the function that calls `0x0053B280` with the
+   message; a record's `caller` (`record_packets.py`) lies in it. Many
+   senders are copiers: they queue a fixed size from a message their
+   caller built, id included. Rule 4 names the id writers.
+2. Search (static, `tools/ghidra/disasm.py`): 122 functions hold the 129
+   calls of `0x0053B280`; no pointer refers to it, to `0x0052B330` or to
+   `0x0053E8D0`. Each was traced to the ids it can queue (an immediate id
+   byte, DL from its callers, or the id store before each call of a
+   copier). No function queues 0x12, 0x13, 0x14, 0x16, 0x24, 0x25, 0x45,
+   0x54, 0x66, 0x6E–0x72 (`produced_by` none: client handlers exist and
+   never run). The only 1-byte builder, `0x0053B320`, gets DL 0, 2, 4,
+   5, 6, 0x4F. `0x0053DDF0`, `0x0053DE90`, `0x0053DF50` (copiers run by
+   `0x005538D0`) carry 0x8C, 0x8D, 0x8E.
+3. Recorded check: in both recordings every record of an id below has
+   its `caller` inside the listed sender (counts in the table).
+4. Senders found in this pass (layouts: the TSV):
+
+   | Id | Sender | Id written by (store) | Records | Notes |
+   |---|---|---|---|---|
+   | 0x26 | `0x0053C750` | `0x0054A5D0` (`0x0054A895`, u8@1 := 6), `0x00571620` (`0x005716A4`, u8@1 := 5); `0x0054A470`, `0x0054A510` pass a built message | 0 | the builder copies u8@1–3, u32@4, u8@8–9, the name (≤ 15 chars + NUL, `0x004135D0`) at 10 and the text (length ≥ 256 → fatal 0x5BA) after the name's NUL. Form 5 (overhead, §7.9 r3): u8@2 = the overhead record's byte +8 (C→S 0x14 u8@2), u8@3 unit type, u32@4 GUID, empty name; bytes 8–9 never written. Form 6 (chat, open question 14): u8@2 0, u8@3 2, u32@4 = ESI, u8@8 0; byte 9 never written |
+   | 0x27 | `0x0053C8D0` | §6 rule 6 | 7 | |
+   | 0x2C | `0x0053D780` | `0x00571740` (`0x00571775`) | 4 | unit type, GUID (+0x0C), event = unit u16 +0x6E; only when unit +0x70 is 0 or the client's player; callers `0x00580917`, `0x00581B07`, `0x00586000`, `0x00598369` |
+   | 0x4C, 0x99 | `0x0053D530` | itself | 2, 0 | rule 5 |
+   | 0x4D, 0x9A | `0x0053D4D0`, `0x0053D530` | itself | 0 | rule 5 |
+   | 0x4E | `0x0053D7B0` | `0x00576770` (BL 0x4E, `0x0057686C`) | 0 | `world/npc.md` §7.2 |
+   | 0x50 | `0x0053D7E0` | §6 rule 6 | 0 | words after the code: code 1 (`0x00546040`) u16@3, @5, @7, rest 0; codes 2, 0x24, 13 u16@3; code 4 u16@3–@11 (the quest record's five words − 0x11, `0x00593D10`); code 0x17 none |
+   | 0x53 | `0x0053C900` | `0x0052D7B0` (`0x0052D800`), `0x0053ABE0` (`0x0053AC4F`), `0x0059A100` (`0x0059A12A`), `0x0059A170` (`0x0059A19C`) | 6 | `0x0053ABE0` takes the values from `0x0061C330(act)`; `render/lighting.md` §9.2 |
+   | 0x58 | `0x0053D8D0` | `0x00579D60` (`0x00579F52`, `0x0057A28B`, `0x0057A4B3`: codes 6, 7), `0x00582610` (`0x005826D9`: 0), `0x005852E0` (`0x00585348`: 1, 4, 5), `0x0059DC70` (`0x0059DD54`: 0) | 0 | GUID u32@1 (−1 without a unit); u8@6 written only with code 5 (`0x005853CD` := 1, or `0x005853E4` := the result of `0x00585240`) |
+   | 0x5D | `0x0053D710` | 18 call sites, `world/quests.md` §6.3 | 1 | |
+   | 0x63 | `0x0053D960` | `0x00584E30` (`0x00584EEA`) | 3 | `world/waypoints.md` §5.3 |
+   | 0x78 | `0x0053CAD0` | `0x00568060` (`0x005682F7`) | 0 | the other player's client name (`0x00538830`, 16 bytes, byte 16 := 0), u32@17 = the other player's GUID; trade only |
+   | 0x89 | `0x0053DFE0` | `0x005456F0` (`0x00545700`), `0x00546270` (`0x00546687`, event 0) | 0 | `world/quests.md` §6.5 |
+   | 0x8A | `0x0053DFF0` | `0x00544590` (`0x005446EE`), `0x005EE3C0` (`0x005EE57B`) | 136 | type 1, GUID = unit +0x0C; `world/quests.md` §6.4 |
+   | 0x91 | `0x0053E060` | `0x00545100` (`0x00545172`) | 0 | `world/quests.md` §6.7 |
+   | 0x94 | `0x0053C5D0` | itself (`0x0053C65F`); called at `0x00532F03` (join) and `0x0056A7B7` | 4 | `client/msg-skills.md` §3 |
+   | 0xA8 | `0x0053E8D0` | `0x005711D0` (`0x00571359`) | 5 | rule 6 |
+   | 0xAA | `0x0053E8D0` | `0x00570E30` | 269 | §7.9 rule 1 |
+
+5. **0x4C / 0x4D / 0x99 / 0x9A.** `0x0053D530` (ECX client, DL unit
+   type; stack: GUID, target type u8, target GUID, skill u16, w u16, b
+   u8, flag): id base 0x4C (16 bytes) or 0x4D (17 bytes), + 0x4D when
+   flag ≠ 0 (0x99, 0x9A). The target is looked up (`0x00552F60`). Found,
+   and the client's player has no room or the target's room
+   (`0x00620BB0`) is not in the list of the player's room
+   (`0x00619790`) → 17-byte form: skill zero-extended to u32@6, b @10,
+   x u16@11 / y u16@13 = the target's path target point (path +0x10 /
+   +0x12, `0x00648A00` / `0x00648A10`, `sim/path-placement.md` path
+   table), w @15. Else (not found, or in that list) → 16-byte form:
+   skill u16@6, b @8, target type @9, target GUID u32@10, w @14.
+   `0x0053D4D0` (DL type; stack: GUID, x u16, y u16, skill u32, w, b,
+   flag) always writes the 17-byte form. Callers: `0x00548090` and
+   `0x00597D70` (flag 0, w 0), `0x00581A20` (0x4D, type 2, point
+   (0, 0)), `0x00571CD0` (flag 1, pending records, §7.9 rule 2).
+6. **0xA7 / 0xA8 / 0xA9** `0x005711D0(unit, client)` (called at
+   `0x00571592`): for each state s whose bit is set in the unit's
+   state-change array (`0x00639F70`, copied; 32-bit words, ascending),
+   s < the `states` count and the row's `nosend` bit clear: the unit
+   has s (`0x00639DF0`) and its stat list (`0x006256B0`) has ≥ 1 entry
+   (`0x00625C90`, ≤ 16) → 0xA8: type, GUID, state u8@7, bit stream @8 =
+   the entries exactly as §7.9 rule 1 step 3 after its list bit, then
+   0x1FF; size u8@6 = 8 + the stream's bytes. Has s, no list or no
+   entry → 0xA7 (`0x0053E260`). Not set → 0xA9 (`0x0053E290`).
+
 ### 4. d2rs mapping and scope
 
 1. **Intents** = the C→S messages with `scope` = sim (80 ids). `d2-proto`
@@ -531,6 +596,11 @@ as in §2.1 rule 5 and §3.1 rule 1.
      `nul@5` `..20`. The present unkeyed `0x50 13 2` row becomes the
      `u16@1=0x0004` row (unkeyed, it hides written bytes of the u16 1,
      2, 0x24 and 13 forms).
+   - Two more keyed ids (§3.5 rule 4; no record yet): **0x26** form 5
+     never writes bytes 8–9, form 6 never writes byte 9 (rows `0x26
+     u8@1=0x05` 8 2, `0x26 u8@1=0x06` 9 1); **0x58** writes byte 6 only
+     with code 5 (rows `0x58 u8@5=0x00`, `=0x01`, `=0x04`, `=0x06`,
+     `=0x07`, each 6 1).
 
 ### 7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`)
 
@@ -1275,6 +1345,17 @@ Synthetic (from the rules; CI-safe):
 | monster mode 0, path without target, GUID 0x1B | `69 1b000000 08 0000 0000 38 06` | §7.4 rule 7; recorded `-015956` frame 2882 |
 | room switch leaving room at tile (968, 1120), level 1 | `08 c803 6004 01` after the switch's 0x07s | §7.8; recorded `-015956` frame 149 |
 | player with state 105 (`alignment`) whose list holds stat 172 = 2, GUID 1 | `aa 00 01000000 0c 69 59 f9 ff 1f` | §7.9 rule 1; recorded `-022633` seq 103 |
+| changed state 105 on player 1, list {172: 2} | `a8 00 01000000 0b 69 ac fc 0f` (stat 9 bits 172, value 2 bits 2, 0x1FF) | §3.5 rule 6; recorded `-015956` seq 234 |
+| changed state 100, list entries all with send bits 0 | `a8 00 01000000 0a 64 ff 01` (only 0x1FF) | §3.5 rule 6; recorded `-022633` seq 12320 |
+| monster 0x32 uses skill 181 on monster 0x34 in view, b 1 | `4c 01 32000000 b500 01 01 34000000 0000` | §3.5 rule 5; recorded `-022633` seq 52921 |
+| same with the target out of the player's rooms, path target (x, y) | `4d 01 32000000 b5000000 01 <x u16> <y u16> 0000` | §3.5 rule 5 (synthetic) |
+| same, pending record (flag 1) | id 0x99 (in view) / 0x9A | §3.5 rule 5 (synthetic) |
+| sound event 18 on monster 0x26; event 2 on player 1 | `2c 01 26000000 1200`; `2c 00 01000000 0200` | §3.5; recorded `-015956` seq 293505, `-022633` seq 46356 |
+| act environment period 2, ticks 0x880, no eclipse | `53 02000000 80080000 00` | §3.5; recorded `-015956` seq 170841 |
+| waypoint 10, record magic 0x0102, indexes 0 and 1 known | `63 0a000000 0201 03000000 00000000 00000000 0000` | §3.5; recorded `-022633` seq 7780 |
+| NPC 7 wants to talk | `8a 01 07000000` | §3.5; recorded `-022633` seq 1563 |
+| NPC text list of monster 0x10: strings 0x40, 0x0B, kind 0 | `27 01 10000000 02 00 00 00 4000 00 00 0b00` + 24 zero bytes | §6 rule 6; recorded `-015956` |
+| skill list of player 1, 8 entries | `94 08 01000000` then `0000 01`, `0200 01`, `0100 01`, `d900 01`, `da00 01`, `db00 01`, `dc00 01`, `0300 01` | §3.5; recorded `-022633` seq 105 |
 | game creation, Normal, expansion, not ladder, arena flags 0x00100004 | `01 00 04001000 01 00`, then `00`, then `02` | §8.1; recorded seq 5–7 of both |
 | hot-key slot 3, skill 36, flag set, item −1 | `7b 03 2480 ffffffff` | §8.2 rule 3.6 (synthetic) |
 | join of a character with no hot key, then the town spawn | 0x59 … 0x0B, 0x5F, …, 0x95, 0x1B, 0x03, 0x53, 0x07 × (1 + array), 0x15, 0x7E; next tick … 0x04 | §8; recorded `-022633` seq 102–219 |
@@ -1327,7 +1408,13 @@ client ids 0x0C, 0x3A, 0x3B (28 client ids seen in total).
   the immediate passed in DL by the caller of a shared builder; bit-packed
   builders via their first 8-bit write). Builders whose header comes from
   a caller-built struct are left `-`; the recorder logs every caller and
-  settles them.
+  settles them. Settled 2026-10-07 (§3.5): the id store before every call
+  of each copier (`lea edx, [ebp − n]` and the byte store at ebp − n in
+  the same function), the DL set before every call of the shared
+  builders, and the `caller` field of every record in both recordings
+  (ids 0x27, 0x2C, 0x4C, 0x53, 0x5D, 0x63, 0x8A, 0x94, 0xA8, 0xAA: 437
+  records, all in the listed sender); layouts from the stores read in
+  the id writers and the builders.
 - **1.14d data**: state 12 = `inferno`, 54 = `uninterruptable`
   (`states.txt` rows, patch_d2 and d2exp); stat 328 = `pierce_idx`
   (`itemstatcost.txt`, patch_d2).
@@ -1423,8 +1510,13 @@ Handlers of §9: `0x0054A260`, `0x0054A290` (with `0x00661110`,
    `0x0053D4D0`, 0x67 `0x0053B710` and `0x0053B910` (§7.4). 0x67 –
    0x6D layouts: §7.7; 0x08 (`0x0053BC90`) and 0x0A: §7.8; 0xAA
    (`0x00570E30`): §7.9 rule 1; 0x01, 0x23, 0x53, 0x7B, 0x7E: §8.
+   *Answered* (§3.5, TSV updated): every receivable id has its sender
+   or `produced_by` none; every row is `yes`.
 5. S→C field layouts: only the builders in the `layout` column were read;
    every other layout is unconfirmed (one owner per system spec later).
+   Still empty after §3.5: ids whose builder layout was not needed by a
+   spec yet (e.g. 0x09, 0x0B, 0x11, 0x20–0x22, 0x28–0x2A, 0x3E, 0x40,
+   0x51, 0x52, …): read when their owner is written.
 6. C→S field meanings marked `partial` (0x14, 0x15, 0x32, 0x33, 0x35,
    0x44, 0x4F): offsets and widths are 1.14d, names are D2MOO's; each
    system spec confirms its own. *Partly answered* (§9; TSV rows 0x26,
@@ -1434,6 +1526,11 @@ Handlers of §9: `0x0054A260`, `0x0054A290` (with `0x00661110`,
    fill (bit 31), u32@13 never read (`world/vendors.md` §7.1); 0x33
    u16@9 = item mode, u32@13 not read (§7.2); 0x35 u16@9 not read, u32@13
    bit 31 = repair all (§8.1); 0x14 u8@1 is not read (§9 rule 3).
+   *Names fixed* (2026-10-07, TSV): 0x14 `unread`@1; 0x32
+   `transaction`@9, `client_price`@13; 0x33 `item_mode`@9,
+   `client_price`@13; 0x35 `unread`@9, `repair_flags`@13; 0x32, 0x33,
+   0x35 now `yes`. Open: 0x14 / 0x15 `lang`@2, 0x15 `type`@1, 0x44,
+   0x4F.
 7. The odd third term of the C→S chat size rule (§2.1 rule 5): does the
    1.14d client ever send a non-zero byte there?
 8. 0x0B, 0x2E, 0x42, 0x43: does the 1.14d client ever send them?
@@ -1445,8 +1542,10 @@ Handlers of §9: `0x0054A260`, `0x0054A290` (with `0x00661110`,
     `0x005A5650` (the d byte, recorded 0x80 on 0x6D) and `0x00572EE0`.
     *Partly answered*: `0x00570E30` (0xAA), `0x00571CD0` (pending event
     records), `0x00571620` (0x76 / overhead 0x26): §7.9; `0x005A5650` =
-    the life fraction (§7.4 rule 5). Open: `0x005711D0`, `0x005715A0`,
-    `0x00572EE0`, and who writes the unit +0xEC records.
+    the life fraction (§7.4 rule 5); `0x005711D0` (0xA7 / 0xA8 / 0xA9
+    per changed state): §3.5 rule 6. Open: `0x005715A0`, `0x00572EE0`,
+    who writes the unit +0xEC records, and who sets the state-change
+    bits `0x005711D0` reads.
 11. The §7.6 order (item 0x9C before the monster's 0x69 in a kill tick
     with a drop): a recording of a kill that drops an item. *0x65 part
     answered* (§7.6 rule 5, static): the kill sets arena flag 0x400
@@ -1469,3 +1568,12 @@ Handlers of §9: `0x0054A260`, `0x0054A290` (with `0x00661110`,
     object (object spec).
 16. `0x005616A0` (0x60, §9 rule 14): the weapon switch and its fail
     flag (item spec).
+17. This spec is past 60 KB (`specs/README.md` Process): split §3.5
+    and the S→C parts of §6–§7 into a sender spec in a later pass.
+18. Client side of ids §3.5 confirmed that still have no client owner
+    (UI entry points: 0x26 → `0x0049F490`, 0x27 → `0x004A1600`, 0x4E →
+    `0x004B3240`, 0x50 → `0x004B9210`, 0x58 → `0x004C0550`, 0x78 →
+    `0x004B9010`, 0x89 → `0x004B9330`, 0x8A → `0x004B3380`, 0x91 →
+    `0x004B3510`; skill events 0x99 / 0x9A → `0x004CA200` /
+    `0x004CA230` → `0x004CA060`): owners the `ui/*` specs (requested in
+    `docs/handoff/xpc-to-pc2.md`) and a client skill-event spec.

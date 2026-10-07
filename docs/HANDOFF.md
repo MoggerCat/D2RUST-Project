@@ -5005,6 +5005,14 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
   `0x005D4150`), Overseer whip (transform rate and class, `0x005D1F70`),
   imps on a barricade tower (state 143, type-5 event, release below 10 %
   life, `0x005D1AB0`).
+- `sim/intents-events.md` §3.5 (static senders, no record yet): open a
+  shop and the hire list (0x58 codes, 0x4E), talk to an NPC with a quest
+  line (0x27 count > 1, 0x50, 0x91, 0x89), a monster casting at the
+  player from outside the player's rooms (0x4D) and a pet summon with a
+  pending skill (0x99 / 0x9A); log caller and bytes (check 0x58 byte 6
+  is stack garbage except code 5; 0x26 bytes 8-9 with form 5).
+- `sim/pets.md` OQ3 (count part): summon a 4th skeleton over max 3; expect
+  three 0x7A action 0 for the removed one (§6 table).
 
 ## 8. Lessons (problems met, fixes)
 
