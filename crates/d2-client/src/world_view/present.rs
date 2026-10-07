@@ -603,6 +603,7 @@ fn world_view_frame(
             let unhandled = state
                 .ground_items
                 .take_clicks(&mut bridge.0, &frame.unhandled)?;
+            crate::bridge::belt::send_keys(&mut bridge.0, &frame.unhandled)?;
             for o in world_clicks(
                 &mut bridge.0,
                 &mut state.click,

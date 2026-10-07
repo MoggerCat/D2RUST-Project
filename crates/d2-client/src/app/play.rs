@@ -292,6 +292,8 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
         let palettes = ActPalettes::live(&archives).map_err(anyhow::Error::msg)?;
         let tiles = TileAssets::new(Some(archives.clone()), Some(palettes.pl2.clone()));
         add_preview(&mut app, level_rows, tiles);
+        let item_parts = super::items::item_parts(&archives).map_err(anyhow::Error::msg)?;
+        super::items::add_items(&mut app, archives.clone(), item_parts);
         palette::add_act_palettes(&mut app, palettes);
         let parts = ui::UiParts::live(archives.clone()).map_err(anyhow::Error::msg)?;
         ui::add_original_ui(&mut app, parts)?;
