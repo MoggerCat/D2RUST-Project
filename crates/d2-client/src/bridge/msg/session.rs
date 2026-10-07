@@ -62,8 +62,13 @@ pub fn load_act(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerErr
     w.palette_act = Some(m.act);
     // The old act's rooms are freed with it: their units leave the room
     // lists (`sim/unit-order.md` §5 rule 6).
+    // The client act free `0x0061AFD0` frees every active room the same
+    // way as a room leaving sight (`model.md` §16 r1, r2): the units
+    // linked in them get flag 0x800000 and flags-2 0x20.
+    for r in w.active_rooms.take().unwrap_or_default() {
+        w.free_active_room(r.room);
+    }
     w.drlg = None;
-    w.active_rooms = None;
     w.room_units = Default::default();
     if let Some(src) = &msg.inputs.drlg {
         w.drlg =
