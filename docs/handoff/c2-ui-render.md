@@ -1,6 +1,6 @@
 # Handoff: c2-ui-render (coverage session, specs/ui + specs/render)
 
-Branch `claude/c2-ui-render`. Test results: see "Verification" at the end.
+Branch `claude/c2-ui-render`. Verification at the end.
 
 ## Counts (uncovered rules, ui + render files; skill_desc.rs left to another session)
 
@@ -75,3 +75,14 @@ specs/ui/text.md	§edge-cases-original-bugs	aggregate list restating rules cover
 specs/ui/panels.md	§7 r4	tool-tip queueing owner is Open questions 1 (pointer)
 specs/ui/panels.md	§9 r1	table of inventory modes (narration of what other rules draw)
 specs/ui/panels.md	§11 r1	stash open goes through the server interaction (world/cube.md), no UI behaviour
+
+## Verification
+
+- `cargo test -p d2-client --lib` (filtered to panels/overlay/unit_composite/inv_grid/controls/ui): 391 passed, 0 failed (stable toolchain).
+- `python3 tools/coverage.py --check`: 0 errors.
+- `cargo clippy -p d2-client --all-targets -- -D warnings` on stable 1.97 fails only in files this session did not touch (audio/sound_table/table.rs, volume.rs, ui/messages/hire.rs); no finding in the new code.
+
+## Rules left (not done)
+
+controls.md §6 r11; inventory.md §3 r1, §6 r1; panels-2.md §14 r13, §18 r1, §22 r2, §22 r4;
+panels-3.md §24 r5; panels.md §12 r5; unit-composite §5 r3 and others in render/ (see coverage output).
