@@ -96,8 +96,10 @@ fn lookups(t: &mut TableSet) {
     for code in CLASS_CODES {
         t.row("playerclass", &[("code", code)]);
     }
+    // Row 0 holds the empty code, as 1.14d (`txt-format.md` §8 "Empty
+    // keys"): an empty `itemNloc` links to 0.
     for code in [
-        "none", "head", "neck", "tors", "rarm", "larm", "rrin", "lrin", "belt", "feet", "glov",
+        "", "head", "neck", "tors", "rarm", "larm", "rrin", "lrin", "belt", "feet", "glov",
     ] {
         t.row("bodylocs", &[("code", code)]);
     }
