@@ -211,4 +211,5 @@ quest-seed draw happens even when no dummy is placed (rule 6).
 
 ## Open questions
 
-None of its own; `world/quests-act3.md` open questions 1 and 8 stay open.
+None of its own; `world/quests-act3.md` open question 1 is answered and
+8 is on the recording list (R-PQ-10).

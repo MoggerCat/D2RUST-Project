@@ -45,7 +45,7 @@
 | Edge cases & original bugs | 901–948 |
 | Test vectors | 949–966 |
 | Provenance | 967–993 |
-| Open questions | 994–1020 |
+| Open questions | 994–1021 |
 <!-- /index -->
 
 ## Summary
@@ -1014,6 +1014,7 @@ quest code draws.
 7. Answered (cross-file request to PC 2 quests-core,
    `docs/handoff/pc2-spec-quests-act3.md`): `quests.tsv` rows 17–24 and
    39, column `spec` := `specified`; owner of those rows is this file.
-8. Record a full Act III run (packets + RNG, `docs/HANDOFF.md` §5):
+8. ~~Record a full Act III run (packets + RNG, `docs/HANDOFF.md` §5):
    chest drops, the Alkor reward broadcast, council kills, the orb, the
-   Hellgate and Natalya's spawn.
+   Hellgate and Natalya's spawn.~~ Needs recording: R-PQ-10
+   (`docs/handoff/pc2-rec-pc2-quests.md`, = HANDOFF §5 S9-A3 Act III).
