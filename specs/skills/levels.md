@@ -25,16 +25,16 @@
 | Rules | 69–70 |
 |   1. Skill level | 71–125 |
 |   2. Special values | 126–171 |
-|   3. Skill damage | 172–271 |
-|   4. Mana cost | 272–293 |
-|   5. To-hit | 294–301 |
-|   6. Learning a skill | 302–329 |
-| Constants & data dependencies | 330–352 |
-| Randomness | 353–363 |
-| Edge cases & original bugs | 364–386 |
-| Test vectors | 387–423 |
-| Provenance | 424–443 |
-| Open questions | 444–467 |
+|   3. Skill damage | 172–288 |
+|   4. Mana cost | 289–310 |
+|   5. To-hit | 311–318 |
+|   6. Learning a skill | 319–346 |
+| Constants & data dependencies | 347–369 |
+| Randomness | 370–381 |
+| Edge cases & original bugs | 382–404 |
+| Test vectors | 405–441 |
+| Provenance | 442–461 |
+| Open questions | 462–483 |
 <!-- /index -->
 
 ## Summary
@@ -263,8 +263,25 @@ synergy.
   callers): `len = elem_len`, `a = elem_min(…, 1)`, `b = elem_max(…,
   1)` (formulas evaluated in this order), `v = a + roll(b − a)`; then
   `0x0056C8E0(unit, record, EType, v, len, 0, 0)` puts `v` and `len`
-  into the record by element (`combat/damage.md` §1; Open question 4).
-  Returns `v`.
+  into the record by element (below). Returns `v`.
+- `add_element(unit, record, e, v, len, &res, &e_out)` = `0x0056C8E0`
+  (ECX unit, EDX record; `ret 0x14`): e = 10 (random): one step of the
+  unit's seed, e = {1, 2, 4, 5}[`lo' & 3`] (table `0x006E1278`), `len ≤
+  0` → 50, and `e_out` (if given) := e. Then by e (`combat/damage.md`
+  §1 offsets): 1 fire += v, hit class 0x20, res 39; 2 lightning += v,
+  0x40, res 41; 3 magic += v, res 37; 4 cold += v, cold length := len,
+  0x30, res 43; 5 poison += v, poison length := len, 0x50, res 45; 6
+  life leech += v; 7 mana leech += v; 8 stamina leech += v; 9 stun
+  length += v + len, 0x60; 11 burn += v, burn length := len; 12 cold +=
+  v, freeze length := len, 0x30, res 43; any other e (0, after the
+  remap never 10): physical += v. `res` (if given) := the resist stat,
+  −1 for 6–9, 11 and physical. Jump table `0x0056CA0C`.
+  "Hit class h" is a plain u32 store: record +0x60 := h, replacing
+  whatever was there (not or-ed, not a nibble); e = 3, 6, 7, 8, 11 and
+  physical leave +0x60 unchanged. The value goes to its field by `+=`;
+  the lengths by `:=` (except stun: length += v + len). `len ≤ 0` → 50
+  applies only on the e = 10 path; a given e uses `len` as passed.
+  1.14d-confirmed (asm of `0x0056C8E0`).
 
 `roll(n)` with `n < 1` does not step (`sim/rng.md` §3). Rolled values
 are below the maximum by at least one 1/256 point.
@@ -356,6 +373,7 @@ Dopplezon, Teleport, Bone Prison, Summon Resist, Double Swing.
 |---|---|---|---|---|---|
 | `0x0056E170` | rolling unit (+0x20) | `roll(n)` `0x0045C3E0` | `n = max − min` | physical | `n < 1` |
 | `0x0056E0C0` | rolling unit | `roll(n)` | `n = max − min` | elemental | `n < 1` |
+| `0x0056C8E0` | rolling unit | inline step, `lo' & 3` | 4 | element of EType 10 (random), after the roll | e ≠ 10 |
 
 Formula `rand()` draws on the context unit's seed
 (`data/calc-expressions.md` §Randomness); 1.14d uses it once (Imp
@@ -451,9 +469,7 @@ Mechanical check (M05, to add with the code): `skillcalc.tsv` and
 3. Who writes the entry level bonus (+0x2C) and how oskill entries are
    created. Ghidra: writers of `[entry+0x2C]` near `0x00643000`–
    `0x00648FFF` (D2MOO `D2Common_11030/11031`).
-4. `0x0056C8E0` (puts rolled elemental damage into the record by
-   EType): which field for each EType and what `len` sets. Ghidra:
-   read it; owner `combat/damage.md`.
+4. Answered: `0x0056C8E0` is `add_element` (§3.6).
 5. Results 2/3 of the 0x3B validator and what the client sees:
    `sim/intents-events.md`.
 6. Skills `range` getter (D2MOO `SKILLS_GetRange`) not located;

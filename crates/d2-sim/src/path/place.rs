@@ -126,7 +126,8 @@ where
     host.or_flags2(unit, bits);
     host.room_change_messages(unit);
     host.set_player_point(unit, p.x, p.y);
-    // Rule 7: the position history (wall-clock) stays out of d2-sim.
+    // Rule 7: the position history write (`0x00554FD0`).
+    host.history_write(unit, p.x, p.y);
     host.schedule_event(unit, PLACE_TIMER_EVENT, PLACE_TIMER_DELAY);
     host.pets_follow(unit);
     Ok(true)
@@ -164,18 +165,18 @@ where
 }
 
 /// Game entry `0x005394A0` for a player not yet placed (§11): the spawn
-/// point of the act's start level with tile index 0, S→C 0x07 for the
-/// spawn room, `0x00554850` puts the player in the world, S→C 0x15 with
-/// flag 1. `size` is the size argument the entry passes to `0x0061B060`
-/// (TODO(spec: path-placement.md §11, game entry's size argument)).
-/// `Ok(false)`: no spawn room (TODO(spec: what game entry does then)).
+/// point of the act's start level with tile index 0 and size = the
+/// unit's size (`0x00620510`, 2 for a player); no spawn room is a fatal
+/// assert ([`PlaceError::NoSpawnRoom`]); S→C 0x07 for the spawn room,
+/// `0x00554850(flag 0)` puts the player in the world (the room-changed
+/// flag is set), S→C 0x15 with flag 1. Every message goes to the
+/// player's own client.
 pub fn game_entry<C, H, L>(
     cv: &mut C,
     host: &mut H,
     levels: &mut L,
     player: C::Unit,
     act: L::Act,
-    size: i32,
 ) -> Result<bool, PlaceError>
 where
     C: CollisionView,
@@ -183,8 +184,9 @@ where
     L: LevelView<C::Room>,
 {
     let level = levels.act_start_level(act);
+    let size = cv.unit_size(player);
     let Some((room, p)) = level_spawn_point(cv, levels, Some(act), level, 0, size)? else {
-        return Ok(false);
+        return Err(PlaceError::NoSpawnRoom);
     };
     let reveal = levels.room_reveal(room);
     host.send(
@@ -212,9 +214,9 @@ where
 /// point of `level` with the caller's tile index, then
 /// `0x00554EA0(exact 0, alt 0)` there, so the free search runs twice.
 /// The rest of `0x0053AEC0` and the act change (`0x00537340` +
-/// `0x0053ACC0`) are not in this spec. `size` as [`game_entry`]
-/// (TODO(spec: path-placement.md §11, level warp's size argument)).
-#[allow(clippy::too_many_arguments)]
+/// `0x0053ACC0`) are not in this spec. The size is the unit's size, as
+/// [`game_entry`]; no spawn room → nothing (`Ok(false)`, the player
+/// stays).
 pub fn level_warp_place<C, H, L>(
     cv: &mut C,
     host: &mut H,
@@ -223,15 +225,14 @@ pub fn level_warp_place<C, H, L>(
     act: L::Act,
     level: u32,
     tile_index: u32,
-    size: i32,
 ) -> Result<bool, PlaceError>
 where
     C: CollisionView,
     H: PlaceHost<C::Unit>,
     L: LevelView<C::Room>,
 {
+    let size = cv.unit_size(player);
     let Some((room, p)) = level_spawn_point(cv, levels, Some(act), level, tile_index, size)? else {
-        // TODO(spec: path-placement.md §11, level warp without a spawn room).
         return Ok(false);
     };
     place_unit(cv, host, levels, player, Some(room), p.x, p.y, false, false)
@@ -501,7 +502,7 @@ pub(crate) mod tests {
             spawn: Some((0, 2, 1)),
             ..Host::default()
         };
-        assert_eq!(game_entry(&mut g, &mut h, &mut lv, p, 0, 2), Ok(true));
+        assert_eq!(game_entry(&mut g, &mut h, &mut lv, p, 0), Ok(true));
         // The act's start level, tile index 0.
         assert_eq!(lv.spawn_calls, [(0, 1, 0)]);
         assert_eq!(
@@ -523,7 +524,7 @@ pub(crate) mod tests {
         };
         lv.spawn_calls.clear();
         assert_eq!(
-            level_warp_place(&mut g, &mut h, &mut lv, p, 0, 3, 5, 2),
+            level_warp_place(&mut g, &mut h, &mut lv, p, 0, 3, 5),
             Ok(true)
         );
         assert_eq!(lv.spawn_calls, [(0, 3, 5)]);

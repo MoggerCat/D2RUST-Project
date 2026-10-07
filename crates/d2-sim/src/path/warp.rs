@@ -47,8 +47,8 @@ pub fn warp_tile_preset<W: WarpTileView>(
     if lx == r.w || ly == r.h {
         return Ok(false);
     }
-    // Rule 3. 32-bit adds with the table's offsets: wrap, never trap
-    // (the original's integer arithmetic; lvlwarp values are data).
+    // Rule 3. 32-bit two's complement arithmetic (§12.2; the 1.14d
+    // lvlwarp values keep every result small).
     w.add_preset_unit(
         room,
         TILE_UNIT_TYPE,
@@ -119,8 +119,8 @@ where
     )? {
         return Ok(WarpOutcome::NotPlaced);
     }
-    // Rule 5.
-    // 32-bit adds with lvlwarp `ExitWalkX/Y` (data): wrap, never trap.
+    // Rule 5: from rule 2's point, not the point `0x00554EA0` may have
+    // moved the player to; 32-bit two's complement adds (§12.2).
     let (tx, ty) = (
         p.x.wrapping_add(dest.exit_walk_x),
         p.y.wrapping_add(dest.exit_walk_y),

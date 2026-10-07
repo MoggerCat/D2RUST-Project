@@ -1,4 +1,4 @@
-// Spec: specs/sim/intents-events.md
+// Spec: specs/sim/intents-events.md; specs/combat/vitals.md §5.1
 //! [`Intents`] and [`Tick`] on `d2_sim::game::Game` (§2.2–§2.4, §4;
 //! `tick.md` §3; client list order `unit-order.md` §7).
 //!
@@ -256,6 +256,11 @@ impl<D: EventDispatch, W: WorldHost<D>> Intents for SimGame<D, W> {
         self.game.frame
     }
 
+    /// The host world's object host tick ([`WorldHost::host_tick`]).
+    fn set_host_tick(&mut self, ms: u32) {
+        self.world.host_tick(&mut self.events, ms);
+    }
+
     /// `None` without player data, or without a staged position.
     fn point_state(&self, client: ClientId) -> Option<PointState> {
         let unit = self.player_unit(client)?;
@@ -360,14 +365,17 @@ impl<D: EventDispatch, W: WorldHost<D>> Intents for SimGame<D, W> {
 impl<D: EventDispatch + TickHooks, W: WorldHost<D>> Tick for SimGame<D, W> {
     /// `d2_sim::tick::tick` with `D` as the step hooks (`tick.md` §3:
     /// the wired dispatch's room, DRLG and population steps run; a
-    /// dispatch without them keeps the defaults). What the host's seams
+    /// dispatch without them keeps the defaults), then the host's
+    /// [`WorldHost::after_tick`]. What the host's seams
     /// sent during the tick ([`WorldHost::take_sent`]) is queued to the
     /// receivers' clients in send order (§3.2 rule 1: a player without a
     /// client receives nothing); a queueing failure is recorded in
     /// [`SimGame::tick_faults`]. Then the deferred item messages
-    /// (`handlers::items::moves::update_pass`, `inventory.md` §6.1).
+    /// (`handlers::items::moves::update_pass`, `inventory.md` §6.1), then
+    /// the client vitals sync ([`SimGame::vitals_sync`]).
     fn tick(&mut self, out: &mut dyn MessageSink) {
         tick::tick(&mut self.game, &mut self.events);
+        self.world.after_tick(&mut self.game, &mut self.events);
         for (unit, bytes) in self.world.take_sent(&mut self.events) {
             if let Some(c) = self.client_of(unit) {
                 if let Err(e) = out.queue(c, &bytes) {
@@ -376,5 +384,43 @@ impl<D: EventDispatch + TickHooks, W: WorldHost<D>> Tick for SimGame<D, W> {
             }
         }
         handlers::items::moves::update_pass(self, out);
+        self.vitals_sync(out);
+    }
+}
+
+impl<D: EventDispatch + TickHooks, W: WorldHost<D>> SimGame<D, W> {
+    /// The client vitals sync (`combat/vitals.md` §5.1 rule 1): every
+    /// flush with argument 1 runs `0x0052D980` for each client in game,
+    /// before its buffers are sent, so these messages end the tick's
+    /// batch. Single player flushes once after each tick that ran, so it
+    /// runs here, at the end of the tick, in client list order. A player
+    /// without a path record is at its staged position ([`UnitFacts`];
+    /// (0, 0) when none is staged). Off unless the host's world turns it
+    /// on (`WorldHost::vitals_sync`).
+    fn vitals_sync(&mut self, out: &mut dyn MessageSink) {
+        for c in self.clients() {
+            let Some(sc) = self.clients.get(&c).copied() else {
+                continue;
+            };
+            let staged = self
+                .game
+                .lists
+                .client(sc)
+                .and_then(|r| r.player)
+                .and_then(|p| self.units.get(&p))
+                .map_or((0, 0), |f| (f.pos.x as u16, f.pos.y as u16));
+            let queued = out.has_queued(c);
+            let Some(msgs) =
+                self.world
+                    .vitals_sync(&mut self.game, &mut self.events, sc, staged, queued)
+            else {
+                continue;
+            };
+            for m in msgs {
+                if let Err(e) = out.queue(c, &m) {
+                    self.tick_faults.push((c, WorldError::from(e)));
+                }
+            }
+        }
     }
 }

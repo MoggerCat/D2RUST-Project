@@ -33,10 +33,10 @@
 |   10. C→S 0x4C is not the cube | 394–408 |
 | Constants & data dependencies | 409–432 |
 | Randomness | 433–451 |
-| Edge cases & original bugs | 452–481 |
-| Test vectors | 482–526 |
-| Provenance | 527–565 |
-| Open questions | 566–590 |
+| Edge cases & original bugs | 452–486 |
+| Test vectors | 487–531 |
+| Provenance | 532–570 |
+| Open questions | 571–596 |
 <!-- /index -->
 
 ## Summary
@@ -269,7 +269,7 @@ made for kinds 0–3.
 
 | Case | Steps |
 |---|---|
-| flags & 0x0001 (`mod`, copy) | it = capture[j].item; page 0xFF, mode 4 (cursor); copy = duplicate(it, fillers = not remove[j]) (`0x0055A2A0`; D2MOO `ITEMS_Duplicate`); class by kind: 0xFC slot item; 0xFD type pick (§7.5) with L; 0xFE capture class if ≥ 0 else 0; 0xFF capture class; other 0. If the copy exists its class := that value. Item init `0x00557AB0(game, &copy, 0, 0)` (owner: items) — out[j] = the result; mode 4; it page := 3 |
+| flags & 0x0001 (`mod`, copy) | it = capture[j].item; page 0xFF, mode 4 (cursor); copy = duplicate(it, fillers = not remove[j]) (`0x0055A2A0`, `world/vendors.md` §7.3; D2MOO `ITEMS_Duplicate`); class by kind: 0xFC slot item; 0xFD type pick (§7.5) with L; 0xFE capture class if ≥ 0 else 0; 0xFF capture class; other 0. If the copy exists its class := that value. Item init `0x00557AB0(game, &copy, 0, 0)` (owner: items) — out[j] = the result; mode 4; it page := 3 |
 | kind 0xFE (`useitem`) | it = capture[j].item; page 0xFF, mode 4; out[j] = duplicate(it, fillers = not remove[j]); mode 4; it page := 3. Capture class (`exc`/`eli`) is **not** used. Quality byte 9: prefix = `0x005C1BC0(out, 1)`, suffix = `0x005C1BC0(out, 0)` (tempered affix rolls, owner: items); both ≠ 0 → quality 9, rare prefix and suffix set (`0x00627EA0`, `0x00628010`, `0x00628070`); else craft := 0 |
 | kind 0xFF, 0xFC, 0xFD | create through an item request (§7.4) |
 | any other kind | nothing (out[j] none) |
@@ -478,6 +478,11 @@ All reproduced by default.
 13. `rep` with `qty` refills stackables; rows 137–140 use `qty=255`, so a
   repaired throwing weapon gets its full stack.
 14. 0x2A ignores the placement result (§2 step 3.5).
+15. 0x2A with a ground item (mode 3, accepted by §2 steps 1 and 3.4)
+   sets its page to 3 and then `0x00560200` refuses it (it places only
+   mode-4 items, `items/inventory.md` §2.4 step 2): the item stays on
+   the ground with page byte 3, handler result 0 (`0x005628C0`). In
+   1.14d a ground item never enters the cube through 0x2A.
 
 ## Test vectors
 
@@ -581,9 +586,10 @@ jump table, `0x00566AA8` op jump table, the two Pandemonium stubs at
    V22; the owners' specs.
 5. Inventory list order of `0x0063B2C0`/`0x0063DFA0` (decides capture
    with quantity > 1 and removal order). Owner: inventory spec.
-6. 0x2A when placement fails (full cube): item left with page 3? Settle:
-   Ghidra `0x00560200` failure path, or a recording putting an item into
-   a full cube.
+6. Answered: `0x00560200` changes nothing on a failed placement
+   (`items/inventory.md` §2.4 step 4), so after 0x2A the item stays
+   where it was (the cursor, mode 4) with its page byte set to 3; a
+   ground item is refused the same way (edge case 15).
 7. Cube-use table base and index (`0x007417CC`, `pSpell` 7?). Owner:
    item-use spec.
-8. Role of `0x0055FA40` on open/close. Owner: inventory/UI spec.
+8. Answered: `0x0055FA40` recounts the scroll/tome skill quantities (stored items on page 0 only); `items/inventory.md` §5.5.

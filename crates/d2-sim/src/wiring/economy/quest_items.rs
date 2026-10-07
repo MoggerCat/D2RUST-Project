@@ -1,4 +1,4 @@
-// Spec: specs/world/quests.md §4.4, §4.5, §9; specs/sim/units.md §2; specs/sim/stat-lists.md §5
+// Spec: specs/world/quests.md §4.4, §4.5, §9; specs/world/quests-act1-rest.md §8; specs/sim/units.md §2; specs/sim/stat-lists.md §5
 //! [`QuestWorld`] on the real providers: game fields ([`GameFields`]),
 //! the frame and unit lookups ([`crate::game::Game`]), unit records
 //! (GUID, class, unit seed), stat lists (stat reads and adds) and the
@@ -8,9 +8,11 @@
 //! [`GameFields`]: super::GameFields
 
 use super::Economy;
+use crate::game::Game;
 use crate::rng::Seed;
+use crate::stats::StatLists;
 use crate::units::lifecycle::LifecycleHooks;
-use crate::units::{UnitId, UnitType};
+use crate::units::{RoomId, UnitId, UnitType};
 use crate::world::quests::{PlayerQuests, QuestChain, QuestWorld, UnitKind};
 
 /// The quest calls no written spec provides yet, each with its expected
@@ -32,7 +34,11 @@ pub trait QuestRest {
     fn unit_level(&self, unit: UnitId) -> Option<u32>;
     /// Superunique hcIdx and minion owner (monsters spec).
     fn unit_kind(&self, unit: UnitId) -> UnitKind;
+    /// `quests.md` §10.5 J3's room test (DRLG rooms).
     fn players_near(&self, unit: UnitId) -> Vec<UnitId>;
+    /// The party list at game +0x1D2C (no party spec; `quests.md` open
+    /// question 7).
+    fn party_members(&self, player: UnitId) -> Option<Vec<UnitId>>;
     fn attach_sound(&mut self, player: UnitId, sound: u16);
     fn send(&mut self, player: UnitId, msg: &[u8]);
     fn send_text_list(&mut self, player: UnitId, npc: UnitId, list: &[(u16, u32)]);
@@ -67,9 +73,114 @@ pub trait QuestRest {
     ) -> Option<(i32, i32)>;
     fn create_portal(&mut self, player: UnitId, x: i32, y: i32, class: u16, level: u32) -> bool;
     fn schedule_quest_event(&mut self, object: UnitId, frame: i32);
-    fn set_object_opened(&mut self, object: UnitId);
+    /// Object mode (+0x10) and `0x00624690` (objects spec).
+    fn object_mode(&self, object: UnitId) -> i32;
+    fn set_object_mode(&mut self, object: UnitId, mode: i32);
     fn mercenary_reward(&mut self, player: UnitId, npc: u16);
+    /// Act I quest seams (`quests.md` §10.6–§10.8: paths, rooms,
+    /// monsters, objects; `QuestWorld` documents each).
+    fn unit_position(&self, unit: UnitId) -> Option<(i32, i32, RoomId)>;
+    fn room_contains(&self, room: RoomId, x: i32, y: i32) -> bool;
+    fn room_at(&self, room: RoomId, x: i32, y: i32) -> Option<RoomId>;
+    #[allow(clippy::too_many_arguments)]
+    fn free_spot_at(
+        &mut self,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        size: u32,
+        mask: u32,
+        radius: u32,
+        limit: u32,
+    ) -> Option<(i32, i32, RoomId)>;
+    #[allow(clippy::too_many_arguments)]
+    fn spawn_monster(
+        &mut self,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        class: u16,
+        mode: u8,
+        r: u32,
+    ) -> Option<UnitId>;
+    fn or_unit_flags(&mut self, unit: UnitId, flags: u32);
+    fn monsters(&self) -> Vec<UnitId>;
+    fn npc_chat_clients(&self, npc: UnitId) -> Option<Vec<UnitId>>;
+    fn remove_monster(&mut self, monster: UnitId);
+    fn drop_preset_monster(&mut self, act: u8, class: u16);
+    fn find_object_near(&self, object: UnitId, class: u16) -> Option<UnitId>;
+    fn create_object(&mut self, room: RoomId, x: i32, y: i32, class: u16) -> Option<UnitId>;
+    fn object_anim_length(&self, object: UnitId) -> i32;
+    fn schedule_object_event(&mut self, object: UnitId, ev: u8, frame: i32);
+    fn open_quest_message(&mut self, player: UnitId, object: UnitId, msg: u16);
     fn unhandled(&mut self, chain: u8, function: u32);
+
+    // Act I remainder seams (`quests-act1-rest.md`; `QuestWorld`
+    // documents each). A host that does not provide one reports the 1.14d
+    // function through `unhandled` (chain 0xFF) and fails.
+    #[allow(clippy::too_many_arguments)]
+    fn spawn_monster_flags(
+        &mut self,
+        _room: RoomId,
+        _x: i32,
+        _y: i32,
+        _class: u16,
+        _mode: u8,
+        _spread: i32,
+        _flags: u32,
+    ) -> Option<UnitId> {
+        self.unhandled(0xFF, 0x005B_2F20);
+        None
+    }
+    #[allow(clippy::too_many_arguments)]
+    fn open_portal(
+        &mut self,
+        _owner: Option<UnitId>,
+        _room: RoomId,
+        _x: i32,
+        _y: i32,
+        _level: u32,
+        _class: u16,
+        _exact: bool,
+    ) -> Option<UnitId> {
+        self.unhandled(0xFF, 0x0056_D130);
+        None
+    }
+    fn create_missile(
+        &mut self,
+        _owner: UnitId,
+        _skill: u16,
+        _level: u8,
+        _class: u16,
+        _x: i32,
+        _y: i32,
+    ) -> Option<UnitId> {
+        self.unhandled(0xFF, 0x0056_EDE0);
+        None
+    }
+    fn set_missile_target(&mut self, _missile: UnitId, _a: u32, _b: u32) {
+        self.unhandled(0xFF, 0x0064_A710);
+    }
+    fn refresh_room(&mut self, _unit: UnitId) {
+        self.unhandled(0xFF, 0x0061_AED0);
+    }
+    fn spawn_object(
+        &mut self,
+        _room: RoomId,
+        _x: i32,
+        _y: i32,
+        _class: u16,
+        _mode: i32,
+    ) -> Option<UnitId> {
+        self.unhandled(0xFF, 0x0055_5230);
+        None
+    }
+    fn client_save_flags(&self, _player: UnitId) -> Option<u16> {
+        None
+    }
+    fn set_client_save_flags(&mut self, _player: UnitId, _flags: u16) {
+        self.unhandled(0xFF, 0x0053_8680);
+    }
 }
 
 /// The quests' world: the economy plus the rest.
@@ -78,9 +189,59 @@ pub struct EconomyQuests<'e, 'a, H, R> {
     pub rest: &'e mut R,
     /// Where the mercenary rewards `0x00579180` go when the caller runs
     /// them on the NPC control block after the quest call
-    /// ([`crate::wiring::interaction::Desk::quest_message`]); `None`:
+    /// ([`crate::wiring::interaction::Desk::quest_message`]), with the
+    /// sends that follow a reward in the call; `None`:
     /// [`QuestRest::mercenary_reward`].
-    pub mercenaries: Option<&'e mut Vec<(UnitId, u16)>>,
+    pub deferred: Option<&'e mut Vec<QuestDeferred>>,
+}
+
+/// A quest-call effect the caller runs after the call, in list order
+/// ([`EconomyQuests::deferred`]).
+///
+/// The reward needs the NPC control block, which the quest call cannot
+/// reach, so it is queued; every send (`send`, `send_text_list`) the call
+/// makes after a queued reward is queued behind it, so the reward's
+/// messages (its 0x50 and the hireling's creation messages) precede them
+/// as in 1.14d (`quests-act1-rest.md` §8 item 8: Kashya's message 92
+/// sends 0x28, rewards, then refreshes the text, 0x27 / 0x29). Other
+/// effects are not queued: none follows the reward in the 1.14d call,
+/// and the reward reads no quest state, nor the refresh hireling state.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum QuestDeferred {
+    /// `0x00579180(npc)` for `player`.
+    Mercenary { player: UnitId, npc: u16 },
+    /// [`QuestRest::send`].
+    Send { player: UnitId, msg: Vec<u8> },
+    /// [`QuestRest::send_text_list`].
+    TextList {
+        player: UnitId,
+        npc: UnitId,
+        list: Vec<(u16, u32)>,
+    },
+}
+
+impl QuestDeferred {
+    /// Sends a queued message through `rest`; a mercenary reward is
+    /// handed back for the caller to run on the NPC control block.
+    pub fn run<R: QuestRest + ?Sized>(self, rest: &mut R) -> Option<(UnitId, u16)> {
+        match self {
+            Self::Mercenary { player, npc } => return Some((player, npc)),
+            Self::Send { player, msg } => rest.send(player, &msg),
+            Self::TextList { player, npc, list } => rest.send_text_list(player, npc, &list),
+        }
+        None
+    }
+}
+
+/// "Every player" of the quest code, `0x005537D0(game, 0, …)`
+/// (`quests-act1-rest.md` §8 item 9): the player hash walk, buckets
+/// 0 … 127 each from its head (`unit-order.md` §2 r4), without the
+/// players in state 7 (`0x00639DF0`, §2 r5). The early stop at a callback
+/// returning 1 is the caller's.
+pub fn quest_players(game: &Game, stats: &StatLists) -> Vec<UnitId> {
+    let mut out = game.lists.units_of_type(UnitType::Player);
+    out.retain(|&u| !stats.has_state(u, 7));
+    out
 }
 
 impl<'e, 'a, H, R> EconomyQuests<'e, 'a, H, R> {
@@ -88,8 +249,14 @@ impl<'e, 'a, H, R> EconomyQuests<'e, 'a, H, R> {
         Self {
             econ,
             rest,
-            mercenaries: None,
+            deferred: None,
         }
+    }
+
+    /// The queue when a reward is already in it (the sends then follow
+    /// it, [`QuestDeferred`]).
+    fn behind_reward(&mut self) -> Option<&mut Vec<QuestDeferred>> {
+        self.deferred.as_deref_mut().filter(|q| !q.is_empty())
     }
 }
 
@@ -126,8 +293,9 @@ impl<H: LifecycleHooks, R: QuestRest> QuestWorld for EconomyQuests<'_, '_, H, R>
         self.rest.has_act2()
     }
 
+    /// [`quest_players`] on the game's lists and stat lists.
     fn players(&self) -> Vec<UnitId> {
-        self.rest.players()
+        quest_players(self.econ.game, self.econ.stats)
     }
     fn first_client_player(&self) -> Option<UnitId> {
         self.rest.first_client_player()
@@ -169,6 +337,10 @@ impl<H: LifecycleHooks, R: QuestRest> QuestWorld for EconomyQuests<'_, '_, H, R>
     fn stat(&self, unit: UnitId, stat: u16) -> i32 {
         self.econ.stats.unit_total(unit, stat, 0)
     }
+    /// `0x006253B0`, layer 0.
+    fn base_stat(&self, unit: UnitId, stat: u16) -> i32 {
+        self.econ.stats.unit_base(unit, stat, 0)
+    }
     /// `0x006272B0`, layer 0.
     fn add_stat(&mut self, unit: UnitId, stat: u16, delta: i32) {
         let e = &mut *self.econ;
@@ -200,12 +372,28 @@ impl<H: LifecycleHooks, R: QuestRest> QuestWorld for EconomyQuests<'_, '_, H, R>
     fn players_near(&self, unit: UnitId) -> Vec<UnitId> {
         self.rest.players_near(unit)
     }
+    fn party_members(&self, player: UnitId) -> Option<Vec<UnitId>> {
+        self.rest.party_members(player)
+    }
 
     fn send(&mut self, player: UnitId, msg: &[u8]) {
-        self.rest.send(player, msg)
+        match self.behind_reward() {
+            Some(q) => q.push(QuestDeferred::Send {
+                player,
+                msg: msg.to_vec(),
+            }),
+            None => self.rest.send(player, msg),
+        }
     }
     fn send_text_list(&mut self, player: UnitId, npc: UnitId, list: &[(u16, u32)]) {
-        self.rest.send_text_list(player, npc, list)
+        match self.behind_reward() {
+            Some(q) => q.push(QuestDeferred::TextList {
+                player,
+                npc,
+                list: list.to_vec(),
+            }),
+            None => self.rest.send_text_list(player, npc, list),
+        }
     }
 
     /// An inventory item whose items record `code` is `code`.
@@ -217,6 +405,11 @@ impl<H: LifecycleHooks, R: QuestRest> QuestWorld for EconomyQuests<'_, '_, H, R>
         self.inventory_records(player)
             .iter()
             .any(|(_, r)| r.code == code)
+    }
+    /// The item's items record code (`0x00628590`).
+    fn item_code(&self, item: UnitId) -> Option<[u8; 4]> {
+        let rec = self.econ.items.get(item)?.record;
+        Some(self.econ.tables.item(rec)?.code)
     }
     fn delete_item(&mut self, player: UnitId, code: [u8; 4]) {
         self.rest.delete_item(player, code)
@@ -267,16 +460,148 @@ impl<H: LifecycleHooks, R: QuestRest> QuestWorld for EconomyQuests<'_, '_, H, R>
     fn schedule_quest_event(&mut self, object: UnitId, frame: i32) {
         self.rest.schedule_quest_event(object, frame)
     }
-    fn set_object_opened(&mut self, object: UnitId) {
-        self.rest.set_object_opened(object)
+    fn object_mode(&self, object: UnitId) -> i32 {
+        self.rest.object_mode(object)
+    }
+    fn set_object_mode(&mut self, object: UnitId, mode: i32) {
+        self.rest.set_object_mode(object, mode)
+    }
+    /// `0x00552F60` type 2: the game's unit lists, class from the record.
+    fn object_by_guid(&self, guid: u32) -> Option<(UnitId, u16)> {
+        let u = self.econ.game.lists.find_unit(UnitType::Object, guid)?;
+        Some((u, self.of_type(u, UnitType::Object)?.class as u16))
     }
     fn mercenary_reward(&mut self, player: UnitId, npc: u16) {
-        match self.mercenaries.as_mut() {
-            Some(q) => q.push((player, npc)),
+        match self.deferred.as_mut() {
+            Some(q) => q.push(QuestDeferred::Mercenary { player, npc }),
             None => self.rest.mercenary_reward(player, npc),
         }
     }
+    fn unit_position(&self, unit: UnitId) -> Option<(i32, i32, RoomId)> {
+        self.rest.unit_position(unit)
+    }
+    fn room_contains(&self, room: RoomId, x: i32, y: i32) -> bool {
+        self.rest.room_contains(room, x, y)
+    }
+    fn room_at(&self, room: RoomId, x: i32, y: i32) -> Option<RoomId> {
+        self.rest.room_at(room, x, y)
+    }
+    #[allow(clippy::too_many_arguments)]
+    fn free_spot_at(
+        &mut self,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        size: u32,
+        mask: u32,
+        radius: u32,
+        limit: u32,
+    ) -> Option<(i32, i32, RoomId)> {
+        self.rest
+            .free_spot_at(room, x, y, size, mask, radius, limit)
+    }
+    #[allow(clippy::too_many_arguments)]
+    fn spawn_monster(
+        &mut self,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        class: u16,
+        mode: u8,
+        r: u32,
+    ) -> Option<UnitId> {
+        self.rest.spawn_monster(room, x, y, class, mode, r)
+    }
+    fn or_unit_flags(&mut self, unit: UnitId, flags: u32) {
+        self.rest.or_unit_flags(unit, flags)
+    }
+    fn monsters(&self) -> Vec<UnitId> {
+        self.rest.monsters()
+    }
+    fn npc_chat_clients(&self, npc: UnitId) -> Option<Vec<UnitId>> {
+        self.rest.npc_chat_clients(npc)
+    }
+    fn remove_monster(&mut self, monster: UnitId) {
+        self.rest.remove_monster(monster)
+    }
+    fn drop_preset_monster(&mut self, act: u8, class: u16) {
+        self.rest.drop_preset_monster(act, class)
+    }
+    fn find_object_near(&self, object: UnitId, class: u16) -> Option<UnitId> {
+        self.rest.find_object_near(object, class)
+    }
+    fn create_object(&mut self, room: RoomId, x: i32, y: i32, class: u16) -> Option<UnitId> {
+        self.rest.create_object(room, x, y, class)
+    }
+    fn object_anim_length(&self, object: UnitId) -> i32 {
+        self.rest.object_anim_length(object)
+    }
+    fn schedule_object_event(&mut self, object: UnitId, ev: u8, frame: i32) {
+        self.rest.schedule_object_event(object, ev, frame)
+    }
+    fn open_quest_message(&mut self, player: UnitId, object: UnitId, msg: u16) {
+        self.rest.open_quest_message(player, object, msg)
+    }
     fn unhandled(&mut self, chain: u8, function: u32) {
         self.rest.unhandled(chain, function)
+    }
+    fn spawn_monster_flags(
+        &mut self,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        class: u16,
+        mode: u8,
+        spread: i32,
+        flags: u32,
+    ) -> Option<UnitId> {
+        self.rest
+            .spawn_monster_flags(room, x, y, class, mode, spread, flags)
+    }
+    fn open_portal(
+        &mut self,
+        owner: Option<UnitId>,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        level: u32,
+        class: u16,
+        exact: bool,
+    ) -> Option<UnitId> {
+        self.rest
+            .open_portal(owner, room, x, y, level, class, exact)
+    }
+    fn create_missile(
+        &mut self,
+        owner: UnitId,
+        skill: u16,
+        level: u8,
+        class: u16,
+        x: i32,
+        y: i32,
+    ) -> Option<UnitId> {
+        self.rest.create_missile(owner, skill, level, class, x, y)
+    }
+    fn set_missile_target(&mut self, missile: UnitId, a: u32, b: u32) {
+        self.rest.set_missile_target(missile, a, b)
+    }
+    fn refresh_room(&mut self, unit: UnitId) {
+        self.rest.refresh_room(unit)
+    }
+    fn spawn_object(
+        &mut self,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        class: u16,
+        mode: i32,
+    ) -> Option<UnitId> {
+        self.rest.spawn_object(room, x, y, class, mode)
+    }
+    fn client_save_flags(&self, player: UnitId) -> Option<u16> {
+        self.rest.client_save_flags(player)
+    }
+    fn set_client_save_flags(&mut self, player: UnitId, flags: u16) {
+        self.rest.set_client_save_flags(player, flags)
     }
 }

@@ -31,15 +31,15 @@
 |   7. Uniques (mode 3) | 204–207 |
 |   8. Set items | 208–218 |
 |   9. Socket fillers (`0x0055C2C0`) | 219–234 |
-|   10. Runewords | 235–255 |
-|   11. Set bonuses (`0x00660120`) | 256–268 |
-|   12. Craft property lists (`0x00660240`) | 269–274 |
-| Constants & data dependencies | 275–284 |
-| Randomness | 285–290 |
-| Edge cases & original bugs | 291–300 |
-| Test vectors | 301–319 |
-| Provenance | 320–338 |
-| Open questions | 339–345 |
+|   10. Runewords | 235–283 |
+|   11. Set bonuses (`0x00660120`) | 284–296 |
+|   12. Craft property lists (`0x00660240`) | 297–302 |
+| Constants & data dependencies | 303–312 |
+| Randomness | 313–318 |
+| Edge cases & original bugs | 319–328 |
+| Test vectors | 329–347 |
+| Provenance | 348–367 |
+| Open questions | 368–379 |
 <!-- /index -->
 
 ## Summary
@@ -244,6 +244,34 @@ fillers in order and cover at least the socket count; none of `etype1`–
 `etype3` (stop at 0) may match the item; any of `itype1`–`itype6` (stop
 at 0) must match. First matching row wins.
 
+Exact form (1.14d `0x0062BED0`, item → runes record or none):
+
+1. None for: no item; a unit of type 4 with item data whose quality
+   (item data +0x00) is 4–9; items `quest` (+0x12A) ≠ 0; no inventory
+   (unit +0x60); an empty inventory (no first item, inventory +0x0C).
+2. Filler class ids: walk the item's inventory list (first +0x0C, next
+   item data +0x64) and take each unit's class id (unit +4). A unit in
+   the list that is not an item (type ≠ 4) → none. Count c.
+3. c ≠ socket count (`0x006299B0`, u8) → none.
+4. For each runes record in row order (0x120 bytes): `complete` (+0x80)
+   = 0 → next. For i = 0…5 while `rune`i+1 (+0x98 + 4i) > 0: i > c →
+   next record; class id i ≠ `rune`i+1 → next record. The number of
+   runes matched must be ≥ c. Then `etype1`–`etype3` (+0x92, i16, stop
+   at 0): any match (itemtypes equivalence, `0x00629BB0`) → next
+   record. `itype1`–`itype6` (+0x86, stop at 0): the first match →
+   **return this record**.
+5. No record → none.
+
+The record's +0x82 (the name's string id, `data/fixups.md` §7 runes
+row) is what `items/bitstream.md` §4.4 rule 1 sends; d2rs's bit-stream
+writer gets the record from this rule (handoff BV5).
+
+Edge: a row with exactly c + 1 runes whose first c runes match compares
+rune c + 1 with class-id slot c, which step 2 never wrote (a stack value
+left from earlier calls; c ≤ 5 here, as at most 6 runes are read). It
+matches only if that stale value equals the rune's class id; d2rs
+treats the unset slot as "no class" (no match), Open question 4.
+
 #### 10.2 Activation (`0x00562660` → `0x006600A0`)
 
 After a filler is inserted and its properties applied (§9): row := §10.1.
@@ -325,7 +353,8 @@ Synthetic, from the rules:
   37 at `0x00745B54`), value roll `0x0065E9E0`, add `0x0065EA50`, list
   `0x0065CBF0`, base reset `0x0065CCC0`, functions per the TSV, skills
   `reqlevel` `0x00644710`, `maxlvl` `0x004AA8B0`, socket fill
-  `0x0055C2C0`, insertion `0x00562660`, runeword match `0x0062BED0`,
+  `0x0055C2C0`, insertion `0x00562660`, runeword match `0x0062BED0`
+  (disassembled; filler walk `0x0063B2C0`, `0x0063DFD0`, `0x0063DFA0`),
   activation `0x006600A0`, set bonuses `0x00660120`, set mask
   `0x0062A370`, craft list `0x00660240`, ethereal `0x0065E4D0`; state and
   flag tables `0x006EDB40`, `0x006EDB5C`, popcount `0x006EDA40`.
@@ -342,3 +371,8 @@ Synthetic, from the rules:
 2. The quality-5 socket-filler branch `0x00663CC0` is not specified.
 3. The owner-vs-item list choice in §4.2 is read from `0x0065CBF0`'s two
    branches and D2MOO; confirm the register mapping (Ghidra request G1).
+4. §10.1 edge: whether the stale class-id slot can ever equal a rune's
+   class id in 1.14d (it would let a socketed item take a runeword one
+   rune longer than its sockets). Settle: a stack trace of the slot at
+   `0x0062BFBA` for a 2-socket item of a 3-rune word, or accept d2rs's
+   "no match".

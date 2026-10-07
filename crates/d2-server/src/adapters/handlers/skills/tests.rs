@@ -14,9 +14,8 @@ use d2_data::tables::{Charstats, Experience, Itemstatcost, Record, Skilldesc, Sk
 use d2_sim::combat::vitals::VitalsTables;
 use d2_sim::combat::CombatTables;
 use d2_sim::game::Game;
-use d2_sim::missiles::MissileParams;
 use d2_sim::rng::Seed;
-use d2_sim::skills::use_::{MissileAim, ModeTarget, ServerMsg, UseState};
+use d2_sim::skills::use_::{ModeTarget, ServerMsg, UseState};
 use d2_sim::skills::{SkillEntry, SkillTables, LEVEL_CAP_114D};
 use d2_sim::stats::{StatData, StatTable};
 use d2_sim::units::anim::AnimError;
@@ -121,19 +120,23 @@ fn skill_rec() -> Skills {
 
 /// Skill ids of the synthetic table.
 const ATTACK: i32 = 0;
-/// Multiple Shot as `use.md` gives it: srvst 4; mana 4, +1, shift 8.
+/// Multiple Shot as `use.md` gives it: srvst 42; mana 4, +1, shift 8.
 const MULTI: i32 = 1;
-/// Might: aura, immediate, perdelay 50, srvdo 65.
+/// Might: aura, immediate, perdelay 50, srvdo 111.
 const MIGHT: i32 = 2;
 /// A learnable skill: max level 3.
 const LEARN: i32 = 3;
 
+/// Start slot of the synthetic start skills: srvst 42 (status `mapped`)
+/// stands in for Multiple Shot's srvst 4, whose body (`skills/bodies.md`
+/// §3.4, ammunition) now runs on the wired host; the do slot 66 stands
+/// in for Might's 65 (§4.5) the same way, so the fake's seam answers.
 fn skills() -> SkillTables {
     let mut v: Vec<Skills> = (0..4).map(|_| skill_rec()).collect();
     let m = &mut v[MULTI as usize];
-    (m.srvstfunc, m.mana, m.lvlmana, m.manashift) = (4, 4, 1, 8);
+    (m.srvstfunc, m.mana, m.lvlmana, m.manashift) = (42, 4, 1, 8);
     let m = &mut v[MIGHT as usize];
-    (m.aura, m.immediate, m.perdelay, m.srvdofunc, m.aurastate) = (true, true, 0, 65, 33);
+    (m.aura, m.immediate, m.perdelay, m.srvdofunc, m.aurastate) = (true, true, 0, 111, 33);
     v[LEARN as usize].maxlvl = 3;
     SkillTables {
         skills: v,
@@ -305,7 +308,6 @@ impl UseRest for Book {
             .copied()
             .unwrap_or(UseState::Usable)
     }
-    fn dec_quantity(&mut self, _: UnitId, _: i32) {}
     fn shapeshifted(&self, _: UnitId) -> bool {
         false
     }
@@ -347,7 +349,6 @@ impl UseRest for Book {
         false
     }
     fn set_aura_state(&mut self, _: UnitId, _: u16, _: i32, _: i32) {}
-    fn skill_missile_fill(&self, _: UnitId, _: bool, _: MissileAim, _: &mut MissileParams) {}
     fn srvst(&mut self, index: u16, _: UnitId, skill: i32, lvl: i32) -> i32 {
         self.get().log.push(format!("srvst {index} {skill} {lvl}"));
         1
@@ -614,7 +615,7 @@ fn right_skill_at_point_starts_and_charges_at_start() {
     assert_eq!(fx.take_errors(), [no_anim_record()]);
     assert_eq!(fx.stat(8), 4000 - 3328);
     assert_eq!(fx.book().used, Some(entry(MULTI, 10)));
-    assert_eq!(fx.book().log, ["srvst 4 1 10"]);
+    assert_eq!(fx.book().log, ["srvst 42 1 10"]);
     // The point validator stored the frame (player data +0x168).
     let p = fx.player;
     let data = fx.host.game.player_fields(p).unwrap().data;
@@ -744,7 +745,7 @@ fn select_skill_might_and_refusals() {
     );
     assert_eq!(
         fx.book().log,
-        ["right 2", "srvdo 65 2 1 true false false", "left 0"]
+        ["right 2", "srvdo 111 2 1 true false false", "left 0"]
     );
     let g = &fx.host.game.game;
     let timers: Vec<_> = g

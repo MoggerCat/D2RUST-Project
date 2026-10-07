@@ -114,9 +114,9 @@ messages! {
         0x97 WeaponSwitch, 0xB0 ConnectionTerminated,
     ]
     built: [
-        0x0D PlayerStop, 0x28 QuestInfo, 0x29 GameQuestInfo, 0x2A NpcTransaction,
-        0x4E MercForHire, 0x50 QuestSpecial, 0x52 QuestLogInfo, 0x58 OpenUi,
-        0x5D QuestItemState, 0x63 WaypointMenu, 0x77 TradeAction, 0x89 UniqueEvent,
+        0x0B GameHandshake, 0x0D PlayerStop, 0x28 QuestInfo, 0x29 GameQuestInfo,
+        0x2A NpcTransaction, 0x4E MercForHire, 0x50 QuestSpecial, 0x52 QuestLogInfo,
+        0x58 OpenUi, 0x59 AssignPlayer, 0x5D QuestItemState, 0x63 WaypointMenu, 0x77 TradeAction, 0x89 UniqueEvent,
         0x8A NpcWantsInteract, 0x91 NpcGossipAct, 0x9B Unknown9B,
     ]
 }

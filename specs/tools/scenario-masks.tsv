@@ -1,0 +1,10 @@
+id	offset	length	source
+0x21	11	1	specs/tools/original-hooks.md §6.2 (builder 0x0053C4A0: byte 11 not written)
+0x22	2	1	specs/tools/original-hooks.md §6.2 (builder 0x0053C520: bytes 2 and 10 not written)
+0x22	10	1	specs/tools/original-hooks.md §6.2 (builder 0x0053C520: bytes 2 and 10 not written)
+0x2A	3	4	specs/world/npc.md §9 (builder table: bytes 3-6 not written), edge case 1
+0x50	13	2	specs/world/quests.md open question 5 (stone-order 0x50: bytes 13-14 uninitialized stack in the sender)
+0x58	6	1	specs/world/npc.md §8.1, edge case 10 (byte 6 not written)
+0x62	6	1	specs/tools/original-hooks.md §6.2 (builder 0x0053D6D0: byte 6 not written)
+0x7E	1	4	specs/tools/original-hooks.md §6.2 (builder 0x0053DB70: only the id is written)
+0x8F	1	*	specs/sim/intents-events.md §6 rule 3, §4 rule 4 (Pong: clock values, transport row)

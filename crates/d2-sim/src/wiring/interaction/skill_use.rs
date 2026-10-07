@@ -1,4 +1,4 @@
-// Spec: specs/skills/use.md §1–§7; specs/missiles/missiles.md §R2; specs/sim/units.md §4.1; specs/sim/tick.md §5.2–§5.4; specs/sim/stat-lists.md §4, §8.1, §9.2
+// Spec: specs/skills/use.md §1–§7; specs/skills/bodies.md (BodyWorld); specs/missiles/missiles.md §R2; specs/sim/units.md §4.1; specs/sim/tick.md §5.2–§5.4; specs/sim/stat-lists.md §4, §8.1, §9.2
 //! Skill use → missiles, combat and the timers: the seams of
 //! [`crate::skills::use_`] on the action wiring's providers.
 //!
@@ -11,8 +11,12 @@
 //! same addresses), the room kind, timer scheduling and deletion, the
 //! skill-delay and aura state lists, stat writes, and missile creation
 //! through [`crate::missiles::create_missile`] on the real missile store.
-//! The skill list, player data, paths, items and per-skill bodies have
-//! no provider: [`UseRest`], implemented by the same
+//! The skill bodies of `functions.tsv` status `spec'd-here` run on this
+//! view ([`BodyWorld`], below): real stat lists, states, timers, rooms,
+//! the combat code and the handler lists of [`ActionHooks`]; the parts
+//! of other unwritten systems through [`Pending`]'s skill-body seams.
+//! The skill list, player data, paths, items and the other per-skill
+//! bodies have no provider: [`UseRest`], implemented by the same
 //! [`Pending`] value as the action wiring's other open seams (one owner
 //! for the skill list, which combat reads through
 //! [`Pending::skill_list`]).
@@ -21,13 +25,14 @@ use crate::combat::{CombatWorld, RoomKind};
 use crate::game::Game;
 use crate::missiles::{self, MissileParams};
 use crate::rng::Seed;
+use crate::skills::use_::bodies::{self, BodyWorld};
 use crate::skills::use_::{
     MissileAim, ModeTarget, ServerMsg, SkillFunctions, UseMissiles, UseState, UseWorld,
 };
-use crate::skills::{ManaUnits, SkillEntry, SkillUnits};
-use crate::stats::lists::RemoveCallback;
+use crate::skills::{KickItems, ManaUnits, SkillEntry, SkillUnits};
+use crate::stats::lists::{ListId, RemoveCallback};
 use crate::tick::events::event;
-use crate::units::{UnitId, UnitType};
+use crate::units::{RoomId, UnitId, UnitType};
 use crate::wiring::action::combat::CombatView;
 use crate::wiring::action::{ActionSim, Pending, View, WiringError};
 
@@ -72,7 +77,6 @@ pub trait UseRest {
     fn set_attack_param4(&mut self, u: UnitId, v: i32);
     /// `0x00647960` (`use.md` §2: parts listed, order not).
     fn use_state(&mut self, u: UnitId, e: &SkillEntry) -> UseState;
-    fn dec_quantity(&mut self, u: UnitId, skill: i32);
     // ---- mana (`skills/levels.md` §4)
     fn shapeshifted(&self, u: UnitId) -> bool;
     fn consume_charges(&mut self, u: UnitId, e: &SkillEntry) -> bool;
@@ -94,11 +98,7 @@ pub trait UseRest {
     fn line_clear(&self, u: UnitId, to: (i32, i32), mask: u32) -> bool;
     // ---- aura state (`use.md` §7: list contents not written)
     fn set_aura_state(&mut self, u: UnitId, state: u16, skill: i32, lvl: i32);
-    // ---- skill code
-    /// The parameter fields of the skill missile helpers `0x0056ECB0` /
-    /// `0x0056EE90` beyond owner, origin, class, skill and level (not
-    /// specified: flags, target, position from `aim`).
-    fn skill_missile_fill(&self, u: UnitId, lob: bool, aim: MissileAim, p: &mut MissileParams);
+    // ---- skill code (the slots `bodies` does not specify)
     fn srvst(&mut self, index: u16, u: UnitId, skill: i32, lvl: i32) -> i32;
     #[allow(clippy::too_many_arguments)]
     fn srvdo(
@@ -236,9 +236,16 @@ impl<X: Pending + UseRest> ManaUnits for UseView<'_, X> {
     }
 }
 
+/// The bodies of `functions.tsv` status `spec'd-here` run here
+/// ([`bodies::run_start`] / [`bodies::run_do`] on this view); every other
+/// slot goes to [`UseRest::srvst`] / [`UseRest::srvdo`].
 impl<X: Pending + UseRest> SkillFunctions for UseView<'_, X> {
     fn srvst(&mut self, index: u16, u: UnitId, skill: i32, lvl: i32) -> i32 {
-        self.xm().srvst(index, u, skill, lvl)
+        let t = self.cv.v.h.tables.clone();
+        match bodies::run_start(self, &t.skills, &t.combat, index, u, skill, lvl) {
+            Some(v) => v,
+            None => self.xm().srvst(index, u, skill, lvl),
+        }
     }
     fn srvdo(
         &mut self,
@@ -250,18 +257,18 @@ impl<X: Pending + UseRest> SkillFunctions for UseView<'_, X> {
         item: bool,
         aim: bool,
     ) -> i32 {
-        self.xm().srvdo(index, u, skill, lvl, charge, item, aim)
+        let t = self.cv.v.h.tables.clone();
+        match bodies::run_do(self, &t.skills, &t.combat, index, u, skill, lvl) {
+            Some(v) => v,
+            None => self.xm().srvdo(index, u, skill, lvl, charge, item, aim),
+        }
     }
 }
 
 impl<X: Pending + UseRest> UseMissiles for UseView<'_, X> {
-    /// `0x0056ECB0` / `0x0056EE90` → `0x0059FA30` (`missiles.md` §R2.3)
-    /// on the real missile store: owner and origin the unit, class
-    /// `srvmissile`, the skill and level (R2.1 +0x2C, +0x30); the other
-    /// fields from [`UseRest::skill_missile_fill`].
-    ///
-    /// TODO(use.md §5.4 step 7): the helpers' record fill (flags, target,
-    /// the `aim` position) is not specified.
+    /// The `srvmissile` path (`bodies.md` §5): `skill_missile`
+    /// (`0x0056EE90` for `lob`, else `0x0056ECB0`, §2.4) with `quant` = 0,
+    /// on the real missile store ([`BodyWorld::spawn_missile`]).
     fn create_skill_missile(
         &mut self,
         u: UnitId,
@@ -271,29 +278,11 @@ impl<X: Pending + UseRest> UseMissiles for UseView<'_, X> {
         lob: bool,
         aim: MissileAim,
     ) {
-        let mut p = MissileParams {
-            owner: Some(u),
-            origin: Some(u),
-            class: i32::from(missile),
-            skill,
-            level: lvl,
-            ..MissileParams::default()
+        let (d, at) = match aim {
+            MissileAim::None => ((0, 0), (0, 0)),
+            MissileAim::At { offset, aim } => (offset, aim),
         };
-        self.x().skill_missile_fill(u, lob, aim, &mut p);
-        let Some(mut store) = self.cv.v.h.missiles.take() else {
-            self.error(WiringError::Reentrant("missiles"));
-            return;
-        };
-        let t = self.cv.v.h.tables.clone();
-        {
-            let mut cx = missiles::Ctx {
-                tables: &t.missiles,
-                store: &mut store,
-                world: &mut self.cv.v,
-            };
-            missiles::create_missile(self.cv.game, &mut cx, &p);
-        }
-        self.cv.v.h.missiles = Some(store);
+        bodies::skill_missile(self, i32::from(missile), u, skill, lvl, d, at, false, lob);
     }
 }
 
@@ -313,9 +302,10 @@ impl<X: Pending + UseRest> UseWorld for UseView<'_, X> {
     fn set_last_point_frame(&mut self, u: UnitId, frame: i32) {
         self.xm().set_last_point_frame(u, frame);
     }
-    /// The path position (the action wiring's [`Pending::position`]).
+    /// The path position (`ActionHooks::path_position`: the path
+    /// provider's, else [`Pending::position`]).
     fn position(&self, u: UnitId) -> (i32, i32) {
-        self.x().position(u)
+        self.cv.v.h.path_position(u)
     }
     /// `0x00552F60` on the type's hash (`unit-order.md` §2.3).
     fn find_unit(&self, ty: u32, guid: u32) -> Option<UnitId> {
@@ -379,8 +369,9 @@ impl<X: Pending + UseRest> UseWorld for UseView<'_, X> {
     fn use_state(&mut self, u: UnitId, e: &SkillEntry) -> UseState {
         self.xm().use_state(u, e)
     }
-    fn dec_quantity(&mut self, u: UnitId, skill: i32) {
-        self.xm().dec_quantity(u, skill);
+    /// `0x0056C3F0` (`bodies.md` §2.5).
+    fn dec_quantity(&mut self, u: UnitId, _skill: i32) {
+        bodies::dec_quantity(self, u);
     }
 
     fn can_dual_wield(&self, u: UnitId) -> bool {
@@ -547,5 +538,581 @@ impl<X: Pending + UseRest> UseWorld for UseView<'_, X> {
     }
     fn set_aura_state(&mut self, u: UnitId, state: u16, skill: i32, lvl: i32) {
         self.xm().set_aura_state(u, state, skill, lvl);
+    }
+}
+
+// ---- BodyWorld: the skill bodies on the wired units ----------------------
+
+impl<X: Pending + UseRest> UseView<'_, X> {
+    fn body_tables(&self) -> Option<&bodies::BodyTables> {
+        self.cv.v.h.bodies.as_deref()
+    }
+}
+
+impl<X: Pending + UseRest> KickItems for UseView<'_, X> {
+    fn toggle_weapon_lists(&mut self, u: UnitId, on: bool) {
+        Pending::toggle_weapon_lists(self.xm(), u, on);
+    }
+    fn boots_damage(&self, item: UnitId) -> (i32, i32) {
+        Pending::boots_damage(self.x(), item)
+    }
+}
+
+impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
+    type List = ListId;
+    type Room = RoomId;
+    type Combat = CombatView<'a, X>;
+
+    fn combat(&mut self) -> &mut CombatView<'a, X> {
+        &mut self.cv
+    }
+
+    fn stat_info(&self, s: i32) -> Option<bodies::BodyStat> {
+        self.body_tables()?.stat(s)
+    }
+    fn state_count(&self) -> i32 {
+        i32::try_from(self.cv.v.stats.data().states.count()).unwrap_or(i32::MAX)
+    }
+    fn state_flag(&self, s: i32, g: usize) -> bool {
+        u32::try_from(s).is_ok_and(|s| self.cv.v.stats.data().states.has_flag(s, g))
+    }
+    fn state_group(&self, s: i32) -> i32 {
+        let i = usize::try_from(s).ok();
+        self.body_tables()
+            .and_then(|b| b.state_group.get(i?).copied())
+            .unwrap_or(0)
+    }
+    fn state_is_aura(&self, s: i32) -> bool {
+        let i = usize::try_from(s).ok();
+        self.body_tables()
+            .and_then(|b| b.state_aura.get(i?).copied())
+            .unwrap_or(false)
+    }
+    fn overlay_count(&self) -> i32 {
+        self.body_tables().map_or(0, |b| b.overlay_count)
+    }
+
+    fn has_group(&self, u: UnitId, g: usize) -> bool {
+        self.cv.v.stats.has_group(u, g)
+    }
+    /// `0x00639DB0`: the toggle (`stat-lists.md` §9.2) and the unit
+    /// queued for update.
+    fn state_on(&mut self, u: UnitId, s: i32, on: bool) {
+        let Ok(s) = u16::try_from(s) else { return };
+        self.cv.v.set_state(u, s, on);
+        BodyWorld::queue_update(self, u);
+    }
+    fn mark_state_changed(&mut self, u: UnitId, s: i32) {
+        if let Ok(s) = u32::try_from(s) {
+            self.cv.v.stats.set_state_changed(u, s, true);
+        }
+    }
+    fn clear_group_states(&mut self, u: UnitId, g: usize) {
+        for s in 0..self.state_count() {
+            let s32 = s as u32;
+            if self.cv.v.stats.data().states.has_flag(s32, g) && self.cv.v.stats.has_state(u, s32) {
+                self.cv.v.stats.set_state_changed(u, s32, true);
+                self.cv.v.set_state(u, s as u16, false);
+            }
+        }
+        BodyWorld::queue_update(self, u);
+    }
+    /// `0x0064C040` (`unit-order.md` §6.2).
+    fn queue_update(&mut self, u: UnitId) {
+        if self.cv.game.lists.queue_update(u).is_err() {
+            self.error(WiringError::Unit(
+                crate::units::modes::UnitError::UnknownUnit(u),
+            ));
+        }
+    }
+    /// The stat host's `0x0063A4A0` (`stat-lists.md` §8.8).
+    fn stays_on_death(&self, u: UnitId, s: i32) -> bool {
+        use crate::stats::lists::StatHost;
+        let v = &self.cv.v;
+        v.h.stays_on_death(v.stats, u, s as u32)
+    }
+
+    fn state_list(&self, u: UnitId, s: i32) -> Option<ListId> {
+        self.cv.v.state_list(u, u16::try_from(s).ok()?)
+    }
+    /// The unit's list by flags (`0x006256E0` on the unit's list).
+    fn first_list_with_flags(&self, u: UnitId, flags: u32) -> Option<ListId> {
+        let st = &self.cv.v.stats;
+        st.list_by_flags(st.unit_list(u)?, flags)
+    }
+    fn alloc_list(&mut self, flags: u32, expire: i32, owner: Option<UnitId>) -> Option<ListId> {
+        let (ty, guid) = match owner {
+            Some(o) => {
+                let r = self.cv.v.units.get(o)?;
+                (r.ty.index() as u32, r.guid)
+            }
+            None => (6, u32::MAX),
+        };
+        Some(self.cv.v.stats.alloc(flags, expire, ty, guid))
+    }
+    fn list_state(&self, l: ListId) -> i32 {
+        self.cv.v.stats.state(l) as i32
+    }
+    fn set_list_state(&mut self, l: ListId, s: i32) {
+        self.cv.v.stats.set_state(l, s as u32);
+    }
+    fn list_skill(&self, l: ListId) -> (i32, i32) {
+        let (s, v) = self.cv.v.stats.skill(l);
+        (s as i32, v as i32)
+    }
+    fn set_list_skill(&mut self, l: ListId, skill: i32, lvl: i32) {
+        self.cv.v.stats.set_skill(l, skill as u32, lvl as u32);
+    }
+    fn list_expire(&self, l: ListId) -> i32 {
+        self.cv.v.stats.expire(l)
+    }
+    fn set_list_expire(&mut self, l: ListId, e: i32) {
+        self.cv.v.stats.set_expire(l, e);
+    }
+    fn list_get(&self, l: ListId, s: i32) -> i32 {
+        u16::try_from(s).map_or(0, |s| self.cv.v.stats.base(l, s, 0))
+    }
+    fn list_set(&mut self, l: ListId, s: i32, v: i32) {
+        if let Ok(s) = u16::try_from(s) {
+            self.cv.v.set_list_stat(l, s, v);
+        }
+    }
+    fn attach(&mut self, u: UnitId, l: ListId) {
+        let v = &mut self.cv.v;
+        v.stats.attach(&mut *v.h, u, l, true);
+    }
+    fn set_remove_callback(&mut self, l: ListId, cb: u32) {
+        self.cv
+            .v
+            .stats
+            .set_remove_callback(l, Some(RemoveCallback(cb)));
+    }
+    /// Detach (`stat-lists.md` §8.2), the list's remove callback as the
+    /// bodies give it ([`bodies::remove_callback`]; the stat host runs
+    /// none), then free (§8.3).
+    fn detach_free(&mut self, u: UnitId, l: ListId) {
+        let st = self.cv.v.stats.state(l) as i32;
+        let cb = self.cv.v.stats.remove_callback(l);
+        {
+            let v = &mut self.cv.v;
+            v.stats.detach(&mut *v.h, l);
+        }
+        if let Some(cb) = cb {
+            let t = self.cv.v.h.tables.clone();
+            bodies::remove_callback(self, &t.skills, u, st, cb.0, l);
+        }
+        let v = &mut self.cv.v;
+        v.stats.free_plain(&mut *v.h, l);
+    }
+
+    fn add_handler(&mut self, u: UnitId, h: bodies::Handler) {
+        self.cv.v.h.handlers.entry(u).or_default().insert(0, h);
+    }
+    /// TODO(bodies.md OQ6): the deferred free of a running record (flags
+    /// bit 0 → flags |= 2) needs the handler iteration, which has no
+    /// provider; records are unlinked at once.
+    fn remove_handlers(&mut self, u: UnitId, key_type: i32, key: i32) {
+        if let Some(v) = self.cv.v.h.handlers.get_mut(&u) {
+            v.retain(|h| !(h.key_type == key_type && h.key == key));
+        }
+    }
+
+    /// The adjacency array (`drlg/rooms.md` §6) of the source's room, or
+    /// of the room containing `at` (`0x00463740`); each room's town test
+    /// and unit list.
+    fn scan_rooms(
+        &self,
+        source: UnitId,
+        at: Option<(i32, i32)>,
+    ) -> Option<Vec<bodies::ScanRoom<UnitId>>> {
+        let game = &*self.cv.game;
+        let drlg = &self.cv.v.h.drlg;
+        let mut room = game.lists.unit(source)?.room()?;
+        if let Some((x, y)) = at {
+            room = drlg.find_room(game, room, x, y)?;
+        }
+        let adjacent = game.lists.room(room)?.adjacent.clone();
+        Some(
+            adjacent
+                .into_iter()
+                .map(|r| bodies::ScanRoom {
+                    town: drlg.in_town(game, r),
+                    units: game.lists.room_units(r),
+                })
+                .collect(),
+        )
+    }
+    fn allied(&self, a: UnitId, b: UnitId) -> bool {
+        self.x().allied(a, b)
+    }
+    /// The missile store's owner (`0x00552FD0`).
+    fn missile_owner(&self, u: UnitId) -> Option<UnitId> {
+        let o = self.cv.v.h.missiles.as_ref()?.get(u)?.owner?;
+        self.cv.game.lists.find_unit(o.ty, o.guid)
+    }
+    fn minion_owner(&self, u: UnitId) -> Option<UnitId> {
+        self.x().minion_owner(u)
+    }
+    fn pet_unsummonable(&self, u: UnitId, pet: UnitId) -> bool {
+        self.x().pet_unsummonable(u, pet)
+    }
+
+    fn frame_bonus(&self, u: UnitId) -> i32 {
+        self.x().frame_bonus(u)
+    }
+    fn set_anim_frame(&mut self, u: UnitId, v: i32) {
+        if let Some(r) = self.cv.v.units.get_mut(u) {
+            r.anim.frame = v;
+        }
+    }
+    fn set_entry_param(&mut self, u: UnitId, i: u8, v: i32) {
+        self.xm().set_entry_param(u, i, v);
+    }
+    fn stat_max(&self, u: UnitId, s: u16) -> i32 {
+        let st = &self.cv.v.stats;
+        match s {
+            6 => st.max_life(u),
+            8 => st.max_mana(u),
+            _ => st.max_stamina(u),
+        }
+    }
+
+    fn composit_weapon_class(&self, u: UnitId) -> i32 {
+        self.x().composit_weapon_class(u)
+    }
+    fn hand_class(&self, u: UnitId) -> i32 {
+        self.x().hand_class(u)
+    }
+    fn item_shoots(&self, item: UnitId) -> bool {
+        self.x().item_shoots(item)
+    }
+    fn item_stackable(&self, item: UnitId) -> bool {
+        self.x().item_stackable(item)
+    }
+    fn item_stat_of(&self, item: UnitId, s: u16) -> i32 {
+        self.cv.v.stats.unit_total(item, s, 0)
+    }
+    fn set_item_stat(&mut self, item: UnitId, s: u16, v: i32) {
+        self.cv.v.set_base(item, s, v);
+    }
+    fn item_max_stack(&self, item: UnitId) -> i32 {
+        self.x().item_max_stack(item)
+    }
+    /// [`Pending::item_max_durability`]; unknown → the current
+    /// durability (nothing is changed).
+    fn item_max_durability(&self, item: UnitId) -> i32 {
+        self.x()
+            .item_max_durability(item)
+            .unwrap_or_else(|| self.cv.v.stats.unit_total(item, 72, 0))
+    }
+    fn quantity_timer(&mut self, item: UnitId) {
+        let game = &mut *self.cv.game;
+        self.cv.v.h.x.quantity_timer(game, item);
+    }
+    fn send_item_stat(&mut self, u: UnitId, item: UnitId, s: u16, v: i32) {
+        self.xm().send_item_stat(u, item, s, v);
+    }
+    fn attack_cleanup(&mut self, u: UnitId) {
+        self.xm().attack_cleanup(u);
+    }
+    fn weapon_cleanup(&mut self, u: UnitId) {
+        self.xm().weapon_cleanup(u);
+    }
+
+    /// `0x0059FA30` (`missiles.md` §R2.3) on the real missile store.
+    fn spawn_missile(&mut self, req: bodies::MissileRequest<UnitId>) -> Option<UnitId> {
+        let p = MissileParams {
+            flags: req.flags,
+            owner: Some(req.owner),
+            origin: req.origin,
+            target: req.target,
+            class: req.class,
+            x: req.x,
+            y: req.y,
+            target_x: req.target_x,
+            target_y: req.target_y,
+            velocity: req.velocity,
+            skill: req.skill,
+            level: req.level,
+            loops: req.loops,
+            activate: req.activate,
+            attack_bonus: req.attack_bonus,
+            range: req.range,
+            init: req.init,
+            ..MissileParams::default()
+        };
+        let Some(mut store) = self.cv.v.h.missiles.take() else {
+            self.error(WiringError::Reentrant("missiles"));
+            return None;
+        };
+        let t = self.cv.v.h.tables.clone();
+        let made = {
+            let mut cx = missiles::Ctx {
+                tables: &t.missiles,
+                store: &mut store,
+                world: &mut self.cv.v,
+            };
+            missiles::create_missile(self.cv.game, &mut cx, &p)
+        };
+        self.cv.v.h.missiles = Some(store);
+        made
+    }
+    fn passive_refresh(&mut self, u: UnitId) {
+        self.xm().passive_refresh(u);
+    }
+    fn buff_refresh(&mut self, u: UnitId) {
+        self.xm().buff_refresh(u);
+    }
+    fn skill_resync(&mut self, u: UnitId) {
+        self.xm().skill_resync(u);
+    }
+    fn passive_state_apply(&mut self, u: UnitId, e: &SkillEntry) {
+        self.xm().passive_state_apply(u, e);
+    }
+    fn set_ai_state(&mut self, u: UnitId, k: i32) {
+        self.xm().set_ai_state(u, k);
+    }
+    fn blood_mana(&mut self, u: UnitId, cost: i32) {
+        self.xm().blood_mana(u, cost);
+    }
+    fn queue_progressive(&mut self, u: UnitId, msg: bodies::ProgressiveMsg<UnitId>) {
+        self.xm().queue_progressive(u, msg);
+    }
+    // ---- batch 2 and 3
+
+    fn effect(&mut self, e: bodies::BodyEffect<UnitId, UnitId, RoomId>) {
+        self.xm().body_effect(e);
+    }
+    fn path_op(&mut self, u: UnitId, op: bodies::PathOp<UnitId>) -> i32 {
+        self.xm().body_path_op(u, op)
+    }
+    fn monlvl(&self) -> &[d2_data::tables::Monlvl] {
+        self.body_tables().map_or(&[], |b| &b.monlvl)
+    }
+    fn pettype_count(&self) -> i32 {
+        self.body_tables().map_or(0, |b| b.pettype_count)
+    }
+    fn l_flag(&self) -> bool {
+        self.x().l_flag()
+    }
+    /// Unit +0xC8.
+    fn unit_c8(&self, u: UnitId) -> u32 {
+        self.cv.v.units.get(u).map_or(0, |r| r.flags2)
+    }
+    fn set_unit_c8(&mut self, u: UnitId, v: u32) {
+        if let Some(r) = self.cv.v.units.get_mut(u) {
+            r.flags2 = v;
+        }
+    }
+    /// Unit +0x44.
+    fn anim_frame(&self, u: UnitId) -> i32 {
+        self.cv.v.units.get(u).map_or(0, |r| r.anim.frame)
+    }
+    fn frame_event_index(&self, u: UnitId) -> i32 {
+        self.x().frame_event_index(u)
+    }
+    fn set_frame_event_index(&mut self, u: UnitId, i: i32) {
+        self.xm().set_frame_event_index(u, i);
+    }
+    /// Unit +0x48.
+    fn frame_count(&self, u: UnitId) -> i32 {
+        self.cv.v.units.get(u).map_or(0, |r| r.anim.frame_count)
+    }
+    fn set_frame_count(&mut self, u: UnitId, v: i32) {
+        if let Some(r) = self.cv.v.units.get_mut(u) {
+            r.anim.frame_count = v;
+        }
+    }
+    /// Unit +0xD0.
+    fn node_slot(&self, u: UnitId) -> i32 {
+        self.cv
+            .v
+            .units
+            .get(u)
+            .map_or(crate::units::record::INITIAL_NODE_INDEX as i32, |r| {
+                r.node_index as i32
+            })
+    }
+    /// Unit +0x5C.
+    fn has_stat_holder(&self, u: UnitId) -> bool {
+        self.cv.v.units.get(u).is_some_and(|r| r.stats.is_some())
+    }
+    /// [`Pending::size`] (`0x00620510`).
+    fn unit_size(&self, u: UnitId) -> i32 {
+        Pending::size(self.x(), u)
+    }
+    fn minion_spawn_class(&self, u: UnitId) -> Option<i32> {
+        self.x().minion_spawn_class(u)
+    }
+    fn linked_unit(&self, u: UnitId) -> Option<UnitId> {
+        self.x().linked_unit(u)
+    }
+    fn killer_of(&self, u: UnitId) -> Option<UnitId> {
+        self.x().killer_of(u)
+    }
+    fn minion_owner_ident(&self, u: UnitId) -> Option<(u32, u32)> {
+        self.x().minion_owner_ident(u)
+    }
+    /// `0x006272B0`: the base value plus v.
+    fn add_stat(&mut self, u: UnitId, s: u16, v: i32) {
+        let b = SkillUnits::base_stat(&self.cv, u, s, 0);
+        self.cv.v.set_base(u, s, b.wrapping_add(v));
+    }
+    fn list_add(&mut self, l: ListId, s: i32, v: i32) {
+        if let Ok(s) = u16::try_from(s) {
+            let v2 = &mut self.cv.v;
+            v2.stats.add(&mut *v2.h, l, s, v, 0);
+        }
+    }
+    fn list_clear(&mut self, l: ListId) {
+        let v = &mut self.cv.v;
+        v.stats.remove_all(&mut *v.h, l);
+    }
+    fn has_handler(&self, u: UnitId, key_type: i32, key: i32, skill: i32) -> bool {
+        self.cv.v.h.handlers.get(&u).is_some_and(|v| {
+            v.iter()
+                .any(|h| h.key_type == key_type && h.key == key && h.skill == skill)
+        })
+    }
+    fn entry_param(&self, u: UnitId, e: &SkillEntry, i: u8) -> i32 {
+        Pending::entry_param(self.x(), u, e, i)
+    }
+    fn set_entry_param_of(&mut self, u: UnitId, e: &SkillEntry, i: u8, v: i32) {
+        self.xm().set_entry_param_of(u, e, i, v);
+    }
+    fn entry_flags(&self, u: UnitId, e: &SkillEntry) -> u32 {
+        self.x().entry_flags(u, e)
+    }
+    fn set_entry_flags(&mut self, u: UnitId, e: &SkillEntry, f: u32) {
+        self.xm().set_entry_flags(u, e, f);
+    }
+    fn set_entry_mode(&mut self, u: UnitId, e: &SkillEntry, m: u32) {
+        self.xm().set_entry_mode(u, e, m);
+    }
+    fn disguise_mode(&self, u: UnitId, m: u32) -> u32 {
+        self.x().disguise_mode(u, m)
+    }
+    fn skill_sequence(&self, u: UnitId) -> Option<Vec<[u8; 6]>> {
+        self.x().skill_sequence(u)
+    }
+    fn anim_rewind(&mut self, u: UnitId, p: i32) {
+        self.xm().anim_rewind(u, p);
+    }
+    fn anim_restart(&mut self, u: UnitId, v: i32) {
+        self.xm().anim_restart(u, v);
+    }
+    fn anim_from(&mut self, u: UnitId, f: i32) {
+        self.xm().anim_from(u, f);
+    }
+    /// `0x00620BB0`.
+    fn unit_room(&self, u: UnitId) -> Option<RoomId> {
+        self.cv.game.lists.unit(u)?.room()
+    }
+    /// `0x00463740`.
+    fn room_at(&self, from: RoomId, x: i32, y: i32) -> Option<RoomId> {
+        self.cv.v.h.drlg.find_room(&*self.cv.game, from, x, y)
+    }
+    /// `0x0061AB00`.
+    fn room_in_town(&self, r: RoomId) -> bool {
+        self.cv.v.h.drlg.in_town(&*self.cv.game, r)
+    }
+    fn room_act(&self, r: RoomId) -> i32 {
+        self.x().room_act(r)
+    }
+    fn room_teleport(&self, r: RoomId) -> Option<i32> {
+        self.x().room_teleport(r)
+    }
+    fn free_point(
+        &mut self,
+        r: RoomId,
+        at: (i32, i32),
+        size: i32,
+        mask: u32,
+        fallback: bool,
+    ) -> Option<(RoomId, (i32, i32))> {
+        self.xm().free_point(r, at, size, mask, fallback)
+    }
+    fn pattern_collides(&self, r: RoomId, at: (i32, i32), u: UnitId, mask: u32) -> bool {
+        self.x().pattern_collides(r, at, u, mask)
+    }
+    fn box_collides(&self, r: RoomId, at: (i32, i32), size: i32, mask: u32) -> bool {
+        self.x().box_collides(r, at, size, mask)
+    }
+    fn line_blocked(&self, r: RoomId, from: (i32, i32), to: (i32, i32), mask: u32) -> bool {
+        self.x().body_line_blocked(r, from, to, mask)
+    }
+    fn place_unit(&mut self, u: UnitId, r: Option<RoomId>, at: (i32, i32)) -> bool {
+        self.xm().place_unit(u, r, at)
+    }
+    fn has_path(&self, u: UnitId) -> bool {
+        self.x().has_path(u)
+    }
+    fn path_point_count(&self, u: UnitId) -> i32 {
+        self.x().path_point_count(u)
+    }
+    fn path_last_point(&self, u: UnitId) -> (i32, i32) {
+        self.x().path_last_point(u)
+    }
+    fn path_target_point(&self, u: UnitId) -> (i32, i32) {
+        self.x().path_target_point(u)
+    }
+    fn create_monster(
+        &mut self,
+        r: RoomId,
+        at: (i32, i32),
+        class: i32,
+        mode: i32,
+        spread: i32,
+    ) -> Option<UnitId> {
+        self.xm().create_monster(r, at, class, mode, spread)
+    }
+    fn mode_request(&mut self, m: UnitId, mode: i32, target: Option<UnitId>) -> i32 {
+        Pending::mode_request(self.xm(), m, mode, target)
+    }
+    /// An item unit is its own item handle here.
+    fn as_item(&self, u: UnitId) -> Option<UnitId> {
+        (self.cv.v.units.get(u)?.ty == UnitType::Item).then_some(u)
+    }
+    fn inventory_busy(&self, u: UnitId) -> bool {
+        self.x().inventory_busy(u)
+    }
+    fn has_inventory(&self, u: UnitId) -> bool {
+        self.x().has_inventory(u)
+    }
+    fn weapon_in_use(&self, u: UnitId) -> Option<UnitId> {
+        self.x().weapon_in_use(u)
+    }
+    fn body_loc(&self, i: UnitId) -> i32 {
+        self.x().body_loc(i)
+    }
+    fn item_usable(&self, i: UnitId) -> bool {
+        self.x().item_usable(i)
+    }
+    fn item_active(&self, i: UnitId) -> bool {
+        self.x().item_active(i)
+    }
+    fn item_breakable(&self, i: UnitId) -> bool {
+        self.x().item_breakable(i)
+    }
+    fn shield(&self, u: UnitId) -> Option<UnitId> {
+        Pending::shield(self.x(), u)
+    }
+    fn shield_damage(&self, i: UnitId) -> Option<(i32, i32)> {
+        self.x().shield_damage(i)
+    }
+    fn item_missile_type(&self, i: UnitId) -> i32 {
+        self.x().item_missile_type(i)
+    }
+    fn golem_item(&self, t: UnitId) -> bool {
+        self.x().golem_item(t)
+    }
+    fn item_first_loc(&self, t: UnitId) -> i32 {
+        self.x().item_first_loc(t)
+    }
+    fn two_melee_weapons(&self, u: UnitId) -> bool {
+        self.x().two_melee_weapons(u)
+    }
+    fn attack_frames(&self, u: UnitId, w: UnitId) -> Option<i32> {
+        self.x().attack_frames(u, w)
     }
 }

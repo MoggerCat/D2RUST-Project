@@ -1,4 +1,4 @@
-//! Readers for D2 file formats: MPQ, DC6, DCC, DT1, DS1, COF, AnimData, palettes and
+//! Readers for D2 file formats: MPQ, DC6, DCC, DT1, DS1, COF, AnimData, palettes, WAV and
 //! string tables. Phase 1 fills this in; each reader names its spec.
 //!
 //! Binary parsing uses explicit little-endian reads, never transmutes.
@@ -6,6 +6,7 @@
 pub mod animdata;
 pub mod cof;
 mod cursor;
+pub mod d2s;
 pub mod dc6;
 pub mod dcc;
 pub mod ds1;
@@ -14,7 +15,12 @@ pub mod font;
 pub mod mpq;
 pub mod palette;
 pub mod tbl;
+pub mod wav;
 
+#[cfg(test)]
+mod mutant_tests_dcc;
+#[cfg(test)]
+mod mutant_tests_formats;
 #[cfg(test)]
 mod robust;
 #[cfg(test)]

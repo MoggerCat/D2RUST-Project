@@ -11,7 +11,7 @@ use d2_proto::schema::FieldType;
 use d2_proto::transport::{Classified, SplitError};
 use d2_proto::{CLIENT_MESSAGES, PROTOCOL_VERSION};
 
-use super::dispatch::{self, Dispatch, HandlerError, Message, Mismatch, Row};
+use super::dispatch::{self, Dispatch, Handle, HandlerError, Message, Mismatch, Row};
 use super::intent::IntentError;
 use super::link::{LinkError, Pumped, SendQueue, Sent, ServerLink};
 use super::mirror::{BridgePlugin, BridgeResource, MirrorIndex, UnitView};
@@ -190,10 +190,10 @@ fn game_send_limit() {
 #[test]
 fn split_and_unowned() {
     let (mut b, _) = bridge();
-    let r = b.receive_chunk(&[0x1A, 0x07, 0x5F, 1, 2, 3, 4]).unwrap();
+    let r = b.receive_chunk(&[0x61, 0x07, 0x5F, 1, 2, 3, 4]).unwrap();
     assert_eq!((r.messages, r.unowned, r.handled), (2, 2, 0));
     let log = b.log();
-    assert_eq!(log.unowned.get(&0x1A), Some(&1));
+    assert_eq!(log.unowned.get(&0x61), Some(&1));
     assert_eq!(log.unowned.get(&0x5F), Some(&1));
     assert!(log.discarded.is_empty());
     assert_eq!(b.world(), &ClientWorld::default());
@@ -203,7 +203,7 @@ fn split_and_unowned() {
 #[test]
 fn unknown_id_ends_split() {
     let (mut b, _) = bridge();
-    let r = b.receive_chunk(&[0x1A, 0x07, 0x80, 0x1A, 0x07]).unwrap();
+    let r = b.receive_chunk(&[0x61, 0x07, 0x80, 0x61, 0x07]).unwrap();
     assert_eq!((r.messages, r.discarded_bytes), (1, 3));
     assert_eq!(
         b.log().discarded,
@@ -218,7 +218,7 @@ fn unknown_id_ends_split() {
 #[test]
 fn fatal_chunks_are_refused_whole() {
     let (mut b, _) = bridge();
-    match b.receive_chunk(&[0x1A, 0x07, 0x5F, 1]) {
+    match b.receive_chunk(&[0x61, 0x07, 0x5F, 1]) {
         Err(BridgeError::Split(SplitError::Truncated { at: 2, size: 5 })) => {}
         other => panic!("{other:?}"),
     }
@@ -254,13 +254,13 @@ fn addressed_units() {
         })
     );
     assert_eq!(addressed_unit(&[0x6E]), None);
-    assert_eq!(addressed_unit(&[0x1A, 0x07]), None);
+    assert_eq!(addressed_unit(&[0x61, 0x07]), None);
 }
 
 // Synthetic handlers: add / remove the addressed unit.
 fn add_unit(world: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerError> {
     let key = msg.unit.ok_or(HandlerError::Invalid("no unit"))?;
-    world.units.insert(key, ClientUnit { key });
+    world.units.insert(key, ClientUnit::new(key));
     Ok(())
 }
 
@@ -279,7 +279,7 @@ fn test_dispatch() -> Dispatch {
     d.set(0x6D, "test", add_unit);
     d.set(0x0E, "test", add_unit);
     d.set(0x0F, "test", remove_unit);
-    d.set(0x1A, "test", refuse);
+    d.set(0x61, "test", refuse);
     d
 }
 
@@ -303,7 +303,7 @@ fn world_updates_from_messages() {
     let chunk = [
         msg(0x6D, 10, 1, 7),
         msg(0x0E, 12, 2, 9),
-        vec![0x1A, 0x07],
+        vec![0x61, 0x07],
         msg(0x0F, 16, 2, 9),
         msg(0x0E, 12, 4, 3),
     ]
@@ -314,14 +314,14 @@ fn world_updates_from_messages() {
     let key = |unit_type, guid| UnitKey { unit_type, guid };
     assert_eq!(keys, vec![key(1, 7), key(4, 3)]);
     assert_eq!(b.log().rejected.len(), 1);
-    assert_eq!(b.log().rejected[0].id, 0x1A);
+    assert_eq!(b.log().rejected[0].id, 0x61);
 }
 
 // Covers: specs/client/bridge.md §4 r4, §5 r3, §8 r1, §8 r3
 #[test]
 fn frame_order_and_counters() {
     let (mut b, link) = bridge();
-    link.deliver(true, &[&[0x1A, 0x07]]);
+    link.deliver(true, &[&[0x61, 0x07]]);
     link.deliver(false, &[]);
     let r1 = b.frame().unwrap();
     assert!(r1.ticked);
@@ -370,10 +370,20 @@ fn dispatch_table_matches_spec() {
 fn dispatch_check_catches_perturbations() {
     let rows = dispatch::parse(dispatch::TSV).unwrap();
     let mut owned = rows.clone();
-    owned[0x1A].owner = Some("specs/client/x.md".into());
+    owned[0x61].owner = Some("specs/client/x.md".into());
     assert_eq!(
         dispatch::check(&owned, dispatch::HANDLERS),
-        vec![Mismatch::NoHandler { id: 0x1A }]
+        vec![Mismatch::NoHandler { id: 0x61 }]
+    );
+    let mut moved = rows.clone();
+    moved[0x1A].owner = Some("specs/client/x.md".into());
+    assert_eq!(
+        dispatch::check(&moved, dispatch::HANDLERS),
+        vec![Mismatch::Owner {
+            id: 0x1A,
+            tsv: "specs/client/x.md".into(),
+            code: "specs/client/msg-stats-items.md".into(),
+        }]
     );
     let mut renamed = rows.clone();
     renamed[0x5F].name = "Renamed".into();
@@ -385,24 +395,42 @@ fn dispatch_check_catches_perturbations() {
             proto: rows[0x5F].name.clone(),
         }]
     );
+    let tbd: Vec<Row> = rows
+        .iter()
+        .map(|r| Row {
+            owner: None,
+            ..r.clone()
+        })
+        .collect();
     let handler = [dispatch::Handler {
-        id: 0x0E,
+        id: 0x5F,
         owner: "specs/client/y.md",
-        handle: add_unit,
+        handle: Handle::General(add_unit),
     }];
     assert_eq!(
-        dispatch::check(&rows, &handler),
-        vec![Mismatch::Unowned { id: 0x0E }]
+        dispatch::check(&tbd, &handler),
+        vec![Mismatch::Unowned { id: 0x5F }]
     );
-    let mut both: Vec<Row> = rows.clone();
-    both[0x0E].owner = Some("specs/client/z.md".into());
+    let mut both: Vec<Row> = tbd.clone();
+    both[0x5F].owner = Some("specs/client/z.md".into());
     assert_eq!(
         dispatch::check(&both, &handler),
         vec![Mismatch::Owner {
-            id: 0x0E,
+            id: 0x5F,
             tsv: "specs/client/z.md".into(),
             code: "specs/client/y.md".into(),
         }]
+    );
+    // The handler kind follows the receive table (`model.md` §4 rule 1):
+    // a general handler for a unit-handler id, and the reverse.
+    let mut kinds: Vec<dispatch::Handler> = dispatch::HANDLERS.to_vec();
+    let i = kinds.iter().position(|h| h.id == 0x6D).unwrap();
+    kinds[i].handle = Handle::General(add_unit);
+    let j = kinds.iter().position(|h| h.id == 0x15).unwrap();
+    kinds[j].handle = Handle::Unit(super::msg::units::queued);
+    assert_eq!(
+        dispatch::check(&rows, &kinds),
+        vec![Mismatch::Kind { id: 0x15 }, Mismatch::Kind { id: 0x6D }]
     );
     // Strict parse: a missing row, a wrong id.
     let short: String = dispatch::TSV
@@ -482,7 +510,7 @@ fn seen() -> Vec<Vec<u8>> {
 
 fn recording_dispatch() -> Dispatch {
     let mut d = Dispatch::empty();
-    for id in [0x0E, 0x6D, 0x1A] {
+    for id in [0x0E, 0x6D, 0x61] {
         d.set(id, "test", record);
     }
     d
@@ -506,6 +534,13 @@ fn bridge_modules_except_mirror_have_no_bevy_type() {
         ("local.rs", include_str!("local.rs")),
         ("receive.rs", include_str!("receive.rs")),
         ("world.rs", include_str!("world.rs")),
+        ("bits.rs", include_str!("bits.rs")),
+        ("check.rs", include_str!("check.rs")),
+        ("update.rs", include_str!("update.rs")),
+        ("msg/mod.rs", include_str!("msg/mod.rs")),
+        ("msg/session.rs", include_str!("msg/session.rs")),
+        ("msg/units.rs", include_str!("msg/units.rs")),
+        ("msg/stats_items.rs", include_str!("msg/stats_items.rs")),
     ];
     for (name, src) in sources {
         for line in code_lines(src) {
@@ -569,15 +604,15 @@ fn bytes_cross_the_boundary_unchanged() {
     // In: each handler sees exactly its message's bytes of the chunk.
     let mut b = Bridge::with_dispatch(ScriptedLink::new(), recording_dispatch()).unwrap();
     let (m1, m2) = (msg(0x0E, 12, 2, 0xA1B2_C3D4), msg(0x6D, 10, 1, 0x0102_0304));
-    let chunk = [m1.clone(), vec![0x1A, 0x07], m2.clone()].concat();
+    let chunk = [m1.clone(), vec![0x61, 0x07], m2.clone()].concat();
     b.receive_chunk(&chunk).unwrap();
-    assert_eq!(seen(), vec![m1, vec![0x1A, 0x07], m2]);
+    assert_eq!(seen(), vec![m1, vec![0x61, 0x07], m2]);
 }
 
 // Covers: specs/client/bridge.md §2 r1
 #[test]
 fn buffer_and_node_chunks_split_alike() {
-    let messages = [msg(0x6D, 10, 1, 7), vec![0x1A, 0x07], msg(0x0E, 12, 2, 9)];
+    let messages = [msg(0x6D, 10, 1, 7), vec![0x61, 0x07], msg(0x0E, 12, 2, 9)];
     let run = |chunks: &[&[u8]]| {
         let link = ScriptedLink::new();
         link.deliver(false, chunks);
@@ -599,10 +634,10 @@ fn chunks_are_handled_in_delivery_order() {
     let (a, c) = (msg(0x6D, 10, 1, 1), msg(0x0E, 12, 2, 2));
     // Delivered "system list" first, then game list; neither is reordered
     // even though the ids would sort the other way.
-    link.deliver(false, &[&[0x1A, 0x07], &a, &c]);
+    link.deliver(false, &[&[0x61, 0x07], &a, &c]);
     let mut b = Bridge::with_dispatch(link, recording_dispatch()).unwrap();
     assert_eq!(b.frame().unwrap().chunks, 3);
-    assert_eq!(seen(), vec![vec![0x1A, 0x07], a, c]);
+    assert_eq!(seen(), vec![vec![0x61, 0x07], a, c]);
 }
 
 // Covers: specs/client/bridge.md §5 r2
@@ -635,12 +670,31 @@ fn units_iterate_in_type_then_guid_order() {
 
 // Covers: specs/client/bridge.md §6 r2
 #[test]
-fn every_row_is_tbd_and_no_handler_is_registered() {
+fn owned_rows_are_exactly_the_registered_handlers() {
     let rows = dispatch::parse(dispatch::TSV).unwrap();
-    assert!(rows.iter().all(|r| r.owner.is_none()));
-    assert!(dispatch::HANDLERS.is_empty());
+    let owned: Vec<(u8, &str)> = rows
+        .iter()
+        .filter_map(|r| r.owner.as_deref().map(|o| (r.id, o)))
+        .collect();
+    let registered: Vec<(u8, &str)> = dispatch::HANDLERS.iter().map(|h| (h.id, h.owner)).collect();
+    assert_eq!(owned, registered);
+    // The three client model specs own 53 ids (0x7A, 0x81: model §14).
+    assert_eq!(owned.len(), 53);
+    for (_, o) in &owned {
+        assert!(
+            [
+                super::msg::MODEL,
+                super::msg::UNITS,
+                super::msg::STATS_ITEMS
+            ]
+            .contains(o),
+            "{o}"
+        );
+    }
     let d = Dispatch::from_spec().unwrap();
-    assert!((0..=0xB4u8).all(|id| d.get(id).is_none()));
+    for r in &rows {
+        assert_eq!(d.get(r.id).is_some(), r.owner.is_some(), "{:#04X}", r.id);
+    }
 }
 
 // Covers: specs/client/bridge.md §7 r2
@@ -720,7 +774,7 @@ fn errors_stop_the_frame_records_do_not() {
 
     // A refused chunk is an error; the chunk after it is not processed.
     let link = ScriptedLink::new();
-    link.deliver(false, &[&[0x1A, 0x07, 0x5F, 1], &[0x1A, 0x07]]);
+    link.deliver(false, &[&[0x61, 0x07, 0x5F, 1], &[0x61, 0x07]]);
     let mut b = Bridge::with_dispatch(link.clone(), recording_dispatch()).unwrap();
     assert!(matches!(
         b.frame(),
@@ -730,7 +784,7 @@ fn errors_stop_the_frame_records_do_not() {
 
     // Unowned ids, discarded bytes and handler rejections are recorded,
     // and the frame succeeds.
-    link.deliver(false, &[&[0x5F, 1, 2, 3, 4, 0x1A, 0x07, 0x80, 0x00]]);
+    link.deliver(false, &[&[0x5F, 1, 2, 3, 4, 0x61, 0x07, 0x80, 0x00]]);
     let mut b = Bridge::with_dispatch(link, test_dispatch()).unwrap();
     let r = b.frame().unwrap();
     assert_eq!((r.unowned, r.rejected, r.discarded_bytes), (1, 1, 2));
@@ -741,7 +795,7 @@ fn errors_stop_the_frame_records_do_not() {
 fn size_zero_ids_end_the_split_and_one_byte_unit_ids_address_nothing() {
     for id in [0x83u8, 0x84, 0x88, 0x80] {
         let (mut b, _) = bridge();
-        let r = b.receive_chunk(&[0x1A, 0x07, id, 0x1A, 0x07]).unwrap();
+        let r = b.receive_chunk(&[0x61, 0x07, id, 0x61, 0x07]).unwrap();
         assert_eq!((r.messages, r.discarded_bytes), (1, 3), "id {id:#04X}");
         assert_eq!(
             b.log().discarded,
@@ -761,4 +815,59 @@ fn size_zero_ids_end_the_split_and_one_byte_unit_ids_address_nothing() {
         );
         assert_eq!(addressed_unit(&[id]), None);
     }
+}
+
+/// The bytes of a hex string.
+fn hx(s: &str) -> Vec<u8> {
+    s.split_whitespace()
+        .map(|b| u8::from_str_radix(b, 16).unwrap())
+        .collect()
+}
+
+// Covers: specs/client/model.md §5 r1, §5 r2, §7 r3
+// Covers: specs/client/bridge.md §8 r1
+#[test]
+fn update_pass_runs_on_ticked_in_game_frames_and_answers_are_sent() {
+    let (mut b, link) = bridge();
+    let mut join = hx("59 01 00 00 00 01 77 65 72 77 65 72");
+    join.resize(0x16, 0);
+    join.extend(hx("41 12 c4 11"));
+    let obj = hx("51 02 0d 00 00 00 25 00 14 12 c0 11 02 00");
+    let state = hx("0e 02 0d 00 00 00 03 00 02 00 00 00");
+    let chunk = [
+        hx("02"),
+        hx("03 00 c4 88 38 10 01 00 61 d1 e0 9f"),
+        join,
+        hx("0b 00 01 00 00 00"),
+        obj,
+        state.clone(),
+        hx("04"),
+    ]
+    .concat();
+    // Frame 1 does not tick: the 0x0E waits in the object's queue.
+    link.deliver(false, &[&chunk]);
+    let r = b.frame().unwrap();
+    assert_eq!((r.handled, r.queued, r.drained, r.answered), (6, 1, 0, 1));
+    let key = UnitKey::new(2, 13);
+    assert!(b.world().in_game);
+    assert_eq!(b.world().units[&key].queue.len(), 1);
+    // The 0x6B answer to 0x02 went through the send path (system queue).
+    assert_eq!(sent(&link), vec![(SendQueue::System, vec![0x6B])]);
+    assert!(b.world().outgoing.is_empty());
+    // Frame 2 ticks: the update pass applies it.
+    link.deliver(true, &[]);
+    let r = b.frame().unwrap();
+    assert_eq!(r.drained, 1);
+    let u = &b.world().units[&key];
+    assert!(u.queue.is_empty());
+    assert_eq!(
+        u.last_mode_request.map(|m| (m.code, m.record)),
+        Some((3, [0, 2, 0, 0, 0, 0, 0]))
+    );
+    // Out of game (0x05): a ticked frame drains nothing.
+    link.deliver(true, &[&[hx("05"), state].concat()]);
+    let r = b.frame().unwrap();
+    assert_eq!((r.queued, r.drained), (1, 0));
+    assert_eq!(b.world().units[&key].queue.len(), 1);
+    assert!(b.log().rejected.is_empty());
 }

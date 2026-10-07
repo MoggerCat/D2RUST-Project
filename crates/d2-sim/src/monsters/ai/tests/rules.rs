@@ -121,13 +121,26 @@ fn think_rhythm_table() {
         assert_eq!(w.thinks(), [100 + want], "d {d:?}");
     }
     // Target modes 4 (SandMaggot) and 5 (FrogDemon), no target: 20, mode
-    // unchanged.
+    // unchanged. Mode 4 stops the think; mode 5 goes on to the body with
+    // T = 0 (`ai-bodies-3.md` §6), so its finder is checked alone.
     for ai in [15, 52] {
         let mut w = World::new(monstats(ai, [0; 5], 15));
         w.game.frame = 100;
         let mon = w.mon;
         w.fake.anim.insert(mon, mode::WALK);
-        w.think_now();
+        if ai == 15 {
+            w.think_now();
+        } else {
+            let mut p = TickParam {
+                target: None,
+                distance: 0,
+                combat: false,
+                class: 0,
+                class2: 0,
+            };
+            assert!(!w.with(|g, cx| precheck_b(g, cx, mon, &mut p)));
+            assert_eq!(p.target, None);
+        }
         assert_eq!(w.thinks(), [120], "ai {ai}");
         assert!(w.fake.modes().is_empty());
         assert_eq!(w.fake.anim_mode(mon), mode::WALK);
@@ -902,7 +915,7 @@ fn mode_requests() {
     let mut row = monstats(3, [0; 5], 15);
     row.skill1 = 7;
     let mut w = World::new(row);
-    w.modes[0] = [8, 9, 14];
+    w.modes[0] = [8, 9, 14, 0, 0, 0, 0, 0];
     let (mon, pl) = (w.mon, w.player);
     let p = param(None, 0, false);
     assert_eq!(w.with(|_, cx| cx.skill(&p, 1)), (7, 8));
@@ -1242,7 +1255,7 @@ fn shaman_world() -> World {
     row.skill1 = 5;
     row.skill2 = 6;
     let mut w = World::new(row);
-    w.modes[0] = [14, 8, 0];
+    w.modes[0] = [14, 8, 0, 0, 0, 0, 0, 0];
     w
 }
 
@@ -1400,7 +1413,7 @@ fn quill_rat_steps() {
 
 fn lancer_world() -> World {
     let mut w = World::new(monstats(36, [60, 75, 9, 0, 15], 15));
-    w.modes[0] = [8, 9, 14];
+    w.modes[0] = [8, 9, 14, 0, 0, 0, 0, 0];
     w
 }
 
@@ -1605,7 +1618,7 @@ fn andariel_world() -> World {
     row.skill1 = 10;
     row.skill2 = 11;
     let mut w = World::new(row);
-    w.modes[0] = [8, 9, 0];
+    w.modes[0] = [8, 9, 0, 0, 0, 0, 0, 0];
     w
 }
 
@@ -1668,7 +1681,7 @@ fn andariel_steps() {
 
 fn archer_world() -> (World, UnitId) {
     let mut w = World::new(monstats(35, [0, 0, 8, 0, 15], 15));
-    w.modes[0] = [8, 9, 14];
+    w.modes[0] = [8, 9, 14, 0, 0, 0, 0, 0];
     let s = w.spawn(UnitType::Monster, (110, 100));
     (w, s)
 }
@@ -1769,7 +1782,9 @@ fn corrupt_archer_circles_toward_no_target() {
 
 // Covers: specs/monsters/ai.md §9.14
 #[test]
-fn d2moo_only_act1_ais_are_stubs() {
+fn no_act1_ai_is_d2moo_only() {
+    // §9.14 ("None left"): the Act 1 AIs that were D2MOO-only are read in
+    // 1.14d (§9.15–§9.18, §9.23, §9.24) and have bodies here.
     for i in [4usize, 5, 10, 37, 43, 59] {
         let row: Vec<&str> = AI_FUNCTIONS_TSV
             .lines()
@@ -1778,16 +1793,18 @@ fn d2moo_only_act1_ais_are_stubs() {
             .split('\t')
             .collect();
         assert_eq!(row[0], i.to_string());
-        assert_eq!(row[10], "D2MOO-only", "index {i}");
+        assert_eq!(row[10], "spec'd-here", "index {i}");
         assert_ne!(row[9], "-", "index {i} has a summary");
         let addr = AI_TABLE[i].think;
-        assert!(!implemented(addr));
+        assert!(implemented(addr), "index {i}");
         let mut w = World::new(monstats(i as u16, [0; 5], 15));
         w.store.unhandled.clear();
         w.run(false, 5);
-        assert_eq!(
-            w.store.unhandled,
-            [Unhandled::Function { addr, unit: w.mon }]
+        assert!(
+            !w.store
+                .unhandled
+                .contains(&Unhandled::Function { addr, unit: w.mon }),
+            "index {i}"
         );
     }
 }

@@ -1,0 +1,322 @@
+// Spec: specs/monsters/ai-bodies-2.md Summary, §2 (pack scan), §11 (land / take off); specs/monsters/ai-bodies-5.md Summary (walk to U, teleport in range); specs/monsters/ai.md §5.4 (scan mode 0), §6
+//! Helpers the Act II–V bodies share: the scheduling and mode helpers of
+//! the `ai-bodies-*` summaries, the room scan of mode 0 with the unit
+//! tests the scan callbacks use, the pack scan and the Vulture land /
+//! take-off helpers (also FrogDemon's sink and surface).
+
+use d2_data::tables::Skills;
+
+use crate::game::Game;
+use crate::units::{RoomId, UnitId, UnitType};
+
+use super::tactics::*;
+use super::{idle_keep_mode, mode, AiHost, Ctx, ModeTarget, TickParam};
+
+/// "wait N" `0x005DE0F0(N)`: delete the thinks and schedule one at frame +
+/// N; the anim mode is not changed.
+pub(super) fn wait<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitId, n: i32) {
+    idle_keep_mode(game, cx, u, n);
+}
+
+/// "mode m at (x, y)" `0x005DE440(x, y, m)`: path step count 1, mode m
+/// at the point, no target unit.
+pub(super) fn mode_point<W: AiHost + ?Sized>(
+    game: &mut Game,
+    cx: &mut Ctx<'_, W>,
+    u: UnitId,
+    m: u8,
+    x: i32,
+    y: i32,
+) -> bool {
+    cx.world.set_path_steps(u, 1);
+    cx.world.change_mode(game, u, m, ModeTarget::Point(x, y))
+}
+
+/// `0x005DDFC0(m, x, y)` / `0x005DE490(x, y, m)`: mode m at the point
+/// with no path step set.
+///
+/// TODO(spec: ai.md §7.1): whether `0x005DDFC0` sets the path step count
+/// is not stated; read as `0x005DE490` ("no path step").
+pub(super) fn mode_point_raw<W: AiHost + ?Sized>(
+    game: &mut Game,
+    cx: &mut Ctx<'_, W>,
+    u: UnitId,
+    m: u8,
+    x: i32,
+    y: i32,
+) -> bool {
+    cx.world.change_mode(game, u, m, ModeTarget::Point(x, y))
+}
+
+/// "Skill k at U" `0x005DEAD0(Skk mode, Skill k, U, 0, 0)`.
+pub(super) fn skill_k<W: AiHost + ?Sized>(
+    game: &mut Game,
+    cx: &mut Ctx<'_, W>,
+    u: UnitId,
+    p: &TickParam,
+    k: usize,
+    target: Option<UnitId>,
+) {
+    let (s, m) = cx.skill(p, k);
+    use_skill(game, cx, u, m, s, target_of(target));
+}
+
+/// A mode request's target: the unit, or the point (0, 0) for none.
+pub(super) fn target_of(t: Option<UnitId>) -> ModeTarget {
+    match t {
+        Some(t) => ModeTarget::Unit(t),
+        None => ModeTarget::Point(0, 0),
+    }
+}
+
+/// `0x005B0BD0`: (Δx)² + (Δy)² of the two positions (wrapping i32).
+pub(super) fn sq_dist<W: AiHost + ?Sized>(cx: &Ctx<'_, W>, a: UnitId, b: UnitId) -> i32 {
+    let (ax, ay) = cx.world.position(a);
+    let (bx, by) = cx.world.position(b);
+    let (dx, dy) = (ax.wrapping_sub(bx), ay.wrapping_sub(by));
+    dx.wrapping_mul(dx).wrapping_add(dy.wrapping_mul(dy))
+}
+
+/// The unit's room.
+pub(super) fn room_of(game: &Game, u: UnitId) -> Option<RoomId> {
+    game.lists.unit(u).and_then(|e| e.room())
+}
+
+/// Unit type.
+pub(super) fn type_of(game: &Game, u: UnitId) -> Option<UnitType> {
+    game.lists.unit(u).map(|e| e.ty)
+}
+
+pub(super) fn is_monster(game: &Game, u: UnitId) -> bool {
+    type_of(game, u) == Some(UnitType::Monster)
+}
+
+pub(super) fn is_player(game: &Game, u: UnitId) -> bool {
+    type_of(game, u) == Some(UnitType::Player)
+}
+
+/// GUID (unit +0x0C); −1 for no unit.
+pub(super) fn guid_of(game: &Game, u: Option<UnitId>) -> i32 {
+    u.and_then(|u| game.lists.unit(u))
+        .map_or(-1, |e| e.guid as i32)
+}
+
+/// Scan mode 0 `0x005DCE60` (`ai.md` §5.4): every unit of every room of
+/// the unit's room's adjacent list (own room included), in room order
+/// and room unit-list order. The callbacks run over this list; a scan
+/// that "returns the first" unit stops at it.
+pub(super) fn scan_units(game: &Game, u: UnitId) -> Vec<UnitId> {
+    let Some(room) = room_of(game, u) else {
+        return Vec::new();
+    };
+    let rooms = game
+        .lists
+        .room(room)
+        .map(|r| r.adjacent.clone())
+        .unwrap_or_default();
+    rooms
+        .into_iter()
+        .flat_map(|r| game.lists.room_units(r))
+        .collect()
+}
+
+/// `0x00463860`: monstats `BaseId` of a class; −1 for a missing row.
+pub(super) fn base_id<W: AiHost + ?Sized>(cx: &Ctx<'_, W>, class: i32) -> i32 {
+    cx.monstats(class)
+        .map_or(-1, |r| i32::from(r.baseid as i16))
+}
+
+/// `BaseId` of a unit's class.
+pub(super) fn unit_base<W: AiHost + ?Sized>(cx: &Ctx<'_, W>, u: UnitId) -> i32 {
+    base_id(cx, cx.world.class(u))
+}
+
+/// A fixed class row: `class`, or −1 when monstats has ≤ `class` rows.
+pub(super) fn fixed_class<W: AiHost + ?Sized>(cx: &Ctx<'_, W>, class: i32) -> i32 {
+    if (class as usize) < cx.tables.monstats.len() {
+        class
+    } else {
+        -1
+    }
+}
+
+/// `0x00650D70(m, u)`: m evil and u evil, or m good and u good (m
+/// neutral never).
+pub(super) fn pairing<W: AiHost + ?Sized>(cx: &Ctx<'_, W>, m: UnitId, u: UnitId) -> bool {
+    match cx.world.alignment(m) {
+        0 => cx.world.alignment(u) == 0,
+        2 => cx.world.alignment(u) == 2,
+        _ => false,
+    }
+}
+
+/// `0x0063EA40`: anim mode 0 or 12 (death, dead).
+pub(super) fn dying<W: AiHost + ?Sized>(cx: &Ctx<'_, W>, u: UnitId) -> bool {
+    matches!(cx.world.anim_mode(u), mode::DEATH | mode::DEAD)
+}
+
+/// Life (stat 6) of a unit.
+pub(super) fn life<W: AiHost + ?Sized>(cx: &Ctx<'_, W>, u: UnitId) -> i32 {
+    cx.world.stat(u, 6)
+}
+
+/// `0x005DD2D0(unit, skill)`: the unit's class lists the skill among
+/// `Skill1`..`Skill8`.
+pub(super) fn has_skill<W: AiHost + ?Sized>(cx: &Ctx<'_, W>, u: UnitId, skill: i32) -> bool {
+    let class = cx.world.class(u);
+    cx.monstats(class).is_some() && (1..=8).any(|k| cx.class_skill(class, k).0 == skill)
+}
+
+/// The skills row of a skill id.
+pub(super) fn skill_row<'a, W: AiHost + ?Sized>(cx: &Ctx<'a, W>, skill: i32) -> Option<&'a Skills> {
+    usize::try_from(skill)
+        .ok()
+        .and_then(|s| cx.tables.skills.get(s))
+}
+
+/// `aurastate` / `auratargetstate` of a skills row as signed values.
+pub(super) fn aura_states(row: &Skills) -> (i32, i32) {
+    (
+        i32::from(row.aurastate as i16),
+        i32::from(row.auratargetstate as i16),
+    )
+}
+
+/// "teleport in range r" `0x005DF850(unit, r, skill, mode)`: x := own x +
+/// roll(2r) − r, then y likewise (two steps, x first; no draw when 2r <
+/// 1); `0x005DEAD0(mode, skill, 0, x, y)`.
+pub(super) fn teleport_in_range<W: AiHost + ?Sized>(
+    game: &mut Game,
+    cx: &mut Ctx<'_, W>,
+    u: UnitId,
+    r: i32,
+    skill: i32,
+    m: u8,
+) {
+    let n = r.wrapping_mul(2);
+    let (ox, oy) = cx.world.position(u);
+    let dx = cx.world.seed(u).roll(n) as i32;
+    let x = ox.wrapping_add(dx).wrapping_sub(r);
+    let dy = cx.world.seed(u).roll(n) as i32;
+    let y = oy.wrapping_add(dy).wrapping_sub(r);
+    use_skill(game, cx, u, m, skill, ModeTarget::Point(x, y));
+}
+
+/// `0x006416D0(a, b)` (`missiles/missiles.md`): per axis |Δ| − (size(a) /
+/// 2 + size(b) / 2), clamped at 0; then (2·max + min) / 2.
+pub(super) fn reach_distance<W: AiHost + ?Sized>(cx: &Ctx<'_, W>, a: UnitId, b: UnitId) -> i32 {
+    let ((ax, ay), (bx, by)) = (cx.world.position(a), cx.world.position(b));
+    let gap = cx.world.size(a) / 2 + cx.world.size(b) / 2;
+    let dx = bx.wrapping_sub(ax).wrapping_abs().wrapping_sub(gap).max(0);
+    let dy = by.wrapping_sub(ay).wrapping_abs().wrapping_sub(gap).max(0);
+    distance_formula(dx, dy)
+}
+
+/// `0x006417F0(unit, x, y)` (`sim/pathing.md`): max(|dx|, |dy|) +
+/// min(|dx|, |dy|) / 2 from the unit's position.
+pub(super) fn point_distance<W: AiHost + ?Sized>(
+    cx: &Ctx<'_, W>,
+    u: UnitId,
+    x: i32,
+    y: i32,
+) -> i32 {
+    let (ux, uy) = cx.world.position(u);
+    let (dx, dy) = (
+        ux.wrapping_sub(x).wrapping_abs(),
+        uy.wrapping_sub(y).wrapping_abs(),
+    );
+    dx.max(dy) + dx.min(dy) / 2
+}
+
+/// "wander near t n" with t = 0 read as the unit itself.
+///
+/// TODO(spec gap): `0x005DF530` with target 0 (target mode 1 always has
+/// one); the own position is used.
+pub(super) fn wander_near_opt<W: AiHost + ?Sized>(
+    game: &mut Game,
+    cx: &mut Ctx<'_, W>,
+    u: UnitId,
+    t: Option<UnitId>,
+    n: i32,
+) -> bool {
+    wander_near(game, cx, u, t.unwrap_or(u), n)
+}
+
+/// "walk in radius of t (a, b)" `0x005DE6D0`; nothing for t = 0.
+///
+/// TODO(spec gap): walking in the radius of target 0 (target mode 1
+/// always has one) does nothing here.
+pub(super) fn radius<W: AiHost + ?Sized>(
+    game: &mut Game,
+    cx: &mut Ctx<'_, W>,
+    u: UnitId,
+    t: Option<UnitId>,
+    a: i32,
+    b: i32,
+) -> bool {
+    match t {
+        Some(t) => cx.world.walk_in_radius(game, u, t, a, b),
+        None => false,
+    }
+}
+
+/// The pack scan (`ai-bodies-2.md` §2, scan 1, callback `0x005B0D00`):
+/// the nearest other monster with the scanner's `BaseId` not in mode 0
+/// or 12, by squared distance (strictly smaller wins); with that squared
+/// distance.
+pub(super) fn pack_scan<W: AiHost + ?Sized>(
+    game: &Game,
+    cx: &Ctx<'_, W>,
+    u: UnitId,
+) -> Option<(UnitId, i32)> {
+    let base = unit_base(cx, u);
+    let mut best: Option<(UnitId, i32)> = None;
+    for v in scan_units(game, u) {
+        if v == u || !is_monster(game, v) || unit_base(cx, v) != base || dying(cx, v) {
+            continue;
+        }
+        let d = sq_dist(cx, u, v);
+        if d < best.map_or(0x7FFF_FFFF, |b| b.1) {
+            best = Some((v, d));
+        }
+    }
+    best
+}
+
+/// Unit flags the Vulture land / take-off helpers toggle.
+pub(super) const FLAG_LANDED: u32 = 0x0E;
+
+/// Land `0x005F2FC0` (`ai-bodies-2.md` §11): unit flags |= 0x0E first;
+/// pattern already 1 → false; place at the own position (failure →
+/// false); stamp pattern 1 with mask 0x100; pattern := 1; move mask :=
+/// 0x3C01; wait 12; true.
+pub(super) fn land<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitId) -> bool {
+    cx.world.set_unit_flag(u, FLAG_LANDED);
+    if cx.world.path_pattern(u) == 1 {
+        return false;
+    }
+    let room = room_of(game, u);
+    let (x, y) = cx.world.position(u);
+    if !cx.world.place_unit(game, u, room, x, y) {
+        return false;
+    }
+    cx.world.stamp_pattern(game, room, x, y, 1, 0x100);
+    cx.world.set_path_pattern(u, 1);
+    cx.world.set_move_mask(u, 0x3C01);
+    wait(game, cx, u, 12);
+    true
+}
+
+/// Take off `0x005F2EB0`: unit flags &= ~0x0E; clear bit 0x1000 then bit
+/// 0x100 of the one cell at the own position (own room); pattern := 5;
+/// move mask := 0; wait 12.
+pub(super) fn take_off<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitId) {
+    cx.world.clear_unit_flag(u, FLAG_LANDED);
+    let room = room_of(game, u);
+    let (x, y) = cx.world.position(u);
+    cx.world.clear_cell(game, room, x, y, 0x1000);
+    cx.world.clear_cell(game, room, x, y, 0x100);
+    cx.world.set_path_pattern(u, 5);
+    cx.world.set_move_mask(u, 0);
+    wait(game, cx, u, 12);
+}

@@ -477,6 +477,11 @@ impl StatLists {
         list.skill_level = level;
     }
 
+    /// The remove callback (+0x38).
+    pub fn remove_callback(&self, l: ListId) -> Option<RemoveCallback> {
+        self.try_l(l).and_then(|x| x.remove_callback)
+    }
+
     pub fn set_remove_callback(&mut self, l: ListId, cb: Option<RemoveCallback>) {
         if let Some(list) = self.try_lm(l) {
             list.remove_callback = cb;

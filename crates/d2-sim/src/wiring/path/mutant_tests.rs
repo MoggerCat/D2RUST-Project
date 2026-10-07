@@ -318,7 +318,7 @@ fn game_entry_places_the_player_in_the_town_and_sends_0x07_then_0x15() {
         let cell = RefCell::new(PathCtx::of(v, g));
         let (mut cv, mut host, mut lv) = (Shared(&cell), Shared(&cell), Shared(&cell));
         assert_eq!(lv.act_start_level(0), TOWN);
-        crate::path::place::game_entry(&mut cv, &mut host, &mut lv, p, 0, 2)
+        crate::path::place::game_entry(&mut cv, &mut host, &mut lv, p, 0)
     });
     assert_eq!(r, Ok(true));
     let (x, y, room) = pos(&mut fx, p);
@@ -471,11 +471,13 @@ fn a_missile_path_takes_its_set_up_and_a_still_missile_stays_put() {
 // Covers: specs/sim/path-placement.md §2.5, §3, §5.1, §5.2, §5.3 r4; specs/sim/units.md §3.2
 #[test]
 fn floor_items_stamp_by_size_and_removal_clears_each_kind() {
-    // Item in mode 3: size 1, mask 0x200 (the cell); a monster: mask
-    // 0x100 by its pattern. Removal clears the footprint of types 0–3
-    // only (`units.md` §3.2, `0x00649F50`): the monster's goes, the
-    // item's stays. (A tile, size 0,
-    // stamps nothing: §5.1 size stamp "others nothing".)
+    // Item in mode 3: size 1, mask 0x200 (the cell). A monster of
+    // monstats2 `SizeX` 0 has pattern 0, which stamps nothing (§5.1); one
+    // of `SizeX` 2 has pattern 1: the plus with mask 0x100 and NO_PATH on
+    // its centre (§3). Removal clears the footprint of types 0–3 only
+    // (`units.md` §3.2, `0x00649F50`): the monster's goes, the item's
+    // stays. (A tile, size 0, stamps nothing: §5.1 size stamp "others
+    // nothing".)
     let mut fx = fx();
     let a = fx.a;
     let req = AllocRequest {
@@ -491,16 +493,28 @@ fn floor_items_stamp_by_size_and_removal_clears_each_kind() {
         .sim
         .with(&mut fx.game, |g, v| v.allocate(g, &req, 5, 5))
         .unwrap();
+    let before = cell(&mut fx, 20, 20);
+    let m0 = fx.spawn(UnitType::Monster, 0, a, 20, 20);
+    assert_eq!(cell(&mut fx, 20, 20), before);
+    {
+        let t = Arc::make_mut(&mut fx.sim.hooks().tables);
+        let ex = usize::from(t.combat.monstats[0].monstatsex);
+        t.combat.monstats2[ex].sizex = 2;
+    }
     let m = fx.spawn(UnitType::Monster, 0, a, 30, 30);
     assert_eq!(cell(&mut fx, 5, 5), 0x200);
     assert_eq!(cell(&mut fx, 6, 5), 0);
-    // The fixture's monster class has monstats2 `SizeX` 0: pattern 0,
-    // the cell, no marker (§3).
-    assert_eq!(cell(&mut fx, 30, 30), 0x100);
-    for u in [i, m] {
+    assert_eq!(cell(&mut fx, 30, 30), 0x100 | bits::NO_PATH);
+    for (x, y) in [(29, 30), (31, 30), (30, 29), (30, 31)] {
+        assert_eq!(cell(&mut fx, x, y), 0x100, "({x}, {y})");
+    }
+    assert_eq!(cell(&mut fx, 29, 29), 0);
+    for u in [i, m0, m] {
         remove(&mut fx, u);
     }
-    assert_eq!(cell(&mut fx, 30, 30), 0);
+    for (x, y) in [(30, 30), (29, 30), (31, 30), (30, 29), (30, 31)] {
+        assert_eq!(cell(&mut fx, x, y), 0, "({x}, {y})");
+    }
     assert_eq!(cell(&mut fx, 5, 5), 0x200);
     fx.assert_clean();
 }

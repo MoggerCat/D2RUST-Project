@@ -667,10 +667,25 @@ fn run() -> Transcript {
         b: 0,
         life_pct: 0,
     };
+    // In the drain: the placement's 0x07 and the arrival 0x0D; then the
+    // tick's room switch sends 0x07 for each room of C's adjacency array
+    // (`path-placement.md` §11 "Recipients"; the one-room town: C itself).
     let mut want = reveal.encode().to_vec();
     want.extend_from_slice(&stop.encode());
+    want.extend_from_slice(&reveal.encode());
     assert_eq!(chunks.concat(), want);
-    assert_eq!((report.messages, report.unowned), (2, 2));
+    // 0x07 needs the client act (no 0x03 was sent: fatal 0x58A,
+    // `client/model.md` §9 rule 1) and 0x0D's player was never announced
+    // (no 0x59: dropped, §4 rule 1).
+    assert_eq!(
+        (
+            report.messages,
+            report.rejected,
+            report.dropped,
+            report.unowned
+        ),
+        (3, 2, 1, 0)
+    );
     let mut travel = vec![chunks];
     // The frames after: nothing (finding 1 of the handoff: no 0x15).
     for _ in 0..3 {
@@ -679,7 +694,16 @@ fn run() -> Transcript {
         travel.push(chunks);
     }
     let unowned = fx.bridge.log().unowned.clone();
-    assert_eq!(unowned, BTreeMap::from([(0x07, 1), (0x0D, 1)]));
+    assert_eq!(unowned, BTreeMap::new());
+    assert_eq!(fx.bridge.log().dropped, BTreeMap::from([(0x0D, 1)]));
+    let rejected: Vec<(u8, String)> = fx
+        .bridge
+        .log()
+        .rejected
+        .iter()
+        .map(|r| (r.id, r.error.to_string()))
+        .collect();
+    assert_eq!(rejected, vec![(0x07, "fatal assert 0x58A".to_owned()); 2]);
     let stamina = {
         let s = fx.sim();
         s.events.with(&mut s.game, |_, v| v.stat(p, STAT_STAMINA))

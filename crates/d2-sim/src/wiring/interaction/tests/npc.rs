@@ -5,6 +5,7 @@
 
 use super::*;
 use crate::tick::events::event;
+use crate::world::hirelings::{flags as hflags, PetNode};
 use crate::world::npc::hire::{hire_init, resurrect_cost};
 use crate::world::npc::{code, talk, AI_PARAM, SOUND_HEAL};
 
@@ -144,6 +145,7 @@ fn cain_identify_pays_from_real_gold() {
 }
 
 // Covers: specs/world/npc.md §7.2, §7.3 r5, §7.3 r6
+// Covers: specs/world/hirelings.md §3.2 r6, §3.2 r7, §3.2 r9
 #[test]
 fn hire_at_asheara_pays_real_gold_for_the_offer() {
     let mut w = World::new(false);
@@ -184,10 +186,27 @@ fn hire_at_asheara_pays_real_gold_for_the_offer() {
         .slots
         .iter()
         .any(|s| s.name == name && s.hired));
-    assert!(w.rest.log.contains(&format!(
-        "init merc {} row {} name {name} price Some({})",
-        merc.0, want.row, want.price
-    )));
+    // The init (`hirelings.md` §3.2): the pet node, the flags, the
+    // offer's level, the 0x81 broadcast.
+    let node = PetNode {
+        dead: false,
+        guid: w.guid(merc),
+        seed: slot.seed,
+        name,
+        id: 15,
+    };
+    assert_eq!(w.state.hirelings.list(player).unwrap().nodes, vec![node]);
+    let f = w.units.get(merc).unwrap().flags;
+    assert_eq!(
+        f & (hflags::INIT | hflags::OWNED),
+        hflags::INIT | hflags::OWNED
+    );
+    assert_eq!(w.stats.unit_base(merc, st::LEVEL, 0), want.level);
+    assert!(w
+        .rest
+        .sent
+        .iter()
+        .any(|(p, m)| *p == player && m[0] == 0x81));
     let last = *npc_transactions(&w.rest).last().unwrap();
     assert_eq!(last.1, code::MERC);
     assert_eq!(last.2, w.guid(merc));
@@ -195,6 +214,7 @@ fn hire_at_asheara_pays_real_gold_for_the_offer() {
 }
 
 // Covers: specs/world/npc.md §7.4 r2, §7.4 r3, §7.4 r4
+// Covers: specs/world/hirelings.md §9 r4
 #[test]
 fn resurrect_revives_a_real_mercenary() {
     let mut w = World::new(true);
@@ -204,7 +224,16 @@ fn resurrect_revives_a_real_mercenary() {
     w.set(player, &[(st::GOLD, PLAYER_GOLD)]);
     w.set(merc, &[(st::LEVEL, 10), (st::MAXHP, 5120), (st::LIFE, 0)]);
     w.units.get_mut(merc).unwrap().flags |= 0x10000;
-    w.rest.pets.insert(player, merc);
+    // A dead hireling node (`hirelings.md` §8 rule 2).
+    let node = PetNode {
+        dead: true,
+        guid: w.guid(merc),
+        seed: 7,
+        name: 10,
+        id: 15,
+    };
+    w.state.hirelings.list_mut(player).nodes.push(node);
+    w.state.hirelings.list_mut(player).max = 1;
     talk_to(&mut w, player, npc);
     let m = msg(0x62, &[w.guid(npc)]);
     assert_eq!(w.desk(|d, ctl| ctl.resurrect(d, player, &m)), 0);
@@ -214,7 +243,10 @@ fn resurrect_revives_a_real_mercenary() {
     assert_eq!(w.units.get(merc).unwrap().flags & 0x10000, 0);
     assert_eq!(w.stat(merc, st::LIFE), w.stats.max_life(merc));
     assert!(w.rest.log.contains(&format!("mode {} 1", merc.0)));
-    assert!(w.rest.log.contains(&format!("revive {}", merc.0)));
+    // `hirelings.md` §9 rules 4, 8: the node living again (0x81), the
+    // hireling warped to the player.
+    assert!(!w.state.hirelings.list(player).unwrap().nodes[0].dead);
+    assert!(w.rest.sent.iter().any(|(_, m)| m[0] == 0x81));
     assert!(w.rest.sent.iter().any(|(_, m)| m[0] == 0x9B));
     let last = *npc_transactions(&w.rest).last().unwrap();
     assert_eq!((last.1, last.2), (code::MERC, w.guid(merc)));

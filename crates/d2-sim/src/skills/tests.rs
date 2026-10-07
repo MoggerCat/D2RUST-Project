@@ -364,9 +364,11 @@ fn rolls_step_unit_seed() {
     assert_eq!(rec.physical, 7 + want);
     assert_eq!(f.units[u].seed, s);
     // One HitShift (8 here) for both: 1536 + roll(1536) on the next step.
-    let (et, v, len) = roll_elemental(&mut f, &t, u, 0, 1);
+    // EType 1: the value goes to fire (`add_element`).
+    let mut rec = DamageRecord::default();
+    let v = roll_elemental(&mut f, &t, u, &mut rec, 0, 1);
     let want = 1_536 + s.roll(1_536) as i32;
-    assert_eq!((et, v, len), (1, want, 0));
+    assert_eq!((v, rec.fire, rec.physical), (want, want, 0));
     // A zero range does not step.
     let mut r = skill_rec();
     (r.mindam, r.maxdam) = (3, 3);
@@ -375,6 +377,64 @@ fn rolls_step_unit_seed() {
     let mut rec = DamageRecord::default();
     roll_physical(&mut f, &t, u, &mut rec, 0, 1);
     assert_eq!((rec.physical, f.units[u].seed), (3, before));
+}
+
+// Covers: specs/skills/levels.md §3.6
+#[test]
+fn add_element_by_etype() {
+    let mut f = Fake::default();
+    let u = player(&mut f);
+    let mut r = DamageRecord::default();
+    let add = |f: &mut Fake, r: &mut DamageRecord, e, v, len| add_element(f, u, r, e, v, len);
+    let before = f.units[u].seed;
+    // Fixed elements: field, length, resist; no draw.
+    assert_eq!(add(&mut f, &mut r, 1, 5, 9).resist, 39);
+    assert_eq!(add(&mut f, &mut r, 2, 6, 9).resist, 41);
+    assert_eq!(add(&mut f, &mut r, 3, 7, 9).resist, 37);
+    let c = add(&mut f, &mut r, 4, 8, 25);
+    assert_eq!((c.resist, c.hit_class), (43, 0x30));
+    assert_eq!(add(&mut f, &mut r, 5, 9, 30).resist, 45);
+    for e in [6, 7, 8] {
+        assert_eq!(add(&mut f, &mut r, e, 1, 0).resist, -1);
+    }
+    add(&mut f, &mut r, 9, 2, 3);
+    add(&mut f, &mut r, 11, 4, 12);
+    add(&mut f, &mut r, 12, 10, 40);
+    add(&mut f, &mut r, 0, 100, 0);
+    add(&mut f, &mut r, 13, 1, 0);
+    assert_eq!(f.units[u].seed, before);
+    let want = DamageRecord {
+        fire: 5,
+        lightning: 6,
+        magic: 7,
+        cold: 18,
+        cold_len: 25,
+        poison: 9,
+        poison_len: 30,
+        life_leech: 1,
+        mana_leech: 1,
+        stamina_leech: 1,
+        stun_len: 5,
+        burn: 4,
+        burn_len: 12,
+        freeze_len: 40,
+        physical: 101,
+        ..DamageRecord::default()
+    };
+    assert_eq!(r, want);
+    // e = 10: one step, {1, 2, 4, 5}[lo' & 3], len ≤ 0 → 50.
+    let mut s = f.units[u].seed;
+    let e = [1, 2, 4, 5][(s.step() & 3) as usize];
+    let mut r = DamageRecord::default();
+    let got = add(&mut f, &mut r, 10, 3, 0);
+    assert_eq!(got.element, e);
+    assert_eq!(f.units[u].seed, s);
+    let len = match e {
+        4 => r.cold_len,
+        5 => r.poison_len,
+        _ => 50,
+    };
+    assert_eq!(len, 50);
 }
 
 // ------------------------------------------------------------ §1 levels

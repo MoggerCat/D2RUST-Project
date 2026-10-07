@@ -124,8 +124,6 @@ pub struct World {
     pub paths: BTreeMap<UnitId, DynamicPath>,
     pub units: BTreeMap<UnitId, Unit>,
     pub client_players: BTreeMap<ClientId, UnitId>,
-    /// `0x00649120` answer (`WalkUnits::repath_budget`).
-    pub budget: i32,
     pub frame: i32,
     pub events: Vec<Ev>,
 }
@@ -199,7 +197,6 @@ impl World {
             paths: BTreeMap::new(),
             units: BTreeMap::new(),
             client_players: BTreeMap::new(),
-            budget: 0,
             frame: 0,
             events: Vec::new(),
         }
@@ -271,6 +268,10 @@ impl World {
     /// Pattern stamp / clear (§5.1) with the §3 marker when the mask is
     /// not 0.
     pub fn stamp(&mut self, at: Point, pattern: u32, mask: u16, set: bool) {
+        // Pattern 0 stamps and clears nothing (§5.1).
+        if pattern == 0 {
+            return;
+        }
         let Some(cs) = pattern_cells(pattern) else {
             return;
         };
@@ -546,9 +547,6 @@ impl WalkUnits for World {
         } else {
             0
         }
-    }
-    fn repath_budget(&self, _unit: UnitId) -> i32 {
-        self.budget
     }
 }
 

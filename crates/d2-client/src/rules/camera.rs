@@ -263,16 +263,6 @@ impl Camera {
     }
 }
 
-/// Errors of the shake envelope where the original's arithmetic would
-/// fault or leave 32 bits; the spec states no result there.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
-pub enum ShakeError {
-    #[error("release time 0 at t = {t}: the original divides by zero")]
-    ZeroRelease { t: u32 },
-    #[error("envelope product {product} at t = {t} exceeds 32 bits")]
-    Overflow { t: u32, product: u64 },
-}
-
 /// A running screen shake (§8, started by `0x00476A80`): peak `A`,
 /// attack `t1`, sustain `t2`, release `t3`, in milliseconds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -295,32 +285,26 @@ impl Shake {
     }
 
     /// The amplitude `a` at `t` ms after the start (§8 table), or `None`
-    /// once `t > t1 + t2 + t3` (the shake has ended; offsets 0).
-    pub fn amplitude(&self, t: u32) -> Result<Option<u32>, ShakeError> {
-        let (a, t1, t2, t3) = (
-            u64::from(self.peak),
-            u64::from(self.attack),
-            u64::from(self.sustain),
-            u64::from(self.release),
-        );
-        let tt = u64::from(t);
-        if tt > t1 + t2 + t3 {
-            return Ok(None);
+    /// once `t > t1 + t2 + t3` (the shake has ended; offsets 0). Every
+    /// value is unsigned 32-bit as in the original: sums and the product
+    /// keep their low 32 bits (`imul`), comparisons and the division are
+    /// unsigned. A zero divisor is never reached: the attack row needs
+    /// `t < t1`, and with `t3 = 0` the release row (only `t = t1 + t2`)
+    /// gives `a = 0`.
+    pub fn amplitude(&self, t: u32) -> Option<u32> {
+        let (a, t1, t2, t3) = (self.peak, self.attack, self.sustain, self.release);
+        let end = t1.wrapping_add(t2).wrapping_add(t3);
+        if t > end {
+            return None;
         }
-        let (num, den) = if tt < t1 {
-            (a * tt, t1)
-        } else if tt < t1 + t2 {
-            return Ok(Some(self.peak));
+        Some(if t < t1 {
+            a.wrapping_mul(t) / t1
+        } else if t < t1.wrapping_add(t2) {
+            a
         } else {
-            (a * (t1 + t2 + t3 - tt), t3)
-        };
-        if num > u64::from(u32::MAX) {
-            return Err(ShakeError::Overflow { t, product: num });
-        }
-        if den == 0 {
-            return Err(ShakeError::ZeroRelease { t });
-        }
-        Ok(Some((num / den) as u32))
+            // t3 = 0: only t = t1 + t2 reaches this row, a = 0.
+            a.wrapping_mul(end - t).checked_div(t3).unwrap_or(0)
+        })
     }
 
     /// §9: the d2rs envelope time of the frame `ticks` client ticks after

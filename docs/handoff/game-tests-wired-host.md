@@ -1,6 +1,6 @@
 # Handoff: game-file tests of the whole wired single-player host (branch `claude/game-tests-wired-host`, 2026-10-06)
 
-> To be folded into `docs/HANDOFF.md` (§1, §5) and `docs/PLAN.md` by a docs session; this file stays as the detailed record.
+> Folded into `docs/HANDOFF.md` (§1–§5, §7, §8) and `docs/PLAN.md` as of the eighth fold (`claude/docs-fold-8`); this file stays as the detailed record. Step 4 asserts the stub for C→S 0x03 and is stale since `wire-path-server` (HANDOFF §2 step 7u(a)); fix it before the local run C59.
 
 Cloud test session, repo only (no `game/`), medium effort, from
 `claude/tender-meitner-mphas3` (merged up to `9fdb785`). Read: `specs/`,

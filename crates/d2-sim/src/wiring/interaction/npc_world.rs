@@ -1,4 +1,4 @@
-// Spec: specs/world/npc.md §2–§8; specs/world/quests.md §4, §10; specs/sim/stat-lists.md §9; specs/sim/tick.md §5.2–§5.4; specs/items/generation.md §7.2, §7.3
+// Spec: specs/world/npc.md §2–§8; specs/world/hirelings.md §5 r4; specs/world/quests.md §4, §10; specs/sim/stat-lists.md §9; specs/sim/tick.md §5.2–§5.4; specs/items/generation.md §7.2, §7.3
 //! [`NpcWorld`] on the real providers: unit records (GUID, class, mode,
 //! act, flags), the unit lists (GUID lookup), the stat lists (stats,
 //! maxima, states, state lists), the timer queue (the AI think), the item
@@ -27,7 +27,7 @@ const STATE_UNINTERRUPTABLE: u32 = 54;
 
 /// The NPC calls no written spec provides yet, each with its expected
 /// provider (`docs/handoff/impl-npc.md` §3).
-pub trait NpcRest {
+pub trait NpcRest: super::HirelingRest {
     /// Game +0x78 (game creation; not in `GameFields`).
     fn item_format(&self) -> u16;
     // ---- positions and paths (movement spec, `intents-events.md` §2.4)
@@ -79,12 +79,9 @@ pub trait NpcRest {
     fn personal_name(&self, item: UnitId) -> Vec<u8>;
     fn set_personal_name(&mut self, item: UnitId, name: &[u8]);
     fn place_or_drop(&mut self, player: UnitId, item: UnitId);
-    // ---- mercenaries (mercenary spec, not written)
-    /// Also the mode set of a revived mercenary (`npc.md` §7.4 step 4).
-    fn set_mode(&mut self, unit: UnitId, mode: u8);
+    // ---- mercenaries (`hirelings.md` §3.1: monster creation; the mode
+    // set is [`super::HirelingRest::set_mode`])
     fn spawn_mercenary(&mut self, near: UnitId, class: u32, mode: u8) -> Option<UnitId>;
-    fn init_mercenary(&mut self, player: UnitId, merc: UnitId, init: &MercInit);
-    fn revive_mercenary(&mut self, player: UnitId, merc: UnitId);
 }
 
 impl<'a, H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> Desk<'_, 'a, H, R> {
@@ -134,7 +131,7 @@ impl<'a, H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> NpcWorld
         self.econ.units.get(unit).map_or(0, |r| r.mode as u8)
     }
     fn set_mode(&mut self, unit: UnitId, mode: u8) {
-        self.rest.set_mode(unit, mode);
+        super::HirelingRest::set_mode(&mut *self.rest, unit, mode);
     }
     /// Unit +0xC4.
     fn clear_unit_flag(&mut self, unit: UnitId, flag: u32) {
@@ -216,7 +213,12 @@ impl<'a, H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> NpcWorld
     fn reset_interact(&mut self, player: UnitId) {
         self.rest.reset_interact(player);
     }
+    /// Kind 7: the hireling list (`hirelings.md` §5 rule 4); other kinds
+    /// are `sim/pets.md`'s (the rest).
     fn pet(&self, player: UnitId, kind: u8, arg: u8) -> Option<UnitId> {
+        if kind == crate::world::hirelings::PET_HIRELING {
+            return self.hireling_pet(player, arg != 0);
+        }
         self.rest.pet(player, kind, arg)
     }
     fn pets(&self, player: UnitId) -> Vec<UnitId> {
@@ -323,8 +325,8 @@ impl<'a, H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> NpcWorld
         act1::respec_done(ctl, &mut w, player);
     }
     fn imbue_granted(&mut self, player: UnitId) {
-        let (_, mut w) = self.quest_world();
-        act1::imbue_granted(&mut w, player);
+        let (ctl, mut w) = self.quest_world();
+        act1::imbue_granted(ctl, &mut w, player);
     }
     fn socket_granted(&mut self, player: UnitId) {
         self.rest.socket_granted(player);
@@ -456,10 +458,12 @@ impl<'a, H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> NpcWorld
     fn spawn_mercenary(&mut self, near: UnitId, class: u32, mode: u8) -> Option<UnitId> {
         self.rest.spawn_mercenary(near, class, mode)
     }
+    /// `hirelings.md` §3.2.
     fn init_mercenary(&mut self, player: UnitId, merc: UnitId, init: &MercInit) {
-        self.rest.init_mercenary(player, merc, init);
+        self.hireling_init(player, merc, init);
     }
+    /// `hirelings.md` §9 rules 3–9.
     fn revive_mercenary(&mut self, player: UnitId, merc: UnitId) {
-        self.rest.revive_mercenary(player, merc);
+        self.hireling_revive(player, merc);
     }
 }

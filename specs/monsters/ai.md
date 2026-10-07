@@ -2,7 +2,7 @@
 
 - **Status:** draft: think scheduling, dispatch, AI tables and the
   shared helpers read from the 1.14d `Game.exe` (addresses below; AI
-  tables dumped from the file); 17 AI functions read in full; think
+  tables dumped from the file); 37 AI functions read in full; think
   intervals checked against 4,409 recorded type-2 runs in three tick
   recordings (mode-end re-think: 79/79 at aidel; no rule contradicted).
 - **Target version:** 1.14d
@@ -29,21 +29,21 @@
 | Outputs / state changes | 80–90 |
 | Rules | 91–92 |
 |   1. Think scheduling | 93–224 |
-|   2. Think dispatch `0x005B1740` | 225–339 |
-|   3. AI control and AI tables | 340–435 |
-|   4. AI parameters | 436–454 |
-|   5. Target selection | 455–537 |
-|   6. Distances and line tests | 538–550 |
-|   7. Tactics helpers | 551–605 |
-|   8. AI commands and minions | 606–626 |
-|   9. Per-AI behaviours | 627–841 |
-|   10. The catalogue `ai-functions.tsv` | 842–862 |
-| Constants & data dependencies | 863–884 |
-| Randomness | 885–903 |
-| Edge cases & original bugs | 904–928 |
-| Test vectors | 929–1002 |
-| Provenance | 1003–1035 |
-| Open questions | 1036–1066 |
+|   2. Think dispatch `0x005B1740` | 225–353 |
+|   3. AI control and AI tables | 354–449 |
+|   4. AI parameters | 450–468 |
+|   5. Target selection | 469–551 |
+|   6. Distances and line tests | 552–566 |
+|   7. Tactics helpers | 567–625 |
+|   8. AI commands and minions | 626–650 |
+|   9. Per-AI behaviours | 651–1450 |
+|   10. The catalogue `ai-functions.tsv` | 1451–1471 |
+| Constants & data dependencies | 1472–1495 |
+| Randomness | 1496–1517 |
+| Edge cases & original bugs | 1518–1559 |
+| Test vectors | 1560–1648 |
+| Provenance | 1649–1697 |
+| Open questions | 1698–1738 |
 <!-- /index -->
 
 ## Summary
@@ -308,6 +308,20 @@ else delete thinks and schedule +20 (no mode change).
 
 1.14d-confirmed (`0x005B1650`, `0x005DE890`, `0x005DE9D0`).
 
+**Target 0 in mode-1 and mode-4 bodies.** Modes 1 and 4 stop the think
+when no target is found, so the AI function of a target-mode-1 or -4
+record (the active record: special state or base) never runs with T =
+0. The "T = 0" branches of such bodies (Fetish's life of T, §9.21;
+BloodRaven's h and raise point, §9.18; SkeletonBow's walk in radius,
+§9.16; run near T) are unreachable in 1.14d, and several of the helpers
+they call read T without a null test (`0x005DF680` run near,
+`0x005DE4E0` walk in radius, `0x005DC480` half-size distance read T's
+unit type at once): a T = 0 call there is an access violation in
+1.14d. An implementation treats them as unreachable (assert), not as a
+rule. Null-safe helpers: `0x00621F20` (life percent of 0 → 0, through
+the null-safe stat getters `0x00625480` / `0x00625D10`) and escape
+`0x005DEFE0` / `0x005DF140` (§7.2).
+
 #### 2.4 Precheck C `0x005B13E0`: boss sound, teleport, special walk
 
 Only when a target was found:
@@ -544,6 +558,8 @@ All distances are in tiles (subtile coordinates of `sim/units.md`):
 | `0x005DC530` | `AIUTIL_GetDistanceToCoordinates_NoUnitSize` | dx = \|ux − x\|, dy = \|uy − y\|; (2·max + min) / 2, truncated |
 | `0x005DC380` | `…_FullUnitSize(a, b)` | dx, dy as above from a to b's position, each minus a's size (`0x00620510`) and **clamped at 0** (D2MOO uses the absolute value: 1.14d differs); then the same formula |
 | `0x005DC5C0` | `AIUTIL_GetDistanceToCoordinates` | same formula on the path position |
+| `0x00621F20(u)`, wrapper `0x005DD280` | `UNITS_GetCurrentLifePercentage` | life percent: (stat 6 life >> 8) × 100 / (max life (`0x00625D10`) >> 8), signed, truncating; 0 when max life >> 8 is 0 |
+| `0x005DC480(u, x, y)` | `…_HalfUnitSize` | dx = \|ux − x\|, dy = \|uy − y\| (u's position), each minus (size(u) / 2 + 1) (`0x00620510`, unsigned halving) and clamped at 0; then (2·max + min) / 2 |
 | `0x005DC640` | `sub_6FCF14D0` | "can reach directly": offset k = table by distance (2 ×3, 3 ×8, 4 ×14, else 3); tests three points (target, and target ± the perpendicular offset) for collision mask 0x1/0x4/0x400 (D2MOO wall, missile barrier, door); fails only if all three collide |
 | `0x00622AA0(a, b, 4)` | `UNITS_TestCollisionWithUnit` | blocked line between a and b with mask 4 (`sim/units.md`) |
 | `0x00622C40(a, b, 0)` | `UNITS_IsInMeleeRange` | combat flag (`sim/units.md`) |
@@ -582,17 +598,21 @@ flag 4 → delete thinks; flag 1 → set control flag 0x40; flag 2 → draw
 | `0x005DED00(t, f)` / `0x005DED20(t)` | `RunToTargetUnit(WithFlags)` | 15, unit, 1, f / 0 | none |
 | `0x005DED40(t, f)` | `sub_6FCD0410` | velocity method 13 first; then 2, unit, 1, f | none |
 | `0x005DEF80(t, n)` / `0x005DEFB0(t, n)` | `Walk/RunToTargetUnitWithSteps` | 2 / 15, unit, n (0 → 1), 0 | none |
-| `0x005DED90`, `0x005DEDE0`, `0x005DEE50` | walk / run (decrepify → walk) / walk + delete thinks on failure, to coordinates | | none |
+| `0x005DED90`, `0x005DEDE0`, `0x005DEE50` | walk / run (decrepify → walk) / walk + delete thinks on failure, to coordinates | 2 / 15 (state 60: velocity reset, 2) / 2, coordinates, path step count 1 (`0x00649070(path, 1)`), no flags | none |
 | `0x005DE200(n)` | `AITACTICS_WalkCloseToUnit` ("wander n") | 2, point near itself, 1, 0 | three or four: (a) step, `lo'` bit 0 = 1 → x offset n, y offset `roll(n)`; bit 0 = 0 → x offset `roll(n)`, y offset n; (b) step, bit 0 = 1 → negate x; (c) step, bit 0 = 1 → negate y. `roll(n)` steps only if n ≥ 1 |
 | `0x005DF530(t, n)` | `WanderToTarget` / `WalkToOwner` | same draws, around unit t | as wander |
-| `0x005DEFE0(t, n, del)` | `D2GAME_AICORE_Escape` | if n > 5 velocity request steps n; walk to (own x + sign(own x − t.x)·n, own y + sign(own y − t.y)·n), step 1, flags del ? 4 : 0 | none |
+| `0x005DEFE0(t, n, del)` | `D2GAME_AICORE_Escape` | unit or t = 0 → return 0, nothing done; if n > 5 velocity request steps n; walk to (own x + sign(own x − t.x)·n, own y + sign(own y − t.y)·n), step 1, flags del ? 4 : 0 | none |
 | `0x005DF140(t, n, del)` | `sub_6FCD06D0` | same, running | none |
 | `0x005DF7D0(t, n, del)` | `sub_6FCD0E80` ("circle n") | one step: low byte of `lo'` < 128 → velocity method 5, else 6, with steps n; then walk toward t, step 1, flags del ? 4 : 0 | one |
 | `0x005DE6D0(t, a, b)` → `0x005DE4E0` | `AITACTICS_WalkInRadiusToTarget` | walk to the point that brings the distance to t toward b by at most a | none |
+| `0x005DF680(t, n)` | `AITACTICS_RunCloseToTargetUnit` ("run near t n") | 15 (2 with the velocity reset if state 60), point near t, 1, no flags; returns the mode-change result | as wander, around t, n as a byte |
+| `0x005DEF30(x, y)` | `WalkToTargetCoordinatesNoSteps` | 2, coordinates, 0, no flags; returns the mode-change result | none |
 
 All draws are from the moving unit's seed (unit +0x20). 1.14d-confirmed
 for `0x005DEB60`, `0x005DE200`, `0x005DF7D0`, `0x005DEFE0`, `0x005DF140`,
-`0x005DED40`; the walk-in-radius geometry is D2MOO's.
+`0x005DED40`, `0x005DF680`, `0x005DEF30`, `0x005DED90`, `0x005DEDE0`,
+`0x005DEE50`; the walk-in-radius geometry is
+D2MOO's.
 
 #### 7.3 Velocity request
 
@@ -614,15 +634,19 @@ last). Param 0 is the command type.
 | `0x0058EE80` | `GetCurrentAiCommandFromUnit` | current command or 0 |
 | `0x0058ED10` | `FreeCurrentAiCommand` | unlink and free the current one; current := its next |
 | `0x0058EDE0` | `FreeAllAiCommands` | |
-| `0x0058EF40` | `CopyAiCommand` | new command with the given params, inserted before current, becomes current |
-| `0x0058EFA0` | `SetCurrentAiCommand(type, set)` | find by type (search starts at current's next), create it with params (type, 0, 0, 0, 0) if absent |
+| `0x0058EF40` | `CopyAiCommand` | new command (`0x0058EC90`) with the given five params; becomes current |
+| `0x0058EC90` | — (allocator) | zeroed 0x1C bytes from the game's pool. Empty ring (last = 0): the only node, next = prev = itself, current = last = it. Else linked between current's prev and current (it is current's new prev); if last = current, last := it |
+| `0x0058EEF0(type, set)` | `GetAiCommandFromParam` | no current (ring empty) → 0. Else the first command of that type in the order current's next, its next, …, current (current is tested last; a one-node ring tests only it); set ≠ 0 makes it current; 0 if none |
+| `0x0058EFA0` | `SetCurrentAiCommand(type, set)` | find by type (`0x0058EEF0`), create it with params (type, 0, 0, 0, 0) if absent (it becomes current), then return `0x0058EEF0(type, set)` |
 | `0x0058F730` | `AllocCommandsForMinions` | copy the command to every minion of this unit's minion owner (control +0x2C/+0x30), in minion-list order |
 | `0x0058F0D0` | `GetMinionOwner` | minion owner unit, or 0 |
 
 Command types used by Act 1 AIs: 1 = "attack now" (Fallen, FallenShaman
-minions), 10 = home position (NPCs, BloodRaven: params 1, 2 = x, y), 4,
-5, 7 = NPC map actions. QuillRat reads params 1, 2 as a unit type and
-GUID. 1.14d-confirmed for the functions listed.
+minions), 10 = home position (NPCs, BloodRaven: params 1, 2 = x, y), 4
+(walk to), 5 (wander) and 7 (mode action) = NPC actions (§9.9). QuillRat reads params 1, 2 as a unit type and
+GUID. `0x0058ED10` keeps current and last both 0 or both set (freeing
+the only node clears both; freeing last moves last to its next).
+1.14d-confirmed for the functions listed.
 
 ### 9. Per-AI behaviours
 
@@ -760,24 +784,121 @@ Draw order: up to 1 (step 1) + 1 (step 3) + 1 (step 4) + 1 (5) + 1 (6)
 
 cr_lancer1 has no skills, so step 2 draws once at most. 1.14d-confirmed.
 
-#### 9.9 Npc (32) `0x005E7130` (summarized)
+#### 9.9 Npc (32) `0x005E7130`
 
-Target mode 0. Order (1.14d): `0x005E6800` (home command: if command
-10 has no position yet, store the current position and idle 20; the
-first think of every town NPC); class cases 0xC9 (jerhyn: idle 40/20/50
-by the palace quest state), 0xFE, 0xFF, 0x109, 0x200 (quest movers;
-quest specs); then three handlers, each of which may end the think:
-`0x005E68F0` (D2MOO `sub_6FCE5EE0`: interaction; while someone interacts
-or AI param 0 > 0, stay or return home and idle 8, counting param 0
-down, which `0x00548B00` set to 40; otherwise a player within 15 at
-distance ≤ 2 or ≥ 24 gets a greeting, sound 18 at most once per 60
-thinks, idle 20, and a player in between makes the NPC walk around him),
-`0x005E6AE0` (D2MOO `sub_6FCE69A0`: command 4/5/7 path actions with
-their own idles 8–50), `0x005E7080` (D2MOO `AITHINK_ExecuteMapAiAction`:
-pct(66) passes → `roll(node count)` picks a preset path node, whose
-action runs); if all three decline: idle 8. Only the top-level order is
-1.14d-confirmed; the handler details are D2MOO's. Recorded: idle 8 and
-10 dominate (Test vectors); the source of 10 is open (question 8).
+Target mode 0 (no T). "Path distance" = `0x005DC5C0` (§6), compared
+unsigned. "Walk to (x, y)" = `0x005DED90`; "walk step 0" = `0x005DEF30`
+(§7.2). Command params are numbered as in §8 (param 0 = type).
+
+1. **Home** (`0x005E6800`): H = command 10 (`0x0058EFA0(10, 0)`, created
+   if absent). If H exists and its params 1 and 2 are both 0: they become
+   the unit's position, idle 20, end. This is the first think of every
+   Npc-AI unit.
+2. **Class cases** (unit class, unit +0x04). The functions called are
+   quest seams (`world/quests.md`; D2MOO names in brackets):
+
+   | Class | Rule |
+   |---|---|
+   | 201 jerhyn | `0x0059F570(game)` [`ACT2Q4_IsJerhynPalaceActivated`] = 0 → idle 40, end. Else `0x0059F580(game, unit, &a, &b)` [`ACT2Q4_GetAndUpdatePalaceNpcState`]: b ≠ 0 → idle 20 (no end); a = 0 → end. `0x0059B6E0(game, unit)` [`ACT2Q4_IsGuardMoving`] ≠ 0 and H found or created → H := (own x + 9, own y), idle 50, end. Otherwise step 3. |
+   | 254 alkor | `0x005BAD20(game)` [`ACT3Q4_GoldenBirdBroughtToAlkor`] ≠ 0 → mode 8 at (0, 0) (`0x005DDFC0`), `0x005BAD40(game)` [`ACT3Q4_ResetAlkor`], end. |
+   | 255 ormus | `0x005B9CA0(game, &x, &y)` [`ACT3Q3_GetAltarCoordinates`] ≠ 0: path distance to (x, y) > 3 → walk to (x, y), end; else mode 8 at (0, 0), `0x005B9CD0(game)` [`ACT3Q3_SetAltarMode`], end. |
+   | 265 cain5 | `0x00594360(game, unit, &x, &y)` [`ACT1Q4_GetCainPortalInTownCoordinates`] ≠ 0: path distance > 2 → walk to (x, y), end; else `0x005945F0(game, unit)` [`ACT1Q4_OnCainInTownActivated`], step 3. |
+   | 512 drehya | `0x0058BC80(game, unit)` [`ACT5Q4_AnyaOpenPortal`], step 3. |
+
+3. Interaction handler (below); returns nonzero → end.
+4. Command handler (below); nonzero → end.
+5. Map-AI handler (below); nonzero → end.
+6. Idle 8.
+
+**Interaction `0x005E68F0`** (D2MOO `sub_6FCE5EE0`):
+
+1. P = nearest interacting player (`0x005DDF20`, §5.3; the NPC itself
+   when none); d = full-size distance NPC → P (§6).
+2. Return 0 if the unit is not a monster or has no interaction block
+   (monster data +0x30; `world/npc.md` §2).
+3. busy := P is in the NPC's interaction list (`0x00572DE0`), or P is a
+   player and `0x00535060(P)` = 1. talking := the list is not empty
+   (`0x00572DC0`).
+4. talking, busy, or AI param 0 > 0: if the path distance to (param 1,
+   param 2) > 2 and param 0 > 36 → walk to (param 1, param 2); else if
+   param 0 > 0 → stop the path (`0x00648730`, when there is one) and idle
+   8. Then param 0 := 0 if it is negative, else param 0 − 1. Return 1,
+   also when nothing was scheduled.
+5. P = 0 or P = the NPC → return 0.
+6. d < 3 or d > 23: stop the path. If param 1 = 0: param 1 := 60; if P
+   is a player, sound 18 on the NPC toward P (`0x00553380(NPC, 18, P)`),
+   idle 20, return 1. If param 1 ≠ 0: negative → 0, positive → minus 1.
+   Idle 20, return 1.
+7. 3 ≤ d ≤ 23: home check `0x005E6860(16)`: H = `0x0058EEF0(10, 0)`;
+   none → return the result of main step 1; path distance to H > 16 →
+   command 4 (found or created) := (H.x, H.y, 12, 10), idle 10, return 1;
+   else 0. If the home check returned 0: velocity request (method 1 → 7,
+   speed 0, steps 0), walk in radius of P (`0x005DE6D0`) with (d − 2, 2)
+   when d < 5, else (3, 2). Return 1.
+
+AI params 0–2 come from NPC messages: `0x00548B00` (interaction start,
+`world/npc.md` §2) sets param 0 := 40; `0x0054CA10` (C→S 0x59
+MakeEntityMove, `sim/client-messages.tsv`: unit type, GUID, x, y) sets
+param 0 := 40 and params 1, 2 := x, y; both stop the path and schedule a think at +1 (§1.2). Param 1 is
+also the greeting countdown of step 6 (one field, two uses: kept).
+
+**Commands `0x005E6AE0`** (D2MOO `sub_6FCE69A0`). Commands are found
+with `0x0058EEF0(type, 0)`. G = the u32 at `0x0088CADC` (zero-initialised
+`.data`, read and written only here; process-wide, not per game).
+
+1. Command 4 (walk to: x, y, tries n, delay t) with n > 0: if x ≠ 0,
+   y ≠ 0 and the path distance to (x, y) > 3 → velocity request with
+   method 5 when G's low two bits are 0, else method 1 (→ 7), speed 0,
+   steps 0; walk step 0 to (x, y); G += 1; n −= 1; return 1. Otherwise
+   idle t, n −= 1, return 1.
+2. Command 5 (wander: count c, distance w, idles k, delay t):
+   - c > 0 and odd: wander w (`0x005DE200`, w as a byte); c −= 1; return
+     1.
+   - c > 0 and even: k > 0 → idle t, c −= 1, k −= 1, return 1; else
+     c −= 1 and go to step 3.
+   - c ≤ 0: k > 0 → idle t, k −= 1, return 1; else step 3.
+3. Command 7 (mode action: mode m, x, y, tries n), present with m ≠ 0;
+   otherwise return 0:
+   1. m ∉ {8, 9, 10, 11} → m := 0, idle 50, return 1.
+   2. e = path distance to (x, y) (signed). e > 0: if n > 0 → velocity
+      request (7, 0, 0), walk step 0 to (x, y), idle 25 if that failed,
+      n −= 1, return 1; else if e > 1 → m := 0.
+   3. Facing (`0x00648820(path, dir)`, path spec): class 154 charsi → 56;
+      155 warriv1 → 52; 178 fara → 4; 405 jamella → 52 if m = 8, 48 if
+      m = 9. Class 511 larzuk: `roll(100)` > 4 → m := 0, idle 50,
+      return 1.
+   4. m ≠ 0: the unit's mode (unit +0x10) = m → idle 50, return 1; else
+      mode m with the unit itself as target (`0x005DDF90`), m := 0,
+      return 1.
+   5. m = 0: class 178 fara and `roll(100)` < 66 → m := 8. Return 0.
+
+**Map AI `0x005E7080`** (D2MOO `AITHINK_ExecuteMapAiAction`):
+
+1. M = control +0x38 (§3.1: node count u32, pointer to 12-byte nodes
+   {action, x, y}). None → return 0, no draw.
+2. Draw `lo' % 100`; ≥ 66 → return 0.
+3. Count 0 → return 0. i = `roll(count)` (`0x0045C3E0`); action a of
+   node i; a outside 0..6 or its entry in table `0x00741D74` (7 pointers:
+   0, `0x005E6DE0`, `0x005E6E80`, `0x005E6EF0`, `0x005E6F00`,
+   `0x005E6FC0`, 0) is 0 → return 0. Else return the handler's result:
+
+| Action | Handler | Effect |
+|---|---|---|
+| 1, 3 | `0x005E6DE0` (3 jumps to it) | x or y = 0 → 0; path distance to (x, y) = 0 → 0; else velocity request (7, 0, 0), walk step 0 to (x, y) (result ignored), command 4 := (x, y, 12, 10), return 1 |
+| 2 | `0x005E6E80` | x or y = 0 → 0; r = action 1; command 4 := (x, y, 20, 10) also when r = 0; return r |
+| 4, 5 | `0x005E6F00`, `0x005E6FC0` | x or y = 0 → 0; r = action 1; command 7 := (m, x, y, 4) with m = 8 (action 4) or 9 (action 5) if the class has that mode (`0x0046C140(class, m)`), else 1; command 4 := (x, y, 12, 10); return r |
+
+Draws per think, in order: map-AI `lo' % 100` and `roll(count)`;
+command 5 wander (3–4); larzuk and fara `roll(100)`. Steps 1, 2,
+the interaction handler and command 4 draw nothing.
+
+Rhythm (settles question 8): a map-AI walk leaves command 4 with 12
+tries and delay 10; the walk ends inline (§1.4), and from then on each
+think within 3 of the node is "idle 10" until the tries run out. So
+idle 10 is command 4's delay, and idle 8 is the fallback of step 6.
+1.14d-confirmed (all functions above); D2MOO differs: it tests the
+interaction block the other way round (returns 0 when one exists) and
+reconstructs G as a local that is always 0 (so always method 5).
 
 #### 9.10 Navi (58) `0x005E7E20`, TownRogue (62) `0x005E7D60`
 
@@ -835,9 +956,497 @@ S = secondary target (`0x005DDC30`) with distance E.
 
 #### 9.14 Other Act 1 AIs (D2MOO-only)
 
-Summaries in `ai-functions.tsv` for Bighead (4), BloodHawk (5),
-CorruptRogue (10), SkeletonBow (37), FoulCrowNest (43), BloodRaven
-(59). Their 1.14d functions are listed but not yet compared.
+None left: the Act 1 AIs that were D2MOO-only are read in 1.14d in
+§9.15–§9.18 (CorruptRogue, SkeletonBow, FoulCrowNest, BloodRaven) and
+§9.23–§9.24 (Bighead, BloodHawk).
+
+#### 9.15 CorruptRogue (10) `0x005F0B00`
+
+1. Player-count record of the unit (`0x00573930` with the unit's room,
+   `monsters/init.md` §9; no draws). L = 20 − 3 × its difficulty field
+   (game +0x6D, which that call clamps to 2): 20 / 17 / 14.
+2. D > L: run (below). End.
+3. C: P(aip3) [75] → A1; else idle aip2 [15]. End.
+4. Not C: P(aip1) [60] fails → idle aip2. End. P(aip5) [20] → run;
+   else walk to T with flags 7 (`0x005DEC80`).
+
+Run: velocity request (method 13, speed aip4 [100], steps 0); run to
+T with 3 steps (`0x005DEFB0`). Draws: 0 (step 2), 1 (step 3) or 1–2
+(step 4). 1.14d-confirmed; same as D2MOO.
+
+#### 9.16 SkeletonBow (37) `0x005F6070`
+
+S, E = secondary target and its distance (`0x005DDC30`, §5.3, second
+argument 0).
+
+1. AI state 3/19: S, E := `0x005DDC30`; S → A1 at S, end.
+2. S, E := `0x005DDC30` (a second search when step 1 found nothing).
+3. No S, or E ≥ 20: P(aip3) [50] → walk in radius of T (`0x005DE6D0`,
+   a = aip4 [5], b = aip5 [6]); else idle 20. End.
+4. P(aip1) [75] → A1 at S. Else draw `lo' % 100` < 20 → circle 3 at T
+   (`0x005DF7D0`, no think delete; one more draw); else idle aip2 [15].
+
+1.14d-confirmed; same as D2MOO. The walk and the circle use T, the
+arrow uses S.
+
+#### 9.17 FoulCrowNest (43) `0x005F6650`, init `0x005F6630`
+
+Init (also of Sarcophagus 45 and MinionSpawner 121): AI param 0 := the
+game frame, param 1 := 0.
+
+1. D > 20 → idle 25. End.
+2. Param 1 ≥ aip3 [6] (the nest has spawned its quota): set unit flag
+   0x20000 (unit +0xC4: no drop, `items/treasure.md`), request mode 0
+   (death) at (0, 0) (`0x005DDFC0`). End.
+3. If `Skill1` ≥ 0 and |frame − param 0| ≥ aip1 [100]: param 0 :=
+   frame; footprint test `0x005FD350(class, room, x, y, 0)` with class
+   206 (crownest1; −1 if monstats has ≤ 206 rows), the unit's room and
+   position (`monsters/population.md` §9: tests (x, y + 3)). Passes →
+   param 1 += 1, use `Skill1` in `Sk1mode` at T (`0x005DEAD0`), end.
+4. Idle `lo' % 10` + 20 (one step). End.
+
+So the nest summons (skill `Nest`, skills spec) at most every aip1
+frames, idles 20–29 between tries, and dies after aip3 summons.
+1.14d-confirmed. D2MOO passes x twice to the footprint test; 1.14d
+passes x, y.
+
+#### 9.18 BloodRaven (59) `0x005E6320`, init `0x005E6300`
+
+Init: AI param 2 := 0. Params: 0 = raise chance, 1 = raises done, 2 =
+"returning home". Distances to the home point use `0x005DC480` (§6).
+
+1. H = command 10 (`0x0058EEF0(10, 0)`). None: copy a new command (type
+   10, params 1, 2 := own position; params 3, 4 are uninitialised stack
+   in 1.14d and unused) and look it up again.
+2. h := 0. If H:
+   1. h = distance from T to H.
+   2. D > 45 → idle 5. End.
+   3. h ≥ 50, or own distance to H > 50: param 2 := 1; velocity request
+      (7, 100, 0); run to H (`0x005DEDE0`); started → end; else delete
+      thinks.
+   4. Param 2 ≠ 0 and own distance to H > 5: velocity (7, 100, 0); run to
+      H; started → end; else delete thinks.
+   5. Param 2 := 0.
+3. D > 20 and h < 50: D := max(D / 2, 12) (the halved value is kept for
+   the steps below); velocity (7, 100, 0); run near T by D
+   (`0x005DF680`, D as a byte; its draws); started → end; else delete
+   thinks.
+4. Param 0 += 3. If `Skill1` ≥ 0, not C, param 1 < 2 × difficulty + 8
+   (game +0x6D) and `roll(100)` < param 0 (drawn only when the first
+   three hold):
+   1. L = `roll(15)` + 5; draw bit 0: 1 → dx = L, dy = `roll(L)`; 0 →
+      dx = `roll(L)`, dy = L; draw bit 0 → dx := −dx; draw bit 0 → dy
+      := −dy (bits by `0x00472210(seed, 2)`, one step each).
+   2. Use `Skill1` in `Sk1mode` with no target at (T.x + dx, T.y + dy)
+      (`0x005DEAD0`); param 1 += 1; param 0 := 0. End.
+5. D > 5:
+   1. Draw `lo' % 100` < 5 and h < 50 → velocity (7, 100, 0); run near
+      T by 12; end (whether or not it started).
+   2. S = secondary target (`0x005DDC30`). If S, AI state not 3/19, and
+      `roll(100)` < 80: if `Skill2` ≥ 0 and `roll(100)` < 10 ×
+      (difficulty + 4) → `Skill2` in `Sk2mode` at S; else A1 at S. End.
+   3. Velocity request (method unchanged, speed 50, steps 0); circle 4
+      at T with think delete (`0x005DF7D0`); started → end.
+6. Draw `lo' % 100` < 30 and D < 12: velocity (7, 100, 0); run away from
+   T by 12 − D (`0x005DF140`, a byte, no think delete); started → end;
+   else delete thinks.
+7. A1 at T.
+
+Live skills: `Skill1` = Nest (`Sk1mode` `seq_bloodravencast`; the
+summon at the point is the skills spec's), `Skill2` = Quick Strike.
+"Delete thinks" = `0x00540E60(2, 0)`: it also removes the `aidel` think
+that the failed mode start scheduled (§1.3); the think then goes on to
+a later step, which always schedules or starts a mode. 1.14d-confirmed; same as D2MOO except that 1.14d writes the
+secondary search's melee flag over h in step 5.2 (h is not read
+afterwards).
+
+#### 9.19 SkeletonMage (64) `0x005F96C0`
+
+Brackets: skmage_fire1 Normal [aip1..aip8 = 35, 9, 30, 5, 0, 18, 20, 5].
+S, E := secondary target and distance (`0x005DDC30`, second argument 0;
+E = 0x7FFFFFFF when there is no S). `Skill1` (SkeletonRaise) is not used
+here.
+
+1. If S:
+   1. E > aip2 [9] and P(aip3) [30] → velocity request (method
+      unchanged, speed 10, steps 0); walk to S with aip2 steps (a byte,
+      `0x005DEF80`). End.
+   2. E ≤ aip4 [5] and P(aip5) [0] → velocity (speed 25); escape from S
+      by 5 with think delete (`0x005DEFE0`); not started → A1 at T. End.
+   3. E < aip6 [18] and P(aip1) [35] → A1 at S. End.
+2. E > aip2 and P(aip3) → velocity (speed 10); walk to T with aip2
+   steps. End. (With no S, E is 0x7FFFFFFF and this test always draws.)
+3. P(aip7) [20] → circle 4 at T (no think delete; one more draw); else
+   idle aip8 [5].
+
+Each P(…) is drawn only when its distance test holds. 1.14d-confirmed;
+same as D2MOO.
+
+#### 9.20 Arach (26) `0x005F4510`
+
+Brackets: arach1 Normal [45, 33, 15, 8, 25]; `Skill1` SpiderLay in
+`Sk1mode` A2. AI params: 0 = state (0 idle, 1 retreating, 2 engaged),
+1 = approach latch, 2 = think counter. L = the unit's life percent
+(`0x00621F20`). "Lunge" = `0x005DED40(T, 0)` (velocity method 13, then
+walk to T, flags 0).
+
+1. State 1:
+   1. Param 1 := 0.
+   2. L > 75: state := 0; P(aip3) [15] → state := 2, lunge; else circle
+      6 at T (no delete). End.
+   3. C and aip1 > 25 and `roll(100)` < aip1 − 25 → A1 at T. End. (No
+      draw unless C and aip1 > 25.)
+   4. D ≥ aip4 [8] and AI state not 3/19 → state := 0; circle 12 at T
+      (no delete). End.
+   5. Escape from T by 4 (no delete). End.
+2. State ≠ 1, C:
+   1. State := 2. P(aip1) [45] → A1 at T. End.
+   2. L < aip5 [25]: state := 1; if `Skill1` ≥ 0 and the unit lacks
+      state 22 (`0x00639DF0`): use `Skill1` in `Sk1mode`, no target, at
+      (0, 0) (`0x005DEAD0`); else escape from T by 8 (no delete). End.
+   3. `roll(100)` < aip2 [33] → circle 4 at T (no delete); else idle 15.
+3. State ≠ 1, not C:
+   1. AI state 3/19 or param 1 = 1 → param 1 := 1, lunge. End.
+   2. Param 2 += 1, wrapping to 0 when it passes 20; param 1 := 0.
+   3. Param 2 = 1 and `roll(100)` < aip3 → param 1 := 1, lunge. End.
+   4. `roll(100)` < 20 → wander 6; else idle 15.
+
+So an idle spider rolls its engage chance once every 21 thinks.
+1.14d-confirmed.
+
+#### 9.21 Fetish (30) `0x005F53E0`
+
+Brackets: fetish1 Normal [100, 10, 4, 33]. AI params: 0 = state (0, 1
+attacking, 2 backing off), 1 = counter. L = life percent of **T**
+(`0x00621F20(T)`).
+
+1. Current command K (`0x0058EE80`): if K's type is 1 or 14 and the unit
+   it names exists (`0x00552F60`, type param 2, GUID param 1): params 0,
+   1 := 0; velocity request (13, 50, 0); walk to that unit (flags 0,
+   `0x005DEC80`); free K. End. Any other K: free it and go on.
+2. State 0: C → param 1 := 0, state := 1, P(aip1) [100] → A1 at T, else
+   idle aip2 [10]; end. Not C → step 5.
+3. State 1: param 1 += 1. If param 1 > aip3 [4] and L > aip4 [33]:
+   state := 2, param 1 := 0, velocity (method 2, speed 50, steps 0),
+   escape from T by 14 with think delete; end (started or not). Else C →
+   `roll(100)` < aip1 → A1 at T, else idle aip2; end. Not C → step 5.
+4. State 2: D > 12: param 1 += 1, reset state and param 1 to 0 when
+   param 1 > 1; draw `lo' % 100` < 20 → circle 4 at T (no delete), else
+   idle 10; end. D ≤ 12: velocity (2, 50, 0); escape from T by 14 with
+   think delete; started → end; else state, param 1 := 0, idle 10; end.
+   Any other state value: idle 10.
+5. Velocity (13, 50, 0); walk to T with flags 7. End.
+
+1.14d-confirmed. The minion's attack-then-back-off rhythm: aip3 attack
+thinks, then back off while the target is above aip4 % life.
+
+#### 9.22 Vampire (28) `0x005F4A70`
+
+Brackets: vampire5 Normal [85, 40, 28, 25, 1]. F = aip5 as spell flags:
+F1 (bit 0) Skill1 / Skill4 bolts, F2 (bit 1) Skill2, F4 (bit 2) Skill3.
+AI params: 0 = state (0, 1 engaged, 2 fleeing), 1 = farthest D seen
+under 30 while in AI state 3/19, 2 = spell cooldown. L = own life
+percent. S, E as in §9.19. "Bolt at X" = `roll(100)` < 50 → `Skill1` in
+`Sk1mode` at X, else `Skill4` in `Sk4mode` (byte +0x183) at X; neither
+skill id is tested for < 0. "Upgrade" = F2, param 2 ≤ 0 and
+`roll(100)` < aip4 → `Skill2` at T, param 2 := 11, end; else F4, param 2
+≤ 0 and `roll(100)` < aip4 → `Skill3` at T, param 2 := 11, end (each
+roll drawn only when its flag and cooldown hold).
+
+1. Param 2 > 0 → param 2 −= 1. S, E := `0x005DDC30`.
+2. AI state 3/19: state 0 → 1; D < 30 and D > param 1 → param 1 := D.
+   If C: draw `lo' % 100`; > 30 or no F1 → A1 at T; else bolt at T. End.
+3. State 2:
+   1. L ≥ 75 → state := 1, walk to T flags 7. End.
+   2. D < 14 or D ≤ param 1: velocity request (method unchanged, speed
+      v, steps 0) with v = `Run` × 100 / `Velocity` − 100 (monstats +52,
+      +50, signed, truncating; 0 when `Velocity` ≤ 0), clamped to 0..120;
+      escape from T by 8 with think delete; started → end.
+   3. D ≥ aip3 [28] → idle 15. End. `roll(100)` ≥ aip2 [40] → idle 15.
+      End.
+   4. Upgrade.
+   5. F1, S and E ≤ 20 → bolt at S; else circle 4 at T (no delete). End.
+4. State ≠ 2:
+   1. L < 33: state := 2; escape from T by 8 (no delete, no velocity);
+      started → end.
+   2. C: state := 1. P(aip1) [85]: no F1 or no S → A1 at T, end;
+      `roll(100)` > 30 → A1 at T, end; E ≤ 20 → bolt at S, end. Then
+      (P(aip1) failed, or E > 20): `roll(100)` < 33 → circle 4 at T
+      (no delete), else idle 10. End.
+   3. Not C, D ≥ aip3: state 1 → walk to T flags 7; else idle 15. End.
+   4. Not C: state := 1. `roll(100)` ≥ aip2: D > 20 → walk to T flags 7;
+      else D < 9 and `roll(100)` < 50 → escape from T by 8 (no delete);
+      else `roll(100)` < 50 → circle 4 at T, else idle 10. End.
+   5. Upgrade.
+   6. No F1, no S, or E > 20 → walk to T flags 7. Else `roll(100)` < 75
+      → bolt at S; else circle 4 at T. End.
+
+1.14d-confirmed; same as D2MOO.
+
+#### 9.23 Bighead (4) `0x005EFF50`
+
+Brackets: bighead1 Normal [88, 40, 0, 60]. A2 is the ranged attack. L =
+own life percent (`0x005DD280`, §6). S = secondary target
+(`0x005DDC30`), searched only where stated; its distance overwrites D
+(not read afterwards).
+
+1. Not C and AI state 3/19 → A2 at T. End.
+2. L ≥ aip1 [88] (healthy):
+   1. C → A1 at T. End.
+   2. D < 15: search S; S and `roll(100)` < aip3 [0] → A2 at T. End.
+   3. Walk to T with flags 7. End.
+3. L < aip1 (hurt):
+   1. D < 3: velocity request (method unchanged, speed 50, steps 0);
+      escape from T by 5 with think delete; not started → A2 at T. End.
+   2. D > 15: walk to T with 6 steps (`0x005DEF80`). End.
+   3. Search S; S and `roll(100)` < aip4 [60] → A2 at T. End.
+   4. `roll(100)` < aip2 [40] → circle 3 at T (no delete); else idle 10.
+
+A2 always targets T, also when S decided it. 1.14d-confirmed.
+
+#### 9.24 BloodHawk (5) `0x005F00E0`
+
+Brackets: foulcrow1 Normal [30, 90, 5, 50, 100]. AI param 0 = "charged
+last think".
+
+1. Param 0 = 1 and C → param 0 := 0, A1 at T. End.
+2. Param 0 := 0.
+3. C: P(aip3) [5] → A1 at T, end; else back off (step 5).
+4. Not C:
+   1. P(aip1) [30] → velocity request (method unchanged, speed aip5
+      [100], steps D, capped by §7.3); param 0 := 1; walk to T (flags 0).
+      End.
+   2. D > 3: P(aip2) [90] → velocity (speed −50) and wander 4; else
+      velocity (0, 0, 0) (writes nothing, §7.3) and wander 3. End.
+   3. D ≤ 3: back off.
+5. Back off: velocity (speed aip4 [50], steps 0); escape from T by 4
+   with think delete; not started → A1 at T.
+
+1.14d-confirmed; same as D2MOO.
+
+#### 9.25 HellMeteor (33) `0x005F56D0`
+
+Brackets: hellmeteor Normal [50, 50, 10]; `Skill1` HellMeteor in A1.
+
+1. `Skill1` ≥ 0 and P(aip1) [50]: x = own x − aip3 + `roll(2·aip3)`,
+   then y = own y − aip3 + `roll(2·aip3)` (`0x0045C3E0`, two draws, x
+   first); use `Skill1` in `Sk1mode`, no target, at (x, y). End.
+2. Idle aip2 [50] (also when `Skill1` < 0, without a draw).
+
+1.14d-confirmed.
+
+#### 9.26 SandRaider (8) `0x005F0700`
+
+Brackets: sandraider1 Normal [40, 70, 75, 70, 18, 0, 50]; `Skill1` Fire
+Hit. AI params: 0 = charge counter, 1 = charged, 2 = help searches.
+States 90 (blue) and 91 (red) and overlays 150 (sricehit) and 46
+(srfirehit) by aip6: 1 → blue / sricehit, else red / srfirehit.
+
+1. Param 0 = 0: clear states 90 and 91 (`0x00639DB0(unit, s, 0)`,
+   `sim/stat-lists.md` §9.2); param 1 := 0.
+2. Param 0 += 1. Param 0 = aip5 [18]: start the overlay
+   (`0x00621E40(unit, overlay, 0)`, stat 178 `unit_dooverlay`); idle
+   `aidel` + 1 (monstats +79 + difficulty, a byte read with no game-type
+   gate). End.
+3. Param 0 > aip5: set the state (on); param 1 := 1.
+4. Param 2 < 7 and own life percent < aip1 [40]: scan 1 (§5.4, every
+   unit of the adjacent rooms) for the nearest other monster with
+   alignment 0 (`0x006259B0`) that is not in mode 0 or 12
+   (`0x0063EA40`), by squared distance (`0x005B0BD0`, strictly smaller
+   wins). Found → walk to it (flags 0), end. Else param 2 += 1.
+5. D > 4, param 1 = 0 and P(aip2) [70] → circle 0 at T (no delete).
+   End.
+6. Not C: param 1 = 0 and P(aip4) [70] fails → rest (step 8); else walk
+   to T (flags 0). End.
+7. C: param 1 = 1 and `Skill1` ≥ 0 → `Skill1` in `Sk1mode` at T, params
+   0, 1 := 0, end. P(aip3) [75] → `roll(100)` < aip7 [50] → A2, else A1,
+   at T; end. Else rest.
+8. Rest: k = max(24 − aip5, 6); param 0 > aip5 + k → params 0, 1 := 0.
+   Idle 15.
+
+So a raider charges for aip5 thinks, glows, hits once with `Skill1`,
+and the counter resets after a further k thinks without a hit.
+1.14d-confirmed.
+
+#### 9.27 Baboon (11) `0x005F0CD0`
+
+Brackets: baboon1 Normal [33, 20, 55, 0, 1]. AI params: 0 = regen
+countdown, 1 = "attacked", 2 = hpregen bonus added. L = own life
+percent. v = `Run` × 100 / `Velocity` (signed, truncating; monstats
++52, +50) − 100, clamped to 0..120, and 0 when `Velocity` ≤ 0 or the
+quotient < 100. "Stat 74" is `hpregen`, read with `0x00625480(unit, 74,
+0)` and written with `0x00627260(unit, 74, value, 0)`.
+
+1. Param 0 ≠ 0 (regenerating):
+   1. Param 0 −= 1; param 1 := 0. Param 0 = 0 or L > 75 → stat 74 :=
+      stat 74 − param 2 (param 2 is kept).
+   2. Not C: L > 75 → param 0 := 0, velocity request (13, v, 0), lunge
+      (`0x005DED40(T, 7)`), end; else step 4.
+   3. C: draw `lo' % 100` < 33 → draw `lo' % 100` < aip4 [0] → A1, else
+      A2, at T; end. Else step 4.
+   4. D ≥ 24 and AI state not 3/19: `roll(100)` < 33 → circle 4 at T
+      (no delete); then idle 20 in either case (the idle's neutral mode
+      request ends the circle walk at once). End.
+   5. Velocity (2, v, 0); escape from T by 15 with think delete; started
+      → end. Not C → wander 5; C → `roll(100)` < aip4 → A1, else A2.
+2. Param 0 = 0:
+   1. Not C → lunge (`0x005DED40(T, 7)`, no velocity request). End.
+   2. C from here. AI state 3/19: if L < aip1 [33] and `roll(100)` < 50: param 0 :=
+      `roll(5)` + 2; R = stat 74; R ≠ 0 → param 2 := aip5 × R / 8
+      (signed, rounding toward 0) and stat 74 := R + param 2; R = 0 →
+      param 2 := 0. Velocity (2, v, 0); escape from T by 15 (no delete).
+      End. Else if param 1 ≠ 0 and `roll(100)` < 20: circle 3 at T (no
+      delete), param 1 := 0, end.
+   3. Param 1 ≠ 0 and P(aip3) [55] fails: `roll(100)` < aip2 [20] →
+      circle 3 at T (no delete) and param 1 := 0; then idle 15. End.
+   4. Param 1 := 1; P(aip4) → A1, else A2, at T.
+
+1.14d-confirmed. Bug kept: step 1.4 starts a circle and then idles in
+neutral mode over it.
+
+#### 9.28 SandMaggot (15) `0x005F1800`, alternate `0x005F1750`
+
+Target mode 4 (§2.3). Brackets: sandmaggot1 Normal [35, 35, 2, 75,
+120]; `Skill1` MagottUp, `Skill2` MagottDown, `Skill3` MagottLay. AI
+params: 0 = state (0–2 above ground; 1 just surfaced or laid, 2 circled;
+3 burrowed), 1 = frame before which it does not burrow or surface
+again, 2 = eggs laid. "Wait N" = `0x005DE130(N)` (§1.2). S, E as in
+§9.19. "Burrow (X)" = `Skill2` in `Sk2mode` at X with (0, 0); wait 30;
+param 1 := frame + aip5; state := 3.
+
+1. State < 3, T = 0: if (no S or E > 10), frame > param 1 and `Skill2` ≥
+   0 → burrow (no target), end. Otherwise go to step 3.
+2. State = 3: unless T ≠ 0, or S with E < 16: wait 20, end. If frame >
+   param 1 and `Skill1` ≥ 0: `Skill1` in `Sk1mode` at T with (0, 0);
+   wait 25; param 1 := frame + aip5; state := 1; end. Else wait 20, end.
+3. Above ground:
+   1. Own life percent < 25, `Skill2` ≥ 0, E < 7, frame > param 1 and
+      `roll(100)` < 20 → burrow (target T). End.
+   2. C and P(aip4) [75] → A1 at T. End.
+   3. S, E < 15 and `roll(100)` < aip2 [35] → A2 at S. End.
+   4. Draw `lo' % 100` < 20 → circle 6 at T (no delete). End.
+   5. Param 2 < aip3 [2] and `roll(100)` < aip1 [35]: state = 2 and
+      `Skill3` ≥ 0 → param 2 += 1, state := 1, `Skill3` in `Sk3mode` at
+      T, wait 20; else circle 6 at T (no delete), state := 2. End.
+   6. Wait 12.
+
+A state above 3 (never written by this function; only a value left in
+param 0 by another AI before a re-install, §3.3, could give one) takes
+the above-ground steps of step 3 whatever T and S are: steps 1 and 2
+only branch on state < 3 and state = 3. 1.14d-confirmed (`0x005F1800`).
+
+Alternate `0x005F1750` (the think while the AI was re-installed over a
+running one, §3.3): K = command 14 (`0x0058EFA0(14, 0)`). K's param 4 =
+1 and `Skill1` ≥ 0 → `Skill1` in `Sk1mode` at the unit's path target
+(`0x00553540`; 0 when that is the unit itself) with (0, 0), wait 30, K's
+param 4 := 0. Otherwise re-install the AI for the control's current
+state (`0x005B0E00`) keeping AI param 2 across it, then wait 1. No
+draws. 1.14d-confirmed (both).
+
+#### 9.29 Scarab (20) `0x005F2540`
+
+Brackets: scarab1 Normal [75, 50, 15, 35, 20]; `Skill1` Jab. AI param
+0 = "circled".
+
+1. Current command K (`0x0058EE80`). None: if D < 20, the scarab is its
+   own minion owner (`0x0058F0D0`) and P(aip5) [20]: a command of type
+   1 (params 1–4 uninitialised stack, unused) goes to all minions
+   (`0x0058F730`) and to itself (`0x0058EF40`); K := it. Else step 3.
+2. K of type 1: C and `Skill1` ≥ 0 → free the current command,
+   `Skill1` in `Sk1mode` at T, end. Else velocity request (2, 100, 0);
+   walk to T (flags 0); not started → free the current command. End.
+   K of another type: step 3 (K stays).
+3. Not C: param 0 ≠ 0 → velocity (2, 0, 4), walk to T with flags 7,
+   then draw `lo' % 100` > 10 → param 0 := 0; end. Param 0 = 0 → circle
+   0 at T (no delete), param 0 := 1; end.
+4. C: P(aip1) [75] fails → idle aip3 [15]. End. `Skill1` ≥ 0 and
+   P(aip4) [35] → `Skill1` at T. End. P(aip2) [50] → A1, else A2, at T.
+
+1.14d-confirmed.
+
+#### 9.30 Smith (98) `0x005E3890`, Griswold (90) `0x005E5AC0`
+
+Smith (the Smith, hephasto), no draws:
+
+1. C → A1 at T. End.
+2. L = own life percent clamped to 0..100; velocity request (method
+   unchanged, speed (100 − L) >> 1, steps 0); walk to T with flags 7.
+
+Griswold:
+
+1. C: draw `lo' % 100` < 80 → A1 at T; else idle 10. End.
+2. Not C: draw `lo' % 100` < 50 → walk to T with flags 7; else idle 10.
+
+1.14d-confirmed.
+
+#### 9.31 GoodNpcRanged (60) `0x005E7AC0`
+
+Also the think of special state 5 (§3.2).
+
+1. Anim mode (unit +0x10) not neutral (1) → idle 5. End.
+2. Unless the unit's room is in town (`0x0061AB00`): S, E := secondary
+   target (`0x005DDC30`). If S and E < 20: `roll(100)` < 30 → for class
+   271 (roguehire) `Skill1` in `Sk1mode` at S, for any other class A1
+   at S; end. Else `roll(100)` < 30 → circle 4 at S (no delete), else
+   idle 10; end.
+3. Draw `lo' % 100` < 20 → wander 5; else idle 10.
+
+The "Else" of step 2 belongs to the first `roll(100)` < 30: both rolls
+happen only when S exists with E < 20. In town, with no S, or with E ≥
+20, the think goes to step 3 (one `lo'` step). A unit with no room
+(`0x00620BB0` returns 0) counts as out of town: `0x0061AB00(0)` returns
+0. 1.14d-confirmed (`0x005E7AC0`, `0x0061AB00`).
+
+1.14d-confirmed.
+
+#### 9.32 NpcOutOfTown (31) `0x005E7880`
+
+Classes cain1 (146, Tristram) and drehyaiced (527); live monstats has
+no other row with AI 31. The quest calls are
+seams (`world/quests.md`; D2MOO names), chosen by class: class 527
+(drehyaiced) → Act 5 quest 3 functions, every other class (cain1, and
+any class given AI 31 by edited data) → Act 1 quest 4 functions:
+
+| Role | cain1 | drehyaiced |
+|---|---|---|
+| set up portal coordinates (0 = failed) | `0x005944B0` [`ACT1Q4_UpdateCainPortalCoordinates`] | `0x0058A940` [`ACT5Q3_InitializeDrehyaPortalCoordinates`] |
+| spawn the town portal | `0x005944F0` [`ACT1Q4_SpawnCainPortalInTown`] | `0x0058A980` |
+| spawn the portal out of town (0 = failed) | `0x005943B0` [`ACT1Q4_SpawnCainPortalOutsideTown`] | `0x0058A820` [`ACT5Q3_SpawnDrehyaPortalOutsideTown`] |
+| portal coordinates (0 = none) | `0x00594450` [`ACT1Q4_GetCainPortalOutsideTownCoordinates`] | `0x0058A8D0` [`ACT5Q3_GetDrehyaPortalCoordinates`] |
+
+"Leave" = spawn the town portal, set stat 6 (life) to 0
+(`0x00627260`), request mode 12 (dead) at the unit's own position.
+
+1. Portal setup (`0x005E77A0`): K = command 3 (`0x0058EFA0(3, 0)`). If
+   K exists with params 1, 2 = 0: params 1, 2 := own x + 3, own y + 3;
+   set up portal coordinates, and if that returns 0, leave; K's params
+   3, 4 := 1, 0; idle 1; end. The param writes and idle 1 also follow a
+   leave (the mode 12 request does not end the function); a K with
+   params 1, 2 ≠ 0 skips step 1.
+2. drehyaiced: `0x0058AA10(game)`.
+3. Someone talks to the NPC (`0x00572DC0`) → idle 40. End.
+4. K = command 3 (`0x0058EEF0`). Anim mode 12 (dead) → end, nothing
+   scheduled.
+5. Interaction handler of §9.9 (`0x005E68F0`); its result is ignored.
+6. No K: step 1 again, then idle 40. End.
+7. K's param 3 ≥ 2: param 3 += 1; portal coordinates (x, y) found: if
+   param 3 < 8 and the path distance to (x, y) ≠ 0 → walk to (x, y),
+   else leave; end. Not found → idle 20, end.
+8. K's param 3 < 2: if the path distance to (param 1, param 2) > 1 and
+   param 4 ≤ 5: param 4 += 1; drehyaiced and `0x0058A9F0(game)` ≠ 0 →
+   idle 20, param 4 := 0; else walk to (param 1, param 2); end. Else if
+   param 3 = 1: spawn the portal out of town; 0 → params 3, 4 := 1,
+   idle 20, end; else param 3 := 2. Idle 20.
+
+No draws. 1.14d-confirmed; same as D2MOO.
+
+Act II bodies (PantherJavelin, GreaterMummy, Mummy, PantherWoman, MaggotLarva, SandLeaper, MaggotEgg, PinHead, ClawViper, Vulture, BatDemon, SandMaggotQueen, Duriel, Summoner) and the special-state thinks 10/17, 11, 12: `monsters/ai-bodies-2.md`.
+
+Act III bodies (Mosquito, ThornHulk, ZakarumZealot, ZakarumPriest, FrogDemon, FetishShaman, HighPriest, FetishBlowgun, WillOWisp, Mephisto) with the FrogDemon and FetishShaman alternates: `monsters/ai-bodies-3.md`.
+
+Act IV bodies (VileMother, VileDog, FingerMage, Regurgitator, Megademon, Diablo with its alternate and the boss target pick and score, Izual, DoomKnight, AbyssKnight, OblivionKnight): `monsters/ai-bodies-4.md`.
+
+Act V bodies (Minion, Imp, Succubus, BloodLord, SuccubusWitch, Overseer, ReanimatedHorde, ClawViperEx, DeathMauler, PutridDefiler, Ancient, AncientStatue, FrozenHorror, SiegeBeast, SuicideMinion, BaalMinion, BaalTaunt, BaalToStairs, BaalThrone, BaalCrab, BaalCrabClone, Nihlathak): `monsters/ai-bodies-5.md`.
 
 ### 10. The catalogue `ai-functions.tsv`
 
@@ -852,7 +1461,7 @@ One row per AI table index (148 rows), tab-separated, header row:
 | `alt_1_14d` | alternate function (record +0x0C), `-` if 0 |
 | `target_mode` | record +0x00 (§2.3) |
 | `d2moo_name` | D2MOO 1.10f function name at the same index |
-| `monstats_rows` | count of live monstats rows using the index, then up to three "row Id" pairs |
+| `monstats_rows` | count of live monstats rows using the index, then up to three "row Id" pairs; row = record index (hcIdx) after the `Expansion` separator line is dropped (`data/txt-format.md` §5), so file line − 2 up to druidbear (409) and file line − 3 from wakeofdestruction (410) on |
 | `aip_meaning` | the monai.txt `*aipN` comment headers (hints, not data) |
 | `summary` | one-line behaviour, `-` when unread |
 | `status` | `spec'd-here` (full rules in §9, 1.14d read), `summarized` (top-level order read in 1.14d), `D2MOO-only` (summary from D2MOO 1.10f, 1.14d not compared), `unread` |
@@ -877,6 +1486,8 @@ can be checked mechanically.
 | teleport | 40 % gate, 15 % move, 25 % heal, skill 184 mode 4 | `0x005B11F0` |
 | leash | ≤ 1 push away 19, > 20 return 19 (steps 40) | `0x005B0FF0` |
 | boss sound | distance < 20, sound 16, idle 20 | `0x005B1140` |
+| Npc map actions | `0x00741D74`, 7 pointers (0 and 6 null) | `0x005E7080` |
+| Npc command counter G | u32 `0x0088CADC`, zero-initialised, process-wide | `0x005E6AE0` |
 | monstats | `AI` +30, `aidel*` +79, `aidist*` +82, `aip*` +86, `isMelee`, `opendoors`, `npc`, `interact`, `switchai` bits of the flags at +12, `Skill1..3` +368/+370/+372, `Sk*mode` bytes +0x180.., `SplEndGeneric` +422, `MonStatsEx` +24, `BaseId` +2 | `data/fields.tsv` |
 | monstats2 | `MeleeRng` +14 | `data/fields.tsv` |
 | levels | `MonSpcWalk` +47 | `data/fields.tsv` |
@@ -888,7 +1499,10 @@ All AI draws use the thinking monster's unit seed (unit +0x20, `rng.md`
 §5.3, §7) with the step of `rng.md` §2; forms: `lo' % 100` (inline or
 `roll(100)` via `0x0045C390`), `roll(n)` (`0x0045C3E0` in wander),
 `lo'` bit 0 (wander, forced-target alignment), low byte < 128 (circle),
-`lo' % 20` (Fallen sound), `roll(3)` (Navi). Per think, the order is:
+`lo' % 20` (Fallen sound), `roll(3)` (Navi), `lo' % 10` (FoulCrowNest),
+`roll(15)`, `roll(L)` and `lo'` bit 0 via `0x00472210(seed, 2)`
+(BloodRaven), `roll(count)` (Npc map AI). The Npc command counter G
+(§9.9) is not a draw. Per think, the order is:
 
 1. Precheck C teleport (§2.4): 1–3 draws, only for flag-0x20 monsters
    with a target.
@@ -925,6 +1539,23 @@ spec and happen later, when the mode's action frame runs.
 10. A think scheduled for a monster with state 54 cancels every pending
     think of that monster first (§1.1), even the one being scheduled
     over.
+11. Npc (§9.9): while a player talks to the NPC and AI param 0 ≤ 0, the
+    interaction handler returns 1 without scheduling; the next think
+    comes from an NPC message (+1) or a mode end. AI param 1 is both the
+    message's x and the greeting countdown.
+12. Npc command 4 alternates velocity method 5 / 7 by a process-wide
+    counter G that never resets between games; its value depends on all
+    NPC walks since the process started.
+13. BloodRaven keeps the halved target distance after a failed "run
+    near" (step 3) and uses it for the 5 / 12 tests of steps 5 and 6.
+14. FoulCrowNest ends by requesting death mode on itself with unit flag
+    0x20000 (no drop) once it has made aip3 summons.
+15. Vampire uses `Skill1`, `Skill4` (and `Skill2`, `Skill3` under its
+    flags) without testing the skill id for < 0; a row without them
+    requests a skill mode with skill −1 (`0x005DEAD0`).
+16. Secondary searches (`0x005DDC30`) report distance 0x7FFFFFFF when
+    they find nothing; SkeletonMage and SkeletonBow then take their
+    "far" branch.
 
 ## Test vectors
 
@@ -949,6 +1580,21 @@ think; draws per `rng.md` §2):
 | QuillRat, not C, D = 5, AI state 0, no command | 51 ≥ 35 → escape 2 | escape 2 | escape 2 | 0 → A2 |
 | circle: low byte, method | 95 → 5 | 119 → 5 | 133 → 6 | 104 → 5 |
 | CorruptLancer, not C, D = 10 | 51 < 60; 31 ≥ 0 → walk 3 steps | 87 → idle 9 | 53; 46 → walk 3 steps | 0; 42 → walk 3 steps |
+| CorruptRogue [60, 15, 75, 100, 20], C, D = 10 | 51 < 75 → A1 | 87 → idle 15 | 53 → A1 | 0 → A1 |
+| CorruptRogue, not C, D = 10 | 51 < 60; 31 ≥ 20 → walk flags 7 | 87 → idle 15 | 53; 46 → walk flags 7 | 0; 42 → walk flags 7 |
+| SkeletonBow [75, 15, 50, 5, 6], AI state 0, S at E = 10 | 51 < 75 → A1 at S | 87; 64 ≥ 20 → idle 15 | 53 → A1 at S | 0 → A1 at S |
+| SkeletonBow, no S | 51 ≥ 50 → idle 20 | 87 → idle 20 | 53 → idle 20 | 0 → walk in radius (5, 6) |
+| FoulCrowNest, D ≤ 20, summon not due: idle | 21 | 27 | 23 | 20 |
+| BloodRaven, D = 8, at home (steps 1–3 draw nothing), not C, param 0 = 0 → 3, param 1 = 0 | 51 ≥ 3: no raise | no raise | no raise | 0 < 3: L = 7; raise at (T.x − 7, T.y − 6); param 1 = 1 |
+| SkeletonMage [§9.19], S at E = 12 | 51 ≥ 30; 31 < 35 → A1 at S | 87; 64; step 2: 71 ≥ 30; 25 ≥ 20 → idle 5 | 53; 46; step 2: 20 < 30 → walk to T, 9 steps | 0 < 30 → walk to S, 9 steps |
+| Arach [§9.20], state 0, not C, AI state 0, params 1, 2 = 0 | 51 ≥ 15; 31 ≥ 20 → idle 15 | 87; 64 → idle 15 | 53; 46 → idle 15 | 0 < 15 → lunge |
+| Fetish [§9.21], state 2, D = 15, param 1 = 0 | 51 → idle 10 | 87 → idle 10 | 53 → idle 10 | 0 < 20 → circle 4 (low byte 46 → method 5) |
+| Vampire [§9.22], state 0, not C, D = 10, L ≥ 33, no S, param 2 = 0 | 51 ≥ 40; 31 < 50 → circle 4 | 87; 64 → idle 10 | 53; 46 → circle 4 | 0 < 40; no F2/F4; no S → walk to T flags 7 |
+| Bighead [§9.23], hurt, D = 10, no S | 51 ≥ 40 → idle 10 | 87 → idle 10 | 53 → idle 10 | 0 < 40 → circle 3 (low byte 46 → method 5) |
+| BloodHawk [§9.24], not C, D = 10, param 0 = 0 | 51 ≥ 30; 31 < 90 → speed −50, wander 4 | 87; 64 → wander 4 | 53; 46 → wander 4 | 0 < 30 → charge: speed 100, steps 10, walk to T |
+| HellMeteor [§9.25], unit at (100, 100) | 51 ≥ 50 → idle 50 | 87 → idle 50 | 53 → idle 50 | 0 < 50: roll(20) 2, 13 → `Skill1` at (92, 103) |
+| Scarab [§9.29], C, D = 25, no command | 51 < 75; 31 < 35 → `Skill1` at T | 87 → idle 15 | 53; 46; 20 < 50 → A1 | 0; 42; 13 → A1 |
+| Npc after steps 1–4 (no class case, no interaction, no command), map AI with 3 nodes | 51 < 66; node 0 | 87 ≥ 66 → 0 (then idle 8) | 53; node 0 | 0; node 2 |
 
 Scheduling (no draws):
 
@@ -1011,11 +1657,24 @@ Other recorded checks:
   `0x0053A8E0`, `0x00554850`, `0x005544B0`, `0x00573120`,
   `0x005DD7F0`, `0x005DE890`, `0x005DE9D0`, `0x005DD0B0`, `0x005DC380`,
   `0x005DC530`, `0x005DE080`–`0x005DF7D0` (helpers of §7),
-  `0x0058EC00`–`0x0058F730` (commands), and the AI functions of §9.
+  `0x0058EC00`–`0x0058F730` (commands), and the AI functions of §9,
+  with their helpers: Npc `0x005E6800`, `0x005E6860`, `0x005E68F0`,
+  `0x005E6AE0`, `0x005E7080`, map actions `0x005E6DE0`–`0x005E6FC0`;
+  `0x005DC480`, `0x005DF680`, `0x005DEF30`, `0x0058EEF0`,
+  `0x00472210`, `0x005FD350`, `0x00573930`, `0x0054CA10`,
+  `0x00621F20`, `0x005B0BD0`, `0x0063EA40`, `0x00553540`,
+  `0x00621E40`, `0x00639DB0`, `0x005DDC30`; for the implementation
+  questions AI1–AI10 (2026-10-06): `0x005E77A0` (class test
+  `cmp [unit+4], 0x20F` = 527), `0x005E7880`, `0x005E7AC0`,
+  `0x0061AB00`, `0x00620BB0`, `0x0058EC90`, `0x0058ED10`,
+  `0x0058EF40`, `0x0058EFA0`, `0x005DED90`, `0x005DEDE0`,
+  `0x005DEE50`, `0x005DE4E0`, `0x005DE6D0`, `0x005F1800`,
+  `0x00625480`, `0x00625D10`; G's references by a scan of `all.asm`.
 - Tables dumped from the file's .rdata/.data with a PE-section parser:
   AI and special-state tables (`0x0073CA18`, 166 records), monster
   event table `0x006E2490`, mode table `0x006E2260`, inline-think bytes
-  `0x0073C6D0`, scan table `0x006E3300`; bytes at `0x005A7F70`,
+  `0x0073C6D0`, scan table `0x006E3300`, map-action table `0x00741D74`
+  (7 pointers); bytes at `0x005A7F70`,
   `0x005B0CC0`, `0x005E7F50` (functions Ghidra did not create).
 - Callers of `0x005417D0` with event type 2: found by scanning all.asm
   for the type push before each call (27 sites).
@@ -1029,6 +1688,9 @@ Other recorded checks:
   copies (indices 1/100, 12/19); special states 10–12 gate on
   `switchai`.
 - Live data: monstats.txt, monai.txt, levels.txt (`patch_d2` layer).
+  `ai-functions.tsv` `monstats_rows` regenerated 2026-10-06 from
+  `patch_d2` monstats.txt (734 records = `monstats.bin` count; all 148
+  counts unchanged, 51 rows' pairs corrected by −1 from record 410).
 - Recordings: `traces/raw/20261006-015554-tick.jsonl`,
   `-021854-tick.jsonl`, `-022304-tick.jsonl` (`tick-raw-1`); counts by
   a script over `hin`, `set`, `ex`, `cancel` records (Test vectors).
@@ -1053,13 +1715,23 @@ Other recorded checks:
    records, the mode-3 draw).
 7. Target-node list slots 8 and 9 contents and order (game +0x10F8): read
    the 1.14d target-node functions (D2MOO `Targets.cpp`).
-8. Which Npc-AI path produces the dominant 10-frame idle (map-AI actions
-   `0x005E7080` or `0x005E6AE0`)? Settle: read those two functions.
+8. Who builds the Npc map-AI record (control +0x38: node count, 12-byte
+   nodes) and from which data (DS1 preset paths?), and the node order.
+   The idle-10 source itself is settled in §9.9 (command 4 delay);
+   confirm with a town recording that logs command 4 next to thinks.
 9. The 2 recorded fallen1 type-1 runs with no schedule and later
    activity: likely a death end followed by a shaman resurrect; check
    with a recording that hooks mode changes.
-10. 119 AI functions are unread and 11 are D2MOO-only
-    (`ai-functions.tsv` status column).
-11. Which message handlers reach `0x00548B00` / `0x0054CA10` (NPC
-    interaction start/stop, +1 think): settle with their callers and a
-    recording that logs client messages next to timer schedules.
+10. The AI functions still `unread` or `D2MOO-only` in
+    `ai-functions.tsv` (status column).
+11. `0x0054CA10` is C→S 0x59 and `0x00548B00` is reached from C→S 0x13
+    (`world/npc.md` §2); still open: confirm the 12 recorded "+1"
+    schedules between ticks with a recording that logs client messages
+    next to timer schedules.
+12. Answered: G (`0x0088CADC`) has exactly two references in the
+    binary (the read and the `add 1` in `0x005E6AE0`) and no reset, so
+    it counts from 0 at process start across every game of the process.
+    `d2-sim` takes G from its host as a counter that outlives games
+    (the local server process owns it, one per server process, never
+    saved); a new game does not reset it. Conformance traces start from
+    a fresh process (G = 0), or are the first game after one.

@@ -1,12 +1,18 @@
-// Spec: specs/client/bridge.md
+// Spec: specs/client/bridge.md (§6), specs/client/model.md (§4 rule 1)
 //! Dispatch table (§6): one row per S→C id in
 //! `specs/client/bridge-dispatch.tsv`, naming the spec that owns what the
 //! message means for the client model, and the handlers registered for
 //! owned ids in [`HANDLERS`]. The two must agree ([`check`]).
+//!
+//! A handler is *general* (applied at receive) or a *unit* handler
+//! (`model.md` §4: queued on the addressed unit at receive, applied in
+//! the update pass); the kind follows the receive table's
+//! `client_unit_handler` column.
 
+use d2_proto::transport::server_message;
 use d2_proto::SERVER_MESSAGES;
 
-use super::world::{ClientWorld, UnitKey};
+use super::world::{ClientWorld, ModelInputs, UnitKey};
 
 /// The dispatch table (spec §6 rule 1).
 pub const TSV: &str = include_str!("../../../../specs/client/bridge-dispatch.tsv");
@@ -18,13 +24,26 @@ pub const IDS: usize = 0xB5;
 pub const TBD: &str = "TBD";
 
 /// One S→C message as a handler sees it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug)]
 pub struct Message<'a> {
     pub id: u8,
     /// The whole message, id included.
     pub bytes: &'a [u8],
     /// The unit it addresses, if any (spec §5 rule 4).
     pub unit: Option<UnitKey>,
+    /// Tables and render seams the rules read (not model state).
+    pub inputs: &'a ModelInputs,
+}
+
+/// A queued message as its unit handler sees it (`model.md` §4 rule 5).
+#[derive(Clone, Copy, Debug)]
+pub struct UnitMessage<'a> {
+    pub id: u8,
+    /// The whole message, id included.
+    pub bytes: &'a [u8],
+    /// The unit whose queue held it; in the model when the handler runs.
+    pub unit: UnitKey,
+    pub inputs: &'a ModelInputs,
 }
 
 /// Why a handler could not apply its message (spec §6 rule 4).
@@ -32,11 +51,41 @@ pub struct Message<'a> {
 pub enum HandlerError {
     #[error(transparent)]
     Decode(#[from] d2_proto::DecodeError),
+    #[error(transparent)]
+    Parse(#[from] d2_proto::s2c::ParseError),
     #[error("{0}")]
     Invalid(&'static str),
+    /// A 1.14d fatal assert (its number), e.g. a message that needs a
+    /// local player when there is none.
+    #[error("fatal assert 0x{0:X}")]
+    Fatal(u32),
+    /// A rule input no spec gives yet.
+    #[error("TODO(spec: {0})")]
+    Unspecified(&'static str),
+    /// The client DRLG (`model.md` §12 rule 1) failed: a fatal error of
+    /// the original's DRLG code, a level-type error, or a snapshot that
+    /// cannot generate.
+    #[error(transparent)]
+    Drlg(#[from] super::drlg::ClientDrlgError),
 }
 
 pub type HandlerFn = fn(&mut ClientWorld, &Message<'_>) -> Result<(), HandlerError>;
+pub type UnitHandlerFn = fn(&mut ClientWorld, &UnitMessage<'_>) -> Result<(), HandlerError>;
+
+/// What a registered handler is.
+#[derive(Clone, Copy, Debug)]
+pub enum Handle {
+    /// Applied when received.
+    General(HandlerFn),
+    /// Queued on the addressed unit, applied in the update pass.
+    Unit(UnitHandlerFn),
+}
+
+impl Handle {
+    fn is_unit(&self) -> bool {
+        matches!(self, Handle::Unit(_))
+    }
+}
 
 /// A handler registered for an owned id.
 #[derive(Clone, Copy, Debug)]
@@ -44,12 +93,11 @@ pub struct Handler {
     pub id: u8,
     /// Spec path, equal to the TSV `owner` of the id.
     pub owner: &'static str,
-    pub handle: HandlerFn,
+    pub handle: Handle,
 }
 
-/// Handlers for owned ids. Empty until a client-model spec takes an id
-/// (spec §6 rule 2).
-pub const HANDLERS: &[Handler] = &[];
+/// Handlers for owned ids (spec §6 rule 2).
+pub const HANDLERS: &[Handler] = super::msg::HANDLERS;
 
 /// One TSV row.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -121,6 +169,9 @@ pub enum Mismatch {
     Owner { id: u8, tsv: String, code: String },
     /// Two handlers for one id, or a handler for an id past 0xB4.
     BadHandler { id: u8 },
+    /// A unit handler for an id without a receive-table unit handler, or
+    /// a general one for an id with one (`model.md` §4 rule 1).
+    Kind { id: u8 },
 }
 
 /// The mechanical check of spec §6 rule 5.
@@ -131,6 +182,10 @@ pub fn check(rows: &[Row], handlers: &[Handler]) -> Vec<Mismatch> {
         match seen.get_mut(h.id as usize) {
             Some(s) if !*s => *s = true,
             _ => out.push(Mismatch::BadHandler { id: h.id }),
+        }
+        let unit_id = server_message(h.id).is_some_and(|m| m.client_unit_handler.is_some());
+        if usize::from(h.id) < IDS && h.handle.is_unit() != unit_id {
+            out.push(Mismatch::Kind { id: h.id });
         }
     }
     for row in rows {
@@ -171,7 +226,7 @@ pub enum TableError {
 #[derive(Clone, Copy, Debug)]
 pub struct Entry {
     pub owner: &'static str,
-    pub handle: HandlerFn,
+    pub handle: Handle,
 }
 
 /// Handlers indexed by id.
@@ -197,7 +252,10 @@ impl Dispatch {
         }
         let mut d = Self::empty();
         for h in HANDLERS {
-            d.set(h.id, h.owner, h.handle);
+            d.entries[h.id as usize] = Some(Entry {
+                owner: h.owner,
+                handle: h.handle,
+            });
         }
         Ok(d)
     }
@@ -205,7 +263,18 @@ impl Dispatch {
     /// Registers `handle` for `id` (tests and tools; production handlers
     /// go in [`HANDLERS`]). Panics for an id past 0xB4.
     pub fn set(&mut self, id: u8, owner: &'static str, handle: HandlerFn) {
-        self.entries[id as usize] = Some(Entry { owner, handle });
+        self.entries[id as usize] = Some(Entry {
+            owner,
+            handle: Handle::General(handle),
+        });
+    }
+
+    /// Registers a unit handler for `id` (tests and tools).
+    pub fn set_unit(&mut self, id: u8, owner: &'static str, handle: UnitHandlerFn) {
+        self.entries[id as usize] = Some(Entry {
+            owner,
+            handle: Handle::Unit(handle),
+        });
     }
 
     /// The handler of `id`, if one is registered.

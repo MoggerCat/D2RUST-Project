@@ -544,6 +544,9 @@ impl QuestWorld for Fake {
     fn stat(&self, unit: UnitId, stat: u16) -> i32 {
         NpcWorld::stat(self, unit, stat) as i32
     }
+    fn base_stat(&self, unit: UnitId, stat: u16) -> i32 {
+        NpcWorld::base_stat(self, unit, stat) as i32
+    }
     fn add_stat(&mut self, unit: UnitId, stat: u16, delta: i32) {
         let v = QuestWorld::stat(self, unit, stat).wrapping_add(delta);
         NpcWorld::set_stat(self, unit, stat, v as u32);
@@ -581,6 +584,9 @@ impl QuestWorld for Fake {
     fn players_near(&self, _: UnitId) -> Vec<UnitId> {
         Vec::new()
     }
+    fn party_members(&self, _: UnitId) -> Option<Vec<UnitId>> {
+        None
+    }
     fn send(&mut self, player: UnitId, msg: &[u8]) {
         NpcWorld::send(self, player, msg);
     }
@@ -617,11 +623,129 @@ impl QuestWorld for Fake {
         false
     }
     fn schedule_quest_event(&mut self, _: UnitId, _: i32) {}
-    fn set_object_opened(&mut self, _: UnitId) {}
+    fn object_mode(&self, _: UnitId) -> i32 {
+        0
+    }
+    fn set_object_mode(&mut self, _: UnitId, _: i32) {}
+    fn object_by_guid(&self, _: u32) -> Option<(UnitId, u16)> {
+        None
+    }
     fn mercenary_reward(&mut self, _: UnitId, _: u16) {}
+    fn unit_position(&self, _: UnitId) -> Option<(i32, i32, d2_sim::units::RoomId)> {
+        None
+    }
+    fn room_contains(&self, _: d2_sim::units::RoomId, _: i32, _: i32) -> bool {
+        false
+    }
+    fn room_at(&self, _: d2_sim::units::RoomId, _: i32, _: i32) -> Option<d2_sim::units::RoomId> {
+        None
+    }
+    fn free_spot_at(
+        &mut self,
+        _: d2_sim::units::RoomId,
+        _: i32,
+        _: i32,
+        _: u32,
+        _: u32,
+        _: u32,
+        _: u32,
+    ) -> Option<(i32, i32, d2_sim::units::RoomId)> {
+        None
+    }
+    fn spawn_monster(
+        &mut self,
+        _: d2_sim::units::RoomId,
+        _: i32,
+        _: i32,
+        _: u16,
+        _: u8,
+        _: u32,
+    ) -> Option<UnitId> {
+        None
+    }
+    fn or_unit_flags(&mut self, _: UnitId, _: u32) {}
+    fn monsters(&self) -> Vec<UnitId> {
+        Vec::new()
+    }
+    fn npc_chat_clients(&self, _: UnitId) -> Option<Vec<UnitId>> {
+        None
+    }
+    fn remove_monster(&mut self, _: UnitId) {}
+    fn drop_preset_monster(&mut self, _: u8, _: u16) {}
+    fn find_object_near(&self, _: UnitId, _: u16) -> Option<UnitId> {
+        None
+    }
+    fn create_object(
+        &mut self,
+        _: d2_sim::units::RoomId,
+        _: i32,
+        _: i32,
+        _: u16,
+    ) -> Option<UnitId> {
+        None
+    }
+    fn object_anim_length(&self, _: UnitId) -> i32 {
+        0
+    }
+    fn schedule_object_event(&mut self, _: UnitId, _: u8, _: i32) {}
+    fn open_quest_message(&mut self, _: UnitId, _: UnitId, _: u16) {}
+    fn item_code(&self, _: UnitId) -> Option<[u8; 4]> {
+        None
+    }
     fn unhandled(&mut self, chain: u8, function: u32) {
         self.log.push(format!("unhandled {chain} {function:#x}"));
     }
+    fn spawn_monster_flags(
+        &mut self,
+        _: d2_sim::units::RoomId,
+        _: i32,
+        _: i32,
+        _: u16,
+        _: u8,
+        _: i32,
+        _: u32,
+    ) -> Option<UnitId> {
+        None
+    }
+    fn open_portal(
+        &mut self,
+        _: Option<UnitId>,
+        _: d2_sim::units::RoomId,
+        _: i32,
+        _: i32,
+        _: u32,
+        _: u16,
+        _: bool,
+    ) -> Option<UnitId> {
+        None
+    }
+    fn create_missile(
+        &mut self,
+        _: UnitId,
+        _: u16,
+        _: u8,
+        _: u16,
+        _: i32,
+        _: i32,
+    ) -> Option<UnitId> {
+        None
+    }
+    fn set_missile_target(&mut self, _: UnitId, _: u32, _: u32) {}
+    fn refresh_room(&mut self, _: UnitId) {}
+    fn spawn_object(
+        &mut self,
+        _: d2_sim::units::RoomId,
+        _: i32,
+        _: i32,
+        _: u16,
+        _: i32,
+    ) -> Option<UnitId> {
+        None
+    }
+    fn client_save_flags(&self, _: UnitId) -> Option<u16> {
+        None
+    }
+    fn set_client_save_flags(&mut self, _: UnitId, _: u16) {}
 }
 
 /// The world host of the tests: the real `NpcControl`, vendor records and

@@ -12,7 +12,8 @@
 //! - a wrong size → 3 with no state change (§7 text);
 //! - every rejection the spec orders before the handler's first effect
 //!   returns the spec's code and leaves the state unchanged (seam calls
-//!   that only log, such as the resync or a sound, are not state). The
+//!   that only log, such as a sound, are not state; the "can't do that"
+//!   0x5A of 0x19 / 0x63 is the one send a rejection makes). The
 //!   expected rejections are written from §7, step by step, below
 //!   (`early`).
 
@@ -220,14 +221,15 @@ fn world(dna: &[u8]) -> Fake {
         consume: d.bool(),
         use_ok: d.bool(),
         equip_picked: d.bool(),
-        special: d.bool(),
         hireling: hire.then_some(merc),
         alive: d.below(4) != 3,
-        not_dead: d.below(4) != 3,
+        used_skill: d.below(4) == 3,
         owns: d.below(4) != 3,
         q44: d.bool(),
         bits: if d.bool() { Vec::new() } else { vec![1, 2, 3] },
-        filler_owner: None,
+        boxes: 16,
+        item_skill: -1,
+        has_skill: false,
     };
     f
 }
@@ -550,7 +552,7 @@ fn early(f: &Fake, m: &Msg, b: &[u8]) -> Option<u32> {
         0x61 => {
             if !f.expansion || (busy && f.k.trading) {
                 Some(res::REFUSED)
-            } else if !(f.k.not_dead && f.k.alive && f.k.hireling.is_some() && f.k.owns) {
+            } else if !(!f.k.used_skill && f.k.alive && f.k.hireling.is_some() && f.k.owns) {
                 Some(res::OK)
             } else {
                 None
@@ -601,6 +603,15 @@ fn run_case(dna: &[u8], msgs: &[Msg]) {
                 }
                 if let Some(want) = early(&pre, m, &b) {
                     assert_eq!(r, Ok(want), "{:#x} early rejection {b:?}", m.id);
+                    // 0x19 / 0x63 with a cursor item answer "can't do
+                    // that" (§7.4 step 2, §7.24 step 1): the one effect
+                    // their rejection has.
+                    if (m.id == 0x19 || m.id == 0x63)
+                        && pre.inv().cursor.is_some()
+                        && f.sent.last() == Some(&super::layouts::cant_do_that())
+                    {
+                        f.sent.pop();
+                    }
                     assert_eq!(
                         state(&f),
                         before,

@@ -120,9 +120,12 @@ passed yet. Run in this order (cheapest and most basic first).
 | 2.10 | `cargo test --release -p d2-sim --test game_monsters -- --ignored` then `… --test game_skills -- --ignored` (C45) | `game_monsters` **19 passed**; `game_skills` **16 passed, 0 failed**. Record the evilhut row (528 or 529) in `population.md`; interpretation points GM1–GM6 in HANDOFF C45. | the claim table of `docs/handoff/game-tests-monsters-skills.md` §4 per passing test (raised game tier 187 → 277 units when measured) |
 | 2.11 | `cargo test --release -p d2-formats --test game_sweep -- --ignored --nocapture` (C46.1) | **11 passed**, each sweep printing its counts (COF 3,606 files as `mpq-tool formats` counts). A failure naming a count while every file decodes is GA3; `animdata_matches_every_cof` on `with_cof` is GA4. DC6 1,651 instead of 1,657 means the six `patch_d2.mpq` names come from elsewhere: record the tool's method in the spec and fix `files_where`. | 16 game-tier units if all pass: `assets.md` 1 → 5, `render-pipeline.md` 3 → 4, `animdata.md` 1 → 8, `cof.md` 3 → 4, `dcc.md` 12 → 13, `palette.md` 2 → 3, `tbl.md` 3 → 4 |
 | 2.12 | `cargo test --release -p d2-client --test game_assets -- --ignored --nocapture --test-threads 1 --skip gpu_compositor_on_real_frames` (C46.2; builds Bevy) | **5 passed**, printing the listed-name count (**0 refused**) and the outcome of the two text `.tbl` files (GA1). A refused non-ASCII name needs a rule (`assets.md` OQ2). | with 2.11 (same table) |
-| 2.13 | `cargo test --release -p d2-server --test game_wired_host -- --ignored --nocapture --test-threads 1` (note `game-tests-wired-host` §4; **not in HANDOFF yet**) | **7 passed, 0 failed** (`wired_host_amazon`, `_sorceress`, `_necromancer`, `_paladin`, `_barbarian`, `_druid`, `_assassin`). Record per class: Blood Moor arrival position and frame, kill / pick-up notes (F1), `digest <hex>`. **Run it twice and compare the seven digest lines: they must be equal.** A failing assertion names its step; read it against F1–F7 first. | none (integration only) |
+| 2.13 | `cargo test --release -p d2-server --test game_wired_host -- --ignored --nocapture --test-threads 1` (C59, note `game-tests-wired-host` §4; **run after HANDOFF §2 step 7u(a)** has updated step 4: the file asserts the stub for C→S 0x03 and the walk handler now exists) | **7 passed, 0 failed** (`wired_host_amazon`, `_sorceress`, `_necromancer`, `_paladin`, `_barbarian`, `_druid`, `_assassin`). Record per class: Blood Moor arrival position and frame, kill / pick-up notes (F1), `digest <hex>`. **Run it twice and compare the seven digest lines: they must be equal.** A failing assertion names its step; read it against F1–F7 first. | none (integration only) |
 | 2.14 | `cargo test -p d2-client --lib composite::tests::all_live_cofs_give_slot_orders -- --ignored --nocapture` | passed in the last Done run (C9: 3,511 distinct names + `amblxbow.cof`, 242,300 frames, 0 failures); regression only | none new |
 | 2.15 | `cargo test -p d2-client --lib frames::tests::all_live_frame_sets_build_and_pack -- --ignored --nocapture` | passed in the last Done run (C8: 23,595 files, 6 parse errors, 288,702 frame sets, 3,345,171 frames, largest 96×960 ≤ 2046); regression only | none new |
+| 2.16 | `cargo test -p d2-formats -- --ignored` then `cargo run --release -p mpq-tool -- formats` (C61, eighth fold) | everything that passed before still passes; all **5,008 Huffman + ADPCM `.wav` files** decode to their exact RIFF size (`mpq.md` Observations): the Huffman decoder was sped up (`mpq-huffman`) and no game-file sector has run through the new code |
+| 2.17 | `GameData::load` with `ActCreation::Full` on the live set (C60, optional, after 2.13) and the `VendorTables::from_fixed` rows (C63; test home needed, `mutants-world` §4) | C60: the same level ids, seeds and digests as `game_wired_host`; C63: a Charsi `npc.txt` row's multipliers, `difficultylevels` gamble odds and an `itemtypes` row equal `vendors.md` §9.3 / Constants |
+| 2.18 | `cargo build --release -p d2s-tool`; `$env:D2_SAVE_DIR = "$env:USERPROFILE\Saved Games\Diablo II"`; `cargo test --release -p d2s-tool --test real_saves -- --ignored --nocapture`; for one save also `target\release\d2s-tool check "<save dir>\<Char>.d2s" --game-dir $env:D2_GAME_DIR` and `… dump …` (C66, `docs/handoff/impl-d2s.md` §4) | `real_saves_round_trip` passes: every `.d2s` parses in `d2s.md` §1 order to the file end and rewrites **byte for byte**; `check` prints OK. A failure names the first differing offset or the internal code: an item entry that does not size is an item-bitstream save-format finding (trailer, unit +0x28, children). Record the first save's header +0x10..+0x37, +0x88..+0xA7, the stats bytes at 0x2FD and `jf`/`kf` bytes (d2s OQ3). | `d2s.md` real-save check (§3, §2.2 r2, §1 r1); add the claim on `real_saves_round_trip` after the pass |
 
 Order note: 2.12, 2.14 and 2.15 build `d2-client` (Bevy); do them once, after
 the cheaper rows, in one `d2-client` target directory.
@@ -311,6 +314,26 @@ timer's frame (death frame + 4) and its position among the death
 animation's timers in the queue; it settles RT1. No `check_*` command
 named: **NOT FOUND** (hand analysis).
 
+### 6.7 Generated characters load in the game (`d2s-tool`, C66 part 2)
+
+```powershell
+cargo build --release -p d2s-tool
+$t = "target\release\d2s-tool"
+& $t new --game-dir $env:D2_GAME_DIR --name TestAma --class ama -o TestAma.d2s
+& $t new --game-dir $env:D2_GAME_DIR --name TestSor --class sor --level 30 --expansion --difficulty-unlocked hell --waypoints all --quests acts=4 --all-skills 1 --gold 100000 --item hp1 --item lsd@0,0 -o TestSor.d2s
+& $t new-stub --name TestStub --class nec -o TestStub.d2s
+```
+
+Copy the three files into the save folder (back the folder up first;
+never commit saves). Expect: all three appear at character select with
+the right class and level, each enters a single-player game, the items
+sit where `dump` says, the waypoints and acts are open. Then exit (the
+game re-saves) and run `& $t check <file> --game-dir $env:D2_GAME_DIR` on
+each re-saved file and `dump` ours vs the game's: differences in the
+stats at 0x2FD, item records (trailer bit, flags such as 0x2000),
++0x88..+0xA7 or the quest words are findings for `formats/d2s.md` /
+`items/bitstream.md` (record them in HANDOFF C66).
+
 ### 6.6 Other recordings (each needs the recorder extensions of M10 first)
 
 | Recording | Command / script | Expect | Source |
@@ -338,7 +361,7 @@ C11 (monster population; `game_monsters` covers part), C12 (maze data),
 C13 (`preset_ds1_survey` in `conformance`), C14 / C19 (vendor lists,
 quest NPC ids; code in 2.4 per HANDOFF), C18 (combat / AI / missile gap
 rules), C20 (treasure dump vs d2rs, reads `traces/raw/20261006-115547-tables`),
-C50 (`anim_record`), C52 (`mpq-tool formats` extension for DC6 flip,
+C50 (`anim_record`), C62 (`mpq-tool formats --huffman-tables` count of the `.wav` weight tables), C63 (`VendorTables::from_fixed` live rows), C64 (mutation re-run with game files), C52 (`mpq-tool formats` extension for DC6 flip,
 DCC odd `variable0`, zero bytes in runs; then `D2_GAME_DIR=<install>
 cargo test -p d2-client -- --ignored`).
 

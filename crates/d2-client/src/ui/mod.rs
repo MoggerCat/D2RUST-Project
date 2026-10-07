@@ -18,8 +18,12 @@ pub mod draw;
 pub mod edge;
 pub mod frame;
 pub mod geom;
+pub mod layout;
+pub mod original;
 pub mod panel;
+pub mod panels;
 pub mod root;
+pub mod states;
 pub mod text;
 pub mod widget;
 
@@ -35,6 +39,6 @@ pub use panel::{
 };
 pub use root::{NoPanelRules, PanelRules, Routed, UiError, UiHit, UiRoot};
 pub use text::{
-    layout_text, GlyphDraw, GlyphLookup, GlyphPlacement, NoTextRules, TextError, TextOpts,
-    TextRules,
+    font_info, layout_text, FontInfo, GlyphDraw, GlyphLookup, GlyphPlacement, OriginalText,
+    TextError, TextOpts, TextRules, FONTS,
 };

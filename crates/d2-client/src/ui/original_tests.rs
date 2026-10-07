@@ -1,0 +1,410 @@
+// Spec: specs/ui/panels.md
+//! The original UI wired into a root: hotkeys, the gate and open mode,
+//! the panel adapters' draws and clicks (spec §Test vectors where the
+//! client model holds the inputs).
+
+use super::*;
+use crate::bridge::world::{ClientUnit, UnitKey};
+use crate::ui::draw::UiDraw;
+use crate::ui::{ClientIntent, NoPanelRules, NoStrings};
+
+const AMAZON: u32 = 0;
+
+fn areas() -> Vec<InvArea> {
+    let mut v = vec![InvArea::default(); 32];
+    // §Test vectors: `inventory.bin` records 0 and 16 (amazon).
+    v[0] = InvArea {
+        left: 320,
+        right: 640,
+        top: 0,
+        bottom: 441,
+    };
+    v[16] = InvArea {
+        left: 400,
+        right: 720,
+        top: 60,
+        bottom: 501,
+    };
+    v
+}
+
+fn world(class: u32, mode: u32, expansion: bool) -> ClientWorld {
+    let mut w = ClientWorld::default();
+    let key = UnitKey::new(PLAYER, 1);
+    let mut u = ClientUnit::new(key);
+    u.class = class;
+    u.mode = mode;
+    w.units.insert(key, u);
+    w.local_player = Some(key);
+    w.expansion = u32::from(expansion);
+    w
+}
+
+struct Ui {
+    ui: OriginalUi,
+    root: UiRoot,
+}
+
+fn ui(inv: Option<Vec<InvArea>>, installed: bool) -> Ui {
+    let config = UiConfig {
+        screen: Screen::R800,
+        expansion_installed: installed,
+    };
+    let ui = OriginalUi::new(config, inv).unwrap();
+    let mut root = UiRoot::new(Box::new(NoPanelRules));
+    ui.install(&mut root).unwrap();
+    Ui { ui, root }
+}
+
+impl Ui {
+    fn send(&mut self, w: &ClientWorld, e: UiEvent) -> Routed {
+        let ctx = UiCtx {
+            tick: 0,
+            world: w,
+            strings: &NoStrings,
+        };
+        self.ui.before_event(e, w);
+        let r = self.root.dispatch(e, &ctx);
+        self.ui.after_event(&mut self.root, e, r).unwrap();
+        r
+    }
+
+    fn key(&mut self, w: &ClientWorld, a: Action) -> Routed {
+        self.send(w, UiEvent::Action(ActionId(a.index() as u16)))
+    }
+
+    fn click(&mut self, w: &ClientWorld, at: Point) -> (Routed, Routed) {
+        let b = PointerButton::Left;
+        (
+            self.send(w, UiEvent::Press { button: b, at }),
+            self.send(w, UiEvent::Release { button: b, at }),
+        )
+    }
+
+    /// (file name, frame, x, y) of every image the open panels draw.
+    fn images(&self, w: &ClientWorld) -> Vec<(String, u32, i32, i32)> {
+        let ctx = UiCtx {
+            tick: 0,
+            world: w,
+            strings: &NoStrings,
+        };
+        let mut out: Vec<UiDraw> = Vec::new();
+        self.root.draw(&ctx, &mut out);
+        let files = self.ui.files();
+        out.iter()
+            .filter_map(|d| match d {
+                UiDraw::Image(i) => Some((
+                    files.name(i.image.file).unwrap().to_string(),
+                    i.image.frame,
+                    i.at.x,
+                    i.at.y,
+                )),
+                _ => None,
+            })
+            .collect()
+    }
+}
+
+fn panel_images(v: &[(String, u32, i32, i32)], prefix: &str) -> Vec<(u32, i32, i32)> {
+    v.iter()
+        .filter(|(n, ..)| n.starts_with(prefix))
+        .map(|(_, f, x, y)| (*f, *x, *y))
+        .collect()
+}
+
+// Covers: specs/ui/panels.md §5, §6 r1, §6 r2
+#[test]
+fn install_mirrors_the_flags_and_keeps_the_border_open() {
+    let u = ui(Some(areas()), true);
+    assert_eq!(u.root.open_panels(), vec![BORDER_PANEL]);
+    let w = world(AMAZON, 1, true);
+    let img = u.images(&w);
+    // Mode 0: no border; the 800 × 600 control panel base, six frames.
+    assert!(panel_images(&img, "panel\\800borderframe").is_empty());
+    let ctrl = panel_images(&img, "panel\\800ctrlpnl7");
+    assert_eq!(ctrl.len(), 6);
+    assert_eq!(ctrl[0], (0, 0, 600));
+    assert_eq!(ctrl[5], (5, 800 - 117, 600));
+}
+
+// Covers: specs/ui/panels.md §2 r2, §2 r5, §2 r6, §4 r2, §4 r3
+#[test]
+fn hotkeys_toggle_their_state_with_jump_0() {
+    let mut u = ui(Some(areas()), true);
+    let w = world(AMAZON, 1, true);
+    // The mouse at x 500 would jump with jump 1 (§4.3 vector); hot keys
+    // pass 0.
+    u.send(&w, UiEvent::CursorMoved(Point::new(500, 300)));
+    assert_eq!(u.key(&w, Action::ToggleInventory), Routed::Unhandled);
+    assert!(u.ui.is_open(UI_INVENTORY));
+    assert_eq!(u.ui.open_mode().get(), 1);
+    assert_eq!(
+        u.ui.take_outcome().effects,
+        vec![
+            UiEffect::Opened(1),
+            UiEffect::InventoryHook,
+            UiEffect::OpenMode(OpenMode::new(1).unwrap())
+        ]
+    );
+    assert_eq!(
+        u.root.open_panels(),
+        vec![PanelId(1), BORDER_PANEL],
+        "the root mirrors the flag"
+    );
+    // The border shows on the right (mode 1): frames 5–9.
+    let border = panel_images(&u.images(&w), "panel\\800borderframe");
+    assert_eq!(
+        border.iter().map(|b| b.0).collect::<Vec<_>>(),
+        vec![5, 6, 7, 8, 9]
+    );
+    u.key(&w, Action::ToggleInventory);
+    assert!(!u.ui.is_open(UI_INVENTORY));
+    assert_eq!(u.ui.open_mode().get(), 0);
+    // An action without a state does nothing.
+    u.key(&w, Action::ToggleRun);
+    assert_eq!(u.root.open_panels(), vec![BORDER_PANEL]);
+}
+
+// Covers: specs/ui/panels.md §3 r3, §4 r2
+#[test]
+fn conflict_table_vectors() {
+    let mut u = ui(Some(areas()), true);
+    let w = world(AMAZON, 1, true);
+    // Inventory open, character on: C[1][2] = 0, both open, mode 3.
+    u.key(&w, Action::ToggleInventory);
+    u.key(&w, Action::ToggleCharacter);
+    assert!(u.ui.is_open(UI_INVENTORY) && u.ui.is_open(UI_CHARACTER));
+    assert_eq!(u.ui.open_mode().get(), 3);
+    // Character off, then the skill tree: C[1][4] = 1 closes the
+    // inventory (mode 0), then the skill tree opens (mode 1).
+    u.key(&w, Action::ToggleCharacter);
+    u.ui.take_outcome();
+    u.key(&w, Action::ToggleSkillTree);
+    assert!(!u.ui.is_open(UI_INVENTORY) && u.ui.is_open(UI_SKILLTREE));
+    assert_eq!(u.ui.open_mode().get(), 1);
+    let fx = u.ui.take_outcome().effects;
+    assert_eq!(fx[0], UiEffect::Closed(1));
+    assert_eq!(
+        *fx.last().unwrap(),
+        UiEffect::OpenMode(OpenMode::new(1).unwrap())
+    );
+}
+
+// Covers: specs/ui/panels.md §2 r5
+#[test]
+fn a_dead_player_cannot_toggle_a_panel() {
+    let mut u = ui(Some(areas()), true);
+    let dead = world(AMAZON, 0x11, true);
+    u.key(&dead, Action::ToggleInventory);
+    assert!(!u.ui.is_open(UI_INVENTORY));
+    // No local player: allowed (§2.5 "no P").
+    u.key(&ClientWorld::default(), Action::ToggleInventory);
+    assert!(u.ui.is_open(UI_INVENTORY));
+}
+
+// Covers: specs/ui/panels.md §4 r4, §9 r3, §7 r2
+#[test]
+fn inventory_draws_its_art_and_its_close_button_closes_it() {
+    let mut u = ui(Some(areas()), true);
+    let w = world(AMAZON, 1, true);
+    u.key(&w, Action::ToggleInventory);
+    // §Test vectors, 800 × 600: frames 4–7 at (400, 316), (656, 316),
+    // (400, 492), (656, 492); close button (418, 476).
+    let img = u.images(&w);
+    assert_eq!(
+        panel_images(&img, "panel\\invchar6"),
+        vec![(4, 400, 316), (5, 656, 316), (6, 400, 492), (7, 656, 492)]
+    );
+    assert_eq!(
+        panel_images(&img, "panel\\buysellbtn"),
+        vec![(10, 418, 476)]
+    );
+    // Press: frame 11; release in the close rectangle: SetUIState(1, off).
+    let at = Point::new(430, 460);
+    let b = PointerButton::Left;
+    assert_eq!(
+        u.send(&w, UiEvent::Press { button: b, at }),
+        Routed::Panel(PanelId(1))
+    );
+    assert_eq!(
+        panel_images(&u.images(&w), "panel\\buysellbtn"),
+        vec![(11, 418, 476)]
+    );
+    u.send(&w, UiEvent::Release { button: b, at });
+    assert!(!u.ui.is_open(UI_INVENTORY));
+    assert_eq!(u.ui.open_mode().get(), 0);
+    // A click elsewhere in the area is consumed and closes nothing.
+    u.key(&w, Action::ToggleInventory);
+    assert_eq!(
+        u.click(&w, Point::new(600, 200)),
+        (Routed::Panel(PanelId(1)), Routed::Panel(PanelId(1)))
+    );
+    assert!(u.ui.is_open(UI_INVENTORY));
+    // Outside the `inv` rectangle: not the panel's.
+    assert_eq!(u.click(&w, Point::new(100, 200)).0, Routed::Unhandled);
+}
+
+// Covers: specs/ui/panels.md §4 r4
+#[test]
+fn without_the_inventory_table_the_right_panels_take_no_click() {
+    let mut u = ui(None, true);
+    let w = world(AMAZON, 1, true);
+    u.key(&w, Action::ToggleInventory);
+    assert_eq!(
+        u.click(&w, Point::new(430, 460)),
+        (Routed::Unhandled, Routed::Unhandled)
+    );
+    assert!(u.ui.is_open(UI_INVENTORY));
+}
+
+// Covers: specs/ui/panels.md §10 r1, §10 r2, §10 r6, §10 r8
+#[test]
+fn skill_tree_art_tabs_and_close() {
+    let mut u = ui(Some(areas()), true);
+    let w = world(AMAZON, 1, true);
+    u.key(&w, Action::ToggleSkillTree);
+    // §Test vectors: amazon tab 1, frames 0–3 then 4–7 at (400, 316) …;
+    // close button at (571, 477).
+    let img = u.images(&w);
+    let art = panel_images(&img, "spells\\skltree_a_back");
+    assert_eq!(
+        art,
+        vec![
+            (0, 400, 316),
+            (1, 656, 316),
+            (2, 400, 492),
+            (3, 656, 492),
+            (4, 400, 316),
+            (5, 656, 316),
+            (6, 400, 492),
+            (7, 656, 492)
+        ]
+    );
+    assert_eq!(
+        panel_images(&img, "panel\\buysellbtn"),
+        vec![(10, 571, 477)]
+    );
+    // Tab 2 (mouse down in its rectangle): the click sound, frames 8–11.
+    let tab2 = Point::new(650, 300);
+    assert_eq!(skilltree_tab(tab2), Some(2));
+    u.click(&w, tab2);
+    assert_eq!(u.ui.take_outcome().sounds, vec![CLICK_SOUND_ID]);
+    let art = panel_images(&u.images(&w), "spells\\skltree_a_back");
+    assert_eq!(
+        art[4..].iter().map(|a| a.0).collect::<Vec<_>>(),
+        vec![8, 9, 10, 11]
+    );
+    // The same tab again: no sound.
+    u.click(&w, tab2);
+    assert!(u.ui.take_outcome().sounds.is_empty());
+    // Close: amazon tab 2 offset −220 → button at (500, 477); release in
+    // its rectangle toggles ui 4 off.
+    u.click(&w, Point::new(510, 460));
+    assert!(!u.ui.is_open(UI_SKILLTREE));
+}
+
+fn skilltree_tab(p: Point) -> Option<u8> {
+    super::super::panels::skilltree::tab_at(&Screen::R800, p)
+}
+
+// Covers: specs/ui/panels.md §8 r1, §8 r2, §8 r3, §4 r4
+#[test]
+fn character_art_and_close_button() {
+    let mut u = ui(Some(areas()), true);
+    let w = world(AMAZON, 1, true);
+    u.key(&w, Action::ToggleCharacter);
+    assert_eq!(u.ui.open_mode().get(), 2);
+    // §Test vectors: quads at (80, 316), (336, 316), (80, 492), (336, 492).
+    let img = u.images(&w);
+    assert_eq!(
+        panel_images(&img, "panel\\invchar6"),
+        vec![(0, 80, 316), (1, 336, 316), (2, 80, 492), (3, 336, 492)]
+    );
+    assert_eq!(
+        panel_images(&img, "panel\\buysellbtn"),
+        vec![(10, 208, 480)]
+    );
+    // No stat-point box or add buttons (`PENDING`).
+    assert!(panel_images(&img, "panel\\skillpoints").is_empty());
+    assert!(panel_images(&img, "panel\\level").is_empty());
+    // A classic install draws `InvChar`.
+    let mut c = ui(Some(areas()), false);
+    c.key(&w, Action::ToggleCharacter);
+    assert_eq!(panel_images(&c.images(&w), "panel\\invchar").len(), 4);
+    assert!(panel_images(&c.images(&w), "panel\\invchar6").is_empty());
+    // Release in the close rectangle: SetUIState(2, off).
+    u.click(&w, Point::new(215, 460));
+    assert!(!u.ui.is_open(UI_CHARACTER));
+    assert_eq!(u.ui.open_mode().get(), 0);
+}
+
+// Covers: specs/ui/panels.md §15
+#[test]
+fn panel_intents_leave_through_the_root_in_order() {
+    let mut u = ui(Some(areas()), true);
+    let w = world(AMAZON, 1, true);
+    let a = ClientIntent(vec![0x3A, 0, 0]);
+    let b = ClientIntent(vec![0x3B, 6, 0]);
+    u.ui.shared.borrow_mut().outputs.extend([
+        PanelOutput::Intent(a.clone()),
+        PanelOutput::SetUi {
+            ui: UI_INVENTORY,
+            mode: 0,
+            jump: false,
+        },
+        PanelOutput::Intent(b.clone()),
+    ]);
+    u.ui.after_event(&mut u.root, UiEvent::CursorLeft, Routed::Unhandled)
+        .unwrap();
+    assert_eq!(u.root.intents(), &[a, b]);
+    assert!(u.ui.is_open(UI_INVENTORY));
+    let _ = w;
+}
+
+// Covers: specs/ui/panels.md §2 r2
+#[test]
+fn a_bad_state_request_is_an_error() {
+    let mut u = ui(None, true);
+    assert!(matches!(
+        u.ui.set_ui(0x26, 0, false),
+        Err(UiStateError::BadState(0x26))
+    ));
+    u.ui.shared.borrow_mut().outputs.push(PanelOutput::SetUi {
+        ui: 1,
+        mode: 3,
+        jump: false,
+    });
+    assert!(u
+        .ui
+        .after_event(&mut u.root, UiEvent::CursorLeft, Routed::Unhandled)
+        .is_err());
+}
+
+// Covers: specs/ui/panels.md §4 r3; specs/items/inventory.md §1.3
+#[test]
+fn hotkey_states_and_records() {
+    assert_eq!(
+        hotkey_state(ActionId(Action::ToggleInventory.index() as u16)),
+        Some(1)
+    );
+    assert_eq!(
+        hotkey_state(ActionId(Action::ToggleCharacter.index() as u16)),
+        Some(2)
+    );
+    assert_eq!(
+        hotkey_state(ActionId(Action::ToggleSkillTree.index() as u16)),
+        Some(4)
+    );
+    assert_eq!(
+        hotkey_state(ActionId(Action::GameMenu.index() as u16)),
+        None
+    );
+    // items/inventory.md §1.3 class records, + 16 at 800 × 600.
+    assert_eq!(inventory_record(0, &Screen::R800), Some(16));
+    assert_eq!(inventory_record(5, &Screen::R640), Some(14));
+    assert_eq!(inventory_record(6, &Screen::R800), Some(31));
+    assert_eq!(inventory_record(7, &Screen::R800), None);
+    assert!(PENDING
+        .iter()
+        .all(|(what, why)| !what.is_empty() && !why.is_empty()));
+}

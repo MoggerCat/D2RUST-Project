@@ -1,0 +1,22 @@
+[package]
+name = "scenario-run"
+description = "Runs differential scenarios (specs/tools/scenario.md) on d2rs and compares scenario traces."
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+conformance.workspace = true
+test-fixtures.workspace = true
+d2-data.workspace = true
+d2-formats.workspace = true
+d2-proto.workspace = true
+d2-server.workspace = true
+d2-sim.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

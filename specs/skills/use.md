@@ -5,8 +5,8 @@
   recordings (`traces/raw/20261006-021854-tick.jsonl`, `…-022304-…`):
   attack request → type-0 do event at start + 6/7, ENDANIM at + 14/15,
   ENDANIM cancelled by the next request in 10 of 13 (melee) and 46 of 59
-  (missile session) cases. Per-skill function bodies are not specified
-  (`skills/functions.tsv`).
+  (missile session) cases. Per-skill function bodies: `skills/bodies.md`
+  for the `functions.tsv` rows marked `spec'd-here`.
 - **Target version:** 1.14d
 - **Crate/module:** `d2-sim::skills::use` (message handlers in
   `d2-server` call into it); function tables in `d2-sim::skills::funcs`
@@ -31,14 +31,14 @@
 |   4. Mode change gates | 152–185 |
 |   5. Start and do | 186–275 |
 |   6. Cooldown | 276–289 |
-|   7. Periodic skills and auras | 290–329 |
-|   8. Function tables | 330–349 |
-| Constants & data dependencies | 350–370 |
-| Randomness | 371–380 |
-| Edge cases & original bugs | 381–402 |
-| Test vectors | 403–416 |
-| Provenance | 417–433 |
-| Open questions | 434–462 |
+|   7. Periodic skills and auras | 290–327 |
+|   8. Function tables | 328–347 |
+| Constants & data dependencies | 348–368 |
+| Randomness | 369–378 |
+| Edge cases & original bugs | 379–400 |
+| Test vectors | 401–414 |
+| Provenance | 415–431 |
+| Open questions | 432–462 |
 <!-- /index -->
 
 ## Summary
@@ -314,11 +314,9 @@ Concentration, Vigor, Fanaticism, Salvation) → run the do core once now;
 else switch on its aura state (stats 350/351). Then schedule in aura
 form. Left/right init: `0x00622F10` / `0x00622EA0`.
 
-Aura do (`srvdofunc` 65, `0x005CF010`): duration = period − frame + 1;
-`aurastat1–6` / `aurastatcalc` on self (`aurastate`) and targets
-(`auratargetstate`) within `eval(aurarangecalc)` filtered by
-`aurafilter`; mana `(mana + lvlmana × (L − 1)) << manashift` (no level
-clamp) through `0x0056C110` with state 85.
+Aura do (`srvdofunc` 65, `0x005CF010`): body in `skills/bodies.md`
+§4.5 (duration, stats on self and targets, `aurafilter` scan, mana and
+state 85).
 
 Type-9 handler `0x0056FE40`: item auras from stat 151; do core (…, 1, 1,
 0). Type-5 handler `0x0056D790`: `srvdo[states.srvactivefunc]` of the
@@ -331,9 +329,9 @@ Passives: learning (0x3B, `skills/levels.md` §6.4) and refreshes call
 
 `skills/functions.tsv`, columns: `kind` (srvst / srvdo), `index`,
 `address` (1.14d, `null` = empty slot), `d2moo_name`, `status`
-(`mapped` = 1.14d table entry identified, body not specified here;
-`null`; `unreferenced` = no 1.14d data uses it), `skills_using` (from
-`skills.txt` 1.14d), `notes`. Ranges `66-90` and `153-190` are one row
+(`spec'd-here` = body specified in `skills/bodies.md`; `mapped` = 1.14d
+table entry identified, body not specified; `null`; `unreferenced` = no
+1.14d data uses it), `skills_using` (from `skills.txt` 1.14d), `notes`. Ranges `66-90` and `153-190` are one row
 each (all null).
 
 - srvst `0x00732140`: 91 slots (bound < 0x5B), 64 non-null (1–29,
@@ -457,5 +455,7 @@ their own (`combat/*`, `skills/levels.md`). The unit-seed reseeder
 9. Server message 0x5A layout for "can't do that" (`5A 0E 01 …`):
    `server-messages.tsv`.
 10. Per-skill start/do bodies (`functions.tsv` status `mapped`): to be
-    specified skill by skill; priority: srvdo 1 (Attack), 2, 65 (auras),
-    30 (curses), 18 (buffs), and the srvmissile path.
+    specified skill by skill in `skills/bodies.md`. Done there: srvdo 1,
+    2, 18, 30, 65, the srvmissile path, srvst 1–5, 15, 29, 32, 33, 46,
+    65. Next: the remaining Act I monster starts (srvst 49 Nest, 50
+    Quick Strike) and the do functions of the level-1 class skills.

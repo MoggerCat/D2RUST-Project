@@ -1,4 +1,4 @@
-// Spec: specs/sim/tick.md §3, §5.5, §5.6; specs/sim/units.md §5; specs/drlg/rooms.md §4.1, §7, §8; specs/drlg/levels.md §9
+// Spec: specs/sim/tick.md §3, §5.5, §5.6; specs/world/objects.md §2, §14; specs/sim/units.md §5; specs/drlg/rooms.md §4.1, §7, §8; specs/drlg/levels.md §9
 //! [`ActionSim`]: the one dispatcher the tick runs. Timer events go to
 //! the unit dispatch (`units.md` §5: the per-kind handler tables and the
 //! monster freeze drop of `tick.md` §5.6), whose hooks run the missile
@@ -16,9 +16,11 @@ use crate::tick::timer::TimerRun;
 use crate::tick::{EventDispatch, TickHooks};
 use crate::units::dispatch::UnitSystem;
 use crate::units::hooks::UnitData;
-use crate::units::{ClientId, RoomId, UnitId};
+use crate::units::{ClientId, RoomId, UnitId, UnitType};
+use crate::world::objects::{ObjectControl, ObjectTables};
 
 use super::combat::CombatView;
+use super::objects::{ObjectCase, ObjectState, ObjectView};
 use super::waypoints::WaypointView;
 use super::{ActionHooks, ActionTables, Pending, View, WiringError};
 
@@ -94,6 +96,8 @@ impl<X: Pending> ActionSim<X> {
                     monstats2: &t.combat.monstats2,
                     levels: &t.levels,
                     skill_modes: &t.skill_modes,
+                    skills: &t.skills.skills,
+                    missiles: &t.skills.missiles,
                 },
                 info,
                 store: &mut store,
@@ -133,6 +137,64 @@ impl<X: Pending> ActionSim<X> {
             v: View::of(&mut s.units, &mut s.stats, &s.data, &mut s.hooks),
         };
         f(&mut w)
+    }
+
+    /// Game creation's object control `0x00546C60` (`objects.md` §2): one
+    /// step of the game seed ([`ActionHooks::game_seed`]), the control,
+    /// the shrine lists and the level regions from `tables`.
+    ///
+    /// TODO(rng.md §5.2): game creation derives, in order, the monster
+    /// regions (`WorldSim::create_regions`), this control, the NPC
+    /// control and the quest control, each from one game-seed step. d2rs
+    /// has no single game-creation sequence yet: the host calls this
+    /// right after the regions and before the NPC and quest controls.
+    pub fn create_objects(&mut self, tables: Arc<ObjectTables>) {
+        let h = &mut self.sys.hooks;
+        h.objects = Some(ObjectState::new(&mut h.game_seed, tables));
+    }
+
+    /// A host holding the quest control takes the object module's quest
+    /// routes from a queue ([`ActionSim::take_quest_calls`]) instead of
+    /// [`super::Pending::object_route`]; call right after
+    /// [`ActionSim::create_objects`]. No object state: nothing.
+    pub fn route_quest_objects(&mut self) {
+        if let Some(st) = self.sys.hooks.objects.as_mut() {
+            st.route_quests();
+        }
+    }
+
+    /// The queued quest routes ([`super::QuestObjectCall`]), in order.
+    pub fn take_quest_calls(&mut self) -> Vec<super::QuestObjectCall> {
+        self.sys
+            .hooks
+            .objects
+            .as_mut()
+            .map(|s| s.take_quest_calls())
+            .unwrap_or_default()
+    }
+
+    /// Runs `f` with the object control, the tables and the object
+    /// code's view (tests, skills that call the dispatch directly).
+    /// `None`: no object state.
+    pub fn objects<R>(
+        &mut self,
+        game: &mut Game,
+        f: impl FnOnce(&mut ObjectControl, &ObjectTables, &mut ObjectView<'_, X>) -> R,
+    ) -> Option<R> {
+        let s = &mut self.sys;
+        let mut v = View::of(&mut s.units, &mut s.stats, &s.data, &mut s.hooks);
+        super::objects::with_objects(game, &mut v, f)
+    }
+
+    /// The C→S 0x13 object case (`waypoints.md` §5.2,
+    /// [`View::object_message`]). `None`: no object state.
+    pub fn operate_object_message(
+        &mut self,
+        game: &mut Game,
+        player: UnitId,
+        guid: u32,
+    ) -> Option<ObjectCase> {
+        self.with(game, |g, v| v.object_message(g, player, guid))
     }
 
     fn log(&mut self, r: Result<(), WiringError>) {
@@ -190,20 +252,40 @@ impl<X: Pending> TickHooks for ActionSim<X> {
     /// Per-client update (`tick.md` §6.5, `0x0053A5D0`): with the path
     /// provider on, a player's movement messages (`pathing.md` §10 rules
     /// 2–3, [`crate::wiring::path::walk::update_messages`]). Other units'
-    /// update messages (the unit-update spec) are not written.
+    /// update messages (the unit-update spec) are not written, except
+    /// objects: the object update pass `0x00581AD0` (`objects.md` §14,
+    /// [`View::object_update`]) to the client's player.
     fn send_unit_update(&mut self, game: &mut Game, client: ClientId, unit: UnitId) {
-        if self.sys.hooks.paths.is_none() {
-            return;
-        }
         let s = &mut self.sys;
         let mut v = View::of(&mut s.units, &mut s.stats, &s.data, &mut s.hooks);
+        if game
+            .lists
+            .unit(unit)
+            .is_some_and(|e| e.ty == UnitType::Object)
+        {
+            if let Some(receiver) = game.lists.client(client).and_then(|c| c.player) {
+                v.object_update(game, receiver, unit);
+            }
+            return;
+        }
+        if v.h.paths.is_none() {
+            return;
+        }
         crate::wiring::path::walk::update_messages(&mut v, game, client, unit);
     }
 
     /// Per-client update (`tick.md` §6.5): the player's room differs from
     /// the client's. The room switch `0x00537B50` (`rooms.md` §4.1,
     /// `levels.md` §9.1) runs on the DRLG and the client's room becomes
-    /// the player's.
+    /// the player's. For each room the client joins (new adjacency order)
+    /// `0x0053A8E0` sends S→C 0x07 for it to the client's player
+    /// (`sim/path-placement.md` §11 "Recipients", [`Pending::send`]).
+    ///
+    /// TODO(spec: intents-events.md §7.2): `0x0053A8E0` then sends the add
+    /// messages (`0x00571F90`) of every unit in the room but the player;
+    /// part B of those messages is not specified, so none is sent. The
+    /// leave side (`0x0053A9B0`) sends nothing here: no spec names a
+    /// message for it (S→C 0x08's server sender is not specified).
     ///
     /// TODO(tick.md §6.5): the level-change calls `0x00543B90`,
     /// `0x00537340` are not specified; a change between acts (act change,
@@ -213,9 +295,8 @@ impl<X: Pending> TickHooks for ActionSim<X> {
         let Some(e) = game.lists.client(client) else {
             return;
         };
-        let old = e.room;
-        let new = e
-            .player
+        let (old, player) = (e.room, e.player);
+        let new = player
             .and_then(|p| game.lists.unit(p))
             .and_then(|u| u.room());
         let act_of = |r: Option<RoomId>| r.and_then(|r| game.lists.room(r)).map(|r| r.act);
@@ -230,7 +311,17 @@ impl<X: Pending> TickHooks for ActionSim<X> {
             .hooks
             .drlg
             .client_changes_room(&mut game.lists, act, client, old, new);
-        self.log(r);
+        match (r, player) {
+            (Ok(joined), Some(player)) => {
+                for (x, y, level) in joined {
+                    let msg =
+                        crate::wiring::path::place::map_reveal(x as u16, y as u16, level as u8);
+                    self.sys.hooks.x.send(player, &msg);
+                }
+            }
+            (Ok(_), None) => {}
+            (Err(e), _) => self.sys.hooks.errors.push(e),
+        }
         if let Some(e) = game.lists.client_mut(client) {
             e.room = new;
         }

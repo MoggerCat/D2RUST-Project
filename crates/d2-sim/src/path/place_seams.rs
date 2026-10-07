@@ -74,10 +74,9 @@ pub trait CollisionView {
     /// Teleport `0x00650910(path, room, x, y)` (§6 rule 4): always
     /// succeeds (footprint move, position, room, movement reset).
     fn teleport(&mut self, unit: Self::Unit, room: Self::Room, x: i32, y: i32);
-    /// Adding a unit to the world `0x00554850` (§2.5) as game entry
-    /// `0x005394A0` calls it for the player (§11). The `flag` argument
-    /// that call passes is not stated by the spec: the provider decides
-    /// (TODO(spec: path-placement.md §11, game entry's 0x00554850 flag)).
+    /// Adding a unit to the world `0x00554850(flag 0)` (§2.5) as game
+    /// entry `0x005394A0` calls it for the player (§11): the room-changed
+    /// flag is set.
     fn add_player_to_world(&mut self, unit: Self::Unit, room: Self::Room, x: i32, y: i32);
 }
 
@@ -126,13 +125,15 @@ pub trait PlaceHost<U> {
     /// Room-change messages `0x00554670(game, unit, 0)` (`sim/pathing.md`
     /// §9.8).
     fn room_change_messages(&mut self, unit: U) {}
-    /// Sends a message to the client of `player` (`0x005531C0`). §10
-    /// rule 6 names that client for 0x07; for the 0x07 / 0x15 of game
-    /// entry and the 0x0D of warp arrival the spec names no recipient
-    /// (TODO(spec: path-placement.md §11, §12.2 recipients)).
+    /// Sends a message to the client of `player` (`0x005531C0`): every
+    /// message of §10–§12 goes to the moving player's own client (§11
+    /// "Recipients").
     fn send(&mut self, player: U, msg: PlaceMessage<U>) {}
     /// Player data +0x148, +0x14C := x, y (§10 rule 6).
     fn set_player_point(&mut self, player: U, x: i32, y: i32) {}
+    /// Position history write `0x00554FD0` (§10 rule 7): entry := (x, y)
+    /// unconditionally ([`super::history::PositionHistory::place_write`]).
+    fn history_write(&mut self, player: U, x: i32, y: i32) {}
     /// Schedules timer `event` for `unit` at frame + `delay` (callback
     /// `0x00554570` for event 14, `sim/units.md` §6).
     fn schedule_event(&mut self, unit: U, event: u8, delay: u32) {}
@@ -156,7 +157,7 @@ pub struct RoomReveal {
     pub level: u32,
 }
 
-/// The destination of a warp tile (`0x006195A0`, open question 3) and
+/// The destination of a warp tile (`0x006195A0`, §12.2 rule 1) and
 /// the facts §12.2 reads from it and its lvlwarp record.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct WarpDestination<R> {
@@ -185,13 +186,18 @@ pub trait LevelView<R> {
     fn act_start_level(&self, act: Self::Act) -> u32;
     /// A room's 0x07 fields (tile x, tile y, level id).
     fn room_reveal(&self, room: R) -> RoomReveal;
-    /// `0x006195A0(room of the tile, tile class)`: the destination tile
-    /// and its lvlwarp record (open question 3). `None`: nothing.
+    /// `0x006195A0(room of the tile, tile class)` (§12.2 rule 1): in the
+    /// source DRLG room's warp-link list the first link whose lvlwarp
+    /// `Id` = class gives the destination DRLG room D; D's link back to
+    /// the source gives the record (`ExitWalkX/Y` are the destination
+    /// side's); the destination tile is the first tile unit of class =
+    /// that record's `Id` in D's active room. `None`: nothing.
     fn warp_destination(&self, tile_room: R, tile_class: u32) -> Option<WarpDestination<R>> {
         None
     }
     /// Quest warp gate `0x00545B80(source level, destination level)`
-    /// (open question 5; owner: the quests spec). Non-zero blocks.
+    /// (§12.2 rule 3; its checks: `world/quests.md` §8.2). Non-zero
+    /// blocks.
     fn quest_gate(&self, source_level: u32, level: u32) -> u32 {
         0
     }
@@ -239,6 +245,9 @@ pub enum PlaceError {
     /// §11 rule 1: act null.
     #[error("level spawn point without an act")]
     NoAct,
+    /// §11 game entry: no spawn room (fatal assert in `0x005394A0`).
+    #[error("game entry without a spawn room")]
+    NoSpawnRoom,
     /// §11 rule 3: no free point around the spawn (edge case 6).
     #[error("no free point around the level spawn")]
     SpawnNotFree,

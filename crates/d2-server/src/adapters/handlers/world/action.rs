@@ -1,4 +1,4 @@
-// Spec: specs/world/waypoints.md §6, §7.1; specs/sim/rng.md §5.3
+// Spec: specs/world/waypoints.md §6, §7.1; specs/sim/rng.md §5.3; specs/combat/vitals.md §5.1
 //! [`ActionWorld`]: the systems whose seams have a provider in
 //! `d2_sim::wiring::action` alone — the waypoints (`WaypointView` on
 //! [`ActionSim`], reached through [`ActionEvents`]) and the skill
@@ -15,8 +15,8 @@
 
 use d2_sim::game::Game;
 use d2_sim::tick::EventDispatch;
-use d2_sim::units::UnitId;
-use d2_sim::wiring::action::{ActionSim, Pending};
+use d2_sim::units::{ClientId as SimClient, UnitId};
+use d2_sim::wiring::action::{vitals_sync, ActionSim, ObjectCase, Pending};
 use d2_sim::wiring::economy::GameFields;
 use d2_sim::wiring::worldgen::{WorldPending, WorldSim};
 use d2_sim::world::waypoints::{ArrivalList, WaypointData};
@@ -123,6 +123,20 @@ where
         )
     }
 
+    /// The 0x13 object case on the action wiring's object state
+    /// (`ActionSim::operate_object_message`; `None` until
+    /// `ActionSim::create_objects` ran). The object calls' host tick is
+    /// the frame's ([`WorldHost::host_tick`]).
+    fn objects(
+        &mut self,
+        game: &mut Game,
+        events: &mut D,
+        player: UnitId,
+        guid: u32,
+    ) -> Option<ObjectCase> {
+        events.action().operate_object_message(game, player, guid)
+    }
+
     fn skill(&mut self, call: SkillCall<'_, D>) -> Option<SkillHandled> {
         self.skills.handle(call)
     }
@@ -132,8 +146,26 @@ where
         super::super::walk::run(game, events, call)
     }
 
+    /// `d2_sim::wiring::action::vitals_sync::run` on the action wiring
+    /// (on when `ActionHooks::enable_vitals_sync` ran).
+    fn vitals_sync(
+        &mut self,
+        game: &mut Game,
+        events: &mut D,
+        client: SimClient,
+        staged: (u16, u16),
+        queued: bool,
+    ) -> Option<Vec<Vec<u8>>> {
+        vitals_sync::run(events.action(), game, client, staged, queued)
+    }
+
     fn take_sent(&mut self, events: &mut D) -> Vec<(UnitId, Vec<u8>)> {
         events.action().hooks().x.take_sent()
+    }
+
+    /// `ActionHooks::set_host_tick` (no object state: nothing).
+    fn host_tick(&mut self, events: &mut D, ms: u32) {
+        events.action().sys.hooks.set_host_tick(ms);
     }
 
     fn fault(&mut self, fault: WorldFault) {
