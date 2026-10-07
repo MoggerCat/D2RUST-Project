@@ -846,3 +846,122 @@ fn close_trade_one_toggles_the_inventory_only_for_a_live_player() {
     .unwrap();
     assert!(!u.is_open(1));
 }
+
+// Covers: specs/ui/messages.md §6 r2
+#[test]
+fn npc_text_freed_at_interaction_end() {
+    let w = world(false);
+    let mut u = ui();
+    u.apply_output(&npc_text(1, 1, 0, 0x25), &w).unwrap();
+    assert!(u.npc_text().is_some());
+    // The interaction ends (`0x004B3C20` → `0x004A1730`): freed.
+    u.free_npc_text();
+    assert_eq!(u.npc_text(), None);
+    // Game exit (`0x004A0680`): freed too, and freeing none is harmless.
+    u.apply_output(&npc_text(1, 1, 0, 0x25), &w).unwrap();
+    u.free_npc_text();
+    u.free_npc_text();
+    assert_eq!(u.npc_text(), None);
+}
+
+// The edge cases of `ui/messages.md`, each reproduced.
+// Covers: specs/ui/messages.md §edge-cases-original-bugs
+#[test]
+fn messages_edge_cases_reproduced() {
+    use crate::ui::messages::chat::ScreenMessages;
+    use crate::ui::messages::dialog::{DialogOpen, DialogUi, Scroll};
+    use crate::ui::messages::hire::{HirePopup, StoneAnim};
+    use crate::ui::messages::overhead::{
+        BubbleBox, BubbleResult, OverheadPass, TimedBox, CAND_H, CAND_W, MOVE_TABLE,
+    };
+    use crate::ui::messages::{testutil::Fixed, Ltrb};
+    let m = Fixed;
+    let wide = |s: &str| s.encode_utf16().collect::<Vec<u16>>();
+    // Timing runs on the wall clock in milliseconds, fed from the frame
+    // clock: records, the timed box, the scroll and the stones take
+    // millisecond ticks.
+    let mut l = ScreenMessages::new();
+    l.add(&wide("a"), 0, 5000, 800, false, &m);
+    assert_eq!(l.records()[0].expiry, 15_000);
+    assert_eq!(TimedBox::open(&wide("x"), 1000, &m).expiry, 1000 + 26 * 200);
+    let mut sc = Scroll::new(4);
+    sc.update(100);
+    sc.update(108);
+    assert_eq!(sc.p, (108 - 100) / 4 * 4);
+    let mut st = StoneAnim::default();
+    st.step(10);
+    st.step(61);
+    assert_eq!(st.counter, 1);
+    // A refused bubble placement leaves font 13 current.
+    let mut p = OverheadPass::default();
+    p.begin((0, 0), None);
+    let b = |x| BubbleBox::new(&wide("hello"), &m).at(x, 300);
+    p.bubble(b(40), 100, 100, 0);
+    assert_eq!(
+        p.bubble(b(40), 100, 100, 0),
+        BubbleResult::Refused {
+            font_restored: false
+        }
+    );
+    // Placement candidates are 400 × 280 and only diagonal.
+    assert_eq!((CAND_W, CAND_H), (400, 280));
+    assert_eq!(MOVE_TABLE, [1, 1, -1, 1, 1, -1, -1, -1]);
+    let mut p = OverheadPass::default();
+    p.begin((0, 0), None);
+    p.place(Ltrb::new(40, 40, 140, 61), 800, 600);
+    p.place(Ltrb::new(40, 40, 140, 61), 800, 600);
+    assert_eq!(p.slots()[1], Ltrb::xywh(90, 75, 400, 280));
+    // A bubble of more than 10 lines draws its first 10 lines at the
+    // positions of the last 10.
+    let mut big = BubbleBox {
+        x: 0,
+        y: 50,
+        w: 50,
+        h: 15 * 12 + 6,
+        lines: (0..12).map(|i| wide(&i.to_string())).collect(),
+        flag: 0,
+    };
+    let d = crate::ui::messages::overhead::bubble_draw(&mut big, 800, 600, 0).unwrap();
+    assert_eq!((d.lines.len(), d.lines[0].y), (10, 50 + 18 + 30));
+    // The timed box is centred on x = 320 at every resolution.
+    let t = TimedBox::open(&wide("0123456789"), 0, &m);
+    assert_eq!(t.bx.x, 320 - t.bx.w / 2);
+    // A second dialog open keeps the old text.
+    let mut d = DialogUi::default();
+    d.open(
+        DialogOpen::Npc { unit: None, id: 1 },
+        &wide("5\nold"),
+        800,
+        600,
+        0,
+        0,
+        1,
+    );
+    d.open(
+        DialogOpen::Npc { unit: None, id: 2 },
+        &wide("5\nnew"),
+        800,
+        600,
+        0,
+        0,
+        2,
+    );
+    assert_eq!(d.panel.as_ref().unwrap().lines[0], wide("old"));
+    // 0x27 with a type other than 1 or 2 frees the list without a null
+    // test: with no list it is "no list" (not a crash).
+    let w = world(false);
+    let mut u = ui();
+    u.apply_output(&npc_text(4, 1, 0, 9), &w).unwrap();
+    assert_eq!(u.npc_text(), None);
+    u.apply_output(&npc_text(1, 1, 0, 9), &w).unwrap();
+    u.apply_output(&npc_text(0xFF, 1, 0, 9), &w).unwrap();
+    assert_eq!(u.npc_text(), None);
+    // 0x50 code 2 passes a hire-table entry the popup never reads: the
+    // popup takes no entry.
+    let mut h = HirePopup::default();
+    h.open(None);
+    assert!(h.popup);
+    // The per-frame bubble box field +0x16 starts at 0 (drawn): d2rs uses
+    // 0 (open question 2).
+    assert_eq!(BubbleBox::new(&wide("x"), &m).flag, 0);
+}

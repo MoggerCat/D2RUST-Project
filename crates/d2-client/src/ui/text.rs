@@ -121,6 +121,116 @@ pub fn font_info(id: u16) -> Option<&'static FontInfo> {
     FONTS.get(usize::from(id))
 }
 
+/// The language: the first byte of `data\local\use`; >= 14 reads as 0
+/// (§1 r1, `0x00525150`). A missing or empty file reads as 0.
+pub fn language_byte(use_file: &[u8]) -> u8 {
+    match use_file.first() {
+        Some(&b) if b < 14 => b,
+        _ => 0,
+    }
+}
+
+/// The font directory and glyph lookup kind of a language (§1 r2,
+/// `0x00502C60`); only `Latin\` is in the 1.14d archives.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FontLocale {
+    pub dir: &'static str,
+    /// `true`: glyph lookup by code; `false`: by position (§3).
+    pub by_code: bool,
+}
+
+/// Directory and lookup for `font` under `language` (§1 r2): with
+/// language 12 the chat font (13) uses `KOR\` and the lookup by code,
+/// the other fonts `Latin\` by position.
+pub fn font_locale(language: u8, font: u16) -> FontLocale {
+    let (dir, by_code) = match language {
+        0..=5 => ("Latin\\", false),
+        6 => ("JPN\\", true),
+        7 => ("KOR\\", true),
+        8 | 9 => ("CHI\\", true),
+        10 => ("LATIN2\\", true),
+        11 => ("CYR\\", true),
+        12 if font == 13 => ("KOR\\", true),
+        12 => ("Latin\\", false),
+        _ => ("Latin\\", true),
+    };
+    FontLocale { dir, by_code }
+}
+
+/// The current font id (`D2Win_SetUnicodeTextFont` `0x00502EF0`, §1 r5);
+/// font 1 is loaded at start. Loading and unloading change no pixel.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CurrentFont(pub u16);
+
+impl Default for CurrentFont {
+    fn default() -> Self {
+        Self(1)
+    }
+}
+
+impl CurrentFont {
+    /// Makes `n` current and returns the previous id.
+    pub fn set(&mut self, n: u16) -> u16 {
+        std::mem::replace(&mut self.0, n)
+    }
+}
+
+/// Where a text color `k` takes its 256-byte shift map from (§4 r5,
+/// `0x004FB010`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TextColorSource {
+    /// PL2 text-color map `k` (0..=12; map 0 is never used for drawing).
+    Map(u8),
+    /// `k` = -1: the selected-unit shift map (`+0xCC`).
+    SelectedUnitShift,
+    /// `k` = -2..-17: inventory color variation 15..0 (`+0xC8`..`+0x8C`).
+    InventoryVariation(u8),
+    /// `k` = -18..-48: light map 31..1 (`+0x88`..`+0x10`).
+    LightMap(u8),
+    /// 13: additive blend (`+0x104`).
+    AdditiveBlend,
+    /// 14: `+0x108`.
+    Plus108,
+    /// 15: `+0x10C`.
+    Plus10C,
+    /// 16: darkened shift (`+0x110`).
+    Darkened,
+    /// 17: the text RGB triples (`+0x114`).
+    TextRgb,
+    /// 18: `H`.
+    H,
+    /// 19: `R`.
+    R,
+    /// `k` >= 20 or < -48: past the block.
+    PastBlock,
+}
+
+/// `k` -> its map source (§4 r5). A code's `k >= 13` never gets here (§5
+/// r1 sets 0); a caller's `k` is not range-checked.
+pub fn text_color_source(k: i32) -> TextColorSource {
+    use TextColorSource::*;
+    match k {
+        0..=12 => Map(k as u8),
+        -1 => SelectedUnitShift,
+        -17..=-2 => InventoryVariation((17 + k) as u8),
+        -48..=-18 => LightMap((49 + k) as u8),
+        13 => AdditiveBlend,
+        14 => Plus108,
+        15 => Plus10C,
+        16 => Darkened,
+        17 => TextRgb,
+        18 => H,
+        19 => R,
+        _ => PastBlock,
+    }
+}
+
+/// Byte offset into the 0x48-pointer block for `k < 0` (§4 r5):
+/// `0xD0 + 4k`.
+pub fn text_color_block_offset(k: i32) -> i32 {
+    0xD0 + 4 * k
+}
+
 /// Which text call draws the string (§7, §9; decision CG2: the original
 /// takes no clip rectangle, so none is carried here).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -647,4 +757,90 @@ pub fn layout_text(
             })
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Covers: specs/ui/text.md §1 r1
+    #[test]
+    fn language_is_first_byte_of_use() {
+        assert_eq!(language_byte(&[0]), 0);
+        assert_eq!(language_byte(&[7, 1, 2]), 7);
+        assert_eq!(language_byte(&[13]), 13);
+        assert_eq!(language_byte(&[14]), 0);
+        assert_eq!(language_byte(&[0xFF]), 0);
+        assert_eq!(language_byte(&[]), 0);
+    }
+
+    // Covers: specs/ui/text.md §1 r2
+    #[test]
+    fn locale_font_directory() {
+        let l = |lang, font| {
+            let f = font_locale(lang, font);
+            (f.dir, f.by_code)
+        };
+        for lang in (0..=5).chain([12]) {
+            assert_eq!(l(lang, 1), ("Latin\\", false), "lang {lang}");
+        }
+        assert_eq!(l(6, 0), ("JPN\\", true));
+        assert_eq!(l(7, 0), ("KOR\\", true));
+        assert_eq!(l(8, 0), ("CHI\\", true));
+        assert_eq!(l(9, 0), ("CHI\\", true));
+        assert_eq!(l(10, 0), ("LATIN2\\", true));
+        assert_eq!(l(11, 0), ("CYR\\", true));
+        assert_eq!(l(13, 0), ("Latin\\", true));
+        // language 12: the chat font alone moves to KOR by code
+        assert_eq!(l(12, 13), ("KOR\\", true));
+        assert_eq!(l(12, 12), ("Latin\\", false));
+    }
+
+    // Covers: specs/ui/text.md §1 r4
+    #[test]
+    fn only_fourteen_names_are_font_inputs() {
+        assert_eq!(FONTS.len(), 14);
+        for f in &FONTS {
+            for bad in ["default", "fonter", "readme", "default.map"] {
+                assert!(!f.tbl_path.contains(bad), "{}", f.tbl_path);
+            }
+            assert!(f.tbl_path.ends_with(".tbl") && f.dc6_path.ends_with(".dc6"));
+        }
+    }
+
+    // Covers: specs/ui/text.md §1 r5
+    #[test]
+    fn set_font_returns_previous() {
+        let mut c = CurrentFont::default();
+        assert_eq!(c.0, 1, "font 1 is loaded at start");
+        assert_eq!(c.set(4), 1);
+        assert_eq!(c.set(0), 4);
+        assert_eq!(c.0, 0);
+    }
+
+    // Covers: specs/ui/text.md §4 r5
+    #[test]
+    fn color_k_selects_its_map() {
+        use TextColorSource::*;
+        // `ÿc!` is k = -15: inventory color variation 2 at +0x94.
+        assert_eq!(text_color_source(-15), InventoryVariation(2));
+        assert_eq!(text_color_block_offset(-15), 0x94);
+        assert_eq!(text_color_source(-1), SelectedUnitShift);
+        assert_eq!(text_color_block_offset(-1), 0xCC);
+        assert_eq!(text_color_source(-2), InventoryVariation(15));
+        assert_eq!(text_color_block_offset(-2), 0xC8);
+        assert_eq!(text_color_source(-17), InventoryVariation(0));
+        assert_eq!(text_color_block_offset(-17), 0x8C);
+        assert_eq!(text_color_source(-18), LightMap(31));
+        assert_eq!(text_color_block_offset(-18), 0x88);
+        assert_eq!(text_color_source(-48), LightMap(1));
+        assert_eq!(text_color_block_offset(-48), 0x10);
+        assert_eq!(text_color_source(12), Map(12));
+        assert_eq!(text_color_source(13), AdditiveBlend);
+        assert_eq!(text_color_source(16), Darkened);
+        assert_eq!(text_color_source(17), TextRgb);
+        assert_eq!(text_color_source(18), H);
+        assert_eq!(text_color_source(19), R);
+        assert_eq!(text_color_source(20), PastBlock);
+    }
 }
