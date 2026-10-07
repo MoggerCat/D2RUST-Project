@@ -596,7 +596,7 @@ stat points: three spends succeed, the fourth fails, result 2.
    `0x005405A0`, `0x0057E510`, `0x0057E860`. The hireling part (86/256
    share, 1/64-level cap, 1.14d adds 2·gain) is confirmed in
    `world/hirelings.md` §7. Open: the x87 party share's
-   precision-control word in force (§4.4 rule 6, as
+   precision-control word in force (PROVISIONAL: 53-bit, because `Game.exe` sets it once at start-up; settled by REC-21) (§4.4 rule 6, as
    `sim/stat-lists.md` open question 1); settle with a party recording
    (multiplayer, Phase 7). Out of Phase 0–6 scope (a party needs two
    players). The hireling level-up body (`0x00572840`) is the mercenary
