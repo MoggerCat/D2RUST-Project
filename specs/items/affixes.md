@@ -14,27 +14,28 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 40–50 |
-| Inputs | 51–58 |
-| Outputs / state changes | 59–63 |
-| Rules | 64–65 |
-|   1. Affix ids and slots | 66–88 |
-|   2. Affix level (alvl) | 89–94 |
-|   3. Magic affix roller (`0x005C1560`, format ≥ 1) | 95–132 |
-|   4. Fit tests | 133–158 |
-|   5. Rare name pick (`0x005C1AB0`, format ≥ 1) | 159–165 |
-|   6. Magic item (`0x005565E0`) | 166–181 |
-|   7. Rare item (`0x005C21A0` → `0x005C1BF0`, format ≥ 1) | 182–201 |
-|   8. Crafted item (`0x005C21D0`) | 202–223 |
-|   9. Tempered item (dispatch case 9) | 224–229 |
-|   10. Charm (`0x00556A60`, from the normal routine) | 230–243 |
-|   11. Automagic (finishing step, `0x00557450`) | 244–250 |
-| Constants & data dependencies | 251–267 |
-| Randomness | 268–283 |
-| Edge cases & original bugs | 284–322 |
-| Test vectors | 323–341 |
-| Provenance | 342–364 |
-| Open questions | 365–396 |
+| Summary | 41–51 |
+| Inputs | 52–59 |
+| Outputs / state changes | 60–64 |
+| Rules | 65–66 |
+|   1. Affix ids and slots | 67–89 |
+|   2. Affix level (alvl) | 90–95 |
+|   3. Magic affix roller (`0x005C1560`, format ≥ 1) | 96–133 |
+|   4. Fit tests | 134–159 |
+|   5. Rare name pick (`0x005C1AB0`, format ≥ 1) | 160–167 |
+|   6. Magic item (`0x005565E0`) | 168–183 |
+|   7. Rare item (`0x005C21A0` → `0x005C1BF0`, format ≥ 1) | 184–203 |
+|   8. Crafted item (`0x005C21D0`) | 204–225 |
+|   9. Tempered item (dispatch case 9) | 226–231 |
+|   10. Charm (`0x00556A60`, from the normal routine) | 232–245 |
+|   11. Automagic (finishing step, `0x00557450`) | 246–252 |
+|   12. Format-0 routines (legacy items) | 253–332 |
+| Constants & data dependencies | 333–349 |
+| Randomness | 350–365 |
+| Edge cases & original bugs | 366–404 |
+| Test vectors | 405–423 |
+| Provenance | 424–446 |
+| Open questions | 447–485 |
 <!-- /index -->
 
 ## Summary
@@ -95,7 +96,7 @@ m ≠ 0 → a := i + m. Else h := qlvl / 2; a := i − h if i < 99 − h, else
 ### 3. Magic affix roller (`0x005C1560`, format ≥ 1)
 
 Arguments: item, require-spawnable, force, assign, prefix, preferred p,
-automagic group g. (Format 0: `0x005C12F0`, not specified.)
+automagic group g. (Format 0: `0x005C12F0`, §12.1.)
 
 1. Part: g ≠ 0 → automagic; else prefix → prefixes; else suffixes.
 2. **Coin:** one step of the item seed. lo′ even and not force → return 0.
@@ -161,7 +162,8 @@ Format < 100: stackable or throwable → no. `version` ≥ 100 and format <
 Arguments: prefix (ECX), item. Part: rare prefixes or rare suffixes.
 Candidates: rows of the part that fit (§4.3), in order (≤ 511). None →
 0. Else r := roll(count) (`roll_range(0, count)`); return the rare id of
-candidate r. No weights. (Format 0: `0x005C19A0`, same logic.)
+candidate r. No weights. (Format 0: `0x005C19A0`, same logic: its
+instructions are the same as `0x005C1AB0`'s one for one, §12.2.)
 
 ### 6. Magic item (`0x005565E0`)
 
@@ -247,6 +249,86 @@ With g := items `auto prefix`: a := §3(not spawnable-only, force, no
 assign, prefix part ignored, p 0, group g) over the automagic part. a ≠ 0
 → auto affix := a, properties of row a (mode 0). Qualities 1, 2, 3, 4, 6,
 8, 9 only, format ≥ 100 (`items/quality.md` §4.5).
+
+### 12. Format-0 routines (legacy items)
+
+Format 0 (item data +0x30 = 0) is reached only by items of a version-0x47
+save (`items/generation.md` Open question 1); every dispatch below tests
+the format with `0x0062A670` (u16 < 1).
+
+#### 12.1 Magic affix roller (`0x005C12F0`)
+
+Arguments (stdcall, 6): item, require-spawnable, force, assign, prefix,
+preferred p; no group (the wrappers `0x005C18E0` / `0x005C1940` drop
+it, so a format-0 call with a group rolls a plain prefix). Returns a u16.
+
+1. Part: prefix ≠ 0 → prefixes (magic array header `0x00633ED0` +0x0C
+   to +0x10), else suffixes (+0x08 to +0x0C); f := the part's first
+   combined index. No part → 0.
+2. **Coin:** one item-seed step; lo′ even and not force → return 0.
+3. a := item level (`0x006281E0`) + 2, then ≤ 1 → 1, ≥ 99 → 99 (no
+   `level` / `magic lvl` of the items row, unlike §2).
+4. For each row i of the part, in order, keep it when all hold: not
+   require-spawnable or `spawnable` ≠ 0; `version` < 100 or format ≥
+   100 (so with format 0: `version` < 100); `level` ≤ a; fits the item
+   (§4.1). Kept rows are appended as (f + i, row) while fewer than 511
+   are listed. No `maxlevel`, `rare`, `group`, `frequency`,
+   `classspecific` or taken test, no weights, no early return for the
+   preferred row.
+5. None kept → 0. Else r := roll(n) (`roll_range(0, n)`, n = the
+   count); the pick is candidate r.
+6. Preferred p > 0: the pick becomes the candidate whose combined index
+   is f + p − 1; if none is listed, the id becomes −1 and the row stays
+   candidate r.
+7. assign ≠ 0 → properties of the row, mode 0 (`0x0065FEC0(0, 0, item,
+   row, 0, 0)`). Return id + 1.
+   So a preferred row that is not a candidate returns 0 but, when
+   assigning, still applies candidate r's properties.
+
+#### 12.2 Rare name pick (`0x005C19A0`)
+
+§5 exactly (rare array header `0x00634250`, rows of 0x48 bytes, fit
+§4.3, ≤ 511 candidates, `roll_range(0, n)`, rare id = combined index +
+1).
+
+#### 12.3 Rare item (`0x005C21A0` → `0x005C1E80`)
+
+`0x005C21A0` first requires itemtype `rare` ≠ 0 (`0x0062E990`), then
+format ≥ 1 → §7, format 0 → this routine (ESI item, one stack argument
+passed on to the class skill mods).
+
+1. rp := §12.2(prefix), rs := §12.2(suffix) (each dispatched by
+   format). Either 0 → return 0. Rare prefix := rp, rare suffix := rs.
+2. Count n: primary type `jewl` (58) → `roll_range(3, 2)`; else
+   `roll_range(4, 3)` (4–6; not the §7 table). n = 0 → return 0
+   (unreachable).
+3. P := 0, S := 0. n times (every pass counts):
+   1. One item-seed step, always; suffix when P = 3, or when S ≠ 3 and
+      lo′ is odd; else prefix.
+   2. Up to 252 tries: a := the roller (format 0: §12.1(item, 1, 1, 0,
+      kind, 0); a format ≥ 1 item would take §3(item, 1, 1, 0, kind, 0,
+      0)): require-spawnable, forced, not assigning, preferred 0 (the
+      request's affixes are not read). a = 0 → the pass ends with no
+      store. Else the taken test of §8 step 3.2 (slots 0–2 of the kind,
+      empty ones skipped, a equal or same `group`): not taken → slot P
+      (S) := a, P (S) += 1, the pass ends; taken → next try. All 252
+      taken → slot P (S) := 0, not advanced.
+4. P = S = 0 → return 0. Else clear the identified flag (0x10),
+   properties (mode 0) of prefix 0, suffix 0, prefix 1, suffix 1, prefix
+   2, suffix 2 (empty slots skipped), class skill mods (`0x005C1260`),
+   return 1.
+
+Unlike §7: no affix preferences, count 4–6 (jewels 3–4), the kind step
+is drawn on every pass, a failed roll ends the pass without closing the
+kind, and the group / duplicate test is the §8 one (with up to 252
+tries) on top of the roller's none.
+
+#### 12.4 Crafted item, format 0
+
+`0x005C21D0` takes §12.2 for the rare names (`0x005C21F6`,
+`0x005C2214`) and §12.1 for the affixes (`0x005C2339` prefix,
+`0x005C2419` suffix: (item, 1, 1, 0, kind, request prefix[P] or
+suffix[S])), else as §8.
 
 ## Constants & data dependencies
 
@@ -365,8 +447,15 @@ Synthetic, from the rules:
 ## Open questions
 
 1. No recording confirms the routines (request R1 in the session report).
-2. Format-0 rollers (`0x005C12F0`, `0x005C19A0`, `0x005C1E80`) are not
-   specified.
+2. Answered (2026-10-07, `disasm.py fn` on `0x005C12F0`, `0x005C19A0`,
+   `0x005C1AB0`, `0x005C1E80`, `0x005C18E0`, `0x005C1940`,
+   `0x005C1BC0`, `0x005C21A0` and the format-0 calls of `0x005C21D0`):
+   §12. The format-0 magic roller has no weights and none of the
+   `maxlevel` / `rare` / `group` / `frequency` / class filters, alvl =
+   ilvl + 2, and a preferred row that is not a candidate returns 0;
+   the rare name pick is §5 instruction for instruction; the rare
+   routine draws 4–6 affixes (jewels 3–4) with the crafted taken test.
+   Reached only by items of version-0x47 saves.
 3. Answered (handoff `triage-game-findings` Q1, Q2): §8 step 3.2 (picks
    written into the item at once; taken test skips empty slots), edge
    cases 3 (the crash is real: no test before the +0x5C read) and 7.
