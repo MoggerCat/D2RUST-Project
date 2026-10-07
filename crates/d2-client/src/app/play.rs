@@ -273,9 +273,11 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
     if let Some(archives) = archives {
         let skills = single_player::client_skill_rows(&archives)?;
         let skill_tables = single_player::client_skill_tables(&archives)?;
+        let class_skills = single_player::client_class_skills(&archives)?;
         {
             let mut bridge = app.world_mut().resource_mut::<BridgeResource>();
             bridge.0.set_skill_rows(skills);
+            bridge.0.set_class_skills(class_skills);
             bridge.0.set_skill_tables(std::sync::Arc::new(skill_tables));
         }
         let units = single_player::client_unit_rows(&archives)?;

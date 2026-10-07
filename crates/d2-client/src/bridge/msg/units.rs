@@ -95,8 +95,17 @@ pub fn assign_player(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handl
     for s in [68, 67, 69] {
         u.stats.insert(s, 100);
     }
-    // A skill list (`0x006438B0`, +0xA8; `msg-skills.md` §1 rule 1).
-    u.skills = Some(SkillList::default());
+    // A skill list (`0x006438B0`, +0xA8; `msg-skills.md` §1 rule 1),
+    // then its native skills (`0x00647EE0`, `msg-skills.md` §2 rule 8).
+    let mut list = SkillList::default();
+    let owner = crate::bridge::skills::Owner {
+        unit_type: PLAYER,
+        class: u.class,
+    };
+    let class_skills = msg.inputs.tables.class_skills.get(u.class as usize);
+    crate::bridge::skills::init_player(&mut list, &msg.inputs.tables.skills, owner, class_skills)
+        .map_err(HandlerError::from)?;
+    u.skills = Some(list);
     u.mode = 5;
     // Randomness rule 2: unless the new record is already the local
     // player (never: the local player pointer is the old record while the
