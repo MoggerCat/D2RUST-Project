@@ -105,6 +105,8 @@ pub struct BodyFake {
     pub found: Vec<usize>,
     pub point_collide: bool,
     pub components: BTreeMap<(usize, usize), i32>,
+    /// Item stats read by `item_stat_of` (default 0).
+    pub item_stats: BTreeMap<(usize, u16), i32>,
 }
 
 impl BodyFake {
@@ -612,11 +614,12 @@ impl BodyWorld for BodyFake {
     fn item_stackable(&self, i: usize) -> bool {
         self.c.items[i].throw
     }
-    fn item_stat_of(&self, _: usize, _: u16) -> i32 {
-        0
+    fn item_stat_of(&self, i: usize, s: u16) -> i32 {
+        self.item_stats.get(&(i, s)).copied().unwrap_or(0)
     }
     fn set_item_stat(&mut self, i: usize, s: u16, v: i32) {
         self.log(format!("itemstat {i} {s} {v}"));
+        self.item_stats.insert((i, s), v);
     }
     fn item_max_stack(&self, _: usize) -> i32 {
         0
