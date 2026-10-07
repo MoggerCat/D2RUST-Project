@@ -89,6 +89,8 @@ plain code (owner data, group spawn, barricade objects 571/572);
   messages (0xAC, 0xAA, 0x6D; intents-events.md §7.2) after the waypoint's 0x51;
   client log handled 20 → 24, dropped gains 0x6D ×1 (the client creates nothing
   from 0xAC yet: no `ClientTables` monster rows), queued 0 → 1 (Akara's 0x6D).
+- `d2-client` `e2e_single_player` (3 tests): the join carries 0xAC, 0xAA per
+  monster (no 0x6D: no path provider there); client log handled 46 → 50.
 - Coverage claims of the skills worker's new tests reformatted (`;` between specs).
 
 ## PROVISIONAL list (code: `// PROVISIONAL (<spec ref>)`)
@@ -129,3 +131,8 @@ Not done (M22 spec side): the matching `PROVISIONAL:` lines in the spec files.
   `player_relation`, `portal_owner`, `monster_add_skills`, `inventory_messages`,
   `hireling_owner_guid`, `unit_owner`, `client_cleanup`; d2-server does not yet
   carry the AI walk counter G across games.
+
+## Gate
+`CARGO_INCREMENTAL=0 sh tools/gate.sh`: every step passes except the two known
+`world::objects::tests::{routes_match_function_table, route_check_catches_perturbations}`
+(base failures, fixed by impl-pc2-s4-world).
