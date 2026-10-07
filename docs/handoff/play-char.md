@@ -85,6 +85,35 @@ positions come from `panel-layout.tsv`. The capture compare for the
 character panel is not queued yet: add it to HANDOFF §5 once a
 `SceneSource` exists.
 
+## Follow-up: play-server start-items seam (G14, client half)
+
+The coordinator asked for this. `origin/claude/specs-staging-7`
+(`bc340d48`) did not contain play-server yet, so I merged both
+`origin/claude/specs-staging-7` and `origin/claude/play-server`
+(`d64ea050`) into this branch, with `--no-ff` and no conflicts.
+
+- **`GameParts::inventory`.** With live data it is
+  `InvTables::from_fixed(&tables.fixed)`; with synthetic data it is
+  `None`. The world gets
+  `world.inventory = parts.inventory.map(preview_inv_parts)`, which uses
+  the D1 preview fills in play-server's `PreviewMoveRest`.
+- **New characters (`Character::New` / `Named`)** now load through
+  `session::load_new_character_with_items`.
+  - `items.faults` are logged as `join: new character: start items: …`,
+    but only when an inventory model exists. Without one (synthetic
+    data), the report's "start items" unapplied step already records the
+    reason. This keeps the existing log test
+    (`tests/app_single_player.rs:193`) unchanged.
+  - `items.sent` (0x9C / 0x9D) is dropped: the join does not send item
+    messages yet (G16).
+- **Local check** (needs `D2_GAME_DIR`): run
+  `cargo run -p d2-client --release -- play --new amazon Test --frames 300`
+  with `RUST_LOG=info`.
+  - Expected: no `start items` line in the join log. The items are made
+    server-side, but the inventory panel stays empty until G16.
+  - A line such as `start items: start item "jav" …` means a placement
+    fault. Report it to the play-server owner.
+
 ## What's left
 
 - Seams 1–4 above.

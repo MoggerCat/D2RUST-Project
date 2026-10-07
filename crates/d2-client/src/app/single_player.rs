@@ -77,8 +77,10 @@ use d2_formats::animdata::AnimData;
 use d2_formats::d2s::{self, D2s, ReadOptions};
 use d2_formats::mpq::ArchiveSet;
 use d2_server::adapters::character::LoadContext;
-use d2_server::adapters::handlers::world::{ActionEvents, ActionWorld, Outbox, WiredWorld};
-use d2_server::adapters::session::{load_new_character, load_save, GameSetup};
+use d2_server::adapters::handlers::world::{
+    preview_inv_parts, ActionEvents, ActionWorld, Outbox, WiredWorld,
+};
+use d2_server::adapters::session::{load_new_character_with_items, load_save, GameSetup};
 use d2_server::adapters::session_flow::{
     create_flags, CharacterLoader, CreateGame, Loaded, SessionFlow,
 };
@@ -98,6 +100,7 @@ use d2_sim::drlg::{
     LevelTypes, RoomGrids, RoomKind, TileInfo, TileRect, TileSource,
 };
 use d2_sim::game::Game;
+use d2_sim::items::inventory::tables::InvTables;
 use d2_sim::items::ItemTables;
 use d2_sim::monsters::init::GameInfo;
 use d2_sim::rng::Seed;
@@ -1038,6 +1041,10 @@ struct GameParts {
     drops: Option<Arc<DropTables>>,
     /// `None`: the mercenary calls report no tables (synthetic).
     hirelings: Option<HirelingTables>,
+    /// The inventory tables of the wired host's inventory model (the new
+    /// character's start items, `items/generation.md` §10.3); none for
+    /// synthetic data (the start items then stay unapplied).
+    inventory: Option<InvTables>,
 }
 
 impl GameParts {
@@ -1089,6 +1096,7 @@ impl GameParts {
             vitals: None,
             drops: None,
             hirelings: None,
+            inventory: None,
         })
     }
 
@@ -1111,6 +1119,10 @@ impl GameParts {
             vitals: Some(Arc::new(t.vitals()?)),
             drops: Some(d.drops.clone()),
             hirelings: Some(d.hirelings.clone()),
+            inventory: Some(
+                InvTables::from_fixed(&t.fixed)
+                    .map_err(|e| BuildError::Tables(format!("inventory tables: {e}")))?,
+            ),
         })
     }
 }
@@ -1320,6 +1332,9 @@ pub fn build_with(
         0,
     );
     world.state.hireling_tables = parts.hirelings;
+    // The play host's inventory model (`play-server` seam, D1 preview
+    // fills in `PreviewMoveRest`): the new character's start items.
+    world.inventory = parts.inventory.map(preview_inv_parts);
     let mut s: Sim = SimGame::with_world(game, sim, world);
     // The session sequence (`intents-events.md` §8) runs on the client's
     // C→S 0x67 / 0x6B: game creation (the client record, 0x01, 0x00,
@@ -1394,7 +1409,12 @@ fn loader(
                 }
                 // §8.2 rule 7: the stub path (start stats, `StartSkill`),
                 // so the join sends 0x5F and the two 0x23.
-                let (entry, report) = load_new_character(s, player, r.char_name);
+                // Then the start items (`items/generation.md` §10.3) on
+                // the wired host. Their queued 0x9C / 0x9D (`items.sent`)
+                // are dropped: the join sends no item messages yet
+                // (rule 3.5; the item stream decode is G16).
+                let (entry, report, items) = load_new_character_with_items(s, player, r.char_name);
+                let has_inventory = s.world.inventory.is_some();
                 let log = &mut s.events.action.hooks().x.log;
                 log.extend(
                     report
@@ -1402,6 +1422,16 @@ fn loader(
                         .iter()
                         .map(|u| format!("join: new character: {u:?}")),
                 );
+                // Without an inventory model (synthetic data) the report's
+                // "start items" step already names why nothing was made.
+                if has_inventory {
+                    log.extend(
+                        items
+                            .faults
+                            .iter()
+                            .map(|f| format!("join: new character: start items: {f}")),
+                    );
+                }
                 (entry, PlayerQuests::default())
             }
             Character::Save(save, ctx) => match load_save(s, player, save, ctx) {
