@@ -44,7 +44,7 @@
 | Edge cases & original bugs | 673–707 |
 | Test vectors | 708–722 |
 | Provenance | 723–747 |
-| Open questions | 748–772 |
+| Open questions | 748–776 |
 <!-- /index -->
 
 ## Summary
@@ -765,7 +765,11 @@ other Act V part-1 quest code draws.
 6. `quests.tsv` column `spec` still says `catalogued` for rows 31–36;
    switch it to `specified` (with a link to these files) once
    `quests.md` §2.4 documents owner files per act. Row 40's `?` cells
-   and the intro message rows: part 2 open question 8.
+   and the intro message rows: part 2 open question 8. **Answered**
+   (2026-10-07): rows 31–36 switched to `specified` (quests-fixups
+   CODE-TABLE commit; every address of these rows is named in
+   `quests-act5.md` / `-2`); row 40 and the intro rows were done by
+   quests-core (part 2 open question 8).
 7. Record a full Act V run (packets + RNG, `docs/HANDOFF.md` §5): Shenk,
    the rescue portals, the rune reward, Anya's thaw, the scroll and
    Anya's item draw.

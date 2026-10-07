@@ -44,13 +44,13 @@
 |   7. NPC dialog hooks | 580–612 |
 |   8. Act transitions, warps and portals | 613–694 |
 |   9. Quest items, rewards and helpers | 695–858 |
-|   11. Acts II–V | 859–864 |
-| Constants & data dependencies | 865–879 |
-| Randomness | 880–906 |
-| Edge cases & original bugs | 907–925 |
-| Test vectors | 926–957 |
-| Provenance | 958–986 |
-| Open questions | 987–1034 |
+|   11. Acts II–V | 859–867 |
+| Constants & data dependencies | 868–882 |
+| Randomness | 883–909 |
+| Edge cases & original bugs | 910–928 |
+| Test vectors | 929–960 |
+| Provenance | 961–989 |
+| Open questions | 990–1051 |
 <!-- /index -->
 
 ## Summary
@@ -860,7 +860,10 @@ Returns 0 in every non-fatal case. No draw of its own.
 
 Catalogued in `quests.tsv` (records, callbacks, tables) and `quest-messages.tsv`.
 Hooks other specs rely on are specified above (§8.1–§8.4, §9.4, §9.5).
-Their state machines are not yet specified (Open question 8).
+Their state machines are not yet specified (Open question 8). Now specified
+(2026-10-07): Act II `quests-act2.md`, `quests-act2-2.md`; Act III
+`quests-act3.md`, `quests-act3-2.md`; Act IV `quests-act4.md`; Act V
+`quests-act5.md`, `quests-act5-2.md`; quest object functions §9.6.
 
 ## Constants & data dependencies
 
@@ -1008,8 +1011,22 @@ item and path-placement specs).
    of the party list at game +0x1D2C (`0x00554630`, `0x00540710`,
    `0x00540510`); future owner `world/party.md`. The Act I iterate tests
    are in `quests-act1.md` §10.4–§10.8 (A1Q2's J3 and J7 in `quests-act1.md` §10.5).)
-8. Acts II–V state machines (later spec).
-9. Event 1, 6, 7, 12 raisers: none found; confirm no indirect calls.
+8. Acts II–V state machines (later spec). **Answered** (2026-10-07): written in the
+   per-act owner files named in §2.4 (`quests-act2.md` / `-2`,
+   `quests-act3.md` / `-2`, `quests-act4.md`, `quests-act5.md` / `-2`);
+   every `quests.tsv` row is `specified` (CODE-TABLE commit of
+   quests-fixups).
+9. Event 1, 6, 7, 12 raisers: none found; confirm no indirect calls. **Answered**
+   (2026-10-07): events 1, 7 and 12 have no callback anywhere: no
+   `quests.tsv` row sets one, and a byte scan of `.text` finds no
+   immediate store of a quest-code address (0x00586000–0x005BE000) to
+   record +0xA4 / +0xBC / +0xD0 (disp32 form) or to +0x04 / +0x1C / +0x30
+   of the callback array (disp8 form), so a raiser would call nothing.
+   Event 6's raiser `0x00543DE0` has no rel32 caller and no 4-byte
+   pointer to it in the image (`disasm.py xref`), so its two callbacks
+   (`0x00591A90`, `0x00592E60`, stored at `0x00591FC4` / `0x005971E6`)
+   never run in 1.14d. The dispatchers' callers are all direct
+   (`0x005438E0`: 6 sites, `0x005439A0`: 6 sites, §4.1).
 10. (Settled: §8.1 table, read from the call sites.) A recording of
     each act change would still confirm the 0x61 bytes.
 11. (Answered: `quests-act1-rest.md` §1 gibbet operate `0x00593480` and

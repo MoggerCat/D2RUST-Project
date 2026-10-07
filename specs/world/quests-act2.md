@@ -44,7 +44,7 @@
 | Edge cases & original bugs | 854–887 |
 | Test vectors | 888–908 |
 | Provenance | 909–931 |
-| Open questions | 932–998 |
+| Open questions | 932–1006 |
 <!-- /index -->
 
 ## Summary
@@ -949,10 +949,18 @@ their own item seeds. No other Act II quest code draws.
 7. ~~`0x00538680(client, 2, difficulty)`~~ Answered:
    `quests-act1-rest.md` §5 (client +0x0A bits 8–12, step 2).
 8. Init 37 (`0x0059DA50`) has no `objects.txt` user in 1.14d; confirm no
-   preset spawns an object through it.
+   preset spawns an object through it. **Answered** (2026-10-07): the init table
+   `0x00731BC0` is read only by `0x0054F5D0` (`0x0054F6A7`,
+   `0x0054F6E6`), indexed by the `objects.txt` record's `InitFn`
+   (+0x1B1); entry 37 (`0x00731C54`) is the only pointer to `0x0059DA50`
+   and no rel32 call reaches it (`disasm.py xref`); no live 1.14d row
+   (d2data, d2exp, patch_d2) has `InitFn` 37. So no object runs it.
 9. `quests.tsv` column `spec` still says `catalogued` for Act II rows;
    switch it to `specified` (with a link to this file) once
-   `quests.md` §2.4 documents a second owner file.
+   `quests.md` §2.4 documents a second owner file. **Answered** (2026-10-07):
+   §2.4 names the owner per act; rows 8–16 and 38 switched to
+   `specified` (quests-fixups CODE-TABLE commit); the row addresses part
+   1 does not name are in `quests-act2-2.md` §4.
 10. Record a full Act II run (packets + RNG, `docs/HANDOFF.md` §5) to
     confirm message order: chat-end status, kill timers, Tyrael's
     portal, Meshif's completion.
