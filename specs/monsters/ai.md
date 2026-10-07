@@ -43,7 +43,7 @@
 | Edge cases & original bugs | 1577–1618 |
 | Test vectors | 1619–1707 |
 | Provenance | 1708–1756 |
-| Open questions | 1757–1829 |
+| Open questions | 1757–1834 |
 <!-- /index -->
 
 ## Summary
@@ -1816,12 +1816,17 @@ Other recorded checks:
     `0x00573930` → `monsters/init.md`, `monsters/population.md`; kill
     `0x0057CCB0` → `combat/damage.md` §7.2; stat lists `0x006251F0`,
     curse flag `0x00625760` → `sim/stat-lists.md`; quest seams →
-    `world/quests.md` and its act files. Still without an owner: the
-    reinit-as-class `0x00574370` (named only in
-    `sim/intents-events.md`), the unit find `0x0065A950`
-    (`ai-bodies-3.md` OQ3), the client preload `0x00571C00` (S→C 0xA4)
-    and the spawn info `0x0063EFA0` beyond the cases read in
-    `ai-bodies-2.md` §13 and `ai-bodies-5.md` §21.3.
+    `world/quests.md` and its act files. The last four (2026-10-07): the
+    reinit-as-class `0x00574370(game, unit, class, mode)` →
+    `monsters/init.md` (it rebuilds the monster data of an existing
+    unit; callers are the death action of `sim/intents-events.md`, a
+    skill class change `skills/bodies-4.md` and BaalThrone
+    `ai-bodies-5.md` §20, so it is not AI-only); the unit find
+    `0x0065A950` / `0x0065AC70` → `monsters/umod-callbacks.md` §3.1; the
+    client preload `0x00571C00` (only caller BaalThrone) → its rule is in
+    `ai-bodies-5.md` §20 step 5 (a pending event record on the unit),
+    the record list and the send → `sim/intents-events.md` §7.9; the
+    spawn info `0x0063EFA0` → `ai-bodies-2.md` §13.1 (every key).
 16. Answered (open question 10): no `unread` row is left in
     `ai-functions.tsv`; the last 55 bodies are `ai-bodies-6.md` and
     `ai-bodies-7.md` (the Uber Mephisto, Diablo and Baal thinks are
