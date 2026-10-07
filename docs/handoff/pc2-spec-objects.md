@@ -58,8 +58,10 @@ set" OB-1 … OB-24, and `objects.md` open questions.
 ## Still open
 
 - objects.md OQ1, OQ10, OQ14: Needs recording (Recording list).
-- object-population.md OQ1: Needs recording; OQ5 (theme bodies,
-  unreachable with live `Themes`): see pass-4 note below.
+- object-population.md OQ1: Needs recording. OQ5 (theme bodies
+  `0x00552000`, `0x00552140`, `0x00552200`): left open on purpose; §4
+  proves no theme runs with live 1.14d `Themes`, so they matter only for
+  a mod (theme 4 also needs the unspecified drop helper `0x00559130`).
 - WW-6 rows owned by quest specs with no stating spec: init 7
   `0x00544990`, init 9 `0x00593FC0`, init 46 `0x005506D0`, init 59
   `0x0054FE10`, init 61 `0x00594290`, operate 33 `0x00583E70`, operate 43

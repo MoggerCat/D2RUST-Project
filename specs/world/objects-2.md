@@ -24,17 +24,17 @@
 |   16. Operate functions, part 2 | 61–188 |
 |   17. Small init functions | 189–215 |
 |   18. Object events 0, 3, 8, 9, 10 | 216–283 |
-|   19. Obelisk completion (C→S 0x44, `0x00585240`) | 284–331 |
-|   20. Item drop helpers (open question 13) | 332–427 |
-|   21. Curable-state removal (`0x00578C20`, open question 15) | 428–440 |
-|   22. Object allocation modes (open question 8) | 441–465 |
-|   23. Client side of S→C 0x0E and 0x4D (open question 4) | 466–483 |
-| Constants & data dependencies | 484–487 |
-| Randomness | 488–502 |
-| Edge cases & original bugs | 503–527 |
-| Test vectors | 528–541 |
-| Provenance | 542–562 |
-| Open questions | 563–566 |
+|   19. Obelisk completion (C→S 0x44, `0x00585240`) | 284–330 |
+|   20. Item drop helpers (open question 13) | 331–426 |
+|   21. Curable-state removal (`0x00578C20`, open question 15) | 427–439 |
+|   22. Object allocation modes (open question 8) | 440–464 |
+|   23. Client side of S→C 0x0E and 0x4D (open question 4) | 465–482 |
+| Constants & data dependencies | 483–486 |
+| Randomness | 487–501 |
+| Edge cases & original bugs | 502–526 |
+| Test vectors | 527–540 |
+| Provenance | 541–561 |
+| Open questions | 562–565 |
 <!-- /index -->
 
 ## Summary
@@ -294,8 +294,7 @@ object other than class 152 takes this branch.
    (`0x0055EEA0(game, P, item)`, items spec); failure → S→C 0x58 result
    4, stop. Then P's interact is cleared (`0x00554190`, §16.3 rule 2).
 2. b := **power-up** (`0x00585240(game, s)`, P in EDI), s := byte +0x122
-   of the item's items record (`subtype`, `data/fields.tsv` seq 62;
-   the record of class −1 when there is no item):
+   of the item's items record (`subtype`, `data/fields.tsv` seq 62):
    1. s ≥ the table count (dword `0x00732FAC` = 21; signed compare) →
       b := 0, no draw.
    2. r := `roll(100)` on **P's unit seed** (unit +0x20; one step,
@@ -384,9 +383,9 @@ Returns the item. The amount is the pipeline's gold rule
    0x9EA. No draw.
 4. Code 0 → id := random class (§20.6) with S := U's unit seed (+0x20)
    and m := (U is a monster). If quality = 4: while id's items record
-   is missing or lacks `bitfield1` bit 0, re-pick: the first 10
-   re-picks with §20.6, later ones with the weapon pick (§20.5)
-   (unbounded loop).
+   is missing or lacks `bitfield1` bit 0, re-pick: the first 11
+   re-picks with §20.6, later ones with the weapon pick (§20.5, level
+   `*level`) (unbounded loop).
 5. Position: U's position (`0x00620870`) and room (`0x00620BB0`); floor
    search `0x00555DA0(room, &pos, &out, 1, 1)`; none → return none
    (request out untouched).
