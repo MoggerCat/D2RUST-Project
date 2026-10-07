@@ -76,7 +76,7 @@ frame 2918), then went back through the town side (0x13 GUID 0x1C, frame
 |---|---|---|
 | C→S 0x13 (portal) | frame 2918, input | frame 3359, input |
 | merc removed: S→C 0x0A `0a0101000000` (caller `0x53BDC2`) | 2918, input phase, right after the 0x13 (after one 0x07) | 3359, input phase, right after the 0x13 |
-| room messages | tick 2919: 0x07s / 0x51s / 0xACs of the town rooms, then the 0x08s and 0x0As of the old rooms | tick 3360: the 0x0As of the town units (no 0x07 in that tick) |
+| room messages | tick 2919: 0x07s / 0x51s / 0xACs of the town rooms, then the 0x08s and 0x0As of the old rooms | tick 3360: 9 × 0x07, 1 × 0x51, 9 × 0x08 and 33 × 0x0A (the town units); one 0x07 already in the input phase of 3359 |
 | merc added: S→C 0xAC GUID 1 class 0x10F (caller `0x53E81E`) | tick 2919 at (4333, 5743), **before** the player's 0x15, after the town NPC 0xACs | tick 3360 at (4471, 5721), **before** the player's 0x15 |
 | player S→C 0x15 type 0 GUID 1 (caller `0x53BC44`) | tick 2919 to (4333, 5743), after the room hides | tick 3360 to (4471, 5721) |
 | merc S→C 0x15 type 1 GUID 1 (caller `0x53BC44`) | tick **2920** to (4333, 5743) (the same point) | none |
