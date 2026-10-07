@@ -429,6 +429,10 @@ impl Fx {
             .action
             .with(&mut s.game, |g, v| v.allocate(g, &req, at.0, at.1))
             .expect("allocated");
+        // Staged as already announced to the client (the room clean-up
+        // cleared unit flag 0x10, `intents-events.md` §7.1 rule 2.1).
+        s.events.action.sys.units.get_mut(u).unwrap().flags &=
+            !d2_sim::units::record::flags::SEED_SET;
         self.stage(u);
         u
     }

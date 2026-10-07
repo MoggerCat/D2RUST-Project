@@ -328,6 +328,9 @@ impl Fx {
             .with(&mut self.sim.game, |g, v| v.allocate(g, &req, x, y))
             .expect("allocated");
         self.sim.events.sys.units.get_mut(p).unwrap().mode = 1;
+        // Staged as already announced (`intents-events.md` §7.1 r2.1).
+        self.sim.events.sys.units.get_mut(p).unwrap().flags &=
+            !d2_sim::units::record::flags::SEED_SET;
         self.sim.events.with(&mut self.sim.game, |_, v| {
             v.set_base(p, STAT_VELOCITY, 100);
         });

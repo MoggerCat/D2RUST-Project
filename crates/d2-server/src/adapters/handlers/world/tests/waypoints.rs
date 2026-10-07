@@ -331,7 +331,10 @@ fn fixture(class: u32, dx: i32) -> Fx {
             mode: 1,
             allied: ty == UnitType::Player,
         };
-        sim.with(game, |g, v| v.allocate(g, &req, x, 20)).unwrap()
+        let u = sim.with(game, |g, v| v.allocate(g, &req, x, 20)).unwrap();
+        // Staged as already announced (`intents-events.md` §7.1 r2.1).
+        sim.sys.units.get_mut(u).unwrap().flags &= !d2_sim::units::record::flags::SEED_SET;
+        u
     };
     let o = spawn(&mut sim, &mut game, UnitType::Object, 0, rooms[0], 20);
     let far = spawn(&mut sim, &mut game, UnitType::Object, 0, rooms[1], 20);
