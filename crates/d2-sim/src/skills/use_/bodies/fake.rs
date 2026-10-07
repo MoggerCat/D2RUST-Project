@@ -37,6 +37,9 @@ pub struct FList {
 /// One `unit_find` call: (at, radius, filter).
 pub type FindArgs = ((i32, i32), i32, u32);
 
+/// One `unit_find` call: (centre, radius, flags).
+pub type FindCall = ((i32, i32), i32, u32);
+
 /// The fake body world.
 #[derive(Debug, Clone, Default)]
 pub struct BodyFake {
@@ -76,6 +79,8 @@ pub struct BodyFake {
     pub srvdo_result: i32,
     pub no_missiles: bool,
     pub no_monsters: bool,
+    /// The next `n` `spawn_monster` calls fail.
+    pub fail_spawns: u32,
     pub c8: BTreeMap<usize, u32>,
     pub node: BTreeMap<usize, i32>,
     pub frame_index: BTreeMap<usize, i32>,
@@ -124,6 +129,10 @@ pub struct BodyFake {
     pub find_args: std::cell::RefCell<Vec<FindArgs>>,
     /// Item stat values by (item, stat) (`item_stat_of`).
     pub item_stats: BTreeMap<(usize, u16), i32>,
+    /// The (centre, radius, flags) of every `unit_find` call.
+    pub finds: std::cell::RefCell<Vec<FindCall>>,
+    /// Base stats given to every missile `spawn_missile` creates.
+    pub missile_base: Vec<(u16, i32)>,
 }
 
 impl BodyFake {
@@ -657,6 +666,9 @@ impl BodyWorld for BodyFake {
             return None;
         }
         let m = self.c.add(FUnit::new(UnitType::Missile, req.class));
+        for &(s, v) in &self.missile_base {
+            self.c.set(m, s, v);
+        }
         self.pos.insert(m, (req.x, req.y));
         Some(m)
     }
@@ -952,6 +964,7 @@ impl BodyWorld for BodyFake {
     }
     fn unit_find(&self, _: usize, at: (i32, i32), r: i32, f: u32) -> Vec<usize> {
         self.find_args.borrow_mut().push((at, r, f));
+        self.finds.borrow_mut().push((at, r, f));
         self.found.clone()
     }
     fn point_collides(&self, _: usize, _: (i32, i32), _: u32) -> bool {
@@ -959,6 +972,10 @@ impl BodyWorld for BodyFake {
     }
     fn spawn_monster(&mut self, q: MonsterSpawn<usize, usize>) -> Option<usize> {
         self.log(format!("{q:?}"));
+        if self.fail_spawns > 0 {
+            self.fail_spawns -= 1;
+            return None;
+        }
         if self.no_monsters {
             return None;
         }
