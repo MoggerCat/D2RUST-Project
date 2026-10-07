@@ -341,9 +341,8 @@ fn put_name(w: &mut BitWriter, name: &[u8; 16]) {
             return;
         }
     }
-    // TODO(spec: bitstream.md §3 rule 3): a name filling all 16 bytes has
-    // no terminator inside +0x4A; the original reads on. Written here as
-    // the 16 characters then a 0.
+    // A name filling all 16 bytes is followed by the 0 at +0x5A (§3 rule
+    // 3): the 16 characters, then 0.
     w.put(7, 0);
 }
 

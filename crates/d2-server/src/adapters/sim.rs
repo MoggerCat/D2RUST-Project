@@ -232,12 +232,12 @@ impl<D: EventDispatch, W> SimGame<D, W> {
     }
 
     /// The client's hot-key slots (client +0x3DC; a slot never bound is
-    /// [`HotKey::UNBOUND`]).
+    /// [`HotKey::NEW_RECORD`]).
     pub fn hotkeys(&self, client: ClientId) -> [HotKey; HOTKEY_SLOTS] {
         self.hotkeys
             .get(&client)
             .copied()
-            .unwrap_or([HotKey::UNBOUND; HOTKEY_SLOTS])
+            .unwrap_or([HotKey::NEW_RECORD; HOTKEY_SLOTS])
     }
 
     /// Stores one hot-key slot (`0x005390A0`); `slot` < 16.
@@ -245,7 +245,7 @@ impl<D: EventDispatch, W> SimGame<D, W> {
         if slot < HOTKEY_SLOTS {
             self.hotkeys
                 .entry(client)
-                .or_insert([HotKey::UNBOUND; HOTKEY_SLOTS])[slot] = key;
+                .or_insert([HotKey::NEW_RECORD; HOTKEY_SLOTS])[slot] = key;
         }
     }
 

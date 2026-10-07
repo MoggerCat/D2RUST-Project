@@ -2331,7 +2331,8 @@ fn run_with(game_seed: u32) -> Transcript {
     assert_eq!(store_rows.last().unwrap().1, CAP, "permanent codes last");
 
     // 12. Sell (C→S 0x33) the picked-up cap (`vendors.md` §7.2): a
-    // permanent code, so no copy; removed from the inventory and freed;
+    // permanent code, so no copy; S→C 0x9D action 5, removed from the
+    // inventory and freed;
     // the price (§9.1, §9.2: B = 100·AC/5, B·512/1024) received: S→C
     // 0x2A kind 3, code 1, its GUID, the new gold.
     let sold = (100 * fx.stat(cap, ARMORCLASS) / 5) * 512 / 1024;
@@ -2348,10 +2349,13 @@ fn run_with(game_seed: u32) -> Transcript {
     );
     assert_eq!(frames.last().unwrap().1.codes, [(0x33, done)]);
     let gold_now = gold_picked + sold;
-    assert_eq!(
-        streams(&fx, &frames.last().unwrap().2),
-        [tx(3, 1, cg, gold_now)]
-    );
+    // A stored cap (mode 0): S→C 0x9D action 5 (flags 0x20) before the
+    // 0x2A (§7.2 rule 9, §7 "Message order").
+    let sent = streams(&fx, &frames.last().unwrap().2);
+    assert_eq!(sent.len(), 2, "{sent:02X?}");
+    assert_eq!((sent[0][0], sent[0][1]), (0x9D, 0x05));
+    assert_eq!(sent[0][4..8], cg.to_le_bytes());
+    assert_eq!(sent[1], tx(3, 1, cg, gold_now));
     assert_eq!(fx.stat(player, GOLD), gold_now);
     assert!(!fx.inventory().contains(&cap));
     assert!(fx.sim_ref().game.lists.unit(cap).is_none(), "freed");
@@ -2539,9 +2543,10 @@ fn run_with(game_seed: u32) -> Transcript {
     // join's four 0x07, the warp's one and the six of its room switch,
     // the switch's four 0x08. The NPC / quest / trade ids are handled
     // now (`client/msg-ui.md` §5, §12, §16, §18: 0x27, 0x29, 0x28, 0x2A
-    // ×2), and Akara's harness add (0xAC) too: 14 + 6.
+    // ×2), and Akara's harness add (0xAC) too: 14 + 6; plus the sell's
+    // 0x9D action 5 (`vendors.md` §7.2 rule 9): 21.
     assert!(log.unowned.is_empty(), "{:?}", log.unowned);
-    assert_eq!(log.handled, 20);
+    assert_eq!(log.handled, 21);
     assert_eq!(log.dropped, BTreeMap::from([(0x0D, 1), (0x69, 2)]));
     assert_eq!((log.queued, log.drained), (0, 0));
     assert_eq!(fx.due, None, "the death end's 0x69 code 9 arrived");

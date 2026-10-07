@@ -29,14 +29,14 @@
 |   1. Writer | 80–96 |
 |   2. Header (`0x006312B0`) | 97–125 |
 |   3. Compact record (`0x0062AF80`) | 126–157 |
-|   4. Full record (`0x0062FFF0`) | 158–294 |
-|   5. Save-format extras (never on the wire) | 295–312 |
-| Constants & data dependencies | 313–336 |
-| Randomness | 337–340 |
-| Edge cases & original bugs | 341–377 |
-| Test vectors | 378–400 |
-| Provenance | 401–425 |
-| Open questions | 426–497 |
+|   4. Full record (`0x0062FFF0`) | 158–304 |
+|   5. Save-format extras (never on the wire) | 305–322 |
+| Constants & data dependencies | 323–346 |
+| Randomness | 347–350 |
+| Edge cases & original bugs | 351–387 |
+| Test vectors | 388–410 |
+| Provenance | 411–435 |
+| Open questions | 436–507 |
 <!-- /index -->
 
 ## Summary
@@ -202,6 +202,12 @@ P = the prefix part's first combined index (747 in 1.14d; table +0x0C −
 suffix ids are sent unchanged (suffixes come first in the combined
 array, `items/affixes.md` §1).
 
+PROVISIONAL: the reader inverts a prefix p′ ≠ 0 as p′ + P and an auto
+affix a′ ≠ 0 (§4.1 rule 11) as a′ + A (a prefix id is always > P in the
+combined array) (because the writer sends p ≤ P unchanged, so the
+inverse is not unique); settled by: item-record capture with a prefix or
+auto affix near P / A (wire layout).
+
 #### 4.3 By quality
 
 "Shown" = save format, or F has 0x10 (identified).
@@ -268,6 +274,10 @@ In this order; "base" = the item's own value (`0x006253B0`), "total"
    0x40); c = L − 1 with a runeword is the runeword list (state 171
    `0x00625790(item, 0xAB, 0x40)`); others the set list of S_c (flags
    0x2040, else 0x40).
+
+PROVISIONAL: a decoded set list gets flags 0x2040 (because the stream
+does not carry which of the two flags it had); settled by: save / copy
+round-trip capture of a set item (saved bytes).
 4. For a list that exists and §4.3 rule 7 did not skip: its own stats
    (`0x00625C90`, up to 511 entries {param u16, id u16, value i32}, list
    order). For each stat s with value v:

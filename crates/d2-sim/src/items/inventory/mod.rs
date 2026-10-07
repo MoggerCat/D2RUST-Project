@@ -44,9 +44,9 @@ pub use checks::{
     trading, usable, Interaction,
 };
 pub use equip::{
-    auto_equip_compatible, auto_equip_location, body_location_allowed, equip_check,
-    equip_from_cursor, equip_profile, hands_compatible, requirements_met, stack_quality_ok,
-    stack_test, EquipOutcome, EquipProfile,
+    auto_equip_compatible, auto_equip_location, body_location_allowed, corpse_slot_fit,
+    equip_check, equip_from_cursor, equip_profile, hands_compatible, pair_location,
+    requirements_met, stack_quality_ok, stack_test, EquipOutcome, EquipProfile,
 };
 pub use grid::{
     find_free_position, grid_record, page_grid_size, place_at_body, place_at_page, place_in_grid,

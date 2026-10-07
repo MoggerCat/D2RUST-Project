@@ -30,14 +30,14 @@
 |   1. Creation values | 73–103 |
 |   2. Spending stat points (message 0x3A) | 104–156 |
 |   3. Level-up `0x00570880` (D2MOO `PLAYERSTATS_LevelUp`) | 157–178 |
-|   4. Experience | 179–369 |
-|   5. Client vitals sync (`0x00548760`) | 370–506 |
-| Constants & data dependencies | 507–523 |
-| Randomness | 524–527 |
-| Edge cases & original bugs | 528–539 |
-| Test vectors | 540–560 |
-| Provenance | 561–587 |
-| Open questions | 588–624 |
+|   4. Experience | 179–373 |
+|   5. Client vitals sync (`0x00548760`) | 374–510 |
+| Constants & data dependencies | 511–527 |
+| Randomness | 528–531 |
+| Edge cases & original bugs | 532–543 |
+| Test vectors | 544–564 |
+| Provenance | 565–591 |
+| Open questions | 592–628 |
 <!-- /index -->
 
 ## Summary
@@ -366,6 +366,10 @@ three `+0x508` references to the client record in `all.asm`).
 So a recovered corpse returns 75 % of the last death's loss, capped by
 §4.5; a second death before pickup overwrites the field, and the
 earlier corpse keeps its own stat 13.
+
+PROVISIONAL: when `0x0057F700` creates no corpse, client +0x508 is left
+unchanged (because the creation's failure path is not read); settled
+by: bin read of the no-corpse path of `0x0057F700`.
 
 ### 5. Client vitals sync (`0x00548760`)
 

@@ -65,9 +65,9 @@ use crate::units::{UnitId, UnitType};
 pub enum InvError {
     Economy(EconomyError),
     List(ListError),
-    /// An item was freed (`0x00557FD0`) while still linked in an
-    /// inventory; the spec writes no unlink there.
-    FreedWhileLinked(UnitId),
+    /// A fatal assert of an item-move rule run outside a move handler
+    /// (e.g. the sell's direct 0x9D, `vendors.md` §7.2 rule 9).
+    Move(crate::items::moves::MoveFatal),
     /// Ground placement found the item in another room than the spot's
     /// (`0x00558AA0` "room added" is written for an item in no room).
     OtherRoom(UnitId),

@@ -312,7 +312,7 @@ fn shown_socketed_items_keep_their_flags() {
         tables: &t,
         seed: &mut seed,
     };
-    open(&mut c, &mut rec, &mut w, npc(), p(), true, false, 0);
+    open(&mut c, &mut rec, &mut w, npc(), p(), true, false, 0).unwrap();
     assert_eq!(w.unit(dgr).flags, flag::IDENTIFIED | flag::NEW);
     assert_eq!(w.unit(sbw).flags, flag::IDENTIFIED | flag::NEW);
 }

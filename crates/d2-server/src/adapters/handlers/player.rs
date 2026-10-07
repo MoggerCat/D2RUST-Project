@@ -214,13 +214,20 @@ pub struct HotKey {
 }
 
 impl HotKey {
-    /// An unbound slot.
-    ///
-    /// TODO(spec: intents-events.md §8.2 r3.6): a new client record's slot
-    /// contents (save load) are not stated; d2rs starts every slot
-    /// unbound (skill −1, which the join's 0x7B skips).
+    /// An unbound slot (skill −1, which the join's 0x7B skips).
     pub const UNBOUND: HotKey = HotKey {
         skill: -1,
+        left: false,
+        item: 0,
+    };
+
+    /// A slot of a new client record before any binding.
+    // PROVISIONAL (intents-events.md §8.2 rule 3.6): a new client record's
+    // slots are the zero-filled stub (skill 0, right hand, item 0), so the
+    // join's 0x7B sends them as skill 0; settled by: new-character join
+    // capture (d2s-load.md OQ4). Wire layout.
+    pub const NEW_RECORD: HotKey = HotKey {
+        skill: 0,
         left: false,
         item: 0,
     };
@@ -508,8 +515,8 @@ pub fn resurrect<W: PlayerWorld>(w: &mut W, p: UnitId) -> u32 {
         w.drop_client(p, DROP_HARDCORE);
         return 0;
     }
-    // TODO(spec: intents-events.md §9 r6): what `0x0053FDF0` does besides
-    // returning 0 is not stated; its value (0) is the warp's argument.
+    // PROVISIONAL (intents-events.md §9 rule 6): `0x0053FDF0` has no side
+    // effect; its value (0) is the warp's argument; settled by: bin read.
     let warp_arg = 0;
     // `0x0056DFA0`: the passive states back on.
     for e in w.skill_entries(p) {
@@ -563,9 +570,8 @@ pub fn merc_command<W: PlayerWorld>(
     if w.hireling(p) != Some(m) {
         return 1;
     }
-    // TODO(spec: intents-events.md §9 r8): the command's fields beyond
-    // {command, a, b} (`0x0058EF40`'s other arguments) are not stated;
-    // they are 0.
+    // PROVISIONAL (intents-events.md §9 rule 8): params 3, 4 of the merc
+    // command (`0x0058EF40`) are 0, 0; settled by: bin read.
     w.replace_ai_commands(m, [cmd, a, b, 0, 0]);
     w.sound(m, SOUND_MERC_ACK, Some(p));
     0

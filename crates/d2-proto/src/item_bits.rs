@@ -265,8 +265,8 @@ fn read_name(r: &mut BitReader<'_>) -> Result<Vec<u8>, ItemBitsError> {
             return Ok(out);
         }
         out.push(c);
-        // TODO(spec: bitstream.md §3 rule 3): the writer's +0x4A is 16
-        // bytes; a longer name is read until its 0.
+        // §3 rule 3: read until its 0, no bound (the stream's length is
+        // the only limit).
     }
 }
 

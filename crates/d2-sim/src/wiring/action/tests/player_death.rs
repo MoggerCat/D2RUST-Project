@@ -81,17 +81,16 @@ fn death_penalties_corpse_experience_and_pickup() {
     assert_eq!(fx.stat(c, EXPERIENCE), 75);
     assert_eq!(fx.sim.hooks().death.exp_lost[&p], 0);
     // Pickup: no `playerbody` → nothing.
-    assert_eq!(hooks_on(&mut fx, |h, sim| h.corpse_pickup(sim, p, c)), 0);
+    assert_eq!(hooks_on(&mut fx, |h, sim| h.corpse_pickup(sim, p, c)), None);
     fx.sim.with(&mut fx.game, |_, v| {
         v.set_state(c, STATE_PLAYERBODY as u16, true)
     });
-    assert_eq!(hooks_on(&mut fx, |h, sim| h.corpse_pickup(sim, p, c)), 75);
+    assert_eq!(
+        hooks_on(&mut fx, |h, sim| h.corpse_pickup(sim, p, c)),
+        Some(75)
+    );
     assert_eq!(fx.stat(p, EXPERIENCE), 975);
     assert_eq!(fx.stat(c, EXPERIENCE), 0);
-    assert_eq!(
-        fx.sim.hooks().x.log.last(),
-        Some(&format!("take back {} {}", p.0, c.0))
-    );
 }
 
 // Covers: specs/combat/vitals.md §4.6
@@ -112,5 +111,5 @@ fn player_killer_takes_gold_only() {
     fx.sim.with(&mut fx.game, |_, v| {
         v.set_state(p, STATE_PLAYERBODY as u16, true)
     });
-    assert_eq!(hooks_on(&mut fx, |h, sim| h.corpse_pickup(sim, q, p)), 0);
+    assert_eq!(hooks_on(&mut fx, |h, sim| h.corpse_pickup(sim, q, p)), None);
 }

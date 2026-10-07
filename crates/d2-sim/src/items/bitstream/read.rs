@@ -116,8 +116,9 @@ fn read_name(r: &mut BitReader<'_>) -> Result<[u8; 16], ReadError> {
         if c == 0 {
             break;
         }
-        // TODO(spec: bitstream.md §3 rule 3, edge case 7): a name of 16 or
-        // more characters is read to its 0 and kept to 16 bytes.
+        // §3 rule 3: the reader reads to its 0 with no bound; d2rs keeps
+        // the first 16 bytes (+0x4A–+0x59; the setter keeps at most 15,
+        // edge case 7, so no longer name arises from d2rs).
         if let Some(b) = name.get_mut(i) {
             *b = c;
         }
@@ -147,9 +148,10 @@ fn read_trailer(r: &mut BitReader<'_>, it: &mut StreamItem) -> Result<(), ReadEr
 }
 
 /// The inverse of a prefix id on the wire (§4.2): an id ≠ 0 is p − P.
-// TODO(spec: bitstream.md §4.2): the writer sends a prefix p ≤ P
-// unchanged, so its inverse is not unique; a prefix id is always > P in
-// the combined array, read as p′ + P.
+// PROVISIONAL (bitstream.md §4.2): the writer sends a prefix p ≤ P
+// unchanged, so its inverse is not unique; read as p′ + P when p′ ≠ 0 (a
+// prefix id is always > P in the combined array); settled by: item-record
+// capture with a prefix near P (wire layout).
 fn prefix_from(p: u32) -> u16 {
     if p == 0 {
         0
@@ -298,8 +300,9 @@ pub fn read_save_record(r: &mut BitReader<'_>, t: &ItemTables) -> Result<ReadIte
         it.gfx = r.read(3)? as i32;
     }
     if r.read(1)? == 1 {
-        // TODO(spec: bitstream.md §4.1 rule 11): as for prefixes, an auto
-        // affix a ≤ A is sent unchanged; read as a′ + A.
+        // PROVISIONAL (bitstream.md §4.1 rule 11): as for prefixes, an
+        // auto affix a ≤ A is sent unchanged; read as a′ + A; settled by:
+        // item-record capture with an auto affix near A (wire layout).
         it.auto_affix = r.read(11)? as u16 + AUTO_OFFSET;
     }
     // §4.3, "shown" always in the save format.

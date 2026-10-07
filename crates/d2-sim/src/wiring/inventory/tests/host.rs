@@ -97,8 +97,8 @@ fn placing_an_item_with_a_room_is_a_caller_error() {
 
 /// §1.4 unlink by unit, then the free: the cells are cleared, the unit
 /// and its item data are gone, nothing logged. A second removal finds
-/// nothing. Freeing an item still linked logs `FreedWhileLinked` (the
-/// check of the free sees the model).
+/// nothing. Freeing an item still linked unlinks it from the player's
+/// inventory first (`0x00557FD0`, `world/cube.md` §8 "Exact" 1).
 #[test]
 fn remove_then_free() {
     let mut w = World::new();
@@ -122,7 +122,9 @@ fn remove_then_free() {
     assert_eq!(w.handle(&insert(k2, 0, 0, 0)), Ok(0));
     let u2 = w.unit(k2).unwrap();
     w.desk(|d| d.free(u2));
-    assert_eq!(w.state.errors, [InvError::FreedWhileLinked(u2)]);
+    assert_eq!(w.state.errors, Vec::new());
+    assert!(w.state.items_of(p).is_empty());
+    assert!(w.unit(k2).is_none());
 }
 
 /// §5.1 by unit: the stored check passes a stored item (0) and refuses a

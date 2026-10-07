@@ -31,6 +31,8 @@ struct Fake {
     body: BTreeMap<u8, Guid>,
     req_pass: bool,
     next_guid: Guid,
+    /// Duplicates fail (`hirelings-2.md` §17 rule 2).
+    dup_fails: bool,
 }
 
 impl Fake {
@@ -81,11 +83,15 @@ impl HirelingItems for Fake {
     fn body_item(&self, _unit: Owner, loc: u8) -> Option<Guid> {
         self.body.get(&loc).copied()
     }
-    fn duplicate(&mut self, owner: Owner, item: Guid) -> Guid {
+    fn duplicate(&mut self, owner: Owner, item: Guid) -> Option<Guid> {
+        if self.dup_fails {
+            self.note(format!("duplicate {} {item} -> none", u(owner)));
+            return None;
+        }
         let g = self.next_guid;
         self.next_guid += 1;
         self.note(format!("duplicate {} {item} -> {g}", u(owner)));
-        g
+        Some(g)
     }
     fn set_mode(&mut self, item: Guid, mode: u8) {
         self.note(format!("mode {item} {mode}"));
@@ -274,4 +280,19 @@ fn occupied_fail_puts_old_back() {
         "0055F4F0 M 0".into(),
     ];
     assert_eq!(f.log, want);
+}
+
+// Covers: specs/world/hirelings-2.md §17 r2
+#[test]
+fn failed_duplicate_loses_the_item() {
+    let mut f = Fake::new();
+    f.dup_fails = true;
+    f.body.insert(4, OLD);
+    assert_eq!(swap(&mut f, true, PLAYER, MERC, C), res::SWAPPED);
+    let at = |s: &str| f.log.iter().position(|l| l.starts_with(s));
+    assert!(!f.log.iter().any(|l| l.starts_with("mode ")));
+    assert!(f.log.contains(&format!("equip M {} 4 true", u32::MAX)));
+    assert!(at(&format!("consume {C}")).is_some());
+    assert!(at(&format!("duplicate P {OLD} -> none")).is_some());
+    assert!(!f.log.iter().any(|l| l.starts_with("become_cursor")));
 }

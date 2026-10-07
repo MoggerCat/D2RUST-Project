@@ -56,13 +56,9 @@ pub fn sound_fields() -> Vec<FieldDef> {
     ]
 }
 
-/// The read `soundenviron.txt` columns with known names (`sound-table.md`
-/// §2), in record order.
-///
-/// TODO(spec: audio/sound-table.md §2): the 12 `EAX …` columns
-/// (0x24–0x50) are not named in the spec, and the spec counts 22 read
-/// columns where the named ones plus 12 make 21. They matter only in
-/// mixer mode 2 (EAX, not reproduced, §9), so they are not bound here.
+/// The 22 read `soundenviron.txt` columns (`sound-table.md` §2), in
+/// record order: 9 named columns, then the 13 `EAX …` columns at 0x24 …
+/// 0x54 (read only by mixer mode 2, EAX, not reproduced, §9).
 pub fn soundenviron_fields() -> Vec<FieldDef> {
     use FieldType::{Byte, Dword};
     let f = |c: &str, t: FieldType, off: u32| FieldDef::new(c, t, 0, off, Link::None);
@@ -76,6 +72,19 @@ pub fn soundenviron_fields() -> Vec<FieldDef> {
         f("Indoors", Byte, 0x18),
         f("Material 1", Dword, 0x1C),
         f("Material 2", Dword, 0x20),
+        f("EAX Environ", Dword, 0x24),
+        f("EAX Env Size", Dword, 0x28),
+        f("EAX Env Diff", Dword, 0x2C),
+        f("EAX Room Vol", Dword, 0x30),
+        f("EAX Room HF", Dword, 0x34),
+        f("EAX Decay Time", Dword, 0x38),
+        f("EAX Decay HF", Dword, 0x3C),
+        f("EAX Reflect", Dword, 0x40),
+        f("EAX Reflect Delay", Dword, 0x44),
+        f("EAX Reverb", Dword, 0x48),
+        f("EAX Rev Delay", Dword, 0x4C),
+        f("EAX Room Roll", Dword, 0x50),
+        f("EAX Air Absorb", Dword, 0x54),
     ]
 }
 

@@ -829,8 +829,9 @@ impl MovePending for Fake {
     fn tile_warp(&mut self, _p: Owner, t: Owner) {
         self.note(format!("warp {}", t.guid));
     }
-    fn corpse_pickup(&mut self, _p: Owner, c: Owner) {
+    fn corpse_pickup(&mut self, _p: Owner, c: Owner) -> bool {
         self.note(format!("corpse {}", c.guid));
+        false
     }
     fn player_interact(&mut self, _p: Owner, o: Owner) {
         self.note(format!("interact {}", o.guid));

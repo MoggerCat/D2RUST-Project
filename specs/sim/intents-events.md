@@ -45,14 +45,14 @@
 |   5. Machine-readable tables | 562–598 |
 |   6. Exact-match comparison | 599–702 |
 |   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 703–1102 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1103–1247 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1248–1392 |
-| Constants & data dependencies | 1393–1411 |
-| Randomness | 1412–1417 |
-| Edge cases & original bugs | 1418–1463 |
-| Test vectors | 1464–1550 |
-| Provenance | 1551–1652 |
-| Open questions | 1653–1772 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1103–1253 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1254–1403 |
+| Constants & data dependencies | 1404–1422 |
+| Randomness | 1423–1428 |
+| Edge cases & original bugs | 1429–1474 |
+| Test vectors | 1475–1561 |
+| Provenance | 1562–1663 |
+| Open questions | 1664–1783 |
 <!-- /index -->
 
 ## Summary
@@ -1183,6 +1183,12 @@ rule 3), drained in a later frame (recorded: after tick 1).
       flag u8 at +2, item u32 at +4) whose skill is in 0..skills count
       − 1: **S→C 0x7B** (`0x0053DB20`, 8 bytes: slot u8@1 = i, u16@2 =
       skill & 0xFFF, | 0x8000 when the flag is set, u32@4 = item).
+      PROVISIONAL: a new client record's 16 slots are the zero-filled
+      stub (skill 0, flag 0, item 0), so a new character's join sends
+      sixteen 0x7B with skill 0 (because the client record is allocated
+      zero-filled and no slot write of the new-character path is read);
+      settled by: new-character join capture (`formats/d2s-load.md` OQ 4;
+      wire).
    7. When `0x006221A0(P)` gives a record: two **S→C 0x23**
       (`0x0053C590`, 13 bytes: type u8@1, GUID u32@2, hand u8@6, skill
       u16@7, item u32@9): hand 1 with record +0x74 / +0x7C, then hand 0
@@ -1302,7 +1308,10 @@ owned it yet, and states the handlers that are only message handling.
    (`0x00538670`, hardcore) → drop the client (`0x0052CAF0(game,
    client, 3)`, `tools/original-hooks.md` §6.1 rule 3), 0. Else in
    order: `0x0053FDF0` (returns 0; its value is the warp's last
-   argument); passive skill states re-applied (`0x0056DFA0`: each skill
+   argument);
+   PROVISIONAL: `0x0053FDF0` has no other effect (because only its
+   return value is read); settled by: bin read; passive skill states
+   re-applied (`0x0056DFA0`: each skill
    of the player with a passive state gets the state on and
    `0x00646D60`); stats 6, 8, 10 (life, mana, stamina) := their maxima
    (`0x00625D10`, `0x00625D60`, `0x00625DB0`; set `0x00627260`, each
@@ -1333,7 +1342,9 @@ owned it yet, and states the handlers that are only message handling.
    command 0x0C; 0x47: a = x, b = y, command 0x0D): no monster with the
    merc GUID → 1; it is not the player's hireling (`0x00574EC0(game,
    player, 7, 0)`) → 1; else free its AI commands (`0x0058EDE0`), add
-   the command {command, a, b} (`0x0058EF40`), sound event 15 on the
+   the command {command, a, b} (`0x0058EF40`; PROVISIONAL: its params 3
+   and 4 are 0, 0, because they are not read; settled by: bin read),
+   sound event 15 on the
    merc toward the player (`0x00553380`), 0. 0x47 returns 0 whatever
    `0x0054C430` returns; 0x46 returns its result.
 9. **0x48** (`0x0054C590`): size 1 else 3; player data +0x4C (busy,

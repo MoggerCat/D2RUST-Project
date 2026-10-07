@@ -590,6 +590,15 @@ pub fn monstats() -> Vec<Monstats> {
     v
 }
 
+/// The messages of a stored item's sale (`vendors.md` §7.2 rule 9, §7
+/// "Message order"): S→C 0x9D action 5 for `guid`, then the 0x2A `last`.
+pub fn assert_stored_sale(got: &[Vec<u8>], guid: u32, last: Vec<u8>) {
+    assert_eq!(got.len(), 2, "{got:02X?}");
+    assert_eq!((got[0][0], got[0][1]), (0x9D, 0x05));
+    assert_eq!(got[0][4..8], guid.to_le_bytes());
+    assert_eq!(got[1], last);
+}
+
 /// S→C 0x2A per `npc.md` §9, bytes 3–6 zero.
 pub fn tx(kind: u8, code: u8, guid: u32, gold: i32) -> Vec<u8> {
     let mut m = vec![0x2A, kind, code, 0, 0, 0, 0];

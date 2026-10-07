@@ -11,7 +11,8 @@
 
 use super::{InvDesk, InvError, InvRest};
 use crate::items::bitstream::{self, read, BitWriter, StreamItem};
-use crate::items::moves::deferred;
+use crate::items::inventory::UnitKind;
+use crate::items::moves::{deferred, mode};
 use crate::items::{flag, stat};
 use crate::units::lifecycle::LifecycleHooks;
 use crate::units::UnitId;
@@ -102,14 +103,43 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
             first.item.filled
         };
         if fillers && n != 0 {
-            // TODO(spec: vendors-2.md §7.3 step 5): the children are socketed
-            // through `0x00562660(child, copy, &out, 0, 1, 0, 0)`; what its
-            // four flag arguments switch off of `inventory-moves.md` §7.19
-            // is not written. The copy fails here (none) instead.
-            self.state.errors.push(InvError::Unwritten(
-                "vendors-2.md §7.3 step 5: 0x00562660 flag arguments",
-            ));
-            return None;
+            // Each child record in stream order (each starts at a byte,
+            // `bitstream.md` §5): read as step 3 with no room (failure →
+            // none; the copy and the children read so far stay), mode 4,
+            // socketed into the copy, flags 0x80000 / 0x2000, command
+            // flag 0x1 cleared.
+            let mut at = r.pos().div_ceil(8);
+            let cg = self.guid_of(copy);
+            self.state.add_inventory(copy, UnitKind::Item, cg);
+            for _ in 0..n {
+                let entry = read::read_save_entry(bytes.get(at..)?, self.econ.tables).ok()?;
+                at += entry.len;
+                let child = match self.econ.item_from_record(&entry.item, None) {
+                    Ok(c) => c,
+                    Err(e) => {
+                        self.state.errors.push(InvError::Economy(e));
+                        return None;
+                    }
+                };
+                self.sync_in();
+                // PROVISIONAL (vendors-2.md §7.3 step 5, inventory-moves.md
+                // §7.19): `0x00562660(child, copy, &out, 0, 1, 0, 0)` is read
+                // as §7.19's link and filler mode 6 only: no targeting
+                // reset, no cursor, no filler properties (the child's lists
+                // came from the stream), no runeword (the copy's list came
+                // from the stream), no messages; result 0 cannot occur;
+                // settled by: static read of 0x00562660 (bin) or a
+                // copy-item recording of a socketed item.
+                let mut inv = self.state.inventories.remove(&copy)?;
+                inv.link(self, child, None);
+                self.state.inventories.insert(copy, inv);
+                if let Some(d) = self.state.items.get_mut(&child) {
+                    d.mode = mode::SOCKETED;
+                    d.flags = (d.flags | flag::INIT) & !flag::INSTORE;
+                    d.cmd_flags &= !CMD_REMOVE;
+                }
+                self.sync_out();
+            }
         }
         // 6. The source's flag.
         if let Some(it) = self.econ.items.get_mut(src) {

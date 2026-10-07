@@ -21,9 +21,9 @@
 |---|---|
 | Summary | 29–38 |
 | Rules | 39–40 |
-|   7.3 Item copy (`0x0055A2A0`, ECX game, EDX source S, owner, fillers) | 41–113 |
-|   7.3.1 Fields the decoder rebuilds (Open question 8) | 114–161 |
-|   10. C→S 0x4F buttons (`0x0054C7C0` → `0x00568060`; answers `ui/panels.md` OQ 6) | 162–276 |
+|   7.3 Item copy (`0x0055A2A0`, ECX game, EDX source S, owner, fillers) | 41–120 |
+|   7.3.1 Fields the decoder rebuilds (Open question 8) | 121–168 |
+|   10. C→S 0x4F buttons (`0x0054C7C0` → `0x00568060`; answers `ui/panels.md` OQ 6) | 169–283 |
 <!-- /index -->
 
 ## Summary
@@ -82,6 +82,13 @@ socketing (`world/npc.md` §8.1); 17 call sites. The owner argument (stack
    cleared; child command flag 0x1 cleared (`0x00628170`).
    fillers = 0: the children are not read; the copy keeps the stream's
    socket flags and its stat lists but has no fillers.
+   PROVISIONAL: `0x00562660(child, copy, &out, 0, 1, 0, 0)` runs only
+   §7.19's link of the child into the copy and child mode 6: no
+   targeting reset, no cursor, no filler properties and no runeword (the
+   stream already carries the child's and the copy's lists), no message
+   (because the four flag arguments are not read; the 1, 1, 1, 1 path
+   minus its hand-offs is the plausible reading); settled by: static read
+   of `0x00562660` (bin) or a copy-item recording of a socketed item.
 6. S item flag 0x8000000 set ("copy source", `items/generation.md`
    §1.4: no reader; it rides in S's later streams, so a second copy
    of the same S, e.g. a permanent store item bought twice, carries

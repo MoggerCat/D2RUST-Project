@@ -223,8 +223,9 @@ impl<X: Pending> PlayerWorld for ActionPlayer<'_, '_, X> {
     }
     /// The path provider's mode request (`pathing.md` §1.2, re-entry 1).
     ///
-    /// TODO(spec: pathing.md §1.2): without the path provider no mode
-    /// request runs (none is wired outside it).
+    /// Without the path provider no mode request runs (none is wired
+    /// outside it): a d2rs wiring choice, no 1.14d behaviour (triage:
+    /// no spec needed).
     fn start_mode_skip_gate(&mut self, player: UnitId, mode: u32) {
         if self.v.h.paths.is_some() {
             d2_sim::wiring::path::walk::request_skip_gate(self.v, self.game, player, mode, 0, 0);

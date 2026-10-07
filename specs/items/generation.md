@@ -42,13 +42,13 @@
 |   9. Forced requests, ears, names, timers | 431–464 |
 |   10. Items from a code: the create wrapper and start items | 465–535 |
 |   11. Format-0 branches (legacy items) | 536–581 |
-|   12. Repair, recharge and runeword removal | 582–645 |
-| Constants & data dependencies | 646–668 |
-| Randomness | 669–687 |
-| Edge cases & original bugs | 688–702 |
-| Test vectors | 703–718 |
-| Provenance | 719–745 |
-| Open questions | 746–836 |
+|   12. Repair, recharge and runeword removal | 582–651 |
+| Constants & data dependencies | 652–674 |
+| Randomness | 675–693 |
+| Edge cases & original bugs | 694–708 |
+| Test vectors | 709–724 |
+| Provenance | 725–751 |
+| Open questions | 752–842 |
 <!-- /index -->
 
 ## Summary
@@ -633,6 +633,12 @@ when n < 1, else n
 X's own inventory (+0x60, node order) until one returns 1; else 0.
 (The client's copy of this rule: `client/msg-stats-items.md` §5, 0x3E
 stat 204.)
+
+PROVISIONAL: "X's stat lists with flag 0x40 in list order" is read as
+the item list (state 0), then the runeword list (state 171) (because
+d2rs has no list-order walk here; a charged skill's key is in one list
+only, so the order shows only when both hold it); settled by: recharge
+capture of a runeword item whose base has the same charged skill.
 
 #### 12.3 Remove a runeword (`0x00558C50`, EDX item X)
 

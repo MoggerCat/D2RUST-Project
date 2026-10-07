@@ -59,10 +59,9 @@ pub trait HirelingItems {
     /// The unit's item at a body location.
     fn body_item(&self, unit: Owner, loc: u8) -> Option<Guid>;
     /// `0x0055A2A0(owner)`: a duplicate of `item` owned by `owner` (new
-    /// GUID, `items/generation.md` duplicate). §11 does not write a failed
-    /// copy.
-    // TODO(spec: hirelings.md §11): the outcome of a failed duplicate.
-    fn duplicate(&mut self, owner: Owner, item: Guid) -> Guid;
+    /// GUID, `items/generation.md` duplicate); none when the creation
+    /// fails (`hirelings-2.md` §17 rule 2).
+    fn duplicate(&mut self, owner: Owner, item: Guid) -> Option<Guid>;
     /// The item's mode.
     fn set_mode(&mut self, item: Guid, mode: u8);
     /// `0x00540E60(game, unit, a, b)` (rule 3: `(9, C's GUID)` to the
@@ -164,6 +163,9 @@ pub fn swap<W: HirelingItems>(
     }
 }
 
+/// The GUID −1 a null unit is passed as.
+const NO_GUID: Guid = u32::MAX;
+
 /// Rule 3, with rule 4's "duplicate of old to the player" when `old` is
 /// given.
 fn equip_copy<W: HirelingItems>(
@@ -174,18 +176,26 @@ fn equip_copy<W: HirelingItems>(
     target: u8,
     old: Option<Guid>,
 ) {
+    // A failed duplicate (`hirelings-2.md` §17 rule 2): the mode set is
+    // skipped, the equip runs with GUID −1 (finds no unit, equips
+    // nothing), C is still consumed and the cursor cleared.
     let copy = w.duplicate(merc, item);
-    w.set_mode(copy, MODE_CURSOR);
+    if let Some(c) = copy {
+        w.set_mode(c, MODE_CURSOR);
+    }
     w.notice(merc, NOTICE_REMOVED, item);
     w.notice(player, NOTICE_REMOVED, item);
-    w.equip_from_cursor(merc, copy, target, true);
+    w.equip_from_cursor(merc, copy.unwrap_or(NO_GUID), target, true);
     w.consume(item);
     w.clear_cursor(player);
     // Rule 4: the old item's duplicate after "cursor := none", before
-    // the refresh calls (all four on the merc).
+    // the refresh calls (all four on the merc); a null copy leaves the
+    // cursor none (§17 rule 2).
     if let Some(old) = old {
-        let back = w.duplicate(player, old);
-        w.become_cursor(player, back);
+        match w.duplicate(player, old) {
+            Some(back) => w.become_cursor(player, back),
+            None => w.clear_cursor(player),
+        }
     }
     w.inventory_pass(merc);
     w.refresh_0055f4f0(merc);

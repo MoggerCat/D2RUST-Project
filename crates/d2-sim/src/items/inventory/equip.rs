@@ -191,6 +191,92 @@ pub fn hands_compatible<W: InvWorld + ?Sized>(
     }
 }
 
+/// Corpse slot fit `0x0055F2D0` (`inventory-moves.md` §12.3) of X for
+/// `unit`, with D (the unit's item at L) and A (its item at the paired
+/// location, or D). Returns (fit, L): rule 3 moves L to the free partner
+/// slot. Differs from §4.4: a quiver next to a bow passes, two non-weapons
+/// fail, any monster passes two weapons.
+pub fn corpse_slot_fit<W: InvWorld + ?Sized>(
+    w: &W,
+    t: &InvTables,
+    unit: UnitId,
+    x: UnitId,
+    d: Option<UnitId>,
+    a: Option<UnitId>,
+    l: u8,
+) -> (bool, u8) {
+    // Rule 1.
+    if w.item(x).is_none() {
+        return (false, l);
+    }
+    // Rule 2.
+    let (d, a, l) = match (d, a) {
+        (None, None) => return (true, l),
+        (Some(_), Some(_)) => return (false, l),
+        // Rule 3: the free partner slot.
+        (Some(old), None) => (None::<UnitId>, Some(old), pair_location(l)),
+        (None, Some(o)) => (None, Some(o), l),
+    };
+    // Rule 4.
+    if ![4, 5, 11, 12].contains(&l) {
+        return (d.is_none(), l);
+    }
+    // Rule 5, with O := A (present).
+    let Some(o) = a else {
+        return (true, l);
+    };
+    let s = |i: UnitId| w.ammo_type(i).unwrap_or(-1);
+    let q = |i: UnitId| {
+        w.item(i)
+            .and_then(|r| t.itype_of(r.record))
+            .map_or(0, |r| r.quiver as i16)
+    };
+    let fit = if s(x) > 0 {
+        is_type(w, t, o, s(x))
+    } else if q(x) != 0 {
+        s(o) > 0 && is_type(w, t, x, s(o))
+    } else if s(o) > 0 {
+        is_type(w, t, x, s(o))
+    } else if q(o) > 0 {
+        is_type(w, t, x, q(o))
+    } else if [x, o]
+        .iter()
+        .any(|&i| w.two_handed(i) && !w.one_or_two_handed(unit, i))
+    {
+        false
+    } else {
+        let (wx, wo) = (is_type(w, t, x, ty::WEAP), is_type(w, t, o, ty::WEAP));
+        if !(wx || wo) {
+            false
+        } else if wx != wo {
+            true
+        } else {
+            match w.unit_kind(unit) {
+                Some(UnitKind::Monster { .. }) => true,
+                Some(UnitKind::Player { class: BARBARIAN }) => true,
+                Some(UnitKind::Player { class: ASSASSIN }) => {
+                    is_type(w, t, x, ty::H2H) && is_type(w, t, o, ty::H2H)
+                }
+                _ => false,
+            }
+        }
+    };
+    (fit, l)
+}
+
+/// The paired body location `0x0055F240`: 4 ↔ 5, 6 ↔ 7, 11 ↔ 12, else 0.
+pub fn pair_location(l: u8) -> u8 {
+    match l {
+        4 => 5,
+        5 => 4,
+        6 => 7,
+        7 => 6,
+        11 => 12,
+        12 => 11,
+        _ => 0,
+    }
+}
+
 /// `0x0062A2F0` (§4.5): quality q ≠ 0 and q ∉ 4–9, so low, normal or
 /// superior (1–3).
 pub fn stack_quality_ok(q: u8) -> bool {

@@ -5,10 +5,11 @@
 use super::deferred::{owner_refresh, send_item_page};
 use super::seams::{MoveWorld, Spot};
 use super::{
-    add_cmd, add_uflags, changed_if_filled, clear_iflags, clear_uflags, cmd, exists, iflag, mode,
-    page, sound, stat, ty, uflag, Guid, MoveFatal, Outcome, Owner, CUBE_CODE, DROP_MASK,
-    DROP_MASK2, GOLD_PER_LEVEL, PILE_CAP,
+    add_cmd, add_iflags, add_uflags, changed_if_filled, clear_iflags, clear_uflags, cmd, exists,
+    iflag, mode, page, sound, stat, ty, uflag, Guid, MoveFatal, Outcome, Owner, CUBE_CODE,
+    DROP_MASK, DROP_MASK2, GOLD_PER_LEVEL, PILE_CAP,
 };
+use crate::items::inventory::pair_location;
 
 /// "Leave the room": room delete notice, collision freed, room list
 /// (§2.2; idempotent on the provider's side).
@@ -50,8 +51,8 @@ pub fn pickup_auto<W: MoveWorld>(
             return Ok(Outcome::REFUSED);
         }
         leave_room(w, item);
-        // TODO(spec: inventory-moves.md §8.1 r5): the result of a failed
-        // `0x00562E00` is not written; read as "nothing".
+        // §8.1 rule 5: a failed `0x00562E00` (unreachable) gives result 0,
+        // out 0, the item out of its room in mode 3 and nothing sent.
         let ok = w.equip_picked(player, item);
         if ok {
             w.quest_item_picked(player, item);
@@ -85,18 +86,39 @@ pub fn pickup_auto<W: MoveWorld>(
             }
         }
     }
+    if !grid_put(w, player, item, true)? {
+        refused_pickup(w, player, item, sound::NO_ROOM);
+        return Ok(Outcome::NOTHING);
+    }
+    Ok(Outcome::DONE)
+}
+
+/// Page-0 free position `0x005600A0(game, leave_room, page 0)` (§8.1 step
+/// 7, §12.2 "grid put"): §2.3 + §2.2, then (with `leave`) the room step,
+/// link kind 1 (failure fatal), cursor := none, item-skill link, stat
+/// refresh, unit flag 0x2 cleared, mode 0, command flag 0x80, update
+/// list, refresh, unit flag 0x2000000 cleared, page := 0, quest hook
+/// ITEMPICKEDUP, inventory pass if active. False: no position.
+pub fn grid_put<W: MoveWorld>(
+    w: &mut W,
+    player: Owner,
+    item: Guid,
+    leave: bool,
+) -> Result<bool, MoveFatal> {
     let placed = match w.find_free(player, item, page::INVENTORY) {
         Some((x, y)) => w.place_at(player, item, page::INVENTORY, x, y),
         None => false,
     };
     if !placed {
-        refused_pickup(w, player, item, sound::NO_ROOM);
-        return Ok(Outcome::NOTHING);
+        return Ok(false);
     }
-    leave_room(w, item);
-    // TODO(spec: inventory-moves.md §8.1 r7): the link's failure is not written
-    // (`0x005600A0`); ignored.
-    w.link_check(player, item, 1);
+    if leave {
+        leave_room(w, item);
+    }
+    // The link (kind 1) failing in `0x005600A0` is a fatal assert (§8.1 r7).
+    if !w.link_check(player, item, 1) {
+        return Err(MoveFatal::Link);
+    }
     w.set_cursor(player, None);
     w.charm_relink(player, item);
     w.stat_refresh(player);
@@ -111,7 +133,160 @@ pub fn pickup_auto<W: MoveWorld>(
     if w.is_active(player, item) {
         w.inventory_pass(player);
     }
-    Ok(Outcome::DONE)
+    Ok(true)
+}
+
+// ------------------------------------------------------------------ §12
+
+/// Sound events of the corpse pickup (§12.1 steps 4–5).
+pub const SOUND_CORPSE_LOOT: u32 = 93;
+pub const SOUND_CANT_CARRY: u32 = 23;
+
+/// The rest of `0x0057FB70` after its steps 1–2 passed (§12.1 steps
+/// 3–5): the take-back §12.2, then the corpse's removal and sound 93, or
+/// sound 23.
+pub fn corpse_pickup_rest<W: MoveWorld>(
+    w: &mut W,
+    player: Owner,
+    corpse: Owner,
+) -> Result<(), MoveFatal> {
+    if corpse_take_back(w, player, corpse)? {
+        w.corpse_taken(player, corpse);
+        w.sound(player, SOUND_CORPSE_LOOT);
+    } else {
+        w.sound(player, SOUND_CANT_CARRY);
+    }
+    Ok(())
+}
+
+/// Corpse take-back `0x00562F30(game, U, C)` (§12.2). True (result 1)
+/// when the last sweep met no can-pick refusal and no failed grid put.
+pub fn corpse_take_back<W: MoveWorld>(w: &mut W, u: Owner, c: Owner) -> Result<bool, MoveFatal> {
+    if !w.has_inventory(u) || !w.has_inventory(c) {
+        return Ok(false);
+    }
+    // Phase 1: body locations.
+    loop {
+        let mut present = 0u32;
+        let mut moved = false;
+        for b in 1..=12u8 {
+            let Some(x) = w.body_item(c, b) else {
+                continue;
+            };
+            present += 1;
+            if !w.requirements(x, u, false) {
+                continue;
+            }
+            let d = w.body_item(u, b);
+            let pair = pair_location(b);
+            let a = if pair != 0 { w.body_item(u, pair) } else { d };
+            let (fit, l) = w.corpse_slot_fit(u, x, d, a, b);
+            if !fit {
+                if !grid_put(w, u, x, false)? {
+                    continue;
+                }
+                w.replenish_timers(x);
+            } else {
+                if w.body_item(u, l).is_some() {
+                    return Err(MoveFatal::SlotHeld);
+                }
+                if !w.place_body(u, x, l) {
+                    continue;
+                }
+                let k = if l == 11 || l == 12 { 4 } else { 3 };
+                if !w.link_check(u, x, k) {
+                    w.clear_body_slot(u, l);
+                    continue;
+                }
+                w.set_cursor(u, None);
+                w.set_body_loc(x, l);
+                clear_uflags(w, x, uflag::TARGETABLE);
+                w.set_mode(x, mode::EQUIPPED);
+                add_cmd(w, x, cmd::EQUIP);
+                w.update_list_add(u, x);
+                owner_refresh(w, u);
+                clear_uflags(w, x, uflag::ON_GROUND);
+                w.set_page(x, page::NONE);
+                if k == 3 {
+                    w.stat_link(u, x);
+                    w.stat_refresh(u);
+                    w.charm_relink(u, x);
+                    w.weapon_bookkeeping(u);
+                }
+                w.quest_item_picked(u, x);
+                w.replenish_timers(x);
+            }
+            // Step 7: X is no longer C's (the unlink returns none).
+            add_iflags(w, x, iflag::CHANGED);
+            let _ = w.unlink(c, x);
+            w.clear_body_slot(c, b);
+            present -= 1;
+            moved = true;
+        }
+        if present == 0 || !moved {
+            break;
+        }
+    }
+    // Phase 2: every item left in C, list order.
+    let mut pass = false;
+    let r = loop {
+        let mut placed = 0u32;
+        let mut r = true;
+        for x in w.items(c) {
+            if !can_pick(w, u, x) {
+                r = false;
+                continue;
+            }
+            if w.equip_picked(u, x) {
+                placed += 1;
+                add_iflags(w, x, iflag::CHANGED);
+                continue;
+            }
+            let belted = w.beltable(x)
+                && w.belt_free_slot(u, x)
+                    .is_some_and(|s| w.belt_place(u, x, u32::from(s)));
+            if belted {
+                if !w.link_check(u, x, 2) {
+                    continue;
+                }
+                w.set_cursor(u, None);
+                if u.is_player() {
+                    w.charm_relink(u, x);
+                }
+                clear_uflags(w, x, uflag::TARGETABLE);
+                if w.is_active(u, x) {
+                    w.stat_refresh(u);
+                }
+                w.set_mode(x, mode::BELT);
+                clear_uflags(w, x, uflag::ON_GROUND);
+                add_cmd(w, x, cmd::PICKED_TO_BELT);
+                w.set_page(x, page::NONE);
+                w.update_list_add(u, x);
+                owner_refresh(w, u);
+                placed += 1;
+                add_iflags(w, x, iflag::CHANGED);
+                continue;
+            }
+            if pass {
+                if grid_put(w, u, x, false)? {
+                    placed += 1;
+                    add_iflags(w, x, iflag::CHANGED);
+                } else {
+                    r = false;
+                }
+            }
+        }
+        if placed != 0 {
+            continue;
+        }
+        if !pass {
+            pass = true;
+            continue;
+        }
+        break r;
+    };
+    w.inventory_pass(u);
+    Ok(r)
 }
 
 /// Pickup to the cursor `0x0055CF50` (§8.2, cursor flag ≠ 0).
@@ -453,9 +628,10 @@ pub fn cube_spill<W: MoveWorld>(w: &mut W, player: Owner) -> Result<(), MoveFata
     for it in list {
         send_item_page(w, player, it, iflag::COPIED, page::CUBE)?;
         let (x, y) = w.pos(Owner::item(it));
-        // TODO(spec: inventory-moves.md §9.3): an unlink failure here is not
-        // written; ignored.
-        w.unlink(player, it);
+        // The unlink not returning the item is a fatal assert (§9.3).
+        if !w.unlink(player, it) {
+            return Err(MoveFatal::Unlink);
+        }
         w.room_change_notice(it, x, y);
         w.set_mode(it, mode::CURSOR);
         w.set_page(it, page::INVENTORY);
@@ -517,10 +693,11 @@ pub fn gold_piles<W: MoveWorld>(w: &mut W, unit: Owner, amount: i32, max: usize)
         let Some(spot) = drop_spot(w, unit, 0) else {
             break;
         };
-        // TODO(spec: inventory-moves.md §10.2): a failed creation is not
-        // written; read as "stop".
+        // A failed creation skips that pile and does not stop: its amount
+        // already counts as placed (§10.2).
         let Some(g) = w.create_gold(unit, spot) else {
-            break;
+            placed += pile;
+            continue;
         };
         w.set_stat(Owner::item(g), stat::GOLD, pile.max(0) as i32);
         ground_place(w, g, spot);

@@ -400,7 +400,7 @@ fn bind_hotkey_fills_the_client_slot() {
     // Skill 100 > 6 skills: unbind slot 7.
     assert_eq!(f.send(&msg(100 | (7 << 16), 9)).0, Done);
     let keys = f.sim().hotkeys(0);
-    let mut want = [HotKey::UNBOUND; HOTKEY_SLOTS];
+    let mut want = [HotKey::NEW_RECORD; HOTKEY_SLOTS];
     want[5] = HotKey {
         skill: 3,
         left: true,

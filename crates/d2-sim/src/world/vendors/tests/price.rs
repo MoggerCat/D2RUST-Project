@@ -129,10 +129,10 @@ fn gamble_prices() {
     t.items[h].gamble_cost = 999;
     let mut f0 = hax.clone();
     f0.format = 0;
-    assert_eq!(gamble_price(&t, &f0, 60, 0), 999);
+    assert_eq!(gamble_price(&t, &f0, 60, 0).unwrap(), 999);
     let r = index(&t, "rin");
     t.items[r].gamble_cost = 12345;
-    assert_eq!(gamble_price(&t, &pi(&t, "rin"), 60, 0), 12345);
+    assert_eq!(gamble_price(&t, &pi(&t, "rin"), 60, 0).unwrap(), 12345);
 }
 
 // Covers: specs/world/vendors.md §9.2 l2 r8, §9.2 l2 r13

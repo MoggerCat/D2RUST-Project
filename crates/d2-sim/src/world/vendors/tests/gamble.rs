@@ -167,13 +167,13 @@ fn open_and_drop() {
         tables: &t,
         seed: &mut seed,
     };
-    open(&mut c, &mut rec, &mut w, npc(), p(), true, true, 0);
+    open(&mut c, &mut rec, &mut w, npc(), p(), true, true, 0).unwrap();
     assert_eq!(rec.chain_node(PLAYER).map(|n| n.gamble_mode), Some(true));
     assert!(!rec.store_generated, "gamble open makes no store");
     let list = rec.gamble_lists[0].items.clone();
     // The list items are shown; a second open keeps the list.
     assert!(list.iter().all(|u| w.trade_inv.contains(&u.0)));
-    open(&mut c, &mut rec, &mut w, npc(), p(), true, true, 0);
+    open(&mut c, &mut rec, &mut w, npc(), p(), true, true, 0).unwrap();
     assert_eq!(rec.gamble_lists.len(), 1);
     assert_eq!(rec.gamble_lists[0].items, list);
     drop_list(&mut rec, &mut w, PLAYER);

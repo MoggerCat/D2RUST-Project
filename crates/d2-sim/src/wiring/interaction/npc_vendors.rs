@@ -106,8 +106,10 @@ where
             };
             let mut v = desk.vendors(Some(&mut *ctl));
             v.npc = Some(npc);
-            store::open(&mut c, rec, &mut v, npc, player, single, gamble, now);
-            v.take_npc_error()
+            match store::open(&mut c, rec, &mut v, npc, player, single, gamble, now) {
+                Ok(()) => v.take_npc_error(),
+                Err(e) => Some(e.into()),
+            }
         });
         ctl.seed = seed;
         match r {
@@ -289,12 +291,13 @@ where
         Some(self.on_record(class, |rec, v| trade::sell(t, rec, v, player, &m)))
     }
 
-    /// C→S 0x35 Repair (`vendors.md` §8.1).
+    /// C→S 0x35 Repair (`vendors.md` §8.1): the handler `0x0054BB60`
+    /// drops the routine's result, 0 for every 17-byte message (rule 7).
     pub fn repair(&mut self, player: UnitId, msg: &[u8]) -> Option<u32> {
         let m = RepairMsg::parse(msg)?;
         let t = self.desk.vendor_tables;
         match trade::repair(t, self, player, &m) {
-            Ok(v) => Some(v),
+            Ok(_) => Some(0),
             Err(e) => {
                 self.desk.state.errors.push(InteractionError::Price(e));
                 Some(0)

@@ -26,19 +26,19 @@
 | Outputs / state changes | 69–74 |
 | Rules | 75–76 |
 |   1. Unit kinds | 77–96 |
-|   2. Unit record | 97–135 |
-|   3. Lifecycle | 136–378 |
-|   4. Modes and mode schedules | 379–740 |
-|   5. Event dispatch | 741–755 |
-|   6. Events per kind | 756–878 |
-|   7. Scheduler inventory (`unit-events.tsv`) | 879–900 |
-|   8. Collision line between two units | 901–905 |
-| Constants & data dependencies | 906–922 |
-| Randomness | 923–930 |
-| Edge cases & original bugs | 931–951 |
-| Test vectors | 952–1011 |
-| Provenance | 1012–1079 |
-| Open questions | 1080–1159 |
+|   2. Unit record | 97–136 |
+|   3. Lifecycle | 137–379 |
+|   4. Modes and mode schedules | 380–741 |
+|   5. Event dispatch | 742–756 |
+|   6. Events per kind | 757–879 |
+|   7. Scheduler inventory (`unit-events.tsv`) | 880–901 |
+|   8. Collision line between two units | 902–906 |
+| Constants & data dependencies | 907–923 |
+| Randomness | 924–931 |
+| Edge cases & original bugs | 932–952 |
+| Test vectors | 953–1012 |
+| Provenance | 1013–1080 |
+| Open questions | 1081–1160 |
 <!-- /index -->
 
 ## Summary
@@ -120,6 +120,7 @@ offset seen in the 1.14d code named in the last column):
 | +0x50 | AnimData record | `formats/animdata.md` §5 | `0x00620F00` |
 | +0x5C | stat list | `sim/stat-lists.md` | `0x00625480` |
 | +0x60 | inventory | — | `0x00620F00` |
+| +0x64, +0x68, +0x6C | interaction GUID, type, active | PROVISIONAL: the reset's values at allocation (GUID −1, type 6, inactive, as `0x00554190`; because no allocation write is read yet); settled by: bin read of `0x00555230` | — |
 | +0x74 | quest chain | 0 at allocation, freed at removal | `0x005552FD`, `0x00555644` |
 | +0x80 | game | — | `0x005552B0` |
 | +0xA4 | hover text | event 6 (§6) | `0x00580B70` |
