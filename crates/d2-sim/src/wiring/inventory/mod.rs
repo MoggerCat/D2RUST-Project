@@ -35,6 +35,7 @@
 //! modules; an adapter maps a seam call to a provider call.
 
 pub mod bits;
+pub mod copy;
 pub mod host;
 pub mod inv_world;
 pub mod ops;
@@ -72,6 +73,9 @@ pub enum InvError {
     /// `0x0063BE30` found the body slot still holding an item after the
     /// unlink (the model clears cells only through §1.4 unlink).
     BodySlotHeld(UnitId, u8),
+    /// A step whose rule the spec does not write (named); the call stops
+    /// there.
+    Unwritten(&'static str),
 }
 
 /// The inventory state of a game: one [`Inventory`] per unit that owns

@@ -36,6 +36,7 @@
 pub mod cube_items;
 pub mod death;
 pub mod game_fields;
+pub mod item_records;
 pub mod item_stats;
 pub mod item_units;
 pub mod quest_host;

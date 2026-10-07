@@ -9,6 +9,7 @@
 mod belt;
 mod bits;
 mod buffer;
+mod copy;
 mod equip;
 mod gold;
 mod ground;
