@@ -527,7 +527,7 @@ fn without_waypoint_tables_0x49_stays_a_stub() {
 /// `monsters/ai.md` open question 12: the Npc command counter G is
 /// process-wide. `ProcessState` hands it to a new game and reads back
 /// what the game left; a fresh process starts at 0.
-// Covers: specs/monsters/ai.md §9.9
+// Covers: specs/monsters/ai-bodies.md §9.9
 #[test]
 fn process_state_carries_the_npc_walk_counter_across_games() {
     use super::super::ProcessState;
