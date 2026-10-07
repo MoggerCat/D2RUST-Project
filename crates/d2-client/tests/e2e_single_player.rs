@@ -897,6 +897,16 @@ struct Transcript {
 }
 
 /// A recording bridge frame.
+/// S→C 0x07 MapReveal of the room at tile (x, y) of `level`
+/// (`server-messages.tsv`: x u16 @1, y u16 @3, level u8 @5).
+fn map_reveal(x: u16, y: u16, level: u32) -> Vec<u8> {
+    let mut b = vec![0x07];
+    b.extend(x.to_le_bytes());
+    b.extend(y.to_le_bytes());
+    b.push(level as u8);
+    b
+}
+
 fn record(fx: &mut Fx, frames: &mut Vec<Frame>, msgs: Vec<Vec<u8>>) {
     let step = fx.step(&msgs);
     // Each received message is accounted once (`bridge.md` §6,
@@ -973,11 +983,17 @@ fn run_with(game_seed: u32) -> Transcript {
     assert!(!r.ticked);
 
     // Frame 2 (tick 1): the client's room change activates the rooms
-    // near the player's (`rooms.md` §4.1: 4 rooms); the room pass
-    // creates the DS1's preset monster at its sub-tile (`population.md`
-    // §11.1). No step sends.
+    // near the player's (`rooms.md` §4.1: 4 rooms) and sends one S→C 0x07
+    // per room of the player's adjacency array, in its order
+    // (`path-placement.md` §11 "Recipients"); the room pass creates the
+    // DS1's preset monster at its sub-tile (`population.md` §11.1).
     record(&mut fx, &mut frames, vec![]);
-    assert_eq!(frames[0].2, none);
+    assert_eq!(
+        frames[0].2,
+        [(8000, 8000), (8000, 8008), (8008, 8000), (8008, 8008)]
+            .map(|(x, y)| map_reveal(x, y, ISLE))
+            .to_vec()
+    );
     assert_eq!(fx.sim_ref().game.lists.active_rooms(0).len(), 4);
     let monsters = fx.monsters();
     assert_eq!(monsters.len(), 1, "the DS1 preset monster");
@@ -1565,8 +1581,10 @@ fn run_with(game_seed: u32) -> Transcript {
     // 27, 32, 33, 34), 0x9D four times (22, 23, 24, 34), 0x47 and 0x48
     // ten times each are applied (`client/msg-stats-items.md`). The 0x9C
     // made the three items it names; 0x9D needs the local player, which
-    // the server never announced (no 0x59 / 0x0B yet), so it changes
-    // nothing (§2 rule 3); nothing rejected or discarded.
+    // this staged game never announces (no 0x59 / 0x0B), so it changes
+    // nothing (§2 rule 3); the join's four 0x07 (frame 2) are rejected,
+    // fatal 0x58A (no client act: this staged game sends no 0x03);
+    // nothing discarded.
     let w = fx.bridge.world();
     let client = (w.frames, w.server_ticks, w.units.len());
     assert_eq!(client, (37, 36, 3));
@@ -1584,7 +1602,13 @@ fn run_with(game_seed: u32) -> Transcript {
         BTreeMap::from([(0x27, 1), (0x28, 1), (0x29, 1), (0x2A, 4)])
     );
     assert_eq!(log.handled, 31);
-    assert!(log.rejected.is_empty() && log.discarded.is_empty());
+    let rejected: Vec<(u8, String)> = log
+        .rejected
+        .iter()
+        .map(|r| (r.id, r.error.to_string()))
+        .collect();
+    assert_eq!(rejected, vec![(0x07, "fatal assert 0x58A".to_owned()); 4]);
+    assert!(log.discarded.is_empty());
     assert!(log.dropped.is_empty() && log.queued == 0);
 
     let player_mana = fx.stat(player, 8);

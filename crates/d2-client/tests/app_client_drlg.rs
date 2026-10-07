@@ -1,13 +1,17 @@
-// Spec: specs/client/model.md (§9, §11, §12), specs/render/composition.md (§4)
+// Spec: specs/client/model.md (§9, §11, §12), specs/render/composition.md (§4), specs/sim/path-placement.md (§13)
 //! The client DRLG in the play mode's wiring, headless: `add_game` +
-//! `add_client_data` over a link that delivers the single-player join in
-//! the order of `model.md` §11 rule 3 (0x01, 0x03, 0x59 at (0, 0), 0x0B,
-//! 0x07, 0x15, 0x04; the in-process server's session code does not send
-//! the join yet, `docs/HANDOFF.md` §2 step 4). The client builds its own
-//! act DRLG from 0x03 and the rooms 0x07 brings in sight; the local
-//! player's level is the level of its room.
+//! `add_client_data` over the app's own single-player game, whose
+//! session join (`d2_server::adapters::session::enter_game`) sends 0x59,
+//! 0x0B, 0x03, 0x07 and 0x15 with the first tick, followed by the room
+//! switch's 0x07s. The client builds its own act DRLG from 0x03 and the
+//! rooms 0x07 brings in sight; the local player's level is the level of
+//! its room. The recorded join (ignored test) is delivered by a scripted
+//! link in the recorded order (0x01, 0x03, 0x59 at (0, 0), 0x0B, 0x07,
+//! 0x15, 0x04; `model.md` §11 rule 3).
 
 use std::collections::VecDeque;
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::Arc;
 
 use bevy::prelude::*;
 use d2_client::app::play::{add_client_data, add_game};
@@ -18,6 +22,7 @@ use d2_client::bridge::{Bridge, BridgeResource};
 use d2_client::rules::OpenMode;
 use d2_client::world_view::WorldViewState;
 use d2_proto::PROTOCOL_VERSION;
+use d2_server::seams::Clock;
 
 /// Delivers one chunk list per pump (each pump a tick).
 struct Script(VecDeque<Vec<Vec<u8>>>, Vec<Vec<u8>>);
@@ -80,16 +85,33 @@ fn check_join(w: &ClientWorld, rejected: usize) -> u16 {
     own.level
 }
 
-// Covers: specs/client/model.md §12 r1, §11 r3, §11 r5
+/// The host clock, advanced by the test.
+struct StepClock(Arc<AtomicU32>);
+
+impl Clock for StepClock {
+    fn now_ms(&mut self) -> u32 {
+        self.0.load(Ordering::SeqCst)
+    }
+}
+
+// Covers: specs/client/model.md §12 r1, §11 r3, §11 r5, §9 r1; specs/sim/path-placement.md §13 r3
 #[test]
 fn the_join_builds_the_client_drlg_in_the_app() {
     let data = GameData::Synthetic;
-    // Cold Plains (level 3) is one 8 × 8-tile room at tile (0, 0).
-    let link = join(
-        "03 00 01 00 00 00 01 00 00 00 00 00",
-        "07 00 00 00 00 03",
-        "15 00 01 00 00 00 05 00 05 00 01",
-    );
+    // The app's own game on its server thread: the session join queues
+    // 0x59, 0x0B, 0x03, 0x07 and 0x15 for the first tick, whose room
+    // switch adds the 0x07s of the spawn room's adjacency array.
+    let ms = Arc::new(AtomicU32::new(1000));
+    let (mut link, started) = single_player::start(
+        data.clone(),
+        single_player::DEFAULT_SEED,
+        StepClock(ms.clone()),
+    )
+    .unwrap();
+    let player = started.player;
+    let server_pos = link
+        .with(move |l| l.host_mut().game.events.hooks().path_position(player))
+        .unwrap();
     let mut app = App::new();
     app.add_plugins((MinimalPlugins, AssetPlugin::default()))
         .init_asset::<Image>()
@@ -106,17 +128,54 @@ fn the_join_builds_the_client_drlg_in_the_app() {
         .resource_mut::<WorldViewState>()
         .feed
         .set_ui_open_mode(OpenMode::new(0).unwrap());
+    // Frame 1 starts the host's tick clock (no tick, nothing received).
     app.update();
+    assert!(app
+        .world()
+        .resource::<BridgeResource>()
+        .0
+        .world()
+        .act
+        .is_none());
+    ms.fetch_add(40, Ordering::SeqCst);
     app.update();
     let b = &app.world().resource::<BridgeResource>().0;
     let w = b.world();
-    let level = check_join(w, b.log().rejected.len());
-    assert_eq!(u32::from(level), single_player::COLD_PLAINS);
+    assert!(b.log().rejected.is_empty(), "{:?}", b.log().rejected);
+    // 0x03: act 0, the synthetic act's init seed (1), its town level 1,
+    // game +0x80 = 0 (the app game has no object control).
+    let act = w.act.expect("0x03 received");
+    assert_eq!((act.act, act.init_seed), (0, 1));
+    let d = w.drlg.as_ref().expect("client DRLG built");
+    assert_eq!((d.drlg.act, d.drlg.init_seed), (act.act, act.init_seed));
+    assert!(d.drlg.on_client);
+    // 0x59 + 0x0B: the local player; 0x15: placed where the server put it.
+    let me = w.local_player.expect("0x0B named the local player");
+    assert_eq!(me.guid, started.player_guid);
+    let own = w
+        .local_room()
+        .expect("the local player is in an active room");
+    assert_eq!(u32::from(own.level), single_player::ACT1_TOWN);
+    assert_eq!(w.player_level(), Some(own.level));
+    let pos = w.units[&me].position.expect("placed by 0x15");
+    assert_eq!((i32::from(pos.0), i32::from(pos.1)), server_pos);
+    // Game entry's 0x07 for the spawn room, then the room switch's for
+    // each room of its adjacency array (the synthetic town is one room).
+    let shown: Vec<_> = w
+        .rooms_in_sight
+        .iter()
+        .map(|r| (r.show, r.level, r.x, r.y))
+        .collect();
+    // The synthetic town room is at tile (16, 0).
+    assert_eq!(shown, vec![(true, 1, 16, 0), (true, 1, 16, 0)]);
     assert_eq!(
         w.active_rooms.as_ref().map(|r| r.len()),
         Some(1),
-        "the one room of the level"
+        "the one room of the town"
     );
+    // TODO(spec: tick.md §6 rule 4, `0x0061A460`): the server sends no
+    // 0x04, so the client is not in game.
+    assert!(!w.in_game);
     // The feed answers BlankScreen from the player's level's row (the
     // synthetic rows have BlankScreen 0).
     let state = app.world().resource::<WorldViewState>();
@@ -165,4 +224,56 @@ fn the_recorded_join_on_the_install() {
         d2_client::scene::present_palette(palettes.of(a))
             .unwrap_or_else(|e| panic!("{}: {e}", act_palette_path(a)));
     }
+}
+
+/// The session join of the app's game on the user's files: game entry in
+/// the Rogue Encampment (`sim/path-placement.md` §13: the town's spawn
+/// search), the client DRLG built from the 0x03 and the 0x07s, the local
+/// player in a level-1 room at the server's point. Prints the received
+/// 0x07 count (1 from game entry + the spawn room's adjacency array).
+///
+/// `D2_GAME_DIR=<install> cargo test -p d2-client --test app_client_drlg -- --ignored`
+// Covers: specs/sim/path-placement.md §13 r3; specs/client/model.md §12 r1, §11 r3
+#[test]
+#[ignore = "needs original game files in D2_GAME_DIR"]
+fn the_session_join_on_the_install() {
+    let dir = std::env::var("D2_GAME_DIR").expect("D2_GAME_DIR must be set");
+    let data = GameData::select(Some(std::path::Path::new(&dir)), false).unwrap();
+    let ms = Arc::new(AtomicU32::new(1000));
+    let (mut link, started) = single_player::start(
+        data.clone(),
+        single_player::DEFAULT_SEED,
+        StepClock(ms.clone()),
+    )
+    .unwrap();
+    let player = started.player;
+    let server_pos = link
+        .with(move |l| l.host_mut().game.events.hooks().path_position(player))
+        .unwrap();
+    let mut bridge = Bridge::new(link).unwrap();
+    bridge.set_drlg_source(Some(single_player::client_drlg_source(&data)));
+    bridge.set_tables(ClientTables {
+        levels: single_player::client_level_rows(&data),
+        ..ClientTables::default()
+    });
+    bridge.frame().unwrap();
+    ms.fetch_add(40, Ordering::SeqCst);
+    bridge.frame().unwrap();
+    assert!(
+        bridge.log().rejected.is_empty(),
+        "{:?}",
+        bridge.log().rejected
+    );
+    let w = bridge.world();
+    assert_eq!(w.act.map(|a| (a.act, a.town_level)), Some((0, 1)));
+    let me = w.local_player.expect("0x0B named the local player");
+    let pos = w.units[&me].position.expect("placed by 0x15");
+    assert_eq!((i32::from(pos.0), i32::from(pos.1)), server_pos);
+    assert_eq!(w.player_level(), Some(1));
+    println!(
+        "player at {pos:?}, {} rooms in sight: {:?}",
+        w.rooms_in_sight.len(),
+        w.rooms_in_sight
+    );
+    assert!(w.rooms_in_sight.len() >= 2);
 }

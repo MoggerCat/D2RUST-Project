@@ -732,8 +732,12 @@ fn waypoint_to_the_town_places_the_player_and_sends_0x0d() {
     // per-client update walks the client's room (still A) adjacency
     // before the room switch (`tick.md` §6.5), and step 6 clears C's
     // queue; the recording R3 (`path-placement.md`) has 0x15 the next
-    // tick. Spec question, not a fix here.
-    for _ in 0..3 {
+    // tick. Spec question, not a fix here. That room switch sends 0x07
+    // for each room of C's adjacency array the client joins
+    // (`path-placement.md` §11 "Recipients"; the one-room town: C), then
+    // nothing.
+    assert_eq!(fx.tick(), vec![(0, reveal.encode().to_vec())]);
+    for _ in 0..2 {
         assert!(fx.tick().is_empty());
     }
     fx.assert_clean();
