@@ -23,7 +23,7 @@
 - **Crate/module:** `d2-formats::d2s` (byte layout, checksum, section
   framing); the load effects (§9) belong to `d2-server` character
   storage.
-- **Related specs:** `formats/d2s-load.md` (new-character start and load
+- **Related specs:** `formats/d2s-appearance.md` (header +0x88..+0xA7, §2.8); `formats/d2s-load.md` (new-character start and load
   effects, §9 rules 6–7); `items/bitstream.md` (one item record, the
   per-item `JM` marker and socketed children); `world/quests.md` §1
   (quest flag records, load normalisation §1.6, NPC intro bits §6.7);
@@ -43,22 +43,22 @@
 | Inputs | 80–89 |
 | Outputs / state changes | 90–95 |
 | Rules | 96–97 |
-|   1. File layout and framing | 98–146 |
-|   2. Header (335 bytes) | 147–470 |
-|   3. Checksum (`0x00411130`) | 471–481 |
-|   4. Quest section (298 bytes at 0x14F) | 482–502 |
-|   5. Waypoint section (80 bytes at 0x279) | 503–508 |
-|   6. NPC flag section (52 bytes at 0x2C9) | 509–554 |
-|   7. Stats and skills | 555–647 |
-|   8. Item sections | 648–870 |
-|   9. Load sequence (`0x0056B180`) | 871–895 |
-|   10. Errors | 896–945 |
-| Constants & data dependencies | 946–965 |
-| Randomness | 966–970 |
-| Edge cases & original bugs | 971–1037 |
-| Test vectors | 1038–1077 |
-| Provenance | 1078–1171 |
-| Open questions | 1172–1263 |
+|   1. File layout and framing | 98–144 |
+|   2. Header (335 bytes) | 145–379 |
+|   3. Checksum (`0x00411130`) | 380–390 |
+|   4. Quest section (298 bytes at 0x14F) | 391–411 |
+|   5. Waypoint section (80 bytes at 0x279) | 412–417 |
+|   6. NPC flag section (52 bytes at 0x2C9) | 418–474 |
+|   7. Stats and skills | 475–567 |
+|   8. Item sections | 568–752 |
+|   9. Load sequence (`0x0056B180`) | 753–777 |
+|   10. Errors | 778–824 |
+| Constants & data dependencies | 825–844 |
+| Randomness | 845–849 |
+| Edge cases & original bugs | 850–916 |
+| Test vectors | 917–956 |
+| Provenance | 957–1036 |
+| Open questions | 1037–1173 |
 <!-- /index -->
 
 ## Summary
@@ -69,8 +69,8 @@ fixed-size quest, waypoint and NPC sections, then variable sections
 in an expansion game the hireling's items and the Iron Golem's item).
 All integers are little-endian. The game writes version 0x60 (96) and
 loads 0x5C–0x60 through the code in this spec; older versions (pre-1.09
-files) go to the legacy loader `0x00534020`, which is outside this spec
-(Open question 1). The file is at most 8,192 bytes.
+files) go to the legacy loader `0x00534020`, outside this spec (Open
+question 1). The file is at most 8,192 bytes.
 A 32-bit rotate-and-add checksum over the whole file (checksum field
 zeroed) and the file size in the header are both checked on load. This
 spec owns the byte layout and the loader's checks; the meaning of
@@ -127,10 +127,8 @@ in the specs listed above.
    cursor to reach the end after the last section (§10 rule 6).
 6. Version dispatch (`0x00534330`): fewer than 8 bytes, or u32 at 0 ≠
    0xAA55AA55 → result 9. Version (u32 at +4) < 0x5C → legacy loader
-   `0x00534020` (needs ≥ 0x82 bytes; pre-1.09 files, outside this spec:
-   Open question 1). That loader reads three emblem bytes from the
-   file into client +0x480..+0x482 (`0x00532997` → `0x005391C0`); this
-   spec's loader sets +0x480 from +0xCF and the other two to 0.
+   `0x00534020` (needs ≥ 0x82 bytes; pre-1.09 files, outside this
+   spec: Open question 1).
    Otherwise the loader of this spec, which rejects versions > 0x60
    (§2.2 rule 3).
 7. Measured (`tools/d2s_check.py`, Provenance): in every 1.14d save of
@@ -177,7 +175,7 @@ Written by `0x00568F20` into a zeroed 0x14F-byte block:
 | 0xA8 | 3 | town per difficulty | byte [game difficulty] = client act (0–4) OR 0x80; the other two bytes 0 |
 | 0xAB | u32 | map seed | game +0x7C |
 | 0xAF | 32 | hireling block | §2.5 |
-| 0xCF | u8 | client byte | client +0x480 (§2.2 rule 9; D2MOO: guild emblem colour; no single-player code sets it, Open question 7) |
+| 0xCF | u8 | client byte | client +0x480 (meaning not traced; D2MOO calls it guild emblem colour; Open question 7) |
 | 0xD0 | 127 | — | 0 |
 
 The writer returns without writing when the player has no client or
@@ -229,21 +227,10 @@ In this order; codes are internal (§10):
    +0x24; client create time := +0x2C; t = byte +0xA8 + game
    difficulty; client act := t & 0x7F, or 0 when that is ≥ 5. If t &
    0x80, game +0x6A = 3 and game +0x84 = 0: game +0x7C := u32 +0xAB
-   (the map seed of `sim/rng.md` §5.4; single player is game type 3
-   and +0x84 is 0 without `-seed`: `sim/rng.md` Open question 2).
+   (the map seed of `sim/rng.md` §5.4; Open question 9).
 9. The player unit is created, hotkeys and mouse skills are decoded
-   (§2.4), client +0x480 := +0xCF, +0x481 := 0, +0x482 := 0
-   (`0x0056A339` → `0x005391C0`); cursor := 0x14F; result 0.
-   Client +0x480..+0x482 are set only by the two loaders (`0x005391C0`
-   has no other caller) and read only by the save writer (+0xCF) and
-   by `0x00539BE0`, which runs when a client leaves the game
-   (`0x00539DA0`) and builds a character summary record: +0x02 11
-   component bytes and +0x0E 11 colour bytes (§2.8, colour 0 → 0xFF),
-   +0x0D class + 1, +0x19 level, +0x1A status (bit 0x08 := bit 0x04 set
-   and player mode 0 or 0x11), +0x1C client +0x45E, +0x1E..+0x20 the
-   three bytes +0x480..+0x482 (0 → 0xFF), +0x21 client +0x460. Where
-   that record goes is realm code (Phase 7, not traced). For the save
-   +0xCF only round-trips: a file's value is kept by every later save.
+   (§2.4), client +0x480 := +0xCF, +0x481 := 0, +0x482 := 0; cursor :=
+   0x14F; result 0.
 10. The client create time is set only by rule 8 (its one setter,
     `0x00538760`, has `0x0056A090` as its only caller). Rule 7 returns
     before it and the new-character start (`0x00569F80`) does not set
@@ -383,90 +370,12 @@ character's file was also 335 bytes before its first save).
    nothing equipped) has all 0xFF; the fresh saves have bytes only at
    the right-hand (+0x8D) and shield (+0x8F) slots (§2.1).
 3. A writer that builds a save of a loaded character must therefore
-   recompute these bytes from the equipped items (rules 4–10), not copy
-   them from the loaded file. Below, `comp[i]` = byte +0x88 + i and
-   `col[i]` = byte +0x98 + i (i = composite component, 0 HD … 15).
-4. **Walk** (`0x0063E510`): the player's inventory (unit +0x60; it must
-   carry the inventory magic 0x01020304, else nothing changes), its
-   item list in link order (`items/inventory.md` §1.4). Items whose
-   mode (unit +0x10) is not 1 are skipped. By the item's body location
-   (item data +0x44, `0x00627D40`):
-   - 1 (head), 4 (right hand), 5 (left hand): the item rule (rule 7),
-     unless the item's type (items +0x11E; the second type is not
-     tested) is equivalent to itemtype 75 `circ` (`0x00629B50`,
-     `data/runtime-maps.md`): then nothing;
-   - 3 (torso): the armour rule (rule 10);
-   - any other location: nothing.
-   A later item overwrites what an earlier item wrote.
-5. **Token table** (`0x0063D710`; built once per process, on first use;
-   255 slots {code, type}; slot 0 is never matched): slots 1, 2, 3 =
-   `lit `, `med `, `hvy `; n (next free) = 4. Then every items record
-   in table order (weapons, armor, misc: `data/field-types.md` §6.5),
-   with g = its `alternategfx` (+0x90), or its `code` (+0x80) when that
-   is 0:
-   1. g equals the code of a slot 1..n−1 → next record;
-   2. its type (+0x11E) is not equivalent to 45 `weap`, 3 `tors`, 51
-      `shld` or 37 `helm`, or is equivalent to 75 `circ` → next record;
-   3. s := n; while (the built-in type of slot s is equivalent to 45
-      and the record's type is equivalent to 45) or (the built-in type
-      of s is equivalent to 50 `armo` and the record's type is
-      equivalent to 50) or slot s is filled: s += 1. Then s ≥ 255 → s
-      := n. Slot s := {g, type}; n += 1 only when s = n.
-   The built-in types come from a fixed 256-entry {code, itemtype}
-   table in `Game.exe` (`0x00744CA8`; only the type is read). With the
-   1.14d itemtypes their classes are: slots 0–3 neither; 4–42 `armo`;
-   43–116 `weap`; 117 neither; 118–121 `armo`; 122–123 neither;
-   124–129 `armo`; 130–133 `weap`; 134 `armo`; 135–234 `weap`; 235–255
-   `armo`. Step 1 compares only slots below n, so a record that step 3
-   put above n does not stop a later record with the same g from
-   taking another slot (original behaviour). With the 1.14d tables n
-   ends at 98 (slots 1–97 filled, 98–116 empty) and 48 records land
-   above n (slots 117–134 and 235–254).
-6. **Lookup** (`0x0063D900`) of an items record: the first slot i in
-   1..254 whose code equals its `alternategfx` or its `code`; none → 0.
-   An `alternategfx` of 0 matches the first empty slot (98 with the
-   1.14d tables); every 1.14d items record has a non-zero
-   `alternategfx`, so only modded tables reach this.
-7. **Item rule** (`0x0063DA70`): k = the items record's `component`
-   (+0x115, `0x00628660`); t = lookup(item). t = 0: if k < 16,
-   comp[k] := col[k] := 0xFF; stop. Otherwise k := 5 when the item is
-   the inventory's component-5 pick, 6 when it is the component-6 pick
-   (`0x0063C050`, `sim/units.md` §4.7), else k stays; k ≥ 16 → stop.
-   comp[k] := t; the crossbow adjustment (rule 9); col[k] := the colour
-   of the item (rule 8).
-8. **Colour** (`0x0062C100(player, item, &col[k], 0)`,
-   `render/shading.md` §6 rule 4, world `Transform`): when that call
-   returns a palette map, col[k] := the byte it wrote + 1, that is 32 ×
-   `Transform` + c + 1 (`Transform` 1, 2, 5, 6, 7 or 8; c ≤ 20); when
-   it returns none, col[k] := 0xFF. The state branch of that rule
-   returns a map without writing the byte, so col[k] becomes its
-   previous value + 1 (0xFF + 1 = 0x00 when nothing wrote it before):
-   original behaviour, reproduced.
-9. **Crossbow adjustment** (`0x0063D930`, items at body location 4 or
-   5 only): w = the player's weapon class code (`0x0064F380`,
-   `combat/hit.md` §7.3). w = `xbw `, the item's `component` is 5 or 6
-   and the inventory has a component-5 pick P: comp[6] := lookup(P)
-   when > 0, else comp[6] := col[6] := 0xFF. w = `bow ` and `component`
-   6: the items record with code `lit ` (`0x00633640`) would give
-   comp[5] (0xFF in both bytes when its lookup is 0); 1.14d has no such
-   record, so nothing changes.
-10. **Armour rule** (torso branch of `0x0063E510`): a = the body
-    armour's items bytes `rArm`, `lArm`, `Torso`, `Legs`, `rSPad`,
-    `lSPad` (+0x116..+0x11B, `0x0063D690`). For c = 1 TR, 2 LG, 3 RA,
-    4 LA, 8 S1, 9 S2 (`0x0064F420`) the armtype index v is `Torso`,
-    `Legs`, `rArm`, `lArm`, `rSPad`, `lSPad` respectively (`0x0064F500`);
-    t = the slot whose code equals armtype record v's code (record
-    stride 0x34, code +0x20, `0x0065B620`): `lit ` 1, `med ` 2, `hvy `
-    3. When the armour's class id (unit +4, `0x00451F60`) is ≥ 1 and t
-    ≠ 0: comp[c] := t and col[c] := the armour's colour (rule 8);
-    else comp[c] := col[c] := 0xFF. (Class id 0 is `hax`, never a body
-    armour.) The other ten components are not touched.
-11. Measured (fresh saves, §2.1): comp[5] (+0x8D) is Amazon `jav` 0x1B,
-    Sorceress `sst` 0x25 (its `alternategfx` `bst` is the earlier
-    slot), Necromancer `wnd` 0x09, Paladin `ssd` 0x11, Barbarian `hax`
-    0x04, Druid `clb` 0x0C, Assassin `ktr` 0x2D; comp[7] (+0x8F) `buc`
-    0x4F; every col 0xFF (normal items, no colour source). Rule 5 run
-    on the 1.14d tables gives exactly these slots.
+   recompute these bytes from the equipped items, not copy them from
+   the loaded file. The per-item byte mapping (`0x0063DA70` and the
+   composite branch of `0x0063E510`) is Open question 17.
+4. The per-item mapping (token table, hand owners, body armour parts,
+   colour byte) is `formats/d2s-appearance.md` (Open question 17,
+   answered).
 
 ### 3. Checksum (`0x00411130`)
 
@@ -551,6 +460,17 @@ Read failures are internal code 16.
    size at +2 is not read.
 5. Measured on the fresh saves (no NPC talked to): all 48 bytes of A
    and B are zero.
+6. Which talks set A (the five rule 3 calls; class from the event
+   +0x14, u16 message id from +0x18; class → bit by rule 2): Act I
+   `0x0058F870`: 147 (0x2D, 0x2E), 148 (0x0B, 0x0C), 150 (0x18, 0x19),
+   154 (0x24, 0x25). Act II `0x005983E0`: 175 (0xD7), 177 (0x11D,
+   0x11E), 178 (0x107, 0x108), 198 (0xBE), 199 (0xCB, 0xCC), 200 (0xE6,
+   0xE7), 202 (0x112), 210 (0xF1, 0xF2). Act III `0x005B6C60`: 245
+   (0x1CA), 252 (0x1EA, 0x1EB), 254 (0x1F5, 0x1F6), 255 (0x202, 0x203),
+   264 (0x1DE, 0x1DF), 297 (0x1C5). `0x0058E990` (Act V): 512 (0x4E2E),
+   513 (0x4E45–0x4E47; then quest record 31 byte +0xC := 1 when it is 0
+   and +9 ≠ 0), 514 (0x4E55–0x4E57), 515 (0x4E61–0x4E63), 520
+   (0x4E23). No other class or message sets A.
 
 ### 7. Stats and skills
 
@@ -667,29 +587,13 @@ them); this list is a measurement, not a constant.
 4. count = (1 if there is a cursor item) + the number of list nodes
    with an item (`0x00531750`), minus 1 for each item that writes 0
    bytes. An item writes 0 bytes when its unit +0xC8 has bit 0x8000
-   (`0x005316D0`). No 1.14d instruction sets that bit on a server
-   unit: the export's only writes of +0xC8 with a register mask are
-   the generic setter `0x0045C430` (no callers, no pointer to it in the
-   image) and client-side code; every constant write uses other bits
-   (0x2, 0x20, 0x80, 0x200, 0x10000, 0x40000, 0x200000, 0x800000,
-   0x2000000). So a game-written save never skips an item this way
-   (Open question 11). (The other skip path of
+   (`0x005316D0`; meaning Open question 11). (The other skip path of
    `0x005316D0` depends on `0x00564CA0`, which always returns 1: dead.)
 5. An item that does not fit the remaining space is a fatal assert
    (`0x005316D0` asserts a 0-byte stream).
 6. If the caller's cache flag is set and the player data holds an
    uploaded item blob (+0x5C: size, bytes) that fits, the player list
-   is that blob copied verbatim (`0x005675E0`). The blob is the trade
-   snapshot (`PlrTrade.cpp`): `0x00566B30` writes the player's item
-   list into it (this same writer, 0x2000 bytes, cache flag 0) and keeps
-   the gold (stat 14) beside it; `0x00566BF0` frees it (the trade
-   commit `0x005679E0` calls it). The save routine `0x00532400` sets the
-   flag when the player has an active interaction (`0x00554100`) with
-   a unit of type 0 (another player: a trade) and passes it to all
-   three save paths (`0x00532340`, `0x00532240`, `0x00531EB0` →
-   `0x00569AD0` → `0x005697B0` → `0x00531BB0`); so a save during a
-   trade writes the pre-trade items. Single player has no second
-   player, so the flag is always 0 there.
+   is that blob copied verbatim (`0x005675E0`; Open question 12).
 7. Before the real write, the master writes all item sections once
    into a 32 KB scratch buffer (pass flag 1). With L = the scratch
    size of the player list, T = the scratch size of all item sections
@@ -743,16 +647,7 @@ them); this list is a measurement, not a constant.
    freed.
 5. A top-level item with the runeword flag (0x4000000) that no longer
    matches a runeword (`items/properties.md` §10.1) is passed to
-   `0x00563470(game, owner, item)`, which removes it (only when the
-   owner has an inventory) by the item's mode (unit +0x10): 0 (stored):
-   stored page := page (`0x00628250` → `0x00628320`), when the owner is a
-   player with a client a 0x9D action 5 with flag 0x20 is queued
-   (`0x0053D010`), then the item is removed and freed
-   (`0x0055DF10(item, 0)`, `world/cube.md`); 1 (equipped): its body
-   location (`0x0063C150`) goes to `0x00560CD0(location, 1, out)`, which
-   moves it to the cursor (`items/inventory-moves.md` §7.7; nothing when
-   a cursor item exists); 4 (cursor): consumed (`0x0055EEA0`); other
-   modes: nothing.
+   `0x00563470` (refresh by item mode; Open question 13).
 6. Errors inside the player list surface as internal 20 (`0x0056A7E0`).
 7. Item flags on load. Every save item (top-level, child, corpse,
    hireling and golem lists alike: `0x005335E0` at `0x00533665` /
@@ -790,9 +685,7 @@ them); this list is a measurement, not a constant.
    = 1: u32 unknown, u32 x, u32 y, then the corpse's item list (§8.1,
    cache flag 0).
 3. The first u32 is never assigned: it holds stack data (original bug;
-   d2rs writes 0). No 1.14d reader uses it: the loader skips the 12
-   bytes (rule 4) and the client's readers take only the header
-   (§2.7). x, y = the corpse's coordinates
+   d2rs writes 0, Open question 14). x, y = the corpse's coordinates
    (`0x0045ADF0`, `0x0045AE20`).
 4. Reader (`0x0056A830`), errors → 21 (with a sub-code for
    diagnostics): no client; fewer than 4 bytes; u16 ≠ 0x4D4A; n ≥ 2.
@@ -845,18 +738,7 @@ them); this list is a measurement, not a constant.
    entry (`0x006439F0`), else 23; read one item entry with its children
    (`0x0056ACE0`; failure → 23); the item gets mode 3 (`0x00624690`) and
    is handed to the client for the golem's re-summon (`0x00538700`,
-   rule 6). The cursor moves past the u8 even when g = 0.
-6. Re-summon. The loader stores the item's GUID in client +0x484
-   (`0x00538700`, at `0x0056AF03`). At game entry (`0x005394A0`,
-   `sim/intents-events.md`), when client +0x484 is neither 0 nor −1:
-   the item unit with that GUID (`0x00552F60(game, 4, GUID)`); found
-   and the player has a skill 90 entry (`0x006439F0`): l = that
-   entry's level (`0x006442A0(player, entry, 1)`), the item's x and y
-   := the player's (`0x00620470`, `0x006204C0` with `0x0045ADF0`,
-   `0x0045AE20`), the player's target := the item (`0x00620C10`), and
-   the skill do-core runs `0x0056F7F0(game, player, 90, l, 1, 0, 0)`
-   (`skills/use.md` §5.4): Iron Golem is cast on the saved item. Then,
-   found or not, client +0x484 := −1.
+   Open question 15). The cursor moves past the u8 even when g = 0.
 3. Measured: a save without an Iron Golem ends `6B 66 00`; that 0 is
    the file's last byte.
 4. Measured (`bdGolem`): a Necromancer saved with a live Clay Golem
@@ -931,11 +813,8 @@ them); this list is a measurement, not a constant.
 
 2. Before the master: bad magic or < 8 bytes → 9 (`0x00534330`); no
    file → no result (the caller's output stays 0, `0x005343A0`).
-3. The result goes to the client as S→C 0xB4 (`sim/intents-events.md`
-   load step 2); the client handler passes it to `0x0044E380`, which
-   keeps a code > 0x1C as 9 and stores it in `[0x007A05D4]` for the
-   error screen (`client/bridge.md` rule on 0xB4). The text shown per
-   code is not traced (Open question 16, recording list IT-5).
+3. The result values are what the game shows the player; their texts
+   are not traced (Open question 16).
 4. The file is read with a 0x2000-byte limit; a longer file is cut and
    then fails the checksum or size check (6 or 5).
 5. A wrong section order or a missing fixed section fails on that
@@ -1146,20 +1025,6 @@ and prints every field; it holds no save data.
   callers).
 - Second pass (DS questions of `docs/handoff/impl-d2s.md`, local run
   C66): addresses and saves in `formats/d2s-load.md` Provenance.
-- Third pass (PC 2 items lane, 2026-10-07; 1.14d export and
-  `re/exports/all.asm`): appearance `0x0063E510`, `0x0063DA70`,
-  `0x0063D710` (read in the disassembly), `0x0063D900`, `0x0063D930`,
-  `0x0063D690`, `0x00628660`, `0x00627D40`, `0x0064F420`, `0x0064F500`,
-  `0x0065B620`, `0x00451F60`, `0x0062C100` (return paths), built-in
-  token table `0x00744CA8` read from the image; the §2.8 rule 5 slot
-  numbers were computed from the 1.14d `patch_d2` weapons, armor, misc
-  and itemtypes `.txt` with a scratch script (not committed) and match
-  all eight measured bytes. Emblem bytes `0x005391C0`, `0x00539BE0`,
-  `0x00539DA0`; flag-ex writes: every `+0xC8` store in `all.asm`;
-  trade snapshot `0x00566B30`, `0x00566BF0`, `0x005675E0`, save flag
-  `0x00532400`, `0x00554100`; runeword removal `0x00563470`; golem
-  `0x00538700`, `0x0056AF03`, `0x005394A0` (`0x005396C8`–`0x0053974C`);
-  0xB4 client side `0x0044E380`; old-version branches `0x0062AE20`.
 - D2MOO 1.10f `PlrSave2.h`/`.cpp` (hint for names: `dwWeaponSwitch`,
   `dwCreateTime`, `nGuildEmblemBgColor`, `D2MercSaveDataStrc`,
   client save flags). Every rule above was read in the 1.14d code.
@@ -1178,7 +1043,7 @@ and prints every field; it holds no save data.
    bodies). Recording list `docs/handoff/pc2-rec-pc2-items.md` IT-1.
 2. ~~Item record decoding for save versions 0x5C–0x5F (the version is
    passed to `0x0062AE20` / `0x00558CB0`).~~ Struck (2026-10-07): the
-   record reader `0x0062CBE0` and `0x0062A970` branch on it in more
+   record readers `0x0062CBE0` and `0x0062A970` branch on it in more
    than 25 places (thresholds 0x51, 0x52, 0x56, 0x59, 0x5A, 0x5D,
    0x60). One fact read: the record peek `0x0062AE20` turns code `nec `
    into `neg ` when the version is < 0x5D. A 0x60 file, the only one
@@ -1202,32 +1067,37 @@ and prints every field; it holds no save data.
    (`world/hirelings.md` Open question 1). Still missing: a dead
    hireling (flags 0x10000) and a hireling carrying items (the `jf`
    item records).
-5. **Answered** (static, edge case 3): linking appends
-   (`items/inventory.md` §1.4 rule 1) and the loader places the items
-   in file order (§8.2), so after a load the item list is in file
-   order; §2.4 rule 6 resolves indices against that order. An index
-   written before the load names the item at that position of the old
-   link order (§8.1 rule 3 moves the hands after the rest), so it
-   points to another item when the old order differed from the file
-   order; after one load-and-save cycle the two orders agree and the
-   indices are stable. Conformance capture: recording list IT-3.
+5. Item index stability (edge case 3): a save with a hotkeyed Tome of
+   Town Portal and an equipped weapon, saved, reloaded and saved again.
+   **Answered from the binary** (`formats/d2s-load.md` §4): linking
+   appends, so the reloaded list is in file order (hands last); an
+   index can resolve to another item once, then stays stable until an
+   item is relinked. The save above is that file's Open question 3.
 6. **Answered** (§8.3 rules 6–7, edge case 12; bdDead, 1.14d): a
    dead softcore character whose corpse is on the ground at save time
    writes n = 1, a non-zero first u32 (stack data), x = y = 0, and its
    equipped weapon as the corpse list. Still untraced: whether x, y
    are 0 because the path is null or its position is 0 (no effect on
    load).
-7. **Answered** (§2.2 rule 9, `0x00539BE0`, `0x005391C0`): +0xCF is
-   copied to client +0x480 on load and back on save; only the two
-   loaders set it and only the leave-time summary `0x00539BE0` reads it
-   besides the writer. In single player it round-trips unchanged.
-8. ~~Ladder checks (§2.2 rule 5.2): the service object `[0x00883D54]`
-   and player +400.~~ Struck (2026-10-07): single player has no
-   service object, so the check never runs in Phases 0–6; it belongs
-   to the realm work (Phase 7). Recording list IT-4.
-9. **Answered** by `sim/rng.md` Open question 2 (static): single
-   player is game type 3 and game +0x84 is 0 without `-seed`, so a load
-   in the save's difficulty restores the map seed (§2.2 rule 8).
+7. Header +0xCF (client +0x480): any save with a non-zero byte there
+   (Battle.net-style emblem) or Ghidra on `0x00539BE0`. Every save of
+   this PC has 0.
+   **Answered**: set only from the file (setter `0x005391C0`, callers
+   `0x0056A343`, legacy `0x00532997`), written back by `0x005692A9`;
+   other readers are realm-only (`0x0052C9AB`, `0x0052CA84` need
+   `[0x00883D50]`; summary `0x00539BE0`). Kept as found.
+8. Ladder checks (§2.2 rule 5.2): the service object `[0x00883D54]`
+   and player +400 are not traced; single player never runs them.
+   **Answered**: dead. `[0x00883D50]`/`[0x00883D54]` (zeroed .data)
+   are written only by `0x0052C0E0`, which nothing calls, jumps to,
+   points to or exports; rule 5.2 never runs, results 25/26 never occur.
+9. Map seed restore needs game +0x6A = 3 and +0x84 = 0: confirm that a
+   single-player game has type 3 (`sim/rng.md` Open question 2): two
+   loads of one save produce the same map.
+   **Answered** (`formats/d2s-load.md` §7): single player has client
+   game type 0 → create message byte 3 (`0x00477CDF`) → game +0x6A = 3
+   (`0x00530CFF`); +0x84 = 0 without `-seed`. The seed is restored on
+   every load in the difficulty the save was written in.
 10. **Answered** (§6 rule 3): field A is the act intro quests'
     first-talk bits (D2MOO `pQuestIntroFlags`), set by `0x00572360`
     from its five direct calls `0x0058E9D4`, `0x0058EA25`,
@@ -1237,26 +1107,66 @@ and prints every field; it holds no save data.
     her bit set in A. Still
     unmeasured: the other Act I NPCs' bits (expected from the same
     table, §6 rule 2).
-11. **Answered** (§8.1 rule 4): no 1.14d server code sets item unit
-    +0xC8 bit 0x8000, so the writer's skip never fires on a game item.
-12. **Answered** (§8.1 rule 6, `0x00532400`, `0x00566B30`,
-    `0x00566BF0`): the blob is the trade snapshot, not an upload; the
-    flag is set while the player trades with another player, never in
-    single player.
-13. **Answered** (§8.2 rule 5, `0x00563470`): the item is removed by
-    mode (stored: freed with a 0x9D action 5; equipped: moved to the
-    cursor; cursor: consumed).
-14. **Answered** (§8.3 rule 3): no 1.14d reader uses it.
-15. **Answered** (§8.5 rule 6, `0x005394A0`): the GUID goes to client
-    +0x484 and the game entry re-casts Iron Golem on the item at the
-    player's skill-90 level. A save with an Iron Golem (still
-    unmeasured) checks the record bytes: recording list IT-7.
-16. ~~Result texts: the strings shown for results 1–26.~~ Struck
-    (2026-10-07): the code reaches `[0x007A05D4]` (§10 rule 3); the
-    screen that turns it into text is a further body. Recording list
-    IT-5.
-17. **Answered** (§2.8 rules 4–11, `0x0063E510`, `0x0063DA70`,
-    `0x0063D710`, `0x0063D900`, `0x0063D930`): the eight measured
-    weapon and shield slots match. Helm, body armour (TR/LG/RA/LA/S1/S2
-    bytes) and coloured items are not yet measured: recording list
-    IT-6.
+    **Answered** (§6 rule 6, switch tables `0x0058F8CC`, `0x00598490`,
+    `0x005B6CF4`, `0x0058EA2C`): the NPCs and message ids per act; the
+    measured Kashya bit matches. Other bits unmeasured.
+11. Item unit +0xC8 bit 0x8000 (items skipped by the writer, §8.1
+    rule 4): which items carry it.
+    **Answered**: none. Of all writes to +0xC8/+0xC9 in `all.asm`, no
+    immediate is 0x8000, server register writes are 0x200 / 0x800000
+    (`0x00542903`, `0x005679E0`, `0x00567B00`, `0x00567C70`), setter
+    `0x0045C430` is unreferenced, the rest are client code. The skip
+    never happens.
+12. Cache flag and the uploaded item blob (§8.1 rule 6): which callers
+    pass the flag (C→S 0x6C upload path).
+    **Answered**: the flag = "interacting with a player": `0x00532400`
+    (`0x00532437`–`0x00532464`) sets it when unit +0x6C ≠ 0 and interact
+    type +0x68 = 0, for all three writers (`0x00531EB0`, `0x00532240`,
+    `0x00532340`); then player data +0x5C (D2MOO `pTrade`: u32 size,
+    pointer) is copied (`0x00531BB0` → `0x005675E0`). Its filler (trade
+    code) is not traced; single player never sets the flag.
+13. `0x00563470` behaviour on a runeword item that no longer matches
+    (§8.2 rule 5).
+    **Answered except the equipped case** (`formats/d2s-load.md` §6):
+    a stored or cursor item is unlinked and freed (deleted); an
+    equipped one is unequipped by `0x00560CD0` with flag 0x20; its end
+    place is that file's Open question 2.
+14. Corpse first u32: whether any reader (client, realm) uses it; d2rs
+    writes 0.
+    **Answered** (`Game.exe`): unused. Readers: the loader skips it
+    (`0x0056A830`); `0x0043C8A0` reads the header, `0x0043CAA0` only
+    checksums, `0x0045C520` copies. Comparisons must mask these 4 bytes.
+15. Iron Golem item on load: how `0x00538700` and the re-summon use it.
+    Settle: a Necromancer with an Iron Golem made from an item. Still
+    missing: that save; none was produced automatically because it
+    needs a Necromancer able to cast Iron Golem (skill points and
+    level well past a fresh character). A Clay Golem save (`bdGolem`)
+    writes `kf` count 0 (§8.5 rule 4), so it does not settle this.
+    **Answered from the binary** (`formats/d2s-load.md` §3): the loader
+    keeps only the item's GUID (client +0x484); on joining,
+    `0x005394A0` finds that item, places it at the player and casts
+    Iron Golem on it at the skill's level with bonuses (`0x0056F7F0`),
+    then clears +0x484. Still unmeasured (needs that save).
+16. Result texts: the strings shown for results 1–26 (character
+    select error dialog).
+    **Answered** (`formats/d2s-load.md` §5): S→C 0xB4 carries the
+    result; the client maps it (`0x0045C7E8`) to a message index and
+    shows string `0x0070F384`[index]: ids 5359–5381, 10101, 10102 per
+    result (table there). Texts come from the user's string tables.
+17. Appearance byte mapping (§2.8 rule 3): which of the 16 component
+    and 16 colour bytes each equipped item sets, and to what value
+    (`0x0063DA70`, the composite branch of `0x0063E510` via
+    `0x0064F420`/`0x0064F500`/`0x0063D900`/`0x0062C100`, and the item
+    class from `0x00627D40`). Settle: Ghidra on those functions, checked
+    against saves with a weapon, a shield, a helm, a body armour and
+    dyed or coloured items equipped. Needed for a d2rs writer to
+    reproduce +0x88..+0xA7; the loader never reads them.
+    **Answered** (`formats/d2s-appearance.md`, from `0x0063E510`,
+    `0x0063DA70`, `0x0063D710`/`0x0063D900`, `0x0062C100`): component
+    byte = index of the item's `alternategfx`/`code` (body armour: the
+    `armtype` token of each of its six part bytes) in a 255-entry token
+    table built once from the item tables; helm → part 0, the hand items
+    → 5 (one-hander in use, or `component` 5) / 6, others their
+    `component`; colour = (`Transform` × 32 + colour) mod 256 + 1, or
+    0xFF. The rule reproduces all eight measured component values;
+    colours and armour still unmeasured (that file's Open question 2).

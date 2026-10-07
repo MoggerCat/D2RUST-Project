@@ -45,7 +45,7 @@
 | Edge cases & original bugs | 901–948 |
 | Test vectors | 949–966 |
 | Provenance | 967–993 |
-| Open questions | 994–1016 |
+| Open questions | 994–1020 |
 <!-- /index -->
 
 ## Summary
@@ -994,10 +994,14 @@ quest code draws.
 ## Open questions
 
 1. Status meanings per Act III quest (client quest log): settle with
-   `quests.md` open question 1.
+   `quests.md` open question 1. **Answered** (2026-10-07): `world/quests-status.md`: the client (0x52 `0x0045CC00` → `0x004A40D0` stores the list; row build `0x004A1950`, tables `0x00723F30` and the per-quest status tables) maps each status to a description string id, a replay speech id and an icon state (§4, §5); Act III tables §9; Blade (q 19) and Blackened Temple (q 21) exceptions §6.
 2. Answered (`quests-act3-2.md` §11.3): `&level` is an output, written at `0x00559AF8`
    before any read; the item level is the source monster's stat 12 or
-   the object's area level.
+   the object's area level. Confirmed again 2026-10-07 (QD-3, `quests-act4.md`
+   §4.7 and its open question 4): player → base stat 12, monster → total
+   stat 12, any other source → `levels.txt` `MonLvl` / `MonLvlEx` (by
+   difficulty) of its room's level (`0x0061DCA0`), ≤ 1 → 1, written at
+   `0x00559AF8` and read back as the item level (`0x00559C66`).
 3. Answered (`quests-act3-2.md` §11.4): mask 0x40 at `0x006CE280` on byte +0x0D = flag
    word bit 14, the `flying` column.
 4. Answered (`quests-act3-2.md` §11.4): type flags & 0x0E (superunique, champion,

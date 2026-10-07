@@ -505,6 +505,7 @@ fn real_use_table_facts() {
 /// minmana 1, no start / do function, srvmissile firebolt), Fire Ball L10
 /// 2,432, Teleport 6,144 / 1,280 / 0 / −1,280, Multiple Shot L10 (srvst 4;
 /// 4, +1, shift 8) 3,328.
+// Covers: specs/skills/use.md §5.1, §5.2 text
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn real_use_vectors() {
@@ -527,6 +528,7 @@ fn real_use_vectors() {
 /// `missiles.bin`: 684 records of 420 bytes, the count stored at offset 0
 /// (§R1.1); row 568's `pSrvHitFunc` holds 0xFDB4, read signed as none
 /// (§R1.3).
+// Covers: specs/missiles/missiles.md §r1-data-the-server-keeps-per-missile r1, §r1-data-the-server-keeps-per-missile r3
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn real_missiles_record_layout() {
@@ -634,6 +636,7 @@ fn every_missile_function_in_catalogue() {
 /// Activate 0, Accel 0, LevRange 0, and the per-row columns of the table;
 /// their creation speeds (§R10 consequence 5) and lifetimes in runs
 /// `Range + level × LevRange` (§R7.2).
+// Covers: specs/missiles/missiles.md §r10-behaviour-of-the-recorded-missiles text, §r10-behaviour-of-the-recorded-missiles r5, §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r5, §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r7, §r7-lifetime-and-expiry r2
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn real_recorded_missiles() {
@@ -800,6 +803,7 @@ const BARBARIAN: i32 = 4;
 
 /// `vitals.md` Constants: the charstats columns of the seven classes and
 /// `experience.txt` MaxLvl 99, level 1 → 500, level 99 → 3,837,739,017.
+// Covers: specs/combat/vitals.md §4.1
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn real_charstats_and_experience() {
@@ -847,6 +851,7 @@ fn real_charstats_and_experience() {
 
 /// `vitals.md` Test vectors: creation values of the Sorceress and the
 /// Barbarian, level 1 → 10, +10 vitality, +10 energy.
+// Covers: specs/combat/vitals.md §1, §2 text, §3 r1, §3 r2, §3 r3, §3 r4, §3 r5, §3 r6
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn real_vitals_vectors() {
@@ -911,6 +916,7 @@ fn real_vitals_vectors() {
 /// 99 (§1, §3): no panic; the level is `level_from_exp`, the maxima grow by
 /// the class's per-level columns × d (<< 6), statpts by StatPerLevel × d,
 /// newskills by d; and the thresholds bracket each level (§4.1).
+// Covers: specs/combat/vitals.md §1, §3 r1, §3 r2, §3 r3, §3 r4, §3 r5, §3 r6, §4.1
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn every_class_every_level() {

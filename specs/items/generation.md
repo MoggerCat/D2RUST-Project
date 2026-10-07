@@ -27,26 +27,27 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 52–66 |
-| Inputs | 67–105 |
-| Outputs / state changes | 106–118 |
-| Rules | 119–120 |
-|   1. Conventions | 121–224 |
-|   2. Seeds | 225–243 |
-|   3. Pipeline (`0x00558D90`, D2MOO `D2GAME_CreateItemEx`) | 244–286 |
-|   4. Base stats (`0x00557AB0`, D2MOO `D2GAME_InitItemStats`) | 287–334 |
-|   5. Special item kinds | 335–345 |
-|   6. Normal quality and class skill mods | 346–392 |
-|   7. Sockets | 393–424 |
-|   8. Ethereal | 425–445 |
-|   9. Forced requests, ears, names, timers | 446–471 |
-|   10. Items from a code: the create wrapper and start items | 472–542 |
-| Constants & data dependencies | 543–565 |
-| Randomness | 566–584 |
-| Edge cases & original bugs | 585–599 |
-| Test vectors | 600–615 |
-| Provenance | 616–642 |
-| Open questions | 643–660 |
+| Summary | 53–67 |
+| Inputs | 68–106 |
+| Outputs / state changes | 107–119 |
+| Rules | 120–121 |
+|   1. Conventions | 122–227 |
+|   2. Seeds | 228–246 |
+|   3. Pipeline (`0x00558D90`, D2MOO `D2GAME_CreateItemEx`) | 247–268 |
+|   4. Base stats (`0x00557AB0`, D2MOO `D2GAME_InitItemStats`) | 269–316 |
+|   5. Special item kinds | 317–327 |
+|   6. Normal quality and class skill mods | 328–374 |
+|   7. Sockets | 375–406 |
+|   8. Ethereal | 407–427 |
+|   9. Forced requests, ears, names, timers | 428–461 |
+|   10. Items from a code: the create wrapper and start items | 462–532 |
+|   11. Format-0 branches (legacy items) | 533–578 |
+| Constants & data dependencies | 579–601 |
+| Randomness | 602–620 |
+| Edge cases & original bugs | 621–635 |
+| Test vectors | 636–651 |
+| Provenance | 652–678 |
+| Open questions | 679–769 |
 <!-- /index -->
 
 ## Summary
@@ -137,10 +138,12 @@ The format is a u16 on the item. Generated items take the game's value
 **101 in an expansion game, 2 in a classic game**. Rules below test
 "format ≥ 1" (all generated items), "format ≥ 100" (expansion) and
 "format = 0". Format 0 occurs only on items decoded from old saves; the
-format-0 branches of the generation code (D2MOO's "Old" functions:
-`0x005C12F0`, `0x005C0D70`, `0x005C19A0`, `0x005C1E80`, `0x005C2740`,
-`0x005C2AF0`, `0x00556D80`, the old property table `0x00745B58`) are not
-specified (open question 1).
+format-0 branches of the generation code (D2MOO's "Old" functions) are
+§11 here (normal routine `0x00556D80`, class skill mods `0x005C0D70`,
+socket step), `items/quality.md` §10 (quality roll, low quality
+`0x005C2AF0`, unique, set `0x005C2740`), `items/affixes.md` §12
+(`0x005C12F0`, `0x005C19A0`, `0x005C1E80`) and `items/properties.md`
+§14 (the old property table `0x00745B58`).
 
 #### 1.3 Item record and type tests
 
@@ -183,11 +186,11 @@ specified (open question 1).
 | 0x100 | broken | forced (§9) |
 | 0x800 | socketed | §7 |
 | 0x1000 | nosell | forced |
-| 0x2000 | instore | every non-forced creation (§3 step 5) |
+| 0x2000 | instore | every non-forced creation (§3 step 5); **cleared** on every item created from a save-format record: the loader's item create `0x00558CB0` (`0x00558D44`–`0x00558D4C`; callers `0x005335E0` player / corpse / hireling lists, `0x0056ACE0` golem, `0x00541990`) and the item copy `0x0055A2A0` (copy and each child, `world/vendors.md` §7.3) |
 | 0x8000 | named | ears (§9) |
 | 0x10000 | is ear | ears (§6) |
 | 0x20000 | start item | forced |
-| 0x80000 | init | every creation |
+| 0x80000 | init | every creation; also **set** on every item created from a save-format record (`0x00558CB0`, `0x00558D37`–`0x00558D3F`; the same callers and the copy `0x0055A2A0`), after the reader `0x0062E430` stored the record's flags with 0x80000 removed. So a saved 0x00A02010 loads as 0x00A80010 in the item and is written back as 0x00A00010 (the writer drops 0x80000 and forces 0x800000, `items/bitstream.md` §2 rule 1) |
 | 0x400000 | ethereal | §8 |
 | 0x1000000 | personalized | (read: §9 step 5) |
 | 0x4000000 | runeword | `items/properties.md` §10 |
@@ -262,27 +265,6 @@ seeds).
 8. Primary type `play` (player body part) → §9 step 5.
 9. Flag 0x1000000 (personalized) set → §9 step 5 (name only).
 10. §9 step 6 (replenish timers). Return the item.
-
-**Simple creation** (`0x00559CE0`; vendors, quest rewards, inventory
-gifts): ECX source unit, EDX item index; stack game, spawn mode,
-quality, no-sockets, never-ethereal, level, use seed, seed, item seed
-(`ret 0x24`). Builds a zeroed request: unit, game, item, spawn mode,
-quality, seed, item seed as given; x, y, room 0; init flags 1; format :=
-the game's (+0x78); flags2 := 0x08 when no-sockets ≠ 0, | 0x02 when
-never-ethereal ≠ 0; ilvl := level, where level ≤ 0 becomes 1 at entry
-(`0x00559D08`). The code after that holds a unit-based default for
-level −1 (the level default below, inlined), but
-−1 has already become 1, so it never runs: a caller that wants the
-default computes it first. Then the pipeline (§3) with "use seed"; on
-success the item gets flag 0x10 (identified, `0x006280D0`).
-
-**Level default** (`0x00558200`, ECX unit, EDX level id): monster →
-its `level` total (stat 12); player → its base `level`; any other unit
-→ the area level (`0x0061DCA0`, `items/treasure.md` §4 step 2) of the
-level of the unit's room (`0x00620BB0`, `0x0061A1B0`), with the unit's
-game difficulty and expansion; no unit → EDX = 0 gives 1, EDX ≠ 0 is
-fatal (the game lookup `0x00554010` asserts on the null unit). A result
-< 1 becomes 1.
 
 ### 4. Base stats (`0x00557AB0`, D2MOO `D2GAME_InitItemStats`)
 
@@ -450,6 +432,14 @@ draw. Also used by property function 23 and craft lists
 2. Format 0 only: forced socket count (not specified, §1.2). Then flag
    0x800 := flags1 & 0x800; 0x100 := flags1 & 0x100; 0x20000 := flags1 &
    0x20000.
+   Scope (handoff `impl-items` OQ-G2, `gaps-items-stats` question 1,
+   re-read in `0x00558D90`): only the socket step is format-0; the three
+   flag copies (`0x00558F80`–`0x00558FB4`) run for **every** forced
+   request. The format-0 socket step (`0x00558F01`–`0x00558F60`): item
+   format 0, the item not of type 3 (`tors`), flags1 has 0x800 and the
+   item's flags do not → max sockets m (`0x0062BC20`); m = 0 → clear
+   flag 0x800; else socket count := (item data +0x10, the start seed,
+   mod m) + 1 (`0x0062BCB0`). No draw.
 3. Quantity: primary type `gold` → gold := request quantity (through the
    gold setter `0x00530EA0`); else set stat 70 := request quantity.
 4. max dur := min(request max dur, 255) (unsigned); min dur := min(min dur,
@@ -539,6 +529,52 @@ A scenario's `char item <code>` matches the original when it repeats
 placement of step 2.6 (find free). The start-item flag (step 2.5) is
 set only for charstats items. Placement at a given cell uses
 `0x00560200` with find free 0 and (x, y) (`items/inventory.md` §2.4).
+
+### 11. Format-0 branches (legacy items)
+
+Only `0x00530F40` (the version-0x47 save path) creates a format-0
+item, always with a forced request (Open question 1). In the pipeline
+the format-0 steps are: §9 rule 2's socket step; the quality roll
+(`items/quality.md` §10.1, drawn even though the request has a
+quality); the dispatched routine by quality (normal §11.1, low, unique,
+set: `items/quality.md` §10; magic, rare, crafted: `items/affixes.md`
+§12; superior and the magic routine itself have no format-0 branch of
+their own beyond the roller); every property application (§14 of
+`items/properties.md`); no ethereal roll and no automagic (format ≥
+100 only, `items/quality.md` §4 step 5).
+
+#### 11.1 Normal-quality routine (`0x00556F30` → `0x00556D80`)
+
+One branch, by the **primary** type (`0x0062B400`, no equivalence;
+jump table `0x00556E44` / `0x00556E5C`):
+
+1. `play` (7): file index := the request unit's class id if a request
+   unit is given, else request `index`; flag 0x10000.
+2. `char` (13): charm affixes (`items/affixes.md` §10).
+3. `book` (18): suffix slot 0 := the `books` row of `BookSpellCode`
+   (`0x005C2540`, EDX 0).
+4. `scro` (22): the same with `ScrollSpellCode` (EDX 1).
+5. `body` (40): file index as in 1, no flag.
+6. Any other type: class skill mods (§11.2 through `0x005C1260`), then
+   the socket roll (§7.1, `0x00556B60`). The finishing step runs §7.1
+   again for quality 2, so such an item draws the socket roll twice.
+
+#### 11.2 Class skill mods (`0x005C1260` → `0x005C0D70`)
+
+After `0x005C1260`'s class and skill-count tests (§6.2 step 1),
+format 0 calls `0x005C0D70`(item, request ilvl, first skill id), all on
+the item seed ("pct" = one step, lo′ mod 100):
+
+1. Count: pct ≥ 91 → 3; ≥ 71 → 2; ≥ 31 → 1; else stop. (No request
+   bonus.)
+2. Tier: ilvl ≥ 25 → 4; ≥ 19 → 3; ≥ 12 → 2; else 1 (no tier 5).
+3. For each mod: pct ≥ 81 → tier + 1; ≥ 31 → tier; ≥ 11 → tier − 1;
+   else tier − 2; < 1 → 1. Then draw skill := first + 5 × (t − 1) +
+   (lo′ mod 5), one step each, until it is not 73 and not a skill
+   already chosen by this call (no try limit, no `itypea1` test).
+   Value: pct ≥ 90 → 3; ≥ 60 → 2; else 1. **Set** stat 107 layer skill
+   := value in the item's (state 0, flags 0x40) list (`0x006257D0`,
+   created if missing).
 
 ## Constants & data dependencies
 
@@ -645,6 +681,26 @@ Real 1.14d vectors need the recording in Open questions 2.
 1. Format-0 generation branches (legacy items) are unspecified; confirm
    that no 1.14d creation path passes format 0 (check the 20 callers of
    `0x00558D90` for the value written at request +0x2A).
+   Partly answered (2026-10-07, disassembly of the 20 callers): 19
+   store the game's u16 +0x78 at request +0x2A (101 / 2, §1.2): 18
+   directly (`0x00559273`, `0x0055942F`, `0x005595B4`, `0x005597B6`,
+   `0x005599B3`, `0x00559C42`, `0x00559D2E`, `0x0055A5F6`, `0x0056601E`,
+   `0x0056D6D1`, `0x0056DB3A`, `0x0057A04E`, `0x00582B43`, `0x00583206`,
+   `0x00583536`, `0x005859FA`, `0x00585B1E`, `0x005AF4D0`), and
+   `0x00563FE0` through its request builder `0x0055E8E0`. The one
+   exception is `0x00530F40`, the legacy save path (version 0x47,
+   `items/bitstream.md` Open question 4): it copies +0x2A from the
+   legacy record's +0x42, which `0x00532F30` sets to 0 for records
+   without flag 0x100000 and to an 8-bit value read from the stream
+   otherwise. So format 0 is passed only for items of a version-0x47
+   save, as §1.2 states; the format-0 branches themselves stay
+   unspecified.
+   Answered (2026-10-07, disassembly of every format-0 branch): §11
+   (pipeline list, normal routine `0x00556D80`, class skill mods
+   `0x005C0D70`), `items/quality.md` §10 (quality roll, low quality,
+   unique, set), `items/affixes.md` §12 (affix roller, rare names, rare
+   routine, crafted rolls) and `items/properties.md` §14 (legacy
+   property table: 244 codes; codes 245–267 crash).
 2. No recording confirms any rule here. Needed: an item-creation trace
    (request R1 in the session report): every unit-seed and item-seed
    draw between the allocation and the return of `0x00558D90`, plus a
@@ -652,8 +708,61 @@ Real 1.14d vectors need the recording in Open questions 2.
    stat list entries).
 3. The meaning of request `spawn mode`/`init flags` values per caller
    belongs to `sim/units.md` and the treasure spec; not checked here.
+   Answered (2026-10-07, the stores to request +0x18 and +0x28 in all
+   20 callers of `0x00558D90` and in the builders they use): init flags
+   (+0x28) are 1 in every request. Spawn mode (+0x18) is 3 (ground) for
+   `0x00559130`, `0x00559300`, `0x005594C0`, `0x00559630`,
+   `0x00559830`, `0x00559A30`, `0x0055A550`, `0x0056DAB0`,
+   `0x00582AC0`, `0x005830E0`, `0x00583410`, `0x00585970`,
+   `0x00585A80`, `0x005AF300`; 4 (inventory) for `0x00565AB0` (cube),
+   `0x0056D5F0`, `0x00563FE0` (builder `0x0055E8E0`) and `0x00559CE0`
+   (its second argument, 4 from all seven callers); the source item's
+   mode (unit +0x10, builder `0x00558270`) for `0x00579D60`; the legacy
+   record's byte +0x0A for `0x00530F40`. What mode 3 / 4 with init flag
+   1 do at allocation is `sim/units.md` §3.1 (step 8 for mode 3, as
+   `items/treasure.md` §7 rule 4 quotes).
 4. §10.3: does any 1.14d path create start items for a loaded
    character? Name the out flag of `0x00532690` that sends the parser to
    `0x00532590` (D2MOO: the new-character branch), and what
    `0x005345A0` and `0x0056B180` are (character creation, ladder or
    realm paths).
+   Answered (2026-10-07, disassembly): no loaded character of a
+   current save gets start items. The three ways to `0x00534F10`:
+   - `0x0056B180` (load sequence of saves ≥ 0x5C, `formats/d2s.md` §9)
+     → `0x00569F80` only for the 335-byte new-character stub (result 2
+     with the cursor at the end; `formats/d2s-load.md` §1).
+   - `0x005345A0` (player creation, only caller `0x00539804` in
+     `0x00539760`) → `0x00532590` when its load flag (second stack
+     argument, `0x005345BF` / `0x005345E2`) is 0. `0x00539760` passes
+     its own first stack argument: 1 from the join `0x005301E4`; 0 from
+     `0x0053A3D4` (`0x0053A2F0`) and `0x0053A4CF` (`0x0053A420`), two
+     act-change re-creations that have no callers in 1.14d (dead code).
+   - `0x00534020` (save versions ≤ 0x5B, `tools/original-hooks.md` §5.3)
+     → `0x00532590` when the header reader `0x00532690` (only caller
+     `0x00534080`) sets its out flag (third stack argument, kept at
+     ebp−0xA8): to 1 when bit 0 of the legacy header's status dword
+     (+0x18) is set (`0x005329A2`–`0x005329B2`; the bit is then cleared
+     in the copy), and, only with host callbacks (`0x00883D50` ≠ 0),
+     for a wrong magic (`0x00532738`), a header size ≠ 0x82
+     (`0x0053276D`) or a version outside 0x47..0x60 (`0x00532BBC`); a
+     name mismatch clears it (`0x005327EA`). In single player
+     (`0x00883D50` = 0) only the legacy status bit 0 makes the legacy
+     loader start a new character (with start items) instead of reading
+     the file's sections.
+5. Answered (handoff `impl-items` OQ-G2, `gaps-items-stats` question 1):
+   §9 rule 2, only the socket count is format-0; the flag copies run for
+   every forced request (`0x00558F80`–`0x00558FB4`).
+6. Answered (handoff `mutants-items-treasure` MT2): §3 step 9 is dead
+   inside the pipeline. It tests the item's own flags (`0x00628110` at
+   `0x0055906B`), which no step 1–8 can give 0x1000000: allocation
+   starts from 0, the forced copies take only 0x10, 0x1000, 0x800,
+   0x100, 0x20000 (and 0x8000 for ears), and the only `0x006280D0(…,
+   0x1000000, 1)` in the exports is `0x00579D60` (the NPC
+   personalization service, `world/npc.md`), which runs on an existing
+   item. A d2rs test of the name step must build the flag by hand.
+7. Answered (handoff `gaps-items-stats` question 2): §4 rule 5, the
+   quest-difficulty step (§5.3) runs only inside the "quest and a request
+   is given" branch of `0x00557AB0` (both arguments tested together
+   before the dispatch `0x00557450`; the stat 356 set and the
+   identified flag follow inside the same branch). Without a request
+   neither the dispatch nor §5.3 runs.

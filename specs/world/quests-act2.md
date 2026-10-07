@@ -44,7 +44,7 @@
 | Edge cases & original bugs | 854–887 |
 | Test vectors | 888–908 |
 | Provenance | 909–931 |
-| Open questions | 932–998 |
+| Open questions | 932–1006 |
 <!-- /index -->
 
 ## Summary
@@ -815,7 +815,7 @@ Its trigger code `trs ` is not an item code in the 1.14d tables
 | palace guard AI `0x005E7590` | `0x0059B8B0`, `0x0059B8F0`, `0x0059AEC0` | guard at end position (+0x18, +0x19 clear and +0x40 = 2; true without chain 11); guard target (+0x30, +0x34, y − 4 with +0x19); blocker open (+0x40 = 2) |
 | Jerhyn / palace NPC logic `0x0059F580` | `0x0059D7C0`, `0x0059D7E0`, `0x0059B820` | chain 13 not-intro with state < 2 → 0 else 1; not-intro with state 1; a player without 14.0, 14.1 within 30 of the blocker (`0x005DC5C0` < 31): +0x1A := 1, +0x1C := GUID |
 | `0x0059F510` | `0x0059DFB0` | chain 13 not-intro with state < 4 → 0, else 1 |
-| Tyrael AI `0x005E73A0` | `0x0059DF50`, `0x0059C750` | +0x3D → true; +0x0F → true when no living player is within 12 (`0x006416D0`); else false. `0x0059C750` runs the §8.11 flag iterate for all |
+| Tyrael AI `0x005E73A0` | `0x0059DF50`, `0x0059C750` | +0x3D → true; +0x0F → true when no living player is within 12 (`0x006416D0`); else false. Exactly (2026-10-07): chain 13 record absent → false; +0x3D ≠ 0 → true; +0x0F ≠ 0 → +0x40 := Tyrael, +0x44 := 0, then for every player without state 7 (`0x005538D0`, callback `0x0059DF30`): d := `0x006416D0(player, Tyrael)` < 12 → +0x44 := 1; result = (+0x44 = 0). `0x006416D0` is the size-adjusted distance of two units (`missiles/missiles.md` §R9.5 item 4) and takes no radius: a host seam bound to it is a distance (`distance_between(a, b)`), and the "< 12" and the living-player loop belong to the caller (a `living_player_within(unit, radius)` seam must be built from both, not bound to `0x006416D0` alone). `0x0059C750` runs the §8.11 flag iterate for all |
 | monster class hook `0x005447A0` | `0x0059B6C0`, `0x0059B6D0` | jerhyn / act2guard2: bare `ret` |
 | cube (`world/cube.md` §8) | `0x0059E5C0` | §4.9 |
 | item use | `0x0055E170` | §3.8 |
@@ -932,7 +932,7 @@ their own item seeds. No other Act II quest code draws.
 ## Open questions
 
 1. Status meanings 1–13 per Act II quest (client quest log): settle with
-   `quests.md` open question 1.
+   `quests.md` open question 1. **Answered** (2026-10-07): `world/quests-status.md`: the client (0x52 `0x0045CC00` → `0x004A40D0` stores the list; row build `0x004A1950`, tables `0x00723F30` and the per-quest status tables) maps each status to a description string id, a replay speech id and an icon state (§4, §5); Act II tables §8; Seven Tombs rows 5–7 and the tomb symbol §4 rule 2, §5 rule 6.
 2. `0x00545850` (quest-chest gate) and `0x00585B90` (chest treasure):
    their exact tests and draws belong to the object spec; until written,
    record one chest opening (packets + RNG).
@@ -949,10 +949,18 @@ their own item seeds. No other Act II quest code draws.
 7. ~~`0x00538680(client, 2, difficulty)`~~ Answered:
    `quests-act1-rest.md` §5 (client +0x0A bits 8–12, step 2).
 8. Init 37 (`0x0059DA50`) has no `objects.txt` user in 1.14d; confirm no
-   preset spawns an object through it.
+   preset spawns an object through it. **Answered** (2026-10-07): the init table
+   `0x00731BC0` is read only by `0x0054F5D0` (`0x0054F6A7`,
+   `0x0054F6E6`), indexed by the `objects.txt` record's `InitFn`
+   (+0x1B1); entry 37 (`0x00731C54`) is the only pointer to `0x0059DA50`
+   and no rel32 call reaches it (`disasm.py xref`); no live 1.14d row
+   (d2data, d2exp, patch_d2) has `InitFn` 37. So no object runs it.
 9. `quests.tsv` column `spec` still says `catalogued` for Act II rows;
    switch it to `specified` (with a link to this file) once
-   `quests.md` §2.4 documents a second owner file.
+   `quests.md` §2.4 documents a second owner file. **Answered** (2026-10-07):
+   §2.4 names the owner per act; rows 8–16 and 38 switched to
+   `specified` (quests-fixups CODE-TABLE commit); the row addresses part
+   1 does not name are in `quests-act2-2.md` §4.
 10. Record a full Act II run (packets + RNG, `docs/HANDOFF.md` §5) to
     confirm message order: chat-end status, kill timers, Tyrael's
     portal, Meshif's completion.
