@@ -85,7 +85,7 @@ own sections are written "load §1", "load §2".
    | corpse | a corpse unit of the player's class with its item list (placed with `0x00531520`), linked to the player | `0x0056A830` | §8.3 |
    | hireling | hireling restored from the header block | `0x0056AA50` | `world/hirelings.md` §10 |
    | hireling items | the hireling's item list, then `world/hirelings.md` §10 rule 8 | `0x0056AC10` | §8.4 |
-   | golem | Iron Golem item (skill 90 check), mode 3, handed to the client | `0x0056AE50` | §8.5; Open question 15 |
+   | golem | Iron Golem item (skill 90 check), mode 3, handed to the client | `0x0056AE50` | §8.5 rules 2 and 6 (re-cast at game entry, `0x005394A0`) |
    | post-load | gold limits, stamina, item indices → GUIDs, mouse skills selected, hitpoints and mana restored, stats 67–69 and 30 | `0x0056AF80`, `0x0056AF20`, `0x005701B0` | §9 rule 4, §2.4 rule 6 |
 
    The player's game entry after a successful load (the quest entry
@@ -138,5 +138,7 @@ the owner specs' (`items/generation.md` §10.3).
 
 ## Open questions
 
-1. None of its own; see `formats/d2s.md` Open questions 15 (golem item)
-   and 17 (appearance bytes).
+1. None. `formats/d2s.md` Open questions 15 (golem item) and 17
+   (appearance bytes) are answered there (§8.5 rule 6, §2.8 rules
+   4–11); their remaining measurements are recording list IT-6 and
+   IT-7.
