@@ -32,6 +32,8 @@ rects (town of `bdBar`: level 1 at tiles (1200, 960) 56 × 40, Blood Moor
 |---|---|---|---|---|---|
 | 1 | monster kill with item drop | **done** | `kill1-spawn.jsonl` (spawn-raw-1), `kill1-spawn-packets.jsonl` (packets-raw-1, 40,284 events) | `check_rng.py`: OK (46 inline draws, 0 unresolved, 7 `chain_unexplained`, 10 draw sites); `check_packets.py`: **6 failures**, all `s2c id 0x3e size 34 != rule 7 (R5)` (finding F1) | see "Item 1" |
 | 7 | Kick / Bash on a monster | **Bash done; Kick blocked** | same files | as item 1 | see "Item 7" |
+| 12 | weather-0001 (Rogue Encampment in rain) | **done (recorded; it rained)** | `wx1-frames.jsonl` (frames-raw-2 + `weather_pools`), PNGs `captures\20261007-084753\` (1,851) | `record_frames.py --selftest` ok; recorder verdict `stability: 0 state keys seen twice or more … NOT ENOUGH` (expected: rain, cursor and the player seed change every frame); no `weather-0001` case file exists to verify against | see "Item 12" |
+| 13 | draw-order OQ7 (`TownE1` tile (950, 933) of run 2) | **blocked (cells not reachable on screen)** | `oq7-frames.jsonl`, PNGs `captures\20261007-085541\` (856; draws every 20th) | recorder verdict `NOT ENOUGH` (walking) | see "Item 13" |
 
 ## Item 1: kill with drop
 
@@ -72,6 +74,56 @@ seeds (game seed before / after the call, room seed) are in the
   would need an injected C→S 0x3C select of skill 1 (`run_scenario.py`
   can inject, but cannot spawn yet) — a message no unmodified client
   sends, so it was not done.
+
+## Town variants of the saves (spawn.py `--status`, `-nosave`)
+
+Level 1 / level 2 rects (tiles) give the exit side: `bdAma`, `bdSor`,
+`bdDru` town (1064, 928) 56 × 40, Blood Moor (1120, 920) 56 × 96 (east
+exit; bridge seen: **`TownE1`**, start (5473, 4708)); `bdBar` (1200, 960),
+Blood Moor (1160, 1000) (south gate); `bdNec` (768, 1032) / (824, 1024)
+(east); `bdPal` (1024, 1208) / (968, 1160) (west); `bdAss`, `bdDead`
+(1104, 1080) / (1064, 1120) (south); `bdMerc`, `ScnSor`, `ScnAma`
+(864, 912) / (920, 904) (east). (`-name` loads the save's own map.)
+
+## Item 12: weather-0001
+
+`bdAma` (`TownE1`), `record_frames.py --seconds 420 --every 5
+--draws-every 40 --weather` (new option, draw-order-2.md §11.1): 1,851
+captured frames (every 5th in-game frame, server frames 2–9342), 232 with
+the full draw list. **It rained**: rain flag on in every frame; target /
+particle count rose to 255 (particles live in frames 6–4279), then the
+rain cycle ended (target 0, particles 0 from about frame 4279); rain
+phases 0–3 seen; lightning never on. Splashes were live in 159 frames
+(frames 2980–3792, walking along the river bank and the bridge); bubbles
+never. **W5 answered by observation:** every one of those 159 frames had
+int(intensity) = 0 (intensity is at most 0.99609375 = 255/256), so
+splashes do appear while int(intensity) is 0. Player seed per frame
+(`seed_start`, `seed_end`): every one of the 1,851 transitions is reached
+by stepping the D2 RNG (0 unresolved); steps per frame mostly 12 (426
+frames; e.g. dry town), 0 (109), 25, 21, 4, and ~100–131 during full rain.
+Example pair (frames 6 and 9, `frame-0000002.png`, `frame-0000003.png`):
+seeds `[2268541034, 812154327]` → `[2669174633, 946191154]` and
+`[658306235, 1655926658]` → `[1583635139, 1518167455]`. Not done: the
+pass 4 / 9 pixel compare (no scene source is wired, `render-capture.md`)
+and the water-floor count per frame (the draw records carry no floor
+material).
+
+## Item 13: draw-order OQ7
+
+`bdAma`'s town is `TownE1` (bridge east of the start, Blood Moor east) at
+origin (1064, 928), so the three cells local (48, 36…38) are level tiles
+(1112, 964…966) (run 2's (952, 932…934) moved by the origin).
+`record_frames.py --seconds 400 --every 10 --draws-every 20`, walked to
+both sides: inside the town the south palisade (local y 28) stops the
+player at subtile y 4780 (closest point tile (1111, 956)); the cells are
+then ~10 tiles down-screen (dx + dy ≈ 10, the 800 × 600 view shows about
+± 6.5); from the east bank in Blood Moor (tile (1122.4, 962.6), via the
+bridge and south) they are ~10 tiles left (dx − dy ≈ −12, the view shows
+± 5). The strip between the palisade and the river that holds the cells
+was not reachable. Blocked: needs another seed / variant whose cells are
+on a walkable spot (the survey counts such cells in every Act 1 town
+variant; the other variants' cell positions are not in the specs), or a
+camera-only capture.
 
 ## Findings
 
