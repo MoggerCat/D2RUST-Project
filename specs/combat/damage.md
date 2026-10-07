@@ -30,17 +30,17 @@
 |   2. Pipeline | 139–153 |
 |   3. Rolling: `start_combat` = `0x0057DBF0` | 154–293 |
 |   4. Totals and resistances: `totals` = `0x0057C1E0` | 294–385 |
-|   5. Application | 386–575 |
-|   6. Hit class and hit recovery | 576–606 |
-|   7. Reaction and death trigger | 607–698 |
-|   8. Event functions (table `0x007325B0`, 32 entries) | 699–762 |
-|   9. Durability `0x0057D3D0` | 763–784 |
-| Constants & data dependencies | 785–806 |
-| Randomness | 807–839 |
-| Edge cases & original bugs | 840–874 |
-| Test vectors | 875–907 |
-| Provenance | 908–933 |
-| Open questions | 934–981 |
+|   5. Application | 386–576 |
+|   6. Hit class and hit recovery | 577–607 |
+|   7. Reaction and death trigger | 608–699 |
+|   8. Event functions (table `0x007325B0`, 32 entries) | 700–763 |
+|   9. Durability `0x0057D3D0` | 764–785 |
+| Constants & data dependencies | 786–807 |
+| Randomness | 808–840 |
+| Edge cases & original bugs | 841–875 |
+| Test vectors | 876–908 |
+| Provenance | 909–934 |
+| Open questions | 935–984 |
 <!-- /index -->
 
 ## Summary
@@ -510,7 +510,8 @@ registered on `unit` for `event` (`events.txt` index: 0 hitbymissile,
 functions through `itemstatcost` `itemevent1/2` + `itemeventfunc1/2`;
 skills register their own. Function table §8. Handler records,
 registration (prepend) and unregistration: `skills/bodies.md` §2.13;
-iteration: §2.18 there. The functions also receive EDX = the event id.
+iteration: §2.18 there, and `sim/units.md` §6.6 (newest first). The
+functions also receive EDX = the event id.
 
 #### 5.5 Stun `0x0057AAE0`
 
@@ -678,7 +679,7 @@ ECX game, EDX victim D; stack killer A, flag (1 at every caller except
    bookkeeping `0x005751A0(game, owner, D)` (`world/hirelings.md` §8
    rule 1, `sim/pets.md`). Other types (and no D) → stop.
 2. A present: experience `0x005A4EF0`: D unit flags lack 0x04000000 →
-   distribution `0x0057E990(game, A, D)` (`combat/vitals.md` §4.3). Arena
+   distribution `0x0057E990(game, A, D)` (`combat/vitals.md` §4.4). Arena
    kill event `0x0053F720(game, A, D)` (`sim/intents-events.md`). D's
    class < monstats count (unsigned; a player victim's class 0–6 passes
    too) and A a player → `0x0066A220(A, D's class)`: an empty stdcall
@@ -947,7 +948,9 @@ Real 1.14d data (`#[ignore]`): the resistance rows of §4.3 equal
    (`monsters/ai.md` §3). `0x0066A220(killer, class)` is an empty stub
    (`ret 8`, §7.2 step 2).
 4. Answered: registration, unregistration and iteration of unit events
-   are `skills/bodies.md` §2.13 and §2.18.
+   are `skills/bodies.md` §2.13 and §2.18; the record list
+   (`0x005C0C30`, add `0x005C0AD0`, newest first) is also
+   `sim/units.md` §6.6.
 5. Answered: every event function other than 15 and 16 is
    `combat/events.md`.
 6. Answered statically: `0x0088CAD0` is read and written only by

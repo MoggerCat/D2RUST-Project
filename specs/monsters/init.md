@@ -49,19 +49,19 @@
 |   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 739–753 |
 |   22. Umod callbacks and the type-7 event | 754–805 |
 |   23. Unique names (client) | 806–815 |
-|   24. Monster assign message | 816–828 |
-|   25. Calling the spawn functions outside population (tools) | 829–919 |
-|   26. Making an existing monster unique (`0x005A4940`) and the warping shrine's pick | 920–978 |
-|   27. Class reinit (`0x00574370`) | 979–1024 |
-| Constants & data dependencies | 1025–1046 |
-| Randomness | 1047–1089 |
-| Edge cases & original bugs | 1090–1120 |
-| Test vectors | 1121–1122 |
-|   Synthetic (CI-safe) | 1123–1145 |
-|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1146–1176 |
-|   Recorded checks (monster assign 0xAC) | 1177–1189 |
-| Provenance | 1190–1268 |
-| Open questions | 1269–1325 |
+|   24. Monster assign message | 816–831 |
+|   25. Calling the spawn functions outside population (tools) | 832–922 |
+|   26. Making an existing monster unique (`0x005A4940`) and the warping shrine's pick | 923–981 |
+|   27. Class reinit (`0x00574370`) | 982–1027 |
+| Constants & data dependencies | 1028–1049 |
+| Randomness | 1050–1092 |
+| Edge cases & original bugs | 1093–1123 |
+| Test vectors | 1124–1125 |
+|   Synthetic (CI-safe) | 1126–1148 |
+|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1149–1179 |
+|   Recorded checks (monster assign 0xAC) | 1180–1192 |
+| Provenance | 1193–1271 |
+| Open questions | 1272–1328 |
 <!-- /index -->
 
 ## Summary
@@ -817,7 +817,10 @@ first). Superuniques use their `Name`. Display only; no sim effect.
 
 Creation sends nothing. Message 0xAC (`server-messages.tsv`, built by
 `0x0053E2E0`) goes out with the unit update queues (`sim/unit-order.md`
-§6). Init-owned fields in it: class, life byte (last_sent_hp_pct, 128
+§6). Header (byte offsets): 0 = 0xAC, 1 GUID u32, 5 class u16, 7 x u16,
+9 y u16 (`0x006488C0` / `0x00648900`), 11 life byte (`0x005A5650`), 12 total
+length u8 (written last, `0x0053E818`; the size rule `u8@12`), 13 the
+bit stream below (buffer 0xF4 bytes). Init-owned fields in it: class, life byte (last_sent_hp_pct, 128
 at spawn), mode (only skill1/skill2/death/dead modes are sent, else 1),
 the 16 components (1 bit when the class's choice count is < 3, else
 bit length of count − 1; omitted when all are 0), and, when the monster

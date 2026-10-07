@@ -3,9 +3,9 @@
 - **Status:** draft: creation (§1), stat points (§2), level-up (§3), the
   client vitals sync (§5) and
   the experience table lookups (§4.1) read in full from the 1.14d
-  `Game.exe`; the experience-on-kill level factor (§4.2) read in full;
-  the rest of §4 (experience ratio, party share, hireling experience) is
-  D2MOO 1.10f structure that is only partly confirmed (Open question 2).
+  `Game.exe`; the experience on a kill (§4.2, §4.3: ratio, party share,
+  hireling experience) read in full; the hireling level-up body belongs
+  to the mercenary spec.
   No trace check yet.
 - **Target version:** 1.14d
 - **Crate/module:** `d2-sim::combat::vitals` (player creation and
@@ -28,16 +28,16 @@
 | Outputs / state changes | 67–70 |
 | Rules | 71–72 |
 |   1. Creation values | 73–95 |
-|   2. Spending stat points (message 0x3A) | 96–145 |
-|   3. Level-up `0x00570880` (D2MOO `PLAYERSTATS_LevelUp`) | 146–167 |
-|   4. Experience | 168–335 |
-|   5. Client vitals sync (`0x00548760`) | 336–472 |
-| Constants & data dependencies | 473–489 |
-| Randomness | 490–493 |
-| Edge cases & original bugs | 494–505 |
-| Test vectors | 506–526 |
-| Provenance | 527–553 |
-| Open questions | 554–586 |
+|   2. Spending stat points (message 0x3A) | 96–146 |
+|   3. Level-up `0x00570880` (D2MOO `PLAYERSTATS_LevelUp`) | 147–168 |
+|   4. Experience | 169–357 |
+|   5. Client vitals sync (`0x00548760`) | 358–494 |
+| Constants & data dependencies | 495–511 |
+| Randomness | 512–515 |
+| Edge cases & original bugs | 516–527 |
+| Test vectors | 528–548 |
+| Provenance | 549–575 |
+| Open questions | 576–611 |
 <!-- /index -->
 
 ## Summary
@@ -98,8 +98,9 @@ experience` if positive, through the add §4.5, which levels up).
 Handler `0x0054BD10`: size must be 3, else 3. Byte +1 is the stat id
 `s`, byte +2 is `count − 1`. `s > 15` or `count − 1 > 99` → 3. Repeat
 `count` times `spend(unit, s)` (`0x00570D60`); the first failure stops
-and returns 2; else 0. (`client-messages.tsv` describes the field as a
-u16 stat: Open question 4.)
+and returns 2; else 0. (`client-messages.tsv` layout `stat:u8@1
+repeat:u8@2`, repeat = count − 1; the handler reads them as one u16 at +1 and
+splits it, `0x0054BD29`.)
 
 `spend(unit, s)`: `statpts(4)` (unit getter) = 0 → fail. By `s`:
 
@@ -182,6 +183,11 @@ it (`0x0057E58A`).
 
 #### 4.2 Level factor `0x0057E2F0(exp, alvl, dlvl)`
 
+Registers: EAX `dlvl` (defender), EDX `alvl` (attacker), ECX `exp`
+(`0x0057E2F3`: `dlvl > alvl` is the second branch). The `pct` branch
+passes ECX `exp`, EDX `alvl`, stack `dlvl`: result = exp · alvl / dlvl
+under `pct` (`combat/damage.md` §0).
+
 `dlvl ≤ alvl`: `f = T1[min(alvl − dlvl, 10)]`, `T1` (`0x006E1668`) =
 256, 256, 256, 256, 256, 256, 207, 159, 110, 61, 13. `dlvl > alvl`: if
 `alvl ≥ 25` and `dlvl > 0` → result `pct(exp, alvl, dlvl)`; else `f = T2[min(dlvl −
@@ -214,12 +220,17 @@ stack game, defender level dlvl. Returns the gain.
    owner (`0x0058F0D0`) must be a player with a pet node for U and a
    hireling row: g := min(g, (threshold(alvl + 1) − threshold(alvl))
    >> 6) (unsigned; `world/hirelings.md` §7.2 rule 4); no such owner,
-   node or row → 0.
+   node or row → 0. Here threshold is the hireling threshold hexp(L) :=
+   L · L · (L + 1) · k (`0x00663790`, 32-bit), k := the row's `exp/lvl`
+   (+0x20); the node is the owner's hireling record for U's GUID
+   (`0x00574BD0`), the row `0x006562F0` (expansion flag, record +8,
+   alvl).
 
 #### 4.4 Distribution on a kill `0x0057E990(game, attacker A, defender D)`
 
-Called by the kill (`combat/damage.md` §7.2 step 2) when D lacks unit
-flag 0x04000000. Stats here are **base** reads (`0x006253B0`) unless
+Called by the kill (`combat/damage.md` §7.2 step 2, from the
+experience step `0x005A4EF0` at `0x005A4F12`) when D lacks unit flag
+0x04000000. Stats here are **base** reads (`0x006253B0`) unless
 marked total.
 
 1. A or D none, or A neither player nor monster → nothing. e := D's
@@ -229,11 +240,22 @@ marked total.
    (`0x00625760`) is looked up on A (when A has a stat holder) and then
    on D (when D has one; D's result replaces A's, even when none); a
    list found → P := the unit of that list's owner type and GUID
-   (`0x00552F60`). P must be a player, else nothing.
+   (`0x00552F60`). P must be a player, else nothing. PC 2 read: the
+   lookup on A (and on D) is gated by the unit being in the `exp` state
+   group (states flag bit 30, `0x0063A690`), not by having a stat
+   holder — to reconcile (staging-5 merge).
 3. dl := D's level (12). Hireling H of P (`0x00574EC0(game, P, 7,
    0)`): g := gain(e, U = H, alvl = H's level, dlvl = dl); A ≠ H → g :=
    g · 86 / 256 (signed, toward zero); add to H (`0x0057E860`,
    `world/hirelings.md` §7.3).
+   Hireling add `0x0057E860` (EAX g, EDI H; game, P, level a): g ≤ 0,
+   no hireling record or no `hireling.txt` row → nothing; a ≥ P's level
+   (total) or a ≥ `max_level(0)` − 1 → nothing. new := H's stat 13 +
+   2·g (twice its share); stat 13 := new; stat message `0x0053BFD0` to
+   P's client (H, stat 13, old, new). L := a, m := `max_level(0)` − 1;
+   repeat: hexp(L + 1) > new (unsigned) → stop; L += 1; until L ≥ m.
+   L > a → `0x00572840(game, P, H, L)`, `0x005726C0(game, P, 0)`, sound
+   `0x00553380(H, 0x5B, P)`, unit event 12 on H.
 4. pl := P's level (12). P in a party (`0x00554630(P)` ≠ 0xFFFF) →
    party share (rule 6) with (e, D, pl, dl). Else g := gain(e, P, pl,
    dl); add(P, pl, g) (§4.5).
@@ -558,13 +580,16 @@ stat points: three spends succeed, the fourth fails, result 2.
    while spending points.
 2. Answered: §4.3–§4.5 read from `0x0057E480`, `0x0057E390`,
    `0x0057E3F0`, `0x0057E990`, `0x0057E7B0`, `0x0057E6C0`, `0x0057E5A0`,
-   `0x005405A0`, `0x0057E510`. Open only for the x87 party share: the
+   `0x005405A0`, `0x0057E510`, `0x0057E860`. The hireling part (86/256
+   share, 1/64-level cap, 1.14d adds 2·gain) is confirmed in
+   `world/hirelings.md` §7. Open: the x87 party share's
    precision-control word in force (§4.4 rule 6, as
-   `sim/stat-lists.md` open question 1); settle with a party recording
-   (multiplayer, Phase 7).
+   `sim/stat-lists.md` open question 1; settle with a party recording,
+   multiplayer, Phase 7) and the hireling level-up body (`0x00572840`,
+   mercenary spec).
 3. Answered: `0x0057E2F0` takes ECX = experience, EDX = alvl, EAX =
    dlvl; for dlvl > alvl ≥ 25 it calls `pct(ECX exp, EDX alvl, stack
-   dlvl)`, i.e. exp × alvl / dlvl as §4.2 states.
+   dlvl)` (at `0x0057E31E`), i.e. exp × alvl / dlvl as §4.2 states.
 4. Answered: the handler (`0x0054BD29`–`0x0054BD3E`) reads byte +1 as
    the stat and byte +2 as count − 1 (§2); `0x0054BD10`: stat ≤ 15,
    count ≤ 100. `client-messages.tsv` row 0x3A is `stat:u8@1

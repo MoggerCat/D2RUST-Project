@@ -27,18 +27,18 @@
 | Rules | 75–76 |
 |   1. Unit kinds | 77–96 |
 |   2. Unit record | 97–135 |
-|   3. Lifecycle | 136–297 |
-|   4. Modes and mode schedules | 298–558 |
-|   5. Event dispatch | 559–573 |
-|   6. Events per kind | 574–668 |
-|   7. Scheduler inventory (`unit-events.tsv`) | 669–690 |
-|   8. Collision line between two units | 691–695 |
-| Constants & data dependencies | 696–712 |
-| Randomness | 713–720 |
-| Edge cases & original bugs | 721–741 |
-| Test vectors | 742–801 |
-| Provenance | 802–852 |
-| Open questions | 853–918 |
+|   3. Lifecycle | 136–303 |
+|   4. Modes and mode schedules | 304–564 |
+|   5. Event dispatch | 565–579 |
+|   6. Events per kind | 580–702 |
+|   7. Scheduler inventory (`unit-events.tsv`) | 703–724 |
+|   8. Collision line between two units | 725–729 |
+| Constants & data dependencies | 730–746 |
+| Randomness | 747–754 |
+| Edge cases & original bugs | 755–775 |
+| Test vectors | 776–835 |
+| Provenance | 836–886 |
+| Open questions | 887–952 |
 <!-- /index -->
 
 ## Summary
@@ -130,8 +130,8 @@ offset seen in the 1.14d code named in the last column):
 | +0xDC | timer list head | `unit-order.md` §8 | `0x00553980` |
 | +0xE0, +0xE4, +0xE8 | update, hash, room links | `unit-order.md` | — |
 
-"Dead" (`0x005541B0`): flag 0x10000, or a player in mode 0 or 17, or a
-monster in mode 0 or 12.
+"Dead" (`0x005541B0`): a null unit, flag 0x10000, a player in mode 0 or
+17, a monster in mode 0 or 12, or any unit of another type.
 
 ### 3. Lifecycle
 
@@ -153,11 +153,17 @@ fixed GUID):
 6. GUID: a monster with flags bit 2 takes the fixed GUID; every other
    unit draws one (`0x00552EE0`, `unit-order.md` §1.3).
 7. Per-kind init (§1 table).
-8. Flags bit 1: `SUNIT_Add` `0x00554850(unit, x, y, game, room, 1)`
-   (`unit-order.md` §3.1). Then a player in mode 0 or 17, or a monster
-   for which `0x0063EA40` holds and `0x004638A0(class, 0x13)` does not,
-   gets path settings (`0x00649560(1)`, `0x00649190(5)`,
+8. Flags & 0x1 (`0x00555443`): `SUNIT_Add` `0x00554850(unit, x, y,
+   game, room, 1)` (`unit-order.md` §3.1), after the per-kind init of
+   step 7; its result is not tested. Then a player in mode 0 or 17, or a
+   monster for which `0x0063EA40` holds and `0x004638A0(class, 0x13)`
+   does not, gets path settings (`0x00649560(1)`, `0x00649190(5)`,
    `0x00648C30(0x8000)`; `sim/path-placement.md` §5.3).
+9. Flags & 0x1 clear: no `SUNIT_Add` and no path settings; the unit is
+   returned as it is after step 7 (seeds drawn, GUID taken, per-kind
+   init done), in no room list, hash list or update queue. This is not
+   a failure: the allocator returns the unit in both cases, and null
+   only from step 1.
 
 Events scheduled by a per-kind init are listed in §6 (missile: §6.3;
 objects: their init functions, §6.4).
@@ -582,7 +588,7 @@ becomes f + 1 (`tick.md` §5.2). Sites: `unit-events.tsv`.
 |---|---|---|---|
 | 0 | §4.2, §4.4; skills `0x005C8CA0` (f + 2, a1 4), `0x005CF900` (f + 1, a1 1), `0x005D1350` (f + 3) | §4 | §4.5 |
 | 1 | §4.2; skills `0x005CF900`, `0x005C8C10`, `0x005CC3B0`, `0x005DA120`, `0x005DA7E0` | §4.2 or per skill | §4.5 |
-| 3 | join `0x00534AD0`; handler itself; damage `0x0057AC50`, `0x0057ADD0`, `0x0057C6C0`; skill items `0x005BE3F0`, `0x005BE7B0`, `0x005BEAC0`; `0x0054CED0` | f + 1, (0, 0) | `0x00580810`: reschedule at f + 1 with the same args **first**, then, if not dead and `0x00580610`, regenerate (`0x00580500`, `0x005806F0`; `sim/stats.md`). So a player has a regen event every frame from its join on |
+| 3 | join `0x00534AD0`; handler itself; damage `0x0057AC50`, `0x0057ADD0`, `0x0057C6C0`; skill items `0x005BE3F0`, `0x005BE7B0`, `0x005BEAC0`; `0x0054CED0` | f + 1, (0, 0) | `0x00580810`: reschedule at f + 1 with the same args **first**, then, if not dead, life (`0x00580610`), and when it returns non-zero, stamina and mana (`0x00580500`, `0x005806F0`); `0x00580610` always returns 1, so all three run (`sim/stat-lists.md` §10.1). So a player has a regen event every frame from its join on |
 | 5, 8, 9, 12 | states, skills, shrines, items (`unit-events.tsv`) | per scheduler | `0x0056D790`, `0x0056FCB0`, `0x0056FE40`, `0x00580800` (remove expired states, `0x00627460(unit, f)`): `sim/stat-lists.md` |
 | 6 | hover text set `0x0054A290`; handler | the hover's timeout | `0x00580B70`: timeout (`0x006611D0`) ≤ f → free the hover, +0xA4 := 0, queue for update, flags \|= 0x100; else reschedule at the timeout |
 | 11 | join `0x00534AD0` (f + 250); handler (f + 30) | (0, 0) | `0x00580BE0`: party refresh (`0x005406A0`), pet refresh (`0x00575630`), reschedule f + 30. D2MOO calls it DELAYEDPORTAL; in 1.14d it is a 30-frame refresh |
@@ -661,10 +667,38 @@ Object internals are owned by the objects spec; the seed of the rolls
 
 | Type | Handler | Scheduled by (expire) |
 |---|---|---|
-| 3 | `0x00562D30` → `0x00562C40` per replenished stat: if the rate r ≠ 0 and the value is below its maximum, add 1 and reschedule at f + max(2500 / r + 1, 125) | start `0x00558530` (stat 252, durability), `0x00558580` (stat 253, quantity), `0x0055A2A0`: if r ≠ 0 and no type-3 event is pending, f + 2500 / r + 1 (integer division, no minimum) |
+| 3 | `0x00562D30`: (a) item not broken (flag 0x100) and with durability (`0x00629930`): replenish(rate 252, value 72, max = max durability `0x00625E00`); (b) only when (a) did not run or returned 0, and the item is stackable (`0x006289F0`): replenish(rate 253, value 70, max = max stack `0x006295B0`). Replenish `0x00562C40`: r := total(rate); r = 0 → return 0 (no reschedule). v := total(value) + 1; v > max → return 1 (no reschedule: the chain ends when full). Else set base value := v; if the item's owner GUID (`0x00629F20`) ≠ −1 names a player with a client, send the stat update `0x0053D130`(client, item, 1, value stat, v, 0); if v ≥ 1 and the item is broken, `0x0055F900` (repair path, items spec). Reschedule event 3 at f + max(2500 / r + 1, 125) (integer division), args (0, 0); return 1 | start `0x00558530` (stat 252, durability), `0x00558580` (stat 253, quantity), `0x0055A2A0`: if r ≠ 0 and no type-3 event is pending, f + 2500 / r + 1 (integer division, no minimum) |
 | 4 | `0x0055F120` (returns at once) | none found |
 | 12 | `0x0055F130`: `0x00627460(item, f)` | `sim/stat-lists.md` |
 | others | null (fatal) | none |
+
+#### 6.6 Unit event records (unit +0x90)
+
+Not timer events: the hooks `combat/damage.md` §5.4 runs. A unit keeps
+a doubly linked list of 0x20-byte records at +0x90 (prev +0x18, next
++0x1C; null head = none). Record: event id (u8 +0x00, `events.txt`
+index), flags (u16 +0x02: 1 running, 2 remove pending), owner kind
+(+0x04), key (+0x08), two values passed to the function (+0x0C,
++0x10), function (+0x14).
+
+1. Add (`0x005C0AD0`(ECX game, EDX unit; event, v0, v1, function,
+   kind, key)): unit null → 0. Allocate, zero, fill, **prepend** at the
+   head; return the record. By table index (`0x0056E740`, same order
+   with a function index instead of a pointer): index > 0x31 or table
+   `0x007325B0`[index] null → 0, nothing added.
+2. Find (`0x005C0BE0`(unit; kind, key, v0)): the first record from the
+   head with equal kind, key and v0, else null.
+3. Remove (`0x005C0B50`(ECX game, EDX unit; kind, key)): every record
+   with that kind and key: running → set remove pending; else unlink
+   and free.
+4. Trigger (`0x005C0C30`(ECX game, EDX event; unit, other, arg)): unit
+   null → 0. From the head, each record whose event id matches: set
+   running, call function(ECX game; unit, other, arg, v0, v1), clear
+   running; then, if remove pending or kind = 0 (one-shot), unlink and
+   free it. The next record is read after the call (a record the
+   function adds at the head is not visited). Returns the last called
+   function's result, 0 when none ran. Most recent registration runs
+   first.
 
 ### 7. Scheduler inventory (`unit-events.tsv`)
 

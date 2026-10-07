@@ -17,6 +17,7 @@ sha2.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
+d2-formats.workspace = true
 proptest.workspace = true
 
 [lints]
