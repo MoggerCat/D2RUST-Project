@@ -23,7 +23,7 @@ Branch `claude/spec-xpc-fixes`, from `origin/claude/local-pc2-integration`
 
 ## xpc-to-pc2 lines done
 
-Commit: see the commit of this note on `claude/spec-xpc-fixes`.
+Commit: 4e6adc4 (all four lines).
 
 - line 18 `world/quests.md` §6.7 (0x91 act byte).
 - line 20 `world/hirelings-ai.md` §1 (moved to ai-bodies-6 §7; OQ1).
