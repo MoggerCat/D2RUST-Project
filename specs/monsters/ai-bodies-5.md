@@ -55,7 +55,7 @@
 | Edge cases & original bugs | 740–754 |
 | Test vectors | 755–769 |
 | Provenance | 770–795 |
-| Open questions | 796–830 |
+| Open questions | 796–834 |
 <!-- /index -->
 
 ## Summary
@@ -798,11 +798,15 @@ Game-file vectors: Open question 1.
 1. No recording of any Act V AI: record a Bloody Foothills / Arreat
    Summit / Worldstone Chamber run (tick recorder) and compare think
    schedules and draws with §2–§23.
-2. Baal §21.3: the draws of the free-point search `0x0054DC40` (case
-   14, `ai.md` open question 4) and of the spawn info `0x0063EFA0` for
-   the clone (owner `monsters/population.md`).
-3. Who sets the Imp mount (§3 AI param 0) besides SiegeBeast §15, and
-   the client side of message 0xA4 (§20).
+2. Answered (2026-10-07): the free-point search `0x0054DC40` draws on
+   the room seed, x then y per try, up to 20 tries
+   (`monsters/population.md` §8); the clone's spawn info is
+   `ai-bodies-2.md` §13.1 (key 544, as OQ10).
+3. Answered (2026-10-07): besides SiegeBeast §15 (`0x005E17E0`) the
+   imp's param 0 is written by its init (−1), its own think (§3) and
+   the inactive restore `0x00541E20` (param 0 := the stored record's
+   +0x4C, every monster; `sim/units.md` §3.4). The 0xA4 record is §20
+   step 5; what the client does with it belongs to the client specs.
 4. Answered (`docs/handoff/impl-ai-acts2-5.md` reading 11): §3 step 5's
    "else" is the distance test (E ≥ I3.aip3), not a failed I3 draw; a
    failed I3 draw goes to step 6 (`0x005E2FF0`). A missing imp row

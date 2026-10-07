@@ -47,7 +47,7 @@
 | Edge cases & original bugs | 630–644 |
 | Test vectors | 645–662 |
 | Provenance | 663–690 |
-| Open questions | 691–713 |
+| Open questions | 691–716 |
 <!-- /index -->
 
 ## Summary
@@ -696,16 +696,19 @@ Game-file vectors: Open question 1.
 2. Vulture §11 and BatDemon §12 flight: confirm modes 8 / 9 / 10 / 11
    and the land / take-off footprints with a recording that logs mode
    changes and collision.
-3. Installers of special states 2, 3, 9, 14, 16 (`0x0056D940`,
-   `0x005C07A0`, `0x005D18E0`, `0x005D19D0`, `0x005EF320`, …): confirm
-   none applies to the Act II rows; their thinks stay unread.
+3. Answered (2026-10-07): `ai.md` §3.3 "Installed special states":
+   no 1.14d site installs 2, 3, 9 or 14 (the summon spawn `0x0056D940`
+   always passes 0); 16 is installed only by the imp possess
+   `0x005D18E0` (Act V imps). None applies to an Act II row.
 4. Answered (2026-10-07): the spawn info `0x0063EFA0` is §13.1 (all
    keys). The queen's class is chain(68): sandmaggot1 walked p steps
    along `NextInClass`, p = the queen class's monstats +0x4B, so
    maggotqueenK spawns sandmaggotK (`0x0054DA60` =
    `monsters/population.md` §11.5 rule 3; `0x006510C0` reads +0x4B).
-5. Who calls the BatDemon alternate (`ai.md` §3.3 re-install while
-   running): the skill or event path that re-installs AI 29.
+5. Answered (2026-10-07): `ai.md` §3.3 "When an alternate runs": any
+   install over the running BatDemon think (curse AI `0x005C34B0`,
+   terror `0x005DDD00`, `0x005D6520`; BatDemon has `switchai`) makes
+   the alternate run for one think, which then installs the new state.
 6. Answered (`docs/handoff/impl-ai-acts2-5.md` reading 1): Vulture
    with T = 0 is unreachable (target mode 1, `ai.md` §2.3); the 1.14d
    null read in §11 step 1 is not a rule. An implementation asserts T
