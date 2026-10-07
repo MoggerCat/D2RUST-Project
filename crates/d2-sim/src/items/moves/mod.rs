@@ -1,5 +1,5 @@
-// Spec: specs/items/inventory.md
-//! Item-move intents and deferred item messages (`inventory.md` §6–§11):
+// Spec: specs/items/inventory-moves.md
+//! Item-move intents and deferred item messages (`inventory-moves.md` §6–§11):
 //! the per-client item message dispatcher ([`deferred`]), every intent
 //! handler of §7 ([`handlers`]), pickup from and drop to the ground and
 //! gold ([`ground`]) and the S→C byte layouts of §11 ([`layouts`]).

@@ -1,4 +1,5 @@
 // Spec: specs/items/inventory.md (fixture of the inventory wiring's mutation tests)
+// Spec: specs/items/inventory-moves.md (§6–§11, split out of `inventory.md`)
 //! The inventory wiring's test world through the public API: synthetic
 //! tables (the shape of `wiring/inventory/tests/mod.rs`: a barbarian,
 //! inventory record 4, 10 × 4, in one room of act 0, fixed game seed),

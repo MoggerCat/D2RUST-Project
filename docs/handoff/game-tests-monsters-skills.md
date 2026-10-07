@@ -67,7 +67,7 @@ difficulties), `real_umod_constants` (K, `MonsterSkillBonus` 0/3/7,
 (recorded [13, 16], champion + unique), `real_champion_fallenshaman1` ([16]
 and ghostly [36] vectors), `real_unique_fallen1`, `real_boss_hp_factors` (NM /
 Hell factors), `real_component_counts` (recorded zombie1 counts),
-`real_recorded_ai_params` (`ai.md` §9.1 table), `real_levels_rows`,
+`real_recorded_ai_params` (`ai-bodies.md` §9.1 table), `real_levels_rows`,
 `real_monstats_population_rows` (Rarity, groups, parties, placespawn,
 sparsePopulate, superuniques 0–9, monumod row 0), `real_level_list_facts`
 (§2.3 step 3).
@@ -169,7 +169,7 @@ locally (game tier). Measured with the claims in place, before the merge of
 | `game_monsters::real_component_counts` | specs/monsters/init.md §10 r2 |
 | `game_monsters::level_stats_every_row` | specs/monsters/init.md §7 r2, §8.1 |
 | `game_monsters::ai_index_of_every_row` | specs/monsters/ai.md §10, §4 |
-| `game_monsters::real_recorded_ai_params` | specs/monsters/ai.md §9.1 |
+| `game_monsters::real_recorded_ai_params` | specs/monsters/ai-bodies.md §9.1 |
 | `game_monsters::real_levels_rows` | specs/monsters/population.md §2.2, §3.1 r1 |
 | `game_monsters::real_monstats_population_rows` | specs/monsters/population.md §4 r4, §7 r1, §10.1 r1, §11.4 text |
 | `game_monsters::real_level_list_facts` | specs/monsters/population.md §2.3 r3 |

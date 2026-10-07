@@ -434,7 +434,7 @@ mod text_tests {
         p
     }
 
-    // Covers: specs/ui/text.md §4 r3, §4 r4
+    // Covers: specs/ui/text.md §4 r3, §4 r4; specs/render/shading.md §6 r5
     #[test]
     fn glyph_look_is_text_color_map_k() {
         let mut table = MapTable::new();

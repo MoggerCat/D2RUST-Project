@@ -1,4 +1,5 @@
 // Spec: specs/items/inventory.md §1.2, §1.3, §2.3, §3.1, §3.4; specs/sim/pathing.md (Constants); specs/sim/path-placement.md (Constants & data dependencies)
+// Spec: specs/items/inventory-moves.md (§6–§11, split out of `inventory.md`)
 //! Game-file tests for the inventory grids and belts and for the path
 //! constant tables:
 //!

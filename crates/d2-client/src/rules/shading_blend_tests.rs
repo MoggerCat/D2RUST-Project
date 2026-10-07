@@ -308,7 +308,7 @@ fn floor_block_light_vectors() {
     );
 }
 
-// Covers: specs/render/shading.md §6 r1, §edge-cases-original-bugs r4
+// Covers: specs/render/shading.md §6 text, §6 r1, §edge-cases-original-bugs r4
 #[test]
 fn unit_palette_index_selects_map_p_minus_1() {
     let (maps, t, p) = tables();

@@ -927,3 +927,13 @@ fn status_reaches_the_0x5d() {
     ctl.send_status(&mut f, P1, C).unwrap();
     assert_eq!(sent_5d(&f), vec![(P1, vec![0x5D, 17, 0x40, 6, 0, 0])]);
 }
+
+// Covers: specs/world/quests-act3.md §5.1
+#[test]
+fn extra_data_at_init() {
+    // Chain 17's init only switches the record on: the extra data is 0.
+    let (ctl, _) = control();
+    assert_eq!(x(&ctl), &act3::q3::Extra::default());
+    let r = &ctl.records[idx(&ctl)];
+    assert!(r.active);
+}

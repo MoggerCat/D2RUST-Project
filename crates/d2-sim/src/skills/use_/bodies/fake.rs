@@ -1,4 +1,4 @@
-// Spec: specs/skills/bodies.md §6–§8, specs/skills/bodies-2.md (test fake)
+// Spec: specs/skills/bodies.md §6–§8, specs/skills/bodies-2.md, specs/skills/bodies-2b.md (test fake)
 //! A [`BodyWorld`] for the body tests: units, stats, combat and the
 //! kick reads are [`crate::skills::fake::Fake`]'s (field `c`); stat
 //! lists, handlers, rooms, positions, skill entries, missiles and summons

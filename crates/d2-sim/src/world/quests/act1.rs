@@ -1,4 +1,5 @@
-// Spec: specs/world/quests.md §10 (Act I), §10.1 (common pattern, sequence functions)
+// Spec: specs/world/quests-act1.md §10 (Act I), §10.1 (common pattern, sequence functions)
+// Spec: specs/world/quests.md (the sections other than §10)
 //! Act I quest callbacks, as far as §10 specifies them: every chain
 //! callback by callback ([`q1`]–[`q6`], the intro record [`intro`]),
 //! A1Q0, Flavie and the respec record here; the shared shorthands

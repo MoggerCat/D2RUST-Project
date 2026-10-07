@@ -22,7 +22,7 @@ Only **one** body in either catalogue is stated completely at this commit:
 quest callback and every other filled skill slot is missing at least one
 branch, constant, draw or message (§3, §4). Nothing was guessed. The
 quest module is unchanged: no Act I callback that `act1.rs` reports as
-`unhandled` has a complete description in `quests.md` §10, and Acts II–V
+`unhandled` has a complete description in `quests-act1.md` §10, and Acts II–V
 are catalogued only (§11, OQ8).
 
 ## 2. Implemented (unverified, M02)
@@ -53,7 +53,7 @@ core's only draw is `interrupt_gate`'s, unchanged).
 
 ## 3. Missing spec: quests (one line each, for the local spec coordinator)
 
-### 3.1 Act I callbacks still `unhandled` (owner `quests.md` §10)
+### 3.1 Act I callbacks still `unhandled` (owner `quests-act1.md` §10)
 
 | Chain | Function | What is missing |
 |---|---|---|

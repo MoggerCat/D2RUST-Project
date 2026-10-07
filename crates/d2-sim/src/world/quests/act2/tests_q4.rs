@@ -94,7 +94,7 @@ fn x4(ctl: &QuestControl, i: usize) -> &q4::Extra {
     &ctl.records[i].extra.a2.q4
 }
 
-// Covers: specs/world/quests-act2.md §6.4
+// Covers: specs/world/quests-act2.md §6.4, §1.2
 #[test]
 fn kaelan_seed_vector() {
     let (mut ctl, mut f, i) = setup();
@@ -174,7 +174,7 @@ fn chat_and_wants_to_talk() {
     assert!(!q4::active(&ctl, &mut f, i, P1, 201));
 }
 
-// Covers: specs/world/quests-act2.md §6.5, §6.2, §6.3
+// Covers: specs/world/quests-act2.md §6.5, §6.2, §6.3, §6.1
 #[test]
 fn messages_and_chat_end() {
     let (mut ctl, mut f, i) = setup();
@@ -221,7 +221,7 @@ fn messages_and_chat_end() {
     assert_eq!(f.sent_ids(), [0x27, 0x29]);
 }
 
-// Covers: specs/world/quests-act2.md §6.5
+// Covers: specs/world/quests-act2.md §6.5, §6.1
 #[test]
 fn tome_message_opens_the_canyon_portal() {
     let (mut ctl, mut f, i) = setup();

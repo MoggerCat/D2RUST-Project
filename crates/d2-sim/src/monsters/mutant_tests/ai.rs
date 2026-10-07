@@ -1,4 +1,4 @@
-// Spec: specs/monsters/ai.md (rules the mutation run found unchecked;
+// Spec: specs/monsters/ai.md, specs/monsters/ai-bodies.md (rules the mutation run found unchecked;
 // fakes from the parent test modules)
 use super::*;
 use crate::monsters::ai::target::Search;
@@ -219,7 +219,7 @@ fn install_init_only_with_a_function_and_both_records() {
 
 // ---- §9: per-AI behaviours -----------------------------------------------
 
-// Covers: specs/monsters/ai.md §9.2
+// Covers: specs/monsters/ai-bodies.md §9.2
 #[test]
 fn function_0_does_nothing() {
     let mut w = World::new(monstats(3, [0; 5], 15));
@@ -235,7 +235,7 @@ fn function_0_does_nothing() {
     assert_eq!(draws(&w, 1), 0);
 }
 
-// Covers: specs/monsters/ai.md §9.3 r2
+// Covers: specs/monsters/ai-bodies.md §9.3 r2
 #[test]
 fn zombie_at_aip2_distance_wanders_without_the_draw() {
     // D < aip2 is strict: at D = aip2 [10] no P(aip1) draw, only the
@@ -249,7 +249,7 @@ fn zombie_at_aip2_distance_wanders_without_the_draw() {
     assert_eq!(draws(&w, lo), k);
 }
 
-// Covers: specs/monsters/ai.md §9.4 r5
+// Covers: specs/monsters/ai-bodies.md §9.4 r5
 #[test]
 fn fallen_pack_command_needs_d_below_15() {
     // A pack leader at D = 15: no command (step 5.2 needs D < 15); step 5.3
@@ -312,7 +312,7 @@ fn think_event_runs_the_think() {
     assert_eq!(w.thinks(), [201]);
 }
 
-// Covers: specs/monsters/ai.md §9.8 r1
+// Covers: specs/monsters/ai-bodies.md §9.8 r1
 #[test]
 fn lancer_at_aip5_distance_does_not_run() {
     // D > aip5 is strict: at D = aip5 [15] step 1 does not run (AI param
@@ -324,7 +324,7 @@ fn lancer_at_aip5_distance_does_not_run() {
     assert!(!w.logged(&at_unit(mode::RUN, w.player)));
 }
 
-// Covers: specs/monsters/ai.md §9.13 r1
+// Covers: specs/monsters/ai-bodies.md §9.13 r1
 #[test]
 fn archer_no_s_draw_49_circles() {
     // `lo' % 100 > 49` → idle; a draw of exactly 49 circles.
@@ -346,7 +346,7 @@ fn archer_at(e: i32, aip1: u16, aip8: u16) -> (Vec<String>, Vec<i32>, usize) {
     (w.fake.modes(), w.thinks(), draws(&w, 1))
 }
 
-// Covers: specs/monsters/ai.md §9.13 r3
+// Covers: specs/monsters/ai-bodies.md §9.13 r3
 #[test]
 fn archer_escape_needs_e_below_6() {
     // E = 6: no aip4 draw and no escape; on to step 6 (P(aip2) = 0 fails,
@@ -354,7 +354,7 @@ fn archer_escape_needs_e_below_6() {
     assert_eq!(archer_at(6, 0, 0), (vec![], vec![8], 1));
 }
 
-// Covers: specs/monsters/ai.md §9.13 r4
+// Covers: specs/monsters/ai-bodies.md §9.13 r4
 #[test]
 fn archer_walk_needs_0_below_aip8_below_e() {
     // aip8 = 0, or aip8 = E: no aip1 draw and no walk; idle aip3.
@@ -362,14 +362,14 @@ fn archer_walk_needs_0_below_aip8_below_e() {
     assert_eq!(archer_at(10, 100, 10), (vec![], vec![8], 1));
 }
 
-// Covers: specs/monsters/ai.md §9.13 r5
+// Covers: specs/monsters/ai-bodies.md §9.13 r5
 #[test]
 fn archer_run_needs_e_above_aip5() {
     // E = aip5 [15]: no run; idle aip3.
     assert_eq!(archer_at(15, 0, 0), (vec![], vec![8], 1));
 }
 
-// Covers: specs/monsters/ai.md §9.13 r7
+// Covers: specs/monsters/ai-bodies.md §9.13 r7
 #[test]
 fn archer_skill1_id_0_is_a_skill() {
     // `Skill1` < 0 is "no skill": id 0 is used in `Sk1mode` (8) at S.

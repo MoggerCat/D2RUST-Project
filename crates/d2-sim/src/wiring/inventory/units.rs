@@ -1,4 +1,5 @@
 // Spec: specs/items/inventory.md §1.1; specs/sim/units.md §2; specs/items/generation.md §1.3; specs/world/cube.md §4.1
+// Spec: specs/items/inventory-moves.md (§6–§11, split out of `inventory.md`)
 //! [`MoveUnits`] on [`InvDesk`]: unit record fields (class, +0xC4, +0xC8,
 //! mode), stats from the stat lists, game fields, the item store (flags,
 //! page, quality, file index), the inventory tables (code, type,

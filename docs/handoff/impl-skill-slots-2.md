@@ -1,5 +1,7 @@
 # impl-skill-slots-2 — the batch 2 and 3 skill bodies, player pet lists
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the ninth fold (`claude/fold-handoff-night`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Ninth set" (PC 1 / PC 2).
+
 Branch `claude/impl-skill-slots-2`, on `claude/specs-staging` at `f294bbf`.
 Specs: `specs/skills/bodies.md` §6–§8 (batch 2), `specs/skills/bodies-2.md`
 (batch 3), `specs/sim/pets.md`, with `specs/skills/functions.tsv`.
@@ -26,7 +28,7 @@ Implementation only; no spec edited.
     pack and alignment helpers, conversion and its remove callbacks,
     Frenzy, Whirlwind, Blade Shield pulse).
   - `starts2.rs` (§7), `dos2.rs` (§8), `b3_lvl01.rs` … `b3_lvl30.rs`
-    (`bodies-2.md` §3–§8). `run_start` / `run_do` dispatch them;
+    (`bodies-2.md` §3–§5, `bodies-2b.md` §6–§8). `run_start` / `run_do` dispatch them;
     `START_BODIES` / `DO_BODIES` list them.
   - Remove callbacks of batch 2 / 3 (`callback::CHARGE`, `INFERNO`,
     `BLADE_FURY`, `SHAPE`, `WHIRLWIND`, `HOLY_FREEZE`, `CONFUSE`,

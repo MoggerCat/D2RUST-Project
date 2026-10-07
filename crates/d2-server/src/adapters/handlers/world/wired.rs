@@ -1,4 +1,4 @@
-// Spec: specs/world/npc.md §1.1, §2–§4, §7.5; specs/world/vendors.md §1, §3, §4, §7; specs/world/quests.md §1.7, §6.2, §7.3, §10.2; specs/world/cube.md §1, §2; specs/world/waypoints.md §6
+// Spec: specs/world/npc.md §1.1, §2–§4, §7.5; specs/world/vendors.md §1, §3, §4, §7; specs/world/quests.md §1.7, §6.2, §7.3; specs/world/quests-act1.md §10.2; specs/world/cube.md §1, §2; specs/world/waypoints.md §6
 //! [`WiredWorld`]: the wired single-player host. The NPC, vendor, quest
 //! and cube systems on their `d2-sim` providers
 //! (`d2_sim::wiring::interaction`: [`Desk`] for `NpcWorld +
@@ -225,7 +225,7 @@ impl<R, S> WiredWorld<R, S> {
 /// A quest call on the desk's economy and rest ([`HostQuests`]: the
 /// [`EconomyQuests`] calls with the object, level, interaction and
 /// identify calls answered by the action wiring and the NPC rest): the
-/// mercenary rewards `0x00579180` an Act I quest grants (`quests.md`
+/// mercenary rewards `0x00579180` an Act I quest grants (`quests-act1.md`
 /// §10.2) are queued during the call with the sends that follow them
 /// ([`d2_sim::wiring::economy::QuestDeferred`]) and run on the NPC
 /// control block right after it, then the queued sends
@@ -514,7 +514,7 @@ where
 
     /// The quest control on the desk's economy and rest
     /// ([`EconomyQuests`]). The mercenary rewards `0x00579180` an Act I
-    /// quest grants (`quests.md` §10.2) are queued during the call, with
+    /// quest grants (`quests-act1.md` §10.2) are queued during the call, with
     /// the sends that follow them
     /// ([`d2_sim::wiring::economy::QuestDeferred`]), and run on the NPC
     /// control block right after it (`npc.md` §7.5,

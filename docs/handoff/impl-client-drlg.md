@@ -1,8 +1,6 @@
 # Handoff: the bridge-owned client DRLG — `claude/impl-client-drlg`
 
-> Not yet folded into `docs/HANDOFF.md` §1–§4 (only the §5 queue entries
-> C81–C83, `docs/PLAN.md` and the status line of `specs/client/model.md`
-> are edited here); the coordinator folds it.
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the ninth fold (`claude/fold-handoff-night`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Ninth set" (PC 1 / PC 2).
 
 Cloud implementation session, 2026-10-07, task class: implementation
 from specs, medium. Base: `claude/specs-staging` at `d33adcf` (merge of

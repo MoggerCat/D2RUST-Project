@@ -1,4 +1,4 @@
-// Spec: specs/skills/bodies.md §6–§8, specs/skills/bodies-2.md §2–§8
+// Spec: specs/skills/bodies.md §6–§8, specs/skills/bodies-2.md §2–§5, specs/skills/bodies-2b.md §6–§8
 //! The calls of the batch 2 and 3 bodies into systems other specs own
 //! that return nothing the bodies read: one [`BodyEffect`] per 1.14d
 //! callee, sent through [`super::BodyWorld::effect`], and the path

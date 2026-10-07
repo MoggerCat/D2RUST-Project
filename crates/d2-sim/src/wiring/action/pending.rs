@@ -290,7 +290,7 @@ pub trait Pending {
     fn footprint_ok(&self, game: &Game, class: i32, room: Option<RoomId>, x: i32, y: i32) -> bool {
         false
     }
-    /// SandRaider's help search (scan 1, `ai.md` §9.26 step 4).
+    /// SandRaider's help search (scan 1, `ai-bodies.md` §9.26 step 4).
     fn nearest_evil_monster(&mut self, game: &mut Game, unit: UnitId) -> Option<UnitId> {
         None
     }
@@ -595,7 +595,7 @@ pub trait Pending {
     ) -> (Option<UnitId>, u32) {
         (None, 0)
     }
-    // ---- AI quest calls (ai.md §9.32; world/quests.md) -----------------
+    // ---- AI quest calls (ai-bodies.md §9.32; world/quests.md) -----------------
 
     /// Portal coordinates set up; `true` (nothing to report) by default.
     fn portal_setup(&mut self, game: &mut Game, unit: UnitId, npc: PortalNpc) -> bool {
@@ -618,7 +618,7 @@ pub trait Pending {
     fn drehya_wait(&mut self, game: &mut Game) -> bool {
         false
     }
-    /// The Npc class cases (`ai.md` §9.9 step 2); defaults: no quest
+    /// The Npc class cases (`ai-bodies.md` §9.9 step 2); defaults: no quest
     /// state (jerhyn's palace inactive, nothing brought or found).
     fn jerhyn_palace_active(&mut self, game: &mut Game) -> bool {
         false
@@ -995,7 +995,7 @@ pub trait Pending {
     ) {
     }
 
-    // ---- skill bodies, batch 2 and 3 (`bodies.md` §6–§8, `bodies-2.md`) --
+    // ---- skill bodies, batch 2 and 3 (`bodies.md` §6–§8, `bodies-2.md`, `bodies-2b.md`) --
 
     /// A call of the bodies into a system with no provider here
     /// ([`crate::skills::use_::bodies::BodyEffect`]). Default: nothing.
@@ -1172,7 +1172,7 @@ pub trait Pending {
     fn item_missile_type(&self, item: UnitId) -> i32 {
         0
     }
-    /// The Iron Golem item test (`bodies-2.md` §7.11). Default: false.
+    /// The Iron Golem item test (`bodies-2b.md` §7.11). Default: false.
     fn golem_item(&self, unit: UnitId) -> bool {
         false
     }

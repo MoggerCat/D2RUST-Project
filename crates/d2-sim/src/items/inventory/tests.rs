@@ -1,4 +1,5 @@
 // Spec: specs/items/inventory.md (Test vectors)
+// Spec: specs/items/inventory-moves.md (§6–§11, split out of `inventory.md`)
 //! Synthetic tests: T1–T9 (§2.3), B1–B5 (§3), E1–E4 (§4.3) and the rules
 //! of §1–§5 on a fake world.
 

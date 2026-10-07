@@ -1,4 +1,5 @@
 // Spec: specs/monsters/ai.md (Test vectors, Edge cases)
+// Spec: specs/monsters/ai-bodies.md (§9, split out of `ai.md`)
 use std::collections::{BTreeMap, BTreeSet};
 
 use d2_data::tables::{Levels, Missiles, Monstats, Monstats2, Record, Skills};
@@ -848,7 +849,7 @@ fn walk_point(x: i32, y: i32) -> String {
     format!("mode 2 Point({x}, {y})")
 }
 
-// Covers: specs/monsters/ai.md §9.3 r1, §9.3 r2, §9.3 r3
+// Covers: specs/monsters/ai-bodies.md §9.3 r1, §9.3 r2, §9.3 r3
 #[test]
 fn zombie_vectors() {
     let row = || monstats(3, [30, 10, 0, 20, 0], 15);
@@ -901,7 +902,7 @@ fn zombie_vectors() {
     assert_eq!(w.fake.seeds[&w.mon], Seed::init_low(1));
 }
 
-// Covers: specs/monsters/ai.md §9.4 r1
+// Covers: specs/monsters/ai-bodies.md §9.4 r1
 #[test]
 fn fallen_vectors() {
     let want = [None, None, None, Some(5)];
@@ -922,7 +923,7 @@ fn fallen_vectors() {
     }
 }
 
-// Covers: specs/monsters/ai.md §9.5 r2
+// Covers: specs/monsters/ai-bodies.md §9.5 r2
 #[test]
 fn brute_vectors() {
     for (s, m) in SEEDS.iter().zip([4, 5, 5, 4]) {
@@ -940,7 +941,7 @@ fn brute_vectors() {
     assert_eq!(last_mode(&w), format!("mode 2 Unit({:?})", w.player));
 }
 
-// Covers: specs/monsters/ai.md §9.7 r4, §9.7 r5, §9.7 r6
+// Covers: specs/monsters/ai-bodies.md §9.7 r4, §9.7 r5, §9.7 r6
 #[test]
 fn quill_rat_vectors() {
     for (s, escape) in SEEDS.iter().zip([true, true, true, false]) {
@@ -974,7 +975,7 @@ fn circle_vectors() {
     }
 }
 
-// Covers: specs/monsters/ai.md §9.8 r1, §9.8 r3
+// Covers: specs/monsters/ai-bodies.md §9.8 r1, §9.8 r3
 #[test]
 fn corrupt_lancer_vectors() {
     for (s, walk) in SEEDS.iter().zip([true, false, true, true]) {
@@ -997,7 +998,7 @@ fn corrupt_lancer_vectors() {
     assert_eq!(w.store.control(w.mon).unwrap().params[0], 1);
 }
 
-// Covers: specs/monsters/ai.md §9.2
+// Covers: specs/monsters/ai-bodies.md §9.2
 #[test]
 fn idle_ai_thinks_every_200() {
     for ai in [1, 100] {

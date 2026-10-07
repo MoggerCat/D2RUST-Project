@@ -1,5 +1,7 @@
 # Handoff: world objects (`d2-sim::world::objects`) and their wiring — `claude/impl-objects`
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the ninth fold (`claude/fold-handoff-night`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Ninth set" (PC 1 / PC 2).
+
 Cloud implementation session, 2026-10-06, task class: implementation from
 a clear spec, medium (METHODS M14). Base: `claude/specs-staging` at
 `5844674`. Repo only, synthetic tables, no game files (M09). Spec:
@@ -83,7 +85,7 @@ tier), `spec_index.py --check`, `depcheck` clean.
 3. Object population (`PopulateFn`, §15) once specified; then population
    creates objects with their real modes (today `create_object` uses
    mode 0, TODO).
-4. Local run queue (add to HANDOFF §5): record `packets` + RNG traces of a
+4. Local run queue (HANDOFF §5 S9-A5): record `packets` + RNG traces of a
    chest, shrine, door, well and portal operate (spec open question 1)
    and an object allocation with `Sync` = 0 (open question 2).
 

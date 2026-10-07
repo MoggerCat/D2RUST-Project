@@ -1,4 +1,4 @@
-// Spec: specs/skills/bodies-2.md §8
+// Spec: specs/skills/bodies-2b.md §8
 //! Batch 3 bodies of required level 30 (§8): Valkyrie, Lightning
 //! Strike, Hydra, Revive, Fist of the Heavens, Redemption, Whirlwind,
 //! Berserk, Blade Shield.

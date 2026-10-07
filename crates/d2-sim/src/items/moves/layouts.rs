@@ -1,4 +1,4 @@
-// Spec: specs/items/inventory.md
+// Spec: specs/items/inventory-moves.md
 //! S→C byte layouts of §11 and the gold messages of §10.3. Little-endian;
 //! the machine copy is `sim/server-messages.tsv` (checked in the tests).
 

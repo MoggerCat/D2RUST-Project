@@ -1487,3 +1487,33 @@ fn hireling_and_class_speech_events() {
     let ids: Vec<i32> = f.made().iter().map(|r| r.0).collect();
     assert_eq!(ids, vec![2936, 2955, 2934, 2959]);
 }
+
+// Covers: specs/audio/triggers.md §1 r6
+#[test]
+fn unit_sound_fields_and_globals_start_at_zero() {
+    // The per-unit fields (+0x70, +0x74, +0x7C, +0x80, +0x84, +0xB0) and
+    // the global timers, the idle gap included, all start 0.
+    let us = UnitSound::default();
+    assert!(!us.obj_seen);
+    assert_eq!(
+        (
+            us.obj_prev_mode,
+            us.last_voice,
+            us.last_idle,
+            us.last_footstep,
+            us.hit_class
+        ),
+        (0, 0, 0, 0, 0)
+    );
+    let g = Globals::default();
+    assert_eq!(
+        (
+            g.last_idle_any,
+            g.last_voice_any,
+            g.idle_gap,
+            g.speech_time,
+            g.speech_id
+        ),
+        (0, 0, 0, 0, 0)
+    );
+}

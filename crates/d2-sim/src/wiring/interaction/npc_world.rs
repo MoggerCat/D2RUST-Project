@@ -1,4 +1,4 @@
-// Spec: specs/world/npc.md §2–§8; specs/world/hirelings.md §5 r4; specs/world/quests.md §4, §10; specs/sim/stat-lists.md §9; specs/sim/tick.md §5.2–§5.4; specs/items/generation.md §7.2, §7.3
+// Spec: specs/world/npc.md §2–§8; specs/world/hirelings.md §5 r4; specs/world/quests.md §4; specs/world/quests-act1.md §10; specs/sim/stat-lists.md §9; specs/sim/tick.md §5.2–§5.4; specs/items/generation.md §7.2, §7.3
 //! [`NpcWorld`] on the real providers: unit records (GUID, class, mode,
 //! act, flags), the unit lists (GUID lookup), the stat lists (stats,
 //! maxima, states, state lists), the timer queue (the AI think), the item
@@ -286,7 +286,7 @@ impl<'a, H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> NpcWorld
         QuestRest::send(&mut *self.rest, player, msg);
     }
 
-    // ---- quests (`quests.md` §1, §4, §10)
+    // ---- quests (`quests.md` §1, §4, `quests-act1.md` §10)
 
     fn quest_flags(&self, player: UnitId) -> QuestFlags {
         let d = usize::from(self.econ.fields.difficulty);

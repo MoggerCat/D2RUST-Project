@@ -1,5 +1,7 @@
 # Handoff: lighting, shading and blend modes in code — `claude/impl-lighting-blend`
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the ninth fold (`claude/fold-handoff-night`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Ninth set" (PC 1 / PC 2).
+
 Cloud implementation session, 2026-10-06. Base `claude/specs-staging`
 (`5844674`). Repo only, synthetic fixtures, no game files. Implements
 `specs/render/lighting.md` (+ `env-periods.tsv`, `wall-light-points.tsv`,

@@ -1,5 +1,7 @@
 # Handoff: live room population (branch `claude/impl-room-population`, 2026-10-06)
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the ninth fold (`claude/fold-handoff-night`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Ninth set" (PC 1 / PC 2).
+
 Cloud implementation session, repo only (no `game/`), from
 `claude/specs-staging` at `5844674`. Read: `specs/`, `docs/`, `crates/`,
 `tools/`. Implements `specs/drlg/levels.md` §11 (logical rooms and the
@@ -76,7 +78,7 @@ other sessions (`monsters::ai::tests::specd_here_*`,
    masked index while the counter stays below 0x0FFFFFFF).
 5. §11.3 step 9 (wall record +0x10) not stored: read only by drawing.
 
-## 4. Local run queue (for `HANDOFF.md` §5; M02)
+## 4. Local run queue (HANDOFF §5 C89 for items 1–2, S9-A6 for items 3–4; M02)
 
 1. `cargo test -p d2-server world_data -- --ignored` with `D2_GAME_DIR`:
    unchanged expectations; additionally the Den of Evil / Blood Moor

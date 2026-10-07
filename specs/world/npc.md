@@ -425,7 +425,7 @@ Hell only (difficulty 2): if slot 1 bit 0 is set and slot 41 bits 1 and
 0 are clear → `0x0058FD20` (sets 41.13, 41.1). Then any difficulty: if
 slot 41 bit 1 is set → reset stats (`0x00570360`) and skills
 (`0x00570C80`) (player spec), sound for the player (`0x00553380`),
-`0x0058FD50` (41.0 set, 41.1 cleared; `quests.md` §10.3).
+`0x0058FD50` (41.0 set, 41.1 cleared; `quests-act1.md` §10.3).
 
 #### 8.3 Act travel
 

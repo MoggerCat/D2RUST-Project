@@ -1,4 +1,5 @@
-// Spec: specs/items/inventory.md §6–§10; specs/sim/unit-order.md §5–§6; specs/sim/units.md §2, §3.2; specs/items/generation.md §3
+// Spec: specs/items/inventory-moves.md §6–§10; specs/sim/unit-order.md §5–§6; specs/sim/units.md §2, §3.2; specs/items/generation.md §3
+// Spec: specs/items/inventory.md (the sections other than §6–§11)
 //! [`MovePending`] on [`InvDesk`]. Wired: the room list (`0x0064C2C0`
 //! insert, `0x0064C370` remove, `unit-order.md` §5), the update queue
 //! (`0x0064C040`, §6), "alive" (`0x005541B0`, `units.md` §2), "has
@@ -57,7 +58,7 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
     /// `0x00555600` (`units.md` §3.2) frees the unit and its item data.
     /// An item still linked in an inventory is logged
     /// ([`InvError::FreedWhileLinked`]) and freed.
-    // TODO(spec: inventory.md §7.12 / §10.1): what `0x00557FD0` does
+    // TODO(spec: inventory-moves.md §7.12 / §10.1): what `0x00557FD0` does
     // besides the unit removal (unlink, room, messages).
     fn free_item(&mut self, item: Guid) {
         let Some(u) = self.item_unit(item) else {

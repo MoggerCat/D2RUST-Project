@@ -138,3 +138,86 @@ fn threshold_vectors() {
     // 32-bit wrap.
     assert_eq!(threshold(i32::MAX, 2), i32::MAX.wrapping_mul(12));
 }
+
+// Covers: specs/world/hirelings.md §1.1 r1, §1.1 r3
+#[test]
+fn from_table_reads_the_row_columns() {
+    use d2_data::bin::BinTable;
+    use d2_data::tables::{Hireling, Record};
+    // Two 280-byte records: the selecting columns at their offsets
+    // (Version u16 +0x00, Id +0x04, Class +0x08, Act +0x0C, Difficulty
+    // +0x10, Seller +0x14, Level +0x1C) and the name ids u16 +0x114 /
+    // +0x116.
+    let mut records = vec![0u8; 2 * Hireling::SIZE];
+    let put = |r: &mut [u8], o: usize, v: &[u8]| r[o..o + v.len()].copy_from_slice(v);
+    for (i, r) in records
+        .as_chunks_mut::<{ Hireling::SIZE }>()
+        .0
+        .iter_mut()
+        .enumerate()
+    {
+        let i = i as u32;
+        put(r, 0x00, &100u16.to_le_bytes());
+        put(r, 0x04, &(3 + i).to_le_bytes());
+        put(r, 0x08, &271u32.to_le_bytes());
+        put(r, 0x0C, &1u32.to_le_bytes());
+        put(r, 0x10, &2u32.to_le_bytes());
+        put(r, 0x14, &150u32.to_le_bytes());
+        put(r, 0x1C, &36u32.to_le_bytes());
+        put(r, 0x114, &(1000 + i as u16).to_le_bytes());
+        put(r, 0x116, &1040u16.to_le_bytes());
+    }
+    let t = BinTable {
+        name: Hireling::TABLE.into(),
+        source: "patch_d2.mpq".into(),
+        count: 2,
+        record_size: Hireling::SIZE,
+        records,
+    };
+    let rows = HirelingRows::from_table(&t).expect("hireling");
+    let r = rows.rows[1];
+    assert_eq!(
+        (
+            r.version,
+            r.id,
+            r.class,
+            r.act,
+            r.difficulty,
+            r.seller,
+            r.level
+        ),
+        (100, 4, 271, 1, 2, 150, 36)
+    );
+    assert_eq!((r.name_first, r.name_last), (1001, 1040));
+    // Each Id is its own row set: Id 4 at L 36 is row 1, Id 3 row 0.
+    assert_eq!(rows.row_at(true, 4, 50), Some(1));
+    assert_eq!(rows.row_at(true, 3, 50), Some(0));
+    assert_eq!(rows.row_at(false, 3, 50), None, "version 100 only");
+    // Not the hireling table: an error.
+    let bad = BinTable {
+        name: "levels".into(),
+        ..t
+    };
+    assert!(HirelingRows::from_table(&bad).is_err());
+}
+
+// Covers: specs/world/hirelings.md §edge-cases-original-bugs text, §edge-cases-original-bugs r1
+#[test]
+fn offer_level_follows_the_player_level_at_evaluation() {
+    // The same slot seed evaluated at player level 10 and 11: L moves by
+    // one, and the price with it (Gold·(100 + 15·d)/100).
+    // The rows of the offer vector (Fire Id 0, then Ice Id 1).
+    let mut rows = vec![row(100, 0, 1, 1, 3)];
+    rows.extend(
+        act1_ice_rows()
+            .into_iter()
+            .map(|r| HirelingRow { gold: 150, ..r }),
+    );
+    let t = HirelingRows::new(rows);
+    let a = t.offer(true, 10, 22_752_887, 0, 0).expect("offer");
+    let b = t.offer(true, 11, 22_752_887, 0, 0).expect("offer");
+    assert_eq!((a.row, a.level, a.price), (1, 6, 217));
+    assert_eq!((b.row, b.level, b.price), (1, 7, 150 * 160 / 100));
+    // Re-evaluating at the same level gives the same offer.
+    assert_eq!(t.offer(true, 10, 22_752_887, 0, 0), Some(a));
+}

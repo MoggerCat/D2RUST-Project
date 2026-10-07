@@ -148,16 +148,16 @@ row against `s2c::AUDIT` by `note_table_matches_audit`.
 | 0x3C | - | 0 | never | - | size 0: never receivable (§3.1 r3) |
 | 0x3D | - | 0 | never | - | size 0: never receivable (§3.1 r3) |
 | 0x3E | UpdateItemStats | u8@1;min=2 | unspecified | - | size rule only |
-| 0x3F | UseStackableItem | 8 | generated | `UseStackableItem` | TSV layout; senders: impl-moves (inventory.md §11) |
+| 0x3F | UseStackableItem | 8 | generated | `UseStackableItem` | TSV layout; senders: impl-moves (inventory-moves.md §11) |
 | 0x40 | ItemFlags | 13 | unspecified | - | size rule only |
 | 0x41 | - | 0 | never | - | size 0: never receivable (§3.1 r3) |
-| 0x42 | ClearCursor | 6 | generated | `ClearCursor` | TSV layout; senders: impl-moves (inventory.md §11) |
+| 0x42 | ClearCursor | 6 | generated | `ClearCursor` | TSV layout; senders: impl-moves (inventory-moves.md §11) |
 | 0x43 | - | 0 | never | - | size 0: never receivable (§3.1 r3) |
 | 0x44 | - | 0 | never | - | size 0: never receivable (§3.1 r3) |
 | 0x45 | Unknown45 | 13 | unspecified | - | size rule only |
 | 0x46 | - | 0 | never | - | size 0: never receivable (§3.1 r3) |
-| 0x47 | Relator1 | 11 | generated | `Relator1` | TSV layout; senders: impl-moves (inventory.md §11) |
-| 0x48 | Relator2 | 11 | generated | `Relator2` | TSV layout; senders: impl-moves (inventory.md §11) |
+| 0x47 | Relator1 | 11 | generated | `Relator1` | TSV layout; senders: impl-moves (inventory-moves.md §11) |
+| 0x48 | Relator2 | 11 | generated | `Relator2` | TSV layout; senders: impl-moves (inventory-moves.md §11) |
 | 0x49 | - | 0 | never | - | size 0: never receivable (§3.1 r3) |
 | 0x4A | - | 0 | never | - | size 0: never receivable (§3.1 r3) |
 | 0x4B | - | 0 | never | - | size 0: never receivable (§3.1 r3) |
@@ -210,7 +210,7 @@ row against `s2c::AUDIT` by `note_table_matches_audit`.
 | 0x7A | PetAction | 13 | unspecified | - | size rule only |
 | 0x7B | AssignHotkey | 8 | unspecified | - | size rule only |
 | 0x7C | UseScroll | 6 | unspecified | - | size rule only |
-| 0x7D | SetItemState | 18 | generated | `SetItemState` | TSV layout; senders: impl-moves (inventory.md §11) |
+| 0x7D | SetItemState | 18 | generated | `SetItemState` | TSV layout; senders: impl-moves (inventory-moves.md §11) |
 | 0x7E | Unknown7E | 5 | unspecified | - | size rule only |
 | 0x7F | AllyPartyInfo | 10 | unspecified | - | size rule only |
 | 0x80 | - | 0 | never | - | size 0 (client expects 4; never receivable, §3.1 r2) |
@@ -241,8 +241,8 @@ row against `s2c::AUDIT` by `note_table_matches_audit`.
 | 0x99 | SkillTriggered | 16 | unspecified | - | size rule only |
 | 0x9A | Unknown9A | 17 | unspecified | - | size rule only |
 | 0x9B | Unknown9B | 7 | built | `Unknown9B` | npc.md §7.3 step 4 |
-| 0x9C | ItemActionWorld | u8@2;min=3 | partial | - | header given (inventory.md §11); item bit stream unspecified (inventory.md OQ1); senders: impl-moves |
-| 0x9D | ItemActionOwned | u8@2;min=3 | partial | - | header given (inventory.md §11); item bit stream unspecified (inventory.md OQ1); senders: impl-moves |
+| 0x9C | ItemActionWorld | u8@2;min=3 | partial | - | header given (inventory-moves.md §11); item bit stream unspecified (inventory.md OQ1); senders: impl-moves |
+| 0x9D | ItemActionOwned | u8@2;min=3 | partial | - | header given (inventory-moves.md §11); item bit stream unspecified (inventory.md OQ1); senders: impl-moves |
 | 0x9E | MercStatByte | 7 | unspecified | - | size rule only |
 | 0x9F | MercStatWord | 8 | unspecified | - | size rule only |
 | 0xA0 | MercStatDword | 10 | unspecified | - | size rule only |

@@ -1,4 +1,4 @@
-// Spec: specs/items/inventory.md (integration of the wired item-move code)
+// Spec: specs/items/inventory.md, specs/items/inventory-moves.md (integration of the wired item-move code)
 //! Integration tests: the item-move handlers (`items::moves`) run on the
 //! inventory model (`items::inventory`), the real unit allocator, unit
 //! lists, stat lists and item creation through [`InvDesk`], on synthetic

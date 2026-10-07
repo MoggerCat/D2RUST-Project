@@ -193,7 +193,7 @@ fn no_player_inventory_is_0_and_missing_merc_inventory_is_created() {
     assert_eq!(f.log[0], "create_inventory M");
 }
 
-// Covers: specs/world/hirelings.md §11 r2, §11 r3
+// Covers: specs/world/hirelings.md §11 text, §11 r2, §11 r3
 #[test]
 fn empty_target_duplicates_equips_and_consumes() {
     let mut f = Fake::new();

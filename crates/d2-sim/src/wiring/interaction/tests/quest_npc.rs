@@ -1,4 +1,4 @@
-// Spec: specs/world/quests.md §7.3, §10.2; specs/world/npc.md §7.5
+// Spec: specs/world/quests.md §7.3; specs/world/quests-act1.md §10.2; specs/world/npc.md §7.5
 //! C→S 0x31 message 92 (Kashya, Sisters' Burial Grounds reward) through
 //! the desk: the real quest handler grants the reward and the real NPC
 //! control block hires the mercenary from Kashya's real hire list.
@@ -38,7 +38,7 @@ fn kashya_reward_hires_from_the_real_hire_list() {
         .find(|s| s.offered && !s.hired)
         .copied()
         .expect("an offered slot");
-    // Blood Raven's kill gave 2.13 and 2.1 (`quests.md` §10.5).
+    // Blood Raven's kill gave 2.13 and 2.1 (`quests-act1.md` §10.5).
     let f = &mut w.rest.quests.get_mut(&player).unwrap().flags[0];
     f.set(2, bit::PRIMARY_GOAL_DONE);
     f.set(2, bit::REWARD_PENDING);
@@ -60,7 +60,7 @@ fn kashya_reward_hires_from_the_real_hire_list() {
     want.extend_from_slice(&offered.name.to_le_bytes());
     want.resize(15, 0);
     assert!(sent.contains(&want));
-    // Every Act I callback has a body (`quests.md` §10): only the
+    // Every Act I callback has a body (`quests-act1.md` §10): only the
     // deferred reward is logged, after the quest call.
     assert_eq!(w.rest.log[0], "spawn merc 271 4");
     // The init (`hirelings.md` §3.2): Kashya's `Id` 0 node for the slot.
