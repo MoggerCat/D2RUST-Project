@@ -42,15 +42,15 @@
 |   5. Quest updater and timers (tick step 8) | 454–475 |
 |   6. Status reporting | 476–580 |
 |   7. NPC dialog hooks | 581–613 |
-|   8. Act transitions, warps and portals | 614–695 |
-|   9. Quest items, rewards and helpers | 696–859 |
-|   11. Acts II–V | 860–875 |
-| Constants & data dependencies | 876–890 |
-| Randomness | 891–917 |
-| Edge cases & original bugs | 918–936 |
-| Test vectors | 937–968 |
-| Provenance | 969–997 |
-| Open questions | 998–1059 |
+|   8. Act transitions, warps and portals | 614–699 |
+|   9. Quest items, rewards and helpers | 700–863 |
+|   11. Acts II–V | 864–879 |
+| Constants & data dependencies | 880–894 |
+| Randomness | 895–921 |
+| Edge cases & original bugs | 922–940 |
+| Test vectors | 941–972 |
+| Provenance | 973–1001 |
+| Open questions | 1002–1063 |
 <!-- /index -->
 
 ## Summary
@@ -616,7 +616,11 @@ args: player, NPC class (0 if none), message; dispatch event 11 (1, 1).
 #### 8.1 Act completion (`0x005467E0(game, player, npc)`)
 
 Called by the NPC travel action (`world/npc.md`, from `0x00579D60`)
-before the act change; only for a monster NPC:
+**after** the act change: at each of the three travel sites the act
+change `0x0054B830` runs first (`0x0057A67A`, `0x0057A6FF`,
+`0x0057A786`), then `0x005467E0` (`0x0057A688`, `0x0057A70D`,
+`0x0057A794`), then the waypoint step (`0x00660E00`; corrected
+2026-10-07, disassembly); only for a monster NPC:
 
 | NPC (class) | Condition | Sets (player record) | Then |
 |---|---|---|---|
