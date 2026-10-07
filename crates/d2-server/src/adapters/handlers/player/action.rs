@@ -154,14 +154,11 @@ impl<X: Pending> PlayerWorld for ActionPlayer<'_, '_, X> {
     fn overhead_text_test(&self, text: &[u8]) -> bool {
         self.v.h.x.overhead_text_test(text)
     }
-    /// The timeout frame at unit +0xA4 (`UnitRecord::hover`, read by
-    /// event 6, `units.md` §6.1); the record's contents go to
-    /// `Pending::replace_overhead`.
+    /// `View::replace_overhead`: the timeout frame at unit +0xA4
+    /// (`UnitRecord::hover`, read by event 6, `units.md` §6.1) and the
+    /// record the overhead 0x26 sends (`intents-events.md` §7.9 rule 3).
     fn replace_overhead(&mut self, u: UnitId, text: &[u8], byte8: u8, end: i32) {
-        if let Some(r) = self.v.units.get_mut(u) {
-            r.hover = Some(end);
-        }
-        self.v.h.x.replace_overhead(u, text, byte8, end);
+        self.v.replace_overhead(u, text, byte8, end);
     }
     fn highlight_door(&mut self, player: UnitId, guid: u32) {
         self.v.h.x.highlight_door(self.game, player, guid);
@@ -224,8 +221,7 @@ impl<X: Pending> PlayerWorld for ActionPlayer<'_, '_, X> {
     /// The path provider's mode request (`pathing.md` §1.2, re-entry 1).
     ///
     /// Without the path provider no mode request runs (none is wired
-    /// outside it): a d2rs wiring choice, no 1.14d behaviour (triage:
-    /// no spec needed).
+    /// outside it; a d2rs wiring choice, `pathing.md` §1.2).
     fn start_mode_skip_gate(&mut self, player: UnitId, mode: u32) {
         if self.v.h.paths.is_some() {
             d2_sim::wiring::path::walk::request_skip_gate(self.v, self.game, player, mode, 0, 0);
