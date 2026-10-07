@@ -293,6 +293,36 @@ pub fn sync(cache: &mut SyncCache, cur: &Current, force: bool) -> Synced {
     } else {
         None
     };
+    finish(cache, cur, msg, &mut out);
+    out
+}
+
+/// The join's call `0x00548760(P, client, force 1)`
+/// (`sim/intents-events.md` §8.2 rule 3.9): step 1 as [`sync`], then
+/// S→C 0x95 (`0x0053C320`; the cache-dependent 0x18 and 0x96 are not
+/// taken at a join), then steps 4–6 on the cache.
+pub fn join(cache: &mut SyncCache, cur: &Current) -> Synced {
+    let mut out = Synced::default();
+    if cur.max_life <= 0 {
+        return out;
+    }
+    let m = life_mana_update2(
+        cur.life,
+        cur.mana,
+        cur.stamina,
+        cur.x,
+        cur.y,
+        cur.dx,
+        cur.dy,
+    )
+    .to_vec();
+    finish(cache, cur, Some(m), &mut out);
+    out
+}
+
+/// Step 3's cache writes for `msg`, then steps 4–6.
+fn finish(cache: &mut SyncCache, cur: &Current, msg: Option<Vec<u8>>, out: &mut Synced) {
+    let (life, mana, stamina) = (cur.life as u16, cur.mana as u16, cur.stamina as u16);
     match msg {
         Some(m) => {
             out.messages.push(m);
@@ -323,7 +353,6 @@ pub fn sync(cache: &mut SyncCache, cur: &Current, force: bool) -> Synced {
     cache.lp = cur.lp;
     cache.mp = cur.mp;
     out.done = true;
-    out
 }
 
 #[cfg(test)]

@@ -128,6 +128,22 @@ impl<X: Pending> CollisionView for Shared<'_, '_, X> {
             d.flags |= crate::path::record::flags::ROOM_CHANGED;
         }
     }
+    /// Game entry's `0x005381F0` → `0x00537B50` for the client whose
+    /// player is `player` ([`crate::wiring::action::View::room_switch`]);
+    /// a player without a client: nothing.
+    fn client_room_switch(&mut self, player: UnitId, room: RoomId) {
+        let mut c = self.0.borrow_mut();
+        let c = &mut *c;
+        let client = c
+            .game
+            .lists
+            .clients()
+            .into_iter()
+            .find(|&k| c.game.lists.client(k).and_then(|e| e.player) == Some(player));
+        if let Some(client) = client {
+            c.v.room_switch(c.game, client, Some(room));
+        }
+    }
 }
 
 /// S→C 0x07 MapReveal (`sim/server-messages.tsv`: x u16 @1, y u16 @3,
@@ -197,6 +213,7 @@ impl<X: Pending> PlaceHost<UnitId> for Shared<'_, '_, X> {
                 let (t, g) = id(&c, unit);
                 crate::path::walk::messages::player_stop(t, g, a, x, y, b, life_pct).to_vec()
             }
+            PlaceMessage::GameEntryDone => crate::units::messages::GAME_ENTRY_DONE.to_vec(),
         };
         c.v.h.x.send(player, &bytes);
     }
@@ -306,8 +323,10 @@ pub fn place_unit<X: Pending>(
 
 /// Game entry `0x005394A0` of a player not yet placed (§11, §13): the
 /// spawn point of act `act`'s town (tile index 0, the unit's size), S→C
-/// 0x07 for the spawn room, `0x00554850(flag 0)`, S→C 0x15 with flag 1,
-/// both to the player's client ([`Pending::send`]). `true` placed; a fatal
+/// 0x07 for the spawn room, the client's room switch (S→C 0x07 and the
+/// add messages of every room of the spawn room's adjacency array,
+/// `sim/intents-events.md` §7.8), `0x00554850(flag 0)`, S→C 0x15 with
+/// flag 1, S→C 0x7E, all to the player's client ([`Pending::send`]). `true` placed; a fatal
 /// assert (no spawn room, no free point, no act) is logged as
 /// [`WiringError::Place`] and gives `false`.
 pub fn game_entry<X: Pending>(c: PathCtx<'_, X>, player: UnitId, act: u8) -> bool {

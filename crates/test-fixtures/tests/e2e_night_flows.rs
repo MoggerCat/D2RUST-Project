@@ -333,10 +333,7 @@ impl Fx {
                 data: Some(PlayerData { last_accept: 0 }),
             },
         );
-        let entry = Entry {
-            act: 0,
-            name: name(),
-        };
+        let entry = Entry::new(0, name());
         assert_eq!(enter_game(&mut s, CLIENT, &entry), Ok(player));
         let mut host: TestHost = Host::new(s, ProtoSizes, NoSession, Ms(1000));
         host.connect(CLIENT);
@@ -529,7 +526,7 @@ fn quest_info(rec: &PlayerQuests) -> Vec<u8> {
 
 // ---- 1. game creation and the join -----------------------------------------------------
 
-// Covers: specs/sim/rng.md §5.2 text; specs/world/objects.md §2 r2; specs/sim/path-placement.md §11 text, §13 r1, §13 r3; specs/client/model.md §11 r1, §11 r3
+// Covers: specs/sim/rng.md §5.2 text; specs/world/objects.md §2 r2; specs/sim/path-placement.md §11 text, §13 r1, §13 r3; specs/client/model.md §11 r1, §11 r3; specs/sim/intents-events.md §8.2 r3, §8.3
 #[test]
 fn game_creation_then_the_real_join() {
     let mut fx = Fx::new();
@@ -553,11 +550,13 @@ fn game_creation_then_the_real_join() {
         "keeper (monstats row 2)"
     );
 
-    // The join (`path-placement.md` §13, `model.md` §11): 0x59, 0x0B,
+    // The join (`intents-events.md` §8.2, `path-placement.md` §11, §13):
+    // 0x59 with the player's own part B (0xAA without states, 0x76), 0x0B,
     // 0x03 (act 0, the act DRLG's init seed, the town level, game +0x80 =
-    // `dwObjSeed`), 0x07 of the spawn room, 0x15 at the spawn search's
-    // point (flag 1), then the first tick's room switch: one 0x07 per room
-    // of the spawn room's adjacency array (the town has one room).
+    // `dwObjSeed`), game entry: 0x07 of the spawn room, the room switch's
+    // 0x07 per room of its adjacency array (the town has one room, no
+    // unit in it), 0x15 at the spawn search's point (flag 1), 0x7E; then
+    // the first tick: the room is ready, 0x04 (`tick.md` §6 rule 6).
     let p = fx.player;
     let g = fx.guid(p).to_le_bytes();
     let (x, y) = fx.pos(p);
@@ -582,9 +581,22 @@ fn game_creation_then_the_real_join() {
     place.extend((x as u16).to_le_bytes());
     place.extend((y as u16).to_le_bytes());
     place.push(1);
+    let states = vec![0xAA, 0, g[0], g[1], g[2], g[3], 8, 0xFF];
+    let proximity = vec![0x76, 0, g[0], g[1], g[2], g[3]];
     assert_eq!(
         fx.joined,
-        vec![assign, handshake, load, reveal.clone(), place, reveal],
+        vec![
+            assign,
+            states,
+            proximity,
+            handshake,
+            load,
+            reveal.clone(),
+            reveal,
+            place,
+            vec![0x7E, 0, 0, 0, 0],
+            vec![0x04]
+        ],
         "{:02x?}",
         fx.joined
     );

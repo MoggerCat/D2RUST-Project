@@ -159,3 +159,95 @@ fn room_switch_reveals_each_joined_room_in_adjacency_order() {
     assert_eq!(reveal_of(d, rc), [0x07, 16, 0, 0, 0, LEVEL as u8]);
     fx.assert_clean();
 }
+
+// Covers: specs/sim/intents-events.md §7.8 r2, §7.8 r3, §7.8 r5, §7.2; specs/sim/tick.md §6 r4, §6 r6
+#[test]
+fn room_switch_sends_add_and_leave_messages_and_the_join_completes() {
+    // A, B, C in a row (A's array {A, B}, C's {B, C}). An object and a
+    // warp tile stand in A. A joining client (state 3) whose player is in
+    // A: tick 1's per-client update switches to A (0x07 A, the object's
+    // 0x51, the tile's 0x09, 0x07 B), the rooms are populated by step 3,
+    // so the room is ready and 0x04 follows, the client in game. Then the
+    // player moves to C: 0x07 C, then A's leave: 0x0A for each unit of A,
+    // 0x08 A.
+    let mut fx = Fx::with_rooms(&[
+        (LEVEL, TileRect::new(0, 0, 8, 8)),
+        (LEVEL, TileRect::new(8, 0, 8, 8)),
+        (LEVEL, TileRect::new(16, 0, 8, 8)),
+    ]);
+    let a = fx.a;
+    let p = fx.spawn(UnitType::Player, 0, a, 10, 10);
+    let o = fx.spawn(UnitType::Object, 7, a, 12, 14);
+    let t = fx.spawn(UnitType::Tile, 3, a, 20, 21);
+    let c = fx
+        .game
+        .lists
+        .add_client(Some(p), None, client_state::JOINING);
+    fx.sim.sys.hooks.x.sent.clear();
+    fx.tick();
+    let sent = |fx: &mut Fx| -> Vec<Vec<u8>> {
+        let v = fx
+            .sim
+            .sys
+            .hooks
+            .x
+            .sent
+            .iter()
+            .filter(|(u, _)| *u == p)
+            .map(|(_, m)| m.clone())
+            .collect();
+        fx.sim.sys.hooks.x.sent.clear();
+        v
+    };
+    let guid = |fx: &Fx, u: UnitId| fx.game.lists.unit(u).unwrap().guid;
+    let (go, gt) = (guid(&fx, o), guid(&fx, t));
+    let game = &fx.game;
+    let (d, ra) = fx.sim.sys.hooks.drlg.drlg_room(game, a).unwrap();
+    let adj = d.active_room(ra).unwrap().adjacency.clone();
+    assert_eq!(adj.len(), 2);
+    let (rev_a, rev_b) = (reveal_of(d, adj[0]), reveal_of(d, adj[1]));
+    assert_eq!(adj[0], ra, "the room itself first in its array");
+    let hide_a = {
+        let mut m = rev_a.clone();
+        m[0] = 0x08;
+        m
+    };
+    let unit_list: Vec<UnitId> = fx.game.lists.room_units(a);
+    let mut adds: Vec<Vec<u8>> = Vec::new();
+    for &u in &unit_list {
+        if u == o {
+            adds.push(crate::units::messages::assign_object(go, 7, 12, 14, 1, 0).to_vec());
+        } else if u == t {
+            adds.push(crate::units::messages::assign_warp(5, gt, 3, 20, 21).to_vec());
+        }
+    }
+    let mut want = vec![rev_a.clone()];
+    want.extend(adds);
+    want.push(rev_b);
+    want.push(vec![0x04]);
+    assert_eq!(sent(&mut fx), want);
+    assert_eq!(
+        fx.game.lists.client(c).unwrap().state,
+        client_state::IN_GAME
+    );
+    // A → C.
+    let rc_id = act_rooms(&fx)
+        .into_iter()
+        .find(|&r| {
+            fx.sim.sys.hooks.drlg.subtiles(&fx.game, r) == Some(TileRect::new(80, 0, 40, 40))
+        })
+        .expect("room C active");
+    fx.game.lists.change_room(p, rc_id).unwrap();
+    fx.tick();
+    let game = &fx.game;
+    let (d, rc) = fx.sim.sys.hooks.drlg.drlg_room(game, rc_id).unwrap();
+    let mut want = vec![reveal_of(d, rc)];
+    for u in fx.game.lists.room_units(a) {
+        let e = fx.game.lists.unit(u).unwrap();
+        want.push(crate::units::messages::remove_unit(e.ty as u8, e.guid).to_vec());
+    }
+    want.push(hide_a);
+    assert_eq!(sent(&mut fx), want);
+    assert_eq!(fx.game.lists.room_units(a).len(), 2);
+    fx.assert_clean();
+}

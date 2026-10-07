@@ -168,9 +168,11 @@ where
 /// point of the act's start level with tile index 0 and size = the
 /// unit's size (`0x00620510`, 2 for a player); no spawn room is a fatal
 /// assert ([`PlaceError::NoSpawnRoom`]); S→C 0x07 for the spawn room,
+/// the client's room switch to it ([`CollisionView::client_room_switch`]:
+/// a 0x07 for every room of its adjacency array, `0x005381F0`),
 /// `0x00554850(flag 0)` puts the player in the world (the room-changed
-/// flag is set), S→C 0x15 with flag 1. Every message goes to the
-/// player's own client.
+/// flag is set), S→C 0x15 with flag 1, S→C 0x7E. Every message goes to
+/// the player's own client. Followers (§13 rule 4) are the caller's.
 pub fn game_entry<C, H, L>(
     cv: &mut C,
     host: &mut H,
@@ -197,6 +199,7 @@ where
             level: reveal.level as u8,
         },
     );
+    cv.client_room_switch(player, room);
     cv.add_player_to_world(player, room, p.x, p.y);
     host.send(
         player,
@@ -207,6 +210,7 @@ where
             flag: 1,
         },
     );
+    host.send(player, PlaceMessage::GameEntryDone);
     Ok(true)
 }
 
@@ -510,9 +514,11 @@ pub(crate) mod tests {
             [
                 "send 0 MapReveal { x: 100, y: 200, level: 7 }",
                 "send 0 ReassignPlayer { unit: 0, x: 13, y: 8, flag: 1 }",
+                "send 0 GameEntryDone",
             ]
         );
-        assert_eq!(g.log, ["add 0 r0 (13,8)"]);
+        // The room switch before the placement (§11).
+        assert_eq!(g.log, ["switch 0 r0", "add 0 r0 (13,8)"]);
         // Level warp: spawn of the given level and tile index, then a
         // placement whose second search finds the same point.
         let mut g = Grid::vec20();
