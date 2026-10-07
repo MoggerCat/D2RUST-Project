@@ -17,6 +17,7 @@ use d2_native::manifest::{
     NativeFile, Status, FILES_HEADER,
 };
 
+use crate::ctable::{self, TableSummary};
 use crate::fsutil::{atomic_write, join, sha256_file, sha256_hex, walk_files};
 use crate::kind::{Failure, Kind, NativeData};
 use crate::names::{self, archive_name};
@@ -99,6 +100,9 @@ pub struct RunSummary {
     pub failures: Vec<(String, String, String)>,
     /// False when `stop_after` ended the run early.
     pub finished: bool,
+    /// C-TABLE step 2 (`None`: the install has no live `.bin`, or the run
+    /// did not finish).
+    pub tables: Option<TableSummary>,
 }
 
 impl RunSummary {
@@ -554,7 +558,22 @@ pub fn convert(opts: &Options, kinds: &[Box<dyn Kind>]) -> Result<RunSummary, Co
             rows: rows.into_values().collect(),
             failures,
             finished,
+            tables: None,
         });
+    }
+
+    // 4b. C-TABLE step 2: the native excel set against the live `.bin`s
+    // (§4.3). Its row is never resumed; it is rederived every run.
+    let mut tables = None;
+    if ctable::applicable(&set) {
+        say(opts, "C-TABLE: compiling the native excel set");
+        let (row, summary, fails) = ctable::run(&set, &opts.language, &base);
+        for (path, detail) in fails {
+            failures.push((path, "C-TABLE".to_owned(), detail));
+        }
+        rows.insert(row.path.clone(), row);
+        say(opts, &format!("C-TABLE: {}", summary.line()));
+        tables = Some(summary);
     }
 
     // 5. Final files.tsv (sorted), orphan sweep, manifest, report.
@@ -596,6 +615,7 @@ pub fn convert(opts: &Options, kinds: &[Box<dyn Kind>]) -> Result<RunSummary, Co
         rejected_names: nameset.rejected.len(),
         kind_time: &per_kind_time,
         wall: started.elapsed(),
+        tables: tables.as_ref(),
     };
     atomic_write(&out.join("report.txt"), report::render(&rep).as_bytes())
         .map_err(io_err("writing report.txt"))?;
@@ -613,6 +633,7 @@ pub fn convert(opts: &Options, kinds: &[Box<dyn Kind>]) -> Result<RunSummary, Co
         rows: all_rows,
         failures,
         finished,
+        tables,
     })
 }
 

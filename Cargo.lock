@@ -2438,6 +2438,7 @@ name = "d2-convert"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "d2-data",
  "d2-formats",
  "d2-native",
  "sha2",

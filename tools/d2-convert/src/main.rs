@@ -7,7 +7,7 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use d2_convert::{convert, kinds, verify, ConvertError, Options, VerifyOptions};
+use d2_convert::{convert, kinds, verify_full, ConvertError, Options, VerifyOptions};
 
 const USAGE: &str = "usage:
   d2-convert convert --install <D2 dir> --out <dir> [--lang ENG] [--force] [--threads N] [--quiet]
@@ -120,12 +120,16 @@ fn main() -> ExitCode {
                 deep_install: if a.deep { a.install } else { None },
                 progress: !a.quiet,
             };
-            let problems = verify(&opts, &kinds);
+            let outcome = verify_full(&opts, &kinds);
+            let problems = outcome.problems;
             for p in &problems {
                 eprintln!("FAILED {p}");
             }
             if problems.is_empty() && !a.quiet {
                 eprintln!("verify: all files pass");
+                if let Some(t) = &outcome.tables {
+                    eprintln!("verify: C-TABLE {}", t.line());
+                }
             }
             ExitCode::from(u8::from(!problems.is_empty()))
         }

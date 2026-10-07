@@ -7,7 +7,9 @@ use std::path::PathBuf;
 
 use d2_formats::mpq::ArchiveSet;
 use d2_native::manifest::{parse_files_tsv, Manifest, Status};
+use d2_native::tables::OVERRIDES_PATH;
 
+use crate::ctable::{self, TableSummary};
 use crate::fsutil::{join, sha256_file, sha256_hex, walk_files};
 use crate::kind::{Kind, NativeData};
 use crate::names::archive_name;
@@ -20,9 +22,34 @@ pub struct VerifyOptions {
     pub progress: bool,
 }
 
+/// What `verify` found.
+#[derive(Debug, Default)]
+pub struct VerifyOutcome {
+    /// One line per problem, naming the file. Empty = pass (exit 0).
+    pub problems: Vec<String>,
+    /// C-TABLE step 2 re-run by `--deep` (`None`: not deep, or the install
+    /// has no live `.bin` tables).
+    pub tables: Option<TableSummary>,
+}
+
 /// Every problem found, one line each, naming the file. Empty = pass
 /// (exit 0).
 pub fn verify(opts: &VerifyOptions, kinds: &[Box<dyn Kind>]) -> Vec<String> {
+    verify_full(opts, kinds).problems
+}
+
+/// [`verify`] plus the tables `--deep` checked.
+pub fn verify_full(opts: &VerifyOptions, kinds: &[Box<dyn Kind>]) -> VerifyOutcome {
+    let mut tables = None;
+    let problems = run(opts, kinds, &mut tables);
+    VerifyOutcome { problems, tables }
+}
+
+fn run(
+    opts: &VerifyOptions,
+    kinds: &[Box<dyn Kind>],
+    tables: &mut Option<TableSummary>,
+) -> Vec<String> {
     let mut problems = Vec::new();
     let out = &opts.out;
     let manifest = match fs::read_to_string(out.join("manifest.toml"))
@@ -109,8 +136,20 @@ pub fn verify(opts: &VerifyOptions, kinds: &[Box<dyn Kind>]) -> Vec<String> {
                 return problems;
             }
         };
+        let applicable = ctable::applicable(&set);
+        let has_row = rows.iter().any(|r| r.path == OVERRIDES_PATH);
+        if applicable && !has_row {
+            problems.push(format!(
+                "{OVERRIDES_PATH}: no files.tsv row (C-TABLE step 2 never ran)"
+            ));
+        }
+        if applicable && has_row {
+            let (summary, p) = ctable::recheck(&set, &manifest.language, &base);
+            problems.extend(p);
+            *tables = Some(summary);
+        }
         for (i, r) in rows.iter().enumerate() {
-            if r.status != Status::Ok {
+            if r.status != Status::Ok || r.path == OVERRIDES_PATH {
                 continue;
             }
             if opts.progress && i % 1000 == 0 {
