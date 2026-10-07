@@ -104,6 +104,48 @@ pub fn create_item<S: ItemStats>(
     Ok(Created { item, event3_at })
 }
 
+/// Create from an index (`0x00559CE0`, `generation.md` §10.2): a request
+/// with the unit, item, quality, the game's item format and the seeds
+/// (allocation fields live with the caller), `flags2` NO_SOCKETS /
+/// NEVER_ETHEREAL from the two switches, `ilvl` ≤ 0 becoming 1; then the
+/// pipeline with `use_seed`, and on success the identified flag.
+#[allow(clippy::too_many_arguments)]
+pub fn create_from_index<S: ItemStats>(
+    t: &ItemTables,
+    game: &mut dyn ItemGame,
+    unit: Option<super::RequestUnit>,
+    index: i32,
+    quality: u8,
+    no_sockets: bool,
+    never_ethereal: bool,
+    ilvl: i32,
+    use_seed: bool,
+    seed: u32,
+    item_seed: u32,
+    stats: S,
+    frame: u32,
+) -> Result<Created<S>, CreateError> {
+    let mut rq = ItemRequest {
+        unit,
+        item: index,
+        quality,
+        format: game.item_format(),
+        ilvl: if ilvl <= 0 { 1 } else { ilvl },
+        seed,
+        item_seed,
+        ..Default::default()
+    };
+    if no_sockets {
+        rq.flags2 |= req::NO_SOCKETS;
+    }
+    if never_ethereal {
+        rq.flags2 |= req::NEVER_ETHEREAL;
+    }
+    let mut created = create_item(t, game, &mut rq, use_seed, stats, frame)?;
+    created.item.flags |= flag::IDENTIFIED;
+    Ok(created)
+}
+
 /// `roll(n)` on the unit seed as i32 (`sim/rng.md` §3).
 fn r(seed: &mut Seed, n: i32) -> i32 {
     seed.roll(n) as i32
@@ -550,9 +592,19 @@ pub fn apply_ethereal<S: ItemStats>(t: &ItemTables, item: &mut Item<S>) {
 fn forced<S: ItemStats>(t: &ItemTables, item: &mut Item<S>, rq: &mut ItemRequest) {
     let copy = |item: &mut Item<S>, bits: u32| item.flags = item.flags & !bits | rq.flags1 & bits;
     copy(item, flag::IDENTIFIED | flag::NOSELL);
-    // Step 2: format 0's forced socket count is not specified (§1.2).
-    // TODO(items OQ-G2): the flag copies of step 2 are read as applying
-    // to every forced item, not to format 0 only.
+    // Step 2, format 0 only: the forced socket count (no draw). The three
+    // flag copies that follow run for every forced request (OQ-G2).
+    let primary = t.item(item.record).map(|r| r.type_);
+    if item.format == 0
+        && primary != Some(ty::TORS as i16)
+        && rq.flags1 & flag::SOCKETED != 0
+        && item.flags & flag::SOCKETED == 0
+    {
+        match max_sockets(t, item) {
+            0 => item.flags &= !flag::SOCKETED,
+            m => socket_count(t, item, (item.start_seed % m as u32) as i32 + 1),
+        }
+    }
     copy(item, flag::SOCKETED | flag::BROKEN | flag::STARTITEM);
     if t.item(item.record)
         .is_some_and(|r| r.type_ == ty::GOLD as i16)
@@ -591,7 +643,7 @@ fn ear<S>(item: &mut Item<S>, rq: &ItemRequest) -> Result<(), CreateError> {
 }
 
 /// §9 step 5, personalized names.
-fn personalize<S>(item: &mut Item<S>, rq: &ItemRequest) -> Result<(), CreateError> {
+pub(crate) fn personalize<S>(item: &mut Item<S>, rq: &ItemRequest) -> Result<(), CreateError> {
     item.name = if rq.force {
         rq.name
     } else {

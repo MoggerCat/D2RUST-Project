@@ -390,10 +390,16 @@ fn stat_op_base_slots_are_reset() {
     }
 }
 
-// No claim: fixups.md §2 text also orders the pass after the count check
-// (loading.md §8), which this test does not observe.
+// Covers: specs/data/fixups.md §2 text
 #[test]
 fn stat_op_source_may_be_its_own_target() {
+    // The pass runs on a set that passed the count check (loading.md §8):
+    // 511 records pass it, 512 fail before any fix-up is applied.
+    let strings = StringTables::default();
+    let many = |n: usize| bin_table("itemstatcost", 0x144, vec![vec![]; n]);
+    assert_eq!(many(1).record_size, 0x144);
+    assert!(crate::bin::post_load_check(&many(511), &[], &strings, true).is_ok());
+    assert!(crate::bin::post_load_check(&many(512), &[], &strings, true).is_err());
     // Stat 1: op 2, param 3, no base (0xFFFF), op stat 1 (itself).
     let s1 = rec(
         0x144,
@@ -418,6 +424,24 @@ fn stat_op_source_may_be_its_own_target() {
     for k in 0..2 {
         assert_eq!(&t.record(k)[0x13E..0x140], [0, 0]);
     }
+}
+
+// Covers: specs/data/fixups.md §11 text
+#[test]
+fn levels_pass_runs_per_record_after_count_check() {
+    let strings = StringTables::default();
+    let mut recs: Vec<Vec<u8>> = (0..2).map(|_| rec(0x220, &[])).collect();
+    recs[1][0x36..0x38].copy_from_slice(&3i16.to_le_bytes());
+    recs[1][0x38..0x3A].copy_from_slice(&(-1i16).to_le_bytes());
+    let mut t = bin_table("levels", 0x220, recs);
+    assert_eq!(t.record_size, 0x220);
+    assert!(crate::bin::post_load_check(&t, &[], &strings, true).is_ok());
+    records::levels(&mut t, &strings).unwrap();
+    // Every record is processed: the counts are per record.
+    assert_eq!(t.record(0)[0x33], 25);
+    assert_eq!(t.record(1)[0x33], 1);
+    let big = bin_table("levels", 0x220, vec![vec![]; 1024]);
+    assert!(crate::bin::post_load_check(&big, &[], &strings, true).is_err());
 }
 
 // Covers: specs/data/fixups.md §4

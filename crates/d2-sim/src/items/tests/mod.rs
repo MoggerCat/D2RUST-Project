@@ -2,6 +2,7 @@
 //! tables and small fakes of the seams.
 
 mod affixes;
+mod cov_items;
 mod create;
 mod gaps_affixes;
 mod gaps_generation;

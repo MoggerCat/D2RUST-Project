@@ -813,3 +813,19 @@ fn game_truth_set() {
     assert_eq!(fixed.tables.len(), 73);
     assert!(d2_data::fixup::PENDING.is_empty());
 }
+
+/// `loading.md` §9: the 1.14d sizes of the combined index spaces. Not yet
+/// run against 1.14d (queued in the report), so no claim.
+#[test]
+#[ignore = "needs original game files in D2_GAME_DIR"]
+fn combined_index_space_sizes() {
+    let n = |t: &str| compiled().table(t).unwrap().compiled.count;
+    assert_eq!([n("weapons"), n("armor"), n("misc")], [306, 202, 151]);
+    assert_eq!(
+        [n("magicsuffix"), n("magicprefix"), n("automagic")],
+        [747, 669, 36]
+    );
+    assert_eq!([n("raresuffix"), n("rareprefix")], [155, 46]);
+    assert_eq!([n("plrtype"), n("plrmode")], [7, 20]);
+    assert_eq!([n("objtype"), n("objmode")], [573, 8]);
+}
