@@ -14,25 +14,26 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 38–46 |
-| Inputs | 47–56 |
-| Outputs / state changes | 57–62 |
-| Rules | 63–64 |
-|   1. Data | 65–78 |
-|   2. Add `0x00575D90(game, player, pet, t, max)` | 79–94 |
-|   3. Group eviction `0x00575720(t)` (player in EDI) | 95–106 |
-|   4. Set the maximum `0x00575850(game, player, t, max)` | 107–117 |
-|   5. Append `0x00575C70(pet, extra)` (E in ESI, game in EAX) | 118–127 |
-|   6. Remove `0x005750E0(game, player, GUID, kill)` and unlink `0x00574850` | 128–156 |
-|   7. Dismiss `0x00574450` (GUID in EBX, game in EDI) | 157–165 |
-|   8. Broadcast and message 0x7A | 166–179 |
-|   9. Lookup `0x00574A20(player, GUID)` | 180–186 |
-| Constants & data dependencies | 187–196 |
-| Randomness | 197–200 |
-| Edge cases & original bugs | 201–212 |
-| Test vectors | 213–221 |
-| Provenance | 222–261 |
-| Open questions | 262–272 |
+| Summary | 39–47 |
+| Inputs | 48–57 |
+| Outputs / state changes | 58–63 |
+| Rules | 64–65 |
+|   1. Data | 66–79 |
+|   2. Add `0x00575D90(game, player, pet, t, max)` | 80–95 |
+|   3. Group eviction `0x00575720(t)` (player in EDI) | 96–107 |
+|   4. Set the maximum `0x00575850(game, player, t, max)` | 108–118 |
+|   5. Append `0x00575C70(pet, extra)` (E in ESI, game in EAX) | 119–131 |
+|   6. Remove `0x005750E0(game, player, GUID, kill)` and unlink `0x00574850` | 132–160 |
+|   7. Dismiss `0x00574450` (GUID in EBX, game in EDI) | 161–169 |
+|   8. Broadcast and message 0x7A | 170–183 |
+|   9. Lookup `0x00574A20(player, GUID)` | 184–190 |
+|   10. Creation, free and maximum resync | 191–230 |
+| Constants & data dependencies | 231–240 |
+| Randomness | 241–244 |
+| Edge cases & original bugs | 245–261 |
+| Test vectors | 262–270 |
+| Provenance | 271–316 |
+| Open questions | 317–331 |
 <!-- /index -->
 
 ## Summary
@@ -120,8 +121,11 @@ The hireling list is never trimmed here.
 1. E.max = 0: resync `0x00575900(game, player)` (`skills/bodies.md` Open
    question 5); still 0 → dismiss (§7) the pet's GUID (−1 without one);
    return 0.
-2. E.count = E.max: head none → fatal assertion; unlink (§6 step 4) the
-   head's GUID with kill 1; still full → fatal assertion.
+2. E.count = E.max: head none → fatal assertion (line 0x312); unlink
+   `0x00574850(head GUID, E, kill 1)` (call at `0x00575CE5`; §6: one
+   0x7A remove from the unlink, then the dismiss `0x00574450` with its
+   own broadcast when the unit exists; no Remove, so no third
+   broadcast); still full → fatal assertion (line 0x316).
 3. A new node {flags 0, pet GUID, extra (3 values)} is linked at the
    tail; E.count += 1; E.count > E.max → fatal assertion. Return 1.
 
@@ -184,6 +188,46 @@ For t = 1…pettype count − 1 in order, each list from its head: a node
 with this GUID → return t. Not found → 0. Used by Unsummon
 (`skills/bodies.md` §3.3) and Remove (§6).
 
+### 10. Creation, free and maximum resync
+
+**Create** `0x00575AF0(game, player)`, called once from the player
+type init `0x005348C0` (allocator, `sim/units.md` §3.1): player data
+none → fatal assertion. P already set → free it first (below). P := a
+4-byte block from the game pool (unit +0x1C); P +0x00 := an array of
+12 · pettype count bytes, zeroed. Then `0x00575A80`: for every pettype
+row t = 0 … count − 1 in order: set the maximum (§4) of t to `basemax`
+(+0x0A, i16). 1.14d: only `single` (1) and `hireable` (7) have basemax
+1; `none` is empty (0) and every other row 0. So a new player starts
+with max 1 for types 1 and 7 and 0 for the rest (§4 rule 2 lets type 1
+take only 1).
+
+**Free** `0x005746D0(game, player)` (from the create above, the player
+free `0x005349D0` and the client leave `0x00539DA0`): player data none
+→ fatal assertion; P null → nothing. For t = 1 … count − 1:
+`0x00574570(game, player, entry t, hireling = (t = 7), 0)`, then the
+array and P are freed and player data +0x44 := 0. `0x00574570` walks the
+list from the head: a non-hireling node → dismiss (§7) its GUID; a
+hireling node whose unit exists → broadcast "remove" {GUID} (§8,
+`0x005538D0` with `0x00574410`), the unit's room gets a removal notice
+(`0x0061A270(room, 1, GUID)`) and the unit is freed (`0x00555600`);
+then count −= 1, max −= 1 and the node is freed. At the end an empty
+list's head := 0.
+
+**Resync** `0x00575900(game, player)` (from §5 rule 1 and the remove
+callbacks of `skills/bodies.md` §2.8; 7 callers): player only, with P
+and a skill list (unit +0xA8). m[0..255] := 0. For each skill of the
+player in list order (`0x00643910`, next `0x006438F0`): its skills
+row; t = `pettype` (+0xBE, i8); 0 < t < pettype count: v =
+`eval(petmax)` (`0x00646CA0(player, calc +0xC0, skill, level)`, level
+= `0x006442A0(player, skill, 1)`), at least 1; v > m[t] → m[t] := v
+and set the maximum (§4) of t to v at once. Then for every t with m[t]
+≤ 0 whose row exists (`0x00478A20`): set the maximum of t to `basemax`.
+§4 trims a list (kill 1) whenever a new maximum is below its count, so
+a lower `petmax` met first can remove pets that a later, higher one
+would have kept (edge case 5). For type 7 no skill has `pettype` 7 in
+1.14d, so its maximum is reset to `basemax` 1 and §4 never trims it.
+No message is sent besides those of the removals.
+
 ## Constants & data dependencies
 
 | Item | Value |
@@ -209,6 +253,11 @@ None.
 4. Setting a maximum below the current count removes the oldest pets one
    by one (kill 1), each with three broadcasts when the unit exists
    (§4, §6 table).
+5. Resync (§10) applies each skill's maximum as soon as it is a new
+   largest for its type, so with two skills of one pet type the list can
+   be trimmed to the first skill's value before the second raises it.
+6. Freeing the lists (§10) also lowers each list's maximum by one per
+   node removed (the lists are freed right after).
 
 ## Test vectors
 
@@ -256,16 +305,26 @@ None.
   `0x00574450`, `0x005751A0`, `0x0057CCB0` (`0x0057CD0D`–`0x0057CD21`);
   the remove-with-kill count is 3, not 2 (§6 table): bodies-3.md §2 was
   right on this point.
+- §10 and Open questions 1, 2, 4 (2026-10-07): `0x00575AF0`,
+  `0x00575A80`, `0x005746D0`, `0x00574570`, `0x00575900`, `0x00575E90`
+  (caller `0x00573394`), `0x00575C70` (`0x00575CBE`, `0x00575CE5`,
+  `0x00575CF2`); writers of player data +0x44 found by scanning
+  `0x00574000`–`0x00576000` for stores to +0x44 (`0x005747A0`,
+  `0x00575B5A` only).
 - D2MOO 1.10f `PlayerPets.cpp` names (`PLAYERPET_*`) used as hints only;
   every step above is from 1.14d.
 
 ## Open questions
 
-1. Who allocates and frees the pet lists (player data +0x44) and sets
-   each entry's initial max from `basemax`; owner: player init spec.
-2. `0x00575900` (resync after a zero maximum): messages and effect
-   (`skills/bodies.md` Open question 5).
+1. Answered (2026-10-07): §10 (create `0x00575AF0` from the player
+   type init, free `0x005746D0`, initial maxima from `basemax`).
+2. Answered (2026-10-07): §10 resync; it sends nothing of its own, and
+   for type 7 (hireable) the maximum returns to `basemax` 1 and is never
+   trimmed (`world/hirelings.md` §5 rule 3).
 3. Recording: summon pets past their maximum and across a group; compare
    the 0x7A messages and which units die.
-4. The three extra node values (+0x08…+0x10): every caller seen passes 0;
-   find a caller that does not (hirelings).
+4. Answered (2026-10-07): the only other append path is
+   `0x00575E90(game, player, pet, 7, extra)` from the hireling init
+   `0x00573270` (call `0x00573394`), extra = {seed, name, row `Id`}
+   (`world/hirelings.md` §3.2 step 6, §5); its broadcast record makes
+   §8's add send S→C 0x81 instead of 0x7A.
