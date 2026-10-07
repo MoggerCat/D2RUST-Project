@@ -32,20 +32,20 @@
 |   1. Conventions | 91–160 |
 |   2. Act III records | 161–188 |
 |   3. A3Q1 Lam Esen's Tome (chain 15, slot 17) | 189–272 |
-|   4. A3Q2 Khalim's Will (chain 16, slot 18) | 273–388 |
-|   5. A3Q3 Blade of the Old Religion (chain 17, slot 19) | 389–495 |
-|   6. A3Q4 The Golden Bird (chain 18, slot 20) | 496–584 |
-|   7. A3Q5 The Blackened Temple (chain 19, slot 21) | 585–681 |
-|   8. A3Q6 The Guardian (chain 20, slot 22) | 682–779 |
-|   9. Act III gossip and intro records | 780–841 |
-|   10. Hooks called from other systems | 842–862 |
-|   11. Clarifications (QC-1 … QC-7) | 863–869 |
-| Constants & data dependencies | 870–886 |
-| Randomness | 887–900 |
-| Edge cases & original bugs | 901–948 |
-| Test vectors | 949–966 |
-| Provenance | 967–993 |
-| Open questions | 994–1020 |
+|   4. A3Q2 Khalim's Will (chain 16, slot 18) | 273–389 |
+|   5. A3Q3 Blade of the Old Religion (chain 17, slot 19) | 390–496 |
+|   6. A3Q4 The Golden Bird (chain 18, slot 20) | 497–585 |
+|   7. A3Q5 The Blackened Temple (chain 19, slot 21) | 586–682 |
+|   8. A3Q6 The Guardian (chain 20, slot 22) | 683–780 |
+|   9. Act III gossip and intro records | 781–842 |
+|   10. Hooks called from other systems | 843–863 |
+|   11. Clarifications (QC-1 … QC-7) | 864–870 |
+| Constants & data dependencies | 871–887 |
+| Randomness | 888–901 |
+| Edge cases & original bugs | 902–949 |
+| Test vectors | 950–967 |
+| Provenance | 968–994 |
+| Open questions | 995–1021 |
 <!-- /index -->
 
 ## Summary
@@ -354,7 +354,8 @@ count and sets the flag; then the chest's own treasure `0x00585B90(op,
 
 - Stairs init 41 (`0x005B8660`): chain 16: +0x00 := 1, +0x04 := GUID;
   intro → mode 2, else mode := +0x08. Stairs operate 44 (`0x005B84E0`):
-  only in mode 2 → `0x0059D9D0` (the stairs' warp, object spec).
+  only in mode 2 → `0x0059D9D0` (the stairs' warp: every type-5 warp
+  tile of the stairs' room gets `0x005550B0`, `quests-act5-2.md` §7.8 summit door).
 - Lever init 42 (`0x005B86B0`): intro → mode 2.
 - Lever operate 45 (`0x005B8530`): lever mode 0, chain 16, +0x00 = 1
   and the stairs unit (+0x04) exists: lever mode := 1 with an

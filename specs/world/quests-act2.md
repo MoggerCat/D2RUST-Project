@@ -44,7 +44,7 @@
 | Edge cases & original bugs | 854–887 |
 | Test vectors | 888–908 |
 | Provenance | 909–931 |
-| Open questions | 932–1006 |
+| Open questions | 932–1017 |
 <!-- /index -->
 
 ## Summary
@@ -127,7 +127,7 @@ record state to table state are read from the image (§Constants).
 #### 1.3 Chest pattern (scroll, staff and cube chests, Tainted Sun altar)
 
 A quest chest's operate function: passes `0x00545850(op)` (the shared
-quest-chest gate, object spec) or returns 0 (the three chests only; the
+quest-chest gate, `quests-act2-2.md` §5.1) or returns 0 (the three chests only; the
 altar has its own guards, §5.7, and never calls the gate); sets the
 object's drop code once, before the count; counts qualifying players (for each player, starting at the
 operating player); creates that many quest items with `0x00559A30(game,
@@ -394,7 +394,7 @@ event 10 touches it); +0x98 altar level; +0x9C amulet drop count.
 #### 5.2 Darken (`0x0059A350`)
 
 Status 1 to all; state 0 → state := 1. If the game has Act II (game
-+0xC0): start the Tainted Sun on it (`0x0061C450`, environment spec),
++0xC0): start the Tainted Sun on it (`0x0061C450`, `quests-act2-2.md` §5.2),
 then for each player whose client is in Act II (`0x005382B0`): S→C
 0x53 `53 05000000 00000000 01` (`0x0053C900`) and `5D 0A 10 00 0000`;
 return 1. Without Act II: +0x03 := 1, return 0. Callers record the
@@ -935,11 +935,22 @@ their own item seeds. No other Act II quest code draws.
    `quests.md` open question 1. **Answered** (2026-10-07): `world/quests-status.md`: the client (0x52 `0x0045CC00` → `0x004A40D0` stores the list; row build `0x004A1950`, tables `0x00723F30` and the per-quest status tables) maps each status to a description string id, a replay speech id and an icon state (§4, §5); Act II tables §8; Seven Tombs rows 5–7 and the tomb symbol §4 rule 2, §5 rule 6.
 2. `0x00545850` (quest-chest gate) and `0x00585B90` (chest treasure):
    their exact tests and draws belong to the object spec; until written,
-   record one chest opening (packets + RNG).
+   record one chest opening (packets + RNG). **Answered** (2026-10-07):
+   the gate is `quests-act2-2.md` §5.1 (mode test, `Mode1` mode 1 + ENDANIM
+   at f + `FrameCnt1` >> 8 or mode 2, flag 0x2 cleared; no draw); the
+   chest treasure is `items/treasure.md` §4. A chest recording would
+   still confirm the order (rec item, not blocking).
 3. Act II light change (`0x0061C450` / `0x0061C4D0`) effect and 0x53
    field names: environment spec; record a Tainted Sun start.
+   **Answered** (2026-10-07): the effect on the server act environment
+   record is `quests-act2-2.md` §5.2 (start: speed 4, index 0, eclipse,
+   ticks 1,200; end: speed 128, index 2, ticks 0, eclipse off); the 0x53
+   fields are `render/lighting.md` §9.2 r2 (u32 period index, u32 ticks,
+   u8 eclipse). A recording would still confirm the client view.
 4. Bytes of the 0x27 type-2 scroll text sent by `0x005456A0` (tome
-   message 396).
+   message 396). **Answered** (2026-10-07): `quests-act2-2.md` §5.4 (type
+   2, object GUID, count 1, kind 0, string id u16@10; bytes 7, 9, 12–39
+   unwritten, `sim/intents-events.md` §3.5).
 5. ~~Chain 38's intro storage~~ Answered: they act on field A (record
    +0) of the player's NPC record, `quests.md` §6.7's pair on field B
    (record +4); `quests-act2-2.md` §1 item 15 (`0x00572360`,
