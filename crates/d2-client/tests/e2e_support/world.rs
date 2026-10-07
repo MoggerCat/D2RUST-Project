@@ -848,6 +848,8 @@ pub fn gold_item_tables() -> ItemTables {
         .map(|_| {
             let mut t: Itemtypes = blank();
             (t.class, t.staffmods, t.rare) = (0xFF, 0xFF, 1);
+            // Empty `shoots`: the link miss (link16 −1).
+            t.shoots = 0xFFFF;
             t
         })
         .collect();

@@ -15,12 +15,13 @@
 //!    (§3) on the NPC-control seed, items created by the economy wiring
 //!    on the game seed (`rng.md` §5.3);
 //! 4. C→S 0x32 with too little gold: S→C 0x2A code 12 (§7.1 rule 4);
-//! 5. C→S 0x32 with enough gold: **stops** at the item copy
-//!    `0x0055A2A0` (`VendorRest::copy_item`, no items spec writes it):
-//!    S→C 0x2A code 9 (§7.1 rule 9.2), nothing paid;
+//! 5. C→S 0x32 with enough gold: the purchase loop (§7.1 rule 9) copies
+//!    the store cap (`0x0055A2A0`, §7.3, on the inventory model), pays
+//!    and places the copy in the backpack: S→C 0x2A code 0, kind 4;
 //! 6. C→S 0x33 of the player's buckler (re-sellable, not one of Akara's
-//!    permanent codes): **stops** at the same copy into the NPC (§7.2
-//!    rule 8): 0x2A code 9, nothing received;
+//!    permanent codes): a restored copy goes into the store (§7.2 rule
+//!    8), the buckler leaves the player (rule 9), the price is received:
+//!    0x2A code 1, kind 3;
 //! 7. C→S 0x33 of the player's cap (a permanent code: no copy back,
 //!    rule 8): rule 9 removes it from the player's inventory (the
 //!    server's one inventory model: unlinked, freed), the price is
@@ -666,9 +667,12 @@ fn run_with(game_seed: u32, gold: i32) -> Transcript {
 
     // 5. C→S 0x32 with `gold`: rules 1–8 pass (in the NPC inventory, the
     // price, gold, no cursor item, no tome, no stack), the purchase loop
-    // copies the store item (rule 9.2). STOP: the copy `0x0055A2A0` is
-    // written by no items spec; the stub's null runs the spec's refusal:
-    // 0x2A code 9, GUID −1 (V10), result 1. Nothing paid.
+    // (rule 9, one pass without fill): the copy of the store cap (§7.3,
+    // fillers 1, on the inventory model: defense and durability through
+    // the save record), the price paid (§9.1), mode 4, auto-placed in the
+    // backpack (`0x00560200`); the on-buy hook keeps the permanent cap
+    // (rule 12); 0x2A code 0, kind 4, GUID = the copy. The copy's next
+    // frame 0x9C (rule 10) is the item update's, as step 3's 0x9C.
     fx.set_gold(gold);
     // The same bytes again: past the client's 200 ms duplicate filter
     // (`bridge.md` §4 rule 5) first, five idle frames (nothing sent or
@@ -677,17 +681,30 @@ fn run_with(game_seed: u32, gold: i32) -> Transcript {
         assert!(fx.step(&[]).received.is_empty());
     }
     let f = fx.step(&[buy]);
-    assert_eq!(f.codes, [(0x32, Some(ResultCode::Refused))]);
-    assert_eq!(f.received, [tx(0, 9, u32::MAX, gold)]);
+    assert_eq!(f.codes, [(0x32, done)]);
+    let bought = *fx.inventory().last().unwrap();
+    assert_eq!(fx.inventory(), [fx.buckler, fx.cap, bought]);
+    assert!(!store.contains(&bought), "a new unit");
+    assert_eq!(f.received, [tx(4, 0, fx.guid(bought), gold - price)]);
     frames.push(f);
+    let gold = gold - price;
     assert_eq!(fx.stat(player, GOLD), gold);
+    assert_eq!(fx.base(bought, ARMORCLASS), store_ac);
+    assert_eq!(fx.stat(bought, MAXDURABILITY), 12);
+    assert!(fx.sim_ref().game.lists.unit(cap).is_some(), "permanent");
 
     // 6. C→S 0x33 of the player's buckler (stored, mode 0): rules 1–7
     // pass (the player's per its inventory, mode 0, no flag, the price,
-    // re-sellable). STOP at rule 8 (not a permanent code): the
-    // copy into the NPC is the same unwritten `0x0055A2A0`: code 9, GUID
-    // −1, result 3.
+    // re-sellable). Rule 8 (not a permanent code): the restored copy
+    // into the NPC (§7.3), placed on its store page; rule 9 removes the
+    // buckler (stored: unlinked, freed); rule 10 receives the price:
+    // 0x2A code 1, kind 3, the buckler's GUID. The price by hand (§9.2,
+    // t = 1): 80·AC/6 (rule 2), buy mult 512: ·512/1024 (rule 9); the
+    // restored copy's price is the same (rule 8: min).
     let pg = fx.guid(fx.buckler);
+    let buc_ac = fx.base(fx.buckler, ARMORCLASS);
+    let buc_sold = (80 * buc_ac / 6) * 512 / 1024;
+    assert!(buc_sold > 0);
     let sell = bytes(&SellItem {
         npc: ng,
         item: pg,
@@ -700,10 +717,20 @@ fn run_with(game_seed: u32, gold: i32) -> Transcript {
     want.extend_from_slice(&[0; 8]);
     assert_eq!(sell, want);
     let f = fx.step(&[sell]);
-    assert_eq!(f.codes, [(0x33, Some(ResultCode::Malformed))]);
-    assert_eq!(f.received, [tx(0, 9, u32::MAX, gold)]);
+    assert_eq!(f.codes, [(0x33, done)]);
+    assert_eq!(f.received, [tx(3, 1, pg, gold + buc_sold)]);
     frames.push(f);
+    let gold = gold + buc_sold;
     assert_eq!(fx.stat(player, GOLD), gold);
+    assert_eq!(fx.inventory(), [fx.cap, bought]);
+    assert!(fx.sim_ref().game.lists.unit(fx.buckler).is_none(), "freed");
+    let restored = {
+        let w = &fx.sim_ref().world;
+        let i = w.state.vendor_index(class::AKARA).unwrap();
+        *w.state.vendors[i].store.last().unwrap()
+    };
+    assert!(!store.contains(&restored), "the copy joined the store");
+    assert_eq!(fx.base(restored, ARMORCLASS), buc_ac);
 
     // 7. C→S 0x33 of the player's cap: re-sellable but one of Akara's
     // permanent codes, so no copy (rule 8: the permanent store item
@@ -728,7 +755,7 @@ fn run_with(game_seed: u32, gold: i32) -> Transcript {
     assert_eq!(f.received, [tx(3, 1, eg, gold + sold)]);
     frames.push(f);
     assert_eq!(fx.stat(player, GOLD), gold + sold);
-    assert_eq!(fx.inventory(), [fx.buckler]);
+    assert_eq!(fx.inventory(), [bought]);
     assert!(fx.sim_ref().game.lists.unit(fx.cap).is_none(), "freed");
     assert!(!fx.sim_ref().events.sys.hooks.items.contains(fx.cap));
 
@@ -757,15 +784,14 @@ fn run_with(game_seed: u32, gold: i32) -> Transcript {
 fn vendor_end_to_end() {
     let t = run();
     assert_eq!(t.frames.len(), 7);
-    // Where each stub was reached, in order.
-    let copies: Vec<&String> = t
-        .rest_log
-        .iter()
-        .filter(|l| l.starts_with("copy"))
-        .collect();
-    assert_eq!(copies.len(), 2, "{:?}", t.rest_log);
-    // The sold cap left the player's inventory; the buckler (its sale
-    // stopped at the copy) stayed.
+    // Both copies ran on the inventory model, none on the rest.
+    assert!(
+        !t.rest_log.iter().any(|l| l.starts_with("copy")),
+        "{:?}",
+        t.rest_log
+    );
+    // The sold buckler and cap left the player's inventory; the bought
+    // copy is in it.
     assert_eq!(t.inventory.len(), 1);
 }
 
