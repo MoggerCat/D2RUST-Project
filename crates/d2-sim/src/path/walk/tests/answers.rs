@@ -297,6 +297,18 @@ fn straight_missile_path() {
     p.put_target(Point::new(110, 105));
     compute(&t, &mut c, &mut p, P, false).unwrap();
     assert_ne!(p.flags & flags::OUTSIDE_ROOM, 0);
+    // Rule 4 (read 2026-10-08): a target inside leaves the flag set; a
+    // path without a room sets it.
+    c.w.room0 = TileRect::new(0, 0, 200, 200);
+    compute(&t, &mut c, &mut p, P, false).unwrap();
+    assert_ne!(p.flags & flags::OUTSIDE_ROOM, 0);
+    p.flags &= !flags::OUTSIDE_ROOM;
+    let room = p.room.take();
+    assert!(room.is_some());
+    compute(&t, &mut c, &mut p, P, false).unwrap();
+    assert_ne!(p.flags & flags::OUTSIDE_ROOM, 0);
+    p.room = room;
+    p.flags &= !flags::OUTSIDE_ROOM;
     // A target unit: its position.
     let mut m = FakeUnit::player();
     m.ty = UnitType::Monster;

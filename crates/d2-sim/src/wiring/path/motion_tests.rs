@@ -428,3 +428,36 @@ fn missile_body_teleport_moves_the_path_and_clears_the_points() {
     assert_eq!(target, (79, 30));
     fx.assert_clean();
 }
+
+// Covers: specs/monsters/ai.md §7.5
+#[test]
+fn every_request_but_get_hit_refills_the_budget_and_retargets() {
+    // §7.5 r1: GH (mode 3) changes neither the target nor the budget;
+    // r2–r3: any other mode, moving or not, sets the target and 20.
+    let mut fx = fx();
+    let m = monster(&mut fx, 26, 10);
+    let a = fx.a;
+    let p = fx.spawn(UnitType::Player, 0, a, 28, 10);
+    change(&mut fx, m, BLOCK, ModeTarget::Unit(p));
+    let drain = |fx: &mut Fx| {
+        let d = fx
+            .sim
+            .hooks()
+            .paths
+            .as_mut()
+            .unwrap()
+            .dynamic_mut(m)
+            .unwrap();
+        d.repath_budget = 7;
+    };
+    drain(&mut fx);
+    change(&mut fx, m, 3, ModeTarget::Point(40, 40));
+    let d = dynamic(&mut fx, m);
+    assert_eq!(d.repath_budget, 7);
+    assert_eq!(d.target_unit.map(|t| t.unit), Some(p));
+    // Neutral (not moving): the point target and the budget again.
+    change(&mut fx, m, 1, ModeTarget::Point(27, 11));
+    let d = dynamic(&mut fx, m);
+    assert_eq!(d.repath_budget, 20);
+    assert_eq!((d.target_x, d.target_y, d.target_unit), (27, 11, None));
+}
