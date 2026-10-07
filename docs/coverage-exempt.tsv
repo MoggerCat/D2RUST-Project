@@ -511,3 +511,10 @@ specs/ui/panels.md	§10 r7	pointer to Open questions 4
 specs/ui/panels.md	§10 r9	pointer to panels-2 §19
 specs/ui/panels.md	§11 r6	pointer to panels-2 §21
 specs/ui/panels.md	§13 r8	pointer to menus.md §1
+specs/audio/triggers-2.md	§21 row1	inputs table row: owner pointer
+specs/audio/triggers.md	§1 r10	definition of terms
+specs/audio/triggers.md	§1 r13	pointer to triggers-2 §18–§21
+specs/client/msg-units.md	§1.2 r8	pointer to model.md §14 rule 4
+specs/client/stat-lists.md	§4 r2	pointer to msg-skills.md open question 2
+specs/client/ui.md	§a1-why-not-bevy-ui	design rationale narration
+specs/client/audio.md	§b-original-behavior-to-reproduce-owners	pointers to other specs
