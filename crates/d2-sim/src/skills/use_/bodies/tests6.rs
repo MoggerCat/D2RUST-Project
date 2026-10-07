@@ -990,3 +990,374 @@ fn dragon_tail_do_finishes_and_splashes_fire() {
     assert_eq!(b3_lvl18::dragon_tail(&mut f, &t, &ct, u, 1, 1), 1);
     assert_eq!(f.c.get(m2, 6), 10_000_000);
 }
+
+// ---------------------------------------------------------------- §7.3
+
+fn doppel_world(
+    edit: impl Fn(&mut d2_data::tables::Skills, &mut Code),
+) -> (
+    crate::skills::SkillTables,
+    crate::combat::CombatTables,
+    BodyFake,
+    usize,
+) {
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.summon = 0;
+    r.summode = 1;
+    r.petmax = c.f(2);
+    r.calc2 = c.f(500);
+    r.calc3 = c.f(25);
+    edit(&mut r, &mut c);
+    let t = tabs(r, c, 1);
+    let ct = combat_tables(vec![monster_rec()]);
+    let (mut f, u) = world();
+    f.tpos.insert(u, (7, 9));
+    (t, ct, f, u)
+}
+
+// Covers: specs/skills/bodies-2b.md §7.3 r1
+#[test]
+fn dopplezon_class_and_pettype() {
+    let (t, ct, mut f, u) = doppel_world(|r, _| r.pettype = 3);
+    assert_eq!(b3_lvl24::dopplezon(&mut f, &t, &ct, u, 9, 1), 0);
+    let (t0, ..) = doppel_world(|r, _| r.summon = 0xFFFF);
+    assert_eq!(b3_lvl24::dopplezon(&mut f, &t0, &ct, u, 1, 1), 0);
+    assert_eq!(f.c.units[u].flags & FLAG_40, 0);
+    assert_eq!(b3_lvl24::dopplezon(&mut f, &t, &ct, u, 1, 1), 1);
+    assert!(f
+        .take_log()
+        .iter()
+        .any(|s| s.starts_with("PetAdd") && s.contains("t: 3")));
+    // pettype >= count: pt = 0, no refusal.
+    let (t, ct, mut f, u) = doppel_world(|r, _| r.pettype = 20);
+    assert_eq!(b3_lvl24::dopplezon(&mut f, &t, &ct, u, 1, 1), 1);
+    assert!(f
+        .take_log()
+        .iter()
+        .any(|s| s.starts_with("PetAdd") && s.contains("t: 0")));
+}
+
+// Covers: specs/skills/bodies-2b.md §7.3 r2, §7.3 r3, §7.3 r4
+#[test]
+fn dopplezon_spawns_and_links() {
+    let (t, ct, mut f, u) = doppel_world(|_, _| {});
+    assert_eq!(b3_lvl24::dopplezon(&mut f, &t, &ct, u, 1, 1), 1);
+    assert_eq!(f.c.units[u].flags & FLAG_40, FLAG_40);
+    let m = f.c.units.len() - 1;
+    let log = f.take_log();
+    // flags 0, class 0, mode 1, at the target position (7, 9).
+    assert!(log.iter().any(|s| s.starts_with("monster 1 (7, 9) 0 1")));
+    assert!(log.iter().any(|s| s.starts_with("PetAdd")
+        && s.contains(&format!("pet: {m}"))
+        && s.contains("max: 2")));
+    assert!(log
+        .iter()
+        .any(|s| s.starts_with("SourceFields") && s.contains(&format!("m: {m}"))));
+    // Spawn failing: 0.
+    f.no_monsters = true;
+    assert_eq!(b3_lvl24::dopplezon(&mut f, &t, &ct, u, 1, 1), 0);
+}
+
+// Covers: specs/skills/bodies-2b.md §7.3 r5, §7.3 r6, §7.3 r7
+#[test]
+fn dopplezon_life_level_and_timer() {
+    let (t, ct, mut f, u) = doppel_world(|_, _| {});
+    f.c.set(u, 12, 30);
+    f.c.set(u, 7, 2000);
+    f.c.frame = 40;
+    assert_eq!(b3_lvl24::dopplezon(&mut f, &t, &ct, u, 1, 5), 1);
+    let m = f.c.units.len() - 1;
+    // h = pct(max life, 25, 100); the summon's level from base_stats
+    // (5 + 30 * 3 / 4 = 27, capped at the owner's 30).
+    assert_eq!(f.c.get(m, 6), 500);
+    assert_eq!(f.c.get(m, 7), 500);
+    assert_eq!(f.c.get(m, 12), 27);
+    let log = f.take_log();
+    assert!(log.contains(&format!("schedule {m} 7 540 0 0")));
+    assert!(log.contains(&format!("Umod {{ m: {m}, umod: 21, arg: 0 }}")));
+    assert!(log
+        .iter()
+        .any(|s| s.contains("171") && s.contains(&format!("{m}"))));
+}
+
+// ---------------------------------------------------------------- §7.5–§7.7
+
+// Covers: specs/skills/bodies-2b.md §7.5 text, §7.5 r0
+#[test]
+fn thunder_storm_start_sets_the_entry() {
+    let t = tabs(body_rec(), Code::new(), 1);
+    let (mut f, u) = world();
+    let e = f.c.units[u].used.unwrap();
+    assert_eq!(b3_lvl24::thunder_storm_start(&mut f, &t, u, 9), 0);
+    // The unit lacks an entry of skill 0.
+    assert_eq!(b3_lvl24::thunder_storm_start(&mut f, &t, u, 0), 0);
+    assert_eq!(b3_lvl24::thunder_storm_start(&mut f, &t, u, 1), 1);
+    assert_eq!((f.entry_param(u, &e, 1), f.entry_param(u, &e, 2)), (-1, 1));
+}
+
+fn storm_world(
+    edit: impl Fn(&mut d2_data::tables::Skills, &mut Code),
+) -> (
+    crate::skills::SkillTables,
+    crate::combat::CombatTables,
+    BodyFake,
+    usize,
+    usize,
+) {
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.srvmissilea = 0;
+    r.aurastate = 55;
+    r.auralencalc = c.f(100);
+    r.param7 = 20;
+    edit(&mut r, &mut c);
+    let t = tabs(r, c, 1);
+    let ct = combat_tables(vec![monster_rec()]);
+    let (mut f, u) = world();
+    let k = monster(&mut f, (3, 0));
+    f.c.units[k].mode = 1;
+    // Flags 0x4 / 0x8 and hostility: the extra bits `next_unit` adds.
+    f.c.units[k].flags = 0xC;
+    f.c.hostile = true;
+    f.scan = vec![k];
+    (t, ct, f, u, k)
+}
+
+// Covers: specs/skills/bodies-2b.md §7.6 text, §7.6 r1
+#[test]
+fn thunder_storm_refusals() {
+    let (t, ct, mut f, u, _) = storm_world(|_, _| {});
+    assert_eq!(b3_lvl24::thunder_storm(&mut f, &t, &ct, u, 9, 1), 0);
+    for edit in [
+        (&|r: &mut d2_data::tables::Skills| r.srvmissilea = 0xFFFF)
+            as &dyn Fn(&mut d2_data::tables::Skills),
+        &|r| r.aurastate = 0xFFFF,
+        &|r| r.aurastate = 200,
+    ] {
+        let (mut t2, ..) = storm_world(|_, _| {});
+        edit(&mut t2.skills[1]);
+        assert_eq!(b3_lvl24::thunder_storm(&mut f, &t2, &ct, u, 1, 1), 0);
+    }
+    // No entry for the skill.
+    assert_eq!(b3_lvl24::thunder_storm(&mut f, &t, &ct, u, 0, 1), 0);
+}
+
+// Covers: specs/skills/bodies-2b.md §7.6 r2, §7.6 r4
+#[test]
+fn thunder_storm_state_run() {
+    let (t, ct, mut f, u, _) = storm_world(|_, _| {});
+    let e = f.c.units[u].used.unwrap();
+    f.c.frame = 10;
+    f.set_entry_param_of(u, &e, 2, 1);
+    assert_eq!(b3_lvl24::thunder_storm(&mut f, &t, &ct, u, 1, 4), 1);
+    let l = f.list_of(u, 55).expect("storm state").clone();
+    assert_eq!(l.expire, 110);
+    assert_eq!(l.callback, callback::DEFAULT);
+    assert_eq!(l.stats.get(&350), Some(&1));
+    assert_eq!(l.stats.get(&351), Some(&4));
+    // r4: E param 2 := 0, and no strike happened.
+    assert_eq!(f.entry_param(u, &e, 2), 0);
+    assert!(f.missiles.is_empty());
+}
+
+// Covers: specs/skills/bodies-2b.md §7.6 r3
+#[test]
+fn thunder_storm_strikes_the_next_unit() {
+    let (t, ct, mut f, u, k) = storm_world(|_, _| {});
+    let e = f.c.units[u].used.unwrap();
+    f.state_on(u, 55, true);
+    f.set_entry_param_of(u, &e, 1, -1);
+    f.set_entry_param_of(u, &e, 2, 0);
+    assert_eq!(b3_lvl24::thunder_storm(&mut f, &t, &ct, u, 1, 4), 1);
+    // A missile at K, handled once and removed, message to the client.
+    assert_eq!(f.missiles.len(), 1);
+    assert_eq!((f.missiles[0].x, f.missiles[0].y), (3, 0));
+    let log = f.take_log();
+    assert!(log
+        .iter()
+        .any(|s| s.starts_with("MissileHit") && s.contains(&format!("unit: {k}"))));
+    assert!(log.iter().any(|s| s.starts_with("RemoveUnit")));
+    assert!(log.iter().any(|s| s.starts_with("MsgA3")));
+    assert_eq!(f.entry_param(u, &e, 1), f.c.units[k].guid as i32);
+    // Wraps round to the same unit when it is the only one.
+    assert_eq!(b3_lvl24::thunder_storm(&mut f, &t, &ct, u, 1, 4), 1);
+    assert_eq!(f.entry_param(u, &e, 1), f.c.units[k].guid as i32);
+    // No accepted unit: E param 1 := -1.
+    f.scan.clear();
+    assert_eq!(b3_lvl24::thunder_storm(&mut f, &t, &ct, u, 1, 4), 1);
+    assert_eq!(f.entry_param(u, &e, 1), -1);
+    // The caster in town (K is not, or the scan would not accept it): no
+    // missile, the GUID still advances.
+    f.scan = vec![k];
+    let n = f.missiles.len();
+    f.set_entry_param_of(u, &e, 1, -1);
+    f.room_of.insert(k, 2);
+    f.town.insert(1);
+    assert_eq!(b3_lvl24::thunder_storm(&mut f, &t, &ct, u, 1, 4), 1);
+    assert_eq!(f.missiles.len(), n);
+    assert_eq!(f.entry_param(u, &e, 1), f.c.units[k].guid as i32);
+}
+
+// Covers: specs/skills/bodies-2b.md §7.7
+#[test]
+fn attract_start_always_succeeds() {
+    assert_eq!(start(18), Some(1));
+    assert_eq!(start(19), None);
+}
+
+// ---------------------------------------------------------------- §7.8
+
+fn attract_world() -> (
+    crate::skills::SkillTables,
+    crate::combat::CombatTables,
+    BodyFake,
+    usize,
+    usize,
+    usize,
+) {
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.aurastat1 = 0xFFFF;
+    r.auratargetstate = 41;
+    r.aurafilter = 0x103;
+    r.aurarangecalc = c.f(10);
+    r.auralencalc = c.f(100);
+    let t = tabs(r, c, 1);
+    let mut ms = monster_rec();
+    ms.switchai = true;
+    let mut ms2: Monstats2 = blank();
+    ms2.isatt = true;
+    let mut ct = combat_tables(vec![ms]);
+    ct.monstats2 = vec![ms2];
+    let (mut f, u) = world();
+    f.c.hostile = true;
+    let tg = monster(&mut f, (2, 0));
+    let other = monster(&mut f, (3, 0));
+    for m in [tg, other] {
+        f.c.units[m].mode = 1;
+    }
+    f.targets.insert(u, tg);
+    f.scan = vec![tg, other];
+    (t, ct, f, u, tg, other)
+}
+
+// Covers: specs/skills/bodies-2b.md §7.8 r1, §7.8 r2, §7.8 r3
+#[test]
+fn attract_refusals() {
+    let (t, ct, mut f, u, tg, _) = attract_world();
+    assert_eq!(b3_lvl24::attract(&mut f, &t, &ct, u, 9, 1), 0);
+    // The attract test.
+    f.c.hostile = false;
+    assert_eq!(b3_lvl24::attract(&mut f, &t, &ct, u, 1, 1), 0);
+    f.c.hostile = true;
+    f.alive.remove(&tg);
+    assert_eq!(b3_lvl24::attract(&mut f, &t, &ct, u, 1, 1), 0);
+    f.alive.insert(tg);
+    f.room_of.insert(tg, 2);
+    f.town.insert(2);
+    assert_eq!(b3_lvl24::attract(&mut f, &t, &ct, u, 1, 1), 0);
+    f.town.clear();
+    let mut ct2 = ct.clone();
+    ct2.monstats[0].switchai = false;
+    assert_eq!(b3_lvl24::attract(&mut f, &t, &ct2, u, 1, 1), 0);
+    f.targets.clear();
+    f.tpos.clear();
+    assert_eq!(b3_lvl24::attract(&mut f, &t, &ct, u, 1, 1), 0);
+    assert!(f.lists.is_empty());
+    // The record checks.
+    let (t, ct, mut f, u, ..) = attract_world();
+    for edit in [
+        (&|r: &mut d2_data::tables::Skills| r.aurastat1 = 0xFFFE)
+            as &dyn Fn(&mut d2_data::tables::Skills),
+        &|r| r.aurastat1 = 359,
+        &|r| r.auratargetstate = 200,
+        &|r| r.auratargetstate = 0xFFFF,
+    ] {
+        let mut t2 = t.clone();
+        edit(&mut t2.skills[1]);
+        assert_eq!(b3_lvl24::attract(&mut f, &t2, &ct, u, 1, 1), 0);
+    }
+    assert_eq!(f.c.units[u].flags & FLAG_40, 0);
+}
+
+// Covers: specs/skills/bodies-2b.md §7.8 r4, §7.8 r5
+#[test]
+fn attract_sets_the_target_up() {
+    let (t, ct, mut f, u, tg, other) = attract_world();
+    f.minion_owner.insert(tg, other);
+    assert_eq!(b3_lvl24::attract(&mut f, &t, &ct, u, 1, 1), 1);
+    assert_eq!(f.c.units[u].flags & FLAG_40, FLAG_40);
+    let log = f.take_log();
+    // T leaves its pack (a leader's pack would be dissolved instead).
+    assert!(log.contains(&format!("LeaveLeader({tg})")), "{log:?}");
+    assert!(log.contains(&format!("Alignment {{ u: {tg}, a: 1, v: 1 }}")));
+    assert!(log.contains(&format!("NodePrepend {{ u: {tg}, slot: 9 }}")));
+}
+
+// Covers: specs/skills/bodies-2b.md §7.8 r5
+#[test]
+fn attract_dissolves_a_leaders_pack() {
+    let (t, ct, mut f, u, tg, _) = attract_world();
+    f.minion_owner.insert(tg, tg);
+    assert_eq!(b3_lvl24::attract(&mut f, &t, &ct, u, 1, 1), 1);
+    assert!(f.take_log().contains(&format!("DissolvePack({tg})")));
+}
+
+// Covers: specs/skills/bodies-2b.md §7.8 r6, §7.8 r7
+#[test]
+fn attract_pulls_the_monsters_in_range() {
+    let (t, mut ct, mut f, u, tg, other) = attract_world();
+    ct.difficultylevels[0].aicursedivisor = 4;
+    f.c.frame = 1000;
+    assert_eq!(b3_lvl24::attract(&mut f, &t, &ct, u, 1, 1), 1);
+    let log = f.take_log();
+    let g = f.c.units[tg].guid;
+    // d = 100 / 4: the other monster targets T (a monster: kind 2).
+    assert!(log.contains(&format!(
+        "TargetOverride {{ m: {other}, kind: 2, guid: {g} }}"
+    )));
+    assert!(log.contains(&format!("schedule {other} 10 1025 0 0")));
+    // A monster the attract test rejects is left alone.
+    let (t, ct, mut f, u, _, other) = attract_world();
+    f.alive.remove(&other);
+    assert_eq!(b3_lvl24::attract(&mut f, &t, &ct, u, 1, 1), 1);
+    assert!(!f
+        .take_log()
+        .iter()
+        .any(|s| s.starts_with("TargetOverride") && s.contains(&format!("m: {other},"))));
+}
+
+// Covers: specs/skills/bodies-2b.md §7.8 r8, §7.8 text
+#[test]
+fn attract_marks_t_with_the_state_and_its_remove_callback() {
+    let (t, ct, mut f, u, tg, _) = attract_world();
+    f.c.frame = 10;
+    assert_eq!(b3_lvl24::attract(&mut f, &t, &ct, u, 1, 1), 1);
+    let l = f.list_of(tg, 41).expect("state on T");
+    assert_eq!(l.expire, 110);
+    assert_eq!(l.callback, callback::ATTRACT);
+    assert_eq!(l.owner, Some(u));
+    // The remove callback: alignment 0, state off, target list remove.
+    f.take_log();
+    helpers3::remove_alignment(&mut f, tg, 41);
+    assert!(!f.has_state(tg, 41));
+    let log = f.take_log();
+    assert!(log.contains(&format!("Alignment {{ u: {tg}, a: 0, v: 1 }}")));
+    assert!(log.contains(&format!("NodeRemove({tg})")));
+}
+
+// ---------------------------------------------------------------- §7.9
+
+// Covers: specs/skills/bodies-2b.md §7.9
+#[test]
+fn bone_prison_start_needs_a_field_target() {
+    let (mut f, u) = world();
+    assert_eq!(b3_lvl24::bone_prison_start(&mut f, u), 0, "no target");
+    let m = monster(&mut f, (2, 2));
+    f.targets.insert(u, m);
+    assert_eq!(b3_lvl24::bone_prison_start(&mut f, u), 1);
+    f.room_of.insert(m, 2);
+    f.town.insert(2);
+    assert_eq!(b3_lvl24::bone_prison_start(&mut f, u), 0);
+}
