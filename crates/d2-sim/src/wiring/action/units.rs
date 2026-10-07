@@ -76,6 +76,16 @@ pub fn anim_record(r: &d2_formats::animdata::AnimRecord) -> AnimRecord {
 }
 
 impl<X: Pending> UnitHooks for ActionHooks<X> {
+    /// `0x00580EC0`: the death penalties at `0x00580F59`
+    /// (`vitals.md` §4.6, [`super::death`]).
+    fn player_death(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
+        self.death_penalties(sim, unit);
+    }
+    /// `0x0057FCA0`: the corpse creation `0x0057F700` at `0x0057FD1C`
+    /// (`vitals.md` §4.7 rule 1, [`super::death`]).
+    fn player_corpse(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
+        self.corpse_creation(sim, unit);
+    }
     /// `0x00620F00`: the AnimData record of the unit's mode
     /// (`units.md` §4.1, `animdata.md` §5).
     fn anim_record(&mut self, sim: &Sim<'_>, unit: UnitId) -> Option<AnimRecord> {

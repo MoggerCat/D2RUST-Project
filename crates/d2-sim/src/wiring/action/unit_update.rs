@@ -265,12 +265,14 @@ impl<X: Pending> ActionHooks<X> {
 
     /// Mode DT's event-1 function `0x005A72B0` (§7.7 rule 3): mode 12,
     /// unit event 13 (`0x005C0C30(game, 13, unit, 0, 0)`,
-    /// [`Pending::unit_event`]), then the `monstats` `SplEndDeath` (row
+    /// [`super::combat::CombatView::fire_unit_event`]), then the `monstats` `SplEndDeath` (row
     /// +0x1A4) action 1 or 2 ([`Pending::death_end_action`] with
     /// `minion1`, row +0x26).
     pub fn death_event1(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
         self.death_mode(sim, unit);
-        self.x.unit_event(13, Some(unit), None, None);
+        View::of(sim.units, sim.stats, sim.data, self)
+            .combat(sim.game)
+            .fire_unit_event(13, Some(unit), None, None);
         let class = sim.units.get(unit).map(|r| r.class);
         let row = class.and_then(|c| self.tables.combat.monstats.get(c as usize));
         if let Some((action, minion)) = row.map(|m| (m.splenddeath, m.minion1)) {

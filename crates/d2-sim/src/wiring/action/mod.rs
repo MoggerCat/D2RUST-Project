@@ -22,6 +22,7 @@
 
 pub mod ai;
 pub mod combat;
+pub mod death;
 pub mod dispatch;
 pub mod missiles;
 pub mod monsters;
@@ -174,7 +175,9 @@ pub struct ActionHooks<X> {
     pub vitals: Option<Arc<VitalsTables>>,
     /// The target of the monster mode change running now (the record
     /// argument of `0x005A7C20`, `units.md` §4.6); set by the kill's
-    /// death mode change only (`damage.md` §7.2).
+    /// death mode change (`damage.md` §7.2). Also the killer of a
+    /// player's DT start (`0x00580A70`'s unit target, [`death`]): the
+    /// host that starts it sets it.
     pub mode_target: Option<UnitId>,
     /// The monster state (monster data, umods, monster init) lent by the
     /// host that owns it ([`monsters`]: `WorldSim` lends its world state
@@ -209,10 +212,19 @@ pub struct ActionHooks<X> {
     /// Unit event handler lists (unit +0x90, `bodies.md` §2.13), first =
     /// head.
     pub handlers: BTreeMap<UnitId, Vec<crate::skills::use_::bodies::Handler>>,
+    /// The unit event iteration `0x005C0C30` on [`Self::handlers`]
+    /// ([`combat::UnitEventFn`]). `None` (the default): every unit event
+    /// goes to [`Pending::unit_event`];
+    /// `ActionHooks::enable_unit_events` (a host with
+    /// [`crate::wiring::interaction::UseRest`]) turns the registry on.
+    pub unit_events: Option<combat::UnitEventFn<X>>,
     /// The client vitals sync's caches ([`vitals_sync`], `vitals.md` §5).
     /// `None` (the default): the sync is off;
     /// [`ActionHooks::enable_vitals_sync`] turns it on.
     pub sync: Option<vitals_sync::SyncState>,
+    /// Client +0x508 of the players' clients ([`death`], `vitals.md`
+    /// §4.6–§4.7).
+    pub death: death::DeathState,
     /// The session state of the clients and players
     /// (`sim/intents-events.md` §8; [`switch`]): player names, hot keys,
     /// skill hands, portal flags.
@@ -254,7 +266,9 @@ impl<X> ActionHooks<X> {
             paths: None,
             bodies: None,
             handlers: BTreeMap::new(),
+            unit_events: None,
             sync: None,
+            death: death::DeathState::default(),
             session: switch::SessionState::default(),
             x,
             orphan_seed: Seed::init(),

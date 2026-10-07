@@ -693,9 +693,13 @@ pub trait Pending {
 
     // ---- unit events, reaction, overlays (units.md, damage.md §7, §8) --
 
-    /// `0x005C0C30(game, event, unit, other, record)`: the unit's event
-    /// functions (registered by items; no registry yet). Event 0 (hit by
-    /// missile) comes with no record and possibly no unit.
+    /// `0x005C0C30(game, event, unit, other, record)` for a host without
+    /// the event registry: with [`ActionHooks::unit_events`] set
+    /// (`ActionHooks::enable_unit_events`, a host with
+    /// [`crate::wiring::interaction::UseRest`]) the iteration runs
+    /// [`crate::combat::events::run`] on [`ActionHooks::handlers`] and this
+    /// seam is not called. Event 0 (hit by missile) comes with no record
+    /// and possibly no unit.
     fn unit_event(
         &mut self,
         event: u8,
@@ -704,6 +708,82 @@ pub trait Pending {
         record: Option<&mut crate::combat::DamageRecord>,
     ) {
     }
+    /// The global layer split of the item event registrations (data
+    /// +0xC6C shift, +0xC70 mask; `items/properties.md` §5 rule 9).
+    ///
+    /// TODO(spec: sim/stats.md): the values are not written; default
+    /// (0, 0) (every item event reads skill = layer, level 0).
+    fn event_layer_split(&self) -> (u32, u32) {
+        (0, 0)
+    }
+    /// Terror install `0x005DDD00(game, source, unit, skill, a, b)`
+    /// (`monsters/ai.md`; `combat/events.md` §2.8).
+    fn event_terror(
+        &mut self,
+        game: &mut Game,
+        source: UnitId,
+        unit: UnitId,
+        skill: i32,
+        a: i32,
+        b: i32,
+    ) {
+    }
+    /// `0x0064D870(U's room, x, y, U's pattern, U's collision mask)` = 0
+    /// (`combat/events.md` §2.7; collision).
+    fn event_point_free(&self, unit: UnitId, at: (i32, i32)) -> bool {
+        false
+    }
+    /// The corpse find of item target 3 (`0x005FD9C0`,
+    /// `combat/events.md` §3): the first unit of the unit find around
+    /// `t0`, radius 10, flags 0x1002, callback `0x00645680`.
+    fn event_corpse_near(&mut self, game: &mut Game, t0: UnitId) -> Option<UnitId> {
+        None
+    }
+    /// S→C 0x99 / 0x9A on the unit's message list and the update queue
+    /// (`0x005717C0` / `0x00571840`, `0x0064C040`).
+    fn queue_item_cast(&mut self, unit: UnitId, msg: crate::combat::events::ItemCastMsg) {}
+    /// The raise test `0x00645510(V, 0)` (`combat/events.md` §2.21).
+    fn raise_test(&self, unit: UnitId) -> bool {
+        false
+    }
+    /// `0x0064EC10(V's room, V x, V y, V pattern, 0x8000)`.
+    fn clear_pattern(&mut self, unit: UnitId) {}
+    /// A step of the Reanimate raise on the new monster
+    /// (`combat/events.md` §2.21) with no body in d2-sim.
+    fn raise_step(
+        &mut self,
+        game: &mut Game,
+        unit: UnitId,
+        step: crate::combat::events::RaiseStep<UnitId>,
+    ) {
+    }
+    // ---- player death (`combat/vitals.md` §4.6–§4.7, [`super::death`]) --
+
+    /// The stash limit `0x00623460` (§4.6 rule 1; not written).
+    fn stash_cap(&self, unit: UnitId) -> i32 {
+        0
+    }
+    /// The death's gold drop `0x00535510(game, P, P's GUID, amount)`
+    /// (`items/inventory.md` §7.22).
+    fn death_drop_gold(&mut self, game: &mut Game, unit: UnitId, amount: i32) {}
+    /// Corpse creation `0x0057F700` without its experience (§4.7 rule
+    /// 1): a new player-type unit of P's class in mode 17 holding P's
+    /// items (`items/inventory.md`). Default: none.
+    fn create_corpse(&mut self, game: &mut Game, unit: UnitId) -> Option<UnitId> {
+        None
+    }
+    /// The corpse's owner GUID from its inventory (`0x0063D450`).
+    fn corpse_owner_guid(&self, corpse: UnitId) -> Option<u32> {
+        None
+    }
+    /// `0x0055B300(owner, P, 1)` for the corpse's player owner
+    /// (`0x0057FAF0`'s second test).
+    fn corpse_loot_allowed(&self, corpse: UnitId, unit: UnitId) -> bool {
+        false
+    }
+    /// The corpse's item take-back `0x00562F30` (§4.7 rule 2).
+    fn corpse_take_back(&mut self, game: &mut Game, unit: UnitId, corpse: UnitId) {}
+
     /// Reaction `0x0057CEE0` (`damage.md` §7.1, call level only; its mode
     /// changes and the kill `0x0057CCB0` are not specified in full).
     fn reaction(&mut self, a: UnitId, d: UnitId, record: &mut crate::combat::DamageRecord) {}
