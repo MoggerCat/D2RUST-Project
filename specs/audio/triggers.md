@@ -45,7 +45,7 @@
 | Test vectors | 725–756 |
 |   Checks (hook addresses for `record_sound.py`, `client/audio.md` §B7) | 757–770 |
 | Provenance | 771–798 |
-| Open questions | 799–832 |
+| Open questions | 799–841 |
 <!-- /index -->
 
 ## Summary
@@ -803,7 +803,16 @@ entry 74 (id-0 requests).
 2. Where the 0x2C events come from per id and tick (server senders);
    compare the request log's C against the 0x2C packet tick.
 3. Who writes client unit +0xB0 (hit class of the last hit; read by
-   §4.2, §4.4); a write watch during a fight.
+   §4.2, §4.4); a write watch during a fight. Partly answered: +0xB0
+   is a dword, written only by the client mode machines: player
+   `0x00461250` (`0x0046140B`, `0x0046143F`, `0x00461498`, `0x004614EF`,
+   `0x0046155E`), monster `0x004AFF60` (`0x004B03BB`, `0x004B043E`,
+   `0x004B04A8`, `0x004B0549`, `0x004B05CD`, `0x004B0650`), plus
+   `0x00450A99` (`0x00450950`) and the player update `0x004635F4`; the
+   values come from the mode event records those machines consume
+   (e.g. record +0x08 at `0x00461494`, +0x18 at `0x004B0546`). Which
+   S→C message field fills them belongs to `client/msg-units.md`; the
+   write watch still settles it end to end.
 4. Event 12: which skill/record `0x006256B0(U, 0x44)` and
    `0x00625D00(·, 350, 0)` select.
 5. `dosound a`/`dosound b` use in `0x004C9B40`, `0x004F4590`.

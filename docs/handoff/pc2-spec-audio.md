@@ -44,6 +44,9 @@ in `C:\Users\zffit\Desktop\D2test\scratch-audio\` (outside the repo).
 | EN-E | `environment.md` §4 r1 | last checked := L before the flag test (after the count and equality tests). |
 | EN-F (OQ 3) | `environment.md` §1 r3 | Day phase = lighting period index (act env +0x00); day = 1–3; entries 69 / 74 confirm (bed 70 → 71 at the period-4 start, with the §7 draws). |
 | env OQ 2, 6, 7 | `environment.md` | Positions in frames; level flags reset per game, last checked never (bug kept); +0x220 = `-ns`. EAX call order corrected (before the cues). |
+| wav OQ 3 | `formats/wav.md` OQ 3 | Stereo voice: the load's format check overwrites the row's `Stereo` from the file (`0x004DF695`); all 30 mismatched rows are non-stream. |
+| — | `formats/wav.md` status, Survey | Status verified for parsing (C72 / entry 72); entry 62 Huffman table 8 fact added. `sound-table.md` status: table layer verified (C73 / entry 73), code predates this pass's corrections. |
+| triggers OQ 3 | `triggers.md` OQ 3 | Partly: the +0xB0 writers are the player / monster mode machines (sites listed); the message field is `client/msg-units.md`'s. |
 | — | `triggers.md` §1 r6 | Correction: the idle gap starts at 90 (reset each game by `0x004CA280`), not 0. |
 | — | `triggers.md` §12 | Thunder draws on the player client seed (500 + roll(1500) timer, 25 + roll(50) delay, y then x = −200 + roll(400)) and sets the position. |
 
@@ -55,6 +58,10 @@ in `C:\Users\zffit\Desktop\D2test\scratch-audio\` (outside the repo).
 | ST7 / sound-table OQ 13 | async read completion time; recording below |
 | sound-table OQ 3 | seed interleave confirmed by entry 74, users / order not identified |
 | sound-table OQ 14 | other writers of the device gain G |
+| sound-table OQ 1, 9, 10 | voice-log conformance; slider mapping (`client/ui.md`); async effect in practice (with OQ 13) |
+| triggers OQ 1, 2, 4, 5, 6, 8, 10, 12, 13 | need the request log replay or the owning features' specs (not settled by this pass); OQ 3 partly |
+| environment OQ 1, 4, 5 | recording replay (entry 74 is partial: no cave, no Blood Raven); weather intensity (weather spec); front end |
+| wav OQ 1, 2 | DirectSound buffer dump (C75, player lane) |
 
 ## CODE-TABLE CHANGE commits
 
@@ -64,7 +71,23 @@ in `C:\Users\zffit\Desktop\D2test\scratch-audio\` (outside the repo).
 
 ## Cross-file requests
 
-(none yet)
+- to PC 1: `specs/formats/mpq.md` Observations; new observation; every
+  ADPCM-masked `.wav` sector (mask 0x41 / 0x81, 350,543 sectors) uses
+  Huffman weight table 8 and no other, 89.4 % with an escape
+  (`docs/handoff/local-buddy-q-data.md` entry 62); add it (the q-data
+  note says it was not yet recorded there). Mirrored in `formats/wav.md`
+  Survey.
+- to PC 1: `specs/client/audio.md` §A3; the original detects a one-shot's
+  end with a 50 ms wall-clock service thread (`0x00516250`) seen by the
+  next sound-tick upkeep (`0x004DF890`), so end ticks are not
+  tick-exact in 1.14d (`audio/sound-table.md` §6.6); state the d2rs
+  end-tick model there (elapsed ticks × 40 ms ≥ duration) and that its
+  conformance waits for `sound-table.md` OQ 12.
+- to PC 1: `specs/client/audio.md` §A4; device gain = trunc((1 − occ) ×
+  trunc(v × G / 255)) / 255 with G = 255 in game (`0x005157B0`,
+  `audio/sound-table.md` §8.3 r3); the `GainCurve` must take the
+  occlusion (0 or 0.5 targets, 0.05 steps) as an input, not only v and
+  pan.
 
 ## Recording list
 
@@ -73,3 +96,8 @@ in `C:\Users\zffit\Desktop\D2test\scratch-audio\` (outside the repo).
   known one-shots; compare end − start with ceil(frames / 882).
 - sound-table OQ 13 (ST-7): `Async Only` first start attempt tick and the
   collecting preload pass tick (`0x00482BF0`).
+- triggers OQ 3: write watch on client unit +0xB0 during a fight (which
+  S→C message field arrives there).
+- Existing recordings used: entry 74 (`snd74*-sound.jsonl`) and entry 69
+  (`env69-sound.jsonl`); still missing from entry 74: a cave walk and
+  Blood Raven's death (stinger 34), needed for `environment.md` OQ 1.

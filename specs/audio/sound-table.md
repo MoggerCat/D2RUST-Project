@@ -1,8 +1,14 @@
 # Spec: Audio — Sound table (sound id → playable voice)
 
-- **Status:** draft; every rule below names its 1.14d `Game.exe` address
-  or live measurement; nothing is confirmed by a trace yet (open
-  questions 1–3 say which recordings settle the rest).
+- **Status:** implemented against the 2026-10-06 draft (`d2_client::audio`,
+  `docs/handoff/impl-audio.md`); the 2026-10-07 corrections (§5 r2, r3,
+  §6.3 r6–r9, §7 r6–r8, §8.1 r1, §8.3 r3, §10 r5–r6) are not in the code
+  yet. The table layer is verified: `sound_table::tests::game` (C73) passes on
+  the 1.14d files (4,699 records, song range, path / group / block rows,
+  4,508 / 157 / 34 / 698 / 7; `docs/handoff/local-buddy-q-data.md` entry
+  73). Every rule names its 1.14d `Game.exe` address or live
+  measurement; the request / channel / volume rules are not yet
+  confirmed by a voice log (open questions 1, 3, 12, 13).
 - **Target version:** 1.14d
 - **Crate/module:** `d2-client::audio` (`SoundTable`, `SoundBank`,
   `VoicePolicy`, `GainCurve` hooks of `client/audio.md` §A2–§A4; §13
@@ -21,29 +27,29 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 49–63 |
-| Inputs | 64–74 |
-| Outputs / state changes | 75–82 |
-| Rules | 83–84 |
-|   1. Loading the table | 85–147 |
-|   2. Sound environment table (load only) | 148–167 |
-|   3. File path | 168–184 |
-|   4. Groups and variants | 185–227 |
-|   5. Requests | 228–304 |
-|   6. Sound tick | 305–478 |
-|   7. Starting on a channel | 479–560 |
-|   8. Volume and pan | 561–678 |
-|   9. Settings | 679–698 |
-|   10. Sample cache | 699–746 |
-|   11. Live data (1.14d) | 747–763 |
-|   12. Edge cases kept | 764–779 |
-|   13. d2rs mapping | 780–790 |
-| Constants & data dependencies | 791–798 |
-| Randomness | 799–806 |
-| Edge cases & original bugs | 807–811 |
-| Test vectors | 812–856 |
-| Provenance | 857–892 |
-| Open questions | 893–941 |
+| Summary | 55–69 |
+| Inputs | 70–80 |
+| Outputs / state changes | 81–88 |
+| Rules | 89–90 |
+|   1. Loading the table | 91–153 |
+|   2. Sound environment table (load only) | 154–173 |
+|   3. File path | 174–190 |
+|   4. Groups and variants | 191–233 |
+|   5. Requests | 234–310 |
+|   6. Sound tick | 311–485 |
+|   7. Starting on a channel | 486–567 |
+|   8. Volume and pan | 568–685 |
+|   9. Settings | 686–705 |
+|   10. Sample cache | 706–753 |
+|   11. Live data (1.14d) | 754–770 |
+|   12. Edge cases kept | 771–786 |
+|   13. d2rs mapping | 787–797 |
+| Constants & data dependencies | 798–805 |
+| Randomness | 806–813 |
+| Edge cases & original bugs | 814–818 |
+| Test vectors | 819–863 |
+| Provenance | 864–899 |
+| Open questions | 900–948 |
 <!-- /index -->
 
 ## Summary
@@ -472,7 +478,8 @@ At the end of the update, if the tick advanced:
    ends depends on real audio time, not on sound ticks: it is the
    first upkeep after the service thread saw the end. d2rs models it as
    "ended in the first upkeep at which elapsed ticks × 40 ms ≥ the
-   sample's duration" (`client/audio.md` §A3); whether the original's
+   sample's duration" (the implementation's choice,
+   `docs/handoff/impl-audio.md` ST4); whether the original's
    end tick fits that model (and by how much it jitters) is open
    question 12 (Needs recording).
 
