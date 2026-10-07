@@ -24,14 +24,14 @@
 |   3. Chance to hit | 115–194 |
 |   4. Melee result flags | 195–219 |
 |   5. Block chance | 220–242 |
-|   6. Block, weapon block, dodge, avoid, evade | 243–289 |
-|   7. Hostility and melee range | 290–352 |
-| Constants & data dependencies | 353–369 |
-| Randomness | 370–381 |
-| Edge cases & original bugs | 382–399 |
-| Test vectors | 400–421 |
-| Provenance | 422–447 |
-| Open questions | 448–462 |
+|   6. Block, weapon block, dodge, avoid, evade | 243–300 |
+|   7. Hostility and melee range | 301–363 |
+| Constants & data dependencies | 364–380 |
+| Randomness | 381–392 |
+| Edge cases & original bugs | 393–413 |
+| Test vectors | 414–438 |
+| Provenance | 439–464 |
+| Open questions | 465–483 |
 <!-- /index -->
 
 ## Summary
@@ -282,10 +282,21 @@ loses its hit flag and sets nothing else. The missile path maps it to
 
 #### 6.4 `weapon_block(unit)` = `0x0057DCA0`
 
-Copy the unit's `passive_weaponblock(348)` stats (`0x006261D0`, at most
-32). Result = the largest value among entries whose layer (an item type)
-is ≤ 0, or matches the type of the right-hand (bodyloc 4) or left-hand
-(bodyloc 5) item (`0x00629BB0`). No unit: 0. No draws.
+No unit: 0. Otherwise take the right-hand (bodyloc 4) and left-hand
+(bodyloc 5) items from the unit's inventory (+0x60, `0x0063BDE0`; no
+inventory: both none) and copy the unit's `passive_weaponblock(348)`
+entries (`0x006261D0`, at most 32, each an 8-byte {u16 layer, u16 stat,
+i32 value}). `w` starts at 0; walk the entries in copy order:
+
+1. Layer (u16, an item type) = 0: `w := value` (unconditional, even
+   when smaller than `w`).
+2. Layer ≠ 0: if the left item is of that type (`0x00629BB0`), or else
+   the right item is: `w := value` when `value > w` (signed).
+3. Neither: unchanged.
+
+Result `w`; no matching entry gives 0 (1.14d-confirmed, `0x0057DCA0`–
+`0x0057DD50`). A layer-0 entry after a larger typed entry lowers `w`
+(Edge cases 8). No draws.
 
 ### 7. Hostility and melee range
 
@@ -396,6 +407,9 @@ Melee (`melee_result`), in order; a draw that is not reached is skipped:
 6. The montype loop reads at most 128 `attack_vs_montype` entries; the
    weapon-block loop at most 32.
 7. Evade in melee clears the hit with no result flag (§6.3).
+8. Weapon block (§6.4): a layer-0 `passive_weaponblock` entry replaces
+   the running value instead of taking the maximum, so the result
+   depends on entry order. Reproduce.
 
 ## Test vectors
 
@@ -414,6 +428,9 @@ Synthetic (CI-safe), from the formulas above:
 | defense: armorclass 100, dex 50, armor% 50 | base 112, bonus 56, 168 |
 | defense: armorclass −32, dex 50, armor% 50 | base −20, bonus 10, −10 |
 | defense 168, armor_override_percent 10 | 168 + 16 = 184 |
+| weapon block: entries (layer 0, 20), (layer 27, 35); right item type 27 | 35 |
+| weapon block: entries (layer 27, 35), (layer 0, 20); right item type 27 | 20 (Edge cases 8) |
+| weapon block: entry (layer 27, 35); no item of type 27 | 0 |
 | draw: seed (1, 0) attacker, chance 83 | step gives lo′ = 0x6AC690C5 = 1791398085; mod 100 = 85 → miss |
 
 Real 1.14d data (`#[ignore]`): `charstats.bin` `ToHitFactor` and
@@ -459,3 +476,7 @@ Real 1.14d data (`#[ignore]`): `charstats.bin` `ToHitFactor` and
    per `monsters/ai.md`).
 4. Answered: §7.4 lists every caller of `hit_test` and
    `block_or_dodge` with the bonus and flags each passes.
+5. Answered (impl-combat item 7): weapon block with no matching entry
+   is 0, confirmed at `0x0057DCF8` (`w` starts at 0). The "largest value"
+   reading was corrected: layer-0 entries assign unconditionally (§6.4,
+   Edge cases 8).

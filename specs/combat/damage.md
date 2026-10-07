@@ -30,17 +30,17 @@
 |   2. Pipeline | 139–153 |
 |   3. Rolling: `start_combat` = `0x0057DBF0` | 154–293 |
 |   4. Totals and resistances: `totals` = `0x0057C1E0` | 294–385 |
-|   5. Application | 386–552 |
-|   6. Hit class and hit recovery | 553–583 |
-|   7. Reaction and death trigger | 584–673 |
-|   8. Event functions (table `0x007325B0`, 32 entries) | 674–735 |
-|   9. Durability `0x0057D3D0` | 736–755 |
-| Constants & data dependencies | 756–777 |
-| Randomness | 778–810 |
-| Edge cases & original bugs | 811–845 |
-| Test vectors | 846–878 |
-| Provenance | 879–904 |
-| Open questions | 905–943 |
+|   5. Application | 386–575 |
+|   6. Hit class and hit recovery | 576–606 |
+|   7. Reaction and death trigger | 607–696 |
+|   8. Event functions (table `0x007325B0`, 32 entries) | 697–760 |
+|   9. Durability `0x0057D3D0` | 761–782 |
+| Constants & data dependencies | 783–804 |
+| Randomness | 805–837 |
+| Edge cases & original bugs | 838–872 |
+| Test vectors | 873–905 |
+| Provenance | 906–931 |
+| Open questions | 932–979 |
 <!-- /index -->
 
 ## Summary
@@ -394,19 +394,27 @@ If ≠ 100: every row of §4.3 marked *scaled* whose value is > 0 becomes
    (attacker is a monster))`): free the attacker's combat records for
    this defender (`0x0057C9F0`), return.
 4. If the copy has hit (1):
-   1. A player or monster attacker in mode 0 (death): free and return.
+   1. A player or monster attacker in mode 0 (death): return at once
+      (`0x0057D5AC`), **without** freeing the combat record, without
+      events, thorns or reaction. The record stays on the attacker
+      until freed elsewhere.
    2. Hit flags = 0x20 (replaces all); `apply(game, attacker, defender,
       missile = 0, copy)` (§5.2).
    3. Overlay +0x6C > 0 → on the defender (`0x00621E40`).
-   4. Hit class: if +0x64 = 0 and the low nibble is 0: OR in the
-      attacker's weapon hit class (`0x00623C20`).
+   4. Hit class: if the byte +0x64 = 0 and the low nibble of +0x60 is
+      0: OR in the attacker's weapon hit class (`0x00623C20`).
    5. Durability (§9).
 5. Unit event 7 (`domeleeattack`) on the attacker, then event 3
-   (`attackedinmelee`) on the defender.
-6. If hit: attacker is an object, or a non-player non-monster, or not
-   in mode 0 → thorns (`0x005D10C0`, skills spec).
+   (`attackedinmelee`) on the defender (both with the copy).
+6. If the copy has hit: attacker type 2 (object) or a type other than
+   0 / 1 → thorns (`0x005D10C0`, skills spec). A player or monster
+   attacker: in mode 0 (it died during steps 4–5, e.g. from an event
+   function) → return at once (`0x0057D63F`), as in step 4.1: no
+   thorns, no reaction, record not freed; any other mode → thorns.
+   Without a hit: no thorns.
 7. Reaction `0x0057CEE0` (§7.1).
-8. Free the combat records for this attacker/defender pair.
+8. Free the combat records for this attacker/defender pair
+   (`0x0057C9F0`).
 
 #### 5.2 `apply(game, attacker, defender, missile, record)` = `0x0057C6C0`
 
@@ -478,6 +486,14 @@ Runs when life leech or mana leech ≠ 0.
 6. The leech fields keep their shifted values; step 12 of §5.2 then
    subtracts the (shifted, divided) mana and stamina leech from the
    defender (Edge case 6).
+7. **No attacker** (1.14d-confirmed, `0x0057C5AB`–`0x0057C67D`): the
+   mode conversion `0x00645270` returns at once for a missing unit and
+   leaves the preset type 6, so the monster rule runs: the fields are
+   stored back as `(x << 6) / 64` (= `x` unless the shift overflowed),
+   `T` is computed from the defender's mana and stamina, the drain
+   scaling applies, then the attacker's max life and life read 0 for a
+   missing unit (`0x00625D10`, `0x00625480`), `T = min(T, 0)` ≤ 0 and
+   the leech stops: nothing healed, no overlay, no draw.
 
 Rule H `heal(unit, x)` = `0x0057A980`: `x ≤ 0`, unit dead, or state 92
 (`death_delay`) → 0. Else life = `min(life + x, max life)`; return the
@@ -530,12 +546,19 @@ Length `n` = stun length; `n ≤ 0` → nothing.
 
 `length ≤ 0` → nothing. Player defender → cold (§5.6) with this
 length. Monster: state 54 → nothing; boss, unique (flag 8) or hireling →
-cold with this length. Otherwise: cold effect ≥ 0 (`0x0057AF30`) →
-nothing; monster: `length /= MonsterFreezeDivisor` (zero is a fatal
-assertion). End `e = frame + length`; existing freeze list (state 1)
-keeps the later expiry, else a new list with state 1; timer 12 at the
-final expiry; cancel the monster's type-2 (AI) timers and schedule type
-2 at frame + length + 1. No draws.
+cold with this length. Otherwise (other monsters, and any other
+defender type): cold effect ≥ 0 (`0x0057AF30`; −50 for a non-monster)
+→ nothing; monster: `length /= MonsterFreezeDivisor` (zero is a fatal
+assertion). End `e = frame + length` (game of the attacker). Existing
+freeze list (state 1, `0x006256B0`): its expiry becomes `max(expiry,
+e)`. No list (1.14d-confirmed, `0x0057B337`–`0x0057B37E`): switch
+state 1 on (`0x00639DB0(def, 1, 1)`) **first**, then create a list
+(expiry `e`, owner attacker or (6, −1)), give it state 1, set its
+remove callback `0x0057B170` (freeze end, `monsters/ai.md` §1.1 rule
+2) and attach it. Timer 12 at the final expiry. Then a monster
+defender: cancel its type-2 (AI) timers and schedule type 2 at frame +
+length + 1 (length after the divisor); a non-monster defender here is
+a fatal assertion (line 0x276). No draws.
 
 #### 5.8 Poison and burn `0x0057AC50`, `0x0057ADD0`
 
@@ -715,10 +738,12 @@ layer, level); the chance stat is read with the item/skill getter from
 
 **Crushing blow (16)**: `c` = chance stat; `c ≤ 0` → 0. Draw (attacker
 seed, inline `lo′ mod 100`); `r ≥ c` → 0. Divisor: player defender 10;
-monster: hireling 10; else 4, or 8 if boss or superunique (flag 2); then
-`h = 0x005738F0(max(monster_playercount(100), 1))` (player-count life
-bonus, monsters branch) and `div += pct(div, h, 100)` if `h ≠ 0`. Other
-defenders 4. Event 6 (missile) doubles it. `x = life / div`; `dr =
+monster: hireling 10 and nothing more (the jump at `0x005C0055` skips
+the player-count term); any other monster 4, or 8 if boss or
+superunique (flag 2), then `h = 0x005738F0(max(monster_playercount
+(100), 1))` (player-count life bonus, monsters branch) and `div +=
+pct(div, h, 100)` if `h ≠ 0` (1.14d-confirmed, `0x005C0046`–
+`0x005C00A0`). Other defenders 4. Event 6 (missile) doubles it. `x = life / div`; `dr =
 min(damageresist(36), 100)`; `dr > 0` → `x −= pct(x, dr, 100)`. Life =
 `max(life − x, 0)`; life ≤ 0 → record result |= 2; `x > 0` → overlay 147.
 Return 1.
@@ -737,8 +762,10 @@ frames, skill 0, level 1, owner attacker.
 
 1. Attacker is a player with a current weapon: `durability_hit(game,
    attacker, weapon)` (`0x00559E30`).
-2. Defender is a player with an inventory: candidates from the weight
-   table `0x00732B90` (7 rows, count at `0x00732BC8`): (bodyloc 1 head,
+2. Defender is a player whose inventory pointer (+0x60) is non-null
+   (every server player: the player type init `0x005348C0` creates it
+   unconditionally at `0x005348F9`; 1.14d-confirmed): candidates from
+   the weight table `0x00732B90` (7 rows, count at `0x00732BC8`): (bodyloc 1 head,
    3), (3 torso, 5), (4 right arm, 4), (5 left arm, 4), (8 belt, 2), (9
    feet, 2), (10 gloves, 2); keep each slot holding an item of type 50
    (any armor); `W` = sum of kept weights. `W > 0`: `i = roll(7)`, `w =
@@ -940,3 +967,12 @@ Real 1.14d data (`#[ignore]`): the resistance rows of §4.3 equal
     `remhit` flag (bitset 6, data tables +0xE4): its state list, if any,
     is detached and freed, then the state is turned off. 1.14d: only
     state 153 `cloak_of_shadows` has `remhit`.
+11. Answered (`docs/handoff/impl-combat.md` items 11–15, checked against
+    the 1.14d disassembly): item 11 corrected, §5.1 steps 4.1 and 6 (a
+    dead attacker returns without freeing the record; the mode-0 test
+    at `0x0057D63B` ends the whole function, not just thorns); item 12
+    specified, §5.3 step 7 (no attacker: monster rule, nothing healed);
+    item 13 confirmed, §5.7 (`0x0057B33C` switches state 1 on before the
+    list is created; remove callback `0x0057B170` added); item 14
+    confirmed, §8 (`0x005C0055`); item 15 confirmed, §9 (inventory
+    pointer +0x60, created for every server player at `0x005348F9`).
