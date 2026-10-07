@@ -51,6 +51,11 @@ was at the 60 KB limit).
 | `ui/messages.md` OQ 3 | `ui/messages.md` OQ 3 | Binding 7 = automap (mini-panel tool tip table `0x0047F490`). |
 | `client/msg-ui.md` OQ7 (writer part) | `ui/messages.md` §14 | All 12 writes of `[0x007C0D25]` / `[0x007C0D29]` are UI code (`0x004B1640`, `0x004B66B0`, `0x004B6DD0`, `0x004B3C20`, `0x004B3E10`): UI state; the bridge needs a UI-keyed lookup rule (cross-file request). |
 
+## xpc-to-pc2 lines done
+
+- `docs/handoff/xpc-to-pc2.md` line 16 (`ui/*`, owner of the UI consumer, `sim/intents-events.md` OQ18: a UI rule per entry point for 0x26, 0x27, 0x4E, 0x50, 0x58, 0x8A, 0x91) — done in `ui/messages.md` §1–§14, commit `a82a04c` (fix-ups in the next commits).
+- `docs/handoff/xpc-to-pc2.md` line 17 (`ui/*` follow-up, PC 1 area 3: chat formats and colours, overhead draw and record rule, NPC text list / dialog panel / box, hire popup and list, 0x58 dialogs, intro table +0x12, interact-NPC writer, `client/msg-ui.md` OQ7) — done in `ui/messages.md` §2–§14, commit `a82a04c`; OQ7 writer part answered (§14), the bridge rule is a cross-file request.
+
 ## Still open
 
 - UP-19 rest: remap `k` per state (capture).

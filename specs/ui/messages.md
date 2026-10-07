@@ -26,25 +26,25 @@
 | Outputs / state changes | 76–85 |
 | Rules | 86–87 |
 |   1. Entry points | 88–101 |
-|   2. Screen message list (`0x0049E3A0(text, color)`) | 102–136 |
-|   3. Chat line formats (0x26, `client/msg-ui.md` §4 r3) | 137–173 |
-|   4. Recipe scroll text (0x26 type 7) | 174–189 |
-|   5. Overhead text | 190–249 |
-|   6. NPC text list `[0x007BF250]` (0x27 type 1) | 250–308 |
-|   7. Dialog panel (`0x004A1320`, `0x004A10E0`) | 309–423 |
-|   8. Timed text box (`0x004A1510(id)`, 0x27 type 2 kind 3) | 424–436 |
-|   9. Hire offers and the hire popup (0x4E, 0x4F, 0x50 code 2) | 437–453 |
-|   10. Other 0x50 codes (UI effects) | 454–488 |
-|   11. Item-socket dialog (UI state 0x0E, 0x58 codes) | 489–558 |
-|   12. NPC alert (0x8A, `client/msg-ui.md` §9 r3) | 559–565 |
-|   13. NPC intro table `0x00726850` (0x91) | 566–594 |
-|   14. Interact NPC `[0x007C0D25]` / `[0x007C0D29]` (answers `client/msg-ui.md` OQ7, writer part) | 595–611 |
-| Constants & data dependencies | 612–629 |
-| Randomness | 630–634 |
-| Edge cases & original bugs | 635–655 |
-| Test vectors | 656–678 |
-| Provenance | 679–705 |
-| Open questions | 706–731 |
+|   2. Screen message list (`0x0049E3A0(text, color)`) | 102–140 |
+|   3. Chat line formats (0x26, `client/msg-ui.md` §4 r3) | 141–177 |
+|   4. Recipe scroll text (0x26 type 7) | 178–193 |
+|   5. Overhead text | 194–253 |
+|   6. NPC text list `[0x007BF250]` (0x27 type 1) | 254–312 |
+|   7. Dialog panel (`0x004A1320`, `0x004A10E0`) | 313–427 |
+|   8. Timed text box (`0x004A1510(id)`, 0x27 type 2 kind 3) | 428–440 |
+|   9. Hire offers and the hire popup (0x4E, 0x4F, 0x50 code 2) | 441–457 |
+|   10. Other 0x50 codes (UI effects) | 458–492 |
+|   11. Item-socket dialog (UI state 0x0E, 0x58 codes) | 493–562 |
+|   12. NPC alert (0x8A, `client/msg-ui.md` §9 r3) | 563–569 |
+|   13. NPC intro table `0x00726850` (0x91) | 570–598 |
+|   14. Interact NPC `[0x007C0D25]` / `[0x007C0D29]` (answers `client/msg-ui.md` OQ7, writer part) | 599–615 |
+| Constants & data dependencies | 616–633 |
+| Randomness | 634–638 |
+| Edge cases & original bugs | 639–659 |
+| Test vectors | 660–682 |
+| Provenance | 683–709 |
+| Open questions | 710–735 |
 <!-- /index -->
 
 ## Summary
@@ -127,10 +127,14 @@ intro table `0x00726850`; `SetUIState` calls (0x0E, 0x23, 0x24, 0x25,
    3 → x = 15, no re-wrap. Records head to tail, their lines in order;
    a line counter k (from 0, over all records) gives y = start + 15 k.
    - no re-wrap: line width w = width C (`0x00501730`) of the line; w = 0
-     → skipped (k unchanged); else the framed box `0x0046EFD0(x − 4, y −
+     → skipped (k unchanged); else the rectangle `0x0046EFD0(x − 4, y −
      14, w + 8, 16, 0, 1)`, then `DrawText(line, x, y, color, 0)`, k + 1;
    - re-wrap: each line is wrapped again to 300 pixels and each piece is
      drawn the same way with the box `(x − 5, y − 14, w + 10, 16, 0, 1)`.
+   `0x0046EFD0(x, y, w, h, color, mode)` here and below is
+   `DrawRectangle(x, y, x + w, y + h, color, mode)`
+   (`render/blend-modes.md` §8 r2): color 0 with mode 1 is the dark
+   translucent text backing.
 5. **Expiry** (end of the same draw): every record whose expiry is
    below `GetTickCount()` is unlinked and freed (count − 1).
 
@@ -242,7 +246,7 @@ stops at a `ÿc` that ends the string.
 6. **Bubble draw** (`0x0049D9A0` → `0x0049D8E0(box, x, y)`): open mode
    1 and x > W / 2 − 10, mode 2 and x < W / 2 + 10, or mode 3 → not
    drawn. Box field +0x16 = 3 → not drawn; 0 → set to 1 (§Open
-   questions 2). Drawn only with y ≥ 0 and y + h < H: the framed box
+   questions 2). Drawn only with y ≥ 0 and y + h < H: the rectangle
    `0x0046EFD0(x, y + 4, w, h − 5, 0, 1)`, then in font 13 the first
    min(lines, 10) lines, line i at `DrawText(line, x + 10, y + 18 + 15 ·
    (i + lines − min(lines, 10)), 0, 0)`.
@@ -359,7 +363,7 @@ stops at a `ÿc` that ends the string.
    `[0x007BF1F6]` (the "Text Display Beta" registry value, default 1,
    set by the NPC Speech option: 0 for "speech", 1 for "text" and
    "both", `0x0047CEF0`) or `[0x007BF1FA]` is set:
-   - place 0 only: framed box `0x0046EFD0(x, y − 5, 325, 122, 0, 1)`,
+   - place 0 only: rectangle `0x0046EFD0(x, y − 5, 325, 122, 0, 1)`,
      border `0x00452E50` (`menu\boxpieces`) around (x − 1, y − 6, x +
      326, y + 117);
    - line i (from the first) has q_i = p − 18432 i; with 0 ≤ q_i < 96256
@@ -524,7 +528,7 @@ stops at a `ÿc` that ends the string.
    both buttons; hover (mouse x < 320 and y < H − 48, inside a hit
    rectangle): caption = 3401 "ok" for button 0 in mode 0, 22748 "add
    sockets" / 22749 "personalize" for button 0 at NPC 511 / 512, else
-   the record caption; box `0x0046EFD0(X − w/2 + 10, Y − h − 42, w + 12,
+   the record caption; rectangle `0x0046EFD0(X − w/2 + 10, Y − h − 42, w + 12,
    h + 6, 0, 2)`, text `DrawText(caption, X − w/2 + 16, Y − 38, 0, 0)`
    (X, Y = +2, +6; w = width A, h = font height). Mode 1: the
    instruction 10076 (NPC 154), 22750 (511) or 22747 (512) wrapped to
