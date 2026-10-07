@@ -18,7 +18,7 @@
 | Rules | 31–32 |
 |   6. Bodies, required level 18 | 33–331 |
 |   7. Bodies, required level 24 | 332–632 |
-|   8. Bodies, required level 30 | 633–869 |
+|   8. Bodies, required level 30 | 633–891 |
 <!-- /index -->
 
 ## Summary
