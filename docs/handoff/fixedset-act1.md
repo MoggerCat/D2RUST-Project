@@ -91,3 +91,14 @@ and `cargo test -p d2-server --test game_wired_host` (builds, 7 ignored).
 | `crates/test-fixtures/tests/act1_game.rs` | the e2e |
 | `crates/d2-server/tests/game_wired_host.rs` | folded onto `GameData` + `Session` |
 | `crates/d2-server/Cargo.toml` | dev-dependency `test-fixtures` |
+
+## 6. Merge with main (2026-10-07)
+
+`origin/main` merged in (a merge, no rebase). The one conflict,
+`d2-server/tests/game_wired_host.rs`, kept this branch's side: the town
+waypoint search lives in `test_fixtures::host` (room, map and DS1 lists);
+main's post-stream `assert_transferred` check (`preset.md` §9) was ported
+there. Main's outdoor neighbour walk now get-or-allocates 1..17, so
+`placement_matches_the_spec_vector` asserts the 20-level `levels.md` vector
+(…, 5, 8, 9, …, 16). `CARGO_INCREMENTAL=0 sh tools/gate.sh`: **PASS**, all
+13 steps (the cloud container needed CI's apt libraries for `d2-client`).
