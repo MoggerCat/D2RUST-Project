@@ -473,3 +473,20 @@ specs/sim/tick.md	§5.7	pointer table to units.md
 specs/sim/tick.md	§6 text	narration
 specs/formats/d2s.md	§4 r4	pointer to world/quests.md
 specs/formats/d2s.md	§8.1 r9	list of call sites (pointers)
+specs/world/waypoints.md	§4 r2	provenance table of setter callers (other specs)
+specs/world/waypoints.md	§9	pointer to other specs
+specs/world/waypoints.md	§10	open questions and provenance
+specs/world/waypoints.md	§edge-cases-original-bugs text	section intro
+specs/world/cube.md	§10	provenance
+specs/world/hirelings.md	§14	pointer to monsters/ai-bodies-6.md
+specs/world/hirelings-ai.md	§1	pointer to other specs
+specs/world/vendors.md	§edge-cases-original-bugs text	section intro
+specs/world/npc.md	§10	dead code in 1.14d (no caller)
+specs/world/quests-act2.md	§6.10	pointer: moved to quests-act2-2.md §2
+specs/world/quests-act2-2.md	§2 text	field-offset narration
+specs/world/quests-act3.md	§edge-cases-original-bugs r17	dead code: no caller in 1.14d
+specs/world/quests-act4.md	§edge-cases-original-bugs r18	dead code: no caller in 1.14d
+specs/world/quests-act5-2.md	§edge-cases-original-bugs r10	dead code: no caller in 1.14d
+specs/world/quests-act5.md	§edge-cases-original-bugs r7	dead code: nothing reachable
+specs/world/quests-act5.md	§1.4	table of function numbers (pointers)
+specs/world/quests-act3-2.md	§11.7 text	record-layout narration
