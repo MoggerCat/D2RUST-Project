@@ -664,7 +664,9 @@ pub trait Pending {
         level: i32,
     ) {
     }
-    /// A missile parameter record's init callback (skills spec).
+    /// A missile parameter record's init callback with an id no spec
+    /// names (the specified ones run in `missiles::init_cb`, §R2.3 step
+    /// 21).
     fn missile_init_callback(&mut self, game: &mut Game, missile: UnitId, callback: u32, arg: u32) {
     }
     /// Server-damage function `index` 1…14 (`0x0073C960`, skills spec):

@@ -241,10 +241,14 @@ pub fn create_missile<W: MissileWorld + ?Sized>(
     cx.world.alloc_stat_list(m);
     // Step 21.
     // The missile spec's own callback (`zigzag`, `missiles/bodies.md`
-    // §19) runs here; every other one is the skills code's.
+    // §19) and the skills spec's ([`super::init_cb`]) run here with the
+    // store; any other id is the host's.
     match p.init {
         Some((super::bodies_ext::ZIGZAG_CALLBACK, _)) => super::bodies_ext::zigzag(game, cx, m),
-        Some((cb, arg)) => cx.world.init_callback(game, m, cb, arg),
+        Some((cb, arg)) if !super::init_cb::run(game, cx, m, cb, arg) => {
+            cx.world.init_callback(game, m, cb, arg);
+        }
+        Some(_) => {}
         None => {}
     }
     // Step 22.

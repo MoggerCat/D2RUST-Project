@@ -691,6 +691,18 @@ impl<X: Pending> crate::missiles::MissileBodies for View<'_, X> {
     fn set_path_distance(&mut self, unit: UnitId, d: i32) {
         let _ = self.path_set_step_counts(unit, d);
     }
+    /// `0x00621DC0` with the path provider; 0 without it.
+    fn dir64(&self, unit: UnitId, at: (i32, i32)) -> i32 {
+        self.path_dir64(unit, at).unwrap_or(0)
+    }
+    /// Path point i with the path provider.
+    fn set_path_point(&mut self, unit: UnitId, i: i32, at: (u16, u16)) {
+        let _ = self.path_set_point(unit, i, at);
+    }
+    /// `0x00648790` with the path provider.
+    fn set_path_point_count(&mut self, unit: UnitId, n: i32) {
+        let _ = self.path_set_point_count(unit, n);
+    }
     /// Teleport `0x00650BE0` with the path provider.
     fn path_teleport(
         &mut self,

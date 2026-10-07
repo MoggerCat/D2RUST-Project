@@ -1,4 +1,4 @@
-// Spec: specs/sim/path-placement.md §2.3, §6 r4; specs/sim/pathing.md §2, §11; specs/skills/bodies.md §2.4; specs/skills/bodies-2.md §2.3; specs/missiles/bodies.md §19; specs/missiles/bodies-2.md §46 (missile-body path seams on the path provider)
+// Spec: specs/sim/path-placement.md §2.3, §6 r4; specs/skills/bodies-3.md §3.8; specs/skills/bodies-4.md §2.4; specs/sim/pathing.md §2, §11; specs/skills/bodies.md §2.4; specs/skills/bodies-2.md §2.3; specs/missiles/bodies.md §19; specs/missiles/bodies-2.md §46 (missile-body path seams on the path provider)
 //! The path seams of the missile server-do / server-hit bodies
 //! ([`crate::missiles::MissileBodies`]) answered by the path provider:
 //! the target point (`0x00648A00` / `0x00648A10`), the target position
@@ -76,6 +76,48 @@ impl<X: Pending> View<'_, X> {
             let v = n.min(STEP_COUNT_CAP) as u8;
             d.dist_budget = v;
             d.max_distance = v;
+        }
+        Some(())
+    }
+
+    /// `0x00621DC0(unit, x, y)` → `0x0064FDC0` (`skills/bodies-3.md`
+    /// §3.8): the direction vector's direction (`pathing.md` §8.3 rules
+    /// 1–3) from the unit's position to (x, y).
+    ///
+    /// TODO(spec: skills/bodies-3.md §3.8): the coordinates `0x0064FDC0`
+    /// feeds §8.3 (sub-tile position or the path's 16.16 one, and the
+    /// target's fraction) are not stated; sub-tiles are used (equal to
+    /// 16.16 whenever both fractions match). §8.3 rule 4 (`0x0064FED5`)
+    /// is the §8.4 caller's and is not applied.
+    pub(crate) fn path_dir64(&self, unit: UnitId, at: (i32, i32)) -> Option<i32> {
+        let p = self.h.paths.as_ref()?;
+        let (x, y) = self.h.path_position(unit);
+        let (_, d) = crate::path::walk::geom::direction_vector(
+            &p.tables,
+            (x as u32, y as u32),
+            (at.0 as u32, at.1 as u32),
+        );
+        Some(i32::from(d))
+    }
+
+    /// Path point i := (x, y) (+0x9C array, `skills/bodies-4.md` §2.4);
+    /// an index outside the array is not written.
+    pub(crate) fn path_set_point(&mut self, unit: UnitId, i: i32, at: (u16, u16)) -> Option<()> {
+        let p = self.h.paths.as_mut()?;
+        if let Some(d) = p.dynamic_mut(unit) {
+            if let Some(pt) = usize::try_from(i).ok().and_then(|i| d.points.get_mut(i)) {
+                pt.x = at.0;
+                pt.y = at.1;
+            }
+        }
+        Some(())
+    }
+
+    /// Point count (+0x28) := n (`0x00648790`).
+    pub(crate) fn path_set_point_count(&mut self, unit: UnitId, n: i32) -> Option<()> {
+        let p = self.h.paths.as_mut()?;
+        if let Some(d) = p.dynamic_mut(unit) {
+            d.point_count = n as u32;
         }
         Some(())
     }

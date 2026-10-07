@@ -397,6 +397,17 @@ pub trait MissileBodies {
     fn set_path_type(&mut self, unit: UnitId, ty: i32) {}
     /// `0x00648E70`: path distance.
     fn set_path_distance(&mut self, unit: UnitId, d: i32) {}
+    /// `0x00621DC0(unit, x, y)`: the 64-step direction from the unit's
+    /// position to (x, y) (`skills/bodies-3.md` §3.8, `sim/pathing.md`
+    /// §8.3). Default: 0.
+    fn dir64(&self, unit: UnitId, at: (i32, i32)) -> i32 {
+        0
+    }
+    /// Path point i := (x, y) (the point array of `0x006487D0`;
+    /// `skills/bodies-4.md` §2.4).
+    fn set_path_point(&mut self, unit: UnitId, i: i32, at: (u16, u16)) {}
+    /// The path's point count := n (`0x00648790`).
+    fn set_path_point_count(&mut self, unit: UnitId, n: i32) {}
     /// `0x00650BE0(path, unit, room, x, y)` (`sim/path-placement.md` §6).
     fn path_teleport(
         &mut self,
