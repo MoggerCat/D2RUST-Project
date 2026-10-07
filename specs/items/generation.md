@@ -430,7 +430,7 @@ draw. Also used by property function 23 and craft lists
 
 1. Forced (§3 step 7): flag 0x10 := flags1 & 0x10; flag 0x1000 := flags1
    & 0x1000.
-2. Format 0 only: forced socket count (§1.2; the step is given below). Then flag
+2. Format 0 only: forced socket count (§1.2; the socket step below). Then flag
    0x800 := flags1 & 0x800; 0x100 := flags1 & 0x100; 0x20000 := flags1 &
    0x20000.
    Scope (handoff `impl-items` OQ-G2, `gaps-items-stats` question 1,

@@ -45,7 +45,7 @@
 | Edge cases & original bugs | 640–663 |
 | Test vectors | 664–693 |
 | Provenance | 694–718 |
-| Open questions | 719–878 |
+| Open questions | 719–881 |
 <!-- /index -->
 
 ## Summary
@@ -728,7 +728,7 @@ Real 1.14d (game-file tests, `#[ignore]`, from the live `.bin` set):
    `0x0055A9B9` for a game with `players` > 1.
 4. The runtime TC array (`0x0096C5EC`, 1,013 × 0x2C plus entries) and the
    chest table (`0x0096C5F4`) are not dumped; §1 is a model until a dump
-   matches (entry counts, starts, flags, rows).
+   matches (entry counts, starts, flags, rows). Recording list IT-9.
 5. x87 precision control on the server thread during §5.4 (irrelevant
    for 1.14d data, §5.4; matters for mods with other nodrop/total pairs).
    Partly answered (2026-10-07, from the binary); the rest **Needs
@@ -870,8 +870,11 @@ Real 1.14d (game-file tests, `#[ignore]`, from the live `.bin` set):
     - 14: the fatal paths (0xF3A, 0xF44, 0xFEA, no ratio row, bone wall,
       > 65,534 TCs) are the original's asserts (process exit); how d2rs
       reports them is a Ruleset choice, not a fidelity fact.
-    §9.1's n = 0 result (an uninitialised stack value): Pending for
-    fidelity (only a stack capture at the pick of `0x00555E70` /
-    `0x00555FB0` / `0x005560F0` with every record filtered could show
-    the 1.14d value, and it depends on earlier calls); d2rs's choice is
-    recorded in §9.1 (−1, no item), so no code waits on it.
+    ~~Still open: §9.1's n = 0 result.~~ Struck (2026-10-07): the value
+    (an uninitialised stack value) is whatever earlier calls left in
+    that stack slot, so no reading of the binary fixes it; only a stack
+    capture at the pick of `0x00555E70` / `0x00555FB0` / `0x005560F0`
+    with every record filtered could show the 1.14d value. d2rs's choice
+    is recorded in §9.1 (−1, no item), so no code waits on it. Recording
+    list `docs/handoff/pc2-rec-pc2-items.md` IT-11 (what 1.14d does in
+    the one reproducible case).

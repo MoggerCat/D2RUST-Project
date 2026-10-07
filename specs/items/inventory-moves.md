@@ -16,12 +16,12 @@
 | Summary | 27–33 |
 | Rules | 34–35 |
 |   6. Deferred item messages | 36–129 |
-|   7. Intents | 130–556 |
-|   8. Pickup from the ground | 557–663 |
-|   9. Drop to the ground | 664–711 |
-|   10. Gold | 712–751 |
-|   11. Message layouts | 752–781 |
-|   12. Corpse take-back (`0x0057FB70` → `0x00562F30`) | 782–909 |
+|   7. Intents | 130–557 |
+|   8. Pickup from the ground | 558–739 |
+|   9. Drop to the ground | 740–787 |
+|   10. Gold | 788–827 |
+|   11. Message layouts | 828–857 |
+|   12. Corpse take-back (`0x0057FB70` → `0x00562F30`) | 858–985 |
 <!-- /index -->
 
 ## Summary
@@ -142,7 +142,8 @@ Every handler checks its exact size first (→ 3, `intents-events.md`
    distance > 50 → 1; distance > 8 → walk to P (`0x00548A50`, as below)
    → 0; P in mode 17 (dead) and the player passes the busy test
    `0x005678A0(1)` = 0 → corpse pickup `0x0057FB70(game, player, P)`
-   (needs P's state 7 `playerbody`; §12) →
+   (needs P's state 7 `playerbody`; §12; `combat/vitals.md` §4.7 rule 2;
+   item take-back §8.5) →
    0; else `0x00566E60` (player-to-player interaction, wall-clock
    throttled with `GetTickCount`; multiplayer, out of scope) → 0. Type 5
    (tile): missing or distance > 50 → 1; distance < 5 → warp
@@ -660,6 +661,81 @@ player.
      each of `qf1`, `qhr`, `qey`, `qbr` (`0x0055CA00`). This is the full
      list.
    Else yes.
+
+#### 8.5 Corpse take-back (`0x00562F30`, ECX game, player P, corpse C)
+
+The same routine is also written up in §12 (a parallel PC 2 session,
+staging-6 merge; the two read the same 1.14d code and agree).
+
+Called from the corpse pickup `0x0057FB70` (`combat/vitals.md` §4.7 rule
+2: state 7 and the permission test, then the experience return) after
+those steps. P's inventory I_P, C's inventory I_C; either missing →
+result 0 and nothing else.
+
+1. **Body pass**, repeated while the last pass found a body item on C
+   and moved one: for location l = 1 … 12 in order, X = C's item at l
+   (`0x0063BDE0`); none → next. X fails the requirements for P
+   (`inventory.md` §4.2, equipping) → next (X stays on C). Else A = P's
+   item at l, o = the other hand of l (`0x0055F240`: 4↔5, 6↔7,
+   11↔12, else 0), B = P's item at o, or B = A when o = 0; then the
+   slot test (rule 3) picks a location L:
+   1. Slot test fails: X goes to a free position of P's inventory page 0
+      (`0x005600A0`, §8.1 step 7); that failing → next location (X
+      stays).
+   2. Slot test passes: P already has an item at L → fatal assert
+      0x1775. X put at L (`0x0063BDB0`) failing → next location. Link
+      (`0x0063B210`, kind 3, or 4 when L is 11 or 12) failing → P's slot
+      L cleared (`0x0063BE30`), next location. Linked: P's cursor :=
+      none, X's body location := L, unit flag 0x2 cleared, mode 1,
+      command flag 0x8, P's update list += X, P refreshed
+      (`0x00621000(P, 1)`), unit flag 0x2000000 cleared, page := 0xFF;
+      kind 3 only: stat link `0x0063D1D0`, stat refresh `0x0055C2C0(P,
+      0)`, item-skill link `0x0055C270`, weapon bookkeeping
+      `0x0055C5C0`; quest event ITEMPICKEDUP (`0x00543D80`).
+   3. Either success (1 or 2): replenish timers (`0x00558530`,
+      `0x00558580`, `items/generation.md` §9), item flag 0x1 set, X
+      unlinked from I_C (`0x0063AD90`) and C's slot l cleared.
+2. **Stored items**, in passes over I_C's item list (first item, each
+   item's successor taken before it is handled). A pass starts with
+   r := 1 and m := 0; the grid flag g starts at 0. For each item Y:
+   1. Can-pick (§8.4) fails → r := 0; Y stays.
+   2. Equip without the cursor (`inventory.md` §4.9, skip 0) succeeds
+      → moved.
+   3. Else Y is beltable (`inventory.md` §3 rule 3) and P's belt has a
+      free box for it (`0x0063C790`) and the link (kind 2) succeeds:
+      P's cursor := none; P a player → item-skill link
+      (`0x0055C110`, add 1); unit flag 0x2 cleared; Y an active
+      inventory item of P (`inventory.md` §5.6) → stat refresh; mode 2;
+      unit flag 0x2000000 cleared; command flag 0x2000; page := 0xFF;
+      P's update list += Y; P refreshed → moved. (A failed link leaves
+      Y and r as they are.)
+   4. Else g = 1: a free position of P's page 0 (`0x005600A0`) →
+      moved; none → r := 0. g = 0: Y stays.
+   Moved: m += 1 and item flag 0x1 set. After a pass with m = 0: g = 1
+   → stop; else g := 1. Then the next pass from the first item; an
+   empty list stops at once (r = 1).
+3. **Slot test** (`0x0055F2D0`, P, X, &A, &B, &L): A and B both
+   present → fail; both absent → pass. A present (B absent): B := A, A
+   := none, L := the other hand o (X tries the free opposite slot).
+   L not a hand (4, 5, 11, 12) → pass when A is absent. Hands (B is
+   present here), with ammo type a(·) (`0x0062E6F0`) and quiver type
+   q(·) (`0x0062E740`): a(X) > 0 → pass when B is-a a(X); else q(X) ≠ 0
+   → pass when a(B) > 0 and X is-a a(B); else a(B) > 0 → pass when X
+   is-a a(B); else q(B) > 0 → pass when X is-a q(B); else X or B
+   two-handed (`0x006289C0`) and not one-or-two-handed for P
+   (`0x0062A1E0`) → fail; exactly one of X, B is-a `weap` (45) → pass;
+   neither → fail; both: P a monster (unit type 1), or class 4, or
+   class 6 with both is-a `h2h` (67) → pass, else fail. (It differs
+   from `inventory.md` §4.4 in the monster case and the ammo order.)
+4. Last, the inventory pass `0x0055DBC0(0)` (`inventory.md` §5.7);
+   result r of the last pass.
+5. In `0x0057FB70`: r ≠ 0 → C's node is removed from I_P's corpse list
+   (`0x0063D4E0(I_P, C's GUID, 1)`), C leaves its room (`0x0061A270`),
+   a removal notice for C's GUID goes out (`0x0053DF80(GUID, 0)`),
+   `0x00623830(C)`, C is freed (`0x00555600`), and event 0x5D
+   (`object_corpse_loot`, `audio/triggers-2.md`) is queued on P
+   (`0x00553380`). r = 0 → event 0x17 (`cantcarry`) on P; C keeps what
+   it still holds.
 
 ### 9. Drop to the ground
 

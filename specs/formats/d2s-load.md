@@ -345,15 +345,15 @@ the owner specs' (`items/generation.md` §10.3).
 
 1. None of its own; see `formats/d2s.md` Open questions 15 (golem item)
    and 17 (appearance bytes).
-2. Load §6 rule 1.2: where an equipped non-matching runeword item ends
-   up after `0x00560CD0` (flag 0x20 set, not the cursor). Settle: the
-   rest of `0x00560CD0` (`0x0055C730`, `0x0055C5C0`, `0x0055DBC0`) or a
-   local save holding an equipped runeword item whose runes were edited
-   so that it no longer matches, loaded and re-saved.
-3. Load §4 is derived from the link rules; measured confirmation: a
-   save with a Tome of Town Portal hotkeyed (inventory) and an equipped
-   weapon linked before it, saved, reloaded and saved again (header
-   +0x38.. and the item order).
+2. ~~Load §6 rule 1.2: where an equipped non-matching runeword item
+   ends up after `0x00560CD0` (flag 0x20 set, not the cursor).~~ Struck
+   (2026-10-07): needs `0x0055C730`, `0x0055C5C0` and `0x0055DBC0`
+   (three bodies). A game-written save holds a stale runeword only
+   after a data change (modded runes), so Phases 0–6 do not reach it.
+   Recording list `docs/handoff/pc2-rec-pc2-items.md` IT-8.
+3. ~~Load §4 measured confirmation.~~ Struck (2026-10-07): the rule is
+   derived from the binary; the confirming save is recording list
+   IT-3.
 4. Load §8 rule 3 (new character's join): record the join of a
    335-byte stub (e.g. a Sorceress) and check the three 0x23 (one from
    the load with item −1, then hand 1 and hand 0 with item 0) and

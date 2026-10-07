@@ -41,7 +41,7 @@
 | Edge cases & original bugs | 481–490 |
 | Test vectors | 491–509 |
 | Provenance | 510–529 |
-| Open questions | 530–616 |
+| Open questions | 530–618 |
 <!-- /index -->
 
 ## Summary
@@ -582,7 +582,9 @@ Synthetic, from the rules:
    hold whatever deeper frames of earlier calls left (for the load
    loops possibly the filler class ids of a previous item matched at
    the same depth); settle with a stack trace at `0x0062BFBA` on those
-   paths, or keep d2rs's "no match" as a Ruleset choice.
+   paths, or keep d2rs's "no match" as a Ruleset choice. Struck for the
+   binary (2026-10-07: stack contents of earlier frames); recording list
+   `docs/handoff/pc2-rec-pc2-items.md` IT-10.
    Status (2026-10-07): Pending for fidelity only; d2rs keeps "no match"
    for the unwritten slot on every path (§10.1 Edge), so no code waits
    on it.

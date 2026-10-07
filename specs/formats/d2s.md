@@ -39,26 +39,26 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 64–78 |
-| Inputs | 79–88 |
-| Outputs / state changes | 89–94 |
-| Rules | 95–96 |
-|   1. File layout and framing | 97–142 |
-|   2. Header (335 bytes) | 143–377 |
-|   3. Checksum (`0x00411130`) | 378–388 |
-|   4. Quest section (298 bytes at 0x14F) | 389–409 |
-|   5. Waypoint section (80 bytes at 0x279) | 410–415 |
-|   6. NPC flag section (52 bytes at 0x2C9) | 416–472 |
-|   7. Stats and skills | 473–565 |
-|   8. Item sections | 566–750 |
-|   9. Load sequence (`0x0056B180`) | 751–775 |
-|   10. Errors | 776–822 |
-| Constants & data dependencies | 823–842 |
-| Randomness | 843–847 |
-| Edge cases & original bugs | 848–914 |
-| Test vectors | 915–954 |
-| Provenance | 955–1034 |
-| Open questions | 1035–1164 |
+| Summary | 64–79 |
+| Inputs | 80–89 |
+| Outputs / state changes | 90–95 |
+| Rules | 96–97 |
+|   1. File layout and framing | 98–143 |
+|   2. Header (335 bytes) | 144–378 |
+|   3. Checksum (`0x00411130`) | 379–389 |
+|   4. Quest section (298 bytes at 0x14F) | 390–410 |
+|   5. Waypoint section (80 bytes at 0x279) | 411–416 |
+|   6. NPC flag section (52 bytes at 0x2C9) | 417–473 |
+|   7. Stats and skills | 474–566 |
+|   8. Item sections | 567–751 |
+|   9. Load sequence (`0x0056B180`) | 752–776 |
+|   10. Errors | 777–823 |
+| Constants & data dependencies | 824–843 |
+| Randomness | 844–848 |
+| Edge cases & original bugs | 849–915 |
+| Test vectors | 916–955 |
+| Provenance | 956–1035 |
+| Open questions | 1036–1173 |
 <!-- /index -->
 
 ## Summary
@@ -68,8 +68,9 @@ fixed-size quest, waypoint and NPC sections, then variable sections
 (stats bit field, skill levels, the player's item list, the corpse, and
 in an expansion game the hireling's items and the Iron Golem's item).
 All integers are little-endian. The game writes version 0x60 (96) and
-loads 0x5C–0x60 through the code in this spec; older versions go to a
-legacy loader (`formats/d2s-legacy.md`). The file is at most 8,192 bytes.
+loads 0x5C–0x60 through the code in this spec; older versions (pre-1.09
+files) go to the legacy loader `0x00534020` (`formats/d2s-legacy.md`).
+The file is at most 8,192 bytes.
 A 32-bit rotate-and-add checksum over the whole file (checksum field
 zeroed) and the file size in the header are both checked on load. This
 spec owns the byte layout and the loader's checks; the meaning of
@@ -126,7 +127,7 @@ in the specs listed above.
    cursor to reach the end after the last section (§10 rule 6).
 6. Version dispatch (`0x00534330`): fewer than 8 bytes, or u32 at 0 ≠
    0xAA55AA55 → result 9. Version (u32 at +4) < 0x5C → legacy loader
-   `0x00534020` (needs ≥ 0x82 bytes; `formats/d2s-legacy.md`).
+   `0x00534020` (needs ≥ 0x82 bytes; pre-1.09 files; `formats/d2s-legacy.md`).
    Otherwise the loader of this spec, which rejects versions > 0x60
    (§2.2 rule 3).
 7. Measured (`tools/d2s_check.py`, Provenance): in every 1.14d save of
@@ -1034,12 +1035,20 @@ and prints every field; it holds no save data.
 
 ## Open questions
 
-1. Legacy loader (`0x00534020`, versions < 0x5C, ≥ 0x82 bytes).
+1. ~~Legacy loader (`0x00534020`, versions < 0x5C, ≥ 0x82 bytes).~~
    Answered: `formats/d2s-legacy.md` (its open questions keep the
-   version-0x47 item record and a check on a real 1.07/1.08 save).
-2. Item record decoding for save versions below 0x60 (the version is
-   passed to `0x0062AE20`/`0x00558CB0`). Settle: the item reader spec.
-   **Answered**: `items/bitstream-legacy.md` §1–§5.
+   version-0x47 item record and a check on a real 1.07/1.08 save). Only
+   pre-1.09 files reach it (§1 rule 6) and the game writes only 0x60, so
+   Phases 0–6 never need it. Recording list
+   `docs/handoff/pc2-rec-pc2-items.md` IT-1.
+2. ~~Item record decoding for save versions below 0x60 (the version is
+   passed to `0x0062AE20` / `0x00558CB0`).~~ **Answered**:
+   `items/bitstream-legacy.md` §1–§5. The record readers `0x0062CBE0`
+   and `0x0062A970` branch on it in more than 25 places (thresholds
+   0x51, 0x52, 0x56, 0x59, 0x5A, 0x5D, 0x60); the record peek
+   `0x0062AE20` turns code `nec ` into `neg ` when the version is
+   < 0x5D. A 0x60 file, the only one the game writes, takes none of the
+   old branches. Recording list IT-2.
 3. **Answered except the classic part** (9 saves and a stub of this PC; §1 rule
    7, §2.1, §7.1 rule 8, §8.1 rule 8): every fresh-character field
    matched. Still open: a classic (non-expansion) character, to see
