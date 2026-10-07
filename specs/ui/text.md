@@ -20,30 +20,31 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 49–61 |
-| Inputs | 62–72 |
-| Outputs / state changes | 73–76 |
-| Rules | 77–78 |
-|   1. Fonts and locale | 79–118 |
-|   2. Strings: decoding and lookup by id | 119–136 |
-|   3. Glyph lookup | 137–151 |
-|   4. Glyph pixels | 152–189 |
-|   5. Color codes | 190–225 |
-|   6. Measuring | 226–245 |
-|   7. The draw call | 246–271 |
-|   8. Framed text (hover boxes) | 272–292 |
-|   9. Variants of the draw call | 293–332 |
-|   10. Word wrap | 333–370 |
-|   11. Alignment | 371–378 |
-|   12. Clipping (decision CG2) | 379–389 |
-|   13. d2rs answers (hooks in `d2-client`) | 390–404 |
-|   14. Wide formatter `0x005269D0` (added 2026-10-07) | 405–452 |
-| Constants & data dependencies | 453–468 |
-| Randomness | 469–472 |
-| Edge cases & original bugs | 473–502 |
-| Test vectors | 503–538 |
-| Provenance | 539–572 |
-| Open questions | 573–639 |
+| Summary | 50–62 |
+| Inputs | 63–73 |
+| Outputs / state changes | 74–77 |
+| Rules | 78–79 |
+|   1. Fonts and locale | 80–119 |
+|   2. Strings: decoding and lookup by id | 120–137 |
+|   3. Glyph lookup | 138–152 |
+|   4. Glyph pixels | 153–190 |
+|   5. Color codes | 191–226 |
+|   6. Measuring | 227–246 |
+|   7. The draw call | 247–272 |
+|   8. Framed text (hover boxes) | 273–293 |
+|   9. Variants of the draw call | 294–333 |
+|   10. Word wrap | 334–371 |
+|   11. Alignment | 372–379 |
+|   12. Clipping (decision CG2) | 380–390 |
+|   13. d2rs answers (hooks in `d2-client`) | 391–405 |
+|   14. Wide formatter `0x005269D0` (added 2026-10-07) | 406–453 |
+|   15. Edit box caret and selection (`0x004FF620`, added 2026-10-08) | 454–483 |
+| Constants & data dependencies | 484–499 |
+| Randomness | 500–503 |
+| Edge cases & original bugs | 504–533 |
+| Test vectors | 534–569 |
+| Provenance | 570–603 |
+| Open questions | 604–669 |
 <!-- /index -->
 
 ## Summary
@@ -450,6 +451,36 @@ list whose length is the number of `%` pairs; rule 2's fatal row is an
 error, and rule 5's null pointer is an error. Rule 4's unterminated
 return is replaced by terminating at the current position (Edge cases).
 
+### 15. Edit box caret and selection (`0x004FF620`, added 2026-10-08)
+
+The D2Win edit box draw (`0x004FF620`, reached through the control's
+function table; control record E). Per drawn line, after the line's text
+(`DrawText(line, x, y, E +0x274, 0)`):
+
+1. Caret glyph: the string `_` (0x5F, converted to UTF-16), width
+   `wc` = its §6 width. Blink: visible when E is the focused control
+   (`0x004F9200()` = E) and `GetTickCount() / 1000` is odd (1 s on, 1 s
+   off, wall clock; client-only, so allowed).
+2. Caret position: the text pointer E +0x25C. When it lies in the
+   current line at offset i (0 ≤ i ≤ the line's drawn length), the caret
+   is drawn once per frame with `DrawText("_", x + width(first i units
+   of the line), y, E +0x274, 0)`; i = 0 uses x. An empty text draws the
+   caret at the text origin.
+3. Line fit: units are added to a line while `width(line) + wc` ≤ E
+   +0x14 − 2·(E +0x40) (the inner width); CR, LF and the end stop the
+   line.
+4. Selection (only when E +0x00 = 1): E +0x54 / +0x58 are the selection
+   ends (−1 = none; equal = none), ordered low / high. The part of the
+   current line inside [low, high) is measured with
+   `0x00502520` and filled before the text with `D2GFX_DrawRectangle`
+   (`0x004F6300`) from (x + width before it, y − line height) to (x +
+   width through it, y), color = palette nearest of (64, 64, 64)
+   (`0x004FB180`), mode 5 (`render/blend-modes.md`).
+
+Pending: the key handling that moves E +0x25C and the selection ends,
+and the scroll offset, belong to the control's other table functions
+(not read here; owner `ui/controls.md`).
+
 ## Constants & data dependencies
 
 - `text-fonts.tsv` (code consumes it): one row per font id. Columns: `id`,
@@ -580,9 +611,8 @@ pushed `k` (214 sites).
    sites) all pass 0, 1, 3, 4, 6 or 9; the 148 sites passing a register
    or memory value need a per-site read (or a runtime trace) to exclude
    `k ≥ 13` or a negative `k`.
-3. Caret and selection drawing of the D2Win edit box (callers of width B
-   `0x005017D0` in `0x004FD…`–`0x004FF…`). Ghidra read; owner of the
-   control may be `ui/controls.md`.
+3. Answered (2026-10-08), §15: caret `_` blinking on the second, the
+   selection rectangle; key handling stays Pending there.
 4. Text-box control `0x004FBF30` (alignment flags, marquee scroll −2 px
    per draw, selected row `0x005025C0`): belongs to the controls owner;
    listed so it is not lost.
