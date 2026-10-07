@@ -37,7 +37,7 @@
 | Edge cases & original bugs | 422–433 |
 | Test vectors | 434–454 |
 | Provenance | 455–481 |
-| Open questions | 482–510 |
+| Open questions | 482–512 |
 <!-- /index -->
 
 ## Summary
@@ -495,6 +495,8 @@ stat points: three spends succeed, the fourth fails, result 2.
    dlvl)`, i.e. exp × alvl / dlvl as §4.2 states.
 4. `client-messages.tsv` row 0x3A says `stat:u16@1`; the handler reads
    byte +1 as the stat and byte +2 as count − 1.
+   *Message part answered* (997e92a): the row is now `stat:u8@1
+   repeat:u8@2` (repeat = count − 1; `0x0054BD10`: stat ≤ 15, count ≤ 100).
 5. Answered: monster stats at spawn are `monsters/init.md` §6–§9,
    §13 and §19.
 6. Partly answered: death penalties are §4.6. Still open: the stat
