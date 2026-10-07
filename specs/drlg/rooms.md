@@ -30,19 +30,19 @@
 |   1. Structures (1.14d layout, for recorders and checks) | 80–118 |
 |   2. DRLG room creation and seeds (`0x0066B3E0`) | 119–151 |
 |   3. Rooms-near arrays (`0x0066C370`) | 152–195 |
-|   4. Status and activation | 196–296 |
-|   5. Active room creation (`0x006422A0`, `0x00619890`) | 297–319 |
-|   6. Adjacency array order (owner of `unit-order.md` §9) | 320–335 |
-|   7. Room clients and the inactivity counter | 336–356 |
-|   8. Deactivation (tick step 9) | 357–392 |
-|   9. Room tile grid | 393–929 |
-|   10. Collision map from tiles | 930–1008 |
-| Constants & data dependencies | 1009–1023 |
-| Randomness | 1024–1041 |
-| Edge cases & original bugs | 1042–1059 |
-| Test vectors | 1060–1107 |
-| Provenance | 1108–1132 |
-| Open questions | 1133–1177 |
+|   4. Status and activation | 196–334 |
+|   5. Active room creation (`0x006422A0`, `0x00619890`) | 335–357 |
+|   6. Adjacency array order (owner of `unit-order.md` §9) | 358–373 |
+|   7. Room clients and the inactivity counter | 374–394 |
+|   8. Deactivation (tick step 9) | 395–430 |
+|   9. Room tile grid | 431–967 |
+|   10. Collision map from tiles | 968–1046 |
+| Constants & data dependencies | 1047–1061 |
+| Randomness | 1062–1079 |
+| Edge cases & original bugs | 1080–1097 |
+| Test vectors | 1098–1145 |
+| Provenance | 1146–1176 |
+| Open questions | 1177–1226 |
 <!-- /index -->
 
 ## Summary
@@ -277,7 +277,8 @@ if type 2 and not yet added, then build (§4.4) if the room has no flag
 3. `0x0066EE70`: map tiles of the room (§9; draws from the room seed).
 4. Create the active room (§5).
 5. drlg +0x98 += 1 (builds since the last client update), drlg +0x08 +=
-   1. Set handler 1 then resets the client copy's build timer (§4.6).
+   1. Set handler 1 then resets the build timer (§4.6 rule 2; only a
+   client reads it).
 
 #### 4.5 Waypoint and spawn rooms
 
@@ -286,13 +287,50 @@ streams the waypoint room before reading its preset units.
 
 #### 4.6 Client copy only
 
-`0x0061B920` (D2MOO `DRLGACTIVATE_Update`), called only by client code
-(`0x0044C790`): copies room statistics to globals; if fewer than 2
-builds happened since the last call, counts a timer (drlg +0x45C, reset
-to 5 on the client, 7 on a server DRLG) down and, at 0, builds the
-status-2 rooms in list order from a saved cursor (+0x460) until one build
-happened. The server never runs it: on the server only status 1 builds
-rooms. Phase 6 client spec.
+`0x0061B920` (D2MOO `DRLGACTIVATE_Update`), the **client build timer**.
+The server never runs it: on the server only status 1 builds rooms.
+
+1. **When.** Once per client update `0x0044C790` (`client/model.md` §5
+   rule 1: single player, a pass where the server ticked, while in
+   game), on the client act's DRLG (`0x0061AA90`: act +0x48), after the
+   unit update and before the automap reveal (`0x00459020`). Its only
+   caller is `0x0044C7E6`.
+2. **State** (all in the DRLG, zero at allocation, `drlg/levels.md` §3):
+   builds counter B (u8 +0x98; every build §4.4 step 5 and every stream
+   §4.3 add 1), timer T (u8 +0x45C), cursor C (+0x460, a DRLG room or
+   none). Reset value R = 5 when DRLG flags (+0x8C) bit 0 (client copy)
+   is set, else 7 (`0x00642A00`); set handler 1 also sets T := R after
+   its build (`0x0061B2F8`).
+3. Statistics: drlg +0x08 and +0x468 are copied to two of four globals
+   (`0x0096C8B8`/`BC` for a client copy, `0x0096C8C0`/`C4` otherwise);
+   nothing reads them for an outcome (d2rs: not modelled).
+4. If B > 1: B := 0 and stop (no timer step).
+5. Else T := T − 1 (u8 wrap). T ≠ 0 → stop; **B is kept** (it carries
+   into the next call).
+6. T = 0: T := R. If C is none or C's status (+0x44) ≠ 2, C := the
+   first room of the status-2 list (the next pointer of the list head,
+   drlg +0x294; the head node itself is at drlg +0x278, §4).
+7. Walk from S = C along the status-2 list (next +0x1C, circular through
+   the head node): for each room N: if N is not the head node, has no
+   active room (+0x30) and no flag 0x100000, build it (§4.4, which adds
+   1 to B). Then N := next; stop when N = S or B ≥ 1. So the walk
+   **examines rooms until one build has happened**, and when B was
+   already 1 on entry it examines only the first room (building it if
+   eligible).
+8. C := the room after the last one examined; B := 0.
+
+Consequences: on a client, a status-2 room (two rooms-near steps from a
+room in sight, §4) is built at most one per call, at the earliest R
+calls after the last set-handler-1 build, while at most one other build
+happened per call; T starts at 0, so with no set-handler-1 build the
+first timed build waits 256 calls. Every build draws from its room seed
+(§4.4) and creates an active room (§5) with its active-room seed, so a
+client that skips this timer has fewer active rooms and different
+unit-creation results (`client/model.md` §2 rule 6, §12 rule 3).
+
+The same client update also runs the level free of `drlg/levels.md`
+§9 rule 2 on the client DRLG (`0x0061AA20`) on every 13th call (counter
+`[0x007A0498]` += 1 first; free when it is a multiple of 13).
 
 ### 5. Active room creation (`0x006422A0`, `0x00619890`)
 
@@ -1124,6 +1162,12 @@ counter (+0x0C), and per level all DRLG rooms in list order; then §3 and
   update (§4.6); handler tables at the addresses above.
 - **Tiles and collision (§9, §10)**: 1.14d: `0x0066D820` (tile choice; draw sites read room +0x14/+0x18), `0x0066E9B0` (cell), `0x0066EC10` (grid walk), `0x0066DC50`/`0x0066DB20`/ `0x0066DDE0`/`0x0066DF40` (records, flags), `0x0066E580`/`0x0066E4C0`/ `0x0066E620`/`0x0066E740`/`0x0066E940` (linking; tables `0x006EF620`, `0x006EF578` read with rd.py), `0x0066E1C0`/`0x0066E260`/`0x0066E360` (warps), `0x0066D9E0` (doors), `0x0066D290`/`0x0066D440`/`0x0066D700`/ `0x0066D3B0`/`0x0066D410`/`0x0066D750` (anim), `0x0066EE40`/`0x0066EE70`/ `0x0066EEA0`/`0x0066EEE0`/`0x0066F050`/`0x0066F0B0`/`0x0066F1A0`/ `0x0066F240` (lifecycle, library), `0x0061B190`/`0x0061B730` (build sequence), `0x00604A40`/`0x00604AE0`/`0x0060D040`/`0x0060CFA0`/ `0x0060CEA0`/`0x0060CF00`/`0x0060A440` (DT1 library), `0x0064C4C0`/ `0x0064C580`/`0x0064C700`/`0x0064C790`/`0x0064C860`/`0x0064C900`/ `0x0064CA10` (collision). D2MOO `DrlgRoomTile.cpp`, `DrlgDrlgAnim.cpp`, `D2Collision.cpp` used as a map; 1.14d differences noted: per-cell function split from the loop, no draw on zero total rarity, fatal missing animation frames, level-133 exclusion of wall warp tiles, all three linked cases through one find-or-add routine. Measurements: `LvlTypes`, `LvlPrest`, `Levels` (patch_d2), Act 1 DT1s and Town DS1s from d2data.mpq. Recording `20261005-232125-rng.jsonl`: per-room counts, first-room vector reproduced by simulation (scratchpad `dt1/simtown.py`).
 - **Recorded**: §Test vectors.
+- **Client build timer (§4.6)**: disassembly of `0x0061B920` (u8 +0x98
+  and +0x45C compares, the `sete`-based reset 5 / 7, list head
+  `+0x278`, cursor `+0x460`), `0x00642A00` (DRLG flags bit 0),
+  `0x0061B2D0` (reset after build), caller `0x0044C790` (single call
+  at `0x0044C7E6`; every-13th free at `0x0044C7F0`–`0x0044C817`); the
+  only writers of +0x45C / +0x460 in `all.asm` are these two functions.
 - **Room free, units left (§8.2 rule 4)**: asm of `0x0061A840`
   (`0x0061A851`–`0x0061A87F` loop), `0x0064C450` (unit leaves room),
   `0x0064FC20` (dynamic path reset), `0x0064C370` (room-list remove);
@@ -1174,3 +1218,8 @@ counter (+0x0C), and per level all DRLG rooms in list order; then §3 and
     (floor layer 1). Does any 1.14d DS1 with lvlprest `Animate` have a
     shadow cell whose tile has material 0x100? Scan the Animate rows'
     DS1 files with their DT1s.
+15. *Answered:* the client build timer (`impl-client-drlg` §3 Q2):
+    §4.6 rules 1–8. Open inside it: a client recording that logs B, T,
+    C and each timed build per client update (memory read of the client
+    DRLG +0x98, +0x45C, +0x460) confirms the order on live data; the
+    recording that built all 35 town rooms is consistent with it.
