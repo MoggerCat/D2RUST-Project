@@ -291,8 +291,14 @@ fn trade_action_a104179() {
     assert_eq!(
         outs(&m),
         [
-            Output::TradeAction { code: 0x10 },
-            Output::TradeAction { code: 0x16 }
+            Output::TradeAction {
+                code: 0x10,
+                dead_or_absent: true
+            },
+            Output::TradeAction {
+                code: 0x16,
+                dead_or_absent: true
+            }
         ]
     );
     assert_eq!(m.w, Model::default().w);
@@ -344,7 +350,10 @@ fn outputs_keep_message_order_and_capture_at_receive() {
                 class: 0x93,
                 event: 18
             },
-            Output::TradeAction { code: 0x10 }
+            Output::TradeAction {
+                code: 0x10,
+                dead_or_absent: true
+            }
         ]
     );
 }

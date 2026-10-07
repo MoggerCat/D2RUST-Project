@@ -505,3 +505,26 @@ fn f4b1a10_class_list() {
         assert_eq!(f4b1a10(c), 0, "{c}");
     }
 }
+
+// Covers: specs/client/msg-ui.md §3 r4
+#[test]
+fn trade_action_captures_dead_or_absent() {
+    let mut m = Model::default();
+    // No local player: absent.
+    m.hex("77 0d");
+    let k = UnitKey::new(PLAYER, 1);
+    m.put(k).mode = 1;
+    m.w.local_player = Some(k);
+    m.hex("77 0d");
+    m.put(k).mode = 0x11;
+    m.hex("77 0d");
+    let flags: Vec<bool> = m
+        .out
+        .iter()
+        .map(|o| match o {
+            Output::TradeAction { dead_or_absent, .. } => *dead_or_absent,
+            _ => panic!(),
+        })
+        .collect();
+    assert_eq!(flags, [true, false, true]);
+}

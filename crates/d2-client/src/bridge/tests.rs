@@ -994,7 +994,10 @@ fn outputs_are_handed_over_once_after_the_frame() {
             class: 37,
             event: 18,
         },
-        Output::TradeAction { code: 0x10 },
+        Output::TradeAction {
+            code: 0x10,
+            dead_or_absent: true,
+        },
     ];
     assert_eq!(b.outputs(), want);
     assert_eq!(b.take_outputs(), want);
@@ -1020,7 +1023,10 @@ fn the_bevy_frame_hands_the_outputs_over() {
     app.update();
     assert_eq!(
         app.world().resource::<FrameOutputs>().0,
-        [Output::TradeAction { code: 0x15 }]
+        [Output::TradeAction {
+            code: 0x15,
+            dead_or_absent: true
+        }]
     );
     assert!(app
         .world()

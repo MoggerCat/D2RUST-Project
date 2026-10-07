@@ -34,8 +34,10 @@ pub enum Output {
     /// S→C 0x63 (`client/msg-ui.md` §2): the waypoint object's GUID and
     /// the 16-byte record as received.
     WaypointMenu { guid: u32, record: [u8; 16] },
-    /// S→C 0x77 (`client/msg-ui.md` §3): the code.
-    TradeAction { code: u8 },
+    /// S→C 0x77 (`client/msg-ui.md` §3): the code, and `0x00463DF0`
+    /// captured at receive (r4): no local player, or its mode is 0x11
+    /// (dead).
+    TradeAction { code: u8, dead_or_absent: bool },
     /// S→C 0x26 (`client/msg-ui.md` §4 r1–r2): the record fields, whether
     /// the unit was in S, and a present player's name.
     ChatLine {
@@ -614,7 +616,10 @@ mod tests {
                 class: 3,
                 event: 18,
             },
-            Output::TradeAction { code: 0x10 },
+            Output::TradeAction {
+                code: 0x10,
+                dead_or_absent: false,
+            },
             Output::ServerSound {
                 unit: UnitKey::new(0, 1),
                 class: 0,
@@ -669,7 +674,10 @@ mod tests {
                 guid: 1,
                 record: [0; 16],
             },
-            Output::TradeAction { code: 0 },
+            Output::TradeAction {
+                code: 0,
+                dead_or_absent: false,
+            },
             Output::ChatLine {
                 kind: 0,
                 lang: 0,

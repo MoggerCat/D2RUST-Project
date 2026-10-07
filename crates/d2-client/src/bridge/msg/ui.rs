@@ -154,13 +154,21 @@ pub fn waypoint_menu(_: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handl
     Ok(())
 }
 
-/// 0x77 TradeAction (§3 rule 1): code u8@1. No model state; one
-/// `TradeAction` output.
-pub fn trade_action(_: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerError> {
+/// 0x77 TradeAction (§3 rules 1, 4): code u8@1. No model state; one
+/// `TradeAction` output with `0x00463DF0` captured: 1 with no local
+/// player or when its mode is 0x11 (dead).
+pub fn trade_action(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerError> {
     let b = Bytes(msg.bytes);
     if msg.bytes.len() != 2 {
         return Err(HandlerError::Invalid("0x77 is 2 bytes"));
     }
-    msg.out.push(Output::TradeAction { code: b.u8(1)? });
+    let dead_or_absent = w
+        .local_player
+        .and_then(|k| w.units.get(&k))
+        .is_none_or(|u| u.mode == 0x11);
+    msg.out.push(Output::TradeAction {
+        code: b.u8(1)?,
+        dead_or_absent,
+    });
     Ok(())
 }

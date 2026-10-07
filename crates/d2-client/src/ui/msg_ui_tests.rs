@@ -196,23 +196,47 @@ fn waypoint_menu_refused_stores_nothing() {
 fn stash_and_cube_a104179() {
     let w = world(false);
     let mut u = ui();
-    u.apply_output(&Output::TradeAction { code: 0x10 }, &w)
-        .unwrap();
+    u.apply_output(
+        &Output::TradeAction {
+            code: 0x10,
+            dead_or_absent: false,
+        },
+        &w,
+    )
+    .unwrap();
     assert!(u.is_open(UI_STASH as u8));
     assert_eq!(u.msg_state().inventory_mode, MODE_STASH);
     // 0x11: the stash closes (inventory mode 0x0C).
-    u.apply_output(&Output::TradeAction { code: 0x11 }, &w)
-        .unwrap();
+    u.apply_output(
+        &Output::TradeAction {
+            code: 0x11,
+            dead_or_absent: false,
+        },
+        &w,
+    )
+    .unwrap();
     assert!(!u.is_open(UI_STASH as u8));
     assert_eq!(u.msg_state().inventory_mode, 0);
     // 0x15: the cube.
-    u.apply_output(&Output::TradeAction { code: 0x15 }, &w)
-        .unwrap();
+    u.apply_output(
+        &Output::TradeAction {
+            code: 0x15,
+            dead_or_absent: false,
+        },
+        &w,
+    )
+    .unwrap();
     assert!(u.is_open(UI_CUBE as u8));
     assert_eq!(u.msg_state().inventory_mode, MODE_CUBE);
     // 0x11 with the cube's mode: nothing.
-    u.apply_output(&Output::TradeAction { code: 0x11 }, &w)
-        .unwrap();
+    u.apply_output(
+        &Output::TradeAction {
+            code: 0x11,
+            dead_or_absent: false,
+        },
+        &w,
+    )
+    .unwrap();
     assert!(u.is_open(UI_CUBE as u8));
 }
 
@@ -222,18 +246,42 @@ fn trade_codes() {
     let w = world(false);
     let mut u = ui();
     // 0x0C with trade state 0: close trade(0), no decline.
-    u.apply_output(&Output::TradeAction { code: 0x0C }, &w)
-        .unwrap();
+    u.apply_output(
+        &Output::TradeAction {
+            code: 0x0C,
+            dead_or_absent: false,
+        },
+        &w,
+    )
+    .unwrap();
     assert_eq!(u.take_outcome(), UiOutcome::default());
-    u.apply_output(&Output::TradeAction { code: 0x0E }, &w)
-        .unwrap();
+    u.apply_output(
+        &Output::TradeAction {
+            code: 0x0E,
+            dead_or_absent: false,
+        },
+        &w,
+    )
+    .unwrap();
     assert!(u.msg_state().trade_7bce28);
-    u.apply_output(&Output::TradeAction { code: 0x0F }, &w)
-        .unwrap();
+    u.apply_output(
+        &Output::TradeAction {
+            code: 0x0F,
+            dead_or_absent: false,
+        },
+        &w,
+    )
+    .unwrap();
     assert!(!u.msg_state().trade_7bce28);
     // Code 9: player event sound 23 on the local player.
-    u.apply_output(&Output::TradeAction { code: 0x09 }, &w)
-        .unwrap();
+    u.apply_output(
+        &Output::TradeAction {
+            code: 0x09,
+            dead_or_absent: false,
+        },
+        &w,
+    )
+    .unwrap();
     assert_eq!(
         u.take_outcome().sounds,
         [SoundRequest::PlayerEvent {
@@ -243,12 +291,25 @@ fn trade_codes() {
     );
     // Past 0x15 and the "nothing" codes.
     for code in [0x16, 0xFF, 0x03, 0x12] {
-        u.apply_output(&Output::TradeAction { code }, &w).unwrap();
+        u.apply_output(
+            &Output::TradeAction {
+                code,
+                dead_or_absent: false,
+            },
+            &w,
+        )
+        .unwrap();
     }
     assert_eq!(u.take_outcome(), UiOutcome::default());
     // The trade codes need the trade helpers: skipped.
-    u.apply_output(&Output::TradeAction { code: 0x00 }, &w)
-        .unwrap();
+    u.apply_output(
+        &Output::TradeAction {
+            code: 0x00,
+            dead_or_absent: false,
+        },
+        &w,
+    )
+    .unwrap();
     assert_eq!(u.take_outcome().skipped, [skip::TRADE]);
     // A sound output is the audio layer's.
     let s = Output::ServerSound {
@@ -472,7 +533,7 @@ fn quest_special_hire_popup_and_code_3() {
     assert_eq!(*u.more(), before);
 }
 
-// Covers: specs/client/bridge.md §10 r9, specs/client/msg-ui.md §9 r3, §9 r4
+// Covers: specs/client/bridge.md §10 r9; specs/client/msg-ui.md §9 r3, §9 r4
 #[test]
 fn npc_interact_sounds_overlay_and_the_interact_npc_test() {
     let w = world(false);
@@ -614,8 +675,14 @@ fn trade_code_0a_plays_on_the_partner() {
     let mut u = ui();
     let p = UnitKey::new(PLAYER, 9);
     w.units.insert(p, ClientUnit::new(p));
-    u.apply_output(&Output::TradeAction { code: 0x0A }, &w)
-        .unwrap();
+    u.apply_output(
+        &Output::TradeAction {
+            code: 0x0A,
+            dead_or_absent: false,
+        },
+        &w,
+    )
+    .unwrap();
     assert!(u.take_outcome().sounds.is_empty());
     u.apply_output(
         &Output::TradePartner {
@@ -625,8 +692,14 @@ fn trade_code_0a_plays_on_the_partner() {
         &w,
     )
     .unwrap();
-    u.apply_output(&Output::TradeAction { code: 0x0A }, &w)
-        .unwrap();
+    u.apply_output(
+        &Output::TradeAction {
+            code: 0x0A,
+            dead_or_absent: false,
+        },
+        &w,
+    )
+    .unwrap();
     assert_eq!(
         u.take_outcome().sounds,
         [SoundRequest::PlayerEvent { unit: p, event: 23 }]
@@ -733,4 +806,43 @@ fn chat_lines_by_type_and_overhead_records() {
     assert!(u
         .chat_line(&chat(4, 7, 1, 0, "", &[0xE9], false), false)
         .is_some());
+}
+
+// Covers: specs/client/msg-ui.md §3 r4
+#[test]
+fn close_trade_one_toggles_the_inventory_only_for_a_live_player() {
+    let w = world(false);
+    // Code 0x0D = close trade(1): a live local player gets the toggle.
+    let mut u = ui();
+    u.apply_output(
+        &Output::TradeAction {
+            code: 0x0D,
+            dead_or_absent: false,
+        },
+        &w,
+    )
+    .unwrap();
+    assert!(u.is_open(1));
+    // Dead or absent (captured at receive): no toggle.
+    let mut u = ui();
+    u.apply_output(
+        &Output::TradeAction {
+            code: 0x0D,
+            dead_or_absent: true,
+        },
+        &w,
+    )
+    .unwrap();
+    assert!(!u.is_open(1));
+    // Close trade(0) never toggles.
+    let mut u = ui();
+    u.apply_output(
+        &Output::TradeAction {
+            code: 0x0C,
+            dead_or_absent: false,
+        },
+        &w,
+    )
+    .unwrap();
+    assert!(!u.is_open(1));
 }

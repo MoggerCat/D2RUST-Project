@@ -64,7 +64,6 @@ pub mod skip {
     pub const TRADE_CLOSE_HELPER: &str = "0x77: the trade close helper 0x00487B30 (msg-ui OQ 5)";
     pub const NOT_APPLIED: &str =
         "a UI output whose dispatch (msg-ui §4–§22, msg-units §8; ui/*) is not written yet";
-    pub const CUBE_CHECK: &str = "0x77: 0x00463DF0 before the inventory toggle (unspecified)";
     pub const NPC_TEXT_SHOW: &str =
         "0x27: the overhead text, list start 0x006616E0, box 0x004A1510 and panel 0x004A1320 (msg-ui §5 r2; ui/*)";
     pub const NPC_DIALOG_UI: &str =
@@ -237,7 +236,10 @@ impl OriginalUi {
                 extra,
             } => self.quest_ui(chain, flags, status, extra, world),
             Output::WaypointMenu { guid, record } => self.waypoint_menu(guid, &record, world),
-            Output::TradeAction { code } => self.trade_action(code, world),
+            Output::TradeAction {
+                code,
+                dead_or_absent,
+            } => self.trade_action(code, dead_or_absent, world),
             Output::NpcText {
                 ref bytes, present, ..
             } => self.npc_text_record(bytes, present),
@@ -419,7 +421,12 @@ impl OriginalUi {
     }
 
     /// The UI action `0x004B8CF0` (§3 rule 2).
-    fn trade_action(&mut self, code: u8, world: &ClientWorld) -> Result<(), OriginalUiError> {
+    fn trade_action(
+        &mut self,
+        code: u8,
+        dead_or_absent: bool,
+        world: &ClientWorld,
+    ) -> Result<(), OriginalUiError> {
         match code {
             0x00 | 0x01 | 0x02 | 0x05 | 0x06 => self.skip(skip::TRADE),
             0x09 => match world.local_player {
@@ -442,7 +449,7 @@ impl OriginalUi {
             }
             0x0C | 0x0D => {
                 self.msg.trade_state = 0;
-                self.close_trade(code == 0x0D)?;
+                self.close_trade(code == 0x0D, dead_or_absent)?;
             }
             0x0E => self.msg.trade_7bce28 = true,
             0x0F => self.msg.trade_7bce28 = false,
@@ -472,7 +479,7 @@ impl OriginalUi {
 
     /// Close trade `0x004B8940(x)` (§3 rule 3). The lists it frees are
     /// not held.
-    fn close_trade(&mut self, x: bool) -> Result<(), OriginalUiError> {
+    fn close_trade(&mut self, x: bool, dead_or_absent: bool) -> Result<(), OriginalUiError> {
         self.msg.trade_7c0e80 = 0;
         if self.msg.trade_state != TRADE_REFUSED {
             if self.is_open(UI_MPTRADE as u8) {
@@ -480,9 +487,10 @@ impl OriginalUi {
                 self.msg.trade_7bce28 = false;
                 self.skip(skip::TRADE_CLOSE_HELPER);
             }
-            if x {
-                // `0x00463DF0() = 0` → `SetUIState(1 inventory, toggle, 0)`.
-                self.skip(skip::CUBE_CHECK);
+            if x && !dead_or_absent {
+                // `0x00463DF0() = 0` (captured, r4) → `SetUIState(1
+                // inventory, toggle, 0)`.
+                self.set_ui(1, 2, false)?;
             }
             if self.is_open(UI_CHAT as u8) {
                 self.set_ui(UI_CHAT, OFF, false)?;
