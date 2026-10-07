@@ -1144,3 +1144,50 @@ pub fn shape_start<W: BodyWorld>(
     crate::combat::start_combat(w.combat(), t, ct, Some(u), Some(tg), &mut record, s);
     1
 }
+
+// ---------------------------------------------------------------- §2.17
+
+/// Pet-maximum resync `0x00575900(game, unit)` (§2.17): the largest
+/// `petmax` of the player's skills per pet type, then `basemax` for every
+/// pet type no skill raised. `set_max(w, t, v)` is `0x00575850` (the pet
+/// lists' maximum, `player::pets::set_max`: only v = 1 for type 1, never
+/// trims type 7); `basemax(t)` is `pettype` `basemax` of row `t`, `None`
+/// without a row. The caller has checked the player's pet lists; an empty
+/// skill list stands for the missing list (nothing happens).
+pub fn pet_resync<W: BodyWorld>(
+    w: &mut W,
+    t: &SkillTables,
+    u: W::Unit,
+    basemax: &dyn Fn(i32) -> Option<i32>,
+    set_max: &mut dyn FnMut(&mut W, i32, i32),
+) {
+    if w.unit_type(u) != UnitType::Player {
+        return;
+    }
+    let list = w.skill_list(u);
+    if list.is_empty() {
+        return;
+    }
+    let count = w.pettype_count();
+    let mut m = vec![0i32; usize::try_from(count).unwrap_or(0)];
+    for e in &list {
+        let lvl = skill_level(w, t, Some(u), Some(e), true);
+        let Some(r) = rec(t, e.skill) else { continue };
+        let (pt, petmax) = (i32::from(r.pettype as i8), r.petmax);
+        if pt <= 0 || pt >= count {
+            continue;
+        }
+        let v = eval(w, t, u, petmax, e.skill, lvl).max(1);
+        if v > m[pt as usize] {
+            m[pt as usize] = v;
+            set_max(w, pt, v);
+        }
+    }
+    for (pt, &have) in m.iter().enumerate() {
+        if have <= 0 {
+            if let Some(b) = basemax(pt as i32) {
+                set_max(w, pt as i32, b);
+            }
+        }
+    }
+}

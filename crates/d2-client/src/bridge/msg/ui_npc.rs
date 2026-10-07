@@ -233,10 +233,14 @@ pub fn npc_interact(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handle
         unit: key,
         present: unit.is_some(),
         class: unit.map_or(0, |u| u.class),
-        // PROVISIONAL (client/msg-ui.md §9 r2): monster data +0x3C has
-        // no model writer, so a monster's stays −1; settled by a Ghidra
-        // xref of +0x3C writes in monster data.
-        mdata_3c: unit.filter(|u| u.key.unit_type == MONSTER).map(|_| -1),
+        // Monster data +0x3C: its only writer is the 0xAC create, with
+        // the bit-stream `value` (−1 when it was not sent), `msg-ui.md`
+        // §9 r2.
+        mdata_3c: unit.and_then(|u| match &u.kind {
+            KindData::Monster(m) => Some(m.value),
+            _ if u.key.unit_type == MONSTER => Some(-1),
+            _ => None,
+        }),
         blocker_open,
     });
     Ok(())

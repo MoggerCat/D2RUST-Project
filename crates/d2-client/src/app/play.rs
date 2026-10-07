@@ -221,10 +221,12 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
         .set_object_rows(object_rows);
     if let Some(archives) = archives {
         let skills = single_player::client_skill_rows(&archives)?;
-        app.world_mut()
-            .resource_mut::<BridgeResource>()
-            .0
-            .set_skill_rows(skills);
+        let skill_tables = single_player::client_skill_tables(&archives)?;
+        {
+            let mut bridge = app.world_mut().resource_mut::<BridgeResource>();
+            bridge.0.set_skill_rows(skills);
+            bridge.0.set_skill_tables(std::sync::Arc::new(skill_tables));
+        }
         let units = single_player::client_unit_rows(&archives)?;
         app.world_mut()
             .resource_mut::<BridgeResource>()

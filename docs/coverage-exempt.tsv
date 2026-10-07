@@ -256,13 +256,11 @@ specs/sim/rng.md	§6 row8	survey table of inlined-draw shapes (provenance)
 specs/sim/units.md	§8	owned by render/draw-order-2.md §15.1/§16
 specs/skills/bodies-2.md	§1	conventions/notation
 specs/skills/bodies-3.md	§1	conventions/notation
-specs/skills/bodies-4.md	§1	conventions/notation
 specs/skills/bodies-4.md	§3 text	section intro text
 specs/skills/bodies.md	§1	conventions/notation
 specs/skills/bodies.md	§6 text	section intro text
 specs/ui/automap.md	§2 text	heading
 specs/ui/automap.md	§4 text	heading
-specs/ui/automap.md	§7 text	heading
 specs/ui/automap.md	§8 text	heading
 specs/ui/automap.md	§9 text	heading
 specs/ui/automap.md	§11 text	heading
@@ -350,7 +348,6 @@ specs/world/quests-status.md	§6	summary of per-quest special cases (restated in
 specs/world/quests-status.md	§12 text	heading
 specs/world/quests.md	§1.8 text	heading
 specs/world/quests.md	§1.8 r5	note
-specs/world/quests.md	§2.3 r4	field address fact
 specs/world/quests.md	§9.6 text	heading
 specs/world/quests.md	§11	links to acts II-V
 specs/world/vendors-2.md	§7.3 text	heading
@@ -413,3 +410,6 @@ specs/drlg/wall-remap.md	§2 r4	note: column never read
 specs/tools/original-hooks-spawn.md	*	trace-recorder tooling for the original game (tools/trace-recorder, local Windows), not crate code
 specs/tools/original-hooks.md	*	trace-recorder tooling for the original game (tools/trace-recorder, local Windows), not crate code
 specs/tools/scenario.md	§2 text	heading
+specs/world/object-population.md	§edge-cases-original-bugs text	heading text only
+specs/world/objects-2.md	§edge-cases-original-bugs text	pointer line
+specs/world/cube.md	§edge-cases-original-bugs text	heading text only

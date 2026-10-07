@@ -1281,3 +1281,45 @@ fn field_a_setter_sets_the_first_matching_bit() {
     assert_eq!(n.a[2], [0x01, 0, 0, 0, 0x04, 0, 0, 0]);
     assert_eq!(n.set_intro_a(3, 150), None);
 }
+
+// Covers: specs/formats/d2s.md §8.4 r1, §8.4 r2, §8.4 r4
+#[test]
+fn hireling_items_written_by_the_writer_round_trip_through_the_loader() {
+    let t = Tables::v114d();
+    let entries = vec![item(9, 0x11), item(6, 0x33)];
+    let mut s = sample(true);
+    s.body
+        .as_mut()
+        .unwrap()
+        .set_hireling_items(true, Some(entries.clone()));
+    let f = write(&s, &t).unwrap();
+    let at = f
+        .windows(4)
+        .position(|w| w == [0x6A, 0x66, 0x4A, 0x4D])
+        .expect("the marker, then the hireling's list");
+    assert_eq!(&f[at + 4..at + 6], &[2, 0]);
+    let back = read(&f, &opts(true), &t).unwrap();
+    assert_eq!(
+        back.body.unwrap().hireling_items,
+        Some(Some(entries.clone()))
+    );
+
+    // No hireling node: the marker alone (rule 4), straight before `kf`.
+    let mut s = sample(true);
+    s.header.hireling = Hireling::default();
+    s.body.as_mut().unwrap().set_hireling_items(true, None);
+    let f = write(&s, &t).unwrap();
+    assert!(f.windows(4).any(|w| w == [0x6A, 0x66, 0x6B, 0x66]));
+    let back = read(&f, &opts(true), &t).unwrap();
+    assert_eq!(back.body.unwrap().hireling_items, Some(None));
+
+    // Classic game: no hireling item section at all.
+    let mut s = sample(false);
+    s.body
+        .as_mut()
+        .unwrap()
+        .set_hireling_items(false, Some(entries));
+    assert_eq!(s.body.as_ref().unwrap().hireling_items, None);
+    let f = write(&s, &t).unwrap();
+    assert!(!f.windows(2).any(|w| w == [0x6A, 0x66]));
+}

@@ -179,6 +179,24 @@ fn open_ui_code_5_takes_the_cursor_item() {
     );
 }
 
+// Covers: specs/client/msg-ui.md §9 r2
+#[test]
+fn npc_interact_captures_the_monster_data_value() {
+    use crate::bridge::world::{KindData, MonsterData};
+    let mut m = Model::default();
+    let k = UnitKey::new(MONSTER, 7);
+    // Monster data +0x3C is the 0xAC bit-stream value (−1 when not sent).
+    m.put(k).kind = KindData::Monster(Box::new(MonsterData {
+        value: 1234,
+        ..MonsterData::default()
+    }));
+    m.hex("8a 01 07 00 00 00");
+    let Output::NpcInteract { mdata_3c, .. } = &m.out[0] else {
+        panic!()
+    };
+    assert_eq!(*mdata_3c, Some(1234));
+}
+
 // Covers: specs/client/msg-ui.md §9 r1, §9 r2
 #[test]
 fn npc_interact_b1563() {
@@ -486,4 +504,27 @@ fn f4b1a10_class_list() {
     for c in [0, 145, 148, 540] {
         assert_eq!(f4b1a10(c), 0, "{c}");
     }
+}
+
+// Covers: specs/client/msg-ui.md §3 r4
+#[test]
+fn trade_action_captures_dead_or_absent() {
+    let mut m = Model::default();
+    // No local player: absent.
+    m.hex("77 0d");
+    let k = UnitKey::new(PLAYER, 1);
+    m.put(k).mode = 1;
+    m.w.local_player = Some(k);
+    m.hex("77 0d");
+    m.put(k).mode = 0x11;
+    m.hex("77 0d");
+    let flags: Vec<bool> = m
+        .out
+        .iter()
+        .map(|o| match o {
+            Output::TradeAction { dead_or_absent, .. } => *dead_or_absent,
+            _ => panic!(),
+        })
+        .collect();
+    assert_eq!(flags, [true, false, true]);
 }

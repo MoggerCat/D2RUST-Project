@@ -3,6 +3,7 @@
 
 mod answers;
 pub(super) mod fake;
+mod fsim;
 mod gaps;
 mod messages;
 

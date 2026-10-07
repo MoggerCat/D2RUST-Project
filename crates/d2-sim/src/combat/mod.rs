@@ -14,6 +14,7 @@
 pub mod damage;
 pub mod events;
 pub mod hit;
+pub mod range;
 pub mod vitals;
 
 use crate::skills::SkillUnits;
@@ -268,6 +269,8 @@ impl CombatTables {
     }
 }
 
+#[cfg(test)]
+mod cov_tests;
 #[cfg(test)]
 mod damage_tests;
 #[cfg(test)]

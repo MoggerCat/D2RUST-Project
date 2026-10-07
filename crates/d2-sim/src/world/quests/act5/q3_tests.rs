@@ -231,7 +231,7 @@ fn vector_resist_scroll() {
     assert!(g.log.is_empty());
 }
 
-// Covers: specs/world/quests-act5.md §5.7, §5.9
+// Covers: specs/world/quests-act5.md §5.7, §5.9, §edge-cases-original-bugs r9
 #[test]
 fn scroll_reward() {
     // 37.1 without 37.9: the scroll, S5D, status 6 to all.
@@ -742,7 +742,7 @@ fn anya_portal_modes() {
 
 // ------------------------------------------------------------ §5.9
 
-// Covers: specs/world/quests-act5.md §5.9
+// Covers: specs/world/quests-act5.md §5.9, §edge-cases-original-bugs r10
 #[test]
 fn town_dummies_and_cleanup() {
     // Dummy 459: Anya spawns there once she is back (+0x84 = 2).

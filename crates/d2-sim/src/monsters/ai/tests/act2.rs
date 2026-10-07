@@ -834,6 +834,7 @@ fn vulture_carrion_and_rooms() {
 
 // T = 0 is unreachable (target mode 1) and asserted (open question 6).
 // Covers: specs/monsters/ai-bodies-2.md §11 r1
+// Covers: specs/monsters/ai.md §2.3 r0
 #[test]
 #[should_panic(expected = "Vulture think without a target")]
 fn vulture_asserts_a_target() {

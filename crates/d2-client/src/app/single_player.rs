@@ -71,7 +71,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use d2_data::tables::{
-    decode_all, Itemstatcost, Levels, Monstats, Objects, Record, Shrines, Skills,
+    decode_all, Difficultylevels, Itemstatcost, Levels, Monstats, Objects, Record, Shrines, Skills,
 };
 use d2_formats::animdata::AnimData;
 use d2_formats::d2s::{self, D2s, ReadOptions};
@@ -124,7 +124,9 @@ use super::rest::AppRest;
 use super::server_thread::{ThreadLink, ThreadStopped};
 use crate::bridge::drlg::DrlgSource;
 use crate::bridge::local::{LocalLink, PendingSession};
-use crate::bridge::world::{LevelRow, MonsterClass, ObjectRow, SkillRow, StatSend, UnitRows};
+use crate::bridge::world::{
+    LevelRow, MonsterClass, MonsterSetup, ObjectRow, SkillRow, StatSend, UnitRows,
+};
 use crate::bridge::LOCAL_CLIENT;
 
 /// The game's dispatch and world host.
@@ -780,6 +782,54 @@ pub fn client_skill_rows(archives: &ArchiveSet) -> Result<Vec<SkillRow>, BuildEr
         .collect())
 }
 
+/// The `monstats` / `monstats2` columns of the client monster set-up
+/// (`client/msg-units.md` §1.2 r6): `m` the typed row, `raw` its record
+/// (the `Sk`i`mode` bytes +0x180 + i are callback columns), `m2` the
+/// `monstats2` record (`isSel` byte +4 bit 3, `shadow` +5 bit 6, `isAtt`
+/// +5 bit 1).
+fn monster_setup(m: &Monstats, raw: &[u8], m2: &[u8]) -> MonsterSetup {
+    let byte = |b: &[u8], o: usize| b.get(o).copied().unwrap_or(0);
+    let skill = [
+        (m.skill1, m.sk1lvl),
+        (m.skill2, m.sk2lvl),
+        (m.skill3, m.sk3lvl),
+        (m.skill4, m.sk4lvl),
+        (m.skill5, m.sk5lvl),
+        (m.skill6, m.sk6lvl),
+        (m.skill7, m.sk7lvl),
+        (m.skill8, m.sk8lvl),
+    ];
+    let mut skills = [(0i16, 0u8, 0u8); 8];
+    for (i, ((s, l), out)) in skill.into_iter().zip(skills.iter_mut()).enumerate() {
+        *out = (s as i16, l, byte(raw, 0x180 + i));
+    }
+    MonsterSetup {
+        level: [m.level, m.level_n, m.level_h],
+        res: [
+            [m.resdm, m.resdm_n, m.resdm_h],
+            [m.resma, m.resma_n, m.resma_h],
+            [m.resfi, m.resfi_n, m.resfi_h],
+            [m.resli, m.resli_n, m.resli_h],
+            [m.resco, m.resco_n, m.resco_h],
+            [m.respo, m.respo_n, m.respo_h],
+        ],
+        velocity: m.velocity,
+        align: m.align,
+        skills,
+        is_sel: byte(m2, 4) & 0x08 != 0,
+        shadow: byte(m2, 5) & 0x40 != 0,
+        is_att: byte(m2, 5) & 0x02 != 0,
+    }
+}
+
+/// The skills tables and formula buffers of the client's passive refresh
+/// (`client/msg-skills.md` §2 r4), from the user's tables.
+pub fn client_skill_tables(archives: &ArchiveSet) -> Result<SkillTables, BuildError> {
+    let set = d2_data::bin::load(archives, "eng").map_err(|e| BuildError::Tables(e.to_string()))?;
+    SkillTables::from_bin(&set, d2_sim::skills::LEVEL_CAP_114D)
+        .map_err(|e| BuildError::Tables(e.to_string()))
+}
+
 /// The unit-message rows of the client (`client/msg-units.md` §1.2 r7:
 /// each `monstats` row's `MonStatsEx` link into `monstats2`, whose record
 /// bytes +0x15… hold the component choice counts; §1.2 r4: the
@@ -793,18 +843,28 @@ pub fn client_unit_rows(archives: &ArchiveSet) -> Result<UnitRows, BuildError> {
             .ok_or_else(|| BuildError::Tables(format!("{name} not loaded")))
     };
     let err = |e: d2_data::tables::WrongTable| BuildError::Tables(e.to_string());
-    let monstats: Vec<Monstats> = decode_all(table("monstats")?).map_err(err)?;
+    let monstats_table = table("monstats")?;
+    let monstats: Vec<Monstats> = decode_all(monstats_table).map_err(err)?;
     let monstats2 = table("monstats2")?;
     let monsters = monstats
         .iter()
-        .map(|m| {
+        .enumerate()
+        .map(|(i, m)| {
             let link = m.monstatsex as i16;
             if link < 0 || link as usize >= monstats2.count {
                 return None;
             }
-            MonsterClass::from_record(monstats2.record(link as usize), m.npc, m.interact)
+            let m2 = monstats2.record(link as usize);
+            let mut c = MonsterClass::from_record(m2, m.npc, m.interact)?;
+            c.setup = Some(monster_setup(m, monstats_table.record(i), m2));
+            Some(c)
         })
         .collect();
+    let difficulty: Vec<Difficultylevels> = decode_all(table("difficultylevels")?).map_err(err)?;
+    let mut monster_skill_bonus = [0i32; 3];
+    for (b, d) in monster_skill_bonus.iter_mut().zip(&difficulty) {
+        *b = d.monsterskillbonus as i32;
+    }
     let isc: Vec<Itemstatcost> = decode_all(table("itemstatcost")?).map_err(err)?;
     let stats = isc
         .iter()
@@ -840,6 +900,7 @@ pub fn client_unit_rows(archives: &ArchiveSet) -> Result<UnitRows, BuildError> {
     let shrines: Vec<Shrines> = decode_all(table("shrines")?).map_err(err)?;
     Ok(UnitRows {
         monsters,
+        monster_skill_bonus,
         stats,
         objects,
         shrines: shrines.iter().map(|s| s.code).collect(),

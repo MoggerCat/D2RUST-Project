@@ -183,6 +183,9 @@ pub trait WorldPending: Pending {
     }
     /// §15.2: item code + drop helper `0x00559A30`.
     fn umod_quest_drop(&mut self, unit: UnitId, code: [u8; 4], arg: i32, announce: bool) {}
+    /// §15.2: `0x0055FE80(game, 0, item)` after the drop (the items
+    /// spec's recharge, `generation.md` §12.2; a rest seam elsewhere).
+    fn umod_recharge(&mut self, item: UnitId) {}
     /// Umod 24's belt steal (§17 steps 3–4; unreachable in 1.14d).
     fn steal_belt_item(&mut self, unit: UnitId, target: UnitId) {}
     /// `0x005B2490(game, unit, class, mode, spread, flags)` (§25).

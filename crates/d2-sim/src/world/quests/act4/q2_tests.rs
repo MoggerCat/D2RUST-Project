@@ -349,7 +349,7 @@ fn seal_fake(class: u16) -> Fake {
     f
 }
 
-// Covers: specs/world/quests-act4.md §5.4, §1.4
+// Covers: specs/world/quests-act4.md §5.4, §1.4, §edge-cases-original-bugs r20
 #[test]
 fn seal_392_spawns_its_boss() {
     // Test vector: seal 392 at (1000, 1000), free → dummy 131 at (988,
@@ -646,7 +646,7 @@ fn kill_diablo(ctl: &mut QuestControl, f: &mut Fake, killer: Option<UnitId>) {
     ctl.monster_killed(f, DIABLO_U, killer);
 }
 
-// Covers: specs/world/quests-act4.md §5.7, §5.8 text, §5.8 r1, §5.8 r2, §5.8 r3, §7, §edge-cases-original-bugs r12
+// Covers: specs/world/quests-act4.md §5.7, §5.8 text, §5.8 r1, §5.8 r2, §5.8 r3, §7, §edge-cases-original-bugs r12, §edge-cases-original-bugs r22
 #[test]
 fn classic_diablo_kill_and_end_of_game() {
     // Test vector: Diablo killed, classic, killer in his room → killer

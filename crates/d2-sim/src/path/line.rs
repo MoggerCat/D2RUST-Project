@@ -1,9 +1,11 @@
-// Spec: specs/sim/pathing.md §13.3
+// Spec: specs/sim/pathing.md §13.3; specs/render/draw-order-2.md §15.1, §16
 //! Cell line test `0x0064E260(room R, &from, &to, mask)` (`pathing.md`
-//! §13.3): the sub-tile cells from `from` to `to` (both included), in
-//! Bresenham order on the major axis, each tested `value & mask` ≠ 0 on
-//! the collision grid of the room the walk is in. No draws.
-
+//! §13.3, `draw-order-2.md` §16): the sub-tile cells from `from` to `to`
+//! (both included), in Bresenham order on the major axis, each tested
+//! `value & mask` ≠ 0 on the collision grid of the room the walk is in;
+//! and the collision line between two units `0x00622AA0`
+//! (`draw-order-2.md` §15.1) over it. The server's monster AI, skill
+//! bodies, missiles and melee range read them. No draws.
 use crate::units::RoomId;
 
 use super::collision::{find_room, CollisionRooms, MISSING_ROOM};
@@ -98,8 +100,71 @@ pub fn line_test<R: CollisionRooms + ?Sized>(
     }
 }
 
+/// Sizes above this read as it (§15.1 rule 3).
+pub const SIZE_CAP: i32 = 2;
+
+/// One unit of the collision line (§15.1 rules 1–3): its room
+/// (`0x00620BB0`), sub-tile position (`0x0045ADF0` / `0x0045AE20`; (0, 0)
+/// without a path) and `sim/path-placement.md` §3 size.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct LineUnit {
+    pub room: Option<RoomId>,
+    pub x: i32,
+    pub y: i32,
+    pub size: i32,
+}
+
+/// The end pull `0x00622920` (§15.1 rule 5).
+fn pull(a: &mut i32, b: &mut i32, sa: i32, sb: i32) {
+    if *a < *b {
+        *a += sa;
+        *b -= sb;
+    } else {
+        *a -= sa;
+        *b += sb;
+    }
+}
+
+/// `0x00622AA0(a, b, mask)` (§15.1): blocked (true) or clear. The
+/// null-unit fatal of rule 1 is the caller's (it has no unit to pass).
+pub fn units_line_blocked<R: CollisionRooms + ?Sized>(
+    rooms: &R,
+    a: &LineUnit,
+    b: &LineUnit,
+    mask: u16,
+) -> bool {
+    // Rule 1.
+    if a.room.is_none() {
+        return false;
+    }
+    // Rules 2–3.
+    let (mut ax, mut ay, mut bx, mut by) = (a.x, a.y, b.x, b.y);
+    let sa = a.size.min(SIZE_CAP);
+    let sb = b.size.min(SIZE_CAP);
+    // Rule 4.
+    let dx = bx.wrapping_sub(ax).wrapping_abs();
+    let dy = by.wrapping_sub(ay).wrapping_abs();
+    if dx.wrapping_add(dy) < sa + sb {
+        return false;
+    }
+    // Rule 5.
+    if !(sa == 0 && sb == 0) {
+        if dy <= dx {
+            pull(&mut ax, &mut bx, sa, sb);
+        }
+        if dy >= dx {
+            pull(&mut ay, &mut by, sa, sb);
+        }
+    }
+    // Rule 6 (the stop cell is discarded).
+    line_test(rooms, a.room, Point::new(ax, ay), Point::new(bx, by), mask).blocked()
+}
+
 #[cfg(test)]
-mod tests {
+mod tests;
+
+#[cfg(test)]
+mod tests_pathing {
     use super::*;
     use crate::drlg::{CollisionGrid, TileRect};
 

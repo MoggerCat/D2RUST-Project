@@ -10,6 +10,7 @@
 use crate::units::{RoomId, UnitId};
 
 use super::chests::{reach_distance, trap_arm, unit_type, ChestWorld};
+use super::misc::stat;
 use super::{
     clear_selectable, frame_cnt, schedule_endanim, selectable, set_mode, sound, MiscWorld,
     ObjectControl, ObjectError, ObjectTables, ObjectWorld, Operate,
@@ -63,6 +64,19 @@ pub trait MechWorld: ChestWorld + MiscWorld {
     }
     /// `0x00554120`: P's interact := (type, GUID) when P +0x6C = 0.
     fn set_interact(&mut self, player: UnitId, unit_type: u8, guid: u32) {}
+    /// `0x0055EEA0(game, player, item)` (§19 rule 1): the item comes off
+    /// the player's cursor; `false`: failure. Default: failure.
+    fn remove_cursor_item(&mut self, player: UnitId, item: UnitId) -> bool {
+        false
+    }
+    /// The `subtype` byte (+0x122) of the item's items record (§19 rule
+    /// 2). Default 0.
+    fn item_subtype(&self, item: UnitId) -> u8 {
+        0
+    }
+    /// `0x006272B0`: base-stat add of `delta` to stat `stat` of the player
+    /// (§19 power-up table). Default: nothing.
+    fn power_up_add_stat(&mut self, player: UnitId, stat: u16, delta: i32) {}
     /// `0x00554190`: clear P's interact (+0x64 := −1, +0x68 := 6, +0x6C
     /// := 0).
     fn clear_interact(&mut self, player: UnitId) {}
@@ -287,6 +301,86 @@ fn obelisk<W: MechWorld>(t: &ObjectTables, w: &mut W, op: &Operate) -> Result<i3
             set_mode(t, w, o, op.class, 1, true)?;
         }
         _ => {}
+    }
+    Ok(1)
+}
+
+/// The obelisk object class that skips the gem insert branch (§19 rule 1:
+/// the orifice, `quests-act2-2.md`).
+pub const ORIFICE_CLASS: u16 = 152;
+/// The power-up table size (dword `0x00732FAC`, §19 rule 2.1).
+pub const POWER_UP_COUNT: u8 = 21;
+
+/// Power-up table `0x00732EB0` (§19): the chance of entry `s` (of 100).
+fn power_up_chance(s: u8) -> u32 {
+    const STEPS: [u32; 3] = [5, 10, 15];
+    match s {
+        0..=2 | 15..=17 => 100,
+        3..=14 => STEPS[usize::from(s) % 3],
+        _ => [3, 6, 10][usize::from(s) % 3],
+    }
+}
+
+/// The power-up `0x00585240(game, s)` of §19 rule 2 with P in EDI: `true`
+/// is b = 1.
+pub fn power_up<W: MechWorld>(w: &mut W, p: UnitId, s: u8) -> bool {
+    if s >= POWER_UP_COUNT {
+        return false;
+    }
+    let r = w.unit_seed(p).map_or(0, |seed| seed.roll(100));
+    if r >= power_up_chance(s) {
+        return false;
+    }
+    let v: i32 = if s == 2 || s == 17 { 2 } else { 1 };
+    match s / 3 {
+        0 => {
+            let m = (w.vital_stat(p, stat::MAX_MANA) as i32 + v * 256) as u32;
+            w.set_vital_stat(p, stat::MANA, m);
+            w.set_vital_stat(p, stat::MAX_MANA, m);
+        }
+        // Energy, dexterity, vitality, strength.
+        g @ 1..=4 => w.power_up_add_stat(p, [0, 1, 2, 3, 0][usize::from(g)], v),
+        5 => {
+            let m = (w.vital_stat(p, stat::MAX_LIFE) as i32 + v * 256) as u32;
+            w.set_vital_stat(p, stat::LIFE, m);
+            w.set_vital_stat(p, stat::MAX_LIFE, m);
+        }
+        _ => w.power_up_add_stat(p, 5, v),
+    }
+    true
+}
+
+/// §19 C→S 0x44 action 3 on an object of class ≠ 152 (`0x005852E0`;
+/// the entry checks and the other actions are `quests-act2-2.md` §3.2):
+/// the item comes off the cursor, P's interact is cleared, the power-up
+/// rolls on P's seed, S→C 0x58 reports it, and the object goes to mode 1
+/// (then ENDANIM) or 0. No test of the object's mode or kind (edge case
+/// 2). Returns 1.
+// PROVISIONAL (objects-2.md §19 rule 1; REC-none): the return value after
+// the cursor-removal failure is not stated; read as 1 like every other
+// path.
+pub fn obelisk_insert<W: MechWorld>(
+    t: &ObjectTables,
+    w: &mut W,
+    player: UnitId,
+    object: UnitId,
+    class: u16,
+    item: UnitId,
+) -> Result<i32, ObjectError> {
+    let g = w.guid(object).to_le_bytes();
+    if !w.remove_cursor_item(player, item) {
+        w.send(player, &[0x58, g[0], g[1], g[2], g[3], 4, 0]);
+        return Ok(1);
+    }
+    w.clear_interact(player);
+    let s = w.item_subtype(item);
+    let b = power_up(w, player, s);
+    w.send(player, &[0x58, g[0], g[1], g[2], g[3], 5, u8::from(b)]);
+    if b {
+        set_mode(t, w, object, class, 1, true)?;
+        schedule_endanim(w, t.object(class)?, object);
+    } else {
+        set_mode(t, w, object, class, 0, true)?;
     }
     Ok(1)
 }

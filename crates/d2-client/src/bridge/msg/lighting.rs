@@ -174,11 +174,24 @@ fn object_env_refresh(
 /// The object light `0x004BC580` (`render/lighting.md` §8 object row):
 /// kind 2, radius `Lit` / 2, the objects color; `Lit` = 0 removes it;
 /// an object with a light gets a new target.
-fn object_light(w: &mut ClientWorld, key: UnitKey, lit: u8, rgb: (u8, u8, u8)) {
+pub fn object_light(w: &mut ClientWorld, key: UnitKey, lit: u8, rgb: (u8, u8, u8)) {
+    object_light_of(w, key, false, lit, rgb);
+}
+
+/// [`object_light`] for an object of set S (`client_only` false) or set
+/// C (the `ObjFx::Light` of the client object code,
+/// `world/objects-client.md` §28 r3).
+pub fn object_light_of(
+    w: &mut ClientWorld,
+    key: UnitKey,
+    client_only: bool,
+    lit: u8,
+    rgb: (u8, u8, u8),
+) {
     let owner = Owner {
         unit_type: u32::from(key.unit_type),
         guid: key.guid,
-        client_only: false,
+        client_only,
     };
     let current = w
         .lights
@@ -197,7 +210,12 @@ fn object_light(w: &mut ClientWorld, key: UnitKey, lit: u8, rgb: (u8, u8, u8)) {
             }
         }
         ObjectLight::Create(req) => {
-            let (x, y) = w.units.get(&key).map_or((0, 0), |u| u.cell());
+            let set = if client_only {
+                &w.objclient.set_c
+            } else {
+                &w.units
+            };
+            let (x, y) = set.get(&key).map_or((0, 0), |u| u.cell());
             let pos = (
                 unit_light_pos(i32::from(x) << 16),
                 unit_light_pos(i32::from(y) << 16),

@@ -1113,7 +1113,9 @@ pub fn do_core<W: UseWorld>(
         let f = w.unit_flags(u);
         w.set_unit_flags(u, f | FLAG_MISSILE_FIRED);
         let at = match (item && aim, w.target_position(u)) {
-            (true, Some((tx, ty))) => {
+            // `0x0056D2C0` fails when either coordinate is 0 (`bodies.md`
+            // §5 step 3: both non-zero).
+            (true, Some((tx, ty))) if tx != 0 && ty != 0 => {
                 let (ux, uy) = w.position(u);
                 MissileAim::At {
                     offset: (tx - ux, ty - uy),

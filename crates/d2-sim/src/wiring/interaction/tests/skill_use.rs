@@ -540,7 +540,7 @@ fn seed_giving(x: u32) -> Seed {
     Seed::new(0, x)
 }
 
-// Covers: specs/skills/use.md §5.4 r7, §5.4 r9
+// Covers: specs/skills/use.md §5.4 r7, §5.4 r9; specs/sim/rng.md §7 row10
 #[test]
 fn skill_do_fires_a_real_missile_that_hits_a_real_monster() {
     let mut fx = Fx::new();

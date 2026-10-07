@@ -1,0 +1,873 @@
+// Spec: specs/ui/control-panel.md
+//! §9 the mini panel (UI state 0x15): variant, blocked sides, layouts,
+//! buttons, tool tips, press and release.
+
+use super::globes::Tip;
+use crate::ui::panels::PanelOutput;
+
+/// Mini panel UI state.
+pub const UI_MINI: u8 = 0x15;
+/// Button tool tip strings by function f (§9 r5).
+pub const TIP_STRINGS: [u16; 8] = [4169, 4170, 4171, 4172, 4173, 4174, 4175, 4176];
+/// The key bindings of the functions (§9 r5), `None` for the game menu.
+pub const FUNCTION_BINDINGS: [Option<u8>; 8] = [
+    Some(0),
+    Some(1),
+    Some(12),
+    Some(2),
+    Some(7),
+    Some(3),
+    Some(4),
+    None,
+];
+
+/// The states that block the left side (§9 r2).
+pub const LEFT_BLOCKERS: [u8; 15] = [
+    0x17, 0x19, 0x1A, 0x0C, 0x1C, 0x1D, 0x18, 3, 0x10, 0x16, 0x24, 2, 0x0F, 0x14, 0x1B,
+];
+/// The states that block the right side (§9 r2), besides the belt rule and
+/// states 1 and 4.
+pub const RIGHT_BLOCKERS: [u8; 8] = [0x17, 0x19, 0x1C, 0x1A, 0x0C, 0x18, 0x1B, 3];
+
+/// The layouts (§9 r3).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Layout {
+    /// Right blocked only: left of centre.
+    One = 1,
+    /// Neither blocked.
+    Two = 2,
+    /// Left blocked only.
+    Three = 3,
+}
+
+/// The sides result (§9 r2).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Sides {
+    /// `0x0047EA60`; stored in `[0x007BC96C]`.
+    pub left_blocked: bool,
+    /// `0x0047EB50`: the return value (the draw uses it).
+    pub right_blocked: bool,
+    /// `[0x007BC968]`: 1 only when state 1 or 4 is open (the input uses
+    /// it).
+    pub flag_968: bool,
+}
+
+/// §9 r2 (`0x0047EA60`, `0x0047EB50`): `open(ui)` tells whether a UI state
+/// is open; `belt_extra_rows` and `belt_row_count` are the belt's.
+pub fn sides(open: &dyn Fn(u8) -> bool, belt_extra_rows: bool, belt_row_count: u8) -> Sides {
+    let left = LEFT_BLOCKERS.iter().any(|&s| open(s));
+    let st14 = open(1) || open(4);
+    let right = RIGHT_BLOCKERS.iter().any(|&s| open(s))
+        || ((open(0x1F) || belt_extra_rows) && belt_row_count > 1)
+        || st14;
+    Sides {
+        left_blocked: left,
+        right_blocked: right,
+        // The other cases set `[0x007BC968]` and then clear it: it ends as
+        // 1 only when state 1 or 4 is open.
+        flag_968: st14,
+    }
+}
+
+/// The layout of the draw (§9 r3) from the draw's sides; `None`: nothing.
+pub fn layout(left_blocked: bool, right_blocked: bool) -> Option<Layout> {
+    match (left_blocked, right_blocked) {
+        (false, false) => Some(Layout::Two),
+        (true, false) => Some(Layout::Three),
+        (false, true) => Some(Layout::One),
+        (true, true) => None,
+    }
+}
+
+/// One button of the layout (§9 r4).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MiniButton {
+    pub i: usize,
+    /// The function f.
+    pub f: usize,
+    /// The art frame drawn: `minipanelbtn` frame b_i (+ 1 pressed).
+    pub frame: u32,
+    pub x: i32,
+    pub y: i32,
+}
+
+/// The mini panel's state and variant.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MiniPanel {
+    /// `[0x007BC978]` ≠ 0: single player.
+    pub single: bool,
+    /// Pressed flags `[0x007BC8F8] + 4 i`.
+    pub pressed: [bool; 8],
+    /// `[0x007BC96C]`: the left side is blocked.
+    pub left_blocked: bool,
+    /// `[0x007BC968]`.
+    pub flag_968: bool,
+    /// `[0x007BC970]`: nothing drawn (both sides blocked).
+    pub hidden: bool,
+    /// The press latch `[0x007BC97C]`.
+    pub latch: bool,
+    /// `[0x007BC974]`.
+    pub flag_974: bool,
+}
+
+/// Why a press or release is not acted on.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct PlayerFacts {
+    /// P is a living player.
+    pub living: bool,
+    /// P is blocked (`0x0044BE50` ≠ 0).
+    pub blocked: bool,
+    /// P is dead (`0x00451F70` = 0x11).
+    pub dead: bool,
+}
+
+/// What a release does (§9 r5).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum MiniAction {
+    Ui(PanelOutput),
+    /// `0x004A3FE0(0)`: the quest log.
+    QuestLog,
+    /// The game menu: `0x00456300(0, 0)`, `0x00453AC0`, `0x0047E090(1, 0)`,
+    /// `0x00453AD0`, `0x00453AE0`.
+    GameMenu,
+    /// `0x0044DA40`, `0x0044DA70` after a release that ran a function.
+    InputReset,
+    /// `0x00468070(0)`: a cursor in mode ≠ 7 is reset.
+    CursorReset,
+    /// UI sound 4 on a press.
+    Sound(u32),
+}
+
+fn toggle_state(ui: u8, open: &dyn Fn(u8) -> bool) -> PanelOutput {
+    PanelOutput::SetUi {
+        ui,
+        // Open → off (1), else toggle (2).
+        mode: if open(ui) { 1 } else { 2 },
+        jump: false,
+    }
+}
+
+/// The action on release of function f (`0x0047EC50`, §9 r5).
+pub fn function_actions(f: usize, single: bool, open: &dyn Fn(u8) -> bool) -> Vec<MiniAction> {
+    let t = |ui| MiniAction::Ui(toggle_state(ui, open));
+    match f {
+        0 => vec![t(2)],
+        1 => vec![t(1)],
+        2 => vec![t(4)],
+        // Multiplayer only.
+        3 if !single => vec![t(0x16)],
+        3 => Vec::new(),
+        4 => vec![t(0x0A)],
+        5 => {
+            let mut v = Vec::new();
+            if open(0x1F) {
+                v.push(MiniAction::Ui(PanelOutput::SetUi {
+                    ui: 0x1F,
+                    mode: 1,
+                    jump: false,
+                }));
+            }
+            v.push(t(0x18));
+            v
+        }
+        6 => vec![MiniAction::QuestLog],
+        7 => vec![MiniAction::GameMenu],
+        _ => Vec::new(),
+    }
+}
+
+/// The region of the tool tips, press and release (§9 r6, r7): strict W/2 +
+/// o − 84 < x < W/2 + o + 89, H − 69 < y < H − 47.
+pub fn region(w: i32, h: i32, o: i32, x: i32, y: i32) -> bool {
+    w / 2 + o - 84 < x && x < w / 2 + o + 89 && h - 69 < y && y < h - 47
+}
+
+impl MiniPanel {
+    /// The variant at game start (`0x0047F0C0`, §9 r1): multiplayer (game
+    /// type ≠ 0) → `Panel\minipanel`, 8 buttons, `[0x007BC978]` := 0; single
+    /// player → `Panel\minipanel_s`, 7 buttons (no party button),
+    /// `[0x007BC978]` := 1. Pressed flags cleared.
+    pub fn new(game_type: u32) -> Self {
+        Self {
+            single: game_type == 0,
+            pressed: [false; 8],
+            left_blocked: false,
+            flag_968: false,
+            hidden: false,
+            latch: false,
+            flag_974: false,
+        }
+    }
+
+    /// The art file by variant.
+    pub fn art(&self) -> &'static str {
+        if self.single {
+            "Panel\\minipanel_s"
+        } else {
+            "Panel\\minipanel"
+        }
+    }
+
+    /// The button count by variant.
+    pub fn button_count(&self) -> usize {
+        if self.single {
+            7
+        } else {
+            8
+        }
+    }
+
+    /// Stores the sides of this frame (the draw's side effects).
+    pub fn set_sides(&mut self, s: &Sides) {
+        self.left_blocked = s.left_blocked;
+        self.flag_968 = s.flag_968;
+    }
+
+    /// The art position by layout (§9 r3): frame 0 at (W/2 − 74 − 3
+    /// (single) or W/2 − 84 − 3, H − 47) for layout 2; (W/2 + 56 − 2 or W/2
+    /// + 35 − 2, H − 47) for layout 3; (W/2 − 205, H − 47) for layout 1.
+    pub fn art_pos(&self, l: Layout, w: i32, h: i32) -> (i32, i32) {
+        let x = match l {
+            Layout::Two => {
+                if self.single {
+                    w / 2 - 74 - 3
+                } else {
+                    w / 2 - 84 - 3
+                }
+            }
+            Layout::Three => {
+                if self.single {
+                    w / 2 + 56 - 2
+                } else {
+                    w / 2 + 35 - 2
+                }
+            }
+            Layout::One => w / 2 - 205,
+        };
+        (x, h - 47)
+    }
+
+    /// The draw (`0x0047F710`, §9 r3): `[0x007BC970]` := 1 when both sides
+    /// are blocked (nothing drawn), else 0.
+    pub fn draw(
+        &mut self,
+        left_blocked: bool,
+        right_blocked: bool,
+        w: i32,
+        h: i32,
+    ) -> Option<((i32, i32), Vec<MiniButton>)> {
+        let l = layout(left_blocked, right_blocked);
+        self.hidden = l.is_none();
+        let l = l?;
+        Some((self.art_pos(l, w, h), self.buttons(l, w, h)))
+    }
+
+    /// The buttons (`0x0047E8B0(layout)`, §9 r4): x0 = W/2 − 84 (multi) /
+    /// W/2 − 74 (single); layout 1 → W/2 − 202; layout 3 → W/2 + 35 (multi)
+    /// / W/2 + 57 (single). Button i at (x0 + 21 i, H − 50); multi f = i, b
+    /// = 2 i; single f = i (+ 1 from i = 3), b = 2 i (+ 2 from i = 3).
+    pub fn buttons(&self, l: Layout, w: i32, h: i32) -> Vec<MiniButton> {
+        let x0 = match l {
+            Layout::One => w / 2 - 202,
+            Layout::Two => {
+                if self.single {
+                    w / 2 - 74
+                } else {
+                    w / 2 - 84
+                }
+            }
+            Layout::Three => {
+                if self.single {
+                    w / 2 + 57
+                } else {
+                    w / 2 + 35
+                }
+            }
+        };
+        (0..self.button_count())
+            .map(|i| {
+                let skip = self.single && i >= 3;
+                let b = 2 * i as u32 + if skip { 2 } else { 0 };
+                MiniButton {
+                    i,
+                    f: i + usize::from(skip),
+                    frame: b + u32::from(self.pressed[i]),
+                    x: x0 + 21 * i as i32,
+                    y: h - 50,
+                }
+            })
+            .collect()
+    }
+
+    /// The tool tip (`0x0047F650(layout)`, §9 r6): in the region of the
+    /// layout the button with x_i < x < x_i + 20 gets (`0x0047F490`) its
+    /// string and for the primary and secondary key of its binding ` (%s)`
+    /// (4178) with the key name, at (x_i − 3, H − 76), color 0, centred.
+    pub fn tip(
+        &self,
+        l: Layout,
+        w: i32,
+        h: i32,
+        mouse: (i32, i32),
+        keys: &dyn Fn(usize) -> [Option<Vec<u16>>; 2],
+        strings: &dyn Fn(u16) -> Vec<u16>,
+    ) -> Option<Tip> {
+        let o = match l {
+            Layout::Two => 0,
+            Layout::One => -118,
+            Layout::Three => 119,
+        };
+        if !region(w, h, o, mouse.0, mouse.1) {
+            return None;
+        }
+        let b = self
+            .buttons(l, w, h)
+            .into_iter()
+            .find(|b| b.x < mouse.0 && mouse.0 < b.x + 20)?;
+        let mut text = strings(TIP_STRINGS[b.f]);
+        for k in keys(b.f).iter().flatten() {
+            let mut one = strings(4178);
+            // " (%s)": substitute the key name.
+            if let Some(p) = one.windows(2).position(|p| p == [37u16, 115]) {
+                one.splice(p..p + 2, k.iter().copied());
+            }
+            text.extend(one);
+        }
+        Some(Tip {
+            text,
+            x: b.x - 3,
+            y: h - 76,
+            color: 0,
+            centered: true,
+        })
+    }
+
+    /// The region offset of press and release (§9 r7): −118 when the belt
+    /// has extra rows and a row count > 1, −118 when `[0x007BC968]`, +119
+    /// when `[0x007BC96C]`.
+    pub fn press_offset(&self, belt_extra_rows: bool, belt_row_count: u8) -> i32 {
+        let mut o = 0;
+        if belt_extra_rows && belt_row_count > 1 {
+            o -= 118;
+        }
+        if self.flag_968 {
+            o -= 118;
+        }
+        if self.left_blocked {
+            o += 119;
+        }
+        o
+    }
+
+    /// PROVISIONAL (specs/ui/control-panel.md §9 r7; REC-ui-mini-layout):
+    /// the layout whose buttons a press or release tests is read from the
+    /// sign of the region offset.
+    fn layout_for(o: i32) -> Layout {
+        match o.cmp(&0) {
+            std::cmp::Ordering::Less => Layout::One,
+            std::cmp::Ordering::Equal => Layout::Two,
+            std::cmp::Ordering::Greater => Layout::Three,
+        }
+    }
+
+    /// The button under x (strict x test) and its function.
+    fn button_at(&self, o: i32, w: i32, h: i32, x: i32) -> Option<MiniButton> {
+        self.buttons(Self::layout_for(o), w, h)
+            .into_iter()
+            .find(|b| b.x < x && x < b.x + 20)
+    }
+
+    /// Press (`0x0047EF30`, §9 r7): no cursor item and `[0x007BC970]` = 0.
+    /// Returns the effects and whether the event is consumed.
+    #[allow(clippy::too_many_arguments)]
+    pub fn press(
+        &mut self,
+        w: i32,
+        h: i32,
+        mouse: (i32, i32),
+        cursor_item: bool,
+        belt_extra_rows: bool,
+        belt_row_count: u8,
+        state9_open: bool,
+        p: &PlayerFacts,
+    ) -> (Vec<MiniAction>, bool) {
+        if cursor_item || self.hidden {
+            return (Vec::new(), false);
+        }
+        let o = self.press_offset(belt_extra_rows, belt_row_count);
+        if !region(w, h, o, mouse.0, mouse.1) {
+            return (Vec::new(), false);
+        }
+        if let Some(b) = self.button_at(o, w, h, mouse.0) {
+            let late = if self.single { 4 } else { 5 };
+            if b.f == 7 || (p.living && (!state9_open || b.i >= late)) {
+                self.pressed[b.i] = true;
+            }
+        }
+        // In every case UI sound 4, the press latch := 1, consumed.
+        self.latch = true;
+        (vec![MiniAction::Sound(4)], true)
+    }
+
+    /// Release (`0x0047ED90`, §9 r8): only with the latch; no cursor item
+    /// (a cursor in mode ≠ 7 is reset); `[0x007BC970]` = 0.
+    #[allow(clippy::too_many_arguments)]
+    pub fn release(
+        &mut self,
+        w: i32,
+        h: i32,
+        mouse: (i32, i32),
+        cursor_item: bool,
+        cursor_mode: u8,
+        belt_extra_rows: bool,
+        belt_row_count: u8,
+        p: &PlayerFacts,
+        open: &dyn Fn(u8) -> bool,
+    ) -> (Vec<MiniAction>, bool) {
+        if !self.latch {
+            return (Vec::new(), false);
+        }
+        self.latch = false;
+        if cursor_item || self.hidden {
+            return (Vec::new(), false);
+        }
+        let mut eff = Vec::new();
+        if cursor_mode != 7 {
+            eff.push(MiniAction::CursorReset);
+        }
+        self.pressed = [false; 8];
+        let o = self.press_offset(belt_extra_rows, belt_row_count);
+        if !region(w, h, o, mouse.0, mouse.1) {
+            self.flag_974 = false;
+            return (eff, false);
+        }
+        if let Some(b) = self.button_at(o, w, h, mouse.0) {
+            // The function runs whatever button was pressed.
+            if b.f == 7 || (!p.blocked && !p.dead) {
+                eff.extend(function_actions(b.f, self.single, open));
+            }
+        }
+        eff.push(MiniAction::InputReset);
+        (eff, true)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn closed(_: u8) -> bool {
+        false
+    }
+
+    // Covers: specs/ui/control-panel.md §9 r1
+    #[test]
+    fn variant_by_game_type() {
+        let m = MiniPanel::new(1);
+        assert_eq!(
+            (m.art(), m.button_count(), m.single),
+            ("Panel\\minipanel", 8, false)
+        );
+        let s = MiniPanel::new(0);
+        assert_eq!(
+            (s.art(), s.button_count(), s.single),
+            ("Panel\\minipanel_s", 7, true)
+        );
+        assert_eq!(s.pressed, [false; 8]);
+        assert_eq!(MiniPanel::new(2).button_count(), 8);
+    }
+
+    // Covers: specs/ui/control-panel.md §9 r2
+    #[test]
+    fn blocked_sides() {
+        let one = |s: u8| move |x: u8| x == s;
+        // Left blockers.
+        for s in LEFT_BLOCKERS {
+            assert!(sides(&one(s), false, 1).left_blocked, "{s:#x}");
+        }
+        for s in [1u8, 4, 5, 6, 7, 8, 9, 0x0A, 0x0B, 0x15, 0x1F] {
+            assert!(!sides(&one(s), false, 1).left_blocked, "{s:#x}");
+        }
+        // Right blockers.
+        for s in RIGHT_BLOCKERS {
+            let r = sides(&one(s), false, 1);
+            assert!(r.right_blocked, "{s:#x}");
+            // [0x007BC968] only for states 1 and 4.
+            assert!(!r.flag_968);
+        }
+        for s in [1u8, 4] {
+            let r = sides(&one(s), false, 1);
+            assert!(r.right_blocked && r.flag_968);
+        }
+        assert!(!sides(&closed, false, 1).right_blocked);
+        // State 0x1F open or the belt has extra rows, with a row count > 1.
+        assert!(sides(&one(0x1F), false, 2).right_blocked);
+        assert!(!sides(&one(0x1F), false, 1).right_blocked);
+        assert!(sides(&closed, true, 3).right_blocked);
+        assert!(!sides(&closed, true, 1).right_blocked);
+        assert!(!sides(&closed, false, 4).right_blocked);
+        // The input flag differs from the draw's return value for the
+        // other blockers (reproduced).
+        let r = sides(&one(3), false, 1);
+        assert_eq!((r.right_blocked, r.flag_968), (true, false));
+    }
+
+    // Test vectors of §9.
+    // Covers: specs/ui/control-panel.md §9 r3, §9 r4
+    #[test]
+    fn layouts_and_buttons() {
+        // (no, no): layout 2; (yes, no): 3; (no, yes): 1; (yes, yes):
+        // nothing, `[0x007BC970]` := 1.
+        let mut s = MiniPanel::new(0);
+        assert_eq!(layout(false, false), Some(Layout::Two));
+        assert_eq!(layout(true, false), Some(Layout::Three));
+        assert_eq!(layout(false, true), Some(Layout::One));
+        assert_eq!(layout(true, true), None);
+        assert!(s.draw(true, true, 800, 600).is_none());
+        assert!(s.hidden);
+        // Single player, 800 × 600, layout 2: art at (323, 553); buttons at
+        // x 326, 347, 368, 389 (f 4), 410, 431, 452.
+        let (art, b) = s.draw(false, false, 800, 600).unwrap();
+        assert!(!s.hidden);
+        assert_eq!(art, (323, 553));
+        assert_eq!(
+            b.iter().map(|b| b.x).collect::<Vec<_>>(),
+            vec![326, 347, 368, 389, 410, 431, 452]
+        );
+        assert_eq!(
+            b.iter().map(|b| b.f).collect::<Vec<_>>(),
+            vec![0, 1, 2, 4, 5, 6, 7]
+        );
+        assert_eq!(
+            b.iter().map(|b| b.frame).collect::<Vec<_>>(),
+            vec![0, 2, 4, 8, 10, 12, 14]
+        );
+        assert!(b.iter().all(|b| b.y == 550));
+        // A pressed button: frame b_i + 1.
+        s.pressed[2] = true;
+        assert_eq!(s.draw(false, false, 800, 600).unwrap().1[2].frame, 5);
+        // Multiplayer, 640 × 480, layout 1: buttons x 118 + 21 i, y 430.
+        let m = MiniPanel::new(1);
+        let b = m.buttons(Layout::One, 640, 480);
+        assert_eq!(b.len(), 8);
+        for (i, b) in b.iter().enumerate() {
+            assert_eq!(
+                (b.x, b.y, b.f, b.frame),
+                (118 + 21 * i as i32, 430, i, 2 * i as u32)
+            );
+        }
+        // The art by layout and variant.
+        let single = MiniPanel::new(0);
+        assert_eq!(m.art_pos(Layout::Two, 800, 600), (400 - 84 - 3, 553));
+        assert_eq!(m.art_pos(Layout::Three, 800, 600), (400 + 35 - 2, 553));
+        assert_eq!(single.art_pos(Layout::Three, 800, 600), (400 + 56 - 2, 553));
+        assert_eq!(m.art_pos(Layout::One, 800, 600), (195, 553));
+        assert_eq!(single.art_pos(Layout::One, 800, 600), (195, 553));
+        // Layout 3 buttons: W/2 + 35 (multi) / W/2 + 57 (single).
+        assert_eq!(m.buttons(Layout::Three, 800, 600)[0].x, 435);
+        assert_eq!(single.buttons(Layout::Three, 800, 600)[0].x, 457);
+        assert_eq!(m.buttons(Layout::Two, 800, 600)[0].x, 316);
+    }
+
+    // Covers: specs/ui/control-panel.md §9 r5
+    #[test]
+    fn function_table() {
+        let set = |ui: u8, mode: u8| {
+            MiniAction::Ui(PanelOutput::SetUi {
+                ui,
+                mode,
+                jump: false,
+            })
+        };
+        // Open → off, else toggle.
+        assert_eq!(function_actions(0, false, &closed), vec![set(2, 2)]);
+        assert_eq!(function_actions(0, false, &|s| s == 2), vec![set(2, 1)]);
+        assert_eq!(function_actions(1, false, &closed), vec![set(1, 2)]);
+        assert_eq!(function_actions(2, false, &|s| s == 4), vec![set(4, 1)]);
+        // Party screen: multiplayer only.
+        assert_eq!(function_actions(3, false, &closed), vec![set(0x16, 2)]);
+        assert!(function_actions(3, true, &closed).is_empty());
+        assert_eq!(function_actions(4, false, &closed), vec![set(0x0A, 2)]);
+        // Message log: state 0x1F off if open; state 0x18 likewise.
+        assert_eq!(function_actions(5, false, &closed), vec![set(0x18, 2)]);
+        assert_eq!(
+            function_actions(5, false, &|s| s == 0x1F),
+            vec![set(0x1F, 1), set(0x18, 2)]
+        );
+        assert_eq!(
+            function_actions(5, false, &|s| s == 0x18),
+            vec![set(0x18, 1)]
+        );
+        assert_eq!(
+            function_actions(6, false, &closed),
+            vec![MiniAction::QuestLog]
+        );
+        assert_eq!(
+            function_actions(7, false, &closed),
+            vec![MiniAction::GameMenu]
+        );
+        // The tool tip strings and bindings.
+        assert_eq!(
+            TIP_STRINGS,
+            [4169, 4170, 4171, 4172, 4173, 4174, 4175, 4176]
+        );
+        assert_eq!(
+            FUNCTION_BINDINGS,
+            [
+                Some(0),
+                Some(1),
+                Some(12),
+                Some(2),
+                Some(7),
+                Some(3),
+                Some(4),
+                None
+            ]
+        );
+    }
+
+    fn strings(id: u16) -> Vec<u16> {
+        let s = match id {
+            4169 => "Character",
+            4170 => "Inventory",
+            4178 => " (%s)",
+            _ => "?",
+        };
+        s.encode_utf16().collect()
+    }
+
+    // Covers: specs/ui/control-panel.md §9 r6
+    #[test]
+    fn tool_tips() {
+        let m = MiniPanel::new(1);
+        let keys = |f: usize| -> [Option<Vec<u16>>; 2] {
+            match f {
+                0 => [Some("C".encode_utf16().collect()), None],
+                1 => [
+                    Some("I".encode_utf16().collect()),
+                    Some("F2".encode_utf16().collect()),
+                ],
+                _ => [None, None],
+            }
+        };
+        // Layout 2, multiplayer 800 × 600: x0 316; button 0 at 316…336.
+        let t = m
+            .tip(Layout::Two, 800, 600, (320, 540), &keys, &strings)
+            .unwrap();
+        assert_eq!(
+            t,
+            Tip {
+                text: "Character (C)".encode_utf16().collect(),
+                x: 313,
+                y: 524,
+                color: 0,
+                centered: true
+            }
+        );
+        // The primary and secondary key.
+        let t = m
+            .tip(Layout::Two, 800, 600, (340, 540), &keys, &strings)
+            .unwrap();
+        assert_eq!(
+            t.text,
+            "Inventory (I) (F2)".encode_utf16().collect::<Vec<_>>()
+        );
+        // Strict: x_i < x < x_i + 20.
+        assert!(m
+            .tip(Layout::Two, 800, 600, (316, 540), &keys, &strings)
+            .is_none());
+        assert!(m
+            .tip(Layout::Two, 800, 600, (336, 540), &keys, &strings)
+            .is_none());
+        // The region (strict): W/2 + o − 84 < x < W/2 + o + 89, H − 69 < y <
+        // H − 47, o = 0 / −118 / +119.
+        assert!(m
+            .tip(Layout::Two, 800, 600, (320, 531), &keys, &strings)
+            .is_none());
+        assert!(m
+            .tip(Layout::Two, 800, 600, (320, 553), &keys, &strings)
+            .is_none());
+        assert!(m
+            .tip(Layout::Two, 800, 600, (320, 532), &keys, &strings)
+            .is_some());
+        assert!(m
+            .tip(Layout::Two, 800, 600, (320, 552), &keys, &strings)
+            .is_some());
+        // Layout 1: x0 198, region 198 … 371; layout 3: x0 435, 435 … 608.
+        assert!(m
+            .tip(Layout::One, 800, 600, (205, 540), &keys, &strings)
+            .is_some());
+        assert!(m
+            .tip(Layout::Three, 800, 600, (440, 540), &keys, &strings)
+            .is_some());
+        assert!(m
+            .tip(Layout::Three, 800, 600, (205, 540), &keys, &strings)
+            .is_none());
+    }
+
+    fn player() -> PlayerFacts {
+        PlayerFacts {
+            living: true,
+            ..Default::default()
+        }
+    }
+
+    // Covers: specs/ui/control-panel.md §9 r7
+    #[test]
+    fn press_region_and_pressed_flags() {
+        // Multiplayer, o = 0: x0 316, button i at 316 + 21 i.
+        let mut m = MiniPanel::new(1);
+        // The press offset: −118 belt extra rows with a count > 1, −118
+        // [7BC968], +119 [7BC96C].
+        assert_eq!(m.press_offset(false, 1), 0);
+        assert_eq!(m.press_offset(true, 2), -118);
+        assert_eq!(m.press_offset(true, 1), 0);
+        m.flag_968 = true;
+        assert_eq!(m.press_offset(true, 2), -236);
+        m.flag_968 = false;
+        m.left_blocked = true;
+        assert_eq!(m.press_offset(false, 1), 119);
+        m.left_blocked = false;
+        // A press on button 1 (x 337…357 → 340): sound 4, latch, consumed,
+        // pressed (state 9 closed, living).
+        let (e, c) = m.press(800, 600, (340, 540), false, false, 1, false, &player());
+        assert_eq!(e, vec![MiniAction::Sound(4)]);
+        assert!(c && m.latch && m.pressed[1]);
+        // State 9 open: only buttons i ≥ 5 (multi) / ≥ 4 (single) and the
+        // game menu (f = 7) press.
+        let mut m = MiniPanel::new(1);
+        let (_, c) = m.press(800, 600, (340, 540), false, false, 1, true, &player());
+        assert!(c && m.latch && m.pressed == [false; 8]);
+        let x5 = 316 + 21 * 5 + 5;
+        m.press(800, 600, (x5, 540), false, false, 1, true, &player());
+        assert!(m.pressed[5]);
+        let mut m = MiniPanel::new(1);
+        m.press(
+            800,
+            600,
+            (316 + 21 * 4 + 5, 540),
+            false,
+            false,
+            1,
+            true,
+            &player(),
+        );
+        assert!(!m.pressed[4]);
+        let mut m = MiniPanel::new(0);
+        m.press(
+            800,
+            600,
+            (326 + 21 * 4 + 5, 540),
+            false,
+            false,
+            1,
+            true,
+            &player(),
+        );
+        assert!(m.pressed[4]);
+        // The game menu (f = 7: single button 6) presses even in state 9 and
+        // for a dead player.
+        let mut m = MiniPanel::new(0);
+        let dead = PlayerFacts::default();
+        m.press(
+            800,
+            600,
+            (326 + 21 * 6 + 5, 540),
+            false,
+            false,
+            1,
+            true,
+            &dead,
+        );
+        assert!(m.pressed[6]);
+        // A non-living player: no pressed flag, still sound and latch.
+        let mut m = MiniPanel::new(1);
+        let (e, c) = m.press(800, 600, (340, 540), false, false, 1, false, &dead);
+        assert!(c && m.latch && m.pressed == [false; 8] && e.len() == 1);
+        // A cursor item, or the panel hidden: nothing. Outside the region:
+        // not consumed.
+        let mut m = MiniPanel::new(1);
+        assert_eq!(
+            m.press(800, 600, (340, 540), true, false, 1, false, &player()),
+            (vec![], false)
+        );
+        m.hidden = true;
+        assert!(
+            !m.press(800, 600, (340, 540), false, false, 1, false, &player())
+                .1
+        );
+        m.hidden = false;
+        let (e, c) = m.press(800, 600, (100, 100), false, false, 1, false, &player());
+        assert!(e.is_empty() && !c && !m.latch);
+    }
+
+    // Covers: specs/ui/control-panel.md §9 r8
+    #[test]
+    fn release_runs_the_button_under_the_mouse() {
+        let open = closed;
+        let set = |ui: u8, mode: u8| {
+            MiniAction::Ui(PanelOutput::SetUi {
+                ui,
+                mode,
+                jump: false,
+            })
+        };
+        let mut m = MiniPanel::new(1);
+        m.press(800, 600, (320, 540), false, false, 1, false, &player());
+        assert!(m.latch && m.pressed[0]);
+        // Released over button 1 (x 337…357): that one runs (the function
+        // runs whatever button was pressed); flags cleared, latch := 0, the
+        // input reset, consumed; a cursor in mode ≠ 7 is reset.
+        let (e, c) = m.release(800, 600, (340, 540), false, 0, false, 1, &player(), &open);
+        assert_eq!(
+            e,
+            vec![MiniAction::CursorReset, set(1, 2), MiniAction::InputReset]
+        );
+        assert!(c && !m.latch && m.pressed == [false; 8]);
+        // Cursor mode 7: no reset.
+        let mut m = MiniPanel::new(1);
+        m.latch = true;
+        let (e, _) = m.release(800, 600, (340, 540), false, 7, false, 1, &player(), &open);
+        assert_eq!(e, vec![set(1, 2), MiniAction::InputReset]);
+        // A blocked or dead player runs nothing (the input reset still
+        // runs); the game menu (f = 7) runs anyway.
+        let blocked = PlayerFacts {
+            living: true,
+            blocked: true,
+            ..Default::default()
+        };
+        let mut m = MiniPanel::new(1);
+        m.latch = true;
+        let (e, c) = m.release(800, 600, (340, 540), false, 7, false, 1, &blocked, &open);
+        assert_eq!(e, vec![MiniAction::InputReset]);
+        assert!(c);
+        let dead = PlayerFacts {
+            dead: true,
+            ..Default::default()
+        };
+        m.latch = true;
+        let (e, _) = m.release(800, 600, (340, 540), false, 7, false, 1, &dead, &open);
+        assert_eq!(e, vec![MiniAction::InputReset]);
+        let x7 = 316 + 21 * 7 + 5;
+        m.latch = true;
+        let (e, _) = m.release(800, 600, (x7, 540), false, 7, false, 1, &dead, &open);
+        assert_eq!(e, vec![MiniAction::GameMenu, MiniAction::InputReset]);
+        // Outside the region: [7BC974] := 0, not consumed. Without the
+        // latch: nothing.
+        let mut m = MiniPanel::new(1);
+        m.flag_974 = true;
+        assert_eq!(
+            m.release(800, 600, (340, 540), false, 7, false, 1, &player(), &open),
+            (vec![], false)
+        );
+        m.latch = true;
+        let (_, c) = m.release(800, 600, (10, 10), false, 7, false, 1, &player(), &open);
+        assert!(!c && !m.flag_974 && !m.latch);
+        // A cursor item: nothing run.
+        m.latch = true;
+        assert!(
+            !m.release(800, 600, (340, 540), true, 0, false, 1, &player(), &open)
+                .1
+        );
+    }
+}

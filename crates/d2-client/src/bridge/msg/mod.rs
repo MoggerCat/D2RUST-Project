@@ -33,6 +33,8 @@ pub mod unit_misc;
 pub mod units;
 
 #[cfg(test)]
+mod tests_c_client;
+#[cfg(test)]
 mod tests_drlg;
 #[cfg(test)]
 mod tests_items_skills;

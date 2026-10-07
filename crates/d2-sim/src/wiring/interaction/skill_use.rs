@@ -1046,7 +1046,20 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
     fn box_collides(&self, r: RoomId, at: (i32, i32), size: i32, mask: u32) -> bool {
         self.x().box_collides(r, at, size, mask)
     }
+    /// `0x0064E260` (`pathing.md` §13.3, [`crate::path::line::line_test`])
+    /// on the DRLG rooms with the path provider; else [`Pending`].
     fn line_blocked(&self, r: RoomId, from: (i32, i32), to: (i32, i32), mask: u32) -> bool {
+        if self.cv.v.h.paths.is_some() {
+            use crate::path::Point;
+            return crate::path::line::line_test(
+                &self.cv.v.h.drlg,
+                Some(r),
+                Point::new(from.0, from.1),
+                Point::new(to.0, to.1),
+                mask as u16,
+            )
+            .blocked();
+        }
         self.x().body_line_blocked(r, from, to, mask)
     }
     fn place_unit(&mut self, u: UnitId, r: Option<RoomId>, at: (i32, i32)) -> bool {

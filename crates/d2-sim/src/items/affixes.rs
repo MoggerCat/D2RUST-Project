@@ -93,13 +93,22 @@ pub fn magic_fits<S: ItemStats>(t: &ItemTables, item: &Item<S>, row: &AffixRec) 
 
 /// Group taken (`0x005C1500`, §4.2).
 fn group_taken<S>(t: &ItemTables, item: &Item<S>, group: i32) -> bool {
-    let scan = |slots: &[u16; 3]| {
+    let scan = |slots: &[u16]| {
         slots
             .iter()
             .take_while(|&&id| id != 0)
             .any(|&id| affix(t, id).is_some_and(|a| a.group == group))
     };
-    scan(&item.prefix) || scan(&item.suffix)
+    // On `scro` and `book` suffix slot 0 holds a books row index, not an
+    // affix id (§1 rule 4): it is skipped.
+    let books = t.is_type(item.record, super::ty::SCRO as i16)
+        || t.is_type(item.record, super::ty::BOOK as i16);
+    scan(&item.prefix)
+        || scan(if books {
+            &item.suffix[1..]
+        } else {
+            &item.suffix
+        })
 }
 
 /// The item's class for `classspecific` (itemtype `class`, ≥ 7 as 7).

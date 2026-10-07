@@ -9,7 +9,11 @@
 //! checked). Every error carries the line it was made on (M07); there is
 //! no silent default.
 
+pub mod click;
+#[cfg(test)]
+mod click_tests;
 mod names;
+pub mod original;
 #[cfg(test)]
 mod tests;
 

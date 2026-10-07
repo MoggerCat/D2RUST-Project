@@ -1,0 +1,23 @@
+// Spec: specs/formats/d2s-load.md (tests)
+//! Load-failure message mapping.
+
+use super::*;
+
+// Covers: specs/formats/d2s-load.md §5 r1, §5 r2
+#[test]
+fn refusal_table() {
+    assert_eq!(refusal_message(1, false), (0, 5365));
+    assert_eq!(refusal_message(6, false), (5, 5371));
+    assert_eq!(refusal_message(7, false), (10, 5373));
+    assert_eq!(refusal_message(14, false), (17, 5380));
+    assert_eq!(refusal_message(17, false), (20, 5364));
+    assert_eq!(refusal_message(17, true), (20, 0x5522));
+    assert_eq!(refusal_message(18, false), (21, 5363));
+    assert_eq!(refusal_message(18, true), (21, 0x5521));
+    assert_eq!(refusal_message(22, false), (9, 5372));
+    assert_eq!(refusal_message(23, false), (25, 10101));
+    assert_eq!(refusal_message(24, false), (26, 10102));
+    assert_eq!(refusal_message(25, false), (27, 5370));
+    assert_eq!(refusal_message(26, false), (28, 5371));
+    assert_eq!(refusal_message(99, false), (9, 5372));
+}

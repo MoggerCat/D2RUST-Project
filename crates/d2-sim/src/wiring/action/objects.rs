@@ -1,4 +1,4 @@
-// Spec: specs/world/objects.md §2, §3, §7, §14 (seam `ObjectWorld`); specs/world/waypoints.md §5.2 (the C→S 0x13 object case)
+// Spec: specs/world/objects.md §2, §3, §7, §14 (seam `ObjectWorld`); specs/audio/triggers-2.md §14; specs/world/waypoints.md §5.2 (the C→S 0x13 object case)
 //! Objects ↔ units, timers, the unit lists and the DRLG: [`ObjectView`]
 //! implements [`ObjectWorld`] (and the extension traits, on their
 //! defaults). The object control and tables live in [`ObjectState`]
@@ -521,8 +521,8 @@ impl<X: Pending> View<'_, X> {
     /// ([`ObjectCase::Waypoint`]); quest and `todo` routes go to
     /// [`Pending::object_route`]. `None`: no object state.
     ///
-    /// TODO(waypoints.md §5.2): the result after the operate (and after
-    /// the walk) is not stated; read as 0.
+    /// Result after the operate (`objects.md` §7.3 rule 5): the entry's
+    /// result 0 → 3, else 0; after the walk 0.
     pub fn object_message(
         &mut self,
         game: &mut Game,
@@ -541,7 +541,11 @@ impl<X: Pending> View<'_, X> {
             ObjectReach::Walk => return Some(ObjectCase::Code(0)),
             ObjectReach::Operate => {}
         }
-        let (_, d) = self.operate_object(game, Some(player), guid)?;
+        let (result, d) = self.operate_object(game, Some(player), guid)?;
+        // Objects §7.3 rule 5: the entry's result 0 (object gone) → 3.
+        if result == 0 {
+            return Some(ObjectCase::Code(3));
+        }
         Some(match d {
             Some(Dispatch::Waypoint(op)) => ObjectCase::Waypoint(op),
             Some(d @ (Dispatch::Quest(_) | Dispatch::NotCovered(_))) => {
@@ -804,8 +808,28 @@ impl<X: Pending> ObjectWorld for ObjectView<'_, X> {
         let (x, y) = self.position(unit);
         apply_object_footprint(&mut self.v.h.drlg, &o, room, x, y, false);
     }
+    /// `0x00553380(unit, id, to)` ([`crate::units::sound::queue_sound`],
+    /// `audio/triggers-2.md` §14 rule 1). `now`: `0x00571740` at once
+    /// (the chest's key sound, `objects.md` §8.1 rule 2, §14 rule 2) to
+    /// the unit's own client when the unit is a player.
     fn sound(&mut self, unit: UnitId, id: u8, to: Option<UnitId>, now: bool) {
-        self.v.h.x.object_sound(unit, id, to, now);
+        if let Err(e) = crate::units::sound::queue_sound(self.game, unit, u16::from(id), to) {
+            self.v.unit_error(crate::game::GameError::from(e).into());
+        }
+        let player = self
+            .game
+            .lists
+            .unit(unit)
+            .is_some_and(|e| e.ty == UnitType::Player);
+        if now && player {
+            // PROVISIONAL (audio/triggers-2.md §14 r2; REC-93; settled by a recording of a chest
+            // unlocked with a key, count of 0x2C event 11): the slot and flag 0x400
+            // stay set after the at-once send, so the player's unit update
+            // of the same tick sends the event a second time.
+            if let Some(m) = crate::units::sound::sound_message(self.game, unit, unit) {
+                self.v.h.x.send(unit, &m);
+            }
+        }
     }
     fn key_test(&mut self, player: UnitId) -> bool {
         self.v.h.x.object_key_test(player)

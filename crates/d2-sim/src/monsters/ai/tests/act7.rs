@@ -67,6 +67,7 @@ fn flying_scimitar_reads_aip1_twice() {
 
 // T = 0 is unreachable in a target-mode-1 body and asserted (`ai.md` §2.3
 // "Target 0 in mode-1 and mode-4 bodies").
+// Covers: specs/monsters/ai.md §2.3 r0
 #[test]
 #[should_panic(expected = "GargoyleTrap think without a target")]
 fn gargoyle_trap_asserts_a_target() {
@@ -400,7 +401,7 @@ fn death_sentry_explodes_corpses() {
 
 // ---- §18 ShadowWarrior ------------------------------------------------------
 
-// Covers: specs/monsters/ai-bodies-7.md §18 text, §18 r1, §18 r2, §18 r6, §edge-cases-original-bugs r6
+// Covers: specs/monsters/ai-bodies-7.md §18 text, §18 r1, §18 r2, §18 r4, §18 r6, §edge-cases-original-bugs r6
 #[test]
 fn shadow_warrior_rules() {
     // No owner: idle 100.

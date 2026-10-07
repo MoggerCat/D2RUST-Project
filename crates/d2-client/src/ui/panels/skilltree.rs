@@ -32,7 +32,7 @@
 //! - Draw order icons → level numbers → close button follows the section
 //!   order of §10, not a read of `0x004AC690`.
 
-use d2_proto::client::AddSkillPoint;
+use d2_proto::client::{AddSkillPoint, SelectSkill};
 
 use super::{cel, emit_static_draws, text, utf16, PanelEnv, PanelOutput, PanelTables};
 use crate::ui::draw::{UiDraw, UiDrawSink};
@@ -81,6 +81,9 @@ pub struct SkillEntry {
     /// `0x004AC4D0`: a point would be accepted (start remap 0 rather than
     /// 5 for a level-0 skill, §10.3).
     pub learnable: bool,
+    /// The skill is `passive` (`skills.txt` flags byte +4 has the
+    /// `passive` bit of `[0x006CE278]`, `panels-2.md` §19 r1.2).
+    pub passive: bool,
     /// The required-level check `0x00646CA0` passes (§10.5).
     pub req_level_ok: bool,
     /// Below the skill's max level (`0x004AA8B0`, `0x004AA900`, §10.5).
@@ -160,13 +163,31 @@ pub fn tab_at(s: &Screen, p: Point) -> Option<u8> {
 }
 
 /// Close-button offset `o` (table `0x00724CE4`, index `3 × class + t`,
-/// §10.6). Only the amazon row is specified (−149, −220, −305); `None`
-/// for the other classes (Open).
+/// §10.6): amazon −149, −220, −305; sorceress −305, −305, −149;
+/// necromancer −305, −149, −305; paladin −305, −220, −305; barbarian
+/// −149, −305, −149; druid −149, −149, −149; assassin −220, −149, −305
+/// for tabs 1, 2, 3.
 pub fn close_offset(class: u8, tab: u8) -> Option<i32> {
-    match (class, tab) {
-        (0, 1) => Some(-149),
-        (0, 2) => Some(-220),
-        (0, 3) => Some(-305),
+    const O: [[i32; 3]; 7] = [
+        [-149, -220, -305],
+        [-305, -305, -149],
+        [-305, -149, -305],
+        [-305, -220, -305],
+        [-149, -305, -149],
+        [-149, -149, -149],
+        [-220, -149, -305],
+    ];
+    let t = usize::from(tab).checked_sub(1)?;
+    O.get(usize::from(class))?.get(t).copied()
+}
+
+/// The close variant `[0x00724CE0]` (§10.6, `0x004AB530`): 1, 2, 3 for `o`
+/// = −149, −220, −305.
+pub fn close_variant(o: i32) -> Option<u8> {
+    match o {
+        -149 => Some(1),
+        -220 => Some(2),
+        -305 => Some(3),
         _ => None,
     }
 }
@@ -195,6 +216,8 @@ pub struct SkillTreePanel {
     pub pressed: Option<u16>,
     /// The close button's pressed flag (frame 11, §7.3).
     pub close_pressed: bool,
+    /// `[0x007C0C4C]`: set by the draw (`panels-2.md` §19 r1.1).
+    pub drawn: std::cell::Cell<bool>,
 }
 
 impl Default for SkillTreePanel {
@@ -210,6 +233,7 @@ impl SkillTreePanel {
             tab: 1,
             pressed: None,
             close_pressed: false,
+            drawn: std::cell::Cell::new(false),
         }
     }
 
@@ -278,6 +302,7 @@ impl SkillTreePanel {
         mouse: Point,
         out: &mut dyn UiDrawSink,
     ) {
+        self.drawn.set(true);
         let tab = self.tab;
         let extra = move |c: Cond| matches!(c, Cond::Tab(n) if n == tab);
         let cond = env.cond(false, &extra);
@@ -296,78 +321,290 @@ impl SkillTreePanel {
         }
     }
 
-    /// Mouse down (`0x004AB7E0`): tabs (§10.2), icons with free points
-    /// (§10.5), the close button (§7.3).
+    /// Mouse down (`0x004AB7E0`) with the default context (a player, not
+    /// over the belt): its outputs. See [`SkillTreePanel::mouse_down_ctx`].
     pub fn mouse_down(
         &mut self,
         env: &PanelEnv,
         view: &dyn SkillTreeView,
         p: Point,
     ) -> Vec<PanelOutput> {
+        self.mouse_down_ctx(env, view, p, InputCtx::DEFAULT).out
+    }
+
+    /// Mouse down `0x004AB7E0` (`panels-2.md` §19 r1), in this order (not
+    /// consumed when over the belt, without a player, or y > `H − 48`):
+    /// 1. no draw yet → `0x0044DA70`, consumed, done;
+    /// 2. no free points and `W − sx − 320` < x < `W − sx − 88`: for each
+    ///    icon of the tab that is hit, not pressed and not passive: C→S
+    ///    0x3C [skill, right hand][−1] then `SetUIState(4, off, 0)`; the
+    ///    walk goes on; consumed;
+    /// 3. tabs (x in [`W − sx − 88`, `W − sx`], §10.2): consumed, goes on;
+    /// 4. the close rectangle: click sound, pressed; goes on;
+    /// 5. the icon column: no points → consumed, done; else the first hit,
+    ///    not pressed icon is pressed, click sound, consumed, done; none:
+    ///    consumed, done;
+    /// 6. otherwise not consumed.
+    pub fn mouse_down_ctx(
+        &mut self,
+        env: &PanelEnv,
+        view: &dyn SkillTreeView,
+        p: Point,
+        ctx: InputCtx,
+    ) -> Down {
         let s = env.screen;
-        let mut out = Vec::new();
-        if let Some(t) = tab_at(&s, p) {
-            if t != self.tab {
-                self.tab = t;
-                out.push(PanelOutput::ClickSound);
-            }
-            return out;
+        let mut d = Down::default();
+        if ctx.over_belt || !ctx.has_player || p.y > s.h - 48 {
+            return d;
         }
-        if view.free_points() > 0 {
-            let hit = self
+        if !self.drawn.get() {
+            d.consumed = true;
+            return d;
+        }
+        let (col_lo, col_hi) = (s.w - s.sx() - 320, s.w - s.sx() - 88);
+        let in_col = col_lo < p.x && p.x < col_hi;
+        if view.free_points() < 1 && in_col {
+            let hits: Vec<u16> = self
                 .tab_skills(&s, view)
-                .find(|&(_, at)| icon_hit(at, p))
-                .map(|(e, _)| e.skill);
-            if let Some(skill) = hit {
-                self.pressed = Some(skill);
-                return out;
+                .filter(|&(e, at)| icon_hit(at, p) && self.pressed != Some(e.skill) && !e.passive)
+                .map(|(e, _)| e.skill)
+                .collect();
+            for skill in hits {
+                d.out.push(PanelOutput::Intent(ClientIntent::from_message(
+                    &SelectSkill {
+                        skill: u32::from(skill),
+                        left: false,
+                        item: u32::MAX,
+                    },
+                )));
+                d.out.push(PanelOutput::SetUi {
+                    ui: UI_SKILLTREE,
+                    mode: 1,
+                    jump: false,
+                });
+            }
+            d.consumed = true;
+        }
+        if col_hi <= p.x && p.x <= s.w - s.sx() {
+            d.consumed = true;
+            if let Some(t) = tab_at(&s, p) {
+                if t != self.tab {
+                    self.tab = t;
+                    d.out.push(PanelOutput::ClickSound);
+                }
             }
         }
         if view.class().is_some_and(|c| close_hit(&s, c, self.tab, p)) {
             self.close_pressed = true;
+            d.out.push(PanelOutput::ClickSound);
         }
-        out
+        if in_col {
+            d.consumed = true;
+            if view.free_points() >= 1 {
+                let hit = self
+                    .tab_skills(&s, view)
+                    .find(|&(e, at)| icon_hit(at, p) && self.pressed != Some(e.skill))
+                    .map(|(e, _)| e.skill);
+                if let Some(skill) = hit {
+                    self.pressed = Some(skill);
+                    d.out.push(PanelOutput::ClickSound);
+                }
+            }
+        }
+        d
     }
 
-    /// Mouse up: a release on the pressed icon with free points, the
-    /// required level and below the max level sends 0x3B (§10.5); a
-    /// release on the close button toggles ui 4 (§10.6); pressed flags
-    /// clear; x ≤ W / 2 is not consumed (§10.8).
+    /// Mouse up with the default context: see
+    /// [`SkillTreePanel::mouse_up_ctx`].
     pub fn mouse_up(&mut self, env: &PanelEnv, view: &dyn SkillTreeView, p: Point) -> Release {
+        self.mouse_up_ctx(env, view, p, InputCtx::DEFAULT)
+    }
+
+    /// Mouse up `0x004ABC30` (`panels-2.md` §19 r2): no player → nothing;
+    /// over the belt → nothing more; no draw yet → `0x0044DA70`,
+    /// consumed. Close pressed → pressed := 0, a release in the close
+    /// rectangle → `SetUIState(4, toggle, 0)`; consumed, done (icon flags
+    /// untouched). x ≤ `W / 2` → not consumed. Points are re-checked:
+    /// base stat 5 ≤ 0 → no flag cleared, consumed. Else the walk: the
+    /// hit icon with pressed = 1 → the checks of §10.5, C→S 0x3B, flags
+    /// := 0, consumed, done; every other visited icon gets pressed := 0.
+    pub fn mouse_up_ctx(
+        &mut self,
+        env: &PanelEnv,
+        view: &dyn SkillTreeView,
+        p: Point,
+        ctx: InputCtx,
+    ) -> Release {
         let s = env.screen;
-        let pressed = self.pressed.take();
-        self.close_pressed = false;
-        if p.x <= s.w / 2 {
-            return Release::default();
+        let mut r = Release::default();
+        if !ctx.has_player || ctx.over_belt {
+            return r;
         }
-        let mut r = Release {
-            consumed: true,
-            out: Vec::new(),
-        };
-        if let Some(skill) = pressed {
-            let on = self
-                .tab_skills(&s, view)
-                .find(|&(e, at)| e.skill == skill && icon_hit(at, p))
-                .map(|(e, _)| e);
-            if let Some(e) = on {
-                if view.free_points() > 0 && e.req_level_ok && e.below_max {
+        if !self.drawn.get() {
+            r.consumed = true;
+            return r;
+        }
+        if self.close_pressed {
+            self.close_pressed = false;
+            if view.class().is_some_and(|c| close_hit(&s, c, self.tab, p)) {
+                r.out.push(PanelOutput::SetUi {
+                    ui: UI_SKILLTREE,
+                    mode: 2,
+                    jump: false,
+                });
+            }
+            r.consumed = true;
+            return r;
+        }
+        if p.x <= s.w / 2 {
+            return r;
+        }
+        r.consumed = true;
+        if view.free_points() <= 0 {
+            return r;
+        }
+        let pressed = self.pressed;
+        let walk: Vec<(u16, bool, bool, bool)> = self
+            .tab_skills(&s, view)
+            .map(|(e, at)| (e.skill, icon_hit(at, p), e.req_level_ok, e.below_max))
+            .collect();
+        for (skill, hit, req_ok, below) in walk {
+            if hit && pressed == Some(skill) {
+                if req_ok && below {
                     r.out.push(PanelOutput::Intent(ClientIntent::from_message(
                         &AddSkillPoint { skill },
                     )));
                 }
+                self.pressed = None;
                 return r;
             }
         }
-        if view.class().is_some_and(|c| close_hit(&s, c, self.tab, p)) {
-            r.out.push(PanelOutput::SetUi {
-                ui: UI_SKILLTREE,
-                mode: 2,
-                jump: false,
-            });
-        }
+        self.pressed = None;
         r
     }
+
+    /// The free-points number (`0x004AC200`, §19 r3), only with base stat
+    /// 5 ≥ 1: `%i` at (`W − sx − 52`, `H + sy − 400`), Font16, color 1
+    /// when the player has state 54 (`uninterruptable`) or `[0x007C0C3C]`
+    /// ≠ 0 (only ever written 0), else 0.
+    pub fn free_points_number(
+        &self,
+        s: &Screen,
+        view: &dyn SkillTreeView,
+        uninterruptable: bool,
+    ) -> Option<(String, Point, u16, u16)> {
+        let n = view.free_points();
+        (n >= 1).then(|| {
+            (
+                n.to_string(),
+                Point::new(s.w - s.sx() - 52, s.h + s.sy() - 400),
+                FONT16,
+                u16::from(uninterruptable),
+            )
+        })
+    }
 }
+
+/// The input context of a press or release (§19 r1–r2).
+#[derive(Clone, Copy, Debug)]
+pub struct InputCtx {
+    /// The mouse is over the belt (`0x00498DC0`).
+    pub over_belt: bool,
+    pub has_player: bool,
+}
+
+impl InputCtx {
+    pub const DEFAULT: InputCtx = InputCtx {
+        over_belt: false,
+        has_player: true,
+    };
+}
+
+/// A press's result (§19 r1).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Down {
+    pub consumed: bool,
+    pub out: Vec<PanelOutput>,
+}
+
+/// A tab tool tip (§19 r4): the region top `T`, the string id and the
+/// rectangle and text positions.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TabTip {
+    pub top: i32,
+    pub string: u16,
+    /// `0x004F6300(W − sx − 89, T + 5, W − sx + 1, T + 25, color (0, 0,
+    /// 0) nearest, mode 6)`.
+    pub rect: (i32, i32, i32, i32),
+    /// Text at (`W − sx − 89`, `T + 20`), color 0, left-aligned.
+    pub text_at: Point,
+}
+
+/// `0x004AB310` (§19 r4), current tab `t`, current mouse: only for x in
+/// [`W − sx − 89`, `W − sx + 1`].
+pub fn tab_tool_tip(s: &Screen, tab: u8, m: Point) -> Option<TabTip> {
+    let right = s.w - s.sx();
+    if m.x < right - 89 || m.x > right + 1 {
+        return None;
+    }
+    let b = s.h + s.sy();
+    let in_closed = |lo: i32, hi: i32| lo <= m.y && m.y <= hi;
+    let (top, string) = match tab {
+        1 => {
+            if in_closed(b - 264, b - 156) {
+                (b - 264, 4225)
+            } else if in_closed(b - 372, b - 265) {
+                (b - 372, 4224)
+            } else {
+                return None;
+            }
+        }
+        2 => {
+            if in_closed(b - 372, b - 264) {
+                (b - 372, 4224)
+            } else if in_closed(b - 156, b - 48) {
+                (b - 156, 4226)
+            } else {
+                return None;
+            }
+        }
+        3 => {
+            if in_closed(b - 264, b - 156) {
+                (b - 264, 4225)
+            } else if in_closed(b - 155, b - 48) {
+                (b - 156, 4226)
+            } else {
+                return None;
+            }
+        }
+        _ => return None,
+    };
+    Some(TabTip {
+        top,
+        string,
+        rect: (right - 89, top + 5, right + 1, top + 25),
+        text_at: Point::new(right - 89, top + 20),
+    })
+}
+
+/// The close tool tip `strClose` position (§19 r5): (`X + 15`, `H + sy −
+/// 98`), centered.
+pub fn close_tool_tip_at(s: &Screen, class: u8, tab: u8) -> Option<Point> {
+    let at = close_pos(s, class, tab)?;
+    Some(Point::new(at.x + 15, s.h + s.sy() - 98))
+}
+
+/// The draw order of `0x004AC690` (§19 r6).
+pub const DRAW_ORDER: [&str; 8] = [
+    "font 16, drawn := 1",
+    "background frames 0-3 then 4t..4t+3",
+    "tab captions",
+    "free-points number (points >= 1) then every class skill of the tab",
+    "icons only (no points)",
+    "close button",
+    "close tool tip (queued)",
+    "tab tool tip (at once)",
+];
 
 /// Level number (§10.4): drawn when level > 0 or hard points ≠ 0; `%d` in
 /// Font16 at (`X + 48`, `Y + 12`), FontFormal10 at x − 4 for ≥ 10; color 3
@@ -439,6 +676,7 @@ mod tests {
             bonus: 0,
             flags: 1,
             learnable: true,
+            passive: false,
             req_level_ok: true,
             below_max: true,
         }
@@ -557,7 +795,10 @@ mod tests {
         // Press draws frame 11; release inside toggles.
         let mut v0 = view(Vec::new());
         v0.free = 0;
-        assert!(p.mouse_down(&e, &v0, Point::new(580, 460)).is_empty());
+        assert_eq!(
+            p.mouse_down(&e, &v0, Point::new(580, 460)),
+            vec![PanelOutput::ClickSound]
+        );
         assert!(p.close_pressed);
         let mut out: Vec<UiDraw> = Vec::new();
         p.draw(&t, &e, &v0, Point::new(0, 0), &mut out);
@@ -577,20 +818,47 @@ mod tests {
         assert!(p.mouse_up(&e, &v0, Point::new(620, 460)).out.is_empty());
     }
 
+    // Covers: specs/ui/panels.md §10 r6
     #[test]
-    fn close_button_unspecified_classes_pending() {
-        for class in 1..7 {
-            for tab in 1..=3 {
-                assert_eq!(close_offset(class, tab), None);
+    fn close_offsets_of_every_class() {
+        let want: [[i32; 3]; 7] = [
+            [-149, -220, -305],
+            [-305, -305, -149],
+            [-305, -149, -305],
+            [-305, -220, -305],
+            [-149, -305, -149],
+            [-149, -149, -149],
+            [-220, -149, -305],
+        ];
+        for (class, row) in want.iter().enumerate() {
+            for (i, &o) in row.iter().enumerate() {
+                assert_eq!(close_offset(class as u8, i as u8 + 1), Some(o));
+                assert_eq!(
+                    close_variant(o),
+                    Some([1, 2, 3][[-149, -220, -305].iter().position(|&x| x == o).unwrap()])
+                );
             }
         }
+        assert_eq!(close_offset(7, 1), None);
+        assert_eq!(close_offset(0, 0), None);
+        assert_eq!(close_offset(0, 4), None);
+        assert_eq!(close_variant(0), None);
+        // sorceress tab 3 at 800 × 600: (571, 477), variant 1 (test vector)
+        assert_eq!(close_pos(&Screen::R800, 1, 3), Some(Point::new(571, 477)));
+        assert_eq!(close_offset(1, 3).and_then(close_variant), Some(1));
+        // druid, any tab: x = W − sx − 149
+        assert_eq!(
+            close_pos(&Screen::R800, 5, 2),
+            Some(Point::new(800 - 80 - 149, 477))
+        );
         let t = tables();
         let mut v = view(Vec::new());
         v.class = Some(3);
         let mut out: Vec<UiDraw> = Vec::new();
         SkillTreePanel::new().draw(&t, &env(Screen::R800), &v, Point::new(0, 0), &mut out);
         let close = t.files.id(CLOSE_FILE).unwrap();
-        assert!(images(&out).iter().all(|i| i.0 != close));
+        // paladin tab 1: o = −305
+        assert!(images(&out).contains(&(close, 10, 800 - 80 - 305, 477)));
     }
 
     // Test vector "skill in column 2, row 3 at 800 × 600: icon at
@@ -732,6 +1000,7 @@ mod tests {
         let e = env(s);
         let v = view(Vec::new());
         let mut p = SkillTreePanel::new();
+        p.drawn.set(true);
         assert_eq!(
             p.mouse_down(&e, &v, Point::new(700, 200)),
             vec![PanelOutput::ClickSound]
@@ -752,7 +1021,11 @@ mod tests {
         let e = env(Screen::R800);
         let v = view(vec![entry(0x1A, 1, 2, 3)]);
         let mut p = SkillTreePanel::new();
-        assert!(p.mouse_down(&e, &v, Point::new(500, 230)).is_empty());
+        p.drawn.set(true);
+        assert_eq!(
+            p.mouse_down(&e, &v, Point::new(500, 230)),
+            vec![PanelOutput::ClickSound]
+        );
         assert_eq!(p.pressed, Some(0x1A));
         let r = p.mouse_up(&e, &v, Point::new(510, 240));
         assert!(r.consumed);
@@ -777,10 +1050,23 @@ mod tests {
             assert_eq!(p.pressed, Some(0x1A));
             assert!(p.mouse_up(&e, &v2, Point::new(500, 230)).out.is_empty());
         }
-        // No free points: no press (the no-points path is OQ4).
+        // No free points: no press; the no-points path (§19 r1.2) selects
+        // the skill for the right hand and closes the tree.
         let mut v0 = view(vec![entry(0x1A, 1, 2, 3)]);
         v0.free = 0;
-        assert!(p.mouse_down(&e, &v0, Point::new(500, 230)).is_empty());
+        assert_eq!(
+            p.mouse_down(&e, &v0, Point::new(500, 230)),
+            vec![
+                PanelOutput::Intent(ClientIntent(vec![
+                    0x3C, 0x1A, 0, 0, 0, 0xFF, 0xFF, 0xFF, 0xFF
+                ])),
+                PanelOutput::SetUi {
+                    ui: 4,
+                    mode: 1,
+                    jump: false
+                },
+            ]
+        );
         assert_eq!(p.pressed, None);
         // Icons of another tab are not hit.
         let v3 = view(vec![entry(0x1A, 2, 2, 3)]);
@@ -794,6 +1080,7 @@ mod tests {
         let e = env(Screen::R800);
         let v = view(Vec::new());
         let mut p = SkillTreePanel::new();
+        p.drawn.set(true);
         assert!(!p.mouse_up(&e, &v, Point::new(400, 300)).consumed);
         assert!(!p.mouse_up(&e, &v, Point::new(0, 300)).consumed);
         assert!(p.mouse_up(&e, &v, Point::new(401, 300)).consumed);
@@ -828,5 +1115,227 @@ mod tests {
         let mut pp = SkillTreePanel::new();
         pp.pressed = Some(6);
         assert_eq!(pp.icon_remap(&v, &e, at, out), 1);
+    }
+
+    fn drawn_panel() -> SkillTreePanel {
+        let p = SkillTreePanel::new();
+        p.drawn.set(true);
+        p
+    }
+
+    // Covers: specs/ui/panels-2.md §19 r1
+    #[test]
+    fn mouse_down_in_the_spec_order() {
+        let e = env(Screen::R800);
+        let ctx = |over_belt, has_player| InputCtx {
+            over_belt,
+            has_player,
+        };
+        let v = view(vec![entry(0x1A, 1, 2, 3)]);
+        let mut p = drawn_panel();
+        // not consumed over the belt, without a player, or y > H − 48
+        let at = Point::new(500, 230);
+        for c in [ctx(true, true), ctx(false, false)] {
+            assert_eq!(p.mouse_down_ctx(&e, &v, at, c), Down::default());
+        }
+        assert_eq!(
+            p.mouse_down_ctx(&e, &v, Point::new(500, 553), InputCtx::DEFAULT),
+            Down::default()
+        );
+        // 1. no draw yet: consumed, done
+        let mut fresh = SkillTreePanel::new();
+        let d = fresh.mouse_down_ctx(&e, &v, at, InputCtx::DEFAULT);
+        assert_eq!((d.consumed, d.out.len()), (true, 0));
+        assert_eq!(fresh.pressed, None);
+        // 6. outside the column and the tab strip: not consumed
+        let d = p.mouse_down_ctx(&e, &v, Point::new(100, 300), InputCtx::DEFAULT);
+        assert!(!d.consumed && d.out.is_empty());
+        // 3. a tab press is consumed even where no tab band is hit
+        let d = p.mouse_down_ctx(&e, &v, Point::new(700, 10), InputCtx::DEFAULT);
+        assert!(d.consumed && d.out.is_empty());
+        // 5. an empty spot of the column with points: consumed, no press
+        let d = p.mouse_down_ctx(&e, &v, Point::new(450, 100), InputCtx::DEFAULT);
+        assert!(d.consumed && d.out.is_empty() && p.pressed.is_none());
+        // 4 + 5: one press sets both the close flag and the column-3 /
+        // row-6 icon where they overlap (o = −149)
+        let ov = view(vec![entry(0x2B, 1, 3, 6)]);
+        let d = p.mouse_down_ctx(&e, &ov, Point::new(580, 450), InputCtx::DEFAULT);
+        assert!(d.consumed);
+        assert!(p.close_pressed);
+        assert_eq!(p.pressed, Some(0x2B));
+        assert_eq!(
+            d.out,
+            vec![PanelOutput::ClickSound, PanelOutput::ClickSound]
+        );
+        // an already pressed icon is not pressed again
+        let mut q = drawn_panel();
+        q.pressed = Some(0x1A);
+        let d = q.mouse_down_ctx(&e, &v, at, InputCtx::DEFAULT);
+        assert!(d.consumed && d.out.is_empty());
+        // 2. no points: the right skill is chosen and the tree closes for
+        // every hit non-passive, not pressed icon; passive ones are not
+        let mut v0 = view(vec![entry(0x1A, 1, 2, 3), entry(0x1B, 1, 2, 3)]);
+        v0.free = 0;
+        v0.skills[1].passive = true;
+        let mut q = drawn_panel();
+        let d = q.mouse_down_ctx(&e, &v0, at, InputCtx::DEFAULT);
+        assert!(d.consumed);
+        assert_eq!(d.out.len(), 2);
+        assert_eq!(
+            d.out[0],
+            PanelOutput::Intent(ClientIntent(vec![
+                0x3C, 0x1A, 0, 0, 0, 0xFF, 0xFF, 0xFF, 0xFF
+            ]))
+        );
+        assert_eq!(
+            d.out[1],
+            PanelOutput::SetUi {
+                ui: 4,
+                mode: 1,
+                jump: false
+            }
+        );
+        // the skill id has bit 31 clear (right hand)
+        assert_eq!(((0x1A_u32 | (1 << 31)) >> 31), 1);
+        assert_eq!(q.pressed, None);
+        // a pressed icon is skipped by the no-points path
+        let mut q = drawn_panel();
+        q.pressed = Some(0x1A);
+        assert!(q
+            .mouse_down_ctx(&e, &v0, at, InputCtx::DEFAULT)
+            .out
+            .is_empty());
+    }
+
+    // Covers: specs/ui/panels-2.md §19 r2
+    #[test]
+    fn mouse_up_in_the_spec_order() {
+        let e = env(Screen::R800);
+        let v = view(vec![entry(0x1A, 1, 2, 3), entry(0x1B, 1, 1, 1)]);
+        let at = Point::new(500, 230);
+        // no player / over the belt: nothing
+        for c in [
+            InputCtx {
+                over_belt: false,
+                has_player: false,
+            },
+            InputCtx {
+                over_belt: true,
+                has_player: true,
+            },
+        ] {
+            let mut p = drawn_panel();
+            p.pressed = Some(0x1A);
+            assert_eq!(p.mouse_up_ctx(&e, &v, at, c), Release::default());
+            assert_eq!(p.pressed, Some(0x1A));
+        }
+        // no draw yet: consumed
+        let mut fresh = SkillTreePanel::new();
+        assert!(fresh.mouse_up(&e, &v, at).consumed);
+        // close pressed: cleared; a release in the rectangle toggles ui 4;
+        // consumed, done, the icon flags untouched
+        let mut p = drawn_panel();
+        p.close_pressed = true;
+        p.pressed = Some(0x1A);
+        let r = p.mouse_up(&e, &v, Point::new(580, 460));
+        assert!(r.consumed);
+        assert_eq!(
+            r.out,
+            vec![PanelOutput::SetUi {
+                ui: 4,
+                mode: 2,
+                jump: false
+            }]
+        );
+        assert_eq!(p.pressed, Some(0x1A));
+        assert!(!p.close_pressed);
+        // ... a close release even in the left half is consumed
+        let mut p = drawn_panel();
+        p.close_pressed = true;
+        let r = p.mouse_up(&e, &v, Point::new(10, 10));
+        assert!(r.consumed && r.out.is_empty());
+        // x ≤ W / 2: not consumed
+        let mut p = drawn_panel();
+        assert!(!p.mouse_up(&e, &v, Point::new(400, 230)).consumed);
+        // points re-checked: none left → no flag cleared, consumed
+        let mut v0 = view(vec![entry(0x1A, 1, 2, 3)]);
+        v0.free = 0;
+        let mut p = drawn_panel();
+        p.pressed = Some(0x1A);
+        let r = p.mouse_up(&e, &v0, at);
+        assert!(r.consumed && r.out.is_empty());
+        assert_eq!(p.pressed, Some(0x1A));
+        // the walk: the hit pressed icon sends 0x3B and clears its flags
+        let mut p = drawn_panel();
+        p.pressed = Some(0x1A);
+        let r = p.mouse_up(&e, &v, at);
+        assert_eq!(
+            r.out,
+            vec![PanelOutput::Intent(ClientIntent(vec![0x3B, 0x1A, 0]))]
+        );
+        assert_eq!(p.pressed, None);
+        // a pressed icon released elsewhere: cleared, nothing sent
+        let mut p = drawn_panel();
+        p.pressed = Some(0x1A);
+        let r = p.mouse_up(&e, &v, Point::new(450, 100));
+        assert!(r.consumed && r.out.is_empty());
+        assert_eq!(p.pressed, None);
+    }
+
+    // Covers: specs/ui/panels-2.md §19 r3, §19 r4, §19 r5, §19 r6
+    #[test]
+    fn numbers_tool_tips_and_draw_order() {
+        let s = Screen::R800;
+        let v = view(Vec::new());
+        let p = SkillTreePanel::new();
+        // free points: only with ≥ 1; Font16; color 1 with uninterruptable
+        let n = p.free_points_number(&s, &v, false).unwrap();
+        assert_eq!(
+            n,
+            ("1".to_string(), Point::new(800 - 80 - 52, 540 - 400), 1, 0)
+        );
+        assert_eq!(p.free_points_number(&s, &v, true).unwrap().3, 1);
+        let mut v0 = view(Vec::new());
+        v0.free = 0;
+        assert!(p.free_points_number(&s, &v0, false).is_none());
+        // tab tool tips (b = 540, right = 720)
+        let tip = |tab, x, y| tab_tool_tip(&s, tab, Point::new(x, y));
+        let t = tip(1, 700, 300).unwrap();
+        assert_eq!((t.top, t.string), (276, 4225));
+        assert_eq!(t.rect, (631, 281, 721, 301));
+        assert_eq!(t.text_at, Point::new(631, 296));
+        assert_eq!(
+            tip(1, 700, 200).map(|t| (t.top, t.string)),
+            Some((168, 4224))
+        );
+        assert_eq!(tip(1, 700, 450), None);
+        assert_eq!(
+            tip(2, 700, 200).map(|t| (t.top, t.string)),
+            Some((168, 4224))
+        );
+        assert_eq!(
+            tip(2, 700, 400).map(|t| (t.top, t.string)),
+            Some((384, 4226))
+        );
+        assert_eq!(tip(2, 700, 300), None);
+        assert_eq!(
+            tip(3, 700, 300).map(|t| (t.top, t.string)),
+            Some((276, 4225))
+        );
+        assert_eq!(
+            tip(3, 700, 400).map(|t| (t.top, t.string)),
+            Some((384, 4226))
+        );
+        assert_eq!(tip(3, 700, 200), None);
+        // x in [W − sx − 89, W − sx + 1] only
+        assert!(tip(1, 631, 300).is_some() && tip(1, 721, 300).is_some());
+        assert!(tip(1, 630, 300).is_none() && tip(1, 722, 300).is_none());
+        // the close tool tip is queued at (X + 15, H + sy − 98)
+        assert_eq!(close_tool_tip_at(&s, 0, 1), Some(Point::new(586, 442)));
+        assert_eq!(close_tool_tip_at(&s, 9, 1), None);
+        // draw order
+        assert_eq!(DRAW_ORDER.len(), 8);
+        assert!(DRAW_ORDER[5].starts_with("close button"));
+        assert!(DRAW_ORDER[7].starts_with("tab tool tip"));
     }
 }

@@ -351,7 +351,7 @@ fn spawn_tile_without_match_reads_record_0() {
 
 // ---- rooms.md -----------------------------------------------------------
 
-// Covers: specs/drlg/rooms.md §2 text, §2 r1
+// Covers: specs/drlg/rooms.md §2 text, §2 r1; specs/sim/rng.md §5.4 row3, §5.4 row4
 #[test]
 fn room_creation_fields_and_seed_by_index() {
     let mut dat = data();
@@ -411,7 +411,7 @@ fn near_array_mixes_levels_sorted_by_global_coordinates() {
     assert_eq!(d.room(r[0]).near(), Some(&[t, r[0], r[1]][..]));
 }
 
-// Covers: specs/drlg/rooms.md §4.4 r1, §4.4 r3, §4.4 r4, §9.2 r3
+// Covers: specs/drlg/rooms.md §4.4 r1, §4.4 r3, §4.4 r4, §9.2 r3; specs/sim/rng.md §5.4 row5, §7 row16
 #[test]
 fn build_sequence_and_stop_when_built() {
     let (mut w, mut d, l, r) = row(3);
@@ -939,4 +939,52 @@ fn warp_level_generated_inside_the_linking_build() {
     s.step();
     assert_eq!(d.level(l3).seed, s);
     assert!(d.active_room(r).is_some());
+}
+
+// Covers: specs/drlg/levels.md §10 r6
+#[test]
+fn spawn_room_position_path_crashes_and_unset_position() {
+    // Tile 13 with no waypoint room: the original crashes; a fatal error.
+    let (mut w, mut d) = spawn_world(1);
+    let mut svc = w.svc();
+    assert_eq!(
+        d.spawn_room(&mut svc, 2, 13),
+        Err(DrlgError::NoWaypointRoom)
+    );
+    // A waypoint room without a waypoint object: that room, (x, y) left
+    // at (−1, −1) (no centre default on the `Position` ≠ 0 path).
+    let (mut w, mut d) = spawn_world(1);
+    w.types.rooms.get_mut(&2).unwrap()[5].flags = room_flags::WAYPOINT;
+    let mut svc = w.svc();
+    let p = d.spawn_room(&mut svc, 2, 13).unwrap();
+    let l = d.find_level(2).unwrap();
+    assert_eq!(p.room, d.level_rooms(l)[5]);
+    assert_eq!((p.x, p.y), (-1, -1));
+    // A spawn-tile record whose position is in no room: fatal as well.
+    let (mut w, mut d) = spawn_world(1);
+    w.types.spawn_tiles.insert(
+        2,
+        vec![SpawnTile {
+            x: 500,
+            y: 500,
+            index: 0,
+        }],
+    );
+    let mut svc = w.svc();
+    assert_eq!(d.spawn_room(&mut svc, 2, 0), Err(DrlgError::NoSpawnRoom));
+}
+
+// Covers: specs/drlg/levels.md §10 r7
+#[test]
+fn spawn_room_with_every_fallback_failing_finds_nothing() {
+    let (mut w, mut d) = spawn_world(0);
+    w.types.rooms.insert(2, Vec::new());
+    let mut svc = w.svc();
+    assert_eq!(d.spawn_room(&mut svc, 2, 0), Err(DrlgError::NoSpawnRoom));
+    let l = d.find_level(2).unwrap();
+    let seed = d.level(l).seed;
+    // The kind-11 query reports it as (−1, −1); no draw on the level seed
+    // (a level with no rooms has nothing to roll over).
+    assert_eq!(d.kind11_location(&mut svc, 2), Ok((-1, -1)));
+    assert_eq!(d.level(l).seed, seed);
 }

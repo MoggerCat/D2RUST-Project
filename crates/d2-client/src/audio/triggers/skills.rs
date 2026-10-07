@@ -336,3 +336,71 @@ pub fn item_use(cx: &mut Ctx, rows: &ItemRows) {
 pub fn item_gold(cx: &mut Ctx) {
     cx.req(ITEM_GOLD, None, 0);
 }
+
+// ---------------------------------------------------------------------------
+// §15 (triggers-2.md): animation event 3 ("sound")
+// ---------------------------------------------------------------------------
+
+/// AnimData event bytes (`formats/cof.md`): 1 attack, 2 missile, 3 sound,
+/// 4 skill.
+pub const EVENT_SOUND: u8 = 3;
+
+/// §15 r1 (`0x00623E00`): the frame advance clears U +0x4E, then for each
+/// frame it crosses stores the event byte of that frame if it is 1–4, so
+/// the stored value is the last such event, or 0.
+pub fn frame_event_after_advance(crossed: &[u8]) -> u8 {
+    crossed
+        .iter()
+        .copied()
+        .rfind(|e| (1..=4).contains(e))
+        .unwrap_or(0)
+}
+
+/// §15 r2, player update (`0x00463390`): the generic skill do runs in a
+/// mode whose movement entry (table `0x00711E00`) is 2 with a current
+/// skill, unless the skill's flag bit 0 path already ran the do this
+/// update, with U flag +0xC4 bit 0x40 clear and +0x4E ∈ {1, 2, 3}.
+pub fn player_generic_do(
+    movement_entry: u8,
+    has_skill: bool,
+    flag0_path_ran: bool,
+    flag_c4_40_set: bool,
+    event: u8,
+) -> bool {
+    movement_entry == 2 && has_skill && !flag0_path_ran && !flag_c4_40_set && matches!(event, 1..=3)
+}
+
+/// §15 r2, monster update (`0x004AF4C0`): +0x4E = 4 runs the do; 1, 2 or 3
+/// run it unless it already ran or `0x00451F30(U, 0x40)` is set.
+pub fn monster_generic_do(event: u8, already_ran: bool, flag_40_set: bool) -> bool {
+    match event {
+        4 => true,
+        1..=3 => !already_ran && !flag_40_set,
+        _ => false,
+    }
+}
+
+/// §15 r3, `cltdofunc` 37 (`0x004C9DB0`; Charge, SerpentCharge): a player
+/// or monster with +0x4E = 3 plays the attack sound `0x004CB6A0(U, U's
+/// mode, 0)` with delay argument 0.
+pub fn event3_attack(
+    cx: &mut Ctx,
+    u: &Unit,
+    us: &mut super::UnitSound,
+    event: u8,
+) -> Result<(), TriggerError> {
+    if event != EVENT_SOUND {
+        return Ok(());
+    }
+    match u.identity() {
+        PLAYER => super::modes::player_attack_with(cx, u, us, false),
+        MONSTER => {
+            if let Some(r) = u.monsounds {
+                let slot = if u.mode == super::modes::mm::A1 { 1 } else { 2 };
+                super::modes::monster_attack(cx, u, us, r, slot);
+            }
+            Ok(())
+        }
+        _ => Ok(()),
+    }
+}

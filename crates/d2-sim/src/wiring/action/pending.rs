@@ -172,6 +172,93 @@ pub trait Pending {
     fn alignment(&self, unit: UnitId) -> u8 {
         0
     }
+
+    // ---- inactive store (`units.md` §3.3–§3.4,
+    // [`super::inactive`]): the facts no d2-sim provider holds and the
+    // re-creation of stored units.
+
+    /// The room's level has `SaveMonsters` ≠ 0 (leveldefs +0x94,
+    /// `0x00642820`). Default: no.
+    fn save_monsters(&self, game: &Game, room: RoomId) -> bool {
+        false
+    }
+    /// The unit has state `state` (`0x00639DF0`). Default: no.
+    fn unit_has_state(&self, unit: UnitId, state: u16) -> bool {
+        false
+    }
+    /// The unit has a state with the `udead` flag (`0x0063A770`).
+    /// Default: no.
+    fn udead_state(&self, unit: UnitId) -> bool {
+        false
+    }
+    /// monstats2 `restore` of the monster (+0x130); `None`: no row.
+    /// Default: 1 (the 1.14d value of 574 of 609 rows).
+    fn monster_restore(&self, unit: UnitId) -> Option<u8> {
+        Some(1)
+    }
+    /// The monster's owner is a player and its pet test `0x005752B0`
+    /// holds (§3.3 rule 6). Default: no.
+    fn player_pet(&self, unit: UnitId) -> bool {
+        false
+    }
+    /// Objects: (`Restore` (+0x173) = 0, unit byte +0x78 has 0x2,
+    /// `RestoreVirgins` (+0x174) ≠ 0). Default: (false, false, false).
+    fn object_restore_facts(&self, unit: UnitId) -> (bool, bool, bool) {
+        (false, false, false)
+    }
+    /// One step of the room's seed (room +0x6C, §3.3 rule 1); `None`:
+    /// the room has no seed here (K := 0, as a step whose value is not
+    /// a multiple of 3).
+    fn room_seed_step(&mut self, game: &Game, room: RoomId) -> Option<u32> {
+        None
+    }
+    /// The fields of a monster record that need monster data, the AI
+    /// control or the owner (§3.4 rule 1); the caller fills the rest.
+    fn monster_record_extra(&self, unit: UnitId, rec: &mut crate::units::inactive::MonsterRecord) {}
+    /// The fields of an "other" record that need object data (§3.4 rule
+    /// 3: the mode-2 switch, event 5 time, GUID / byte +0x78, byte +4,
+    /// +0xB8).
+    fn other_record_extra(&mut self, unit: UnitId, rec: &mut crate::units::inactive::OtherRecord) {}
+    /// The item record of §3.4 rule 2 (the save-form bit stream of the
+    /// item and its socketed items, `0x006313E0`). Default: none (the
+    /// item is freed without a record).
+    fn item_record(&mut self, item: UnitId) -> Option<crate::units::inactive::ItemRecord> {
+        None
+    }
+    /// Detach `0x0064C450`'s path part (§3.3: precise and client x / y
+    /// := 0, point count 0, previous room, path flag 0x2).
+    fn detach_path(&mut self, unit: UnitId, room: RoomId) {}
+    /// §3.4 rule 4.1: re-create a monster record (`how`) in `room`.
+    fn restore_monster(
+        &mut self,
+        game: &mut Game,
+        room: RoomId,
+        rec: &crate::units::inactive::MonsterRecord,
+        how: crate::units::inactive::MonsterRestore,
+    ) {
+    }
+    /// §3.4 rule 4.2: re-create an item record with ground expiry
+    /// `expiry` in `room`.
+    fn restore_item(
+        &mut self,
+        game: &mut Game,
+        room: RoomId,
+        rec: &crate::units::inactive::ItemRecord,
+        expiry: i32,
+    ) {
+    }
+    /// §3.4 rule 4.3: re-create or re-place an "other" record in `room`.
+    fn restore_other(
+        &mut self,
+        game: &mut Game,
+        room: RoomId,
+        rec: &crate::units::inactive::OtherRecord,
+    ) {
+    }
+    /// Level 108 and `0x005B5210` (§3.4 rule 4.1). Default: no.
+    fn sanctuary_gate(&self, game: &Game, room: RoomId) -> bool {
+        false
+    }
     /// `0x005A0180(unit, mask)`: monster type flags (2 superunique, 4
     /// champion, 8 unique). Monster data (`monsters/init.md`).
     fn monster_flag(&self, unit: UnitId, mask: u32) -> bool {
@@ -876,9 +963,6 @@ pub trait Pending {
 
     // ---- objects (`world/objects.md`; `ObjectWorld` seams) ------------
 
-    /// Attach object sound `id` (`objects.md` §14; `0x00571740` when
-    /// `now`). Sounds spec, not written.
-    fn object_sound(&mut self, unit: UnitId, id: u8, to: Option<UnitId>, now: bool) {}
     /// `0x0055F140`: the key test and use (inventory). Default: no key.
     fn object_key_test(&mut self, player: UnitId) -> bool {
         false

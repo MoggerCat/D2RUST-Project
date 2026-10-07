@@ -162,7 +162,9 @@ fn blank<T: Record>() -> T {
     T::decode(&vec![0u8; T::SIZE])
 }
 
-/// Cold Plains (act 0, waypoint index 1) and Lut Gholein (act 1).
+/// Rogue Encampment (act 0, waypoint index 0; it holds the waypoint
+/// object), Cold Plains (act 0, waypoint index 1) and Lut Gholein (act 1).
+const ROGUE_ENCAMPMENT: u32 = 1;
 const COLD_PLAINS: u32 = 3;
 const ACT2_TOWN: u32 = 40;
 /// The game's fixed seed.
@@ -175,7 +177,7 @@ fn waypoint_data() -> WaypointData {
         l.waypoint = NO_WAYPOINT;
         l.act = if i >= 40 { 1 } else { 0 };
     }
-    levels[1].waypoint = 0;
+    levels[ROGUE_ENCAMPMENT as usize].waypoint = 0;
     levels[COLD_PLAINS as usize].waypoint = 1;
     levels[ACT2_TOWN as usize].waypoint = 9;
     let mut o: Objects = blank();
@@ -199,8 +201,10 @@ impl Clock for Ms {
 type Link = LocalLink<Sim, ProtoSizes, PendingSession, Ms>;
 
 /// The local game: a sorceress (class 1) for the local client at
-/// (42, 20) in Cold Plains, a waypoint object at (20, 20) there, and her
-/// Cold Plains waypoint known. Returns the game, the player and the
+/// (42, 20) in Cold Plains, a waypoint object at (20, 20) in the Rogue
+/// Encampment (same act, so travelling to Cold Plains is not the
+/// object's own level: `world/waypoints.md` §7 rule 2), and her Cold
+/// Plains waypoint known. Returns the game, the player and the
 /// waypoint GUID.
 fn game() -> (Sim, UnitId, u32) {
     let mut data = DrlgData {
@@ -213,11 +217,12 @@ fn game() -> (Sim, UnitId, u32) {
     let mut files = vec![Vec::new(); 32];
     files[0] = b"floor.dt1".to_vec();
     data.lvltypes = vec![vec![Vec::new(); 32], files];
-    for id in [COLD_PLAINS, ACT2_TOWN] {
+    for id in [ROGUE_ENCAMPMENT, COLD_PLAINS, ACT2_TOWN] {
         data.levels[id as usize].drlg_type = 2;
         data.levels[id as usize].level_type = 1;
     }
     let mut types = Types(BTreeMap::from([
+        (ROGUE_ENCAMPMENT, TileRect::new(0, 0, 8, 8)),
         (COLD_PLAINS, TileRect::new(0, 0, 8, 8)),
         (ACT2_TOWN, TileRect::new(0, 0, 8, 8)),
     ]));
@@ -260,7 +265,7 @@ fn game() -> (Sim, UnitId, u32) {
     let mut sim = ActionSim::new(Arc::new(StatData::default()), UnitData::default(), hooks);
     let mut game = Game::new();
     let mut rooms = Vec::new();
-    for (act, level) in [(0u8, COLD_PLAINS), (1, ACT2_TOWN)] {
+    for (act, level) in [(0u8, COLD_PLAINS), (1, ACT2_TOWN), (0, ROGUE_ENCAMPMENT)] {
         game.lists.ensure_act(act).unwrap();
         let r = sim
             .hooks()
@@ -293,7 +298,7 @@ fn game() -> (Sim, UnitId, u32) {
         };
         sim.with(game, |g, v| v.allocate(g, &req, x, 20)).unwrap()
     };
-    let o = spawn(&mut sim, &mut game, UnitType::Object, 0, rooms[0], 20);
+    let o = spawn(&mut sim, &mut game, UnitType::Object, 0, rooms[2], 20);
     let player = spawn(&mut sim, &mut game, UnitType::Player, 1, rooms[0], 42);
     sim.sys.units.get_mut(player).unwrap().mode = 1;
     sim.hooks()

@@ -764,7 +764,11 @@ impl Drlg {
         }
         let mut pos: Option<(i32, i32)> = None;
         let room;
+        // (x, y) start at (−1, −1) (§10 rule 6); rule 5's centre default
+        // runs only on the `Position` = 0 path.
+        let mut default_centre = true;
         if svc.data.level(level_id)?.position != 0 {
+            default_centre = false;
             if tile == SPAWN_WAYPOINT {
                 let (r, p) = self
                     .waypoint_room(svc, l)?
@@ -798,7 +802,11 @@ impl Drlg {
         }
         let (x, y) = pos.unwrap_or_else(|| {
             let r = self.room(room).rect;
-            (r.x + r.w / 2, r.y + r.h / 2)
+            if default_centre {
+                (r.x + r.w / 2, r.y + r.h / 2)
+            } else {
+                (-1, -1)
+            }
         });
         let active = self.stream_room(svc, room)?;
         Ok(SpawnPoint { room, x, y, active })

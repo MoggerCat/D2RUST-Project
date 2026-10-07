@@ -640,7 +640,7 @@ fn item_to_cube_checks() {
 /// item gets page 3; the placement (§2.4 step 2: the item must be on the
 /// cursor) refuses a ground item, its result is ignored (§2 step 3.5):
 /// result 0, the ring stays on the ground, unlinked.
-// Covers: specs/world/cube.md §2 r1
+// Covers: specs/world/cube.md §2 r1, §edge-cases-original-bugs r15
 #[test]
 fn item_to_cube_ground_item() {
     let mut t = setup(3);
@@ -711,18 +711,50 @@ fn click_button_without_interaction() {
 }
 
 /// Buttons 0x17 / 0x18 with an interaction that is not the cube's → 3;
-/// another button with an active interaction is not the cube's: it
-/// stays the stub.
-// Covers: specs/world/cube.md §1
+/// another button with a non-player interaction → 0x77 0x0D, result 3
+/// (`vendors-2.md` §10.1 rule 5); with a player interaction (type 0) it
+/// is the player-trade switch (§10.3, no owner spec): it stays the stub.
+// Covers: specs/world/cube.md §1; specs/world/vendors-2.md §10.1 r4, §10.1 r5
 #[test]
 fn click_button_other_interaction() {
     let mut t = setup(4);
     t.interact(2, 77);
     assert_eq!(t.frame(&click(0x17)), (ResultCode::Malformed, NO_BYTES));
     assert_eq!(t.frame(&click(0x18)), (ResultCode::Malformed, NO_BYTES));
+    assert_eq!(
+        t.frame(&click(0x01)),
+        (ResultCode::Malformed, vec![vec![0x77, 0x0D]])
+    );
+    assert!(t.host.game.unhandled.is_empty());
+    let g = t.guid(t.player);
+    t.interact(0, g);
     assert_eq!(t.frame(&click(0x01)), (ResultCode::Done, NO_BYTES));
     assert_eq!(t.host.game.unhandled, [(0, CLICK_BUTTON, 7)]);
     assert!(t.pending.take().is_empty());
+}
+
+/// The stash buttons through the handler (`vendors-2.md` §10.1 rule 3):
+/// with the cube's interaction (type 4) → result 1, nothing sent, the
+/// gold unchanged; with a type-2 interaction whose GUID is no stash
+/// object, the common checks fail: result 0, nothing (§10.2).
+// Covers: specs/world/vendors-2.md §10.1 r3
+#[test]
+fn stash_buttons_through_the_handler() {
+    let mut t = setup(4);
+    let p = t.player;
+    t.interact(4, 9);
+    let mut withdraw = click(0x13);
+    withdraw[5] = 10; // p2 = 10: v = 10.
+    for m in [click(0x12), withdraw, click(0x14)] {
+        assert_eq!(t.frame(&m), (ResultCode::Refused, NO_BYTES));
+    }
+    t.interact(2, 77);
+    assert_eq!(t.frame(&withdraw), (ResultCode::Done, NO_BYTES));
+    assert_eq!(t.frame(&click(0x12)), (ResultCode::Done, NO_BYTES));
+    let r = t.units().get(p).unwrap().interact.get();
+    assert_eq!(r, Some((2, 77)), "the common checks fail before the reset");
+    assert!(t.host.game.unhandled.is_empty());
+    assert!(t.cube().staged.sounds.is_empty());
 }
 
 /// 0x17 with the cube open: the interaction resets (GUID −1, type 6,

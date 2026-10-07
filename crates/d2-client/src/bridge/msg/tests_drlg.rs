@@ -236,7 +236,7 @@ fn rooms_come_in_sight_and_go() {
     assert_eq!(m.w.active_rooms, Some(Vec::new()));
 }
 
-// Covers: specs/client/model.md §2 r6, §12 r5
+// Covers: specs/client/model.md §2 r6, §2 r7, §12 r5
 #[test]
 fn units_created_at_a_point_take_the_rooms_seed() {
     let mut m = model();
@@ -635,4 +635,61 @@ fn room_mut(
     k: usize,
 ) -> &mut crate::rules::draw_order::Room {
     &mut near.rooms[k]
+}
+
+// Covers: specs/client/model.md §16 r1, §16 r2, §16 r3, §16 r4
+#[test]
+fn a_freed_room_leaves_a_server_unit_roomless_and_it_sends_0x4b_once() {
+    let mut m = model();
+    m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
+    m.recv(&sight(true, 0, 0)).recv(&sight(true, 16, 0));
+    let (a, b, d) = (
+        UnitKey::new(MONSTER, 6),
+        UnitKey::new(MONSTER, 7),
+        UnitKey::new(MONSTER, 8),
+    );
+    // A in room 2, B in room 0, D created at (0, 0): in no room.
+    m.recv(&assign_monster(6, 85, 5));
+    m.recv(&assign_monster(7, 5, 5));
+    m.recv(&assign_monster(8, 0, 0));
+    let flags = |m: &Model, k| (m.unit(k).room_freed, m.unit(k).flag_ex & 0x20 != 0);
+    // r4: a room that stays in sight frees nothing (room 2 is still an
+    // active room after its own 0x08).
+    m.recv(&sight(false, 16, 0));
+    assert_eq!(m.w.active_rooms.as_ref().unwrap().len(), 2);
+    assert_eq!(flags(&m, a), (false, false));
+    // r1, first path: the last 0x08 takes every room to status 4 and the
+    // active rooms are freed.
+    m.recv(&sight(false, 0, 0));
+    assert_eq!(m.w.active_rooms, Some(Vec::new()));
+    // r2: each unit still linked in a freed room gets 0x800000 and, as a
+    // server unit (no flag 0x400000), flags-2 0x20; D, in no room, nothing.
+    assert_eq!(flags(&m, a), (true, true));
+    assert_eq!(flags(&m, b), (true, true));
+    assert_eq!(flags(&m, d), (false, false));
+    // r3: the next update pass skips A's update and queue, sends C→S 0x4B
+    // (type 1, its GUID) and clears both bits; D sends nothing (r4).
+    m.w.units
+        .get_mut(&a)
+        .unwrap()
+        .queue
+        .push(hex("6d 06 00 00 00 1a 12 b9 11 80"));
+    m.drain();
+    assert_eq!(
+        m.w.outgoing,
+        [
+            hex("4b 01 00 00 00 06 00 00 00"),
+            hex("4b 01 00 00 00 07 00 00 00")
+        ]
+    );
+    assert_eq!(flags(&m, a), (false, false));
+    assert_eq!(m.unit(a).queue.len(), 1, "the queue was not drained");
+    m.drain();
+    assert_eq!(m.w.outgoing.len(), 2, "once");
+    // r1, second path: the whole client act freed (a new 0x03) frees the
+    // rooms still linked the same way.
+    m.recv(&sight(true, 0, 0));
+    m.recv(&assign_monster(9, 5, 5));
+    m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
+    assert_eq!(flags(&m, UnitKey::new(MONSTER, 9)), (true, true));
 }

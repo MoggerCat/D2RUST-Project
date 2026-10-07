@@ -189,12 +189,15 @@ impl CubePanel {
         out: &mut dyn UiDrawSink,
     ) -> Vec<PanelOutput> {
         if !cube_present {
+            // `panels-2.md` §20 r4: the close hook sends the latched 0x17,
+            // then `0x0048F183` sends it again: two messages.
             return vec![
                 PanelOutput::SetUi {
                     ui: UI_CUBE,
                     mode: 1,
                     jump: false,
                 },
+                click_button(0x17),
                 click_button(0x17),
             ];
         }
@@ -256,6 +259,13 @@ impl HoradricAnim {
     /// The `menu\horadric` frame to draw (draw mode 3), or `None`.
     pub fn frame(&self) -> Option<u32> {
         self.running.then_some(self.n)
+    }
+
+    /// The cube grid (page 3) is not drawn while the animation runs with
+    /// `n` < 14 (`0x0048EF92`–`0x0048EFA7`, §12.4); from `n` = 14 on, and
+    /// when no animation runs, it is drawn.
+    pub fn grid_visible(&self) -> bool {
+        !self.running || self.n >= 14
     }
 }
 
@@ -411,6 +421,7 @@ mod tests {
                     mode: 1,
                     jump: false
                 },
+                PanelOutput::Intent(ClientIntent(vec![0x4F, 0x17, 0, 0, 0, 0, 0])),
                 PanelOutput::Intent(ClientIntent(vec![0x4F, 0x17, 0, 0, 0, 0, 0])),
             ]
         );

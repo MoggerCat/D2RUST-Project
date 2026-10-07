@@ -425,3 +425,7 @@ fn room_deactivation<H: TickHooks + ?Sized>(game: &mut Game, hooks: &mut H) {
 mod gaps_tests;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_fsim;
+#[cfg(test)]
+mod tests_lsim;

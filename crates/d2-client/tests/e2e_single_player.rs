@@ -1637,7 +1637,8 @@ fn run_with(game_seed: u32) -> Transcript {
     // created; the ring gets 0x9D action 5 now (§8 step 1, `inventory-moves.md`
     // §6.4: owner the player) and is removed from the inventory and
     // freed; sound 4; the amulet is placed on page 3 (§2.4, "send"),
-    // identified: its 0x9C action 4 in the tick's update pass.
+    // identified: its 0x9C action 4 in the tick's update pass, then the
+    // player's update with the sound (0x2C).
     let cg2 = fx.guid(cube);
     stage_interact(&mut fx, player, (4, cg2));
     let click = bytes(&ClickButton {
@@ -1654,6 +1655,13 @@ fn run_with(game_seed: u32) -> Transcript {
     let ag = fx.guid(amulet);
     let mut want = vec![x9d(0x05, rg)];
     want.extend(pass(vec![x9c(0x04, ag)]));
+    // Sound 4 reaches the wire as S→C 0x2C in the player's unit update,
+    // to the acting player's client (`cube.md` §8 "Exact" item 3, Open
+    // question 2; `audio/triggers-2.md` §14).
+    let mut snd = vec![0x2C, 0];
+    snd.extend_from_slice(&fx.guid(player).to_le_bytes());
+    snd.extend_from_slice(&4u16.to_le_bytes());
+    want.push(snd);
     assert_eq!(streams(&fx, &frames[34].2), want);
     assert!(!fx.items().contains(ring));
     assert!(fx.sim_ref().game.lists.unit(ring).is_none(), "freed");
@@ -1738,8 +1746,9 @@ fn run_with(game_seed: u32) -> Transcript {
     // 35 before (the buy's 0x9C, 0x47, 0x48 among them) + 0x27, 0x28,
     // 0x29 ×2 + 0x2A ×4 + Akara's 0xAC + the three stored sales' 0x9D
     // action 5 (`vendors.md` §7.2 rule 9), + the join's monster adds
-    // (`intents-events.md` §7.2: 0xAC ×2, 0xAA ×2).
-    assert_eq!(log.handled, 53);
+    // (`intents-events.md` §7.2: 0xAC ×2, 0xAA ×2), + the transmute's
+    // sound 0x2C (step 25, `cube.md` §8 "Exact" item 3).
+    assert_eq!(log.handled, 54);
     let rejected: Vec<(u8, String)> = log
         .rejected
         .iter()

@@ -30,20 +30,20 @@
 | Outputs / state changes | 69–74 |
 | Rules | 75–76 |
 |   13. Remaining fixed-request conditions (`audio/triggers.md` open question 10) | 77–174 |
-|   14. Server senders of S→C 0x2C (`audio/triggers.md` open question 2) | 175–236 |
-|   15. Animation event 3 ("sound") (`audio/triggers.md` open question 13) | 237–264 |
-|   16. `ProgSound` conditions (`audio/triggers.md` open question 6) | 265–282 |
-|   17. Options-menu UI sounds (`audio/triggers.md` open question 12, part) | 283–291 |
-|   18. Sound identity of a unit and its `monsounds` record | 292–340 |
-|   19. A unit's request list (U +0x78) | 341–387 |
-|   20. When object units make their mode sounds | 388–426 |
-|   21. What the driver needs per rule (inputs and owners) | 427–455 |
-| Constants & data dependencies | 456–465 |
-| Randomness | 466–471 |
-| Edge cases & original bugs | 472–481 |
-| Test vectors | 482–511 |
-| Provenance | 512–540 |
-| Open questions | 541–544 |
+|   14. Server senders of S→C 0x2C (`audio/triggers.md` open question 2) | 175–241 |
+|   15. Animation event 3 ("sound") (`audio/triggers.md` open question 13) | 242–269 |
+|   16. `ProgSound` conditions (`audio/triggers.md` open question 6) | 270–287 |
+|   17. Options-menu UI sounds (`audio/triggers.md` open question 12, part) | 288–296 |
+|   18. Sound identity of a unit and its `monsounds` record | 297–345 |
+|   19. A unit's request list (U +0x78) | 346–392 |
+|   20. When object units make their mode sounds | 393–431 |
+|   21. What the driver needs per rule (inputs and owners) | 432–460 |
+| Constants & data dependencies | 461–470 |
+| Randomness | 471–476 |
+| Edge cases & original bugs | 477–486 |
+| Test vectors | 487–516 |
+| Provenance | 517–545 |
+| Open questions | 546–549 |
 <!-- /index -->
 
 ## Summary
@@ -188,6 +188,11 @@ specs; listed only for order).
    `world/objects.md` §8.1). The client handler requests at receive
    (part 1 §2 r1–r3), so the sound starts at the first sound tick after
    the receive that delivers it; the delays of part 1 §3 r4 still apply.
+   PROVISIONAL: the chest's at-once send leaves +0x6E and flag 0x400
+   set, so the player's unit update of the same tick sends event 11 a
+   second time (because no read function clears flag 0x400 before the
+   room clean-up); settled by a recording of a locked chest opened with
+   a key (count of S→C 0x2C event 11 in that tick; REC-93).
 3. **Call sites by event** (78 calls of `0x00553380`; the event is
    EDX, a constant at each site or `lea` of a register known to be 0
    or 1 there; owner = the spec that owns the calling function):

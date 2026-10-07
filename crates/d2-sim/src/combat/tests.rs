@@ -336,7 +336,7 @@ fn block_edge_cases() {
     assert_eq!(f.units[sor].seed, s0);
 }
 
-// Covers: specs/combat/hit.md §6.2 r1, §6.2 r2, §6.4, §6.4 r1, §6.4 r2, §6.4 r3, §edge-cases-original-bugs r8
+// Covers: specs/combat/hit.md §6.2 text, §6.2 r1, §6.2 r2, §6.4, §6.4 r1, §6.4 r2, §6.4 r3, §edge-cases-original-bugs r8
 #[test]
 fn dodge_avoid_evade_weapon_block() {
     let mut f = world();
@@ -399,7 +399,7 @@ fn dodge_avoid_evade_weapon_block() {
     assert_eq!(f.units[d].seed, s);
 }
 
-// Covers: specs/combat/hit.md §4 r1, §4 r2, §4 r3, §4 r4, §4 r5, §4 r7, §6.3, §edge-cases-original-bugs r5, §edge-cases-original-bugs r7
+// Covers: specs/combat/hit.md §4 text, §4 r6, §4 r1, §4 r2, §4 r3, §4 r4, §4 r5, §4 r7, §6.3, §edge-cases-original-bugs r5, §edge-cases-original-bugs r7
 #[test]
 fn melee_result_flow() {
     let (s, c) = (st(), ct());

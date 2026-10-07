@@ -10,10 +10,9 @@
 //! C→S 0x3A intents (§8.5, §15), the close button as `SetUIState(2, off)`.
 //!
 //! Open (spec gaps, `ui/panels.md` §8.7–§8.10, §Open questions 3):
-//! - level (12), experience (13) and next-level (30) are formatted by
-//!   `0x00525350` ("thousands grouping"): the exact format (separator,
-//!   group size, language rules) is not in the spec, so those three values
-//!   are not drawn.
+//! - experience (13) and next-level (30) use the format of `0x00525350`
+//!   (§8.11, `char_details::group_digits`); the level (12) is a plain
+//!   value.
 //! - the popup width `0x00502520` of §8.8 is not specified; it is asked of
 //!   [`CharacterView::popup_width`], and a value whose font depends on it
 //!   is not drawn while that answer is `None`.
@@ -97,6 +96,12 @@ pub trait CharacterView {
     fn popup_width(&self, _text: &[u16]) -> Option<i32> {
         None
     }
+    /// The next-level value of §8.11 (the `experience.txt` entry of the
+    /// player's class for its level, or stat 30 at the maximum level);
+    /// `None`: stat 30.
+    fn next_level(&self) -> Option<u32> {
+        None
+    }
 }
 
 /// Pressed state of the character panel (`[0x007C02F4]` and the pressed
@@ -137,9 +142,9 @@ pub fn area(s: &Screen) -> Rect {
 /// handled by the caller). `None`: not drawn (Open: §8.7 thousands
 /// grouping).
 fn plain_value(view: &dyn CharacterView, stat: u16) -> Option<(i32, u16)> {
-    // Open: level, experience and next-level use the unspecified
-    // thousands grouping of `0x00525350` (§8.7).
-    if matches!(stat, 12 | 13 | 30) {
+    // Experience and next-level are grouped by `0x00525350` (§8.11) and
+    // drawn by `draw_text_row`.
+    if matches!(stat, 13 | 30) {
         return None;
     }
     let value = view.stat(stat);
@@ -274,6 +279,19 @@ impl CharacterPanel {
                 let Some(stat) = value_stat(&r.item) else {
                     return;
                 };
+                // §8.11: experience (13) and next level (30): unsigned
+                // decimal with `,` every 3 digits, Font16, color 0, no
+                // Font8 fallback.
+                if matches!(stat, 13 | 30) {
+                    let v = if stat == 13 {
+                        view.stat(13) as u32
+                    } else {
+                        view.next_level().unwrap_or(view.stat(30) as u32)
+                    };
+                    let s16 = utf16(&super::char_details::group_digits(v, 128));
+                    centered(s16, y, font, 0, out);
+                    return;
+                }
                 let resist = RESISTS.iter().find(|&&(st, _)| st == stat);
                 let (shown, color) = match resist {
                     Some(&(st, max)) => resist_value(view, st, max),
@@ -304,8 +322,15 @@ impl CharacterPanel {
         }
     }
 
-    /// Mouse up (`0x004A78C0`, §8.3, §8.5). Clears every pressed field
-    /// first; no check that the press began on the button (§Edge cases).
+    /// Mouse up (`0x004A78C0`, §8.3, §8.5, `panels-2.md` §17 r1–r2): the
+    /// close pressed field is cleared. With no points left nothing else
+    /// happens (no add-button flag is cleared, nothing is sent). Else the
+    /// four add buttons are walked in table order; each pressed field is
+    /// cleared as it is reached and the first button whose rectangle holds
+    /// the release spends and the walk **stops**, so the pressed fields of
+    /// the buttons after it stay set (§17 r2 corrects the "clears every
+    /// pressed field first" of §8.5). No check that the press began on
+    /// the button (§Edge cases).
     pub fn release(
         &mut self,
         t: &PanelTables,
@@ -315,7 +340,6 @@ impl CharacterPanel {
         statpts: i32,
     ) -> Vec<PanelOutput> {
         self.close_pressed = false;
-        self.stat_pressed = [false; 4];
         let mut outp = Vec::new();
         if close_rect(t, s).is_some_and(|r| r.contains(at)) {
             outp.push(PanelOutput::SetUi {
@@ -324,13 +348,19 @@ impl CharacterPanel {
                 jump: false,
             });
         }
-        if let Some(i) = add_button_at(t, s, at, statpts) {
-            let stat = ADD_BUTTON_STATS[i];
-            let mut count = if shift_held { statpts } else { 1 };
-            while count > 0 {
-                let n = count.min(STAT_CHUNK);
-                outp.push(PanelOutput::Intent(add_stat_point(stat, n)));
-                count -= n;
+        if statpts != 0 {
+            let hit = add_button_at(t, s, at, statpts);
+            for (i, &stat) in ADD_BUTTON_STATS.iter().enumerate() {
+                self.stat_pressed[i] = false;
+                if hit == Some(i) {
+                    let mut count = if shift_held { statpts } else { 1 };
+                    while count > 0 {
+                        let n = count.min(STAT_CHUNK);
+                        outp.push(PanelOutput::Intent(add_stat_point(stat, n)));
+                        count -= n;
+                    }
+                    break;
+                }
             }
         }
         outp
@@ -651,6 +681,7 @@ mod tests {
         assert!(tx.contains(&("Name\n".into(), 19, 44, 6, 0)));
     }
 
+    // Covers: specs/ui/panels.md §8 r7
     #[test]
     fn values_shift_cmp_and_min_life() {
         let v = View {
@@ -683,8 +714,8 @@ mod tests {
         assert!(tx.contains(&("100".into(), 242, 270, 1, 0)));
         // mana 20 at [273, 308], y 308.
         assert!(tx.contains(&("20".into(), 286, 308, 1, 0)));
-        // Open: level (12) not drawn.
-        assert!(!tx.iter().any(|t| t.2 == 59 && t.1 < 60));
+        // level (12): compare color, `%ld`, centered in [13, 53] at y 59.
+        assert!(tx.contains(&("7".into(), 31, 59, 1, 0)));
     }
 
     #[test]
@@ -896,8 +927,9 @@ mod tests {
             close_pressed: false,
             stat_pressed: [true, false, false, true],
         };
-        // Close rect x [128, 160], y [388, 420].
-        let o = p.release(&t, &s, Point::new(160, 388), false, 0);
+        // Close rect x [128, 160], y [388, 420]. With points left the walk
+        // reaches all four buttons (no hit) and clears them.
+        let o = p.release(&t, &s, Point::new(160, 388), false, 1);
         assert_eq!(
             o,
             vec![PanelOutput::SetUi {
@@ -923,5 +955,26 @@ mod tests {
         assert!(!a.contains(Point::new(400, 491)));
         assert!(!a.contains(Point::new(399, 492)));
         assert!(!a.contains(Point::new(79, 0)));
+    }
+
+    // Covers: specs/ui/panels.md §8 r11
+    #[test]
+    fn experience_and_next_level_grouped() {
+        let v = View {
+            stats: vec![(13, 1_234_567, 0), (30, 999, 0)],
+            popup: Some(0),
+            ..View::default()
+        };
+        let d = draws(
+            &CharacterPanel::default(),
+            Screen::R640,
+            &v,
+            &Strings(vec![]),
+        );
+        let tx = texts(&d);
+        // experience: [67, 180], 9 units of 5 → 67 + 34; Font16, color 0
+        assert!(tx.contains(&("1,234,567".into(), 101, 59, 1, 0)));
+        // next level (stat 30 at the maximum level): [195, 308]
+        assert!(tx.contains(&("999".into(), 244, 59, 1, 0)));
     }
 }

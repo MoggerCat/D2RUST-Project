@@ -23,6 +23,7 @@ pub mod moves;
 pub mod props;
 pub mod quality;
 pub mod recharge;
+pub mod set_state;
 pub mod tables;
 
 #[cfg(any(test, feature = "bench-fixtures"))]

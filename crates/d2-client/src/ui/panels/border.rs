@@ -97,6 +97,7 @@ mod tests {
     }
 
     // Covers: specs/ui/panels.md §6 r1
+    // Covers: specs/ui/control-panel.md §1 r1
     #[test]
     fn border_800_one_side_per_open_mode() {
         for (mode, frames) in [
@@ -120,6 +121,7 @@ mod tests {
     }
 
     // Covers: specs/ui/panels.md §6 r2
+    // Covers: specs/ui/control-panel.md §1 r2
     #[test]
     fn ctrlpnl_640_five_frames_no_border() {
         let (_, d) = draws(PanelEnv {

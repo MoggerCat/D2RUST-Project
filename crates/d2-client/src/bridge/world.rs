@@ -229,6 +229,9 @@ pub struct ClientUnit {
     /// Unit flag +0xC4 bit 0x4, read by the interact sender (§8 rule 7).
     /// TODO(spec: client/model.md §8 rule 7): no model rule writes it.
     pub flag_4: bool,
+    /// +0xB0: the last hit class (§18 rule 1), written by the player
+    /// mode machine (§8 rule 4: `+0xB0` := r2); 0 at creation.
+    pub hit_class: u32,
 }
 
 /// The reserved `outgoing` slot of 0x28's dialog branch (`msg-ui.md`
@@ -265,6 +268,7 @@ impl ClientUnit {
             frame: 0,
             flag_ex: 0,
             flag_4: false,
+            hit_class: 0,
         }
     }
 
@@ -674,6 +678,19 @@ impl ClientWorld {
             .find(|r| r.room == room)
     }
 
+    /// The client active-room free `0x0061A840` (`drlg/rooms.md` §8 r4,
+    /// `client/model.md` §16 r2): each unit linked in the room leaves it;
+    /// flags-2 0x20 (server units: no flag 0x400000) and flag 0x800000
+    /// are set on it.
+    pub fn free_active_room(&mut self, room: DrlgRoomId) {
+        for k in self.room_units.free_room(room) {
+            if let Some(u) = self.units.get_mut(&k) {
+                u.flag_ex |= 0x20;
+                u.room_freed = true;
+            }
+        }
+    }
+
     /// Refreshes [`ClientWorld::active_rooms`] from the client DRLG after
     /// a DRLG change: the units of a room that is no longer active leave
     /// its list (the client room free, `sim/unit-order.md` §5 rule 6),
@@ -687,19 +704,18 @@ impl ClientWorld {
     pub fn refresh_active_rooms(&mut self) -> Result<(), LightError> {
         let old = self.active_rooms.take().unwrap_or_default();
         self.active_rooms = self.drlg.as_ref().map(ClientDrlg::active_rooms);
-        let now = self.active_rooms.as_deref().unwrap_or(&[]);
-        for r in &old {
-            if !now.iter().any(|n| n.room == r.room) {
-                // `drlg/rooms.md` §8 r4: each unit of the freed room
-                // (server units: no flag 0x400000) gets flags-2 0x20,
-                // then flag 0x800000, then leaves the room.
-                for k in self.room_units.free_room(r.room) {
-                    if let Some(u) = self.units.get_mut(&k) {
-                        u.flag_ex |= 0x20;
-                        u.room_freed = true;
-                    }
-                }
-            }
+        let gone: Vec<DrlgRoomId> = {
+            let now = self.active_rooms.as_deref().unwrap_or(&[]);
+            old.iter()
+                .map(|r| r.room)
+                .filter(|&r| !now.iter().any(|n| n.room == r))
+                .collect()
+        };
+        // `drlg/rooms.md` §8 r4: each unit of a freed room (server units:
+        // no flag 0x400000) gets flags-2 0x20, then flag 0x800000, then
+        // leaves the room.
+        for room in gone {
+            self.free_active_room(room);
         }
         let created = self
             .drlg
@@ -749,17 +765,20 @@ impl ClientWorld {
     }
 
     /// `total(unit, stat, layer)` (`0x00625480`, `client/stat-lists.md`
-    /// §1 rule 3): the full array of the unit's list. It equals the base
-    /// until a client rule attaches a list (§2–§4): item lists wait for
-    /// the item stream (`stat-lists.md` open question 2), and a passive
-    /// skill's list is refused as pending
-    /// (`super::skills::SkillError::PassiveState`). The state lists of
-    /// 0xA7–0xAA are held per state (`ClientUnit::state_lists`).
-    /// TODO(spec: client/stat-lists.md §1 r2): their propagation into
-    /// the full array is the `d2-sim` list's, not built on the client
-    /// yet, so the total stays the base.
+    /// §1 rule 3): the full array of the unit's list: the base plus the
+    /// lists attached to the unit (§1 rule 2: the state lists of 0xA7–0xAA
+    /// and the passive-state lists, `ClientUnit::state_lists`, each
+    /// propagating its stats into the owner's full array,
+    /// `sim/stat-lists.md` §8.1). Item lists wait for the item stream
+    /// (`stat-lists.md` open question 2).
     pub fn total(&self, key: UnitKey, stat: u16, layer: u16) -> i32 {
-        self.base(key, stat, layer)
+        let Some(u) = self.units.get(&key) else {
+            return 0;
+        };
+        u.state_lists
+            .values()
+            .filter_map(|l| l.get(&(stat, layer)))
+            .fold(self.base(key, stat, layer), |a, &v| a.wrapping_add(v))
     }
 
     /// The roster lookup `0x004792E0(GUID)` (`msg-units.md` §8 r2):
@@ -884,6 +903,33 @@ pub struct MonsterClass {
     pub npc: bool,
     /// `monstats` flag bit 9 `interact` (`0x00457490(class, 9)`).
     pub interact: bool,
+    /// The columns of the monster set-up `0x004AE8D0` (`msg-units.md`
+    /// §1.2 r6); `None`: the tables do not give them (the set-up's table
+    /// parts are not run).
+    pub setup: Option<MonsterSetup>,
+}
+
+/// The `monstats` / `monstats2` columns of the monster set-up
+/// (`msg-units.md` §1.2 r6), by difficulty where the table has three.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct MonsterSetup {
+    /// `Level`, `Level(N)`, `Level(H)` (+0xAA + 2d).
+    pub level: [u16; 3],
+    /// `ResDm`, `ResMa`, `ResFi`, `ResLi`, `ResCo`, `ResPo` by difficulty
+    /// (stats 36, 37, 39, 41, 43, 45).
+    pub res: [[u16; 3]; 6],
+    /// `Velocity` (+0x32).
+    pub velocity: u16,
+    /// `Align` (classic scaling, `monsters/init.md` §13).
+    pub align: u8,
+    /// `Skill1`…`Skill8` (+0x170 + 2i, signed), `Sk1lvl`… (+0x198 + i),
+    /// `Sk1mode`… (+0x180 + i).
+    pub skills: [(i16, u8, u8); 8],
+    /// `monstats2` `isSel` (byte +4 bit 3), `shadow` (byte +5 bit 6),
+    /// `isAtt` (byte +5 bit 1).
+    pub is_sel: bool,
+    pub shadow: bool,
+    pub is_att: bool,
 }
 
 /// One `objects.txt` row as the shrine requests read it (`model.md`
@@ -939,6 +985,8 @@ pub struct StatSend {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct UnitRows {
     pub monsters: Vec<Option<MonsterClass>>,
+    /// `difficultylevels` `MonsterSkillBonus` by difficulty.
+    pub monster_skill_bonus: [i32; 3],
     pub stats: Vec<StatSend>,
     pub objects: Vec<ObjectRow>,
     pub shrines: Vec<u8>,
@@ -956,6 +1004,7 @@ impl MonsterClass {
             components,
             npc,
             interact,
+            setup: None,
         })
     }
 }
@@ -967,6 +1016,10 @@ impl MonsterClass {
 pub struct ClientTables {
     /// One entry per `monstats` row: `None` = no `monstats2` row.
     pub monsters: Vec<Option<MonsterClass>>,
+    /// The act level bonus of the monster skills by difficulty
+    /// (`0x00611D30(d)` +0x10, `difficultylevels`; `msg-units.md` §1.2
+    /// r6.8).
+    pub monster_skill_bonus: [i32; 3],
     /// One entry per `itemstatcost` row.
     pub stats: Vec<StatSend>,
     /// One entry per `Levels.txt` row, by level id (§11 rule 4).
@@ -1052,4 +1105,8 @@ pub struct ModelInputs {
     /// What the client object functions read beside the model
     /// (`world/objects-client.md` Inputs).
     pub objclient: ObjClientInputs,
+    /// The skills tables and formula buffers the passive refresh
+    /// evaluates (`client/msg-skills.md` §2 r4); `None`: a passive skill
+    /// is a handler error.
+    pub skill_tables: Option<std::sync::Arc<super::passive::Tables>>,
 }

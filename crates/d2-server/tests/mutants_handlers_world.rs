@@ -106,8 +106,10 @@ fn tile(orientation: u32, main: u32, sub: u32, rarity: u32) -> TileInfo {
     }
 }
 
-/// Cold Plains (act 0, waypoint index 1) and Lut Gholein (act 1, index 9).
+/// Cold Plains (act 0, waypoint index 1), level 4 (act 0, index 2) and
+/// Lut Gholein (act 1, index 9).
 const COLD_PLAINS: u32 = 3;
+const LEVEL4: u32 = 4;
 const ACT2_TOWN: u32 = 40;
 
 fn drlg() -> DrlgWorld {
@@ -122,14 +124,17 @@ fn drlg() -> DrlgWorld {
     let mut files = vec![Vec::new(); 32];
     files[0] = b"floor.dt1".to_vec();
     data.lvltypes = vec![vec![Vec::new(); 32], files];
-    for id in [COLD_PLAINS, ACT2_TOWN] {
+    for id in [COLD_PLAINS, LEVEL4, ACT2_TOWN] {
         data.levels[id as usize].drlg_type = 2;
         data.levels[id as usize].level_type = 1;
     }
     let mut types = Types(
-        [COLD_PLAINS, ACT2_TOWN]
-            .map(|l| (l, TileRect::new(0, 0, 8, 8)))
-            .into(),
+        [
+            (COLD_PLAINS, TileRect::new(0, 0, 8, 8)),
+            (LEVEL4, TileRect::new(8, 0, 8, 8)),
+            (ACT2_TOWN, TileRect::new(0, 0, 8, 8)),
+        ]
+        .into(),
     );
     let mut dungeon = Dungeon::default();
     dungeon.acts[0] = Some(Drlg::create(0, 1, 0, 0, false, &data, &mut types).unwrap());
@@ -164,6 +169,7 @@ fn waypoint_data() -> WaypointData {
     }
     levels[1].waypoint = 0;
     levels[COLD_PLAINS as usize].waypoint = 1;
+    levels[LEVEL4 as usize].waypoint = 2;
     levels[ACT2_TOWN as usize].waypoint = 9;
     let mut o: Objects = blank();
     o.operatefn = 23;
@@ -173,10 +179,10 @@ fn waypoint_data() -> WaypointData {
 }
 
 /// The action sim and game: a waypoint at (20, 20) in Cold Plains,
-/// another in Lut Gholein, a player of `class` at (20 + dx, 20) in Cold
-/// Plains who knows index 1 on Normal. Returns (events, game, player,
-/// its room, waypoint GUID, far waypoint GUID).
-fn world(class: u32, dx: i32) -> (ActionSim<ActionRest>, Game, UnitId, RoomId, u32, u32) {
+/// another in Lut Gholein, a third at (20, 20) in level 4, a player of
+/// `class` at (20 + dx, 20) in Cold Plains who knows index 1 on Normal.
+/// Returns (events, game, player, its room, waypoint GUIDs).
+fn world(class: u32, dx: i32) -> (ActionSim<ActionRest>, Game, UnitId, RoomId, Wps) {
     let hooks = ActionHooks::new(
         Arc::new(empty_action_tables()),
         drlg(),
@@ -186,7 +192,7 @@ fn world(class: u32, dx: i32) -> (ActionSim<ActionRest>, Game, UnitId, RoomId, u
     let mut sim = ActionSim::new(stat_data(), UnitData::default(), hooks);
     let mut game = Game::new();
     let mut rooms = Vec::new();
-    for (act, level) in [(0u8, COLD_PLAINS), (1, ACT2_TOWN)] {
+    for (act, level) in [(0u8, COLD_PLAINS), (1, ACT2_TOWN), (0, LEVEL4)] {
         game.lists.ensure_act(act).unwrap();
         let r = sim
             .hooks()
@@ -218,6 +224,8 @@ fn world(class: u32, dx: i32) -> (ActionSim<ActionRest>, Game, UnitId, RoomId, u
     let o = spawn(UnitType::Object, 0, rooms[0], 20);
     let far = spawn(UnitType::Object, 0, rooms[1], 20);
     let player = spawn(UnitType::Player, class, rooms[0], 20 + dx);
+    // After the player: the other units' GUIDs stay as before.
+    let side = spawn(UnitType::Object, 0, rooms[2], 20);
     sim.sys.units.get_mut(player).unwrap().mode = 1;
     sim.hooks()
         .waypoints
@@ -228,7 +236,20 @@ fn world(class: u32, dx: i32) -> (ActionSim<ActionRest>, Game, UnitId, RoomId, u
         .unwrap();
     let wp = game.lists.unit(o).unwrap().guid;
     let far_wp = game.lists.unit(far).unwrap().guid;
-    (sim, game, player, rooms[0], wp, far_wp)
+    let side_wp = game.lists.unit(side).unwrap().guid;
+    let wps = Wps {
+        wp,
+        far_wp,
+        side_wp,
+    };
+    (sim, game, player, rooms[0], wps)
+}
+
+/// The waypoint GUIDs of [`world`]: Cold Plains, Lut Gholein, level 4.
+struct Wps {
+    wp: u32,
+    far_wp: u32,
+    side_wp: u32,
 }
 
 type Wired = SimGame<ActionSim<ActionRest>, WiredWorld<Rest>>;
@@ -239,11 +260,19 @@ struct Fx {
     player: UnitId,
     wp: u32,
     far_wp: u32,
+    /// Level 4's waypoint: travel to Cold Plains from it is not to its
+    /// own level (§7 r2).
+    side_wp: u32,
 }
 
 impl Fx {
     fn new(class: u32, dx: i32, client: u32) -> Self {
-        let (mut events, game, player, room, wp, far_wp) = world(class, dx);
+        let (mut events, game, player, room, wps) = world(class, dx);
+        let Wps {
+            wp,
+            far_wp,
+            side_wp,
+        } = wps;
         let mut seed = events.hooks().game_seed;
         let npc = NpcControl::new(&[], Vec::new(), true, 0, &mut seed).unwrap();
         let quests = QuestControl::new(&QuestTables::load().unwrap(), &mut seed).unwrap();
@@ -276,6 +305,7 @@ impl Fx {
             player,
             wp,
             far_wp,
+            side_wp,
         }
     }
 
@@ -313,10 +343,11 @@ fn msg(wp: u32, level: u32) -> Vec<u8> {
 #[test]
 fn wired_travel() {
     let mut fx = Fx::new(1, 22, 0);
-    fx.set_interact((2, fx.wp));
+    // From level 4's waypoint (travel to its own level only closes).
+    fx.set_interact((2, fx.side_wp));
     let p = fx.player;
     let guid = fx.sim.game.lists.unit(p).unwrap().guid;
-    let (code, got) = handle(&mut fx.sim, 0, &msg(fx.wp, COLD_PLAINS));
+    let (code, got) = handle(&mut fx.sim, 0, &msg(fx.side_wp, COLD_PLAINS));
     assert_eq!(code, Done);
     assert_eq!(
         fx.log(),
@@ -414,14 +445,15 @@ impl MessageSink for Refusing {
 #[test]
 fn unqueued_message_is_a_recorded_fault() {
     let mut fx = Fx::new(1, 22, 0);
-    let m = msg(fx.wp, COLD_PLAINS);
+    // From level 4's waypoint, so the travel sends (§7 r2).
+    let m = msg(fx.side_wp, COLD_PLAINS);
     let code = Intents::handle(&mut fx.sim, 0, &m, m.len(), &mut Refusing);
     assert_eq!(code, Malformed);
     let faults = &fx.sim.world.action.faults;
     assert_eq!(faults.len(), 1);
     assert!(matches!(faults[0].error, WorldError::Sink(_)));
 
-    let (events, game, player, room, wp, _) = world(1, 22);
+    let (events, game, player, room, wps) = world(1, 22);
     let action: ActionWorld = ActionWorld {
         waypoints: Some(waypoint_data()),
         ..ActionWorld::default()
@@ -436,7 +468,7 @@ fn unqueued_message_is_a_recorded_fault() {
             data: Some(PlayerData { last_accept: 0 }),
         },
     );
-    let m = msg(wp, COLD_PLAINS);
+    let m = msg(wps.side_wp, COLD_PLAINS);
     let code = Intents::handle(&mut sim, 0, &m, m.len(), &mut Refusing);
     assert_eq!(code, Malformed);
     assert_eq!(sim.world.faults.len(), 1);

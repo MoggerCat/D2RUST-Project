@@ -165,6 +165,9 @@ impl ShrineWorld for Fake {
     fn make_nearest_unique(&mut self, player: UnitId) {
         other(self, format!("unique {}", player.0));
     }
+    fn reverse_player_name(&mut self, player: UnitId) {
+        other(self, format!("reverse {}", player.0));
+    }
 }
 
 // ------------------------------------------------------------------ setup
@@ -395,7 +398,7 @@ fn reset_event_needs_subclass_bit_0() {
     assert!(s.w.calls.is_empty());
 }
 
-// Covers: specs/world/objects.md §9.1 text
+// Covers: specs/world/objects.md §9.1 text; specs/world/objects-2.md §24 r4
 #[test]
 fn hover_event_frees_or_reschedules() {
     // Expired (expiry = frame): freed, queued, flag 0x100.
@@ -596,14 +599,14 @@ fn value_function() {
     assert_eq!(value(&w, P, 31, 50), -3);
 }
 
-// Covers: specs/world/objects.md §9.2
+// Covers: specs/world/objects.md §9.2, §edge-cases-original-bugs r26
 #[test]
 fn code_16_and_20() {
-    assert!(run(16, |_| {}).is_empty());
+    assert_eq!(run(16, |_| {}), vec!["reverse 20"]);
     assert_eq!(run(20, |_| {}), vec!["unique 20"]);
 }
 
-// Covers: specs/world/objects.md §9.2
+// Covers: specs/world/objects.md §9.2, §edge-cases-original-bugs r27
 #[test]
 fn portal_shrine_code_17() {
     let got = run(17, |s| {
@@ -668,7 +671,7 @@ fn gem_shrine_without_gem_rolls_on_player_seed() {
     assert_eq!(s.w.seeds[&OBJ], u_seed);
 }
 
-// Covers: specs/world/objects.md §9.3
+// Covers: specs/world/objects.md §9.3; specs/world/objects-2.md §24 r3
 #[test]
 fn storm_shrine() {
     let got = run(19, |s| {

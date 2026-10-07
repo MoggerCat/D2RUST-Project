@@ -488,7 +488,7 @@ fn skipped_units() {
     assert_eq!(u.flags & UNIT_DRAWN, 0);
 }
 
-// Covers: specs/render/draw-order.md §5 r3
+// Covers: specs/render/draw-order.md §5 r3, §5 r4
 #[test]
 fn sight_test() {
     let f = |unit_type, mode, local| UnitFacts {

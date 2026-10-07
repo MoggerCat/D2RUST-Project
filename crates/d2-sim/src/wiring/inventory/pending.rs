@@ -257,11 +257,29 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
     fn stat_link(&mut self, owner: Owner, item: Guid) {
         self.rest.stat_link(owner, item)
     }
+    /// §5.5 `0x0055C270` on the rules when [`InvState::equip_rules`] is on.
+    ///
+    /// [`InvState::equip_rules`]: super::InvState::equip_rules
     fn charm_relink(&mut self, owner: Owner, item: Guid) {
-        self.rest.charm_relink(owner, item)
+        match (
+            self.state.equip_rules,
+            self.unit_of(owner),
+            self.item_unit(item),
+        ) {
+            (true, Some(o), Some(i)) => self.run_item_skill_link(o, i, true),
+            _ => self.rest.charm_relink(owner, item),
+        }
     }
+    /// §5.5 `0x0055C6E0` on the rules when the equipment rules are on.
     fn charm_unlink(&mut self, owner: Owner, item: Guid) {
-        self.rest.charm_unlink(owner, item)
+        match (
+            self.state.equip_rules,
+            self.unit_of(owner),
+            self.item_unit(item),
+        ) {
+            (true, Some(o), Some(i)) => self.run_item_skill_link(o, i, false),
+            _ => self.rest.charm_unlink(owner, item),
+        }
     }
     /// §5.6 (`0x0062FF70`).
     fn is_active(&self, owner: Owner, item: Guid) -> bool {
@@ -270,14 +288,22 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
             _ => false,
         }
     }
+    /// §5.7 `0x0055DBC0(0)` on the rules when the equipment rules are on.
     fn inventory_pass(&mut self, owner: Owner) {
-        self.rest.inventory_pass(owner)
+        match (self.state.equip_rules, self.unit_of(owner)) {
+            (true, Some(o)) => self.run_inventory_pass(o, false),
+            _ => self.rest.inventory_pass(owner),
+        }
     }
     fn weapon_in_use_update(&mut self, owner: Owner) {
         self.rest.weapon_in_use_update(owner)
     }
+    /// §5.8 `0x0055C5C0` on the rules when the equipment rules are on.
     fn weapon_bookkeeping(&mut self, owner: Owner) {
-        self.rest.weapon_bookkeeping(owner)
+        match (self.state.equip_rules, self.unit_of(owner)) {
+            (true, Some(o)) => self.run_weapon_bookkeeping(o),
+            _ => self.rest.weapon_bookkeeping(owner),
+        }
     }
     fn body_leave_effects(&mut self, owner: Owner, item: Guid) {
         self.rest.body_leave_effects(owner, item)

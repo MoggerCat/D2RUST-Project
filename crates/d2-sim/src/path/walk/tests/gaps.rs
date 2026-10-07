@@ -22,7 +22,7 @@ use crate::units::{ClientId, RoomId, UnitId, UnitType};
 
 /// A context over [`FakeWorld`] with typed unit positions (targets of
 /// §3 step 4) and one seed.
-struct Recorder {
+pub(super) struct Recorder {
     w: FakeWorld,
     units: BTreeMap<UnitId, (UnitType, Point)>,
     seed: Seed,
@@ -442,7 +442,7 @@ fn room_recache_can_leave_a_non_missile_without_a_room() {
 /// A monster [`Finder`] over a free 40 × 40 [`Recorder`] grid with
 /// `walls`, and a path info from `start` to `target` (one-cell pattern 0,
 /// move mask 0x1C09).
-fn other_setup(walls: &[(i32, i32)]) -> Recorder {
+pub(super) fn other_setup(walls: &[(i32, i32)]) -> Recorder {
     let mut w = FakeWorld::new(40, 40);
     for &(x, y) in walls {
         w.wall(x, y);
@@ -450,7 +450,7 @@ fn other_setup(walls: &[(i32, i32)]) -> Recorder {
     Recorder::new(w)
 }
 
-fn other_info(ty: u32, start: (i32, i32), target: (i32, i32), max: i32) -> PathInfo {
+pub(super) fn other_info(ty: u32, start: (i32, i32), target: (i32, i32), max: i32) -> PathInfo {
     PathInfo {
         start: Point::new(start.0, start.1),
         target: Point::new(target.0, target.1),
@@ -466,7 +466,7 @@ fn other_info(ty: u32, start: (i32, i32), target: (i32, i32), max: i32) -> PathI
     }
 }
 
-fn owned_path(max: u8) -> DynamicPath {
+pub(super) fn owned_path(max: u8) -> DynamicPath {
     DynamicPath {
         owner: Some(P),
         max_distance: max,

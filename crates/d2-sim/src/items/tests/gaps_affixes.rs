@@ -125,7 +125,7 @@ fn preferred_is_index_in_part() {
 // ---------------------------------------------------------------- §3
 
 /// The roller's arguments (§3 text) and the part they select (§3 r1).
-// Covers: specs/items/affixes.md §3 text, §3 r1
+// Covers: specs/items/affixes.md §3 text, §3 r1, §3.1
 #[test]
 fn roller_arguments_and_part() {
     let mut s = affix_row(RING, 1);
@@ -576,7 +576,7 @@ fn crafted_rare_names() {
 /// The affix loop: a kind step per affix; 252 tries when the roll is
 /// taken (same id or group in a filled slot of the kind) and then slot P
 /// := 0 without advancing; the request's preference of slot P (S).
-// Covers: specs/items/affixes.md §8 r3
+// Covers: specs/items/affixes.md §8 r3, §edge-cases-original-bugs r7
 #[test]
 fn crafted_affix_loop() {
     // (a) Taken 252 times, P not advanced. Prefix rows A, A2: group 1,

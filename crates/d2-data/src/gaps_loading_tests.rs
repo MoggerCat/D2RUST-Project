@@ -265,8 +265,9 @@ fn links_point_to_earlier_steps() {
 /// The TC list of §10.6 (names and order only): TC 0 empty, 32 automatic
 /// TCs per itemtypes record with byte 0x1D ≠ 0 in record order (code with
 /// pad spaces removed + level 3, 6, …, 96), then the treasureclassex rows
-/// up to the first empty name. Not a claim on §10 r6: the automatic TCs'
-/// item lists (level in (L−3, L]) are not built by d2-data.
+/// up to the first empty name. The automatic TCs' item lists (level in
+/// (L−3, L]) are `treasure.md` §1.3 (`d2-sim` treasure tests).
+// Covers: specs/data/loading.md §10 r6
 #[test]
 fn treasure_class_list_order() {
     let itemtypes_size = size("itemtypes");

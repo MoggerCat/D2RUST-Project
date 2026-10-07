@@ -1017,7 +1017,7 @@ mod text {
         );
     }
 
-    // Covers: specs/ui/text.md §7 text
+    // Covers: specs/ui/text.md §7 text, §11
     #[test]
     fn centered_span_counts_codes() {
         let f = font16();

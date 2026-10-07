@@ -231,12 +231,16 @@ struct Fx {
     player: UnitId,
     wp: u32,
     far_wp: u32,
+    /// A waypoint in level 4 (act 0) at the same spot as `wp`: travel to
+    /// Cold Plains from it is not to its own level (§7 r2).
+    side_wp: u32,
 }
 
-/// Cold Plains (one room, act 0) and level 40 (one room, act 1). A
-/// waypoint object at (20, 20) in Cold Plains, another in level 40, and
-/// a player of `class` at (20 + dx, 20) for client 0. The player knows
-/// index 1 (Cold Plains).
+/// Cold Plains and level 4 (one room each, act 0) and level 40 (one
+/// room, act 1). A waypoint object at (20, 20) in Cold Plains, another in
+/// level 40, a third at (20, 20) in level 4, and a player of `class` at
+/// (20 + dx, 20) in Cold Plains for client 0. The player knows index 1
+/// (Cold Plains).
 fn fixture(class: u32, dx: i32) -> Fx {
     let mut data = DrlgData {
         levels: vec![LevelDef::default(); 150],
@@ -248,12 +252,13 @@ fn fixture(class: u32, dx: i32) -> Fx {
     let mut files = vec![Vec::new(); 32];
     files[0] = b"floor.dt1".to_vec();
     data.lvltypes = vec![vec![Vec::new(); 32], files];
-    for id in [COLD_PLAINS, ACT2_TOWN] {
+    for id in [COLD_PLAINS, LEVEL4, ACT2_TOWN] {
         data.levels[id as usize].drlg_type = 2;
         data.levels[id as usize].level_type = 1;
     }
     let mut types = Types(BTreeMap::from([
         (COLD_PLAINS, TileRect::new(0, 0, 8, 8)),
+        (LEVEL4, TileRect::new(8, 0, 8, 8)),
         (ACT2_TOWN, TileRect::new(0, 0, 8, 8)),
     ]));
     let mut dungeon = Dungeon::default();
@@ -295,7 +300,7 @@ fn fixture(class: u32, dx: i32) -> Fx {
     let mut sim = ActionSim::new(Arc::new(StatData::default()), UnitData::default(), hooks);
     let mut game = Game::new();
     let mut rooms = Vec::new();
-    for (act, level) in [(0u8, COLD_PLAINS), (1, ACT2_TOWN)] {
+    for (act, level) in [(0u8, COLD_PLAINS), (1, ACT2_TOWN), (0, LEVEL4)] {
         game.lists.ensure_act(act).unwrap();
         let r = sim
             .hooks()
@@ -338,6 +343,8 @@ fn fixture(class: u32, dx: i32) -> Fx {
         rooms[0],
         20 + dx,
     );
+    // After the player: the other units' GUIDs stay as before.
+    let side = spawn(&mut sim, &mut game, UnitType::Object, 0, rooms[2], 20);
     sim.sys.units.get_mut(player).unwrap().mode = 1;
     sim.hooks()
         .waypoints
@@ -348,6 +355,7 @@ fn fixture(class: u32, dx: i32) -> Fx {
         .unwrap();
     let wp = game.lists.unit(o).unwrap().guid;
     let far_wp = game.lists.unit(far).unwrap().guid;
+    let side_wp = game.lists.unit(side).unwrap().guid;
     let mut s: Sim = SimGame::with_events(game, sim);
     s.world.waypoints = Some(waypoint_data());
     s.join(0, Some(player), Some(rooms[0]), client_state::IN_GAME)
@@ -367,6 +375,7 @@ fn fixture(class: u32, dx: i32) -> Fx {
         player,
         wp,
         far_wp,
+        side_wp,
     }
 }
 
@@ -436,14 +445,17 @@ fn amazon_out_of_reach_is_refused_and_the_menu_closed() {
     fx.assert_clean();
 }
 
-// Covers: specs/world/waypoints.md §6.2, §7 r3, §7 r4, §7 r5, §7 r7, §7 r8
+// Covers: specs/world/waypoints.md §6.2, §7 r2, §7 r3, §7 r4, §7 r5, §7 r7, §7 r8
 #[test]
 fn sorceress_at_22_travels_with_the_arrival_message() {
     let mut fx = fixture(1, 22);
-    fx.open_menu();
+    // From level 4's waypoint: travel to the object's own level would
+    // only close the menu (§7 r2).
+    let side = fx.side_wp;
+    fx.stage(2, side);
     let p = fx.player;
     let guid = fx.host.game.game.lists.unit(p).unwrap().guid;
-    let (code, got) = send(&mut fx.host, &Fx::msg(fx.wp, COLD_PLAINS as u16));
+    let (code, got) = send(&mut fx.host, &Fx::msg(side, COLD_PLAINS as u16));
     assert_eq!(code, ResultCode::Done);
     // The warp is a seam (logged); the player stays in the only room of
     // the level, which is the spawn room: mode 2, then 0x0D at x+3, y+3.

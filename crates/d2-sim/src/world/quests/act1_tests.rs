@@ -1700,3 +1700,29 @@ fn act_transition_send_order() {
     ctl.act_completion(&mut f, P1, npc::MESHIF1).unwrap();
     assert_eq!(f.sent_ids(), [0x28]);
 }
+
+// Covers: specs/world/quests-act1.md §10.5 text, §10.7 text
+#[test]
+fn chain_2_3_5_init_records() {
+    // Init `0x00591210` (A1Q2), `0x00591F70` (A1Q3), `0x00595920` (A1Q5):
+    // active 1, state 0, the init_no / seq_id / filter and the function
+    // addresses of each record, the extra zeroed.
+    let (ctl, _) = control();
+    for (chain, init_no, seq_id, filter, status_fn, active_fn, seq_fn) in [
+        (2u8, 4u8, 4u8, 2u8, None, 0x0059_1080u32, 0x0059_10F0u32),
+        (3, 5, 6, 3, Some(0x0059_1D30), 0x0059_1C30, 0x0059_1E40),
+        (5, 4, 3, 5, None, 0x0059_52C0, 0x0059_5240),
+    ] {
+        let r = ctl.record(chain).unwrap();
+        assert!(r.active, "chain {chain}");
+        assert_eq!((r.state, r.init_no, r.seq_id), (0, init_no, Some(seq_id)));
+        assert_eq!(r.filter, filter, "chain {chain}");
+        assert_eq!(r.status_fn, status_fn, "chain {chain}");
+        assert_eq!(r.active_fn, Some(active_fn), "chain {chain}");
+        assert_eq!(r.seq_fn, Some(seq_fn), "chain {chain}");
+        assert!(r.guids.0.is_empty(), "chain {chain}");
+    }
+    let e = &ctl.record(5).unwrap().extra.q5;
+    assert!(e.reported.is_empty() && e.credited.is_empty() && e.chests.is_empty());
+    assert!(e.in_cellar.0.is_empty() && e.death_pos == (0, 0) && !e.killed && !e.trap_spawned);
+}

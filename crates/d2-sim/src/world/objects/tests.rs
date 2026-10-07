@@ -666,7 +666,7 @@ fn preset_shrines() {
     assert_eq!(preset_ids(579), BTreeSet::from([14]));
 }
 
-// Covers: specs/world/objects.md §6
+// Covers: specs/world/objects.md §6, §edge-cases-original-bugs r22; specs/world/objects-2.md §24 r1, §22 r1
 #[test]
 fn preset_bounds_and_580() {
     let t = tables();
@@ -704,12 +704,17 @@ fn preset_bounds_and_580() {
     );
     let r = create_preset(&mut ctl, &t, &mut f, RoomId(1), 25, 580, 3, 4, 1).unwrap();
     assert_eq!(r, Preset::Object(Some(u)));
-    assert_eq!(f.calls[0], Call::Allocate(RoomId(1), 371, 3, 4, 1));
+    // The preset mode (1) is ignored: allocated in mode 0 (§6, edge 22).
+    assert_eq!(f.calls[0], Call::Allocate(RoomId(1), 371, 3, 4, 0));
     let d = ctl.get(u).unwrap();
     assert_eq!((d.spark, d.interact), (1, 3));
     assert_ne!(f.flags[&u] & oflags::KEEP_MODE, 0);
     assert_eq!(f.modes[&u], 0);
     assert_eq!(ctl.seed, Seed::init());
+    // objects-2 §24 r1: the final mode set (mode 0 → 0) runs no setup and
+    // draws nothing, but queues the object and sets flag 0x1.
+    assert!(f.calls.contains(&Call::Mode(u, 0, true)));
+    assert_ne!(f.flags[&u] & oflags::CHANGED, 0);
 }
 
 // ------------------------------------------------------------------ §7
@@ -892,9 +897,9 @@ fn route_mismatches(text: &str) -> Result<Vec<(String, u32)>, TsvError> {
         let index = tsv_num(tn, line, "index", c[1])?;
         let address = tsv_num(tn, line, "address", c[2])?;
         let want = match (c[5], address) {
-            // Null slot: `-` or the rule that says it does nothing
-            // (§7.2 operate 35–38 / 60, §3 init 35, 36, 40).
-            ("-" | "§7.2" | "§3", 0) => Some(Route::Null),
+            // Null slots (address 0): owner `-`, or the section that
+            // names the null entry (e44dcaa1).
+            (o, 0) if o == "-" || o.starts_with('§') => Some(Route::Null),
             (o, a) if o.starts_with("world/quests") && a != 0 => Some(Route::Quest),
             ("world/waypoints.md", a) if a != 0 => Some(Route::Waypoint),
             ("todo", a) if a != 0 => Some(Route::NotCovered),
@@ -1008,7 +1013,7 @@ fn end_anim_and_delayed_portal_events() {
 
 // ------------------------------------------------------------------ §14
 
-// Covers: specs/world/objects.md §14 text, §14 r1
+// Covers: specs/world/objects.md §14 text, §14 r1; specs/world/objects-2.md §23 r1, §23 r3
 #[test]
 fn update_message_bytes() {
     assert_eq!(

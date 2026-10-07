@@ -216,6 +216,10 @@ pub enum ObjSound {
         unit: ObjUnit,
         class: u32,
         mode: u32,
+        /// `0x006416D0(U, P)` at the call (`audio/triggers.md` §7 r2;
+        /// `audio/triggers-2.md` §20 r5): the path distance to the local
+        /// player, [`NO_LOCAL_DISTANCE`] without one.
+        local_dist: i32,
     },
     /// A sound request `0x004B9A00(id, U, 0, 0, 0)` (§26.18).
     Request { id: i32, unit: ObjUnit },
@@ -329,10 +333,12 @@ impl Cx<'_> {
     pub fn sound(&mut self) -> Result<(), HandlerError> {
         let u = self.u()?;
         let (class, mode) = (u.class, u.mode);
+        let local_dist = local_distance(self.w, self.inputs, self.unit);
         self.out.push(Output::ObjectSound(ObjSound::Mode {
             unit: self.unit,
             class,
             mode,
+            local_dist,
         }));
         Ok(())
     }
@@ -594,6 +600,27 @@ pub fn distance(a: &ClientUnit, size_a: i32, b: &ClientUnit, size_b: i32) -> i32
         (i32::from(bx), i32::from(by)),
         size_b,
     )
+}
+
+/// The distance of an [`ObjSound::Mode`] without a local player (or with
+/// U gone): no rule reads it as near.
+/// PROVISIONAL (audio/triggers.md §7 r2; REC-51): 1.14d has no update
+/// pass without a local player in practice; read as far.
+pub const NO_LOCAL_DISTANCE: i32 = i32::MAX;
+
+/// `0x006416D0(U, P)` for an object U and the local player P (the mode
+/// sound's distance, `audio/triggers.md` §7 r2).
+pub fn local_distance(w: &ClientWorld, inputs: &ModelInputs, unit: ObjUnit) -> i32 {
+    let rows = &inputs.objclient.rows;
+    let u = if unit.client_only {
+        w.objclient.set_c.get(&unit.key)
+    } else {
+        w.units.get(&unit.key)
+    };
+    match (u, w.local()) {
+        (Some(u), Some(p)) => distance(u, unit_size(u, rows), p, unit_size(p, rows)),
+        _ => NO_LOCAL_DISTANCE,
+    }
 }
 
 /// The unit size of `0x00620510` for a client unit (`sim/path-placement.md`

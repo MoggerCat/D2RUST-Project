@@ -2789,5 +2789,6 @@ fn add_elem_and_clear_elems_by_etype() {
 #[path = "mutant_tests.rs"]
 mod mutant_tests;
 
+mod cov_text;
 mod ext;
 mod r9;

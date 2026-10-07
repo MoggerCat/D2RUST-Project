@@ -237,3 +237,25 @@ fn missile_hit_class_merges_the_element_nibble() {
     merge_hit_class(&mut r, 0x01);
     assert_eq!((r.hit_class, r.hit_class_fixed), (0x01, 1));
 }
+
+// Covers: specs/missiles/missiles.md §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r9
+#[test]
+fn allocation_steps_game_seed_guid_and_init() {
+    let mut s = shot();
+    let ty = UnitType::Missile;
+    let guid_before = s.fx.game.lists.guids.get(ty);
+    let mut game_seed = s.fx.sim.hooks().game_seed;
+    let m = s.fire(13);
+    // One game-seed step derives the missile's unit seed.
+    let derived = game_seed.step();
+    assert_eq!(s.fx.sim.hooks().game_seed, game_seed);
+    assert_eq!(s.fx.sim.sys.units.get(m).unwrap().init_seed, derived);
+    // The GUID counter of type 3 advanced by one.
+    assert_eq!(s.fx.game.lists.guids.get(ty), guid_before + 1);
+    // Missile init: data, unit flags 1 and 3 clear, the every-tick
+    // type-0 event with args 0, 0 and no other timer.
+    assert!(s.fx.sim.hooks().missile_store().get(m).is_some());
+    let f = s.fx.sim.sys.units.get(m).unwrap().flags;
+    assert_eq!(f & (unit_flag::BIT1 | unit_flag::IS_VALID_TARGET), 0);
+    assert_eq!(s.fx.timers(m), [(0, -1)]);
+}

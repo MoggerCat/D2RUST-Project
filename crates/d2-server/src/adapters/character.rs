@@ -599,5 +599,56 @@ pub fn loaded_flags(stored: u32) -> u32 {
     d2s::item_flags_on_load(stored)
 }
 
+/// Load result → (m, string id) of the refusal message (load §5 rule 2,
+/// client handler `0x0045C6D0` / `0x0044E380`). `alt_bit` is config byte
+/// +0x1EF bit 0x20: results 17 and 18 then show 0x5522 / 0x5521. A
+/// result outside 1..=26 gives m = 9 and string 5372 (rule 1's "any
+/// other value").
+pub fn refusal_message(result: u32, alt_bit: bool) -> (u8, u16) {
+    // (m, string id) for results 1..=26, in order.
+    const T: [(u8, u16); 26] = [
+        (0, 5365),
+        (1, 5366),
+        (2, 5367),
+        (3, 5368),
+        (4, 5369),
+        (5, 5371),
+        (10, 5373),
+        (11, 5374),
+        (12, 5375),
+        (13, 5376),
+        (14, 5377),
+        (15, 5378),
+        (16, 5379),
+        (17, 5380),
+        (18, 5381),
+        (19, 5360),
+        (20, 5364),
+        (21, 5363),
+        (22, 5362),
+        (23, 5361),
+        (24, 5359),
+        (9, 5372),
+        (25, 10101),
+        (26, 10102),
+        (27, 5370),
+        (28, 5371),
+    ];
+    match result {
+        1..=26 => {
+            let (m, id) = T[result as usize - 1];
+            match (alt_bit, m) {
+                (true, 20) => (m, 0x5522),
+                (true, 21) => (m, 0x5521),
+                _ => (m, id),
+            }
+        }
+        _ => (9, 5372),
+    }
+}
+pub mod save;
+
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_fitems;

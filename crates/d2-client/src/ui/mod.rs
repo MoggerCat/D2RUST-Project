@@ -15,21 +15,31 @@
 //! behavior.
 
 pub mod automap;
+pub mod cursor;
 pub mod draw;
 pub mod edge;
+pub mod edit_box;
 pub mod frame;
 pub mod geom;
+pub mod gold;
+pub mod inv_grid;
 pub mod layout;
+pub mod messages;
 pub mod original;
 pub mod panel;
 pub mod panels;
+pub mod quest_log;
 pub mod root;
+pub mod skill_desc;
 pub mod states;
 pub mod text;
+pub mod wformat;
 pub mod widget;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_fdesc;
 
 pub use draw::{ImageRef, ImageRequest, TextRequest, TextStyle, UiDraw, UiDrawSink};
 pub use frame::{FrameError, FramePos, Presentation};

@@ -188,7 +188,7 @@ mod tests {
         eval(bytes, 0, &mut Stub)
     }
 
-    // Covers: specs/data/calc-expressions.md §3.1 r1, §3.2, §3.3
+    // Covers: specs/data/calc-expressions.md §3.1 text, §3.1 r1, §3.2, §3.3, §d2rs-policy-proposed-not-yet-logged-in-docs-plan-md-1-2-4-6-implemented r5
     #[test]
     fn evaluator_vectors() {
         assert_eq!(ev(&[0x04, 0x10, 0x07, 0x02, 0x12, 0x00]), 32);

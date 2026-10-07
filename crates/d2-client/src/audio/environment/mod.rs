@@ -24,6 +24,8 @@ use std::collections::BTreeSet;
 use super::calls::{jitter, uniform, Handle, SoundCalls, FLAG_NO_FADE_IN};
 use crate::bridge::world::UnitKey;
 
+pub mod frontend;
+
 #[cfg(test)]
 mod tests;
 

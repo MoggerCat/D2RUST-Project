@@ -244,6 +244,8 @@ pub struct OriginalUi {
     outcome: UiOutcome,
     /// The UI globals of the bridge outputs (`client/msg-ui.md`).
     msg: MsgUiState,
+    /// The UI globals of the smaller outputs (`msg_ui::more`).
+    more: MsgUiMore,
     /// The NPC text list `[0x007BF250]` (`client/msg-ui.md` §5 r2).
     npc_text: Option<NpcTextList>,
     /// The case of 0x28's dialog branch this UI chose for the last
@@ -268,6 +270,10 @@ pub enum OriginalUiError {
     /// 1.14d, `client/msg-ui.md` §16 r4.3).
     #[error("0x28 NPC dialog without an NPC text list (fatal 0x1060)")]
     NoNpcText,
+    /// 0x27's list build asserts at a count of 8 or more (`0x00661557`,
+    /// `client/msg-ui.md` §16 r9.1).
+    #[error("0x27 NPC text list with count {0} (fatal assertion 0x00661557)")]
+    NpcTextCount(u8),
 }
 
 impl OriginalUi {
@@ -293,6 +299,7 @@ impl OriginalUi {
             shared: Rc::new(RefCell::new(shared)),
             outcome: UiOutcome::default(),
             msg: MsgUiState::default(),
+            more: MsgUiMore::default(),
             npc_text: None,
             dialog_answer: None,
         })
@@ -666,7 +673,9 @@ impl Panel for BorderUi {
 
 #[path = "msg_ui.rs"]
 pub mod msg_ui;
-pub use msg_ui::{MsgUiState, NpcTextList, WaypointMenuState};
+pub use msg_ui::{
+    ChatAction, IntroEntry, MsgUiMore, MsgUiState, NpcTextList, OverheadText, WaypointMenuState,
+};
 
 #[cfg(test)]
 #[path = "original_tests.rs"]
