@@ -32,15 +32,15 @@
 |   4. Totals and resistances: `totals` = `0x0057C1E0` | 297–398 |
 |   5. Application | 399–589 |
 |   6. Hit class and hit recovery | 590–620 |
-|   7. Reaction and death trigger | 621–712 |
-|   8. Event functions (table `0x007325B0`, 32 entries) | 713–776 |
-|   9. Durability `0x0057D3D0` | 777–798 |
-| Constants & data dependencies | 799–820 |
-| Randomness | 821–853 |
-| Edge cases & original bugs | 854–888 |
-| Test vectors | 889–921 |
-| Provenance | 922–947 |
-| Open questions | 948–997 |
+|   7. Reaction and death trigger | 621–722 |
+|   8. Event functions (table `0x007325B0`, 32 entries) | 723–786 |
+|   9. Durability `0x0057D3D0` | 787–808 |
+| Constants & data dependencies | 809–830 |
+| Randomness | 831–863 |
+| Edge cases & original bugs | 864–898 |
+| Test vectors | 899–931 |
+| Provenance | 932–957 |
+| Open questions | 958–1007 |
 <!-- /index -->
 
 ## Summary
@@ -673,7 +673,17 @@ except inside the get-hit test (§6.2).
       (102) / 8 (toward zero) + 15 → point form (no skill, mode 9 `BL`,
       0, 0, 0), then stat 95 := frame (game +0xA8). Return.
    4. F has 2: D in mode 0 or 17 → return; else unit form (no skill,
-      mode 0, tA, gA, 0). Return.
+      mode 0, tA, gA, 0). Return. This starts a player's death (no other
+      caller of `0x00580A70` passes a fixed mode 0; 2026-10-08,
+      `0x0057D324`): it resolves (tA, gA)
+      (`0x00552F60`); **no unit (no A: (6, −1)) → logged
+      (`0x006248E0`) and nothing**, D stays alive in its mode. Else the
+      mode check (`sim/pathing.md` §1.3: mode 0 allowed, also with a
+      cursor item), the interrupt check (§1.4: refused for state 54 or
+      mode 0 / 17, else allowed for m = 0), D's player data +0x154,
+      +0x150 := 0, then the DT start `0x00580EC0` with K = the resolved
+      A (`combat/vitals.md` §4.8). The kill `0x0057CCB0` (§7.2) never
+      changes a player's mode.
    5. F has 8: unit form (no skill, mode 19 `KB`, tA, gA, 0). Return.
    6. F has 4: no state-21 list and the get-hit test true → soft;
       else point form (no skill, mode 4 `GH`, x = R +0x4C, 0, 0).

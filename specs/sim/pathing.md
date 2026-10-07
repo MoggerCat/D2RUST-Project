@@ -24,28 +24,29 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 51–66 |
-| Inputs | 67–76 |
-| Outputs / state changes | 77–83 |
-| Rules | 84–85 |
-|   1. Walk and run requests | 86–230 |
-|   2. Path types | 231–270 |
-|   3. Path compute (`0x00649970(path, unit, town access)`) | 271–337 |
-|   4. Target preparation (flag 0x1000, `0x00648120`) | 338–354 |
-|   5. Toward (type 2, `0x00679C80`) | 355–422 |
-|   6. Straight (type 7, `0x00679ED0`) | 423–432 |
-|   7. A* (type 1, `0x0067B850`) | 433–470 |
-|   8. Velocity, direction vector, facing | 471–557 |
-|   9. Per-tick movement | 558–739 |
-|   10. Messages | 740–762 |
-|   11. Missile paths (`0x00649760`) | 763–815 |
-|   12. Other path types (1.14d-read 2026-10-08) | 816–1029 |
-| Constants & data dependencies | 1030–1066 |
-| Randomness | 1067–1077 |
-| Edge cases & original bugs | 1078–1125 |
-| Test vectors | 1126–1163 |
-| Provenance | 1164–1201 |
-| Open questions | 1202–1275 |
+| Summary | 52–67 |
+| Inputs | 68–77 |
+| Outputs / state changes | 78–84 |
+| Rules | 85–86 |
+|   1. Walk and run requests | 87–231 |
+|   2. Path types | 232–271 |
+|   3. Path compute (`0x00649970(path, unit, town access)`) | 272–338 |
+|   4. Target preparation (flag 0x1000, `0x00648120`) | 339–355 |
+|   5. Toward (type 2, `0x00679C80`) | 356–423 |
+|   6. Straight (type 7, `0x00679ED0`) | 424–433 |
+|   7. A* (type 1, `0x0067B850`) | 434–471 |
+|   8. Velocity, direction vector, facing | 472–558 |
+|   9. Per-tick movement | 559–742 |
+|   10. Messages | 743–765 |
+|   11. Missile paths (`0x00649760`) | 766–818 |
+|   12. Other path types (1.14d-read 2026-10-08) | 819–1032 |
+|   13. Path accessors and the cell line test (1.14d-read 2026-10-08) | 1033–1112 |
+| Constants & data dependencies | 1113–1149 |
+| Randomness | 1150–1160 |
+| Edge cases & original bugs | 1161–1208 |
+| Test vectors | 1209–1246 |
+| Provenance | 1247–1289 |
+| Open questions | 1290–1363 |
 <!-- /index -->
 
 ## Summary
@@ -563,7 +564,9 @@ Event 0 every tick (`sim/tick.md` §3 step 4; `sim/units.md` §4.4–§4.6):
 players in modes 2, 3, 6, 19 → `0x00580C20`; monsters in moving modes →
 the mode's event-0 function, e.g. walk `0x005A8490`: state 13 →
 `0x005C9D90`, state 22 → `0x005CE4F0`, step (§9.3), result 2 → the
-mode's end (`0x005A8030`).
+mode's end (`0x005A8030`). The two state calls never gate the step
+(results untested); run, knockback and sequence event 0: `sim/units.md`
+§4.6 rule 13.
 
 #### 9.2 Player step (`0x00580C20`)
 
@@ -1027,6 +1030,86 @@ A: (12, 10) blocked → dir 2 → (13, 11); B (13, 9); A (13, 10) = buf[2]
 10), i = 4; (14, 10) taken untested, (15, 10) free. Compression: (11,
 10), (12, 11), (13, 10), (15, 10); count 4.
 
+### 13. Path accessors and the cell line test (1.14d-read 2026-10-08)
+
+Gaps MV7, MV9–MV11 of `docs/handoff/impl-path-motion.md`.
+
+#### 13.1 Small setters
+
+1. **Step counts** `0x00648E70(path, n)`: null path → nothing. Only the
+   low byte of n is used, unsigned: b ≥ 77 → 77; distance budget (+0x90)
+   and max path distance (+0x91) := b. So a negative n gives its low
+   byte: −1 → 255 → 77, −256 → 0, −200 → 56. (`0x00648E40(path, n)`
+   writes +0x90 only, no cap.)
+2. **Stop distance** `0x00649070(path, n)` (the AI's "path step count",
+   `monsters/ai.md` §7.1–§7.2): §9.5 rule 3 (+0x93 := n − 1 for n in
+   1…19, else 0).
+3. **Stop the path** `0x00648730(path)`: flags (+0x34) &= ~0x20, point
+   count (+0x28) := 0. Nothing else (target, type, budgets, re-path
+   budget kept). Callers: NPC interaction `0x00548B95`
+   (`monsters/ai.md` §1.2), the client's 0x28 branch
+   (`client/msg-ui.md` §16), AI bodies.
+
+#### 13.2 Path target unit `0x00553540(game, unit)` and target position `0x0056D2C0`
+
+1. `0x00553540`: target check `0x00553490` (§9.2 step 1: a target unit
+   whose stored type and GUID no longer resolve to the stored pointer,
+   or an item in mode 1 or 2, is cleared to none by `0x00648B90(0)`),
+   then the path's target unit (+0x58); the unit itself counts as none.
+2. `0x0056D2C0(game, unit, &x, &y)`: T := rule 1. T present → (x, y) :=
+   T's position (types 2, 4, 5: static path +0x0C / +0x10; else the
+   dynamic path x / y `0x006488C0` / `0x00648900`, 0 without a path).
+   T none → (x, y) := the path's target point (+0x10, +0x12;
+   `0x00648A00` / `0x00648A10`). Result 1 when both are non-zero, else 0.
+3. So a stale target (its GUID gone or reused) is cleared **and**
+   replaced by the stored target point. `0x00648B90` never writes
+   +0x10 / +0x12, so that point is whatever `0x00648AD0` (or the path
+   code) last wrote: for an AI request aimed at a unit, the point of an
+   earlier request, (0, 0) for a never-written path.
+
+#### 13.3 Cell line test `0x0064E260(room R, &from, &to, mask)`
+
+Cells are sub-tiles; "R's rect" = room +0x4C x, +0x50 y, +0x54 width,
++0x58 height; the cell value is R's collision grid word (`0x0061A010`,
+`drlg/rooms.md` §10.3). Result 0 = clear (to unchanged); 1 = blocked,
+and `to` := the blocking cell (the first cell that fails).
+
+1. R null → 1, to := from. From not in R's rect → R := the cell lookup
+   from R (`sim/path-placement.md` §4 rule 1); none, or from still
+   outside → 1, to := from.
+2. dx = to.x − from.x, dy = to.y − from.y, sx, sy their signs (+1 for
+   0), adx = |dx|, ady = |dy|.
+3. Cells visited, in order, each tested `value & mask` ≠ 0 → blocked
+   there:
+   - adx = ady = 0: the one cell from.
+   - adx = 0 (or ady = 0): from, stepping one axis by sy (sx) up to and
+     including `to`.
+   - ady > adx (y major): cell k = (from.x + sx·⌊k·adx / ady⌋, from.y +
+     sy·k), k = 0 … ady (error e starts 0, e += adx per step, x steps
+     when e ≥ ady, then e −= ady).
+   - adx ≥ ady (x major, ties included): cell k = (from.x + sx·k,
+     from.y + sy·⌊k·ady / adx⌋), k = 0 … adx.
+   All cells clear → 0.
+4. Room crossing: when the next cell leaves R's rect on either axis
+   (and the walk is not finished), R := the cell lookup for that cell
+   from R; none, or the cell outside the found room's rect → 1, to :=
+   that cell (it is not tested). Then the walk goes on in the new room
+   with the same error term.
+
+Callers named in other specs: the line test `0x00645910`
+(`skills/bodies-2.md`, `monsters/ai.md` §7.4), the missile line test
+(`skills/bodies.md` §2.11), event flag 0x200 (`skills/bodies.md`). No
+draws.
+
+Test vectors (synthetic; one room rect (0, 0, 20, 20), mask 1, cell
+(3, 1) has bit 1, all others 0):
+
+| from → to | Cells | Result, to |
+|---|---|---|
+| (0, 0) → (6, 2) | (0,0) (1,0) (2,0) (3,1) | 1, (3, 1) |
+| (0, 0) → (2, 6) | (0,0) (0,1) (0,2) (1,3) (1,4) (1,5) (2,6) | 0 |
+| (3, 1) → (3, 1) | (3,1) | 1, (3, 1) |
+
 ## Constants & data dependencies
 
 | Constant | Value | Where |
@@ -1186,6 +1269,11 @@ Real (recordings; message side):
   `0x0053B4B0`, `0x0053C3F0`, `0x0053C320`, `0x0053C230`; missile paths `0x00649760`,
   `0x006492F0`, `0x0067A240`, `0x0067A140`, `0x0040B330`, `0x0040B350`
   (table `0x00707800`); room change `0x005545C0`, `0x00571600`.
+- §13 (2026-10-08): `disasm.py fn` on `0x00648E70`, `0x00648E40`,
+  `0x00649070`, `0x00648730`, `0x00553540`, `0x00553490`, `0x00648B90`,
+  `0x00648AD0`; decompile of `0x0056D2C0` and `0x0064E260` (branch
+  structure checked against its error-term updates); test vectors hand
+  computed from §13.3.
 - D2MOO 1.10f as a map (`D2Common_10142`, `PATH_Toward_6FDAA9F0`,
   `PATH_RayTrace`, `PATH_Straight_Compute`, `PATH_AStar_*`,
   `PATH_PreparePathTargetForPathUpdate`,
