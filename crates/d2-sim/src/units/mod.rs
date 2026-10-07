@@ -3,7 +3,9 @@
 //! ([`lists`]); unit data, stats and behaviour follow with their specs.
 
 pub mod anim;
+pub mod anim_rate;
 pub mod dispatch;
+pub mod event_records;
 #[cfg(test)]
 mod gap_tests;
 pub mod hooks;
