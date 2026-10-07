@@ -36,7 +36,7 @@
 | Edge cases & original bugs | 328–346 |
 | Test vectors | 347–359 |
 | Provenance | 360–379 |
-| Open questions | 380–412 |
+| Open questions | 380–435 |
 <!-- /index -->
 
 ## Summary
@@ -402,6 +402,29 @@ Synthetic, from the rules (`sim/rng.md` generator):
    `0x00585A80`); whether those values can be 0
    stays with their owners (treasure, cube, NPC, quest and object
    specs).
+   Rest answered (2026-10-07, the quality argument pushed at every call
+   site of the parameterised builders, read from the disassembly):
+   - Quality 0, so §3 is drawn: the Cow King's eight `vps ` drops
+     (`0x00559A30` from `0x00593F41`, `world/quests-act1.md` event 8);
+     the chest code drops `0x00585970(game, object, code, 0)` at
+     `0x005861BF`, `0x005861DC`, `0x005861FC`, `0x005862DF` (chest
+     operate `0x00585F60`, `world/objects.md` §8.1); the shrine potion
+     drops inline in `0x005830E0` / `0x00583410` (+0x30 := 0 at
+     `0x00583216` / `0x00583546`, `world/objects.md` "Potion drop");
+     cube outputs without a quality byte (`0x00565AB0`, +0x30 := the
+     slot byte, `world/cube.md` §7).
+   - Never 0: the other 32 `0x00559A30` sites (2 or 7); the other eight
+     `0x00585970` sites (2); `0x0056DAB0` (one site, 2, the potion drop
+     of `skills/bodies-2.md` §2.4); the TC walk `0x0055A550` (Q or
+     `items/treasure.md` §6, which gives 0 only for a missing item or
+     type record); `0x00559CE0` from the start items `0x00534CA0` (2),
+     `0x0055A188` / `0x0055A26F` (2), the store `0x005764D6`
+     (`world/vendors.md` §3.1: 2, 3 or 4), the gamble list `0x005789F9`
+     (4–7), the quest gift `0x005466B0` (11 sites: 2 or 6) and the
+     monster equip `0x00573B20` (`0x005B1CCD`: 4; from monequip
+     `0x005D6B60` the row's `mod`k, 0–7 else 0, which is 3, 4 or 6 in
+     every live `monequip.txt` row with an item).
+   - `0x00585A80`: no call and no pointer in 1.14d (`disasm.py xref`).
 3. Answered (handoff `impl-items` OQ-Q1): the §8.1 vector is reworded,
    the rules stand. In `0x005566B0` the accept test (`0x005569B0`–`0x005569C0`: items `quest` ≠ 0, or game none, or idx < 0x1001 and its bit
    clear) runs before the marking `0x00556530`; for idx 4097 on a
