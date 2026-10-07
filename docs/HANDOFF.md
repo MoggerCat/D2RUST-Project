@@ -5124,6 +5124,12 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
   a pending skill (0x99 / 0x9A, line above) — log whether any later
   message of the same receive changes the 0x99 unit (0x0A, 0x15,
   0xA8 / 0xA9 state 118).
+- `client/model.md` OQ14 (§16) + OQ15 (§15): from `tp80-packets.jsonl`
+  (PC 2) list the S→C messages between the town-portal use and the C→S
+  0x4B after tick 2919 (expected: the 0x08 dropping the hireling's room,
+  no 0x0A / 0x15 / 0xAC for GUID 1 before it), and the same window at
+  the second teleport; one shrine use (any shrine) logging 0x0E / 0x4D
+  bytes and the `0x004B9A00` request (id = table +0x10 for the code).
 
 ## 8. Lessons (problems met, fixes)
 
