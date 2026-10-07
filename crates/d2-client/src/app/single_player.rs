@@ -61,9 +61,9 @@
 //!
 //! Seams without a provider are [`LocalSeams`] (the action and world
 //! wiring's): the narrowest answers (`Pending`'s and `WorldPending`'s
-//! defaults) plus a store of what the sim itself sets (positions, the
-//! interaction target) and the transport outbox; and
-//! [`super::rest::AppRest`] (the wired host's). Nothing
+//! defaults) plus a store of what the sim itself sets (positions) and
+//! the transport outbox; and [`super::rest::AppRest`] (the wired
+//! host's). Nothing
 //! here decides an outcome: it stages the game the way the server tests
 //! do (a sorceress who knows her act's first waypoint, `bridge.md` §3).
 
@@ -118,7 +118,7 @@ use d2_sim::world::waypoints::{WaypointData, NO_WAYPOINT};
 use d2_sim::drlg::outdoor::{OutdoorData, SubFile, SubFiles};
 use d2_sim::drlg::preset::{Ds1Input, Ds1Source, PresetData};
 
-use super::rest::{AppRest, Interactions};
+use super::rest::AppRest;
 use super::server_thread::{ThreadLink, ThreadStopped};
 use crate::bridge::drlg::DrlgSource;
 use crate::bridge::local::{LocalLink, PendingSession};
@@ -254,16 +254,14 @@ pub enum BuildError {
 }
 
 /// The action and world wiring's seams without a provider. Positions
-/// and the interaction target are stored as the sim sets them (the
-/// interaction in the store shared with the wired host's rest,
-/// [`Interactions`]); messages the sim
+/// are stored as the sim sets them (the interaction target is the unit
+/// record's, `UnitRecord::interact`); messages the sim
 /// sends wait in `sent` for the world handlers ([`Outbox`]); warp and
 /// arrival mode, whose bodies are unwritten specs, are logged. The world
 /// wiring's seams keep `WorldPending`'s defaults.
 #[derive(Debug, Default)]
 pub struct LocalSeams {
     pub pos: BTreeMap<UnitId, (i32, i32)>,
-    pub interact: Interactions,
     pub sent: Vec<(UnitId, Vec<u8>)>,
     pub log: Vec<String>,
 }
@@ -274,18 +272,6 @@ impl Pending for LocalSeams {
     }
     fn place(&mut self, unit: UnitId, x: i32, y: i32) {
         self.pos.insert(unit, (x, y));
-    }
-    fn set_interact(&mut self, player: UnitId, unit_type: u8, guid: u32) {
-        self.interact
-            .borrow_mut()
-            .entry(player)
-            .or_insert((unit_type, guid));
-    }
-    fn reset_interact(&mut self, player: UnitId) {
-        self.interact.borrow_mut().remove(&player);
-    }
-    fn interact_guid(&self, player: UnitId) -> Option<u32> {
-        self.interact.borrow().get(&player).map(|i| i.1)
     }
     fn send(&mut self, player: UnitId, msg: &[u8]) {
         self.sent.push((player, msg.to_vec()));
@@ -949,17 +935,13 @@ pub fn build_with(
         tiles: levels.tiles,
         types: levels.types,
     };
-    let interact = Interactions::default();
     // `rng.md` §5.2, the fixed-seed branch (`--seed N`): the game seed
     // is `{N, 666}`, unstepped.
     let mut hooks = ActionHooks::new(
         Arc::new(parts.action),
         world,
         Seed::init_low(seed),
-        LocalSeams {
-            interact: interact.clone(),
-            ..LocalSeams::default()
-        },
+        LocalSeams::default(),
     );
     hooks.anim_data = parts.anim;
     hooks.vitals = parts.vitals;
@@ -1061,7 +1043,6 @@ pub fn build_with(
         ..ActionWorld::default()
     };
     let rest = AppRest {
-        interact,
         expansion: GAME_SETUP.expansion,
         ..AppRest::default()
     };

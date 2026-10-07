@@ -9,10 +9,9 @@
 //! (`d2-server/tests/game_wired_host.rs`), gathered here so a synthetic
 //! install ([`crate::install`]) goes the same way; nothing here adds a
 //! rule. The seams with no provider keep the sim's defaults: [`Seams`]
-//! answers only the bookkeeping no rule decides (the interaction owner,
-//! the transport), as the live host test does.
+//! answers only the bookkeeping no rule decides (the transport), as the
+//! live host test does.
 
-use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use d2_data::bin::{BinSet, BinTable};
@@ -322,24 +321,14 @@ impl GameData {
 }
 
 /// The seams without a provider keep their defaults (`Pending`,
-/// `WorldPending`), except the interaction owner (kept as set) and the
-/// transport (`send` collected and handed to the host by [`Outbox`]).
+/// `WorldPending`), except the transport (`send` collected and handed
+/// to the host by [`Outbox`]).
 #[derive(Default)]
 pub struct Seams {
-    pub interact: BTreeMap<UnitId, (u8, u32)>,
     pub sent: Vec<(UnitId, Vec<u8>)>,
 }
 
 impl Pending for Seams {
-    fn set_interact(&mut self, player: UnitId, unit_type: u8, guid: u32) {
-        self.interact.entry(player).or_insert((unit_type, guid));
-    }
-    fn reset_interact(&mut self, player: UnitId) {
-        self.interact.remove(&player);
-    }
-    fn interact_guid(&self, player: UnitId) -> Option<u32> {
-        self.interact.get(&player).map(|i| i.1)
-    }
     fn send(&mut self, player: UnitId, msg: &[u8]) {
         self.sent.push((player, msg.to_vec()));
     }

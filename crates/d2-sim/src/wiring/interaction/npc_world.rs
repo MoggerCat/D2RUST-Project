@@ -41,9 +41,6 @@ pub trait NpcRest: super::HirelingRest {
     /// `npc.md` Open question 1.
     fn start_allowed(&self, player: UnitId, npc: UnitId) -> bool;
     fn tristram_cain_busy(&self, player: UnitId, npc: UnitId) -> bool;
-    fn interact_unit(&self, player: UnitId) -> Option<(u8, u32)>;
-    fn set_interact(&mut self, player: UnitId, unit_type: u8, guid: u32);
-    fn reset_interact(&mut self, player: UnitId);
     fn pet(&self, player: UnitId, kind: u8, arg: u8) -> Option<UnitId>;
     fn pets(&self, player: UnitId) -> Vec<UnitId>;
     fn player_name(&self, player: UnitId) -> Vec<u8>;
@@ -204,14 +201,22 @@ impl<'a, H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> NpcWorld
     fn interaction(&mut self, npc: UnitId) -> Option<&mut InteractionList> {
         self.state.lists.get_mut(&npc)
     }
+    /// `0x00554100` on the player's unit record (+0x64 / +0x68 / +0x6C,
+    /// [`crate::units::record::InteractInfo`]); no record → none.
     fn interact_unit(&self, player: UnitId) -> Option<(u8, u32)> {
-        self.rest.interact_unit(player)
+        self.econ.units.get(player)?.interact.get()
     }
+    /// `0x00554120` (ignored while active).
     fn set_interact(&mut self, player: UnitId, unit_type: u8, guid: u32) {
-        self.rest.set_interact(player, unit_type, guid);
+        if let Some(r) = self.record_mut(player) {
+            r.interact.set(unit_type, guid);
+        }
     }
+    /// `0x00554190`.
     fn reset_interact(&mut self, player: UnitId) {
-        self.rest.reset_interact(player);
+        if let Some(r) = self.record_mut(player) {
+            r.interact.reset();
+        }
     }
     /// Kind 7: the hireling list (`hirelings.md` §5 rule 4); other kinds
     /// are `sim/pets.md`'s (the rest).

@@ -1,8 +1,9 @@
-// Spec: specs/items/inventory.md §1–§5; specs/items/generation.md §1.3; specs/world/cube.md §4.1 (item getters); specs/sim/unit-order.md §5
+// Spec: specs/items/inventory.md §1–§5; specs/items/generation.md §1.3; specs/world/cube.md §4.1 (item getters); specs/sim/unit-order.md §5; specs/world/npc.md §2 (the interact info)
 // Spec: specs/items/inventory-moves.md (§6–§11, split out of `inventory.md`)
 //! [`InvWorld`] on [`InvDesk`]: item data from the state's copies, unit
 //! kinds and acts from the unit records, stats from the stat lists, room
-//! removal from the unit lists, item getters from the item store; the
+//! removal from the unit lists, item getters from the item store, the
+//! interaction from the unit record's interact info; the
 //! rest through [`InvRest`] / [`MovePending`].
 
 use super::{InvDesk, InvRest};
@@ -206,12 +207,26 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvWorld for InvDesk<'_, '_, H, R> 
             .send(p, layouts::use_stackable(0xFF, item_guid, 0xFFFF));
     }
 
+    /// `0x00554100` on the player's unit record (+0x64 / +0x68 / +0x6C,
+    /// [`crate::units::record::InteractInfo`]), its unit looked up by
+    /// type and GUID (`0x00552F60`); a type outside 0–5 finds none.
     fn interaction(&self, player: UnitId) -> InteractionTarget {
-        self.rest.interaction(self.o(player))
+        let Some((ty, guid)) = self.econ.units.get(player).and_then(|r| r.interact.get()) else {
+            return InteractionTarget::None;
+        };
+        let unit = UnitType::ALL
+            .get(usize::from(ty))
+            .and_then(|&t| self.econ.game.lists.find_unit(t, guid));
+        match unit {
+            Some(unit) => InteractionTarget::Unit { ty, unit },
+            None => InteractionTarget::Missing,
+        }
     }
+    /// `0x00554190` on the player's unit record.
     fn clear_interaction(&mut self, player: UnitId) {
-        let p = self.o(player);
-        self.rest.clear_interaction(p)
+        if let Some(r) = self.econ.units.get_mut(player) {
+            r.interact.reset();
+        }
     }
     fn player_data_4c(&self, player: UnitId) -> u32 {
         self.rest.player_data_4c(self.o(player))

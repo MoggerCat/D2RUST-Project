@@ -1,4 +1,4 @@
-// Spec: specs/world/quests.md §9; specs/world/quests-act1.md §10; specs/world/quests-act1-rest.md §1–§3; specs/world/quests-act2.md §1.5; specs/world/objects.md §3, §4, §7; specs/world/npc.md §2 (the interaction owner); specs/sim/tick.md §5.2
+// Spec: specs/world/quests.md §9; specs/world/quests-act1.md §10; specs/world/quests-act1-rest.md §1–§3; specs/world/quests-act2.md §1.5; specs/world/objects.md §3, §4, §7; specs/sim/tick.md §5.2
 //! [`HostQuests`]: the quests' world on the wired host. Every
 //! [`QuestWorld`] call goes to [`EconomyQuests`] (the economy plus the
 //! rest), except those the action wiring provides:
@@ -12,8 +12,6 @@
 //!   ([`View::create_object`]) and the collision free `0x00623830` (the
 //!   object code's footprint seam, `Pending::object_free_footprint`);
 //! - the level of a unit in a DRLG room (`DrlgWorld::level_id`);
-//! - the player's interaction (`0x00554120` / `0x00554190`) on the
-//!   host's one owner, the NPC rest (`NpcRest`);
 //! - `0x006280D0(item, 0x10)` on an item of the game's item store;
 //! - `missiles.txt` `Range` from the action tables;
 //! - the chest treasure `0x00585B90(op, kind)` on the object drop state
@@ -27,7 +25,6 @@
 use crate::rng::Seed;
 use crate::units::{RoomId, UnitId};
 use crate::wiring::action::{ActionHooks, Pending, View};
-use crate::wiring::interaction::NpcRest;
 use crate::world::quests::{PlayerQuests, QuestChain, QuestWorld, UnitKind};
 
 use super::{EconomyQuests, QuestRest};
@@ -74,7 +71,7 @@ impl<'e, 'a, X: Pending, R: QuestRest> HostQuests<'e, 'a, X, R> {
     }
 }
 
-impl<X: Pending, R: QuestRest + NpcRest> QuestWorld for HostQuests<'_, '_, X, R> {
+impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
     /// Unit +0x10 of an object with object data.
     fn object_mode(&self, object: UnitId) -> i32 {
         if self.known(object) {
@@ -153,16 +150,11 @@ impl<X: Pending, R: QuestRest + NpcRest> QuestWorld for HostQuests<'_, '_, X, R>
         room.and_then(|r| e.hooks.drlg.level_id(e.game, r))
             .or_else(|| self.inner.unit_level(unit))
     }
-    /// The interaction owner (`NpcRest::interact_unit`, `npc.md` §2).
     fn interact_unit(&mut self, player: UnitId) -> Option<(u8, u32)> {
-        NpcRest::interact_unit(&*self.inner.rest, player)
+        self.inner.interact_unit(player)
     }
-    /// `0x00554120` (`Some`) / `0x00554190` (`None`) on the owner.
     fn set_interact_unit(&mut self, player: UnitId, unit: Option<(u8, u32)>) {
-        match unit {
-            Some((t, guid)) => self.inner.rest.set_interact(player, t, guid),
-            None => self.inner.rest.reset_interact(player),
-        }
+        self.inner.set_interact_unit(player, unit)
     }
     /// `0x006280D0(item, 0x10)`: item flags +0x18 |= identified.
     fn identify_item(&mut self, item: UnitId) {

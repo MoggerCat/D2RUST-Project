@@ -156,6 +156,11 @@ pub trait UnitHooks: StatHost {
     /// player spec.
     fn player_corpse(&mut self, sim: &mut Sim<'_>, unit: UnitId) {}
 
+    /// `0x0057FB70(game, player, corpse)`: the corpse pickup of C→S 0x16
+    /// type 0 (`items/inventory-moves.md` §7.1, `combat/vitals.md` §4.7
+    /// rule 2). Provider: player/combat spec.
+    fn player_corpse_pickup(&mut self, sim: &mut Sim<'_>, player: UnitId, corpse: UnitId) {}
+
     /// Knockback start: path values 8 and 5. Provider: path spec.
     fn player_knockback_path(&mut self, sim: &mut Sim<'_>, unit: UnitId) {}
 

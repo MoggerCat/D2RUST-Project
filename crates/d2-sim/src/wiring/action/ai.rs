@@ -126,8 +126,10 @@ impl<X: Pending> AiUnits for View<'_, X> {
     fn interacting(&self, unit: UnitId) -> bool {
         self.h.x.interacting(unit)
     }
+    /// `0x00535060`: the interact info on the unit record (active),
+    /// then [`Pending::busy`] (cursor, player data +0x4C).
     fn busy(&self, unit: UnitId) -> bool {
-        self.h.x.busy(unit)
+        self.units.get(unit).is_some_and(|r| r.interact.active) || self.h.x.busy(unit)
     }
     fn has_interaction_block(&self, unit: UnitId) -> bool {
         self.h.x.has_interaction_block(unit)

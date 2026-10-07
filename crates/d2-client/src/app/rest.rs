@@ -2,9 +2,9 @@
 //! The seams of the app's wired host (`d2_server::adapters::handlers::
 //! world::WiredWorld`) that no written spec provides: the rest `R` of the
 //! NPC, vendor, quest and hireling wiring (`docs/handoff/
-//! wire-interaction.md` §6 names each call's owner), and the
-//! interaction store it shares with the action wiring's
-//! [`super::single_player::LocalSeams`].
+//! wire-interaction.md` §6 names each call's owner). The players'
+//! interaction is the unit record's (`UnitRecord::interact`), not the
+//! rest's.
 //!
 //! Every answer is the narrowest one, as `Pending`'s defaults are: a
 //! query answers "none" (no unit, no item, no spot, not allowed, out of
@@ -14,9 +14,7 @@
 //! messages the rests send) is kept as set. Nothing here decides an
 //! outcome; a call that would need a decision is refused.
 
-use std::cell::RefCell;
 use std::collections::BTreeMap;
-use std::rc::Rc;
 
 use d2_server::adapters::handlers::world::Outbox;
 use d2_sim::units::{RoomId, UnitId};
@@ -27,19 +25,9 @@ use d2_sim::world::quests::{PlayerQuests, QuestChain, TextList, UnitKind};
 use d2_sim::world::vendors::price::Bonus;
 use d2_sim::world::vendors::Transaction;
 
-/// The players' interaction (player data +0x64 GUID, +0x68 type), one
-/// store for the action wiring's `Pending` (object operate, waypoints)
-/// and the NPC wiring's `NpcRest` (the wired host's one owner), shared
-/// by both seams of the app's game.
-///
-/// TODO(impl-items-wiring): the interaction moves onto the unit record
-/// (`UnitRecord::interact`); this store goes then.
-pub type Interactions = Rc<RefCell<BTreeMap<UnitId, (u8, u32)>>>;
-
 /// The rest of the app's wired host (module docs).
 #[derive(Debug, Default)]
 pub struct AppRest {
-    pub interact: Interactions,
     /// Expansion game (the item format, `generation.md` §1.2).
     pub expansion: bool,
     /// The players' quest records (player data, `quests.md` §1.7), set at
@@ -107,18 +95,6 @@ impl NpcRest for AppRest {
     }
     fn tristram_cain_busy(&self, _: UnitId, _: UnitId) -> bool {
         true
-    }
-    fn interact_unit(&self, player: UnitId) -> Option<(u8, u32)> {
-        self.interact.borrow().get(&player).copied()
-    }
-    fn set_interact(&mut self, player: UnitId, unit_type: u8, guid: u32) {
-        self.interact
-            .borrow_mut()
-            .entry(player)
-            .or_insert((unit_type, guid));
-    }
-    fn reset_interact(&mut self, player: UnitId) {
-        self.interact.borrow_mut().remove(&player);
     }
     fn pet(&self, _: UnitId, _: u8, _: u8) -> Option<UnitId> {
         None

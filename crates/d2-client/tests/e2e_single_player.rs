@@ -44,11 +44,13 @@
 //!    §11: 0x9C / 0x9D with the item bit stream, `items/bitstream.md`:
 //!    decoded with `d2-proto`'s reader and cut off by `streams`) and
 //!    0x47, 0x48;
-//! 10. (steps 19–22) the vendor on the same inventory: the cap placed by
-//!     0x18 is sold (0x33: removed, freed, the price received: S→C 0x2A
-//!     kind 3), a buy (0x32) **stops at the item copy** `0x0055A2A0`
-//!     (§7.1 rule 9.2: 0x2A code 9), the stored buckler's sale **stops
-//!     at the same copy** (§7.2 rule 8), the stored cap is sold; quests
+//! 10. (steps 19–22) the vendor on the same inventory (the player
+//!     leaves Akara for the item moves, C→S 0x30, and talks to her
+//!     again first): the cap placed by 0x18 is sold (0x33: removed, freed, the price received: S→C 0x2A
+//!     kind 3), a buy (0x32) copies the store cap (`0x0055A2A0`, §7.1
+//!     rule 9.2, on the inventory model) into the backpack (0x2A kind 4,
+//!     its 0x9C action 4), the stored buckler is sold (a restored copy
+//!     into the store, §7.2 rule 8), the stored cap is sold; quests
 //!     (0x31, 0x40, 0x58) are a marked step for after the quest-host
 //!     merge;
 //! 11. (steps 23–25) the cube (C→S 0x2A, 0x4F, `cube.md` §1, §2, §3, §8)
@@ -71,7 +73,7 @@
 //! cube message to them yet). Where a step needs behaviour no written spec
 //! owns (the COF-name composer, the animation rate, the missile's path
 //! and damage setup, the death start's body, the free-spot search, the
-//! item copy, the cube's opening, the item-move seams of `InvFx`), the fixture answers
+//! cube's opening, the item-move seams of `InvFx`), the fixture answers
 //! the seam and says so at the answer (`docs/handoff/e2e-next.md`).
 //!
 //! The whole run is repeated: same seed → byte-identical transcript.
@@ -88,7 +90,7 @@ use d2_data::tables::{Difficultylevels, Monlvl};
 use d2_proto::client::{
     AddStatPoint, BuyItem, ClickButton, DropItem, EntityAction, EquipItem, InitEntityChat,
     InsertItemInBuffer, InteractWithEntity, ItemToCube, PickItem, RemoveBodyItem,
-    RemoveItemFromBuffer, RightSkill, SellItem, TakeOrCloseWp,
+    RemoveItemFromBuffer, RightSkill, SellItem, TakeOrCloseWp, TerminateEntityChat,
 };
 use d2_server::adapters::handlers::items::{CubeParts, ItemPending};
 use d2_server::adapters::handlers::skills::wired::WiredSkills;
@@ -951,6 +953,15 @@ fn map_reveal(x: u16, y: u16, level: u32) -> Vec<u8> {
     b
 }
 
+/// Stages the player's interact info (the unit record's) as (type,
+/// GUID), active: a path no written spec opens (the cube's opening, the
+/// waypoint's operate).
+fn stage_interact(fx: &mut Fx, player: UnitId, (ty, guid): (u8, u32)) {
+    let rec = fx.sim().events.action.sys.units.get_mut(player).unwrap();
+    rec.interact.reset();
+    rec.interact.set(ty, guid);
+}
+
 fn record(fx: &mut Fx, frames: &mut Vec<Frame>, msgs: Vec<Vec<u8>>) {
     let step = fx.step(&msgs);
     // Each received message is accounted once (`bridge.md` §6,
@@ -1250,7 +1261,7 @@ fn run_with(game_seed: u32) -> Transcript {
     // (`server-messages.tsv` 0x27 `partial`, staged zeros).
     let ng = fx.guid(fx.npc);
     let talk = bytes(&InteractWithEntity { type_: 1, id: ng });
-    record(&mut fx, &mut frames, vec![talk]);
+    record(&mut fx, &mut frames, vec![talk.clone()]);
     assert_eq!(frames[17].1.codes, [(0x13, done)]);
     let mut npc_info = vec![0x27, 1];
     npc_info.extend_from_slice(&ng.to_le_bytes());
@@ -1262,7 +1273,8 @@ fn run_with(game_seed: u32) -> Transcript {
     quest_info.push(0);
     quest_info.extend_from_slice(&fx.sim_ref().world.rest.quests[&player].flags[0].0);
     assert_eq!(frames[17].2, [npc_info, game_quests, quest_info]);
-    assert_eq!(fx.sim_ref().world.rest.interact[&player], (1, ng));
+    let rec = fx.sim_ref().events.action.sys.units.get(player).unwrap();
+    assert_eq!(rec.interact.get(), Some((1, ng)));
 
     // 9. Chat (C→S 0x2F, §3): the heal hook (§5; nothing to heal). No
     // message.
@@ -1316,8 +1328,11 @@ fn run_with(game_seed: u32) -> Transcript {
     assert!(store_rows[..store.len() - 1].iter().all(|r| r.1 == BUC));
 
     // 11–16. Item moves (`inventory-moves.md` §7) on the game's inventory
-    // model, with Akara's trade open (the item-move seams answer no
-    // interaction: `InvFx`): a cap on the ground beside the player, made
+    // model, after the player leaves Akara (C→S 0x30 in step 11's frame,
+    // `npc.md` §3: the node freed, the interact unit reset, no message):
+    // with the interaction active the player is busy (`0x00535060`) and a
+    // pickup to the cursor does nothing (§8.2). A cap on the ground beside
+    // the player, made
     // by the economy wiring on the game seed into the game's one item
     // store, identified, at (x + 1, y + 1).
     let cap = fx.ground_cap();
@@ -1352,16 +1367,17 @@ fn run_with(game_seed: u32) -> Transcript {
         v
     };
 
-    // 11. Pick-up to the cursor (C→S 0x16 cursor 1, §7.1 → §8.2): the
-    // staged distance 3 (< 5), the cap leaves the room for the cursor
-    // (mode 4) → 0x9C action 1.
+    // 11. The chat closed (C→S 0x30), then the pick-up to the cursor
+    // (C→S 0x16 cursor 1, §7.1 → §8.2): the staged distance 3 (< 5), the
+    // cap leaves the room for the cursor (mode 4) → 0x9C action 1.
     let pick_cap = bytes(&PickItem {
         type_: 4,
         id: cg,
         cursor: 1,
     });
-    record(&mut fx, &mut frames, vec![pick_cap.clone()]);
-    assert_eq!(frames[20].1.codes, [(0x16, done)]);
+    let close = bytes(&TerminateEntityChat { id: ng });
+    record(&mut fx, &mut frames, vec![close, pick_cap.clone()]);
+    assert_eq!(frames[20].1.codes, [(0x30, done), (0x16, done)]);
     assert_eq!(streams(&fx, &frames[20].2), pass(vec![x9c(0x01, cg)]));
     assert_eq!(fx.mode(cap), 4);
     assert_eq!(fx.sim_ref().game.lists.unit(cap).unwrap().room(), None);
@@ -1446,8 +1462,10 @@ fn run_with(game_seed: u32) -> Transcript {
     assert!(fx.inv.with(|r| r.log.len()) == 2);
     fx.inv.with(|r| r.log.clear());
 
-    // 19. Sell (C→S 0x33) the cap placed by 0x18 (`vendors.md` §7.2):
-    // the player's per its inventory (rule 3, the model), mode 0 (rule
+    // 19. Talk to Akara again (C→S 0x13: the interact unit, 0x27, 0x29,
+    // 0x28 as step 8), then sell (C→S 0x33) the cap placed by 0x18
+    // (`vendors.md` §7.2; rule 2: Akara is the interact unit): the
+    // player's per its inventory (rule 3, the model), mode 0 (rule
     // 4), one of Akara's permanent codes, so no copy (rule 8); rule 9
     // removes it (stored: `0x0055DF10`: unlinked from the inventory,
     // freed); rule 10 receives the price (§9.1, §9.2 by hand: B =
@@ -1463,10 +1481,13 @@ fn run_with(game_seed: u32) -> Transcript {
     };
     let sold = (100 * fx.stat(cap, ARMORCLASS) / 5) * 512 / 1024;
     assert!(sold > 0);
-    record(&mut fx, &mut frames, vec![sell(cg)]);
-    assert_eq!(frames[28].1.codes, [(0x33, done)]);
+    record(&mut fx, &mut frames, vec![talk.clone(), sell(cg)]);
+    assert_eq!(frames[28].1.codes, [(0x13, done), (0x33, done)]);
     gold_now += sold;
-    assert_eq!(frames[28].2, [tx(3, 1, cg, gold_now)]);
+    // The talk's 0x27, 0x29, 0x28 (as step 8), then the sale's 0x2A.
+    let mut want = frames[17].2.clone();
+    want.push(tx(3, 1, cg, gold_now));
+    assert_eq!(frames[28].2, want);
     assert_eq!(fx.stat(player, GOLD), gold_now);
     assert!(!fx.inventory().contains(&cap));
     assert!(fx.sim_ref().game.lists.unit(cap).is_none(), "freed");
@@ -1474,10 +1495,13 @@ fn run_with(game_seed: u32) -> Transcript {
 
     // 20. Buy (C→S 0x32) the store's cap with enough gold: rules 1–8
     // pass (in the NPC inventory, the price, gold, no cursor item in the
-    // player's inventory), the purchase copies the store item (§7.1 rule
-    // 9.2). STOP at the item copy `0x0055A2A0` (`VendorRest::copy_item`,
-    // no items spec writes it): its null runs the spec's refusal: S→C
-    // 0x2A code 9, GUID −1, result 1; nothing paid.
+    // player's inventory); the purchase loop (§7.1 rule 9) copies the
+    // store cap (§7.3, on the inventory model), pays (§9.1, §9.2 by
+    // hand: 100·AC/5, sell mult 1024), and auto-places the copy in the
+    // backpack (`0x00560200`, "send"): 0x2A code 0, kind 4, the copy's
+    // GUID; the copy's 0x9C action 4 in the tick's update pass. The
+    // permanent cap stays in the store (rule 12).
+    let price = 100 * fx.stat(*store.last().unwrap(), ARMORCLASS) / 5;
     let store_cap = fx.guid(*store.last().unwrap());
     let buy = bytes(&BuyItem {
         npc: ng,
@@ -1486,19 +1510,33 @@ fn run_with(game_seed: u32) -> Transcript {
         client_price: 0,
     });
     record(&mut fx, &mut frames, vec![buy]);
-    assert_eq!(frames[29].1.codes, [(0x32, Some(ResultCode::Refused))]);
-    assert_eq!(frames[29].2, [tx(0, 9, u32::MAX, gold_now)]);
+    // The client's own 0x2F (its 0x28 handler of step 19, as step 9)
+    // comes first.
+    assert_eq!(frames[29].1.codes, [(0x2F, done), (0x32, done)]);
+    let bought = *fx.inventory().last().unwrap();
+    assert!(!store.contains(&bought), "a new unit");
+    let bg = fx.guid(bought);
+    gold_now -= price;
+    let mut want = vec![tx(4, 0, bg, gold_now)];
+    want.extend(pass(vec![x9c(0x04, bg)]));
+    assert_eq!(streams(&fx, &frames[29].2), want);
     assert_eq!(fx.stat(player, GOLD), gold_now);
+    assert_eq!(fx.inventory(), [fx.buckler, fx.cap, fx.cube, bought]);
 
     // 21. Sell the player's stored buckler (re-sellable, not a
-    // permanent code). STOP at §7.2 rule 8: the copy into the NPC is the
-    // same unwritten `0x0055A2A0`: 0x2A code 9, GUID −1, result 3; the
-    // buckler stays in the inventory.
+    // permanent code): §7.2 rule 8 copies it into the store (restored,
+    // §7.3); rule 9 removes it (stored: unlinked, freed); rule 10: 0x2A
+    // kind 3, code 1, its GUID, the new gold (§9.2 by hand: 80·AC/6,
+    // buy mult 512; the restored copy's price is the same).
     let buckler = fx.guid(fx.buckler);
+    let buc_sold = (80 * fx.stat(fx.buckler, ARMORCLASS) / 6) * 512 / 1024;
     record(&mut fx, &mut frames, vec![sell(buckler)]);
-    assert_eq!(frames[30].1.codes, [(0x33, Some(ResultCode::Malformed))]);
-    assert_eq!(frames[30].2, [tx(0, 9, u32::MAX, gold_now)]);
-    assert!(fx.inventory().contains(&fx.buckler));
+    assert_eq!(frames[30].1.codes, [(0x33, done)]);
+    gold_now += buc_sold;
+    assert_eq!(frames[30].2, [tx(3, 1, buckler, gold_now)]);
+    assert_eq!(fx.stat(player, GOLD), gold_now);
+    assert!(!fx.inventory().contains(&fx.buckler));
+    assert!(fx.sim_ref().game.lists.unit(fx.buckler).is_none(), "freed");
 
     // 22. Sell the player's stored cap (stored at creation, §2.4): as
     // step 19: 0x2A kind 3, code 1, its GUID, the new gold.
@@ -1509,30 +1547,34 @@ fn run_with(game_seed: u32) -> Transcript {
     gold_now += sold;
     assert_eq!(frames[31].2, [tx(3, 1, scap, gold_now)]);
     assert_eq!(fx.stat(player, GOLD), gold_now);
-    assert_eq!(fx.inventory(), [fx.buckler, fx.cube]);
+    assert_eq!(fx.inventory(), [fx.cube, bought]);
     let copies = fx.sim_ref().world.rest.log.iter();
     let copies: Vec<&String> = copies.filter(|l| l.starts_with("copy")).collect();
-    assert_eq!(copies.len(), 2, "the two stops at 0x0055A2A0");
+    assert!(copies.is_empty(), "both copies on the inventory model");
     assert!(fx.errors().is_empty(), "{:?}", fx.errors());
 
     // TODO(after the quest-host merge): quest messages 0x31, 0x40, 0x58
     // on `WiredWorld` (`QuestCall`) are being added in parallel; until
     // then they stay stubs and this run sends none. The step goes here.
 
-    // 23. The ring on the ground beside the player picked to the cursor
-    // (C→S 0x16 cursor 1, §8.2) → 0x9C action 1.
+    // 23. The player leaves Akara (C→S 0x30, as step 11), then the ring
+    // on the ground beside the player picked to the cursor (C→S 0x16
+    // cursor 1, §8.2) → 0x9C action 1.
     let (cube, ring) = (fx.cube, fx.ring);
     let rg = fx.guid(ring);
     record(
         &mut fx,
         &mut frames,
-        vec![bytes(&PickItem {
-            type_: 4,
-            id: rg,
-            cursor: 1,
-        })],
+        vec![
+            bytes(&TerminateEntityChat { id: ng }),
+            bytes(&PickItem {
+                type_: 4,
+                id: rg,
+                cursor: 1,
+            }),
+        ],
     );
-    assert_eq!(frames[32].1.codes, [(0x16, done)]);
+    assert_eq!(frames[32].1.codes, [(0x30, done), (0x16, done)]);
     assert_eq!(streams(&fx, &frames[32].2), pass(vec![x9c(0x01, rg)]));
     assert_eq!(fx.mode(ring), 4);
     // §8.2: the quest hook ITEMPICKEDUP, then the pickup sound.
@@ -1565,18 +1607,18 @@ fn run_with(game_seed: u32) -> Transcript {
     assert_eq!(streams(&fx, &frames[33].2), pass(vec![x9c(0x04, rg)]));
     assert_eq!(fx.items().get(ring).unwrap().inv_page, CUBE_PAGE);
     assert_eq!(fx.mode(ring), 0);
-    assert_eq!(fx.inventory(), [fx.buckler, cube, ring]);
+    assert_eq!(fx.inventory(), [cube, bought, ring]);
 
     // 25. Transmute (C→S 0x4F button 0x18, `cube.md` §1, §3, §8) with
     // the cube open. The cube's opening (item use, `cube.md` §10) has no
-    // spec: the interaction (type 4, the cube's GUID) is staged at the
-    // host's one owner. The ring matches the recipe: the amulet is
+    // spec: the interaction (type 4, the cube's GUID) is staged on the
+    // player's interact info (the unit record). The ring matches the recipe: the amulet is
     // created; the ring gets 0x9D action 5 now (§8 step 1, `inventory-moves.md`
     // §6.4: owner the player) and is removed from the inventory and
     // freed; sound 4; the amulet is placed on page 3 (§2.4, "send"),
     // identified: its 0x9C action 4 in the tick's update pass.
     let cg2 = fx.guid(cube);
-    fx.sim().world.rest.interact.insert(player, (4, cg2));
+    stage_interact(&mut fx, player, (4, cg2));
     let click = bytes(&ClickButton {
         button: 0x18,
         p1: 0,
@@ -1615,7 +1657,7 @@ fn run_with(game_seed: u32) -> Transcript {
     // is the path provider's, off in this run (WP1), so `Pending::warp`
     // logs it, the player stays in the ISLE room and rule 7's room test
     // sends no S→C 0x0D (provider on: `e2e_walk.rs`).
-    fx.sim().world.rest.interact.insert(player, (2, wp));
+    stage_interact(&mut fx, player, (2, wp));
     let travel = bytes(&TakeOrCloseWp {
         wp,
         level: GATE as u16,
@@ -1627,7 +1669,8 @@ fn run_with(game_seed: u32) -> Transcript {
     record(&mut fx, &mut frames, vec![travel]);
     assert_eq!(frames[35].1.codes, [(0x49, done)]);
     assert_eq!(frames[35].2, none);
-    assert!(!fx.sim_ref().world.rest.interact.contains_key(&player));
+    let rec = fx.sim_ref().events.action.sys.units.get(player).unwrap();
+    assert_eq!(rec.interact.get(), None);
     let log = fx.pending().log.clone();
     assert_eq!(log.last(), Some(&format!("warp {} {GATE} 0", player.0)));
     assert_eq!(fx.sim_ref().game.lists.active_rooms(0).len(), 5);
@@ -1638,12 +1681,13 @@ fn run_with(game_seed: u32) -> Transcript {
     assert_eq!(fx.inv.with(|r| r.log.clone()), Vec::<String>::new());
 
     // The client: 37 frames, 36 server ticks. The S→C messages it got:
-    // 0x27, 0x29, 0x28 once, 0x2A four times (frames 28–31), handled
+    // 0x27, 0x29, 0x28 twice (frames 17, 28), 0x2A four times (frames
+    // 28–31), handled
     // (`client/msg-ui.md` §5, §12, §16, §18), and Akara's harness add
-    // (0xAC, `akara_add`); 0x9C seven times (frames 20, 21, 26,
-    // 27, 32, 33, 34), 0x9D four times (22, 23, 24, 34), 0x47 and 0x48
-    // ten times each are applied (`client/msg-stats-items.md`). The 0x9C
-    // made the three items it names; 0x9D needs the local player, which
+    // (0xAC, `akara_add`); 0x9C eight times (frames 20, 21, 26,
+    // 27, 29, 32, 33, 34), 0x9D four times (22, 23, 24, 34), 0x47 and
+    // 0x48 eleven times each are applied (`client/msg-stats-items.md`).
+    // The 0x9C made the four items it names (the bought cap too); 0x9D needs the local player, which
     // this staged game never announces (no 0x59 / 0x0B), so it changes
     // nothing (§2 rule 3); the join's four 0x07 (frame 2) are rejected,
     // fatal 0x58A (no client act: this staged game sends no 0x03); the
@@ -1651,7 +1695,7 @@ fn run_with(game_seed: u32) -> Transcript {
     // nothing discarded.
     let w = fx.bridge.world();
     let client = (w.frames, w.server_ticks, w.units.len());
-    assert_eq!(client, (37, 36, 5));
+    assert_eq!(client, (37, 36, 6));
     assert_eq!(w.local_player, None);
     let object = d2_client::bridge::world::UnitKey::new(d2_client::bridge::world::OBJECT, wp);
     assert!(w.units.contains_key(&object));
@@ -1670,8 +1714,9 @@ fn run_with(game_seed: u32) -> Transcript {
     }
     let log = fx.bridge.log();
     assert!(log.unowned.is_empty(), "{:?}", log.unowned);
-    // 32 before + 0x27, 0x28, 0x29, 0x2A ×4 + Akara's 0xAC.
-    assert_eq!(log.handled, 40);
+    // 35 before (the buy's 0x9C, 0x47, 0x48 among them) + 0x27, 0x28,
+    // 0x29 ×2 + 0x2A ×4 + Akara's 0xAC.
+    assert_eq!(log.handled, 46);
     let rejected: Vec<(u8, String)> = log
         .rejected
         .iter()
@@ -1745,13 +1790,13 @@ fn single_player_end_to_end() {
     let t = run();
     assert_eq!(t.game_frame, 36);
     assert_eq!(t.frames.len(), 36);
-    // The buckler (its sale stopped at the copy), the cube and the
-    // transmuted amulet: one inventory for moves, vendor and cube.
+    // The cube, the bought cap and the transmuted amulet: one inventory
+    // for moves, vendor and cube.
     assert_eq!(t.inventory.len(), 3);
     assert_eq!(t.player_exp, 100);
     assert_eq!(t.drops.len(), 1);
     // Level 2, 4 stat points left, strength 1, gold after the pickup and
-    // the two cap sales.
+    // the buy and the three sales.
     assert_eq!(t.player_stats[..3], [2, 4, 1]);
     assert!(t.player_stats[3] > PLAYER_GOLD);
 }

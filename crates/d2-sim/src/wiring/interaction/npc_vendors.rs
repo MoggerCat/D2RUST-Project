@@ -187,7 +187,7 @@ where
     /// `npc.md` §2 start step 4: the player's interact unit is (1, GUID).
     fn is_interact_unit(&self, player: UnitId, npc: UnitId) -> bool {
         let guid = NpcWorld::guid(&*self.desk, npc);
-        NpcRest::interact_unit(&*self.desk.rest, player) == Some((UNIT_MONSTER, guid))
+        NpcWorld::interact_unit(&*self.desk, player) == Some((UNIT_MONSTER, guid))
     }
     fn interaction_empty(&self, npc: UnitId) -> bool {
         self.desk

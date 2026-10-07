@@ -9,8 +9,9 @@
 //! ([`crate::wiring::path`]) the same-act warp (spawn point, free
 //! coordinates, placement) and the arrival mode request; object modes on
 //! the object state ([`super::objects`]). The act change, the modes of
-//! objects without object data, interaction, sounds and messages go to
-//! [`Pending`].
+//! objects without object data, sounds and messages go to [`Pending`];
+//! the player's interact info is the unit record's
+//! ([`crate::units::record::InteractInfo`]).
 
 use crate::drlg::act_of_level;
 use crate::game::Game;
@@ -110,17 +111,30 @@ impl<X: Pending> WaypointWorld for WaypointView<'_, X> {
             self.v.unit_error(e.into());
         }
     }
+    /// `0x00535060`: the interact info on the player's unit record
+    /// (active), then [`Pending::busy`] (cursor, player data +0x4C).
     fn player_busy(&self, player: UnitId) -> bool {
-        self.v.h.x.busy(player)
+        self.v.units.get(player).is_some_and(|r| r.interact.active) || self.v.h.x.busy(player)
     }
+    /// `0x00554120` on the player's unit record (ignored while active).
     fn set_interact(&mut self, player: UnitId, unit_type: u8, guid: u32) {
-        self.v.h.x.set_interact(player, unit_type, guid);
+        if let Some(r) = self.v.units.get_mut(player) {
+            r.interact.set(unit_type, guid);
+        }
     }
+    /// `0x00554190` on the player's unit record.
     fn reset_interact(&mut self, player: UnitId) {
-        self.v.h.x.reset_interact(player);
+        if let Some(r) = self.v.units.get_mut(player) {
+            r.interact.reset();
+        }
     }
+    /// `0x00554D00`: the GUID of the player's interact unit.
+    // TODO(spec: world/waypoints.md §6.3 rule 1): `0x00554D00` has no
+    // written body; read as the record's GUID while the info is active
+    // (`0x00554100`'s answer), the reading every caller compares with.
     fn interact_guid(&self, player: UnitId) -> Option<u32> {
-        self.v.h.x.interact_guid(player)
+        let (_, guid) = self.v.units.get(player)?.interact.get()?;
+        Some(guid)
     }
     fn hostile_delay(&self, player: UnitId) -> bool {
         self.v.h.x.hostile_delay(player)
