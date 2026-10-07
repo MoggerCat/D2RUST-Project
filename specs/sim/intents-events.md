@@ -39,20 +39,20 @@
 | Outputs / state changes | 84–90 |
 | Rules | 91–92 |
 |   1. Loop order (single player) | 93–114 |
-|   2. Client → server | 115–315 |
-|   3. Server → client | 316–528 |
-|   4. d2rs mapping and scope | 529–560 |
-|   5. Machine-readable tables | 561–597 |
-|   6. Exact-match comparison | 598–701 |
-|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 702–1101 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1102–1246 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1247–1391 |
-| Constants & data dependencies | 1392–1410 |
-| Randomness | 1411–1416 |
-| Edge cases & original bugs | 1417–1462 |
-| Test vectors | 1463–1549 |
-| Provenance | 1550–1651 |
-| Open questions | 1652–1771 |
+|   2. Client → server | 115–316 |
+|   3. Server → client | 317–529 |
+|   4. d2rs mapping and scope | 530–561 |
+|   5. Machine-readable tables | 562–598 |
+|   6. Exact-match comparison | 599–702 |
+|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 703–1102 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1103–1247 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1248–1392 |
+| Constants & data dependencies | 1393–1411 |
+| Randomness | 1412–1417 |
+| Edge cases & original bugs | 1418–1463 |
+| Test vectors | 1464–1550 |
+| Provenance | 1551–1652 |
+| Open questions | 1653–1772 |
 <!-- /index -->
 
 ## Summary
