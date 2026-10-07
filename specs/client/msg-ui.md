@@ -31,30 +31,30 @@
 |   2. 0x63 waypoint menu (`0x0045E670` → `0x0049CF90`) | 187–210 |
 |   3. 0x77 UI action (`0x0045E800` → `0x004B8CF0`) | 211–248 |
 |   4. 0x26 chat and overhead text (`0x0045DFC0` → `0x0049F490`) | 249–299 |
-|   5. 0x27 NPC text (`0x0045E0A0` → `0x004A1600`) | 300–319 |
-|   6. 0x4E hire offer and 0x4F hire list reset | 320–332 |
-|   7. 0x50 quest special (`0x0045E370` → `0x004B9210`) | 333–356 |
-|   8. 0x58 UI open (`0x0045E490` → `0x004C0550`) | 357–376 |
-|   9. 0x8A NPC wants to interact (`0x0045EA40` → `0x004B3380`) | 377–395 |
-|   10. 0x91 NPC intros (`0x0045E580` → `0x004B3510`) | 396–406 |
-|   11. 0x78 trade partner (`0x0045E810` → `0x004B9010`) | 407–415 |
-|   12. 0x29 game quest flags (`0x0045D3A0` → `0x004B2620`) | 416–425 |
-|   13. 0x52 quest log status (`0x0045CC00` → `0x004A40D0`) | 426–438 |
-|   14. 0x5E game quest availability (`0x0045E570` → `0x004B92B0`) | 439–446 |
-|   15. 0x9B hireling revive state (`0x0045EAC0` → `0x004B6980`) | 447–457 |
-|   16. 0x28 NPC dialog start and quest flags (`0x0045D370` → `0x004B6DD0`) | 458–503 |
-|   17. 0x62 NPC dialog end (`0x0045D390` → `0x004B5320`) | 504–516 |
-|   18. 0x2A NPC transaction (`0x0045E0D0` → `0x004B6390`) | 517–527 |
-|   19. 0x5A event text (`0x0045E070` → `0x0049EB10`) | 528–547 |
-|   20. 0x61 act video (`0x0045E660`) | 548–555 |
-|   21. 0x76 overhead clear (`0x0045E050` → `0x0049F8C0`) | 556–563 |
-|   22. 0x7B skill hotkey (`0x0045E8D0` → `0x004AA0C0`) | 564–573 |
-| Constants & data dependencies | 574–585 |
-| Randomness | 586–590 |
-| Edge cases & original bugs | 591–607 |
-| Test vectors | 608–655 |
-| Provenance | 656–697 |
-| Open questions | 698–752 |
+|   5. 0x27 NPC text (`0x0045E0A0` → `0x004A1600`) | 300–329 |
+|   6. 0x4E hire offer and 0x4F hire list reset | 330–342 |
+|   7. 0x50 quest special (`0x0045E370` → `0x004B9210`) | 343–383 |
+|   8. 0x58 UI open (`0x0045E490` → `0x004C0550`) | 384–417 |
+|   9. 0x8A NPC wants to interact (`0x0045EA40` → `0x004B3380`) | 418–443 |
+|   10. 0x91 NPC intros (`0x0045E580` → `0x004B3510`) | 444–454 |
+|   11. 0x78 trade partner (`0x0045E810` → `0x004B9010`) | 455–463 |
+|   12. 0x29 game quest flags (`0x0045D3A0` → `0x004B2620`) | 464–473 |
+|   13. 0x52 quest log status (`0x0045CC00` → `0x004A40D0`) | 474–486 |
+|   14. 0x5E game quest availability (`0x0045E570` → `0x004B92B0`) | 487–494 |
+|   15. 0x9B hireling revive state (`0x0045EAC0` → `0x004B6980`) | 495–505 |
+|   16. 0x28 NPC dialog start and quest flags (`0x0045D370` → `0x004B6DD0`) | 506–559 |
+|   17. 0x62 NPC dialog end (`0x0045D390` → `0x004B5320`) | 560–572 |
+|   18. 0x2A NPC transaction (`0x0045E0D0` → `0x004B6390`) | 573–583 |
+|   19. 0x5A event text (`0x0045E070` → `0x0049EB10`) | 584–603 |
+|   20. 0x61 act video (`0x0045E660`) | 604–611 |
+|   21. 0x76 overhead clear (`0x0045E050` → `0x0049F8C0`) | 612–619 |
+|   22. 0x7B skill hotkey (`0x0045E8D0` → `0x004AA0C0`) | 620–629 |
+| Constants & data dependencies | 630–641 |
+| Randomness | 642–646 |
+| Edge cases & original bugs | 647–663 |
+| Test vectors | 664–711 |
+| Provenance | 712–762 |
+| Open questions | 763–835 |
 <!-- /index -->
 
 Owned ids: 0x26, 0x27, 0x29, 0x4E, 0x4F, 0x50, 0x52, 0x58, 0x5D, 0x5E,
@@ -316,6 +316,16 @@ layer.
       `0x004A1320(str0, 0, 1)` (the NPC dialog text panel).
    3. Any other type: the list is freed and `[0x007BF250]` := 0.
    What the list, box and panel show: `ui/*` (PC 2).
+3. **Free without a null test** (r2.3). The type-1 path tests the list
+   before freeing it (`0x004A167A`); the other-type path does not:
+   `0x004A170D` calls the free `0x006612A0` with `[0x007BF250]` as is,
+   and the free reads the list's +8 (first node) before anything else.
+   With no list (0) that read is address 8: an access violation that
+   ends the 1.14d process (no assert, no message). d2rs: the UI layer
+   treats a null list as "no list" (nothing to free; `[0x007BF250]`
+   stays 0), as `ui/messages.md` Edge cases states; a UI output cannot
+   be refused as a handler error (`client/bridge.md` §10 r4). With a
+   list present both builds free it and clear the pointer.
 
 ### 6. 0x4E hire offer and 0x4F hire list reset
 
@@ -340,8 +350,8 @@ layer.
    | Code | Action | Part |
    |---|---|---|
    | 1 | `[0x007BF2A4]` := u16@3, `[0x007BF2A8]` := u16@5, `[0x007BF2AC]` := u16@7 (`0x004A28A0`; the quest-log values of §1 r7) | output |
-   | 2 | the hire-table entry (§6) whose name = u16@3, or the end of the table, → `0x004939B0` (the hire popup) | output |
-   | 3 | `[0x007C0D29]` ≠ 0 and the monster (1, `[0x007C0D25]`) in S → `[0x007C0D39]` := 1, `[0x007C0D3D]` := 3 (`0x004B25C0`) | output |
+   | 2 | the hire-table entry (§6) whose name = u16@3, or the end of the table, → `0x004939B0` (the hire popup; the entry is never read, r4) | output |
+   | 3 | `[0x007C0D29]` ≠ 0 and the monster (1, `[0x007C0D25]`) in S → `[0x007C0D39]` := 1, `[0x007C0D3D]` := 3 (`0x004B25C0`; no reader, r5) | output |
    | 4 | `[0x007BF098..0x007BF0A3]` := bytes 3–14, `[0x007BF254]` := 0 (`0x0049FF60`) | output |
    | 6 | `0x004B25C0`: does nothing (code ≠ 3) | – |
    | 13 | `0x0049FF60`: does nothing (code ≠ 4) | – |
@@ -353,6 +363,23 @@ layer.
    23 and 36 also emit one `QuestSpecial` output {code, the six
    words}, applied by the UI layer. Code 3's monster lookup uses a UI
    field, so the UI layer resolves it at delivery (open question 7).
+4. **Code 2 in detail** (2026-10-08). `0x004B9233` jumps to `0x004B3340`
+   with u16@3 in CX: a scan of the 10 hire entries (stride 16 from
+   `0x007C0C85`, stop at `0x007C0D25`) for name = CX, ignoring the used
+   flag; the entry found (or the end) is left in EAX and the code jumps
+   to `0x004939B0`, which never reads EAX. So the name word has no
+   effect. The UI effect is the hire popup only: `[0x007BEECC]` := 0,
+   `SetUIState(0x23, on, 0)` (UI_HIREICONS), then the registry value
+   `PopupHireling` is read (missing = 0) and, when 0, `[0x007BEEE4]` :=
+   1 (the one-time hireling-panel open: `ui/messages.md` §9 r2–r3).
+5. **Code 3 in detail.** `0x004B25C0` (fatal 0xFC6 without a message)
+   tests u16@1 = 3 and `[0x007C0D29]` ≠ 0, looks up (1,
+   `[0x007C0D25]`) and, when present, writes `[0x007C0D39]` := 1 and the
+   word `[0x007C0D3D]` := 3 (`0x004B260A`, `0x004B2618`). No instruction
+   of `Game.exe` reads either address (scan of `re/exports/all.asm`:
+   the two writes are the only references; `ui/messages.md` §10). The
+   code therefore has no observable effect; d2rs need not keep the two
+   fields (`client/bridge.md` §10 r9).
 
 ### 8. 0x58 UI open (`0x0045E490` → `0x004C0550`)
 
@@ -364,7 +391,7 @@ layer.
 
    | Code | Action | Part |
    |---|---|---|
-   | 0 | `[0x007C5470]` := 0, `[0x007C547C]` := GUID, `0x004C0380` (the dialog opens; its refusal path sends a C→S message through the send path) | output |
+   | 0 | `[0x007C5470]` := 0, `[0x007C547C]` := GUID, `0x004C0380` (the item-socket dialog opens; its refusal path sends C→S 0x44 through the send path; r4) | output |
    | 1 | `0x004C0090` (close) | output |
    | 4 | `[0x007C5474]` := 2; the list `[0x007C5484]` freed (`0x004B8020`) and cleared | output |
    | 5 | the local player's cursor item is taken out of its inventory (`0x0063C180(inventory +0x60, none)` → `0x0063AAF0`): `cursor_item` := none (`client/msg-stats-items.md` §2 r5; the item unit stays in S); then UI sound 5 when arg ≠ 0, else 3 (`0x004B9A00`), then `0x004C0090` | model: `cursor_item`; output: the rest |
@@ -373,6 +400,20 @@ layer.
 3. Every code that does not assert emits one `OpenUi` output {GUID,
    code, arg} after its model part. The dialogs: `ui/*` (PC 2);
    senders: `world/quests-act2.md` §8.6 (orifice).
+4. **Code 0's dialog** (2026-10-08) is the item-socket dialog, UI state
+   0x0E (`ui/messages.md` §11, which owns its drawing and input): mode
+   `[0x007C5470]` := 0 (object), object GUID `[0x007C547C]` := GUID, then
+   the open `0x004C0380`: `0x00456300(0, 0)`, step `[0x007C5474]` := 1,
+   last click := `GetTickCount`, the dialog's handlers registered,
+   `0x00487B80`, `SetUIState(0x0E, on, 0)`. Refused with mode 0: C→S
+   **0x44** (17 bytes, `0x00478700` called at `0x004C03F4`): u32@1 = the
+   local player's GUID (−1 without a local player), u32@5 = the object
+   GUID `[0x007C547C]`, u32@9 = 0, u32@13 = 2 (`sim/client-messages.tsv`
+   0x44: orifice, item, action), then the close `0x004C0090`. Refused
+   with mode 1 (NPC service; not reachable from code 0): end the NPC
+   interaction (`0x004B3FE0`) and close. Accepted: `0x0044DA40` and the
+   mouse window (107, 91, 222, 278) (`0x00467430`). The send goes
+   through the send path (`client/bridge.md` §10 r6).
 
 ### 9. 0x8A NPC wants to interact (`0x0045EA40` → `0x004B3380`)
 
@@ -392,6 +433,13 @@ layer.
    `[0x007C0D43]` set with quest 12 bits 8 and 1 both clear
    (`0x0065C310`) and no blocker in mode 2 → UI sound 3983 on the unit.
    Sounds: `audio/triggers.md` §11 request path.
+4. **The interact-NPC test** (2026-10-08; open question 7). 1.14d looks
+   up (1, `[0x007C0D25]`) when `[0x007C0D29]` ≠ 0 and compares the unit
+   pointer with the message's unit (`0x004B33CC`–`0x004B33EB`). With the
+   message's unit present this equals: `[0x007C0D29]` ≠ 0, u8@1 = 1 and
+   u32@2 = `[0x007C0D25]`. The UI layer evaluates it with its own
+   fields at delivery (`client/bridge.md` §10 r9) and the captured
+   "unit present".
 
 ### 10. 0x91 NPC intros (`0x0045E580` → `0x004B3510`)
 
@@ -500,6 +548,14 @@ layer.
    and the local player's facing) and one sends C→S 0x31. Under
    `client/bridge.md` §10 r6 a consumer may send (the send path) but
    not write the model: open question 10.
+6. **More model writes in the UI functions named here** (2026-10-08):
+   `0x004B3C20` (B1, B4, and every interaction end), `0x004B3830` (the
+   `NpcGone` output of r3, and the refused menu open of B6
+   `0x004B66B0`) and `0x004B66B0` itself write the model: the NPC's
+   stock items leave S, the NPC's unit flag bit 0x2, flag bit 0x40 and
+   mode, the local player's data +0x150…+0x15C. They are stated as
+   model rules in `client/model.md` §17; how the UI layer's request
+   reaches the model is open question 10.
 
 ### 17. 0x62 NPC dialog end (`0x0045D390` → `0x004B5320`)
 
@@ -694,6 +750,15 @@ arguments of `0x004786A0`: CL id, EDX u32@1, stack u32@5),
 `0x0049F36E`); §20 `0x0045E660`, `0x00482EF0`, `0x0047F1D0`; §21
 `0x0049F8C0`; §22 `0x0045E8D0`, `0x004AA0C0`. Recorded bytes: both
 recordings (0x28 × 10, 0x2A × 3, 0x5A × 4, 0x76 × 4).
+2026-10-08 (PC 2 cross-file requests from spec-ui pass 3, each
+re-read on the 1.14d export): §5 r3 `0x004A1600` (`0x004A167A`,
+`0x004A1707`–`0x004A1712`), `0x006612A0`; §7 r4 `0x004B9233`,
+`0x004B3340` (not a Ghidra function; `tools/ghidra/disasm.py at`),
+`0x004939B0`; §7 r5 `0x004B25C0` and an all.asm scan of `0x007C0D39` /
+`0x007C0D3D`; §8 r4 `0x004C0380` (`0x004C03CC`–`0x004C0407`),
+`0x00478700`; §9 r4 `0x004B3380`; OQ7 all.asm scan of the writes of
+`0x007C0D25` / `0x007C0D29`; OQ9 `0x0049E3A0` (`0x0049E4D9`–
+`0x0049E52D`).
 
 ## Open questions
 
@@ -729,12 +794,28 @@ recordings (0x28 × 10, 0x2A × 3, 0x5A × 4, 0x76 × 4).
    Either `client/bridge.md` §10 r3 gets a rule for UI-keyed lookups,
    or the interact NPC GUID moves into the model (who writes
    `[0x007C0D25]` / `[0x007C0D29]`: the NPC interaction UI, PC 2).
+   *Answered (2026-10-08).* All 12 writes of the two fields are in UI
+   code (`0x004B1640`, `0x004B66B0`, `0x004B6DD0` dialog branch,
+   `0x004B3C20`, `0x004B3E10`; `ui/messages.md` §14, confirmed by a
+   scan of `re/exports/all.asm`), so the interact NPC stays UI state
+   and the lookups follow `client/bridge.md` §10 r9: 0x8A's test is
+   exact at delivery (§9 r3: active, type u8@1 = 1 and GUID u32@2 =
+   `[0x007C0D25]`; presence is captured), 0x50 code 3 has no
+   observable effect (§7 r5). Residue: `0x004B3E10` runs from the local
+   player's update (`client/model.md` §17 r5, open question 16 there).
 8. `[0x0070EE8C]` and `[0x007A0674]` (0x50 code 23): what the client
    loop does with them after the exit (`0x0044B8A0`, `0x0044DD60`,
    `0x0044E0B0`, `0x0044E200`); owner `client/model.md` §7 if they are
    session state.
 9. The text filter object `0x00611560` (methods +8, +0x14) used by
    §4 r3.2: what it rejects (a squelch / profanity list?); UI spec.
+   *Partly answered (2026-10-08):* the same object's method +0x18 also
+   receives every screen message of color 4 that wraps to exactly one
+   line, as 8-bit text: `0x0049E3A0` (`0x0049E4D9`–`0x0049E52D`) clears
+   a 256-byte buffer, converts the line with `0x005263E0` (limit 0x100)
+   and calls method +0x18 (buffer, 0x100), before the message-log copy
+   `0x0049DBC0` (`ui/messages.md` §2 r2 owns the screen-message rule).
+   Open: what +8, +0x14 and +0x18 do with their input.
 10. 0x28's dialog branch (§16 r4.3) writes the model from the UI layer
     (unit flag 0x2 cleared, the NPC's mode and facing, the local
     player's facing, the NPC's path stop), which `client/bridge.md` §10
@@ -744,7 +825,9 @@ recordings (0x28 × 10, 0x2A × 3, 0x5A × 4, 0x76 × 4).
     handler takes the branch at receive, or §10 gets a rule for model
     writes requested by a UI output. Same question for the send of
     C→S 0x31: 1.14d sends it inside the receive, the UI layer after the
-    frame's other sends (`client/bridge.md` §10 r6).
+    frame's other sends (`client/bridge.md` §10 r6). The same question
+    covers the UI-made model writes of `client/model.md` §17 r1–r4
+    (interaction end, menu open, stock discard; 2026-10-08).
 11. 0x61's video table entries and the display-mode reset (`0x0047F1D0`
     reads a registry value): Phase 6 UI / video spec; 0x2A's panel
     functions `0x004B53F0`, `0x004B5640` and the meaning of its bytes:
