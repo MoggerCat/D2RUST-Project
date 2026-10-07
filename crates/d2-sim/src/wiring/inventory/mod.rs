@@ -36,6 +36,7 @@
 
 pub mod bits;
 pub mod copy;
+pub mod equip_rules;
 pub mod host;
 pub mod inv_world;
 pub mod ops;
@@ -84,6 +85,9 @@ pub enum InvError {
     /// still in a room (`items/inventory.md` §2.4 rule 2): a caller error;
     /// not placed.
     PlacedWithRoom(UnitId),
+    /// A fatal assert of the equipment bookkeeping (`inventory.md` §5.5,
+    /// §5.8; [`equip_rules`]).
+    Equip(crate::items::inventory::bookkeeping::EquipFatal),
 }
 
 /// The inventory state of a game: one [`Inventory`] per unit that owns
@@ -98,6 +102,17 @@ pub struct InvState {
     /// Ground expiry (item data +0x24, §9.2).
     pub expiry: BTreeMap<UnitId, i32>,
     pub errors: Vec<InvError>,
+    /// The equipment rules run on the desk ([`equip_rules`]: item-skill
+    /// link, inventory pass, weapon bookkeeping, the set-item update) in
+    /// place of the [`InvRest`] calls of the same addresses. Off (the
+    /// default): those calls go to the rest, as before; a host turns it
+    /// on when its rest answers the equipment seams (the skill list,
+    /// player data mouse slots, stat links).
+    pub equip_rules: bool,
+    /// Equipment-rule calls the inventory functions asked for while the
+    /// owner's inventory was lent to them ([`InvDesk::with_inv`]); run
+    /// when the call returns, before the owner refreshes.
+    equip_queue: Vec<equip_rules::EquipCall>,
     /// Owner refreshes asked by the inventory functions during a call;
     /// run (`items::moves::owner_refresh`) when the call returns.
     refresh: Vec<UnitId>,
@@ -213,6 +228,57 @@ pub trait InvRest: MovePending {
     fn npc_talking(&self, npc: Owner, player: Owner) -> bool;
     /// The player-trade part of `0x00567620` (multiplayer).
     fn player_trade_gate(&self, player: Owner) -> Option<bool>;
+
+    // ---- equipment seams ([`equip_rules`]; `inventory.md` §5.5–§5.8,
+    // `properties.md` §11, §13). The skill list is the skills spec's
+    // (`skills/use.md` §2); defaults: no skill, no row, nothing sent.
+
+    /// books `scrollskill` (`scroll`) or `bookskill` of the spell index
+    /// `spell` (`0x006374B0`); `None`: no row.
+    fn book_skill(&self, spell: i32, scroll: bool) -> Option<i32> {
+        None
+    }
+    /// Stat unlink `0x0063D2B0`.
+    fn stat_unlink(&mut self, owner: Owner, item: Guid) {}
+    /// §5.7 step 8: S→C 0x48 for the unit (`0x0053D3C0`).
+    fn send_unit_refresh(&mut self, unit: Owner) {}
+    /// The quantity of the unit's skill `skill`, owner −1 (`0x006439B0`,
+    /// skill +0x30); `None`: absent.
+    fn skill_quantity(&self, unit: Owner, skill: i32) -> Option<i32> {
+        None
+    }
+    /// `0x00645120`.
+    fn set_skill_quantity(&mut self, unit: Owner, skill: i32, q: i32) {}
+    /// `0x00570080`.
+    fn learn_skill(&mut self, unit: Owner, skill: i32) {}
+    /// S→C 0x22 (`0x0053C520`).
+    fn send_skill_quantity(&mut self, unit: Owner, skill: i32, q: i32) {}
+    /// The left / right mouse skill (`0x00620190` / `0x006201D0`).
+    fn mouse_skill(&self, unit: Owner, left: bool) -> Option<(i32, i32)> {
+        None
+    }
+    /// `0x005701B0`.
+    fn select_skill(&mut self, unit: Owner, left: bool, skill: (i32, i32)) {}
+    /// `0x006439B0` with (id, owner).
+    fn has_skill_owned(&self, unit: Owner, skill: (i32, i32)) -> bool {
+        false
+    }
+    /// `0x00647960` (`skills/use.md` §2). Default: 0 (usable).
+    fn skill_use_state(&mut self, unit: Owner, skill: (i32, i32)) -> u8 {
+        0
+    }
+    /// The skills.txt part of `0x0055C560` (`itypea1` > 0 is-a `thro`,
+    /// `range` 2).
+    fn throw_skill_row(&self, skill: i32) -> bool {
+        false
+    }
+    /// Player data +0x70..+0x7C (§5.8). Default: (0, −1).
+    fn saved_mouse_skill(&self, unit: Owner, left: bool) -> (i32, i32) {
+        (0, -1)
+    }
+    fn set_saved_mouse_skill(&mut self, unit: Owner, left: bool, skill: (i32, i32)) {}
+    /// The set bonuses `0x00660120` (`properties.md` §11).
+    fn set_bonuses(&mut self, owner: Owner, item: Guid, state: u32) {}
 }
 
 /// The inventory world of one call: the economy's parts (game, unit
@@ -244,6 +310,14 @@ impl<'d, 'a, H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'d, 'a, H, R> {
         d.apply_write_backs();
         d.sync_in();
         d
+    }
+
+    /// The owner of a unit, or the "none" owner (type 6).
+    pub fn owner_or_none(&self, u: UnitId) -> Owner {
+        self.owner_of(u).unwrap_or(Owner {
+            ty: Owner::NONE,
+            guid: u32::MAX,
+        })
     }
 
     /// Unit lookup by type and GUID (`unit-order.md` §2).
@@ -325,6 +399,7 @@ impl<'d, 'a, H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'d, 'a, H, R> {
         let out = f(&mut inv, self);
         self.state.inventories.insert(u, inv);
         self.sync_out();
+        self.run_equip_queue();
         for r in std::mem::take(&mut self.state.refresh) {
             if let Some(o) = self.owner_of(r) {
                 deferred::owner_refresh(self, o);
