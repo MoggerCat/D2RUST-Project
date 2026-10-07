@@ -274,6 +274,17 @@ pub fn read_save_record(r: &mut BitReader<'_>, t: &ItemTables) -> Result<ReadIte
             it.total_quest_diff = isc_get(r, c)? << c.valshift;
         }
         read_trailer(r, &mut it)?;
+        // Spec: vendors-2.md §7.3.1 rule 5: the compact decoder
+        // (`0x0062A970`) sets item level 1, quality 2 and suffix slot 0
+        // (0 for `tsc `, 1 for `isc `); the seed field is 0 (unit28).
+        it.ilvl = 1;
+        it.quality = 2;
+        it.unit28 = 0;
+        it.suffix[0] = match &it.code {
+            b"tsc " => 0,
+            b"isc " => 1,
+            _ => it.suffix[0],
+        };
         return Ok(ReadItem { record, item: it });
     }
     let code = r.read(32)?.to_le_bytes();
@@ -290,7 +301,8 @@ pub fn read_save_record(r: &mut BitReader<'_>, t: &ItemTables) -> Result<ReadIte
     facts(&mut it, record);
     it.filled = r.read(3)?;
     it.unit28 = r.read(32)?;
-    it.ilvl = r.read(7)? as i32;
+    // Spec: vendors-2.md §7.3.1 rule 4: a level below 1 reads as 1.
+    it.ilvl = (r.read(7)? as i32).max(1);
     it.quality = r.read(4)? as u8;
     it.varinvgfx = r.read(1)? == 1;
     if it.varinvgfx {
@@ -312,6 +324,11 @@ pub fn read_save_record(r: &mut BitReader<'_>, t: &ItemTables) -> Result<ReadIte
             let v = r.read(12)?;
             // A negative file index is written as 0xFFF (§4.3 rule 4).
             it.file_index = if v == 0xFFF { -1 } else { v as i32 };
+            // §7.3.1 rule 4: a unique's index at or above the
+            // uniqueitems count is −1.
+            if it.quality == 7 && it.file_index >= t.uniques.len() as i32 {
+                it.file_index = -1;
+            }
         }
         6 | 8 => {
             it.rare_prefix = r.read(8)? as u16;

@@ -171,3 +171,41 @@ fn children_and_the_fillers_argument() {
     assert_eq!(w.state.items.get(&kids[0]).unwrap().mode, 6);
     assert_eq!(w.state.errors, Vec::new());
 }
+
+/// Step 7: a copy whose total of stat 252 is 10 holds exactly one event 3
+/// at frame + 2500 / 10 + 1 = frame + 251.
+// Covers: specs/world/vendors-2.md §7.3 r7
+#[test]
+fn copy_schedules_one_replenish_event() {
+    let mut w = world();
+    w.tables.isc[usize::from(stat::REPLENISH_DURABILITY)] = Isc {
+        valshift: 0,
+        save_bits: 6,
+        save_add: 0,
+        save_param_bits: 0,
+    };
+    w.game.frame = 1000;
+    let s = w.cursor_item(CAP);
+    let su = w.unit(s).unwrap();
+    w.econ().with_stats(|ctx| {
+        let mut st = crate::wiring::economy::UnitStats::new(ctx, su);
+        crate::items::ItemStats::list_set(
+            &mut st,
+            ListKey::ITEM,
+            stat::REPLENISH_DURABILITY,
+            0,
+            10,
+        );
+    });
+    let c = w.desk(|d| d.copy_of(su, true)).expect("copied");
+    assert_eq!(w.stats.unit_total(c, stat::REPLENISH_DURABILITY, 0), 10);
+    let due: Vec<_> = w
+        .game
+        .timers
+        .unit_timers(c)
+        .into_iter()
+        .filter(|&id| w.game.timers.event(id).is_some_and(|(e, _, _)| e == 3))
+        .filter_map(|id| w.game.timers.expire(id))
+        .collect();
+    assert_eq!(due, [1251]);
+}
