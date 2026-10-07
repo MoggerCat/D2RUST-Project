@@ -111,6 +111,8 @@ impl AssetKind {
 
 /// A decoded asset, as both sources return it (§5 r1).
 #[derive(Debug, Clone, PartialEq)]
+// One value per load, moved once into its asset: boxing buys nothing.
+#[allow(clippy::large_enum_variant)]
 pub enum NativeAsset {
     Dc6(Dc6),
     Dcc(Dcc),
