@@ -76,7 +76,7 @@ fn death_penalties_corpse_experience_and_pickup() {
     assert_eq!(fx.sim.hooks().death.exp_lost[&p], 100);
     // DD start: the corpse holds 75 % of the loss; the field is cleared.
     let guid = fx.sim.sys.units.get(p).unwrap().guid;
-    fx.sim.hooks().corpse = Some((c, guid));
+    fx.sim.hooks().x.corpse = Some((c, guid));
     hooks_on(&mut fx, |h, sim| h.player_corpse(sim, p));
     assert_eq!(fx.stat(c, EXPERIENCE), 75);
     assert_eq!(fx.sim.hooks().death.exp_lost[&p], 0);
@@ -108,7 +108,7 @@ fn player_killer_takes_gold_only() {
     assert!(fx.sim.hooks().death.exp_lost.is_empty());
     // A corpse of a pickup by another player is refused without the
     // loot test.
-    fx.sim.hooks().corpse = Some((p, 12345));
+    fx.sim.hooks().x.corpse = Some((p, 12345));
     fx.sim.with(&mut fx.game, |_, v| {
         v.set_state(p, STATE_PLAYERBODY as u16, true)
     });
