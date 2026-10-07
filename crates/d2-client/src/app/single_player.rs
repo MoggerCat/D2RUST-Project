@@ -164,37 +164,56 @@ pub const GAME_SETUP: GameSetup = GameSetup {
     ladder: false,
 };
 
-/// The local client's C→S 0x67 (`intents-events.md` §2.5): the
-/// character class and name above, game type 3 (single player's create
-/// message, `rng.md` §5 open question answered: `0x00477CDF`), Normal,
-/// expansion (flags bit 20) with bit 2 set, locale 0; passes the server's
-/// stated checks.
-///
-/// TODO(spec: the client's 0x67 sender, the character-select / game
-/// menus): the game name, template, arena and the bytes 43–44
-/// the original client fills are not specified; they are zero here (no
-/// server rule d2rs runs reads them, `session_flow` module docs).
+/// The local client's C→S 0x67 (`client/model.md` §7 rule 9, builder
+/// `0x00477CA0`; checks `intents-events.md` §2.5): the character class
+/// and name above, game type 3, Normal, an expansion character's flags
+/// 0x00100004, locale 0; passes the server's checks.
 pub fn create_request() -> CreateGame {
     create_request_for(&Character::New)
 }
 
-/// The local client's C→S 0x67 for `character`: [`create_request`]'s,
-/// with a save's class (+0x28) and name (+0x14) for
-/// [`Character::Save`] (the client sends the selected character's,
-/// `intents-events.md` §2.5).
+/// The 0x67 u32@0x27 of an expansion character: the builder's default
+/// 4 | 0x100000 (`client/model.md` §7 rule 9; recorded 0x00100004).
+pub const CREATE_FLAGS_EXPANSION: u32 = create_flags::EXPANSION | 0x4;
+
+/// The 0x67 u32@0x27 of a classic character.
+///
+/// PROVISIONAL (client/model.md §7 r9; REC-46): bit 2 alone, without the
+/// expansion bit 20.
+pub const CREATE_FLAGS_CLASSIC: u32 = 0x4;
+
+/// The local client's C→S 0x67 for `character` (`client/model.md` §7
+/// rule 9): game name empty (byte 1 = 0), game type 3 (client type 0),
+/// the character's class and name ([`Character::Save`]: the save's
+/// class +0x28 and name +0x14), template 0, the game's difficulty,
+/// u16@0x25 = 0, the flags of an expansion or a classic character (save
+/// status bit 5), @0x2B = @0x2C = 0, language id 0. Bytes after a name's
+/// NUL are zero.
 pub fn create_request_for(character: &Character) -> CreateGame {
-    let (class, name) = match character {
-        Character::New => (PLAYER_CLASS as u8, PLAYER_NAME),
-        Character::Save(save, _) => (save.header.class, save.header.name_bytes()),
+    let (class, name, expansion) = match character {
+        Character::New => (PLAYER_CLASS as u8, PLAYER_NAME, GAME_SETUP.expansion),
+        Character::Save(save, _) => (
+            save.header.class,
+            save.header.name_bytes(),
+            save.header.status & d2_formats::d2s::status::EXPANSION != 0,
+        ),
     };
     let mut char_name = [0u8; 16];
     char_name[..name.len()].copy_from_slice(name);
     CreateGame {
         game_type: GAME_TYPE,
         class,
+        template: 0,
         difficulty: GAME_SETUP.difficulty,
         char_name,
-        flags: create_flags::EXPANSION | 0x4,
+        arena: 0,
+        flags: if expansion {
+            CREATE_FLAGS_EXPANSION
+        } else {
+            CREATE_FLAGS_CLASSIC
+        },
+        unk_43: 0,
+        unk_44: 0,
         locale: 0,
         ..CreateGame::default()
     }
@@ -206,11 +225,10 @@ pub fn create_request_for(character: &Character) -> CreateGame {
 pub enum Character {
     /// A new character of the 0x67 request's class and name, as the save
     /// loader leaves a player (no room, at (0, 0), mode 1), knowing Cold
-    /// Plains' waypoint on Normal (the server tests' staging).
-    ///
-    /// TODO(spec: formats/d2s.md, intents-events.md §8.2 rule 3): the new
-    /// character's record (`0x00532590`) is not specified, so its entry
-    /// carries no player record (no 0x5F / 0x23 at the join).
+    /// Plains' waypoint on Normal (the server tests' staging). It is the
+    /// stub load (`intents-events.md` §8.2 rule 7,
+    /// `d2_server::adapters::session::load_new_character`), so the join
+    /// sends 0x5F and the two 0x23.
     #[default]
     New,
     /// A parsed `.d2s` loaded onto the new player

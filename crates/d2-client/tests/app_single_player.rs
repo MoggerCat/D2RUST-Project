@@ -437,3 +437,36 @@ fn a_save_from_the_command_line_joins() {
     eprintln!("load log: {log:#?}");
     assert!(player.is_some(), "joined; faults {faults:?}");
 }
+
+/// The app's C→S 0x67 bytes (`client/model.md` §7 rule 9): the recorded
+/// single-player layout for an expansion character; a classic save sends
+/// bit 2 alone (PROVISIONAL there, REC-46).
+// Covers: specs/client/model.md §7 r9
+#[test]
+fn the_create_request_has_the_builder_layout() {
+    use d2_client::app::single_player::{Character, CREATE_FLAGS_CLASSIC};
+    use d2_server::adapters::character::LoadContext;
+    let b = single_player::create_request().encode();
+    assert_eq!(b.len(), 46);
+    assert_eq!(b[0], 0x67);
+    assert_eq!(b[1..0x11], [0; 16], "empty game name");
+    assert_eq!(b[0x11], 3, "game type 3");
+    assert_eq!(b[0x12], single_player::PLAYER_CLASS as u8);
+    assert_eq!((b[0x13], b[0x14]), (0, 0), "template, Normal");
+    let mut name = [0u8; 16];
+    name[..single_player::PLAYER_NAME.len()].copy_from_slice(single_player::PLAYER_NAME);
+    assert_eq!(b[0x15..0x25], name);
+    assert_eq!(b[0x25..0x27], [0, 0]);
+    assert_eq!(b[0x27..0x2B], 0x0010_0004u32.to_le_bytes());
+    assert_eq!(b[0x2B..0x2E], [0, 0, 0]);
+    // A save's class and name; its status bit 5 picks the flags.
+    for (status, flags) in [(0x20u16, 0x0010_0004u32), (0, CREATE_FLAGS_CLASSIC)] {
+        let save = d2_formats::d2s::D2s::new_stub(b"Necro", 2, status, 1).unwrap();
+        let r = single_player::create_request_for(&Character::Save(
+            Box::new(save),
+            LoadContext::default(),
+        ));
+        assert_eq!((r.class, &r.char_name[..6]), (2, &b"Necro\0"[..]));
+        assert_eq!(r.flags, flags, "status {status:#x}");
+    }
+}
