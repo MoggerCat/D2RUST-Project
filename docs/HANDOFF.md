@@ -5323,6 +5323,10 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
 - `world/quests-status.md` OQ1 (PC 2 spec-quests-status): open the quest log in several states of one quest (e.g. Den of Evil: started; D = 3 monsters left; just completed; completed in an earlier game) and record the screen plus packets: drawn text, icon frame, and the C→S 0x58 sent after the completion animation.
 - `items/bitstream.md` OQ2 (PC 2 spec-items pass 2): pickup and stash of a set, unique, rare, runeword, ear, gold pile, tome and a socket-filled item with `record_packets.py`: the S→C 0x9C / 0x9D streams of each.
 - `items/treasure.md` OQ5 (PC 2 spec-items pass 3): the x87 control word at `0x0055A935` (treasure float math) under each video mode (DirectDraw / Direct3D / Glide, windowed `-w`): is precision still 53-bit (CRT default) or did the video layer switch it to 24-bit (SetCooperativeLevel flags 0x11 / 0x411 lack FPU-preserve).
+- `audio/triggers.md` OQ1 (PC 2 spec-audio pass 3): a sound request log (`0x004B9A00` caller, id, unit, delay, flags, T, C) with each S→C 0x2C / 0xA9 and code-8 request over two floor materials, a melee and a caster fight with a death and a block, an NPC greeting and talk, item pickup / drop / identify, a waypoint, a Leap, a fire-enchanted unique's death, the options sliders.
+- `audio/environment.md` OQ1 (PC 2 spec-audio pass 3): town → Blood Moor → Den of Evil → town, a day change, Blood Raven's death (stinger 34), rain on and off, with the `0x004DCAA0` / `0x004DCD40` / `0x004E42E0` hooks.
+- `formats/wav.md` OQ1 (= §5 C75, PC 2 spec-audio pass 3): dump at `0x00516760` (pointer, size) for the `wav.md` Test-vector files and one ADPCM file per channel count, and the first 256 KiB of `music\act1\crypt.wav` from the refill copy `0x004157C0`; compare byte for byte with our decode.
+- `audio/sound-table.md` OQ1 / OQ10 (PC 2 spec-audio pass 3): see the exact captures written in those open questions.
 
 **Ninth set (2026-10-07; the 22 notes `impl-ai-acts2-5`, `impl-skill-slots-2`,
 `impl-missile-bodies-2`, `impl-quests-act1-rest`, `impl-quests-act2`,
