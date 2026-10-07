@@ -5252,6 +5252,8 @@ what to log); PC 2 (Local2) records them and moves each line to §5 Done
 with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
 - `world/hirelings.md` R2-27 rest / OQ7 / OQ2 (PC 2 spec-hirelings, 2026-10-07): with `bdMercTwo`: level-up (0xA1 / 0xA2 and the second stats batch), death (0x9B name id + cost, 0x7A remove), resurrect at an NPC (0x9B `ffff 00000000`, 0x81, 0x2A code 5), give / take an item (two 0x540E60 notices, new GUIDs); a two-player game where the second client sees the owner's hireling level up (expect 0x9E–0xA0 stats there, not 0xA1 / 0xA2); die, change level, return and resurrect (OQ2).
 - `world/quests-act2-2.md` OQ1 (PC 2 spec-quests-act2, 2026-10-07): orifice insert (Act II, Horadric Staff assembled): operate the orifice (S→C 0x58 result 0), cancel the dialog (C→S 0x44 action 2 → 0x58 result 1), insert a wrong cursor item (result 4), then the staff (result 5, byte 6 = 1); log the 7 bytes of each 0x58, especially byte 6 for results 0, 1, 4.
+- `world/quests.md` OQ14 (PC 2 spec-quests-core, R-QC-1): a 1.14d expansion character that completed every Normal quest; save right after the last one, then after one more game; dump both quest sections and list the set bits per slot.
+- `world/quests-act1-rest.md` OQ12 (PC 2 spec-quests-core, R-QC-2, = §5 C79): creation of the town-Cain marker (class 385) after Cain left Tristram, packets + RNG: Cain's spawn draws must come between the marker's unit-seed step and the next preset unit's.
 
 - `drlg/rooms.md` OQ15: client build timer (B, T, cursor) per client
   update over a level load.
