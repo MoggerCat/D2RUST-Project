@@ -87,6 +87,13 @@ pub struct ItemRec {
     /// `normcode` (+0x84; the alt-code record's base code,
     /// `items/bitstream.md` §4.1 rule 4).
     pub normcode: [u8; 4],
+    /// `spawnable` (+0x133; `treasure.md` §9.1 rule 2).
+    pub spawnable: u8,
+    /// `rarity` (+0xFC, u8; `treasure.md` §9.1 rule 2).
+    pub rarity: u8,
+    /// `bitfield1` (+0xDC); bit 0 "may be magic" (`treasure.md` §9 rule 3,
+    /// `world/vendors.md` §3 step 5).
+    pub bitfield1: u32,
 }
 
 macro_rules! item_rec {
@@ -130,6 +137,9 @@ macro_rules! item_rec {
                     ultracode: r.ultracode,
                     compactsave: r.compactsave,
                     normcode: r.normcode,
+                    spawnable: r.spawnable,
+                    rarity: r.rarity,
+                    bitfield1: r.bitfield1,
                 }
             }
         }
@@ -620,6 +630,10 @@ pub struct ItemTables {
     pub sets: Vec<SetRec>,
     pub gems: Vec<GemRec>,
     pub runes: Vec<RuneRec>,
+    /// The parts of the combined items array (start, count): weapons,
+    /// armor, misc (`treasure.md` §9.1, header `0x0096CA58`); `None`: the
+    /// part's table is absent (start pointer 0).
+    pub parts: [Option<(usize, usize)>; 3],
 }
 
 /// A table the projection needs is missing or has the wrong layout.
@@ -643,8 +657,16 @@ impl ItemTables {
     /// Projects the fixed-up table set (`d2_data::fixup::apply`).
     pub fn from_fixed(f: &FixedSet) -> Result<Self, TableError> {
         let mut items: Vec<ItemRec> = typed::<Weapons>(f)?.iter().map(ItemRec::from).collect();
+        let n_weapons = items.len();
         items.extend(typed::<Armor>(f)?.iter().map(ItemRec::from));
+        let n_armor = items.len() - n_weapons;
         items.extend(typed::<Misc>(f)?.iter().map(ItemRec::from));
+        let n_misc = items.len() - n_weapons - n_armor;
+        let parts = [
+            Some((0, n_weapons)),
+            Some((n_weapons, n_armor)),
+            Some((n_weapons + n_armor, n_misc)),
+        ];
         let mut magic: Vec<AffixRec> = typed::<Magicsuffix>(f)?
             .iter()
             .map(AffixRec::from)
@@ -724,6 +746,7 @@ impl ItemTables {
                 .zip(get(f, Runes::TABLE)?.iter())
                 .map(|(r, raw)| RuneRec::from_record(r, raw))
                 .collect(),
+            parts,
         })
     }
 

@@ -68,6 +68,49 @@ impl<'e, 'a, X: Pending, R: QuestRest> HostQuests<'e, 'a, X, R> {
         f(&mut *e.game, &mut v)
     }
 
+    /// `0x00559A30` with the drop code `code` (`treasure.md` §9,
+    /// [`super::unit_quest_drop`]) when the game holds the drop state
+    /// (`ActionHooks::object_drops`) and `unit` has a record; `None`: no
+    /// drop state (the caller keeps the rest's answer).
+    fn econ_quest_drop(
+        &mut self,
+        unit: UnitId,
+        code: [u8; 4],
+        quality: u8,
+        p7: i32,
+    ) -> Option<Option<UnitId>> {
+        let e = &mut *self.inner.econ;
+        e.units.get(unit)?;
+        let mut d = e.hooks.object_drops.take()?;
+        // The economy holds the game's item store, game seed and unique
+        // bits for this call (as `object_treasure`).
+        std::mem::swap(&mut e.hooks.items, &mut *e.items);
+        e.hooks.game_seed = e.fields.seed;
+        e.hooks.uniques = std::mem::take(&mut e.fields.uniques);
+        let mut sim = crate::units::hooks::Sim {
+            game: &mut *e.game,
+            units: &mut *e.units,
+            stats: &mut *e.stats,
+            data: e.data,
+        };
+        let item = super::unit_quest_drop(
+            &mut *e.hooks,
+            &mut sim,
+            &mut d,
+            &mut super::NoSpot,
+            unit,
+            Some(code),
+            quality,
+            -1,
+            p7,
+        );
+        std::mem::swap(&mut e.hooks.items, &mut *e.items);
+        e.fields.seed = e.hooks.game_seed;
+        e.fields.uniques = std::mem::take(&mut e.hooks.uniques);
+        e.hooks.object_drops = Some(d);
+        Some(item)
+    }
+
     /// `0x005417D0` on the game's timer queue (`tick.md` §5.2); a refused
     /// schedule is a unit error of the action wiring.
     fn schedule(&mut self, object: UnitId, ev: u8, frame: i32) {
@@ -276,8 +319,14 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
         self.inner
             .reward_item(player, code, level, quality, droppable)
     }
+    /// `0x00559A30(game, unit, quality, &out, 0, −1, 0)` with the drop
+    /// code `code` ([`Self::econ_quest_drop`]); without the drop state,
+    /// the rest's answer.
     fn drop_item_at(&mut self, unit: UnitId, code: [u8; 4], quality: u8) -> bool {
-        self.inner.drop_item_at(unit, code, quality)
+        match self.econ_quest_drop(unit, code, quality, 0) {
+            Some(item) => item.is_some(),
+            None => self.inner.drop_item_at(unit, code, quality),
+        }
     }
     fn quest_items(&self, player: UnitId) -> Vec<(UnitId, u8)> {
         self.inner.quest_items(player)
@@ -510,7 +559,11 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
         level: Option<i32>,
         droppable: bool,
     ) -> Option<UnitId> {
-        self.inner.quest_drop(unit, code, quality, level, droppable)
+        // `level` is the helper's output (§9 rule 2), not an input.
+        match self.econ_quest_drop(unit, code, quality, i32::from(droppable)) {
+            Some(item) => item,
+            None => self.inner.quest_drop(unit, code, quality, level, droppable),
+        }
     }
     /// `0x00585B90(op, kind)` on an object with object data when the
     /// game holds the object drop state (`ActionHooks::object_drops`,

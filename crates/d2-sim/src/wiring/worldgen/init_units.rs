@@ -351,8 +351,40 @@ impl<X: WorldPending> InitHost for WorldHost<'_, X> {
     fn game_8c(&self) -> i32 {
         self.v.h.x.umod_game_8c()
     }
+    /// §15.2: the drop helper `0x00559A30` with the item code `code`
+    /// and quality `arg` (`items/treasure.md` §9,
+    /// [`crate::wiring::economy::unit_quest_drop`]) when the game holds
+    /// the drop state; with `announce`, `0x0055FE80(game, 0, item)` on the
+    /// item ([`WorldPending::umod_recharge`]). Without the drop state:
+    /// [`WorldPending::umod_quest_drop`].
     fn quest_drop(&mut self, unit: UnitId, code: [u8; 4], arg: i32, announce: bool) {
-        self.v.h.x.umod_quest_drop(unit, code, arg, announce);
+        let Some(mut d) = self.v.h.object_drops.take() else {
+            self.v.h.x.umod_quest_drop(unit, code, arg, announce);
+            return;
+        };
+        let item = {
+            let mut sim = Sim {
+                game: &mut *self.game,
+                units: &mut *self.v.units,
+                stats: &mut *self.v.stats,
+                data: self.v.data,
+            };
+            crate::wiring::economy::unit_quest_drop(
+                &mut *self.v.h,
+                &mut sim,
+                &mut d,
+                &mut crate::wiring::economy::NoSpot,
+                unit,
+                Some(code),
+                arg as u8,
+                -1,
+                0,
+            )
+        };
+        self.v.h.object_drops = Some(d);
+        if let (true, Some(item)) = (announce, item) {
+            self.v.h.x.umod_recharge(item);
+        }
     }
     fn steal_belt_item(&mut self, unit: UnitId, target: UnitId) {
         self.v.h.x.steal_belt_item(unit, target);

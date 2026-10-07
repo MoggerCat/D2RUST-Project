@@ -11,6 +11,7 @@
 
 pub mod drop;
 pub mod quality;
+pub mod quest_drop;
 pub mod runtime;
 pub mod softfloat;
 pub mod walk;
@@ -73,4 +74,12 @@ pub enum TreasureError {
     Difficulty(u8),
     #[error("act {0} out of range")]
     Act(u8),
+    #[error("quest class pick at item level {0} > 65 (fatal 0x180)")]
+    PickLevel(i32),
+    #[error("quest class pick roll {0} ≥ 100 (fatal 0x1BA)")]
+    PickRoll(i32),
+    #[error("drop item code {0:?} not in the items table (fatal 0x9EA)")]
+    DropCode([u8; 4]),
+    #[error("quest drop magic loop without a magic class (1.14d hangs)")]
+    QuestDropHang,
 }
