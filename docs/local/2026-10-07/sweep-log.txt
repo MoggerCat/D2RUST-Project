@@ -1,0 +1,128 @@
+﻿cargo :    Compiling syn v2.0.119
+At line:1 char:584
++ ...  "sccache"; cargo test --release -p d2-formats --test game_sweep -- - ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (   Compiling syn v2.0.119:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+   Compiling getrandom v0.3.4
+   Compiling windows-sys v0.61.2
+   Compiling num-traits v0.2.19
+   Compiling d2-formats v0.0.0 (C:\Users\pc\Documents\Claude code folder\w-integ\crates\d2-formats)
+   Compiling rand_core v0.9.5
+   Compiling serde_derive v1.0.229
+   Compiling serde_json v1.0.151
+   Compiling winapi-util v0.1.11
+   Compiling d2-proto v0.0.0 (C:\Users\pc\Documents\Claude code folder\w-integ\crates\d2-proto)
+   Compiling d2-data v0.0.0 (C:\Users\pc\Documents\Claude code folder\w-integ\crates\d2-data)
+   Compiling zerocopy-derive v0.8.59
+   Compiling serde v1.0.229
+   Compiling memchr v2.8.3
+   Compiling zerocopy v0.8.59
+   Compiling either v1.18.0
+   Compiling clap_lex v1.1.1
+   Compiling anstyle v1.0.14
+   Compiling ciborium-io v0.2.2
+   Compiling clap_builder v4.6.7
+   Compiling itertools v0.10.5
+   Compiling half v2.7.1
+   Compiling ciborium-ll v0.2.2
+   Compiling d2-sim v0.0.0 (C:\Users\pc\Documents\Claude code folder\w-integ\crates\d2-sim)
+   Compiling ppv-lite86 v0.2.21
+   Compiling d2-net v0.0.0 (C:\Users\pc\Documents\Claude code folder\w-integ\crates\d2-net)
+   Compiling same-file v1.0.6
+   Compiling regex-automata v0.4.18
+   Compiling cast v0.3.0
+   Compiling criterion-plot v0.5.0
+   Compiling rand_chacha v0.9.0
+   Compiling walkdir v2.5.0
+   Compiling tinytemplate v1.2.1
+   Compiling clap v4.6.7
+   Compiling ciborium v0.2.2
+   Compiling is-terminal v0.4.17
+   Compiling rand_xorshift v0.4.0
+   Compiling regex v1.13.1
+   Compiling rand v0.9.5
+   Compiling oorandom v11.1.5
+   Compiling unarray v0.1.4
+   Compiling anes v0.1.6
+   Compiling bitflags v2.13.2
+   Compiling criterion v0.5.1
+   Compiling proptest v1.11.0
+   Compiling d2-server v0.0.0 (C:\Users\pc\Documents\Claude code folder\w-integ\crates\d2-server)
+   Compiling test-fixtures v0.0.0 (C:\Users\pc\Documents\Claude code folder\w-integ\crates\test-fixtures)
+    Finished `release` profile [optimized] target(s) in 1m 33s
+     Running tests\game_sweep.rs (C:\Users\pc\Documents\Claude code 
+folder\d2rs\target\release\deps\game_sweep-63b499cf5197fbf5.exe)
+
+running 11 tests
+test expfield_layout ... ok
+test animdata_real_vectors ... ok
+animdata: 3558 records, 3529 with a .cof (3500 distinct names), 9 non-matching copies skipped
+test animdata_matches_every_cof ... ok
+cof: 3605 parse, failed [("d2char.mpq:data\\global\\chars\\am\\cof\\amblxbow.cof", 72)], 42-byte padded 3
+font tables: 14
+test font_tables_every_file_parses ... ok
+  data\global\chars\am\cof\ambl1hs.cof: ["d2char.mpq"]
+  data\global\chars\am\cof\ambl1ht.cof: ["d2char.mpq"]
+  data\global\chars\am\cof\amblhth.cof: ["d2char.mpq"]
+  data\global\chars\am\cof\amblxbow.cof: ["d2char.mpq"]
+test cof_every_live_file_parses ... ok
+palettes: 19 .dat (19 pal.dat), 17 .pl2, text colors {12: 1, 13: 16}
+test palettes_every_file_parses ... ok
+string tables: 29 (20 paths, 10 languages {"chi", "deu", "eng", "esp", "fra", "ita", "jpn", "kor", "pol", "por"}), 63167 used entries, 4236 resolve to an earlier duplicate, 16786 non-ASCII values, 0 raw FF, 130 with C3 BF
+test string_tables_every_key_resolves ... ok
+ds1: 2372 files, versions {3: 1, 8: 6, 12: 14, 13: 36, 15: 13, 16: 229, 17: 147, 18: 1926}
+
+thread 'ds1_every_file_parses' (8200) panicked at crates\d2-formats\tests\game_sweep.rs:284:5:
+assertion `left == right` failed
+  left: 2372
+ right: 2456
+stack backtrace:
+   0: std::panicking::panic_handler
+             at /rustc/b940084d7eb6a299eb4bfeb8e34901bc051e7ac4/library\std\src\panicking.rs:679
+   1: core::panicking::panic_fmt
+             at /rustc/b940084d7eb6a299eb4bfeb8e34901bc051e7ac4/library\core\src\panicking.rs:80
+   2: core::panicking::assert_failed_inner
+             at /rustc/b940084d7eb6a299eb4bfeb8e34901bc051e7ac4/library\core\src\panicking.rs:452
+   3: core::panicking::assert_failed<usize,usize>
+             at /rustc/b940084d7eb6a299eb4bfeb8e34901bc051e7ac4/library\core\src\panicking.rs:407
+   4: game_sweep::main
+   5: core::ops::function::FnOnce::call_once
+             at /rustc/b940084d7eb6a299eb4bfeb8e34901bc051e7ac4/library\core\src\ops\function.rs:250
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+test ds1_every_file_parses ... FAILED
+dc6: 1653 files, 26317 frames, 140 flipped, termination {[00, 00, 00, 00]: 3C, [CD, CD, CD, CD]: 190, [EE, EE, EE, EE]: 4A9}
+test dc6_every_file_decodes ... ok
+dt1: 250 live files, 15873 tiles, version-4 ["d2data.mpq:data\\global\\tiles\\act1\\barracks\\barracks.dt1", "d2data.mpq:data\\global\\tiles\\act1\\barracks\\gargtrap.dt1", "d2data.mpq:data\\global\\tiles\\act1\\catacomb\\catacombs.dt1", "d2data.mpq:data\\global\\tiles\\act1\\cathedrl\\cathedrl.dt1", "d2data.mpq:data\\global\\tiles\\act1\\court\\court.dt1", "d2data.mpq:data\\global\\tiles\\act1\\outdoors\\outdoor1.dt1"], block formats {0001: 376B4, 1001: 1A969, 2005: 3D60}
+
+thread 'dt1_every_live_file_decodes' (8320) panicked at crates\d2-formats\tests\game_sweep.rs:258:5:
+assertion `left == right` failed
+  left: {1: 226996, 4097: 108905, 8197: 15712}
+ right: {1: 226996, 4097: 110259, 8197: 15712}
+stack backtrace:
+   0: std::panicking::panic_handler
+             at /rustc/b940084d7eb6a299eb4bfeb8e34901bc051e7ac4/library\std\src\panicking.rs:679
+   1: core::panicking::panic_fmt
+             at /rustc/b940084d7eb6a299eb4bfeb8e34901bc051e7ac4/library\core\src\panicking.rs:80
+   2: core::panicking::assert_failed_inner
+             at /rustc/b940084d7eb6a299eb4bfeb8e34901bc051e7ac4/library\core\src\panicking.rs:452
+test dt1_every_live_file_decodes ... FAILED
+   3: core::panicking::assert_failed::<alloc::collections::btree::map::BTreeMap<u16, usize>, 
+alloc::collections::btree::map::BTreeMap<u16, usize>>
+   4: game_sweep::main
+   5: core::ops::function::FnOnce::call_once
+             at /rustc/b940084d7eb6a299eb4bfeb8e34901bc051e7ac4/library\core\src\ops\function.rs:250
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+dcc: 21717 files, 271176 directions, 3305132 frames
+test dcc_every_file_decodes ... ok
+
+failures:
+
+failures:
+    ds1_every_file_parses
+    dt1_every_live_file_decodes
+
+test result: FAILED. 9 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 44.85s
+
+error: test failed, to rerun pass `-p d2-formats --test game_sweep`
