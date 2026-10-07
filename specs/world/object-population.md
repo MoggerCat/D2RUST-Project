@@ -523,7 +523,7 @@ Game-file (`#[ignore]`, `D2_GAME_DIR`): the §8 counts from the live
 
 ## Open questions
 
-1. **Needs recording**: no trace of a room population: record RNG + packets while entering a
+1. **Needs recording** (entry OP-1, `docs/handoff/pc2-rec-pc2-objects-hirelings.md`): no trace of a room population: record RNG + packets while entering a
    fresh Act I level and compare object classes, positions and draw
    counts with §5–§7.
 2. Confirm in a live 1.14d process that `0x00731EB8` + 8q still reads 0
