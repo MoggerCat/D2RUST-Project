@@ -29,17 +29,17 @@
 |   5. NPC flags (`0x00532D00`) | 167–172 |
 |   6. Stats (`0x00532DA0`) | 173–185 |
 |   7. Skills (`0x00532E90`) | 186–193 |
-|   8. Player items (`0x005337F0`) | 194–212 |
-|   9. Corpses (`0x005339A0`) | 213–221 |
-|   10. Hireling (`0x00533C70`) | 222–269 |
-|   11. Trailing block (`0x00533F70`) | 270–277 |
-|   12. Post-load (`0x00534020` tail) | 278–284 |
-| Constants & data dependencies | 285–293 |
-| Randomness | 294–298 |
-| Edge cases & original bugs | 299–309 |
-| Test vectors | 310–329 |
-| Provenance | 330–341 |
-| Open questions | 342–349 |
+|   8. Player items (`0x005337F0`) | 194–228 |
+|   9. Corpses (`0x005339A0`) | 229–237 |
+|   10. Hireling (`0x00533C70`) | 238–285 |
+|   11. Trailing block (`0x00533F70`) | 286–293 |
+|   12. Post-load (`0x00534020` tail) | 294–300 |
+| Constants & data dependencies | 301–309 |
+| Randomness | 310–314 |
+| Edge cases & original bugs | 315–329 |
+| Test vectors | 330–349 |
+| Provenance | 350–361 |
+| Open questions | 362–372 |
 <!-- /index -->
 
 ## Summary
@@ -197,17 +197,33 @@ u16 0x4D4A ("JM"), u16 count c, then c items.
 
 1. **Versions 0x48–0x5B** (`0x005335E0`): each item is one record of
    the item reader at this save version (`0x0062AE20`, `0x00558CB0`;
-   `items/bitstream.md`, `formats/d2s.md` Open question 2), placed into
+   `items/bitstream.md`, `items/bitstream-legacy.md` §1–§5,
+   `formats/d2s.md` Open question 2), placed into
    the player (`0x00531210`) or, failing, freed; its socketed children
    follow (count from the parent record) and go into it. A record that
    cannot be read → error 14 (ignored, §1 r2). A parent with item flag
    0x4000000 that no longer forms a runeword gets the runeword refresh
    (`0x00563470`, `formats/d2s-load.md` §6).
 2. **Version 0x47** (`0x00533350`): each item starts with u16 "JM" and
-   is a fixed legacy record (`0x00532F30`); an item whose five
-   identifying values equal those of an earlier item of the same list
-   is skipped together with its socketed children; others are placed
-   (`0x00531040`). The record layout is Open question 1.
+   is a fixed legacy record (`0x00532F30`, `items/bitstream-legacy.md`
+   §6–§8). Every record is placed (`0x00531040` for the player,
+   `0x00531390` for a corpse): the list keeps a table of five
+   identifying values per item for a duplicate skip, but its count
+   starts at 0 (`0x005333B2`) and grows only inside the compare loop,
+   which runs only when the count is above 0 (`0x005333FE`), so no
+   entry is ever stored and the skip never fires. Socketed children
+   (count from the placed parent) follow their parent and go into it.
+   Failures:
+   1. A record that does not start with "JM" → error 14 (`0x005335C2`).
+   2. A top-level item of the player list that fails placement (result
+      ≠ 0) is passed over: the list goes on with the next entry
+      (`0x0053352F` → `0x005334EB`), so that parent's child records
+      are then read as top-level entries of the count.
+   3. A child item that fails placement, or any item of a corpse list
+      that fails, ends the list with its code (0xC player, 0xD corpse;
+      `0x005335A9`, `0x00533497`); the byte count is not written.
+   4. No length check: the remaining-length word is decremented per
+      record but never tested.
 3. **Hotkey indices**: none; legacy hotkeys carry no item (§2 r9).
 
 ### 9. Corpses (`0x005339A0`)
@@ -306,6 +322,10 @@ None in the loader; a new character's start items are
    as the trailing block (§10 r4).
 4. A header that fails its count check (§2 r8) has already created and
    announced the player unit.
+5. Version 0x47: a duplicate item record is placed like any other
+   (the duplicate skip never fires, §8 r2); a failed top-level player
+   item makes its socketed children count as top-level entries, which
+   shifts the rest of the list (§8 r2.2).
 
 ## Test vectors
 
@@ -344,5 +364,8 @@ D2MOO not used.
 1. The version-0x47 item record (`0x00532F30`, 1,055 bytes) and its
    placement (`0x00531040`, `0x00531390`): Pending; settle with a
    Ghidra read of those three functions (only 1.00–1.06 saves use it).
+   **Answered**: `items/bitstream-legacy.md` §6 (record `0x00532F30`),
+   §7 (request `0x00530F40`), §8 (placement `0x00531040`,
+   `0x00531390`); the list itself is §8 rule 2.
 2. Pending: load one 1.07/1.08 save (version 0x57 / 0x59) in 1.14d and
    compare the unit (stats, skills, items, hireling) with these rules.

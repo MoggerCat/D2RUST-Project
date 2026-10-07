@@ -100,7 +100,7 @@ return `[0x007A6A70]`) and step its +0x20 (inline, or through
 | receive / update | Den of Evil lights `0x0046AF70` (rooms of level 8) | 2 per try, up to 25 tries | `render/lighting.md` §10 r1 |
 | receive / update | overlay create `0x00470390(unit, overlay, type, a, …, b)` for **any** unit's overlay | type 6: 1 `roll(frames)` (start frame, +0x18); a ≠ 0: 1 `roll(a × 256)` (+0x18); b ≠ 0: 1 `roll(b × 16)` added to +0x14 (`0x004704DD`, `0x004705B6`, `0x004705D7`). Callers that can pass these: item `0x004C1B48` (type 6, a = 8), skill `0x004C661C`, states `0x004D95B0`, `0x004D961A`, `0x004D9A92`; the other 58 call sites pass type ≠ 6 and a = b = 0 | none yet (`render/unit-composite.md` names the creation link only) |
 | update | client monster class 344 at creation (`0x004AE4F0`, `0x004AE567`) | 1 (path direction := lo' & 0x3F) | `client/msg-units.md` |
-| update | `0x004A3150` (pointer from `0x004BDE40`), only while byte `[0x007C025F]` ≠ 0 | 1 (lo' mod 3 + 2 client monsters) | none |
+| update | `0x004A3150` (pointer from `0x004BDE40`), only while byte `[0x007C025F]` ≠ 0 | 1 (lo' mod 3 + 2 client monsters) | `world/objects-client.md` §26.17 |
 | NPC interaction (input and receive paths) | `0x004B1680` (from `0x004B17A0`, `0x004B3E10`; up to 10 `roll`), `0x004B4DB0` (from `0x004B4FD0`, `0x004B6A30`; 1 advance-only step when the dialog with speech 3,386–3,390 opens) | as stated | `world/npc.md`, `ui/menus.md` |
 | draw (UI pass `0x00456EE0`) | Nihlathak's hurry-up `0x004B4380` (`roll(30)`, `0x004B44B2`), once per interaction | 1 | `audio/triggers.md` open question 8 |
 | receive | S→C 0x59 for the local player | 1 step of the new unit's seed | `client/msg-units.md` |

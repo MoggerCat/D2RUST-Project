@@ -36,14 +36,14 @@
 |   17. Options-menu UI sounds (`audio/triggers.md` open question 12, part) | 283–291 |
 |   18. Sound identity of a unit and its `monsounds` record | 292–340 |
 |   19. A unit's request list (U +0x78) | 341–387 |
-|   20. When object units make their mode sounds | 388–422 |
-|   21. What the driver needs per rule (inputs and owners) | 423–451 |
-| Constants & data dependencies | 452–461 |
-| Randomness | 462–467 |
-| Edge cases & original bugs | 468–477 |
-| Test vectors | 478–507 |
-| Provenance | 508–536 |
-| Open questions | 537–540 |
+|   20. When object units make their mode sounds | 388–426 |
+|   21. What the driver needs per rule (inputs and owners) | 427–455 |
+| Constants & data dependencies | 456–465 |
+| Randomness | 466–471 |
+| Edge cases & original bugs | 472–481 |
+| Test vectors | 482–511 |
+| Provenance | 512–540 |
+| Open questions | 541–544 |
 <!-- /index -->
 
 ## Summary
@@ -400,8 +400,8 @@ other sites of part 1 §11 stay with `client/ui.md` §B8.
    class), 4, 5, 6 (`0x004BD860`, `0x004BD900`, `0x004BD9C0`: call it,
    return 0, so once; live classes 110 `drinker`, 112 `gesturer`,
    114 `turner`). Their mode
-   changes run on `GetTickCount` time (owner: the client object
-   functions, Cross-file request). `ClientFn` 18 (`0x004BDD50`; live:
+   changes run on `GetTickCount` time (owner: `world/objects-client.md`
+   §25–§26). `ClientFn` 18 (`0x004BDD50`; live:
    class 568 `Keeper`): when `GetTickCount` > U+0xD4 (unsigned), one step
    of U's own seed (+0x20/+0x24, `sim/rng.md` §2) r1; r1 mod 100 < 10
    (low dword, unsigned) → request(2,505 `barbarian_grunt_small_1`, U);
@@ -415,6 +415,10 @@ other sites of part 1 §11 stay with `client/ui.md` §B8.
    after their update (r1) the walk runs `0x004BDEE0` once more for
    type-2 units, for every `ClientFn` (case 0 returns 1 at once), so
    `ClientFn` 3–6 objects of that set make their call a second time.
+   In 1.14d only client-only (C) objects reach this second call site and no
+   live C object has `ClientFn` 3–6 (C objects are classes 40–42, 65, 478;
+   `world/objects-client.md` §25 r4), so the second call happens only for
+   `clientsmoke` (`ClientFn` 9, no sound call of its own).
 5. The mode sound call itself (part 1 §7) decides by U+0x70 / U+0x74
    whether anything is requested; the distance test of part 1 §7 r2 uses
    `0x006416D0` (the units' path distance, `sim/units.md`), not the
@@ -445,7 +449,7 @@ rules to run (wiring: Cross-file requests in
 | weather active, intensity | `0x00473C40`, `[0x007A89A0]` | `audio/environment.md` §5–§6; part 1 §12 | `render/draw-order-2.md` §11 |
 | client quest state | `[0x007C0D43]` record | `audio/environment.md` §4 r2; part 1 open question 8 | `world/quests.md` §1, `world/quests-status.md` |
 | NPC interaction state | `[0x007C0D25]`, `[0x007C0D29]`, menu flags | part 1 §10, open question 8 | `ui/menus.md` |
-| `ClientFn`, object seed, U+0xD4 | objects +0x1B4; +0x20/+0x24; +0xD4 | §20 | `world/objects.md`, client object functions (Cross-file request) |
+| `ClientFn`, object seed, U+0xD4 | objects +0x1B4; +0x20/+0x24; +0xD4 | §20 | `world/objects.md`, `world/objects-client.md` §25–§26 |
 | NPC greeting records | `npc-greetings.tsv` | part 1 §10 r1, r5 | this directory |
 | `monsounds`, `monstats`, `monstats2`, `superuniques`, `skills`, `missiles`, `states`, item rows, `objects`, `levels`, `soundenviron` | tables | all | `data/fields.tsv` |
 

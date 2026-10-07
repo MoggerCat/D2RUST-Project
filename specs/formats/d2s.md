@@ -58,7 +58,7 @@
 | Edge cases & original bugs | 848–914 |
 | Test vectors | 915–954 |
 | Provenance | 955–1034 |
-| Open questions | 1035–1163 |
+| Open questions | 1035–1164 |
 <!-- /index -->
 
 ## Summary
@@ -1039,6 +1039,7 @@ and prints every field; it holds no save data.
    version-0x47 item record and a check on a real 1.07/1.08 save).
 2. Item record decoding for save versions below 0x60 (the version is
    passed to `0x0062AE20`/`0x00558CB0`). Settle: the item reader spec.
+   **Answered**: `items/bitstream-legacy.md` §1–§5.
 3. **Answered except the classic part** (9 saves and a stub of this PC; §1 rule
    7, §2.1, §7.1 rule 8, §8.1 rule 8): every fresh-character field
    matched. Still open: a classic (non-expansion) character, to see
