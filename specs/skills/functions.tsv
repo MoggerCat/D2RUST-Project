@@ -46,13 +46,13 @@ srvst	44	0x005CB170	SrvSt44_MaggotUp	spec'd-here	MagottUp	body: bodies-3.md §5.
 srvst	45	0x005CB270	SrvSt45_MaggotDown	spec'd-here	MagottDown	no function at this entry in the Ghidra export (data-only xref); body: bodies-3.md §5.9
 srvst	46	0x005CB4D0	SrvSt46_AndrialSpray	spec'd-here	AndrialSpray	no function at this entry in the Ghidra export (data-only xref); body: bodies.md §3.10
 srvst	47	0x005CB730	SrvSt47_Jump	spec'd-here	Jump	body: bodies-3.md §5.13
-srvst	48	0x005CBBF0	SrvSt48_SwarmMove	mapped	Swarm Move	no function at this entry in the Ghidra export (data-only xref)
+srvst	48	0x005CBBF0	SrvSt48_SwarmMove	spec'd-here	Swarm Move	no function at this entry in the Ghidra export (data-only xref); body: bodies-3.md §5.15
 srvst	49	0x005CBD10	SrvSt49_Nest_EvilHutSpawner	spec'd-here	Nest,EvilHutSpawner	body: bodies-3.md §4.6
-srvst	50	0x005CBF30	SrvSt50_QuickStrike	mapped	Quick Strike	
-srvst	51	0x005CC1D0	SrvSt51_Submerge	mapped	Submerge	no function at this entry in the Ghidra export (data-only xref)
-srvst	52	0x005CC220	SrvSt52_Emerge	mapped	Emerge	no function at this entry in the Ghidra export (data-only xref)
+srvst	50	0x005CBF30	SrvSt50_QuickStrike	spec'd-here	Quick Strike	body: bodies-3.md §5.17
+srvst	51	0x005CC1D0	SrvSt51_Submerge	spec'd-here	Submerge	no function at this entry in the Ghidra export (data-only xref); body: bodies-3.md §5.20
+srvst	52	0x005CC220	SrvSt52_Emerge	spec'd-here	Emerge	no function at this entry in the Ghidra export (data-only xref); body: bodies-3.md §5.23
 srvst	53	0x005CC240	SrvSt53_MonInferno	spec'd-here	FetishInferno,DiabLight,mon inferno sentry,Baal Inferno,MegademonInferno,Horror Arctic Blast	body: bodies-3.md §4.1
-srvst	54	0x005CD2C0	SrvSt54_DiabRun	mapped	DiabRun	
+srvst	54	0x005CD2C0	SrvSt54_DiabRun	spec'd-here	DiabRun	body: bodies-3.md §5.29
 srvst	55	0x005CD910	SrvSt55_Mosquito	mapped	Mosquito	
 srvst	56	0x005C7690	SrvSt56_FeralRage_Maul	spec'd-here	Feral Rage,Maul	body: bodies.md §7.7
 srvst	57	0x005C79E0	SrvSt57_Rabies	spec'd-here	Rabies	body: bodies-2.md §6.13
@@ -156,28 +156,28 @@ srvdo	86	0x005CB300	SrvDo086_MaggotDown	spec'd-here	MagottDown	body: bodies-3.md
 srvdo	87	0x005CB3C0	SrvDo087_MaggotLay	spec'd-here	MagottLay	body: bodies-3.md §5.11
 srvdo	88	0x005CB580	SrvDo088_AndrialSpray	spec'd-here	AndrialSpray	body: bodies-3.md §5.12
 srvdo	89	0x005CB940	SrvDo089_Jump	spec'd-here	Jump	body: bodies-3.md §5.14
-srvdo	90	0x005CBC80	SrvDo090_SwarmMove	mapped	Swarm Move	
+srvdo	90	0x005CBC80	SrvDo090_SwarmMove	spec'd-here	Swarm Move	body: bodies-3.md §5.16
 srvdo	91	0x005CBE00	SrvDo091_Nest_EvilHutSpawner	spec'd-here	Nest,EvilHutSpawner	body: bodies-3.md §4.7
-srvdo	92	0x005CBF90	SrvDo092_QuickStrike	mapped	Quick Strike	
-srvdo	93	0x005CC050	SrvDo093_GargoyleTrap	mapped	GargoyleTrap	
-srvdo	94	0x005CC1F0	SrvDo094_Submerge	mapped	Submerge	
+srvdo	92	0x005CBF90	SrvDo092_QuickStrike	spec'd-here	Quick Strike	body: bodies-3.md §5.18
+srvdo	93	0x005CC050	SrvDo093_GargoyleTrap	spec'd-here	GargoyleTrap	body: bodies-3.md §5.19
+srvdo	94	0x005CC1F0	SrvDo094_Submerge	spec'd-here	Submerge	body: bodies-3.md §5.21
 srvdo	95	0x005CC4E0	SrvDo095_MonInferno	spec'd-here	FetishInferno,mon inferno sentry,Baal Inferno,MegademonInferno,Horror Arctic Blast	body: bodies-3.md §4.2
 srvdo	96	0x005CC840	SrvDo096_ZakarumHeal_Bestow	spec'd-here	ZakarumHeal,Bestow	body: bodies-3.md §4.10
 srvdo	97	0x005CCB10	SrvDo097_Resurrect	spec'd-here	Resurrect,Resurrect2	body: bodies-3.md §4.11
 srvdo	98	0x005CCC80	SrvDo098_MonTeleport	spec'd-here	MonTeleport,Teleport 2,Baal Teleport,Baal Clone Teleport	body: bodies-3.md §4.3
-srvdo	99	0x005CCD10	SrvDo099_PrimePoisonNova	mapped	PrimePoisonNova	
-srvdo	100	0x005CCE80	SrvDo100_DiabCold	mapped	DiabCold	
-srvdo	101	0x005CCFA0	SrvDo101_FingerMageSpider	mapped	FingerMageSpider	
-srvdo	102	0x005CD1C0	SrvDo102_DiabWall	mapped	DiabWall	
-srvdo	103	0x005CD380	SrvDo103_DiabRun	mapped	DiabRun	
-srvdo	104	0x005CD5D0	SrvDo104_DiabPrison	mapped	DiabPrison	
-srvdo	105	0x005CD6A0	SrvDo105_DesertTurret	mapped	DesertTurret	
-srvdo	106	0x005CD870	SrvDo106_ArcaneTower	mapped	ArcaneTower	
+srvdo	99	0x005CCD10	SrvDo099_PrimePoisonNova	spec'd-here	PrimePoisonNova	body: bodies-3.md §5.24
+srvdo	100	0x005CCE80	SrvDo100_DiabCold	spec'd-here	DiabCold	body: bodies-3.md §5.26
+srvdo	101	0x005CCFA0	SrvDo101_FingerMageSpider	spec'd-here	FingerMageSpider	body: bodies-3.md §5.27
+srvdo	102	0x005CD1C0	SrvDo102_DiabWall	spec'd-here	DiabWall	body: bodies-3.md §5.28
+srvdo	103	0x005CD380	SrvDo103_DiabRun	spec'd-here	DiabRun	body: bodies-3.md §5.30
+srvdo	104	0x005CD5D0	SrvDo104_DiabPrison	spec'd-here	DiabPrison	body: bodies-3.md §5.31
+srvdo	105	0x005CD6A0	SrvDo105_DesertTurret	spec'd-here	DesertTurret	body: bodies-3.md §5.32
+srvdo	106	0x005CD870	SrvDo106_ArcaneTower	spec'd-here	ArcaneTower	body: bodies-3.md §5.33
 srvdo	107	0x005CDA00	SrvDo107_Mosquito	mapped	Mosquito	
 srvdo	108	0x005CDC10	SrvDo108_RegurgitatorEat	mapped	RegurgitatorEat	
 srvdo	109	0x005CDF10	SrvDo109_MonFrenzy	spec'd-here	MonFrenzy,BloodLordFrenzy	body: bodies-3.md §4.13
 srvdo	110	0x005CE1B0	SrvDo110_Hireable_RogueMissile	spec'd-here	MissileSkill1,HireableMissile,RogueMissile	body: bodies-3.md §4.5
-srvdo	111	0x005CE670	SrvDo111_FetishAura	mapped	FetishAura	
+srvdo	111	0x005CE670	SrvDo111_FetishAura	spec'd-here	FetishAura	body: bodies-3.md §5.22
 srvdo	112	0x005CE2B0	SrvDo112_MonCurseCast	mapped	MonCurseCast	
 srvdo	113	0x005BF3D0	SrvDo113_Scroll_Book	spec'd-here	Scroll of Identify,Book of Identify,Scroll of Townportal,Book of Townportal	body: bodies-3.md §4.4
 srvdo	114	0x005C6910	SrvDo114_Raven	spec'd-here	Raven	body: bodies-2.md §3.6
@@ -218,5 +218,5 @@ srvdo	148	0x005CDFB0	SrvDo148_DoomKnightMissile	mapped	DoomKnightMissile
 srvdo	149	0x005CE0B0	SrvDo149_NecromageMissile	mapped	NecromageMissile	
 srvdo	150	0x005CE9F0	SrvDo150_Smite	spec'd-here	Smite	body: bodies-2.md §3.4
 srvdo	151	0x005CA260	SrvDo151_Unused	mapped	(none)	ItemEffect: Chain Lightning
-srvdo	152	0x005CC690	SrvDo152_DiabLight	mapped	DiabLight	
+srvdo	152	0x005CC690	SrvDo152_DiabLight	spec'd-here	DiabLight	body: bodies-3.md §5.25
 srvdo	153-190	null	-	null	(none)	table has 191 slots (bound check < 0xBF)
