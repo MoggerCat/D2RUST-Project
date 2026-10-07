@@ -214,7 +214,7 @@ fn charge_add_counts_to_three() {
     assert_eq!(f.lists[l].callback, callback::CHARGE);
 }
 
-// Covers: specs/skills/bodies.md §6.1, specs/skills/bodies-3.md §2 answer 3
+// Covers: specs/skills/bodies.md §6.1; specs/skills/bodies-3.md §2
 #[test]
 fn summon_class_from_the_record_or_the_ai_control() {
     let mut r = body_rec();

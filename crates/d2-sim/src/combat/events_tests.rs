@@ -506,7 +506,7 @@ fn item_cast_core_needs_item_effect_and_restores_the_target() {
     );
 }
 
-// Covers: specs/skills/bodies.md §2.18 (the next record is read after the call)
+// Covers: specs/skills/bodies.md §2.18
 #[test]
 fn iteration_continues_with_the_live_records_ahead() {
     let h = |key: i32| Handler {

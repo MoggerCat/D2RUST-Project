@@ -651,7 +651,7 @@ fn weapon_mastery_layers_and_throw() {
     assert_eq!(weapon_mastery(&f, &t, Some(u), Some(sword), Some(0), 1), 0);
 }
 
-// Covers: specs/skills/levels.md §3.5, specs/skills/bodies-3.md §3.3 step 6, Open question 8
+// Covers: specs/skills/levels.md §3.5; specs/skills/bodies-3.md §3.3
 #[test]
 fn throw_mastery_is_zero_off_the_throw_gate() {
     let mut s = skill_rec();

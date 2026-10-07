@@ -661,7 +661,7 @@ fn whirlwind_start_in_melee_range_swings() {
 
 // ---------------------------------------------------------------- spec answers (bodies-3.md §2, bodies-4.md)
 
-// Covers: specs/skills/bodies-3.md §2 answer 8 (bodies-2b.md §6.8)
+// Covers: specs/skills/bodies-3.md §2; specs/skills/bodies-2b.md §6.8
 #[test]
 fn vengeance_negative_index_keeps_c_remainder() {
     let t = tabs(body_rec(), Code::new(), 1);
@@ -690,7 +690,7 @@ fn vengeance_negative_index_keeps_c_remainder() {
     assert_eq!(f.entry_param(u, &e, 1), -1);
 }
 
-// Covers: specs/skills/bodies-3.md §2 answer 8 (bodies-2b.md §7.2 step 8)
+// Covers: specs/skills/bodies-3.md §2; specs/skills/bodies-2b.md §7.2
 #[test]
 fn strafe_rewinds_only_with_a_next_target() {
     let mut c = Code::new();
@@ -730,7 +730,7 @@ fn burst_rings_follow_the_steps() {
     assert_eq!(f.missiles.len(), 4 + 8);
 }
 
-// Covers: specs/skills/bodies-3.md §2 answer 8 (a negative step is a fatal assertion)
+// Covers: specs/skills/bodies-3.md §2
 #[cfg(debug_assertions)]
 #[test]
 #[should_panic(expected = "negative burst step2")]
@@ -740,7 +740,7 @@ fn burst_negative_step_is_fatal() {
     burst(&mut f, &t, u, u, 0, 1, 1, (-1, 4, 0));
 }
 
-// Covers: specs/skills/bodies-3.md §2 answer 5 (bodies.md §6.15)
+// Covers: specs/skills/bodies-3.md §2; specs/skills/bodies.md §6.15
 #[cfg(debug_assertions)]
 #[test]
 #[should_panic(expected = "negative skeleton mastery level")]
@@ -759,7 +759,7 @@ fn skeleton_negative_mastery_is_fatal() {
     components(&mut f, &t, u, m, 1, 1);
 }
 
-// Covers: specs/skills/bodies-4.md §3.24 step 3, Open question 6
+// Covers: specs/skills/bodies-4.md §3.24
 #[test]
 fn imp_teleport_riding_uses_the_written_point() {
     let mut r = body_rec();
@@ -776,7 +776,7 @@ fn imp_teleport_riding_uses_the_written_point() {
     assert!(f.take_log().contains(&format!("place {imp} None (7, 0)")));
 }
 
-// Covers: specs/skills/bodies-4.md §3.22 step 3, Open question 4 (monsters/ai-bodies-2.md §13.1)
+// Covers: specs/skills/bodies-4.md §3.22; specs/monsters/ai-bodies-2.md §13.1
 #[test]
 fn baal_tentacle_spawn_info_for_other_keys() {
     let mut rows = vec![monster_rec(); 300];
