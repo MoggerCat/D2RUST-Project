@@ -30,14 +30,14 @@
 |   1. Creation values | 73–95 |
 |   2. Spending stat points (message 0x3A) | 96–146 |
 |   3. Level-up `0x00570880` (D2MOO `PLAYERSTATS_LevelUp`) | 147–168 |
-|   4. Experience | 169–357 |
-|   5. Client vitals sync (`0x00548760`) | 358–494 |
-| Constants & data dependencies | 495–511 |
-| Randomness | 512–515 |
-| Edge cases & original bugs | 516–527 |
-| Test vectors | 528–548 |
-| Provenance | 549–575 |
-| Open questions | 576–612 |
+|   4. Experience | 169–358 |
+|   5. Client vitals sync (`0x00548760`) | 359–495 |
+| Constants & data dependencies | 496–512 |
+| Randomness | 513–516 |
+| Edge cases & original bugs | 517–528 |
+| Test vectors | 529–549 |
+| Provenance | 550–576 |
+| Open questions | 577–613 |
 <!-- /index -->
 
 ## Summary
@@ -237,13 +237,14 @@ marked total.
    experience (13) ≤ 0 → nothing.
 2. Credited player P (`0x0057E7B0`): A a player → A. A a monster: P :=
    A's owner (`0x0058F0D0`); then a stat list with flag 0x800
-   (`0x00625760`) is looked up on A (when A has a stat holder) and then
-   on D (when D has one; D's result replaces A's, even when none); a
-   list found → P := the unit of that list's owner type and GUID
-   (`0x00552F60`). P must be a player, else nothing. PC 2 read: the
-   lookup on A (and on D) is gated by the unit being in the `exp` state
-   group (states flag bit 30, `0x0063A690`), not by having a stat
-   holder — to reconcile (staging-5 merge).
+   (`0x00625760`) is looked up on A when A has a state with the
+   `states` flag `exp` (bit 30, bitset at data tables +0x144; test
+   `0x0063A690` → `0x0063A130`), and then on D (D given and in an `exp`
+   state; D's result replaces A's, even when none); a list found → P :=
+   the unit of that list's owner type (`0x00625250`) and GUID
+   (`0x006252B0`) (`0x00552F60`). P must be a player, else nothing.
+   Read on 1.14d at `0x0057E7E4`–`0x0057E816` (2026-10-08); this
+   supersedes the earlier "A has a stat holder" gate.
 3. dl := D's level (12). Hireling H of P (`0x00574EC0(game, P, 7,
    0)`): g := gain(e, U = H, alvl = H's level, dlvl = dl); A ≠ H → g :=
    g · 86 / 256 (signed, toward zero); add to H (`0x0057E860`,
