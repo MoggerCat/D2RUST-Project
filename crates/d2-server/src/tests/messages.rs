@@ -285,11 +285,12 @@ fn handler_size_and_stubs() {
     assert_eq!(run(&mut g, &[0x14, 0, 0]), ResultCode::Malformed);
 }
 
+// Covers: specs/sim/intents-events.md §2.4 r6
 #[test]
 fn chat_string_checks() {
     let mut g = FakeGame::with_player(0, ALIVE);
-    // strlen 0 → 2.
-    assert_eq!(run(&mut g, &[0x14, 0, 0, 0, 0]), ResultCode::Invalid);
+    // strlen 0 → 0 with no effect (spec §2.4 rule 6).
+    assert_eq!(run(&mut g, &[0x14, 0, 0, 0, 0]), ResultCode::Done);
     // strlen 255 → accepted; 256 → 2 (inside 275 bytes).
     let mut m = vec![0x14, 0, 0];
     m.extend(std::iter::repeat_n(b'a', 255));
@@ -543,7 +544,7 @@ fn delivery_splits_and_routes() {
     assert_eq!(ids, [0xB4, 0xAF, 0x0C, 0x01]);
 }
 
-// Covers: specs/sim/intents-events.md §3.3 r3, §edge-cases-original-bugs r7
+// Covers: specs/sim/intents-events.md §3.3 r3, §edge-cases-original-bugs r7, §edge-cases-original-bugs r8
 #[test]
 fn delivery_split_ends_at_a_size_zero_id() {
     // Edge case 7: 0x83 (size 0) ends the split; the rest is lost.
