@@ -23,19 +23,19 @@
 |---|---|
 | Summary | 41–52 |
 | Inputs | 53–63 |
-| Outputs / state changes | 64–69 |
-| Rules | 70–71 |
-|   1. Writer | 72–88 |
-|   2. Header (`0x006312B0`) | 89–117 |
-|   3. Compact record (`0x0062AF80`) | 118–137 |
-|   4. Full record (`0x0062FFF0`) | 138–274 |
-|   5. Save-format extras (never on the wire) | 275–292 |
-| Constants & data dependencies | 293–316 |
-| Randomness | 317–320 |
-| Edge cases & original bugs | 321–357 |
-| Test vectors | 358–380 |
-| Provenance | 381–405 |
-| Open questions | 406–477 |
+| Outputs / state changes | 64–74 |
+| Rules | 75–76 |
+|   1. Writer | 77–93 |
+|   2. Header (`0x006312B0`) | 94–122 |
+|   3. Compact record (`0x0062AF80`) | 123–154 |
+|   4. Full record (`0x0062FFF0`) | 155–291 |
+|   5. Save-format extras (never on the wire) | 292–309 |
+| Constants & data dependencies | 310–333 |
+| Randomness | 334–337 |
+| Edge cases & original bugs | 338–374 |
+| Test vectors | 375–397 |
+| Provenance | 398–422 |
+| Open questions | 423–494 |
 <!-- /index -->
 
 ## Summary
@@ -64,8 +64,13 @@ the network stream is the case "save off, children off".
 ## Outputs / state changes
 
 The stream bytes (whole bytes; the last byte is padded with zero bits).
-Side effect: a full record of an item whose quality is not 1–9 writes
-quality 2 into the item (§4.3 rule 6).
+Side effects on the server's item, kept after the write (every later
+read, message and save sees them): a full record of an item whose
+quality is not 1–9 writes quality 2 into item data +0x00 (§4.3 rule 7;
+"rule 6" in older references), and one whose item level is < 1 writes
+1 into +0x2C (§4.1 rule 8; > 99 is only clamped in the stream, not
+stored). An implementation whose writer reads a copy must apply both
+writes back to the item.
 
 ## Rules
 
@@ -127,6 +132,18 @@ quality 2 into the item (§4.3 rule 6).
 3. Ear (F & 0x10000): 3 bits ear class (file index, `0x00629DA0`), 7
    bits ear level (+0x48), then the name (+0x4A) as 7-bit characters up
    to and **including** the terminating 0.
+   Length (2026-10-07): the writer (`0x0062B250` loop) takes bytes from
+   +0x4A until a 0 byte, with no bound; item data is 0x74 bytes zeroed
+   at allocation (`0x00627C90`; only +0x0C := −1), and `all.asm` has no
+   byte or word store with displacement 0x5A or 0x5B at all, so a
+   16-character name (no 0 in +0x4A–+0x59) is followed by the 0 at
+   +0x5A: the stream holds the 16 characters, then 0. Only the
+   version-0x47 ear (edge case 7, Open question 4) writes past +0x59;
+   its 17th character then precedes the 0. The reader (`0x0062D298`)
+   reads 7-bit characters until it reads a 0 (stored too), no bound;
+   the stream's own length is the only limit. d2rs: the setter keeps
+   at most 15 characters (edge case 7), so the writer's 16-character
+   case does not arise; a reader accepts any length up to its 0.
 4. Else: 32 bits item code (`code`, four characters, first character in
    the low byte). Gold (type 4 with equivalence, `0x00629BB0`): 1 bit
    (gold ≥ 0x1000), then the gold (stat 14 total) in 32 bits when that

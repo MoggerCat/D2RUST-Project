@@ -25,23 +25,23 @@
 |   1. Property record and slots | 75–83 |
 |   2. Modes (`0x0065FEC0`, D2MOO `ITEMMODS_AssignProperty`) | 84–103 |
 |   3. Dispatcher (`0x0065FD70`; wrapper `0x0065FE10` for format ≥ 1) | 104–113 |
-|   4. Shared helpers | 114–163 |
-|   5. Property functions | 164–218 |
-|   6. Superior (mode 1) and affixes (mode 0) | 219–223 |
-|   7. Uniques (mode 3) | 224–227 |
-|   8. Set items | 228–238 |
-|   9. Socket fillers (`0x0055C2C0`) | 239–258 |
-|   10. Runewords | 259–317 |
-|   11. Set bonuses (`0x00660120`) | 318–330 |
-|   12. Craft property lists (`0x00660240`) | 331–336 |
-|   13. Set-item state update (`0x00663CC0`) | 337–392 |
-|   14. Format-0 property functions (legacy table `0x00745B58`) | 393–460 |
-| Constants & data dependencies | 461–470 |
-| Randomness | 471–476 |
-| Edge cases & original bugs | 477–486 |
-| Test vectors | 487–505 |
-| Provenance | 506–525 |
-| Open questions | 526–609 |
+|   4. Shared helpers | 114–167 |
+|   5. Property functions | 168–222 |
+|   6. Superior (mode 1) and affixes (mode 0) | 223–227 |
+|   7. Uniques (mode 3) | 228–231 |
+|   8. Set items | 232–242 |
+|   9. Socket fillers (`0x0055C2C0`) | 243–262 |
+|   10. Runewords | 263–321 |
+|   11. Set bonuses (`0x00660120`) | 322–334 |
+|   12. Craft property lists (`0x00660240`) | 335–340 |
+|   13. Set-item state update (`0x00663CC0`) | 341–396 |
+|   14. Format-0 property functions (legacy table `0x00745B58`) | 397–464 |
+| Constants & data dependencies | 465–474 |
+| Randomness | 475–480 |
+| Edge cases & original bugs | 481–490 |
+| Test vectors | 491–509 |
+| Provenance | 510–529 |
+| Open questions | 530–613 |
 <!-- /index -->
 
 ## Summary
@@ -139,9 +139,13 @@ first stack argument with I in ECX, flags in EDX, state as its last
 argument. `0x0065CBF0`(EAX O, EBX flags, I, state): the unit is O when
 O ≠ none, else I; its list of (state, flags) (`0x00625790`: state ≠ 0 →
 the list of that state, state 0 → the first list with those flags);
-none → a new list (that unit's pool, flags, expiry 0, owner type 4,
-that unit's GUID; GUID −1 when I is none too), attached with reset 1,
-state set; a null list is fatal (0x201). Who is O: modes 0–5 and 7 pass
+none → a new list (`0x006251F0`(that unit's pool unit +0x08, flags,
+expiry 0, owner type **4** as a constant, that unit's GUID unit +0x0C):
+the type is 4 whatever the unit's own type, so §11's lists on the
+player carry type 4 with the player's GUID (`0x0065CC17`,
+`0x0065CC55`); GUID −1 when I is none too), attached to that unit with
+reset 1 (`0x00626E10`), state := the state argument (`0x006252D0`); a
+null list is fatal (0x201). Who is O: modes 0–5 and 7 pass
 O = none (the wrapper's second argument is 0; the mode's extra unit
 goes to the dispatcher's last argument), so they write I's own list
 (for a gem or rune: the filler's); §11 passes O = the player; mode 6

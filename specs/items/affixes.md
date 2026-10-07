@@ -26,16 +26,16 @@
 |   6. Magic item (`0x005565E0`) | 168–183 |
 |   7. Rare item (`0x005C21A0` → `0x005C1BF0`, format ≥ 1) | 184–203 |
 |   8. Crafted item (`0x005C21D0`) | 204–225 |
-|   9. Tempered item (dispatch case 9) | 226–231 |
-|   10. Charm (`0x00556A60`, from the normal routine) | 232–245 |
-|   11. Automagic (finishing step, `0x00557450`) | 246–252 |
-|   12. Format-0 routines (legacy items) | 253–332 |
-| Constants & data dependencies | 333–349 |
-| Randomness | 350–365 |
-| Edge cases & original bugs | 366–404 |
-| Test vectors | 405–423 |
-| Provenance | 424–446 |
-| Open questions | 447–485 |
+|   9. Tempered item (dispatch case 9) | 226–247 |
+|   10. Charm (`0x00556A60`, from the normal routine) | 248–261 |
+|   11. Automagic (finishing step, `0x00557450`) | 262–268 |
+|   12. Format-0 routines (legacy items) | 269–348 |
+| Constants & data dependencies | 349–365 |
+| Randomness | 366–381 |
+| Edge cases & original bugs | 382–420 |
+| Test vectors | 421–439 |
+| Provenance | 440–462 |
+| Open questions | 463–501 |
 <!-- /index -->
 
 ## Summary
@@ -228,6 +228,22 @@ forced.
 rp := §5(prefix), rs := §5(suffix); both ≠ 0 → rare prefix/suffix := rp,
 rs, success (no affixes, no properties); else downgrade to normal.
 (Tempered quality is only reachable by a request quality of 9.)
+
+Exact (2026-10-07, `disasm.py fn 0x005C1BC0` and the dispatch at
+`0x00557801`–`0x0055786C`): the dispatch first clears rare prefix and
+rare suffix (`0x00628010`(item, 0), `0x00628070`(item, 0)) and saves
+S := the dword at item data +0x04 (`0x00627D90`, `0x00650E50`) for the
+downgrade D(2) (`items/quality.md` §4 table, §5),
+then calls `0x005C1BC0`(ECX item, EDX 1) and `0x005C1BC0`(ECX item,
+EDX 0). `0x005C1BC0`(item, prefix) is the **rare name pick by format**:
+format (`0x0062A670`) ≥ 1 → §5 (`0x005C1AB0`, ECX = prefix, item);
+format 0 → §12.2 (`0x005C19A0`); it returns that routine's rare id (0
+= no candidate) and draws what that routine draws (one item-seed step
+when there is a candidate, none otherwise). It is not a separate
+"tempered" roll: `world/cube.md` §7.3's two calls (quality byte 9) are
+this same pick, prefix then suffix. Both ids ≠ 0 → rare prefix := rp
+(`0x00628010`), rare suffix := rs (`0x00628070`); either 0 → the
+normal downgrade (`0x005572A0`) with the saved seed.
 
 ### 10. Charm (`0x00556A60`, from the normal routine)
 
