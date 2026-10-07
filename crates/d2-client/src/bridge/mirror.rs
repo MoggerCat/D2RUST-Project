@@ -64,7 +64,14 @@ impl Plugin for BridgePlugin {
 pub fn bridge_frame(
     mut bridge: ResMut<BridgeResource>,
     mut outputs: ResMut<FrameOutputs>,
+    time: Option<Res<Time<Real>>>,
 ) -> Result {
+    // The host clock as `GetTickCount` (`world/objects-client.md` §25 r6):
+    // wrapping milliseconds since the app started. An app without Bevy's
+    // time (headless tests) keeps the value it set.
+    if let Some(time) = time {
+        bridge.0.set_now(time.elapsed().as_millis() as u32);
+    }
     bridge.0.frame()?;
     outputs.0 = bridge.0.take_outputs();
     Ok(())

@@ -10,6 +10,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+pub use super::objects::{ClientObjects, ObjClientInputs};
+
 use super::drlg::{ClientDrlg, DrlgRoomId, DrlgSource};
 use super::skills::SkillList;
 use crate::rules::lighting::environment::Environment;
@@ -205,11 +207,6 @@ pub struct ClientUnit {
     /// takes its player's). The model holds no client path record, so
     /// the source is kept, not the direction.
     pub direction_of: Option<UnitKey>,
-    /// Unit flag-ex `+0xC8` bits as written by model rules
-    /// (`msg-units.md` §1.2 r3, r4: 0x40000 cleared for a hireling in
-    /// mode 1, 0x400 the source-unit link; 0x20 set by the client room
-    /// free, `drlg/rooms.md` §8 r4).
-    pub flags_ex: u32,
     /// Unit flag `+0xC4` 0x800000: set only by the client room free
     /// `0x0061A840` (`model.md` §5 r5, `drlg/rooms.md` §8 r4).
     pub room_freed: bool,
@@ -217,6 +214,21 @@ pub struct ClientUnit {
     /// (`model.md` §14 r3); 0xAB skips such a unit (`msg-units.md` §7
     /// r11).
     pub flag_200: bool,
+    /// +0xD4 (u32, 0 at creation): the interact stamp of a monster
+    /// (§8 rule 7) and the timer T of the client object functions
+    /// (`world/objects-client.md` §25 r5).
+    pub interact_ms: u32,
+    /// +0x44: the animation frame (signed, 8.8 fixed point; §18 rule 1).
+    pub frame: i32,
+    /// +0xC8: flag-ex. Bit 0x2000000 := `expansion` ≠ 0 at creation
+    /// (§2 rule 6); the other bits are written by the rules that own
+    /// them (`world/objects-client.md` §26.2; `msg-units.md` §1.2 r3, r4:
+    /// 0x40000 cleared for a hireling in mode 1, 0x400 the source-unit
+    /// link; 0x20 set by the client room free, `drlg/rooms.md` §8 r4).
+    pub flag_ex: u32,
+    /// Unit flag +0xC4 bit 0x4, read by the interact sender (§8 rule 7).
+    /// TODO(spec: client/model.md §8 rule 7): no model rule writes it.
+    pub flag_4: bool,
 }
 
 /// The reserved `outgoing` slot of 0x28's dialog branch (`msg-ui.md`
@@ -247,9 +259,12 @@ impl ClientUnit {
             turned_toward: None,
             path_stopped: false,
             direction_of: None,
-            flags_ex: 0,
             room_freed: false,
             flag_200: false,
+            interact_ms: 0,
+            frame: 0,
+            flag_ex: 0,
+            flag_4: false,
         }
     }
 
@@ -551,6 +566,9 @@ pub struct ClientWorld {
     /// (`msg-stats-items.md` §5 r7): entries of 0x120 bytes. Entries
     /// built at load (`0x006394A0`) are not held (open question 7).
     pub item_table_ext: Vec<Vec<u8>>,
+    /// Set C and the client latches of the object functions
+    /// (`world/objects-client.md` §27, `model.md` §2 rule 1).
+    pub objclient: ClientObjects,
 }
 
 impl ClientWorld {
@@ -653,7 +671,7 @@ impl ClientWorld {
                 // then flag 0x800000, then leaves the room.
                 for k in self.room_units.free_room(r.room) {
                     if let Some(u) = self.units.get_mut(&k) {
-                        u.flags_ex |= 0x20;
+                        u.flag_ex |= 0x20;
                         u.room_freed = true;
                     }
                 }
@@ -1003,4 +1021,11 @@ pub struct ModelInputs {
     /// a `time()` base plus elapsed `GetTickCount` / 1000; client-only, a
     /// host input). 0 when the host gives none.
     pub wall_seconds: Option<fn() -> i32>,
+    /// `GetTickCount()` of this update, wrapping milliseconds (§5 rule 2;
+    /// `world/objects-client.md` §25 r6): the live client passes the host
+    /// clock, tests and replays a scripted value.
+    pub now: u32,
+    /// What the client object functions read beside the model
+    /// (`world/objects-client.md` Inputs).
+    pub objclient: ObjClientInputs,
 }

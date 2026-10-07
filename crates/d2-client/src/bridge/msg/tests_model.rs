@@ -687,12 +687,12 @@ fn room_freed_unit_sends_0x4b_once() {
     let k = UnitKey::new(MONSTER, 0x105);
     let u = m.put(k);
     u.room_freed = true;
-    u.flags_ex = 0x20;
+    u.flag_ex = 0x20;
     u.queue.push(hex(STOP_1_6));
     m.drain();
     assert_eq!(m.w.outgoing, [hex("4b 01 00 00 00 05 01 00 00")]);
     let u = m.unit(k);
-    assert!(!u.room_freed && u.flags_ex == 0);
+    assert!(!u.room_freed && u.flag_ex == 0);
     // The queue was not drained that pass.
     assert_eq!(u.queue.len(), 1);
 }

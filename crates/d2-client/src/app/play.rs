@@ -191,6 +191,7 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
     };
     let drlg_source = single_player::client_drlg_source(&config.data);
     let level_rows = single_player::client_level_rows(&config.data);
+    let object_rows = single_player::client_object_rows(&config.data);
     let request = config.character.clone();
     let (link, started) = single_player::start_with(
         config.data,
@@ -214,6 +215,10 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
     add_game(&mut app, Box::new(link), true)?;
     send_create_game_for(&mut app, &request)?;
     add_client_data(&mut app, drlg_source, level_rows);
+    app.world_mut()
+        .resource_mut::<BridgeResource>()
+        .0
+        .set_object_rows(object_rows);
     if let Some(archives) = archives {
         let skills = single_player::client_skill_rows(&archives)?;
         app.world_mut()
