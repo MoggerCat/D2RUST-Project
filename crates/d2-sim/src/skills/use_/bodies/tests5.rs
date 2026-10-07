@@ -458,7 +458,7 @@ fn run_scan(
     (n, seen)
 }
 
-// Covers: specs/skills/bodies.md §2.12 text, §2.12 r1, §2.12 r3
+// Covers: specs/skills/bodies.md §2.12 text, §2.12 r1, §2.12 r3, §edge-cases-original-bugs r5
 #[test]
 fn scan_unit_visits_accepted_units_in_range() {
     let (mut f, u, a, b, _c) = scan_world();
@@ -880,7 +880,7 @@ fn sacrifice_start_rolls_a_melee_hit_and_always_starts_combat() {
     );
 }
 
-// Covers: specs/skills/bodies.md §3.8
+// Covers: specs/skills/bodies.md §3.8, §edge-cases-original-bugs r2
 #[test]
 fn bash_start_attackrate_list_record_pair_bonus_and_aura_state() {
     use crate::combat::{melee_result, start_combat};
@@ -1109,7 +1109,7 @@ fn melee_state_tables() -> crate::skills::SkillTables {
     tabs(r, c, 1)
 }
 
-// Covers: specs/skills/bodies.md §4.2 text, §4.2 r1, §4.2 r2
+// Covers: specs/skills/bodies.md §4.2 text, §4.2 r1, §4.2 r2, §edge-cases-original-bugs r3
 #[test]
 fn melee_state_overlay_and_dispatch() {
     let t = melee_state_tables();
@@ -1165,7 +1165,7 @@ fn melee_state_overlay_and_dispatch() {
     assert_eq!(dos::melee_state(&mut f, &t, &ct, u, 1, 1), 0);
 }
 
-// Covers: specs/skills/bodies.md §4.2 r3
+// Covers: specs/skills/bodies.md §4.2 r3, §edge-cases-original-bugs r8
 #[test]
 fn melee_state_target_state_list() {
     let mut t = melee_state_tables();
@@ -1482,7 +1482,7 @@ fn curse_unit_scales_and_sets_stats() {
     assert!(!f.take_log().contains(&format!("anim {m}")));
 }
 
-// Covers: specs/skills/bodies.md §4.4 l2 r8
+// Covers: specs/skills/bodies.md §4.4 l2 r8, §edge-cases-original-bugs r4
 #[test]
 fn curse_unit_registers_the_first_three_event_pairs() {
     let ct = curse_ct();
@@ -1819,7 +1819,7 @@ fn summoner() -> (BodyFake, usize, usize) {
     (f, u, m)
 }
 
-// Covers: specs/skills/bodies.md §6.5 text, §6.5 r1, §6.5 r2, §6.5 r3
+// Covers: specs/skills/bodies.md §6.5 text, §6.5 r1, §6.5 r2, §6.5 r3, §edge-cases-original-bugs r10
 #[test]
 fn skill_stats_passive_and_aura_stats_with_stat_events() {
     let t = summon_skill_tables();
@@ -1885,7 +1885,7 @@ fn skill_stats_passive_and_aura_stats_with_stat_events() {
     assert!(f.has_state(m, 40));
 }
 
-// Covers: specs/skills/bodies.md §6.5 r4, §6.5 r5, §6.5 r6, §6.5 r7
+// Covers: specs/skills/bodies.md §6.5 r4, §6.5 r5, §6.5 r6, §6.5 r7, §edge-cases-original-bugs r12
 #[test]
 fn skill_stats_state_life_skills_events() {
     let t = summon_skill_tables();
@@ -2107,7 +2107,7 @@ fn golem_stats_and_summon_resistance() {
     );
 }
 
-// Covers: specs/skills/bodies.md §6.19 text, §6.19 r1, §6.19 r2, §6.19 r3, §6.19 r4, §6.19 r5
+// Covers: specs/skills/bodies.md §6.19 text, §6.19 r1, §6.19 r2, §6.19 r3, §6.19 r4, §6.19 r5, §edge-cases-original-bugs r18
 #[test]
 fn shadow_stats_use_the_second_formula_on_the_shadow() {
     let mut c = Code::new();
@@ -2442,7 +2442,7 @@ fn nova_attack_ring_velocity() {
     assert!(f.missiles.iter().all(|m| m.flags == 7 && m.velocity == 18));
 }
 
-// Covers: specs/skills/bodies.md §8.7 r1, §8.7 r2, §8.7 r3, §8.7 r4, §8.7 r5, §8.7 r6, §8.7 r7, §8.7 r8, §8.7 r9
+// Covers: specs/skills/bodies.md §8.7 r1, §8.7 r2, §8.7 r3, §8.7 r4, §8.7 r5, §8.7 r6, §8.7 r7, §8.7 r8, §8.7 r9, §edge-cases-original-bugs r13
 #[test]
 fn vines_summon_in_mode_8_with_the_vine_state() {
     let ct = ct3();
@@ -2651,7 +2651,7 @@ fn blaze_buff_without_flag_or_group_removal() {
     assert_eq!(dos2::blaze(&mut f, &t, &ct, u, 1, 1), 0);
 }
 
-// Covers: specs/skills/bodies.md §8.18 r1, §8.18 r2, §8.18 r3, §8.18 r4, §8.18 r5, §8.18 r6, §8.18 r7, §8.18 r8
+// Covers: specs/skills/bodies.md §8.18 r1, §8.18 r2, §8.18 r3, §8.18 r4, §8.18 r5, §8.18 r6, §8.18 r7, §8.18 r8, §edge-cases-original-bugs r19
 #[test]
 fn feral_rage_do_charges_up_to_calc2() {
     let ct = ct3();
@@ -2812,4 +2812,385 @@ fn shadow_warrior_steps() {
     assert!(!log
         .iter()
         .any(|l| l.starts_with(&format!("schedule {m} 7")) || l.contains("umod: 21")));
+}
+
+// ---------------------------------------------------------------- §2.15 and edge cases
+
+// Covers: specs/skills/bodies.md §2.15, §edge-cases-original-bugs r6
+#[test]
+fn shape_start_adds_each_shape_skills_to_hit_at_the_attack_level() {
+    use crate::combat::{melee_result, start_combat};
+    let ct = ct3();
+    let mut a = body_rec();
+    a.tohit = 10;
+    a.levtohit = 5;
+    a.srcdam = 64;
+    let mut b = body_rec();
+    b.tohit = 4;
+    let t = tabs_n(vec![body_rec(), body_rec(), a, b], Code::new());
+    let (mut f, u, m) = duel();
+    // T none → 0.
+    f.targets.remove(&u);
+    assert_eq!(helpers::shape_start(&mut f, &t, &ct, u, 3), 0);
+    f.targets.insert(u, m);
+    assert!(f.c.units[u].combat.is_empty());
+    // Two disguise states (flag group 16) with lists naming skills 2 and
+    // 3; a third, non-disguise state is ignored.
+    for (s, k) in [(140, 2), (141, 3), (142, 2)] {
+        if s != 142 {
+            f.state_flags.insert((s, group::DISGUISE));
+        }
+        f.c.units[u].states.push(s as u16);
+        let l = f.alloc_list(0, 0, None).unwrap();
+        f.set_list_state(l, s);
+        f.attach(u, l);
+        f.list_set(l, 350, k);
+    }
+    // Skill 2 at the Attack level 3 is 10 + 2·5; skill 3 is 4: the bonus
+    // is their sum (not the shape skills' own levels); SrcDam 64 from
+    // skill 2 (skill 3 has 0, which keeps it).
+    assert_eq!(crate::skills::to_hit(&mut f, &t, Some(u), 2, 3), 20);
+    assert_eq!(crate::skills::to_hit(&mut f, &t, Some(u), 3, 3), 4);
+    let mut g = f.clone();
+    let mut want = DamageRecord {
+        result: melee_result(&mut g.c, &t, &ct, Some(u), Some(m), 24, 0),
+        hit_class: 1,
+        ..DamageRecord::default()
+    };
+    start_combat(&mut g.c, &t, &ct, Some(u), Some(m), &mut want, 64);
+    assert_eq!(helpers::shape_start(&mut f, &t, &ct, u, 3), 1);
+    assert_eq!(last_entry(&mut f, u).record, want);
+    assert_eq!(f.c.units[u].seed, g.c.units[u].seed);
+    // Without a disguise state: bonus 0, SrcDam 128.
+    let (mut f, u, m) = duel();
+    let mut g = f.clone();
+    let mut want = DamageRecord {
+        result: melee_result(&mut g.c, &t, &ct, Some(u), Some(m), 0, 0),
+        hit_class: 1,
+        ..DamageRecord::default()
+    };
+    start_combat(&mut g.c, &t, &ct, Some(u), Some(m), &mut want, 128);
+    assert_eq!(helpers::shape_start(&mut f, &t, &ct, u, 3), 1);
+    assert_eq!(last_entry(&mut f, u).record, want);
+}
+
+// Covers: specs/skills/bodies.md §edge-cases-original-bugs r1
+#[test]
+fn aura_below_cost_refreshes_lists_without_stats() {
+    let ct = ct3();
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.mana = 2;
+    r.manashift = 8;
+    r.aurastate = 40;
+    r.aurastat1 = 26;
+    r.aurastatcalc1 = c.f(8);
+    r.passivestat1 = 30;
+    r.passivecalc1 = c.f(4);
+    let t = tabs(r, c, 1);
+    assert_eq!(crate::skills::mana_cost(&t.skills[1], 1), 512);
+    for (mana, aura, passive) in [(511, false, false), (512, true, false), (513, true, true)] {
+        let (mut f, u) = world();
+        f.c.set(u, 8, mana);
+        assert_eq!(dos::aura(&mut f, &t, &ct, u, 1, 1), 1);
+        // The state list exists whatever the mana.
+        let l = f
+            .list_of(u, 40)
+            .unwrap_or_else(|| panic!("mana {mana}: no list"));
+        assert_eq!(l.stats.get(&26) == Some(&8), aura, "mana {mana}");
+        assert_eq!(l.stats.get(&30) == Some(&4), passive, "mana {mana}");
+    }
+}
+
+// Covers: specs/skills/bodies.md §edge-cases-original-bugs r7
+#[test]
+fn apply_state_refuses_lower_levels_and_replaces_with_higher() {
+    let ct = ct2();
+    let (mut f, u) = world();
+    let q = |level| StateRequest {
+        source: u,
+        target: u,
+        skill: 5,
+        level,
+        duration: 0,
+        stat: -1,
+        value: 0,
+        state: 3,
+        callback: 0,
+    };
+    let first = apply_state(&mut f, &ct, q(3)).expect("list");
+    // Same skill, lower level: refused; same level: the list is kept.
+    assert!(apply_state(&mut f, &ct, q(2)).is_none());
+    assert_eq!(apply_state(&mut f, &ct, q(3)), Some(first));
+    // A higher level frees the old list and makes a new one.
+    let second = apply_state(&mut f, &ct, q(4)).expect("replacement");
+    assert_ne!(second, first);
+    assert!(f.lists[first].freed);
+    assert_eq!(f.lists[second].lvl, 4);
+}
+
+// Covers: specs/skills/bodies.md §edge-cases-original-bugs r9
+#[test]
+fn damage_aura_never_counts_targets_and_needs_mana_for_target_values() {
+    let ct = curse_ct();
+    let mk = |c: &mut Code| {
+        let mut r = body_rec();
+        r.mana = 2;
+        r.manashift = 8;
+        r.aurastate = 40;
+        r.auratargetstate = 41;
+        r.aurastat1 = 26;
+        r.aurastatcalc1 = c.f(8);
+        r.aurarangecalc = c.f(100);
+        r.aurafilter = 3;
+        r
+    };
+    let mut c = Code::new();
+    let r = mk(&mut c);
+    let t = tabs(r, c, 1);
+    // A player with enough mana: the target gets its list, state 85 ends
+    // off (it was on) and no mana is paid.
+    let (mut f, u, m) = curse_world();
+    f.c.set(u, 8, 1000);
+    f.c.units[u].states.push(85);
+    assert_eq!(dos2::damage_aura(&mut f, &t, &ct, u, 1, 1, false), 1);
+    assert_eq!(f.list_of(m, 41).map(|l| l.stats.get(&26)), Some(Some(&8)));
+    assert!(!f.has_state(u, 85));
+    assert_eq!(f.c.get(u, 8), 1000);
+    // A monster caster below the cost: the target values are 0, so no
+    // target list is made — the mana test applies to monsters too.
+    let (mut f, u, m) = curse_world();
+    let c0 = f.add(FUnit::new(UnitType::Monster, 0), (10, 10));
+    f.c.units[c0].flags = 0xE;
+    f.scan = vec![m];
+    f.c.hostile = true;
+    f.c.set(c0, 8, 100);
+    f.tpos.insert(c0, (10, 10));
+    f.pos.insert(c0, (10, 10));
+    let _ = u;
+    assert_eq!(dos2::damage_aura(&mut f, &t, &ct, c0, 1, 1, false), 1);
+    assert!(f.list_of(m, 41).is_none());
+}
+
+// Covers: specs/skills/bodies.md §edge-cases-original-bugs r11
+#[test]
+fn summon_class_falls_back_to_the_spawn_class_and_refuses_otherwise() {
+    let ct = ct3();
+    let mut r = body_rec();
+    r.summon = 0xFFFF;
+    let t = tabs(r, Code::new(), 1);
+    let (mut f, u) = world();
+    assert_eq!(helpers2::summon_class(&f, &t, &ct, u, 1).0, -1);
+    f.spawn_class = Some(1);
+    assert_eq!(helpers2::summon_class(&f, &t, &ct, u, 1).0, 1);
+    // A spawn class outside 1…count − 1 is no class.
+    f.spawn_class = Some(0);
+    assert_eq!(helpers2::summon_class(&f, &t, &ct, u, 1).0, -1);
+    f.spawn_class = Some(2);
+    assert_eq!(helpers2::summon_class(&f, &t, &ct, u, 1).0, -1);
+}
+
+// Covers: specs/skills/bodies.md §edge-cases-original-bugs r14
+#[test]
+fn charge_hit_leaves_flag_40_and_claws_set_or_clear_it() {
+    let ct = ct3();
+    let mut r = body_rec();
+    r.aurastate = 40;
+    r.aurastat1 = 25;
+    let t = tabs(r, Code::new(), 1);
+    for start in [0u32, 0x40] {
+        let (mut f, u, _) = duel();
+        f.c.units[u].flags = start;
+        assert_eq!(dos2::charge_hit(&mut f, &t, &ct, u, 1, 1), 1);
+        assert_eq!(f.c.units[u].flags & 0x40, start, "flag as it was");
+    }
+    // Claws: the flag is set unless two different claws are wielded and
+    // the frame event index is even (then it is cleared).
+    let (mut f, u, _) = duel();
+    f.inventory = true;
+    let a = f.c.add_item(FItem {
+        types: vec![45],
+        ..FItem::default()
+    });
+    let b = f.c.add_item(FItem {
+        types: vec![45],
+        ..FItem::default()
+    });
+    f.c.units[u].items.insert(4, a);
+    f.c.units[u].items.insert(5, b);
+    for (idx, flag) in [(1, 0x40), (2, 0), (3, 0x40)] {
+        f.c.units[u].flags = 0x40;
+        f.frame_index.insert(u, idx);
+        assert_eq!(dos2::claws(&mut f, &t, &ct, u, 1, 1), 1);
+        assert_eq!(f.c.units[u].flags & 0x40, flag, "index {idx}");
+    }
+    // One claw only, or a non-claw: always set.
+    f.c.units[u].items.remove(&5);
+    f.c.units[u].flags = 0;
+    f.frame_index.insert(u, 2);
+    dos2::claws(&mut f, &t, &ct, u, 1, 1);
+    assert_eq!(f.c.units[u].flags & 0x40, 0x40);
+}
+
+// Covers: specs/skills/bodies.md §edge-cases-original-bugs r15
+#[test]
+fn multiple_shot_target_failure_returns_one_and_fend_returns_zero() {
+    let ct = ct3();
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.calc1 = c.f(3);
+    r.calc2 = c.f(1);
+    r.srvmissilea = 0;
+    let t = tabs(r, c, 1);
+    let (mut f, u) = world();
+    // No target position: 1 and nothing made (the flag is set).
+    assert_eq!(dos2::multiple_shot(&mut f, &t, u, 1, 1), 1);
+    assert!(f.missiles.is_empty());
+    assert_eq!(f.c.units[u].flags & 0x40, 0x40);
+    f.tpos.insert(u, (40, 7));
+    assert_eq!(dos2::multiple_shot(&mut f, &t, u, 1, 1), 1);
+    assert_eq!(f.missiles.len(), 3);
+    // Fend returns 0 after a hit.
+    let (mut f, u, m) = duel();
+    f.entries.insert((u, 1, 1), 1);
+    f.entries.insert((u, 1, 2), 0);
+    f.entries.insert((u, 1, 3), f.c.units[m].guid as i32);
+    assert_eq!(dos2::fend(&mut f, &t, &ct, u, 1, 1), 0);
+    assert!(f.c.units[u].combat.is_empty(), "the melee was applied");
+}
+
+// Covers: specs/skills/bodies.md §edge-cases-original-bugs r16
+#[test]
+fn monster_inferno_always_ends_after_one_call() {
+    let mut ct = ct3();
+    ct.monstats2[0].infernolen = 9;
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.srvmissilea = 0;
+    r.calc1 = c.f(5);
+    let t = tabs(r, c, 1);
+    let (mut f, _) = world();
+    let mut mon = FUnit::new(UnitType::Monster, 0);
+    mon.skills.push(SkillEntry {
+        skill: 1,
+        base: 1,
+        owner_guid: -1,
+        ..SkillEntry::default()
+    });
+    mon.used = mon.skills.first().copied();
+    mon.states.push(12);
+    let m = f.add(mon, (0, 0));
+    f.tpos.insert(m, (5, 5));
+    f.c.frame = 100;
+    f.take_log();
+    assert_eq!(dos2::inferno_cast(&mut f, &t, &ct, m, 1, 1), 1);
+    let log = f.take_log();
+    // Param 1 was set to 1 first, so F < param 1 never holds: state 12
+    // off, type-0 timers deleted, ENDANIM (type 1) at F + InfernoLen.
+    assert!(!f.has_state(m, 12));
+    assert!(has(&log, format!("deltimers {m} 0 0")));
+    assert!(has(&log, format!("schedule {m} 1 109 0 0")));
+    assert!(!log
+        .iter()
+        .any(|l| l.starts_with(&format!("schedule {m} 0"))));
+    assert_eq!(f.anim_frame[&m], 0xB00);
+}
+
+// Covers: specs/skills/bodies.md §edge-cases-original-bugs r17
+#[test]
+fn raise_skeleton_penalty_hits_a_paladin_even_when_the_raise_fails() {
+    let (mut f, u, _, ct) = corpse_world();
+    f.c.units[u].class = 3;
+    f.c.set(u, 6, 1000);
+    f.c.set(u, 7, 800);
+    // R invalid: the raise fails after the corpse test and the penalty.
+    let t = tabs(body_rec(), Code::new(), 1);
+    let mut g = f.clone();
+    let mut want = DamageRecord {
+        hit_flags: 0x1000,
+        result: 4,
+        physical: 100,
+        total: 100,
+        ..DamageRecord::default()
+    };
+    crate::combat::apply(&mut g.c, &ct, u, u, false, &mut want);
+    let before = f.c.get(u, 6);
+    assert_eq!(dos2::raise_skeleton(&mut f, &t, &ct, u, 99, 1), 0);
+    assert!(f.c.get(u, 6) < before, "max life / 8 taken");
+    assert_eq!(f.c.get(u, 6), g.c.get(u, 6));
+    // Another class takes nothing.
+    let (mut f2, u2, _, ct2_) = corpse_world();
+    f2.c.set(u2, 6, 1000);
+    f2.c.set(u2, 7, 800);
+    assert_eq!(dos2::raise_skeleton(&mut f2, &t, &ct2_, u2, 99, 1), 0);
+    assert_eq!(f2.c.get(u2, 6), 1000);
+    // No corpse: no penalty either.
+    let (mut f3, u3, m3, ct3_) = corpse_world();
+    f3.c.units[u3].class = 3;
+    f3.c.set(u3, 6, 1000);
+    f3.c.set(u3, 7, 800);
+    f3.c.units[m3].mode = 1;
+    assert_eq!(dos2::raise_skeleton(&mut f3, &t, &ct3_, u3, 1, 1), 0);
+    assert_eq!(f3.c.get(u3, 6), 1000);
+}
+
+// Covers: specs/skills/bodies.md §4.3 text
+#[test]
+fn defensive_buff_is_slot_18() {
+    let mut r = body_rec();
+    r.aurastate = 20;
+    let t = tabs(r, Code::new(), 1);
+    let ct = ct3();
+    let (mut f, u) = world();
+    assert_eq!(run_do(&mut f, &t, &ct, 18, u, 1, 1), Some(1));
+    assert!(f.has_state(u, 20) && f.c.units[u].flags & 0x40 == 0x40);
+    assert_eq!(run_do(&mut f, &t, &ct, 18, u, 99, 1), Some(0));
+}
+
+// Covers: specs/skills/bodies.md §2.17 text, §2.17 r1, §2.17 r2
+#[test]
+fn pet_resync_takes_the_largest_petmax_then_basemax() {
+    let mut c = Code::new();
+    let pet = |c: &mut Code, pt: u8, v: i16| {
+        let mut r = body_rec();
+        r.pettype = pt;
+        r.petmax = c.f(v);
+        r
+    };
+    let recs = vec![
+        body_rec(),
+        pet(&mut c, 2, 3),
+        pet(&mut c, 2, 7),
+        pet(&mut c, 4, -2),
+        pet(&mut c, 0, 9),
+        pet(&mut c, 9, 9),
+        pet(&mut c, 2, 5),
+    ];
+    let t = tabs_n(recs, c);
+    let (mut f, u) = world();
+    f.pettypes = 5;
+    f.c.units[u].skills = (1..=6)
+        .map(|k| SkillEntry {
+            skill: k,
+            base: 1,
+            owner_guid: -1,
+            ..SkillEntry::default()
+        })
+        .collect();
+    let rows = |t: i32| (t != 3).then_some(10 + t);
+    let mut calls = Vec::new();
+    helpers::pet_resync(&mut f, &t, u, &rows, &mut |_, t, v| calls.push((t, v)));
+    // r1: skills in list order; a larger value raises the maximum (type
+    // 2: 3, then 7; the later 5 does not); −2 counts as 1; type 0 and the
+    // invalid type 9 are skipped.
+    // r2: types with no value get basemax when they have a row (0, 1;
+    // type 3 has none).
+    assert_eq!(calls, [(2, 3), (2, 7), (4, 1), (0, 10), (1, 11)]);
+    // Not a player, or no skill list: nothing.
+    let m = monster(&mut f, (1, 1));
+    let mut calls = Vec::new();
+    helpers::pet_resync(&mut f, &t, m, &rows, &mut |_, t, v| calls.push((t, v)));
+    f.c.units[u].skills.clear();
+    helpers::pet_resync(&mut f, &t, u, &rows, &mut |_, t, v| calls.push((t, v)));
+    assert!(calls.is_empty());
 }
