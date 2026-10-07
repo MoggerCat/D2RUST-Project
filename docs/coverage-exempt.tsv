@@ -413,3 +413,61 @@ specs/tools/scenario.md	§2 text	heading
 specs/world/object-population.md	§edge-cases-original-bugs text	heading text only
 specs/world/objects-2.md	§edge-cases-original-bugs text	pointer line
 specs/world/cube.md	§edge-cases-original-bugs text	heading text only
+# Added in the c2 review (coordinator): narration, pointers, convention tables, out-of-scope network mode only.
+specs/drlg/preset.md	§2 r3	assumption note (expansion install), no behaviour
+specs/drlg/preset.md	§3.1 r4	pointer to levels.md §6
+specs/drlg/preset.md	§6 text	intro and callers list
+specs/drlg/outdoor-act3-act5.md	§5 text	pointer to outdoor.md
+specs/drlg/outdoor.md	§3 text	intro
+specs/drlg/outdoor.md	§7 text	level-id range note
+specs/items/treasure.md	§9 text	intro and calling convention
+specs/items/quality.md	§2	pointer to treasure.md §6
+specs/monsters/umod-callbacks.md	§1 r3	conventions (helper addresses of another spec)
+specs/monsters/umod-callbacks.md	§1 r5	conventions (helper definitions)
+specs/monsters/umod-callbacks.md	§2 text	call-site list (pointers to other specs)
+specs/monsters/umod-callbacks.md	§2 r5	call site owned by combat/damage.md
+specs/monsters/umod-callbacks.md	§28 text	intro
+specs/monsters/umod-callbacks.md	§28.1 r3	call-site table (pointers)
+specs/monsters/umod-callbacks.md	§28.1 r4	conventions
+specs/monsters/umod-callbacks.md	§28.4	reachability note
+specs/monsters/init.md	§1	entry-point table (callers)
+specs/monsters/init.md	§4.1 text	intro
+specs/monsters/init.md	§4.1 r1	pointer to sim/path-placement.md and sim/units.md
+specs/monsters/init.md	§4.1 r2	pointer to sim/unit-order.md
+specs/monsters/init.md	§4.1 r3	pointer to sim/units.md
+specs/monsters/init.md	§25.1	calling-convention table
+specs/monsters/population.md	§1 r2	caller list
+specs/monsters/population.md	§14 r3	pointer to AI and skills callers
+specs/monsters/population.md	§14 r5	pointer (MonSpcWalk read by AI only)
+specs/monsters/population.md	§14 r6	pointer to the missiles spec
+specs/monsters/ai.md	§5.3	table of helper addresses
+specs/monsters/ai.md	§5.1 text	callers and setters (pointers)
+specs/sim/rng.md	§3 r6	calling convention (registers), no behaviour
+specs/sim/rng.md	§7 text	seed map; each system spec owns its draws
+specs/sim/rng.md	§7 row1	seed map row (pointer)
+specs/sim/rng.md	§7 row2	seed map row (pointer)
+specs/sim/rng.md	§7 row3	seed map row (pointer)
+specs/sim/rng.md	§7 row4	seed map row (pointer)
+specs/sim/rng.md	§7 row5	seed map row (pointer)
+specs/sim/rng.md	§7 row6	seed map row (pointer)
+specs/sim/rng.md	§7 row7	seed map row (pointer)
+specs/sim/rng.md	§7 row8	seed map row (pointer)
+specs/sim/rng.md	§7 row9	seed map row (pointer)
+specs/sim/rng.md	§7 row11	seed map row (pointer)
+specs/sim/rng.md	§7 row12	seed map row (pointer)
+specs/sim/rng.md	§7 row13	seed map row (pointer)
+specs/sim/rng.md	§7 row15	seed map row (pointer)
+specs/sim/rng.md	§7 row17	seed map row (pointer)
+specs/sim/rng.md	§7 row18	seed map row (pointer)
+specs/sim/rng.md	§7 row19	seed map row (pointer)
+specs/sim/intents-events.md	§1 text	intro
+specs/sim/intents-events.md	§2.2 text	intro
+specs/sim/intents-events.md	§7 text	intro
+specs/sim/intents-events.md	§7.5 text	intro
+specs/sim/intents-events.md	§7.8 text	intro
+specs/sim/intents-events.md	§9 text	intro
+specs/sim/intents-events.md	§1 r5	list of other call sites (pointers)
+specs/sim/intents-events.md	§3.2 r5	game types 1/2 and network mode: Phase 7, out of scope
+specs/sim/intents-events.md	§3.2 r6	game types 1/2 and network mode: Phase 7, out of scope
+specs/sim/tick.md	§5.7	pointer table to units.md
+specs/sim/tick.md	§6 text	narration
