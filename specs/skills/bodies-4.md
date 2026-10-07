@@ -23,14 +23,14 @@
 | Rules | 57–58 |
 |   1. Conventions | 59–67 |
 |   2. Shared helpers, batch 4 (continued) | 68–192 |
-|   3. Bodies used by one monster skill (continued) | 193–506 |
-|   4. Bodies used by no monster skill row | 507–635 |
-| Constants & data dependencies | 636–647 |
-| Randomness | 648–663 |
-| Edge cases & original bugs | 664–688 |
-| Test vectors | 689–699 |
-| Provenance | 700–710 |
-| Open questions | 711–727 |
+|   3. Bodies used by one monster skill (continued) | 193–509 |
+|   4. Bodies used by no monster skill row | 510–638 |
+| Constants & data dependencies | 639–650 |
+| Randomness | 651–666 |
+| Edge cases & original bugs | 667–691 |
+| Test vectors | 692–702 |
+| Provenance | 703–713 |
+| Open questions | 714–735 |
 <!-- /index -->
 
 ## Summary
@@ -482,7 +482,10 @@ Each eaten corpse adds one more list of the state (Edge case 6).
 
 1. R invalid or `aurastate` invalid → 0.
 2. O = the source of the unit (§1). T = target.
-3. O exists (riding): target position (result not tested);
+3. O exists (riding): target position (x, y) (`0x0056D2C0`,
+   `bodies.md` §2.4; result not tested: it always writes both
+   coordinates, from the target unit or else the path's target point,
+   and "fails" only when one of them is 0, which is then used as is);
    `0x00554EA0(game, unit, room none, x, y, 0, 0)` (result not read);
    release (§2.3) with (unit, O, skill, L). Return 1.
 4. No O, no T → return srvdo 98 (`bodies-3.md` §4.3).
@@ -724,3 +727,8 @@ The riding imp (§2.3) follows its tower or siege beast every tick.
    `missiles/missiles.md` (`area_damage` callback) and `0x0064CB30`
    (point collision) in `sim/path-placement.md` §4 (query table, rule
    5, masked value rule 2).
+6. Answered (2026-10-08, `docs/handoff/impl-monster-skill-slots.md`): Imp Teleport's point
+   when the target position "fails" (§3.24 step 3) is the pair that
+   `0x0056D2C0` wrote anyway (target unit's position, else the path
+   target), one or both coordinates 0; never a separate (0, 0) default.
+   Read at `0x005D1B1A`–`0x005D1B3D`.
