@@ -2683,3 +2683,365 @@ fn edge_blade_shield_pulse_is_not_a_table_slot() {
     assert!(!DO_BODIES.contains(&142));
     assert!(DO_BODIES.contains(&54));
 }
+
+// ---------------------------------------------------------------- edge cases of bodies-2b
+
+/// A formula `rand(a, b)`: push a, push b, call function 2, end.
+fn rand_formula(c: &mut Code, a: i16, b: i16) -> u32 {
+    let at = c.0.len() as u32;
+    c.0.push(0x08);
+    c.0.extend(a.to_le_bytes());
+    c.0.push(0x08);
+    c.0.extend(b.to_le_bytes());
+    c.0.extend([0x01, 2, 0x00]);
+    at
+}
+
+/// A switchable monster class (`SwitchAI`, attackable) and a world with a
+/// hostile player and one such monster in scan range.
+fn switch_world(
+    edit: impl FnOnce(&mut d2_data::tables::Skills, &mut Code),
+) -> (BodyFake, SkillTables, CombatTables, usize, usize) {
+    let mut c = Code::new();
+    let mut r = body_rec();
+    edit(&mut r, &mut c);
+    let t = tabs(r, c, 2);
+    let mut ms = monster_rec();
+    ms.switchai = true;
+    let mut ct = combat_tables(vec![ms]);
+    ct.monstats2[0].isatt = true;
+    let (mut f, u) = world();
+    f.c.hostile = true;
+    f.c.in_range = true;
+    let m = monster(&mut f, (3, 0));
+    f.c.units[m].flags = 0xE;
+    f.c.mflags.insert(m, 0);
+    f.c.set(m, 12, 1);
+    f.c.set(u, 12, 1);
+    f.scan = vec![m];
+    (f, t, ct, u, m)
+}
+
+// Covers: specs/skills/bodies-2.md §edge-cases-original-bugs r17
+#[test]
+fn edge_leap_attack_start_does_nothing_for_a_state_54_target() {
+    let (mut f, _t, _ct, u, m) = switch_world(|_, _| {});
+    f.c.in_range = false;
+    f.pos.insert(m, (10, 0));
+    f.c.units[m].states.push(54);
+    f.targets.insert(u, m);
+    f.take_log();
+    assert_eq!(b3_lvl18::leap_attack_start(&mut f, u, 1), 1);
+    let e = f.c.units[u].used.unwrap();
+    assert_eq!(f.entry_flags(u, &e), 0x1080);
+    assert_eq!(
+        (f.entry_param(u, &e, 3), f.entry_param(u, &e, 4)),
+        (1, m as i32)
+    );
+    assert_eq!(f.c.units[m].states, [54], "the target is untouched");
+    let log = f.take_log();
+    for p in [
+        "state",
+        "update",
+        "schedule",
+        "path",
+        "deltimers",
+        "overlay",
+        "event",
+    ] {
+        assert!(
+            !log.iter().any(|l| l.starts_with(&format!("{p} {m} "))),
+            "{p}: {log:?}"
+        );
+    }
+}
+
+// Covers: specs/skills/bodies-2.md §edge-cases-original-bugs r18
+#[test]
+fn edge_confuse_slot_one_gives_no_stat() {
+    let (mut f, t, ct, u, m) = switch_world(|r, c| {
+        r.auratargetstate = 81;
+        r.auralencalc = c.f(100);
+        r.aurarangecalc = c.f(10);
+        r.aurafilter = 0x8783;
+        r.aurastat1 = 100; // never read: the context starts at aurastat2
+        r.aurastatcalc1 = c.f(9);
+        r.aurastat2 = 101;
+        r.aurastatcalc2 = c.f(4);
+    });
+    f.tpos.insert(u, (3, 0));
+    f.c.frame = 20;
+    f.take_log();
+    assert_eq!(b3_lvl18::confuse(&mut f, &t, &ct, u, 1, 1), 1);
+    let l = f.state_list(m, 81).expect("confuse state");
+    assert_eq!(f.lists[l].callback, callback::CONFUSE);
+    assert!(!f.lists[l].stats.contains_key(&100), "aurastat1 is skipped");
+    assert!(!f.lists[l].stats.contains_key(&0), "slot 1 is (stat 0, 0)");
+    assert_eq!(f.list_get(l, 101), 4);
+    let log = f.take_log();
+    assert!(log.contains(&format!("Alignment {{ u: {m}, a: 1, v: 1 }}")));
+    assert!(log.contains(&format!("schedule {m} 10 120 0 0")));
+}
+
+// Covers: specs/skills/bodies-2.md §edge-cases-original-bugs r19
+#[test]
+fn edge_dragon_tail_explodes_only_for_a_living_target() {
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.calc1 = c.f(50);
+    r.aurarangecalc = c.f(6);
+    let t = tabs(r, c, 1);
+    let ct = combat_tables(vec![monster_rec()]);
+    for dead in [false, true] {
+        let (mut f, u, m) = hit_world();
+        let x = monster(&mut f, (2, 0));
+        f.c.units[x].flags = 0xC;
+        f.c.set(x, 6, 1_000_000);
+        f.c.set(x, 12, 1);
+        f.scan = vec![x];
+        f.c.set(m, 6, 1_000_000);
+        let rec = DamageRecord {
+            result: 1,
+            physical: 2560,
+            total: 2560,
+            ..DamageRecord::default()
+        };
+        super::fake::stored(&mut f, u, m, rec);
+        if dead {
+            f.dead.insert(m);
+        }
+        f.take_log();
+        assert_eq!(b3_lvl18::dragon_tail(&mut f, &t, &ct, u, 1, 1), 1);
+        let hit = f.c.reactions.iter().any(|r| r.1 == x);
+        assert_eq!(hit, !dead, "explosion only if T is alive (dead: {dead})");
+    }
+}
+
+// Covers: specs/skills/bodies-2.md §edge-cases-original-bugs r20
+#[test]
+fn edge_rabies_start_evaluates_and_discards() {
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.calc1 = rand_formula(&mut c, 0, 100);
+    r.calc4 = rand_formula(&mut c, 0, 100);
+    r.etype = 1;
+    let t = tabs(r, c, 1);
+    let ct = combat_tables(vec![monster_rec()]);
+    let (mut f, u, m) = hit_world();
+    let e = f.c.units[u].used.unwrap();
+    // A seed for which the hit (bonus 0, as the start rolls it) lands.
+    let s0 = (1u32..)
+        .map(|lo| Seed::new(lo, 0))
+        .find(|&s| {
+            let mut g = f.clone();
+            g.c.units[u].seed = s;
+            crate::combat::melee_result(&mut g.c, &t, &ct, Some(u), Some(m), 0, 0) & 1 != 0
+        })
+        .unwrap();
+    f.c.units[u].seed = s0;
+    // The seed after the melee roll, then the two discarded evaluations.
+    let mut g = f.clone();
+    crate::combat::melee_result(&mut g.c, &t, &ct, Some(u), Some(m), 0, 0);
+    let mut want = g.c.units[u].seed;
+    want.step();
+    want.step();
+    assert_eq!(b3_lvl18::rabies_start(&mut f, &t, &ct, u, 1, 1), 1);
+    assert_eq!(f.entry_param(u, &e, 1), 1);
+    assert_eq!(f.c.units[u].seed, want, "calc1 and calc4 were evaluated");
+    assert!(f.c.units[u].combat.is_empty(), "no damage record");
+    // A miss: 0 and E param 1 stays 0.
+    let (mut f, u, _m) = hit_world();
+    f.c.in_range = false;
+    assert_eq!(b3_lvl18::rabies_start(&mut f, &t, &ct, u, 1, 1), 0);
+    assert_eq!(f.entry_param(u, &e, 1), 0);
+}
+
+// Covers: specs/skills/bodies-2.md §edge-cases-original-bugs r21
+#[test]
+fn edge_teleport_tests_neither_r_nor_the_position() {
+    let (mut f, u) = world();
+    f.teleport = Some(1);
+    f.take_log();
+    // No target position at all: the unit is placed at (0, 0).
+    assert_eq!(b3_lvl18::teleport(&mut f, u), 1);
+    assert!(f.take_log().contains(&format!("place {u} None (0, 0)")));
+    f.teleport = Some(0);
+    assert_eq!(b3_lvl18::teleport(&mut f, u), 0);
+    f.teleport = Some(2);
+    f.blocked = true;
+    assert_eq!(b3_lvl18::teleport(&mut f, u), 0, "line of sight");
+}
+
+// Covers: specs/skills/bodies-2.md §edge-cases-original-bugs r23
+#[test]
+fn edge_mind_blast_converts_on_equal_conversion_does_not() {
+    let k = 40;
+    let seed = (1u32..)
+        .map(|lo| Seed::new(lo, 0))
+        .find(|s| {
+            let mut s = *s;
+            s.roll(100) == k
+        })
+        .unwrap();
+    // Conversion (srvdo 79): `roll(100) < calc1`, equal fails.
+    let (mut f, t, ct, u, m) = switch_world(|r, c| {
+        r.calc1 = c.f(k as i16);
+        r.auratargetstate = 60;
+        r.auralencalc = c.f(100);
+    });
+    f.c.units[u].seed = seed;
+    f.targets.insert(u, m);
+    super::fake::stored(
+        &mut f,
+        u,
+        m,
+        DamageRecord {
+            result: 1,
+            ..DamageRecord::default()
+        },
+    );
+    assert_eq!(b3_lvl24::conversion_do(&mut f, &t, &ct, u, 1, 1), 1);
+    assert!(f.state_list(m, 60).is_none(), "equal is not a conversion");
+    // Mind Blast (srvdo 51): `roll(100) ≤ chance`, equal converts.
+    let (mut f, t, ct, u, m) = switch_world(|r, c| {
+        r.param3 = 10;
+        r.param4 = 5;
+        r.param5 = k as i32 as _;
+        r.param6 = k as i32 as _;
+        r.aurarangecalc = c.f(10);
+        r.aurafilter = 0x8783;
+    });
+    f.tpos.insert(u, (3, 3));
+    f.c.units[u].seed = seed;
+    assert_eq!(b3_lvl24::mind_blast(&mut f, &t, &ct, u, 1, 1), 1);
+    let l = f.state_list(m, 53).expect("conversion state");
+    assert_eq!(f.lists[l].callback, callback::MIND_BLAST);
+}
+
+// Covers: specs/skills/bodies-2.md §edge-cases-original-bugs r24
+#[test]
+fn edge_strafe_last_arrow_returns_0() {
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.srvmissilea = 1;
+    r.calc2 = c.f(3);
+    r.aurarangecalc = c.f(10);
+    r.aurafilter = 0x8783;
+    let t = tabs(r, c, 2);
+    let ct = combat_tables(vec![monster_rec()]);
+    for (n, want, left) in [(2, 1, 1), (1, 0, 0)] {
+        let (mut f, u, m) = hit_world();
+        f.c.units[m].flags = 0xC;
+        f.scan = vec![m];
+        let e = f.c.units[u].used.unwrap();
+        f.set_entry_param_of(u, &e, 1, n);
+        f.set_entry_param_of(u, &e, 2, 1);
+        f.set_entry_param_of(u, &e, 3, f.c.units[m].guid as i32);
+        assert_eq!(b3_lvl24::strafe(&mut f, &t, &ct, u, 1, 1), want);
+        assert_eq!(f.missiles.len(), 1, "the arrow is made either way");
+        assert_eq!(f.entry_param(u, &e, 1), left);
+    }
+}
+
+// Covers: specs/skills/bodies-2.md §edge-cases-original-bugs r25
+#[test]
+fn edge_dopplezon_keeps_a_bad_pettype_as_0_raven_refuses() {
+    let mut r = body_rec();
+    r.summon = 0;
+    r.pettype = 20; // ≥ the pettype count 15
+    let t = tabs(r, Code::new(), 1);
+    let ct = combat_tables(vec![monster_rec()]);
+    let (mut f, u) = world();
+    f.monlvl = vec![crate::skills::fake::blank::<d2_data::tables::Monlvl>(); 4];
+    f.take_log();
+    assert_eq!(b3_lvl24::dopplezon(&mut f, &t, &ct, u, 1, 1), 1);
+    assert!(
+        f.take_log()
+            .iter()
+            .any(|s| s.starts_with("PetAdd") && s.contains("t: 0")),
+        "pet type kept as 0"
+    );
+    assert_eq!(
+        b3_lvl01::raven(&mut f, &t, &ct, u, 1, 1),
+        0,
+        "Raven refuses"
+    );
+}
+
+// Covers: specs/skills/bodies-2.md §edge-cases-original-bugs r26
+#[test]
+fn edge_revive_goes_on_without_a_free_point() {
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.pettype = 3;
+    r.summon = 0;
+    r.petmax = c.f(4);
+    let t = tabs(r, c, 1);
+    let mut ms = monster_rec();
+    ms.switchai = true;
+    let mut ct = combat_tables(vec![ms]);
+    ct.monstats2[0].revive = true;
+    ct.monstats2[0].corpsesel = true;
+    let (mut f, u) = world();
+    let k = monster(&mut f, (6, 6));
+    f.c.units[k].mode = 12;
+    f.alive.remove(&k);
+    f.c.units[k].flags = 4; // a dead unit still passes can_switch
+    f.c.mflags.insert(k, 0);
+    f.targets.insert(u, k);
+    f.free_shift = None; // no free point
+    f.take_log();
+    assert_eq!(b3_lvl30::revive(&mut f, &t, &ct, u, 1, 1), 1);
+    let log = f.take_log();
+    assert!(!log.iter().any(|s| s.starts_with("place ")), "not stood up");
+    assert!(f.c.has_state(k, 96), "revive state still set");
+    assert!(log
+        .iter()
+        .any(|s| s.starts_with("PetAdd") && s.contains("t: 3")));
+    assert!(log
+        .iter()
+        .any(|s| s.starts_with("OwnerData") && s.contains(&format!("owner: Some({u})"))));
+}
+
+// Covers: specs/skills/bodies-2.md §edge-cases-original-bugs r28
+#[test]
+fn edge_redemption_pays_for_corpses_fist_accepts_overlay_0() {
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.aurastate = 40;
+    r.aurarangecalc = c.f(5);
+    r.calc1 = c.f(100);
+    r.calc2 = c.f(1);
+    r.calc3 = c.f(0);
+    r.mana = 1;
+    r.manashift = 8;
+    r.perdelay = 0xFFFF_FFFF;
+    r.aurafilter = 0x1002;
+    let t = tabs(r, c, 1);
+    let mut ms2: d2_data::tables::Monstats2 = crate::skills::fake::blank();
+    ms2.corpsesel = true;
+    ms2.soft = true;
+    let mut ct = combat_tables(vec![monster_rec()]);
+    ct.monstats2 = vec![ms2];
+    let (mut f, u) = world();
+    f.c.set(u, 8, 1000);
+    f.c.set(u, 9, 5000);
+    f.c.set(u, 7, 5000);
+    let k = monster(&mut f, (2, 2));
+    f.c.units[k].mode = 12;
+    f.scan = vec![k];
+    assert_eq!(b3_lvl30::redemption(&mut f, &t, &ct, u, 1, 1), 1);
+    assert!(f.c.has_state(k, 99), "redeemed corpse counted");
+    assert_eq!(f.c.get(u, 8), 1000 - 256, "the mana cost is paid");
+    // Fist of the Heavens: an overlay id of 0 is accepted.
+    let mut r = body_rec();
+    r.srvmissilea = 1;
+    r.srvoverlay = 0;
+    let t2 = tabs(r, Code::new(), 2);
+    let (mut f, u) = world();
+    let m = monster(&mut f, (4, 4));
+    f.targets.insert(u, m);
+    f.take_log();
+    assert_eq!(b3_lvl30::fist_of_heavens(&mut f, &t2, u, 1, 1), 1);
+    assert!(f.take_log().contains(&format!("overlay {m} 0")));
+}
