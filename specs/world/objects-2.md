@@ -17,24 +17,25 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 40–49 |
-| Inputs | 50–53 |
-| Outputs / state changes | 54–58 |
-| Rules | 59–60 |
-|   16. Operate functions, part 2 | 61–188 |
-|   17. Small init functions | 189–215 |
-|   18. Object events 0, 3, 8, 9, 10 | 216–283 |
-|   19. Obelisk completion (C→S 0x44, `0x00585240`) | 284–330 |
-|   20. Item drop helpers (open question 13) | 331–426 |
-|   21. Curable-state removal (`0x00578C20`, open question 15) | 427–439 |
-|   22. Object allocation modes (open question 8) | 440–464 |
-|   23. Client side of S→C 0x0E and 0x4D (open question 4) | 465–482 |
-| Constants & data dependencies | 483–486 |
-| Randomness | 487–501 |
-| Edge cases & original bugs | 502–526 |
-| Test vectors | 527–540 |
-| Provenance | 541–561 |
-| Open questions | 562–565 |
+| Summary | 41–50 |
+| Inputs | 51–54 |
+| Outputs / state changes | 55–59 |
+| Rules | 60–61 |
+|   16. Operate functions, part 2 | 62–189 |
+|   17. Small init functions | 190–216 |
+|   18. Object events 0, 3, 8, 9, 10 | 217–284 |
+|   19. Obelisk completion (C→S 0x44, `0x00585240`) | 285–331 |
+|   20. Item drop helpers (open question 13) | 332–427 |
+|   21. Curable-state removal (`0x00578C20`, open question 15) | 428–440 |
+|   22. Object allocation modes (open question 8) | 441–489 |
+|   23. Client side of S→C 0x0E and 0x4D (open question 4) | 490–507 |
+|   24. Guards and corner cases of part 1 (read 2026-10-07) | 508–549 |
+| Constants & data dependencies | 550–553 |
+| Randomness | 554–568 |
+| Edge cases & original bugs | 569–593 |
+| Test vectors | 594–610 |
+| Provenance | 611–637 |
+| Open questions | 638–641 |
 <!-- /index -->
 
 ## Summary
@@ -45,7 +46,7 @@ operate functions beyond §8–§13, the small init functions, and the
 object event handlers 0, 1, 3, 8, 9 and 10; §19–§23 answer open
 questions of part 1 (obelisk completion, the item drop helpers, the
 well's curable-state removal, object allocation modes, the client side
-of 0x0E / 0x4D).
+of 0x0E / 0x4D); §24 settles guards and corner cases of part 1.
 
 ## Inputs
 
@@ -462,6 +463,30 @@ key test) is unreachable with live data:
 Doors therefore start in mode 0 (or 2 by §3 rule 8) and §10 only moves
 them among 0, 2, 4 and 5.
 
+4. Allocation mode per object call site (type 2, or a type register
+   that holds 2; the mode is the sixth stack argument of `0x00555230`,
+   stack order x, y, game, room, flag, mode, GUID). Read from the
+   pushes before each call (2026-10-07):
+
+   | Mode | Call sites (function) | Creates |
+   |---|---|---|
+   | 0 | `0x0054E03B` (`0x0054DF80`) | object 562 at an evilhut pack leader (`monsters/population.md` §9 rule 6) |
+   | 0 | `0x0054E5AA`, `0x0054E5EA` (`0x0054E490`) | objects 571 / 572 at barricade-door monsters 432 / 433 (`monsters/population.md` OQ3) |
+   | 0 | `0x0054F35D` (`0x0054F180`), `0x0054F478` (`0x0054F430`) | presets 581 / 580, 582 (§6) |
+   | 0 | `0x00550526`, `0x005506B8`, `0x00550C07` (random, spread, oriented spot) | population (`world/object-population.md` §6) |
+   | 0 | `0x00550ED0`, `0x005510F8` (fn 1), `0x005511E8` (flies 103, `0x00551150`), `0x00551408` (fn 7), `0x00551A4B`, `0x00551BA7` (fn 4), `0x00551E56`, `0x00551F9D` (fn 5), `0x005520DD`, `0x005522F0`, `0x0055238E` (themes) | population |
+   | 0 | `0x005B6B43` (`0x005B6AD0`), `0x005BD479` (`0x005BD390`) | object 131 (quest and monster code, `world/quests-act3.md`, `world/quests-act4.md`) |
+   | 1 | `0x005823B9`, `0x00582408` (`0x00582380`) | fire objects 162 / 160 of traps 5 / 7 (§8.3) |
+   | 1 | `0x0056D249` (`0x0056D130`) | town portal 59 (§12) |
+   | 1 | `0x00588A13`, `0x00588A3B`, `0x00588A90`, `0x00589313`, `0x0058A55D`, `0x0058A8A2`, `0x0058CB1C`, `0x0058D847`, `0x00594429`, `0x005945C2`, `0x0059B779`, `0x0059B7AB`, `0x0059D969`, `0x005B4648` | quest objects (classes 189, 558, 561, 565, 318, 100, 566; `world/quests*.md`) |
+   | 2 | `0x0056D092` (`0x0056CF40`) | portal object of `0x0056CF40` (`monsters/population.md` §1) |
+   | argument | `0x0054F131` (`0x0054F0D0`, presets 574–579), `0x00555843` (`0x005557D0`, DS1 presets and the inactive-unit restore, rule 1) | the preset's or the saved mode |
+
+   Every population and monster-pack object is therefore allocated in
+   **mode 0**; its init (§3 rule 6) and PreOperate (§3 rule 8) give the
+   rest. The other `0x00555230` calls allocate players (type 0),
+   monsters (type 1), missiles (type 3) or items (type 4).
+
 ### 23. Client side of S→C 0x0E and 0x4D (open question 4)
 
 1. 0x0E byte @6 is the client's mode-request code (`client/msg-units.md`
@@ -479,6 +504,48 @@ them among 0, 2, 4 and 5.
 3. The server must still send §14's bytes exactly (zeros included) for
    byte-equal traces. The client rows belong to `client/model.md` §8
    rule 5 (cross-file request in `docs/handoff/pc2-spec-objects.md`).
+
+### 24. Guards and corner cases of part 1 (read 2026-10-07)
+
+Points the implementation of `world/objects.md` §6–§12 read narrowly;
+each is settled from the 1.14d function named.
+
+1. **Preset 580's last mode set** (`0x0054F370`, §6) is the ordinary
+   mode set `0x00624690(O, 0)` (`sim/units.md` §4). When O is already
+   in mode 0 it runs no animation setup and draws nothing, but it still
+   queues O for update and sets flag 0x1, so the 0x0E of §14 is sent.
+2. **Barrel, operate 5** (`0x005868A0`): the only test is "object
+   missing, or its mode is 0"; the "when the object exists" guard of the
+   flag clear protects only the null object, which the dispatch (§7.2)
+   never passes. So with an object in mode 0 the selectable flag is
+   always cleared. The skill start runs only when the operator exists
+   and is a player (type 0) and its skill `0x006439B0(P, −1)` exists.
+   Order: skill start, mode 1, clear 0x2, free the footprint, trap
+   `roll(10000)`, drop `roll(100)`, ENDANIM.
+3. **Shrine storm (19)** (`0x00582DA0`, §9.3): the life loss is only
+   the base-stat add on stat 6; nothing tests the result or kills. A
+   unit can be left with life ≤ 0 and no death runs from the shrine.
+   The finder keeps units of type 0 or 1 only; each is also skipped
+   when `0x005541B0` reports it dead.
+4. **Shrine event 6** (`0x00581620`, §9.1): no object, or an object
+   whose hover (+0xA4) is null → nothing, and no reschedule. Otherwise
+   hover expiry ≤ the game frame → free the hover (`0x006611A0`),
+   +0xA4 := 0, queue, flag 0x100; else event 6 again at the expiry.
+5. **Well "used"** (`0x00585720`, §11): set by each heal **write**, not
+   by a changed value. A write happens when the stat's total is below
+   its maximum (life only with `Parm3` & 2, mana only with `Parm3` & 1,
+   stamina always); the written value min(total + ((max · `Parm1`) >>
+   8), max) may equal the total (`Parm1` 0 or a small max) and still
+   counts. Then each removed poison (state 2) or freeze (state 1) stat
+   list, `0x00578C20` ≠ 0 and the pet callback set it.
+6. **Locked door with no operator** (§10 mode 6): the key test runs
+   with a null unit and is fatal as for chests (§8.1 rule 8); with live
+   data no door reaches mode 6 (§22).
+7. **Well event 2 mode set** (§11): the refill's mode set is the
+   ordinary `0x00624690`, which queues and sets flag 0x1 itself. The
+   explicit queue and flag 0x1 after it (`0x00581510`) run on every
+   refill that adds a charge, also when the mode rule sets no mode;
+   after a mode set they repeat it (no second effect).
 
 ## Constants & data dependencies
 
@@ -537,6 +604,9 @@ Listed in `world/objects.md` (Constants & data dependencies).
 | random class, S = {1, 666} (r = 51), L = 10 / 20 / 40 | gold (51 < 55) / armor (45 ≤ 51 < 60) / weapon (50 ≤ 51 < 80) | §20.6 |
 | A(L), L = 39, 40, 108, 109, 1024 | 0, 1, 3, 4, 0 | §20.5 |
 | well heal, P with states 9 and 60 | both lists removed, result 1 | §21 |
+| well, `Parm1` 0, `Parm3` 3, P life 10 of max 20 (8.8), mana and stamina full | life written 10 (unchanged), used: charges 2 → 1, mode 1 | §24 rule 5 |
+| preset 580, init leaves mode 0 | no draw, O queued, flag 0x1 (0x0E sent) | §24 rule 1 |
+| population / evilhut / barricade object | allocated in mode 0 | §22 rule 4 |
 
 ## Provenance
 
@@ -558,6 +628,12 @@ The §16–§18 bullet of `world/objects.md` Provenance; §18.6 from
   `0x0066BF30` callers, the `0x00624690` callers with a constant 6, and
   an `all.asm` search for stores of 6 at +0x10.
 - §23: `0x004BD6D0`, `0x004BD5C0` (client); `client/msg-units.md` §4.
+- §22 rule 4: the pushes before all 53 `0x00555230` calls in `all.asm`
+  (script outside the repo), with `disasm.py at` for the sites whose
+  mode or type is a register (`0x00550ED0`, `0x00551408`, `0x00551A4B`,
+  `0x00551BA7`, `0x0056D092`, `0x00588A3B`, `0x0059D969`).
+- §24: `0x0054F370`, `0x005868A0`, `0x00582DA0`, `0x00581620`,
+  `0x00585720`, `0x00581510`, `0x00624690`.
 
 ## Open questions
 
