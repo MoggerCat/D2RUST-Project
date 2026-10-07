@@ -110,6 +110,8 @@ pub struct Fake {
     pub range_needed: Option<i32>,
     /// Every unit is shapeshifted (`ManaUnits::shapeshifted`).
     pub shifted: bool,
+    /// The record `reaction` was last called with.
+    pub last_reaction: Option<DamageRecord>,
     pub log: Vec<String>,
 }
 
@@ -378,7 +380,8 @@ impl CombatWorld for Fake {
     fn thorns(&mut self, a: usize, d: usize, _r: &mut DamageRecord) {
         self.log.push(format!("thorns {a} {d}"));
     }
-    fn reaction(&mut self, a: usize, d: usize, _r: &mut DamageRecord) {
+    fn reaction(&mut self, a: usize, d: usize, r: &mut DamageRecord) {
+        self.last_reaction = Some(*r);
         self.log.push(format!("reaction {a} {d}"));
     }
 }

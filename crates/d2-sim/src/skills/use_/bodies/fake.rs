@@ -34,6 +34,9 @@ pub struct FList {
     pub freed: bool,
 }
 
+/// One `unit_find` call: (at, radius, filter).
+pub type FindArgs = ((i32, i32), i32, u32);
+
 /// The fake body world.
 #[derive(Debug, Clone, Default)]
 pub struct BodyFake {
@@ -105,6 +108,10 @@ pub struct BodyFake {
     pub found: Vec<usize>,
     pub point_collide: bool,
     pub components: BTreeMap<(usize, usize), i32>,
+    /// `place_unit` refuses (the move test fails).
+    pub place_fails: bool,
+    /// The (at, radius, filter) of every `unit_find`.
+    pub find_args: std::cell::RefCell<Vec<FindArgs>>,
 }
 
 impl BodyFake {
@@ -801,6 +808,9 @@ impl BodyWorld for BodyFake {
     }
     fn place_unit(&mut self, u: usize, r: Option<usize>, at: (i32, i32)) -> bool {
         self.log(format!("place {u} {r:?} {at:?}"));
+        if self.place_fails {
+            return false;
+        }
         self.pos.insert(u, at);
         true
     }
@@ -925,7 +935,8 @@ impl BodyWorld for BodyFake {
     fn inventory_nodes(&self, _: usize) -> Vec<(usize, i32)> {
         self.inv_nodes.clone()
     }
-    fn unit_find(&self, _: usize, _: (i32, i32), _: i32, _: u32) -> Vec<usize> {
+    fn unit_find(&self, _: usize, at: (i32, i32), r: i32, f: u32) -> Vec<usize> {
+        self.find_args.borrow_mut().push((at, r, f));
         self.found.clone()
     }
     fn point_collides(&self, _: usize, _: (i32, i32), _: u32) -> bool {
