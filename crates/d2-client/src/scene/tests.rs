@@ -924,7 +924,7 @@ fn lit_blend_drops_the_remap() {
 
 /// Test vector 6: PL2 bytes `01 02 03 xx 10 20 30 xx` → index 0 (1, 2, 3),
 /// index 1 (0x10, 0x20, 0x30); RGBA alpha 255, index 0 included.
-// Covers: specs/render/composition.md §4, §6
+// Covers: specs/render/composition.md §4, §6; specs/render/shading.md §9
 #[test]
 fn present_palette_from_pl2() {
     let mut pl2 = vec![0xEEu8; PL2_PALETTE_BYTES + 100];

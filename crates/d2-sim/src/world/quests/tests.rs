@@ -222,6 +222,8 @@ pub(super) struct Fake {
     pub(super) gate_closed: bool,
     /// `quest_drop` fails.
     pub(super) drop_fails: bool,
+    /// `drop_item_at` creates nothing (it still logs the attempt).
+    pub(super) drop_at_fails: bool,
     /// Items made by `quest_drop`, in order (ids from 600).
     pub(super) dropped: Vec<UnitId>,
     /// `spawn_quest_object` results in order (empty: fails).
@@ -487,7 +489,7 @@ impl QuestWorld for Fake {
     fn drop_item_at(&mut self, _: UnitId, code: [u8; 4], quality: u8) -> bool {
         self.log
             .push(format!("drop {} {quality}", String::from_utf8_lossy(&code)));
-        true
+        !self.drop_at_fails
     }
     fn quest_items(&self, _: UnitId) -> Vec<(UnitId, u8)> {
         Vec::new()

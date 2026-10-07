@@ -1024,3 +1024,26 @@ fn sample_pins_on_level_change() {
         Some(SamplePins { materials: [0, 0] })
     );
 }
+
+// Covers: specs/audio/environment.md §2 text, §3 text, §5 text, §6 text, §7 text
+#[test]
+fn state_variables_start_at_zero() {
+    // The §2 music state (cur, last level, Tl, Ts, last announced, one
+    // resume value per song id of the range), the §3 stinger state and
+    // the §5–§7 ambience, rain and event-cue state all start at 0.
+    let e = Environment::new(SongRange::LIVE);
+    let m = &e.music;
+    assert_eq!(
+        (m.cur, m.last_level, m.tl, m.ts, m.last_announced),
+        (0, 0, 0, 0, 0)
+    );
+    for id in 4657..=4684 {
+        assert_eq!(m.resume(id), 0, "song {id}");
+    }
+    assert_eq!(m.stinger, Stinger::default());
+    assert!(!m.stinger.active && !m.stinger.m_pending && !m.stinger.s_pending);
+    let a = e.ambience;
+    assert_eq!((a.bed, a.bed_handle), (0, 0));
+    assert_eq!((a.rain_handle, a.rain_prev), (0, 0));
+    assert_eq!((a.event_id, a.gap, a.last_cue), (0, 0, 0));
+}

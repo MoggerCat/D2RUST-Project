@@ -374,6 +374,7 @@ mod tests {
         assert!(r.release(&t, &s, Point::new(417, 476)).is_empty());
     }
 
+    // Covers: specs/ui/panels.md §9 r3, §7 r3
     #[test]
     fn close_release_without_press() {
         let t = tables();

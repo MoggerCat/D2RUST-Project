@@ -206,7 +206,7 @@ fn ormus_594_vector() {
     assert_eq!(ctl.records[i].state, 0);
 }
 
-// Covers: specs/world/quests-act3.md §7.3, §1.3
+// Covers: specs/world/quests-act3.md §7.3, §4.10, §1.3
 #[test]
 fn cain_626_completes() {
     let (mut ctl, mut f, i) = setup();
@@ -685,7 +685,7 @@ fn orb_init_spawns_monster() {
     assert_eq!(f.log(), ["mode 80 2"]);
 }
 
-// Covers: specs/world/quests-act3.md §7.7, §edge-cases-original-bugs r12
+// Covers: specs/world/quests-act3.md §7.7, §4.10, §edge-cases-original-bugs r12
 #[test]
 fn orb_operate_two_hits() {
     let (mut ctl, mut f, i) = setup();
@@ -777,4 +777,20 @@ fn stairs_r_and_durance_check() {
     assert!(act3::durance_open(&ctl, 83));
     act3::stairs_r_init(&mut ctl, &mut f, STAIRS_U);
     assert_eq!(f.log(), ["mode 81 2"]);
+}
+
+// Covers: specs/world/quests-act3.md §4.10
+#[test]
+fn khalims_will_completes_by_the_durance_warp() {
+    // The third way (`quests.md` §8.1): the Durance warp sets 18.0 and
+    // 18.13 and deletes the five Khalim items; the orb smash and Cain's
+    // 626 are `orb_operate_two_hits` and `cain_626_completes`.
+    let (mut ctl, _) = control();
+    let mut f = crate::world::quests::tests::Fake::new();
+    ctl.object_warp(&mut f, P1, 102);
+    let fl = f.flags(P1);
+    assert!(fl.get(18, 0) && fl.get(18, 13));
+    for c in ["qey ", "qhr ", "qbr ", "qf1 ", "qf2 "] {
+        assert!(f.log.contains(&format!("delete {c}")), "{c}: {:?}", f.log);
+    }
 }

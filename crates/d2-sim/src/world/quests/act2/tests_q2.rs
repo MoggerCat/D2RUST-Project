@@ -610,3 +610,25 @@ fn leaving_town_and_game() {
     assert!(ctl.record(9).unwrap().guids.0.is_empty());
     assert!(f.log.is_empty());
 }
+
+// Covers: specs/world/quests-act2.md §4.1
+#[test]
+fn items_and_the_record_that_stays_on() {
+    assert_eq!(
+        [q2::SCROLL, q2::STAFF, q2::AMULET, q2::CUBE, q2::HSTAFF],
+        [*b"tr1 ", *b"msf ", *b"vip ", *b"box ", *b"hst "]
+    );
+    assert_eq!((q2::CHAIN, q2::SLOT), (9, 10));
+    // no_set_state = 1: a first player who finished the quest before
+    // (10.12, 10.15) does not switch chain 9 off (`quests.md` §3).
+    let (mut ctl, _) = control();
+    let row = ctl.rows.iter().find(|r| r.chain == 9).unwrap();
+    assert_eq!(row.no_set_state, Some(true));
+    let mut f = fake(false);
+    f.p(P1).quests.flags[0].set(10, bit::REWARD_GRANTED);
+    f.p(P1).quests.flags[0].set(10, bit::COMPLETED_BEFORE);
+    ctl.player_enters(&mut f, P1, 0).unwrap();
+    let r = ctl.record(9).unwrap();
+    assert!(r.not_intro && r.active);
+    assert!(!ctl.game.get(10, bit::COMPLETED_BEFORE));
+}

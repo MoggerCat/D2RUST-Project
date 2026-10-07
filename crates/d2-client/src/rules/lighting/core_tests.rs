@@ -783,3 +783,51 @@ fn bytes_and_digest() {
     let zero: [u8; 32] = Sha256::digest(vec![0u8; MAP_BYTES]).into();
     assert_eq!(empty_map().digest(), zero);
 }
+
+// Covers: specs/render/lighting.md §12 r1, §12 r2
+#[test]
+fn build_is_a_pure_function_of_its_inputs() {
+    // The same window, ambients, flags, q and records give the same bytes
+    // (no seed is an input, so the build draws nothing); changing one
+    // input (q, a record's radius) changes the map.
+    let world = World::default();
+    let scene = AmbientScene {
+        player_ambient: amb(10),
+        near: vec![],
+    };
+    let lights = || {
+        let mut l = LightList::new();
+        l.create(
+            None,
+            (804, 804),
+            LightKind::Shadowed,
+            13,
+            255,
+            255,
+            255,
+            255,
+        );
+        l.create(None, (820, 790), LightKind::Plain, 6, 200, 255, 0, 0);
+        l
+    };
+    let build = |q: u8, l: &mut LightList| {
+        LightMap::build(
+            (100, 100),
+            Some(&scene),
+            |x, y| (x, y) == (102, 100),
+            q,
+            l,
+            &world,
+        )
+        .unwrap()
+    };
+    let a = build(2, &mut lights());
+    let b = build(2, &mut lights());
+    assert_eq!(a.bytes(), b.bytes());
+    assert_eq!(a.digest(), b.digest());
+    assert_ne!(build(0, &mut lights()).digest(), a.digest(), "q");
+    let mut l = lights();
+    let first = l.iter().next().unwrap().0;
+    l.set_radius(first, 3);
+    assert_ne!(build(2, &mut l).digest(), a.digest(), "radius");
+}

@@ -819,3 +819,19 @@ fn status_function() {
     ctl.record_mut(C).unwrap().not_intro = false;
     assert_eq!(status_of(&ctl, &mut f, P1), 0);
 }
+
+// Covers: specs/world/quests-act3.md §6.1
+#[test]
+fn extra_data_at_init() {
+    // +0x01 (a boss may be chosen) and +0x0C (figurine still to drop) are
+    // 1 at init; every other field is 0.
+    let (ctl, _) = control();
+    assert_eq!(
+        x(&ctl),
+        &act3::q4::Extra {
+            may_choose: true,
+            to_drop: true,
+            ..act3::q4::Extra::default()
+        }
+    );
+}
