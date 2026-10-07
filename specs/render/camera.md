@@ -26,16 +26,16 @@
 |   4. Units | 134–152 |
 |   5. Panel shift for floors | 153–158 |
 |   6. Tiles | 159–198 |
-|   7. View culling | 199–248 |
-|   8. Screen shake | 249–280 |
-|   9. Time base: no interpolation | 281–323 |
-|   10. What d2rs hooks get | 324–332 |
-| Constants & data dependencies | 333–339 |
-| Randomness | 340–345 |
-| Edge cases & original bugs | 346–355 |
-| Test vectors | 356–377 |
-| Provenance | 378–401 |
-| Open questions | 402–494 |
+|   7. View culling | 199–249 |
+|   8. Screen shake | 250–281 |
+|   9. Time base: no interpolation | 282–335 |
+|   10. What d2rs hooks get | 336–344 |
+| Constants & data dependencies | 345–351 |
+| Randomness | 352–357 |
+| Edge cases & original bugs | 358–367 |
+| Test vectors | 368–389 |
+| Provenance | 390–413 |
+| Open questions | 414–504 |
 <!-- /index -->
 
 ## Summary
@@ -183,10 +183,10 @@ orientations are in which list, the order, shadows and the fade alpha are
 `draw-order.md` / `blend-modes.md`. The floor/wall alignment equals
 `map-preview.md` (walls 80 below floors, `WALL_BASE`); the absolute x is
 80 left of its `sx`. Roofs differ from `map-preview.md` (no `+WALL_BASE`):
-live roof blocks lie where floor blocks do (all 15,432 blocks of the 715
-orientation-15 tiles in the 250 used DT1 files have y in {0, 8, …, 64},
-the floor diamond rows), so a roof is its cell's floor diamond raised by
-`roof_height` rows; `map-preview.md`'s `sy + y0 + WALL_BASE − roof_height`
+live roof blocks lie where floor blocks do (every block of the
+orientation-15 tiles in the used DT1 files has y in 0 … 64, on the floor
+diamond rows; the exact block count is *Pending*, Open question 1), so
+a roof is its cell's floor diamond raised by `roof_height` rows; `map-preview.md`'s `sy + y0 + WALL_BASE − roof_height`
 puts it `WALL_BASE` (80) rows lower than 1.14d. `roof_height` is read
 unsigned (`0x004DEBA6`, 16-bit zero-extended); live values 0, 80, 100,
 120, 156, 160, 190, 230, 240 and once 56,376 (`expansion\Siege\
@@ -212,11 +212,12 @@ units use `H / 2 − 8`, tiles `(H − 40) / 2` (§3, §4).
   It equals one clip of the assembled tile image to the union of the kept
   blocks only when no culled block overlaps a kept one; with 32-wide
   blocks whose x and y lie on a 32 grid of the tile that always holds,
-  and it does for the live data: all 104,767 blocks of non-floor,
-  non-shadow, non-roof tiles (orientation ∉ {0, 13, 15}) of the 250 used
-  DT1 files have x ≡ 0 and y ≡ 0 (mod 32) (both block formats are 32
-  wide). In modes 0/3 a culled block has no pixel in the frame, so
-  culling changes no pixel there.
+  and it does for the live data: every block of non-floor, non-shadow,
+  non-roof tiles (orientation ∉ {0, 13, 15}) of the used DT1 files has
+  x ≡ 0 and y ≡ 0 (mod 32) (both block formats are 32 wide; the count,
+  and y, are *Pending* a recount, Open question 7). In modes 0/3 a
+  culled block has no pixel in the frame, so culling changes no pixel
+  there.
 - Units: no view-rectangle test. The world unit draw `0x004DC7B0` skips a
   unit only (a) by the unit flags and states it checks (owner
   `draw-order.md`), (b) in perspective mode (not GDI) by `0x004F66E0`, and
@@ -291,19 +292,30 @@ any formula except the shake envelope (§8, wall clock).
 
 Client path step: each client update (`0x0044C790`) runs the per-unit
 update `0x00480810` once per client unit (`0x00465AA0` walks the client
-unit tables with it). A player steps its path once there through
-`0x004807C0` → `0x00650840(unit, base)` (`sim/pathing.md` §9.4) when its
-mode's class (`[0x00711E00 + 12 × mode]`) is 1, or when it is 2 and the
-mode's skill has flag bit 0 (`0x006446A0`); the two cases exclude each
-other (`0x00463390`). A monster steps once when its mode record's class is
-1 (`0x004B13A0`). `base` is `[0x007A04C4]` (`0x0044DB10`), a zero-filled
-global with no direct writer in the binary, so the step uses the
-server's 0x400 (`0x006502D0`: base ≤ 0 → 0x400). So a client unit moves
-exactly one server step per client update, never more. PC 1 read (owner,
-Open question 5): not exactly once for every unit (a monster can step
-in `0x004AF4C0` and again in its update; a local player's missile steps
-twice on its first client update), and `[0x007A04C4]` is +0x5C of the
-client record at `0x007A0468` — to reconcile (staging-5 merge).
+unit tables with it). The path step is `0x00650840(unit, base)`
+(`sim/pathing.md` §9.4); its only client callers are `0x004807C0`
+(players and monsters) and the missile step `0x004D30C0`.
+
+`base` is `[0x007A04C4]`, read through `0x0044DB10` by those two callers
+only. The dword lies in the 0x80-byte block `0x007A0480`–`0x007A04FF`,
+which `0x0044E200` (game start) and `0x0044C890` (game end) zero with
+one memset. No instruction writes it, by absolute address or indexed.
+(`0x007A0468` is the lock object passed to the imports at
+`[0x006CC210]` / `[0x006CC218]` / `[0x006CC214]`, not a record that
+holds it.) So `base` is always 0, and the step uses the server's 0x400
+(`0x006502D0`: base ≤ 0 → 0x400).
+
+Steps per client update:
+
+| Unit | Steps | Condition (1.14d) |
+|---|---|---|
+| Player | 0 or 1 | `0x00463390` → `0x004807C0`. Steps when the mode class `[0x00711E00 + 12 × mode]` is 1, or when it is 2 and the used skill (`0x00620250`) has flag bit 0 (`0x006446A0`). The two calls are exclusive. |
+| Monster | 0, 1 or 2 | `0x004B13A0`. First `0x004AF4C0` steps when the used skill (`0x00620250`, its skills row via `0x00643CE0`) has flag bit 0 (`0x006446A0`). Then the update steps again when the monster mode-table entry (`0x004AF400`) is 1. Nothing excludes both in one update. |
+| Missile | 0, 1 or 2 | Each client missile function (table `0x0072A398`) calls `0x004D30C0` at most once. It steps once when the missile has a path (`0x006486C0`). It then loops once more (`0x004D3341` → `0x004D3141`) when the owner (`0x004639D0`) is the local player (`0x00463DD0`) in game types 0, 1, 6 or 8, its elapsed frames (`0x0064A3B0`) are 1, and it still has frames left. So a local player's missile moves two steps on its first client update, and its frames left drop by 2. |
+
+d2rs follows this table, with each step one server step of 0x400.
+Whether a monster meets both of its conditions in one update in practice
+is a recording question (Open question 5). The rule is the table.
 
 For d2rs: one frame per presented tick, positions from the snapshot of
 that tick, no interpolation. The shake envelope uses `t = 40 × (ticks since
@@ -405,16 +417,24 @@ DT1 files `mpq-tool extract` wrote from `d2data.mpq` / `d2exp.mpq`
    (§6); `map-preview.md` places roofs at `sy + 80 − roof_height`. Which
    y range do live roof (orientation 15) blocks use? A game-file read of
    roof block y's plus a capture under a roof settles it.
-   *Partly answered* (game-file read, d2data + d2exp DT1s, the 6 unused
-   ones excluded): the 13,432 orientation-15 blocks have block y in
-   0 … 64 (multiples of 8 almost always) and block x on a 16-pixel grid.
-   §6 concludes from it that 1.14d's `sy − roof_height` stands and
-   `map-preview.md` is 80 rows low. Still open: the capture under a roof
-   that decides between the two y formulas (the pixel proof: a roof in
-   view, e.g. the Rogue Encampment, player under a tent edge, roofs not
-   faded). PC 2 read: 15,432 blocks of 715 orientation-15 tiles in the
-   250 used DT1 files, all with y in {0, 8, …, 64} — to reconcile
-   (staging-5 merge).
+   *Partly answered* (game-file reads, d2data + d2exp DT1s, the 6 unused
+   ones excluded): every orientation-15 block has block y in 0 … 64 on
+   the floor diamond rows, and block x on a 16-pixel grid. §6 concludes
+   from it that 1.14d's `sy − roof_height` stands and `map-preview.md`
+   is 80 rows low. Both reads agree on that. They disagree on the
+   numbers, and those are *Pending*:
+   - the block count (one read: 13,432 blocks; the other: 15,432 blocks
+     of 715 tiles in 250 used files);
+   - whether y is a multiple of 8 always or only almost always.
+
+   To settle: run `mpq-tool extract d2data.mpq "data\global\tiles\*.dt1"`
+   and the same for `d2exp.mpq`. Keep the files that a `LvlTypes` File
+   column names (the 6 unused excluded; `formats/dt1.md` counts 251).
+   Over their orientation-15 tiles, count tiles and blocks, and list
+   every block y not in {0, 8, …, 64}. §6's count follows the result.
+   Still open: the capture under a roof that decides between the two y
+   formulas (the pixel proof: a roof in view, e.g. the Rogue
+   Encampment, player under a tent edge, roofs not faded).
 2. ~~Unit culling~~: answered in §7 (no view test; visibility test
    `0x004DC710`). *Answered* (static): `0x00642840` is the level's
    `LOSDraw` gate (`render/draw-order-2.md` §15 r1) and
@@ -433,38 +453,20 @@ DT1 files `mpq-tool extract` wrote from `d2data.mpq` / `d2exp.mpq`
    that unit path positions advance exactly once per tick there (Ghidra
    read), so a capture's state equals the server state after the same
    tick plus the client's own path step.
-   *Partly answered* (static, 1.14d asm): not exactly once for every
-   unit. The
-   update itself runs once per server tick (`client/model.md` §5 r1);
-   the client calls the path step `0x00650840` (`sim/pathing.md` §9.4,
-   base `[0x007A04C4]`, which no instruction writes by absolute address
-   — it is +0x5C of the client record at `0x007A0468`; ≤ 0 → 0x400)
-   from three places:
-   - Players (`0x00463390`, via `0x004807C0`): at most once. Mode-table
-     `0x00711E00` entry 1 → step; entry 2 with a used skill
-     (`0x00620250`) whose flags +0x0C bit 0 is set → step. The two are
-     exclusive.
-   - Monsters (`0x004B13A0`): `0x004AF4C0` steps when the used skill's
-     flags bit 0 is set, then the update steps again when the monster
-     mode table (`0x004AF400`) entry is 1. Both in one update only when
-     both hold (no reader excludes it).
-   - Missiles: each client missile function (table `0x0072A398`) ends
-     in at most one call of the missile step `0x004D30C0` (all 82 call
-     sites are on exclusive return paths). It steps once, then loops a
-     second time in the same update when the missile's owner
-     (`0x004639D0`) is the local player in game types 0, 1, 6, 8, its
-     elapsed frames (`0x0064A3B0`) are 1 and it still has a path: a
-     local player's missile moves two steps (and its frames left drop
-     by 2) on its first client update.
+   *Answered* (static, 1.14d asm), in §9's step table. It is not
+   exactly once for every unit: players step 0 or 1 times, monsters 0,
+   1 or 2 (skill-flag step in `0x004AF4C0`, then the mode-class step),
+   and a local player's missile steps twice on its first client update.
+   The base `[0x007A04C4]` is always 0, so every step is 0x400. The
+   dword is in the block `0x007A0480`–`0x007A04FF` that the memsets at
+   `0x0044E200` / `0x0044C890` zero, and nothing writes it.
+   `0x007A0468` is a lock object, not its record. The update itself
+   runs once per server tick (`client/model.md` §5 r1).
    Still open (recording): whether a monster ever meets both step
    conditions in one update, and whether client updates and server
-   ticks are 1:1 in single player (the `frames-raw-2` `client_update`
-   counter against the server tick count over one run settles it;
-   OQ8). PC 2 read (§9): every client unit steps exactly once per
-   client update (players by mode class 1 or 2 + skill flag, monsters
-   by mode class 1 only), and `[0x007A04C4]` is a zero-filled global
-   with no writer, so the step always uses 0x400 — to reconcile
-   (staging-5 merge).
+   ticks are 1:1 in single player. The `frames-raw-2` `client_update`
+   counter against the server tick count over one run settles it
+   (OQ8).
 6. ~~Client player seed init~~: `sim/rng.md` §5.3 (one step of the
    client room seed at the player's creation position, `0x00465FD0`).
    At a single-player join it is {0x6AC6935F, 0} (`client/model.md`
@@ -481,13 +483,21 @@ DT1 files `mpq-tool extract` wrote from `d2data.mpq` / `d2exp.mpq`
 7. Wall blocks: is every live wall block 32 pixels wide with an x on a 32
    grid of its tile (§7 clip equivalence)? Game-file count with the C52
    DT1 counts.
-   *Answered* (game-file read, 2026-10-07, 251 used DT1s of d2data +
+   *Answered* (game-file reads, 2026-10-06/07, used DT1s of d2data +
    d2exp; `Patch_D2.mpq` unlisted): yes. Every block is 32 pixels wide
-   by format (`formats/dt1.md`), and all 104,780 blocks of orientations
-   1–12, 14 and 16–19 have x ≡ 0 (mod 32). (The six unused DT1s are the
-   only files with off-grid wall blocks.) PC 2 read (§7): all 104,767
-   blocks of orientations ∉ {0, 13, 15} in the 250 used DT1 files, with
-   x ≡ 0 and y ≡ 0 (mod 32) — to reconcile (staging-5 merge).
+   by format (`formats/dt1.md`). Every block of orientations ∉ {0, 13,
+   15} has x ≡ 0 (mod 32), in both reads. The six unused DT1s are the
+   only files with off-grid wall blocks. The two reads disagree on the
+   numbers, which are *Pending*:
+   - the file set and count: one read gives 104,780 blocks in 251 files
+     with x only checked; the other gives 104,767 blocks in 250 files
+     with x and y checked;
+   - y ≡ 0 (mod 32) comes from the 250-file read only.
+
+   To settle: use OQ1's extract and file set (the files a `LvlTypes`
+   File column names). Over the blocks of orientations ∉ {0, 13, 15},
+   count the files and blocks, and list every block with x or y ≢ 0
+   (mod 32). §7's count follows the result.
 8. Draws with no server tick between them (118 frames of run 1 while not
    paused, `capture.md` §4, OQ8) against §9's "passes without a tick do
    not draw"; the `frames-raw-2` client-update counter settles it.
