@@ -179,6 +179,24 @@ fn open_ui_code_5_takes_the_cursor_item() {
     );
 }
 
+// Covers: specs/client/msg-ui.md §9 r2
+#[test]
+fn npc_interact_captures_the_monster_data_value() {
+    use crate::bridge::world::{KindData, MonsterData};
+    let mut m = Model::default();
+    let k = UnitKey::new(MONSTER, 7);
+    // Monster data +0x3C is the 0xAC bit-stream value (−1 when not sent).
+    m.put(k).kind = KindData::Monster(Box::new(MonsterData {
+        value: 1234,
+        ..MonsterData::default()
+    }));
+    m.hex("8a 01 07 00 00 00");
+    let Output::NpcInteract { mdata_3c, .. } = &m.out[0] else {
+        panic!()
+    };
+    assert_eq!(*mdata_3c, Some(1234));
+}
+
 // Covers: specs/client/msg-ui.md §9 r1, §9 r2
 #[test]
 fn npc_interact_b1563() {

@@ -20,7 +20,7 @@ use crate::audio::driver::SoundRequest;
 use crate::bridge::msg::ui::{quest_row, QuestRow};
 use crate::bridge::msg::ui_npc::DialogCase;
 use crate::bridge::output::{Consumer, NpcDialog, Output};
-use crate::bridge::world::ClientWorld;
+use crate::bridge::world::{ClientWorld, UnitKey, PLAYER};
 use crate::rules::lighting::environment::act_index;
 
 /// `SetUIState` modes (`ui/panels.md` §2).
@@ -60,8 +60,6 @@ pub mod skip {
         "0x63: the waypoint tab gate reads the client quest flags (msg-ui OQ 4)";
     pub const WAYPOINT_ROWS: &str = "0x63: the row rebuild 0x0049C7F0 (ui/panels.md §13 r5)";
     pub const TRADE: &str = "0x77: the trade helpers of codes 0x00–0x06 (msg-ui OQ 5)";
-    pub const TRADE_PARTNER: &str =
-        "0x77 code 0x0A: the trade partner [0x007C0E60] has no writer in the specs";
     pub const NO_LOCAL_PLAYER: &str = "0x77 code 9: no local player";
     pub const TRADE_CLOSE_HELPER: &str = "0x77: the trade close helper 0x00487B30 (msg-ui OQ 5)";
     pub const NOT_APPLIED: &str =
@@ -70,7 +68,7 @@ pub mod skip {
     pub const NPC_TEXT_SHOW: &str =
         "0x27: the overhead text, list start 0x006616E0, box 0x004A1510 and panel 0x004A1320 (msg-ui §5 r2; ui/*)";
     pub const NPC_DIALOG_UI: &str =
-        "0x28: overlay 72 off, [0x007C0D43] := Q, 0x004B2250, 0x0044DA40 and the chosen case's UI calls (msg-ui §16 r4.1–r4.3; ui/*)";
+        "0x28: overlay 72 off, 0x004B2250, 0x0044DA40 and the chosen case's UI calls (msg-ui §16 r4.1–r4.3; ui/*)";
     pub const NPC_DIALOG_M: &str =
         "0x28: m = 0x00661400(txt, 0) of this NPC text list is not specified (msg-ui §16 r4.3, OQ 10): no case handed back, no C→S 0x31";
 }
@@ -105,29 +103,54 @@ impl NpcTextList {
         u16::from_le_bytes([self.bytes[4 + 4 * k], self.bytes[5 + 4 * k]])
     }
 
-    /// `0x00661400(txt, 0)`, the m of 0x28's dialog branch (§16 r4.3).
-    /// The spec pins one point (A seq 37351 → 37353): a list of one entry
-    /// of kind 0 gives m = that entry's string id (0x25 → C→S
-    /// `31 06000000 25000000`).
-    ///
-    /// PROVISIONAL (ui/messages.md §14 / client/msg-ui.md §16 r4.3): any
-    /// list gives its first entry's string id (whatever its kind and the
-    /// list start `0x006616E0`), an empty list 0xFFFF; settled by a
-    /// capture of NPC dialogs with 2+ list entries (HANDOFF §7 PC 2
-    /// recording list).
-    pub fn first_m(&self) -> Option<u16> {
-        Some(if self.count() == 0 {
-            0xFFFF
+    /// The list as the build `0x00661510` and the start `0x006616E0` leave
+    /// it (§16 r9): nodes (kind, string id) prepended in message order,
+    /// so reversed; a list of two or more nodes is stable-insertion
+    /// sorted by string id, ascending (unsigned u16). A count past 8 is
+    /// not a list (the build asserts at count ≥ 8, [`Self::checked`]).
+    pub fn nodes(&self) -> Vec<(u8, u16)> {
+        let n = usize::from(self.count()).min(8);
+        let mut v: Vec<(u8, u16)> = (0..n)
+            .rev()
+            .map(|k| (self.kind(k), self.string(k)))
+            .collect();
+        // Stable insertion sort (`0x006615D0`): `sort_by_key` is stable.
+        v.sort_by_key(|&(_, id)| id);
+        v
+    }
+
+    /// `0x00661510`'s assertion (§16 r9.1, `0x00661557`): a count of 8 or
+    /// more is fatal.
+    pub fn checked(self) -> Result<Self, OriginalUiError> {
+        if self.count() >= 8 {
+            Err(OriginalUiError::NpcTextCount(self.count()))
         } else {
-            self.string(0)
-        })
+            Ok(self)
+        }
+    }
+
+    /// `0x00661400(list, 0)`, the m of 0x28's dialog branch: the first
+    /// node of kind 0 in list order (so the smallest kind-0 string id),
+    /// 0xFFFF when none (§16 r9.3).
+    pub fn m(&self) -> u16 {
+        self.nodes()
+            .into_iter()
+            .find(|&(k, _)| k == 0)
+            .map_or(0xFFFF, |(_, id)| id)
+    }
+
+    /// `0x00661440(list, 0)`, m2: the same for kind 1.
+    pub fn m2(&self) -> u16 {
+        self.nodes()
+            .into_iter()
+            .find(|&(k, _)| k == 1)
+            .map_or(0xFFFF, |(_, id)| id)
     }
 }
 
 /// 0x28's dialog branch (§16 r4.3), the case 1.14d takes (the first that
 /// holds), from the UI state `[0x007C0C68]`, the NPC text list and the
-/// captured inputs. `Ok(None)`: the case depends on an m
-/// [`NpcTextList::first_m`] does not give. B3–B6 are one case for the
+/// captured inputs. B3–B6 are one case for the
 /// bridge ([`DialogCase::Rest`]): they write the model alike.
 ///
 /// Reading taken (as the bridge's): B0 ends the branch, the "(always
@@ -142,16 +165,14 @@ pub fn dialog_case(
     }
     // txt := `0x0049F900`: none → fatal 0x1060.
     let txt = txt.ok_or(OriginalUiError::NoNpcText)?;
-    let m = txt.first_m();
+    let m = txt.m();
     if d.cursor_item {
         return Ok(Some(DialogCase::B1));
     }
-    Ok(m.map(|m| {
-        if m != 0xFFFF {
-            DialogCase::B2 { m: u32::from(m) }
-        } else {
-            DialogCase::Rest
-        }
+    Ok(Some(if m != 0xFFFF {
+        DialogCase::B2 { m: u32::from(m) }
+    } else {
+        DialogCase::Rest
     }))
 }
 
@@ -205,6 +226,9 @@ impl OriginalUi {
     /// effect here.
     pub fn apply_output(&mut self, o: &Output, world: &ClientWorld) -> Result<(), OriginalUiError> {
         self.refresh_facts(world);
+        if self.apply_more(o)? {
+            return Ok(());
+        }
         match *o {
             Output::QuestUi {
                 chain,
@@ -216,10 +240,7 @@ impl OriginalUi {
             Output::TradeAction { code } => self.trade_action(code, world),
             Output::NpcText {
                 ref bytes, present, ..
-            } => {
-                self.npc_text_record(bytes, present);
-                Ok(())
-            }
+            } => self.npc_text_record(bytes, present),
             Output::NpcDialog(ref d) => self.npc_dialog(d),
             // Not UI outputs (`client/bridge.md` §10 rule 5).
             Output::ServerSound { .. } | Output::ShrineSound { .. } => Ok(()),
@@ -259,23 +280,30 @@ impl OriginalUi {
 
     /// §5 r2 at delivery: the list part of `0x004A1600`; what is shown is
     /// skipped (`ui/*`).
-    fn npc_text_record(&mut self, bytes: &[u8; 40], present: bool) {
+    fn npc_text_record(&mut self, bytes: &[u8; 40], present: bool) -> Result<(), OriginalUiError> {
         let list = NpcTextList::from_record(bytes);
         match bytes[1] {
             // r2.1: an overhead number, the list stays.
-            1 if present && list.count() == 1 && list.kind(0) == 3 => {}
-            1 => self.npc_text = Some(list),
+            1 if present && list.count() == 1 && list.kind(0) == 3 => {
+                let guid = u32::from_le_bytes([bytes[2], bytes[3], bytes[4], bytes[5]]);
+                let text = list.string(0).to_string();
+                self.set_overhead(UnitKey::new(1, guid), text.as_bytes(), self.more.own_lang);
+            }
+            1 => self.npc_text = Some(list.checked()?),
             // r2.2: the box or the panel; the list stays.
             2 => {}
             // r2.3.
             _ => self.npc_text = None,
         }
         self.skip(skip::NPC_TEXT_SHOW);
+        Ok(())
     }
 
     /// §16 r4 at delivery: the UI-only calls are skipped; the branch case
     /// is chosen and kept for the bridge.
     fn npc_dialog(&mut self, d: &NpcDialog) -> Result<(), OriginalUiError> {
+        // r4.2: `[0x007C0D43]` := Q (§16 r7).
+        self.more.client_quest = d.quest_flags;
         self.skip(skip::NPC_DIALOG_UI);
         match dialog_case(self.msg.ui_7c0c68, self.npc_text.as_ref(), d)? {
             Some(case) => self.dialog_answer = Some((Box::new(d.clone()), case)),
@@ -402,7 +430,16 @@ impl OriginalUi {
                     .push(SoundRequest::PlayerEvent { unit: p, event: 23 }),
                 None => self.skip(skip::NO_LOCAL_PLAYER),
             },
-            0x0A => self.skip(skip::TRADE_PARTNER),
+            // The partner `[0x007C0E60]` (0x78, §11 r2): player (0, GUID)
+            // in S → player event sound 23 on it.
+            0x0A => {
+                let p = UnitKey::new(PLAYER, self.more.partner_guid);
+                if world.units.contains_key(&p) {
+                    self.outcome
+                        .sounds
+                        .push(SoundRequest::PlayerEvent { unit: p, event: 23 });
+                }
+            }
             0x0C | 0x0D => {
                 self.msg.trade_state = 0;
                 self.close_trade(code == 0x0D)?;
@@ -458,6 +495,10 @@ impl OriginalUi {
 
 /// The waypoint tab count `[0x007224E4]` (§2 r2.3).
 pub const WAYPOINT_TABS: u32 = 5;
+
+#[path = "msg_ui_more.rs"]
+mod more;
+pub use more::{ChatAction, IntroEntry, MsgUiMore, OverheadText};
 
 #[cfg(test)]
 #[path = "msg_ui_tests.rs"]

@@ -289,7 +289,7 @@ fn npc_dialog(cursor_item: bool) -> NpcDialog {
     }
 }
 
-// Covers: specs/client/msg-ui.md §5 r2
+// Covers: specs/client/msg-ui.md §5 r2, §5 r3
 #[test]
 fn npc_text_list() {
     let w = world(false);
@@ -299,7 +299,7 @@ fn npc_text_list() {
     u.apply_output(&npc_text(1, 1, 0, 0x25), &w).unwrap();
     let l = *u.npc_text().unwrap();
     assert_eq!((l.count(), l.kind(0), l.string(0)), (1, 0, 0x25));
-    assert_eq!(l.first_m(), Some(0x25));
+    assert_eq!(l.m(), 0x25);
     // r2.1 overhead number and r2.2 type 2: the list stays.
     u.apply_output(&npc_text(1, 1, 3, 37), &w).unwrap();
     u.apply_output(&npc_text(2, 1, 0, 9), &w).unwrap();
@@ -307,6 +307,10 @@ fn npc_text_list() {
     assert_eq!(u.take_outcome().skipped, [skip::NPC_TEXT_SHOW; 3]);
     // r2.3: any other type frees it.
     u.apply_output(&npc_text(4, 1, 0, 9), &w).unwrap();
+    assert_eq!(u.npc_text(), None);
+    // r3: freeing with no list is "nothing to free", not a fault (the
+    // original's null read ends the process; d2rs treats it as none).
+    u.apply_output(&npc_text(5, 1, 0, 9), &w).unwrap();
     assert_eq!(u.npc_text(), None);
 }
 
@@ -340,14 +344,15 @@ fn npc_dialog_case() {
         dialog_case(0, Some(&list(1, 0, 0xFFFF)), &d).unwrap(),
         Some(DialogCase::Rest)
     );
-    // PROVISIONAL: a longer list gives its first entry's string id; B1
-    // does not need m; an empty list gives 0xFFFF.
+    // §16 r9: m is the smallest kind-0 string id of the list (a second
+    // entry of the helper is (kind 0, id 0)); B1 does not need m; an
+    // empty list gives 0xFFFF.
     let l2 = list(2, 0, 0x25);
     assert_eq!(
         dialog_case(0, Some(&l2), &d).unwrap(),
-        Some(DialogCase::B2 { m: 0x25 })
+        Some(DialogCase::B2 { m: 0 })
     );
-    assert_eq!(list(0, 0, 0x25).first_m(), Some(0xFFFF));
+    assert_eq!(list(0, 0, 0x25).m(), 0xFFFF);
     assert_eq!(
         dialog_case(0, Some(&l2), &npc_dialog(true)).unwrap(),
         Some(DialogCase::B1)
@@ -376,14 +381,356 @@ fn npc_dialog_answer_is_kept_for_the_bridge() {
     );
     assert_eq!(u.take_dialog_answer(), None);
     assert_eq!(u.take_outcome().skipped, [skip::NPC_DIALOG_UI]);
-    // PROVISIONAL: a 2-entry list gives its first entry's m.
+    // §16 r9: a 2-entry list (helper: second entry kind 0, id 0) gives m = 0.
     u.apply_output(&npc_text(1, 2, 0, 0x25), &w).unwrap();
     u.take_outcome();
     u.apply_output(&Output::NpcDialog(Box::new(d.clone())), &w)
         .unwrap();
     assert_eq!(
         u.take_dialog_answer(),
-        Some((Box::new(d), DialogCase::B2 { m: 0x25 }))
+        Some((Box::new(d), DialogCase::B2 { m: 0 }))
     );
     assert_eq!(u.take_outcome().skipped, [skip::NPC_DIALOG_UI]);
+}
+
+fn record(t: u8, guid: u32, entries: &[(u8, u16)]) -> Output {
+    let mut bytes = [0u8; 40];
+    bytes[0] = 0x27;
+    bytes[1] = t;
+    bytes[2..6].copy_from_slice(&guid.to_le_bytes());
+    bytes[6] = entries.len() as u8;
+    for (k, &(kind, id)) in entries.iter().enumerate() {
+        bytes[8 + 4 * k] = kind;
+        bytes[10 + 4 * k..12 + 4 * k].copy_from_slice(&id.to_le_bytes());
+    }
+    Output::NpcText {
+        bytes,
+        present: true,
+        object_class: 0,
+    }
+}
+
+// Covers: specs/client/msg-ui.md §16 r9, §16 r8
+#[test]
+fn npc_text_list_walk() {
+    let w = world(false);
+    let mut u = ui();
+    // The spec's example: (kind 0, 300), (kind 1, 50), (kind 0, 120).
+    u.apply_output(&record(1, 6, &[(0, 300), (1, 50), (0, 120)]), &w)
+        .unwrap();
+    let l = *u.npc_text().unwrap();
+    // Built by prepending (reverse message order), then sorted by id.
+    assert_eq!(l.nodes(), [(1, 50), (0, 120), (0, 300)]);
+    assert_eq!((l.m(), l.m2()), (120, 50));
+    // Kinds other than 0 and 1 are skipped; none → 0xFFFF.
+    u.apply_output(&record(1, 6, &[(2, 7), (3, 8)]), &w)
+        .unwrap();
+    let l = *u.npc_text().unwrap();
+    assert_eq!((l.m(), l.m2()), (0xFFFF, 0xFFFF));
+    // Ids compare as unsigned u16.
+    u.apply_output(&record(1, 6, &[(0, 0x9000), (0, 0x0100)]), &w)
+        .unwrap();
+    assert_eq!(u.npc_text().unwrap().m(), 0x0100);
+    // The 1-entry kind-3 overhead case does not rebuild the list.
+    u.apply_output(&record(1, 6, &[(3, 37)]), &w).unwrap();
+    assert_eq!(u.npc_text().unwrap().m(), 0x0100);
+    // A count of 8 or more is the build's fatal assertion.
+    let eight = [(0u8, 1u16); 8];
+    assert!(matches!(
+        u.apply_output(&record(1, 6, &eight), &w),
+        Err(OriginalUiError::NpcTextCount(8))
+    ));
+    // r8: `[0x007C0C68]` has no writer: it stays 0, so B0 never holds.
+    assert_eq!(u.msg_state().ui_7c0c68, 0);
+}
+
+// Covers: specs/client/msg-ui.md §7 r4, §7 r5
+#[test]
+fn quest_special_hire_popup_and_code_3() {
+    let w = world(true);
+    let mut u = ui();
+    let sp = |code: u16, a: u16| Output::QuestSpecial {
+        code,
+        words: [a, 0, 0, 0, 0, 0],
+    };
+    // Code 2: the name word has no effect; the popup opens UI 0x23 and,
+    // with `PopupHireling` missing (0), `[0x007BEEE4]` := 1.
+    u.more_mut().hire_7beecc = 9;
+    u.apply_output(&sp(2, 0x1234), &w).unwrap();
+    assert!(u.is_open(0x23));
+    assert_eq!(u.more().hire_7beecc, 0);
+    assert_eq!(u.more().hire_7beee4, 1);
+    // Another name, popup already configured: no one-time open.
+    let mut u = ui();
+    u.more_mut().popup_hireling = 1;
+    u.apply_output(&sp(2, 0), &w).unwrap();
+    assert!(u.is_open(0x23));
+    assert_eq!(u.more().hire_7beee4, 0);
+    // Code 3 has no observable effect (the two fields have no reader).
+    let before = u.more().clone();
+    u.apply_output(&sp(3, 5), &w).unwrap();
+    assert_eq!(*u.more(), before);
+}
+
+// Covers: specs/client/bridge.md §10 r9, specs/client/msg-ui.md §9 r3, §9 r4
+#[test]
+fn npc_interact_sounds_overlay_and_the_interact_npc_test() {
+    let w = world(false);
+    let mut u = ui();
+    let k = UnitKey::new(1, 7);
+    let mk = |unit: UnitKey, present, class, m3c, blocker| Output::NpcInteract {
+        unit,
+        present,
+        class,
+        mdata_3c: m3c,
+        blocker_open: blocker,
+    };
+    // Absent: nothing.
+    u.apply_output(&mk(k, false, 148, None, false), &w).unwrap();
+    assert!(u.more().unit_sounds.is_empty() && u.more().overlays.is_empty());
+    // act5pow (534): sound 4603 when +0x3C ≠ −1, else 4607; no overlay.
+    u.apply_output(&mk(k, true, 534, Some(5), false), &w)
+        .unwrap();
+    u.apply_output(&mk(k, true, 534, Some(-1), false), &w)
+        .unwrap();
+    assert_eq!(u.more().unit_sounds, [(4603, k), (4607, k)]);
+    assert!(u.more().overlays.is_empty());
+    // Another class: overlay 72 unless the unit is the interact NPC.
+    let mut u = ui();
+    u.apply_output(&mk(k, true, 148, Some(-1), false), &w)
+        .unwrap();
+    assert_eq!(u.more().overlays, [(k, 72)]);
+    u.more_mut().interact_active = true;
+    u.more_mut().interact_npc = 7;
+    u.apply_output(&mk(k, true, 148, Some(-1), false), &w)
+        .unwrap();
+    assert_eq!(u.more().overlays.len(), 1);
+    // The test needs [0x007C0D29] set: not active, same GUID → overlay.
+    u.more_mut().interact_active = false;
+    u.apply_output(&mk(k, true, 148, Some(-1), false), &w)
+        .unwrap();
+    assert_eq!(u.more().overlays.len(), 2);
+    // act2guard2 (331): sound 3983 unless a blocker is open, the flag
+    // function is set, or quest 12 bit 8 or bit 1 is set.
+    let mut u = ui();
+    u.apply_output(&mk(k, true, 331, Some(-1), false), &w)
+        .unwrap();
+    assert_eq!(u.more().unit_sounds, [(3983, k)]);
+    u.apply_output(&mk(k, true, 331, Some(-1), true), &w)
+        .unwrap();
+    assert_eq!(u.more().unit_sounds.len(), 1);
+    u.more_mut().f4b1620 = true;
+    u.apply_output(&mk(k, true, 331, Some(-1), false), &w)
+        .unwrap();
+    assert_eq!(u.more().unit_sounds.len(), 1);
+    u.more_mut().f4b1620 = false;
+    for bit in [8usize, 1] {
+        let mut q = [0u8; 96];
+        let n = 16 * 12 + bit;
+        q[n >> 3] |= 1 << (n & 7);
+        u.apply_output(&Output::QuestFlags { record: q }, &w)
+            .unwrap();
+        u.apply_output(&mk(k, true, 331, Some(-1), false), &w)
+            .unwrap();
+        assert_eq!(u.more().unit_sounds.len(), 1, "bit {bit}");
+    }
+}
+
+// Covers: specs/client/msg-ui.md §10 r2, §11 r2, §12 r2, §13 r2, §14 r2, §15 r2, §16 r7
+#[test]
+fn small_ui_globals() {
+    let w = world(false);
+    let mut u = ui();
+    // 0x91: flags of entries whose class equals a slot below the row
+    // count; nothing is cleared.
+    u.more_mut().monstats_rows = 600;
+    u.more_mut().intro_table = [(148, 0), (148, 0), (150, 0), (700, 0), (5, 1)]
+        .map(|(class, flag)| IntroEntry { class, flag })
+        .to_vec();
+    let mut slots = [0xFFFFu16; 12];
+    slots[0] = 148;
+    slots[3] = 700; // past the row count
+    u.apply_output(&Output::NpcIntro { slots }, &w).unwrap();
+    let flags: Vec<u8> = u.more().intro_table.iter().map(|e| e.flag).collect();
+    assert_eq!(flags, [1, 1, 0, 0, 1]);
+    // 0x78: the name with byte 15 forced to 0, and the partner GUID.
+    u.apply_output(
+        &Output::TradePartner {
+            name: [b'x'; 16],
+            guid: 77,
+        },
+        &w,
+    )
+    .unwrap();
+    assert_eq!(u.more().partner_name[14..], [b'x', 0]);
+    assert_eq!(u.more().partner_guid, 77);
+    // 0x29: the game quest record.
+    u.apply_output(&Output::GameQuestFlags { record: [7; 96] }, &w)
+        .unwrap();
+    assert_eq!(u.more().game_quest_record, [7; 96]);
+    // 0x52: status bytes copied, `[0x007BF2B0]` := 0.
+    let mut st = [0u8; 41];
+    st[5] = 9;
+    u.more_mut().quest_7bf2b0 = 4;
+    u.apply_output(&Output::QuestLog { status: st }, &w)
+        .unwrap();
+    assert_eq!(u.more().quest_log_status, st);
+    assert_eq!(u.more().quest_7bf2b0, 0);
+    // 0x5E: the 37 bytes and `[0x007C0ECC]` := 1.
+    u.apply_output(&Output::QuestAvailability { bytes: [3; 37] }, &w)
+        .unwrap();
+    assert_eq!(u.more().quest_avail, [3; 37]);
+    assert!(u.more().quest_avail_set);
+    // 0x9B: alive (0xFFFF) runs the NPC-menu edit with 11, 8, 24, 21, 43.
+    u.apply_output(&Output::MercRevive { state: 5, value: 6 }, &w)
+        .unwrap();
+    assert_eq!((u.more().merc_state, u.more().merc_7c0dd0), (5, 6));
+    assert!(u.more().merc_menu_calls.is_empty());
+    u.apply_output(
+        &Output::MercRevive {
+            state: 0xFFFF,
+            value: 0,
+        },
+        &w,
+    )
+    .unwrap();
+    assert_eq!(u.more().merc_menu_calls, [11, 8, 24, 21, 43]);
+    // 0x28 T = 6 copies Q; the record is overwritten only by 0x28.
+    assert_eq!(u.more().client_quest, [0; 96]);
+    u.apply_output(&Output::QuestFlags { record: [1; 96] }, &w)
+        .unwrap();
+    assert_eq!(u.more().client_quest, [1; 96]);
+    u.apply_output(&npc_text(1, 1, 0, 0x25), &w).unwrap();
+    let mut d = npc_dialog(false);
+    d.quest_flags = [2; 96];
+    u.apply_output(&Output::NpcDialog(Box::new(d)), &w).unwrap();
+    assert_eq!(u.more().client_quest, [2; 96]);
+}
+
+// Covers: specs/client/msg-ui.md §3 r2
+#[test]
+fn trade_code_0a_plays_on_the_partner() {
+    let mut w = world(false);
+    let mut u = ui();
+    let p = UnitKey::new(PLAYER, 9);
+    w.units.insert(p, ClientUnit::new(p));
+    u.apply_output(&Output::TradeAction { code: 0x0A }, &w)
+        .unwrap();
+    assert!(u.take_outcome().sounds.is_empty());
+    u.apply_output(
+        &Output::TradePartner {
+            name: [0; 16],
+            guid: 9,
+        },
+        &w,
+    )
+    .unwrap();
+    u.apply_output(&Output::TradeAction { code: 0x0A }, &w)
+        .unwrap();
+    assert_eq!(
+        u.take_outcome().sounds,
+        [SoundRequest::PlayerEvent { unit: p, event: 23 }]
+    );
+}
+
+fn chat(kind: u8, lang: u8, ut: u8, b8: u8, name: &str, text: &[u8], present: bool) -> Output {
+    Output::ChatLine {
+        kind,
+        lang,
+        unit: UnitKey::new(ut, 4),
+        b8,
+        b9: 0,
+        name: name.as_bytes().to_vec(),
+        text: text.to_vec(),
+        present,
+        player_name: None,
+    }
+}
+
+// Covers: specs/client/msg-ui.md §4 r3, §4 r4
+#[test]
+fn chat_lines_by_type_and_overhead_records() {
+    let mut u = ui();
+    let t = b"hi".to_vec();
+    // By type.
+    assert_eq!(
+        u.chat_line(&chat(4, 0, 0, 0, "", b"hi", false), false),
+        Some(ChatAction::ScreenMessage(t.clone()))
+    );
+    assert_eq!(
+        u.chat_line(&chat(6, 0, 0, 0, "", b"hi", false), false),
+        Some(ChatAction::Formatted(t.clone()))
+    );
+    // 1 with u8@3 in {0, 1}: a plain screen message; otherwise named.
+    assert_eq!(
+        u.chat_line(&chat(1, 0, 1, 0, "n", b"hi", false), false),
+        Some(ChatAction::ScreenMessage(t.clone()))
+    );
+    assert_eq!(
+        u.chat_line(&chat(1, 0, 2, 0, "n", b"hi", false), false),
+        Some(ChatAction::Named {
+            name: b"n".to_vec(),
+            text: t.clone()
+        })
+    );
+    assert_eq!(
+        u.chat_line(&chat(2, 0, 0, 0, "n", b"hi", false), false),
+        Some(ChatAction::Named {
+            name: b"n".to_vec(),
+            text: t.clone()
+        })
+    );
+    assert_eq!(
+        u.chat_line(&chat(7, 0, 0, 5, "", b"hi", false), false),
+        Some(ChatAction::Type7(5))
+    );
+    assert_eq!(
+        u.chat_line(&chat(3, 0, 0, 0, "", b"hi", false), false),
+        None
+    );
+    // 5: overhead text only when the unit was present.
+    let k = UnitKey::new(1, 4);
+    assert_eq!(
+        u.chat_line(&chat(5, 0, 1, 0, "", b"hi", false), false),
+        None
+    );
+    assert!(u.more().overhead.is_empty());
+    assert_eq!(
+        u.chat_line(&chat(5, 0, 1, 0, "", b"hi", true), false),
+        Some(ChatAction::Overhead(k, t.clone()))
+    );
+    // r4: d = 8 · min(n, 254) + 125; end = counter + d.
+    let r = u.more().overhead[&k].clone();
+    assert_eq!((r.duration, r.end, r.text), (141, 141, t));
+    let long = vec![b'a'; 300];
+    u.set_overhead(k, &long, 0);
+    let r = u.more().overhead[&k].clone();
+    assert_eq!((r.duration, r.text.len()), (8 * 254 + 125, 254));
+    // The counter steps per draw; a record is freed once its end passed.
+    u.set_overhead(k, b"hi", 0);
+    for _ in 0..141 {
+        u.overhead_draw();
+    }
+    assert!(u.more().overhead.contains_key(&k));
+    u.overhead_draw();
+    assert!(!u.more().overhead.contains_key(&k));
+    // An empty text frees the record; so does OverheadClear (§21).
+    u.set_overhead(k, b"x", 0);
+    u.set_overhead(k, b"", 0);
+    assert!(u.more().overhead.is_empty());
+    // r3.1: a squelched player line shows nothing; r3.3: a text with a
+    // character >= 0x80 in a foreign language is refused unless {7, 12}.
+    assert_eq!(u.chat_line(&chat(4, 0, 0, 0, "", b"hi", false), true), None);
+    u.more_mut().own_lang = 0;
+    assert_eq!(
+        u.chat_line(&chat(4, 9, 1, 0, "", &[0xE9], false), false),
+        None
+    );
+    assert!(u
+        .chat_line(&chat(4, 0, 1, 0, "", &[0xE9], false), false)
+        .is_some());
+    u.more_mut().own_lang = 12;
+    assert!(u
+        .chat_line(&chat(4, 7, 1, 0, "", &[0xE9], false), false)
+        .is_some());
 }

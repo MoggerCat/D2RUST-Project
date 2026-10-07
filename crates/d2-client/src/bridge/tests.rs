@@ -1137,9 +1137,10 @@ fn ui_answers_npc_dialog_with_0x31_in_order() {
     let (first, _, mode) = run(npc_text(1, 0), 0, true);
     assert_eq!(first, [x2f.clone(), x30.clone()]);
     assert_eq!(mode, 1);
-    // PROVISIONAL (first-entry m): a 2-entry list answers as B2 too.
+    // `client/msg-ui.md` §16 r9: m is the smallest kind-0 string id; the
+    // helper's second entry is (kind 0, id 0), so m = 0.
     let (first, next, mode) = run(npc_text(2, 0), 0, false);
-    assert_eq!(first, [x2f, g("31 06000000 25000000"), x30]);
+    assert_eq!(first, [x2f, g("31 06000000 00000000"), x30]);
     assert!(next.is_empty());
     assert_eq!(mode, 1);
 }
