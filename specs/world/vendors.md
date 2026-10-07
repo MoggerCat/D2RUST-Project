@@ -34,15 +34,15 @@
 |   4. Opening trade or gamble (`0x00579430(npc, single, gamble)`) | 243–272 |
 |   5. Gambling | 273–339 |
 |   6. Refresh | 340–371 |
-|   7. Buying and selling | 372–578 |
-|   8. Repair | 579–625 |
-|   9. Prices | 626–802 |
-| Constants & data dependencies | 803–822 |
-| Randomness | 823–838 |
-| Edge cases & original bugs | 839–868 |
-| Test vectors | 869–891 |
-| Provenance | 892–930 |
-| Open questions | 931–985 |
+|   7. Buying and selling | 372–622 |
+|   8. Repair | 623–669 |
+|   9. Prices | 670–846 |
+| Constants & data dependencies | 847–866 |
+| Randomness | 867–882 |
+| Edge cases & original bugs | 883–912 |
+| Test vectors | 913–935 |
+| Provenance | 936–974 |
+| Open questions | 975–1038 |
 <!-- /index -->
 
 ## Summary
@@ -570,7 +570,51 @@ stream. So a copy with k fillers read costs 2 · (1 + k) game-seed steps,
 copy first, children in stream order; the GUID (`0x00552EE0`) and the
 rest of the routine draw nothing. The decode rules of
 `0x0062E430` (`0x0062CBE0` full record, `0x0062A970` compact) are the inverse
-of `items/bitstream.md`; their differences are Open question 8.
+of `items/bitstream.md` except for the fields of §7.3.1.
+
+#### 7.3.1 Fields the decoder rebuilds (Open question 8)
+
+The copy passes save version 0x60 (`0x0055A2FE`), so none of the
+decoder's old-version conversions apply. The decoder entry (`0x0062E430`)
+stores the stream's flags without 0x2000000 and 0x80000 and zeroes the
+affix and rare-name slots before the record is read. Not read from the
+stream but rebuilt:
+
+1. Full record (`0x0062CBE0`), weapon (type `weap`): stat 68 := −items
+   `speed`; stats 22, 21, 24, 23 :=
+   `maxdam`, `mindam`, `2handmaxdam`, `2handmindam`, and, when
+   `maxmisdam` ≠ 0, 159 := `minmisdam`, 160 := `maxmisdam` (unit base
+   set `0x00627260`). Quality 1: each is ⌊3v / 4⌋ instead, then 22, 24,
+   160 at least 2 and 21, 23, 159 raised from 0 to 1. Item flag
+   0x400000 (`0x0062A8D0`): each of the six := base × 3 / 2 (signed).
+   Durability (73, then 72 when 73 ≠ 0) is read.
+2. Full record, armor (type `armo`): stat 20 := items `block`, 67 :=
+   −items `speed`; defense (31) and durability are read.
+3. While the stat lists are read: an entry for stat 17 (read with its
+   pair 18) first raises base 22, 24 and, for a throwable item
+   (`0x0062BA80`), 160 to the items column when the base is below it,
+   and before 18 raises 21, 23, 159 the same way (`0x0062C9F0`, a
+   "raise when below" form of `items/properties.md` §4.3); an entry for
+   stat 57 (read with 58 and 59) sets stat 326 (`poison_count`) := 1 in
+   that list.
+4. Item level: a read value < 1 → 1. Unique (quality 7): a file index ≥
+   the uniqueitems count → −1.
+5. Compact record (`0x0062A970`): item level := 1, quality := 2, unit
+   seed field +0x28 := 0 and the item seed initialised from it
+   (`0x00650E40`), suffix slot 0 := 0 for `tsc ` and 1 for `isc `.
+
+So a copy differs from S (whose base values come from
+`items/generation.md` §6 and `items/quality.md` §6) in: the item level
+and item seed of a compact item; stat 326 when S's list holds a value ≥
+2 (two poison properties added to one list, `items/properties.md` §4.2);
+the base damage of a low-quality weapon whose runeword list holds stat
+17 or 18 (the runeword's own reset acts on the filler, §10.2 there, so S
+keeps ⌊3v / 4⌋ while the copy gets the full column); any weapon base
+damage S holds other than the values of rule 1 (e.g. the craft list
+re-applying × 3 / 2 to an ethereal weapon, `items/properties.md` §12).
+The low-quality missile floors differ from creation (creation 159 ≥ 2,
+160 ≥ 1; decode 159 ≥ 1, 160 ≥ 2), but no live `weapons.txt` row with
+`maxmisdam` ≠ 0 reaches a floor.
 
 Recorded: the buy of rule 10 creates the copy GUID 0x36 from store item
 0x12; the sell of §7.2 creates GUID 0x35 from GUID 7 (each the next
@@ -969,6 +1013,15 @@ Min 1 Max 1 MagicMin 1 MagicMax 1 MagicLvl 1).
    stats from the item record, list values after the clamp) would make
    the copy differ from S. Settle: Ghidra on `0x0062CBE0`, or a buy of
    a socketed magic item compared stat by stat with the store item.
+   Answered (2026-10-07, the exported decompile of `0x0062E430`,
+   `0x0062CBE0`, `0x0062A970`, `0x0062C9F0`, register uses checked in
+   the disassembly; the copy's version 0x60 at `0x0055A2FE`): §7.3.1.
+   Rebuilt instead of read: weapon base damage / speed and armor block
+   / speed from the items row (× 3 / 4 low quality, × 3 / 2 ethereal),
+   the stat-17/18 base raise, stat 326 := 1 with stat 57, item level ≥
+   1, a unique index past the table → −1, and for compact items item
+   level 1, quality 2 and a seed from 0. The differences from S that
+   follow are listed there; a recorded buy still confirms them.
 9. §7.3 step 6: S's item flag 0x8000000 (set on every copied source)
    has no name in `items/generation.md` §1.4. Settle: the readers of
    item flag 0x8000000.
