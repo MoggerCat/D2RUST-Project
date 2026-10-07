@@ -39,7 +39,7 @@
 | Edge cases & original bugs | 468–499 |
 | Test vectors | 500–588 |
 | Provenance | 589–617 |
-| Open questions | 618–648 |
+| Open questions | 618–658 |
 <!-- /index -->
 
 ## Summary
@@ -622,6 +622,16 @@ equal the implementation's lists (`unit-order.md`, Test vectors).
 2. Timers without a unit (edge case 3): does any 1.14d path schedule one?
    Search callers of `0x005417D0` / `0x00541800` passing unit 0. None in
    the recordings.
+   *Partly answered* (static): `0x005416B0` has only the two wrappers as
+   callers; the unit is EDX at the wrapper call. Of the 252 call sites in
+   `all.asm` (251 of `0x005417D0`, `0x00555046` of `0x00541800`) none
+   loads a constant 0 into EDX. The one site where the unit register may
+   be null, `0x005A3EDA` in `0x005A3E70` (type 7, frame + 4, taken when
+   its unit argument is null), is umod 33's mode-1 callback (table
+   `0x0073C0B8` entry 199, `monsters/init.md` §22), which the dispatcher
+   only calls with the monster itself. Open: a register-held unit that
+   is null at run time at one of the other sites (a breakpoint on
+   `0x005416B0` with EDX = 0 over a long run settles it).
 3. Settled for the observed combinations by `units.md` (U1–U10 on the
    three recordings); per-site confirmation needs a `record_tick.py`
    0.2.0 recording (`units.md` open question 1).
