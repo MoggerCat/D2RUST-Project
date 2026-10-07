@@ -273,8 +273,8 @@ stat-list links, `weapon_set`, the runtime item table (§5). No outputs.
          (id, owner) exists and is not the current left, and the
          skill-use check `0x004D9FC0(U, entry)` gives neither 2 nor 7
          → select left (id, owner) (`client/msg-skills.md` §2 r3); the
-         same for right. (The meaning of `0x004D9FC0`'s results beyond
-         "2 / 7 refuse": Pending.)
+         same for right. (`0x004D9FC0`'s results: `client/stat-lists.md`
+         §3 r6.8.)
       7. Changed: a player → `0x0046F950`, `0x00470610` (gfx, effects);
          any other unit → `0x004AFF60(U, 0)` (the monster mode machine,
          `client/model.md` §8; Phase 6).

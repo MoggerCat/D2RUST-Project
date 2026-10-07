@@ -251,17 +251,16 @@ by `total(unit, stat, layer)` and `base(unit, stat, layer)`.
       `0x004D8B90`, `0x004D9090`, `0x004D8E60`, `0x004D9160`,
       `0x004D9180`, `0x004D9310`, `0x004D9320`, `0x004D9360`
       (`render/unit-composite.md`), `0x004D93B0`, `0x004D9450`,
-      `0x004D9480`, `0x004D96B0`, `0x004D9740`, `0x004D97E0`; the
-      bodies other than entry 3 are Pending (treated as effects until
-      read). Then cltevent ≥ 0 and the state's
+      `0x004D9480`, `0x004D96B0`, `0x004D9740`, `0x004D97E0`; bodies:
+      rule 6.5. Then cltevent ≥ 0 and the state's
       list exists → client event `0x004C7C40(stat 350, stat 351,
       clteventfunc, 1, state)` (effects).
    3. Off (0xA9: `0x004D9F40` then `0x004D9C30`): remfunc r (0 ≤ r <
       30, table `0x0072A710`: entries 1–12 `0x004D8760`, `0x004D89A0`,
       `0x004D8A60`, `0x004D90F0`, `0x004D8D90`, `0x004D9170`,
       `0x004D9260`, `0x004D9340`, `0x004D9380`, `0x004D93A0`,
-      `0x004D9630`, `0x004D97E0`, the rest null) is called (bodies
-      Pending, effects);
+      `0x004D9630`, `0x004D97E0`, the rest null) is called (bodies:
+      rule 6.6);
       cltevent ≥ 0 and the list exists → `0x004DC190(state)` (event
       end). Then, when the bit is set: **the unit's list of that state,
       if its state id matches, is detached and freed** (`0x006277E0`,
@@ -276,6 +275,147 @@ by `total(unit, stat, layer)` and `base(unit, stat, layer)`.
       `0x00470610(unit, 1)` and `0x00624390(unit)` (animation reset,
       Phase 6), **unit +0x44 := 0**, **current skill := none**
       (`0x00620210(unit, 0)`).
+   5. **Setfunc bodies** (2026-10-08, 1.14d asm). All are
+      `__fastcall(U, state)`; R = the states record (+0xBC, 0x3C bytes,
+      count +0xC4; an index outside → nothing), L = U's list of the
+      state (`0x006256B0(U, state)`; none → nothing where L is read);
+      `stat(n)` = L's stat n (`0x00625D00(L, n, 0)`); skill rows +0xB98
+      (0x23C bytes, count +0xBA0), "k valid" = 0 ≤ k < count.
+      Overlay calls (owner of the overlay records: none yet,
+      `render/unit-composite.md` §5 r4 and open question 13): add
+      `0x00470390(U, id, mode, …)` (stack zeros unless named), remove
+      `0x0046F0C0(U, 0, id)`, remove group G(id) = `0x004D8660` (EBX id;
+      id = −1 → nothing; else removes id … id + `1ofN` − 1, overlay
+      +0x4C via `0x00664740`). ov1–ov4 = R +2/+4/+6/+8, cast = +0xA,
+      pgsv = +0xE (negative → −1 unless stated).
+      - 1 `0x004D86A0` (pgsv): R `pgsv` (+0x10 & 0x10), 0 < pgsv <
+        overlay count (+0xBC0), 0 ≤ R `stat` (+0x18) ≤ itemstatcost
+        count (+0xBD4; ≤, original) → remove pgsv, pgsv + 1, pgsv + 2;
+        v := `0x00625480(U, stat, 0)`; 1 ≤ v ≤ 3 → add pgsv + v − 1,
+        mode 3.
+      - 2 `0x004D87E0` (darkness; state 153 `cloak_of_shadows`): U has
+        a room (`0x00620BB0`), L, skill k = stat(350) valid → v :=
+        `0x00646CA0(U, auralencalc +0x60, k, stat(351))`; darkness
+        event `0x0046AE50(in 5, hold trunc(3v / 5), out trunc(2v / 5),
+        level id 0x0061A1B0(room), 0)` (`render/lighting.md` §10 r3).
+      - 3 `0x004D88A0`: rule 6.2 (model).
+      - 4 `0x004D8960`: L; t := stat(353) < 6 (unsigned) → **source
+        link `0x00621CC0(U, t, stat(354))`** (`client/msg-units.md`
+        §1.2 r4; `skills/bodies.md` §6.20 semantics: +0x94, +0x98,
+        state 98 list, +0xC8 |= 0x400).
+      - 5 `0x004D89B0`: U a monster (type 1) with L: c := stat(355);
+        m := U +0x10 (mode, read first); **`0x004AEDD0(U, c)`** (client
+        monster re-init as class c: +4 := c, stats, flags; body
+        Pending); **mode set `0x00480E70(U, 8 if m = 8 else 1)`**
+        (`client/model.md` §17 r1.7); c = 543 → **facing
+        `0x00649EF0(path +0x2C, x, y + 10, 1)`** (x, y = `0x0045ADF0` /
+        `0x0045AE20`).
+      - 6 `0x004D8B90` and 8 `0x004D8E60` (tiered overlays): L; a :=
+        stat(132), b := stat(133), o := stat(355); tier t := 3, 2 when
+        a < b / 3, then −1 when a < 2·(b / 3) (C division; so 1–3);
+        **stat(355) := t** (`0x00627150(L, 355, t, 0)`).
+        Setfunc 6 (cast kept as read): t > o → remfunc 3 body; ov3 ≠ −1,
+        t ≥ 3 → add ov3 mode 7; ov4 ≠ −1, t ≥ 2 → add ov4 mode 7; cast,
+        ov1, ov2 all ≠ −1 → add cast mode 4 with stack (0, ov1, ov2, 0,
+        0). t < o → (o − t) times: G(ov1), G(ov2).
+        Setfunc 8 (ov1–ov3): t > o → remfunc 5 body; then for (ov3, 3),
+        (ov2, 2), (ov1, 1): ov ≠ −1, t ≥ n → add ov and ov + 1, mode 3.
+        t ≤ o → ov3 ≠ 0, t ≤ 2 → G(ov3), G(ov3 + 1); ov2 ≠ 0, t ≤ 1 →
+        G(ov2), G(ov2 + 1); ov1 ≠ 0 and **ov1** ≤ 1 → G(ov1), G(ov1 +
+        1) (original: tests 0 not −1, so −1 removes overlay 0's group;
+        the last test reads ov1, not t; reproduce).
+      - 7 `0x004D9090`: L, k = stat(350) valid, `prgsound` (+0x10E) >
+        0 → request `0x004B9A00(prgsound, U, 0, 0, 0)`
+        (`audio/triggers.md` §8 r2).
+      - 9 `0x004D9160` (= remfunc 6 `0x004D9170`): **passive refresh
+        `0x00646F20(U)`** (`client/msg-skills.md` §9 r4).
+      - 10 `0x004D9180`: R `skill` (+0x38) valid and its `cltmissilea`
+        (+0xEA) in [0, missile count +0xB6C) → client missile create
+        `0x004CD540` with the zeroed 0x5C record: +4, +8 := U, +0x10 :=
+        cltmissilea, +0x2C := R skill, +0x30 := 1 (Phase 6 client
+        missiles; `client/msg-units.md` §7 r6); then U ≠ none → **+0xC8
+        |= 0x40000, +0xC4 |= 0x20**.
+      - 11 `0x004D9310`: **U +0xC8 |= 0x40000** (flag-ex bit 18: not
+        drawn, `render/draw-order.md` §5 r1). 12 `0x004D9320`: the same
+        and **U +0xC4 |= 0x20** (no shadow, `render/blend-modes.md` §5
+        r3).
+      - 13 `0x004D9360`: motion record `0x004DA000(U)`, flag 0x10 set
+        `0x004DA620(U, 1)` (`render/unit-composite.md` §8, creator
+        `0x004D9364`).
+      - 14 `0x004D93B0`: record of 7 i32 zeroed; [0], [1] := U's x, y
+        (types 2, 4, 5: path +0xC / +0x10; else `0x006488C0` /
+        `0x00648900`, 0 with no path); **mode request `0x00480C10(0x19,
+        U, record, 0)`** (`client/model.md` §8); **direction
+        `0x00648820(path, 0)`** (`sim/pathing.md`).
+      - 15 `0x004D9450`: **mode set `0x00480E70(U, 1)`; U +0xC4 |=
+        0x80000000** (reader not traced: Pending); **path reset
+        `0x00649CA0(U)`**.
+      - 16 `0x004D9480` (progressive overlays): L, k = stat(350) valid,
+        m := `0x00646CA0(U, calc2 +0x13C, k, stat(351))` > 0; c :=
+        stat(169). For each range (ov1 … ov2), then (ov3 … ov4), lower
+        ≥ 0 and ≤ upper, n = upper − lower + 1 (the clamps use the first
+        range's n1: m := min(m, n1), c := min(c, n1)): j := (c − 1)·n /
+        m (C division); for i in 0 … n − 1: i = j → add lower + i, mode
+        3, when U lacks it (`0x0046E100(U, id)` = 0); else remove lower
+        + i.
+      - 17 `0x004D96B0`: R `missile` (+0x3A) in [0, missile count) →
+        `0x004CD540` record: +4, +8 := U, +0x10 := missile, +0x2C := R
+        skill (negative → 0), +0x30 := 1.
+      - 18 `0x004D9740`: `0x004AF890(U, 5, 0)` (client monster effect;
+        body Pending), then setfunc 17's body.
+      - 19 `0x004D97E0` (= remfunc 12): **skill-use lock
+        `[0x007A04FC]` := 0** (`0x0044CE40(0)`; rule 6.8).
+   6. **Remfunc bodies** (same conventions):
+      - 1 `0x004D8760`: setfunc 1's guard → remove pgsv, pgsv + 1,
+        pgsv + 2.
+      - 2 `0x004D89A0`: **unlink `0x00621CE0(U, 0)`** (`skills/bodies.md`
+        §6.20, owner none: +0x94, +0x98 := 0, state 98 off with its list
+        freed, +0xC8 &= ~0x400).
+      - 3 `0x004D8A60`: cast, ov1, ov2: each ≠ −1 → G three times; ov3,
+        ov4 ≠ −1 → G once.
+      - 4 `0x004D90F0`: L, k = stat(350) valid, `prgsound` > 0, h :=
+        U's request of that sound (`0x004CA900(U, prgsound)`) ≠ 0 →
+        detach `0x004BA790(h, U, 1)` (`audio/triggers.md` §1 r3).
+      - 5 `0x004D8D90`: ov1, ov2, ov3: each ≠ −1 → G(ov), G(ov + 1).
+      - 6 `0x004D9170`: setfunc 9.
+      - 7 `0x004D9260`: U a monster with a current skill E
+        (`0x00620250`) of id 167 (`0x00643CE0`); x, y := E's point
+        (`0x006444D0`, `0x00644500`); either ≠ 0 → **E's point := 0, 0
+        (`0x006445A0`, `0x006445E0`); room := cell lookup
+        `0x00463740(U's room, x, y)`; found → pattern clear
+        `0x0064EC10(room, x, y, 1, 0x100)`** (`sim/path-placement.md`).
+      - 8 `0x004D9340`: **U +0xC8 &= ~0x40000, +0xC4 &= ~0x20**.
+      - 9 `0x004D9380`: motion flag 0x10 clear `0x004DA620(U, 0)`,
+        position `0x004DA1D0(U, 0, 0, 0)`.
+      - 10 `0x004D93A0`: `0x004ADCE0(U)` (pain worms,
+        `monsters/umod-callbacks.md` §28.2 umod 40).
+      - 11 `0x004D9630`: remove every id of ov1 … ov2 and ov3 … ov4
+        (lower ≥ 0).
+      - 12 `0x004D97E0`: setfunc 19.
+   7. **Hook values in `StateFx`**: bold writes in rules 6.5–6.6 run in
+      the model; the rest is effects. A hooks or off `StateFx` carries
+      the hook number (setfunc s / remfunc r; 0 when the body's
+      model-side guards fail or it has no effect part) and two i32 the
+      model captures at the call: setfunc 1 (v), 2 (v, level id), 6 and
+      8 (o, t), 7 and remfunc 4 (k), 16 (m, c after the clamps); 0
+      otherwise. Besides these the effect layer reads only static
+      records and U's overlays.
+   8. **Skill-use check** `0x004D9FC0(U, E)` (`client/msg-stats-items.md`
+      restore hands): r := `0x00647960(U, E)`; r ≠ 0 → r. Else U is
+      the local player and C (`0x0044DA90`, client update counter
+      `[0x007A0498]`) < the lock `[0x007A04FC]` (`0x0044CE50`) → 8;
+      else 0. The lock is set to C + min(calc, 12) by the client skill
+      function at `0x004C68DA` and cleared by setfunc 19 / remfunc 12.
+      `0x00647960`: E's record none or `InGame` clear → 3; **7: E's
+      level with bonuses `0x006442A0(U, E, 1)` = 0**; `aura` → 6;
+      `passive` → 5; **2: `0x00647640` fails (body Pending), or the
+      weapon-type test `0x00643F80(U)` (`itypea1` +0x18 / `etypea1`
+      +0x24 against the items at body locations 4 and 5) fails, or the
+      charge test `0x00647840` fails (E from an item, owner GUID +0x34 ≠
+      −1: that item's stat 204 with param (base level `0x006442A0(U,
+      E, 0)` & 0x3F) + skill·64 has low byte 0, no charges)**, the
+      last after the 1 / 4 tests; else 1, 4 or 8 from `0x00647540`, `0x00644060`,
+      `0x006440F0`, `0x006478F0` (not traced).
 
 ### 4. Skills
 
@@ -388,7 +528,7 @@ code), `0x00460930`, `0x004609A0`, `0x00643620` (caller `0x00646E30`),
    itemstatcost +0x04 & `[0x006CE26C]` = `signed`, +0x05 & 2 =
    `updateanimrate`.
 6. *Answered (2026-10-08)*: §3 rule 6 (model parts; effect calls as
-   `StateFx`; setfunc / remfunc bodies other than setfunc 3 Pending).
+   `StateFx`; setfunc / remfunc bodies: rules 6.5–6.7).
    Original question: the rest of the state on / off paths (`0x004D97F0`, `0x004D9920`,
    `0x004D9AD0`, `0x004D9F40`, `0x004D9C30`) and their owner (a client
    states spec taking 0xA7–0xA9). A recording with a buff (e.g. a
