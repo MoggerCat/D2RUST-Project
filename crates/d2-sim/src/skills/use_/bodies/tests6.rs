@@ -1536,7 +1536,10 @@ fn conversion_expiry_and_callback() {
     assert_eq!(b3_lvl24::conversion_do(&mut f, &t, &ct, u, 1, 1), 1);
     let l = f.list_of(m, 53).unwrap();
     assert_eq!((l.expire, l.callback), (150, callback::CONVERSION));
-    assert!(!f.c.units[u].combat.is_empty(), "the stored hit is not applied");
+    assert!(
+        !f.c.units[u].combat.is_empty(),
+        "the stored hit is not applied"
+    );
     // A zero length still lasts one frame.
     let (mut t, ct, mut f, u, m) = conv_world(100);
     t.skills[1].auralencalc = 0xFFFF_FFFF;
@@ -1602,4 +1605,328 @@ fn frenzy_even_and_odd_frames() {
     assert!(!log.iter().any(|s| s.starts_with("FreeCombat")));
     assert!(log.contains(&format!("attackcleanup {u}")));
     assert!(log.contains(&format!("path {u} TargetUnit(Some({m2}))")));
+}
+
+// ---------------------------------------------------------------- §7.16
+
+fn ward_world(
+    large: bool,
+    small: bool,
+) -> (
+    crate::skills::SkillTables,
+    crate::combat::CombatTables,
+    BodyFake,
+    usize,
+    usize,
+) {
+    let mut r = body_rec();
+    r.srvmissilea = 0;
+    r.srvmissileb = 1;
+    r.srvmissilec = 2;
+    let t = tabs(r, Code::new(), 3);
+    let mut ms2: Monstats2 = blank();
+    ms2.corpsesel = true;
+    ms2.soft = true;
+    ms2.large = large;
+    ms2.small = small;
+    let mut ct = combat_tables(vec![monster_rec()]);
+    ct.monstats2 = vec![ms2];
+    let (mut f, u) = world();
+    let m = monster(&mut f, (8, 9));
+    f.c.units[m].mode = 12;
+    f.targets.insert(u, m);
+    f.free_shift = Some((3, 2));
+    (t, ct, f, u, m)
+}
+
+// Covers: specs/skills/bodies-2b.md §7.16 r1
+#[test]
+fn grim_ward_needs_a_soft_corpse() {
+    let (t, ct, mut f, u, m) = ward_world(false, false);
+    assert_eq!(b3_lvl24::grim_ward(&mut f, &t, &ct, u, 9, 1), 0);
+    f.c.units[m].mode = 1;
+    assert_eq!(
+        b3_lvl24::grim_ward(&mut f, &t, &ct, u, 1, 1),
+        0,
+        "not a corpse"
+    );
+    f.c.units[m].mode = 12;
+    f.targets.clear();
+    assert_eq!(b3_lvl24::grim_ward(&mut f, &t, &ct, u, 1, 1), 0, "T none");
+    assert!(f.missiles.is_empty());
+}
+
+// Covers: specs/skills/bodies-2b.md §7.16 r2
+#[test]
+fn grim_ward_needs_a_room_and_a_free_point() {
+    let (t, ct, mut f, u, m) = ward_world(false, false);
+    f.point_rooms.insert((8, 9), None);
+    assert_eq!(
+        b3_lvl24::grim_ward(&mut f, &t, &ct, u, 1, 1),
+        0,
+        "no room at the point"
+    );
+    f.point_rooms.clear();
+    f.room_of.remove(&m);
+    assert_eq!(
+        b3_lvl24::grim_ward(&mut f, &t, &ct, u, 1, 1),
+        0,
+        "T's room none"
+    );
+    f.room_of.insert(m, 1);
+    f.free_shift = None;
+    assert_eq!(
+        b3_lvl24::grim_ward(&mut f, &t, &ct, u, 1, 1),
+        0,
+        "no free point"
+    );
+    assert!(f.missiles.is_empty());
+}
+
+// Covers: specs/skills/bodies-2b.md §7.16 r3, §7.16 r4, §7.16 r5
+#[test]
+fn grim_ward_missile_by_size_and_the_corpse_states() {
+    for (large, small, want) in [
+        (false, false, 0),
+        (false, true, 1),
+        (true, true, 2),
+        (true, false, 2),
+    ] {
+        let (t, ct, mut f, u, m) = ward_world(large, small);
+        assert_eq!(b3_lvl24::grim_ward(&mut f, &t, &ct, u, 1, 3), 1);
+        let q = f.missiles[0];
+        assert_eq!(q.class, want, "large {large} small {small}");
+        // Flags 1 at the free point (8 + 3, 9 + 2).
+        assert_eq!((q.flags, q.x, q.y, q.skill, q.level), (1, 11, 11, 1, 3));
+        assert!(f.has_state(m, 104) && f.has_state(m, 118));
+        assert!(f.take_log().contains(&format!("update {m}")));
+    }
+    // The chosen missile invalid.
+    let (mut t, ct, mut f, u, _) = ward_world(true, false);
+    t.skills[1].srvmissilec = 0xFFFF;
+    assert_eq!(b3_lvl24::grim_ward(&mut f, &t, &ct, u, 1, 1), 0);
+    // No monstats2 record for the class.
+    let (t, mut ct, mut f, u, _) = ward_world(false, false);
+    ct.monstats2.clear();
+    assert_eq!(b3_lvl24::grim_ward(&mut f, &t, &ct, u, 1, 1), 0);
+}
+
+// ---------------------------------------------------------------- §7.17
+
+fn hunger_run(p: i16, l: i16, m: i16, miss: bool) -> (i32, BodyFake, usize, usize, i32) {
+    let (t, ct, mut f, u, tg) = claws_world(|r, c| {
+        r.calc1 = c.f(p);
+        r.calc2 = c.f(l);
+        r.calc3 = c.f(m);
+        if miss {
+            r.resultflags = 0;
+        }
+    });
+    f.c.set(u, 21, 10);
+    f.c.set(u, 22, 10);
+    f.c.set(tg, 6, 10_000_000);
+    f.c.set(u, 6, 100);
+    f.c.set(u, 7, 10_000_000);
+    f.c.set(u, 8, 0);
+    f.c.set(u, 9, 10_000_000);
+    if miss {
+        f.c.set(u, 19, 0);
+        f.c.set(tg, 31, 100_000);
+    }
+    let r = b3_lvl24::hunger(&mut f, &t, &ct, u, 1, 1);
+    (r, f, u, tg, 10_000_000 - 0)
+}
+
+// Covers: specs/skills/bodies-2b.md §7.17 r1, §7.17 r2
+#[test]
+fn hunger_refusals_and_flag() {
+    let (t, ct, mut f, u, _) = claws_world(|_, _| {});
+    assert_eq!(b3_lvl24::hunger(&mut f, &t, &ct, u, 9, 1), 0);
+    f.targets.clear();
+    f.tpos.clear();
+    assert_eq!(b3_lvl24::hunger(&mut f, &t, &ct, u, 1, 1), 0);
+    assert_eq!(f.c.units[u].flags & FLAG_40, 0);
+    let (r, f, u, ..) = hunger_run(0, 0, 0, false);
+    assert_eq!(r, 1);
+    assert_eq!(f.c.units[u].flags & FLAG_40, FLAG_40);
+}
+
+// Covers: specs/skills/bodies-2b.md §7.17 r3, §7.17 r4
+#[test]
+fn hunger_adds_physical_and_leech() {
+    let (_, f0, _, tg, full) = hunger_run(0, 0, 0, false);
+    let base = full - f0.c.get(tg, 6);
+    assert!(base > 0);
+    // calc1 = 100: physical doubles.
+    let (_, f1, _, tg, _) = hunger_run(100, 0, 0, false);
+    assert_eq!(full - f1.c.get(tg, 6), 2 * base);
+    // calc2 = 20 / calc3 = 30: leeches of the damage done.
+    let (_, f2, u, _, _) = hunger_run(0, 20, 30, false);
+    assert_eq!(f2.c.get(u, 6) - 100, base * 20 / 100);
+    assert_eq!(f2.c.get(u, 8), base * 30 / 100);
+}
+
+// Covers: specs/skills/bodies-2b.md §7.17 r5
+#[test]
+fn hunger_returns_one_on_a_miss() {
+    let mut missed = false;
+    for _ in 0..50 {
+        let (r, f, _, tg, full) = hunger_run(0, 0, 0, true);
+        assert_eq!(r, 1);
+        missed |= f.c.get(tg, 6) == full;
+    }
+    assert!(missed);
+}
+
+// ---------------------------------------------------------------- §7.19
+
+fn blast_world() -> (
+    crate::skills::SkillTables,
+    crate::combat::CombatTables,
+    BodyFake,
+    usize,
+    usize,
+) {
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.aurafilter = 0x103;
+    r.aurarangecalc = c.f(10);
+    r.param3 = 100;
+    r.param4 = 50;
+    r.param5 = 100;
+    r.param6 = 100;
+    let t = tabs(r, c, 1);
+    let mut ms = monster_rec();
+    ms.switchai = true;
+    let mut ct = combat_tables(vec![monster_rec()]);
+    ct.monstats = vec![ms];
+    let (mut f, u) = world();
+    f.tpos.insert(u, (4, 1));
+    f.c.hostile = true;
+    let m = monster(&mut f, (4, 2));
+    f.c.units[m].mode = 1;
+    f.c.set(m, 6, 10_000_000);
+    f.scan = vec![m];
+    (t, ct, f, u, m)
+}
+
+// Covers: specs/skills/bodies-2b.md §7.19 r1, §7.19 r2
+#[test]
+fn mind_blast_refusals_and_range() {
+    let (t, ct, mut f, u, m) = blast_world();
+    assert_eq!(b3_lvl24::mind_blast(&mut f, &t, &ct, u, 9, 1), 0);
+    f.tpos.clear();
+    assert_eq!(b3_lvl24::mind_blast(&mut f, &t, &ct, u, 1, 1), 0);
+    assert!(f.lists.is_empty());
+    // The range is aurarangecalc (10): a monster 500 away is not reached.
+    f.tpos.insert(u, (500, 500));
+    assert_eq!(b3_lvl24::mind_blast(&mut f, &t, &ct, u, 1, 1), 1);
+    assert!(f.list_of(m, 53).is_none());
+}
+
+// Covers: specs/skills/bodies-2b.md §7.19 r3, §7.19 r4, §7.19 r5
+#[test]
+fn mind_blast_converts_with_the_chance_or_hits() {
+    // chance DM(1, 100, 100) = 100: always converted.
+    let (t, ct, mut f, u, m) = blast_world();
+    f.c.frame = 1000;
+    assert_eq!(b3_lvl24::mind_blast(&mut f, &t, &ct, u, 1, 1), 1);
+    let l = f.list_of(m, 53).expect("conversion state");
+    assert!(
+        (1100..1150).contains(&l.expire),
+        "e = roll(Param4) + F + Param3"
+    );
+    assert_eq!(l.callback, callback::MIND_BLAST);
+    assert!(
+        !f.take_log().iter().any(|s| s.starts_with("reaction")),
+        "no damage to a converted unit"
+    );
+    // A hireling cannot be converted: the damage record is applied.
+    let (t, ct, mut f, u, m) = blast_world();
+    f.c.units[m].hireling = true;
+    assert_eq!(b3_lvl24::mind_blast(&mut f, &t, &ct, u, 1, 1), 1);
+    assert!(f.list_of(m, 53).is_none());
+    assert!(f.take_log().contains(&format!("reaction {u} {m}")));
+    // A monster that cannot be switched likewise.
+    let (t, mut ct, mut f, u, m) = blast_world();
+    ct.monstats[0].switchai = false;
+    b3_lvl24::mind_blast(&mut f, &t, &ct, u, 1, 1);
+    assert!(f.list_of(m, 53).is_none());
+}
+
+// ---------------------------------------------------------------- §7.20
+
+fn flight_world(
+    p1: i16,
+) -> (
+    crate::skills::SkillTables,
+    crate::combat::CombatTables,
+    BodyFake,
+    usize,
+    usize,
+) {
+    let (t, ct, mut f, u, tg) = claws_world(|r, _| {
+        r.resultflags = 3;
+        r.param1 = i32::from(p1) as _;
+        r.param2 = 5;
+    });
+    f.tpos.insert(u, (30, 40));
+    f.c.set(tg, 6, 10_000_000);
+    f.c.set(u, 137, 20);
+    (t, ct, f, u, tg)
+}
+
+// Covers: specs/skills/bodies-2b.md §7.20 r1
+#[test]
+fn dragon_flight_refusals() {
+    let (t, ct, mut f, u, _) = flight_world(0);
+    assert_eq!(b3_lvl24::dragon_flight(&mut f, &t, &ct, u, 9, 1), 0);
+    f.targets.clear();
+    assert_eq!(b3_lvl24::dragon_flight(&mut f, &t, &ct, u, 1, 1), 0);
+}
+
+// Covers: specs/skills/bodies-2b.md §7.20 text, §7.20 r2
+#[test]
+fn dragon_flight_even_frames_teleport() {
+    let (t, ct, mut f, u, _) = flight_world(0);
+    f.frame_index.insert(u, 0);
+    f.c.units[u].flags = FLAG_40;
+    // The level rule: none / 0 refused.
+    f.teleport = None;
+    assert_eq!(b3_lvl24::dragon_flight(&mut f, &t, &ct, u, 1, 1), 0);
+    f.teleport = Some(0);
+    assert_eq!(b3_lvl24::dragon_flight(&mut f, &t, &ct, u, 1, 1), 0);
+    // 2 with a blocked line: refused; the flag was cleared on the way.
+    f.teleport = Some(2);
+    f.blocked = true;
+    assert_eq!(b3_lvl24::dragon_flight(&mut f, &t, &ct, u, 1, 1), 0);
+    assert_eq!(f.c.units[u].flags & FLAG_40, 0);
+    f.blocked = false;
+    f.take_log();
+    assert_eq!(b3_lvl24::dragon_flight(&mut f, &t, &ct, u, 1, 1), 1);
+    assert!(f.take_log().contains(&format!("place {u} None (30, 40)")));
+    // No room: refused.
+    f.room_of.remove(&u);
+    assert_eq!(b3_lvl24::dragon_flight(&mut f, &t, &ct, u, 1, 1), 0);
+}
+
+// Covers: specs/skills/bodies-2b.md §7.20 r3
+#[test]
+fn dragon_flight_odd_frames_kick() {
+    let run = |p1| {
+        let (t, ct, mut f, u, tg) = flight_world(p1);
+        f.frame_index.insert(u, 1);
+        assert_eq!(b3_lvl24::dragon_flight(&mut f, &t, &ct, u, 1, 3), 1);
+        (10_000_000 - f.c.get(tg, 6), f.take_log())
+    };
+    let (base, log) = run(0);
+    assert!(base > 0, "kick damage dealt");
+    // The finisher ran (it clears the pgsv group), and the hit was applied.
+    assert!(log.contains(&"cleargroup 0 4".to_string()));
+    // Enhanced damage % = Param1 + (L - 1) * Param2 = 0 + 10 at L = 3:
+    // 20 kick damage + 10% = 22 (in 1/256 life units).
+    assert_eq!(base, 22 * 256);
+    // Param1 = 100: 110%.
+    let (more, _) = run(100);
+    assert_eq!(more, 42 * 256);
 }
