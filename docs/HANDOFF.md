@@ -5183,6 +5183,15 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
 - `skills/levels.md` §7.5 / §7.6 (no OQ, unverified): equip an aura
   item (e.g. Dragon) and a charged item; log `0x005BF510` /
   `0x00647320` calls and the type-9 timers they schedule.
+- `combat/vitals.md` §4.7 (static, unverified): a level ≥ 2 character
+  dies to a monster (Nightmare or Hell), then picks up its corpse; log
+  stat 13 before death, after death, on the corpse at `0x0057F875`, and
+  after pickup (expect + `pct(loss, 75, 100)`); also a Token of
+  Absolution use (§2.1, `skills/levels.md` §6.5: 0x21 per class skill,
+  stat 5 and 4 after).
+- `combat/hit.md` §6.4 / Edge case 8 (static): a player with two
+  `passive_weaponblock` entries (layer 0 and a matching type) blocking
+  in melee; log `0x0057DCA0`'s return.
 
 ## 8. Lessons (problems met, fixes)
 

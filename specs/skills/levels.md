@@ -28,14 +28,14 @@
 |   3. Skill damage | 180–300 |
 |   4. Mana cost | 301–340 |
 |   5. To-hit | 341–348 |
-|   6. Learning a skill | 349–382 |
-|   7. Skill stat callbacks | 383–542 |
-| Constants & data dependencies | 543–565 |
-| Randomness | 566–577 |
-| Edge cases & original bugs | 578–600 |
-| Test vectors | 601–652 |
-| Provenance | 653–689 |
-| Open questions | 690–721 |
+|   6. Learning a skill | 349–406 |
+|   7. Skill stat callbacks | 407–566 |
+| Constants & data dependencies | 567–589 |
+| Randomness | 590–601 |
+| Edge cases & original bugs | 602–624 |
+| Test vectors | 625–676 |
+| Provenance | 677–713 |
+| Open questions | 714–745 |
 <!-- /index -->
 
 ## Summary
@@ -379,6 +379,30 @@ skill 0, base level 1, remove 0: the client re-assigns Attack at level
 and returns 3; a failed spend (step 4) sends nothing and returns 2;
 success returns 0. The dispatcher ignores the result
 (`sim/intents-events.md` §2.2 rule 5).
+
+#### 6.5 Skill reset `0x00570360`
+
+Fastcall ECX game, EDX player P; a missing unit or a non-player →
+nothing. `sum` := 0. For k = 0 … count − 1 of P's class skill list
+(`0x00646140(class)` count, `0x006460F0(class, k)` skill id,
+`data/runtime-maps.md`):
+
+1. Native entry E := `0x006439B0(P, skill, owner −1)`; none → next k.
+2. `sum += skill_level(P, E, 0)` (§1: hard points only, clamped).
+3. Remove the skill: `0x0056DEB0(P, skill, level 0, remove 1)`, which
+   runs the assign `0x00647280` (`client/msg-skills.md` §2 rule 2:
+   level 0 with remove set deletes the entry), the list refresh
+   `0x00646F20` and, for a player, `0x00575900(game, P)`.
+4. Message 0x21 to P's client (`0x005531C0` → `0x0053C4A0(client, P,
+   skill, base 0, remove 1)`, `client/msg-skills.md` §4).
+
+Then `newskills(5) += sum` (add `0x006272B0`), `0x0055F500(game, P)`
+and `0x0055FDE0(game, P, 1)` (client updates, as level-up,
+`combat/vitals.md` §3 rule 7). Item-granted entries (owner ≠ −1) and
+skills outside the class list are untouched. No draws. Callers: the
+two stat-reset sites, which run it just before the stat reset
+(`combat/vitals.md` §2.1). 1.14d-confirmed (`0x00570360`–`0x0057041E`,
+`0x0056DEB0`, `0x00647280`, `0x0053C4A0`).
 
 ### 7. Skill stat callbacks
 

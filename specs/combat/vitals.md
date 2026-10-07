@@ -28,16 +28,16 @@
 | Outputs / state changes | 67–70 |
 | Rules | 71–72 |
 |   1. Creation values | 73–95 |
-|   2. Spending stat points (message 0x3A) | 96–133 |
-|   3. Level-up `0x00570880` (D2MOO `PLAYERSTATS_LevelUp`) | 134–155 |
-|   4. Experience | 156–288 |
-|   5. Client vitals sync (`0x00548760`) | 289–400 |
-| Constants & data dependencies | 401–417 |
-| Randomness | 418–421 |
-| Edge cases & original bugs | 422–433 |
-| Test vectors | 434–454 |
-| Provenance | 455–481 |
-| Open questions | 482–512 |
+|   2. Spending stat points (message 0x3A) | 96–145 |
+|   3. Level-up `0x00570880` (D2MOO `PLAYERSTATS_LevelUp`) | 146–167 |
+|   4. Experience | 168–335 |
+|   5. Client vitals sync (`0x00548760`) | 336–472 |
+| Constants & data dependencies | 473–489 |
+| Randomness | 490–493 |
+| Edge cases & original bugs | 494–505 |
+| Test vectors | 506–526 |
+| Provenance | 527–553 |
+| Open questions | 554–593 |
 <!-- /index -->
 
 ## Summary
@@ -128,8 +128,20 @@ is then clamped.
 Players only: for strength, energy, dexterity, vitality in that order,
 `d = charstats start value − base value`; strength and dexterity: if `d
 ≠ 0`, `statpts −= d`, stat `+= d`, refresh; energy: `gain_energy(unit,
-d)`; vitality: `gain_vitality(unit, d)`. Its callers (the Akara reset
-quest reward) belong to the quests spec.
+d)`; vitality: `gain_vitality(unit, d)`. Fastcall ECX game, EDX
+player; a non-player, a class outside `charstats` or no record →
+nothing. Start values: `charstats` +0x30 str, +0x32 int (energy),
++0x31 dex, +0x33 vit (u8); base values through the base getter
+`0x006253B0` (stats 0, 1, 2, 3).
+
+Callers (exactly two, 1.14d-confirmed by `disasm.py xref 0x570C80`),
+both running the skill reset `0x00570360` (`skills/levels.md` §6.5)
+immediately before, then the sound `0x00553380(player, 2)` after:
+
+| Call site | Caller | Trigger | Spec |
+|---|---|---|---|
+| `0x0055E552` | `0x0055E170` (use grid item) | using a `toa` (Token of Absolution); the token is then consumed (`0x0055E000`) | `items/inventory.md` §7.11 |
+| `0x0057A24B` | `0x00579D60` (NPC action) | Akara's respec, when quest slot 41 bit 1 is set; then `0x0058FD50` | `world/npc.md` §8.2 |
 
 ### 3. Level-up `0x00570880` (D2MOO `PLAYERSTATS_LevelUp`)
 
@@ -280,11 +292,46 @@ Caller `0x00580F59` (player death). In order:
    100 (32-bit unsigned product and division; `difficultylevels` +0x04
    of the game's difficulty: 0 / 5 / 10). loss = 0 → nothing. new := x
    − loss; new ≤ lo (unsigned) → loss := max(x − lo, 0) (signed), new
-   := lo + 1. Message `0x005391E0(client, loss)` to P's client
-   (`0x005531C0`); stat 13 := new.
+   := lo + 1. `0x005391E0(client, loss)` on P's client (`0x005531C0`):
+   not a message: it stores `loss` in the client record at +0x508
+   (fatal assert when `loss` < 0); stat 13 := new. The stored loss is
+   what the corpse later returns (§4.7).
 
 So a death never lowers the level: experience stops at the level's
 first point plus one.
+
+#### 4.7 Corpse experience
+
+Client +0x508 ("experience lost", u32) starts at 0 (the client record
+is zero-filled at allocation, `0x00539A30`). Its only writer is §4.6
+rule 2 (`0x005391E0`, one caller `0x00535A8A`); its only reader is the
+getter `0x00539210` (one caller, `0x0057F80F`). 1.14d-confirmed (the
+three `+0x508` references to the client record in `all.asm`).
+
+1. **Corpse creation** `0x0057F700` (from the mode-17 `DD` start
+   `0x0057FCA0` at `0x0057FD1C`, `sim/units.md` §4.5): the corpse C is a new player-type
+   unit of P's class in mode 17 holding P's items (`items/inventory.md`).
+   v := client +0x508; C's stat 13 (`experience`) := `pct(v, 75, 100)`
+   (`combat/damage.md` §0; inline at `0x0057F816`–`0x0057F86C`: v >
+   0x100000 → (v / 100) × 75, else v × 75 / 100, 32-bit, toward
+   zero); then client +0x508 := 0. A death with no experience loss
+   (pvp killer, level 1, `DeathExpPenalty` 0) leaves the field 0, so
+   C holds 0.
+2. **Corpse pickup** `0x0057FB70(game, player P, corpse C)`
+   (the 0x16 PickItem path on a dead player, `items/inventory.md`
+   §7.1 rule 2): C must have state 7
+   (`playerbody`) and P must be allowed to take it (`0x0057FAF0`: C's
+   owner GUID, from C's inventory `0x0063D450`, equals P's GUID, or
+   the owner is a player for whom `0x0055B300(owner, P, 1)` holds).
+   Only when the owner GUID is P's own: x := C's stat 13; x ≠ 0 → C's
+   stat 13 := 0 and `0x0057EAB0(game, P, x)`, which for a player is the
+   add §4.5 with L0 = P's base level (12) (a monster with a player
+   owner takes the owner path `0x0057E860` instead). The item take-back
+   follows (`0x00562F30`).
+
+So a recovered corpse returns 75 % of the last death's loss, capped by
+§4.5; a second death before pickup overwrites the field, and the
+earlier corpse keeps its own stat 13.
 
 ### 5. Client vitals sync (`0x00548760`)
 
@@ -320,8 +367,33 @@ link here.
    head buffer B (`0x005392E0`), the client's unit and client +0x1B0 ≥
    10 all required; n = (499 − B's size, B +0x00) / 9 (signed,
    truncating); n ≤ 0 → nothing; n > 55 → fatal; else `0x00537FD0(client,
-   n)` (a scan of the units around the client's room) and `0x0053E130`
-   (Open question 7).
+   n)` and `0x0053E130`:
+   1. **Nearest players** `0x00537FD0` (ECX client, EDX n): client room
+      (+0x1B4) null → fatal. C := the client's unit; none → nothing.
+      (px, py) := C's sub-tile position. A list of up to n nodes {unit,
+      d, next} is built from every unit of every room in the client
+      room's room list (`0x00619790`, `drlg/rooms.md` §10.4), rooms in
+      list order, units in room-list order (room +0x74, next +0xE8);
+      only players (type 0, C included) count, d := |x − px| + |y −
+      py| (`0x00537D10`). The list is kept sorted by ascending d: a new
+      player with d below the first node's becomes the first node;
+      otherwise it goes before the first node after the first whose d
+      ≥ its own (so it ties after the first node but before any other),
+      else at the end; once n are held, a
+      player with d ≥ the current maximum is skipped, else the last
+      node is dropped and its slot reused. Then `0x00537EE0` copies the
+      list from its first node into client +0x1CC as 9-byte records
+      {u8 type, u32 GUID, u16 x, u16 y} (players: path position) and
+      the count into client +0x3BC, stopping **before** the node whose
+      next is none: the farthest kept player is never copied, except
+      when the list holds one player.
+   2. **Send** `0x0053E130` (ECX client): count c = client +0x3BC; c = 0
+      → nothing. Appends to the head buffer: u8 0x16, u16 size @1 =
+      9c + 13, u8 c @3, then the c records from @4; the buffer length
+      grows by 9c + 13, so the last 9 bytes of the message are left
+      unwritten (whatever the buffer held).
+   1.14d-confirmed (`0x0052DA00`, `0x00537FD0`, `0x00537D10`,
+   `0x00537EE0`, `0x0053E130`).
 
 #### 5.2 Values
 
@@ -493,19 +565,28 @@ stat points: three spends succeed, the fourth fails, result 2.
 3. Answered: `0x0057E2F0` takes ECX = experience, EDX = alvl, EAX =
    dlvl; for dlvl > alvl ≥ 25 it calls `pct(ECX exp, EDX alvl, stack
    dlvl)`, i.e. exp × alvl / dlvl as §4.2 states.
+<<<<<<< HEAD
 4. `client-messages.tsv` row 0x3A says `stat:u16@1`; the handler reads
    byte +1 as the stat and byte +2 as count − 1.
    *Message part answered* (997e92a): the row is now `stat:u8@1
    repeat:u8@2` (repeat = count − 1; `0x0054BD10`: stat ≤ 15, count ≤ 100).
+=======
+4. Answered: the handler (`0x0054BD29`–`0x0054BD3E`) reads the u16 at
+   +1 and splits it: low byte = stat, high byte = count − 1 (§2). The
+   `client-messages.tsv` row 0x3A (`stat:u16@1`) belongs to the message
+   worker: it should read `stat:u8@1 count_minus_1:u8@2`.
+>>>>>>> origin/claude/spec-skill-area-4
 5. Answered: monster stats at spawn are `monsters/init.md` §6–§9,
    §13 and §19.
-6. Partly answered: death penalties are §4.6. Still open: the stat
-   reset callers (§2) and the layout of the experience-loss message
-   `0x005391E0` (owner `sim/intents-events.md`).
-7. §5.1 rule 4: the setting is answered (registry `PlayerPos`, off in a
-   standard install). Still unread, only for `PlayerPos` ≠ 0:
-   `0x00537FD0(client, n)` and `0x0053E130`; not needed for
-   `Ruleset::Original`.
+6. Answered: death penalties are §4.6; the stat reset callers are §2.1
+   (the `toa` token and Akara's respec, each after the skill reset
+   `skills/levels.md` §6.5). `0x005391E0` sends nothing: it stores the
+   loss in client +0x508, which the corpse turns into 75 % recoverable
+   experience (§4.7); the client learns the new experience through the
+   ordinary stat updates.
+7. Answered: §5.1 rule 4 (registry `PlayerPos`, off in a standard
+   install; `0x00537FD0` and `0x0053E130` specified there; not run by
+   `Ruleset::Original`).
 8. §5 has no trace check. Settle: R5 of `items/inventory.md` (gold) and
    any recording with damage, potions and running: every 0x18 / 0x95 /
    0x96 / 0x1A–0x1C byte and its tick.
