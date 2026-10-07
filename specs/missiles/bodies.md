@@ -30,37 +30,37 @@
 |   3. Server-do 34 Baal taunt control `0x005B04A0` | 147–169 |
 |   4. Server-do 35 Royal Strike chaos ice `0x005B0640` | 170–190 |
 |   5. Server-hit 58 Baal taunt lightning control `0x005ACDF0` | 191–205 |
-|   6. Server-hit 2 Plague Javelin, gas potions `0x005A9D80` | 206–243 |
-|   7. Server-do 6 Fire Wall maker, Molten Boulder `0x005AE680` | 244–261 |
-|   8. Server-hit 3 potions, bomb on ground `0x005A9F90` and server-hit 44 Exploding / Ice Javelin `0x005A9E10` | 262–292 |
-|   9. Server-hit 14 Meteor center, catapult meteor, royal strike meteor `0x005AABB0` | 293–334 |
-|   10. Server-hit 36 missile in air `0x005ABF70` | 335–351 |
-|   11. Server-hit 10 Guided Arrow, Bone Spirit `0x005AA650` | 352–394 |
-|   12. Server-hit 16 Spider goo, vines trail, vines wither `0x005AAE10` | 395–423 |
-|   13. Server-hit 18 Shout, Battle Command, Battle Orders `0x005AB0B0` | 424–438 |
-|   14. Server-hit 26 Grim Ward start `0x005AB8D0` | 439–453 |
-|   15. Server-do 14 Grim Ward `0x005AEF70`, server-hit 27 `0x005ABA00` | 454–473 |
-|   16. Server-hit 52 Blade Fury `0x005AC940` | 474–492 |
-|   17. Server-hit 7 Holy Bolt, Fist of the Heavens bolt `0x005A9FB0` | 493–521 |
-|   18. Server-do 22 lightning trailing javelin `0x005AF620` | 522–538 |
-|   19. Server-hit 45 lightning trailing javelin `0x005AC480`, server-hit 38 catapult charged ball `0x005AC0A0` | 539–595 |
-|   20. Server-do 23 / 24 Succubus fireball, firestorm maker `0x005AF790` | 596–608 |
-|   21. Server-do 26 Vines, Plague Vines `0x005AF980` | 609–619 |
-|   22. Server-do 31 Wake of Destruction maker, Baal cold maker `0x005B01F0` | 620–639 |
-|   23. Server-hit 56 Armageddon / Diablogeddon control `0x005ACC50` | 640–656 |
-|   24. Server-hit 8 Blaze `0x005AA180` | 657–668 |
-|   25. Server-hit 9 Immolation Arrow `0x005AA250` | 669–706 |
-|   26. Server-do 9 bat lightning bolt `0x005AE940` | 707–718 |
-|   27. Server-hit 15 spider goo lay `0x005AAD40` | 719–728 |
-|   28. Server-hit 17 Howl `0x005AAFB0` | 729–745 |
-|   29. Server-do 11 finger mage spider `0x005AEB60` | 746–765 |
-|   30. Server-hit 19 finger mage spider `0x005AB110` | 766–775 |
-| Constants & data dependencies | 776–820 |
-| Randomness | 821–839 |
-| Edge cases & original bugs | 840–869 |
-| Test vectors | 870–897 |
-| Provenance | 898–927 |
-| Open questions | 928–944 |
+|   6. Server-hit 2 Plague Javelin, gas potions `0x005A9D80` | 206–246 |
+|   7. Server-do 6 Fire Wall maker, Molten Boulder `0x005AE680` | 247–264 |
+|   8. Server-hit 3 potions, bomb on ground `0x005A9F90` and server-hit 44 Exploding / Ice Javelin `0x005A9E10` | 265–295 |
+|   9. Server-hit 14 Meteor center, catapult meteor, royal strike meteor `0x005AABB0` | 296–337 |
+|   10. Server-hit 36 missile in air `0x005ABF70` | 338–354 |
+|   11. Server-hit 10 Guided Arrow, Bone Spirit `0x005AA650` | 355–397 |
+|   12. Server-hit 16 Spider goo, vines trail, vines wither `0x005AAE10` | 398–426 |
+|   13. Server-hit 18 Shout, Battle Command, Battle Orders `0x005AB0B0` | 427–441 |
+|   14. Server-hit 26 Grim Ward start `0x005AB8D0` | 442–456 |
+|   15. Server-do 14 Grim Ward `0x005AEF70`, server-hit 27 `0x005ABA00` | 457–476 |
+|   16. Server-hit 52 Blade Fury `0x005AC940` | 477–495 |
+|   17. Server-hit 7 Holy Bolt, Fist of the Heavens bolt `0x005A9FB0` | 496–524 |
+|   18. Server-do 22 lightning trailing javelin `0x005AF620` | 525–541 |
+|   19. Server-hit 45 lightning trailing javelin `0x005AC480`, server-hit 38 catapult charged ball `0x005AC0A0` | 542–598 |
+|   20. Server-do 23 / 24 Succubus fireball, firestorm maker `0x005AF790` | 599–611 |
+|   21. Server-do 26 Vines, Plague Vines `0x005AF980` | 612–622 |
+|   22. Server-do 31 Wake of Destruction maker, Baal cold maker `0x005B01F0` | 623–642 |
+|   23. Server-hit 56 Armageddon / Diablogeddon control `0x005ACC50` | 643–659 |
+|   24. Server-hit 8 Blaze `0x005AA180` | 660–671 |
+|   25. Server-hit 9 Immolation Arrow `0x005AA250` | 672–709 |
+|   26. Server-do 9 bat lightning bolt `0x005AE940` | 710–721 |
+|   27. Server-hit 15 spider goo lay `0x005AAD40` | 722–731 |
+|   28. Server-hit 17 Howl `0x005AAFB0` | 732–748 |
+|   29. Server-do 11 finger mage spider `0x005AEB60` | 749–768 |
+|   30. Server-hit 19 finger mage spider `0x005AB110` | 769–778 |
+| Constants & data dependencies | 779–823 |
+| Randomness | 824–842 |
+| Edge cases & original bugs | 843–872 |
+| Test vectors | 873–901 |
+| Provenance | 902–932 |
+| Open questions | 933–952 |
 <!-- /index -->
 
 ## Summary
@@ -223,8 +223,11 @@ plaguejavelin2 (436). `sHitPar1` 1, 0, 2, 1, 2, 1; `sHitPar2` 2 and
    target relative, 4 velocity given); loops > 0 → flags 0x1F and loops
    field := loops. Owner, origin, class; start = the origin's position
    (`0x0045ADF0` / `0x0045AE20`); skill, level.
-3. Velocity field := `Param1` of the **created class's** row << 7
-   (§R2.3 step 5 then shifts it << 8 and step 7 takes 75 %).
+3. Velocity field := `Param1` of the **created class's** row << 7.
+   Flag 0x10 (part of 0x17 / 0x1F) marks it as already fixed point, so
+   §R2.3 step 5 does **not** shift it again; step 7 takes 75 %:
+   `Param1` 2 → 256 → 192 (a `Vel` 24 javelin flies at 24 << 8 × 75 % =
+   4,608).
 4. s = max(b, 1). For i = 0, s, 2s, … while i < 16: target offset
    (RX[i], RY[i]); create (`0x0059FA30`).
 5. a ≠ 0: velocity field := the created row's `Param2` << 7; for i = 0,
@@ -785,7 +788,7 @@ step 6 is the same.
 | skills.txt | `aurarangecalc` +0x64, `calc4` +0x144 | `data/fields.tsv` |
 | plague ring RX / RY | 16 entries each, radius 2 (§6) | `0x006E2510` / `0x006E24D0` |
 | meteor scatter MX / MY | 18 entries each (§9) | `0x006E2550` / `0x006E2598` |
-| plague ring velocity | created row `Param1` / `Param2` << 7, flag 4 | `0x005A9370` |
+| plague ring velocity | created row `Param1` / `Param2` << 7, flags 4 + 0x10 (no further << 8) | `0x005A9370`, `0x0059FA30` |
 | damage record | 0x70 bytes, hit flags +0x00, result flags +0x04 | `0x005A9E10`, `0x005AABB0` |
 | bone spirit re-aim | `Range` + `LevRange` × (L − 1); rebuild when d < 25 | `0x005AA460` |
 | goo state length | max(`calc4`, 5) frames | `0x005AAE10` |
@@ -877,6 +880,7 @@ Created missiles draw on their own seeds (`missiles.md` §R2.3).
 | cairnstones, frames left 150, data +0x28 = 0 | no portal (150 > 140); sparks if elapsed even | live row, §1 |
 | baal taunt control, elapsed 24 | body 3 only, no draw | live row, §3 |
 | plaguejavelin hit (`sHitPar1` 1, `sHitPar2` 2) | 8 clouds at RX/RY 0, 2, …, 14, then 15 at 1…15; 23 creations | live row, §6 |
+| plaguejavelin hit, created row plaguejavcloud (`Param1` 2, `Param2` 4) | first ring 2 << 7 = 256 → 192; second ring 4 << 7 = 512 → 384 | live row, §6 step 3 |
 | rancidgasepotion hit (`sHitPar1` 0) | 8 clouds, offsets (0, 2), (2, 2), (2, 0), (2, −2), (0, −2), (−2, −2), (−2, 0), (−2, 2) | live row, §6 |
 | meteorcenter hit, L = 3 | 18 meteorfire, range field 60, first at (x + 2, y − 2) | live row + skills Meteor, §9 |
 | catapult meteor ball (`sHitPar2` 0) | step 1: 18 pieces | live row, §9 |
@@ -915,7 +919,8 @@ Created missiles draw on their own seeds (`missiles.md` §R2.3).
   `0x005AC040`, `0x005AF790`, `0x005AF980`, `0x005B01F0`,
   `0x005ACC50`, `0x005AA180`, `0x005AA250`, `0x005A9530`,
   `0x005AE940`, `0x005AAD40`, `0x005AAFB0`, `0x004EFC20`, `0x004EFCB0`,
-  `0x005AEB60`, `0x005AB110`; table
+  `0x005AEB60`, `0x005AB110`; ring velocity: `0x0059FA30` shifts a
+  given velocity << 8 only when flag 0x10 is clear; table
   pointers checked (`disasm.py xref`: server-hit table `0x0073C840` +
   4 × index, server-do `0x0073C768` + 4 × index); offset tables dumped
   from `Game.exe` (`0x006E1488`–`0x006E151F`, `0x006E24D0`–`0x006E25DF`, `0x006E2A38`–`0x006E2A77`). Live rows listed per
@@ -932,9 +937,12 @@ Created missiles draw on their own seeds (`missiles.md` §R2.3).
    missiles and their ticks.
 2. Flag 0x100 of the volcano record is not among the flags
    `0x0059FA30` reads (`missiles.md` §R2.1): confirm it is ignored.
-3. Plague ring clouds get velocity `Param1` << 7 << 8 before the 75 %
-   cut (49 152 for `Param1` 2; a `Vel` 24 javelin flies at 4 608): record Plague
-   Javelin and compare the cloud positions per tick.
+3. *Answered* (`impl-missile-bodies-2` Q1): the ring's flags 0x17 /
+   0x1F hold 0x10, so `0x0059FA30` takes the velocity field as fixed
+   point without the << 8 (its flag-4 branch shifts only when 0x10 is
+   clear): `Param1` 2 → 256 → 192 after the 75 % cut (§6 step 3). A
+   Plague Javelin recording (Open question 1) still checks the cloud
+   positions per tick.
 4. Blade Fury contacts create class-0 (arrow) missiles (§16): record a
    Blade Fury hit and check for the eight extra missiles and their
    damage.
