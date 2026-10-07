@@ -1001,7 +1001,7 @@ fn server_cube_answers_from_the_economy() {
     );
     assert!(errors.is_empty(), "{errors:?}");
     assert_eq!(t.host.game.events.sys.hooks.game_seed, Seed::init_low(77));
-    assert!(t.world().uniques.get(7));
+    assert!(t.host.game.events.sys.hooks.uniques.get(7));
     let rec = t.host.game.events.sys.units.get(ring).unwrap();
     assert_eq!((rec.mode, rec.class), (3, AMULET as u32));
     assert_eq!(rec.seed, Seed::init_low(9));

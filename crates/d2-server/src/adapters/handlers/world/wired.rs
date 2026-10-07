@@ -28,8 +28,10 @@
 //! creation by
 //! [`super::ActionEvents::create_game`]); the economy's [`GameFields`]
 //! are built from them for each call and the seed is written back
-//! ([`WiredWorld::with_economy`]). The unique bits (+0x1B24) only the
-//! item code touches live here.
+//! ([`WiredWorld::with_economy`]). The unique bits (+0x1B24) live there
+//! too (`ActionHooks::uniques`): one store for the handlers' economy, the
+//! lent quest parts and the object and monster drops of the action
+//! wiring (`ActionHooks::object_drops`).
 //!
 //! One owner of the player's interaction (+0x64 GUID, +0x68 type, +0x6C
 //! active): the NPC wiring's player-data rest (`NpcRest::interact_unit`,
@@ -43,7 +45,7 @@
 //! its messages leave through [`Outbox`].
 
 use d2_sim::game::Game;
-use d2_sim::items::{ItemTables, UniqueBits};
+use d2_sim::items::ItemTables;
 use d2_sim::units::{RoomId, UnitId};
 use d2_sim::wiring::action::Pending;
 use d2_sim::wiring::action::{ActionHooks, ObjectCase};
@@ -85,16 +87,14 @@ impl<R: NpcRest + VendorRest + QuestRest + PlayerQuestsRef + Outbox> TradeRest f
 
 /// The wired host of a game on `ActionSim` (or `WorldSim`): the action
 /// systems ([`ActionWorld`], with the skill slot `S`), the economy's own
-/// parts (item tables, unique bits; the item store is the action
-/// wiring's `ActionHooks::items`), the cube's parts, the inventory
+/// parts (item tables; the item store and the unique bits are the action
+/// wiring's `ActionHooks::items`, `ActionHooks::uniques`), the cube's parts, the inventory
 /// model, the quests, the NPC control block, the vendor tables and the
 /// interaction state (one vendor record per NPC record, the NPCs'
 /// interaction lists), and the rest.
 pub struct WiredWorld<R, S = NoSkills> {
     /// Waypoints, arrivals, the skill slot and the handlers' faults.
     pub action: ActionWorld<S>,
-    /// Game +0x1B24 (`quality.md` §8.1).
-    pub uniques: UniqueBits,
     pub tables: ItemTables,
     /// The cube (`None`: 0x2A, 0x4F stay stubs).
     pub cube: Option<CubeParts>,
@@ -133,7 +133,6 @@ impl<R, S> WiredWorld<R, S> {
         let state = InteractionState::new(&npc, &GlobalLists::build(&vendor_tables));
         Self {
             action,
-            uniques: UniqueBits::default(),
             tables,
             cube: None,
             inventory: None,
@@ -166,7 +165,7 @@ impl<R, S> WiredWorld<R, S> {
             s.hooks.game_seed,
             &s.hooks.ai_info,
             s.data.expansion,
-            std::mem::take(&mut self.uniques),
+            std::mem::take(&mut s.hooks.uniques),
         );
         let mut items = std::mem::take(&mut s.hooks.items);
         let out = {
@@ -194,7 +193,7 @@ impl<R, S> WiredWorld<R, S> {
         };
         s.hooks.items = items;
         s.hooks.game_seed = fields.seed;
-        self.uniques = fields.uniques;
+        s.hooks.uniques = fields.uniques;
         out
     }
 
@@ -284,7 +283,7 @@ fn quest_objects<X: Pending, R: TradeRest>(
 
 impl<R: TradeRest + Default + 'static, S> WiredWorld<R, S> {
     /// Runs `f` with this world's quest parts (the quest control, the
-    /// rest, the item tables, the unique bits) lent to the action hooks
+    /// rest, the item tables) lent to the action hooks
     /// ([`QuestLoan`], `ActionHooks::quest_host`), so a quest init,
     /// operate or object event 7 the object module hands back during `f`
     /// runs at once, inside its allocation, dispatch or timer event
@@ -305,7 +304,6 @@ impl<R: TradeRest + Default + 'static, S> WiredWorld<R, S> {
             quests: std::mem::replace(&mut self.quests, empty),
             rest: std::mem::take(&mut self.rest),
             tables: std::mem::take(&mut self.tables),
-            uniques: std::mem::take(&mut self.uniques),
         };
         events.action().sys.hooks.quest_host = Some(Box::new(loan));
         let out = f(&mut self.action, events);
@@ -322,7 +320,6 @@ impl<R: TradeRest + Default + 'static, S> WiredWorld<R, S> {
                 self.quests = l.quests;
                 self.rest = l.rest;
                 self.tables = l.tables;
-                self.uniques = l.uniques;
             }
             // `f` took the loan out of the hooks or put another one in:
             // the game's quest state is gone (API misuse, fatal).

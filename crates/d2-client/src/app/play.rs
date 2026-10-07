@@ -92,10 +92,19 @@ pub fn add_game(app: &mut App, link: DynLink, gpu: bool) -> Result<(), BridgeErr
 /// `intents-events.md` §8.1). The bridge answers the 0x02 that follows
 /// with C→S 0x6B on its own (`client/model.md` §7 rule 3): the join.
 pub fn send_create_game(app: &mut App) -> Result<(), BridgeError> {
+    send_create_game_for(app, &single_player::Character::New)
+}
+
+/// [`send_create_game`] for `character` (a save's class and name,
+/// [`single_player::create_request_for`]).
+pub fn send_create_game_for(
+    app: &mut App,
+    character: &single_player::Character,
+) -> Result<(), BridgeError> {
     app.world_mut()
         .resource_mut::<BridgeResource>()
         .0
-        .send(&single_player::create_request())?;
+        .send(&single_player::create_request_for(character))?;
     Ok(())
 }
 
@@ -144,6 +153,8 @@ fn log_progress(
 pub struct PlayConfig {
     pub data: GameData,
     pub seed: u32,
+    /// The character the join loads (`--save`).
+    pub character: single_player::Character,
     /// Close after this many frames (smoke test).
     pub exit_after: Option<u32>,
 }
@@ -167,7 +178,13 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
     };
     let drlg_source = single_player::client_drlg_source(&config.data);
     let level_rows = single_player::client_level_rows(&config.data);
-    let (link, started) = single_player::start(config.data, config.seed, SystemClock::default())?;
+    let request = config.character.clone();
+    let (link, started) = single_player::start_with(
+        config.data,
+        config.seed,
+        config.character,
+        SystemClock::default(),
+    )?;
     // Before the app exists, so not through Bevy's log.
     println!(
         "single player: seed {}, waypoint unit {:?} (GUID {})",
@@ -182,7 +199,7 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
         ..default()
     }));
     add_game(&mut app, Box::new(link), true)?;
-    send_create_game(&mut app)?;
+    send_create_game_for(&mut app, &request)?;
     add_client_data(&mut app, drlg_source, level_rows);
     if let Some(archives) = archives {
         let skills = single_player::client_skill_rows(&archives)?;

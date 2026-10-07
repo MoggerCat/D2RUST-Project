@@ -11,6 +11,7 @@
 
 pub mod palette;
 pub mod play;
+pub mod rest;
 pub mod server_thread;
 pub mod single_player;
 pub mod sound;

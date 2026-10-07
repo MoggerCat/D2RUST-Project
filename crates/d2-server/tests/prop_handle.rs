@@ -1786,7 +1786,7 @@ impl Digest for ItemGame {
             w.state,
             w.npc,
             w.quests,
-            w.uniques,
+            self.events.sys.hooks.uniques,
             w.rest,
             cube,
             self.events.sys.hooks.game_seed,

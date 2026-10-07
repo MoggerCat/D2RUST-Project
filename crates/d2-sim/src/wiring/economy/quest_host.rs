@@ -493,10 +493,11 @@ impl<X: Pending, R: QuestRest + NpcRest> QuestWorld for HostQuests<'_, '_, X, R>
             return;
         };
         // The economy holds the game's item store, game seed and unique
-        // bits for this call: hand them to the drop and take them back.
+        // bits for this call: hand them back to their home in the hooks
+        // for the drop, and take them again after it.
         std::mem::swap(&mut e.hooks.items, &mut *e.items);
         e.hooks.game_seed = e.fields.seed;
-        d.fields.uniques = std::mem::take(&mut e.fields.uniques);
+        e.hooks.uniques = std::mem::take(&mut e.fields.uniques);
         let mut sim = crate::units::hooks::Sim {
             game: &mut *e.game,
             units: &mut *e.units,
@@ -515,7 +516,7 @@ impl<X: Pending, R: QuestRest + NpcRest> QuestWorld for HostQuests<'_, '_, X, R>
         );
         std::mem::swap(&mut e.hooks.items, &mut *e.items);
         e.fields.seed = e.hooks.game_seed;
-        e.fields.uniques = std::mem::take(&mut d.fields.uniques);
+        e.fields.uniques = std::mem::take(&mut e.hooks.uniques);
         e.hooks.object_drops = Some(d);
     }
     fn drop_gold(&mut self, object: UnitId) {
