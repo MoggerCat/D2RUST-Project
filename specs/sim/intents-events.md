@@ -40,19 +40,19 @@
 | Rules | 91–92 |
 |   1. Loop order (single player) | 93–114 |
 |   2. Client → server | 115–287 |
-|   3. Server → client | 288–467 |
-|   4. d2rs mapping and scope | 468–499 |
-|   5. Machine-readable tables | 500–536 |
-|   6. Exact-match comparison | 537–635 |
-|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 636–1035 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1036–1180 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1181–1325 |
-| Constants & data dependencies | 1326–1344 |
-| Randomness | 1345–1350 |
-| Edge cases & original bugs | 1351–1384 |
-| Test vectors | 1385–1471 |
-| Provenance | 1472–1573 |
-| Open questions | 1574–1689 |
+|   3. Server → client | 288–486 |
+|   4. d2rs mapping and scope | 487–518 |
+|   5. Machine-readable tables | 519–555 |
+|   6. Exact-match comparison | 556–654 |
+|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 655–1054 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1055–1199 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1200–1344 |
+| Constants & data dependencies | 1345–1363 |
+| Randomness | 1364–1369 |
+| Edge cases & original bugs | 1370–1403 |
+| Test vectors | 1404–1490 |
+| Provenance | 1491–1592 |
+| Open questions | 1593–1708 |
 <!-- /index -->
 
 ## Summary
@@ -408,6 +408,7 @@ Queue 2 (id 0xFF, 16 bytes, `0x0052CC20`) runs only when host callbacks
    |---|---|---|---|---|
    | 0x26 | `0x0053C750` | `0x0054A5D0` (`0x0054A895`, u8@1 := 6), `0x00571620` (`0x005716A4`, u8@1 := 5); `0x0054A470`, `0x0054A510` pass a built message | 0 | the builder copies u8@1–3, u32@4, u8@8–9, the name (≤ 15 chars + NUL, `0x004135D0`) at 10 and the text (length ≥ 256 → fatal 0x5BA) after the name's NUL. Form 5 (overhead, §7.9 r3): u8@2 = the overhead record's byte +8 (C→S 0x14 u8@2), u8@3 unit type, u32@4 GUID, empty name; bytes 8–9 never written. Form 6 (chat, open question 14): u8@2 0, u8@3 2, u32@4 = ESI, u8@8 0; byte 9 never written |
    | 0x27 | `0x0053C8D0` | §6 rule 6 | 7 | |
+   | 0x2A | `0x0053D740` | callers pass DL 0x2A (e.g. `0x0057737A`) | 0 | 15 bytes from registers: kind u8@1 (4th stack arg), code u8@2 (1st), GUID u32@7 (3rd; −1 without a unit), gold u32@11 (2nd, e.g. stat 14 via `0x00625480`); bytes 3–6 never written (`tools/original-hooks.md` §6.2) |
    | 0x2C | `0x0053D780` | `0x00571740` (`0x00571775`) | 4 | unit type, GUID (+0x0C), event = unit u16 +0x6E; only when unit +0x70 is 0 or the client's player; callers `0x00580917`, `0x00581B07`, `0x00586000`, `0x00598369`; the event setter `0x00553380` (78 call sites by event, last event before the flush wins: u16 +0x6E overwritten) is owned by `audio/triggers-2.md` §14 |
    | 0x4C, 0x99 | `0x0053D530` | itself | 2, 0 | rule 5 |
    | 0x4D, 0x9A | `0x0053D4D0`, `0x0053D530` | itself | 0 | rule 5 |
@@ -428,7 +429,25 @@ Queue 2 (id 0xFF, 16 bytes, `0x0052CC20`) runs only when host callbacks
    | 0xA5 | `0x0053C190` | itself | 0 | 8 bytes, zeroed first: unit type u8@1 (DL), GUID u32@2, skill u16@6 (stack); `skills/bodies-2.md` §2.13 |
    | 0xA8 | `0x0053E8D0` | `0x005711D0` (`0x00571359`) | 5 | rule 6 |
    | 0xAA | `0x0053E8D0` | `0x00570E30` | 269 | §7.9 rule 1 |
+   | 0xAC | `0x0053E2E0` | itself; one caller `0x005720D8` | 0 | header GUID u32@1, class u16@5, x u16@7, y u16@9, life u8@11, size u8@12, bit stream @13: `monsters/init.md` §24 |
 
+4.1. **Rows decided against PC 2** (2026-10-08; PC 2's
+   `spec-answers-tick-messages` on `claude/specs-staging-4` gave other
+   layouts; this table and the TSV are the owners). 0x2A and 0xAC: PC
+   2's layouts match the builders (table above). 0x50: `0x0053D7E0`
+   copies a 15-byte caller record; no caller writes bytes 13–14 (the
+   widest, `0x00593CB0`, loops five u16 @3–@11, `0x00593D10`), so the
+   TSV has code u16@1 and five u16 v0–v4 @3–@11 (PC 2's reading; the
+   former u16@13 field is dropped; masks §6 rule 6). 0x58: kept as
+   GUID u32@1, code u8@5, arg u8@6, because code 5 writes byte 6
+   (`0x005853CD`, `0x005853E4`); PC 2's 7-byte form without @6 loses
+   it. 0x63: kept as GUID u32@1, magic u16@5, bits u32@7, @11, @15,
+   u16@19: `0x006610B0` copies the 16-byte waypoint record (u16 0x0102,
+   then 14 bytes of bits) to @5; PC 2's single 16-byte field is the same
+   bytes unsplit. C→S 0x3A (`client-messages.tsv`): kept as
+   `repeat:u8@2`; `0x0054BD10` spends repeat + 1 points (stat < 16,
+   repeat < 100, else result 3), the same quantity PC 2 calls
+   `count_minus_one` (`combat/vitals.md` owns the spend).
 5. **0x4C / 0x4D / 0x99 / 0x9A.** `0x0053D530` (ECX client, DL unit
    type; stack: GUID, target type u8, target GUID, skill u16, w u16, b
    u8, flag): id base 0x4C (16 bytes) or 0x4D (17 bytes), + 0x4D when
