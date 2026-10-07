@@ -13,6 +13,7 @@ pub mod character;
 pub mod inventory;
 pub mod menu_box;
 pub mod npc;
+pub mod npc_menu;
 pub mod shop;
 pub mod skilltree;
 pub mod stash_cube;
