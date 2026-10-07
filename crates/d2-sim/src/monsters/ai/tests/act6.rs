@@ -80,12 +80,27 @@ fn pet_move_ahead_and_catch_up() {
     assert!(r);
     assert_eq!(w.fake.modes(), [point_mode(mode::WALK, 130, 108)]);
     assert_eq!((w.vel_request().speed, w.vel_request().steps), (50, 40));
-    // Q in another coordinate area: the midpoint ((U + Q) >> 1).
+    // Q in O's coordinate area whose walk fails: the midpoint
+    // ((U + Q) >> 1) is tried next.
+    let mut w = world(act_row(67, &[]));
+    w.fake.y.final_point.insert(o, (130, 100));
+    w.fake.fail_points.insert((130, 108));
+    let r = w.with(|g, cx| pet_move(g, cx, Mover::Pet, o, u, 0, false, 0, 0));
+    assert!(r);
+    assert_eq!(
+        w.fake.modes(),
+        [
+            point_mode(mode::WALK, 130, 108),
+            point_mode(mode::WALK, 115, 104)
+        ]
+    );
+    // Q in another coordinate area: nothing is tried for it (no
+    // midpoint); e 1 → j 3 → Q = F + 8 × (−1, +1).
     let mut w = world(act_row(67, &[]));
     w.fake.y.final_point.insert(o, (130, 100));
     w.fake.y.coord.insert((130, 108), 7);
     w.with(|g, cx| pet_move(g, cx, Mover::Pet, o, u, 0, false, 0, 0));
-    assert_eq!(w.fake.modes()[0], point_mode(mode::WALK, 115, 104));
+    assert_eq!(w.fake.modes(), [point_mode(mode::WALK, 122, 108)]);
     // k 3: free spot for class 363 near O; placed → flag 0x10000, idle 5.
     let mut w = world(act_row(67, &[]));
     grow(&mut w, 364);
@@ -574,6 +589,29 @@ fn desert_turret_vectors() {
     set_param_of(&mut w, 0, 50);
     w.think_with(Some(w.player), 10, false);
     assert_eq!(w.thinks(), [10]);
+}
+
+// Covers: specs/monsters/ai-bodies-6.md §13 r5
+#[test]
+fn desert_turret_second_check_is_at_the_target() {
+    // Step 5: `0x005FD470(Skill1, T, Q)` then `0x005FD470(Skill1, T, T.x,
+    // T.y)` (T's own position, not the turret's).
+    let mut w = world(act_row(94, &[10, 5, 120, 30, 5]));
+    give_skill(&mut w, 1, 300, 10);
+    w.game.frame = 7;
+    set_param_of(&mut w, 0, 5);
+    let pl = w.player;
+    w.fake.pos.insert(pl, (130, 140));
+    w.think_with(Some(pl), 10, false);
+    let checks: Vec<&String> = w
+        .fake
+        .log
+        .iter()
+        .filter(|l| l.starts_with("check "))
+        .collect();
+    assert_eq!(checks.len(), 2, "{checks:?}");
+    assert!(checks[0].starts_with(&format!("check 300 Some({pl:?}) ")));
+    assert_eq!(checks[1], &format!("check 300 Some({pl:?}) 130 140"));
 }
 
 // ---- §14 AssassinSentry, §15 Catapult, §16 CatapultSpotter ------------------
