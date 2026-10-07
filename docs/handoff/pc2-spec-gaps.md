@@ -694,3 +694,157 @@ Unspecified / Pending markers (line: text):
 - 418: checking pressed; elsewhere it ends a pending cursor action.
 - 844: panels (0x1B, 0x1C): not specified here.
 
+
+## Update on the synced base (claude/pc2-sync-staging-5 3430b0a)
+
+The audit above was taken on `specs-staging-4`, which lacks `claude/local-pc2-integration` after `e76afc8` (`ae4ce27`) and the three session-3 branches (`pc2-waveb-tests` `2c1acad`, `spec-ui-controls-inventory` `c5d5159`: `ui/controls.md` and `ui/inventory.md` now exist, `pc2-xpc-msg-rows` `23cf641`: the 0x2A / 0x50 / 0x58 / 0x63 lines are in `xpc-to-pc1.md`; `cube.md` §1 0x77 is done in `2a72110`). On the synced base the same grep finds 13 unspecified lines (down from 90) and 76 code `TODO(spec: …)` hooks; workers re-check each item of the tables above against the synced files and skip the ones already answered.
+
+
+Totals: 13 spec lines, 76 code TODOs.
+
+### `specs/audio/environment.md` (0 spec lines, 6 code TODOs)
+
+- code: crates/d2-client/src/audio/environment/mod.rs:395:/// TODO(spec: audio/environment.md open question 6): when they are
+- code: crates/d2-client/src/audio/environment/mod.rs:486:    /// table := 0. TODO(spec: audio/environment.md open question 7): the
+- code: crates/d2-client/src/audio/environment/mod.rs:716:            // TODO(spec: audio/environment.md §5 r2): the spec names one
+- code: crates/d2-client/src/audio/environment/mod.rs:754:            // TODO(spec: audio/environment.md §6 r3): the volume read of a
+- code: crates/d2-client/src/audio/mod.rs:207:/// TODO(spec: audio/triggers.md, audio/environment.md): which events make
+- code: crates/d2-client/src/audio/sound_table/system.rs:1314:    /// TODO(spec: audio/environment.md open question 2): the units of the
+
+### `specs/audio/sound-table.md` (0 spec lines, 21 code TODOs)
+
+- code: crates/d2-client/src/app/sound.rs:14://! [`NoSoundTable`]: TODO(spec: audio/sound-table.md)), the WAV decode
+- code: crates/d2-client/src/app/sound.rs:41:/// TODO(spec: audio/sound-table.md) (`audio.md` §B3): the `sounds.txt`
+- code: crates/d2-client/src/audio/mixer.rs:108:/// TODO(spec: audio/sound-table.md): the original's curves as tables
+- code: crates/d2-client/src/audio/mod.rs:217:/// TODO(spec: audio/sound-table.md): the `sounds.txt` mapping, variants
+- code: crates/d2-client/src/audio/mod.rs:240:/// TODO(spec: audio/sound-table.md): the original's rules (§B3). The
+- code: crates/d2-client/src/audio/mod.rs:411:    /// nothing. TODO(spec: audio/sound-table.md): confirm against §B7.
+- code: crates/d2-client/src/audio/sound_table/system.rs:52:    /// TODO(spec: audio/sound-table.md open question 2): the units of
+- code: crates/d2-client/src/audio/sound_table/system.rs:146:    /// specified (TODO(spec: audio/sound-table.md §7 r3): the kinds
+- code: crates/d2-client/src/audio/sound_table/system.rs:298:    /// TODO(spec: audio/sound-table.md §7 r4): the core mixer has no loop
+- code: crates/d2-client/src/audio/sound_table/system.rs:331:    /// TODO(spec: audio/sound-table.md open question 8): sound 2599
+- code: crates/d2-client/src/audio/sound_table/system.rs:387:        // §5 r2. TODO(spec: audio/sound-table.md §5 r2): whether a merged
+- code: crates/d2-client/src/audio/sound_table/system.rs:585:    /// TODO(spec: audio/sound-table.md §4 r5): with no local player 1.14d
+- code: crates/d2-client/src/audio/sound_table/system.rs:601:    /// TODO(spec: audio/sound-table.md open question 10): the original's
+- code: crates/d2-client/src/audio/sound_table/system.rs:631:    /// cache limit: TODO(spec: audio/sound-table.md §10 r2): eviction
+- code: crates/d2-client/src/audio/sound_table/system.rs:634:    /// TODO(spec: audio/sound-table.md §10 r3): the phase of the 25-tick
+- code: crates/d2-client/src/audio/sound_table/system.rs:953:    /// TODO(spec: audio/sound-table.md §7): after a variant pick, d2rs
+- code: crates/d2-client/src/audio/sound_table/system.rs:995:            // TODO(spec: audio/sound-table.md §7 r5): what a stream that
+- code: crates/d2-client/src/audio/sound_table/system.rs:1100:    /// TODO(spec: audio/sound-table.md §6.1, §7 r3): when 1.14d's channel
+- code: crates/d2-client/src/audio/sound_table/system.rs:1326:    /// TODO(spec: audio/sound-table.md §8.1): whether this also updates
+- code: crates/d2-client/src/audio/sound_table/volume.rs:54:    /// TODO(spec: audio/sound-table.md §6.4 r1): which option this is and
+- code: crates/d2-data/src/sounds.rs:62:/// TODO(spec: audio/sound-table.md §2): the 12 `EAX …` columns
+
+### `specs/audio/triggers.md` (0 spec lines, 12 code TODOs)
+
+- code: crates/d2-client/src/app/sound.rs:13://! TODO(spec: audio/triggers.md)), sound ids to files ([`SoundTable`],
+- code: crates/d2-client/src/audio/sound_table/system.rs:1337:    /// TODO(spec: audio/triggers.md §1 r6): the order of the unit's own
+- code: crates/d2-client/src/audio/triggers/events.rs:33:    /// TODO(spec: audio/triggers.md open question 4): which skill/record
+- code: crates/d2-client/src/audio/triggers/events.rs:151:    // r2. TODO(spec: audio/triggers.md §3 r2): "P is missing" is not
+- code: crates/d2-client/src/audio/triggers/mod.rs:333:/// TODO(spec: audio/triggers.md §10 r1): "skill voices" read as the
+- code: crates/d2-client/src/audio/triggers/movement.rs:87:/// TODO(spec: audio/triggers.md §5 r4): the signedness of `f ± s` before
+- code: crates/d2-client/src/audio/triggers/npc.rs:14:/// TODO(spec: audio/triggers.md §10 r1): the class → record table (35
+- code: crates/d2-client/src/audio/triggers/npc.rs:46:/// TODO(spec: audio/triggers.md §10 r1): whether mode 2 also updates
+- code: crates/d2-client/src/audio/triggers/objects.rs:23:/// TODO(spec: audio/triggers.md §7 r1): a class without a TSV row (120
+- code: crates/d2-client/src/audio/triggers/objects.rs:26:/// TODO(spec: audio/triggers.md §7 r4): the cairn ids `cairn_stone_1..5`
+- code: crates/d2-client/src/audio/triggers/skills.rs:78:/// TODO(spec: audio/triggers.md open question 5): `dosound a` / `dosound b`.
+- code: crates/d2-client/src/audio/triggers/ui.rs:39:/// TODO(spec: audio/triggers.md open question 9): when f has both bit 0
+
+### `specs/formats/d2s.md` (2 spec lines, 4 code TODOs)
+
+- L72: legacy loader that is not specified. The file is at most 8,192 bytes.
+- L129: `0x00534020` (needs ≥ 0x82 bytes; not specified, Open question 1).
+- code: crates/d2-server/src/adapters/session.rs:141:    /// TODO(spec: formats/d2s.md, intents-events.md §8.2 rule 3): the
+- code: docs/handoff/scenario-harness.md:233:Errors (no trace): `char save` (TODO(spec: formats/d2s.md)); an area
+- code: tools/scenario-run/src/lib.rs:19://! - `char save`: no loader, TODO(spec: formats/d2s.md) (an error, not a
+- code: tools/scenario-run/src/lib.rs:270:            "char save {}: no save loader yet and no inline character, TODO(spec: formats/d2s.md)",
+
+### `specs/formats/wav.md` (0 spec lines, 4 code TODOs)
+
+- code: crates/d2-client/src/app/sound.rs:15://! ([`WavDecoder`], [`NoWavDecoder`]: TODO(spec: formats/wav.md §B1)),
+- code: crates/d2-client/src/app/sound.rs:63:        Err("no WAV decoder: TODO(spec: formats/wav.md §B1)".into())
+- code: crates/d2-client/src/audio/mod.rs:218:/// and their client RNG (`audio.md` §B3); TODO(spec: formats/wav.md): the
+- code: docs/handoff/client-own-gaps.md:81:- `WavDecoder`: nothing implements it. `TODO(spec: formats/wav.md §B1)`;
+
+### `specs/items/generation.md` (3 spec lines, 0 code TODOs)
+
+- L432: 2. Format 0 only: forced socket count (not specified, §1.2). Then flag
+- L681: 1. Format-0 generation branches (legacy items) are unspecified; confirm
+- L697: unspecified.
+
+### `specs/items/inventory-moves.md` (1 spec lines, 0 code TODOs)
+
+- L144: (needs P's state 7 `playerbody`; corpse spec, not specified here) →
+
+### `specs/items/inventory.md` (1 spec lines, 0 code TODOs)
+
+- L519: `inventory-moves.md` §7.1 step 2; corpse spec, not specified here).
+
+### `specs/items/treasure.md` (1 spec lines, 0 code TODOs)
+
+- L791: count, else mod) and `0x005560F0` are not specified, nor the meaning
+
+### `specs/ui/controls.md` (0 spec lines, 3 code TODOs)
+
+- code: crates/d2-client/src/ui/panel.rs:27:/// shift/alt modifiers) is `TODO(spec: ui/controls.md §B4)`.
+- code: crates/d2-client/src/world_view/present.rs:306:/// buttons routed as-is (their meaning is `TODO(spec: ui/controls.md)`).
+- code: crates/d2-client/src/world_view/ui_bind.rs:322:    /// TODO(spec: ui/controls.md) (§B4): they are reported, never acted on.
+
+### `specs/ui/inventory.md` (0 spec lines, 1 code TODOs)
+
+- code: crates/d2-client/src/ui/widget.rs:211:        // TODO(spec: ui/inventory.md §B5): cell art, item graphics,
+
+### `specs/ui/panels.md` (1 spec lines, 6 code TODOs)
+
+- L940: panels (0x1B, 0x1C): not specified here.
+- code: crates/d2-client/src/ui/widget.rs:33:/// `TODO(spec: ui/panels.md §B1)`: the image does not change here.
+- code: crates/d2-client/src/ui/widget.rs:85:/// `TODO(spec: ui/panels.md)`: the request carries the rect origin.
+- code: crates/d2-client/src/ui/widget.rs:219:/// scrolls is `TODO(spec: ui/panels.md §B2)`: the caller passes rows.
+- code: crates/d2-client/src/world_view/feed.rs:64:    /// TODO(spec: ui/panels.md) (camera §1): the screen open mode.
+- code: crates/d2-client/src/world_view/ui_bind.rs:45:    /// TODO(spec: ui/panels.md) (§B1, §B6): the DC6 file and frame an
+- code: docs/handoff/impl-client-model.md:188:("UI image (TODO(spec: ui/panels.md))"), fails identically on the base
+
+### `specs/world/cube.md` (1 spec lines, 0 code TODOs)
+
+- L51: (affixes, quality, unique/set picks) is called, not specified, here.
+
+### `specs/world/object-population.md` (1 spec lines, 0 code TODOs)
+
+- L170: bodies are not specified (open question 5).
+
+### `specs/world/objects.md` (1 spec lines, 0 code TODOs)
+
+- L1077: (gold), `0x00559A30` (by code): items spec, not yet specified.
+
+### `specs/world/quests.md` (1 spec lines, 1 code TODOs)
+
+- L864: Their state machines are not yet specified (Open question 8). Now specified
+- code: crates/d2-client/src/audio/environment/mod.rs:56:    /// state (§4 r2). TODO(spec: world/quests.md): the client quest state.
+
+### `specs/world/vendors.md` (0 spec lines, 18 code TODOs)
+
+- code: crates/d2-sim/src/world/vendors.rs:474:    // TODO(specs/world/vendors.md §7.2 rule 7): the mask's value is not
+- code: crates/d2-sim/src/world/vendors/gamble.rs:77:        // TODO(specs/world/vendors.md §5.1): "requires the gamble index";
+- code: crates/d2-sim/src/world/vendors/gamble.rs:103:            // TODO(specs/world/vendors.md §5.1 step 2): an index past the
+- code: crates/d2-sim/src/world/vendors/gamble.rs:117:        // TODO(specs/world/vendors.md §5.1 step 4): `rin` / `amu` missing
+- code: crates/d2-sim/src/world/vendors/price.rs:174:    // TODO(specs/world/vendors.md §9.2 rule 4): an empty slot (id 0) is
+- code: crates/d2-sim/src/world/vendors/price.rs:188:        // TODO(specs/world/vendors.md §9.2 (A)): a layer without a skills
+- code: crates/d2-sim/src/world/vendors/price.rs:217:// TODO(specs/world/vendors.md §9.2 (B) encode 4): "(min, max) of the
+- code: crates/d2-sim/src/world/vendors/price.rs:443:        // TODO(specs/world/vendors.md §9.2 rule 6): "cost/2" is read as the
+- code: crates/d2-sim/src/world/vendors/price.rs:546:        // TODO(specs/world/vendors.md §9.4): an item without a normal-code
+- code: crates/d2-sim/src/world/vendors/store.rs:87:            // TODO(specs/world/vendors.md §3.1 rule 1): an upgrade code not
+- code: crates/d2-sim/src/world/vendors/store.rs:167:            // TODO(specs/world/vendors.md §3.1 rule 2): a null creation is
+- code: crates/d2-sim/src/world/vendors/store.rs:232:        // TODO(specs/world/vendors.md §3 step 1): a list code missing from
+- code: crates/d2-sim/src/world/vendors/store.rs:280:        // TODO(specs/world/vendors.md §3): as above, a permanent code missing
+- code: crates/d2-sim/src/world/vendors/trade.rs:223:        // TODO(specs/world/vendors.md §7.1 rule 2): the GUID of this 0x2A
+- code: crates/d2-sim/src/world/vendors/trade.rs:480:                // TODO(specs/world/vendors.md §7.2 rule 8): "quantity := max
+- code: crates/d2-sim/src/world/vendors/trade.rs:559:// TODO(specs/world/vendors.md §8.1): the handler result is written only
+- code: docs/HANDOFF.md:3873:**`world/vendors.md`** (tags `TODO(specs/world/vendors.md §…)`): V1 §7.2
+- code: docs/handoff/impl-vendors.md:114:Each has a `TODO(specs/world/vendors.md …)` at the site unless noted.
+
+### Code seams waiting (pending lists in PC 2 code areas)
+
+- `crates/d2-client/src/audio/driver.rs` `PENDING`: server sound events 12, 16, 17, 18 and event 12's `stsound`, `monsounds` rows / per-unit sound fields / NPC greeting records not held by the driver; overhead text and quest stingers + re-arm (`environment.md` §3); mode sounds / footsteps / idle voices (`triggers.md` §4–§6: needs per-unit frame / speed, weapon hit class, states, floor material in the client model); object mode sounds (§7: no bridge event, distance needs client unit positions, `sound-table.md` OQ2); skill / missile / state / item sounds (§8, §9); NPC speech (§10); ambience / rain / music (`environment.md`). Most of these are client-model / bridge wiring (PC 1 `client/*`); the PC 2 part is that every trigger rule the driver needs is specified.
+- `crates/d2-client/src/ui/original.rs` `PENDING`: character values / labels / stat box / add buttons (`panels.md` §8.4–§8.9, totals from the model); inventory equipment backgrounds (§9.4, item stream decode `msg-stats-items.md` OQ3); skill tree icons and levels (§10.3–§10.5, icon prefix now `panels.md` UP-19); waypoint menu panel (§13 r2–r7, `menus.md` §1).
+- `crates/d2-sim/src/world/objects.rs`: routes `NotCovered` for init 8, 10, 13, 14, 22, 24, 26, 27, 28, 34, 37, 58 and the operates listed in `docs/handoff/pc2-spec-objects.md` (all now specified in `objects-2.md` §16–§18 / `quests-act2.md` §8.8: implementation gap, not a spec gap).
+- `crates/d2-sim/src/world/quests`: about 100 `QuestWorld` seams with default bodies (`unhandled(0xFF / 0xFE, addr)`) answered on the wired host by `HostQuests` or left with a reason (`wire-world-staging.md` §3 item 6): wiring, the per-act specs cover the behaviour.
