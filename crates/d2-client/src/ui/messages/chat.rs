@@ -455,7 +455,7 @@ mod tests {
     }
 
     // Test vectors "0x26 type 2/6/1" and the type table rows.
-    // Covers: specs/ui/messages.md §3 text, §3 r2, §3 r3
+    // Covers: specs/ui/messages.md §3 r2, §3 r3
     #[test]
     fn chat_formats() {
         let s = ChatStrings::default();

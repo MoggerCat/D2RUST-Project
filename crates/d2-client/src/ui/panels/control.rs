@@ -246,7 +246,7 @@ mod tests {
         assert_eq!(z.timer, 0);
     }
 
-    // Covers: specs/ui/control-panel.md §1 text
+    // (§1 text is exempt)
     #[test]
     fn step8_order_and_mini_panel_gate() {
         assert_eq!(

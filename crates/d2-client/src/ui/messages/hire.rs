@@ -337,7 +337,7 @@ mod tests {
         assert_eq!(calls, vec![(0x24, 0)]);
     }
 
-    // Covers: specs/ui/messages.md §10 text
+    // (§10 text is exempt)
     #[test]
     fn code_table() {
         assert_eq!(code_effect(1), Some(CodeEffect::QuestLogValues));
