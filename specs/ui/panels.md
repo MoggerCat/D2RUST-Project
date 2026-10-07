@@ -30,28 +30,28 @@
 | Inputs | 74–86 |
 | Outputs / state changes | 87–91 |
 | Rules | 92–93 |
-|   1. Screen layout model | 94–128 |
-|   2. UI states and the open/close call | 129–168 |
-|   3. The conflict gate (`0x00453910`) | 169–197 |
-|   4. Slots, open mode and the view shift | 198–249 |
-|   5. UI pass order (`0x00456EE0`) | 250–289 |
-|   6. 800 × 600 border and control panel art (`0x00499450`) | 290–310 |
-|   7. Shared panel parts | 311–328 |
-|   8. Character panel (ui 2, left; `0x004A7D00`) | 329–394 |
-|   9. Inventory panel family (`0x0048EDF0`) | 395–449 |
-|   10. Skill tree (ui 4, right; `0x004AC690`) | 450–497 |
-|   11. Stash (ui 0x19, full; inventory modes 0x0C / 0x0D) | 498–520 |
-|   12. Horadric Cube (ui 0x1A, full; inventory mode 0x0E) | 521–541 |
-|   13. Waypoint menu (ui 0x14, left; `0x0049C9C0`) | 542–581 |
-|   14. NPC menu (ui 8) and NPC shop (ui 0x0C) | 582–639 |
-|   15. Event → intent summary | 640–667 |
-|   16. Machine tables | 668–702 |
-| Constants & data dependencies | 703–723 |
-| Randomness | 724–728 |
-| Edge cases & original bugs | 729–749 |
-| Test vectors | 750–777 |
-| Provenance | 778–810 |
-| Open questions | 811–847 |
+|   1. Screen layout model | 94–130 |
+|   2. UI states and the open/close call | 131–170 |
+|   3. The conflict gate (`0x00453910`) | 171–199 |
+|   4. Slots, open mode and the view shift | 200–251 |
+|   5. UI pass order (`0x00456EE0`) | 252–291 |
+|   6. 800 × 600 border and control panel art (`0x00499450`) | 292–312 |
+|   7. Shared panel parts | 313–330 |
+|   8. Character panel (ui 2, left; `0x004A7D00`) | 331–430 |
+|   9. Inventory panel family (`0x0048EDF0`) | 431–485 |
+|   10. Skill tree (ui 4, right; `0x004AC690`) | 486–546 |
+|   11. Stash (ui 0x19, full; inventory modes 0x0C / 0x0D) | 547–581 |
+|   12. Horadric Cube (ui 0x1A, full; inventory mode 0x0E) | 582–630 |
+|   13. Waypoint menu (ui 0x14, left; `0x0049C9C0`) | 631–683 |
+|   14. NPC menu (ui 8) and NPC shop (ui 0x0C) | 684–752 |
+|   15. Event → intent summary | 753–780 |
+|   16. Machine tables | 781–815 |
+| Constants & data dependencies | 816–836 |
+| Randomness | 837–841 |
+| Edge cases & original bugs | 842–862 |
+| Test vectors | 863–901 |
+| Provenance | 902–942 |
+| Open questions | 943–1001 |
 <!-- /index -->
 
 ## Summary
@@ -108,7 +108,9 @@ cursor position (cursor jump, §4.3), UI `DrawItem`s, C→S messages (§15).
    rectangles move with the art.
 3. Panel art positions are cel draw positions (X, Y): the frame covers
    columns `X … X + w − 1`, rows `Y − h + 1 … Y` (`sprite-placement.md`
-   §2; every panel frame has offsets 0, measured on all files of §16).
+   §2; every panel frame has offsets 0, measured on all files of §16,
+   except `menu\horadric` (§12.4) and `cursor\pentspin` (`ui/menus.md` §2.5), whose
+   frames carry non-zero offsets that the cel draw applies as usual).
 4. **Panel quads.** A full panel is 320 × 432 pixels, stored as four
    frames `f … f + 3` of sizes 256 × 256, 64 × 256, 256 × 176, 64 × 176
    (measured on every panel file of §16). With panel left edge `X0` they
@@ -374,23 +376,57 @@ after both.
    max) are shown `>> 8`; stat 6 is shown as at least 1 while the player
    is alive. Color: 3 (blue) when value > base, 1 (red) when value <
    base, else 0, for stats 0, 2, 3, 1 (attributes), 7, 9, 11 (max
-   life/mana/stamina), 31 (defense) and the resistances; level (12),
-   experience (13) and next-level (30) are formatted by `0x00525350`
-   (thousands grouping) in color 0.
+   life/mana/stamina), 12 (level), 31 (defense) and the resistances
+   (§8.9); experience (13) and next-level (30) are formatted by
+   `0x00525350` (thousands grouping, §8.11) in color 0. Per-stat paths
+   (switch `0x004A8448`, index bytes `0x004A897C` for stats 6–45, jump
+   table `0x004A8950`): 6 → `>> 8`, min 1 while alive, color 0; 7, 9,
+   11 → color compares the **unshifted** value and base, then `>> 8`;
+   8, 10 → `>> 8`, color 0; 13, 30 → §8.11; 31 → §8.8; 37–45 (odd) →
+   §8.9; every other stat (0–3, 12) → color compare, text `%ld`
+   (`wsprintfA`, format `0x006D9BE8`). All non-grouped values use
+   `%ld` (signed decimal).
 8. Font fallback: for the stats 6–11 and, for defense, when its value
    is ≥ 1,000 (or language 6), the value is drawn in Font8 (font 0)
    instead of Font16 if it is ≥ 1,000 or its popup width (`0x00502520`)
-   is ≥ `x2 − x1`; the font is restored after the value.
+   is ≥ `x2 − x1`; the font is restored after the value. The popup width
+   is the max width (`text.md` §6, `0x00501840`) of the formatted value
+   in Font16; `x1`, `x2` are the table values (no `sx`); the ≥ 1,000
+   test is on the shown (shifted) value (`0x004A8893`–`0x004A88C5`).
+   Stats 12, 13, 30, the attributes and the resistances never switch
+   font.
 9. Resistances (stats 39 fire, 43 cold, 41 lightning, 45 poison): shown
    value = stat − difficulty penalty (classic game: 20 in nightmare, 50
    in hell, `[0x0044DCD0]`; expansion game: the difficulty table value
    `0x00611D30`), clamped to [−100, cap], cap = min(75 + the matching
    max-resist stat (40, 44, 42, 46), 95). Blue when a resist-raising
    effect is active (`0x0063A570`… family), red when a lowering one is.
+   Exact order (`0x004A8570`–`0x004A86A0`): color := 3 if the raising
+   test (fire `0x0063A570`, cold `0x0063A590`, lightning `0x0063A5B0`,
+   poison `0x0063A5D0`) is true, then := 1 if the lowering test
+   (`0x0063A610`, `0x0063A630`, `0x0063A650`, `0x0063A670`) is true
+   (lowering wins). Then with `v` = stat − penalty: if max(`v`, −100) ≥
+   cap, shown := cap (so a cap below −100 wins over the −100 floor) and
+   color := 4 unless it is 3; else shown := max(`v`, −100) and, if shown
+   < 0, color := 1 (also over 3). Text `%ld`.
 10. The damage / attack-rating block (`0x004EDA20`, `0x004A7340`,
     `0x004A74A0`, `0x004A7AE0`, `0x004A7180`), the name and class lines
     (Font16 at y `H + sy − 455`) and the hover texts of the stat lines:
     §Open questions 3.
+11. **Experience and next level** (`0x004A87F7`, `0x004A8750`). Value:
+    experience = stat 13 (`0x00625480`); next level: with `L` = the
+    player's base level (`0x006253B0`, stat 12) and `c` = its class
+    (unit +4; outside 0–6 read as 0), if `L` ≠ `experience.txt` MaxLvl of
+    `c` (`0x00611830`), the value is the `experience.txt` entry of `c` on
+    the row whose `Level` is `L` (`0x00611800`: record `L + 1`, i.e. the
+    total experience that ends level `L`; level 1 → 500), else the
+    player's stat 30 value. Text: `0x00525350(buf, value, 128)`: the
+    value as **unsigned** decimal (`_ultoa`), with `,` inserted after
+    every 3 digits counted from the right (only when there are more than
+    3 digits; no locale), e.g. 1234567 → `1,234,567`, 999 → `999`; if
+    the result does not fit the buffer it is `*` (unreachable with 128).
+    Drawn at once: Font16, color 0, centered in [`sx + x1`, `sx + x2`]
+    (width A) at y `H + sy − 480 + y`; no Font8 fallback.
 
 ### 9. Inventory panel family (`0x0048EDF0`)
 
@@ -465,7 +501,13 @@ after both.
    equals `t`: column (+4) 1, 2, 3 → x = `W − sx − 305`, `− 236`,
    `− 167`; row (+3) 1–6 → y = `H + sy − 418`, `− 350`, `− 282`,
    `− 214`, `− 145`, `− 77` (`0x004AA9C0`); file = class icon file (§16
-   rows `icon_*`, `0x004A8C80`), frame = skilldesc `IconCel` (+7), + 1
+   rows `icon_*`, `0x004A8C80`): `Spells\<CC>Skillicon` with `CC` = `Am`,
+   `So`, `Ne`, `Pa`, `Ba`, `Dr`, `As` for classes 0–6 (table
+   `0x00724AC0`, stride 0x22: cel u32, path; the skill tree passes no
+   skill, so the player's class `[0x007A0522]` is used; with a skill the
+   skill's class `0x00645040` is used, loaded on first use by
+   `0x004520C0`, and a class > 6 gives `Spells\Skillicon`
+   `[0x007C07F8]`), frame = skilldesc `IconCel` (+7), + 1
    while pressed. Remap `k` (`0x004F64B0`): start 5 (grey: skill level
    0 and a point would not be accepted) or 0 (learnable / learned,
    `0x004AC4D0`), 3 if the mouse is strictly inside the icon, 1 if the
@@ -485,7 +527,14 @@ after both.
    `SetUIState`: §Open questions 4.
 6. Close button: §7.2 at (`W − sx + o`, `H + sy − 63`), `o` from table
    `0x00724CE4` index `3 × class + t` (−149, −220 or −305; e.g.
-   amazon tabs 1–3: −149, −220, −305). Its hover / release rectangle is
+   amazon tabs 1–3: −149, −220, −305). The whole table (i32 × 22, entry
+   0 = 0 unused), `o` for tabs 1, 2, 3: amazon −149, −220, −305;
+   sorceress −305, −305, −149; necromancer −305, −149, −305; paladin
+   −305, −220, −305; barbarian −149, −305, −149; druid −149, −149, −149;
+   assassin −220, −149, −305 (read from the 1.14d image, `0x004AB549`).
+   `0x004AB530` sets the variant `[0x00724CE0]` := 1, 2, 3 for `o` =
+   −149, −220, −305; the hit test `0x004AB630` uses the variant's fixed
+   x. Frame 10, + 1 while pressed (`[0x007C0C38]` ≠ 0). Its hover / release rectangle is
    [`W − sx + o`, `+ 0x22`] × [`H + sy − 63 − 0x22`, `H + sy − 63`]
    (`0x004AB630`, `0x004AB5F0(0x22, 0x22)`). Release there:
    `SetUIState(4, toggle, 0)` (`0x004ABD42`).
@@ -517,6 +566,18 @@ after both.
    meaning of 0x12: §Open questions 6.
 6. Grid clicks: stash page 4 intents (§15). Stash gold buttons:
    §Open questions 5.
+7. **How many 0x4F 0x12.** The close hook `0x00489EE0` sends one only
+   while the inventory mode is 0x0C or 0x0D (it sets mode 0 first and
+   calls `SetUIState(0x19, off, 0)` again, a no-op); there is no latch.
+   Mouse up `0x00489AC0`: in the inventory close rectangle
+   (`0x00486E10`) with no cursor item → `SetUIState(0x19, off, 0)` only
+   (hook: **one** message); in the stash close rectangle (`0x00489980`)
+   with the button pressed (`[0x007BCE38]` ≠ 0; not pressed → nothing)
+   → pressed := 0, `SetUIState(0x19, off, 0)` (hook: one message), then
+   0x4F 0x12 again at `0x00489B92`: **two** messages. The key handler
+   `0x00489CE0` (mode 0x0C, chat ui 5 closed) does the same: `SetUIState`
+   then a second send at `0x00489D21` (two), and resets the stash
+   selection globals (`0x00721E3C`–`0x00721E50` := −1).
 
 ### 12. Horadric Cube (ui 0x1A, full; inventory mode 0x0E)
 
@@ -533,11 +594,39 @@ after both.
    frame `n` at (W / 2, H / 2 − 1) in draw mode 3; `n` += 1 when more
    than 70 ms passed since the last step (`GetTickCount`); at `n` = 30
    the animation stops and the cel is freed. This is wall-clock timed.
+   Exact (`0x0048F03E`–`0x0048F0C0`): each drawn frame, if more than 70 ms
+   passed, the stamp := now and `n` += 1; if `n` reaches 30 the flag and
+   (if loaded) the cel are cleared and **nothing is drawn** that frame,
+   so frames 0–29 are drawn and frame 30 never. Otherwise frame `n` is
+   drawn by `0x004F6480` at (`W / 2`, `H / 2 − 1`) (C division), light
+   0xFF (pushed as −1, as for §1.4), draw mode 3, no remap. Start (`0x0048A540`): flag
+   := 1, `n` := 0, stamp := now, cel loaded if not yet. The file's frames
+   are not centered on the draw point: frames 0 and 30 are 2 × 2 with
+   offsets (0, 0); frames 1–29 have widths 92–239, heights 121–256,
+   offset x −287 … −205 and offset y 17 … 82 (frame 1: 92 × 121 at
+   (−205, 17)), all measured on `d2data` `menu\horadric.dc6`; the cel
+   draw applies them (`sprite-placement.md` §2), so frame 1 covers
+   columns `W / 2 − 205 … W / 2 − 114`, rows `H / 2 − 104 … H / 2 + 16`.
+   While the animation runs with `n` < 14 the cube grid (page 3,
+   `0x00483FF0`) is not drawn (`0x0048EF92`–`0x0048EFA7`); from `n` = 14
+   on, and when no animation runs, it is drawn with `[0x007BCC04]` := 3
+   for the call.
 5. Hover over the buttons → `strUiMenu2` "Transmute" (3341 = 0xD0D) or
    `strClose` tool tips (y `H + sy − 100` / `H + sy − 223`).
 6. Messages: transmute button release → C→S 0x4F button 0x18
    (`0x0048A28B`); close → 0x4F button 0x17 (`0x0048A07D`,
    `0x0048F183`); items in / out: §15 (`world/cube.md`).
+7. **Close** `0x0048A050`: animation flag := 0, `SetUIState(0x1A, off,
+   0)`, then C→S 0x4F button 0x17 (p1 = p2 = 0) only if the latch
+   `[0x007BCC54]` is 0, setting it (the open `0x0048A460` clears it),
+   then a pending cursor-item restore (`[0x007BCC50]`, `0x00463990` /
+   `0x00480930`). Callers: the close-button release `0x0048A190` (pressed
+   `[0x007BCE40]` and the release in the button rectangle, `0x0048A257`),
+   `0x0048A3E0`, and the close hook `0x0048A500` (only while the
+   inventory mode is still 0x0E; it sets mode 0 first). When a button
+   close reaches the hook, the nested `0x0048A050`'s `SetUIState` finds
+   the state closed (no hook again) and the latch lets only the first of
+   the two calls send: **one** 0x4F 0x17 per open, whichever path closes.
 
 ### 13. Waypoint menu (ui 0x14, left; `0x0049C9C0`)
 
@@ -559,7 +648,11 @@ after both.
    Hover x in [`sx + 273`, `sx + 308`], y in [`387 − sy`, `420 − sy`] →
    a filled rectangle (`D2GFX_DrawRectangle`, color 0, mode 2) and the
    `strUiMenu1` "Cancel" (4130) tool tip at y `385 − sy`, centered
-   on `sx + 291`.
+   on `sx + 291`. Exact (`0x0049CDA6`–`0x0049CE33`, drawn after the
+   rows): with `s` = width A of the string / 2 (C division), the
+   rectangle `0x004F6300(left sx + 287 − s, top 370 − sy, right
+   sx + 294 + s, bottom 387 − sy, color 0, mode 2)`, then the text at
+   pen (`sx + 292 − s`, `385 − sy`), color 0, current font.
 5. Rows: `[0x007BF08A]` rows (≤ 9) of the current tab, table
    `0x007224E8` (stride 24: icon x, icon y, text x, text y, 2 more i32):
    icon x/y = (17, 89 + 36 r) except row 4 onward (234, 270, 306, 342,
@@ -568,7 +661,13 @@ after both.
    is the current level, else `3 + sel`; the current level also gets
    frame 0 drawn again. Text: level name (`0x00453E70`) at (`sx + tx`,
    `ty − sy`), Font16, color 5 unknown, 0 known, 3 if hovered-selected
-   or current level.
+   or current level. Exact (`0x0049CD10`–`0x0049CD8B`): unknown row
+   (used byte 0): no icon, color 5; known: 0; then 3 if the close button
+   is not pressed and the row is the pressed row (`[0x007BF06D]`, set by
+   mouse down, `ui/menus.md` §1.2; an unknown row can never be pressed,
+   the row hit skips it); then 3 if the row's level is the current
+   level (the second icon draw, frame 0). Text = level name
+   (`0x00453E70(level)`).
 6. Title: `waypointsheader` (3990) if any other waypoint is known
    (`[0x007BF08E]`), else `nowaypoints` (3991), Font16, color 0, at
    x = `sx + 160 − width / 2`, y = `48 − sy`.
@@ -578,6 +677,9 @@ after both.
    `0x0049CEC0`, `0x0049CF50`, `0x0049D2B5`). Travel rules:
    `world/waypoints.md` §6–§7. Tab and row hit rectangles: §Open
    questions 7.
+8. Mouse-down / mouse-up handling, the tab and row hit tests, the tab
+   setter, the close latch, the self-close and the key close:
+   `ui/menus.md` §1.
 
 ### 14. NPC menu (ui 8) and NPC shop (ui 0x0C)
 
@@ -591,7 +693,7 @@ after both.
    | `0x004B6C70` | talk (3381) | dialog: C→S 0x2F / 0x30 (`0x004B6A30`) |
    | `0x004B42B0` | trade (3396), trade/repair (3334) | C→S 0x38 action 1, NPC GUID, 0 |
    | `0x004B3D40` | gamble (3398) | C→S 0x38 action 2, NPC GUID, 0 |
-   | `0x004B5C60` | hire (3397) | hire list (C→S 0x38 action 3 per `world/npc.md` §4; sender not confirmed, §Open questions 8) |
+   | `0x004B5C60` | hire (3397) | opens the hire list (`ui/menus.md` §3); choosing a row sends C→S 0x36 (`0x004B1E9E`). The hire-list request C→S 0x38 action 3 is sent when the menu opens (`ui/menus.md` §2.2) |
    | `0x004B52C0` | go west (3383) | C→S 0x38 action 0, NPC GUID, 1 |
    | `0x004B5260` | sail west (3385) | C→S 0x38 action 0, NPC GUID, 0x28 |
    | `0x004B2020` | Identify Items (4020) | C→S 0x34 NPC GUID |
@@ -610,6 +712,15 @@ after both.
    game `0x004B6440` inserts or removes Resurrect depending on whether
    the mercenary is dead (`[0x00725494]` ≠ −1). Other additions (imbue,
    sockets, personalize, act travel east): §Open questions 8.
+   `0x004B6440(record, insert)` does nothing unless the expansion is
+   installed and the game is an expansion game. Insert: if a slot already
+   has handler `0x004B1DD0` (Resurrect), nothing; else if a slot `j` has
+   the hire handler `0x004B5C60`, slots `j … count − 1` move up one and
+   Resurrect goes to `j` (before hire); else Resurrect goes to slot
+   `count − 1`, after the last option (the builder shows slots 0 …
+   `count − 2`, then its own cancel); count += 1. The inserted string id is 0x1507 (5383), a
+   placeholder replaced at build time (`ui/menus.md` §2.3). Remove: the Resurrect
+   slot is taken out, later slots move down one, count −= 1.
 3. **Menu box.** `0x004B4830` builds a menu object (`0x004B7EB0`) with one
    item per option (`0x004B85F0`); special captions: `NPCHeal` (3337)
    gets the heal cost, identify (4020) a cost, `0x1507` a quest text.
@@ -618,7 +729,7 @@ after both.
    bottom, each at its own x and height; the selected item in color 3,
    or flanked by two `pentspin` frames (`frame = counter % 7`) at
    (x − 24, y + 4) and (x + w + 2, y + 4). Box position and sizes:
-   §Open questions 8.
+   §Open questions 8 (answered: `ui/menus.md` §2).
 4. **Shop panel** (ui 0x0C after trade / gamble, `0x00488400`): art
    `%s\ui\panel\buysell` (`0x004B23E0`) frames 0–3 as left quads; NPC
    store grid (`0x00483FF0`); action buttons: `[0x00722160]` buttons,
@@ -636,6 +747,8 @@ after both.
    gamble identify 0x37 (`0x004C0F20`, `0x004C0FF0`), hire 0x36
    (`0x004B1E80`), closing the shop ends the interaction with C→S 0x30
    (`0x004B3C20`). Item rules: `world/vendors.md`.
+6. Menu box geometry and items, the hire list and the client fields
+   of 0x32 / 0x33 / 0x35 / 0x36: `ui/menus.md` §2–§4.
 
 ### 15. Event → intent summary
 
@@ -684,7 +797,7 @@ One row per draw, text or hit. Columns:
 | `panel` | ui id (decimal) or `border` / `ctrlpnl` |
 | `item` | name, unique per panel and kind with `cond` |
 | `kind` | `draw` (cel at draw position x, y), `text` (pen x, y), `hit` (rectangle) |
-| `file` | `draw`: path under `data\global\ui\` without extension (`C` = class letter of §10.1, `CC` = class icon prefix); else `-` |
+| `file` | `draw`: path under `data\global\ui\` without extension (`C` = class letter of §10.1, `CC` = class icon prefix of §10.3: `Am`, `So`, `Ne`, `Pa`, `Ba`, `Dr`, `As`); else `-` |
 | `frame` | `draw`: frame index, or a word named in §8–§14 (`iconcel`, `tabstate`, `rowstate`); `text`: string id, `value`, `level`, `tabstr`, or `a/b` alternatives |
 | `x`, `y` | expression: terms joined by `+` / `-`, a term is a decimal integer, `W`, `H`, `W2` (= W / 2), `sx`, `sy`; no spaces |
 | `w`, `h` | `hit`: size, the rectangle covers `x … x + w − 1`, `y … y + h − 1` (`h` `-` for `tab1_bottom`: bottom row `H − 50`); `text`: `w` = centering span when `cond` has `centered`; else `-` |
@@ -715,7 +828,7 @@ One row per static record of §14.1: `record`, `npc` (class id),
   `spells\skltree_?_back` (16 each; `d`, `i` in d2exp), class skill
   icons 48 × 48, `menu\waygatebackground` (4), `menu\waygatetabs`
   (8, 78 × 30), `menu\expwaygatetabs` (d2exp, 10, 63 × 31),
-  `menu\waygateicons` (5, 30 × 30), `menu\horadric` (31). `Patch_D2.mpq`
+  `menu\waygateicons` (5, 30 × 30), `menu\horadric` (31, non-zero frame offsets, §12.4). `Patch_D2.mpq`
   holds no UI file (listfile).
 - `inventory.bin` records 0–31 (fields `data/fields.tsv` `inventory`).
 - Strings (English): 3990, 3991, 4036–4039, 4051, 4057–4076, 4130, 4144,
@@ -774,6 +887,17 @@ Reproduced by default.
 | capture `placement-0001` inventory frames | inventory pixels equal the CPU reference of §9.3 (frames 4–7 and the close button); camera fields per `camera.md` | capture, queued (LOCAL-RUN batch 6) |
 | capture `ui-0001` (to add to `capture.md` §8): open in turn character, inventory, skill tree, stash, cube, waypoint, at 800 × 600 | each frame equals the CPU reference of §6–§13 | capture, queued |
 | capture `ui-0002`: same at 640 × 480 (`-w` with the 640 option) | same | capture, queued |
+| `menu\horadric` frame 1 (92 × 121, offset (−205, 17)) at 640 × 480 | drawn at (320, 239): columns 115–206, rows 136–256 | §12.4, d2data DC6 header |
+| `menu\horadric` frame offsets (game-file test) | frames 0 and 30: 2 × 2 at (0, 0); frames 1–29 non-zero offsets as measured (frame 1 (−205, 17), frame 15 (−280, 82)); 31 frames | §12.4 |
+| Horadric animation, 30 steps done | `n` = 30: nothing drawn, flag 0; only frames 0–29 were ever drawn | §12.4 |
+| experience 1234567 | `1,234,567`, color 0 | §8.11 |
+| level 1 character, next level | `500` (experience.txt row `1`) | §8.11 |
+| experience 999 / 1000 | `999` / `1,000` | §8.11 |
+| sorceress skill tree tab 3, 800 × 600 | close button at (W − sx − 149, H + sy − 63) = (571, 477); variant 1 | §10.6 |
+| druid, any tab | `o` = −149 | §10.6 |
+| fire resist 80, max-fire 0, normal, no effect | cap 75: shown 75, color 4 | §8.9 |
+| fire resist −150, max-fire −200 (cap −125) | shown −125, color 4 | §8.9 |
+| cold resist −10, lowering and raising effects both active | shown −10, color 1 | §8.9 |
 
 ## Provenance
 
@@ -807,6 +931,14 @@ code (`screen/panel/*.java`) hinted that the character page uses
 `data\global\ui\{panel,menu,spells,cursor}` files (d2data, d2exp;
 Patch_D2 has none), `inventory.bin` (d2exp), English string tables;
 probes with Python, outputs outside the repo. No capture yet.
+2026-10-07 additions: value switch `0x004A8448` (index bytes
+`0x004A897C`, jump table `0x004A8950`, resist table `0x004A89A4`),
+grouping `0x00525350`, next-level lookups `0x00611800` / `0x00611830`;
+icon files `0x00724AC0`, close offsets `0x00724CE4` read from the image;
+Horadric animation `0x0048F03E`–`0x0048F0C0`, start `0x0048A540`, frame
+headers of d2data `menu\horadric.dc6` (all 31 frames, Python, outside the
+repo; HANDOFF §5 C71 found frame 1 at (−205, 17)); cube close
+`0x0048A050`, `0x0048A190`, `0x0048A500`; Resurrect insert `0x004B6440`.
 
 ## Open questions
 
@@ -824,16 +956,25 @@ probes with Python, outputs outside the repo. No capture yet.
 3. Character panel: damage / attack-rating block, name and class lines,
    per-stat hover texts (§8.10). Disassembly of `0x004A7D00` after
    `0x004A818C` and `0x004A7340`–`0x004A7AE0`.
-4. Skill tree: the free-points box (`0x004AC200`), the tab tool tips
+4. Skill tree (partly answered 2026-10-07: the icon file `CC` §10.3 and
+   the close offsets per class §10.6 are read from the image; still
+   open as below): the free-points box (`0x004AC200`), the tab tool tips
    (`0x004AB310`), the no-points mouse-down message (§10.5), the exact
    remap `k` per state (verify by capture).
 5. Stash gold buttons, gold dialog and the inventory gold button
    (`0x004845A0`, `0x00489580`, `0x004891xx`). Ghidra read.
 6. Server meaning of C→S 0x4F button 0x12 (stash close) and of the
    player-trade buttons 2, 4, 7, 8: `0x0054C7C0` → `0x00568060`.
-7. Waypoint tab and row click rectangles and the tab switch
+7. **Answered** (2026-10-07, `ui/menus.md` §1: `0x0049D160` mouse down,
+   `0x0049D010` mouse up, `0x0049C490` tab hit, `0x0049C510` row hit,
+   `0x0049C760` tab set, latch `[0x007BF085]`). Was: waypoint tab and
+   row click rectangles and the tab switch
    (`0x0049D010`, `0x0049D160`): Ghidra read.
-8. NPC menu: box position and item metrics (`0x004B7EB0`, `0x004B85F0`),
+8. **Partly answered** (2026-10-07): box position and item metrics,
+   the hire sender (C→S 0x36 `0x004B1E9E`; the 0x38 action 3 request
+   at menu open `0x004B48E8`) and the Resurrect insert are in
+   `ui/menus.md` §2–§3 and §14.2; still open: the record flag byte and
+   the remaining runtime inserts. Was: NPC menu: box position and item metrics (`0x004B7EB0`, `0x004B85F0`),
    the record flag byte, the remaining runtime option inserts (imbue,
    add sockets, personalize, go east / sail east), the hire sender
    (`0x004B5C60`). Ghidra read; check against a capture of Akara's and
@@ -844,3 +985,16 @@ probes with Python, outputs outside the repo. No capture yet.
    panels (0x1B, 0x1C): not specified here.
 10. Pixel proof: capture cases `ui-0001`, `ui-0002` and the inventory
     frames of `placement-0001` (§Test vectors).
+11. The Horadric animation draws with draw mode 3 (§12.4) and light 0xFF:
+    which blend that is for a cel with these offsets is `render/blend-
+    modes.md`'s; confirm the pixels with a capture of a transmute
+    (frames 1, 15, 29).
+12. Character panel draw order of the 18 values against the labels and
+    the add buttons when a value is wider than its span (overlap):
+    capture `ui-0001` with a level-99 character (experience
+    `3,520,485,254`).
+13. Cube-gone close (§12.2): `0x0048F183` sends 0x4F 0x17 directly and
+    `SetUIState(0x1A, off)` runs the close hook `0x0048A500` → `0x0048A050`
+    with its latched send (§12.7): one or two 0x4F 0x17 messages? Read
+    whether `[0x007BCC54]` or the inventory mode is changed before the
+    `SetUIState` call at `0x0048F160`–`0x0048F183`.
