@@ -83,4 +83,4 @@ pick rows = items rows. Then the existing world-data game tests:
 
 ## 6. Gate
 
-See the final message to the coordinator (head SHA and result).
+`CARGO_INCREMENTAL=0 sh tools/gate.sh`: **PASS** (every step, d2-client included) on the head before this note (68e1c9bc); this note adds docs only.
