@@ -1,0 +1,186 @@
+# Handoff: PC 2 spec worker — audio (`claude/spec-audio`)
+
+Spec session 2026-10-07. Task: the open points of
+`docs/handoff/impl-audio.md` §3 (ST1–ST11, TR1–TR7, EN-A–EN-E; HANDOFF §7
+ninth set ST-*, TR-*, EN-*) and the open questions of `specs/audio/*` and
+`specs/formats/wav.md` that the 1.14d binary settles. Evidence: Ghidra
+exports + `tools/ghidra/disasm.py` on `game/Game.exe`; image constants
+with `pefile`; local recordings of `docs/handoff/local-buddy-q-rec.md`
+(branch `origin/claude/local-buddy-q-rec-2026-10-07`) entries 69 and 74,
+read from the raw `snd74*-sound.jsonl` (not committed) where cited;
+`docs/handoff/local-buddy-q-data.md` entries 62, 72, 73. Scratch scripts
+in `C:\Users\zffit\Desktop\D2test\scratch-audio\` (outside the repo).
+Fourth pass (2026-10-07): the remaining "Still open" items: sound-table
+OQ 1, 9, 10; triggers OQ 1, 2, 6, 10, 12, 13; environment OQ 1, 5; wav
+OQ 1. New file `specs/audio/triggers-2.md` (§13–§17); `sound-table-2.md`
+§15; `environment.md` §9.
+
+## Answered
+
+| Id | Spec § | Answer |
+|---|---|---|
+| ST1 | `sound-table.md` §2 | 13 EAX columns (`EAX Environ` 0x24 … `EAX Air Absorb` 0x54), 9 + 13 = 22 read columns; field list `0x00481CA6`–`0x00481FDA`. The draft's "12 at 0x24–0x50" was wrong. |
+| ST2 | `sound-table.md` §7 r7 | Mode 0: slots 0–3 stereo (kind 1), slots 4–15 mono (kind 0); kinds must match. 4 stereo + 12 mono voices (`0x004DFAA0`, `0x004E025D`). Not "any". |
+| ST3 | `sound-table.md` §7 r6 | The pick overwrites the request id; history goes on the pre-pick id's record; everything after (Stream, load, Async, failed, Stereo, Loop, blocks, sample, Reverb, path, volume chain) reads the variant's record. As implemented. Plus: restarts pick from the variant. |
+| ST4 | `sound-table.md` §6.6 | Stop/steal save the stream position (4-byte units; 0 for non-stream). Natural end: upkeep `0x004DF890` sees the voice's playing flag cleared by the 50 ms wall-clock service thread `0x00516250`: not tick-exact in 1.14d. Model kept; OQ 12 Needs recording. |
+| ST5 | `sound-table.md` §5 r2 | Wrong in the impl: a merged compound call **does** attach its unit (request unit list + unit's list, head, no dedupe). |
+| ST6 | `sound-table.md` §6.4 r1 | `0x007A061C` is the game-loaded flag (S→C 0x04 sets, 0x05 clears): always on in game. Tracking on. |
+| ST7 | `sound-table.md` §10 r5–r6 | Preload at T = 0, 25, 50 …, ids 1–2,933 only; async reads are collected only there; non-Async-Only pending loads finish synchronously at start. Latency of the read itself: OQ 13 Needs recording. |
+| ST8 | `sound-table.md` §4 r6 | No guard: a draw with no local player crashes in 1.14d (seed at address 0x20). d2rs: internal error. |
+| ST9 | `sound-table.md` §6.3 r6, §5 r6 | Restart by r1 starts next update (exclusive branches); r5 also runs for a request started in r3 the same pass; new requests at the list **head** (then sorted). |
+| ST10 | `sound-table.md` §8.2 r12 | Exact sequence: CRT `log` / f32 ln 2 (0.6931471824645996), CRT `pow(10, ·)`, f32 stores, `cvttsd2si`. Residual CRT ulp → voice log. |
+| ST11 | `sound-table.md` §7 r8, §5 r8 | Play position in 4-byte units (frames for the stereo songs), not bytes; start offset ×4 mod data size; set position **does** write distance²; unit lists newest first. |
+| OQ2, 4–8, 11 | `sound-table.md` OQ | Pixel points per type; paused path; occlusion × (1 − occ) at the device; duck = single player + ESC/options; songs ignore blocks in the stream; river projection; −2³¹ silent. |
+| — | `sound-table.md` §5 r3, §8.1 r1 | Corrections: no-unit position (0, 0, 320.0), unit z = 640.0 (both were 0 in the draft); changes the mode-0 gain of every unit sound (e.g. (320, 0, 640) → 228, not 255). |
+| — | `sound-table.md` §6.3 r7 | Original bug: a failed fade-in start leaves volume 0; a looping request then never starts. |
+| TR1 | `triggers.md` §7 r7 | 120 null records behave as all-zero rows: no transition, loop 0 → detach looping requests (no force), U+0x70/0x74 still set. "No call" is observably the same except that detach. |
+| TR2 | `triggers.md` §7 r8 | Cairn table `0x00728338`: modes 1–5 → 413–417 `cairn_stone_1..5`, else 0. |
+| TR3 | `triggers.md` §10 r5, `npc-greetings.tsv` | 35 classes → 28 records, dumped (new TSV, own commit); records shared by classes share last/tick. |
+| TR4 | `triggers.md` §4.3 r2.2 | As implemented: >1 unit → detach with force; else fade to 0 len 6 (raised to Fade Out), U stays listed; every request of U in Neutral's group, playing or not. |
+| TR5 | `triggers.md` §5 r9 | Speed is signed i16; sums wrap i32; reduction by mask (power of two, incl. 0) or signed `idiv` remainder; distances/compares signed; elapsed tests unsigned. Not plain u32. |
+| TR6 | `triggers.md` §1 r11 | Id-0 requests return 0 at the entry with no side effect or draw; entry 74 logs many (caller `0x004D9BC7`), seed unchanged. |
+| TR7 | `triggers.md` Test vectors, §10 r6 | 115 record addresses, 106 distinct contents (wording fixed); key 506 twice (order 37 → 3,533 wins, 38 → 3,534 never); lookup scans to a zero sound, 16-bit key. |
+| TR8 (OQ 7, 11) | `triggers.md` OQ | NPC Speech flag only set by the options menu (image value 1); Init voice at client monster creation (0xAC / `0x00466730`), not first sight. |
+| EN-A | `environment.md` §5 r2 | As implemented: `0x004BA950(a, 64 if weather active else 0)`, `0x004BA9D0(ev, 0)`; "raining" = this tick's weather-active flag, not the intensity. |
+| EN-B | `environment.md` §6 r4 | Wrong in the impl: a gone handle reads volume 0, then min(6, v) is written to nothing and the stale handle is kept; rain stays silent until v = 0 or weather off. Also previous := 64 on every active tick (even at intensity 0). |
+| EN-C | `environment.md` §3 r1 | As implemented (resume −1 → offset 0xFFFFFFFF), and the stream then starts at 0xFFFFFFFC mod data size (deterministic). |
+| EN-D | `environment.md` §2 r11 | Listed per test: unsigned differences (75, 62, gap, C − P+0x7C), unsigned absolute compares (T > Ts + 125, C ≥ tM / tS, C < tH), signed play-position compares. |
+| EN-E | `environment.md` §4 r1 | last checked := L before the flag test (after the count and equality tests). |
+| EN-F (OQ 3) | `environment.md` §1 r3 | Day phase = lighting period index (act env +0x00); day = 1–3; entries 69 / 74 confirm (bed 70 → 71 at the period-4 start, with the §7 draws). |
+| env OQ 2, 6, 7 | `environment.md` | Positions in frames; level flags reset per game, last checked never (bug kept); +0x220 = `-ns`. EAX call order corrected (before the cues). |
+| wav OQ 3 | `formats/wav.md` OQ 3 | Stereo voice: the load's format check overwrites the row's `Stereo` from the file (`0x004DF695`); all 30 mismatched rows are non-stream. |
+| — | `formats/wav.md` status, Survey | Status verified for parsing (C72 / entry 72); entry 62 Huffman table 8 fact added. `sound-table.md` status: table layer verified (C73 / entry 73), code predates this pass's corrections. |
+| triggers OQ 3 | `triggers.md` OQ 3 | Partly: the +0xB0 writers are the player / monster mode machines (sites listed); the message field is `client/msg-units.md`'s. |
+| — | `triggers.md` §1 r6 | Correction: the idle gap starts at 90 (reset each game by `0x004CA280`), not 0. |
+| — | `triggers.md` §12 | Thunder draws on the player client seed (500 + roll(1500) timer, 25 + roll(50) delay, y then x = −200 + roll(400)) and sets the position. |
+| sound-table OQ 3 (third pass) | `sound-table-2.md` §14 (new file) | Static: inside the sound tick only `0x004E40A0` steps the seed (791-function closure); between ticks the receive → client update → draw → sound tick order of `0x0044EFA0`, and the users listed (cursor, shake, weather, water floors, lightning, room-change weather, Den lights, overlay create `0x00470390`, NPC code, `cltdofunc` entries of local-player casts). Draw-phase users are frame- and wall-clock-dependent, so the interleave is not tick-exact; conformance takes the recorded seed per sound draw as input. |
+| sound-table OQ 14 | `sound-table.md` §8.3 r4 | G = 255 at every game volume send; all 15 `0x00515CE0` sites listed (init, shutdown, Bink close, stop-all, 180 ms stream-voice fade), each restoring 255 before returning. |
+| ST4 remainder | `sound-table.md` §6.6 r4 | Device side settled: 128/256 KiB looping buffers, zero padding after the data, strict played > size test per service pass; audible output exact, only the ended tick lags (OQ 12 still Needs recording). |
+| ST7 remainder | `sound-table.md` OQ 13 | Async mode is on in every run (`0x0040A390`, ECX 1); Storm `0x0041AAD0` either completes at once or queues; branch for sound files not settled statically. Still Needs recording. |
+| — | `sound-table.md` §6.2 r3 | New: `soundchaosdebug` chat toggle: random speech 2,934–4,656 every 3rd tick while on (debug, off by default). |
+| triggers OQ 3 | `triggers.md` OQ 3 | Writer scan of every `[reg+0xB0]` store in client code: list complete (three extra sites are a non-unit list link). Message field still `client/msg-units.md`'s. |
+| triggers OQ 4 | `triggers.md` OQ 4 | Event 12 = state 68 `evade` → stat 350 skill → that skill's `stsound` (Dodge/Avoid/Evade: 2,236 `amazon_dodge_1`). |
+| triggers OQ 5 | `triggers.md` OQ 5 | `cltdofunc` 16 (Jab): action frame 3 → `dosound a` (player) / `dosound b` (monster); `cltstfunc` 25 (Charge, SerpentCharge): `dosound a` / monster skill-slot sound. |
+| triggers OQ 8 | `triggers.md` OQ 8 | 0x8A handler conditions (act5pow, act2guard2 with Arcane Sanctuary bits and harem blocker); Nihlathak hurry-up plays at once (deadline test inverted, bug kept), `roll(30)` on the sound seed during a drawn frame. |
+| triggers OQ 10 | `triggers.md` §12 | Partly: 396/397, 452, 2,231, 2,671, 4,640, 4,638 conditions; correction: 4,638 has no unit. |
+| env OQ 4 | `environment.md` OQ 4 | Active = snow-mode flag 0 and the level's `Rain` byte; intensity owned by `render/draw-order-2.md` §11. |
+| wav OQ 2 | `formats/wav.md` OQ 2, §2, §3 | Storm stream path copies bytes unchanged (`0x004157C0` memcpy); correction: stream buffers take the file's own format, and the Storm chunk walk has no length bound. |
+| sound-table OQ 9 (fourth pass) | `sound-table-2.md` §15 | 21 slider stops; value = 5 × position (`0x0047CD00`), position = ⌊(v + 1) / 5⌋ at menu open (`0x0047CC90`); setters only on a change; arrows / drag (13.25 px stops) / enter mapped with their cursor sounds; `3DBias` only in mixer modes 1–2. |
+| sound-table OQ 1, 10 | `sound-table.md` OQ | Needs recording (what to record written there). |
+| triggers OQ 10 (rest) | `triggers-2.md` §13 | 2,458: client umod phase-2 hooks (fire 9 / goboom 31: unique, mode 0, frame 4; worms 40: unconditional) and state 110 `pregnant` remove hook on 0xA9; death sounds of the code-8 request by `BaseId` 453 / 461 / 425–427 (minion sound by direction d8 & 3); 2,517 on Leap / Leap Attack landing (players only, after the run footstep); 1,830 per update of a `spiderlay` unit whose path flag 0x08 is set, outside town. |
+| triggers OQ 2 | `triggers-2.md` §14 | All 78 `0x00553380` sites by event; one pending event per unit (last wins), flushed in the per-client unit update; no 0x2C sender for 3, 5, 14, 21, 84, 90 and most quest events. |
+| triggers OQ 13 | `triggers-2.md` §15 | Event 3 → U +0x4E; runs the generic skill do (`dosound` / `tgtsound`) like 1–2; `cltdofunc` 16 / 37 act on it alone; nothing else reads it. |
+| triggers OQ 6 | `triggers-2.md` §16 | `ProgSound` of missile functions 9, 29, 47, 51; correction: 29 tests elapsed = 315, not missile 315 (`triggers.md` §8 r3 fixed). |
+| triggers OQ 12 (part) | `triggers-2.md` §17 | The seven options-menu sites mapped; rest is `client/ui.md` §B8 (cross-file request). |
+| triggers OQ 1 | `triggers.md` OQ 1 | Needs recording (session and hooks listed there). |
+| env OQ 5 | `environment.md` §9 | Front-end jukebox: two 8-track lists, entry 0 first, then CRT `rand()` mod 8 forward to an unplayed track, volume 110, toggle `0x004FA160`, 200 ms stop fade, 180 ms device fade on game entry. |
+| env OQ 1, wav OQ 1 | `environment.md` OQ 1, `formats/wav.md` OQ 1 | Needs recording (details there). |
+
+## Still open
+
+| Id | Why |
+|---|---|
+| ST4 / sound-table OQ 12 | natural-end tick depends on real audio time (device side settled, §6.6 r4); recording below |
+| ST7 / sound-table OQ 13 | async read completion time; Storm branch for sound files not settled statically; recording below |
+| sound-table OQ 1, 10 | Needs recording: voice log per tick; `Async Only` request/attempt/start ticks (with OQ 13) |
+| triggers OQ 1 | Needs recording: request log over the listed session |
+| triggers OQ 3 | message field that fills +0xB0 (`client/msg-units.md`; write watch below) |
+| triggers OQ 12 (rest) | UI control names per site: `client/ui.md` §B8 (cross-file request) |
+| environment OQ 1 | Needs recording (entry 74 is partial: no cave, no Blood Raven, no rain toggle) |
+| wav OQ 1 | Needs recording: DirectSound buffer dump (C75, player lane) |
+| — (size rule) | `sound-table.md` §1–§13 are all claimed by code `Covers:` lines (`crates/d2-client/src/audio/sound_table/tests.rs`), so moving a § would break `coverage.py`; the new material went into a new file `sound-table-2.md` §14 instead and `sound-table.md` stays at 59.5 KB. |
+
+## CODE-TABLE CHANGE commits
+
+| Sha | File |
+|---|---|
+| 0d617d9 | `specs/audio/npc-greetings.tsv` (new; TR-3) |
+
+## Cross-file requests
+
+- ~~to PC 1: `specs/formats/mpq.md` Observations; new observation; every
+  ADPCM-masked `.wav` sector (mask 0x41 / 0x81, 350,543 sectors) uses
+  Huffman weight table 8 and no other, 89.4 % with an escape
+  (`docs/handoff/local-buddy-q-data.md` entry 62); add it (the q-data
+  note says it was not yet recorded there). Mirrored in `formats/wav.md`
+  Survey.~~ Done by PC 1 (commit 4ebe8d2, `xpc-to-pc2.md`).
+- ~~to PC 1: `specs/client/audio.md` §A3; the original detects a one-shot's
+  end with a 50 ms wall-clock service thread (`0x00516250`) seen by the
+  next sound-tick upkeep (`0x004DF890`), so end ticks are not
+  tick-exact in 1.14d (`audio/sound-table.md` §6.6); state the d2rs
+  end-tick model there (elapsed ticks × 40 ms ≥ duration) and that its
+  conformance waits for `sound-table.md` OQ 12.~~ Done by PC 1 (commit 4ebe8d2, `xpc-to-pc2.md`).
+- ~~to PC 1: `specs/client/audio.md` §A4; device gain = trunc((1 − occ) ×
+  trunc(v × G / 255)) / 255 with G = 255 in game (`0x005157B0`,
+  `audio/sound-table.md` §8.3 r3); the `GainCurve` must take the
+  occlusion (0 or 0.5 targets, 0.05 steps) as an input, not only v and
+  pan.~~ Done by PC 1 (commit 4ebe8d2, `xpc-to-pc2.md`).
+- to PC 1: `specs/sim/rng.md` §7, row "sound variants, NPC greetings,
+  …"; the same seed is also stepped by the overlay create `0x00470390`
+  for any unit's overlay (type 6: `roll(frames)`; arg a ≠ 0:
+  `roll(a × 256)`; arg b ≠ 0: `roll(b × 16)`, `0x004704DD`,
+  `0x004705B6`, `0x004705D7`), by local-player skill casts through
+  `cltdofunc` entries 5, 24, 32, 34, 54, 56, 63, 71, 77, 82, 86, 87, 89,
+  90 (table `0x00727BA8`) and by the draw-phase users; add a pointer to
+  `audio/sound-table-2.md` §14 (full list).
+- to PC 1: `specs/client/audio.md` §A3; variant / greeting / timer
+  choices cannot be compared by replaying the seed from ticks in 1.14d
+  (the draw phase steps the same seed per frame and the cursor on wall
+  clock, `audio/sound-table-2.md` §14.4); the conformance check must
+  take the recorded seed before each sound draw as input.
+- to PC 1: `specs/render/unit-composite.md` (overlay owner text, "no
+  spec yet; `0x00470390`"); when the overlay spec is written it must
+  own the three draws of `0x00470390` on the local player's seed listed
+  above (`audio/sound-table-2.md` §14.3 states them meanwhile).
+- to PC 1: `specs/client/ui.md` §B8; `audio/triggers.md` open question
+  12; the seven options-menu UI sound sites are mapped in
+  `audio/sound-table-2.md` §15 r5 / `audio/triggers-2.md` §17 (handler
+  table `0x006D6034`–`0x006D6090`); the control names of the other 65
+  sites of `triggers.md` §11 (ids 1–6, 15, 16) are §B8's: add a site →
+  control table there and a link back.
+- to PC 1: `specs/monsters/umod-callbacks.md` (client side, new note);
+  the client has its own umod hook table `0x00724E28` (5 phases per
+  umod, `0x004ADD90`); phase 2 runs every client update and the umod 40
+  entry `0x004ADD80` has no mode or frame test (corpse-explode missiles
+  117 / 545 and sound 2,458 each update, `audio/triggers-2.md` §13.1
+  r4); state whether any client monster can carry umod 40 (0xAC list).
+- to PC 1: `specs/missiles/missiles.md` (client part, `ProgSound`);
+  conditions of missile functions 9, 29, 47, 51 are in
+  `audio/triggers-2.md` §16 (function 29 `0x004CE850`: elapsed = 315,
+  not missile 315); link it from the client-function rules.
+- to PC 1: `specs/sim/intents-events.md` §4 table row 0x2C; the 78
+  `0x00553380` sites by event and the last-wins rule (u16 +0x6E
+  overwritten before the flush) are in `audio/triggers-2.md` §14; add
+  a pointer there.
+
+## Recording list
+
+- sound-table OQ 12 (ST-4): one-shot natural-end ticks (hook the state-2
+  store at `0x004DF8D2` with T, and `0x004E01B0` starts) for a few hundred
+  known one-shots; compare end − start with ceil(frames / 882).
+- sound-table OQ 13 (ST-7): `Async Only` first start attempt tick and the
+  collecting preload pass tick (`0x00482BF0`).
+- triggers OQ 3: write watch on client unit +0xB0 during a fight (which
+  S→C message field arrives there).
+- Existing recordings used: entry 74 (`snd74*-sound.jsonl`) and entry 69
+  (`env69-sound.jsonl`); still missing from entry 74: a cave walk and
+  Blood Raven's death (stinger 34), needed for `environment.md` OQ 1.
+- sound-table OQ 1: voice log per sound tick (each `0x004E01B0` start
+  with id, variant, unit, offset, loop; each `0x005157B0` / `0x00515890`
+  argument; listener and unit points; settings) over a town walk, a
+  fight, a song change and the ESC menu.
+- sound-table OQ 10 (with 13): fresh start; per `Async Only` request,
+  T of the request, of the first start attempt and of the start (or the
+  §6.3 r4 drop).
+- triggers OQ 1: request log (`0x004B9A00` caller, id, unit, delay,
+  flags, T, C) with each S→C 0x2C / 0xA9 and code-8 request: two floor
+  materials, a melee and a caster fight with a death and a block, an
+  NPC greeting and talk, item pickup / drop / identify, a waypoint, a
+  Leap, a fire-enchanted unique's death, the options sliders.
+- environment OQ 1: town → Blood Moor → Den of Evil → town, a day
+  change, Blood Raven's death (stinger 34), rain on and off; the
+  `0x004DCAA0` / `0x004DCD40` / `0x004E42E0` hooks.
+- wav OQ 1 (C75): dump at `0x00516760` (pointer, size) for the wav.md
+  Test vectors files and one ADPCM file per channel count, and the
+  first 256 KiB of `music\act1\crypt.wav` from the refill copy
+  `0x004157C0`; compare byte for byte with our decode.

@@ -26,16 +26,16 @@
 | Outputs / state changes | 64–69 |
 | Rules | 70–71 |
 |   1. Writer | 72–88 |
-|   2. Header (`0x006312B0`) | 89–101 |
-|   3. Compact record (`0x0062AF80`) | 102–121 |
-|   4. Full record (`0x0062FFF0`) | 122–245 |
-|   5. Save-format extras (never on the wire) | 246–251 |
-| Constants & data dependencies | 252–275 |
-| Randomness | 276–279 |
-| Edge cases & original bugs | 280–306 |
-| Test vectors | 307–329 |
-| Provenance | 330–354 |
-| Open questions | 355–372 |
+|   2. Header (`0x006312B0`) | 89–117 |
+|   3. Compact record (`0x0062AF80`) | 118–137 |
+|   4. Full record (`0x0062FFF0`) | 138–274 |
+|   5. Save-format extras (never on the wire) | 275–292 |
+| Constants & data dependencies | 293–316 |
+| Randomness | 317–320 |
+| Edge cases & original bugs | 321–357 |
+| Test vectors | 358–380 |
+| Provenance | 381–405 |
+| Open questions | 406–477 |
 <!-- /index -->
 
 ## Summary
@@ -98,6 +98,22 @@ quality 2 into the item (§4.3 rule 6).
 5. Save format with children: each item of the item's own inventory
    (list order) follows as a complete stream (§2, recursively). Never
    on the wire.
+   Exact condition (`0x00631382`–`0x006313CC`): alt-code flag = 0,
+   children ≠ 0 and the unit's inventory (unit +0x60) ≠ none; then for
+   every item of that inventory (`0x0063B2C0` first, `0x0063DFA0` next,
+   `0x0063DFD0` the item), compact or full parent alike and whatever the
+   parent's `hasinv`: the writer first pads to a whole byte
+   (`0x00411070`: when the bit position is inside a byte, skip to the
+   next byte), then writes the child through `0x006312B0(child, buffer,
+   save, children, alt 0)`. A child therefore goes through the same
+   `0x0062FFF0` / `0x0062AF80`, so the write-backs of §4.1 rule 8 (item
+   level < 1 → 1) and §4.3 rule 7 (quality outside 1–9 → 2) are applied
+   to every child item too. Reader side: the header peek `0x0062AE20`
+   gives the child count as 3 bits read after the item code only when
+   the flags lack both 0x200000 (compact) and 0x2000000 (alt-code), else
+   0; that count is the filled-socket field of §4.1 rule 6 (written from
+   the inventory count only when `hasinv` ≠ 0), and the game never checks
+   it against the number of child streams that follow.
 
 ### 3. Compact record (`0x0062AF80`)
 
@@ -132,6 +148,19 @@ quality 2 into the item (§4.3 rule 6).
    capped at 15); 3 bits page + 1 (+0x45; page 0xFF → 0).
 4. Alt-code flag ≠ 0: 32 bits items +0x84 (the base code; `code` when
    0; `0x006287D0`) and the record **ends**.
+   Items +0x84 is the `normcode` column (`data/fields.tsv` `weapons`
+   offset 132), so the alt code is the item's normal-tier code. The only
+   sender with alt ≠ 0 is the store check of the dispatcher
+   (`items/inventory-moves.md` §6.2): `0x0053EF30` with 0x38 (item +0xC8
+   bit 2, the vendor item flag of `world/vendors.md` §4) sends S→C 0x9C
+   action 0x0B to the trading client with alt = 1 exactly when the item's
+   quality is 4–9 (`0x0062A0F0`) and it lacks item flag 0x10
+   (`0x006280A0`, `0x0053EF84`–`0x0053EFB1`): the unidentified items of a
+   gamble list (`world/vendors.md` §5.1 rule 7). Every other caller passes
+   0 (Open question 1). Reader (`0x0062E430`): the flags word is stored
+   with 0x2000000 and 0x80000 removed; `0x0062CBE0` with alt reads the
+   32-bit code, sets the class from it (`0x00633680`), item level 1 and
+   quality 1, and returns (no unit +0x28, no further field, no trailer).
 5. 32 bits item code (`code`).
 6. 3 bits filled sockets: the number of items in the item's own
    inventory when items `hasinv` ≠ 0, else 0 (`0x0062A900`).
@@ -248,6 +277,18 @@ In this order; "base" = the item's own value (`0x006253B0`), "total"
 1. §2 rule 2 (the "JM" marker), §4.1 rule 7, children (§2 rule 5).
 2. Trailer (`0x00629E40`, after §3 rule 5 and after §4.4): 1 bit 0, or
    1 bit 1 followed by two 32-bit values and then 32 bits 0.
+   The two values are item data +0x1C and +0x20 (`dwRealmData[0..1]` in
+   the D2MOO naming; getter `0x00629E40`). The bit is 1 exactly when
+   +0x20 ≠ 0; then 32 bits +0x1C, 32 bits +0x20, 32 bits 0 (compact
+   `0x0062B341`–`0x0062B387`, full `0x006309CD`–`0x00630A19`). Reader
+   (save format only, and only when the save version argument > 0x56:
+   compact `0x0062ABF9`–`0x0062AC34`, full `0x0062D2A9`–`0x0062D2EA`):
+   1 bit; when 1: 32 bits a, 32 bits b, then when the version > 0x5D 32
+   more bits that are discarded; a → +0x1C, b → +0x20 through the setter
+   `0x00629EA0`, whose only two callers are these readers (`0x0062AC26`,
+   `0x0062D2EA`). No other code path of the exports calls the setter, so
+   in a game every item has +0x20 = 0 unless it was read from a save that
+   carried the values, and its trailer is the single 0 bit.
 
 ## Constants & data dependencies
 
@@ -295,7 +336,7 @@ None.
    name setter `0x00628370` and the readers (`0x0062D298`) are unbounded
    copies too. The buffer is 16 bytes (+0x4A–+0x59); the 1.14d names are
    player names (ears, personalization), which fit with their
-   terminator, so a 16-character name is not expected (Open question 4). A name with no 0 in its 16 bytes
+   terminator, so a 16-character name is not expected (Open question 4: the one exception is a version-0x47 save's ear, up to 17 characters). A name with no 0 in its 16 bytes
    would read on into +0x5A…; d2rs stores at most 15 characters and
    rejects a longer one at the setter instead (handoff BV7).
 8. A compact ear has no item code on the wire (§3 rule 4). The reader
@@ -303,6 +344,16 @@ None.
    header peek), and live `misc.txt` row `ear` has `quest` empty (0), so
    §3 rule 5 never applies to an ear: a reader writes no quest
    difficulty for it (handoff BV9).
+
+9. A gamble list item reaches its client as an alt-code record (§4.1
+   rule 4): the client's copy has the normal-tier code, item level 1,
+   quality 1 and no affixes, whatever the server item is (an
+   exceptional or elite upgrade of `world/vendors.md` §5.1 rule 5 shows
+   as its `normcode` base).
+10. The header peek `0x0062AE20` replaces the item code `nec ` by `neg `
+    when the version argument is < 0x5D (`0x0062AF03`–`0x0062AF10`); the
+    full reader `0x0062CBE0` then sets the class from the code it reads
+    itself, without that replacement.
 
 ## Test vectors
 
@@ -354,18 +405,72 @@ with `Save Add` 0 in 8 bits → 0xFF.
 
 ## Open questions
 
-1. Which callers pass the alt-code flag (§4.1 rule 4, header bit
-   0x2000000): none of the dispatcher's senders do. Settle: xrefs of
-   `0x0053EAE0` / `0x0053CEF0` with a non-zero last argument.
-2. No recorded stream covers set, unique, rare, runeword, ear, gold,
-   book or a filled socket. Settle: a recording that picks up and stashes
-   such items (inventory R2/R5 scenarios).
-3. The save-format trailer values (`0x00629E40`) are not named.
-   Settle: Ghidra on `0x00629E40` (save spec).
-4. Edge case 7: that every caller of the name setter `0x00628370`
-   (`0x0055903B`, `0x005590A4`, `0x0055910E`, `0x00567086`,
-   `0x005670CC`, `0x0057A12B`, `0x0057A625`) passes a name of at most 15
-   characters. Settle: read the source buffer of each call site.
+1. Answered (handoff `pc2-spec-d2s` DS-2a; re-read for this answer): §4.1
+   rule 4. The save-format callers of `0x006313E0` all pass 0
+   (`0x00531712`, `0x00531899`, `0x005318C3`, `0x005318F0`,
+   `0x00531929`, `0x0053195A`, `0x00541B5C`, `0x0055A2E1`), so a game
+   save never holds an alt-code record. Of the 25 network callers
+   (`0x0053EAE0` 13 sites, `0x0053CEF0` 12) only `0x0053EFB1` (0x9C
+   action 0x0B from the store check `0x0053EF30`) can pass 1: an
+   unidentified quality 4–9 item shown to the trading client, i.e. a
+   gamble list item; all others push 0.
+2. Needs recording. The rules for these records are read from the
+   1.14d writer and reader (§3–§5); the binary cannot confirm its own
+   reading. The recording must show, for each of a set, unique, rare,
+   runeword, ear, gold pile, tome and an item with a filled socket: the
+   S→C 0x9C / 0x9D bytes when it is picked up and when it is stored
+   (inventory R2 / R5 scenarios), so each stream decodes to the end with
+   §3–§5 and re-encodes byte for byte (the 0x9D child stream included).
+3. Answered (handoff `pc2-spec-d2s` DS-5): §5 rule 2. Item data +0x1C
+   and +0x20 (D2MOO `dwRealmData`), written only when +0x20 ≠ 0; read only
+   when the save version > 0x56, with one discarded u32 when > 0x5D; the
+   setter `0x00629EA0` is called only by the two save readers.
+4. Answered (2026-10-07, disassembly of the 20 callers of `0x00558D90`
+   and of the legacy save reader): the edge-case-7 claim does **not**
+   hold for one path. Of the 20 callers (`disasm.py xref 0x558D90`: all
+   direct, no pointer), only `0x00530F40` sets the request's forced
+   field +0x2C (`0x00530FDA`, := 1); the 19 others build their request
+   at ebp−0x88 (`0x00579D60` at ebp−0xEC) and never store to +0x2C or
+   to +0x58..+0x67, so after the zeroing memset they reach the
+   unforced branches (`0x005590A4`, player name). `0x00530F40` (callers
+   `0x00531040`, `0x00531390`, both only from `0x00533350`) copies the
+   name with an unbounded byte loop (`0x00530FE3`–`0x00530FED`) from
+   +0x32 of a 0x48-byte legacy record into request +0x58; that record
+   is filled by `0x00532F30`, the reader `formats/d2s.md` §8.2 rule 1
+   selects for save version 0x47. Its ear branches read 16 characters
+   of 7 bits each into +0x32..+0x41: in the "flags 0x100000 clear"
+   ear branch the loop stops at the first 0 and +0x42 (u16) was set to
+   0, so at most 16 characters; in the "0x100000 set, 0x200000 set,
+   0x10000 set" branch all 16 are read with no stop, and +0x42 holds
+   the low byte of a 10-bit field read before them (+0x43 = 0), so a
+   version-0x47 ear name can be 17 characters (16 + that byte) before
+   its terminator. `0x00558D90` then passes request +0x58 to the
+   setter `0x00628370` (unbounded) at `0x0055903B` (type 7 ear) and
+   `0x0055910E` (flag 0x1000000), so up to 18 bytes (17 + 0) are
+   written from item data +0x4A, i.e. 2 bytes past the 16-byte field
+   (+0x5A, +0x5B). Every non-legacy path passes at most 15 characters
+   (the five sites below). d2rs (edge case 7: at most 15 characters,
+   rejected at the setter) therefore differs from 1.14d only for a
+   version-0x47 save holding an ear whose name has ≥ 16 characters; the
+   rejection stays a Ruleset choice and is recorded as such.
+   Earlier partial answer (source of each call site, disassembled):
+   `0x005590A4` and `0x0057A625` copy the player's name (player data
+   +0x00, `0x006221A0`), which the character load bounds to 15
+   characters (`formats/d2s.md` load rule 4: byte +0x23 := 0, and it must
+   equal the client name); `0x00567086` and `0x005670CC` (`0x00567070`)
+   copy another item's name (`0x00628340`, item data +0x4A); `0x0057A12B`
+   copies a name that `0x00579D60` first copied from the same item
+   (`0x0057A073`–`0x0057A08C`, unbounded byte loop into a stack buffer
+   at ebp−0x68). So those five pass at most 15 characters whenever the
+   names already held are. Open: `0x0055903B` (ear, forced request) and
+   `0x0055910E` (personalized, forced request) copy the request's name
+   field +0x58 (16 bytes; `items/generation.md` Inputs); the request
+   builders seen zero the request (`0x00681EF0`); a first scan of the
+   21 callers of `0x00558D90` found no direct store to +0x58, which does
+   not rule out a copy through a pointer. Settle: find the writer
+   of request +0x58 for an ear (player death drop) and check its bound.
+   Original text: Edge case 7: that every caller of the name setter
+   `0x00628370` passes a name of at most 15 characters.
 5. Answered (handoff `impl-bitstream-vitals` BV1-BV4, BV5, BV7, BV9,
    LB1): §3 rules 1-2, §4.3 rule 7, §4.6 rule 4.3, §4.4 rule 1
    (`items/properties.md` §10.1), edge cases 7-8, Constants.

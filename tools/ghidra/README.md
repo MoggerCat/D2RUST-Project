@@ -55,3 +55,5 @@ the target's label, type and small value), `switches.tsv` (computed-jump
 case targets per site), `labels.tsv`, `strings.tsv` and `data.tsv`
 (every defined data item). About 2 minutes; grep these instead of opening
 Ghidra.
+
+`switches.tsv` `case_index` is the order of the computed-jump references on the instruction, not the case value: read the jump table itself (or `disasm.py`) for the case number (a close-hook table was found one case off this way).
