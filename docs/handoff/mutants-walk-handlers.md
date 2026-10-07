@@ -204,3 +204,12 @@ re-run), **5 equivalent left**.
 2. Re-run `place.rs` / `units.rs` with `-F` on the 10 mutants killed by
    hand to record the kill by the tool.
 3. Fold this note into `docs/HANDOFF.md` and `docs/PLAN.md`.
+
+**Merge follow-up and gate.** After the merge, `d2-server/tests/
+mutants_walk.rs` no longer compiled (main grew `NpcRest`, `QuestRest`
+and added `HirelingRest`); its no-op `Rest` was replaced by the shared
+`mutants_handlers_fx::Rest`, assertions unchanged. Gate on this head:
+`cargo fmt --check`, `cargo clippy -p d2-sim -p d2-server --all-targets
+-- -D warnings`, `CARGO_INCREMENTAL=0 cargo test -p d2-sim -p d2-server`
+(40 test binaries, all ok), `coverage.py --check` (8,194 claims, 0
+errors), `spec_index.py --check`: all PASS.
