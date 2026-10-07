@@ -38,13 +38,13 @@
 |   12. Clipping (decision CG2) | 380–390 |
 |   13. d2rs answers (hooks in `d2-client`) | 391–405 |
 |   14. Wide formatter `0x005269D0` (added 2026-10-07) | 406–453 |
-|   15. Edit box caret and selection (`0x004FF620`, added 2026-10-08) | 454–483 |
-| Constants & data dependencies | 484–499 |
-| Randomness | 500–503 |
-| Edge cases & original bugs | 504–533 |
-| Test vectors | 534–569 |
-| Provenance | 570–603 |
-| Open questions | 604–669 |
+|   15. Edit box caret and selection (`0x004FF620`, added 2026-10-08) | 454–534 |
+| Constants & data dependencies | 535–550 |
+| Randomness | 551–554 |
+| Edge cases & original bugs | 555–584 |
+| Test vectors | 585–620 |
+| Provenance | 621–654 |
+| Open questions | 655–721 |
 <!-- /index -->
 
 ## Summary
@@ -477,9 +477,60 @@ function table; control record E). Per drawn line, after the line's text
    width through it, y), color = palette nearest of (64, 64, 64)
    (`0x004FB180`), mode 5 (`render/blend-modes.md`).
 
-Pending: the key handling that moves E +0x25C and the selection ends,
-and the scroll offset, belong to the control's other table functions
-(not read here; owner `ui/controls.md`).
+5. Key handler (`0x004FF050(E, vk)`, added 2026-10-08; E +0x25C is the
+   caret as a unit index into the text at E +0x5C). E +0x00 ≠ 1 is fatal
+   0x302 (E = null: 0x300). When E +0x08 has no bit in both global masks
+   `[0x006CE270]` and `[0x006CE268]` the key is not handled (returns 0).
+   Shift = `GetKeyState(VK_SHIFT)` high bit.
+   1. Pre-step. Backspace (0x08) / Delete (0x2E): when a selection
+      exists (`0x004FDC70`: +0x54 ≠ −1 and +0x54 ≠ +0x58) it is deleted
+      (`0x004FE9F0`) and the key does nothing else. End, Home, Left, Up,
+      Right, Down (0x23–0x28): without Shift the selection is cleared
+      (`0x004FDCC0`: +0x54 := −1, +0x58 := 0); with Shift and +0x54 = −1
+      both ends := the caret (anchor).
+   2. Backspace (no selection deleted), caret > 0: remove the unit
+      before the caret; when the unit before that one is CR (0x0D), it
+      goes too (CR LF removed as a pair). Delete (no selection deleted),
+      unit at caret ≠ 0: remove it; when the unit now at the caret is LF
+      (0x0A), it goes too.
+   3. Home: caret := 0 (Shift: +0x58 := 0). End: caret := text length
+      (Shift: +0x58 := caret). Left: caret − 1, or − 2 when the unit
+      before is LF; never below 0 (Shift with an anchor: +0x58 :=
+      caret). Right, unit at caret ≠ 0: caret + 1, or + 2 when the next
+      unit is LF (Shift: +0x58 := caret). Up / Down with E +0x260 bit 3
+      (multi-line): the caret's point (`0x004FDFF0`) moved one line
+      height (`0x00501A40`) up / down, the caret placed at that point
+      (`0x004FE3B0`); without bit 3, Up acts as Home and Down as End.
+   4. Tab: focus moves (`0x004F91C0`, then `0x004FDD00`) to the next
+      control of the chain E +0x278 (Shift: the previous one, +0x27C)
+      whose +0x08 passes both masks (reaching E itself stops there);
+      walking off the chain end focuses none (null); an empty link
+      (+0x278 / +0x27C = 0) does nothing. Returns 1.
+   5. Enter (0x0D) with a callback E +0x264: it is called with the text
+      (E +0x5C) inside the re-entry counter `[0x007D55C4]` +1 / −1; when
+      E +0x260 bit 1 is clear the handler returns 1 at once. Escape
+      (0x1B): the callback is called with 0 (same counter), return 1;
+      no callback: return 1.
+   6. F1 (0x70): not handled (returns 0).
+   7. All other cases end with the caret stored, the scroll window
+      refit (r6), then the change callback E +0x26C(0) when set;
+      returns 1. (The filter E +0x268 is only consulted after a
+      Backspace / Delete, which bypasses its result.) Typed characters
+      are a different handler (the character entry), not this one.
+6. Scroll window (`0x004FE7C0`, after every key of r5): E +0x4C / +0x50
+   are the first / last visible unit. n = text length, W = E +0x14 −
+   2·(E +0x40); with E +0x260 bit 0 (password) widths are measured on n
+   `*` (0x2A) instead of the text. wt = width of the text, wc = width
+   of `_`. When (wt + wc if caret = n, else wt) ≤ W: first := 0, last :=
+   n − 1. Otherwise W′ = W − wc when caret = n, else W, and: caret >
+   last → last := caret, first walks down from caret − 1 while the span
+   fits (< W′), then first + 1; caret ≤ first + 1 → first := max(caret −
+   1, 0), last walks up from first + 1 while the span fits, then − 1.
+   PROVISIONAL: the remaining case (caret inside the window) refits
+   from the end of the text when the text from the window start fits,
+   else keeps `first` and walks `last` up as above (because the two
+   width calls take their spans in registers not traced here); settled
+   by REC-60.
 
 ## Constants & data dependencies
 
@@ -612,7 +663,8 @@ pushed `k` (214 sites).
    or memory value need a per-site read (or a runtime trace) to exclude
    `k ≥ 13` or a negative `k`.
 3. Answered (2026-10-08), §15: caret `_` blinking on the second, the
-   selection rectangle; key handling stays Pending there.
+   selection rectangle; key handling and the scroll window answered
+   in §15 r5 / r6 (2026-10-08; one case PROVISIONAL, REC-60).
 4. Text-box control `0x004FBF30` (alignment flags, marquee scroll −2 px
    per draw, selected row `0x005025C0`): belongs to the controls owner;
    listed so it is not lost.
