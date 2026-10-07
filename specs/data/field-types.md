@@ -40,7 +40,7 @@
 | Edge cases & original bugs | 524–531 |
 | Test vectors | 532–657 |
 | Provenance | 658–736 |
-| Open questions | 737–764 |
+| Open questions | 737–772 |
 <!-- /index -->
 
 ## Summary
@@ -751,6 +751,14 @@ functions) agrees with every rule here.
    compiled 11154 when d2rs compiles that table (§10).
 8. Whether string-table element numbering is the same in every language.
    The shipped bins hold one set of IDs; this install has only `ENG`.
+   *Answered* (game-file read, 2026-10-07): no. `d2exp.mpq` also carries
+   other languages' tables. Element i's key differs from `ENG` in
+   several: `DEU` and `FRA` `string.tbl` have 5,322 elements (ENG
+   5,391), `ITA` has 5,391 in a different key order, and `patchstring.tbl`
+   has 59 elements in CHI/DEU/ESP/FRA/ITA/JPN/KOR/POL, 17 in POR and 869
+   in ENG. The shipped `.bin` IDs therefore match only the ENG numbering;
+   d2rs keeps ENG (the installed language) and treats another
+   language's tables as out of scope.
 9. The client sound tables' field lists (`sounds.txt` 142-byte and
    `soundenviron.txt` 88-byte records) were not examined; they use the same
    compiler functions.

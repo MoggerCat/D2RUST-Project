@@ -5031,6 +5031,11 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
   `0x00532690` path) in order.
 - `sim/pathing.md` OQ9: FPU control word at `0x0067A140` (or a Blessed
   Hammer's per-tick positions).
+- `formats/ds1.md` OQ3 + `drlg/preset.md` OQ2: after the Trees
+  substitution DS1 loads, dump its 14 group records (0x18 bytes each)
+  and the 0x320 slack after the file buffer.
+- `tools/original-hooks.md` OQ9: breakpoint on `0x00552E6C` over a full
+  scenario; log the allocating caller (unit-seed fallback).
 
 ## 8. Lessons (problems met, fixes)
 
