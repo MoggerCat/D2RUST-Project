@@ -699,7 +699,7 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         }
         if let Some(cb) = cb {
             let t = self.cv.v.h.tables.clone();
-            bodies::remove_callback(self, &t.skills, u, st, cb.0, l);
+            bodies::remove_callback(self, &t.skills, &t.combat, u, st, cb.0, l);
         }
         let v = &mut self.cv.v;
         v.stats.free_plain(&mut *v.h, l);
@@ -1114,5 +1114,114 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
     }
     fn attack_frames(&self, u: UnitId, w: UnitId) -> Option<i32> {
         self.x().attack_frames(u, w)
+    }
+    // ---- batch 4
+
+    fn dir64(&self, u: UnitId, at: (i32, i32)) -> i32 {
+        self.x().body_dir64(u, at)
+    }
+    /// Unit +0x4E.
+    fn action_frame(&self, u: UnitId) -> i32 {
+        self.cv
+            .v
+            .units
+            .get(u)
+            .map_or(0, |r| i32::from(r.anim.action_frame))
+    }
+    fn set_action_frame(&mut self, u: UnitId, v: i32) {
+        if let Some(r) = self.cv.v.units.get_mut(u) {
+            r.anim.action_frame = v as u8;
+        }
+    }
+    /// Unit +0x3C (the sequence's speed; no sequence: nothing kept).
+    fn set_seq_speed(&mut self, u: UnitId, v: i32) {
+        if let Some(q) = self
+            .cv
+            .v
+            .units
+            .get_mut(u)
+            .and_then(|r| r.anim.sequence.as_mut())
+        {
+            q.speed = v;
+        }
+    }
+    /// Unit +0x4C (i16).
+    fn anim_speed(&self, u: UnitId) -> i32 {
+        self.cv
+            .v
+            .units
+            .get(u)
+            .map_or(0, |r| i32::from(r.anim.speed))
+    }
+    fn set_anim_speed(&mut self, u: UnitId, v: i32) {
+        if let Some(r) = self.cv.v.units.get_mut(u) {
+            r.anim.speed = v as i16;
+        }
+    }
+    fn missile_frames(&self, m: UnitId) -> i32 {
+        self.x().body_missile_frames(m)
+    }
+    fn set_missile_frames(&mut self, m: UnitId, total: i32, left: i32) {
+        self.xm().body_set_missile_frames(m, total, left);
+    }
+    /// Unit +0x30 → +0x34.
+    fn sequence_frames(&self, u: UnitId) -> Option<i32> {
+        let r = self.cv.v.units.get(u)?;
+        r.anim.sequence.as_ref().map(|q| q.frame_count)
+    }
+    /// The sequence's event byte of frame `f >> 8`.
+    fn sequence_event(&self, u: UnitId, f: i32) -> i32 {
+        let Some(q) = self
+            .cv
+            .v
+            .units
+            .get(u)
+            .and_then(|r| r.anim.sequence.as_ref())
+        else {
+            return 0;
+        };
+        usize::try_from(f >> 8)
+            .ok()
+            .and_then(|i| q.events.get(i))
+            .map_or(0, |&e| i32::from(e))
+    }
+    /// Unit +0x50: the AnimData record.
+    fn anim_data(&self, u: UnitId) -> Option<(u32, Vec<u8>)> {
+        let a = self.cv.v.units.get(u)?.anim.record.as_ref()?;
+        Some((a.frames, a.events.to_vec()))
+    }
+    fn action_event_between(&self, u: UnitId, a: i32, b: i32) -> bool {
+        self.x().body_action_event_between(u, a, b)
+    }
+    /// [`Pending::ai_chain_index`] (`0x006510C0`).
+    fn chain_position(&self, class: i32) -> i32 {
+        self.x().ai_chain_index(class)
+    }
+    fn book_skills(&self, i: UnitId) -> Option<(i32, i32)> {
+        self.x().body_book_skills(i)
+    }
+    fn inventory_nodes(&self, u: UnitId) -> Vec<(UnitId, i32)> {
+        self.x().body_inventory_nodes(u)
+    }
+    fn unit_find(&self, room: RoomId, at: (i32, i32), r: i32, f: u32) -> Vec<UnitId> {
+        self.x().body_unit_find(room, at, r, f)
+    }
+    fn point_collides(&self, room: RoomId, at: (i32, i32), mask: u32) -> bool {
+        self.x().body_point_collides(room, at, mask)
+    }
+    fn spawn_monster(&mut self, q: bodies::MonsterSpawn<UnitId, RoomId>) -> Option<UnitId> {
+        self.xm().body_spawn_monster(q)
+    }
+    /// a = 0: [`BodyWorld::place_unit`]'s provider.
+    fn place_unit_flag(&mut self, u: UnitId, r: Option<RoomId>, at: (i32, i32), a: i32) -> bool {
+        if a == 0 {
+            self.xm().place_unit(u, r, at)
+        } else {
+            self.xm().body_place_unit_flag(u, r, at, a)
+        }
+    }
+    /// [`Pending::ai_component`].
+    fn component(&self, u: UnitId, k: usize) -> i32 {
+        i32::from(self.x().ai_component(u, k))
     }
 }

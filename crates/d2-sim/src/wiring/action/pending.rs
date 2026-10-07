@@ -1188,6 +1188,62 @@ pub trait Pending {
     fn attack_frames(&self, unit: UnitId, item: UnitId) -> Option<i32> {
         None
     }
+
+    // ---- skill bodies, batch 4 (`bodies-3.md`, `bodies-4.md`) --
+
+    /// `0x00621DC0`: the 64-step direction from the unit to (x, y)
+    /// (`sim/pathing.md` §8.3). Default: 0.
+    fn body_dir64(&self, unit: UnitId, at: (i32, i32)) -> i32 {
+        0
+    }
+    /// A missile's total frames. Default: 0.
+    fn body_missile_frames(&self, missile: UnitId) -> i32 {
+        0
+    }
+    /// A missile's total frames and frames left (`0x0064A2B0`,
+    /// `0x0064A330`). Default: nothing.
+    fn body_set_missile_frames(&mut self, missile: UnitId, total: i32, left: i32) {}
+    /// `0x00621920`: an action event in the frames (a, b]. Default: none.
+    fn body_action_event_between(&self, unit: UnitId, a: i32, b: i32) -> bool {
+        false
+    }
+    /// The books row of an item's spell index: (`scrollskill`,
+    /// `bookskill`). Default: none.
+    fn body_book_skills(&self, item: UnitId) -> Option<(i32, i32)> {
+        None
+    }
+    /// The unit's inventory nodes (item, node kind) in list order.
+    /// Default: none.
+    fn body_inventory_nodes(&self, unit: UnitId) -> Vec<(UnitId, i32)> {
+        Vec::new()
+    }
+    /// The unit find of `missiles/bodies-2.md` §44. Default: nothing found.
+    fn body_unit_find(&self, room: RoomId, at: (i32, i32), r: i32, f: u32) -> Vec<UnitId> {
+        Vec::new()
+    }
+    /// `0x0064CB30(room, x, y, mask)`. Default: collides.
+    fn body_point_collides(&self, room: RoomId, at: (i32, i32), mask: u32) -> bool {
+        true
+    }
+    /// A monster creation entry point (`monsters/init.md` §1). Default:
+    /// none.
+    /// `0x00554EA0(game, unit, room, x, y, a, 0)` with a ≠ 0. Default: not
+    /// placed.
+    fn body_place_unit_flag(
+        &mut self,
+        unit: UnitId,
+        room: Option<RoomId>,
+        at: (i32, i32),
+        a: i32,
+    ) -> bool {
+        false
+    }
+    fn body_spawn_monster(
+        &mut self,
+        q: crate::skills::use_::bodies::MonsterSpawn<UnitId, RoomId>,
+    ) -> Option<UnitId> {
+        None
+    }
     /// `0x00627910` for the kick damage: weapon lists off / back on
     /// (`levels.md` §3.5).
     fn toggle_weapon_lists(&mut self, unit: UnitId, on: bool) {}

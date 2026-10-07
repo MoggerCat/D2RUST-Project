@@ -946,6 +946,26 @@ pub fn mana_check<W: UseWorld>(w: &W, t: &SkillTables, u: W::Unit, e: &SkillEntr
 /// Collision masks of `lineofsight` 1–5 (§5.3 step 6.4).
 pub const LOS_MASKS: [u32; 5] = [4, 0x1C09, 0x180, 0x804, 0x805];
 
+/// Start core `0x0056F640(game, unit, skill, L, 0)` called from a body
+/// (`bodies-3.md` §1): the unit's used entry when it is of `skill`, else
+/// its entry of `skill`; none → 0.
+pub(crate) fn start_core_of<W: UseWorld>(
+    w: &mut W,
+    t: &SkillTables,
+    u: W::Unit,
+    skill: i32,
+    l: i32,
+) -> i32 {
+    let e = match w.used_skill(u) {
+        Some(e) if e.skill == skill => Some(e),
+        _ => w.find_entry(u, skill),
+    };
+    match e {
+        Some(e) => start_core(w, t, u, &e, l),
+        None => 0,
+    }
+}
+
 /// Start core `0x0056F640` (`noManaCheck = 0`, §5.3 step 6).
 fn start_core<W: UseWorld>(w: &mut W, t: &SkillTables, u: W::Unit, e: &SkillEntry, l: i32) -> i32 {
     let Some(r) = rec(t, e.skill) else {
