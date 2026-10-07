@@ -199,8 +199,14 @@ fn client_world_holds_only_stated_fields() {
         palette_act,
         drlg,
         active_rooms,
+        // `sim/unit-order.md` §5 rules 6–8, `render/lighting.md` §6.3,
+        // `drlg/rooms.md` §4.6 (last paragraph).
+        room_units,
+        lights,
+        drlg_updates,
     } = ClientWorld::default();
     assert!(pets.is_empty() && palette_act.is_none() && active_rooms.is_none());
+    assert!(room_units == Default::default() && lights.is_empty() && drlg_updates == 0);
     assert!(drlg.is_none());
     assert_eq!((frames, server_ticks, units.len()), (0, 0, 0));
     assert_eq!((local_player, act, use_cursor), (None, None, None));

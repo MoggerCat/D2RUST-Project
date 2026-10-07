@@ -309,6 +309,21 @@ impl Drlg {
         Some(info.list[k])
     }
 
+    /// A wall record's coordinate record (+0x10, `0x0066C9C0`, §11.3 step
+    /// 9) for the record at room-relative tile (x, y): the record-grid
+    /// entry at its cell in a grid-built room; `None` (0) in a one-record
+    /// room or a room without info. Read when needed, so an index renamed
+    /// by a later merge (§11.3 step 11) is the current one, as through
+    /// the record pointer. Read by drawing code only
+    /// (`render/draw-order.md` §8).
+    pub fn wall_coord(&self, id: DrlgRoomId, x: i32, y: i32) -> Option<CoordRec> {
+        let room = self.room(id);
+        if room.logic.as_ref()?.flags == INFO_ONE {
+            return None;
+        }
+        self.coord_at_tile(id, room.rect.x + x, room.rect.y + y)
+    }
+
     /// `0x0066CF30` (§11.4): the record list of the room's info, head
     /// first; `None` without info (fatal 0x2CD in the original).
     pub fn coord_first(&self, id: DrlgRoomId) -> Option<&[CoordRec]> {

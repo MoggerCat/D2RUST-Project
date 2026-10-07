@@ -516,6 +516,7 @@ fn levels() -> Vec<LevelRow> {
         act: 0,
         blank_screen: true,
         sound_env: 0,
+        draw_edges: false,
     };
     v[40].act = 1;
     v
@@ -557,6 +558,7 @@ fn join_level_comes_from_the_room_of_the_0x15_placement() {
         inner: NoFeed,
         levels: Some(levels()),
         ui_open_mode: None,
+        map: None,
     };
     m.recv(&assign_player(0, 0)).hex("0b 00 01 00 00 00");
     // 0x03 seq 142: palette act 0; u16@6 (town level 1) is not the level.

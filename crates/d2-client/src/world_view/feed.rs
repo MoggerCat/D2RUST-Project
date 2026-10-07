@@ -25,13 +25,14 @@
 use d2_data::tables::Levels;
 use d2_sim::rng::Seed;
 
-use crate::bridge::world::ClientWorld;
+use crate::bridge::drlg::DrlgRoomId;
+use crate::bridge::world::{ClientWorld, UnitKey};
 use crate::bridge::ClientUnit;
 use crate::composite::{ComponentFrame, ComponentRequest, CompositeError, UnitParams};
 use crate::frames::IndexFrame;
 use crate::rules::camera::shake_offsets;
 use crate::rules::draw_order::source::{ordered_source, TileArt, WeatherFrame};
-use crate::rules::draw_order::{FadeClock, NearRooms, OrderedTile};
+use crate::rules::draw_order::{FadeClock, NearRooms, OrderedTile, UnitFacts};
 use crate::rules::lighting::view::{FrameLight, LitRules, LookFeed};
 use crate::rules::{
     Camera, FrameSize, MapTile, OpenMode, OriginalView, Shake, UnitPosition, ViewSource,
@@ -85,6 +86,31 @@ pub trait ViewFeed: ViewSource {
     /// = the model states no map, and `map_tiles` answers alone.
     fn near_rooms(&mut self, _world: &ClientWorld) -> Result<Option<&mut NearRooms>, ViewError> {
         Ok(None)
+    }
+
+    /// The facts of a room unit the draw order reads (`draw-order.md` §3
+    /// r4, §5) that the client model does not hold: unit flags (+0xC4),
+    /// flag-ex (+0xC8), monstats2 `unflatDead`, objects `DrawUnder`, states
+    /// 7, 143, 146 and the sight test (`draw-order-2.md` §15). A feed that
+    /// builds near rooms from the model asks this for every listed unit;
+    /// the default refuses (no spec puts them in the model yet).
+    fn unit_facts(&self, _world: &ClientWorld, unit: &ClientUnit) -> Result<UnitFacts, ViewError> {
+        Err(ViewError::Unresolved {
+            what: "room unit facts",
+            spec: "render/draw-order.md",
+            message: format!(
+                "unit ({}, {}): unit flags, flag-ex, states and the sight test are not in the \
+                 client model",
+                unit.key.unit_type, unit.key.guid
+            ),
+        })
+    }
+
+    /// The room unit lists the frame's fill sorted by y (`sim/unit-order.md`
+    /// §5 rule 7), each handed over once after the frame so the client's
+    /// lists keep the order ([`crate::bridge::Bridge::set_room_order`]).
+    fn take_unit_orders(&mut self) -> Vec<(DrlgRoomId, Vec<UnitKey>)> {
+        Vec::new()
     }
 
     /// The weather state of the frame (`draw-order-2.md` §11; pools,

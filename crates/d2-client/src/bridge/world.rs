@@ -1,4 +1,4 @@
-// Spec: specs/client/model.md (§1, §2, §5 rule 4), specs/client/bridge.md (§5)
+// Spec: specs/client/model.md (§1, §2, §5 rule 4, §12 rule 2), specs/client/bridge.md (§5), specs/sim/unit-order.md (§5 rules 6–8), specs/render/lighting.md (§6.4), specs/drlg/rooms.md (§4.6, §5 rule 9)
 //! Client world model: what the S→C messages have told the client. Plain
 //! Rust, no Bevy. Not game state: `d2-sim` on the server is.
 //!
@@ -11,6 +11,7 @@
 use std::collections::BTreeMap;
 
 use super::drlg::{ClientDrlg, DrlgRoomId, DrlgSource};
+use crate::rules::lighting::records::{LightError, LightList, LightRooms, Owner, RoomId};
 use d2_proto::transport::server_message;
 
 /// Unit types (`sim/unit-order.md` §1 rule 1).
@@ -256,6 +257,80 @@ pub struct UseCursor {
     pub code: u8,
 }
 
+/// The units of each client active room (`sim/unit-order.md` §5 rules
+/// 6–8): the room list at active room +0x74 (head first, insert =
+/// prepend `0x0064C350`, remove `0x0064C370`), the client's only link
+/// from a unit to a room. A unit at (0, 0) or with no room is in no list.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct RoomUnits {
+    lists: BTreeMap<DrlgRoomId, Vec<UnitKey>>,
+    rooms: BTreeMap<UnitKey, DrlgRoomId>,
+}
+
+impl RoomUnits {
+    /// The room's list, head first (empty for a room with no units).
+    pub fn list(&self, room: DrlgRoomId) -> &[UnitKey] {
+        self.lists.get(&room).map_or(&[], Vec::as_slice)
+    }
+
+    /// The room whose list holds `key`.
+    pub fn room_of(&self, key: UnitKey) -> Option<DrlgRoomId> {
+        self.rooms.get(&key).copied()
+    }
+
+    /// Unit leaves its room (`0x0064C370` / `0x0064C450`); not in a list:
+    /// nothing.
+    pub fn leave(&mut self, key: UnitKey) {
+        let Some(room) = self.rooms.remove(&key) else {
+            return;
+        };
+        if let Some(list) = self.lists.get_mut(&room) {
+            list.retain(|&k| k != key);
+            if list.is_empty() {
+                self.lists.remove(&room);
+            }
+        }
+    }
+
+    /// The room recache (`0x0064FAD0`, rule 6): leave the old room, then
+    /// insert at the head of `room`'s list when it is not none (rule 2).
+    pub fn place(&mut self, key: UnitKey, room: Option<DrlgRoomId>) {
+        self.leave(key);
+        if let Some(room) = room {
+            self.lists.entry(room).or_default().insert(0, key);
+            self.rooms.insert(key, room);
+        }
+    }
+
+    /// The client room free (`0x0061A840`, rule 6 table): each unit of
+    /// the room leaves it. Returns them in list order.
+    pub fn free_room(&mut self, room: DrlgRoomId) -> Vec<UnitKey> {
+        let units = self.lists.remove(&room).unwrap_or_default();
+        for k in &units {
+            self.rooms.remove(k);
+        }
+        units
+    }
+
+    /// The draw's Y sort written back (rule 7): `order` is the room's list
+    /// after the stable sort the draw ran on it. Refused (`false`, nothing
+    /// changed) unless it holds exactly the list's units.
+    pub fn set_order(&mut self, room: DrlgRoomId, order: &[UnitKey]) -> bool {
+        let Some(list) = self.lists.get_mut(&room) else {
+            return order.is_empty();
+        };
+        let mut a = list.clone();
+        let mut b = order.to_vec();
+        a.sort();
+        b.sort();
+        if a != b {
+            return false;
+        }
+        list.copy_from_slice(order);
+        true
+    }
+}
+
 /// The client world model.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ClientWorld {
@@ -296,6 +371,17 @@ pub struct ClientWorld {
     /// headless configuration of `ModelInputs::default`), so a placement
     /// is taken as in a room and the level is unknown.
     pub active_rooms: Option<Vec<ActiveRoom>>,
+    /// The client room unit lists (`sim/unit-order.md` §5 rules 6–8).
+    pub room_units: RoomUnits,
+    /// The client's light list (`render/lighting.md` §6.3). Its records
+    /// are created by unit code no model rule runs yet; the act room
+    /// callback (`rooms.md` §5 rule 9) runs over it for every new active
+    /// room.
+    pub lights: LightList,
+    /// `[0x007A0498]`: client updates that ran the DRLG part
+    /// (`rooms.md` §4.6, last paragraph: += 1 first, level free on every
+    /// multiple of 13).
+    pub drlg_updates: u32,
 }
 
 impl ClientWorld {
@@ -317,6 +403,8 @@ impl ClientWorld {
     /// not in the set: nothing.
     pub fn remove(&mut self, key: UnitKey) -> Option<ClientUnit> {
         let unit = self.units.remove(&key)?;
+        // The unit free leaves the room list (`unit-order.md` §5 rule 6).
+        self.room_units.leave(key);
         if self.local_player == Some(key) {
             self.local_player = None;
         }
@@ -358,42 +446,128 @@ impl ClientWorld {
     pub fn room_from(&self, start: Option<&ActiveRoom>, x: u16, y: u16) -> Option<ActiveRoom> {
         let rooms = self.active_rooms.as_deref()?;
         let (x, y) = (i32::from(x), i32::from(y));
-        if let Some(own) = start {
-            if own.contains(x, y) {
-                return Some(*own);
-            }
-            let adjacency = self
-                .drlg
-                .as_ref()
-                .map_or_else(Vec::new, |d| d.adjacency(own.room));
-            let found = adjacency
-                .iter()
-                .filter_map(|&n| rooms.iter().find(|r| r.room == n))
-                .find(|r| r.contains(x, y));
-            if let Some(r) = found {
-                return Some(*r);
-            }
+        if let Some(found) = start.and_then(|own| self.cell_lookup(own, x, y)) {
+            return Some(found);
         }
         room_of_point(rooms, x, y).copied()
     }
 
-    /// The room of a unit: the active room containing its position (the
-    /// model holds no unit → room pointer); `None` when it is not placed
-    /// or with no client DRLG.
+    /// The room of a unit: the active room whose unit list holds it
+    /// (`sim/unit-order.md` §5 rule 6, the client's only unit → room
+    /// link); `None` when it is in no list or with no client DRLG.
     pub fn unit_room(&self, key: UnitKey) -> Option<&ActiveRoom> {
-        let (x, y) = self.units.get(&key)?.position?;
-        room_of_point(self.active_rooms.as_deref()?, i32::from(x), i32::from(y))
+        let room = self.room_units.room_of(key)?;
+        self.active_rooms
+            .as_deref()?
+            .iter()
+            .find(|r| r.room == room)
     }
 
-    /// Refreshes [`ClientWorld::active_rooms`] from the client DRLG.
-    pub fn refresh_active_rooms(&mut self) {
+    /// Refreshes [`ClientWorld::active_rooms`] from the client DRLG after
+    /// a DRLG change: the units of a room that is no longer active leave
+    /// its list (the client room free, `sim/unit-order.md` §5 rule 6),
+    /// then the act room callback runs for each new active room in
+    /// creation order (`drlg/rooms.md` §5 rule 9, `render/lighting.md`
+    /// §6.4: the light cache). The callbacks run after the whole change:
+    /// the callback reads only the owners' rooms (unchanged by a DRLG
+    /// change) and the cell lookup from them, whose answer for the new
+    /// room is the same once the change ends (rooms do not overlap, and
+    /// a set-in-sight or a timed build removes no active room).
+    pub fn refresh_active_rooms(&mut self) -> Result<(), LightError> {
+        let old = self.active_rooms.take().unwrap_or_default();
         self.active_rooms = self.drlg.as_ref().map(ClientDrlg::active_rooms);
+        let now = self.active_rooms.as_deref().unwrap_or(&[]);
+        for r in &old {
+            if !now.iter().any(|n| n.room == r.room) {
+                self.room_units.free_room(r.room);
+            }
+        }
+        let created = self
+            .drlg
+            .as_mut()
+            .map_or_else(Vec::new, ClientDrlg::take_created);
+        let mut lights = std::mem::take(&mut self.lights);
+        let mut result = Ok(());
+        for room in created {
+            if let Err(e) = lights.room_created(light_room(room), &*self) {
+                result = Err(e);
+                break;
+            }
+        }
+        self.lights = lights;
+        result
+    }
+
+    /// The cell lookup `0x00463740(room, x, y)` (`sim/path-placement.md`
+    /// §4 rule 1): `start` itself if it contains the point, else the first
+    /// room of its adjacency array that does; none otherwise.
+    pub fn cell_lookup(&self, start: &ActiveRoom, x: i32, y: i32) -> Option<ActiveRoom> {
+        let rooms = self.active_rooms.as_deref()?;
+        if start.contains(x, y) {
+            return Some(*start);
+        }
+        let adjacency = self
+            .drlg
+            .as_ref()
+            .map_or_else(Vec::new, |d| d.adjacency(start.room));
+        adjacency
+            .iter()
+            .filter_map(|&n| rooms.iter().find(|r| r.room == n))
+            .find(|r| r.contains(x, y))
+            .copied()
     }
 
     /// The local player's level (§11 rules 3, 5): the level id of its
     /// room; none while it has no room.
     pub fn player_level(&self) -> Option<u16> {
         self.local_room().map(|r| r.level)
+    }
+}
+
+/// The light code's room handle of a DRLG room (one active room per
+/// DRLG room at a time).
+pub fn light_room(room: DrlgRoomId) -> RoomId {
+    room.0
+}
+
+/// The client world as the light code's new-room rule reads it
+/// (`render/lighting.md` §6.4). The model holds set S only, so an owner
+/// marked client-only (set C) is not found.
+impl LightRooms for ClientWorld {
+    fn owner_position(&self, owner: &Owner) -> Option<(i32, i32)> {
+        let (x, y) = self.light_owner(owner)?.cell();
+        let centre = |c: u16| (i32::from(c) << 16) | 0x8000;
+        Some((centre(x), centre(y)))
+    }
+
+    fn owner_subtile(&self, owner: &Owner) -> Option<(i32, i32)> {
+        let (x, y) = self.light_owner(owner)?.cell();
+        Some((i32::from(x), i32::from(y)))
+    }
+
+    fn owner_room(&self, owner: &Owner) -> Option<RoomId> {
+        let u = self.light_owner(owner)?;
+        self.room_units.room_of(u.key).map(light_room)
+    }
+
+    fn cell_room(&self, room: RoomId, x: i32, y: i32) -> Option<RoomId> {
+        let start = self
+            .active_rooms
+            .as_deref()?
+            .iter()
+            .find(|r| light_room(r.room) == room)?;
+        self.cell_lookup(start, x, y).map(|r| light_room(r.room))
+    }
+}
+
+impl ClientWorld {
+    /// The owner lookup of `render/lighting.md` §6.4 rule 1 over set S.
+    fn light_owner(&self, owner: &Owner) -> Option<&ClientUnit> {
+        if owner.client_only {
+            return None;
+        }
+        let t = u8::try_from(owner.unit_type).ok()?;
+        self.units.get(&UnitKey::new(t, owner.guid))
     }
 }
 
@@ -486,6 +660,8 @@ pub struct LevelRow {
     /// `SoundEnv`: the `soundenviron` row of the level
     /// (`audio/environment.md` §1 r2).
     pub sound_env: u8,
+    /// `DrawEdges` (+9, `render/draw-order.md` §6 r2).
+    pub draw_edges: bool,
 }
 
 /// Inputs of the message rules that are not model state.

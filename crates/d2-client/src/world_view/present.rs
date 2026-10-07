@@ -361,6 +361,11 @@ fn world_view_frame(
         state.feed.as_mut(),
         &state.assets,
     )?;
+    // `sim/unit-order.md` §5 rule 7: the fill's Y sort persists in the
+    // client's room lists.
+    for (room, order) in state.feed.take_unit_orders() {
+        bridge.0.set_room_order(room, &order);
+    }
     let blank_screen = state.feed.blank_screen(bridge.0.world())?;
     let use_gpu = gpu.is_some();
     let bridge_frame = bridge.0.world().frames;

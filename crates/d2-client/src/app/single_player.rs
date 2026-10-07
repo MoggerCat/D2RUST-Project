@@ -508,6 +508,7 @@ pub fn client_level_rows(data: &GameData) -> Vec<LevelRow> {
             act: l.act,
             blank_screen: l.blankscreen != 0,
             sound_env: l.soundenv,
+            draw_edges: l.drawedges != 0,
         })
         .collect()
 }

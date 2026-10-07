@@ -1,4 +1,4 @@
-// Spec: specs/client/model.md (§3 rule 1, §7, §9, §11 rule 2, §12 rule 1)
+// Spec: specs/client/model.md (§3 rule 1, §7, §9 rules 1–5, §11 rule 2, §12 rule 1), specs/sim/unit-order.md (§5 rule 6)
 //! Session messages (0x00–0x06), the local player message (0x0B) and the
 //! room-in-sight messages (0x07, 0x08). 0x03 builds the client DRLG act
 //! and 0x07 / 0x08 set its rooms in sight ([`super::super::drlg`]); the
@@ -58,12 +58,15 @@ pub fn load_act(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerErr
     // §11 rule 2: the act of 0x03 is the palette act. u16@6 is the act's
     // town, never the player's level (§11 rules 1, 5).
     w.palette_act = Some(m.act);
+    // The old act's rooms are freed with it: their units leave the room
+    // lists (`sim/unit-order.md` §5 rule 6).
     w.drlg = None;
     w.active_rooms = None;
+    w.room_units = Default::default();
     if let Some(src) = &msg.inputs.drlg {
         w.drlg =
             Some(ClientDrlg::build(src, m.act, m.f2, w.difficulty).map_err(ClientDrlgError::from)?);
-        w.refresh_active_rooms();
+        w.refresh_active_rooms()?;
     }
     Ok(())
 }
@@ -121,13 +124,15 @@ fn room_sight(w: &mut ClientWorld, msg: &Message<'_>, show: bool) -> Result<(), 
     } else {
         drlg.unset_in_sight(sight.level, sight.x, sight.y, hint)?
     };
-    w.refresh_active_rooms();
-    if found.is_none() {
-        // TODO(spec: model.md §9 rules 1–2): what 1.14d does when the
-        // level has no DRLG room at the point is not stated.
-        return Err(HandlerError::Unspecified(
-            "model.md §9 r1–r2: 0x07 / 0x08 at a point in no room of the level",
-        ));
+    w.refresh_active_rooms()?;
+    // §9 rule 5: no room at the point. 0x07 reads the status-1 count of
+    // the null room (an access violation that ends 1.14d); 0x08 tests the
+    // room and does nothing.
+    if found.is_none() && show {
+        return Err(HandlerError::Crash {
+            at: 0x0061_B672,
+            what: "0x07 at a point in no room of the level reads the null room's count",
+        });
     }
     Ok(())
 }

@@ -378,3 +378,31 @@ fn rename_rules() {
     assert_eq!(indexes(&d, r[2]), [9, 0]);
     assert_eq!(indexes(&d, r[3]), [30, 0]);
 }
+
+// Covers: specs/drlg/levels.md §11.3 r9
+#[test]
+fn wall_records_point_at_the_record_grid() {
+    let (mut d, l, _) = world();
+    let id = room(&mut d, l, 10, 20, 2, 1);
+    d.room_mut(id).tiles.as_mut().unwrap().walls = vec![wall(1, 0), wall(1, 1)];
+    d.level_mut(l).coord_counter = 3;
+    let g = LogicGrids {
+        orientation: grid(3, 2, &[(1, 0, 1), (1, 1, 1)]),
+        floor: grid(3, 2, &[(2, 0, 0x01E0_0002)]),
+        wall: CellGrid::default(),
+    };
+    d.build_logic_grid(id, &g);
+    // Room-relative cells: (0, 0) is in record 4, (1, 0) in record 5.
+    assert_eq!(d.wall_coord(id, 0, 0).map(|r| r.index), Some(4));
+    assert_eq!(
+        d.wall_coord(id, 1, 0),
+        Some(cr(5, false, [11, 20, 13, 22], [11, 20, 12, 21]))
+    );
+    // A one-record room: 0 (no record pointer).
+    let one = room(&mut d, l, 30, 20, 2, 2);
+    d.build_logic_one(one);
+    assert_eq!(d.wall_coord(one, 0, 0), None);
+    // No info: none.
+    let bare = room(&mut d, l, 50, 20, 2, 2);
+    assert_eq!(d.wall_coord(bare, 0, 0), None);
+}

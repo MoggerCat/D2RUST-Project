@@ -347,6 +347,9 @@ mod tests {
         u.position = Some((45, 5));
         w.units.insert(key, u);
         w.local_player = Some(key);
+        // The player is in the room's unit list (`sim/unit-order.md` §5
+        // rule 6: the client's only unit → room link).
+        w.room_units.place(key, Some(DrlgRoomId(0)));
         let room = |level| ActiveRoom {
             x0: 40,
             y0: 0,

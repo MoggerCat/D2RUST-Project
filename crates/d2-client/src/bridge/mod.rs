@@ -197,6 +197,13 @@ impl<L: ServerLink> Bridge<L> {
         Ok(out.len())
     }
 
+    /// The draw's Y sort of a room's unit list written back to the client
+    /// list (`sim/unit-order.md` §5 rule 7: the sorted order persists).
+    /// `false`: `order` is not a permutation of the list (nothing changed).
+    pub fn set_room_order(&mut self, room: drlg::DrlgRoomId, order: &[UnitKey]) -> bool {
+        self.world.room_units.set_order(room, order)
+    }
+
     /// The tables the message rules read (`msg-units.md` Inputs).
     pub fn set_tables(&mut self, tables: ClientTables) {
         self.inputs.tables = tables;

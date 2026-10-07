@@ -59,6 +59,10 @@ pub enum HandlerError {
     /// local player when there is none.
     #[error("fatal assert 0x{0:X}")]
     Fatal(u32),
+    /// A 1.14d access violation that ends the process (no assert, no
+    /// message): the instruction address and what it reads.
+    #[error("access violation at 0x{at:08X}: {what}")]
+    Crash { at: u32, what: &'static str },
     /// A rule input no spec gives yet.
     #[error("TODO(spec: {0})")]
     Unspecified(&'static str),

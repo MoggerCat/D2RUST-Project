@@ -181,7 +181,7 @@ fn load_act_builds_the_client_drlg() {
     assert!(bare.w.drlg.is_none() && bare.w.active_rooms.is_none());
 }
 
-// Covers: specs/client/model.md §9 r1, §9 r2, §12 r1; specs/drlg/rooms.md §4.2, §5 r5
+// Covers: specs/client/model.md §9 r1, §9 r2, §9 r5, §12 r1; specs/drlg/rooms.md §4.2, §5 r5
 #[test]
 fn rooms_come_in_sight_and_go() {
     let mut m = model();
@@ -217,10 +217,20 @@ fn rooms_come_in_sight_and_go() {
     m.recv(&sight(false, 0, 0));
     assert_eq!(m.w.active_rooms, Some(Vec::new()));
     assert_eq!((st(&m, 0), st(&m, 1), st(&m, 2)), (4, 4, 4));
-    // A point in no room of the level: an unspecified case, refused.
+    // A point in no room of the level (§9 r5): 0x07 reads the null
+    // room's count, an access violation that ends 1.14d (refused and
+    // recorded); 0x08 tests the room and does nothing. Both are recorded.
     m.recv(&sight(true, 200, 200));
     assert_eq!(m.rejected().len(), 1);
     assert_eq!(m.rejected()[0].0, 0x07);
+    assert_eq!(
+        m.rejected()[0].1,
+        "access violation at 0x0061B672: 0x07 at a point in no room of the level reads the \
+         null room's count"
+    );
+    m.recv(&sight(false, 200, 200));
+    assert_eq!(m.rejected().len(), 1);
+    assert_eq!(m.w.rooms_in_sight.len(), 6);
     // A new 0x03 frees the act and builds a new one.
     m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
     assert_eq!(m.w.active_rooms, Some(Vec::new()));
@@ -328,4 +338,301 @@ fn a_correction_needs_a_room_for_the_point() {
         Checked::Moved
     );
     assert_eq!(m.unit(k).position, Some((85, 5)));
+}
+
+// Covers: specs/sim/unit-order.md §5 r6, §5 r8
+#[test]
+fn units_live_in_their_rooms_lists() {
+    let mut m = model();
+    m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
+    m.recv(&sight(true, 8, 0)).recv(&sight(true, 16, 0));
+    let rooms = m.w.active_rooms.clone().unwrap();
+    let (r2, r1) = (rooms[0].room, rooms[1].room);
+    let mon = UnitKey::new(MONSTER, 6);
+    let pl = UnitKey::new(PLAYER, 1);
+    // Creation at a point: the head of the creation room's list.
+    m.recv(&assign_monster(6, 45, 5));
+    m.recv(&assign_player(46, 6));
+    assert_eq!(m.w.room_units.list(r1), [pl, mon]);
+    assert_eq!(m.w.unit_room(pl).map(|r| r.room), Some(r1));
+    // At (0, 0): no room, in no list.
+    m.recv(&assign_monster(7, 0, 0));
+    assert_eq!(m.w.room_units.room_of(UnitKey::new(MONSTER, 7)), None);
+    // 0x15 to room 2: the room recache (leave, head of the new list).
+    m.hex("0b 00 01 00 00 00");
+    m.hex("15 00 01 00 00 00 55 00 05 00 01");
+    assert_eq!(m.w.room_units.list(r1), [mon]);
+    assert_eq!(m.w.room_units.list(r2), [pl]);
+    assert_eq!(m.w.local_room().map(|r| r.room), Some(r2));
+    // 0x0A: the unit free leaves the list.
+    m.hex("0a 01 06 00 00 00");
+    assert!(m.w.room_units.list(r1).is_empty());
+    // Both rooms out of sight: the client room free empties the lists.
+    m.recv(&sight(false, 8, 0)).recv(&sight(false, 16, 0));
+    assert_eq!(m.w.active_rooms, Some(Vec::new()));
+    assert_eq!(m.w.room_units.room_of(pl), None);
+    assert_eq!(m.w.local_room(), None);
+}
+
+// Covers: specs/sim/unit-order.md §5 r7
+#[test]
+fn the_draw_order_of_a_list_is_written_back() {
+    let mut m = model();
+    m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
+    m.recv(&sight(true, 8, 0));
+    let r1 = m.w.active_rooms.as_ref().unwrap()[0].room;
+    m.recv(&assign_monster(6, 45, 5))
+        .recv(&assign_monster(7, 46, 5));
+    let (a, b) = (UnitKey::new(MONSTER, 6), UnitKey::new(MONSTER, 7));
+    assert_eq!(m.w.room_units.list(r1), [b, a]);
+    // A permutation is kept; anything else is refused.
+    assert!(m.w.room_units.set_order(r1, &[a, b]));
+    assert_eq!(m.w.room_units.list(r1), [a, b]);
+    assert!(!m.w.room_units.set_order(r1, &[a]));
+    assert!(!m.w.room_units.set_order(r1, &[a, UnitKey::new(MONSTER, 9)]));
+    assert_eq!(m.w.room_units.list(r1), [a, b]);
+    // Later inserts prepend into the kept order.
+    m.recv(&assign_monster(8, 47, 5));
+    assert_eq!(m.w.room_units.list(r1), [UnitKey::new(MONSTER, 8), a, b]);
+}
+
+// Covers: specs/drlg/rooms.md §4.6 r1, §4.6 r6, §4.6 r7
+#[test]
+fn the_update_pass_runs_the_build_timer() {
+    let mut m = model();
+    m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
+    m.recv(&sight(true, 8, 0));
+    let two = |m: &Model| m.w.drlg.as_ref().unwrap().drlg.status_list(2).to_vec();
+    let waiting = two(&m);
+    assert_eq!(waiting.len(), 2);
+    let active = |m: &Model| {
+        m.w.active_rooms
+            .as_ref()
+            .unwrap()
+            .iter()
+            .map(|r| r.room)
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(active(&m).len(), 1);
+    // Set handler 1 built room 1 (T := 5, B = 1): the fifth update builds
+    // the first status-2 room, the tenth the next.
+    for _ in 0..4 {
+        m.drain();
+    }
+    assert_eq!(active(&m).len(), 1);
+    m.drain();
+    assert_eq!(active(&m)[0], waiting[0]);
+    for _ in 0..4 {
+        m.drain();
+    }
+    assert_eq!(active(&m).len(), 2);
+    m.drain();
+    assert_eq!(active(&m)[0], waiting[1]);
+    assert_eq!(m.w.drlg_updates, 10);
+    // Every room is now active: the units' room lookups see them.
+    assert!(m.w.room_at(5, 5).is_some() && m.w.room_at(85, 5).is_some());
+    assert!(m.rejected().is_empty());
+}
+
+// Covers: specs/drlg/rooms.md §5 r9; specs/render/lighting.md §6.4
+#[test]
+fn a_new_active_room_drops_light_caches_reaching_it() {
+    use crate::rules::lighting::records::{LightKind, Owner};
+    let mut m = model();
+    m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
+    m.recv(&sight(true, 8, 0));
+    // Two monsters in room 1 (sub-tiles 40…79): one 5 sub-tiles from
+    // room 2, one 35 away.
+    m.recv(&assign_monster(6, 75, 5))
+        .recv(&assign_monster(7, 45, 5));
+    let owner = |guid| Owner {
+        unit_type: 1,
+        guid,
+        client_only: false,
+    };
+    let mut cached = |guid| {
+        let id =
+            m.w.lights
+                .create(
+                    Some(owner(guid)),
+                    (0, 0),
+                    LightKind::Cached,
+                    10,
+                    255,
+                    0,
+                    0,
+                    0,
+                )
+                .unwrap();
+        m.w.lights.get_mut(id).unwrap().cache_valid = true;
+        id
+    };
+    let (near, far) = (cached(6), cached(7));
+    // 0x07 builds room 2: the callback probes (75 + 10, 5) from room 1,
+    // which its adjacency array resolves to room 2.
+    m.recv(&sight(true, 16, 0));
+    assert!(!m.w.lights.get(near).unwrap().cache_valid);
+    assert!(m.w.lights.get(far).unwrap().cache_valid);
+    // An owner the model does not hold: fatal 0x591.
+    m.w.lights
+        .create(Some(owner(99)), (0, 0), LightKind::Cached, 3, 255, 0, 0, 0)
+        .unwrap();
+    m.recv(&sight(true, 0, 0));
+    assert_eq!(m.rejected().last().unwrap().1, "fatal assert 0x591");
+}
+
+/// An inner feed whose unit facts are all zero / false (the facts the
+/// model does not hold), for the near-room build.
+struct ZeroFacts;
+
+impl crate::rules::ViewSource for ZeroFacts {
+    fn unit_position(
+        &self,
+        u: &crate::bridge::ClientUnit,
+    ) -> Result<crate::rules::UnitPosition, String> {
+        crate::world_view::model_feed::unit_position(u)
+    }
+    fn unit_offset(
+        &self,
+        _: &crate::bridge::ClientUnit,
+        _: &crate::world_view::UnitPose,
+    ) -> Result<(i32, i32), String> {
+        Ok((0, 0))
+    }
+    fn map_tiles(
+        &self,
+        _: &super::super::world::ClientWorld,
+        _: &crate::world_view::ViewAssets,
+    ) -> Result<Vec<crate::rules::MapTile>, crate::world_view::ViewError> {
+        Ok(Vec::new())
+    }
+}
+
+impl crate::world_view::ViewFeed for ZeroFacts {
+    fn player(
+        &self,
+        _: &super::super::world::ClientWorld,
+    ) -> Result<Option<crate::rules::UnitPosition>, crate::world_view::ViewError> {
+        Ok(None)
+    }
+    fn open_mode(
+        &self,
+        _: &super::super::world::ClientWorld,
+    ) -> Result<crate::rules::OpenMode, crate::world_view::ViewError> {
+        Ok(crate::rules::OpenMode::new(0).unwrap())
+    }
+    fn shake(
+        &self,
+        _: &super::super::world::ClientWorld,
+    ) -> Result<Option<crate::world_view::feed::RunningShake>, crate::world_view::ViewError> {
+        Ok(None)
+    }
+    fn player_seed(
+        &mut self,
+        _: &super::super::world::ClientWorld,
+    ) -> Result<&mut Seed, crate::world_view::ViewError> {
+        unreachable!("not read by the near-room build")
+    }
+    fn blank_screen(
+        &self,
+        _: &super::super::world::ClientWorld,
+    ) -> Result<bool, crate::world_view::ViewError> {
+        Ok(true)
+    }
+    fn unit_facts(
+        &self,
+        _: &super::super::world::ClientWorld,
+        _: &crate::bridge::ClientUnit,
+    ) -> Result<crate::rules::draw_order::UnitFacts, crate::world_view::ViewError> {
+        Ok(crate::rules::draw_order::UnitFacts::default())
+    }
+}
+
+// Covers: specs/render/draw-order.md §9, §3 r2; specs/drlg/rooms.md §9.3 text; specs/sim/unit-order.md §5 r7
+#[test]
+fn near_rooms_come_from_the_client_drlg() {
+    use crate::rules::draw_order::{TileArray, REC_DRAWN};
+    use crate::world_view::model_feed::ModelFeed;
+    use crate::world_view::ViewFeed;
+    let mut m = model();
+    m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
+    m.recv(&sight(true, 8, 0)).recv(&sight(true, 16, 0));
+    m.recv(&assign_player(46, 6)).hex("0b 00 01 00 00 00");
+    m.recv(&assign_monster(6, 47, 9));
+    let mut feed = ModelFeed::new(ZeroFacts).with_map();
+    // Without Levels rows the level facts (DrawEdges) are unknown.
+    assert!(feed.near_rooms(&m.w).is_err());
+    let mut rows = vec![LevelRow::default(); 4];
+    rows[2].draw_edges = true;
+    feed.levels = Some(rows);
+    // The map off: the inner feed's answer (none).
+    assert!(ModelFeed::new(ZeroFacts)
+        .near_rooms(&m.w)
+        .unwrap()
+        .is_none());
+    let cd = m.w.drlg.clone().unwrap();
+    let own = m.w.local_room().copied().unwrap();
+    let adjacency = cd.adjacency(own.room);
+    let near = feed.near_rooms(&m.w).unwrap().unwrap();
+    // The local player's room's adjacency array, in order.
+    assert_eq!(near.rooms.len(), adjacency.len());
+    assert_eq!((near.level.id, near.level.draw_edges), (2, true));
+    assert_eq!(near.player_tile, (9, 1));
+    let rec = cd.drlg.coord_at(own.room, 46, 6).unwrap();
+    assert_eq!(near.player_logical, rec.index as i32);
+    let k = adjacency.iter().position(|&r| r == own.room).unwrap();
+    let room = &near.rooms[k];
+    let drlg_room = cd.drlg.room(own.room);
+    assert_eq!(
+        (room.tiles.x, room.tiles.y, room.tiles.w, room.tiles.h),
+        (8, 0, 8, 8)
+    );
+    assert_eq!(room.subtile_origin, (40, 0));
+    let tiles = drlg_room.tiles().unwrap();
+    assert_eq!(room.floors.len(), tiles.floors.len());
+    assert_eq!(room.walls.len(), tiles.walls.len());
+    assert!(!room.floors.is_empty());
+    assert_eq!(room.floors[0].flags, tiles.floors[0].flags);
+    assert_eq!(
+        (room.floors[0].dt1.roof_height, room.floors[0].dt1.height),
+        (0, 0)
+    );
+    // The unit list in the client's order (newest first), the model's
+    // facts over the inner feed's.
+    let keys: Vec<UnitKey> = room.units.iter().map(|u| u.key).collect();
+    assert_eq!(keys, [UnitKey::new(MONSTER, 6), UnitKey::new(PLAYER, 1)]);
+    assert!(room.units[1].facts.local && !room.units[0].facts.local);
+    assert_eq!(room.units[1].facts.mode, 5);
+    // The draw writes flags into a record and sorts the list (here by
+    // hand): the flags persist into the next frame's build, the order
+    // goes back to the client's list.
+    room_mut(near, k).floors[0].flags |= REC_DRAWN;
+    room_mut(near, k).units.reverse();
+    room_mut(near, k).units_sorted = true;
+    let orders = feed.take_unit_orders();
+    assert_eq!(orders.len(), 1);
+    assert!(feed.take_unit_orders().is_empty());
+    assert!(m.w.room_units.set_order(orders[0].0, &orders[0].1));
+    m.w.frames += 1;
+    let near = feed.near_rooms(&m.w).unwrap().unwrap();
+    assert_ne!(near.rooms[k].floors[0].flags & REC_DRAWN, 0);
+    let keys: Vec<UnitKey> = near.rooms[k].units.iter().map(|u| u.key).collect();
+    assert_eq!(keys, [UnitKey::new(PLAYER, 1), UnitKey::new(MONSTER, 6)]);
+    // Each record's DT1 entry is (path, index in file order).
+    let map = feed.map.as_ref().unwrap();
+    assert_eq!(
+        map.entry(k, TileArray::Floor, 0),
+        Some(&(b"floor.dt1".to_vec(), 0))
+    );
+    // The default inner feed refuses the facts the model lacks.
+    let mut bare = ModelFeed::<crate::world_view::feed::NoFeed>::default().with_map();
+    bare.levels = Some(vec![LevelRow::default(); 4]);
+    assert!(bare.near_rooms(&m.w).is_err());
+}
+
+fn room_mut(
+    near: &mut crate::rules::draw_order::NearRooms,
+    k: usize,
+) -> &mut crate::rules::draw_order::Room {
+    &mut near.rooms[k]
 }
