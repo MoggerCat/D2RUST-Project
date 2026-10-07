@@ -1108,3 +1108,36 @@ fn chain13_hooks() {
     assert_eq!(hooks(&ctl), (true, false, true));
     assert!(!tyrael_leave_hook(&ctl, &mut f, TYRAEL_U));
 }
+
+// Spec: specs/world/quests-act2.md §8.7 (Test vectors, live `missiles.txt`)
+// Covers: specs/world/quests-act2.md §8.6, §8.7
+#[test]
+#[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
+#[allow(clippy::disallowed_methods)]
+fn staff_hand_in_period_from_the_live_missiles_range() {
+    use d2_data::bin::BinTable;
+    use d2_data::tables::{Missiles, Record};
+    let dir = std::env::var("D2_GAME_DIR").expect("D2_GAME_DIR must be set");
+    let path = format!("{dir}/extracted/patch_d2/data/global/excel/missiles.bin");
+    let bytes = std::fs::read(&path).unwrap_or_else(|e| panic!("{path}: {e}"));
+    let table = BinTable::parse(
+        "missiles",
+        "patch_d2.mpq",
+        "missiles.bin",
+        &bytes,
+        Missiles::SIZE,
+    )
+    .expect("missiles parses");
+    let range = Missiles::decode(table.record(STAFF_MISSILE_ROW as usize)).range;
+    assert_eq!(range, 440, "missiles.txt row 338 (horadricstaff) Range");
+    let (mut ctl, _) = control();
+    let mut f = fake();
+    orifice_world(&mut f);
+    f.missile_ranges.insert(STAFF_MISSILE_ROW, i32::from(range));
+    f.players.insert(P2, act2_player(2, 40));
+    f.p(P1).items = vec![*b"hst ", *b"vip ", *b"msf "];
+    f.party.insert(P1, vec![P1]);
+    staff_inserted(&mut ctl, &mut f, P1, ORIFICE_U);
+    assert_eq!(ctl.timers.len(), 1);
+    assert_eq!(ctl.timers[0].period, 18);
+}
