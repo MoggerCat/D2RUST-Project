@@ -983,6 +983,7 @@ fn ai_index_of_every_row() {
 
 /// The recorded classes' AI index, Normal aip1..aip5 and `aidel` (`ai-bodies.md`
 /// §9.1).
+// Covers: specs/monsters/ai-bodies.md §9.1
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn real_recorded_ai_params() {
@@ -1082,6 +1083,7 @@ fn real_levels_rows() {
 /// monstats.txt values (`population.md` Real): Rarity, groups, parties,
 /// the placespawn and sparsePopulate rows; superuniques 0–9 (§11.4);
 /// monumod row 0 = 20.
+// Covers: specs/monsters/population.md §4 r4, §7 r1, §10.1 r1, §11.4 text
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn real_monstats_population_rows() {
@@ -1162,6 +1164,7 @@ fn real_monstats_population_rows() {
 /// `population.md` §2.3 step 3: no level list holds a non-`isSpawn` class
 /// except level 120; `rangedspawn` only on Act 5 levels 110–119, 123–131,
 /// 135; no listed class has `Rarity` above 2.
+// Covers: specs/monsters/population.md §2.3 r3
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn real_level_list_facts() {
@@ -1186,6 +1189,7 @@ fn real_level_list_facts() {
 /// copies equals its levels column; the list holds at most min(NumMon, 13,
 /// list count) entries, each from the difficulty's list and `isSpawn`; the
 /// rarity total is their sum; variants stay within the component counts.
+// Covers: specs/monsters/population.md §2.1 r1, §2.1 r2, §2.2, §2.3 r1, §2.3 r2, §2.4 r1, §2.4 r2, §2.4 r3, §2.4 r5
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn regions_every_level() {

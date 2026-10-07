@@ -264,6 +264,72 @@ fn lvlmaze_rows_as_stated() {
     }
 }
 
+/// `maze.md` §1, §3.3, §3.6, §4–§7 fixed defs (HANDOFF §5 C12).
+const MAZE_FIXED_DEFS: [u32; 29] = [
+    167, 288, 289, 290, 333, 336, 444, 445, 446, 447, 480, 735, 736, 737, 738, 836, 852, 853, 854,
+    855, 856, 1038, 1039, 1040, 1041, 1074, 1075, 1076, 1077,
+];
+
+// Spec: specs/drlg/maze.md §1 (lvlmaze row), §3.3 (pick-shape def), §3.6 + specs/drlg/maze-specials.tsv (special defs), §4–§7 (fixed defs), Constants (lvlprest `Files` +64)
+// Intended claim (unconfirmed until the first local run): specs/drlg/maze.md §1 r1, §3.3 (every def the maze code can name exists in the live lvlprest with Files >= 1)
+#[test]
+#[ignore = "needs original game files in D2_GAME_DIR"]
+fn maze_defs_exist_in_live_lvlprest() {
+    let data = drlg_data();
+    let maze = MazeData::from_tables(&rows::<Lvlmaze>(), &rows::<Lvlprest>());
+    assert_eq!(maze.rows.len(), 81, "lvlmaze records");
+    let mut missing = Vec::new();
+    let check = |def: u32, what: String| match maze.files(def) {
+        Ok(f) if f >= 1 => None,
+        Ok(f) => Some(format!("{what}: def {def} Files {f}")),
+        Err(e) => Some(format!("{what}: def {def} {e:?}")),
+    };
+    let mut maze_types = BTreeSet::new();
+    for (id, l) in data.levels.iter().enumerate().skip(1) {
+        if l.drlg_type != 1 {
+            continue;
+        }
+        let row = maze
+            .row_index(id as u32)
+            .unwrap_or_else(|e| panic!("maze level {id}: {e:?}"));
+        for d in 0..3 {
+            let rooms_one = maze.rows[row].rooms[d] == 1;
+            maze_types.insert((l.level_type, rooms_one));
+        }
+    }
+    for &(t, rooms_one) in &maze_types {
+        for mask in 1..=15 {
+            match d2_sim::drlg::maze::cells::shape_def(t, mask, rooms_one) {
+                Ok(0) => {}
+                Ok(def) => missing.extend(check(
+                    def,
+                    format!("type {t} mask {mask} rooms_one {rooms_one}"),
+                )),
+                Err(e) => missing.push(format!("type {t} mask {mask}: {e:?}")),
+            }
+        }
+    }
+    let kinds: Vec<String> = maze.specials.kinds().map(str::to_string).collect();
+    for k in &kinds {
+        for (i, r) in maze.specials.table(k).unwrap().iter().enumerate() {
+            missing.extend(check(r.special, format!("special {k}[{i}]")));
+        }
+    }
+    for &def in &MAZE_FIXED_DEFS {
+        missing.extend(check(def, "fixed def".to_string()));
+    }
+    println!(
+        "maze level types (type, rooms_one): {maze_types:?}; special kinds {}",
+        kinds.len()
+    );
+    assert!(
+        missing.is_empty(),
+        "{} defs missing or Files 0, first: {:?}",
+        missing.len(),
+        &missing[..missing.len().min(20)]
+    );
+}
+
 // ---- lvlsub --------------------------------------------------------------------------
 
 /// `outdoor-tilesub.md` Constants and the recorded Blood Moor room.
