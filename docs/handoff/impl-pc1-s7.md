@@ -163,4 +163,16 @@ wall follow, hit class, bodies-4 EC1) and `claude/impl-pc1-s7-automap`
 
 ## 5. Gate
 
-GATE_PLACEHOLDER
+`CARGO_INCREMENTAL=0 sh tools/gate.sh` on the merged tree (this branch +
+motion + automap + staging-7 @ 431a3fd): **GATE: PASS** (every step,
+d2-client included). Earlier runs: `prop_walk_motion
+chase_a_moving_target` failed ~50% on base `da55bc9` (random proptest
+seeds; type 15 after a re-path is legitimate, pathing.md §9.10); fixed
+upstream in 4c391149, which arrived with the 431a3fd merge (22/22 clean).
+
+Lesson (HANDOFF §8 candidate): a subagent worktree that shares the
+parent's `CARGO_TARGET_DIR` overwrites the parent's workspace-crate
+artifacts (cargo hashes path packages relative to the workspace root),
+so the parent's next clippy saw a stale `d2-proto` (`OpenUi` without
+`effect`). Caught by the gate's clippy step; fix: separate target dirs
+per worktree (or `touch` the sources before re-gating).
