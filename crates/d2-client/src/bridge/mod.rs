@@ -277,6 +277,12 @@ impl<L: ServerLink> Bridge<L> {
         t.shrines = rows.shrines;
     }
 
+    /// The host's wall-clock seconds `0x00410A80` (`render/lighting.md`
+    /// §10 r4).
+    pub fn set_wall_seconds(&mut self, f: fn() -> i32) {
+        self.inputs.wall_seconds = Some(f);
+    }
+
     /// The `skills` rows of the client skill list (`msg-skills.md`
     /// Inputs); the other tables stay.
     pub fn set_skill_rows(&mut self, rows: Vec<world::SkillRow>) {

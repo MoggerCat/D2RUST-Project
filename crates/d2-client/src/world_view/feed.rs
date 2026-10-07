@@ -192,20 +192,29 @@ pub fn blank_screen(level: &Levels) -> bool {
 pub const SHAKE_EVENT_CODE: u8 = 0x12;
 
 /// The screen shake an S→C 0x5A event of `code` starts at server tick
-/// `start_tick` (camera §8, §9): code 0x12 calls `0x00476A80(6, 4000,
-/// 10000, 4000)` (`client/msg-ui.md` §19 r3); every other code starts
-/// none.
-// PROVISIONAL (render/camera.md §8, callers of 0x00476A80): the 0x5A code
-// 0x12 shake is the only start d2rs makes; the other callers (e.g. the
-// `diablo appears` missile, `audio/triggers.md`) and their (A, t1, t2, t3)
-// start none; settled by: Ghidra callers of 0x00476A80 (effect specs),
-// HIGH-PRIORITY CAPTURE (each shaking frame draws twice from the client
-// player seed: RNG draw order).
+/// `start_tick` (camera §8 first row, §9): code 0x12 calls
+/// `0x00476A80(6, 4000, 10000, 4000)` (`client/msg-ui.md` §19 r3); every
+/// other code starts none.
 pub fn event_shake(code: u8, start_tick: u64) -> Option<RunningShake> {
     if code != SHAKE_EVENT_CODE {
         return None;
     }
     Shake::start(6, 4000, 10000, 4000).map(|shake| RunningShake { shake, start_tick })
+}
+
+/// Client missile 372 `diablo appears` (function 37, `0x004D6540`) at
+/// frames left 150 calls `0x00476A80(25, 0, 4000, 0)` (camera §8 fifth
+/// row).
+// PROVISIONAL (render/camera.md §8): of the ten call sites only this one
+// and `event_shake` start a shake; the other rows start none; settled by
+// REC-62 (HIGH-PRIORITY CAPTURE: each shaking frame draws twice from the
+// client player seed). The client missile layer that reaches it is
+// Phase 6 effects.
+pub fn diablo_appears_shake(frames_left: u32, start_tick: u64) -> Option<RunningShake> {
+    if frames_left != 150 {
+        return None;
+    }
+    Shake::start(25, 0, 4000, 0).map(|shake| RunningShake { shake, start_tick })
 }
 
 /// A `GetTickCount`-style host clock (`draw-order.md` §8): milliseconds

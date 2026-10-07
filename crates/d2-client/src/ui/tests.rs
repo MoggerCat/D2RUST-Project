@@ -1266,7 +1266,7 @@ mod text {
         );
     }
 
-    // Covers: specs/ui/text.md §15 r1–r3
+    // Covers: specs/ui/text.md §15 r1, §15 r2, §15 r3
     #[test]
     fn text_input_caret_blinks_after_the_text() {
         let f = five();
@@ -1360,7 +1360,7 @@ fn wheel_scrolls_zero_rows() {
     assert_eq!(s.first(), 3);
 }
 
-// Covers: specs/ui/inventory.md §1 r3–r4, §5 r1, r3, §8 r4
+// Covers: specs/ui/inventory.md §1 r3, §1 r4, §5 r1, §5 r3, §8 r4
 #[test]
 fn cell_grid_inventory_geometry() {
     // Inventory 10 × 4 cells of 29 × 29 at (100, 200).

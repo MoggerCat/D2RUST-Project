@@ -71,11 +71,38 @@ pub fn state_off(w: &mut ClientWorld, key: UnitKey, state: u8) {
 /// (`client/stat-lists.md` §3 r2): the unit's list of the state (made
 /// and attached when it has none), then the set `0x00627150`
 /// (`sim/stat-lists.md` §5 r1: a value 0 removes the entry).
-/// PROVISIONAL (client/stat-lists.md §3 r2): stat 172's
-/// `0x00463C00(value)` changes no model field (the stats refresh
-/// `0x00623F50` is `sim/units.md` §4.7's and has no client model field);
-/// settled by a Ghidra read of 0x00463C00.
-pub fn state_stat(w: &mut ClientWorld, key: UnitKey, state: u8, stat: u16, param: u16, value: i32) {
+/// Stat 172 also runs `0x00463C00(value)` (§3 r2): a monster with old ≠
+/// new (bytes; old = the existing list's stat 172 at that param, 4 for a
+/// new list) and a room changes the room's allied count (+0x28): new = 2
+/// → += 1, else old = 2 → −= 1 (fatal 0x27C when already < 1); the path
+/// reset `0x00649CA0` has no model field.
+pub fn state_stat(
+    w: &mut ClientWorld,
+    key: UnitKey,
+    state: u8,
+    stat: u16,
+    param: u16,
+    value: i32,
+) -> Result<(), HandlerError> {
+    if stat == 172 && key.unit_type == MONSTER {
+        let old = w
+            .units
+            .get(&key)
+            .and_then(|u| u.state_lists.get(&state))
+            .map_or(4, |l| l.get(&(172, param)).copied().unwrap_or(0)) as u8;
+        let new = value as u8;
+        if let Some(room) = w.room_units.room_of(key).filter(|_| old != new) {
+            let count = w.room_allied.entry(room).or_insert(0);
+            if new == 2 {
+                *count += 1;
+            } else if old == 2 {
+                if *count < 1 {
+                    return Err(HandlerError::Fatal(0x27C));
+                }
+                *count -= 1;
+            }
+        }
+    }
     if let Some(u) = w.units.get_mut(&key) {
         let list = u.state_lists.entry(state).or_default();
         if value == 0 {
@@ -84,6 +111,7 @@ pub fn state_stat(w: &mut ClientWorld, key: UnitKey, state: u8, stat: u16, param
             list.insert((stat, param), value);
         }
     }
+    Ok(())
 }
 
 /// Why a state stat stream stopped.
@@ -92,6 +120,8 @@ enum StatsEnd {
     Done,
     /// A stat outside the table or with `Send Bits` 0.
     Abort,
+    /// A fatal assert of a state stat (§3 r2).
+    Fatal(HandlerError),
 }
 
 /// One state's stat stream (0xA8 rule 1, 0xAA rule 2.3): stat id 9 bits,
@@ -125,7 +155,9 @@ fn read_stats(
         } else {
             r.read(bits) as i32
         };
-        state_stat(w, key, state, id as u16, param, value);
+        if let Err(e) = state_stat(w, key, state, id as u16, param, value) {
+            return StatsEnd::Fatal(e);
+        }
     }
 }
 
@@ -166,7 +198,9 @@ pub fn set_state(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerEr
     state_on(w, msg.inputs, key, state)?;
     let mut r = BitReader::new(&msg.bytes[8..]);
     // Either end runs the hooks (rule 1: "after the stream").
-    let _ = read_stats(w, msg.inputs, key, state, &mut r);
+    if let StatsEnd::Fatal(e) = read_stats(w, msg.inputs, key, state, &mut r) {
+        return Err(e);
+    }
     Ok(())
 }
 
@@ -197,9 +231,11 @@ pub fn add_unit_states(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Han
         let state = s as u8;
         state_on(w, msg.inputs, key, state)?;
         if r.read(1) == 1 {
-            if let StatsEnd::Abort = read_stats(w, msg.inputs, key, state, &mut r) {
+            match read_stats(w, msg.inputs, key, state, &mut r) {
                 // Rule 2.3: the whole message ends, no hooks.
-                return Ok(());
+                StatsEnd::Abort => return Ok(()),
+                StatsEnd::Fatal(e) => return Err(e),
+                StatsEnd::Done => {}
             }
         }
         if r.overflow {

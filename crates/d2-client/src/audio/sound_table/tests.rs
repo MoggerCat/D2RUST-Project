@@ -902,7 +902,7 @@ fn sixteen_channels_and_stealing() {
     assert_eq!(v.state, RequestState::Waiting);
 }
 
-// Covers: specs/audio/sound-table.md §7 r7, §7 t1 row14
+// Covers: specs/audio/sound-table.md §7 r7
 #[test]
 fn mode0_has_four_stereo_channels() {
     let mut r = rows(10);

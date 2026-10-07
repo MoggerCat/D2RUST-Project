@@ -459,7 +459,7 @@ fn assign_object_shrine_record_and_never_sent_types() {
     assert!(!m.w.units.contains_key(&UnitKey::new(4, 15)));
 }
 
-// Covers: specs/client/msg-units.md §1.2 r2.1, §1.2 r3, §1.2 r4
+// Covers: specs/client/msg-units.md §1.2 r2, §1.2 r3, §1.2 r4
 #[test]
 fn assign_monster_hireling_reinit_and_source_link() {
     use super::super::world::{PetRecord, PET_HIRELING};

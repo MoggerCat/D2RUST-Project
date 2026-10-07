@@ -174,7 +174,7 @@ fn relators_change_no_field() {
     assert_eq!((m.log.handled, m.log.rejected.len()), (2, 0));
 }
 
-// Covers: specs/client/msg-stats-items.md §2 r4, §2 r5 (PROVISIONAL header, OQ 3)
+// Covers: specs/client/msg-stats-items.md §2 r4, §2 r5
 #[test]
 fn item_header_and_cursor_writes() {
     use super::stats_items::ItemHeader;

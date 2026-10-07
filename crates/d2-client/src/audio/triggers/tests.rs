@@ -1756,7 +1756,7 @@ fn ui_action_first_match_wins() {
     assert_eq!(ids, vec![237, 243]);
 }
 
-// Covers: specs/audio/triggers.md OQ 5
+// Covers: specs/audio/triggers.md §8
 #[test]
 fn dosound_a_and_b() {
     let mut g = Globals::default();

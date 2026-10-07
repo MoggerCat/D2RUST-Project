@@ -224,16 +224,14 @@ pub fn baal_wave(_: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerEr
 }
 
 /// 0xAB NpcHeal (§7 r11): type u8@1, GUID u32@2, life u8@6 (of 128).
-/// PROVISIONAL (client/msg-ui.md OQ 2 → client/msg-units.md, unit flag
-/// word +0xC4): unit flag 0x200 has no client writer the specs name, so
-/// the flag test is taken as clear; settled by a Ghidra xref of all
-/// +0xC4 writers.
+/// A unit with flag 0x200 (the hireling setup of 0x81, `model.md` §14
+/// r3) is skipped.
 pub fn npc_heal(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerError> {
     len(msg, 7, "0xAB is 7 bytes")?;
     let b = Bytes(msg.bytes);
     let key = UnitKey::new(b.u8(1)?, b.u32(2)?);
     let life = b.u8(6)?;
-    if !w.units.contains_key(&key) || w.local_player == Some(key) {
+    if !w.units.get(&key).is_some_and(|u| !u.flag_200) || w.local_player == Some(key) {
         return Ok(());
     }
     if key.unit_type == MONSTER {

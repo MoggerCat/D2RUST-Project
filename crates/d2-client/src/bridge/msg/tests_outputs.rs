@@ -408,7 +408,7 @@ fn darkness_needs_the_players_act() {
     assert_eq!((e.index, e.kind, e.ticks, e.eclipse), (5, 2, 30_720, true));
 }
 
-// Covers: specs/render/lighting.md §9.2 r4.4, open question 11
+// Covers: specs/render/lighting.md §9.2 r4
 #[test]
 fn darkness_object_day_refresh() {
     use super::super::world::{ObjectRow, OBJECT};

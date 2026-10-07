@@ -15,7 +15,6 @@ use crate::rules::lighting::environment::{
 };
 use crate::rules::lighting::records::{unit_light_pos, LightKind, Owner};
 use crate::rules::lighting::sources::{self, ObjectLight};
-use d2_sim::rng::Seed;
 
 fn periods() -> Result<PeriodTables, HandlerError> {
     PeriodTables::builtin().map_err(|_| HandlerError::Invalid("render/env-periods.tsv"))
@@ -77,26 +76,11 @@ pub fn unique_event(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handle
         _ => {}
     }
     let level = w.player_level().map_or(0, u32::from);
-    // Id 13: `[0x007A7464]` := a draw from `0x00410A80` + 90 (§10 r4).
-    // PROVISIONAL (render/lighting.md §10 r4): the draw is one step of
-    // the local player's client seed (its low word); settled by a Ghidra
-    // read of 0x00410A80 plus a Terror's End trace (HIGH-PRIORITY
-    // CAPTURE: RNG draw order).
-    let local = w.local_player;
-    let mut draw = || {
-        local
-            .and_then(|k| w.units.get_mut(&k))
-            .and_then(|u| u.seed.as_mut())
-            .map_or(0, |s| {
-                let mut seed = Seed::new(s.0, s.1);
-                let v = seed.step();
-                *s = (seed.lo, seed.hi);
-                v as i32
-            })
-    };
-    let v = if id == 13 { draw() } else { 0 };
+    // Id 13: `[0x007A7464]` := `0x00410A80()` + 90 (§10 r4): wall-clock
+    // seconds, no RNG draw (the host's input).
+    let now = msg.inputs.wall_seconds.map_or(0, |f| f());
     w.overrides
-        .unique_event(id, level, || v)
+        .unique_event(id, level, || now)
         .map_err(|_| HandlerError::Invalid("0x89 id"))?;
     Ok(())
 }

@@ -175,6 +175,14 @@ fn exit_after(limit: Res<ExitAfter>, mut seen: Local<u32>, mut exit: MessageWrit
     }
 }
 
+/// `0x00410A80` (`render/lighting.md` §10 r4): wall-clock seconds, a
+/// client-only host input.
+fn wall_seconds() -> i32 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs() as i32)
+}
+
 /// Opens the window and runs the game until it is closed.
 pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
     let archives = match &config.data {
@@ -217,6 +225,10 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
             .resource_mut::<BridgeResource>()
             .0
             .set_unit_rows(units);
+        app.world_mut()
+            .resource_mut::<BridgeResource>()
+            .0
+            .set_wall_seconds(wall_seconds);
         let palettes = ActPalettes::live(&archives).map_err(anyhow::Error::msg)?;
         palette::add_act_palettes(&mut app, palettes);
         let parts = ui::UiParts::live(archives.clone()).map_err(anyhow::Error::msg)?;

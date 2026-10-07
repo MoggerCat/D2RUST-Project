@@ -253,10 +253,10 @@ impl CellGrid {
         let (mut c, mut r) = self.mouse_cell(p);
         let left = self.origin.x as u32;
         let top = self.origin.y as u32;
-        if w % 2 == 0 {
+        if w.is_multiple_of(2) {
             c = (gw >> 2).wrapping_sub(left).wrapping_add(p.x as u32) / cw;
         }
-        if h % 2 == 0 {
+        if h.is_multiple_of(2) {
             r = (gh >> 2).wrapping_sub(top).wrapping_add(p.y as u32) / ch;
         }
         if w == self.cols {

@@ -4,7 +4,7 @@
 //! GUID u32@5).
 
 use super::super::dispatch::{HandlerError, Message};
-use super::super::world::{ClientWorld, PetRecord, PET_HIRELING};
+use super::super::world::{ClientWorld, PetRecord, UnitKey, MONSTER, PET_HIRELING};
 use super::Bytes;
 
 /// The set `0x00478B10(pet, owner, type, class)` (§14 rule 2).
@@ -82,6 +82,17 @@ pub fn assign_merc(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handler
     match w.pets.iter_mut().find(|r| r.pet == pet) {
         Some(r) => r.extra = Some(extra),
         None => return Err(HandlerError::Fatal(0x95)),
+    }
+    // Type 7 with the monster (1, pet) in S: the client hireling setup
+    // `0x004B1090` (unit flags +0xC4 |= 0x202), the dead-flag clear
+    // `0x004647D0`, the light `0x004AE210` (render state) and mode := 1
+    // (`0x00624690`).
+    if b.u8(1)? == PET_HIRELING {
+        if let Some(u) = w.units.get_mut(&UnitKey::new(MONSTER, pet)) {
+            u.flag_2 = Some(true);
+            u.flag_200 = true;
+            u.mode = 1;
+        }
     }
     Ok(())
 }

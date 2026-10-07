@@ -213,6 +213,10 @@ pub struct ClientUnit {
     /// Unit flag `+0xC4` 0x800000: set only by the client room free
     /// `0x0061A840` (`model.md` §5 r5, `drlg/rooms.md` §8 r4).
     pub room_freed: bool,
+    /// Unit flag `+0xC4` 0x200: set by the client hireling setup of 0x81
+    /// (`model.md` §14 r3); 0xAB skips such a unit (`msg-units.md` §7
+    /// r11).
+    pub flag_200: bool,
 }
 
 /// The reserved `outgoing` slot of 0x28's dialog branch (`msg-ui.md`
@@ -245,6 +249,7 @@ impl ClientUnit {
             direction_of: None,
             flags_ex: 0,
             room_freed: false,
+            flag_200: false,
         }
     }
 
@@ -514,6 +519,9 @@ pub struct ClientWorld {
     /// (`rooms.md` §4.6, last paragraph: += 1 first, level free on every
     /// multiple of 13).
     pub drlg_updates: u32,
+    /// The allied count (+0x28) of each client room as stat 172 changes
+    /// it (`client/stat-lists.md` §3 r2; `sim/unit-order.md` §5 r2).
+    pub room_allied: BTreeMap<DrlgRoomId, i32>,
     /// The environment record of the client act (act +0x04,
     /// `render/lighting.md` §9.1, §9.2 r4): created with the act by 0x03,
     /// set by 0x53.
@@ -991,4 +999,8 @@ pub struct ModelInputs {
     pub drlg: Option<DrlgSource>,
     /// The `d2exp.mpq` check `0x00408F20` (`msg-stats-items.md` §5 r6).
     pub expansion_installed: bool,
+    /// `0x00410A80()`: wall-clock seconds (`render/lighting.md` §10 r4:
+    /// a `time()` base plus elapsed `GetTickCount` / 1000; client-only, a
+    /// host input). 0 when the host gives none.
+    pub wall_seconds: Option<fn() -> i32>,
 }

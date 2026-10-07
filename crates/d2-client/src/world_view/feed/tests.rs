@@ -256,3 +256,11 @@ fn default_fade_clock_is_instant_on_the_host_clock() {
     assert!(a.instant && b.instant);
     assert!(b.now.wrapping_sub(a.now) < 60_000);
 }
+
+// Covers: specs/render/camera.md §8
+#[test]
+fn diablo_appears_shake_at_150_frames_left() {
+    assert!(diablo_appears_shake(149, 3).is_none());
+    let s = diablo_appears_shake(150, 3).unwrap();
+    assert_eq!(s.start_tick, 3);
+}
