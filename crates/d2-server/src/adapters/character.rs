@@ -260,6 +260,8 @@ pub struct LoadReport {
     pub act: u8,
     /// Steps the provider could not apply, in order.
     pub unapplied: Vec<Unapplied>,
+    /// Load §1: the right skill selected (`StartSkill`), if any.
+    pub right_skill: Option<u16>,
 }
 
 fn note(r: &mut LoadReport, res: Result<(), Unapplied>) {
@@ -279,10 +281,7 @@ pub fn load(
     let Some(body) = &save.body else {
         // Load §1, §2.2 rule 7: the stub; the client act stays 0 (no
         // header step runs), so `StartSkill` applies (edge case 1).
-        r.new_character = true;
-        r.act = 0;
-        new_character(w, r.act, &mut r);
-        return Ok(r);
+        return Ok(load_new_character(w));
     };
     let h = header_load(&save.header, ctx);
     r.act = h.act;
@@ -332,8 +331,21 @@ pub fn load(
     Ok(r)
 }
 
-/// Load §1 rule 1 after the unit exists.
-fn new_character(w: &mut dyn CharacterWorld, act: u8, r: &mut LoadReport) {
+/// Load §1 on `w` (the stub's load, and a new character,
+/// `sim/intents-events.md` §8.2 rule 7): the client act stays 0 (no
+/// header step runs), so `StartSkill` applies (edge case 1).
+pub fn load_new_character(w: &mut dyn CharacterWorld) -> LoadReport {
+    let mut r = LoadReport {
+        new_character: true,
+        act: 0,
+        ..LoadReport::default()
+    };
+    r.right_skill = new_character(w, r.act, &mut r);
+    r
+}
+
+/// Load §1 rule 1 after the unit exists; the right skill selected.
+fn new_character(w: &mut dyn CharacterWorld, act: u8, r: &mut LoadReport) -> Option<u16> {
     note(r, w.new_character_setup());
     note(r, w.start_stats(act));
     note(r, w.start_items());
@@ -344,8 +356,12 @@ fn new_character(w: &mut dyn CharacterWorld, act: u8, r: &mut LoadReport) {
                 Ok(true) => Some(s),
                 Ok(false) => None,
                 Err(u) => {
+                    // PROVISIONAL (formats/d2s-load.md §1 rule 1, §8 rule 3;
+                    // REC-02): with no skill-list provider the start skill
+                    // is taken as present, as in the fresh 1.14d saves
+                    // (Sorceress 36, Necromancer 70 = `StartSkill`).
                     r.unapplied.push(u);
-                    None
+                    Some(s)
                 }
             },
             Err(u) => {
@@ -358,6 +374,7 @@ fn new_character(w: &mut dyn CharacterWorld, act: u8, r: &mut LoadReport) {
     };
     note(r, w.set_mouse_skills(right));
     note(r, w.quest_entry(1));
+    right
 }
 
 /// §9 rule 4 (`0x0056AF80`): gold limits, stamina, item indices,

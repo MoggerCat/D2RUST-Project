@@ -127,7 +127,7 @@ pub const AUDIT: [Audit; 0xB5] = [
     Audit { id: 0x55, status: Never, builder: None, note: "size 0: never receivable (§3.1 r3)" },
     Audit { id: 0x56, status: Never, builder: None, note: "size 0: never receivable (§3.1 r3)" },
     Audit { id: 0x57, status: Generated, builder: Some("NpcEnchants"), note: "TSV layout" },
-    Audit { id: 0x58, status: Built, builder: Some("OpenUi"), note: "npc.md §8.1; byte 6 unwritten" },
+    Audit { id: 0x58, status: Built, builder: Some("OpenUi"), note: "npc.md §8.1; effect @6 only for result 5 (keyed mask)" },
     Audit { id: 0x59, status: Built, builder: Some("AssignPlayer"), note: "msg-units.md §1.1 r1 offsets, intents-events.md §7.2 fields" },
     Audit { id: 0x5A, status: Generated, builder: Some("EventMessage"), note: "TSV layout" },
     Audit { id: 0x5B, status: Unspecified, builder: None, note: "size rule only" },

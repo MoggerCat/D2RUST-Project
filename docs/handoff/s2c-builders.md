@@ -173,7 +173,7 @@ row against `s2c::AUDIT` by `note_table_matches_audit`.
 | 0x55 | - | 0 | never | - | size 0: never receivable (§3.1 r3) |
 | 0x56 | - | 0 | never | - | size 0: never receivable (§3.1 r3) |
 | 0x57 | NpcEnchants | 14 | generated | `NpcEnchants` | TSV layout |
-| 0x58 | OpenUi | 7 | built | `OpenUi` | npc.md §8.1; byte 6 unwritten |
+| 0x58 | OpenUi | 7 | built | `OpenUi` | npc.md §8.1; effect @6 only for result 5 (keyed mask) |
 | 0x59 | AssignPlayer | 26 | built | `AssignPlayer` | msg-units.md §1.1 r1 offsets, intents-events.md §7.2 fields |
 | 0x5A | EventMessage | 40 | generated | `EventMessage` | TSV layout |
 | 0x5B | PlayerJoined | u16@1;min=34 | unspecified | - | size rule only |

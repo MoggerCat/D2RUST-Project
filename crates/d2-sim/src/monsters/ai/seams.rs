@@ -112,6 +112,27 @@ pub trait AiModes {
         let _ = path_byte;
         self.change_mode(game, unit, mode, target)
     }
+    /// [`AiModes::change_mode`] (or, with a path byte,
+    /// [`AiModes::change_mode_path_byte`]) with the monster's pending
+    /// velocity request (`ai.md` §7.3), which the mode set's movement
+    /// set-up consumes for every mode but GH (§7.5 rule 4.1): a provider
+    /// that runs the set-up takes it and leaves `velocity` zeroed.
+    /// Default: the plain change, the request kept.
+    fn change_mode_with(
+        &mut self,
+        game: &mut Game,
+        unit: UnitId,
+        mode: u8,
+        target: ModeTarget,
+        path_byte: Option<u8>,
+        velocity: &mut super::VelocityRequest,
+    ) -> bool {
+        let _ = velocity;
+        match path_byte {
+            Some(b) => self.change_mode_path_byte(game, unit, mode, target, b),
+            None => self.change_mode(game, unit, mode, target),
+        }
+    }
     /// Sets the anim mode without a mode change (inline thinks, §1.4).
     fn set_anim_mode(&mut self, unit: UnitId, mode: u8);
     /// The path step count.

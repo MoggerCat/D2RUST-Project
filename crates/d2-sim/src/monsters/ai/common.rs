@@ -10,7 +10,7 @@ use crate::game::Game;
 use crate::units::{RoomId, UnitId, UnitType};
 
 use super::tactics::*;
-use super::{idle_keep_mode, mode, AiHost, Ctx, ModeTarget, TickParam};
+use super::{idle_keep_mode, mode, request_mode, AiHost, Ctx, ModeTarget, TickParam};
 
 /// "wait N" `0x005DE0F0(N)`: delete the thinks and schedule one at frame +
 /// N; the anim mode is not changed.
@@ -29,7 +29,7 @@ pub(super) fn mode_point<W: AiHost + ?Sized>(
     y: i32,
 ) -> bool {
     cx.world.set_path_steps(u, 1);
-    cx.world.change_mode(game, u, m, ModeTarget::Point(x, y))
+    request_mode(game, cx, u, m, ModeTarget::Point(x, y))
 }
 
 /// `0x005DDFC0(m, x, y)` / `0x005DE490(x, y, m)`: mode m at the point
@@ -42,7 +42,7 @@ pub(super) fn mode_point_raw<W: AiHost + ?Sized>(
     x: i32,
     y: i32,
 ) -> bool {
-    cx.world.change_mode(game, u, m, ModeTarget::Point(x, y))
+    request_mode(game, cx, u, m, ModeTarget::Point(x, y))
 }
 
 /// "Skill k at U" `0x005DEAD0(Skk mode, Skill k, U, 0, 0)`.

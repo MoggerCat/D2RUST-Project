@@ -16,6 +16,8 @@ use super::super::bits::BitReader;
 use super::super::check::check;
 use super::super::dispatch::{HandlerError, Message, UnitMessage};
 use super::super::drlg::DrlgRoomId;
+use super::super::objects::interact::{mode_request_code_2, CODE_INTERACT};
+use super::super::objects::FLAG_EX_EXPANSION;
 use super::super::output::{Output, ShrineFxKind};
 use super::super::skills::SkillList;
 use super::super::world::{
@@ -58,6 +60,9 @@ fn create(
 ) -> Result<Created, HandlerError> {
     let mut u = ClientUnit::new(key);
     u.class = class;
+    if w.expansion != 0 {
+        u.flag_ex |= FLAG_EX_EXPANSION;
+    }
     let placed = (x, y) != (0, 0);
     u.seed = (!placed).then_some(INIT_SEED);
     let mut room = None;
@@ -218,7 +223,7 @@ pub fn assign_monster(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Hand
             u.stats.insert(6, i32::from(life) << 8);
         }
         if own_hireling && u.mode == 1 {
-            u.flags_ex &= !0x40000;
+            u.flag_ex &= !0x40000;
         }
         u.stats.insert(328, i32::from(x.wrapping_add(y)));
     };
@@ -261,7 +266,7 @@ pub fn assign_monster(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Hand
             let l = u.state_lists.entry(SOURCE_UNIT_STATE).or_default();
             l.remove(&(353, 0));
             l.insert((354, 0), v as i32);
-            u.flags_ex |= 0x400;
+            u.flag_ex |= 0x400;
         }
         if let KindData::Monster(d) = &mut u.kind {
             if let Some(v) = link {
@@ -596,6 +601,13 @@ pub fn queued(w: &mut ClientWorld, msg: &UnitMessage<'_>) -> Result<(), HandlerE
         *slot = read(&b, f)?;
     }
     mode_request(w, msg.unit, code, record);
+    // Player code 0x02 (model §8 rule 4): the interact sender
+    // `0x00480930(r0 & 0xFFFF, r1)` (§8 rule 7).
+    if msg.unit.unit_type == PLAYER && code == CODE_INTERACT && w.units.contains_key(&msg.unit) {
+        for o in mode_request_code_2(w, msg.inputs, record)? {
+            msg.out.push(o);
+        }
+    }
     // Objects (rule 5, `model.md` §15): the shrine part of codes 3 and
     // 0x15, after the stored request.
     if msg.unit.unit_type == OBJECT {

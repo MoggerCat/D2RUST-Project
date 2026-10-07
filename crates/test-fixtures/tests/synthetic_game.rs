@@ -650,7 +650,7 @@ fn session_host(loads: std::rc::Rc<std::cell::Cell<u32>>) -> (TestHost, TownFact
             entry.name = r.char_name;
             Ok(Loaded { player, entry })
         });
-    t.s.set_session(SessionFlow::new(SETUP.arena_flags, loader));
+    t.s.set_session(SessionFlow::new(loader));
     let Town {
         s,
         rect,
@@ -766,6 +766,200 @@ fn session_refusals_stop_the_sequence() {
     // (`intents-events.md` §3.2 rule 3): nothing arrives (the refusal's
     // 0xB4, a direct send, is a named gap).
     assert_eq!(host.receive(CLIENT), Vec::<Vec<u8>>::new());
+}
+
+// Covers: specs/sim/intents-events.md §2.5 r1
+#[test]
+fn create_checks_run_in_their_order() {
+    let loads = std::rc::Rc::new(std::cell::Cell::new(0));
+    let (mut host, _t) = session_host(loads.clone());
+    let other: ClientId = 1;
+    host.connect(other);
+    // No NUL in the character name's 16 bytes; in the game name's.
+    let mut bad = create_request(CLASS as u8, EXPANSION_FLAGS);
+    bad.char_name = [b'a'; 16];
+    host.send_system(CLIENT, &bad.encode()).expect("queued");
+    let mut bad = create_request(CLASS as u8, EXPANSION_FLAGS);
+    bad.game_name = [b'g'; 16];
+    host.send_system(CLIENT, &bad.encode()).expect("queued");
+    // The character-name test runs before the locale test.
+    let mut bad = create_request(CLASS as u8, EXPANSION_FLAGS);
+    bad.char_name = [b'a'; 16];
+    bad.locale = 15;
+    host.send_system(CLIENT, &bad.encode()).expect("queued");
+    // Accepted; then the same client again (`0x00538B70`), before the
+    // class test.
+    host.send_system(
+        CLIENT,
+        &create_request(CLASS as u8, EXPANSION_FLAGS).encode(),
+    )
+    .expect("queued");
+    host.send_system(CLIENT, &create_request(7, EXPANSION_FLAGS).encode())
+        .expect("queued");
+    // Another client with the same name in another case (`0x00538C60`,
+    // `_strnicmp`).
+    let mut same = create_request(CLASS as u8, EXPANSION_FLAGS);
+    same.char_name
+        .iter_mut()
+        .for_each(|c| *c = c.to_ascii_uppercase());
+    assert_ne!(same.char_name, name());
+    host.send_system(other, &same.encode()).expect("queued");
+    host.frame().expect("frame 1");
+    assert_eq!(
+        faults(&host),
+        [
+            (CLIENT, SessionFault::CreateRefused(CreateRefusal::CharName)),
+            (CLIENT, SessionFault::CreateRefused(CreateRefusal::GameName)),
+            (CLIENT, SessionFault::CreateRefused(CreateRefusal::CharName)),
+            (
+                CLIENT,
+                SessionFault::CreateRefused(CreateRefusal::HasGame(name()))
+            ),
+            (
+                other,
+                SessionFault::CreateRefused(CreateRefusal::NameTaken(name()))
+            ),
+        ]
+    );
+    assert!(host.game.sim_client(CLIENT).is_some());
+    assert_eq!(host.game.sim_client(other), None);
+}
+
+/// A host whose client is in game (state 4) through 0x67 and 0x6B.
+fn in_game_host() -> TestHost {
+    let loads = std::rc::Rc::new(std::cell::Cell::new(0));
+    let (mut host, _t) = session_host(loads);
+    host.send_system(
+        CLIENT,
+        &create_request(CLASS as u8, EXPANSION_FLAGS).encode(),
+    )
+    .expect("queued");
+    host.frame().expect("frame 1");
+    host.clock.0 += 40;
+    host.frame().expect("frame 2");
+    host.send_system(CLIENT, &[0x6B]).expect("queued");
+    for _ in 0..4 {
+        host.clock.0 += 40;
+        host.frame().expect("frame");
+    }
+    let id = host.game.sim_client(CLIENT).expect("the client record");
+    assert_eq!(
+        host.game.game.lists.client(id).unwrap().state,
+        client_state::IN_GAME
+    );
+    host.receive(CLIENT);
+    host
+}
+
+// Covers: specs/sim/intents-events.md §2.5 r2
+#[test]
+fn leave_sends_its_messages_and_removes_the_client() {
+    let mut host = in_game_host();
+    host.send_system(CLIENT, &[0x69]).expect("queued");
+    host.frame().expect("frame");
+    // The direct 0xB0 is on the system list (received first), then the
+    // flushed 0x05 and 0x06; single player has nobody left for the 0x5A.
+    assert_eq!(host.receive(CLIENT), [vec![0xB0], vec![0x05], vec![0x06]]);
+    assert_eq!(host.game.sim_client(CLIENT), None);
+    // The character save has no writer (named).
+    assert_eq!(faults(&host), [(CLIENT, SessionFault::NotSaved)]);
+    // M08: a second leave without a record does nothing.
+    host.send_system(CLIENT, &[0x69]).expect("queued");
+    host.clock.0 += 40;
+    host.frame().expect("frame");
+    assert_eq!(host.receive(CLIENT), Vec::<Vec<u8>>::new());
+}
+
+// Covers: specs/sim/intents-events.md §2.5 r2
+#[test]
+fn leave_needs_state_4() {
+    let loads = std::rc::Rc::new(std::cell::Cell::new(0));
+    let (mut host, _t) = session_host(loads);
+    host.send_system(
+        CLIENT,
+        &create_request(CLASS as u8, EXPANSION_FLAGS).encode(),
+    )
+    .expect("queued");
+    // State 1 (created, not joined): 0x69 does nothing.
+    host.send_system(CLIENT, &[0x69]).expect("queued");
+    host.frame().expect("frame 1");
+    assert!(host.game.sim_client(CLIENT).is_some());
+    assert_eq!(faults(&host), []);
+}
+
+// Covers: specs/sim/intents-events.md §2.5 r3, §2.5 r5, §2.5 r6
+#[test]
+fn game_list_and_the_no_effect_ids() {
+    let mut host = in_game_host();
+    host.send_system(CLIENT, &[0x6A]).expect("queued");
+    host.send_system(CLIENT, &[0x6E]).expect("queued");
+    host.send_system(CLIENT, &[0x70]).expect("queued");
+    host.frame().expect("frame");
+    let mut game = [0u8; 53];
+    game[0] = 0xB2;
+    game[1..5].copy_from_slice(b"game");
+    game[0x31] = 1;
+    let mut end = [0u8; 53];
+    end[0] = 0xB2;
+    end[0x33..0x35].copy_from_slice(&[0xFF, 0xFF]);
+    let got = host.receive(CLIENT);
+    assert_eq!(got[..2], [game.to_vec(), end.to_vec()]);
+    let flow = host.game.session().unwrap();
+    assert!(flow.heartbeat_flag.contains(&CLIENT));
+    assert_eq!(flow.faults, []);
+}
+
+// Covers: specs/sim/intents-events.md §2.5 r4
+#[test]
+fn save_upload_collects_chunks_then_checksums() {
+    let mut host = in_game_host();
+    let save: Vec<u8> = (0..300u32).map(|i| (i * 7) as u8).collect();
+    let chunk = |part: &[u8]| {
+        let mut m = vec![0x6C, part.len() as u8];
+        m.extend((save.len() as u32).to_le_bytes());
+        m.extend(part);
+        // The size rule is len + 7 (`client-messages.tsv`): one byte
+        // after the data.
+        m.push(0);
+        m
+    };
+    host.send_system(CLIENT, &chunk(&save[..200]))
+        .expect("queued");
+    host.frame().expect("frame");
+    let u = &host.game.session().unwrap().uploads[&CLIENT];
+    assert_eq!((u.count, u.complete), (200, false));
+    host.send_system(CLIENT, &chunk(&save[200..]))
+        .expect("queued");
+    host.clock.0 += 40;
+    host.frame().expect("frame");
+    let u = &host.game.session().unwrap().uploads[&CLIENT];
+    assert_eq!((u.count, u.complete), (300, true));
+    assert_eq!(u.buffer, save);
+    assert_eq!(u.checksum, d2_formats::d2s::checksum(&save));
+    // M08: one more chunk overflows (fatal 0xB2F); a total ≥ 0x2000 is the
+    // fatal assert.
+    host.send_system(CLIENT, &chunk(&save[..1]))
+        .expect("queued");
+    let mut big = vec![0x6C, 1];
+    big.extend(0x2000u32.to_le_bytes());
+    big.extend([0, 0]);
+    host.send_system(CLIENT, &big).expect("queued");
+    host.clock.0 += 40;
+    host.frame().expect("frame");
+    assert_eq!(
+        host.game.session().unwrap().faults,
+        [
+            (
+                CLIENT,
+                SessionFault::UploadOverflow {
+                    count: 300,
+                    len: 1,
+                    total: 300
+                }
+            ),
+            (CLIENT, SessionFault::UploadTotal(0x2000)),
+        ]
+    );
 }
 
 /// The messages of game creation and the join up to game entry's 0x7E,
@@ -923,11 +1117,11 @@ fn a_full_save_loads_before_the_join_sequence() {
     assert_eq!(j.received[8][0], 0x03);
 }
 
-// Covers: specs/formats/d2s-load.md §1 r1
+// Covers: specs/formats/d2s-load.md §1 r1, §8 r1, §8 r3; specs/sim/intents-events.md §8.2 r7
 #[test]
 fn a_stub_starts_a_new_character_before_the_join_sequence() {
     use d2_server::adapters::character::LoadContext;
-    use d2_server::adapters::session::enter_game_from_save;
+    use d2_server::adapters::session::{enter_game_from_save, initial_portal_flags};
     let n = name();
     let len = n.iter().position(|&c| c == 0).unwrap_or(15);
     let stub = d2_formats::d2s::D2s::new_stub(&n[..len], CLASS as u8, 0, 1).unwrap();
@@ -937,10 +1131,12 @@ fn a_stub_starts_a_new_character_before_the_join_sequence() {
         .expect("charstats row")
         .clone();
     let mut report = None;
-    join_with(|s, player| {
+    let mut portals = Vec::new();
+    let j = join_with(|s, player| {
         if s.events.action.hooks().vitals.is_none() {
             s.events.action.hooks().vitals = Some(std::sync::Arc::new(vitals.clone()));
         }
+        portals = s.events.action.hooks().drlg.data.portal_levels();
         let (_, r) = enter_game_from_save(s, CLIENT, &stub, &LoadContext::default())
             .expect("started and placed");
         let v = &s.events.action.sys.stats;
@@ -950,6 +1146,31 @@ fn a_stub_starts_a_new_character_before_the_join_sequence() {
     });
     let r = report.unwrap();
     assert!(r.new_character);
+    // `intents-events.md` §8.2 rule 7, `d2s-load.md` §8 rules 1, 3: the
+    // load's own 0x23 (hand 0, `StartSkill`, item −1) after the add
+    // messages, then 0x0B, 0x5F with +0x2C and the two hands with item 0.
+    assert_ne!(cs.startskill, 0, "the fixture class has a start skill");
+    assert_eq!(r.right_skill, Some(cs.startskill));
+    let g = j.guid.to_le_bytes();
+    let k = cs.startskill.to_le_bytes();
+    let hand = |h: u8, skill: [u8; 2], item: [u8; 4]| {
+        let mut m = vec![0x23, 0, g[0], g[1], g[2], g[3], h, skill[0], skill[1]];
+        m.extend(item);
+        m
+    };
+    let flags = initial_portal_flags(&portals).to_le_bytes();
+    let ids: Vec<u8> = j.received.iter().take(10).map(|m| m[0]).collect();
+    assert_eq!(
+        ids,
+        [0x01, 0x00, 0x02, 0x59, 0xAA, 0x76, 0x23, 0x0B, 0x5F, 0x23]
+    );
+    assert_eq!(j.received[6], hand(0, k, [0xFF; 4]));
+    assert_eq!(
+        j.received[8],
+        [0x5F, flags[0], flags[1], flags[2], flags[3]]
+    );
+    assert_eq!(j.received[9], hand(1, [0, 0], [0; 4]));
+    assert_eq!(j.received[10], hand(0, k, [0; 4]));
     let steps: Vec<_> = r.unapplied.iter().map(|u| u.step).collect();
     assert_eq!(
         steps,

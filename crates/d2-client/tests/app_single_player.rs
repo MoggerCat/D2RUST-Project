@@ -94,7 +94,7 @@ impl d2_server::seams::Clock for StepClock {
 /// loader runs only at the 0x6B: it creates a player of the request's
 /// class (sorceress), knowing Cold Plains' waypoint, with its player
 /// fields; the join's 0x59 … 0x7E and 0x04 follow with tick 2's flush.
-// Covers: specs/sim/intents-events.md §8.1, §8.2 r2, §8.2 r3
+// Covers: specs/sim/intents-events.md §8.1, §8.2 r2, §8.2 r3, §8.2 r7
 #[test]
 fn the_session_flow_creates_the_game_then_loads_the_character_at_the_join() {
     use d2_client::bridge::link::SendQueue;
@@ -151,6 +151,11 @@ fn the_session_flow_creates_the_game_then_loads_the_character_at_the_join() {
     let got = ids(chunks);
     assert_eq!(got.first(), Some(&0x59), "{got:02X?}");
     assert_eq!(got.last(), Some(&0x04), "{got:02X?}");
+    // A new character has its player record (§8.2 rule 7): 0x5F after
+    // 0x0B and the two 0x23 (no `StartSkill` without the vitals tables, so
+    // no load 0x23).
+    assert!(got.windows(2).any(|w| w == [0x0B, 0x5F]), "{got:02X?}");
+    assert_eq!(got.iter().filter(|&&i| i == 0x23).count(), 2, "{got:02X?}");
     let (class, fields, knows, faults, log) = link
         .with(|l| {
             let sim = &mut l.host_mut().game;
@@ -174,7 +179,28 @@ fn the_session_flow_creates_the_game_then_loads_the_character_at_the_join() {
         "the synthetic Cold Plains waypoint (index 1)"
     );
     assert_eq!(faults, Some(0));
-    assert!(log.is_empty(), "{log:?}");
+    // The new character is the stub load (`intents-events.md` §8.2 rule
+    // 7, `formats/d2s-load.md` §1): its steps without a provider in the
+    // synthetic game are named, nothing else is logged.
+    let steps: Vec<&str> = log
+        .iter()
+        .map(|l| {
+            l.strip_prefix("join: new character: Unapplied { step: \"")
+                .and_then(|r| r.split('"').next())
+                .unwrap_or(l)
+        })
+        .collect();
+    assert_eq!(
+        steps,
+        [
+            "new character set-up",
+            "start stats",
+            "start items",
+            "start skill",
+            "mouse skills",
+            "quest entry"
+        ]
+    );
 }
 
 /// M08 for the test above: the same 0x67 without flag bits 1 and 2 is
@@ -410,4 +436,37 @@ fn a_save_from_the_command_line_joins() {
         .unwrap();
     eprintln!("load log: {log:#?}");
     assert!(player.is_some(), "joined; faults {faults:?}");
+}
+
+/// The app's C→S 0x67 bytes (`client/model.md` §7 rule 9): the recorded
+/// single-player layout for an expansion character; a classic save sends
+/// bit 2 alone (PROVISIONAL there, REC-46).
+// Covers: specs/client/model.md §7 r9
+#[test]
+fn the_create_request_has_the_builder_layout() {
+    use d2_client::app::single_player::{Character, CREATE_FLAGS_CLASSIC};
+    use d2_server::adapters::character::LoadContext;
+    let b = single_player::create_request().encode();
+    assert_eq!(b.len(), 46);
+    assert_eq!(b[0], 0x67);
+    assert_eq!(b[1..0x11], [0; 16], "empty game name");
+    assert_eq!(b[0x11], 3, "game type 3");
+    assert_eq!(b[0x12], single_player::PLAYER_CLASS as u8);
+    assert_eq!((b[0x13], b[0x14]), (0, 0), "template, Normal");
+    let mut name = [0u8; 16];
+    name[..single_player::PLAYER_NAME.len()].copy_from_slice(single_player::PLAYER_NAME);
+    assert_eq!(b[0x15..0x25], name);
+    assert_eq!(b[0x25..0x27], [0, 0]);
+    assert_eq!(b[0x27..0x2B], 0x0010_0004u32.to_le_bytes());
+    assert_eq!(b[0x2B..0x2E], [0, 0, 0]);
+    // A save's class and name; its status bit 5 picks the flags.
+    for (status, flags) in [(0x20u16, 0x0010_0004u32), (0, CREATE_FLAGS_CLASSIC)] {
+        let save = d2_formats::d2s::D2s::new_stub(b"Necro", 2, status, 1).unwrap();
+        let r = single_player::create_request_for(&Character::Save(
+            Box::new(save),
+            LoadContext::default(),
+        ));
+        assert_eq!((r.class, &r.char_name[..6]), (2, &b"Necro\0"[..]));
+        assert_eq!(r.flags, flags, "status {status:#x}");
+    }
 }

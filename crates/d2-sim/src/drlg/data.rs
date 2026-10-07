@@ -1,4 +1,4 @@
-// Spec: specs/drlg/levels.md, specs/drlg/rooms.md
+// Spec: specs/drlg/levels.md, specs/drlg/rooms.md, specs/data/runtime-maps.md §9 (portal level list)
 //! The table view the DRLG reads, built from `d2_data::tables` records
 //! (`leveldefs`, `lvlwarp`, `lvltypes`, `objects`). Only the columns the
 //! two specs name are kept. Plus the code tables of `rooms.md` §9.5–§9.6:
@@ -30,6 +30,9 @@ pub struct LevelDef {
     pub warp: [i32; 8],
     /// `Position` (+0x90).
     pub position: u32,
+    /// `Portal` (+0x8C): ≠ 0 puts the level in the portal level list
+    /// (`data/runtime-maps.md` §9, [`DrlgData::portal_levels`]).
+    pub portal: u32,
 }
 
 impl LevelDef {
@@ -59,6 +62,7 @@ impl LevelDef {
                 i(r.warp7),
             ],
             position: r.position,
+            portal: r.portal,
         }
     }
 }
@@ -232,6 +236,16 @@ impl DrlgData {
             wall_remap: WallRemap::original(),
             doors: DoorTables::default(),
         }
+    }
+
+    /// The portal level list (`leveldefs_portals`, `data/runtime-maps.md`
+    /// §9, `0x0061DD00`): the level ids whose `Portal` ≠ 0, in order.
+    pub fn portal_levels(&self) -> Vec<u32> {
+        (0u32..)
+            .zip(&self.levels)
+            .filter(|(_, l)| l.portal != 0)
+            .map(|(i, _)| i)
+            .collect()
     }
 
     /// The leveldefs row of a level id.

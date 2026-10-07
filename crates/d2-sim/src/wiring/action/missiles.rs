@@ -1,4 +1,4 @@
-// Spec: specs/missiles/missiles.md §R2, §R4, §R5, §R6, §R9.5, §R9.6; specs/monsters/init.md §22 (seams `MissileUnits`, `MissilePath`, `MissileRooms`, `MissileCombat`, `MissileHooks`, `MissileBodies`)
+// Spec: specs/missiles/missiles.md §R2, §R4, §R5, §R6, §R9.5, §R9.6; specs/sim/pathing.md §13.3 (line_hits); specs/monsters/init.md §22 (seams `MissileUnits`, `MissilePath`, `MissileRooms`, `MissileCombat`, `MissileHooks`, `MissileBodies`)
 //! Missiles ↔ units, DRLG and combat: [`View`] implements
 //! [`crate::missiles::MissileWorld`]. Real providers: unit allocation and
 //! removal (`units.md` §3), seeds, stats, states and state lists
@@ -315,6 +315,19 @@ pub fn result_bits(missile: u32) -> u16 {
 /// A missile damage record (`missiles.md` §R6.2) as the combat damage
 /// record (`damage.md` §1): [`Damage::to_record`] (deadly strike, bypass
 /// hit flags, the §R6.3 fields) with the missile's result flags.
+/// The hit-class merge of `0x005AD730` (`missiles.md` §R6.1,
+/// `0x005AD863`–`0x005AD87A`): R +0x60 := `HitClass` | (R +0x60 & 0xF0);
+/// R byte +0x64 := 1 when either has a bit in 0xF0 (else kept). So the
+/// 0x60 of server-damage functions 7 and 9 (§R6.3) survives as
+/// `HitClass` | 0x60.
+pub fn merge_hit_class(rec: &mut DamageRecord, hit_class: u32) {
+    let element = rec.hit_class & 0xF0;
+    if element != 0 || hit_class & 0xF0 != 0 {
+        rec.hit_class_fixed = 1;
+    }
+    rec.hit_class = hit_class | element;
+}
+
 pub fn damage_record(d: &Damage) -> DamageRecord {
     let mut rec = d.to_record();
     rec.result |= result_bits(d.result);
@@ -432,7 +445,7 @@ impl<X: Pending> View<'_, X> {
             .map(|d| d.class);
         let t = self.h.tables.clone();
         if let Some(row) = class.and_then(|c| t.missiles.get(usize::from(c))) {
-            rec.hit_class = u32::from(row.hitclass);
+            merge_hit_class(rec, u32::from(row.hitclass));
         }
         rec.pierce_pct = View::stat(self, missile, PIERCE_PERCENT_STAT);
         let mut w = self.combat(game);
@@ -642,6 +655,26 @@ impl<X: Pending> crate::missiles::MissileBodies for View<'_, X> {
     /// step 2).
     fn room_seed(&mut self, _: &mut Game, room: RoomId) -> Option<&mut crate::rng::Seed> {
         self.h.drlg.active_seed_mut(room)
+    }
+    /// `0x0064E260(room, from, to, mask)` (`pathing.md` §13.3) on the
+    /// DRLG's collision grids: result 1 (blocked).
+    fn line_hits(
+        &self,
+        _: &Game,
+        room: RoomId,
+        from: (i32, i32),
+        to: (i32, i32),
+        mask: u16,
+    ) -> bool {
+        use crate::path::Point;
+        crate::path::line::line_test(
+            &self.h.drlg,
+            Some(room),
+            Point::new(from.0, from.1),
+            Point::new(to.0, to.1),
+            mask,
+        )
+        .blocked()
     }
     /// Path target point (`0x00648A00` / `0x00648A10`) with the path
     /// provider ([`crate::wiring::path::missiles`]); (0, 0) without it.

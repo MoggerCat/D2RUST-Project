@@ -493,5 +493,5 @@ fn assign_monster_hireling_reinit_and_source_link() {
     // Rule 4: state 98 with stat 354 = v, flag-ex 0x400.
     assert!(u.states.contains(&98));
     assert_eq!(u.state_lists[&98].get(&(354, 0)), Some(&5));
-    assert_eq!(u.flags_ex & 0x400, 0x400);
+    assert_eq!(u.flag_ex & 0x400, 0x400);
 }

@@ -22,6 +22,7 @@ pub mod link;
 pub mod local;
 pub mod mirror;
 pub mod msg;
+pub mod objects;
 pub mod output;
 pub mod receive;
 pub mod skills;
@@ -293,6 +294,25 @@ impl<L: ServerLink> Bridge<L> {
     /// 1); `None`: no client DRLG.
     pub fn set_drlg_source(&mut self, source: Option<drlg::DrlgSource>) {
         self.inputs.drlg = source;
+    }
+
+    /// The wall clock of the next update, `GetTickCount()` in wrapping
+    /// milliseconds (`model.md` §5 rule 2; `world/objects-client.md` §25
+    /// r6): the live client passes the host clock, tests a scripted value.
+    pub fn set_now(&mut self, now: u32) {
+        self.inputs.now = now;
+    }
+
+    /// The `objects.txt` rows the client object update reads
+    /// (`world/objects-client.md` §28 r1); empty: no object update.
+    pub fn set_object_rows(&mut self, rows: Vec<objects::ObjClientRow>) {
+        self.inputs.objclient.rows = rows;
+    }
+
+    /// The UI layer's client quest record `[0x007C0D43]` (`ClientFn` 13,
+    /// `world/objects-client.md` §26.13 r3).
+    pub fn set_client_quest_flags(&mut self, flags: Option<[u8; objects::QUEST_RECORD]>) {
+        self.inputs.objclient.quest_flags = flags;
     }
 
     /// The visibility predicate of the position check (`model.md` §6

@@ -9,6 +9,11 @@
 /// A call with no result the bodies read (`U` unit, `I` item, `R` room).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BodyEffect<U, I, R> {
+    // ---- d2rs faults (no 1.14d callee)
+    /// The lightning fan / ring loop (`bodies-4.md` §2.4, §2.5) with a
+    /// progressive step ≤ 0, which never ends in 1.14d (Edge case 1):
+    /// d2rs stopped it and reports the fault.
+    EndlessProgressive { unit: U, skill: i32, step: i32 },
     // ---- monsters (`monsters/ai.md`, `monsters/init.md`)
     /// Owner data `0x0058F030(game, m, owner GUID, owner type, a, b)` (no
     /// owner: GUID −1, type 6).

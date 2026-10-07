@@ -3,8 +3,10 @@
 - **Status:** draft: every rule below was read from the 1.14d `Game.exe`
   disassembly (`tools/ghidra/disasm.py`, addresses inline) and the live
   1.14d `patch_d2` `objects.txt` (`ClientFn` column, 574 data rows); D2MOO
-  1.10f was not used. No recording of these objects exists. Not
-  implemented yet.
+  1.10f was not used. No recording of these objects exists.
+  Implemented, unverified: `d2-client::bridge::objects` (branch
+  `claude/impl-final-objclient`; its PROVISIONAL choices are listed in
+  `docs/handoff/impl-final-objclient.md`).
 - **Target version:** 1.14d
 - **Crate/module:** `d2-client` (client object update; the model is
   `client/model.md`), with the rows of `objects.txt` from `d2-data`
@@ -25,20 +27,20 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 44–54 |
-| Inputs | 55–66 |
-| Outputs / state changes | 67–74 |
-| Rules | 75–76 |
-|   25. Client object function dispatch | 77–166 |
-|   26. The client object functions | 167–365 |
-|   27. Client latches of the zoo and the preloads | 366–376 |
-|   28. What d2rs must model for §25–§27 | 377–389 |
-| Constants & data dependencies | 390–411 |
-| Randomness | 412–425 |
-| Edge cases & original bugs | 426–443 |
-| Test vectors | 444–470 |
-| Provenance | 471–492 |
-| Open questions | 493–500 |
+| Summary | 46–56 |
+| Inputs | 57–68 |
+| Outputs / state changes | 69–76 |
+| Rules | 77–78 |
+|   25. Client object function dispatch | 79–168 |
+|   26. The client object functions | 169–367 |
+|   27. Client latches of the zoo and the preloads | 368–378 |
+|   28. What d2rs must model for §25–§27 | 379–391 |
+| Constants & data dependencies | 392–413 |
+| Randomness | 414–427 |
+| Edge cases & original bugs | 428–445 |
+| Test vectors | 446–472 |
+| Provenance | 473–494 |
+| Open questions | 495–502 |
 <!-- /index -->
 
 ## Summary

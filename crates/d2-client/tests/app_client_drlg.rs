@@ -127,12 +127,7 @@ fn the_join_builds_the_client_drlg_in_the_app() {
         single_player::client_drlg_source(&data),
         single_player::client_level_rows(&data),
     );
-    // Skill 0's row: the join's two S→C 0x23 select it
-    // (`formats/d2s-load.md` §8 r3; synthetic data has no skills table).
-    app.world_mut()
-        .resource_mut::<BridgeResource>()
-        .0
-        .set_skill_rows(vec![Default::default()]);
+    app_support::synthetic_skill_rows(&mut app);
     // No original UI here: the open mode it would hand over with every
     // panel closed (`ui/panels.md` §4.2), so the world view can place.
     app.world_mut()

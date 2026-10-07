@@ -222,8 +222,12 @@ fn client_world_holds_only_stated_fields() {
         connected,
         ping,
         pet_palette,
+        // `client/model.md` §2 rule 1 (set C); `world/objects-client.md`
+        // §27 r2 (the latches).
+        objclient,
     } = ClientWorld::default();
     assert!(!connected && ping == Default::default() && pet_palette.is_empty());
+    assert_eq!(objclient, Default::default());
     assert!(overrides == Default::default() && roster.is_empty() && roster_inactive.is_empty());
     assert!(weapon_set == 0 && item_table_ext.is_empty());
     assert!(pets.is_empty() && palette_act.is_none() && active_rooms.is_none());
@@ -265,13 +269,19 @@ fn client_world_holds_only_stated_fields() {
         path_stopped,
         // `client/msg-units.md` §7 r7.2, §1.2 r3–r4.
         direction_of,
-        flags_ex,
         room_freed,
         flag_200,
+        // `client/model.md` §8 rule 7, §18 rule 1, §2 rule 6;
+        // `world/objects-client.md` §25 r5; `msg-units.md` §1.2 r3–r4.
+        interact_ms,
+        frame,
+        flag_ex,
+        flag_4,
     } = ClientUnit::new(key);
+    assert_eq!((interact_ms, frame, flag_ex, flag_4), (0, 0, 0, false));
     assert!(skills.is_none() && !quest_untargetable);
     assert!(turned_toward.is_none() && !path_stopped);
-    assert!(direction_of.is_none() && flags_ex == 0 && !room_freed && !flag_200);
+    assert!(direction_of.is_none() && !room_freed && !flag_200);
     assert!(flag_2.is_none() && states.is_empty() && state_lists.is_empty());
     assert_eq!(k, key);
     assert_eq!((class, mode, position, server_point), (0, 0, None, (0, 0)));

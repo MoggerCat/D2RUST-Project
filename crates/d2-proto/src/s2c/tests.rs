@@ -538,7 +538,8 @@ fn samples() -> Vec<Message> {
         Message::QuestLogInfo(QuestLogInfo { list }),
         Message::OpenUi(OpenUi {
             npc_guid: 9,
-            result: 7,
+            result: 5,
+            effect: 1,
         }),
         Message::QuestItemState(QuestItemState {
             chain: 3,
@@ -653,19 +654,15 @@ fn parse_rejects_bad_messages() {
         })
     );
     // Unwritten bytes are ignored.
-    let mut b = OpenUi {
-        npc_guid: 9,
-        result: 6,
-    }
-    .encode();
-    b[6] = 0xCC;
-    assert_eq!(
-        parse(&b),
-        Ok(Message::OpenUi(OpenUi {
-            npc_guid: 9,
-            result: 6
-        }))
-    );
+    let m = NpcTransaction {
+        kind: 1,
+        code: 6,
+        guid: 9,
+        gold: 10,
+    };
+    let mut b = m.encode();
+    b[3..7].copy_from_slice(&[0xCC; 4]);
+    assert_eq!(parse(&b), Ok(Message::NpcTransaction(m)));
 }
 
 #[test]
