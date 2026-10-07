@@ -5036,6 +5036,9 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
   and the 0x320 slack after the file buffer.
 - `tools/original-hooks.md` OQ9: breakpoint on `0x00552E6C` over a full
   scenario; log the allocating caller (unit-seed fallback).
+- `client/model.md` OQ8 (static answer 13) + OQ9: a waypoint to another
+  act (log S→C 0x05, 0x03, 0x53 bytes), and a monster's client +0x20
+  seed after 0xAC against the server unit's seed.
 
 ## 8. Lessons (problems met, fixes)
 
