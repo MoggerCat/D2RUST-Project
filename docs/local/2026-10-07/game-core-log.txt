@@ -1,0 +1,32 @@
+﻿cargo :    Compiling d2-formats v0.0.0 (C:\Users\pc\Documents\Claude code folder\w-integ\crates\d2-formats)
+At line:1 char:514
++ ...  "sccache"; cargo test --release -p d2-sim --test game_core -- --igno ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (   Compiling d2...tes\d2-formats):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+   Compiling d2-data v0.0.0 (C:\Users\pc\Documents\Claude code folder\w-integ\crates\d2-data)
+   Compiling d2-sim v0.0.0 (C:\Users\pc\Documents\Claude code folder\w-integ\crates\d2-sim)
+    Finished `release` profile [optimized] target(s) in 1m 02s
+     Running tests\game_core.rs (C:\Users\pc\Documents\Claude code 
+folder\d2rs\target\release\deps\game_core-478442852ac59370.exe)
+
+running 12 tests
+test charstats_and_experience_as_stated ... ok
+test itemstatcost_columns_as_stated ... ok
+test itemstatcost_ops_as_stated ... ok
+test op_tables_rebuild_from_the_columns ... ok
+test level_up_and_stat_point_vectors ... ok
+test skills_table_facts ... ok
+734 monstats rows, 673 with DamageRegen
+test special_value_vectors ... ok
+test stat_list_vector_on_live_records ... ok
+test monster_damage_regen_every_class ... ok
+test player_creation_every_class ... ok
+3558 AnimData records scheduled, 0 with a speed past i16
+test anim_schedule_every_record ... ok
+357 skills, 78804 values evaluated
+test every_skill_level_calc_evaluates ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
