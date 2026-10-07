@@ -315,9 +315,11 @@ fn parse(
             }
         }
     } else if id == 0x14 {
-        // msg = cstr at +3, 1 <= strlen < 256 (a missing NUL fails too).
+        // msg = cstr at +3, strlen < 256 (a missing NUL fails too); strlen
+        // 0 is done with no effect (`0x0054A2D5`, spec §2.4 rule 6).
         match msg.get(3..).and_then(strlen) {
-            Some(n) if (1..256).contains(&n) => {}
+            Some(0) => return Err(ResultCode::Done),
+            Some(n) if n < 256 => {}
             _ => return Err(ResultCode::Invalid),
         }
     }
