@@ -65,7 +65,17 @@ pub fn render(r: &Report) -> String {
     );
     let _ = writeln!(s, "\nunconverted extensions (files, no reader)");
     for (e, n) in r.unconverted {
-        let _ = writeln!(s, "  .{e}: {n}");
+        match crate::kinds::SKIPPED_EXTENSIONS
+            .iter()
+            .find(|(x, _)| x == e)
+        {
+            Some((_, why)) => {
+                let _ = writeln!(s, "  .{e}: {n} (skipped: {why})");
+            }
+            None => {
+                let _ = writeln!(s, "  .{e}: {n}");
+            }
+        }
     }
     s
 }

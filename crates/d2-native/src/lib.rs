@@ -23,6 +23,7 @@ pub mod toml_kinds;
 pub mod wav;
 
 // ---- N3: converter support (manifest)
+pub mod asset;
 pub mod manifest;
 
 // ---- N4: runtime source and mod layers (source, layers)

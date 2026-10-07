@@ -2441,6 +2441,7 @@ dependencies = [
  "d2-formats",
  "d2-native",
  "sha2",
+ "test-fixtures",
  "thiserror 2.0.21",
  "toml",
 ]
