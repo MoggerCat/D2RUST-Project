@@ -579,7 +579,10 @@ fn put_while_trading() {
             .get_mut(&p)
             .unwrap()
             .set_cursor(Some(r));
-        fx.sim.world.rest.interact.insert(p, interaction(pg, 9999));
+        let (ty, guid) = interaction(pg, 9999);
+        let rec = fx.sim.events.sys.units.get_mut(p).unwrap();
+        rec.interact.reset();
+        rec.interact.set(ty, guid);
         let out = put(&mut fx, r);
         let page = fx.sim.events.sys.hooks.items.get(r).unwrap().inv_page;
         (out, page)

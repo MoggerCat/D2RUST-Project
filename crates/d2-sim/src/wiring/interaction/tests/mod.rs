@@ -330,7 +330,6 @@ impl LifecycleHooks for Hooks {}
 pub struct Rest {
     pub item_format: u16,
     pub distance: i32,
-    pub interact: BTreeMap<UnitId, (u8, u32)>,
     pub quests: BTreeMap<UnitId, PlayerQuests>,
     pub pets: BTreeMap<UnitId, UnitId>,
     pub inventory: Vec<InvEntry>,
@@ -389,15 +388,6 @@ impl NpcRest for Rest {
     }
     fn tristram_cain_busy(&self, _: UnitId, _: UnitId) -> bool {
         false
-    }
-    fn interact_unit(&self, player: UnitId) -> Option<(u8, u32)> {
-        self.interact.get(&player).copied()
-    }
-    fn set_interact(&mut self, player: UnitId, t: u8, guid: u32) {
-        self.interact.insert(player, (t, guid));
-    }
-    fn reset_interact(&mut self, player: UnitId) {
-        self.interact.remove(&player);
     }
     fn pet(&self, player: UnitId, _: u8, _: u8) -> Option<UnitId> {
         self.pets.get(&player).copied()

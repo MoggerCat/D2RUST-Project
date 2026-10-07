@@ -31,7 +31,7 @@ use d2_data::tables::{Itemratio, Itemstatcost, Itemtypes, Record};
 use super::{InvDesk, InvRest, InvState};
 use crate::game::Game;
 use crate::items::inventory::tables::{GridRec, InvItemRec, InvTypeRec};
-use crate::items::inventory::{InteractionTarget, InvTables, UnitKind};
+use crate::items::inventory::{InvTables, UnitKind};
 use crate::items::moves::{self, Guid, MovePending, Owner, Spot};
 use crate::items::tables::ItemRec;
 use crate::items::{q, ItemRequest, ItemTables};
@@ -404,10 +404,6 @@ impl InvRest for Rest {
     fn quiver_kind(&self, _: Guid) -> bool {
         false
     }
-    fn interaction(&self, _: Owner) -> InteractionTarget {
-        InteractionTarget::None
-    }
-    fn clear_interaction(&mut self, _: Owner) {}
     fn player_data_4c(&self, _: Owner) -> u32 {
         0
     }

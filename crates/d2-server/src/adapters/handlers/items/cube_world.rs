@@ -1,7 +1,7 @@
 // Spec: specs/world/cube.md §1, §2, §8; specs/items/inventory.md §1.4, §2.4, §5.1, §5.3; specs/items/inventory-moves.md §6.4; specs/sim/intents-events.md §2.4
 //! [`CubeWorld`] for the server: the economy wiring's [`EconomyCube`]
-//! for items, stats, unit records and creation; the player's
-//! interaction owner ([`Interact`]); the game's one inventory model
+//! for items, stats, unit records and creation (the player's interact
+//! info on the unit record too); the game's one inventory model
 //! ([`InvParts`], `d2_sim::wiring::inventory`) for the item list, the
 //! checks (`0x00549350`, `0x00549150`: `inventory.md` §5.1), the
 //! targeting reset (`0x0055BF50`, §5.3), placement (`0x00560200`, §2.4)
@@ -14,17 +14,13 @@ use std::collections::BTreeMap;
 
 use d2_sim::items::moves::{iflag, page};
 use d2_sim::rng::Seed;
-use d2_sim::units::{UnitId, UnitType};
+use d2_sim::units::UnitId;
 use d2_sim::wiring::economy::{CubeRest, EconomyCube};
 use d2_sim::wiring::inventory::InvDesk;
 use d2_sim::world::cube::{CraftProperty, CubeWorld, ItemRequest, StatRead};
 
 use super::moves::{take_sent, InvParts, MoveRest};
-use super::{CubeHooks, Interact, ItemError, ItemPending, Staged};
-
-/// Interaction "stash" (`cube.md` §1: type 2, object class 0x10B).
-const STASH_TYPE: u8 = 2;
-const STASH_CLASS: u32 = 0x10B;
+use super::{CubeHooks, ItemError, ItemPending, Staged};
 
 /// The player data item creation reads (`generation.md` §9 step 5): the
 /// name and the client's hardcore flag.
@@ -54,22 +50,7 @@ impl CubeRest for InfoRest<'_> {
     fn send(&mut self, _: UnitId, _: &[u8]) {
         unreachable!("{OVERRIDDEN}")
     }
-    fn interaction(&self, _: UnitId) -> Option<(u8, u32)> {
-        unreachable!("{OVERRIDDEN}")
-    }
-    fn set_interaction(&mut self, _: UnitId, _: u8, _: u32) {
-        unreachable!("{OVERRIDDEN}")
-    }
-    fn reset_interaction(&mut self, _: UnitId) {
-        unreachable!("{OVERRIDDEN}")
-    }
     fn inventory_pass(&mut self, _: UnitId) {
-        unreachable!("{OVERRIDDEN}")
-    }
-    fn interacting_with_stash(&self, _: UnitId) -> bool {
-        unreachable!("{OVERRIDDEN}")
-    }
-    fn trading(&self, _: UnitId) -> bool {
         unreachable!("{OVERRIDDEN}")
     }
     fn inventory(&self, _: UnitId) -> Vec<UnitId> {
@@ -126,7 +107,6 @@ pub(super) struct ServerCube<'e, 'a, 'r, H> {
     inv: RefCell<Option<&'e mut InvParts>>,
     staged: &'e mut Staged,
     pending: &'e mut dyn ItemPending,
-    interact: &'e mut dyn Interact,
     player: UnitId,
     sent: Vec<Vec<u8>>,
     errors: Vec<ItemError>,
@@ -141,7 +121,6 @@ impl<'e, 'a, 'r, H: CubeHooks> ServerCube<'e, 'a, 'r, H> {
         staged: &'e mut Staged,
         pending: &'e mut dyn ItemPending,
         inv: Option<&'e mut InvParts>,
-        interact: &'e mut dyn Interact,
         player: UnitId,
     ) -> Self {
         Self {
@@ -149,7 +128,6 @@ impl<'e, 'a, 'r, H: CubeHooks> ServerCube<'e, 'a, 'r, H> {
             inv: RefCell::new(inv),
             staged,
             pending,
-            interact,
             player,
             sent: Vec::new(),
             errors: Vec::new(),
@@ -179,11 +157,6 @@ impl<'e, 'a, 'r, H: CubeHooks> ServerCube<'e, 'a, 'r, H> {
         self.econ.get_mut()
     }
 
-    /// The active interaction: (unit type, GUID).
-    fn active(&self, player: UnitId) -> Option<(u8, u32)> {
-        self.interact.interact_unit(player)
-    }
-
     /// Runs `f` on the inventory desk over this call's economy (`None`:
     /// a host without inventory parts).
     fn read_desk<T>(&self, f: impl FnOnce(&CubeDesk<'_, 'a, H>) -> T) -> Option<T> {
@@ -210,12 +183,6 @@ impl<'e, 'a, 'r, H: CubeHooks> ServerCube<'e, 'a, 'r, H> {
             }
         }
         Some(out)
-    }
-
-    fn unit_class(&self, ty: UnitType, guid: u32) -> Option<u32> {
-        let ec = self.ec();
-        let u = ec.econ.game.lists.find_unit(ty, guid)?;
-        ec.econ.units.get(u).map(|r| r.class)
     }
 }
 
@@ -264,39 +231,25 @@ impl<H: CubeHooks> CubeWorld for ServerCube<'_, '_, '_, H> {
         }
     }
 
+    /// The interact info on the player's unit record (the economy
+    /// cube's, `0x00554100` / `0x00554120` / `0x00554190`).
     fn interaction(&self, player: UnitId) -> Option<(u8, u32)> {
-        self.active(player)
+        self.ec().interaction(player)
     }
-    /// `0x00554120`: only when no interaction is active.
     fn set_interaction(&mut self, player: UnitId, unit_type: u8, guid: u32) {
-        if self.active(player).is_none() {
-            self.interact.set_interact(player, unit_type, guid);
-        }
+        self.ec_mut().set_interaction(player, unit_type, guid)
     }
-    /// `0x00554190`: GUID −1, type 6, inactive.
     fn reset_interaction(&mut self, player: UnitId) {
-        self.interact.reset_interact(player);
+        self.ec_mut().reset_interaction(player)
     }
     fn inventory_pass(&mut self, player: UnitId) {
         self.pending.inventory_pass(player, &mut self.sent);
     }
     fn interacting_with_stash(&self, player: UnitId) -> bool {
-        self.active(player).is_some_and(|(ty, guid)| {
-            ty == STASH_TYPE && self.unit_class(UnitType::Object, guid) == Some(STASH_CLASS)
-        })
+        self.ec().interacting_with_stash(player)
     }
-    /// `0x005678A0`: interaction type 0 with a live (player) unit.
     fn trading(&self, player: UnitId) -> bool {
-        self.active(player).is_some_and(|(ty, guid)| {
-            ty == 0
-                && self
-                    .ec()
-                    .econ
-                    .game
-                    .lists
-                    .find_unit(UnitType::Player, guid)
-                    .is_some()
-        })
+        self.ec().trading(player)
     }
 
     /// The player's item list in link order (`inventory.md` §1.4 rule 1,

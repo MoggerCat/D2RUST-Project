@@ -88,10 +88,12 @@ fn game(ms: &Arc<AtomicU32>) -> (ThreadLink<Link<StepClock>>, Started) {
         l.host_mut()
             .game
             .events
-            .hooks()
-            .x
+            .sys
+            .units
+            .get_mut(player)
+            .expect("player record")
             .interact
-            .insert(player, (2, guid));
+            .set(2, guid);
     })
     .unwrap();
     (link, started)

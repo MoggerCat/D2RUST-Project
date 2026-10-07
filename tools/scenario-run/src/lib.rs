@@ -135,21 +135,11 @@ impl Data {
 /// the character's skill list (unit +0xA8), staged from `char skill`.
 #[derive(Default)]
 pub struct ScenarioSeams {
-    pub interact: BTreeMap<UnitId, (u8, u32)>,
     pub sent: Vec<(UnitId, Vec<u8>)>,
     pub skills: BTreeMap<UnitId, Vec<SkillEntry>>,
 }
 
 impl Pending for ScenarioSeams {
-    fn set_interact(&mut self, player: UnitId, unit_type: u8, guid: u32) {
-        self.interact.entry(player).or_insert((unit_type, guid));
-    }
-    fn reset_interact(&mut self, player: UnitId) {
-        self.interact.remove(&player);
-    }
-    fn interact_guid(&self, player: UnitId) -> Option<u32> {
-        self.interact.get(&player).map(|i| i.1)
-    }
     fn send(&mut self, player: UnitId, msg: &[u8]) {
         self.sent.push((player, msg.to_vec()));
     }

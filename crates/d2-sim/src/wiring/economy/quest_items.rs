@@ -1,4 +1,4 @@
-// Spec: specs/world/quests.md §4.4, §4.5, §9; specs/world/quests-act1-rest.md §8; specs/sim/units.md §2; specs/sim/stat-lists.md §5
+// Spec: specs/world/quests.md §4.4, §4.5, §9; specs/world/quests-act1-rest.md §8; specs/sim/units.md §2; specs/world/npc.md §2 (the interact info); specs/sim/stat-lists.md §5
 //! [`QuestWorld`] on the real providers: game fields ([`GameFields`]),
 //! the frame and unit lookups ([`crate::game::Game`]), unit records
 //! (GUID, class, unit seed), stat lists (stat reads and adds) and the
@@ -279,6 +279,21 @@ impl<H: LifecycleHooks, R: QuestRest> EconomyQuests<'_, '_, H, R> {
 impl<H: LifecycleHooks, R: QuestRest> QuestWorld for EconomyQuests<'_, '_, H, R> {
     fn frame(&self) -> i32 {
         self.econ.game.frame
+    }
+    /// `0x00554100` on the player's unit record (+0x64 / +0x68 / +0x6C,
+    /// [`crate::units::record::InteractInfo`]); no record → none.
+    fn interact_unit(&mut self, player: UnitId) -> Option<(u8, u32)> {
+        self.econ.units.get(player)?.interact.get()
+    }
+    /// `0x00554120` (`Some`, ignored while active) / `0x00554190`
+    /// (`None`) on the player's unit record.
+    fn set_interact_unit(&mut self, player: UnitId, unit: Option<(u8, u32)>) {
+        if let Some(r) = self.econ.units.get_mut(player) {
+            match unit {
+                Some((t, guid)) => r.interact.set(t, guid),
+                None => r.interact.reset(),
+            }
+        }
     }
     fn difficulty(&self) -> u8 {
         self.econ.fields.difficulty

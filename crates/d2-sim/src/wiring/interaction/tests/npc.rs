@@ -64,7 +64,7 @@ fn talk_starts_on_real_units_timers_and_quests() {
     // §2 start: the player's node, the interact unit, then 0x27, 0x29
     // (game flags, real QuestControl) and 0x28 (the player's flags).
     assert_eq!(w.state.lists[&npc].nodes, [(player, talk::TALKING)]);
-    assert_eq!(w.rest.interact[&player], (1, guid));
+    assert_eq!(w.units.get(player).unwrap().interact.get(), Some((1, guid)));
     let ids: Vec<u8> = w.rest.sent.iter().map(|(_, m)| m[0]).collect();
     assert_eq!(ids, [0x27, 0x29, 0x28]);
     assert_eq!(w.rest.sent[0].1[2..6], guid.to_le_bytes());

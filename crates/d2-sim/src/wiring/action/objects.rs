@@ -667,10 +667,9 @@ impl<X: Pending> ObjectWorld for ObjectView<'_, X> {
     fn in_interact_range(&self, operator: UnitId, object: UnitId) -> bool {
         self.v.h.x.object_in_range(self.game, operator, object)
     }
-    /// `0x00554100`: the interact info ([`Pending::interact_guid`], the
-    /// waypoint seam's).
+    /// `0x00554100`: the interact info on the player's unit record.
     fn interact_active(&self, player: UnitId) -> bool {
-        self.v.h.x.interact_guid(player).is_some()
+        self.v.units.get(player).is_some_and(|r| r.interact.active)
     }
     fn player_busy(&self, player: UnitId) -> bool {
         self.v.h.x.object_player_busy(player)

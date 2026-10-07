@@ -89,9 +89,7 @@ use d2_sim::drlg::{
 };
 use d2_sim::game::Game;
 use d2_sim::items::inventory::tables::{GridRec, InvItemRec, InvTypeRec};
-use d2_sim::items::inventory::{
-    grid_id, mode, InteractionTarget, InvItem, InvTables, Inventory, UnitKind as InvKind,
-};
+use d2_sim::items::inventory::{grid_id, mode, InvItem, InvTables, Inventory, UnitKind as InvKind};
 use d2_sim::items::moves::{Guid, MovePending, Owner, Spot};
 use d2_sim::items::tables::ItemRec;
 use d2_sim::items::{flag, q, ty, ItemRequest, ItemTables};
@@ -602,7 +600,6 @@ const MODEL: &str = "WiredWorld answers from the inventory model";
 /// grid is the rest's), so the properties can find every store item.
 #[derive(Default)]
 struct Rest {
-    interact: BTreeMap<UnitId, (u8, u32)>,
     quests: BTreeMap<UnitId, PlayerQuests>,
     last_bought: BTreeMap<UnitId, u32>,
     sent: Vec<(UnitId, Vec<u8>)>,
@@ -645,15 +642,6 @@ impl NpcRest for Rest {
     }
     fn tristram_cain_busy(&self, _: UnitId, _: UnitId) -> bool {
         false
-    }
-    fn interact_unit(&self, player: UnitId) -> Option<(u8, u32)> {
-        self.interact.get(&player).copied()
-    }
-    fn set_interact(&mut self, player: UnitId, t: u8, guid: u32) {
-        self.interact.insert(player, (t, guid));
-    }
-    fn reset_interact(&mut self, player: UnitId) {
-        self.interact.remove(&player);
     }
     fn pet(&self, _: UnitId, _: u8, _: u8) -> Option<UnitId> {
         None
@@ -1053,10 +1041,6 @@ impl InvRest for InvFx {
     fn quiver_kind(&self, _: Guid) -> bool {
         false
     }
-    fn interaction(&self, _: Owner) -> InteractionTarget {
-        InteractionTarget::None
-    }
-    fn clear_interaction(&mut self, _: Owner) {}
     fn player_data_4c(&self, _: Owner) -> u32 {
         0
     }
@@ -1362,9 +1346,9 @@ impl Host {
             // The cube closed again (unspecified as its opening): the
             // staged interaction ends, so a later NPC talk can start.
             let cube = (4, self.guid_or_none(self.cube));
-            let rest = &mut self.sim.world.rest;
-            if rest.interact.get(&self.player) == Some(&cube) {
-                rest.interact.remove(&self.player);
+            let rec = self.sim.events.sys.units.get_mut(self.player).unwrap();
+            if rec.interact.get() == Some(cube) {
+                rec.interact.reset();
             }
         }
         let direct = self.drain();
@@ -1461,7 +1445,9 @@ impl Host {
                 // spec: the interaction (type 4, the cube) is staged.
                 let cg = self.guid_or_none(self.cube);
                 if cg != u32::MAX {
-                    self.sim.world.rest.interact.insert(self.player, (4, cg));
+                    let rec = self.sim.events.sys.units.get_mut(self.player).unwrap();
+                    rec.interact.reset();
+                    rec.interact.set(4, cg);
                 }
                 vec![vec![0x4F, 0x18, 0, 0, 0, 0, 0]]
             }

@@ -52,7 +52,7 @@ use std::collections::BTreeMap;
 
 use super::economy::{Economy, EconomyError, ItemSpawn};
 use crate::items::bitstream::WriteBack;
-use crate::items::inventory::{InteractionTarget, InvItem, InvTables, Inventory, UnitKind};
+use crate::items::inventory::{InvItem, InvTables, Inventory, UnitKind};
 use crate::items::moves::{deferred, Guid, MovePending, Owner};
 use crate::items::ItemRequest;
 use crate::units::lifecycle::LifecycleHooks;
@@ -195,12 +195,9 @@ pub trait InvRest: MovePending {
     /// Quiver-type item (`0x00628480`).
     fn quiver_kind(&self, item: Guid) -> bool;
 
-    // ---- player data and interaction (`world/npc.md` §2) -------------------
+    // ---- player data (`world/npc.md` §2; the interact info is the unit
+    // record's, `units::record::InteractInfo`) ---------------------------
 
-    /// The player's interaction (`0x00554100`).
-    fn interaction(&self, player: Owner) -> InteractionTarget;
-    /// `0x00554190`.
-    fn clear_interaction(&mut self, player: Owner);
     /// Player data +0x4C.
     fn player_data_4c(&self, player: Owner) -> u32;
     /// Player data +0x50.

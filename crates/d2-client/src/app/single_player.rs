@@ -32,7 +32,7 @@
 //!
 //! Seams without a provider are [`LocalSeams`]: the narrowest answers
 //! (`Pending`'s defaults) plus a store of what the sim itself sets
-//! (positions, the interaction target) and the transport outbox. Nothing
+//! (positions) and the transport outbox. Nothing
 //! here decides an outcome: it stages the game the way the server tests
 //! do (a sorceress who knows her act's first waypoint, `bridge.md` §3).
 
@@ -128,14 +128,13 @@ pub enum BuildError {
     Thread(#[from] ThreadStopped),
 }
 
-/// The action wiring's seams without a provider. Positions and the
-/// interaction target are stored as the sim sets them; messages the sim
+/// The action wiring's seams without a provider. Positions are stored
+/// as the sim sets them; messages the sim
 /// sends wait in `sent` for the world handlers ([`Outbox`]); warp and
 /// arrival mode, whose bodies are unwritten specs, are logged.
 #[derive(Debug, Default)]
 pub struct LocalSeams {
     pub pos: BTreeMap<UnitId, (i32, i32)>,
-    pub interact: BTreeMap<UnitId, (u8, u32)>,
     pub sent: Vec<(UnitId, Vec<u8>)>,
     pub log: Vec<String>,
 }
@@ -146,15 +145,6 @@ impl Pending for LocalSeams {
     }
     fn place(&mut self, unit: UnitId, x: i32, y: i32) {
         self.pos.insert(unit, (x, y));
-    }
-    fn set_interact(&mut self, player: UnitId, unit_type: u8, guid: u32) {
-        self.interact.entry(player).or_insert((unit_type, guid));
-    }
-    fn reset_interact(&mut self, player: UnitId) {
-        self.interact.remove(&player);
-    }
-    fn interact_guid(&self, player: UnitId) -> Option<u32> {
-        self.interact.get(&player).map(|i| i.1)
     }
     fn send(&mut self, player: UnitId, msg: &[u8]) {
         self.sent.push((player, msg.to_vec()));

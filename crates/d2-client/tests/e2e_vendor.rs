@@ -569,7 +569,8 @@ fn run_with(game_seed: u32, gold: i32) -> Transcript {
     quest_info.extend_from_slice(&fx.sim_ref().world.rest.quests[&player].flags[0].0);
     assert_eq!(f.received[2], quest_info);
     assert_eq!(f.received[2].len(), 103);
-    assert_eq!(fx.sim_ref().world.rest.interact[&player], (1, ng));
+    let rec = fx.sim_ref().events.sys.units.get(player).unwrap();
+    assert_eq!(rec.interact.get(), Some((1, ng)));
     frames.push(f);
 
     // 2. C→S 0x2F: chat open (§3): node state 0 → 1, the heal hook (§5;

@@ -44,13 +44,12 @@ use super::local::{LocalLink, PendingSession};
 use super::world::{ClientUnit, ClientWorld, UnitKey};
 use super::{Bridge, BridgeError};
 
-/// The action wiring's seams without a provider: positions, interaction,
-/// warp and arrival mode (logged), and the transport (`send`, handed to
-/// the world handlers through [`Outbox`]).
+/// The action wiring's seams without a provider: positions, warp and
+/// arrival mode (logged), and the transport (`send`, handed to the world
+/// handlers through [`Outbox`]).
 #[derive(Default)]
 struct TestPending {
     pos: BTreeMap<UnitId, (i32, i32)>,
-    interact: BTreeMap<UnitId, (u8, u32)>,
     sent: Vec<(UnitId, Vec<u8>)>,
     log: Vec<String>,
 }
@@ -61,15 +60,6 @@ impl Pending for TestPending {
     }
     fn place(&mut self, unit: UnitId, x: i32, y: i32) {
         self.pos.insert(unit, (x, y));
-    }
-    fn set_interact(&mut self, player: UnitId, unit_type: u8, guid: u32) {
-        self.interact.entry(player).or_insert((unit_type, guid));
-    }
-    fn reset_interact(&mut self, player: UnitId) {
-        self.interact.remove(&player);
-    }
-    fn interact_guid(&self, player: UnitId) -> Option<u32> {
-        self.interact.get(&player).map(|i| i.1)
     }
     fn send(&mut self, player: UnitId, msg: &[u8]) {
         self.sent.push((player, msg.to_vec()));
@@ -394,6 +384,12 @@ impl Fx {
         &mut self.sim().events.hooks().x
     }
 
+    /// The player's interact info (the unit record's).
+    fn interact(&mut self) -> &mut d2_sim::units::record::InteractInfo {
+        let p = self.player;
+        &mut self.sim().events.sys.units.get_mut(p).unwrap().interact
+    }
+
     /// Advances the host clock by `ms`.
     fn advance(&mut self, ms: u32) {
         self.link().host_mut().clock.0 += ms;
@@ -452,7 +448,7 @@ fn waypoint_travel_end_to_end() {
     // The waypoint menu is open; the client asks to travel to Cold
     // Plains. The bytes reach the server queue during the frame.
     let (p, wp) = (fx.player, fx.wp);
-    fx.pending().interact.insert(p, (2, wp));
+    fx.interact().set(2, wp);
     let sent = fx
         .bridge
         .send(&TakeOrCloseWp {
@@ -504,7 +500,7 @@ fn waypoint_travel_end_to_end() {
         fx.pending().log,
         [format!("warp {} 3 0", p.0), format!("arrival mode {}", p.0)]
     );
-    assert!(fx.pending().interact.is_empty());
+    assert_eq!(fx.interact().get(), None);
     assert!(fx.sim().world.faults.is_empty());
     assert!(fx.sim().unhandled.is_empty());
 
@@ -520,8 +516,8 @@ fn waypoint_travel_end_to_end() {
 fn spec_table_drops_a_unit_message_for_an_unknown_unit() {
     let mut fx = fixture(Dispatch::from_spec().unwrap());
     fx.bridge.frame().unwrap();
-    let (p, wp) = (fx.player, fx.wp);
-    fx.pending().interact.insert(p, (2, wp));
+    let wp = fx.wp;
+    fx.interact().set(2, wp);
     fx.bridge
         .send(&TakeOrCloseWp {
             wp,

@@ -165,7 +165,7 @@ const STAMINA: i32 = 0x6400;
 /// and the timer paths alike), the drop state, and a log of the calls
 /// that change something. The answers are the narrowest ones
 /// (`Pending`'s defaults) except those the test stages (see each). The
-/// player's interaction is the server host's (the NPC rest, `Rest`).
+/// player's interaction is the unit record's interact info.
 #[derive(Default)]
 struct TestPending {
     sent: Vec<(UnitId, Vec<u8>)>,
@@ -2402,12 +2402,16 @@ fn run_with(game_seed: u32) -> Transcript {
 
     // 15. Waypoint travel to the GATE level (C→S 0x49, `waypoints.md`
     // §6–§7) with the menu open (the operate path is the object spec's:
-    // the interaction staged at the host's owner). With the path
+    // the interaction staged on the player's unit record). With the path
     // provider the same-act warp places the player in the destination's
     // spawn room (`path-placement.md` §10, §11), so rule 7 holds: in the
     // drain the client gets 0x07 MapReveal of the placement room, then
     // 0x0D at the player's position + 3 (§8 rule 3).
-    fx.sim().world.rest.interact.insert(player, (2, wp));
+    {
+        let rec = fx.sim().events.action.sys.units.get_mut(player).unwrap();
+        rec.interact.reset();
+        rec.interact.set(2, wp);
+    }
     let travel = bytes(&TakeOrCloseWp {
         wp,
         level: GATE as u16,
@@ -2510,7 +2514,8 @@ fn run_with(game_seed: u32) -> Transcript {
     want.extend(switch);
     want.extend(leave);
     assert_eq!(frames.last().unwrap().2, want);
-    assert!(!fx.sim_ref().world.rest.interact.contains_key(&player));
+    let rec = fx.sim_ref().events.action.sys.units.get(player).unwrap();
+    assert_eq!(rec.interact.get(), None);
     // The next tick: nothing (the 0x15 of `docs/handoff/wire-path-server.md`
     // §4 finding 1 came with the room switch's player update).
     record(&mut fx, &mut frames, vec![]);

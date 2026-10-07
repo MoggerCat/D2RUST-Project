@@ -218,10 +218,12 @@ fn host_quests_answer_from_the_owner_and_the_object_state() {
     };
     let s = &mut fx.h.game;
     let out = WorldHost::quests(&mut s.world, &mut s.game, &mut s.events, probe).unwrap();
-    // The interaction owner (the NPC rest), `objects.txt` FrameCnt1 as
-    // stored, the mode set on the real object.
+    // The interaction owner (the player's unit record), `objects.txt`
+    // FrameCnt1 as stored, the mode set on the real object.
     assert_eq!(out, (Some((2, 77)), None, 15 << 8, 2));
-    assert!(fx.world().rest.interact.is_empty());
+    let p = fx.player;
+    let units = &fx.h.game.events.sys.units;
+    assert_eq!(units.get(p).unwrap().interact.get(), None);
     assert_eq!(fx.mode(gibbet), 2);
     // The rest's staged modes were not used.
     assert!(fx.world().rest.object_modes.is_empty());
