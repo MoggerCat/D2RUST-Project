@@ -1,0 +1,147 @@
+﻿cargo :    Compiling d2-client v0.0.0 (C:\Users\pc\Documents\Claude code folder\w-integ\crates\d2-client)
+At line:1 char:632
++ ...  "sccache"; cargo run -p d2-client --release -- play --new sorceress  ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (   Compiling d2...ates\d2-client):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+    Finished `release` profile [optimized] target(s) in 10.07s
+     Running `C:\Users\pc\Documents\Claude code folder\d2rs\target\release\d2-client.exe play --new sorceress Test`
+play: game data from D2_GAME_DIR (137 levels, 573 objects, waypoint object class 119; level files: 2043 DS1, 34 lvlsub DS1, 241 DT1)
+play: new character Test (sorceress), not saved
+single player: seed 1234, waypoint unit UnitId(0) (GUID 1)
+2026-10-07T22:32:00.015415Z  INFO bevy_diagnostic::system_information_diagnostics_plugin::internal: SystemInfo { os: 
+"Windows 10 Enterprise", kernel: "19045", cpu: "Intel(R) Core(TM) i7-7700HQ CPU @ 2.80GHz", core_count: "4", memory: 
+"15.9 GiB" }
+2026-10-07T22:32:00.103474Z  INFO bevy_render::renderer: AdapterInfo { name: "Intel(R) HD Graphics 630", vendor: 
+32902, device: 22811, device_type: IntegratedGpu, device_pci_bus_id: "", driver: "?", driver_info: "?", backend: 
+Vulkan, subgroup_min_size: 4, subgroup_max_size: 128, transient_saves_memory: false }
+2026-10-07T22:32:00.520832Z  INFO bevy_pbr::cluster: GPU clustering is supported on this device.
+2026-10-07T22:32:00.520933Z  INFO bevy_render::batching::gpu_preprocessing: GPU preprocessing is fully supported on 
+this device.
+2026-10-07T22:32:00.522301Z  INFO bevy_winit::system: Creating new window d2rs (65v0)
+2026-10-07T22:32:00.794511Z  WARN d2_client::app::ui: unit art: DATA\GLOBAL\CHARS\SO\SH\SOSHlitTNhth.dcc: in no archive
+2026-10-07T22:32:02.045457Z DEBUG d2_client::bridge::click: click LeftDown at Some((546, 330)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) pos Some((4873, 4228)) server Some((0, 0)) mode Some(5) class Some(1) cursor false skills 
+Some((Some(0), Some(0), [(0, 4294967295, 1), (2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 
+4294967295, 1), (219, 4294967295, 1), (220, 4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160), Code { 
+code: 1, a: 4880, b: 4226 }, HoverCall(4618864)]
+2026-10-07T22:32:02.145571Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) pos Some((4873, 4228)) server Some((0, 0)) mode Some(5) class Some(1) cursor false skills Some((Some(0), 
+Some(0), [(0, 4294967295, 1), (2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), 
+(219, 4294967295, 1), (220, 4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160)]
+2026-10-07T22:32:02.496094Z DEBUG d2_client::bridge::click: click LeftDown at Some((525, 367)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) pos Some((4873, 4228)) server Some((0, 0)) mode Some(5) class Some(1) cursor false skills 
+Some((Some(0), Some(0), [(0, 4294967295, 1), (2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 
+4294967295, 1), (219, 4294967295, 1), (220, 4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160), Code { 
+code: 1, a: 4882, b: 4229 }, HoverCall(4618864)]
+2026-10-07T22:32:02.595925Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) pos Some((4873, 4228)) server Some((0, 0)) mode Some(5) class Some(1) cursor false skills Some((Some(0), 
+Some(0), [(0, 4294967295, 1), (2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), 
+(219, 4294967295, 1), (220, 4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160)]
+2026-10-07T22:32:02.645455Z DEBUG d2_client::bridge::click: click LeftDown at Some((522, 370)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) pos Some((4873, 4228)) server Some((0, 0)) mode Some(5) class Some(1) cursor false skills 
+Some((Some(0), Some(0), [(0, 4294967295, 1), (2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 
+4294967295, 1), (219, 4294967295, 1), (220, 4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160), Code { 
+code: 1, a: 4882, b: 4229 }, HoverCall(4618864)]
+2026-10-07T22:32:02.746175Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) pos Some((4873, 4228)) server Some((0, 0)) mode Some(5) class Some(1) cursor false skills Some((Some(0), 
+Some(0), [(0, 4294967295, 1), (2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), 
+(219, 4294967295, 1), (220, 4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160)]
+2026-10-07T22:32:03.545424Z DEBUG d2_client::bridge::click: click LeftDown at Some((132, 249)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) pos Some((4873, 4228)) server Some((0, 0)) mode Some(5) class Some(1) cursor false skills 
+Some((Some(0), Some(0), [(0, 4294967295, 1), (2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 
+4294967295, 1), (219, 4294967295, 1), (220, 4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160), Code { 
+code: 1, a: 4862, b: 4234 }, HoverCall(4618864)]
+2026-10-07T22:32:03.645409Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) pos Some((4873, 4228)) server Some((0, 0)) mode Some(5) class Some(1) cursor false skills Some((Some(0), 
+Some(0), [(0, 4294967295, 1), (2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), 
+(219, 4294967295, 1), (220, 4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160)]
+2026-10-07T22:32:03.994358Z DEBUG d2_client::bridge::click: click LeftDown at Some((453, 106)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) pos Some((4873, 4228)) server Some((0, 0)) mode Some(5) class Some(1) cursor false skills 
+Some((Some(0), Some(0), [(0, 4294967295, 1), (2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 
+4294967295, 1), (219, 4294967295, 1), (220, 4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160), Code { 
+code: 1, a: 4863, b: 4215 }, HoverCall(4618864)]
+2026-10-07T22:32:04.045253Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) pos Some((4873, 4228)) server Some((0, 0)) mode Some(5) class Some(1) cursor false skills Some((Some(0), 
+Some(0), [(0, 4294967295, 1), (2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), 
+(219, 4294967295, 1), (220, 4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160)]
+2026-10-07T22:32:04.260322Z DEBUG d2_client::bridge::click: click LeftDown at Some((480, 309)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) pos Some((4873, 4228)) server Some((0, 0)) mode Some(5) class Some(1) cursor false skills 
+Some((Some(0), Some(0), [(0, 4294967295, 1), (2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 
+4294967295, 1), (219, 4294967295, 1), (220, 4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160), Code { 
+code: 1, a: 4877, b: 4227 }, HoverCall(4618864)]
+2026-10-07T22:32:04.310677Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) pos Some((4873, 4228)) server Some((0, 0)) mode Some(5) class Some(1) cursor false skills Some((Some(0), 
+Some(0), [(0, 4294967295, 1), (2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), 
+(219, 4294967295, 1), (220, 4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160)]
+2026-10-07T22:32:04.462035Z DEBUG d2_client::bridge::click: click LeftDown at Some((497, 402)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) pos Some((4873, 4228)) server Some((0, 0)) mode Some(5) class Some(1) cursor false skills 
+Some((Some(0), Some(0), [(0, 4294967295, 1), (2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 
+4294967295, 1), (219, 4294967295, 1), (220, 4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160), Code { 
+code: 1, a: 4883, b: 4232 }, HoverCall(4618864)]
+2026-10-07T22:32:04.561688Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) pos Some((4873, 4228)) server Some((0, 0)) mode Some(5) class Some(1) cursor false skills Some((Some(0), 
+Some(0), [(0, 4294967295, 1), (2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), 
+(219, 4294967295, 1), (220, 4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160)]
+2026-10-07T22:32:05.110237Z DEBUG d2_client::bridge::click: click LeftDown at Some((144, 260)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) pos Some((4873, 4228)) server Some((0, 0)) mode Some(5) class Some(1) cursor false skills 
+Some((Some(0), Some(0), [(0, 4294967295, 1), (2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 
+4294967295, 1), (219, 4294967295, 1), (220, 4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160), Code { 
+code: 1, a: 4863, b: 4234 }, HoverCall(4618864)]
+2026-10-07T22:32:05.212637Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) pos Some((4873, 4228)) server Some((0, 0)) mode Some(5) class Some(1) cursor false skills Some((Some(0), 
+Some(0), [(0, 4294967295, 1), (2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), 
+(219, 4294967295, 1), (220, 4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160)]
+2026-10-07T22:32:05.557631Z DEBUG d2_client::bridge::click: click LeftDown at Some((525, 94)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) pos Some((4873, 4228)) server Some((0, 0)) mode Some(5) class Some(1) cursor false skills 
+Some((Some(0), Some(0), [(0, 4294967295, 1), (2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 
+4294967295, 1), (219, 4294967295, 1), (220, 4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160), Code { 
+code: 1, a: 4865, b: 4212 }, HoverCall(4618864)]
+2026-10-07T22:32:05.624090Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) pos Some((4873, 4228)) server Some((0, 0)) mode Some(5) class Some(1) cursor false skills Some((Some(0), 
+Some(0), [(0, 4294967295, 1), (2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), 
+(219, 4294967295, 1), (220, 4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160)]
+2026-10-07T22:32:05.630108Z  INFO d2_client::app::play: frame 250: 106 server ticks, 4 units in the model, unowned S→C 
+ids {}; last view Some(FrameStats { bridge_frame: 250, server_tick: 106, items: 129, units_drawn: 1, units_hidden: 3, 
+ui_sent: 0, ui_unhandled: 1, gpu: true }); node frames 81; audio Some(AudioStats { frame: 250, presented: 106, 
+decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:32:05.809801Z DEBUG d2_client::bridge::click: click LeftDown at Some((519, 362)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) pos Some((4873, 4228)) server Some((0, 0)) mode Some(5) class Some(1) cursor false skills 
+Some((Some(0), Some(0), [(0, 4294967295, 1), (2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 
+4294967295, 1), (219, 4294967295, 1), (220, 4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160), Code { 
+code: 1, a: 4881, b: 4229 }, HoverCall(4618864)]
+2026-10-07T22:32:05.908654Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) pos Some((4873, 4228)) server Some((0, 0)) mode Some(5) class Some(1) cursor false skills Some((Some(0), 
+Some(0), [(0, 4294967295, 1), (2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), 
+(219, 4294967295, 1), (220, 4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160)]
+2026-10-07T22:32:06.109705Z DEBUG d2_client::bridge::click: click LeftDown at Some((183, 260)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) pos Some((4873, 4228)) server Some((0, 0)) mode Some(5) class Some(1) cursor false skills 
+Some((Some(0), Some(0), [(0, 4294967295, 1), (2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 
+4294967295, 1), (219, 4294967295, 1), (220, 4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160), Code { 
+code: 1, a: 4864, b: 4233 }, HoverCall(4618864)]
+2026-10-07T22:32:06.211142Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) pos Some((4873, 4228)) server Some((0, 0)) mode Some(5) class Some(1) cursor false skills Some((Some(0), 
+Some(0), [(0, 4294967295, 1), (2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), 
+(219, 4294967295, 1), (220, 4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160)]
+2026-10-07T22:32:06.510893Z DEBUG d2_client::bridge::click: click LeftDown at Some((490, 104)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) pos Some((4873, 4228)) server Some((0, 0)) mode Some(5) class Some(1) cursor false skills 
+Some((Some(0), Some(0), [(0, 4294967295, 1), (2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 
+4294967295, 1), (219, 4294967295, 1), (220, 4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160), Code { 
+code: 1, a: 4864, b: 4213 }, HoverCall(4618864)]
+2026-10-07T22:32:06.610574Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) pos Some((4873, 4228)) server Some((0, 0)) mode Some(5) class Some(1) cursor false skills Some((Some(0), 
+Some(0), [(0, 4294967295, 1), (2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), 
+(219, 4294967295, 1), (220, 4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160)]
+2026-10-07T22:32:06.711279Z DEBUG d2_client::bridge::click: click LeftDown at Some((496, 305)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) pos Some((4873, 4228)) server Some((0, 0)) mode Some(5) class Some(1) cursor false skills 
+Some((Some(0), Some(0), [(0, 4294967295, 1), (2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 
+4294967295, 1), (219, 4294967295, 1), (220, 4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160), Code { 
+code: 1, a: 4877, b: 4226 }, HoverCall(4618864)]
+2026-10-07T22:32:06.810506Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) pos Some((4873, 4228)) server Some((0, 0)) mode Some(5) class Some(1) cursor false skills Some((Some(0), 
+Some(0), [(0, 4294967295, 1), (2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), 
+(219, 4294967295, 1), (220, 4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160)]
+2026-10-07T22:32:07.695388Z  INFO bevy_window::system: No windows are open, exiting
+2026-10-07T22:32:07.695445Z  INFO bevy_winit::system: Closing window 65v0
+EXIT=0

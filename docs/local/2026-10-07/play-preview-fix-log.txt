@@ -1,0 +1,95 @@
+﻿cargo :    Compiling d2-server v0.0.0 (C:\Users\pc\Documents\Claude code folder\w-integ\crates\d2-server)
+At line:1 char:569
++ ...  "sccache"; cargo run -p d2-client --release -- play --new sorceress  ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (   Compiling d2...ates\d2-server):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+   Compiling d2-client v0.0.0 (C:\Users\pc\Documents\Claude code folder\w-integ\crates\d2-client)
+    Finished `release` profile [optimized] target(s) in 1m 33s
+     Running `C:\Users\pc\Documents\Claude code folder\d2rs\target\release\d2-client.exe play --new sorceress Test`
+play: game data from D2_GAME_DIR (137 levels, 573 objects, waypoint object class 119; level files: 2043 DS1, 34 lvlsub DS1, 241 DT1)
+play: new character Test (sorceress), not saved
+single player: seed 1234, waypoint unit UnitId(0) (GUID 1)
+2026-10-07T22:17:03.203732Z  INFO bevy_diagnostic::system_information_diagnostics_plugin::internal: SystemInfo { os: 
+"Windows 10 Enterprise", kernel: "19045", cpu: "Intel(R) Core(TM) i7-7700HQ CPU @ 2.80GHz", core_count: "4", memory: 
+"15.9 GiB" }
+2026-10-07T22:17:03.299717Z  INFO bevy_render::renderer: AdapterInfo { name: "Intel(R) HD Graphics 630", vendor: 
+32902, device: 22811, device_type: IntegratedGpu, device_pci_bus_id: "", driver: "?", driver_info: "?", backend: 
+Vulkan, subgroup_min_size: 4, subgroup_max_size: 128, transient_saves_memory: false }
+2026-10-07T22:17:03.718669Z  INFO bevy_pbr::cluster: GPU clustering is supported on this device.
+2026-10-07T22:17:03.718747Z  INFO bevy_render::batching::gpu_preprocessing: GPU preprocessing is fully supported on 
+this device.
+2026-10-07T22:17:03.719590Z  INFO bevy_winit::system: Creating new window d2rs (65v0)
+2026-10-07T22:17:03.952758Z  WARN d2_client::app::ui: unit art: DATA\GLOBAL\CHARS\SO\SH\SOSHlitTNhth.dcc: in no archive
+2026-10-07T22:17:08.681842Z  INFO d2_client::app::play: frame 250: 105 server ticks, 4 units in the model, unowned S→C 
+ids {}; last view Some(FrameStats { bridge_frame: 249, server_tick: 104, items: 129, units_drawn: 1, units_hidden: 3, 
+ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 81; audio Some(AudioStats { frame: 250, presented: 105, 
+decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:17:12.847739Z  INFO d2_client::app::play: frame 500: 209 server ticks, 4 units in the model, unowned S→C 
+ids {}; last view Some(FrameStats { bridge_frame: 498, server_tick: 208, items: 129, units_drawn: 1, units_hidden: 3, 
+ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 165; audio Some(AudioStats { frame: 500, presented: 209, 
+decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:17:17.014734Z  INFO d2_client::app::play: frame 750: 313 server ticks, 4 units in the model, unowned S→C 
+ids {}; last view Some(FrameStats { bridge_frame: 748, server_tick: 312, items: 129, units_drawn: 1, units_hidden: 3, 
+ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 248; audio Some(AudioStats { frame: 750, presented: 313, 
+decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:17:21.180262Z  INFO d2_client::app::play: frame 1000: 417 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 1000, server_tick: 417, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 331; audio Some(AudioStats { frame: 1000, 
+presented: 417, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:17:25.345661Z  INFO d2_client::app::play: frame 1250: 521 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 1250, server_tick: 521, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 414; audio Some(AudioStats { frame: 1250, 
+presented: 521, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:17:29.508348Z  INFO d2_client::app::play: frame 1500: 625 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 1498, server_tick: 625, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 498; audio Some(AudioStats { frame: 1500, 
+presented: 625, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:17:33.678397Z  INFO d2_client::app::play: frame 1750: 730 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 1750, server_tick: 730, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 580; audio Some(AudioStats { frame: 1750, 
+presented: 730, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:17:37.854250Z  INFO d2_client::app::play: frame 2000: 834 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 1999, server_tick: 834, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 663; audio Some(AudioStats { frame: 2000, 
+presented: 834, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:17:42.021769Z  INFO d2_client::app::play: frame 2250: 938 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 2248, server_tick: 937, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 2, gpu: true }); node frames 747; audio Some(AudioStats { frame: 2250, 
+presented: 938, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:17:42.337736Z DEBUG d2_client::bridge::click: click LeftDown at Some((438, 289)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) mode Some(5) class Some(1) cursor false outs [HoverCall(4616160)]
+2026-10-07T22:17:42.337771Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) mode Some(5) class Some(1) cursor false outs []
+2026-10-07T22:17:43.635377Z DEBUG d2_client::bridge::click: click LeftDown at Some((563, 390)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) mode Some(5) class Some(1) cursor false outs [HoverCall(4616160)]
+2026-10-07T22:17:43.786101Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) mode Some(5) class Some(1) cursor false outs [HoverCall(4616160)]
+2026-10-07T22:17:44.336126Z DEBUG d2_client::bridge::click: click LeftDown at Some((414, 323)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) mode Some(5) class Some(1) cursor false outs [HoverCall(4616160)]
+2026-10-07T22:17:44.736187Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) mode Some(5) class Some(1) cursor false outs [HoverCall(4616160)]
+2026-10-07T22:17:45.185127Z DEBUG d2_client::bridge::click: click LeftDown at Some((148, 234)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) mode Some(5) class Some(1) cursor false outs [HoverCall(4616160)]
+2026-10-07T22:17:45.285019Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) mode Some(5) class Some(1) cursor false outs [HoverCall(4616160)]
+2026-10-07T22:17:45.633811Z DEBUG d2_client::bridge::click: click LeftDown at Some((606, 425)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) mode Some(5) class Some(1) cursor false outs [HoverCall(4616160)]
+2026-10-07T22:17:45.685443Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) mode Some(5) class Some(1) cursor false outs [HoverCall(4616160)]
+2026-10-07T22:17:45.935735Z DEBUG d2_client::bridge::click: click LeftDown at Some((257, 292)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) mode Some(5) class Some(1) cursor false outs [HoverCall(4616160)]
+2026-10-07T22:17:45.985121Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) mode Some(5) class Some(1) cursor false outs [HoverCall(4616160)]
+2026-10-07T22:17:46.086608Z DEBUG d2_client::bridge::click: click LeftDown at Some((628, 410)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) mode Some(5) class Some(1) cursor false outs [HoverCall(4616160)]
+2026-10-07T22:17:46.184706Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) mode Some(5) class Some(1) cursor false outs [HoverCall(4616160)]
+2026-10-07T22:17:46.189235Z  INFO d2_client::app::play: frame 2500: 1042 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 2500, server_tick: 1042, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 1, gpu: true }); node frames 830; audio Some(AudioStats { frame: 2500, 
+presented: 1042, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:17:48.660701Z  INFO bevy_window::system: No windows are open, exiting
+2026-10-07T22:17:48.660753Z  INFO bevy_winit::system: Closing window 65v0
+EXIT=0

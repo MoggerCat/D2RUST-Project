@@ -1,0 +1,342 @@
+﻿cargo :    Compiling d2-client v0.0.0 (C:\Users\pc\Documents\Claude code folder\w-integ\crates\d2-client)
+At line:1 char:569
++ ...  "sccache"; cargo run -p d2-client --release -- play --new sorceress  ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (   Compiling d2...ates\d2-client):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+    Finished `release` profile [optimized] target(s) in 1m 24s
+     Running `C:\Users\pc\Documents\Claude code folder\d2rs\target\release\d2-client.exe play --new sorceress Test`
+play: game data from D2_GAME_DIR (137 levels, 573 objects, waypoint object class 119; level files: 2043 DS1, 34 lvlsub DS1, 241 DT1)
+play: new character Test (sorceress), not saved
+single player: seed 1234, waypoint unit UnitId(0) (GUID 1)
+2026-10-07T22:28:29.633157Z  INFO bevy_diagnostic::system_information_diagnostics_plugin::internal: SystemInfo { os: 
+"Windows 10 Enterprise", kernel: "19045", cpu: "Intel(R) Core(TM) i7-7700HQ CPU @ 2.80GHz", core_count: "4", memory: 
+"15.9 GiB" }
+2026-10-07T22:28:29.791815Z  INFO bevy_render::renderer: AdapterInfo { name: "Intel(R) HD Graphics 630", vendor: 
+32902, device: 22811, device_type: IntegratedGpu, device_pci_bus_id: "", driver: "?", driver_info: "?", backend: 
+Vulkan, subgroup_min_size: 4, subgroup_max_size: 128, transient_saves_memory: false }
+2026-10-07T22:28:30.230021Z  INFO bevy_pbr::cluster: GPU clustering is supported on this device.
+2026-10-07T22:28:30.230102Z  INFO bevy_render::batching::gpu_preprocessing: GPU preprocessing is fully supported on 
+this device.
+2026-10-07T22:28:30.231031Z  INFO bevy_winit::system: Creating new window d2rs (65v0)
+2026-10-07T22:28:30.469458Z  WARN d2_client::app::ui: unit art: DATA\GLOBAL\CHARS\SO\SH\SOSHlitTNhth.dcc: in no archive
+2026-10-07T22:28:32.148917Z DEBUG d2_client::bridge::click: click LeftDown at Some((514, 322)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((Some(0), Some(0), [(0, 4294967295, 1), 
+(2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), (219, 4294967295, 1), (220, 
+4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160), Code { code: 1, a: 4878, b: 4226 }, HoverCall(4618864)]
+2026-10-07T22:28:32.249600Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((Some(0), Some(0), [(0, 4294967295, 1), (2, 4294967295, 
+1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), (219, 4294967295, 1), (220, 4294967295, 1), (3, 
+4294967295, 1)])) outs [HoverCall(4616160)]
+2026-10-07T22:28:32.650850Z DEBUG d2_client::bridge::click: click LeftDown at Some((483, 354)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((Some(0), Some(0), [(0, 4294967295, 1), 
+(2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), (219, 4294967295, 1), (220, 
+4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160), Code { code: 1, a: 4879, b: 4229 }, HoverCall(4618864)]
+2026-10-07T22:28:32.750199Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((Some(0), Some(0), [(0, 4294967295, 1), (2, 4294967295, 
+1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), (219, 4294967295, 1), (220, 4294967295, 1), (3, 
+4294967295, 1)])) outs [HoverCall(4616160)]
+2026-10-07T22:28:32.800674Z DEBUG d2_client::bridge::click: click LeftDown at Some((483, 354)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((Some(0), Some(0), [(0, 4294967295, 1), 
+(2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), (219, 4294967295, 1), (220, 
+4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160), Code { code: 1, a: 4879, b: 4229 }, HoverCall(4618864)]
+2026-10-07T22:28:32.897064Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((Some(0), Some(0), [(0, 4294967295, 1), (2, 4294967295, 
+1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), (219, 4294967295, 1), (220, 4294967295, 1), (3, 
+4294967295, 1)])) outs [HoverCall(4616160)]
+2026-10-07T22:28:33.531671Z DEBUG d2_client::bridge::click: click LeftDown at Some((177, 250)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((Some(0), Some(0), [(0, 4294967295, 1), 
+(2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), (219, 4294967295, 1), (220, 
+4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160), Code { code: 1, a: 4863, b: 4232 }, HoverCall(4618864)]
+2026-10-07T22:28:33.632081Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((Some(0), Some(0), [(0, 4294967295, 1), (2, 4294967295, 
+1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), (219, 4294967295, 1), (220, 4294967295, 1), (3, 
+4294967295, 1)])) outs [HoverCall(4616160)]
+2026-10-07T22:28:33.932381Z DEBUG d2_client::bridge::click: click LeftDown at Some((163, 264)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((Some(0), Some(0), [(0, 4294967295, 1), 
+(2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), (219, 4294967295, 1), (220, 
+4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160), Code { code: 1, a: 4864, b: 4234 }, HoverCall(4618864)]
+2026-10-07T22:28:34.032150Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((Some(0), Some(0), [(0, 4294967295, 1), (2, 4294967295, 
+1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), (219, 4294967295, 1), (220, 4294967295, 1), (3, 
+4294967295, 1)])) outs [HoverCall(4616160)]
+2026-10-07T22:28:34.431438Z DEBUG d2_client::bridge::click: click LeftDown at Some((270, 307)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((Some(0), Some(0), [(0, 4294967295, 1), 
+(2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), (219, 4294967295, 1), (220, 
+4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160), Code { code: 1, a: 4870, b: 4233 }, HoverCall(4618864)]
+2026-10-07T22:28:34.532242Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((Some(0), Some(0), [(0, 4294967295, 1), (2, 4294967295, 
+1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), (219, 4294967295, 1), (220, 4294967295, 1), (3, 
+4294967295, 1)])) outs [HoverCall(4616160)]
+2026-10-07T22:28:35.066487Z  INFO d2_client::app::play: frame 250: 105 server ticks, 4 units in the model, unowned S→C 
+ids {}; last view Some(FrameStats { bridge_frame: 248, server_tick: 104, items: 129, units_drawn: 1, units_hidden: 3, 
+ui_sent: 0, ui_unhandled: 3, gpu: true }); node frames 81; audio Some(AudioStats { frame: 250, presented: 105, 
+decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:28:35.082256Z DEBUG d2_client::bridge::click: click LeftDown at Some((509, 84)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((Some(0), Some(0), [(0, 4294967295, 1), 
+(2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), (219, 4294967295, 1), (220, 
+4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160), Code { code: 1, a: 4863, b: 4212 }, HoverCall(4618864)]
+2026-10-07T22:28:35.182571Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((Some(0), Some(0), [(0, 4294967295, 1), (2, 4294967295, 
+1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), (219, 4294967295, 1), (220, 4294967295, 1), (3, 
+4294967295, 1)])) outs [HoverCall(4616160)]
+2026-10-07T22:28:35.533828Z DEBUG d2_client::bridge::click: click LeftDown at Some((500, 318)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((Some(0), Some(0), [(0, 4294967295, 1), 
+(2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), (219, 4294967295, 1), (220, 
+4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160), Code { code: 1, a: 4878, b: 4227 }, HoverCall(4618864)]
+2026-10-07T22:28:35.631718Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((Some(0), Some(0), [(0, 4294967295, 1), (2, 4294967295, 
+1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), (219, 4294967295, 1), (220, 4294967295, 1), (3, 
+4294967295, 1)])) outs [HoverCall(4616160)]
+2026-10-07T22:28:35.988749Z DEBUG d2_client::bridge::click: click LeftDown at Some((602, 366)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((Some(0), Some(0), [(0, 4294967295, 1), 
+(2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), (219, 4294967295, 1), (220, 
+4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160), Code { code: 1, a: 4884, b: 4226 }, HoverCall(4618864)]
+2026-10-07T22:28:36.080800Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((Some(0), Some(0), [(0, 4294967295, 1), (2, 4294967295, 
+1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), (219, 4294967295, 1), (220, 4294967295, 1), (3, 
+4294967295, 1)])) outs [HoverCall(4616160)]
+2026-10-07T22:28:36.334589Z DEBUG d2_client::bridge::click: click LeftDown at Some((486, 432)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((Some(0), Some(0), [(0, 4294967295, 1), 
+(2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), (219, 4294967295, 1), (220, 
+4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160), Code { code: 1, a: 4884, b: 4234 }, HoverCall(4618864)]
+2026-10-07T22:28:36.432387Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((Some(0), Some(0), [(0, 4294967295, 1), (2, 4294967295, 
+1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), (219, 4294967295, 1), (220, 4294967295, 1), (3, 
+4294967295, 1)])) outs [HoverCall(4616160)]
+2026-10-07T22:28:36.881534Z DEBUG d2_client::bridge::click: click LeftDown at Some((138, 260)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((Some(0), Some(0), [(0, 4294967295, 1), 
+(2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), (219, 4294967295, 1), (220, 
+4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160), Code { code: 1, a: 4863, b: 4234 }, HoverCall(4618864)]
+2026-10-07T22:28:36.932080Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((Some(0), Some(0), [(0, 4294967295, 1), (2, 4294967295, 
+1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), (219, 4294967295, 1), (220, 4294967295, 1), (3, 
+4294967295, 1)])) outs [HoverCall(4616160)]
+2026-10-07T22:28:39.250910Z  INFO d2_client::app::play: frame 500: 209 server ticks, 4 units in the model, unowned S→C 
+ids {}; last view Some(FrameStats { bridge_frame: 500, server_tick: 209, items: 129, units_drawn: 1, units_hidden: 3, 
+ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 163; audio Some(AudioStats { frame: 500, presented: 209, 
+decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:28:41.295565Z DEBUG d2_client::bridge::click: click LeftDown at Some((502, 378)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((Some(0), Some(0), [(0, 4294967295, 1), 
+(2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), (219, 4294967295, 1), (220, 
+4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160), Code { code: 1, a: 4882, b: 4230 }, HoverCall(4618864)]
+2026-10-07T22:28:41.345954Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((Some(0), Some(0), [(0, 4294967295, 1), (2, 4294967295, 
+1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), (219, 4294967295, 1), (220, 4294967295, 1), (3, 
+4294967295, 1)])) outs [HoverCall(4616160)]
+2026-10-07T22:28:41.396085Z DEBUG d2_client::bridge::click: click LeftDown at Some((502, 378)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((Some(0), Some(0), [(0, 4294967295, 1), 
+(2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), (219, 4294967295, 1), (220, 
+4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160), Code { code: 1, a: 4882, b: 4230 }, HoverCall(4618864)]
+2026-10-07T22:28:41.496027Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((Some(0), Some(0), [(0, 4294967295, 1), (2, 4294967295, 
+1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), (219, 4294967295, 1), (220, 4294967295, 1), (3, 
+4294967295, 1)])) outs [HoverCall(4616160)]
+2026-10-07T22:28:41.845583Z DEBUG d2_client::bridge::click: click LeftDown at Some((432, 282)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((Some(0), Some(0), [(0, 4294967295, 1), 
+(2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), (219, 4294967295, 1), (220, 
+4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160), Code { code: 1, a: 4873, b: 4222 }, HoverCall(4618864)]
+2026-10-07T22:28:41.946281Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((Some(0), Some(0), [(0, 4294967295, 1), (2, 4294967295, 
+1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), (219, 4294967295, 1), (220, 4294967295, 1), (3, 
+4294967295, 1)])) outs [HoverCall(4616160)]
+2026-10-07T22:28:43.415081Z  INFO d2_client::app::play: frame 750: 313 server ticks, 4 units in the model, unowned S→C 
+ids {}; last view Some(FrameStats { bridge_frame: 749, server_tick: 313, items: 129, units_drawn: 1, units_hidden: 3, 
+ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 246; audio Some(AudioStats { frame: 750, presented: 313, 
+decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:28:47.601232Z  INFO d2_client::app::play: frame 1000: 418 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 998, server_tick: 417, items: 129, units_drawn: 1, units_hidden: 
+3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 330; audio Some(AudioStats { frame: 1000, presented: 418, 
+decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:28:51.791501Z  INFO d2_client::app::play: frame 1250: 523 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 1250, server_tick: 523, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 426; audio Some(AudioStats { frame: 1250, 
+presented: 523, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:28:55.926763Z  INFO d2_client::app::play: frame 1500: 626 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 1498, server_tick: 625, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 3, gpu: true }); node frames 522; audio Some(AudioStats { frame: 1500, 
+presented: 626, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:29:00.185405Z  INFO d2_client::app::play: frame 1750: 732 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 1748, server_tick: 732, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 620; audio Some(AudioStats { frame: 1750, 
+presented: 732, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:29:04.326114Z  INFO d2_client::app::play: frame 2000: 836 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 1998, server_tick: 835, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 722; audio Some(AudioStats { frame: 2000, 
+presented: 836, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:29:08.495990Z  INFO d2_client::app::play: frame 2250: 940 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 2250, server_tick: 940, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 805; audio Some(AudioStats { frame: 2250, 
+presented: 940, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:29:12.685085Z  INFO d2_client::app::play: frame 2500: 1045 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 2500, server_tick: 1045, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 888; audio Some(AudioStats { frame: 2500, 
+presented: 1045, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:29:16.850492Z  INFO d2_client::app::play: frame 2750: 1149 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 2750, server_tick: 1149, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 971; audio Some(AudioStats { frame: 2750, 
+presented: 1149, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:29:21.017200Z  INFO d2_client::app::play: frame 3000: 1253 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 3000, server_tick: 1253, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 1054; audio Some(AudioStats { frame: 3000, 
+presented: 1253, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:29:25.178950Z  INFO d2_client::app::play: frame 3250: 1357 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 3249, server_tick: 1357, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 1139; audio Some(AudioStats { frame: 3250, 
+presented: 1357, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:29:29.349894Z  INFO d2_client::app::play: frame 3500: 1462 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 3500, server_tick: 1462, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 1239; audio Some(AudioStats { frame: 3500, 
+presented: 1462, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:29:33.516380Z  INFO d2_client::app::play: frame 3750: 1566 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 3750, server_tick: 1566, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 1343; audio Some(AudioStats { frame: 3750, 
+presented: 1566, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:29:37.683164Z  INFO d2_client::app::play: frame 4000: 1670 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 4000, server_tick: 1670, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 1447; audio Some(AudioStats { frame: 4000, 
+presented: 1670, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:29:41.847598Z  INFO d2_client::app::play: frame 4250: 1774 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 4249, server_tick: 1774, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 1552; audio Some(AudioStats { frame: 4250, 
+presented: 1774, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:29:46.014410Z  INFO d2_client::app::play: frame 4500: 1878 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 4499, server_tick: 1878, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 1656; audio Some(AudioStats { frame: 4500, 
+presented: 1878, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:29:50.179493Z  INFO d2_client::app::play: frame 4750: 1982 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 4748, server_tick: 1982, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 1760; audio Some(AudioStats { frame: 4750, 
+presented: 1982, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:29:54.364569Z  INFO d2_client::app::play: frame 5000: 2087 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 4999, server_tick: 2087, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 1865; audio Some(AudioStats { frame: 5000, 
+presented: 2087, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:29:58.531349Z  INFO d2_client::app::play: frame 5250: 2191 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 5249, server_tick: 2191, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 1969; audio Some(AudioStats { frame: 5250, 
+presented: 2191, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:30:02.698030Z  INFO d2_client::app::play: frame 5500: 2295 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 5499, server_tick: 2295, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 2073; audio Some(AudioStats { frame: 5500, 
+presented: 2295, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:30:06.864816Z  INFO d2_client::app::play: frame 5750: 2399 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 5748, server_tick: 2399, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 2177; audio Some(AudioStats { frame: 5750, 
+presented: 2399, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:30:11.034447Z  INFO d2_client::app::play: frame 6000: 2504 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 6000, server_tick: 2504, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 2281; audio Some(AudioStats { frame: 6000, 
+presented: 2504, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:30:16.409135Z  INFO d2_client::app::play: frame 6250: 2635 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 6250, server_tick: 2635, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 2379; audio Some(AudioStats { frame: 6250, 
+presented: 2635, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:30:19.022581Z DEBUG d2_client::bridge::click: click LeftDown at Some((370, 439)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((Some(0), Some(0), [(0, 4294967295, 1), 
+(2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), (219, 4294967295, 1), (220, 
+4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160), Code { code: 1, a: 4881, b: 4238 }, HoverCall(4618864)]
+2026-10-07T22:30:19.137024Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((Some(0), Some(0), [(0, 4294967295, 1), (2, 4294967295, 
+1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), (219, 4294967295, 1), (220, 4294967295, 1), (3, 
+4294967295, 1)])) outs [HoverCall(4616160)]
+2026-10-07T22:30:20.161973Z DEBUG d2_client::bridge::click: click LeftDown at Some((508, 348)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((Some(0), Some(0), [(0, 4294967295, 1), 
+(2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), (219, 4294967295, 1), (220, 
+4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160), Code { code: 1, a: 4880, b: 4228 }, HoverCall(4618864)]
+2026-10-07T22:30:20.231593Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((Some(0), Some(0), [(0, 4294967295, 1), (2, 4294967295, 
+1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), (219, 4294967295, 1), (220, 4294967295, 1), (3, 
+4294967295, 1)])) outs [HoverCall(4616160)]
+2026-10-07T22:30:20.741428Z DEBUG d2_client::bridge::click: click LeftDown at Some((549, 368)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((Some(0), Some(0), [(0, 4294967295, 1), 
+(2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), (219, 4294967295, 1), (220, 
+4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160), Code { code: 1, a: 4882, b: 4228 }, HoverCall(4618864)]
+2026-10-07T22:30:20.828148Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((Some(0), Some(0), [(0, 4294967295, 1), (2, 4294967295, 
+1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), (219, 4294967295, 1), (220, 4294967295, 1), (3, 
+4294967295, 1)])) outs [HoverCall(4616160)]
+2026-10-07T22:30:20.913514Z DEBUG d2_client::bridge::click: click LeftDown at Some((549, 368)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((Some(0), Some(0), [(0, 4294967295, 1), 
+(2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), (219, 4294967295, 1), (220, 
+4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160), Code { code: 1, a: 4882, b: 4228 }, HoverCall(4618864)]
+2026-10-07T22:30:20.913580Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((Some(0), Some(0), [(0, 4294967295, 1), (2, 4294967295, 
+1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), (219, 4294967295, 1), (220, 4294967295, 1), (3, 
+4294967295, 1)])) outs []
+2026-10-07T22:30:21.447010Z DEBUG d2_client::bridge::click: click LeftDown at Some((149, 214)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((Some(0), Some(0), [(0, 4294967295, 1), 
+(2, 4294967295, 1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), (219, 4294967295, 1), (220, 
+4294967295, 1), (3, 4294967295, 1)])) outs [HoverCall(4616160), Code { code: 1, a: 4860, b: 4231 }, HoverCall(4618864)]
+2026-10-07T22:30:21.527349Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((Some(0), Some(0), [(0, 4294967295, 1), (2, 4294967295, 
+1), (1, 4294967295, 1), (217, 4294967295, 1), (218, 4294967295, 1), (219, 4294967295, 1), (220, 4294967295, 1), (3, 
+4294967295, 1)])) outs [HoverCall(4616160)]
+2026-10-07T22:30:25.227167Z  INFO d2_client::app::play: frame 6500: 2836 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 6500, server_tick: 2836, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 2461; audio Some(AudioStats { frame: 6500, 
+presented: 2836, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:30:31.239055Z  INFO d2_client::app::play: frame 6750: 2982 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 6750, server_tick: 2982, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 2546; audio Some(AudioStats { frame: 6750, 
+presented: 2982, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:30:35.522472Z  INFO d2_client::app::play: frame 7000: 3089 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 7000, server_tick: 3089, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 2644; audio Some(AudioStats { frame: 7000, 
+presented: 3089, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:30:41.789389Z  INFO d2_client::app::play: frame 7250: 3237 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 7248, server_tick: 3235, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 2735; audio Some(AudioStats { frame: 7250, 
+presented: 3237, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:30:50.764074Z  INFO d2_client::app::play: frame 7500: 3435 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 7500, server_tick: 3435, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 2817; audio Some(AudioStats { frame: 7500, 
+presented: 3435, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:30:56.265982Z  INFO d2_client::app::play: frame 7750: 3569 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 7749, server_tick: 3569, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 2902; audio Some(AudioStats { frame: 7750, 
+presented: 3569, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:31:02.607083Z  INFO d2_client::app::play: frame 8000: 3726 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 7999, server_tick: 3725, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 2984; audio Some(AudioStats { frame: 8000, 
+presented: 3726, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:31:08.370687Z  INFO d2_client::app::play: frame 8250: 3866 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 8249, server_tick: 3866, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 3079; audio Some(AudioStats { frame: 8250, 
+presented: 3866, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:31:12.536962Z  INFO d2_client::app::play: frame 8500: 3970 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 8499, server_tick: 3970, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 3182; audio Some(AudioStats { frame: 8500, 
+presented: 3970, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:31:16.705561Z  INFO d2_client::app::play: frame 8750: 4074 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 8748, server_tick: 4074, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 3286; audio Some(AudioStats { frame: 8750, 
+presented: 4074, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:31:21.295524Z  INFO d2_client::app::play: frame 9000: 4187 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 9000, server_tick: 4187, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 3389; audio Some(AudioStats { frame: 9000, 
+presented: 4187, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:31:25.460722Z  INFO d2_client::app::play: frame 9250: 4291 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 9250, server_tick: 4291, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 3493; audio Some(AudioStats { frame: 9250, 
+presented: 4291, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:31:29.628577Z  INFO d2_client::app::play: frame 9500: 4395 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 9500, server_tick: 4395, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 3597; audio Some(AudioStats { frame: 9500, 
+presented: 4395, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:31:33.791727Z  INFO d2_client::app::play: frame 9750: 4499 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 9749, server_tick: 4499, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 3702; audio Some(AudioStats { frame: 9750, 
+presented: 4499, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:31:37.958870Z  INFO d2_client::app::play: frame 10000: 4603 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 9999, server_tick: 4603, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 3806; audio Some(AudioStats { frame: 10000, 
+presented: 4603, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:31:42.125244Z  INFO d2_client::app::play: frame 10250: 4707 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 10249, server_tick: 4707, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 3910; audio Some(AudioStats { frame: 10250, 
+presented: 4707, decodes: 9, load_errors: 0, engine_errors: 0 })
+error: process didn't exit successfully: `C:\Users\pc\Documents\Claude code folder\d2rs\target\release\d2-client.exe 
+play --new sorceress Test` (exit code: 0xffffffff)
+EXIT=-1

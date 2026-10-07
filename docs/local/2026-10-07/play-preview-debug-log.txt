@@ -1,0 +1,99 @@
+﻿cargo :     Finished `release` profile [optimized] target(s) in 0.78s
+At line:1 char:626
++ ...  "sccache"; cargo run -p d2-client --release -- play --new sorceress  ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (    Finished `r...get(s) in 0.78s:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+     Running `C:\Users\pc\Documents\Claude code folder\d2rs\target\release\d2-client.exe play --new sorceress Test`
+play: game data from D2_GAME_DIR (137 levels, 573 objects, waypoint object class 119; level files: 2043 DS1, 34 lvlsub DS1, 241 DT1)
+play: new character Test (sorceress), not saved
+single player: seed 1234, waypoint unit UnitId(0) (GUID 1)
+2026-10-07T22:08:44.870651Z  INFO bevy_diagnostic::system_information_diagnostics_plugin::internal: SystemInfo { os: 
+"Windows 10 Enterprise", kernel: "19045", cpu: "Intel(R) Core(TM) i7-7700HQ CPU @ 2.80GHz", core_count: "4", memory: 
+"15.9 GiB" }
+2026-10-07T22:08:44.962959Z  INFO bevy_render::renderer: AdapterInfo { name: "Intel(R) HD Graphics 630", vendor: 
+32902, device: 22811, device_type: IntegratedGpu, device_pci_bus_id: "", driver: "?", driver_info: "?", backend: 
+Vulkan, subgroup_min_size: 4, subgroup_max_size: 128, transient_saves_memory: false }
+2026-10-07T22:08:45.366462Z  INFO bevy_pbr::cluster: GPU clustering is supported on this device.
+2026-10-07T22:08:45.366533Z  INFO bevy_render::batching::gpu_preprocessing: GPU preprocessing is fully supported on 
+this device.
+2026-10-07T22:08:45.367262Z  INFO bevy_winit::system: Creating new window d2rs (65v0)
+2026-10-07T22:08:45.579063Z DEBUG d2_client::world_view::present: effects output CommonCof { act: 0 }: no effect layer
+2026-10-07T22:08:45.596632Z  WARN d2_client::app::ui: unit art: DATA\GLOBAL\CHARS\SO\SH\SOSHlitTNhth.dcc: in no archive
+2026-10-07T22:08:50.421152Z  INFO d2_client::app::play: frame 250: 105 server ticks, 4 units in the model, unowned S→C 
+ids {}; last view Some(FrameStats { bridge_frame: 250, server_tick: 105, items: 129, units_drawn: 1, units_hidden: 3, 
+ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 81; audio Some(AudioStats { frame: 250, presented: 105, 
+decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:08:54.583705Z  INFO d2_client::app::play: frame 500: 209 server ticks, 4 units in the model, unowned S→C 
+ids {}; last view Some(FrameStats { bridge_frame: 498, server_tick: 208, items: 129, units_drawn: 1, units_hidden: 3, 
+ui_sent: 0, ui_unhandled: 3, gpu: true }); node frames 164; audio Some(AudioStats { frame: 500, presented: 209, 
+decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:08:54.650155Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:08:54.749254Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:08:54.998626Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:08:55.098507Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:08:55.149937Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:08:55.248954Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:08:55.597746Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:08:55.698674Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:08:55.747724Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:08:55.848632Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:08:55.948202Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:08:55.998776Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:08:56.148246Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:08:56.248188Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:08:56.347585Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:08:56.447984Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:08:56.547583Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:08:56.599131Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:08:56.747087Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:08:56.798814Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:08:57.048564Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:08:57.148607Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:08:57.697761Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:08:57.747595Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:08:57.997287Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:08:58.048406Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:08:58.372804Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:08:58.464699Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:08:58.513843Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:08:58.565245Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:08:58.664252Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:08:58.713656Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:08:58.749810Z  INFO d2_client::app::play: frame 750: 313 server ticks, 4 units in the model, unowned S→C 
+ids {}; last view Some(FrameStats { bridge_frame: 748, server_tick: 312, items: 129, units_drawn: 1, units_hidden: 3, 
+ui_sent: 0, ui_unhandled: 5, gpu: true }); node frames 247; audio Some(AudioStats { frame: 750, presented: 313, 
+decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:08:58.814226Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:08:59.113272Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:08:59.164545Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:08:59.264176Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:08:59.363857Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:09:01.862237Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:09:01.911947Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:09:02.011723Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:09:02.112558Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:09:02.915567Z  INFO d2_client::app::play: frame 1000: 417 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 1000, server_tick: 417, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 330; audio Some(AudioStats { frame: 1000, 
+presented: 417, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:09:07.029056Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:09:07.127590Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:09:07.182585Z  INFO d2_client::app::play: frame 1250: 522 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 1250, server_tick: 522, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 2, gpu: true }); node frames 413; audio Some(AudioStats { frame: 1250, 
+presented: 522, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:09:07.227652Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:09:07.278505Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:09:07.428344Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:09:07.478940Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:09:07.578595Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:09:07.677606Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:09:07.728243Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:09:07.829889Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:09:08.428395Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:09:08.479212Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:09:09.195687Z  INFO bevy_window::system: No windows are open, exiting
+2026-10-07T22:09:09.195761Z  INFO bevy_winit::system: Closing window 65v0
+EXIT=0

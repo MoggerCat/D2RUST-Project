@@ -192,17 +192,24 @@ pub fn initial_portal_flags(portal_levels: &[u32]) -> u32 {
 impl PlayerRecord {
     /// A new character's record (`formats/d2s-load.md` §8 rules 1, 3):
     /// +0x2C from [`initial_portal_flags`]; hand 0 = the right skill
-    /// `StartSkill` when load §1 selected it, else 0; hand 1 = 0; both
-    /// items 0 (+0x78 / +0x7C keep the zero fill).
+    /// `StartSkill` when load §1 selected it, else 0; hand 1 = 0.
+    /// PROVISIONAL (formats/d2s-load.md §8 r3; REC-02): both items −1, as
+    /// the recorded fresh saves carry (`23 … ffffffff`), not the static
+    /// reading's zero fill: with item 0 the client's select (`client/
+    /// msg-skills.md` §2 r3) finds no (skill, 0) entry and the player has
+    /// no left skill, so no click walks.
     pub fn new_character(portal_levels: &[u32], right: Option<u16>) -> Self {
         Self {
             portal_flags: initial_portal_flags(portal_levels),
             hands: [
                 SkillHand {
                     skill: right.unwrap_or(0),
-                    item: 0,
+                    item: u32::MAX,
                 },
-                SkillHand { skill: 0, item: 0 },
+                SkillHand {
+                    skill: 0,
+                    item: u32::MAX,
+                },
             ],
         }
     }
@@ -597,9 +604,22 @@ mod tests {
         assert_eq!(e.hotkeys, [NO_HOT_KEY; 16]);
         let r = e.record.unwrap();
         assert_eq!(r.portal_flags, 1);
-        // Hand 0 = `StartSkill`, hand 1 = 0; both items 0 (zero fill).
-        assert_eq!(r.hands[0], SkillHand { skill: 36, item: 0 });
-        assert_eq!(r.hands[1], SkillHand { skill: 0, item: 0 });
+        // Hand 0 = `StartSkill`, hand 1 = 0; both items −1 (PROVISIONAL,
+        // d2s-load.md §8 r3).
+        assert_eq!(
+            r.hands[0],
+            SkillHand {
+                skill: 36,
+                item: u32::MAX
+            }
+        );
+        assert_eq!(
+            r.hands[1],
+            SkillHand {
+                skill: 0,
+                item: u32::MAX
+            }
+        );
         assert_eq!(
             e.load_skill,
             Some(SkillHand {
@@ -609,7 +629,13 @@ mod tests {
         );
         // No start skill: hand 0 is 0 and the load sends no 0x23.
         let e = Entry::new_character([0; 16], &PORTALS, None);
-        assert_eq!(e.record.unwrap().hands[0], SkillHand::default());
+        assert_eq!(
+            e.record.unwrap().hands[0],
+            SkillHand {
+                skill: 0,
+                item: u32::MAX
+            }
+        );
         assert_eq!(e.load_skill, None);
     }
 }

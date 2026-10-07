@@ -28,13 +28,13 @@
 |   5. Load failure: result codes and the message shown | 163–200 |
 |   6. Runeword items that no longer match (`0x00563470`) | 201–226 |
 |   7. Map seed restore in single player | 227–238 |
-|   8. Player-record values sent at the join (`sim/intents-events.md` §8.2 rule 3) | 239–275 |
-| Constants & data dependencies | 276–280 |
-| Randomness | 281–285 |
-| Edge cases & original bugs | 286–294 |
-| Test vectors | 295–302 |
-| Provenance | 303–343 |
-| Open questions | 344–361 |
+|   8. Player-record values sent at the join (`sim/intents-events.md` §8.2 rule 3) | 239–280 |
+| Constants & data dependencies | 281–285 |
+| Randomness | 286–290 |
+| Edge cases & original bugs | 291–299 |
+| Test vectors | 300–307 |
+| Provenance | 308–348 |
+| Open questions | 349–366 |
 <!-- /index -->
 
 ## Summary
@@ -269,6 +269,11 @@ values, for both load paths:
    owner item +0x34 when not −1, `0x00643B00`; −1 for a class skill), so
    a fresh Sorceress or Necromancer gets three 0x23 in its join. Static
    reading; no new-character join is recorded yet (Open question 4).
+   PROVISIONAL: d2rs sends hand 1 and hand 0 with item −1, not 0
+   (because the recorded fresh saves carry `ffffffff` there, and with
+   item 0 the client's select, `client/msg-skills.md` §2 r3, finds no
+   (skill, 0) entry, so a new character has no left skill and no click
+   walks; 2026-10-08 preview); settled by REC-02.
 4. d2rs: `d2-server::adapters::session::PlayerRecord` = {+0x2C,
    hands} from r1–r3; `Entry::record` is always known once the save
    (or stub) is parsed.

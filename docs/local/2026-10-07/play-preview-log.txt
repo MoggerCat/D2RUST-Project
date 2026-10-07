@@ -1,0 +1,47 @@
+﻿cargo :    Compiling d2-formats v0.0.0 (C:\Users\pc\Documents\Claude code folder\w-integ\crates\d2-formats)
+At line:1 char:622
++ ...  "sccache"; cargo run -p d2-client --release -- play --new sorceress  ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (   Compiling d2...tes\d2-formats):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+   Compiling d2-data v0.0.0 (C:\Users\pc\Documents\Claude code folder\w-integ\crates\d2-data)
+   Compiling d2-sim v0.0.0 (C:\Users\pc\Documents\Claude code folder\w-integ\crates\d2-sim)
+   Compiling d2-server v0.0.0 (C:\Users\pc\Documents\Claude code folder\w-integ\crates\d2-server)
+   Compiling d2-client v0.0.0 (C:\Users\pc\Documents\Claude code folder\w-integ\crates\d2-client)
+    Finished `release` profile [optimized] target(s) in 2m 19s
+     Running `C:\Users\pc\Documents\Claude code folder\d2rs\target\release\d2-client.exe play --new sorceress Test`
+play: game data from D2_GAME_DIR (137 levels, 573 objects, waypoint object class 119; level files: 2043 DS1, 34 lvlsub DS1, 241 DT1)
+play: new character Test (sorceress), not saved
+single player: seed 1234, waypoint unit UnitId(0) (GUID 1)
+2026-10-07T22:38:23.502488Z  INFO bevy_diagnostic::system_information_diagnostics_plugin::internal: SystemInfo { os: 
+"Windows 10 Enterprise", kernel: "19045", cpu: "Intel(R) Core(TM) i7-7700HQ CPU @ 2.80GHz", core_count: "4", memory: 
+"15.9 GiB" }
+2026-10-07T22:38:23.590863Z  INFO bevy_render::renderer: AdapterInfo { name: "Intel(R) HD Graphics 630", vendor: 
+32902, device: 22811, device_type: IntegratedGpu, device_pci_bus_id: "", driver: "?", driver_info: "?", backend: 
+Vulkan, subgroup_min_size: 4, subgroup_max_size: 128, transient_saves_memory: false }
+2026-10-07T22:38:24.061560Z  INFO bevy_pbr::cluster: GPU clustering is supported on this device.
+2026-10-07T22:38:24.061644Z  INFO bevy_render::batching::gpu_preprocessing: GPU preprocessing is fully supported on 
+this device.
+2026-10-07T22:38:24.062620Z  INFO bevy_winit::system: Creating new window d2rs (65v0)
+2026-10-07T22:38:24.294993Z  WARN d2_client::app::ui: unit art: DATA\GLOBAL\CHARS\SO\SH\SOSHlitTNhth.dcc: in no archive
+2026-10-07T22:38:29.085213Z  INFO d2_client::app::play: frame 250: 105 server ticks, 4 units in the model, unowned S→C 
+ids {}; last view Some(FrameStats { bridge_frame: 250, server_tick: 105, items: 129, units_drawn: 1, units_hidden: 3, 
+ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 80; audio Some(AudioStats { frame: 250, presented: 105, 
+decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:38:32.512521Z  WARN d2_client::app::ui: unit art: DATA\GLOBAL\CHARS\SO\SH\SOSHlitWLhth.dcc: in no archive
+2026-10-07T22:38:33.247006Z  INFO d2_client::app::play: frame 500: 210 server ticks, 4 units in the model, unowned S→C 
+ids {}; last view Some(FrameStats { bridge_frame: 499, server_tick: 209, items: 136, units_drawn: 1, units_hidden: 3, 
+ui_sent: 0, ui_unhandled: 3, gpu: true }); node frames 163; audio Some(AudioStats { frame: 500, presented: 210, 
+decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:38:37.413866Z  INFO d2_client::app::play: frame 750: 314 server ticks, 4 units in the model, unowned S→C 
+ids {}; last view Some(FrameStats { bridge_frame: 748, server_tick: 313, items: 143, units_drawn: 1, units_hidden: 3, 
+ui_sent: 0, ui_unhandled: 2, gpu: true }); node frames 247; audio Some(AudioStats { frame: 750, presented: 314, 
+decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:38:41.581336Z  INFO d2_client::app::play: frame 1000: 418 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 1000, server_tick: 418, items: 120, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 1, gpu: true }); node frames 330; audio Some(AudioStats { frame: 1000, 
+presented: 418, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:38:42.992404Z  INFO bevy_window::system: No windows are open, exiting
+2026-10-07T22:38:42.992449Z  INFO bevy_winit::system: Closing window 65v0
+EXIT=0

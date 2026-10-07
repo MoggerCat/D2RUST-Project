@@ -1,0 +1,114 @@
+﻿cargo :     Finished `release` profile [optimized] target(s) in 0.85s
+At line:1 char:538
++ ...  "sccache"; cargo run -p d2-client --release -- play --new sorceress  ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (    Finished `r...get(s) in 0.85s:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+     Running `C:\Users\pc\Documents\Claude code folder\d2rs\target\release\d2-client.exe play --new sorceress Test`
+play: game data from D2_GAME_DIR (137 levels, 573 objects, waypoint object class 119; level files: 2043 DS1, 34 lvlsub DS1, 241 DT1)
+play: new character Test (sorceress), not saved
+single player: seed 1234, waypoint unit UnitId(0) (GUID 1)
+2026-10-07T22:40:09.176667Z  INFO bevy_diagnostic::system_information_diagnostics_plugin::internal: SystemInfo { os: 
+"Windows 10 Enterprise", kernel: "19045", cpu: "Intel(R) Core(TM) i7-7700HQ CPU @ 2.80GHz", core_count: "4", memory: 
+"15.9 GiB" }
+2026-10-07T22:40:09.273197Z  INFO bevy_render::renderer: AdapterInfo { name: "Intel(R) HD Graphics 630", vendor: 
+32902, device: 22811, device_type: IntegratedGpu, device_pci_bus_id: "", driver: "?", driver_info: "?", backend: 
+Vulkan, subgroup_min_size: 4, subgroup_max_size: 128, transient_saves_memory: false }
+2026-10-07T22:40:09.779903Z  INFO bevy_pbr::cluster: GPU clustering is supported on this device.
+2026-10-07T22:40:09.779986Z  INFO bevy_render::batching::gpu_preprocessing: GPU preprocessing is fully supported on 
+this device.
+2026-10-07T22:40:09.780798Z  INFO bevy_winit::system: Creating new window d2rs (65v0)
+2026-10-07T22:40:10.060235Z  WARN d2_client::app::ui: unit art: DATA\GLOBAL\CHARS\SO\SH\SOSHlitTNhth.dcc: in no archive
+2026-10-07T22:40:11.269181Z  WARN d2_client::app::ui: unit art: DATA\GLOBAL\CHARS\SO\SH\SOSHlitWLhth.dcc: in no archive
+2026-10-07T22:40:14.796552Z  INFO d2_client::app::play: frame 250: 105 server ticks, 4 units in the model, unowned S→C 
+ids {}; last view Some(FrameStats { bridge_frame: 248, server_tick: 104, items: 124, units_drawn: 1, units_hidden: 3, 
+ui_sent: 0, ui_unhandled: 1, gpu: true }); node frames 81; audio Some(AudioStats { frame: 250, presented: 105, 
+decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:40:18.965485Z  INFO d2_client::app::play: frame 500: 209 server ticks, 4 units in the model, unowned S→C 
+ids {}; last view Some(FrameStats { bridge_frame: 500, server_tick: 209, items: 101, units_drawn: 1, units_hidden: 3, 
+ui_sent: 0, ui_unhandled: 3, gpu: true }); node frames 164; audio Some(AudioStats { frame: 500, presented: 209, 
+decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:40:23.126018Z  INFO d2_client::app::play: frame 750: 313 server ticks, 4 units in the model, unowned S→C 
+ids {}; last view Some(FrameStats { bridge_frame: 749, server_tick: 313, items: 47, units_drawn: 0, units_hidden: 4, 
+ui_sent: 0, ui_unhandled: 2, gpu: true }); node frames 247; audio Some(AudioStats { frame: 750, presented: 313, 
+decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:40:27.299572Z  INFO d2_client::app::play: frame 1000: 418 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 999, server_tick: 417, items: 34, units_drawn: 0, units_hidden: 
+4, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 330; audio Some(AudioStats { frame: 1000, presented: 418, 
+decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:40:31.476817Z  INFO d2_client::app::play: frame 1250: 522 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 1248, server_tick: 521, items: 87, units_drawn: 1, units_hidden: 
+3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 418; audio Some(AudioStats { frame: 1250, presented: 522, 
+decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:40:35.679345Z  INFO d2_client::app::play: frame 1500: 627 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 1499, server_tick: 627, items: 128, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 516; audio Some(AudioStats { frame: 1500, 
+presented: 627, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:40:39.845287Z  INFO d2_client::app::play: frame 1750: 731 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 1748, server_tick: 731, items: 128, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 620; audio Some(AudioStats { frame: 1750, 
+presented: 731, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:40:44.012450Z  INFO d2_client::app::play: frame 2000: 836 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 1999, server_tick: 835, items: 128, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 703; audio Some(AudioStats { frame: 2000, 
+presented: 836, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:40:48.180179Z  INFO d2_client::app::play: frame 2250: 940 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 2248, server_tick: 939, items: 128, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 787; audio Some(AudioStats { frame: 2250, 
+presented: 940, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:40:52.349638Z  INFO d2_client::app::play: frame 2500: 1044 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 2500, server_tick: 1044, items: 128, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 870; audio Some(AudioStats { frame: 2500, 
+presented: 1044, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:40:56.512822Z  INFO d2_client::app::play: frame 2750: 1148 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 2748, server_tick: 1147, items: 128, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 954; audio Some(AudioStats { frame: 2750, 
+presented: 1148, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:41:00.683807Z  INFO d2_client::app::play: frame 3000: 1252 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 3000, server_tick: 1252, items: 128, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 1040; audio Some(AudioStats { frame: 3000, 
+presented: 1252, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:41:04.865406Z  INFO d2_client::app::play: frame 3250: 1357 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 3250, server_tick: 1357, items: 128, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 1130; audio Some(AudioStats { frame: 3250, 
+presented: 1357, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:41:09.029413Z  INFO d2_client::app::play: frame 3500: 1461 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 3499, server_tick: 1461, items: 128, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 1235; audio Some(AudioStats { frame: 3500, 
+presented: 1461, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:41:13.196030Z  INFO d2_client::app::play: frame 3750: 1565 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 3749, server_tick: 1565, items: 128, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 1339; audio Some(AudioStats { frame: 3750, 
+presented: 1565, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:41:17.363341Z  INFO d2_client::app::play: frame 4000: 1669 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 3999, server_tick: 1669, items: 128, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 1443; audio Some(AudioStats { frame: 4000, 
+presented: 1669, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:41:21.533142Z  INFO d2_client::app::play: frame 4250: 1774 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 4250, server_tick: 1774, items: 128, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 1547; audio Some(AudioStats { frame: 4250, 
+presented: 1774, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:41:25.674196Z  INFO d2_client::app::play: frame 4500: 1877 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 4498, server_tick: 1876, items: 128, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 1, gpu: true }); node frames 1649; audio Some(AudioStats { frame: 4500, 
+presented: 1877, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:41:29.838265Z  INFO d2_client::app::play: frame 4750: 1981 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 4748, server_tick: 1980, items: 156, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 1732; audio Some(AudioStats { frame: 4750, 
+presented: 1981, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:41:34.004947Z  INFO d2_client::app::play: frame 5000: 2085 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 5000, server_tick: 2085, items: 146, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 1815; audio Some(AudioStats { frame: 5000, 
+presented: 2085, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:41:38.184540Z  INFO d2_client::app::play: frame 5250: 2190 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 5249, server_tick: 2189, items: 158, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 3, gpu: true }); node frames 1898; audio Some(AudioStats { frame: 5250, 
+presented: 2190, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:41:42.348984Z  INFO d2_client::app::play: frame 5500: 2294 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 5499, server_tick: 2294, items: 136, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 3, gpu: true }); node frames 1981; audio Some(AudioStats { frame: 5500, 
+presented: 2294, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:41:44.134217Z  INFO bevy_window::system: No windows are open, exiting
+2026-10-07T22:41:44.134302Z  INFO bevy_winit::system: Closing window 65v0
+EXIT=0
