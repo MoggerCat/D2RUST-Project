@@ -833,7 +833,7 @@ becomes f + 1 (`tick.md` §5.2). Sites: `unit-events.tsv`.
 | 5, 8, 9, 12 | states, skills, shrines, items (`unit-events.tsv`) | per scheduler | `0x0056D790`, `0x0056FCB0`, `0x0056FE40`, `0x00580800` (remove expired states, `0x00627460(unit, f)`): `sim/stat-lists.md` |
 | 6 | hover text set `0x0054A290`; handler | the hover's timeout | `0x00580B70`: timeout (`0x006611D0`) ≤ f → free the hover, +0xA4 := 0, queue for update, flags \|= 0x100; else reschedule at the timeout |
 | 11 | join `0x00534AD0` (f + 250); handler (f + 30) | (0, 0) | `0x00580BE0`: party refresh (`0x005406A0`), pet refresh (`0x00575630`), reschedule f + 30. D2MOO calls it DELAYEDPORTAL; in 1.14d it is a 30-frame refresh |
-| 13 | trade and vendor code `0x00567620`–`0x00568D10` | per caller | `0x005689D0` (trade spec) |
+| 13 | trade and vendor code `0x00567620`–`0x00568D10` | per caller | `0x005689D0`: reschedules itself (`unit-events.tsv` rows 55–63). Out of scope (Phases 0–6): its player-trade body (multiplayer only) |
 | 14 | `0x00554EA0` | f + 50, callback `0x00554570` | the callback (skill cooldown end); the class table entry is null |
 | 2, 4, 7, 10 | none for players | — | null entries |
 

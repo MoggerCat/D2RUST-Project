@@ -49,7 +49,7 @@
 | Edge cases & original bugs | 911–915 |
 | Test vectors | 916–960 |
 | Provenance | 961–1005 |
-| Open questions | 1006–1086 |
+| Open questions | 1006–1093 |
 <!-- /index -->
 
 ## Summary
@@ -1052,6 +1052,8 @@ sites, fade `0x00515F50`, front-end stream `0x00514780`, `0x00514840`,
     (d2rs has no load latency); compare voice logs for a fresh start.
     Needs recording (with 13): fresh start; per `Async Only`
     request, T of request, first attempt and start (or §6.3 r4 drop).
+    PROVISIONAL: a load completes by the next tick (because d2rs has no
+    load latency); settled by REC-19 (async loads).
 11. Answered (§12 r2): −2³¹ from `cvttsd2si`, then wrapping integer
     steps; silent at the device.
 12. Needs recording (ST-4, §6.6 r3): the sound tick at which one-shots
@@ -1063,6 +1065,9 @@ sites, fade `0x00515F50`, front-end stream `0x00514780`, `0x00514840`,
     Hz) or something else, and its spread. The device side is settled
     (§6.6 r4: strict played > size test per service pass, output
     padded with silence); only the tick offset needs the recording.
+    PROVISIONAL: end tick = start tick + ceil(frames / 882) (because
+    the device plays 882 frames per 40 ms tick); settled by REC-19
+    (one-shot lengths).
 13. Needs recording (ST-7, §10 r6): for `Async Only` sounds, the tick of
     the first start attempt (async read started, `0x00482AE4` path) and
     of the collecting preload pass (`0x00482BF0`, T); settles whether the
@@ -1074,7 +1079,9 @@ sites, fade `0x00515F50`, front-end stream `0x00514780`, `0x00514840`,
     reads at once and sets the event before returning or queues the
     sector reads (`0x00419790`) and the event is set later, depending on
     the file's archive state. Which branch the sound files take is not
-    settled statically.
+    settled statically. PROVISIONAL: the read is finished by the next
+    pass at T ≡ 0 (mod 25) (because the sound files sit in loaded
+    archives); settled by REC-19 (async loads).
 14. Answered (§8.3 r4): G = 255 at every send in game; the other
     writers are init, shutdown, video close, stop-all and the 180 ms
     stream-voice fade, each restoring 255 before returning.

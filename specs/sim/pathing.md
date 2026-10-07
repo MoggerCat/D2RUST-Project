@@ -28,25 +28,25 @@
 | Inputs | 68–77 |
 | Outputs / state changes | 78–84 |
 | Rules | 85–86 |
-|   1. Walk and run requests | 87–231 |
-|   2. Path types | 232–271 |
-|   3. Path compute (`0x00649970(path, unit, town access)`) | 272–338 |
-|   4. Target preparation (flag 0x1000, `0x00648120`) | 339–355 |
-|   5. Toward (type 2, `0x00679C80`) | 356–423 |
-|   6. Straight (type 7, `0x00679ED0`) | 424–433 |
-|   7. A* (type 1, `0x0067B850`) | 434–471 |
-|   8. Velocity, direction vector, facing | 472–558 |
-|   9. Per-tick movement | 559–742 |
-|   10. Messages | 743–765 |
-|   11. Missile paths (`0x00649760`) | 766–818 |
-|   12. Other path types (1.14d-read 2026-10-08) | 819–1032 |
-|   13. Path accessors and the cell line test (1.14d-read 2026-10-08) | 1033–1112 |
-| Constants & data dependencies | 1113–1149 |
-| Randomness | 1150–1160 |
-| Edge cases & original bugs | 1161–1208 |
-| Test vectors | 1209–1246 |
-| Provenance | 1247–1289 |
-| Open questions | 1290–1363 |
+|   1. Walk and run requests | 87–234 |
+|   2. Path types | 235–274 |
+|   3. Path compute (`0x00649970(path, unit, town access)`) | 275–341 |
+|   4. Target preparation (flag 0x1000, `0x00648120`) | 342–358 |
+|   5. Toward (type 2, `0x00679C80`) | 359–426 |
+|   6. Straight (type 7, `0x00679ED0`) | 427–436 |
+|   7. A* (type 1, `0x0067B850`) | 437–474 |
+|   8. Velocity, direction vector, facing | 475–561 |
+|   9. Per-tick movement | 562–745 |
+|   10. Messages | 746–768 |
+|   11. Missile paths (`0x00649760`) | 769–821 |
+|   12. Other path types (1.14d-read 2026-10-08) | 822–1035 |
+|   13. Path accessors and the cell line test (1.14d-read 2026-10-08) | 1036–1115 |
+| Constants & data dependencies | 1116–1152 |
+| Randomness | 1153–1163 |
+| Edge cases & original bugs | 1164–1211 |
+| Test vectors | 1212–1249 |
+| Provenance | 1250–1292 |
+| Open questions | 1293–1366 |
 <!-- /index -->
 
 ## Summary
@@ -116,6 +116,9 @@ Both return 0 to the dispatcher whether or not the mode starts.
    `0x0057F190` sets the target unit (`0x00648B90`: unit, its type and
    GUID), except that a knockback request on a unit already in mode 19
    does nothing. Both then run §1.5.
+
+d2rs wiring without its path provider (a d2rs host setup, no 1.14d
+counterpart) runs no mode request: design choice, no fidelity rule.
 
 #### 1.3 Mode check (`0x0057EDD0`, requested mode m)
 
