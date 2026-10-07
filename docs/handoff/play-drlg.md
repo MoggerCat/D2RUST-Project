@@ -111,3 +111,11 @@ stays.
   frees per-room data; the record removal is the smallest change that
   keeps §9.4's order. Spec question for the next RE session: what
   `0x006754C0` frees (the existing TODO in `Outdoor::reset_level`).
+
+## Gate run in this session
+
+`cargo fmt --all --check` clean; `cargo clippy -p d2-sim -p d2-client
+--all-targets -- -D warnings` clean; `cargo test -p d2-sim` 4465 passed,
+0 failed; `cargo test -p d2-client --test app_level_border` passed
+(85 s in a debug build: 3000 ticks through the Bevy app);
+`python3 tools/coverage.py --check` 0 errors.
