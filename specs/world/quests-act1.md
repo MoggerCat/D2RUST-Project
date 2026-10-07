@@ -20,7 +20,7 @@
 |---|---|
 | Summary | 26–32 |
 | Rules | 33–34 |
-|   10. Act I quests | 35–829 |
+|   10. Act I quests | 35–849 |
 <!-- /index -->
 
 ## Summary
@@ -155,6 +155,26 @@ compare constants in the 1.14d scroll callbacks (`quests.tsv` callback
      player's intro bit for that NPC. Nothing else (no 0x27 refresh).
   3. **Active** `0x0058F9C0`: true iff the player's record lacks 1.0,
      the NPC is akara (148) and the player's akara intro bit is clear.
+  4. **Every setter call (all acts, confirmed 2026-10-07).** The setter
+     `0x00572360` (ECX player = event +0x0C, EDX game = event +0x00,
+     stack NPC class = event +0x14; the bit is the class's field-A bit,
+     `formats/d2s.md` §6 rules 2–3) has exactly five direct calls
+     (`disasm.py xref 0x00572360`), each after a class jump table and a
+     message compare (message = u16 event +0x18):
+
+     | Call | Function (event 11 of) | NPC class: messages |
+     |---|---|---|
+     | `0x0058F8C2` | `0x0058F870` (Act I intro, chain 37; table `0x0058F8CC`, class − 147) | 147: 0x2D, 0x2E; 148: 0x0B, 0x0C; 150: 0x18, 0x19; 154: 0x24, 0x25 |
+     | `0x00598464` | `0x005983E0` (Act II intro, chain 38; bytes `0x00598490`, pointers `0x0059846C`, class − 175) | 175: 0xD7; 177: 0x11D, 0x11E; 178: 0x107, 0x108; 198: 0xBE; 199: 0xCB, 0xCC; 200: 0xE6, 0xE7; 202: 0x112; 210: 0xF1, 0xF2 |
+     | `0x005B6CCF` | `0x005B6C60` (Act III intro; bytes `0x005B6CF4`, pointers `0x005B6CD8`, class − 245) | 245: 0x1CA; 252: 0x1EA, 0x1EB; 254: 0x1F5, 0x1F6; 255: 0x202, 0x203; 264: 0x1DE, 0x1DF; 297: 0x1C5 |
+     | `0x0058E9D4` | `0x0058E990` (Act V intro, chain 40; pointers `0x0058EA2C`, class − 512) | 513: 0x4E45–0x4E47 |
+     | `0x0058EA25` | `0x0058E990` | 512: 0x4E2E; 514: 0x4E55–0x4E57; 515: 0x4E61–0x4E63; 520: 0x4E23 |
+
+     Side effect of the `0x0058E9D4` path only: after the set, chain 31's
+     record (`0x00543640(game, 31)`, Siege on Harrogath) with state
+     (+0x0C) 0 and not-intro (+0x09) ≠ 0 gets state := 1
+     (`0x0058E9E9`–`0x0058E9F5`; `quests-act5-2.md` §9). No other class
+     or message sets field A; classes 516–519 fall to the no-op.
 
 #### 10.4 A1Q1 Den of Evil (chain 1)
 

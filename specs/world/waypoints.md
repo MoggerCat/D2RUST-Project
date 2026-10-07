@@ -33,18 +33,18 @@
 |   2. Waypoint record ("history") | 115–146 |
 |   3. Save field layout (owner of the save format: the character-save spec) | 147–169 |
 |   4. Which waypoints are known without operating one | 170–189 |
-|   5. Waypoint objects | 190–263 |
-|   6. C→S 0x49 TakeOrCloseWp (`0x0054C5D0`) | 264–302 |
-|   7. Travel (`0x00584F60`) | 303–350 |
-|   8. Timing and message order | 351–372 |
-|   9. Town portals | 373–378 |
-|   10. Object mode change (consequence used above) | 379–386 |
-| Constants & data dependencies | 387–414 |
-| Randomness | 415–438 |
-| Edge cases & original bugs | 439–475 |
-| Test vectors | 476–515 |
-| Provenance | 516–554 |
-| Open questions | 555–576 |
+|   5. Waypoint objects | 190–277 |
+|   6. C→S 0x49 TakeOrCloseWp (`0x0054C5D0`) | 278–322 |
+|   7. Travel (`0x00584F60`) | 323–378 |
+|   8. Timing and message order | 379–400 |
+|   9. Town portals | 401–406 |
+|   10. Object mode change (consequence used above) | 407–414 |
+| Constants & data dependencies | 415–442 |
+| Randomness | 443–466 |
+| Edge cases & original bugs | 467–503 |
+| Test vectors | 504–543 |
+| Provenance | 544–582 |
+| Open questions | 583–630 |
 <!-- /index -->
 
 ## Summary
@@ -246,6 +246,20 @@ Steps, in order:
    (`0x00554120`; ignored if already active). Return 1.
 4. Any other mode: nothing. Return 1.
 
+Result of the 0x13 (2026-10-07, `0x00548B19`–`0x00548BD8`,
+`0x00584540`, `0x00584420`): the handler's object case returns 1 for a
+missing object or distance > 50, 3 for object mode ≥ 8, 0 for the walk
+(not in operate range `0x00623660` or blocked `0x00622B50(…, 0x804)` →
+approach `0x00548A50`), and for the operate itself the result of
+`0x00584540`: 0 → 3, else 0. `0x00584540` returns 0 only when the object
+GUID no longer resolves, 1 when the operate is skipped (a monster
+operator on an object without the monster flag, or out of range), and
+otherwise 1 whatever happens in `0x00584420` (its result slot is set to
+1 and never changed; the operate function's own return, 1 for function
+23, is dropped). So an operate of a waypoint answers 0 in every mode
+and on the busy refusal of step 3. An object class without an
+objects.txt record (`0x00640E90` null) is a fatal assert (line 0x2BF).
+
 1.14d differs from D2MOO 1.10f here: the 10-second hostile check
 (§6.1) is not in the operate function; it moved to the 0x49 handler.
 
@@ -293,6 +307,12 @@ value stays 0 and this branch never fires (open question 6).
 Not checked: that `wp` is a waypoint object, that the menu is open or
 the interact info names `wp`, the destination act, expansion, quests.
 
+Step 2 without a room (handoff `impl-world` W1, `0x00549597`–
+`0x005495BC`): the act is `0x006427F0(0x0061A1B0(room))`; with no room
+`0x0061A1B0` returns level id 0 and `0x006427F0(0)` is act 0. So a
+player or object without a room counts as **act 0**, not "no act": a
+roomless unit passes step 2 against any Act I unit.
+
 #### 6.3 After validation
 
 1. Result ≠ 0: if the player's interact unit (`0x00554D00`) is the
@@ -333,7 +353,15 @@ the interact info names `wp`, the destination act, expansion, quests.
    coordinate search and placement: `drlg/levels.md` §10, `sim/path-placement.md` §7, §10, §11.
 7. Arrival message: if the player now has a room and it equals the room
    that `0x00619E50(act of level, level, tile code)` returns (same search
-   without the free-coordinate step): set the player's mode to 2 at its
+   without the free-coordinate step):
+   `0x00619E50(act, level, tile code, &x, &y)` asserts a non-null act
+   (line 0x221) and makes exactly the call `0x0066B2B0(act +0x48,
+   level, tile code, &x, &y)` that rule 6 made, a second time: whatever
+   that search does (level init and room activation when needed, the
+   chosen room) runs again; the room is then already built and active,
+   and no 1.14d waypoint level reaches its drawing branches
+   (Randomness 3), so the second call has no effect beyond its result.
+   Its x, y are discarded; set the player's mode to 2 at its
    own position (`0x005809D0(game, player, no skill, 2, x, y, 0)`), then
    queue S→C 0x0D to the client (`0x0053B4B0`): unit type 0, player GUID,
    1, **x + 3, y + 3**, 0, 0 (x, y = the player's position after
@@ -566,10 +594,36 @@ Save: the test character with Cold Plains has the section `5753
 4. Object ENDANIM handler `0x00581490` (not in the exports): D2MOO sets
    mode 1 → 2 directly when `Mode2` ≠ 0, without the anim setup. Settle:
    Ghidra function at `0x00581490`.
+   Answered (2026-10-07, `disasm.py at 0x581490`; `sim/units.md` §6.4
+   event 1): null object → nothing; the u16 mode at +0x10 ≠ 1 →
+   nothing; objects record byte +0x141 (`Mode2`) = 0 → nothing; else a
+   direct dword write of 2 to +0x10 (`0x005814B0`; no `0x00624690`, no
+   update queued, no animation setup, no draw), then, when record byte
+   +0x122 (`HasCollision2`) = 0, the footprint is freed (`0x00623830`).
+   Waypoint classes have `Mode2` = 1, so a waypoint in mode 1 is in mode
+   2 after its ENDANIM fires.
 5. Is player data +0x160 zero for a fresh player in 1.14d (allocation
    zeroes it)? Settle: read it in a running single-player game.
+   Answered (2026-10-07): yes. Player data (0x16C bytes) is allocated
+   and zeroed by `0x00621F90` (`_memset` at `0x00621FEC`; callers the
+   player init `0x00534922` and the client `0x00460D0D`), and the only
+   server write to +0x160 is `0x0055B76B` in `0x0055B720`
+   (`GetTickCount`), reached only from `0x005A5F51` (hostility). The
+   other `mov [reg + 0x160]` sites are client code (`0x00421E10`,
+   `0x004B83A0`).
 6. Multiplayer conversion of the 10 s wall-clock hostile delay to ticks
    (Phase 7 decision, not a fidelity fact).
 7. Classic (non-expansion) games: nothing in the waypoint path blocks an
    act-5 index; whether a classic record can ever hold one. Settle: grep
    the save-load path for expansion masking.
+   Answered (2026-10-07): the load path masks nothing. Both section
+   readers (`0x0056A3E0`, legacy `0x00532C70`) check only "WS" and the
+   three magics and pass each record to the load copy `0x00661030`,
+   which copies all 16 bytes, applies only the magic rule (§2 rule 5)
+   and sets bit 0; neither reads the game's or the character's
+   expansion flag. So a classic character keeps every act-5 bit its
+   file holds, and travel to such an index is then not blocked by the
+   waypoint path (this question's premise). The in-game setters are the
+   six callers of `0x00660EC0` (`0x0057A6B4`, `0x0057A739`, `0x0057A7BC`,
+   `0x005847FC`, `0x00584E7C`, `0x005B501C`); whether a classic game can
+   reach one with an act-5 index belongs to their owners.

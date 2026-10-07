@@ -17,26 +17,26 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 42–53 |
-| Inputs | 54–66 |
-| Outputs / state changes | 67–77 |
-| Rules | 78–79 |
-|   1. Routing | 80–95 |
-|   2. Put an item into the cube (C→S 0x2A) | 96–127 |
-|   3. Transmute entry (`0x005665F0`) | 128–140 |
-|   4. Recipe eligibility | 141–155 |
-|   5. Ops | 156–175 |
-|   6. Input matching | 176–240 |
-|   7. Outputs | 241–344 |
-|   8. Commit | 345–372 |
-|   9. Portals | 373–392 |
-|   10. C→S 0x4C is not the cube | 393–407 |
-| Constants & data dependencies | 408–431 |
-| Randomness | 432–450 |
-| Edge cases & original bugs | 451–485 |
-| Test vectors | 486–530 |
-| Provenance | 531–569 |
-| Open questions | 570–595 |
+| Summary | 42–55 |
+| Inputs | 56–68 |
+| Outputs / state changes | 69–79 |
+| Rules | 80–81 |
+|   1. Routing | 82–98 |
+|   2. Put an item into the cube (C→S 0x2A) | 99–145 |
+|   3. Transmute entry (`0x005665F0`) | 146–158 |
+|   4. Recipe eligibility | 159–173 |
+|   5. Ops | 174–193 |
+|   6. Input matching | 194–262 |
+|   7. Outputs | 263–397 |
+|   8. Commit | 398–466 |
+|   9. Portals | 467–486 |
+|   10. C→S 0x4C is not the cube | 487–501 |
+| Constants & data dependencies | 502–525 |
+| Randomness | 526–544 |
+| Edge cases & original bugs | 545–579 |
+| Test vectors | 580–624 |
+| Provenance | 625–663 |
+| Open questions | 664–772 |
 <!-- /index -->
 
 ## Summary
@@ -48,7 +48,9 @@ order, takes the first enabled, eligible record whose seven input slots all
 match, and runs its three output slots. If at least one output succeeds,
 every page-3 item is removed, the transmute sound is attached to the
 player and the outputs are placed in the cube. Item creation itself
-(affixes, quality, unique/set picks) is called, not specified, here.
+(affixes, quality, unique/set picks) is specified by `items/generation.md`
+(the request of §7.4 enters its pipeline, §3 there), `items/quality.md`
+and `items/affixes.md`; this spec fills the request.
 C→S 0x4C is **not** the cube (§10).
 
 ## Inputs
@@ -90,8 +92,9 @@ C→S 0x4C is **not** the cube (§10).
 
 `0x0055FA40` (inventory pass over stored items) and the 0x77 byte values
 belong to the UI/inventory owner; listed here for message order only.
-`server-messages.tsv` marks 0x77 `out` (trade), but these paths send it in
-single player.
+`server-messages.tsv` marks 0x77 `sim` (since PC 1 `e2fa8c2`: single
+player sends it too, `sim/intents-events.md` §4 rule 4); these paths send
+it in single player.
 
 ### 2. Put an item into the cube (C→S 0x2A)
 
@@ -102,12 +105,27 @@ Handler `0x0054B790`, size == 9 else 3.
    2, distance test `0x00548EF0` (range argument 10) fails → non-zero;
    modes 0–2, 4: the item must be in the player's inventory or be its
    cursor item, else 1. Non-zero ends the handler with that result.
+   The distance test's result is exactly 1 (handoff `server-items` SI1):
+   `0x00548EF0` returns 0 when |unit x − item x| ≤ 10 and |unit y − item
+   y| ≤ 10 (the unit's static-path position for types 2, 4, 5, else its
+   path position; a unit without a path counts as (0, 0)), else 1.
 2. Cube check `0x00549150(cube)`: the cube must exist, be in mode 0
    (stored) and be in the player's inventory, else result 1.
 3. `0x005628C0`, with a "refused" flag cleared first:
    1. Targeting reset `0x0055BF50` (shared, 26 callers): every inventory
-      item with item flag 0x4 gets it cleared and, for a player, a 0x3F
-      is queued (`items/inventory.md` §5.3).
+      item with item flag 0x4 gets it cleared; when `0x0044BE50` (unit
+      type of its argument, 6 for none) returns 0, 0x3F is queued
+      (`0x0053D220`, arguments 0xFF, 1, 0, 0xFFFF).
+      Exact (handoff `server-items` SI3): the argument of `0x0044BE50` is
+      the player whose inventory is walked (ECX at `0x0055BF98`), so the
+      0x3F is sent for every reset item when the unit is a player (type
+      0), to that player's client (`0x005531C0`), at once. Bytes (8,
+      `sim/server-messages.tsv` 0x3F; builder `0x0053D220`): `3F FF`,
+      the item GUID u32 @2, `FF FF` @6 (with the second argument 1 the
+      code byte is 0xFF whatever the first; the third argument is not
+      read). Only the inventory item list is walked (`0x0063B2C0`); the
+      cursor item is not in it (`items/inventory.md` §1.4 rule 3) and is
+      never reset here.
    2. Cube = item unit `cube`; it must exist, be mode 0 and have code
       `box ` (items.txt code, `0x00628590`), else refused.
    3. If the player is trading (interaction type 0 with a live unit,
@@ -235,6 +253,10 @@ j:
   and its index i is found (code linker, `0x006BD130`) and (game is
   expansion or record i `version` < 100) → class = i; else if flags &
   0x0100 (`eli`) → the same with ultracode.
+  Exact (handoff `impl-world` C1, `0x0056572E`–`0x005657C4`): the `eli`
+  test runs only when `exc` is clear; when `exc` is set and the uber
+  upgrade fails (ubercode 4 spaces, not found, or the version test),
+  the class stays as set above and `eli` is not tried.
 
 With quantity > 1 the last passing item in list order wins.
 
@@ -269,9 +291,20 @@ made for kinds 0–3.
 | Case | Steps |
 |---|---|
 | flags & 0x0001 (`mod`, copy) | it = capture[j].item; page 0xFF, mode 4 (cursor); copy = duplicate(it, fillers = not remove[j]) (`0x0055A2A0`, `world/vendors.md` §7.3; D2MOO `ITEMS_Duplicate`); class by kind: 0xFC slot item; 0xFD type pick (§7.5) with L; 0xFE capture class if ≥ 0 else 0; 0xFF capture class; other 0. If the copy exists its class := that value. Item init `0x00557AB0(game, &copy, 0, 0)` (owner: items) — out[j] = the result; mode 4; it page := 3 |
-| kind 0xFE (`useitem`) | it = capture[j].item; page 0xFF, mode 4; out[j] = duplicate(it, fillers = not remove[j]); mode 4; it page := 3. Capture class (`exc`/`eli`) is **not** used. Quality byte 9: prefix = `0x005C1BC0(out, 1)`, suffix = `0x005C1BC0(out, 0)` (the rare-name pick by format, `items/affixes.md` §5; ECX item, EDX 1 prefix / 0 suffix); both ≠ 0 → quality 9, rare prefix and suffix set (`0x00627EA0`, `0x00628010`, `0x00628070`); else craft := 0 |
+| kind 0xFE (`useitem`) | it = capture[j].item; page 0xFF, mode 4; out[j] = duplicate(it, fillers = not remove[j]); mode 4; it page := 3. Capture class (`exc`/`eli`) is **not** used. Quality byte 9: prefix = `0x005C1BC0(out, 1)`, suffix = `0x005C1BC0(out, 0)` (tempered affix rolls, owner: items; `0x005C1BC0` takes ECX = item, EDX = 1 prefix / 0 suffix and is the rare-name pick by item format: format ≥ 1 → `items/affixes.md` §5 `0x005C1AB0`, format 0 → §12.2 `0x005C19A0`; both picks always run, prefix first (`0x00565EC7`, `0x00565ED3`), the same pair as the tempered case `items/affixes.md` §9, which owns the routine); both ≠ 0 → quality 9, rare prefix and suffix set (`0x00627EA0`, `0x00628010`, `0x00628070`); else craft := 0 |
 | kind 0xFF, 0xFC, 0xFD | create through an item request (§7.4) |
 | any other kind | nothing (out[j] none) |
+
+Null cases (handoff `impl-world` C2, C3, `0x00565D61`–`0x00565ED3`):
+`mod` or `useitem` with capture[j].item = none → the page and mode
+setters skip none, then the duplicate `0x0055A2A0` asks the room of none
+(`0x00620BB0`) → fatal assert (line 0x896): the original exits. It
+needs output b or c with `mod` / `useitem` while output a has none of
+`mod`, `usetype`, `useitem` (capture is keyed on output a, §6.4); no
+1.14d record does that (checked over the 151 live records). A
+`useitem` duplicate that returns none with quality byte 9 → the
+tempered roll `0x005C1BC0(none, 1)` reads the format of none
+(`0x0062A670`) → fatal assert (line 0x1504).
 
 #### 7.4 Item request (`0x00558D90(request, 0)`, owner: item creation)
 
@@ -313,29 +346,49 @@ not mark it.
 Item `stop` is never examined (original bug), and "no candidate" yields
 item 0.
 
+Exact (`0x005659B7`, handoff `impl-world` C5): the candidate test of
+step 2 is not "append if fewer than 256": when 256 candidates are held
+the scan **ends** (jump to the pick), so the later items are never
+examined; the 1.14d type output (record 19, `pole` up to level 50)
+never reaches 256. N = 0 (no items table) would loop for ever (i stays
+0, stop is −1); the item tables always load, so this is unreachable.
+No candidate → 0 without the second roll (one draw spent).
+
 #### 7.6 After an item exists (out[j] ≠ none)
 
 In this order:
 
 1. success := 1.
-2. remove[j]: drop the copy's runeword stat list (`0x00558C50`); if
+2. remove[j]: drop the copy's runeword stat list (`0x00558C50`,
+   `items/generation.md` §12.3); if
    flags & 0x0020 (`rem`) and the source item has an inventory: for each
    item in it, duplicate it (fillers on), page 0xFF, mode 4, append to
    fillers. (`uns` alone loses the fillers: the copy was made without
-   them.)
+   them.) The fillers list is an 18-entry stack array with no bound test
+   (`0x005661AC`–`0x005661BC`, handoff `impl-world` C4): a 19th entry
+   would overwrite the frame's other locals (the craft-property buffer
+   at ebp−0xE8, then remove[] and out[]). 18 is exactly three `rem`
+   outputs of one captured item with 6 sockets, the 1.14d maximum, so
+   the overflow needs a modded socket count.
 3. craft ≠ 0: for mods m = 1 … 5 (slot +24 + 12(m−1): property i32, param
    +4, min +6, max +8, chance u8 +10): property < 0 → skip. If 0 < chance
    < 100: step the **output item's unit seed** (unit +0x20, inline draw)
    and skip when lo′ mod 100 > chance. Then add the property {property,
    param, min, max} (param, min, max sign-extended from 16 bits) with
    `0x00660240(out, &prop, game expansion)` (D2MOO
-   `ITEMMODS_AddCraftPropertyList`; owner: items/properties).
+   `ITEMMODS_AddCraftPropertyList`; owner: `items/properties.md` §12).
+   The third argument (game +0x70, pushed at `0x0056626B`) is never
+   read: `0x00660240` uses only the item and the record (it calls the
+   wrapper `0x0065FE10` with ESI = item, EDI = record, mode 7, flags
+   0x40) and pops it (`ret 0xC`). So the craft mods do not depend on
+   the game's expansion flag.
 4. flags & 0x0200 (`rep`): if stackable and quantity ≠ 0 → stat 70
    (quantity) := min(quantity, max stack) where max stack =
    `maxstack` + stat 254, capped at 511 (`0x006295B0`). Then broken (item
-   flag 0x100) → repair `0x0055F900`; else if base stat 72 (durability) <
+   flag 0x100) → repair `0x0055F900` (`items/generation.md` §12.1); else if base stat 72 (durability) <
    stat 73 (max durability) → stat 72 := stat 73.
-5. flags & 0x0400 (`rch`): recharge `0x0055FE80` (owner: items).
+5. flags & 0x0400 (`rch`): recharge `0x0055FE80` (owner: items;
+   `items/generation.md` §12.2, with `0x0065C940`).
 6. flags & 0x0002 (`sock`): if quantity ≠ 0 and stat 194 = 0 and item
    flag 0x800 clear: s = min(max sockets `0x0062BC20`, quantity); quality
    4 or 9 → s ≤ 3; quality 5, 6, 7, 8 → s ≤ 1; s > 0 → set item flag
@@ -353,14 +406,20 @@ is sent; outputs already made in out[] are neither placed nor freed
    5, flags 0x20, page shown as the item's stored page, set to 3 first by
    `0x00628320`); then remove it from the inventory and free it
    (`0x0055DF10(game, player, item, 0)` → `0x00557FD0`). All page-3 items
-   go, matched or not.
+   go, matched or not. `0x0055DF10` (`world/vendors.md` §7.2 rule 9):
+   item unit flag 0x2 cleared, unlink `0x0063AD90`, grid cells cleared
+   `0x0063BCF0`, page := 0xFF, freed; a null game or player, or an
+   unlink that does not return this item, is a fatal assert (no return).
+   The walk passes items of the player's own list, so the unlink never
+   fails here.
 2. Sound event 4 on the player.
 3. For out[0], out[1], out[2] that exist: page := 3; place with
    `0x00560200(game, player, id, 0, 0, 1, 1, 0)`. Failed placement → free
    the unit (`0x00555600`), the output is lost. Placed → item flag 0x10
    (identified) set; if its items record `quest` ≠ 0: code `hst ` →
-   `0x0059E5C0` (Act 2 Horadric Staff hook), `qf2 ` → `0x005B86E0` (Act 3
-   Khalim's Will hook); quest state changes: `world/quests.md`.
+   `0x0059E5C0` (Act 2 Horadric Staff hook, `world/quests-act2.md`
+   §4.9), `qf2 ` → `0x005B86E0` (Act 3 Khalim's Will hook,
+   `world/quests-act3.md` §4.8); quest state changes: `world/quests.md`.
 4. Fillers in order: page 3, place; failure frees, success sets
    identified.
 
@@ -369,6 +428,41 @@ item, each followed by what removal queues; (2) per placed output, what
 placement queues; (3) per placed filler, the same. The sound and the
 quest hooks travel through their owners' messages. Exact bytes of (1)'s
 removal part, (2) and (3) are open (question 1).
+
+Exact (Open questions 1 and 2 answered from the code; a recording of V1
+still confirms):
+
+1. Removal: `0x0053D010` sends the 0x9D action 5 at once, while the
+   0x4F is handled (page shown = the stored page, then page 3 restored;
+   layout `items/inventory-moves.md` §11). `0x0055DF10(game, player,
+   item, 0)` then sends nothing: unit flag 0x2 cleared, unlink
+   `0x0063AD90`, the notice `0x0063BCF0` is an empty function, page :=
+   0xFF, the fourth argument 0 skips `0x00571600`; `0x00557FD0` unlinks
+   the item from any player inventory list or cursor still holding it
+   (callback `0x00557FA0` → `0x00557F50` over the players) and frees it
+   (`0x00555600`, which queues nothing for an item outside a room;
+   handoff `server-items` SI2: nothing else the sim sees).
+2. Placement: every `0x00560200(…, send 1, …)` first runs the targeting
+   reset (0x3F per flagged item, at once), then sets command flag 0x2
+   (and item flag 0x1 for a socket-filled item) and appends the item to
+   the player's update list (`items/inventory.md` §2.4 step 8). Nothing
+   is sent at the call. In the player's unit update of the same tick
+   (`0x00580860`, per client, room update queue walk;
+   `items/inventory-moves.md` §6.1 rule 2) the dispatcher sends one
+   0x9C action 4 (`items/item-actions.tsv` row 3, owner's client only)
+   per placed item, in update-list order: out[0], out[1], out[2], then
+   the fillers; then the 0x47 / 0x48 of that rule.
+3. Sound (question 2): `0x00553380(player, event, player)` stores the
+   event at unit +0x6E, the target at +0x70 and sets unit flag 0x400. In
+   the same `0x00580860` call, after the item messages and 0x47 / 0x48,
+   flag 0x400 → `0x00571740`: S→C 0x2C (8 bytes, `2C`, unit type u8 0,
+   player GUID u32 @2, event u16 @6; `audio/triggers.md` §2) to that
+   client, only when the target is none or is the client's own player
+   (`0x00537860`). The cube passes the player as target (`0x0056296C`
+   event 19, `0x00566439` event 4, `0x00594253` event 20), so only the
+   acting player's client hears it. The room clean-up clears flag 0x400
+   (`items/inventory-moves.md` §6.1 rule 4): one sound per unit per
+   tick, a later event in the same tick overwriting +0x6E.
 
 ### 9. Portals
 
@@ -569,21 +663,92 @@ jump table, `0x00566AA8` op jump table, the two Pandemonium stubs at
 
 ## Open questions
 
-1. Exact S→C bytes and order of a successful transmute: what placement
+1. Answered from the code (§8 "Exact", items 1–2; the V1 recording
+   still confirms). Original text: Exact S→C bytes and order of a
+   successful transmute: what placement
    (`0x00560200`), removal (`0x0055DF10` → `0x00557FD0`) and freeing
    (`0x00555600`) queue. Settle: packet recording of V1 (record 23) and
    V22.
-2. Which message carries the attached sound events 4/19/20 and in which
+2. Answered from the code (§8 "Exact", item 3: S→C 0x2C in the
+   player's unit update, to the acting player's client). Original text:
+   Which message carries the attached sound events 4/19/20 and in which
    tick pass. Settle: same recording (expect it with the player's unit
    update).
 3. Single-player values of game +0x6A and +0x74 (ladder records usable or
    not). Settle: V17 in a recorded SP game, or read the game struct after
    creation.
+   Answered (2026-10-07, `0x00530BF0` disassembled, plus the recorded
+   single-player games of `sim/intents-events.md` §8.1 and its
+   recording notes): game creation writes +0x6A := its game-type
+   argument (`0x00530CFF`, the byte of C→S 0x67) and +0x74 := bit 21
+   (0x200000) of its game-flags argument (`0x00530D4C`–`0x00530D59`;
+   +0x70 = bit 20). The recorded single-player games show game type 3
+   on every tick and S→C 0x01 u8@7 = 0 (u8@7 = (+0x74 ≠ 0)), so in
+   single player +0x6A = 3 and +0x74 = 0: §4's test 3 passes through
+   its first term, so `ladder` cube records are usable in single
+   player.
 4. RNG draws inside duplicate `0x0055A2A0`, item init `0x00557AB0`, item
    request `0x00558D90`, free-spot `0x00545340` and portal creation
    `0x0056D130`. Settle: rng trace (`check_rng.py`) of V1, record 19 and
    V22; the owners' specs.
-5. Inventory list order of `0x0063B2C0`/`0x0063DFA0` (decides capture
+   Partly answered (duplicate only): `0x0055A2A0` makes exactly two
+   game-seed steps per item unit it allocates (unit seed `0x00552DF0`,
+   item seed `0x00552E90`, inside `0x00555230`), i.e. 2 · (1 + k) for a
+   copy with k fillers read, and no other draw (`world/vendors.md` §7.3).
+   The other four functions stay open.
+   Further answered: item init `0x00557AB0` and the item request
+   `0x00558D90` draw as `items/generation.md` Randomness states (rows 1–2
+   game seed for the unit and item seeds of each new unit, then base
+   stats on the unit seed, then the item seed; the duplicate path's
+   `0x00557AB0(game, &copy, 0, 0)` is the "no request" branch, §4 there);
+   the free-spot search `0x00545340` draws nothing
+   (`world/quests-act1-rest.md`, town Cain rule 2). Still open: the
+   portal creation `0x0056D130` (free spot `0x0064E810`, object
+   allocation `0x00555230`, mode set `0x00624690(obj, 1)` and the
+   destination half `0x0056CF40`); owner: objects / quests specs, settle
+   with `disasm.py fn 0x0056CF40` and an rng trace of record 2.
+   Answered (2026-10-07; disassembly of both functions, plus a
+   reachability scan of every callee for the step constant 0x6AC690C5
+   and the draw helpers, `rng.md` §3/§6): portal creation draws, in
+   this order, on these seeds:
+   1. Free spot `0x0064E810` (only when the last argument is 0),
+      cell lookup `0x00463740`: no draw.
+   2. Object 1 (`0x0056D249`: `0x00555230`, type 2, the class
+      argument, mode 1, flags 1, GUID 0): **one game-seed step** (unit
+      seed `0x00552DF0`, `0x0055530E`; the item seed `0x00552E90` only
+      for type 4; the GUID `0x00552EE0` is a counter). The init dispatch
+      `0x0054F5D0` draws only for `PreOperate` ≠ 0 (rule 8; 0 for
+      classes 59 and 60 in the live table); inits 11 (`0x00550140`) and
+      12 (`0x0054FE70`) draw nothing (their `0x005417D0` scheduling
+      draws only for a monster, `sim/tick.md` §5.2 rule 4; init 12's
+      mode set runs only for mode 0); the object branch of
+      `0x00554850` draws nothing.
+   3. Mode set `0x00624690(obj, 1)` (`0x0056D25C`): the object is
+      already in mode 1, so no animation setup and no draw
+      (`sim/units.md` §4.1; the `roll` at `0x00624563` runs only on a
+      real mode change).
+   4. `0x0056CF40`: the spawn point `0x0061B060` may build the
+      destination level (`0x0066B2B0`: level / DRLG room seed draws,
+      `drlg/*`), then the room population `0x0052D0F0` (draws of
+      `monsters/population.md`, on the game seed and the room seeds),
+      both before the null test; for level 73 the A2Q6 arrival
+      `0x00545830` → `0x0059DFD0` does the same for level 40; the free
+      point `0x0064E7E0` draws nothing; the fallback `0x0061B060`
+      (`0x0056D033`) runs only when that point is not found.
+   5. Object 2 (`0x0056D092`: same class as object 1 (+0x04), mode 2,
+      flags 1): **one game-seed step** (its unit seed), init as in 2
+      (no draw: init 11 acts only in mode 1, init 12 only in mode 0).
+   6. `0x00624690(obj2, 2)` (`0x0056D107`): same mode, no draw;
+      `0x00553590`, `0x00621CE0` (twice), `0x00622300`, `0x0061AED0`:
+      no draw.
+   So outside the level build and the population the cube's portal
+   costs exactly two game-seed steps, one before and one after
+   `0x0052D0F0`. The failure paths free object 1 (`0x00555600`), whose
+   draws are that function's. All five functions of this question are
+   now answered.
+5. Answered by the inventory spec: link order (`items/inventory.md`
+   §1.4 rule 1: `0x0063AF20` appends at the tail). Original text:
+   Inventory list order of `0x0063B2C0`/`0x0063DFA0` (decides capture
    with quantity > 1 and removal order). Owner: inventory spec.
 6. Answered: `0x00560200` changes nothing on a failed placement
    (`items/inventory.md` §2.4 step 4), so after 0x2A the item stays
@@ -591,4 +756,16 @@ jump table, `0x00566AA8` op jump table, the two Pandemonium stubs at
    ground item is refused the same way (edge case 15).
 7. Cube-use table base and index (`0x007417CC`, `pSpell` 7?). Owner:
    item-use spec.
+   Answered (2026-10-07, `0x005BF240` disassembled, table read from the
+   binary): the item-use table is at `0x00741790`, 31 entries
+   (`0x0074178C`) of two words (first use, second use); the index is
+   items `pSpell` (+0x94; for `book` / `scro` items the +0x04 word of
+   the `books` row named by suffix slot 0 (`0x006374B0`) when it is >
+   0), used only when 0 < index < 31. A first word is called while item
+   flag 0x4 is clear; otherwise, or when it is 0, the second word is
+   called after setting flag 0x4. Entry 7
+   = (0, `0x005BF0C0`): the first word is 0, so the dispatcher takes the
+   second word (`0x007417CC`). `box`
+   is the only live `misc.txt` row with `pSpell` 7, so the cube-open
+   routine is exactly entry 7, word 2.
 8. Answered: `0x0055FA40` recounts the scroll/tome skill quantities (stored items on page 0 only); `items/inventory.md` §5.5.

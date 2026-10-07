@@ -40,17 +40,17 @@
 |   3. Game entry: picking the quest set | 336–368 |
 |   4. Events and dispatch | 369–453 |
 |   5. Quest updater and timers (tick step 8) | 454–475 |
-|   6. Status reporting | 476–582 |
-|   7. NPC dialog hooks | 583–615 |
-|   8. Act transitions, warps and portals | 616–697 |
-|   9. Quest items, rewards and helpers | 698–778 |
-|   11. Acts II–V | 779–784 |
-| Constants & data dependencies | 785–799 |
-| Randomness | 800–818 |
-| Edge cases & original bugs | 819–837 |
-| Test vectors | 838–869 |
-| Provenance | 870–891 |
-| Open questions | 892–935 |
+|   6. Status reporting | 476–585 |
+|   7. NPC dialog hooks | 586–618 |
+|   8. Act transitions, warps and portals | 619–706 |
+|   9. Quest items, rewards and helpers | 707–871 |
+|   11. Acts II–V | 872–887 |
+| Constants & data dependencies | 888–902 |
+| Randomness | 903–929 |
+| Edge cases & original bugs | 930–948 |
+| Test vectors | 949–980 |
+| Provenance | 981–1009 |
+| Open questions | 1010–1071 |
 <!-- /index -->
 
 ## Summary
@@ -172,7 +172,7 @@ status functions return false, §6.1).
 
 | Msg | Size | Layout | Sender |
 |---|---|---|---|
-| S→C 0x28 QuestInfo | 103 | u8 0x28, u8 unit type, u32 unit GUID, u8 at 6 (the builder's fourth argument: 0 from quest code; from the NPC chat path `0x00572C10` its own third argument), 96 bytes player record (current difficulty) at 7 | `0x0053D670` |
+| S→C 0x28 QuestInfo | 103 | u8 0x28, u8 unit type, u32 unit GUID, u8 0, 96 bytes player record (current difficulty) | `0x0053D670` |
 | S→C 0x29 GameQuestInfo | 97 | u8 0x29, 96 bytes game record | `0x00544520` → `0x0053D700` |
 
 0x28's unit is the NPC being talked to (type 1, its GUID) when sent by the
@@ -500,11 +500,8 @@ Handler `0x0054C0C0` (size must be 1) calls `0x00546040(game, player)`:
 2. list[41] = 0. For each record (list order) with status ≠ 0: assert
    chain ≤ 40; status from status_fn if set (written to list[filter] only
    if it returns 1), else the default rule into list[filter].
-3. 0x50 (15 bytes, sender `0x0053D7E0` copying a 15-byte record: u8
-   0x50, u16 kind 1 at 1, u16 Den of Evil monsters left at 3, i16 staff
-   tomb at 5, u16 barbarians left at 7, bytes 9–11 zero; bytes 12–14
-   are never written in `0x00546040` (stack contents, masked in the
-   exact comparison, `sim/intents-events.md` §6 r3)) is sent if list[1] ≠ 0
+3. 0x50 (15 bytes: u8 0x50, u16 1, u16 Den of Evil monsters left, i16
+   staff tomb, u16 barbarians left, 6 zero bytes) is sent if list[1] ≠ 0
    (then monsters left = `0x005901E0` of chain 1's record), or list[36] ≠
    0 (barbarians = `0x00588C50` of chain 32's record: 5 for each of
    extra bytes +0x86, +0x87, +0x88 that is 0, plus extra +0xA4 − +0xAC −
@@ -520,7 +517,12 @@ Handler `0x0054C0C0` (size must be 1) calls `0x00546040(game, player)`:
 player's room's act = record act. Message (6 bytes, `0x0053D710`): u8
 0x5D, u8 chain, u8 record flags (+0x14), u8 status (status_fn, or the
 default rule), u16 extra = Den of Evil monsters left for filter 1,
-barbarians left for filter 36, else 0. Quest code sends it per player
+barbarians left for filter 36, else 0. Status byte exactly
+(`0x00544236`–`0x005442B6`): it starts at 0; no status_fn → the default
+rule (`0x00543F90`); a status_fn gets an out byte preset to 0 and the
+status byte takes it only when the function returns 1 (`0x005442AF`),
+so a status_fn returning 0 sends status **0**, not the record's status.
+No player room, or a room without a level → nothing sent. Quest code sends it per player
 through `0x00544300(record, status, unit, iterate_fn, iterate)`: status
 byte = status; if iterate = 1 (iterate_fn null → fatal), call
 iterate_fn(game, player, unit) for every player through `0x005537D0`
@@ -561,9 +563,10 @@ hold 6, 11, 7, 0 and 7 NPCs for acts I–V.
 - `0x00544FA0(act)` / `0x00544F60(list, n)` set the intro bit of every
   NPC of the act's list (act transitions, §8.1).
 - `0x00545100(game, player, act)` (caller `0x00537340`): for acts 0, 1,
-  2, 4 build 0x91 (26 bytes, `0x0053E060`): u8 0x91, u8 (D2MOO: act),
-  then 12 u16 slots preset to 0xFFFF; for each NPC of the act's list in
-  order whose intro bit is set, write its class id into the **next**
+  2, 4 build 0x91 (26 bytes, `0x0053E060`): u8 0x91, u8 act (the act
+  argument, stored from BL at `0x00545176`; the function switches on it,
+  table `0x0054519C`, acts 0–4), then 12 u16 slots preset to 0xFFFF;
+  for each NPC of the act's list in order whose intro bit is set, write its class id into the **next**
   slot (`0x00545090`: introduced NPCs are packed at the front; D2MOO
   1.10f writes slot i for list entry i). Sent only if at least one is
   set. Act 3 (IV) sends nothing.
@@ -618,7 +621,11 @@ args: player, NPC class (0 if none), message; dispatch event 11 (1, 1).
 #### 8.1 Act completion (`0x005467E0(game, player, npc)`)
 
 Called by the NPC travel action (`world/npc.md`, from `0x00579D60`)
-before the act change; only for a monster NPC:
+**after** the act change: at each of the three travel sites the act
+change `0x0054B830` runs first (`0x0057A67A`, `0x0057A6FF`,
+`0x0057A786`), then `0x005467E0` (`0x0057A688`, `0x0057A70D`,
+`0x0057A794`), then the waypoint step (`0x00660E00`; corrected
+2026-10-07, disassembly); only for a monster NPC:
 
 | NPC (class) | Condition | Sets (player record) | Then |
 |---|---|---|---|
@@ -690,7 +697,9 @@ the Cow King); or (classic game) the player lacks slot 26 bit 0, or
 Encampment). Else free spot near the player (`0x00545340`, size 3,
 collision mask 0x400, radius 4 (unused: `0x00545340` never reads this sixth argument, `[ebp+0x14]`; the search runs to the limit), limit 100); if found and a portal object
 of class 60 to level 39 is created (`0x0056D130`), set game slot 4 bit 11
-and return 1. Its only route is the cube output-kind table `0x006E11C8`
+and return 1. Every other outcome (a refusal test, no free spot at
+`0x00594211`, no portal at `0x0059422F`) takes the same exit
+`0x0059424B`: the player sound `0x00553380`, return 0. Its only route is the cube output-kind table `0x006E11C8`
 through `jmp` thunks (`world/cube.md` §9). The Pandemonium portal functions
 `0x00594270` and `0x00594280` are `xor eax, eax; ret` stubs in 1.14d:
 they create nothing.
@@ -701,9 +710,9 @@ they create nothing.
 
 (game, player, code, level, quality, droppable): look up the item code
 (return none if absent); level = the player-based default
-(`0x00558200`, `items/generation.md` §3) unless level ≠ 0; ask item
-creation (`0x00559CE0`, `items/generation.md` §3 "simple creation",
-count 1, the given quality) for the item (items spec); if it has max
+(`0x00558200`, `quests-act5.md` open question 2: the player's base
+stat 12, at least 1) unless level ≠ 0; ask item creation (`0x00559CE0`,
+`items/generation.md` §10.2; count 1, the given quality) for the item (items spec); if it has max
 durability > 0 set durability to it; inventory page 0; try to place it in
 the inventory (`0x00560200`); on success identify it unless identified
 and return it; else if droppable: drop it at a free spot near the player
@@ -713,22 +722,8 @@ else free it and return none.
 #### 9.2 Deleting a quest item
 
 `0x00544160(game, player, code)` finds the player's item with the code
-(`0x00558110`) and removes it (`0x005440A0`: by item mode: stored →
+(`0x00558110`, search order `quests-helpers.md` §8) and removes it (`0x005440A0`: by item mode: stored →
 update client and remove; equipped → unequip path; on cursor → remove).
-
-Finding the item (`0x00558110`, ECX game, EDX player, stack code): the
-player's inventory (+0x60) missing → none. Code compare: the item's
-code (`0x00628590`, items.txt `code`) = the asked code.
-1. The cursor item (`0x0063C1E0`), if its code matches: returned when its
-   items record is missing, when `quest` (+0x12A) = 0, or when game
-   difficulty (+0x6D) ≤ its stat 356 (`questitemdifficulty`, total);
-   else go on (no `questdiffcheck` test here).
-2. Every item of the inventory list in list order (`0x0063B2C0`,
-   `0x0063DFA0`: stored, equipped, belt and cube items alike), skipping
-   items on page 1 (`0x00628250`): the first whose code matches and that
-   has no items record, or `quest` = 0, or `questdiffcheck` (+0x12B) = 0,
-   or difficulty ≤ stat 356, is returned.
-3. Else none.
 
 #### 9.3 Player GUID lists
 
@@ -776,11 +771,119 @@ nothing.
 Classes 0x173–0x1DC use the jump tables `0x00544DA0` / `0x00544DBC` (index =
 class − 0x173). The Act II–V functions are catalogued only (§11).
 
+#### 9.6 Quest-owned object init and operate functions
+
+`world/object-functions.tsv` names this file the owner of seven object
+functions. Each was re-read in the 1.14d `Game.exe` (2026-10-07,
+`tools/ghidra/disasm.py`); where another quest file already states the
+body, this table links it and records only what the re-read added.
+Init functions take the init record {game +0x00, object +0x04, room
++0x08, control +0x0C, `objects.txt` record +0x10, x +0x14, y +0x18}
+(`world/objects.md` §3 rule 6; built at `0x0054F6D0`–`0x0054F6F6`, the
+control being `0x00546FA0`'s game +0x10F0); operate functions take the
+operate record {game +0x00, object +0x04, operator +0x08, …, class
++0x10}. All live rows below have `Sync` = 1, so none of their mode sets
+draws (`world/objects.md` §4).
+
+| Function | Class (1.14d `objects.txt`) | Owner of the body | Re-read |
+|---|---|---|---|
+| init 7 `0x00544990` | 26 gibbet | `quests-act1-rest.md` §9 item 8 | confirmed: record walk from game +0x10F4 (id +0x00, next +0xF4), tail jump to `0x00594060` |
+| init 9 `0x00593FC0` | 30 Inifuss tree | `quests-act1-rest.md` §9 item 9 | confirmed (`0x00543640(game, 4)`) |
+| init 46 `0x005506D0` | 369 trapped soul placeholder | rules 1–6 below | new |
+| init 59 `0x0054FE10` | 131 Dummy "vile dog afterglow" | rule 7 below (use: `quests-act4.md` §5.4) | confirmed |
+| init 61 `0x00594290` | 189 Dummy "cain portal" | `quests-act1-rest.md` §9 item 10 | confirmed: no mode test, mode := 1 always, event 7 at f + 25 |
+| operate 33 `0x00583E70` | 268 Wirt's body | `quests-act1-rest.md` §9 item 11 | confirmed; the "object exists" test only guards the mode read: a null object goes on and writes the drop code through null (fatal; operate always passes an object) |
+| operate 43 `0x00584D00` | 100 Duriel's Lair portal, 377 guild portal | rule 8 below | new |
+
+**Init 46, trapped-soul placeholder (`0x005506D0`).** Every draw is on
+the object-control seed (game +0x10F0, +0x00; the function reaches it
+both as `0x00546FA0`'s result and as the init record's control, the same
+pointer). `roll` is `sim/rng.md` §3 (`n` < 1: 0, no draw).
+
+1. The object exists and its mode ≠ 0 → nothing (population allocates
+   it in mode 0, `world/object-population.md`).
+2. (x0, y0, w, h) := the room's sub-tile box (`0x00619730`). Budget c :=
+   (((w · h) >> 7) · 30) >> 8 (i32, arithmetic shifts). c ≤ 0 → nothing.
+3. Up to 12 tries; a try starts only while c > 0 (tested before the
+   first try and after each one). One try:
+   1. px := x0 + roll(w − 4); then py := y0 + roll(h − 4).
+   2. Fit A (`0x00550220`, sx = sy = 3: `world/object-population.md`
+      §6, Fit A row) on (px, py) with the room's box and room. No fit →
+      the try ends.
+   3. class := 403 (`trappedsoul1`) + roll(2) (1 → 404 `trappedsoul2`).
+      Spawn `0x005B2F20(game, room, x, y, class, mode 1, spread −1,
+      flags 0)` at the **placeholder's own point** (init record x, y),
+      not at (px, py). Created → object mode := 2 (`0x00624690`) and
+      c −= 1.
+   4. k := 1, walking := yes. Then repeat:
+      1. n := k >> 1; n > 0 → roll(n); a nonzero result ends the try.
+         (k = 2 and 3 give roll(1): one draw, always 0.)
+      2. walking = no → the try ends.
+      3. Walk: walking := no; m := 3 · max(c, 4); up to m steps, each:
+         d := roll(8); px += (roll(5) + 5) · DX[d] · 2; py += (roll(5) +
+         5) · DY[d] · 2 (draws in that order: roll(8), x's roll(5), y's
+         roll(5)); then Fit A on (px, py); a fit → walking := yes, stop
+         stepping. Failed steps still move the point: the walk is
+         cumulative from the try's (px, py) and never resets in a try.
+      4. No fit in m steps → back to 4.1 (so k ≥ 2 still draws its
+         roll(k >> 1) before the try ends).
+      5. Fit: class := 403 + roll(2); k += 1; spawn as in 3.3 at (px,
+         py); created → object mode := 2, c −= 1. Back to 4.1.
+   5. c is not tested inside rule 3.4, so it can end below 0; the
+      outer test then stops the tries.
+4. DX = (−1, 0, 1, −1, 1, −1, 0, 1), DY = (−1, −1, −1, 0, 0, 1, 1, 1)
+   for d = 0…7 (i32 tables `0x00731B7C`, `0x00731B9C`, read from the
+   image). One step moves 10–18 sub-tiles on each nonzero axis.
+5. Fit A compares the low 16 bits of px / py with the box (a walk that
+   goes negative never fits); its two collision boxes take the full
+   values.
+6. Each spawn draws as `monsters/init.md` §1–§4 and the placement of
+   `monsters/population.md` §9.3 say (their own seeds; they do not touch
+   the control seed). The object ends in mode 2 when at least one trapped
+   soul was created, else stays in mode 0. No message, timer or event.
+
+**Rule 7, init 59 (`0x0054FE10`).** Object null or mode 0: mode := 1
+(`0x00624690`), object event 7 at frame (game +0xA8) + 27, then object
+event 1 at frame + (record +0xDC >> 8) + 1 (`FrameCnt1`; Dummy 131: 20,
+so f + 21) (`0x005417D0`, both with the two trailing arguments 0).
+Mode ≠ 0 → nothing. No draw. Event 7 then runs the class-131 row of
+§9.5.
+
+**Rule 8, operate 43 (`0x00584D00`), Duriel's Lair / guild portal.**
+Returns 0 in every non-fatal case. No draw of its own.
+
+1. Operator null or not a player (type ≠ 0) → fatal (assert, line
+   0xFB3).
+2. Portal flags (object data +0x05, `0x006222C0` / `0x00622300`) |= 5.
+3. Destination level L: class 100 → 73 (Duriel's Lair); class 377 → the
+   object's `InteractType` (data +0x04); other classes → 0.
+4. a := act of L (`0x006427F0`, `drlg/levels.md` §6 rule 3); a ≥ 5 →
+   fatal (0xFCB).
+5. Room R := `0x0061B060(act record game +0xBC + 4·a, L, tile index 0,
+   &x, &y, operator size 0x00620510)` (`sim/path-placement.md` §11; it
+   may draw on the level seed); none → fatal (0xFCD).
+6. Free point from R at (x, y): `0x0064E7B0(R, &pt, operator size, mask
+   0x1C09, fallback 0)` (`sim/path-placement.md` §7). None → return 0
+   (the flags of step 2 stay set; the player is not moved).
+7. Found room R' → place the operator: `0x00554EA0(game, operator, R',
+   pt.x, pt.y, 0, 0)` (`sim/path-placement.md` §10); failure → fatal
+   (0xFD9).
+
 ### 11. Acts II–V
 
 Catalogued in `quests.tsv` (records, callbacks, tables) and `quest-messages.tsv`.
 Hooks other specs rely on are specified above (§8.1–§8.4, §9.4, §9.5).
-Their state machines are not yet specified (Open question 8).
+Their state machines (Open question 8, answered) are in the per-act files
+(2026-10-07): Act II `quests-act2.md`, `quests-act2-2.md`; Act III
+`quests-act3.md`, `quests-act3-2.md`; Act IV `quests-act4.md`; Act V
+`quests-act5.md`, `quests-act5-2.md`; quest object functions §9.6.
+The client's copy of the quest state (S→C 0x52 / 0x5D / 0x5E / 0x28 /
+0x29 / 0x50) and the client quest check `0x004A4180` that the
+level-entry lines use: `quests-status.md` §1 and §12.
+Shared helper functions the act files call (free-spot search
+`0x00545340`, critical spawn `0x005459A0`, superunique spawn
+`0x00545C30`, quest missiles, interaction end, game end):
+`quests-helpers.md`.
 
 ## Constants & data dependencies
 
@@ -816,6 +919,14 @@ monster specs). Quest-seed sites outside Act I (for later specs):
 `0x005B8860`, `0x005B8940`, `0x005B8A20`, `0x005BD390`. A2Q7 gossip
 (`0x0059E140`) draws from the player unit seed like Flavie.
 
+Object functions of §9.6: init 46 (trapped-soul placeholder, at the
+object's creation) draws on the object-control seed (game +0x10F0), in
+§9.6 rule 3's order: per try roll(w − 4), roll(h − 4), then roll(2) per
+spawn, roll(k >> 1) per cluster round (k ≥ 2), and roll(8), roll(5),
+roll(5) per walk step. Inits 7, 9, 59, 61 and operates 33, 43 draw
+nothing themselves (33's drop and 43's spawn-point search draw in the
+item and path-placement specs).
+
 ## Edge cases & original bugs
 
 1. The first player to enter decides the switched-off quests for the
@@ -832,8 +943,8 @@ monster specs). Quest-seed sites outside Act I (for later specs):
 6. Timer due values are compared unsigned; the wrap at tick 2^32 − 1
    rewrites them as 0xFFFFFFFF − due.
 7. The Malus needs character level 8 in 1.14d (`quests-act1.md` §10.5).
-8. 0x50 kind 1's unused fields 9–11 are 0 and 12–14 unwritten (§6.2);
-   the client reads all three counters from one message.
+8. 0x50's unused fields are 0; the client reads all three counters from
+   one message.
 
 ## Test vectors
 
@@ -888,11 +999,18 @@ monster specs). Quest-seed sites outside Act I (for later specs):
   scratch; regenerate the same way).
 - Recordings: `015956-packets` and `022633-packets` (messages and frames
   cited in Test vectors).
+- §9.6 (2026-10-07, quests-fixups): `0x00544990`, `0x00594060`,
+  `0x00593FC0`, `0x005506D0` (with `0x00550220`, `0x00619730`,
+  `0x00546FA0`, `0x005B2F20`, tables `0x00731B7C` / `0x00731B9C` read
+  from the image), `0x0054FE10`, `0x00594290`, `0x00583E70`,
+  `0x00584D00` (with `0x006222C0`, `0x00622300`, `0x006427F0`,
+  `0x0061B060`, `0x0064E7B0`, `0x00554EA0`), init record layout at
+  `0x0054F6D0`–`0x0054F6F6`; classes from live 1.14d `objects.txt`.
 
 ## Open questions
 
 1. Status byte meanings 1–11 per quest (client quest-log text): settle
-   from the client's quest log code (`0x0045CC00` 0x52 handler).
+   from the client's quest log code (`0x0045CC00` 0x52 handler). **Answered** (2026-10-07): `world/quests-status.md`: the client (0x52 `0x0045CC00` → `0x004A40D0` stores the list; row build `0x004A1950`, tables `0x00723F30` and the per-quest status tables) maps each status to a description string id, a replay speech id and an icon state (§4, §5); per-quest tables §7–§11, Act I in §7, special cases §6.
 2. Does Flavie's chat really draw twice from the player seed and list
    two lines? Settle with an RNG + packets recording of one Flavie chat.
 3. (Settled: the cow portal is reached through the cube's thunk table,
@@ -913,8 +1031,22 @@ monster specs). Quest-seed sites outside Act I (for later specs):
    of the party list at game +0x1D2C (`0x00554630`, `0x00540710`,
    `0x00540510`); future owner `world/party.md`. The Act I iterate tests
    are in `quests-act1.md` §10.4–§10.8 (A1Q2's J3 and J7 in `quests-act1.md` §10.5).)
-8. Acts II–V state machines (later spec).
-9. Event 1, 6, 7, 12 raisers: none found; confirm no indirect calls.
+8. Acts II–V state machines (later spec). **Answered** (2026-10-07): written in the
+   per-act owner files named in §2.4 (`quests-act2.md` / `-2`,
+   `quests-act3.md` / `-2`, `quests-act4.md`, `quests-act5.md` / `-2`);
+   every `quests.tsv` row is `specified` (CODE-TABLE commit of
+   quests-fixups).
+9. Event 1, 6, 7, 12 raisers: none found; confirm no indirect calls. **Answered**
+   (2026-10-07): events 1, 7 and 12 have no callback anywhere: no
+   `quests.tsv` row sets one, and a byte scan of `.text` finds no
+   immediate store of a quest-code address (0x00586000–0x005BE000) to
+   record +0xA4 / +0xBC / +0xD0 (disp32 form) or to +0x04 / +0x1C / +0x30
+   of the callback array (disp8 form), so a raiser would call nothing.
+   Event 6's raiser `0x00543DE0` has no rel32 caller and no 4-byte
+   pointer to it in the image (`disasm.py xref`), so its two callbacks
+   (`0x00591A90`, `0x00592E60`, stored at `0x00591FC4` / `0x005971E6`)
+   never run in 1.14d. The dispatchers' callers are all direct
+   (`0x005438E0`: 6 sites, `0x005439A0`: 6 sites, §4.1).
 10. (Settled: §8.1 table, read from the call sites.) A recording of
     each act change would still confirm the 0x61 bytes.
 11. (Answered: `quests-act1-rest.md` §1 gibbet operate `0x00593480` and
@@ -932,3 +1064,7 @@ monster specs). Quest-seed sites outside Act I (for later specs):
     the quest section (`d2s-tool dump`) and list, per slot, the bits
     set, against a second save of the same character after another
     game (bits 13 / 14 must be gone).
+15. Quest-owned object functions with no stating spec
+    (`object-functions.tsv` rows owned by this file: inits 7, 9, 46, 59,
+    61, operates 33, 43): **Answered** (2026-10-07): §9.6 (inits 46, 59
+    and operate 43 stated there; the others confirmed and linked).
