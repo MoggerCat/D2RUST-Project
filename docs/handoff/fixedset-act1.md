@@ -1,5 +1,7 @@
 # Handoff: Act I on synthetic data — `claude/fixedset-act1`
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the tenth fold (`claude/fold-handoff-10`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Tenth set" (PC 1 / PC 2).
+
 Cloud implementation session, 2026-10-06, follow-up of
 `docs/handoff/fixedset-game.md`. Medium effort. Wrapped up early on the
 coordinator's budget call: the full `tools/gate.sh` was **not** run. What was

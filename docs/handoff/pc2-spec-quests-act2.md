@@ -1,5 +1,7 @@
 # Handoff: PC 2 spec worker — Act II quest questions (`claude/spec-quests-act2`)
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the tenth fold (`claude/fold-handoff-10`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Tenth set" (PC 1 / PC 2).
+
 Answers to the questions `docs/handoff/impl-quests-act2.md` raised
 (HANDOFF §7 ninth set, QB-1–QB-20), read from the 1.14d `Game.exe`
 (`tools/ghidra/disasm.py`, raw image bytes) on 2026-10-07. New file

@@ -1,5 +1,7 @@
 # Handoff: quest answers (Acts I–III, tables, wiring) — `claude/impl-quests-answers`
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the tenth fold (`claude/fold-handoff-10`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Tenth set" (PC 1 / PC 2).
+
 Cloud implementation session, 2026-10-07, task class: implementation from
 clear specs, medium (METHODS M14). Base: `claude/specs-staging-2` at
 `b222388`. Repo only, synthetic data (M09): nothing here is verified

@@ -1,5 +1,7 @@
 # Handoff: impl-session-flow (2026-10-07)
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the tenth fold (`claude/fold-handoff-10`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Tenth set" (PC 1 / PC 2).
+
 Cloud implementation session. Base `claude/specs-staging-5` @ `01229ee`;
 branch `claude/impl-session-flow`. Task: the server session-flow items of
 `docs/HANDOFF.md` §1 row "3 not implemented" (ninth fold list): the §7.3

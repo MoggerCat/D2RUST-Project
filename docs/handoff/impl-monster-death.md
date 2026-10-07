@@ -1,5 +1,7 @@
 # Handoff: the monster mode message and the death pair — `claude/impl-monster-death`
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the tenth fold (`claude/fold-handoff-10`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Tenth set" (PC 1 / PC 2).
+
 Cloud implementation session, 2026-10-07. Task class: implementation from
 a clear spec, medium (METHODS M14). Base: `claude/specs-staging-2` at
 `ddbfe0b`. Repo only, synthetic data, no game files (M09). Specs:

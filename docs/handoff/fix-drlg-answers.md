@@ -1,5 +1,7 @@
 # Handoff: DRLG answers and the Cold Plains grid (`fix-drlg-answers`)
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the tenth fold (`claude/fold-handoff-10`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Tenth set" (PC 1 / PC 2).
+
 Branch `claude/fix-drlg-answers`, from `claude/specs-staging-2` at
 `ddbfe0b` (cloud, 2026-10-07). Implementation session (M14: medium),
 repo only. Implements PC 1's answers to `impl-drlg-act3-5` Q1–Q13 and

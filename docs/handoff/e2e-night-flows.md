@@ -1,5 +1,7 @@
 # Handoff: end-to-end tests of the night's world features — `claude/e2e-night-flows`
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the tenth fold (`claude/fold-handoff-10`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Tenth set" (PC 1 / PC 2).
+
 Cloud integration-test session, 2026-10-07, task class: tests from
 specs, medium. Base: `claude/specs-staging` at `913d3b0` (the ninth
 fold). Repo only: no `game/`, no `re/`, no recordings (M09: every claim

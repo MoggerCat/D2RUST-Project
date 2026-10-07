@@ -1,5 +1,7 @@
 # impl-monster-skill-slots — batch 4 skill bodies (monster slots)
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the tenth fold (`claude/fold-handoff-10`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Tenth set" (PC 1 / PC 2).
+
 Branch `claude/impl-monster-skill-slots`, on `claude/specs-staging-2` at
 `b222388`. Specs: `specs/skills/bodies-3.md`, `specs/skills/bodies-4.md`,
 `specs/skills/functions.tsv`. Implementation only; no spec edited.

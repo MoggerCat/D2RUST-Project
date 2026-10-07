@@ -1,5 +1,7 @@
 # Handoff: PC 1's final spec batch in code — `claude/impl-pc1-final`
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the tenth fold (`claude/fold-handoff-10`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Tenth set" (PC 1 / PC 2).
+
 Cloud implementation session, 2026-10-07. Repo only, no game files.
 Base: `claude/specs-staging-3` (PC 1's `local-pc1-integration` 8654215,
 then 4f3fade merged in mid-session), finally merged with

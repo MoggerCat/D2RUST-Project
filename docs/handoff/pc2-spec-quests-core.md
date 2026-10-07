@@ -1,5 +1,7 @@
 # Handoff: PC 2 spec worker, quests core — `claude/spec-quests-core`
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the tenth fold (`claude/fold-handoff-10`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Tenth set" (PC 1 / PC 2).
+
 Spec session, 2026-10-07, from `claude/local-pc2-integration`. Files
 owned: `specs/world/quests.md`, `specs/world/quests-act1*.md`,
 `specs/world/quests.tsv`, `specs/world/quest-messages.tsv`. Every answer
