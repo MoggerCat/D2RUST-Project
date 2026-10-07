@@ -50,7 +50,7 @@ pub const CHICKEN_GAP: u32 = 25;
 /// m = U's current mode for mode sets (explicit = 0) and the explicit m
 /// otherwise; objects and other types do nothing here (§4.1 r4).
 pub fn mode_sound(cx: &mut Ctx, u: &Unit, us: &mut UnitSound, m: u8) -> Result<(), TriggerError> {
-    match u.unit_type() {
+    match u.identity() {
         PLAYER => match m {
             pm::DT | pm::GH | pm::KB => hit_death(cx, u, us, m)?,
             pm::A1 | pm::A2 => player_attack(cx, u, us)?,
@@ -77,6 +77,24 @@ pub fn mode_sound(cx: &mut Ctx, u: &Unit, us: &mut UnitSound, m: u8) -> Result<(
             }
         }
         _ => {}
+    }
+    Ok(())
+}
+
+/// One client mode set (§4.1 r1, r5): the mode sounds of the new mode
+/// (`m` = U's current mode for a mode set, explicit = 0; the explicit
+/// callers pass their own m) come first, then the skill start sounds of
+/// the same mode set (§8 r1) when the mode set belongs to a skill start.
+pub fn mode_set(
+    cx: &mut Ctx,
+    u: &Unit,
+    us: &mut UnitSound,
+    m: u8,
+    skill: Option<(&super::skills::SkillStart, bool)>,
+) -> Result<(), TriggerError> {
+    mode_sound(cx, u, us, m)?;
+    if let Some((sk, start_ok)) = skill {
+        super::skills::skill_start(cx, u, sk, start_ok)?;
     }
     Ok(())
 }
@@ -148,14 +166,14 @@ pub fn impact(h: u8, unit_type: u8, critter: bool, m: u8) -> (i32, i32) {
 
 /// Hit and death `0x004CC410(U, m)` (§4.2).
 pub fn hit_death(cx: &mut Ctx, u: &Unit, us: &mut UnitSound, m: u8) -> Result<(), TriggerError> {
-    let monster = u.unit_type() == MONSTER;
+    let monster = u.identity() == MONSTER;
     // r1.
     if monster && u.state_146 {
         return Ok(());
     }
     // r2, r3.
     let h = us.hit_class;
-    let (a, b) = impact(h, u.unit_type(), u.critter, m);
+    let (a, b) = impact(h, u.identity(), u.critter, m);
     let ha = cx.req(a, Some(u.key), 0);
     cx.req(b, Some(u.key), 0);
     if ha != 0 && u.is_local {
@@ -193,7 +211,7 @@ pub fn hit_death(cx: &mut Ctx, u: &Unit, us: &mut UnitSound, m: u8) -> Result<()
                 }
             }
         }
-    } else if u.unit_type() == PLAYER {
+    } else if u.identity() == PLAYER {
         // r7.
         let rec = class_record(u.class)?;
         if m == pm::GH || m == pm::KB {
@@ -211,10 +229,25 @@ pub fn hit_death(cx: &mut Ctx, u: &Unit, us: &mut UnitSound, m: u8) -> Result<()
 
 /// Player attack `0x004CB6A0(U, m, 1)` (§4.3 r1).
 pub fn player_attack(cx: &mut Ctx, u: &Unit, us: &mut UnitSound) -> Result<(), TriggerError> {
+    player_attack_with(cx, u, us, true)
+}
+
+/// `0x004CB6A0(U, m, with_delay)`: d = swing(U, h), or 0 when the third
+/// argument is 0 (§4.3 r1; `triggers-2.md` §15 r3 passes 0).
+pub fn player_attack_with(
+    cx: &mut Ctx,
+    u: &Unit,
+    us: &mut UnitSound,
+    with_delay: bool,
+) -> Result<(), TriggerError> {
     let h = u.weapon_hit_class;
     let (id, frames) = swing_entry(h)?;
     if id != 0 {
-        let d = super::delay_ticks(frames, u.speed);
+        let d = if with_delay {
+            super::delay_ticks(frames, u.speed)
+        } else {
+            0
+        };
         cx.req(id, Some(u.key), d);
     }
     us.last_voice = cx.c;

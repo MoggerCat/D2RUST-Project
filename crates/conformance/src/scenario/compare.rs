@@ -803,7 +803,7 @@ mod tests {
         );
     }
 
-    // Covers: specs/tools/scenario.md §6 r1, §6 row1, §6 row2, §6 row6, §6 row7
+    // Covers: specs/tools/scenario.md §6 r1, §6 row1, §6 row2, §6 row6, §6 row7, §6 row9, §6 row10
     #[test]
     fn unwritten_builder_bytes_are_masked_and_only_those() {
         // (id, size, masked offsets) per `tools/original-hooks.md` §6.2.
@@ -1051,5 +1051,86 @@ mod tests {
         let mut b = trace("d2rs", base());
         b.header.gaps.push("items not created".into());
         assert_eq!(compare(&a, &b).unwrap().verdict, Verdict::Partial);
+    }
+
+    // Covers: specs/tools/scenario.md §6 row11
+    #[test]
+    fn pong_is_masked_from_byte_one_but_its_length_is_compared() {
+        let m = masks();
+        let a = [0x8F, 1, 2, 3, 4, 5, 6, 7, 8];
+        let b = [0x8F, 9, 9, 9, 9, 9, 9, 9, 9];
+        assert_eq!(compare_bytes(&a, &b, &m), Ok(8));
+        // The id byte is not masked.
+        let c = [0x90, 1, 2, 3, 4, 5, 6, 7, 8];
+        assert_eq!(compare_bytes(&a, &c, &m), Err((0, 0)));
+        // A shorter message is a size difference, found by `diff`.
+        let mut ta = base();
+        let mut tb = base();
+        ta.insert(
+            1,
+            Record::S2c {
+                t: 0,
+                client: 0,
+                bytes: a.to_vec(),
+            },
+        );
+        tb.insert(
+            1,
+            Record::S2c {
+                t: 0,
+                client: 0,
+                bytes: b[..5].to_vec(),
+            },
+        );
+        let r = compare(&trace("original", ta), &trace("d2rs", tb)).unwrap();
+        assert_eq!(r.verdict, Verdict::Diverged);
+        assert_eq!(r.first.unwrap().at, "size");
+    }
+
+    // Covers: specs/tools/scenario.md §6 r2
+    #[test]
+    fn only_the_listed_ids_are_masked() {
+        let listed = [
+            0x21u8, 0x22, 0x26, 0x27, 0x2A, 0x50, 0x58, 0x62, 0x7E, 0x82, 0x8F,
+        ];
+        let m = masks();
+        let mut ids: Vec<u8> = m.iter().map(|x| x.id).collect();
+        ids.sort_unstable();
+        ids.dedup();
+        assert_eq!(ids, listed);
+        // Any other id: a difference at any byte is found at that byte.
+        for id in (0u8..=0xB4).filter(|i| !listed.contains(i)) {
+            let a: Vec<u8> = std::iter::once(id).chain(1..40).collect();
+            for k in [1usize, 5, 20, 39] {
+                let mut b = a.clone();
+                b[k] ^= 1;
+                assert_eq!(compare_bytes(&a, &b, &m), Err((k, 0)), "0x{id:02X}[{k}]");
+            }
+        }
+    }
+
+    // Covers: specs/tools/scenario.md §5 r7
+    #[test]
+    fn summary_lists_counts_masks_streams_and_gaps() {
+        let a = trace("original", base());
+        let mut b = trace("d2rs", base());
+        b.header.gaps.push("g-ours".into());
+        let mut a2 = a.clone();
+        a2.header.gaps.push("g-orig".into());
+        a2.header.streams.retain(|s| s != "units");
+        let r = compare(&a2, &b).unwrap();
+        let text = r.to_string();
+        assert_eq!(r.ticks, 4);
+        assert_eq!(r.compared["rng"], 2);
+        assert_eq!(r.masked_bytes, 4);
+        assert!(text.contains("ticks compared: 4\n"), "{text}");
+        assert!(text.contains("  rng: 2 records\n"), "{text}");
+        assert!(text.contains("masked bytes skipped: 4\n"), "{text}");
+        assert!(
+            text.contains("not compared: units: the original did not record it\n"),
+            "{text}"
+        );
+        assert!(text.contains("gap (original): g-orig\n"), "{text}");
+        assert!(text.contains("gap (d2rs): g-ours\n"), "{text}");
     }
 }

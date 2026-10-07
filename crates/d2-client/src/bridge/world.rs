@@ -674,6 +674,19 @@ impl ClientWorld {
             .find(|r| r.room == room)
     }
 
+    /// The client active-room free `0x0061A840` (`drlg/rooms.md` §8 r4,
+    /// `client/model.md` §16 r2): each unit linked in the room leaves it;
+    /// flags-2 0x20 (server units: no flag 0x400000) and flag 0x800000
+    /// are set on it.
+    pub fn free_active_room(&mut self, room: DrlgRoomId) {
+        for k in self.room_units.free_room(room) {
+            if let Some(u) = self.units.get_mut(&k) {
+                u.flag_ex |= 0x20;
+                u.room_freed = true;
+            }
+        }
+    }
+
     /// Refreshes [`ClientWorld::active_rooms`] from the client DRLG after
     /// a DRLG change: the units of a room that is no longer active leave
     /// its list (the client room free, `sim/unit-order.md` §5 rule 6),
@@ -687,19 +700,18 @@ impl ClientWorld {
     pub fn refresh_active_rooms(&mut self) -> Result<(), LightError> {
         let old = self.active_rooms.take().unwrap_or_default();
         self.active_rooms = self.drlg.as_ref().map(ClientDrlg::active_rooms);
-        let now = self.active_rooms.as_deref().unwrap_or(&[]);
-        for r in &old {
-            if !now.iter().any(|n| n.room == r.room) {
-                // `drlg/rooms.md` §8 r4: each unit of the freed room
-                // (server units: no flag 0x400000) gets flags-2 0x20,
-                // then flag 0x800000, then leaves the room.
-                for k in self.room_units.free_room(r.room) {
-                    if let Some(u) = self.units.get_mut(&k) {
-                        u.flag_ex |= 0x20;
-                        u.room_freed = true;
-                    }
-                }
-            }
+        let gone: Vec<DrlgRoomId> = {
+            let now = self.active_rooms.as_deref().unwrap_or(&[]);
+            old.iter()
+                .map(|r| r.room)
+                .filter(|&r| !now.iter().any(|n| n.room == r))
+                .collect()
+        };
+        // `drlg/rooms.md` §8 r4: each unit of a freed room (server units:
+        // no flag 0x400000) gets flags-2 0x20, then flag 0x800000, then
+        // leaves the room.
+        for room in gone {
+            self.free_active_room(room);
         }
         let created = self
             .drlg

@@ -11,6 +11,7 @@
 //! send as cues (so the core runs with [`crate::audio::Unlimited`]);
 //! [`DeviceGain`] is the `GainCurve` of §8.3.
 
+pub mod sliders;
 pub mod system;
 pub mod table;
 pub mod volume;

@@ -1079,3 +1079,276 @@ fn state_variables_start_at_zero() {
     assert_eq!((a.rain_handle, a.rain_prev), (0, 0));
     assert_eq!((a.event_id, a.gap, a.last_cue), (0, 0, 0));
 }
+
+// Covers: specs/audio/environment.md §2 r11
+#[test]
+fn time_tests_are_unsigned_and_exact() {
+    // r3: T − Tl is an unsigned difference across the u32 wrap.
+    let (mut e, mut s, mut h) = (env(), Fake::default(), Hooks::default());
+    s.t = 0xFFFF_FFF0;
+    e.tick(&mut s, &mut h, &input(1, Some(song_row(SONG_A))));
+    assert_eq!(e.music.cur, SONG_A);
+    s.t = 0xFFFF_FFF1;
+    e.tick(&mut s, &mut h, &input(2, Some(song_row(SONG_B))));
+    assert_eq!(e.music.tl, 0xFFFF_FFF1);
+    // T − Tl = 74 (T = 0x39): still song A; 75 (T = 0x3A): switch.
+    s.t = 0xFFFF_FFF1u32.wrapping_add(74);
+    e.tick(&mut s, &mut h, &input(2, Some(song_row(SONG_B))));
+    assert_eq!(e.music.cur, SONG_A);
+    s.t = 0xFFFF_FFF1u32.wrapping_add(75);
+    e.tick(&mut s, &mut h, &input(2, Some(song_row(SONG_B))));
+    assert_eq!(e.music.cur, SONG_B);
+
+    // r8: `T > Ts + 125` is an absolute compare of the wrapped sum, so
+    // just after Ts = 0xFFFFFFF0 (sum wraps to 109) it is already true.
+    let (mut e, mut s, mut h) = (env(), Fake::default(), Hooks::default());
+    s.blocks.insert(SONG_A, CAVES_BLOCKS);
+    s.t = 0xFFFF_FFF0;
+    e.tick(&mut s, &mut h, &input(1, Some(song_row(SONG_A))));
+    s.positions.insert(SONG_A, 1_000_000);
+    s.t = 0xFFFF_FFF5;
+    e.tick(&mut s, &mut h, &input(1, Some(song_row(SONG_A))));
+    assert_eq!(e.music.resume(SONG_A), 1_478_063);
+    assert_eq!(e.music.ts, 0xFFFF_FFF5);
+
+    // §3 r4: `C < tH` is absolute: tH = C + H wrapping below C ends the
+    // hold at once, and `C ≥ tM` is absolute too.
+    let (mut e, mut s, mut h) = (env(), Fake::default(), Hooks::default());
+    let c = 0xFFFF_FF00u32;
+    e.music
+        .start_stinger(&mut s, c, stinger_for_event(35, 2961).unwrap());
+    assert_eq!(e.music.stinger.th, c.wrapping_add(300));
+    assert!(e.music.stinger.th < c);
+    let mut inp = input(1, Some(song_row(0)));
+    inp.c = c;
+    s.t = 1;
+    e.tick(&mut s, &mut h, &inp);
+    assert!(!e.music.stinger.active);
+
+    // §4 r2: `C − P+0x7C > 62` is an unsigned difference.
+    let (mut e, mut s, mut h) = (env(), Fake::default(), Hooks::default());
+    h.quest_ok = true;
+    entry_tick(&mut e, &mut s, &mut h, 1, 5, 0);
+    for t in 100..=200 {
+        entry_tick(&mut e, &mut s, &mut h, 8, t, 0xFFFF_FFF0);
+    }
+    // C = 100 → diff 116 > 62 from the first eligible tick.
+    assert_eq!(h.events, vec![41]);
+
+    // §7 r3: `T − last ≥ gap` is unsigned: last just before the wrap is
+    // not "in the future".
+    let (mut e, mut s, mut h) = (env(), Fake::default(), Hooks::default());
+    s.t = 0x10;
+    s.rolls.extend([0, 0]);
+    e.tick(&mut s, &mut h, &input(1, Some(cue_row())));
+    e.ambience.last_cue = 0xFFFF_FFF0;
+    e.ambience.gap = 250;
+    s.take();
+    // diff = T − last = 100 + 16 = 116 < 250: no cue.
+    s.t = 100;
+    e.tick(&mut s, &mut h, &input(1, Some(cue_row())));
+    assert!(cue_calls(&mut s).is_empty());
+    // diff = 250 at T = 234: due.
+    s.t = 234;
+    s.rolls.extend([1, 0, 0, 0]);
+    e.tick(&mut s, &mut h, &input(1, Some(cue_row())));
+    assert!(cue_calls(&mut s)
+        .iter()
+        .any(|c| matches!(c, Call::Request { id: 72, .. })));
+    // A signed play position below 0 matches no block.
+    assert_eq!(resume_point(WILD_BLOCKS, 0x8000_0000), 0);
+}
+
+// Covers: specs/audio/environment.md §6 r4
+#[test]
+fn rain_edge_cases_exact() {
+    let (mut e, mut s, mut h) = (env(), Fake::default(), Hooks::default());
+    // Weather active with intensity 0 from the first tick: previous = 64.
+    e.tick(&mut s, &mut h, &rain_input(0));
+    assert_eq!((e.ambience.rain_handle, e.ambience.rain_prev), (0, 64));
+    s.take();
+    // First tick with v ≠ 0 requests 64 at once (no one-tick delay).
+    e.tick(&mut s, &mut h, &rain_input(100));
+    assert_eq!(rain_calls(&mut s)[0], req(64, None, 0, 0, 1));
+    // The request disappears (stale handle): w reads 0, min(6, v) is
+    // written to the missing request, the handle is kept.
+    s.reqs.clear();
+    e.tick(&mut s, &mut h, &rain_input(100));
+    assert_eq!(rain_calls(&mut s), vec![Call::SetVolume(1, 6)]);
+    assert_eq!(e.ambience.rain_handle, 1);
+    e.tick(&mut s, &mut h, &rain_input(100));
+    assert_eq!(e.ambience.rain_handle, 1);
+    assert!(rain_calls(&mut s)
+        .iter()
+        .all(|c| matches!(c, Call::SetVolume(1, 6))));
+    // v = 0 clears the stale handle at once.
+    e.tick(&mut s, &mut h, &rain_input(0));
+    assert_eq!(rain_calls(&mut s), vec![Call::StopHandle(1)]);
+    assert_eq!(e.ambience.rain_handle, 0);
+}
+
+// --- §9 front-end music -------------------------------------------------
+
+use super::frontend::*;
+
+#[derive(Default)]
+struct Dev {
+    rands: VecDeque<u32>,
+    playing: bool,
+    /// Paths whose start fails.
+    bad: Vec<&'static str>,
+    started: Vec<(String, i32)>,
+    fades: Vec<u32>,
+    stops: u32,
+    gain: Option<i32>,
+}
+
+impl JukeboxHost for Dev {
+    fn rand(&mut self) -> u32 {
+        self.rands.pop_front().expect("scripted rand")
+    }
+    fn voice_playing(&self) -> bool {
+        self.playing
+    }
+    fn start_stream(&mut self, path: &str, volume: i32) -> bool {
+        if self.bad.contains(&path) {
+            return false;
+        }
+        self.started.push((path.to_string(), volume));
+        self.playing = true;
+        true
+    }
+    fn fade_out(&mut self, ms: u32) {
+        self.fades.push(ms);
+    }
+    fn stop_voice(&mut self) {
+        self.stops += 1;
+        self.playing = false;
+    }
+    fn set_global_gain(&mut self, g: i32) {
+        self.gain = Some(g);
+    }
+}
+
+// Covers: specs/audio/environment.md §9 r1
+#[test]
+fn front_end_playlists_and_latch() {
+    assert_eq!(LIST_A[0], "common\\options.wav");
+    assert_eq!(LIST_A[7], "act3\\kurastsewer.wav");
+    assert_eq!(LIST_B[0], "introedit.wav");
+    assert_eq!(LIST_B[7], "act4\\diablo.wav");
+    assert_eq!(LIST_A.len(), 8);
+    assert_eq!(LIST_B.len(), 8);
+    // The list is latched on first use.
+    let mut j = Jukebox::default();
+    assert_eq!(j.playlist(true)[0], "introedit.wav");
+    assert_eq!(j.playlist(false)[0], "introedit.wav");
+    let mut j = Jukebox::default();
+    assert_eq!(j.playlist(false)[0], "common\\options.wav");
+    assert_eq!(j.playlist(true)[0], "common\\options.wav");
+}
+
+// Covers: specs/audio/environment.md §9 r2
+#[test]
+fn front_end_start_clears_flags_once() {
+    let mut j = Jukebox::default();
+    j.played[3] = true;
+    j.start();
+    assert!(j.wanted && j.first_track);
+    assert_eq!(j.played, [false; 8]);
+    // Already wanted: nothing is cleared.
+    j.played[2] = true;
+    j.first_track = false;
+    j.start();
+    assert!(j.played[2] && !j.first_track && j.wanted);
+}
+
+// Covers: specs/audio/environment.md §9 r3
+#[test]
+fn front_end_pick_order() {
+    let (mut j, mut d) = (Jukebox::default(), Dev::default());
+    j.start();
+    // Entry 0 first, volume 110.
+    assert_eq!(j.service(&mut d, false), Some("common\\options.wav"));
+    assert_eq!(d.started, vec![("common\\options.wav".to_string(), 110)]);
+    // The voice is playing: no pick.
+    assert_eq!(j.service(&mut d, false), None);
+    d.playing = false;
+    // rand 8 → i = 0 (played) → forward wrap to 1.
+    d.rands.push_back(8);
+    assert_eq!(j.service(&mut d, false), Some("act1\\caves.wav"));
+    d.playing = false;
+    // i = 7 unplayed.
+    d.rands.push_back(7);
+    assert_eq!(j.service(&mut d, false), Some("act3\\kurastsewer.wav"));
+    d.playing = false;
+    // i = 7 played → wraps past 0, 1 to 2.
+    d.rands.push_back(7);
+    assert_eq!(j.service(&mut d, false), Some("act1\\monastery.wav"));
+    // Use up the list: all flags clear once, then play on.
+    for _ in 0..4 {
+        d.playing = false;
+        d.rands.push_back(0);
+        assert!(j.service(&mut d, false).is_some());
+    }
+    assert!(j.played.iter().all(|&p| p));
+    d.playing = false;
+    d.rands.push_back(5);
+    assert_eq!(j.service(&mut d, false), Some("act2\\tombs.wav"));
+    assert_eq!(j.played.iter().filter(|&&p| p).count(), 1);
+    // Not wanted: no pick even with an idle voice.
+    j.wanted = false;
+    d.playing = false;
+    assert_eq!(j.service(&mut d, false), None);
+}
+
+// Covers: specs/audio/environment.md §9 r3
+#[test]
+fn front_end_failed_start_picks_again_and_exhaustion_stops() {
+    let (mut j, mut d) = (Jukebox::default(), Dev::default());
+    j.start();
+    d.bad = vec!["common\\options.wav", "act1\\caves.wav"];
+    // Entry 0 fails (marked played); rand 0 → forward to 1, which fails;
+    // rand 0 → forward to 2.
+    d.rands.extend([0, 0]);
+    // (Entry 0 is the first-track pick, then two random ones.)
+    assert_eq!(j.pick(&mut d, false), Some("act1\\monastery.wav"));
+    assert!(j.played[0] && j.played[2]);
+    // Every entry unplayed-or-failing: all start attempts fail → the list
+    // is used up, cleared once, used up again → wanted := 0.
+    let (mut j, mut d) = (Jukebox::default(), Dev::default());
+    j.start();
+    d.bad = LIST_A.to_vec();
+    d.rands.extend([0; 32]);
+    assert_eq!(j.pick(&mut d, false), None);
+    assert!(!j.wanted);
+}
+
+// Covers: specs/audio/environment.md §9 r4, §9 r6
+#[test]
+fn front_end_toggle() {
+    let (mut j, mut d) = (Jukebox::default(), Dev::default());
+    // Off → start, Options Music := 1.
+    assert!(j.toggle(&mut d, false));
+    assert!(j.wanted && j.first_track);
+    j.service(&mut d, false);
+    assert!(d.playing);
+    // On → stop: wanted := 0, a playing voice fades over 200 ms.
+    assert!(!j.toggle(&mut d, true));
+    assert!(!j.wanted);
+    assert_eq!(d.fades, vec![200]);
+}
+
+// Covers: specs/audio/environment.md §9 r5
+#[test]
+fn front_end_leave_fades_stops_and_resets_gain() {
+    let (mut j, mut d) = (Jukebox::default(), Dev::default());
+    j.start();
+    j.leave_front_end(&mut d);
+    assert!(d.fades.is_empty() && d.gain.is_none(), "voice not playing");
+    j.service(&mut d, false);
+    j.leave_front_end(&mut d);
+    assert_eq!(d.fades, vec![180]);
+    assert_eq!((d.stops, d.gain), (1, Some(255)));
+    assert!(!j.wanted);
+}

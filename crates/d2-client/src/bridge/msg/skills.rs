@@ -222,6 +222,7 @@ pub fn skill_bonus(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handler
     }
     let t = &msg.inputs.tables;
     let (rows, desc) = (&t.skills[..], &t.skilldesc[..]);
+    let unit_class = w.units[&key].class;
     let mut first = Ok(());
     let mut i = 0;
     while let Some(e) = w.units[&key]
@@ -245,11 +246,21 @@ pub fn skill_bonus(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handler
         // `0x00647B20`: the native entry exists (E itself).
         let list = w.units.get_mut(&key).and_then(|u| u.skills.as_mut());
         let list = list.expect("checked above");
-        list.entries[i].level_bonus += bonus;
+        // `0x00647B20(U, s, bonus)` (§2 rule 7.2): a negative result is
+        // clamped to 0.
+        let owner = Owner {
+            unit_type: key.unit_type,
+            class: unit_class,
+        };
+        if let Err(e) = skills::add_bonus(list, rows, owner, e.skill, bonus) {
+            if first.is_ok() {
+                first = Err(e);
+            }
+        }
         let now = list.entries[i];
         if level_with_bonuses(w, key, rows, desc, &now) == 0 {
             let list = w.units.get_mut(&key).and_then(|u| u.skills.as_mut());
-            let r = skills::remove(list.expect("checked above"), rows, e.skill);
+            let r = skills::remove(list.expect("checked above"), rows, e.skill, true);
             if first.is_ok() {
                 first = r;
             }

@@ -19,6 +19,8 @@
 //! - §11 UI sounds, §12 other fixed requests: [`ui`]
 
 pub mod events;
+pub mod hooks;
+pub mod identity;
 pub mod modes;
 pub mod movement;
 pub mod npc;
@@ -47,6 +49,9 @@ pub trait TriggerSound: SoundCalls {
     fn sound_on(&self) -> bool;
     /// Group base of a sound id (`sounds` +0x60, `sound-table.md` §4 r1).
     fn group_base(&self, id: i32) -> i32;
+    /// `Group Size` of row `base` after the group pass (`sound-table.md`
+    /// §4 r1; §19 r3).
+    fn group_size(&self, base: i32) -> i32;
     /// The sound row's `Loop` column (§7 r4, `0x004CAA10`).
     fn looping(&self, id: i32) -> bool;
     /// U+0x78 (§1 r6, `triggers-2.md` §19): U's request list, newest
@@ -58,6 +63,9 @@ pub trait TriggerSound: SoundCalls {
     /// Variant pick `0x00482680(id)` with its draws (`sound-table.md` §4
     /// r3), used by the NPC greeting (§10 r1).
     fn variant(&mut self, id: i32) -> i32;
+    /// `0x004B9B20(h)`: the volume (+0x1C) of the request with this
+    /// handle, `None` when it is gone (§12 r2).
+    fn request_volume(&self, h: Handle) -> Option<i32>;
 }
 
 /// A fatal path of the original (an assert / crash in 1.14d). Returned,
@@ -72,6 +80,8 @@ pub enum TriggerError {
     ObjectClass(i32),
     #[error("object mode {0} >= 8 (§7 r7)")]
     ObjectMode(u8),
+    #[error("client object function {0} >= 19 (§20 r1, fatal 0x546)")]
+    ClientFn(u8),
     #[error("footstep divisor n × s = 0 (F = {frames}, n = {count}; §5 r9 division by zero)")]
     FootstepStep { frames: u32, count: u32 },
 }
@@ -145,6 +155,37 @@ impl<'a> Unit<'a> {
     /// The raw unit type (+0x00).
     pub fn unit_type(&self) -> u8 {
         self.key.unit_type
+    }
+
+    /// The sound identity's type (§18 r1, r2): what the mode, footstep
+    /// and idle rules mean by "player" and "monster".
+    pub fn identity(&self) -> u8 {
+        self.identity_type
+    }
+}
+
+/// `0x004CA900(U, s)` (§19 r3): U has a request in `s`'s group. B = s's
+/// group base, n = B's `Group Size`; true for the first handle (newest
+/// first) whose request's current id lies in B … B + n − 1 (signed
+/// compares; a freed handle reads 0). False while the channels are not
+/// set up (`0x004DF880`, the sound system off).
+pub fn request_in_group(s: &dyn TriggerSound, unit: UnitKey, id: i32) -> bool {
+    if !s.sound_on() {
+        return false;
+    }
+    let b = s.group_base(id);
+    let n = s.group_size(b);
+    s.unit_requests(unit)
+        .iter()
+        .any(|&(_, cur)| cur >= b && cur < b.wrapping_add(n))
+}
+
+/// `0x004CA9C0(U, force)` (§19 r3, r5): detach every handle of U's list;
+/// the unit free (`0x00465870`) runs it without force first, so loops
+/// lose U and stop when U was their last unit and one-shots keep playing.
+pub fn detach_all(s: &mut dyn TriggerSound, unit: UnitKey, force: bool) {
+    for (h, _) in s.unit_requests(unit) {
+        s.detach(h, unit, force);
     }
 }
 

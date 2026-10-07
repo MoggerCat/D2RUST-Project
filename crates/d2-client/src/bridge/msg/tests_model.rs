@@ -262,7 +262,7 @@ fn shown(_: &ClientUnit, _: i32, _: i32) -> bool {
     true
 }
 
-// Covers: specs/client/model.md §6 r1, §6 r2, §6 r3, §6 r4, §6 r5, §6 r6, §6 r7, §6 r8, §6 text
+// Covers: specs/client/model.md §6 r1, §6 r2, §6 r3, §6 r4, §6 r5, §6 r6, §6 r7, §6 r8, §6 text, §13 r6
 #[test]
 fn position_check_vectors() {
     let none = ModelInputs::default();

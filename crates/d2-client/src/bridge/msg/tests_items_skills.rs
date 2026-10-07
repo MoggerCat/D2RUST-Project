@@ -180,12 +180,23 @@ fn skill_bonus_by_element_and_page() {
             (0x93, "fatal assert 0x96D".to_string())
         ]
     );
-    // A bonus that takes the level with bonuses to 0 removes the entry
-    // (base 1, bonus 0x81 = −127).
+    // `0x00647B20` clamps a negative bonus at 0 (§2 rule 7.2): base 1 and
+    // bonus 0x81 = −127 leave bonus 0, level 1, so the entry stays.
     let mut rows = vec![SkillRow::default(); 3];
     rows[1].enhanceable = true;
-    let mut m = with_skills(rows, &[1, 2]);
+    let mut m = with_skills(rows.clone(), &[1, 2]);
     m.hex("93 01 00 00 00 81 00 04");
+    assert_eq!(bonuses(&m), [0, 0]);
+    // A base-0 entry with bonus 2 qualifies (level 2); −5 clamps the
+    // bonus to 0, the level with bonuses is 0, so the entry is removed
+    // (`0x00646FD0` with d = 1: base −1 < 1, §9 r3).
+    let mut m = with_skills(rows, &[1, 2]);
+    {
+        let l = m.w.units.get_mut(&P1).unwrap().skills.as_mut().unwrap();
+        l.entries[0].base = 0;
+        l.entries[0].level_bonus = 2;
+    }
+    m.hex("93 01 00 00 00 fb 00 04");
     let left: Vec<u16> = m
         .unit(P1)
         .skills

@@ -179,12 +179,7 @@ pub fn neutral(cx: &mut Ctx, u: &Unit, us: &mut UnitSound) {
         return;
     }
     // 1. `0x004CA900` (false while the sound system is off).
-    let in_group = cx.s.sound_on() && {
-        let base = cx.s.group_base(neutral);
-        cx.s.unit_requests(u.key)
-            .iter()
-            .any(|&(_, id)| cx.s.group_base(id) == base)
-    };
+    let in_group = super::request_in_group(&*cx.s, u.key, neutral);
     let c = cx.c;
     let ok = !in_group
         && c.wrapping_sub(cx.g.last_idle_any) >= cx.g.idle_gap
