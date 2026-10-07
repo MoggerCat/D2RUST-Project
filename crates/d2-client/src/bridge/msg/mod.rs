@@ -1,4 +1,4 @@
-// Spec: specs/client/bridge-dispatch.tsv (owner rows), specs/client/model.md, specs/client/msg-units.md, specs/client/msg-stats-items.md
+// Spec: specs/client/bridge-dispatch.tsv (owner rows), specs/client/model.md, specs/client/msg-units.md, specs/client/msg-stats-items.md, specs/client/msg-skills.md, specs/client/msg-ui.md, specs/audio/triggers.md (§2 r4), specs/render/lighting.md (§9.2 r4)
 //! The S→C handlers of the client world model, one per owned id of
 //! `bridge-dispatch.tsv`, registered in [`HANDLERS`]:
 //!
@@ -6,17 +6,28 @@
 //! - [`pets`]: `client/model.md` §14 (0x7A, 0x81);
 //! - [`units`]: `client/msg-units.md` (unit add, remove, place, queued
 //!   movement and action messages, the local player's vitals);
-//! - [`stats_items`]: `client/msg-stats-items.md` (stats, items).
+//! - [`stats_items`]: `client/msg-stats-items.md` (stats, items);
+//! - [`skills`]: `client/msg-skills.md` (0x21, 0x22, 0x23, 0x94);
+//! - [`ui`]: `client/msg-ui.md` (0x5D, 0x63, 0x77: outputs to the UI);
+//! - [`sound`]: `audio/triggers.md` §2 r4 (0x2C: output to the audio);
+//! - [`lighting`]: `render/lighting.md` §9.2 r4 (0x53, the act's
+//!   environment record).
 
+pub mod lighting;
 pub mod pets;
 pub mod session;
+pub mod skills;
+pub mod sound;
 pub mod stats_items;
+pub mod ui;
 pub mod units;
 
 #[cfg(test)]
 mod tests_drlg;
 #[cfg(test)]
 mod tests_model;
+#[cfg(test)]
+mod tests_outputs;
 #[cfg(test)]
 mod tests_stats_items;
 #[cfg(test)]
@@ -27,6 +38,10 @@ use super::dispatch::{Handle, Handler, HandlerError, HandlerFn, UnitHandlerFn};
 pub const MODEL: &str = "specs/client/model.md";
 pub const UNITS: &str = "specs/client/msg-units.md";
 pub const STATS_ITEMS: &str = "specs/client/msg-stats-items.md";
+pub const SKILLS: &str = "specs/client/msg-skills.md";
+pub const UI: &str = "specs/client/msg-ui.md";
+pub const TRIGGERS: &str = "specs/audio/triggers.md";
+pub const LIGHTING: &str = "specs/render/lighting.md";
 
 const fn general(id: u8, owner: &'static str, f: HandlerFn) -> Handler {
     Handler {
@@ -72,6 +87,10 @@ pub const HANDLERS: &[Handler] = &[
     general(0x1E, STATS_ITEMS, stats_items::local_stat),
     general(0x1F, STATS_ITEMS, stats_items::local_stat),
     general(0x20, STATS_ITEMS, stats_items::stat_update),
+    general(0x21, SKILLS, skills::update_item_oskill),
+    general(0x22, SKILLS, skills::update_item_skill),
+    general(0x23, SKILLS, skills::set_skill),
+    general(0x2C, TRIGGERS, sound::play_sound),
     general(0x3F, STATS_ITEMS, stats_items::use_stackable_item),
     general(0x42, STATS_ITEMS, stats_items::clear_cursor),
     general(0x47, STATS_ITEMS, stats_items::relator),
@@ -79,7 +98,10 @@ pub const HANDLERS: &[Handler] = &[
     unit(0x4C, units::queued),
     unit(0x4D, units::queued),
     general(0x51, UNITS, units::assign_object),
+    general(0x53, LIGHTING, lighting::darkness),
     general(0x59, UNITS, units::assign_player),
+    general(0x5D, UI, ui::quest_status),
+    general(0x63, UI, ui::waypoint_menu),
     unit(0x67, units::queued),
     unit(0x68, units::queued),
     unit(0x69, units::queued),
@@ -92,8 +114,10 @@ pub const HANDLERS: &[Handler] = &[
     unit(0x70, units::no_effect),
     unit(0x71, units::no_effect),
     unit(0x72, units::no_effect),
+    general(0x77, UI, ui::trade_action),
     general(0x7A, MODEL, pets::pet_action),
     general(0x81, MODEL, pets::assign_merc),
+    general(0x94, SKILLS, skills::base_skill_levels),
     general(0x95, UNITS, units::vitals),
     general(0x96, UNITS, units::vitals),
     general(0x9C, STATS_ITEMS, stats_items::item_action),
@@ -134,6 +158,7 @@ impl Bytes<'_> {
 #[cfg(test)]
 pub(crate) mod support {
     use super::super::dispatch::Dispatch;
+    use super::super::output::Output;
     use super::super::receive::{receive_chunk, ReceiveLog};
     use super::super::update::update_pass;
     use super::super::world::{ClientUnit, ClientWorld, ModelInputs, UnitKey};
@@ -145,6 +170,8 @@ pub(crate) mod support {
         pub w: ClientWorld,
         pub inputs: ModelInputs,
         pub log: ReceiveLog,
+        /// The handlers' outputs (`bridge.md` §10), in order.
+        pub out: Vec<Output>,
     }
 
     /// Bytes from a hex string ("6d 06 00 …").
@@ -158,7 +185,15 @@ pub(crate) mod support {
         /// Receives `bytes` as one chunk; panics if the chunk is refused.
         pub fn recv(&mut self, bytes: &[u8]) -> &mut Self {
             let d = Dispatch::from_spec().unwrap();
-            receive_chunk(&mut self.w, &self.inputs, &d, &mut self.log, bytes).unwrap();
+            receive_chunk(
+                &mut self.w,
+                &self.inputs,
+                &d,
+                &mut self.log,
+                &mut self.out,
+                bytes,
+            )
+            .unwrap();
             self
         }
 
@@ -170,7 +205,7 @@ pub(crate) mod support {
         /// Runs the update pass; returns the messages applied.
         pub fn drain(&mut self) -> usize {
             let d = Dispatch::from_spec().unwrap();
-            update_pass(&mut self.w, &self.inputs, &d, &mut self.log)
+            update_pass(&mut self.w, &self.inputs, &d, &mut self.log, &mut self.out)
         }
 
         /// Inserts a bare unit (fixture state).

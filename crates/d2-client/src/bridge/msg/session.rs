@@ -1,4 +1,4 @@
-// Spec: specs/client/model.md (§3 rule 1, §7, §9, §11 rule 2, §12 rule 1)
+// Spec: specs/client/model.md (§3 rule 1, §7, §9, §11 rule 2, §12 rule 1), specs/render/lighting.md (§9.1, §9.2 r3)
 //! Session messages (0x00–0x06), the local player message (0x0B) and the
 //! room-in-sight messages (0x07, 0x08). 0x03 builds the client DRLG act
 //! and 0x07 / 0x08 set its rooms in sight ([`super::super::drlg`]); the
@@ -10,6 +10,7 @@ use d2_proto::s2c::{parse, Message as S2c};
 use super::super::dispatch::{HandlerError, Message};
 use super::super::drlg::{ClientDrlg, ClientDrlgError};
 use super::super::world::{ActLoad, ClientWorld, RoomSight, UnitKey};
+use super::lighting::{act_load_eclipse, create_environment};
 use super::Bytes;
 
 fn parsed(msg: &Message<'_>) -> Result<S2c, HandlerError> {
@@ -65,7 +66,10 @@ pub fn load_act(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerErr
             Some(ClientDrlg::build(src, m.act, m.f2, w.difficulty).map_err(ClientDrlgError::from)?);
         w.refresh_active_rooms();
     }
-    Ok(())
+    // The act's environment record (`render/lighting.md` §9.1), then the
+    // pending eclipse (§9.2 r3).
+    w.environment = Some(create_environment()?);
+    act_load_eclipse(w, m.act)
 }
 
 /// 0x04 LoadComplete (§7 rule 5): the local player must have a room

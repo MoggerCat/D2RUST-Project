@@ -1,4 +1,4 @@
-// Spec: specs/audio/sound-table.md (§6.1 sound tick, §6.4 r2, §6.5 r2, §8.1, §4 r5), specs/audio/triggers.md (§1 r5, §11)
+// Spec: specs/audio/sound-table.md (§6.1 sound tick, §6.4 r2, §6.5 r2, §8.1, §4 r5), specs/audio/triggers.md (§1 r5, §2 r2–r4, §3, §11), specs/client/bridge.md (§10 r5)
 //! The sound layer driven from the client model: [`SoundDriver`] runs one
 //! sound tick of the [`SoundSystem`] per server tick the bridge ran
 //! (T and C advance once per client update, one per server tick in
@@ -7,25 +7,39 @@
 //! audio core (the core then runs with [`crate::audio::Unlimited`] and
 //! presents the sound tick, [`SoundDriver::tick`]).
 //!
-//! Trigger feeds wired: the UI sounds (`triggers.md` §11: the click
-//! sound of `ui/panels.md` §10.2). Every other cause class needs input
-//! the client model does not hold; each is in [`PENDING`]. The
-//! [`SoundWorld`] questions the model cannot answer are not guessed: a
-//! request that asks one makes the frame fail ([`DriverError::Pending`]).
+//! Trigger feeds wired, as one ordered request list ([`SoundRequest`]):
+//! the UI sounds (`triggers.md` §11: the click sound of `ui/panels.md`
+//! §10.2 and the sounds of the S→C 0x5D / 0x77 UI outputs), the server
+//! sound events of the bridge's `ServerSound` outputs (S→C 0x2C,
+//! `triggers.md` §2 r2–r4) and the player event sounds the UI asks for
+//! (§3). Every other cause class needs input the client model does not
+//! hold; each is in [`PENDING`]. The [`SoundWorld`] questions the model
+//! cannot answer are not guessed: a request that asks one makes the frame
+//! fail ([`DriverError::Pending`]). A rule part whose input is not held
+//! (an event's record, a follow-up's owner not wired) is skipped and
+//! named in [`SoundDriver::take_skipped`].
 
 use std::cell::RefCell;
 
 use crate::audio::sound_table::{SoundSystem, SoundWorld};
-use crate::audio::triggers::{ui, Ctx, Globals};
+use crate::audio::triggers::events::{player_event, server_event, EventExtra, Followup};
+use crate::audio::triggers::{ui, Ctx, Globals, TriggerError, Unit, UnitSound};
 use crate::audio::{CueSource, TriggerQueue};
-use crate::bridge::world::{ClientWorld, LevelRow, UnitKey};
+use crate::bridge::world::{ClientWorld, LevelRow, UnitKey, MONSTER};
 use d2_sim::rng::Seed;
 
 /// Trigger feeds not wired, each with the input it lacks (M02).
 pub const PENDING: &[(&str, &str)] = &[
     (
-        "server sound events, S→C 0x2C (§2) and player event sounds (§3)",
-        "S→C 0x2C has no client handler (`client/msg-*` specs)",
+        "server sound events 12, 16 (monsters), 17, 18 (§2 r2)",
+        "event 12's `stsound` (open question 4), the `monsounds` rows, the per-unit sound \
+         fields and the NPC greeting records are not held by the driver",
+    ),
+    (
+        "event follow-ups: overhead text (`0x004A0200`), quest stingers and the stinger \
+         re-arm (§2 r3, §3 r4, r7)",
+        "the overhead text (`client/ui.md`) and the stinger machine (`environment.md` §3) \
+         are not wired",
     ),
     (
         "mode sounds, footsteps, idle voices (§4–§6)",
@@ -44,10 +58,6 @@ pub const PENDING: &[(&str, &str)] = &[
     ),
     ("NPC speech (§10)", "no NPC interaction in the client model"),
     (
-        "S→C 0x5D sound actions (§11)",
-        "S→C 0x5D has no client handler",
-    ),
-    (
         "ambience, rain, music (`environment.md`)",
         "the player's level and its sound environment are known now (`model.md` §11 r5, \
          `environment.md` §1 r2), but every tick of the machines also reads the day phase \
@@ -56,12 +66,43 @@ pub const PENDING: &[(&str, &str)] = &[
     ),
 ];
 
-/// A [`SoundWorld`] question the model cannot answer yet.
+/// A [`SoundWorld`] question the model cannot answer yet, or a fatal
+/// path of the original.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum DriverError {
     #[error("sound world: {0} (pending: not in the client model)")]
     Pending(&'static str),
+    #[error(transparent)]
+    Trigger(#[from] TriggerError),
 }
+
+/// One sound request of a frame, in the order 1.14d makes the calls
+/// (`client/bridge.md` §10 rules 2, 5).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SoundRequest {
+    /// A UI sound: request(id, none), delay 0 (§11).
+    Ui(i32),
+    /// A `ServerSound` output (S→C 0x2C, §2 r4): the event unit's key and
+    /// class captured at receive, and the event.
+    Server {
+        unit: UnitKey,
+        class: u32,
+        event: u16,
+    },
+    /// A player event sound `0x004CB9C0(unit, event)` (§3) the UI asked
+    /// for (S→C 0x77 code 9 on the local player, `client/msg-ui.md` §3).
+    PlayerEvent { unit: UnitKey, event: u16 },
+}
+
+/// A rule part the driver skipped (its input is not held), named.
+pub const SKIP_EVENT_12: &str = "S→C 0x2C event 12: the skill `stsound` (triggers.md OQ 4)";
+pub const SKIP_EVENT_16: &str = "S→C 0x2C event 16 on a monster: its `monsounds` record";
+pub const SKIP_EVENT_17: &str = "S→C 0x2C event 17: the monster flee voice (§6 r4)";
+pub const SKIP_EVENT_18: &str = "S→C 0x2C event 18: the NPC greeting record (§10 r1)";
+pub const SKIP_OVERHEAD: &str = "overhead text 0x004A0200 (client/ui.md)";
+pub const SKIP_STINGER: &str = "quest stinger line (environment.md §3)";
+pub const SKIP_REARM: &str = "stinger speech re-arm 0x004DCE10 (environment.md §3 r5)";
+pub const SKIP_NO_UNIT: &str = "player event sound: the unit is not in the model";
 
 /// The sound layer's view of the client model (`sound-table.md` §8.1,
 /// §6.4 r2, §6.5 r2, §4 r5). Questions it cannot answer are recorded in
@@ -160,6 +201,8 @@ pub struct SoundDriver {
     cues: TriggerQueue,
     /// The last server tick a sound tick ran for.
     last_server_tick: Option<u64>,
+    /// Rule parts skipped since the last [`SoundDriver::take_skipped`].
+    skipped: Vec<&'static str>,
 }
 
 impl SoundDriver {
@@ -170,6 +213,7 @@ impl SoundDriver {
             globals: Globals::default(),
             cues: TriggerQueue::new(),
             last_server_tick: None,
+            skipped: Vec::new(),
         }
     }
 
@@ -182,16 +226,17 @@ impl SoundDriver {
         self.system.tick()
     }
 
-    /// One audio frame: the UI sound requests (`triggers.md` §11), then
-    /// one sound tick per server tick since the last frame (none before
-    /// the first server tick). A pending [`SoundWorld`] question fails
-    /// the frame after the tick that asked it.
-    /// `levels` are the `Levels.txt` rows by level id (`SoundEnv`).
+    /// One audio frame: the frame's sound requests in order (UI sounds,
+    /// server sound events, player event sounds), then one sound tick per
+    /// server tick since the last frame (none before the first server
+    /// tick). A pending [`SoundWorld`] question fails the frame after the
+    /// tick that asked it. `levels` are the `Levels.txt` rows by level id
+    /// (`SoundEnv`). P is the local player now (§2 r4: at delivery).
     pub fn frame(
         &mut self,
         world: &ClientWorld,
         levels: &[LevelRow],
-        ui_sounds: &[i32],
+        requests: &[SoundRequest],
     ) -> Result<(), DriverError> {
         let now = world.server_ticks;
         let ticks = match self.last_server_tick {
@@ -200,13 +245,13 @@ impl SoundDriver {
             Some(last) => now.saturating_sub(last),
         };
         let mut sw = ModelSoundWorld::with_env(world, levels, &self.env_indoors);
-        if !ui_sounds.is_empty() {
+        if !requests.is_empty() {
             // C: one client update per server tick (§1 r5).
             let c = now as u32;
             let mut ctx = self.system.with(&mut sw);
             let mut cx = Ctx::new(&mut ctx, &mut self.globals, c);
-            for &id in ui_sounds {
-                ui::ui_sound(&mut cx, id);
+            for r in requests {
+                request(&mut cx, world, r, &mut self.skipped)?;
             }
         }
         for _ in 0..ticks {
@@ -221,10 +266,83 @@ impl SoundDriver {
         Ok(())
     }
 
+    /// The rule parts skipped since the last call, in order.
+    pub fn take_skipped(&mut self) -> Vec<&'static str> {
+        std::mem::take(&mut self.skipped)
+    }
+
     /// Errors the sound system recorded (table lookups, locks).
     pub fn take_errors(&mut self) -> Vec<crate::audio::sound_table::SoundError> {
         self.system.take_errors()
     }
+}
+
+/// The unit as the event rules read it: key and class (captured at
+/// receive for 0x2C), whether it is P, and P's mode when it is (§3 r2's
+/// dead check reads it; P is read at delivery).
+fn event_unit(world: &ClientWorld, key: UnitKey, class: u32) -> Unit<'static> {
+    let mut u = Unit::new(key, class as i32);
+    u.is_local = world.local_player == Some(key);
+    if u.is_local {
+        if let Some(p) = world.units.get(&key) {
+            u.mode = p.mode as u8;
+        }
+    }
+    u
+}
+
+fn followups(out: Vec<Followup>, skipped: &mut Vec<&'static str>) {
+    for f in out {
+        skipped.push(match f {
+            Followup::OverheadText(_) => SKIP_OVERHEAD,
+            Followup::QuestStinger { .. } => SKIP_STINGER,
+            Followup::StingerRearm => SKIP_REARM,
+        });
+    }
+}
+
+/// One request (§11, §2 r2–r4, §3).
+fn request(
+    cx: &mut Ctx,
+    world: &ClientWorld,
+    r: &SoundRequest,
+    skipped: &mut Vec<&'static str>,
+) -> Result<(), DriverError> {
+    match *r {
+        SoundRequest::Ui(id) => ui::ui_sound(cx, id),
+        SoundRequest::Server { unit, class, event } => {
+            let u = event_unit(world, unit, class);
+            let skip = match event {
+                12 => Some(SKIP_EVENT_12),
+                16 if unit.unit_type == MONSTER => Some(SKIP_EVENT_16),
+                17 => Some(SKIP_EVENT_17),
+                18 => Some(SKIP_EVENT_18),
+                _ => None,
+            };
+            if let Some(s) = skip {
+                skipped.push(s);
+                return Ok(());
+            }
+            let extra = EventExtra {
+                local: world.local_player,
+                event12_stsound: 0,
+                greeting: None,
+                day_phase: 0,
+            };
+            let out = server_event(cx, &u, &mut UnitSound::default(), event, extra)?;
+            followups(out, skipped);
+        }
+        SoundRequest::PlayerEvent { unit, event } => {
+            let Some(p) = world.units.get(&unit) else {
+                skipped.push(SKIP_NO_UNIT);
+                return Ok(());
+            };
+            let u = event_unit(world, unit, p.class);
+            let out = player_event(cx, &u, event)?;
+            followups(out, skipped);
+        }
+    }
+    Ok(())
 }
 
 impl CueSource for SoundDriver {
@@ -242,7 +360,7 @@ mod tests {
     use super::*;
     use crate::audio::sound_table::SoundTableData;
     use crate::audio::{Sound, SoundBank, SoundId};
-    use crate::bridge::world::{ClientUnit, PLAYER};
+    use crate::bridge::world::{ClientUnit, MONSTER, PLAYER};
 
     struct Bank;
 
@@ -294,7 +412,7 @@ mod tests {
     #[test]
     fn ui_sounds_are_requested_and_their_cues_reach_the_core() {
         let mut d = driver();
-        d.frame(&at_tick(1), &[], &[1]).unwrap();
+        d.frame(&at_tick(1), &[], &[SoundRequest::Ui(1)]).unwrap();
         let mut q = TriggerQueue::new();
         d.drain_cues(&mut q);
         assert!(!q.is_empty(), "the request's channel start is a cue");
@@ -303,13 +421,89 @@ mod tests {
         assert!(again.is_empty(), "cues are handed over once");
     }
 
+    // Covers: specs/audio/triggers.md §2 r2, §2 r3, §2 r4, §3 r5; specs/client/bridge.md §10 r2
+    #[test]
+    fn server_sounds_and_ui_sounds_run_in_list_order() {
+        use crate::audio::sound_table::SoundError;
+        use crate::bridge::world::OBJECT;
+        let mut d = driver();
+        let mut w = at_tick(1);
+        let p = UnitKey::new(PLAYER, 1);
+        let mut u = ClientUnit::new(p);
+        u.mode = 1;
+        w.units.insert(p, u);
+        w.local_player = Some(p);
+        let obj = UnitKey::new(OBJECT, 9);
+        let requests = [
+            // Event 13 on an object: 2,634 on it.
+            SoundRequest::Server {
+                unit: obj,
+                class: 5,
+                event: 13,
+            },
+            SoundRequest::Ui(5000),
+            // Event 2 on the local player: the player event sound (§3),
+            // id 7, and its overhead text (r7, not wired).
+            SoundRequest::Server {
+                unit: p,
+                class: 0,
+                event: 2,
+            },
+            // Events whose record the driver does not hold.
+            SoundRequest::Server {
+                unit: obj,
+                class: 5,
+                event: 12,
+            },
+            SoundRequest::Server {
+                unit: UnitKey::new(MONSTER, 3),
+                class: 5,
+                event: 18,
+            },
+            SoundRequest::PlayerEvent {
+                unit: UnitKey::new(PLAYER, 77),
+                event: 23,
+            },
+        ];
+        d.frame(&w, &[], &requests).unwrap();
+        // The ids are outside the 4-row test table: each request is
+        // reported in order (`sound-table.md` §1 r4).
+        assert_eq!(
+            d.take_errors(),
+            [
+                SoundError::OutOfTable(2634),
+                SoundError::OutOfTable(5000),
+                SoundError::OutOfTable(7)
+            ]
+        );
+        assert_eq!(
+            d.take_skipped(),
+            [SKIP_OVERHEAD, SKIP_EVENT_12, SKIP_EVENT_18, SKIP_NO_UNIT]
+        );
+        // The dead local player makes no player event sound (§3 r2).
+        w.units.get_mut(&p).unwrap().mode = 17;
+        d.frame(&w, &[], &[SoundRequest::PlayerEvent { unit: p, event: 2 }])
+            .unwrap();
+        assert!(d.take_errors().is_empty() && d.take_skipped().is_empty());
+        // A player class outside the record table is fatal (§3 r1).
+        let bad = SoundRequest::Server {
+            unit: UnitKey::new(PLAYER, 2),
+            class: 9,
+            event: 2,
+        };
+        assert_eq!(
+            d.frame(&w, &[], &[bad]),
+            Err(DriverError::Trigger(TriggerError::PlayerClass(9)))
+        );
+    }
+
     // Covers: specs/audio/sound-table.md §4 r5
     #[test]
     fn a_question_the_model_cannot_answer_fails_the_frame() {
         let mut d = driver();
         // Id 2 heads a group: the variant roll needs the client seed.
         assert_eq!(
-            d.frame(&at_tick(1), &[], &[2]),
+            d.frame(&at_tick(1), &[], &[SoundRequest::Ui(2)]),
             Err(DriverError::Pending(
                 "local player client seed (§4 r5): read-only model seed"
             ))
