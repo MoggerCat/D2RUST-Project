@@ -25,21 +25,21 @@
 | Outputs / state changes | 65–73 |
 | Rules | 74–75 |
 |   1. The client skill list (unit +0xA8) | 76–99 |
-|   2. Shared skill-list operations | 100–154 |
-|   3. 0x94 BaseSkillLevels (`0x0045DD60`) | 155–164 |
-|   4. 0x21 UpdateItemOSkill (`0x0045DCD0`) | 165–174 |
-|   5. 0x22 UpdateItemSkill (`0x0045DDB0`) | 175–184 |
-|   6. 0x23 SetSkill (`0x0045DE10`) | 185–191 |
-|   7. 0x99 / 0x9A skill events (`0x0045DE80` / `0x0045DEC0` → `0x004CA060`) | 192–235 |
-|   8. 0xA3 skill do (`0x0045D5E0`) | 236–249 |
-|   9. 0x93 skill bonus by element and page (`0x0045DD10` → `0x004C7990`) | 250–278 |
-|   10. 0xA5 skill end on a unit (`0x0045D6A0`) | 279–293 |
-| Constants & data dependencies | 294–305 |
-| Randomness | 306–309 |
-| Edge cases & original bugs | 310–319 |
-| Test vectors | 320–345 |
-| Provenance | 346–366 |
-| Open questions | 367–394 |
+|   2. Shared skill-list operations | 100–170 |
+|   3. 0x94 BaseSkillLevels (`0x0045DD60`) | 171–180 |
+|   4. 0x21 UpdateItemOSkill (`0x0045DCD0`) | 181–190 |
+|   5. 0x22 UpdateItemSkill (`0x0045DDB0`) | 191–200 |
+|   6. 0x23 SetSkill (`0x0045DE10`) | 201–207 |
+|   7. 0x99 / 0x9A skill events (`0x0045DE80` / `0x0045DEC0` → `0x004CA060`) | 208–251 |
+|   8. 0xA3 skill do (`0x0045D5E0`) | 252–265 |
+|   9. 0x93 skill bonus by element and page (`0x0045DD10` → `0x004C7990`) | 266–294 |
+|   10. 0xA5 skill end on a unit (`0x0045D6A0`) | 295–309 |
+| Constants & data dependencies | 310–321 |
+| Randomness | 322–325 |
+| Edge cases & original bugs | 326–335 |
+| Test vectors | 336–361 |
+| Provenance | 362–382 |
+| Open questions | 383–413 |
 <!-- /index -->
 
 Owned ids: 0x21, 0x22, 0x23, 0x94, 0x99, 0x9A, 0xA3; §9–§10: 0x93, 0xA5.
@@ -151,6 +151,22 @@ handlers (the server specs link here for the steps).
    it is unlinked and freed; with d ≠ 0 its base (+0x28) −= 1 and it is
    unlinked and freed only when the base is now < 1; then refresh
    (rule 4) for s.
+6. **A hand left on the removed entry** (2026-10-08; answers
+   `docs/handoff/impl-client-msgs-3.md` §3 Q6). The hand resets of rule
+   5 run before the unlink and only re-point the hand when select finds
+   the entry (0, −1) (rule 3: not found → unchanged). Two cases leave
+   left (+8) or right (+0xC) pointing at the entry that rule 5 then
+   frees (`0x0040B480`, `Skills.cpp` line 0x4AC): (a) the unit has no
+   native skill-0 entry; (b) s = 0, so select finds the entry being
+   removed (still linked) and keeps it. 1.14d keeps the freed pointer
+   (no test, no assert); the next read of that hand reads freed memory
+   (undefined). With d ≠ 0 and the base still ≥ 1 after the decrement
+   nothing is freed and the hand stays valid. **d2rs:** an assign or
+   remove that would leave a hand on a freed entry is refused as a
+   handler error (`client/bridge.md` §2.4; recorded, model unchanged),
+   the same choice as `client/model.md` §9 rule 5 for a 1.14d access
+   violation. Whether a 1.14d server ever sends such a removal is not
+   established.
 
 ### 3. 0x94 BaseSkillLevels (`0x0045DD60`)
 
@@ -391,3 +407,6 @@ bit 17 `enhanceable`, mask table `0x006CE268`), `0x00643AD0`,
 5. The client functions of 0xA5 (`0x004CA000`, `0x004C9420`,
    `0x004C8B80`) and which skills have `srvdofunc` 67, 76, 77, 78:
    Phase 6 client skill effect spec; and the name of state 18.
+6. *Answered (2026-10-08)* (`docs/handoff/impl-client-msgs-3.md` §3
+   Q6): a remove that leaves the left or right hand on the freed entry
+   (no native skill-0 entry, or skill 0 itself): §2 rule 6.
