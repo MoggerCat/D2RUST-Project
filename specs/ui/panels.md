@@ -34,25 +34,25 @@
 |   1. Screen layout model | 95–131 |
 |   2. UI states and the open/close call | 132–171 |
 |   3. The conflict gate (`0x00453910`) | 172–200 |
-|   4. Slots, open mode and the view shift | 201–252 |
-|   5. UI pass order (`0x00456EE0`) | 253–292 |
-|   6. 800 × 600 border and control panel art (`0x00499450`) | 293–313 |
-|   7. Shared panel parts | 314–331 |
-|   8. Character panel (ui 2, left; `0x004A7D00`) | 332–434 |
-|   9. Inventory panel family (`0x0048EDF0`) | 435–491 |
-|   10. Skill tree (ui 4, right; `0x004AC690`) | 492–554 |
-|   11. Stash (ui 0x19, full; inventory modes 0x0C / 0x0D) | 555–590 |
-|   12. Horadric Cube (ui 0x1A, full; inventory mode 0x0E) | 591–641 |
-|   13. Waypoint menu (ui 0x14, left; `0x0049C9C0`) | 642–694 |
-|   14. NPC menu (ui 8) and NPC shop (ui 0x0C) | 695–700 |
-|   15. Event → intent summary | 701–728 |
-|   16. Machine tables | 729–763 |
-| Constants & data dependencies | 764–784 |
-| Randomness | 785–789 |
-| Edge cases & original bugs | 790–810 |
-| Test vectors | 811–849 |
-| Provenance | 850–890 |
-| Open questions | 891–959 |
+|   4. Slots, open mode and the view shift | 201–258 |
+|   5. UI pass order (`0x00456EE0`) | 259–298 |
+|   6. 800 × 600 border and control panel art (`0x00499450`) | 299–319 |
+|   7. Shared panel parts | 320–337 |
+|   8. Character panel (ui 2, left; `0x004A7D00`) | 338–440 |
+|   9. Inventory panel family (`0x0048EDF0`) | 441–497 |
+|   10. Skill tree (ui 4, right; `0x004AC690`) | 498–560 |
+|   11. Stash (ui 0x19, full; inventory modes 0x0C / 0x0D) | 561–596 |
+|   12. Horadric Cube (ui 0x1A, full; inventory mode 0x0E) | 597–647 |
+|   13. Waypoint menu (ui 0x14, left; `0x0049C9C0`) | 648–700 |
+|   14. NPC menu (ui 8) and NPC shop (ui 0x0C) | 701–706 |
+|   15. Event → intent summary | 707–734 |
+|   16. Machine tables | 735–769 |
+| Constants & data dependencies | 770–790 |
+| Randomness | 791–795 |
+| Edge cases & original bugs | 796–816 |
+| Test vectors | 817–857 |
+| Provenance | 858–898 |
+| Open questions | 899–979 |
 <!-- /index -->
 
 ## Summary
@@ -238,10 +238,16 @@ skips it and passes).
    | left closed, no right open | x > W / 2 | x − W / 4 |
 
    No jump when the other side is open (modes 2/3 and 1/3) or for full
-   and anvil kinds. In 1.14d the only callers that pass `jump` = 1 are
-   the waypoint menu (0x14 on, `0x0049CF90`; off, `0x0049CEC0`,
-   `0x0049D160`) and `0x004A2840` (ui 0x0F off) (scan of all 136 call
-   sites). Hot keys pass 0 (§Open questions 2).
+   and anvil kinds. Callers that pass `jump` = 1: the waypoint menu
+   (0x14 on, `0x0049CF90`; off, `0x0049CEC0`, `0x0049D160`),
+   `0x004A2840` (ui 0x0F off) (scan of the 136 call sites inside
+   functions), and the key-command handlers, which lie outside the
+   exported functions and were missed by that scan: Character Screen
+   (ui 2), Inventory Screen (ui 1), Party Screen (ui 0x16), Skill Tree
+   (ui 4) and Hireling Screen (ui 0x24) toggle with `jump` = 1; every
+   other hot key passes 0 (`ui/controls.md` §3). Clear Screen and Esc
+   close panels through `0x00456300(·, jump 1)`, which moves the cursor
+   by the same rule.
 4. The play area for clicks: a click inside an open panel's area is
    consumed by the panel (§8–§14); the world input path is not reached.
    The right panel's area is the inventory record's `inv` rectangle
@@ -822,6 +828,8 @@ Reproduced by default.
 | quest log open, `SetUIState(2, on)` | `C[0x0F][2]` = 1: quest log closed, character open, mode 2 | §3.3 |
 | right panel opened at 800 × 600, jump = 1, mouse x 500 | cursor x 300 | §4.3 |
 | left panel closed at 640 × 480, jump = 1, mouse x 600 | cursor x 440 | §4.3 |
+| key I (command 1) at 800 × 600, nothing open, mouse x 500 | inventory open, mode 1, cursor x 300 (hot key passes `jump` = 1) | §4.3, `ui/controls.md` §3 |
+| key M (command 3, ui 0x18) with the character panel open | no cursor move (`jump` = 0, slot kind none) | §4.3 |
 | shift-click "Vitality +" with 70 points | three 0x3A messages: `3A 03 1F`, `3A 03 1F`, `3A 03 05` | §8.5 |
 | click "Strength +" without shift | `3A 00 00` | §8.5 |
 | label `strchrfir` (4071, "Fire⏎Resistance"), 640 × 480 | "Fire" centered in [190, 268] at y 342, "Resistance" at y 350 | §8.6 |
@@ -903,9 +911,8 @@ repo; HANDOFF §5 C71 found frame 1 at (−205, 17)); cube close
    states, icons and the 0x58 replay: `world/quests-status.md` §3, §5
    (`0x004A34F0`, `0x004A3220`, `0x004A23D0`, `0x004A27D0`); only its
    layout, hit rectangles and draw order belong here.
-2. Which key toggles which state and with which `jump` (CmdTbl
-   `0x004A5…`, `default.key`): owner `ui/controls.md` (`client/ui.md`
-   §B4). Read of the command table.
+2. **Answered** (2026-10-07, `ui/controls.md` §3; §4.3 corrected). Was:
+   which key toggles which state and with which `jump`.
 3. **Answered** (2026-10-07, `panels-2.md` §17; the `descdam` /
    `descatt` functions: `panels-2.md` OQ 1). Was: Character panel: damage / attack-rating block, name and class lines,
    per-stat hover texts (§8.10). Disassembly of `0x004A7D00` after
@@ -916,10 +923,18 @@ repo; HANDOFF §5 C71 found frame 1 at (−205, 17)); cube close
    open as below): the free-points box (`0x004AC200`), the tab tool tips
    (`0x004AB310`), the no-points mouse-down message (§10.5), the exact
    remap `k` per state (verify by capture).
-5. Stash gold buttons, gold dialog and the inventory gold button
-   (`0x004845A0`, `0x00489580`, `0x004891xx`). Ghidra read.
-6. Server meaning of C→S 0x4F button 0x12 (stash close) and of the
-   player-trade buttons 2, 4, 7, 8: `0x0054C7C0` → `0x00568060`.
+5. **Answered** (2026-10-07): stash gold button hit and press
+   `panels-2.md` §20.1; the gold amount dialog and its messages
+   `ui/inventory.md` §9; `0x004845A0` is the equipped-item draw
+   (`ui/inventory.md` §6), not a gold routine. The inventory gold
+   button's art and the gold amount text: capture `inv-0003`
+   (`docs/handoff/pc2-rec-pc2-ui.md`). Was: stash gold buttons, gold
+   dialog and the inventory gold button.
+6. **Answered** for the stash (2026-10-07, `world/cube.md` §1: 0x12
+   close, 0x13 withdraw, 0x14 deposit, `0x00564D50`). The player-trade
+   buttons (`0x00568060` cases 2, 3, …) are multiplayer trade, outside
+   Phases 0–6. Was: server meaning of 0x4F 0x12 and of the trade
+   buttons 2, 4, 7, 8.
 7. **Answered** (2026-10-07, `ui/menus.md` §1: `0x0049D160` mouse down,
    `0x0049D010` mouse up, `0x0049C490` tab hit, `0x0049C510` row hit,
    `0x0049C760` tab set, latch `[0x007BF085]`). Was: waypoint tab and
@@ -934,10 +949,15 @@ repo; HANDOFF §5 C71 found frame 1 at (−205, 17)); cube close
    add sockets, personalize, go east / sail east), the hire sender
    (`0x004B5C60`). Ghidra read; check against a capture of Akara's and
    Charsi's menus.
-9. Trade panel (ui 0x17, inventory mode 0x0B: `%s\ui\panel\trade`
-   `[0x007BCB04]`, both players' names and gold at `0x1B − sy` /
-   `0xF2 − sy`), anvil (ui 0x0E), Inifuss scroll, recipe scroll, guild
-   panels (0x1B, 0x1C): not specified here.
+9. **Answered by owner links** (2026-10-07): the anvil / item dialog
+   (ui 0x0E, `0x004C01E0`), the Inifuss scroll (ui 0x10, `0x0049FF10`)
+   and the recipe scroll (ui 0x25, `0x0048BC10`) are `ui/messages.md`
+   (§4 and its item-dialog and Inifuss sections). The trade panel (ui
+   0x17, inventory mode 0x0B) is multiplayer, outside Phases 0–6. The
+   guild panels (0x1B, 0x1C): no `SetUIState` call site passes 0x1B or
+   0x1C as a constant (scan of `all.asm`, 2026-10-07); the only
+   variable-id call in that range is `0x0049675E` (help-screen block,
+   ids 0x18–0x38); nothing to draw for single player.
 10. Pixel proof: capture cases `ui-0001`, `ui-0002` and the inventory
     frames of `placement-0001` (§Test vectors).
 11. **Answered** (2026-10-07): mode 3 is the additive blend of

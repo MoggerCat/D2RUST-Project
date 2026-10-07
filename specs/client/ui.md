@@ -93,9 +93,9 @@ fn layout_text(font: &Font, text: &[u16], origin: IVec2, color: TextColor,
 - Bevy keyboard/mouse events are mapped to `Action` values in
   `d2-client::input` (the only Bevy-facing part); everything after is
   plain Rust.
-- `Action` is a closed enum, ours: movement/attack clicks, skill slots,
-  belt slots, panel toggles, chat, map, run toggle, etc. Its list is
-  completed from §B4 (the original's configurable commands).
+- `Action` is a closed enum, ours: the 57 configurable commands of
+  `ui/controls.md` §3 plus the fixed inputs of its §4.3 (left / right
+  button, which are not configurable).
 - Mouse position is converted to the 800×600 frame by the inverse of the
   presentation scale (`render-pipeline.md` §A9) with integer division,
   then clamped; positions in the black bars are outside the frame.
@@ -144,22 +144,35 @@ Rules:
 5. Newer `version` than supported: error. Older: migrated in code
    (`controls::migrate`), file rewritten only on explicit user save.
 
-`preset = "original"` is the original's default key configuration (§B4);
-until that spec exists, only `preset = "dev"` (ours, marked unverified
-in code) is accepted.
+`preset = "original"` is the original's default key configuration:
+the 57 commands and 114 default bindings of `ui/controls.md` §3
+(machine form `ui/key-commands.tsv`; `Action` names = its `string_key`
+column, command 56 = `GameMenu`), checked by `ui/controls.md` §B4.
+`preset = "dev"` (ours) stays accepted for development.
 
-### B. Original behavior to reproduce (not specified here)
+### B. Original behavior to reproduce (owned by the specs named)
 
-| # | Behavior | Owner spec (to write) | Measure | Comparison |
+Owners as of 2026-10-07 (`claude/pc2-ui`): B1 `ui/panels.md`,
+`ui/panels-2.md`, `ui/control-panel.md`, `ui/menus.md`,
+`ui/messages.md`; B2 `ui/panels.md` §2–§4; B3 `ui/text.md`; B4
+`ui/controls.md` (world click messages and hold repeat: its OQ 2,
+recording `controls-0001`); B5 `ui/inventory.md` (cursor item draw and
+belt panel: its OQ 4, 5); B6 `render/capture.md` §3.3 (cursor type
+table, frames, draw position); B7 `ui/automap.md` **not written** (draw
+`0x0045AD60`, key commands 7–11 and 45 in `ui/controls.md` §3); B8
+`audio/triggers.md` (UI sound requests through `0x004B9A00`). All are
+draft: pixels unverified until their capture cases run.
+
+| # | Behavior | Owner spec | Measure | Comparison |
 |---|---|---|---|---|
-| B1 | Panel art and layout: which DC6 files and frames each panel draws, positions at 800×600, control panel, belt, orbs (fill rule), minipanel | `ui/panels.md` | client UI draw path; captures | identical pixels on `ui` captures per panel |
+| B1 | Panel art and layout: which DC6 files and frames each panel draws, positions at 800×600, control panel, belt, orbs (fill rule), minipanel | `ui/panels.md`, `ui/panels-2.md`, `ui/control-panel.md` | client UI draw path; captures | identical pixels on `ui` captures per panel |
 | B2 | Panel open/close/stack rules, which panels exclude each other, world view shift when panels open | `ui/panels.md` | UI state code; captures | identical pixels and identical intents per input sequence |
 | B3 | Text layout: advance (font `width` vs cell), line height, baseline, the font `.tbl` unknowns (`font-tbl.md` OQ 1), wrap, alignment, `ÿc` color codes, text-color PL2 maps, hover/item-name boxes | `ui/text.md` | text draw path; captures of known strings | identical pixels |
 | B4 | Default key configuration, configurable command list, mouse semantics (left/right/shift/alt), repeat behavior, at which tick held buttons send repeated intents | `ui/controls.md` | 1.14d key config and input path; packet trace with known inputs | identical action list; identical C→S messages and send ticks for a scripted input |
 | B5 | Inventory/stash/cube/belt grids: cell sizes, item graphic placement (`invfile`, sizes), hover highlight, cursor item drawing | `ui/inventory.md` | UI draw path; captures | identical pixels |
-| B6 | Cursor: images, hotspots, animation frames, when it changes | `ui/panels.md` | captures | identical pixels |
-| B7 | Automap: drawing, fade, cells revealed | `ui/automap.md` | captures | identical pixels |
-| B8 | UI sounds triggered by panels and clicks | `client/audio.md` §B owners | audio trace | identical file and trigger tick |
+| B6 | Cursor: images, hotspots, animation frames, when it changes | `render/capture.md` §3.3 | captures | identical pixels |
+| B7 | Automap: drawing, fade, cells revealed | `ui/automap.md` (not written) | captures | identical pixels |
+| B8 | UI sounds triggered by panels and clicks | `audio/triggers.md` | audio trace | identical file and trigger tick |
 
 ## Constants & data dependencies
 
@@ -198,7 +211,8 @@ stated here.
 
 1. Does the original's UI layout at 800×600 differ from 640×480 beyond
    centering, and must 640×480 be offered? (decision + `ui/panels.md`)
-2. §B1–§B8.
+2. §B1–§B8: owners named in §B (2026-10-07); still to write:
+   `ui/automap.md` (§B7).
 3. Text input (chat) IME/clipboard: ours to decide once chat exists;
    no fidelity impact beyond the characters sent.
 4. OQ 1 is answered for the panels by `ui/panels.md` §1: the 800 × 600
