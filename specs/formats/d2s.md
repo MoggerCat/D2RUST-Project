@@ -23,7 +23,7 @@
 - **Crate/module:** `d2-formats::d2s` (byte layout, checksum, section
   framing); the load effects (§9) belong to `d2-server` character
   storage.
-- **Related specs:** `formats/d2s-appearance.md` (header +0x88..+0xA7, §2.8); `formats/d2s-load.md` (new-character start and load
+- **Related specs:** `formats/d2s-legacy.md` (versions < 0x5C); `formats/d2s-appearance.md` (header +0x88..+0xA7, §2.8); `formats/d2s-load.md` (new-character start and load
   effects, §9 rules 6–7); `items/bitstream.md` (one item record, the
   per-item `JM` marker and socketed children); `world/quests.md` §1
   (quest flag records, load normalisation §1.6, NPC intro bits §6.7);
@@ -69,7 +69,7 @@ fixed-size quest, waypoint and NPC sections, then variable sections
 in an expansion game the hireling's items and the Iron Golem's item).
 All integers are little-endian. The game writes version 0x60 (96) and
 loads 0x5C–0x60 through the code in this spec; older versions go to a
-legacy loader that is not specified. The file is at most 8,192 bytes.
+legacy loader (`formats/d2s-legacy.md`). The file is at most 8,192 bytes.
 A 32-bit rotate-and-add checksum over the whole file (checksum field
 zeroed) and the file size in the header are both checked on load. This
 spec owns the byte layout and the loader's checks; the meaning of
@@ -126,7 +126,7 @@ in the specs listed above.
    cursor to reach the end after the last section (§10 rule 6).
 6. Version dispatch (`0x00534330`): fewer than 8 bytes, or u32 at 0 ≠
    0xAA55AA55 → result 9. Version (u32 at +4) < 0x5C → legacy loader
-   `0x00534020` (needs ≥ 0x82 bytes; not specified, Open question 1).
+   `0x00534020` (needs ≥ 0x82 bytes; `formats/d2s-legacy.md`).
    Otherwise the loader of this spec, which rejects versions > 0x60
    (§2.2 rule 3).
 7. Measured (`tools/d2s_check.py`, Provenance): in every 1.14d save of
@@ -1034,9 +1034,9 @@ and prints every field; it holds no save data.
 
 ## Open questions
 
-1. Legacy loader (`0x00534020`, versions < 0x5C, ≥ 0x82 bytes): not
-   specified. Settle: only if pre-1.09 saves must load; Ghidra on
-   `0x00532690`–`0x00533F70`.
+1. Legacy loader (`0x00534020`, versions < 0x5C, ≥ 0x82 bytes).
+   Answered: `formats/d2s-legacy.md` (its open questions keep the
+   version-0x47 item record and a check on a real 1.07/1.08 save).
 2. Item record decoding for save versions below 0x60 (the version is
    passed to `0x0062AE20`/`0x00558CB0`). Settle: the item reader spec.
 3. **Answered except the classic part** (9 saves and a stub of this PC; §1 rule

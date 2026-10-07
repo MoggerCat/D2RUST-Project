@@ -21,35 +21,37 @@
   rule 6 (teleport calls §6 here); `sim/stats.md`, `sim/stat-lists.md`;
   `sim/server-messages.tsv`, `sim/client-messages.tsv`; `data/fields.tsv`
   (`hireling`, `pettype`), `data/runtime-maps.md` §8 (hireling id
-  tables), `data/fixups.md` §7 (name ids).
+  tables), `data/fixups.md` §7 (name ids); `world/hirelings-2.md`
+  (part 2: §15 player death, §16 restore details, §17 swap timers, §18
+  follow details, §19 entry points and tables).
 
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 55–69 |
-| Inputs | 70–81 |
-| Outputs / state changes | 82–87 |
-| Rules | 88–89 |
-|   1. `hireling.txt` rows | 90–172 |
-|   2. Offer values and price (`0x006637F0(expansion, player, seed, act0, diff0, out)`) | 173–213 |
-|   3. Creating the hireling | 214–268 |
-|   4. Level stats (`0x00572840(game, player, merc, level)`) | 269–310 |
-|   5. Owner link and pet list | 311–372 |
-|   6. Following the player | 373–447 |
-|   7. Experience and level-up | 448–513 |
-|   8. Death (`0x0057CCB0` → `0x005751A0`) | 514–566 |
-|   9. Revive | 567–604 |
-|   10. Restoring from a save | 605–638 |
-|   11. Items (expansion) | 639–692 |
-|   12. Services (links) | 693–702 |
-|   13. Messages | 703–769 |
-|   14. Skill pick of the Hireable AI (`0x005E4D30`) | 770–776 |
-| Constants & data dependencies | 777–800 |
-| Randomness | 801–811 |
-| Edge cases & original bugs | 812–862 |
-| Test vectors | 863–913 |
-| Provenance | 914–970 |
-| Open questions | 971–1053 |
+| Summary | 57–73 |
+| Inputs | 74–85 |
+| Outputs / state changes | 86–91 |
+| Rules | 92–93 |
+|   1. `hireling.txt` rows | 94–176 |
+|   2. Offer values and price (`0x006637F0(expansion, player, seed, act0, diff0, out)`) | 177–217 |
+|   3. Creating the hireling | 218–272 |
+|   4. Level stats (`0x00572840(game, player, merc, level)`) | 273–314 |
+|   5. Owner link and pet list | 315–376 |
+|   6. Following the player | 377–454 |
+|   7. Experience and level-up | 455–520 |
+|   8. Death (`0x0057CCB0` → `0x005751A0`) | 521–575 |
+|   9. Revive | 576–613 |
+|   10. Restoring from a save | 614–651 |
+|   11. Items (expansion) | 652–709 |
+|   12. Services (links) | 710–713 |
+|   13. Messages | 714–780 |
+|   14. Skill pick of the Hireable AI (`0x005E4D30`) | 781–787 |
+| Constants & data dependencies | 788–811 |
+| Randomness | 812–822 |
+| Edge cases & original bugs | 823–873 |
+| Test vectors | 874–924 |
+| Provenance | 925–981 |
+| Open questions | 982–1066 |
 <!-- /index -->
 
 ## Summary
@@ -63,7 +65,9 @@ initialising the hireling unit (§3), its level-dependent stats and
 skills (§4), the owner link and pet node (§5), following the player
 across levels and acts (§6), experience and level-up (§7), death (§8),
 revive (§9), restoring from a save (§10), the item swap (§11) and the
-messages (§13). Classic games keep the hireling inside its act;
+messages (§13). Part 2 (`world/hirelings-2.md`, numbers continue)
+adds the owner's death (§15) and the callers a game wires (§19).
+Classic games keep the hireling inside its act;
 expansion games keep it across acts, let it die and be resurrected, and
 let it wear items.
 
@@ -444,6 +448,9 @@ Used by the new hire (§3.2 rule 9), level-up (§7.3) and restore (§10).
    stood (0x6D after its 0xAC). d2rs: the server needs nothing beyond
    the 0x4B handler; the client side is PC 1's (handoff cross-file
    request).
+8. The range branch of rule 1 (squared distance 1600 to the player
+   unit's position, not the follow's (x, y)) and the list-head step of
+   rule 4: `world/hirelings-2.md` §18.
 
 ### 7. Experience and level-up
 
@@ -563,6 +570,8 @@ gain may carry it past the player's level.
    instruction that clears flags 2 0x100 is `0x00554A86` in the
    inactive-storage restore `0x00554A30`, which a hireling never goes
    through, so a revived hireling keeps the bit (open question 10).
+6. The owner's death kills the hireling too (player mode 17,
+   `world/hirelings-2.md` §15).
 
 ### 9. Revive
 
@@ -635,6 +644,10 @@ version ≥ 0x5C, `0x00533C70` for older):
    section `jf`, expansion only, written when any hireling node
    exists); after they load: refresh, life := max (also when dead),
    send the stats (flag 1).
+9. Details (the class argument, the `Id` 0xFFFF path of version-0x47
+   saves, the roomless allocation and the join follow, `0x005738D0`,
+   the row checks, each loader's order of rule 7):
+   `world/hirelings-2.md` §16.
 
 ### 11. Items (expansion)
 
@@ -649,8 +662,9 @@ allows C:
    there. Act 3 hireling (359) with a shield (type 2) → location 2
    instead (left hand).
 3. Target empty: **duplicate** C into the merc (`0x0055A2A0`), set the
-   copy's mode 4, two item-removal notices for C's GUID
-   (`0x00540E60(9, GUID)`), equip the copy at the target from the
+   copy's mode 4, two timer cancels for C's GUID
+   (`0x00540E60(9, GUID)`: type-9 events with that argument, on the
+   merc and on the player; `world/hirelings-2.md` §17), equip the copy at the target from the
    cursor path (`inventory.md` §4.6, skip requirements 1), consume C
    (`0x0055EEA0`), the player's cursor := none. Refresh
    (`0x0055DF00`, `0x0055F4F0(0)`), `0x00540E60(3, 0)`, event 3 at
@@ -673,7 +687,7 @@ allows C:
      0)`, then the requirement check `0x0062EAF0(C, merc, 0, 0, 0, 0)`.
      Shared tail (rule 3): copy := `0x0055A2A0(game, C, merc, 1)`; mode 4;
      `0x00540E60(game, merc, 9, C GUID)` then `0x00540E60(game, player,
-     9, C GUID)` (the first notice goes to the merc, the second to the
+     9, C GUID)` (the first cancel acts on the merc, the second on the
      player); equip the copy (`0x005606B0(game, merc, copy GUID, slot,
      1, out)`); consume C (`0x0055EEA0(game, player, C)`); player cursor
      := none (`0x0063C180(player inventory, 0)`); **then**, only when
@@ -689,16 +703,13 @@ allows C:
    §7.23, item-use spec); C→S 0x26 `on_merc` (belt) likewise.
 7. Death keeps the items (§8 rule 3); a replaced hireling's items are
    freed with it (§3.2 rule 4).
+8. A duplicate that fails (`0x0055A2A0` returns none) and the
+   socket and replenish details of the copies: `world/hirelings-2.md`
+   §17.
 
 ### 12. Services (links)
 
-| Service | Owner | Hireling-side rule here |
-|---|---|---|
-| hire (C→S 0x36) | `npc.md` §7.3 | offer §2, init §3, replace §3.2 rule 4 |
-| resurrect (C→S 0x62) | `npc.md` §7.4 | cost §9 rule 1, revive §9 |
-| heal on chat open | `npc.md` §5 step 5 | life to max, curable states; mana not touched |
-| quest-granted hireling | `npc.md` §7.5, `quests.md` | init §3 |
-| command (C→S 0x46, 0x47) | AI spec | — |
+Moved to `world/hirelings-2.md` §12 (number kept).
 
 ### 13. Messages
 
@@ -1050,3 +1061,5 @@ Pass 2 B):
     bit and whether it changes the revived unit's behaviour (D2MOO
     names it "deleted, not yet freed"); read the readers of +0xC8 &
     0x100 in the image.
+    **Answered** 2026-10-07 from the binary: the bit changes nothing
+    for a hireling (`world/hirelings-2.md` §18 rule 4).

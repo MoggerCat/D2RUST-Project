@@ -16,21 +16,22 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 36–47 |
-| Inputs | 48–53 |
-| Outputs / state changes | 54–59 |
-| Rules | 60–63 |
-|   1. Header | 64–70 |
-|   2. Chunk walk (no pad bytes) | 71–112 |
-|   3. Samples | 113–136 |
-|   4. Format checks by the game | 137–149 |
-| Constants & data dependencies | 150–157 |
-| Randomness | 158–161 |
-| Survey (1.14d data) | 162–214 |
-| Edge cases & original bugs | 215–228 |
-| Test vectors | 229–267 |
-| Provenance | 268–284 |
-| Open questions | 285–314 |
+| Summary | 37–48 |
+| Inputs | 49–54 |
+| Outputs / state changes | 55–60 |
+| Rules | 61–64 |
+|   1. Header | 65–71 |
+|   2. Chunk walk (no pad bytes) | 72–113 |
+|   3. Samples | 114–137 |
+|   4. Format checks by the game | 138–150 |
+|   5. Decoder hook (d2rs) | 151–164 |
+| Constants & data dependencies | 165–172 |
+| Randomness | 173–176 |
+| Survey (1.14d data) | 177–229 |
+| Edge cases & original bugs | 230–243 |
+| Test vectors | 244–282 |
+| Provenance | 283–299 |
+| Open questions | 300–329 |
 <!-- /index -->
 
 ## Summary
@@ -146,6 +147,20 @@ The format tag, byte rate and block align are never checked. d2rs: the
 parser returns all fields; the audio layer accepts only tag 1, 16-bit,
 22,050 Hz (every file `sounds.txt` names passes; Survey) and treats any
 other file as failed to load, as 0x4DF630 does.
+
+### 5. Decoder hook (d2rs)
+
+The client's `WavDecoder` / `SoundBank` decode (`client/audio.md` §A1,
+§B1; the code's `TODO(spec: formats/wav.md §B1)`) is this spec with no
+further rule: archive lookup (`formats/mpq.md` §11), §1–§3 parse
+(`d2-formats::wav`, verified), then §4's check. Its outputs per sound
+id (`audio/sound-table.md` §1 r3): the interleaved i16 samples, the
+file's channel count (which overwrites the row's `Stereo` for
+non-stream rows, `audio/sound-table.md` §7 r7) and the byte size used by
+the cache (`audio/sound-table-2.md` §16 r2). A parse error or a failed
+§4 check is the original's "file failed" (+0x81 := 1, never retried,
+`audio/sound-table.md` §10 r2); a missing file likewise. `Stream` rows
+are decoded the same way (§3: the stream path copies the same bytes).
 
 ## Constants & data dependencies
 

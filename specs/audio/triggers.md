@@ -28,25 +28,25 @@
 | Inputs | 67–79 |
 | Outputs / state changes | 80–85 |
 | Rules | 86–87 |
-|   1. Conventions and shared state | 88–156 |
-|   2. Server sound events (S→C 0x2C) | 157–205 |
-|   3. Player event sounds (`0x004CB9C0(U, event e)`) | 206–266 |
-|   4. Mode sounds | 267–372 |
-|   5. Footsteps (`0x004CAF60(U)`) | 373–424 |
-|   6. Monster idle voices | 425–451 |
-|   7. Object mode sounds (`0x004CB460`, objects) | 452–493 |
-|   8. Skills, missiles, states | 494–531 |
-|   9. Items | 532–555 |
-|   10. NPC speech | 556–618 |
-|   11. UI sounds | 619–642 |
-|   12. Other fixed requests | 643–708 |
-| Constants & data dependencies | 709–725 |
-| Randomness | 726–749 |
-| Edge cases & original bugs | 750–766 |
-| Test vectors | 767–798 |
-|   Checks (hook addresses for `record_sound.py`, `client/audio.md` §B7) | 799–812 |
-| Provenance | 813–840 |
-| Open questions | 841–950 |
+|   1. Conventions and shared state | 88–164 |
+|   2. Server sound events (S→C 0x2C) | 165–213 |
+|   3. Player event sounds (`0x004CB9C0(U, event e)`) | 214–277 |
+|   4. Mode sounds | 278–383 |
+|   5. Footsteps (`0x004CAF60(U)`) | 384–435 |
+|   6. Monster idle voices | 436–462 |
+|   7. Object mode sounds (`0x004CB460`, objects) | 463–504 |
+|   8. Skills, missiles, states | 505–542 |
+|   9. Items | 543–566 |
+|   10. NPC speech | 567–636 |
+|   11. UI sounds | 637–663 |
+|   12. Other fixed requests | 664–729 |
+| Constants & data dependencies | 730–746 |
+| Randomness | 747–770 |
+| Edge cases & original bugs | 771–787 |
+| Test vectors | 788–819 |
+|   Checks (hook addresses for `record_sound.py`, `client/audio.md` §B7) | 820–833 |
+| Provenance | 834–861 |
+| Open questions | 862–971 |
 <!-- /index -->
 
 ## Summary
@@ -153,6 +153,14 @@ the sound fields of §1 r6. Each client RNG draw listed in Randomness.
     difference, e.g. `0x004CB5C4`–`0x004CB6A0`, `0x004CB043`,
     `0x004CC359`), so a stored time in the future reads as a huge
     elapsed time.
+13. **Identity, lists, objects, inputs** (second pass): the type, class
+    and mode the rules of §4–§6 read are the unit's *sound identity*
+    (a transformed player sounds as its monster form) and its
+    `monsounds` record is chosen by superunique / unique / minion rules:
+    `audio/triggers-2.md` §18. The unit's request list (+0x78: order,
+    lifetime, the group walk `0x004CA900`, unit free): §19 there. When
+    object units make their §7 call: §20. Every client input the rules
+    read and its owner spec: §21.
 
 ### 2. Server sound events (S→C 0x2C)
 
@@ -223,7 +231,10 @@ the sound fields of §1 r6. Each client RNG draw listed in Randomness.
    `light_walk_dirt_1`, 2,768 `medium_walk_dirt_1`, 2,816
    `heavy_walk_dirt_1` (§5).
 2. If U is P and P is missing or in mode 17 (dead) (`0x00463DF0`):
-   nothing.
+   nothing. Exact (`0x004CB9C0`–`0x004CBA23`): U null or U's class ≥ 7
+   is fatal (`0xB22`) before this test, so "missing" never applies: the
+   rule is U = P (`[0x007A6A70]`) and P's mode (+0x10) = 17. Another
+   player's events play even when it is dead.
 3. **Chat, e = 25–32** (sent for C→S 0x3F PlayAudio,
    `client-messages.tsv`): unless `speaking(U)`, id = chat base + 2·(e
    − 25) (8 lines, 2 variants each), on U.
@@ -615,6 +626,13 @@ line indices, 0 = none. Dumped from `Game.exe`.
    menu `0x0047CEF0` (`0x0047CF17`, `0x0047CF28`, `0x0047CF3C`)
    (answers open question 7: no start-up path applies the stored
    `NPC Speech` setting).
+7. **Mode 2 and the record state** (`0x004E05AA`): mode 2 returns
+   `return` before the attempt loop and writes neither `last` (+0x10)
+   nor `tick` (+0x14); only modes 0 and 1 set them, after the last
+   attempt (`0x004E062E`, `tick` := C). The day phase of r1.2 is read
+   once per attempt that reaches it (`0x0061C220([0x007A0634])`).
+   "N's skill voices" of r1 and r2 (`0x004CB190`): `audio/triggers-2.md`
+   §19 r4.
 
 ### 11. UI sounds
 
@@ -638,7 +656,10 @@ S→C 0x5D (`0x004A2CB0`, flags byte f, code c, value v): f bit 0 and c
 = 33 → 237 `item_potion`; f bit 1: c = 4 → 241 `item_ring`; c ∈ {8,
 15, 18, 22, 35} → 7 `cursor_level_up`; c = 32 → 217 `item_gem`; c = 33
 → 243 `item_scroll`; f = 0x10: c = 10 → 2,456 then 2,474; c = 33 → id
-v. All none (open question 9).
+v. All none (open question 9). Only the first matching row of
+`client/msg-ui.md` §1 r2 runs: with f bit 0 set the bit-1 rows are not
+reached (f = 3, c = 33 plays 237 only), and f = 0x10 rows only when bits
+0 and 1 are clear.
 
 ### 12. Other fixed requests
 

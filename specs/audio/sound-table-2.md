@@ -7,7 +7,9 @@
   §1–§13 are claimed by code, so no section was moved; this part adds
   §14). §15 (fourth pass): static answer to `audio/sound-table.md` open
   question 9 (options-menu slider mapping), from the option records
-  and handlers read in the image.
+  and handlers read in the image. §16–§17 (fifth pass): the sample
+  cache's exact use order, load, eviction and unload, and the start
+  failures after a slot is taken (refining part 1 §7 and §10).
 - **Target version:** 1.14d
 - **Crate/module:** `d2-client::audio` (variant picks, `client/audio.md`
   §A3) and every client system listed in §14.3.
@@ -21,12 +23,14 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 32–42 |
-| Rules | 43–44 |
-|   14. Other users of the local player's client unit seed | 45–142 |
-|   15. Options-menu sliders (`audio/sound-table.md` open question 9) | 143–205 |
-| Test vectors | 206–220 |
-| Provenance | 221–239 |
+| Summary | 36–46 |
+| Rules | 47–48 |
+|   14. Other users of the local player's client unit seed | 49–146 |
+|   15. Options-menu sliders (`audio/sound-table.md` open question 9) | 147–209 |
+|   16. Sample cache, exact (refines `audio/sound-table.md` §10 r2–r6) | 210–260 |
+|   17. Start failures on a channel (refines `audio/sound-table.md` §7) | 261–280 |
+| Test vectors | 281–302 |
+| Provenance | 303–326 |
 <!-- /index -->
 
 ## Summary
@@ -203,6 +207,77 @@ owns how the three audio sliders turn into the §9 settings of
    The volume chain (`audio/sound-table.md` §8.2) reads the setting
    every update, so a change is heard from the next sound tick.
 
+### 16. Sample cache, exact (refines `audio/sound-table.md` §10 r2–r6)
+
+1. **Use order.** The cache keeps a list of ids (`[0x007BC9B8]`, one
+   node per id) in least-recently-used order: every load start (sync or
+   async, `0x00482970`) and every use stamp (`0x00482860`: last-use
+   tick := T, at a load and at every §6.3 r5 update of a playing
+   request) removes the id's node, if any, and appends it at the
+   **tail** (`0x00516980`, `0x00516A70`); an unload (`0x004823E0`)
+   removes it. The head is the least recently used id.
+2. **Load** `0x00482970(id, sync, recent)`. Nothing when the row's
+   file failed (+0x81) or it is loaded (state 2). State 1 (async
+   pending): sync = 0 → nothing; sync ≠ 0 → finish it now (the collect
+   of `audio/sound-table.md` §10 r5, blocking). State 0: open the file
+   (path §3; missing → +0x81 := 1, done); size = the file's size; if
+   total + size > limit (unsigned) the eviction r3 runs with (need =
+   total + size − limit, sync, recent); eviction failed → the stamp
+   `[0x007BC9C4]` := T (the "last failed eviction" of §10 r5) and no
+   load. Else sync ≠ 0: read the whole file (failure fatal `0x302`),
+   total += size, use stamp (r1), state 2, format check
+   (`formats/wav.md` §4). Sync = 0: open an async read (no handle →
+   nothing), total += its size, size field := it, use stamp, pending
+   loads += 1, state 1. Callers: a start (`audio/sound-table.md` §7 r2)
+   passes sync = (`Async Only` = 0), recent = 0; the preload (§10 r5)
+   passes sync = (T = 0), recent = 1. **Correction** to §10 r5: at T = 0
+   the preload loads **synchronously** (the whole file, at once), not
+   async; from T = 25 on it starts async reads.
+3. **Eviction** `0x004824A0(need, second, recent)`: target = total −
+   need (u32; a need above the total wraps, the target exceeds the
+   total and the call succeeds at once without evicting). While total >
+   target: walk the list from the head; a row is **kept** when (walk 0
+   and (lock count > 0 or `Cache`)) or (recent ≠ 0 and T − its last use
+   < 750, unsigned) or a channel is playing its id (`0x004DF9D0`); the
+   first row not kept is unloaded (r4) and the walk stops there. With
+   second ≠ 0 a walk 1 follows from the head with the lock / `Cache`
+   protection off (it can unload a second row even when the first was
+   enough). If no walk of this round unloaded anything → fail (0); else
+   repeat the while test. Success → 1.
+4. **Unload** `0x004823E0(id)` (state ≠ 0 only): a playing channel of
+   the id is fatal (`0x259`); total −= size; the node leaves the list;
+   last use := 0; an async handle is closed (the read is abandoned),
+   then sample := 0, state 0. The pending-loads counter is **not**
+   decremented for an abandoned async read (original bug, reproduce):
+   it counts down only in the collect (`0x00481720`) and is reset only
+   by sound init, so each pending read lost to an eviction keeps one
+   count until the next game start, and at 15 the T ≠ 0 preload starts
+   nothing more.
+5. d2rs (no load latency, `audio/sound-table.md` §10 last paragraph):
+   the cache bytes are modelled for these rules only; "size" is the
+   file's size in the archive listing (the uncompressed WAV size, as
+   Storm reports it), so the same evictions happen.
+
+### 17. Start failures on a channel (refines `audio/sound-table.md` §7)
+
+1. After a slot is taken (§7 r3; a steal has already stopped and ended
+   its victim): non-stream rows attach the cached sample to the voice
+   (`0x005155D0`); failure → the start fails with the slot left free
+   (its request pointer was not yet set). Then the slot's request :=
+   this one, volume and pan are computed and sent (`0x004DFC20`), and
+   the voice plays (`0x005156A0`) or the stream opens and plays
+   (`0x00515D70`, path §3, start offset × 4, `Loop`).
+2. A play or stream open that fails clears the slot's request again and
+   the start fails (`0x004E034D`–`0x004E0351`); the variant pick, the
+   history and the overwritten request id stay. A stream failure sets
+   no file-failed flag (+0x81 is written only by the load, §16 r2), so
+   a `Loop` stream request waits and retries on every later update
+   (`audio/sound-table.md` §6.3 r3, with a new variant pick each time
+   when its id opens a group); a one-shot is dropped by §6.3 r4.
+3. The duplicate test of §7 r1 and the eviction keep test (§16 r3) use
+   `0x004DF9D0(id)`: among slots whose voice is playing and whose
+   request's current id is id, the one with the smallest start tick.
+
 ## Test vectors
 
 | Input | Expected | Source |
@@ -217,6 +292,13 @@ owns how the three audio sliders turn into the §9 settings of
 | drag on `Sound`, W = 800, x = 300 | trunc(trunc(33 / 6.625 + 1) / 2) = trunc(5 / 2) = 2 → Master Volume 10 | §15 r4 |
 | drag on `Sound`, W = 800, x = 533 (x0 + 266) | position 20 | §15 r4 |
 | `3DBias` with mixer mode 0 | every input ignored | §15 r1 |
+| LRU [5, 9, 7]; id 9 used | [5, 7, 9] | §16 r1 |
+| limit 100, total 90, load size 30, sync, LRU [5 (20, unlocked), 7 (25, `Cache`)] | need 20, target 70: walk 0 unloads 5 (total 70), walk 1 unloads 7 (total 45); load: total 75 | §16 r3 |
+| same, sync = 0 (async start) | walk 0 only: unloads 5; total 70 → load starts, total 100 | §16 r3 |
+| eviction finds nothing to unload at T 400 | no load; failed-eviction stamp 400; the preload starts nothing before T 650 | §16 r2, `sound-table.md` §10 r5 |
+| preload at T = 0 of a `Cache` row | synchronous load, state 2 at once | §16 r2 |
+| pending 3; one pending row evicted | pending stays 3 | §16 r4 |
+| `Loop` `Stream` request whose stream fails to open | fails; waits; tried again next update | §17 r2 |
 
 ## Provenance
 
@@ -236,3 +318,8 @@ handler table `0x006D6034`–`0x006D6090` read from the image with
 `0x004DF880`, `0x004DF980`, setters `0x00514CD0`, `0x00514D00`,
 `0x00514D30` (each has no direct caller: only the apply thunks jump to
 them).
+§16–§17 (2026-10-07, disassembly): `0x00482970`, `0x004824A0`,
+`0x004823E0`, `0x00482860`, `0x00481720`, `0x00482B40` (its tail store
+`0x00482C0B`), `0x00482260` (counter resets `0x00482293`–`0x004822A2`),
+list helpers `0x00516950`, `0x00516980`, `0x00516A70`; start
+`0x004E01B0`, `0x004DF9D0`, `0x005155D0`, `0x005156A0`, `0x00515D70`.
