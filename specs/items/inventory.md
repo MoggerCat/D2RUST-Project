@@ -42,7 +42,7 @@
 | Edge cases & original bugs | 684–728 |
 | Test vectors | 729–777 |
 | Provenance | 778–834 |
-| Open questions | 835–934 |
+| Open questions | 835–937 |
 <!-- /index -->
 
 ## Summary
@@ -900,10 +900,13 @@ Answered handoff questions (`docs/HANDOFF.md` §7):
   N missing or not in mode 4 → out 0; `inventory-moves.md` §7.10 target not in mode 0 →
   nothing (out 0), C's link failing → out 1; `inventory-moves.md` §7.16 C's link failing →
   fatal assert (line 0x12D4); `inventory-moves.md` §7.19 only "filler missing / not in mode
-  4 / target missing" set out, every other check → 0 with out 0. Not
-  re-read here: `inventory-moves.md` §7.17, §7.23 copy, `inventory-moves.md` §8.1 rules 5 and 7, §9.3 unlink,
-  `inventory-moves.md` §10.2 pile creation (Ghidra on `0x00562390`, `0x0054D130`,
-  `0x0055D0D0`, `0x00563840`, `0x0055A090`).
+  4 / target missing" set out, every other check → 0 with out 0. The
+  sites first left out are answered in place (2026-10-07): §7.17 no
+  hireling → the potion is used on the player; §7.23 a failed copy →
+  fatal assert; §8.1 rule 5 (§4.9 result 0 unreachable; were it 0:
+  result 0, out 0) and rule 7 (link failure fatal); §9.3 unlink failure
+  fatal; §10.2 a failed pile creation skips that pile and goes on; §7.8
+  failure outcomes (E's unlink fatal) in its own paragraph.
 - MV5: type tests through `0x00629BB0` use itemtypes equivalence; those
   through `0x0062B400` compare the primary type only (§4.7 type 38;
   `inventory-moves.md` §7.6–§7.8 type 19; `inventory-moves.md` §7.12 and §7.20 the book type 18); `inventory-moves.md` §7.12 reads the

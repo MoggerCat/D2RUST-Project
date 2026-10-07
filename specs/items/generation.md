@@ -27,27 +27,28 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 53–67 |
-| Inputs | 68–106 |
-| Outputs / state changes | 107–119 |
-| Rules | 120–121 |
-|   1. Conventions | 122–227 |
-|   2. Seeds | 228–246 |
-|   3. Pipeline (`0x00558D90`, D2MOO `D2GAME_CreateItemEx`) | 247–268 |
-|   4. Base stats (`0x00557AB0`, D2MOO `D2GAME_InitItemStats`) | 269–316 |
-|   5. Special item kinds | 317–327 |
-|   6. Normal quality and class skill mods | 328–374 |
-|   7. Sockets | 375–406 |
-|   8. Ethereal | 407–427 |
-|   9. Forced requests, ears, names, timers | 428–461 |
-|   10. Items from a code: the create wrapper and start items | 462–532 |
-|   11. Format-0 branches (legacy items) | 533–578 |
-| Constants & data dependencies | 579–601 |
-| Randomness | 602–620 |
-| Edge cases & original bugs | 621–635 |
-| Test vectors | 636–651 |
-| Provenance | 652–678 |
-| Open questions | 679–769 |
+| Summary | 54–68 |
+| Inputs | 69–107 |
+| Outputs / state changes | 108–120 |
+| Rules | 121–122 |
+|   1. Conventions | 123–228 |
+|   2. Seeds | 229–247 |
+|   3. Pipeline (`0x00558D90`, D2MOO `D2GAME_CreateItemEx`) | 248–269 |
+|   4. Base stats (`0x00557AB0`, D2MOO `D2GAME_InitItemStats`) | 270–317 |
+|   5. Special item kinds | 318–328 |
+|   6. Normal quality and class skill mods | 329–375 |
+|   7. Sockets | 376–407 |
+|   8. Ethereal | 408–428 |
+|   9. Forced requests, ears, names, timers | 429–462 |
+|   10. Items from a code: the create wrapper and start items | 463–533 |
+|   11. Format-0 branches (legacy items) | 534–579 |
+|   12. Repair, recharge and runeword removal | 580–643 |
+| Constants & data dependencies | 644–666 |
+| Randomness | 667–685 |
+| Edge cases & original bugs | 686–700 |
+| Test vectors | 701–716 |
+| Provenance | 717–743 |
+| Open questions | 744–834 |
 <!-- /index -->
 
 ## Summary
@@ -575,6 +576,70 @@ the item seed ("pct" = one step, lo′ mod 100):
    Value: pct ≥ 90 → 3; ≥ 60 → 2; else 1. **Set** stat 107 layer skill
    := value in the item's (state 0, flags 0x40) list (`0x006257D0`,
    created if missing).
+
+### 12. Repair, recharge and runeword removal
+
+Item routines other specs call (`world/vendors.md` §8.2, `world/cube.md`
+§7, `items/inventory-moves.md` §7.19, `sim/units.md` §6.5 event 3);
+read from the 1.14d disassembly, 2026-10-07. No RNG draw in any of them.
+
+#### 12.1 Repair a broken item (`0x0055F900`, ECX game, EDX owner U or none, stack item X)
+
+Callers: the replenish event `0x00562C40` (value ≥ 1 on a broken item),
+the cube (`0x005662E5`), the vendor repair `0x005761C0` (`0x00576254`).
+
+1. Item flag 0x200 set, item flag 0x100 (broken) cleared
+   (`0x006280D0`).
+2. U given and U has an inventory (unit +0x60): `0x0055D970`(EDI U,
+   ESI X; game) (`items/inventory.md` §5.7 step 2: stat link unless body
+   location 11 / 12, stat refresh `0x0055C2C0(X, U, 1)` when X is in
+   mode 1, or in mode 0 and an active inventory item), inventory pass
+   §5.7 (send 0), update list += X, owner refresh (`0x00621000`(U, 1)).
+3. m := X's max durability (`0x00625E00`); m > 0 → base stat 72 := m
+   (`0x00627260`); with U given, S→C 0x3E (stat 72, value m, param 0)
+   to U's client (`0x005531C0`: U's client when U is a player, else
+   none; `0x0053D130`).
+4. Set-item state update `items/properties.md` §13(U, X, 0, 0).
+5. U given → weapon bookkeeping `0x0055C5C0`(U).
+
+#### 12.2 Recharge (`0x0055FE80`, ECX game, EDX owner U or none, stack item X) → 0 / 1
+
+Callers: socketing (`0x00562848`, `items/inventory-moves.md` §7.19),
+the cube (`0x00566325`), the vendor repair (`0x00576231`), the uber
+death handler (`0x005E0112`).
+
+1. Game none, X none or not an item → 0.
+2. client := U's client when U is a player (`0x005531C0`), else none.
+3. E := X's stat-204 (`item_charged_skill`) entries of its aggregate
+   (extended, flag bit 31) list, at most 64 (`0x006261D0`; no such list
+   → none), each {layer k u16, value v i32}. r := 0.
+4. For each entry in that order: m := v >> 8 (signed), c := v & 0xFF.
+   c < m → set the charges (`0x0065C940`(X, skill k >> [data +0xC6C],
+   level k & [data +0xC70], m)), r := 1 (whatever that returned), and
+   with a client S→C 0x3E (stat 204, value (m & 0xFF) + m × 256, param
+   key k′ = (skill << [+0xC6C]) + (level & [+0xC70])).
+5. Return r.
+
+Set the charges `0x0065C940`(X, skill, level, n): key := (skill <<
+[+0xC6C]) + (level & [+0xC70]); X's stat lists with flag 0x40 in list
+order (`0x00625760`, `0x00625730`): the first stat-204 entry with layer
+key (`0x00625D00`): mx := entry >> 8; mx − 1 < 255 (unsigned, i.e. mx
+in 1 … 255) → entry := mx × 256 + (min(n′, mx) & 0xFF) with n′ := 0
+when n < 1, else n
+(`0x00627220`(list, 204, value, key, X)), return 1; else return 0
+(nothing written). No entry in X's lists → the same on each item of
+X's own inventory (+0x60, node order) until one returns 1; else 0.
+(The client's copy of this rule: `client/msg-stats-items.md` §5, 0x3E
+stat 204.)
+
+#### 12.3 Remove a runeword (`0x00558C50`, EDX item X)
+
+Caller: the cube (`0x00566130`, `world/cube.md` §7 remove[j]). X none,
+not an item, or item flag 0x4000000 (runeword) clear → nothing. Else:
+flag 0x4000000 cleared; prefix slot 0 (item data +0x38) := 0
+(`0x00627EF0`(X, 0, 0)); X's list of state 171 with flags 0x40
+(`0x00625790`), when present, detached from X (`0x006277E0`) and freed
+(`0x00626CD0`). The fillers stay in X.
 
 ## Constants & data dependencies
 

@@ -41,7 +41,7 @@
 | Edge cases & original bugs | 481–490 |
 | Test vectors | 491–509 |
 | Provenance | 510–529 |
-| Open questions | 530–613 |
+| Open questions | 530–616 |
 <!-- /index -->
 
 ## Summary
@@ -583,6 +583,9 @@ Synthetic, from the rules:
    loops possibly the filler class ids of a previous item matched at
    the same depth); settle with a stack trace at `0x0062BFBA` on those
    paths, or keep d2rs's "no match" as a Ruleset choice.
+   Status (2026-10-07): Pending for fidelity only; d2rs keeps "no match"
+   for the unwritten slot on every path (§10.1 Edge), so no code waits
+   on it.
 5. Answered (handoff `impl-items` OQ-P1): §5 rules 8 and 9 "**set**" is
    not §4.2. Functions 18 (`0x0065F870`) and 19 (`0x0065F6A0`) take the
    list through the same owner-or-item lookup as §4.2 (`0x0065CBF0`,

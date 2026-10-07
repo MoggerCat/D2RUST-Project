@@ -39,13 +39,13 @@
 |   6. Drop quality (`0x00558640`) | 428–459 |
 |   7. Creation inputs and placement (`0x0055A550`) | 460–490 |
 |   8. Gold amount | 491–506 |
-|   9. Quest drop helper (`0x00559A30`) | 507–588 |
-| Constants & data dependencies | 589–618 |
-| Randomness | 619–635 |
-| Edge cases & original bugs | 636–659 |
-| Test vectors | 660–689 |
-| Provenance | 690–714 |
-| Open questions | 715–871 |
+|   9. Quest drop helper (`0x00559A30`) | 507–592 |
+| Constants & data dependencies | 593–622 |
+| Randomness | 623–639 |
+| Edge cases & original bugs | 640–663 |
+| Test vectors | 664–693 |
+| Provenance | 694–718 |
+| Open questions | 719–878 |
 <!-- /index -->
 
 ## Summary
@@ -579,7 +579,11 @@ Pick: count n > 0 → one step of the seed; n a power of two → `lo'` &
 start of 0 returns −1 at once. n = 0 → the routine returns the
 **uninitialised** first slot of its candidate array (a stack value),
 reachable whenever every record is filtered out (for example all rarity
-rolls reject at a low `L`) — d2rs: Open question 12. `p6` = item type filter (−1 = any), `p7` = skip
+rolls reject at a low `L`). d2rs (Ruleset choice, Open question 12):
+the n = 0 result is −1, as for a part start of 0; the caller then
+treats it as a missing record (§9 rule 3: the magic loop retries;
+otherwise the request item −1 fails `items/generation.md` §3 step 2,
+no item). `p6` = item type filter (−1 = any), `p7` = skip
 the rarity roll; the quest specs pass `p6` = −1. Draws: one `roll(d)`
 per record that reaches the rarity test with d > 0, in index order, then
 the pick step. `bitfield1` (+0xDC) bit 0, tested by the §9 magic retry
@@ -866,5 +870,8 @@ Real 1.14d (game-file tests, `#[ignore]`, from the live `.bin` set):
     - 14: the fatal paths (0xF3A, 0xF44, 0xFEA, no ratio row, bone wall,
       > 65,534 TCs) are the original's asserts (process exit); how d2rs
       reports them is a Ruleset choice, not a fidelity fact.
-    Still open: §9.1's n = 0 result (an uninitialised stack value; d2rs
-    must pick a value: settle only by choosing, e.g. treat as no item).
+    §9.1's n = 0 result (an uninitialised stack value): Pending for
+    fidelity (only a stack capture at the pick of `0x00555E70` /
+    `0x00555FB0` / `0x005560F0` with every record filtered could show
+    the 1.14d value, and it depends on earlier calls); d2rs's choice is
+    recorded in §9.1 (−1, no item), so no code waits on it.
