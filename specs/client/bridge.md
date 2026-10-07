@@ -46,13 +46,13 @@
 |   7. Bevy mirror | 237–255 |
 |   8. Frame pacing | 256–276 |
 |   9. Versioning | 277–287 |
-|   10. Client outputs (bridge → UI and audio) | 288–445 |
-| Constants & data dependencies | 446–460 |
-| Randomness | 461–464 |
-| Edge cases & original bugs | 465–473 |
-| Test vectors | 474–504 |
-| Provenance | 505–515 |
-| Open questions | 516–553 |
+|   10. Client outputs (bridge → UI and audio) | 288–450 |
+| Constants & data dependencies | 451–465 |
+| Randomness | 466–469 |
+| Edge cases & original bugs | 470–478 |
+| Test vectors | 479–509 |
+| Provenance | 510–520 |
+| Open questions | 521–558 |
 <!-- /index -->
 
 ## Summary
@@ -377,8 +377,11 @@ model state: 1.14d's handler calls a UI or sound function directly
 11. **Update-pass outputs** (2026-10-08; answers `client/model.md` open
    question 16). The client update pass (`client/model.md` §5) may emit
    an output too; its producer in the table is `update`, not a message
-   id. The one such output is `TownExit` (`client/model.md` §17 r6
-   step 4). In 1.14d the town exit runs inside the local player's
+   id. The one such output delivered out of order is `TownExit`
+   (`client/model.md` §17 r6 step 4); the client object outputs
+   `ObjectSound` and `ObjectFx` (the object update and the mode
+   requests of the drains, `world/objects-client.md` §28 r3) stay in
+   the list in update order under rule 4. In 1.14d the town exit runs inside the local player's
    update, after every UI call of the frame's receive and before the
    rest of the pass, so the bridge delivers it at the point it is
    emitted, as an exception to rule 4: it first hands the UI layer
@@ -442,6 +445,8 @@ model state: 1.14d's handler calls a UI or sound function directly
 | `JoinRefused` | error number u8 (the mapped code) | 0xB4 | UI | `client/model.md` §7 rule 8 |
 | `TownExit` | local player key, GUIDs of the S monsters | update | UI | `client/model.md` §17 rule 6; delivery `client/bridge.md` §10 r11 |
 | `StateFx` | unit key, state u16, phase (on / hooks / off), bit set before, unit dead, hook number u8 (setfunc / remfunc, 0 = none), two hook values i32 (`client/stat-lists.md` §3 r6.7) | 0xA8 (also 0xA7, 0xA9, 0xAA) | effects | `client/stat-lists.md` §3 rule 6 |
+| `ObjectSound` | the call (mode sound: unit key, set S or C, class, mode; request: id, unit; player event: player key, event) | update | audio | `world/objects-client.md` §25 r2, §26, §28 r3; `client/model.md` §8 rule 7 |
+| `ObjectFx` | the call (graphics refresh, graphics load, overlay create / remove, object light, client skill start) with the values read | update | effects | `world/objects-client.md` §26, §28 r3; `render/overlay.md` §5; `render/lighting.md` open question 11 |
 
 ## Constants & data dependencies
 

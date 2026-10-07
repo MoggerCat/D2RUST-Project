@@ -16,6 +16,8 @@ use super::super::bits::BitReader;
 use super::super::check::check;
 use super::super::dispatch::{HandlerError, Message, UnitMessage};
 use super::super::drlg::DrlgRoomId;
+use super::super::objects::interact::{mode_request_code_2, CODE_INTERACT};
+use super::super::objects::FLAG_EX_EXPANSION;
 use super::super::output::{Output, ShrineFxKind};
 use super::super::skills::SkillList;
 use super::super::world::{
@@ -58,6 +60,9 @@ fn create(
 ) -> Result<Created, HandlerError> {
     let mut u = ClientUnit::new(key);
     u.class = class;
+    if w.expansion != 0 {
+        u.flag_ex |= FLAG_EX_EXPANSION;
+    }
     let placed = (x, y) != (0, 0);
     u.seed = (!placed).then_some(INIT_SEED);
     let mut room = None;
@@ -508,6 +513,13 @@ pub fn queued(w: &mut ClientWorld, msg: &UnitMessage<'_>) -> Result<(), HandlerE
         *slot = read(&b, f)?;
     }
     mode_request(w, msg.unit, code, record);
+    // Player code 0x02 (model §8 rule 4): the interact sender
+    // `0x00480930(r0 & 0xFFFF, r1)` (§8 rule 7).
+    if msg.unit.unit_type == PLAYER && code == CODE_INTERACT && w.units.contains_key(&msg.unit) {
+        for o in mode_request_code_2(w, msg.inputs, record)? {
+            msg.out.push(o);
+        }
+    }
     // Objects (rule 5, `model.md` §15): the shrine part of codes 3 and
     // 0x15, after the stored request.
     if msg.unit.unit_type == OBJECT {

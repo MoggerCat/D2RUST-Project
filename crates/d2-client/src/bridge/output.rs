@@ -9,6 +9,7 @@
 
 use std::cell::RefCell;
 
+use super::objects::{ObjFx, ObjSound};
 use super::world::{RosterRecord, UnitKey};
 
 /// One output: a 1.14d UI, sound or client-effect entry point with the
@@ -211,6 +212,14 @@ pub enum Output {
         hook: u8,
         values: [i32; 2],
     },
+    /// The client object update's audio calls (`world/objects-client.md`
+    /// §28 r3; mode sound calls, requests, the player event sound), in
+    /// update order.
+    ObjectSound(ObjSound),
+    /// The client object update's effect calls (`world/objects-client.md`
+    /// §28 r3; graphics refresh and loads, overlays, lights, the client
+    /// skill start), in update order.
+    ObjectFx(ObjFx),
 }
 
 /// The phase of a `StateFx` (`client/stat-lists.md` §3 r6.1–r6.3).
@@ -309,7 +318,7 @@ use Consumer::{Audio, Effects, Ui};
 
 /// The variants in code, in the §10 table's order (checked against the
 /// table, §10 rule 8).
-pub const ROWS: [Row; 40] = [
+pub const ROWS: [Row; 42] = [
     row("ServerSound", 0x2C, Audio),
     row("QuestUi", 0x5D, Ui),
     row("WaypointMenu", 0x63, Ui),
@@ -350,6 +359,8 @@ pub const ROWS: [Row; 40] = [
     row("JoinRefused", 0xB4, Ui),
     update_row("TownExit", Ui),
     row("StateFx", 0xA8, Effects),
+    update_row("ObjectSound", Audio),
+    update_row("ObjectFx", Effects),
 ];
 
 impl Output {
@@ -396,6 +407,8 @@ impl Output {
             Output::JoinRefused { .. } => 37,
             Output::TownExit { .. } => 38,
             Output::StateFx { .. } => 39,
+            Output::ObjectSound(_) => 40,
+            Output::ObjectFx(_) => 41,
         };
         &ROWS[i]
     }

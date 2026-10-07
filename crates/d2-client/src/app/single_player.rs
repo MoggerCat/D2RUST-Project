@@ -706,6 +706,16 @@ pub fn client_drlg_source(data: &GameData) -> DrlgSource {
     }
 }
 
+/// The `objects.txt` rows of the client object update
+/// (`world/objects-client.md` §28 r1): the live table; none for the
+/// synthetic game (its object update then runs nothing).
+pub fn client_object_rows(data: &GameData) -> Vec<crate::bridge::objects::ObjClientRow> {
+    match data {
+        GameData::Synthetic => Vec::new(),
+        GameData::Live(d) => crate::bridge::objects::ObjClientRow::rows(&d.waypoints.objects),
+    }
+}
+
 /// The `Levels.txt` fields the client reads (`client/model.md` §11
 /// rules 3–4: `Pal`, `Act`, `BlankScreen`; `audio/environment.md` §1 r2:
 /// `SoundEnv`), one row per level id, from the game's `levels` table.

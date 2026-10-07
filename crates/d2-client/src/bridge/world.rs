@@ -10,6 +10,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+pub use super::objects::{ClientObjects, ObjClientInputs};
+
 use super::drlg::{ClientDrlg, DrlgRoomId, DrlgSource};
 use super::skills::SkillList;
 use crate::rules::lighting::environment::Environment;
@@ -200,6 +202,19 @@ pub struct ClientUnit {
     /// `0x00648730` (path flag 0x20 cleared, point count := 0) was called
     /// on the unit's path by a model rule (`msg-ui.md` §16 r4.3).
     pub path_stopped: bool,
+    /// +0xD4 (u32, 0 at creation): the interact stamp of a monster
+    /// (§8 rule 7) and the timer T of the client object functions
+    /// (`world/objects-client.md` §25 r5).
+    pub interact_ms: u32,
+    /// +0x44: the animation frame (signed, 8.8 fixed point; §18 rule 1).
+    pub frame: i32,
+    /// +0xC8: flag-ex. Bit 0x2000000 := `expansion` ≠ 0 at creation
+    /// (§2 rule 6); the other bits are written by the rules that own
+    /// them (`world/objects-client.md` §26.2).
+    pub flag_ex: u32,
+    /// Unit flag +0xC4 bit 0x4, read by the interact sender (§8 rule 7).
+    /// TODO(spec: client/model.md §8 rule 7): no model rule writes it.
+    pub flag_4: bool,
 }
 
 /// The reserved `outgoing` slot of 0x28's dialog branch (`msg-ui.md`
@@ -229,6 +244,10 @@ impl ClientUnit {
             state_lists: BTreeMap::new(),
             turned_toward: None,
             path_stopped: false,
+            interact_ms: 0,
+            frame: 0,
+            flag_ex: 0,
+            flag_4: false,
         }
     }
 
@@ -519,6 +538,9 @@ pub struct ClientWorld {
     /// (`msg-stats-items.md` §5 r7): entries of 0x120 bytes. Entries
     /// built at load (`0x006394A0`) are not held (open question 7).
     pub item_table_ext: Vec<Vec<u8>>,
+    /// Set C and the client latches of the object functions
+    /// (`world/objects-client.md` §27, `model.md` §2 rule 1).
+    pub objclient: ClientObjects,
 }
 
 impl ClientWorld {
@@ -921,4 +943,11 @@ pub struct ModelInputs {
     pub drlg: Option<DrlgSource>,
     /// The `d2exp.mpq` check `0x00408F20` (`msg-stats-items.md` §5 r6).
     pub expansion_installed: bool,
+    /// `GetTickCount()` of this update, wrapping milliseconds (§5 rule 2;
+    /// `world/objects-client.md` §25 r6): the live client passes the host
+    /// clock, tests and replays a scripted value.
+    pub now: u32,
+    /// What the client object functions read beside the model
+    /// (`world/objects-client.md` Inputs).
+    pub objclient: ObjClientInputs,
 }

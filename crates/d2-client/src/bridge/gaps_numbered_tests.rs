@@ -215,7 +215,11 @@ fn client_world_holds_only_stated_fields() {
         roster_inactive,
         weapon_set,
         item_table_ext,
+        // `client/model.md` §2 rule 1 (set C); `world/objects-client.md`
+        // §27 r2 (the latches).
+        objclient,
     } = ClientWorld::default();
+    assert_eq!(objclient, Default::default());
     assert!(overrides == Default::default() && roster.is_empty() && roster_inactive.is_empty());
     assert!(weapon_set == 0 && item_table_ext.is_empty());
     assert!(pets.is_empty() && palette_act.is_none() && active_rooms.is_none());
@@ -253,7 +257,14 @@ fn client_world_holds_only_stated_fields() {
         // `client/msg-ui.md` §16 r4.3 (open question 10 decided as A).
         turned_toward,
         path_stopped,
+        // `client/model.md` §8 rule 7, §18 rule 1, §2 rule 6;
+        // `world/objects-client.md` §25 r5.
+        interact_ms,
+        frame,
+        flag_ex,
+        flag_4,
     } = ClientUnit::new(key);
+    assert_eq!((interact_ms, frame, flag_ex, flag_4), (0, 0, 0, false));
     assert!(skills.is_none() && !quest_untargetable);
     assert!(turned_toward.is_none() && !path_stopped);
     assert!(flag_2.is_none() && states.is_empty() && state_lists.is_empty());
