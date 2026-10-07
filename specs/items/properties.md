@@ -25,21 +25,21 @@
 |   1. Property record and slots | 73–81 |
 |   2. Modes (`0x0065FEC0`, D2MOO `ITEMMODS_AssignProperty`) | 82–100 |
 |   3. Dispatcher (`0x0065FD70`; wrapper `0x0065FE10` for format ≥ 1) | 101–110 |
-|   4. Shared helpers | 111–143 |
-|   5. Property functions | 144–198 |
-|   6. Superior (mode 1) and affixes (mode 0) | 199–203 |
-|   7. Uniques (mode 3) | 204–207 |
-|   8. Set items | 208–218 |
-|   9. Socket fillers (`0x0055C2C0`) | 219–234 |
-|   10. Runewords | 235–283 |
-|   11. Set bonuses (`0x00660120`) | 284–296 |
-|   12. Craft property lists (`0x00660240`) | 297–302 |
-| Constants & data dependencies | 303–312 |
-| Randomness | 313–318 |
-| Edge cases & original bugs | 319–328 |
-| Test vectors | 329–347 |
-| Provenance | 348–367 |
-| Open questions | 368–379 |
+|   4. Shared helpers | 111–150 |
+|   5. Property functions | 151–205 |
+|   6. Superior (mode 1) and affixes (mode 0) | 206–210 |
+|   7. Uniques (mode 3) | 211–214 |
+|   8. Set items | 215–225 |
+|   9. Socket fillers (`0x0055C2C0`) | 226–241 |
+|   10. Runewords | 242–290 |
+|   11. Set bonuses (`0x00660120`) | 291–303 |
+|   12. Craft property lists (`0x00660240`) | 304–313 |
+| Constants & data dependencies | 314–323 |
+| Randomness | 324–329 |
+| Edge cases & original bugs | 330–339 |
+| Test vectors | 340–358 |
+| Provenance | 359–378 |
+| Open questions | 379–390 |
 <!-- /index -->
 
 ## Summary
@@ -118,10 +118,17 @@ the unit's seed).
 
 #### 4.2 Add to the stat list (`0x0065EA50`)
 
-Arguments: owner, record, set, stat, layer, value, state, flags. Nothing
-(return 0) if the record is none, value = 0, or the stat is out of
-itemstatcost. List: the owner's list with this state and flags if an
-owner is given, else the item's; created if missing (`sim/stat-lists.md`).
+Arguments: ECX item, EDX flags; stack owner, record, set, stat, layer,
+value, state (the property functions pass their own EDX as the owner,
+e.g. `0x0065EB88`). Nothing (return 0) if the record is none, value = 0,
+or the stat is out of itemstatcost. List (`0x0065CBF0`): X := the owner
+if given, else the item. Find on X (`0x00625790`): X's list missing or
+not extended → none; state ≠ 0 → the list of that state
+(`sim/stat-lists.md` §9.3, `0x00625650`), state = 0 → the first list
+with any of the flags (`0x006256E0`). None → allocate a plain list
+(flags, expire 0, owner type **4** and X's GUID even when X is the
+owner unit; GUID −1 when X is none), attach it to X with reset 1 and set
+its state; a null result is fatal.
 v := value << itemstatcost `valshift`. set ≠ 0 → **set** stat (layer) :=
 v; and for stat 58 (`poisonmaxdam`): if stat 326 (`poison_count`) is 0,
 set it to 1. set = 0 → **add** v; for stat 58 also add 1 to stat 326.
@@ -296,9 +303,13 @@ first < 0).
 
 ### 12. Craft property lists (`0x00660240`)
 
+Arguments (stack): item, record list, a third value (the cube passes
+the game's expansion flag, `world/cube.md` §7). Item null → nothing.
 Mode 7 for one record list (owner none, flags 0x40); then, if the item
 is flagged ethereal (0x400000), re-apply ethereal (`items/generation.md`
-§8.2). The list and when it runs belong to the cube spec.
+§8.2). The third argument is never read (`0x00660240` pops it unused,
+`ret 0xC`): the expansion flag has no effect here. The list and when it
+runs belong to the cube spec.
 
 ## Constants & data dependencies
 
@@ -369,8 +380,8 @@ Synthetic, from the rules:
 
 1. No recording confirms any rule (request R1 in the session report).
 2. The quality-5 socket-filler branch `0x00663CC0` is not specified.
-3. The owner-vs-item list choice in §4.2 is read from `0x0065CBF0`'s two
-   branches and D2MOO; confirm the register mapping (Ghidra request G1).
+3. Answered (G1): §4.2, register mapping read from `0x0065EA50`,
+   `0x0065CBF0` and the caller `0x0065EB30`.
 4. §10.1 edge: whether the stale class-id slot can ever equal a rune's
    class id in 1.14d (it would let a socketed item take a runeword one
    rune longer than its sockets). Settle: a stack trace of the slot at

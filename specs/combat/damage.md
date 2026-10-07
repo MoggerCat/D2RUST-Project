@@ -493,7 +493,7 @@ registered on `unit` for `event` (`events.txt` index: 0 hitbymissile,
 functions through `itemstatcost` `itemevent1/2` + `itemeventfunc1/2`;
 skills register their own. Function table §8. Handler records,
 registration (prepend) and unregistration: `skills/bodies.md` §2.13;
-iteration order belongs to `sim/units.md` (Open question 4).
+iteration order: `sim/units.md` §6.6 (newest first).
 
 #### 5.5 Stun `0x0057AAE0`
 
@@ -840,8 +840,8 @@ Real 1.14d data (`#[ignore]`): the resistance rows of §4.3 equal
    `0x0057CEE0` (size 1,254) and `0x0057CCB0` (375) branch by branch
    against §7, especially the block-animation frame test and the soft-hit
    path.
-4. Unit-event registration and iteration order (`0x005C0C30`, D2MOO
-   `SUNITEVENT_Trigger`/`Register`): owner `sim/units.md`.
+4. Answered: unit-event registration and iteration order
+   (`0x005C0C30`, `0x005C0AD0`) are `sim/units.md` §6.6.
 5. Event functions other than 15 and 16 (table §8): behaviour and draws
    unspecified. Ghidra request: each address in §8.
 6. Hosted games: confirm the element hit-class counter is shared across
