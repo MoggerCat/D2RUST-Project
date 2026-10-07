@@ -23,16 +23,16 @@
 |   3. Group eviction `0x00575720(t)` (player in EDI) | 95–106 |
 |   4. Set the maximum `0x00575850(game, player, t, max)` | 107–117 |
 |   5. Append `0x00575C70(pet, extra)` (E in ESI, game in EAX) | 118–127 |
-|   6. Remove `0x005750E0(game, player, GUID, kill)` and unlink `0x00574850` | 128–144 |
-|   7. Dismiss `0x00574450` (GUID in EBX, game in EDI) | 145–153 |
-|   8. Broadcast and message 0x7A | 154–167 |
-|   9. Lookup `0x00574A20(player, GUID)` | 168–174 |
-| Constants & data dependencies | 175–184 |
-| Randomness | 185–188 |
-| Edge cases & original bugs | 189–198 |
-| Test vectors | 199–207 |
-| Provenance | 208–227 |
-| Open questions | 228–238 |
+|   6. Remove `0x005750E0(game, player, GUID, kill)` and unlink `0x00574850` | 128–156 |
+|   7. Dismiss `0x00574450` (GUID in EBX, game in EDI) | 157–165 |
+|   8. Broadcast and message 0x7A | 166–179 |
+|   9. Lookup `0x00574A20(player, GUID)` | 180–186 |
+| Constants & data dependencies | 187–196 |
+| Randomness | 197–200 |
+| Edge cases & original bugs | 201–212 |
+| Test vectors | 213–221 |
+| Provenance | 222–261 |
+| Open questions | 262–272 |
 <!-- /index -->
 
 ## Summary
@@ -140,7 +140,19 @@ node with this GUID (none → return); unlink it; broadcast "remove"; the
 unit of GUID exists: kill = 0 → its flags (+0xC4) &= ~0x80000000; else
 dismiss (§7); free the node; E.count −= 1 (< 0 → fatal assertion).
 
-A remove therefore broadcasts twice (unlink and Remove itself).
+Broadcast count of one Remove (each broadcast = one 0x7A remove per
+player, §8):
+
+| Case | Broadcasts | From |
+|---|---|---|
+| GUID in list t ≥ 1, kill 1, its unit exists | 3 | unlink (`0x005748B3`), dismiss inside unlink (`0x005748D5` → `0x0057452B`), Remove (`0x0057518F`) |
+| GUID in list t ≥ 1, kill 0, or its unit gone | 2 | unlink, Remove |
+| t = 0 (in no list), kill 1, unit exists | 2 | dismiss (`0x00575137`), Remove |
+| t = 0, kill 0, or unit gone | 1 | Remove |
+
+The dismiss kill `0x0057CCB0(game, unit, 0, 0)` passes 0 as its second
+stack argument, so the kill path's own pet removal (`0x0057CD0D` →
+`0x005751A0`, which calls Remove again) does not run inside a remove.
 
 ### 7. Dismiss `0x00574450` (GUID in EBX, game in EDI)
 
@@ -188,13 +200,15 @@ None.
 
 ## Edge cases & original bugs
 
-1. A remove broadcasts 0x7A twice (§6).
+1. A remove broadcasts 0x7A up to three times: three for a listed pet
+   removed with kill 1 whose unit exists (§6 table).
 2. Remove of a GUID that is in no list still dismisses the monster when
    kill ≠ 0 and still broadcasts (§6 step 2).
 3. Group eviction stops at the first list head whose unit no longer
    exists, leaving later nodes of that type (§3).
 4. Setting a maximum below the current count removes the oldest pets one
-   by one, each with two broadcasts (§4).
+   by one (kill 1), each with three broadcasts when the unit exists
+   (§4, §6 table).
 
 ## Test vectors
 
@@ -222,6 +236,26 @@ None.
   `0x00478F20` returns) and u32@5 as the owner (`client/model.md` §14).
   No 0x7A occurs in the two recordings (`traces/raw/20261006-015956`,
   `-022633`).
+- Re-checked again 2026-10-07 (spec-senders-area-2) because
+  `skills/bodies-3.md` §2 (branch `spec-skill-area`) read pet @5 / owner
+  @9: **owner @5, pet @9 stands**. `0x0053CB30` stores ECX = client, DL
+  @1, stack arg 1 ([EBP+8]) @2, arg 2 ([EBP+0xC]) @9, arg 3 ([EBP+0x10])
+  @5, arg 4 ([EBP+0x14], u16) @3 (`0x0053CB44`–`0x0053CB6B`). `0x00575D90`
+  (ECX game, EDX = the player: its type is checked to be 0 at
+  `0x00575DA7`; stack arg 1 = the pet unit, EBX) builds the record +0x00 =
+  pet +0x0C (GUID, `0x00575E4F`), +0x04 = player +0x0C (`0x00575E61`),
+  +0x08 = pet +0x04 (class, `0x00575E5E`), +0x0C = pet type
+  (`0x00575E42`). `0x00574930` / `0x00574410` push +0x08, +0x04, +0x00,
+  +0x0C, so arg 2 = pet, arg 3 = owner. The third caller, `0x00574F80`
+  (call `0x0053CA6E`, every pet of a player to one client, action 1),
+  pushes the player's GUID as arg 3 and the node GUID as arg 2
+  (`0x0057501E`–`0x00575026`): the same order. `sim/server-messages.tsv`
+  0x7A (`owner:u32@5 pet:u32@9`) is right; bodies-3.md §2 is the one
+  to fix.
+- Same session, broadcast count: `0x005750E0`, `0x00574850`,
+  `0x00574450`, `0x005751A0`, `0x0057CCB0` (`0x0057CD0D`–`0x0057CD21`);
+  the remove-with-kill count is 3, not 2 (§6 table): bodies-3.md §2 was
+  right on this point.
 - D2MOO 1.10f `PlayerPets.cpp` names (`PLAYERPET_*`) used as hints only;
   every step above is from 1.14d.
 
