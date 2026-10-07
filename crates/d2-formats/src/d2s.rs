@@ -15,6 +15,7 @@
 //! Open question 3, C66). The load effects are `formats/d2s-load.md`
 //! (`d2-server` character storage).
 
+pub mod appearance;
 #[cfg(test)]
 mod tests;
 
@@ -323,10 +324,24 @@ impl Header {
     /// The writer's pre-fill of the 32 appearance bytes +0x88..+0xA7
     /// (§2.8 rule 1): all 0xFF. The writer then lets each equipped item
     /// (mode 1) change its bytes; with no equipped item this is the saved
-    /// value (§2.8 rule 2). The per-item mapping is Open question 17.
+    /// value (§2.8 rule 2). The per-item mapping is
+    /// [`appearance`] (§2.8 rule 4).
     pub fn reset_appearance(&mut self) {
         self.components = [0xFF; 16];
         self.colours = [0xFF; 16];
+    }
+
+    /// The writer's appearance bytes (§2.8 rules 1, 3, 4): the 0xFF
+    /// pre-fill, then the fill of `formats/d2s-appearance.md` §3 from the
+    /// items equipped at save time. The bytes the header held before
+    /// (a loaded file's) never reach the result.
+    pub fn rebuild_appearance(
+        &mut self,
+        eq: &appearance::Equipment,
+        t: &appearance::AppearanceTables,
+    ) {
+        self.reset_appearance();
+        appearance::fill(eq, t, &mut self.components, &mut self.colours);
     }
 
     /// The name bytes before the first NUL, at most 15 (§2.2 rule 4).
@@ -731,6 +746,18 @@ pub struct Body {
     /// Bytes after the last section: never written by the game, not
     /// checked by the loader (§10 rule 6); kept for a lossless rewrite.
     pub trailing: Vec<u8>,
+}
+
+impl Body {
+    /// The `jf` section the writer stores (§8.4 rule 1, `0x005699A0`):
+    /// a classic game writes none (§1 rule 2); an expansion game writes
+    /// the marker, then, when the player has a hireling pet node, that
+    /// hireling's item list (§8.1; empty when it carries nothing, rule 5).
+    /// `hireling`: `None` = no hireling node; `Some(entries)` = its items
+    /// in the §8.1 rule 3 order.
+    pub fn set_hireling_items(&mut self, expansion: bool, hireling: Option<Vec<ItemEntry>>) {
+        self.hireling_items = expansion.then_some(hireling);
+    }
 }
 
 impl Default for Stats {
