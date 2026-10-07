@@ -128,7 +128,15 @@ Stopped early on the coordinator's budget cut; partial gate:
   `CARGO_INCREMENTAL=0 cargo test --workspace` (d2-server built its
   touched tests only through the `TileInfo` field change, not run).
 
-What is left: the clippy and workspace runs above; then §3 / §4.
+**Final gate** (after merging `origin/claude/specs-staging-2` twice,
+keeping both sides; one 0x7A encoder `world::hirelings::pets::pet_action`
+with staging's signature `(…, pet, owner)` writing owner @5 / pet @9,
+`player::pets::PetMsg::bytes` now calls it; `e2e_pet_action` un-ignored
+and passing): `CARGO_INCREMENTAL=0 cargo test --workspace --no-fail-fast`
+→ only `world::quests::tests::tables_parse_and_check` red (allowed);
+`cargo clippy --workspace --all-targets -D warnings` clean (one lint
+fixed in `tests/e2e_single_player.rs`, `std::slice::from_ref`); fmt
+clean. What is left: §3 / §4.
 
 ## 6. Local run queue
 
