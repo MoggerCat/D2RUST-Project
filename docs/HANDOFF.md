@@ -5788,6 +5788,13 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 - Output: `traces/raw/pc2rec-r93-packets.jsonl`.
 - Compare: count of S→C 0x2C event 11 in the opening tick (2 expected by the provisional reading, 1 otherwise). Fold: write the result into the cited rule and drop its PROVISIONAL line.
 
+##### REC-94 [MANUAL] world/objects.md §7.1 r3 (interact range `0x00623660`)
+- Priority P2.
+- Settles: world/objects.md §7.1 r3 (PROVISIONAL: a player operator is always in interact range; `LocalSeams::object_in_range` in `crates/d2-client/src/app/single_player.rs`).
+- Steps: `py tools/trace-recorder/record_packets.py --seconds 120` + NEW HOOK at `0x00623660` exit logging operator / object positions and the result, while clicking the Rogue Encampment waypoint from 1, 3, 5 and 8 subtiles away (walk interrupted by a second click) and a chest from the same distances.
+- Output: `traces/raw/pc2rec-r94-packets.jsonl` + hook log.
+- Compare: the distance at which the hook first returns 1 and whether S→C 0x63 follows the C→S 0x13. Fold: write the range test into §7.1 r3 and drop its PROVISIONAL line.
+
 ##### REC-50 [NO RUN] client/stat-lists.md §6 r6.5 setfunc 15 (+0xC4 bit 0x80000000 reader), client/model.md §14
 - Priority P2.
 - Settles: client/stat-lists.md §6 r6.5 setfunc 15 (+0xC4 bit 0x80000000 reader), client/model.md §14 r3 / OQ10 (reader of pet record +0x1C).

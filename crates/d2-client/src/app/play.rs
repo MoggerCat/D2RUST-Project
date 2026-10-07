@@ -244,6 +244,7 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
     };
     let drlg_source = single_player::client_drlg_source(&config.data);
     let level_rows = single_player::client_level_rows(&config.data);
+    let waypoint_map = single_player::client_waypoint_map(&config.data);
     let object_rows = single_player::client_object_rows(&config.data);
     let request = config.character.clone();
     let speeds = single_player::walk_speeds(&config.data, &config.character)?;
@@ -320,6 +321,7 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
         palette::add_act_palettes(&mut app, palettes);
         let parts = ui::UiParts::live(archives.clone()).map_err(anyhow::Error::msg)?;
         ui::add_original_ui(&mut app, parts)?;
+        ui::set_waypoint_map(&mut app, waypoint_map);
         let table = sound::sound_table_live(&archives).map_err(anyhow::Error::msg)?;
         app.insert_resource(GameAudio::new(AudioParts::original(archives, table)));
     } else {
