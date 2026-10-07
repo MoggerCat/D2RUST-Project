@@ -4990,6 +4990,28 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
   axis).
 - `missiles/bodies.md` OQ1 / OQ3: Plague Javelin hit, cloud positions
   per tick (velocity 192 / 384, no extra << 8).
+- DRLG act entries (one run, RNG hooks on): enter Act 2 and Act 3
+  (`drlg/levels.md` OQ1: drlg +0x94/+0x484/+0x474; `outdoor.md` OQ3/OQ4,
+  `outdoor-act3-act5.md` OQ1: levels 76..78 +0x1C..+0x28, +0x1B8,
+  +0x1BC), Act 4 (Outer Steppes flag) and Act 5 levels 111, 112, 117
+  (`outdoor.md` OQ9, `outdoor-act3-act5.md` OQ3: stamps, room counts of
+  76..78); after Act I creation read level +0x1C..+0x28 of 1–7, 17, 26,
+  39 and preset direction of 1 and 27 (`outdoor.md` OQ1).
+- `drlg/levels.md` OQ3: a town arrival and an act change, draws at
+  `0x0066ACB0`–`0x0066ACE0` on the level seed.
+- `drlg/levels.md` OQ7: a crypt level (`Logicals` 1) and an outdoor
+  level, dump DRLG room +0x64 records after activation.
+- `drlg/maze.md` OQ1: enter Den of Evil (8) and Cave Level 1 (9) with
+  RNG hooks; compare with the maze vectors.
+- `drlg/outdoor.md` OQ5: Stony Field, Dark Wood, Black Marsh, Tamoe
+  builds (sites `0x00680251`, `0x0068034F`).
+- `drlg/outdoor-tilesub.md` OQ2 + OQ4: Cold Plains far enough to build a
+  waypoint and a shrine room; also read the `Trees` substitution DS1's
+  group records (+0x14 of each 0x18-byte group) after its first load.
+- `drlg/preset.md` OQ3: a level whose river/navi units are added at
+  first activation; log §8 adds versus §9 transfers per room.
+- `drlg/rooms.md` OQ7: the entry `0x0066D820` returns for seq
+  6822–6835 of the RNG recording's run.
 
 ## 8. Lessons (problems met, fixes)
 

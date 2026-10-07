@@ -37,10 +37,10 @@
 |   11. Logical rooms (coordinate lists) and population queries | 350–629 |
 | Constants & data dependencies | 630–650 |
 | Randomness | 651–669 |
-| Edge cases & original bugs | 670–693 |
-| Test vectors | 694–737 |
-| Provenance | 738–770 |
-| Open questions | 771–804 |
+| Edge cases & original bugs | 670–694 |
+| Test vectors | 695–738 |
+| Provenance | 739–771 |
+| Open questions | 772–832 |
 <!-- /index -->
 
 ## Summary
@@ -675,7 +675,8 @@ creation by any code in this spec.
    0 (§8.1). Reproduce: list order decides iteration in §9.2 and §8.1.
 2. `0x00642920`: if no slot matches and no free slot exists, the slot
    index stays −1: vis goes to the record's level-id field and warp to
-   vis[7]. D2MOO asserts. Not known to be reached (open question 2).
+   vis[7]. D2MOO asserts. Unreachable with 1.14d data (open question 2,
+   answered).
 3. Warp-room centres have 9 slots and no bound check: a 10th qualifying
    room overwrites y[0] and the count (§5.4).
 4. Spawn-tile pick with no match reads record 0. The pick walk cannot
@@ -773,8 +774,24 @@ first) with each level's seed state, equal the recorded game.
 1. Act II tomb choice and Act III jungle bit: record entering Act 2 and
    Act 3 (draws at `0x00642E73`–`0x00642ED5`, `0x00642F04`; read drlg
    +0x94, +0x484, +0x474) to confirm the computed vectors.
-2. `0x00642920` overflow (edge case 2): can any 1.14d act layout fill all
-   8 slots of a record? Check the outdoor placer's calls per act.
+2. *Answered* (static): `0x00642920` never overflows in 1.14d. Its only
+   callers are the link driver (`0x006772C0`, four sites: both link
+   columns, both ways; skipped in Act V) and the adjacency warps
+   (`0x006775C0`, `outdoor.md` §2.7). Free slots (vis 0 and warp −1 in
+   1.14d `levels.txt`) versus the most new vis ids a level can receive:
+   Act I/II/IV links give at most 3 (Cold Plains: 4, 2, 17; 4 free),
+   Black Marsh 2 (3 free), every other level ≤ 2 with ≥ 4 free; Act V
+   adjacency gives one id per call (110, 111: two calls, 8 free). Act III
+   adjacency (75..83): every id in the range is new (no 1.14d vis value
+   lies in 75..83); jungle rects are 64 × 192 on a 64-tile x grid from
+   the docks, the Kurast chain is stacked above 78 and centred on it
+   (79–81 x edges at 78.x − 8 / + 72, never on the jungle grid; 82 lies
+   inside 78's column), so a chain level touches a jungle only through a
+   horizontal edge and 83 only through a side. Bounds: 80, 81 ≤ 4 (two
+   chain neighbours + two jungles; 4 free), 82 ≤ 4 (6 free), 76/77/78
+   ≤ 6 (75, the two other jungles, 79 or 81 by a horizontal edge, 83 by
+   a side; 6, 8, 6 free), 75 touches only the jungle directly on top of
+   it. Edge case 2 is therefore unreachable.
 3. Does the server call the spawn-room choice (§10) with index ≠ 13 for
    levels with `Position` ≠ 0 (town arrivals)? Record a town arrival and
    an act change: draws at `0x0066ACB0`–`0x0066ACE0` on the level seed.
@@ -782,8 +799,19 @@ first) with each level's seed state, equal the recorded game.
    `0x0061AC10` (§11.5 item 3), whose only caller is `0x0054DB50`, called
    only from `0x0054DC40` (`monsters/population.md` §8, owner of the
    `WarpDist` test).
-5. When is game +0x7C set to the map ID in single player (`rng.md` OQ 2)?
-   Watch writes to game +0x7C during a single-player join.
+5. *Answered* (static): game +0x7C has three writers. `0x0052C2E3` and
+   `0x0052C2FD` in game creation (`0x0052C280`: time value, or the
+   `-seed` value, `rng.md` §5.2), and `0x00532A45` in the player-join
+   routine `0x00532690` (only caller `0x00534080`): it copies the
+   32-bit field at +0x7E of the 0x80-byte join record (copied to the
+   stack at entry) into +0x7C when game +0x6A = 3, game +0x84 = 0 (no
+   fixed seed) and the record's difficulty (high nibble of record byte
+   +0x58) equals game +0x6D. The write precedes the player's unit
+   allocation (`0x00555230`, same routine); act creation (§2) reads +0x7C
+   when the act is made, and the recorded single-player DRLG seed equals
+   the map ID, so the first act is created after this write. That the
+   record field is the `.d2s` map ID is observed (`rng.md` §5.4); a
+   brand-new character's value is `rng.md` OQ 2.
 6. Can a 1.14d level have 10 or more warp-room centre rooms (§5.4)?
    Generate every level of the five acts and count rooms with a
    waypoint flag or a warp flag whose warp id ≠ −1; a 10th corrupts the
