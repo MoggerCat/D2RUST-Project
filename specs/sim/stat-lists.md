@@ -38,7 +38,7 @@
 | Edge cases & original bugs | 598–621 |
 | Test vectors | 622–658 |
 | Provenance | 659–682 |
-| Open questions | 683–714 |
+| Open questions | 683–709 |
 <!-- /index -->
 
 ## Summary
@@ -686,13 +686,8 @@ replaces it under the same comparison.
    product (24-, 53- or 64-bit) decides the float32 result in rare cases;
    settle with a recording of max-life changes (`check_stats.py`
    compares the nested set) or by reading the FPU control word at the
-<<<<<<< HEAD
-   call.
-2. Answered (2026-10-07): `0x0061AB00(room)` (§10.1 step 4) is "room in a town": the
-=======
    call.~~ → PC 2 recording list.
-2. Answered (2026-10-07): `0x0061AB00(room)` is "room in a town": the
->>>>>>> origin/claude/pc1-done-combat
+2. Answered (2026-10-07): `0x0061AB00(room)` (§10.1 step 4) is "room in a town": the
    room's level id (`0x0066BAB0`) is 1, 40, 75, 103 or 109 (`0x006426A0`,
    byte table `0x006426C8`); null room → 0. Also used by the unit find
    (`monsters/umod-callbacks.md` §3.1).

@@ -37,7 +37,7 @@
 | Edge cases & original bugs | 516–527 |
 | Test vectors | 528–548 |
 | Provenance | 549–575 |
-| Open questions | 576–617 |
+| Open questions | 576–612 |
 <!-- /index -->
 
 ## Summary
@@ -584,15 +584,10 @@ stat points: three spends succeed, the fourth fails, result 2.
    share, 1/64-level cap, 1.14d adds 2·gain) is confirmed in
    `world/hirelings.md` §7. Open: the x87 party share's
    precision-control word in force (§4.4 rule 6, as
-<<<<<<< HEAD
-   `sim/stat-lists.md` open question 1; settle with a party recording,
-   multiplayer, Phase 7) and the hireling level-up body (`0x00572840`,
-   mercenary spec).
-=======
    `sim/stat-lists.md` open question 1); settle with a party recording
    (multiplayer, Phase 7). Out of Phase 0–6 scope (a party needs two
-   players).
->>>>>>> origin/claude/pc1-done-combat
+   players). The hireling level-up body (`0x00572840`) is the mercenary
+   spec's.
 3. Answered: `0x0057E2F0` takes ECX = experience, EDX = alvl, EAX =
    dlvl; for dlvl > alvl ≥ 25 it calls `pct(ECX exp, EDX alvl, stack
    dlvl)` (at `0x0057E31E`), i.e. exp × alvl / dlvl as §4.2 states.
