@@ -52,6 +52,8 @@ input (`PostMessageW`), memory-aimed `goto`, `waitlevel`, `dumpdrlg`.
 |---|---|---|---|---|---|
 | 0 | `auto-tick-1234.jsonl` | `record_tick.py --seconds 40 --auto ScnAma --seed 1234` | 40 s, 840 ticks | `check_tick` 0 errors; `check_units` 0 errors | proof of the unattended start |
 | D1 | `pc2rec-d1-rng.jsonl` (sha256 8ac70b456cea9732…) | `record_rng.py --seconds 1500 --auto TestSor --seed 644409375 --input "wait 3; dumpdrlg act1; goto 2 119 300; wait 3; click 178 75; wait 2; click 200 138; waitlevel 40 400; wait 5; dumpdrlg act2; goto 2 156,157,237,238,288,323,324,398,402 300; wait 3; click 240 75; wait 2; click 200 138; waitlevel 75 400; wait 5; dumpdrlg act3; goto 2 <same> 300; wait 3; click 300 75; wait 2; click 200 138; waitlevel 103 400; wait 5; dumpdrlg act4; shot act4; end"` | 86 s (Act I at 22.8 s, II 49.9 s, III 64.4 s, IV 81.1 s), 96,978 events | `check_rng` OK (0 unexplained, 138 sites); `check_drlg_acts` 4 records 0 errors | `drlg/levels.md` OQ1, OQ3 (start and waypoint arrivals); `outdoor.md` OQ1 (rects), OQ4/OQ7; `outdoor-act3-act5.md` OQ1 (creation): all in `xpc-to-pc1.md` (PC 1 specs) |
+| D2 | `pc2rec-d2-sweep.log` | `autostart.py --try TestSor --seeds 1,2,3,7,42,1000,31337,65535,123456789,2147483647,987654321,555 --seconds 120 --input "wait 1; dumpdrlg act1; goto 2 119 60; wait 2; click 178 75; wait 1; click 200 138; waitlevel 40 40; wait 2; dumpdrlg act2; goto 2 156 60; wait 2; click 240 75; wait 1; click 200 138; waitlevel 75 40; wait 2; dumpdrlg act3; end"` (no hooks) | 12 games, ~1 min each | `check_drlg_acts`: 36 records, 0 errors, 271 unbuilt level seeds; `--perturb 4` / `--perturb 5`: 1 error each | mass check (M08) of `drlg/levels.md` §3 step 2–4 and §4.3 over 12 seeds × Acts I–III: Act II tombs, Act III jungle bit (seed 555: 0, the others 1), every `{dwStartSeed + id, 666}` |
+| D1b | (log only) | `autostart.py --try TestSor --seed 644409375 --input "...; click 240 75; click 200 138; waitlevel 75; dumpdrlg act3"` | 25 s | — | Act III jungle block ids (+0x1BC array) 76: 541, 533, 543, 565, 570, 582, 571, 575, 570, 575, 537, 0; 77: 554, 577, 541, 0, 539, 534, 0, 541, 576, 569, 576, 566; 78: 0, 533, 535, 565, 570, 582, 539, 534, 558, 565, 541, 581 = the derived vector of `outdoor-act3-act5.md` |
 
 Raw files are also copied to the main checkout's `traces/raw/` on PC 2.
 
@@ -64,3 +66,9 @@ jungle bit 0). The same check runs on any `--auto` recording with
 
 | Entry | Why |
 |---|---|
+| Fights, kills with drops, hireling level-up / death / resurrect (`world/hirelings.md` R2-27 rest), umod deaths, skills on monsters (`skills/bodies*.md`, `monsters/umod-callbacks.md`) | the script has no combat loop: aiming at moving monsters and surviving needs feedback the input script does not have (`spawn.py` on `local-buddy-q9-rec` places monsters by debugger call, which is the better base for these) |
+| Quest chains (`world/quests*.md` OQs needing completed quests, orifice, Cain) | progression: the saves at hand have no completed quest; `d2s-tool --quests` flags do not give the in-world quest states |
+| Act V entries (levels 109–132: `outdoor.md` OQ9, `outdoor-act3-act5.md` OQ3 part 2) | `TestSor`'s waypoint panel has tabs I–IV only (no Act V access in the save) |
+| Two-client games (hireling seen by a second client, R1 on a hosted game) | needs a second game client joined over TCP/IP; not attempted |
+| `render/draw-order.md` OQ7 (TownE1 tile (950, 933)) | `local-buddy-q9-rec` R2-1: the cells are off-screen from every reachable spot |
+| Classic-game messages (`monsters/init.md` OQ1 0x67 in classic SP) | the forced start always makes an expansion game; a classic character is refused |

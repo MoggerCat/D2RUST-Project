@@ -234,6 +234,9 @@ def drlg_dump(mem, label=""):
                        "jungle_clearings": mem.read_u32(lv + 0x1B8),
                        "jungle_blocks": mem.read_u32(lv + 0x1BC),
                        "warp_centres": mem.read_u32(lv + 0x228)})
+        ids = mem.read_u32(lv + 0x1BC)      # Act III jungles: pointer to the block ids
+        if ids and 76 <= levels[-1]["id"] <= 78:   # (outdoor-act3-act5.md §2.8; 2 x 6 blocks)
+            levels[-1]["jungle_blocks"] = [mem.read_u32(ids + 4 * i) for i in range(12)]
         lv = mem.read_u32(lv + 0x1AC)
         n += 1
     r["levels"] = sorted(levels, key=lambda x: x["id"])
@@ -582,9 +585,9 @@ def probe(exe, args, auto, seconds):
         close_event_handles = staticmethod(rr.Recorder.close_event_handles)
         h_process = None
         pending = None
-        notes = []
 
     p = Probe()
+    p.notes = []
     si = rr.STARTUPINFOW()
     si.cb = C.sizeof(si)
     pi = rr.PROCESS_INFORMATION()
@@ -720,6 +723,8 @@ def main():
     ap.add_argument("--game", default=os.path.join(repo, "game", "Game.exe"))
     ap.add_argument("--try", dest="char", help="start this character unattended, report, kill")
     ap.add_argument("--seed", type=int, default=None)
+    ap.add_argument("--seeds", default=None,
+                    help="comma-separated seeds: one game per seed, one after the other")
     ap.add_argument("--after", type=float, default=DEFAULT_AFTER)
     ap.add_argument("--seconds", type=float, default=60.0)
     ap.add_argument("--input", default="wait 2; shot arrival; end",
@@ -736,10 +741,16 @@ def main():
     exe = os.path.abspath(a.game)
     if hashlib.sha256(open(exe, "rb").read()).hexdigest() != rr.GAME_EXE_SHA256:
         sys.exit(f"{exe}: not the reference 1.14d Game.exe")
-    auto = AutoStart(a.after, a.input, a.shots)
-    for n in probe(exe, game_args(a.char, a.seed), auto, a.seconds):
-        print("note:", n)
-    sys.exit(0 if auto.arrived_at is not None else 1)
+    seeds = [int(x, 0) for x in a.seeds.split(",")] if a.seeds else [a.seed]
+    ok = True
+    for seed in seeds:
+        auto = AutoStart(a.after, a.input, a.shots)
+        notes = probe(exe, game_args(a.char, seed), auto, a.seconds)
+        for n in notes:
+            if not n.startswith("autostart:"):     # already printed by the log
+                print("note:", n)
+        ok = ok and auto.arrived_at is not None
+    sys.exit(0 if ok else 1)
 
 
 if __name__ == "__main__":
