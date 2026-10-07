@@ -7,6 +7,13 @@
 //! its own marker.
 
 // ---- N1: images (png, sheet, tileset, expfield, pal)
+pub mod expfield;
+pub mod kind;
+pub mod native_toml;
+pub mod pal;
+pub mod png;
+pub mod sheet;
+pub mod tileset;
 
 // ---- N2: text and audio (toml_kinds, tbl, wav, animdata, tables)
 pub mod animdata;
