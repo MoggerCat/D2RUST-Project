@@ -98,7 +98,7 @@ TC records (0x2C bytes, array `0x0096C5EC`, count `0x0096C5F0`; index =
 | count | 0x04 | i32 | entries |
 | total classic | 0x08 | i32 | sum of classic probs |
 | total expansion | 0x0C | i32 | sum of expansion probs |
-| picks | 0x10 | i32 | never 0 (§1.4) |
+| picks | 0x10 | i32 | never 0 for TCs 1+ (§1.4); TC 0 is all zero (§1.2) |
 | nodrop | 0x14 | i32 | |
 | mods | 0x1A | 6 × u16 | magic, rare, set, unique, slot 5, slot 6 |
 | entries | 0x28 | ptr | `count` entries |
@@ -122,7 +122,8 @@ does).
 
 #### 1.2 Order
 
-TC 0 (empty name, no entries), the automatic TCs (§1.3), then
+TC 0 (empty name, no entries, all fields 0 including picks: the 1.14d
+memory dump `traces/raw/20261006-201456-tables` has an all-zero record 0), the automatic TCs (§1.3), then
 `treasureclassex` rows (§1.4); list and name order: `loading.md` §10.6.
 Each TC's name is added to `@treasureclass` when its record is created,
 so a name lookup during §1.4 sees only TCs created before (`field-types.md`
