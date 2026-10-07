@@ -1076,3 +1076,38 @@ fn act4_mesas_pits_and_sanctum() {
         }
     }
 }
+
+// Covers: specs/drlg/levels.md §3 r7
+#[test]
+fn link_driver_draws_on_a_copy_of_the_drlg_seed() {
+    let mut d = data();
+    set(&mut d, 39, 3, (64, 64), (0, 300));
+    set(&mut d, 4, 3, (40, 40), (84, 300));
+    set(&mut d, 5, 3, (80, 80), (0, 0));
+    let rows = [
+        LinkRow {
+            linker: Linker::Def,
+            level: 39,
+            link: -1,
+        },
+        LinkRow {
+            linker: Linker::Def,
+            level: 4,
+            link: -1,
+        },
+        LinkRow {
+            linker: Linker::R4,
+            level: 5,
+            link: 0,
+        },
+    ];
+    let mut drlg = Drlg::create(0, 7, 0, 0, false, &d, &mut NoLevelTypes).unwrap();
+    let s0 = drlg.seed;
+    let mut o = Outdoor::default();
+    let dv = o
+        .drive(&mut drlg, &d, &mut NoLevelTypes, &rows, Check::None, false)
+        .unwrap();
+    // The copy restarts from the DRLG seed and advances on its own.
+    assert_ne!(dv.seed, s0);
+    assert_eq!(drlg.seed, s0);
+}

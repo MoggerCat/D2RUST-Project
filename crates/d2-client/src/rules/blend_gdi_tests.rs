@@ -218,7 +218,7 @@ fn octant(p: (i32, i32), swap: bool, sx: i32, sy: i32) -> (i32, i32) {
     (x * sx, y * sy)
 }
 
-// Covers: specs/render/blend-modes.md §8 r1
+// Covers: specs/render/blend-modes.md §8 r1, §edge-cases-original-bugs r7
 #[test]
 fn line_steps_in_all_octants() {
     // (0, 0) → (5, 2): error 2, 4, 6 > 5 (y + 1, error 1), 3, 5 (not > 5).
@@ -320,7 +320,7 @@ fn line_is_opaque_and_clipped_per_pixel() {
     assert_eq!(blend::gdi_line(SURFACE, red, 10, 0, 20, 7), Ok(None));
 }
 
-// Covers: specs/render/blend-modes.md §8 text, §8 r2
+// Covers: specs/render/blend-modes.md §8 text, §8 r2, §edge-cases-original-bugs r8
 #[test]
 fn rectangle_clamps_and_empty_cases() {
     let (mut maps, t, _) = tables();

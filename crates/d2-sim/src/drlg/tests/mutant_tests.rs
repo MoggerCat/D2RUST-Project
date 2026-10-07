@@ -1175,3 +1175,35 @@ fn bit_7_merges_to_the_new_type() {
     assert_eq!(kinds.len(), 7);
     assert!(kinds.iter().all(|&(k, _)| k == 2), "{kinds:?}");
 }
+
+/// Column `r4` is never read: the find step skips type-4 records, so a
+/// linked cell over a type-4 record finds nothing and builds its own.
+#[test]
+fn wall_remap_type4_records_are_never_found() {
+    let (d, _, b) = link_pair(Shared::BLeft, (WALL, 4), (WALL, 1), [[2; 7]; 6]);
+    assert_eq!(link_count(&d, b), 7);
+}
+
+// Covers: specs/drlg/wall-remap.md §edge-cases-original-bugs r1
+/// A door (8, 9) is `stop` unless it is on its own room's top or left
+/// edge (where it keeps its type before the table is consulted).
+#[test]
+fn wall_remap_doors_stop_off_the_top_left_edge() {
+    for tb in [8, 9] {
+        let (d, a) = merge_pair(1, tb, 0, false, [[2; 7]; 6]);
+        assert!(linked_kinds(&d, a).iter().all(|&(k, _)| k == 1), "{tb}");
+        let (d, a) = merge_pair(1, tb, 0, true, [[2; 7]; 6]);
+        assert!(linked_kinds(&d, a).iter().all(|&(k, _)| k == tb), "{tb}");
+    }
+}
+
+// Covers: specs/drlg/wall-remap.md §edge-cases-original-bugs r2
+/// A `table` type over R of type > 7 stops; a `keep` type over the same
+/// R replaces R's type.
+#[test]
+fn wall_remap_table_stops_over_high_r_and_keep_replaces() {
+    let (d, a) = merge_pair(14, 1, 0, true, [[2; 7]; 6]);
+    assert!(linked_kinds(&d, a).iter().all(|&(k, _)| k == 14));
+    let (d, a) = merge_pair(14, 15, 0, true, [[2; 7]; 6]);
+    assert!(linked_kinds(&d, a).iter().all(|&(k, _)| k == 15));
+}

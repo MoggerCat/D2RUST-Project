@@ -969,6 +969,7 @@ fn outdoor_room_takes_sub_type_theme_and_pick() {
     assert_eq!((room.sub_type, room.sub_theme, room.picked), (5, 1, 0b101));
 }
 
+// Covers: specs/drlg/outdoor.md §12.2
 /// `outdoor.md` §12.2 grids: floor cells (0..7) := 0x40002; floor flags
 /// by level type OR into floor cells without bits 0x3F0FF80; wall and
 /// floor grid edges |= 0x4.

@@ -1101,3 +1101,75 @@ fn single_cel_units() {
     );
     assert_eq!(missile_file("Arrow"), "DATA\\GLOBAL\\MISSILES\\Arrow.dcc");
 }
+
+// Covers: specs/render/unit-composite.md §3 r2
+#[test]
+fn frame_is_the_counter_shifted_right_8() {
+    // Unit +0x44 >> 8; the low byte is the fraction and is dropped.
+    assert_eq!(frame_index(0), 0);
+    assert_eq!(frame_index(0x00FF), 0);
+    assert_eq!(frame_index(0x0100), 1);
+    assert_eq!(frame_index(0x0305), 3);
+    assert_eq!(frame_index(0x1_2345), 0x123);
+}
+
+// Covers: specs/render/unit-composite.md §2 r4
+#[test]
+fn a_missing_cof_means_the_unit_is_not_drawn() {
+    let name = CofName::player(code(b"BA"), 1, code(b"NU"), code(b"HTH"));
+    let cof = cof_box(-30, 30, -90, 0);
+    let kind = Some(CompositeKind::Player);
+    let pose = |kind, cof: Option<&Cof>| {
+        unit_pose(kind, &name, cof, (400, 300), (800, 600), 8, 0, false, 2).unwrap()
+    };
+    // COF present and inside the frame: a pose.
+    assert_eq!(pose(kind, Some(&cof)).unwrap().0.frame, 2);
+    // COF not in the archives: nothing is drawn (no error).
+    assert!(pose(kind, None).is_none());
+    // Types 3 and 4 (single cel) take no composite path.
+    assert!(pose(None, Some(&cof)).is_none());
+}
+
+// Covers: specs/render/unit-composite.md §9
+#[test]
+fn single_cel_units_missiles_and_items() {
+    // Missiles: DCC under DATA\GLOBAL\MISSILES.
+    assert_eq!(
+        missile_file("fireball"),
+        "DATA\\GLOBAL\\MISSILES\\fireball.dcc"
+    );
+    // Items: modes 0, 1, 2, 4, 6 inventory, 3 and 5 ground.
+    for m in [0, 1, 2, 4, 6] {
+        assert_eq!(item_graphic(m), Some(ItemGraphic::Inventory), "mode {m}");
+    }
+    for m in [3, 5] {
+        assert_eq!(item_graphic(m), Some(ItemGraphic::Ground), "mode {m}");
+    }
+    assert_eq!(item_graphic(7), None);
+    // Gold pile direction by the amount of stat 14.
+    for (amount, dir) in [
+        (0, 0),
+        (99, 0),
+        (100, 1),
+        (499, 1),
+        (500, 2),
+        (4_999, 2),
+        (5_000, 3),
+        (1_000_000, 3),
+    ] {
+        assert_eq!(gold_direction(amount), dir, "{amount}");
+    }
+    // Ground flippy file: unique (7) / set (5) names win when not empty.
+    let own = "DATA\\GLOBAL\\items\\own.dc6";
+    assert_eq!(flippy_file("own", 2, Some("u"), Some("s")), own);
+    assert_eq!(
+        flippy_file("own", QUALITY_UNIQUE, Some("u"), Some("s")),
+        "DATA\\GLOBAL\\items\\u.dc6"
+    );
+    assert_eq!(
+        flippy_file("own", QUALITY_SET, Some("u"), Some("s")),
+        "DATA\\GLOBAL\\items\\s.dc6"
+    );
+    assert_eq!(flippy_file("own", QUALITY_UNIQUE, Some(""), None), own);
+    assert_eq!(flippy_file("own", QUALITY_SET, None, Some("")), own);
+}
