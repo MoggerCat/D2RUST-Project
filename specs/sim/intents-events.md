@@ -38,15 +38,15 @@
 |   3. Server → client | 279–378 |
 |   4. d2rs mapping and scope | 379–406 |
 |   5. Machine-readable tables | 407–443 |
-|   6. Exact-match comparison | 444–481 |
-|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 482–843 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 844–960 |
-| Constants & data dependencies | 961–979 |
-| Randomness | 980–985 |
-| Edge cases & original bugs | 986–1019 |
-| Test vectors | 1020–1083 |
-| Provenance | 1084–1159 |
-| Open questions | 1160–1216 |
+|   6. Exact-match comparison | 444–529 |
+|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 530–891 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 892–1008 |
+| Constants & data dependencies | 1009–1027 |
+| Randomness | 1028–1033 |
+| Edge cases & original bugs | 1034–1067 |
+| Test vectors | 1068–1131 |
+| Provenance | 1132–1207 |
+| Open questions | 1208–1264 |
 <!-- /index -->
 
 ## Summary
@@ -478,6 +478,54 @@ as in §2.1 rule 5 and §3.1 rule 1.
    to an NPC, buy and sell one item, spend a stat point if available,
    take a waypoint if available, exit. Command and expected output:
    `docs/HANDOFF.md` §5.
+6. **Keyed masks** (the exception to rule 3 for bytes the original never
+   writes; which builders leave which bytes: `tools/original-hooks.md`
+   §6.2; d2rs writes 0 there). A record carries no sender, so a mask
+   whose bytes are written in another form of the same id needs a key
+   read from bytes every form writes, or a content-dependent offset. The
+   three ids an id / offset / length row cannot express:
+
+   | Id | Key (bytes every form writes) | Masked bytes | Why the key is exact |
+   |---|---|---|---|
+   | 0x27 | count u8@6 = 1 | 7, 9, 12–39 | below |
+   | 0x50 | u16@1 = 4 | 13–14 | `0x00593CB0` writes u16 4 (`0x00593CF6`) |
+   | 0x50 | u16@1 = 2, 0x24, 13 | 5–14 | `0x00579180` (`0x005792C0`), `0x0058E120` (`0x0058E140`), `0x0059D6A0` (`0x0059D6D3`) |
+   | 0x50 | u16@1 = 0x17 | 3–14 | `0x005B4A80` (`0x005B4B37`) |
+   | 0x50 | u16@1 = 1 | none | the status reply `0x00546040` zeroes its buffer and writes u16 1 (`0x00546248`) |
+   | 0x82 | none | from the byte after the first 0 in bytes 5–20, through byte 20 | below |
+
+   - **0x27** (40 bytes, all senders copy through `0x0053C8D0`; its four
+     call sites `0x005456E4`, `0x00545811`, `0x00572D55`, `0x005DE397`):
+     unit type u8@1, GUID u32@2, entry count u8@6 (low byte of the text
+     list's u16 count), entry k < 8: kind u8@8+4k, string id
+     u16@10+4k. The one-entry senders `0x005456A0` (u8@1 = 2, count 1,
+     kind 0) and `0x005DE330` (u8@1 = 1, count 1, kind 3) leave 7, 9 and
+     12–39 unwritten. The list senders `0x00545780` and `0x00572C10`
+     zero bytes 6–39 (`0x00661480`), then write the count and the
+     entries; 7 and 9 + 4k are never written (stay 0), and more than 8
+     entries is a fatal assert (`0x00661509`). So with count 1 every
+     masked byte of a list form is 0 on both sides; count ≠ 1 is never
+     a one-entry form. Cost: a d2rs list form with one entry that wrote a
+     non-zero padding byte would pass.
+   - **0x50**: the six call sites of the copier `0x0053D7E0` (15 bytes)
+     are the five rows above; each writes a constant u16@1.
+   - **0x82** (29 bytes, `0x0053DB90`, call site `0x005720B1`): owner
+     GUID u32@1, byte 5 := 0, then the owner's name is copied to
+     bytes 5–20 by `0x004135D0` (at most 15 characters + NUL; it writes
+     exactly through the NUL, also in its dword path, never past it);
+     u32@21 and u32@25 are written. A 15-character name leaves nothing
+     unwritten.
+   - Proposed columns for the mask table (the format is
+     `tools/scenario.md` §6's): `id`, `key` (`-`, or `u8@<off>=<v>` /
+     `u16@<off>=<v>`, little-endian, v hex), `offset` (decimal, or
+     `nul@<n>` = the byte after the first 0 byte at or after n; no 0 in
+     n…last → nothing masked), `length` (decimal, `*` = to the end, or
+     `..<n>` = through byte n), `source`. Rows: `0x27 u8@6=0x01` 7 1,
+     9 1, 12 28; `0x50 u16@1=0x0004` 13 2; `0x50 u16@1=0x0002`,
+     `=0x0024`, `=0x000D` 5 10; `0x50 u16@1=0x0017` 3 12; `0x82 -`
+     `nul@5` `..20`. The present unkeyed `0x50 13 2` row becomes the
+     `u16@1=0x0004` row (unkeyed, it hides written bytes of the u16 1,
+     2, 0x24 and 13 forms).
 
 ### 7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`)
 
