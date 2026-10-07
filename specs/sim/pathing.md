@@ -44,7 +44,7 @@
 | Edge cases & original bugs | 839–886 |
 | Test vectors | 887–924 |
 | Provenance | 925–962 |
-| Open questions | 963–1021 |
+| Open questions | 963–1030 |
 <!-- /index -->
 
 ## Summary
@@ -992,6 +992,15 @@ Real (recordings; message side):
    rounds cos · r to float32 before the truncation). Settle: a recording
    of a Blessed Hammer missile's per-tick positions, or a debugger read
    of the FPU control word in `0x0067A140`.
+   *Partly answered* (static): `Game.exe` sets 53-bit precision once,
+   in the C runtime start-up (`__setdefaultprecision` `0x0068E70A`:
+   `_controlfp_s(·, 0x10000, 0x30000)`, called from `0x00682FC4` and
+   `0x006ADD40`), and never changes it afterwards: `__set_controlfp` has
+   no caller, and every game `fldcw` (40 sites, e.g. `0x0067A1A9`) loads
+   the saved word OR 0xC00 (rounding = truncate) and then restores it,
+   leaving precision alone. So §11.3 runs in 53-bit unless code outside
+   `Game.exe` (a display driver DLL) changes the control word; the
+   debugger read at `0x0067A140` still confirms it for the GDI mode.
 
 Answered handoff questions (`docs/HANDOFF.md` §7):
 

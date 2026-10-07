@@ -5024,6 +5024,13 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
   that draw.
 - `render/capture.md` OQ7 + `render/lighting.md` OQ9: rerun of run 1b
   f 13,486–14,636 with `--draws-every` and the light-map digest.
+- `sim/rng.md` OQ2: a brand-new character's first game and a
+  save-and-exit reload; log game +0x7C and the S→C 0x03 map seed.
+- `sim/path-placement.md` OQ8: load a character saved in Act III; log
+  writes of client +0x1AC (sites `0x0052FB97`, `0x00530E17`,
+  `0x00532690` path) in order.
+- `sim/pathing.md` OQ9: FPU control word at `0x0067A140` (or a Blessed
+  Hammer's per-tick positions).
 
 ## 8. Lessons (problems met, fixes)
 
