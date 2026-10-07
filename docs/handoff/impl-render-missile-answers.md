@@ -114,3 +114,28 @@ New tests:
   - `Weather` still needs `video_mode` and a palette-built
     `ColorTables` from the feed.
   - `WallPass` has no caller yet: the view does not draw wall blocks lit.
+
+## Follow-up after the merge into `claude/specs-staging-2`
+
+The coordinator removed the `EnvError::EclipsePending` arm in
+`bridge/msg/lighting.rs`. After that, two `impl-client-msgs-3` tests
+failed because they still asserted the old "eclipse pending" rejection.
+Spec `lighting.md` §9.2 r2 now defines the eclipse branch: the period
+reset `0x0061BDF0`, then intensity and color. So the tests were wrong, not
+the code, and I corrected the tests to the spec (no assertion loosened):
+
+- `bridge::msg::tests_outputs::quest_status_eclipse`: 0x5D quest 10 with
+  a client act, and the pending eclipse at the act-2 load. Both now
+  assert that nothing is rejected, plus the spec's state: index 5, type 2,
+  ticks 240 × 128 = 30,720, eclipse on.
+- `bridge::msg::tests_outputs::darkness_needs_the_players_act`: 0x53
+  index 5 with eclipse 1 is applied (same state), so 2 rejections
+  (bad index, negative ticks) instead of 3.
+
+The Levels `Pal` reading is not involved in either test. The handler code
+is unchanged.
+
+Gate: `CARGO_INCREMENTAL=0 cargo test -p d2-client --no-fail-fast`. Lib:
+884 passed, 1 failed (`bridge::local_tests::unknown_and_unowned_ids`,
+owned by another session). Every other target is green. fmt is clean and
+`coverage.py --check` reports 0 errors.

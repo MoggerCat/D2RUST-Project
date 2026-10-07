@@ -251,15 +251,15 @@ fn quest_status_eclipse() {
     let mut m = Model::default();
     m.hex("5d 0a 01 00 00 00");
     assert!(m.w.eclipse_pending && outs(&m).is_empty());
-    // With a client act the setter runs with the eclipse flag, whose
-    // branch (`0x0061BDF0`) no spec describes: pending, not guessed.
+    // With a client act the setter runs now with index 5, ticks 0,
+    // eclipse 1 (§9.2 r2): the period reset `0x0061BDF0` takes type and
+    // ticks from eclipse entry 5 (type 2, 240 × speed = 30,720).
     let mut m = Model::default();
     m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
-    let env = m.w.environment;
     m.hex("5d 0a 01 00 00 00");
-    assert_eq!(m.log.rejected.len(), 1);
-    assert!(m.rejected()[0].1.contains("0x0061BDF0"));
-    assert_eq!(m.w.environment, env, "the record is unchanged");
+    assert!(m.log.rejected.is_empty());
+    let e = m.w.environment.unwrap();
+    assert_eq!((e.index, e.kind, e.ticks, e.eclipse), (5, 2, 30_720, true));
     assert!(!m.w.eclipse_pending && outs(&m).is_empty());
     // A pending eclipse turns into the setter call at the act-2 load.
     let mut m = Model::default();
@@ -267,7 +267,9 @@ fn quest_status_eclipse() {
     m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
     assert!(m.log.rejected.is_empty(), "act 1: nothing");
     m.hex("03 01 c4 88 38 10 01 00 61 d1 e0 9f");
-    assert!(m.rejected()[0].1.contains("0x0061BDF0"));
+    assert!(m.log.rejected.is_empty());
+    let e = m.w.environment.unwrap();
+    assert_eq!((e.index, e.kind, e.ticks, e.eclipse), (5, 2, 30_720, true));
 }
 
 // Covers: specs/client/msg-ui.md §2 r1
@@ -392,14 +394,16 @@ fn darkness_needs_the_players_act() {
     m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
     m.hex("53 02 00 00 00 00 00 00 00 00");
     assert_eq!(m.log.rejected.len(), 1);
-    // Fatal values and the eclipse branch.
+    // Fatal values, then the eclipse branch.
     let mut m = placed(0x1241, 0x11C4);
     m.hex("53 06 00 00 00 00 00 00 00 00")
         .hex("53 02 00 00 00 ff ff ff ff 00")
         .hex("53 05 00 00 00 00 00 00 00 01");
     let r = m.rejected();
-    assert_eq!(r.len(), 3);
+    assert_eq!(r.len(), 2);
     assert!(r[0].1.contains("period index") && r[1].1.contains("negative ticks"));
-    assert!(r[2].1.contains("0x0061BDF0"));
-    assert_eq!(m.w.environment.unwrap().index, 2);
+    // The eclipse branch now runs (§9.2 r2): eclipse entry 5's type and
+    // start × speed replace the received ticks 0.
+    let e = m.w.environment.unwrap();
+    assert_eq!((e.index, e.kind, e.ticks, e.eclipse), (5, 2, 30_720, true));
 }
