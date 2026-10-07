@@ -9,8 +9,8 @@
   Test vectors). Act I quests are specified at the level of their
   triggers, flags, rewards, timers and draws; A1Q1 (`quests-act1.md` §10.4) and the
   sequence functions (`quests-act1.md` §10.1) are specified callback by callback from
-  the 1.14d disassembly; Acts II–V are catalogued only (`quests.tsv`
-  column `spec`).
+  the 1.14d disassembly; Acts II–V are specified in their act files
+  (`quests.md` §2.4 owner list; every `quests.tsv` row `specified`).
 - **Target version:** 1.14d
 - **Crate/module:** `d2-sim::world::quests` (flag record, quest control,
   dispatch, updater); `d2-sim::world::quests::act1` (Act I quests)
@@ -37,20 +37,20 @@
 | Rules | 94–95 |
 |   1. Quest flag records | 96–237 |
 |   2. Quest control and quest records | 238–335 |
-|   3. Game entry: picking the quest set | 336–368 |
-|   4. Events and dispatch | 369–453 |
-|   5. Quest updater and timers (tick step 8) | 454–475 |
-|   6. Status reporting | 476–583 |
-|   7. NPC dialog hooks | 584–616 |
-|   8. Act transitions, warps and portals | 617–698 |
-|   9. Quest items, rewards and helpers | 699–877 |
-|   11. Acts II–V | 878–886 |
-| Constants & data dependencies | 887–901 |
-| Randomness | 902–928 |
-| Edge cases & original bugs | 929–947 |
-| Test vectors | 948–979 |
-| Provenance | 980–1008 |
-| Open questions | 1009–1070 |
+|   3. Game entry: picking the quest set | 336–383 |
+|   4. Events and dispatch | 384–468 |
+|   5. Quest updater and timers (tick step 8) | 469–490 |
+|   6. Status reporting | 491–598 |
+|   7. NPC dialog hooks | 599–631 |
+|   8. Act transitions, warps and portals | 632–713 |
+|   9. Quest items, rewards and helpers | 714–893 |
+|   11. Acts II–V | 894–902 |
+| Constants & data dependencies | 903–917 |
+| Randomness | 918–944 |
+| Edge cases & original bugs | 945–963 |
+| Test vectors | 964–995 |
+| Provenance | 996–1024 |
+| Open questions | 1025–1093 |
 <!-- /index -->
 
 ## Summary
@@ -360,6 +360,21 @@ is never read by the 1.14d quest code found so far.
 8. If chain 1's record exists and `0x00590810` (not-intro ≠ 0 and state
    ≥ 4: Den of Evil cleared in this game) holds, send 0x89 `89 00`.
 
+Which caller runs (dispatcher `0x005345A0(game, …, has_save, …)`):
+game type +0x6A = 1 or 2, or the service object `[0x00883D50]` ≠ 0,
+with a save → `0x00534520` (client buffer, mode 0 when a player was
+made); otherwise with a save → `0x005344B0`, which reads the file
+(`0x005343A0` → `0x00534330`, `formats/d2s.md` §1 rule 6) and calls
+mode 0 whenever a player was made, whatever the load result
+(`0x005344E7`–`0x005344EF`); no save → `0x00532590` (mode 1). Single
+player (type 3, no service object, `formats/d2s.md` §2.2 rule 5.2)
+takes `0x005344B0`: mode 0. A 335-byte new-character stub is started
+inside that load by `0x00569F80`, which calls mode 1 first
+(`0x0056A072`); the following mode-0 call then finds the set picked
+(step 1: callbacks 14, then steps 5–8 again), so a new character's
+first game sends 0x5E, 0x28, 0x29 (and 0x89 if due) twice, and no quest
+is switched off by step 2 for it.
+
 So the first player to enter decides which quests are "done" for the
 whole game: a quest that player has already completed (bit 0 or 15) is
 switched off (not intro, inactive) for everybody. Rows with
@@ -649,8 +664,8 @@ clear: set 18.0, 18.13 and delete items `qey`, `qhr`, `qbr`, `qf1`,
 1.10f does not); +0x4C / 0x61. Other levels: `0x005BCFD0`: chain 20's
 record (A3Q6; none → nothing): extra +0x0C := 2, +0x10 := 2; if extra
 +1 ≠ 0, the object with GUID +4 gets mode 1; if extra +2 ≠ 0, the
-object with GUID +8 gets mode 2 (the Act III record fields are
-otherwise uncatalogued, §11).
+object with GUID +8 gets mode 2 (the Act III record fields:
+`quests-act3.md` §8).
 
 #### 8.2 Level warp check (`0x00545B80(game, player, from, to)`)
 
@@ -775,7 +790,8 @@ nothing.
 | 0x1DA–0x1DC (474–476) | record 35 | `0x0058C0E0` |
 
 Classes 0x173–0x1DC use the jump tables `0x00544DA0` / `0x00544DBC` (index =
-class − 0x173). The Act II–V functions are catalogued only (§11).
+class − 0x173). The Act II–V functions are specified in the act files
+(§11) and listed in §9.6.
 
 #### 9.6 Quest-owned object init and operate functions
 
@@ -877,12 +893,12 @@ Returns 0 in every non-fatal case. No draw of its own.
 
 ### 11. Acts II–V
 
-Catalogued in `quests.tsv` (records, callbacks, tables) and `quest-messages.tsv`.
-Hooks other specs rely on are specified above (§8.1–§8.4, §9.4, §9.5).
-Their state machines are not yet specified (Open question 8). Now specified
-(2026-10-07): Act II `quests-act2.md`, `quests-act2-2.md`; Act III
+Records, callbacks and tables are in `quests.tsv` and
+`quest-messages.tsv`; hooks other specs rely on are above (§8.1–§8.4,
+§9.4, §9.5); quest object functions §9.6. The state machines are
+specified per act: Act II `quests-act2.md`, `quests-act2-2.md`; Act III
 `quests-act3.md`, `quests-act3-2.md`; Act IV `quests-act4.md`; Act V
-`quests-act5.md`, `quests-act5-2.md`; quest object functions §9.6.
+`quests-act5.md`, `quests-act5-2.md`.
 
 ## Constants & data dependencies
 
@@ -1010,13 +1026,19 @@ item and path-placement specs).
 
 1. Status byte meanings 1–11 per quest (client quest-log text): settle
    from the client's quest log code (`0x0045CC00` 0x52 handler). **Answered** (2026-10-07): `world/quests-status.md`: the client (0x52 `0x0045CC00` → `0x004A40D0` stores the list; row build `0x004A1950`, tables `0x00723F30` and the per-quest status tables) maps each status to a description string id, a replay speech id and an icon state (§4, §5); per-quest tables §7–§11, Act I in §7, special cases §6.
-2. Does Flavie's chat really draw twice from the player seed and list
-   two lines? Settle with an RNG + packets recording of one Flavie chat.
-3. (Settled: the cow portal is reached through the cube's thunk table,
+2. ~~Does Flavie's chat really draw twice from the player seed and list
+   two lines? Settle with an RNG + packets recording of one Flavie chat.~~
+   Needs recording: R-PQ-1 (`docs/handoff/pc2-rec-pc2-quests.md`).
+3. ~~(Settled: the cow portal is reached through the cube's thunk table,
    `world/cube.md` §9.) A recording of a cow-portal transmute would still
-   confirm its draws (`world/cube.md` open question 4).
-4. Which game-entry path (mode 0 or 1, §3) single player takes: record a
-   game start with a breakpoint on `0x00546270`.
+   confirm its draws (`world/cube.md` open question 4).~~ Settled;
+   confirming recording R-PQ-2.
+4. ~~Which game-entry path (mode 0 or 1, §3) single player takes: record a
+   game start with a breakpoint on `0x00546270`.~~ **Answered**
+   (2026-10-07): §3 "Which caller runs" (`0x005345A0`, `0x005344B0`,
+   `0x0056A072`): mode 0; a new-character stub gets mode 1 then mode 0.
+   The doubled 0x5E / 0x28 / 0x29 of a new character's first game is a
+   code reading: recording R-PQ-3 (`docs/handoff/pc2-rec-pc2-quests.md`).
 5. (Answered: `quests-act1-rest.md` §7: bytes 13–14 are confirmed never
    written by `0x00593CB0`; d2rs writes 0 and exact-match comparison
    masks them.)
@@ -1046,8 +1068,9 @@ item and path-placement specs).
    (`0x00591A90`, `0x00592E60`, stored at `0x00591FC4` / `0x005971E6`)
    never run in 1.14d. The dispatchers' callers are all direct
    (`0x005438E0`: 6 sites, `0x005439A0`: 6 sites, §4.1).
-10. (Settled: §8.1 table, read from the call sites.) A recording of
-    each act change would still confirm the 0x61 bytes.
+10. ~~(Settled: §8.1 table, read from the call sites.) A recording of
+    each act change would still confirm the 0x61 bytes.~~ Settled;
+    confirming recording R-PQ-4.
 11. (Answered: `quests-act1-rest.md` §1 gibbet operate `0x00593480` and
     quest function `0x00593290`; §2 stone init `0x005935E0`, portal
     timer `0x00592D50` and the stone value (= the object's class); §3
@@ -1057,8 +1080,8 @@ item and path-placement specs).
     still confirm it, its Open question 3.)
 13. (Answered: `quests-act1-rest.md` §5: it raises the character
     progression in the client save flags; future owner the save spec.)
-14. Which bits a played completion of each quest leaves (§1.8 rule 3):
-    Needs recording: a 1.14d character that completed every quest on
+14. ~~Which bits a played completion of each quest leaves (§1.8 rule 3).~~
+    Needs recording (R-PQ-5, = HANDOFF §7 R-QC-1): a 1.14d character that completed every quest on
     Normal (expansion), saved after the last one and loaded once; dump
     the quest section (`d2s-tool dump`) and list, per slot, the bits
     set, against a second save of the same character after another
