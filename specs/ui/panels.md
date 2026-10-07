@@ -40,18 +40,18 @@
 |   8. Character panel (ui 2, left; `0x004A7D00`) | 331–430 |
 |   9. Inventory panel family (`0x0048EDF0`) | 431–485 |
 |   10. Skill tree (ui 4, right; `0x004AC690`) | 486–546 |
-|   11. Stash (ui 0x19, full; inventory modes 0x0C / 0x0D) | 547–569 |
-|   12. Horadric Cube (ui 0x1A, full; inventory mode 0x0E) | 570–618 |
-|   13. Waypoint menu (ui 0x14, left; `0x0049C9C0`) | 619–661 |
-|   14. NPC menu (ui 8) and NPC shop (ui 0x0C) | 662–730 |
-|   15. Event → intent summary | 731–758 |
-|   16. Machine tables | 759–793 |
-| Constants & data dependencies | 794–814 |
-| Randomness | 815–819 |
-| Edge cases & original bugs | 820–840 |
-| Test vectors | 841–879 |
-| Provenance | 880–920 |
-| Open questions | 921–979 |
+|   11. Stash (ui 0x19, full; inventory modes 0x0C / 0x0D) | 547–581 |
+|   12. Horadric Cube (ui 0x1A, full; inventory mode 0x0E) | 582–630 |
+|   13. Waypoint menu (ui 0x14, left; `0x0049C9C0`) | 631–683 |
+|   14. NPC menu (ui 8) and NPC shop (ui 0x0C) | 684–752 |
+|   15. Event → intent summary | 753–780 |
+|   16. Machine tables | 781–815 |
+| Constants & data dependencies | 816–836 |
+| Randomness | 837–841 |
+| Edge cases & original bugs | 842–862 |
+| Test vectors | 863–901 |
+| Provenance | 902–942 |
+| Open questions | 943–1001 |
 <!-- /index -->
 
 ## Summary
@@ -566,6 +566,18 @@ after both.
    meaning of 0x12: §Open questions 6.
 6. Grid clicks: stash page 4 intents (§15). Stash gold buttons:
    §Open questions 5.
+7. **How many 0x4F 0x12.** The close hook `0x00489EE0` sends one only
+   while the inventory mode is 0x0C or 0x0D (it sets mode 0 first and
+   calls `SetUIState(0x19, off, 0)` again, a no-op); there is no latch.
+   Mouse up `0x00489AC0`: in the inventory close rectangle
+   (`0x00486E10`) with no cursor item → `SetUIState(0x19, off, 0)` only
+   (hook: **one** message); in the stash close rectangle (`0x00489980`)
+   with the button pressed (`[0x007BCE38]` ≠ 0; not pressed → nothing)
+   → pressed := 0, `SetUIState(0x19, off, 0)` (hook: one message), then
+   0x4F 0x12 again at `0x00489B92`: **two** messages. The key handler
+   `0x00489CE0` (mode 0x0C, chat ui 5 closed) does the same: `SetUIState`
+   then a second send at `0x00489D21` (two), and resets the stash
+   selection globals (`0x00721E3C`–`0x00721E50` := −1).
 
 ### 12. Horadric Cube (ui 0x1A, full; inventory mode 0x0E)
 
@@ -636,7 +648,11 @@ after both.
    Hover x in [`sx + 273`, `sx + 308`], y in [`387 − sy`, `420 − sy`] →
    a filled rectangle (`D2GFX_DrawRectangle`, color 0, mode 2) and the
    `strUiMenu1` "Cancel" (4130) tool tip at y `385 − sy`, centered
-   on `sx + 291`.
+   on `sx + 291`. Exact (`0x0049CDA6`–`0x0049CE33`, drawn after the
+   rows): with `s` = width A of the string / 2 (C division), the
+   rectangle `0x004F6300(left sx + 287 − s, top 370 − sy, right
+   sx + 294 + s, bottom 387 − sy, color 0, mode 2)`, then the text at
+   pen (`sx + 292 − s`, `385 − sy`), color 0, current font.
 5. Rows: `[0x007BF08A]` rows (≤ 9) of the current tab, table
    `0x007224E8` (stride 24: icon x, icon y, text x, text y, 2 more i32):
    icon x/y = (17, 89 + 36 r) except row 4 onward (234, 270, 306, 342,
@@ -645,7 +661,13 @@ after both.
    is the current level, else `3 + sel`; the current level also gets
    frame 0 drawn again. Text: level name (`0x00453E70`) at (`sx + tx`,
    `ty − sy`), Font16, color 5 unknown, 0 known, 3 if hovered-selected
-   or current level.
+   or current level. Exact (`0x0049CD10`–`0x0049CD8B`): unknown row
+   (used byte 0): no icon, color 5; known: 0; then 3 if the close button
+   is not pressed and the row is the pressed row (`[0x007BF06D]`, set by
+   mouse down, `ui/menus.md` §1.2; an unknown row can never be pressed,
+   the row hit skips it); then 3 if the row's level is the current
+   level (the second icon draw, frame 0). Text = level name
+   (`0x00453E70(level)`).
 6. Title: `waypointsheader` (3990) if any other waypoint is known
    (`[0x007BF08E]`), else `nowaypoints` (3991), Font16, color 0, at
    x = `sx + 160 − width / 2`, y = `48 − sy`.

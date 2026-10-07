@@ -28,17 +28,19 @@ was at the 60 KB limit).
 | UP-25 (self-close mode / jump, latch reset) | `menus.md` §1.5, §1.7 | `SetUIState(0x14, off, 0)`, draw continues; latch cleared only at open, `0x0049C6A0`, `0x0049C7F0` (tab > 5). |
 | UP-26 (close via `0x0049CEC0` twice?) | `menus.md` §1.5, §1.8 | Once: every level-0 send shares the latch `[0x007BF085]`. |
 | UP-27 part (tab on open) | `menus.md` §1.4 | The act of the player's level, then the quest fallback. |
+| UP-11 (stash close: one or two 0x4F 0x12) | `panels.md` §11.7 | The close hook sends one (no latch, only in inventory mode 0x0C / 0x0D); the stash close-button release (`0x00489B92`) and the key handler (`0x00489D21`) send a second one: **two**. A release on the inventory close button sends one. |
+| UP-24 rest (filled hover rectangle extent) | `panels.md` §13.4 | `0x004F6300(sx + 287 − s, 370 − sy, sx + 294 + s, 387 − sy, 0, 2)`, `s` = half the text width; text pen (`sx + 292 − s`, `385 − sy`). |
+| UP-27 rest (color of an unknown selected row) | `panels.md` §13.5 | Always 5: the row hit skips unknown rows, so they are never pressed; 3 = pressed row (close not pressed) or current level. |
 | `panels.md` OQ 7 | `menus.md` §1 | Answered (marked in place). |
 | `panels.md` OQ 4, OQ 8 | §10.3, §10.6; `menus.md` §2–§3 | Partly answered (marked in place). |
 
 ## Still open
 
 - UP-6 (add buttons with 0 points; damage block, name / class, hovers): no new read (`panels.md` OQ 3).
-- UP-7, UP-8, UP-9, UP-10, UP-11, UP-16, UP-17, UP-21, UP-22, UP-23, UP-28: not reached in this pass.
+- UP-7, UP-8, UP-9, UP-10, UP-16, UP-17, UP-21, UP-22, UP-23, UP-28: not reached in this pass.
 - UP-14 rest: Cain's count reset `0x004B5640` (note: `0x004B4830` itself rewrites the identify record's count to 2 / 3, `menus.md` §2.3).
 - UP-15 rest: talk message bytes (`0x004B6C70` sends nothing; it opens the talk sub-menu `0x004B5890`; the 0x2F / 0x30 senders are `0x004B6E87` / `0x004B6E45`).
 - UP-19 rest: remap `k` per state (`panels.md` OQ 4, capture).
-- UP-24 rest: the filled hover rectangle extent; UP-27 rest: color of an unknown selected row.
 - New: `panels.md` OQ 11 (mode 3 pixels of the transmute), OQ 12 (value overflow / draw order), OQ 13 (cube-gone close: one or two 0x4F 0x17); `menus.md` OQ 1 (hire row text), OQ 2 (confirm dialog `0x004B2F50`), OQ 3 (callers' flags), OQ 4 (captures).
 
 ## CODE-TABLE CHANGE commits
