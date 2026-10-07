@@ -505,3 +505,28 @@ fn item_cast_core_needs_item_effect_and_restores_the_target() {
         &&format!("path {u} TargetPoint(0, 0)")
     );
 }
+
+// Covers: specs/skills/bodies.md §2.18 (the next record is read after the call)
+#[test]
+fn iteration_continues_with_the_live_records_ahead() {
+    let h = |key: i32| Handler {
+        event: 1,
+        key_type: 1,
+        key,
+        skill: 0,
+        level: 0,
+        func: 1,
+    };
+    let (a, b, c, d, n) = (h(1), h(2), h(3), h(4), h(9));
+    // Nothing changed: the whole tail is still ahead.
+    assert_eq!(surviving_tail(&[a, b, c, d], &[c, d]), 2);
+    // A record ahead unlinked by the call is not reached.
+    assert_eq!(surviving_tail(&[a, b, d], &[c, d]), 1);
+    // A record prepended by the call lies behind the walk.
+    assert_eq!(surviving_tail(&[n, a, b, c, d], &[c, d]), 2);
+    // The current record unregistered during its own call, the rest kept.
+    assert_eq!(surviving_tail(&[a, c, d], &[c, d]), 2);
+    // Every record ahead gone.
+    assert_eq!(surviving_tail(&[n, a, b], &[c, d]), 0);
+    assert_eq!(surviving_tail(&[], &[c, d]), 0);
+}

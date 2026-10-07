@@ -408,8 +408,12 @@ fn add_element_by_etype() {
     let before = f.units[u].seed;
     // Fixed elements: field, length, resist; no draw.
     assert_eq!(add(&mut f, &mut r, 1, 5, 9).resist, 39);
+    assert_eq!(r.hit_class, 0x20);
     assert_eq!(add(&mut f, &mut r, 2, 6, 9).resist, 41);
+    assert_eq!(r.hit_class, 0x40);
+    // Magic has no hit class: +0x60 unchanged.
     assert_eq!(add(&mut f, &mut r, 3, 7, 9).resist, 37);
+    assert_eq!(r.hit_class, 0x40);
     let c = add(&mut f, &mut r, 4, 8, 25);
     assert_eq!((c.resist, c.hit_class), (43, 0x30));
     assert_eq!(add(&mut f, &mut r, 5, 9, 30).resist, 45);
@@ -438,6 +442,9 @@ fn add_element_by_etype() {
         burn_len: 12,
         freeze_len: 40,
         physical: 101,
+        // A plain store of the last class given (e = 12: 0x30); 11, 0 and
+        // 13 leave it (`levels.md` §3.6).
+        hit_class: 0x30,
         ..DamageRecord::default()
     };
     assert_eq!(r, want);
@@ -642,6 +649,35 @@ fn weapon_mastery_layers_and_throw() {
     // Negative values give 0.
     f.units[u].entries.insert(343, vec![(30, -5)]);
     assert_eq!(weapon_mastery(&f, &t, Some(u), Some(sword), Some(0), 1), 0);
+}
+
+// Covers: specs/skills/levels.md §3.5, specs/skills/bodies-3.md §3.3 step 6, Open question 8
+#[test]
+fn throw_mastery_is_zero_off_the_throw_gate() {
+    let mut s = skill_rec();
+    (s.range, s.itypea1) = (2, 48);
+    let t = skill_tables(vec![skill_rec(), s]);
+    let mut f = Fake::default();
+    let u = player(&mut f);
+    let axe = f.add_item(FItem {
+        types: vec![30],
+        ..FItem::default()
+    });
+    f.units[u].entries.insert(342, vec![(30, 20)]);
+    f.units[u].entries.insert(343, vec![(30, 40)]);
+    f.units[u].entries.insert(345, vec![(30, 70)]);
+    f.units[u].entries.insert(346, vec![(30, 90)]);
+    f.units[u].used = Some(entry(1, 1, -1));
+    // Not `throwable`: 0, not the plain masteries 342 / 343.
+    assert_eq!(throw_mastery(&f, &t, Some(u), Some(axe), None, 0), 0);
+    assert_eq!(throw_mastery(&f, &t, Some(u), Some(axe), None, 1), 0);
+    f.items[axe].throw = true;
+    assert_eq!(throw_mastery(&f, &t, Some(u), Some(axe), None, 0), 70);
+    assert_eq!(throw_mastery(&f, &t, Some(u), Some(axe), None, 1), 90);
+    // A used skill off the gate (range ≠ 2): 0.
+    assert_eq!(throw_mastery(&f, &t, Some(u), Some(axe), Some(0), 0), 0);
+    f.units[u].used = None;
+    assert_eq!(throw_mastery(&f, &t, Some(u), Some(axe), None, 0), 0);
 }
 
 // Covers: specs/skills/levels.md §3.5

@@ -969,16 +969,54 @@ pub fn weapon_mastery<W: SkillUnits>(
         return 0;
     };
     let skill = skill.or_else(|| w.used_skill(u).map(|e| e.skill));
-    // Throw path `0x00645720`.
-    let throw = w.item_flag_throw(item)
+    let stat = if throw_gate(w, t, item, skill) {
+        345
+    } else {
+        342
+    } + u16::from(ty.min(2));
+    mastery_of(w, u, item, stat)
+}
+
+/// The gate of the throw path `0x00645720` (§3.5, `bodies-3.md` §3.3
+/// step 6): the item is of type `throwable` (`0x0062BA80`), the skill
+/// exists, its `itypea1` is-a 48 (`thro`) and its range is 2.
+fn throw_gate<W: SkillUnits>(w: &W, t: &SkillTables, item: W::Item, skill: Option<i32>) -> bool {
+    w.item_flag_throw(item)
         && skill.and_then(|s| t.skill(s)).is_some_and(|r| {
             r.range == 2 && r.itypea1 != 0xFFFF && w.itype_is(i32::from(r.itypea1), 48)
-        });
-    let stat = if throw { 345 } else { 342 } + u16::from(ty.min(2));
+        })
+}
+
+/// Max(0, the values of up to 32 entries of `stat` whose layer is an item
+/// type the item is) (§3.5).
+fn mastery_of<W: SkillUnits>(w: &W, u: W::Unit, item: W::Item, stat: u16) -> i32 {
     w.stat_entries(u, stat, 32)
         .into_iter()
         .filter(|&(layer, _)| w.item_is(item, i32::from(layer)))
         .fold(0, |m, (_, v)| m.max(v))
+}
+
+/// Throw mastery `0x00645720(unit, item, skill, type)` (§3.5; `bodies-3.md`
+/// §3.3 step 6 and Open question 8): 0 unless the throw gate passes (the
+/// item is `throwable`, the used skill has `itypea1` `thro` and range 2);
+/// then stats 345 / 346 / 347 as in [`weapon_mastery`]. Null unit or
+/// item → 0; null skill → the used skill.
+pub fn throw_mastery<W: SkillUnits>(
+    w: &W,
+    t: &SkillTables,
+    unit: Option<W::Unit>,
+    item: Option<W::Item>,
+    skill: Option<i32>,
+    ty: u8,
+) -> i32 {
+    let (Some(u), Some(item)) = (unit, item) else {
+        return 0;
+    };
+    let skill = skill.or_else(|| w.used_skill(u).map(|e| e.skill));
+    if !throw_gate(w, t, item, skill) {
+        return 0;
+    }
+    mastery_of(w, u, item, 345 + u16::from(ty.min(2)))
 }
 
 /// Concentration `0x006461D0` (§3.5): with state 42, `(damagepercent of
@@ -1084,10 +1122,9 @@ pub struct ElementAdded {
     /// physical (`res`).
     pub resist: i32,
     /// The hit class the element names (0x20 fire, 0x40 lightning, 0x30
-    /// cold and freeze, 0x50 poison, 0x60 stun; 0 otherwise).
-    // TODO(spec: levels.md §3.6): how `add_element` writes the hit class
-    // (record +0x60 set, or-ed, or only its high nibble) is not stated;
-    // the record's hit class is left unchanged and the value returned.
+    /// cold and freeze, 0x50 poison, 0x60 stun; 0 otherwise). A non-zero
+    /// class is also stored in the record (`levels.md` §3.6: a plain u32
+    /// store to +0x60, replacing the old value); 0 leaves it unchanged.
     pub hit_class: u32,
 }
 
@@ -1167,6 +1204,11 @@ pub fn add_element<W: SkillUnits>(
             (-1, 0)
         }
     };
+    // §3.6: "hit class h" is a plain store (record +0x60 := h); the
+    // elements without one leave +0x60 unchanged.
+    if hit_class != 0 {
+        r.hit_class = hit_class;
+    }
     ElementAdded {
         element: e,
         resist,
