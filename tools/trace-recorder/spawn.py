@@ -290,6 +290,21 @@ class SpawnRecorder(rr.Recorder):
                                  "mode": self.read_u32(u + 0x10), "x": mx, "y": my,
                                  "hp": mv.get("hitpoints", 0) >> 8})
             st["monsters"] = mons
+            # objects (type 2) within 60 and room tiles / warps (type 5) within 120 subtiles:
+            # static path +0x0C / +0x10 (render/lighting.md §6.3); for walking to them
+            for key, t, lim in (("objects", 2, 60), ("tiles", 5, 120)):
+                found = []
+                for b in range(128):
+                    u, n = self.read_u32(game + HASH_BASE + t * 0x200 + 4 * b), 0
+                    while u and n < 1000:
+                        sp_ = self.read_u32(u + U_PATH)
+                        if sp_:
+                            ox, oy = self.read_u32(sp_ + 0x0C), self.read_u32(sp_ + 0x10)
+                            if abs(ox - px) <= lim and abs(oy - py) <= lim:
+                                found.append({"guid": self.read_u32(u + 0x0C), "class": self.read_u32(u + 4),
+                                              "mode": self.read_u32(u + 0x10), "x": ox, "y": oy})
+                        u, n = self.read_u32(u + U_NEXT), n + 1
+                st[key] = found
             # level rects in tiles (specs/drlg/maze.md: level +0x1C..+0x28 x/y/w/h, id
             # +0x1D0, next level +0x1AC), following the chain from the player's level
             room = self.read_u32(path + 0x1C) if path else 0
