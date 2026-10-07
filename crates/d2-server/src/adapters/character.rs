@@ -1,4 +1,4 @@
-// Spec: specs/formats/d2s-load.md; specs/world/hirelings-2.md §19; specs/formats/d2s.md §2.2 r7, §2.2 r8, §2.2 r9, §2.4 r4, §2.4 r5, §2.4 r6, §8.2 r7, §8.5 r2, §9; specs/world/quests.md §1.6
+// Spec: specs/formats/d2s-load.md; specs/items/generation.md §10.3; specs/world/hirelings-2.md §19; specs/formats/d2s.md §2.2 r7, §2.2 r8, §2.2 r9, §2.4 r4, §2.4 r5, §2.4 r6, §8.2 r7, §8.5 r2, §9; specs/world/quests.md §1.6
 //! Character storage: what loading a parsed `.d2s` does to the game
 //! (`formats/d2s-load.md`). `d2_formats::d2s` parses and checks the bytes
 //! (`formats/d2s.md` §1–§8, §10); [`load`] then runs either the
@@ -599,6 +599,158 @@ pub fn loaded_flags(stored: u32) -> u32 {
     d2s::item_flags_on_load(stored)
 }
 
+/// One charstats start-item slot (`items/generation.md` §10.3: `itemN`
+/// code +0x5C + 8s, `itemNloc` +0x60 + 8s, `itemNcount` +0x61 + 8s).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct StartSlot {
+    pub code: [u8; 4],
+    /// A `bodylocs` row; 0: the inventory.
+    pub loc: u8,
+    pub count: u8,
+}
+
+/// The ten start-item slots of a charstats row, in slot order.
+pub fn start_slots(cs: &d2_data::tables::Charstats) -> [StartSlot; 10] {
+    let s = |code, loc, count| StartSlot { code, loc, count };
+    [
+        s(cs.item1, cs.item1loc, cs.item1count),
+        s(cs.item2, cs.item2loc, cs.item2count),
+        s(cs.item3, cs.item3loc, cs.item3count),
+        s(cs.item4, cs.item4loc, cs.item4count),
+        s(cs.item5, cs.item5loc, cs.item5count),
+        s(cs.item6, cs.item6loc, cs.item6count),
+        s(cs.item7, cs.item7loc, cs.item7count),
+        s(cs.item8, cs.item8loc, cs.item8count),
+        s(cs.item9, cs.item9loc, cs.item9count),
+        s(cs.item10, cs.item10loc, cs.item10count),
+    ]
+}
+
+/// Quantity a quiver gets after its placement (§10.3 step 2.6).
+pub const QUIVER_STORED: i32 = 100;
+/// Quantity a quiver gets after its equip (§10.3 step 2.6).
+pub const QUIVER_EQUIPPED: i32 = 250;
+
+/// Where a start item went (§10.3 step 2.6).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StartPlace {
+    Belt,
+    Inventory,
+    Equipped(u8),
+    /// Every placement refused it: it stays with no place.
+    Nowhere,
+}
+
+/// The seams of the start items `0x00534F10` (`items/generation.md`
+/// §10.3) on one player.
+pub trait StartItemWorld {
+    /// §10.1 code lookup and §10.2 creation (source the player, spawn mode
+    /// 4, quality 2, no sockets, never ethereal, ilvl the player's base
+    /// level, no seeds). `None`: code not found or creation refused.
+    fn create(&mut self, code: [u8; 4]) -> Option<UnitId>;
+    /// Step 2.2: remove and free the item's flag-0x40 stat list, if any.
+    fn drop_class_skill_list(&mut self, item: UnitId);
+    /// Step 2.3: stat 107 layer `skill` := 1 in the flag-0x40 list
+    /// (created if missing).
+    fn set_single_skill(&mut self, item: UnitId, skill: u16);
+    /// §1.3 stackable.
+    fn stackable(&self, item: UnitId) -> bool;
+    /// Step 2.4: stat 70 := the total max stack.
+    fn fill_stack(&mut self, item: UnitId);
+    /// Step 2.5: item flag 0x20000; body location := `loc`.
+    fn mark_start(&mut self, item: UnitId, loc: u8);
+    /// `inventory.md` §3 rule 3.
+    fn beltable(&self, item: UnitId) -> bool;
+    /// Belt placement (`0x0055E9B0`, slot = item x, find 1).
+    fn place_belt(&mut self, item: UnitId) -> bool;
+    /// Inventory placement (`0x00534B30`: page 0, find free, send 1).
+    fn place_inventory(&mut self, item: UnitId) -> bool;
+    /// Equip at `loc` (`0x005606B0`, skip 1).
+    fn equip(&mut self, item: UnitId, loc: u8) -> bool;
+    /// Itemtype 5 (`bowq`).
+    fn quiver(&self, item: UnitId) -> bool;
+    /// Stat 70 := `n`.
+    fn set_quantity(&mut self, item: UnitId, n: i32);
+    /// Stat 72 := the max durability (`0x00625E00`).
+    fn fill_durability(&mut self, item: UnitId);
+}
+
+/// `0x00534F10` (`items/generation.md` §10.3) over the class's slots:
+/// for each slot with a count, `count` copies, each created, finished
+/// (steps 2.2–2.5) and placed (step 2.6). `start_skill`: charstats
+/// `StartSkill` when it is a valid skill row (step 2.3, slot 0 only).
+/// Returns each created item with where it went, in creation order.
+pub fn start_items(
+    w: &mut dyn StartItemWorld,
+    slots: &[StartSlot],
+    start_skill: Option<u16>,
+) -> Vec<(UnitId, StartPlace)> {
+    let mut out = Vec::new();
+    for (s, slot) in slots.iter().enumerate() {
+        if slot.count == 0 {
+            continue;
+        }
+        for _ in 0..slot.count {
+            // Step 1: a code not found makes every copy fail the same
+            // lookup (no draw), so the slot ends here.
+            let Some(item) = w.create(slot.code) else {
+                break;
+            };
+            w.drop_class_skill_list(item);
+            if s == 0 {
+                if let Some(k) = start_skill {
+                    w.set_single_skill(item, k);
+                }
+            }
+            if w.stackable(item) {
+                w.fill_stack(item);
+            }
+            w.mark_start(item, slot.loc);
+            out.push((item, place_start_item(w, item, slot.loc)));
+        }
+    }
+    out
+}
+
+/// §10.3 step 2.6. A beltable item goes to the belt, else (failed) to
+/// the inventory branch; loc 0: the inventory, then stat 70 := 250 for a
+/// quiver (overridden by 100) else stat 72 := max durability; else equip
+/// at loc, else (failed) the inventory placement, then stat 70 := 250 for
+/// a quiver else stat 72 := max durability.
+fn place_start_item(w: &mut dyn StartItemWorld, item: UnitId, loc: u8) -> StartPlace {
+    let belted = w.beltable(item);
+    if belted && w.place_belt(item) {
+        return StartPlace::Belt;
+    }
+    if belted || loc == 0 {
+        let stored = w.place_inventory(item);
+        if w.quiver(item) {
+            w.set_quantity(item, QUIVER_EQUIPPED);
+            w.set_quantity(item, QUIVER_STORED);
+        } else {
+            w.fill_durability(item);
+        }
+        return if stored {
+            StartPlace::Inventory
+        } else {
+            StartPlace::Nowhere
+        };
+    }
+    let place = if w.equip(item, loc) {
+        StartPlace::Equipped(loc)
+    } else if w.place_inventory(item) {
+        StartPlace::Inventory
+    } else {
+        StartPlace::Nowhere
+    };
+    if w.quiver(item) {
+        w.set_quantity(item, QUIVER_EQUIPPED);
+    } else {
+        w.fill_durability(item);
+    }
+    place
+}
+
 /// Load result → (m, string id) of the refusal message (load §5 rule 2,
 /// client handler `0x0045C6D0` / `0x0044E380`). `alt_bit` is config byte
 /// +0x1EF bit 0x20: results 17 and 18 then show 0x5522 / 0x5521. A
@@ -652,3 +804,205 @@ pub mod save;
 mod tests;
 #[cfg(test)]
 mod tests_fitems;
+
+#[cfg(test)]
+mod start_items_tests {
+    use super::*;
+
+    /// Codes: `hp1 ` beltable, `bowq` quiver, `jav ` stackable weapon,
+    /// `bad ` not found; `full` refuses every placement.
+    #[derive(Default)]
+    struct Fake {
+        next: u32,
+        codes: Vec<(UnitId, [u8; 4])>,
+        log: Vec<String>,
+        belt_full: bool,
+        equip_fails: bool,
+    }
+
+    impl Fake {
+        fn code(&self, item: UnitId) -> [u8; 4] {
+            self.codes.iter().find(|c| c.0 == item).unwrap().1
+        }
+        fn say(&mut self, item: UnitId, what: &str) {
+            let c = String::from_utf8_lossy(&self.code(item)).trim().to_string();
+            self.log.push(format!("{c} {what}"));
+        }
+    }
+
+    impl StartItemWorld for Fake {
+        fn create(&mut self, code: [u8; 4]) -> Option<UnitId> {
+            if &code == b"bad " {
+                return None;
+            }
+            self.next += 1;
+            let u = UnitId(self.next);
+            self.codes.push((u, code));
+            self.say(u, "create");
+            Some(u)
+        }
+        fn drop_class_skill_list(&mut self, item: UnitId) {
+            self.say(item, "drop40");
+        }
+        fn set_single_skill(&mut self, item: UnitId, skill: u16) {
+            self.say(item, &format!("skill{skill}"));
+        }
+        fn stackable(&self, item: UnitId) -> bool {
+            matches!(&self.code(item), b"jav " | b"bowq")
+        }
+        fn fill_stack(&mut self, item: UnitId) {
+            self.say(item, "stack");
+        }
+        fn mark_start(&mut self, item: UnitId, loc: u8) {
+            self.say(item, &format!("start{loc}"));
+        }
+        fn beltable(&self, item: UnitId) -> bool {
+            &self.code(item) == b"hp1 "
+        }
+        fn place_belt(&mut self, item: UnitId) -> bool {
+            self.say(item, "belt");
+            !self.belt_full
+        }
+        fn place_inventory(&mut self, item: UnitId) -> bool {
+            self.say(item, "inv");
+            &self.code(item) != b"full"
+        }
+        fn equip(&mut self, item: UnitId, loc: u8) -> bool {
+            self.say(item, &format!("equip{loc}"));
+            !self.equip_fails
+        }
+        fn quiver(&self, item: UnitId) -> bool {
+            &self.code(item) == b"bowq"
+        }
+        fn set_quantity(&mut self, item: UnitId, n: i32) {
+            self.say(item, &format!("qty{n}"));
+        }
+        fn fill_durability(&mut self, item: UnitId) {
+            self.say(item, "dur");
+        }
+    }
+
+    fn slot(code: &[u8; 4], loc: u8, count: u8) -> StartSlot {
+        StartSlot {
+            code: *code,
+            loc,
+            count,
+        }
+    }
+
+    // Covers: specs/items/generation.md §10.3
+    #[test]
+    fn slots_run_in_order_with_their_counts_and_the_start_skill_on_slot_0() {
+        let mut w = Fake::default();
+        let slots = [
+            slot(b"jav ", 4, 1),
+            slot(b"bad ", 0, 3),
+            slot(b"hp1 ", 0, 2),
+            slot(b"cap ", 1, 0),
+            slot(b"bowq", 5, 1),
+        ];
+        let got = start_items(&mut w, &slots, Some(36));
+        assert_eq!(
+            got.iter().map(|g| g.1).collect::<Vec<_>>(),
+            [
+                StartPlace::Equipped(4),
+                StartPlace::Belt,
+                StartPlace::Belt,
+                StartPlace::Equipped(5),
+            ]
+        );
+        assert_eq!(
+            w.log,
+            [
+                "jav create",
+                "jav drop40",
+                "jav skill36",
+                "jav stack",
+                "jav start4",
+                "jav equip4",
+                "jav dur",
+                "hp1 create",
+                "hp1 drop40",
+                "hp1 start0",
+                "hp1 belt",
+                "hp1 create",
+                "hp1 drop40",
+                "hp1 start0",
+                "hp1 belt",
+                "bowq create",
+                "bowq drop40",
+                "bowq stack",
+                "bowq start5",
+                "bowq equip5",
+                "bowq qty250",
+            ]
+        );
+    }
+
+    // Covers: specs/items/generation.md §10.3
+    #[test]
+    fn failed_belt_and_equip_fall_back_to_the_inventory() {
+        let mut w = Fake {
+            belt_full: true,
+            equip_fails: true,
+            ..Fake::default()
+        };
+        let slots = [
+            slot(b"hp1 ", 0, 1),
+            slot(b"bowq", 5, 1),
+            slot(b"bowq", 0, 1),
+            slot(b"full", 3, 1),
+        ];
+        let got = start_items(&mut w, &slots, None);
+        assert_eq!(
+            got.iter().map(|g| g.1).collect::<Vec<_>>(),
+            [
+                StartPlace::Inventory,
+                StartPlace::Inventory,
+                StartPlace::Inventory,
+                StartPlace::Nowhere,
+            ]
+        );
+        let tail = |c: &str| {
+            w.log
+                .iter()
+                .filter(|l| l.starts_with(c) && !l.contains("create"))
+                .cloned()
+                .collect::<Vec<_>>()
+        };
+        // Belt refused → the inventory branch (no start skill: none given).
+        assert_eq!(
+            tail("hp1"),
+            ["hp1 drop40", "hp1 start0", "hp1 belt", "hp1 inv", "hp1 dur"]
+        );
+        // An equipped quiver gets 250 even when the equip falls back; a
+        // stored one gets 250 then 100.
+        assert_eq!(
+            tail("bowq"),
+            [
+                "bowq drop40",
+                "bowq stack",
+                "bowq start5",
+                "bowq equip5",
+                "bowq inv",
+                "bowq qty250",
+                "bowq drop40",
+                "bowq stack",
+                "bowq start0",
+                "bowq inv",
+                "bowq qty250",
+                "bowq qty100",
+            ]
+        );
+        assert_eq!(
+            tail("full"),
+            [
+                "full drop40",
+                "full start3",
+                "full equip3",
+                "full inv",
+                "full dur"
+            ]
+        );
+    }
+}
