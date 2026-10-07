@@ -2877,12 +2877,12 @@ the dev-dependency) and record results here.
     error from `present_act_palette`; the frame palette is act 1's
     `pal.pl2` from the first frame (`composition.md` §4: act 0 at game
     start), so the window is no longer all zeros where index 0 differs
-    from black. The in-process server sends no 0x03 / 0x07 / 0x15 at the
-    join yet (`docs/HANDOFF.md` §2 step 4), so `ClientWorld::drlg` stays
-    `None` and the act never changes in this run; once the session code
-    sends the join, rerun and expect no 0x07 / 0xAC / 0x15 refusal in the
-    log (a `fatal assert 0x13C` / `0x168` or a `TODO(spec: model.md §9`
-    rejection is a finding: see `impl-client-drlg` §3 Q1–Q2).
+    from black. Since `impl-server-join` the in-process server sends the
+    session join (0x59, 0x0B, 0x03, 0x07, 0x15, then the room switch's
+    0x07s), so the client DRLG is built in this run: expect no 0x07 /
+    0xAC / 0x15 refusal in the log (a `fatal assert 0x13C` / `0x168` or a
+    `TODO(spec: model.md §9` rejection is a finding: see
+    `impl-client-drlg` §3 Q1–Q2).
 83. Client room seeds vs the server's (`client/model.md` OQ 9, §12 r5):
     with `tools/trace-recorder`, after a join, read the client unit seed
     (`+0x20`) of the first monster 0xAC adds at a non-zero point and the
@@ -2892,6 +2892,34 @@ the dev-dependency) and record results here.
     creation at a point, `init_low(lo')`); a mismatch is either OQ 9
     (client rooms created by other draws, e.g. the §4.6 build timer) or
     object creation not stepping the seed (`impl-client-drlg` §3 Q3).
+84. Server join order (`impl-server-join` §3 Q1; `sim/path-placement.md`
+    §11, R2; `client/model.md` §11 r3): in `20261006-022633-packets.jsonl`
+    frame 1, list every S→C id from 0x59 to 0x15 with its `caller`.
+    `path-placement.md` §11 says game entry sends 0x07 (spawn room) and
+    0x15 "at once" and the other 0x07s come from the first per-client
+    update's room switch, which would give 0x07, 0x15, 0x07 × 9; R2 and
+    `model.md` §11 r3 record 0x07 × 10 then 0x15. d2rs sends the §11 text
+    order. Expect the callers to settle which: the 0x15's caller
+    (`0x005394A0` at once, or the update pass `0x00580860` through flag-ex
+    0x10000) and the nine 0x07s' (`0x0053A8E0`). Also list the ids
+    between 0x0B and 0x03 and after 0x03 (0x53?) with their callers:
+    each is a message d2rs does not send yet (`impl-server-join` §2).
+85. Game +0x80 in 0x03 (`client/model.md` §11 r1, `objects.md` §2 r2):
+    with `tools/trace-recorder`, at a single-player join read the result
+    of `0x00546C60` and game +0x80, and the S→C 0x03 u32@8 (recorded
+    0x9FE0D161 in `-022633`). Expect all three equal (d2rs sends the
+    object control's `lo'`, `ObjectState::obj_seed`; the app's game has
+    no object control and sends 0, a known wiring gap).
+86. The session join on game files (`impl-server-join`):
+    `D2_GAME_DIR=<install> cargo test -p d2-client --test app_client_drlg
+    -- --ignored the_session_join_on_the_install --nocapture`. Expect a
+    pass: no message refused, act 0 with town level 1, the local player
+    in a level-1 room of the client DRLG at the server's spawn point;
+    record the printed 0x07 count and positions (1 from game entry + the
+    spawn room's adjacency array) and compare them with the ten 0x07 of
+    the recorded join (C84: same count, and the first at the spawn room).
+    A spawn search failure (`game entry failed`) is a finding for
+    `drlg/levels.md` §10 / `path-placement.md` §11 on the live town.
 
 Kept entries (unchanged):
 

@@ -1665,6 +1665,16 @@ fn streams(fx: &Fx, msgs: &[Vec<u8>]) -> Vec<Vec<u8>> {
         .collect()
 }
 
+/// S→C 0x07 MapReveal of the room at tile (x, y) of `level`
+/// (`server-messages.tsv`: x u16 @1, y u16 @3, level u8 @5).
+fn map_reveal(x: u16, y: u16, level: u32) -> Vec<u8> {
+    let mut b = vec![0x07];
+    b.extend(x.to_le_bytes());
+    b.extend(y.to_le_bytes());
+    b.push(level as u8);
+    b
+}
+
 fn record(fx: &mut Fx, frames: &mut Vec<Frame>, msgs: Vec<Vec<u8>>) {
     let step = fx.step(&msgs);
     // Each received message is accounted once (`bridge.md` §6,
@@ -1753,11 +1763,19 @@ fn run_with(game_seed: u32) -> Transcript {
     assert!(!r.ticked);
 
     // Frame 2 (tick 1), join: the client's room change activates the
-    // rooms near the player's (`rooms.md` §4.1: 4 rooms); the room pass
-    // creates the DS1's preset monster at its sub-tile (`population.md`
-    // §11.1), placed on its path. No message.
+    // rooms near the player's (`rooms.md` §4.1: 4 rooms) and sends one
+    // S→C 0x07 per room of the player's adjacency array, in its order
+    // (`path-placement.md` §11 "Recipients": tile x, tile y, level); the
+    // room pass creates the DS1's preset monster at its sub-tile
+    // (`population.md` §11.1), placed on its path. This staged game sends
+    // no 0x03, so the client refuses each 0x07 (fatal 0x58A).
     record(&mut fx, &mut frames, vec![]);
-    assert_eq!(frames[0].2, none);
+    assert_eq!(
+        frames[0].2,
+        [(8000, 8000), (8000, 8008), (8008, 8000), (8008, 8008)]
+            .map(|(x, y)| map_reveal(x, y, ISLE))
+            .to_vec()
+    );
     assert_eq!(fx.sim_ref().game.lists.active_rooms(0).len(), 4);
     let monsters = fx.monsters();
     assert_eq!(monsters.len(), 1, "the DS1 preset monster");
@@ -1915,10 +1933,11 @@ fn run_with(game_seed: u32) -> Transcript {
         let r = fx.sim_ref().events.action.sys.units.get(gold).unwrap();
         vec![(fx.guid(gold), r.seed, spot.x, spot.y, r.mode)]
     };
-    // No S→C so far: the unit-add / ground messages of the missile, the
-    // death and the drop belong to the per-unit update `0x0053A500`,
-    // which the tick wiring does not run yet (`inventory.md` §6.3; IS2).
-    for f in &frames {
+    // No S→C so far but the join's 0x07s (frame 2): the unit-add /
+    // ground messages of the missile, the death and the drop belong to
+    // the per-unit update `0x0053A500`, which the tick wiring does not run
+    // yet (`inventory.md` §6.3; IS2).
+    for f in &frames[1..] {
         assert_eq!(f.2, none, "no S→C up to here");
     }
     assert!(fx.errors().is_empty(), "{:?}", fx.errors());
@@ -2282,10 +2301,33 @@ fn run_with(game_seed: u32) -> Transcript {
         b: 0,
         life_pct: 0,
     };
-    assert_eq!(
-        frames.last().unwrap().2,
-        [reveal.encode().to_vec(), stop.encode().to_vec()]
-    );
+    // Then the tick's room switch: one 0x07 per room of the placement
+    // room's adjacency array (none of them was in the old array, which
+    // held the Isle's rooms), in its order (`path-placement.md` §11).
+    let switch: Vec<Vec<u8>> = {
+        let s = fx.sim_ref();
+        let (d, r) = s
+            .events
+            .action
+            .sys
+            .hooks
+            .drlg
+            .drlg_room(&s.game, room)
+            .unwrap();
+        d.active_room(r)
+            .unwrap()
+            .adjacency
+            .iter()
+            .map(|&a| {
+                let rr = d.room(a);
+                map_reveal(rr.rect.x as u16, rr.rect.y as u16, GATE)
+            })
+            .collect()
+    };
+    assert_eq!(switch.len(), 6);
+    let mut want = vec![reveal.encode().to_vec(), stop.encode().to_vec()];
+    want.extend(switch);
+    assert_eq!(frames.last().unwrap().2, want);
     assert!(!fx.sim_ref().world.rest.interact.contains_key(&player));
     // The next tick: no 0x15 (`docs/handoff/wire-path-server.md` §4
     // finding 1; §8 rule 3's room messages are the unit-update spec's).
@@ -2301,9 +2343,10 @@ fn run_with(game_seed: u32) -> Transcript {
     // The S→C stream drove the client model (`client/model.md`,
     // `msg-units.md`, `msg-stats-items.md`): 0x9C ×2, 0x47 ×2, 0x48 ×2
     // applied; 0x0D dropped (the player was never announced: the server
-    // sends no 0x59 / 0x0B yet); 0x07 rejected (no client act: the server
-    // sends no 0x03 yet, fatal 0x58A); the NPC / quest / trade ids have no
-    // owner spec yet.
+    // sends no 0x59 / 0x0B in this staged game); every 0x07 rejected (no
+    // client act: this staged game sends no 0x03, fatal 0x58A): the join's
+    // four, the warp's one and the six of its room switch; the NPC /
+    // quest / trade ids have no owner spec yet.
     assert_eq!(
         log.unowned,
         BTreeMap::from([(0x27, 1), (0x28, 1), (0x29, 1), (0x2A, 2)])
@@ -2316,7 +2359,7 @@ fn run_with(game_seed: u32) -> Transcript {
         .iter()
         .map(|r| (r.id, r.error.to_string()))
         .collect();
-    assert_eq!(rejected, [(0x07, "fatal assert 0x58A".to_owned())]);
+    assert_eq!(rejected, vec![(0x07, "fatal assert 0x58A".to_owned()); 11]);
     assert!(log.discarded.is_empty());
     // No local player: the world view has no camera (`model.md` §3 rule 3).
     assert_eq!(w.local_player, None);

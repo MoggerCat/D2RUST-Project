@@ -1,10 +1,11 @@
-// Spec: specs/sim/path-placement.md §9–§12; specs/world/waypoints.md §7 rule 5 (wiring of the placement seams)
+// Spec: specs/sim/path-placement.md §9–§13; specs/world/waypoints.md §7 rule 5 (wiring of the placement seams)
 //! The placement seams of `path::place` / `path::warp` on the unit
 //! system and the DRLG: [`CollisionView`], [`PlaceHost`] and
 //! [`LevelView`] on [`Shared`], three handles to one [`PathCtx`] (the
 //! placement code takes them as separate arguments and calls them one
 //! after another, so each call borrows the context for its own
-//! duration). Entry points: [`place_unit`] (`0x00554EA0`), [`level_warp`]
+//! duration). Entry points: [`place_unit`] (`0x00554EA0`), [`game_entry`]
+//! (`0x005394A0`), [`level_warp`]
 //! (the same-act part of `0x0053AEC0`), [`warp_player`] (`0x005550B0`);
 //! on [`Rooms`] (the DRLG alone): [`floor_drop`] (`0x00555DA0` /
 //! `0x0064E810`) and [`coarse_free_box`] (`0x0064E840`).
@@ -299,6 +300,19 @@ pub fn place_unit<X: Pending>(
 ) -> bool {
     with_shared(c, |cv, host, lv| {
         let r = crate::path::place::place_unit(cv, host, &*lv, unit, room, x, y, exact, alt);
+        log(cv, r).unwrap_or(false)
+    })
+}
+
+/// Game entry `0x005394A0` of a player not yet placed (§11, §13): the
+/// spawn point of act `act`'s town (tile index 0, the unit's size), S→C
+/// 0x07 for the spawn room, `0x00554850(flag 0)`, S→C 0x15 with flag 1,
+/// both to the player's client ([`Pending::send`]). `true` placed; a fatal
+/// assert (no spawn room, no free point, no act) is logged as
+/// [`WiringError::Place`] and gives `false`.
+pub fn game_entry<X: Pending>(c: PathCtx<'_, X>, player: UnitId, act: u8) -> bool {
+    with_shared(c, |cv, host, lv| {
+        let r = crate::path::place::game_entry(cv, host, lv, player, act);
         log(cv, r).unwrap_or(false)
     })
 }

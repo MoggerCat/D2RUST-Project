@@ -667,8 +667,12 @@ fn run() -> Transcript {
         b: 0,
         life_pct: 0,
     };
+    // In the drain: the placement's 0x07 and the arrival 0x0D; then the
+    // tick's room switch sends 0x07 for each room of C's adjacency array
+    // (`path-placement.md` §11 "Recipients"; the one-room town: C itself).
     let mut want = reveal.encode().to_vec();
     want.extend_from_slice(&stop.encode());
+    want.extend_from_slice(&reveal.encode());
     assert_eq!(chunks.concat(), want);
     // 0x07 needs the client act (no 0x03 was sent: fatal 0x58A,
     // `client/model.md` §9 rule 1) and 0x0D's player was never announced
@@ -680,7 +684,7 @@ fn run() -> Transcript {
             report.dropped,
             report.unowned
         ),
-        (2, 1, 1, 0)
+        (3, 2, 1, 0)
     );
     let mut travel = vec![chunks];
     // The frames after: nothing (finding 1 of the handoff: no 0x15).
@@ -699,7 +703,7 @@ fn run() -> Transcript {
         .iter()
         .map(|r| (r.id, r.error.to_string()))
         .collect();
-    assert_eq!(rejected, [(0x07, "fatal assert 0x58A".to_owned())]);
+    assert_eq!(rejected, vec![(0x07, "fatal assert 0x58A".to_owned()); 2]);
     let stamina = {
         let s = fx.sim();
         s.events.with(&mut s.game, |_, v| v.stat(p, STAT_STAMINA))

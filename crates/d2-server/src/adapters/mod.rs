@@ -6,6 +6,7 @@
 
 pub mod handlers;
 pub mod item_bits;
+pub mod session;
 mod sim;
 mod sizes;
 
