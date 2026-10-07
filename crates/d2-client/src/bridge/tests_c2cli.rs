@@ -38,7 +38,22 @@ fn multiplayer_only_ids_are_no_ops() {
         msg[0] = id;
         let mut b = Bridge::new(Idle).unwrap();
         let r = b.receive_chunk(&msg).unwrap();
-        assert_eq!((r.messages, r.unowned, r.handled), (1, 0, 1), "id {id:#04X}");
+        assert_eq!(
+            (r.messages, r.unowned, r.handled),
+            (1, 0, 1),
+            "id {id:#04X}"
+        );
         assert_eq!(b.world(), &ClientWorld::default());
     }
+}
+
+// Covers: specs/client/model.md §7 r12
+#[test]
+fn download_save_is_a_no_op() {
+    // 0xB3: size = u8@1 + 7; the save chunk is not written anywhere.
+    let msg = [0xB3u8, 1, 0, 0, 0, 0, 0, 0];
+    let mut b = Bridge::new(Idle).unwrap();
+    let r = b.receive_chunk(&msg).unwrap();
+    assert_eq!((r.messages, r.unowned, r.handled), (1, 0, 1));
+    assert_eq!(b.world(), &ClientWorld::default());
 }
