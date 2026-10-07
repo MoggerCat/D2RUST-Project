@@ -36,6 +36,7 @@ pub mod overlay;
 pub mod panel_art;
 pub mod present;
 pub mod preview;
+pub mod preview_light;
 pub mod tile_assets;
 pub mod ui_bind;
 pub mod unit_assets;

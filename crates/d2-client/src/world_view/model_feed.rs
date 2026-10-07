@@ -260,7 +260,15 @@ impl<F: ViewFeed> ViewFeed for ModelFeed<F> {
             })
     }
 
+    /// Preview: the frame's light and look (`preview_light`), unless
+    /// full bright; else the inner feed's.
     fn light(&self, world: &ClientWorld) -> Result<Option<super::feed::FeedLight<'_>>, ViewError> {
+        if let Some(p) = &self.preview {
+            return Ok(p.light.frame().map(|light| super::feed::FeedLight {
+                light,
+                look: p.light.look(),
+            }));
+        }
         self.inner.light(world)
     }
 
@@ -325,8 +333,15 @@ impl<F: ViewFeed> ViewFeed for ModelFeed<F> {
             Some(m) => preview::entries(m, &counts),
             None => Vec::new(),
         };
+        let local_at = self.local_at;
         let preview = self.preview.as_mut().expect("checked above");
-        preview.prepare(world, &entries, assets)
+        let r = preview.prepare(world, &entries, assets);
+        let tables = preview
+            .tiles
+            .shades(world.palette_act.unwrap_or(0))
+            .copied();
+        preview.light.refresh(world, local_at, tables.as_ref());
+        r
     }
 
     fn take_unit_orders(&mut self) -> Vec<(DrlgRoomId, Vec<UnitKey>)> {

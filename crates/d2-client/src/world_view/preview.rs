@@ -7,7 +7,9 @@
 //! fill is verified against 1.14d (CLAUDE.md rule 10).
 //!
 //! The fills, each `d2rs-own, unverified`:
-//! - **Light:** full bright. Tiles draw with no light map (the source
+//! - **Light:** lit by [`super::preview_light`] (the light map, PL2
+//!   shades); with `D2RS_FULLBRIGHT=1` full bright, as follows.
+//! - **Full-bright light:** Tiles draw with no light map (the source
 //!   index unchanged, as a light byte of 0xFF, `shading.md` §3 r1); the
 //!   feed states no frame light, so unit shade stays the rules'.
 //! - **Unit facts:** zero unit flags and flag-ex, no states, objects
@@ -173,6 +175,9 @@ pub struct Preview {
     pub tiles: TileAssets,
     /// The palette act of the last prepared frame (its shade tables).
     act: u8,
+    /// The preview's light (`preview_light`); full bright with
+    /// `D2RS_FULLBRIGHT=1`.
+    pub light: super::preview_light::PreviewLight,
     logged: Arc<Mutex<BTreeSet<String>>>,
 }
 
@@ -180,6 +185,7 @@ impl Preview {
     pub fn new(tiles: TileAssets) -> Self {
         Preview {
             tiles,
+            light: super::preview_light::PreviewLight::new(),
             ..Preview::default()
         }
     }
@@ -253,6 +259,15 @@ impl Preview {
         let Some((shade, blend)) = tile_ops(tile.kind, tile.alpha, self.tiles.shades(self.act))
         else {
             return skipped_art();
+        };
+        // Lit (preview_light, d2rs-own, unverified): a tile's light is one
+        // flat value; shadow tiles keep their blend-table chain.
+        let shade = match tile.kind {
+            TileKind::ShadowTile => shade,
+            _ => self
+                .light
+                .tile_chain(tile.kind, &tile.dt1, tile.cell)
+                .unwrap_or(shade),
         };
         TileArt {
             frame: ComponentFrame { set: key, index: 0 },
