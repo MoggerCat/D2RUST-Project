@@ -8,7 +8,7 @@ Cut short by the deadline: only the cheap rules were done.
 |---|---|---|
 | formats/animdata.md | 10 / 18 | 11 / 18 |
 | formats/wav.md | 10 / 12 | 11 / 12 |
-| formats/d2s.md | 98 / 133 | 106 / 133 |
+| formats/d2s.md | 98 / 133 | 105 / 133 |
 | data/patch-layers.md | 17 / 22 | 19 / 22 |
 | data/loading.md | 30 / 44 | 31 / 44 |
 
@@ -37,6 +37,6 @@ specs/formats/d2s-load.md	§3 r1	original join handler addresses; server join (I
 ## Rules left
 
 - d2s.md: §2.4 r5, §8.1 r6/r7, §8.2 r1/r3/r5, §8.3 r1, §8.4 r3, §8.5 r5, §10 r3 and
-  edge cases r3, r6, r9, r11–r15.
+  edge cases r3, r6, r9, r11–r15 (r4 and r16 done).
 - d2s-load.md: 12 rules (server load effects, d2-server work).
 - data/calc-expressions, loading, patch-layers: a few each, not read.
