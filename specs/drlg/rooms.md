@@ -27,22 +27,22 @@
 | Inputs | 63–71 |
 | Outputs / state changes | 72–77 |
 | Rules | 78–79 |
-|   1. Structures (1.14d layout, for recorders and checks) | 80–118 |
-|   2. DRLG room creation and seeds (`0x0066B3E0`) | 119–151 |
-|   3. Rooms-near arrays (`0x0066C370`) | 152–195 |
-|   4. Status and activation | 196–334 |
-|   5. Active room creation (`0x006422A0`, `0x00619890`) | 335–368 |
-|   6. Adjacency array order (owner of `unit-order.md` §9) | 369–384 |
-|   7. Room clients and the inactivity counter | 385–405 |
-|   8. Deactivation (tick step 9) | 406–441 |
-|   9. Room tile grid | 442–995 |
-|   10. Collision map from tiles | 996–1074 |
-| Constants & data dependencies | 1075–1089 |
-| Randomness | 1090–1107 |
-| Edge cases & original bugs | 1108–1125 |
-| Test vectors | 1126–1173 |
-| Provenance | 1174–1211 |
-| Open questions | 1212–1273 |
+|   1. Structures (1.14d layout, for recorders and checks) | 80–128 |
+|   2. DRLG room creation and seeds (`0x0066B3E0`) | 129–161 |
+|   3. Rooms-near arrays (`0x0066C370`) | 162–205 |
+|   4. Status and activation | 206–344 |
+|   5. Active room creation (`0x006422A0`, `0x00619890`) | 345–378 |
+|   6. Adjacency array order (owner of `unit-order.md` §9) | 379–394 |
+|   7. Room clients and the inactivity counter | 395–415 |
+|   8. Deactivation (tick step 9) | 416–451 |
+|   9. Room tile grid | 452–1013 |
+|   10. Collision map from tiles | 1014–1092 |
+| Constants & data dependencies | 1093–1107 |
+| Randomness | 1108–1125 |
+| Edge cases & original bugs | 1126–1143 |
+| Test vectors | 1144–1191 |
+| Provenance | 1192–1229 |
+| Open questions | 1230–1298 |
 <!-- /index -->
 
 ## Summary
@@ -101,6 +101,16 @@ DRLG room (0xEC bytes):
 | +0x5C | preset units |
 | +0x60 | other flags (bit 0: was populated) |
 | +0x64 | logical-room info: coordinate lists (`drlg/levels.md` §11) |
+
+The link list (+0x00) is written only by maze generation (every caller
+of `0x0066B5E0` lies in the maze code `0x00670D47`–`0x00673ACE`;
+`0x0066B790` adds cross-level records from the maze and from the outdoor
+placer, whose list is the level's outdoor list) and read by the maze code
+during generation and by the room free (§2.1, `0x0066B610`, `0x0066B530`);
+D2MOO 1.10f has no other reader of `pDrlgOrth`. After generation nothing
+known reads a built room's links (the rooms-near arrays of §3 use the
+gap rule, warp links are +0x4C): keeping or dropping them is not
+observable, except that §2.1 then has nothing to remove.
 
 Room flags (+0x28; D2MOO names): 0x10 << i warp toward vis slot i (i =
 0..7); 0x1000–0x8000 sub-shrine rows; 0x10000 waypoint; 0x20000 small
@@ -720,7 +730,15 @@ except the layer and type rules):
 Record flag 0x8 (hidden) means "not drawn" (render) but the record still
 exists and still counts for collision (§B). Door records (type 8/9) in a
 room also get their preset unit (`0x0066D9E0`, before the flags; skipped
-if the record already has flag 0x20). Record fields (0x30 bytes): screen
+if the record already has flag 0x20). The flag rules routine
+(`0x0066DB20`) makes that call itself, first, for every record of type 8
+or 9 (`0x0066DB2A`–`0x0066DB3E`), so the tile code sets flag 0x20
+through it: `0x0066D9E0` ORs 0x20 into record +0x14 on the outcomes of
+`drlg/preset.md` §11 (unit added, or `roll(3)` gave 0). The record's
+flags were assigned at creation (`0x0066DC50` writes +0x14 before
+calling `0x0066DB20`) and every later rule only ORs (only 0x8 is
+cleared), so 0x20 stays; a re-run of the flag rules on a door record
+(§9.6 step 3) finds 0x20 and skips the unit and its draw. Record fields (0x30 bytes): screen
 x/y of the tile (`0x00643310` on (wx, wy+1); y + 40), position relative
 to the room, flags, chosen DT1 entry, type, next-in-chain, RGB = 0xFF.
 
@@ -1270,3 +1288,10 @@ counter (+0x0C), and per level all DRLG rooms in list order; then §3 and
     tile 2 has key (1, 0, 0), roof height 0, height −80, loaded into
     slot 0 → the lookup for (1, 0, 0) returns (slot 0's path, index 2)
     and the record reads roof height 0, height −80 from it.
+18. *Answered* (`impl-drlg-act3-5` Q11): a built room's link list has no
+    reader after maze generation other than the room free (§1, after
+    the room flags table); dropping it changes nothing observable.
+19. *Answered* (`impl-drlg-act3-5` Q12, door flag): the tile code sets
+    record flag 0x20 through `0x0066DB20` → `0x0066D9E0` (§9.5.1, wall
+    records); the door-unit call returns nothing, the flag is written
+    on the record.

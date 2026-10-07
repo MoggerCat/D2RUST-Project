@@ -34,13 +34,13 @@
 |   8. Coordinates to rooms | 247–260 |
 |   9. Level lifecycle: activity and freeing | 261–309 |
 |   10. Spawn room in a level (`0x0066B2B0`) | 310–349 |
-|   11. Logical rooms (coordinate lists) and population queries | 350–590 |
-| Constants & data dependencies | 591–611 |
-| Randomness | 612–630 |
-| Edge cases & original bugs | 631–654 |
-| Test vectors | 655–698 |
-| Provenance | 699–731 |
-| Open questions | 732–756 |
+|   11. Logical rooms (coordinate lists) and population queries | 350–629 |
+| Constants & data dependencies | 630–650 |
+| Randomness | 651–669 |
+| Edge cases & original bugs | 670–693 |
+| Test vectors | 694–737 |
+| Provenance | 738–770 |
+| Open questions | 771–804 |
 <!-- /index -->
 
 ## Summary
@@ -425,6 +425,15 @@ With room tile rect (X, Y, W, H), cells (x, y) for 0 ≤ x ≤ W,
    (`drlg/rooms.md` §9.6), every record of its chain with the same
    test: if (N.x + rec x, N.y + rec y) is inside or on the border of
    this room's rect (`0x0066B9D0`), mark B at that point minus (X, Y).
+   Layout (`0x0066D1A5`–`0x0066D1C3`, grid init `0x0067CBF0`): B is a
+   (W+1) × (H+1) grid, row-major, cell (x, y) at index y·(W+1) + x, row
+   offsets r·(W+1); cells and row offsets are fixed stack buffers of
+   1,024 and 256 entries, zeroed for (W+1)(H+1) cells. Every point marked
+   lies inside or on the border of the rect, so 0 ≤ x ≤ W, 0 ≤ y ≤ H. The
+   buffers never overflow in 1.14d: grid-built rooms are preset rooms,
+   at most 8 × 8 tiles in multi-room mode and at most 12 × 12 in the
+   maze's single-room mode (`drlg/maze.md` §9 step 3), so at most 169
+   cells and 13 rows.
 5. **Regions** (`0x0066C580`): for y = 0..H (outer), x = 0..W (inner):
    if the index cell lacks 0x10000000: counter += 1; current mark M :=
    (counter & 0x0FFFFFFF) | 0x10000000; if the floor layer 0 cell v has
@@ -448,6 +457,14 @@ With room tile rect (X, Y, W, H), cells (x, y) for 0 ≤ x ≤ W,
       R = 0xFFFFFFFF for d = −1 and d = 2, R = 0 for d = 0, 1, 3 (the
       dwords at `0x006EEE24`–`0x006EEE34`: the end of the offset table
       and one zero dword).
+      Orientations above 19 read past T1 into the source-file name
+      string at `0x006EEEF0` (".\DRLG\DrlgLogic.cpp"), whose dwords give
+      a T2 index far outside the image: not reproducible. Not reached:
+      no wall layer of any lvlprest DS1 holds an orientation above 19
+      (measured over the 2,058 `File1`–`File6` references of
+      `lvlprest.txt`, 872 of them in rows with `Logicals` 1, d2exp copies
+      over d2data, version < 7 values mapped by `drlg/preset.md` §5.2
+      step 6; the `Patch_D2.mpq` overrides are `preset.md` OQ 5).
    4. R & 1: OR M into the cell. R & 2 and d ≠ 2: fill (x+1, y, 0).
       R & 4 and d ≠ 3: fill (x, y+1, 1). R & 8 and d ≠ 0: fill (x−1, y,
       2). R & 16 and d ≠ 1: fill (x, y−1, 3).
@@ -498,7 +515,8 @@ Consequences (reproduce them):
   one-record rooms resetting the counter (§11.2 step 2); readers only
   compare them (§11.4).
 - No bound check on the local blocker grid (1,024 cells, 256 rows) or on
-  orientation values above 19.
+  orientation values above 19; neither is reached by 1.14d data (steps
+  4 and 6).
 
 #### 11.4 Lookups
 
@@ -509,7 +527,28 @@ Consequences (reproduce them):
 | `0x0061B130` (`0x0066CE30`) | active room, subtile x, y | the room containing (x, y) among the room and its adjacency array (`0x00463740`); none → **0**; else that room's record at the point as above → its index; null record → −1 |
 
 No bound check: a point outside the room's (W+1) × (H+1) cells reads
-outside the grid.
+outside the grid. The record grid is one block (`0x0067CB80`, from
+`0x0066CA50`): H+1 row offsets r·(W+1), then (W+1)(H+1) cell pointers.
+For a point with cell (cx, cy) = (x/5 − X, y/5 − Y):
+
+| Case | 1.14d read |
+|---|---|
+| 0 ≤ cy ≤ H and 0 ≤ cy·(W+1) + cx < (W+1)(H+1) | that cell of the block: cx outside 0..W wraps into the row before or after (a real record) |
+| 0 ≤ cy ≤ H, −(H+1) ≤ cy·(W+1) + cx < 0 | a row-offset integer used as a record pointer (garbage) |
+| any other | memory outside the block (not reproducible) |
+
+Who can pass such a point: `0x0061B130` never (it first finds the room
+whose sub-tile rect contains the point, `0x00463740`, so 0 ≤ cx < W, 0 ≤
+cy < H); `0x0061AD30` from `0x0054E0ED` (pack at a preset point, the
+preset unit's own room, `monsters/population.md` §11.5), `0x005B1302`,
+`0x005E3CE2` and `0x005E441D` (a unit's own room and position) stay in
+the grid. Only `0x005B2E86` in `0x005B2A00` (spawn with spread,
+`missiles/bodies-2.md`) passes its start room with the found spawn point,
+which the spread search may take from a neighbouring room (the
+`0x0061B130` test there compares only the logical index): that read
+can leave the grid. Reproduce the first table row; for the other two
+d2rs returns no record (a choice, the original's value is not
+reproducible).
 
 #### 11.5 Populated level, room count, warp points, kind-11 location
 
@@ -753,3 +792,12 @@ first) with each level's seed state, equal the recorded game.
    level (`Logicals` 1) and an outdoor level, dump DRLG room +0x64 info
    and its records (boxes, node, index, order) after activation, and
    compare with a simulation of §11.3 on the same tiles.
+8. *Answered* (`impl-room-population` §3 Q1): orientations above 19
+   read the file-name string after T1 (not reproducible) and are never
+   reached by 1.14d DS1 data (§11.3 step 6).
+9. *Answered* (`impl-room-population` §3 Q2): the blocker grid is
+   (W+1) × (H+1), row-major, in fixed 1,024-cell / 256-row buffers that
+   1.14d rooms never overflow (§11.3 step 4).
+10. *Answered* (`impl-room-population` §3 Q3): out-of-grid record
+    lookups read the record-grid block as §11.4's table; reachable only
+    from `0x005B2A00`'s spread search.

@@ -33,16 +33,16 @@
 |   6. Borders (`0x00675850`, D2MOO `PlaceAct1245OutdoorBorders`) | 398–452 |
 |   7. Act I (`0x006807F0`, D2MOO `OutWild`) | 453–620 |
 |   8. Act II (`0x0067F980`, D2MOO `OutDesr`) | 621–665 |
-|   9. Act III | 666–725 |
-|   10. Act IV (`0x0067E890`) | 726–737 |
-|   11. Act V (`0x0067E600`) | 738–809 |
-|   12. Rooms | 810–845 |
-| Constants & data dependencies | 846–868 |
-| Randomness | 869–890 |
-| Edge cases & original bugs | 891–912 |
-| Test vectors | 913–997 |
-| Provenance | 998–1038 |
-| Open questions | 1039–1066 |
+|   9. Act III | 666–733 |
+|   10. Act IV (`0x0067E890`) | 734–745 |
+|   11. Act V (`0x0067E600`) | 746–837 |
+|   12. Rooms | 838–873 |
+| Constants & data dependencies | 874–896 |
+| Randomness | 897–918 |
+| Edge cases & original bugs | 919–940 |
+| Test vectors | 941–1060 |
+| Provenance | 1061–1101 |
+| Open questions | 1102–1151 |
 <!-- /index -->
 
 ## Summary
@@ -701,8 +701,13 @@ max)" is the random preset placer below.
 | 80 Kurast Bazaar (`0x0067EC30`) | for i = 1..gw−2, first (i, 0) 619, or 627 at i = B; then (i, gh−1) 620, or 628 at i = A; A = gw−2, B = 1 if J = 0, A = 1, B = gw−2 if J ≠ 0 | (with the top row) | (gw−1, i) 621, then (0, i) 622 | 624, 623, 626, 625 |
 | 81 Upper Kurast (`0x0067ED70`) | i from 1 while i < gw−1: 636, or 644 at i = (gw−1)/2, which also skips the next i | i = 1..gw−2: 637, or 645 at i = T (T = gw−2 if J else 1) | (gw−1, i) 638, then (0, i) 639 | 641, 640, 643, 642 |
 
-Halves truncate toward zero. Corners are stamped in the column order
-given.
+Halves truncate toward zero. Each level stamps in the table's column
+order: the whole top row, then the whole bottom row (level 80: top and
+bottom alternate per i, top first), then the sides (for each i, east
+(gw−1, i) before west (0, i)), then the corners in the order given
+(confirmed call by call in `0x0067EAD0`, `0x0067EC30`, `0x0067ED70`;
+every stamp F −1, border 0). The first stamp of each id draws its
+build-list roll (§5.1), so this order fixes the roll order.
 
 **Fixed and random presets** (`0x0067F190`, after the border rows;
 X := gw − 4, Y := gh − 4):
@@ -719,9 +724,12 @@ X := gw − 4, Y := gh − 4):
 := hi − lo + 1; A := gw·gh (the full grid, unlike §5.3); A = 0 →
 nothing. Entry k := (k mod gw, k div gw); A swaps of entries `roll(A)`,
 `roll(A)` (in this order, as §5.3). Then for each entry in order: P :=
-lo + `roll(n)` (drawn for every tried entry; n = 1 still steps); if
-the preset fits at the entry's cell (§5.2, m 0, flags 15): stamp P
-there, F −1; count += 1; stop when max > 0 and count ≥ max.
+lo + `roll(n)` (drawn for every tried entry; n = 1 still steps; n ≤ 0
+would give lo without a step); if the preset fits at the entry's cell
+(§5.2, m 0, flags 15): stamp P at that same cell (no margin, no offset;
+`0x0067F121`–`0x0067F14B` pass the entry's (x, y) to both the test and
+the stamp), F −1, border 0; count += 1; stop when max > 0 and count ≥
+max.
 
 ### 10. Act IV (`0x0067E890`)
 
@@ -760,12 +768,26 @@ SpawnOutdoorLevelPreset(P, F, m 0, flags 15)):
    lookup); a non-zero piece is stamped at (nx, ny), F −1, grid 2 |= 0x1.
    After the walk, level 111 only: grid 2 |= 0x400 at (gw−2, gh−4) and
    (gw−2, gh−3).
+   The straight walk has no step count: it tests (x, y) = (nx, ny)
+   before every step (`0x0067DD92`–`0x0067DDCD`). It always ends: §4
+   edges are axis-aligned, so only one coordinate moves; both ends have
+   bit 0 cleared, so their difference is even and of the sign of n − v
+   (or 0), and the walk reaches (nx, ny) after |Δ|/2 stamps (0 when the
+   cleared ends are equal).
 3. **Ravine walk** (`0x0067DEF0`): B := 881, B' := 893, ends 906 / 905
    (level 117: 957, 969, 982 / 981). (x, y) := (gw−2, 0); while (x, y)
    ≠ (0, gh−2): k := grid 0 (x, y) − B; stamp B' + k at (x, y), F −1;
    (x, y) += 2·D[k] with D (`0x006F1FD8`, k = 0..11) = (−1,0), (0,−1),
    (1,0), (0,1), (0,−1), (1,0), (0,1), (−1,0), (−1,0), (0,−1), (1,0),
    (0,1). Then stamp 906 at (gw−2, 0) and 905 at (0, gh−2), F −1.
+   No check in 1.14d: k is not range-checked (D is read at `0x006F1FD8`
+   + 8k for any k) and nothing stops a walk that never reaches
+   (0, gh−2). Neither happens with 1.14d data: every cell the walk visits
+   holds a step-2 barricade piece B + k with k = 0..11 (§6 table Q:
+   barricade column 881 + k, snow 957 + k), and D[k] moves along that
+   closed outline from the NE piece to the SW piece. An out-of-range k
+   would stamp a non-row id (null lvlprest row, crash in §5.1) or loop
+   forever; d2rs may report either as a fatal error.
 4. **Entrances** (`0x0067DB50`; F −1, the code's F 1 branch is for
    level 110 only): the first x = 0..gw−1 with grid 2 (x, 0) & 0x400 →
    stamp 909 at (x, 0); the first x = 0..gw−1 with grid 2 (x, gh−2) &
@@ -776,7 +798,9 @@ SpawnOutdoorLevelPreset(P, F, m 0, flags 15)):
    P tall, P wide): (112, 0, 0, 913, 914), (117, 0, 1, 983, 984), (117,
    0, 0, 985, 986)): for each row of this level: if level w > h: stamp P
    wide at (side ? gw−2 : 0, 2); else P tall at (2, side ? gh−2 : 0); F
-   from the row.
+   from the row. w, h are the level's tile rect (level +0x24, +0x28,
+   `0x0067DA8C`), not the grid; w = h takes the tall id here (never
+   reached: the linkers give 64×160 or 160×64).
 6. Level 111: **connect to siege** (`0x0067E4B0`): x := gw −
    SizeX(880)/8, y := gh − SizeY(880)/8 (lvlprest sizes); stamp 880 at
    (x, y) and 896 at (x, y − 2), F −1 (fatal if the level, its outdoor
@@ -786,7 +810,9 @@ SpawnOutdoorLevelPreset(P, F, m 0, flags 15)):
 8. **Prisons** (`0x0067E240`, level 111 only): cell value V(x, y) :=
    grid 0 (x, y) when grid 2 (x, y) has 0x200, else 0 (`0x00674120`).
    Up to 90 tries while placed < 3: x := 2·roll(gw/2), y :=
-   2·roll(gh/2) (level seed, helper `0x0045C390`, in this order); if
+   2·roll(gh/2) (level seed +0x1C4, helper `0x0045C390` = `roll` of
+   `sim/rng.md` §3, read in full: n < 1 → 0 without a step, else one
+   step, `lo' & (n−1)` for a power of two, else `lo' mod n`; x first); if
    915 ≤ V ≤ 922: stamp V + 16 at (x, y), F −1, placed += 1. Then sx :=
    roll(gw/2), sy := roll(gh/2) (inline, level seed, always drawn); for
    i = 0..gh−1 (outer), j = 0..gw−1 (inner), while placed < 3: x := (j
@@ -796,7 +822,9 @@ SpawnOutdoorLevelPreset(P, F, m 0, flags 15)):
    `0x006F2100`: level, P tall (used when level w < h), P wide, F, a
    dword this code does not read, count, fatal): for each row of this
    level, count times S(P, F); if the last call placed nothing and the
-   row is fatal: fatal error 0x219. Rows: (111, 955, 956, F 0, ×1,
+   row is fatal: fatal error 0x219. Tall/wide is chosen once from the level's
+   tile rect (level +0x24 < +0x28 → tall, `0x0067E166`–`0x0067E172`; w =
+   h takes the wide id, never reached). Rows: (111, 955, 956, F 0, ×1,
    fatal), (112, 955, 956, 0, ×1, fatal), (117, 955, 956, 1, ×1, fatal),
    (112, 953, 953, −1, ×1, fatal), (117, 954, 954, −1, ×1, fatal), (111,
    944, 947, −1, ×1), (111, 942, 945, −1, ×4), (111, 943, 946, −1, ×4),
@@ -981,14 +1009,49 @@ PoooPoPPoP PPPooooooP PPPoPPoooP PoooPPoPPP PPPPPPPP
 ```
 
 61 P + 37 o = 98 of the 10 × 10 = 100 cells. Every preset cell with
-P ≠ 0 makes exactly one room (no P without an allocation). Laid out
-10 per row, rows 0–7 start and end with P (the border) only if no cell
-before index 79 is skipped; a search over every placement of the 2
-roomless cells (0x100 cells, or 0x200 with P = 0) that keeps the
-border rows and columns P finds them all at cell indexes 79–99 (210
-placements; which two is open question 10). A build that makes 97
-rooms has one more roomless cell: compare its per-cell kind string
-(P / o / none) with this one; the first difference is the cell to dump.
+P ≠ 0 makes exactly one room (no P without an allocation).
+
+**Cold Plains grid** (grid 0 per cell after §7, rows y = 0..9 top to
+bottom, x = 0..9; o = outdoor room, − = blank 0x100, no room):
+
+```
+ 9  6  6  6  6  6  6  6  6 10
+ 5  o  A  o  o  o  o  A 44  7
+ 5  o  o  o 15  4  4 12  o  7
+ 5  o  o  o 14  6 10  5  o  7
+ 5  o 51  o  o  o  7  5  o  7
+ 5  o  o  o  A  o 14 13  o  7
+ 8  4 12  o  o  o  o  o  o  7
+ 9  6 13  o 15 12  o  o  o  7
+ 5  o  o  o  7  5  o 15  4 11
+ 8  4  4  4 11  8  4 11  −  −
+```
+
+A = 48, 29, 30 (Cottages 2, Stone Fill 1 and 2) in an order this
+recording does not fix. Read in §12.1 order it gives the kind string
+above, and each P's file-count class matches the recorded branch of
+`0x00666F33` (`mul` site `0x00666F54` for a power-of-two `Files`: the
+corner pieces 8–15, 44, 51; `0x00666F3A` otherwise: straight pieces
+4–7, 48, 29, 30) for all 61 presets. How it is built (§6, §7; draws
+recorded): ring of §6 pieces (polygon V0 (0, 9), link u2 (0, 3), V1,
+V2, link u1 (9, 2), V3, link u3 (4, 9); link midpoints (0, 1), (9, 5),
+(2, 9) get 0x400 and file 3); substitution type 1 (Border - Middle)
+seq 8396 `roll(9)` = 0, seq 8447 `0x0066F8DB` lo' 1833932632 mod 10 = 2:
+group 0 variant 2 at (3, 1); type 2 (Border - Corner) seq 8644
+`0x0066F905` lo' 3559729267 & 1 = 1: group 1 (bottom-right, N 2)
+variant 1 at (6, 6), whose pattern cells (2, 3) and (3, 3) are blank →
+**the two roomless cells are (8, 9) and (9, 9)** (cell indexes 98, 99);
+cave entrance 51 at (2, 4) (seq 9481 build roll; margin 1 rules out
+(8, 1)); type 3 (Border - Border) seq 10204 and 10499 `0x0066F905`
+(N 1): group 8 at (3, 6) and group 11 at (0, 5), neither with a blank;
+then 48, 44, 29, 30 (§7.4, build rolls seq 11622, 11752, 11881, 12009).
+Room count rule: with every Cold Plains preset 8 × 8 (one cell), rooms
+= 100 − blank cells; blanks come only from §6 step 5 (none here: every
+corner holds a piece) and from blank pattern cells of a border
+substitution (`outdoor-tilesub.md` §2.3). A build with 97 rooms has a
+third blank cell: its grid differs from this one, and the first
+differing cell (dump grid 0 / grid 2 per cell before §12.1) names the
+substitution or step that differs.
 
 Comparison (exact): for an act creation and each generated outdoor level,
 the sequence of (site, seed state after) of every draw equals the
@@ -1059,7 +1122,29 @@ recording; level rects and outdoor flags equal a level-coordinate probe
    levels would confirm them (as for OQ 4).
 9. *Answered:* Act V beyond the siege strip is §11, read from 1.14d.
    A recording of levels 111, 112 and 117 would confirm the draws.
-10. Cold Plains roomless cells (Test vectors, 98 rooms): which two of
-    cells 79–99 make no room (0x100 cell, or 0x200 with grid 0 = 0)?
-    Dump (x, y, grid 0, grid 2) per cell at `0x006750F0` for level 3 of
-    the recorded seed (`20261005-232125-rng.jsonl`).
+10. *Answered* (also `impl-room-population` §3, "Cold Plains live 97
+    vs 98"): the roomless cells are (8, 9) and (9, 9), blanked by
+    Border - Corner group 1 variant 1 at (6, 6) (Test vectors, "Cold
+    Plains grid": the derived grid reproduces all 98 recorded cells and
+    the file-count class of all 61 presets). 98 is the 1.14d count; a
+    live 97 has one more blank cell, so its generation differs from
+    this grid (most likely in a border substitution, the only source of
+    blanks here); compare the implementation's per-cell grid with the
+    table to find it.
+11. *Answered* (`impl-drlg-act3-5` Q4): Kurast border order is §9.4
+    (top row, bottom row, sides east before west, corners), read call by
+    call from `0x0067EAD0`, `0x0067EC30`, `0x0067ED70`.
+12. *Answered* (`impl-drlg-act3-5` Q5): the random placer R stamps at
+    the tried cell itself, no margin or offset (§9.4, `0x0067F121`–
+    `0x0067F14B`).
+13. *Answered* (`impl-drlg-act3-5` Q6): the ravine walk has no range
+    check and no termination guard in 1.14d; 1.14d data never leaves
+    k = 0..11 or fails to end (§11 step 3).
+14. *Answered* (`impl-drlg-act3-5` Q7): the barricade straight walk
+    stops on equality, not a count, and always ends on §4's axis-aligned
+    edges (§11 step 2).
+15. *Answered* (`impl-drlg-act3-5` Q8): caves and special presets choose
+    tall / wide from the level tile rect (level +0x24, +0x28), with
+    opposite ties (§11 steps 5, 9).
+16. *Answered* (`impl-drlg-act3-5` Q9): the prisons helper `0x0045C390`
+    is `roll` (`sim/rng.md` §3) on the level seed (§11 step 8).
