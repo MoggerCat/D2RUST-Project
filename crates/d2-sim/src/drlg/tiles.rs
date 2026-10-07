@@ -149,9 +149,11 @@ pub struct RoomTiles {
     pub floors: Vec<TileRecord>,
     pub walls: Vec<TileRecord>,
     pub shadows: Vec<TileRecord>,
-    /// Linked floor records, in list order (§9.6).
+    /// The floor link chain (§9.6 C1), oldest first: 1.14d prepends, so
+    /// its chain head is the last entry.
     pub floor_links: Vec<usize>,
-    /// Linked wall and shadow records, in list order (§9.6).
+    /// The non-floor link chain (§9.6 C1), oldest first (head last); a
+    /// type-3 record is followed by its type-4 half (prepended after it).
     pub other_links: Vec<(RecordKind, usize)>,
     /// Animation entries, head first.
     pub anims: Vec<AnimEntry>,
@@ -683,14 +685,16 @@ impl Drlg {
             if !nr.rect.contains_closed(wx, wy) {
                 continue;
             }
+            // Chains are walked head first: newest first (C1).
             let list: Vec<(RecordKind, usize)> = if t == 0 {
                 tiles
                     .floor_links
                     .iter()
+                    .rev()
                     .map(|&i| (RecordKind::Floor, i))
                     .collect()
             } else {
-                tiles.other_links.clone()
+                tiles.other_links.iter().rev().copied().collect()
             };
             for (k, i) in list {
                 let r = &tiles.records(k)[i];
@@ -706,6 +710,17 @@ impl Drlg {
             }
         }
         None
+    }
+
+    /// Prepends wall record `i` of room `id` to its non-floor link chain,
+    /// then its type-4 half when it has one (§9.6 C1, C5.5).
+    fn link_wall(&mut self, id: DrlgRoomId, i: usize) {
+        let half = self.tiles_mut(id).walls[i].half;
+        let links = &mut self.tiles_mut(id).other_links;
+        links.push((RecordKind::Wall, i));
+        if let Some(h) = half {
+            links.push((RecordKind::Wall, h));
+        }
     }
 
     /// `0x0066E940`: find or add a linked cell's record.
@@ -740,7 +755,7 @@ impl Drlg {
                     }
                     _ => {
                         let i = self.add_wall(svc, id, x, y, v, t, tile)?;
-                        self.tiles_mut(id).other_links.push((RecordKind::Wall, i));
+                        self.link_wall(id, i);
                         // TODO(rooms.md §9.6): the level-133 exclusion is
                         // stated for §9.5.1 step 6 only; applied here too.
                         let level_id = self.level(self.room(id).level).id;
@@ -809,22 +824,14 @@ impl Drlg {
             .as_ref()
             .expect("found in tiles")
             .records(k)[i];
-        let shadow = k == RecordKind::Shadow;
+        let rect = self.room(id).rect;
+        let (wx, wy) = (rect.x + x, rect.y + y);
         if r.flags & rec_flags::LAYER_ABOVE != 0 {
             if is_door(r.kind) {
-                // The re-run's door unit call (`0x0066DB20` → `0x0066D9E0`)
-                // is skipped for a record with flag 0x20 (§9.5.1).
-                // TODO(spec: rooms.md §9.6 step 3): for a door record
-                // without flag 0x20 the re-run calls the door unit again;
-                // which room (this one or N) and position it passes is not
-                // stated, so no call is made here.
-                let f = record_flags(r.flags, r.kind, v, self.material(r.tile), shadow);
-                self.tiles_mut(n).records_mut(k)[i].flags = f;
+                self.rerun_flags(svc, id, wx, wy, v, n, k, i);
             }
             return Ok(());
         }
-        let rect = self.room(id).rect;
-        let (wx, wy) = (rect.x + x, rect.y + y);
         // Rule 1: v bit 7 → m = t, no table, no edge test.
         let merged = if v & cell::LAYER_ABOVE != 0 {
             t
@@ -834,22 +841,31 @@ impl Drlg {
                 None => return Ok(()),
             }
         };
-        // Corner handling.
+        // Corner handling (C3–C6).
         if r.kind == 3 && merged != 3 {
-            if let Some(h) = r.half {
-                let old = {
-                    let rec = &mut self.tiles_mut(n).walls[h];
-                    rec.flags |= rec_flags::HIDDEN;
-                    rec.tile
-                };
-                self.collision_update(n, RecordKind::Wall, h, Some(old), None);
-            }
+            // C3: P = R +0x20, the record linked into N's chain just
+            // before R (never R's own half H); C4: none → 1.14d faults.
+            let chain = &self.room(n).tiles.as_ref().expect("tiles").other_links;
+            let at = chain
+                .iter()
+                .position(|&e| e == (k, i))
+                .expect("a found record is in its chain");
+            let Some(&(pk, pi)) = at.checked_sub(1).map(|p| &chain[p]) else {
+                return Err(DrlgError::LinkedCornerNoNext);
+            };
+            let old = {
+                let rec = &mut self.tiles_mut(n).records_mut(pk)[pi];
+                rec.flags |= rec_flags::HIDDEN;
+                rec.tile
+            };
+            self.collision_update(n, pk, pi, Some(old), None);
         } else if r.kind != 3 && merged == 3 {
+            // C5.
             self.tiles_mut(n).records_mut(k)[i].flags |= 0xC008;
             self.collision_update(n, k, i, Some(r.tile), None);
             let tile = self.choose_tile(id, 3, cell::main(v), cell::sub(v))?;
             let ni = self.add_wall(svc, id, x, y, v, 3, tile)?;
-            self.tiles_mut(id).other_links.push((RecordKind::Wall, ni));
+            self.link_wall(id, ni);
         }
         let tile_key = {
             let ti = self.tile_info(r.tile);
@@ -865,10 +881,38 @@ impl Drlg {
                 self.collision_update(n, k, i, Some(old), Some(tile));
             }
         }
-        let rec = self.room(n).tiles.as_ref().expect("tiles").records(k)[i];
-        let f = record_flags(rec.flags, rec.kind, v, self.material(rec.tile), shadow);
-        self.tiles_mut(n).records_mut(k)[i].flags = f;
+        self.rerun_flags(svc, id, wx, wy, v, n, k, i);
         Ok(())
+    }
+
+    /// A flag-rule re-run of §9.6 step 3 on N's record R (both re-runs):
+    /// room = this room `id`, position (wx, wy), this room's v. A door
+    /// record without flag 0x20 first gets the door unit call
+    /// (`0x0066D9E0`, `preset.md` §11) for this room, which puts flag
+    /// 0x20 on R on its outcome.
+    #[allow(clippy::too_many_arguments)]
+    fn rerun_flags(
+        &mut self,
+        svc: &mut Services<'_>,
+        id: DrlgRoomId,
+        wx: i32,
+        wy: i32,
+        v: u32,
+        n: DrlgRoomId,
+        k: RecordKind,
+        i: usize,
+    ) {
+        let rec = self.room(n).tiles.as_ref().expect("tiles").records(k)[i];
+        let shadow = k == RecordKind::Shadow;
+        let door_flag = !shadow
+            && is_door(rec.kind)
+            && rec.flags & rec_flags::DOOR_UNIT == 0
+            && svc.types.door_unit(self, svc.data, id, wx, wy, v, rec.kind);
+        let mut f = record_flags(rec.flags, rec.kind, v, self.material(rec.tile), shadow);
+        if door_flag {
+            f |= rec_flags::DOOR_UNIT;
+        }
+        self.tiles_mut(n).records_mut(k)[i].flags = f;
     }
 
     // ---- animation (§9.7) -------------------------------------------------
