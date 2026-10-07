@@ -82,5 +82,6 @@ Left on purpose:
 Per pair, the set of covered units of old + new after equals the old file's
 set before. `py tools/coverage.py --selftest`, `py tools/spec_index.py
 --check`, `cargo fmt --check` pass; `cargo test -p d2-proto` passes;
-`cargo test -p d2-sim --lib` result in the commit message of this branch's
-last commit.
+`cargo test -p d2-sim --lib`: 3145 passed, 0 failed, 8 ignored. `d2-server`
+and `d2-client` tests were not run (only comments, spec-name string
+literals and one-line `// Spec:` additions changed there).
