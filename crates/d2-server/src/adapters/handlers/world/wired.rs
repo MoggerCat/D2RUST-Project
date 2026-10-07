@@ -1,4 +1,4 @@
-// Spec: specs/world/npc.md §1.1, §2–§4, §7.5; specs/world/vendors.md §1, §3, §4, §7; specs/world/quests.md §1.7, §6.2, §7.3; specs/world/quests-act1.md §10.2; specs/world/cube.md §1, §2; specs/world/waypoints.md §6
+// Spec: specs/world/npc.md §1.1, §2–§4, §7.5; specs/world/vendors.md §1, §3, §4, §7; specs/world/quests.md §1.7, §6.2, §7.3; specs/world/quests-act1.md §10.2; specs/world/cube.md §1, §2; specs/world/waypoints.md §6; specs/world/hirelings.md §6 r1, §8 r1; specs/world/hirelings-2.md §15, §19
 //! [`WiredWorld`]: the wired single-player host. The NPC, vendor, quest
 //! and cube systems on their `d2-sim` providers
 //! (`d2_sim::wiring::interaction`: [`Desk`] for `NpcWorld +
@@ -367,29 +367,42 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
     /// The hireling deaths the kill queued (`ActionHooks::pet_deaths`, on
     /// from the first frame): `hirelings.md` §8 rule 1 → `0x005751A0`
     /// ([`life::on_kill`] with flag 1) for each killed monster with a
-    /// player owner and a hireling node. Without hireling tables the
-    /// game has no hireling: the queue is dropped.
+    /// player owner and a hireling node; then the owners' deaths the
+    /// player mode-17 start queued (`ActionHooks::owner_deaths`):
+    /// `hirelings-2.md` §15 → `0x00575BC0` ([`life::player_death`], every
+    /// game type). Without hireling tables the game has no hireling: the
+    /// queues are dropped.
     ///
-    /// TODO(hirelings.md §8 r1): in 1.14d `0x005751A0` runs inside the
-    /// kill, before the killer bookkeeping and the death mode; here it
-    /// runs when the handler or tick that killed returns, so its 0x9B /
-    /// 0x7A follow the kill's other messages.
+    /// TODO(hirelings.md §8 r1, hirelings-2.md §15 r5): in 1.14d
+    /// `0x005751A0` runs inside the kill, before the killer bookkeeping
+    /// and the death mode, and `0x00575BC0` inside the mode-17 start right
+    /// after the corpse creation; here both run when the handler or tick
+    /// that queued them returns (the hireling state is this host's, not
+    /// the action wiring's), so their 0x9B / 0x7A follow the call's other
+    /// messages, and a kill and an owner death queued in one call run
+    /// kills first.
     pub fn pet_deaths<D: ActionEvents>(&mut self, game: &mut Game, events: &mut D) {
-        let q = events
-            .action()
-            .sys
-            .hooks
+        let hooks = &mut events.action().sys.hooks;
+        let q = hooks
             .pet_deaths
             .as_mut()
             .map(std::mem::take)
             .unwrap_or_default();
-        if q.is_empty() || self.state.hireling_tables.is_none() {
+        let owners = hooks
+            .owner_deaths
+            .as_mut()
+            .map(std::mem::take)
+            .unwrap_or_default();
+        if (q.is_empty() && owners.is_empty()) || self.state.hireling_tables.is_none() {
             return;
         }
         self.desk(game, events, |desk, _, _| {
             desk.with_hirelings(|w, _, st| {
                 for m in q {
                     life::on_kill(w, st, m, true);
+                }
+                for p in owners {
+                    life::player_death(w, st, p);
                 }
             })
         });
@@ -752,6 +765,7 @@ where
         let h = &mut events.action().sys.hooks;
         h.pet_follows.get_or_insert_with(Vec::new);
         h.pet_deaths.get_or_insert_with(Vec::new);
+        h.owner_deaths.get_or_insert_with(Vec::new);
         WorldHost::<D>::host_tick(&mut self.action, events, ms);
     }
 

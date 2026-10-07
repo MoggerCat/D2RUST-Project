@@ -165,6 +165,12 @@ pub struct ActionHooks<X> {
     /// hireling lists: `hirelings.md` §8 rule 1 (`0x005751A0` when the
     /// owner is a player). `None` (the default): nothing is recorded.
     pub pet_deaths: Option<Vec<UnitId>>,
+    /// Players whose mode-17 start `0x0057FCA0` ran (after the corpse
+    /// creation), for the host that holds the hireling lists:
+    /// `hirelings-2.md` §15 (`0x00575BC0`, the hireling dies with its
+    /// owner, every game type). `None` (the default): nothing is
+    /// recorded.
+    pub owner_deaths: Option<Vec<UnitId>>,
     /// The loaded `AnimData.d2` (`formats/animdata.md`, parsed by
     /// `d2-formats`): the records `UnitHooks::anim_record` looks up by
     /// COF name. `None`: no record for any unit (as before the table is
@@ -255,6 +261,7 @@ impl<X> ActionHooks<X> {
             object_drops: None,
             pet_follows: None,
             pet_deaths: None,
+            owner_deaths: None,
             anim_data: None,
             vitals: None,
             mode_target: None,
