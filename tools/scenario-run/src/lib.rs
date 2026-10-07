@@ -38,7 +38,7 @@ use d2_server::adapters::{PlayerData, PlayerFields, ProtoSizes, SimGame, UnitFac
 use d2_server::seams::{ClientId, MessageSink, PlayerGate, Pos, SessionHandler};
 use d2_server::transport::{Classified, Queue, ServerQueues};
 use d2_sim::combat::vitals::init_player_stats;
-use d2_sim::drlg::DrlgError;
+use d2_sim::drlg::{act_of_level, DrlgError};
 use d2_sim::game::Game;
 use d2_sim::monsters::init::{self, GameInfo, InitHost};
 use d2_sim::monsters::population::{placement, spawn as pop_spawn};
@@ -329,6 +329,7 @@ fn build(s: &Scenario, data: &Data) -> Result<Built, RunError> {
     ActionEvents::create_game(&mut sim, &fields);
     sim.create_regions();
 
+    let wp_levels = d.waypoints().map_err(b)?;
     // The area generated and every room streamed.
     let mut game = Game::new();
     game.lists
@@ -342,6 +343,18 @@ fn build(s: &Scenario, data: &Data) -> Result<Built, RunError> {
             let lv = dr.get_or_alloc_level(svc.data, svc.types, c.area)?;
             if dr.level_rooms(lv).is_empty() {
                 dr.generate_level(svc.data, svc.types, lv)?;
+            }
+            // The other act 0 levels the character holds a waypoint of
+            // are generated too, so a travel there finds its rooms (the
+            // synthetic act is created town only).
+            for &w in &c.waypoints {
+                if w != c.area && act_of_level(w) == 0 && wp_levels.map.index_of_level(w).is_some()
+                {
+                    let other = dr.get_or_alloc_level(svc.data, svc.types, w)?;
+                    if dr.level_rooms(other).is_empty() {
+                        dr.generate_level(svc.data, svc.types, other)?;
+                    }
+                }
             }
             let mut out = Vec::new();
             for r in dr.level_rooms(lv) {
