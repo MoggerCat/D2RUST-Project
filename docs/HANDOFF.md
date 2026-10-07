@@ -5305,6 +5305,7 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
   `0x005D4150`), Overseer whip (transform rate and class, `0x005D1F70`),
   imps on a barricade tower (state 143, type-5 event, release below 10 %
   life, `0x005D1AB0`).
+- `world/quests-act4.md` OQ2 / QD-1 (PC 2 spec-quests-act4-5, R-QD-1): one classic Diablo kill with frames logged — the kill, each credited player's warp, the uncredited player's 0x50 and the game end — ideally once on an idle and once on a loaded machine (settles whether the GetTickCount end-of-game timers can be expressed in ticks).
 
 **Ninth set (2026-10-07; the 22 notes `impl-ai-acts2-5`, `impl-skill-slots-2`,
 `impl-missile-bodies-2`, `impl-quests-act1-rest`, `impl-quests-act2`,
