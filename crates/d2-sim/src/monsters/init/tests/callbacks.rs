@@ -1325,7 +1325,11 @@ fn unique_is_the_flag_of_the_walked_monster_and_mode_5_uses_the_owner() {
         let m = f.add(UnitType::Missile, 5, 1, 0);
         f.owners.insert(m, o);
         f.run(o, Some(m), 5);
-        assert_eq!(f.missiles().len(), if unique { 2 } else { 0 }, "unique {unique}");
+        assert_eq!(
+            f.missiles().len(),
+            if unique { 2 } else { 0 },
+            "unique {unique}"
+        );
     }
     // Mode 2: the walked monster's own flag (umod 41 ... via umod 9 fire
     // explosion, a unique or not alike; umod 27 spectral hit differs).
@@ -1334,7 +1338,11 @@ fn unique_is_the_flag_of_the_walked_monster_and_mode_5_uses_the_owner() {
         let u = f.monster(0, &[18], unique, 1);
         f.set_mode_of(u, mode::DEATH);
         f.run(u, None, 1);
-        assert_eq!(f.timers(u).len(), usize::from(unique), "umod 18 unique {unique}");
+        assert_eq!(
+            f.timers(u).len(),
+            usize::from(unique),
+            "umod 18 unique {unique}"
+        );
     }
 }
 

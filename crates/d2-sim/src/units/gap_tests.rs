@@ -1717,7 +1717,10 @@ fn umod_mode_1_site_runs_for_every_mode_after_the_start_and_before_the_cancel() 
             .expect("mode 1 site ran");
         assert_eq!(log[one], format!("umods 1 cur Some({mode})"), "mode {mode}");
         if mode != 1 {
-            let start = log.iter().position(|l| l.starts_with("mfn")).expect("start");
+            let start = log
+                .iter()
+                .position(|l| l.starts_with("mfn"))
+                .expect("start");
             assert!(start < one, "mode {mode}: after the start function");
         }
         let zero = log.iter().position(|l| l.starts_with("umods 0"));

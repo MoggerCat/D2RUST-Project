@@ -366,13 +366,7 @@ impl<X: WorldPending> InitHost for WorldHost<'_, X> {
     /// `0x005DD250(unit, 1)`: AI control flags |= `flag` (`umod-init-bodies.md`
     /// §4 r4); a unit without an AI control writes nothing.
     fn set_ai_flag(&mut self, unit: UnitId, flag: u16) {
-        if let Some(c) = self
-            .v
-            .h
-            .ai
-            .as_mut()
-            .and_then(|ai| ai.control_mut(unit))
-        {
+        if let Some(c) = self.v.h.ai.as_mut().and_then(|ai| ai.control_mut(unit)) {
             c.flags |= flag;
         }
     }
