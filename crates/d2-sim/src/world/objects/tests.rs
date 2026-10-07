@@ -664,7 +664,7 @@ fn preset_shrines() {
     assert_eq!(preset_ids(579), BTreeSet::from([14]));
 }
 
-// Covers: specs/world/objects.md §6; specs/world/objects-2.md §24 r1, §22 r1
+// Covers: specs/world/objects.md §6, §edge-cases-original-bugs r22; specs/world/objects-2.md §24 r1, §22 r1
 #[test]
 fn preset_bounds_and_580() {
     let t = tables();
@@ -702,7 +702,8 @@ fn preset_bounds_and_580() {
     );
     let r = create_preset(&mut ctl, &t, &mut f, RoomId(1), 25, 580, 3, 4, 1).unwrap();
     assert_eq!(r, Preset::Object(Some(u)));
-    assert_eq!(f.calls[0], Call::Allocate(RoomId(1), 371, 3, 4, 1));
+    // The preset mode (1) is ignored: allocated in mode 0 (§6, edge 22).
+    assert_eq!(f.calls[0], Call::Allocate(RoomId(1), 371, 3, 4, 0));
     let d = ctl.get(u).unwrap();
     assert_eq!((d.spark, d.interact), (1, 3));
     assert_ne!(f.flags[&u] & oflags::KEEP_MODE, 0);

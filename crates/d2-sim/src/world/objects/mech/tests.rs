@@ -231,7 +231,7 @@ fn bookshelf_code_draws() {
     assert_eq!(modes(&f), vec![2]);
 }
 
-// Covers: specs/world/objects-2.md §16.3
+// Covers: specs/world/objects-2.md §16.3; specs/world/objects.md §edge-cases-original-bugs r14
 #[test]
 fn obelisk_needs_a_gem() {
     let mut t = tables();
@@ -343,7 +343,7 @@ fn trapped_soul_operate_and_events() {
     assert_eq!(f.schedules(), vec![(O, mevent::SOUL, 125)]);
 }
 
-// Covers: specs/world/objects-2.md §18.1, §18.6, §edge-cases-original-bugs r1
+// Covers: specs/world/objects-2.md §18.1, §18.6, §edge-cases-original-bugs r1; specs/world/objects.md §edge-cases-original-bugs r13
 #[test]
 fn fire_event_and_endanim_write_mode_directly() {
     let mut t = tables();
@@ -372,7 +372,7 @@ fn fire_event_and_endanim_write_mode_directly() {
     assert!(f.calls.is_empty());
 }
 
-// Covers: specs/world/objects-2.md §18.2, §18.3
+// Covers: specs/world/objects-2.md §18.2, §18.3; specs/world/objects.md §edge-cases-original-bugs r20
 #[test]
 fn spike_and_fissure_events() {
     let mut t = tables();
@@ -465,7 +465,7 @@ fn stairs_open_and_stair2_gate() {
     assert!(f.calls.is_empty());
 }
 
-// Covers: specs/world/objects-2.md §16.2
+// Covers: specs/world/objects-2.md §16.2; specs/world/objects.md §edge-cases-original-bugs r16
 #[test]
 fn trap_door_modes() {
     let mut t = tables();
@@ -735,4 +735,130 @@ fn burn_scans_only_own_room_players_in_reach() {
         others(&f),
         vec!["store 10 2", "damage 10 41 1", "damage 10 45 1"]
     );
+}
+
+// Covers: specs/world/objects-2.md §17; specs/world/objects.md §edge-cases-original-bugs r18
+#[test]
+fn gold_placeholder_room_lookup_drifts() {
+    let mut t = tables();
+    t.objects[CLASS as usize].mode2 = 1;
+    // The init room covers x ≥ 7 only (init point (5, 5)).
+    fn inside(x: i32, _y: i32) -> bool {
+        x >= 7
+    }
+    let (mut c, mut f) = setup(CLASS, 0, 0, &mut t);
+    f.room_at_fn = Some(inside);
+    f.free_all = true;
+    init(&mut c, &t, &mut f, O, 28, Some(ROOM), 5, 5).unwrap();
+    // Reference of the spec text: the lookup uses the last accepted point
+    // L plus the new offset; the drop uses the init point plus the offset.
+    let mut e = Seed::new(1, 666);
+    let n = e.step() % 9 + 1;
+    let (mut l, mut drift, mut naive) = ((5, 5), vec![], vec![]);
+    for _ in 0..n {
+        let (dx, dy) = ((e.step() & 3) as i32, (e.step() & 3) as i32);
+        if inside(l.0 + dx, l.1 + dy) {
+            l = (5 + dx, 5 + dy);
+            drift.push(format!("gold {} {}", 5 + dx, 5 + dy));
+        }
+        if inside(5 + dx, 5 + dy) {
+            naive.push(format!("gold {} {}", 5 + dx, 5 + dy));
+        }
+    }
+    assert!(!drift.is_empty());
+    assert_ne!(drift, naive, "the vector exercises the drift");
+    assert_eq!(
+        others(&f).into_iter().filter(|s| s.starts_with("gold")).collect::<Vec<_>>(),
+        drift
+    );
+    assert_eq!(c.seed, e);
+}
+
+// Covers: specs/world/objects-2.md §16.13, §18.4; specs/world/objects.md §edge-cases-original-bugs r19, §edge-cases-original-bugs r21
+#[test]
+fn gate_ignores_occupancy_and_dropless_soul_goes_inert() {
+    let mut t = tables();
+    // Gate in mode 2 with units in the doorway (cells 0xFFFF): restamped
+    // and closed anyway.
+    let (mut c, mut f) = setup(CLASS, 2, 61, &mut t);
+    f.tick = 5000;
+    f.stats.insert((O, 0xFFFF), 0xFFFF);
+    dispatch(&mut c, &t, &mut f, O, Some(P)).unwrap();
+    assert_eq!(f.calls[0], Call::Stamp(O));
+    assert_eq!(modes(&f), vec![0]);
+    // Trapped soul, mode 2, counter 1 → 2: the drop finds nothing: no
+    // mode, no event pending.
+    let (mut c, mut f) = setup(CLASS, 2, 48, &mut t);
+    c.get_mut(O).unwrap().interact = 1;
+    object_event(&mut c, &t, &mut f, O, mevent::SOUL).unwrap();
+    assert_eq!(c.get(O).unwrap().interact, 2);
+    assert!(modes(&f).is_empty());
+    assert!(f.schedules().is_empty());
+}
+
+// Covers: specs/world/objects.md §edge-cases-original-bugs r15
+#[test]
+fn teleport_pad_ignores_its_own_mode() {
+    let mut t = tables();
+    for mode in [0u8, 1, 2, 3, 5] {
+        let (mut c, mut f) = setup(CLASS, mode, 27, &mut t);
+        f.unit_classes.insert(O, u32::from(CLASS));
+        f.room_unit_lists.entry(ROOM).or_default().push(UnitId(40));
+        f.unit_types.insert(UnitId(40), 2);
+        f.unit_classes.insert(UnitId(40), u32::from(CLASS));
+        f.positions.insert(UnitId(40), (70, 80));
+        assert_eq!(
+            dispatch(&mut c, &t, &mut f, O, Some(P)),
+            Ok(Dispatch::Done(0))
+        );
+        assert!(
+            others(&f).contains(&"place 20 3 70 80".to_string()),
+            "mode {mode}"
+        );
+    }
+}
+
+// Covers: specs/world/objects-2.md §16.11; specs/world/objects.md §edge-cases-original-bugs r16, §edge-cases-original-bugs r17
+#[test]
+fn stairs_warp_searches_own_then_adjacent_rooms() {
+    let mut t = tables();
+    let tile = |f: &mut Fake, room: u32, unit: u32| {
+        let u = UnitId(unit);
+        f.room_unit_lists.entry(RoomId(room)).or_default().push(u);
+        f.unit_types.insert(u, 5);
+    };
+    for fn_ in [47u8, 50] {
+        // Mode 2, no tile in O's room: the adjacency rooms in order, O's
+        // room skipped.
+        let (mut c, mut f) = setup(CLASS, 2, fn_, &mut t);
+        f.adjacent
+            .insert(ROOM, vec![ROOM, RoomId(4), RoomId(5)]);
+        tile(&mut f, 5, 52);
+        tile(&mut f, 4, 51);
+        assert_eq!(
+            dispatch(&mut c, &t, &mut f, O, Some(P)),
+            Ok(Dispatch::Done(1)),
+            "fn {fn_}"
+        );
+        assert_eq!(others(&f), vec!["warp 20 51"]);
+        // A tile in O's own room wins.
+        tile(&mut f, 3, 50);
+        f.calls.clear();
+        dispatch(&mut c, &t, &mut f, O, Some(P)).unwrap();
+        assert_eq!(others(&f), vec!["warp 20 50"]);
+        // None anywhere: nothing, result 1 (not fatal, unlike the trap door).
+        let (mut c, mut f) = setup(CLASS, 2, fn_, &mut t);
+        assert_eq!(
+            dispatch(&mut c, &t, &mut f, O, Some(P)),
+            Ok(Dispatch::Done(1))
+        );
+        assert!(f.calls.is_empty());
+    }
+    // 50 from mode 0: returns 0 and never opens (47 opens).
+    let (mut c, mut f) = setup(CLASS, 0, 50, &mut t);
+    assert_eq!(
+        dispatch(&mut c, &t, &mut f, O, Some(P)),
+        Ok(Dispatch::Done(0))
+    );
+    assert!(f.calls.is_empty());
 }

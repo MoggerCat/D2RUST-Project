@@ -74,6 +74,10 @@ pub struct Fake {
     pub unit_classes: BTreeMap<UnitId, u32>,
     /// Adjacency arrays of a room.
     pub adjacent: BTreeMap<RoomId, Vec<RoomId>>,
+    /// Gold placeholder fakes: a point is inside the init room when this
+    /// returns true; every point is free when `free_all`.
+    pub room_at_fn: Option<fn(i32, i32) -> bool>,
+    pub free_all: bool,
     /// Box queries seen by the population fake: (x, y, sx, sy, mask).
     pub box_log: std::cell::RefCell<Vec<(i32, i32, u32, u32, u32)>>,
     /// Predicate for the population fake's box query: `true` = blocked.
@@ -196,6 +200,15 @@ impl ObjectWorld for Fake {
         self.rooms.insert(u, room);
         self.positions.insert(u, (x, y));
         Some(u)
+    }
+    fn room_at(&self, room: RoomId, x: i32, y: i32) -> Option<RoomId> {
+        self.room_at_fn.and_then(|f| f(x, y).then_some(room))
+    }
+    fn gold_drop(&mut self, _room: RoomId, x: i32, y: i32) {
+        self.calls.push(Call::Other(format!("gold {x} {y}")));
+    }
+    fn point_free(&self, _room: RoomId, _x: i32, _y: i32, _mask: u32) -> bool {
+        self.free_all
     }
     fn staff_tomb_level(&self) -> u32 {
         self.staff_tomb

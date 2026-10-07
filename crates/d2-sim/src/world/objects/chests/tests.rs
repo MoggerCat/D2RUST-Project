@@ -452,7 +452,7 @@ fn chest_locked_without_key_stays_closed() {
     assert_eq!(h.f.mode(OBJ), 0);
 }
 
-// Covers: specs/world/objects.md §8.1 r2
+// Covers: specs/world/objects.md §8.1 r2, §edge-cases-original-bugs r23
 #[test]
 fn chest_locked_assassin_needs_no_key() {
     let t = tables();
@@ -716,7 +716,7 @@ fn urn_rolls_20_inclusive() {
     }
 }
 
-// Covers: specs/world/objects.md §8.2; specs/world/objects-2.md §24 r2
+// Covers: specs/world/objects.md §8.2, §edge-cases-original-bugs r24; specs/world/objects-2.md §24 r2
 #[test]
 fn barrel_skill_draw_order_and_no_trap_arm() {
     let t = tables();
@@ -1076,4 +1076,17 @@ fn magic_test_is_item_type_4_quality_4_to_9() {
     assert!(!is_magic(&h, Some(m)));
     // No item (the chest drop returned none).
     assert!(!is_magic(&h, None));
+}
+
+// Covers: specs/world/objects.md §8.1 r8, §edge-cases-original-bugs r28
+#[test]
+fn locked_chest_without_operator_is_fatal() {
+    let t = tables();
+    let (mut c, mut h) = setup(CHEST, 0x80, Seed::init_low(1));
+    let mut o = op(CHEST, 4);
+    o.operator = None;
+    assert_eq!(
+        operate(&mut c, &t, &mut h, &o),
+        Err(ObjectError::KeyTestNoUnit)
+    );
 }

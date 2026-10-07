@@ -426,7 +426,7 @@ fn well_larger_parm2_modes() {
 
 // ------------------------------------------------------------------ §12
 
-// Covers: specs/world/objects.md §12 text, §12 r1, §12 r5
+// Covers: specs/world/objects.md §12 text, §12 r1, §12 r5, §edge-cases-original-bugs r28
 #[test]
 fn portal_busy_and_owner() {
     let t = tables();
@@ -600,7 +600,7 @@ fn portal_partner_destination_and_quest_hook() {
     assert_eq!(ctl.get(O).unwrap().portal_flags, 5);
 }
 
-// Covers: specs/world/objects.md §12 r12
+// Covers: specs/world/objects.md §12 r12, §edge-cases-original-bugs r29
 #[test]
 fn portal_removal_rules() {
     let t = tables();
