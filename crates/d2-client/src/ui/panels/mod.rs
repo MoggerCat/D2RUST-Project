@@ -11,6 +11,7 @@
 pub mod border;
 pub mod character;
 pub mod inventory;
+pub mod menu_box;
 pub mod npc;
 pub mod shop;
 pub mod skilltree;

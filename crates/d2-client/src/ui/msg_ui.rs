@@ -239,6 +239,13 @@ impl OriginalUi {
         self.msg.ui_7c0c68 = v;
     }
 
+    /// `ui/messages.md` §6 r2: the NPC text list is freed when the
+    /// interaction ends (`0x004A1730`, from `0x004B3C20`) and on game exit
+    /// (`0x004A0680`).
+    pub fn free_npc_text(&mut self) {
+        self.npc_text = None;
+    }
+
     /// The NPC text list `[0x007BF250]` (§5 r2), `None` when freed.
     pub fn npc_text(&self) -> Option<&NpcTextList> {
         self.npc_text.as_ref()
