@@ -223,8 +223,12 @@ impl CharacterPanel {
         out: &mut dyn UiDrawSink,
     ) {
         let s = env.screen;
+        // `panels-2.md` §17 r1: the base `statpts` gates the points box,
+        // its labels, the number and the add buttons; the number is the
+        // full value (§8.4).
         let statpts = view.stat(STAT_STATPTS);
-        let extra = move |c: Cond| c == Cond::StatPts && statpts != 0;
+        let shown = super::char_details::points_block_drawn(view.base(STAT_STATPTS));
+        let extra = move |c: Cond| c == Cond::StatPts && shown;
         for r in t.rows(PANEL) {
             let cenv = env.cond(self.row_pressed(r), &extra);
             if !r.applies(&cenv) {
@@ -661,6 +665,30 @@ mod tests {
         let sp = t.files.id("panel\\skillpoints").unwrap();
         let sock = t.files.id("panel\\levelsocket").unwrap();
         assert!(!images(&d).iter().any(|i| i.0 == sp || i.0 == sock));
+    }
+
+    // Covers: specs/ui/panels-2.md §17 r1
+    #[test]
+    fn the_base_statpts_gates_the_points_block() {
+        let t = tables();
+        let sp = t.files.id("panel\\skillpoints").unwrap();
+        let p = CharacterPanel::default();
+        // Full value 3, base 0: no box.
+        let v = View {
+            stats: vec![(4, 3, 0)],
+            ..View::default()
+        };
+        assert!(!images(&draws(&p, Screen::R640, &v, &Strings(vec![])))
+            .iter()
+            .any(|i| i.0 == sp));
+        // Base 2, full value 3: the box, and the number is the full value.
+        let v = View {
+            stats: vec![(4, 3, 2)],
+            ..View::default()
+        };
+        let d = draws(&p, Screen::R640, &v, &Strings(vec![]));
+        assert!(images(&d).contains(&(sp, 0, 3, 364)));
+        assert!(texts(&d).iter().any(|x| x.0 == "3" && x.2 == 360));
     }
 
     // Covers: specs/ui/panels.md §8 r6

@@ -9,6 +9,7 @@
 //! single-player game ([`single_player`], on a server thread,
 //! [`server_thread`]) through the bridge and the world view.
 
+pub mod hud;
 pub mod palette;
 pub mod play;
 pub mod rest;

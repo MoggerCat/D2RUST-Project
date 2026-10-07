@@ -32,7 +32,7 @@ use crate::bridge::output::Output;
 use crate::bridge::world::{ClientWorld, KindData};
 
 /// The hire list panel id (one past the border panel).
-pub const HIRE_PANEL: PanelId = PanelId(0x101);
+pub const HIRE_PANEL: PanelId = PanelId(0x102);
 /// Offers a list holds (`menus.md` §3.3: 10 records).
 pub const MAX_OFFERS: usize = 10;
 /// Row height of the list (`menus.md` §3.3: item heights 21 / 15).

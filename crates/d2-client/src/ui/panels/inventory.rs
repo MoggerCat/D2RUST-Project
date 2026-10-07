@@ -3,8 +3,10 @@
 //! spec owns — panel art and close button (§9.3), the close rectangle and
 //! its mouse handlers (`0x00486E10`, `0x00489190`, `0x00486EF0`), the
 //! empty equipment-slot backgrounds (§9.4) and the dead weapon-swap tab
-//! code (§9.5, a no-op). The grid, equipped items, gold and cursor item
-//! belong to `ui/inventory.md` (§9.6).
+//! code (§9.5, a no-op), and between the art and the close button the
+//! gold line and gold button (§9.6, `panels-2.md` §21 r1: [`super::inv_gold`]).
+//! The grid, equipped items and cursor item belong to `ui/inventory.md`
+//! (§9.6).
 //!
 //! Open (spec gaps):
 //! - §9.3 does not say whether mouse up clears the close button's pressed
@@ -236,19 +238,32 @@ pub fn in_panel_area(left: i32, right: i32, top: i32, bottom: i32, x: i32, y: i3
     left <= x && x < right && top <= y && y <= bottom
 }
 
-/// Pressed state of the inventory close button (`[0x007BCE90]`).
+/// Pressed state of the inventory close button (`[0x007BCE90]`) and of
+/// the gold button (`[0x007BCE30]`, `panels-2.md` §21 r1; its press is
+/// not wired yet, [`super::inv_gold`]).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct InventoryPanel {
     pub close_pressed: bool,
+    pub gold_pressed: bool,
 }
 
 impl InventoryPanel {
     /// Panel art (frames 4–7 as right quads, `InvChar6` / `InvChar` per
-    /// §8.1) and the close button (frame 10, 11 pressed), §9.3, in
-    /// `panel-layout.tsv` row order.
-    pub fn draw(&self, t: &PanelTables, env: &PanelEnv, out: &mut dyn UiDrawSink) {
+    /// §8.1), the gold value (`gold`: the full stat 14, `None` = not
+    /// drawn) and gold button (§9.6, `panels-2.md` §21 r1), then the
+    /// close button (frame 10, 11 pressed), §9.3, in `panel-layout.tsv`
+    /// row order.
+    pub fn draw(
+        &self,
+        t: &PanelTables,
+        env: &PanelEnv,
+        gold: Option<i32>,
+        out: &mut dyn UiDrawSink,
+    ) {
         let cenv = env.cond(self.close_pressed, &no_extra);
-        emit_static_draws(t, PANEL, &cenv, None, &|_| true, out);
+        emit_static_draws(t, PANEL, &cenv, None, &|r| r.item.starts_with("art"), out);
+        super::inv_gold::draw_inventory_gold(t, env, self.gold_pressed, gold, out);
+        emit_static_draws(t, PANEL, &cenv, None, &|r| r.item == "close", out);
     }
 
     /// Mouse down (`0x00489190`): in the close rectangle sets pressed.
@@ -317,9 +332,10 @@ mod tests {
     fn art_640() {
         let t = tables();
         let mut out: Vec<UiDraw> = Vec::new();
-        InventoryPanel::default().draw(&t, &env(Screen::R640, true), &mut out);
+        InventoryPanel::default().draw(&t, &env(Screen::R640, true), None, &mut out);
         let f = t.files.id("panel\\invchar6").unwrap();
         let btn = t.files.id("panel\\buysellbtn").unwrap();
+        let gold = t.files.id("panel\\goldcoinbtn").unwrap();
         assert_eq!(
             images(&out),
             vec![
@@ -327,19 +343,21 @@ mod tests {
                 (f, 5, 576, 256),
                 (f, 6, 320, 432),
                 (f, 7, 576, 432),
+                (gold, 0, 404, 409),
                 (btn, 10, 338, 416),
             ]
         );
     }
 
-    // Covers: specs/ui/panels.md §9 r3
+    // Covers: specs/ui/panels.md §9 r3; specs/ui/panels-2.md §21 r1
     #[test]
     fn art_800_and_close_button() {
         let t = tables();
         let mut out: Vec<UiDraw> = Vec::new();
-        InventoryPanel::default().draw(&t, &env(Screen::R800, true), &mut out);
+        InventoryPanel::default().draw(&t, &env(Screen::R800, true), None, &mut out);
         let f = t.files.id("panel\\invchar6").unwrap();
         let btn = t.files.id("panel\\buysellbtn").unwrap();
+        let gold = t.files.id("panel\\goldcoinbtn").unwrap();
         assert_eq!(
             images(&out),
             vec![
@@ -347,17 +365,19 @@ mod tests {
                 (f, 5, 656, 316),
                 (f, 6, 400, 492),
                 (f, 7, 656, 492),
+                (gold, 0, 484, 469),
                 (btn, 10, 418, 476),
             ]
         );
         let mut out: Vec<UiDraw> = Vec::new();
         let p = InventoryPanel {
             close_pressed: true,
+            ..InventoryPanel::default()
         };
-        p.draw(&t, &env(Screen::R800, false), &mut out);
+        p.draw(&t, &env(Screen::R800, false), None, &mut out);
         let c = t.files.id("panel\\invchar").unwrap();
         assert_eq!(images(&out)[0], (c, 4, 400, 316));
-        assert_eq!(images(&out)[4], (btn, 11, 418, 476));
+        assert_eq!(images(&out)[5], (btn, 11, 418, 476));
         // Close rect x [418, 450], y [444, 476].
         assert_eq!(
             close_rect(&t, &Screen::R800),
