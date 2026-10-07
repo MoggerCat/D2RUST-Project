@@ -1,0 +1,420 @@
+# Rules no code can claim (docs/COVERAGE.md §5). Read by tools/coverage.py.
+# Columns (tab-separated): spec, rule, reason.
+# rule: any claimable ID of the spec (a section exempts every unit inside it),
+# or `*` for the whole spec. Exempt rules leave the "uncovered" list and the
+# denominator of the percentages; an entry naming a missing rule, or a rule a
+# `Covers:` claim also names, fails `--check`.
+# Source: docs/handoff/uncovered-rules-sort.md bucket X. Not exempted on
+# purpose: edge cases that describe behaviour d2rs reproduces.
+specs/combat/hit.md	§7.4	prose list of callers of hit_test / block_or_dodge
+specs/data/loading.md	§rules text	section heading text
+specs/data/loading.md	§3.2 text	-txt mode not reproduced by d2rs
+specs/data/loading.md	§3.2 r2	-txt mode not reproduced by d2rs
+specs/data/loading.md	§3.2 r3	-txt mode not reproduced by d2rs
+specs/data/loading.md	§d2-data-policy r5	statement of what is not reproduced / survey scope
+specs/data/loading.md	§d2-data-policy r6	statement of what is not reproduced / survey scope
+specs/data/schema.md	§3 r1	Game.exe table extraction procedure (RE tooling; output is fields.tsv/tables.tsv checked by codegen)
+specs/data/schema.md	§3 r2	Game.exe table extraction procedure (RE tooling; output is fields.tsv/tables.tsv checked by codegen)
+specs/data/schema.md	§3 r3	Game.exe table extraction procedure (RE tooling; output is fields.tsv/tables.tsv checked by codegen)
+specs/data/txt-format.md	§1	prose: where the reader is used
+specs/formats/d2s-appearance.md	§rules text	section heading text
+specs/formats/d2s-legacy.md	§rules text	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§1 r1	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§1 r2	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§2 row1	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§2 row2	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§2 row3	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§2 row4	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§2 row5	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§2 row6	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§2 row7	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§2 row8	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§2 row9	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§2 row10	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§2 row11	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§2 row12	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§2 row13	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§2 row14	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§2 row15	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§2 row16	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§2 row17	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§2 row18	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§2 r1	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§2 r2	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§2 r3	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§2 r4	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§2 r5	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§2 r6	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§2 r7	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§2 r8	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§2 r9	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§3	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§4	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§5	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§6 r1	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§6 r2	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§6 r3	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§7	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§8 text	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§8 r1	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§8 r2	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§8 r3	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§9	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§10 r1	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§10 r2	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§10 r3	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§10 r4	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§10 r5	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§10 r6	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§10 row1	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§10 row2	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§10 row3	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§10 row4	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§10 row5	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§10 row6	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§10 row7	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§10 row8	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§10 row9	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§10 row10	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§10 row11	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§10 row12	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§10 row13	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§11	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§12	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§edge-cases-original-bugs r1	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§edge-cases-original-bugs r2	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§edge-cases-original-bugs r3	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§edge-cases-original-bugs r4	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-legacy.md	§edge-cases-original-bugs r5	legacy loader 0x47-0x5B: saves < 0x5C not loaded (D2sError::Legacy); out of scope until old saves are needed
+specs/formats/d2s-load.md	§rules text	section heading text
+specs/formats/d2s.md	§2.7 r1	client-side header users (no server rule)
+specs/formats/d2s.md	§2.7 r2	client-side header users (no server rule)
+specs/formats/d2s.md	§2.7 r3	client-side header users (no server rule)
+specs/formats/tbl.md	§live-tables-1-14d	observation table of live string-table archives
+specs/formats/wav.md	§rules text	section heading text
+specs/items/affixes.md	§12 text	format-0 (version-0x47 save) routines: legacy saves out of scope (TODO in items/affixes.rs)
+specs/items/affixes.md	§12.1 text	format-0 (version-0x47 save) routines: legacy saves out of scope (TODO in items/affixes.rs)
+specs/items/affixes.md	§12.1 r1	format-0 (version-0x47 save) routines: legacy saves out of scope (TODO in items/affixes.rs)
+specs/items/affixes.md	§12.1 r2	format-0 (version-0x47 save) routines: legacy saves out of scope (TODO in items/affixes.rs)
+specs/items/affixes.md	§12.1 r3	format-0 (version-0x47 save) routines: legacy saves out of scope (TODO in items/affixes.rs)
+specs/items/affixes.md	§12.1 r4	format-0 (version-0x47 save) routines: legacy saves out of scope (TODO in items/affixes.rs)
+specs/items/affixes.md	§12.1 r5	format-0 (version-0x47 save) routines: legacy saves out of scope (TODO in items/affixes.rs)
+specs/items/affixes.md	§12.1 r6	format-0 (version-0x47 save) routines: legacy saves out of scope (TODO in items/affixes.rs)
+specs/items/affixes.md	§12.1 r7	format-0 (version-0x47 save) routines: legacy saves out of scope (TODO in items/affixes.rs)
+specs/items/affixes.md	§12.2	format-0 (version-0x47 save) routines: legacy saves out of scope (TODO in items/affixes.rs)
+specs/items/affixes.md	§12.3 text	format-0 (version-0x47 save) routines: legacy saves out of scope (TODO in items/affixes.rs)
+specs/items/affixes.md	§12.3 r1	format-0 (version-0x47 save) routines: legacy saves out of scope (TODO in items/affixes.rs)
+specs/items/affixes.md	§12.3 r2	format-0 (version-0x47 save) routines: legacy saves out of scope (TODO in items/affixes.rs)
+specs/items/affixes.md	§12.3 r3	format-0 (version-0x47 save) routines: legacy saves out of scope (TODO in items/affixes.rs)
+specs/items/affixes.md	§12.3 r4	format-0 (version-0x47 save) routines: legacy saves out of scope (TODO in items/affixes.rs)
+specs/items/affixes.md	§12.4	format-0 (version-0x47 save) routines: legacy saves out of scope (TODO in items/affixes.rs)
+specs/items/bitstream-legacy.md	§rules text	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§1 r1	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§1 r2	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§1 r3	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§1 r4	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§2 r1	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§2 r2	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§2 row1	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§2 row2	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§2 row3	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§2 row4	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§2 row5	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§2 row6	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§2 row7	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§2 row8	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§2 row9	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§2 row10	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§2 row11	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§2 row12	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§2 row13	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§2 row14	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§2 row15	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§2 row16	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§2 row17	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§2 row18	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§2 row19	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§2 row20	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§2 r3	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§2 t2 row1	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§2 t2 row2	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§2 t2 row3	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§2 t2 row4	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§2 t2 row5	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§3 text	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§3 r1	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§3 r2	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§3 r3	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§3 r4	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§3 r5	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§3 r6	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§3 r7	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§3 r8	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§3 r9	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§3 r10	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§3 r11	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§3 r12	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§4 r1	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§4 r2	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§4 r3	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§4 r4	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§4 r5	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§4 row1	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§4 row2	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§4 row3	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§4 row4	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§4 row5	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§4 row6	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§4 r6	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§4 r7	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§4 r8	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§5 r1	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§5 r2	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§5 r3	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§5 r4	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§5 r5	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§5 r6	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§6 text	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§6 r1	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§6 r2	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§6 r3	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§6 r4	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§6 r5	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§7 r1	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§7 r2	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§7 r3	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§8 r1	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§8 r2	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§8 r3	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§edge-cases-original-bugs r1	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§edge-cases-original-bugs r2	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§edge-cases-original-bugs r3	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§edge-cases-original-bugs r4	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§edge-cases-original-bugs r5	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§edge-cases-original-bugs r6	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§edge-cases-original-bugs r7	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§edge-cases-original-bugs r8	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§edge-cases-original-bugs r9	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream-legacy.md	§edge-cases-original-bugs r10	item reader by save version 0x47-0x60: pre-1.10 saves not loaded (D2sError::Legacy; HANDOFF IT-1/REC-44 defer until old saves are in scope)
+specs/items/bitstream.md	§edge-cases-original-bugs r10	peek nec->neg for save version < 0x5D: legacy-version reader
+specs/items/generation.md	§11 text	format-0 branches (version-0x47 saves only)
+specs/items/generation.md	§11.1 text	format-0 branches (version-0x47 saves only)
+specs/items/generation.md	§11.1 r1	format-0 branches (version-0x47 saves only)
+specs/items/generation.md	§11.1 r2	format-0 branches (version-0x47 saves only)
+specs/items/generation.md	§11.1 r3	format-0 branches (version-0x47 saves only)
+specs/items/generation.md	§11.1 r4	format-0 branches (version-0x47 saves only)
+specs/items/generation.md	§11.1 r5	format-0 branches (version-0x47 saves only)
+specs/items/generation.md	§11.1 r6	format-0 branches (version-0x47 saves only)
+specs/items/generation.md	§11.2 text	format-0 branches (version-0x47 saves only)
+specs/items/generation.md	§11.2 r1	format-0 branches (version-0x47 saves only)
+specs/items/generation.md	§11.2 r2	format-0 branches (version-0x47 saves only)
+specs/items/generation.md	§11.2 r3	format-0 branches (version-0x47 saves only)
+specs/items/properties.md	§14	format-0 property functions (version-0x47 saves only)
+specs/items/quality.md	§10 text	format-0 branches / cross-reference to treasure.md / unreachable overflow (1.14d has 8 rows)
+specs/items/quality.md	§10.1	format-0 branches / cross-reference to treasure.md / unreachable overflow (1.14d has 8 rows)
+specs/items/quality.md	§10.2 r1	format-0 branches / cross-reference to treasure.md / unreachable overflow (1.14d has 8 rows)
+specs/items/quality.md	§10.2 r2	format-0 branches / cross-reference to treasure.md / unreachable overflow (1.14d has 8 rows)
+specs/items/quality.md	§10.2 r3	format-0 branches / cross-reference to treasure.md / unreachable overflow (1.14d has 8 rows)
+specs/items/quality.md	§10.2 r4	format-0 branches / cross-reference to treasure.md / unreachable overflow (1.14d has 8 rows)
+specs/items/quality.md	§10.2 r5	format-0 branches / cross-reference to treasure.md / unreachable overflow (1.14d has 8 rows)
+specs/items/quality.md	§10.3 r1	format-0 branches / cross-reference to treasure.md / unreachable overflow (1.14d has 8 rows)
+specs/items/quality.md	§10.3 r2	format-0 branches / cross-reference to treasure.md / unreachable overflow (1.14d has 8 rows)
+specs/items/quality.md	§10.3 r3	format-0 branches / cross-reference to treasure.md / unreachable overflow (1.14d has 8 rows)
+specs/items/quality.md	§10.4 r1	format-0 branches / cross-reference to treasure.md / unreachable overflow (1.14d has 8 rows)
+specs/items/quality.md	§10.4 r2	format-0 branches / cross-reference to treasure.md / unreachable overflow (1.14d has 8 rows)
+specs/items/quality.md	§10.4 r3	format-0 branches / cross-reference to treasure.md / unreachable overflow (1.14d has 8 rows)
+specs/items/quality.md	§10.4 r4	format-0 branches / cross-reference to treasure.md / unreachable overflow (1.14d has 8 rows)
+specs/items/quality.md	§10.4 r5	format-0 branches / cross-reference to treasure.md / unreachable overflow (1.14d has 8 rows)
+specs/missiles/missiles.md	§r11-missiles-txt-columns-and-their-server-use	reference table of missiles.txt columns (table-match tests cover it)
+specs/monsters/ai-bodies-2.md	§1	scope/order index table of the AI bodies in this spec
+specs/monsters/ai-bodies-3.md	§1	scope/order index table of the AI bodies in this spec
+specs/monsters/ai-bodies-4.md	§1	scope/order index table of the AI bodies in this spec
+specs/monsters/ai-bodies-5.md	§1	scope/order index table of the AI bodies in this spec
+specs/monsters/ai-bodies-6.md	§1	scope/order index table of the AI bodies in this spec
+specs/monsters/ai-bodies-7.md	§1	scope/order index table of the AI bodies in this spec
+specs/monsters/init.md	§19.7	index of bodies owned by other specs
+specs/monsters/init.md	§25 text	tool-call intro prose
+specs/monsters/umod-callbacks.md	§3.6	table of monster data fields (data dependency list)
+specs/sim/intents-events.md	§7.6 r1	worked example composing 7.1-7.5 (no rule of its own)
+specs/sim/intents-events.md	§7.6 r2	worked example composing 7.1-7.5 (no rule of its own)
+specs/sim/intents-events.md	§7.6 r3	worked example composing 7.1-7.5 (no rule of its own)
+specs/sim/intents-events.md	§7.6 r4	worked example composing 7.1-7.5 (no rule of its own)
+specs/sim/path-placement.md	§edge-cases-original-bugs text	heading text only
+specs/sim/pathing.md	§12 text	section intro prose
+specs/sim/pathing.md	§13 text	section intro prose
+specs/sim/pathing.md	§edge-cases-original-bugs text	heading text only
+specs/sim/rng.md	§5.5 text	heading intro of client-only globals
+specs/sim/rng.md	§6 text	survey table of inlined-draw shapes (provenance)
+specs/sim/rng.md	§6 row1	survey table of inlined-draw shapes (provenance)
+specs/sim/rng.md	§6 row2	survey table of inlined-draw shapes (provenance)
+specs/sim/rng.md	§6 row3	survey table of inlined-draw shapes (provenance)
+specs/sim/rng.md	§6 row4	survey table of inlined-draw shapes (provenance)
+specs/sim/rng.md	§6 row5	survey table of inlined-draw shapes (provenance)
+specs/sim/rng.md	§6 row6	survey table of inlined-draw shapes (provenance)
+specs/sim/rng.md	§6 row7	survey table of inlined-draw shapes (provenance)
+specs/sim/rng.md	§6 row8	survey table of inlined-draw shapes (provenance)
+specs/sim/units.md	§8	owned by render/draw-order-2.md §15.1/§16
+specs/skills/bodies-2.md	§1	conventions/notation
+specs/skills/bodies-3.md	§1	conventions/notation
+specs/skills/bodies-3.md	§5 text	section intro text
+specs/skills/bodies-4.md	§1	conventions/notation
+specs/skills/bodies-4.md	§3 text	section intro text
+specs/skills/bodies.md	§1	conventions/notation
+specs/skills/bodies.md	§6 text	section intro text
+specs/ui/automap.md	§2 text	heading
+specs/ui/automap.md	§4 text	heading
+specs/ui/automap.md	§7 text	heading
+specs/ui/automap.md	§8 text	heading
+specs/ui/automap.md	§9 text	heading
+specs/ui/automap.md	§11 text	heading
+specs/ui/automap.md	§13 text	heading
+specs/ui/control-panel.md	§1 text	heading
+specs/ui/controls.md	§3 text	heading
+specs/ui/controls.md	§3.1 r3	note: no default key
+specs/ui/controls.md	§4.3 r4	pointer to section 6
+specs/ui/controls.md	§b4-original-defaults-check-client-ui-md-b4 text	heading
+specs/ui/inventory.md	§7	not drawn here
+specs/ui/inventory.md	§10 text	heading
+specs/ui/inventory.md	§11 text	heading
+specs/ui/messages.md	§3 text	heading
+specs/ui/messages.md	§10 text	heading
+specs/ui/panels-2.md	§14 r6	pointer to menu geometry elsewhere
+specs/ui/panels-2.md	§18 r4	statement, no behavior
+specs/ui/panels-2.md	§19 text	heading
+specs/ui/panels-2.md	§22 r6	pointer to panels-3 section 23
+specs/ui/panels-3.md	§23 r12	dead copy / consequence narration
+specs/ui/panels-3.md	§23 r13	dead copy / consequence narration
+specs/ui/panels-3.md	§26 r3	pointer to panels.md
+specs/ui/panels-3.md	§27 r5	states never opened / anvil pointer / narration
+specs/ui/panels-3.md	§27 r6	states never opened / anvil pointer / narration
+specs/ui/panels-3.md	§27 r8	states never opened / anvil pointer / narration
+specs/ui/panels-3.md	§28 text	heading
+specs/ui/panels.md	§14	heading, content in panels-2
+specs/ui/text.md	§14 text	heading
+specs/ui/text.md	§15 text	heading
+specs/client/assets.md	§a6-writes	policy section (what the client may write)
+specs/client/assets.md	§b-original-behavior-to-reproduce-not-specified-here	pointer heading
+specs/client/bridge.md	§10 text	heading
+specs/client/bridge.md	§10 r7	statement: outputs not persisted
+specs/client/model.md	§13 text	heading
+specs/client/model.md	§16 text	heading
+specs/client/model.md	§17 text	heading
+specs/client/msg-skills.md	§2 text	heading
+specs/client/msg-skills.md	§7 text	heading
+specs/client/msg-ui.md	§1 r8	note, no rule change
+specs/client/render-pipeline.md	§b-original-behavior-to-reproduce-not-specified-here	pointer heading
+specs/client/stat-lists.md	§3 r5	owner pointer into dispatch tsv
+specs/client/ui.md	§b8-1-ui-sound-request-sites-controls	audit notes (site counts, owners elsewhere)
+specs/world/hirelings-2.md	§12	links
+specs/world/hirelings-ai.md	§edge-cases-original-bugs	moved note
+specs/world/hirelings.md	§1.1 r4	live-data / reader provenance
+specs/world/hirelings.md	§1.1 r5	live-data / reader provenance
+specs/world/hirelings.md	§1.1 r6	live-data / reader provenance
+specs/world/hirelings.md	§6 r6	recording evidence / provenance
+specs/world/hirelings.md	§6 r7	recording evidence / provenance
+specs/world/hirelings.md	§7.1 text	heading
+specs/world/hirelings.md	§12	links
+specs/world/hirelings.md	§13 r7	links / string id fact
+specs/world/hirelings.md	§13 r8	links / string id fact
+specs/world/object-population.md	§1 text	heading
+specs/world/object-population.md	§3 text	heading
+specs/world/object-population.md	§4 text	heading
+specs/world/object-population.md	§5 text	heading
+specs/world/object-population.md	§7 text	heading
+specs/world/object-population.md	§7.1 text	heading
+specs/world/object-population.md	§7.4 text	heading
+specs/world/object-population.md	§7.5 text	heading
+specs/world/object-population.md	§7.7 text	heading
+specs/world/object-population.md	§8	live data table
+specs/world/objects-2.md	§16 text	heading
+specs/world/objects-2.md	§16.7 text	heading
+specs/world/objects-2.md	§19 text	heading
+specs/world/objects-2.md	§20 text	heading
+specs/world/objects-2.md	§20.1 text	heading
+specs/world/objects-2.md	§20.5 text	heading
+specs/world/objects-2.md	§22 text	heading
+specs/world/objects-2.md	§24 text	heading
+specs/world/objects.md	§7.3 text	heading
+specs/world/objects.md	§16-18-moved	moved pointer
+specs/world/quests-act1-rest.md	§5 l2 r2	client title text, presentation of front end (out of scope)
+specs/world/quests-act1-rest.md	§8 text	heading
+specs/world/quests-act1-rest.md	§9 text	heading
+specs/world/quests-act1-rest.md	§9 r5	no reader, note
+specs/world/quests-act2-2.md	§1 r1	test vector note
+specs/world/quests-act2-2.md	§4	address list of quests.tsv
+specs/world/quests-act2-2.md	§5.3 text	heading
+specs/world/quests-act2.md	§5.9 text	heading
+specs/world/quests-act3-2.md	§11 text	heading
+specs/world/quests-act3.md	§11	clarifications heading
+specs/world/quests-helpers.md	§6 text	heading
+specs/world/quests-helpers.md	§8 text	heading
+specs/world/quests-status.md	§1 r6	note: 0x4C is not a quest message
+specs/world/quests-status.md	§4 text	heading
+specs/world/quests-status.md	§5 text	heading
+specs/world/quests-status.md	§6	summary of per-quest special cases (restated in entries)
+specs/world/quests-status.md	§12 text	heading
+specs/world/quests.md	§1.8 text	heading
+specs/world/quests.md	§1.8 r5	note
+specs/world/quests.md	§2.3 r4	field address fact
+specs/world/quests.md	§9.6 text	heading
+specs/world/quests.md	§11	links to acts II-V
+specs/world/vendors-2.md	§7.3 text	heading
+specs/world/vendors-2.md	§7.3.1 text	heading
+specs/world/vendors-2.md	§10 text	heading
+specs/world/vendors-2.md	§10.2 text	heading
+specs/world/vendors-2.md	§10.3	player-trade buttons: out of scope (trade)
+specs/world/vendors-2.md	§10.4 text	heading
+specs/world/vendors.md	§7 text	heading
+specs/world/vendors.md	§7.3	moved
+specs/world/vendors.md	§9.2 l2 r5	empty rule
+specs/world/waypoints.md	§3 r3	measured-on-saves note
+specs/world/waypoints.md	§4 text	heading
+specs/world/waypoints.md	§4 r3	readers note
+specs/render/composition.md	§1 text	heading
+specs/render/composition.md	§1 r1	rationale for choosing the reference renderer
+specs/render/composition.md	§1 r2	rationale for choosing the reference renderer
+specs/render/composition.md	§7	non-reference renderer (DirectDraw) differences, out of scope
+specs/render/draw-order-2.md	§11.9 text	heading
+specs/render/draw-order-2.md	§15.1 text	heading
+specs/render/draw-order.md	§5 text	heading
+specs/render/lighting.md	§12 r4	recorded-run evidence
+specs/render/lighting.md	§12 r5	recorded-run evidence
+specs/render/overlay.md	§4 text	heading
+specs/render/overlay.md	§4	restates the draw order of section 2/3 rules
+specs/render/unit-composite.md	§5 text	heading
+specs/render/unit-composite.md	§10	d2rs mapping note
+specs/audio/environment.md	§1 r5	inputs owned elsewhere
+specs/audio/environment.md	§2 r10	live-table / recording evidence
+specs/audio/environment.md	§7 r6	live-table / recording evidence
+specs/audio/environment.md	§9 text	heading
+specs/audio/sound-table-2.md	§14.1	analysis of audio tick closure
+specs/audio/sound-table-2.md	§14.2	client loop pass order narration
+specs/audio/sound-table-2.md	§14.3	table of non-audio RNG users, each owned by the cited spec
+specs/audio/sound-table-2.md	§14.4	note on draw-phase steps
+specs/audio/sound-table-2.md	§15 text	heading
+specs/audio/sound-table.md	§6.6 r3	voice service thread / device side, no d2rs equivalent
+specs/audio/sound-table.md	§6.6 r4	voice service thread / device side, no d2rs equivalent
+specs/audio/triggers-2.md	§21 text	heading
+specs/audio/triggers.md	§12 text	heading
+specs/drlg/levels.md	§1	structure layout for recorders
+specs/drlg/levels.md	§3 text	heading
+specs/drlg/levels.md	§10 text	heading
+specs/drlg/levels.md	§11 text	heading
+specs/drlg/levels.md	§11.2 text	heading
+specs/drlg/levels.md	§11.3 text	heading
+specs/drlg/outdoor-act3-act5.md	§rules text	heading
+specs/drlg/outdoor-tilesub.md	§2.1	context and callers
+specs/drlg/preset.md	§1	record layout for recorders
+specs/drlg/preset.md	§3.1 text	heading
+specs/drlg/preset.md	§5.2 text	heading
+specs/drlg/preset.md	§13	lvlprest column use table
+specs/drlg/rooms.md	§1	structure layout for recorders
+specs/drlg/rooms.md	§4.6 text	heading
+specs/drlg/rooms.md	§4.6 r3	statistics copied to globals, no consumer
+specs/drlg/rooms.md	§6 r4	consumers note
+specs/drlg/rooms.md	§9.2 text	heading
+specs/drlg/rooms.md	§9.9	recorded test vectors
+specs/drlg/wall-remap.md	§2 r4	note: column never read
+specs/tools/original-hooks-spawn.md	*	trace-recorder tooling for the original game (tools/trace-recorder, local Windows), not crate code
+specs/tools/original-hooks.md	*	trace-recorder tooling for the original game (tools/trace-recorder, local Windows), not crate code
+specs/tools/scenario.md	§2 text	heading
