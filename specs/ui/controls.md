@@ -27,15 +27,15 @@
 |   3. Commands and default keys | 124–194 |
 |   4. Dispatch | 195–264 |
 |   5. Key-config screen assignment | 265–280 |
-|   6. World clicks (left / right button; answers OQ 2 in part) | 281–558 |
-|   7. Gates and belt use (answers OQ 3, OQ 4, OQ 5) | 559–600 |
-|   B4. Original-defaults check (`client/ui.md` §B4) | 601–610 |
-| Constants & data dependencies | 611–617 |
-| Randomness | 618–621 |
-| Edge cases & original bugs | 622–634 |
-| Test vectors | 635–659 |
-| Provenance | 660–678 |
-| Open questions | 679–719 |
+|   6. World clicks (left / right button; answers OQ 2 in part) | 281–596 |
+|   7. Gates and belt use (answers OQ 3, OQ 4, OQ 5) | 597–638 |
+|   B4. Original-defaults check (`client/ui.md` §B4) | 639–648 |
+| Constants & data dependencies | 649–655 |
+| Randomness | 656–659 |
+| Edge cases & original bugs | 660–672 |
+| Test vectors | 673–697 |
+| Provenance | 698–716 |
+| Open questions | 717–758 |
 <!-- /index -->
 
 ## Summary
@@ -556,6 +556,44 @@ otherwise significant except for the first-match rules of §4.1.
     `0x00467660`; `SearchOpenXY` → `0x004677B0(&x)`; these return the
     new U (their search rules: §Open questions 8).
 
+11. **Re-pick searches** (r10; answers the rest of OQ 8). Positions are
+    a unit's position as in r9.6; d = P's direction (`0x00620100`) & 0xFF,
+    shifted right by 3 (0–7).
+    1. **Nudge** `0x004C51E0(P, &x, &y)`: x := px + A[d], y := py + B[d]
+       with A = (0, −1, −2, −1, 0, 1, 2, 1), B = (2, 1, 0, −1, −2, −1,
+       0, 1) (so a click on P's own position becomes a point two
+       subtiles ahead in P's facing).
+    2. **`SearchEnemyNear`** `0x00467490(skill, U, &x, &y)` (EAX = the
+       row): with U: the row has `TargetCorpse` and U is dead → keep U;
+       else (x, y) := U's position. Search flags m := 0x3002 with
+       `TargetCorpse`, else 0x2003; skill id 90 (Iron Golem): an item
+       U whose base record has flag +0xDC bit 1 (`0x00629CC0`) → keep U;
+       else m := 0x20 with the filter `0x00467470`. Then every unit
+       found by the area search around (x, y) with radius 9 in P's room
+       (`0x0065A950`, `0x0065AC70`, freed by `0x0065AA00`; search record
+       m, local player id `0x00463DE0`) is ranked by its distance to (x,
+       y) (`0x006417F0`); the first with distance < 10 and below every
+       earlier one that passes the hover selectability test
+       (`0x00466870`, `client/model.md` hover) becomes U; none → U is
+       unchanged.
+    3. **`SearchEnemyXY`** `0x00467660(row)` (EBX = P): for the offsets
+       k = 0, −1, 1, −2, 2 (table `0x006D6B34`) in that order: j = (k +
+       d) & 7; point = P's position + (DX[j], DY[j]) with DX =
+       `0x006D6B14` (0, −2, −3, −2, 0, 2, 3, 2), DY = `0x006D6AF4` (3,
+       2, 0, −2, −3, −2, 0, 2); the point must pass the room test
+       `0x0064D9B0(room, x, y, 1, 0x180)` and hold a unit
+       (`0x00641CB0(room, x, y, filter 0x00467640, 0, 1)`) with flag
+       +0xC4 bit 2, and either the row lacks `TargetableOnly` (bit 20),
+       or the unit is a monster with the `monstats2` flag tested by
+       `0x004638A0`, or the hostility test r9.7 holds → P's target :=
+       that unit (`0x00620C10`) and it becomes U. No point qualifies →
+       U := none.
+    4. **`SearchOpenXY`** `0x004677B0(&x)` (EBX = &y, ESI = U): the
+       point is U's position (U given) or (x, y); when P's room
+       (`0x004646A0`) blocks it (`0x0064CB30(room, x, y, 1)` ≠ 0) and a
+       free point is found nearby (`0x0064E780(room, &pt, 1, 1, 0, 7)`),
+       (x, y) := that point and U := none; else U unchanged.
+
 ### 7. Gates and belt use (answers OQ 3, OQ 4, OQ 5)
 
 1. **Gates** of §3: `0x0044DA30` = `[0x007A0620]`, the game-exit flag
@@ -710,7 +748,8 @@ archive `default.key` headers measured. No D2MOO code used.
    interact, melee range, the town and `0x00645460` / `0x00643860` /
    `0x00465C60` / `0x004610C0` / `0x00462560` / `0x004623C0` tests), and
    the target re-pick `0x00467880`. Disassembly read; then the packet
-   trace of OQ 2. *Partly answered* (2026-10-07, §6 r8–r10: the full
+   trace of OQ 2. **Answered** (2026-10-07, §6 r8–r11; the send ticks
+   stay OQ 2). Earlier *partly answered* (2026-10-07, §6 r8–r10: the full
    order of `0x004625B0`, every sender, the hostility test, the walk
    clamp and the re-pick). Open: the three searches of the re-pick
    (`0x00467490` `SearchEnemyNear`, `0x00467660` `SearchEnemyXY`,

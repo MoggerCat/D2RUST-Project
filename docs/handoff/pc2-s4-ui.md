@@ -89,7 +89,7 @@ None.
 
 | Spec § | Behaviour | 1.14d addresses |
 |---|---|---|
-| `controls.md` §6 r8–r10 (OQ 8 partly answered) | world-click decision order (unit / point split, corpse and item-skill tests, "act on it", town gates, press-only monster walk), every sender (interact by unit type with reach 4 / 2 / 5 / 3, NPC stop C→S 0x59, town-portal `just_portaled` gate, warp 500-unit throttle; attack with melee test, Inferno / Arctic Blast approach; object; town player), use check and refusal sound, walk clamp (min step, 7-update held throttle), client hostility test, target re-pick | `0x004625B0`, `0x004621D0`, `0x004610C0`, `0x00461DC0` (table `0x004621AC`), `0x00461C70`, `0x00461B40`, `0x00461890`, `0x004619E0`, `0x00461840`, `0x004623C0`, `0x00465C60`, `0x00467880` |
+| `controls.md` §6 r8–r11 (OQ 8 answered) | world-click decision order (unit / point split, corpse and item-skill tests, "act on it", town gates, press-only monster walk), every sender (interact by unit type with reach 4 / 2 / 5 / 3, NPC stop C→S 0x59, town-portal `just_portaled` gate, warp 500-unit throttle; attack with melee test, Inferno / Arctic Blast approach; object; town player), use check and refusal sound, walk clamp (min step, 7-update held throttle), client hostility test, target re-pick and its searches (nudge, `SearchEnemyNear`, `SearchEnemyXY`, `SearchOpenXY`) | `0x004625B0`, `0x004621D0`, `0x004610C0`, `0x00461DC0` (table `0x004621AC`), `0x00461C70`, `0x00461B40`, `0x00461890`, `0x004619E0`, `0x00461840`, `0x004623C0`, `0x00465C60`, `0x00467880` |
 | `panels.md` OQ 6; `panels-2.md` §21 r8 | links to `world/vendors-2.md` §10.2 (orchestrator relay) | — |
 | `panels-3.md` §28 (`panels-2.md` §21 r9 pointer; OQ 6 answered) | gold dialog box (art, control list order, 80 ms guard, outside click = cancel, Esc / Clear Screen keys, WM_CHAR routing), OK / Cancel buttons (`buysellbtn` frames, caption hover, press sound 4, Enter = OK), numeric edit box (blink, scroll, digit entry, Backspace / `.` quirks, 9-digit cap, max clamp, value), spinner (art, hit rectangles, accelerating step, wheel ±1, value clamp) | `0x004B7CD0`, `0x004B7270`–`0x004B7A90`, `0x004BAF20`–`0x004BB000`, `0x004BBBB0`–`0x004BB620`, `0x004BC340`–`0x004BBFB0`, `0x00453FE0` |
 | `panels-3.md` §27 r7 (OQ 1 answered) | scroll reading `0x0049FF90` (toggle ui 0x10, `bkd` → flag 1 + C→S 0x3E); no writer of the symbol slots `[0x007BF098]` or of the flag elsewhere → the symbol pass is unreachable in 1.14d | `0x0049FF90`, `0x0049FF10`, `0x0049D440` |
@@ -100,10 +100,6 @@ None.
 
 ### Pending
 
-- `controls.md` OQ 8 rest: the three target searches of the re-pick
-  (`0x00467490` `SearchEnemyNear`, `0x00467660` `SearchEnemyXY`,
-  `0x004677B0` `SearchOpenXY`) and the same-point nudge `0x004C51E0`
-  (§6 r10). A read of those four functions settles it.
 - `panels-3.md` §27 r7: "no writer" of the symbol slots rests on the
   absolute-reference scan; a pointer-based write cannot be excluded
   without a capture of reading the `bkd` scroll (expected: base only).
@@ -118,13 +114,11 @@ None.
 
 - `client/model.md` (PC 1); §8 mode requests: the interact code 0x13
   is requested by `ui/controls.md` §6 r9.2 / r9.4 / r9.5 with (type,
-  GUID); the C→S 0x13 itself leaves from the mode-0x13 arrival path
-  (`0x00461250` → `0x00480930`, per unit type: type 0 records the
-  player's position first, type 1 throttles to one send per 200 ms
-  per unit (+0xD4 tick), type 2 re-targets the path and checks objects
-  0x194 / 0x178 against the cube / Horadric-staff items, type 4
-  sends `0x004786D0` with the ui-9 flag); please state it as the sender
-  of C→S 0x13.
+  GUID), and the mode request with code 0x13 sends nothing itself
+  (`0x00480B40`); the unit-code sends of `0x00480930` (`0x004786A0`,
+  caller `0x00461250`, the `client/model.md` §8 code-0x02 row) look
+  like the C→S 0x13 sender: please confirm and state which path sends
+  C→S 0x13 and when.
 - `sim/client-messages.tsv` (code-mirrored; owner of `sim/`): 0x59
   `MakeEntityMove` is sent by the client when interacting with an
   `npc` + `interact` monster (`ui/controls.md` §6 r9.2, `0x00461DC0`
