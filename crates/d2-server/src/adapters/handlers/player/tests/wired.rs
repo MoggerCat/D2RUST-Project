@@ -28,7 +28,8 @@ use crate::adapters::handlers::world::tests::waypoints::{field_drlg, field_room}
 use crate::adapters::handlers::world::tests::{host, send, TestHost};
 use crate::adapters::handlers::world::{ActionWorld, Outbox};
 use crate::adapters::{PlayerData, PlayerFields, SimGame, UnitFacts};
-use crate::seams::{PlayerGate, Pos, ResultCode};
+use crate::buffers::ClientBuffers;
+use crate::seams::{Intents, PlayerGate, Pos, ResultCode};
 
 /// The `Pending` seams of §9 recorded; the stat messages sent as S→C
 /// 0x1D (stat u8, value u8) so their relay is visible.
@@ -230,6 +231,14 @@ impl Fx {
         self.host.clock.0 += 200;
         send(&mut self.host, m)
     }
+    /// The handler alone (`Intents::handle`, after the gate and size
+    /// checks), without the frame's tick: the state the handler leaves
+    /// before the end-of-tick room clean-up (`intents-events.md` §7.5
+    /// rule 3) clears the update flags.
+    fn handle_only(&mut self, m: &[u8]) -> ResultCode {
+        let mut out = ClientBuffers::new();
+        Intents::handle(&mut self.host.game, 0, m, m.len(), &mut out)
+    }
     fn sim(&mut self) -> &mut Wired {
         &mut self.host.game
     }
@@ -245,6 +254,9 @@ impl Fx {
     }
     fn record(&mut self, u: UnitId) -> d2_sim::units::record::UnitRecord {
         self.sim().events.sys.units.get(u).unwrap().clone()
+    }
+    fn record_mode(&mut self, u: UnitId, mode: u32) {
+        self.sim().events.sys.units.get_mut(u).unwrap().mode = mode;
     }
     fn guid(&mut self, u: UnitId) -> u32 {
         self.sim().game.lists.unit(u).unwrap().guid
@@ -287,10 +299,15 @@ fn stamina_switches_the_unit_mode() {
     assert_eq!(f.send(&[0x53]).0, Done);
     assert_eq!(f.record(p).mode, 2);
     f.set_stat(10, 5 << 8);
-    assert_eq!(f.send(&[0x53]).0, Done);
+    // The handler's mode set flags the unit (units.md §4.1); the
+    // end-of-tick clean-up (`intents-events.md` §7.5 r3) clears it again.
+    assert_eq!(f.handle_only(&[0x53]), Done);
     let r = f.record(p);
     assert_eq!(r.mode, 3);
     assert_ne!(r.flags & 1, 0, "flags |= 1 (units.md §4.1)");
+    f.record_mode(p, 2);
+    assert_eq!(f.send(&[0x53]).0, Done);
+    assert_eq!(f.record(p).mode, 3);
     assert_eq!(f.send(&[0x54]).0, Done);
     assert_eq!(f.record(p).mode, 2);
 }
@@ -301,9 +318,11 @@ fn overhead_chat_timeout_flags_and_event_6() {
     let mut f = fx(1);
     let p = f.player;
     let frame = f.sim().game.frame;
-    let (code, got) = f.send(&[0x14, 1, 4, b'y', b'o', 0, 0, 0]);
-    assert_eq!((code, got), (Done, vec![]));
-    // Handled before the frame's tick: d = 8·2 + 0x7D.
+    // The handler alone: the flag is set before the end-of-tick clean-up
+    // (`intents-events.md` §7.5 r3) clears it.
+    let code = f.handle_only(&[0x14, 1, 4, b'y', b'o', 0, 0, 0]);
+    assert_eq!(code, Done);
+    // d = 8·2 + 0x7D.
     let end = frame + 16 + 0x7D;
     assert_eq!(f.log(), [format!("overhead {} yo 4 @{end}", p.0)]);
     let r = f.record(p);
@@ -340,14 +359,16 @@ fn request_entity_update_sets_flag_ex() {
     let mut msg = vec![0x4B];
     msg.extend(1u32.to_le_bytes());
     msg.extend(g.to_le_bytes());
-    assert_eq!(f.send(&msg).0, Done);
+    // The handler alone: flag-ex 0x10000 set before the end-of-tick
+    // clean-up (`intents-events.md` §7.5 r3) clears it with the update.
+    assert_eq!(f.handle_only(&msg), Done);
     assert_ne!(f.record(m).flags2 & FLAG_EX_RESEND, 0);
     // The player itself (type 0).
     let pg = f.guid(p);
     let mut msg = vec![0x4B];
     msg.extend(0u32.to_le_bytes());
     msg.extend(pg.to_le_bytes());
-    assert_eq!(f.send(&msg).0, Done);
+    assert_eq!(f.handle_only(&msg), Done);
     assert_ne!(f.record(p).flags2 & FLAG_EX_RESEND, 0);
     // A missing unit → 1.
     let mut msg = vec![0x4B];
