@@ -42,6 +42,8 @@ pub enum Status {
     Handled,
     /// No written spec owns the behaviour: stays a stub.
     Stub,
+    /// Owned by a spec another handler module implements (named).
+    OtherModule(&'static str),
 }
 
 /// Every skill / combat client id, its owner spec and status.
@@ -112,8 +114,8 @@ pub const IDS: &[(u8, &str, &str, Status)] = &[
     (
         0x12,
         "EndInferno",
-        "none (client-messages.tsv request only)",
-        Status::Stub,
+        "sim/intents-events.md §9 r2",
+        Status::OtherModule("player"),
     ),
     (0x3A, "AddStatPoint", "combat/vitals.md §2", Status::Handled),
     (
@@ -131,14 +133,14 @@ pub const IDS: &[(u8, &str, &str, Status)] = &[
     (
         0x41,
         "Resurrect",
-        "none (client-messages.tsv request only)",
-        Status::Stub,
+        "sim/intents-events.md §9 r6",
+        Status::OtherModule("player"),
     ),
     (
         0x51,
         "BindHotkey",
-        "sim/intents-events.md §2.4 rule 7 (fields only)",
-        Status::Stub,
+        "sim/intents-events.md §9 r12 (fields: §2.4 rule 7)",
+        Status::OtherModule("player"),
     ),
 ];
 

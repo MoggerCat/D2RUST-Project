@@ -17,16 +17,18 @@ use crate::units::{UnitId, UnitType};
 
 use super::skill_use::{skills, Fx};
 
-/// The aura skill: `aura`, `srvdofunc` 111 (an aura do whose body is not
-/// specified, so the fake logs it; the specified basic aura do 65 runs
-/// its body, `skill_bodies`), no missile, no mana, no formulas.
+/// The aura skill: `aura`, `srvdofunc` 53 (a filled slot without a body,
+/// so the fake logs it; the specified basic aura do 65 runs its body,
+/// `skill_bodies`), no missile, no mana, no formulas.
 const AURA: i32 = 1;
-/// Its do function (`functions.tsv` srvdo 111, status `mapped`).
-const AURA_DO: u16 = 111;
+/// Its do function (`functions.tsv` srvdo 53, status `unreferenced`: every
+/// referenced slot has a body since batch 4).
+const AURA_DO: u16 = 53;
 /// Its aura state.
 const AURA_STATE: u16 = 40;
-/// `srvactivefunc` of the aura state: hurricane (`use.md` §7).
-const HURRICANE: u16 = 145;
+/// `srvactivefunc` of the aura state (`use.md` §7): srvdo 138, a filled
+/// slot without a body (hurricane, 145, has one since batch 4).
+const ACTIVE_DO: u16 = 138;
 
 fn aura_skills() -> SkillTables {
     let mut t = skills();
@@ -46,7 +48,7 @@ fn aura_skills() -> SkillTables {
 fn aura_stats() -> Arc<StatData> {
     let mut d = (*super::stat_data()).clone();
     d.aurastate[AURA as usize] = AURA_STATE;
-    d.states.set_srvactivefunc(u32::from(AURA_STATE), HURRICANE);
+    d.states.set_srvactivefunc(u32::from(AURA_STATE), ACTIVE_DO);
     Arc::new(d)
 }
 
@@ -178,7 +180,7 @@ fn active_state_event_calls_the_aura_states_server_do_function() {
         .schedule_event(p, u32::from(event::ACTIVE_STATE), 1, None, 0, 4)
         .unwrap();
     fx.frame();
-    assert_eq!(srvdo_count(&fx, HURRICANE), 1);
+    assert_eq!(srvdo_count(&fx, ACTIVE_DO), 1);
     assert_eq!(fx.sim.sys.hooks.x.log.len(), 1);
     fx.assert_clean();
 }

@@ -78,6 +78,27 @@ pub struct QuestObjectCall {
     pub y: i32,
 }
 
+/// The quest control of a host, lent to the hooks
+/// ([`super::ActionHooks::quest_host`]) so that the quest routes of the
+/// object module run where 1.14d runs them: a quest init inside the
+/// object's allocation `0x00555230` (after the unit's seed step, before
+/// the `PreOperate` draw and the add-to-world; `quests-act1-rest.md` §9
+/// item 7, `objects.md` §3 rule 6), an operate inside the dispatch, object
+/// event 7 inside the timer event. The provider is
+/// `crate::wiring::economy::QuestLoan`.
+pub trait QuestObjectHost<X> {
+    /// Runs one route now on the game's parts; `Some`: a route no quest
+    /// spec states, for [`Pending::object_route`].
+    fn run(
+        &mut self,
+        game: &mut Game,
+        v: &mut View<'_, X>,
+        call: QuestObjectCall,
+    ) -> Option<ObjectRoute>;
+    /// For the host taking its parts back.
+    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any>;
+}
+
 /// What the object module handed back to its caller.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ObjectRoute {
@@ -240,17 +261,57 @@ impl<X: Pending> View<'_, X> {
         let class = object
             .and_then(|o| self.units.get(o))
             .map(|r| u16::try_from(r.class).unwrap_or(u16::MAX));
-        let queue = self.h.objects.as_mut().and_then(|s| s.quest_calls.as_mut());
-        match (class, queue) {
-            (Some(class), Some(q)) => q.push(QuestObjectCall {
-                route,
-                class,
-                room,
-                x,
-                y,
-            }),
-            _ => self.h.x.object_route(game, route),
+        let Some(class) = class else {
+            return self.h.x.object_route(game, route);
+        };
+        let call = QuestObjectCall {
+            route,
+            class,
+            room,
+            x,
+            y,
+        };
+        if self.h.quest_host.is_some() {
+            return self.run_quest_host(game, call);
         }
+        let out = self.h.quest_host_out;
+        let queue = self.h.objects.as_mut().and_then(|s| {
+            if out {
+                // Raised inside a lent route: run right after it.
+                s.route_quests();
+            }
+            s.quest_calls.as_mut()
+        });
+        match queue {
+            Some(q) => q.push(call),
+            None => self.h.x.object_route(game, route),
+        }
+    }
+
+    /// Runs `call` on the lent quest host now, then the routes it raised
+    /// (queued while it ran: a quest function that allocates a quest
+    /// object, `quests-act1-rest.md` §3 step 3), in order.
+    fn run_quest_host(&mut self, game: &mut Game, call: QuestObjectCall) {
+        let Some(mut host) = self.h.quest_host.take() else {
+            return;
+        };
+        self.h.quest_host_out = true;
+        let mut calls = vec![call];
+        while !calls.is_empty() {
+            for c in calls {
+                if let Some(r) = host.run(game, self, c) {
+                    self.h.x.object_route(game, r);
+                }
+            }
+            calls = self
+                .h
+                .objects
+                .as_mut()
+                .map(|s| s.take_quest_calls())
+                .unwrap_or_default();
+        }
+        self.h.quest_host_out = false;
+        self.h.quest_host = Some(host);
     }
 
     /// The per-kind init of an object allocation (`units.md` §3.1, §1
@@ -282,20 +343,34 @@ impl<X: Pending> View<'_, X> {
             .as_ref()
             .and_then(|s| s.alloc_at)
             .unwrap_or((0, 0));
+        // Class and mode bounds are the dispatcher's fatal checks.
+        let class = u16::try_from(class).unwrap_or(u16::MAX);
+        let mode = u8::try_from(mode).unwrap_or(u8::MAX);
         let r = with_objects(game, self, |ctl, t, w| {
-            // Class and mode bounds are the dispatcher's fatal checks.
-            let class = u16::try_from(class).unwrap_or(u16::MAX);
-            let mode = u8::try_from(mode).unwrap_or(u8::MAX);
-            objects::create(ctl, t, w, unit, class, guid, room, mode, x, y)
+            objects::create_init(ctl, t, w, unit, class, guid, room, mode, x, y)
         });
         let Some(created) = r.and_then(|r| log(self, r)) else {
             return;
         };
-        if !matches!(created.init, objects::Route::Here | objects::Route::Null) {
-            let route = ObjectRoute::Init {
-                object: unit,
-                created,
-            };
+        let handed = !matches!(created.init, objects::Route::Here | objects::Route::Null);
+        let route = ObjectRoute::Init {
+            object: unit,
+            created,
+        };
+        // A quest init on a lent quest host runs at rule 6, before rules
+        // 7–9 (`quests-act1-rest.md` §9 item 7); any other route is
+        // handed back after them, as before.
+        let now = handed && created.init == objects::Route::Quest && self.h.quest_host.is_some();
+        if now {
+            self.object_route(game, route, room, (x, y));
+        }
+        let r = with_objects(game, self, |ctl, t, w| {
+            objects::create_rest(ctl, t, w, unit, mode)
+        });
+        if let Some(r) = r {
+            log(self, r);
+        }
+        if handed && !now {
             self.object_route(game, route, room, (x, y));
         }
     }

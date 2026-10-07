@@ -11,13 +11,6 @@ use super::super::world::{
 };
 use super::Bytes;
 
-/// total(s) (`0x00625480`): the base value plus item and state bonuses.
-/// TODO(spec: msg-stats-items.md edge case 1): the model holds layer-0
-/// base values only (no item or state lists), so the total is the base.
-fn total(u: &ClientUnit, stat: u16) -> i32 {
-    u.stat(stat)
-}
-
 /// The post-write hook `0x0045D4B0` (§1 rule 5): every branch (leave the
 /// dead mode, level and attribute refreshes) is Phase 6 UI or mode
 /// machine behaviour (open questions 2; `model.md` open question 1): no
@@ -31,17 +24,19 @@ pub fn local_stat(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerE
         .local_player
         .filter(|k| w.units.contains_key(k))
         .ok_or(HandlerError::Fatal(0x9AA))?;
-    let u = w.units.get_mut(&key).expect("checked above");
+    // total(s) (`0x00625480`, `client/stat-lists.md` §1 rule 3).
+    let total = |s| w.total(key, s, 0);
     let (stat, value) = match m {
-        S2c::SmallGoldPickup(m) => (14, total(u, 14).wrapping_add(i32::from(m.delta))),
-        S2c::AddExpByte(m) => (13, total(u, 13).wrapping_add(i32::from(m.value))),
-        S2c::AddExpWord(m) => (13, total(u, 13).wrapping_add(i32::from(m.value))),
+        S2c::SmallGoldPickup(m) => (14, total(14).wrapping_add(i32::from(m.delta))),
+        S2c::AddExpByte(m) => (13, total(13).wrapping_add(i32::from(m.value))),
+        S2c::AddExpWord(m) => (13, total(13).wrapping_add(i32::from(m.value))),
         S2c::AddExpDword(m) => (13, m.value as i32),
         S2c::SetStatByte(m) => (u16::from(m.stat), i32::from(m.value)),
         S2c::SetStatWord(m) => (u16::from(m.stat), i32::from(m.value)),
         S2c::SetStatDword(m) => (u16::from(m.stat), m.value as i32),
         _ => return Err(HandlerError::Invalid("not 0x19..=0x1F")),
     };
+    let u = w.units.get_mut(&key).expect("checked above");
     u.stats.insert(stat, value);
     hook(u, stat, value);
     Ok(())

@@ -444,3 +444,67 @@ fn command_line() {
         "checksum mismatch"
     );
 }
+
+/// A generated save is what the game writes after loading it (C66): no
+/// item carries flag 0x2000, the appearance bytes are 32 × 0xFF (no
+/// equipped item).
+// Covers: specs/formats/d2s.md §2.8 r2, §8.2 r7, §edge-cases-original-bugs r17, §edge-cases-original-bugs r18
+#[test]
+fn new_save_is_the_game_resave_form() {
+    let t = tables();
+    let mut e = edits();
+    e.items = vec!["sb1".parse().unwrap(), "pt1".parse().unwrap()];
+    let s = read(&write(&new_save(&e, t).unwrap()));
+    assert_eq!(s.header.to_bytes()[0x88..0xA8], [0xFF; 32]);
+    for it in &s.body.as_ref().unwrap().items {
+        let f = it.record_flags(0).expect("JM");
+        assert_eq!(f & d2s::ITEM_FLAG_INSTORE, 0, "flags {f:#x}");
+        assert_eq!(f & 0x80_0000, 0x80_0000, "the writer's forced bit");
+    }
+}
+
+/// `set` writes the game's re-save form: 0x2000 cleared on every item
+/// record (player list, corpse, hireling list), the appearance bytes
+/// reset when nothing is equipped.
+// Covers: specs/formats/d2s.md §2.8 r1, §2.8 r2, §8.2 r7
+#[test]
+fn resave_clears_instore_and_resets_appearance() {
+    use d2s_tool::save::resave;
+    let t = tables();
+    let mut e = edits();
+    e.items = vec!["sb1".parse().unwrap()];
+    let mut s = new_save(&e, t).unwrap();
+    {
+        // A file as an older writer left it: 0x2000 on the items, the
+        // stub's component bytes.
+        let b = s.body.as_mut().unwrap();
+        let mut it = b.items[0].clone();
+        let f = it.record_flags(0).unwrap();
+        it.set_record_flags(0, f | d2s::ITEM_FLAG_INSTORE).unwrap();
+        b.items[0] = it.clone();
+        b.corpses.push(d2s::Corpse {
+            unk: 1,
+            x: 0,
+            y: 0,
+            items: vec![it.clone()],
+        });
+        b.hireling_items = Some(Some(vec![it]));
+        // The list is read only for a present hireling (§8.4 rule 2).
+        s.header.hireling.seed = 1;
+        s.header.components = d2s::STUB_COMPONENTS;
+    }
+    let notes = resave(&mut s, t).unwrap();
+    assert!(notes.is_empty());
+    let b = s.body.as_ref().unwrap();
+    let hire = &b.hireling_items.as_ref().unwrap().as_ref().unwrap()[0];
+    for it in [&b.items[0], &b.corpses[0].items[0], hire] {
+        assert_eq!(it.record_flags(0).unwrap() & d2s::ITEM_FLAG_INSTORE, 0);
+    }
+    assert_eq!(s.header.to_bytes()[0x88..0xA8], [0xFF; 32]);
+    // It still reads back and rewrites to itself.
+    let f = write(&s);
+    assert!(matches!(
+        round_trip(&f, &read_options(&f, None), t).unwrap(),
+        RoundTrip::Same(_)
+    ));
+}

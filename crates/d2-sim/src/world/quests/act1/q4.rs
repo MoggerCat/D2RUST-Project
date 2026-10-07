@@ -112,8 +112,15 @@ pub struct Extra4 {
     pub found_player: Option<UnitId>,
     /// +0x84, +0x88: the marker's position.
     pub marker_pos: (i32, i32),
-    /// +0x91 (set by "Cain leaves Tristram"; never read).
+    /// +0x91 (set by "Cain leaves Tristram"; read by the cain portal's
+    /// event 7 outside the Rogue Encampment, `quests-act1-rest.md` §9
+    /// item 10).
     pub b91: bool,
+    /// +0x80: the cain portals' event-7 count in the Rogue Encampment
+    /// (shared by every cain portal of the game, never reset); +0x92:
+    /// set once it passes 5 (§9 item 10).
+    pub town_portal_count: u32,
+    pub b92: bool,
     /// +0x96, +0xA4: the Cain portal object and its GUID.
     pub cain_portal: bool,
     pub cain_portal_guid: u32,
@@ -695,29 +702,35 @@ pub(super) fn removal_timer<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i:
 
 /// The town Cain spawn at the marker object `m` (§10.6 step 3.3;
 /// `quests-act1-rest.md` §8 item 3: (x, y) and R0 are the object's). A
-/// marker found by GUID always has a room in 1.14d; one without is an
-/// invariant violation, reported as fatal.
+/// marker left in a freed room has no room (§9 item 2): every spawn try
+/// finds none and nothing spawns or draws.
 fn spawn_town_cain_at_marker<W: QuestWorld>(
     ctl: &mut QuestControl,
     w: &mut W,
     i: usize,
     m: UnitId,
 ) {
-    match w.unit_position(m) {
-        Some((x, y, r0)) => spawn_town_cain(ctl, w, i, x, y, r0),
+    let room = w.unit_position(m).map(|p| p.2);
+    match w.unit_xy(m) {
+        Some((x, y)) => spawn_town_cain(ctl, w, i, x, y, room),
+        // A marker found by GUID always has a static path.
         None => ctl.faults.push(QuestError::Fatal(0x0059_2960)),
     }
 }
 
 /// Town Cain spawn `0x00592960(game, x, y)` in room R0 (§10.6 step 15).
+/// R0 null (`quests-act1-rest.md` §9 items 1–2): the point test reads an
+/// all-zero box and every spawn try returns null before any allocation
+/// or draw, so nothing happens.
 fn spawn_town_cain<W: QuestWorld>(
     ctl: &mut QuestControl,
     w: &mut W,
     i: usize,
     x: i32,
     y: i32,
-    r0: RoomId,
+    r0: Option<RoomId>,
 ) {
+    let Some(r0) = r0 else { return };
     // 21 points, i = 0 through 20 (`quests-act1-rest.md` §8 item 3).
     let (mut px, mut py) = (0..=20)
         .map(|k| (x + k, y + k))
@@ -1040,18 +1053,22 @@ pub fn gibbet_event<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: Un
     }
     x4(ctl, i).gibbet_open = 3;
     w.set_object_mode(object, 3);
-    // An object always has a room (its static path); one without is an
-    // invariant violation, reported as fatal.
-    let Some((ox, oy, room)) = w.unit_position(object) else {
+    // The object's position (static path) and room (static path +0x00,
+    // read without a test): a gibbet left in a freed room has none, and
+    // both spawns and the free-spot search find nothing
+    // (`quests-act1-rest.md` §9 items 1–2).
+    let Some((ox, oy)) = w.unit_xy(object) else {
         return ctl.faults.push(QuestError::Fatal(0x0059_3290));
     };
+    let room = w.unit_position(object).map(|p| p.2);
     let (x, y) = (ox + 3, oy + 3);
-    let cain = w
-        .spawn_monster(room, x, y, CAIN_TRISTRAM, 1, u32::MAX)
-        .or_else(|| {
-            let (fx, fy, fr) = w.free_spot_at(room, x, y, 2, 0x100, 3, 100)?;
-            w.spawn_monster(fr, fx, fy, CAIN_TRISTRAM, 1, u32::MAX)
-        });
+    let cain = room.and_then(|room| {
+        w.spawn_monster(room, x, y, CAIN_TRISTRAM, 1, u32::MAX)
+            .or_else(|| {
+                let (fx, fy, fr) = w.free_spot_at(room, x, y, 2, 0x100, 3, 100)?;
+                w.spawn_monster(fr, fx, fy, CAIN_TRISTRAM, 1, u32::MAX)
+            })
+    });
     match cain {
         None => {
             // `0x00593220` over every player: the first in Tristram.
@@ -1061,11 +1078,17 @@ pub fn gibbet_event<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: Un
                 .find(|&p| w.unit_level(p) == Some(TRISTRAM));
             x4(ctl, i).found_player = found;
             if let Some(p) = found {
-                if !x4(ctl, i).out_portal
-                    && w.open_portal(Some(p), room, x + 3, y + 3, TOWN, PORTAL_TO_TOWN, false)
+                if !x4(ctl, i).out_portal {
+                    // `0x0056D130` exits with an internal error on a null
+                    // room (`0x0056D147`, §9 item 2): the game ends here.
+                    let Some(room) = room else {
+                        return ctl.faults.push(QuestError::Fatal(0x0056_D147));
+                    };
+                    if w.open_portal(Some(p), room, x + 3, y + 3, TOWN, PORTAL_TO_TOWN, false)
                         .is_some()
-                {
-                    x4(ctl, i).out_portal = true;
+                    {
+                        x4(ctl, i).out_portal = true;
+                    }
                 }
             }
             let x = x4(ctl, i);
@@ -1156,12 +1179,13 @@ pub(super) fn tristram_portal_timer<W: QuestWorld>(
 }
 
 /// Town-Cain marker init `0x005940E0` (object 385, `InitFn` 54;
-/// `quests-act1-rest.md` §3) with the init args' room and position.
+/// `quests-act1-rest.md` §3) with the init args' room and position. A
+/// null room spawns nothing (§9 item 2).
 pub fn marker_init<W: QuestWorld>(
     ctl: &mut QuestControl,
     w: &mut W,
     object: UnitId,
-    room: RoomId,
+    room: Option<RoomId>,
     x: i32,
     y: i32,
 ) {
@@ -1189,8 +1213,12 @@ pub fn cain_leaves_tristram<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W) {
     let Some((m, _)) = w.object_by_guid(x.marker_guid) else {
         return;
     };
-    match w.unit_position(m) {
-        Some((mx, my, room)) => marker_init(ctl, w, m, room, mx, my),
+    // A marker left in a freed room passes a null room: the town Cain
+    // spawn finds nothing (§9 item 2).
+    let room = w.unit_position(m).map(|p| p.2);
+    match w.unit_xy(m) {
+        Some((mx, my)) => marker_init(ctl, w, m, room, mx, my),
+        // A marker found by GUID always has a static path.
         None => return ctl.faults.push(QuestError::Fatal(0x0059_44F0)),
     }
     if !x4(ctl, i).town_cain {
@@ -1199,6 +1227,8 @@ pub fn cain_leaves_tristram<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W) {
     let Some((c, _)) = w.monster_by_guid(x4(ctl, i).town_cain_guid) else {
         return;
     };
+    // Cain's room is its dynamic path +0x1C; without one the cell
+    // lookup `0x00463740(null)` is null: no portal object.
     let Some((cx, cy, croom)) = w.unit_position(c) else {
         return;
     };
@@ -1211,4 +1241,104 @@ pub fn cain_leaves_tristram<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W) {
         x.cain_portal = true;
         x.cain_portal_guid = g;
     }
+}
+
+/// Gibbet init `0x00544990` → `0x00594060` (object 26, `InitFn` 7;
+/// `quests-act1-rest.md` §9 item 8): no chain 4 record → mode 2 unless it
+/// is 2; else mode := X +0x54 (3 once opened), X +0x48 := 1, X +0x34 :=
+/// the object's GUID. No draw, no message.
+pub fn gibbet_init<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: UnitId) {
+    let Some(i) = ctl.find(CHAIN) else {
+        if w.object_mode(object) != 2 {
+            w.set_object_mode(object, 2);
+        }
+        return;
+    };
+    let mode = x4(ctl, i).gibbet_open;
+    w.set_object_mode(object, mode);
+    let g = w.guid(object);
+    let x = x4(ctl, i);
+    x.gibbet_known = true;
+    x.gibbet_guid = g;
+}
+
+/// Inifuss tree init `0x00593FC0` (object 30, `InitFn` 9;
+/// `quests-act1-rest.md` §9 item 9): no chain 4 record → mode 2 unless it
+/// is 2; else X +0x47 := 1 (the GUID at +0x30 is the operate's), X +0x58
+/// := 1 when not-intro = 0 or Cain is gone (+0x50), then mode := X +0x58.
+pub fn tree_init<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: UnitId) {
+    let Some(i) = ctl.find(CHAIN) else {
+        if w.object_mode(object) != 2 {
+            w.set_object_mode(object, 2);
+        }
+        return;
+    };
+    let not_intro = ctl.records[i].not_intro;
+    let x = x4(ctl, i);
+    x.tree_known = true;
+    if !not_intro || x.cain_gone {
+        x.progress = 1;
+    }
+    let mode = x.progress;
+    w.set_object_mode(object, mode);
+}
+
+/// Cain portal init `0x00594290` (object 189, `InitFn` 61;
+/// `quests-act1-rest.md` §9 item 10): mode 1, object event 7 at frame +
+/// 25.
+pub fn cain_portal_init<W: QuestWorld>(w: &mut W, object: UnitId) {
+    w.set_object_mode(object, 1);
+    let at = w.frame() + 25;
+    w.schedule_quest_event(object, at);
+}
+
+/// The Act I cain portal's event 7, `0x005942C0(record, object)`
+/// (`quests.md` §9.5 class 189 in Act I; `quests-act1-rest.md` §9 item
+/// 10): by the object's mode, 1 → 2; 2 → in the Rogue Encampment count
+/// +0x80 and set +0x92 past 5, then 3 when +0x92 is set, elsewhere 3 when
+/// +0x91 is set; 3 → 4. Event 7 again at frame + 25 in every case.
+pub fn cain_portal_event<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: UnitId) {
+    let Some(i) = ctl.find(CHAIN) else { return };
+    match w.object_mode(object) {
+        1 => w.set_object_mode(object, 2),
+        2 => {
+            if w.unit_level(object) == Some(TOWN) {
+                let x = x4(ctl, i);
+                x.town_portal_count = x.town_portal_count.wrapping_add(1);
+                if x.town_portal_count > 5 {
+                    x.b92 = true;
+                }
+                if x.b92 {
+                    w.set_object_mode(object, 3);
+                }
+            } else if x4(ctl, i).b91 {
+                w.set_object_mode(object, 3);
+            }
+        }
+        3 => w.set_object_mode(object, 4),
+        _ => {}
+    }
+    let at = w.frame() + 25;
+    w.schedule_quest_event(object, at);
+}
+
+/// Wirt's body operate `0x00583E70` (object 268, `OperateFn` 33;
+/// `quests-act1-rest.md` §9 item 11; returns 1 in every case): only in
+/// mode 0; drop code := `leg ` and one drop at the object
+/// (`0x00559A30(game, object, 2, &out, 0, −1, 0)`); no item → nothing
+/// more (the next operate tries again, edge case 9); an item → mode 1,
+/// object event 1 at frame + (`FrameCnt1` >> 8) + 1 and event 7 (the gold
+/// piles, [`wirt_body`]) at frame + 10.
+pub fn wirt_body_operate<W: QuestWorld>(w: &mut W, object: UnitId) {
+    if w.object_mode(object) != 0 {
+        return;
+    }
+    if w.quest_drop(object, *b"leg ", 2, None, false).is_none() {
+        return;
+    }
+    w.set_object_mode(object, 1);
+    let at = w.frame() + (w.object_anim_length(object) >> 8) + 1;
+    w.schedule_object_event(object, 1, at);
+    let at = w.frame() + 10;
+    w.schedule_quest_event(object, at);
 }

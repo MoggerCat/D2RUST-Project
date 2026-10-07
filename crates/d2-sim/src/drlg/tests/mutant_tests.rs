@@ -654,6 +654,27 @@ fn door_unit_at_the_cells_world_tile() {
     assert_eq!(w.types.door_units, [(11, 22)]);
 }
 
+/// `rooms.md` §9.5.1 door records: the flag rules call the door unit
+/// first and the record gets flag 0x20 on the outcomes that set it
+/// (`preset.md` §11: unit added or `roll(3)` = 0), and only then.
+// Covers: specs/drlg/rooms.md §9.5 text; specs/drlg/preset.md §11
+#[test]
+fn door_record_flag_0x20_follows_the_door_unit() {
+    for flag in [false, true] {
+        let mut c = [0; 9];
+        let mut o = [0; 9];
+        c[7] = cell::WALL | key(1, 0);
+        o[7] = 8;
+        let (mut w, mut d, r) = room_with(TileRect::new(10, 20, 2, 2), pass3(c, Some(o), false), 2);
+        w.types.door_flag = flag;
+        let mut svc = w.svc();
+        d.stream_room(&mut svc, r).unwrap();
+        let t = d.room(r).tiles().unwrap();
+        let door = t.walls.iter().find(|x| x.kind == 8).unwrap();
+        assert_eq!(door.flags & rec_flags::DOOR_UNIT != 0, flag);
+    }
+}
+
 /// `rooms.md` §9.5.1 step 2: only keys (30, 0) and (30, 1) are blank;
 /// a (30, 2) floor stays visible.
 #[test]

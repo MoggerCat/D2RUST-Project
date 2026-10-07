@@ -358,12 +358,13 @@ pub(crate) fn curse_unit<W: BodyWorld>(
     {
         return 0;
     }
+    // Step 2: stat1 = −1 goes on with v1 = 0.
     let mut v1 = 0;
     if cx.stats[0] >= 0 {
         v1 = scaled(w, x, cx.stats[0], cx.values[0]);
-    }
-    if v1 == 0 {
-        return 0;
+        if v1 == 0 {
+            return 0;
+        }
     }
     // `0x005C3420(game, unit, U)`.
     if w.unit_type(x) == UnitType::Monster

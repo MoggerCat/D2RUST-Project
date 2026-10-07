@@ -292,7 +292,13 @@ pub struct Room {
     pub walls: Vec<TileRecord>,
     pub floors: Vec<TileRecord>,
     pub shadows: Vec<TileRecord>,
+    /// The room's unit list (active room +0x74), head first. The fill
+    /// sorts it by y in place (§3 r4, `sim/unit-order.md` §5 r7).
     pub units: Vec<RoomUnit>,
+    /// Set by the fill when it sorted `units` (the room passed the room
+    /// test and units were not skipped): the owner writes the order back
+    /// to the client's list, where it persists (`unit-order.md` §5 r7).
+    pub units_sorted: bool,
 }
 
 /// The level fields the passes read.
@@ -600,10 +606,23 @@ pub fn fill(
                 });
             }
         }
-        // r4: the units.
+        // r4: the units, after the in-place Y sort of the room's list
+        // (`0x00619EA0` → `0x0064C0C0`, `sim/unit-order.md` §5 r7: adjacent
+        // swaps while the earlier y is strictly greater, signed, which is
+        // a stable sort by y).
         if skip_units {
             continue;
         }
+        for unit in &room.units {
+            if !positions.contains_key(&unit.key) {
+                return Err(OrderError::NoPosition {
+                    room: ri,
+                    key: unit.key,
+                });
+            }
+        }
+        room.units.sort_by_key(|u| positions[&u.key].y);
+        room.units_sorted = true;
         for (ui, unit) in room.units.iter().enumerate() {
             let at = positions.get(&unit.key).ok_or(OrderError::NoPosition {
                 room: ri,

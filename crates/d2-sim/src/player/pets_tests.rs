@@ -694,20 +694,20 @@ fn dismiss_missing_unit_and_c8_assertion() {
 // Covers: specs/sim/pets.md §8
 #[test]
 fn pet_action_bytes() {
-    // Test vector 4 (add, pet GUID 5, owner 1, class 363, type 4) in the
-    // `server-messages.tsv` layout (pet@5, owner@9; pets.md §8 swaps
-    // them, an open question).
+    // Test vector 4 (add, pet GUID 5, owner 1, class 363, type 4):
+    // owner @5, pet @9 (§8).
     let msg = added(4, 363, 1, 5);
     assert_eq!(
         msg.bytes(),
-        Some([0x7A, 0x01, 0x04, 0x6B, 0x01, 0x05, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00])
+        Some([0x7A, 0x01, 0x04, 0x6B, 0x01, 0x01, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00])
     );
+    // A remove: type, class and owner 0, the GUID @9.
     assert_eq!(
         rm(5).bytes(),
-        Some([0x7A, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0])
+        Some([0x7A, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0])
     );
     // −1 GUID.
-    assert_eq!(rm(-1).bytes().unwrap()[5..9], [0xFF; 4]);
+    assert_eq!(rm(-1).bytes().unwrap()[9..13], [0xFF; 4]);
 }
 
 // Covers: specs/sim/pets.md §8

@@ -25,6 +25,9 @@ pub mod b3_lvl12;
 pub mod b3_lvl18;
 pub mod b3_lvl24;
 pub mod b3_lvl30;
+pub mod b4_helpers;
+pub mod b4_mon;
+pub mod b4_more;
 pub mod dos;
 pub mod dos2;
 pub mod effects;
@@ -43,6 +46,7 @@ mod tests2;
 #[cfg(test)]
 mod tests3;
 
+pub use b4_helpers::{diab_wall_cb, zigzag_cb, zigzag_ring_cb, PathMissile};
 pub use effects::{BodyEffect, PathOp};
 pub use helpers::*;
 pub use helpers2::*;
@@ -55,18 +59,24 @@ use crate::skills::{KickItems, SkillEntry, SkillTables};
 /// `srvst` slots whose body reads and changes nothing ([`start`]).
 pub const PURE_START: &[u16] = &[18];
 /// `srvst` slots with a body over [`BodyWorld`] (`functions.tsv` status
-/// `spec'd-here`: `bodies.md` §3, §7, `bodies-2.md`, `bodies-2b.md`).
+/// `spec'd-here`: `bodies.md` §3, §7, `bodies-2.md`, `bodies-2b.md`,
+/// `bodies-3.md`, `bodies-4.md`).
 pub const START_BODIES: &[u16] = &[
     1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
-    27, 28, 29, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 46, 56, 57, 58, 65,
+    27, 28, 29, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51,
+    52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65,
 ];
 /// `srvdo` slots with a body over [`BodyWorld`] (status `spec'd-here`:
-/// `bodies.md` §4, §8, `bodies-2.md`, `bodies-2b.md`).
+/// `bodies.md` §4, §8, `bodies-2.md`, `bodies-2b.md`, `bodies-3.md`,
+/// `bodies-4.md`).
 pub const DO_BODIES: &[u16] = &[
-    1, 2, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28,
-    29, 30, 31, 32, 33, 34, 35, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 54, 55, 56, 57, 58, 59,
-    60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82,
-    114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 144, 150,
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
+    27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50,
+    51, 52, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75,
+    76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99,
+    100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118,
+    119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137,
+    139, 140, 141, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152,
 ];
 
 /// `srvst[index](game, unit, skill, level)` when the slot's body reads
@@ -110,8 +120,10 @@ pub mod callback {
     pub const CONVERSION: u32 = 0x005D_01A0;
     /// Mind Blast `0x005D7310` (`bodies-2.md` §2.23).
     pub const MIND_BLAST: u32 = 0x005D_7310;
+    /// Pregnant `0x005D21B0` (`bodies-4.md` §3.16).
+    pub const PREGNANT: u32 = 0x005D_21B0;
     /// Every callback id the bodies specify.
-    pub const ALL: [u32; 14] = [
+    pub const ALL: [u32; 15] = [
         DEFAULT,
         SELF_AURA,
         BUFF,
@@ -126,6 +138,7 @@ pub mod callback {
         ATTRACT,
         CONVERSION,
         MIND_BLAST,
+        PREGNANT,
     ];
 }
 
@@ -142,6 +155,12 @@ pub struct BodyStat {
     pub itemevent: [i32; 2],
     /// `itemeventfunc1`, `itemeventfunc2` (i16).
     pub itemeventfunc: [i32; 2],
+    /// `send bits` (+0x08), `send param bits` (+0x09), `signed` (+0x04
+    /// bit 1): read by the unit-state message 0xAA
+    /// (`sim/intents-events.md` §7.9 rule 1.3), not by the bodies.
+    pub send_bits: u8,
+    pub send_param_bits: u8,
+    pub signed: bool,
 }
 
 /// The table data the bodies read beyond [`SkillTables`] and
@@ -155,6 +174,9 @@ pub struct BodyTables {
     pub state_group: Vec<i32>,
     /// States `aura` (+0x10 bit 1) by state.
     pub state_aura: Vec<bool>,
+    /// States `nosend` (+0x10 bit 0) by state (the unit-state message,
+    /// `sim/intents-events.md` §7.9 rule 1.1).
+    pub state_nosend: Vec<bool>,
     /// `overlay.txt` record count.
     pub overlay_count: i32,
     /// `monlvl.txt` rows (`monsters/init.md` §8.1).
@@ -194,10 +216,14 @@ impl BodyTables {
                     maxstat: i16v(r.maxstat),
                     itemevent: [i16v(r.itemevent1), i16v(r.itemevent2)],
                     itemeventfunc: [i16v(r.itemeventfunc1), i16v(r.itemeventfunc2)],
+                    send_bits: r.send_bits,
+                    send_param_bits: r.send_param_bits,
+                    signed: r.signed,
                 })
                 .collect(),
             state_group: states.iter().map(|r| i32::from(r.group as i16)).collect(),
             state_aura: states.iter().map(|r| r.aura).collect(),
+            state_nosend: states.iter().map(|r| r.nosend).collect(),
             overlay_count: i32::try_from(overlay.count).unwrap_or(i32::MAX),
             monlvl: Vec::new(),
             pettype_count: 0,
@@ -306,6 +332,12 @@ pub mod init_cb {
     pub const JITTER: u32 = 0x005C_9290;
     /// `damagepercent(25)` += argument `0x005DB6A0` (`bodies.md` §8.19).
     pub const DAMAGE_PERCENT: u32 = 0x005D_B6A0;
+    /// DiabWall `0x005CD110` (`bodies-3.md` §5.28).
+    pub const DIAB_WALL: u32 = 0x005C_D110;
+    /// Lightning fan `0x005D4680` (`bodies-4.md` §2.4).
+    pub const ZIGZAG: u32 = 0x005D_4680;
+    /// Lightning ring `0x005D40F0` (`bodies-4.md` §2.5).
+    pub const ZIGZAG_RING: u32 = 0x005D_40F0;
 }
 
 /// Message 0xA3 queued by the progressive finisher (§2.14 step 5,
@@ -660,6 +692,118 @@ pub trait BodyWorld: UseWorld + KickItems {
     fn two_melee_weapons(&self, u: Self::Unit) -> bool;
     /// `0x0062A710(unit, W)`: attack frames (AnimData); `None` = fatal.
     fn attack_frames(&self, u: Self::Unit, w: Self::Item) -> Option<i32>;
+
+    // ---- batch 4 (`bodies-3.md`, `bodies-4.md`)
+    /// `0x00621DC0(unit, x, y)`: the 64-step direction from the unit's
+    /// position to (x, y) (`0x0064FDC0`, `sim/pathing.md` §8.3).
+    fn dir64(&self, u: Self::Unit, at: (i32, i32)) -> i32;
+    /// Unit +0x4E (action frame).
+    fn action_frame(&self, u: Self::Unit) -> i32;
+    fn set_action_frame(&mut self, u: Self::Unit, v: i32);
+    /// Unit +0x3C := v (sequence speed, `sim/units.md` §3).
+    fn set_seq_speed(&mut self, u: Self::Unit, v: i32);
+    /// Unit +0x4C (animation speed; set `0x00621780`).
+    fn anim_speed(&self, u: Self::Unit) -> i32;
+    fn set_anim_speed(&mut self, u: Self::Unit, v: i32);
+    /// A missile's total frames (`missiles.md`).
+    fn missile_frames(&self, m: Self::Unit) -> i32;
+    /// A missile's total frames and frames left (`0x0064A2B0`,
+    /// `0x0064A330`).
+    fn set_missile_frames(&mut self, m: Self::Unit, total: i32, left: i32);
+    /// The unit's running sequence (`0x006633B0`): its frame count
+    /// (`0x006633D0`, 8.8); `None` without a sequence.
+    fn sequence_frames(&self, u: Self::Unit) -> Option<i32>;
+    /// `0x006634C0(unit +0x30, f, &e)`: the sequence event at frame `f`
+    /// (8.8).
+    fn sequence_event(&self, u: Self::Unit, f: i32) -> i32;
+    /// The unit's AnimData record (+0x50): frame count (+0x08) and event
+    /// bytes (+0x10 …); `None` without one.
+    fn anim_data(&self, u: Self::Unit) -> Option<(u32, Vec<u8>)>;
+    /// `0x00621920`: an action event (1 or 2) lies in the frames (a, b].
+    fn action_event_between(&self, u: Self::Unit, a: i32, b: i32) -> bool;
+    /// `0x006510C0(class, 0, &v)`: the monstats chain position (+0x4B,
+    /// `data/fixups.md`); 0 for an invalid class.
+    fn chain_position(&self, class: i32) -> i32;
+    /// The books row of an item's spell index (item data +0x3E,
+    /// `0x00627F80` → `0x006374B0`): (`scrollskill`, `bookskill`).
+    fn book_skills(&self, i: Self::Item) -> Option<(i32, i32)>;
+    /// The unit's inventory nodes in list order (first `0x0063B2C0`, next
+    /// `0x0063DFA0`): each node's item (`0x0063DFD0`) and kind
+    /// (`0x0063E020`).
+    fn inventory_nodes(&self, u: Self::Unit) -> Vec<(Self::Item, i32)>;
+    /// The unit find (`0x0065A950` / `0x0065AC70`, default filter;
+    /// `missiles/bodies-2.md` §44) around `at` with radius `r` and flags
+    /// `f` over the neighbourhood of `room`: the found units in order.
+    fn unit_find(&self, room: Self::Room, at: (i32, i32), r: i32, f: u32) -> Vec<Self::Unit>;
+    /// `0x0064CB30(room, x, y, mask)` ≠ 0: the point collides.
+    fn point_collides(&self, room: Self::Room, at: (i32, i32), mask: u32) -> bool;
+    /// A monster creation entry point (`monsters/init.md` §1).
+    fn spawn_monster(&mut self, q: MonsterSpawn<Self::Unit, Self::Room>) -> Option<Self::Unit>;
+    /// `0x00554EA0(game, unit, room, x, y, a, 0)` with its sixth argument
+    /// `a` (`sim/path-placement.md` §10): true when placed.
+    fn place_unit_flag(
+        &mut self,
+        u: Self::Unit,
+        r: Option<Self::Room>,
+        at: (i32, i32),
+        a: i32,
+    ) -> bool;
+    /// Monster data component byte k (+0x04 + k, `monsters/init.md` §10);
+    /// 0 without monster data.
+    fn component(&self, u: Self::Unit, k: usize) -> i32;
+}
+
+/// The monster creation entry points the batch 4 bodies call
+/// (`monsters/init.md` §1 table).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MonsterSpawn<U, R> {
+    /// `0x005B2F20(game, room, x, y, class, mode, spread, flags)`.
+    At {
+        room: R,
+        x: i32,
+        y: i32,
+        class: i32,
+        mode: i32,
+        spread: i32,
+        flags: u32,
+    },
+    /// `0x005B23C0(game, unit, class, mode, spread, flags)`: near the unit.
+    Near {
+        unit: U,
+        class: i32,
+        mode: i32,
+        spread: i32,
+        flags: u32,
+    },
+    /// `0x005B2490(game, unit, class, mode, spread, flags)`: the class
+    /// remapped for the unit's level (`0x0063EC70`), then near the unit.
+    NearLevel {
+        unit: U,
+        class: i32,
+        mode: i32,
+        spread: i32,
+        flags: u32,
+    },
+    /// `0x005B3130(game, room, x, y, class, mode, spread, a, b)`: one
+    /// spawn with owner data (a pattern leader).
+    Leader {
+        room: R,
+        x: i32,
+        y: i32,
+        class: i32,
+        mode: i32,
+        spread: i32,
+    },
+    /// `0x005B31B0(game, leader, x, y, class, mode, spread, 1, 0)`: the
+    /// leader's minion.
+    Minion {
+        leader: U,
+        x: i32,
+        y: i32,
+        class: i32,
+        mode: i32,
+        spread: i32,
+    },
 }
 
 /// `srvst[index](game, unit, skill, level)` for a slot of
@@ -679,6 +823,8 @@ pub fn run_start<W: BodyWorld>(
     use b3_lvl18 as l18;
     use b3_lvl24 as l24;
     use b3_lvl30 as l30;
+    use b4_mon as m4;
+    use b4_more as x4;
     use starts::*;
     use starts2 as s2;
     Some(match index {
@@ -723,10 +869,29 @@ pub fn run_start<W: BodyWorld>(
         39 => l30::berserk(w, t, ct, u, skill, lvl),
         40 => l6::leap_start(w, t, ct, u, skill, lvl),
         41 => l18::leap_attack_start(w, u, skill),
+        42 => m4::fire_hit_start(w, t, ct, u, skill, lvl),
+        43 => m4::maggot_egg_start(w, u),
+        44 => m4::maggot_up(w, u),
+        45 => m4::maggot_down_start(w, u),
         46 => andrial_spray(w, u),
+        47 => m4::jump_start(w, t, ct, u, skill, lvl),
+        48 => m4::swarm_move_start(w, u),
+        49 => m4::nest_start(w, t, ct, u, skill),
+        50 => m4::quick_strike_start(w, t, ct, u),
+        51 => m4::submerge_start(w, u),
+        52 => m4::emerge_start(w, u),
+        53 => m4::mon_inferno_start(w, t, u, skill, lvl, false),
+        54 => m4::diab_run_start(w, u),
+        55 => x4::mosquito_start(w, t, u, skill, lvl),
         56 => s2::feral_rage(w, t, ct, u, skill, lvl),
         57 => l18::rabies_start(w, t, ct, u, skill, lvl),
         58 => l18::fire_claws(w, t, ct, u, skill, lvl),
+        59 => x4::imp_inferno_start(w, t, u, skill, lvl),
+        60 => x4::suck_blood_start(w, t, ct, u, skill, lvl),
+        61 => x4::self_resurrect(w, u),
+        62 => x4::minion_spawner_start(w, t, ct, u, skill),
+        63 => m4::corpse_cycler(w, t, u, skill, lvl),
+        64 => m4::mon_frenzy_start(w, u),
         _ => return None,
     })
 }
@@ -749,11 +914,17 @@ pub fn run_do<W: BodyWorld>(
     use b3_lvl18 as l18;
     use b3_lvl24 as l24;
     use b3_lvl30 as l30;
+    use b4_helpers::throw;
+    use b4_mon as m4;
+    use b4_more as x4;
     use dos::*;
     use dos2 as d2;
     Some(match index {
         1 => attack(w, t, ct, u, skill, lvl),
         2 => melee_state(w, t, ct, u, skill, lvl),
+        3 => throw(w, t, u, skill, lvl, false),
+        4 => m4::unsummon_do(w, u),
+        5 => throw(w, t, u, skill, lvl, true),
         6 => d2::inner_sight(w, t, ct, u, skill, lvl),
         7 => l1::jab(w, t, ct, u, skill, lvl),
         8 => d2::multiple_shot(w, t, u, skill, lvl),
@@ -784,6 +955,12 @@ pub fn run_do<W: BodyWorld>(
         33 => l1::psychic_hammer(w, t, ct, u, skill, lvl),
         34 => d2::charge_hit(w, t, ct, u, skill, lvl),
         35 => d2::claws(w, t, ct, u, skill, lvl),
+        36 => x4::thunder_ring(w, t, u, skill, lvl),
+        37 => x4::lightning(w, t, u, skill, lvl, true),
+        38 => x4::prog_burst(w, t, ct, u, skill, lvl),
+        39 => x4::prog_scatter(w, t, u, skill, lvl),
+        40 => x4::royal_meteor(w, t, u, skill, lvl),
+        41 => x4::royal_shards(w, t, u, skill, lvl),
         42 => l1::dragon_talon(w, t, ct, u, skill, lvl),
         43 => l6::shock_field(w, t, u, skill, lvl),
         44 => l6::blade_sentinel(w, t, ct, u, skill, lvl),
@@ -824,6 +1001,37 @@ pub fn run_do<W: BodyWorld>(
         80 => l30::fist_of_heavens(w, t, u, skill, lvl),
         81 => d2::damage_aura(w, t, ct, u, skill, lvl, true),
         82 => l30::redemption(w, t, ct, u, skill, lvl),
+        83 => m4::fire_hit(w, t, ct, u, skill, lvl),
+        84 => m4::maggot_egg(w, t, ct, u, skill, lvl),
+        85 => m4::family_bolt(w, t, u, skill, lvl),
+        86 => m4::maggot_down(w, t, u, skill, lvl),
+        87 => m4::maggot_lay(w, t, ct, u, skill),
+        88 => m4::andrial_spray(w, t, u, skill, lvl),
+        89 => m4::jump(w, ct, u),
+        90 => m4::swarm_move(w, t, u, skill, lvl),
+        91 => m4::nest(w, t, u, skill),
+        92 => m4::quick_strike(w, t, ct, u, skill, lvl),
+        93 => m4::gargoyle_trap(w, t, u, skill, lvl),
+        94 => m4::submerge(w, u),
+        95 | 152 => m4::mon_inferno(w, t, ct, u, skill, lvl),
+        96 => m4::zakarum_heal(w, t, u, skill, lvl),
+        97 => m4::resurrect(w, t, ct, u, skill),
+        98 => m4::mon_teleport(w, u),
+        99 => m4::prime_poison_nova(w, t, u, skill, lvl),
+        100 => m4::diab_cold(w, t, ct, u, skill, lvl),
+        101 => m4::finger_mage_spider(w, t, u, skill, lvl),
+        102 => m4::diab_wall(w, t, u, skill, lvl),
+        103 => m4::diab_run(w, t, ct, u, skill, lvl),
+        104 => m4::diab_prison(w, t, ct, u, skill),
+        105 => m4::desert_turret(w, t, u, skill, lvl),
+        106 => m4::arcane_tower(w, t, u, skill, lvl),
+        107 => x4::mosquito(w, t, ct, u, skill, lvl),
+        108 => x4::regurgitator_eat(w, t, u, skill, lvl),
+        109 => m4::mon_frenzy(w, t, ct, u, skill, lvl),
+        110 => m4::hireable_missile(w, t, u, skill, lvl),
+        111 => m4::fetish_aura(w, t, ct, u, skill, lvl),
+        112 => x4::mon_curse_cast(w, t, ct, u, lvl),
+        113 => m4::scroll_book(w, u, skill),
         114 => l1::raven(w, t, ct, u, skill, lvl),
         115 => d2::vines(w, t, ct, u, skill, lvl),
         116 => d2::shape_shift(w, t, u, skill, lvl),
@@ -835,8 +1043,31 @@ pub fn run_do<W: BodyWorld>(
         122 => l24::hunger(w, t, ct, u, skill, lvl),
         123 => l24::volcano(w, t, u, skill, lvl),
         124 => d2::armageddon(w, t, u, skill, lvl),
+        125 => x4::wake_of_destruction(w, t, u, skill, lvl),
+        126 => x4::imp_inferno(w, t, ct, u, skill, lvl),
+        127 => x4::suck_blood(w, t, ct, u, skill, lvl),
+        128 => x4::cry_help(w, t, u, skill, lvl),
+        129 => x4::imp_teleport(w, t, ct, u, skill, lvl),
+        130 => x4::vine_attack(w, t, u, skill, lvl),
+        131 => x4::overseer_whip(w, t, ct, u, skill, lvl),
+        132 => x4::imp_fire_missile(w, t, u, skill, lvl),
+        133 => x4::impregnate(w, t, ct, u, skill, lvl),
+        134 => x4::siege_stomp(w, t, ct, u, skill, lvl),
+        135 => x4::minion_spawner(w, t, u, skill),
+        136 => x4::death_maul(w, t, u, skill, lvl),
+        137 => x4::fenris_rage(w, t, ct, u, skill, lvl),
+        139 => x4::baal_cold_missiles(w, t, u, skill, lvl),
+        140 => x4::baal_tentacle(w, ct, u),
+        141 => x4::baal_corpse_explode(w, t, ct, u, skill, lvl),
+        143 => x4::lightning(w, t, u, skill, lvl, false),
         144 => l30::hydra(w, t, ct, u, skill, lvl),
+        145 => x4::hurricane_state(w, t, ct, u, skill, lvl),
+        146 => x4::armageddon_state(w, t, u, skill, lvl),
+        147 => x4::attached_state(w, u),
+        148 => x4::component_missile(w, t, u, skill, lvl, 10),
+        149 => x4::component_missile(w, t, u, skill, lvl, 11),
         150 => l1::smite(w, t, ct, u, skill, lvl),
+        151 => x4::chain_lightning_item(w, t, u, skill, lvl),
         _ => return None,
     })
 }
@@ -865,6 +1096,7 @@ pub(crate) fn do_slot<W: BodyWorld>(
 pub fn remove_callback<W: BodyWorld>(
     w: &mut W,
     t: &SkillTables,
+    ct: &CombatTables,
     u: W::Unit,
     state: i32,
     cb: u32,
@@ -886,6 +1118,7 @@ pub fn remove_callback<W: BodyWorld>(
         callback::CONFUSE | callback::ATTRACT => helpers3::remove_alignment(w, u, state),
         callback::CONVERSION => helpers3::remove_conversion(w, u, state, false),
         callback::MIND_BLAST => helpers3::remove_conversion(w, u, state, true),
+        callback::PREGNANT => b4_more::remove_pregnant(w, t, ct, u, state, l),
         _ => return false,
     }
     true

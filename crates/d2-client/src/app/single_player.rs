@@ -9,9 +9,13 @@
 //! the intents whose handler runs on a real provider (0x49 waypoints). Two
 //! acts are created and one room is streamed in Cold Plains (act 0) and
 //! Lut Gholein (act 1). The local player enters through the session join
-//! (`d2_server::adapters::session::enter_game`, `sim/path-placement.md`
-//! §13): the client receives 0x59, 0x0B, 0x03, 0x07 and 0x15 with the
-//! first tick, then the room switch's 0x07s, and builds its own DRLG.
+//! (`d2_server::adapters::session::{create_game, enter_game}`,
+//! `sim/intents-events.md` §8, `sim/path-placement.md` §13): the client
+//! receives with the first flush 0x01, 0x00, 0x02, the player's 0x59,
+//! 0xAA, 0x76, 0x0B, 0x5F, 0x23 × 2, 0x03, then game entry's 0x07, the
+//! room switch's 0x07s (with the add messages of the rooms' units),
+//! 0x15, 0x7E, and the first tick's 0x04; it builds its own DRLG and is
+//! in game.
 //!
 //! [`GameData::Live`] (with `D2_GAME_DIR`, [`LiveData::load`]) takes
 //! everything from the user's own files: the `levels` and `objects` tables
@@ -35,10 +39,10 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use d2_data::tables::{decode_all, Levels, Objects, Record};
+use d2_data::tables::{decode_all, Levels, Objects, Record, Skills};
 use d2_formats::mpq::ArchiveSet;
 use d2_server::adapters::handlers::world::{ActionWorld, Outbox};
-use d2_server::adapters::session::{enter_game, Entry};
+use d2_server::adapters::session::{create_game, enter_game, Entry, GameSetup};
 use d2_server::adapters::{PlayerData, PlayerFields, ProtoSizes, SimGame};
 use d2_server::host::Host;
 use d2_server::host::SystemClock;
@@ -58,7 +62,6 @@ use d2_sim::skills::SkillTables;
 use d2_sim::stats::StatData;
 use d2_sim::units::hooks::UnitData;
 use d2_sim::units::lifecycle::AllocRequest;
-use d2_sim::units::lists::client_state;
 use d2_sim::units::{RoomId, UnitId, UnitType};
 use d2_sim::wiring::action::{ActionHooks, ActionSim, ActionTables, DrlgWorld, Pending};
 use d2_sim::wiring::worldgen::levels::{SharedTypes, WorldTypes};
@@ -70,7 +73,7 @@ use d2_sim::drlg::preset::{Ds1Input, Ds1Source};
 use super::server_thread::{ThreadLink, ThreadStopped};
 use crate::bridge::drlg::DrlgSource;
 use crate::bridge::local::{LocalLink, PendingSession};
-use crate::bridge::world::LevelRow;
+use crate::bridge::world::{LevelRow, SkillRow};
 use crate::bridge::LOCAL_CLIENT;
 
 /// The game's dispatch and world host.
@@ -95,6 +98,16 @@ pub const UNIT_Y: i32 = 20;
 pub const PLAYER_CLASS: u32 = 1;
 /// The character's name (0x59 bytes 6..22, zero-padded).
 pub const PLAYER_NAME: &[u8] = b"Sorceress";
+
+/// The app's game (S→C 0x01, `intents-events.md` §8.1 rule 3): Normal,
+/// expansion, not ladder, the arena flags of every recorded join
+/// (0x00100004; the arena record is not modelled).
+pub const GAME_SETUP: GameSetup = GameSetup {
+    difficulty: 0,
+    arena_flags: 0x0010_0004,
+    expansion: true,
+    ladder: false,
+};
 
 /// Errors building the game.
 #[derive(Debug, thiserror::Error)]
@@ -212,6 +225,8 @@ fn tile(o: u32, main: u32, sub: u32, rarity: u32) -> TileInfo {
         rarity,
         material: 0,
         subtile_flags: [0; 25],
+        roof_height: 0,
+        height: 0,
     }
 }
 
@@ -496,18 +511,40 @@ pub fn client_drlg_source(data: &GameData) -> DrlgSource {
 }
 
 /// The `Levels.txt` fields the client reads (`client/model.md` §11
-/// rules 3–4: `Act`, `BlankScreen`; `audio/environment.md` §1 r2:
+/// rules 3–4: `Pal`, `Act`, `BlankScreen`; `audio/environment.md` §1 r2:
 /// `SoundEnv`), one row per level id, from the game's `levels` table.
 pub fn client_level_rows(data: &GameData) -> Vec<LevelRow> {
     data.tables()
         .levels
         .iter()
         .map(|l| LevelRow {
+            pal: l.pal,
             act: l.act,
             blank_screen: l.blankscreen != 0,
             sound_env: l.soundenv,
+            draw_edges: l.drawedges != 0,
         })
         .collect()
+}
+
+/// The `skills` fields the client skill list reads (`client/msg-skills.md`
+/// Inputs: `anim`, `monanim`, `passivestate`; `skills/levels.md` §6:
+/// `maxlvl`), one row per skill id, from the user's `skills` table.
+pub fn client_skill_rows(archives: &ArchiveSet) -> Result<Vec<SkillRow>, BuildError> {
+    let set = d2_data::bin::load(archives, "eng").map_err(|e| BuildError::Tables(e.to_string()))?;
+    let table = set
+        .table("skills")
+        .ok_or_else(|| BuildError::Tables("skills not loaded".to_owned()))?;
+    let rows: Vec<Skills> = decode_all(table).map_err(|e| BuildError::Tables(e.to_string()))?;
+    Ok(rows
+        .iter()
+        .map(|s| SkillRow {
+            anim: s.anim,
+            monanim: s.monanim,
+            passivestate: s.passivestate,
+            maxlvl: s.maxlvl,
+        })
+        .collect())
 }
 
 /// A built game and the units the app and tests address.
@@ -661,21 +698,20 @@ pub fn build(data: &GameData, seed: u32) -> Result<LocalGame, BuildError> {
         .guid;
     let mut s: Sim = SimGame::with_events(game, sim);
     s.world.waypoints = Some(WaypointData::new(&wp_tables.levels, &wp_tables.objects));
-    // No room yet: the first tick's client update sees the player's room
-    // differ and runs the room switch (`rooms.md` §4.1), which registers
-    // the client with the DRLG and reveals the rooms around the player.
-    // A client joined with its room already set skips it, and the room
-    // inactivity of tick step 9 then frees the player's room under the
-    // player (`rooms.md` §7.2, §8).
-    //
-    // TODO(spec: tick.md §6 rule 4): a joining client is in state 3 until
-    // its room is ready (`0x0061A460`, unspecified), then gets 0x04; the
-    // client joins in state 4 here, so no 0x04 is sent.
-    s.join(LOCAL_CLIENT, Some(player), None, client_state::IN_GAME)
+    // The client record as its allocation leaves it (no room, state 0),
+    // then the session sequence (`intents-events.md` §8): game creation
+    // (0x01, 0x00, 0x02; state 1) and the join (the player's add
+    // messages, 0x0B, …, 0x03, game entry with its room switch; state 3).
+    // The first tick then populates the town's rooms, the client's room is
+    // ready and the client pass sends 0x04 (`tick.md` §6 rule 6): the
+    // client is in game.
+    s.join(LOCAL_CLIENT, Some(player), None, 0)
         .map_err(|e| BuildError::Setup(e.to_string()))?;
+    create_game(&mut s, LOCAL_CLIENT, &GAME_SETUP)
+        .map_err(|e| BuildError::Setup(format!("game creation: {e}")))?;
     let mut name = [0u8; 16];
     name[..PLAYER_NAME.len()].copy_from_slice(PLAYER_NAME);
-    enter_game(&mut s, LOCAL_CLIENT, &Entry { act: 0, name })
+    enter_game(&mut s, LOCAL_CLIENT, &Entry::new(0, name))
         .map_err(|e| BuildError::Setup(format!("game entry: {e}")))?;
     s.set_player(
         player,

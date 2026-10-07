@@ -1,4 +1,5 @@
 // Spec: specs/world/quests-act2.md §4 (A2Q2 The Horadric Staff, chain 9, slot 10)
+// Spec: specs/world/quests-act2-2.md §1 items 13, 14, 20
 //! A2Q2 callback by callback: Cain's text selector (§4.3), chat and the
 //! active function (§4.4), Cain's messages (§4.5), the status function
 //! (§4.6), the three quest chests (§4.7, the §1.3 pattern), pick-up and
@@ -299,21 +300,27 @@ fn chest<W: QuestWorld>(
     if !w.quest_chest_gate(object, player) {
         return 0;
     }
-    // "for each player, starting at the operating player": the count does
-    // not depend on the order.
-    let mut n = 0;
-    for p in w.players() {
-        let f = pf(w, p);
-        if qualifies(w, p, &f) {
-            n += 1;
+    // The drop code is stored once, before the count (`quests-act2-2.md`
+    // §1 item 20); `0x00559A30` reads it for every item.
+    w.set_drop_code(object, code);
+    // Without chain 9 the count and the items are skipped; treasure and
+    // gold still drop (§1 item 20).
+    if ctl.find(CHAIN).is_some() {
+        // "for each player, starting at the operating player": the count
+        // does not depend on the order.
+        let mut n = 0;
+        for p in w.players() {
+            let f = pf(w, p);
+            if qualifies(w, p, &f) {
+                n += 1;
+            }
         }
-    }
-    // TODO(quests-act2 §1.3): the drop code is set even when no item is
-    // made; the `quest_drop` seam sets it per item only (open question).
-    for _ in 0..n {
-        // The level variable is not named by the spec (`None`).
-        if let Some(item) = w.quest_drop(object, code, quality, None, true) {
-            per_item(ctl, w, item);
+        for _ in 0..n {
+            // `&level` is an out parameter: `0x00559A30` computes the
+            // item level itself (the chest's area level, §1 item 20).
+            if let Some(item) = w.quest_drop(object, code, quality, None, true) {
+                per_item(ctl, w, item);
+            }
         }
     }
     w.object_treasure(object, 4);
@@ -407,10 +414,11 @@ fn pick_up<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, args: Eve
         Some(AMULET | CUBE | STAFF) => Some(if read { 2 } else { 6 }),
         _ => return,
     };
+    // `tr1 ` with 10.3 set: flags := 0 only, no status and no 0x5D
+    // (`quests-act2-2.md` §1 item 13).
+    let Some(s) = status else { return };
     // Edge case 3: the record's status byte, shared by all players.
-    if let Some(s) = status {
-        ctl.records[i].status = s;
-    }
+    ctl.records[i].status = s;
     status_iterate(ctl, w, i, p);
 }
 
@@ -451,7 +459,8 @@ pub fn staff_assembled<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, player:
 // ------------------------------------------------------------ §4.10
 
 /// Adds the player's held `msf`, `vip`, `box`, `hst` to the counts
-/// (events 13 and 14).
+/// (events 13 and 14): one per code at most (`0x00558110` returns the
+/// first match, `quests-act2-2.md` §1 item 14).
 fn count_held<W: QuestWorld>(ctl: &mut QuestControl, w: &W, i: usize, p: UnitId) {
     let held = |c| i32::from(w.has_item(p, c));
     let x = &mut ctl.records[i].extra.a2.q2;

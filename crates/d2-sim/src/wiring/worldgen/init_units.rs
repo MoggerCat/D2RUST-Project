@@ -1,4 +1,4 @@
-// Spec: specs/monsters/init.md §5, §6, §10, §16, §17.3, §18 (the InitHost seam); specs/sim/stat-lists.md §8; specs/monsters/ai.md §3.3; specs/monsters/population.md §2.5, §6.3 step 5; specs/data/runtime-maps.md §2
+// Spec: specs/monsters/init.md §5, §6, §10, §16, §17.3, §18 (the InitHost seam); specs/monsters/umod-callbacks.md (the callback seams); specs/sim/stat-lists.md §8; specs/monsters/ai.md §3.3; specs/monsters/population.md §2.5, §6.3 step 5; specs/data/runtime-maps.md §2
 //! Init → units, stats, AI and population: [`InitHost`] on
 //! [`WorldHost`]. Unit records and base stats (layer 0) are the action
 //! systems' ([`crate::units::record::Units`], [`crate::stats::StatLists`]);
@@ -238,5 +238,137 @@ impl<X: WorldPending> InitHost for WorldHost<'_, X> {
     /// State toggle (`stat-lists.md` §9.2).
     fn set_state(&mut self, unit: UnitId, state: u16) {
         self.v.set_state(unit, state, true);
+    }
+
+    // ---- umod callbacks (`umod-callbacks.md`; bodies in `umod_host.rs`)
+
+    fn stat_total(&self, unit: UnitId, stat: u16) -> i32 {
+        self.v.stat(unit, stat)
+    }
+    fn set_base_list_stat(&mut self, unit: UnitId, stat: u16, value: i32) {
+        self.umod_set_base_list(unit, stat, value);
+    }
+    fn position(&self, unit: UnitId) -> (i32, i32) {
+        self.v.h.path_position(unit)
+    }
+    fn has_state(&self, unit: UnitId, state: u16) -> bool {
+        self.v.stats.has_state(unit, u32::from(state))
+    }
+    fn has_state_in_group(&self, unit: UnitId, group: u8) -> bool {
+        self.v.stats.has_group(unit, usize::from(group))
+    }
+    fn set_mode(&mut self, unit: UnitId, mode: u32) {
+        self.umod_set_mode(unit, mode);
+    }
+    fn owner(&self, unit: UnitId) -> Option<UnitId> {
+        self.umod_owner(unit)
+    }
+    /// The wired world's minion owner link ([`super::WorldState::owners`]).
+    fn minion_owner(&mut self, unit: UnitId) -> Option<UnitId> {
+        self.w.owners.get(&unit).copied()
+    }
+    fn alignment(&self, unit: UnitId) -> u8 {
+        self.v.h.x.alignment(unit)
+    }
+    fn hostile(&self, a: UnitId, b: UnitId) -> bool {
+        self.v.h.x.may_attack(a, b)
+    }
+    fn target(&self, unit: UnitId) -> Option<UnitId> {
+        self.v.h.x.umod_target(unit)
+    }
+    fn target_position(&self, unit: UnitId) -> Option<(i32, i32)> {
+        self.v.h.x.umod_target_position(unit)
+    }
+    fn path_target_point(&self, missile: UnitId) -> (i32, i32) {
+        self.v.h.x.path_target_point(missile)
+    }
+    fn create_missile(
+        &mut self,
+        req: crate::skills::use_::bodies::MissileRequest<UnitId>,
+    ) -> Option<UnitId> {
+        self.umod_create_missile(req)
+    }
+    fn missile_row_flags(&self, class: i32) -> Option<u32> {
+        self.umod_missile_flags(class)
+    }
+    fn missile_velocity(&self, class: i32, level: i32) -> i32 {
+        self.umod_missile_velocity(class, level)
+    }
+    fn missile_skill_level(&self, missile: UnitId) -> (i32, i32) {
+        self.umod_missile_skill_level(missile)
+    }
+    fn find_units(&mut self, near: UnitId, q: init::find::FindQuery) -> Vec<UnitId> {
+        self.umod_find_units(near, q)
+    }
+    fn line_clear(&mut self, from: (i32, i32), unit: UnitId) -> bool {
+        self.umod_line_clear(from, unit)
+    }
+    fn missile_hit(&mut self, src: UnitId, unit: UnitId, rec: &crate::combat::DamageRecord) {
+        self.umod_missile_hit(src, unit, rec);
+    }
+    fn skill_calc(
+        &mut self,
+        unit: UnitId,
+        skill: u16,
+        calc: init::callbacks::SkillCalc,
+        level: i32,
+    ) -> i32 {
+        self.umod_skill_calc(unit, skill, calc, level)
+    }
+    fn aura_fields(&self, skill: u16) -> Option<init::callbacks::AuraFields> {
+        self.umod_aura_fields(skill)
+    }
+    fn stat_and_state_counts(&self) -> (i32, i32) {
+        self.umod_counts()
+    }
+    fn apply_state(&mut self, req: init::callbacks::StateApply) -> Option<crate::stats::ListId> {
+        self.v.h.x.umod_apply_state(req)
+    }
+    fn set_list_stat(&mut self, list: crate::stats::ListId, stat: u16, value: i32) {
+        self.v.set_list_stat(list, stat, value);
+    }
+    /// `0x0058F160`: the unit's minion list in the wired world.
+    fn free_minions(&mut self, unit: UnitId) {
+        self.w.minions.remove(&unit);
+    }
+    fn clear_owner_data(&mut self, unit: UnitId) {
+        self.umod_clear_owner_data(unit);
+    }
+    fn remove_pet(&mut self, owner: UnitId, pet: UnitId) {
+        self.v.h.x.remove_pet(owner, pet);
+    }
+    fn quest_death(&mut self, unit: UnitId, call: u32) {
+        self.v.h.x.quest_death(unit, call);
+    }
+    fn steal_belt_item(&mut self, unit: UnitId, target: UnitId) {
+        self.v.h.x.steal_belt_item(unit, target);
+    }
+    fn spawn_near(&mut self, unit: UnitId, class: u32, mode: u32, spread: i32, flags: u32) {
+        self.v.h.x.spawn_near(unit, class, mode, spread, flags);
+    }
+    fn footprint_occupied(&mut self, unit: UnitId) -> bool {
+        self.umod_footprint_occupied(unit)
+    }
+    fn ai_param0(&mut self, unit: UnitId) -> i32 {
+        self.v.h.x.ai_param0(unit)
+    }
+    fn set_ai_param0(&mut self, unit: UnitId, v: i32) {
+        self.v.h.x.set_ai_param0(unit, v);
+    }
+    fn can_raise(&mut self, unit: UnitId) -> bool {
+        self.v.h.x.can_raise(unit)
+    }
+    fn ai_use_skill(&mut self, unit: UnitId, mode: u32, skill: u16) {
+        self.v.h.x.ai_use_skill(unit, mode, skill);
+    }
+    fn skill_level(&mut self, unit: UnitId, skill: u16) -> Option<i32> {
+        self.v.h.x.skill_level(unit, skill)
+    }
+    /// `0x00621F20` as the AI reads it ([`crate::monsters::ai::AiUnits`]).
+    fn life_percent(&self, unit: UnitId) -> i32 {
+        crate::monsters::ai::AiUnits::life_percent(&self.v, unit)
+    }
+    fn room_area_level(&mut self, unit: UnitId) -> Option<i32> {
+        self.umod_room_area_level(unit)
     }
 }

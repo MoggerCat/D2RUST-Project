@@ -10,8 +10,10 @@
 //! Item records stay opaque byte entries: their length comes from the item
 //! bit stream reader (`items/bitstream.md`) through [`SaveTables`].
 //!
-//! Status: implemented from a draft spec, unverified against 1.14d saves
-//! (spec Open question 3; local run queue).
+//! Status: implemented from a draft spec; the layout matches 13 real
+//! 1.14d saves and game re-saves of generated files (spec §1 rule 7,
+//! Open question 3, C66). The load effects are `formats/d2s-load.md`
+//! (`d2-server` character storage).
 
 #[cfg(test)]
 mod tests;
@@ -65,6 +67,24 @@ pub mod status {
     pub fn progression(s: u16) -> u8 {
         ((s >> 8) & 0x1F) as u8
     }
+}
+
+/// Item flag 0x2000 (instore): cleared on every item a load creates
+/// (§8.2 rule 7, edge case 17).
+pub const ITEM_FLAG_INSTORE: u32 = 0x2000;
+/// Item flag 0x80000: set on every item a load creates, cleared by the
+/// writer (§8.2 rule 7; `items/bitstream.md` §2 rule 1).
+pub const ITEM_FLAG_LOADED: u32 = 0x80000;
+/// Item header bit 0x2000000 (alt code): dropped from the stored flags
+/// by the record decode (§8.2 rule 7, `0x0062E430`).
+pub const ITEM_FLAG_ALT_CODE: u32 = 0x200_0000;
+
+/// The flags an item created from a save record carries (§8.2 rule 7):
+/// the stored flags without 0x80000 and the alt-code bit (the decode
+/// `0x0062E430`), then 0x80000 set and 0x2000 cleared (`0x00558CB0`,
+/// `0x00558D37`–`0x00558D4C`).
+pub fn item_flags_on_load(stored: u32) -> u32 {
+    ((stored & !(ITEM_FLAG_LOADED | ITEM_FLAG_ALT_CODE)) | ITEM_FLAG_LOADED) & !ITEM_FLAG_INSTORE
 }
 
 /// The 16 appearance bytes of a new character (§2.6, table `0x0070CCC8`).
@@ -300,6 +320,15 @@ fn arr<const N: usize>(b: &[u8], at: usize) -> [u8; N] {
 }
 
 impl Header {
+    /// The writer's pre-fill of the 32 appearance bytes +0x88..+0xA7
+    /// (§2.8 rule 1): all 0xFF. The writer then lets each equipped item
+    /// (mode 1) change its bytes; with no equipped item this is the saved
+    /// value (§2.8 rule 2). The per-item mapping is Open question 17.
+    pub fn reset_appearance(&mut self) {
+        self.components = [0xFF; 16];
+        self.colours = [0xFF; 16];
+    }
+
     /// The name bytes before the first NUL, at most 15 (§2.2 rule 4).
     pub fn name_bytes(&self) -> &[u8] {
         let n = self.name[..15].iter().position(|&c| c == 0).unwrap_or(15);
@@ -542,6 +571,19 @@ impl Default for Npcs {
     }
 }
 
+impl Npcs {
+    /// Field A setter `0x00572360(player, game, NPC class)` (§6 rule 3):
+    /// in difficulty `d`'s field A, the bit of the first rule 2 pair whose
+    /// class id matches (bit 0 when none matches): [`npc_bit`]. `None`:
+    /// difficulty out of range.
+    pub fn set_intro_a(&mut self, d: usize, class_id: i32) -> Option<()> {
+        let n = npc_bit(class_id);
+        let f = self.a.get_mut(d)?;
+        f[usize::from(n >> 3)] |= 1 << (n & 7);
+        Some(())
+    }
+}
+
 /// NPC class id → bit, table `0x00732738` (§6 rule 2); 0 when absent.
 pub fn npc_bit(class_id: i32) -> u8 {
     const RANGES: [(i32, i32, u8); 18] = [
@@ -629,6 +671,25 @@ pub struct StatSave {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ItemEntry {
     pub bytes: Vec<u8>,
+}
+
+impl ItemEntry {
+    /// The stored flags of the record starting at byte `at` of the entry
+    /// (the u32 after the `JM` marker: bits 16–47 of the record, so byte
+    /// aligned, `items/bitstream.md` §2 rules 2–3). `None`: no `JM`
+    /// marker there.
+    pub fn record_flags(&self, at: usize) -> Option<u32> {
+        let b = self.bytes.get(at..at + 6)?;
+        (u16_at(b, 0) == ITEMS_MAGIC).then(|| u32_at(b, 2))
+    }
+
+    /// Stores `flags` in the record starting at byte `at`. `None`: no
+    /// `JM` marker there.
+    pub fn set_record_flags(&mut self, at: usize, flags: u32) -> Option<()> {
+        self.record_flags(at)?;
+        self.bytes[at + 2..at + 6].copy_from_slice(&flags.to_le_bytes());
+        Some(())
+    }
 }
 
 /// Corpse (§8.3 rule 2).

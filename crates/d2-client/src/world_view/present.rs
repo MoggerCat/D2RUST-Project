@@ -1,4 +1,4 @@
-// Spec: specs/client/render-pipeline.md (A1 stages 4–5, A9 presentation), specs/client/ui.md (A4), specs/render/camera.md (§3, §9), specs/render/composition.md (§3)
+// Spec: specs/client/render-pipeline.md (A1 stages 4–5, A9 presentation), specs/client/ui.md (A4), specs/render/camera.md (§3, §9), specs/render/composition.md (§3), specs/client/bridge.md (§10 rules 4–5)
 //! Bevy edge of the world view: after the bridge frame (`PreUpdate`,
 //! `bridge.md` §8), one `Update` system runs UI → [`super::build_frame`]
 //! (the frame's camera from the [`super::ViewFeed`], then the original's
@@ -23,6 +23,11 @@
 //! frame that would build before that waits, like one whose bridge frame
 //! ran no tick).
 //!
+//! The bridge frame's UI and sound outputs (`bridge.md` §10) are applied
+//! by [`deliver_outputs`] right after the bridge frame, before the input
+//! and UI systems: UI outputs by the original UI, sound outputs (and the
+//! sounds the UI makes for them) appended to [`UiSounds`] in list order.
+//!
 //! Inert until the app inserts [`crate::bridge::BridgeResource`] and
 //! [`WorldViewState`]: nothing here builds a server or chooses rules.
 //! Errors go to Bevy's error handler; there is no fallback from a failed
@@ -38,7 +43,10 @@ use bevy::render::view::Msaa;
 use bevy::window::PrimaryWindow;
 use std::sync::Arc;
 
-use crate::bridge::BridgeResource;
+use crate::audio::driver::SoundRequest;
+use crate::bridge::mirror::bridge_frame;
+use crate::bridge::output::{dispatch, Output};
+use crate::bridge::{BridgeResource, FrameOutputs};
 use crate::controls::Bindings;
 use crate::frames::atlas::AtlasPage;
 use crate::ui::original::OriginalUi;
@@ -142,11 +150,13 @@ impl WorldViewUi {
     }
 }
 
-/// Sound requests (`sounds.txt` ids, no unit, delay 0) the UI made, in
-/// order, for the audio frame (`audio/triggers.md` §11: UI sounds). The
-/// world view appends; the audio side drains.
+/// Sound requests for the audio frame, in order: the bridge outputs'
+/// (S→C 0x2C server sounds, the sounds of the UI dispatch of 0x5D /
+/// 0x77; `client/bridge.md` §10) and the UI's own (`audio/triggers.md`
+/// §11). The output dispatcher and the world view append; the audio side
+/// drains.
 #[derive(Resource, Debug, Default, Clone, PartialEq, Eq)]
-pub struct UiSounds(pub Vec<i32>);
+pub struct UiSounds(pub Vec<SoundRequest>);
 
 /// The GPU path's main-world half: the atlas of the frame store, and the
 /// pages last handed to the node (replaced only when frames were added). The compute compositor itself runs in the render
@@ -206,14 +216,80 @@ struct GpuWanted(bool);
 impl Plugin for WorldViewPlugin {
     fn build(&self, app: &mut App) {
         let node = self.gpu && add_node(app);
-        app.insert_resource(GpuWanted(node)).add_systems(
-            Update,
-            (init_gpu, ui_input, world_view_frame, present_scale)
-                .chain()
-                .run_if(resource_exists::<BridgeResource>)
-                .run_if(resource_exists::<WorldViewState>),
-        );
+        app.insert_resource(GpuWanted(node))
+            .init_resource::<UiSounds>()
+            .add_systems(
+                PreUpdate,
+                deliver_outputs
+                    .after(bridge_frame)
+                    .run_if(resource_exists::<BridgeResource>),
+            )
+            .add_systems(
+                Update,
+                (init_gpu, ui_input, world_view_frame, present_scale)
+                    .chain()
+                    .run_if(resource_exists::<BridgeResource>)
+                    .run_if(resource_exists::<WorldViewState>),
+            );
     }
+}
+
+/// What the output dispatcher could not apply.
+#[derive(Debug, thiserror::Error)]
+pub enum DeliverError {
+    #[error(transparent)]
+    Ui(#[from] crate::ui::original::OriginalUiError),
+}
+
+/// The output dispatcher (`client/bridge.md` §10 rules 4–5): the last
+/// bridge frame's outputs in list order, UI outputs to the original UI
+/// (its sounds appended at once, so the request order is the call order),
+/// sound outputs to [`UiSounds`]. Without the original UI the UI outputs
+/// have no consumer and are dropped with a log line.
+pub fn deliver_outputs(
+    bridge: Res<BridgeResource>,
+    outputs: Option<ResMut<FrameOutputs>>,
+    ui: Option<NonSendMut<WorldViewUi>>,
+    sounds: Option<ResMut<UiSounds>>,
+) -> Result {
+    let Some(mut outputs) = outputs else {
+        return Ok(());
+    };
+    let list = std::mem::take(&mut outputs.0);
+    if list.is_empty() {
+        return Ok(());
+    }
+    let world = bridge.0.world();
+    let mut original = ui.map(|u| u.into_inner()).and_then(|u| u.original.as_mut());
+    let requests = std::cell::RefCell::new(Vec::new());
+    dispatch::<DeliverError>(
+        &list,
+        &mut |o| {
+            match original.as_deref_mut() {
+                Some(ui) => {
+                    ui.apply_output(o, world)?;
+                    requests.borrow_mut().extend(ui.take_sounds());
+                    for s in ui.take_skipped() {
+                        debug!("ui output {o:?}: skipped {s}");
+                    }
+                }
+                None => debug!("ui output {o:?}: no original UI"),
+            }
+            Ok(())
+        },
+        &mut |o| {
+            if let Output::ServerSound { unit, class, event } = *o {
+                requests
+                    .borrow_mut()
+                    .push(SoundRequest::Server { unit, class, event });
+            }
+            Ok(())
+        },
+    )?;
+    if let Some(mut s) = sounds {
+        s.0.extend(requests.into_inner());
+    }
+    Ok(())
 }
 
 /// Creates the GPU path once, when the node exists.
@@ -361,6 +437,11 @@ fn world_view_frame(
         state.feed.as_mut(),
         &state.assets,
     )?;
+    // `sim/unit-order.md` §5 rule 7: the fill's Y sort persists in the
+    // client's room lists.
+    for (room, order) in state.feed.take_unit_orders() {
+        bridge.0.set_room_order(room, &order);
+    }
     let blank_screen = state.feed.blank_screen(bridge.0.world())?;
     let use_gpu = gpu.is_some();
     let bridge_frame = bridge.0.world().frames;

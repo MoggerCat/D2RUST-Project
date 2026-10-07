@@ -136,7 +136,7 @@ impl Gen<'_> {
     /// grid shuffled, one `roll(n)` per tried entry, fit test m 0 flags
     /// 15, stamp F −1; `max` = 0 means no limit.
     pub fn random_presets(&mut self, lo: u32, hi: u32, max: i32) -> Result<(), OutdoorError> {
-        let n = (hi - lo + 1) as i32;
+        let n = hi as i32 - lo as i32 + 1;
         let (gw, gh) = (self.gw(), self.gh());
         // A = gw·gh = 0 → nothing (shuffle_cells returns no entries).
         let cells = shuffle_cells(self.seed(), gw, gh);

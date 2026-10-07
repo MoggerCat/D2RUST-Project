@@ -553,3 +553,33 @@ fn client_copy_frees_tiles_on_status_4() {
     assert!(d.room(r[1]).active().is_none());
     assert_eq!(d.freed_rooms, 2);
 }
+
+// Covers: specs/drlg/rooms.md §9.3 text
+#[test]
+fn entry_identity_carries_roof_height_and_height() {
+    // OQ 17 vector: a DT1 with 3 tiles whose tile 2 has key (1, 0, 0),
+    // roof height 0, height −80, loaded into slot 0 → the lookup for
+    // (1, 0, 0) returns (slot 0's path, index 2), and the record reads
+    // roof height 0, height −80 from it.
+    let (mut w, mut d, r) = one_room(RoomGrids::default(), 2);
+    w.data.lvltypes[1][0] = b"three.dt1".to_vec();
+    let mut t2 = tile(1, 0, 0, 1);
+    t2.roof_height = 0;
+    t2.height = -80;
+    let mut t0 = tile(0, 5, 0, 1);
+    t0.roof_height = 0x30;
+    w.tiles
+        .0
+        .insert(b"three.dt1".to_vec(), vec![t0, tile(0, 6, 0, 1), t2]);
+    d.room_mut(r).dt1_mask = 0b1;
+    let mut svc = w.svc();
+    d.stream_room(&mut svc, r).unwrap();
+    let e = d.lookup_tiles(r, 1, 0, 0);
+    assert_eq!(e.len(), 1);
+    assert_eq!(e[0].index, 2);
+    assert_eq!(d.dt1_path(e[0]), b"three.dt1");
+    let info = d.tile_info(e[0]);
+    assert_eq!((info.roof_height, info.height), (0, -80));
+    let first = d.lookup_tiles(r, 0, 5, 0);
+    assert_eq!(d.tile_info(first[0]).roof_height, 0x30);
+}

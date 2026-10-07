@@ -231,6 +231,35 @@ fn a_killing_missile_runs_the_kill_and_gives_experience() {
     fx.assert_clean();
 }
 
+/// `hirelings.md` §8 rule 1: the kill (flag 1) queues the killed monster
+/// for the hireling host (`ActionHooks::pet_deaths`), before the pet
+/// credit seam; a guarded kill queues nothing; without the queue nothing
+/// is recorded.
+// Covers: specs/world/hirelings.md §8 r1
+#[test]
+fn the_kill_queues_the_defender_for_the_hireling_host() {
+    let mut fx = Fx::new();
+    let (p, m) = kill_setup(&mut fx);
+    fx.sim.combat(&mut fx.game, |w, _| {
+        crate::wiring::action::reaction::kill(w, m, p);
+    });
+    assert_eq!(fx.sim.hooks().pet_deaths, None);
+
+    let mut fx = Fx::new();
+    let (p, m) = kill_setup(&mut fx);
+    fx.sim.hooks().pet_deaths = Some(Vec::new());
+    fx.sim.sys.units.get_mut(m).unwrap().mode = monster_mode::DD;
+    fx.sim.combat(&mut fx.game, |w, _| {
+        crate::wiring::action::reaction::kill(w, m, p);
+    });
+    assert_eq!(fx.sim.hooks().pet_deaths, Some(vec![]));
+    fx.sim.sys.units.get_mut(m).unwrap().mode = 1;
+    fx.sim.combat(&mut fx.game, |w, _| {
+        crate::wiring::action::reaction::kill(w, m, p);
+    });
+    assert_eq!(fx.sim.hooks().pet_deaths, Some(vec![m]));
+}
+
 /// A dead monster is not killed again (§7.2 guard), and an uninterruptible
 /// defender only gets `death_delay` (§7.1).
 #[test]

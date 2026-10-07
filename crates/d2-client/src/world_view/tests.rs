@@ -1055,3 +1055,66 @@ fn build_frame_lights_units_through_the_feeds_light() {
     }
     assert!(units > 0);
 }
+
+// Covers: specs/client/bridge.md §10 r4, §10 r5; specs/client/msg-ui.md §3 r2
+#[test]
+fn outputs_reach_the_ui_and_the_sound_requests_in_order() {
+    use crate::audio::driver::SoundRequest;
+    use crate::bridge::BridgePlugin;
+    use crate::ui::layout::Screen;
+    use crate::ui::original::{OriginalUi, UiConfig};
+    let link = RecordingLink::default();
+    // Object 13, a 0x5D whose UI row is sound 7, a 0x2C on the object,
+    // then the stash (0x77 0x10).
+    let chunk: Vec<u8> = [
+        "51 02 0d 00 00 00 25 00 14 12 c0 11 02 00",
+        "5d 08 02 00 00 00",
+        "2c 02 0d 00 00 00 0d 00",
+        "77 10",
+    ]
+    .iter()
+    .flat_map(|m| {
+        m.split_whitespace()
+            .map(|b| u8::from_str_radix(b, 16).unwrap())
+    })
+    .collect();
+    link.deliveries.lock().unwrap().push(chunk);
+    let bridge = Bridge::new(Box::new(link) as _).unwrap();
+    let mut app = App::new();
+    app.add_plugins((MinimalPlugins, AssetPlugin::default()))
+        .init_asset::<Image>()
+        .add_plugins((BridgePlugin, WorldViewPlugin { gpu: false }))
+        .insert_resource(BridgeResource(bridge));
+    let mut root = UiRoot::new(Box::new(NoPanelRules));
+    let original = OriginalUi::new(
+        UiConfig {
+            screen: Screen::R800,
+            expansion_installed: false,
+        },
+        None,
+    )
+    .unwrap();
+    original.install(&mut root).unwrap();
+    let mut ui = WorldViewUi::new(root, Box::new(NoStrings));
+    ui.original = Some(original);
+    app.insert_non_send(ui);
+    app.update();
+    assert_eq!(
+        app.world().resource::<UiSounds>().0,
+        [
+            SoundRequest::Ui(7),
+            SoundRequest::Server {
+                unit: UnitKey::new(2, 13),
+                class: 37,
+                event: 13
+            }
+        ]
+    );
+    let ui = app.world().non_send::<WorldViewUi>();
+    assert!(ui.original.as_ref().unwrap().is_open(25), "the stash");
+    assert!(app
+        .world()
+        .resource::<crate::bridge::FrameOutputs>()
+        .0
+        .is_empty());
+}

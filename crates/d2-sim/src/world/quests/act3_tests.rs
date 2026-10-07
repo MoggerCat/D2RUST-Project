@@ -1,4 +1,4 @@
-// Spec: specs/world/quests-act3.md (Test vectors)
+// Spec: specs/world/quests-act3.md (Test vectors); specs/world/quests-act3-2.md (Test vectors)
 //! The Act III quests callback by callback, on the quests' fake world
 //! wrapped with the Act III seams ([`Fake3`]). One file per quest.
 
@@ -8,6 +8,7 @@ use super::tests::*;
 use super::*;
 
 mod gossip;
+mod part2;
 mod q1;
 mod q2;
 mod q3;

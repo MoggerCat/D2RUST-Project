@@ -22,6 +22,14 @@ impl DrlgWorld {
     }
 }
 
+impl DrlgWorld {
+    /// The active-room seed (+0x6C, `drlg/rooms.md` §1) of an active room.
+    pub fn active_seed_mut(&mut self, room: RoomId) -> Option<&mut crate::rng::Seed> {
+        let (act, _, r) = self.owner_of(room)?;
+        self.dungeon.acts[act].as_mut()?.active_room_seed_mut(r)
+    }
+}
+
 impl CollisionRooms for DrlgWorld {
     fn subtile_rect(&self, room: RoomId) -> Option<TileRect> {
         let (_, d, r) = self.owner_of(room)?;

@@ -3,11 +3,12 @@
 //! NPC intro record (events 0 and 11, the active function), and the
 //! Siege's start from Malah's intro line.
 //!
-//! Open question 8 of the spec: `quests.tsv` row 40 still has `?` cells
-//! and the table `0x00732FF8` is not in `quest-messages.tsv`. The init
-//! `0x0058EA50` stores the callbacks, functions and table itself (§9),
-//! so [`init`] writes them on the record, and the table's rows are
-//! [`TABLE`] here.
+//! The init `0x0058EA50` stores the callbacks, functions and table
+//! itself (§9), so [`init`] writes them on the record, and the table's
+//! rows are [`TABLE`] here. `quests.tsv` row 40 and the table
+//! `0x00732FF8` in `quest-messages.tsv` state the same values
+//! (`quests.md` open question 6, answered); the test
+//! `act5_intro_matches_its_rows` keeps both equal.
 
 use super::super::{EventArgs, QuestControl, QuestFlags, QuestRecord, QuestWorld, TextList};
 use crate::units::UnitId;

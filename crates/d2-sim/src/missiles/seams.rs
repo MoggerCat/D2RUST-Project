@@ -586,18 +586,11 @@ pub trait MissileBodies {
     fn object_frame_cnt1(&self, unit: UnitId) -> Option<i32> {
         None
     }
-    /// The units the finder `0x0065A950` / `0x0065AC70` collects around
-    /// (x, y) with radius `r` and `flags` over `room`'s neighbourhood, in
-    /// found order (`missiles/bodies-2.md` Open question 3).
-    fn corpse_units(
-        &mut self,
-        game: &Game,
-        room: RoomId,
-        at: (i32, i32),
-        r: i32,
-        flags: u32,
-    ) -> Vec<UnitId> {
-        Vec::new()
+    /// The active room's sub-tile rectangle (x, y, w, h; active room
+    /// +0x4C, `drlg/rooms.md` §1) read by the unit find (`bodies-2.md`
+    /// §44, `0x0065A6B0`); `None` without one.
+    fn room_subtiles(&self, game: &Game, room: RoomId) -> Option<(i32, i32, i32, i32)> {
+        None
     }
     /// `0x005D0C40(game, missile, unit, skill, level, last)` (Redemption's
     /// per-corpse effect; `missiles/bodies-2.md` Open question 4).

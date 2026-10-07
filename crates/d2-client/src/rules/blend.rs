@@ -331,13 +331,9 @@ pub fn wall_block_ops(
 pub enum BlendError {
     #[error("perspective mode is not GDI (§5 r3: position from 0x004F6760, not specified)")]
     Perspective,
-    #[error(
-        "GDI line with |dx| = |dy| = {0} > 0: which axis is major (TODO(spec: render/blend-modes.md §8 r1))"
-    )]
-    LineMajorAxisTie(u32),
     #[error("GDI rectangle y1 {y1} < y0 {y0}: fatal error 0x32 (§8 r2)")]
     RectangleRowsReversed { y0: i32, y1: i32 },
-    #[error("GDI rectangle x1 {x1} < x0 {x0} (TODO(spec: render/blend-modes.md §8 r2))")]
+    #[error("GDI rectangle x1 {x1} < x0 {x0}: negative row width, the original faults (§8 r2)")]
     RectangleColumnsReversed { x0: i32, x1: i32 },
 }
 
@@ -493,14 +489,14 @@ pub fn color_row(color: u8) -> [u8; 256] {
 /// steps along the major axis; the error starts at 0, gains the minor
 /// distance each step, and when it **exceeds** the major distance the
 /// minor axis advances one pixel toward the end and the error loses the
-/// major distance. `|Δx| = |Δy| > 0` is [`BlendError::LineMajorAxisTie`].
+/// major distance. The major axis is y only when |Δx| < |Δy|, so a 45°
+/// line is x-major; a line with a non-zero minor distance ends one pixel
+/// short of (x1, y1) on the minor axis. Never an error (the `Result`
+/// stays for the callers).
 pub fn gdi_line_pixels(x0: i32, y0: i32, x1: i32, y1: i32) -> Result<Vec<(i32, i32)>, BlendError> {
     let (dx, dy) = (i64::from(x1) - i64::from(x0), i64::from(y1) - i64::from(y0));
     let (adx, ady) = (dx.unsigned_abs(), dy.unsigned_abs());
-    if adx == ady && adx != 0 {
-        return Err(BlendError::LineMajorAxisTie(adx as u32));
-    }
-    let x_major = adx > ady;
+    let x_major = adx >= ady;
     let (major, minor) = if x_major { (adx, ady) } else { (ady, adx) };
     let (sx, sy) = (dx.signum(), dy.signum());
     let (mut x, mut y) = (i64::from(x0), i64::from(y0));
@@ -586,7 +582,8 @@ pub fn gdi_mode_value(mode: u8) -> u8 {
 /// A GDI rectangle (§8 r2, `0x006C8A60`). Each coordinate is clamped to
 /// `[0, W − 1]` (x) or `[0, H − 1]` (y); nothing is drawn (`None`) when
 /// `x0 = x1` or `y0 = y1`; `y1 < y0` is fatal 0x32 (checked after the
-/// empty test, in the spec's order); `x1 < x0` is not specified. Pixels:
+/// empty test, in the spec's order); `x1 < x0` is fatal (the original's
+/// negative row width faults). Pixels:
 /// columns `x0 … x1 − 1`, rows `y0 … y1 − 1`, written by `k`
 /// ([`gdi_mode_value`]): 0 → `d' = color`; 1 → `d' = T[d]` (row 0 of `T`,
 /// column `d`: chain `[Z]` and the transposed read); 2 → `d' = T[256·d +

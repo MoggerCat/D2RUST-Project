@@ -94,7 +94,9 @@ pub trait LevelTypes {
     /// (open question 10); the `roll(3)` for objects 91–92 is drawn from
     /// the room seed (`drlg.room_mut(room).seed`) by the provider.
     /// `orientation` is the cell's tile type (`preset.md` §11: 9 = right
-    /// door).
+    /// door). Returns whether the door record (when there is one) gets
+    /// flag 0x20 (`preset.md` §11: a unit added, or `roll(3)` gave 0;
+    /// `rooms.md` §9.5.1 door records).
     #[allow(clippy::too_many_arguments)]
     fn door_unit(
         &mut self,
@@ -105,7 +107,8 @@ pub trait LevelTypes {
         wy: i32,
         cell: u32,
         orientation: u32,
-    ) {
+    ) -> bool {
+        false
     }
 
     /// A hidden exit cell's warp unit (`0x0066E1C0`, `rooms.md` §9.5.1
@@ -162,6 +165,11 @@ pub struct TileInfo {
     pub material: u16,
     /// Sub-tile flags (+0x28), bottom row first (`rooms.md` §10.4).
     pub subtile_flags: [u8; 25],
+    /// Roof height (+0x04, u16). Read only by the client draw
+    /// (`rooms.md` §9.3 "Entry identity", `render/draw-order.md` §3 r2).
+    pub roof_height: u16,
+    /// Height (+0x08, i32). Read only by the client draw (as above).
+    pub height: i32,
 }
 
 /// Parsed DT1 files by path (no I/O in the sim). Paths are the

@@ -507,7 +507,7 @@ pub fn redemption<W: BodyWorld>(
 // ---------------------------------------------------------------- §8.10
 
 /// Walk velocity `0x0056E5B0(unit)` (§8.10 step 6).
-fn walk_velocity<W: BodyWorld>(w: &W, ct: &CombatTables, u: W::Unit) -> i32 {
+pub(crate) fn walk_velocity<W: BodyWorld>(w: &W, ct: &CombatTables, u: W::Unit) -> i32 {
     match w.unit_type(u) {
         UnitType::Player => ct
             .charstats(w.class_id(u))

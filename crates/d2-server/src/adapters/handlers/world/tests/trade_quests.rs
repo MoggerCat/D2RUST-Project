@@ -106,6 +106,12 @@ pub struct Rest {
     /// The item the next `reward_item` creates (placed in the player's
     /// staged inventory).
     pub reward: Option<UnitId>,
+    /// Staged monster owners (`0x0058F0D0`: GUID, unit type).
+    pub owners: BTreeMap<UnitId, (u32, u8)>,
+    /// Client save flags (client +0x0A) by player. Every player with a
+    /// staged quest record has a client (`quests-act1-rest.md` §9 item
+    /// 4: a host gives every player one); absent here = 0.
+    pub client_flags: BTreeMap<UnitId, u16>,
 }
 
 impl Outbox for Rest {
@@ -226,8 +232,8 @@ impl HirelingRest for Rest {
     }
     fn set_skill_level(&mut self, _: UnitId, _: u32, _: i32) {}
     fn set_owner(&mut self, _: UnitId, _: u32, _: u8) {}
-    fn owner(&self, _: UnitId) -> Option<(u32, u8)> {
-        None
+    fn owner(&self, merc: UnitId) -> Option<(u32, u8)> {
+        self.owners.get(&merc).copied()
     }
     fn join_team(&mut self, _: UnitId, _: UnitId) {}
     fn hireling_ai(&mut self, _: UnitId) {}
@@ -331,6 +337,14 @@ impl VendorRest for Rest {
 }
 
 impl QuestRest for Rest {
+    fn client_save_flags(&self, player: UnitId) -> Option<u16> {
+        self.quests
+            .contains_key(&player)
+            .then(|| self.client_flags.get(&player).copied().unwrap_or(0))
+    }
+    fn set_client_save_flags(&mut self, player: UnitId, flags: u16) {
+        self.client_flags.insert(player, flags);
+    }
     fn has_act2(&self) -> bool {
         false
     }

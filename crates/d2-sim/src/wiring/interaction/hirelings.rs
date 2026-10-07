@@ -37,6 +37,15 @@ pub trait HirelingRest {
     fn skill_reqlevel(&self, skill: u32) -> Option<i16>;
     /// `0x0056DEB0` (skills spec).
     fn set_skill_level(&mut self, unit: UnitId, skill: u32, level: i32);
+    /// `hirelings.md` §5 rule 3 (`0x00575900`): the largest `petmax` of
+    /// the player's skills of `pettype` `pet_type` (skills spec: the skill
+    /// list and the `petmax` calc). The default answers `None` (no such
+    /// skill): live 1.14d `skills.txt` has no skill of `pettype`
+    /// `hireable`, so a host without the skill provider gets `basemax`.
+    fn skill_pet_max(&self, player: UnitId, pet_type: u8) -> Option<i32> {
+        let _ = (player, pet_type);
+        None
+    }
     /// `0x0058F030` / `0x0058F0D0` (monsters/ai.md control block).
     fn set_owner(&mut self, merc: UnitId, guid: u32, unit_type: u8);
     fn owner(&self, merc: UnitId) -> Option<(u32, u8)>;
@@ -89,11 +98,23 @@ impl<H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> HirelingWorld
     fn send(&mut self, player: UnitId, bytes: &[u8]) {
         QuestRest::send(&mut *self.desk.rest, player, bytes);
     }
+    /// Onto [`super::InteractionState::unit_stats`].
+    fn queue_stat(&mut self, unit: UnitId, stat: u16, value: u32) {
+        self.desk
+            .state
+            .unit_stats
+            .entry(unit)
+            .or_default()
+            .push((stat, value));
+    }
     fn guid(&self, unit: UnitId) -> u32 {
         self.desk.econ.units.get(unit).map_or(u32::MAX, |r| r.guid)
     }
     fn monster_by_guid(&self, guid: u32) -> Option<UnitId> {
         self.desk.econ.game.lists.find_unit(UnitType::Monster, guid)
+    }
+    fn player_by_guid(&self, guid: u32) -> Option<UnitId> {
+        self.desk.econ.game.lists.find_unit(UnitType::Player, guid)
     }
     fn unit_type(&self, unit: UnitId) -> u8 {
         self.desk
@@ -166,6 +187,9 @@ impl<H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> HirelingWorld
     }
     fn set_skill_level(&mut self, unit: UnitId, skill: u32, level: i32) {
         self.desk.rest.set_skill_level(unit, skill, level);
+    }
+    fn skill_pet_max(&self, player: UnitId, pet_type: u8) -> Option<i32> {
+        self.desk.rest.skill_pet_max(player, pet_type)
     }
     fn set_owner(&mut self, merc: UnitId, guid: u32, unit_type: u8) {
         self.desk.rest.set_owner(merc, guid, unit_type);

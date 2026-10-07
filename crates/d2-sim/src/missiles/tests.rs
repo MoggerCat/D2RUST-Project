@@ -123,7 +123,7 @@ struct Bodies {
     monstats: i32,
     modes: BTreeMap<UnitId, i32>,
     frame_cnt1: Option<i32>,
-    corpses: Vec<UnitId>,
+    rects: BTreeMap<RoomId, (i32, i32, i32, i32)>,
     quest_open: bool,
     accept: bool,
     apply_ok: bool,
@@ -623,16 +623,8 @@ impl MissileBodies for Fake {
     fn object_frame_cnt1(&self, _: UnitId) -> Option<i32> {
         self.mb.frame_cnt1
     }
-    fn corpse_units(
-        &mut self,
-        _: &Game,
-        _: RoomId,
-        at: (i32, i32),
-        r: i32,
-        flags: u32,
-    ) -> Vec<UnitId> {
-        self.log.push(format!("corpses {at:?} {r} {flags:#x}"));
-        self.mb.corpses.clone()
+    fn room_subtiles(&self, _: &Game, room: RoomId) -> Option<(i32, i32, i32, i32)> {
+        self.mb.rects.get(&room).copied()
     }
     fn redemption_effect(
         &mut self,

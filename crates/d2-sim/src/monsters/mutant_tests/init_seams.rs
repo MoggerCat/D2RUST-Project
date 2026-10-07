@@ -55,7 +55,9 @@ fn default_queries_answer_nothing() {
         assert!(!h.has_item_at(u, loc), "loc {loc}");
     }
     assert!(h.minions(u).is_empty());
-    assert!(!h.umod34_gate(u));
+    // Umod 34's alignment gate (`umod-callbacks.md` §23.1): 0, run.
+    assert_eq!(h.alignment(u), 0);
+    assert!(h.minion_owner(u).is_none() && !h.has_state(u, 54));
 }
 
 #[test]

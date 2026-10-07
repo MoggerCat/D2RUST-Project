@@ -12,6 +12,7 @@
 use d2_proto::transport::server_message;
 use d2_proto::SERVER_MESSAGES;
 
+use super::output::Outputs;
 use super::world::{ClientWorld, ModelInputs, UnitKey};
 
 /// The dispatch table (spec §6 rule 1).
@@ -33,6 +34,8 @@ pub struct Message<'a> {
     pub unit: Option<UnitKey>,
     /// Tables and render seams the rules read (not model state).
     pub inputs: &'a ModelInputs,
+    /// Where the handler appends its UI and sound outputs (spec §10).
+    pub out: &'a Outputs,
 }
 
 /// A queued message as its unit handler sees it (`model.md` §4 rule 5).
@@ -44,6 +47,9 @@ pub struct UnitMessage<'a> {
     /// The unit whose queue held it; in the model when the handler runs.
     pub unit: UnitKey,
     pub inputs: &'a ModelInputs,
+    /// Where the handler appends its UI and sound outputs (spec §10
+    /// rule 2: in update order).
+    pub out: &'a Outputs,
 }
 
 /// Why a handler could not apply its message (spec §6 rule 4).
@@ -59,6 +65,10 @@ pub enum HandlerError {
     /// local player when there is none.
     #[error("fatal assert 0x{0:X}")]
     Fatal(u32),
+    /// A 1.14d access violation that ends the process (no assert, no
+    /// message): the instruction address and what it reads.
+    #[error("access violation at 0x{at:08X}: {what}")]
+    Crash { at: u32, what: &'static str },
     /// A rule input no spec gives yet.
     #[error("TODO(spec: {0})")]
     Unspecified(&'static str),

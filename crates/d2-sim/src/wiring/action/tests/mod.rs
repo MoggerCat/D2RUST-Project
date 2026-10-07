@@ -165,6 +165,10 @@ impl Pending for TestPending {
     fn object_free_footprint(&mut self, _: &mut Game, object: UnitId) {
         self.log.push(format!("free footprint {}", object.0));
     }
+    fn death_end_action(&mut self, _: &mut Game, unit: UnitId, action: u8, minion: u16) {
+        self.log
+            .push(format!("death action {} {action} {minion}", unit.0));
+    }
 }
 
 // ---- DRLG fixture -------------------------------------------------------------------
@@ -231,6 +235,8 @@ fn tile(o: u32, main: u32, sub: u32, rarity: u32) -> TileInfo {
         rarity,
         material: 0,
         subtile_flags: [0; 25],
+        roof_height: 0,
+        height: 0,
     }
 }
 

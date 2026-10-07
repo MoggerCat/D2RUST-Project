@@ -72,7 +72,7 @@ pub fn init<W: HirelingWorld>(
         discard(w, st, player, old)?;
     }
     // Rule 5.
-    let act0 = t.rows.act_of_name(slot.name);
+    let act0 = t.rows.act_of_name(w.expansion(), slot.name);
     let player_level = w.stat(player, stat::LEVEL);
     let Some(offer) = t.rows.offer(
         w.expansion(),
@@ -83,10 +83,8 @@ pub fn init<W: HirelingWorld>(
     ) else {
         return Ok(None);
     };
-    // Rule 6. A `false` (maximum 0, unit dismissed) does not stop the
-    // init in the spec text.
-    // TODO(hirelings.md §3.2 r6): whether `0x00573270` reads the add's
-    // result is not stated; the init continues.
+    // Rule 6. The add is void in 1.14d (`0x00575E90`, no test after the
+    // call): a `false` (no node added) does not stop the init.
     pets::add(w, t, st, player, merc, slot.seed, slot.name, offer.id)?;
     // Rule 7.
     let f = w.flags(merc);
@@ -111,16 +109,39 @@ pub fn init<W: HirelingWorld>(
     Ok(Some(offer))
 }
 
+/// §8 rule 1, the hireling part of the kill `0x0057CCB0(game, unit,
+/// killer, flag)`: the kill's own guards (monster mode not 0 / 12, the
+/// `0x00457490(class, 15)` `killable` test) are the caller's; then with
+/// `flag` ≠ 0 (1 at every caller except the expired-pet kill
+/// `0x00574450`) and a player owner (`0x0058F0D0`, type 0),
+/// `0x005751A0(game, owner, merc)` ([`death`]). Returns whether a node
+/// was marked dead.
+pub fn on_kill<W: HirelingWorld>(
+    w: &mut W,
+    st: &mut HirelingState,
+    merc: UnitId,
+    flag: bool,
+) -> bool {
+    if !flag {
+        return false;
+    }
+    let Some((guid, UNIT_PLAYER)) = w.owner(merc) else {
+        return false;
+    };
+    let Some(owner) = w.player_by_guid(guid) else {
+        return false;
+    };
+    death(w, st, owner, merc)
+}
+
 /// §8 rule 2 (`0x005751A0(game, owner, merc)`), hireling list part: the
 /// node of the merc's GUID gets bit 0 (dead), the owner's client gets
 /// 0x9B (name id, resurrect cost at the current level) and every client
 /// 0x7A remove with only the GUID. `false`: the GUID is in no hireling
 /// node.
 ///
-/// TODO(hirelings.md §8 r2): the pet type lookup (`0x00574A20`) and the
-/// type ≠ 7 node removal are `sim/pets.md`'s (`d2-sim::player::pets`).
-/// The trigger (§8 rule 1: the `0x00457490` test, open question 8) is
-/// the death path's.
+/// The pet type lookup (`0x00574A20`) and the type ≠ 7 node removal are
+/// `sim/pets.md`'s (`d2-sim::player::pets`); the trigger is [`on_kill`].
 pub fn death<W: HirelingWorld>(
     w: &mut W,
     st: &mut HirelingState,
@@ -314,7 +335,7 @@ pub fn restore_plan(
     };
     // Rule 3: classic → only in the name's act. The row of rule 3 is the
     // same (Id, 1) row, so its name clamp leaves `name` unchanged.
-    if !expansion && t.rows.act_of_name(name) != player_act {
+    if !expansion && t.rows.act_of_name(expansion, name) != player_act {
         return Err(RestoreSkip::OtherAct);
     }
     let mode = if saved.dead { MODE_DEAD } else { MODE_NEUTRAL };

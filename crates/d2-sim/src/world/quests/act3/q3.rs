@@ -1,11 +1,11 @@
-// Spec: specs/world/quests-act3.md §5 (A3Q3 Blade of the Old Religion, chain 17)
+// Spec: specs/world/quests-act3.md §5 (A3Q3 Blade of the Old Religion, chain 17); specs/world/quests-act3-2.md §11.3, §11.4, §11.7
 //! A3Q3: events 0, 2, 3, 4, 8, 9, 11, 13, 14, the status and active
 //! functions, the decoy (operate 31, init 25), its timer, the boss, the
 //! altar (init 39) and Ormus' map-AI hooks.
 
 use super::{
     add_guid, add_state, guid_listed, in_act3, install, npc, npc_of, pf, quick_remove, sequence,
-    set, sound, status_all, status_silent, table_state, Timer, DOCKS,
+    set, sound, status_all, status_silent, table_state, InitPoint, Timer, DOCKS,
 };
 use crate::units::{RoomId, UnitId};
 use crate::world::quests::{
@@ -24,6 +24,9 @@ const MSG_STATE: [i8; 4] = [-1, 0, 1, 2];
 const FLAYER_JUNGLE: u32 = 78;
 /// The boss timer's period (updater ticks).
 const BOSS_PERIOD: u32 = 7;
+/// `0x005A0180(victim, 0x0E)`: monster data type flags (+0x16)
+/// superunique (2), champion (4) or unique (8) (`quests-act3-2.md` §11.4).
+pub const KILL_TYPE_FLAGS: u8 = 0x0E;
 
 /// Chain 17's extra data (§5.1).
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -339,7 +342,19 @@ fn picked_up<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, args: E
     flag_iterate_all(ctl, w, i);
 }
 
-/// Event 8 `0x005B9980` (§5.6; installed by the boss timer).
+/// The Gidbinn kill test (§5.6, `quests-act3-2.md` §11.4), what the host's
+/// [`QuestWorld::special_monster`] computes: `0x005A0180(victim, 0x0E)`,
+/// the victim's monster type flags & 0x0E ≠ 0, else `0x0063E9F0(0,
+/// victim)`, its monstats `boss` column (flag word +0x0C bit 6). Either
+/// one passes. The boss itself (a random boss, unique or champion; edge
+/// case 19) carries type flags 1 | 8 and always passes.
+pub fn gidbinn_kill_test(type_flags: u8, monstats_boss: bool) -> bool {
+    type_flags & KILL_TYPE_FLAGS != 0 || monstats_boss
+}
+
+/// Event 8 `0x005B9980` (§5.6; installed by the boss timer). The drop's
+/// item level is the victim's stat 12 (`quests-act3-2.md` §11.3, the
+/// `&level` output; no incoming value).
 fn killed<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, args: EventArgs) {
     if !x(ctl, i).boss_spawned || !ctl.records[i].not_intro {
         return;
@@ -479,28 +494,27 @@ pub fn decoy_operate<W: QuestWorld>(
     }
 }
 
-/// Decoy init 25 `0x005B9AE0`.
-pub fn decoy_init<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: UnitId) {
+/// Decoy init 25 `0x005B9AE0`; `at` is the object's init record
+/// (`quests-act3-2.md` §11.7 rule 1): +0x08 / +0x0C := its (x, y), the
+/// boss spawn uses its room.
+pub fn decoy_init<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: UnitId, at: InitPoint) {
     let Some(i) = ctl.find(CHAIN) else { return };
     if !ctl.records[i].not_intro {
         w.set_object_mode(object, 2);
         return;
     }
-    x(ctl, i).decoy_known = true;
-    // TODO(quests-act3 §5.6): an object without a room (no position) is
-    // not described; nothing is stored or spawned then.
-    let Some((px, py, room)) = w.unit_position(object) else {
-        return;
-    };
     let e = x(ctl, i);
-    (e.decoy_x, e.decoy_y) = (px, py);
+    e.decoy_known = true;
+    (e.decoy_x, e.decoy_y) = (at.x, at.y);
     if e.decoy_active && !e.boss_spawned {
-        spawn_boss(ctl, w, i, room);
+        spawn_boss(ctl, w, i, at.room);
     }
 }
 
 /// Timer `0x005B9A30`; returns 1 (remove): one attempt per operation
-/// (edge case 4).
+/// (edge case 4). The room is the Act III room covering (+0x08, +0x0C)
+/// (`0x00619DA0` on game +0xC4); the boss spawns in that covering room,
+/// not the player's (`quests-act3-2.md` §11.7 rule 1).
 pub(super) fn boss_timer<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize) -> bool {
     x(ctl, i).timer = false;
     let e = x(ctl, i).clone();
@@ -517,7 +531,10 @@ pub(super) fn boss_timer<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: us
     true
 }
 
-/// Boss spawn `0x005B9930`: monster 407 `fetish11` in `room`.
+/// Boss spawn `0x005B9930`: monster 407 `fetish11` in `room`, the random
+/// boss of `monsters/init.md` §16.1 with champions allowed
+/// (`0x005A43E0(game, room, 0, 407, 1, 0, 0, 1)`, `quests-act3-2.md`
+/// §11.4; edge case 19).
 fn spawn_boss<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, room: RoomId) {
     x(ctl, i).boss_spawning = true;
     if let Some(u) = w.spawn_monster_in_room(room, npc::FETISH11) {
@@ -530,18 +547,15 @@ fn spawn_boss<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, room: 
     x(ctl, i).boss_spawning = false;
 }
 
-/// Altar init 39 `0x005B9D40` (object 251).
-pub fn altar_init<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: UnitId) {
+/// Altar init 39 `0x005B9D40` (object 251); `at` is the object's init
+/// record (`quests-act3-2.md` §11.7 rule 2): +0x10 / +0x14 := its (x, y).
+pub fn altar_init<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: UnitId, at: InitPoint) {
     let Some(i) = ctl.find(CHAIN) else { return };
     let g = w.guid(object);
-    x(ctl, i).altar_guid = g;
-    // TODO(quests-act3 §5.7): an altar without a room (no position)
-    // keeps the old position.
-    if let Some((px, py, _)) = w.unit_position(object) {
-        let e = x(ctl, i);
-        (e.altar_x, e.altar_y) = (px, py);
-    }
-    let mode = x(ctl, i).altar_mode;
+    let e = x(ctl, i);
+    e.altar_guid = g;
+    (e.altar_x, e.altar_y) = (at.x, at.y);
+    let mode = e.altar_mode;
     w.set_object_mode(object, mode);
 }
 
@@ -551,15 +565,17 @@ pub fn altar_position(ctl: &QuestControl) -> Option<(i32, i32)> {
     e.altar_ready.then_some((e.altar_x, e.altar_y))
 }
 
-/// `0x005B9CD0` (Ormus' map AI): activate the altar.
+/// `0x005B9CD0` (Ormus' map AI): activate the altar. +0x06 is cleared
+/// first; when the altar unit (+0x28, unit type 2) is not found nothing
+/// else happens and +0x2C keeps its value (`quests-act3-2.md` §11.7
+/// rule 2).
 pub fn activate_altar<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W) {
     let Some(i) = ctl.find(CHAIN) else { return };
     x(ctl, i).altar_ready = false;
-    // TODO(quests-act3 §5.7): an altar GUID without a unit is not
-    // described; the mode and event are skipped, +0x2C is still stored.
-    if let Some((altar, _)) = w.object_by_guid(x(ctl, i).altar_guid) {
-        w.set_object_mode(altar, 1);
-        end_animation(w, altar, 1);
-    }
+    let Some((altar, _)) = w.object_by_guid(x(ctl, i).altar_guid) else {
+        return;
+    };
+    w.set_object_mode(altar, 1);
+    end_animation(w, altar, 1);
     x(ctl, i).altar_mode = 2;
 }

@@ -10,7 +10,7 @@ use super::seams::{Point, TargetUnit, WalkError, WalkUnits};
 use super::tests::fake::{Ctx, FakeUnit, FakeUnits, FakeWorld, ROOM};
 use crate::drlg::TileRect;
 use crate::path::footprint::stamp_pattern;
-use crate::path::record::{flags, DynamicPath};
+use crate::path::record::{flags, DynamicPath, PathPoint};
 use crate::path::tables::PathTables;
 use crate::units::{RoomId, UnitId, UnitType};
 
@@ -1401,4 +1401,503 @@ fn interrupt_check_concentration_roll_boundary() {
     };
     assert!(check(0));
     assert!(!check(1));
+}
+
+// ---- §9 per-tick movement (step.rs survivors) -------------------------
+
+use super::step::{Walk, STEP_BASE};
+use crate::path::coords::to_fp16_center as centre;
+use crate::path::record::path_types;
+
+/// The player at (100, 100) of a 200×200 world walking (mode 2) toward
+/// `target`; returns the stored path.
+fn walking(target: (i32, i32)) -> (PathTables, Ctx, DynamicPath) {
+    let (t, mut c) = setup(200, 200, 100, 100);
+    let target = WalkTarget::Point(Point::new(target.0, target.1));
+    request(&t, &mut c, P, None, 2, target, false).unwrap();
+    let p = c.w.paths[&P].clone();
+    c.w.log.clear();
+    (t, c, p)
+}
+
+/// Movement `0x00650840(unit, base)` of the player.
+fn movement(t: &PathTables, c: &mut Ctx, p: &mut DynamicPath, base: i32) -> bool {
+    Walk { t, c }.movement(P, p, base).unwrap()
+}
+
+// Kills `&` → `|` on flag 0x20 and `count > 0` → `>=` in the rule 2
+// guard: no active flag, or no points, is no move (rule 3: reset).
+// Covers: specs/sim/pathing.md §9.4 r2, §9.4 r3, §9.7
+#[test]
+fn movement_needs_active_flag_and_points() {
+    let (t, mut c, p) = walking((110, 100));
+    assert_eq!(p.point_count, 1);
+    assert_ne!(p.flags & flags::ACTIVE, 0);
+    // Flag 0x20 clear: reset at the cell centre, no move.
+    let mut q = p.clone();
+    q.flags &= !flags::ACTIVE;
+    assert!(!movement(&t, &mut c, &mut q, STEP_BASE));
+    assert_eq!((q.precise_x, q.precise_y), (centre(100), centre(100)));
+    assert_eq!((q.point_count, q.cur_point), (0, 0));
+    // Count 0 with a final target elsewhere: the arrival check (which
+    // would re-path, §9.5 r2) is never reached; no move.
+    let mut q = p.clone();
+    q.point_count = 0;
+    assert_ne!(q.final_target(), q.cell());
+    assert!(!movement(&t, &mut c, &mut q, STEP_BASE));
+    assert_eq!(q.point_count, 0);
+    assert!(c.w.log.is_empty());
+}
+
+// Kills `index < count` → `<=` in the rule 2 guard: index = count with
+// the position on the final target passes the arrival check (§9.5 r2)
+// but does not move; the mutant steps 1.5 cells first.
+// Covers: specs/sim/pathing.md §9.4 r2, §9.5 r2
+#[test]
+fn movement_at_index_count_does_not_step() {
+    let (t, mut c, mut p) = walking((110, 100));
+    p.cur_point = p.point_count;
+    p.put_final_target(p.cell());
+    p.velocity = 0x1800;
+    assert!(!movement(&t, &mut c, &mut p, STEP_BASE));
+    assert_eq!((p.precise_x, p.precise_y), (centre(100), centre(100)));
+}
+
+// Kills `base <= 0` → `>`: base ≤ 0 is 0x400; another base scales the
+// step (m = base · velocity >> 6).
+// Covers: specs/sim/pathing.md §9.4 r2
+#[test]
+fn movement_base() {
+    let (t, mut c, p) = walking((110, 100));
+    assert_eq!((p.velocity, p.dir_vec_x, p.dir_vec_y), (0x600, 0x1000, 0));
+    for (base, dx) in [
+        (STEP_BASE, 0x6000),
+        (0, 0x6000),
+        (-5, 0x6000),
+        (0x200, 0x3000),
+    ] {
+        let mut q = p.clone();
+        assert!(movement(&t, &mut c, &mut q, base));
+        assert_eq!(q.precise_x, centre(100) + dx, "base {base}");
+    }
+}
+
+// Kills the acceleration mutants: the counter counts only with an
+// acceleration, the velocity changes when the counter exceeds 4, by
+// + acceleration, clamped to [0, max]; reaching the max clears the
+// acceleration.
+// Covers: specs/sim/pathing.md §9.4 r2
+#[test]
+fn movement_acceleration() {
+    let (t, mut c, p) = walking((150, 100));
+    // No acceleration: the counter stays.
+    let mut q = p.clone();
+    assert_eq!(q.acceleration, 0);
+    assert!(movement(&t, &mut c, &mut q, STEP_BASE));
+    assert_eq!((q.accel_counter, q.velocity), (0, 0x600));
+    // 0x100 + 0x40 every fifth tick, max 0x180.
+    let mut q = p.clone();
+    (q.velocity, q.max_velocity, q.acceleration) = (0x100, 0x180, 0x40);
+    let mut seen = Vec::new();
+    for _ in 0..10 {
+        assert!(movement(&t, &mut c, &mut q, STEP_BASE));
+        seen.push((q.accel_counter, q.velocity, q.acceleration));
+    }
+    assert_eq!(
+        seen,
+        [
+            (1, 0x100, 0x40),
+            (2, 0x100, 0x40),
+            (3, 0x100, 0x40),
+            (4, 0x100, 0x40),
+            (0, 0x140, 0x40),
+            (1, 0x140, 0x40),
+            (2, 0x140, 0x40),
+            (3, 0x140, 0x40),
+            (4, 0x140, 0x40),
+            (0, 0x180, 0),
+        ]
+    );
+    // Clamped at the max.
+    let mut q = p.clone();
+    (q.velocity, q.max_velocity, q.acceleration, q.accel_counter) = (0x170, 0x180, 0x40, 4);
+    assert!(movement(&t, &mut c, &mut q, STEP_BASE));
+    assert_eq!((q.velocity, q.acceleration), (0x180, 0));
+    // Clamped at 0: a zero velocity vector is no move (rule 2.2 → reset);
+    // the acceleration stays (velocity ≠ max).
+    let mut q = p.clone();
+    (q.velocity, q.max_velocity, q.acceleration, q.accel_counter) = (0x80, 0x180, -0x100, 4);
+    assert!(!movement(&t, &mut c, &mut q, STEP_BASE));
+    assert_eq!(
+        (q.velocity, q.acceleration, q.accel_counter),
+        (0, -0x100, 0)
+    );
+}
+
+// Kills `index < count` → `<=` before the aim (rule 2.5): the step that
+// reaches the last point does not aim again, so the direction vector and
+// facing keep the last leg's values (edge case 6: movement ends there).
+// Covers: specs/sim/pathing.md §9.4 r2, §edge-cases-original-bugs r6
+#[test]
+fn movement_no_aim_after_the_last_point() {
+    let (t, mut c, mut p) = walking((105, 100));
+    let mut last = (p.dir_vec_x, p.dir_vec_y, p.new_direction);
+    for _ in 0..20 {
+        if !movement(&t, &mut c, &mut p, STEP_BASE) {
+            break;
+        }
+        last = (p.dir_vec_x, p.dir_vec_y, p.new_direction);
+    }
+    assert_eq!((p.precise_x, p.precise_y), (centre(105), centre(100)));
+    assert_eq!((p.dir_vec_x, p.dir_vec_y, p.new_direction), last);
+    assert_eq!(last.0, 0x1000);
+}
+
+/// The player walking to the monster `M` at (110, 100).
+fn walking_to_monster() -> (PathTables, Ctx, DynamicPath) {
+    let (t, mut c) = setup(200, 200, 100, 100);
+    add(&mut c, M, UnitType::Monster, 110, 100, 2);
+    let target = WalkTarget::Unit {
+        ty: UnitType::Monster,
+        guid: M.0,
+    };
+    request(&t, &mut c, P, None, 2, target, false).unwrap();
+    let p = c.w.paths[&P].clone();
+    c.w.log.clear();
+    assert_eq!(p.prev_target(), Point::new(110, 100));
+    assert_eq!(p.flags & flags::KEEP_TARGET, 0);
+    (t, c, p)
+}
+
+// Kills the §9.5 rule 3 refresh mutants (`&&` / `||`, `>` → `==` / `<` /
+// `>=`, `-` → `+` / `/` on either axis): a monster target more than 5
+// from the previous target on one axis re-paths (finish 1; the new
+// compute stores its position as the previous target); exactly 5 does
+// not. The re-path result decides (rule 4): non-zero moves.
+// Covers: specs/sim/pathing.md §9.5 r3, §9.5 r4, §9.10
+#[test]
+fn arrival_refresh_beyond_5_repaths() {
+    for (dx, dy, repath) in [
+        (6, 0, true),
+        (5, 0, false),
+        (0, 6, true),
+        (0, 5, false),
+        (-6, 0, true),
+        (0, -5, false),
+        (0, 0, false),
+    ] {
+        let (t, mut c, mut p) = walking_to_monster();
+        c.u.unit(M).pos = Point::new(110 + dx, 100 + dy);
+        assert!(movement(&t, &mut c, &mut p, STEP_BASE), "({dx}, {dy})");
+        let queued = c.w.log.contains(&"queue 1".to_string());
+        assert_eq!(queued, repath, "({dx}, {dy})");
+        let prev = if repath {
+            Point::new(110 + dx, 100 + dy)
+        } else {
+            Point::new(110, 100)
+        };
+        assert_eq!(p.prev_target(), prev, "({dx}, {dy})");
+    }
+}
+
+// Kills the rule 3 tail mutants (`||` → `&&`, `<` → `==` / `>` / `<=`,
+// `==` → `!=`, and the re-path result `!=` → `==`): index < count passes
+// without a re-path; index = count on the final target passes (then no
+// move); index = count elsewhere re-paths (finish 1) and a non-zero
+// result moves on.
+// Covers: specs/sim/pathing.md §9.5 r3, §9.5 r4, §9.4 r2
+#[test]
+fn arrival_target_unit_tail() {
+    // index < count: passes, no re-path.
+    let (t, mut c, mut p) = walking_to_monster();
+    assert_eq!(p.cur_point, 0);
+    assert!(movement(&t, &mut c, &mut p, STEP_BASE));
+    assert!(c.w.log.is_empty());
+    // index = count on the final target: passes, no re-path, no move.
+    let (t, mut c, mut p) = walking_to_monster();
+    p.cur_point = p.point_count;
+    p.put_final_target(p.cell());
+    assert!(!movement(&t, &mut c, &mut p, STEP_BASE));
+    assert!(c.w.log.is_empty());
+    // index = count elsewhere: re-path; its count > 0 passes and moves.
+    let (t, mut c, mut p) = walking_to_monster();
+    p.cur_point = p.point_count;
+    assert_ne!(p.final_target(), p.cell());
+    assert!(movement(&t, &mut c, &mut p, STEP_BASE));
+    assert!(c.w.log.contains(&"queue 1".to_string()));
+    assert!(p.cur_point < p.point_count);
+}
+
+// Kills the distance-budget mutants (`> 0` → `<`, `!= 8` / `!= 11` →
+// `==`, `-=` → `+=` / `/=`): crossing a cell takes 1 from a non-zero
+// budget, except for types 8 and 11.
+// Covers: specs/sim/pathing.md §9.6 r4
+#[test]
+fn one_step_distance_budget() {
+    for (ty, budget, after) in [
+        (path_types::STRAIGHT, 3, 2),
+        (path_types::STRAIGHT, 0, 0),
+        (path_types::KNOCKBACK_SERVER, 3, 3),
+        (path_types::KNOCKBACK_CLIENT, 3, 3),
+    ] {
+        let (t, mut c, mut p) = walking((110, 100));
+        p.path_type = ty;
+        p.dist_budget = budget;
+        p.velocity = 0x1000; // one cell per tick
+        assert!(movement(&t, &mut c, &mut p, STEP_BASE));
+        assert_eq!(p.cell(), Point::new(101, 100));
+        assert_eq!(p.dist_budget, after, "type {ty} budget {budget}");
+    }
+}
+
+// Kills `>` → `>=` / `==` in the halving loop on either axis: a
+// component of exactly 0x10000 is not halved, so a (1, ½)-cell step
+// moves diagonally in one sub-step and never tests the side cell; halved,
+// the first sub-step enters the side cell, whose plus meets the wall.
+// Covers: specs/sim/pathing.md §9.6 r5
+#[test]
+fn cell_walk_halves_only_above_0x10000() {
+    for (d, wall) in [
+        ((0x10000, 0x8000), (102, 100)),
+        ((0x8000, 0x10000), (100, 102)),
+    ] {
+        let (t, mut c) = setup(200, 200, 100, 100);
+        let mut p = c.w.paths[&P].clone();
+        c.w.wall(wall.0, wall.1);
+        let r = Walk { t: &t, c: &mut c }.cell_walk(P, &mut p, d).unwrap();
+        let end = (
+            centre(100).wrapping_add_signed(d.0),
+            centre(100).wrapping_add_signed(d.1),
+        );
+        assert_eq!(r, Ok(end), "{d:?}");
+        assert_eq!(p.saved_count, 1);
+        assert_eq!(p.saved_steps[0], PathPoint { x: 101, y: 101 });
+    }
+}
+
+// Kills the saved-step and flag 0x8 mutants: with flag 0x20000 each
+// crossed cell is saved; flag 0x8 iff k > 0, on a blocked walk too
+// (`path-placement.md` §2.3: the step crossed at least one cell);
+// without 0x20000 nothing is saved and 0x8 stays clear.
+// Covers: specs/sim/pathing.md §9.6 r5; specs/sim/path-placement.md §2.3
+#[test]
+fn cell_walk_saved_steps_and_moved_flag() {
+    // Blocked after two cells: k = 2, flag 0x8.
+    let (t, mut c) = setup(200, 200, 100, 100);
+    let mut p = c.w.paths[&P].clone();
+    assert_ne!(p.flags & flags::SAVE_STEPS, 0);
+    p.flags &= !flags::MOVED;
+    c.w.wall(104, 100);
+    let r = Walk { t: &t, c: &mut c }
+        .cell_walk(P, &mut p, (5 << 16, 0))
+        .unwrap();
+    assert_eq!(r, Err((centre(102), centre(100))));
+    assert_eq!(p.saved_count, 2);
+    assert_ne!(p.flags & flags::MOVED, 0);
+    // Blocked at the first cell: k = 0, no flag 0x8.
+    let (t, mut c) = setup(200, 200, 100, 100);
+    let mut p = c.w.paths[&P].clone();
+    p.flags &= !flags::MOVED;
+    c.w.wall(102, 100);
+    let r = Walk { t: &t, c: &mut c }
+        .cell_walk(P, &mut p, (5 << 16, 0))
+        .unwrap();
+    assert_eq!(r, Err((centre(100), centre(100))));
+    assert_eq!(p.saved_count, 0);
+    assert_eq!(p.flags & flags::MOVED, 0);
+    // No flag 0x20000: three free cells, nothing saved, no flag 0x8.
+    let (t, mut c) = setup(200, 200, 100, 100);
+    let mut p = c.w.paths[&P].clone();
+    p.flags &= !(flags::SAVE_STEPS | flags::MOVED);
+    let r = Walk { t: &t, c: &mut c }
+        .cell_walk(P, &mut p, (3 << 16, 0))
+        .unwrap();
+    assert_eq!(r, Ok((centre(103), centre(100))));
+    assert_eq!(p.saved_count, 0);
+    assert_eq!(p.flags & flags::MOVED, 0);
+    assert_eq!(c.w.value(Point::new(103, 100)) & 0x1000, 0x1000);
+}
+
+// Kills `delete !` on the forced move: flag 0x4 moves a player through a
+// wall untested; any other type is fatal.
+// Covers: specs/sim/pathing.md §9.6 r6
+#[test]
+fn footprint_forced_move_walkers_only() {
+    let (t, mut c) = setup(200, 200, 100, 100);
+    let mut p = c.w.paths[&P].clone();
+    p.flags |= flags::NO_TEST;
+    c.w.wall(102, 100);
+    let r = Walk { t: &t, c: &mut c }
+        .cell_walk(P, &mut p, (2 << 16, 0))
+        .unwrap();
+    assert_eq!(r, Ok((centre(102), centre(100))));
+    assert_eq!(p.collided_mask, 0);
+    for ty in [UnitType::Item, UnitType::Object, UnitType::Missile] {
+        let (t, mut c) = setup(200, 200, 100, 100);
+        let mut p = c.w.paths[&P].clone();
+        p.flags |= flags::NO_TEST;
+        c.u.unit(P).ty = ty;
+        let r = Walk { t: &t, c: &mut c }.cell_walk(P, &mut p, (2 << 16, 0));
+        assert!(matches!(r, Err(WalkError::Fatal(_))), "{ty:?}");
+    }
+}
+
+// Kills the missile footprint mutants (`|=` → `&=`, `== 0` → `!=`, `&` →
+// `|` / `^`): the collided mask accumulates; only 0x1 or 0x4 refuses.
+// Covers: specs/sim/pathing.md §9.6 r6
+#[test]
+fn footprint_missile_refused_only_by_0x1_or_0x4() {
+    let (t, mut c) = setup(200, 200, 100, 100);
+    c.u.unit(P).ty = UnitType::Missile;
+    let mut p = DynamicPath {
+        owner: Some(P),
+        room: Some(ROOM),
+        precise_x: centre(100),
+        precise_y: centre(90),
+        unit_size: 1,
+        move_mask: 0xF,
+        ..DynamicPath::default()
+    };
+    *c.w.grid.get_mut(101, 90).unwrap() |= 0x2;
+    *c.w.grid.get_mut(102, 90).unwrap() |= 0x8;
+    *c.w.grid.get_mut(103, 90).unwrap() |= 0x4;
+    let r = Walk { t: &t, c: &mut c }
+        .cell_walk(P, &mut p, (5 << 16, 0))
+        .unwrap();
+    assert_eq!(r, Err((centre(102), centre(90))));
+    assert_eq!(p.collided_mask, 0xE);
+    // A free walk: accepted, mask 0.
+    let mut p = DynamicPath {
+        owner: Some(P),
+        room: Some(ROOM),
+        precise_x: centre(100),
+        precise_y: centre(80),
+        unit_size: 1,
+        move_mask: 0xF,
+        ..DynamicPath::default()
+    };
+    let r = Walk { t: &t, c: &mut c }
+        .cell_walk(P, &mut p, (2 << 16, 0))
+        .unwrap();
+    assert_eq!(r, Ok((centre(102), centre(80))));
+    assert_eq!(p.collided_mask, 0);
+}
+
+// Kills `== 0x3401` → `!=`: move mask 0x3401 tests with 0x3C01 (0x800
+// refuses); any other mask tests as is.
+// Covers: specs/sim/pathing.md §9.6 r6
+#[test]
+fn footprint_move_mask_0x3401_tests_0x3c01() {
+    for (mask, refused) in [(0x3401, true), (0x0001, false)] {
+        let (t, mut c) = setup(200, 200, 100, 100);
+        let mut p = c.w.paths[&P].clone();
+        p.move_mask = mask;
+        *c.w.grid.get_mut(102, 100).unwrap() |= 0x800;
+        let r = Walk { t: &t, c: &mut c }
+            .cell_walk(P, &mut p, (1 << 16, 0))
+            .unwrap();
+        if refused {
+            assert_eq!(r, Err((centre(100), centre(100))));
+            assert_eq!(p.collided_mask, 0x800);
+        } else {
+            assert_eq!(r, Ok((centre(101), centre(100))));
+            assert_eq!(p.collided_mask, 0);
+        }
+    }
+}
+
+// Kills `&` → `|` / `^` on flag 0x1 in set position: only a path with
+// flag 0x1 recaches its room.
+// Covers: specs/sim/pathing.md §9.6 r8, §9.6 r9
+#[test]
+fn set_position_recaches_only_with_flag_0x1() {
+    for outside in [false, true] {
+        let (t, mut c) = setup(40, 20, 18, 10);
+        c.w.room0 = TileRect::new(0, 0, 20, 20);
+        let r1 = RoomId(1);
+        c.w.rooms.insert(r1, TileRect::new(20, 0, 20, 20));
+        let mut p = c.w.paths[&P].clone();
+        if outside {
+            p.flags |= flags::OUTSIDE_ROOM;
+        } else {
+            p.flags &= !flags::OUTSIDE_ROOM;
+        }
+        c.w.log.clear();
+        Walk { t: &t, c: &mut c }.set_position(P, &mut p, (centre(22), centre(10)), None);
+        assert_eq!(p.cell(), Point::new(22, 10));
+        if outside {
+            assert_eq!(p.room, Some(r1));
+            assert_ne!(p.flags & flags::ROOM_CHANGED, 0);
+            assert_eq!(c.w.log, ["leave 1 0", "insert 1 1", "queue 1"]);
+        } else {
+            assert_eq!(p.room, Some(ROOM));
+            assert_eq!(p.flags & flags::ROOM_CHANGED, 0);
+            assert!(c.w.log.is_empty());
+        }
+    }
+}
+
+/// Room-change messages of `unit` (type `ty`) from the old room's
+/// clients to the new room's; the add / remove / memo log.
+fn room_change(ty: UnitType, old: &[u32], new: &[u32], flag: bool) -> Vec<String> {
+    let t = tables();
+    let mut c = Ctx::new(FakeWorld::new(1, 1), FakeUnits::with_player(P));
+    c.u.unit(P).ty = ty;
+    let (r0, r1) = (RoomId(0), RoomId(1));
+    let ids = |v: &[u32]| v.iter().map(|&i| crate::units::ClientId(i)).collect();
+    c.w.clients.insert(r0, ids(old));
+    c.w.clients.insert(r1, ids(new));
+    let mut p = DynamicPath {
+        owner: Some(P),
+        room: Some(r1),
+        prev_room: Some(r0),
+        flags: if flag { flags::ROOM_CHANGED } else { 0 },
+        ..DynamicPath::default()
+    };
+    Walk { t: &t, c: &mut c }.room_change_messages(P, &mut p);
+    assert_eq!(p.flags & flags::ROOM_CHANGED, 0);
+    c.u.log
+}
+
+// Kills `&` → `|` on flag 0x2, `== Monster` → `!=`, the merge loop's
+// `<` → `==` / `>` and the guard → true: nothing without flag 0x2; a
+// monster's AI room memo is cleared; the two sorted arrays merge in
+// order (old-only: removal; new-only: add).
+// Covers: specs/sim/pathing.md §9.8
+#[test]
+fn room_change_messages_flag_memo_and_merge() {
+    assert!(room_change(UnitType::Player, &[1], &[2], false).is_empty());
+    assert_eq!(
+        room_change(UnitType::Player, &[1, 3], &[2], true),
+        ["remove 1 to 1", "add 1 to 2", "remove 1 to 3"]
+    );
+    assert_eq!(
+        room_change(UnitType::Monster, &[1, 2, 4], &[2, 3, 5], true),
+        [
+            "memo 1",
+            "remove 1 to 1",
+            "add 1 to 3",
+            "remove 1 to 4",
+            "add 1 to 5"
+        ]
+    );
+}
+
+// Kills `d < 1` → `==` and `stamina > 0` → `>=`: a negative drain is 1;
+// stamina reaching exactly 0 is exhausted.
+// Covers: specs/sim/pathing.md §9.9 r2, §9.9 r3
+#[test]
+fn run_drain_floor_and_zero_stamina() {
+    let (t, mut c) = setup(40, 40, 10, 10);
+    let p = c.w.paths[&P].clone();
+    // d = 40 − 40·200/100 = −40 → 1.
+    c.u.unit(P).stats.insert(10, 1000);
+    c.u.unit(P).item_stats.insert(154, 200);
+    assert!(!Walk { t: &t, c: &mut c }.run_drain(P, &p));
+    assert_eq!(c.u.units[&P].stats[&10], 999);
+    // d = 40 on 40: 0 is exhausted.
+    c.u.unit(P).item_stats.clear();
+    c.u.unit(P).stats.insert(10, 40);
+    assert!(Walk { t: &t, c: &mut c }.run_drain(P, &p));
+    assert_eq!(c.u.units[&P].stats[&10], 0);
 }
