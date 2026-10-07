@@ -121,5 +121,9 @@ stat-message and start-item bytes.
   world_data_tables` fails 3 tests on the base too (`string.tbl` /
   `monstats.bin`: "failed to fill whole buffer" while loading the
   synthetic install; looks like tests sharing one install directory).
-- `d2-client` was not built here beyond a partial test run (§1 note in
-  the coordinator message); the full gate is the coordinator's.
+- `d2-client` could not be built in this container (`wayland-sys` build
+  script panics: no system Wayland library), so its tests did not run
+  here. My changes to its inputs: the additive `d2-server` APIs and the
+  synthetic `bodylocs` row 0 (the client's synthetic-data tests,
+  `bridge/msg/tests_units.rs` and `app/single_player.rs` tests, should be
+  checked in the full gate).
