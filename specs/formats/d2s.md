@@ -11,16 +11,20 @@
   all match; no layout mismatch was found. One binary reading was
   corrected (§6 rule 3: field A has callers). The waypoint section
   also matches the saves measured for `world/waypoints.md`. Still
-  unmeasured: a classic character, a hireling's items, an Iron Golem
+  unmeasured: a hireling's items, an Iron Golem
   item (Open questions). A corpse was measured on the final `bdDead`
   save (§8.3 rules 6–7). A live hired rogue's header block and its
   empty `jf` list were measured on `bdMercTwo`, and a Clay Golem's
   empty `kf` on `bdGolem` (§2.5 rule 3, §8.4 rule 5, §8.5 rule 4).
+  Classic saves and game re-saves of d2rs-generated files were
+  measured in the C66 run (Open question 3; §2.8, §8.2 rule 7, §9
+  rule 6).
 - **Target version:** 1.14d
 - **Crate/module:** `d2-formats::d2s` (byte layout, checksum, section
   framing); the load effects (§9) belong to `d2-server` character
   storage.
-- **Related specs:** `items/bitstream.md` (one item record, the
+- **Related specs:** `formats/d2s-load.md` (new-character start and load
+  effects, §9 rules 6–7); `items/bitstream.md` (one item record, the
   per-item `JM` marker and socketed children); `world/quests.md` §1
   (quest flag records, load normalisation §1.6, NPC intro bits §6.7);
   `world/waypoints.md` §2–§3 (waypoint records and the `WS` section
@@ -35,26 +39,26 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 60–74 |
-| Inputs | 75–84 |
-| Outputs / state changes | 85–90 |
-| Rules | 91–92 |
-|   1. File layout and framing | 93–138 |
-|   2. Header (335 bytes) | 139–348 |
-|   3. Checksum (`0x00411130`) | 349–359 |
-|   4. Quest section (298 bytes at 0x14F) | 360–375 |
-|   5. Waypoint section (80 bytes at 0x279) | 376–381 |
-|   6. NPC flag section (52 bytes at 0x2C9) | 382–420 |
-|   7. Stats and skills | 421–513 |
-|   8. Item sections | 514–656 |
-|   9. Load sequence (`0x0056B180`) | 657–676 |
-|   10. Errors | 677–723 |
-| Constants & data dependencies | 724–743 |
-| Randomness | 744–748 |
-| Edge cases & original bugs | 749–787 |
-| Test vectors | 788–823 |
-| Provenance | 824–901 |
-| Open questions | 902–957 |
+| Summary | 64–78 |
+| Inputs | 79–88 |
+| Outputs / state changes | 89–94 |
+| Rules | 95–96 |
+|   1. File layout and framing | 97–142 |
+|   2. Header (335 bytes) | 143–374 |
+|   3. Checksum (`0x00411130`) | 375–385 |
+|   4. Quest section (298 bytes at 0x14F) | 386–406 |
+|   5. Waypoint section (80 bytes at 0x279) | 407–412 |
+|   6. NPC flag section (52 bytes at 0x2C9) | 413–451 |
+|   7. Stats and skills | 452–544 |
+|   8. Item sections | 545–729 |
+|   9. Load sequence (`0x0056B180`) | 730–754 |
+|   10. Errors | 755–801 |
+| Constants & data dependencies | 802–821 |
+| Randomness | 822–826 |
+| Edge cases & original bugs | 827–893 |
+| Test vectors | 894–933 |
+| Provenance | 934–1013 |
+| Open questions | 1014–1084 |
 <!-- /index -->
 
 ## Summary
@@ -346,6 +350,28 @@ character's file was also 335 bytes before its first save).
    magic and ≥ 0x14F bytes → keep u16 +0x24 in the client, write the
    received bytes unchanged as the file.
 
+#### 2.8 Appearance bytes are rebuilt on every save
+
+1. The writer (`0x00568F20`, `0x0056923A`–`0x00569269`) fills all 32
+   bytes +0x88..+0xA7 with 0xFF and then calls `0x0063E510`(player,
+   components +0x88, colours +0x98). That function walks the player's
+   inventory item list and changes bytes only for items in mode 1
+   (equipped, unit +0x10 = 1); every other byte stays 0xFF. Nothing
+   else writes these 32 bytes, and the loader does not read them
+   (§2.2), so the bytes a file holds before a load never reach the next
+   save: they are a function of the items equipped at save time.
+2. So a character with no equipped item saves 32 × 0xFF, whatever its
+   file held before (the stub's `01` fill of §2.6 included). Measured:
+   two generated characters (`TestAma`, `TestSor`, no equipped item)
+   whose files held the stub's 16 component bytes were re-saved by the
+   game with all 16 components 0xFF; `bdDead` (weapon on the corpse,
+   nothing equipped) has all 0xFF; the fresh saves have bytes only at
+   the right-hand (+0x8D) and shield (+0x8F) slots (§2.1).
+3. A writer that builds a save of a loaded character must therefore
+   recompute these bytes from the equipped items, not copy them from
+   the loaded file. The per-item byte mapping (`0x0063DA70` and the
+   composite branch of `0x0063E510`) is Open question 17.
+
 ### 3. Checksum (`0x00411130`)
 
 1. s = 0 (u32). For each byte b of the file, in order: s := rotl(s, 1)
@@ -372,6 +398,11 @@ character's file was also 335 bytes before its first save).
    0x216F6F57 / 6 → 15. The size at +8 is not read. Each record is
    copied in with normalisation (`world/quests.md` §1.6).
 3. Record contents: `world/quests.md` §1 (slot q = bytes 2q, 2q+1).
+4. Which bits a completed quest leaves in its slot (what a save of a
+   character that finished a quest holds, and so what a save editor
+   must write for "completed") is defined in `specs/world/quests.md`
+   (quests-core owner), not here; this section only carries the 96
+   bytes per difficulty.
 
 ### 5. Waypoint section (80 bytes at 0x279)
 
@@ -560,7 +591,20 @@ them); this list is a measurement, not a constant.
    word is stored as the item has it: the starting items carry 0x2000
    (`items/generation.md` §1.4) in eight saves, and it was clear on
    every item of one save of a character that had been played longer
-   (what clears it is not traced here).
+   (what clears it is not traced here; it is the load, §8.2 rule 7).
+9. Every save-format call of the item writer `0x006313E0` passes save =
+   1, children = 1 and alt-code = 0: `0x00531712` (`0x005316D0`), the
+   five calls of `0x005317B0` (`0x00531899`, `0x005318C3`, `0x005318F0`,
+   `0x00531929`, `0x0053195A`), `0x00541B5C` (`0x00541B10`) and
+   `0x0055A2E1` (`0x0055A2A0`); the remaining two calls are the network
+   senders (`items/bitstream.md` Open question 1). So a game-written
+   save never holds an alt-code record (header bit 0x2000000).
+10. Children are written for every item that has its own inventory
+    (`0x006312B0`: alt-code 0, children 1 and unit +0x60 ≠ 0), compact
+    or full, whatever its type's `hasinv`; the "filled sockets" count
+    the reader uses (§8.2 rule 4) is written only in a full record and
+    counts the inventory only when `hasinv` ≠ 0 (`0x0062A900`, 3 bits).
+    The writer does not compare the two (edge case 15).
 
 #### 8.2 Item list reading (`0x005337F0` → `0x005335E0`)
 
@@ -582,6 +626,30 @@ them); this list is a measurement, not a constant.
    matches a runeword (`items/properties.md` §10.1) is passed to
    `0x00563470` (refresh by item mode; Open question 13).
 6. Errors inside the player list surface as internal 20 (`0x0056A7E0`).
+7. Item flags on load. Every save item (top-level, child, corpse,
+   hireling and golem lists alike: `0x005335E0` at `0x00533665` /
+   `0x00533712` and `0x0056ACE0` both create through `0x00558CB0`)
+   gets, after its record is decoded (`0x0062E430`, which drops 0x80000
+   and the alt-code bit 0x2000000 from the stored flags): flag 0x80000
+   set and flag 0x2000 (instore) cleared (`0x00558D37`–`0x00558D4C`,
+   flag setter `0x006280D0`(item, mask, on) on item data +0x18), then
+   the replenish timers of `items/generation.md` §9 step 6
+   (`0x00558530`, `0x00558580`). So a file's 0x2000 never survives a
+   load, and the next save writes the flags without it (the writer's
+   own changes, 0x80000 cleared and 0x800000 set, are
+   `items/bitstream.md` §2 rule 1). Only items created since the last
+   load (start items, drops, vendor items) are saved with 0x2000.
+   Measured on two generated characters: a compact `hp1 ` saved with
+   flags 0x00A02010 and a full `lsd ` with 0x00802010 were re-saved by
+   the game as 0x00A00010 and 0x00800010, every other record bit
+   unchanged (record lengths 14 and 23 bytes, trailer, item level,
+   position, quality); the fresh characters' start items keep 0x2000
+   (§8.1 rule 8) because they were created, not loaded.
+8. Child count. The number of children read after an entry (rule 4)
+   comes from the record peek `0x0062AE20`: the 3-bit "filled sockets"
+   value of a full record, and 0 when the flags have 0x200000
+   (compact) or 0x2000000 (alt-code), so compact and alt-code entries
+   never have children on load.
 
 #### 8.3 Corpse section
 
@@ -653,6 +721,11 @@ them); this list is a measurement, not a constant.
 4. Measured (`bdGolem`): a Necromancer saved with a live Clay Golem
    (class 289, skill 75) writes g = 0 and the file ends `6B 66 00`, as
    rule 1 requires (class ≠ 0x123): a Clay Golem is not saved.
+5. The reader checks only that the 2 marker bytes fit
+   (`0x0056AE73`–`0x0056AE78`); it then reads g at the cursor without a
+   bounds check (`0x0056AE85`). A classic game returns before any read
+   (game +0x70 = 0, `0x0056AE5B`), so rule 2 applies to expansion
+   games only. Edge case 16.
 
 ### 9. Load sequence (`0x0056B180`)
 
@@ -673,6 +746,11 @@ them); this list is a measurement, not a constant.
    68, 69 (`velocitypercent`, `attackrate`, `other_animrate`) := 100;
    stat 30 (`nextexp`) := `0x00611800`(class, level).
 5. On any error after the player unit exists, the unit is removed.
+6. New-character start (`0x00569F80`, rule 1): `formats/d2s-load.md`
+   §1 (what it creates, and why a 335-byte stub grows to a full save).
+7. Load effects in the master's order, each with its code and owner
+   spec (what `d2-server` character storage applies after
+   `d2-formats` parsed the bytes): `formats/d2s-load.md` §2.
 
 ### 10. Errors
 
@@ -784,6 +862,34 @@ draws.
     the corpse's saved position carries no information.
 13. A Clay Golem is not saved: `kf` count 0 (§8.5 rule 4); only an
     Iron Golem's item is kept, so no other summon survives a save.
+14. Alt-code records (item header bit 0x2000000) never occur in a
+    game-written save (§8.1 rule 9). A hand-made one is still accepted:
+    the record ends after its base code (no unit +0x28, no trailer;
+    `items/bitstream.md` §4.1 rule 4) and it has no children (§8.2
+    rule 8). d2rs reads it the same way and never writes one.
+15. Children vs. the filled count (§8.1 rule 10): the writer writes a
+    child for every item in an item's inventory, the reader reads as
+    many as the 3-bit filled count (0 for compact records, 0 when
+    `hasinv` = 0, at most 7). A mismatch would make the reader take a
+    child as the next top-level entry. All 13 saves of this PC parse
+    to their last byte, so none has a mismatch; d2rs's
+    writer refuses an item whose child count differs from the count its
+    record carries, since the game could not read such a file back.
+16. A file that ends right after the `kf` marker (`6B 66`, no g byte)
+    makes the reader take g from the byte after the file's data (§8.5
+    rule 5). In single player that byte is uninitialised stack in the
+    8,192-byte read buffer of `0x005343A0` (filled only up to the file
+    length by `fread`), so the outcome is not defined by the file: g =
+    0 loads, anything else needs skill 90 and an item record from 0
+    remaining bytes and fails with 23 (result 10). Only a hand-made
+    file can do this (size and checksum must match); d2rs rejects it
+    with 23.
+17. Item flag 0x2000 (instore) in a file has no effect: the loader
+    clears it on every item (§8.2 rule 7). A writer may set or clear it
+    on hand-built items; the game-equivalent choice for a character
+    that was loaded at least once is clear.
+18. The 32 appearance bytes are never carried over from a loaded file
+    (§2.8); copying them makes a save differ from the game's.
 
 ## Test vectors
 
@@ -812,6 +918,10 @@ save.
 | hotkey: skill 36, left flag, no item | `24 80 00 00` | §2.4 rule 1 |
 | hotkey: none | `FF FF 00 00`; decodes to skill −1, item −1 | §2.4 rules 1, 4 |
 | expansion, hireling present with no items, no golem | `6A 66 4A 4D 00 00 6B 66 00` | §8.4 rules 2, 5; §8.5 |
+| a compact item stored with flags 0x00A02010, loaded, saved again (nothing else changed) | flags written 0x00A00010; the rest of its record unchanged | §8.2 rule 7; `items/bitstream.md` §2 rule 1 |
+| a full item stored with flags 0x00802010, loaded, saved again | flags written 0x00800010 | §8.2 rule 7 |
+| header +0x88..+0x97 = `01 01 01 01 01 FF FF FF 01 01 FF FF FF FF FF FF`, no equipped item, loaded and saved | +0x88..+0xA7 = 32 × `FF` | §2.8 rules 1–2 |
+| a full record with flags bit 0x200000 or 0x2000000 followed by further bytes | child count 0: the next bytes are the next top-level entry | §8.2 rule 8 |
 
 Real-save checks (`#[ignore]`, `D2_GAME_DIR` or the user's save
 folder): every 1.14d `.d2s` passes §3 and §2.2 rule 2, its sections
@@ -890,6 +1000,8 @@ and prints every field; it holds no save data.
   setter call sites were found with `tools/ghidra/disasm.py xref`
   (raw rel32 scan; the Ghidra export lists the setter with 0
   callers).
+- Second pass (DS questions of `docs/handoff/impl-d2s.md`, local run
+  C66): addresses and saves in `formats/d2s-load.md` Provenance.
 - D2MOO 1.10f `PlrSave2.h`/`.cpp` (hint for names: `dwWeaponSwitch`,
   `dwCreateTime`, `nGuildEmblemBgColor`, `D2MercSaveDataStrc`,
   client save flags). Every rule above was read in the 1.14d code.
@@ -911,6 +1023,13 @@ and prints every field; it holds no save data.
    matched. Still open: a classic (non-expansion) character, to see
    status without 0x20 and a file ending after the corpse section
    with no `jf`/`kf`.
+   **Answered** (classic part; C66 run 2026-10-07, `local-buddy-q-saves.md`):
+   13 saves round-trip byte for byte; the classic `TestAma` and the
+   classic stub `TestStub` were loaded and re-saved by 1.14d: status
+   without 0x20 (`TestStub` 0), and the file ends after the corpse
+   header with no `jf` / `kf` (§1 rule 2, §8.5 rule 5 `0x0056AE5B`).
+   The game's re-saves differ from d2rs-generated files only as §2.8
+   and §8.2 rule 7 explain.
 4. **Answered** (confirmed on bdMercTwo (1.14d, hired rogue); §2.5
    rule 3, §8.4 rule 5): a live Act I rogue writes flags 0, its seed,
    name index, `Id` 0 and experience, and `jf` carries a count-0 list
@@ -954,3 +1073,11 @@ and prints every field; it holds no save data.
     writes `kf` count 0 (§8.5 rule 4), so it does not settle this.
 16. Result texts: the strings shown for results 1–26 (character
     select error dialog).
+17. Appearance byte mapping (§2.8 rule 3): which of the 16 component
+    and 16 colour bytes each equipped item sets, and to what value
+    (`0x0063DA70`, the composite branch of `0x0063E510` via
+    `0x0064F420`/`0x0064F500`/`0x0063D900`/`0x0062C100`, and the item
+    class from `0x00627D40`). Settle: Ghidra on those functions, checked
+    against saves with a weapon, a shield, a helm, a body armour and
+    dyed or coloured items equipped. Needed for a d2rs writer to
+    reproduce +0x88..+0xA7; the loader never reads them.
