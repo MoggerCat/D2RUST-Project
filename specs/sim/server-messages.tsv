@@ -162,7 +162,7 @@ id	name	size	layout	sender	client_handler	client_unit_handler	produced_by	confir
 0xA0	MercStatDword	10	stat:u8@1 merc:u32@2 value:u32@6	0x0053BEE0 0x0053BFD0	0x0045D540	-	sim	yes
 0xA1	MercAddExpByte	7	stat:u8@1 merc:u32@2 delta:u8@6	0x0053BFD0	0x0045D540	-	sim	yes
 0xA2	MercAddExpWord	8	stat:u8@1 merc:u32@2 delta:u16@6	0x0053BFD0	0x0045D540	-	sim	yes
-0xA3	UnknownA3	24		0x0053C0E0	0x0045D5E0	-	sim	yes
+0xA3	UnknownA3	24	v:u8@1 skill:u16@2 level:u16@4 type:u8@6 guid:u32@7 target_type:u8@0xB target:u32@0xC x:u32@0x10 y:u32@0x14	0x0053C0E0	0x0045D5E0	-	sim	yes
 0xA4	BaalWave	3		0x0053E1A0	0x0045D760	-	sim	yes
 0xA5	UnknownA5	8	type:u8@1 guid:u32@2 skill:u16@6	0x0053C190	0x0045D6A0	-	sim	yes
 0xA6	UnknownA6	u16@2;min=4		0x0053E1C0	0x0045EDC0	-	sim	yes
