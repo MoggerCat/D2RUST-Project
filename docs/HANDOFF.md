@@ -5170,6 +5170,13 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
 - `monsters/init.md` §27: kill a fetish shaman (Act III); log the
   `0x00574370` call (class 278–282 → 141–145, mode 1) and its rng draws
   with callers.
+- `combat/events.md` OQ1: items with knockback, freeze, slow,
+  skill-on-hit, damage-to-mana; Energy Shield, Bone Armor, Iron Maiden
+  in play. Log each event function's entry / return (table
+  `0x007325B0` targets), H's seed before / after, and the record.
+- `skills/levels.md` §7.5 / §7.6 (no OQ, unverified): equip an aura
+  item (e.g. Dragon) and a charged item; log `0x005BF510` /
+  `0x00647320` calls and the type-9 timers they schedule.
 
 ## 8. Lessons (problems met, fixes)
 
