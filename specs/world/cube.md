@@ -21,22 +21,22 @@
 | Inputs | 56–68 |
 | Outputs / state changes | 69–79 |
 | Rules | 80–81 |
-|   1. Routing | 82–98 |
-|   2. Put an item into the cube (C→S 0x2A) | 99–145 |
-|   3. Transmute entry (`0x005665F0`) | 146–158 |
-|   4. Recipe eligibility | 159–173 |
-|   5. Ops | 174–193 |
-|   6. Input matching | 194–262 |
-|   7. Outputs | 263–397 |
-|   8. Commit | 398–466 |
-|   9. Portals | 467–486 |
-|   10. C→S 0x4C is not the cube | 487–501 |
-| Constants & data dependencies | 502–525 |
-| Randomness | 526–544 |
-| Edge cases & original bugs | 545–579 |
-| Test vectors | 580–624 |
-| Provenance | 625–663 |
-| Open questions | 664–772 |
+|   1. Routing | 82–99 |
+|   2. Put an item into the cube (C→S 0x2A) | 100–146 |
+|   3. Transmute entry (`0x005665F0`) | 147–159 |
+|   4. Recipe eligibility | 160–174 |
+|   5. Ops | 175–194 |
+|   6. Input matching | 195–263 |
+|   7. Outputs | 264–398 |
+|   8. Commit | 399–467 |
+|   9. Portals | 468–487 |
+|   10. C→S 0x4C is not the cube | 488–502 |
+| Constants & data dependencies | 503–526 |
+| Randomness | 527–545 |
+| Edge cases & original bugs | 546–580 |
+| Test vectors | 581–625 |
+| Provenance | 626–664 |
+| Open questions | 665–773 |
 <!-- /index -->
 
 ## Summary
@@ -87,6 +87,7 @@ C→S 0x4C is **not** the cube (§10).
 | C→S 0x4F, any button | `0x00568060` | No active interaction (player +0x6C = 0): queue 0x77 with 0x0C, result 0. |
 | C→S 0x4F button 0x17 | `0x00568060` → `0x00566AE0` | Interaction type ≠ 4 → result 3. Else reset it (GUID −1, type 6, active 0, `0x00554190`), then `0x0055FA40`; result 0. |
 | C→S 0x4F button 0x18 | `0x00568060` → `0x00566AE0` → `0x005665F0` | Interaction type ≠ 4 → result 3. Type 4: transmute (§3); result 0. The GUID is not checked: any interaction of type 4 transmutes page 3. |
+| C→S 0x4F buttons 0x12–0x14 (stash) | `0x00568060` → `0x00564D50` | Interaction type ≠ 2 → nothing (result 0). Type 2: the interaction unit must be an object of class 0x10B (stash) and the player's and the stash's rooms must be town levels (`0x0061AB00`), else nothing. Amount a = the u32 of §1 of `sim/intents-events.md` rule 15 (p1 high, p2 low). **0x12** (close): end the interaction (`0x00554190`, type 2 only), `0x0055FA40`. **0x13** (withdraw): a > 0, a ≤ stash gold (stat 15) and inventory gold (stat 14) + a ≤ the gold limit (`0x00622E70`, level × 10,000): stat 14 += a (`0x0055B060`), then stat 15 −= a (`0x0053FF00(player, 15, −a)`; `0x0053FF00` adds a delta to a stat, clamping a negative result to 0 and, for a player, stat 14 / 15 above the gold limit / stash cap to 0); over the limit → `0x00553380` (refusal), nothing moves; a ≤ 0 or a > stash gold → nothing. **0x14** (deposit): a > 0 and a ≤ stat 14: if stat 15 + a ≤ the stash cap (`0x00623460`) stat 14 −= a, stat 15 += a; else if stat 15 < cap, stat 15 += cap − stat 15 and stat 14 −= the same; else nothing (`0x0053FF00` pairs). Client side: `ui/inventory.md` §11. |
 | C→S 0x2A | `0x0054B790` → `0x005628C0` | §2 |
 | C→S 0x4C | `0x0054C760` | body-part transmogrify, not the cube (§10) |
 
