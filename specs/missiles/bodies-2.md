@@ -405,8 +405,8 @@ unit, skill, x, y, radius 0, level, 0, cb} and runs `0x0056DCC0`:
    level, 0)`.
 
 Both callbacks call `0x005D0C40(game, missile, U, 124, level, last)`
-(D2MOO `SKILLS_ApplyRedemptionEffect`; skills spec, not yet written,
-Open question 4) with last = 0 for `0x005AD8F0` and 1 for `0x005AD910`.
+(D2MOO `SKILLS_ApplyRedemptionEffect`; `skills/bodies-2b.md` §8.9
+"Per-corpse effect") with last = 0 for `0x005AD8F0` and 1 for `0x005AD910`.
 
 **Unit find** (`0x0065A950` / `0x0065AC70` / `0x0065AA40`): owned by
 `monsters/umod-callbacks.md` §3.1 (rooms, found order, filter flags).
@@ -668,7 +668,7 @@ Server-hit 53:
 3. t < 10 → return 1. t > `elem_len(O, k, L, 1)` (`0x00644F20`,
    `skills/levels.md` §3.2) → return 1.
 4. `0x005C7DB0(game, O, unit, t, k, L)` (D2MOO `sub_6FCFEDD0`, the
-   rabies poison; skills spec, Open question 5). Return 2.
+   rabies poison) = `plague` (`skills/bodies-2.md` §2.18). Return 2.
 
 ### 57. Server-do 32 Tiger Fury `0x005B03E0`
 
@@ -896,11 +896,14 @@ Created missiles and monsters draw on their own seeds.
 3. *Answered* (`impl-missile-bodies-2` Q6): the unit find (rooms,
    found order, default filter) is owned by `monsters/umod-callbacks.md`
    §3.1; flags 0x3002 = dead monsters (mode 12) outside towns within r.
-4. `0x005D0C40` (D2MOO `SKILLS_ApplyRedemptionEffect`) has no spec: the
-   skills spec should own it (Redemption's per-corpse effect; called
-   with last = 1 on the final frame).
-5. `0x005C7DB0` (rabies poison from a contagion, D2MOO `sub_6FCFEDD0`)
-   has no spec; the skills spec should own it.
+4. Answered (2026-10-08): `0x005D0C40` (D2MOO
+   `SKILLS_ApplyRedemptionEffect`) is specified in `skills/bodies-2b.md`
+   §8.9 "Per-corpse effect" (source = the missile, draw on its seed, no
+   draw when last = 1); §44 points there.
+5. Answered (2026-10-08): `0x005C7DB0` is `plague`, owned by
+   `skills/bodies-2.md` §2.18 (infect `0x005C7B10`, spreader
+   `0x005C7CE0`; called as `plague(game, O, unit, t, k, L)`, len = t);
+   §56 server-hit step 4 points there.
 6. Server-do 32 (§57): confirm with a Tiger Strike / Royal Strike
    recording that no tigerfurytrail missile is ever created.
 7. `0x0058E920` (Tyrael's spawn in the Worldstone Chamber) and the quest

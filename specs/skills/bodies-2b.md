@@ -777,6 +777,28 @@ caster):
 Unlike srvdo 66 (`bodies.md` Edge case 9) the count is kept: a player
 pays the mana cost for every run that redeems something.
 
+**Per-corpse effect** `0x005D0C40` (D2MOO
+`SKILLS_ApplyRedemptionEffect`): `redeem(game, S, U, skill, L, last)`
+(ECX game, unused; EDX source S; `ret 0x10`). The only callers are the
+radament-death missile callbacks `0x005AD8F0` (last 0) and `0x005AD910`
+(last 1) (`missiles/bodies-2.md` §44), so S is that missile and skill
+is 124:
+
+1. skill not in 0…skills count − 1, U none, or `0x006456D0(U)` fails
+   (the corpse test of callback step 1) → 0.
+2. last = 0: p = `eval(S, calc1)` (skills +0x138); one draw `roll(100)`
+   on **S's** seed (S + 0x20, `0x0045C390`); draw ≥ p → 0. last ≠ 0: no
+   draw, the corpse is always taken.
+3. S life (stat 6) := min(life + `eval(S, calc2)` << 8, maximum life
+   `0x00625D10`); S mana (stat 8) := min(mana + `eval(S, calc3)` << 8,
+   maximum mana `0x00625D60`) (`0x00625480` / `0x00627260`).
+4. U state 99 (`redeemed`) on (`0x00639DB0`); U flags (+0xC4) &= ~6.
+   Return 1.
+
+Steps 2–4 are callback steps 2–4 with the caster replaced by S and the
+roll skipped on the last frame; no count and no mana cost. The heal of
+step 3 goes to the missile, not to Radament.
+
 #### 8.10 srvst 38 Whirlwind `0x005D8F50`
 
 1. R invalid → 0. E = the unit's entry of the skill; none, or the target
