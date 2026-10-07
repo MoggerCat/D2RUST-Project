@@ -43,7 +43,7 @@
 | Edge cases & original bugs | 1700–1749 |
 | Test vectors | 1750–1770 |
 | Provenance | 1771–1808 |
-| Open questions | 1809–1832 |
+| Open questions | 1809–1834 |
 <!-- /index -->
 
 ## Summary
@@ -1829,3 +1829,5 @@ the file; `0x005D3880`, `0x005D3970`; `0x005C37C0`, `0x005C35C0`;
    31, 19, 7, 6 on the summon (§6.4, §6.5) and the AI think at F + 25.
 
 Batch 3 (the 85 slots used by one class skill, Constants "count 1") is in `skills/bodies-2.md`.
+
+Batch 4 (monster slots) is in `skills/bodies-3.md` / `bodies-4.md`; its §2 answers the implementation questions on §2.16 (left / right skill order corrected), §6.1, §6.2, §6.5, §6.15.
