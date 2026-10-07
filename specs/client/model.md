@@ -50,7 +50,7 @@
 | Edge cases & original bugs | 804–812 |
 | Test vectors | 813–860 |
 | Provenance | 861–919 |
-| Open questions | 920–998 |
+| Open questions | 920–1000 |
 <!-- /index -->
 
 ## Summary
@@ -703,9 +703,9 @@ as a model rule; the bridge reproduces it as a `ClientWorld` operation
 with exactly this effect, at the point of 1.14d order where the UI
 function runs. Rules 1–3 run when the UI layer performs the 1.14d UI
 function that contains them (`client/msg-ui.md` §16, `ui/messages.md`
-§11, §13, §14); how that UI request reaches the model under
-`client/bridge.md` §10 r6 is `client/msg-ui.md` open question 10 (not
-decided here). Rule 4 is model-side and decided here. "Flag bit n" is
+§11, §13, §14); the UI request reaches the model through the
+bridge (`client/bridge.md` §10 r10: the UI layer returns the write as a
+request, the bridge applies it before the next message; §10 r6 stands). Rule 4 is model-side and decided here. "Flag bit n" is
 the unit flag word +0xC4 (`client/msg-ui.md` OQ2 owns the full word;
 bit 0x2 is the bit of `client/msg-ui.md` §1 r4 and §16).
 
@@ -989,7 +989,9 @@ mode 1; rule 2's refusal also runs the stock discard.
     message output. d2rs needs a way for the update pass to hand it to
     the UI layer in 1.14d order (e.g. a new `client/bridge.md` §10
     output variant emitted by the update pass; a code-table change) —
-    decide together with `client/msg-ui.md` open question 10.
+    (`client/msg-ui.md` open question 10 is answered by
+    `client/bridge.md` §10 r10, which covers the model writes; the hand-off
+    of the update pass to the UI layer stays open.)
 17. §17 rule 4: whether 1.14d ever runs the in-game UI draw
     (`0x0044C990` → `0x00456EE0`) a different number of times than
     the receive per frame (frame skip, minimized window). It matters

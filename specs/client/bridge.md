@@ -46,13 +46,13 @@
 |   7. Bevy mirror | 236–254 |
 |   8. Frame pacing | 255–275 |
 |   9. Versioning | 276–286 |
-|   10. Client outputs (bridge → UI and audio) | 287–403 |
-| Constants & data dependencies | 404–418 |
-| Randomness | 419–422 |
-| Edge cases & original bugs | 423–431 |
-| Test vectors | 432–462 |
-| Provenance | 463–473 |
-| Open questions | 474–509 |
+|   10. Client outputs (bridge → UI and audio) | 287–415 |
+| Constants & data dependencies | 416–430 |
+| Randomness | 431–434 |
+| Edge cases & original bugs | 435–443 |
+| Test vectors | 444–474 |
+| Provenance | 475–485 |
+| Open questions | 486–521 |
 <!-- /index -->
 
 ## Summary
@@ -359,6 +359,18 @@ model state: 1.14d's handler calls a UI or sound function directly
    One UI writer runs outside any output: the town exit `0x004B3E10`
    from the local player's update (`client/model.md` §17 r5, open
    question 16 there).
+10. **UI-requested model writes** (2026-10-08, user decision; answers
+   `client/msg-ui.md` open question 10). Rule 6 stands: a consumer never
+   writes `ClientWorld`. The model writes that 1.14d makes inside UI code
+   (the 0x28 dialog branch, `client/msg-ui.md` §16 r4.3 / r5; interaction
+   end, menu open and stock discard, `client/model.md` §17 r1–r4) go
+   through the bridge: the UI layer, while it applies the output, returns
+   each write as a request (unit, the field and value of the owning model
+   rule); the bridge applies the requests to the model in request order
+   before it handles the next message of the frame, which is the point
+   1.14d makes them (inside the receive). The UI layer decides from its
+   own state; the bridge does not re-decide. A C→S send the same code
+   makes (0x28's 0x31) uses the send path of rule 6.
 
 <!-- rows -->
 | Variant | Payload | Producer | Consumer | Owner (what the consumer does) |

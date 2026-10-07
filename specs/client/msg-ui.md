@@ -42,19 +42,19 @@
 |   13. 0x52 quest log status (`0x0045CC00` → `0x004A40D0`) | 498–510 |
 |   14. 0x5E game quest availability (`0x0045E570` → `0x004B92B0`) | 511–518 |
 |   15. 0x9B hireling revive state (`0x0045EAC0` → `0x004B6980`) | 519–529 |
-|   16. 0x28 NPC dialog start and quest flags (`0x0045D370` → `0x004B6DD0`) | 530–583 |
-|   17. 0x62 NPC dialog end (`0x0045D390` → `0x004B5320`) | 584–596 |
-|   18. 0x2A NPC transaction (`0x0045E0D0` → `0x004B6390`) | 597–607 |
-|   19. 0x5A event text (`0x0045E070` → `0x0049EB10`) | 608–627 |
-|   20. 0x61 act video (`0x0045E660`) | 628–635 |
-|   21. 0x76 overhead clear (`0x0045E050` → `0x0049F8C0`) | 636–643 |
-|   22. 0x7B skill hotkey (`0x0045E8D0` → `0x004AA0C0`) | 644–653 |
-| Constants & data dependencies | 654–665 |
-| Randomness | 666–670 |
-| Edge cases & original bugs | 671–687 |
-| Test vectors | 688–735 |
-| Provenance | 736–786 |
-| Open questions | 787–869 |
+|   16. 0x28 NPC dialog start and quest flags (`0x0045D370` → `0x004B6DD0`) | 530–584 |
+|   17. 0x62 NPC dialog end (`0x0045D390` → `0x004B5320`) | 585–597 |
+|   18. 0x2A NPC transaction (`0x0045E0D0` → `0x004B6390`) | 598–608 |
+|   19. 0x5A event text (`0x0045E070` → `0x0049EB10`) | 609–628 |
+|   20. 0x61 act video (`0x0045E660`) | 629–636 |
+|   21. 0x76 overhead clear (`0x0045E050` → `0x0049F8C0`) | 637–644 |
+|   22. 0x7B skill hotkey (`0x0045E8D0` → `0x004AA0C0`) | 645–654 |
+| Constants & data dependencies | 655–666 |
+| Randomness | 667–671 |
+| Edge cases & original bugs | 672–688 |
+| Test vectors | 689–736 |
+| Provenance | 737–787 |
+| Open questions | 788–874 |
 <!-- /index -->
 
 Owned ids: 0x26, 0x27, 0x29, 0x4E, 0x4F, 0x50, 0x52, 0x58, 0x5D, 0x5E,
@@ -571,15 +571,16 @@ layer.
    effects (bold) write the model (unit flag 0x2, U's mode and path, U's
    and the local player's facing) and one sends C→S 0x31. Under
    `client/bridge.md` §10 r6 a consumer may send (the send path) but
-   not write the model: open question 10.
+   not write the model; the bold writes go through the bridge as UI
+   requests (`client/bridge.md` §10 r10; open question 10, answered).
 6. **More model writes in the UI functions named here** (2026-10-08):
    `0x004B3C20` (B1, B4, and every interaction end), `0x004B3830` (the
    `NpcGone` output of r3, and the refused menu open of B6
    `0x004B66B0`) and `0x004B66B0` itself write the model: the NPC's
    stock items leave S, the NPC's unit flag bit 0x2, flag bit 0x40 and
    mode, the local player's data +0x150…+0x15C. They are stated as
-   model rules in `client/model.md` §17; how the UI layer's request
-   reaches the model is open question 10.
+   model rules in `client/model.md` §17; the UI layer's request reaches
+   the model through the bridge (`client/bridge.md` §10 r10).
 
 ### 17. 0x62 NPC dialog end (`0x0045D390` → `0x004B5320`)
 
@@ -805,7 +806,8 @@ re-read on the 1.14d export): §5 r3 `0x004A1600` (`0x004A167A`,
    `[0x007C0D43]` is written by 0x28 (`0x0045D370` → `0x004B6DD0`: type
    6, and the NPC-interaction path with a unit, both
    `0x0065C4D0([0x007C0D43], bytes @7, 0x60, 0)`). *0x28 answered*:
-   owned and split in §16 (residue: open question 10).
+   owned and split in §16 (open question 10 answered: `client/bridge.md`
+   §10 r10).
 5. The trade helpers `0x004B8BF0`, `0x004B85E0`, `0x004B8AD0`,
    `0x00489360`, `0x004897E0`, `0x00487B30` (trade screen; out of Phase
    0–6 single-player scope except code 0x0C's close path).
@@ -840,7 +842,10 @@ re-read on the 1.14d export): §5 r3 `0x004A1600` (`0x004A167A`,
    and calls method +0x18 (buffer, 0x100), before the message-log copy
    `0x0049DBC0` (`ui/messages.md` §2 r2 owns the screen-message rule).
    Open: what +8, +0x14 and +0x18 do with their input.
-10. 0x28's dialog branch (§16 r4.3) writes the model from the UI layer
+10. Answered (2026-10-08, user decision): the writes go through the
+    bridge as UI requests, applied before the next message;
+    `client/bridge.md` §10 r6 unchanged, new §10 r10. The question was:
+    0x28's dialog branch (§16 r4.3) writes the model from the UI layer
     (unit flag 0x2 cleared, the NPC's mode and facing, the local
     player's facing, the NPC's path stop), which `client/bridge.md` §10
     r6 forbids. Either the inputs it decides on (`[0x007C0C68]`, the NPC
