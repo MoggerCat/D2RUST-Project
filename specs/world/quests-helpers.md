@@ -7,7 +7,8 @@
 - **Crate/module:** `d2-sim::world::quests` (the `QuestWorld` seams
   `free_spot`, `free_spot_at`, `critical_spawn`, `spawn_superunique`,
   `spawn_superunique_at_unit`, `quest_missile`, `create_missile_at`,
-  `end_interaction`, `end_game`) and the host (`d2-server`) for §6.
+  `end_interaction`, `end_game`, `kill_monster`, `close_town_portal`)
+  and the host (`d2-server`) for §6.
 - **Related specs:** `world/quests.md` (record layout, §4 events);
   the per-act files that call these helpers (`quests-act1.md` …
   `quests-act5-2.md`); `drlg/rooms.md` §1 (room sub-tile box `0x00619730`),
@@ -20,22 +21,23 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 41–50 |
-| Inputs | 51–58 |
-| Outputs / state changes | 59–63 |
-| Rules | 64–65 |
-|   1. Free-spot search (`0x00545340(room R0, &point, size s, mask m, &out room, unused, limit L)`) | 66–98 |
-|   2. Critical monster spawn (`0x005459A0(game, x, y, room R, flag, class)`) | 99–124 |
-|   3. Superunique spawn at a point (`0x00545C30(game, unit U, &point, kind, id)`) | 125–142 |
-|   4. Quest missiles | 143–178 |
-|   5. End a player's interaction (`0x005351C0(game, player)`) | 179–211 |
-|   6. End the game (`0x00530590(game, client c)`) — host | 212–229 |
-| Constants & data dependencies | 230–241 |
-| Randomness | 242–246 |
-| Edge cases & original bugs | 247–255 |
-| Test vectors | 256–269 |
-| Provenance | 270–280 |
-| Open questions | 281–286 |
+| Summary | 43–52 |
+| Inputs | 53–60 |
+| Outputs / state changes | 61–65 |
+| Rules | 66–67 |
+|   1. Free-spot search (`0x00545340(room R0, &point, size s, mask m, &out room, unused, limit L)`) | 68–100 |
+|   2. Critical monster spawn (`0x005459A0(game, x, y, room R, flag, class)`) | 101–126 |
+|   3. Superunique spawn at a point (`0x00545C30(game, unit U, &point, kind, id)`) | 127–144 |
+|   4. Quest missiles | 145–197 |
+|   5. End a player's interaction (`0x005351C0(game, player)`) | 198–230 |
+|   6. End the game (`0x00530590(game, client c)`) — host | 231–248 |
+|   7. Close a player's town portal (`0x00535430(game, player)`) | 249–272 |
+| Constants & data dependencies | 273–286 |
+| Randomness | 287–291 |
+| Edge cases & original bugs | 292–300 |
+| Test vectors | 301–314 |
+| Provenance | 315–327 |
+| Open questions | 328–333 |
 <!-- /index -->
 
 ## Summary
@@ -176,6 +178,23 @@ the victim, skill 0, level 1, class 625 (`baalfx control`), (x, y) = the
 victim's position. That missile later spawns Tyrael (`0x0058E920`,
 `missiles/bodies-2.md` §60).
 
+#### 4.3 Orb missile (`0x005DFEE0(game, monster M)`, Khalim's Will)
+
+Called by the Compelling Orb operate (`0x005BB980` at `0x005BBA9D`,
+`quests-act3.md` §6) right after `0x005DDFC0(game, M, 0, 0, 0)` (mode
+request mode 0 at (0, 0), `monsters/ai.md` §7.1) on the orb monster M.
+
+1. O := the first unit of type 2 and class 386 (`Dummy` / `stairsr`)
+   among M's room and its adjacent rooms (`0x0065A620(room, 2, 386)`,
+   room list `0x00619790`); none → fatal 0x8F.
+2. Zeroed record: flags 0x420, owner = origin = M, class 368
+   (`orbmist`), target = O's position (as §4.1 step 2), level 1. Create
+   (`0x0059FA30`).
+3. Made → missile data +0x28 := O's GUID (`0x0064A710`); O's room
+   refresh `0x0061AED0(room, 0)` (`drlg/rooms.md` §8). Not made and O's
+   mode is 0 → O mode := 1 and ENDANIM on O at frame + (`FrameCnt1` of
+   object 386 >> 8) (`0x005417D0`).
+
 ### 5. End a player's interaction (`0x005351C0(game, player)`)
 
 Caller (quest code): the classic Diablo credit `0x005B4A80`
@@ -227,6 +246,30 @@ point the quest rule calls them (`QuestWorld::end_game`,
 `QuestWorld::save_pass`) and changes no game state itself; the host
 runs them after the current frame's quest step, in call order.
 
+### 7. Close a player's town portal (`0x00535430(game, player)`)
+
+`0x005353F0(player)` = the GUID of the player's town portal (player
+data +0x48; null player → fatal 0x24D, no player data → 0x250).
+
+1. Null player → fatal 0x25A; no player data → fatal 0x25D.
+2. P := the object (type 2) with that GUID; none, or its class ≠ 59
+   (town portal) → nothing.
+3. Chain 35 hook `0x0058CF50(game, P)` (`quests-act5-2.md` §7.6
+   "Closed"). Q := P's partner (`0x00553720`: streams the room at P's
+   destination point (object data +0x14: act of byte +4, x +0x18, y
+   +0x1C; `0x00619DA0`, else `0x0061A140` + `0x0052D0F0`), then the unit
+   whose type / GUID are P +0x94 / +0x98).
+4. P leaves its room when it has one (`0x0061A270(room, 2, GUID)`), is
+   freed (`0x00555600`), and P's room (possibly null) is refreshed
+   (`0x0061AED0(room, 1)`).
+5. Q exists → the same three steps for Q (hook `0x0058CF50(game, Q)`
+   first).
+
+Player data +0x48 is not cleared here. Caller in the quests: the altar
+(`0x0058D2C0`: only when P's room's level is 120, `quests-act5-2.md`
+§7.8); the other callers (`monsters/population.md`, `sim/units.md`) use
+the same function.
+
 ## Constants & data dependencies
 
 | Item | Value | Source |
@@ -238,6 +281,8 @@ runs them after the current frame's quest step, in call order.
 | missile 541 flags / level | 0x420 / 1 | `0x0058C902`, `0x0058C979` |
 | missile wrapper range | 100 | `0x0056EE3C` |
 | interaction kinds | table `0x005352A4` (0, 1, 2, 3, 4) | image |
+| orb missile | class 368, object 386, flags 0x420, level 1 | `0x005DFF32`, `0x005DFF39`, `0x005DFEE9` |
+| town portal class | 59 | `0x00535482` |
 
 ## Randomness
 
@@ -275,7 +320,9 @@ Synthetic (from the rules; no recording).
 `0x0056EDE0` (`0x0056D2C0`; caller `0x0058E0F9`), `0x005351C0` (table
 `0x005352A4`, `0x00579130`, `0x00572E00`, `0x005854D0`, `0x00584820`,
 `0x00567330`, `0x0053D6D0`), `0x00530590` (`0x0052CBB0`, `0x0052CBD0`,
-`0x0052DED0`, `0x005303D0`). Object and missile names from the 1.14d
+`0x0052DED0`, `0x005303D0`), `0x005DFEE0` (caller `0x005BBA9D`,
+`0x0065A620`), `0x00535430` (`0x005353F0`, `0x00553720`, caller
+`0x0058D2C0`). Object and missile names from the 1.14d
 `objects.txt` / `missiles.txt` (Patch_D2). D2MOO not used.
 
 ## Open questions

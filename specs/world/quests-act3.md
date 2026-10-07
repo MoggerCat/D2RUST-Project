@@ -671,7 +671,7 @@ Other victims:
   += 1; below 2 → return 0 (the first valid hit does nothing). Then:
   set 18.0, 18.13; delete `qf2 `; 21.4 set → set 21.0 (when clear); the
   orb monster (+0x2C) exists → kill it (`0x005DDFC0`, `0x005DFEE0`,
-  monster spec); object mode 1 with an end-animation event; +0x0C := 1;
+  `quests-helpers.md` §4.3); object mode 1 with an end-animation event; +0x0C := 1;
   FX 10; call chain 19's seq fn; party members (`0x005BB850`): with
   18.0 → delete the five Khalim items; else in Act III → set 18.0,
   18.13, delete the five items unless trading (`0x005678A0`), and 21.4

@@ -304,7 +304,7 @@ stats 13 / 30 are read with the base getter `0x006253B0`, the level with
 - Altar init 72 (`0x0058D240`, object 546): +0x50 := GUID; mode := +0x4C.
 - Altar operate 65 (`0x0058D310`): only in object mode 0. Intro: town
   portals open → close them (`0x0058D2C0`: each player's town portal
-  (`0x005353F0`) in level 120 is closed, `0x00535430`); scroll message
+  (`0x005353F0`) in level 120 is closed, `0x00535430`, `quests-helpers.md` §7); scroll message
   20002 to the player. Not-intro and state < 4: the same; state < 2 →
   state := 2; status ≠ 3 → status 3 (the flags byte is not cleared).
   Not-intro with state ≥ 4: neither. Then altar mode 1, +0x4C := 2.
