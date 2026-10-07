@@ -51,7 +51,7 @@
 | Edge cases & original bugs | 958–976 |
 | Test vectors | 977–1008 |
 | Provenance | 1009–1037 |
-| Open questions | 1038–1107 |
+| Open questions | 1038–1108 |
 <!-- /index -->
 
 ## Summary
@@ -1095,6 +1095,7 @@ item and path-placement specs).
 13. (Answered: `quests-act1-rest.md` §5: it raises the character
     progression in the client save flags; future owner the save spec.)
 14. ~~Which bits a played completion of each quest leaves (§1.8 rule 3).~~
+    PROVISIONAL: a played completion leaves exactly the bits §1.8 rule 3 and the per-quest tables give (because those are read from the quest handlers and no other writer is known); settled by: new capture — a 1.14d expansion character that completed every quest on Normal, saved and loaded once, `d2s-tool dump` of the quest section (R-PQ-5).
     Needs recording (R-PQ-5, = HANDOFF §7 R-QC-1): a 1.14d character that completed every quest on
     Normal (expansion), saved after the last one and loaded once; dump
     the quest section (`d2s-tool dump`) and list, per slot, the bits
