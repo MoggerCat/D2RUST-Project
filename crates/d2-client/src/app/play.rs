@@ -188,7 +188,15 @@ fn log_progress(
     runs: Option<Res<NodeRuns>>,
     audio: Option<Res<GameAudio>>,
     walk: Option<Res<PreviewWalk>>,
+    mut seen_rejected: Local<usize>,
 ) {
+    // Every refused S→C message once, as it happens (a refused 0x07 or
+    // unit add leaves the model short with no other trace).
+    let rejected = &bridge.0.log().rejected;
+    for r in rejected.iter().skip(*seen_rejected) {
+        warn!("S→C 0x{:02X} refused: {}", r.id, r.error);
+    }
+    *seen_rejected = rejected.len();
     let w = bridge.0.world();
     if w.frames == 0 || !w.frames.is_multiple_of(LOG_EVERY) {
         return;
@@ -203,7 +211,15 @@ fn log_progress(
         runs.map_or(0, |r| r.get()),
         audio.map(|a| a.stats.clone()),
     );
-    info!("frame {}: {}", w.frames, where_line(w, walk.as_deref()));
+    let log = bridge.0.log();
+    info!(
+        "frame {}: {}; refused {}, dropped (unit not in the model) {:?}, discarded {}",
+        w.frames,
+        where_line(w, walk.as_deref()),
+        log.rejected.len(),
+        log.dropped,
+        log.discarded.len(),
+    );
 }
 
 /// The local player's place in the model for the progress log: its model
