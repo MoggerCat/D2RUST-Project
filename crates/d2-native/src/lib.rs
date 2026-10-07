@@ -9,6 +9,11 @@
 // ---- N1: images (png, sheet, tileset, expfield, pal)
 
 // ---- N2: text and audio (toml_kinds, tbl, wav, animdata, tables)
+pub mod animdata;
+pub mod tables;
+pub mod tbl;
+pub mod toml_kinds;
+pub mod wav;
 
 // ---- N3: converter support (manifest)
 pub mod manifest;
