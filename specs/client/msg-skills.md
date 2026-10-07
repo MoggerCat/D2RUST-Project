@@ -25,21 +25,21 @@
 | Outputs / state changes | 65–73 |
 | Rules | 74–75 |
 |   1. The client skill list (unit +0xA8) | 76–99 |
-|   2. Shared skill-list operations | 100–141 |
-|   3. 0x94 BaseSkillLevels (`0x0045DD60`) | 142–151 |
-|   4. 0x21 UpdateItemOSkill (`0x0045DCD0`) | 152–161 |
-|   5. 0x22 UpdateItemSkill (`0x0045DDB0`) | 162–171 |
-|   6. 0x23 SetSkill (`0x0045DE10`) | 172–178 |
-|   7. 0x99 / 0x9A skill events (`0x0045DE80` / `0x0045DEC0` → `0x004CA060`) | 179–222 |
-|   8. 0xA3 skill do (`0x0045D5E0`) | 223–236 |
-|   9. 0x93 skill bonus by element and page (`0x0045DD10` → `0x004C7990`) | 237–265 |
-|   10. 0xA5 skill end on a unit (`0x0045D6A0`) | 266–280 |
-| Constants & data dependencies | 281–292 |
-| Randomness | 293–296 |
-| Edge cases & original bugs | 297–306 |
-| Test vectors | 307–332 |
-| Provenance | 333–353 |
-| Open questions | 354–381 |
+|   2. Shared skill-list operations | 100–142 |
+|   3. 0x94 BaseSkillLevels (`0x0045DD60`) | 143–152 |
+|   4. 0x21 UpdateItemOSkill (`0x0045DCD0`) | 153–162 |
+|   5. 0x22 UpdateItemSkill (`0x0045DDB0`) | 163–172 |
+|   6. 0x23 SetSkill (`0x0045DE10`) | 173–179 |
+|   7. 0x99 / 0x9A skill events (`0x0045DE80` / `0x0045DEC0` → `0x004CA060`) | 180–223 |
+|   8. 0xA3 skill do (`0x0045D5E0`) | 224–237 |
+|   9. 0x93 skill bonus by element and page (`0x0045DD10` → `0x004C7990`) | 238–266 |
+|   10. 0xA5 skill end on a unit (`0x0045D6A0`) | 267–281 |
+| Constants & data dependencies | 282–293 |
+| Randomness | 294–297 |
+| Edge cases & original bugs | 298–307 |
+| Test vectors | 308–333 |
+| Provenance | 334–354 |
+| Open questions | 355–382 |
 <!-- /index -->
 
 Owned ids: 0x21, 0x22, 0x23, 0x94, 0x99, 0x9A, 0xA3; §9–§10: 0x93, 0xA5.
@@ -130,7 +130,8 @@ handlers (the server specs link here for the steps).
    and (`aurastate` ≤ 0 or the unit does not have state `aurastate`):
    L := `skill_level(unit, E, 1)`; the state list of p (`0x00643620`:
    found, or created with the unit as owner, state p, and attached to
-   the unit, `sim/stat-lists.md` §8.1) is updated only when its stat
+   the unit, `sim/stat-lists.md` §8.1; arguments `client/stat-lists.md`
+   §4 r3) is updated only when its stat
    351 ≠ L: for i = 1…5 while `passivestat_i` is a valid stat: set
    (`0x00627150`) stat `passivestat_i` with layer `passiveitype` (0 when
    ≤ 0) to `eval(passivecalc_i, skill, L)` (`0x00646CA0`); then stat 350
