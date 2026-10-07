@@ -17,6 +17,8 @@
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_fitems;
 
 /// File magic (§2.1, `0x00568F20`).
 pub const MAGIC: u32 = 0xAA55_AA55;
