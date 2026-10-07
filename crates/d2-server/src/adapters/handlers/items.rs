@@ -1,4 +1,4 @@
-// Spec: specs/world/cube.md §1, §2; specs/sim/intents-events.md §2.4
+// Spec: specs/world/cube.md §1, §2; specs/sim/intents-events.md §2.4; specs/world/vendors-2.md §10.1, §10.2
 //! Item, inventory and cube intents (`docs/HANDOFF.md` §2 step 3).
 //!
 //! Only ids whose behaviour a written spec owns get a handler; every
@@ -17,7 +17,7 @@
 //! §2.4, removal §1.4, the §5.1 checks, the §5.3 targeting reset), the
 //! same one the item moves and the vendors ([`InvVendors`]) use. What the
 //! cube asks for that no written spec provides is either staged in the
-//! host's [`CubeParts`] ([`Staged`]: the local date, sound events) or
+//! host's [`CubeParts`] ([`Staged`]: the local date) or
 //! goes to [`ItemPending`], whose provider is the
 //! unwritten owner spec (the inventory pass, the item routines no items
 //! spec writes, quest hooks).
@@ -30,12 +30,16 @@ mod vendor_inv;
 
 use std::collections::BTreeMap;
 
+use d2_sim::game::Game;
 use d2_sim::stats::StatHost;
 use d2_sim::tick::EventDispatch;
 use d2_sim::units::lifecycle::LifecycleHooks;
+use d2_sim::units::RoomId;
 use d2_sim::units::UnitId;
+use d2_sim::wiring::action::{ActionHooks, Pending};
 use d2_sim::wiring::economy::{Economy, EconomyCube, EconomyError};
 use d2_sim::world::cube::CubeData;
+use d2_sim::world::stash::{self, ButtonRoute};
 
 use super::super::SimGame;
 use super::world::WorldHost;
@@ -48,7 +52,8 @@ pub use vendor_inv::InvVendors;
 
 /// C→S 0x2A ItemToCube (`cube.md` §2).
 pub const ITEM_TO_CUBE: u8 = 0x2A;
-/// C→S 0x4F ClickButton (`cube.md` §1: the cube's buttons).
+/// C→S 0x4F ClickButton (`vendors-2.md` §10.1: the stash and cube
+/// buttons).
 pub const CLICK_BUTTON: u8 = 0x4F;
 
 /// Every item-related C→S id (`client-messages.tsv`) and the spec that
@@ -80,7 +85,7 @@ pub const ITEM_IDS: &[(u8, Option<&str>)] = &[
     (ITEM_TO_CUBE, Some("specs/world/cube.md §2")),
     // `cube.md` §10 routes 0x4C to the item-use spec (not written).
     (0x4C, None), // Transmogrify
-    (CLICK_BUTTON, Some("specs/world/cube.md §1")),
+    (CLICK_BUTTON, Some("specs/world/vendors-2.md §10.1")),
     (0x50, Some("specs/items/inventory-moves.md §7.22")), // DropGold
     (0x61, Some("specs/items/inventory-moves.md §7.23")), // MercItem
     (0x63, Some("specs/items/inventory-moves.md §7.24")), // ItemToBeltShift
@@ -107,9 +112,10 @@ pub enum ItemError {
 pub struct Staged {
     /// `GetLocalTime` (day of month, day of week + 1): host input.
     pub local_date: (u8, u8),
-    /// Sound events attached to players (`0x00553380`, `cube.md`
-    /// Outputs), in order. Which message carries them is open (`cube.md`
-    /// OQ 2), so none is queued.
+    /// The cube's sound events (`0x00553380`, `cube.md` §8 rule 3), in
+    /// order: a record of the calls. The event itself is queued on the
+    /// game's sound slots (`d2_sim::units::sound`) and leaves as S→C 0x2C
+    /// in the player's unit update.
     pub sounds: Vec<(UnitId, u8)>,
 }
 
@@ -165,11 +171,24 @@ impl CubeParts {
     }
 }
 
-/// The hooks an economy needs for the cube: the unit lifecycle hooks and
-/// the stat host (the action wiring's `ActionHooks`).
-pub trait CubeHooks: LifecycleHooks + StatHost {}
+/// `0x0061AB00` on an active room: its level is a town (the stash
+/// buttons' common check, `vendors-2.md` §10.2).
+pub trait TownRooms {
+    fn room_in_town(&self, game: &Game, room: RoomId) -> bool;
+}
 
-impl<H: LifecycleHooks + StatHost> CubeHooks for H {}
+impl<X: Pending> TownRooms for ActionHooks<X> {
+    fn room_in_town(&self, game: &Game, room: RoomId) -> bool {
+        self.drlg.in_town(game, room)
+    }
+}
+
+/// The hooks an economy needs for the cube and the stash: the unit
+/// lifecycle hooks, the stat host and the town test (the action wiring's
+/// `ActionHooks`).
+pub trait CubeHooks: LifecycleHooks + StatHost + TownRooms {}
+
+impl<H: LifecycleHooks + StatHost + TownRooms> CubeHooks for H {}
 
 /// One call into the cube on the host's economy, its cube parts, the
 /// host's inventory model (`None`: every player's inventory is empty).
@@ -195,9 +214,11 @@ fn result_code(r: u32) -> ResultCode {
 }
 
 /// The handler of an item id this module owns, after the dispatcher's
-/// gate and size check (`intents-events.md` §2.3–§2.4). `None`: not an
-/// id with a handler here, no player, a host without the cube (or a 0x4F
-/// button the cube does not own), so the caller keeps its stub.
+/// gate and size check (`intents-events.md` §2.3–§2.4). C→S 0x4F runs
+/// the button dispatch `0x00568060` (`vendors-2.md` §10.1: the stash
+/// buttons §10.2, the cube's `cube.md` §1). `None`: not an id with a
+/// handler here, no player, a host without the cube, or a player-trade
+/// button (§10.3, no owner spec), so the caller keeps its stub.
 pub fn handle<D: EventDispatch, W: WorldHost<D>>(
     sim: &mut SimGame<D, W>,
     client: ClientId,
@@ -257,9 +278,17 @@ impl CubeCall for CubeRun<'_> {
         let code = if self.msg[0] == ITEM_TO_CUBE {
             Some(cube.put_in(&mut w, self.player, self.msg))
         } else {
-            // 0x4F: button u16 at +1 (size 7 already checked).
-            let button = u16::from_le_bytes([self.msg[1], self.msg[2]]);
-            cube.click_button(&mut w, self.player, button)
+            // 0x4F: [button u16@1][p1 u16@3][p2 u16@5] (size 7 already
+            // checked); the dispatch `0x00568060` (`vendors-2.md` §10.1).
+            let le = |o: usize| u16::from_le_bytes([self.msg[o], self.msg[o + 1]]);
+            let button = le(1);
+            let v = stash::button_value(le(3), le(5));
+            match stash::click_button(&mut w, self.player, button, v) {
+                ButtonRoute::Done(r) => Some(r),
+                ButtonRoute::Cube => cube.click_button(&mut w, self.player, button),
+                // §10.3: the player-trade switch has no owner spec.
+                ButtonRoute::Trade => None,
+            }
         };
         let (sent, errs) = w.finish();
         errors.extend(errs);

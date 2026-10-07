@@ -887,9 +887,6 @@ pub trait Pending {
     fn object_stamp_footprint(&mut self, game: &mut Game, object: UnitId) {}
     /// `0x00623830`: free an object's footprint (as above).
     fn object_free_footprint(&mut self, game: &mut Game, object: UnitId) {}
-    /// Attach object sound `id` (`objects.md` §14; `0x00571740` when
-    /// `now`). Sounds spec, not written.
-    fn object_sound(&mut self, unit: UnitId, id: u8, to: Option<UnitId>, now: bool) {}
     /// `0x0055F140`: the key test and use (inventory). Default: no key.
     fn object_key_test(&mut self, player: UnitId) -> bool {
         false

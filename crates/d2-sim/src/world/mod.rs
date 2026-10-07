@@ -14,6 +14,7 @@ pub mod hirelings;
 pub mod npc;
 pub mod objects;
 pub mod quests;
+pub mod stash;
 pub mod vendors;
 pub mod waypoints;
 

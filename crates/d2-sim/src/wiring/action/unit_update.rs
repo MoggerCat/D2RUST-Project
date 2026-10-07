@@ -1,4 +1,4 @@
-// Spec: specs/sim/intents-events.md §7.3, §7.4, §7.5, §7.7, §7.9 rule 3; specs/sim/pathing.md §9.8; specs/sim/units.md §4.1, §4.6
+// Spec: specs/sim/intents-events.md §7.3, §7.4, §7.5, §7.7, §7.9 rule 3; specs/sim/pathing.md §9.8; specs/sim/units.md §4.1, §4.6; specs/audio/triggers-2.md §14
 //! The monster part of the per-unit update (`0x00598220`, §7.3 rule 2
 //! step 2: the mode message `0x00597E20`, S→C 0x67–0x6D, built by
 //! [`crate::monsters::mode_message`]), the flag part of the room
@@ -80,15 +80,16 @@ impl<X: Pending> View<'_, X> {
     ///    unit, 0)` (`pathing.md` §9.8);
     /// 2. unit flag 0x1: the mode message (§7.4), then unit flag 0x80000
     ///    := 0;
-    /// 4. unit flag 0x100: the overhead message `0x00571620` (§7.9 rule 3).
+    /// 4. unit flag 0x100: the overhead message `0x00571620` (§7.9 rule 3);
+    /// 6. unit flag 0x400: S→C 0x2C (`0x00571740`, `audio/triggers-2.md`
+    ///    §14 rule 2, [`crate::units::sound::sound_message`]).
     ///
     /// TODO(spec: intents-events.md §7.1 rule 2.1, §7.2): a monster
     /// with unit flag 0x10 (not yet announced) first gets its add
     /// messages (0xAC, 0x98, 0x21, part B with a second mode message);
     /// they are not sent here. Of rule 2, step 3 has nothing to send
-    /// (d2rs keeps no pending event records, §7.9 rule 2) and steps 5–10
-    /// are not sent: step 5 needs the item world, step 6's `0x00571740`
-    /// (unit +0x6E), step 7's 0x0C fields (`0x00597CF0`), step 8's test
+    /// (d2rs keeps no pending event records, §7.9 rule 2) and steps 5 and
+    /// 7–10 are not sent: step 5 needs the item world, step 7's 0x0C fields (`0x00597CF0`), step 8's test
     /// `0x00639F20` and stat sender `0x005711D0`, step 9's `0x00625A20` /
     /// `0x005715A0` conditions and step 10's 0x57 (`0x00597C70`) are not
     /// specified.
@@ -123,6 +124,11 @@ impl<X: Pending> View<'_, X> {
         // Step 4.
         if unit_flags & flags::HOVER_FREED != 0 {
             self.overhead_message(receiver, unit, UnitType::Monster as u8, guid);
+        }
+        // Step 6: unit flag 0x400 → `0x00571740` (`audio/triggers-2.md`
+        // §14 rule 2).
+        if let Some(m) = crate::units::sound::sound_message(game, unit, receiver) {
+            self.h.x.send(receiver, &m);
         }
     }
 
