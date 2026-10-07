@@ -41,3 +41,17 @@ the disassembly: `py tools/ghidra/disasm.py fn|at|xref|dump|selftest`
 re/exports/all.asm` writes the whole binary as one greppable file
 (~7 s, ~890k lines), the fastest way to find every reader and writer of
 a global or a struct offset.
+
+## Index export (calls, data refs, switch tables, labels, strings)
+
+```
+& $G re\ghidra D2_114d -process Game.exe -noanalysis -readOnly -scriptPath tools\ghidra `
+    -postScript ExportIndex.java re\exports\index
+```
+
+Writes `re/exports/index/`: `calls.tsv` (every call site with caller and
+callee), `datarefs.tsv` (every data read / write / pointer from code with
+the target's label, type and small value), `switches.tsv` (computed-jump
+case targets per site), `labels.tsv`, `strings.tsv` and `data.tsv`
+(every defined data item). About 2 minutes; grep these instead of opening
+Ghidra.
