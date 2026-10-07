@@ -19,24 +19,25 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 42–52 |
-| Inputs | 53–63 |
-| Outputs / state changes | 64–71 |
-| Rules | 72–73 |
-|   1. A1Q4 gibbet (Cain's cage, object class 26) | 74–144 |
-|   2. Cairn stones (object classes 17–21) | 145–192 |
-|   3. Town-Cain marker (object class 385, `InitFn` 54) | 193–219 |
-|   4. A1Q5 Countess chest trap (`0x005954F0(record, extra)`) | 220–258 |
-|   5. Character progression (`0x00538680(client, step, difficulty)`) | 259–282 |
-|   6. Party list as read by the quest code | 283–308 |
-|   7. Cairn stone-order 0x50: bytes 13–14 | 309–318 |
-|   8. Act I clarifications (implementation questions, 2026-10-06) | 319–389 |
-| Constants & data dependencies | 390–403 |
-| Randomness | 404–410 |
-| Edge cases & original bugs | 411–427 |
-| Test vectors | 428–450 |
-| Provenance | 451–475 |
-| Open questions | 476–490 |
+| Summary | 43–53 |
+| Inputs | 54–64 |
+| Outputs / state changes | 65–72 |
+| Rules | 73–74 |
+|   1. A1Q4 gibbet (Cain's cage, object class 26) | 75–147 |
+|   2. Cairn stones (object classes 17–21) | 148–195 |
+|   3. Town-Cain marker (object class 385, `InitFn` 54) | 196–222 |
+|   4. A1Q5 Countess chest trap (`0x005954F0(record, extra)`) | 223–261 |
+|   5. Character progression (`0x00538680(client, step, difficulty)`) | 262–285 |
+|   6. Party list as read by the quest code | 286–311 |
+|   7. Cairn stone-order 0x50: bytes 13–14 | 312–321 |
+|   8. Act I clarifications (implementation questions, 2026-10-06) | 322–392 |
+|   9. Implementation and wiring questions (2026-10-07) | 393–550 |
+| Constants & data dependencies | 551–566 |
+| Randomness | 567–573 |
+| Edge cases & original bugs | 574–597 |
+| Test vectors | 598–629 |
+| Provenance | 630–663 |
+| Open questions | 664–691 |
 <!-- /index -->
 
 ## Summary
