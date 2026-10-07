@@ -8,6 +8,8 @@
   §16–§18 cover the remaining generic operate and init functions and
   object events 0, 3, 8, 9, 10 (§15). Implemented 2026-10-06 (§1–§14),
   unverified (`d2_sim::world::objects`, `docs/handoff/impl-objects.md`).
+  §4 rule 5 (no animation setup at allocation) is confirmed by recording
+  `obj1` (open question 2).
 - **Target version:** 1.14d
 - **Crate/module:** `d2-sim::world::objects` (init and operate dispatch,
   per-function behavior, object events); message layouts in `d2-proto`
@@ -26,39 +28,38 @@
   (room population, `PopulateFn`), `sim/path-placement.md` §7, §10, §12.2
   (free point, placement, warp), `items/inventory.md` §5.5 (bank
   recount), `world/quests-act2.md`, `world/quests-act3.md` (quest
-  inits). Machine table: `world/object-functions.tsv`.
+  inits), `world/objects-2.md` (part 2: §16–§18). Machine table:
+  `world/object-functions.tsv`.
 
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 64–75 |
-| Inputs | 76–87 |
-| Outputs / state changes | 88–94 |
-| Rules | 95–96 |
-|   1. Object data and unit fields | 97–125 |
-|   2. Object control (game +0x10F0) | 126–148 |
-|   3. Creation and init dispatch (`0x0054F5D0`) | 149–173 |
-|   4. Object animation at a mode change | 174–186 |
-|   5. Init functions | 187–254 |
-|   6. Preset object classes 574–582 (`0x0054F490`) | 255–274 |
-|   7. Operate dispatch | 275–304 |
-|   8. Chests and breakables | 305–396 |
-|   9. Shrines | 397–474 |
-|   10. Doors, operate 8 (`0x00581D40`) | 475–492 |
-|   11. Wells, operate 22 (`0x005858A0`) | 493–510 |
-|   12. Portals, operate 15 (`0x00584870`) | 511–527 |
-|   13. Torch, operate 11 (`0x005843D0`) | 528–532 |
-|   14. Client messages | 533–550 |
-|   15. Not covered yet | 551–563 |
-|   16. Operate functions, part 2 | 564–690 |
-|   17. Small init functions | 691–717 |
-|   18. Object events 0, 3, 8, 9, 10 | 718–777 |
-| Constants & data dependencies | 778–824 |
-| Randomness | 825–864 |
-| Edge cases & original bugs | 865–915 |
-| Test vectors | 916–946 |
-| Provenance | 947–989 |
-| Open questions | 990–1022 |
+| Summary | 65–76 |
+| Inputs | 77–88 |
+| Outputs / state changes | 89–95 |
+| Rules | 96–97 |
+|   1. Object data and unit fields | 98–128 |
+|   2. Object control (game +0x10F0) | 129–151 |
+|   3. Creation and init dispatch (`0x0054F5D0`) | 152–176 |
+|   4. Object animation at a mode change | 177–208 |
+|   5. Init functions | 209–282 |
+|   6. Preset object classes 574–582 (`0x0054F490`) | 283–319 |
+|   7. Operate dispatch | 320–367 |
+|   8. Chests and breakables | 368–501 |
+|   9. Shrines | 502–610 |
+|   10. Doors, operate 8 (`0x00581D40`) | 611–634 |
+|   11. Wells, operate 22 (`0x005858A0`) | 635–665 |
+|   12. Portals, operate 15 (`0x00584870`) | 666–731 |
+|   13. Torch, operate 11 (`0x005843D0`) | 732–736 |
+|   14. Client messages | 737–764 |
+|   15. Not covered yet | 765–777 |
+|   16.–18. Moved | 778–783 |
+| Constants & data dependencies | 784–830 |
+| Randomness | 831–876 |
+| Edge cases & original bugs | 877–943 |
+| Test vectors | 944–982 |
+| Provenance | 983–1040 |
+| Open questions | 1041–1074 |
 <!-- /index -->
 
 ## Summary
@@ -105,6 +106,8 @@ The 0x38-byte object data (unit +0x14, zeroed at allocation,
 | +0x04 | `InteractType` (u8) | chests/urns: trap type (bits 0–6) + locked (bit 7); shrines: shrine id; wells: charges; portals: destination level |
 | +0x08 | shrines.txt record | shrines (`0x00621BB0` writes, `0x00621B70` reads) |
 | +0x0C | operator GUID + 1 (0 = none) | shrines (§9) |
+| +0x05 | portal flags (u8) | portals: read `0x006222C0`, written `0x00622300`; portal creation ORs 0x3 (`0x0056D0F5`, `0x0056D28C`, event 11 `0x00581459`), operate 15 and 43 OR 0x5 (`0x00584AB6`, `0x00584D43`), `0x0058561D` ORs 0x1; sent in S→C 0x60 (§14) |
+| +0x18, +0x1C | destination x, y (u32) | portals: partner lookup `0x00553720` (§12 rule 6) |
 
 Unit fields used here (offsets: `sim/units.md` §2): +0x0C GUID (written
 by the init dispatcher), +0x10 mode, +0x20 seed, +0x78 spark byte
@@ -183,6 +186,25 @@ static path are set, and **before** the unit is added to the world
    **object's unit seed** (arithmetic shift; `roll(n < 1)` draws nothing),
    speed := r + d − (d >> 4) (16-bit arithmetic shift), then 0 if ≤ 0,
    then at most 0x7FFF.
+4. Widths (`0x00624558`–`0x0062458C`): r (unsigned, below 4096) +
+   d − (d >> 4) is a 32-bit sum of the sign-extended values; ≤ 0
+   (signed) → 0; ≥ 0x7FFF → 0x7FFF; the low 16 bits are stored. The
+   current frame is `Start[mode]` (u8) · 256; the frame count is the
+   stored u32.
+5. **Allocation runs no animation setup.** Unit allocation stores the
+   mode argument directly (`0x005553E5`), allocates the zeroed 0x20-byte
+   static path (`0x00623520`) and calls §3; neither touches the
+   animation. The only §4 runs at creation come from mode sets inside
+   the init function or §3 rule 8, and a mode set to the unit's current
+   mode does no setup (`0x00624690` only queues the unit and sets flag
+   0x1; `sim/units.md` §4). An object whose init leaves its allocation
+   mode unchanged keeps speed 0, frame 0 and frame count 0 until its
+   first real mode change. **Answered (confirmed by recording)** `obj1`
+   (`docs/handoff/local-buddy-q9-rec.md`): 32 allocations, 26 with
+   `Sync` = 0; class 37 (init 8 sets mode 2): one `roll(25)` at
+   `0x00624563` on the object's seed, `FrameDelta` 200, r = 23, speed
+   211; classes 35, 36, 39 allocated in mode 0 with no mode set: no
+   setup, no draw.
 
 ### 5. Init functions
 
@@ -252,6 +274,12 @@ Returns at once. A door's state comes only from its allocation mode and
   at frame + 1 (event 11 creates the matching portal, `sim/units.md`
   §6.4). Other levels: unchanged.
 
+The footprint stamp of inits 11 and 12 (`0x00620A70(O, room, x, y)`)
+takes the room and point from the init record and the size and mask
+from the object's class (`0x00620510`, `0x006205A0`, `0x006209D0`;
+`sim/path-placement.md` §3); it does not read the static path, which is
+still zeroed then (§4 rule 5).
+
 ### 6. Preset object classes 574–582 (`0x0054F490`)
 
 DS1 presets may name class ids beyond `objects.txt` (`drlg/preset.md`
@@ -263,14 +291,31 @@ index := class − 574; index ≥ 9 (`0x00731D4C`) → none; else handler
 | Class | Handler | Result |
 |---|---|---|
 | 574–579 | `0x0054F0D0` | allocate the class/range row of `0x006E1080` (below) with the preset mode; then id := min + `roll(max − min)` on the **new object's unit seed**; 4 or 5 → 2; set `InteractType` and the shrine record (overrides init 1, whose draws already happened) |
-| 580 | `0x0054F370` | special chest: level 25 → class 371, else the class argument (580) through 581's path; then for levels 62–64: `roll(100)` on the control seed, spark only if ≤ 50; other levels: spark always; level 25: `InteractType` := 3; then flag 0x80 and mode 0 |
-| 581 | `0x0054F180` | random chest class by act (not re-read here: open question 6) |
-| 582 | `0x0054F430` | class from `0x0059D830` (quest spec), mode 1-argument allocation |
+| 580 | `0x0054F370` | special chest: c := 371 at level 25, else the class argument (580); run 581's handler with c (its class draw happens at every level); no object → done. Levels 62–64: `roll(100)` on the control seed, spark only if ≤ 50; other levels: spark (`0x005540A0`, 1); level 25 (spark branch): `InteractType` := 3. Then flag 0x80 and a mode-0 set (a no-op unless the init changed the mode) |
+| 581 | `0x0054F180` | random chest class by act (below), allocated in **mode 0**: the preset mode is ignored |
+| 582 | `0x0054F430` | class from `0x0059D830(game)` (quest spec), allocated in **mode 0** (no room → fatal) |
 
 `0x006E1080` rows {class, min, max}: 574 {136, 2, 6}, 575 {136, 7, 7},
 576 {136, 8, 11}, 577 {136, 12, 12}, 578 {136, 1, 5}, 579 {136, 14, 14}.
 `max` is exclusive: 576 never gives 11 (resist poison), 578 never 5;
 574 gives 2 or 3.
+
+**Preset chest 581** (`0x0054F180(game, room, class, x, y, mode)`): A :=
+act of the room's level (`0x006427F0`), L := the level; one control-seed
+step, then:
+
+- Act II (A = 1): L = 74 → {387, 389, 390, 391}[lo' & 3]; else {87,
+  88}[lo' & 1].
+- Act III (A = 2): L = 83 → {329, 330, 331, 332}[lo' & 3]; else {181,
+  183}[lo' & 1].
+- Acts I, IV, V: {5, 6, 139, 140, 141, 144, 176, 177, 198, 240, 241,
+  242, 243}[lo' mod 13].
+
+A class argument of 371 then replaces the pick (580 at level 25). No
+room → fatal. Allocation `0x00555230(2, class, x, y, game, room, 1, 0,
+0)` (stack: x, y, game, room, flag 1, mode, 0; presets 574–579 pass the
+preset mode, 581 and 582 pass 0); the class's own init (chests: init 3)
+runs inside it. Open question 6 answered.
 
 ### 7. Operate dispatch
 
@@ -301,6 +346,24 @@ Skills call §7.2 directly (`0x005C9B13`, skills spec).
 
 The functions' return values reach no caller that acts on them (§7.1
 returns 1); they are listed for fidelity only.
+
+#### 7.3 C→S 0x13 object case (`0x00548B00`, unit type 2)
+
+The handler's result (`sim/intents-events.md`), in order:
+
+1. No object with the GUID (`0x00552F60`) → 1. No objects record →
+   fatal.
+2. Object mode ≥ 8 → 3.
+3. Distance P → O (`0x00641530`) > 50 (signed) → 1.
+4. Not in interact range (`0x00623660` = 0), or the line test
+   `0x00622B50(P, O, 0x804)` ≠ 0 → walk to the object (`0x00548A50`,
+   argument −2 when the message's u32 @9 is nonzero, else −1;
+   `sim/pathing.md`) → 0.
+5. Else stop P's path (`0x00648730`) and run §7.1 (`0x00584540(game,
+   P, 2, GUID)`): its result 0 (object gone) → 3, else → 0.
+
+So an operate or a walk gives 0; the operate function's own result
+never reaches this value.
 
 ### 8. Chests and breakables
 
@@ -353,6 +416,14 @@ Common pieces:
    (`FrameCnt1` >> 8) + 1; else mode 2. Clear flag 0x2. If the drop item
    code (+0xB8) ≠ 0: drop it at the object (`0x00559A30`, items spec).
    Trap arm. Return 1.
+8. Every path returns 1 (`0x00586406`). The assassin exemption tests the
+   operator's class id only (`[P +0x04] = 6`, no type test), so any
+   operator unit of class 6 skips the key. A locked chest with no
+   operator calls the key test with no unit, which is fatal
+   (`0x0055F173`).
+9. A `D(Q)` that returns no item counts as neither item nor magic in
+   every loop of rules 4–5; in the three small class-397 bands a null
+   result goes to the tail at once (no second try).
 
 #### 8.2 Breakables
 
@@ -367,6 +438,20 @@ Common pieces:
 
 "ENDANIM" = event 1 at frame + (`FrameCnt1` >> 8) + 1. All rolls on the
 control seed. 61 rows use operate 14, 25 operate 3, 13 operate 1.
+
+Return values (one exit each): casket, urn, corpse, evil urn → 1;
+barrel (5) and exploding barrel (7) → 0.
+
+**Exploding barrel ranges** (`0x00584240`): B := the barrel's position
+(`0x00620870`); only the barrel's room unit list is walked (head +0x74,
+next +0xE8). A player (not mode 17) or monster (not mode 12) is hit when
+dx² + dy² ≤ 9 (`0x00641890(unit, B, 3)`: dx, dy = |B − unit position|,
+static-path position for objects, items and tiles, path position
+otherwise; inclusive). Another barrel (object class 11 in mode 0)
+explodes when `0x006416D0(barrel, other)` ≤ 2 (signed, size-adjusted
+metric of `missiles/missiles.md` §R9.5); the recursion reuses the
+operate record with only the object replaced (same operator). Items,
+missiles, tiles and the barrel itself are skipped.
 
 #### 8.3 Traps
 
@@ -394,6 +479,26 @@ Trap monsters 1–4 go through `0x00582420`: try the object's spot
 (`0x005B3090`, flag 0x88), else a free spot (mask 0x3F11), spawn
 (`0x005B2F20`, monsters spec).
 
+**Fire objects** (t = 5, 7; `0x00582380`) are allocated in **mode 1**
+(`0x00555230(…, flag 1, mode 1, 0)`): object 162 at the trap's position,
+then object 160 at (x + 1, y) only when x0 ≤ x + 1 < x0 + width of the
+room rectangle (`0x00619730`; y is not tested). Both get spark byte 2; a
+failed 160 allocation is fatal (`0x005540A0` asserts).
+
+**Trap monster id** (`0x005474C0`, no draws; open question 3 answered):
+L := the object's level, G := the control's region of L (§2). G +0x1C in
+0 … monstats count − 1 → return it. Else G +0x1C := 234, and the level's
+monster region (`0x00547BB0(game +0xF0, L)`, `monsters/population.md`
+§2.2) is walked over its first `+0x10` entries in order; for each entry
+class c, the first family range holding c caches its **base** and ends
+the walk: first the act range (Act II, act index 1: [96, 101) → 96,
+mummies; other acts: [5, 10) → 5, zombies), then [0, 4) → 0, [170, 174)
+→ 170, [274, 278) → 274, [379, 383) → 379, [383, 387) → 383, [387, 391)
+→ 387 (skeletons, archers, mages). No match → 234 (flying scimitar)
+stays cached; trap arm skips 234 in act I (`0x00582250`). Trap 8/9 take
+their control step (count 1 + (lo' & 1)) before this lookup; an id
+outside 0 … count − 1 spawns nothing.
+
 ### 9. Shrines
 
 #### 9.1 Operate 2 (`0x00583C70`)
@@ -418,6 +523,14 @@ queue, flag 0x1, mode 0, +0x0C := 0 (the shrine can be used again).
 **Event 6** (`0x00581620`): hover expired (expiry ≤ frame) → free it,
 queue, flag 0x100; else reschedule at its expiry.
 
+**No guards in 1.14d:** `0x00583C70` reads the shrine record
+(`0x00621B70`) only at rule 4, after rules 1–3, and uses it unchecked;
+every live operate-2 row has `InitFn` 1, which always sets it. With no
+operator, rule 2 stores 0 (the shrine stays usable) and the effect
+functions get the missing operator unchecked. Live shrine rows have
+`MonsterOK` 0 and both the 0x13 path and skills pass a unit, so neither
+case occurs with live data.
+
 #### 9.2 Effects (table `0x006E1850`, 3 dwords: function, stat, state)
 
 P = player (operator), S = shrine record. Stats: 6 life, 8 mana, 10
@@ -430,18 +543,23 @@ object, duration `Duration in frames` (+0x0C), that stat and value.
 | 1, 0, 23 | `0x005828E0` | life += max − life (`0x00625D10`), mana += max − mana (`0x00625D60`) (base stat adds) |
 | 2 | `0x00582860` | life to max (1.14d: no doubling) |
 | 3 | `0x005828A0` | mana to max |
-| 4 | `0x00582940` | d := `Arg0` · (life >> 8) / 100; life −= d · 256; mana += `Arg1` · d · 256 / 100 (unsigned) |
-| 5 | `0x005829A0` | d := `Arg0` · mana / 100; mana −= d; life += `Arg1` · d / 100 |
+| 4 | `0x00582940` | d := `Arg0` · (life >> 8) / 100; life −= d · 256; mana += `Arg1` · d · 256 / 100 (unsigned; base adds below) |
+| 5 | `0x005829A0` | d := `Arg0` · mana / 100; mana −= d; life += `Arg1` · d / 100 (unsigned; base adds below) |
 | 6, 8–11, 13, 15 | `0x00583B30` | State(table state, table stat, V(stat, `Arg0`)) |
 | 7 | `0x005839B0` | v := V(19, `Arg0`); State(129, stat 25, `Arg1`), then stat 19 := v on that list |
 | 12 | `0x00583BF0` | State(134, stat 11, 0, remove callback `0x00583BD0`); refresh P's skills (`0x0056DE40`); the +2 comes from state 134 (`skills/levels.md`) |
 | 14 | `0x00583A70` | stamina := max (`0x00625DB0`); v := V(162, `Arg0`); State(136, 162, v, cb `0x00583A40`); on that list stamina := 2v, stat 28 := 1000 |
-| 16 | `0x00582A00` | (unreachable through init) |
-| 17 | `0x00582A30` | free spot near P (`0x0064E7B0`, size 3, mask 0x1C09); town portal object 59 at spot + (5, 5) to P's act town (`0x0056D130`) |
+| 16 | `0x00582A00` | reverses P's name in place (player data +0x00: `_strrev`, then `strncpy` of 16 bytes; no message); unreachable through init |
+| 17 | `0x00582A30` | free spot near P (`0x0064E7B0`, size 3, mask 0x1C09); none → nothing; town portal object 59 at spot + (5, 5) to P's act town (`0x0056D130`), created in **P's room** (not the room the spot was found in) |
 | 18 | `0x00582C40` | gem upgrade (§9.3) |
 | 19 | `0x00582DA0` | storm (§9.3) |
 | 20 | `0x00583050` | nearest eligible monster to P becomes unique (`0x0065A800`, callback `0x00582750`; monsters spec) |
 | 21, 22 | `0x005830E0`, `0x00583410` | potions + missiles (§9.3) |
+
+Codes 1–5 read unit totals (`0x00625480`) and change life and mana
+only by base-stat adds (`0x006272B0`, a 0 add writes nothing): code 4
+adds −d · 256 to stat 6 and the gain to stat 8, code 5 −d to stat 8 and
+the gain to stat 6; codes 1–3 add max − total.
 
 Table stat/state pairs: 6 → 171 / 128, 8 → 39 / 131, 9 → 43 / 132, 10 →
 41 / 130, 11 → 45 / 133, 13 → 27 / 135, 15 → 85 / 137. 1.14d values
@@ -471,6 +589,24 @@ stat 162 is "other" → a · stat162(P) / 100.
   / `gpm` (quantity 1) dropped near P; then 6 missiles 45 / 48 from the
   shrine to offsets (−6, 6), (−6, −6), (0, 6), (0, −6), (6, 6), (6, −6),
   owner P, flags 0x520, skill level as storm.
+- **Storm, read in 1.14d** (`0x00582DA0`): targets come from the unit
+  finder (`0x0065A950` / `0x0065AC70`, `missiles/bodies-2.md`) around
+  the shrine's position with radius `Arg1` and filter `0x00582710`
+  (players not in mode 0 or 17; monsters with `0x0063EA40` = 0). Each
+  found player or monster not dead (`0x005541B0` = 0) gets a base-stat
+  add (`0x006272B0`) on stat 6 of −trunc((life >> 8) · `Arg0` / 100) ·
+  256 (signed division toward 0, life = unit total). Missiles: i outer,
+  j inner (1 … 4); parameter record (`missiles/missiles.md` §R2.1):
+  flags 3 (position given, target relative), owner P, class 62, start
+  := the shrine's position, target offset (+5i if i odd else −5i, +5j if
+  j odd else −5j), skill level := clamp(stat 12 of P / 5 (signed), 1,
+  8); created by `0x0059FA30`.
+- **Potion drop** (21, 22; inline in `0x005830E0` / `0x00583410`): code
+  index `0x00633680('opm ' / 'gpm ')` (−1 → fatal); per potion a free
+  item spot next to P (`0x00555DA0`); none → that potion is skipped but
+  counted; else a zeroed 0x84-byte item record is filled (code index,
+  spot, P's item level `0x00558200`) and created by `0x00558D90` (items
+  spec), quantity (stat 70) := 1 (`0x00627260`), queued with flag 0x1.
 
 ### 10. Doors, operate 8 (`0x00581D40`)
 
@@ -490,6 +626,12 @@ stat 162 is "other" → a · stat162(P) / 100.
 Footprint mask of doors (`IsDoor` ≠ 0): `sim/path-placement.md` §3.
 Live: 23 rows use operate 8, all `IsDoor` = 1.
 
+The locked case runs the key test with **no** assassin exemption (unlike
+§8.1). The debounce compares unsigned 32-bit values: refused while t <
+(+0xD4 + 500) mod 2^32 (`jb` at `0x00581DA6`); the gate (§16.13) and the
+portal hostile delay (§12 rule 2: refused while (hostile + 5000) mod
+2^32 > t, `0x005848CF`) do the same.
+
 ### 11. Wells, operate 22 (`0x005858A0`)
 
 1. c := charges (`InteractType`); c = 0 → return 0.
@@ -508,6 +650,19 @@ Live: 23 rows use operate 8, all `IsDoor` = 1.
 as charges go 2 → 1 → 0 (refills: 1 → mode 1, 2 → mode 0); one charge
 returns 751 frames after each use.
 
+Heal details (`0x00585720`): life (6), mana (8) and stamina (10) change
+only while the unit total is below the maximum (`0x00625D10`,
+`0x00625D60`, `0x00625DB0`): new := min(total + ((max · `Parm1`) >> 8),
+max), unsigned 32-bit, written by set-stat (`0x00627260`) and sent to
+P's client (`0x00548520`). "Used" is set by each such write, by removing
+a state-2 or state-1 stat list, by `0x00578C20(P)` ≠ 0, or by the pet
+callback `0x005856A0` (through `0x00574DE0`, sharing the flag). The
+charge helpers are M = 2 · `Parm2` (`0x00552AA0`) and the constant 2
+(`0x00552AB0`), so the mode rule's divisor is `Parm2`; a row with
+`Parm2` = 0 starts with 0 charges and never heals. The operate's mode
+set is the normal `0x00624690`; event 2 sets the mode the same way and
+then queues with flag 0x1 again.
+
 ### 12. Portals, operate 15 (`0x00584870`)
 
 Classes 59 (town portal) and 60 (permanent portal). Rules read in 1.14d:
@@ -522,8 +677,57 @@ Classes 59 (town portal) and 60 (permanent portal). Rules read in 1.14d:
    (the level) or the linked portal; free spot (mask 0x1C09, player
    size); player placed with arrival offset + (5, 5); sound 8; S→C 0x0D;
    class 59 used by its owner removes both portals; mode-1 portals get
-   ENDANIM; P gets state 102 (`just_portaled`) for 75 frames (event 12). These steps are
-   not yet re-read in detail (open question 7).
+   ENDANIM; P gets state 102 (`just_portaled`) for 75 frames (event 12).
+   Rules 4–14 give these steps in order (open question 7 answered).
+4. Owner gate: o := timer-argument owner GUID (`0x00552B10`). If o ≠ −1
+   and o ≠ P's GUID: P's party id (`0x00554630`, u16) = 0xFFFF → sound
+   19 on P (target P), return 0. Else the owner player (`0x00552F60(game,
+   0, o)`): found and party ids differ → the same refusal; not found →
+   go on.
+5. P must exist and be a player, else fatal (`0x0058494F`); 1.14d has
+   no earlier null guard (D2MOO returns 0). Rows 59 and 60 have
+   `MonsterOK` 0, so §7.1 stops monsters first.
+6. Partner L := `0x00553720(game, O)`: in the act of `InteractType`, at
+   the destination point (object data +0x18, +0x1C); no room there →
+   stream one (`0x0061A140`) and, if found, `0x0052D0F0(game, room)`;
+   then L := the unit of type O +0x94 and GUID O +0x98 (`0x00552F60`);
+   L not an object → none.
+7. Quest gate, only when O has a room: Q := P's quest record for the
+   game difficulty (player data +0x10 + 4 · game +0x6D), none → refuse
+   (sound 19 on P, return 0); D := leveldefs record of `InteractType`
+   (`0x0061E470`, 0x9C bytes), none → refuse. Class 59 only: u := player
+   data +0x48 (`0x005353F0`, D2MOO `dwUniqueId`); u ≠ O's GUID and L
+   exists and u ≠ L's GUID (`0x00451F50`) → q := `QuestFlagEx` (+0x04)
+   in an expansion game (game +0x70 ≠ 0), else `QuestFlag` (+0x00); q >
+   0 and quest flag (q, bit 0) clear (`0x0065C310(Q, q, 0)`) → refuse.
+   No L skips the class-59 test.
+8. Destination: L exists → its position (`0x0045ADF0`, `0x0045AE20`)
+   and room R. Else R := `0x0061B060(game +0xBC + 4 · act, InteractType,
+   0, &x, &y, 3)` (the level's arrival point; DRLG spec).
+9. O's portal flags |= 5 (§1). P's room in a town (`0x0061AB00`) →
+   `0x00543B90(game, level of P's room, level of R, P)` (quest
+   change-level hook, `world/quests.md`).
+10. Free point from R: `0x0064E7B0(R, &point, P's size (0x00620510),
+    0x1C09, 0)` (`sim/path-placement.md` §7); none → return 0 (rule 9's
+    changes stay).
+11. Place P: `0x00554EA0(game, P, room, x, y, 0, 0)`
+    (`sim/path-placement.md` §10), failure → fatal. Sound 8 on P (no
+    target). Player mode set `0x005809D0(game, P, 0, 2, x + 5, y + 5,
+    0)` (player-mode spec). S→C 0x0D to P's client (`0x0053B4B0`): P's
+    type, GUID, 1, x + 5, y + 5, 0, 0.
+12. L exists and O's class ≠ 60 and u = L's GUID → remove both portals:
+    O (`0x0061A270(room, 2, GUID)`, free `0x00555600`, `0x0061AED0(room,
+    1)`), then `0x0058CF50(game, L)` (Act V quest hook), then L the same
+    way. L exists, class 59 and u ≠ L's GUID → nothing. Else (no L, or
+    class 60): O in mode 1 → ENDANIM at f + (`FrameCnt1` >> 8) + 1.
+13. State 102: stat list `0x006251F0(pool, 2, f + 75, 0, P's type)`;
+    created → event 12 on P at f + 75, state 102 on (`0x00639DB0`), list
+    state 102 (`0x006252D0`), remove callback `0x0056E900`
+    (`0x00625CE0`), attach (`0x00626E10`). Every path returns 0.
+14. Rule 1's `0x00535B10(game, P)` is 1 when, for some living player u
+    (`0x005538D0` walk, callback `0x00535AF0`), P's player-list entry
+    toward u has flag 8 (hostile; `0x0055B300(P, u, 8)`); then only the
+    owner may use the portal, others get 0 with no sound.
 
 ### 13. Torch, operate 11 (`0x005843D0`)
 
@@ -548,6 +752,16 @@ Object update pass (`0x00581AD0`, per queued object and client;
 Sound ids used here: 8 (portal), 11 (unlock), 13 (trap armed), 19
 (portal refused), 22 (locked).
 
+Builder details: `0x0053D4D0` (17 bytes) writes @0 0x4D, or 0x9A when
+its last argument is nonzero (the shrine passes 0), @1 the unit type,
+@2 u32, @6 u32, @10 u8, @11, @13, @15 u16. The shrine call passes the
+object GUID, the operator field − 1 (§9.1 stores GUID + 1, so this is
+the operator's GUID), byte 0 of the shrine record (`Code`) and zeros.
+It is sent only when `SubClass` ≠ 0, bit 2 clear, the mode (u32) = 1,
+bit 0 set and the operator field ≠ 0. S→C 0x60 (`0x0053D900`, 7 bytes):
+@0 0x60, @1 portal flags (object data +0x05, `0x006222C0`), @2
+`InteractType` (destination level, u8), @3 object GUID (u32).
+
 ### 15. Not covered yet
 
 All items of this list are done:
@@ -561,219 +775,11 @@ All items of this list are done:
   §16; small init functions: done, §17;
 - object events 0, 3, 8, 9, 10: done, §18.
 
-### 16. Operate functions, part 2
+### 16.–18. Moved
 
-Operate record as §7.2 (game, object O, operator P, control, class id);
-"none" = no object unit; ENDANIM as §8.2; f = game frame. Return values
-are listed for fidelity only (§7.2). Live rows are `objects.txt` `Id`s.
-
-#### 16.1 Torch tiki, operate 13 (`0x005843A0`)
-
-Mode 0 (or none) → mode 1; mode 1 → mode 0; other modes nothing.
-Returns 0. Live: 37.
-
-#### 16.2 Trap door, operate 16 (`0x00581EB0`)
-
-1. Mode 0 (or none) → mode 2. Return 1.
-2. Mode 2: the first unit of type 5 (warp tile) in O's room unit list
-   (head +0x74, next +0xE8); none → fatal. Warp P through it
-   (`0x005550B0`, `sim/path-placement.md` §12.2). Return 1.
-3. Other modes: return 1. (O's room, position and size are read first
-   and not used.) Live: 74.
-
-#### 16.3 Obelisk, operate 17 (`0x00582610`)
-
-I := the unit P interacts with (`0x00554D00`: P +0x6C ≠ 0 → the unit
-with GUID P +0x64, else none).
-
-1. Mode 0 (or none): P busy (`0x00535060` = 1) → nothing. P has no item
-   of type 20 (gem) in its item list (`0x005825B0`: inventory walk with
-   the item-type test `0x00629BB0`) → sound 19 on P with target P
-   (`0x00553380`: sound id at unit +0x6E, target at +0x70, queue, flag
-   0x400). Else: P's interact := (type 2, O's GUID) (`0x00554120`: only
-   when P +0x6C = 0; then +0x64 GUID, +0x68 type, +0x6C := 1), mode 3,
-   S→C 0x58 (7 bytes, builder `0x0053D8D0`) to P's client: 0x58, O's
-   GUID @1 (u32), 0 @5 (u8), byte @6 never written (stack contents).
-2. Mode 3 and I = O: clear P's interact (`0x00554190`: +0x64 := −1,
-   +0x68 := 6, +0x6C := 0), mode 1.
-3. Return 1 in every case. Live: 80, 90 (90 has `InitFn` 1, so it also
-   holds a shrine record).
-
-#### 16.4 Secret door, operate 18 (`0x00583FF0`)
-
-Mode 0 (or none): mode 1, clear flag 0x2, ENDANIM, free the footprint
-(`0x00623830`). Return 1. Live: 129.
-
-#### 16.5 Armor stand, operate 19 (`0x00584160`); weapon rack, operate 20 (`0x005841D0`)
-
-Mode 0 (or none): drop at O's position in O's room, armor
-`0x005594C0(game, room, &pos, −1, 0, 0)` or weapon `0x00559630(…)`
-(items spec); then mode 2, clear flag 0x2. Return 1. The drop's draws
-come before the mode change's §4 draw. Live: stands 104, 105, 550, 551;
-racks 106, 107, 548, 549.
-
-#### 16.6 Bookshelf, operate 26 (`0x00584060`)
-
-Mode 0 (or none):
-
-1. Mode 2, clear flag 0x2.
-2. r := C step, lo' mod 20 (C = control seed). r < 13: C step, lo' & 1 =
-   0 → code `tsc `, 1 → `isc `. r ≥ 13: C step, lo' & 1 = 0 → `tbk `, 1 →
-   `ibk `. Drop item code (+0xB8) := it.
-3. Drop it at O (`0x00559A30`, quality argument 2; items spec).
-
-Return 1. Live: 179, 180 (`InitFn` 2: their trap byte is never armed
-here).
-
-#### 16.7 Teleport pad, operate 27 (`0x00581BF0`)
-
-1. O's room R0 none → return 0.
-2. Partner T: in R0's unit list the first object (type 2) ≠ O with O's
-   class; else, in R0's adjacency array order (`drlg/rooms.md` §6, R0
-   itself skipped), the first such object of each room; RT := the room
-   it was found in. None → return 0.
-3. Point := T's position; free point from RT (`0x0064E7B0`, size 3, mask
-   0x1C09, no fallback; `sim/path-placement.md` §7); none → return 0.
-4. Place P (`0x00554EA0(game, P, RT, x, y, exact 0, alt 0)`,
-   `sim/path-placement.md` §10); failure → return 0.
-5. S→C 0x07 (`0x0053BC50`) to P's client: RT's tile x and y (room rect
-   +0x10, +0x14) and RT's level; queue P for update (`0x0064C040`); P
-   flags 2 (+0xC8) |= 0x10000. Return 0.
-
-O's mode is not tested. Live: 192, 304, 305, 306.
-
-#### 16.8 Slime door, operate 29 (`0x005821A0`)
-
-Mode ≠ 0 → return 1. Else mode 1, free the footprint, flag 0x2 :=
-`Selectable[new mode]`, and ENDANIM only when `Mode2` (+0x141) ≠ 0.
-Return 1. Live: 229, 230.
-
-#### 16.9 Exploding chest, operate 30 (`0x00581CD0`)
-
-Mode 0 (or none): trap damage `0x005DFA00(game, O, P, 0)`, then `(game,
-O, P, 1)` (combat spec); mode 1; ENDANIM. Returns 0. Live: 250
-(exploding cow), 454.
-
-#### 16.10 Bank, operate 32 (`0x00564CD0`)
-
-Only for class 267. P's room and O's room both in a town level
-(`0x0061AB00`): P's interact := (2, O's GUID) (`0x00554120`); S→C 0x77
-(`0x0053CAB0`) with action 0x10 to P's client; scroll/tome recount
-(`0x0055FA40`, `items/inventory.md` §5.5). Returns 0. §7.2 rule 2 lets
-P operate it with an item on the cursor.
-
-#### 16.11 Stairs, operate 47 (`0x00581F60`) and 50 (`0x00582180`)
-
-- **47:** mode 0 (or none) → mode 1, ENDANIM. Mode 2 → the first warp
-  tile (type 5) in O's room, else in the adjacency rooms (O's room
-  skipped) in order; found → warp P (`0x005550B0`); none → nothing.
-  Return 1. Live: 194, 195.
-- **50:** O present and its mode's low 16 bits = 2 → run 47 (the warp);
-  else return 0, so mode 0 never opens. Live: 386 (its mode comes from
-  init 53, `world/quests-act3.md` §7.7).
-
-#### 16.12 Jungle stash, operate 51 (`0x00583F10`)
-
-Mode 0 (or none): mode 1, clear flag 0x2, ENDANIM, event 10 at f +
-`Parm1` + 1, free the footprint when `HasCollision1` (+0x121) = 0, trap
-arm with `InteractType` & 0x7F (§8.3), timer-argument owner GUID := P's
-GUID (none: −1; `0x00552AF0`). Return 1. The drop is event 10 (§18.5).
-Live: 185–188 (`InitFn` 2, so trapped by §5.2; `Parm1` 11, 34, 13, 33).
-
-#### 16.13 Harrogath gate, operate 61 (`0x00582080`)
-
-t := `GetTickCount`; t < +0xD4 + 500 → return 1 (host clock, as §10).
-Mode 0 → free the footprint, mode 1, +0xD4 := t, ENDANIM. Mode 2 → stamp
-the footprint at O's room and position (`0x00620A70`), mode 0, +0xD4 :=
-t. Other modes nothing. Return 1. Unlike doors there is no occupancy
-test before closing. Live: 449, 508.
-
-### 17. Small init functions
-
-Init record as §3 rule 6 (game, O, room, control, record, x, y). Mode
-sets here run before the unit is added to the world (§3).
-
-| Init | Address | Live rows | Rule |
-|---|---|---|---|
-| 8 torch | `0x005500C0` | 29, 37, 38, 102, 117 | mode 2 |
-| 10 | `0x0054F860` | none | room level (`0x0061A1B0`) = 1 → event 8 at f + 60; else mode 2 and event 0 at f + 25 |
-| 13 invisible object | `0x00594020` | 61 | quest chain 4 record exists (`0x00543640(game, 4)`) → link O to it (`0x005436B0(…, O, 4)`, `world/quests.md` §4.6); else mode 2 unless O is already in mode 2 |
-| 14 brazier | `0x005500D0` | 101 | mode 1 |
-| 22 fire | `0x0054FB40` | 160–162, 245, 345–347 | `Mode2` (+0x141) ≠ 0 and mode 0 (or none) and `Mode0` (+0x13F) = 0 → mode 2; then event 0 at f + 25 |
-| 24 spike floor trap | `0x0054FB90` | 196, 261 | event 3 at f + 25 |
-| 26 | `0x005500E0` | 259, 373 | mode 1 |
-| 27 goo pile | `0x0054FC50` | 266 | C step: lo' mod 1000 ≤ 332 → `InteractType` := 3 (poison trap, §8.3), else 0 |
-| 28 gold placeholder | `0x0054F8C0` | 269 | below |
-| 34 hell brazier fire | `0x005500F0` | 358, 359 | C step: lo' & 1 = 1 → mode 1 |
-| 37 | `0x0059DA50` | none | `world/quests-act2.md` §8.8 |
-| 58 fissure | `0x0054FDB0` | 399 | C step; event 8 at f + 25 + lo' mod 250 |
-
-**Gold placeholder** (init 28): mode ≠ 0 → nothing. Else mode 2; n :=
-(C step, lo' mod 9) + 1; L := (x, y). n times: dx := C step & 3, dy := C
-step & 3; room lookup from the init room at (L.x + dx, L.y + dy)
-(`0x00463740`); found room = the init room → P := (x + dx, y + dy), L :=
-P, and if the point query at P with mask 0x3F11 is free
-(`0x0064D800(room, P, 1, 1)`): gold drop at P (`0x00559300`, items spec).
-
-### 18. Object events 0, 3, 8, 9, 10
-
-Handlers (game, O) as `sim/units.md` §6.4. **Burn** (`0x00581680`): for
-each player (type 0) in O's room unit list not in mode 17 with distance
-(`0x006416D0`, `missiles/missiles.md` §R9.5) ≤ `Parm0` + 1: trap damage
-`0x005DFA00(game, O, player, 1)`. Only O's own room is scanned.
-
-#### 18.1 Event 0, fire (`0x00581700`)
-
-1. O in mode 1 → its mode field := 2, written directly (no mode set: no
-   animation, draw or update).
-2. Burn.
-3. C step; event 0 at f + 15 + lo' mod 35.
-
-#### 18.2 Event 3, spike floor trap (`0x005818B0`)
-
-State s := `InteractType`; "on it" = a player not in mode 17 at
-distance ≤ 0.
-
-- s = 0: for each player on it, sound 13 on O (no target; one per
-  player). Any → s := 1, event 3 at f + 25. None → event 3 at f + 15.
-- s = 1: each player on it takes trap damage `(game, O, player, 0)`.
-  Any → s := 2 and mode 1; none → s := 0. Event 3 at f + (`FrameCnt1` >>
-  8) + 1.
-- s = 2: O's mode at entry ≠ 0 → mode 0, s := 0. Event 3 at f + 15.
-- other s: event 3 at f + 15.
-
-No draws.
-
-#### 18.3 Event 8 (`0x00581250`)
-
-- **Class 399 (fissure):** mode (low 16 bits) not 0 or 2 → nothing, and
-  no reschedule. Else C step; event 8 at f + 25 + lo' mod 250; mode 1;
-  ENDANIM.
-- **Other classes** (init 10 only; no live row): p := Act I period of
-  day (`0x0061C100(game act 0, none)`; `sim/stats.md` §8 note). p = 0 →
-  mode 1 or 2 → mode 0; event 8 at f + 1000. p in 1..3 → mode 0 → mode 1
-  and ENDANIM; event 8 at f + 1000. Other p → event 8 at f + 600.
-
-#### 18.4 Event 9, trapped souls and burning bodies (`0x00585CE0`)
-
-Schedulers: init 51 (`0x005501F0`): mode 1 or 2 → event 9 at f + 35.
-Operate 48 (`0x005869F0`): mode ≠ 0 → return 0; r := C step mod 100; r <
-90 → `D(0)` (§8, operator P), an item → mode 5; r ≥ 90 → mode 1,
-ENDANIM, event 9 at f + 20. Returns 0. Live: 380, 381.
-
-Handler:
-
-- mode 1 → event 9 at f + 10.
-- mode 2 → `InteractType` += 1 (u8). Below 2 → burn, event 9 at f + 25.
-  Else `D(0)` with no operator; an item → mode 3 and event 9 at f +
-  (`FrameCnt3` (+0xE4) >> 8) + 1; no item → nothing more.
-- mode 3 → mode 4.
-- other modes: nothing.
-
-#### 18.5 Event 10, jungle stash drop (`0x00586850`)
-
-`D(0)` with operator := the player (`0x00552F60(game, type 0, GUID)`)
-whose GUID is O's timer-argument owner (`0x00552B10`); gone → none.
+§16 (operate functions, part 2), §17 (small init functions) and §18
+(object events) are in `world/objects-2.md`, numbers kept; §19 and later
+continue there too. A reference to §16–§18 in this file means that file.
 
 ## Constants & data dependencies
 
@@ -861,6 +867,12 @@ Seeds: **C** = object-control seed (§2), **U** = the object's unit seed,
     step, then the mode change; 3 none; 9 and 10 only the drop's draws.
 13. Teleport pad, trap door, stairs: the free-point and warp code of
     `sim/path-placement.md` (no draws found there).
+14. Preset 581: one C step before the allocation (so before the chest's
+    init draws); preset 580: that step, the init's draws, then [`roll(100)`
+    C for levels 62–64]. Trap monster id (§8.3): no draws.
+15. Shrine storm (19): no draws of its own; the missiles' creation draws
+    (`missiles/missiles.md`). Potions (21, 22): the item creation draws,
+    per potion, after the count `roll` on U.
 
 ## Edge cases & original bugs
 
@@ -912,6 +924,22 @@ Reproduced by default.
     or 2 does not reschedule.
 21. **Trapped soul with no drop goes inert**: mode 2, counter ≥ 2, no
     event pending.
+22. **Presets 580–582 ignore the preset mode** (mode 0); 580 at level
+    25 still takes 581's class step before 371 replaces the pick.
+23. **Key bypass by class id**: any operator of class 6 (also a monster
+    row 6) opens a locked chest without a key (§8.1 rule 8).
+24. **Barrels return 0**, every other breakable 1 (no caller reads it).
+25. **Trap monster is the family base** (§8.3): a level whose first
+    matching entry is zombie3 spawns zombie1 (5); cached per level for
+    the game.
+26. **Enirhs (16) reverses the player's name** in the server's player
+    data; unreachable through init and presets.
+27. **Shrine 17 portal room**: created in P's room even when the free
+    spot lies in a neighbouring room.
+28. **No null-operator guard** in the portal (fatal assert) or the chest
+    lock (fatal in the key test).
+29. **Portals close only for the linked owner**: removal needs player
+    data +0x48 = the linked portal's GUID; class 60 never removes.
 
 ## Test vectors
 
@@ -921,7 +949,7 @@ Synthetic (CI), RNG per `rng.md` §3:
 |---|---|---|
 | chest init 3, lockable, `MonLvl1` 1, C = {1, 666} | draws 51 (not trapped), 31 (not locked); `InteractType` 0; U := `init_low(55249)`; C after = {671516612, 330169957} | §5.2 |
 | same, C = {410, 666} | 0 (trapped), trap 8, 0 (locked): `InteractType` 0x88; U := `init_low(48426)` | §5.2 |
-| shrine init 1, `Parm0` 3, level 2, C = {1, 666} | `roll(10)` 1 → class 4; picks 4 (id 8, `LevelMin` 5 > 2), 8 (id 13): id 13 | §5.1 |
+| shrine init 1, `Parm0` 3, level 2, C = {1, 666} | `roll(10)` 1 → class 4; picks 4 (id 9, `LevelMin` 26 > 2), 8 (id 13): id 13 | §5.1 |
 | shrine init 1, `Parm0` 0, level 2, C = {1, 666} | `roll(22)` = 21 → id 22 | §5.1 |
 | shrine init 1, `Parm0` 3, level 2, C = {4, 666} | `roll(10)` 0 → class 1; picks 2 (id 18, `LevelMin` 4), 3 (id 19): id 19 | §5.1 |
 | PreOperate, C = {1, 666} | `roll(14)` = 9: mode unchanged | §3 |
@@ -939,6 +967,14 @@ Synthetic (CI), RNG per `rng.md` §3:
 | trapped soul operate, C = {1, 666} | 51 < 90 → `D(0)` | §18.4 |
 | gate, +0xD4 = 1000, tick 1400 | nothing (1400 < 1500) | §16.13 |
 | spike trap s = 0, one player at distance 0 | sound 13, s := 1, event 3 at f + 25 | §18.2 |
+| preset 581, Act I level, C = {1, 666} | lo' 1791398751 mod 13 = 12 → class 243 | §6 |
+| preset 581, level 74, C = {1, 666} | lo' & 3 = 3 → class 391 | §6 |
+| preset 581, Act II not 74 / Act III not 83, C = {1, 666} | lo' & 1 = 1 → 88 / 183 | §6 |
+| preset 580, level 62, C = {1, 666} | class 88; next step 791599131 mod 100 = 31 ≤ 50 → spark | §6 |
+| animation, `FrameDelta` 200, `Sync` 0, mode change | `roll(25)`; r = 23 → speed 211 (recording `obj1`, class 37) | §4 |
+| object allocated in mode 0, init sets no mode | no draw; speed 0, frame count 0 | §4 r5 |
+| storm, P level 23 / 3 / 50 | missile skill level 4 / 1 / 8 | §9.3 |
+| exploding barrel at (10, 10), player at (12, 12) / (13, 11) | hit (8 ≤ 9) / not hit (10 > 9) | §8.2 |
 
 Game-file (`#[ignore]`, `D2_GAME_DIR`): `object-functions.tsv` equals the
 three tables of the 1.14d `Game.exe` and the live row counts; the shrine
@@ -986,36 +1022,52 @@ lists of §2 from the live `shrines.txt`.
   D2MOO `ObjMode.cpp` gave the names; 1.14d differences: the obelisk
   sends 0x58 with an unwritten 7th byte; the exploding chest, torch tiki
   and teleport pad return 0; the trap door asserts on a missing tile.
+- Answers of the implementation questions (2026-10-07): `0x00624558`–
+  `0x0062458C`, `0x005553E5`, `0x00623520`, `0x00624690` (§4);
+  `0x00620A70` (§5.5); `0x0054F180`, `0x0054F370`, `0x0054F430`,
+  `0x0054F0D0` (§6); `0x00548B00` (§7.3); `0x00585F60`, `0x0055F140`
+  (§8.1); `0x00584240`, `0x00641890` (§8.2); `0x00582380`, `0x005474C0`,
+  `0x00582250`, `0x005822F0` (§8.3); `0x00583C70`, `0x00621B70`,
+  `0x00582940`, `0x005829A0`, `0x00582A00`, `0x00582A30`, `0x00582DA0`,
+  `0x00582710`, `0x005830E0`, `0x00583410` (§9); `0x00581D40` (§10);
+  `0x005858A0`, `0x00585720`, `0x00552AA0`, `0x00552AB0` (§11);
+  `0x00584870`, `0x00553720`, `0x00535B10`, `0x005353F0`, `0x0061E470`
+  (§12); `0x00581A20`, `0x0053D4D0`, `0x0053D900` (§14); `0x00581490`
+  (§18.6). D2MOO `OBJECTS_OperateFunction15_Portal` matched the portal
+  order; 1.14d differs: no null-operator return. Recording `obj1`
+  (`docs/handoff/local-buddy-q9-rec.md`, `record_objects.py` 0.1.0)
+  confirmed §4 rule 5.
 
 ## Open questions
 
 1. No recording of a chest, shrine, door, well or portal yet: record
    `packets` + RNG traces for one of each to confirm draw order and the
    0x0E/0x4D bytes.
-2. Whether the allocation sets the animation (§4 draw) before the init
-   function runs (the mode is stored directly at `0x005553E5`); settled
-   by a trace of an object allocation with `Sync` = 0.
-3. Trap monster choice `0x005474C0` (per-level cache; D2MOO
-   `OBJRGN_GetTrapMonsterId`): not re-read in 1.14d; decides which
-   monsters casket/barrel/trap 8–9 spawn.
+2. **Answered (confirmed by recording `obj1`)**: no animation setup runs
+   before the init function; §4 rule 5 (`0x005553E5`, `0x00624690`).
+3. **Answered**: `0x005474C0` read in 1.14d, §8.3 "Trap monster id".
 4. Meaning of the constant 3 at 0x0E offset 6 and of 0x4D's zero fields
    (client handler `0x0045CD10` and the 0x4D client handler).
 5. Callback `0x00582750` and the eligibility test of the warping shrine
    (20); owner monsters spec.
-6. Preset 581 (`0x0054F180`): act-dependent random chest class and its
-   draw; settled by reading it against D2MOO `OBJECTS_SpawnPresetChest`.
-7. Portal operate steps of §12 rule 3 in order, with their quest-flag
-   gate (`levels`/leveldefs quest columns).
+6. **Answered**: §6 "Preset chest 581" (`0x0054F180`).
+7. **Answered**: §12 rules 4–14 (`0x00584870`).
 8. Who sets door mode 6 (locked): DS1 preset modes or population; settled
    by a DS1 survey of door object modes.
 9. Obelisk: what completes it after mode 3 (gem use, reward) lives in
    the client UI and item code; find the C→S message and its handler.
 10. Fire event 0's direct mode write (§18.1): confirm with a packets
     trace that clients see no 1 → 2 update for fires.
-11. `object-functions.tsv` gives init 51 and operate 48 (trapped souls)
-    to `world/quests.md`, which does not cover them; §18.4 states them.
-    Settle the owner cell.
-12. `sim/server-messages.tsv` row 0x58 has no builder; it is
-    `0x0053D8D0` (owner `sim/intents-events.md`).
+11. **Answered**: owner cells of init 51 and operate 48 are §18.4, init
+    13 is §17 (CODE-TABLE CHANGE commit).
+12. **Answered** for this spec: the 0x58 builder is `0x0053D8D0`; the
+    row change is a cross-file request (`docs/handoff/pc2-spec-objects.md`).
 13. Drops `0x005594C0` (armor), `0x00559630` (weapon), `0x00559300`
     (gold), `0x00559A30` (by code): items spec, not yet specified.
+14. Recording `obj1`: two class-37 allocations show speed 0 at return in
+    mode 2; §4 rule 5 predicts an allocation mode of 2 (init 8's set is
+    then a no-op). Check their mode argument in `obj1-objects.jsonl`.
+15. Well heal: what `0x00578C20(P)` removes or resets (it counts as
+    "used", §11); stat-list / states spec.
+16. `0x0061B060(…, 3)` (portal arrival point without a partner, §12
+    rule 8): the DRLG spec owns which point kind 3 is.
