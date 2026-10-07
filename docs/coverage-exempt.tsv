@@ -471,3 +471,5 @@ specs/sim/intents-events.md	§3.2 r5	game types 1/2 and network mode: Phase 7, o
 specs/sim/intents-events.md	§3.2 r6	game types 1/2 and network mode: Phase 7, out of scope
 specs/sim/tick.md	§5.7	pointer table to units.md
 specs/sim/tick.md	§6 text	narration
+specs/formats/d2s.md	§4 r4	pointer to world/quests.md
+specs/formats/d2s.md	§8.1 r9	list of call sites (pointers)
