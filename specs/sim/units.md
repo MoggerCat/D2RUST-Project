@@ -28,17 +28,17 @@
 |   1. Unit kinds | 77–96 |
 |   2. Unit record | 97–136 |
 |   3. Lifecycle | 137–379 |
-|   4. Modes and mode schedules | 380–741 |
-|   5. Event dispatch | 742–756 |
-|   6. Events per kind | 757–879 |
-|   7. Scheduler inventory (`unit-events.tsv`) | 880–901 |
-|   8. Collision line between two units | 902–906 |
-| Constants & data dependencies | 907–923 |
-| Randomness | 924–931 |
-| Edge cases & original bugs | 932–952 |
-| Test vectors | 953–1012 |
-| Provenance | 1013–1080 |
-| Open questions | 1081–1160 |
+|   4. Modes and mode schedules | 380–805 |
+|   5. Event dispatch | 806–820 |
+|   6. Events per kind | 821–943 |
+|   7. Scheduler inventory (`unit-events.tsv`) | 944–965 |
+|   8. Collision line between two units | 966–970 |
+| Constants & data dependencies | 971–987 |
+| Randomness | 988–995 |
+| Edge cases & original bugs | 996–1016 |
+| Test vectors | 1017–1076 |
+| Provenance | 1077–1151 |
+| Open questions | 1152–1231 |
 <!-- /index -->
 
 ## Summary
@@ -621,6 +621,70 @@ start; `0x005A7C20` never writes it itself.
 Draws: only the bonefetish branch (U's seed, one `roll`, plus the
 missile creation's own); the siege-beast skill use per its spec.
 
+**The other start and event functions** (1.14d-read 2026-10-08,
+`0x005A7490`–`0x005A7891`, `0x005A8490`–`0x005A872F`). Same calling
+convention; "set mode m" as above. A start returning 0 makes
+`0x005A7C20` run the neutral start instead. The path fields, the
+velocity request and the path compute of a moving request are done by
+`0x005A7C20` **before** the start runs (`monsters/ai.md` §7.5).
+
+5. **WL start** `0x005A7520`, **RN start** `0x005A7550`: path point
+   count (+0x28, `0x00648780`) = 0 → return 0 (neutral); else set mode
+   2 (WL) / 15 (RN), return 1. So a walk or run whose compute found no
+   point never enters the mode.
+6. **GH start** `0x005A7580`: U null, or U in mode 0 or 12 → return 1,
+   mode unchanged. Class without mode 3 (`0x0046C140(class, 3)`) →
+   return 0. Else set mode 3, return 1.
+7. **Attack / skill start** `0x005A75C0` (modes 4, 5, 7, 8, 9; m = R
+   mode): m a moving mode for U (`0x005A6B10`, `monsters/ai.md` §7.1):
+   point count ≠ 0 → compute the path again (`0x00649970(path, U, 0)`)
+   and go on; point count 0 → U's `BaseId` 110 (`vulture1`): compute,
+   set mode m, return 1 (no skill start); any other → return 0. Then
+   (and directly for a non-moving m): set mode m; U has a used skill
+   (`0x00620250`) → skill start `0x0056FAF0(game, U)` (`skills/use.md`
+   §5.3; its result ignored); return 1. So AI attacks and skill modes
+   do enter their mode; the used skill is the one the request set
+   (`monsters/ai.md` §7.1 `0x005DEAD0`).
+8. **BL start** `0x005A77C0`: set mode 6, return 1.
+9. **KB start** `0x005A77D0`: class without mode 3 or without mode 13
+   (`0x0046C140`) → return 0. U null or in mode 0 → return 1, mode
+   unchanged. Else path type := 8 (set type `0x00648CF0`, `sim/pathing.md`
+   §12.5), distance budget (+0x90, `0x00648E40`) := 10 for `BaseId` 78
+   (`sandleaper1`), else 5; compute (`0x00649970(path, U, 0)`); set mode
+   13; return 1.
+10. **SQ start** `0x005A7870`: set mode 14; U flags (+0xC4) &= ~0x40;
+    return the skill start `0x0056FAF0(game, U)` (0 → neutral).
+11. **S3** (mode 10): start `0x005A7490` sets mode 10, returns 1. Event
+    0 `0x005A74A0`: step `0x00554CA0` (result ignored), animation refresh
+    `0x00623E00`, animation complete (`0x006217C0`) → set mode 11;
+    returns 1. Event 1 `0x005A74D0` does nothing. (Mode 10 has no
+    schedule flag, so `0x005A7C20` schedules neither.)
+12. **S4 start** `0x005A74E0`: set mode 11; think (event type 2) at f +
+    15 (`0x005417D0(game, U, 2, f + 15, 0, 0)`); return 1.
+13. **Event 0 of the moving modes** (ECX game, EDX U; 1 = go on, 2 =
+    stopped):
+    - WL `0x005A8490`: U has state 13 → `0x005C9D90(game, U)`; U has
+      state 22 → `0x005CE4F0(game, U)` (skills spec); neither result is
+      tested, both run before the step and never gate it. Step
+      `0x00554CA0` (`sim/pathing.md` §9.3): 2 → mode end `0x005A8030`
+      (`monsters/ai.md` §1.4), return 2; else 1.
+    - RN `0x005A84F0`: the WL body without the two state calls.
+    - KB `0x005A8630`: step (result ignored), animation refresh,
+      animation complete → KB event 1 `0x005A8520` and return 2; else 1.
+    - SQ `0x005A8670`: animation complete → mode end, return 2. Else E
+      := the used skill, f := its E flags (`0x006446A0`), "do left" :=
+      1. f bit 0 (moving skill): target check `0x00553490`, step; result
+      2 → E flags := f | 2 (`0x00644660`), do `0x0056FC50` (`skills/use.md`
+      §5.4), do left := 0. Then by U's frame code (byte +0x4E): 4 → do;
+      else do left, U flag 0x40 clear and code 1 or 2 → do. Animation
+      refresh; return 1.
+14. **KB event 1** `0x005A8520`: path type reset `0x00648DC0`
+    (`sim/pathing.md` §1.5 rule 1). Class without mode 3 → think at f +
+    1, done. A monster with `BaseId` 78 → think at f + 45 with state 21,
+    else f + 15, done. Otherwise: used skill := none, U +0xB0 := 0xA0,
+    mode request 3 (record zeroed, mode 3, unit U, byte +0x15 := 100;
+    `0x005A7C20(game, &req, 1)`).
+
 #### 4.7 Animation rate `0x00623F50` and frame bonus `0x00623B10`
 
 **Rate** `0x00623F50(unit U, file, line)` (`ret 0xC`; 23 callers: every
@@ -1029,6 +1093,13 @@ AI from AI functions, everything in "not yet observed" (open question 1).
   bit `deathDmg` from `data/fields.tsv`, mask `[0x006CE278]` = 0x10
   (mask table `0x006CE268` dumped: 1, 2, 4, …); BaseId 212 / 441 names
   from `patch_d2` `monstats.txt`.
+- §4.6 rules 5–14 (2026-10-08, gaps MV1–MV3 of
+  `docs/handoff/impl-path-motion.md`): `disasm.py fn` on `0x005A7490`,
+  `0x005A74A0`, `0x005A74E0`, `0x005A7520`, `0x005A7550`, `0x005A7580`,
+  `0x005A75C0`, `0x005A77C0`, `0x005A77D0`, `0x005A7870`, `0x005A8490`,
+  `0x005A84F0`, `0x005A8520`, `0x005A8630`, `0x005A8670` (none in the
+  Ghidra export); helpers `0x00648780` (+0x28), `0x00648E40` (+0x90);
+  `BaseId` 110 = `vulture1` from `patch_d2` `monstats.txt`.
 - **1.14d `Game.exe`** (SHA-256 `631066c1…adaaf`): every address read
   from the disassembly (`tools/ghidra/disasm.py`) with the Ghidra
   decompile as a guide; scheduler sites by rel32 scan (`disasm.py xref`)
