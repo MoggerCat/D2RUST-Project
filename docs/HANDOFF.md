@@ -5327,6 +5327,9 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
 - `audio/environment.md` OQ1 (PC 2 spec-audio pass 3): town → Blood Moor → Den of Evil → town, a day change, Blood Raven's death (stinger 34), rain on and off, with the `0x004DCAA0` / `0x004DCD40` / `0x004E42E0` hooks.
 - `formats/wav.md` OQ1 (= §5 C75, PC 2 spec-audio pass 3): dump at `0x00516760` (pointer, size) for the `wav.md` Test-vector files and one ADPCM file per channel count, and the first 256 KiB of `music\act1\crypt.wav` from the refill copy `0x004157C0`; compare byte for byte with our decode.
 - `audio/sound-table.md` OQ1 / OQ10 (PC 2 spec-audio pass 3): see the exact captures written in those open questions.
+- `ui/control-panel.md` OQ1 / OQ6 (PC 2 spec-ui pass 3): a globe refilling after a potion, frame by frame (smoothing precision), and the control panel at 640 × 480 and 800 × 600 with the belt popped and the mini panel in its three layouts.
+- `ui/messages.md` OQ1 (PC 2 spec-ui pass 3): chat lines (whisper, whisper echo, broadcast) at 800 × 600; two monsters with overhead text at once (bubble moved); an NPC dialog panel scrolling with frame times; a timed box.
+- `ui/panels-2.md` OQ4 (PC 2 spec-ui): stash open at 800 × 600, expansion and classic: the `GoldMax` line, to confirm its font (static answer: font 1).
 
 **Ninth set (2026-10-07; the 22 notes `impl-ai-acts2-5`, `impl-skill-slots-2`,
 `impl-missile-bodies-2`, `impl-quests-act1-rest`, `impl-quests-act2`,
