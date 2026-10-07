@@ -97,6 +97,10 @@ pub struct SimGame<D = Unspecified, W = NoWorld> {
     transport_ids: BTreeMap<SimClient, ClientId>,
     players: BTreeMap<UnitId, PlayerFields>,
     units: BTreeMap<UnitId, UnitFacts>,
+    /// The units whose facts came from the world host
+    /// ([`WorldHost::live_facts`]) rather than the caller: refreshed
+    /// before each point / unit parse.
+    live: std::collections::BTreeSet<UnitId>,
     /// Clients the point parser asked to resync with S→C 0x15, in order.
     /// Not queued: the 11-byte layout of 0x15 is not in
     /// `server-messages.tsv` (`docs/HANDOFF.md` §7).
@@ -158,6 +162,7 @@ impl<D: EventDispatch, W> SimGame<D, W> {
             transport_ids: BTreeMap::new(),
             players: BTreeMap::new(),
             units: BTreeMap::new(),
+            live: Default::default(),
             resyncs: Vec::new(),
             unhandled: Vec::new(),
             world,
@@ -339,6 +344,35 @@ impl<D: EventDispatch, W: WorldHost<D>> Intents for SimGame<D, W> {
     }
 
     /// `None` without player data, or without a staged position.
+    /// The facts of the client's player and, for a unit message, of the
+    /// target, from the world host when the caller staged none (the app
+    /// stages none: without this every walk was refused `Invalid`).
+    fn refresh_targets(&mut self, client: ClientId, msg: &[u8]) {
+        let mut units: Vec<UnitId> = self.player_unit(client).into_iter().collect();
+        if let (Some(&id), Some(ty), Some(guid)) = (
+            msg.first(),
+            msg.get(1..5)
+                .map(|b| u32::from_le_bytes(b.try_into().unwrap())),
+            msg.get(5..9)
+                .map(|b| u32::from_le_bytes(b.try_into().unwrap())),
+        ) {
+            if crate::dispatch::is_unit(id) {
+                if let Some(&t) = UnitType::ALL.get(ty as usize) {
+                    units.extend(self.game.lists.find_unit(t, guid));
+                }
+            }
+        }
+        for u in units {
+            if self.units.contains_key(&u) && !self.live.contains(&u) {
+                continue;
+            }
+            if let Some(f) = self.world.live_facts(&self.game, &mut self.events, u) {
+                self.units.insert(u, f);
+                self.live.insert(u);
+            }
+        }
+    }
+
     fn point_state(&self, client: ClientId) -> Option<PointState> {
         let unit = self.player_unit(client)?;
         let data = self.players.get(&unit)?.data?;

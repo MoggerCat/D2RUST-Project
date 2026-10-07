@@ -146,6 +146,8 @@ pub type Link<C = SystemClock> = LocalLink<Sim, ProtoSizes, PendingSession, C>;
 /// player: `sim/path-placement.md` §13 rule 2), Cold Plains (act 0) and
 /// Lut Gholein (act 1).
 pub const ACT1_TOWN: u32 = 1;
+/// The Blood Moor (act 0), east of the synthetic town's room.
+pub const BLOOD_MOOR: u32 = 2;
 pub const COLD_PLAINS: u32 = 3;
 pub const ACT2_TOWN: u32 = 40;
 /// The default game seed.
@@ -421,6 +423,9 @@ impl LevelTypes for Types {
         if let Some(&rect) = self.0.get(&id) {
             let r = drlg.alloc_room(level, RoomKind::Preset, rect);
             drlg.room_mut(r).dt1_mask = 1;
+            if id == ACT1_TOWN || id == BLOOD_MOOR {
+                drlg.room_mut(r).flags |= d2_sim::drlg::room_flags::WARP_0;
+            }
             drlg.link_room(r, LinkAt::Tail);
         }
         Ok(())
@@ -750,19 +755,26 @@ fn synthetic_drlg_data() -> DrlgData {
     let mut files = vec![Vec::new(); 32];
     files[0] = b"floor.dt1".to_vec();
     drlg.lvltypes = vec![vec![Vec::new(); 32], files];
-    for id in [ACT1_TOWN, COLD_PLAINS, ACT2_TOWN] {
+    for id in [ACT1_TOWN, BLOOD_MOOR, COLD_PLAINS, ACT2_TOWN] {
         drlg.levels[id as usize].drlg_type = 2;
         drlg.levels[id as usize].level_type = 1;
     }
+    // The town and the Blood Moor see each other through vis slot 0, a
+    // border (warp −1, `drlg/rooms.md` §3.3): each one's room carries
+    // flag WARP_0 ([`Types`]).
+    drlg.levels[ACT1_TOWN as usize].vis[0] = BLOOD_MOOR;
+    drlg.levels[BLOOD_MOOR as usize].vis[0] = ACT1_TOWN;
     drlg
 }
 
 /// The synthetic level types: one 8×8-tile floor room in the Rogue
 /// Encampment (the game entry's town, at tile (16, 0): levels of one act
-/// do not overlap), one in Cold Plains and one in Lut Gholein.
+/// do not overlap), one in the Blood Moor east of it (tile (24, 0), a
+/// level border), one in Cold Plains and one in Lut Gholein.
 fn synthetic_types() -> Types {
     Types(BTreeMap::from([
         (ACT1_TOWN, TileRect::new(16, 0, 8, 8)),
+        (BLOOD_MOOR, TileRect::new(24, 0, 8, 8)),
         (COLD_PLAINS, TileRect::new(0, 0, 8, 8)),
         (ACT2_TOWN, TileRect::new(0, 0, 8, 8)),
     ]))

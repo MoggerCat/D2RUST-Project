@@ -353,6 +353,18 @@ pub trait WorldHost<D> {
     fn walk(&mut self, game: &mut Game, events: &mut D, call: WalkCall) -> Option<WalkResult> {
         None
     }
+    /// The live act and position of `unit` the point / unit parser reads
+    /// (`intents-events.md` §2.4 rules 3–4), from the game's own unit
+    /// (its room's act, its path position). `None`: the host has none
+    /// (the caller's staged [`super::super::UnitFacts`] are used).
+    fn live_facts(
+        &mut self,
+        game: &Game,
+        events: &mut D,
+        unit: UnitId,
+    ) -> Option<super::super::UnitFacts> {
+        None
+    }
     /// The client vitals sync (`combat/vitals.md` §5) for one client at
     /// the end of a flush: the messages to send it, in order. `None`:
     /// the host has no sync (or it is off), nothing runs. `staged`: the

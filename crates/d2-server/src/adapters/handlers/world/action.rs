@@ -198,6 +198,34 @@ where
         super::super::walk::run(game, events, call)
     }
 
+    /// A player, monster or object in a room: the room's act and the
+    /// unit's position (path, or the seam's staged position without the
+    /// path provider; `pathing.md` §2.1). Items and missiles: none (an
+    /// item's owner is not read here).
+    fn live_facts(
+        &mut self,
+        game: &Game,
+        events: &mut D,
+        unit: UnitId,
+    ) -> Option<crate::adapters::UnitFacts> {
+        let e = game.lists.unit(unit)?;
+        if !matches!(
+            e.ty,
+            d2_sim::units::UnitType::Player
+                | d2_sim::units::UnitType::Monster
+                | d2_sim::units::UnitType::Object
+        ) {
+            return None;
+        }
+        let act = game.lists.room(e.room()?)?.act;
+        let (x, y) = events.action().hooks().path_position(unit);
+        Some(crate::adapters::UnitFacts {
+            act,
+            pos: crate::seams::Pos { x, y },
+            owner: None,
+        })
+    }
+
     /// `d2_sim::wiring::action::vitals_sync::run` on the action wiring
     /// (on when `ActionHooks::enable_vitals_sync` ran).
     fn vitals_sync(
