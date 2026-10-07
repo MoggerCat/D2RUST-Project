@@ -31,7 +31,7 @@
 | Edge cases & original bugs | 211–220 |
 | Test vectors | 221–248 |
 | Provenance | 249–263 |
-| Open questions | 264–284 |
+| Open questions | 264–285 |
 <!-- /index -->
 
 Owned ids: 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F, 0x20, 0x3F, 0x42,
@@ -276,7 +276,8 @@ scan for calls to it).
 4. `0x004C1350` requirement refresh: the full rule (it walks the body
    locations and the grid, tests requirements `0x004C10E0`, sets item
    flag 0x4000).
-5. 0x21, 0x22, 0x23, 0x94 (skills; seen at join) are not owned here.
+5. Answered: 0x21, 0x22, 0x23, 0x94 are owned by `client/msg-skills.md`
+   (skill list, §3–§6 there).
 6. `cursor_item` in the other item actions (§2 rule 5's list): per
    handler, whether it passes the action's item, a swapped-out item or
    0 to `0x0063C180`; with the header byte +8 of the GroundToCursor
