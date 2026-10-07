@@ -21,17 +21,17 @@
 | Rules | 63–64 |
 |   1. Renderers in 1.14d and the reference | 65–104 |
 |   2. Framebuffer | 105–113 |
-|   3. Frame cycle | 114–151 |
-|   4. Palette (one per presented frame) | 152–199 |
-|   5. One pixel write (index domain) | 200–238 |
-|   6. d2rs answers | 239–257 |
-|   7. DirectDraw (display type 3) differences | 258–269 |
-| Constants & data dependencies | 270–275 |
-| Randomness | 276–279 |
-| Edge cases & original bugs | 280–289 |
-| Test vectors | 290–301 |
-| Provenance | 302–328 |
-| Open questions | 329–362 |
+|   3. Frame cycle | 114–166 |
+|   4. Palette (one per presented frame) | 167–223 |
+|   5. One pixel write (index domain) | 224–262 |
+|   6. d2rs answers | 263–283 |
+|   7. DirectDraw (display type 3) differences | 284–295 |
+| Constants & data dependencies | 296–301 |
+| Randomness | 302–305 |
+| Edge cases & original bugs | 306–315 |
+| Test vectors | 316–327 |
+| Provenance | 328–356 |
+| Open questions | 357–389 |
 <!-- /index -->
 
 ## Summary
@@ -145,6 +145,21 @@ The in-game frame (`0x0044C990`), once per client tick (`camera.md` §9):
    entries of `0x00989C40`, `StretchBlt` of the W × H DIB to the window's
    client rectangle).
 
+Out-of-game frames start the same way. Every other `StartDraw` caller
+passes `bClear = 1` (same partial GDI clear) except the D2Win control
+drawer:
+
+| Caller | `StartDraw` | extra clear |
+|---|---|---|
+| `0x0044CB60` | 1 (`0x0044CB78`) | `ClearScreen(0)` right after (`0x0044CB88`, wrapper `0x004F63B0` → slot `+0xC4`): whole frame 0 |
+| `0x0044D100` (beta screens, `ui\betascreens\screen01…`) | 1 (`0x0044D126`) | none |
+| `0x0044E770` (end-game screen) | 1 (`0x0044E78E`) | none |
+| `0x004565E0` | 1 (`0x0045661F`) | `ClearScreen(0)` before it (`0x004565F4`) |
+| code at `0x0045FDE0`, `0x00460190`, `0x00460490` | 1 (`0x0045FDEE`, `0x0046019E`, `0x004604A3`) | none |
+| `0x004F98E0` (D2Win controls, only when `[0x007D55D8]` = 0) | 0 (`0x004F9934`) | none: the previous frame stays |
+
+Each skips the frame when `0x004F6070` (`[0x007C9340]`) is non-zero.
+
 The presented frame is exactly the framebuffer at `EndScene` entry.
 Pixels not written in a frame keep the previous frame's index (the
 uncleared bottom 47 rows, or everything when `bClear = 0`).
@@ -196,6 +211,15 @@ then loads act 5's palette (`a` = 4 at `0x00483283`); the state loop
 `0x0044F360` calls it with video 5 when `[0x007A0604]` ≠ 0 (set by
 `0x0044EC80`) and with video 7 when `[0x007A0628]` ≠ 0, and S→C 0x61
 (`0x0045E660` → `0x004B9320`) calls it with the video id u8@1.
+
+Live data (all 17 `pal.pl2` and their 17 `pal.dat` siblings: d2data
+ACT1–ACT5, EndGame, fechar, loading, Menu0–menu4, Sky, Trademark; d2exp
+ACT5, EndGame2; `patch_d2` holds none): the PL2 base palette equals the
+`.dat` palette with B and R swapped (`pl2[4i + k] = dat[3i + 2 − k]`) for
+all 256 entries of every pair, every 4th byte is 0 in the file, and entry
+0 is (0, 0, 0) in every PL2 and every `.dat` (also `STATIC`, `Units`).
+So reading the `.dat` (B, G, R) gives the same 256 colors, and index 0
+presents black in every act.
 
 ### 5. One pixel write (index domain)
 
@@ -252,8 +276,10 @@ file: the lit translucent wall drawer reads the transpose
   P[s]]` without `L`).
 - `IndexTable`: row = destination (§5).
 - RGBA for verify and present: `(R, G, B, 255)` of §4 for every index,
-  0 included. `map::cpu::to_rgba` (0 → black) equals this exactly when
-  each act's PL2 entry 0 is black (Open question 1).
+  0 included. `map::cpu::to_rgba` (0 → black) equals this exactly: every
+  live palette's entry 0 is (0, 0, 0) (§4 measurement). Confirmed by
+  `d2-client verify --case map` (`townN1.ds1`): 0 differing RGBA pixels
+  on an AMD Radeon RX 9070 XT (Vulkan), 2026-10-06.
 
 ### 7. DirectDraw (display type 3) differences
 
@@ -314,8 +340,10 @@ the table cases to `0x00606E40`, `0x00607060`, `0x006072F0`,
 `0x00607480`, `0x00607970`, `0x00607B90`), blend getter `0x00511D70`,
 act load `0x0045C8E0` → `0x0044E100`. Display-type names from `refs/1.14d-notes` (`VideoMode`) and
 D2MOO `DisplayType.h`. Levels BlankScreen counted in
-`game/extracted/patch_d2/data/global/excel/levels.txt` (137 × 1). No
-capture yet. Frame-cycle follow-ups (FC1, FC2): BlankScreen level chain
+`game/extracted/patch_d2/data/global/excel/levels.txt` (137 × 1).
+Palettes measured 2026-10-06 on the files extracted with `mpq-tool
+extract` from `d2data.mpq` / `d2exp.mpq` (`patch_d2.mpq` probed by name:
+no palette). No capture yet. Frame-cycle follow-ups (FC1, FC2): BlankScreen level chain
 read at `0x0044CA8F`–`0x0044CAD5`; act palette loader `0x004FB480`
 (format `%s\palette\act%d\%s`), callers `0x0044F2DC`, `0x0046562A`
 (room change in `0x004654C0`: old room `0x00620BB0`, new room
@@ -328,12 +356,10 @@ Ghidra backlog (2026-10-06): act palette at game start from
 
 ## Open questions
 
-1. For every act palette: does the PL2 base palette (R, G, B at bytes
-   `4i…4i + 2`) equal the `.dat` palette (B, G, R at `3i…`), and is entry 0
-   (0, 0, 0)? Game-file check (`mpq-tool` extension); decides whether
-   d2rs may keep reading `.dat`. Each capture also holds the presented
-   palette (PNG `PLTE`, `capture.md` §5): comparing it with the act's
-   `pal.pl2` first 1,024 bytes and its `.dat` settles §4 on live frames.
+1. ~~PL2 base palette vs `.dat`, entry 0~~: answered in §4 (equal with B
+   and R swapped in all 17 pairs; entry 0 is black everywhere). Open
+   only as a live-frame check: a capture's presented palette (PNG `PLTE`,
+   `capture.md` §5) equals the act's `pal.pl2` first 1,024 bytes.
 2. ~~Write order when both `L` and `T` are present~~: answered in §5
    (`T[256 × d + L[s]]`, `P` dropped; dispatcher `0x00608540`). The
    identification is now read from the caller too: the GDI cel draw
@@ -345,10 +371,11 @@ Ghidra backlog (2026-10-06): act palette at game start from
    that order; `0x00608540` uses the first as the outer table of `L[P[s]]`
    and the one kept with `T`. A capture of a lit, remapped, translucent
    draw remains a pixel check, not an open rule.
-3. Out-of-game screens (menus, loading screens, cut-scenes) use other
-   callers of `StartDraw` (`0x0044CB60`, `0x0044D100`, `0x0044E770`,
-   `0x004565E0`, `0x00460190`, `0x004F98E0`): their clear arguments, for
-   `ui/` capture cases.
+3. ~~Clear arguments of the out-of-game `StartDraw` callers~~: answered
+   in §3 (all 1 except the D2Win control drawer, 0). Open: which screen
+   each of `0x0044CB60`, `0x004565E0`, `0x0045FDE0`, `0x00460190`,
+   `0x00460490` draws (Ghidra read of their state-table owners, owner
+   `client/ui.md`), for `ui/` capture cases.
 4. ~~What sets the post-draw clear counter~~: the act load (S→C 0x03,
    §3 step 4).
 5. ~~Act palette at game start outside act 1~~: answered in §4 (the act
