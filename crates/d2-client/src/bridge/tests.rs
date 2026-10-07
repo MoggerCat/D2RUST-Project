@@ -746,11 +746,12 @@ fn owned_rows_are_exactly_the_registered_handlers() {
         .collect();
     let registered: Vec<(u8, &str)> = dispatch::HANDLERS.iter().map(|h| (h.id, h.owner)).collect();
     assert_eq!(owned, registered);
-    // Every id but the 14 out-of-scope ids of `bridge.md` §6 rule 7 is
-    // owned (2026-10-07, area 4): model 12, msg-units 47, msg-stats-items
-    // 26, msg-skills 9, msg-ui 23, `audio/triggers.md` 0x2C,
+    // Every id but the 13 out-of-scope ids of `bridge.md` §6 rule 7 is
+    // owned (2026-10-07, area 4; 0xB4 to `client/model.md` §7 r8 on
+    // 2026-10-08): model 13, msg-units 47, msg-stats-items 26,
+    // msg-skills 9, msg-ui 23, `audio/triggers.md` 0x2C,
     // `render/lighting.md` 0x53 and 0x89, `bridge.md` 47 (§6 rule 6).
-    assert_eq!(owned.len(), 0xB5 - 14);
+    assert_eq!(owned.len(), 0xB5 - 13);
     let per = |spec: &str| owned.iter().filter(|(_, o)| *o == spec).count();
     assert_eq!(
         [
@@ -764,7 +765,7 @@ fn owned_rows_are_exactly_the_registered_handlers() {
             super::msg::BRIDGE,
         ]
         .map(per),
-        [12, 47, 26, 9, 23, 1, 2, 47]
+        [13, 47, 26, 9, 23, 1, 2, 47]
     );
     for (_, o) in &owned {
         assert!(

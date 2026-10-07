@@ -191,6 +191,37 @@ pub enum Output {
         left: bool,
         item: u32,
     },
+    /// S→C 0xB4 (`client/model.md` §7 r8.3): the mapped error number n
+    /// of `0x0044E380(n)`.
+    JoinRefused { error: u8 },
+    /// The update pass's town exit (`client/model.md` §17 r6;
+    /// delivery `client/bridge.md` §10 r11): the local player's key and
+    /// the GUIDs of every monster (type 1) in S, in key order.
+    TownExit { player: UnitKey, monsters: Vec<u32> },
+    /// One effect call of state on / hooks / off (`client/stat-lists.md`
+    /// §3 r6, r6.7): the unit, the state, the phase, whether the bit was
+    /// set before, the unit's dead test, the hook number (setfunc /
+    /// remfunc; 0 = none) and the two hook values the model captured.
+    StateFx {
+        unit: UnitKey,
+        state: u16,
+        phase: StatePhase,
+        was_set: bool,
+        dead: bool,
+        hook: u8,
+        values: [i32; 2],
+    },
+}
+
+/// The phase of a `StateFx` (`client/stat-lists.md` §3 r6.1–r6.3).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StatePhase {
+    /// State on `0x004D9B20` (r6.1).
+    On,
+    /// State on hooks `0x004D9E60` (r6.2).
+    Hooks,
+    /// State off `0x004D9F40` / `0x004D9C30` (r6.3).
+    Off,
 }
 
 /// The target of a skill event (`client/msg-skills.md` §7).
@@ -240,18 +271,36 @@ pub enum Consumer {
     Effects,
 }
 
-/// One row of the §10 table: variant name, producer id, consumer.
+/// Who emits a variant (§10 table `Producer` column): an S→C message
+/// handler, or the client update pass (§10 r11, written `update`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Producer {
+    /// The first S→C id of the cell.
+    Message(u8),
+    /// The update pass.
+    Update,
+}
+
+/// One row of the §10 table: variant name, producer, consumer.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Row {
     pub variant: &'static str,
-    pub producer: u8,
+    pub producer: Producer,
     pub consumer: Consumer,
 }
 
 const fn row(variant: &'static str, producer: u8, consumer: Consumer) -> Row {
     Row {
         variant,
-        producer,
+        producer: Producer::Message(producer),
+        consumer,
+    }
+}
+
+const fn update_row(variant: &'static str, consumer: Consumer) -> Row {
+    Row {
+        variant,
+        producer: Producer::Update,
         consumer,
     }
 }
@@ -260,7 +309,7 @@ use Consumer::{Audio, Effects, Ui};
 
 /// The variants in code, in the §10 table's order (checked against the
 /// table, §10 rule 8).
-pub const ROWS: [Row; 37] = [
+pub const ROWS: [Row; 40] = [
     row("ServerSound", 0x2C, Audio),
     row("QuestUi", 0x5D, Ui),
     row("WaypointMenu", 0x63, Ui),
@@ -298,6 +347,9 @@ pub const ROWS: [Row; 37] = [
     row("ActVideo", 0x61, Ui),
     row("OverheadClear", 0x76, Ui),
     row("HotkeyAssign", 0x7B, Ui),
+    row("JoinRefused", 0xB4, Ui),
+    update_row("TownExit", Ui),
+    row("StateFx", 0xA8, Effects),
 ];
 
 impl Output {
@@ -341,6 +393,9 @@ impl Output {
             Output::ActVideo { .. } => 34,
             Output::OverheadClear { .. } => 35,
             Output::HotkeyAssign { .. } => 36,
+            Output::JoinRefused { .. } => 37,
+            Output::TownExit { .. } => 38,
+            Output::StateFx { .. } => 39,
         };
         &ROWS[i]
     }
@@ -391,7 +446,7 @@ pub enum TableError {
     #[error("bridge.md has no §10 rows table")]
     NoTable,
     #[error(
-        "§10 row {0:?}: expected | `Variant` | payload | 0xNN … | ui, audio or effects | owner |"
+        "§10 row {0:?}: expected | `Variant` | payload | 0xNN … or update | ui, audio or effects | owner |"
     )]
     Row(String),
 }
@@ -400,12 +455,13 @@ pub enum TableError {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TableRow {
     pub variant: String,
-    pub producer: u8,
+    pub producer: Producer,
     pub consumer: Consumer,
 }
 
 /// The §10 table of `bridge.md` (the rows after `<!-- rows -->` in
-/// §10); the producer is the first `0xNN` of its cell.
+/// §10); the producer is the first `0xNN` of its cell, or the cell
+/// `update` (§10 r11).
 pub fn parse_table(spec: &str) -> Result<Vec<TableRow>, TableError> {
     let section = spec.split("### 10.").nth(1).ok_or(TableError::NoTable)?;
     let table = section
@@ -426,10 +482,14 @@ pub fn parse_table(spec: &str) -> Result<Vec<TableRow>, TableError> {
             .strip_prefix('`')
             .and_then(|v| v.strip_suffix('`'))
             .ok_or_else(bad)?;
-        let hex = cells[3].get(2..4).filter(|_| cells[3].starts_with("0x"));
-        let producer = hex
-            .and_then(|h| u8::from_str_radix(h, 16).ok())
-            .ok_or_else(bad)?;
+        let producer = if cells[3] == "update" {
+            Producer::Update
+        } else {
+            let hex = cells[3].get(2..4).filter(|_| cells[3].starts_with("0x"));
+            hex.and_then(|h| u8::from_str_radix(h, 16).ok())
+                .map(Producer::Message)
+                .ok_or_else(bad)?
+        };
         let consumer = match cells[4] {
             "UI" | "ui" => Consumer::Ui,
             "audio" => Consumer::Audio,
@@ -487,8 +547,8 @@ mod tests {
     #[test]
     fn a_changed_row_is_reported() {
         let perturbed = SPEC.replace(
-            "| `TradeAction` | code u8 | 0x77 |",
-            "| `TradeAction` | code u8 | 0x78 |",
+            "captured) | 0x77 | UI | `client/msg-ui.md` §3 |",
+            "captured) | 0x78 | UI | `client/msg-ui.md` §3 |",
         );
         assert_ne!(perturbed, SPEC);
         let table = parse_table(&perturbed).unwrap();
@@ -496,6 +556,27 @@ mod tests {
         let renamed = SPEC.replace("| `QuestUi` |", "| `QuestScreen` |");
         let table = parse_table(&renamed).unwrap();
         assert_eq!(check(&table, &ROWS), ["QuestUi", "QuestScreen"]);
+    }
+
+    // Covers: specs/client/bridge.md §10 r11
+    #[test]
+    fn an_update_producer_is_its_own_kind() {
+        let table = parse_table(SPEC).unwrap();
+        let town = table.iter().find(|r| r.variant == "TownExit").unwrap();
+        assert_eq!(town.producer, Producer::Update);
+        let refused = table.iter().find(|r| r.variant == "JoinRefused").unwrap();
+        assert_eq!(refused.producer, Producer::Message(0xB4));
+        let bad = SPEC.replace(
+            "| `TownExit` | local player key, GUIDs of the S monsters | update |",
+            "| `TownExit` | local player key, GUIDs of the S monsters | updates |",
+        );
+        assert_ne!(bad, SPEC);
+        assert!(matches!(parse_table(&bad), Err(TableError::Row(_))));
+        let moved = SPEC.replace(
+            "| `TownExit` | local player key, GUIDs of the S monsters | update |",
+            "| `TownExit` | local player key, GUIDs of the S monsters | 0x15 |",
+        );
+        assert_eq!(check(&parse_table(&moved).unwrap(), &ROWS), ["TownExit"]);
     }
 
     // Covers: specs/client/bridge.md §10 r4, §10 r5

@@ -2,7 +2,7 @@
 //! The S→C handlers of the client world model, one per owned id of
 //! `bridge-dispatch.tsv`, registered in [`HANDLERS`]:
 //!
-//! - [`session`]: `client/model.md` (0x00–0x08, 0x0B);
+//! - [`session`]: `client/model.md` (0x00–0x08, 0x0B, 0xB4);
 //! - [`pets`]: `client/model.md` §14 (0x7A, 0x81);
 //! - [`units`]: `client/msg-units.md` (unit add, remove, place, queued
 //!   movement and action messages with `client/model.md` §15, the local
@@ -268,6 +268,7 @@ pub const HANDLERS: &[Handler] = &[
     general(0xAC, UNITS, units::assign_monster),
     none(0xAD),
     none(0xB1),
+    general(0xB4, MODEL, session::join_refused),
 ];
 
 /// Little-endian field reads with a handler error for a short message.
