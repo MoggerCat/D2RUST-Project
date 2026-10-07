@@ -41,7 +41,7 @@
 | Edge cases & original bugs | 477–486 |
 | Test vectors | 487–505 |
 | Provenance | 506–525 |
-| Open questions | 526–609 |
+| Open questions | 526–611 |
 <!-- /index -->
 
 ## Summary
@@ -578,7 +578,9 @@ Synthetic, from the rules:
    hold whatever deeper frames of earlier calls left (for the load
    loops possibly the filler class ids of a previous item matched at
    the same depth); settle with a stack trace at `0x0062BFBA` on those
-   paths, or keep d2rs's "no match" as a Ruleset choice.
+   paths, or keep d2rs's "no match" as a Ruleset choice. Struck for the
+   binary (2026-10-07: stack contents of earlier frames); recording list
+   `docs/handoff/pc2-rec-pc2-items.md` IT-10.
 5. Answered (handoff `impl-items` OQ-P1): §5 rules 8 and 9 "**set**" is
    not §4.2. Functions 18 (`0x0065F870`) and 19 (`0x0065F6A0`) take the
    list through the same owner-or-item lookup as §4.2 (`0x0065CBF0`,

@@ -45,7 +45,7 @@
 | Edge cases & original bugs | 619–642 |
 | Test vectors | 643–672 |
 | Provenance | 673–697 |
-| Open questions | 698–854 |
+| Open questions | 698–857 |
 <!-- /index -->
 
 ## Summary
@@ -707,7 +707,7 @@ Real 1.14d (game-file tests, `#[ignore]`, from the live `.bin` set):
    `0x0055A9B9` for a game with `players` > 1.
 4. The runtime TC array (`0x0096C5EC`, 1,013 × 0x2C plus entries) and the
    chest table (`0x0096C5F4`) are not dumped; §1 is a model until a dump
-   matches (entry counts, starts, flags, rows).
+   matches (entry counts, starts, flags, rows). Recording list IT-9.
 5. x87 precision control on the server thread during §5.4 (irrelevant
    for 1.14d data, §5.4; matters for mods with other nodrop/total pairs).
    Partly answered (2026-10-07, from the binary); the rest **Needs
@@ -849,5 +849,8 @@ Real 1.14d (game-file tests, `#[ignore]`, from the live `.bin` set):
     - 14: the fatal paths (0xF3A, 0xF44, 0xFEA, no ratio row, bone wall,
       > 65,534 TCs) are the original's asserts (process exit); how d2rs
       reports them is a Ruleset choice, not a fidelity fact.
-    Still open: §9.1's n = 0 result (an uninitialised stack value; d2rs
-    must pick a value: settle only by choosing, e.g. treat as no item).
+    ~~Still open: §9.1's n = 0 result.~~ Struck (2026-10-07): the value
+    is whatever earlier calls left in that stack slot, so no reading of
+    the binary fixes it; d2rs picks a Ruleset value. Recording list
+    `docs/handoff/pc2-rec-pc2-items.md` IT-11 (what 1.14d does in the
+    one reproducible case).

@@ -429,7 +429,7 @@ draw. Also used by property function 23 and craft lists
 
 1. Forced (§3 step 7): flag 0x10 := flags1 & 0x10; flag 0x1000 := flags1
    & 0x1000.
-2. Format 0 only: forced socket count (not specified, §1.2). Then flag
+2. Format 0 only: forced socket count (the socket step below). Then flag
    0x800 := flags1 & 0x800; 0x100 := flags1 & 0x100; 0x20000 := flags1 &
    0x20000.
    Scope (handoff `impl-items` OQ-G2, `gaps-items-stats` question 1,
@@ -678,7 +678,7 @@ Real 1.14d vectors need the recording in Open questions 2.
 
 ## Open questions
 
-1. Format-0 generation branches (legacy items) are unspecified; confirm
+1. Format-0 generation branches (legacy items): confirm
    that no 1.14d creation path passes format 0 (check the 20 callers of
    `0x00558D90` for the value written at request +0x2A).
    Partly answered (2026-10-07, disassembly of the 20 callers): 19
@@ -693,8 +693,8 @@ Real 1.14d vectors need the recording in Open questions 2.
    legacy record's +0x42, which `0x00532F30` sets to 0 for records
    without flag 0x100000 and to an 8-bit value read from the stream
    otherwise. So format 0 is passed only for items of a version-0x47
-   save, as §1.2 states; the format-0 branches themselves stay
-   unspecified.
+   save, as §1.2 states; the branches themselves are the next
+   paragraph.
    Answered (2026-10-07, disassembly of every format-0 branch): §11
    (pipeline list, normal routine `0x00556D80`, class skill mods
    `0x005C0D70`), `items/quality.md` §10 (quality roll, low quality,
