@@ -37,7 +37,7 @@
 | Edge cases & original bugs | 567–581 |
 | Test vectors | 582–602 |
 | Provenance | 603–650 |
-| Open questions | 651–711 |
+| Open questions | 651–714 |
 <!-- /index -->
 
 ## Summary
@@ -276,7 +276,7 @@ For `s` = 0 … L − 1, component `c` = row byte `s` (§3 r6):
    with `LocalBlood` (`+0x81`) ≠ 0 and the green-blood switch on
    (`render/shading.md` §6 r7) the code fetches the blood map
    (`0x00477680`) but discards it (original bug, reproduce: no remap). The overlay records' creation, timing and
-   files beyond this are the overlay owner's (no spec yet).
+   removal are `render/overlay.md`.
 
 #### 5.1 The component request (`0x004DB7B0`)
 
@@ -708,3 +708,6 @@ gfxclass / bossinv columns of `patch_d2`.
     `roll(b × 16)` added to +0x14 (`0x004705D7`). They share the sound
     seed (`sim/rng.md` §7; stated meanwhile in `audio/sound-table-2.md`
     §14.3, PC 2).
+    *Answered* (static, 1.14d asm): `render/overlay.md` owns the record,
+    the create (§2), the per-update advance and kinds (§3), the three
+    rolls (§4) and the call sites (§5).

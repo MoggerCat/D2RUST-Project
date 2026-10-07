@@ -26,16 +26,16 @@
 |   4. Units | 134–152 |
 |   5. Panel shift for floors | 153–158 |
 |   6. Tiles | 159–198 |
-|   7. View culling | 199–248 |
-|   8. Screen shake | 249–280 |
-|   9. Time base: no interpolation | 281–323 |
-|   10. What d2rs hooks get | 324–332 |
-| Constants & data dependencies | 333–339 |
-| Randomness | 340–345 |
-| Edge cases & original bugs | 346–355 |
-| Test vectors | 356–377 |
-| Provenance | 378–401 |
-| Open questions | 402–494 |
+|   7. View culling | 199–249 |
+|   8. Screen shake | 250–281 |
+|   9. Time base: no interpolation | 282–335 |
+|   10. What d2rs hooks get | 336–344 |
+| Constants & data dependencies | 345–351 |
+| Randomness | 352–357 |
+| Edge cases & original bugs | 358–367 |
+| Test vectors | 368–389 |
+| Provenance | 390–413 |
+| Open questions | 414–504 |
 <!-- /index -->
 
 ## Summary
@@ -185,8 +185,8 @@ orientations are in which list, the order, shadows and the fade alpha are
 80 left of its `sx`. Roofs differ from `map-preview.md` (no `+WALL_BASE`):
 live roof blocks lie where floor blocks do (every block of the
 orientation-15 tiles in the used DT1 files has y in 0 … 64, on the floor
-diamond rows; the exact block count is *Pending*, Open question 1), so a roof is its cell's floor diamond raised by
-`roof_height` rows; `map-preview.md`'s `sy + y0 + WALL_BASE − roof_height`
+diamond rows; the exact block count is *Pending*, Open question 1), so
+a roof is its cell's floor diamond raised by `roof_height` rows; `map-preview.md`'s `sy + y0 + WALL_BASE − roof_height`
 puts it `WALL_BASE` (80) rows lower than 1.14d. `roof_height` is read
 unsigned (`0x004DEBA6`, 16-bit zero-extended); live values 0, 80, 100,
 120, 156, 160, 190, 230, 240 and once 56,376 (`expansion\Siege\
@@ -215,8 +215,9 @@ units use `H / 2 − 8`, tiles `(H − 40) / 2` (§3, §4).
   and it does for the live data: every block of non-floor, non-shadow,
   non-roof tiles (orientation ∉ {0, 13, 15}) of the used DT1 files has
   x ≡ 0 and y ≡ 0 (mod 32) (both block formats are 32 wide; the count,
-  and y, are *Pending* a recount, Open question 7). In modes 0/3 a culled block has no pixel in the frame, so
-  culling changes no pixel there.
+  and y, are *Pending* a recount, Open question 7). In modes 0/3 a
+  culled block has no pixel in the frame, so culling changes no pixel
+  there.
 - Units: no view-rectangle test. The world unit draw `0x004DC7B0` skips a
   unit only (a) by the unit flags and states it checks (owner
   `draw-order.md`), (b) in perspective mode (not GDI) by `0x004F66E0`, and
