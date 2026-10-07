@@ -52,14 +52,14 @@
 |   12. Portals, operate 15 (`0x00584870`) | 668–734 |
 |   13. Torch, operate 11 (`0x005843D0`) | 735–739 |
 |   14. Client messages | 740–767 |
-|   15. Not covered yet | 768–780 |
-|   16.–18. Moved | 781–786 |
-| Constants & data dependencies | 787–833 |
-| Randomness | 834–879 |
-| Edge cases & original bugs | 880–946 |
-| Test vectors | 947–985 |
-| Provenance | 986–1043 |
-| Open questions | 1044–1090 |
+|   15. Not covered yet | 768–782 |
+|   16.–18. Moved | 783–789 |
+| Constants & data dependencies | 790–836 |
+| Randomness | 837–882 |
+| Edge cases & original bugs | 883–949 |
+| Test vectors | 950–988 |
+| Provenance | 989–1046 |
+| Open questions | 1047–1093 |
 <!-- /index -->
 
 ## Summary
@@ -777,12 +777,15 @@ All items of this list are done:
   exploding chest, bank, stairs, jungle stash, gate, torch tiki): done,
   §16; small init functions: done, §17;
 - object events 0, 3, 8, 9, 10: done, §18.
+- the client object functions (`ClientFn` 1–18, table `0x007277F0`):
+  done, `world/objects-client.md` §25–§28.
 
 ### 16.–18. Moved
 
 §16 (operate functions, part 2), §17 (small init functions) and §18
 (object events) are in `world/objects-2.md`, numbers kept; §19 and later
 continue there too. A reference to §16–§18 in this file means that file.
+§25–§28 (client object functions) are in `world/objects-client.md`.
 
 ## Constants & data dependencies
 
