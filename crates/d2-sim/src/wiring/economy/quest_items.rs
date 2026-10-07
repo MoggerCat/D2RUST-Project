@@ -53,12 +53,9 @@ pub trait QuestRest {
     }
     /// `0x00544160` (`quests.md` §9.2: removal by item mode, inventory).
     fn delete_item(&mut self, player: UnitId, code: [u8; 4]);
-    /// `0x005466B0` (`quests.md` §9.1). TODO(quests.md §9.1): the steps
-    /// are specified (creation `0x00559CE0` = `items/generation.md`
-    /// §10.2, level default `0x00558200`, placement `0x00560200`, the
-    /// free-spot drop); the creation and placement providers live with
-    /// the inventory host, which the quest world does not reach. Not
-    /// wired.
+    /// `0x005466B0` (`quests.md` §9.1) for a host that lends no inventory
+    /// model: the wired host's runs on [`super::HostQuests`] with one
+    /// ([`super::quest_reward`]).
     fn reward_item(
         &mut self,
         player: UnitId,

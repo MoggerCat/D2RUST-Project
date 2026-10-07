@@ -1,4 +1,4 @@
-// Spec: specs/sim/path-placement.md §4, §7, §9, §10, §11, §12.2; specs/sim/units.md §6.1; specs/drlg/levels.md §2
+// Spec: specs/sim/path-placement.md §4, §7, §9, §10, §11, §12.2; specs/sim/units.md §6.1; specs/drlg/levels.md §2; specs/world/hirelings-2.md §16 r3
 //! Mutation tests (METHODS M08) of the placement adapters
 //! (`wiring::path::place`): each test drives one adapter through its
 //! wiring entry point ([`place_unit`], [`floor_drop`], [`warp_player`],
@@ -342,6 +342,62 @@ fn game_entry_places_the_player_in_the_town_and_sends_0x07_then_0x15() {
         ]
     );
     fx.assert_clean();
+}
+
+/// The hireling callers of the placement wiring
+/// (`ActionHooks::hireling_calls`, for the host holding the lists): the
+/// game entry `0x005394A0` of a placed player queues its join follow
+/// `0x005773D0` (`hirelings-2.md` §16 rule 3); a level warp to another
+/// act queues the act change `0x0053ACC0` (`hirelings.md` §6 rule 3) and
+/// stays on its `Pending` route. Queue off (`None`): nothing recorded.
+// Covers: specs/world/hirelings-2.md §16 r3, §19; specs/world/hirelings.md §6 r3
+#[test]
+fn game_entry_and_an_act_change_queue_the_hireling_calls() {
+    use crate::wiring::action::HirelingCall;
+    let mut fx = fx_with(&[
+        (LEVEL, TileRect::new(0, 0, 8, 8)),
+        (TOWN, TileRect::new(0, 16, 8, 8)),
+    ]);
+    let req = AllocRequest {
+        ty: UnitType::Player,
+        class: 0,
+        room: None,
+        add: true,
+        fixed_guid: None,
+        mode: 1,
+        allied: true,
+    };
+    let p = fx
+        .sim
+        .with(&mut fx.game, |g, v| v.allocate(g, &req, 0, 0))
+        .unwrap();
+    fx.sim.hooks().hireling_calls = Some(Vec::new());
+    let placed = fx.sim.with(&mut fx.game, |g, v| {
+        super::place::game_entry(PathCtx::of(v, g), p, 0)
+    });
+    assert!(placed);
+    assert_eq!(
+        fx.sim.hooks().hireling_calls,
+        Some(vec![HirelingCall::JoinFollow(p)])
+    );
+    // Level 40 is in act 1 (`drlg/levels.md` §2): the act change.
+    let r = fx.sim.with(&mut fx.game, |g, v| {
+        super::place::level_warp(PathCtx::of(v, g), p, 40, 0)
+    });
+    assert_eq!(r, None);
+    assert_eq!(
+        fx.sim.hooks().hireling_calls,
+        Some(vec![
+            HirelingCall::JoinFollow(p),
+            HirelingCall::ActChange(p)
+        ])
+    );
+    fx.sim.hooks().hireling_calls = None;
+    let r = fx.sim.with(&mut fx.game, |g, v| {
+        super::place::level_warp(PathCtx::of(v, g), p, 40, 0)
+    });
+    assert_eq!(r, None);
+    assert_eq!(fx.sim.hooks().hireling_calls, None);
 }
 
 // Covers: specs/drlg/levels.md §2

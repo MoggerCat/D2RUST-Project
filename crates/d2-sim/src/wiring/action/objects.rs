@@ -39,6 +39,9 @@ use crate::world::objects::{
 };
 
 use super::{Pending, View, WiringError};
+use crate::path::record::ObjectShape;
+use crate::wiring::economy::drop_helpers;
+use d2_data::tables::Objects;
 
 /// The game's object state: the object control (game +0x10F0,
 /// `objects.md` §2) with the per-object data, the tables, and the host
@@ -425,6 +428,26 @@ impl<X: Pending> View<'_, X> {
         u
     }
 
+    /// `0x00623830` for `object` outside an object call (the quest
+    /// code's collision free, `quests-act2.md` §8, `quests-act3.md`):
+    /// [`apply_object_footprint`] with the object state's tables;
+    /// `false`: no object state or `object` is not an object.
+    pub fn free_object_footprint(&mut self, game: &Game, object: UnitId) -> bool {
+        let Some(st) = self.h.objects.as_ref() else {
+            return false;
+        };
+        let Some(r) = self.units.get(object).filter(|r| r.ty == UnitType::Object) else {
+            return false;
+        };
+        let Ok(o) = st.tables.object(r.class as u16).cloned() else {
+            return false;
+        };
+        let room = game.lists.unit(object).and_then(|e| e.room());
+        let (x, y) = self.h.path_position(object);
+        apply_object_footprint(&mut self.h.drlg, &o, room, x, y, false);
+        true
+    }
+
     /// An object timer event (`units.md` §6.4) on the object state.
     pub fn object_event(&mut self, game: &mut Game, unit: UnitId, ev: u8) {
         let r = with_objects(game, self, |ctl, t, w| {
@@ -572,7 +595,103 @@ impl<X: Pending> View<'_, X> {
     }
 }
 
+/// The §3 inputs of an objects row (`sim/path-placement.md` §3: size
+/// `SizeX` × `SizeY`, the footprint mask from `IsDoor`, `BlocksVis`,
+/// `BlockMissile`, `SubClass`; `HasCollision0..7`).
+pub fn object_shape(o: &Objects) -> ObjectShape {
+    ObjectShape {
+        size_x: o.sizex,
+        size_y: o.sizey,
+        is_door: o.isdoor != 0,
+        blocks_vis: o.blocksvis != 0,
+        block_missile: o.blockmissile != 0,
+        sub_class: u32::from(o.subclass),
+        has_collision: [
+            o.hascollision0,
+            o.hascollision1,
+            o.hascollision2,
+            o.hascollision3,
+            o.hascollision4,
+            o.hascollision5,
+            o.hascollision6,
+            o.hascollision7,
+        ]
+        .map(|b| b != 0),
+    }
+}
+
+/// The object footprint stamp `0x00620A70` (`set`) and free `0x00623830`
+/// (`objects.md` §5.5, §8.2, §10; `objects-2.md` §16.13, §18.6): the
+/// `SizeX` × `SizeY` box with the class's footprint mask (§3,
+/// `0x006209D0`) set (`0x0064DE30`) or cleared (`0x0064DC00`) at (x, y),
+/// cells looked up from `room` (`sim/path-placement.md` §4 rules 4–5,
+/// §5.1); no room → nothing.
+// PROVISIONAL (objects.md §8.2, §10; path-placement.md §5.2; REC-none):
+// the free `0x00623830` is read as the box clear `0x0064DC00` with the
+// class's footprint mask at the object's room and position, with no
+// `HasCollision` test (its callers test `HasCollision` themselves;
+// `sim/units.md` §3.1 r7.3 names the `0x0064DC00` call). Settled by a
+// collision-grid capture around a door opening and a chest opening.
+pub fn apply_object_footprint(
+    drlg: &mut super::DrlgWorld,
+    o: &Objects,
+    room: Option<RoomId>,
+    x: i32,
+    y: i32,
+    set: bool,
+) {
+    let s = object_shape(o);
+    crate::path::collision::box_apply(drlg, room, x, y, (s.size_x, s.size_y), s.foot_mask(), set);
+}
+
 impl<X: Pending> ObjectView<'_, X> {
+    /// The objects row of an object unit's class (unit record).
+    fn object_row(&self, unit: UnitId) -> Option<Objects> {
+        let r = self.v.units.get(unit)?;
+        if r.ty != UnitType::Object {
+            return None;
+        }
+        self.tables.object(r.class as u16).ok().cloned()
+    }
+
+    /// Runs a drop helper (`objects-2.md` §20,
+    /// [`crate::wiring::economy::drop_helpers`]) with the drop state of
+    /// [`super::ActionHooks::object_drops`] lent out and the object
+    /// tables' `levels`; `None`: the game has no drop state. Without the
+    /// path provider's field the floor search finds nothing
+    /// ([`crate::wiring::economy::NoSpot`]): the picks still draw, no
+    /// item is created.
+    fn with_drops<R>(
+        &mut self,
+        f: impl FnOnce(
+            &mut super::ActionHooks<X>,
+            &mut crate::units::hooks::Sim<'_>,
+            &mut crate::wiring::economy::DeathDrops,
+            &[d2_data::tables::Levels],
+            &mut crate::wiring::economy::NoSpot,
+        ) -> R,
+    ) -> Option<R> {
+        let mut d = self.v.h.object_drops.take()?;
+        let t = self.tables.clone();
+        let out = {
+            let mut sim = crate::units::hooks::Sim {
+                game: &mut *self.game,
+                units: &mut *self.v.units,
+                stats: &mut *self.v.stats,
+                data: self.v.data,
+            };
+            f(
+                &mut *self.v.h,
+                &mut sim,
+                &mut d,
+                &t.levels,
+                &mut crate::wiring::economy::NoSpot,
+            )
+        };
+        self.v.h.object_drops = Some(d);
+        Some(out)
+    }
+
     fn record(&mut self, u: UnitId) -> Option<&mut crate::units::record::UnitRecord> {
         let r = self.v.units.get_mut(u);
         if r.is_none() {
@@ -668,11 +787,22 @@ impl<X: Pending> ObjectWorld for ObjectView<'_, X> {
     fn cancel_timers(&mut self, unit: UnitId) {
         self.game.timers.cancel_unit_timers(unit);
     }
-    fn stamp_footprint(&mut self, unit: UnitId) {
-        self.v.h.x.object_stamp_footprint(self.game, unit);
+    /// `0x00620A70(O, room, x, y)` on the act DRLG's collision grids.
+    fn stamp_footprint(&mut self, unit: UnitId, room: Option<RoomId>, x: i32, y: i32) {
+        let Some(o) = self.object_row(unit) else {
+            return;
+        };
+        apply_object_footprint(&mut self.v.h.drlg, &o, room, x, y, true);
     }
+    /// `0x00623830` on the act DRLG's collision grids, at O's room and
+    /// position.
     fn free_footprint(&mut self, unit: UnitId) {
-        self.v.h.x.object_free_footprint(self.game, unit);
+        let Some(o) = self.object_row(unit) else {
+            return;
+        };
+        let room = self.room(unit);
+        let (x, y) = self.position(unit);
+        apply_object_footprint(&mut self.v.h.drlg, &o, room, x, y, false);
     }
     fn sound(&mut self, unit: UnitId, id: u8, to: Option<UnitId>, now: bool) {
         self.v.h.x.object_sound(unit, id, to, now);
@@ -741,6 +871,12 @@ impl<X: Pending> ObjectWorld for ObjectView<'_, X> {
     fn room_at(&self, room: RoomId, x: i32, y: i32) -> Option<RoomId> {
         self.v.h.drlg.find_room(self.game, room, x, y)
     }
+    /// `0x00559300` (`objects-2.md` §20.3) on the drop state.
+    fn gold_drop(&mut self, room: RoomId, x: i32, y: i32) {
+        self.with_drops(|h, sim, d, levels, spots| {
+            drop_helpers::gold_drop(h, sim, d, levels, spots, Some(room), (x, y))
+        });
+    }
     /// `0x0064D800` with sizes 1, 1: the point query.
     fn point_free(&self, room: RoomId, x: i32, y: i32, mask: u32) -> bool {
         crate::path::collision::point_value(&self.v.h.drlg, Some(room), x, y, mask as u16) == 0
@@ -751,8 +887,8 @@ impl<X: Pending> ObjectWorld for ObjectView<'_, X> {
 /// the act DRLG and the path provider: interact (the unit record's
 /// interact info), messages ([`Pending::send`]), adjacency, free
 /// point and placement (`sim/path-placement.md` §7, §10), the 0x07 room
-/// reveal, flags 2, the town test and the player lookup. Item drops (the
-/// §20 helpers), trap damage, the gem test, the tome recount, the warp
+/// reveal, flags 2, the town test and the player lookup, the item drops
+/// of §20 ([`drop_helpers`]). Trap damage, the gem test, the tome recount, the warp
 /// tile, the day period keep their defaults.
 impl<X: Pending> objects::MechWorld for ObjectView<'_, X> {
     /// `0x00554D00` on the unit record's interact info.
@@ -826,6 +962,22 @@ impl<X: Pending> objects::MechWorld for ObjectView<'_, X> {
     fn find_player(&self, guid: u32) -> Option<UnitId> {
         self.game.lists.find_unit(UnitType::Player, guid)
     }
+    /// `0x005594C0` / `0x00559630` with (room, &pos, −1, 0, 0) at the
+    /// object (§16.5, §20.1, §20.2).
+    fn stand_drop(&mut self, object: UnitId, weapon: bool) {
+        let room = self.room(object);
+        let pos = self.position(object);
+        self.with_drops(|h, sim, d, levels, spots| {
+            drop_helpers::stand_drop(h, sim, d, levels, spots, room, pos, weapon, -1, false, None)
+        });
+    }
+    /// `0x00559A30(game, O, quality, &level, 0, −1, 0)` with O's drop
+    /// code (§16.6, §20.4).
+    fn drop_code_quality(&mut self, object: UnitId, code: u32, quality: u8) {
+        self.with_drops(|h, sim, d, levels, spots| {
+            drop_helpers::source_drop(h, sim, d, levels, spots, object, code, quality, -1, false)
+        });
+    }
 }
 
 /// The population seams on the act DRLG: the active room seed (+0x6C),
@@ -877,11 +1029,12 @@ impl<X: Pending> objects::populate::PopulateWorld for ObjectView<'_, X> {
 
 /// The chest seams on the providers the action wiring holds: the chest
 /// drop on [`super::ActionHooks::object_drops`]
-/// ([`crate::wiring::economy::object_chest_drop`]), unit type (unit
+/// ([`crate::wiring::economy::object_chest_drop`]), the code drop
+/// `0x00585970` and drop item code `0x00559A30` on the same drop state
+/// ([`drop_helpers`]), unit type (unit
 /// records), item quality (the game's item store), the room's units (the
 /// room unit list). The rest keep their defaults (no spec body or no
-/// provider: the key test, code drop `0x00585970` and drop item code
-/// `0x00559A30` (items specs), trap monsters and monster spawns
+/// provider: the key test, trap monsters and monster spawns
 /// (monsters specs), the free-spot search with mask 0x3F11, the player's
 /// skill start, the range test's metric, trap damage, the "inside the
 /// room" bound).
@@ -913,6 +1066,24 @@ impl<X: Pending> ChestWorld for ObjectView<'_, X> {
         };
         self.v.h.object_drops = Some(d);
         out
+    }
+    /// `0x00585970(game, object, code, 0)` ([`drop_helpers::code_drop`],
+    /// PROVISIONAL there).
+    fn code_drop(&mut self, object: UnitId, code: u32) -> Option<UnitId> {
+        self.with_drops(|h, sim, d, levels, spots| {
+            drop_helpers::code_drop(h, sim, d, levels, spots, object, code, 0)
+        })
+        .flatten()
+    }
+    /// `0x00559A30` with the object's drop code (§8.1 rule 7, §20.4).
+    // PROVISIONAL (objects.md §8.1 rule 7; REC-none): quality 2 (normal):
+    // `items/quality.md` OQ2 gives 2 or 7 for every `0x00559A30` site
+    // but the Cow King's, without naming the chest's; settled by a
+    // capture of a chest with a drop code.
+    fn drop_item_code(&mut self, object: UnitId, code: u32) {
+        self.with_drops(|h, sim, d, levels, spots| {
+            drop_helpers::source_drop(h, sim, d, levels, spots, object, code, 2, -1, false)
+        });
     }
     fn unit_type(&self, unit: UnitId) -> Option<u8> {
         self.v.units.get(unit).map(|r| r.ty as u8)
@@ -1003,6 +1174,21 @@ const STAT_LEVEL: u16 = 12;
 /// TODO(objects.md §11 rule 2): the client update of the vital set is
 /// the stat list host's; no separate message is sent here.
 impl<X: Pending> MiscWorld for ObjectView<'_, X> {
+    /// `0x0064D800(room, x, y, SizeX, SizeY, mask)` at O's room and
+    /// position (§10; `object-population.md` §6: the box query, sizes
+    /// ≤ 1 the point read): some cell has bits in `mask` (a cell without
+    /// a room reads 0x27, `path-placement.md` §4 rule 2).
+    fn footprint_collides(&self, object: UnitId, mask: u16) -> bool {
+        let Some(o) = self.object_row(object) else {
+            return false;
+        };
+        let Some(room) = self.room(object) else {
+            return true;
+        };
+        let (x, y) = self.position(object);
+        use objects::populate::PopulateWorld;
+        self.box_query(room, x, y, o.sizex, o.sizey, u32::from(mask)) != 0
+    }
     fn party_id(&self, unit: UnitId) -> u16 {
         self.v.h.x.object_party_id(unit)
     }

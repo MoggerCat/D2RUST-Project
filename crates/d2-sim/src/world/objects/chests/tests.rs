@@ -119,8 +119,8 @@ impl ObjectWorld for H {
     fn cancel_timers(&mut self, unit: UnitId) {
         self.f.cancel_timers(unit)
     }
-    fn stamp_footprint(&mut self, unit: UnitId) {
-        self.f.stamp_footprint(unit)
+    fn stamp_footprint(&mut self, unit: UnitId, room: Option<RoomId>, x: i32, y: i32) {
+        self.f.stamp_footprint(unit, room, x, y)
     }
     fn free_footprint(&mut self, unit: UnitId) {
         self.f.free_footprint(unit)

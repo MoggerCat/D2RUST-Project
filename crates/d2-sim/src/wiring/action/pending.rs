@@ -878,12 +878,6 @@ pub trait Pending {
 
     // ---- objects (`world/objects.md`; `ObjectWorld` seams) ------------
 
-    /// `0x00620A70`: stamp an object's footprint. The path provider has
-    /// no objects.txt shape for objects (`wiring::path` `path_shape`) and
-    /// the function is not in `path-placement.md`.
-    fn object_stamp_footprint(&mut self, game: &mut Game, object: UnitId) {}
-    /// `0x00623830`: free an object's footprint (as above).
-    fn object_free_footprint(&mut self, game: &mut Game, object: UnitId) {}
     /// Attach object sound `id` (`objects.md` §14; `0x00571740` when
     /// `now`). Sounds spec, not written.
     fn object_sound(&mut self, unit: UnitId, id: u8, to: Option<UnitId>, now: bool) {}

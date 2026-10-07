@@ -1,4 +1,4 @@
-// Spec: specs/world/quests.md §9; specs/world/quests-act1.md §10; specs/world/quests-act1-rest.md §1–§3; specs/world/quests-act2.md §1.5; specs/world/objects.md §3, §4, §7; specs/sim/tick.md §5.2
+// Spec: specs/world/quests.md §9; specs/world/quests-helpers.md §4.2, §5, §7; specs/world/quests-act3.md §6; specs/world/vendors-2.md §10.1; specs/world/quests-act1.md §10; specs/world/quests-act1-rest.md §1–§3; specs/world/quests-act2.md §1.5; specs/world/objects.md §3, §4, §7; specs/sim/tick.md §5.2
 //! [`HostQuests`]: the quests' world on the wired host. Every
 //! [`QuestWorld`] call goes to [`EconomyQuests`] (the economy plus the
 //! rest), except those the action wiring provides:
@@ -10,12 +10,26 @@
 //!   through the timer queue `0x005417D0` (event 7 for the quest event),
 //!   the Act I object allocation `0x00555230` with a mode
 //!   ([`View::create_object`]) and the collision free `0x00623830` (the
-//!   object code's footprint seam, `Pending::object_free_footprint`);
+//!   object code's footprint free, `View::free_object_footprint`);
 //! - the level of a unit in a DRLG room (`DrlgWorld::level_id`);
 //! - `0x006280D0(item, 0x10)` on an item of the game's item store;
 //! - `missiles.txt` `Range` from the action tables;
 //! - the chest treasure `0x00585B90(op, kind)` on the object drop state
-//!   (`ActionHooks::object_drops`, [`super::object_chest_drop`]).
+//!   (`ActionHooks::object_drops`, [`super::object_chest_drop`]);
+//! - the quest helpers' host calls: the path target `0x0056D2C0` (path
+//!   provider), the trade button `0x00568060` (`vendors-2.md` §10.1), the
+//!   obelisk's 0x44 cancel, the town portal GUID / partner / removal
+//!   (the action wiring's portal seams, one home with `objects.md` §12),
+//!   the mode request `0x005DDFC0` (the monster mode change), the item
+//!   level `0x00558200`;
+//!
+//! and those of the host parts a caller lends ([`HostQuests::inventory`]:
+//! the reward `0x005466B0`, [`super::quest_reward`], and the cube close's
+//! `0x0055FA40`; [`HostQuests::chats`]: the chat-node frees `0x00572E00`,
+//! `0x00573180`).
+//!
+//! Left to the rest: the Steeg Stone release `0x00584820` (no object data
+//! +0 for class 337 in d2-sim: no object spec states that object).
 //!
 //! An object without object data, a unit outside a DRLG room and an item
 //! outside the store keep the rest's answer, as before.
@@ -32,17 +46,36 @@ use crate::wiring::path::place::Rooms;
 use crate::world::quests::helpers::{self, QuestMissile};
 use crate::world::quests::{PlayerQuests, QuestChain, QuestWorld, UnitKind};
 
+use super::quest_reward::{self, Placed, QuestInventory};
 use super::{EconomyQuests, QuestRest};
+use crate::items::moves::Spot;
+use crate::monsters::ai::seams::{AiModes, ModeTarget};
+use crate::world::cube::trade_action;
+use crate::world::npc::InteractionList;
+use crate::world::quests::act2;
+use std::collections::BTreeMap;
 
 /// [`EconomyQuests`] on the action wiring's hooks, with the calls the
-/// action wiring provides answered there (module doc).
+/// action wiring provides answered there (module doc), and the host
+/// parts a caller may lend for the call.
 pub struct HostQuests<'e, 'a, X, R> {
     pub inner: EconomyQuests<'e, 'a, ActionHooks<X>, R>,
+    /// The host's inventory model (the reward `0x005466B0`, the cube
+    /// close's `0x0055FA40`); `None`: the rest's answers.
+    pub inventory: Option<&'e mut dyn QuestInventory<ActionHooks<X>>>,
+    /// The NPCs' interaction lists (monster data +0x30, `npc.md` §2;
+    /// `InteractionState::lists`); `None`: the chat-node calls are
+    /// reported unhandled.
+    pub chats: Option<&'e mut BTreeMap<UnitId, InteractionList>>,
 }
 
 impl<'e, 'a, X: Pending, R: QuestRest> HostQuests<'e, 'a, X, R> {
     pub fn new(inner: EconomyQuests<'e, 'a, ActionHooks<X>, R>) -> Self {
-        Self { inner }
+        Self {
+            inner,
+            inventory: None,
+            chats: None,
+        }
     }
 
     /// The object has object data (a created object state knows it).
@@ -62,6 +95,49 @@ impl<'e, 'a, X: Pending, R: QuestRest> HostQuests<'e, 'a, X, R> {
     }
 
     /// Runs `f` on the action wiring's view over the economy's parts.
+    /// Runs a drop helper (`objects-2.md` §20) with the game's drop state
+    /// (`ActionHooks::object_drops`) lent out and the action tables'
+    /// `levels`; the economy's item store, game seed and unique bits go
+    /// back to the hooks for the call (as [`Self::object_treasure`]).
+    /// `None`: no drop state.
+    fn with_drop_state<T>(
+        &mut self,
+        f: impl FnOnce(
+            &mut crate::wiring::action::ActionHooks<X>,
+            &mut crate::units::hooks::Sim<'_>,
+            &mut super::DeathDrops,
+            &[d2_data::tables::Levels],
+            &mut super::NoSpot,
+        ) -> T,
+    ) -> Option<T> {
+        let e = &mut *self.inner.econ;
+        let mut d = e.hooks.object_drops.take()?;
+        let at = e.hooks.tables.clone();
+        std::mem::swap(&mut e.hooks.items, &mut *e.items);
+        e.hooks.game_seed = e.fields.seed;
+        e.hooks.uniques = std::mem::take(&mut e.fields.uniques);
+        let out = {
+            let mut sim = crate::units::hooks::Sim {
+                game: &mut *e.game,
+                units: &mut *e.units,
+                stats: &mut *e.stats,
+                data: e.data,
+            };
+            f(
+                &mut *e.hooks,
+                &mut sim,
+                &mut d,
+                &at.levels,
+                &mut super::NoSpot,
+            )
+        };
+        std::mem::swap(&mut e.hooks.items, &mut *e.items);
+        e.fields.seed = e.hooks.game_seed;
+        e.fields.uniques = std::mem::take(&mut e.hooks.uniques);
+        e.hooks.object_drops = Some(d);
+        Some(out)
+    }
+
     fn view<T>(&mut self, f: impl FnOnce(&mut crate::game::Game, &mut View<'_, X>) -> T) -> T {
         let e = &mut *self.inner.econ;
         let mut v = View::of(&mut *e.units, &mut *e.stats, e.data, &mut *e.hooks);
@@ -79,6 +155,73 @@ impl<'e, 'a, X: Pending, R: QuestRest> HostQuests<'e, 'a, X, R> {
             let mut v = View::of(&mut *e.units, &mut *e.stats, e.data, &mut *e.hooks);
             v.unit_error(err.into());
         }
+    }
+}
+
+impl<X: Pending, R: QuestRest> HostQuests<'_, '_, X, R> {
+    /// `0x005466B0` (`quests.md` §9.1) on the lent inventory model
+    /// ([`quest_reward`]): create, place, else drop next to the player
+    /// when droppable, else free.
+    fn reward_on_host(
+        &mut self,
+        player: UnitId,
+        code: [u8; 4],
+        level: i32,
+        quality: u8,
+        droppable: bool,
+    ) -> Option<UnitId> {
+        let made = quest_reward::create_reward(&mut *self.inner.econ, player, code, level, quality);
+        let item = match made {
+            Ok(Some(item)) => item,
+            Ok(None) => return None,
+            Err(e) => {
+                if let Some(inv) = self.inventory.as_deref_mut() {
+                    inv.fault(e);
+                }
+                return None;
+            }
+        };
+        let inv = self.inventory.as_deref_mut()?;
+        if let Placed::Stored(item) =
+            quest_reward::place_reward(&mut *self.inner.econ, inv, player, item)
+        {
+            return Some(item);
+        }
+        let spot = if droppable {
+            self.reward_spot(player)
+        } else {
+            None
+        };
+        let inv = self.inventory.as_deref_mut()?;
+        quest_reward::drop_or_free(&mut *self.inner.econ, inv, item, spot)
+    }
+
+    /// §9.1's drop spot: `0x00545340` ([`helpers::free_spot`]) from the
+    /// player's path position and room, size 1, mask 0x3E01, limit 100.
+    /// `None`: the player has no position (the reward is freed).
+    ///
+    /// PROVISIONAL (quests.md §9.1; REC-none): when the search accepts
+    /// nothing (or the player's room has no DRLG room here) the item is
+    /// dropped at the player's own position and room (`0x00545340` leaves
+    /// the point as passed; what the drop does with its null out room is
+    /// not written).
+    fn reward_spot(&mut self, player: UnitId) -> Option<Spot> {
+        let (x, y, room) = self.unit_position(player)?;
+        let found = if self.drlg_room(room) {
+            helpers::free_spot(
+                self,
+                room,
+                x,
+                y,
+                quest_reward::DROP_SIZE,
+                quest_reward::DROP_MASK,
+                quest_reward::DROP_LIMIT,
+            )
+        } else {
+            None
+        };
+        let (x, y, room) = found.unwrap_or((x, y, room));
+        Some(Spot { room, x, y })
     }
 }
 
@@ -146,11 +289,11 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
         self.inner.spawn_object(room, x, y, class, mode)
     }
     /// `0x00623830`: the object code's footprint free
-    /// (`Pending::object_free_footprint`, `objects.md` §8.2, §10).
+    /// (`View::free_object_footprint`, `objects.md` §8.2, §10).
     fn free_object_collision(&mut self, object: UnitId) {
         if self.known(object) {
-            let e = &mut *self.inner.econ;
-            return e.hooks.x.object_free_footprint(e.game, object);
+            self.view(|g, v| v.free_object_footprint(g, object));
+            return;
         }
         self.inner.free_object_collision(object)
     }
@@ -273,11 +416,24 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
         quality: u8,
         droppable: bool,
     ) -> Option<UnitId> {
-        self.inner
-            .reward_item(player, code, level, quality, droppable)
+        if self.inventory.is_none() {
+            return self
+                .inner
+                .reward_item(player, code, level, quality, droppable);
+        }
+        self.reward_on_host(player, code, level, quality, droppable)
     }
+    /// `0x00559A30(game, unit, quality, …, −1, 0)` with `code` as the
+    /// drop code ([`super::drop_helpers::source_drop`]) on the game's
+    /// drop state; without one, the rest's answer.
     fn drop_item_at(&mut self, unit: UnitId, code: [u8; 4], quality: u8) -> bool {
-        self.inner.drop_item_at(unit, code, quality)
+        let c = u32::from_le_bytes(code);
+        match self.with_drop_state(|h, sim, d, levels, spots| {
+            super::drop_helpers::source_drop(h, sim, d, levels, spots, unit, c, quality, -1, false)
+        }) {
+            Some((item, _)) => item.is_some(),
+            None => self.inner.drop_item_at(unit, code, quality),
+        }
     }
     fn quest_items(&self, player: UnitId) -> Vec<(UnitId, u8)> {
         self.inner.quest_items(player)
@@ -510,7 +666,17 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
         level: Option<i32>,
         droppable: bool,
     ) -> Option<UnitId> {
-        self.inner.quest_drop(unit, code, quality, level, droppable)
+        // `level` is the out-parameter `0x00559A30` overwrites before it
+        // reads it (`quests-act3-2.md` §11.3): not an input here.
+        let c = u32::from_le_bytes(code);
+        match self.with_drop_state(|h, sim, d, levels, spots| {
+            super::drop_helpers::source_drop(
+                h, sim, d, levels, spots, unit, c, quality, -1, droppable,
+            )
+        }) {
+            Some((item, _)) => item,
+            None => self.inner.quest_drop(unit, code, quality, level, droppable),
+        }
     }
     /// `0x00585B90(op, kind)` on an object with object data when the
     /// game holds the object drop state (`ActionHooks::object_drops`,
@@ -552,8 +718,18 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
         e.fields.uniques = std::mem::take(&mut e.hooks.uniques);
         e.hooks.object_drops = Some(d);
     }
+    /// `0x00585970(game, object, 'gld ', 2)`
+    /// ([`super::drop_helpers::code_drop`], PROVISIONAL there).
     fn drop_gold(&mut self, object: UnitId) {
-        self.inner.drop_gold(object)
+        let gold = u32::from_le_bytes(*b"gld ");
+        if self
+            .with_drop_state(|h, sim, d, levels, spots| {
+                super::drop_helpers::code_drop(h, sim, d, levels, spots, object, gold, 2)
+            })
+            .is_none()
+        {
+            self.inner.drop_gold(object)
+        }
     }
     fn set_room_portal(&mut self, room: RoomId, on: bool) {
         self.inner.set_room_portal(room, on)
@@ -723,6 +899,130 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
                 room,
                 class,
             )
+        });
+    }
+
+    // -- The quest helpers' host seams (`quests-helpers.md` §4.2, §5, §7;
+    // `quests-act3.md` §6) on the action wiring and the lent host parts.
+
+    /// `0x00558200(player, 0)` (`quests-act5.md` open question 2,
+    /// [`quest_reward::item_level`]) on the unit's record and stats.
+    fn quest_item_level(&mut self, player: UnitId) -> i32 {
+        match quest_reward::item_level(&*self.inner.econ, player) {
+            Some(v) => v,
+            None => self.inner.quest_item_level(player),
+        }
+    }
+    /// `0x0056D2C0` (`skills/bodies.md` §2.4) on the path provider: the
+    /// path target unit's position, else the target point; `None` when
+    /// a coordinate is 0. No path provider: the rest's.
+    fn path_target_xy(&mut self, unit: UnitId) -> Option<(i32, i32)> {
+        match self.view(|g, v| v.path_target_position(g, unit)) {
+            Some(p) => p,
+            None => self.inner.path_target_xy(unit),
+        }
+    }
+    /// `0x00568060(game, player, button, 0)` (`world/vendors-2.md` §10.1):
+    /// no player → nothing; no active interaction → S→C 0x77 0x0C;
+    /// buttons 0x12–0x14, 0x17, 0x18 (stash, cube) → their owners (the
+    /// rest); an interaction other than a player → 0x77 0x0D; a trade
+    /// partner gone → 0x77 0x0C; with the partner, buttons 5 and 6 and
+    /// those outside 2–8 do nothing, the other trade buttons are the
+    /// player-trade flow's (no spec, §10.3: the rest).
+    ///
+    /// PROVISIONAL (world/vendors-2.md §10.1 rule 5; REC-none): with the
+    /// partner gone `0x00597A20(game, P)` is read as 0 (its body is not
+    /// written), so 0x77 0x0C is sent.
+    fn trade_button(&mut self, player: UnitId, button: u8) {
+        if self.inner.econ.units.get(player).is_none() {
+            return;
+        }
+        let Some((ty, guid)) = self.interact_unit(player) else {
+            return self.send(player, &trade_action(0x0C));
+        };
+        match button {
+            0x12..=0x14 | 0x17 | 0x18 => self.inner.trade_button(player, button),
+            _ if ty != 0 => self.send(player, &trade_action(0x0D)),
+            _ if self.player_by_guid(guid).is_none() => {
+                self.send(player, &trade_action(0x0C));
+            }
+            2..=4 | 7 | 8 => self.inner.trade_button(player, button),
+            _ => {}
+        }
+    }
+    /// `0x00572E00` on the NPC's interaction list (lent with
+    /// [`HostQuests::chats`]): the player's node unlinked; nothing for a
+    /// unit without a list (not an `interact` monster).
+    fn free_chat_node(&mut self, npc: UnitId, player: UnitId) {
+        let Some(chats) = self.chats.as_deref_mut() else {
+            return self.inner.free_chat_node(npc, player);
+        };
+        if let Some(l) = chats.get_mut(&npc) {
+            if let Some(i) = l.nodes.iter().position(|n| n.0 == player) {
+                l.nodes.remove(i);
+            }
+        }
+    }
+    /// `0x00573180`'s end (`quests-act5.md` §5.7) on the NPC's interaction
+    /// list: every node freed, the list emptied.
+    fn clear_npc_chats(&mut self, npc: UnitId) {
+        let Some(chats) = self.chats.as_deref_mut() else {
+            return self.inner.clear_npc_chats(npc);
+        };
+        if let Some(l) = chats.get_mut(&npc) {
+            l.nodes.clear();
+        }
+    }
+    /// `0x005852E0(game, player GUID, object GUID, 0, 2)`: the C→S 0x44
+    /// cancel (`quests-act2-2.md` §3.2 step 3, [`act2::q6::insert_cancel`]).
+    fn obelisk_close(&mut self, player: UnitId, object: UnitId) {
+        let g = self.guid(object);
+        act2::q6::insert_cancel(self, player, object, g);
+    }
+    /// `0x00567330` → `0x0055FA40` (`items/inventory.md` §5.5) on the lent
+    /// inventory model; none lent: the rest's.
+    fn close_cube(&mut self, player: UnitId) {
+        match self.inventory.as_deref_mut() {
+            Some(inv) => inv.inventory_pass(&mut *self.inner.econ, player),
+            None => self.inner.close_cube(player),
+        }
+    }
+    /// `0x005353F0`: player data +0x48 through the action wiring's one
+    /// seam for it (`Pending::object_portal_guid`, the portal operate's,
+    /// `objects.md` §12); a unit other than a player has no player data.
+    fn town_portal_guid(&mut self, player: UnitId) -> Option<u32> {
+        match self.inner.econ.units.get(player).map(|r| r.ty) {
+            Some(UnitType::Player) => Some(self.inner.econ.hooks.x.object_portal_guid(player)),
+            Some(_) => None,
+            None => self.inner.town_portal_guid(player),
+        }
+    }
+    /// `0x00553720` through the action wiring's seam the portal operate
+    /// uses (`Pending::object_portal_partner`, `objects.md` §12 rule 6).
+    fn portal_partner(&mut self, portal: UnitId) -> Option<UnitId> {
+        self.view(|g, v| v.h.x.object_portal_partner(g, portal))
+    }
+    /// `quests-helpers.md` §7 step 4 = `objects.md` §12 rule 12's removal
+    /// (`0x0061A270`, `0x00555600`, `0x0061AED0(room, 1)`) through the
+    /// action wiring's seam for it (`Pending::object_remove_portal`).
+    fn free_portal_object(&mut self, portal: UnitId) {
+        self.view(|g, v| v.h.x.object_remove_portal(g, portal));
+    }
+    /// `0x005DDFC0(game, monster, mode, x, y)` (`monsters/ai.md` §7.1: the
+    /// mode request at a point, no path step set) on the action wiring's
+    /// monster mode change; a unit that is not a monster: the rest's.
+    fn monster_mode_at(&mut self, monster: UnitId, mode: u8, x: i32, y: i32) {
+        let is_monster = self
+            .inner
+            .econ
+            .units
+            .get(monster)
+            .is_some_and(|r| r.ty == UnitType::Monster);
+        if !is_monster {
+            return self.inner.monster_mode_at(monster, mode, x, y);
+        }
+        self.view(|g, v| {
+            AiModes::change_mode(v, g, monster, mode, ModeTarget::Point(x, y));
         });
     }
 }

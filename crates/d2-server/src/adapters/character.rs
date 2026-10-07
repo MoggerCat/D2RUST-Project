@@ -1,4 +1,4 @@
-// Spec: specs/formats/d2s-load.md; specs/formats/d2s.md §2.2 r7, §2.2 r8, §2.2 r9, §2.4 r4, §2.4 r5, §2.4 r6, §8.2 r7, §8.5 r2, §9; specs/world/quests.md §1.6
+// Spec: specs/formats/d2s-load.md; specs/world/hirelings-2.md §19; specs/formats/d2s.md §2.2 r7, §2.2 r8, §2.2 r9, §2.4 r4, §2.4 r5, §2.4 r6, §8.2 r7, §8.5 r2, §9; specs/world/quests.md §1.6
 //! Character storage: what loading a parsed `.d2s` does to the game
 //! (`formats/d2s-load.md`). `d2_formats::d2s` parses and checks the bytes
 //! (`formats/d2s.md` §1–§8, §10); [`load`] then runs either the
@@ -24,7 +24,8 @@
 use d2_formats::d2s::{self, Corpse, D2s, Header, Hireling, ItemEntry, Slot, StatEntry};
 use d2_sim::combat::vitals::{init_player_stats, VitalsUnits};
 use d2_sim::units::UnitId;
-use d2_sim::wiring::action::{Pending, View};
+use d2_sim::wiring::action::{HirelingCall, Pending, View};
+use d2_sim::world::hirelings::life::{Loader, SavedHireling};
 
 /// Stat ids the load reads or writes (`formats/d2s.md` §9).
 pub mod stat {
@@ -525,24 +526,40 @@ impl<X: Pending> CharacterWorld for ActionCharacter<'_, '_, X> {
             "the corpse unit (`0x0056A830`) has no d2-sim body",
         )
     }
+    /// `0x0056AA50`: queued for the host that holds the hireling lists
+    /// (`ActionHooks::hireling_calls`, `HirelingCall::Restore`; the
+    /// wired host runs `hirelings.md` §10 rules 1–7 on it, with the
+    /// roomless allocation of `hirelings-2.md` §16 rule 3). The parser
+    /// takes versions ≥ 0x5C only (`formats/d2s.md` §1 rule 6), so the
+    /// loader is always the ≥ 0x5C one (`Loader::Current`).
     fn restore_hireling(&mut self, block: &Hireling) -> Result<(), Unapplied> {
         if !block.is_present() {
             // `world/hirelings.md` §10 rule 1: no hireling.
             return Ok(());
         }
-        // `hirelings-2.md` §16: `d2_sim::world::hirelings::life`
-        // `restore_plan` / `restore` / `restore_tail` and
-        // `level::restore_experience` implement the restore.
-        unapplied(
-            "hireling",
-            "the roomless monster allocation of `hirelings-2.md` §16 rule 3 and the hireling \
-             state are the wired host's (WiredWorld), not this load world's",
-        )
+        let Some(q) = self.v.h.hireling_calls.as_mut() else {
+            return unapplied(
+                "hireling",
+                "no host holds the hireling lists (`ActionHooks::hireling_calls` is off)",
+            );
+        };
+        q.push(HirelingCall::Restore {
+            player: self.player,
+            saved: SavedHireling {
+                dead: block.flags & Hireling::DEAD != 0,
+                seed: block.seed,
+                name_index: block.name_index,
+                id: block.id,
+                experience: block.experience,
+            },
+            loader: Loader::Current,
+        });
+        Ok(())
     }
     fn hireling_items_loaded(&mut self) -> Result<(), Unapplied> {
         unapplied(
             "hireling rule 8",
-            "no restored hireling (see the hireling step)",
+            "the hireling's items are not created (see the items step), so rule 8 does not run",
         )
     }
     fn resolve_item_indices(&mut self) -> Result<(), Unapplied> {

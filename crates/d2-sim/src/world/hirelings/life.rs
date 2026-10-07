@@ -282,11 +282,10 @@ pub fn range_distance(pet: (i32, i32), player: (i32, i32)) -> i32 {
 /// hireling (`(7, 0)`); else nothing. A dead restored hireling stays
 /// roomless (§8 rule 5).
 ///
-/// TODO(hirelings-2.md §19): no caller yet. The join placement
-/// (`wiring::path::place::game_entry`, `0x005394A0`) runs on the action
-/// wiring, which does not hold the hireling lists; the save restore that
-/// gives a joining player a hireling has no caller either (`d2-server`
-/// character load).
+/// Caller (`hirelings-2.md` §19): the join placement
+/// (`wiring::path::place::game_entry`, `0x005394A0`) queues the call
+/// (`wiring::action::HirelingCall::JoinFollow`) for the host holding the
+/// hireling lists (`d2-server` `WiredWorld::hireling_calls`).
 pub fn join_follow<W: HirelingWorld>(
     w: &mut W,
     t: &HirelingTables,
@@ -345,11 +344,12 @@ pub fn kill_with_owner<W: HirelingWorld>(w: &mut W, st: &mut HirelingState, play
 /// [`kill_with_owner`]. The caller then runs the pet follow ([`follow`])
 /// to the new position (in both game types).
 ///
-/// TODO(hirelings-2.md §19): no caller yet. The act change `0x0053ACC0`
-/// (from the level warp `0x0053AEC0`) is not implemented in d2-sim: the
-/// path wiring's `level_warp` answers `None` for another act and the warp
-/// stays on its `Pending::warp` route (owner: the act / level-change
-/// spec).
+/// Caller (`hirelings-2.md` §19): the path wiring's `level_warp` meets
+/// the act change (another act: `None`, the warp stays on its
+/// `Pending::warp` route, owner: the act / level-change spec) and queues
+/// it (`wiring::action::HirelingCall::ActChange`); the host holding the
+/// hireling lists runs this, then [`follow`] (`d2-server`
+/// `WiredWorld::hireling_calls`).
 pub fn classic_act_change<W: HirelingWorld>(w: &mut W, st: &mut HirelingState, player: UnitId) {
     kill_with_owner(w, st, player);
 }
@@ -539,10 +539,11 @@ pub fn restore_plan(
 /// The caller then runs §10 rules 5–6 ([`super::level::restore_experience`],
 /// not on the 0x47 path) and [`restore_tail`] (rule 7).
 ///
-/// TODO(hirelings-2.md §19): no caller yet (save load `0x0056B180` →
-/// `0x0056AA50`; `d2-server` `adapters::character` reports the step
-/// unapplied: the roomless monster allocation and the hireling state are
-/// the wired host's, not the load world's).
+/// Caller (`hirelings-2.md` §19): the save load `0x0056B180` →
+/// `0x0056AA50` (`d2-server` `adapters::character`) queues the restore
+/// (`wiring::action::HirelingCall::Restore`); the wired host
+/// (`WiredWorld::restore_hireling`) allocates the roomless unit and runs
+/// this with [`restore_plan`], the experience step and [`restore_tail`].
 #[allow(clippy::too_many_arguments)]
 pub fn restore<W: HirelingWorld>(
     w: &mut W,

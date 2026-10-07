@@ -26,9 +26,14 @@
 //! - [`chest_drop`]: the chest drop `D(Q)` of the object code
 //!   (`treasure.md` §4) the same way, the object the dropper
 //!   ([`object_chest_drop`]).
+//! - [`drop_helpers`]: the object and quest drop helpers
+//!   (`objects-2.md` §20: armor, weapon, gold, by source unit; the code
+//!   drop) the same way.
 //! - [`quest_host`]: the quests' world on the wired host ([`HostQuests`]:
 //!   [`EconomyQuests`] with the object, level, interaction and identify
 //!   calls the action wiring provides).
+//! - [`quest_reward`]: the quest reward `0x005466B0` on the host's
+//!   inventory model ([`QuestInventory`], [`QuestInv`]).
 //! - [`quest_objects`]: the object module's quest routes on the quest
 //!   control (init / operate functions by index, object event 7).
 //! - [`quest_tick`]: tick step 8, the quest updater, on the same quest
@@ -39,6 +44,7 @@
 pub mod chest_drop;
 pub mod cube_items;
 pub mod death;
+pub mod drop_helpers;
 pub mod game_fields;
 pub mod item_records;
 pub mod item_stats;
@@ -46,6 +52,7 @@ pub mod item_units;
 pub mod quest_host;
 pub mod quest_items;
 pub mod quest_objects;
+pub mod quest_reward;
 pub mod quest_tick;
 pub mod treasure_items;
 
@@ -61,6 +68,7 @@ pub use item_units::{Economy, ItemScope, ItemSpawn, ItemStore};
 pub use quest_host::HostQuests;
 pub use quest_items::{EconomyQuests, QuestDeferred, QuestRest};
 pub use quest_objects::{QuestLoan, QuestObjectRun};
+pub use quest_reward::{QuestInv, QuestInventory};
 pub use quest_tick::{QuestTick, UnitSide};
 pub use treasure_items::{dropper, recipient, DropPlacer, DropSpot, ItemDrops};
 

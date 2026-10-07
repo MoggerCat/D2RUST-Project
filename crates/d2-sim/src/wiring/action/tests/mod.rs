@@ -175,9 +175,6 @@ impl Pending for TestPending {
     fn send(&mut self, player: UnitId, msg: &[u8]) {
         self.sent.push((player, msg.to_vec()));
     }
-    fn object_free_footprint(&mut self, _: &mut Game, object: UnitId) {
-        self.log.push(format!("free footprint {}", object.0));
-    }
     fn death_end_action(&mut self, _: &mut Game, unit: UnitId, action: u8, minion: u16) {
         self.log
             .push(format!("death action {} {action} {minion}", unit.0));

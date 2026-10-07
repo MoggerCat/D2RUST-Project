@@ -144,7 +144,7 @@ impl ObjectWorld for Fake {
     fn cancel_timers(&mut self, unit: UnitId) {
         self.calls.push(Call::CancelTimers(unit));
     }
-    fn stamp_footprint(&mut self, unit: UnitId) {
+    fn stamp_footprint(&mut self, unit: UnitId, _: Option<RoomId>, _: i32, _: i32) {
         self.calls.push(Call::Stamp(unit));
     }
     fn free_footprint(&mut self, unit: UnitId) {

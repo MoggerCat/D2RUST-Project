@@ -387,14 +387,28 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
         }
         ran
     }
+    /// `0x00574EC0(7, 0)` on the lent hireling lists
+    /// ([`InvDesk::lent_hireling`]); none lent → the rest.
     fn hireling(&self, player: Owner) -> Option<Owner> {
-        self.rest.hireling(player)
+        match self.lent_hireling(player) {
+            Some(m) => m,
+            None => self.rest.hireling(player),
+        }
     }
+    /// `0x0065A590` with the lent lists ([`InvDesk::lent_owns_hireling`]);
+    /// none lent → the rest.
     fn owns_hireling(&self, player: Owner, merc: Owner) -> bool {
-        self.rest.owns_hireling(player, merc)
+        match self.lent_owns_hireling(player, merc) {
+            Some(b) => b,
+            None => self.rest.owns_hireling(player, merc),
+        }
     }
+    /// `0x0054CED0` (`world/hirelings.md` §11) with the lent lists
+    /// ([`InvDesk::lent_equip_on_merc`]); none lent → the rest.
     fn equip_on_merc(&mut self, merc: Owner, item: Guid) {
-        self.rest.equip_on_merc(merc, item)
+        if !self.lent_equip_on_merc(merc, item) {
+            self.rest.equip_on_merc(merc, item)
+        }
     }
     fn merc_after_take(&mut self, merc: Owner) {
         self.rest.merc_after_take(merc)

@@ -182,7 +182,8 @@ pub fn door<W: ObjectHost>(
         }
         2 | 5 => {
             if !w.footprint_collides(obj, DOOR_CLEAR_MASK) {
-                w.stamp_footprint(obj);
+                let (x, y) = w.position(obj);
+                w.stamp_footprint(obj, w.room(obj), x, y);
                 set_object_mode(ctl, t, w, obj, 0)?;
                 ctl.get_mut(obj)?.last_tick = now;
             } else if w.footprint_collides(obj, DOOR_CORPSE_MASK) {
