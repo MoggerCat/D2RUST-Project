@@ -261,7 +261,7 @@ fn level_init_file_draws() {
     );
 }
 
-// Covers: specs/drlg/preset.md §3.2 r1, §3.2 r2, §3.2 r3, §4 r1, §4 r2, §4 r3, §4 r4, §6 r10
+// Covers: specs/drlg/preset.md §3.2 r1, §3.2 r2, §3.2 r3, §4 r1, §4 r2, §4 r3, §4 r4, §6 r10; specs/sim/rng.md §7 row14
 #[test]
 fn town_generation_35_rooms_row_major() {
     let mut w = World::new();

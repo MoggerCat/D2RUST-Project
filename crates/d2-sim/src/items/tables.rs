@@ -736,6 +736,13 @@ impl ItemTables {
         usize::try_from(t).ok().and_then(|t| self.itemtypes.get(t))
     }
 
+    /// Code lookup (`0x00633640`, `generation.md` §10.1): a 4-byte,
+    /// space-padded item code to the combined items index; an unknown
+    /// code is not found.
+    pub fn find_code(&self, code: [u8; 4]) -> Option<usize> {
+        self.items.iter().position(|r| r.code == code)
+    }
+
     /// The primary type's itemtypes row of item `i` (`generation.md` §1.3).
     pub fn itype_of(&self, i: usize) -> Option<&Itemtypes> {
         self.item(i).and_then(|r| self.itemtype(r.type_))

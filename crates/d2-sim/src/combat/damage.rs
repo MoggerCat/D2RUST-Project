@@ -1076,8 +1076,11 @@ pub fn leech<W: CombatWorld>(
     rec.life_leech = rec.life_leech.wrapping_shl(6);
     rec.mana_leech = rec.mana_leech.wrapping_shl(6);
     let Some(a) = a else {
-        // TODO(damage.md §5.3 step 3): "or none" takes the mode
-        // conversion of a missing attacker; nothing to leech into.
+        // Step 7 (`0x0057C5AB`–`0x0057C67D`): a missing attacker takes
+        // the monster rule; the fields are stored back as
+        // `(x << 6) / 64`, nothing is healed, no overlay, no draw.
+        rec.life_leech /= 64;
+        rec.mana_leech /= 64;
         return;
     };
     let player_rule = match w.unit_type(a) {

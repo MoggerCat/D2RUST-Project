@@ -72,6 +72,8 @@ pub struct BodyFake {
     pub alive: BTreeSet<usize>,
     pub dead: BTreeSet<usize>,
     pub missiles: Vec<MissileRequest<usize>>,
+    /// What every `srvdo` returns (the do core's result).
+    pub srvdo_result: i32,
     pub no_missiles: bool,
     pub no_monsters: bool,
     pub c8: BTreeMap<usize, u32>,
@@ -291,7 +293,7 @@ impl SkillFunctions for BodyFake {
         _: bool,
     ) -> i32 {
         self.log(format!("srvdo {index} {u} {skill} {lvl}"));
-        0
+        self.srvdo_result
     }
 }
 

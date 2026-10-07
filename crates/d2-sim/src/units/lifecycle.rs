@@ -66,7 +66,11 @@ pub fn allocate<H: LifecycleHooks>(
     let Some(unit) = allocate_unlinked(sim, hooks, game_seed, req)? else {
         return Ok(None);
     };
-    add(sim, hooks, unit, req)?;
+    // §3.1 r9: flags bit 1 clear → no `SUNIT_Add`; the unit is returned
+    // as it is after step 7, in no list.
+    if req.add {
+        add(sim, hooks, unit, req)?;
+    }
     Ok(Some(unit))
 }
 
@@ -108,9 +112,6 @@ pub fn allocate_unlinked<H: LifecycleHooks>(
         UnitType::Player if req.class >= PLAYER_CLASSES => return Ok(None),
         _ => {}
     }
-    if !req.add {
-        return Err(UnitError::NotAdded);
-    }
     // Step 3: the act of the allocation room's level. An unknown room
     // is refused here, before any draw.
     let act = match req.room {
@@ -146,7 +147,14 @@ pub fn allocate_unlinked<H: LifecycleHooks>(
     };
     // The entry exists from here (it owns timers) but is in no list
     // until step 8 (r7.1).
-    if let Err(e) = sim.game.lists.check_guid_free(req.ty, guid) {
+    // Without `SUNIT_Add` (flags bit 1 clear, §3.1 r9) no list is touched,
+    // so a taken GUID is not met either.
+    let free = if req.add {
+        sim.game.lists.check_guid_free(req.ty, guid)
+    } else {
+        Ok(())
+    };
+    if let Err(e) = free {
         *game_seed = undo.0;
         sim.game.lists.guids.set(req.ty, undo.1);
         return Err(GameError::from(e).into());

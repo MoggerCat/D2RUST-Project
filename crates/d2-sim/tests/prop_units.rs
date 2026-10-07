@@ -474,8 +474,15 @@ fn run_ops(ops: Vec<Op>) {
                     continue;
                 }
                 if !add {
-                    assert_eq!(got, Err(UnitError::NotAdded));
-                    assert_eq!(fingerprint(&w, seed), before);
+                    // §3.1 r9: the unit is returned, in no list, with no
+                    // duplicate-GUID check; the draws stay.
+                    let id = got.expect("allocate").expect("returned");
+                    let rec = w.units.get(id).expect("record").clone();
+                    assert_eq!((rec.ty, rec.class), (ty, class));
+                    assert_ne!(w.game.lists.find_unit(ty, rec.guid), Some(id));
+                    // Free it again; the model of linked units is unchanged.
+                    remove(&mut w.sim(), &mut hooks, id).expect("remove");
+                    game_seed = seed;
                     continue;
                 }
                 let guid = match (ty, fixed_guid) {
