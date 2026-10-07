@@ -668,3 +668,443 @@ fn totem_catches_up_with_a_walking_or_running_owner() {
         "a neutral owner is not chased by k 0"
     );
 }
+
+// ---- §24 DruidWolf, §25 CycleOfLife ------------------------------------------
+
+/// A druid wolf (class 420 spirit wolf, 421 fenris) owned by the player at
+/// (103, 100), good alignment; `Skill1` / `Skill2` are Teleport (mode 10).
+fn druid(class: i32) -> World {
+    let aips: [i16; 5] = if class == 420 {
+        [22, 20, 14, 20, 26]
+    } else {
+        [22, 20, 25, 24, 30]
+    };
+    let mut w = world(act_row(108, &aips));
+    grow(&mut w, 422);
+    w.fake.class.insert(w.mon, class);
+    give_skill(&mut w, if class == 420 { 1 } else { 2 }, 54, 10);
+    own(&mut w);
+    w.fake.align = 1;
+    put_owner(&mut w, (103, 100));
+    w
+}
+
+fn put_owner(w: &mut World, at: (i32, i32)) {
+    w.fake.pos.insert(w.player, at);
+    w.fake.y.final_point.insert(w.player, at);
+    w.fake.y.target_point.insert(w.player, at);
+    w.fake.y.last_placed = (200, 200);
+}
+
+fn has_event0(w: &World, at: i32) -> bool {
+    let t = &w.game.timers;
+    t.unit_timers(w.mon)
+        .into_iter()
+        .any(|id| t.event(id).map(|e| e.0) == Some(0) && t.expire(id) == Some(at))
+}
+
+// Covers: specs/monsters/ai-bodies-6.md §24 r4, §24.1 r5
+#[test]
+fn spirit_wolf_search_cap_and_the_owner_view_bug() {
+    // r (aip4) = 20 caps the search: E = 20 keeps S, E = 21 drops it. S
+    // (reachable, M = 0, reach(O, S) < r) → run to S.
+    for (e, runs) in [(20, true), (21, false)] {
+        let mut w = druid(420);
+        let t = w.add_unit(UnitType::Monster, (108, 100));
+        w.fake.good_for.insert(w.mon, (t, e));
+        w.seed(seed_with(1, |v| v[0] >= 20));
+        w.think_with(None, 0, false);
+        assert_eq!(
+            w.fake.modes().contains(&unit_mode(mode::RUN, t)),
+            runs,
+            "E {e}"
+        );
+    }
+    // Step 5, bug kept: S = 0 (nothing within r) and T0 (the owner's search)
+    // within r of the wolf: S := T0 only when T0 is NOT directly reachable.
+    for (reach_fails, runs) in [(true, true), (false, false)] {
+        let mut w = druid(420);
+        let t = w.add_unit(UnitType::Monster, (115, 100)); // 14 from the wolf
+        w.fake.good_for.insert(w.player, (t, 40));
+        w.fake.reach_fails = reach_fails;
+        w.seed(seed_with(1, |v| v[0] >= 20));
+        w.think_with(None, 0, false);
+        assert_eq!(
+            w.fake.modes().contains(&unit_mode(mode::RUN, t)),
+            runs,
+            "reach_fails {reach_fails}"
+        );
+    }
+    // T0 at 29 (≥ r): never taken.
+    let mut w = druid(420);
+    let t = w.add_unit(UnitType::Monster, (130, 100));
+    w.fake.good_for.insert(w.player, (t, 40));
+    w.fake.reach_fails = true;
+    w.seed(seed_with(1, |v| v[0] >= 20));
+    w.think_with(None, 0, false);
+    assert!(!w.fake.modes().contains(&unit_mode(mode::RUN, t)));
+}
+
+// Covers: specs/monsters/ai-bodies-6.md §24.1 r6
+#[test]
+fn spirit_wolf_ports_to_a_far_owner() {
+    // d > 50 and Skill1 ≥ 0: port to O's position, MODECHANGE at frame + 4,
+    // wait 10.
+    let mut w = druid(420);
+    put_owner(&mut w, (160, 100));
+    w.game.frame = 7;
+    w.think_with(None, 0, false);
+    assert_eq!(w.fake.modes(), [point_mode(10, 160, 100)]);
+    assert!(has_event0(&w, 11));
+    assert_eq!(w.thinks(), [17]);
+    // Without the skill: no port.
+    let mut w = druid(420);
+    w.monstats[0].skill1 = 0xFFFF;
+    put_owner(&mut w, (160, 100));
+    w.think_with(None, 0, false);
+    assert!(!w.fake.modes().contains(&point_mode(10, 160, 100)));
+}
+
+// Covers: specs/monsters/ai-bodies-6.md §24.1 r7
+#[test]
+fn spirit_wolf_catches_up_by_distance_and_owner_mode() {
+    // d > aip5 [26]: pet move k 0 (run 1, speed 100) → end (run to Q).
+    let mut w = druid(420);
+    put_owner(&mut w, (135, 100));
+    w.think_with(None, 0, false);
+    assert_eq!(w.fake.modes(), [point_mode(mode::RUN, 135, 108)]);
+    assert_eq!(w.vel_request().speed, 100);
+    // aip3 [14] < d ≤ aip5: O walking (2) → k 0 (0, 0, 0); O running (3) →
+    // k 0 (1, 100, 0).
+    for (om, want, speed) in [(2u8, mode::WALK, 0), (3, mode::RUN, 100)] {
+        let mut w = druid(420);
+        put_owner(&mut w, (123, 100));
+        w.fake.anim.insert(w.player, om);
+        w.think_with(None, 0, false);
+        assert_eq!(w.fake.modes(), [point_mode(want, 123, 108)], "O mode {om}");
+        assert_eq!(w.vel_request().speed, speed, "O mode {om}");
+    }
+    // The pet follow is evaluated whatever d is: d ≤ 1 beside a neutral O
+    // is pet move k 5 (wander near O by n = 6), not the later steps.
+    let mut w = druid(420);
+    put_owner(&mut w, (101, 100));
+    w.seed(1);
+    w.think_with(None, 0, false);
+    assert_eq!(w.fake.modes(), [wander_at(1, 0, (101, 100), 6)]);
+}
+
+// Covers: specs/monsters/ai-bodies-6.md §24.1 r8
+#[test]
+fn spirit_wolf_with_a_target_attacks_runs_or_waits() {
+    let with_target = |owner_at: (i32, i32), at: (i32, i32), melee: bool| {
+        let mut w = druid(420);
+        put_owner(&mut w, owner_at);
+        let t = w.add_unit(UnitType::Monster, at);
+        w.fake.good_for.insert(w.mon, (t, 5));
+        if melee {
+            w.fake.melee.insert(t);
+        }
+        w.seed(1);
+        w.think_with(None, 0, false);
+        (w, t)
+    };
+    // M ≠ 0: A1 at S, wait aip1 [22].
+    let (w, t) = with_target((103, 100), (105, 100), true);
+    assert_eq!(w.fake.modes(), [unit_mode(mode::ATTACK1, t)]);
+    assert_eq!(w.thinks(), [22]);
+    // M = 0 and reach(O, S) < r [20]: velocity (0, v, 0), run to S.
+    let (w, t) = with_target((103, 100), (108, 100), false);
+    assert_eq!(w.fake.modes(), [unit_mode(mode::RUN, t)]);
+    assert_eq!(w.vel_request().speed, 100);
+    // reach(O, S) ≥ r and d > 10: walk in radius of O (8, 6).
+    let (w, _) = with_target((112, 100), (135, 100), false);
+    assert!(logged(&w, "radius 8 6"));
+    // reach(O, S) ≥ r and d ≤ 10: idle 15.
+    let (w, _) = with_target((103, 100), (135, 100), false);
+    assert_eq!(w.thinks(), [15]);
+}
+
+// Covers: specs/monsters/ai-bodies-6.md §24.2 r5, §24.2 r6
+#[test]
+fn fenris_target_reachability_and_owner_leash() {
+    // r5: S = 0 (the wolf's own search finds nothing); T0 (the owner's
+    // search) at distance 10 < r [24] and directly reachable → S := T0.
+    for (reach_fails, runs) in [(false, true), (true, false)] {
+        let mut w = druid(421);
+        let t = w.add_unit(UnitType::Monster, (110, 100));
+        w.fake.good_for.insert(w.player, (t, 10));
+        w.fake.reach_fails = reach_fails;
+        w.seed(seed_with(1, |v| v[0] >= 25));
+        w.think_with(None, 0, false);
+        assert_eq!(
+            w.fake.modes().contains(&unit_mode(mode::RUN, t)),
+            runs,
+            "reach_fails {reach_fails}"
+        );
+    }
+    // T0's search distance 30 ≥ r: not taken.
+    let mut w = druid(421);
+    let t = w.add_unit(UnitType::Monster, (110, 100));
+    w.fake.good_for.insert(w.player, (t, 30));
+    w.seed(seed_with(1, |v| v[0] >= 25));
+    w.think_with(None, 0, false);
+    assert!(!w.fake.modes().contains(&unit_mode(mode::RUN, t)));
+    // r6: S set, d > r and reach(O, S) > r → S := 0. O 26 away (≤ aip5):
+    // S at 16 from O stays (run to it); S at 34 from O is dropped.
+    for (sx, runs) in [(110, true), (160, false)] {
+        let mut w = druid(421);
+        put_owner(&mut w, (126, 100));
+        let t = w.add_unit(UnitType::Monster, (sx, 100));
+        w.fake.good_for.insert(w.mon, (t, 10));
+        w.seed(seed_with(1, |v| v[0] >= 25));
+        w.think_with(None, 0, false);
+        assert_eq!(
+            w.fake.modes().contains(&unit_mode(mode::RUN, t)),
+            runs,
+            "S at {sx}"
+        );
+    }
+}
+
+// Covers: specs/monsters/ai-bodies-6.md §24.2 r7, §24.2 r8, §24.2 r9
+#[test]
+fn fenris_ports_catches_up_and_follows() {
+    // r7: Skill2 ≥ 0 and d > 50: port to O, MODECHANGE at frame + 2, wait 10.
+    let mut w = druid(421);
+    put_owner(&mut w, (160, 100));
+    w.game.frame = 5;
+    w.think_with(None, 0, false);
+    assert_eq!(w.fake.modes(), [point_mode(10, 160, 100)]);
+    assert!(has_event0(&w, 7));
+    assert_eq!(w.thinks(), [15]);
+    // r8: d > aip5 [30]: k 0 (1, 100, 0), end whatever it returned.
+    let mut w = druid(421);
+    put_owner(&mut w, (140, 100));
+    w.think_with(None, 0, false);
+    assert_eq!(w.fake.modes(), [point_mode(mode::RUN, 140, 108)]);
+    assert_eq!(w.vel_request().speed, 100);
+    // d > r [24]: O running (3) → the same; O walking (2) → k 0 (0, 0, 0).
+    for (om, want, speed) in [(3u8, mode::RUN, 100), (2, mode::WALK, 0)] {
+        let mut w = druid(421);
+        put_owner(&mut w, (128, 100));
+        w.fake.anim.insert(w.player, om);
+        w.think_with(None, 0, false);
+        assert_eq!(w.fake.modes(), [point_mode(want, 128, 108)], "O mode {om}");
+        assert_eq!(w.vel_request().speed, speed, "O mode {om}");
+    }
+    // r9: the quiet follow ≠ 0 ends the think: d ≤ 1 beside a neutral O →
+    // k 5 (wander near O).
+    let mut w = druid(421);
+    put_owner(&mut w, (101, 100));
+    w.seed(1);
+    w.think_with(None, 0, false);
+    assert_eq!(w.fake.modes(), [wander_at(1, 0, (101, 100), 6)]);
+}
+
+// Covers: specs/monsters/ai-bodies-6.md §24.2 r10
+#[test]
+fn fenris_rage_by_skill_state_and_corpse() {
+    let rage = |w: &mut World| {
+        give_skill(w, 1, 60, 10);
+    };
+    // Corpse K within r / 2 [12] of the unit, not in melee range, M = 0:
+    // run to K, param 0 := 1 (the existing vector); in melee range: Skill1
+    // at K, param 0 := 0.
+    let lo = seed_with(1, |v| v[0] < 25);
+    let mut w = druid(421);
+    rage(&mut w);
+    let k = w.add_unit(UnitType::Monster, (105, 100));
+    w.fake.y.corpse = Some(k);
+    w.fake.melee.insert(k);
+    w.seed(lo);
+    set_param_of(&mut w, 0, 1);
+    w.think_with(None, 0, false);
+    assert_eq!(w.fake.modes(), [unit_mode(10, k)]);
+    assert_eq!(param_of(&w, 0), 0);
+    // K too far (≥ r / 2): no rage cast, step 11.
+    let mut w = druid(421);
+    rage(&mut w);
+    let k = w.add_unit(UnitType::Monster, (115, 100));
+    w.fake.y.corpse = Some(k);
+    w.seed(lo);
+    w.think_with(None, 0, false);
+    assert!(!w.fake.modes().contains(&unit_mode(10, k)));
+    assert!(!w.fake.modes().contains(&unit_mode(mode::RUN, k)));
+    // Skill1 < 0, or state 138: no corpse search at all.
+    let mut w = druid(421);
+    let k = w.add_unit(UnitType::Monster, (105, 100));
+    w.fake.y.corpse = Some(k);
+    w.seed(lo);
+    w.think_with(None, 0, false);
+    assert!(!logged(&w, "corpsefind 10"));
+    let mut w = druid(421);
+    rage(&mut w);
+    w.fake.states.insert((w.mon, 138));
+    let k = w.add_unit(UnitType::Monster, (105, 100));
+    w.fake.y.corpse = Some(k);
+    w.seed(lo);
+    w.think_with(None, 0, false);
+    assert!(!logged(&w, "corpsefind 10"));
+    // M ≠ 0 (a monster in contact) with a corpse near: step 11's A1 branch.
+    let mut w = druid(421);
+    rage(&mut w);
+    let k = w.add_unit(UnitType::Monster, (105, 100));
+    w.fake.y.corpse = Some(k);
+    let t = w.add_unit(UnitType::Monster, (104, 100));
+    w.fake.good_for.insert(w.mon, (t, 4));
+    w.fake.melee.insert(t);
+    w.seed(lo);
+    w.think_with(None, 0, false);
+    assert_eq!(w.fake.modes(), [unit_mode(mode::ATTACK1, t)]);
+}
+
+/// A cycleoflife (426) with `Skill1` 7 (the corpse cycler) at level 3, its
+/// range calc worth `calc`, owner beside it.
+fn cycle(calc: i32) -> World {
+    let mut w = world(act_row(111, &[50, 20, 25, 10, 35]));
+    grow(&mut w, 500);
+    w.fake.class.insert(w.mon, 426);
+    give_skill(&mut w, 1, 7, 8);
+    w.skills = vec![Skills::decode(&vec![0u8; Skills::SIZE]); 8];
+    w.fake.x.skill_level.insert(7, 3);
+    w.fake.y.calc = calc;
+    own(&mut w);
+    put_owner(&mut w, (103, 100));
+    w
+}
+
+// Covers: specs/monsters/ai-bodies-6.md §25 r2
+#[test]
+fn cycle_of_life_far_from_its_owner_teleports_to_it() {
+    // d ≥ aip5 [35]: pet move k 3 (free spot near O, place, idle 5) ≠ 0 →
+    // end (no corpse search).
+    let mut w = cycle(12);
+    put_owner(&mut w, (140, 100));
+    let room = w.room;
+    w.fake.y.free_spot = Some((110, 110));
+    w.fake.x.room_at = Some(room);
+    w.fake.x.place_ok = true;
+    w.think_with(None, 0, false);
+    assert!(logged(&w, "place 110 110"));
+    assert_eq!(w.thinks(), [5]);
+    assert!(!logged(&w, "corpsefind 12"));
+    // d = 34 < aip5: the think goes on.
+    let mut w = cycle(12);
+    put_owner(&mut w, (134, 100));
+    w.think_with(None, 0, false);
+    assert!(logged(&w, "corpsefind 12"));
+}
+
+// Covers: specs/monsters/ai-bodies-6.md §25 r4
+#[test]
+fn cycle_of_life_corpse_search_range_and_conditions() {
+    // n := the range calc at the entry's level, clamped to 5..50.
+    for (calc, n) in [(2, 5), (12, 12), (100, 50)] {
+        let mut w = cycle(calc);
+        w.think_with(None, 0, false);
+        assert!(logged(&w, &format!("corpsefind {n}")), "calc {calc}");
+    }
+    // Skill1 = 0 (not > 0), no skills row, or no entry: no search.
+    let mut w = cycle(12);
+    w.monstats[0].skill1 = 0;
+    w.think_with(None, 0, false);
+    assert!(!w.fake.log.iter().any(|l| l.starts_with("corpsefind")));
+    let mut w = cycle(12);
+    w.skills.clear();
+    w.think_with(None, 0, false);
+    assert!(!w.fake.log.iter().any(|l| l.starts_with("corpsefind")));
+    let mut w = cycle(12);
+    w.fake.x.skill_level.clear();
+    w.think_with(None, 0, false);
+    assert!(!w.fake.log.iter().any(|l| l.starts_with("corpsefind")));
+}
+
+/// A cycleoflife with a corpse K at `k_at`, no melee contact (so the cast
+/// of step 8 is off) and a target `T` at (110, 100).
+fn cycle_with_corpse(k_at: (i32, i32)) -> (World, UnitId, UnitId) {
+    let mut w = cycle(12);
+    let k = w.add_unit(UnitType::Monster, k_at);
+    w.fake.y.corpse = Some(k);
+    let t = w.add_unit(UnitType::Monster, (110, 100));
+    (w, k, t)
+}
+
+// Covers: specs/monsters/ai-bodies-6.md §25 r5, §25 r10, §25 r11
+#[test]
+fn cycle_of_life_keeps_a_near_corpse_walks_to_it_or_idles() {
+    // dK = 5 < aip2 [20]: K kept: walk to K (flags 7).
+    let (mut w, k, _) = cycle_with_corpse((105, 100));
+    w.think_with(None, 0, false);
+    assert_eq!(w.fake.modes(), [unit_mode(mode::WALK, k)]);
+    // dK = 25 ≥ 20: K := 0: idle aip3 [25]. (The owner is far enough for
+    // the follow's k 3, which finds no free spot and returns 0; with a
+    // near owner the follow itself would loiter and end the think.)
+    let (mut w, _, _) = cycle_with_corpse((125, 100));
+    put_owner(&mut w, (160, 100));
+    w.think_with(None, 0, false);
+    assert!(w.fake.modes().is_empty());
+    assert_eq!(w.thinks(), [25]);
+    // No corpse at all: idle 25.
+    let mut w = cycle(12);
+    put_owner(&mut w, (160, 100));
+    w.think_with(None, 0, false);
+    assert_eq!(w.thinks(), [25]);
+}
+
+// Covers: specs/monsters/ai-bodies-6.md §25 r3, §25 r9
+#[test]
+fn cycle_of_life_backs_away_from_a_live_target_in_contact() {
+    // C, T alive and `roll(100)` < 25: escape from T by aip4 [10], no delete.
+    let lo = seed_with(1, |v| v[0] < 25);
+    let (mut w, k, t) = cycle_with_corpse((105, 100));
+    w.seed(lo);
+    w.think_with(Some(t), 10, true);
+    assert_eq!(w.fake.modes(), [point_mode(mode::WALK, 90, 100)]);
+    let _ = k;
+    // A draw ≥ 25: step 10 / 11 (walk to K).
+    let lo = seed_with(1, |v| v[0] >= 25);
+    let (mut w, k, t) = cycle_with_corpse((105, 100));
+    w.seed(lo);
+    w.think_with(Some(t), 10, true);
+    assert_eq!(w.fake.modes(), [unit_mode(mode::WALK, k)]);
+    // r3: a dead T clears T and C: no escape even with a draw < 25.
+    let (mut w, k, t) = cycle_with_corpse((105, 100));
+    w.seed(seed_with(1, |v| v[0] < 25));
+    w.fake.dead.insert(t);
+    w.think_with(Some(t), 10, true);
+    assert_eq!(w.fake.modes(), [unit_mode(mode::WALK, k)]);
+}
+
+// Covers: specs/monsters/ai-bodies-6.md §25 r7, §25 r8
+#[test]
+fn cycle_of_life_casts_on_a_corpse_in_contact_when_the_owner_needs_it() {
+    // K in melee range, frame > f + aip1 [50]: class 426 needs O hurt
+    // (life < max life), class 427 needs O's mana below max.
+    let cast = |class: i32, life: i32, mana: i32, frame: i32| {
+        let (mut w, k, _) = cycle_with_corpse((104, 100));
+        w.fake.class.insert(w.mon, class);
+        w.fake.melee.insert(k);
+        w.fake.stats.insert((w.player, 6), life);
+        w.fake.x.max_life.insert(w.player, 100);
+        w.fake.stats.insert((w.player, 8), mana);
+        w.fake.x.max_mana.insert(w.player, 50);
+        w.game.frame = frame;
+        w.think_with(None, 0, false);
+        let cast = w.fake.modes() == [unit_mode(8, k)];
+        (cast, param_of(&w, 1))
+    };
+    assert_eq!(cast(426, 40, 50, 60), (true, 60), "hurt owner, due");
+    assert!(!cast(426, 100, 0, 60).0, "full life: no need");
+    assert!(!cast(426, 40, 50, 50).0, "frame = f + aip1: not due");
+    assert_eq!(cast(427, 100, 10, 60), (true, 60), "low mana");
+    assert!(!cast(427, 0, 50, 60).0, "full mana: no need");
+    // Skill 1 mode is the fixed 8 (the row's own mode is another).
+    let (mut w, k, _) = cycle_with_corpse((104, 100));
+    w.modes[0][0] = 3;
+    w.fake.melee.insert(k);
+    w.fake.stats.insert((w.player, 6), 1);
+    w.fake.x.max_life.insert(w.player, 100);
+    w.game.frame = 60;
+    w.think_with(None, 0, false);
+    assert_eq!(w.fake.modes(), [unit_mode(8, k)]);
+}

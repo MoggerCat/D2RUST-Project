@@ -55,6 +55,8 @@ struct Fake {
     last_dead: BTreeMap<RoomId, [Option<UnitId>; 4]>,
     forced: Option<(UnitId, i32)>,
     good: Option<(UnitId, i32)>,
+    /// `good_target_search` result by searching unit (before `good`).
+    good_for: BTreeMap<UnitId, (UnitId, i32)>,
     nearest: Option<(UnitId, bool)>,
     special_walk: Option<(UnitId, i32)>,
     corpses: (Option<UnitId>, u32),
@@ -389,9 +391,14 @@ impl AiTargets for Fake {
     fn forced_target(&mut self, _: &mut Game, _: UnitId) -> Option<(UnitId, i32)> {
         self.forced
     }
-    fn good_target_search(&mut self, _: &mut Game, _: UnitId, los: bool) -> Option<(UnitId, i32)> {
+    fn good_target_search(
+        &mut self,
+        _: &mut Game,
+        unit: UnitId,
+        los: bool,
+    ) -> Option<(UnitId, i32)> {
         self.log.push(format!("good {los}"));
-        self.good
+        self.good_for.get(&unit).copied().or(self.good)
     }
     fn choose_alternative(
         &mut self,
