@@ -95,3 +95,4 @@ None.
 | `panels-3.md` §27 r7 (OQ 1 answered) | scroll reading `0x0049FF90` (toggle ui 0x10, `bkd` → flag 1 + C→S 0x3E); no writer of the symbol slots `[0x007BF098]` or of the flag elsewhere → the symbol pass is unreachable in 1.14d | `0x0049FF90`, `0x0049FF10`, `0x0049D440` |
 | `panels-3.md` §27 r8 (OQ 2 answered) | ui 0x1B–0x1D, 0x20 never opened: all 136 `SetUIState` sites resolved | `0x00455F20` call sites, `0x00456970` |
 | `panels-3.md` §23 r14 (OQ 4 answered) | cursor handlers: WM_MOUSEMOVE, WM_NCMOUSEMOVE (hide), WM_LBUTTONUP; the press transition only from the character-panel and control-panel button presses | table `0x00711FEC`, `0x00467EF0`, callers of `0x00467F20` / `0x00467FA0` |
+| `inventory.md` §8 r6 (OQ 7 answered) | gold picture: the amount class is the cel direction; `invgld` has 1 direction × 1 frame → frame 0 always | `0x0046EE80`, `0x004DBB50`, `0x00601840`, table `0x006E45A0` |

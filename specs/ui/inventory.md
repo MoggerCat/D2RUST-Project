@@ -27,15 +27,15 @@
 |   5. Hover state (`0x00487000`) | 159–184 |
 |   6. Equipment boxes (`0x004845A0`) | 185–214 |
 |   7. Not drawn here | 215–224 |
-|   8. Item graphic (`0x0046EE80(item, x, top)`; answers OQ 2) | 225–267 |
-|   9. Item checks used by the tints (answers OQ 6) | 268–284 |
-|   B5. `CellGrid` answers (`client/ui.md` §B5) | 285–292 |
-| Constants & data dependencies | 293–302 |
-| Randomness | 303–306 |
-| Edge cases & original bugs | 307–314 |
-| Test vectors | 315–332 |
-| Provenance | 333–342 |
-| Open questions | 343–371 |
+|   8. Item graphic (`0x0046EE80(item, x, top)`; answers OQ 2) | 225–281 |
+|   9. Item checks used by the tints (answers OQ 6) | 282–298 |
+|   B5. `CellGrid` answers (`client/ui.md` §B5) | 299–306 |
+| Constants & data dependencies | 307–316 |
+| Randomness | 317–320 |
+| Edge cases & original bugs | 321–328 |
+| Test vectors | 329–346 |
+| Provenance | 347–356 |
+| Open questions | 357–385 |
 <!-- /index -->
 
 ## Summary
@@ -250,7 +250,7 @@ line and gold buttons: `ui/panels-2.md` §21.
    Gold (primary type 4): an amount class 0 (< 100), 1 (100–499), 2
    (500–4,999), 3 (≥ 5,000) of stat 14 is passed as the cel context's
    +0x40 value: how it selects the frame of the gold picture: §Open
-   questions 7.
+   questions 7 (answered: r6).
 3. **Visibility**: the cel's extent at (x, top + h) must touch [0, W] ×
    [0, H] (`0x004DAB40`), else nothing is drawn (returns 0).
 4. **Draw**: `0x004F6480` at (x, top + h) (`h` = the frame height,
@@ -265,6 +265,20 @@ line and gold buttons: `ui/panels-2.md` §21.
    overlays centred on the picture (owner: the render overlay spec,
    `render/draw-order.md`); none for a plain item.
 
+6. **Gold picture frame** (answers §Open questions 7). The amount class
+   of r2 is stored in the cel context's direction field (+0x40; the
+   other fields: +0x34 cel file := none, +0 frame := 0, `0x004DBB50`).
+   The cel pick maps it through the file-direction table
+   (`0x00601840`: frame = frame count × `0x006E45A0`[`ffs(D)`][dir] +
+   frame, `render/unit-composite.md` §6 r3; the cache path `0x006001F0`
+   rescales it only for files with more than one direction,
+   `0x00600CB0`). The gold `invfile` is `invgld` (`misc.txt`; `gold`
+   `VarInvGfx` 0, so r2 step 3), a DC6 of **1 direction × 1 frame**
+   (28 × 28, offsets 0; d2data, measured), and row `ffs(1)` = 1 of the
+   table is 0 for directions 0–3 (read from the image). So the class has
+   no visible effect in 1.14d: every gold pile in a grid draws frame 0
+   of `invgld`. (`invgldm` / `invgldh`, also 1 × 1 frames of 28 × 28, are
+   named by no 1.14d table or string and are not drawn by this path.)
 ### 9. Item checks used by the tints (answers OQ 6)
 
 1. `0x0062A4E0(item)` "usable state": 1 unless the item data flags
@@ -363,7 +377,7 @@ arguments checked with `tools/ghidra/disasm.py`. No D2MOO code used.
 6. **Answered** (2026-10-07, §9). Was: The checks `0x004C2240`,
    `0x0062A4E0`, `0x0062A0A0`, `0x0062E6F0`, `0x0062E740`, cursor state
    8, and the quest test `0x00483F80`.
-7. Gold picture frame (§8 r2): how the cel context +0x40 value (gold
+7. **Answered** (2026-10-07, §8 r6: frame 0 always). Was: Gold picture frame (§8 r2): how the cel context +0x40 value (gold
    amount class 0–3) picks the frame inside the cel loader `0x006001F0`
    (`0x00600CB0` scaling by the frame count), and the frame count of the
    `gld` inventory file. Disassembly read of `0x00600CB0`; DC6 header of
