@@ -46,13 +46,15 @@ was at the 60 KB limit).
 | `menus.md` OQ 1, 2, 3 | `menus.md` §3.5, §4.4, §4.5 | Hire row text; confirm dialog; click callers (wParam = flags, Shift → 0x32 bit 31 on quick paths). |
 | Split | `panels.md` §14 → `panels-2.md` §14 | panels.md 61.0 → 58.9 KB; §14 had no coverage claims. |
 | xpc-to-pc2 `ui/*` lines (0x26, 0x27, 0x4E, 0x50, 0x58, 0x8A, 0x91 consumers) | new `ui/messages.md` §1–§14 | Screen message list (add / wrap / 18-line cap / 10 s expiry / draw), chat line formats of types 1, 2, 4, 6 (+ 5, 7: recipe scroll), overhead bubbles (text pass, per-unit placement, 16-slot overlap search, bubble draw), NPC text list (sorted list, talk topic box, caption table), dialog panel (open, speed line, scroll, speech wait, end, skip input, 0x31 on close), timed box, hire popup (`SetUIState(0x23)`, `PopupHireling` → hireling panel once), 0x50 code effects (3 dead, 4 Inifuss stones), item-socket dialog (state 0x0E: orifice / imbue / sockets / personalize, 0x44 / 0x38 sends), 0x8A balloon overlay, intro table +0x12 (return greeting + C→S 0x4D). |
+| UP-28 (control panel overlays) | new `ui/control-panel.md` §1–§10 | Draw order of `0x00499450`; globes (smoothing `0x00496DD0`, 80-row fill, potion overlays, poison frame, covers, HP / MP numbers and toggles); experience and stamina bars; run / walk and menu buttons; belt (type from body location 8, `belts.bin` record, pop-up rows, slot boxes, key labels, hit area, pop-up on hover); skill buttons; new-stats / new-skills buttons per resolution; mini panel (7 / 8 buttons by game type, three layouts, functions, tool tips, press / release); control panel mouse down / up. |
+| UP-9 (GoldMax font) | `panels-2.md` §20.6, OQ 4 | Font 1: the belt draw `0x00499040` sets it every frame in step 7 and never restores it; every other font setter reached before the next frame's stash draw saves and restores (static read of the 176 `0x00502EF0` call sites); exception: a refused overhead bubble leaves font 13. |
+| `ui/messages.md` OQ 3 | `ui/messages.md` OQ 3 | Binding 7 = automap (mini-panel tool tip table `0x0047F490`). |
 | `client/msg-ui.md` OQ7 (writer part) | `ui/messages.md` §14 | All 12 writes of `[0x007C0D25]` / `[0x007C0D29]` are UI code (`0x004B1640`, `0x004B66B0`, `0x004B6DD0`, `0x004B3C20`, `0x004B3E10`): UI state; the bridge needs a UI-keyed lookup rule (cross-file request). |
 
 ## Still open
 
-- UP-9 (GoldMax font): the stash path sets no font; which font is current needs a read of every font setter before it or a capture (`panels-2.md` §20.5, OQ 4).
 - UP-19 rest: remap `k` per state (capture).
-- UP-28 (control panel overlays): not reached; needs its own spec (`ui/control-panel.md`).
+- `ui/control-panel.md` OQ 1–6 (x87 precision of the globe smoothing; belt hover / click; skill icon overlays; level-change timer; new-stats / new-skills input; captures).
 - `panels-2.md` OQ 1 (descdam / descatt functions), OQ 2 (skill-tree tab captions), OQ 3 (result note caption), OQ 5 (button fields +0x0A, +0x10).
 - `panels.md` OQ 8 rest (runtime inserts), `menus.md` OQ 4 (captures).
 
@@ -82,8 +84,11 @@ None (no TSV changed; the per-class close offsets are prose, the
 - to PC 1 (`client/msg-ui.md` §8 code 0): the "dialog" is the item-socket dialog, UI state 0x0E; refusal sends C→S 0x44 [player GUID or −1][object GUID][0][2] (`0x004C03F4`), `ui/messages.md` §11.
 - to PC 1 (`client/msg-ui.md` OQ9): the filter object's method +0x18 also receives every one-line color-4 screen message as 8-bit text (`0x0049E4E6`–`0x0049E52D`, `ui/messages.md` §2 r2).
 
+- to PC 1 (`client/model.md` / skills): the control panel skill-button draw `0x00496CF0` replaces a left / right skill whose level is ≤ 0 (`0x006442A0(P, skill, 1)`) in the model (`0x00643CE0`, `0x006470F0`, `0x00643BC0(P, 0, −1)` / `0x00643C50(P, 0, −1)`), every frame: a model write inside a UI draw; the bridge needs it as a rule or a model-side check (`ui/control-panel.md` §7 r1).
+
 ## Recording list
 
+- A globe refilling after a potion, frame by frame (smoothing precision), and the control panel at 640 × 480 and 800 × 600 with the belt popped and the mini panel in its three layouts (`ui/control-panel.md` OQ 1, OQ 6).
 - Chat lines (whisper, whisper echo, broadcast) at 800 × 600; two monsters with overhead text at once (bubble moved); an NPC dialog panel scrolling with frame times; a timed box (`ui/messages.md` OQ 1).
 
 - Stash open at 800 × 600, expansion and classic: the `GoldMax` line, to identify its font (`panels-2.md` OQ 4).

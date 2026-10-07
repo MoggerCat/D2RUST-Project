@@ -44,7 +44,7 @@
 | Edge cases & original bugs | 635–655 |
 | Test vectors | 656–678 |
 | Provenance | 679–705 |
-| Open questions | 706–728 |
+| Open questions | 706–731 |
 <!-- /index -->
 
 ## Summary
@@ -713,7 +713,10 @@ outside the repo. No capture yet.
    `0x0040B380`) is not cleared, and `0x0049D9A0` tests its +0x16 for 3;
    whether the pool can hand back a block holding 3 there (bubble
    skipped) needs the allocator (`0x0040A080`) read. d2rs uses 0 (drawn).
-3. Binding 7 of `0x00469AA0` (the key that does not skip a dialog):
+3. **Answered** (2026-10-07): binding 7 is the automap key (the mini
+   panel's Automap button shows the keys of binding 7,
+   `0x0047F4E0`; `ui/control-panel.md` §9 r5), so the automap key
+   typed as a character does not skip a dialog (§7 r7). Was: Binding 7 of `0x00469AA0` (the key that does not skip a dialog):
    which command it is (a controls spec).
 4. The 15-byte gossip text records (+5 of an intro-table entry): field
    meanings beyond text id +0, flag +2, quest +3 / +7, class +0x0B

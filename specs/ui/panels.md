@@ -52,7 +52,7 @@
 | Edge cases & original bugs | 790–810 |
 | Test vectors | 811–849 |
 | Provenance | 850–890 |
-| Open questions | 891–957 |
+| Open questions | 891–959 |
 <!-- /index -->
 
 ## Summary
@@ -890,7 +890,9 @@ repo; HANDOFF §5 C71 found frame 1 at (−205, 17)); cube close
 
 ## Open questions
 
-1. Owners still to write (listed so the work is not lost): control panel
+1. *Partly answered* (2026-10-07): the control panel overlays, the
+   mini panel and the new-stats / new-skills buttons are
+   `ui/control-panel.md`. Was: Owners still to write (listed so the work is not lost): control panel
    overlays (globes and their fill rule, belt, skill buttons, mini panel
    `0x0047F710` / button handler `0x0047EC50`, run and menu buttons,
    new-stats / new-skills buttons), cursor (`client/ui.md` §B6,
