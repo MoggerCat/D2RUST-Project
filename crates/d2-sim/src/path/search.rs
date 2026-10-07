@@ -537,6 +537,9 @@ pub(crate) mod tests {
             u.room = Some(room);
             u.pos = Point::new(x, y);
         }
+        fn client_room_switch(&mut self, player: usize, room: usize) {
+            self.log.push(format!("switch {player} r{room}"));
+        }
         fn add_player_to_world(&mut self, unit: usize, room: usize, x: i32, y: i32) {
             self.log.push(format!("add {unit} r{room} ({x},{y})"));
             let u = &mut self.units[unit];

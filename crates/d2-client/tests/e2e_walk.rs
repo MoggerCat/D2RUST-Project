@@ -668,15 +668,30 @@ fn run() -> Transcript {
         life_pct: 0,
     };
     // In the drain: the placement's 0x07 and the arrival 0x0D; then the
-    // tick's room switch sends 0x07 for each room of C's adjacency array
-    // (`path-placement.md` §11 "Recipients"; the one-room town: C itself).
+    // tick's room switch (`intents-events.md` §7.8) sends 0x07 for each
+    // room of C's adjacency array (the one-room town: C itself), then
+    // leaves A's array {A, B} in order: 0x0A for the waypoint in A, 0x08
+    // A, the player update after the client's old room (rule 3.4: 0x15
+    // with flag 1 at the player's cell), 0x08 B.
+    let hide = |x: u16| d2_sim::units::messages::map_hide(x, 0, COLD_PLAINS as u8);
+    let reassign = d2_proto::server::ReassignPlayer {
+        type_: 0,
+        guid,
+        x: d.x() as u16,
+        y: d.y() as u16,
+        flag: 1,
+    };
     let mut want = reveal.encode().to_vec();
     want.extend_from_slice(&stop.encode());
     want.extend_from_slice(&reveal.encode());
+    want.extend_from_slice(&d2_sim::units::messages::remove_unit(2, og));
+    want.extend_from_slice(&hide(0));
+    want.extend_from_slice(&reassign.encode());
+    want.extend_from_slice(&hide(8));
     assert_eq!(chunks.concat(), want);
-    // 0x07 needs the client act (no 0x03 was sent: fatal 0x58A,
-    // `client/model.md` §9 rule 1) and 0x0D's player was never announced
-    // (no 0x59: dropped, §4 rule 1).
+    // 0x07 and 0x08 need the client act (no 0x03 was sent: fatal 0x58A /
+    // 0x59E, `client/model.md` §9 rule 1) and 0x0D's player was never
+    // announced (no 0x59: dropped, §4 rule 1); 0x0A and 0x15 apply.
     assert_eq!(
         (
             report.messages,
@@ -684,10 +699,10 @@ fn run() -> Transcript {
             report.dropped,
             report.unowned
         ),
-        (3, 2, 1, 0)
+        (7, 4, 1, 0)
     );
     let mut travel = vec![chunks];
-    // The frames after: nothing (finding 1 of the handoff: no 0x15).
+    // The frames after: nothing (the 0x15 came with the switch).
     for _ in 0..3 {
         let (codes, chunks, _) = fx.frame();
         assert!(codes.is_empty() && chunks.is_empty());
@@ -703,7 +718,9 @@ fn run() -> Transcript {
         .iter()
         .map(|r| (r.id, r.error.to_string()))
         .collect();
-    assert_eq!(rejected, vec![(0x07, "fatal assert 0x58A".to_owned()); 2]);
+    let mut want = vec![(0x07, "fatal assert 0x58A".to_owned()); 2];
+    want.extend(vec![(0x08, "fatal assert 0x59E".to_owned()); 2]);
+    assert_eq!(rejected, want);
     let stamina = {
         let s = fx.sim();
         s.events.with(&mut s.game, |_, v| v.stat(p, STAT_STAMINA))
@@ -721,7 +738,7 @@ fn run() -> Transcript {
     }
 }
 
-// Covers: specs/sim/pathing.md §1.1, §9.6 r9, §9.9 r3, §10 r2; specs/world/waypoints.md §7 r5, §7 r7
+// Covers: specs/sim/pathing.md §1.1, §9.6 r9, §9.9 r3, §10 r2; specs/world/waypoints.md §7 r5, §7 r7; specs/sim/intents-events.md §7.8 r3
 #[test]
 fn walk_across_the_level_and_take_the_waypoint() {
     run();

@@ -142,6 +142,12 @@ pub struct BodyStat {
     pub itemevent: [i32; 2],
     /// `itemeventfunc1`, `itemeventfunc2` (i16).
     pub itemeventfunc: [i32; 2],
+    /// `send bits` (+0x08), `send param bits` (+0x09), `signed` (+0x04
+    /// bit 1): read by the unit-state message 0xAA
+    /// (`sim/intents-events.md` §7.9 rule 1.3), not by the bodies.
+    pub send_bits: u8,
+    pub send_param_bits: u8,
+    pub signed: bool,
 }
 
 /// The table data the bodies read beyond [`SkillTables`] and
@@ -155,6 +161,9 @@ pub struct BodyTables {
     pub state_group: Vec<i32>,
     /// States `aura` (+0x10 bit 1) by state.
     pub state_aura: Vec<bool>,
+    /// States `nosend` (+0x10 bit 0) by state (the unit-state message,
+    /// `sim/intents-events.md` §7.9 rule 1.1).
+    pub state_nosend: Vec<bool>,
     /// `overlay.txt` record count.
     pub overlay_count: i32,
     /// `monlvl.txt` rows (`monsters/init.md` §8.1).
@@ -194,10 +203,14 @@ impl BodyTables {
                     maxstat: i16v(r.maxstat),
                     itemevent: [i16v(r.itemevent1), i16v(r.itemevent2)],
                     itemeventfunc: [i16v(r.itemeventfunc1), i16v(r.itemeventfunc2)],
+                    send_bits: r.send_bits,
+                    send_param_bits: r.send_param_bits,
+                    signed: r.signed,
                 })
                 .collect(),
             state_group: states.iter().map(|r| i32::from(r.group as i16)).collect(),
             state_aura: states.iter().map(|r| r.aura).collect(),
+            state_nosend: states.iter().map(|r| r.nosend).collect(),
             overlay_count: i32::try_from(overlay.count).unwrap_or(i32::MAX),
             monlvl: Vec::new(),
             pettype_count: 0,

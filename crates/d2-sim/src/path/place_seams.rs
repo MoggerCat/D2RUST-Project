@@ -78,6 +78,14 @@ pub trait CollisionView {
     /// entry `0x005394A0` calls it for the player (§11): the room-changed
     /// flag is set.
     fn add_player_to_world(&mut self, unit: Self::Unit, room: Self::Room, x: i32, y: i32);
+    /// Game entry's room switch of the player's client to `room`
+    /// (`0x005381F0` → `0x00537B50`, §11; owner
+    /// `sim/intents-events.md` §7.8): S→C 0x07 and the add messages for
+    /// every room of the room's adjacency array, client +0x1B4 := `room`.
+    /// Default: nothing.
+    fn client_room_switch(&mut self, player: Self::Unit, room: Self::Room) {
+        let _ = (player, room);
+    }
 }
 
 /// The unit flags 2 (+0xC8) bits §10 rule 5 sets.
@@ -111,6 +119,10 @@ pub enum PlaceMessage<U> {
         b: u8,
         life_pct: u8,
     },
+    /// 0x7E (`0x0053DB70`, 5 bytes), the last message of game entry
+    /// (§11): only the id is written in 1.14d
+    /// (`sim/intents-events.md` edge case 10).
+    GameEntryDone,
 }
 
 /// Units, messages, timers and walk calls of §10–§12 that are not §1–§6.

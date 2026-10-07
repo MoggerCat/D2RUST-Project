@@ -16,7 +16,9 @@ use std::sync::OnceLock;
 
 use d2_data::tables::Objects;
 use d2_server::adapters::handlers::world::ActionWorld;
-use d2_server::adapters::session::{enter_game, Entry, JoinError};
+use d2_server::adapters::session::{
+    create_game, enter_game, Entry, GameSetup, HotKey, JoinError, PlayerRecord, SkillHand,
+};
 use d2_server::adapters::{PlayerData, PlayerFields, ProtoSizes, SimGame, UnitFacts};
 use d2_server::host::Host;
 use d2_server::seams::{ClientId, Clock, MessageSink, PlayerGate, Pos, SessionHandler};
@@ -328,6 +330,38 @@ fn name() -> [u8; 16] {
     n
 }
 
+/// The join test's character: the recorded record (`-022633` seq 113–141:
+/// hand 1 skill 0, hand 0 skill 36, no item), portal flags 5, hot keys in
+/// slot 3 (skill 0, flag set) and slot 7 (a skill id past the `skills`
+/// rows: not sent, `intents-events.md` §8.2 rule 3.6).
+fn entry(skills: usize) -> Entry {
+    let mut e = Entry::new(0, name());
+    e.hotkeys[3] = HotKey {
+        skill: 0,
+        flag: true,
+        item: u32::MAX,
+    };
+    e.hotkeys[7] = HotKey {
+        skill: skills as i16,
+        flag: false,
+        item: 9,
+    };
+    e.record = Some(PlayerRecord {
+        portal_flags: 5,
+        hands: [
+            SkillHand {
+                skill: 36,
+                item: u32::MAX,
+            },
+            SkillHand {
+                skill: 0,
+                item: u32::MAX,
+            },
+        ],
+    });
+    e
+}
+
 /// What the client receives from the session join (`enter_game`) and the
 /// next ticks, with the facts the expected bytes are built from.
 #[derive(Debug, PartialEq, Eq)]
@@ -336,11 +370,28 @@ struct Joined {
     obj_seed: u32,
     room_rect: (i32, i32, i32, i32),
     pos: (i32, i32),
+    /// The waypoint's GUID, class, position, mode and interact byte.
+    waypoint: (u32, u16, (i32, i32), u8, u8),
+    /// The client's state after the frames.
+    state: u32,
+    /// Messages of the first flush (the join and tick 1).
+    first: usize,
+    /// `skills` rows of the game.
+    skills: usize,
     received: Vec<Vec<u8>>,
 }
 
-/// The town of [`run`] with its waypoint, an unplaced player joined in
-/// state 4, then `enter_game` and `FRAMES` frames.
+/// The game of the join test (`intents-events.md` §8.1: Normal,
+/// expansion, not ladder, the recorded arena flags).
+const SETUP: GameSetup = GameSetup {
+    difficulty: 0,
+    arena_flags: 0x0010_0004,
+    expansion: true,
+    ladder: false,
+};
+
+/// The town of [`run`] with its waypoint, an unplaced player, its client
+/// record, then `create_game`, `enter_game` and `FRAMES` frames.
 fn join_run() -> Joined {
     let d = data();
     let (mut sim, _) = d
@@ -387,24 +438,40 @@ fn join_run() -> Joined {
         .iter()
         .position(|o| o.operatefn == 23)
         .expect("the waypoint row") as u32;
-    alloc(UnitType::Object, wp_class, Some(room), wp_at);
+    let wp = alloc(UnitType::Object, wp_class, Some(room), wp_at);
     // The player as the save loader leaves it: no room, at (0, 0).
     let player = alloc(UnitType::Player, CLASS, None, (0, 0));
     sim.action.sys.units.get_mut(player).unwrap().mode = 1;
     let guid = game.lists.unit(player).unwrap().guid;
+    let wp_guid = game.lists.unit(wp).unwrap().guid;
     let obj_seed = sim.action.hooks().objects.as_ref().unwrap().obj_seed;
     let world = ActionWorld {
         waypoints: Some(d.waypoints().unwrap()),
         ..ActionWorld::default()
     };
     let mut s: Sim = SimGame::with_world(game, sim, world);
-    s.join(CLIENT, Some(player), None, client_state::IN_GAME)
-        .expect("join");
-    let entry = Entry {
-        act: 0,
-        name: name(),
-    };
+    // The client record as its allocation leaves it (state 0); game
+    // creation sets state 1, the join 2 then 3 (`intents-events.md` §8).
+    s.join(CLIENT, Some(player), None, 0).expect("join");
+    create_game(&mut s, CLIENT, &SETUP).expect("game creation");
+    let skills = s.events.action.hooks().tables.skills.skills.len();
+    let entry = entry(skills);
     assert_eq!(enter_game(&mut s, CLIENT, &entry), Ok(player));
+    let id = s.sim_client(CLIENT).unwrap();
+    assert_eq!(
+        s.game.lists.client(id).unwrap().state,
+        client_state::JOINING
+    );
+    // The waypoint's 0x51 fields at the join.
+    let a = &mut s.events.action;
+    let wp_mode = a.sys.units.get(wp).unwrap().mode as u8;
+    let wp_interact = a
+        .hooks()
+        .objects
+        .as_ref()
+        .and_then(|o| o.control.data.get(&wp))
+        .map_or(0, |d| d.interact);
+    let waypoint = (wp_guid, wp_class as u16, wp_at, wp_mode, wp_interact);
     // A second entry of the placed player is refused.
     assert_eq!(
         enter_game(&mut s, CLIENT, &entry),
@@ -414,26 +481,37 @@ fn join_run() -> Joined {
     host.connect(CLIENT);
     host.frame().expect("first frame");
     let mut received = host.receive(CLIENT);
+    // The first flush (the host's first frame starts the tick driver's
+    // clock and may not tick).
+    let mut first = None;
     for f in 0..FRAMES {
         host.clock.0 += 40;
         host.frame().unwrap_or_else(|e| panic!("frame {f}: {e:?}"));
         received.extend(host.receive(CLIENT));
+        if first.is_none() && !received.is_empty() {
+            first = Some(received.len());
+        }
         let s = &host.game;
         assert!(s.tick_faults.is_empty(), "frame {f}: {:?}", s.tick_faults);
         assert_eq!(s.events.errors(), Vec::<String>::new(), "frame {f}");
     }
     let s = &mut host.game;
     let pos = s.events.action.hooks().path_position(player);
+    let state = s.game.lists.client(id).unwrap().state;
     Joined {
         guid,
         obj_seed,
         room_rect: (rect.x, rect.y, rect.w, rect.h),
         pos,
+        waypoint,
+        state,
+        first: first.unwrap_or(0),
+        skills,
         received,
     }
 }
 
-// Covers: specs/sim/path-placement.md §11, §13 r1, §13 r3; specs/client/model.md §11 r1, §11 r3; specs/sim/intents-events.md §7.2
+// Covers: specs/sim/path-placement.md §11, §13 r1, §13 r3; specs/client/model.md §11 r1, §11 r3; specs/sim/intents-events.md §7.2, §7.8 r2, §7.8 r5, §8.1, §8.2 r3, §8.2 r4, §8.2 r5, §8.2 r6, §8.3; specs/sim/tick.md §6 r6
 #[test]
 fn town_entry_sends_the_join_sequence() {
     let j = join_run();
@@ -446,10 +524,22 @@ fn town_entry_sends_the_join_sequence() {
         j.pos,
         j.room_rect
     );
+    assert!(j.skills > 0, "the synthetic skills table has rows");
     let g = j.guid.to_le_bytes();
     let mut assign = vec![0x59, g[0], g[1], g[2], g[3], CLASS as u8];
     assign.extend(name());
     assign.extend([0, 0, 0, 0]);
+    // The player has no state: the stream is the end marker alone.
+    let states = vec![0xAA, 0, g[0], g[1], g[2], g[3], 8, 0xFF];
+    let proximity = vec![0x76, 0, g[0], g[1], g[2], g[3]];
+    let handshake = vec![0x0B, 0, g[0], g[1], g[2], g[3]];
+    let portal = vec![0x5F, 5, 0, 0, 0];
+    let hotkey = vec![0x7B, 3, 0, 0x80, 0xFF, 0xFF, 0xFF, 0xFF];
+    let hand = |h: u8, skill: u8| {
+        vec![
+            0x23, 0, g[0], g[1], g[2], g[3], h, skill, 0, 0xFF, 0xFF, 0xFF, 0xFF,
+        ]
+    };
     let mut load = vec![0x03, 0];
     load.extend(INIT.to_le_bytes());
     load.extend((TOWN as u16).to_le_bytes());
@@ -461,22 +551,64 @@ fn town_entry_sends_the_join_sequence() {
         b.push(TOWN as u8);
         b
     };
+    let (wg, wc, (wx, wy), wm, wi) = j.waypoint;
+    let object = {
+        let mut b = vec![0x51, 2];
+        b.extend(wg.to_le_bytes());
+        b.extend(wc.to_le_bytes());
+        b.extend((wx as u16).to_le_bytes());
+        b.extend((wy as u16).to_le_bytes());
+        b.extend([wm, wi]);
+        b
+    };
     let mut place = vec![0x15, 0, g[0], g[1], g[2], g[3]];
     place.extend((x as u16).to_le_bytes());
     place.extend((y as u16).to_le_bytes());
     place.push(1);
-    let handshake = vec![0x0B, 0, g[0], g[1], g[2], g[3]];
-    // The session part (enter_game), then the first tick's room switch:
-    // one 0x07 per room of the spawn room's adjacency array (the town has
-    // one room, so its own) (`path-placement.md` §11 "Recipients").
+    // Game creation (§8.1), the join (§8.2: the player's own add
+    // messages, 0x0B, 0x5F, slot 3's hot key, the two hands; no 0x95: the
+    // player has no life), then game entry: 0x07 for the spawn room, the
+    // room switch (the town has one room: its 0x07 again, then the add
+    // messages of its units, the waypoint), 0x15, 0x7E; all before the
+    // first tick (`path-placement.md` §11 "Recipients").
+    let want = vec![
+        vec![0x01, 0x00, 0x04, 0x00, 0x10, 0x00, 0x01, 0x00],
+        vec![0x00],
+        vec![0x02],
+        assign,
+        states,
+        proximity,
+        handshake,
+        portal,
+        hotkey,
+        hand(1, 0),
+        hand(0, 36),
+        load,
+        reveal.clone(),
+        reveal,
+        object,
+        place,
+        vec![0x7E, 0, 0, 0, 0],
+    ];
     assert_eq!(
-        j.received[..6].to_vec(),
-        vec![assign, handshake, load, reveal.clone(), place, reveal],
+        j.received[..want.len()].to_vec(),
+        want,
         "join prefix of {:02x?}",
         j.received
     );
+    // The first tick populates the town room, so the client's room is
+    // ready: 0x04 once, the client in game (`tick.md` §6 rule 6).
+    let rest = &j.received[want.len()..];
+    assert_eq!(rest.iter().filter(|m| m[..] == [0x04]).count(), 1);
+    let at = j.received.iter().position(|m| m[..] == [0x04]).unwrap();
+    assert!(
+        at < j.first,
+        "0x04 at {at}, after the first flush's {}",
+        j.first
+    );
+    assert_eq!(j.state, client_state::IN_GAME);
     // No further room comes into sight while the player stands still.
-    assert!(!j.received[6..].iter().any(|m| m[0] == 0x07));
+    assert!(!rest.iter().any(|m| m[0] == 0x07 || m[0] == 0x08));
     // Determinism on the synthetic data.
     assert_eq!(join_run(), j);
 }

@@ -111,6 +111,8 @@ struct World {
     units: Vec<FakeUnit>,
     teleports: Vec<(usize, usize, i32, i32)>,
     added: Vec<(usize, usize, i32, i32)>,
+    /// Game entry's room switches (player, room).
+    switched: Vec<(usize, usize)>,
 }
 
 impl World {
@@ -342,10 +344,15 @@ impl CollisionView for World {
         u.pos = Point::new(x, y);
     }
     fn add_player_to_world(&mut self, unit: usize, room: usize, x: i32, y: i32) {
+        // Game entry runs the room switch before the placement (§11).
+        assert_eq!(self.switched.last().map(|&(u, _)| u), Some(unit));
         self.added.push((unit, room, x, y));
         let u = &mut self.units[unit];
         u.room = Some(room);
         u.pos = Point::new(x, y);
+    }
+    fn client_room_switch(&mut self, player: usize, room: usize) {
+        self.switched.push((player, room));
     }
 }
 
@@ -1138,7 +1145,7 @@ proptest! {
                     1 => prop_assert_eq!(got, Err(PlaceError::NoSpawnRoom)),
                     _ => prop_assert_eq!(got.unwrap(), "false"),
                 }
-                prop_assert!(w.teleports.is_empty() && w.added.is_empty() && host.log.is_empty());
+                prop_assert!(w.teleports.is_empty() && w.added.is_empty() && w.switched.is_empty() && host.log.is_empty());
             }
             Some((None, _)) => {
                 prop_assert_eq!(got, Err(PlaceError::SpawnNotFree));
@@ -1150,10 +1157,12 @@ proptest! {
                     1 => {
                         prop_assert_eq!(got.unwrap(), "true");
                         prop_assert_eq!(&w.added, &vec![(u, r, p.x, p.y)]);
+                        prop_assert_eq!(&w.switched, &vec![(u, r)]);
                         prop_assert!(w.teleports.is_empty());
                         prop_assert_eq!(&host.log, &vec![
                             Ev::Send(u, reveal_msg(r)),
                             Ev::Send(u, PlaceMessage::ReassignPlayer { unit: u, x: p.x as u16, y: p.y as u16, flag: 1 }),
+                            Ev::Send(u, PlaceMessage::GameEntryDone),
                         ]);
                     }
                     _ => {

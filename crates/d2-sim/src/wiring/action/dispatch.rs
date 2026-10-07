@@ -275,55 +275,35 @@ impl<X: Pending> TickHooks for ActionSim<X> {
     }
 
     /// Per-client update (`tick.md` §6.5): the player's room differs from
-    /// the client's. The room switch `0x00537B50` (`rooms.md` §4.1,
-    /// `levels.md` §9.1) runs on the DRLG and the client's room becomes
-    /// the player's. For each room the client joins (new adjacency order)
-    /// `0x0053A8E0` sends S→C 0x07 for it to the client's player
-    /// (`sim/path-placement.md` §11 "Recipients", [`Pending::send`]).
-    ///
-    /// TODO(spec: intents-events.md §7.2): `0x0053A8E0` then sends the add
-    /// messages (`0x00571F90`) of every unit in the room but the player;
-    /// part B of those messages is not specified, so none is sent. The
-    /// leave side (`0x0053A9B0`) sends nothing here: no spec names a
-    /// message for it (S→C 0x08's server sender is not specified).
+    /// the client's: the room switch `0x00537B50` to the player's room
+    /// ([`View::room_switch`], `intents-events.md` §7.8).
     ///
     /// TODO(tick.md §6.5): the level-change calls `0x00543B90`,
-    /// `0x00537340` are not specified; a change between acts (act change,
-    /// `waypoints.md` open question 1) is not handled: the client keeps
-    /// its room.
+    /// `0x00537340` are not specified.
     fn client_level_change(&mut self, game: &mut Game, client: ClientId) {
-        let Some(e) = game.lists.client(client) else {
-            return;
-        };
-        let (old, player) = (e.room, e.player);
-        let new = player
+        let new = game
+            .lists
+            .client(client)
+            .and_then(|e| e.player)
             .and_then(|p| game.lists.unit(p))
             .and_then(|u| u.room());
-        let act_of = |r: Option<RoomId>| r.and_then(|r| game.lists.room(r)).map(|r| r.act);
-        let (old_act, new_act) = (act_of(old), act_of(new));
-        let act = match (old_act, new_act) {
-            (Some(a), Some(b)) if a != b => return,
-            (Some(a), _) | (None, Some(a)) => a,
-            (None, None) => return,
-        };
-        let r = self
-            .sys
-            .hooks
-            .drlg
-            .client_changes_room(&mut game.lists, act, client, old, new);
-        match (r, player) {
-            (Ok(joined), Some(player)) => {
-                for (x, y, level) in joined {
-                    let msg =
-                        crate::wiring::path::place::map_reveal(x as u16, y as u16, level as u8);
-                    self.sys.hooks.x.send(player, &msg);
-                }
-            }
-            (Ok(_), None) => {}
-            (Err(e), _) => self.sys.hooks.errors.push(e),
-        }
-        if let Some(e) = game.lists.client_mut(client) {
-            e.room = new;
+        self.with(game, |g, v| v.room_switch(g, client, new));
+    }
+
+    /// Step 5 (`0x0061A460`, `tick.md` §6 rule 6): the client's room is
+    /// ready ([`View::client_room_ready`]).
+    fn client_room_ready(&mut self, game: &mut Game, client: ClientId) -> bool {
+        self.with(game, |g, v| v.client_room_ready(g, client))
+    }
+
+    /// Step 5: S→C 0x04 LoadComplete (`0x0053B320(client, 4)`, `tick.md`
+    /// §6 rule 6) to the client's player.
+    fn send_load_complete(&mut self, game: &mut Game, client: ClientId) {
+        if let Some(p) = game.lists.client(client).and_then(|e| e.player) {
+            self.sys
+                .hooks
+                .x
+                .send(p, &crate::units::messages::LOAD_COMPLETE);
         }
     }
 }
