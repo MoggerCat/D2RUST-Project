@@ -1,4 +1,4 @@
-// Spec: specs/sim/path-placement.md §9–§13; specs/world/waypoints.md §7 rule 5 (wiring of the placement seams)
+// Spec: specs/sim/path-placement.md §9–§13; specs/world/waypoints.md §7 rule 5; specs/world/hirelings.md §6 r3; specs/world/hirelings-2.md §16 r3 (wiring of the placement seams)
 //! The placement seams of `path::place` / `path::warp` on the unit
 //! system and the DRLG: [`CollisionView`], [`PlaceHost`] and
 //! [`LevelView`] on [`Shared`], three handles to one [`PathCtx`] (the
@@ -22,7 +22,7 @@ use crate::path::search::ExpField;
 use crate::path::warp::WarpOutcome;
 use crate::path::CollisionRooms;
 use crate::units::{RoomId, UnitId, UnitType};
-use crate::wiring::action::{DrlgWorld, Pending, WiringError};
+use crate::wiring::action::{DrlgWorld, HirelingCall, Pending, WiringError};
 
 use super::walk::PathCtx;
 
@@ -329,10 +329,21 @@ pub fn place_unit<X: Pending>(
 /// flag 1, S→C 0x7E, all to the player's client ([`Pending::send`]). `true` placed; a fatal
 /// assert (no spawn room, no free point, no act) is logged as
 /// [`WiringError::Place`] and gives `false`.
+///
+/// A placed player's join follow `0x005773D0` (`hirelings-2.md` §16
+/// rule 3, called at `0x005396C3`) is queued for the host that holds the
+/// hireling lists ([`super::super::action::ActionHooks::hireling_calls`];
+/// none → nothing).
 pub fn game_entry<X: Pending>(c: PathCtx<'_, X>, player: UnitId, act: u8) -> bool {
     with_shared(c, |cv, host, lv| {
         let r = crate::path::place::game_entry(cv, host, lv, player, act);
-        log(cv, r).unwrap_or(false)
+        let placed = log(cv, r).unwrap_or(false);
+        if placed {
+            if let Some(q) = cv.0.borrow_mut().v.h.hireling_calls.as_mut() {
+                q.push(HirelingCall::JoinFollow(player));
+            }
+        }
+        placed
     })
 }
 
@@ -355,6 +366,12 @@ pub fn level_warp<X: Pending>(
         .and_then(|r| c.game.lists.room(r))
         .map(|r| r.act);
     if own.is_some_and(|a| a != act) {
+        // The act change `0x0053ACC0`: its hireling part (`hirelings.md`
+        // §6 rules 3–4) is queued for the host that holds the hireling
+        // lists ([`super::super::action::ActionHooks::hireling_calls`]).
+        if let Some(q) = c.v.h.hireling_calls.as_mut() {
+            q.push(HirelingCall::ActChange(player));
+        }
         return None;
     }
     Some(with_shared(c, |cv, host, lv| {

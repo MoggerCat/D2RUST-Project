@@ -25,14 +25,14 @@
 | Rules | 64–65 |
 |   1. The list of a client unit | 66–101 |
 |   2. Items | 102–188 |
-|   3. States (S→C 0xA7, 0xA8, 0xA9) | 189–419 |
-|   4. Skills | 420–451 |
-| Constants & data dependencies | 452–462 |
-| Randomness | 463–467 |
-| Edge cases & original bugs | 468–475 |
-| Test vectors | 476–487 |
-| Provenance | 488–500 |
-| Open questions | 501–540 |
+|   3. States (S→C 0xA7, 0xA8, 0xA9) | 189–491 |
+|   4. Skills | 492–523 |
+| Constants & data dependencies | 524–534 |
+| Randomness | 535–539 |
+| Edge cases & original bugs | 540–547 |
+| Test vectors | 548–559 |
+| Provenance | 560–572 |
+| Open questions | 573–612 |
 <!-- /index -->
 
 ## Summary
@@ -205,7 +205,16 @@ by `total(unit, stat, layer)` and `base(unit, stat, layer)`.
    set (`0x006252D0`) and attached to the unit (`0x00626E10(unit, list,
    1)`). Then the stat is set on it (`0x00627150(list, stat, value,
    param)`, `sim/stat-lists.md` §5). Stat 172 (0xAC) also calls
-   `0x00463C00(value)`; a stat whose flags (+0x05) have bit
+   `0x00463C00(value)`: ECX = the unit, DL = the old value (the
+   existing state list's stat 172 at that param, `0x00625D00`; 4 when
+   the list was given or newly made), stack = the new value; compared
+   as bytes. A monster (type 1) with old ≠ new and a room
+   (`0x00620BB0`): new = 2 → the room's allied count (+0x28) += 1
+   (`0x00619EE0`); else old = 2 → allied count −= 1 (`0x00619F20`,
+   fatal 0x27C when already < 1); in both cases (and for a change
+   between two non-2 values) path reset `0x00649CA0(U)`. No other model
+   field (`sim/unit-order.md` §5 r2 for the count; 2026-10-08, read of
+   `0x004D9DF9`–`0x004D9E0A` and `0x00463C00`). A stat whose flags (+0x05) have bit
    `[0x006CE26C]` (= 2, `updateanimrate`) also runs `0x00623F50(unit)`.
 3. **State on** `0x004D9B20(unit, state)` (also 0xA7): a state with the
    flag `[0x006CE284]` (+0x14 & 0x80 = `notondead`) on a dead unit
@@ -233,7 +242,11 @@ by `total(unit, stat, layer)` and `base(unit, stat, layer)`.
    events) carried by one `StateFx` output per call of rules 6.1–6.3
    (`client/bridge.md` §10 table; captured: unit key, state, the phase,
    whether the bit was set before, the unit's dead test); the effect
-   layer runs the named 1.14d calls for it.
+   layer runs the named 1.14d calls for it. Confirmed 2026-10-08
+   (impl-pc1-s5): table bounds setfunc < 31 (`0x004D9ED3`) and remfunc
+   < 30 (`0x004D9F79`), setfunc 11 / 12 and remfunc 8 bodies (each tests
+   U ≠ none first) as below; nothing here is open, so the `StateFx`
+   emission and the bold writes are owed by code.
    1. On (`0x004D9B20`, after rule 3's notondead exit and list empty):
       bit already clear and onsound ≥ 0 → sound (`0x004B9A00`); **bit
       := 1**; colorshift ≠ 0 → `0x004D97F0` (color); `0x004D9920`
@@ -305,8 +318,7 @@ by `total(unit, stat, layer)` and `base(unit, stat, layer)`.
         state 98 list, +0xC8 |= 0x400).
       - 5 `0x004D89B0`: U a monster (type 1) with L: c := stat(355);
         m := U +0x10 (mode, read first); **`0x004AEDD0(U, c)`** (client
-        monster re-init as class c: +4 := c, stats, flags; body
-        Pending); **mode set `0x00480E70(U, 8 if m = 8 else 1)`**
+        monster re-init as class c, rule 6.9); **mode set `0x00480E70(U, 8 if m = 8 else 1)`**
         (`client/model.md` §17 r1.7); c = 543 → **facing
         `0x00649EF0(path +0x2C, x, y + 10, 1)`** (x, y = `0x0045ADF0` /
         `0x0045AE20`).
@@ -348,7 +360,12 @@ by `total(unit, stat, layer)` and `base(unit, stat, layer)`.
         U, record, 0)`** (`client/model.md` §8); **direction
         `0x00648820(path, 0)`** (`sim/pathing.md`).
       - 15 `0x004D9450`: **mode set `0x00480E70(U, 1)`; U +0xC4 |=
-        0x80000000** (reader not traced: Pending); **path reset
+        0x80000000** (PROVISIONAL: no client reader, the bit is model
+        state only (because the generic flag test `0x00451F30` is called
+        with mask 0x80000000 only from server code, `0x005543B0`,
+        `0x0057C060`, and no immediate-operand test of that mask on
+        +0xC4 lies in client code; register-form tests were not
+        scanned); settled by REC-50); **path reset
         `0x00649CA0(U)`**.
       - 16 `0x004D9480` (progressive overlays): L, k = stat(350) valid,
         m := `0x00646CA0(U, calc2 +0x13C, k, stat(351))` > 0; c :=
@@ -361,8 +378,8 @@ by `total(unit, stat, layer)` and `base(unit, stat, layer)`.
       - 17 `0x004D96B0`: R `missile` (+0x3A) in [0, missile count) →
         `0x004CD540` record: +4, +8 := U, +0x10 := missile, +0x2C := R
         skill (negative → 0), +0x30 := 1.
-      - 18 `0x004D9740`: `0x004AF890(U, 5, 0)` (client monster effect;
-        body Pending), then setfunc 17's body.
+      - 18 `0x004D9740`: `0x004AF890(U, 5, 0)` (blood spray, rule 6.10),
+        then setfunc 17's body.
       - 19 `0x004D97E0` (= remfunc 12): **skill-use lock
         `[0x007A04FC]` := 0** (`0x0044CE40(0)`; rule 6.8).
    6. **Remfunc bodies** (same conventions):
@@ -408,7 +425,7 @@ by `total(unit, stat, layer)` and `base(unit, stat, layer)`.
       function at `0x004C68DA` and cleared by setfunc 19 / remfunc 12.
       `0x00647960`: E's record none or `InGame` clear → 3; **7: E's
       level with bonuses `0x006442A0(U, E, 1)` = 0**; `aura` → 6;
-      `passive` → 5; **2: `0x00647640` fails (body Pending), or the
+      `passive` → 5; **2: `0x00647640(E, U)` fails (rule 6.11), or the
       weapon-type test `0x00643F80(U)` (`itypea1` +0x18 / `etypea1`
       +0x24 against the items at body locations 4 and 5) fails, or the
       charge test `0x00647840` fails (E from an item, owner GUID +0x34 ≠
@@ -416,6 +433,61 @@ by `total(unit, stat, layer)` and `base(unit, stat, layer)`.
       E, 0)` & 0x3F) + skill·64 has low byte 0, no charges)**, the
       last after the 1 / 4 tests; else 1, 4 or 8 from `0x00647540`, `0x00644060`,
       `0x006440F0`, `0x006478F0` (not traced).
+   9. **Client monster re-init** `0x004AEDD0(U, c)` (2026-10-08, one
+      read; setfunc 5): c outside the monstats rows, or no monstats2 row
+      → nothing. Then in order: graphics freed (`0x0046EC10`),
+      `0x00466CB0(U, 0)`, inventory freed (`0x0063AC40(U +0x60)`, +0x60
+      := 0), `0x00464930(U)`, `0x00643A00(U, 0)` ≠ 0 → `0x004743D0` on
+      it; a monster with monster data whose name (+0x2C) is set: freed,
+      := 0. U +0x6C := 0, **U +4 := c**. No path (+0x2C) → stop. Path
+      speed `0x00648690(path, Velocity << 8)`; `0x00649FF0(U, 0)`;
+      monstats `interact` and no inventory → inventory :=
+      `0x0063ABD0(0, U)`. Stats cleared (`0x00626D40(U, 0, 0, 0)`), base
+      stats (`0x00627260`): 68, 67, 69 := 100; d := difficulty
+      (`0x0044DCD0` & 0xFF): 36, 37, 39, 41, 43, 45 := monstats
+      `ResDm`, `ResMa`, `ResFi`, `ResLi`, `ResCo`, `ResPo` column d;
+      7, 6 := 0x8000. Mode set `0x00624690(U, 1)`; **U +0x44 := roll on
+      U's seed (+0x20) with range U +0x48** (`0x0045C3E0`, one draw).
+      Flags from monstats2: +0xC4 bit 2 := `isSel`, +0xC8 &= ~0x40000,
+      bit 0x20 := not `shadow`, |= 8, bit 4 := `isAtt`. Then
+      `0x004AE0A0(U, 0)`, `0x004AE4F0(U, c)`, `0x004AE210(U)`,
+      `0x004AD020(U)` (as at creation, `client/msg-units.md` §1.2 r7),
+      U +0xA8 := `0x006438B0(0)`; skills i = 0…7: `Skill`i ≥ 0 → add
+      (`0x00647280(U, skill, Sk`i`lvl` (signed byte), 0)`). Monstats
+      `npc` clear → **one draw on U's seed, direction
+      `0x006488A0(path, low32 & 0xFFFFFF3F)`**. Graphics
+      `0x004DC510(U)`. Palette level t := `TransLvl` + 2 when
+      `TransLvl` < 8, else 2; class 156, 211, 242, 243 → by difficulty
+      0 / 1 / 2: t := 2 / 3 / 4; class 333 → t := 5; class 527 →
+      overlay `0x00470390(U, 0xE3, 5, 0, 0, 0, 0, 0)`; then t ≥ 8 → 2
+      (not for 333 and the difficulty cases, which skip the test);
+      `0x00463E20(U, t)`, `0x00463E80(U, t)`.
+   10. **Blood spray** `0x004AF890(U, n, roll)` (setfunc 18 passes (5,
+      0)): roll ≠ 0 → one draw on U's seed, low32 % 25 ≠ 0 → stop. U a
+      monster in mode 3 → one draw, low32 % 3 ≠ 0 → stop. n := U's
+      stat 140 (`item_extrablood`) when ≠ 0. U's monstats2 `bleed`
+      (+0x11D) = b; b = 0 or n ≤ 0 → nothing. Else n times: U has a
+      path with `0x006486C0` ≠ 0 → one draw r, d := ((U direction
+      `0x00620100` & 0xFF) >> 3) + r % 7 − 3; else one draw, d := r;
+      d &= 7. From d, try up to 7 directions d, d + 1, … (mod 8): the
+      cell (x + dx[d], y + dy[d]) (tables `0x006DA610` / `0x006DA5F0`;
+      x, y as §6 conventions) with `0x0064CB30(room, x', y', 1)` = 0 is
+      taken; all 7 blocked → the whole call stops. Then one draw r2,
+      missile m := 18 + r2 % (2b) (a power of two → `& (2b − 1)`, same
+      value) created at the cell by `0x004CDBA0(U, m, x', y', 0, 1)`
+      (`monsters/umod-callbacks.md` §28 r4 "missile").
+   11. **Skill item test** `0x00647640(E, U)`: U's inventory (+0x60)
+      none → 0 (also for the cases below). E's record `scroll` flag
+      (bit 36) → E +0x30 > 0. Else by the record's skill id (+0x00):
+      the weapon pick `0x0063C9B0(inventory, &I, &loc, &inuse)`
+      (`skills/bodies-3.md` §3.3 step 2), J := the item at the other
+      location (`0x00643D60(loc)`), "throw-ok(X)" := X throwable type
+      (`0x0062BA80`) or X's stat 125 (`0x00625500`). Skill 2 (Throw):
+      U not dual-wielding (`0x006235A0` = 0) → pick ok, inuse ≠ 0 and
+      throw-ok(I); dual → pick ok, throw-ok(inuse = 0 ? J : I). Skill 4
+      (Left Hand Throw): pick ok, throw-ok(inuse = 0 ? I : J). Skill 5
+      (Left Hand Swing): needs dual-wield; pick ok and (inuse = 0 ? I :
+      J) is of type 45 `weap` (`0x00629BB0`). Other skills → 1.
 
 ### 4. Skills
 

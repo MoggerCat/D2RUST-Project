@@ -30,10 +30,8 @@ use crate::units::{RoomId, UnitId, UnitType};
 
 /// Item timer event 3: replenish (`units.md` §6, `generation.md` §9 step 6).
 const EVENT_REPLENISH: u32 = 3;
-/// Flags of a set list (`items/bitstream.md` §4.6 rule 1: 0x2040, else
-/// 0x40).
-// TODO(spec: bitstream.md §4.6 rule 1, vendors.md OQ8): the stream does
-// not say which of the two flags a set list had; read back as 0x2040.
+/// Flags of a set list read back (`items/bitstream.md` §4.6 rule 6:
+/// 0x2040).
 const SET_FLAGS: u32 = 0x2040;
 /// Flags of the runeword list (§4.6 rule 3: state 171, flag 0x40).
 const RUNEWORD_FLAGS: u32 = 0x40;
@@ -94,13 +92,14 @@ impl<H: LifecycleHooks> Economy<'_, H> {
             .get_mut(unit)
             .ok_or(EconomyError::NoRecord(unit))?;
         // `rng.md` §5.3 "item seed from a save": the full record's 32 bits
-        // (`0x0062CBE0`); the compact reader `0x0062A970` sets 0.
-        // TODO(spec: sim/rng.md §5.3): whether the decoder writes the
-        // whole seed (`init_low`, high word 666) or the low word only; read
-        // as `init_low`. The start seed stays the allocation's.
+        // v (`0x0062CBE0`); the compact reader `0x0062A970` sets 0
+        // (`vendors-2.md` §7.3.1 rule 5). Unit init seed +0x28 := v and the
+        // unit seed +0x20 / +0x24 := `init_low(v)` = {v, 666}
+        // (`0x00650E40`, `rng.md` §5.1). The item data seed +0x04 and the
+        // start seed +0x10 keep the allocation's game-seed step.
         let v = if it.compact || it.alt { 0 } else { it.unit28 };
-        let start = r.item_seed.map_or(0, |(_, st)| st);
-        r.item_seed = Some((Seed::init_low(v), start));
+        r.init_seed = v;
+        r.seed = Seed::init_low(v);
         let frame = self.game.frame as u32;
         let event3_at = {
             let ctx = RefCell::new(StatCtx::new(self.stats, self.hooks));

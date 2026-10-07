@@ -7,9 +7,9 @@
 //! the running screen shake and the player seed it draws from (§8), the
 //! BlankScreen flag of the player's level (`composition.md` §3 step 2),
 //! and (as a [`ViewSource`]) unit positions, unit offsets and the map tiles.
-//! Each is a `TODO(spec: …)` hook of its owner; [`NoFeed`] is the
-//! placeholder: no local player, no map, no shake, and an error for
-//! anything that would need a rule. A feed that states the near rooms
+//! Each hook names its owner spec; [`NoFeed`] is the placeholder: no local
+//! player, no map, no shake, open mode 0 (no original UI), and an error
+//! for anything that needs a model input it lacks. A feed that states the near rooms
 //! (`draw-order.md` §9) has its frame ordered by `rules::draw_order`:
 //! map tiles and unit draw keys then come from the order.
 //!
@@ -56,12 +56,15 @@ pub struct RunningShake {
 /// [`ViewSource`] answers. One per app (it keeps the client's copy of
 /// the player seed between frames).
 pub trait ViewFeed: ViewSource {
-    /// TODO(spec: the S→C owner spec of the local player's position)
-    /// (camera §3, `[0x007A6A70]`): the local player's position as the
-    /// client keeps it; `None` = the model states no local player.
+    /// The local player's position as the client keeps it (camera §2, §3,
+    /// `[0x007A6A70]`; `client/model.md` §3 r3 places it); `None` = the
+    /// model states no local player.
     fn player(&self, world: &ClientWorld) -> Result<Option<UnitPosition>, ViewError>;
 
-    /// TODO(spec: ui/panels.md) (camera §1): the screen open mode.
+    /// The screen open mode (camera §1). It is UI state only
+    /// (`ui/panels-2.md` §22 r5, `ui/panels.md` §4.2): no message or model
+    /// field carries it. A feed without the original UI answers 0 (no
+    /// panel open); with it, what the UI set ([`Self::set_ui_open_mode`]).
     fn open_mode(&self, world: &ClientWorld) -> Result<OpenMode, ViewError>;
 
     /// The screen open mode the UI set for this frame (`ui/panels.md`
@@ -70,18 +73,21 @@ pub trait ViewFeed: ViewSource {
     /// default ignores it: the feed answers [`Self::open_mode`] itself.
     fn set_ui_open_mode(&mut self, _mode: OpenMode) {}
 
-    /// TODO(spec: the effect specs that call `0x00476A80`) (camera §8):
-    /// the shake running at this frame, if any.
+    /// The shake running at this frame, if any (camera §8, started by
+    /// `0x00476A80`). The starts d2rs knows are [`event_shake`]'s.
     fn shake(&self, world: &ClientWorld) -> Result<Option<RunningShake>, ViewError>;
 
-    /// TODO(spec: render/camera.md open question 6): the client's copy of
-    /// the local player unit's seed (`unit +0x20`), advanced by the two
-    /// draws of each shaking frame.
+    /// The client's copy of the local player unit's seed (`unit +0x20`,
+    /// `ClientUnit::seed`), advanced by the two draws of each shaking
+    /// frame (camera §8). Its initial value is `sim/rng.md` §5.3 and
+    /// `client/model.md` Randomness r2 ({0x6AC6935F, 0} at a single-player
+    /// join; camera open question 6 answered); the other draws on the same
+    /// seed (cursor, weather) are `client/model.md` open question 6.
     fn player_seed(&mut self, world: &ClientWorld) -> Result<&mut Seed, ViewError>;
 
-    /// TODO(spec: the DRLG → client owner spec; `drlg/rooms.md` §3, §6,
-    /// §9) (`draw-order.md` §9): the near-room array of the local player's
-    /// active room with its tile records and unit lists; the draw order
+    /// The near-room array of the local player's active room with its tile
+    /// records and unit lists (`draw-order.md` §9; built from the client
+    /// DRLG, `drlg/rooms.md` §9.3, §9.6, `client/model.md` §12); the draw order
     /// writes the frame's flag and fade changes back. `None` (the default)
     /// = the model states no map, and `map_tiles` answers alone.
     fn near_rooms(&mut self, _world: &ClientWorld) -> Result<Option<&mut NearRooms>, ViewError> {
@@ -124,18 +130,25 @@ pub trait ViewFeed: ViewSource {
         Ok(None)
     }
 
-    /// TODO(spec: render/blend-modes.md, render/lighting.md)
-    /// (`draw-order.md` §8): the fade clock of the frame.
+    /// The fade clock of the frame (`draw-order.md` §8 clock arithmetic):
+    /// `now` is a host `GetTickCount`-style millisecond count read once per
+    /// frame ([`host_tick_count`]), and `instant` is set: d2rs draws as the
+    /// GDI reference (render kind 1 ≤ 3, `composition.md` §1), where every
+    /// ramp completes at its first walk, so `now` only reaches the
+    /// unreachable bit-2 branch (`draw-order.md` open question 16).
     fn fade_clock(&self, _world: &ClientWorld) -> Result<FadeClock, ViewError> {
-        Err(ViewError::unresolved(
-            "wall fade clock",
-            "render/blend-modes.md",
-        ))
+        Ok(FadeClock {
+            now: host_tick_count(),
+            instant: true,
+        })
     }
 
-    /// TODO(spec: render/draw-order.md open question 12, render/shading.md,
-    /// render/lighting.md, render/blend-modes.md): the DT1 frame, blocks,
-    /// shading and blend of an ordered tile.
+    /// The DT1 frame, blocks, shading and blend of an ordered tile: the
+    /// record's DT1 entry (`drlg/rooms.md` §9.3 Entry identity, answering
+    /// `draw-order.md` open question 12), its block light and shade
+    /// (`render/lighting.md` §11 r2–r4, `render/shading.md` §4) and blend
+    /// (`render/blend-modes.md` §6). The default refuses: the art needs the
+    /// frame's light, which a feed must state ([`Self::light`]).
     fn tile_art(&self, _tile: &OrderedTile, _assets: &ViewAssets) -> Result<TileArt, ViewError> {
         Err(ViewError::unresolved(
             "tile art",
@@ -143,15 +156,16 @@ pub trait ViewFeed: ViewSource {
         ))
     }
 
-    /// TODO(spec: the S→C owner spec of the player's current level)
-    /// (`composition.md` §3 step 2): BlankScreen of the player's current
-    /// level, i.e. [`blank_screen`] of its `Levels.txt` row; it decides
+    /// BlankScreen of the player's current level (`composition.md` §3 step
+    /// 2; the level of the local player's room, `client/model.md` §11), i.e.
+    /// [`blank_screen`] of its `Levels.txt` row; it decides
     /// the frame's start-of-frame clear ([`crate::scene::FrameCycle::plan`]).
     fn blank_screen(&self, world: &ClientWorld) -> Result<bool, ViewError>;
 
-    /// TODO(spec: client/model.md light records, `render/lighting.md` §8):
-    /// the frame's light (`lighting.md` §1 r3: the light map rebuilt per
-    /// drawn frame, the act's shade tables) and the per-unit look inputs.
+    /// The frame's light (`render/lighting.md` §1 r3: the light map rebuilt
+    /// per drawn frame from the light records of §6, §8 and the
+    /// `client/model.md` record list; the act's shade tables) and the
+    /// per-unit look inputs.
     /// `Some` makes [`build_frame`] answer unit `shade` / `blend` through
     /// [`LitRules`]; `None` (the default) leaves them to the rules.
     fn light(&self, _world: &ClientWorld) -> Result<Option<FeedLight<'_>>, ViewError> {
@@ -173,6 +187,48 @@ pub fn blank_screen(level: &Levels) -> bool {
     level.blankscreen != 0
 }
 
+/// The S→C 0x5A event code that starts a screen shake (`client/msg-ui.md`
+/// §19 r3).
+pub const SHAKE_EVENT_CODE: u8 = 0x12;
+
+/// The screen shake an S→C 0x5A event of `code` starts at server tick
+/// `start_tick` (camera §8 first row, §9): code 0x12 calls
+/// `0x00476A80(6, 4000, 10000, 4000)` (`client/msg-ui.md` §19 r3); every
+/// other code starts none.
+pub fn event_shake(code: u8, start_tick: u64) -> Option<RunningShake> {
+    if code != SHAKE_EVENT_CODE {
+        return None;
+    }
+    Shake::start(6, 4000, 10000, 4000).map(|shake| RunningShake { shake, start_tick })
+}
+
+/// Client missile 372 `diablo appears` (function 37, `0x004D6540`) at
+/// frames left 150 calls `0x00476A80(25, 0, 4000, 0)` (camera §8 fifth
+/// row).
+// PROVISIONAL (render/camera.md §8): of the ten call sites only this one
+// and `event_shake` start a shake; the other rows start none; settled by
+// REC-62 (HIGH-PRIORITY CAPTURE: each shaking frame draws twice from the
+// client player seed). The client missile layer that reaches it is
+// Phase 6 effects.
+pub fn diablo_appears_shake(frames_left: u32, start_tick: u64) -> Option<RunningShake> {
+    if frames_left != 150 {
+        return None;
+    }
+    Shake::start(25, 0, 4000, 0).map(|shake| RunningShake { shake, start_tick })
+}
+
+/// A `GetTickCount`-style host clock (`draw-order.md` §8): milliseconds
+/// since the first call, as a wrapping `u32`. Client-only host input
+/// (wall clock), never read by game logic.
+pub fn host_tick_count() -> u32 {
+    use std::sync::OnceLock;
+    use std::time::Instant;
+    static START: OnceLock<Instant> = OnceLock::new();
+    let ms = START.get_or_init(Instant::now).elapsed().as_millis();
+    // Wraps mod 2^32 like `GetTickCount`.
+    (ms & u128::from(u32::MAX)) as u32
+}
+
 /// The placeholder feed: the client world states no local player, no map
 /// and no shake (the model holds none of them: `bridge.md` §5), and every
 /// question that would need a rule is an error.
@@ -180,12 +236,20 @@ pub fn blank_screen(level: &Levels) -> bool {
 pub struct NoFeed;
 
 impl ViewSource for NoFeed {
+    /// The placeholder states no positions (`ModelFeed` answers them from
+    /// the model, camera §2, `client/model.md` §3).
     fn unit_position(&self, _: &ClientUnit) -> Result<UnitPosition, String> {
-        Err("TODO(spec: the S→C owner spec of unit positions): no rule yet".into())
+        Err("the placeholder feed states no unit positions (render/camera.md §2)".into())
     }
 
+    /// The extra offsets (`render/unit-composite.md` §8) need the unit's
+    /// client motion record and table offsets, which the placeholder lacks.
     fn unit_offset(&self, _: &ClientUnit, _: &UnitPose) -> Result<(i32, i32), String> {
-        Err("TODO(spec: render/unit-composite.md): no rule yet".into())
+        Err(
+            "the placeholder feed states no motion records for the extra offsets \
+             (render/unit-composite.md §8)"
+                .into(),
+        )
     }
 
     fn map_tiles(&self, _: &ClientWorld, _: &ViewAssets) -> Result<Vec<MapTile>, ViewError> {
@@ -198,8 +262,9 @@ impl ViewFeed for NoFeed {
         Ok(None)
     }
 
+    /// No original UI: open mode 0 (`ui/panels-2.md` §22 r5).
     fn open_mode(&self, _: &ClientWorld) -> Result<OpenMode, ViewError> {
-        Err(ViewError::unresolved("screen open mode", "ui/panels.md"))
+        Ok(OpenMode::NONE)
     }
 
     fn shake(&self, _: &ClientWorld) -> Result<Option<RunningShake>, ViewError> {

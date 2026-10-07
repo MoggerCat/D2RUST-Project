@@ -37,6 +37,8 @@ fn every_game_view_builds_from_the_synthetic_install() {
     t.hire_rows().unwrap();
     assert_eq!(t.item_tables().unwrap().items.len(), 6);
     assert_eq!(t.vendor_tables().unwrap().items.len(), 6);
+    let p = t.class_picks().unwrap();
+    assert_eq!((p.rows.len(), p.weapons, p.armor), (6, 2, 2));
 }
 
 // Covers: specs/items/treasure.md §1
@@ -158,4 +160,28 @@ fn every_loader_builds_from_the_users_install() {
     );
     let s = SaveData::from_fixed(&t.fixed, true).unwrap();
     assert_eq!(s.stats.len(), t.table("itemstatcost").unwrap().count);
+}
+
+// Covers: specs/world/object-population.md §5; specs/world/objects.md §12 r7; specs/world/objects-2.md §20.2
+#[test]
+#[ignore = "needs the game files (D2_GAME_DIR)"]
+fn object_tables_load_objgroup_leveldefs_and_the_pick_columns() {
+    let t = live();
+    let o = t.object_tables().unwrap();
+    // `objgroup.bin` (d2exp): one record per objgroup.txt row, the
+    // `EXPANSION` separator (record 97) included (`d2-data` game_data).
+    assert_eq!(o.objgroup.len(), 133);
+    let g = &o.objgroup[97];
+    assert_eq!([g.id0, g.id1, g.id2, u32::from(g.prob0)], [0; 4]);
+    // `leveldefs.bin` is built from levels.txt: one record per levels row.
+    assert_eq!(o.leveldefs.len(), o.levels.len());
+    assert!(o.objects.len() > 500, "objects rows: {}", o.objects.len());
+    // The drop helpers' picks: "200 of the 306 weapon rows have bit 1"
+    // (`objects-2.md` §20.2).
+    let p = t.class_picks().unwrap();
+    assert_eq!(p.weapons, 306);
+    let w = p.part(d2_sim::treasure::class_pick::Part::Weapons);
+    let keep = p.rows[w].iter().filter(|r| r.bitfield1 & 2 != 0).count();
+    assert_eq!(keep, 200);
+    assert_eq!(p.rows.len(), t.item_tables().unwrap().items.len());
 }

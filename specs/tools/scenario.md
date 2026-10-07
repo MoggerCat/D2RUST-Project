@@ -28,11 +28,11 @@
 |   3. Typed messages and references | 176–231 |
 |   4. Run model | 232–290 |
 |   5. Comparison | 291–321 |
-|   6. Masks | 322–346 |
-| Edge cases & original bugs | 347–358 |
-| Test vectors | 359–374 |
-| Provenance | 375–384 |
-| Open questions | 385–407 |
+|   6. Masks | 322–356 |
+| Edge cases & original bugs | 357–368 |
+| Test vectors | 369–384 |
+| Provenance | 385–394 |
+| Open questions | 395–417 |
 <!-- /index -->
 
 ## Summary
@@ -322,15 +322,22 @@ so in its trace header's `gaps` (FORMAT.md) instead of approximating.
 ### 6. Masks
 
 1. `specs/tools/scenario-masks.tsv` lists the S→C bytes the original does not
-   write or fills from the clock: `id`, `offset`, `length` (`*` = to the
-   end of the message), `source` (the spec that states it). Masks apply
-   to `s2c` records of that id on both sides; the message length is
-   still compared.
+   write or fills from the clock: `id`, `key` (`-`, or `u8@<off>=<v>` /
+   `u16@<off>=<v>`, little-endian, v hex: the row applies only when the
+   original's message has that value there), `offset` (decimal, or
+   `nul@<n>` = the byte after the first 0 byte at or after n; no 0 → nothing
+   masked), `length` (decimal, `*` = to the end of the message, or `..<n>`
+   = through byte n), `source` (the spec that states it). Columns per
+   `sim/intents-events.md` §6 rule 6 (keyed masks). Masks apply to `s2c`
+   records of that id on both sides; keys and NUL positions are read from
+   the original's record; key bytes and the message length are still
+   compared.
 2. Nothing else is masked (`sim/intents-events.md` §6 rule 3). A new
    mask needs a spec that states the bytes are unwritten or
    clock-derived.
-3. The table is read with strict errors: four columns, a hex id that is
-   an S→C id (≤ 0xB4), a decimal offset, a decimal length or `*`.
+3. The table is read with strict errors: five columns, a hex id that is
+   an S→C id (≤ 0xB4), a key as in rule 1, a decimal offset or `nul@<n>`,
+   a non-zero decimal length, `*` or `..<n>`, a non-empty source.
 
 <!-- rows -->
 | id | bytes | why |
@@ -338,8 +345,11 @@ so in its trace header's `gaps` (FORMAT.md) instead of approximating.
 | 0x21 | 11 | not written by the builder (`tools/original-hooks.md` §6.2) |
 | 0x22 | 2, 10 | not written by the builder (`tools/original-hooks.md` §6.2) |
 | 0x2A | 3–6 | not written by the builder (`world/npc.md` §9, edge case 1) |
-| 0x50 | 13–14 | uninitialized stack in the sender (`world/quests.md` open question 5) |
-| 0x58 | 6 | not written (`world/npc.md` §8.1, edge case 10) |
+| 0x26 | 8–9 (form 5), 9 (form 6) | keyed by u8@1 (`sim/intents-events.md` §6 rule 6) |
+| 0x27 | 7, 9, 12–39 when count u8@6 = 1 | one-entry senders (`sim/intents-events.md` §6 rule 6) |
+| 0x50 | keyed by u16@1: 4 → 13–14; 2, 0x24, 13 → 5–14; 0x17 → 3–14 | `sim/intents-events.md` §6 rule 6 |
+| 0x58 | 6 for codes 0, 1, 4, 6, 7 (not 5) | `effect` written only on the result-5 path (`sim/intents-events.md` §6 rules 3, 6) |
+| 0x82 | name bytes after its NUL, through 20 | `sim/intents-events.md` §6 rule 6 |
 | 0x62 | 6 | not written by the builder (`tools/original-hooks.md` §6.2) |
 | 0x7E | 1–4 | only the id is written (`tools/original-hooks.md` §6.2) |
 | 0x8F | 1–end | Pong: clock values, a transport row (`sim/intents-events.md` §6 rule 3) |

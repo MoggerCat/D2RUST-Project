@@ -14,6 +14,7 @@
 //! it carries a `TODO(spec: <owner spec>)` hook with the narrowest neutral
 //! behavior.
 
+pub mod automap;
 pub mod draw;
 pub mod edge;
 pub mod frame;

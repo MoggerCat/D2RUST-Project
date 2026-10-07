@@ -9,6 +9,7 @@
 
 use std::cell::RefCell;
 
+use super::objects::{ObjFx, ObjSound};
 use super::world::{RosterRecord, UnitKey};
 
 /// One output: a 1.14d UI, sound or client-effect entry point with the
@@ -74,9 +75,11 @@ pub enum Output {
         unit: UnitKey,
         present: bool,
         class: u32,
-        /// Monster data +0x3C (`0x004AE130`); `None`: not in the model.
-        /// TODO(spec: client/msg-ui.md §9 r2): no model rule writes
-        /// monster data +0x3C, so its value cannot be captured.
+        /// Monster data +0x3C (`0x004AE130`); `None`: no monster U.
+        /// PROVISIONAL (client/msg-ui.md §9 r2): no model rule writes
+        /// monster data +0x3C, so it keeps −1 (the act5pow sound 4607
+        /// path); settled by a Ghidra xref of +0x3C writes in monster
+        /// data.
         mdata_3c: Option<i32>,
         /// S holds an object of class 318 in mode 2.
         blocker_open: bool,
@@ -211,6 +214,14 @@ pub enum Output {
         hook: u8,
         values: [i32; 2],
     },
+    /// The client object update's audio calls (`world/objects-client.md`
+    /// §28 r3; mode sound calls, requests, the player event sound), in
+    /// update order.
+    ObjectSound(ObjSound),
+    /// The client object update's effect calls (`world/objects-client.md`
+    /// §28 r3; graphics refresh and loads, overlays, lights, the client
+    /// skill start), in update order.
+    ObjectFx(ObjFx),
 }
 
 /// The phase of a `StateFx` (`client/stat-lists.md` §3 r6.1–r6.3).
@@ -240,6 +251,17 @@ pub enum ShrineFxKind {
     OnUse,
 }
 
+/// The NPC classes `0x004B1A10(class)` holds (`ui/panels-2.md` §14 r8).
+pub const CLASSES_4B1A10: [u32; 13] = [
+    146, 251, 266, 331, 377, 378, 406, 408, 521, 527, 537, 538, 539,
+];
+
+/// `0x004B1A10(class)` (`ui/panels-2.md` §14 r8): 1 when `class` is one
+/// of [`CLASSES_4B1A10`], else 0.
+pub fn f4b1a10(class: u32) -> u32 {
+    u32::from(CLASSES_4B1A10.contains(&class))
+}
+
 /// The payload of `NpcDialog` (`client/msg-ui.md` §16 r4).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NpcDialog {
@@ -250,9 +272,8 @@ pub struct NpcDialog {
     pub class: u32,
     /// The monstats `interact` flag of the class (bit 9).
     pub interact: bool,
-    /// `0x004B1A10(class)`; `None`: not captured. TODO(spec:
-    /// client/msg-ui.md open question 10): the function's result is not
-    /// specified.
+    /// `0x004B1A10(class)`: 1 for a class of [`CLASSES_4B1A10`]
+    /// (`ui/panels-2.md` §14 r8), else 0; `None`: not captured.
     pub f4b1a10: Option<u32>,
     /// The local player has a cursor item.
     pub cursor_item: bool,
@@ -309,7 +330,7 @@ use Consumer::{Audio, Effects, Ui};
 
 /// The variants in code, in the §10 table's order (checked against the
 /// table, §10 rule 8).
-pub const ROWS: [Row; 40] = [
+pub const ROWS: [Row; 42] = [
     row("ServerSound", 0x2C, Audio),
     row("QuestUi", 0x5D, Ui),
     row("WaypointMenu", 0x63, Ui),
@@ -350,6 +371,8 @@ pub const ROWS: [Row; 40] = [
     row("JoinRefused", 0xB4, Ui),
     update_row("TownExit", Ui),
     row("StateFx", 0xA8, Effects),
+    update_row("ObjectSound", Audio),
+    update_row("ObjectFx", Effects),
 ];
 
 impl Output {
@@ -396,6 +419,8 @@ impl Output {
             Output::JoinRefused { .. } => 37,
             Output::TownExit { .. } => 38,
             Output::StateFx { .. } => 39,
+            Output::ObjectSound(_) => 40,
+            Output::ObjectFx(_) => 41,
         };
         &ROWS[i]
     }

@@ -8,7 +8,8 @@ use super::deferred::{
     mark, owner_refresh, send_item_page, send_item_world, send_to_belt, NO_FILLERS,
 };
 use super::ground::{
-    drop_cursor_item, gold_limit, gold_piles, ground_place, pickup_auto, pickup_to_cursor,
+    corpse_pickup_rest, drop_cursor_item, gold_limit, gold_piles, ground_place, pickup_auto,
+    pickup_to_cursor,
 };
 use super::layouts;
 use super::seams::MoveWorld;
@@ -141,7 +142,7 @@ pub fn pick_item<W: MoveWorld>(
         return Ok(res::REFUSED);
     }
     match unit_type {
-        0 => Ok(pick_player(w, p, guid, cursor)),
+        0 => pick_player(w, p, guid, cursor),
         1 => Ok(w.pick_npc(p, guid, cursor)),
         2 => Ok(w.pick_object(p, guid, cursor)),
         3 => Ok(res::RANGE),
@@ -167,22 +168,30 @@ pub fn pick_item<W: MoveWorld>(
 }
 
 /// 0x16 type 0 (§7.1 step 2): another player P.
-fn pick_player<W: MoveWorld>(w: &mut W, p: Owner, guid: Guid, cursor: u32) -> u32 {
+fn pick_player<W: MoveWorld>(
+    w: &mut W,
+    p: Owner,
+    guid: Guid,
+    cursor: u32,
+) -> Result<u32, MoveFatal> {
     let o = Owner::player(guid);
     if !w.unit_exists(o) || w.distance(p, o) > PICK_RANGE {
-        return res::RANGE;
+        return Ok(res::RANGE);
     }
     if w.distance(p, o) > PLAYER_WALK_RANGE {
         w.walk_to_unit(p, o, cursor != 0);
-        return res::OK;
+        return Ok(res::OK);
     }
     // Busy test `0x005678A0(1)` = the trading test (§5.2).
     if w.unit_mode(o) == MODE_DEAD && !w.trading(p) {
-        w.corpse_pickup(p, o);
+        // §12.1 steps 1–2 (the rest's), then steps 3–5.
+        if w.corpse_pickup(p, o) {
+            corpse_pickup_rest(w, p, o)?;
+        }
     } else {
         w.player_interact(p, o);
     }
-    res::OK
+    Ok(res::OK)
 }
 
 /// 0x16 type 5 (§7.1 step 2): a tile.
@@ -549,9 +558,10 @@ pub fn swap_cursor_with_body<W: MoveWorld>(
     // E leaves the body (as §7.6, without its own belt step).
     let eloc = w.body_loc(e);
     w.body_leave_effects(p, e);
-    // TODO(spec: inventory-moves.md §7.8): an unlink failure of E is not
-    // written (MV4 does not list it); ignored.
-    w.unlink(p, e);
+    // The unlink of E not returning E → fatal assert (§7.8, `0x00560F18`).
+    if !w.unlink(p, e) {
+        return Err(MoveFatal::Unlink);
+    }
     w.clear_body_slot(p, eloc);
     w.set_cursor(p, Some(e));
     w.set_mode(e, mode::CURSOR);
@@ -1129,12 +1139,11 @@ pub fn use_belt_item<W: MoveWorld>(w: &mut W, p: Owner, item: Guid, on_merc: u32
         {
             return res::OK;
         }
-        // TODO(spec: inventory-moves.md §7.17): no hireling is not written; read
-        // as "nothing".
-        let Some(merc) = w.hireling(p) else {
-            return res::OK;
-        };
-        target = merc;
+        // No hireling: the target stays the player, so the potion is used
+        // on the player (§7.17, `0x00562494`–`0x005624A0`).
+        if let Some(merc) = w.hireling(p) {
+            target = merc;
+        }
     }
     let slot = w.pos(Owner::item(item)).0;
     if w.use_item(p, target, item) {
@@ -1461,11 +1470,12 @@ pub fn merc_take<W: MoveWorld>(
     w.clear_body_slot(merc, loc);
     w.stat_refresh_unlink(merc, 0);
     mark(w, merc, it, cmd::UNEQUIP);
-    // TODO(spec: inventory-moves.md §7.23): a failed copy is not written; read as
-    // "no cursor item".
-    if let Some(copy) = w.copy_item(it) {
-        w.give_cursor_item(p, copy);
-    }
+    // A failed copy is fatal (§7.23: the cursor is set to none, then
+    // `0x0055FB10` asserts, line 0x19A1), after the original already left.
+    let Some(copy) = w.copy_item(it) else {
+        return Err(MoveFatal::Create);
+    };
+    w.give_cursor_item(p, copy);
     add_iflags(w, it, iflag::COPIED);
     w.merc_after_take(merc);
     Ok(res::OK)

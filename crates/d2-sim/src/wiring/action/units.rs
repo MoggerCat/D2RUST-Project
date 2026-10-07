@@ -94,8 +94,8 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
     }
     /// `0x0057FB70` ([`super::death`]; the experience it returns is not
     /// read by the 0x16 caller).
-    fn player_corpse_pickup(&mut self, sim: &mut Sim<'_>, player: UnitId, corpse: UnitId) {
-        self.corpse_pickup(sim, player, corpse);
+    fn player_corpse_pickup(&mut self, sim: &mut Sim<'_>, player: UnitId, corpse: UnitId) -> bool {
+        self.corpse_pickup(sim, player, corpse).is_some()
     }
     /// `0x00620F00`: the AnimData record of the unit's mode
     /// (`units.md` §4.1, `animdata.md` §5).
@@ -115,8 +115,10 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
         self.monster_mode_velocity(sim, unit);
     }
 
-    /// The path part of `0x005A7C20` ([`crate::wiring::path::monsters`]).
+    /// The path part of `0x005A7C20` ([`crate::wiring::path::monsters`]);
+    /// the requested mode is kept for the start function.
     fn monster_mode_bookkeeping(&mut self, sim: &mut Sim<'_>, unit: UnitId, mode: u32) {
+        self.monster_request = mode;
         self.monster_path_setup(sim, unit, mode);
     }
 
@@ -148,12 +150,13 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
         X::action_frame(self, sim, unit, a1, a2)
     }
 
-    /// Monster mode functions (`units.md` §4.6): the death start
-    /// `0x005A6FF0` goes to [`Pending::monster_death_start`] with the
-    /// mode change's target; DT's event functions `0x005A7350` /
+    /// Monster mode functions (`units.md` §4.6): the start and event
+    /// functions of rules 5–14 ([`crate::wiring::path::monsters`]); the
+    /// death start `0x005A6FF0` goes to [`Pending::monster_death_start`]
+    /// with the mode change's target; DT's event functions `0x005A7350` /
     /// `0x005A72B0` end the death in mode 12 (`intents-events.md` §7.7
     /// rule 3, [`super::unit_update::death_function`]); every other
-    /// function keeps the default (started, nothing done: monster spec).
+    /// function keeps the default (started, nothing done).
     fn monster_mode_function(&mut self, sim: &mut Sim<'_>, unit: UnitId, address: u32) -> bool {
         if let Some(started) = self.monster_motion_function(sim, unit, address) {
             return started;

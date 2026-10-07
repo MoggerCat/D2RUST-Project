@@ -41,10 +41,10 @@
 |   9. Prices | 642–838 |
 | Constants & data dependencies | 839–858 |
 | Randomness | 859–877 |
-| Edge cases & original bugs | 878–914 |
-| Test vectors | 915–937 |
-| Provenance | 938–976 |
-| Open questions | 977–1061 |
+| Edge cases & original bugs | 878–917 |
+| Test vectors | 918–940 |
+| Provenance | 941–979 |
+| Open questions | 980–1063 |
 <!-- /index -->
 
 ## Summary
@@ -885,12 +885,15 @@ Reproduced by default.
    Warriv) reaches the fatal assert of §9.2 rule 9 (0x2A is never sent;
    the original process exits). Only a crafted 0x33 (or a crafted 0x32
    with t ∉ {0, 2}, edge case 3) gets there: the client offers no trade
-   at those NPCs. Not reproduced. d2rs policy (Ruleset::Original): a
-   cost() call for a class without an `npc.txt` row is a handler error;
-   the handler stops at that step (§7.2 step 6, before any state
-   change) with no message and the game goes on. Other PC 2 session
-   decided (Open question 5): the server ends that game, as the
-   original's process exit does — to reconcile (staging-6 merge).
+   at those NPCs. 1.14d: the `npc.txt` lookup (`0x00656900`) returns
+   null, the caller's assert reaches the CRT exit (`0x00681E09(-1)` →
+   `0x00681D27`), so the whole server process ends and every game with
+   it. d2rs policy (Ruleset::Original, Open question 5): a cost() call
+   for a class without an `npc.txt` row is a fatal handler error; the
+   handler stops at §7.2 step 6 (before any state change, nothing sent)
+   and the server ends that game, dropping every client of it (the
+   game-scoped form of the process exit; supersedes the "game goes on"
+   merged reading).
 3. Buy with t ∉ {0, 2} skips the "item is offered" test: any existing
    item GUID is copied and priced with cost(t) (t = 1 gives the sell
    price).
@@ -1018,9 +1021,8 @@ Min 1 Max 1 MagicMin 1 MagicMax 1 MagicLvl 1).
    drops them). Other fatal asserts of this spec reached by a crafted
    message are handled the same way. A rejecting variant belongs to
    `Ruleset::Mod`.
-   Other PC 2 session read (edge case 2): the handler stops at §7.2
-   step 6 with no message and the game goes on — to reconcile
-   (staging-6 merge).
+   The "handler stops and the game goes on" reading is superseded: the
+   binary exits the process (edge case 2).
 6. Price of a magic / rare / unique item: record a buy and a sell of
    one to confirm §9.2 rules 4–5 end to end.
    Recording R-NV-5.

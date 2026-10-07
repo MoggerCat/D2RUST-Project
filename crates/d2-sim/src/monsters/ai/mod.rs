@@ -173,16 +173,28 @@ pub struct AiStore {
     pub unhandled: Vec<Unhandled>,
     /// The Npc command counter G (`0x0088CADC`, §9.9 commands step 1).
     ///
-    /// TODO(spec: ai.md open question 12): G is process-wide in 1.14d and
-    /// never reset between games; `d2-sim` has no process state, so it is
-    /// kept with the game's AI store (equal to 1.14d for the first game of
-    /// a fresh process).
+    /// G is process-wide in 1.14d: it counts from 0 at process start
+    /// across every game of the process and is never reset or saved
+    /// (`ai.md` open question 12). `d2-sim` has no process state, so G is
+    /// a host input: the host (one per server process) hands the value
+    /// left by its previous game to the next game's store
+    /// ([`AiStore::with_npc_walk_counter`]) and reads it back from here
+    /// when the game ends. A fresh process starts at 0 ([`AiStore::new`]).
     pub npc_walk_counter: u32,
 }
 
 impl AiStore {
+    /// The store of the first game of a fresh process (G = 0).
     pub fn new() -> Self {
         Self::default()
+    }
+    /// The store of a later game of the same process: G continues from
+    /// `g`, the value the previous game left (`ai.md` open question 12).
+    pub fn with_npc_walk_counter(g: u32) -> Self {
+        Self {
+            npc_walk_counter: g,
+            ..Self::default()
+        }
     }
     pub fn get(&self, u: UnitId) -> Option<&MonsterAi> {
         self.units.get(&u)
@@ -465,14 +477,46 @@ fn reschedule<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, unit: Un
     schedule_think(game, cx, unit, at);
 }
 
+/// An AI mode request (`0x005A7E60` + `0x005A7C20`, §7.1, §7.5): the
+/// mode change with the monster's velocity request (§7.3), which the
+/// mode set's movement set-up consumes (§7.5 rule 4.1).
+pub fn request_mode<W: AiHost + ?Sized>(
+    game: &mut Game,
+    cx: &mut Ctx<'_, W>,
+    unit: UnitId,
+    m: u8,
+    target: ModeTarget,
+) -> bool {
+    request_mode_byte(game, cx, unit, m, target, None)
+}
+
+/// [`request_mode`] with the request's path-type byte overwritten
+/// (`path_byte`, §7.1).
+pub fn request_mode_byte<W: AiHost + ?Sized>(
+    game: &mut Game,
+    cx: &mut Ctx<'_, W>,
+    unit: UnitId,
+    m: u8,
+    target: ModeTarget,
+    path_byte: Option<u8>,
+) -> bool {
+    let mut v = cx.store.get(unit).map(|e| e.velocity).unwrap_or_default();
+    let ok = cx
+        .world
+        .change_mode_with(game, unit, m, target, path_byte, &mut v);
+    if let Some(e) = cx.store.units.get_mut(&unit) {
+        e.velocity = v;
+    }
+    ok
+}
+
 /// `0x005DE080` `AITACTICS_IdleInNeutralMode` ("idle N", §1.2): N 0 → 1;
 /// a non-neutral unit first gets a mode change to neutral targeting
 /// itself; then delete + schedule.
 pub fn idle<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, unit: UnitId, n: i32) {
     let n = if n == 0 { 1 } else { n };
     if cx.world.anim_mode(unit) != mode::NEUTRAL {
-        cx.world
-            .change_mode(game, unit, mode::NEUTRAL, ModeTarget::Unit(unit));
+        request_mode(game, cx, unit, mode::NEUTRAL, ModeTarget::Unit(unit));
     }
     reschedule(game, cx, unit, n);
 }
@@ -621,24 +665,17 @@ pub fn frozen<W: AiHost + ?Sized>(cx: &Ctx<'_, W>, unit: UnitId) -> bool {
     cx.world.has_state(unit, state::FREEZE) && !cx.world.is_dead(unit)
 }
 
-/// `0x005A8030`, the end of modes 3–9 and 14 (§1.4): walk/run ends and
-/// the `SplEndGeneric` cases run the think inline; every other case
+/// `0x005A8030`, the end of modes 3–9 and 14 (§1.4): the `SplEndGeneric`
+/// cases and the walk/run ends run the think inline; every other case
 /// requests a mode change to neutral.
-///
-/// TODO(spec gap): for the `SplEndGeneric` cases the spec does not say
-/// whether the anim mode is set to neutral first; it is not set here.
 pub fn mode_end<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, unit: UnitId, ended: u8) {
     const INLINE: [u8; 16] = [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
-    if INLINE.get(ended as usize) == Some(&1) {
-        cx.world.set_anim_mode(unit, mode::NEUTRAL);
-        if !frozen(cx, unit) {
-            think(game, cx, unit);
-        }
-        return;
-    }
     let class = cx.world.class(unit);
     let generic = cx.monstats(class).is_some_and(|r| r.splendgeneric != 0);
     let base = cx.base_class(unit);
+    // §1.4: the `SplEndGeneric` branch is tested first and does not set
+    // the anim mode; a matching class whose mode does not match falls to
+    // the table test.
     let special = generic
         && match base {
             110 => ended == 8,
@@ -654,8 +691,14 @@ pub fn mode_end<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, unit: 
         }
         return;
     }
-    cx.world
-        .change_mode(game, unit, mode::NEUTRAL, ModeTarget::Unit(unit));
+    if INLINE.get(ended as usize) == Some(&1) {
+        cx.world.set_anim_mode(unit, mode::NEUTRAL);
+        if !frozen(cx, unit) {
+            think(game, cx, unit);
+        }
+        return;
+    }
+    request_mode(game, cx, unit, mode::NEUTRAL, ModeTarget::Unit(unit));
 }
 
 /// Installing an AI `0x005B0E00` (§3.3).

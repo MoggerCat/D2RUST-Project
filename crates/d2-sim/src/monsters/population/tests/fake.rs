@@ -59,6 +59,8 @@ pub struct Fake {
     pub collide_calls: std::cell::RefCell<Vec<(i32, i32, i32, u16)>>,
     /// The nearest free point, if set; else the asked point.
     pub nearest: Option<(i32, i32)>,
+    /// The room of the nearest free point, if set; else the asked room.
+    pub nearest_room: Option<RoomId>,
 }
 
 impl Fake {
@@ -185,7 +187,7 @@ impl PopWorld for Fake {
     }
     fn nearest_free_point(&self, room: RoomId, x: i32, y: i32) -> Option<(RoomId, i32, i32)> {
         let (x, y) = self.nearest.unwrap_or((x, y));
-        Some((room, x, y))
+        Some((self.nearest_room.unwrap_or(room), x, y))
     }
 }
 
@@ -270,9 +272,7 @@ impl MonsterInit for Fake {
         self.log
             .push(format!("owner {} {owner:?} {a} {b} {c}", unit.0));
     }
-    fn unique_minion_owner_data(&mut self, boss: UnitId, minion: UnitId) {
-        self.log.push(format!("uowner {} {}", boss.0, minion.0));
-    }
+
     fn add_minion(&mut self, leader: UnitId, minion: UnitId) {
         self.log.push(format!("minion {} {}", leader.0, minion.0));
     }
@@ -285,19 +285,11 @@ impl MonsterInit for Fake {
     fn superunique_init(&mut self, boss: UnitId, su: i32) {
         self.log.push(format!("suinit {} {su}", boss.0));
     }
-    fn superunique_owner_data(&mut self, boss: UnitId) {
-        self.log.push(format!("suowner {}", boss.0));
-    }
-    fn group_spawn(&mut self, boss: UnitId, class: i32, a: i32, b: i32, c: i32, flags: u16) {
-        self.log
-            .push(format!("group {} {class} {a} {b} {c} {flags:#x}", boss.0));
-    }
+
     fn create_object(&mut self, _room: RoomId, class: i32, x: i32, y: i32) {
         self.log.push(format!("object {class} {x} {y}"));
     }
-    fn barricade_object(&mut self, unit: UnitId, class: i32) {
-        self.log.push(format!("barricade {} {class}", unit.0));
-    }
+
     fn preset_created(&mut self, unit: UnitId, preset: &PresetUnit) {
         self.log
             .push(format!("preset {} {}", unit.0, preset.has_data));

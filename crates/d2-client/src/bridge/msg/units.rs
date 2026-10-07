@@ -16,6 +16,8 @@ use super::super::bits::BitReader;
 use super::super::check::check;
 use super::super::dispatch::{HandlerError, Message, UnitMessage};
 use super::super::drlg::DrlgRoomId;
+use super::super::objects::interact::{mode_request_code_2, CODE_INTERACT};
+use super::super::objects::FLAG_EX_EXPANSION;
 use super::super::output::{Output, ShrineFxKind};
 use super::super::skills::SkillList;
 use super::super::world::{
@@ -58,6 +60,9 @@ fn create(
 ) -> Result<Created, HandlerError> {
     let mut u = ClientUnit::new(key);
     u.class = class;
+    if w.expansion != 0 {
+        u.flag_ex |= FLAG_EX_EXPANSION;
+    }
     let placed = (x, y) != (0, 0);
     u.seed = (!placed).then_some(INIT_SEED);
     let mut room = None;
@@ -120,6 +125,9 @@ fn component_bits(c: u8) -> u32 {
     }
 }
 
+/// State 98 `sourceunit` (`msg-units.md` §1.2 r4).
+const SOURCE_UNIT_STATE: u8 = 98;
+
 /// 0xAC AssignMonster (§1.2).
 pub fn assign_monster(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerError> {
     let b = Bytes(msg.bytes);
@@ -132,11 +140,6 @@ pub fn assign_monster(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Hand
     let (x, y) = (b.u16(7)?, b.u16(9)?);
     let life = b.u8(0xB)?;
     let mut r = BitReader::new(&msg.bytes[0xD..]);
-    // TODO(spec: msg-units.md §1.2 rules 2–3): the hireling GUID is
-    // `ClientWorld::hireling_guid`, but the re-initialisation `0x0046EC10`
-    // (which fields it resets, whether rules 3–4 then run) and the hireling
-    // class test `0x0063EE90` are not stated; every 0xAC takes the creation
-    // path.
     let tables = &msg.inputs.tables;
     let class_row = tables.monsters.get(usize::from(class)).copied().flatten();
     let mode = r.read(4);
@@ -178,35 +181,56 @@ pub fn assign_monster(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Hand
             data.value = r.read(32) as i32;
         }
     }
-    // Rule 2: the class must be a `monstats` row with a `monstats2` row.
-    if class_row.is_none() {
-        return Ok(());
+    // Rule 2: the local player's hireling (GUID = `0x00478F20(local
+    // player, 7)`, monster in S) is re-initialised, not created (r2.1:
+    // graphics rebuilt, mode := the 4-bit mode; nothing else of the
+    // message is written); rules 3 and 4 then run on it.
+    let hireling = w.hireling_guid(w.local_player);
+    let reinit = key.guid == hireling && w.units.contains_key(&key);
+    let mut created = None;
+    if reinit {
+        w.units.get_mut(&key).expect("checked above").mode = mode;
+    } else {
+        // Rule 2: the class must be a `monstats` row with a `monstats2`
+        // row.
+        if class_row.is_none() {
+            return Ok(());
+        }
+        let mut c = create(w, key, u32::from(class), x, y)?;
+        let u = &mut c.unit;
+        // A monster's seed is init_low(+0x28), {0, 666} without a room.
+        if u.position.is_none() {
+            u.seed = Some((0, INIT_SEED.1));
+        }
+        // Rule 6.4: the mode argument is the 4-bit mode. The rest of the
+        // set-up `0x004AE8D0` (rule 6: table stats, path, the frame and
+        // direction draws on the unit seed, unit flags, light, skills
+        // from the `monstats` Skill columns) reads `monstats` columns
+        // and animation data the client tables do not hold: not run
+        // (`docs/handoff/impl-triage-client.md`).
+        u.mode = mode;
+        // Rule 6.7: `+0xA8` := a skill list (`0x006438B0(0)`).
+        u.skills = Some(SkillList::default());
+        u.kind = KindData::Monster(Box::new(data));
+        created = Some(c);
     }
-    let mut c = create(w, key, u32::from(class), x, y)?;
-    let u = &mut c.unit;
-    // A monster's seed is init_low(+0x28), {0, 666} without a room.
-    if u.position.is_none() {
-        u.seed = Some((0, INIT_SEED.1));
-    }
-    // TODO(spec: msg-units.md open question 2): `0x004AE8D0` (table
-    // stats, path, the mode it sets); the model takes the 4-bit mode.
-    u.mode = mode;
-    // Rule 3 (the hireling exception needs the hireling GUID, see above).
-    u.stats.insert(7, 0x8000);
-    u.stats.insert(6, i32::from(life) << 8);
-    u.stats.insert(328, i32::from(x.wrapping_add(y)));
-    // Rule 7: `+0xA8` := a skill list (`0x006438B0(0)`). TODO(spec:
-    // msg-units.md §1.2 rule 8): the `monstats` Skill / level / mode
-    // columns are not in the client tables, so no skill is added.
-    u.skills = Some(SkillList::default());
-    // Rule 4.
+    // Rule 3 on U (the new unit, or the re-initialised hireling).
+    let apply3 = |u: &mut ClientUnit| {
+        // `0x0063EE90` tests U's own class.
+        let own_hireling = matches!(u.class, 271 | 338 | 359 | 560 | 561);
+        if !(own_hireling && key.guid == hireling) {
+            u.stats.insert(7, 0x8000);
+            u.stats.insert(6, i32::from(life) << 8);
+        }
+        if own_hireling && u.mode == 1 {
+            u.flag_ex &= !0x40000;
+        }
+        u.stats.insert(328, i32::from(x.wrapping_add(y)));
+    };
+    // Rule 4: the source-unit link and the 0x40 stat list.
+    let link = (r.read(1) == 1).then(|| r.read(31));
+    let mut list = BTreeMap::new();
     if r.read(1) == 1 {
-        // TODO(spec: msg-units.md open question 3): what `0x00621CC0`
-        // sets.
-        data.v31 = Some(r.read(31));
-    }
-    if r.read(1) == 1 {
-        let mut list = BTreeMap::new();
         loop {
             let s = r.read(9);
             let Some(row) = tables.stats.get(s as usize) else {
@@ -231,12 +255,43 @@ pub fn assign_monster(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Hand
                 break;
             }
         }
-        if !list.is_empty() {
-            data.stat_list = Some(list);
+    }
+    let apply4 = |u: &mut ClientUnit| {
+        if let Some(v) = link {
+            // `0x00621CC0(unit, 0, v)` → `0x00621C30` (`skills/bodies.md`
+            // §6.20): +0x94 := 0 (owner type player), +0x98 := v, state
+            // 98 `sourceunit` with stats 353 := 0, 354 := v (the unit has
+            // a stat holder), flag-ex |= 0x400.
+            u.states.insert(SOURCE_UNIT_STATE);
+            let l = u.state_lists.entry(SOURCE_UNIT_STATE).or_default();
+            l.remove(&(353, 0));
+            l.insert((354, 0), v as i32);
+            u.flag_ex |= 0x400;
+        }
+        if let KindData::Monster(d) = &mut u.kind {
+            if let Some(v) = link {
+                d.v31 = Some(v);
+            }
+            if !list.is_empty() {
+                // The flag-0x40 list: an existing one is reused.
+                d.stat_list
+                    .get_or_insert_with(BTreeMap::new)
+                    .extend(list.clone());
+            }
+        }
+    };
+    match created {
+        Some(mut c) => {
+            apply3(&mut c.unit);
+            apply4(&mut c.unit);
+            c.add(w);
+        }
+        None => {
+            let u = w.units.get_mut(&key).expect("checked above");
+            apply3(u);
+            apply4(u);
         }
     }
-    u.kind = KindData::Monster(Box::new(data));
-    c.add(w);
     Ok(())
 }
 
@@ -257,21 +312,59 @@ pub fn assign_object(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handl
     let (x, y) = (b.u16(8)?, b.u16(0xA)?);
     let mut c = create(w, key, u32::from(b.u16(6)?), x, y)?;
     let u = &mut c.unit;
-    if ty == OBJECT {
-        u.mode = u32::from(b.u8(0xC)?);
-        u.kind = KindData::Object(ObjectData {
-            interact: b.u8(0xD)?,
-            ..ObjectData::default()
-        });
-    } else {
-        // TODO(spec: msg-units.md §1.2 rule 2): types 0, 3, 4, 5 take
-        // their kind's init (player, missile, item, tile); only the object
-        // init and its data +4 are stated.
-        return Err(HandlerError::Unspecified(
-            "msg-units.md §1.3 rule 2: 0x51 for a unit type other than 2",
+    if ty != OBJECT {
+        // Rule 5: 1.14d never sends types 0, 3, 4, 5 (the one builder
+        // passes type 2); refused like type 1.
+        return Err(HandlerError::Invalid(
+            "0x51: unit type 0, 3, 4 or 5 (never sent by 1.14d, msg-units.md §1.3 rule 5)",
         ));
     }
+    let class = u.class;
+    let interact = b.u8(0xD)?;
+    u.mode = u32::from(b.u8(0xC)?);
+    // Rule 3: a shrine (`0x00621B00`: objects `SubClass` bit 0) gets the
+    // shrines record of index interact (`0x006414B0`; out of range →
+    // fatal 0x15F / 0x160), then `0x004BD650` runs the code's on-mode
+    // function. Without the class's `objects.txt` row the shrine test
+    // cannot run: the shrine part is skipped (as `shrine_facts`).
+    let is_shrine = msg
+        .inputs
+        .tables
+        .objects
+        .get(class as usize)
+        .is_some_and(|r| r.subclass & 1 != 0);
+    let shrine_code = if is_shrine {
+        let code = *msg
+            .inputs
+            .tables
+            .shrines
+            .get(usize::from(interact))
+            .ok_or(HandlerError::Fatal(0x15F))?;
+        if code >= SHRINES {
+            return Err(HandlerError::Fatal(0x37B));
+        }
+        Some(code)
+    } else {
+        None
+    };
+    u.kind = KindData::Object(ObjectData {
+        interact,
+        shrine: shrine_code,
+        ..ObjectData::default()
+    });
     c.add(w);
+    if let Some(code) = shrine_code {
+        let e = shrine(code);
+        if e.on_mode {
+            msg.out.push(Output::ShrineFx {
+                kind: ShrineFxKind::OnMode,
+                code,
+                object: key,
+                player: None,
+                overlays: e.overlays,
+            });
+        }
+    }
     Ok(())
 }
 
@@ -279,8 +372,8 @@ pub fn assign_object(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handl
 /// x u16@7, y u16@9. Created with the common fields (the room seed
 /// step at a point other than (0, 0)) and added; the kind inits are not
 /// modelled (the model of §7 r1 is a unit with `class` and `position`).
-/// TODO(spec: msg-units.md §7 r1): `0x00470B70` for a type-1 unit (no
-/// 1.14d sender passes type 1).
+/// `0x00470B70` for a type-1 unit (no 1.14d sender passes type 1) writes
+/// no model field §7 r1 names (as after 0xAC, §1.2 r3).
 pub fn assign_level_warp(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerError> {
     let b = Bytes(msg.bytes);
     if msg.bytes.len() != 11 {
@@ -508,6 +601,13 @@ pub fn queued(w: &mut ClientWorld, msg: &UnitMessage<'_>) -> Result<(), HandlerE
         *slot = read(&b, f)?;
     }
     mode_request(w, msg.unit, code, record);
+    // Player code 0x02 (model §8 rule 4): the interact sender
+    // `0x00480930(r0 & 0xFFFF, r1)` (§8 rule 7).
+    if msg.unit.unit_type == PLAYER && code == CODE_INTERACT && w.units.contains_key(&msg.unit) {
+        for o in mode_request_code_2(w, msg.inputs, record)? {
+            msg.out.push(o);
+        }
+    }
     // Objects (rule 5, `model.md` §15): the shrine part of codes 3 and
     // 0x15, after the stored request.
     if msg.unit.unit_type == OBJECT {
@@ -567,10 +667,9 @@ fn shrine(code: u8) -> Shrine {
 
 /// The object's `objects.txt` row and its shrine code (`model.md` §15
 /// rule 1): `(is shrine, shrine data Code, ShrineFunction)`. `None` when
-/// the client tables hold no row for the class: TODO(spec:
-/// client/model.md §15 rule 1): the app supplies no `objects.txt` rows
-/// yet, so (as 0xAC without `monstats2` rows) the shrine part is
-/// skipped.
+/// the client tables hold no row for the class (as 0xAC without
+/// `monstats2` rows, the shrine part is skipped); the app supplies the
+/// user's `objects.txt` and `shrines.txt` rows (`ClientTables`).
 fn shrine_facts(w: &ClientWorld, msg: &UnitMessage<'_>) -> Option<(bool, Option<u8>, u8)> {
     let u = w.units.get(&msg.unit)?;
     let row = msg.inputs.tables.objects.get(u.class as usize)?;

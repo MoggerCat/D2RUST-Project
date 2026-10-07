@@ -77,7 +77,8 @@ use d2_sim::items::{flag, ty, ItemRequest, ItemTables};
 use d2_sim::missiles::unit_flag;
 use d2_sim::monsters::init::{GameInfo, MonstatsExtra};
 use d2_sim::monsters::population::PopTables;
-use d2_sim::path::CollisionRooms;
+use d2_sim::path::walk::geom::unit_distance;
+use d2_sim::path::{CollisionRooms, PathTables, Point as PathPoint};
 use d2_sim::rng::Seed;
 use d2_sim::skills::use_::{ModeTarget, ServerMsg, UseState};
 use d2_sim::skills::{SkillEntry, SkillTables, LEVEL_CAP_114D};
@@ -1847,15 +1848,29 @@ fn run_with(game_seed: u32) -> Transcript {
     // 0x07 is followed by the add messages of its units
     // (`intents-events.md` §7.8 rule 2): the waypoint's 0x51 (type 2,
     // class 0, its position, mode 1, interact 0: no object data in this
-    // game) after its room's; Akara (a monster) and the player send none
-    // (§7.2 monster part: not specified; the client's own player is
-    // skipped). This staged game sends no 0x03, so the client refuses
+    // game) after its room's. Each monster (the preset monster, GUID 2,
+    // then Akara, GUID 1, class 148) sends §7.2 part A: 0xAC
+    // (`monsters/init.md` §24: life 128, a one-byte stream of mode 1 and
+    // no optional blocks), 0xAA (its states: none), then part B's mode
+    // message (mode 1: 0x6D, §7.4 rule 5). The client's own player is
+    // skipped. This staged game sends no 0x03, so the client refuses
     // each 0x07 (fatal 0x58A).
     record(&mut fx, &mut frames, vec![]);
     let mut want: Vec<Vec<u8>> = [(8000, 8000), (8000, 8008), (8008, 8000), (8008, 8008)]
         .map(|(x, y)| map_reveal(x, y, ISLE))
         .to_vec();
     want.insert(1, assign_object(wp, 0, WP_AT, 1, 0));
+    let monster_adds: [Vec<u8>; 6] = [
+        vec![0xAC, 2, 0, 0, 0, 0, 0, 76, 156, 74, 156, 128, 14, 1],
+        vec![0xAA, 1, 2, 0, 0, 0, 8, 0xFF],
+        vec![0x6D, 2, 0, 0, 0, 76, 156, 74, 156, 128],
+        vec![0xAC, 1, 0, 0, 0, 148, 0, 86, 156, 86, 156, 128, 14, 1],
+        vec![0xAA, 1, 1, 0, 0, 0, 8, 0xFF],
+        vec![0x6D, 1, 0, 0, 0, 86, 156, 86, 156, 128],
+    ];
+    for (i, m) in monster_adds.into_iter().enumerate() {
+        want.insert(1 + i, m);
+    }
     assert_eq!(frames[0].2, want);
     assert_eq!(fx.sim_ref().game.lists.active_rooms(0).len(), 4);
     let monsters = fx.monsters();
@@ -2152,10 +2167,14 @@ fn run_with(game_seed: u32) -> Transcript {
     // → §8.2) → 0x9C action 1 in the tick's update pass, then 0x47,
     // 0x48 (§6, §11; the item bit stream is OQ1's: empty). The distance
     // test reads the item-move seam `InvRest::distance` (`0x00641530`),
-    // a staged 3: it is not routed to the path positions yet.
-    // TODO(spec/wiring: inventory-moves.md §8.1 rule 4): answer the item
-    // distance from the path provider (the walk above put the player on
-    // the cap's sub-tile).
+    // answered here from the path positions: the unit distance of
+    // `pathing.md` §9.5 between the player (size 2) and the item (size 1,
+    // `path-placement.md` §3) after the walk above put the player on the
+    // cap's sub-tile.
+    let paths = PathTables::spec().unwrap();
+    let at = |p: (i32, i32)| PathPoint { x: p.0, y: p.1 };
+    let d = unit_distance(&paths, at(fx.pos(player)), 2, at(CAP_AT), 1);
+    fx.inv.with(|r| r.distance = d);
     let pg = fx.guid(player);
     let cg = fx.guid(cap);
     let x9c = |action: u8, g: u32| {
@@ -2254,8 +2273,8 @@ fn run_with(game_seed: u32) -> Transcript {
     // setter (0: `pathing.md` §9.5 rule 3 never stops early) and the
     // player's move mask 0x1C09 (`path-placement.md` §2.4) does not hold
     // the monster footprint bit 0x100, so the run ends on Akara's own
-    // sub-tile. TODO(spec: pathing.md §9.5 rule 3): the stop distance a
-    // walk / run to a unit sets.
+    // sub-tile (`pathing.md` §9.5 rule 3: no player walk / run path sets
+    // the stop distance, so it stays 0).
     let ng = fx.guid(npc);
     let w = walk(
         &mut fx,
@@ -2331,7 +2350,8 @@ fn run_with(game_seed: u32) -> Transcript {
     assert_eq!(store_rows.last().unwrap().1, CAP, "permanent codes last");
 
     // 12. Sell (C→S 0x33) the picked-up cap (`vendors.md` §7.2): a
-    // permanent code, so no copy; removed from the inventory and freed;
+    // permanent code, so no copy; S→C 0x9D action 5, removed from the
+    // inventory and freed;
     // the price (§9.1, §9.2: B = 100·AC/5, B·512/1024) received: S→C
     // 0x2A kind 3, code 1, its GUID, the new gold.
     let sold = (100 * fx.stat(cap, ARMORCLASS) / 5) * 512 / 1024;
@@ -2348,10 +2368,13 @@ fn run_with(game_seed: u32) -> Transcript {
     );
     assert_eq!(frames.last().unwrap().1.codes, [(0x33, done)]);
     let gold_now = gold_picked + sold;
-    assert_eq!(
-        streams(&fx, &frames.last().unwrap().2),
-        [tx(3, 1, cg, gold_now)]
-    );
+    // A stored cap (mode 0): S→C 0x9D action 5 (flags 0x20) before the
+    // 0x2A (§7.2 rule 9, §7 "Message order").
+    let sent = streams(&fx, &frames.last().unwrap().2);
+    assert_eq!(sent.len(), 2, "{sent:02X?}");
+    assert_eq!((sent[0][0], sent[0][1]), (0x9D, 0x05));
+    assert_eq!(sent[0][4..8], cg.to_le_bytes());
+    assert_eq!(sent[1], tx(3, 1, cg, gold_now));
     assert_eq!(fx.stat(player, GOLD), gold_now);
     assert!(!fx.inventory().contains(&cap));
     assert!(fx.sim_ref().game.lists.unit(cap).is_none(), "freed");
@@ -2539,11 +2562,20 @@ fn run_with(game_seed: u32) -> Transcript {
     // join's four 0x07, the warp's one and the six of its room switch,
     // the switch's four 0x08. The NPC / quest / trade ids are handled
     // now (`client/msg-ui.md` §5, §12, §16, §18: 0x27, 0x29, 0x28, 0x2A
-    // ×2), and Akara's harness add (0xAC) too: 14 + 6.
+    // ×2), and Akara's harness add (0xAC) too: 14 + 6; plus the sell's
+    // 0x9D action 5 (`vendors.md` §7.2 rule 9): 21; the join's monster
+    // adds (`intents-events.md` §7.2) add 4: two 0xAC (the client
+    // creates nothing from them yet: no `ClientTables` monster rows,
+    // `msg-units.md` §1.2 rule 2) and two 0xAA. The preset monster's 0x6D
+    // is dropped like its 0x69s (not in the model); Akara's is queued on
+    // its unit (`model.md` §4) and never drained in this staged game.
     assert!(log.unowned.is_empty(), "{:?}", log.unowned);
-    assert_eq!(log.handled, 20);
-    assert_eq!(log.dropped, BTreeMap::from([(0x0D, 1), (0x69, 2)]));
-    assert_eq!((log.queued, log.drained), (0, 0));
+    assert_eq!(log.handled, 25);
+    assert_eq!(
+        log.dropped,
+        BTreeMap::from([(0x0D, 1), (0x69, 2), (0x6D, 1)])
+    );
+    assert_eq!((log.queued, log.drained), (1, 0));
     assert_eq!(fx.due, None, "the death end's 0x69 code 9 arrived");
     let rejected: Vec<(u8, String)> = log
         .rejected

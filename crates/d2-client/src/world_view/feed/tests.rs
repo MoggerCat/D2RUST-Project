@@ -115,8 +115,9 @@ fn no_player_no_camera_and_nothing_placeable() {
         .unit_params(&world, &world.units[&key], &pose)
         .unwrap_err();
     assert!(e.to_string().contains("no local player"), "{e}");
-    // The placeholder feed refuses what needs a rule.
-    assert!(NoFeed.open_mode(&world).is_err());
+    // The placeholder feed refuses what needs a model input; its open
+    // mode is 0 (no original UI, ui/panels-2.md §22 r5).
+    assert_eq!(NoFeed.open_mode(&world).unwrap(), OpenMode::NONE);
     assert!(NoFeed.player_seed(&world).is_err());
     assert!(NoFeed.unit_position(&world.units[&key]).is_err());
 }
@@ -205,4 +206,61 @@ fn blank_screen_from_the_levels_row() {
     bytes[0x21B] = 0x80;
     assert!(blank_screen(&Levels::decode(&bytes)));
     assert!(NoFeed.blank_screen(&ClientWorld::default()).unwrap());
+}
+
+// The open mode is UI state only: without the original UI a feed answers
+// 0; a UI hand-over does not change the placeholder's answer.
+// Covers: specs/ui/panels-2.md §22 r5
+#[test]
+fn open_mode_without_the_ui_is_0() {
+    let world = ClientWorld::default();
+    let mut feed = NoFeed;
+    assert_eq!(feed.open_mode(&world).unwrap().get(), 0);
+    feed.set_ui_open_mode(OpenMode::new(2).unwrap());
+    assert_eq!(feed.open_mode(&world).unwrap().get(), 0);
+}
+
+// S→C 0x5A code 0x12 starts 0x00476A80(6, 4000, 10000, 4000); no other
+// code starts a shake (provisional: the only known caller).
+// Covers: specs/client/msg-ui.md §19 r3; specs/render/camera.md §8
+#[test]
+fn event_0x12_starts_the_shake() {
+    let r = event_shake(0x12, 5).unwrap();
+    assert_eq!(r.start_tick, 5);
+    assert_eq!(
+        (
+            r.shake.peak,
+            r.shake.attack,
+            r.shake.sustain,
+            r.shake.release
+        ),
+        (6, 4000, 10000, 4000)
+    );
+    for code in [0u8, 2, 7, 0xC, 0x11, 0x13, 0xFF] {
+        assert_eq!(event_shake(code, 5), None, "code {code:#x}");
+    }
+    // On the tick time base: 50 ticks in (t = 2000 ms), a = 6·2000/4000 = 3;
+    // after t1 + t2 + t3 = 18000 ms (450 ticks) it has ended.
+    assert_eq!(r.shake.amplitude(Shake::time_of(50)), Some(3));
+    assert_eq!(r.shake.amplitude(Shake::time_of(451)), None);
+}
+
+// The default fade clock: GDI reference, every ramp instant; `now` a host
+// millisecond count that does not run backwards between reads.
+// Covers: specs/render/draw-order.md §8
+#[test]
+fn default_fade_clock_is_instant_on_the_host_clock() {
+    let world = ClientWorld::default();
+    let a = NoFeed.fade_clock(&world).unwrap();
+    let b = NoFeed.fade_clock(&world).unwrap();
+    assert!(a.instant && b.instant);
+    assert!(b.now.wrapping_sub(a.now) < 60_000);
+}
+
+// Covers: specs/render/camera.md §8
+#[test]
+fn diablo_appears_shake_at_150_frames_left() {
+    assert!(diablo_appears_shake(149, 3).is_none());
+    let s = diablo_appears_shake(150, 3).unwrap();
+    assert_eq!(s.start_tick, 3);
 }

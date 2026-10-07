@@ -1,4 +1,4 @@
-// Spec: specs/data/loading.md (the loaded set), specs/data/fixups.md (the fixed-up set); the table views of specs/skills, specs/combat, specs/combat/vitals.md, specs/monsters/population.md, specs/sim/units.md, specs/world/objects.md Inputs, specs/world/npc.md §1.1, specs/world/vendors.md §1, specs/items/generation.md
+// Spec: specs/data/loading.md (the loaded set), specs/data/fixups.md (the fixed-up set); the table views of specs/skills, specs/combat, specs/combat/vitals.md, specs/monsters/population.md, specs/sim/units.md, specs/world/objects.md Inputs, specs/world/objects-2.md §20.5, specs/world/npc.md §1.1, specs/world/vendors.md §1, specs/items/generation.md
 //! Every table view a game is built from, from the user's archives: the
 //! loaded set (`bin::load`), `AnimData.d2` and the fixed-up set
 //! (`fixup::apply`), and the views the sim and the wired host read
@@ -12,6 +12,7 @@ use d2_data::tables::{
     decode_all, Difficultylevels, Levels, Missiles, Monequip, Monlvl, Monprop, Monstats, Monstats2,
     Monumod, Objects, Record, Shrines, Superuniques,
 };
+use d2_data::tables::{Armor, Misc, Weapons};
 use d2_formats::animdata::AnimData;
 use d2_formats::mpq::ArchiveSet;
 use d2_sim::combat::vitals::VitalsTables;
@@ -22,6 +23,7 @@ use d2_sim::monsters::init::{component_counts, monstats_extra, NamedIds};
 use d2_sim::monsters::population::PopTables;
 use d2_sim::skills::{SkillTables, LEVEL_CAP_114D};
 use d2_sim::stats::{StatData, StateTable};
+use d2_sim::treasure::class_pick::ClassPicks;
 use d2_sim::units::hooks::UnitData;
 use d2_sim::wiring::action::ActionTables;
 use d2_sim::wiring::worldgen::WorldTables;
@@ -99,6 +101,18 @@ impl GameTables {
             objgroup: self.rows::<d2_data::tables::Objgroup>()?,
             leveldefs: self.rows::<d2_data::tables::Leveldefs>()?,
         })
+    }
+
+    /// The pick columns of the combined items array (weapons, armor,
+    /// misc) the object and quest drop helpers read
+    /// (`world/objects-2.md` §20.5, `items/treasure.md` §9.1); a host sets
+    /// them on its drop state (`DeathDrops::with_picks`).
+    pub fn class_picks(&self) -> Result<ClassPicks, WorldDataError> {
+        Ok(ClassPicks::new(
+            &self.rows::<Weapons>()?,
+            &self.rows::<Armor>()?,
+            &self.rows::<Misc>()?,
+        ))
     }
 
     /// Population and monster-init tables.

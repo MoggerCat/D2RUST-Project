@@ -171,8 +171,10 @@ fn water_point<H: PopHost + ?Sized>(host: &mut H, room: RoomId) -> Option<(i32, 
         s = 1;
     }
     if n == 1 {
-        // TODO(spec: population.md open question 5): s = 1 is out of range
-        // with n = 1; read as no tile tested.
+        // Original bug (population.md open question 5): with n = 1 the
+        // loop tests exactly one record, index 1, one past the end of the
+        // list (the next 0x30 bytes in memory), then stops; index 0 is
+        // never tested. Those bytes are not tile data here, so no point.
         return None;
     }
     const NEAR: [(i32, i32); 4] = [(0, -3), (3, 0), (0, 3), (-3, 0)];

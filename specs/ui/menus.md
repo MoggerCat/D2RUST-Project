@@ -19,18 +19,18 @@
 |---|---|
 | Summary | 36–47 |
 | Inputs | 48–57 |
-| Outputs / state changes | 58–62 |
-| Rules | 63–64 |
-|   1. Waypoint menu input (ui 0x14) | 65–121 |
-|   2. NPC menu box | 122–197 |
-|   3. Hire list (`0x004B5C60`, NPC option "hire") | 198–240 |
-|   4. Shop transactions | 241–320 |
-| Constants & data dependencies | 321–328 |
-| Randomness | 329–332 |
-| Edge cases & original bugs | 333–344 |
-| Test vectors | 345–356 |
-| Provenance | 357–373 |
-| Open questions | 374–389 |
+| Outputs / state changes | 58–65 |
+| Rules | 66–67 |
+|   1. Waypoint menu input (ui 0x14) | 68–124 |
+|   2. NPC menu box | 125–200 |
+|   3. Hire list (`0x004B5C60`, NPC option "hire") | 201–243 |
+|   4. Shop transactions | 244–323 |
+| Constants & data dependencies | 324–331 |
+| Randomness | 332–335 |
+| Edge cases & original bugs | 336–347 |
+| Test vectors | 348–359 |
+| Provenance | 360–376 |
+| Open questions | 377–392 |
 <!-- /index -->
 
 ## Summary
@@ -59,6 +59,9 @@ confirm dialog.
 
 C→S 0x49, 0x36, 0x38 (action 3), 0x32, 0x33, 0x35; `SetUIState` calls;
 menu box draws; click sounds (`0x004B9A00(id, 0, 0, 0)`).
+
+The front-end game start (C→S 0x67, create game) is not sent from these
+menus: its client sender is `client/model.md` §7 rule 9.
 
 ## Rules
 

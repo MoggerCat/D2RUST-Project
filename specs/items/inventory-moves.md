@@ -16,12 +16,12 @@
 | Summary | 27–33 |
 | Rules | 34–35 |
 |   6. Deferred item messages | 36–129 |
-|   7. Intents | 130–557 |
-|   8. Pickup from the ground | 558–739 |
-|   9. Drop to the ground | 740–787 |
-|   10. Gold | 788–827 |
-|   11. Message layouts | 828–857 |
-|   12. Corpse take-back (`0x0057FB70` → `0x00562F30`) | 858–985 |
+|   7. Intents | 130–574 |
+|   8. Pickup from the ground | 575–756 |
+|   9. Drop to the ground | 757–804 |
+|   10. Gold | 805–844 |
+|   11. Message layouts | 845–874 |
+|   12. Corpse take-back (`0x0057FB70` → `0x00562F30`) | 875–1002 |
 <!-- /index -->
 
 ## Summary
@@ -479,6 +479,23 @@ the item-use spec):
    `0x0055FE80`. Then target item flag 0x1, 0x4000 cleared, refresh,
    update list += target (0x9D action 0x15 per §6.2 row 20). Result 0 or
    3.
+4. The four flags of `0x00562660(…, f1, f2, f3, f4)` (EDX = the unit
+   whose inventory and refresh it uses, here the player; none skips
+   every step that names it), as read in 1.14d:
+   - f3 ≠ 0: the target's mode must be 0 or 1 (the mode check of rule 2);
+     f3 = 0 skips it.
+   - f2 ≠ 0 and EDX unit ≠ none: its inventory cursor is cleared
+     (`0x0063C180(inventory, 0)`) after the link (the "cursor := none" of
+     rule 3).
+   - Runeword match (rule 3): `0x006600A0`, `0x00558530`, `0x00558580`,
+     and `0x0055FE80(target)` only when f4 ≠ 0.
+   - No match (or the runes record forbids it): f1 = 0 → return 1 right
+     after filler mode 6 (no target flag 0x1, no 0x4000 clear, no
+     refresh, no update list); f1 ≠ 0 → the tail of rule 3 as for a match.
+   - The tail's refresh (`0x00621000(EDX unit, 1)`) and update list
+     (`0x0063CC70`) run only when EDX unit ≠ none.
+   The item copy passes (0, 1, 0, 0) with EDX = the copy (`0x0055A41A`;
+   `world/vendors-2.md` §7.3 step 5).
 
 #### 7.20 0x29 ScrollToBook (`0x0054B710` → `0x0055EF20`)
 

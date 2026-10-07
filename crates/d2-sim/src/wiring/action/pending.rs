@@ -140,18 +140,16 @@ pub trait Pending {
     }
     /// The target point or unit handed to a mode start (AI mode requests).
     fn set_mode_target(&mut self, unit: UnitId, target: ModeTarget) {}
-    /// The path step count (AI).
+    /// The path step count (AI): the stop distance `0x00649070`
+    /// (`ai.md` §7.5 rule 7) without the path provider. Default: nothing.
     fn set_path_steps(&mut self, unit: UnitId, steps: i32) {}
     /// Path flag 0x800 (blocked step).
     fn path_blocked(&self, unit: UnitId) -> bool {
         false
     }
-    /// Stops the unit's path.
+    /// Stops the unit's path (`0x00648730`, `pathing.md` §13.1 rule 3)
+    /// without the path provider. Default: nothing.
     fn stop_path(&mut self, unit: UnitId) {}
-    /// Monster run event 0 `0x005A84F0` (`units.md` §4.6) with the path
-    /// provider on: its body is not described (`pathing.md` §9.1 names
-    /// only walk's). Default: nothing (the monster does not move).
-    fn monster_run_event0(&mut self, unit: UnitId) {}
     /// `0x005DE6D0` → `0x005DE4E0` walk in radius; false = failed.
     fn walk_in_radius(
         &mut self,
@@ -707,12 +705,11 @@ pub trait Pending {
     ) {
     }
     /// The global layer split of the item event registrations (data
-    /// +0xC6C shift, +0xC70 mask; `items/properties.md` §5 rule 9).
-    ///
-    /// TODO(spec: sim/stats.md): the values are not written; default
-    /// (0, 0) (every item event reads skill = layer, level 0).
+    /// +0xC6C shift, +0xC70 mask; `items/properties.md` §5 rule 9,
+    /// `data/runtime-maps.md` §3), used when the hooks have no body
+    /// tables. Default: the 1.14d values (6, 0x3F).
     fn event_layer_split(&self) -> (u32, u32) {
-        (0, 0)
+        (6, 0x3F)
     }
     /// Terror install `0x005DDD00(game, source, unit, skill, a, b)`
     /// (`monsters/ai.md`; `combat/events.md` §2.8).
@@ -779,8 +776,6 @@ pub trait Pending {
     fn corpse_loot_allowed(&self, corpse: UnitId, unit: UnitId) -> bool {
         false
     }
-    /// The corpse's item take-back `0x00562F30` (§4.7 rule 2).
-    fn corpse_take_back(&mut self, game: &mut Game, unit: UnitId, corpse: UnitId) {}
 
     /// Reaction `0x0057CEE0` (`damage.md` §7.1, call level only; its mode
     /// changes and the kill `0x0057CCB0` are not specified in full).
@@ -881,12 +876,6 @@ pub trait Pending {
 
     // ---- objects (`world/objects.md`; `ObjectWorld` seams) ------------
 
-    /// `0x00620A70`: stamp an object's footprint. The path provider has
-    /// no objects.txt shape for objects (`wiring::path` `path_shape`) and
-    /// the function is not in `path-placement.md`.
-    fn object_stamp_footprint(&mut self, game: &mut Game, object: UnitId) {}
-    /// `0x00623830`: free an object's footprint (as above).
-    fn object_free_footprint(&mut self, game: &mut Game, object: UnitId) {}
     /// Attach object sound `id` (`objects.md` §14; `0x00571740` when
     /// `now`). Sounds spec, not written.
     fn object_sound(&mut self, unit: UnitId, id: u8, to: Option<UnitId>, now: bool) {}
@@ -952,6 +941,33 @@ pub trait Pending {
     /// waypoint and `todo` inits, operates and events, uncovered presets
     /// ([`super::objects::ObjectRoute`]).
     fn object_route(&mut self, game: &mut Game, route: super::objects::ObjectRoute) {}
+    /// A class-59 portal's owner for S→C 0x82 (`intents-events.md`
+    /// §7.2): (owner GUID, owner name, the paired portal's GUID or
+    /// 0xFFFF_FFFF). Default: unknown (nothing is sent).
+    fn portal_owner(&self, object: UnitId) -> Option<(u32, Vec<u8>, u32)> {
+        None
+    }
+    /// The skill messages 0x21 of a monster's add (`intents-events.md`
+    /// §7.2): for each `monstats` skill slot i = 0..7 whose bit i of row
+    /// +0x16C is set, whose skill id (row +0x170 + 2i) is valid and which
+    /// the unit has: (skill, base level, bonus level). Default: none.
+    fn monster_add_skills(&self, unit: UnitId) -> Vec<(u16, u8, u8)> {
+        Vec::new()
+    }
+    /// The inventory messages `0x00534F80(unit, client)`
+    /// (`intents-events.md` §7.9 rule 4) to `receiver`'s client.
+    /// Default: nothing.
+    fn inventory_messages(&mut self, receiver: UnitId, unit: UnitId) {}
+    /// The GUID of the unit's minion owner (`0x0058F0D0`) when it is a
+    /// player whose pet type of the unit is 7 (hireable, `sim/pets.md`
+    /// §9; `monsters/init.md` §24 rule 4). Default: none.
+    fn hireling_owner_guid(&self, unit: UnitId) -> Option<u32> {
+        None
+    }
+    /// The unit's owner fields (type +0x94, id +0x98). Default: none.
+    fn unit_owner(&self, unit: UnitId) -> Option<(u32, u32)> {
+        None
+    }
     /// The C→S 0x13 object case's reach step (`waypoints.md` §5.2,
     /// `0x00548B00`: distance > 50 → refuse; in range and unobstructed →
     /// stop the player and operate; else walk and operate on arrival;
@@ -1441,6 +1457,28 @@ pub trait Pending {
     {
         1
     }
+    /// The skill start `0x0056FAF0` of a monster's attack / skill start
+    /// and sequence start (`units.md` §4.6 rules 7, 10); its result. A
+    /// [`crate::wiring::interaction::UseRest`] value routes it to
+    /// [`crate::wiring::interaction::skill_events::monster_skill_start`]
+    /// (`use.md` §5.3). Default: 0 (no skill pipeline: no used skill).
+    fn monster_skill_start(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, unit: UnitId) -> i32
+    where
+        Self: Sized,
+    {
+        0
+    }
+    /// The skill part of the monster sequence event 0 `0x005A8670`
+    /// (`units.md` §4.6 rule 13, before the animation refresh): E flags,
+    /// the moving skill's step and the do `0x0056FC50` by frame code. A
+    /// [`crate::wiring::interaction::UseRest`] value routes it to
+    /// [`crate::wiring::interaction::skill_events::monster_sequence_frame`].
+    /// Default: nothing.
+    fn monster_sequence_frame(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, unit: UnitId)
+    where
+        Self: Sized,
+    {
+    }
 
     // ---- client intents (`sim/intents-events.md` §9; d2-server's
     // `handlers::player`) -------------------------------------------------
@@ -1458,6 +1496,24 @@ pub trait Pending {
     /// contents (hover/chat spec, S→C 0x26 §7.9) live here. Default:
     /// nothing kept.
     fn replace_overhead(&mut self, player: UnitId, text: &[u8], byte8: u8, end: i32) {}
+    /// The items refresh `0x0055FDE0` of tick step 1 (`sim/tick.md` §3:
+    /// an act's environment report, before its 0x53). Default: nothing.
+    fn environment_refresh_items(&mut self, player: UnitId) {}
+    /// The room clean-up's client part for a player (`intents-events.md`
+    /// §7.5 step 7, `0x0053FA90`: the client record's +0x34 → +4 := 0).
+    /// Default: nothing (no client record model).
+    fn client_cleanup(&mut self, player: UnitId) {}
+    /// The text (`0x006611E0`) and byte +8 of the unit's overhead record
+    /// (unit +0xA4), for the overhead 0x26 of `intents-events.md` §7.9
+    /// rule 3. Default: none kept (nothing is sent).
+    fn overhead_record(&self, unit: UnitId) -> Option<(Vec<u8>, u8)> {
+        None
+    }
+    /// `0x0055B300(a, b, flag)`: a's relation to b has `flag` (party /
+    /// hostility flags). Default: no relation.
+    fn player_relation(&self, a: UnitId, b: UnitId, flag: u32) -> bool {
+        false
+    }
     /// `0x005845D0(game, player, GUID)`: the door highlight of C→S 0x3D
     /// (§9 rule 4, open question 15). Default: nothing.
     fn highlight_door(&mut self, game: &mut Game, player: UnitId, guid: u32) {}

@@ -87,7 +87,7 @@ id	name	size	layout	sender	client_handler	client_unit_handler	produced_by	confir
 0x55	-	0		-	0x0045C900	-	none	yes
 0x56	-	0		-	0x0045C900	-	none	yes
 0x57	NpcEnchants	14	guid:u32@1 type:u8@5 name:u16@6 umod0:u8@8 umod1:u8@9 umod2:u16@10 flag:u16@12	0x0053D880	0x0045E400	-	sim	yes
-0x58	OpenUi	7	guid:u32@1 code:u8@5 arg:u8@6	0x0053D8D0	0x0045E490	-	sim	yes
+0x58	OpenUi	7	guid:u32@1 code:u8@5 effect:u8@6	0x0053D8D0	0x0045E490	-	sim	yes
 0x59	AssignPlayer	26	guid:u32@1 class:u8@5 name:cstr16@6 x:u16@22 y:u16@24	0x0053E8F0	0x0045E4C0	-	sim	yes
 0x5A	EventMessage	40	code:u8@1 u8@2 u32@3 name:cstr16@8	0x0053C850	0x0045E070	-	sim	yes
 0x5B	PlayerJoined	u16@1;min=34	size:u16@1 guid:u32@3 class:u8@7 name:cstr16@8 level:u16@24 party:u16@26 u16@28 u16@30 u16@32 str1:cstr@34 str2:cstr	0x0053C940	0x0045E4E0	-	session	yes

@@ -3,7 +3,7 @@
 //! Object mode sounds (`0x004CB460` on objects): Cain's gibbet line, the
 //! mode loop `0x004CB3E0` and the transition `0x004CB380`.
 
-use super::tables::{ObjectSounds, MAX_OBJECT_CLASS};
+use super::tables::{ObjectSoundRow, ObjectSounds, MAX_OBJECT_CLASS};
 use super::{Ctx, TriggerError, Unit, UnitSound};
 
 /// Class 26 (Cain's gibbet), its line 3,671 `cain_act1_help` and the
@@ -15,17 +15,17 @@ pub const CAIN_DIST: i32 = 20;
 pub const TOWN_PORTAL: i32 = 59;
 /// Class 61: cairn stone loops by mode (§7 r4, table `0x00728338`).
 pub const CAIRN: i32 = 61;
+/// The cairn loop table `0x00728338` by mode (§7 r8): modes 1–5 → 413–417
+/// (`cairn_stone_1` … `cairn_stone_5`), modes 0, 6, 7 → 0.
+pub const CAIRN_LOOPS: [i32; 8] = [0, 413, 414, 415, 416, 417, 0, 0];
 /// Loop mode value meaning "any mode" (§7 TSV).
 pub const ANY_MODE: u8 = 8;
 
 /// Object mode sound call on object U in its current mode (§7 r1–r6).
-///
-/// TODO(spec: audio/triggers.md §7 r1): a class without a TSV row (120
-/// of 573): the original reads a record pointer the spec does not
-/// describe; d2rs makes no call and leaves the fields unchanged.
-/// TODO(spec: audio/triggers.md §7 r4): the cairn ids `cairn_stone_1..5`
-/// of table `0x00728338` are not given as numbers; for class 61 the loop
-/// step makes no call.
+/// A class without a TSV row (120 of 573) behaves as an all-zero row
+/// (§7 r7): no transition, loop 0 (U is detached from its looping
+/// requests), and U+0x74 / U+0x70 still updated. Class ≥ 573 or mode ≥ 8
+/// is fatal. Class 61 loops the cairn table by mode (§7 r8).
 pub fn object_mode(
     cx: &mut Ctx,
     table: &ObjectSounds,
@@ -37,9 +37,20 @@ pub fn object_mode(
     if !(0..=MAX_OBJECT_CLASS).contains(&c) {
         return Err(TriggerError::ObjectClass(c));
     }
-    let Some(row) = table.get(c) else {
-        return Ok(());
+    if m >= 8 {
+        return Err(TriggerError::ObjectMode(m));
+    }
+    let zero = ObjectSoundRow {
+        class: c,
+        modes: [0; 8],
+        loop_a: 0,
+        loop_a_mode: 0,
+        loop_b: 0,
+        loop_b_mode: 0,
+        ordered: false,
     };
+    let has_record = table.get(c).is_some();
+    let row = table.get(c).unwrap_or(&zero);
     // r2.
     if c == CAIN_GIBBET && m == 0 && us.last_idle == 0 && u.local_dist < CAIN_DIST {
         cx.req(CAIN_HELP, Some(u.key), 0);
@@ -49,26 +60,28 @@ pub fn object_mode(
     if us.obj_seen && m == us.obj_prev_mode {
         return Ok(());
     }
-    // r4.
-    if c != CAIRN {
-        let s = if row.loop_a_mode == m || row.loop_a_mode == ANY_MODE {
-            row.loop_a
-        } else if row.loop_b_mode == m || row.loop_b_mode == ANY_MODE {
-            row.loop_b
-        } else {
-            0
-        };
-        let reqs = cx.s.unit_requests(u.key);
-        if s != 0 {
-            let base = cx.s.group_base(s);
-            if !reqs.iter().any(|&(_, id)| cx.s.group_base(id) == base) {
-                cx.req(s, Some(u.key), 0);
-            }
-        } else {
-            for (h, id) in reqs {
-                if cx.s.looping(id) {
-                    cx.s.detach(h, u.key, false);
-                }
+    // r4 (`0x004CB3E0`; a null record gives 0, r7).
+    let s = if !has_record {
+        0
+    } else if c == CAIRN {
+        CAIRN_LOOPS[m as usize]
+    } else if row.loop_a_mode == m || row.loop_a_mode == ANY_MODE {
+        row.loop_a
+    } else if row.loop_b_mode == m || row.loop_b_mode == ANY_MODE {
+        row.loop_b
+    } else {
+        0
+    };
+    let reqs = cx.s.unit_requests(u.key);
+    if s != 0 {
+        let base = cx.s.group_base(s);
+        if !reqs.iter().any(|&(_, id)| cx.s.group_base(id) == base) {
+            cx.req(s, Some(u.key), 0);
+        }
+    } else {
+        for (h, id) in reqs {
+            if cx.s.looping(id) {
+                cx.s.detach(h, u.key, false);
             }
         }
     }

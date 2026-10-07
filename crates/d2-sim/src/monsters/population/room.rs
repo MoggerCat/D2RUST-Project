@@ -47,7 +47,8 @@ pub fn pick<H: PopHost + ?Sized>(
         record: false,
     };
     let Some(region) = cx.state.regions.get(level) else {
-        // TODO(spec: population.md §4): a null region is not described.
+        // §3.1: §4 is only reached with a non-null region (unreachable in
+        // 1.14d); a null region picks nothing.
         return none;
     };
     let seed = cx.host.room_seed(room);
@@ -155,8 +156,8 @@ pub fn populate_room<H: PopHost + ?Sized>(cx: &mut Ctx<'_, H>, room: RoomId) {
         return;
     }
     let Some(region) = cx.state.regions.get_mut(lvl) else {
-        // TODO(spec: population.md §3.1): regions[lvl] null after the
-        // guard passed is not described; nothing is populated.
+        // §3.1: a null region at either lookup means no population and no
+        // draws (unreachable in 1.14d).
         return;
     };
     if region.mon_den > MON_DEN_MAX {

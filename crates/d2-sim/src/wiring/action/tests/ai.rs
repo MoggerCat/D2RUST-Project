@@ -109,6 +109,35 @@ fn ai_mode_change_runs_the_monster_mode_set() {
 }
 
 #[test]
+fn ai_state_toggle_queues_the_unit_update() {
+    // `ai-bodies.md` §9.26 / `stat-lists.md` §9.2: the AI's `0x00639DB0`
+    // toggles the state and then always inserts the unit into its room's
+    // update queue, also when the bit did not change; a state outside the
+    // states table does nothing.
+    use crate::monsters::ai::AiUnits;
+    let mut fx = Fx::new();
+    let m = monster(&mut fx);
+    let _ = fx.game.lists.clear_update_queue(fx.a);
+    fx.sim.with(&mut fx.game, |g, v| {
+        AiUnits::set_state(v, g, m, u16::MAX, true)
+    });
+    assert!(fx.game.lists.update_queue(fx.a).is_empty());
+    let freeze = state::FREEZE as u16;
+    fx.sim.with(&mut fx.game, |g, v| {
+        AiUnits::set_state(v, g, m, freeze, true)
+    });
+    assert!(fx.sim.sys.stats.has_state(m, state::FREEZE));
+    assert_eq!(fx.game.lists.update_queue(fx.a), [m]);
+    let _ = fx.game.lists.clear_update_queue(fx.a);
+    // Unchanged bit: queued again.
+    fx.sim.with(&mut fx.game, |g, v| {
+        AiUnits::set_state(v, g, m, freeze, true)
+    });
+    assert_eq!(fx.game.lists.update_queue(fx.a), [m]);
+    fx.assert_clean();
+}
+
+#[test]
 fn think_scheduled_with_state_54_clears_it_first() {
     // `tick.md` §5.2 rule 4 / `ai.md` §1.1: `0x005544B0(unit, 0)` clears
     // state 54 and cancels the monster's type-2 events before the new
@@ -167,9 +196,10 @@ fn good_npc_ranged_takes_ai_turns() {
     assert_eq!(thinks(&fx, m), [21]);
     // The turn at 21 draws 5 < 20 → wander 5: exactly the wander draws
     // around its own position (`ai.md` §7.2), and a walk request the real
-    // monster mode set accepts (the walk start itself is the path spec's,
-    // pending here), so no think is left: the next comes from the walk's
-    // end.
+    // monster mode set runs. Without the path provider the monster has no
+    // path, so its point count is 0: the walk start fails into the
+    // neutral start (`units.md` §4.6 rule 5), which schedules the next
+    // think at 21 + aidel (0 → 15).
     fx.seed(m, seed_giving(5));
     let pos = fx.sim.hooks().x.position(m);
     let mut want = seed_giving(5);
@@ -179,7 +209,11 @@ fn good_npc_ranged_takes_ai_turns() {
         fx.frame();
     }
     assert_eq!(fx.sim.sys.units.get(m).unwrap().seed, want);
-    assert!(thinks(&fx, m).is_empty());
+    assert_eq!(thinks(&fx, m), [36]);
+    assert_eq!(
+        fx.sim.sys.units.get(m).unwrap().mode,
+        u32::from(mode::NEUTRAL)
+    );
     assert!(fx.sim.hooks().ai_store().unhandled.is_empty());
     fx.assert_clean();
 }

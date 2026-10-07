@@ -13,10 +13,11 @@
 //! (the client quest check, the player event line of `triggers.md` §3 r4)
 //! go through [`EnvHooks`].
 //!
-//! Inputs whose owner spec does not exist yet are taken as plain
-//! parameters: the day phase (TODO(spec: render/lighting.md), open
-//! question 3) and the weather flag / intensity (TODO(spec: weather), open
-//! question 4).
+//! Inputs owned by other specs are plain parameters (`environment.md` §1
+//! r5): the day phase is the period index of the client act's environment
+//! record (§1 r3, `render/lighting.md` §9.1–§9.3); the weather flag and
+//! intensity are the weather state of `render/draw-order-2.md`
+//! §11.1–§11.3.
 
 use std::collections::BTreeSet;
 
@@ -35,9 +36,11 @@ pub trait EnvCalls: SoundCalls {
     /// `0x004B9C60`: a request with an id in 4,657–4,698 is still active
     /// (not ended; a stop flag alone does not end it) (§2 r6).
     fn music_active(&self) -> bool;
-    /// `0x004B9D50` → `0x004DF900`: the play position of the playing
-    /// request of this id, or `None` when no request of it is playing
-    /// (§2 r8, §3 r1). Units: open question 2.
+    /// `0x004B9D50` → `0x004DF900`: the play position of the first
+    /// request of the active list whose current id is `id`, if it is
+    /// playing, else `None` (§1 r6; §2 r8, §3 r1). Units: 4-byte units of
+    /// the stream (`sound-table.md` §7 r8), one frame of a 16-bit stereo
+    /// song.
     fn play_position(&self, id: i32) -> Option<u32>;
     /// `Block 1`, `Block 2`, `Block 3` of sound row `id`
     /// (`sound-table.md` §1 r2; an empty cell reads −1).
@@ -45,15 +48,21 @@ pub trait EnvCalls: SoundCalls {
     /// Volume (+0x1C) of the request with this handle, `None` when no
     /// such request exists (§6 r3).
     fn volume(&self, h: Handle) -> Option<i32>;
-    /// `0x004B99A0(h, x, y, z)`: the request's position (§7 r3). The
-    /// original stores f32; every value passed here is integral.
+    /// `0x004B99A0(h, x, y, z)` (`sound-table.md` §5 r8): the request's
+    /// position := (x, y, z + 640.0) and its distance² from x, y (§7 r3).
+    /// The original stores f32; every value passed here is integral.
     fn set_position(&mut self, h: Handle, x: i32, y: i32, z: i32);
 }
 
 /// Calls into client code outside the sound layer.
 pub trait EnvHooks {
-    /// `0x004A4180(q)`: quest `q` is open and not done in the client quest
-    /// state (§4 r2). TODO(spec: world/quests.md): the client quest state.
+    /// `0x004A4180(q)` (§4 r2, `world/quests-status.md` §12): 1 when quest
+    /// `q` is open and not done for this player: byte q of the last S→C
+    /// 0x5E ≠ 0 (indexed directly, so q 12 / 13 read the bytes of chains 11
+    /// / 12), the first quest-log entry whose chain is q found, its slot
+    /// clear in the game record (bit 13) and the player record (bits 1, 0,
+    /// 14), and for q = 1 the Den of Evil shown status < 5. Only called
+    /// with q ≠ 0.
     fn quest_check(&self, q: u8) -> bool;
     /// Player event `e` on the local player P (`audio/triggers.md` §3 r4:
     /// the class quest line base + e − 33, delay per that rule) (§4 r2).
@@ -144,14 +153,18 @@ pub struct TickInput {
     pub level: u32,
     /// E: [`env_row`] of `levels[L].SoundEnv` (§1 r2).
     pub env: Option<EnvRow>,
-    /// First dword of the client act's environment (§1 r3).
-    /// TODO(spec: render/lighting.md): what sets it (open question 3).
+    /// The period index (+0x00) of the client act's environment record
+    /// (§1 r3, r5; answers open question 3): set by the client update's
+    /// advance and S→C 0x53 (`render/lighting.md` §9.2–§9.3), index 2
+    /// before the first 0x53 (§9.1). Day is 1–3.
     pub day_phase: u32,
-    /// Weather active (`0x00473C40`). TODO(spec: weather): open question 4.
+    /// Weather active (`0x00473C40`; `render/draw-order-2.md` §11.1–§11.3,
+    /// §1 r5).
     pub weather_active: bool,
     /// trunc(intensity × 255.0) of the weather intensity (f32
-    /// `[0x007A89A0]`), computed by the weather owner so no float reaches
-    /// this module (§6 r1). TODO(spec: weather): open question 4.
+    /// `[0x007A89A0]` = target particles × 1/256, `render/draw-order-2.md`
+    /// §11.1), computed by the weather owner so no float reaches this
+    /// module (§6 r1).
     pub rain_level: i32,
     /// `Master Volume` 0–100 (`sound-table.md` §9).
     pub master_volume: i32,
@@ -391,9 +404,10 @@ pub const ENTRY_RECORDS: [EntryRecord; 14] = [
 // ---------------------------------------------------------------------------
 
 /// State of `0x004CC270`: last level checked `[0x007C88CC]` and the
-/// per-level flags `[0x007C78B8]`. Not part of the §2 r9 reset.
-/// TODO(spec: audio/environment.md open question 6): when they are
-/// cleared; d2rs keeps them for the life of this value.
+/// per-level flags `[0x007C78B8]`. §4 r4 (answers open question 6): sound
+/// init at every game start clears the flags ([`EntryLines::game_start`],
+/// `0x004CA280`); the last level checked is never reset, so it carries
+/// the previous game's last level into the next game (reproduced).
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct EntryLines {
     last_checked: u32,
@@ -403,6 +417,17 @@ pub struct EntryLines {
 impl EntryLines {
     pub fn is_flagged(&self, level: u32) -> bool {
         self.flagged.contains(&level)
+    }
+
+    /// The last level checked (`[0x007C88CC]`).
+    pub fn last_checked(&self) -> u32 {
+        self.last_checked
+    }
+
+    /// `0x004CA280` from sound init (§4 r4): the level flags := 0; the
+    /// last level checked keeps its value.
+    pub fn game_start(&mut self) {
+        self.flagged.clear();
     }
 
     /// §4 r1–r3.
@@ -483,8 +508,8 @@ impl Music {
     }
 
     /// §2 r9 (`0x004DCA30`): every §2 and §3 variable and the resume
-    /// table := 0. TODO(spec: audio/environment.md open question 7): the
-    /// `[0x007A0438]` +0x220 condition is the caller's.
+    /// table := 0. Run by [`Environment::sound_init`], which applies the
+    /// `-ns` condition.
     pub fn reset(&mut self) {
         *self = Music::new(self.range);
     }
@@ -661,8 +686,10 @@ pub const SCENE_RAIN: i32 = 64;
 pub const BED_FADE: u32 = 250;
 /// Rain volume step per tick (§6 r3).
 pub const RAIN_STEP: i32 = 6;
-/// Cue z (640.0 in the original, §7 r3).
-pub const CUE_Z: i32 = 640;
+/// The z argument of the cue's position call (§7 r3, r6:
+/// `position(h, x, y, 0)`); `0x004B99A0` adds 640.0 (`sound-table.md` §5
+/// r8), so the cue sits at z = 640.0.
+pub const CUE_Z: i32 = 0;
 
 /// `0x004E42E0` state: bed `[0x007C8C88]` and its handle `[0x007C8C80]`,
 /// rain handle `[0x007C8C84]` and previous id `[0x007C8C8C]`, event id
@@ -713,9 +740,8 @@ impl Ambience {
             // "when raining": the weather flag of this tick (§6 r1 r ≠ 0).
             let rain = if inp.weather_active { SCENE_RAIN } else { 0 };
             s.stop_52_71_except(a, rain);
-            // TODO(spec: audio/environment.md §5 r2): the spec names one
-            // exception (E's current event id); the second argument of
-            // `0x004BA9D0` is not stated. Neutral: 0.
+            // §5 r2 (`0x004E4403`): the second exception of `0x004BA9D0`
+            // is always 0.
             s.stop_72_201_except(event_of(inp), 0);
         }
         if a == 0 {
@@ -751,8 +777,10 @@ impl Ambience {
             s.set_volume(self.rain_handle, v);
         }
         if self.rain_handle != 0 {
-            // TODO(spec: audio/environment.md §6 r3): the volume read of a
-            // handle whose request is gone; neutral: 0 (stops it).
+            // §6 r4: `0x004B9B20` reads 0 for a handle whose request is
+            // gone; with v > 0 the step then writes min(6, v) to the
+            // missing request (nothing happens) and the stale handle is
+            // kept until v reaches 0 or the weather ends.
             let w = s.volume(self.rain_handle).unwrap_or(0);
             let w = if w < v {
                 (w + RAIN_STEP).min(v)
@@ -836,6 +864,17 @@ impl Environment {
             music: Music::new(range),
             entry: EntryLines::default(),
         }
+    }
+
+    /// Sound init at a game start (`0x00482260`): the music reset of §2 r9
+    /// runs unless the start-up configuration's `-ns` switch
+    /// (`[0x007A0438]` +0x220) is set (answers open question 7); the
+    /// level-entry flags are cleared (§4 r4).
+    pub fn sound_init(&mut self, no_sound_switch: bool) {
+        if !no_sound_switch {
+            self.music.reset();
+        }
+        self.entry.game_start();
     }
 
     /// One sound tick (`0x00482C20`, before the request update): ambience

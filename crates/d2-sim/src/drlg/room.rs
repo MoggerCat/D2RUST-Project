@@ -7,7 +7,7 @@ use crate::rng::Seed;
 
 use super::active::ActiveRoom;
 use super::data::DrlgData;
-use super::level::Drlg;
+use super::level::{BuildCursor, Drlg};
 use super::logic::LogicInfo;
 use super::seams::{LevelTypes, Services};
 use super::tiles::RoomTiles;
@@ -683,26 +683,27 @@ impl Drlg {
         if self.build_timer != 0 {
             return Ok(Vec::new());
         }
-        // Rule 6. The head node (cursor `None` after a walk that ended at
-        // the tail) is taken as not having status 2.
-        // TODO(spec: drlg/rooms.md §4.6 rule 6): the status (+0x44) of the
-        // list head node at drlg +0x278 is not stated; zero at allocation
-        // (`levels.md` §3 step 1) unless `0x0061B7E0` writes it.
+        // Rule 6: C none or on a room whose status is not 2 → the first
+        // status-2 room (the head node when the list is empty). The head
+        // node reads status 2 (rule 9, `0x0061B7E0`), so it is kept.
         self.build_timer = self.build_timer_reset();
         let list = self.status_lists[2].clone();
-        let start = self
-            .build_cursor
-            .filter(|&c| self.try_room(c).is_some_and(|r| r.status == 2))
-            .and_then(|c| list.iter().position(|&r| r == c))
-            .unwrap_or(0);
-        // Rule 7: the circular walk from S = C; `None` is the head node.
         let n = list.len();
+        let start = match self.build_cursor {
+            BuildCursor::Head => n,
+            BuildCursor::Room(c) if self.try_room(c).is_some_and(|r| r.status == 2) => {
+                list.iter().position(|&r| r == c).unwrap_or(0)
+            }
+            _ => 0,
+        };
+        // Rule 7: the circular walk from S = C; index n (`None`) is the
+        // head node, never built.
         let walk = (0..=n).map(|k| {
             let i = (start + k) % (n + 1);
             list.get(i).copied()
         });
         let mut built = Vec::new();
-        let mut next = None;
+        let mut next = BuildCursor::Head;
         for (k, node) in walk.enumerate() {
             if let Some(id) = node {
                 let r = self.room(id);
@@ -713,7 +714,9 @@ impl Drlg {
             }
             // Rule 8: C := the room after the last one examined.
             let after = (start + k + 1) % (n + 1);
-            next = list.get(after).copied();
+            next = list
+                .get(after)
+                .map_or(BuildCursor::Head, |&r| BuildCursor::Room(r));
             if k + 1 == n + 1 || self.builds_since_update >= 1 {
                 break;
             }

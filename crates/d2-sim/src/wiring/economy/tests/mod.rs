@@ -5,7 +5,9 @@
 
 mod cube;
 mod items;
+mod quest_host;
 mod quest_players;
+mod quest_reward;
 mod quests;
 mod treasure;
 

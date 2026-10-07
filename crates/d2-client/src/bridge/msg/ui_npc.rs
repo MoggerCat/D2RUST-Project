@@ -85,7 +85,7 @@ pub fn quest_info(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerE
         unit: key,
         class,
         interact: row(class).is_some_and(|r| r.interact),
-        f4b1a10: None,
+        f4b1a10: Some(crate::bridge::output::f4b1a10(class)),
         cursor_item,
         npc_monsters,
     })));
@@ -233,7 +233,10 @@ pub fn npc_interact(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handle
         unit: key,
         present: unit.is_some(),
         class: unit.map_or(0, |u| u.class),
-        mdata_3c: None,
+        // PROVISIONAL (client/msg-ui.md §9 r2): monster data +0x3C has
+        // no model writer, so a monster's stays −1; settled by a Ghidra
+        // xref of +0x3C writes in monster data.
+        mdata_3c: unit.filter(|u| u.key.unit_type == MONSTER).map(|_| -1),
         blocker_open,
     });
     Ok(())

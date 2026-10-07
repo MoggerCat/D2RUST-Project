@@ -27,9 +27,11 @@ pub enum Checked {
     NoRoom,
 }
 
-/// `L` of rule 4: `([0x007A04A4] + 0x32) >> 7` with the global 0
-/// (open question 3).
-const L: u32 = 0;
+/// `L` of rule 4: `([0x007A04A4] + 0x32) >> 7`, read from the model's
+/// ping round trip (`model.md` §7 r11; d2rs sends no ping, so 0).
+fn latency(world: &ClientWorld) -> u32 {
+    world.ping.rtt.wrapping_add(0x32) >> 7
+}
 
 /// Static-path kinds (rule 3): objects, items, tiles.
 fn is_static(unit_type: u8) -> bool {
@@ -41,11 +43,14 @@ fn tolerance(world: &ClientWorld, unit: &ClientUnit, kind: u8) -> u32 {
     match kind {
         1 => 10,
         2 => 0,
-        _ if world.local_player == Some(unit.key) => match unit.mode {
-            1 => 3 + L,
-            3 => 7 + L,
-            _ => 5 + L,
-        },
+        _ if world.local_player == Some(unit.key) => {
+            let l = latency(world);
+            match unit.mode {
+                1 => 3 + l,
+                3 => 7 + l,
+                _ => 5 + l,
+            }
+        }
         _ if unit.key.unit_type == MONSTER && (3..=5).contains(&unit.mode) => 5,
         _ if unit.key.unit_type == MONSTER && (6..=11).contains(&unit.mode) => 7,
         _ => 15,
@@ -171,4 +176,9 @@ fn correct(world: &mut ClientWorld, key: UnitKey, x: u16, y: u16) -> Checked {
         world.room_units.place(key, room);
     }
     Checked::Moved
+}
+
+#[cfg(test)]
+pub(crate) fn latency_for_test(world: &ClientWorld) -> u32 {
+    latency(world)
 }

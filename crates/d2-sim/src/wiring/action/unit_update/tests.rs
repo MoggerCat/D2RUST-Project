@@ -210,6 +210,21 @@ fn room_cleanup_clears_the_listed_flags() {
     assert_eq!(path(&mut fx, m).flags, !0x2);
 }
 
+/// §7.5 steps 4 and 7: the state-changed bits are zeroed and a player's
+/// stat 29 `lastexp` := −1.
+// Covers: specs/sim/intents-events.md §7.5 r4, §7.5 r7
+#[test]
+fn room_cleanup_resets_changed_states_and_lastexp() {
+    let (mut fx, p, _) = setup();
+    fx.sim.sys.stats.set_state_changed(p, 1, true);
+    let s = &mut fx.sim.sys;
+    let mut v = View::of(&mut s.units, &mut s.stats, &s.data, &mut s.hooks);
+    v.room_cleanup(p);
+    let (_, changed) = fx.sim.sys.stats.state_bits(p).expect("state bits");
+    assert!(changed.iter().all(|&w| w == 0), "{changed:?}");
+    assert_eq!(fx.sim.sys.stats.unit_base(p, 29, 0), -1);
+}
+
 /// §7.4 rule 4: with the provider on and no path record, the mode
 /// message is the fatal 0xE6 (logged, nothing sent).
 // Covers: specs/sim/intents-events.md §7.4 r4
@@ -321,4 +336,63 @@ fn unqueued_monster_bits_send_nothing() {
     }
     fx.tick();
     assert_eq!(sent(&mut fx), vec![]);
+}
+
+/// §7.9 rule 3 with §9 rule 3's record: no hover → 0x76; after
+/// `replace_overhead` (text "yo", byte +8 = 4) the overhead chat 0x26
+/// form 5 carries the kept record (a player the receiver has no
+/// relation to).
+// Covers: specs/sim/intents-events.md §7.9 r3, §9 r3
+#[test]
+fn overhead_message_sends_the_kept_record() {
+    let (mut fx, p, _) = setup();
+    let g = guid(&fx, p);
+    fx.sim.sys.units.get_mut(p).unwrap().hover = None;
+    let s = &mut fx.sim.sys;
+    let mut v = View::of(&mut s.units, &mut s.stats, &s.data, &mut s.hooks);
+    v.overhead_message(p, p, 0, g);
+    v.replace_overhead(p, b"yo", 4, 77);
+    v.overhead_message(p, p, 0, g);
+    assert_eq!(fx.sim.sys.units.get(p).unwrap().hover, Some(77));
+    let gb = g.to_le_bytes();
+    assert_eq!(
+        sent(&mut fx),
+        vec![
+            (p, vec![0x76, 0, gb[0], gb[1], gb[2], gb[3]]),
+            (p, crate::units::messages::overhead_chat(4, 0, g, b"yo")),
+        ]
+    );
+}
+
+/// `tick.md` §3 step 1 with `render/lighting.md` §9.3 rule 5: the act's
+/// record advances once per tick; the 2176th tick reports and the
+/// in-game client of that act gets `53 02000000 80080000 00`.
+// Covers: specs/sim/tick.md §3; specs/render/lighting.md §9.3 r5
+#[test]
+fn environment_report_sends_0x53_to_the_act_s_clients() {
+    let (mut fx, p, _) = setup();
+    let act = fx.game.lists.room(fx.a).unwrap().act;
+    // Not built by a join: no advance (the setup tick left it untouched).
+    assert_eq!(
+        fx.game.lists.act(act).unwrap().environment,
+        crate::world::environment::Environment::CREATED
+    );
+    fx.game.lists.act_mut(act).unwrap().built = true;
+    fx.tick();
+    let env = |fx: &mut Fx| {
+        let s = std::mem::take(&mut fx.sim.hooks().x.sent);
+        s.into_iter()
+            .filter(|(_, m)| m[0] == 0x53)
+            .collect::<Vec<_>>()
+    };
+    for _ in 1..2175 {
+        fx.tick();
+    }
+    assert_eq!(env(&mut fx), vec![]);
+    fx.tick();
+    assert_eq!(
+        env(&mut fx),
+        vec![(p, vec![0x53, 2, 0, 0, 0, 0x80, 0x08, 0, 0, 0])]
+    );
+    assert_eq!(fx.game.lists.act(act).unwrap().environment.last_hour, 17);
 }

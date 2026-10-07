@@ -10,9 +10,12 @@
 //! Every other call goes to [`InvRest`] unchanged.
 
 use super::{InvDesk, InvError, InvRest};
-use crate::items::inventory::{active_inventory_item, belt_removal_allowed};
+use crate::items::inventory::{
+    active_inventory_item, belt_removal_allowed, corpse_slot_fit, InvWorld, UnitKind,
+};
 use crate::items::moves::{Guid, MovePending, Owner, Spot};
 use crate::units::lifecycle::LifecycleHooks;
+use crate::units::UnitId;
 
 /// Stat 152 `item_indesctructible` (`generation.md` §1.3).
 const STAT_INDESTRUCTIBLE: u16 = 152;
@@ -54,27 +57,27 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
             self.note_list(r);
         }
     }
-    /// `0x00557FD0`: its body is not written; the unit removal
-    /// `0x00555600` (`units.md` §3.2) frees the unit and its item data.
-    /// An item still linked in an inventory is logged
-    /// ([`InvError::FreedWhileLinked`]) and freed.
-    // TODO(spec: inventory-moves.md §7.12 / §10.1): what `0x00557FD0` does
-    // besides the unit removal (unlink, room, messages).
+    /// `0x00557FD0` (`world/cube.md` §8 "Exact" 1, `inventory-moves.md`
+    /// §7.12): the item is unlinked from any player inventory list or
+    /// cursor still holding it (callback `0x00557FA0` → `0x00557F50` over
+    /// the players), then the unit removal `0x00555600` (`units.md` §3.2)
+    /// frees the unit and its item data. Nothing else.
     fn free_item(&mut self, item: Guid) {
         let Some(u) = self.item_unit(item) else {
             return;
         };
-        // The cursor item is not in the item list (§1.4 rule 3): freeing
-        // it before "cursor := none" (§7.20) is no linked free.
-        let linked = self
+        let holders: Vec<UnitId> = self
             .state
-            .items
-            .get(&u)
-            .and_then(|d| d.inv)
-            .and_then(|o| self.state.inventories.get(&o))
-            .is_some_and(|inv| inv.contains(u));
-        if linked {
-            self.state.errors.push(InvError::FreedWhileLinked(u));
+            .inventories
+            .iter()
+            .filter(|(&o, inv)| {
+                matches!(self.kind_of(o), Some(UnitKind::Player { .. }))
+                    && (inv.contains(u) || inv.cursor() == Some(u))
+            })
+            .map(|(&o, _)| o)
+            .collect();
+        for o in holders {
+            self.unlink_from(o, u);
         }
         if let Err(e) = self.econ.free_item(u) {
             self.state.errors.push(InvError::Economy(e));
@@ -177,9 +180,9 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
     /// `0x0057FB70` on the unit hooks
     /// ([`crate::units::hooks::UnitHooks::player_corpse_pickup`]: the
     /// action wiring's `ActionHooks::corpse_pickup`).
-    fn corpse_pickup(&mut self, player: Owner, corpse: Owner) {
+    fn corpse_pickup(&mut self, player: Owner, corpse: Owner) -> bool {
         let (Some(p), Some(c)) = (self.unit_of(player), self.unit_of(corpse)) else {
-            return;
+            return false;
         };
         let e = &mut *self.econ;
         let mut sim = crate::units::hooks::Sim {
@@ -188,7 +191,33 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
             stats: &mut *e.stats,
             data: e.data,
         };
-        e.hooks.player_corpse_pickup(&mut sim, p, c);
+        e.hooks.player_corpse_pickup(&mut sim, p, c)
+    }
+    /// §12.3 on the inventory model ([`corpse_slot_fit`]).
+    fn corpse_slot_fit(
+        &self,
+        unit: Owner,
+        x: Guid,
+        d: Option<Guid>,
+        a: Option<Guid>,
+        l: u8,
+    ) -> (bool, u8) {
+        let (Some(u), Some(xu)) = (self.unit_of(unit), self.item_unit(x)) else {
+            return (false, l);
+        };
+        let d = d.and_then(|g| self.item_unit(g));
+        let a = a.and_then(|g| self.item_unit(g));
+        corpse_slot_fit(self, self.tables, u, xu, d, a, l)
+    }
+    /// The corpse list, room and unit removal are not modelled by the
+    /// desk: the rest's.
+    fn corpse_taken(&mut self, player: Owner, corpse: Owner) {
+        self.rest.corpse_taken(player, corpse)
+    }
+    fn replenish_timers(&mut self, item: Guid) {
+        if let Some(u) = self.item_unit(item) {
+            self.schedule_replenish(u);
+        }
     }
     fn player_interact(&mut self, player: Owner, other: Owner) {
         self.rest.player_interact(player, other)
@@ -341,20 +370,45 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
         }
         self.rest.filler_linked(filler, target)
     }
-    /// §7.19 step 3's runeword ([`InvDesk::activate_runeword_on`]); the
-    /// rest's default is not asked.
-    fn runeword(&mut self, _player: Owner, target: Guid) -> bool {
-        self.item_unit(target)
-            .is_some_and(|t| self.activate_runeword_on(t))
+    /// §7.19 step 3's runeword and recharge ([`InvDesk::socket_runeword`]);
+    /// each recharged charged skill is announced to the player by S→C 0x3E
+    /// stat 204 (`generation.md` §12.2 step 4). The rest's default is not
+    /// asked.
+    fn runeword(&mut self, player: Owner, target: Guid) -> bool {
+        let Some(t) = self.item_unit(target) else {
+            return false;
+        };
+        let (ran, recharged) = self.socket_runeword(t);
+        if player.is_player() {
+            for _ in recharged {
+                self.rest
+                    .send_item_stat(player, target, crate::items::recharge::CHARGED_SKILL);
+            }
+        }
+        ran
     }
+    /// `0x00574EC0(7, 0)` on the lent hireling lists
+    /// ([`InvDesk::lent_hireling`]); none lent → the rest.
     fn hireling(&self, player: Owner) -> Option<Owner> {
-        self.rest.hireling(player)
+        match self.lent_hireling(player) {
+            Some(m) => m,
+            None => self.rest.hireling(player),
+        }
     }
+    /// `0x0065A590` with the lent lists ([`InvDesk::lent_owns_hireling`]);
+    /// none lent → the rest.
     fn owns_hireling(&self, player: Owner, merc: Owner) -> bool {
-        self.rest.owns_hireling(player, merc)
+        match self.lent_owns_hireling(player, merc) {
+            Some(b) => b,
+            None => self.rest.owns_hireling(player, merc),
+        }
     }
+    /// `0x0054CED0` (`world/hirelings.md` §11) with the lent lists
+    /// ([`InvDesk::lent_equip_on_merc`]); none lent → the rest.
     fn equip_on_merc(&mut self, merc: Owner, item: Guid) {
-        self.rest.equip_on_merc(merc, item)
+        if !self.lent_equip_on_merc(merc, item) {
+            self.rest.equip_on_merc(merc, item)
+        }
     }
     fn merc_after_take(&mut self, merc: Owner) {
         self.rest.merc_after_take(merc)

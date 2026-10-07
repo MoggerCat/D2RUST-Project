@@ -3,8 +3,10 @@
 - **Status:** draft: every rule below was read from the 1.14d `Game.exe`
   disassembly (`tools/ghidra/disasm.py`, addresses inline) and the live
   1.14d `patch_d2` `objects.txt` (`ClientFn` column, 574 data rows); D2MOO
-  1.10f was not used. No recording of these objects exists. Not
-  implemented yet.
+  1.10f was not used. No recording of these objects exists.
+  Implemented, unverified: `d2-client::bridge::objects` (branch
+  `claude/impl-final-objclient`; its PROVISIONAL choices are listed in
+  `docs/handoff/impl-final-objclient.md`).
 - **Target version:** 1.14d
 - **Crate/module:** `d2-client` (client object update; the model is
   `client/model.md`), with the rows of `objects.txt` from `d2-data`
@@ -25,20 +27,20 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 44–54 |
-| Inputs | 55–66 |
-| Outputs / state changes | 67–74 |
-| Rules | 75–76 |
-|   25. Client object function dispatch | 77–166 |
-|   26. The client object functions | 167–364 |
-|   27. Client latches of the zoo and the preloads | 365–375 |
-|   28. What d2rs must model for §25–§27 | 376–388 |
-| Constants & data dependencies | 389–410 |
-| Randomness | 411–424 |
-| Edge cases & original bugs | 425–442 |
-| Test vectors | 443–469 |
-| Provenance | 470–491 |
-| Open questions | 492–498 |
+| Summary | 46–56 |
+| Inputs | 57–68 |
+| Outputs / state changes | 69–76 |
+| Rules | 77–78 |
+|   25. Client object function dispatch | 79–168 |
+|   26. The client object functions | 169–367 |
+|   27. Client latches of the zoo and the preloads | 368–378 |
+|   28. What d2rs must model for §25–§27 | 379–391 |
+| Constants & data dependencies | 392–413 |
+| Randomness | 414–427 |
+| Edge cases & original bugs | 428–445 |
+| Test vectors | 446–472 |
+| Provenance | 473–494 |
+| Open questions | 495–502 |
 <!-- /index -->
 
 ## Summary
@@ -319,13 +321,14 @@ now > T →
 Returns 1. `0x00470390` has no duplicate test for type 3 (only type 8
 tests, `0x0046E100`), so in mode 0 a new overlay record is added every
 500 ms; how long a type-3 overlay lives is the overlay owner's
-(`render/unit-composite.md`, Pending there).
+(`render/unit-composite.md` owns it).
 
 #### 26.16 ClientFn 16, `0x004BDE00` (563, 569 Baal's portals)
 
 Mode = 1 and frame = `Start1` × 256 exactly (+0x12A, shifted) → write
 mode 2, frame := 0, `refresh(U)`, `reinit(U)`. Returns 1.
-Pending: at call site A the generic step `0x004BCBB0` has already
+PROVISIONAL: the generic step reaches mode 2 itself at the end of mode 1 (because the rule cannot hold after the step has advanced the frame at a non-zero speed); settled by REC-45.
+Why: at call site A the generic step `0x004BCBB0` has already
 advanced the frame in the same update, so with a non-zero speed the
 frame is past `Start1` × 256 (live `Start1` 0, `FrameDelta1` 256) and
 the rule cannot hold; the generic step then reaches mode 2 itself at
@@ -436,7 +439,7 @@ All draws are client-side and never reach the server.
 5. ClientFn 9 and 17 read the local player without a null test; ClientFn
    13 tests it.
 6. ClientFn 15 adds an overlay every 500 ms in mode 0 (§26.15).
-7. ClientFn 16 may never fire (§26.16, Pending).
+7. ClientFn 16 may never fire (§26.16, PROVISIONAL, REC-45).
 8. ClientFn 14, 15, 18 set T from a second `GetTickCount` read after
    the work, not from now.
 
@@ -493,5 +496,6 @@ and the next lo'' = 791,599,131 (`world/objects.md` test vectors).
 
 1. §26.16: can ClientFn 16 fire (object speed in mode 1)? A recording of
    Baal's portal opening settles it.
+   PROVISIONAL: ClientFn 16 never fires; the generic step reaches mode 2 (because the frame has advanced past `Start1` × 256 before the test); settled by REC-45.
 2. What `0x0046F870`'s flag 1 (orifice preload) changes against 0
    (`client/msg-ui.md` open question 1, same point).

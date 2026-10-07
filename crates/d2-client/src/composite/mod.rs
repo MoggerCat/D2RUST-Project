@@ -4,9 +4,9 @@
 //! [`DrawItem`] per drawn component. Plain Rust, no Bevy types.
 //!
 //! Only the mechanism is ours. Everything §A7 hands to a §B owner spec goes
-//! through [`ComponentResolver`], whose methods are the `TODO(spec: …)`
-//! hooks: this module never picks a file, a frame inside it, a screen
-//! position, a shade chain or a blend op on its own.
+//! through [`ComponentResolver`], one hook per owner-spec question (each
+//! names its spec): this module never picks a file, a frame inside it, a
+//! screen position, a shade chain or a blend op on its own.
 //!
 //! The scene id of the chosen frame is not a hook: [`build_with`] looks
 //! `(FrameSetKey, index)` up in a frame store ([`FrameIds`], implemented by
@@ -203,15 +203,15 @@ pub struct ComponentFrame {
 }
 
 /// The §B owner-spec answers a composite needs, one hook per question.
-/// Every method is a `TODO(spec: …)` hook: implementations follow the named
-/// owner spec once written; until then an implementation that cannot answer
-/// returns an error (`CompositeError::Unresolved`), never a default.
+/// Every method cites the owner spec it follows; an implementation whose
+/// inputs are missing returns an error (`CompositeError::Unresolved`),
+/// never a default.
 pub trait ComponentResolver {
-    /// TODO(spec: render/unit-composite.md) (§B4): component file path
-    /// (token, armor class variant, mode, weapon class), file direction for
-    /// the COF direction, and the frame inside that direction. Whether a
-    /// slot is drawn at all is also §B4: until it says otherwise, every
-    /// slot is drawn.
+    /// `render/unit-composite.md` §5.1, §6, §10 (the rules are
+    /// `rules::unit_composite`): component file path (token, armor class
+    /// variant, mode, weapon class, §5.1), file direction `dcc_dir` from
+    /// the snapped `dir64` and the cel `Ff × dcc_dir + frame` (§3, §6 r3).
+    /// Whether a slot draws at all is [`Self::slot_frame`].
     fn frame(&self, req: &ComponentRequest<'_>) -> Result<ComponentFrame, CompositeError>;
 
     /// The slot's frame, or `None` when the slot draws nothing
@@ -226,20 +226,23 @@ pub trait ComponentResolver {
         self.frame(req).map(Some)
     }
 
-    /// TODO(spec: render/sprite-placement.md) (§B1): screen top-left of the
-    /// component's image, from the unit's position and the frame offsets.
+    /// `render/sprite-placement.md` §2, §8 and `render/camera.md` §4, §10:
+    /// screen top-left of the component's image, from the unit's position
+    /// (camera §4: X, Y) and the frame offsets (placement §8).
     fn place(
         &self,
         req: &ComponentRequest<'_>,
         frame: &ComponentFrame,
     ) -> Result<(i32, i32), CompositeError>;
 
-    /// TODO(spec: render/shading.md, render/unit-composite.md) (§B3/§B4):
-    /// light level, per-component colormaps, selection highlight.
+    /// `render/shading.md` §6, §10, `render/unit-composite.md` §7 and
+    /// `render/lighting.md` §11 r1, §13: the remap `P` of the component's
+    /// colormap source, then the light map `L` of the unit's light value
+    /// (highlight `H` in draw mode 7, shading §5).
     fn shade(&self, req: &ComponentRequest<'_>) -> Result<ShadeChain, CompositeError>;
 
-    /// TODO(spec: render/blend-modes.md) (§B5): the blend op, including the
-    /// layer's translucency override fields.
+    /// `render/blend-modes.md` §3, §7: the blend op of the component's draw
+    /// mode, including the COF layer's translucency override (bytes 3, 4).
     fn blend(&self, req: &ComponentRequest<'_>) -> Result<BlendOp, CompositeError>;
 
     /// The scene id of a resident frame (residency, `client/assets.md`
@@ -278,13 +281,16 @@ impl FrameIds for FrameStore {
 /// Per-unit draw parameters shared by all its components.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UnitParams {
-    /// Draw key fields shared by all components (§A7 step 4).
-    /// TODO(spec: render/draw-order.md) (§B6): the caller fills them.
+    /// Draw key fields shared by all components (§A7 step 4), filled by
+    /// the caller from the unit's place in the frame's draw order
+    /// (`render/draw-order.md` §10: e.g. pass 6, major = cell index, minor
+    /// = wall count + unit-list position); `sub` is the slot index
+    /// ([`build`], `render/unit-composite.md` §10).
     pub pass: u32,
     pub major: u32,
     pub minor: u32,
-    /// TODO(spec: render/camera.md, render/draw-order.md): the view edge or
-    /// UI clip; [`Rect::FRAME`] when nothing else applies.
+    /// The frame `[0, W) × [0, H)` (`render/camera.md` §10: the play area
+    /// is not a clip; wall culling, §7, never applies to units).
     pub clip: Rect,
     /// Debug label, e.g. [`ItemTag::Unit`] with the unit GUID.
     pub tag: ItemTag,

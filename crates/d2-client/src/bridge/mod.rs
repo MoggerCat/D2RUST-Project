@@ -22,6 +22,7 @@ pub mod link;
 pub mod local;
 pub mod mirror;
 pub mod msg;
+pub mod objects;
 pub mod output;
 pub mod receive;
 pub mod skills;
@@ -266,6 +267,23 @@ impl<L: ServerLink> Bridge<L> {
         self.inputs.tables = tables;
     }
 
+    /// The unit-message rows (`msg-units.md` §1.2 r7, §1.3 r3,
+    /// `model.md` §15 r1): `monstats` / `monstats2`, `itemstatcost` send
+    /// columns, `objects.txt` and `shrines.txt`; the other tables stay.
+    pub fn set_unit_rows(&mut self, rows: world::UnitRows) {
+        let t = &mut self.inputs.tables;
+        t.monsters = rows.monsters;
+        t.stats = rows.stats;
+        t.objects = rows.objects;
+        t.shrines = rows.shrines;
+    }
+
+    /// The host's wall-clock seconds `0x00410A80` (`render/lighting.md`
+    /// §10 r4).
+    pub fn set_wall_seconds(&mut self, f: fn() -> i32) {
+        self.inputs.wall_seconds = Some(f);
+    }
+
     /// The `skills` rows of the client skill list (`msg-skills.md`
     /// Inputs); the other tables stay.
     pub fn set_skill_rows(&mut self, rows: Vec<world::SkillRow>) {
@@ -276,6 +294,25 @@ impl<L: ServerLink> Bridge<L> {
     /// 1); `None`: no client DRLG.
     pub fn set_drlg_source(&mut self, source: Option<drlg::DrlgSource>) {
         self.inputs.drlg = source;
+    }
+
+    /// The wall clock of the next update, `GetTickCount()` in wrapping
+    /// milliseconds (`model.md` §5 rule 2; `world/objects-client.md` §25
+    /// r6): the live client passes the host clock, tests a scripted value.
+    pub fn set_now(&mut self, now: u32) {
+        self.inputs.now = now;
+    }
+
+    /// The `objects.txt` rows the client object update reads
+    /// (`world/objects-client.md` §28 r1); empty: no object update.
+    pub fn set_object_rows(&mut self, rows: Vec<objects::ObjClientRow>) {
+        self.inputs.objclient.rows = rows;
+    }
+
+    /// The UI layer's client quest record `[0x007C0D43]` (`ClientFn` 13,
+    /// `world/objects-client.md` §26.13 r3).
+    pub fn set_client_quest_flags(&mut self, flags: Option<[u8; objects::QUEST_RECORD]>) {
+        self.inputs.objclient.quest_flags = flags;
     }
 
     /// The visibility predicate of the position check (`model.md` §6

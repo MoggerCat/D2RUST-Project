@@ -458,7 +458,8 @@ fn gate<W: MechWorld>(
             schedule_endanim(w, t.object(op.class)?, o);
         }
         2 => {
-            w.stamp_footprint(o);
+            let (x, y) = w.position(o);
+            w.stamp_footprint(o, w.room(o), x, y);
             set_mode(t, w, o, op.class, 0, true)?;
             ctl.get_mut(o)?.last_tick = now;
         }

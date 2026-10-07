@@ -140,7 +140,7 @@ pub enum SceneError {
     LightMaps(MapId),
     #[error("drawn area {area:?} leaves the gradient block {block:?}")]
     GradientArea { area: Rect, block: Rect },
-    #[error("flip_x is reserved until an owner spec defines it")]
+    #[error("flip_x is always false: no original draw mirrors (render/sprite-placement.md §8)")]
     FlipX,
     #[error("view {0:?} has pixels past the i32 screen range")]
     View(Rect),

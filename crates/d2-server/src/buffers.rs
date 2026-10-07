@@ -27,6 +27,9 @@ pub enum QueueError {
     BadId(u8),
     #[error("S->C message of {0} bytes (local delivery asserts 1..=0x204)")]
     BadSize(usize),
+    /// A direct send or a client flush on a sink without receive lists.
+    #[error("S->C id {0:#04x}: this sink has no direct send or flush")]
+    NoDirect(u8),
 }
 
 /// The per-client buffer lists (spec §3.2 rules 1–2). Clients are known

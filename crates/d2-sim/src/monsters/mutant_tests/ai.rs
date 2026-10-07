@@ -162,6 +162,27 @@ fn spl_end_generic_cases() {
     }
 }
 
+// Covers: specs/monsters/ai.md §1.4
+#[test]
+fn spl_end_generic_is_tested_before_the_walk_table() {
+    // Willowisp (118) at the end of walk: the SplEndGeneric branch runs
+    // first and leaves the anim mode as it is (still walk at the think, so
+    // the Idle AI's idle requests neutral); without SplEndGeneric the
+    // table-1 branch sets neutral first (no request). Both think inline
+    // (Idle AI → +200).
+    for (generic, request) in [(1, true), (0, false)] {
+        let mut w = World::new(monstats(1, [0; 5], 15));
+        w.monstats[0].baseid = 118;
+        w.monstats[0].splendgeneric = generic;
+        let mon = w.mon;
+        w.fake.anim.insert(mon, mode::WALK);
+        w.with(|g, cx| mode_end(g, cx, mon, mode::WALK));
+        assert_eq!(w.thinks(), [200], "generic {generic}");
+        let neutral = w.logged(&at_unit(mode::NEUTRAL, mon));
+        assert_eq!(neutral, request, "generic {generic}");
+    }
+}
+
 // ---- §3.3: installing an AI ----------------------------------------------
 
 // Covers: specs/monsters/ai.md §3.3 r2

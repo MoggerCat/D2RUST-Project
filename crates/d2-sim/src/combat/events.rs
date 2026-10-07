@@ -1492,11 +1492,14 @@ pub fn core<W: EventWorld>(
 /// (`skills/bodies.md` §2.18) over the unit's handlers in list order: each
 /// record of `event` runs once; key-type-0 records are removed after
 /// their run. Returns the last matching result, 0 when none matched.
-// TODO(spec: skills/bodies.md §2.18): the walk reads the next record after
-// each call; d2rs walks a snapshot taken before the first call, so a
-// record unregistered (not running) by an earlier call in the same run
-// still runs here. The running-record deferral (flags bit 2) is the
-// same as removing it after its own call.
+///
+/// §2.18 reads the next record **after** each call: a record unlinked by
+/// an earlier call in the same run is not reached, and a record added
+/// during a call (registration prepends, §2.13) lies behind the walk. The
+/// host's list keeps no record identity, so after each call the walk
+/// continues with [`surviving_tail`] of the live list. A record
+/// unregistered while running (flags bit 2) is unlinked by the host at
+/// once, which is the same as its deferred free after the call.
 pub fn run<W: EventWorld>(
     w: &mut W,
     tb: EventTables<'_>,
@@ -1509,7 +1512,9 @@ pub fn run<W: EventWorld>(
         return 0;
     };
     let mut last = 0;
-    for h in w.handlers_of(u) {
+    let mut tail = w.handlers_of(u);
+    while !tail.is_empty() {
+        let h = tail.remove(0);
         if h.event != event {
             continue;
         }
@@ -1526,9 +1531,32 @@ pub fn run<W: EventWorld>(
             },
             r.as_deref_mut(),
         );
-        if h.key_type == 0 {
+        // The next record is read after the call.
+        let live = w.handlers_of(u);
+        let k = surviving_tail(&live, &tail);
+        let head = &live[..live.len() - k];
+        tail = live[live.len() - k..].to_vec();
+        // Key type 0: unlinked after its run (when still linked: a record
+        // unregistered during its own call is already gone).
+        if h.key_type == 0 && head.contains(&h) {
             w.remove_handler(u, &h);
         }
     }
     last
+}
+
+/// The length of the records still ahead of the walk after a call: the
+/// longest suffix of the live list (at most `tail.len()` records) that is
+/// a subsequence of `tail`, the records that were ahead before the call.
+/// Calls only unlink records behind the cursor and prepend new ones
+/// (§2.13), so the records ahead form that suffix.
+pub fn surviving_tail(live: &[Handler], tail: &[Handler]) -> usize {
+    let is_subsequence = |sub: &[Handler]| {
+        let mut it = tail.iter();
+        sub.iter().all(|x| it.any(|y| y == x))
+    };
+    (0..=live.len().min(tail.len()))
+        .rev()
+        .find(|&k| is_subsequence(&live[live.len() - k..]))
+        .unwrap_or(0)
 }

@@ -427,3 +427,23 @@ fn shrine_on_mode_overlays() {
     m.drain();
     assert_eq!(m.rejected(), [(0x0E, "fatal assert 0x37A".to_string())]);
 }
+
+// Covers: specs/client/stat-lists.md §3 r2
+#[test]
+fn stat_172_changes_the_rooms_allied_count() {
+    use super::super::drlg::DrlgRoomId;
+    let mut m = with_stats();
+    m.inputs.tables.states = vec![StateRow::default(); 200];
+    // State on keeps the existing list, so the second 0xAA reads old 2.
+    m.inputs.tables.states[105].keep_list = true;
+    let k = UnitKey::new(MONSTER, 8);
+    m.put(k);
+    m.w.room_units.place(k, Some(DrlgRoomId(3)));
+    // B 103's 0xAA: state 105 with stat 172 = 2 on a new list (old 4).
+    m.hex("aa 01 08 00 00 00 0c 69 59 f9 ff 1f");
+    assert_eq!(m.w.room_allied.get(&DrlgRoomId(3)), Some(&1));
+    // The same value again: old = new, no change.
+    m.hex("aa 01 08 00 00 00 0c 69 59 f9 ff 1f");
+    assert_eq!(m.w.room_allied.get(&DrlgRoomId(3)), Some(&1));
+    assert!(m.log.rejected.is_empty(), "{:?}", m.rejected());
+}

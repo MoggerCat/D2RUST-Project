@@ -11,7 +11,11 @@
 
 use super::{InvDesk, InvError, InvRest};
 use crate::items::bitstream::{self, read, BitWriter, StreamItem};
-use crate::items::moves::deferred;
+use crate::items::inventory::UnitKind;
+use crate::items::moves::{
+    add_iflags, clear_iflags, clear_uflags, deferred, iflag, mode, uflag, InventoryOps,
+    MovePending, Owner,
+};
 use crate::items::{flag, stat};
 use crate::units::lifecycle::LifecycleHooks;
 use crate::units::UnitId;
@@ -102,14 +106,61 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
             first.item.filled
         };
         if fillers && n != 0 {
-            // TODO(spec: vendors-2.md §7.3 step 5): the children are socketed
-            // through `0x00562660(child, copy, &out, 0, 1, 0, 0)`; what its
-            // four flag arguments switch off of `inventory-moves.md` §7.19
-            // is not written. The copy fails here (none) instead.
-            self.state.errors.push(InvError::Unwritten(
-                "vendors-2.md §7.3 step 5: 0x00562660 flag arguments",
-            ));
-            return None;
+            // Each child record in stream order (each starts at a byte,
+            // `bitstream.md` §5): read as step 3 with no room (failure →
+            // none; the copy and the children read so far stay), mode 4,
+            // socketed into the copy, flags 0x80000 / 0x2000, command
+            // flag 0x1 cleared.
+            let mut at = r.pos().div_ceil(8);
+            let cg = self.guid_of(copy);
+            self.state.add_inventory(copy, UnitKind::Item, cg);
+            for _ in 0..n {
+                let entry = read::read_save_entry(bytes.get(at..)?, self.econ.tables).ok()?;
+                at += entry.len;
+                let child = match self.econ.item_from_record(&entry.item, None) {
+                    Ok(c) => c,
+                    Err(e) => {
+                        self.state.errors.push(InvError::Economy(e));
+                        return None;
+                    }
+                };
+                self.sync_in();
+                // Mode 4, then `0x00562660(child, copy, &out, 0, 1, 0, 0)`
+                // with EDX = the copy (`inventory-moves.md` §7.19 rule 4).
+                // The rule 2 gates (f3 = 0: no target mode test) hold for
+                // a stream written from a socketed source whose fillers
+                // passed them, so result 0 (fatal, line 0xDD4) does not
+                // arise; the link cannot fail here.
+                if let Some(d) = self.state.items.get_mut(&child) {
+                    d.mode = mode::CURSOR;
+                }
+                let fg = self.guid_of(child);
+                let mut inv = self.state.inventories.remove(&copy)?;
+                inv.link(self, child, None);
+                // f2 = 1: the copy's inventory cursor := none.
+                inv.put_cursor(self, None);
+                self.state.inventories.insert(copy, inv);
+                clear_uflags(self, fg, uflag::TARGETABLE);
+                // Filler properties `0x0055C2C0` and owner link `0x006276C0`.
+                self.filler_linked(fg, cg);
+                if let Some(d) = self.state.items.get_mut(&child) {
+                    d.mode = mode::SOCKETED;
+                }
+                // f4 = 0: a match runs the runeword stats and the timers
+                // without the recharge `0x0055FE80`; f1 = 0: no match
+                // returns here, before the tail.
+                if self.activate_runeword_on(copy) {
+                    add_iflags(self, cg, iflag::CHANGED);
+                    clear_iflags(self, cg, iflag::NOEQUIP);
+                    deferred::owner_refresh(self, Owner::item(cg));
+                    self.update_list_add(Owner::item(cg), cg);
+                }
+                if let Some(d) = self.state.items.get_mut(&child) {
+                    d.flags = (d.flags | flag::INIT) & !flag::INSTORE;
+                    d.cmd_flags &= !CMD_REMOVE;
+                }
+                self.sync_out();
+            }
         }
         // 6. The source's flag.
         if let Some(it) = self.econ.items.get_mut(src) {

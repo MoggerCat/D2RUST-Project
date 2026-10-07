@@ -247,15 +247,14 @@ fn game_send_limit() {
 #[test]
 fn split_and_unowned() {
     let (mut b, _) = bridge();
-    // 0x79 (6 bytes) and 0x8B (6 bytes): out-of-scope ids, unowned
-    // (`bridge.md` §6 rule 7).
+    // 0x79 (6 bytes) and 0x8B (6 bytes): out-of-scope ids; the shared
+    // no-op handler runs (`bridge.md` §6 rule 7), nothing is unowned.
     let r = b
         .receive_chunk(&[0x79, 1, 2, 3, 4, 5, 0x8B, 1, 2, 3, 4, 5])
         .unwrap();
-    assert_eq!((r.messages, r.unowned, r.handled), (2, 2, 0));
+    assert_eq!((r.messages, r.unowned, r.handled), (2, 0, 2));
     let log = b.log();
-    assert_eq!(log.unowned.get(&0x79), Some(&1));
-    assert_eq!(log.unowned.get(&0x8B), Some(&1));
+    assert!(log.unowned.is_empty());
     assert!(log.discarded.is_empty());
     assert_eq!(b.world(), &ClientWorld::default());
 }
@@ -431,11 +430,21 @@ fn dispatch_table_matches_spec() {
 fn dispatch_check_catches_perturbations() {
     let rows = dispatch::parse(dispatch::TSV).unwrap();
     let mut owned = rows.clone();
-    // 0x75: an out-of-scope id (`bridge.md` §6 rule 7), unowned.
+    // A handler-less id given an owner has no handler to match.
+    let mut no_handler = dispatch::HANDLERS.to_vec();
+    no_handler.retain(|h| h.id != 0x79);
+    assert_eq!(
+        dispatch::check(&owned, &no_handler),
+        vec![Mismatch::NoHandler { id: 0x79 }]
+    );
     owned[0x75].owner = Some("specs/client/x.md".into());
     assert_eq!(
         dispatch::check(&owned, dispatch::HANDLERS),
-        vec![Mismatch::NoHandler { id: 0x75 }]
+        vec![Mismatch::Owner {
+            id: 0x75,
+            tsv: "specs/client/x.md".into(),
+            code: "specs/client/msg-units.md".into()
+        }]
     );
     let mut moved = rows.clone();
     moved[0x1A].owner = Some("specs/client/x.md".into());
@@ -746,12 +755,12 @@ fn owned_rows_are_exactly_the_registered_handlers() {
         .collect();
     let registered: Vec<(u8, &str)> = dispatch::HANDLERS.iter().map(|h| (h.id, h.owner)).collect();
     assert_eq!(owned, registered);
-    // Every id but the 13 out-of-scope ids of `bridge.md` §6 rule 7 is
-    // owned (2026-10-07, area 4; 0xB4 to `client/model.md` §7 r8 on
-    // 2026-10-08): model 13, msg-units 47, msg-stats-items 26,
-    // msg-skills 9, msg-ui 23, `audio/triggers.md` 0x2C,
-    // `render/lighting.md` 0x53 and 0x89, `bridge.md` 47 (§6 rule 6).
-    assert_eq!(owned.len(), 0xB5 - 13);
+    // Every id is owned (`bridge.md` §6 rule 7 gave the out-of-scope ids
+    // owners and the no-op handler, 2026-10-08): model 17, msg-units 53,
+    // msg-stats-items 26, msg-skills 9, msg-ui 24, `audio/triggers.md`
+    // 0x2C, `render/lighting.md` 0x53 and 0x89, `bridge.md` 49 (§6
+    // rules 6–7).
+    assert_eq!(owned.len(), 0xB5);
     let per = |spec: &str| owned.iter().filter(|(_, o)| *o == spec).count();
     assert_eq!(
         [
@@ -765,7 +774,7 @@ fn owned_rows_are_exactly_the_registered_handlers() {
             super::msg::BRIDGE,
         ]
         .map(per),
-        [13, 47, 26, 9, 23, 1, 2, 47]
+        [17, 53, 26, 9, 24, 1, 2, 49]
     );
     for (_, o) in &owned {
         assert!(
@@ -1128,10 +1137,9 @@ fn ui_answers_npc_dialog_with_0x31_in_order() {
     let (first, _, mode) = run(npc_text(1, 0), 0, true);
     assert_eq!(first, [x2f.clone(), x30.clone()]);
     assert_eq!(mode, 1);
-    // A list shape whose m no spec gives: no case, no 0x31; the 0x30
-    // behind the slot goes at the next frame (the slot is dropped).
+    // PROVISIONAL (first-entry m): a 2-entry list answers as B2 too.
     let (first, next, mode) = run(npc_text(2, 0), 0, false);
-    assert_eq!(first, [x2f]);
-    assert_eq!(next, [x30]);
-    assert_eq!(mode, 0);
+    assert_eq!(first, [x2f, g("31 06000000 25000000"), x30]);
+    assert!(next.is_empty());
+    assert_eq!(mode, 1);
 }

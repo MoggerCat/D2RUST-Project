@@ -23,9 +23,11 @@
 //! RGBA. The RGBA reference is `map::cpu::to_rgba` (index 0 = opaque
 //! black, `map-preview.md` §Palette shading); the compositor maps every
 //! index through the palette (`scene::to_rgba`). They differ wherever the
-//! background shows, exactly when `palette[0]` is not black: the open
-//! index-0 question (`TODO(spec: render/composition.md)`, §B2), shown by
-//! this case, not decided here.
+//! background shows exactly when `palette[0]` is not black. Index 0 is
+//! black in every act palette (`render/composition.md` §4, open question 1
+//! answered), and a drawn pixel mapped to 0 is opaque index 0
+//! (`render/shading.md` §7), so with an act palette the two agree; a
+//! mismatch there names a palette that is not an act's.
 //!
 //! `--perturb N` flips the index top bit of N reference pixels and the red
 //! top bit of the same N RGBA pixels (the [`super::perturb`] spacing), so

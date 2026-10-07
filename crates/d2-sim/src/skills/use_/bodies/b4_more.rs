@@ -769,23 +769,74 @@ pub fn fenris_rage<W: BodyWorld>(
 
 // ---------------------------------------------------------------- §3.22, §3.23
 
+/// The spawn info `0x0063EFA0(unit, &c, &x0, &y0, &mode, difficulty, 0)`
+/// as srvdo 140 calls it (§3.22 step 3, Open question 4; the table of
+/// `monsters/ai-bodies-2.md` §13.1, keyed by the unit's `BaseId`): the
+/// class and mode; the point is unused by the caller. `None`: the keys
+/// 526 / 528 without a pick (a fatal assertion; refused).
+fn tentacle_spawn_info<W: BodyWorld>(
+    w: &mut W,
+    ct: &CombatTables,
+    u: W::Unit,
+    d: i32,
+) -> Option<(i32, i32)> {
+    let count = ct.monstats.len() as i32;
+    let clamp = |c: i32| if count > c { c } else { -1 };
+    let class = w.class_id(u);
+    let key = match base_id(w, ct, u) {
+        b if ct.monstats(b).is_some() => b,
+        _ => -1,
+    };
+    let p = if class < 0 {
+        0
+    } else {
+        w.chain_position(class)
+    };
+    let chain = |b: i32| class_step(ct, clamp(b), p);
+    Some(match key {
+        206 => (chain(15), 1),
+        228 => {
+            let room = w.unit_room(u);
+            (w.class_for_level(room, clamp(96)), 1)
+        }
+        267 => (clamp(6), 8),
+        284 => (chain(68), 8),
+        298 => (chain(301), 1),
+        321 => (clamp(if class == 711 { 712 } else { 19 }), 1),
+        334 => (chain(114), 1),
+        484 => (chain(453), 1),
+        526 | 528 => {
+            debug_assert!(
+                false,
+                "spawn info key {key} without a pick (ai-bodies-2.md §13.1)"
+            );
+            return None;
+        }
+        537 => {
+            let c = chain(540);
+            w.state_on(u, 146, true);
+            (c, 1)
+        }
+        544 => {
+            // The incoming class is an uninitialised local here, read as
+            // "not 570" (Edge case 7): three draws on the unit's seed.
+            let k = (w.seed(u).roll(2) as i32).wrapping_add(d);
+            let c = class_step(ct, 562, k);
+            w.seed(u).roll(24);
+            w.seed(u).roll(24);
+            (c, 4)
+        }
+        _ => (clamp(0), 1),
+    })
+}
+
 /// srvdo 140 Baal Tentacle `0x005D2C20` (§3.22).
 pub fn baal_tentacle<W: BodyWorld>(w: &mut W, ct: &CombatTables, u: W::Unit) -> i32 {
     let d = w.combat().difficulty() as i32;
     let n = (w.seed(u).step() % 3) as i32 + d + 2;
-    // Spawn info `0x0063EFA0(unit, &c, …, difficulty, 0)`: for Baal the
-    // uninitialised incoming class read as "not 570" (Edge case 7).
-    if base_id(w, ct, u) != 544 {
-        // TODO(spec: bodies-4.md §3.22, Open question 4): what the spawn
-        // info gives a unit other than Baal is not stated; d2rs spawns
-        // nothing.
+    let Some((c, mode)) = tentacle_spawn_info(w, ct, u, d) else {
         return 1;
-    }
-    let k = (w.seed(u).roll(2) as i32).wrapping_add(d);
-    let c = class_step(ct, 562, k);
-    w.seed(u).roll(24);
-    w.seed(u).roll(24);
-    let mode = 4;
+    };
     let (bx, by) = match target(w, u) {
         Some(tg) => w.position(tg),
         None => w.position(u),
@@ -867,10 +918,14 @@ pub fn imp_teleport<W: BodyWorld>(
     let o = source_of(w, u);
     let tg = target(w, u);
     if let Some(o) = o {
-        // The target position's result is not tested.
-        // TODO(spec: bodies-4.md §3.24 step 3): the point placed at when
-        // the target position fails (uninitialised locals): read as (0, 0).
-        let at = w.target_position(u).unwrap_or((0, 0));
+        // The target position's result is not tested (§3.24 step 3, Open
+        // question 6): `0x0056D2C0` always writes the pair (the target
+        // unit's position, else the path's target point) and "fails" only
+        // when a coordinate is 0, which is then used as is.
+        let at = w.target_position(u).unwrap_or_else(|| match tg {
+            Some(t) => w.position(t),
+            None => w.path_target_point(u),
+        });
         w.place_unit(u, None, at);
         release(w, ct, u, o, skill);
         return 1;

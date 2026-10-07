@@ -83,10 +83,10 @@ pub fn boss_spawn<H: PopHost + ?Sized>(
     if x == 0 && y == 0 {
         (x, y) = spawn_point(cx, room, cl, class, warp_check)?;
     }
-    // TODO(spec: population.md §6.3): the creation mode is not stated;
-    // mode 1 (neutral) as for every other population spawn.
+    // PROVISIONAL (monsters/population.md §6.3; REC-80): the creation mode
+    // is 1 (neutral), as for every other population spawn.
     let mode = 1;
-    let at = |cx: &mut Ctx<'_, H>, x, y, r, f| {
+    let at = |cx: &mut Ctx<'_, H>, room: RoomId, x, y, r, f| {
         let req = placement::SpawnReq {
             room: Some(room),
             cl,
@@ -101,23 +101,24 @@ pub fn boss_spawn<H: PopHost + ?Sized>(
         placement::place(cx, req).unit()
     };
     let boss = if cl.is_some() {
-        at(cx, x, y, -1, flags::NO_PARTY)
+        at(cx, room, x, y, -1, flags::NO_PARTY)
     } else if guid.is_none() {
-        at(cx, x, y, -1, flags::NO_PARTY).or_else(|| at(cx, x, y, 5, flags::NO_PARTY))
+        at(cx, room, x, y, -1, flags::NO_PARTY).or_else(|| at(cx, room, x, y, 5, flags::NO_PARTY))
     } else {
         // Restore paths (not population).
         let f = 0x62;
-        at(cx, x, y, -1, f)
-            .or_else(|| at(cx, x, y, 5, f))
+        at(cx, room, x, y, -1, f)
+            .or_else(|| at(cx, room, x, y, 5, f))
             .or_else(|| {
                 let (px, py) = spawn_point(cx, room, None, class, false)?;
-                at(cx, px, py, -1, f)
+                at(cx, room, px, py, -1, f)
             })
             .or_else(|| {
-                // TODO(spec: population.md §6.3 r4): the room of the nearest
-                // free point is used for the placement.
-                let (_, px, py) = cx.host.nearest_free_point(room, x, y)?;
-                at(cx, px, py, -1, f)
+                // PROVISIONAL (monsters/population.md §6.3 r4; REC-80): the
+                // room passed on is the room holding the nearest free
+                // point.
+                let (fr, px, py) = cx.host.nearest_free_point(room, x, y)?;
+                at(cx, fr, px, py, -1, f)
             })
     }?;
     // `0x005A0320`.
@@ -178,7 +179,8 @@ pub fn unique_minions<H: PopHost + ?Sized>(
             continue;
         };
         cx.host.transfer_modifiers(boss, m);
-        cx.host.unique_minion_owner_data(boss, m);
+        // `0x0058F030(game, minion, boss GUID, 1, 0, 0)` (open question 4).
+        cx.host.set_owner_data(m, OwnerKey::Guid(boss), 1, 0, 0);
         cx.host.add_minion(boss, m);
         cx.host.set_owner(m, boss);
         cx.host.set_type_flags(m, type_flag::MINION);
@@ -304,9 +306,9 @@ fn tentacles<H: PopHost + ?Sized>(
             flags: flags::NO_PARTY,
         };
         if let Placed::Unit(m) = placement::place(cx, req) {
-            // TODO(spec: population.md §10.3 r1): "as in 10.2.3" read as
-            // the same calls without the SetBoss condition (the leader's
-            // owner data is set always here).
+            // PROVISIONAL (monsters/population.md §10.3 r1; REC-80): owner
+            // data and minion list as in 10.2.3, unconditional (no
+            // `SetBoss` test inside 0x005B2570).
             cx.host.set_owner_data(m, OwnerKey::DataOf(leader), 1, 0, 0);
             cx.host.add_minion(leader, m);
         }

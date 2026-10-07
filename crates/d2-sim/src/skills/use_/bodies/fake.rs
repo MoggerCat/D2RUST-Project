@@ -34,6 +34,9 @@ pub struct FList {
     pub freed: bool,
 }
 
+/// One `unit_find` call: (at, radius, filter).
+pub type FindArgs = ((i32, i32), i32, u32);
+
 /// The fake body world.
 #[derive(Debug, Clone, Default)]
 pub struct BodyFake {
@@ -100,11 +103,25 @@ pub struct BodyFake {
     pub anim_data: Option<(u32, Vec<u8>)>,
     pub action_event: bool,
     pub chains: BTreeMap<i32, i32>,
+    /// `class_for_level` remaps (class → class); absent → unchanged.
+    pub level_classes: BTreeMap<i32, i32>,
+    /// `missile_owner` answers (default none).
+    pub missile_owners: BTreeMap<usize, usize>,
     pub books: BTreeMap<usize, (i32, i32)>,
     pub inv_nodes: Vec<(usize, i32)>,
     pub found: Vec<usize>,
     pub point_collide: bool,
     pub components: BTreeMap<(usize, usize), i32>,
+    /// Selected skill per (unit, left hand) (`stat_cb` tests).
+    pub sel: BTreeMap<(usize, bool), SkillEntry>,
+    /// Pettype row → skill ids (`stat_cb` tests).
+    pub pet_skills: BTreeMap<i32, Vec<i32>>,
+    /// `place_unit` refuses (the move test fails).
+    pub place_fails: bool,
+    /// The (at, radius, filter) of every `unit_find`.
+    pub find_args: std::cell::RefCell<Vec<FindArgs>>,
+    /// Item stat values by (item, stat) (`item_stat_of`).
+    pub item_stats: BTreeMap<(usize, u16), i32>,
 }
 
 impl BodyFake {
@@ -578,8 +595,8 @@ impl BodyWorld for BodyFake {
     fn allied(&self, a: usize, b: usize) -> bool {
         a == b || self.allies.contains(&(a, b))
     }
-    fn missile_owner(&self, _: usize) -> Option<usize> {
-        None
+    fn missile_owner(&self, u: usize) -> Option<usize> {
+        self.missile_owners.get(&u).copied()
     }
     fn minion_owner(&self, u: usize) -> Option<usize> {
         self.minion_owner.get(&u).copied()
@@ -612,8 +629,8 @@ impl BodyWorld for BodyFake {
     fn item_stackable(&self, i: usize) -> bool {
         self.c.items[i].throw
     }
-    fn item_stat_of(&self, _: usize, _: u16) -> i32 {
-        0
+    fn item_stat_of(&self, i: usize, s: u16) -> i32 {
+        self.item_stats.get(&(i, s)).copied().unwrap_or(0)
     }
     fn set_item_stat(&mut self, i: usize, s: u16, v: i32) {
         self.log(format!("itemstat {i} {s} {v}"));
@@ -801,6 +818,9 @@ impl BodyWorld for BodyFake {
     }
     fn place_unit(&mut self, u: usize, r: Option<usize>, at: (i32, i32)) -> bool {
         self.log(format!("place {u} {r:?} {at:?}"));
+        if self.place_fails {
+            return false;
+        }
         self.pos.insert(u, at);
         true
     }
@@ -919,13 +939,17 @@ impl BodyWorld for BodyFake {
     fn chain_position(&self, class: i32) -> i32 {
         self.chains.get(&class).copied().unwrap_or(0)
     }
+    fn class_for_level(&self, _: Option<usize>, class: i32) -> i32 {
+        self.level_classes.get(&class).copied().unwrap_or(class)
+    }
     fn book_skills(&self, i: usize) -> Option<(i32, i32)> {
         self.books.get(&i).copied()
     }
     fn inventory_nodes(&self, _: usize) -> Vec<(usize, i32)> {
         self.inv_nodes.clone()
     }
-    fn unit_find(&self, _: usize, _: (i32, i32), _: i32, _: u32) -> Vec<usize> {
+    fn unit_find(&self, _: usize, at: (i32, i32), r: i32, f: u32) -> Vec<usize> {
+        self.find_args.borrow_mut().push((at, r, f));
         self.found.clone()
     }
     fn point_collides(&self, _: usize, _: (i32, i32), _: u32) -> bool {

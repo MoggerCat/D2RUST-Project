@@ -37,6 +37,7 @@ use super::{
 };
 use crate::items::ItemTables;
 use crate::path::coords::Point;
+use crate::treasure::class_pick::{ClassPicks, PickError};
 use crate::treasure::drop::{monster_drop, monster_drop_gate, MonsterDrop, MonsterRank};
 use crate::treasure::{ItemData, TreasureClasses, TreasureData, TreasureError};
 use crate::units::hooks::Sim;
@@ -85,6 +86,13 @@ pub struct DeathDrops {
     pub failures: Vec<EconomyError>,
     /// The walk's fatal errors.
     pub errors: Vec<TreasureError>,
+    /// The item class picks of the drop helpers
+    /// ([`super::drop_helpers`], `objects-2.md` §20): the combined items
+    /// array's pick columns. Empty by default (every pick finds no
+    /// candidate, so the helpers create nothing).
+    pub picks: Arc<ClassPicks>,
+    /// The drop helpers' pick fatals (`objects-2.md` §20.4, §20.6).
+    pub pick_errors: Vec<PickError>,
 }
 
 impl DeathDrops {
@@ -97,7 +105,15 @@ impl DeathDrops {
             placed: Vec::new(),
             failures: Vec::new(),
             errors: Vec::new(),
+            picks: Arc::default(),
+            pick_errors: Vec::new(),
         }
+    }
+
+    /// With the drop helpers' pick rows.
+    pub fn with_picks(mut self, picks: Arc<ClassPicks>) -> Self {
+        self.picks = picks;
+        self
     }
 }
 

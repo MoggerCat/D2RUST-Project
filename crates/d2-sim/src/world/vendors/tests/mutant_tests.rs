@@ -224,7 +224,7 @@ mod store {
         let mut w = Fake::new(class::CHARSI);
         w.difficulty = 2;
         let mut seed = Seed::new(0, 1560);
-        make_store_item(&mut ctx(&t, &mut seed), &mut rec, &mut w, hax, 2, 35, 30);
+        make_store_item(&mut ctx(&t, &mut seed), &mut rec, &mut w, hax, 2, 35, 30).unwrap();
         assert_eq!(w.created[0].0, index(&t, "9ha"));
     }
 
@@ -284,7 +284,8 @@ mod store {
             &mut w,
             p(),
             0,
-        );
+        )
+        .unwrap();
         assert_eq!(codes(&t, &w, &rec)[..2], ["hax", "hax"]);
     }
 
@@ -297,7 +298,7 @@ mod store {
         let mut w = Fake::new(class::CHARSI);
         w.set(PLAYER, stat::LEVEL, 20);
         let mut seed = Seed::new(5, 666);
-        generate(&mut ctx(&t, &mut seed), &mut rec, &mut w, p(), 0);
+        generate(&mut ctx(&t, &mut seed), &mut rec, &mut w, p(), 0).unwrap();
         let mut s = Seed::new(5, 666);
         let k = range(&mut s, 1, 3) + 1;
         let n_mag = range(&mut s, 1, k);
@@ -324,7 +325,8 @@ mod store {
             &mut w,
             p(),
             0,
-        );
+        )
+        .unwrap();
         assert!(!rec.store.is_empty());
     }
 
@@ -348,7 +350,8 @@ mod store {
             &mut w,
             p(),
             0,
-        );
+        )
+        .unwrap();
         w
     }
 

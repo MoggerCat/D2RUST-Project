@@ -24,7 +24,9 @@ pub mod ai;
 pub mod combat;
 pub mod death;
 pub mod dispatch;
+pub mod hirelings;
 pub mod missiles;
+pub mod monster_add;
 pub mod monsters;
 pub mod objects;
 pub mod pending;
@@ -62,6 +64,7 @@ use crate::units::UnitId;
 use crate::world::waypoints::WaypointRecords;
 
 pub use dispatch::ActionSim;
+pub use hirelings::HirelingCall;
 pub use monsters::MonsterWorld;
 pub use objects::{
     ObjectCase, ObjectReach, ObjectRoute, ObjectState, ObjectView, QuestObjectCall, QuestObjectHost,
@@ -116,6 +119,14 @@ pub enum WiringError {
     /// The monster mode message (`sim/intents-events.md` §7.4): a fatal
     /// assert or a message the spec gives no layout for.
     ModeMessage(unit_update::ModeMessageError),
+    /// The lightning fan / ring with a progressive step ≤ 0
+    /// (`skills/bodies-4.md` Edge case 1): an endless loop in 1.14d;
+    /// d2rs stopped it (as `StatListError::EndlessExpiry`).
+    EndlessProgressive {
+        unit: UnitId,
+        skill: i32,
+        step: i32,
+    },
 }
 
 /// The [`crate::units::hooks::UnitHooks`] of [`ActionSim`]'s unit system
@@ -177,6 +188,11 @@ pub struct ActionHooks<X> {
     /// owner, every game type). `None` (the default): nothing is
     /// recorded.
     pub owner_deaths: Option<Vec<UnitId>>,
+    /// The hireling calls met in order (save restore, join follow, act
+    /// change; [`HirelingCall`]), for the host that holds the hireling
+    /// lists (`hirelings-2.md` §19). `None` (the default): nothing is
+    /// recorded.
+    pub hireling_calls: Option<Vec<HirelingCall>>,
     /// The loaded `AnimData.d2` (`formats/animdata.md`, parsed by
     /// `d2-formats`): the records `UnitHooks::anim_record` looks up by
     /// COF name. `None`: no record for any unit (as before the table is
@@ -191,6 +207,10 @@ pub struct ActionHooks<X> {
     /// player's DT start (`0x00580A70`'s unit target, [`death`]): the
     /// host that starts it sets it.
     pub mode_target: Option<UnitId>,
+    /// The mode of the monster mode change running now (the record's
+    /// mode, `units.md` §4.6), for the start functions that read it (the
+    /// attack / skill start `0x005A75C0`, rule 7).
+    pub monster_request: u32,
     /// The monster state (monster data, umods, monster init) lent by the
     /// host that owns it ([`monsters`]: `WorldSim` lends its world state
     /// around its timer events and tick hooks). `None`: the monster
@@ -272,9 +292,11 @@ impl<X> ActionHooks<X> {
             pet_follows: None,
             pet_deaths: None,
             owner_deaths: None,
+            hireling_calls: None,
             anim_data: None,
             vitals: None,
             mode_target: None,
+            monster_request: 0,
             monster_world: None,
             monster_world_out: false,
             quest_host: None,

@@ -700,7 +700,7 @@ gfxclass / bossinv columns of `patch_d2`.
 13. Overlay files and their back/front split: the split, order,
     position and blend are answered in §5 r4; the creation of overlay
     records (who adds which `overlay.txt` row, frame advance) stays with
-    the overlay owner (no spec yet; `0x00470390`). That spec must own
+    the overlay owner (`render/overlay.md`; `0x00470390`). It owns
     the three draws of `0x00470390` on the **local player's** client
     unit seed (unit from `0x00463DD0`, +0x20; for any unit's overlay):
     type 6 `roll(frames)` → +0x18 (`0x004704DD`); argument a ≠ 0

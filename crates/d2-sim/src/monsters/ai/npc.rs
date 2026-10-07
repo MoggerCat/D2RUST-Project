@@ -7,7 +7,7 @@ use crate::game::Game;
 use crate::units::{UnitId, UnitType};
 
 use super::tactics::*;
-use super::{idle, mode, AiHost, Ctx, ModeTarget, PortalNpc, TickParam};
+use super::{idle, mode, request_mode, AiHost, Ctx, ModeTarget, PortalNpc, TickParam};
 
 /// Command types of §8 used here.
 mod cmd {
@@ -27,8 +27,6 @@ mod cmd {
 mod class {
     /// roguehire (§9.31).
     pub const ROGUEHIRE: i32 = 271;
-    /// cain1, Tristram (§9.32).
-    pub const CAIN1: i32 = 146;
     /// drehyaiced (§9.32; the rebuilt catalogue's `monstats_rows` of
     /// index 31 lists `527 drehyaiced` too).
     pub const DREHYAICED: i32 = 527;
@@ -68,15 +66,14 @@ pub fn good_npc_ranged<W: AiHost + ?Sized>(
         return;
     }
     // 2.
-    // TODO(spec: ai-bodies.md §9.31): `0x0061AB00` on a unit without a room is
-    // not stated; such a unit is read as out of town.
+    // A unit with no room counts as out of town (`0x0061AB00(0)` returns
+    // 0; `ai-bodies.md` §9.31).
     let room = game.lists.unit(u).and_then(|e| e.room());
     let in_town = room.is_some_and(|r| cx.world.in_town(game, r));
     if !in_town {
-        // TODO(spec: ai-bodies.md §9.31 step 2): the "Else" is read as the else
-        // of the first 30 % test (the catalogue summary: "secondary target
-        // under 20: 30% A1, else 30% circle 4, else idle 10"); without S
-        // under 20 the think goes on to step 3.
+        // The "Else" belongs to the first 30 % roll: both rolls happen
+        // only with S under 20; otherwise the think goes on to step 3
+        // (`ai-bodies.md` §9.31).
         let (s, e, _) = cx.world.secondary_target(game, u);
         if let Some(s) = s.filter(|_| e < 20) {
             if cx.world.seed(u).roll(100) < 30 {
@@ -210,8 +207,7 @@ fn leave<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitId, np
     cx.world.spawn_town_portal(game, u, npc);
     cx.world.set_life(u, 0);
     let (x, y) = cx.world.position(u);
-    cx.world
-        .change_mode(game, u, mode::DEAD, ModeTarget::Point(x, y));
+    request_mode(game, cx, u, mode::DEAD, ModeTarget::Point(x, y));
 }
 
 /// §9.32 step 1, the portal setup `0x005E77A0`.
@@ -232,8 +228,8 @@ fn portal_setup<W: AiHost + ?Sized>(
     set_cmd(cx, u, k, 1, x.wrapping_add(3));
     set_cmd(cx, u, k, 2, y.wrapping_add(3));
     if !cx.world.portal_setup(game, u, npc) {
-        // TODO(spec: ai-bodies.md §9.32 step 1): read as written, the setup goes
-        // on after "leave" (params 3, 4 and idle 1).
+        // The mode 12 request does not end the function: the param writes
+        // and idle 1 follow a leave too (`ai-bodies.md` §9.32 step 1).
         leave(game, cx, u, npc);
     }
     set_cmd(cx, u, k, 3, 1);
@@ -249,12 +245,13 @@ pub fn npc_out_of_town<W: AiHost + ?Sized>(
     u: UnitId,
     _p: &TickParam,
 ) {
-    let npc = match cx.world.class(u) {
-        class::CAIN1 => PortalNpc::Cain,
-        class::DREHYAICED => PortalNpc::Drehya,
-        // TODO(spec: ai-bodies.md §9.32): the quest functions of any other class
-        // are not stated; nothing is done.
-        _ => return,
+    // Class 527 (drehyaiced) takes the Act 5 quest 3 functions; every
+    // other class (cain1, and any class given AI 31 by edited data) the
+    // Act 1 quest 4 ones (`ai-bodies.md` §9.32).
+    let npc = if cx.world.class(u) == class::DREHYAICED {
+        PortalNpc::Drehya
+    } else {
+        PortalNpc::Cain
     };
     // 1.
     if portal_setup(game, cx, u, npc) {
@@ -370,8 +367,7 @@ pub fn npc<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitId, 
         }
         npc_class::ALKOR => {
             if cx.world.alkor_bird(game) {
-                cx.world
-                    .change_mode(game, u, mode::SKILL1, ModeTarget::Point(0, 0));
+                request_mode(game, cx, u, mode::SKILL1, ModeTarget::Point(0, 0));
                 cx.world.alkor_reset(game);
                 return;
             }
@@ -381,8 +377,7 @@ pub fn npc<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitId, 
                 if path_distance(cx, u, x, y) as u32 > 3 {
                     walk_to_point(game, cx, u, x, y);
                 } else {
-                    cx.world
-                        .change_mode(game, u, mode::SKILL1, ModeTarget::Point(0, 0));
+                    request_mode(game, cx, u, mode::SKILL1, ModeTarget::Point(0, 0));
                     cx.world.ormus_set_altar_mode(game);
                 }
                 return;
@@ -505,7 +500,7 @@ pub(super) fn npc_commands<W: AiHost + ?Sized>(
             idle(game, cx, u, 50);
             return true;
         }
-        cx.world.change_mode(game, u, m as u8, ModeTarget::Unit(u));
+        request_mode(game, cx, u, m as u8, ModeTarget::Unit(u));
         set_cmd(cx, u, k, 1, 0);
         return true;
     }

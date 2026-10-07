@@ -61,6 +61,14 @@ pub fn quest_special(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handl
         w.outgoing.push(vec![0x69]);
         w.exit_requested = true;
     }
+    if code == 36 {
+        // `0x004A3100`: the zoo latch of the client chickens
+        // (`world/objects-client.md` §26.17, §27 r2: client session
+        // state, so the model holds it).
+        let l = &mut w.objclient.latches;
+        l.zoo = true;
+        l.zoo_word = words[0];
+    }
     if matches!(code, 1..=4 | 23 | 36) {
         msg.out.push(Output::QuestSpecial { code, words });
     }

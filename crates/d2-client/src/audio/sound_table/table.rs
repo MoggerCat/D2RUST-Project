@@ -72,6 +72,9 @@ pub struct SoundEntry {
     pub failed: bool,
     /// +0x7C: sound tick of last use.
     pub last_use: u32,
+    /// +0x70: sample size in bytes charged to the cache (`sound-table-2.md`
+    /// §16 r2).
+    pub size: u32,
     /// +0x8A (§10 r4).
     pub locks: u32,
     /// The decoded sample once loaded (d2rs: decoded up front by the bank,
@@ -104,6 +107,7 @@ impl SoundTableData {
                 load: LoadState::None,
                 failed: false,
                 last_use: 0,
+                size: 0,
                 locks: 0,
                 sample: None,
                 row,

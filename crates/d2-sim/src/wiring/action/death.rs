@@ -13,10 +13,11 @@
 //!
 //! Client +0x508 ("experience lost", §4.7) is [`DeathState::exp_lost`],
 //! keyed by the player (`0x005531C0`: one client per player).
-//!
-//! TODO(spec: sim/units.md §4.5): the rest of `0x00580EC0` (before and
-//! after `0x00580F59`) and of `0x0057FCA0` (character save) are not
-//! written; only the calls above run.
+
+// PROVISIONAL (sim/units.md §4.5): of `0x00580EC0` (before and after
+// `0x00580F59`) and `0x0057FCA0` (character save) only the calls above
+// run; settled by a bin read and a save capture on death (HIGH PRIORITY:
+// saved bytes).
 
 use std::collections::BTreeMap;
 
@@ -131,9 +132,7 @@ impl<X: Pending> ActionHooks<X> {
     /// Corpse creation `0x0057F700` (§4.7 rule 1): the corpse
     /// ([`Pending::create_corpse`]) gets stat 13 := `pct(v, 75, 100)` of
     /// client +0x508, then +0x508 := 0.
-    ///
-    /// TODO(spec: vitals.md §4.7): with no corpse created the field is
-    /// left as is (the creation's failure path is not written).
+    /// With no corpse (§4.7 rule 1.2) +0x508 is left unchanged.
     pub fn corpse_creation(&mut self, sim: &mut Sim<'_>, p: UnitId) {
         let Some(c) = self.x.create_corpse(sim.game, p) else {
             return;
@@ -147,21 +146,22 @@ impl<X: Pending> ActionHooks<X> {
         cv.v.h.death.exp_lost.insert(p, 0);
     }
 
-    /// Corpse pickup `0x0057FB70(game, P, C)` (§4.7 rule 2): C has state
-    /// 7 (`playerbody`) and P may take it (`0x0057FAF0`: C's owner GUID
-    /// is P's, or [`Pending::corpse_loot_allowed`]); its own player gets
-    /// the corpse's experience back (the add §4.5); then the item
-    /// take-back `0x00562F30` ([`Pending::corpse_take_back`]). Returns
-    /// the experience returned.
-    pub fn corpse_pickup(&mut self, sim: &mut Sim<'_>, p: UnitId, c: UnitId) -> i32 {
+    /// Corpse pickup `0x0057FB70(game, P, C)` steps 1–2 (§4.7 rule 2,
+    /// `inventory-moves.md` §12.1): C has state 7 (`playerbody`) and P
+    /// may take it (`0x0057FAF0`: C's owner GUID is P's, or
+    /// [`Pending::corpse_loot_allowed`]); its own player gets the corpse's
+    /// experience back (the add §4.5). Returns the experience returned,
+    /// or none when refused; the item take-back `0x00562F30` and the rest
+    /// of §12.1 are the inventory's (`items::moves::ground`).
+    pub fn corpse_pickup(&mut self, sim: &mut Sim<'_>, p: UnitId, c: UnitId) -> Option<i32> {
         if !sim.stats.has_state(c, STATE_PLAYERBODY) {
-            return 0;
+            return None;
         }
         let guid = sim.units.get(p).map(|r| r.guid);
         let owner = self.x.corpse_owner_guid(c);
         let own = owner.is_some() && owner == guid;
         if !own && !self.x.corpse_loot_allowed(c, p) {
-            return 0;
+            return None;
         }
         let mut x = 0;
         if let Some(t) = self.vitals.clone() {
@@ -171,7 +171,6 @@ impl<X: Pending> ActionHooks<X> {
             };
             x = corpse_pickup(&mut cv, &t, p, c, own);
         }
-        self.x.corpse_take_back(sim.game, p, c);
-        x
+        Some(x)
     }
 }

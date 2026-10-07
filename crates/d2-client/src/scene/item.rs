@@ -401,9 +401,9 @@ pub struct DrawItem {
     /// format offsets into this is the builder's job (§B1).
     pub x: i32,
     pub y: i32,
-    /// Reserved (§A3). TODO(spec: render/sprite-placement.md,
-    /// render/unit-composite.md): set only when an owner spec requires a
-    /// mirrored draw; until then `true` is rejected ([`SceneError::FlipX`]).
+    /// Reserved (§A3); always `false`: the original's cel path never
+    /// mirrors horizontally (`render/sprite-placement.md` §8), so `true` is
+    /// rejected ([`SceneError::FlipX`]).
     pub flip_x: bool,
     /// Pixels outside this screen rectangle are not drawn.
     pub clip: Rect,

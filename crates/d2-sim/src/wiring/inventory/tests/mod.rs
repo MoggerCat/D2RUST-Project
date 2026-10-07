@@ -156,7 +156,7 @@ const ROWS: [Row; 10] = [
 ];
 
 /// The items creation reads (`items::ItemTables`).
-fn item_tables() -> ItemTables {
+pub fn item_tables() -> ItemTables {
     let mut ratio = Itemratio::decode(&[0u8; Itemratio::SIZE]);
     ratio.version = 1;
     let itemtypes = (0..N_TYPES)
@@ -250,6 +250,8 @@ pub struct Hooks {
     /// The corpse pickups `0x0057FB70` the desk handed over (player,
     /// corpse).
     pub corpse_pickups: Vec<(UnitId, UnitId)>,
+    /// The answer of the corpse pickup's steps 1–2 (§12.1).
+    pub corpse_allowed: bool,
 }
 impl StatHost for Hooks {}
 impl UnitHooks for Hooks {
@@ -258,8 +260,9 @@ impl UnitHooks for Hooks {
         _: &mut crate::units::hooks::Sim<'_>,
         player: UnitId,
         corpse: UnitId,
-    ) {
+    ) -> bool {
         self.corpse_pickups.push((player, corpse));
+        self.corpse_allowed
     }
 }
 impl LifecycleHooks for Hooks {}
@@ -332,6 +335,9 @@ impl MovePending for Rest {
     }
     fn stat_refresh(&mut self, u: Owner) {
         self.log.push(format!("stat_refresh {}", u.guid));
+    }
+    fn corpse_taken(&mut self, p: Owner, c: Owner) {
+        self.log.push(format!("corpse_taken {} {}", p.guid, c.guid));
     }
     fn sound(&mut self, u: Owner, id: u32) {
         self.log.push(format!("sound {} {id:#x}", u.guid));
@@ -506,7 +512,7 @@ impl World {
         w
     }
 
-    fn alloc(&mut self, ty: UnitType, class: u32) -> UnitId {
+    pub fn alloc(&mut self, ty: UnitType, class: u32) -> UnitId {
         let req = AllocRequest {
             ty,
             class,

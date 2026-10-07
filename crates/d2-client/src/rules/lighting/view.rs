@@ -39,16 +39,19 @@ pub struct ComponentLook {
     pub remap: Option<MapId>,
 }
 
-/// The per-unit inputs of [`LitRules`]. Each is answered by its owner
-/// spec once the client model holds it.
+/// The per-unit inputs of [`LitRules`], each from the client model as its
+/// owner spec states it; an implementation whose input the model does not
+/// hold returns an error.
 pub trait LookFeed {
-    /// TODO(spec: the S→C owner specs of unit positions): the unit's
-    /// sub-tile; its light is the light-map cell read at sub-tile × 8
-    /// (`lighting.md` §11 r1, `0x004DD600`).
+    /// The unit's sub-tile (its position, `render/camera.md` §2;
+    /// `client/model.md` §2, §3, §5); its light is the light-map cell read
+    /// at sub-tile × 8 (`lighting.md` §11 r1, `0x004DD600`).
     fn light_subtile(&self, unit: &ClientUnit) -> Result<(i32, i32), String>;
 
-    /// TODO(spec: client/model.md, items, ui hover): the component's look
-    /// inputs.
+    /// The component's look inputs: the colormap source and remap `P`
+    /// (`render/unit-composite.md` §7, `render/shading.md` §6 r4), the
+    /// ghostly flag, unit override and hover of the draw mode
+    /// (`render/blend-modes.md` §3).
     fn look(&self, unit: &ClientUnit, req: &ComponentRequest<'_>) -> Result<ComponentLook, String>;
 }
 

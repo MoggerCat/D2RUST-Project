@@ -127,6 +127,7 @@ fn the_join_builds_the_client_drlg_in_the_app() {
         single_player::client_drlg_source(&data),
         single_player::client_level_rows(&data),
     );
+    app_support::synthetic_skill_rows(&mut app);
     // No original UI here: the open mode it would hand over with every
     // panel closed (`ui/panels.md` §4.2), so the world view can place.
     app.world_mut()

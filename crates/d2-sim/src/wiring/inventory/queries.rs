@@ -10,6 +10,7 @@
 use super::{InvDesk, InvError, InvRest};
 use crate::items::affixes::affix;
 use crate::items::inventory::{level_requirement, AffixReq, LevelReqItem, LevelReqUnit};
+use crate::items::recharge::{self, Recharged};
 use crate::items::{props, replenish_timer, stat};
 use crate::stats::{key_layer, key_stat};
 use crate::units::lifecycle::LifecycleHooks;
@@ -69,7 +70,7 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
     /// The entries of `stat` in the item's extended stat list
     /// (`0x006261D0`, at most 64, list order) as (layer, value); a plain
     /// list or none gives none (§4.8).
-    fn extended_entries(&self, u: UnitId, s: u16) -> Vec<(u16, i32)> {
+    pub(super) fn extended_entries(&self, u: UnitId, s: u16) -> Vec<(u16, i32)> {
         let stats = &*self.econ.stats;
         let Some(l) = stats.unit_list(u).filter(|&l| stats.is_extended(l)) else {
             return Vec::new();
@@ -171,14 +172,19 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
     /// §10.2 (`0x006600A0`: a `server` row needs game +0x74; a target that
     /// already has a runeword list is left as is), then the replenish
     /// timers (`generation.md` §9 step 6: event 3 when not scheduled).
-    /// True when the runeword properties ran.
-    // TODO(spec: inventory-moves.md §7.19 step 3 vs properties.md §10.2):
-    // the first gates a `server` row on "an expansion game", the second on
-    // game +0x74 (ladder); §10.2 (the owner) is followed. The recharge
-    // `0x0055FE80` that §7.19 lists after the timers has no written body.
+    /// True when the runeword properties ran. §10.2 (the owner of the
+    /// `server` gate) is followed over §7.19's "an expansion game".
     pub fn activate_runeword_on(&mut self, target: UnitId) -> bool {
+        self.socket_runeword(target).0
+    }
+
+    /// [`InvDesk::activate_runeword_on`], then the recharge `0x0055FE80`
+    /// (`generation.md` §12.2) that §7.19 step 3 runs after the timers
+    /// whenever a runeword row matched. Returns (runeword ran, the
+    /// recharged charged skills for the S→C 0x3E of step 4).
+    pub fn socket_runeword(&mut self, target: UnitId) -> (bool, Vec<Recharged>) {
         let Some(it) = self.econ.items.get(target) else {
-            return false;
+            return (false, Vec::new());
         };
         let fillers: Vec<usize> = self
             .state
@@ -195,7 +201,7 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
         let Some(row) =
             props::runeword_row(self.econ.tables, it.record, it.quality, sockets, &fillers)
         else {
-            return false;
+            return (false, Vec::new());
         };
         let ladder = self.econ.fields.ladder;
         let scheduled = self
@@ -221,7 +227,7 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
             )
         });
         self.sync_in();
-        match ran {
+        let ran = match ran {
             Ok((ran, at)) => {
                 if let Some(f) = at {
                     // TODO(units.md §6 row 3): the event's arguments are
@@ -239,6 +245,70 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
             Err(e) => {
                 self.state.errors.push(InvError::Economy(e));
                 false
+            }
+        };
+        (ran, self.recharge_item(target))
+    }
+
+    /// Recharge `0x0055FE80` (`generation.md` §12.2) on `item`: its
+    /// stat-204 entries of the extended list; each below its maximum is
+    /// set on the item's own lists (`0x0065C940`), else on the items of
+    /// its own inventory in node order until one takes it.
+    pub fn recharge_item(&mut self, item: UnitId) -> Vec<Recharged> {
+        let entries = self.extended_entries(item, recharge::CHARGED_SKILL);
+        let inner: Vec<UnitId> = self
+            .state
+            .inventories
+            .get(&item)
+            .map(|inv| inv.items().to_vec())
+            .unwrap_or_default();
+        let mut sets = Vec::new();
+        let out = recharge::recharge(&entries, |k, m| sets.push((k, m)));
+        for (k, m) in sets {
+            for u in std::iter::once(item).chain(inner.iter().copied()) {
+                match self
+                    .econ
+                    .with_item(u, |s| recharge::set_charges(&mut s.item.stats, k, m))
+                {
+                    Ok(true) => break,
+                    Ok(false) => {}
+                    Err(e) => self.state.errors.push(InvError::Economy(e)),
+                }
+            }
+        }
+        self.sync_in();
+        out
+    }
+
+    /// Replenish timers of `u` (`0x00558530`, `0x00558580`,
+    /// `generation.md` §9 step 6): event 3 at frame + 2500 / r + 1 for the
+    /// first of stats 252, 253 with a total r ≠ 0, when none is scheduled.
+    pub fn schedule_replenish(&mut self, u: UnitId) {
+        let scheduled = self.econ.game.timers.unit_timers(u).into_iter().any(|id| {
+            self.econ
+                .game
+                .timers
+                .event(id)
+                .is_some_and(|(e, _, _)| u32::from(e) == EVENT_REPLENISH)
+        });
+        let frame = self.econ.game.frame as u32;
+        let at = match self
+            .econ
+            .with_item(u, |s| replenish_timer(&s.item.stats, scheduled, frame))
+        {
+            Ok(at) => at,
+            Err(e) => {
+                self.state.errors.push(InvError::Economy(e));
+                None
+            }
+        };
+        if let Some(f) = at {
+            if let Err(e) = self
+                .econ
+                .game
+                .schedule_event(u, EVENT_REPLENISH, f as i32, None, 0, 0)
+            {
+                self.state.errors.push(InvError::Economy(e.into()));
             }
         }
     }

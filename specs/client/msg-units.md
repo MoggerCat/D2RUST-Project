@@ -29,13 +29,13 @@
 |   5. Local player vitals: 0x18, 0x95, 0x96 | 356–377 |
 |   6. Unit states: 0xA7, 0xA8, 0xA9, 0xAA | 378–408 |
 |   7. Other unit messages (general handlers, act at receive) | 409–524 |
-|   8. Player roster (0x5B, 0x5C, 0x65, 0x82, 0x8E; life from 0x0D, 0xAB) | 525–602 |
-| Constants & data dependencies | 603–614 |
-| Randomness | 615–622 |
-| Edge cases & original bugs | 623–645 |
-| Test vectors | 646–696 |
-| Provenance | 697–739 |
-| Open questions | 740–774 |
+|   8. Player roster (0x5B, 0x5C, 0x65, 0x75, 0x82, 0x8E; life from 0x0D, 0xAB) | 525–629 |
+| Constants & data dependencies | 630–641 |
+| Randomness | 642–649 |
+| Edge cases & original bugs | 650–672 |
+| Test vectors | 673–723 |
+| Provenance | 724–766 |
+| Open questions | 767–805 |
 <!-- /index -->
 
 Owned ids: 0x0A, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x15, 0x18, 0x4C, 0x4D,
@@ -522,7 +522,7 @@ The player roster (§8). Outputs (`client/bridge.md` §10): `UnitOverlay`
     roster life percent (§8 rule 6) := (u8@6 × 100) / 128, truncated
     toward zero. Recorded `ab 01 13000000 30` (`-015956` seq 219061).
 
-### 8. Player roster (0x5B, 0x5C, 0x65, 0x82, 0x8E; life from 0x0D, 0xAB)
+### 8. Player roster (0x5B, 0x5C, 0x65, 0x75, 0x82, 0x8E; life from 0x0D, 0xAB)
 
 1. The client keeps two lists of 0xD8-byte player records, linked at
    +0x80: **active** `[0x007BB5C0]` and **inactive** `[0x007BB5C4]`.
@@ -551,7 +551,10 @@ The player roster (§8). Outputs (`client/bridge.md` §10): `UnitOverlay`
    min 34): GUID u32@3, class u8@7, name @8 (16 bytes), u16@0x18,
    u16@0x1A, u16@0x1C, u16@0x1E, u16@0x20, string 1 @0x22, string 2
    after string 1's NUL. GUID −1 → fatal 0xB3. A record found by GUID
-   or by name (`0x00479360`, active list) is updated in place; else an
+   or by name (`0x00479360`, active list `[0x007BB5C0]`, next +0x80:
+   the first record whose GUID +0x10 equals the GUID, or whose name at
+   +0x00 equals the message name byte for byte up to and including the
+   NUL (case-sensitive, no length bound); 2026-10-08 read) is updated in place; else an
    inactive record with that GUID is moved out of the inactive list,
    else a new record is allocated (first 0x84 bytes zeroed); +0x34 :=
    a new handle; fields filled (`0x004793C0`): name, GUID, class,
@@ -599,6 +602,30 @@ The player roster (§8). Outputs (`client/bridge.md` §10): `UnitOverlay`
    UI fields and not modelled. `RosterChanged` {} tells the UI layer to
    rebuild the party view from the roster captured in the output
    (`client/bridge.md` §10 r3: the payload carries the active records).
+   0x75 (rule 10) also writes the roster.
+10. **0x75** PlayerPartyInfo (`0x0045E7E0` → `0x0047A850`, 13 bytes;
+    2026-10-08 read): GUID u32@1, party u16@5, level u16@7, u16@9,
+    u16@11. Record r found (rule 2), else nothing. If the GUID is in
+    r's corpse list (r was found as a corpse holder), nothing. Else r
+    +0x22 := party, +0x20 := level, +0x30 := u16@11 (zero-extended);
+    u16@9 is not stored (the same slots as 0x5B's u16@0x1A, u16@0x18,
+    u16@0x1E, rule 3). Then the pet pass `0x00478FA0`: for each pet
+    record of type 4 (`client/model.md` §14) whose monster (1, pet
+    GUID) is present, palette level t := 1 when `0x00478E70(local
+    player, U)` = 0, else 0, set through `0x00463E20(U, t)` and
+    `0x00463E80(U, t)` (render state, not in the model; open question
+    11); then `RosterChanged` (`0x00479AB0`, `0x0049A640`). Single
+    player: recorded once in `-022633` (sender `0x0053DA90`): `75
+    01000000 ffff 0200 0000 0100` (GUID 1, party 0xFFFF, level 2,
+    u16@11 = 1).
+11. **Out of scope (Phases 0–6): multiplayer only**
+    (`sim/intents-events.md` §4 rule 4; none occurs in either
+    recording): 0x7F AllyPartyInfo (`0x0045E990`), 0x8B
+    PlayerRelationship (`0x0045EA60`), 0x8C RelationshipUpdate
+    (`0x0045EA70`), 0x8D AssignPlayerToParty (`0x0045EA90`), 0x90
+    PartyAutomapInfo (`0x0045E9C0`; its automap use is `ui/automap.md`
+    §12, a two-player case). The d2rs handler of each is the no-op of
+    `client/bridge.md` §6 rule 7.
 
 ## Constants & data dependencies
 
@@ -771,3 +798,7 @@ Act-switch session (2026-10-07): `0x004654C0` at `0x00465603`–`0x00465634`
 10. The client missile body of 0x73 (`0x004CD540`, `0x0064A330`,
     `0x0045C3E0`) and the umod client functions of 0x57 (table
     `0x00724D78`): Phase 6 effects spec.
+11. §8 rule 10's pet pass `0x00478FA0`: which pets are type 4, what
+    `0x00478E70(local player, U)` tests, and which render spec owns the
+    palette-level pair `0x00463E20` / `0x00463E80` it sets. Settle by
+    reading `0x00478E70` and the pet-type writers of 0x7A / 0x81.

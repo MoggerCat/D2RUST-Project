@@ -109,3 +109,62 @@ fn level_cap_same_for_every_unit() {
         }
     }
 }
+
+// §3.3 step 2: the Kick flag. Player x = dex + str − 20; monster x = 3 ×
+// level; x ≥ 1; min (x / 4) << 8, max (x / 3) << 8.
+// Covers: specs/skills/levels.md §3.3 text
+#[test]
+fn kick_flag_damage() {
+    let mut k = skill_rec();
+    k.kick = true;
+    let t = skill_tables(vec![k]);
+    let mut f = Fake::default();
+    let p = f.add(FUnit::new(UnitType::Player, 1).with(0, 100).with(2, 50));
+    assert_eq!(phys_min(&mut f, &t, Some(p), 0, 1, true), (130 / 4) << 8);
+    assert_eq!(phys_max(&mut f, &t, Some(p), 0, 1, true), (130 / 3) << 8);
+    let m = f.add(FUnit::new(UnitType::Monster, 1).with(12, 20));
+    assert_eq!(phys_min(&mut f, &t, Some(m), 0, 1, true), (60 / 4) << 8);
+    assert_eq!(phys_max(&mut f, &t, Some(m), 0, 1, true), (60 / 3) << 8);
+    // x is at least 1.
+    let w = f.add(FUnit::new(UnitType::Player, 1));
+    assert_eq!(phys_min(&mut f, &t, Some(w), 0, 1, true), 0);
+    assert_eq!(phys_max(&mut f, &t, Some(w), 0, 1, true), 0);
+    // A bad skill is 1 / 2 unshifted.
+    assert_eq!(phys_min(&mut f, &t, Some(p), 9, 1, true), 1);
+    assert_eq!(phys_max(&mut f, &t, Some(p), 9, 1, true), 2);
+}
+
+// §6.4 replies and results: validator 2 and the maximum level send the
+// Attack reset (message 0x21) and return 2; validator 3 sends nothing and
+// returns 3; a failed spend returns 2 silently; success returns 0.
+// Covers: specs/skills/levels.md §6.4 text
+#[test]
+fn add_skill_point_results() {
+    let mut a = skill_rec();
+    (a.reqlevel, a.maxlvl, a.ingame) = (1, 2, true);
+    a.reqstr = 50;
+    let mut b = skill_rec();
+    (b.reqlevel, b.maxlvl, b.ingame) = (1, 2, true);
+    let t = skill_tables(vec![a, b]);
+    let mut f = Fake::default();
+    let u = f.add(FUnit::new(UnitType::Player, 1).with(12, 5).with(0, 10));
+    // Requirement fails (strength): 3, no message.
+    assert_eq!(add_skill_point(&mut f, &t, u, 0), 3);
+    assert!(f.log.is_empty());
+    // Bad id: 2 with the reset message.
+    assert_eq!(add_skill_point(&mut f, &t, u, 9), 2);
+    assert_eq!(f.log, ["msg21 0"]);
+    f.log.clear();
+    // No point to spend: 2, silent.
+    assert_eq!(add_skill_point(&mut f, &t, u, 1), 2);
+    assert!(f.log.is_empty());
+    // Success: 0.
+    f.units[u].base.insert((5, 0), 1);
+    assert_eq!(add_skill_point(&mut f, &t, u, 1), 0);
+    assert_eq!(f.log, ["addskill 0 1 1", "pointupdates 0"]);
+    f.log.clear();
+    // At the maximum level: 2 with the reset message.
+    f.units[u].skills.push(native(1, 2));
+    assert_eq!(add_skill_point(&mut f, &t, u, 1), 2);
+    assert_eq!(f.log, ["msg21 0"]);
+}

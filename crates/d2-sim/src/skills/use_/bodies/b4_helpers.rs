@@ -13,7 +13,7 @@ use super::helpers3::JitterMissile;
 use super::{callback, init_cb, BodyWorld, MissileRequest};
 use crate::combat::{apply_melee, bonuses, start_combat, CombatTables, CombatWorld, DamageRecord};
 use crate::rng::Seed;
-use crate::skills::{phys_max, phys_min, roll_elemental, weapon_mastery, SkillTables};
+use crate::skills::{phys_max, phys_min, roll_elemental, throw_mastery, SkillTables};
 use crate::units::UnitType;
 use d2_data::tables::Skills;
 
@@ -281,12 +281,10 @@ pub fn throw<W: BodyWorld>(
     let mm = skill_missile_unit(w, m, u, skill, lvl, (0, 0), (0, 0), true, lob);
     // Post-throw `0x0056C600(unit, M, I)`.
     if let Some(mm) = mm {
-        // TODO(spec: bodies-3.md §3.3 step 6): `0x00645720` is the throw
-        // path of `weapon_mastery` (`levels.md` §3.5); what it gives for
-        // an item that fails the throw test is not stated: read through
-        // `weapon_mastery` (stats 342 / 343 then).
-        let h = weapon_mastery(w, t, Some(u), Some(i), None, 0);
-        let d = weapon_mastery(w, t, Some(u), Some(i), None, 1);
+        // `0x00645720` (`bodies-3.md` §3.3 step 6, Open question 8): 0 for
+        // an item that fails the throw gate (not stats 342 / 343).
+        let h = throw_mastery(w, t, Some(u), Some(i), None, 0);
+        let d = throw_mastery(w, t, Some(u), Some(i), None, 1);
         let v = w.stat(mm, sid::TOHIT, 0).wrapping_add(h);
         w.set_stat(mm, sid::TOHIT, v);
         let v = w.stat(mm, sid::DAMAGEPERCENT, 0).wrapping_add(d);
@@ -696,11 +694,6 @@ pub fn zigzag<W: BodyWorld>(
         init: Some((cb, 0)),
         ..MissileRequest::new(u, m)
     };
-    // TODO(spec: bodies-4.md Edge case 1): a step ≤ 0 never ends the
-    // original's loop (the game hangs); d2rs creates nothing.
-    if step <= 0 {
-        return;
-    }
     let p2 = param(t, 280, 2).wrapping_add(1);
     let mut i = 0;
     while i < 64 {
@@ -715,6 +708,19 @@ pub fn zigzag<W: BodyWorld>(
             if ring || m == 568 {
                 w.effect(BodyEffect::MissileData28 { missile: mm, v: p2 });
             }
+        }
+        // `bodies-4.md` Edge case 1 (d2rs decision): a step ≤ 0 never
+        // ends the original's loop (it hangs, or a negative step reads
+        // past the ring tables). d2rs stops here, after the i = 0
+        // missile the original makes first, creates no further missile
+        // and reports the fault.
+        if step <= 0 {
+            w.effect(BodyEffect::EndlessProgressive {
+                unit: u,
+                skill,
+                step,
+            });
+            return;
         }
         i += step;
     }

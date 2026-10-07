@@ -27,15 +27,15 @@
 |   5. Panel shift for floors | 153–158 |
 |   6. Tiles | 159–198 |
 |   7. View culling | 199–249 |
-|   8. Screen shake | 250–281 |
-|   9. Time base: no interpolation | 282–335 |
-|   10. What d2rs hooks get | 336–344 |
-| Constants & data dependencies | 345–351 |
-| Randomness | 352–357 |
-| Edge cases & original bugs | 358–367 |
-| Test vectors | 368–389 |
-| Provenance | 390–413 |
-| Open questions | 414–504 |
+|   8. Screen shake | 250–301 |
+|   9. Time base: no interpolation | 302–355 |
+|   10. What d2rs hooks get | 356–364 |
+| Constants & data dependencies | 365–371 |
+| Randomness | 372–377 |
+| Edge cases & original bugs | 378–387 |
+| Test vectors | 388–409 |
+| Provenance | 410–433 |
+| Open questions | 434–528 |
 <!-- /index -->
 
 ## Summary
@@ -185,7 +185,7 @@ orientations are in which list, the order, shadows and the fade alpha are
 80 left of its `sx`. Roofs differ from `map-preview.md` (no `+WALL_BASE`):
 live roof blocks lie where floor blocks do (every block of the
 orientation-15 tiles in the used DT1 files has y in 0 … 64, on the floor
-diamond rows; the exact block count is *Pending*, Open question 1), so
+diamond rows; the exact block count is PROVISIONAL, Open question 1), so
 a roof is its cell's floor diamond raised by `roof_height` rows; `map-preview.md`'s `sy + y0 + WALL_BASE − roof_height`
 puts it `WALL_BASE` (80) rows lower than 1.14d. `roof_height` is read
 unsigned (`0x004DEBA6`, 16-bit zero-extended); live values 0, 80, 100,
@@ -215,7 +215,7 @@ units use `H / 2 − 8`, tiles `(H − 40) / 2` (§3, §4).
   and it does for the live data: every block of non-floor, non-shadow,
   non-roof tiles (orientation ∉ {0, 13, 15}) of the used DT1 files has
   x ≡ 0 and y ≡ 0 (mod 32) (both block formats are 32 wide; the count,
-  and y, are *Pending* a recount, Open question 7). In modes 0/3 a
+  and y, are PROVISIONAL until a recount, Open question 7). In modes 0/3 a
   culled block has no pixel in the frame, so culling changes no pixel
   there.
 - Units: no view-rectangle test. The world unit draw `0x004DC7B0` skips a
@@ -274,8 +274,28 @@ seeded RNG helper `0x00472280` on the local player unit's seed,
 `unit +0x20`; `rnd(n)` per `sim/rng.md`), stored in `0x007B9538` /
 `0x007B8D20`, added to the tile origin and, through `0x00476AC0`, to the
 unit origin. `0x004769D0(a)` also drives a rumble sound (audio specs).
-Callers of `0x00476A80` (skills/missiles) and their parameters belong to
-their effect specs. The same seed is stepped by the mouse cursor in its
+Callers of `0x00476A80` (2026-10-08, static: every `call 0x476A80`
+in 1.14d; (A, t1, t2, t3)):
+
+| Site (function) | Parameters | Condition at the site |
+|---|---|---|
+| `0x0049F34E` (`0x0049EB10`, S→C 0x5A type 18, `client/msg-ui.md` §9) | (6, 4000, 10000, 4000) | always |
+| `0x004D2695` (`0x004D2610`) | (6, 2000, 3000, 2000) | the counter stored at record +0x20 has its low 6 bits 0 |
+| `0x004D3DD3` (`0x004D3D30`) | (record +0x58, t, v, t) | computed t, v |
+| `0x004D5433` (`0x004D5310`, client missile function 29) | (8, t, v, t) | computed t, v |
+| `0x004D655C` (`0x004D6540`, client missile function 37, missile 372 `diablo appears`) | (25, 0, 4000, 0) | frames left = 150 |
+| `0x004D66C7` (`0x004D6680`) | (4, 80, 80, 400) | value = 10 |
+| `0x004D6854` (`0x004D6820`) | (25, 0, 4000, 0) | value = 150 |
+| `0x004D742A` (`0x004D7400`) | (20, 0, 6000, 0) | `0x0064A380` = 325 |
+| `0x004D8207` (`0x004D8000`) | (3, 600, 4000, 3000) | value = 5 |
+| `0x004F0811` (`0x004F0710`) | (local, t, v, w) | computed |
+
+PROVISIONAL: d2rs starts a shake only at the two sites whose trigger
+is known: S→C 0x5A type 18 (first row) and client missile function 37
+at frames left 150 (fifth row); every other row starts none (because
+the missiles / skills reaching those functions and the computed
+parameter formulas were not read); settled by REC-62. Each started shake draws 2 values per frame
+on the client player seed, so this is RNG draw order. The same seed is stepped by the mouse cursor in its
 idle state and by the weather in the same frame (`capture.md` §3.3,
 Randomness).
 
@@ -422,7 +442,9 @@ DT1 files `mpq-tool extract` wrote from `d2data.mpq` / `d2exp.mpq`
    the floor diamond rows, and block x on a 16-pixel grid. §6 concludes
    from it that 1.14d's `sy − roof_height` stands and `map-preview.md`
    is 80 rows low. Both reads agree on that. They disagree on the
-   numbers, and those are *Pending*:
+   numbers. PROVISIONAL: the rule (roof blocks on the floor diamond
+   rows, y in 0 … 64) stands and no d2rs code depends on the count
+   (because both reads agree on the range); settled by REC-61:
    - the block count (one read: 13,432 blocks; the other: 15,432 blocks
      of 715 tiles in 250 used files);
    - whether y is a multiple of 8 always or only almost always.
@@ -488,7 +510,9 @@ DT1 files `mpq-tool extract` wrote from `d2data.mpq` / `d2exp.mpq`
    by format (`formats/dt1.md`). Every block of orientations ∉ {0, 13,
    15} has x ≡ 0 (mod 32), in both reads. The six unused DT1s are the
    only files with off-grid wall blocks. The two reads disagree on the
-   numbers, which are *Pending*:
+   numbers. PROVISIONAL: §7's per-block cull is taken as equal to one
+   clip of the assembled tile (x and y on the 32 grid; because both
+   reads agree on x and the 250-file read on y); settled by REC-61:
    - the file set and count: one read gives 104,780 blocks in 251 files
      with x only checked; the other gives 104,767 blocks in 250 files
      with x and y checked;

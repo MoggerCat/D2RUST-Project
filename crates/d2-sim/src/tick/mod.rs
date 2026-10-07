@@ -55,8 +55,10 @@ pub trait EventDispatch {
 /// and flags around them.
 #[allow(unused_variables)]
 pub trait TickHooks: EventDispatch {
-    /// Step 1 (`0x0061C040`): advance act `act`'s day/night cycle; true
-    /// when the cycle index changed.
+    /// Step 1 (`0x0061C040(act, a)`, `render/lighting.md` §9.3 rule 5):
+    /// advance act `act`'s day/night cycle with `A` = `act`; true when the
+    /// index or type changed or the hour moved more than 16 degrees since
+    /// the last report.
     fn advance_environment(&mut self, game: &mut Game, act: u8) -> bool {
         false
     }
@@ -105,7 +107,10 @@ pub trait TickHooks: EventDispatch {
     fn send_unit_update(&mut self, game: &mut Game, client: ClientId, unit: UnitId) {}
 
     /// Per-client update (§6.5): player stat-change messages
-    /// (`0x006258D0`), the flagged inventory refresh, `0x0055F4F0`.
+    /// (`0x006258D0`); then, only when the player's flag-ex (+0xC8) bit 21
+    /// is set, the inventory refresh (`0x0055DF00`) and `0x0055F4F0`
+    /// (both skipped otherwise; `0x0055F4F0` is an empty function in
+    /// 1.14d, OQ6, so an implementation calls nothing for it).
     fn client_update_messages(&mut self, game: &mut Game, client: ClientId) {}
 
     /// Per-client update (§6.5): the player's room differs from the

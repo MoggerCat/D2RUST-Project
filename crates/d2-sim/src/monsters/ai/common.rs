@@ -10,7 +10,7 @@ use crate::game::Game;
 use crate::units::{RoomId, UnitId, UnitType};
 
 use super::tactics::*;
-use super::{idle_keep_mode, mode, AiHost, Ctx, ModeTarget, TickParam};
+use super::{idle_keep_mode, mode, request_mode, AiHost, Ctx, ModeTarget, TickParam};
 
 /// "wait N" `0x005DE0F0(N)`: delete the thinks and schedule one at frame +
 /// N; the anim mode is not changed.
@@ -29,7 +29,7 @@ pub(super) fn mode_point<W: AiHost + ?Sized>(
     y: i32,
 ) -> bool {
     cx.world.set_path_steps(u, 1);
-    cx.world.change_mode(game, u, m, ModeTarget::Point(x, y))
+    request_mode(game, cx, u, m, ModeTarget::Point(x, y))
 }
 
 /// `0x005DDFC0(m, x, y)` / `0x005DE490(x, y, m)`: mode m at the point
@@ -42,7 +42,7 @@ pub(super) fn mode_point_raw<W: AiHost + ?Sized>(
     x: i32,
     y: i32,
 ) -> bool {
-    cx.world.change_mode(game, u, m, ModeTarget::Point(x, y))
+    request_mode(game, cx, u, m, ModeTarget::Point(x, y))
 }
 
 /// "Skill k at U" `0x005DEAD0(Skk mode, Skill k, U, 0, 0)`.
@@ -225,10 +225,9 @@ pub(super) fn point_distance<W: AiHost + ?Sized>(
     dx.max(dy) + dx.min(dy) / 2
 }
 
-/// "wander near t n" with t = 0 read as the unit itself.
-///
-/// TODO(spec gap): `0x005DF530` with target 0 (target mode 1 always has
-/// one); the own position is used.
+/// "wander near T n" `0x005DF530` in a target-mode-1 body. T = 0 is
+/// unreachable there (`ai.md` §2.3 "Target 0 in mode-1 and mode-4
+/// bodies"): asserted, not handled.
 pub(super) fn wander_near_opt<W: AiHost + ?Sized>(
     game: &mut Game,
     cx: &mut Ctx<'_, W>,
@@ -236,13 +235,14 @@ pub(super) fn wander_near_opt<W: AiHost + ?Sized>(
     t: Option<UnitId>,
     n: i32,
 ) -> bool {
-    wander_near(game, cx, u, t.unwrap_or(u), n)
+    let t = t.expect("wander near target 0 in a target-mode-1 body (ai.md §2.3)");
+    wander_near(game, cx, u, t, n)
 }
 
-/// "walk in radius of t (a, b)" `0x005DE6D0`; nothing for t = 0.
-///
-/// TODO(spec gap): walking in the radius of target 0 (target mode 1
-/// always has one) does nothing here.
+/// "walk in radius of t (a, b)" `0x005DE6D0`. `0x005DE4E0` reads t
+/// without a null test (an access violation in 1.14d), so t = 0 is
+/// unreachable (`ai.md` §2.3 "Target 0 in mode-1 and mode-4 bodies"):
+/// asserted, not handled.
 pub(super) fn radius<W: AiHost + ?Sized>(
     game: &mut Game,
     cx: &mut Ctx<'_, W>,
@@ -251,10 +251,8 @@ pub(super) fn radius<W: AiHost + ?Sized>(
     a: i32,
     b: i32,
 ) -> bool {
-    match t {
-        Some(t) => cx.world.walk_in_radius(game, u, t, a, b),
-        None => false,
-    }
+    let t = t.expect("walk in radius of target 0 (ai.md §2.3)");
+    cx.world.walk_in_radius(game, u, t, a, b)
 }
 
 /// The pack scan (`ai-bodies-2.md` §2, scan 1, callback `0x005B0D00`):
@@ -361,7 +359,7 @@ const STATE_146: u16 = 146;
 /// pick 0)` (`ai-bodies-2.md` §13.1), keyed by the unit's `BaseId`.
 /// `class_in` is the incoming class (read by key 544 only).
 pub(super) fn spawn_info<W: AiHost + ?Sized>(
-    game: &Game,
+    game: &mut Game,
     cx: &mut Ctx<'_, W>,
     u: UnitId,
     class_in: i32,
@@ -403,7 +401,7 @@ pub(super) fn spawn_info<W: AiHost + ?Sized>(
         526 | 528 => panic!("spawn info key {key} without a pick (ai-bodies-2.md §13.1, fatal)"),
         537 => {
             let c = chain(cx, u, 540);
-            cx.world.set_state(u, STATE_146, true);
+            cx.world.set_state(game, u, STATE_146, true);
             at(c, ux, uy + 2, 1)
         }
         544 => {

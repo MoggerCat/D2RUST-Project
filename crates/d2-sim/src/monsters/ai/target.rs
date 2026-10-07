@@ -204,8 +204,8 @@ pub fn main_search_with<W: AiHost + ?Sized>(
     }
     if let Some((a, ad)) = alt {
         if cx.world.choose_alternative(game, unit, chosen, a) {
-            // TODO(spec gap): the distance reported for a chosen
-            // alternative; here its own no-size distance.
+            // Accepted: B := the alternative's own no-size distance, so
+            // step 7 reports it (§5.2 step 5.3).
             chosen = Some(a);
             best = ad;
         }
@@ -282,11 +282,8 @@ pub(super) fn find_mode1<W: AiHost + ?Sized>(
     false
 }
 
-/// `0x005DE9D0` (§2.3), target modes 4 and 5.
-///
-/// TODO(spec gap): "same collision test → wander 5": whether the
-/// can-walk test of `0x005DE890` also applies; here only the collision
-/// test.
+/// `0x005DE9D0` (§2.3), target modes 4 and 5: the collision test **and**
+/// the class can walk → wander 5; otherwise idle 20 without a mode change.
 fn find_mode45<W: AiHost + ?Sized>(
     game: &mut Game,
     cx: &mut Ctx<'_, W>,
@@ -298,7 +295,7 @@ fn find_mode45<W: AiHost + ?Sized>(
     if s.target.is_some() {
         return true;
     }
-    if cx.world.collides(game, unit, 0x40) {
+    if cx.world.collides(game, unit, 0x40) && cx.can_walk(unit) {
         wander(game, cx, unit, 5);
     } else {
         idle_keep_mode(game, cx, unit, 20);

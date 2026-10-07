@@ -28,21 +28,21 @@
 | Inputs | 72–83 |
 | Outputs / state changes | 84–94 |
 | Rules | 95–96 |
-|   1. Think scheduling | 97–242 |
-|   2. Think dispatch `0x005B1740` | 243–372 |
-|   3. AI control and AI tables | 373–544 |
-|   4. AI parameters | 545–563 |
-|   5. Target selection | 564–695 |
-|   6. Distances and line tests | 696–710 |
-|   7. Tactics helpers | 711–854 |
-|   8. AI commands and minions | 855–879 |
-|   10. The catalogue `ai-functions.tsv` | 880–900 |
-| Constants & data dependencies | 901–924 |
-| Randomness | 925–946 |
-| Edge cases & original bugs | 947–988 |
-| Test vectors | 989–1077 |
-| Provenance | 1078–1134 |
-| Open questions | 1135–1238 |
+|   1. Think scheduling | 97–245 |
+|   2. Think dispatch `0x005B1740` | 246–382 |
+|   3. AI control and AI tables | 383–554 |
+|   4. AI parameters | 555–573 |
+|   5. Target selection | 574–705 |
+|   6. Distances and line tests | 706–720 |
+|   7. Tactics helpers | 721–913 |
+|   8. AI commands and minions | 914–938 |
+|   10. The catalogue `ai-functions.tsv` | 939–959 |
+| Constants & data dependencies | 960–983 |
+| Randomness | 984–1005 |
+| Edge cases & original bugs | 1006–1047 |
+| Test vectors | 1048–1136 |
+| Provenance | 1137–1193 |
+| Open questions | 1194–1297 |
 <!-- /index -->
 
 ## Summary
@@ -196,7 +196,10 @@ class handler, no type-2 event): `0x005A8030`, the end function of modes
   class matches, the think also runs inline: base 110 (vulture1) at the
   end of mode 8, 247 (frogdemon1) mode 14, 136 (batdemon1) modes 10/11,
   230/231 (firebeast, iceglobe) any mode, 118 (willowisp1) mode 2, 403
-  (trappedsoul1) any mode;
+  (trappedsoul1) any mode. This branch is tested first and does **not**
+  set the anim mode (only the table-1 branch calls `0x00624690(unit,
+  1)`); same freeze gate, then the think (`0x005A80C5`–`0x005A80F5`); a
+  matching class whose mode does not match falls to the table test;
 - every other case requests a mode change to neutral (which schedules
   through §1.3).
 
@@ -321,8 +324,15 @@ The finders write target, distance and combat into the record.
 3. Else idle by the distance `0x005DD7F0` returned (nearest player,
    §5.2): ≥ 35 → 25; ≥ 25 → d − 10; else 10.
 
-`0x005DE9D0` (D2MOO `sub_6FCCFC00`): same collision test → wander 5;
-else delete thinks and schedule +20 (no mode change).
+`0x005DE9D0` (D2MOO `sub_6FCCFC00`): runs `0x005DD7F0` first (a target
+found → return it); else the same collision test (mask 0x40 at the
+unit's position, static path +0x0C / +0x10 for path types 2, 4, 5,
+else the dynamic x / y) **and** the class can walk (has mode 2 `WL`,
+`0x0046C140(class, 2)`, the same test as `0x005DE890`) → wander 5;
+otherwise (no collision, or no walk mode) delete thinks (`0x00540E60`
+type 2) and schedule a type-2 think at frame + 20 (`0x005417D0`; no
+mode change), return 0. No draw happens in this function besides the
+wander's own (§7.2).
 
 1.14d-confirmed (`0x005B1650`, `0x005DE890`, `0x005DE9D0`).
 
@@ -736,11 +746,12 @@ the point (+0x0C, +0x10) only when +0x08 = 0 (`0x00648AD0`). So
 `0x005DEAD0(mode, skill, T, x, y)` with T ≠ 0 aims at T; the point is
 stored and ignored. Byte +0x15 reaches the movement set-up
 `0x005A63F0` with +0x18 and byte +0x1C: a pending velocity request
-(AI param record +0x18 method, +0x1C speed, §7.3) replaces them and is
-cleared; then path type 100 = no path (path type 0, nothing computed),
-101 = path type 13, any other value is the path type computed
-(`0x005A6290`; a failed compute of types 2, 7, 9 or 13 retries with
-type 15). Flag ≠ 0: when the unit's mode after the change equals the
+(AI param record +0x18 method, +0x1C speed, +0x20 steps, §7.3)
+replaces them field by field and is cleared; then path type 100 = no
+path (the path is not touched; counter index 0), 101 = path type 13,
+any other value is the path type computed (`0x005A6290`; a failed
+compute of types 2, 7, 9 or 13 retries with type 15). Exact steps:
+§7.5 rules 4–5. Flag ≠ 0: when the unit's mode after the change equals the
 requested mode, the current skill is cleared again. 1.14d-confirmed
 (`0x005A7E60`, `0x005A7C20`, `0x005A63F0`, `0x005A6290`,
 `0x005A6B10`).
@@ -789,8 +800,8 @@ D2MOO's.
 maps method 1 to 7, and writes into the monster's AI param record
 (monster data +0x2C) through `0x005A6260`: each nonzero argument
 overwrites its field (+0x18 method, +0x1C speed bonus, +0x20 steps, steps
-capped at 77). The record is consumed by the movement code
-(`sim/units.md`). 1.14d-confirmed.
+capped at 77). The record is consumed by the next non-GH mode request
+(§7.5 rule 4.1). 1.14d-confirmed.
 
 #### 7.4 Monster skill check `0x005FD470`
 
@@ -851,6 +862,54 @@ request. `0x006490E0` has no other caller and no other code writes path
 yet does not re-path. 1.14d-confirmed (`0x005A7C20` at `0x005A7CC9`–
 `0x005A7CFF`; xref of `0x006490E0`; `byte [r + 0x94]` stores in
 `all.asm`).
+
+Rules 4–7 (1.14d-read 2026-10-08, gaps MV4–MV7 of
+`docs/handoff/impl-path-motion.md`; `0x005A7D1F`–`0x005A7D2F`,
+`0x005A63F0`, `0x005A6290`):
+
+4. **Movement set-up** `0x005A63F0`, after rule 3, for every mode but
+   GH. Inputs: P = the AI param record (monster data +0x2C), t = record
+   byte +0x15, v = record dword +0x18 (speed), n = record byte +0x1C
+   (steps).
+   1. Velocity request: P +0x18 ≠ 0 → t := P +0x18 (the method replaces
+      the path type, also a 100 or 101 byte); P +0x1C ≠ 0 → v := P
+      +0x1C; P byte +0x20 ≠ 0 → n := it. Then P +0x18, +0x1C, +0x20 :=
+      0. So any non-GH mode request consumes the request, also one whose
+      start then fails.
+   2. t = 100 → c := 0, v := 0; nothing is written to the path (type,
+      points and step counts keep their values).
+   3. Else n = 0 → n := 5; t = 101 → t := 13; c := compute(t, n) (rule
+      5).
+   4. P +0x14 := 10 when t ≠ 100, c ≠ 1 and the path has a target unit
+      (`0x00648BF0`), else −1. P +0x10 := v.
+   5. Counters: game +0x1D70 + 4·c += 1; c ≠ 0 → game +0x1DB4 += 1 (no
+      reader in this spec).
+5. **Compute** `0x005A6290(t)` (U, P, n as in rule 4): step counts :=
+   n (`0x00648E70`, `sim/pathing.md` §13.1 rule 1). Target cache: when
+   (path target unit, target x, target y) (`0x00648BF0`, `0x00648A00`,
+   `0x00648A10`) differ from P (+0x04, +0x08, +0x0C), store them there
+   and P bytes +0x00, +0x01 := 0. Path type := t through **set type**
+   `0x00648CF0` (`sim/pathing.md` §2: the flag, previous-type and saved
+   velocity rules apply), then compute `0x00649970(path, U, 0)` (town
+   access 0). Point count ≠ 0 → U queued for update (`0x0064C040`), U
+   flags (+0xC4) |= 1, P bytes +0x00, +0x01 := 0, c := t. Point count
+   0 and t ∈ {2, 7, 9, 13} → U queued, flags |= 1, set type 15,
+   compute again (town access 0), c := 15 whatever it finds. Other t →
+   c := t (no points).
+6. **Callers without a target** (MV6). Every caller of `0x005A7C20`
+   goes through rule 2; nothing keeps the old target. A record with
+   +0x08 = 0 sets the target point (+0x0C, +0x10), which the builder
+   `0x005A7E60` and the inline records leave at (0, 0) unless the
+   caller writes them, and clears the target unit. Mode 3 requests
+   (reaction GH, KB event 1 `sim/units.md` §4.6 rule 14) change no path
+   field (rule 1). A non-moving mode never computes (byte 100, rule
+   4.2), so a (0, 0) target matters only for a moving request or a
+   pending velocity request (rule 4.1).
+7. **Path step count and stop path** (MV7): the "path step count" of
+   §7.1–§7.2 is the stop distance, path +0x93 (`0x00649070`,
+   `sim/pathing.md` §9.5 rule 3). "Stop the path" (§1.2 table, the NPC
+   interaction at `0x00548B95`, AI bodies) is `0x00648730`:
+   `sim/pathing.md` §13.1 rule 3.
 
 ### 8. AI commands and minions
 

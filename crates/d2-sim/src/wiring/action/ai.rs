@@ -21,7 +21,7 @@ use crate::units::{RoomId, UnitId};
 
 use super::objects::ObjectRoute;
 use super::units::clear_uninterruptable;
-use super::{Pending, View};
+use super::{Pending, View, WiringError};
 use crate::world::objects::Dispatch;
 
 /// Monster mode 3, get-hit (`ai.md` §1.2).
@@ -153,12 +153,22 @@ impl<X: Pending> AiUnits for View<'_, X> {
             r.flags |= mask;
         }
     }
-    /// The state toggle `0x00625A70` (`stat-lists.md` §9.2).
-    ///
-    /// TODO(spec: ai-bodies.md §9.26): SandRaider calls `0x00639DB0`; read as the
-    /// state toggle of `stat-lists.md` §9.2.
-    fn set_state(&mut self, unit: UnitId, s: u16, on: bool) {
+    /// `0x00639DB0(unit, s, on)` (`ai-bodies.md` §9.26, `stat-lists.md`
+    /// §9.2): s outside 0 … states count − 1 → nothing; else the toggle
+    /// `0x00625A70`, then the update-queue insert `0x0064C040`
+    /// (`unit-order.md` §6.2) whether or not the bit changed.
+    fn set_state(&mut self, game: &mut Game, unit: UnitId, s: u16, on: bool) {
+        if usize::from(s) >= self.stats.data().states.count() {
+            return;
+        }
         View::set_state(self, unit, s, on);
+        if let Err(e) = game.lists.queue_update(unit) {
+            self.h
+                .errors
+                .push(WiringError::Unit(crate::units::modes::UnitError::Game(
+                    e.into(),
+                )));
+        }
     }
     fn path_target(&self, unit: UnitId) -> Option<UnitId> {
         if self.h.paths.is_some() {
@@ -178,8 +188,42 @@ impl<X: Pending> AiModes for View<'_, X> {
     /// (state 54, bad mode).
     fn change_mode(&mut self, game: &mut Game, unit: UnitId, mode: u8, target: ModeTarget) -> bool {
         self.h.x.set_mode_target(unit, target);
-        crate::wiring::path::monsters::stage_request(self.h, unit, target);
+        crate::wiring::path::monsters::stage_request(self.h, unit, target, None);
         self.monster_set_mode(game, unit, u32::from(mode))
+    }
+    fn change_mode_path_byte(
+        &mut self,
+        game: &mut Game,
+        unit: UnitId,
+        mode: u8,
+        target: ModeTarget,
+        path_byte: u8,
+    ) -> bool {
+        self.h.x.set_mode_target(unit, target);
+        crate::wiring::path::monsters::stage_request(self.h, unit, target, Some(path_byte));
+        self.monster_set_mode(game, unit, u32::from(mode))
+    }
+    /// The mode change with the velocity request (`ai.md` §7.5 rule
+    /// 4.1): every mode but GH consumes it (staged for the movement
+    /// set-up of [`crate::wiring::path::monsters`]; dropped without the
+    /// provider, which has no path to give it to).
+    fn change_mode_with(
+        &mut self,
+        game: &mut Game,
+        unit: UnitId,
+        mode: u8,
+        target: ModeTarget,
+        path_byte: Option<u8>,
+        velocity: &mut crate::monsters::ai::VelocityRequest,
+    ) -> bool {
+        if u32::from(mode) != MODE_GETHIT {
+            let v = std::mem::take(velocity);
+            crate::wiring::path::monsters::stage_velocity(self.h, unit, v);
+        }
+        match path_byte {
+            Some(b) => self.change_mode_path_byte(game, unit, mode, target, b),
+            None => self.change_mode(game, unit, mode, target),
+        }
     }
     /// The anim mode (unit +0x10) without a mode change.
     fn set_anim_mode(&mut self, unit: UnitId, mode: u8) {
@@ -187,15 +231,23 @@ impl<X: Pending> AiModes for View<'_, X> {
             r.mode = u32::from(mode);
         }
     }
+    /// The path step count: the stop distance `0x00649070` (`ai.md`
+    /// §7.5 rule 7, `pathing.md` §13.1 rule 2) with the path provider.
     fn set_path_steps(&mut self, unit: UnitId, steps: i32) {
-        self.h.x.set_path_steps(unit, steps);
+        if crate::wiring::path::monsters::set_stop_distance(self.h, unit, steps).is_none() {
+            self.h.x.set_path_steps(unit, steps);
+        }
     }
     fn path_blocked(&self, unit: UnitId) -> bool {
         crate::wiring::path::monsters::path_blocked(self.h, unit)
             .unwrap_or_else(|| self.h.x.path_blocked(unit))
     }
+    /// Stop the path `0x00648730` (`ai.md` §7.5 rule 7, `pathing.md`
+    /// §13.1 rule 3) with the path provider.
     fn stop_path(&mut self, unit: UnitId) {
-        self.h.x.stop_path(unit);
+        if crate::wiring::path::monsters::stop_path(self.h, unit).is_none() {
+            self.h.x.stop_path(unit);
+        }
     }
     fn set_current_skill(&mut self, unit: UnitId, skill: i32) -> bool {
         self.h.x.set_current_skill(unit, skill)
@@ -604,7 +656,7 @@ impl<X: Pending> AiActs for View<'_, X> {
         self.h.x.ai_direction64(unit, target)
     }
     fn stop_unit_path(&mut self, unit: UnitId) {
-        self.h.x.stop_path(unit);
+        AiModes::stop_path(self, unit);
     }
     fn spawn_monster(
         &mut self,

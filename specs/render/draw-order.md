@@ -27,17 +27,17 @@
 |   3. Filling the grid (`0x004DD7C0` per room) | 131–175 |
 |   4. List insertion | 176–186 |
 |   5. Which units draw | 187–209 |
-|   6. The passes | 210–288 |
-|   7. Tile records that never draw | 289–302 |
-|   8. Wall fade targets (`0x004DD180`, `0x004DD060`) | 303–359 |
-|   9. Map-tile feed | 360–380 |
-|   10. d2rs mapping | 381–430 |
-| Constants & data dependencies | 431–439 |
-| Randomness | 440–445 |
-| Edge cases & original bugs | 446–463 |
-| Test vectors | 464–492 |
-| Provenance | 493–529 |
-| Open questions | 530–625 |
+|   6. The passes | 210–290 |
+|   7. Tile records that never draw | 291–304 |
+|   8. Wall fade targets (`0x004DD180`, `0x004DD060`) | 305–361 |
+|   9. Map-tile feed | 362–382 |
+|   10. d2rs mapping | 383–432 |
+| Constants & data dependencies | 433–441 |
+| Randomness | 442–447 |
+| Edge cases & original bugs | 448–465 |
+| Test vectors | 466–494 |
+| Provenance | 495–531 |
+| Open questions | 532–627 |
 <!-- /index -->
 
 ## Summary
@@ -270,12 +270,14 @@ The unit draw entry `0x004DC7B0` (from the shadow pass and the wall pass,
    moved by `d ≥ 0x50` since the last reveal (`|Δx|`, `|Δy|` from the
    stored `[0x007A51FC]`/`[0x007A51F4]`: `d = (2·max + min) / 2`, C
    division), it stores the new position and walks the player room's
-   near-room array; for each room of the player's level it calls
+   near-room array; for each room whose level has the same leveldefs
+   `Layer` as the player's level (not only rooms of the player's level;
+   owner: `ui/automap.md` §5 and its edge case 6) it calls
    `0x00458F40(room, 0, cell)`. That function walks the room's floor
    array (`0x00619660`: tile data +0x08 / +0x0C, §9) and then its wall
    array (`0x006196A0`: +0x00 / +0x04, the getter the grid fill uses) in
    order and
-   adds to the automap (`0x00457CF0`, owner: the automap spec) every
+   adds to the automap (`0x00457CF0`, owner: `ui/automap.md` §3) every
    record without flag 0x8 that has flag 0x20000, or any record when
    `[0x007A51A0]` ≠ 0 (no writer in `Game.exe`: 0) or the second
    argument is 1; then `0x00458DC0` (room objects). The DRLG room-init
@@ -418,12 +420,12 @@ A shadow tile item carries no draw mode: its blend is the shadow-tile
 rule of `render/blend-modes.md` §5, whatever mode the caller names (§6
 r3). A unit's items keep the order's `pass` / `major` / `minor` and take
 `sub` from the composite; the unit's own position and offsets are
-`camera.md` §4 and `unit-composite.md` §8. An item this order emits whose
-drawing has no spec yet makes the frame an error, never a silent skip.
+`camera.md` §4 and `unit-composite.md` §8. An item this order emits
+without a drawing rule in the render specs makes the frame an error,
+never a silent skip.
 Since 2026-10-06 the former gaps are specified: water effects and passes
-4 and 9 (`draw-order-2.md` §11; the particle floats are its Open
-question 3, so a frame with live rain or snow particles stays an error
-until it is answered), level backgrounds (§12; they need the recorded
+4 and 9 (`draw-order-2.md` §11; the particle move is §11.9, answered
+from its Open question 3), level backgrounds (§12; they need the recorded
 background seed), pass 8 (§13: emits nothing), edge floors (§14; the act
 edge record is its Open question 2), the sight test (§15, §16) and the
 fade group mode (§8). Pass 10 has no d2rs input (screen fade timer).

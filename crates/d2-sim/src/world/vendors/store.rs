@@ -2,6 +2,7 @@
 //! Store generation (`0x00576980`), one store item (`0x00576330`), trade
 //! and gamble open (`0x00579430`) and the refresh rules.
 
+use super::price::PriceFatal;
 use super::trade::repair_item;
 use super::{
     flag, gamble, stat, store_level, unit_flag, EventNode, VendorRecord, VendorTables, VendorWorld,
@@ -84,11 +85,9 @@ fn upgrade<W: VendorWorld>(
         if let (true, Some(u)) = (r < ilvl * 64 + 4000, t.valid_code(rec.ubercode)) {
             code = u;
         } else if rec.nightmare_upgrade != XXX {
-            // TODO(specs/world/vendors.md §3.1 rule 1): an upgrade code not
-            // in the code map is not described; the base code is kept.
-            if let Some(i) = t.find_code(rec.nightmare_upgrade) {
-                code = i;
-            }
+            // A code the map lacks is class index 0 (`hax`: `0x00633640`
+            // writes 0), §3.1 rule 2.
+            code = t.find_code(rec.nightmare_upgrade).unwrap_or(0);
         }
     } else {
         if let (true, true, Some(x)) = (
@@ -101,9 +100,7 @@ fn upgrade<W: VendorWorld>(
             code = u;
         }
         if rec.hell_upgrade != XXX {
-            if let Some(i) = t.find_code(rec.hell_upgrade) {
-                code = i;
-            }
+            code = t.find_code(rec.hell_upgrade).unwrap_or(0);
         }
     }
     code
@@ -147,7 +144,8 @@ pub(crate) fn place_store_page<W: VendorWorld>(
     Some(false)
 }
 
-/// One store item `0x00576330` (§3.1). Returns the placed item, or null.
+/// One store item `0x00576330` (§3.1). Returns the placed item, or null;
+/// a null creation call is the fatal assert of rule 2.
 pub fn make_store_item<W: VendorWorld>(
     c: &mut StoreCtx,
     rec: &mut VendorRecord,
@@ -156,27 +154,31 @@ pub fn make_store_item<W: VendorWorld>(
     quality: u8,
     ilvl: i32,
     player_level: i32,
-) -> Option<UnitId> {
+) -> Result<Option<UnitId>, PriceFatal> {
     let t = c.tables;
     let chosen = upgrade(t, c.seed, w, record, ilvl, player_level);
     let mut q = quality;
     let mut made = None;
-    'rounds: for round in 0..2 {
+    'rounds: for _ in 0..2 {
         let mut item = None;
         for _ in 0..5 {
-            // TODO(specs/world/vendors.md §3.1 rule 2): a null creation is
-            // read as a failed try (as a cracked one).
+            // A null creation ends the try loop and the code read of none
+            // is a fatal assert (rule 2, line 0x61A).
             match w.create_item(rec.class, chosen, q, ilvl) {
                 Some(i) if is_cracked(t, w, i) => w.destroy_item(i),
                 Some(i) => {
                     item = Some(i);
                     break;
                 }
-                None => {}
+                None => return Err(PriceFatal::NullStoreItem),
             }
         }
-        let i = item?;
-        if round == 0 && w.item_record(i) != chosen {
+        let Some(i) = item else {
+            return Ok(None);
+        };
+        // A code mismatch destroys the item; in round 2 the result is
+        // null (rule 2, V7).
+        if w.item_record(i) != chosen {
             w.destroy_item(i);
             q = q::NORMAL;
             continue 'rounds;
@@ -184,12 +186,14 @@ pub fn make_store_item<W: VendorWorld>(
         made = Some(i);
         break;
     }
-    let item = made?;
+    let Some(item) = made else {
+        return Ok(None);
+    };
     // Rule 3–4.
     let page = t.type_of(w.item_record(item)).map_or(0xFF, |y| y.storepage);
     if page == 0xFF {
         w.destroy_item(item);
-        return None;
+        return Ok(None);
     }
     w.set_item_page(item, page);
     repair_item(t, w, item, None);
@@ -205,12 +209,12 @@ pub fn make_store_item<W: VendorWorld>(
             kind: 0,
             deferred: true,
         });
-        return None;
+        return Ok(None);
     }
     // Rule 5.
     mark(w, rec.class, item);
     rec.store.push(item);
-    Some(item)
+    Ok(Some(item))
 }
 
 /// Store generation `0x00576980` (§3). `now` is the host's
@@ -221,7 +225,7 @@ pub fn generate<W: VendorWorld>(
     w: &mut W,
     player: UnitId,
     now: u32,
-) {
+) -> Result<(), PriceFatal> {
     let t = c.tables;
     rec.store_time = now;
     let lp = w.stat(player, stat::LEVEL, 0);
@@ -229,9 +233,8 @@ pub fn generate<W: VendorWorld>(
     let mut fails = 0u32;
     let entries = rec.items.clone();
     for e in &entries {
-        // TODO(specs/world/vendors.md §3 step 1): a list code missing from
-        // the code map is skipped without a draw (lists are built from the
-        // records, so it does not occur with consistent tables).
+        // Every list code is an item record's code (§3, V8), so the map
+        // finds it; a missing one (unreachable) is skipped.
         let Some(record) = t.find_code(e.code) else {
             continue;
         };
@@ -253,10 +256,10 @@ pub fn generate<W: VendorWorld>(
         // Step 4.
         for _ in 0..n_norm {
             let q = quality_draw(c.seed, ilvl);
-            if make_store_item(c, rec, w, record, q, ilvl, lp).is_none() {
+            if make_store_item(c, rec, w, record, q, ilvl, lp)?.is_none() {
                 fails += 1;
                 if fails > FAIL_LIMIT {
-                    return;
+                    return Ok(());
                 }
             }
         }
@@ -269,7 +272,7 @@ pub fn generate<W: VendorWorld>(
             };
             let n_mag = range(c.seed, i32::from(e.magic_min), i32::from(e.magic_max) + k);
             for _ in 0..n_mag {
-                if make_store_item(c, rec, w, record, q::MAGIC, ilvl, lp).is_none() {
+                if make_store_item(c, rec, w, record, q::MAGIC, ilvl, lp)?.is_none() {
                     fails += 1;
                 }
             }
@@ -277,10 +280,9 @@ pub fn generate<W: VendorWorld>(
     }
     let perm = rec.perm.clone();
     for code in perm {
-        // TODO(specs/world/vendors.md §3): as above, a permanent code missing
-        // from the code map is skipped.
+        // As above: every permanent code is in the map (unreachable skip).
         if let Some(record) = t.find_code(code) {
-            match make_store_item(c, rec, w, record, q::NORMAL, ilvl, lp) {
+            match make_store_item(c, rec, w, record, q::NORMAL, ilvl, lp)? {
                 None => fails += 1,
                 Some(item) => {
                     if code == CQV || code == AQV {
@@ -293,9 +295,10 @@ pub fn generate<W: VendorWorld>(
             }
         }
         if fails > FAIL_LIMIT {
-            return;
+            return Ok(());
         }
     }
+    Ok(())
 }
 
 /// Clearing a record's data `0x00536580` (§6 rule 4).
@@ -346,7 +349,7 @@ pub fn open<W: VendorWorld>(
     single: bool,
     is_gamble: bool,
     now: u32,
-) {
+) -> Result<(), PriceFatal> {
     let pg = w.guid(player);
     // Rule 1.
     rec.has_traded = true;
@@ -356,7 +359,7 @@ pub fn open<W: VendorWorld>(
         if rec.trader {
             rec.chain_node_mut(pg).gamble_mode = false;
             if !rec.store_generated {
-                generate(c, rec, w, player, now);
+                generate(c, rec, w, player, now)?;
                 rec.store_generated = true;
             }
             if !w.hire_list_made(rec.class) {
@@ -374,17 +377,18 @@ pub fn open<W: VendorWorld>(
     }
     // Rule 3.
     if NO_STORE_REFRESH.contains(&rec.class) {
-        return;
+        return Ok(());
     }
     if !is_gamble && single && rec.refresh_pending {
         rec.refresh_pending = false;
         clear_record(rec, w);
         w.new_store_inventory(rec.class, None);
-        generate(c, rec, w, player, now);
+        generate(c, rec, w, player, now)?;
         rec.store_generated = true;
     }
     w.refresh_npc_inventory(npc);
     show_items(rec, w, pg, is_gamble);
+    Ok(())
 }
 
 /// Refresh rule 3 `0x00537230(act, empty)` over the game's records.

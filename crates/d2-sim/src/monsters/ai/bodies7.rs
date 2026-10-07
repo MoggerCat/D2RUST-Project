@@ -125,10 +125,9 @@ pub fn gargoyle_trap<W: AiHost + ?Sized>(
     if let Some(tt) = t {
         cx.world.set_path_target(u, tt);
     }
-    // 3.
-    // TODO(spec gap): T = 0 (target mode 1 always has one) reads the own
-    // position.
-    let (tx, ty) = cx.world.position(t.unwrap_or(u));
+    // 3. T = 0 is unreachable (target mode 1, `ai.md` §2.3): asserted.
+    let tt = t.expect("GargoyleTrap think without a target (ai.md §2.3)");
+    let (tx, ty) = cx.world.position(tt);
     let (ux, uy) = cx.world.position(u);
     let (dx, dy) = (tx.wrapping_sub(ux), ty.wrapping_sub(uy));
     let pt = if dx.wrapping_abs() < dy.wrapping_abs() {
@@ -190,9 +189,9 @@ pub fn arrow_trap<W: AiHost + ?Sized>(
     }
     // 2.
     let (ox, oy) = cx.world.position(u);
-    // TODO(spec gap): T = 0 (target mode 1 always has one) reads the own
-    // position.
-    let (tx, ty) = cx.world.position(t.unwrap_or(u));
+    // T = 0 is unreachable (target mode 1, `ai.md` §2.3): asserted.
+    let tt = t.expect("arrow trap think without a target (ai.md §2.3)");
+    let (tx, ty) = cx.world.position(tt);
     let axis = if vertical {
         oy.wrapping_sub(ty)
     } else {
@@ -629,8 +628,8 @@ pub fn blade_creeper<W: AiHost + ?Sized>(
     if walk_point_del(game, cx, u, second.0, second.1) {
         return;
     }
-    let o = minion_owner(game, cx, u);
-    if !wander_near_opt(game, cx, u, o, 5) {
+    let o = minion_owner(game, cx, u).unwrap_or(u);
+    if !wander_near(game, cx, u, o, 5) {
         idle(game, cx, u, 5);
     }
 }
@@ -645,9 +644,15 @@ pub fn inviso_pet<W: AiHost + ?Sized>(
     u: UnitId,
     p: &TickParam,
 ) {
-    // TODO(spec: ai-bodies-7.md §16): without a minion owner 1.14d reads
-    // a null pointer (unreachable); nothing is done here.
-    let Some(o) = minion_owner(game, cx, u) else {
+    // Without a minion owner 1.14d reads through a null pointer
+    // (unreachable in practice, `ai-bodies-7.md` §16): asserted in debug
+    // builds; a release build does nothing.
+    let o = minion_owner(game, cx, u);
+    debug_assert!(
+        o.is_some(),
+        "InvisoPet think without a minion owner (ai-bodies-7.md §16)"
+    );
+    let Some(o) = o else {
         return;
     };
     // 1.
@@ -746,8 +751,8 @@ fn aip8_columns<W: AiHost + ?Sized>(cx: &Ctx<'_, W>, class: i32) -> (i32, i32, i
 /// skill K0.
 pub fn shadow_warrior_init<W: AiHost + ?Sized>(game: &Game, cx: &mut Ctx<'_, W>, u: UnitId) {
     let (k0, _, _) = aip8_columns(cx, cx.world.class(u));
-    // TODO(spec: ai-bodies-7.md §18 init): "O's entry of skill K0" is read
-    // as the highest entry (`0x006439F0`).
+    // §18 init: O's entry is `highest_entry(O, K0)` `0x006439F0`, its
+    // level with bonus `0x006442A0(O, entry, 1)`.
     let lambda = minion_owner(game, cx, u)
         .and_then(|o| cx.world.skill_level(o, k0, true))
         .unwrap_or(1);
@@ -772,7 +777,7 @@ fn range_kind<W: AiHost + ?Sized>(game: &Game, cx: &Ctx<'_, W>, u: UnitId, skill
 }
 
 /// The pet test `0x005EAB20` (§18 Allowed).
-fn pet_test<W: AiHost + ?Sized>(
+pub(super) fn pet_test<W: AiHost + ?Sized>(
     game: &Game,
     cx: &Ctx<'_, W>,
     o: Option<UnitId>,
@@ -789,11 +794,12 @@ fn pet_test<W: AiHost + ?Sized>(
     if summon == cx.world.class(u) {
         return false;
     }
-    // TODO(spec: ai-bodies-7.md §18 Allowed): "pettype valid" is read as
-    // not 0xFF.
+    // §18 Allowed: `pettype` (+0xBE, a signed byte) is valid when ≥ 0 and
+    // below the pettype row count (`0x005EAB94`–`0x005EAB9E`).
+    let pettype = i32::from(row.pettype as i8);
     match o {
-        Some(o) if row.pettype != 0xFF => {
-            cx.world.pet_type_of(game, o, u) != i32::from(row.pettype)
+        Some(o) if pettype >= 0 && pettype < cx.world.pettype_count() => {
+            cx.world.pet_type_of(game, o, u) != pettype
         }
         _ => true,
     }
@@ -1079,8 +1085,8 @@ pub fn raven<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitId
         let (s1, _) = cx.skill(p, 1);
         let mut n = 3;
         if s1 >= 0 {
-            // TODO(spec: ai-bodies-7.md §19 step 2): "O's level of its
-            // `Skill1` entry" is read as the highest entry with bonus.
+            // §19 step 2: O's level of its highest `Skill1` entry, with
+            // bonus (§18 init lookup).
             let lvl = cx.world.skill_level(o, s1, true).unwrap_or(0);
             n = if lvl <= 0 {
                 0
@@ -1523,11 +1529,8 @@ fn master_aips<W: AiHost + ?Sized>(cx: &Ctx<'_, W>, class: i32) -> MasterAips {
 }
 
 /// The init of ShadowMaster (106) `0x005EB490` (`class_skills` true) and
-/// ShadowMasterNoInit (143) `0x005EB5C0` (false).
-///
-/// TODO(spec: ai-bodies-7.md §27 init 143): "λ := 1 / O's level of K0;
-/// skill 0 ensured; left and right := 0" is read as init 106's rule (O a
-/// player) without the class skills.
+/// ShadowMasterNoInit (143) `0x005EB5C0` (false): init 143 is init 106
+/// without the class skills (§27 "Init 143").
 pub fn shadow_master_init<W: AiHost + ?Sized>(
     game: &mut Game,
     cx: &mut Ctx<'_, W>,
@@ -1541,8 +1544,8 @@ pub fn shadow_master_init<W: AiHost + ?Sized>(
     let Some(o) = minion_owner(game, cx, u).filter(|&o| is_player(game, o)) else {
         return;
     };
-    // TODO(spec: ai-bodies-7.md §27 init): "O's level of K0 with bonus" is
-    // read as the highest entry (`0x006439F0`).
+    // §27 init: O's level of K0 with bonus (§18 init lookup: the highest
+    // entry `0x006439F0`).
     let lambda = cx.world.skill_level(o, k0, true).unwrap_or(1);
     set_param(cx, u, 2, lambda);
     if cx.world.skill_level(u, 0, false).is_none() {
@@ -1669,8 +1672,9 @@ fn master_scan<W: AiHost + ?Sized>(
                 dist_o = d;
             }
         }
-        // TODO(spec: ai-bodies-7.md §27 step 8): the n / near / best tests
-        // are read as independent of each other.
+        // PROVISIONAL (monsters/ai-bodies-7.md §27 step 8; REC-80): the n,
+        // near, best and notable tests are independent of each other (a U
+        // beyond 1024 skips only n).
         let d = sq_dist(cx, u, v);
         if d <= 1024 {
             r.n += 1;
@@ -1926,8 +1930,9 @@ fn master_scores<W: AiHost + ?Sized>(
         let has_aura = aura > 0 && cx.world.has_state(u, aura as u16);
         let s = match row.aitype {
             1 => {
-                // TODO(spec: ai-bodies-7.md §27 step 12 aitype 1): "the unit
-                // lacks it → s := 0" is read as ending the case (no pick).
+                // PROVISIONAL (monsters/ai-bodies-7.md §27 step 12 aitype 1;
+                // REC-82): "the unit lacks it → s := 0" ends the case (no
+                // pick, no draw). HIGH-PRIORITY CAPTURE (RNG draw order).
                 if aura > 0 && !cx.world.has_state(u, aura as u16) {
                     0
                 } else {
@@ -2006,9 +2011,10 @@ fn master_scores<W: AiHost + ?Sized>(
                             s
                         }
                     } else {
-                        // TODO(spec: ai-bodies-7.md §27 step 12): the
-                        // non-progressive rule is given for aitype 4 only;
-                        // aitype 12 takes it too.
+                        // PROVISIONAL (monsters/ai-bodies-7.md §27 step
+                        // 12; REC-82): a non-progressive aitype 12 skill
+                        // takes the non-progressive rule given for aitype
+                        // 4. HIGH-PRIORITY CAPTURE (RNG draw order).
                         if a.a1h > 0 && !k.pg {
                             base -= 10;
                         } else {

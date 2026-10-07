@@ -1073,11 +1073,13 @@ fn real_levels_rows() {
         }
     }
     assert!(act1 > 0);
-    // "Act 1 WarpDist is 2025" (§8) is read as every Act 0 row; the first
-    // local run found level 15 = 3800. Print every Act 0 row that differs
-    // so the spec can name the rows it means (triage-game-findings).
-    eprintln!("act 0 levels with WarpDist != 2025: {other:?}");
-    assert!(other.is_empty(), "act 0 WarpDist != 2025: {other:?}");
+    // §8 / Real: Act I WarpDist is 2025 except level 15 (3800) and levels
+    // 20, 21, 23, 25 (100) (live values, PC 2 local run C11).
+    assert_eq!(
+        other,
+        [(15, 3800), (20, 100), (21, 100), (23, 100), (25, 100)],
+        "act 0 WarpDist != 2025"
+    );
 }
 
 /// monstats.txt values (`population.md` Real): Rarity, groups, parties,

@@ -65,6 +65,15 @@ fn flying_scimitar_reads_aip1_twice() {
     assert_eq!(steps_since(&w, lo), 3);
 }
 
+// T = 0 is unreachable in a target-mode-1 body and asserted (`ai.md` §2.3
+// "Target 0 in mode-1 and mode-4 bodies").
+#[test]
+#[should_panic(expected = "GargoyleTrap think without a target")]
+fn gargoyle_trap_asserts_a_target() {
+    let mut w = world(act_row(63, &[24, 20, 12, 15]));
+    w.think_with(None, 0, false);
+}
+
 // Covers: specs/monsters/ai-bodies-7.md §4 text, §4 r1, §4 r2, §4 r3, §4 r4, §4 r5, §4 r6, §4 r7
 #[test]
 fn gargoyle_trap_vectors() {
@@ -447,6 +456,34 @@ fn shadow_warrior_mimics_its_owner() {
         w.fake.modes().last().unwrap(),
         &unit_mode(mode::ATTACK1, w.player)
     );
+}
+
+// Covers: specs/monsters/ai-bodies-7.md §18 text
+#[test]
+fn shadow_warrior_pet_test_reads_pettype_as_a_signed_index() {
+    use crate::monsters::ai::bodies7::pet_test;
+    // summon ≠ 0 and ≠ the unit's class; pettype valid (≥ 0 and below the
+    // pettype row count 10) and O ≠ 0 → pass when the unit's pet type ≠
+    // pettype; an invalid pettype (negative, or ≥ the count) → pass.
+    // (pettype byte, the unit's pet type, pass)
+    for (pettype, pet_type, pass) in [
+        (3u8, 3, false),
+        (3, 2, true),
+        (12, 12, true),
+        (0xFF, -1, true),
+        (0x80, -128, true),
+    ] {
+        let mut w = world(act_row(105, &[40, 30, 60, 1]));
+        let mut sk = Skills::decode(&vec![0u8; Skills::SIZE]);
+        sk.summon = 999;
+        sk.pettype = pettype;
+        w.skills = vec![sk];
+        w.fake.y.pettype_count = 10;
+        w.fake.y.pet_type = pet_type;
+        let (u, o) = (w.mon, w.player);
+        let r = w.with(|g, cx| pet_test(g, cx, Some(o), u, 0));
+        assert_eq!(r, pass, "pettype {pettype:#x}, pet type {pet_type}");
+    }
 }
 
 // ---- §19 Raven, §20 Vines, §21 DruidBear -------------------------------------

@@ -11,19 +11,16 @@
 //! and game entry (`path-placement.md` §11, through
 //! `crate::wiring::path::place`).
 //!
+//! Monster add messages: [`super::monster_add`].
+//!
 //! Also the room-ready test `0x0061A460` (`tick.md` §6 rule 6) and the
 //! session state the join reads ([`SessionState`]).
 //!
 //! Every message goes to the client's player ([`Pending::send`]).
 //!
 //! Not sent, because no spec gives them (named, not guessed):
-//! - monster add messages: 0xAC's server-side fields past
-//!   `monsters/init.md` §24 (the "has value" part, the source-unit bit and
-//!   stat list of `client/msg-units.md` §1.2 rule 4) and part B's mode
-//!   message (§7.4, owned by the monster-message work);
 //! - missile 0x73 (`0x0059FEE0`), item 0x9C (the item world is not
-//!   reachable from the action wiring, as for §7.1), object class 59's
-//!   0x82;
+//!   reachable from the action wiring, as for §7.1);
 //! - player part B for another player (`0x005489F0`, `0x005484B0`,
 //!   multiplayer only, §7.9 rule 5), the corpse 0x74 and the inventory
 //!   messages `0x00534F80`;
@@ -46,6 +43,11 @@ use super::{Pending, View, WiringError};
 pub struct SessionState {
     /// Player data names (0x59 bytes 6..22), zero-padded.
     pub names: BTreeMap<UnitId, [u8; 16]>,
+    /// The overhead records (unit +0xA4; `intents-events.md` §9 rule 3,
+    /// written by the C→S 0x14 handler through
+    /// [`View::replace_overhead`]): text (`0x006611E0`) and byte +8. The
+    /// record is live while the unit's `hover` frame is set.
+    pub overheads: BTreeMap<UnitId, (Vec<u8>, u8)>,
 }
 
 /// S→C 0x59 AssignPlayer (`0x0053E8F0`, 26 bytes, §7.2 part A): GUID
@@ -194,8 +196,9 @@ impl<X: Pending> View<'_, X> {
                 let m = messages::assign_warp(ty as u8, guid, class as u8, x as u16, y as u16);
                 self.h.x.send(receiver, &m);
             }
+            UnitType::Monster => self.monster_add(game, receiver, unit),
             // Module docs: not specified far enough.
-            UnitType::Monster | UnitType::Missile | UnitType::Item => {}
+            UnitType::Missile | UnitType::Item => {}
         }
     }
 
@@ -213,15 +216,49 @@ impl<X: Pending> View<'_, X> {
         self.overhead_message(receiver, unit, ty, guid);
     }
 
-    /// §7.9 rule 3: unit +0xA4 = 0 → S→C 0x76.
-    ///
-    /// TODO(spec: intents-events.md §7.9 rule 3): with a hover text set,
-    /// the overhead chat 0x26 (`0x0053C750`) carries the hover record's
-    /// text, which d2rs does not keep; nothing is sent then.
+    /// §7.9 rule 3 (`0x00571620`): unit +0xA4 = 0 → S→C 0x76. Else,
+    /// unless the unit is a player the receiver relates to
+    /// (`0x0055B300(P, unit, 4)` or `0x0055B300(unit, P, 2)`), the
+    /// overhead chat 0x26 form 5 with the +0xA4 record's text
+    /// (the record [`View::replace_overhead`] kept, else
+    /// [`Pending::overhead_record`]; none → nothing).
     pub(super) fn overhead_message(&mut self, receiver: UnitId, unit: UnitId, ty: u8, guid: u32) {
-        if self.units.get(unit).is_some_and(|r| r.hover.is_none()) {
+        let Some(r) = self.units.get(unit) else {
+            return;
+        };
+        if r.hover.is_none() {
             self.h.x.send(receiver, &messages::unit_ref(0x76, ty, guid));
+            return;
         }
+        if r.ty == UnitType::Player
+            && (self.h.x.player_relation(receiver, unit, 4)
+                || self.h.x.player_relation(unit, receiver, 2))
+        {
+            return;
+        }
+        let record = self.h.session.overheads.get(&unit).cloned();
+        if let Some((text, byte8)) = record.or_else(|| self.h.x.overhead_record(unit)) {
+            self.h
+                .x
+                .send(receiver, &messages::overhead_chat(byte8, ty, guid, &text));
+        }
+    }
+
+    /// The overhead record replaced (`intents-events.md` §9 rule 3:
+    /// `0x006611A0` free, `0x00661110(game +0x1C, text, frame)` new, byte
+    /// +8 := `byte8`, `0x00661230`): unit +0xA4's timeout frame
+    /// (`UnitRecord::hover`, read by event 6, `units.md` §6.1) := `end`
+    /// and the record kept for the overhead 0x26 (§7.9 rule 3); then
+    /// [`Pending::replace_overhead`].
+    pub fn replace_overhead(&mut self, unit: UnitId, text: &[u8], byte8: u8, end: i32) {
+        if let Some(r) = self.units.get_mut(unit) {
+            r.hover = Some(end);
+        }
+        self.h
+            .session
+            .overheads
+            .insert(unit, (text.to_vec(), byte8));
+        self.h.x.replace_overhead(unit, text, byte8, end);
     }
 
     /// S→C 0xAA of `unit` (§7.9 rule 1): its states in ascending order,
@@ -278,8 +315,8 @@ impl<X: Pending> View<'_, X> {
     ///
     /// A game without the object control (`ActionHooks::objects` `None`,
     /// no object data) sends interact 0, as its 0x03 sends game +0x80 = 0.
-    /// TODO(spec: intents-events.md §7.2): class 59's 0x82
-    /// (`0x0053DB90`, the portal owner's name) is not sent.
+    /// Class 59 then sends 0x82 (`0x0053DB90`, §7.2 table, layout §6
+    /// rule 6) from [`Pending::portal_owner`].
     fn object_add(
         &mut self,
         receiver: UnitId,
@@ -301,6 +338,16 @@ impl<X: Pending> View<'_, X> {
         self.h.x.send(receiver, &m);
         if let Some(b) = portal {
             self.h.x.send(receiver, &b);
+        }
+        if class == 59 {
+            if let Some((owner, name, portal2)) = self.h.x.portal_owner(unit) {
+                // PROVISIONAL (intents-events.md §7.2, §6 rule 6): u32@21 is
+                // this portal's GUID and u32@25 its pair's (−1: none), as
+                // the client handler reads them (`client/msg-units.md`
+                // rule 7); settled by a town-portal join capture.
+                let m = messages::portal_ownership(owner, &name, guid, portal2);
+                self.h.x.send(receiver, &m);
+            }
         }
     }
 

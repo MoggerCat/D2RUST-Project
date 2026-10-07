@@ -41,6 +41,8 @@ mod tests_model;
 #[cfg(test)]
 mod tests_outputs;
 #[cfg(test)]
+mod tests_pc1;
+#[cfg(test)]
 mod tests_stats_items;
 #[cfg(test)]
 mod tests_ui_more;
@@ -218,14 +220,17 @@ pub const HANDLERS: &[Handler] = &[
     unit(0x72, units::no_effect),
     general(0x73, UNITS, unit_misc::client_missile),
     general(0x74, UNITS, unit_misc::player_corpse_assign),
+    general(0x75, UNITS, roster::player_party_info),
     general(0x76, UI, ui_text::overhead_clear),
     general(0x77, UI, ui::trade_action),
     general(0x78, UI, ui_text::trade_partner),
+    general(0x79, UI, no_op),
     general(0x7A, MODEL, pets::pet_action),
     general(0x7B, UI, ui_text::hotkey),
     general(0x7C, STATS_ITEMS, items::use_scroll),
     general(0x7D, STATS_ITEMS, items::set_item_state),
     general(0x7E, UNITS, unit_misc::common_cof),
+    general(0x7F, UNITS, no_op),
     none(0x80),
     general(0x81, MODEL, pets::assign_merc),
     general(0x82, UNITS, roster::portal_ownership),
@@ -237,7 +242,12 @@ pub const HANDLERS: &[Handler] = &[
     none(0x88),
     general(0x89, LIGHTING, lighting::unique_event),
     general(0x8A, UI, ui_npc::npc_interact),
+    general(0x8B, UNITS, no_op),
+    general(0x8C, UNITS, no_op),
+    general(0x8D, UNITS, no_op),
     general(0x8E, UNITS, roster::corpse_assign),
+    general(0x8F, MODEL, session::pong),
+    general(0x90, UNITS, no_op),
     general(0x91, UI, ui_npc::npc_intro),
     general(0x92, STATS_ITEMS, items::remove_items_display),
     general(0x93, SKILLS, skills::skill_bonus),
@@ -267,7 +277,12 @@ pub const HANDLERS: &[Handler] = &[
     general(0xAB, UNITS, unit_misc::npc_heal),
     general(0xAC, UNITS, units::assign_monster),
     none(0xAD),
+    general(0xAE, BRIDGE, no_op),
+    general(0xAF, MODEL, session::connection_info),
+    general(0xB0, MODEL, session::connection_terminated),
     none(0xB1),
+    none(0xB2),
+    general(0xB3, MODEL, no_op),
     general(0xB4, MODEL, session::join_refused),
 ];
 

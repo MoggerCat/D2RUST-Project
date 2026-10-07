@@ -241,6 +241,7 @@ fn elem_len_low_band() {
 }
 
 // §3.1 step 4: mastery stat by EType.
+// Covers: specs/skills/levels.md §3.1 text
 #[test]
 fn elem_mastery_stats() {
     for (e, s) in [

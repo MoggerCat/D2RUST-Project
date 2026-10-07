@@ -338,7 +338,7 @@ transport row).
 | 0x50 | `0x00593CB0` (u16 4 at byte 1) | 13–14 | `world/quests-act1-rest.md` §7 |
 | 0x50 | `0x00579180` (u16 2), `0x0058E120` (u16 0x24), `0x0059D6A0` (u16 13) | 5–14 | through `0x0053D7E0`, which copies 15 bytes |
 | 0x50 | `0x005B4A80` (u16 0x17) | 3–14 | |
-| 0x58 | callers of `0x0053D8D0` (copies 7 bytes) | 6 | `world/npc.md` §8.1 |
+| 0x58 | callers of `0x0053D8D0` (copies 7 bytes) | 6, except code 5 (u8@5 = 5) | written only on `0x005852E0`'s code-5 path; keyed mask `sim/intents-events.md` §6 rule 6 |
 | 0x62 | `0x0053D6D0` (`0x00535294`, `0x005731E4`) | 6 | |
 | 0x7E | `0x0053DB70` (`0x005395BA`) | 1–4 | only the id is written |
 | 0x82 | `0x0053DB90` (`0x005720B1`) | name field 5–20 after its NUL | byte 5 := 0, then `0x004135D0` copies the owner's name (at most 15 characters + NUL) without padding |

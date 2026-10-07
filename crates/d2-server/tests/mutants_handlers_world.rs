@@ -455,9 +455,10 @@ fn npc_msg(id: u8, npc: u32, tail: &[u8]) -> Vec<u8> {
 /// `vendors.md` §7.2 on the wired host, the player on client 2: Akara's
 /// trade opened (0x13, 0x2F, 0x38), then 0x33 of the player's cap. The
 /// cap is one of Akara's permanent codes (her record, not Gheed's): no
-/// copy (rule 8), the price is paid (rule 10) and S→C 0x2A code 1 with
-/// the cap's GUID and the new gold reaches client 2 (§3.2 rule 1).
-// Covers: specs/world/vendors.md §7.2 r8, §7.2 r10; specs/sim/intents-events.md §3.2 r1
+/// copy (rule 8), the cap leaves with S→C 0x9D action 5 (rule 9), the
+/// price is paid (rule 10) and S→C 0x2A code 1 with the cap's GUID and the
+/// new gold reaches client 2 (§3.2 rule 1).
+// Covers: specs/world/vendors.md §7.2 r8, §7.2 r9, §7.2 r10; specs/sim/intents-events.md §3.2 r1
 #[test]
 fn sale_uses_the_npcs_own_record_and_client() {
     let mut fx = TradeFx::new(2);
@@ -480,7 +481,16 @@ fn sale_uses_the_npcs_own_record_and_client() {
     assert_eq!(code, Done);
     let now = fx.gold();
     assert!(now > gold, "{now} {gold}");
-    assert_eq!(got, vec![transaction(3, 1, eg, now as u32).to_vec()]);
+    // A stored item (mode 0): S→C 0x9D action 5 (command flags 0x20, the
+    // stored page shown) before the 0x2A (§7.2 rule 9, §7 "Message
+    // order").
+    // Both reach the client in one send.
+    assert_eq!(got.len(), 1, "{got:02X?}");
+    let m = &got[0];
+    let size = usize::from(m[2]);
+    assert_eq!((m[0], m[1]), (0x9D, 0x05));
+    assert_eq!(m[4..8], eg.to_le_bytes());
+    assert_eq!(m[size..], transaction(3, 1, eg, now as u32));
     let inv = fx.sim.world.inventory.as_ref().unwrap();
     assert!(!inv.state.items_of(fx.player).contains(&cap));
     let _ = fx.gheed;

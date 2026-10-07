@@ -211,7 +211,8 @@ pub fn bash<W: BodyWorld>(
         return 0;
     }
     // `0x0056E520(unit, eval(calc3))`.
-    // TODO(spec: bodies.md OQ4): who removes this flag-4 list.
+    // A TEMPONLY (flag 4) list: freed at the unit's next mode change
+    // (`sim/stat-lists.md` §8.9).
     let rate = eval(w, t, u, calc3, skill, lvl);
     if let Some(l) = w.alloc_list(4, 0, Some(u)) {
         w.attach(u, l);

@@ -129,7 +129,9 @@ use d2_sim::world::quests::{PlayerQuests, QuestControl, QuestTables};
 mod e2e_support;
 #[path = "e2e_support/world.rs"]
 mod e2e_world;
-use e2e_support::{blank, item_tables, monstats as npc_monstats, tx, vendor_tables, Rest};
+use e2e_support::{
+    assert_stored_sale, blank, item_tables, monstats as npc_monstats, tx, vendor_tables, Rest,
+};
 use e2e_support::{inv_parts, inv_tables, store, InvFx, BUC, CAP, N_MONSTATS};
 use e2e_world::*;
 
@@ -1045,13 +1047,26 @@ fn run_with(game_seed: u32) -> Transcript {
     // joined room's 0x07 is followed by the add messages of its units
     // (`intents-events.md` §7.8 rule 2): the waypoint's 0x51 (type 2,
     // class 0, its position, mode 1, interact 0: no object data in this
-    // game) after its room's; the monster and the client's own player
-    // send none (§7.2 monster part: not specified).
+    // game) after its room's. Each monster (the preset monster, GUID 2,
+    // then Akara, GUID 1, class 148) sends §7.2 part A: 0xAC
+    // (`monsters/init.md` §24: life 128, a one-byte stream of mode 1 and
+    // no optional blocks) and 0xAA (no states); part B's mode message
+    // needs the path provider, which this game does not run. The
+    // client's own player is skipped.
     record(&mut fx, &mut frames, vec![]);
     let mut want: Vec<Vec<u8>> = [(8000, 8000), (8000, 8008), (8008, 8000), (8008, 8008)]
         .map(|(x, y)| map_reveal(x, y, ISLE))
         .to_vec();
     want.insert(1, assign_object(wp, 0, WP_AT, 1, 0));
+    let monster_adds: [Vec<u8>; 4] = [
+        vec![0xAC, 2, 0, 0, 0, 0, 0, 76, 156, 74, 156, 128, 14, 1],
+        vec![0xAA, 1, 2, 0, 0, 0, 8, 0xFF],
+        vec![0xAC, 1, 0, 0, 0, 148, 0, 86, 156, 86, 156, 128, 14, 1],
+        vec![0xAA, 1, 1, 0, 0, 0, 8, 0xFF],
+    ];
+    for (i, m) in monster_adds.into_iter().enumerate() {
+        want.insert(1 + i, m);
+    }
     assert_eq!(frames[0].2, want);
     assert_eq!(fx.sim_ref().game.lists.active_rooms(0).len(), 4);
     let monsters = fx.monsters();
@@ -1484,10 +1499,16 @@ fn run_with(game_seed: u32) -> Transcript {
     record(&mut fx, &mut frames, vec![talk.clone(), sell(cg)]);
     assert_eq!(frames[28].1.codes, [(0x13, done), (0x33, done)]);
     gold_now += sold;
-    // The talk's 0x27, 0x29, 0x28 (as step 8), then the sale's 0x2A.
-    let mut want = frames[17].2.clone();
-    want.push(tx(3, 1, cg, gold_now));
-    assert_eq!(frames[28].2, want);
+    // The talk's 0x27, 0x29, 0x28 (as step 8), then the sale's 0x9D
+    // action 5 (the stored cap, `vendors.md` §7.2 rule 9) and its 0x2A.
+    let talk_msgs = frames[17].2.clone();
+    let got = &frames[28].2;
+    assert_eq!(got.len(), talk_msgs.len() + 2, "{got:02X?}");
+    assert_eq!(got[..talk_msgs.len()], talk_msgs[..]);
+    let n9d = &got[talk_msgs.len()];
+    assert_eq!((n9d[0], n9d[1]), (0x9D, 0x05));
+    assert_eq!(n9d[4..8], cg.to_le_bytes());
+    assert_eq!(got[talk_msgs.len() + 1], tx(3, 1, cg, gold_now));
     assert_eq!(fx.stat(player, GOLD), gold_now);
     assert!(!fx.inventory().contains(&cap));
     assert!(fx.sim_ref().game.lists.unit(cap).is_none(), "freed");
@@ -1533,7 +1554,7 @@ fn run_with(game_seed: u32) -> Transcript {
     record(&mut fx, &mut frames, vec![sell(buckler)]);
     assert_eq!(frames[30].1.codes, [(0x33, done)]);
     gold_now += buc_sold;
-    assert_eq!(frames[30].2, [tx(3, 1, buckler, gold_now)]);
+    assert_stored_sale(&frames[30].2, buckler, tx(3, 1, buckler, gold_now));
     assert_eq!(fx.stat(player, GOLD), gold_now);
     assert!(!fx.inventory().contains(&fx.buckler));
     assert!(fx.sim_ref().game.lists.unit(fx.buckler).is_none(), "freed");
@@ -1545,7 +1566,7 @@ fn run_with(game_seed: u32) -> Transcript {
     record(&mut fx, &mut frames, vec![sell(scap)]);
     assert_eq!(frames[31].1.codes, [(0x33, done)]);
     gold_now += sold;
-    assert_eq!(frames[31].2, [tx(3, 1, scap, gold_now)]);
+    assert_stored_sale(&frames[31].2, scap, tx(3, 1, scap, gold_now));
     assert_eq!(fx.stat(player, GOLD), gold_now);
     assert_eq!(fx.inventory(), [fx.cube, bought]);
     let copies = fx.sim_ref().world.rest.log.iter();
@@ -1715,8 +1736,10 @@ fn run_with(game_seed: u32) -> Transcript {
     let log = fx.bridge.log();
     assert!(log.unowned.is_empty(), "{:?}", log.unowned);
     // 35 before (the buy's 0x9C, 0x47, 0x48 among them) + 0x27, 0x28,
-    // 0x29 ×2 + 0x2A ×4 + Akara's 0xAC.
-    assert_eq!(log.handled, 46);
+    // 0x29 ×2 + 0x2A ×4 + Akara's 0xAC + the three stored sales' 0x9D
+    // action 5 (`vendors.md` §7.2 rule 9), + the join's monster adds
+    // (`intents-events.md` §7.2: 0xAC ×2, 0xAA ×2).
+    assert_eq!(log.handled, 53);
     let rejected: Vec<(u8, String)> = log
         .rejected
         .iter()

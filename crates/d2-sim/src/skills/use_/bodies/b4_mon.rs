@@ -1222,10 +1222,10 @@ pub fn fetish_aura<W: BodyWorld>(
         return 0;
     };
     let r = p4.wrapping_add(lvl.wrapping_mul(2));
-    // TODO(spec: bodies-3.md Open question 5): the finder of `0x0056C210`
-    // has no owning spec; read as the unit find around the target point
-    // from the room containing it.
-    let found = match room_at_of(w, u, at) {
+    // The finder `0x0056C210` (`monsters/umod-callbacks.md` §3.1,
+    // `bodies-3.md` Open questions 5 and 8): room R = the casting unit's
+    // own room (`0x00620BB0`); R none → nothing found.
+    let found = match w.unit_room(u) {
         Some(room) => w.unit_find(room, at, r, DEFAULT_FILTER),
         None => Vec::new(),
     };
@@ -1532,8 +1532,8 @@ pub fn diab_prison<W: BodyWorld>(
     }
     let k = match target(w, u) {
         Some(k) => Some(k),
-        // TODO(spec: bodies-3.md Open question 6): which caller stores an
-        // object target as (GUID, type 2) in P +0x10 / +0x12.
+        // `bodies-3.md` Open question 6: P +0x10 / +0x12 are the path's
+        // target position, read literally as (GUID, type 2) (§5.31 step 2).
         None if w.has_path(u) && w.path_target_point(u).1 == 2 => {
             let g = w.path_target_point(u).0;
             w.find_unit(2, g as u32)

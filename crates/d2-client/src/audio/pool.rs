@@ -13,6 +13,7 @@
 //! [`D2Wav`] decodes with `d2_formats::wav` and applies the sound-start
 //! format check of `wav.md` §4.
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use crate::assets::cache::{CacheError, CacheEvent, FrameNo, Pool};
@@ -76,6 +77,9 @@ pub struct SoundPool {
     decoder: Box<dyn WavDecoder>,
     pool: Pool<CanonicalPath, Arc<Sound>>,
     decodes: u64,
+    /// File size in bytes of every file read (`sound-table-2.md` §16 r5:
+    /// the size the sample cache charges).
+    sizes: BTreeMap<CanonicalPath, u64>,
 }
 
 impl SoundPool {
@@ -85,6 +89,7 @@ impl SoundPool {
             decoder,
             pool: Pool::new(POOL_NAME, budget),
             decodes: 0,
+            sizes: BTreeMap::new(),
         }
     }
 
@@ -102,6 +107,7 @@ impl SoundPool {
             return Ok(Arc::clone(sound));
         }
         let bytes = read_asset(self.source.as_ref(), path.as_str())?;
+        self.sizes.insert(path.clone(), bytes.len() as u64);
         self.decodes += 1;
         let sound =
             self.decoder
@@ -121,6 +127,12 @@ impl SoundPool {
     pub fn peek(&self, path: &str) -> Option<Arc<Sound>> {
         let path = CanonicalPath::new(path).ok()?;
         self.pool.peek(&path).cloned()
+    }
+
+    /// The size in bytes of `path`'s file, once it has been read.
+    pub fn file_size(&self, path: &str) -> Option<u64> {
+        let path = CanonicalPath::new(path).ok()?;
+        self.sizes.get(&path).copied()
     }
 
     /// Files decoded so far (a resident hit does not count).

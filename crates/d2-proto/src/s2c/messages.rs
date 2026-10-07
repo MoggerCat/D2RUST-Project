@@ -139,15 +139,20 @@ s2c_message! {
 
 s2c_message! {
     /// 0x58 OpenUi (7 bytes), builder `0x0053D8D0` (`world/npc.md` §8.1):
-    /// NPC service result. Byte 6 is not written by the original.
+    /// NPC service or object-insert result. Byte 6 (`effect`) is written
+    /// only on the result-5 path (`0x005852E0`); for every other code the
+    /// original leaves it unwritten, d2rs writes 0 and the comparison
+    /// masks it by a keyed row (`sim/intents-events.md` §6 rules 3, 6).
     0x58 OpenUi 7 {
         /// `u32` at 1.
         npc_guid: u32 = 1,
-        /// `u8` at 5: 6 done, 7 refused.
+        /// `u8` at 5: 6 done, 7 refused; 0, 1, 4, 5 object inserts.
         result: u8 = 5,
+        /// `u8` at 6: "accepted with effect" (result 5 only).
+        effect: u8 = 6,
     }
     consts []
-    unwritten [6]
+    unwritten []
 }
 
 s2c_message! {

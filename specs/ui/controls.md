@@ -436,7 +436,7 @@ check reads it.
    `AttackNoMana` 28, `interrupt` 31.
    1. Set-up `0x004621D0` (r5 first part): with a skill, R and rng ≠ 1:
       no row → stop; row lacks `InTown` and P's room is in town → event
-      sound, stop; `passive` → stop. Walk codes (r5). Pending
+      sound, stop; `passive` → stop. Walk codes set (r5). P's pending
       interaction cleared (r5). **No skill → stop** (so the action below
       always has a skill). Re-pick (r10) into U. Cursor state 6 → C→S
       0x27 (as kind 0); state 8 → C→S 0x4C [−1]; either way the action

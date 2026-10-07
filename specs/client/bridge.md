@@ -42,17 +42,17 @@
 |   3. Server link | 135–153 |
 |   4. Send path (intents) | 154–174 |
 |   5. Client world model | 175–194 |
-|   6. Dispatch table | 195–236 |
-|   7. Bevy mirror | 237–255 |
-|   8. Frame pacing | 256–276 |
-|   9. Versioning | 277–287 |
-|   10. Client outputs (bridge → UI and audio) | 288–440 |
-| Constants & data dependencies | 441–455 |
-| Randomness | 456–459 |
-| Edge cases & original bugs | 460–468 |
-| Test vectors | 469–499 |
-| Provenance | 500–510 |
-| Open questions | 511–548 |
+|   6. Dispatch table | 195–246 |
+|   7. Bevy mirror | 247–265 |
+|   8. Frame pacing | 266–286 |
+|   9. Versioning | 287–297 |
+|   10. Client outputs (bridge → UI and audio) | 298–460 |
+| Constants & data dependencies | 461–475 |
+| Randomness | 476–479 |
+| Edge cases & original bugs | 480–488 |
+| Test vectors | 489–519 |
+| Provenance | 520–530 |
+| Open questions | 531–568 |
 <!-- /index -->
 
 ## Summary
@@ -222,14 +222,24 @@ receive).
      id (§2 rule 3), so the handler is never called.
    - Handlers that do nothing: 0x12, 0x13, 0x14, 0x45, 0x66 (a bare
      `ret`: `0x0045D130`, `0x0045D140`, `0x0045D150`, `0x0045E290`,
-     `0x0045E6C0`); 0x24, 0x25 (the empty handler `0x0045C900`).
+     `0x0045E6C0`); 0x24, 0x25 (the empty handler `0x0045C900`); 0xB2
+     GameList (system handler `0x0045C850`, jump table `0x0045C894`
+     entry 3 = `0x0045C876`, a bare `ret`; 2026-10-08 read).
    - Never produced (no 1.14d function queues them,
      `sim/intents-events.md` §3.5 rule 2, so their handlers never run):
      0x16 (`0x0045D2E0`), 0x54 (`0x0045E3B0` → `0x00473CA0`).
 7. **Out of scope** (`sim/intents-events.md` §4 rule 4: multiplayer,
-   Battle.net, transport): 0x75, 0x79, 0x7F, 0x8B–0x8D, 0x8F, 0x90,
-   0xAE–0xB0, 0xB2, 0xB3 keep owner `TBD` and stay unowned (rule 3)
-   until Phase 7. 0xB4 is also the single-player load refusal
+   Battle.net, transport) and unused-in-single-player ids are owned by
+   the spec that carries their one-line scope note; the implementation
+   registers the shared no-op handler of rule 6 for each until Phase 7
+   (2026-10-08, replaces `TBD`): 0x79 (`client/msg-ui.md` §11 r3);
+   0x7F, 0x8B–0x8D, 0x90 (`client/msg-units.md` §8 r11); 0xB3
+   (`client/model.md` §7 r12); 0xAE WardenRequest (handler
+   `0x0045F5F0`): **Out of scope (Phases 0–6): Battle.net anti-cheat**
+   (`sim/intents-events.md` §4 rule 4; no record in either recording).
+   0x75, 0x8F, 0xAF and 0xB0 are sent in single player (recorded) and
+   have behaviour rules: `client/msg-units.md` §8 r10, `client/model.md`
+   §7 r10–r11. 0xB4 is also the single-player load refusal
    (`sim/intents-events.md` §8.2 rule 2; client `0x0045C6D0` maps its
    code to `0x0044E380(n)`): owner `client/model.md` §7 rule 8
    (2026-10-08, open question 7).
@@ -371,12 +381,17 @@ model state: 1.14d's handler calls a UI or sound function directly
    before it handles the next message of the frame, which is the point
    1.14d makes them (inside the receive). The UI layer decides from its
    own state; the bridge does not re-decide. A C→S send the same code
-   makes (0x28's 0x31) uses the send path of rule 6.
+   makes (0x28's 0x31) uses the send path of rule 6. Confirmed
+   2026-10-08 (impl-pc1-s5): the 0x28 handler `0x0045D370` calls its UI
+   code `0x004B6DD0` directly (`0x0045D37F`), inside the receive.
 11. **Update-pass outputs** (2026-10-08; answers `client/model.md` open
    question 16). The client update pass (`client/model.md` §5) may emit
    an output too; its producer in the table is `update`, not a message
-   id. The one such output is `TownExit` (`client/model.md` §17 r6
-   step 4). In 1.14d the town exit runs inside the local player's
+   id. The one such output delivered out of order is `TownExit`
+   (`client/model.md` §17 r6 step 4); the client object outputs
+   `ObjectSound` and `ObjectFx` (the object update and the mode
+   requests of the drains, `world/objects-client.md` §28 r3) stay in
+   the list in update order under rule 4. In 1.14d the town exit runs inside the local player's
    update, after every UI call of the frame's receive and before the
    rest of the pass, so the bridge delivers it at the point it is
    emitted, as an exception to rule 4: it first hands the UI layer
@@ -392,7 +407,10 @@ model state: 1.14d's handler calls a UI or sound function directly
    NPC present: `[0x007C0C6B]` := 0, `0x00487990`, `E(G)`,
    `0x00455F20(8, 1, 0)`, interaction active := 0;
    `ui/messages.md` §13 r4). Its C→S 0x30 (inside `E`) uses the send
-   path (rule 6).
+   path (rule 6). Confirmed 2026-10-08 (impl-pc1-s5): `0x004B3E10` has
+   one caller, `0x00460E70` (`0x00460EDE`), itself called only from the
+   player update `0x00463390` (`0x004636D5`); the room-change step goes
+   on after it (`0x0061AA40`, `0x00473C90`, …).
 
 <!-- rows -->
 | Variant | Payload | Producer | Consumer | Owner (what the consumer does) |
@@ -437,6 +455,8 @@ model state: 1.14d's handler calls a UI or sound function directly
 | `JoinRefused` | error number u8 (the mapped code) | 0xB4 | UI | `client/model.md` §7 rule 8 |
 | `TownExit` | local player key, GUIDs of the S monsters | update | UI | `client/model.md` §17 rule 6; delivery `client/bridge.md` §10 r11 |
 | `StateFx` | unit key, state u16, phase (on / hooks / off), bit set before, unit dead, hook number u8 (setfunc / remfunc, 0 = none), two hook values i32 (`client/stat-lists.md` §3 r6.7) | 0xA8 (also 0xA7, 0xA9, 0xAA) | effects | `client/stat-lists.md` §3 rule 6 |
+| `ObjectSound` | the call (mode sound: unit key, set S or C, class, mode; request: id, unit; player event: player key, event) | update | audio | `world/objects-client.md` §25 r2, §26, §28 r3; `client/model.md` §8 rule 7 |
+| `ObjectFx` | the call (graphics refresh, graphics load, overlay create / remove, object light, client skill start) with the values read | update | effects | `world/objects-client.md` §26, §28 r3; `render/overlay.md` §5; `render/lighting.md` open question 11 |
 
 ## Constants & data dependencies
 
@@ -492,7 +512,7 @@ Synthetic, run as unit tests in `crates/d2-client/src/bridge/tests.rs`.
 | test handlers add units (1, 7), (2, 9); Bevy `App` update | 2 `UnitView` entities in key order; after removing (1, 7) and one update, 1 entity | §7 rule 3 |
 | dispatch TSV with one owner changed | check reports exactly that id | §6 rule 5 |
 | chunk `12 …` (26 bytes) | no-op handler runs; nothing recorded as unowned | §6 rule 6 |
-| chunk `75 …` (13 bytes) | unowned count for 0x75 = 1 | §6 rules 3, 7 |
+| chunk `79 …` (6 bytes) | no-op handler runs; nothing recorded as unowned | §6 rules 6, 7 |
 | chunk [0x2C for (1, 0x26) event 18; 0x77 code 0x10] | outputs = [`ServerSound` (1, 0x26) 18, `TradeAction` 0x10], in that order, delivered once after the frame | §10 rules 2, 4 |
 | frame with no outputs | dispatcher not called; list empty | §10 rule 4 |
 | 0x2C for (1, 0x26), then 0x0A removing (1, 0x26), same chunk | `ServerSound` still delivered with the class captured at receive | §10 rule 3 |

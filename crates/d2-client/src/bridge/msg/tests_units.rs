@@ -429,3 +429,69 @@ impl Model {
         self.w.units.get_mut(&k).unwrap().stats.insert(stat, v);
     }
 }
+
+// Covers: specs/client/msg-units.md §1.3 r3, §1.3 r5
+#[test]
+fn assign_object_shrine_record_and_never_sent_types() {
+    use super::super::output::{Output, ShrineFxKind};
+    use super::super::world::ObjectRow;
+    let mut m = Model::default();
+    m.inputs.tables.objects = vec![ObjectRow::default(); 40];
+    m.inputs.tables.objects[37].subclass = 1;
+    m.inputs.tables.shrines = vec![0, 2, 6];
+    // Class 37 (a shrine), interact 2 → shrines row 2, code 6 (on-mode).
+    m.hex("51 02 0d 00 00 00 25 00 14 12 c0 11 02 02");
+    let k = UnitKey::new(OBJECT, 13);
+    match &m.unit(k).kind {
+        KindData::Object(d) => assert_eq!((d.interact, d.shrine), (2, Some(6))),
+        k => panic!("{k:?}"),
+    }
+    assert!(m.out.iter().any(|o| matches!(
+        o,
+        Output::ShrineFx { kind: ShrineFxKind::OnMode, code: 6, object, .. } if *object == k
+    )));
+    // Interact past the shrines rows: fatal 0x15F.
+    m.hex("51 02 0e 00 00 00 25 00 14 12 c0 11 02 09");
+    assert_eq!(m.rejected(), [(0x51, "fatal assert 0x15F".to_owned())]);
+    // Types 0, 3, 4, 5 are never sent: refused.
+    m.hex("51 04 0f 00 00 00 25 00 14 12 c0 11 02 00");
+    assert_eq!(m.rejected().len(), 2);
+    assert!(!m.w.units.contains_key(&UnitKey::new(4, 15)));
+}
+
+// Covers: specs/client/msg-units.md §1.2 r2, §1.2 r3, §1.2 r4
+#[test]
+fn assign_monster_hireling_reinit_and_source_link() {
+    use super::super::world::{PetRecord, PET_HIRELING};
+    let mut m = with_monsters();
+    m.inputs.tables.monsters = vec![Some(MonsterClass::default()); 400];
+    local(&mut m, (0, 0), 1);
+    m.w.pets.push(PetRecord {
+        class: 338,
+        pet_type: PET_HIRELING,
+        pet: 9,
+        owner: 1,
+        f1c: 100,
+        gone: false,
+        extra: None,
+    });
+    let k = UnitKey::new(MONSTER, 9);
+    let u = m.put(k);
+    u.class = 338;
+    u.stats.insert(6, 77);
+    // Mode 1, no components, no flags, link bit 1 with v = 5, no list.
+    let mut msg = vec![0xAC, 9, 0, 0, 0, 0x52, 0x01, 0, 0, 0, 0, 0x80, 0];
+    msg.extend(pack(&[(1, 4), (0, 1), (0, 1), (1, 1), (5, 31), (0, 1)]));
+    msg[0xC] = msg.len() as u8;
+    m.recv(&msg);
+    let u = m.unit(k);
+    // Re-initialised: the existing unit keeps its class; mode := 1; a
+    // hireling class with the hireling GUID keeps stats 6 / 7.
+    assert_eq!((u.class, u.mode), (338, 1));
+    assert_eq!(u.stats.get(&6), Some(&77));
+    assert_eq!(u.stats.get(&328), Some(&0));
+    // Rule 4: state 98 with stat 354 = v, flag-ex 0x400.
+    assert!(u.states.contains(&98));
+    assert_eq!(u.state_lists[&98].get(&(354, 0)), Some(&5));
+    assert_eq!(u.flag_ex & 0x400, 0x400);
+}

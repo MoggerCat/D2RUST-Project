@@ -70,13 +70,15 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use d2_data::tables::{decode_all, Levels, Monstats, Objects, Record, Skills};
+use d2_data::tables::{
+    decode_all, Itemstatcost, Levels, Monstats, Objects, Record, Shrines, Skills,
+};
 use d2_formats::animdata::AnimData;
 use d2_formats::d2s::{self, D2s, ReadOptions};
 use d2_formats::mpq::ArchiveSet;
 use d2_server::adapters::character::LoadContext;
 use d2_server::adapters::handlers::world::{ActionEvents, ActionWorld, Outbox, WiredWorld};
-use d2_server::adapters::session::{load_save, Entry, GameSetup};
+use d2_server::adapters::session::{load_new_character, load_save, GameSetup};
 use d2_server::adapters::session_flow::{
     create_flags, CharacterLoader, CreateGame, Loaded, SessionFlow,
 };
@@ -111,7 +113,7 @@ use d2_sim::wiring::worldgen::{CreationTables, WorldPending, WorldSim, WorldStat
 use d2_sim::world::hirelings::HirelingTables;
 use d2_sim::world::npc::HireRow;
 use d2_sim::world::objects::ObjectTables;
-use d2_sim::world::quests::{PlayerQuests, QuestTables};
+use d2_sim::world::quests::{PlayerQuests, QuestFlags, QuestTables};
 use d2_sim::world::vendors::VendorTables;
 use d2_sim::world::waypoints::{WaypointData, NO_WAYPOINT};
 
@@ -122,7 +124,7 @@ use super::rest::AppRest;
 use super::server_thread::{ThreadLink, ThreadStopped};
 use crate::bridge::drlg::DrlgSource;
 use crate::bridge::local::{LocalLink, PendingSession};
-use crate::bridge::world::{LevelRow, SkillRow};
+use crate::bridge::world::{LevelRow, MonsterClass, ObjectRow, SkillRow, StatSend, UnitRows};
 use crate::bridge::LOCAL_CLIENT;
 
 /// The game's dispatch and world host.
@@ -164,37 +166,56 @@ pub const GAME_SETUP: GameSetup = GameSetup {
     ladder: false,
 };
 
-/// The local client's C→S 0x67 (`intents-events.md` §2.5): the
-/// character class and name above, game type 3 (single player's create
-/// message, `rng.md` §5 open question answered: `0x00477CDF`), Normal,
-/// expansion (flags bit 20) with bit 2 set, locale 0; passes the server's
-/// stated checks.
-///
-/// TODO(spec: the client's 0x67 sender, the character-select / game
-/// menus): the game name, template, arena and the bytes 43–44
-/// the original client fills are not specified; they are zero here (no
-/// server rule d2rs runs reads them, `session_flow` module docs).
+/// The local client's C→S 0x67 (`client/model.md` §7 rule 9, builder
+/// `0x00477CA0`; checks `intents-events.md` §2.5): the character class
+/// and name above, game type 3, Normal, an expansion character's flags
+/// 0x00100004, locale 0; passes the server's checks.
 pub fn create_request() -> CreateGame {
     create_request_for(&Character::New)
 }
 
-/// The local client's C→S 0x67 for `character`: [`create_request`]'s,
-/// with a save's class (+0x28) and name (+0x14) for
-/// [`Character::Save`] (the client sends the selected character's,
-/// `intents-events.md` §2.5).
+/// The 0x67 u32@0x27 of an expansion character: the builder's default
+/// 4 | 0x100000 (`client/model.md` §7 rule 9; recorded 0x00100004).
+pub const CREATE_FLAGS_EXPANSION: u32 = create_flags::EXPANSION | 0x4;
+
+/// The 0x67 u32@0x27 of a classic character.
+///
+/// PROVISIONAL (client/model.md §7 r9; REC-46): bit 2 alone, without the
+/// expansion bit 20.
+pub const CREATE_FLAGS_CLASSIC: u32 = 0x4;
+
+/// The local client's C→S 0x67 for `character` (`client/model.md` §7
+/// rule 9): game name empty (byte 1 = 0), game type 3 (client type 0),
+/// the character's class and name ([`Character::Save`]: the save's
+/// class +0x28 and name +0x14), template 0, the game's difficulty,
+/// u16@0x25 = 0, the flags of an expansion or a classic character (save
+/// status bit 5), @0x2B = @0x2C = 0, language id 0. Bytes after a name's
+/// NUL are zero.
 pub fn create_request_for(character: &Character) -> CreateGame {
-    let (class, name) = match character {
-        Character::New => (PLAYER_CLASS as u8, PLAYER_NAME),
-        Character::Save(save, _) => (save.header.class, save.header.name_bytes()),
+    let (class, name, expansion) = match character {
+        Character::New => (PLAYER_CLASS as u8, PLAYER_NAME, GAME_SETUP.expansion),
+        Character::Save(save, _) => (
+            save.header.class,
+            save.header.name_bytes(),
+            save.header.status & d2_formats::d2s::status::EXPANSION != 0,
+        ),
     };
     let mut char_name = [0u8; 16];
     char_name[..name.len()].copy_from_slice(name);
     CreateGame {
         game_type: GAME_TYPE,
         class,
+        template: 0,
         difficulty: GAME_SETUP.difficulty,
         char_name,
-        flags: create_flags::EXPANSION | 0x4,
+        arena: 0,
+        flags: if expansion {
+            CREATE_FLAGS_EXPANSION
+        } else {
+            CREATE_FLAGS_CLASSIC
+        },
+        unk_43: 0,
+        unk_44: 0,
         locale: 0,
         ..CreateGame::default()
     }
@@ -206,11 +227,10 @@ pub fn create_request_for(character: &Character) -> CreateGame {
 pub enum Character {
     /// A new character of the 0x67 request's class and name, as the save
     /// loader leaves a player (no room, at (0, 0), mode 1), knowing Cold
-    /// Plains' waypoint on Normal (the server tests' staging).
-    ///
-    /// TODO(spec: formats/d2s.md, intents-events.md §8.2 rule 3): the new
-    /// character's record (`0x00532590`) is not specified, so its entry
-    /// carries no player record (no 0x5F / 0x23 at the join).
+    /// Plains' waypoint on Normal (the server tests' staging). It is the
+    /// stub load (`intents-events.md` §8.2 rule 7,
+    /// `d2_server::adapters::session::load_new_character`), so the join
+    /// sends 0x5F and the two 0x23.
     #[default]
     New,
     /// A parsed `.d2s` loaded onto the new player
@@ -706,6 +726,16 @@ pub fn client_drlg_source(data: &GameData) -> DrlgSource {
     }
 }
 
+/// The `objects.txt` rows of the client object update
+/// (`world/objects-client.md` §28 r1): the live table; none for the
+/// synthetic game (its object update then runs nothing).
+pub fn client_object_rows(data: &GameData) -> Vec<crate::bridge::objects::ObjClientRow> {
+    match data {
+        GameData::Synthetic => Vec::new(),
+        GameData::Live(d) => crate::bridge::objects::ObjClientRow::rows(&d.waypoints.objects),
+    }
+}
+
 /// The `Levels.txt` fields the client reads (`client/model.md` §11
 /// rules 3–4: `Pal`, `Act`, `BlankScreen`; `audio/environment.md` §1 r2:
 /// `SoundEnv`), one row per level id, from the game's `levels` table.
@@ -748,6 +778,72 @@ pub fn client_skill_rows(archives: &ArchiveSet) -> Result<Vec<SkillRow>, BuildEr
             etype: s.etype,
         })
         .collect())
+}
+
+/// The unit-message rows of the client (`client/msg-units.md` §1.2 r7:
+/// each `monstats` row's `MonStatsEx` link into `monstats2`, whose record
+/// bytes +0x15… hold the component choice counts; §1.2 r4: the
+/// `itemstatcost` send columns; §1.3 r3 and `client/model.md` §15 r1,
+/// `render/lighting.md` OQ 11: `objects.txt` and the `shrines.txt`
+/// codes), from the user's tables.
+pub fn client_unit_rows(archives: &ArchiveSet) -> Result<UnitRows, BuildError> {
+    let set = d2_data::bin::load(archives, "eng").map_err(|e| BuildError::Tables(e.to_string()))?;
+    let table = |name: &str| {
+        set.table(name)
+            .ok_or_else(|| BuildError::Tables(format!("{name} not loaded")))
+    };
+    let err = |e: d2_data::tables::WrongTable| BuildError::Tables(e.to_string());
+    let monstats: Vec<Monstats> = decode_all(table("monstats")?).map_err(err)?;
+    let monstats2 = table("monstats2")?;
+    let monsters = monstats
+        .iter()
+        .map(|m| {
+            let link = m.monstatsex as i16;
+            if link < 0 || link as usize >= monstats2.count {
+                return None;
+            }
+            MonsterClass::from_record(monstats2.record(link as usize), m.npc, m.interact)
+        })
+        .collect();
+    let isc: Vec<Itemstatcost> = decode_all(table("itemstatcost")?).map_err(err)?;
+    let stats = isc
+        .iter()
+        .map(|r| StatSend {
+            bits: r.send_bits,
+            param_bits: r.send_param_bits,
+            signed: r.signed,
+        })
+        .collect();
+    let objects: Vec<Objects> = decode_all(table("objects")?).map_err(err)?;
+    let objects = objects
+        .iter()
+        .map(|o| ObjectRow {
+            subclass: o.subclass,
+            shrine_function: o.shrinefunction,
+            env_effect: o.enveffect != 0,
+            lit: [
+                o.lit0, o.lit1, o.lit2, o.lit3, o.lit4, o.lit5, o.lit6, o.lit7,
+            ],
+            selectable: [
+                o.selectable0 != 0,
+                o.selectable1 != 0,
+                o.selectable2 != 0,
+                o.selectable3 != 0,
+                o.selectable4 != 0,
+                o.selectable5 != 0,
+                o.selectable6 != 0,
+                o.selectable7 != 0,
+            ],
+            rgb: (o.red, o.green, o.blue),
+        })
+        .collect();
+    let shrines: Vec<Shrines> = decode_all(table("shrines")?).map_err(err)?;
+    Ok(UnitRows {
+        monsters,
+        stats,
+        objects,
+        shrines: shrines.iter().map(|s| s.code).collect(),
+    })
 }
 
 /// A built game and the units the app and tests address. The player
@@ -1047,8 +1143,9 @@ pub fn build_with(
         expansion: GAME_SETUP.expansion,
         ..AppRest::default()
     };
-    // TODO(spec: the host clock of store generation, `vendors.md` edge
-    // case 10): `WiredWorld::now` stays 0; nothing in the app updates it.
+    // `WiredWorld::now` (store generation and refresh, `vendors.md` edge
+    // case 10) is the host clock in ms, set by each host frame
+    // (`host_tick`); 0 until the first frame.
     let mut world = WiredWorld::new(
         action,
         parts.items,
@@ -1067,10 +1164,7 @@ pub fn build_with(
     // state 3). The next tick populates the town's rooms, the client's room
     // is ready and the client pass sends 0x04 (`tick.md` §6 rule 6).
     let cold_plains_wp = wp_tables.waypoint(COLD_PLAINS);
-    s.set_session(SessionFlow::new(
-        GAME_SETUP.arena_flags,
-        loader(character, cold_plains_wp),
-    ));
+    s.set_session(SessionFlow::new(loader(character, cold_plains_wp)));
     Ok(LocalGame {
         sim: s,
         waypoint,
@@ -1113,7 +1207,7 @@ fn loader(
         if let Some(u) = s.events.action.sys.units.get_mut(player) {
             u.mode = 1;
         }
-        let entry = match &character {
+        let (entry, quests) = match &character {
             Character::New => {
                 if let Some(index) = cold_plains_wp {
                     let set = s
@@ -1134,7 +1228,17 @@ fn loader(
                             .push(format!("join: waypoint {index}: {e:?}"));
                     }
                 }
-                Entry::new(0, r.char_name)
+                // §8.2 rule 7: the stub path (start stats, `StartSkill`),
+                // so the join sends 0x5F and the two 0x23.
+                let (entry, report) = load_new_character(s, player, r.char_name);
+                let log = &mut s.events.action.hooks().x.log;
+                log.extend(
+                    report
+                        .unapplied
+                        .iter()
+                        .map(|u| format!("join: new character: {u:?}")),
+                );
+                (entry, PlayerQuests::default())
             }
             Character::Save(save, ctx) => match load_save(s, player, save, ctx) {
                 Ok((entry, report)) => {
@@ -1145,11 +1249,20 @@ fn loader(
                             .iter()
                             .map(|u| format!("join: save load: {u:?}")),
                     );
-                    // TODO(spec: formats/d2s-load.md, the quest section
-                    // onto the quest record): the save's quest flags are
-                    // not applied; the record starts new.
-                    log.push("join: save load: quest records start new".into());
-                    entry
+                    // Load §2 quests row (`0x0056A370` → `0x0065C4D0`,
+                    // `world/quests.md` §1.6): each 96-byte record copied
+                    // into the player's quest record with normalisation.
+                    // A stub (no body) keeps the new record (load §1).
+                    let mut quests = PlayerQuests::default();
+                    if let Some(body) = &save.body {
+                        for (d, rec) in body.quests.records.iter().enumerate() {
+                            match QuestFlags::copy_in(rec, true) {
+                                Ok(f) => quests.flags[d] = f,
+                                Err(e) => log.push(format!("join: save load: quests {d}: {e}")),
+                            }
+                        }
+                    }
+                    (entry, quests)
                 }
                 Err(e) => {
                     s.events
@@ -1165,7 +1278,7 @@ fn loader(
         let name = r.char_name;
         let n = name.iter().position(|&b| b == 0).unwrap_or(name.len());
         let rest = &mut s.world.rest;
-        rest.quests.insert(player, PlayerQuests::default());
+        rest.quests.insert(player, quests);
         rest.names.insert(player, name[..n].to_vec());
         s.set_player(
             player,

@@ -57,9 +57,12 @@ fn birth<W: AiHost + ?Sized>(
     u: UnitId,
     p: &TickParam,
 ) -> bool {
-    // TODO(spec gap): the direction toward target 0 (target mode 1
-    // always has one) is 0.
-    let d = p.target.map_or(0, |t| cx.world.direction64(u, t));
+    // T = 0 is unreachable (VileMother is target mode 1, `ai.md` §2.3):
+    // asserted, not handled.
+    let t = p
+        .target
+        .expect("VileMother birth without a target (ai.md §2.3)");
+    let d = cx.world.direction64(u, t);
     let d8 = dir8(d);
     let (s1, m1) = cx.skill(p, 1);
     let (ox, oy) = cx.world.position(u);
@@ -421,7 +424,7 @@ pub fn megademon<W: AiHost + ?Sized>(
     if s1 >= 0 && !p.combat && p.distance < r {
         // 1.
         if i {
-            cx.world.set_state(u, STATE_INFERNO, false);
+            cx.world.set_state(game, u, STATE_INFERNO, false);
         } else if frame > param(cx, u, 0) && pct(cx, u) < cx.aip(p, 1) {
             cast(game, cx);
             return;
@@ -429,7 +432,7 @@ pub fn megademon<W: AiHost + ?Sized>(
     } else {
         // 2.
         if i {
-            cx.world.set_state(u, STATE_INFERNO, false);
+            cx.world.set_state(game, u, STATE_INFERNO, false);
         }
         if p.combat {
             if s1 >= 0 && frame > param(cx, u, 0) && pct(cx, u) < cx.aip(p, 2) {
@@ -925,7 +928,9 @@ pub fn diablo<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitI
     match k {
         1 => {
             set_velocity(cx, u, 0, 20, 0);
-            // TODO(spec gap): X = 0 here reads a null unit; (0, 0) is used.
+            // PROVISIONAL (monsters/ai-bodies-4.md §8): X = 0 here reads a
+            // null unit in 1.14d; the walk goes to (0, 0); settled by a bin
+            // read (likely unreachable).
             let (xx, xy) = x.map_or((0, 0), |x| cx.world.position(x));
             walk_to_point(game, cx, u, xx, xy);
         }
@@ -942,7 +947,7 @@ pub fn diablo<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitI
             if cx.skill(p, 1).0 < 0 {
                 idle(game, cx, u, 2);
             } else if cx.world.has_state(u, STATE_INFERNO) {
-                cx.world.set_state(u, STATE_INFERNO, false);
+                cx.world.set_state(game, u, STATE_INFERNO, false);
                 idle(game, cx, u, 2);
             } else {
                 skill_k(game, cx, u, p, 1, x);
@@ -1015,7 +1020,7 @@ pub fn diablo_alt<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: U
         .and_then(|k| command_mut(cx, u, k).map(|c| (c.params[1], c.params[2])))
         .unwrap_or((0, 0));
     if cx.world.has_state(u, STATE_INFERNO) {
-        cx.world.set_state(u, STATE_INFERNO, false);
+        cx.world.set_state(game, u, STATE_INFERNO, false);
     }
     reinstall(game, cx, u);
     if find_command(cx, u, 10, false).is_none() && x != 0 && y != 0 {

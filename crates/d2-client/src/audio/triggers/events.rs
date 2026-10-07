@@ -29,9 +29,11 @@ pub const ROGUEHIRE: i32 = 271;
 pub struct EventExtra<'a> {
     /// Local player P (`[0x007A6A70]`); `None` when missing.
     pub local: Option<UnitKey>,
-    /// Event 12: the `stsound` the caller read from U.
-    /// TODO(spec: audio/triggers.md open question 4): which skill/record
-    /// `0x006256B0(U, 0x44)` and `0x00625D00(·, 350, 0)` select.
+    /// Event 12 (open question 4, answered): the `stsound` (+0xFC) of the
+    /// skill in stat 350 (`modifierlist_skill`) of U's state-68 (`evade`)
+    /// stat list, when U has that skill and its `skills.txt` record
+    /// exists; 0 otherwise (no state 68, no skill). Live: Dodge, Avoid and
+    /// Evade all give 2,236 `amazon_dodge_1`. The caller reads it from U.
     pub event12_stsound: i32,
     /// Event 18: U's NPC greeting record and state (§10 r1); `None` = no
     /// record (id 0).
@@ -41,7 +43,10 @@ pub struct EventExtra<'a> {
 }
 
 /// S→C 0x2C event `event` on unit U (§2 r2, r3). The caller looks U up
-/// (`0x00463990`); a missing unit makes no call.
+/// (`0x00463990`); a missing unit makes no call. The handler reads U's
+/// type through the sound identity (`triggers-2.md` §18 r2: the class 271
+/// tests, the monster events 16–17 and the player test of r3); U's
+/// `monsounds` is the §18 r3 record.
 pub fn server_event(
     cx: &mut Ctx,
     u: &Unit,
@@ -74,7 +79,7 @@ pub fn server_event(
             }
         }
         16 => {
-            let id = match (u.unit_type(), u.monsounds) {
+            let id = match (u.identity_type, u.monsounds) {
                 (MONSTER, Some(r)) => sid(r.taunt),
                 _ => 0,
             };
@@ -98,7 +103,7 @@ pub fn server_event(
             let id = if rogue { female } else { male };
             out.push(Followup::OverheadText(id));
             cx.req(id, on_u, 0);
-            if u.unit_type() == PLAYER {
+            if u.identity_type == PLAYER {
                 out.extend(player_event(cx, u, event)?);
             }
         }
@@ -113,7 +118,7 @@ pub fn server_event(
             cx.req(2553, on_u, 0);
         }
         _ => {
-            if u.unit_type() == PLAYER {
+            if u.identity_type == PLAYER {
                 out.extend(player_event(cx, u, event)?);
             }
         }
@@ -148,12 +153,13 @@ pub const EVENT_KEY_USED: (u16, i32) = (11, 228);
 /// Player event sound `0x004CB9C0(U, e)` (§3). U is a player; its class
 /// is `u.class`.
 pub fn player_event(cx: &mut Ctx, u: &Unit, e: u16) -> Result<Vec<Followup>, TriggerError> {
-    // r2. TODO(spec: audio/triggers.md §3 r2): "P is missing" is not
-    // representable here (U is a unit); only the dead check applies.
+    // r1–r2 (`0x004CB9C0`–`0x004CBA23`): a class ≥ 7 is fatal before the
+    // dead test, so "P missing" never applies: nothing when U = P and P's
+    // mode is 17. Another player's events play even when it is dead.
+    let rec = class_record(u.class)?;
     if u.is_local && u.mode == 17 {
         return Ok(Vec::new());
     }
-    let rec = class_record(u.class)?;
     let on_u = Some(u.key);
     let mut out = Vec::new();
     let requested = match e {

@@ -24,33 +24,34 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 56–73 |
-| Inputs | 74–82 |
-| Outputs / state changes | 83–89 |
-| Rules | 90–91 |
-|   1. Model contents | 92–131 |
-|   2. Unit table | 132–177 |
-|   3. Local player | 178–200 |
-|   4. Receive and the unit message queue | 201–238 |
-|   5. Client update pass | 239–275 |
-|   6. Position check (`0x004804E0`) | 276–315 |
-|   7. Session messages | 316–392 |
-|   8. Mode requests | 393–444 |
-|   9. Room-in-sight messages | 445–479 |
-|   10. Bit reader | 480–494 |
-|   11. Current act and level (join and later) | 495–540 |
-|   12. Client DRLG and the room of a point | 541–582 |
-|   13. Visibility predicate (`0x004DBF20`) | 583–610 |
-|   14. Pet list and the hireling GUID | 611–637 |
-|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 638–704 |
-|   16. C→S 0x4B after a teleport (the hireling case) | 705–739 |
-|   17. Model writes made by 1.14d UI code | 740–857 |
-| Constants & data dependencies | 858–870 |
-| Randomness | 871–882 |
-| Edge cases & original bugs | 883–891 |
-| Test vectors | 892–939 |
-| Provenance | 940–998 |
-| Open questions | 999–1081 |
+| Summary | 57–74 |
+| Inputs | 75–84 |
+| Outputs / state changes | 85–91 |
+| Rules | 92–93 |
+|   1. Model contents | 94–137 |
+|   2. Unit table | 138–183 |
+|   3. Local player | 184–206 |
+|   4. Receive and the unit message queue | 207–244 |
+|   5. Client update pass | 245–293 |
+|   6. Position check (`0x004804E0`) | 294–334 |
+|   7. Session messages | 335–493 |
+|   8. Mode requests | 494–578 |
+|   9. Room-in-sight messages | 579–613 |
+|   10. Bit reader | 614–628 |
+|   11. Current act and level (join and later) | 629–674 |
+|   12. Client DRLG and the room of a point | 675–716 |
+|   13. Visibility predicate (`0x004DBF20`) | 717–744 |
+|   14. Pet list and the hireling GUID | 745–784 |
+|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 785–851 |
+|   16. C→S 0x4B after a teleport (the hireling case) | 852–886 |
+|   17. Model writes made by 1.14d UI code | 887–1004 |
+|   18. Audio driver inputs and the client object functions | 1005–1035 |
+| Constants & data dependencies | 1036–1048 |
+| Randomness | 1049–1060 |
+| Edge cases & original bugs | 1061–1072 |
+| Test vectors | 1073–1120 |
+| Provenance | 1121–1199 |
+| Open questions | 1200–1298 |
 <!-- /index -->
 
 ## Summary
@@ -79,11 +80,12 @@ position check of the local player.
 | loop pass tick flag | whether the server ticked in this client loop pass | `client/bridge.md` §8 |
 | unit visibility | whether a unit's sprite at a pixel point is drawable (`0x004DBF20`) | Phase 6 render seam (§6 rule 7) |
 | mode machines | per unit type, consume a mode request (`0x00480C10`) | Phase 6 seam (§8) |
+| `now: u32` | wrapping milliseconds (1.14d `GetTickCount`); host clock live, scripted in tests / replays | bridge; read by §5 rule 2, §8 rule 7 (`world/objects-client.md` §25 r6) |
 
 ## Outputs / state changes
 
 - `ClientWorld` fields of §1, changed only by the rules below.
-- C→S messages the client itself sends: 0x6B (§7 rule 3), 0x5F (§6
+- C→S messages the client itself sends: 0x67 (§7 rule 9), 0x6B (§7 rule 3), 0x5F (§6
   rule 8). They go through the bridge send path (`client/bridge.md` §4).
 - Mode requests handed to the unit-type mode machines (§8).
 
@@ -107,6 +109,8 @@ position check of the local player.
    | `in_game: bool` | `[0x007A061C]` | 0x04 (1), 0x05 (0), 0xB4 through the UI (0, §7 rule 8) |
    | `unloaded: bool` | `[0x007A0624]` | 0x04 (0), 0x05 (1) |
    | `exit_requested: bool` | `[0x007A0620]` | 0x06; 0xB4 through the UI (§7 rule 8) |
+   | `connected: bool` | `[0x007A0618]` | 0xAF (1), 0xB0 (0), 0xB4 through the UI (0) (§7 rule 10) |
+   | `ping: PingState` | `[0x007A04A0]` … `[0x007A04F0]` | the ping timer and 0x8F (§7 rule 11) |
    | `town_flag: bool` | `[0x007A5260]` | player creation (`msg-units.md` §1.1 r3), §17 rule 6 |
    | `rooms_in_sight: Vec<RoomSight>` | client DRLG room status (`drlg/rooms.md` §4) | 0x07, 0x08 (§9) |
    | `outgoing: Vec<Vec<u8>>` | client send path | §6 rule 8, §7 rule 3 |
@@ -127,6 +131,8 @@ position check of the local player.
    | `seed: (u32, u32)` | +0x20 / +0x24 | client copy of the unit seed (§2 rule 6) |
    | `queue: Vec<Vec<u8>>` | +0xD8 message queue | §4 |
    | `last_mode_request: Option<ModeRequest>` | — (d2rs) | §8 rule 3 |
+   | `interact_ms: u32` | +0xD4 | monster interact gate (§8 rule 7); objects' `ClientFn` timer T (`world/objects-client.md` §25 r5) |
+   | audio inputs | +0x30 … +0x88, +0xB0, monster data +0x16 / +0x26 | §18 rule 1 |
    | kind data | +0x14 type data | per kind, owned by `msg-units.md` §1 and `msg-stats-items.md` §2–§3 |
 
 ### 2. Unit table
@@ -250,12 +256,24 @@ position check of the local player.
    missile `0x004D2C70`, item `0x004C1AD0`; Phase 6), then look the unit
    up again by (type, GUID) in its own set and, if it still exists,
    drain its queue (§4 rule 5).
+   The object update `0x004BDFF0` is the generic object step
+   `0x004BCBB0` (`render/lighting.md` §8), then the `ClientFn` / mode
+   sound step of `world/objects-client.md` §25 r2 (dispatch `0x004BDEE0`,
+   table `0x007277F0`; bodies §26 there; ownership §18 rule 3). The
+   update pass takes `now: u32` (wrapping milliseconds, the 1.14d
+   `GetTickCount`) from the bridge and hands it to that step
+   (`world/objects-client.md` §25 r6); the only other reader in this
+   spec is §8 rule 7.
 3. Order (`0x00465AA0`, the first part; buckets 0..127, each chain in
    its order, i.e. descending GUID): S missiles, C missiles, C objects,
    S players, S monsters, S objects, S items, C monsters. The S sets are
    walked by `0x00463C90` (next link read before the unit runs, so a
    unit may free itself); the C sets by `0x00463CC0`. The rest of
    `0x00465AA0` and of `0x0044C790` runs no handler (Phase 6).
+   `0x00463CC0` runs rule 2's per-unit step (`0x00480810`), then looks
+   the unit up again in its C set; still present: type 2 →
+   `0x004BDEE0` once more, result ignored (`world/objects-client.md`
+   §25 r3), type 1 → `0x0046D780` (Phase 6); other types nothing.
 4. d2rs order for the queue drains: types in the order above (S only:
    missiles 3, players 0, monsters 1, objects 2, items 4), then
    `GUID & 0x7F` ascending, then GUID descending.
@@ -286,9 +304,10 @@ position check of the local player.
    static-path kinds 2, 4, 5 read the static path).
 4. Tolerance T: kind 1 → 10; kind 2 → 0; any other kind: U is the local
    player → mode 1 → 3 + L, mode 3 → 7 + L, other modes → 5 + L, with
-   L = (`[0x007A04A4]` + 0x32) >> 7 (L = 0: the global is only ever
-   zeroed, by the `0x007A0480` block clears of `0x0044E200` and
-   `0x0044C890`; no other writer); U is a
+   L = (`ping.rtt` + 0x32) >> 7 (§7 rule 11: the last ping round trip
+   in ms, `[0x007A04A4]`, read through `0x0044CE60`; 0 until the first
+   0x8F and after the `0x007A0480` block clears of `0x0044E200` and
+   `0x0044C890`; L = 1 from a round trip of 78 ms); U is a
    monster in mode 3–5 → 5, mode 6–11 → 7; otherwise 15.
 5. far := |x − cx| > T. If far or |y − cy| > T: if kind = 0 and tx > 0
    (signed): d1 := (cx − x)² + (cy − y)² (`0x006492A0`); d1 ≥ 100 →
@@ -375,7 +394,7 @@ position check of the local player.
       panel is closed (`0x00456300(1, 0)`); the timer is started
       (`GetTickCount`, 0x9C4 ms); **`exit_requested` := true**
       (`[0x007A0620]`); **`in_game` := false** (`[0x007A061C]`); the
-      connection flag `[0x007A0618]` (0xAF / 0xB0, out of scope) := 0;
+      connection flag `[0x007A0618]` (`connected`, rule 10) := 0;
       `[0x0070EE8C]` := 0 (`0x0044B880`, the flag of `client/msg-ui.md`
       open question 8). The error screen
       (`0x0044CB60`: the string of error n; codes 0x14 / 0x15 add a line
@@ -389,6 +408,88 @@ position check of the local player.
       := false; §10 r10 there). Applying them at delivery (§10 r4) is
       exact because no message follows 0xB4 in its frame (rule 8
       preamble).
+9. **C→S 0x67** create game (2026-10-08). The client's game start
+   `0x0044F360` calls the builder `0x00477CA0` (at `0x0044F45E`) when
+   the client game type `[0x007A0610]` is not 3, 7 or 9, with ECX =
+   the game name buffer `0x007A05DC` (EDX = `0x0047A990()`, unused).
+   The builder fills 46 bytes on the stack and sends them through
+   `0x0052AE50(0x2E, 0, msg)` (system queue, `client/bridge.md` §4
+   rule 2), then adds 0x2E to `[0x007A6AF8]` and 1 to `[0x007A6B00]`
+   (send counters). C = the start-up configuration `[0x007A0438]`
+   (`tools/original-hooks.md`):
+
+   | Bytes | Value | Single player (recorded seq 1, both recordings) |
+   |---|---|---|
+   | @0 | 0x67 | |
+   | @1 | game name `0x007A05DC`, copied up to its NUL (`0x004135D0`); the bytes after the NUL keep stack contents | empty (byte 1 = 0) |
+   | @0x11 | game type: `[0x007A0610]` 0 → 3, 6 → 1, 8 → 2, else 0 | 3 (type 0) |
+   | @0x12 | class: `0x0047AA20()` (`[0x00712F00]`) when `[0x00712EFC]` bit 8, else byte `[0x007A0522]` | the selected character's class |
+   | @0x13 | template: C +0x20D | 0 |
+   | @0x14 | difficulty: C +0x210 (0–2; read as such by `0x0044CF20`) | 0 (Normal) |
+   | @0x15 | character name `0x007A05C4`, copied up to its NUL | the character |
+   | @0x25 | u16 C +0x207 (the server never reads it, `sim/intents-events.md` §2.5) | 0 |
+   | @0x27 | u32 C +0x209; when it is 0 the builder first stores 4 \| 0x100000 there | 0x00100004 |
+   | @0x2B, @0x2C | C +0x20E, C +0x20F (passed, never read by the server) | 0, 0 |
+   | @0x2D | language id `0x00525150()` (0–13; the server refuses > 14) | 0 |
+
+   d2rs: the app builds these bytes from its own state: name empty, type
+   3, the character's class and name, template 0, the chosen difficulty,
+   u16@0x25 = 0, flags 0x00100004 for an expansion character, @0x2B =
+   @0x2C = 0, the language id. PROVISIONAL: a classic character sends
+   0x00000004 (because the server reads only bit 20 for expansion and
+   bits 1–2 for its check, and the builder's default sets bit 2; the
+   menu writer of C +0x209 is UI code not read here); settled by
+   REC-46. Bytes after a
+   name's NUL: zero (the original's stack contents are not
+   reproducible and no reader uses them).
+10. **0xAF** ConnectionInfo and **0xB0** ConnectionTerminated (system
+    handler `0x0045C850`, jump table `0x0045C894` indexed by id − 0xAF;
+    2026-10-08 read): 0xAF (`0x0045C86C`) → `connected` := 1; u8@1 is
+    not read. 0xB0 (`0x0045C877`) → `connected` := 0. Both are direct
+    sends (`sim/intents-events.md` §3.3 rule 5) and occur in single
+    player: `af 00` twice (the first at the join) and `b0` once in each
+    of both recordings (`-015956`, `-022633`; senders `0x0052B780`,
+    `0x0053B220`). Other writers of 0: `0x0044E380` (rule 8.2), the
+    exit send `0x00477EE0` (`client/msg-ui.md` §3 code 23) and
+    `0x00453910`. Readers (UI / start-up, Phase 6): the system-message
+    pump `0x0044BAD0` returns `connected` ≠ 0 after each message,
+    `0x0044BD20` returns `connected` = 0, and the watchdog
+    `0x0044EEC0` calls `0x0044E380(6)` when `connected`, `in_game`,
+    `exit_requested` and `unloaded` are all 0 only for game types 7
+    and 9 (hosted, out of scope), so never in single player.
+11. **0x8F** Pong (`0x0045EB00` → `0x0044CDB0`, 33 bytes; 2026-10-08
+    read) and the ping timer. `PingState` fields: `next_ms`
+    `[0x007A049C]`, `sent_ms` `[0x007A04A0]`, `rtt` `[0x007A04A4]`,
+    `samples` `[0x007A04CC]`, `mean` `[0x007A04D0]`, `pong: [u32; 8]`
+    `[0x007A04D4]`…`[0x007A04F0]`.
+    1. Timer (`0x0044CD70`, and the same code inline in the game loop
+       `0x0044EFA0`): now := `GetTickCount()`; `next_ms` < now → the
+       C→S 0x6D builder `0x00477DD0` runs (reads `pong[5..8]`, Battle.net
+       / transport, `sim/intents-events.md` §4 rule 4), `sent_ms` :=
+       now, `next_ms` := now + 5000.
+    2. 0x8F: `pong[i]` := u32@(1 + 4i), i = 0…7; then `pong[4]` :=
+       `GetTickCount()` (overwrites u32@17); `rtt` := `GetTickCount()` −
+       `sent_ms`; while `samples` < 10: `mean` := (`mean` · `samples` +
+       `rtt`) / (`samples` + 1) (u32, truncating), `samples` += 1. Read
+       by §6 rule 4 (`rtt`, `0x0044CE60`) and `0x0044CE70` (`mean`).
+    3. Single player (both recordings, 33 and 32 records): every 0x8F is
+       33 zero bytes, sent 2.7–48.7 ms after the matching C→S 0x6D
+       (server send time; the client's receive time is not recorded).
+    4. d2rs: the in-process link has no transport delay, so the bridge
+       sends no 0x6D and receives no 0x8F; `rtt` stays 0 and §6 rule 4
+       uses L = 0. A 1.14d single-player round trip of 78 ms or more
+       (one client frame plus one server tick can exceed it) gives L =
+       1 there: open question 18.
+12. **0xB3** DownloadSave (handler `0x0045C620`, which appends the
+    chunk to a client buffer and at `total` calls the save writer
+    `0x0045C520`, `formats/d2s.md` §2.7 rule 3): **unused in single
+    player: never sent by the 1.14d server in a single-player game.**
+    Its only sender `0x0052E110` runs for game type 1 or 2
+    (`sim/intents-events.md` §3.2 rule 5; the leave drain of §2.5
+    rule 2 there is gated the same way); the single-player game type is
+    3 (§2.5 rule 2 there). No record in either recording. The d2rs
+    handler is
+    the no-op of `client/bridge.md` §6 rule 7.
 
 ### 8. Mode requests
 
@@ -417,7 +518,7 @@ position check of the local player.
    |---|---|
    | 0x00 | `0x00480780(U, r0, r1)`; mode := walk (`0x00480E70`) |
    | 0x01 | `0x004804A0(U, r0, r1)`; mode := walk |
-   | 0x02 | `0x00480930(r0 & 0xFFFF, r1)` |
+   | 0x02 | `0x00480930(r0 & 0xFFFF, r1)`: the interact sender, rule 7 |
    | 0x06 | `+0xB0` := r2; mode := 4; `check(U, r0, r1, 1, 0, 0)` |
    | 0x07 | was-dead := `0x00464820(U)`; `0x004647D0(U)`; flag 0x2 set; mode := neutral; with a record `0x00480EF0(U, r0, r1, was-dead)` |
    | 0x08 | local player → `0x00456300(1, 0)`; `+0xB0` := r2; U the hover target (`0x00467A10`) → `0x00466FE0` unless `0x0044BF00` or `0x0044BF10` has bit 8, else `0x0044DA40` + `0x00467A70(0)`; `check(U, r0, r1, 0, 0, 0)`; mode := 0; `0x00461010(U)`; `0x0045C470(U)` |
@@ -441,6 +542,39 @@ position check of the local player.
    Both codes in detail, with the shrine table: §15.
 6. **Item** (`0x004C1B80`): code 2 → mode := r1 (`0x00624690`), unit
    flag 0x2 := (r0 ≠ 0); other codes do nothing.
+7. **Interact sender** `0x00480930(type, GUID)` (ECX = type u16, EDX =
+   GUID; callers: rule 4 code 0x02 and `ClientFn` 13,
+   `world/objects-client.md` §26.13). P := the local player
+   (`0x00463DD0`), U := (type, GUID) looked up in S (`0x00463990`); no U
+   → nothing. "send 0x13" = append C→S 0x13 {0x13 u8, type u32, GUID
+   u32}, 9 bytes (`0x004786A0`, CL = 0x13; `outgoing`, bridge send path).
+   By type:
+   - 0 (player): P faces U (`0x00621C00(P, x, y)` with U's client point
+     `0x0045AE20` / `0x0045ADF0`); send 0x13.
+   - 1 (monster): when `now` − U+0xD4 < 200 (u32 wrapping, unsigned;
+     `0x00480AA7`) nothing; else U+0xD4 := `now`, send 0x13. d2rs: U+0xD4
+     is `ClientUnit.interact_ms: u32`, 0 at creation.
+   - 2 (object): P's path reset `0x00648B90(P path, 0)`. U's flag +0xC4
+     bit 0x4 clear → send 0x13. Set → P faces U as for type 0; a
+     7-value record R := 0, R[0] := the id (`0x00643CE0`) of P's skill
+     on side 1 (`0x006439F0`). By U's class: 404 in mode 0 and 376 in
+     mode 2 test the code of P's item in hand (`0x0063BEF0(P+0x60)`,
+     `0x00628590`) against `qf2 ` (404) / `hfh ` (376): no item or
+     another code → the player event sound `0x004CB9C0(P, 0x13)`
+     (`audio/triggers.md` §3) and nothing sent; equal → R[0] := the id
+     of P's skill 0 (`0x006439B0(P, 0, −1)`). 376 in mode 0 → send 0x13
+     only (no skill start). Every other case continues: R[1] := −1,
+     R[2] := 2, R[3] := GUID; the client skill start `0x004C6EB0(P, R)`
+     (`render/lighting.md` §8 r3); send 0x13.
+   - 4 (item): append C→S 0x16 {0x16 u8, 4 u32, GUID u32, b u32}, 13
+     bytes (`0x004786D0`), b = the byte `0x004538D0(1)` zero-extended.
+   - other types: nothing.
+   The code-0x13 mode request (rule 4) sends nothing itself: `0x00480D20`
+   only adds overlays (`0x00470390`) and `0x004CC5B0` and the functions
+   it calls (`0x004CA2C0`, `0x004CA320`, `0x004CA380`, `0x004CA410`,
+   `0x004CB2C0`, `0x004CB6A0`, `0x004CB860`, `0x004CB890`, `0x004CC410`,
+   `0x004B9A00`) do not reach the send path `0x00478350`. The C→S 0x13
+   of an interact is this rule's (`ui/controls.md` §6 r8–r11).
 
 ### 9. Room-in-sight messages
 
@@ -624,8 +758,21 @@ player is in", the input of `render/composition.md` §3 step 2
    is kept with gone := 1, else it is unlinked and freed.
 3. **S→C 0x81** AssignMerc (`0x0045E890`, 20 bytes): `0x00478BB0(pet
    GUID u32@8, owner GUID u32@4, type u8@1, class u16@2, {u32@0xC,
-   u32@0x10, 0})`: set as rule 2, then the three extra values are stored
-   in the record (+0x24…); a missing record afterwards is fatal 0x95.
+   u32@0x10, 0})`: set as rule 2 (a missing record afterwards is fatal
+   0x95), then pet GUID, owner GUID and type are rewritten and **+0x24
+   := u32@0xC, +0x28 := u32@0x10, +0x2C := 0**. Type 7 with the
+   monster (1, pet GUID) in S (`0x00463990`): the client hireling setup
+   `0x004B1090(U, {u16 := u32@0x10 & 0xFFFF, u32 at +4 := u32@0xC})` (U +0xC4 |= 0x202, hireling
+   skills from the hireling record, `client/msg-ui.md` OQ 2), the dead
+   flag clear `0x004647D0(U)`, `0x004AE210(U)` and mode set
+   `0x00624690(U, 1)` (2026-10-08 read of `0x00478BB0`). The 0xAC create
+   (`0x00466360`, pet type 7) passes the same pair from the record
+   (`0x00478E40`): +0x28 low 16 bits and +0x24; `0x004B1090` hands the
+   u16 to `0x00663750` / `0x0044DCC0` (hireling row lookup) and the u32
+   to `0x00463DD0` / `0x006637F0`. PROVISIONAL: +0x1C (100 at
+   creation) has no model reader, UI only (because no client reader was
+   traced); settled by REC-50 (reader scan of +0x1C) and REC-10 (0x81
+   bytes of a hireling).
 4. **Hireling GUID** (`0x00478F20(player, 7, any = 1)`, the call of
    `msg-units.md` §1.2 rule 2 and §2 rule 2): no player → −1; else the
    first record in list order with type 7 and owner GUID = the player's
@@ -855,6 +1002,37 @@ bit 0x2 is the bit of `client/msg-ui.md` §1 r4 and §16).
    before the pass continues, so later units' updates and queue drains
    see the writes as in 1.14d.
 
+### 18. Audio driver inputs and the client object functions
+
+1. **Per-unit audio inputs.** `ClientUnit` holds, beside §1 rule 2, the
+   fields the sound triggers read (`audio/triggers-2.md` §21, which
+   names the owner of each value): sequence mode +0x30 / +0x40; flag-ex
+   +0xC8 (bit 3) and the transform states; frame +0x44, frame count
+   +0x48, speed +0x4C (i16), frame event +0x4E; last hit class +0xB0
+   (written by the mode machines, §8 rule 4); for monsters the monster
+   data +0x16 (type flags) and +0x26 (superunique row) from S→C 0xAC
+   (`client/msg-units.md`); the unit sound fields +0x70, +0x74, +0x78
+   (request list), +0x7C, +0x80, +0x84, +0x88, zero at creation and
+   written only by the audio rules; and, through U's room, the floor
+   material (`drlg/rooms.md`, `formats/dt1.md`). The model stores them;
+   it decides none of them.
+2. **Order of the audio calls inside the model passes.** The object
+   update of §5 rule 2 and the C-set second call of §5 rule 3 make their
+   mode sound calls in the order of `audio/triggers-2.md` §20 r1, r2,
+   r4; an object mode change (§8 rule 5, code 3, `0x004BCF60`) makes its
+   mode sound call inside the change (§20 r3). The model hands each call
+   to the audio driver at that point of the pass, so the driver sees
+   them in 1.14d order. **Unit free** (§2 rule 5, `0x00465870`): before
+   the per-type frees, every request handle of U is detached without
+   force and U's sample locks released (`audio/triggers-2.md` §19 r5);
+   the per-type branches' second detach finds the list empty.
+3. **`ClientFn` owner** (answer to PC 2): the bodies of `ClientFn`
+   1–18 (table `0x007277F0`, 19 entries) and the per-call-site rules
+   are owned by `world/objects-client.md` §25–§26; `client/model.md`
+   owns where the dispatch `0x004BDEE0` is called from (§5 rules 2–3,
+   once per object update and once more for C objects) and the `now`
+   input it reads (§5 rule 2).
+
 ## Constants & data dependencies
 
 | Constant | Value | Source |
@@ -887,7 +1065,10 @@ bit 0x2 is the bit of `client/msg-ui.md` §1 r4 and §16).
   (`msg-units.md` §4); the model uses 0.
 - A replacing add (§2 rule 4) of the local player clears
   `local_player` until the next 0x0B.
-- `[0x007A04A4]` has no direct writer (§6 rule 4, open question 3).
+- `[0x007A04A4]` (`ping.rtt`) is written only by the 0x8F handler
+  `0x0044CDB0` (§7 rule 11), code the `all.asm` export does not cover
+  (it is reached by the jump at `0x0045EB00`), which is why open
+  question 3 first found no writer.
 
 ## Test vectors
 
@@ -967,6 +1148,13 @@ Ghidra backlog (2026-10-06): mode machines `0x00461250` (jump tables
 (only `0x0061A840` sets bit 23), update `0x00480810`, C→S 0x4B
 `0x004786A0`; `[0x007A04A4]`: all references (reader `0x0044CE60`,
 block clears `0x0044E200` / `0x0044C890`).
+Dispatch owners session (2026-10-08, `tools/ghidra/disasm.py fn` over the
+image, since `all.asm` lacks the code at `0x0044CDB0`): 0x8F
+`0x0045EB00` → `0x0044CDB0`, ping timer `0x0044CD70` / `0x0044EFA0`,
+0x6D builder `0x00477DD0`; system handler `0x0045C850` and its jump
+table (0xAF, 0xB0, 0xB2, 0xB3 `0x0045C620`); `[0x007A0618]` writers and
+readers in `all.asm`; packet counts and 0x6D → 0x8F delays from both
+`traces/raw/*-packets.jsonl` recordings.
 Join-update session (2026-10-06): 0x03 builder `0x0053ABE0` (callers
 `0x0052C210`, `0x0053ACC0`), `0x0053B390`, `0x005382B0`, `0x0061AE80`,
 `0x0061C330`; act lookup `0x00619DA0`, room level `0x0061A1B0`;
@@ -995,6 +1183,19 @@ offsets from `data/fields.tsv`. Room free paths: `0x0061B560`,
 (`0x004636D5`). The export adds to PC 2's list: rule 1 also runs the
 stock discard, clears monster data +0x28 bit 0, flag bit 0x40 and sets
 mode 1; rule 2's refusal also runs the stock discard.
+§5 r2–r3, §8 r7, §18 (2026-10-08, PC 2 requests from spec-objects-client
+and spec-audio-s4): `0x004BDFF0`, `0x00463CC0` (type 1 / 2 branches),
+`0x00480930` whole (disassembly: CL / EDX / stack of the `0x004786A0`
+and `0x004786D0` calls, the 200 ms compare at `0x00480AB5`, record
+build `0x004809A2`–`0x00480A34`), `0x004786A0`, `0x004786D0`,
+`0x006439B0`; code-0x13 path `0x00480D20`, `0x004CC5B0` and its direct
+callees (no call of `0x00478350`). §18 r1–r2 restate
+`audio/triggers-2.md` §19–§21 (PC 2, read there).
+
+§7 rule 9 (2026-10-08, asm): `0x00477CA0` (`0x00477CDF` game type),
+its only caller `0x0044F360` (`0x0044F43E`–`0x0044F45E`),
+`0x0047AA30`, `0x0047AA20`; the recorded C→S 0x67 is seq 1 of
+`20261006-022633-packets.jsonl`.
 
 ## Open questions
 
@@ -1002,14 +1203,22 @@ mode 1; rule 2's refusal also runs the stock discard.
    answered in §8 rules 4–6. Open: the monster machine `0x004AFF60`
    (3,678 bytes, 10 callers) per code, and the effects of the helpers
    the tables name (`0x00480E70` mode set, `0x004804A0` / `0x00480780`,
-   `0x00480930`, `0x00480EF0`, `0x004BCF60`, `0x004BD5C0`): Phase 6
-   client unit-modes spec.
+   `0x00480930` (answered: §8 rule 7), `0x00480EF0`, `0x004BCF60`, `0x004BD5C0`): Phase 6
+   client unit-modes spec. PROVISIONAL: a client monster changes mode
+   only as the S→C messages state (§8), with no client-side mode steps
+   and no client seed draws beyond those the message rules name
+   (because the server stream carries every mode change the recordings
+   show); settled by REC-51 (HIGH-PRIORITY CAPTURE: client seed draws).
 2. Local walk prediction and per-update path stepping of the local
    player (input → path, `0x00463390`): needed for a smooth
    `ViewFeed::player`; Phase 6 movement spec; check against
-   `record_frames.py` positions.
-3. ~~`[0x007A04A4]`~~: answered in §6 rule 4 (only zeroed; L = 0). A
-   memory read during play confirms.
+   `record_frames.py` positions. PROVISIONAL: the local player is drawn
+   at the last server-sent position (the message rules of §8 /
+   `client/msg-units.md`), no local prediction (because d2rs runs client and server in one
+   process with no latency); settled by REC-51.
+3. ~~`[0x007A04A4]`~~: answered in §6 rule 4 and §7 rule 11
+   (2026-10-08 correction: the ping round trip written by 0x8F, not
+   only zeroed); the single-player value is open question 18.
 4. ~~Unit flag 0x800000~~: answered in §5 rule 5 (room free
    `0x0061A840`).
 5. ~~The client DRLG as a d2rs component~~: answered in §12 (the
@@ -1031,7 +1240,10 @@ mode 1; rule 2's refusal also runs the stock discard.
    client active room's seed (+0x6C) equals the server's for the same
    DRLG room; check by comparing a monster's client `+0x20` seed after
    0xAC at a non-zero point with the server unit's seed (memory read).
-10. The pet record fields +0x24… written by 0x81 (§14 rule 3) and who
+10. *Answered (2026-10-08)*: the 0x81 writes are §14 rule 3 (+0x24,
+    +0x28, +0x2C and the type-7 unit setup); the reader of +0x1C
+    stays PROVISIONAL there (settled by REC-10, REC-50).
+    Original question: the pet record fields +0x24… written by 0x81 and who
     reads +0x1C: UI (Phase 6); and a recording with a hireling (0x7A /
     0x81 seen) to confirm §14.
 11. *Answered:* 0x07 / 0x08 at a point in no DRLG room of the level
@@ -1078,3 +1290,8 @@ mode 1; rule 2's refusal also runs the stock discard.
     the receive per frame (frame skip, minimized window). It matters
     only when the fallback repeats (a skill-0 entry with level ≤ 0).
     Settle by reading `0x0044C990`'s callers.
+18. §7 rule 11.4: how often a 1.14d single-player ping round trip
+    (`ping.rtt`) reaches 78 ms, giving the local player's position
+    tolerance L = 1 in §6 rule 4 where d2rs uses 0. Settle with a memory
+    read of `[0x007A04A4]` during play, or by recording the client's
+    receive time of 0x8F beside the 0x6D send time.

@@ -41,6 +41,8 @@ struct Fake {
     busy: BTreeSet<UnitId>,
     /// Modes whose start fails.
     fail_modes: BTreeSet<u8>,
+    /// Point targets whose mode start fails.
+    fail_points: BTreeSet<(i32, i32)>,
     /// A failed mode start falls into the neutral start (§1.3), which
     /// adds a think at frame + this when none is pending later.
     fail_think: Option<i32>,
@@ -109,6 +111,10 @@ struct Summ {
     last_placed: (i32, i32),
     pets: Vec<UnitId>,
     pet_count: i32,
+    /// `0x00574A20` result (consulted only when `pettype_count` makes the
+    /// skill's pettype valid).
+    pet_type: i32,
+    pettype_count: i32,
     hire_id: Option<i32>,
     hire_row: Option<HireRow>,
     calc: i32,
@@ -262,7 +268,7 @@ impl AiUnits for Fake {
     fn set_unit_flag(&mut self, _: UnitId, mask: u32) {
         self.log.push(format!("flag {mask:#x}"));
     }
-    fn set_state(&mut self, unit: UnitId, state: u16, on: bool) {
+    fn set_state(&mut self, _: &mut Game, unit: UnitId, state: u16, on: bool) {
         if on {
             self.states.insert((unit, state));
         } else {
@@ -277,7 +283,11 @@ impl AiUnits for Fake {
 impl AiModes for Fake {
     fn change_mode(&mut self, game: &mut Game, unit: UnitId, m: u8, target: ModeTarget) -> bool {
         self.log.push(format!("mode {m} {target:?}"));
-        if (self.walk_fails && matches!(m, mode::WALK | mode::RUN)) || self.fail_modes.contains(&m)
+        let point_fails =
+            matches!(target, ModeTarget::Point(x, y) if self.fail_points.contains(&(x, y)));
+        if (self.walk_fails && matches!(m, mode::WALK | mode::RUN))
+            || self.fail_modes.contains(&m)
+            || point_fails
         {
             if let Some(n) = self.fail_think {
                 if pending_think(game, unit) <= game.frame {
@@ -811,6 +821,12 @@ impl AiSummons for Fake {
     }
     fn pet_count(&self, _: UnitId) -> i32 {
         self.y.pet_count
+    }
+    fn pet_type_of(&self, _: &Game, _: UnitId, _: UnitId) -> i32 {
+        self.y.pet_type
+    }
+    fn pettype_count(&self) -> i32 {
+        self.y.pettype_count
     }
     fn hireling_id(&self, _: &Game, _: UnitId, _: UnitId) -> Option<i32> {
         self.y.hire_id
@@ -1569,6 +1585,39 @@ fn commands() {
         assert_eq!(current_command(cx, mon).unwrap().params[0], 1);
         free_current_command(cx, mon);
         assert_eq!(current_command(cx, mon), None);
+    });
+}
+
+// Freeing the current command makes its ring next current, also when it
+// is the last index (its next is index 0); the search then starts after
+// that new current (`ai.md` §8: `0x0058ED10`, `0x0058EEF0`).
+// Covers: specs/monsters/ai.md §8
+#[test]
+fn freeing_the_last_command_wraps_to_its_next() {
+    let mut w = World::new(monstats(6, [0; 5], 15));
+    let mon = w.mon;
+    w.with(|_, cx| {
+        let c = cx.store.control_mut(mon).unwrap();
+        c.commands = [[4, 1, 0, 0, 0], [4, 2, 0, 0, 0], [5, 3, 0, 0, 0]]
+            .map(|params| AiCommand { params })
+            .to_vec();
+        c.cur = 2;
+        free_current_command(cx, mon);
+        // Ring 0 → 1 → 0: index 0 (the freed node's next) is current.
+        assert_eq!(current_command(cx, mon).unwrap().params, [4, 1, 0, 0, 0]);
+        // The type-4 search tests current's next (index 1) first.
+        assert_eq!(find_command(cx, mon, 4, false), Some(1));
+        // `0x0058EF40` links the new command before current (index 0).
+        copy_command(
+            cx,
+            mon,
+            AiCommand {
+                params: [6, 0, 0, 0, 0],
+            },
+        );
+        let c = cx.store.control(mon).unwrap();
+        assert_eq!(c.cur, 0);
+        assert_eq!(c.commands[1].params, [4, 1, 0, 0, 0]);
     });
 }
 

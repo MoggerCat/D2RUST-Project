@@ -53,12 +53,9 @@ pub trait QuestRest {
     }
     /// `0x00544160` (`quests.md` §9.2: removal by item mode, inventory).
     fn delete_item(&mut self, player: UnitId, code: [u8; 4]);
-    /// `0x005466B0` (`quests.md` §9.1). TODO(quests.md §9.1): the steps
-    /// are specified (creation `0x00559CE0` = `items/generation.md`
-    /// §10.2, level default `0x00558200`, placement `0x00560200`, the
-    /// free-spot drop); the creation and placement providers live with
-    /// the inventory host, which the quest world does not reach. Not
-    /// wired.
+    /// `0x005466B0` (`quests.md` §9.1) for a host that lends no inventory
+    /// model: the wired host's runs on [`super::HostQuests`] with one
+    /// ([`super::quest_reward`]).
     fn reward_item(
         &mut self,
         player: UnitId,
@@ -317,18 +314,26 @@ impl<H: LifecycleHooks, R: QuestRest> EconomyQuests<'_, '_, H, R> {
 }
 
 /// `quests-act2-2.md` §5.2 `0x0061C450`: the Tainted Sun start on the act
-/// environment record (the 0x53 fields: index 0, ticks 300 × 4 from the
-/// period reset `0x0061BDF0` of the eclipse table's entry 0, eclipse 1).
+/// environment record (speed 4; the 0x53 fields: index 0, ticks 300 × 4
+/// from the period reset `0x0061BDF0` of the eclipse table's entry 0,
+/// eclipse 1; type 3).
 pub fn tainted_sun_start(e: &mut crate::world::environment::Environment) {
+    use crate::world::environment::{ECLIPSE, SPEED_ECLIPSE};
+    e.speed = SPEED_ECLIPSE;
     e.period = 0;
-    e.ticks = 300 * 4;
+    e.kind = ECLIPSE[0].kind;
+    e.ticks = ECLIPSE[0].start * SPEED_ECLIPSE;
     e.eclipse = true;
 }
 
-/// `quests-act2-2.md` §5.2 `0x0061C4D0`: the Tainted Sun end (index 2,
-/// ticks 0, eclipse 0; no period reset).
+/// `quests-act2-2.md` §5.2 `0x0061C4D0`: the Tainted Sun end (speed 128,
+/// index 2, ticks 0, the normal entry 2 type, eclipse 0; no period
+/// reset).
 pub fn tainted_sun_end(e: &mut crate::world::environment::Environment) {
+    use crate::world::environment::{NORMAL, SPEED_NORMAL};
+    e.speed = SPEED_NORMAL;
     e.period = 2;
+    e.kind = NORMAL[2].kind;
     e.ticks = 0;
     e.eclipse = false;
 }

@@ -10,17 +10,20 @@
 //! What the window shows is what the specs allow: the S→C handlers of
 //! `client/model.md`, `msg-units.md` and `msg-stats-items.md` fill the
 //! client world model, and every rule of how a unit, tile or panel looks
-//! is a `TODO(spec: …)` hook answered by `world_view::Unspecified` (draw
-//! nothing). Placement is the original's: the world view builds each
+//! is a world-view hook (each names its owner spec) answered here by
+//! `world_view::Unspecified` (draw nothing: the model lacks their inputs,
+//! `model_feed::PENDING`). Placement is the original's: the world view builds each
 //! frame through `rules::OriginalView` with the camera of
 //! `render/camera.md` §3, fed by `world_view::ModelFeed` (the local
-//! player's position and unit positions from the model; the open mode,
-//! the shake and the map stay `NoFeed`'s until their owners land). No
-//! player in the model: no camera, nothing placeable.
+//! player's position, unit positions and BlankScreen from the model; the
+//! open mode is the original UI's, else 0, `ui/panels-2.md` §22 r5; the
+//! shake and the map stay `NoFeed`'s, `model_feed::PENDING`). No player
+//! in the model: no camera, nothing placeable.
 //! One frame per server tick (§9). The frame is the composed empty list: palette index 0 over
 //! the whole view. The frame palette is the act's `pal.pl2`
-//! (`render/composition.md` §4, `ViewAssets::from_pl2`); the model states
-//! no level, so no act: all zeros until it does.
+//! (`render/composition.md` §4) of the model's palette act
+//! (`client/model.md` §11), presented by [`super::palette`] when the
+//! user's archives are read; without them it is [`unspecified_palette`].
 //!
 //! Frames come from the frame store (`ViewAssets::frames`, the store of
 //! verify-map; empty until a rule names a frame set to load), UI text goes
@@ -56,10 +59,12 @@ use crate::world_view::{
 /// Frames between two progress lines in the log.
 const LOG_EVERY: u64 = 250;
 
-/// The frame palette while the model states no level for the player:
-/// all zeros (black). TODO(spec: the S→C owner spec of the player's
-/// level): then the act's `pal.pl2` (`render/composition.md` §4,
-/// `ViewAssets::from_pl2`).
+/// The frame palette before an act palette is presented: all zeros
+/// (black). With the user's archives [`super::palette`] replaces it with
+/// the `pal.pl2` of the model's palette act (`render/composition.md` §4,
+/// `client/model.md` §11 rules 2, 4); without them (synthetic data) there
+/// is no palette file and it stays. Index 0, the only index an empty
+/// frame shows, is black in every act palette (`composition.md` §4).
 pub fn unspecified_palette() -> Palette {
     Palette {
         colors: [Rgb { r: 0, g: 0, b: 0 }; 256],
@@ -170,6 +175,14 @@ fn exit_after(limit: Res<ExitAfter>, mut seen: Local<u32>, mut exit: MessageWrit
     }
 }
 
+/// `0x00410A80` (`render/lighting.md` §10 r4): wall-clock seconds, a
+/// client-only host input.
+fn wall_seconds() -> i32 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs() as i32)
+}
+
 /// Opens the window and runs the game until it is closed.
 pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
     let archives = match &config.data {
@@ -178,6 +191,7 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
     };
     let drlg_source = single_player::client_drlg_source(&config.data);
     let level_rows = single_player::client_level_rows(&config.data);
+    let object_rows = single_player::client_object_rows(&config.data);
     let request = config.character.clone();
     let (link, started) = single_player::start_with(
         config.data,
@@ -201,12 +215,25 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
     add_game(&mut app, Box::new(link), true)?;
     send_create_game_for(&mut app, &request)?;
     add_client_data(&mut app, drlg_source, level_rows);
+    app.world_mut()
+        .resource_mut::<BridgeResource>()
+        .0
+        .set_object_rows(object_rows);
     if let Some(archives) = archives {
         let skills = single_player::client_skill_rows(&archives)?;
         app.world_mut()
             .resource_mut::<BridgeResource>()
             .0
             .set_skill_rows(skills);
+        let units = single_player::client_unit_rows(&archives)?;
+        app.world_mut()
+            .resource_mut::<BridgeResource>()
+            .0
+            .set_unit_rows(units);
+        app.world_mut()
+            .resource_mut::<BridgeResource>()
+            .0
+            .set_wall_seconds(wall_seconds);
         let palettes = ActPalettes::live(&archives).map_err(anyhow::Error::msg)?;
         palette::add_act_palettes(&mut app, palettes);
         let parts = ui::UiParts::live(archives.clone()).map_err(anyhow::Error::msg)?;

@@ -407,3 +407,37 @@ fn darkness_needs_the_players_act() {
     let e = m.w.environment.unwrap();
     assert_eq!((e.index, e.kind, e.ticks, e.eclipse), (5, 2, 30_720, true));
 }
+
+// Covers: specs/render/lighting.md §9.2 r4
+#[test]
+fn darkness_object_day_refresh() {
+    use super::super::world::{ObjectRow, OBJECT};
+    let mut m = placed(0x1241, 0x11C4);
+    m.inputs.tables.objects = vec![ObjectRow::default(); 40];
+    m.inputs.tables.objects[39] = ObjectRow {
+        env_effect: true,
+        lit: [0, 19, 19, 0, 0, 0, 0, 0],
+        rgb: (255, 236, 176),
+        ..ObjectRow::default()
+    };
+    let fire = UnitKey::new(OBJECT, 0x20);
+    let u = m.put(fire);
+    u.class = 39;
+    u.position = Some((0x1241, 0x11C4));
+    let lights = |m: &Model| m.w.lights.len();
+    let before = lights(&m);
+    // Index 2: day (type 0) = the zero cache: nothing.
+    m.hex("53 02 00 00 00 00 00 00 00 00");
+    assert_eq!((m.unit(fire).mode, lights(&m)), (0, before));
+    // Index 4: type 1 → mode 1, its light (radius 19 / 2).
+    m.hex("53 04 00 00 00 00 00 00 00 00");
+    assert_eq!(m.w.env_period_cache, 1);
+    assert_eq!((m.unit(fire).mode, m.unit(fire).flag_2), (1, Some(false)));
+    assert_eq!(lights(&m), before + 1);
+    let (id, rec) = m.w.lights.iter().next().unwrap();
+    assert_eq!((rec.owner_guid, m.w.lights.radius(id)), (0x20, Some(9)));
+    // Back to day: mode 0, `Lit0` = 0 removes the light.
+    m.hex("53 02 00 00 00 00 00 00 00 00");
+    assert_eq!((m.unit(fire).mode, lights(&m)), (0, before));
+    assert!(m.log.rejected.is_empty());
+}

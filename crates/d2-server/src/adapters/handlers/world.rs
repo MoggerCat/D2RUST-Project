@@ -26,12 +26,13 @@
 //! and the cube on the same unit world).
 
 mod action;
+mod hireling_host;
 mod wired;
 
 #[cfg(test)]
 pub(crate) mod tests;
 
-pub use action::{ActionEvents, ActionWorld, Outbox};
+pub use action::{ActionEvents, ActionWorld, Outbox, ProcessState};
 pub use wired::{Parts, TradeRest, WiredWorld};
 
 use d2_sim::game::Game;
@@ -379,6 +380,12 @@ pub trait WorldHost<D> {
     /// The host's millisecond clock (`Intents::set_host_tick`): the
     /// object code's `GetTickCount` input (`objects.md` edge case 9).
     fn host_tick(&mut self, events: &mut D, ms: u32) {}
+    /// The host calls the game's quest rules raised since the last take
+    /// (`quests-helpers.md` §6: `QuestControl::take_host_requests`), in
+    /// call order. A host without quests raises none.
+    fn take_host_requests(&mut self) -> Vec<d2_sim::world::quests::HostRequest> {
+        Vec::new()
+    }
     /// Records a fatal path (see [`WorldError`]).
     fn fault(&mut self, fault: WorldFault);
 }
@@ -542,8 +549,13 @@ impl VendorCall for VendorRun<'_> {
                 }
                 None => Some(3),
             },
+            // The handler `0x0054BB60` drops the routine's result: 0 for
+            // every 17-byte message (`vendors.md` §8.1 rule 7).
             0x35 => match RepairMsg::parse(m) {
-                Some(r) => Some(repair(tables, w, p, &r)?),
+                Some(r) => {
+                    repair(tables, w, p, &r)?;
+                    Some(0)
+                }
                 None => Some(3),
             },
             0x37 => Some(identify_gamble(w, p, m)),

@@ -32,17 +32,17 @@
 |   4. FingerMage (70) `0x005FA380` | 156–179 |
 |   5. Regurgitator (71) `0x005FA710` | 180–215 |
 |   6. Megademon (89) `0x005E0C80` | 216–232 |
-|   7. Diablo (51) `0x005E9170`, alternate `0x005E8480` | 233–368 |
-|   8. Izual (55) `0x005F89B0` | 369–389 |
-|   9. DoomKnight (72) `0x005FAA90` | 390–399 |
-|   10. AbyssKnight (73) `0x005FAB80` | 400–421 |
-|   11. OblivionKnight (74) `0x005FAF00` | 422–455 |
-| Constants & data dependencies | 456–468 |
-| Randomness | 469–477 |
-| Edge cases & original bugs | 478–494 |
-| Test vectors | 495–510 |
-| Provenance | 511–535 |
-| Open questions | 536–561 |
+|   7. Diablo (51) `0x005E9170`, alternate `0x005E8480` | 233–371 |
+|   8. Izual (55) `0x005F89B0` | 372–392 |
+|   9. DoomKnight (72) `0x005FAA90` | 393–402 |
+|   10. AbyssKnight (73) `0x005FAB80` | 403–424 |
+|   11. OblivionKnight (74) `0x005FAF00` | 425–458 |
+| Constants & data dependencies | 459–471 |
+| Randomness | 472–480 |
+| Edge cases & original bugs | 481–497 |
+| Test vectors | 498–513 |
+| Provenance | 514–538 |
+| Open questions | 539–564 |
 <!-- /index -->
 
 ## Summary
@@ -247,6 +247,9 @@ pending choice k (5 = keep channeling).
    (`0x005DEAD0` ≠ 0) → param 0 := 0. End. (Diablo has no `Skill8`.)
 5. By k (each ends with param 0 := 0 unless noted):
    - 1: velocity (0, 20, 0); walk to X's position (`0x005DED90`).
+     k = 1 never comes with X = 0: with X = 0 the choice (§7.3 step 2)
+     gives only 16, 4 or 11, or the pending param 0, which this body
+     only ever sets to 0 or 5.
    - 2 / 3 / 4: A1 / A2 / S4 (mode 11) at X.
    - 5: `Skill1` < 0 → idle 2. State 12 set → state 12 off, idle 2.
      Else `Skill1` at X; param 0 := 5.

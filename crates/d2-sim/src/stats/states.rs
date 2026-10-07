@@ -26,6 +26,8 @@ pub mod state {
 
 /// State flag groups (states flag bit k = bitset k).
 pub mod group {
+    /// `hide` (states flag bit 2; data tables +0xD4, `0x0063A320`).
+    pub const HIDE: usize = 2;
     /// `disguise`.
     pub const DISGUISE: usize = 16;
     /// `life` (`0x0063A750`).
@@ -172,6 +174,16 @@ impl StatLists {
             w[words + i] |= bit;
         } else {
             w[words + i] &= !bit;
+        }
+    }
+
+    /// `0x00639EE0`: zeroes all the unit's state-changed bits.
+    pub fn clear_states_changed(&mut self, unit: UnitId) {
+        let words = self.data().states.words();
+        if let Some(w) = self.unit_list(unit).and_then(|r| self.state_words_mut(r)) {
+            for c in w.iter_mut().skip(words).take(words) {
+                *c = 0;
+            }
         }
     }
 
