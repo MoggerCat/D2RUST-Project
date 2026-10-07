@@ -555,8 +555,10 @@ pub fn transaction(kind: u8, code: u8, guid: u32, gold: u32) -> [u8; 15] {
     m
 }
 
-/// `0x0053D8D0`: S→C 0x58 (7 bytes); byte 6 is not written in the
-/// original (edge case 10), d2rs writes 0.
+/// `0x0053D8D0`: S→C 0x58 (7 bytes); byte 6 (`effect`) is written only
+/// on the object-insert result-5 path, so for the service results 6 / 7
+/// it is unwritten in the original (edge case 10; masked by a keyed row,
+/// `sim/intents-events.md` §6 rule 6) and d2rs writes 0.
 pub fn service_result(npc_guid: u32, result: u8) -> [u8; 7] {
     let mut m = [0u8; 7];
     m[0] = 0x58;
