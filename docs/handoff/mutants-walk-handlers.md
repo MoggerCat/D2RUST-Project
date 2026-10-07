@@ -144,3 +144,63 @@ coverage, which flagged a `Covers:` line using `§R2.3` (not an anchor);
 that claim was removed (comment-only change) and `coverage.py --check`
 (4,276 claims, 0 errors) / `--selftest`, `cargo fmt --check` and the new
 tests were re-run and pass.
+
+## 6. Second session (2026-10-07): merge, open survivors, partial re-run
+
+Cloud test session, wrapped up early on a coordinator budget cut.
+
+**Merge.** `origin/main` merged (a merge, no rebase). One conflict: the
+action fixture's `TestPending` (`wiring/action/tests/mod.rs`); main
+already records `Pending::send` as `sent` (plus the interact-range
+log), so main's side was taken. Follow-ups to main in
+`wiring/path/mutant_tests.rs`: `path::place::game_entry` takes the size
+from the unit (argument dropped); main's `path-placement.md` §5.1 now
+says pattern 0 stamps nothing, so
+`floor_items_stamp_by_size_and_removal_clears_each_kind` asserts a
+pattern-0 monster leaves its cell unchanged and checks removal on a
+`SizeX` 2 monster (plus + NO_PATH marker). That test is stricter than
+before, not weaker. The §3 spec note (c) above is settled by main.
+
+**Re-run, partial.** The same `cargo mutants` command found **340**
+mutants (main added code). Stopped at **193 / 340** (budget cut):
+156 caught, 11 missed, 26 unviable, 0 timeout; the 193 cover `mod.rs`,
+`place.rs`, `rooms.rs` and `units.rs`, not `walk.rs`. **All 58 kills
+the first session targeted are confirmed** (none of them is in the
+missed list). The run used the tree as of commit `48c3f1a`.
+
+**Survivors of the 193 and outcome:**
+
+| Mutant | Outcome |
+|---|---|
+| `place.rs` `Rooms::has_path → true`, `Rooms::unit_size → 1 / −1` | equivalent (§3 table (b)) |
+| `units.rs` `footprint_of` object arm / tile arm deleted | equivalent (§3 table (b)) |
+| `place.rs` `add_player_to_world` `|= → &=` | killed: game entry leaves path flag 0x2 set (§11), added to `game_entry_places_the_player_in_the_town_and_sends_0x07_then_0x15` |
+| `place.rs` `Shared::queue_update → ()` | killed: `placing_a_unit_in_its_own_room_queues_it_for_update` (§10 r5) |
+| `place.rs` `Shared::history_write → ()` | killed: `placing_a_player_writes_its_position_history` (§10 r6, r7; new in main) |
+| `place.rs` `game_entry → true / false` (wiring) | killed: `the_wired_game_entry_reports_placed_or_a_missing_spawn_room` (§11; new in main) |
+| `units.rs` `path_cached_word → None` | **reclassified** from equivalent: main specified missile paths, so a moving missile has points. Killed: `a_moving_missile_reads_the_collision_word_its_step_cached` (`missiles.md` §R4 step 6) |
+
+**The three open survivors of §3 are killed:**
+`a_walk_request_puts_the_walkers_footprint_back` (`path_add_footprint`,
+`pathing.md` §3 r6, r9), `a_monsters_velocity_comes_from_its_monstats_row`
+(`monster_velocity`, §8.1 r2),
+`a_fatal_type_set_in_a_walk_request_is_reported` (`walk_error`, §2;
+the test sets prev type 8 directly, no normal walk reaches it).
+
+Every kill above was measured by applying the mutant by hand and
+running `wiring::path::mutant_tests` (each fails its test); the
+cargo-mutants run started before these tests existed, so it lists them
+as missed. Counted: **10 survivors killed** (3 open + 7 from the
+re-run), **5 equivalent left**.
+
+**Left (exact):**
+1. Finish the re-run on the remaining 147 mutants, mostly `walk.rs`:
+   `CARGO_INCREMENTAL=0 cargo mutants -p d2-sim --file
+   'crates/d2-sim/src/wiring/path/walk.rs' --timeout 120 -j 3
+   --test-tool nextest` (about 1.5 h), then re-check the earlier
+   `walk.rs` classifications (`PathCtx::step → None`, `unit_step →
+   true / false`): main's missile paths may make them observable now,
+   as with `path_cached_word`.
+2. Re-run `place.rs` / `units.rs` with `-F` on the 10 mutants killed by
+   hand to record the kill by the tool.
+3. Fold this note into `docs/HANDOFF.md` and `docs/PLAN.md`.
