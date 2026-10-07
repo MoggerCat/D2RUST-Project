@@ -35,7 +35,7 @@
 | Edge cases & original bugs | 268–286 |
 | Test vectors | 287–299 |
 | Provenance | 300–319 |
-| Open questions | 320–333 |
+| Open questions | 320–352 |
 <!-- /index -->
 
 ## Summary
@@ -323,6 +323,25 @@ Synthetic, from the rules (`sim/rng.md` generator):
    session report; `items/generation.md` Open question 2).
 2. Which non-treasure callers pass request quality 0 (vendors, quests,
    cube) and so draw §3: owned by those specs; check when written.
+   Partly answered (2026-10-07; the store to request +0x30 in each of
+   the 20 callers of `0x00558D90`, request at ebp−0x88): a constant 0
+   is written by `0x00559130` (`0x005592B3`; caller the object theme
+   body `0x00552140`, `world/object-population.md`), `0x00559300`
+   (`0x0055946F`, gold; caller `0x0054F8C0`), `0x005594C0`
+   (`0x005595F3`, armor; caller `0x00584160`), `0x00559630`
+   (`0x005597F5`, weapon; caller `0x005841D0`; both `world/objects-2.md`
+   §20) and `0x00559830` (`0x005599EC`; no callers, dead). A constant 2
+   by `0x0056D5F0` (`0x0056D71D`), `0x00582AC0` (`0x00582B6D`),
+   `0x005AF300` (`0x005AF511`) and `0x00563FE0` (through its request
+   builder `0x0055E8E0`, which stores 2 at +0x30), so those never draw
+   §3. `0x00579D60`
+   writes 6 (`0x0057A0A4`, request at ebp−0xEC). `0x00530F40` takes the
+   legacy record's quality. The rest pass a value from their caller or
+   from data (`0x00559A30`, `0x00559CE0`, `0x0055A550`, `0x00565AB0`,
+   `0x0056DAB0`, `0x005830E0`, `0x00583410`, `0x00585970`,
+   `0x00585A80`); whether those values can be 0
+   stays with their owners (treasure, cube, NPC, quest and object
+   specs).
 3. Answered (handoff `impl-items` OQ-Q1): the §8.1 vector is reworded,
    the rules stand. In `0x005566B0` the accept test (`0x005569B0`–`0x005569C0`: items `quest` ≠ 0, or game none, or idx < 0x1001 and its bit
    clear) runs before the marking `0x00556530`; for idx 4097 on a

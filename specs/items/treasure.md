@@ -45,7 +45,7 @@
 | Edge cases & original bugs | 619–642 |
 | Test vectors | 643–672 |
 | Provenance | 673–697 |
-| Open questions | 698–798 |
+| Open questions | 698–844 |
 <!-- /index -->
 
 ## Summary
@@ -710,6 +710,52 @@ Real 1.14d (game-file tests, `#[ignore]`, from the live `.bin` set):
    matches (entry counts, starts, flags, rows).
 5. x87 precision control on the server thread during §5.4 (irrelevant
    for 1.14d data, §5.4; matters for mods with other nodrop/total pairs).
+   Partly answered (2026-10-07, from the binary); the rest **Needs
+   recording**.
+   - CRT startup: `___tmainCRTStartup` calls `__cinit(1)` (`0x006828EA`,
+     ebx = 1), which calls `__fpmath(1)` through `0x006F2874`; with a
+     non-zero argument it runs `__setdefaultprecision` (`0x00682FC4` →
+     `0x0068E70A`): `_controlfp_s(NULL, 0x10000 = _PC_53, 0x30000 =
+     _MCW_PC)`, then `fnclex`. Rounding control and exception masks are
+     not touched, so the main thread starts with the Windows default
+     word plus PC = 53 bits: round to nearest even, 53-bit significand,
+     all exceptions masked. `__set_controlfp` has no callers;
+     `__controlfp_s` is called only from there and from
+     `__setdefaultprecision`.
+   - Game code: the only `fldcw` sites outside the CRT are 14 local
+     pairs in 8 functions (`0x0047CC90`, `0x0047CD00`, `0x00605080` ×4,
+     `0x00605F00`, `0x0061BCE0`, `0x00679190` ×2, `0x00679250` ×2,
+     `0x0067A140` ×2): each saves the word (`fnstcw`), sets RC = chop
+     (`or 0xC00`) for one `fistp`, and restores it. None is on the §5.4
+     path, and none changes the precision. The CRT's own math helpers
+     (`0x006879DD`–`0x00688718`, `__ctrlfp` `0x0069D097`) also save and
+     restore.
+   - §5.4 itself (`0x0055A935`–`0x0055A9B9`): `fild` of the i32 values,
+     `fdivp`, the `fmul` chain, `fld1` / `fsubrp`, the `fucomp` zero
+     test, `fsub`, `fimul` by `C`, `fdivrp`, all on the x87 stack with
+     no store between them, then `0x00682FD0` (SSE2: `fstp` to a double,
+     `cvttsd2si`, truncation regardless of RC). Under the startup word
+     (PC = 53, RC = nearest) every one of these operations rounds once
+     to a 53-bit significand; the exponent range is wider than
+     binary64's, which matters only outside its normal range (here, for
+     n0 ≥ 1 and n0 + C in 1..2³¹−1, x > 2⁻³¹ and p' = x^n with n ≤ 8,
+     so every intermediate stays above 2⁻²⁴⁸, far inside binary64's
+     normal range), and the `fstp`
+     to a double is exact. So with the startup word §5.4 equals the
+     IEEE binary64 evaluation d2rs uses, bit for bit.
+   - Not settled by the binary: single player runs the server inline
+     on the client frame thread (`sim/tick.md` §1 rule 4), the same
+     thread as the renderer. Game.exe passes neither `DDSCL_FPUSETUP`
+     (0x800) nor `DDSCL_FPUPRESERVE` (0x1000) at its SetCooperativeLevel
+     calls found by their error strings (`0x0051129F`, `0x005115E6`,
+     `0x006B40E2`, `0x006B4541`: 0x11; `0x006B505A`: 0x411), so whether
+     the DirectDraw / Direct3D runtime, a Glide wrapper or a driver
+     leaves the thread at another precision (24-bit) is decided outside
+     Game.exe. Recording: in a single-player game under each video mode
+     (DirectDraw, Direct3D, Glide), read the x87 control word (`fnstcw`)
+     at `0x0055A935` on a monster kill with a nodrop TC and `n` ≥ 2;
+     expect 0x027F (PC = 53, RC = nearest, all masked); any other PC
+     value means the evaluation is not binary64 there.
 6. Meaning of drop flags 0x04/0x10 (D2MOO: superior / normal) and their
    effect in creation: items spec.
 7. Answered (handoff `impl-treasure` 13): "living" = not dead by
