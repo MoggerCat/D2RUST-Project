@@ -1,4 +1,4 @@
-// Spec: specs/items/inventory.md §1.4, §2.4, §5.1, §5.3, §6.4; specs/world/cube.md §2, §8; specs/world/vendors.md §7
+// Spec: specs/items/inventory.md §1.4, §2.4, §5.1, §5.3; specs/items/inventory-moves.md §6.4; specs/world/cube.md §2, §8; specs/world/vendors.md §7
 //! The inventory model for the other item systems (vendors, the cube):
 //! one inventory per owner unit, read and written by every system that
 //! touches a player's items. The item-move code (`items::moves`) runs on

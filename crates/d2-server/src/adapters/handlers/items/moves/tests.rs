@@ -865,7 +865,7 @@ fn move_ids_check_reports_perturbations() {
 /// out of the room list. The same frame's tick sends the update pass:
 /// 0x9C action 1 (row 1), then 0x47, 0x48. The clean-up (§6.1 rule 4)
 /// leaves nothing for the next tick.
-// Covers: specs/items/inventory.md §6.1 r2, §6.1 r4, §7.1 r2, §11
+// Covers: specs/items/inventory-moves.md §6.1 r2, §6.1 r4, §7.1 r2, §11
 #[test]
 fn pick_item_to_the_cursor() {
     let mut t = setup();
@@ -890,7 +890,7 @@ fn pick_item_to_the_cursor() {
 /// 0x16 auto pickup (§8.1 step 7): the first free page-0 position of
 /// the 10 × 4 grid, (9, 3); 0x9C action 4. Refusals: distance > 50 → 1;
 /// distance ≥ 5 → walk, 0; type > 5 → 2; the own player → 3.
-// Covers: specs/items/inventory.md §7.1 r1, §7.1 r2
+// Covers: specs/items/inventory-moves.md §7.1 r1, §7.1 r2
 #[test]
 fn pick_item_auto_and_refusals() {
     let mut t = setup();
@@ -918,7 +918,7 @@ fn pick_item_auto_and_refusals() {
 /// the ground message (§6.3) is not sent: the per-unit update that would
 /// send it is not wired (see `update_pass`). An item
 /// that is not the cursor item → 1.
-// Covers: specs/items/inventory.md §7.2 r1, §9.1
+// Covers: specs/items/inventory-moves.md §7.2 r1, §9.1
 #[test]
 fn drop_item_to_the_ground() {
     let mut t = setup();
@@ -950,7 +950,7 @@ fn drop_item_to_the_ground() {
 /// 0x9D action 5 with the player as owner (row 4). 0x18 (§7.3) back at
 /// (0, 0) of page 0: mode 0 → 0x9C action 4 (row 3). Page 1 → 2; a cell
 /// outside the cube page → 3; lifting with a cursor item → 2.
-// Covers: specs/items/inventory.md §7.3 r1, §7.4 r1
+// Covers: specs/items/inventory-moves.md §7.3 r1, §7.4 r1
 #[test]
 fn lift_and_insert() {
     let mut t = setup();
@@ -981,7 +981,7 @@ fn lift_and_insert() {
 /// to the cursor (stored page 0), C stored at the message's position
 /// (2, 1); both command flag 0x40000 → 0x9C action 0xD (row 10, owner)
 /// in update-list order.
-// Covers: specs/items/inventory.md §7.10 r1, §7.10 r2, §7.10 r3
+// Covers: specs/items/inventory-moves.md §7.10 r1, §7.10 r2, §7.10 r3
 #[test]
 fn swap_cursor_buffer_item() {
     let mut t = setup();
@@ -1002,7 +1002,7 @@ fn swap_cursor_buffer_item() {
 /// 0x1A (§7.5, §4.6): a cap to the head: mode 1, body location 1 → 0x9D
 /// action 6 (row 5). 0x1C (§7.7): off again → cursor, 0x9D action 8 (row
 /// 7). Location 11 → 2; 0x1C with a cursor item does nothing.
-// Covers: specs/items/inventory.md §7.5, §7.7
+// Covers: specs/items/inventory-moves.md §7.5, §7.7
 #[test]
 fn equip_and_remove_body_item() {
     let mut t = setup();
@@ -1027,7 +1027,7 @@ fn equip_and_remove_body_item() {
 /// 0x1B (§7.6): a two-handed sword onto the right hand over a shield in
 /// the left: the shield leaves the body (mode 4, not linked; WV2), the
 /// sword goes to location 4 → 0x9D action 7 (row 6). Location 3 → 3.
-// Covers: specs/items/inventory.md §7.6
+// Covers: specs/items/inventory-moves.md §7.6
 #[test]
 fn swap_two_handed_item() {
     let mut t = setup();
@@ -1049,7 +1049,7 @@ fn swap_two_handed_item() {
 /// 0x1D (§7.8): a cap on the cursor over an equipped cap: E to the
 /// cursor, N to the head; both command flag 0x20 → 0x9D action 9 (row 8)
 /// in update-list order. An empty location → 1.
-// Covers: specs/items/inventory.md §7.8
+// Covers: specs/items/inventory-moves.md §7.8
 #[test]
 fn swap_cursor_with_body() {
     let mut t = setup();
@@ -1069,7 +1069,7 @@ fn swap_cursor_with_body() {
 /// 0x1E (§7.9): location 3 → 3; an empty location 4 → 1; a two-hander
 /// onto a sword with the other hand empty: §4.3 gives 0, not 7 → 0 with
 /// nothing moved.
-// Covers: specs/items/inventory.md §7.9
+// Covers: specs/items/inventory-moves.md §7.9
 #[test]
 fn swap_one_handed_with_two_handed() {
     let mut t = setup();
@@ -1087,7 +1087,7 @@ fn swap_one_handed_with_two_handed() {
 
 /// 0x20 (§7.11): a key is not `useable` → out 1 (step 1) → 3. A ground
 /// item → 1.
-// Covers: specs/items/inventory.md §7.11
+// Covers: specs/items/inventory-moves.md §7.11
 #[test]
 fn use_grid_item() {
     let mut t = setup();
@@ -1100,7 +1100,7 @@ fn use_grid_item() {
 /// 0x21 (§7.12): keys over the max stack (12): dst := 12, src := 3, both
 /// announced (0x3E seam, logged), dst 0x9C action 0xA (row 9). 0x22
 /// (§7.13) on an owned item → 3 (X1).
-// Covers: specs/items/inventory.md §7.12, §7.13
+// Covers: specs/items/inventory-moves.md §7.12, §7.13
 #[test]
 fn stack_and_unstack_items() {
     let mut t = setup();
@@ -1135,7 +1135,7 @@ fn stack_and_unstack_items() {
 /// slot 0 back to the cursor → 0x9C action 0xF, and the compaction moves
 /// slot 4 to 0 → 0x9D action 0x15 (row 20). 0x25 (§7.16) the cursor
 /// potion and the belt potion change places → 0x9C action 0x10 twice.
-// Covers: specs/items/inventory.md §7.14, §7.15, §7.16
+// Covers: specs/items/inventory-moves.md §7.14, §7.15, §7.16
 #[test]
 fn belt_moves() {
     let mut t = setup();
@@ -1165,7 +1165,7 @@ fn belt_moves() {
 /// 0x26 (§7.17): a belt potion used on the player (seam `use_item`,
 /// logged); not used → nothing more, 0. Used → charge update and removal
 /// (seams), 0.
-// Covers: specs/items/inventory.md §7.17
+// Covers: specs/items/inventory-moves.md §7.17
 #[test]
 fn use_belt_item() {
     let mut t = setup();
@@ -1184,7 +1184,7 @@ fn use_belt_item() {
 /// messages go out **in the handler** (§6.4): 0x9D action 5 (page shown
 /// as the stored page 0) and 0x9C action 0xE, then the tick's pass (owner
 /// refresh, no update list): 0x47, 0x48. A cursor item → 2.
-// Covers: specs/items/inventory.md §6.4, §7.24 r1, §7.24 r2, §7.24 r3, §7.24 r4
+// Covers: specs/items/inventory-moves.md §6.4, §7.24 r1, §7.24 r2, §7.24 r3, §7.24 r4
 #[test]
 fn item_to_belt_shift_sends_now() {
     let mut t = setup();
@@ -1204,7 +1204,7 @@ fn item_to_belt_shift_sends_now() {
 
 /// 0x27 (§7.18): both items owned, but a cursor item exists → 0 (step
 /// 2). A ground target → 1.
-// Covers: specs/items/inventory.md §7.18
+// Covers: specs/items/inventory-moves.md §7.18
 #[test]
 fn use_item_action() {
     let mut t = setup();
@@ -1218,7 +1218,7 @@ fn use_item_action() {
 /// 0x28 (§7.19): the filler is not a socket filler (seam
 /// `socket_filler`, default no) → nothing, 0; a filler not on the cursor
 /// → the cursor check's result.
-// Covers: specs/items/inventory.md §7.19 r1, §7.19 r2
+// Covers: specs/items/inventory-moves.md §7.19 r1, §7.19 r2
 #[test]
 fn socket_item() {
     let mut t = setup();
@@ -1235,7 +1235,7 @@ fn socket_item() {
 /// consumed one by one: seam default) and the cursor cleared; nothing is
 /// sent. A second scroll of another spell → the original's fatal assert
 /// (line 0x149C): result 3 and a recorded fault.
-// Covers: specs/items/inventory.md §7.20
+// Covers: specs/items/inventory-moves.md §7.20
 #[test]
 fn scroll_to_book_and_its_fatal() {
     let mut t = setup();
@@ -1273,7 +1273,7 @@ fn scroll_to_book_and_its_fatal() {
 /// the real item creation on the host's economy, on the ground at the
 /// spot, its gold 1500; the player's gold 3500; nothing sent. More than
 /// the gold → 3; another unit's GUID → 3.
-// Covers: specs/items/inventory.md §7.22, §10.2
+// Covers: specs/items/inventory-moves.md §7.22, §10.2
 #[test]
 fn drop_gold_makes_a_pile() {
     let mut t = setup();
@@ -1320,7 +1320,7 @@ fn drop_gold_makes_a_pile() {
 
 /// 0x61 (§7.23): a classic game → 3; an expansion game without a
 /// hireling (seam default) → 0, nothing changed.
-// Covers: specs/items/inventory.md §7.23 r1, §7.23 r2
+// Covers: specs/items/inventory-moves.md §7.23 r1, §7.23 r2
 #[test]
 fn merc_item() {
     let mut t = setup_with(false);
@@ -1398,7 +1398,7 @@ impl T {
     }
 }
 
-/// The refusals `inventory.md` §7 orders before any effect (the item,
+/// The refusals `inventory-moves.md` §7 orders before any effect (the item,
 /// cursor, stored, owned and location checks of §5.1, before the
 /// targeting reset and the placement; `docs/HANDOFF.md` PK1) leave the
 /// game, the inventories and the outgoing messages unchanged. The

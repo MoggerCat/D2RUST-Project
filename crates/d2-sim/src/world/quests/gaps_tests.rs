@@ -1,4 +1,5 @@
 // Spec: specs/world/quests.md
+// Spec: specs/world/quests-act1.md (§10, split out of `quests.md`)
 //! Gap tests: rules of the spec not yet claimed by other tests.
 
 #[allow(unused_imports)]

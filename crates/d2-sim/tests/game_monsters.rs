@@ -1,4 +1,5 @@
 // Spec: specs/monsters/init.md, specs/monsters/population.md, specs/monsters/ai.md (1.14d data vectors and whole-table sweeps)
+// Spec: specs/monsters/ai-bodies.md (§9, split out of `ai.md`)
 //! Game-file tests for the monster specs: the recorded and live-table
 //! vectors of each spec's Test vectors section, the table facts the specs
 //! state, and sweeps over every live row that must not panic and must keep
@@ -980,7 +981,7 @@ fn ai_index_of_every_row() {
     assert!(bad_rows.is_empty(), "{} row pairs differ", bad_rows.len());
 }
 
-/// The recorded classes' AI index, Normal aip1..aip5 and `aidel` (`ai.md`
+/// The recorded classes' AI index, Normal aip1..aip5 and `aidel` (`ai-bodies.md`
 /// §9.1).
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]

@@ -1,4 +1,4 @@
-// Spec: specs/skills/bodies-2.md §7
+// Spec: specs/skills/bodies-2b.md §7
 //! Batch 3 bodies of required level 24 (§7): Strafe, Dopplezon, Fend,
 //! Thunder Storm, Attract, Bone Prison, Iron Golem, Conversion, Holy
 //! Shield, Frenzy, Grim Ward, Hunger, Volcano, Mind Blast, Dragon
@@ -137,7 +137,7 @@ pub fn strafe<W: BodyWorld>(
         w.set_entry_param_of(u, &e, 2, ty);
         w.set_entry_param_of(u, &e, 3, g2 as i32);
     }
-    // TODO(spec: bodies-2.md §7.2 step 8): the rewind is read as made
+    // TODO(spec: bodies-2b.md §7.2 step 8): the rewind is read as made
     // whether or not K2 exists.
     w.anim_rewind(u, param(t, skill, 6));
     1
@@ -447,7 +447,7 @@ fn prison_segment<W: BodyWorld>(
     }
     let r = rec(t, skill)?;
     let (pet, petmax) = (i32::from(r.pettype), r.petmax);
-    // TODO(spec: bodies-2.md §7.10): "≥ count → 0" in a function that
+    // TODO(spec: bodies-2b.md §7.10): "≥ count → 0" in a function that
     // returns a unit is read as pt := 0.
     let pt = if pet >= w.pettype_count() { 0 } else { pet };
     if let Some(room) = w.unit_room(u).and_then(|r| w.room_at(r, x, y)) {

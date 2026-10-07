@@ -1,4 +1,5 @@
 // Spec: specs/items/inventory.md
+// Spec: specs/items/inventory-moves.md (§6–§11, split out of `inventory.md`)
 //! State-machine property test of the inventory model
 //! (`d2_sim::items::inventory`, `inventory.md` §1–§5) against a reference
 //! model written from the spec rules, not from the code.

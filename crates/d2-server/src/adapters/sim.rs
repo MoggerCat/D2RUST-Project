@@ -371,7 +371,7 @@ impl<D: EventDispatch + TickHooks, W: WorldHost<D>> Tick for SimGame<D, W> {
     /// receivers' clients in send order (§3.2 rule 1: a player without a
     /// client receives nothing); a queueing failure is recorded in
     /// [`SimGame::tick_faults`]. Then the deferred item messages
-    /// (`handlers::items::moves::update_pass`, `inventory.md` §6.1), then
+    /// (`handlers::items::moves::update_pass`, `inventory-moves.md` §6.1), then
     /// the client vitals sync ([`SimGame::vitals_sync`]).
     fn tick(&mut self, out: &mut dyn MessageSink) {
         tick::tick(&mut self.game, &mut self.events);

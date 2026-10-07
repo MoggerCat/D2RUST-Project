@@ -38,7 +38,7 @@ The tick replay (`cargo test -p conformance`) passes unchanged.
 |---|---|---|
 | `wiring/action/pending.rs` | + `SkillEvent`, `Pending::skill_event` (default nothing) | `stat-lists.md` §10.2, §10.3; `use.md` §7 |
 | `wiring/interaction/skill_events.rs` | `route`: events 5 / 8 / 9 on `UseView` | `use.md` §7, `stat-lists.md` §10.2–§10.3 |
-| `wiring/interaction/quest_npc.rs` | `Desk::quest_message` (0x31 + deferred mercenary reward) | `quests.md` §7.3, §10.2; `npc.md` §7.5 |
+| `wiring/interaction/quest_npc.rs` | `Desk::quest_message` (0x31 + deferred mercenary reward) | `quests.md` §7.3, `quests-act1.md` §10.2; `npc.md` §7.5 |
 | `wiring/worldgen/events.rs` | `WorldHooks` (UnitHooks / LifecycleHooks / StatHost = action hooks + world state), `WorldState::forget`, `WorldSim::remove_unit` | `init.md` §22, `units.md` §3.2, §5 |
 | `wiring/economy/quest_tick.rs` | `UnitSide` (for `UnitSystem`, `ActionSim`, `WorldSim`), `QuestTick` | `tick.md` §3 step 8, `quests.md` §5 |
 

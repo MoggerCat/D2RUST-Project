@@ -123,7 +123,7 @@ offset seen in the 1.14d code named in the last column):
 | +0x80 | game | — | `0x005552B0` |
 | +0xA4 | hover text | event 6 (§6) | `0x00580B70` |
 | +0xAC | combat list | own entries dropped at every mode set | `0x0057C980` |
-| +0xC4 | flags | bit 0x1 changed (set by every mode set), 0x2 tile, 0x10 new, not yet announced to clients (every allocation; cleared with 0x1 by the room clean-up `0x00553220`; `items/inventory.md` §6.3; D2MOO `INITSEEDSET`), 0x40 cleared by attack-mode starts, 0x100 hover freed, 0x2000 queued (`unit-order.md` §6), 0x10000 dead, 0x80000 monster mode changing | `0x00555230`, `0x00624690`, `0x0057FED8`, `0x005541B8`, `0x005A7C20` |
+| +0xC4 | flags | bit 0x1 changed (set by every mode set), 0x2 tile, 0x10 new, not yet announced to clients (every allocation; cleared with 0x1 by the room clean-up `0x00553220`; `items/inventory-moves.md` §6.3; D2MOO `INITSEEDSET`), 0x40 cleared by attack-mode starts, 0x100 hover freed, 0x2000 queued (`unit-order.md` §6), 0x10000 dead, 0x80000 monster mode changing | `0x00555230`, `0x00624690`, `0x0057FED8`, `0x005541B8`, `0x005A7C20` |
 | +0xC8 | flags 2 | 0x2000000 expansion (game +0x70 ≠ 0), 0x4000000 server unit (every allocation) | `0x005552B6` |
 | +0xD0 | node index | 11 at allocation | `0x00555339` |
 | +0xDC | timer list head | `unit-order.md` §8 | `0x00553980` |

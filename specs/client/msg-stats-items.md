@@ -12,7 +12,7 @@
 - **Related specs:** `client/model.md` (model §1, unit table §2, local
   player §3, bit reader §10); `sim/stat-lists.md` §5 (set and add on a
   unit); `sim/stats.md` (stat ids, total and base getters);
-  `items/inventory.md` §6, §11 (the server side of 0x9C / 0x9D / 0x3F /
+  `items/inventory-moves.md` §6, §11 (the server side of 0x9C / 0x9D / 0x3F /
   0x42 / 0x47 / 0x48; open question 1: the item bit stream);
   `items/item-actions.tsv` (action labels).
 
@@ -96,7 +96,7 @@ of the cursor item (0x42), item flag 4 (0x3F).
 
 ### 2. Item actions: 0x9C ItemActionWorld (`0x0045EB10`), 0x9D ItemActionOwned (`0x0045EC70`)
 
-1. Layouts (`items/inventory.md` §11): 0x9C action u8@1, size u8@2,
+1. Layouts (`items/inventory-moves.md` §11): 0x9C action u8@1, size u8@2,
    category u8@3, item GUID u32@4, stream @8 (size − 8 bytes); 0x9D the
    same plus owner type u8@8, owner GUID u32@9, stream @13 (size − 13
    bytes).
@@ -108,7 +108,7 @@ of the cursor item (0x42), item flag 4 (0x3F).
    |---|---|---|---|
    | 0x00 | `0x004C25B0` | fatal | (new on ground) |
    | 0x01 | `0x004C2650` | fatal | GroundToCursor |
-   | 0x02 | `0x004C26F0` | fatal | dropped (`inventory.md` §6.3) |
+   | 0x02 | `0x004C26F0` | fatal | dropped (`inventory-moves.md` §6.3) |
    | 0x03 | `0x004C2810` | fatal | on ground (§6.3) |
    | 0x04 | `0x004C2AD0` | fatal | PutInContainer |
    | 0x05 | fatal | `0x004C2C80` | RemoveFromContainer |
@@ -124,7 +124,7 @@ of the cursor item (0x42), item flag 4 (0x3F).
    | 0x10 | `0x004C45C0` | fatal | SwapInBelt |
    | 0x11 | fatal | `0x004C4740` | AutoUnequip |
    | 0x12 | `0x004C20B0` | fatal | ToCursor |
-   | 0x13 | fatal | `0x004C4990` | (socket filler, `inventory.md` §11) |
+   | 0x13 | fatal | `0x004C4990` | (socket filler, `inventory-moves.md` §11) |
    | 0x14 | fatal | `0x004C4AA0` | Unknown0x14 |
    | 0x15 | fatal | `0x004C4C70` | UpdateStats |
    | 0x16 | fatal | `0x004C2340` | Unknown0x16 |

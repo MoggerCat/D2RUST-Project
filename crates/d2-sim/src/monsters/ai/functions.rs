@@ -1,4 +1,5 @@
-// Spec: specs/monsters/ai.md §9 (per-AI behaviours), §10 (catalogue); specs/monsters/ai-bodies-2.md..ai-bodies-5.md (Act II–V bodies)
+// Spec: specs/monsters/ai-bodies.md §9 (per-AI behaviours), §10 (catalogue); specs/monsters/ai-bodies-2.md..ai-bodies-5.md (Act II–V bodies)
+// Spec: specs/monsters/ai.md (the sections other than §9)
 //! The AI functions, dispatched by their 1.14d address (the control
 //! stores the address, as the original stores the pointer). Functions
 //! with status `spec'd-here` in `ai-functions.tsv` are implemented here,
@@ -117,7 +118,7 @@ pub const IMPLEMENTED: [(u32, u8); 93] = [
     (0x005F_1DE0, 142), // ClawViperEx
 ];
 
-/// Init functions implemented here (`ai.md` §9.17, §9.18;
+/// Init functions implemented here (`ai-bodies.md` §9.17, §9.18;
 /// `ai-bodies-2.md` §16 terror; `ai-bodies-5.md` §3, §20, §23).
 pub const INIT_IMPLEMENTED: [u32; 6] = [
     0x005F_6630,

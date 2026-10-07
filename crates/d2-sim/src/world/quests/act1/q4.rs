@@ -1,5 +1,6 @@
-// Spec: specs/world/quests.md §10.6 (A1Q4 The Search for Cain, chain 4), §9.4, §4.6
+// Spec: specs/world/quests-act1.md §10.6 (A1Q4 The Search for Cain, chain 4), §9.4, §4.6
 // Spec: specs/world/quests-act1-rest.md §1–§3, §6, §7, §8 items 1–3, 5
+// Spec: specs/world/quests.md (the sections other than §10)
 //! A1Q4 callback by callback: events 0, 2, 3, 4, 6, 8 (the Cow King), 9,
 //! 10, 11, 13, 14, the active function, the tree reset, the Cain cleanup
 //! and its timer, the town Cain spawn, the act-change hook, the class-61

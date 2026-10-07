@@ -6,7 +6,7 @@ Cloud test session, 2026-10-06. Task class: property tests from specs plus
 root-cause fixes, medium effort (METHODS M14). Base:
 `claude/tender-meitner-mphas3` at `edd9925`. Repo only, synthetic data, no
 game files (M09: every claim holds on this branch, debug build, overflow
-checks on). Inputs read: `specs/items/inventory.md` §1–§7, `docs/`,
+checks on). Inputs read: `specs/items/inventory.md` §1–§5, `specs/items/inventory-moves.md` §6–§7, `docs/`,
 `crates/d2-sim/src/items/{inventory,moves}`. Parallel sessions
 `wire-inventory-sim` (`wiring/inventory/`) and `mutants-inventory`
 (`mutant_tests.rs` files) were left alone: this session's work is two new

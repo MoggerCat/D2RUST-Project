@@ -1,4 +1,4 @@
-// Spec: specs/world/vendors.md §7, §8; specs/items/inventory.md §1.2, §1.4, §2.4, §5.1, §6.4; specs/world/cube.md §1, §2, §8
+// Spec: specs/world/vendors.md §7, §8; specs/items/inventory.md §1.2, §1.4, §2.4, §5.1; specs/items/inventory-moves.md §6.4; specs/world/cube.md §1, §2, §8
 //! Mutation-testing additions (METHODS M08) for the unified item host
 //! (`docs/handoff/unify-items.md`): the vendor world on the inventory
 //! model ([`InvVendors`]), the cube's world ([`ServerCube`]) on the same

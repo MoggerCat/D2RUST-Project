@@ -111,7 +111,7 @@ providers do.
 7. Part 2 OQ8: row 40 of `quests.tsv` is `?` and its 15 message rows are not in `quest-messages.tsv`. `act5::intro::init` writes what init `0x0058EA50` stores, and `intro::TABLE` holds the spec's §9 rows. Spec task: fill the TSVs (and the 779-row count in `tables_parse_and_check`), then drop the constant.
 8. Readings marked in code:
    - Plain "status n" is a byte write.
-   - "status n (silent)" leaves flags alone (`late::status_silent`, from `quests.md` §10.1 status(S)).
+   - "status n (silent)" leaves flags alone (`late::status_silent`, from `quests-act1.md` §10.1 status(S)).
    - §4.7 keeps flags 0x20 through "status 2 to all".
    - Freed > 15 → 36.5.
    - §7.6's post-kill steps sit inside not-intro.

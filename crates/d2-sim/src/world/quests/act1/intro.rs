@@ -1,4 +1,5 @@
-// Spec: specs/world/quests.md §10.3 (Act I intro, chain 37), §6.7
+// Spec: specs/world/quests-act1.md §10.3 (Act I intro, chain 37), §6.7
+// Spec: specs/world/quests.md (the sections other than §10)
 //! The Act I intro record: per-NPC first-talk text kept in the player's
 //! NPC intro record (events 0 and 11, the active function).
 

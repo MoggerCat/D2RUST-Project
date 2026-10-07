@@ -1,4 +1,5 @@
 // Spec: specs/monsters/ai.md (Related specs; the seams to other systems)
+// Spec: specs/monsters/ai-bodies.md (§9, split out of `ai.md`)
 //! What AI code needs from systems owned by other specs. Each trait names
 //! its expected provider; tests use small fakes. The decisions (draws,
 //! tests, delays) stay in the AI modules.

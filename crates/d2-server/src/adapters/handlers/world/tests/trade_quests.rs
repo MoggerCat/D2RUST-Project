@@ -1,4 +1,4 @@
-// Spec: specs/world/quests.md §1.5, §1.7, §6.2, §7.2, §7.3, §10.2; specs/world/npc.md §7.5
+// Spec: specs/world/quests.md §1.5, §1.7, §6.2, §7.2, §7.3; specs/world/quests-act1.md §10.2; specs/world/npc.md §7.5
 //! C→S 0x31, 0x40 and 0x58 on the wired host: `SimGame<ActionSim,
 //! WiredWorld>` (`WiredWorld::quests`: the real `QuestControl` on
 //! `wiring::economy::EconomyQuests` over the action sim's own units, on
@@ -764,7 +764,7 @@ fn akara_message_64_starts_den_of_evil_then_chat_end() {
     assert_eq!(f.record(), want);
     assert_eq!(f.world().quests.record(1).unwrap().state, 2);
     // The refresh at state 2 (records newest first): the Act I intro's
-    // first-talk line for a sorceress (`quests.md` §10.3: state 1, 12),
+    // first-talk line for a sorceress (`quests-act1.md` §10.3: state 1, 12),
     // then A1Q1's message state 1 line (§10.4 r4: state 2 → 1, 65).
     let log = vec![format!("text list {} [(12, 0), (65, 2)]", f.akara.0)];
     assert_eq!(f.take_log(), log);
@@ -785,7 +785,7 @@ fn akara_message_64_starts_den_of_evil_then_chat_end() {
 /// the module's tests).
 #[test]
 fn kashya_message_92_grants_the_mercenary_on_the_npc_control() {
-    // Blood Raven's kill gave 2.13 and 2.1 (`quests.md` §10.5).
+    // Blood Raven's kill gave 2.13 and 2.1 (`quests-act1.md` §10.5).
     let mut f = Fx::new(|q| {
         q.flags[0].set(2, 13);
         q.flags[0].set(2, REWARD_PENDING);
@@ -796,7 +796,7 @@ fn kashya_message_92_grants_the_mercenary_on_the_npc_control() {
     let (code, got) = send(&mut f.h, &quest_message(g, 92));
     assert_eq!(code, ResultCode::Done);
     // 0x28, S→C 0x50 (15 bytes): u16 2, the slot's name, zeros (§7.5),
-    // then the text refresh (`quests.md` §10.5 r7, `quests-act1-rest.md`
+    // then the text refresh (`quests-act1.md` §10.5 r7, `quests-act1-rest.md`
     // §8 item 8).
     let mut m50 = vec![0x50, 2, 0];
     m50.extend_from_slice(&name.to_le_bytes());
@@ -820,7 +820,7 @@ fn kashya_message_92_grants_the_mercenary_on_the_npc_control() {
     // The reward ran on the NPC control (the spawn seam, modes 4, 6, 12)
     // after the quest call, never on `QuestRest::mercenary_reward`, and
     // before the refresh; the refreshed Kashya lines: the Act I intro's
-    // (`quests.md` §10.3, 24) and A1Q2's message state 4 (92,
+    // (`quests-act1.md` §10.3, 24) and A1Q2's message state 4 (92,
     // `quest-messages.tsv`).
     let mut log: Vec<String> = ["spawn merc 271 4", "spawn merc 271 6", "spawn merc 271 12"]
         .map(String::from)

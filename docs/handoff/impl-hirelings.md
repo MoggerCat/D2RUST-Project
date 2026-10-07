@@ -5,7 +5,7 @@ a clear spec, medium (METHODS M14); three parallel agents on independent
 files (level / XP, pets + life, item swap), the coordinator on rows, the
 seam and the wiring. Base: `claude/specs-staging` at `5844674`. Repo only,
 no game files (M09). Inputs: `specs/world/hirelings.md`, `specs/sim/pets.md`
-§5–§8, `specs/world/npc.md` §7, `specs/items/inventory.md` §7.23,
+§5–§8, `specs/world/npc.md` §7, `specs/items/inventory-moves.md` §7.23,
 `specs/combat/vitals.md` §4, `specs/sim/server-messages.tsv`.
 
 ## 1. Result (unverified, M02)

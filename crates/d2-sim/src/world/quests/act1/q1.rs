@@ -1,4 +1,5 @@
-// Spec: specs/world/quests.md §10.4 (A1Q1 Den of Evil, chain 1)
+// Spec: specs/world/quests-act1.md §10.4 (A1Q1 Den of Evil, chain 1)
+// Spec: specs/world/quests.md (the sections other than §10)
 //! A1Q1 callback by callback: events 0, 2, 3, 8, 10, 11, 13, the timer
 //! `0x00590230`, the active function and the iterate functions I2–I5
 //! (I1 is the shared status iterate). Slot 1 is a constant in each.

@@ -9,7 +9,7 @@
 - **Target version:** 1.14d
 - **Crate/module:** `d2-sim::items::bitstream` (writer); a reader for
   the client and the conformance harness
-- **Related specs:** `items/inventory.md` §11 (the 0x9C / 0x9D message
+- **Related specs:** `items/inventory-moves.md` §11 (the 0x9C / 0x9D message
   header, the flag argument, the filler messages: owner), §6.2
   (dispatcher); `items/generation.md` §1.1–§1.4 (quality ids, item
   format, type tests, item flags); `items/affixes.md` §1 (affix ids);

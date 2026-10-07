@@ -1,4 +1,5 @@
 // Spec: specs/world/vendors.md §7, §8; specs/items/inventory.md §1.4, §1.2, §2.4
+// Spec: specs/items/inventory-moves.md (§6–§11, split out of `inventory.md`)
 //! The vendor world of the wired host on the game's one inventory model:
 //! [`InvVendors`] wraps the interaction wiring's vendor world
 //! ([`VendorDesk`] over the economy) and answers the player-inventory calls of

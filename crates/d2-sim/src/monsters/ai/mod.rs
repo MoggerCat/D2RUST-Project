@@ -1,8 +1,8 @@
-// Spec: specs/monsters/ai.md
+// Spec: specs/monsters/ai.md; specs/monsters/ai-bodies.md (§9)
 //! Monster AI think: scheduling (§1), dispatch and prechecks (§2), the AI
 //! control record and tables (§3), AI parameters (§4), target selection
 //! (§5), distances (§6), tactics helpers (§7), commands (§8) and the
-//! per-AI functions (§9) of the catalogue `ai-functions.tsv` (§10).
+//! per-AI functions (`ai-bodies.md` §9) of the catalogue `ai-functions.tsv` (§10).
 //!
 //! Mode changes, movement, collision, target-node lists, skills and
 //! damage are other specs'; they are reached through [`seams`]. AI timer

@@ -1,6 +1,7 @@
 // Spec: specs/monsters/ai.md, specs/monsters/init.md, specs/monsters/population.md
 // (rules the mutation run of `cargo mutants --file
 // 'crates/d2-sim/src/monsters/**'` found unchecked)
+// Spec: specs/monsters/ai-bodies.md (§9, split out of `ai.md`)
 //! Tests that kill mutants which survived the existing monster tests
 //! (METHODS M08), on public APIs only. Tests that need a submodule's
 //! private fakes live in `mutant_tests/{ai,init,population}.rs`, mounted

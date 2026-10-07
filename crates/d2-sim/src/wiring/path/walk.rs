@@ -205,7 +205,7 @@ pub fn build_path<X: Pending>(v: &mut View<'_, X>, game: &mut Game, unit: UnitId
 /// with a dynamic path, and clients without a player, get nothing.
 ///
 /// TODO(spec: tick.md §3 step 6, `0x00553220`): the room clean-up is
-/// not wired. `items/inventory.md` §6.3 names unit flags 0x1 and 0x10
+/// not wired. `items/inventory-moves.md` §6.3 names unit flags 0x1 and 0x10
 /// (and, for items, 0x1000 and item flags 0x20 / 0x2000); whether it
 /// clears flags 2 bits 0x10000 / 0x800 is still not written, so they are
 /// sent again whenever the unit is queued later

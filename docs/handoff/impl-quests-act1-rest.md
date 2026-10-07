@@ -31,7 +31,7 @@ this code; every rule is from the 1.14d disassembly read in the spec).
 | §8 items 1–9 | item 2 tree order (already literal), 3 marker object anchor + 21 points + fatal without a room, 4 comment (not reachable), 5 event 0 without a player fatal (A1Q3 `0x005916B3`, A1Q4 `0x005925BB`), 6 A1Q6 event 3 keeps states 3–5, 7 O7 comment, 8 / 9 see below |
 | §8 item 8 Kashya's order | `wiring::economy::QuestDeferred`: after a queued mercenary reward, the quest call's later sends queue behind it; `Desk::quest_message` and `WiredWorld::quests` run the queue in order (0x28, 0x50 + hireling, 0x27, 0x29) |
 | §8 item 9 "every player" order | `wiring::economy::quest_players`: the player list's buckets 0–127, state 7 skipped (`EconomyQuests::players`; `QuestRest::players` is no longer called) |
-| `quests.md` §10.6 stone operate | the fifth stone creates missile 288 (owner the player, skill 0, level 1) through `create_missile`, then `refresh_room` (was `create_object`) |
+| `quests-act1.md` §10.6 stone operate | the fifth stone creates missile 288 (owner the player, skill 0, level 1) through `create_missile`, then `refresh_room` (was `create_object`) |
 
 ## Seams added
 
@@ -101,7 +101,7 @@ table_check_mutants` 2, `skills::use_::tests` 4); clippy `-D warnings`
    with the function's address; 1.14d reads the static path without a
    test (invariant, never null on a 1.14d path).
 3. §1 L4 (`0x00593130`): the party step is read as inside the
-   "neither 4.0 nor 4.1 and in Tristram" test (`quests.md` §10.6 table).
+   "neither 4.0 nor 4.1 and in Tristram" test (`quests-act1.md` §10.6 table).
 4. §5: a player without a client (`client_save_flags` = none) gets no
    progression; 1.14d always has one.
 5. +0x38 (the scroll's GUID, §8 item 1) is not kept: no reader, and the

@@ -5,7 +5,7 @@
 Cloud implementation session, 2026-10-06, task class: implementation from
 a clear spec, medium (METHODS M14). Branch `claude/impl-moves` from
 `claude/tender-meitner-mphas3` at `9b49081`. Spec:
-`specs/items/inventory.md` §6–§11 (+ `items/item-actions.tsv`). Repo only;
+`specs/items/inventory-moves.md` §6–§11 (+ `items/item-actions.tsv`). Repo only;
 every claim below holds on this branch.
 
 ## 1. State

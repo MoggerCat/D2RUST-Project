@@ -1,4 +1,5 @@
-// Spec: specs/client/bridge.md §3; specs/sim/pathing.md §1.1, §9, §10; specs/sim/path-placement.md §2.4, §2.5, §10, §11; specs/sim/intents-events.md §2.4; specs/skills/use.md §1, §5.4; specs/missiles/missiles.md §R2.3, §R4; specs/combat/damage.md §5.2, §7.2; specs/combat/vitals.md §3, §4.2; specs/items/treasure.md §3; specs/items/inventory.md §10.1; specs/items/inventory.md §7.1, §7.3, §8.2; specs/world/npc.md §2; specs/world/vendors.md §3, §4, §7.1, §7.2, §9; specs/world/waypoints.md §6, §7, §8 (end to end)
+// Spec: specs/client/bridge.md §3; specs/sim/pathing.md §1.1, §9, §10; specs/sim/path-placement.md §2.4, §2.5, §10, §11; specs/sim/intents-events.md §2.4; specs/skills/use.md §1, §5.4; specs/missiles/missiles.md §R2.3, §R4; specs/combat/damage.md §5.2, §7.2; specs/combat/vitals.md §3, §4.2; specs/items/treasure.md §3; specs/items/inventory-moves.md §10.1; specs/items/inventory-moves.md §7.1, §7.3, §8.2; specs/world/npc.md §2; specs/world/vendors.md §3, §4, §7.1, §7.2, §9; specs/world/waypoints.md §6, §7, §8 (end to end)
+// Spec: specs/items/inventory.md (the sections other than §6–§11)
 //! The full single-player loop, end to end, on the wired host with the
 //! path provider on: the bridge (`d2_client::bridge`) on its local link
 //! over the in-process `d2-server` host, whose game is `SimGame` on
@@ -1936,13 +1937,13 @@ fn run_with(game_seed: u32) -> Transcript {
     // No S→C so far but the join's 0x07s (frame 2): the unit-add /
     // ground messages of the missile, the death and the drop belong to
     // the per-unit update `0x0053A500`, which the tick wiring does not run
-    // yet (`inventory.md` §6.3; IS2).
+    // yet (`inventory-moves.md` §6.3; IS2).
     for f in &frames[1..] {
         assert_eq!(f.2, none, "no S→C up to here");
     }
     assert!(fx.errors().is_empty(), "{:?}", fx.errors());
 
-    // 5b. Pick-up of the kill's gold (C→S 0x16 cursor 0, `inventory.md`
+    // 5b. Pick-up of the kill's gold (C→S 0x16 cursor 0, `inventory-moves.md`
     // §7.1 → §8.1 → §10.1): the staged distance 3 (< 5, `InvRest::
     // distance`); gold → §10.1: limit = level 2 × 10000, take = p: stat
     // 14 += take; the pile leaves its room and is freed. Result 0. No
@@ -2030,12 +2031,12 @@ fn run_with(game_seed: u32) -> Transcript {
     assert!(fx.stat(player, STAT_STAMINA) < stamina);
     walks.push(w);
 
-    // 8. Pick-up to the cursor (C→S 0x16 cursor 1, `inventory.md` §7.1
+    // 8. Pick-up to the cursor (C→S 0x16 cursor 1, `inventory-moves.md` §7.1
     // → §8.2) → 0x9C action 1 in the tick's update pass, then 0x47,
     // 0x48 (§6, §11; the item bit stream is OQ1's: empty). The distance
     // test reads the item-move seam `InvRest::distance` (`0x00641530`),
     // a staged 3: it is not routed to the path positions yet.
-    // TODO(spec/wiring: inventory.md §8.1 rule 4): answer the item
+    // TODO(spec/wiring: inventory-moves.md §8.1 rule 4): answer the item
     // distance from the path provider (the walk above put the player on
     // the cap's sub-tile).
     let pg = fx.guid(player);

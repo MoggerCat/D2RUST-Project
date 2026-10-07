@@ -1,4 +1,5 @@
-// Spec: specs/items/inventory.md
+// Spec: specs/items/inventory-moves.md
+// Spec: specs/items/inventory.md (the sections other than §6–§11)
 //! The item-move intents (§7): C→S 0x16–0x29, 0x50, 0x61 (expansion only)
 //! and 0x63, each in the spec's validation order with its result codes.
 //! 0x4C is `world/cube.md` §10's. Layouts: `sim/client-messages.tsv`.
@@ -548,7 +549,7 @@ pub fn swap_cursor_with_body<W: MoveWorld>(
     // E leaves the body (as §7.6, without its own belt step).
     let eloc = w.body_loc(e);
     w.body_leave_effects(p, e);
-    // TODO(spec: inventory.md §7.8): an unlink failure of E is not
+    // TODO(spec: inventory-moves.md §7.8): an unlink failure of E is not
     // written (MV4 does not list it); ignored.
     w.unlink(p, e);
     w.clear_body_slot(p, eloc);
@@ -1128,7 +1129,7 @@ pub fn use_belt_item<W: MoveWorld>(w: &mut W, p: Owner, item: Guid, on_merc: u32
         {
             return res::OK;
         }
-        // TODO(spec: inventory.md §7.17): no hireling is not written; read
+        // TODO(spec: inventory-moves.md §7.17): no hireling is not written; read
         // as "nothing".
         let Some(merc) = w.hireling(p) else {
             return res::OK;
@@ -1460,7 +1461,7 @@ pub fn merc_take<W: MoveWorld>(
     w.clear_body_slot(merc, loc);
     w.stat_refresh_unlink(merc, 0);
     mark(w, merc, it, cmd::UNEQUIP);
-    // TODO(spec: inventory.md §7.23): a failed copy is not written; read as
+    // TODO(spec: inventory-moves.md §7.23): a failed copy is not written; read as
     // "no cursor item".
     if let Some(copy) = w.copy_item(it) {
         w.give_cursor_item(p, copy);

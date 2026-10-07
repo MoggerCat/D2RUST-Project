@@ -1,4 +1,4 @@
-// Spec: specs/world/quests.md §8.1, §9.4, §10.1, §10.3–§10.8 (Test vectors)
+// Spec: specs/world/quests.md §8.1, §9.4 (Test vectors); specs/world/quests-act1.md §10.1, §10.3–§10.8
 //! The Act I quests callback by callback, the sequence walk, the intro
 //! record and the act transitions, from the spec's test vectors and
 //! rules, on the quests' fake world.
@@ -71,7 +71,7 @@ fn kill(ctl: &mut QuestControl, f: &mut Fake, chain: u8, victim: UnitId, killer:
 
 // ------------------------------------------------------------ §10.1
 
-// Covers: specs/world/quests.md §10.1 r1, §10.1 r2, §10.1 r3
+// Covers: specs/world/quests-act1.md §10.1 r1, §10.1 r2, §10.1 r3
 #[test]
 fn sequence_walk() {
     // Vector: from chain 1 (state 5), chain 2 state 5, chain 4 state 0
@@ -123,7 +123,7 @@ fn sequence_walk() {
 
 // ------------------------------------------------------------ §10.4
 
-// Covers: specs/world/quests.md §10.4 r1, §10.4 r2, §10.4 r3, §10.4 r4
+// Covers: specs/world/quests-act1.md §10.4 r1, §10.4 r2, §10.4 r3, §10.4 r4
 #[test]
 fn den_npc_text() {
     let (mut ctl, _) = control();
@@ -156,7 +156,7 @@ fn den_npc_text() {
     assert!(text(&mut ctl, &mut f, 1, AKARA_U).is_empty());
 }
 
-// Covers: specs/world/quests.md §10.4 l2 r1, §10.4 l2 r2, §10.4 l2 r3
+// Covers: specs/world/quests-act1.md §10.4 l2 r1, §10.4 l2 r2, §10.4 l2 r3
 #[test]
 fn den_level_changes() {
     // Vector: a = 1, b = 2, state 2, status 0, one player with slot 1 =
@@ -202,7 +202,7 @@ fn den_level_changes() {
     assert_eq!(ctl.record(1).unwrap().state, 1);
 }
 
-// Covers: specs/world/quests.md §10.4 l3 r1, §10.4 l3 r2, §10.4 l3 r3, §10.4 l3 r4, §10.4 l3 r6, §10.4 l3 r7
+// Covers: specs/world/quests-act1.md §10.4 l3 r1, §10.4 l3 r2, §10.4 l3 r3, §10.4 l3 r4, §10.4 l3 r6, §10.4 l3 r7
 #[test]
 fn den_kills_before_the_clear() {
     // Vector: P = 10, V = 10, spawned 40, killed 37, state 3 → left 3;
@@ -236,7 +236,7 @@ fn den_kills_before_the_clear() {
     assert!(ctl.record(1).unwrap().extra.guids.0.is_empty());
 }
 
-// Covers: specs/world/quests.md §10.4 l3 r5, §5 text
+// Covers: specs/world/quests.md §5 text; specs/world/quests-act1.md §10.4 l3 r5
 #[test]
 fn den_clear_iterates_and_timer() {
     // Vector: P = V = 10, spawned = killed = 40 → state 4; game 1.13;
@@ -294,7 +294,7 @@ fn den_clear_iterates_and_timer() {
     assert!(ctl.timers.is_empty() && !ctl.record(1).unwrap().extra.timer);
 }
 
-// Covers: specs/world/quests.md §10.4 l4 r1, §10.4 l4 r2, §10.4 l4 r3, §10.4 text
+// Covers: specs/world/quests-act1.md §10.4 l4 r1, §10.4 l4 r2, §10.4 l4 r3, §10.4 text
 #[test]
 fn den_akara_messages() {
     // Vector: msg 76 with R slot 1 = 0x2002, state 4, chain 2 state 0
@@ -357,7 +357,7 @@ fn den_akara_messages() {
     assert!(!ctl.record(1).unwrap().extra.guids.contains(1));
 }
 
-// Covers: specs/world/quests.md §10.4 text, §6.4
+// Covers: specs/world/quests.md §6.4; specs/world/quests-act1.md §10.4 text
 #[test]
 fn den_active_fn() {
     let (ctl, _) = control();
@@ -377,7 +377,7 @@ fn den_active_fn() {
 
 // ------------------------------------------------------------ §10.5 A1Q2
 
-// Covers: specs/world/quests.md §10.5 r1, §10.5 r9
+// Covers: specs/world/quests-act1.md §10.5 r1, §10.5 r9
 #[test]
 fn burial_npc_text_and_active() {
     let (mut ctl, _) = control();
@@ -411,7 +411,7 @@ fn burial_npc_text_and_active() {
     assert!(!act1::active_fn(&ctl, &mut f, i, P1, npc::KASHYA, f0));
 }
 
-// Covers: specs/world/quests.md §10.5 r2, §10.5 r3, §10.5 r6, §10.5 r8
+// Covers: specs/world/quests-act1.md §10.5 r2, §10.5 r3, §10.5 r6, §10.5 r8
 #[test]
 fn burial_start_and_area() {
     let (mut ctl, _) = control();
@@ -460,7 +460,7 @@ fn burial_start_and_area() {
     assert!(!ctl.record(2).unwrap().guids.contains(1));
 }
 
-// Covers: specs/world/quests.md §10.5 r4, §10.5 r5
+// Covers: specs/world/quests-act1.md §10.5 r4, §10.5 r5
 #[test]
 fn burial_kill_and_timer() {
     let (mut ctl, _) = control();
@@ -521,7 +521,7 @@ fn burial_kill_and_timer() {
     assert_eq!(ctl.record(2).unwrap().state, 0);
 }
 
-// Covers: specs/world/quests.md §10.5 r7, §10.2
+// Covers: specs/world/quests-act1.md §10.5 r7, §10.2
 #[test]
 fn burial_reward() {
     let (mut ctl, _) = control();
@@ -564,7 +564,7 @@ fn malus_fake() -> (QuestControl, Fake, UnitId) {
 
 use act1::q3;
 
-// Covers: specs/world/quests.md §10.5 l2 r1, §10.5 l2 r2
+// Covers: specs/world/quests-act1.md §10.5 l2 r1, §10.5 l2 r2
 #[test]
 fn malus_object_init_and_operate() {
     let (mut ctl, mut f, malus) = malus_fake();
@@ -599,7 +599,7 @@ fn malus_object_init_and_operate() {
     assert_eq!(f.flags(P1).word(3), 0);
 }
 
-// Covers: specs/world/quests.md §10.5 l2 r3, §10.5 l2 r14
+// Covers: specs/world/quests-act1.md §10.5 l2 r3, §10.5 l2 r14
 #[test]
 fn malus_npc_text_and_active() {
     let (mut ctl, mut f, _) = malus_fake();
@@ -636,7 +636,7 @@ fn malus_npc_text_and_active() {
     assert!(!act1::active_fn(&ctl, &mut f, i, P1, npc::CHARSI, f0));
 }
 
-// Covers: specs/world/quests.md §10.5 l2 r4, §10.5 l2 r5, §10.5 l2 r6, §10.5 l2 r9
+// Covers: specs/world/quests-act1.md §10.5 l2 r4, §10.5 l2 r5, §10.5 l2 r6, §10.5 l2 r9
 #[test]
 fn malus_start_chat_end_and_pick_up() {
     let (mut ctl, mut f, _) = malus_fake();
@@ -687,7 +687,7 @@ fn malus_start_chat_end_and_pick_up() {
     assert!(!ctl.record(3).unwrap().extra.rewarded);
 }
 
-// Covers: specs/world/quests.md §10.5 l2 r10, §10.5 l2 r17
+// Covers: specs/world/quests-act1.md §10.5 l2 r10, §10.5 l2 r17
 #[test]
 fn malus_brought_to_charsi() {
     let (mut ctl, mut f, malus) = malus_fake();
@@ -735,7 +735,7 @@ fn malus_brought_to_charsi() {
     assert_eq!(ctl.timers.last().unwrap().func, TimerFn::SlaughterOpen);
 }
 
-// Covers: specs/world/quests.md §10.5 l2 r7, §10.5 l2 r8, §10.5 l2 r11, §10.5 l2 r12, §10.5 l2 r15
+// Covers: specs/world/quests-act1.md §10.5 l2 r7, §10.5 l2 r8, §10.5 l2 r11, §10.5 l2 r12, §10.5 l2 r15
 #[test]
 fn malus_counts_and_reset() {
     // Event 13 with the Malus: counted, +0xA1; bit 2 → state 2 first.
@@ -805,7 +805,7 @@ fn malus_counts_and_reset() {
     assert!(!ctl.record(3).unwrap().extra.malus_known);
 }
 
-// Covers: specs/world/quests.md §10.5 l2 r13
+// Covers: specs/world/quests-act1.md §10.5 l2 r13
 #[test]
 fn malus_status_fn() {
     let (mut ctl, mut f, _) = malus_fake();
@@ -844,7 +844,7 @@ fn malus_status_fn() {
     assert_eq!(f.sent.last().unwrap().1[1 + 3], 1);
 }
 
-// Covers: specs/world/quests.md §10.5 l2 r16
+// Covers: specs/world/quests-act1.md §10.5 l2 r16
 #[test]
 fn malus_imbue_granted() {
     let (mut ctl, mut f, _) = malus_fake();
@@ -891,7 +891,7 @@ fn call(ctl: &mut QuestControl, f: &mut Fake, chain: u8, args: EventArgs) {
     act1::callback(ctl, f, i, args, None, false);
 }
 
-// Covers: specs/world/quests.md §10.6 r1
+// Covers: specs/world/quests-act1.md §10.6 r1
 #[test]
 fn cain_npc_text() {
     let (mut ctl, _) = control();
@@ -936,7 +936,7 @@ fn cain_npc_text() {
     assert_eq!(q4(&ctl).scrolls, 0);
 }
 
-// Covers: specs/world/quests.md §10.6 r2, §10.6 r3, §10.6 r9, §10.6 r14, §10.6 r18
+// Covers: specs/world/quests-act1.md §10.6 r2, §10.6 r3, §10.6 r9, §10.6 r14, §10.6 r18
 #[test]
 fn cain_through_akara_and_act2() {
     let (mut ctl, _) = control();
@@ -1020,7 +1020,7 @@ fn cain_through_akara_and_act2() {
     assert!(f.sent.is_empty());
 }
 
-// Covers: specs/world/quests.md §10.6 r14
+// Covers: specs/world/quests-act1.md §10.6 r14
 #[test]
 fn cain_removal_waits_for_an_open_chat() {
     let (mut ctl, _) = control();
@@ -1034,7 +1034,7 @@ fn cain_removal_waits_for_an_open_chat() {
     assert!(!q4(&ctl).cain_removed && q4(&ctl).cain_gone);
 }
 
-// Covers: specs/world/quests.md §10.6 r15
+// Covers: specs/world/quests-act1.md §10.6 r15
 // Covers: specs/world/quests-act1-rest.md §8 r3
 #[test]
 fn town_cain_spawn() {
@@ -1082,7 +1082,7 @@ fn town_cain_spawn() {
     assert!(!q4(&ctl).town_cain);
 }
 
-// Covers: specs/world/quests.md §10.6 r4, §10.6 r5, §10.6 r7, §10.6 r8, §10.6 r13
+// Covers: specs/world/quests-act1.md §10.6 r4, §10.6 r5, §10.6 r7, §10.6 r8, §10.6 r13
 #[test]
 fn cain_items_and_leaving() {
     let (mut ctl, _) = control();
@@ -1140,7 +1140,7 @@ fn cain_items_and_leaving() {
     assert!(!r.extra.q4.heard.contains(1));
 }
 
-// Covers: specs/world/quests.md §10.6 r6
+// Covers: specs/world/quests-act1.md §10.6 r6
 #[test]
 fn cow_king_needs_the_cow_level_access() {
     // Vector: killed by a classic-game player lacking 26.0 → nothing.
@@ -1169,7 +1169,7 @@ fn cow_king_needs_the_cow_level_access() {
     assert!(f.log.is_empty());
 }
 
-// Covers: specs/world/quests.md §10.6 r10, §10.6 r11, §10.6 r12
+// Covers: specs/world/quests-act1.md §10.6 r10, §10.6 r11, §10.6 r12
 #[test]
 fn cain_start_join_and_active() {
     let state = |bits: &[u8], items: &[[u8; 4]]| {
@@ -1228,7 +1228,7 @@ fn cain_start_join_and_active() {
     assert!(!act1::active_fn(&ctl, &mut f, i, P1, npc::KASHYA, f0));
 }
 
-// Covers: specs/world/quests.md §10.6 text, §10.6 r17, §9.4
+// Covers: specs/world/quests.md §9.4; specs/world/quests-act1.md §10.6 text, §10.6 r17
 #[test]
 fn stone_order_tree_and_stones() {
     // Vector: order [18, 20, 17, 21, 19] → `50 0400 0100 0300 0000 0400
@@ -1313,7 +1313,7 @@ fn q5(ctl: &QuestControl) -> &act1::q5::Extra5 {
     &ctl.record(5).unwrap().extra.q5
 }
 
-// Covers: specs/world/quests.md §10.7 r1, §10.7 r8
+// Covers: specs/world/quests-act1.md §10.7 r1, §10.7 r8
 #[test]
 fn tower_npc_text_and_active() {
     let (mut ctl, _) = control();
@@ -1338,7 +1338,7 @@ fn tower_npc_text_and_active() {
     assert_eq!(text(&mut ctl, &mut f, 5, AKARA_U), [(143, 2)]);
 }
 
-// Covers: specs/world/quests.md §10.7 r2, §10.7 r6, §10.7 r9, §10.7 r11
+// Covers: specs/world/quests-act1.md §10.7 r2, §10.7 r6, §10.7 r9, §10.7 r11
 #[test]
 fn tower_tome_levels_and_report() {
     let (mut ctl, _) = control();
@@ -1388,7 +1388,7 @@ fn tower_tome_levels_and_report() {
     assert!(!ctl.record(5).unwrap().active);
 }
 
-// Covers: specs/world/quests.md §10.7 r3, §10.7 r4, §10.7 r5
+// Covers: specs/world/quests-act1.md §10.7 r3, §10.7 r4, §10.7 r5
 #[test]
 fn countess_kill_and_timer() {
     let (mut ctl, _) = control();
@@ -1438,7 +1438,7 @@ fn countess_kill_and_timer() {
     assert!(q5(&ctl).credited.is_empty());
 }
 
-// Covers: specs/world/quests.md §10.7 r7, §10.7 r10, §9.5
+// Covers: specs/world/quests.md §9.5; specs/world/quests-act1.md §10.7 r7, §10.7 r10
 #[test]
 fn tower_restore_and_objects() {
     for (bits, want) in [
@@ -1493,7 +1493,7 @@ fn q6(ctl: &QuestControl) -> &act1::q6::Extra6 {
     &ctl.record(6).unwrap().extra.q6
 }
 
-// Covers: specs/world/quests.md §10.8 r1, §10.8 r9
+// Covers: specs/world/quests-act1.md §10.8 r1, §10.8 r9
 #[test]
 fn slaughter_npc_text_and_active() {
     let (mut ctl, _) = control();
@@ -1520,7 +1520,7 @@ fn slaughter_npc_text_and_active() {
     assert!(!act1::active_fn(&ctl, &mut f, i, P1, npc::CAIN5, f0));
 }
 
-// Covers: specs/world/quests.md §10.8 r2, §10.8 r3, §10.8 r7, §10.8 r8
+// Covers: specs/world/quests-act1.md §10.8 r2, §10.8 r3, §10.8 r7, §10.8 r8
 #[test]
 fn slaughter_start_catacombs_and_reward() {
     let (mut ctl, _) = control();
@@ -1582,7 +1582,7 @@ fn slaughter_start_catacombs_and_reward() {
     assert_eq!((r.state, r.status), (3, 1));
 }
 
-// Covers: specs/world/quests.md §10.8 r4, §10.8 r5, §10.8 r6, §10.8 text, §5 text
+// Covers: specs/world/quests.md §5 text; specs/world/quests-act1.md §10.8 r4, §10.8 r5, §10.8 r6, §10.8 text
 // Covers: specs/world/quests-act1-rest.md §5 r1, §5 r2, §5 r3
 #[test]
 fn andariel_kill_and_portal_timer() {
@@ -1655,7 +1655,7 @@ fn andariel_kill_and_portal_timer() {
 
 // ------------------------------------------------------------ §10.3, §8.1
 
-// Covers: specs/world/quests.md §10.3
+// Covers: specs/world/quests-act1.md §10.3
 #[test]
 fn act1_intro_first_talk() {
     let (mut ctl, _) = control();

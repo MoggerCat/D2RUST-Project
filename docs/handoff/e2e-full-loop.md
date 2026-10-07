@@ -48,7 +48,7 @@ the store; the walks and every result code are equal.
 
 | Path | What | Spec |
 |---|---|---|
-| `crates/d2-client/tests/e2e_full_loop.rs` | the full loop above on the wired host, path provider on | `pathing.md` §1.1, §9, §10; `path-placement.md` §2.4, §2.5, §10, §11; `use.md` §1; `missiles.md` §R2.3; `inventory.md` §7–§8; `npc.md` §2; `vendors.md` §3–§9; `waypoints.md` §6–§8 |
+| `crates/d2-client/tests/e2e_full_loop.rs` | the full loop above on the wired host, path provider on | `pathing.md` §1.1, §9, §10; `path-placement.md` §2.4, §2.5, §10, §11; `use.md` §1; `missiles.md` §R2.3; `inventory-moves.md` §7–§8; `npc.md` §2; `vendors.md` §3–§9; `waypoints.md` §6–§8 |
 
 ## 3. Fixes and signature changes
 
@@ -87,7 +87,7 @@ walk / run columns (6, 9, drain 20) and stats 67 = 100, 10 = 0x6400, as
   of the drop with paths on, or when F1 is settled.
 - **F4** — `TODO(spec/wiring)` in the test. Distances on the item and
   NPC paths are still staged seams, not the path positions: the pick-up
-  (`InvRest::distance`, `inventory.md` §8.1 rule 4) and the talk range
+  (`InvRest::distance`, `inventory-moves.md` §8.1 rule 4) and the talk range
   (`TradeRest` distance, `npc.md` §2), both `0x00641530` (unit distance,
   written in `pathing.md` §9.5). The walks above put the player on the
   cap and on Akara, but the handlers do not read it. Wiring task: answer

@@ -3,7 +3,7 @@
 use super::{Fake, P};
 use crate::items::moves::{handle, HANDLED};
 
-// Covers: specs/items/inventory.md §7.21
+// Covers: specs/items/inventory-moves.md §7.21
 #[test]
 fn transmogrify_0x4c_is_not_an_item_move() {
     // 0x4C belongs to `world/cube.md` §10: not in the handler table, and

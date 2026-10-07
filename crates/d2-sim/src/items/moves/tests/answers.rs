@@ -34,7 +34,7 @@ fn run(f: &mut Fake, msg: &[u8]) -> Result<u32, MoveFatal> {
 
 // ---------------------------------------------------------------- §6
 
-// Covers: specs/items/inventory.md §6.2
+// Covers: specs/items/inventory-moves.md §6.2
 #[test]
 fn excluded_row_lets_the_walk_go_on() {
     // Row 3 (0x2, owner only) matches by flags; for another client the
@@ -48,7 +48,7 @@ fn excluded_row_lets_the_walk_go_on() {
     assert_eq!(&m[0][..2], &[0x9C, 0x04]);
 }
 
-// Covers: specs/items/inventory.md §6.2
+// Covers: specs/items/inventory-moves.md §6.2
 #[test]
 fn item_flag_rows_18_19_end_the_walk() {
     // Broken (row 18) and changed (row 20), mode 0, another client: the
@@ -64,7 +64,7 @@ fn item_flag_rows_18_19_end_the_walk() {
     assert_eq!(m, vec![layouts::item_state(0, P, 10, 0x200, 0x200)]);
 }
 
-// Covers: specs/items/inventory.md §11
+// Covers: specs/items/inventory-moves.md §11
 #[test]
 fn no_fillers_with_flag_0x20() {
     let mut f = Fake::new();
@@ -84,7 +84,7 @@ fn no_fillers_with_flag_0x20() {
     assert_eq!(f.sent[2][13..], [0xEE, 0xC, 0xFF]);
 }
 
-// Covers: specs/items/inventory.md §6.1 r4
+// Covers: specs/items/inventory-moves.md §6.1 r4
 #[test]
 fn update_list_reset_clears_by_the_tables() {
     let mut f = Fake::new();
@@ -131,7 +131,7 @@ fn update_list_reset_clears_by_the_tables() {
     assert_eq!(f.update_bits(m), 1);
 }
 
-// Covers: specs/items/inventory.md §6.1 r4
+// Covers: specs/items/inventory-moves.md §6.1 r4
 #[test]
 fn room_cleanup_clears_unit_flags_and_bits() {
     let mut f = Fake::new();
@@ -197,7 +197,7 @@ fn belt_change_moves_items_beyond_the_new_boxes() {
 
 // ---------------------------------------------------------------- §7
 
-// Covers: specs/items/inventory.md §7.8
+// Covers: specs/items/inventory-moves.md §7.8
 #[test]
 fn swap_cursor_with_body_failures_and_belt() {
     let setup = || {
@@ -226,7 +226,7 @@ fn swap_cursor_with_body_failures_and_belt() {
     assert!(f.logged("place_in_page 20 0,0 find=true send=true"));
 }
 
-// Covers: specs/items/inventory.md §7.9 r1, §7.9 r2, §7.9 r3, §7.9 r4, §7.9 r5, §7.9 r6, §7.9 r7
+// Covers: specs/items/inventory-moves.md §7.9 r1, §7.9 r2, §7.9 r3, §7.9 r4, §7.9 r5, §7.9 r6, §7.9 r7
 #[test]
 fn swap_1h_with_2h_body() {
     let setup = || {
@@ -280,7 +280,7 @@ fn swap_1h_with_2h_body() {
     assert_eq!(f.inv().cursor, Some(11));
 }
 
-// Covers: specs/items/inventory.md §7.10 r3
+// Covers: specs/items/inventory-moves.md §7.10 r3
 #[test]
 fn swap_cursor_buffer_link_failure() {
     let mut f = Fake::new();
@@ -290,7 +290,7 @@ fn swap_cursor_buffer_link_failure() {
     assert_eq!(run(&mut f, &m32(0x1F, &[10, 11, 2, 3])), Ok(res::REFUSED));
 }
 
-// Covers: specs/items/inventory.md §7.11 r1, §7.11 r2, §7.11 r3
+// Covers: specs/items/inventory-moves.md §7.11 r1, §7.11 r2, §7.11 r3
 #[test]
 fn use_grid_item_body_use() {
     let book = |f: &mut Fake, q: i32| {
@@ -330,7 +330,7 @@ fn use_grid_item_body_use() {
     assert!(!f.logged("use_at 10 100,100"));
 }
 
-// Covers: specs/items/inventory.md §7.11 r4
+// Covers: specs/items/inventory-moves.md §7.11 r4
 #[test]
 fn use_grid_item_quest_items() {
     let quest_item = |code: &[u8; 4]| {
@@ -371,7 +371,7 @@ fn use_grid_item_quest_items() {
     assert!(!f.logged("consume_item 10"));
 }
 
-// Covers: specs/items/inventory.md §7.16
+// Covers: specs/items/inventory-moves.md §7.16
 #[test]
 fn switch_belt_item_link_failure_is_fatal() {
     let mut f = Fake::new();
@@ -388,7 +388,7 @@ fn tome(f: &mut Fake, g: u32, q: i32) {
     f.set_stat(Owner::item(g), 70, q);
 }
 
-// Covers: specs/items/inventory.md §7.18 r1, §7.18 r2, §7.18 r3, §7.18 r4
+// Covers: specs/items/inventory-moves.md §7.18 r1, §7.18 r2, §7.18 r3, §7.18 r4
 #[test]
 fn use_item_action_gates() {
     // T = U → nothing.
@@ -415,7 +415,7 @@ fn use_item_action_gates() {
     assert!(!f.logged("use 11 on 4:10"));
 }
 
-// Covers: specs/items/inventory.md §7.18 r5, §7.18 r6, §7.18 r7, §7.18 r8, §7.18 r9
+// Covers: specs/items/inventory-moves.md §7.18 r5, §7.18 r6, §7.18 r7, §7.18 r8, §7.18 r9
 #[test]
 fn use_item_action_effects() {
     // Not used → result 1 (handler 0), nothing spent.
@@ -452,7 +452,7 @@ fn use_item_action_effects() {
 
 // ---------------------------------------------------------------- §8
 
-// Covers: specs/items/inventory.md §8.1 r4
+// Covers: specs/items/inventory-moves.md §8.1 r4
 #[test]
 fn pickup_scroll_and_book_into_a_tome() {
     // A scroll goes into the first tome of page 0 with its spell and room.
@@ -493,7 +493,7 @@ fn pickup_scroll_and_book_into_a_tome() {
     );
 }
 
-// Covers: specs/items/inventory.md §8.1 r4
+// Covers: specs/items/inventory-moves.md §8.1 r4
 #[test]
 fn pickup_auto_stack_fills_in_order() {
     let mut f = Fake::new();
@@ -525,7 +525,7 @@ fn pickup_auto_stack_fills_in_order() {
     assert_eq!(f.stat(Owner::item(10), 70), 3);
 }
 
-// Covers: specs/items/inventory.md §8.4
+// Covers: specs/items/inventory-moves.md §8.4
 #[test]
 fn held_pairs_corpses_and_the_stop_at_p() {
     let quest_item = |f: &mut Fake, g: u32, m: u8, code: &[u8; 4]| {
@@ -556,7 +556,7 @@ fn held_pairs_corpses_and_the_stop_at_p() {
 
 // ---------------------------------------------------------------- §9
 
-// Covers: specs/items/inventory.md §9.2
+// Covers: specs/items/inventory-moves.md §9.2
 #[test]
 fn expiry_reader_takes_due_items_only() {
     let units = [(10, 0), (11, 500), (12, 1000), (13, 1001)];
