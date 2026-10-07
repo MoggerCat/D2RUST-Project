@@ -60,10 +60,12 @@ fn copy_of_a_held_item() {
     assert_ne!(c, su);
     let cg = w.units.get(c).unwrap().guid;
     assert_eq!(cg, s + 1, "the next item GUID");
-    // The save's 32 bits (unit +0x28) become the copy's item seed
-    // (`rng.md` §5.3).
-    let seed = w.units.get(c).unwrap().item_seed.unwrap().0;
-    assert_eq!(seed, crate::rng::Seed::init_low(init));
+    // The save's 32 bits become the copy's unit +0x28 and unit seed
+    // `init_low`; the item seed is the allocation's (`rng.md` §5.3).
+    let cr = w.units.get(c).unwrap();
+    assert_eq!(cr.init_seed, init);
+    assert_eq!(cr.seed, crate::rng::Seed::init_low(init));
+    assert_ne!(cr.item_seed.unwrap().0, crate::rng::Seed::init_low(init));
     assert_eq!(w.units.get(c).unwrap().mode, w.units.get(su).unwrap().mode);
     assert_eq!(w.game.lists.unit(c).unwrap().room(), None);
     assert_eq!((w.data(cg).x, w.data(cg).y), (w.data(s).x, w.data(s).y));
