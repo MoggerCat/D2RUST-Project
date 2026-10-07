@@ -175,6 +175,21 @@ pub trait Intents {
     /// the flush order (spec §3.2 rule 3).
     fn clients(&self) -> Vec<ClientId>;
 
+    /// The game's part of a drained queue-0 message (spec §2.5, §8: the
+    /// single-player session sequence C→S 0x67 → 0x6B). True when the
+    /// game handled it; false hands it to the host's [`SessionHandler`].
+    /// Default: the game handles none.
+    fn session_message(
+        &mut self,
+        client: ClientId,
+        msg: &[u8],
+        size: usize,
+        out: &mut dyn MessageSink,
+    ) -> bool {
+        let _ = (client, msg, size, out);
+        false
+    }
+
     /// The host's millisecond clock of this frame, read once per frame
     /// before the drain (`Host::frame`): the `GetTickCount` input of the
     /// object code (`world/objects.md` edge case 9; `d2-sim` never reads a

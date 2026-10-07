@@ -196,6 +196,39 @@ fn drain_routes_every_queue() {
     assert_eq!(h.session.seen, [(0, vec![0x6B], 1)]);
 }
 
+// Covers: specs/sim/intents-events.md §2.5, §8
+#[test]
+fn system_messages_reach_the_game_first() {
+    let mut h = host();
+    h.game.session_ids = vec![0x67, 0x6B];
+    let mut create = vec![0x67];
+    create.resize(46, 0);
+    h.send_system(0, &create).unwrap();
+    h.send_system(0, &[0x69]).unwrap();
+    h.send_system(0, &[0x6B]).unwrap();
+    let r = h.frame().unwrap();
+    let ids: Vec<(u8, Handled)> = r.messages.iter().map(|m| (m.id, m.handled)).collect();
+    assert_eq!(
+        ids,
+        [
+            (0x67, Handled::System),
+            (0x69, Handled::System),
+            (0x6B, Handled::System)
+        ]
+    );
+    // The game took 0x67 and 0x6B in drain order; 0x69 went to the
+    // session handler.
+    assert_eq!(
+        h.game.session_seen,
+        [(0, create.clone(), 46), (0, vec![0x6B], 1)]
+    );
+    assert_eq!(h.session.seen, [(0, vec![0x69], 1)]);
+    // What the game queued in the drain leaves with the tick's flush.
+    h.clock.0 += 40;
+    assert!(h.frame().unwrap().ticked);
+    assert_eq!(h.receive(0), [vec![0x02], vec![0x02]]);
+}
+
 // Covers: specs/sim/intents-events.md §2.1 r1, §2.1 r2
 #[test]
 fn duplicate_filter_on_the_host() {

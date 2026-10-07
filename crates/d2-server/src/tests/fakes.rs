@@ -230,6 +230,11 @@ pub struct FakeGame {
     pub tick_out: Vec<(ClientId, Vec<u8>)>,
     /// Messages each handler call queues.
     pub handler_out: Vec<(ClientId, Vec<u8>)>,
+    /// System ids the game's session part takes (`Intents::session_message`),
+    /// each answered with S→C 0x02; the rest go to the `SessionHandler`.
+    pub session_ids: Vec<u8>,
+    /// The system messages the game took.
+    pub session_seen: Vec<(ClientId, Vec<u8>, usize)>,
 }
 
 pub const ALIVE: PlayerGate = PlayerGate {
@@ -298,6 +303,20 @@ impl Intents for FakeGame {
     }
     fn clients(&self) -> Vec<ClientId> {
         self.client_list.clone()
+    }
+    fn session_message(
+        &mut self,
+        client: ClientId,
+        msg: &[u8],
+        size: usize,
+        out: &mut dyn MessageSink,
+    ) -> bool {
+        if !self.session_ids.contains(&msg[0]) {
+            return false;
+        }
+        self.session_seen.push((client, msg.to_vec(), size));
+        out.queue(client, &[0x02]).unwrap();
+        true
     }
 }
 

@@ -276,3 +276,49 @@ fn the_target_is_refreshed_and_tested_against_the_client_rooms() {
     assert_eq!(path(&mut fx, m).target_unit, None);
     fx.assert_clean();
 }
+
+/// §7.3 rule 2 step 1: flag-ex 0x10000 sends S→C 0x15 (type 1, GUID,
+/// the path's cell, flag 1), then the room-change messages (`pathing.md`
+/// §9.8: nothing without path flag 0x2); step 4: unit flag 0x100 with no
+/// hover text sends 0x76 (§7.9 rule 3). Step 1 comes first. The room
+/// clean-up clears both bits (§7.5), so the next pass sends nothing.
+// Covers: specs/sim/intents-events.md §7.3 r2, §7.9 r3, §7.5 r3, §7.5 r7
+#[test]
+fn reassign_and_overhead_steps_of_the_monster_update() {
+    let (mut fx, p, m) = setup();
+    let g = guid(&fx, m).to_le_bytes();
+    {
+        let r = fx.sim.sys.units.get_mut(m).unwrap();
+        r.flags |= flags::HOVER_FREED;
+        r.flags2 |= 0x1_0000;
+    }
+    fx.game.lists.queue_update(m).unwrap();
+    let d = path(&mut fx, m);
+    fx.tick();
+    let mut reassign = vec![0x15, 1, g[0], g[1], g[2], g[3]];
+    reassign.extend((d.x() as u16).to_le_bytes());
+    reassign.extend((d.y() as u16).to_le_bytes());
+    reassign.push(1);
+    let overhead = vec![0x76, 1, g[0], g[1], g[2], g[3]];
+    assert_eq!(sent(&mut fx), vec![(p, reassign), (p, overhead)]);
+    fx.game.lists.queue_update(m).unwrap();
+    fx.tick();
+    assert_eq!(sent(&mut fx), vec![]);
+    fx.assert_clean();
+}
+
+/// Perturbation of the test above: the same bits on a monster that is
+/// not queued for update send nothing (the client pass walks the update
+/// queues, §7.1 rule 1).
+// Covers: specs/sim/intents-events.md §7.1 r1
+#[test]
+fn unqueued_monster_bits_send_nothing() {
+    let (mut fx, _, m) = setup();
+    {
+        let r = fx.sim.sys.units.get_mut(m).unwrap();
+        r.flags |= flags::HOVER_FREED;
+        r.flags2 |= 0x1_0000;
+    }
+    fx.tick();
+    assert_eq!(sent(&mut fx), vec![]);
+}

@@ -526,7 +526,7 @@ fn quest_info(rec: &PlayerQuests) -> Vec<u8> {
 
 // ---- 1. game creation and the join -----------------------------------------------------
 
-// Covers: specs/sim/rng.md §5.2 text; specs/world/objects.md §2 r2; specs/sim/path-placement.md §11 text, §13 r1, §13 r3; specs/client/model.md §11 r1, §11 r3; specs/sim/intents-events.md §8.2 r3, §8.3
+// Covers: specs/sim/rng.md §5.2 text; specs/world/objects.md §2 r2; specs/sim/path-placement.md §11 text, §13 r1, §13 r3; specs/client/model.md §11 r1, §11 r3; specs/sim/intents-events.md §8.2 r3, §8.2 r4, §8.3
 #[test]
 fn game_creation_then_the_real_join() {
     let mut fx = Fx::new();
@@ -553,7 +553,7 @@ fn game_creation_then_the_real_join() {
     // The join (`intents-events.md` §8.2, `path-placement.md` §11, §13):
     // 0x59 with the player's own part B (0xAA without states, 0x76), 0x0B,
     // 0x03 (act 0, the act DRLG's init seed, the town level, game +0x80 =
-    // `dwObjSeed`), game entry: 0x07 of the spawn room, the room switch's
+    // `dwObjSeed`), 0x53, game entry: 0x07 of the spawn room, the room switch's
     // 0x07 per room of its adjacency array (the town has one room, no
     // unit in it), 0x15 at the spawn search's point (flag 1), 0x7E; then
     // the first tick: the room is ready, 0x04 (`tick.md` §6 rule 6).
@@ -591,6 +591,8 @@ fn game_creation_then_the_real_join() {
             proximity,
             handshake,
             load,
+            // 0x53: the new act's environment record (§8.2 rule 4).
+            vec![0x53, 2, 0, 0, 0, 0, 0, 0, 0, 0],
             reveal.clone(),
             reveal,
             place,

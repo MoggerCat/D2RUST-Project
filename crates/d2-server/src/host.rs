@@ -238,8 +238,14 @@ where
         for d in self.queues.drain() {
             let handled = match d.queue {
                 Queue::System => {
-                    self.session
-                        .system_message(d.client, &d.msg, d.size, &mut self.buffers);
+                    // The game's session part first (`Intents::session_message`).
+                    if !self
+                        .game
+                        .session_message(d.client, &d.msg, d.size, &mut self.buffers)
+                    {
+                        self.session
+                            .system_message(d.client, &d.msg, d.size, &mut self.buffers);
+                    }
                     Handled::System
                 }
                 Queue::Game => Handled::Game(process_game_message(

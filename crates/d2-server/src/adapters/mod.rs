@@ -8,6 +8,7 @@ pub mod character;
 pub mod handlers;
 pub mod item_bits;
 pub mod session;
+pub mod session_flow;
 mod sim;
 mod sizes;
 
