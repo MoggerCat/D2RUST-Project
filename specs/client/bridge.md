@@ -46,13 +46,13 @@
 |   7. Bevy mirror | 237–255 |
 |   8. Frame pacing | 256–276 |
 |   9. Versioning | 277–287 |
-|   10. Client outputs (bridge → UI and audio) | 288–440 |
-| Constants & data dependencies | 441–455 |
-| Randomness | 456–459 |
-| Edge cases & original bugs | 460–468 |
-| Test vectors | 469–499 |
-| Provenance | 500–510 |
-| Open questions | 511–548 |
+|   10. Client outputs (bridge → UI and audio) | 288–445 |
+| Constants & data dependencies | 446–460 |
+| Randomness | 461–464 |
+| Edge cases & original bugs | 465–473 |
+| Test vectors | 474–504 |
+| Provenance | 505–515 |
+| Open questions | 516–553 |
 <!-- /index -->
 
 ## Summary
@@ -371,7 +371,9 @@ model state: 1.14d's handler calls a UI or sound function directly
    before it handles the next message of the frame, which is the point
    1.14d makes them (inside the receive). The UI layer decides from its
    own state; the bridge does not re-decide. A C→S send the same code
-   makes (0x28's 0x31) uses the send path of rule 6.
+   makes (0x28's 0x31) uses the send path of rule 6. Confirmed
+   2026-10-08 (impl-pc1-s5): the 0x28 handler `0x0045D370` calls its UI
+   code `0x004B6DD0` directly (`0x0045D37F`), inside the receive.
 11. **Update-pass outputs** (2026-10-08; answers `client/model.md` open
    question 16). The client update pass (`client/model.md` §5) may emit
    an output too; its producer in the table is `update`, not a message
@@ -392,7 +394,10 @@ model state: 1.14d's handler calls a UI or sound function directly
    NPC present: `[0x007C0C6B]` := 0, `0x00487990`, `E(G)`,
    `0x00455F20(8, 1, 0)`, interaction active := 0;
    `ui/messages.md` §13 r4). Its C→S 0x30 (inside `E`) uses the send
-   path (rule 6).
+   path (rule 6). Confirmed 2026-10-08 (impl-pc1-s5): `0x004B3E10` has
+   one caller, `0x00460E70` (`0x00460EDE`), itself called only from the
+   player update `0x00463390` (`0x004636D5`); the room-change step goes
+   on after it (`0x0061AA40`, `0x00473C90`, …).
 
 <!-- rows -->
 | Variant | Payload | Producer | Consumer | Owner (what the consumer does) |

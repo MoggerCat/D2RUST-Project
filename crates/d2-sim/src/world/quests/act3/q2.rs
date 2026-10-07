@@ -494,9 +494,8 @@ pub fn lever_event<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: Uni
             w.set_object_mode(stairs, mode);
             if mode != OPEN {
                 ctl.records[i].extra.act3.q2.stairs_mode = OPEN;
-                // TODO(quests-act3 §4.7): the spec names "an end-animation
-                // event on the stairs" without its frame; the lever's
-                // frame + (FrameCnt1 >> 8) is taken.
+                // The stairs' own `FrameCnt1` >> 8, no + 1
+                // (`0x005B862A`–`0x005B864A`).
                 end_animation(w, stairs);
             }
         }

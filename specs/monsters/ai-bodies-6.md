@@ -31,37 +31,37 @@
 | Outputs / state changes | 90–96 |
 | Rules | 97–98 |
 |   1. Scope and order | 99–134 |
-|   2. Shared pet helpers | 135–240 |
-|   3. NecroPet (67) `0x005E4CF0` | 241–289 |
-|   4. MinionSpawner (121) `0x005E2BD0`, init `0x005F6630` | 290–309 |
-|   5. Towner (41) `0x005E7540` | 310–323 |
-|   6. EvilHole (76) `0x005FB410` | 324–351 |
-|   7. Hireable (61) `0x005E52D0`, alternate `0x005E5280` | 352–472 |
-|   8. QuillMother (75) `0x005FB2A0` | 473–487 |
-|   9. BaalTentacle (139) `0x005EF820` | 488–501 |
-|   10. ElementalBeast (46) `0x005F6B70` | 502–520 |
-|   11. NpcStationary (54) `0x005E73A0` | 521–548 |
-|   12. MosquitoNest (83) `0x005E0260` | 549–566 |
-|   13. DesertTurret (94) `0x005E0980` | 567–605 |
-|   14. AssassinSentry (101) `0x005EA3D0`, init `0x005EA290` | 606–640 |
-|   15. Catapult (123) `0x005E34C0` | 641–645 |
-|   16. CatapultSpotter (126) `0x005EE040` | 646–684 |
-|   17. Tentacle (56) `0x005F8F80` | 685–709 |
-|   18. TentacleHead (57) `0x005F9270` | 710–727 |
-|   19. Hydra (86) `0x005E9E60` | 728–738 |
-|   20. Totem (109) `0x005ED9E0` | 739–759 |
-|   21. Vendor (42) `0x005E9E00` | 760–765 |
-|   22. Trap-Missile (77) `0x005FB5B0` | 766–778 |
-|   23. TrappedSoul (99) `0x005E9F10` | 779–795 |
-|   24. DruidWolf (108) `0x005ED710` | 796–875 |
-|   25. CycleOfLife (111) `0x005EC8C0`, init `0x005EC6A0` | 876–904 |
-|   26. NpcBarb (127) `0x005EDC50`, init `0x005EDC40` | 905–925 |
-| Constants & data dependencies | 926–950 |
-| Randomness | 951–959 |
-| Edge cases & original bugs | 960–977 |
-| Test vectors | 978–1002 |
-| Provenance | 1003–1029 |
-| Open questions | 1030–1038 |
+|   2. Shared pet helpers | 135–243 |
+|   3. NecroPet (67) `0x005E4CF0` | 244–292 |
+|   4. MinionSpawner (121) `0x005E2BD0`, init `0x005F6630` | 293–312 |
+|   5. Towner (41) `0x005E7540` | 313–326 |
+|   6. EvilHole (76) `0x005FB410` | 327–354 |
+|   7. Hireable (61) `0x005E52D0`, alternate `0x005E5280` | 355–475 |
+|   8. QuillMother (75) `0x005FB2A0` | 476–490 |
+|   9. BaalTentacle (139) `0x005EF820` | 491–504 |
+|   10. ElementalBeast (46) `0x005F6B70` | 505–523 |
+|   11. NpcStationary (54) `0x005E73A0` | 524–551 |
+|   12. MosquitoNest (83) `0x005E0260` | 552–569 |
+|   13. DesertTurret (94) `0x005E0980` | 570–610 |
+|   14. AssassinSentry (101) `0x005EA3D0`, init `0x005EA290` | 611–645 |
+|   15. Catapult (123) `0x005E34C0` | 646–650 |
+|   16. CatapultSpotter (126) `0x005EE040` | 651–689 |
+|   17. Tentacle (56) `0x005F8F80` | 690–714 |
+|   18. TentacleHead (57) `0x005F9270` | 715–732 |
+|   19. Hydra (86) `0x005E9E60` | 733–743 |
+|   20. Totem (109) `0x005ED9E0` | 744–764 |
+|   21. Vendor (42) `0x005E9E00` | 765–770 |
+|   22. Trap-Missile (77) `0x005FB5B0` | 771–783 |
+|   23. TrappedSoul (99) `0x005E9F10` | 784–800 |
+|   24. DruidWolf (108) `0x005ED710` | 801–883 |
+|   25. CycleOfLife (111) `0x005EC8C0`, init `0x005EC6A0` | 884–914 |
+|   26. NpcBarb (127) `0x005EDC50`, init `0x005EDC40` | 915–935 |
+| Constants & data dependencies | 936–960 |
+| Randomness | 961–969 |
+| Edge cases & original bugs | 970–987 |
+| Test vectors | 988–1012 |
+| Provenance | 1013–1039 |
+| Open questions | 1040–1048 |
 <!-- /index -->
 
 ## Summary
@@ -171,7 +171,10 @@ else 0 (E and M keep what the search wrote).
   coordinate index at Q (looked up from O's room) is c0: velocity (0,
   speed, 40); run ≠ 0 → run-del to Q, else walk-del to Q; started →
   1. Else the same to the midpoint ((U.x + Q.x) >> 1, (U.y + Q.y) >>
-  1) (unsigned shift); started → 1. Then e := (e + 1) & 7. After the 8
+  1) (unsigned shift); started → 1. The midpoint try belongs to the
+  "index is c0" case only (Q's try did not start; no second velocity
+  call); an index ≠ c0 tries nothing (`0x005E4049` skips both to the
+  loop step `0x005E40D2`). Then e := (e + 1) & 7. After the 8
   tries: delete U's thinks; wander' 4 → 1 if started. run ≠ 0 →
   run-del to ((U.x + O.x) / 2, (U.y + O.y) / 2) (signed halving) → 1 if
   started. Walk-del to the same midpoint → 1 if started. Return walk to
@@ -580,7 +583,9 @@ index j (0..7).
    [5] × V[j] (table `0x006E33A0`). Path target unit := T
    (`0x00620C10`).
 5. `Skill1` ≥ 0, the skill check `0x005FD470(Skill1, T, Q)` ≠ 0 and
-   the check at the own position ≠ 0 (`ai.md` §7.4) → `0x005DEAD0(Sk1mode,
+   the second check `0x005FD470(Skill1, T, T.x, T.y)` ≠ 0 (T's own
+   position, `0x0045ADF0` / `0x0045AE20` on T, `0x005E0BA6`–`0x005E0BCD`;
+   `ai.md` §7.4) → `0x005DEAD0(Sk1mode,
    Skill1, 0, Q.x, Q.y)`; path target point := Q (`0x00648AD0`); n += 1;
    n > aip2 [5; 6, 7] → f := frame + aip3 [120; 100, 80], n := 0; else
    f := frame + aip1 [10; 7, 3]. End.
@@ -831,7 +836,10 @@ After the common start of §24:
 7. d > aip5 [26] → pet move k 0 (run 1, speed 100, n 0) started → end.
    d > aip3 [14]: O in mode 2 or 6 → pet move k 0 (0, 0, 0) started →
    end; O in mode 3 → k 0 (1, 100, 0) started → end. Pet follow (S, O,
-   M, quiet 1, n 6) ≠ 0 → end.
+   M, quiet 1, n 6) ≠ 0 → end. The pet follow is evaluated whatever d
+   is (d ≤ aip3 and every not-started pet move fall through to it,
+   `0x005ED199`); a not-started aip5 move still goes on to the aip3
+   test.
 8. S ≠ 0: M ≠ 0 → A1 at S; wait aip1 [22]. End. `0x006416D0(O, S)` <
    r → velocity (0, v, 0); run to S (`0x005DED20`). End. d > 10 → walk
    in radius of O (`0x005DE6D0(O, 8, 6)`). End. Else idle 15. End.
@@ -885,8 +893,10 @@ owner.
    speed 0, n 6) ≠ 0 → end.
 3. T ≠ 0 and T dead (`0x005541B0`) → T := 0, C := 0.
 4. K := 0, dK := 0. `Skill1` > 0, its row exists and the unit has its
-   entry: n := the skill's `aurarangecalc` (skills +0x64) at the entry's
-   level (`0x00646CA0`), clamped to 5..50; K := corpse search (game,
+   entry (E := `highest_entry(unit, Skill1)` `0x006439F0`, `skills/levels.md`;
+   none → K stays 0): n := the skill's `aurarangecalc` (skills +0x64) at
+   the entry's level L = `skill_level(unit, E, 1)` (`0x006442A0`, bonus
+   1; then `0x00646CA0`), clamped to 5..50; K := corpse search (game,
    unit, O, n) (§24.3); K → dK := `0x006416D0(unit, K)`.
 5. dK < aip2 [20]: K → mK := melee range unit→K. Else K := 0.
 6. Pet follow (K, O, mK, quiet 0, n 6) ≠ 0 → end.

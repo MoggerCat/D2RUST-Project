@@ -937,6 +937,7 @@ impl GameParts {
                 objects: wp.objects.clone(),
                 shrines: Vec::new(),
                 levels: wp.levels.clone(),
+                ..ObjectTables::default()
             },
             monstats: Vec::new(),
             hire_rows: Vec::new(),

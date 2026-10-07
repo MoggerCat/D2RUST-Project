@@ -142,10 +142,6 @@ impl<X: WorldPending> MonsterInit for WorldHost<'_, X> {
         self.v.h.x.set_owner_data(unit, owner, a, b, c);
     }
 
-    fn unique_minion_owner_data(&mut self, boss: UnitId, minion: UnitId) {
-        self.v.h.x.unique_minion_owner_data(boss, minion);
-    }
-
     /// `0x0058F100`.
     fn add_minion(&mut self, leader: UnitId, minion: UnitId) {
         self.w.minions.entry(leader).or_default().push(minion);
@@ -174,21 +170,13 @@ impl<X: WorldPending> MonsterInit for WorldHost<'_, X> {
         }
     }
 
-    fn superunique_owner_data(&mut self, boss: UnitId) {
-        self.v.h.x.superunique_owner_data(boss);
-    }
-
-    fn group_spawn(&mut self, boss: UnitId, class: i32, a: i32, b: i32, c: i32, flags: u16) {
-        self.v.h.x.group_spawn(boss, class, a, b, c, flags);
-    }
-
     /// `0x00555230(type 2, class, …)` with the object init
     /// (`objects.md` §3, §6) on the action wiring's object state
     /// ([`crate::wiring::action::View::create_object`]); a game without
     /// one: [`WorldPending::create_object`].
     ///
-    /// TODO(population.md §7 step 6, objects.md §3): the allocation
-    /// mode of this creation is not stated; mode 0 is used.
+    /// Allocated in mode 0 with flag 1 and GUID 0 (`objects-2.md` §22
+    /// rule 4: evilhut and barricade-door objects).
     fn create_object(&mut self, room: RoomId, class: i32, x: i32, y: i32) {
         match u32::try_from(class) {
             Ok(c) if self.v.h.objects.is_some() => {
@@ -196,10 +184,6 @@ impl<X: WorldPending> MonsterInit for WorldHost<'_, X> {
             }
             _ => self.v.h.x.create_object(room, class, x, y),
         }
-    }
-
-    fn barricade_object(&mut self, unit: UnitId, class: i32) {
-        self.v.h.x.barricade_object(unit, class);
     }
 
     fn preset_created(&mut self, unit: UnitId, preset: &PresetUnit) {
@@ -230,7 +214,15 @@ impl<X: WorldPending> MonsterInit for WorldHost<'_, X> {
         self.v.h.x.restore_inactive_units(room);
     }
 
+    /// `0x00552610` (`object-population.md`) on the action wiring's
+    /// object state with the room facts of the DRLG; a game without one:
+    /// [`WorldPending::populate_objects`].
     fn populate_objects(&mut self, room: RoomId) {
-        self.v.h.x.populate_objects(room);
+        if self.v.h.objects.is_none() {
+            self.v.h.x.populate_objects(room);
+            return;
+        }
+        let info = self.object_room_info(room);
+        self.v.populate_objects(self.game, &info);
     }
 }

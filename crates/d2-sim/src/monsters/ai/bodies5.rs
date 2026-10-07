@@ -534,7 +534,7 @@ pub fn claw_viper_ex<W: AiHost + ?Sized>(
     let g = glow(cx.aip(p, 6));
     // 1.
     if let Some(st) = g.filter(|_| param(cx, u, 0) != 0) {
-        cx.world.set_state(u, st, false);
+        cx.world.set_state(game, u, st, false);
     }
     // 2.
     if p.combat {
@@ -562,7 +562,7 @@ pub fn claw_viper_ex<W: AiHost + ?Sized>(
         if cx.world.skill_check(game, u, s1, t, tx, ty) {
             skill_k(game, cx, u, p, 1, t);
             if let Some(st) = g {
-                cx.world.set_state(u, st, true);
+                cx.world.set_state(game, u, st, true);
             }
             set_param(cx, u, 0, 1);
             return;
@@ -712,10 +712,9 @@ fn talic<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitId, p:
         let skill = cx.world.skill_entry(u, s1).map_or(s1, |e| e.0);
         cx.world.set_current_skill(u, skill);
         cx.world.set_path_steps(u, 1);
-        // TODO(spec: ai-bodies-5.md §12 A step 3): the request byte +0x15
-        // := 100 has no field in the mode request here.
+        // The request byte +0x15 := 100: no path (ai.md §7.1).
         cx.world
-            .change_mode(game, u, m1, ModeTarget::Point(tx + dx, ty + dy));
+            .change_mode_path_byte(game, u, m1, ModeTarget::Point(tx + dx, ty + dy), 100);
         return;
     }
     // 4.
@@ -854,7 +853,7 @@ pub fn frozen_horror<W: AiHost + ?Sized>(
     }
     // 2.
     if cx.world.has_state(u, STATE_INFERNO) {
-        cx.world.set_state(u, STATE_INFERNO, false);
+        cx.world.set_state(game, u, STATE_INFERNO, false);
     }
     // 3.
     if !p.combat {
@@ -1094,7 +1093,7 @@ pub fn baal_to_stairs<W: AiHost + ?Sized>(
     // 2.
     if reach_distance(cx, u, o) < cx.aip(p, 1) {
         cx.world.quest_call(game, u, QuestCall::BaalToStairs);
-        cx.world.set_state(u, STATE_INVIS, true);
+        cx.world.set_state(game, u, STATE_INVIS, true);
         cx.world.stop_unit_path(u);
         delete_thinks(game, u);
         cx.world.remove_unit(game, u);
@@ -1192,7 +1191,7 @@ pub fn baal_throne<W: AiHost + ?Sized>(
         cx.world
             .reinit_class(game, u, BAALCRABSTAIRS, mode::NEUTRAL);
         install(game, cx, u, 0);
-        cx.world.set_state(u, STATE_CHANGECLASS, true);
+        cx.world.set_state(game, u, STATE_CHANGECLASS, true);
         cx.world.change_class_list(game, u, BAALCRABSTAIRS);
         idle(game, cx, u, 5);
         return;
@@ -1588,7 +1587,7 @@ pub fn nihlathak<W: AiHost + ?Sized>(
     cx.world.quest_call(game, u, QuestCall::Nihlathak);
     // 2.
     if cx.world.has_state(u, STATE_INFERNO) {
-        cx.world.set_state(u, STATE_INFERNO, false);
+        cx.world.set_state(game, u, STATE_INFERNO, false);
     }
     // 3.
     if t.is_none() {
@@ -1668,7 +1667,7 @@ pub fn nihlathak<W: AiHost + ?Sized>(
 /// state 12 off, re-install, idle 1. No draws.
 pub fn nihlathak_alt<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitId) {
     if cx.world.has_state(u, STATE_INFERNO) {
-        cx.world.set_state(u, STATE_INFERNO, false);
+        cx.world.set_state(game, u, STATE_INFERNO, false);
     }
     reinstall(game, cx, u);
     idle(game, cx, u, 1);

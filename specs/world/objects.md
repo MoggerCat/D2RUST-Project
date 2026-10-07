@@ -59,7 +59,7 @@
 | Edge cases & original bugs | 883–949 |
 | Test vectors | 950–988 |
 | Provenance | 989–1046 |
-| Open questions | 1047–1093 |
+| Open questions | 1047–1095 |
 <!-- /index -->
 
 ## Summary
@@ -1072,13 +1072,15 @@ lists of §2 from the live `shrines.txt`.
    (`world/objects-2.md` §19).
 10. **Needs recording**: fire event 0's direct mode write (§18.1): confirm with a packets
     trace that clients see no 1 → 2 update for fires.
+    PROVISIONAL: clients see no 1 → 2 update for fires (because event 0 writes the mode directly, §18.1); settled by REC-07.
 11. **Answered**: owner cells of init 51 and operate 48 are §18.4, init
     13 is §17 (CODE-TABLE CHANGE commit).
 12. **Answered** for this spec: the 0x58 builder is `0x0053D8D0`; the
     row change is a cross-file request (`docs/handoff/pc2-spec-objects.md`).
 13. Drops `0x005594C0` (armor), `0x00559630` (weapon), `0x00559300`
-    (gold), `0x00559A30` (by code): items spec, not yet specified.
-    **Answered**: `world/objects-2.md` §20 (with the class picks
+    (gold), `0x00559A30` (by code).
+    **Answered**: `world/objects-2.md` §20; request quality per caller
+    of `0x00559A30` and `0x00585970`: `items/quality.md` open question 2 (with the class picks
     `0x00555E70`, `0x00555FB0`, `0x005560F0`, `0x00556240`).
 14. **Needs recording** (`obj1` data): two class-37 allocations show speed 0 at return in
     mode 2; §4 rule 5 predicts an allocation mode of 2 (init 8's set is

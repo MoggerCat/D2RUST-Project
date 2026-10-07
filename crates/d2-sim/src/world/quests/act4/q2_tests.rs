@@ -5,7 +5,7 @@
 //! logs.
 
 use super::super::super::tests::*;
-use super::super::super::{act1, object_event, QuestChain, UnitKind};
+use super::super::super::{act1, object_event, HostRequest, QuestChain, UnitKind};
 use super::*;
 use crate::units::RoomId;
 
@@ -689,12 +689,14 @@ fn classic_diablo_kill_and_end_of_game() {
         f.frame = frame;
         run_timer(ctl, f, Timer::Diablo, CHAIN)
     };
+    // The save pass and the game end are host requests
+    // (`quests-helpers.md` §6).
     assert!(!fire(&mut ctl, &mut f, 1000 + 1875)); // 75000 ms: not yet
-    assert!(f.log.is_empty());
+    assert!(f.log.is_empty() && ctl.host_requests.is_empty());
     assert!(!fire(&mut ctl, &mut f, 1000 + 1876));
-    assert_eq!(f.log, ["save pass"]);
+    assert_eq!(ctl.take_host_requests(), [HostRequest::SavePass]);
     assert!(!fire(&mut ctl, &mut f, 1000 + 2250)); // once only
-    assert_eq!(f.log, ["save pass"]);
+    assert!(ctl.host_requests.is_empty());
     f.log.clear();
     assert!(!fire(&mut ctl, &mut f, 1000 + 2251));
     assert_eq!(
@@ -710,7 +712,8 @@ fn classic_diablo_kill_and_end_of_game() {
     assert!(!fire(&mut ctl, &mut f, 1000 + 2375)); // warp done once
     assert!(f.log.is_empty());
     assert!(fire(&mut ctl, &mut f, 1000 + 2376));
-    assert_eq!(f.log, ["end game"]);
+    assert!(f.log.is_empty());
+    assert_eq!(ctl.take_host_requests(), [HostRequest::EndGame]);
     let x = xd(&ctl);
     assert!(!x.timer && !x.ending && !x.end_pending);
 }
@@ -733,7 +736,8 @@ fn expansion_diablo_kill_runs_the_timer_without_ending() {
         f.frame = frame;
         assert_eq!(run_timer(&mut ctl, &mut f, Timer::Diablo, CHAIN), done);
     }
-    assert_eq!(f.log, ["save pass"]);
+    assert!(f.log.is_empty());
+    assert_eq!(ctl.take_host_requests(), [HostRequest::SavePass]);
     assert!(f.sent.is_empty());
 }
 

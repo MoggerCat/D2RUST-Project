@@ -40,9 +40,9 @@
 | Constants & data dependencies | 881–903 |
 | Randomness | 904–925 |
 | Edge cases & original bugs | 926–947 |
-| Test vectors | 948–1073 |
-| Provenance | 1074–1114 |
-| Open questions | 1115–1188 |
+| Test vectors | 948–1122 |
+| Provenance | 1123–1163 |
+| Open questions | 1164–1255 |
 <!-- /index -->
 
 ## Summary
@@ -967,7 +967,7 @@ neighbour entries (§2.7, ids 1..17) get-or-allocate every id in order,
 and 8..16 are the ones not yet allocated (`levels.md` Test vectors, seq
 2425–2452).
 
-Derived from the rules (simulation of §2, not yet recorded): wild chain
+Derived from the rules (simulation of §2; recorded below): wild chain
 retries Blood Moor (3,0)→(3,1)→(0,0)→(0,1) and Rogue (2,0)→(2,1)→(3,0)→
 (3,1); final rects (x, y, w, h): Stony Field (1000, 1000, 80, 80), Cold
 Plains (920, 984, 80, 80), Blood Moor (904, 1064, 56, 96), Rogue
@@ -976,6 +976,55 @@ Encampment (960, 1112, 56, 40), direction 3, Burial Grounds (880, 968, 40,
 1000), Tamoe (3000, 1018), Black Marsh (2920, 1002), Dark Wood (2904,
 1082) (Dark Wood retried 3→0). Act I flags: Blood Moor and Cold Plains 0
 (consistent with no river/side-cave draws recorded).
+
+Recorded Act I rects (`pc2rec-d1-rng`, TestSor, `-seed` 644409375,
+sha256 8ac70b456cea9732…, client copy `dumpdrlg` right after arrival;
+level +0x1C..+0x28 as (x, y, w, h)): 1 (960, 1112, 56, 40), 2 (904,
+1064, 56, 96), 3 (920, 984, 80, 80), 4 (1000, 1000, 80, 80), 5 (2904,
+1082, 80, 80), 6 (2920, 1002, 80, 80), 7 (3000, 1018, 80, 80), 17 (880,
+968, 40, 48), 26 (3000, 1000, 64, 18), 27 (3000, 960, 56, 40), 39 (5000,
+1148, 80, 80): all equal the derived values. DRLG seed after placement
+{1406222081, 1674353446}; Blood Moor 81 rooms, Cold Plains 98.
+
+**Act II and Act IV placement** (recorded, `pc2rec-d1-rng`; server seq
+and client copy equal; draws on the driver's copy of the DRLG seed):
+
+| Act | Seq (client) | Site | Value | Meaning (§2.4) |
+|---|---|---|---|---|
+| II | 36432 (48904) | `0x006769B5` RW | 457460266 | `& 1` = 0 → R0 1 |
+| II | 36433–36435 (48905–48907) | `0x00676299` R8 ×3 | 1949180022, 1550108608, 4175359377 | `& 7` = 6, 0, 1 |
+| II | 36436 (48908) | `0x00676AF5` VS | 3621635452 | `& 7` = 4 |
+| IV | 87896 (92413) | `0x00676C43` OS | 1406222081 | odd → Place A(3, 3), flag 0x800000 |
+| IV | 87897–87898 (92414–92415) | `0x00676165` R4 ×2 | 3154683627, 457460266 | `& 3` = 3, 2 |
+
+Recorded rects (client copy at the town arrival), each equal to a
+hand simulation of §2.3–§2.6 from the draws above: Act II 40 (1000,
+1000, 56, 56) Def; 41 (920, 1000, 80, 80) Place A(1, 0), Lut Gholein
+direction R0 1; 42 (872, 1080, 80, 80): R0 6, 7 overlap 40, retry 0 →
+Place C(0, 1); 43 (824, 1160, 80, 80) Place C(0, 1); 44 (872, 1240, 80,
+80) Place C(1, 1); 45 (952, 1240, 32, 32): R0 4, 5 overlap 43, retry 6
+→ Place C(6, 0); 46 (2500, 1000, 80, 80) Def. Act IV 103 (1000, 1000,
+32, 24) Def; 104 (1032, 968, 80, 64) Place A(3, 3); 105 (1112, 968, 64,
+80) Place A(3, 1); 106 (1112, 904, 80, 64) Place A(2, 1) (touches 104,
+allowed); 108 (1500, 1000, 120, 120) Def. The Outer Steppes flag word
+was not read.
+
+**Act I side builds** (recorded, `pc2rec-d4-rng`, TestSor, `-seed`
+644409375, sha256 58075dfa665975bc…; waypoints Rogue Encampment →
+Stony Field → Dark Wood → Black Marsh; `check_rng` OK,
+`check_drlg_acts` 0 errors). Room counts (client copy): Stony Field (4)
+90, Dark Wood (5) 86, Black Marsh (6) 98, Tamoe Highland (7) 94,
+Underground Passage 1 (10) 81. §7.2 and §7.6 draws, both copies equal:
+
+| Seq server (client) | Site | Seed before → `lo'` | Rule |
+|---|---|---|---|
+| 69877 (84164) | `0x00680251` | {4232451448, 846413147} → 189088435 (bit 1) | §7.2 step 2 |
+| 76737 (90248) | `0x0067FD84` | — (bridge roll) | §7.6 |
+| 76738 (90249) | `0x00680251` | {3992420112, 226630349} → 1255137821 (bit 1) | §7.2 step 2 |
+
+No draw at `0x0068034F` (§7.2 step 3) in this run. The bridge roll
+directly before the second side-cave draw is the §7.2 order (step 1
+river and bridge, then step 2) on one level seed.
 
 Per-site draw counts of one level build (one copy; both copies equal):
 
@@ -1117,6 +1166,10 @@ recording; level rects and outdoor flags equal a level-coordinate probe
 1. Level rects and directions after Act I creation (§Test vectors,
    derived): read level +0x1C..+0x28 of levels 1–7, 17, 26, 39 and
    preset direction of levels 1 and 27 after act creation.
+   *Answered (2026-10-08, recorded: `pc2rec-d1-rng`)* for the rects: all
+   eleven equal the derived values (Test vectors, "Recorded Act I
+   rects"). Still open: the preset direction of levels 1 and 27 (no
+   field offset known).
 2. Disassemble the linker bodies `0x00676150`–`0x00676DC0` (no function
    in the export) and compare with §2.4 (draw forms, B/A choice, BM size).
    *Partly answered* (static, `tools/ghidra/disasm.py at`): R4
@@ -1140,15 +1193,29 @@ recording; level rects and outdoor flags equal a level-coordinate probe
    0x400000) all match §2.4.
 3. Record entering Act 2 (desert chain, `R8` / `RW` / `VS` draws, Lut
    Gholein direction from R0[i+1]) and Act 4 (Outer Steppes flag).
+   *Answered (2026-10-08, recorded: `pc2rec-d1-rng`)*: Act II and Act IV
+   draws and rects equal §2.3–§2.6 (Test vectors, "Act II and Act IV
+   placement"; Lut Gholein direction R0 1). The Outer Steppes flag word
+   itself was not read; its OS draw is odd, so §2.4 gives 0x800000.
 4. Record Act 3 entry: jungle placer draws on the DRLG seed
    (`drlg/outdoor-act3-act5.md` OQ 1).
+   *Answered (2026-10-08, recorded: `pc2rec-d1-rng`)*: see
+   `drlg/outdoor-act3-act5.md` OQ 1 (123 draws per copy, rects, block
+   ids and clearings equal the derived vector).
 5. Stony Field, Dark Wood, Black Marsh, Tamoe builds (river, bridge,
    cliff caves, side cave draws `0x00680251`, `0x0068034F`): record a run
    that generates them.
+   *Answered (2026-10-08, recorded: `pc2rec-d4-rng`)*: room counts and
+   the §7.2 / §7.6 draws are in Test vectors ("Act I side builds"); two
+   side-cave draws and one bridge roll per copy, none at `0x0068034F`,
+   in §7.2 order. Not done: attributing each draw to its level through
+   the level-seed chain from {4014346869 + id, 666} (needs a §7
+   simulation of levels 4–7).
 6. *Answered:* path floor table `0x006F2700` (not `0x006F2860`) is in
    `drlg/outdoor-path-floor.tsv`, the bit order in §7.5.3.
 7. *Answered:* the jungle placer is read in full from 1.14d in
-   `drlg/outdoor-act3-act5.md` §2 (its OQ 1 asks for the recording).
+   `drlg/outdoor-act3-act5.md` §2; its OQ 1 recording (2026-10-08,
+   `pc2rec-d1-rng`) equals the derived vector.
 8. *Answered:* Kurast and Travincal lists and positions are §9.4, read
    from 1.14d; the jungle file table is §9.3. A recording of the Act 3
    levels would confirm them (as for OQ 4).

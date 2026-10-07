@@ -254,6 +254,9 @@ fn messages<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, args: Ev
                 if ctl.records[i].state != 5 {
                     set_state(ctl, i, 5);
                     super::sequence(ctl, w, CHAIN);
+                    // The one Act V "(silent)" call clears the flags
+                    // first (`0x00587C1E`, `quests-act5-2.md` §6.8).
+                    ctl.records[i].flags = 0;
                     status_silent(ctl, i, 13);
                 }
                 ctl.records[i].clear_callback(event::NPC_DEACTIVATE);
@@ -473,8 +476,10 @@ pub fn cage_init<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: UnitI
 /// The bits of the completion check for `freed` barbarians: 36.5 for
 /// 15, 36.6 for 14, 36.7 for 12–13 (§4.7).
 fn freed_bit(freed: i32) -> u8 {
+    // Equality tests only (`0x00588B96`–`0x00588BA8`): 15 → 36.5, 14 →
+    // 36.6, any other count → 36.7.
     match freed {
-        15.. => FREED_15,
+        15 => FREED_15,
         14 => FREED_14,
         _ => FREED_12,
     }
@@ -587,9 +592,8 @@ fn completion_check<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, 
     } else {
         set(w, p, SLOT, RESCUED_GROUP);
         if e.killed < 5 {
-            // TODO(quests-act5 §4.7): the flags byte 0x20 is written
-            // before "status 2 to all"; read as that call keeping the
-            // byte (the notation's flags := 0 would discard it).
+            // The flags byte is set to 0x20, not cleared, before the
+            // status call (`0x00588C2A`).
             ctl.records[i].flags = 0x20;
             ctl.records[i].status = 2;
             iterate_all(ctl, w, i);

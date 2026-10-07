@@ -5447,1092 +5447,382 @@ GitHub runners may be 1.5–2× slower than the measured 670 s.
 
 ### PC 2 recording list (spec answers that need a recording or capture)
 
-Spec writers append here (one line: spec + open question, what to record,
-what to log); PC 2 (Local2) records them and moves each line to §5 Done
-with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
-- `world/hirelings.md` R2-27 rest / OQ7 / OQ2 (PC 2 spec-hirelings, 2026-10-07): with `bdMercTwo`: level-up (0xA1 / 0xA2 and the second stats batch), death (0x9B name id + cost, 0x7A remove), resurrect at an NPC (0x9B `ffff 00000000`, 0x81, 0x2A code 5), give / take an item (two 0x540E60 notices, new GUIDs); a two-player game where the second client sees the owner's hireling level up (expect 0x9E–0xA0 stats there, not 0xA1 / 0xA2); die, change level, return and resurrect (OQ2).
-- `world/quests-act2-2.md` OQ1 (PC 2 spec-quests-act2, 2026-10-07): orifice insert (Act II, Horadric Staff assembled): operate the orifice (S→C 0x58 result 0), cancel the dialog (C→S 0x44 action 2 → 0x58 result 1), insert a wrong cursor item (result 4), then the staff (result 5, byte 6 = 1); log the 7 bytes of each 0x58, especially byte 6 for results 0, 1, 4.
-- `world/quests.md` OQ14 (PC 2 spec-quests-core, R-QC-1): a 1.14d expansion character that completed every Normal quest; save right after the last one, then after one more game; dump both quest sections and list the set bits per slot.
-- `world/quests-act1-rest.md` OQ12 (PC 2 spec-quests-core, R-QC-2, = §5 C79): creation of the town-Cain marker (class 385) after Cain left Tristram, packets + RNG: Cain's spawn draws must come between the marker's unit-seed step and the next preset unit's.
-- `skills/descriptions.md` OQ1 + OQ2 (PC 1 spec-xpc3-skills, 2026-10-07): character panel damage / attack-rating lines for one skill per `descdam` 1–24 and `descatt` 1–5 (kick: expect `v-(v+1)`; smite; dual-wield assassin for `descatt` 5), log the drawn strings, colors and the player's stats 0, 2, 17–25, 48–59, 119, 159, 160; and the title string of a skill whose skilldesc `str name` ≠ `str alt`.
+Folded 2026-10-08 into one list: the former spec-writer lines of this section (the early lines, the ninth-set R2-1..R2-46 and the later PC 2 lines), the `pc2-rec-*.md` lane lists and `docs/handoff/recording-list.md` (now a pointer). Each former line is a `Settles:` item of the entry that captures it; lines already done and folded (pc2rec-d1 / d3 / d4-rng, pc2rec-p1 / p2-packets) are not repeated. **This section is PC 2's testing prompt**: do the entries in order, REC-01 first. PC 1's RE / spec questions (Ghidra answers) are not recordings and live in `xpc-to-pc1.md` and the specs.
 
-- `drlg/rooms.md` OQ15: client build timer (B, T, cursor) per client
-  update over a level load.
-- `sim/unit-order.md` OQ5: client room unit-list order before each draw
-  sort, one town scene.
-- `client/model.md` OQ9: the client side of the join stream (see the
-  spec).
-- `render/draw-order.md` OQ7: town river-bank cells, capture at `TownE1`
-  tile (950, 933).
-- `sim/intents-events.md` OQ11 (order part; the 0x65 path is answered
-  statically, §7.6 rule 5): a monster kill that drops an item; log that
-  tick's 0x9C / 0x69 / 0x65 order with callers (expect 0x9C, 0x69, then
-  0x65 from `0x0053FB30` called by `0x0053FC20`).
-- `sim/intents-events.md` OQ14: type one chat line (C→S 0x15) in single
-  player; log the S→C messages of that frame with callers.
-- `client/bridge.md` OQ6: a 0x2C followed by a 0x0A in one chunk.
-- `render/lighting.md` OQ11 (answered statically 2026-10-07: only
-  `EnvEffect` objects change; fire 39 goes to mode 0 without light in
-  the day, mode 1 with light radius 9 otherwise): a day-period change
-  with a fire 39 in sight confirms the mode and light.
-- `client/msg-skills.md` OQ1: equipping a charged item.
-- `client/stat-lists.md` OQ6: a buff (0xA8 bytes).
-- `client/model.md` OQ10: a game with a hireling (0x7A / 0x81).
-- `monsters/umod-callbacks.md` OQ1 + OQ2: a fire-enchanted unique dying
-  next to the player, and a suicide minion hit into GH (Act V); log
-  timer sets / runs (type 7, site), rng draws with caller, area-damage
-  targets.
-- `monsters/umod-callbacks.md` OQ6: dump the stat list of a missile
-  fired by a spectral-hit unique (is stat 12 present).
-- `render/draw-order-2.md` OQ1 / OQ9 (W5): Rogue Encampment in rain:
-  per frame the player seed, rain target `[0x007A89E0]`, `k` (context
-  `0x007C8A38`), `last_s` and the splash pool count; check splashes
-  spawn only when `r` < ⌊target × 1000 / 256⌋.
-- `render/blend-modes.md` OQ6: a weather or Arcane-star capture with the
-  line endpoints logged (45° lines x-major, end one short on the minor
-  axis).
-- `missiles/bodies.md` OQ1 / OQ3: Plague Javelin hit, cloud positions
-  per tick (velocity 192 / 384, no extra << 8).
-- `sim/intents-events.md` OQ11: breakpoint, no new play: return address
-  one level up of `0x0053FB30` during a monster kill (which path sends the
-  0x65 in a kill tick).
-- `sim/intents-events.md` OQ13: breakpoint at join: caller of the first
-  0x48 in frame 2.
-- `skills/bodies-3.md` OQ1–4: Fetish Shaman / Baal Inferno (E param 1,
-  timers, missile frames per do of `0x005CC4E0`), Greater Mummy resurrect
-  (T mode, used skill, life after `0x005CCB10`), Sand Leaper jump (E
-  flags, path type, target per do of `0x005CB940`), Sand Maggot egg cast
-  (egg count, modes, `0x005CAFA0`).
-- `skills/bodies-4.md` OQ1–3: Royal Strike / Claws of Thunder charge
-  release (zigzag path points and missile seeds, `0x005D4870`,
-  `0x005D4150`), Overseer whip (transform rate and class, `0x005D1F70`),
-  imps on a barricade tower (state 143, type-5 event, release below 10 %
-  life, `0x005D1AB0`).
-- `world/quests-act4.md` OQ2 / QD-1 (PC 2 spec-quests-act4-5, R-QD-1): one classic Diablo kill with frames logged — the kill, each credited player's warp, the uncredited player's 0x50 and the game end — ideally once on an idle and once on a loaded machine (settles whether the GetTickCount end-of-game timers can be expressed in ticks).
-- `world/objects.md` OQ1 (PC 2 spec-objects): with `record_objects.py`, operate one chest, shrine, door, well and portal (packets + RNG): the draw order of §8–§12 and the 0x0E / 0x4D / 0x60 bytes of §14.
-- `world/objects.md` OQ10 (PC 2 spec-objects): a fire object (class 160–162) for a few seconds: no 0x0E 1 → 2 update expected.
-- `world/objects.md` OQ14 (PC 2 spec-objects): in the existing `obj1-objects.jsonl` (PC 2 raw), the mode argument of the two class-37 allocations with speed 0 (expected 2).
-- `ui/panels.md` §12.4 / OQ11 (PC 2 spec-ui): transmute in the Horadric Cube at 800 × 600 and 640 × 480: frames at animation steps 1, 15, 29 and the step after 29 (no frame), proving the offsets and draw mode 3.
-- `ui/panels.md` §8.11 (PC 2 spec-ui): character panel of a level-99 character (experience 3,520,485,254) and of a level-1 character: the grouped strings and the next-level value.
-- `ui/menus.md` OQ1 / OQ4 (PC 2 spec-ui): Akara's menu, Charsi's menu and Kashya's hire list at 800 × 600 (box position, item rows, highlight).
-- `ui/menus.md` §1 / `ui/panels.md` §13 (PC 2 spec-ui): the waypoint menu with each tab clicked and a row hovered.
-- `audio/sound-table.md` OQ12 (PC 2 spec-audio): the tick at which one-shot sounds end (1.14d detects it on a 50 ms wall-clock thread `0x00516250`): log request start tick and the tick its slot frees, for several known-length sounds.
-- `audio/sound-table.md` OQ13 (PC 2 spec-audio): how long `Async Only` sound loads take to complete (ticks from request to playable).
-- `audio/triggers.md` OQ3 (PC 2 spec-audio): a write watch on unit +0xB0 (last-hit class) during a fight: who writes it and when.
-- `audio/environment.md` (PC 2 spec-audio, entry 74 rest): the town → wilderness → cave walk and Blood Raven's death with `record_sound.py` (without `-ns`).
-- `world/npc.md` OQ6 rest (PC 2 spec-hirelings pass 3): resurrect, heal at Akara, Cain identify (3 items and none), imbue / socket / personalize, act travel (OQ6 a–d, expected messages in the spec).
-- `world/hirelings.md` §8 rule 5 (optional confirmation, PC 2 spec-hirelings pass 3): hireling dies in the wilderness, player goes to town and waits > 11 room passes (132 frames) so the room is freed, then resurrects: expected 0x81, the merc's 0xAC at the player, `9b ffff 00000000`, 0x2A code 5, and no 0x4B / error.
-- `world/quests-status.md` OQ1 (PC 2 spec-quests-status): open the quest log in several states of one quest (e.g. Den of Evil: started; D = 3 monsters left; just completed; completed in an earlier game) and record the screen plus packets: drawn text, icon frame, and the C→S 0x58 sent after the completion animation.
-- `items/bitstream.md` OQ2 (PC 2 spec-items pass 2): pickup and stash of a set, unique, rare, runeword, ear, gold pile, tome and a socket-filled item with `record_packets.py`: the S→C 0x9C / 0x9D streams of each.
-- `items/treasure.md` OQ5 (PC 2 spec-items pass 3): the x87 control word at `0x0055A935` (treasure float math) under each video mode (DirectDraw / Direct3D / Glide, windowed `-w`): is precision still 53-bit (CRT default) or did the video layer switch it to 24-bit (SetCooperativeLevel flags 0x11 / 0x411 lack FPU-preserve).
-- `audio/triggers.md` OQ1 (PC 2 spec-audio pass 3): a sound request log (`0x004B9A00` caller, id, unit, delay, flags, T, C) with each S→C 0x2C / 0xA9 and code-8 request over two floor materials, a melee and a caster fight with a death and a block, an NPC greeting and talk, item pickup / drop / identify, a waypoint, a Leap, a fire-enchanted unique's death, the options sliders.
-- `audio/environment.md` OQ1 (PC 2 spec-audio pass 3): town → Blood Moor → Den of Evil → town, a day change, Blood Raven's death (stinger 34), rain on and off, with the `0x004DCAA0` / `0x004DCD40` / `0x004E42E0` hooks.
-- `formats/wav.md` OQ1 (= §5 C75, PC 2 spec-audio pass 3): dump at `0x00516760` (pointer, size) for the `wav.md` Test-vector files and one ADPCM file per channel count, and the first 256 KiB of `music\act1\crypt.wav` from the refill copy `0x004157C0`; compare byte for byte with our decode.
-- `audio/sound-table.md` OQ1 / OQ10 (PC 2 spec-audio pass 3): see the exact captures written in those open questions.
-- `ui/control-panel.md` OQ1 / OQ6 (PC 2 spec-ui pass 3): a globe refilling after a potion, frame by frame (smoothing precision), and the control panel at 640 × 480 and 800 × 600 with the belt popped and the mini panel in its three layouts.
-- `ui/messages.md` OQ1 (PC 2 spec-ui pass 3): chat lines (whisper, whisper echo, broadcast) at 800 × 600; two monsters with overhead text at once (bubble moved); an NPC dialog panel scrolling with frame times; a timed box.
-- `ui/panels-2.md` OQ4 (PC 2 spec-ui): stash open at 800 × 600, expansion and classic: the `GoldMax` line, to confirm its font (static answer: font 1).
-- `client/model.md` OQ14 (§16) + OQ15 (§15): from `tp80-packets.jsonl`
-  (PC 2) list the S→C messages between the town-portal use and the C→S
-  0x4B after tick 2919 (expected: the 0x08 dropping the hireling's room,
-  no 0x0A / 0x15 / 0xAC for GUID 1 before it), and the same window at
-  the second teleport; one shrine use (any shrine) logging 0x0E / 0x4D
-  bytes and the `0x004B9A00` request (id = table +0x10 for the code).
-- `combat/vitals.md` §4.7 (static, unverified): a level ≥ 2 character
-  dies to a monster (Nightmare or Hell), then picks up its corpse; log
-  stat 13 before death, after death, on the corpse at `0x0057F875`, and
-  after pickup (expect + `pct(loss, 75, 100)`); also a Token of
-  Absolution use (§2.1, `skills/levels.md` §6.5: 0x21 per class skill,
-  stat 5 and 4 after).
-- `combat/hit.md` §6.4 / Edge case 8 (static): a player with two
-  `passive_weaponblock` entries (layer 0 and a matching type) blocking
-  in melee; log `0x0057DCA0`'s return.
-- `render/camera.md` OQ5 (static part answered 2026-10-07): log
-  `0x00650840` calls per client update with caller over monster fights
-  (do `0x004AF4C0` and `0x004B13A0` both step one monster in one
-  update?) and a local player's missile's first client update (two
-  steps expected).
-- `sim/tick.md` OQ2 (breakpoint, no new play): `0x005416B0` with EDX = 0
-  over a long run (any timer scheduled without a unit; log the caller).
-- `tools/original-hooks.md` OQ1–OQ4 and `tools/original-hooks-spawn.md`
-  OQ1 (probes, area-5 round 2026-10-07): each OQ names its probe
-  (walk injection at `0x0044F136`, forced start 0x67, seed override
-  chains run twice, save-dir breakpoint `0x00534410`, spawn at
-  `0x0052FD1E` with `record_packets.py`).
-- `render/unit-composite.md` OQ4: a monster's first attack after a mode
-  change to a not-yet-loaded mode; log whether a draw happens before the
-  mode's graphics-ready flag is set. Same session, OQ7: a bone prison, a
-  leaping unit and a missile with creation flag 0x100; log the motion
-  record (gfx +0x30, 0x4C bytes) at creation and per update.
-- `sim/units.md` OQ8: leave and re-enter a wilderness area; log the
-  restore order and GUIDs (`0x00542B40`).
-- `render/camera.md` OQ6: client player seed (`unit +0x20`) at frame
-  start and end over a session with cursor movement and weather.
-- `render/draw-order.md` OQ14: a capture with a panel open (any UI or
-  cursor draw between the world passes `0x00456EE0` … `0x00477980`).
-- `render/lighting.md` OQ10: memory read of `[0x0072DA50]` and
-  `[0x0072A348]` at the first in-game draw, with and without a "Light
-  Quality" registry value.
-- `ui/text.md` OQ5 (memory read of `0x007D6268` on a loading screen)
-  and OQ9 (captures `text-0001`, `text-0002`).
-- `drlg/rooms.md` OQ13 and `drlg/wall-remap.md` OQ1: dump every built
-  room's link chains (five acts) from the original's memory.
+#### How to run the list
 
-**Ninth set (2026-10-07; the 22 notes `impl-ai-acts2-5`, `impl-skill-slots-2`,
-`impl-missile-bodies-2`, `impl-quests-act1-rest`, `impl-quests-act2`,
-`impl-quests-act3`, `impl-quests-act4-5`, `impl-objects`, `impl-hirelings`,
-`impl-drlg-act3-5`, `impl-room-population`, `impl-client-staging`,
-`impl-lighting-blend`, `impl-draw-order-2`, `impl-ui-panels`, `impl-audio`,
-`impl-d2s`, `wire-client-staging`, `wire-world-staging`, `impl-client-msgs-2`,
-`impl-client-drlg`, `impl-server-join`).** Grouped by who answers, then by
-spec file. **PC 1** answers from Ghidra / the 1.14d binary and edits the spec;
-**PC 2** records or captures on the original game (§5 A, S9-A*). Each line
-names d2rs's current reading (a `TODO(spec…)` at the site, "here" = d2rs).
-IDs are `<tag>-<n>`, n the note's own number where it has one; the tag names
-the note: AI `impl-ai-acts2-5` (Open questions), SK `impl-skill-slots-2` (Open
-questions), MB `impl-missile-bodies-2` (§3–§4), QA `impl-quests-act1-rest`,
-QB `impl-quests-act2`, QC `impl-quests-act3`, QD / QE `impl-quests-act4-5`
-(§3 Act IV / Act V), OB `impl-objects` (§4), HL `impl-hirelings` (§4), DR
-`impl-drlg-act3-5`, RP `impl-room-population` (§3), CS `impl-client-staging`
-(§4), LB `impl-lighting-blend` ("Not wired" 3–5), DW `impl-draw-order-2`
-("Questions"), UP `impl-ui-panels` (§3), ST / TR / EN `impl-audio` (§3), DS
-`impl-d2s` (§5), WC `wire-client-staging` (§2–§3), WW `wire-world-staging`
-(§3), CM `impl-client-msgs-2` (§2), CD `impl-client-drlg` (§3), SJ
-`impl-server-join` (§2–§3), I integration (two specs or two sides disagree),
-R2 a recording or capture.
+- Do the entries in order, REC-01 first. Priority 1 = blocks d2rs code or settles a `Pending` / integration conflict (I-n, C-n); priority 2 = unattended (`--auto`), cheapest first; priority 3 = needs manual play. Inside priority 1 the unattended entries come first. REC ids are cited by specs and never renumbered; new entries take the next number.
+- Tag **[AUTO]** = no player (`--auto CHAR [--seed N] [--input SCRIPT]`, `tools/trace-recorder/autostart.py`); **[MANUAL]** = a person plays inside the recording window; **[ASSISTED]** = `spawn.py` (debugger-placed monsters, foreground `SendInput`); **[NO]** = not reachable (see the last section).
+- Prerequisites: PC 2 (Windows, real GPU), `game/Game.exe` with the reference SHA-256 (`traces/reference-install.toml`; every recorder refuses another), `py` 3.10, branch `claude/pc2-recordings` (autostart, `dumpdrlg`, `check_*.py`). `record_sound.py`, `record_objects.py`, `spawn.py`, `run_scenario.py`, `d2ui.py`, `make_saves.py` live on `origin/claude/local-buddy-q-rec-2026-10-07` / `-q9-rec-2026-10-07`: merge or copy them first (entries say which use them). **NEW HOOK** in an entry = a probe the recorder lacks; add it first (INT3 at the address, log the named fields, check expected bytes as the other hooks do).
+- Characters: **expansion only** (a classic one is refused). `TestSor` (`d2s-tool new --waypoints all --quests acts=4`, panel shows tabs I–IV, no Act V) is the default; seed `644409375` (the D1/D3/D4 seed) unless stated; `ScnAma` / `ScnSor` for town-only runs. "Prepared save" = `d2s-tool` edit, copied read-only into `%USERPROFILE%\Saved Games\Diablo II`, never into the repo. `--auto` uses `-nosave`: a run that must Save and Exit is [MANUAL] without `--auto`.
+- Input-script fragments (800 × 600; waypoint panel: act tabs y 75, x 115 / 178 / 240 / 300; entries x 200, y 138 + 35·k, k = 0 first entry):
+  - `T12` = `wait 3; goto 2 119 300; wait 3; click 178 75; wait 2; click 200 138; waitlevel 40 400; wait 5`
+  - `T23` = `goto 2 156,157,237,238,288,323,324,398,402 300; wait 3; click 240 75; wait 2; click 200 138; waitlevel 75 400; wait 5`
+  - `T34` = the same `goto`, then `click 300 75; wait 2; click 200 138; waitlevel 103 400; wait 5`
+  - Back to Act I from any town: `goto 2 <WPALL> 300; wait 3; click 115 75; click 200 138; waitlevel 1 60; wait 3`
+  - Act I wilderness by waypoint (entry y): Cold Plains 173 (level 3), Stony Field 208 (4), Dark Wood 243 (5), Black Marsh 278 (6), Jail 1 348 (29), Catacombs 2 418 (35); each: `goto 2 <WPALL> 300; wait 3; click 115 75; click 200 <y>; waitlevel <id> 400; wait 8`. `<WPALL>` = the class list of the pc2rec-d3 / d4 inputs (header `args` of those raw files).
+  - Other script words: `wait S`, `move X Y`, `click X Y`, `rclick X Y`, `hold X Y S`, `key K [S]`, `text STR`, `shot NAME`, `waitlevel ID [S]`, `goto TYPE CLASS[,..] [S [DX DY]]` (type 1 = NPC / monster, 2 = object), `dumpdrlg [LABEL]`, `end`.
+- Pairs: one process = one debugger, so an RNG trace and a packets trace are two runs of the same character and `--seed`; the same script then reproduces the same game.
+- Where traces go: `traces/raw/pc2rec-<entry>-<kind>.jsonl` (use `--out`; gitignored). Run the matching `check_*.py` (`check_rng`, `check_packets`, `check_tick`, `check_units`, `check_stats`, `check_drlg_acts`) on every raw file; record the result. After every run `tasklist | findstr Game.exe` must be empty. Commit only a normalized trace a spec asks for (`convert_*.py`), never raw files.
+- How to report: one line per entry appended to `docs/handoff/xpc-to-pc1.md`: `REC-nn | DONE / PARTIAL / BLOCKED | raw file(s) + sha256 | check result | one-line finding per question id (matches / differs: what) | what was not recorded`. PC 1 reads the line, edits the spec (closes the OQ) and strikes the line with the commit. Already done and folded (not repeated): pc2rec-d1 / d3 / d4-rng, pc2rec-p1 / p2-packets (waypoints OQ1 incl. cross-act travel, drlg levels OQ1 / OQ3, outdoor OQ1 / OQ4 / OQ5 / OQ7, outdoor-tilesub OQ2, maze OQ1, intents-events OQ14 chat line, Act III jungle ids).
 
-**Resolved in the ninth fold:** the 47 `d2-client` failures
-`Table(Mismatch([NoHandler { id: 122 }, NoHandler { id: 129 }]))` (0x7A and
-0x81 handlers, `impl-client-staging`); the ten `d2-sim` reds the night's
-sessions reported for each other (`missiles::tests_bodies`,
-`monsters::ai::tests::specd_here_*`, `skills::use_::tests`,
-`skills::mutant_tests::table_check_mutants`: each closed by its own branch;
-`impl-server-join`'s workspace gate at `ef00681`: 5,263 passed, 0 failed);
-F1 "no room population with the default `WorldPending`" and GH1 (population
-places presets only) (`impl-room-population`; `seed-finder.md` F1); "the
-in-process server sends no join" (`impl-client-drlg` §2, closed by
-`impl-server-join`); `quests-act1-rest.md` OQ2 (gibbet / stone / marker
-functions without a dispatcher: routed by `wire-world-staging`);
-`vendors.md` §1 r1 `HratliMagicLvl` (no code change; pinned by
-`hratli_magic_lvl_header_does_not_bind`); the A1Q6 Catacombs entry keeps
-states 4 and 5 (`quests.md` §10.8 event 3, fixed in `act1/q6.rs`).
 
-**Tenth fold:** read each id of the ninth set against "Resolved in the tenth fold" at the end of this section first; the list below is not edited, so it still shows the closed ids.
+#### Priority 0 (high-priority captures: RNG draw order or wire / saved byte layout; run these first)
 
-**PC 1 — RE / spec answers** (Ghidra and spec edits; 288 questions)
+##### REC-81 [AUTO] population.md §11.4 hcIdx 10 (Radament)
+- Priority P0 (RNG draw order).
+- Settles: population.md §11.4 hcIdx 10 (Radament).
+- Steps: Act II save at the Sewers Level 3 waypoint; `record_rng.py --seconds 120` + `record_tick.py --seconds 120` with a hook on `0x005A49B0` / `0x005B23C0`; walk into Radament's room so he spawns.
+- Output: seed (unit vs room) and caller of the `roll(5)` draw, mode argument of each `0x005B23C0` call.
+- Compare: boss unit seed, mode 1. Fold: write the result into the cited rule and drop its PROVISIONAL line.
 
-*Integration*
-- I-1 0x7A order: `pets.md` §8 and `model.md` §14 r2 say owner@5, pet@9; the TSV
-  and `hirelings.md` §13 r2 say pet@5, owner@9. Server and client now differ.
-- I-2 `0x006416D0`: Acts IV / V bind it as `distance_between`, Act II as
-  `living_player_within(unit, radius)` (act4 §3.6, act5 §4.6). [QD §2]
-- I-3 `0x00538680` progression: A1Q6 calls it, Act III (OQ5) and Act IV (OQ9)
-  report `unhandled`, Act V uses a seam; settle once with `d2s.md`.
-- I-4 act palette switch: `model.md` §11 r4 compares the Levels `Act` byte,
-  `msg-units.md` §3 r4.4 the area byte of `0x0061DB70`. [CS Q3]
-- I-5 client room seed: `model.md` §2 r6 has `0x00465FD0` (objects …) step it,
-  `msg-units.md` names only 0x59 / 0xAC; code: 0x51 steps it. [CD Q3; C83]
-- I-6 join order: `path-placement.md` §11 text gives 0x07, 0x15, 0x07 × 9; its
-  R2 and `model.md` §11 r3 record 0x07 × 10, 0x15; code: the text. [SJ Q1; C84]
-- I-7 0x3A AddStatPoint: the proto TSV has one u16 at byte 1, `panels.md` two
-  bytes `[stat][n − 1]` (same bytes); `vitals.md` §2 owns the names. [UP §1]
+##### REC-82 [AUTO] ai-bodies-7.md §27 step 12 (aitype 1 / 12)
+- Priority P0 (RNG draw order).
+- Settles: ai-bodies-7.md §27 step 12 (aitype 1 / 12).
+- Steps: `d2s-tool` Assassin with Shadow Master and a few aitype-1 / aitype-12 skills; `record_rng.py --seconds 240` + `record_tick.py --seconds 240` while the Shadow Master fights in the Blood Moor; log unit-seed steps with caller inside `0x005EB970` per think.
+- Output: draw sequence per skill in list order.
+- Compare: no `roll(A2n)` for an aitype-1 skill whose aurastate the unit lacks; aitype 12 non-progressive scored with the aitype 4 rule. Fold: write the result into the cited rule and drop its PROVISIONAL line.
 
-*`monsters/ai-bodies-2.md` … `-5.md`, `monsters/ai.md`*
-- AI-1 `-2` §11 s1: Vulture with T = 0 and a failed landing (1.14d reads a
-  null unit): stops here.
-- AI-2 `0x005DEAD0` with a unit and a point (`-2` §15, `-3` §8 s1.3, `-4` §8):
-  the request holds one (Summoner, Izual: T; HighPriest hydra: the point).
-- AI-3 `-3` §5 s1.1: a failed teleport check goes on to s1.2 (cooldown spent)?
-- AI-4 `-3` §8 s1.2: the heal-scan callback does not exclude the scanner?
-- AI-5 `-3` §10: ritual slot ≤ 0 reads an uninitialised stack entry ((0, 0)
-  used); ritual points with T = 0 use the own position.
-- AI-6 `-3` §11 case 2, n = 0 skills: does the closing `50 − K` draw follow the
-  wander? (not here)
-- AI-7 `-3` §4 s1: a monster T without an owner record keeps Q = T.
-- AI-8 `-4` §5 s2: "Then s := 3; idle 8" read as following both the walk and
-  the near case.
-- AI-9 `-4` §7.1 s3: no best → melee test and path compute see unit 0; read as
-  "swap to the alternative".
-- AI-10 `-4` §7.2 s6: `d58 >> 8 + d55 + …` read as `(d58 >> 8) + d55 + …`.
-- AI-11 `-5` §3 s5: "else" = the I3 draw failing; a missing Imp row reads
-  aips 0 (1.14d: null pointer).
-- AI-12 `-5` §6 s3.1: the aip8 draw only when S was found.
-- AI-13 `-5` §7 s4: C with a draw ≥ aip6 goes on to s5.
-- AI-14 `-5` §12 A s3: the whirlwind request byte +0x15 := 100 has no field
-  in the mode request.
-- AI-15 `-5` §15 s2: "nearer" read as squared distance.
-- AI-16 `-5` §20 s7: a missing wave record passes −1 as the skill param
-  (1.14d: fatal).
-- AI-17 `-5` OQ2: the clone's spawn info `0x0063EFA0` (draws, class / point /
-  mode) not modelled; class 570, mode 1, ±12 used.
-- AI-18 `ai.md` §7.1: `0x005DDFC0` (WillOWisp) read as not setting the path
-  step count, like `0x005DE490`.
-- AI-19 `-3` OQ3 the wisp find `0x0065A950`'s order, `-2` OQ4 the queen spawn
-  class: seams only.
+##### REC-62 [MANUAL] render/camera.md §8 (which missiles / skills reach `0x004D2610`, `0x004D3D30`, `0x004D5310
+- Priority P0 (RNG draw order: each shake draws 2 values per frame on the client player seed).
+- Settles: render/camera.md §8 (which missiles / skills reach `0x004D2610`, `0x004D3D30`, `0x004D5310`, `0x004D6680`, `0x004D6820`, `0x004D7400`, `0x004D8000`, `0x004F0710`, and the computed (A, t1, t2, t3)).
+- Steps: NEW HOOK at `0x00476A80` entry logging return address, ECX, EDX, [esp+4], [esp+8], client update count, local player seed before / after; run during the REC-31 skill / missile sitting and the REC-29 Act IV run (Diablo).
+- Output: `pc2rec-r62-shake.jsonl`.
+- Compare: per site the parameters against the §8 table, the triggering class, 2 draws per frame while a ≠ 0. Fold: write the result into the cited rule and drop its PROVISIONAL line.
 
-*`skills/bodies.md`, `skills/bodies-2.md`, `monsters/init.md`*
-- SK-3 `bodies.md` §6.1: an invalid skill leaves `summon_class`'s `mode`
-  unwritten (0 here; every caller tests R first).
-- SK-4 §6.5 s2: does `itemevent2` share the `itemevent1` condition (read:
-  yes)?
-- SK-5 §6.5 s9: do the ilvl clamps apply to a given ilvl (read: only in the
-  ilvl = 0 branch)?
-- SK-6 §6.15: a negative skeleton-mastery level reads before the component
-  table (nothing written here).
-- SK-7 `init.md` §8.1 flag 8: "TH from TH / L-TH" read as pct(monlvl TH,
-  monstats to-hit, 100) in `mode_damage`.
-- SK-8 `bodies-2.md` ";" after "Hit:" / "EType ≠ 0:": read as inside the clause
-  (`claw_hit`, Fend, Poison Dagger, §2.19, §2.26), as §4.3 says.
-- SK-9 `bodies-2.md` §2.16: a negative `step2` (read as 1).
-- SK-10 §6.8: a stored hit-class index outside 0…2 (no class set).
-- SK-11 §7.2 s8: the Strafe rewind is made whether or not K2 exists.
-- SK-12 §7.10: Bone Prison "pet type ≥ count → 0" read as pt := 0.
-- SK-13 `bodies.md` §6.2: `0x0057CCB0(it, 1)` on a replaced linked unit has
-  no full argument list (`BodyEffect::KillReplaced`).
-- SK-14 §6.5 s6: `0x005701B0(m, 0, k, −1)` is "right skill" but §2.16 calls
-  side 0 left; passed raw.
+##### REC-51 [AUTO] client/model.md OQ1 and OQ2, client/msg-ui.md OQ2 (0x10000 per-caller conditions)
+- Priority P0 (RNG draw order in the client animation).
+- Settles: client/model.md OQ1 and OQ2, client/msg-ui.md OQ2 (0x10000 per-caller conditions).
+- Steps: `record_frames.py --seconds 120` + `record_rng.py --seconds 120` on one character in the Blood Moor: walk, run, fight 3+ monsters until one dies; hooks: entry/exit of 0x004AFF60 (unit type, GUID, mode +0x10, seed +0x20/+0x24); 0x00464810 and 0x004647D0 (caller, unit, mode); 0x00463390 (local player path x/y); per frame log `[0x007A0498]`, the server tick, the local player's client and server positions.
+- Output: `pc2rec-r51-frames.jsonl`, `pc2rec-r51-rng.jsonl`.
+- Compare: client seed draws per frame against the message-driven draws in client/msg-units.md; every 0x004AFF60 mode change against that frame's S→C messages; local position against server position (any lead = prediction). Fold: write the result into the cited rule and drop its PROVISIONAL line.
 
-*`sim/pets.md`*
-- SK-2a a remove broadcasts 0x7A three times while the monster exists
-  (unlink → dismiss) against the "twice" of edge cases 1 and 4.
-- SK-2b a GUID in two lists makes §3 / §4 loop forever: state the rule.
-- SK-2c the add record's +0x10 / +0x14 are never set (read 0 → always 0x7A).
-- HL-3 §5 r3 full-list eviction: `hirelings.md` "removed with kill" (two
-  broadcasts) vs `pets.md` §5 r2 unlink (one); code: `pets.md`.
-- HL-4 §5 r3 max recompute `0x00575900` (`pets.md` OQ2): max 0 → `basemax`.
+#### Priority 1
 
-*`missiles/bodies.md`, `bodies-2.md`, `missiles.md`, `sim/intents-events.md`*
-- MB-1 `bodies.md` §6 s2: plague ring flags 0x17 (`ring8` 0x1F) hold 0x10
-  "fixed point" (§R2.1) yet s3 / OQ3 shift << 8; flags used here.
-- MB-2 `bodies-2.md` §41 s2: `elem_roll` returns `EType` (§R9.6), edge case 5
-  reads a rolled amount; the return is used.
-- MB-3 `missiles.md` §R6.2: where the full roll's crit and the 103 / 104 / 106
-  bypass flags land in the 0x70-byte area record (crit → 0x2000).
-- MB-4 `bodies-2.md` §60 `tyrael`: room refresh inside or after the quest-test
-  branch? (after, always)
-- MB-5 §47 `spawn_for_level`: s4's "c = −1 → return 0" vs s3's fatal read for
-  an invalid class (fatal here).
-- MB-6 §47 / §43 s4.2: what a missile with no room passes (no spawn, no gold
-  here).
-- MB-7 §44 / §47: corpse finder `0x0065A950` (OQ3) and the room seed have no
-  spec'd provider.
-- MB-8 `intents-events.md` §7.3: no sender for the 0x67–0x6D client pass, so
-  0x69 codes 8 / 9 at death (§7.4 r7) cannot go out. [MB §3 item 1]
+##### REC-01 [AUTO, no run] Analysis of two existing raw files
+- Priority 1 (cheapest: no game).
+- Settles: `client/model.md` OQ14 + OQ15 first part: from `tp80-packets.jsonl` list the S→C messages between the town-portal use and the C→S 0x4B after tick 2919 (expect the 0x08 dropping the hireling's room, no 0x0A / 0x15 / 0xAC for GUID 1 before it) and the same window at the second teleport (R2-28, C80); `world/objects.md` OQ14: in `obj1-objects.jsonl` the mode argument of the two class-37 allocations with speed 0 (expect 2).
+- Steps: `py` over the two files (grep `s2c` records between the two tick markers; filter allocations of class 37).
+- Output: a note in the xpc line (message list, mode values).
+- Fold: PC 1 closes OQ14 / OQ15a and objects OQ14; a differing message names a model.md rule to fix.
 
-*`world/quests-act1-rest.md`*
-- QA-1 §4 s2.3.2: the retry's room (`0x00463740`) is not null-tested; what
-  does `0x005B2F20` do with a null room? (spawn skipped here)
-- QA-2 an object or marker without a room (gibbet event, Cain leaves, trap
-  chest): `QuestError::Fatal`; confirm it is never null in 1.14d.
-- QA-3 §1 L4 `0x00593130`: party step read as inside the "neither 4.0 nor 4.1
-  and in Tristram" test.
-- QA-4 §5: a player without a client gets no progression.
-- QA-5 §8 item 1: +0x38 (the scroll's GUID) not kept; confirm no reader.
-- QA-6 chain 37's `0x0058F870` runs before Kashya's deferred reward; body
-  unwritten.
+##### REC-02 [AUTO] Join stream and new-character entry (packets + RNG twin)
+- Priority 1 (blocks code: the join order is an open integration conflict).
+- Settles: I-5 (client room seed: which function steps it: `model.md` §2 r6 vs `msg-units.md`), I-6 (join order: 0x07 × 9 then 0x15, or ×10), SJ-1..3, C83, C84 (frame-1 S→C order and callers from 0x59 to 0x15; R2-8, R2-10), C85 / R2-9 (game +0x80 = `0x00546C60`'s result = 0x03 u32@8), `client/model.md` OQ9 (client side of the join stream; R2-10), `sim/intents-events.md` OQ13 (caller of the first 0x48 in frame 2), `client/bridge.md` OQ6 (a 0x2C then a 0x0A in one chunk: look in this stream), `quests.md` OQ4 / R-PQ-3 (new character: 0x5E, 0x28 type 6, 0x29 each sent twice; an existing character once; code `0x0056A072` then `0x005344EF`), `sim/rng.md` OQ2 (a brand-new character's first game and a save-and-exit reload: log game +0x7C and the S→C 0x03 map seed; the reload half is a 30 s [MANUAL] run without `--auto`).
+- Steps (A, packets): `py tools/trace-recorder/record_packets.py --seconds 60 --auto ScnAma --seed 1234 --input "wait 5; end" --out traces/raw/pc2rec-r02a-packets.jsonl`; (B, rng twin): the same with `record_rng.py --seconds 120 ... --out traces/raw/pc2rec-r02b-rng.jsonl`; (C, existing character): A again with `--auto TestSor --seed 644409375` (`pc2rec-r02c-packets.jsonl`). Level-1 fresh save `ScnAma` stands for "new character" (R-PQ-3); if its entry sends each message once, also run a character created in the game's own menu by hand (manual, 30 s). NEW HOOK for C85: log EAX of `0x00546C60` and game +0x80 at the first tick.
+- Output: the three files above.
+- Compare: S→C order in frame 1 with callers against `path-placement.md` §11 and `model.md` §11 r3; the room-seed steps in B (sites from `rng.md`) against I-5; C against A for the twice-vs-once. Fold: PC 1 fixes the losing spec text; d2rs's join order and client seed step follow.
 
-*`world/quests-act2.md`*
-- QB-1 Test vector 1 "table state 2 (msgs 325–334)" vs chain 8's 315–324;
-  tests follow §1.2.
-- QB-2 chain 8 event 10 `0x00598980` and chain 7 event 10 (list removal) are
-  not described.
-- QB-3 do chains 26 / 27's event-11 handlers test the NPC class?
-- QB-4 §5.7: the altar does not call the quest-chest gate (§1.3 lists it).
-- QB-5 §5.8: darken sends status 1 first, so "status 0 → status 2 to all" is
-  unreachable; confirm.
-- QB-6 "status n, state m" in game-start callbacks: bytes only, no flags
-  reset, nothing sent.
-- QB-7 §5.6 / §6.7 ";" scope: "if intro: game 11.13" after the 11.1 block;
-  §6.7 grants also in intro games.
-- QB-8 §7.2: +0x09 := 0 on every kill; the 13.2 iterate inside "status < 2".
-- QB-9 §8.3: Tyrael only adds table state 2 and stops.
-- QB-10 §8.11 msg 442: only state := 5 depends on 14.13; msg 430: refresh
-  before state := 2.
-- QB-11 §8.6: 0x44 with a non-orifice class returns 5; the 0x58 layout is not
-  in the spec.
-- QB-12 §8.11 kill party credit: members get the player's test (without 14.0,
-  14.3–14.5).
-- QB-13 §4.8 pick-up: 0x5D also for `tr1 ` with 10.3 set.
-- QB-14 events 13 / 14 count at most one item per code (yes / no seam).
-- QB-15 spec OQ5: where chain 38's intro record is stored.
-- QB-16 §6.10 Jerhyn's palace spawn: base point of the offsets, the `r`
-  argument, who stores +0x3C (`unhandled 0x0059EF70`).
-- QB-17 §8.11 Tyrael's party tail `0x0059C9A0` → `0x0059C920` ("per D2MOO,
-  not re-read"): members get no bits.
-- QB-18 bodies: `0x005940A0` (chain 7 Cain hook), chain 38's active fn
-  `0x005985C0`, the status fns of chains 26 / 27 / 38.
-- QB-19 §3.6 status ≥ 2 with state < 3, and the orifice operate with a busy
-  player: not described.
-- QB-20 §1.3: chest drop code set once before the count (per item here); the
-  chest item level (`None` here).
+##### REC-03 [AUTO] Runtime tables not in `dump_tables`
+- Priority 1 (blocks the treasure walk code).
+- Settles: `items/treasure.md` OQ4 (IT-9): runtime TC array `[0x0096C5EC]` (count × 0x2C bytes plus each TC's entry block) and chest table `[0x0096C5F4]` equal the §1 model built from `treasureclassex.bin`.
+- Steps: `py tools/trace-recorder/dump_tables.py --out traces/raw/pc2rec-r03-tables` with the two dumps added (NEW HOOK-free: memory read at the dump point `0x0044B93C`, files `map-tc-runtime.bin`, `map-chest-table.bin`). ~7 s.
+- Output: `traces/raw/pc2rec-r03-tables/`.
+- Compare: byte for byte with the §1 model (`data-tool`). Fold: treasure.md OQ4 closed; a differing start / flag names the §1 rule.
 
-*`world/quests-act3.md`*
-- QC-1 17.3 (Lam Esen "left town"): which code sets it? §3.7 event 13 restores
-  state 3 from it.
-- QC-3a spec OQ2: `0x00559A30`'s `&level`.
-- QC-3b OQ3: monstats +0x0D bit 6 (used as 0x40).
-- QC-3c OQ4: `0x005A0180` / `0x0063E9F0` (the `special_monster` seam).
-- QC-3d OQ6: `0x0063BEF0`, the weapon slot (`weapon_code` seam).
-- QC-4 Natalya / Hratli map AI (`0x005BD040`, `0x005B7230`) have no 1.14d
-  caller, so +0x24 / +0x18 are never set: confirm.
-- QC-5 decoy, altar, Hratli dummies, wanderer without a room: no form given.
-- QC-7 `quests.tsv` `spec` column still `catalogued` for the Act III rows
-  (OQ7, table edit).
+##### REC-04 [AUTO] Tick run over a waypoint walk with the room / unit probes
+- Priority 1 (settles `Pending` of `drlg/rooms.md` OQ13 / OQ15 / OQ23; blocks DRLG client code).
+- Settles: `drlg/rooms.md` OQ15 (client build timer (B, T, cursor) per client update over a level load), OQ23 (across a client level free: per client update `[0x007A0498]`, client DRLG +0x98, +0x45C, +0x460 and the byte at (+0x460)+0x44, plus every room free address; whether a freed cursor room is reallocated before the next timed step, §4.6 rule 11), OQ13 + `drlg/wall-remap.md` OQ1 (every built room's link chains from memory; Acts I–IV; Act V see REC-30), `drlg/levels.md` OQ7 + `monsters/population.md` (R2-31: room +0x64 lists of a crypt and an outdoor level), `sim/units.md` OQ8 (leave and re-enter a wilderness area: restore order and GUIDs, `0x00542B40`), `sim/tick.md` OQ2 (`0x005416B0` with EDX = 0 over a long run: any timer without a unit, log the caller), part of `sim/units.md` OQ1 (0.2.0 `anim` + `site` records: waypoint / walk / town only; combat part in REC-09).
+- Steps: `py tools/trace-recorder/record_tick.py --seconds 400 --auto TestSor --seed 644409375 --input "<T12>; dumpdrlg act2; <Act I tab: Cold Plains>; wait 8; dumpdrlg coldplains; <Stony Field>; <Cold Plains again>; <Jail 1>; <Catacombs 2>; dumpdrlg cata2; <T-to Act III via T12/T23>; dumpdrlg act3; end" --out traces/raw/pc2rec-r04-tick.jsonl`. NEW HOOKS: the OQ15 / OQ23 fields per client update, room-free addresses, `0x005416B0` entry with EDX = 0 and its caller, a `dumpdrlg rooms` word writing each built room's link chains and +0x64 list.
+- Output: `pc2rec-r04-tick.jsonl` (+ its `dumpdrlg` records in the footer notes).
+- Compare: `check_tick`, `check_units`, `check_drlg_acts` must pass (0 errors); then the logged fields against rooms.md §4.6 and the wall-remap link chains. Fold: close OQ13 / 15 / 23 / wall-remap OQ1 / levels OQ7 / units OQ8 / tick OQ2 or edit the rule.
 
-*`world/quests-act4.md`, `quests-act5.md`, `quests-act5-2.md`*
-- QD-3 OQ4: `drop_item_at` has no `&level`, so the gem / rune slot 50 and the
-  hammer's slot are not passed.
-- QD-5a OQ5: `0x005A4850` (owner: monsters).
-- QD-5b OQ6: the ghost removal `0x005E7350` (owner: AI).
-- QD-5c OQ7: `0x0061AED0` after the dummy (owner: objects / rooms).
-- QD-5d OQ8: the +0xAE0 superunique table (owner: data).
-- QD-6 Hellforge delays use `FrameCnt1` = `FrameCnt3` = 22 as constants; name
-  the reading function.
-- QD-7 §8 creation links exist for chains 22 / 24 only; chain 23's (bases 243,
-  hcIdx 36–38) are not stated for its caller.
-- QD-8a the Diablo spawn tries r = −1 / 5 / 10 at one spot; a missing
-  start-point object counts as a failed spawn.
-- QD-8b Q1 event 3's silent status sits inside the state-2 test.
-- QD-8c Hadriel's wish to talk tests "26.13 and 26.0 both clear".
-- QE-1 `0x00589540` (part 1 §5.9): "kills him again if he is back" has no
-  test for "back".
-- QE-2 §5.7 scroll reward with iced Anya interacting: `0x00589070`; which
-  player gets S5D(33, 0x20, 0)?
-- QE-3 §5.9: Anya's to-town portal flag arguments ((1, 1, 0) here).
-- QE-4 Anya AI hooks `0x0058A7D0` … `0x0058AA10`, map-AI stores
-  `0x0058AD80` / `0x0058AE10` (part 1 OQ4).
-- QE-5 part 2: Tyrael's last portal `0x0058D7D0` and spawn `0x0058E920` lack
-  the free-spot limit; the spawn needs flags 0x42.
-- QE-6 part 2 §7.8: summit door 564 in mode 0 after the Ancients names no warp
-  function (`0x0058D6A0`).
-- QE-7 part 2 OQ8: `quests.tsv` row 40 is `?` and its 15 rows are missing from
-  `quest-messages.tsv`; fill both, then drop `intro::TABLE`.
-- QE-8a plain "status n" read as a byte write; "status n (silent)" leaves the
-  flags (`quests.md` §10.1).
-- QE-8b §4.7 keeps flags 0x20 through "status 2 to all".
-- QE-8c freed > 15 → 36.5.
-- QE-8d §7.6's post-kill steps sit inside not-intro.
-- QE-8e §8.5 "none → stop" ends step 1 only.
-- QE-8f experience stats 13 / 29 written through `add_stat` (no set-stat named).
+##### REC-05 [AUTO] Act changes by waypoint: packets and palette frames
+- Priority 1 (I-4 integration conflict: act palette switch).
+- Settles: I-4 / R2-11 (act palette switch: `model.md` §11 r4 compares the Levels `Act` byte, `msg-units.md` §3 r4.4 the area byte of `0x0061DB70`), `quests.md` OQ10 / R-PQ-4 for the waypoint-driven act changes (S→C 0x61 bytes against §8.1; Warriv, Meshif, the Hellgate and Tyrael portals are REC-27 / 28 / 29), `client/model.md` act-change message order (the part not settled by waypoints OQ1, already folded), `client/model.md` OQ8 (a waypoint to another act: S→C 0x05, 0x03, 0x53 bytes; static answer 13).
+- Steps: (A) `record_packets.py --seconds 120 --auto TestSor --seed 644409375 --input "<T12>; <T23>; <T34>; <back to Act I>; end"`; (B) `record_frames.py --seconds 120 --auto TestSor --seed 644409375 --input "<same>" ` (GDI palette read each frame). NEW HOOK: log the palette-switch call (`0x0061DB70` area byte, Levels `Act` byte) in A.
+- Output: `pc2rec-r05a-packets.jsonl`, `pc2rec-r05b-frames.jsonl`.
+- Compare: first frame whose palette changes against the act-change message tick; the byte the switch reads. Fold: PC 1 picks the correct reading in `model.md` §11 / `msg-units.md` §3.
 
-*`world/objects.md`, `object-functions.tsv`, `sim/units.md` §6.4*
-- OB-1 §5.1 Test vector 1: the fifth class-4 pick is id 9 (index 4 of
-  {1, 6..15}), not 8; fix the vector.
-- OB-2 §4 r3: speed sum read in 32 bits, then clamped to 0..0x7FFF.
-- OB-3 `units.md` §6.4 type 1: footprint free read as inside the mode-1
-  branch.
-- OB-4 §14: the 0x4D "operator GUID" written as stored − 1 (OQ4).
-- OB-5 §14: the 0x60 portal message layout is not in the spec.
-- OB-6 §6: 580 outside level 25 → 581's path (OQ6); 581 / 582 not covered.
-- OB-7 §8 locked chest with no operator = "no key".
-- OB-8 §8 null drops in the class-397 bands count as neither magic nor
-  non-magic.
-- OB-9 §8 breakables return 1 on every path.
-- OB-10 §8 exploding barrel: distance metric and bound inclusivity (provider's).
-- OB-11 §8 trap 8 / 9: the trap monster id is read after the control-seed step
-  (OQ3).
-- OB-12 §8 fire objects 162 / 160 allocated in mode 0.
-- OB-13 §9 no shrine record → `Err(NoRow)` before any change; no operator → no
-  effect.
-- OB-14 §9 codes 4 / 5 written as `set_stat` of the new value.
-- OB-15 §9 code 16 does nothing; code 17 without a free spot creates nothing.
-- OB-16 §9 storm: the life writer, loop nesting (i outer) and missile flags
-  (0) are not stated.
-- OB-17 §9 the potion drop has no address (own seam).
-- OB-18 §10 locked door: key test without the assassin exemption.
-- OB-19 §10 debounce and hostile delay compared as wrapping u32 sums.
-- OB-20 §12 well: "used" = a value changed; the refill mode set is queued
-  explicitly after; `Parm2` = 0 → error.
-- OB-21 §13 portal with a monster or no operator refused; rule 3 (OQ7) not
-  run.
-- OB-22 wiring: the init's footprint stamp sees no path record (the path is
-  placed after the per-kind init).
-- OB-23 the 0x13 result after an operate or a walk read as 0.
-- OB-24 §15 `PopulateFn` unspecified: population creates objects in mode 0.
-- WW-6 quest object bodies not stated: Jerhyn inits 18 / 19, gibbet init 7,
-  tree init 9, Cain portal init 61, Wirt's body operate 33 / init 37.
-- WW-7 Act II `spawn_quest_object`: the argument form's mode is not stated.
+##### REC-06 [AUTO] Waypoint object init (town waypoint after travel)
+- Priority 1 (cheap, shares REC-05's route).
+- Settles: `world/waypoints.md` OQ3 (R-NV-13): does init 17 (`0x00547210`) run for the town waypoint on arrival, with which arrival-list head (game +0x10F0 → +0x1110); the arrival node left in the list (edge case 3).
+- Steps: `record_packets.py --seconds 180 --auto TestSor --seed 644409375 --input "<T12 to Cold Plains by waypoint: Act I tab, y 173>; <back to Rogue Encampment: click 200 138>; <Cold Plains>; <Rogue Encampment>; end"`. NEW HOOK: INT3 `0x00547210` entry and exit, log object class, room, the list head.
+- Output: `pc2rec-r06-packets.jsonl`.
+- Compare: breakpoint hits per arrival; if never hit, the town object came back without init (its 0x51 mode 2). Fold: waypoints.md OQ3.
 
-*`world/quests.md` seams, `items/*`, `render/lighting.md` (functions no spec states)*
-- WW-8 `0x0061C450` the Tainted Sun environment (environment spec).
-- WW-9 `0x00559A30` `quest_drop` is in no items spec.
-- WW-10 `0x0061AED0` (`set_room_portal` / `refresh_room`) is not specified.
-- WW-11 the 0x58 insert dialog layout (`open_insert_dialog`).
-- WW-12 `npc_intro_heard` / `set_npc_intro` storage (= QB-15's question).
+##### REC-07 [MANUAL] Object operation and room population
+- Priority 1 (blocks object code; objects.md OQ1 is the largest open draw order).
+- Settles: `world/objects.md` OQ1 (R2-18: draw order of §8–§12 and the 0x0E / 0x4D / 0x60 bytes of §14 for one chest, shrine, door, well and portal; a `Sync` = 0 allocation, OQ2), OQ10 (a fire object class 160–162 a few seconds: no 0x0E 1 → 2 update), R2-17 (Cairn stone / gibbet / tome operate: 0x0E ticks and bytes, C78: the Cairn part is in REC-11), `sim/units.md` OQ4 (delayed events of a chest, door, trap, shrine: object-control seed draws of events 0 and 8 with caller addresses, scheduled frame), `client/model.md` OQ15 second part (one shrine use: 0x0E / 0x4D bytes and the `0x004B9A00` request, id = table +0x10 for the code), `sim/units.md` OQ1 (combat-free part: shrine, well, trade), `world/object-population.md` OQ1 (OP-1: first population of fresh rooms, R2-32 / S9-A6: eight active-room-seed steps per room plus one per passing slot, populate steps, classes from the Blood Moor `ObjGrp`), `client/model.md` OQ9 monster half (a monster's client +0x20 seed after its 0xAC against the server unit's seed, from the Blood Moor monsters of run 3), `monsters/init.md` OQ4 (one population pass with the rng hook and callers = run 2), `sim/units.md` OQ6 trade part (78 rows left `proof = file`: a `site` recording over a trade and an item use; the combat part is REC-09).
+- Steps: new Normal character, Rogue Encampment → Blood Moor (west, walk on ~60 s so new rooms populate), operate one chest, shrine, door, well, a town portal (scroll) and a fire object if met. Three runs of the same route and character, `record_objects.py` (q9-rec) for the first: (1) `record_objects.py` (packets + RNG of the operates); (2) `record_rng.py --seconds 120` (population: OP-1); (3) `record_packets.py --seconds 120` (the 0x51 objects of the same route); optionally `record_tick.py` for units OQ4. Write each action with its wall-clock second.
+- Output: `pc2rec-r07-objects.jsonl`, `-rng.jsonl`, `-packets.jsonl`.
+- Compare: `check_rng` / `check_packets` pass; draw lists per operate against objects.md §8–§12; population draws against object-population.md §3–§7 (no corpse-on-stick from population, §7.7). Fold: close objects OQ1 / 10, units OQ4, population OQ1; mismatches become spec edits.
 
-*`world/hirelings.md`*
-- HL-1 §7.2 r3: the `ExpRatio` step (`0x0057E390`, "shift from the MaxLvl
-  row") has no formula (also `vitals.md` §4.3).
-- HL-5 §3.2 r6: does the init stop when the add fails? (continues here)
-- HL-6 §7.1 r2: "defender level" base or total? (base)
-- HL-7a §11 r4: where the copy of the old item goes relative to r3's "cursor
-  := none" (after it, before the refresh calls).
-- HL-7b which unit `0x0055DF00`, `0x0055F4F0`, `0x00540E60`, `0x005417D0` act
-  on.
-- HL-8 §13 r4 / OQ7: stats sent to the owner only, at once (not queued).
-- HL-9 §1.2 r3: the fallback `0x00656390` is not described.
-- WW-2 §8 r1: the death test `0x00457490` and the death flag argument (OQ8);
-  `damage.md` §7.2 does not place `0x005751A0` among the kill's steps.
+##### REC-08 [MANUAL] A monster kill with a drop, pick-up and stash
+- Priority 1 (blocks the treasure / item creation code).
+- Settles: `sim/intents-events.md` OQ11 (tick order 0x9C, 0x69, 0x65 with callers; expect 0x65 from `0x0053FB30` called by `0x0053FC20`; breakpoint: the return address one level up of `0x0053FB30` in a kill tick), R2-33 (the drop position, S8-A3, and the treasure walk S9-A1 (5)), `items/treasure.md` OQ1–OQ3, items R1 (item creation draws: `items/affixes.md` OQ1, `generation.md` OQ2, `properties.md` OQ1, `quality.md` OQ1), `items/inventory.md` OQ1 / OQ2 / OQ12 (R1–R5 item-move packet order: pick up, drop, stash, swap, gold), `items/bitstream.md` OQ2 (pickup and stash of a set, unique, rare, runeword, ear, gold pile, tome and a socket-filled item: the S→C 0x9C / 0x9D of each: a `d2s-tool` save holding these items in the stash makes it deterministic), `combat/vitals.md` OQ8 (every S→C 0x18 / 0x95 / 0x96 / 0x1A–0x1C with tick, over damage, potions, running), `quests.md` packets for 0x50 where it appears.
+- Steps: Blood Moor, kill monsters until a drop (use a high-level character so drops are items, a second pass for each of the listed item kinds), pick up, stash, drop. Pairs: `record_rng.py --seconds 300` run and `record_packets.py --seconds 300` run, same character, seed fixed with `--seed` where the game start is automatic; treasure OQ1–3 also under `record_stats.py` if a drop has stats to check.
+- Output: `pc2rec-r08-rng.jsonl`, `-packets.jsonl` (+ `-stats.jsonl`).
+- Compare: the draw order of the kill tick against `treasure.md` §3–§9; packet order against `inventory.md` §R1–R5; d2rs's item streams byte-for-byte. Fold: close the OQs or edit.
 
-*`drlg/outdoor-act3-act5.md`, `outdoor.md`, `maze.md`, `preset.md`, `rooms.md`*
-- DR-1 §2.7 jungle code lookup outside rows 1..14 (and row 0 slot 3):
-  `Fatal(0x78C)`; the image value is not given (OQ2).
-- DR-2 §2.4 s4: fewer than i + 1 blocks with C = 2 is not described; nothing
-  dropped, n still decrements.
-- DR-3 a jungle id array shorter than SXb·SYb at build: read as 0.
-- DR-4 `outdoor.md` §9.4 Kurast border order: confirm against `0x0067EAD0`,
-  `0x0067EC30`, `0x0067ED70`.
-- DR-5 random placer R: stamps at the tried cell, no margin / offset.
-- DR-6 §11 s3 ravine walk: grid value − B outside 0..11, or no reach of
-  (0, gh − 2): placeholder `Fatal(0x0067DEF0)`.
-- DR-7 §11 s2 barricade walk: fixed count of 2-cell steps; ends that never
-  meet are not described.
-- DR-8 §11 s5, s9 caves / specials tall-wide: the level tile rect used.
-- DR-9 prisons helper `0x0045C390` read as `roll`.
-- DR-10 `maze.md` §7.1 cross-level sorted insert: "otherwise at the tail".
-- DR-11 built rooms' orth links are dropped after maze generation (no link
-  list on `drlg::room`).
-- DR-12 `preset.md` §6 s10 link bit 0 needs a link-record type; door flag 0x20
-  (`rooms.md` §9.5.1) is not set by the tile code.
-- DR-13 `maze.md` §5.5: the spiral never makes branches edge-adjacent, so the
-  after-all-branches pass is unobservable; confirm.
+##### REC-09 [MANUAL] Combat core with stats
+- Priority 1 (blocks the combat / stat code: spec rules are static readings).
+- Settles: `combat/damage.md` OQ1 (hooks `0x0057DBF0` entry / exit EBX record +0x08…+0x4C; `0x0057C6C0` defender stat 6 before / after; attacker and defender seeds), OQ2 (life / mana leech item and a vampire hitting the player: `0x0057C420`, `0x0057A980` / `0x0057AA00` amounts), `combat/hit.md` OQ1 + OQ2 and §6.4 / edge case 8 (shield-wearing player and blocking monsters: `0x0057DB61`, `0x0057DFB0`, `0x0057E04B`; a player with two `passive_weaponblock` entries: `0x0057DCA0` return), `combat/vitals.md` OQ1 (level-up, five stat points and a skill point: 0x3A / 0x3B, hooks `0x00570880`, `0x00570D60`, stats 4–13), §4.7 (a level ≥ 2 character dies in Nightmare / Hell, picks up the corpse: stat 13 before death / after death / on the corpse `0x0057F875` / after pickup, expect + `pct(loss, 75, 100)`; a Token of Absolution: 0x21 per class skill, stats 5 and 4), `sim/stat-lists.md` OQ4 + `sim/stats.md` OQ1 (`record_stats.py` over equips, a level-up, a buff and a curse; items with +max life / mana, IAS / FRW, a socketed item: `check_stats.py` passes with no hidden writes), `client/stat-lists.md` OQ6 (a buff: 0xA8 bytes), `client/msg-skills.md` OQ1 (equipping a charged item), `sim/units.md` OQ9 rest (kills by melee, missile and spell: at `0x005A6FF0` entry the record R bytes +0x00…+0x1C, byte +0x14, caller chain) and `monsters/init.md` OQ13 (a bonefetish1 kill beside the player: death area damage, §4.6 branch 1.4; the server 0xAC of a hireling and of a boss with umods, §24 rules 4 / 6), `render/camera.md` OQ5 (`0x00650840` calls with caller per client update over monster fights; a local player's missile's first client update, two steps expected), `sim/units.md` OQ1 (combat, skills, cooldown part), `sim/intents-events.md` §3.5 (a monster casting at the player from outside its rooms: 0x4D; a pet summon: 0x99 / 0x9A), `sim/units.md` OQ6 combat part (78 rows left `proof = file`: a `site` recording over combat with skills to confirm the scheduled unit kinds of the state-timer, damage and trade sites; trade and item use in REC-07).
+- Steps: three sittings of ~240 s on one character with the hooks named: (1) `record_rng.py` (damage, hit, leech, level-up draws and seeds); (2) `record_stats.py --seconds 300` (equips, level-up, buff, curse, leech, charged item); (3) `record_packets.py` plus `record_tick.py` (0x18 / 0x95 / 0x96 / 0x1A–0x1C bytes, units OQ1 / OQ9). Death + corpse in sitting 2 on a Nightmare character. NEW HOOKS: those listed per OQ above.
+- Output: `pc2rec-r09-{rng,stats,packets,tick}.jsonl`.
+- Compare: `check_stats`, `check_tick`, `check_units`, `check_packets` pass; recompute §3–§5 of damage.md / hit.md from the logged stats: every record and life change must equal. Fold: close the OQs.
 
-*`drlg/levels.md` §11*
-- RP-1 §11.3 s6: orientations above 19 read past T1 (rule 0 here).
-- RP-2 §11.3 s4: the local blocker grid's layout (1,024 cells, 256 rows) is
-  not given; (W + 1) × (H + 1) here.
-- RP-3 §11.4: lookups outside the cells read outside the grid in 1.14d; −1
-  here.
-- RP-4 s8 "same index": the full cell value is compared.
-- RP-5 §11.3 s9: the wall record +0x10 is not stored (read only by drawing).
+##### REC-10 [MANUAL] Hireling session (and resurrect at an NPC)
+- Priority 1 (blocks `hirelings.md`; I-1 0x7A order is a live integration conflict).
+- Settles: `world/hirelings.md` R2-27 rest / R2-42 / OQ7 / OQ2 / OQ9 (HL-7, HL-8): with `bdMercTwo`: hire (0x9B + 0x7A), level-up (0xA1 / 0xA2 and the second stats batch), death (0x9B name id + cost, 0x7A remove), resurrect at Kashya (0x9B `ffff 00000000`, 0x81, 0x2A code 5; = `npc.md` OQ5 / OQ6 R-NV-1: C→S 0x62, gold 0x1D next frame), give / take an item (two 0x540E60 notices, new GUIDs), the 0x7A order and remove broadcasts on the wire (I-1, SK-2a, HL-3, R2-26), `world/hirelings.md` OQ2 / R2-44 (die, change level, return, resurrect), §8 rule 5 (the hireling dies in the wilderness, the player waits > 11 room passes = 132 frames in town so the room is freed, then resurrects: expect 0x81, the merc's 0xAC at the player, `9b ffff 00000000`, 0x2A code 5, no 0x4B / error), R2-28 / `client/model.md` OQ10 (0x7A / 0x81 in a game with a hireling; teleport with a living hireling: its warp messages vs the player's room / 0x15), R2-29 (an act change with a hireling: classic act change §6 r3–4; waypoint Act I → II and back), `intents-events.md` §3.5 (0x58 codes and 0x4E on the hire list), `sim/units.md` OQ3 (a hireling following: the 20 history entries of player data +0xA8 per frame and a town-portal teleport frame), `world/hirelings.md` OQ1–OQ5, OQ9 rest and §6 rule 6 (why the first teleport had an extra 0x15: read it from the teleport window), `world/npc.md` OQ5.
+- Steps (`record_packets.py --seconds 600`, character level ≥ 9 in Act I, ≥ 2,000 gold, a hired Rogue): hire at Kashya; fight in the Blood Moor until the Rogue levels; give / take an item; let the Rogue die; go to town and resurrect; repeat with a level change between death and resurrect; separately die far away and wait > 132 frames in town; a waypoint to Act II and back (Sorceress Teleport once for R2-28). A two-player game (second client sees the owner's hireling level up: `hirelings.md` OQ7 / R2-43; expect 0x9E–0xA0 stats there) is [NO] unattended: one run if a second client over TCP/IP can be joined, else mark BLOCKED.
+- Output: `pc2rec-r10-packets.jsonl` (+ `-rng.jsonl` for the resurrect frame).
+- Compare: `check_packets`; message order per event against `hirelings.md` §8, §13; the 0x7A order against `pets.md` §8. Fold: close the OQs; pick I-1.
 
-*`client/model.md`, `client/msg-units.md`, `drlg/rooms.md`*
-- CS-1 `msg-units.md` §1.2 r2–3: what the hireling re-init `0x0046EC10` resets,
-  whether r3–4 run after it, the class set of `0x0063EE90`.
-- CD-1 §9 r1–r2: do `0x0061B640` / `0x0061B690` null-test a point in no room?
-  (refused here)
-- CD-2 the client build timer (`rooms.md` §4.6, `0x0061B920`) is unwritten:
-  only rooms set in sight are built here.
-- CD-4 the act's room callbacks (`rooms.md` §5 r8, act +0x4C, `0x0061AF60`
-  from `0x00475B40`): not specified, not run.
-- CD-6 client room unit lists (room +0x74) and the draw path's Y sort
-  `0x0064C0C0` via `0x00619EA0`: no owner.
-- CD-7 DT1 roof height (+0x04) and height (+0x08) of a tile record: extend
-  `TileInfo` or read DT1 headers (`draw-order.md` OQ12).
+##### REC-11 [MANUAL] Act I quest session
+- Priority 1 (blocks the Act I quest code; C78 / C79 are open).
+- Settles: `quests.md` OQ2 / R-PQ-1 (Flavie: player-seed draws between C→S 0x2F / 0x31 and S→C 0x27; message lines of the 0x27: chains 25 and 30 share event 0), `quests-act1-rest.md` OQ3 / R2-12, R2-13, R2-17 (a: Tristram, Cairn stone done, operate the gibbet: mode 1, slot 4 = `0x2002`, 0x28 at once, 17 frames later Cain (class 146) at gibbet + (3, 3) and `5d 04 00 06 0000`; b: Forgotten Tower 5: kill the Countess with a chest in her room: one monster 326 mode 12 at the death spot, one missile 332 per listed chest), OQ12 / R-QC-2 / C79 / R2-16 / R2-40 (the town-Cain marker, class 385, after Cain left Tristram: packets + RNG: Cain's spawn draws must fall between the marker's unit-seed step and the next preset unit's), OQ5 / R-PQ-7 / R2-14 (a: after killing Andariel (state 4) leave and re-enter Catacombs 1: no 0x5D on entry, state kept; b: complete A1Q2 with no hireling and talk to Kashya: order 0x28, the hireling's 0x50 and creation messages, then 0x27, 0x29), R2-15 (save header progression bits 8–12 after Andariel; I-3), `quests-status.md` OQ1 / R-PQ-14 (the quest log in several states: Den of Evil started; 3 monsters left; just completed; completed in an earlier game; the screen and the C→S 0x58 after the completion animation: `record_frames.py` + `record_packets.py`), `sim/intents-events.md` §3.5 (talk to an NPC with a quest line: 0x27 count > 1, 0x50, 0x91, 0x89; log caller and bytes), `world/quests-act1-rest.md` OQ2–OQ5 (the open ones not listed above: read each OQ's own capture).
+- Steps: a new Normal expansion character; play the listed quest points in order, one packets + RNG + tick run per part (`record_packets.py --seconds 300`, `record_rng.py --seconds 300`, `record_tick.py` for the Cain rescue), `record_frames.py --seconds 120` for the quest log opens. Use a `d2s-tool` save with the quest state pre-set for (a) of OQ3 and OQ5.
+- Output: `pc2rec-r11-*.jsonl`.
+- Compare: each listed byte / frame / draw against the OQ's expectation. Fold: close the OQs.
 
-*`sim/path-placement.md` §11, `sim/intents-events.md`, `sim/tick.md` §6*
-- SJ-2 the spawn room's own 0x07 twice (game entry, then the switch); both
-  sent here; confirm.
-- SJ-3 the rest of the 0x6B path `0x00530190` between 0x0B and 0x03, and where
-  0x59 / 0x0B are sent from.
-- SJ-4 0x04 / room ready `0x0061A460` and the client's state at join (3).
-- SJ-5 0x01 / 0x00 / 0x02 at game creation: sender, trigger, 0x01's u32@2
-  (`intents-events.md` OQ2).
-- SJ-6 0x08's server sender, if any (`0x0053A9B0` states no message).
-- SJ-7 the 0x59 name: from the save (`d2s.md`) or the session (`Entry::name`
-  here)?
-- SJ-8 `intents-events.md` §7.2 part B: the room switch's add messages
-  (`0x00571F90`) are unspecified; the client hears of no unit.
+##### REC-80 [NO RUN] population.md §6.3, §10.3, §11.5 rule 6
+- Priority P1.
+- Settles: population.md §6.3, §10.3, §11.5 rule 6; ai-bodies-7.md §27 step 8.
+- Steps: (Ghidra read, no game run) `py tools/ghidra/disasm.py fn 0x005A09E0`, `fn 0x005B2570`, `fn 0x0054E600` (+ the preset-id switch of `0x005559A0`), `fn 0x005EB6D0`.
+- Output: creation-call mode and room args; any SetBoss / flag test before `0x0058F030` / `0x0058F100`; the default case of the preset-id switch; branch structure of the callback's counters.
+- Compare: the PROVISIONAL text in each section. Fold: write the result into the cited rule and drop its PROVISIONAL line.
 
-*`client/bridge.md`, `bridge-dispatch.tsv` owners*
-- CM-1 0x2C PlaySound: owner, plus event 12's `stsound`, event 18's greeting
-  record, events 84–87's overhead text.
-- CM-2 0x53 Darkness: owner; the act-environment record in the model and its
-  client data sources.
-- CM-3 0x5D: owner; the full `0x004A2CB0` dispatch in one place (field names
-  differ, `triggers.md` vs `quests.md` §6.3); a client quest store?
-- CM-4 0x63 WaypointMenu: owner, where its record lives, the load copy
-  `0x00661030`, the tab inputs `0x004B32D0` / `0x0065C310`.
-- CM-5 0x77 TradeAction: owner; the client handler `0x0045E800`'s code →
-  action table (stash, cube, close, refuse).
-- CM-6 0x94 BaseSkillLevels: layout, the client skill list, an owner with
-  0x21–0x23 (`msg-stats-items.md` OQ5).
-- CM-7 a bridge → UI / sound output channel in `bridge.md`: handlers only
-  write `ClientWorld` today.
-- CM-8 character totals: how the client extends the local player's stat list
-  (items, states, 0x21 / 0x22) for `0x00625480`.
+#### Priority 2 (unattended, cheapest first)
 
-*`tools/scenario.md`, `formats/tbl.md`*
-- CS-4 0x27 masks (7, 9, 12–39) are keyed by sender; §6 rows carry no sender.
-- CS-5 0x50 masks are keyed by the u16 at bytes 1–2; no key column (the
-  unkeyed `0x50 13 2` over-masks the u16 1 form).
-- CS-6 0x82 (name bytes after the NUL through 20) is content-dependent.
-- CS-7 `scenario.md` names `tools/scenario-masks.tsv`; the file is
-  `specs/tools/scenario-masks.tsv`.
-- CS-8 `tbl.md` OQ3 still says "all 33 1.14d tables" (29).
+##### REC-12 [AUTO] Short frames run: first-frame order, settings word, panels, light registry
+- Settles: `render/lighting.md` OQ6 / RA-L2 (the flushed S→C buffer holding 0x53 precedes the first in-game `EndScene`; any earlier frame has `env` I 128 white, §9.1), `render/blend-modes.md` OQ3 / RA-B3 (settings word `[0x0072DA5C]`, Blended Shadows, logged once per frame), `render/camera.md` OQ6 (client player seed `unit +0x20` at frame start and end over cursor movement), `render/draw-order.md` OQ14 (a capture with a panel open: any UI or cursor draw between the world passes `0x00456EE0` … `0x00477980`), `render/lighting.md` OQ10 (memory read of `[0x0072DA50]` and `[0x0072A348]` at the first in-game draw, with and without a "Light Quality" registry value: two runs; the value is the game's own registry key on this PC, restore it after), `render/lighting.md` OQ5 part (the 0x89 id 0 needs REC-32), `sim/unit-order.md` OQ5 (the client room unit-list order before each draw sort, one town scene: NEW HOOK at the sort, log the list per draw).
+- Steps: `record_packets.py --seconds 60 --auto ScnAma --seed 1234 --input "wait 10; end"` + `record_frames.py --seconds 60 --auto ScnAma --seed 1234 --draws-every 1 --input "wait 5; move 400 300; move 600 200; wait 2; key I; wait 3; key ESC; key C; wait 3; key ESC; end"` (NEW HOOK: log `[0x0072DA5C]` once per frame, `[0x0072DA50]` and `[0x0072A348]` at the first draw). Repeat the frames run with the "Light Quality" registry value set and absent.
+- Output: `pc2rec-r12a-packets.jsonl`, `pc2rec-r12b-frames.jsonl`, `-r12c-frames-lq.jsonl`.
+- Compare: tick of the 0x53 flush vs frame 0; seed per frame; draw log between the world passes with a panel open. Fold: lighting OQ6 / OQ10, blend OQ3, camera OQ6, draw-order OQ14.
 
-*`render/lighting.md`, `shading.md`, `blend-modes.md`*
-- LB-1 lighting §9.2 r2: the 0x53 setter's eclipse branch calls `0x0061BDF0`,
-  undescribed (`EnvError::EclipsePending`).
-- LB-2 §11 r2 / edge 7: wall direction 0 (uninitialised), > 9, and block
-  columns needing point 6 are errors.
-- LB-3 blend §8 r2: x1 < x0 after the clamp (error here); "empty" tested
-  before the fatal y1 < y0.
-- LB-4 §6.4: room leave with an owner without a room (error here).
-- LB-5 blend §5 r4: objects take r3 by type dispatch, so r4's object branch is
-  unreachable: is `0x004DB180` a type ≥ 3 test?
-- LB-6 §7.4 r1: the cached grid's ray centres use the grid's own sub-tiles.
-- LB-7 §9.2 r2: the intensity step uses the player room's act and level.
-- LB-8 §9.2 r3: the pending flag `[0x007A060E]` is left set after the act
-  load.
-- LB-9 §9.3 r4: `ticks / speed` as a double division.
-- LB-10 §10 r2: "resets flag and counter" = 0 and −1.
-- LB-11 §8: the monster level-8 radius 3 applied before "none when 0".
-- LB-12 §11 r3 / r4: floor and roof reads use the clamping read.
-- LB-13 §3 r1: with no local player the light map still needs an origin.
-- LB-14 shading §6: `RandTransforms.dat` read as 30 headerless 256-byte maps,
-  `GreenBlood.dat` as its first 256 bytes (C68 sizes).
-- LB-15 shading §6: palshift offsets from the class base; missile
-  `LocalBlood` read as a bool.
-- LB-16 `0x004791B0` (shading OQ7) and `0x00410A80` (lighting §10 r4 id 13)
-  are taken as caller inputs.
-- LB-17 §7.1 r6: white on black gives 254, not 255 (`65536 / i` truncates);
-  confirm.
-- LB-18 unit shadows have rules but no draw-order item (`draw-order.md` OQ3
-  refuses `UnitShadow`).
+##### REC-13 [AUTO] The day cycle in one long run
+- Settles: `render/lighting.md` OQ7 / RA-L3 (`sin` / `cos` rounding: recorded `env[0]` = I of §9.3 r4 from the recorded ticks; every θ where it differs by 1; first extend `record_frames.py` to log env +0x08 (ticks) and +0x28 (speed) beside +0x0C), R2-7 (env +0x0C and RGB per client update over a day vs `Environment::update`, C69), `render/shading.md` OQ1 / RA-S1 (floor light gradient: the `FloorTileDraw` 768-byte light grid vs the CPU render at night, on open floor with no other light, then with a camp fire at the screen edge), `render/lighting.md` OQ11 (answered statically: a day-period change with a fire 39 in sight: mode 0 without light in the day, mode 1 with light radius 9 otherwise: confirmation), `lighting.md` OQ9 / RA-L4 (the light records that change the digest: see REC-14).
+- Steps: `record_frames.py --seconds 2100 --auto ScnAma --seed 1234 --draws-every 50 --draws-light --input "wait 2090; end"` in the Rogue Encampment (one day = speed × 360 ticks: 46,080 ticks ≈ 1,843 s at speed 128; use the recorded speed). If `lighting.md` §9 says the town differs from the Blood Moor, repeat manually in the Blood Moor at a dead end (RA-L3's own wording).
+- Output: `pc2rec-r13-frames.jsonl` (size: check the disk first).
+- Compare: `env[0]` vs §9.3 r4 for every frame; light grids at the night frames (frames' `env` colour (125, 144, 243), normal period 5) vs `FloorTileDraw` CPU reference (`d2-client verify`). Fold: lighting OQ7 / OQ11, shading OQ1.
 
-*`render/draw-order-2.md`, `draw-order.md`, `unit-composite.md`*
-- DW-1 W1 `[0x007A8A20]` (read by §11.3 with the snow lock): no writer.
-- DW-2 W2 snow spawn draws: "one more step" than what; does `0x00472FB0`
-  draw?
-- DW-3 W3 the values of the snow line table `0x006D6E78`.
-- DW-4 W4 grey / tinted colour ramps (input here); alpha 0x7F only for day
-  period 0?; landed drop colour = +0x24?
-- DW-5 W5 intensity = target / 256 gives int 0 at every rain peak, yet run 2
-  saw splashes: the scale or the `r < int` test.
-- DW-6 W6 §11.7 r3: lightning on at ≤ 9 fps (no flash): do particles draw?
-  (yes here)
-- DW-7 W7 initial phase / countdown / length and `last_s` / `last_b` (0 here).
-- DW-8 §12: the two seed globals are 4 bytes apart: `init_low(time_value)`
-  with hi 666?
-- DW-9 §12: the initial star tick; which palette `nearest` searches.
-- DW-10 §12: build order of the extra summit frame (x0 − 256) and of
-  mountains vs clouds.
-- DW-11 §14: extents before any floor is drawn and when they reset.
-- DW-12 §14: does a drawn edge floor widen by its strip sub-tile?
-  `draw-order.md` §10 has no edge-floor key row.
-- DW-13 §16: a room whose rectangle holds the cell but whose grid lacks it
-  (`NoGridCell` here).
-- DW-14 §16: the stop cell written back when r1 blocks; unit size signedness
-  in `0x00622AA0`.
-- DW-15 `unit-composite.md`: does body armour / "no inventory" read the
-  linked unit's inventory (Decoy)?
-- DW-16 `unit-composite.md` §8 r4 "nothing happens while K is in DT / DD":
-  following missiles only?
+##### REC-14 [AUTO] Frames: shadows, light records, item colormaps (prepared saves)
+- Settles: `render/blend-modes.md` OQ1 + OQ2 / RA-B1 + R2-6 (shadow shape and position §5 r2–r4, pixels `A0[256·d + 0]`; ethereal weapon mode-1 table, ethereal shield mode-2 table in the §2 orientation: a frame matching only with row / column swapped decides the other orientation), `lighting.md` OQ9 / RA-L4 (the light records of §6.1 that change the digest between frames: Rogue Encampment, 7 standing positions, 30 s each, `--draws-every 1`, digest of §12 r3 in the key), `render/shading.md` OQ4 / RA-S2 (item colormaps, §6 r4: a unique and a set item with `chrtransform` ≠ 0, a magic item with a `transformcolor` affix, a socketed normal item; dropped on open floor and in the inventory), `render/capture.md` OQ7 (rerun of run 1b, frames 13,486–14,636, with `--draws-every` and the light-map digest).
+- Steps: prepared saves `ShadEth` (ethereal weapon + shield equipped) and `ColItems` (the items in the inventory). `record_frames.py --seconds 60 --auto ShadEth --draws-every 1 --input "wait 20; end"` (also with the weapon swapped out: a second save); `--seconds 300 --auto ScnAma --draws-every 1 --input "<7 × (move X Y or click X Y; wait 30)>"` (positions from a first `shot` run); `--auto ColItems --input "key I; wait 3; <click item; click open floor> × 4; wait 5; key I; wait 5; end"` (cell coordinates from a `shot` first). Needs REC-12's settings-word hook.
+- Output: `pc2rec-r14{a,b,c}-frames.jsonl`.
+- Compare: CPU reference renders of the frames equal the capture. Fold: blend OQ1 / OQ2, lighting OQ9, shading OQ4.
 
-*`ui/panels.md`, `ui/controls.md`*
-- UP-1 §8: thousands grouping `0x00525350` (level, experience, next level not
-  drawn until given).
-- UP-2 §8: popup width `0x00502520` (Font8 fallback below 1,000).
-- UP-3 §8: number format of the other values (`%i` assumed).
-- UP-4 §8: cmp on unshifted vs shifted values for 7, 9, 11; color of 6, 8, 10.
-- UP-5 §8: which resist effect wins when both are active; clamp order when
-  the cap < −100.
-- UP-6 §8: add buttons with 0 points; damage block, name / class lines,
-  hovers (OQ3).
-- UP-7 §9: does mouse-up clear `[0x007BCE90]`?; the `panel\inv_*` files have
-  no layout rows.
-- UP-8 §4.4: the inventory click area's bottom edge (read exclusive, WC
-  reading 1).
-- UP-9 §11: GoldMax font ("current font").
-- UP-10 §11 / §12: stash and cube button press / release rectangles (only
-  hover given).
-- UP-11 §11: does a stash close send 0x4F 0x12 once (here) or twice
-  (release + close hook)?
-- UP-12 §12: does the cube close button also call `SetUIState(0x1A, off)`?
-- UP-13 §12: Horadric frame 30 drawn or not; draw mode 3 has no field in
-  `ImageRequest`.
-- UP-14 §14.1: Resurrect insert / remove slot `0x004B6440`; Cain's count reset
-  `0x004B5640`.
-- UP-15 §14: talk message bytes; the hire sender and the menu box (OQ8).
-- UP-16 §14: the lookup of NPC 257 (two records, first used); the flag byte.
-- UP-17 §14.4: shop button file, mode derivation, tab / button hit rects,
-  `0x004B3500`.
-- UP-18 §14.5: buy / sell / repair client fields (price, 0x35 u16,
-  transaction mapping).
-- UP-19 §10: the class icon file prefix `CC`; remap k (OQ4).
-- UP-20 §10: close-button offsets for classes other than amazon
-  (`0x00724CE4`).
-- UP-21 §10: the no-points mouse-down message, free-points box, tab tool tips
-  (OQ4).
-- UP-22 §10: close press rect and its test order against the column 3 / row 6
-  icon; free points re-checked at release?
-- UP-23 §10: draw order of icons / numbers / close (section order here).
-- UP-24 §13: tab and row click rectangles and the tab switch (OQ7); the filled
-  hover rectangle extent.
-- UP-25 §13: mode and jump of the self-close (off, 0 here) and when its latch
-  resets.
-- UP-26 §13: does a close via `0x0049CEC0` send 0x49 twice (release + hook)?
-- UP-27 §13: color of an unknown selected row; tab / row on open.
-- UP-28 §6.3: control panel overlays (OQ1).
-- WC-2 §2.5 "P alive" uses the mode only; unit flag 0x10000 is not in the
-  model (`model.md` OQ4).
-- WC-4 the original key table (`ui/controls.md` OQ2): hotkeys use the `dev`
-  bindings with jump 0.
+##### REC-15 [AUTO] World clicks and keys: C→S ids
+- Settles: `ui/controls.md` OQ2 (controls-0001: C→S id per world click, hold resend interval, Shift / Ctrl / R / Alt effects: recording 015956 showed 0x10 every 13 frames), the 0x58 / 0x4E senders of `intents-events.md` §3.5 that need no shop (hotkeys only).
+- Steps: `record_packets.py --seconds 180 --auto ScnSor --seed 1234 --input "wait 3; click 600 300 x5 (wait 1 between); key CTRL 1; click ..; key R; click ..x5; key R; hold 600 300 3; rclick ... x3; hold-right via hold + rclick; key SHIFT 3 with click; key ALT 2; key 96 (Numpad0); key 103 (Numpad7); key 73 (I); key 87 (W); end"` (the Fire Bolt right skill: a prepared `ScnSor` with Fire Bolt on right and a monster near the town edge for steps (5)–(6) is not available: in town clicks on the ground only; the monster steps are in REC-09). If a modifier cannot overlap a mouse click with `PostMessageW`, do those steps by hand.
+- Output: `pc2rec-r15-packets.jsonl`.
+- Compare: id (0x01 / 0x03 / 0x05–0x11), tick of every send and resend interval; Ctrl → 0x53 / 0x54; Numpad → 0x3F 0x19 / 0x20; wheel → 0x3C. Fold: controls OQ2.
 
-*`audio/sound-table.md`, `triggers.md`, `environment.md`*
-- ST-1 §2: EAX column names are not in the spec (22 read columns vs named +
-  12 EAX = 21); not bound.
-- ST-2 §7 r3: the channel kinds `0x004E0050` gives in mode 0 (`Any` here).
-- ST-3 which record after a variant pick (the variant's for sample, Stream,
-  Async, Loop, blocks, Stereo here).
-- ST-5 §5 r2: a merged compound call attaches no unit.
-- ST-6 §6.4 r1: option flag `0x007A061C`, meaning and default (off here).
-- ST-7 §10: async latency one tick (OQ10); preload at tick 0 then every 25;
-  no eviction.
-- ST-8 no local player when rolling: returns 0, no seed step.
-- ST-9 §6.3 reading order: r1's restart in the same pass; r5 only for
-  requests playing before r3; new requests at the list end.
-- ST-11 `play_position` in bytes (environment OQ2); `set_position` writes no
-  distance²; `unit_requests` in active-list order.
-- TR-1 §7 r1: 120 of 573 object classes have no TSV row (no call).
-- TR-2 §7 r4: the cairn ids of class 61 (table `0x00728338`) are not given.
-- TR-3 §10 r1: NPC class → greeting record table (35 classes, 28 records) is
-  not in the spec as data.
-- TR-4 §4.3 r2.2: a multi-unit request detached with force, else faded to 0
-  over 6.
-- TR-5 §5 r4: signedness of `f ± s` (u32 wrapping here).
-- TR-6 a request with id 0 where the spec has no guard is still made.
-- TR-7 Test vectors' "115 distinct records" counts addresses (106 contents);
-  `npc-speech.tsv` key 506 duplicated.
-- TR-8 triggers OQ4, 5, 6, 8, 9, 11 are left to the callers (module docs).
-- EN-A §5 r2: the second exception of the 72–201 stop passed as 0; "when
-  raining" = this tick's weather flag.
-- EN-B §6 r3: rain handle gone → volume 0 → rain stops.
-- EN-C §3 r1: k ≠ 0 on a song without that block → resume −1, offset
-  0xFFFFFFFF.
-- EN-D T / C differences unsigned wrapping (only §7 r3 says so).
-- EN-E §4 r1: order of last-checked := L vs the flag check.
-- EN-F day phase (OQ3) and weather (OQ4) inputs: plain parameters until their
-  specs exist.
-- WC-7 `sound-table.md` §6.5 r2 (OQ6): the state-duck condition taken as never
-  holding (no menu, no pause).
-- WC-8 `sound-table.md` OQ2: units per type for `SoundWorld::position`.
-- WC-10 the local player's client seed is read-only in the model, shared with
-  the camera shake (`camera.md` OQ6, `sound-table.md` §4 r5).
+##### REC-16 [AUTO] Key-configuration panel and text checks
+- Settles: `ui/controls.md` OQ6 + OQ7 (controls-0002: `A` vs `C` columns for Character Screen; whether Accept rewrote `<name>.key` and `default.key`; row pitch, highlight, scroll step, button positions), `ui/text.md` OQ5 (memory read of `0x007D6268` on a loading screen) and OQ9 (captures `text-0001`, `text-0002`).
+- Steps: `record_frames.py --seconds 40 --auto ScnSor --seed 1234 --draws-every 1 --input "wait 3; key ESC; click <Configure Controls>; wait 2; hold <list> 0; scroll bottom; click <Key/Button Two of Inventory Screen>; key K; click <Cancel>; ...; end"` (coordinates from a `shot` run first); `Get-ChildItem` the two `.key` files before / after; repeat at 640 × 480 (the pane's 640 option). NEW HOOK for text OQ5.
+- Output: `pc2rec-r16-frames.jsonl`, the `.key` mtimes in the xpc line.
+- Fold: controls OQ6 / OQ7, text OQ5 / OQ9.
 
-*`formats/d2s.md`, `items/bitstream.md`*
-- DS-1 d2s OQ1–OQ16 stand (OQ3 is the save comparison, C66).
-- DS-2a an alt-code record ends after its base code: no unit +0x28, no
-  trailer written or read.
-- DS-2b compact and alt-code records have no socketed children.
-- DS-2c children's write-backs (§4.1 r8, §4.3 r7) are not returned by
-  `write_save`; `filled == children.len()` is not checked.
-- DS-3 `kf` with its marker but no g byte: rejected with 23 (unspecified).
-- DS-4 which quest bits a completed quest leaves (`--quests all` refused;
-  `acts=N` sets bit 0 of the §8.1 slots).
-- DS-5 every item gets the 1-bit 0 trailer (`bitstream.md` OQ3).
+##### REC-17 [AUTO] Inventory, gold, character, stash, control-panel UI frames (prepared saves)
+- Settles: `ui/inventory.md` OQ1 + OQ5 (inv-0001: tints, rectangles `0x004F6340` family, cursor item draw position, hotspot: a wand 1 × 3, helm 2 × 2, armor 2 × 3; hover over empty, one item, two items, outside the grid, the helm slot), §5 (inv-0002: hover anchor and box clamping for a ring top-left, an armor bottom-right, the equipped weapon, a belt potion, a stash item), §9 + OQ5 + OQ7 (inv-0003: gold dialog pixels, 123 typed, deposit 1000 `4F 14 00 00 00 E8 03`, withdraw 500 `4F 13 00 00 00 F4 01`, withdraw 999,999 clamp), `ui/panels.md` §8.11 (character panel of a level-99 character, experience 3,520,485,254, and of level 1), `ui/panels-2.md` OQ4 (stash open at 800 × 600, expansion and classic: the `GoldMax` line font), `ui/panels.md` §12.4 / OQ11 (cube transmute frames at steps 1, 15, 29 and the step after, at 800 × 600 and 640 × 480: prepared cube save), `ui/control-panel.md` OQ1 + OQ6 (a globe refilling after a potion frame by frame; the control panel at 640 × 480 and 800 × 600 with the belt popped and the mini panel in its three layouts), `ui/messages.md` OQ1 (chat lines: whisper, echo, broadcast; a timed box; NPC dialog scrolling with frame times), R2-36 / `ui/panels.md` UP-7–UP-27 (`placement-0001`, `ui-0001`, `ui-0002`: the rectangle and draw-order readings), `client/msg-ui.md` §4–§11 chat part (one chat line and one whisper to the own name: C→S 0x14 / 0x15 and S→C 0x26 forms 1, 2, 6, overhead form 5; breakpoints `0x0049F410` (overhead set: unit, text, language) and `0x004A1600` (record bytes)).
+- Steps: `record_frames.py --draws-every 1` and `record_packets.py` (two runs each), `--auto InvUI` (prepared: the items, 5,000 gold, a belt with potions; a level-99 save `Lv99`; a cube save). Clicks and key `I` / `C` / `B`, `text` for chat; coordinates from a `shot`; stash object by `goto 2 <Bank class from objects.txt>`. Two-monster overhead text (`messages.md`) is in REC-09.
+- Output: `pc2rec-r17*-frames.jsonl`, `-packets.jsonl`.
+- Compare: rectangles / colours / positions against the OQs' spec tables; C→S bytes. Fold: close the UI OQs.
 
-**PC 2 — recordings and captures on the original game** (§5 A S9-A*, and the
-C entries that need the game running; 38 questions)
+##### REC-18 [AUTO] NPC menus, waypoint panel and talk on arrival
+- Settles: `ui/menus.md` OQ1 + OQ4 (Akara's menu, Charsi's menu and Kashya's hire list at 800 × 600: box position, item rows, highlight), `ui/menus.md` §1 / `ui/panels.md` §13 (the waypoint menu with each tab clicked and a row hovered), `world/npc.md` OQ7 / R-NV-4 (talk on arrival: stand 7–8 sub-tiles from Akara, one click, the character runs to her: expect one C→S 0x13, then S→C 0x27, 0x29, 0x28 in one frame when it stops, no second 0x13), `client/model.md` §7 r8 / §17 r6 part (b) and R2-39 NPC part (walk out of town once plainly, once right after starting an NPC talk: log the town flag `[0x007A5260]`, the interact NPC fields and the C→S 0x30), `intents-events.md` §3.5 (open a shop and the hire list: 0x58 codes, 0x4E), `client/msg-ui.md` §4–§11 NPC part (talk to Akara: 0x27 count and kinds; open and close the hire list: 0x4F, 0x4E × n, 0x50 code 2; same breakpoints as REC-17).
+- Steps: `record_frames.py --seconds 90 --auto ScnSor --seed 1234 --draws-every 1 --input "wait 3; goto 1 148 40; wait 3; shot akara; key ESC; goto 1 154 40; wait 3; shot charsi; key ESC; goto 1 150 40; wait 3; shot kashya; key ESC; goto 2 119 300; wait 3; click 115 75; shot wp1; click 178 75; shot wp2; click 240 75; shot wp3; click 300 75; shot wp4; move 200 138; wait 1; shot wphover; key ESC; end"` (NPC classes Akara 148, Charsi 154, Kashya 150: check against `monstats`). Twin `record_packets.py` with `--input "wait 3; click <Akara draw point from the shot>; wait 8; key ESC; end"` for R-NV-4 and the leave-town-after-talk variant. NEW HOOK: the town flag and NPC fields.
+- Output: `pc2rec-r18{a,b}-{frames,packets}.jsonl`, screenshots in `traces/raw/shots`.
+- Fold: menus OQ1 / OQ4 / §1, npc OQ7, model §7 r8.
 
-*PC 1's recording list* (§5 S9-A1, 13 items): draw-order OQ7 (`TownE1` tile
-(950, 933)), `weather-0001`, levels 74 / 120, Act III entry, a kill with an
-item drop, a hireling game, an act change, Might in a party, Kick / Bash on
-a monster, a Druid summon, a Clay Golem, a Countess kill, a Cain rescue.
+##### REC-19 [AUTO] Sound: request-site map of every UI control, one-shot lengths, async loads
+- Settles: `audio/triggers.md` OQ12 / RA-T1 (UI control → §11 request site: `0x004B9A00` caller for ids 1–6, 15, 16; every site of §11's counts 24, 7, 4, 26, 1, 8, 1, 1 appears or is named unreached), R2-39 (a UI-sound request log clicking each control of `client/ui.md` §B8.1 once: popups, configure controls, stash / cube / trade buttons, NPC menu, text list; an NPC talk → cancel with a memory read of the NPC's unit flags, mode, store items in S: `model.md` §17 r1–r3; a left skill dropping to level 0: r4), `audio/sound-table.md` OQ12 (the tick at which one-shot sounds end: the request start tick and the tick the slot frees, for several known-length sounds, 50 ms thread `0x00516250`), OQ13 (ticks from request to playable of an `Async Only` load), `audio/triggers.md` OQ1 UI part (item pickup / drop / identify, the options sliders).
+- Steps: `record_sound.py --seconds 400 --auto ScnSor --seed 1234 --input "<hover + click each mini-panel button, each panel, skill tree point spend, quest log, automap, party, message log, Esc menu, Options sliders; belt; run toggle; NPC talk → cancel; drop an item on an invalid spot / ground; swap; a trade window tab, buy, sell, repair>" -- -w` (sound on: the recorders default to `-w -ns`; pass `-- -w`; Master and Music volume at their defaults). Side log of each action with its wall-clock second (the script's `shot` lines serve). Hook `0x004B9A00` logging id, caller, unit, delay, flags, T, C; add `0x00516250` slot-free.
+- Output: `pc2rec-r19-sound.jsonl`.
+- Compare: one row per (control, action) → (id, caller); channel-end ticks vs sample length. Fold: triggers OQ12 / OQ1, sound-table OQ12 / OQ13, `model.md` §17.
 
-*`render/draw-order.md`, `draw-order-2.md`, `lighting.md`, `blend-modes.md`*
-- R2-1 `order-0003`: the 8 `townN1` river-bank cells hidden or shown
-  (`draw-order.md` OQ7; S9-A1 (1)).
-- R2-2 `weather-0001`: pass 4 / 9 pixels, player-seed draws per water floor,
-  splashes at int 0 (DW-5; S9-A1 (2)).
-- R2-3 Arcane Sanctuary / Arreat Summit with the two seed globals (DW-8–DW-10;
-  S9-A1 (3)).
-- R2-4 a `Logicals` preset walk (levels 18, 19): the group-mode fade on pixels
-  (`draw-order.md` OQ6).
-- R2-5 a weather line / Arcane star vs `gdi_line_pixels`: the |dx| = |dy| major
-  axis and the end pixel (blend §8 r1; C70).
-- R2-6 the player's shadow on a flat floor vs `unit_shadow_position` (blend
-  OQ1; C70).
-- R2-7 env +0x0C and RGB per client update over a day vs `Environment::update`
-  (lighting OQ7, light-map digest OQ9; C69).
+##### REC-20 [AUTO] Sound and music by waypoint, wav dumps, the day change
+- Settles: `formats/wav.md` OQ1 / R2-35 / C75 (dump at `0x00516760` (pointer, size) for the `wav.md` Test-vector files and one ADPCM file per channel count; the first 256 KiB of `music\act1\crypt.wav` from the refill copy `0x004157C0`: byte for byte with our decode), `audio/environment.md` OQ1 + entry 74 rest, partial (`0x004DCAA0`, `0x004DCD40`, `0x004E42E0`: town → Cold Plains → Catacombs 2 by waypoint, the music / ambient request at each level change, a day change in a 2100 s town sit; the Den and Blood Raven's death are REC-33), `audio/sound-table.md` OQ1 / OQ10 (the exact captures written in those open questions: read them first), `audio/triggers.md` OQ1 (waypoint activation sound).
+- Steps: `record_sound.py --seconds 2200 --auto TestSor --seed 644409375 --input "wait 2; <Cold Plains by waypoint>; wait 20; <Catacombs 2 by waypoint (T-path via Jail 1, as D3)>; wait 60; <back to Rogue Encampment>; wait 1900; end" -- -w`; hooks as REC-19 plus the three environment addresses and the `0x00516760` / `0x004157C0` dumps.
+- Output: `pc2rec-r20-sound.jsonl`, `pc2rec-r20-wav/` (dump files).
+- Compare: dumps against `data-tool` decode; the request log against environment §10 r1. Fold: wav OQ1 / OQ2, environment OQ1, sound-table.
 
-*`client/model.md`, `sim/path-placement.md`, `world/objects.md` (the join)*
-- R2-8 frame-1 S→C order and callers from 0x59 to 0x15 (I-6, SJ-2, SJ-3; C84).
-- R2-9 game +0x80 = `0x00546C60`'s result = 0x03 u32@8 (C85).
-- R2-10 the client unit seed and room seed step vs the bridge (I-5,
-  `model.md` OQ9; C83).
-- R2-11 the act palette switch at an act change (I-4; S9-A1 (7)).
+##### REC-21 [AUTO] x87 control word under each video mode
+- Settles: `items/treasure.md` OQ5 (the control word at `0x0055A935` (treasure float math): 53-bit (CRT default) or 24-bit after the video layer: SetCooperativeLevel flags 0x11 / 0x411 lack FPU-preserve), `sim/stat-lists.md` OQ1 (the x87 control word at the §7.2 max-rescale call during a max-life change: add a prepared save with a +max life item to equip / remove at second 10; a D3D device may set 24-bit), `sim/pathing.md` OQ9 (the FPU control word at `0x0067A140`; or a Blessed Hammer's per-tick positions if the word is not enough).
+- Steps: three runs, game args after `--`: `-w -ns` (DirectDraw), `-w -ns -d3d`, and Glide if a wrapper is installed: `record_tick.py --seconds 30 --auto ScnAma --seed 1234 --input "wait 15; end" -- -w -ns -d3d`. NEW HOOK: read the game thread's FPU control word from its thread context at the first tick (the kill needs no drop: the word is a thread property, read it at every tick marker; if the engine reloads it per treasure call, REC-08's drop confirms).
+- Output: `pc2rec-r21-{dd,d3d,glide}-tick.jsonl`.
+- Fold: treasure.md OQ5 states the precision; d2rs's float helper follows.
 
-*`world/quests-act1-rest.md`, `world/objects.md`, `sim/rng.md` §5.2*
-- R2-12 Cain rescue: gibbet mode 1, slot 4, 0x28, Cain at + 17 frames
-  (S9-A1 (13), C78).
-- R2-13 Countess kill with a listed chest: monster 326, missiles 332
-  (S9-A1 (12); QA-1).
-- R2-14 Catacombs 1 after Andariel: no 0x5D, state kept (S9-A2).
-- R2-15 the save header's progression bits 8–12 after Andariel (S9-A2; I-3).
-- R2-16 quest init order: Cain's spawn draw vs the room's other allocations
-  (the drained init, `wire-world-staging` §3 item 1; C79).
-- R2-17 a Cairn stone, gibbet and tome operate: 0x0E ticks and bytes (C78).
-- R2-18 chest, shrine, door, well, portal operates and a `Sync` = 0
-  allocation (`objects.md` OQ1–2; S9-A5; OB-*).
+##### REC-22 [AUTO] The area-5 hook probes
+- Settles: `tools/original-hooks.md` OQ1–OQ4 (walk injection at `0x0044F136`, forced start 0x67, seed override chains run twice, save-dir breakpoint `0x00534410`) and `tools/original-hooks-spawn.md` OQ1 (spawn at `0x0052FD1E` with `record_packets.py`): each OQ names its probe, `tools/original-hooks.md` OQ9 (breakpoint on `0x00552E6C` over a full scenario: log the allocating caller, the unit-seed fallback).
+- Steps: run each probe as its OQ words it (`run_scenario.py --probe` covers the seed override); `--auto` where the recorder allows.
+- Output: per probe, one line in the xpc report. Fold: close the OQ.
 
-*`world/quests-act2.md` … `quests-act5-2.md`*
-- R2-19 Act II run: chat-end status, kill timers, Tyrael's portal, Meshif
-  (OQ10; S9-A3; QB-*).
-- R2-20 Act III run (OQ8; S9-A3): settles the 19 "Readings taken literally"
-  of `impl-quests-act3` (each names its test).
-- R2-21 Act IV run (OQ13; S9-A3): the classic end on `GetTickCount` (OQ2,
-  needs a `sim/tick.md` exception), uncredited 0x50 bytes 3–14 (OQ3).
-- R2-22 Act V run (OQ7; S9-A3; QE-*).
+##### REC-35 [AUTO] DRLG extra probes: Trees substitution DS1, river units, room-entry returns
+- Priority 2 (unattended; the Cold Plains walk of REC-04 can carry the same hooks).
+- Settles: `formats/ds1.md` OQ3 + `drlg/preset.md` OQ2 (after the Trees substitution DS1 loads: its 14 group records, 0x18 bytes each, and the 0x320 bytes of slack after the file buffer), `drlg/outdoor-tilesub.md` OQ4 (the same Trees group records, +0x14 of each; OQ2 of that spec is already folded), `drlg/preset.md` OQ3 (a level whose river / navi units are added at first activation: the §8 adds against the §9 transfers per room), `drlg/rooms.md` OQ7 (the value `0x0066D820` returns for RNG sequence 6822–6835 of the RNG recording's run), `formats/ds1.md` OQ3 second half (a memory read of the slack bytes after the DS1 buffer, `0x00517079`, and which lvlsub group `trees.ds1`'s 14th group picks).
+- Steps: `py tools/trace-recorder/record_rng.py --seconds 400 --auto TestSor --seed 644409375 --input "<T12>; <Cold Plains by waypoint>; wait 20; <Stony Field by waypoint>; wait 20; end" --out traces/raw/pc2rec-r35-rng.jsonl` (same character, seed and waypoint list as pc2rec-d3 so the sequence numbers 6822–6835 match; take the header `args` of that raw file). NEW HOOKS: a memory read of the Trees DS1's 14 group records and the 0x320 slack at the point its load finishes (names in `ds1.md` OQ3); INT3 at the §8 add and §9 transfer sites of `preset.md` logging room and unit; entry and return of `0x0066D820` with the RNG sequence number.
+- Output: `pc2rec-r35-rng.jsonl` (+ the dump files beside it).
+- Compare: `check_rng` passes; the group records against `ds1.md` §3; the add / transfer counts per room against `preset.md` §8 / §9. Fold: close ds1 OQ3, preset OQ2 / OQ3, tilesub OQ4, rooms OQ7.
 
-*`monsters/ai-bodies-*.md`, `skills/bodies*.md`, `missiles/bodies*.md`, `sim/pets.md`*
-- R2-23 Act II–V monster AI per `ai-bodies-2.md`..`-5.md` OQ1 (S9-A4; AI-*).
-- R2-24 Might in a party, Kick / Bash, a Druid summon, a Clay Golem (S9-A1
-  (8)–(11)), with the `bodies.md` / `bodies-2.md` OQ1 list (SK-*).
-- R2-25 the missile list of `impl-missile-bodies-2` §5.3 (S9-A4; MB-1–MB-6).
-- R2-26 the 0x7A order and the remove broadcasts on the wire (I-1, SK-2a,
-  HL-3) from S9-A1 (6), (10), (11).
+##### REC-36 [AUTO] Load a character saved in Act III (client +0x1AC writes)
+- Priority 2 (unattended once the save exists).
+- Settles: `sim/path-placement.md` OQ8 (the writes of client +0x1AC in order, sites `0x0052FB97`, `0x00530E17` and the `0x00532690` path, while a character saved in Act III loads).
+- Steps: prepared save `ScnAct3` (`d2s-tool new --waypoints all --quests acts=4`, then a `d2s-tool` edit to put the saved area in Act III's town, Kurast Docks; check `d2s-tool --help` for the field; read-only copy in `%USERPROFILE%\Saved Games\Diablo II`). Fallback if the edit is not possible: take `TestSor` to Act III with `<T12>; <T23>`, Save and Exit by hand (no `--auto`), then reload it. `py tools/trace-recorder/record_tick.py --seconds 60 --auto ScnAct3 --seed 1234 --input "wait 10; end" --out traces/raw/pc2rec-r36-tick.jsonl`. NEW HOOK: INT3 at each of the three sites, log old and new value of client +0x1AC, site, order.
+- Output: `pc2rec-r36-tick.jsonl`.
+- Compare: the order of the three writes against `path-placement.md` §11 / OQ8. Fold: close OQ8 or edit §11.
 
-*`world/hirelings.md`*
-- R2-27 hire, level-up, death, resurrect, give / take (OQ9: HL-7, HL-8;
-  S9-A1 (6)).
-- R2-28 teleport with a living hireling: its warp messages vs the player's
-  room / 0x15 messages (C80).
-- R2-29 an act change with a hireling (classic act change §6 r3–4; S9-A1 (7)).
+##### REC-43 [no game] Re-export Ghidra with labels
+- Priority 2 (cheap, unattended; only needs the PC's Ghidra project).
+- Settles: R2-46 last clause: re-export Ghidra with labels once `1.14d-notes` is on the PC.
+- Steps: as `tools/ghidra/README.md`.
+- Output: the export named there; one line in the xpc report.
 
-*`drlg/outdoor-act3-act5.md`, `drlg/levels.md` §11, `monsters/population.md`*
-- R2-30 Act III creation draws and the 76..78 / 111 / 112 / 117 builds
-  (OQ1, OQ3; S9-A1 (4); DR-*).
-- R2-31 DRLG room +0x64 lists of a crypt and an outdoor level (`levels.md`
-  OQ7; RP-*; S9-A6).
-- R2-32 the first population of a Blood Moor room vs the spawn RNG (S9-A6).
-- R2-33 a kill with an item drop: the drop position (S8-A3) and the treasure
-  walk (S9-A1 (5)).
+##### REC-60 [AUTO] ui/text.md §15 r6 (scroll window, caret-inside-window case)
+- Priority P2.
+- Settles: ui/text.md §15 r6 (scroll window, caret-inside-window case).
+- Steps: `record_frames.py --seconds 40 --auto ScnSor --seed 1234 --draws-every 1 --input "wait 3; key ENTER; text <60 chars longer than the chat box>; key HOME; key RIGHT x5; key END; key LEFT x10; key SHIFT+LEFT x5; key BACKSPACE; key DELETE; key RIGHT x20; key ESC; end"` + NEW HOOK at `0x004FE7C0` exit logging E +0x25C, +0x4C, +0x50.
+- Output: `pc2rec-r60-frames.jsonl` + hook log.
+- Compare: §15 r5 / r6 per key: caret, selection ends, first / last window. Fold: write the result into the cited rule and drop its PROVISIONAL line.
 
-*`audio/*`, `formats/wav.md`*
-- R2-34 the sound request log (C74): settles ST-3, ST-4 (channel end / steal
-  position, × 40 ms here), ST-9, ST-10 (x87 vs `log2` / `powf`), TR-4, EN-*.
-- R2-35 decoded DirectSound buffers vs ours (`wav.md` OQ1–2; C75).
+##### REC-61 [NO RUN] render/camera.md OQ1 (roof block count
+- Priority P2.
+- Settles: render/camera.md OQ1 (roof block count; roof y multiple of 8) and OQ7 (wall-block file / block count; x, y ≡ 0 mod 32).
+- Steps: (no game run) `mpq-tool extract d2data.mpq "data\global\tiles\*.dt1"` and the same for d2exp.mpq; keep the files a `LvlTypes` File column names (exclude the 6 unused); over orientation-15 tiles count tiles and blocks and list block y ∉ {0, 8, …, 64}; over orientations ∉ {0, 13, 15} count files and blocks and list blocks with x or y ≢ 0 (mod 32).
+- Output: counts + exception lists.
+- Compare: 13,432 vs 15,432 roof blocks; 104,780 / 251 vs 104,767 / 250; zero exceptions expected. Fold: write the result into the cited rule and drop its PROVISIONAL line.
 
-*`ui/panels.md`*
-- R2-36 `placement-0001`, `ui-0001`, `ui-0002` (S9-A7): the rectangle and draw
-  order readings of UP-7–UP-27.
+##### REC-90 [AUTO] sim/path-placement.md §10 rule 1 (static-path unit passed to `0x00554EA0`)
+- Priority P2.
+- Settles: sim/path-placement.md §10 rule 1 (static-path unit passed to `0x00554EA0`).
+- Steps: `py tools/trace-recorder/record_tick.py --seconds 300 --auto TestSor --seed 644409375` + NEW INT3 hook on `0x00554EA0` entry logging caller return address, unit type (unit +0x00) and path pointer +0x2C over a waypoint walk, a town portal, a Teleport cast and an item / object placement.
+- Output: `traces/raw/pc2rec-r90-tick.jsonl`.
+- Compare: no entry with unit type 2, 4 or 5 expected; if one shows up, write the 1.14d effect into §10 r1 and drop the d2rs static-set choice. Fold: write the result into the cited rule and drop its PROVISIONAL line.
 
-*`formats/d2s.md`*
-- R2-37 1.14d saves round trip; header +0x10..+0x37, +0x88..+0xA7, stats at
-  0x2FD, `jf` / `kf` (OQ3; C66 (1)).
-- R2-38 `d2s-tool` characters load and re-save in 1.14d: quest bits, trailer
-  bit, +0x88..+0xA7, flag 0x2000 (DS-2, DS-4, DS-5; C66 (2)).
-- `sim/intents-events.md` §3.5 (static senders, no record yet): open a
-  shop and the hire list (0x58 codes, 0x4E), talk to an NPC with a quest
-  line (0x27 count > 1, 0x50, 0x91, 0x89), a monster casting at the
-  player from outside the player's rooms (0x4D) and a pet summon with a
-  pending skill (0x99 / 0x9A); log caller and bytes (check 0x58 byte 6
-  is stack garbage except code 5; 0x26 bytes 8-9 with form 5).
-- `sim/pets.md` OQ3 (count part): summon a 4th skeleton over max 3; expect
-  three 0x7A action 0 for the removed one (§6 table).
-- `monsters/ai-bodies-6.md` OQ1 (spec area 1, AI): a necromancer game
-  with golem, skeletons and a skeleton mage, a hireling following and
-  fighting, an Act II town walk, a MinionSpawner, an EvilHole and a
-  desert turret; log per think: type-2 schedule frame, unit-seed steps,
-  mode requests (mode, target, point), AI params 0–2.
-- `monsters/ai-bodies-7.md` OQ1 (AI): arrow / poison / nova traps, the
-  Act II palace guard before and after the door opens, the Dark
-  Wanderer, druid summons (wolves, bear, ravens, vines) and assassin
-  shadows; same log.
-- `monsters/ai-bodies-7.md` OQ2 (AI): Uber Tristram: for Uber Mephisto,
-  Diablo and Baal log the AI control's function (+0x04) and special
-  state (+0x00) after creation and at each think, and every type-2
-  schedule (their table thinks are empty in 1.14d).
-- `monsters/umod-init-bodies.md` OQ1: 0xAC assign + stat messages of a
-  lightning, cold or mana-burn unique with minions (expect the §2
-  values; minions on Normal get no damage stats, cold minions still get
-  coldlength).
-- `monsters/init.md` OQ1 / OQ4 / OQ10: client message 0x67 game type in
-  classic SP and TCP/IP; one population pass with rng hook + callers; a
-  unique's client name draws.
-- `sim/stat-lists.md` OQ1: read the x87 control word (precision bits) at
-  the §7.2 max-rescale call during a max-life change (a D3D device may
-  set 24-bit).
-- `sim/units.md` OQ6 (78 rows left `proof = file`): a `site` recording
-  over combat with skills, a trade and an item use, to confirm the
-  scheduled unit kinds of the state-timer, damage and trade sites.
-- `skills/use.md` OQ3–7: hook `0x0056FAF0` (entry/return) and
-  `0x0056F7F0` (entry), cast a non-`TargetAlly` skill on a party member
-  (does the do run after start returned 0); hook `0x0056BFE0` for
-  Teleport at level ≥ 25 with < 1 mana (cast free?); two C→S 0x06 two
-  frames apart (does the second restart A1); hook `0x005A7670` (arg1,
-  arg2, unit +0x4E) on monsters; log arg1 of `0x005539B0` per type-0
-  timer during Strafe / Zeal.
-- `skills/levels.md` OQ1: hook `0x00646460`, `0x00644D50` /
-  `0x00644E40` (entry/return) with known skill levels, and
-  `0x0056BFE0` (mana before/after) for a few skills.
-- `skills/bodies.md` OQ1–3, OQ9: Paladin Might in a party (hook
-  `0x005CF010`, `0x0056E970`: duration, expiry, count, state 85 per
-  tick); Kick, Bash, Attack on a monster (`0x0057DBF0` record before /
-  after); Amplify Damage on an immune monster and Dim Vision in
-  Nightmare (expiry − F); a Druid summon and a Clay Golem (stats 12,
-  31, 19, 7, 6 on the summon, AI think at F + 25).
-- `skills/bodies-2.md` OQ1–5, 7, 8, 12: Jab / Smite monsters (stats
-  21, 22, 19 and element stats around `mode_damage`); Dragon Talon L6 /
-  L12 (kicks, last-kick knockback, E param 1); Find Potion per act and
-  difficulty (codes, seed draws); Leap and monster Leap (E flags,
-  landing frame, knockback, 0xA5); Shock Field (caster seed before /
-  after); Conversion on a higher-level monster (stats 12, 6, 7 during
-  and after); Holy Freeze pulses (state 107, target seed); Whirlwind
-  with one and two weapons (E param 4, hits per do).
-- DRLG act entries (one run, RNG hooks on): enter Act 2 and Act 3
-  (`drlg/levels.md` OQ1: drlg +0x94/+0x484/+0x474; `outdoor.md` OQ3/OQ4,
-  `outdoor-act3-act5.md` OQ1: levels 76..78 +0x1C..+0x28, +0x1B8,
-  +0x1BC), Act 4 (Outer Steppes flag) and Act 5 levels 111, 112, 117
-  (`outdoor.md` OQ9, `outdoor-act3-act5.md` OQ3: stamps, room counts of
-  76..78); after Act I creation read level +0x1C..+0x28 of 1–7, 17, 26,
-  39 and preset direction of 1 and 27 (`outdoor.md` OQ1).
-- `drlg/levels.md` OQ3: a town arrival and an act change, draws at
-  `0x0066ACB0`–`0x0066ACE0` on the level seed.
-- `drlg/levels.md` OQ7: a crypt level (`Logicals` 1) and an outdoor
-  level, dump DRLG room +0x64 records after activation.
-- `drlg/maze.md` OQ1: enter Den of Evil (8) and Cave Level 1 (9) with
-  RNG hooks; compare with the maze vectors.
-- `drlg/outdoor.md` OQ5: Stony Field, Dark Wood, Black Marsh, Tamoe
-  builds (sites `0x00680251`, `0x0068034F`).
-- `drlg/outdoor-tilesub.md` OQ2 + OQ4: Cold Plains far enough to build a
-  waypoint and a shrine room; also read the `Trees` substitution DS1's
-  group records (+0x14 of each 0x18-byte group) after its first load.
-- `drlg/preset.md` OQ3: a level whose river/navi units are added at
-  first activation; log §8 adds versus §9 transfers per room.
-- `drlg/rooms.md` OQ7: the entry `0x0066D820` returns for seq
-  6822–6835 of the RNG recording's run.
-- `render/camera.md` OQ1: a capture standing under a roof (decides the
-  roof y formula; roof blocks y 0…64 from the files).
-- `render/camera.md` OQ8 + `render/capture.md` OQ8: `frames-raw-2` with
-  the client-update counter per frame (draws with no tick between).
-- `render/blend-modes.md` OQ2 + OQ3: a ghostly / ethereal unit or a
-  blended shadow over a known background, static camera; log
-  `[0x0072DA5C]` (Blended Shadows).
-- `render/lighting.md` OQ6 + OQ10: a game join; log whether S→C 0x53
-  precedes the first world draw, and `[0x0072DA50]` / `[0x0072A348]` at
-  that draw.
-- `render/capture.md` OQ7 + `render/lighting.md` OQ9: rerun of run 1b
-  f 13,486–14,636 with `--draws-every` and the light-map digest.
-- `sim/rng.md` OQ2: a brand-new character's first game and a
-  save-and-exit reload; log game +0x7C and the S→C 0x03 map seed.
-- `sim/path-placement.md` OQ8: load a character saved in Act III; log
-  writes of client +0x1AC (sites `0x0052FB97`, `0x00530E17`,
-  `0x00532690` path) in order.
-- `sim/pathing.md` OQ9: FPU control word at `0x0067A140` (or a Blessed
-  Hammer's per-tick positions).
-- `formats/ds1.md` OQ3 + `drlg/preset.md` OQ2: after the Trees
-  substitution DS1 loads, dump its 14 group records (0x18 bytes each)
-  and the 0x320 slack after the file buffer.
-- `tools/original-hooks.md` OQ9: breakpoint on `0x00552E6C` over a full
-  scenario; log the allocating caller (unit-seed fallback).
-- `client/model.md` OQ8 (static answer 13) + OQ9: a waypoint to another
-  act (log S→C 0x05, 0x03, 0x53 bytes), and a monster's client +0x20
-  seed after 0xAC against the server unit's seed.
-- `client/msg-ui.md` §4–§11 (client side, no new play beyond the
-  §3.5 line above): in the same session log the client handlers'
-  inputs: type one chat line and one whisper to the own name (0x26
-  forms 1, 2, 6; overhead form 5 from C→S 0x14), talk to Akara (0x27
-  count, kinds), open and close the hire list (0x4F, 0x4E × n, 0x50
-  code 2); breakpoint `0x0049F410` (overhead set: unit, text, lang) and
-  `0x004A1600` (record bytes).
-- `client/msg-skills.md` OQ4 / `client/msg-ui.md` OQ7: a pet summon with
-  a pending skill (0x99 / 0x9A, line above) — log whether any later
-  message of the same receive changes the 0x99 unit (0x0A, 0x15,
-  0xA8 / 0xA9 state 118).
-- `sim/units.md` §4.7 (OQ1, OQ2 answered statically): log unit +0x4C,
-  +0x3C and the §4.2 start index per `anim` record for a player with
-  IAS / FCR / FHR / FBR / FRW items in every mode (dual-wield
-  Assassin or Barbarian, a were-form, Holy Shield block) and for a
-  monster walking, running, attacking, casting and knocked back.
-- `sim/units.md` OQ3: move a player with a hireling following (20
-  history entries of player data +0xA8 per frame, and a town-portal
-  teleport frame).
-- `monsters/init.md` §4.1, §14.3, §26 (OQ4): rng hook with caller
-  addresses during one Act 5 ancient-barbarian spawn (four item
-  creations after the boss mods) and one warping-shrine use (§17 draws
-  on the chosen monster).
-- `sim/pets.md` §10 (OQ3): summon two pet types of one group, then
-  lower a `petmax` skill level (resync trims), and leave the game with
-  a hireling (free path: 0x7A removes).
-- `monsters/ai.md` OQ1 / OQ2 / OQ3 (AI, spec area 1): freeze a monster
-  (cold damage with freeze) and knock back a fallen and a sand leaper;
-  play one Nightmare area; log type-2 schedules (site, frame), timer
-  type 12, state 1 on / off, mode changes. Expect: a think at freeze
-  apply + len + 1 and one at expiry + `aidel` (`0x0057B170`); knockback
-  end +1 / 15 / gethit (`0x005A8520`); Nightmare mode-end delays =
-  `aidel(N)` (zombie1 14).
-- `monsters/ai.md` OQ8 / OQ9 / OQ11 (AI): a town walk clicking NPCs
-  (C→S 0x13, 0x59) and an Act I fight with a fallen shaman; log command
-  4 next to each NPC think, every client message next to type-2
-  schedules, and mode changes of fallens (death end, resurrect).
-- `monsters/ai-bodies-2.md` OQ1 / OQ2, `ai-bodies-3.md` OQ1 / OQ2,
-  `ai-bodies-4.md` OQ1 / OQ2, `ai-bodies-5.md` OQ1 (AI): one run per act
-  II–V (Far Oasis, Arcane Sanctuary, Spider Forest, Durance, Chaos
-  Sanctuary with Diablo, Arreat Summit, Worldstone Chamber); log per
-  think the type-2 schedule, unit-seed steps with caller, mode requests
-  (mode, target, point), AI params 0–2; for vultures, bat demons and
-  frog demons also modes 8–11 / 14 and collision; for Diablo the mode
-  chosen per think with the player's resistances.
-- `monsters/ai-bodies-7.md` OQ2 (AI, refined 2026-10-07): the static
-  read finds no driver for Uber Mephisto / Diablo / Baal (§26). In the
-  Uber Tristram run also log every mode change of the three with its
-  caller and every `0x005B0E00` call on them; expect no attack or skill
-  mode started by AI code (only gethit / knockback / death).
-- `sim/units.md` OQ7 (answered statically 2026-10-07: single player has
-  game +0x6A = 3, so the difficulty's `aidel` column): a Nightmare
-  single-player game; log monster event-2 sets (U10) and check the
-  delay = Nightmare `aidel` (0 → 15).
-- `monsters/init.md` §27: kill a fetish shaman (Act III); log the
-  `0x00574370` call (class 278–282 → 141–145, mode 1) and its rng draws
-  with callers.
-- `combat/events.md` OQ1: items with knockback, freeze, slow,
-  skill-on-hit, damage-to-mana; Energy Shield, Bone Armor, Iron Maiden
-  in play. Log each event function's entry / return (table
-  `0x007325B0` targets), H's seed before / after, and the record.
-- `skills/levels.md` §7.5 / §7.6 (no OQ, unverified): equip an aura
-  item (e.g. Dragon) and a charged item; log `0x005BF510` /
-  `0x00647320` calls and the type-9 timers they schedule.
+##### REC-50 [NO RUN] client/stat-lists.md §6 r6.5 setfunc 15 (+0xC4 bit 0x80000000 reader), client/model.md §14
+- Priority P2.
+- Settles: client/stat-lists.md §6 r6.5 setfunc 15 (+0xC4 bit 0x80000000 reader), client/model.md §14 r3 / OQ10 (reader of pet record +0x1C).
+- Steps: (no game run) Ghidra scan of client code 0x00400000–0x0051FFFF with `py tools/ghidra/disasm.py`: every read of unit +0xC4 followed by a sign test (`js`/`jns`/`test reg,reg`, `shr 0x1f`, `and 0x80000000`) and every read of [record+0x1C] where the record comes from the pet list `[0x007BB5BC]` (walkers 0x00478E40 / 0x00478F20 and callers).
+- Output: a list of reading functions and their conditions.
+- Compare: none found → the provisionals stand; otherwise write each reader's rule into the spec. Fold: write the result into the cited rule and drop its PROVISIONAL line.
 
-**Tenth set (2026-10-07; the 28 notes of the title line).** Grouped by who answers. The
-two request files hold the open lines and their addresses: **`xpc-to-pc1.md`**
-(PC 2's requests to PC 1 and the spec gaps of `impl-session-flow`,
-`impl-path-motion`, `impl-pc1-wiring`, `impl-pc2-fixes`; strike a line with the
-commit that did it) and **`xpc-to-pc2.md`** (PC 1's requests to PC 2 and the gaps
-G1–G8 of `impl-world-rest`). The lists below name only what those files do not
-carry. IDs: SF `impl-session-flow`, MV `impl-path-motion` (MV1–MV11), PW
-`impl-pc1-wiring`, PF `impl-pc1-final` (Open items), PX `impl-pc2-fixes`, G
-`impl-world-rest` (§5), CM3 `impl-client-msgs-3` (§3), CD2 `impl-client-drlg-2`
-(§4), UC `impl-umods-cs-handlers` (U1–U6 and the subagent's list), MS
-`impl-monster-skill-slots` ("Left" 3), RM `impl-render-missile-answers`
-("Left"), FD `fix-drlg-answers` (§3), MD `impl-monster-death` (§3, §4), SJ2
-`impl-server-join-2` (§3), DL `impl-d2s-load-hirelings` ("Left"), QZ
-`impl-quests-answers` ("Left"), GN `gaps-night-specs` ("Questions"), EN
-`e2e-night-flows` (§4), L2 `local2-2026-10-06`.
+#### Priority 3 (manual / assisted)
 
-**Resolved in the tenth fold:** I-1 (0x7A owner @5 / pet @9, server and client);
-CM-1–CM-6 handlers (0x21–0x23, 0x2C, 0x53, 0x5D, 0x63, 0x77, 0x94) and the 85
-`d2-client` dispatch reds; SJ-2–SJ-5 and MB-8 (join messages, 0x69 at death);
-WS2 / PU1 (clean-up flags in tick step 6); WP1 and `pathing.md` OQ3 for
-missiles; WI10 (kill experience); N-2 / N-3 / N-4 (`e2e-night-flows`), QA-1–QA-6,
-WW-6, WW-10, QB-1–QB-20, QC-1–QC-5, QC-7, QE-7 and the quest table edits; HL1–HL9,
-WW-2, hirelings OQ6–OQ8 and GN1; DS-1–DS-5 and the C66 findings (flag 0x2000, +0x88);
-`fix-drlg-answers` Q1–Q13 and room-population Q1–Q3 (Cold Plains 97 vs 98 stays
-open as C92); the AI, skill-slot, umod and missile-body rows that were waiting for
-a spec (`ai-bodies-6` / `-7`, `bodies-3` / `-4`, `umod-callbacks`); the code fixes of L2 §3 as numbered in
-`impl-pc2-fixes` (1, 2, 6, 7 done; 3, 4 were already in code; 5 is open as PX-5;
-the `mpq-tool` counts are C98); the staging-5 spec
-contradictions are on PC 1 below.
+##### REC-23 [MANUAL] Vendors: prices, equip-on-buy, refresh, gamble, copy rebuild
+- Settles: `world/vendors.md` OQ1 + OQ6 (R-NV-5: magic / rare / unique sell prices and buy-back vs §9.2 rules 2–9; term B uses stat "bonus" `0x00625560`: the same steps under `record_stats.py`), OQ3 (R-NV-6: arrows to the equip slot with a bow, to the inventory with a crossbow; a cap not auto-equipped, §7.1.1), OQ4 (R-NV-7: a new 0x9C action 11 list with new GUIDs and NPC-control seed draws between two opens across a level change), OQ7 (R-NV-8: Elzix gamble: 14 items, first `rin`, second `amu`; §5.1 draws; purchase 0x32 transaction 2; 0x37 identify; re-open), OQ8 (R-NV-9: ethereal socketed weapon and a low-quality throwing weapon sold and bought back: stats 20–24, 67, 68, 159, 160, durability field by field).
+- Steps: per R-NV-5 … R-NV-9 as in `pc2-rec-npc-vendors.md` (five sittings of 180–300 s: packets; 5 and 7 and 8 also under `record_stats.py` / `record_rng.py` with the same steps; Act I save with ≥ 50,000 gold, magic / rare / unique items; Act II save level ≥ 20 with ≥ 100,000 gold).
+- Output: `pc2rec-r23-*`. Fold: close vendors OQ1 / 3 / 4 / 6 / 7 / 8.
 
-**PC 1 — RE / spec answers** (the full lines are in `xpc-to-pc1.md`; the notes'
-own lists below are the ones that file does not repeat)
-- SF, MV1–MV11, PW, PX-5 (`units.md` §3.1 room / level source of the per-kind
-  inits), PX (`ai.md` setter of the re-path budget 20 at `0x005A7C20`, `drlg` §9.6
-  corner half), PF items 4–7 and the staging-5 contradictions: in
-  `xpc-to-pc1.md`. PF also: `impl-pc1-final` open items 1, 2, 3 are code (§2 7w).
-- CM3 Q1–Q10 (`msg-ui.md` §1 r5 vs its vectors and `bridge.md` §10 for an inert
-  output; the classic branch of `[0x007BC9D4]`; dump the quest-log table
-  `0x00723F30`; `0x0044DA40` / `0x00463DF0`; the arguments of the `0x00643620`
-  list creation and the client's state bits before a state list exists;
-  `msg-skills.md` §2 r2.2 dangling hand pointers; `lighting.md` §9.2 r4.4
-  `0x0061C100` period and r4.2 null acts; `audio/triggers.md` §2 r4 / §3 r2
-  payload mode; build the client stat list now or wait for OQ1).
-- CD2 Q1–Q3 (`rooms.md` §4.6 r6 / r8 build-timer cursor on the list head, reset
-  of `[0x007A0498]`, a cursor on a freed room).
-- UC U1–U6 (GH animation record for the mode-1 site; multishot inside a missile
-  creation needs a store-lend redesign; `umod-callbacks.md` §3.1 filter excluded
-  unit and flag 0x200; §22.2 A1 damage reading; §3.5 base class "row missing";
-  `minion_owner`) and the subagent's: C→S 0x14 empty text (§2.4 r6 → 2 vs §9 r3
-  → 0), 0x59 owner is `ai-bodies.md` §9.9, 0x44 result vs `quests-act2-2.md`
-  §3.2, text test `0x00413490`, `0x0053FDF0`, 0x41 flag bit 2, `0x0058EF40`
-  extra args, `0x005724C0` intro field, initial hot-key slots.
-- MS (`bodies-3.md` §3.3 throw mastery for a non-throw item, OQ5 FetishAura
-  finder room, OQ6 DiabPrison object target, OQ4 Baal Tentacle spawn info for a
-  non-Baal unit, zigzag step ≤ 0, Imp Teleport point, "E flags bit 2").
-- RM (unit find flags 0x200 / 0x800 for a caller with its own filter,
-  `ai-bodies-3` OQ3; particle move `0x004732C0`, `draw-order-2.md` OQ3).
-- FD (`outdoor-act3-act5.md` §2.7 row 15 of T; `rooms.md` §9.6 step 3 which room
-  and position the door unit gets when the layer-above door record lacks flag
-  0x20; `outdoor.md` "group 8" / "group 11" read as indexes into the DS1 group
-  list).
-- MD (`intents-events.md` Test-vector label "cell (4757, 5461)" is the path
-  target; §7.4 rule 3 0x4C / 0x4D layouts; §7.5 steps 1, 2, 4–6; §7.7 rule 3 setter
-  of mode 12 and `0x005A7390`), SJ2 and DL (`d2s-load.md` §1: does the caller run
-  quest entry mode 0 after a new-character start?), QZ (`quests.md` §1.8 / OQ14
-  per-path bits; `set_room_portal` `on` vs `clear` per site; QC-3b class with no
-  monstats row).
-- L2 §4 live findings and the two cross-checks of §5 (named in C98).
+##### REC-24 [MANUAL] NPC services
+- Settles: `world/npc.md` OQ6 rest (R-NV-2: Akara heal: C→S 0x13 then 0x2F, 0x1D–0x1F in that frame, sound-10; Cain identify of 3 items: C→S 0x34, one 0x2A code 3, gold −300; with none: 0x2A code 9; R-NV-3: imbue (Charsi), socket (Larzuk), personalize (Anya), respec (Akara): C→S 0x38, S→C 0x58 result 6, the item 0x9C order, socket count = `MaxSock` cap; act travel a–d (resurrect is REC-10)).
+- Steps: `pc2-rec-npc-vendors.md` R-NV-2 and R-NV-3 (saves A–D: A: Act I Tools of the Trade reward pending, a socketless Long Sword; B: Act V Siege done, a Crystal Sword; C: Act V Betrayal done, a rare body armour; D: Hell character with the Den reward unused). `record_packets.py --seconds 240` / 600 s per save.
+- Output: `pc2rec-r24-*`. Fold: npc OQ6.
 
-**PC 2 — items, objects, hirelings, quests, UI, audio, d2s** (the full lines are in
-`xpc-to-pc2.md`; G1–G8 are its last line)
-- G1–G8 (`objects.md` §15 population `0x00552610`; footprints `0x00623830` /
-  `0x00620A70` / `0x0064D800`; `0x00585970` / `0x00559A30`; `objects.md` §8.2 fn 7
-  and §8.3; §9.2 code 17; §9.3 missile creator; `0x00545850`; `hirelings.md`
-  `0x0053ACC0`, restore place, `0x0055A2A0`), and the PC 1 → PC 2 lines for the UI
-  consumers of 0x26 / 0x27 / 0x4E / 0x50 / 0x58 / 0x89 / 0x8A / 0x91, `quests.md`
-  §6.7, `hirelings-ai.md` §1, `npc.md` §2 r2 / §8.2, `items/inventory.md` §7.1 /
-  §7.11 / `0x00623990`.
-- GN2 (`d2s.md` §7.2 r3, edge 4: should the spec say d2rs rejects a short skills
-  section with 19?), GN3 (`audio/sound-table.md` §9 line "9. d2rs reproduces
-  mixer mode 0 only" is read as a list item; a rewrap removes the unit and its
-  claim).
-- From the PC 2 spec workers (still open in their specs): `hirelings.md` OQ1–OQ5,
-  OQ9 rest, §6 rule 6 (why the first teleport had an extra 0x15), `npc.md` OQ5 /
-  OQ6 rest; d2s OQ1, 2, 4–11, 12–17 (OQ17 new: bytes written into +0x88..+0xA7);
-  `quests.md` OQ14 (new), `quests-act1-rest.md` OQ2–OQ5, `quests-act2-2.md` OQ1
-  (0x58 byte 6), `quests-act3.md` OQ1, OQ8. Requests to the other PC: the
-  `formats/d2s.md` → `items/bitstream.md` / `generation.md` / `inventory.md` lines
-  of `pc2-spec-d2s` ("Cross-file requests"), the "radius" argument of `0x00545340`
-  is unused (`pc2-spec-quests-act2`), init 37 `0x0059DA50` is chain 13 code
-  (`pc2-spec-quests-core`).
+##### REC-25 [MANUAL] Cube and the cow portal
+- Settles: `world/cube.md` OQ1 / OQ2 / OQ4 (R-NV-10: the transmute frame messages with callers and tick pass: input removal 0x9C / 0x0A, output 0x9C, sound event 4; two game-seed steps per created item; run A V1 three Chipped Amethysts; run B V22 with Wirt's Leg + Tome of Town Portal in the Rogue Encampment (Baal killed in Normal, the Cow King never killed) the portal object's allocation and init-12 draws; run C record 19 `pole,mag,pre=191`), `quests.md` OQ3 / R-PQ-2 (the cow portal: draws between C→S 0x4F 0x18 and the portal's S→C 0x51; object class / mode).
+- Steps: `pc2-rec-npc-vendors.md` R-NV-10; `record_packets.py` + `record_rng.py` per run (300 s each, `check_rng`).
+- Output: `pc2rec-r25-*`. Fold: cube OQ1 / 2 / 4, quests OQ3.
 
-**PC 2 — recordings and captures on the original game** (new; the older R2-1–R2-38
-are above)
-- R2-39 `quests.md` OQ14: a 1.14d expansion character that completed every Normal
-  quest, saved right after the last one and after one more game; dump both quest
-  sections and list per slot the set bits (R-QC-1; DS-4 per-path bits).
-- R2-40 town-Cain marker (class 385) creation after Cain left Tristram, packets
-  and RNG: Cain's spawn draws must fall between the marker's unit-seed step and
-  the next preset unit's (R-QC-2, `quests-act1-rest.md` OQ12, = C79).
-- R2-41 orifice insert (Act II, staff assembled): operate (0x58 result 0), cancel
-  (C→S 0x44 action 2 → result 1), a wrong cursor item (result 4), the staff
-  (result 5, byte 6 = 1): the 7 bytes of each 0x58, byte 6 for results 0, 1, 4
-  (`quests-act2-2.md` OQ1).
-- R2-42 hireling, rest of R2-27: level-up (0xA1 / 0xA2 and the second stats
-  batch), death (0x9B name id + cost, 0x7A remove), resurrect at an NPC (0x9B
-  `ffff 00000000`, 0x81, 0x2A code 5), give / take an item (two 0x540E60
-  notices, new GUIDs), character `bdMercTwo`.
-- R2-43 `hirelings.md` OQ7: a two-player game where the second client sees the
-  owner's hireling level up (expect the hireling's 0x9E–0xA0 stats, not the
-  0xA1 / 0xA2 delta).
-- R2-44 `hirelings.md` OQ2: die, change level, return and resurrect.
-- R2-45 `d2s.md` OQ17 (local saves, not a recording): one character saved with
-  weapon, shield, helm, body armour, belt, gloves and boots equipped and again
-  with a different set, to compare +0x88..+0xA7.
-- R2-46 the captures and recordings L2 §5 lists: a roof in view (`camera.md` OQ1),
-  `composition-0001`, `frames-raw-2` (`camera.md` OQ5 / OQ8, `capture.md` OQ5 /
-  OQ8), a GT / THS1 monster (`sprite-placement.md` OQ5), a position trace
-  (`pathing.md` OQ1 / OQ2), item-move packets R1–R5 (`inventory.md` OQ1, OQ2,
-  OQ12), packets for 0x50 (`quests.md`), a voice-log trace (`sound-table.md` OQ1),
-  a debugger dump of a decoded `.wav` buffer (`wav.md` OQ1), Act III jungle
-  (`outdoor.md` OQ7), cold damage (`ai.md` OQ1); also re-export Ghidra with
-  labels once `1.14d-notes` is on the PC (`tools/ghidra/README.md`).
-- `drlg/rooms.md` OQ23 (PC 1 spec-cloudq-area5, 2026-10-08): client build timer across a client level free: per client update log `[0x007A0498]`, client DRLG +0x98, +0x45C, +0x460 and the byte at (+0x460)+0x44, plus every room free address; shows whether a freed cursor room is reallocated before the next timed step (§4.6 rule 11).
-- `monsters/umod-callbacks.md` OQ7 / §28 (PC 1 spec-xpc3-umods, 2026-10-07): client side of a fire-enchanted unique's death (and a cold / lightning unique hit into GH / KB): log client missile creates (`0x004CD540` class, position), `0x004B9A00` id 2,458 and U's mode / +0x44 per client update; expect §28.2 rows (frame 4 / frame 2 tests).
-- `sim/units.md` OQ9 / `monsters/init.md` OQ13 (PC 1 spec-xpc3-umods, 2026-10-08): kill a bonefetish1 next to the player (death area damage, §4.6 branch 1.4: U-seed draw, physical-only hit) and log the server 0xAC of a hireling and of a boss with umods (§24 rules 4 and 6: umod terminator, owner GUID, `send other` stats); compare bytes.
+##### REC-26 [MANUAL] First waypoint activation
+- Settles: `world/waypoints.md` OQ2 / R-NV-12 (a new Normal character without the Cold Plains waypoint: the first click lights it (no 0x63; 0x0E / 0x51 mode 1), mode 2 reached after frame + 15 + 1 with no message; the second click opens the menu: S→C 0x63 with the Cold Plains bit).
+- Steps: R-NV-12 in `pc2-rec-npc-vendors.md`: `record_packets.py --seconds 180` by hand from the Blood Moor into Cold Plains.
+- Output: `pc2rec-r26-packets.jsonl`. Fold: waypoints OQ2.
 
-*`client/ui.md`, `client/model.md` (PC 1, 2026-10-08)*
-- R2-39 a UI-sound request log while clicking each control of
-  `client/ui.md` §B8.1 once (popups, configure controls, stash / cube /
-  trade buttons, NPC menu, text list) and an NPC talk → cancel with a
-  memory read of the NPC's unit flags, mode and the store items in S
-  (`client/model.md` §17 r1–r3); a character whose left skill drops to
-  level 0 (§17 r4).
-- `client/model.md` §7 r8 / §17 r6 (PC 1 spec-s3-client, 2026-10-08): (a) join a classic single-player game with an expansion-class character: log the S→C 0xB4 bytes (expect code 0x18) and the error string shown (error number 0x1A); (b) walk out of town (once plainly, once right after starting an NPC talk): log the town flag `[0x007A5260]`, the interact NPC fields and the C→S 0x30 of the town exit, and player data +0x2C before and after entering a portal level.
+##### REC-27 [MANUAL] Act II run (and the orifice)
+- Settles: `world/quests-act2-2.md` OQ1 / R2-41 / R-PQ-9 (orifice: operate → 0x58 result 0; cancel → C→S 0x44 action 2 → result 1; a wrong cursor item → result 4; the staff → result 5, byte 6 = 1: the 7 bytes of each, byte 6 for results 0, 1, 4; `quests-act2.md` OQ31), `quests-act2.md` OQ10 / OQ2 / OQ3 / R-PQ-8 / R2-19 (Jerhyn, Drognan, Atma; Radament; scroll and cube chests: gate mode 1 / 2 and end-animation frame per chest §1.3; Claw Viper Temple altar `53 05000000 00000000 01` at the start and `53 02000000 00000000 00` at the altar; Horazon's journal; the Summoner; the staff; Duriel; Tyrael's portal; Meshif's completion order), `quests.md` OQ10 for the Warriv / Meshif / Tyrael act changes (REC-05 covered the waypoint ones).
+- Steps: `record_packets.py` + `record_rng.py` per sitting (300 s each) on an expansion character entering Act II on Normal with no Act II quest done; a `d2s-tool` save per stage.
+- Output: `pc2rec-r27-*`. Fold: close the Act II OQs.
 
-*combat / units / spawn / pets (PC 1 pc1-done-combat, 2026-10-08)*
-- `combat/damage.md` OQ1: melee and missile play (a player hitting monsters, monsters hitting the player); hook `0x0057DBF0` entry / exit (EBX record +0x08…+0x4C before / after) and `0x0057C6C0` entry / exit (defender stat 6 before / after), log attacker and defender seeds at entry; settles when §3–§5 recomputed from the logged stats equal every logged record and life change.
-- `combat/damage.md` OQ2: a life-leech and mana-leech item on the player (and a vampire-type monster hitting the player); hook `0x0057C420` entry (EAX record, EBX attacker, [EBP+8] defender) and the calls `0x0057A980` / `0x0057AA00` (amounts); settles rules H / M and Edge case 6 when every logged amount equals the rule's value.
-- `combat/hit.md` OQ1 + OQ2: melee play with a shield-wearing player and monsters that block; hook `0x0057DB61` (ESI r, EDI chance, EBX attacker, [EBP−0xC] defender), `0x0057DFB0` entry / return and `0x0057E04B` (EDI r, EBX chance, ESI defender); settles when every chance equals §3–§6 from logged stats, the block chance shows the /3 rule while moving, and a zero chance still draws (Edge case 1).
-- `combat/vitals.md` OQ1: a level-up and spending five stat points and one skill point (0x3A, 0x3B); hook `0x00570880` entry / exit and `0x00570D60`, log stats 4–13 before / after; settles §1–§3 when every logged value matches.
-- `combat/vitals.md` OQ8: any recording with damage, potions and running (R5 of `items/inventory.md` covers gold): log every S→C 0x18 / 0x95 / 0x96 / 0x1A–0x1C with its bytes and tick; settles §5 when ours emit the same bytes on the same ticks.
-- `sim/units.md` OQ1: a 0.2.0 `record_tick.py` run of U4 with `anim` records and U11 with `site` on every schedule, covering combat with skills, a shrine, a well, a trade and a cooldown skill; settles when every scheduled event (type, unit, frame, site) matches §4–§6.
-- `sim/units.md` OQ4: operate objects with delayed events (a chest, a door, a trap, a shrine) with the rng hook (caller addresses) and tick log; settles the object-control seed draws of events 0 and 8 (`unit-events.tsv` sites) when the logged draw and scheduled frame match.
-- `sim/units.md` OQ9 (rest): kill monsters by melee, missile and spell; at `0x005A6FF0` entry log the mode-change record R (ESI) bytes +0x00…+0x1C, especially byte +0x14, and the caller chain; settles what +0x14 holds (death-cause / path flag passed to `0x005A6520` and `0x006488A0`). Same run: the bonefetish1 kill of the existing line.
-- `sim/stat-lists.md` OQ4 (and `sim/stats.md` status): run `record_stats.py` over a session with equips, a level-up, a buff and a curse; settles when `check_stats.py` passes on it.
-- `sim/stats.md` OQ1: in the same `record_stats.py` session equip and remove items with +max life / mana (MaxStat 6→7, 8→9), IAS / FRW (UpdateAnimRate 67–69) and a socketed item (itemspecific); settles when `check_stats.py` shows no stat array change outside the `stat-lists.md` §5 writes (no hidden direct writes by property or animation code).
+##### REC-28 [MANUAL] Act III run
+- Settles: `quests-act3.md` OQ8 / R-PQ-10 / R2-20 (the 19 "Readings taken literally" of `impl-quests-act3`: Lam Esen's tome, the Golden Bird / Alkor potion, Gidbinn, Khalim's parts and flail, the orb's two hits, the council kills' 0x5D status bytes, Mephisto's timer and the Hellgate, Natalya's spawn, the Dark Wanderer's 7 / 8 minions; chest gold and item draws §4; the Alkor 564 broadcast needs a second player: [NO] unattended, BLOCKED unless a TCP/IP host plus two clients is available), `drlg/outdoor-act3-act5.md` OQ1 creation draws already folded (D1), `quests-act3.md` OQ1 (open: read its own capture).
+- Steps: `pc2rec-rec-pc2-quests.md` R-PQ-10. Output: `pc2rec-r28-*`.
+
+##### REC-29 [MANUAL] Act IV run
+- Settles: `quests-act4.md` OQ13 / R-PQ-11 / R2-21 (Izual and the ghost, the Hellforge drops, the five seals, Diablo's spawn and death in a classic game and an expansion one, Tyrael's portal object 566; the classic game is [NO]: see the last section), `quests-act4.md` OQ2 / QD-1 / R-PQ-12 (classic Diablo kill with frames: whether the 2250 / 2375-frame offsets drift with wall-clock time; idle and loaded machine; the uncredited player's 0x50 bytes 3–14: OQ3).
+- Steps: expansion part by hand (`record_packets.py` + `record_rng.py`, 300 s per sitting); classic part BLOCKED (see the last section).
+- Output: `pc2rec-r29-*`.
+
+##### REC-30 [MANUAL] Act V run and the Act V levels
+- Settles: `quests-act5.md` OQ7 + `quests-act5-2.md` OQ7 / R-PQ-13 / R2-22 (Shenk and the socket reward, rescue portals and the rune draw, Anya's thaw and item draw `0x00558200`, Nihlathak's portal, the Ancients' reset and experience, Baal's gold draws, missile 625, the zoo id 0x50), `drlg/outdoor.md` OQ9 (levels 109–132) and `outdoor-act3-act5.md` OQ3 part 2 + the 111 / 112 / 117 builds (R2-30).
+- **Not reachable unattended**: `TestSor` has no Act V tab. Needs a character that has Harrogath: a played-through save, or a `d2s-tool` save with the Act V quest bits and waypoint flags; then `record_rng.py` + `dumpdrlg` for each Act V level.
+- Output: `pc2rec-r30-*`.
+
+##### REC-31 [ASSISTED] Skill, monster and missile bodies, umods
+- Settles: `skills/bodies-3.md` OQ1–OQ4 (Fetish Shaman / Baal Inferno E param 1, timers, missile frames per do of `0x005CC4E0`; Greater Mummy resurrect: T mode, skill, life after `0x005CCB10`; Sand Leaper jump `0x005CB940`; Sand Maggot egg cast `0x005CAFA0`), `skills/bodies-4.md` OQ1–OQ3 (Royal Strike / Claws of Thunder charge release: path points and seeds `0x005D4870`, `0x005D4150`; Overseer whip `0x005D1F70`; imps on a barricade tower `0x005D1AB0`), `monsters/umod-callbacks.md` OQ1 + OQ2 (a fire-enchanted unique dying beside the player, a suicide minion hit into GH in Act V: timer sets / runs (type 7, site), rng draws with caller, area-damage targets), OQ6 (stat list of a missile fired by a spectral-hit unique: is stat 12 present), OQ7 / §28 (client side of a fire-enchanted unique's death: `0x004CD540` creates, `0x004B9A00` id 2,458, mode / +0x44 per update), `missiles/bodies.md` OQ1 / OQ3 (Plague Javelin hit: cloud positions per tick), R2-24 (Might in a party, Kick / Bash, a Druid summon, a Clay Golem: SK-*), R2-25 (the missile list of `impl-missile-bodies-2` §5.3: MB-1…MB-6), R2-23 (Act II–V monster AI: moved to REC-40), `monsters/ai.md` OQ1 (cold damage: REC-40), `skills/descriptions.md` OQ1 + OQ2 (character panel damage / attack-rating lines for one skill per `descdam` 1–24 and `descatt` 1–5; kick `v-(v+1)`, smite, dual-wield assassin for `descatt` 5; stats 0, 2, 17–25, 48–59, 119, 159, 160; the title string of a skill whose skilldesc `str name` ≠ `str alt`: `record_frames.py` with the panel open), `monsters/init.md` §27 (kill a fetish shaman in Act III: the `0x00574370` call, class 278–282 → 141–145, mode 1, and its rng draws with callers).
+- Steps: `spawn.py` (q9-rec branch: places monsters by debugger call, foreground input) with `record_tick.py` / `record_rng.py` / `record_packets.py` / `record_frames.py` per OQ; the hook addresses are the ones in the OQ text. Act V items (GH) need an Act V save (REC-30).
+- Output: `pc2rec-r31-*`. Fold: close each OQ.
+
+##### REC-32 [MANUAL] Weather, translucent walls, arcane, Den light
+- Settles: `render/draw-order.md` OQ7 / R2-1 (the 8 `townN1` river-bank cells at `TownE1` tile (950, 933): off-screen from every reachable spot per `local-buddy-q9-rec` R2-1: try a screen-edge map position; BLOCKED otherwise), OQ6 / R2-4 (a `Logicals` preset walk, levels 18 and 19: the group-mode fade), `render/draw-order-2.md` OQ1 / OQ9 / R2-2 (Rogue Encampment in rain: per frame the player seed, rain target `[0x007A89E0]`, `k` `0x007C8A38`, `last_s`, the splash pool count; splashes only when `r` < ⌊target × 1000 / 256⌋), R2-3 (Arcane Sanctuary / Arreat Summit with the two seed globals; Act V part REC-30), `render/blend-modes.md` OQ6 / RA-B4 / R2-5 (rain and Arcane-star line endpoints: 45° lines x-major, end one short on the minor axis), OQ2 / RA-B2 (Lut Gholein translucent walls: walk behind a building towards the palace; alpha byte and pixels per frame), `render/lighting.md` OQ5 / RA-L1 (new Amazon in the Den of Evil: S→C `89 00` when the last monster dies, then the Den's ambient; `record_packets.py` + `record_frames.py` in two sittings), `render/unit-composite.md` OQ4 + OQ7 (a monster's first attack after a mode change to a not-yet-loaded mode: is a draw made before the graphics-ready flag; a bone prison, a leaping unit and a missile with creation flag 0x100: motion record gfx +0x30, 0x4C bytes), `render/camera.md` OQ1 (a roof in view), `composition-0001`, `frames-raw-2` (`camera.md` OQ5 / OQ8, `capture.md` OQ5 / OQ8), `sprite-placement.md` OQ5 (a GT / THS1 monster), `sim/pathing.md` OQ1 / OQ2 (a position trace), `world/quests-status.md`-style packets for 0x50.
+- Steps: `record_frames.py --draws-every 1` (rain needs weather on: wait for a rain period or re-run; `weather.rain` = 1 in the frames) per OQ; `spawn.py` for the unit-composite probes.
+- Output: `pc2rec-r32-*`.
+
+##### REC-33 [MANUAL] Audio in fights and the Den, with sound on
+- Settles: `audio/triggers.md` OQ1 (full list: two floor materials, a melee and a caster fight with a death and a block, an NPC greeting and talk, a waypoint, a Leap, a fire-enchanted unique's death), OQ3 (a write watch on unit +0xB0, last-hit class, during a fight: who writes it and when), `audio/environment.md` OQ1 + entry 74 rest (town → Blood Moor → Den of Evil → town, a day change, Blood Raven's death stinger 34, rain on and off), `audio/sound-table.md` OQ1 / OQ10 in full, R2-34 (ST-3, ST-4, ST-9, ST-10 (x87 vs `log2` / `powf`), TR-4, EN-*).
+- Steps: `record_sound.py -- -w` by hand, side log with wall-clock seconds; REC-19 / 20's hooks. Output: `pc2rec-r33-sound.jsonl`.
+
+##### REC-34 [MANUAL] Save and item round trips (no `--auto`)
+- Settles: `formats/d2s-load.md` OQ3 / `d2s.md` OQ5 / IT-3 (item index stability across Save and Exit: A / B / C copies, the hotkey words +0x38..+0x87), `d2s-appearance.md` OQ1–OQ2 / IT-6 (+0x88..+0xA7 after each of: helm `cap`; `brs` / `plt`; a `transformcolor` magic item; set / unique `chrtransform`; gem-socketed normal; crossbow `lxb`; circlet; Enchant active), R2-45 / `d2s.md` OQ17 (one character saved with weapon, shield, helm, body armour, belt, gloves, boots, and again with a different set), R2-37 / R2-38 (1.14d saves round trip: header +0x10..+0x37, +0x88..+0xA7, stats at 0x2FD, `jf` / `kf`; `d2s-tool` characters load and re-save: quest bits, trailer bit, flag 0x2000: DS-2, DS-4, DS-5), `d2s.md` OQ15 / IT-7 (Iron Golem item: `kf` g = 1, an item record, a skill-90 cast at entry `0x005394A0`), `d2s-load.md` OQ2 / IT-8 (an equipped stale runeword: where the item ends, flags 0x20), `items/properties.md` OQ4 rest / IT-10 (break `0x0062BFBA` during load `0x0056AD78` and save `0x0063087E`; the 6 slots at ebp−0x2C), `items/treasure.md` OQ12 / IT-11 (capture only if seen), `world/quests.md` OQ14 / R-QC-1 / R-PQ-5 / R2-39 (a 1.14d expansion character that completed every Normal quest, saved right after the last one and after one more game: `d2s-tool dump` both quest sections; per slot the set bits; bits 13 / 14 gone in the second; DS-4 per-path bits), `formats/d2s.md` OQ4–OQ14 and OQ16 (the open ones not listed above, and the `d2s` lines of `xpc-to-pc2.md`: read each OQ's own capture; OQ1 and OQ2 are Deferred).
+- Steps: by hand, `tools/d2s_check.py` before / after, saves in `%USERPROFILE%\Saved Games\Diablo II`. Output: the saves' hashes and the check results in the xpc line.
+
+##### REC-37 [MANUAL] Animation-rate records: IAS / FCR / FHR / FBR / FRW
+- Priority 3 (manual play; prepared saves).
+- Settles: `sim/units.md` §4.7 (OQ1, OQ2 answered statically: unit +0x4C, +0x3C and the §4.2 start index per `anim` record for a player with IAS / FCR / FHR / FBR / FRW items in every mode (a dual-wield Assassin or Barbarian, a were-form, a Holy Shield block) and for a monster walking, running, attacking, casting and knocked back).
+- Steps: prepared saves (`d2s-tool`) `AnimBar` (dual-wield Barbarian with IAS / FRW items), `AnimAss` (dual-wield Assassin), `AnimDru` (were-form), `AnimPal` (Holy Shield). Blood Moor, one sitting each: `py tools/trace-recorder/record_tick.py --seconds 240 --out traces/raw/pc2rec-r37-<save>-tick.jsonl` (0.2.0 `anim` records); run, attack, get hit, block; write the actions with wall-clock seconds.
+- Output: `pc2rec-r37-*-tick.jsonl`.
+- Compare: `check_tick`, `check_units` pass; the start index and +0x4C per record against `units.md` §4.2 / §4.7. Fold: close OQ1 / OQ2.
+
+##### REC-38 [MANUAL] Monster init and umods: uniques, ancient barbarians, warping shrine
+- Priority 3 (manual play; the Act V parts need REC-30's Act V save).
+- Settles: `monsters/umod-init-bodies.md` OQ1 (0xAC assign + stat messages of a lightning, cold or mana-burn unique with minions: expect the §2 values; minions on Normal get no damage stats, cold minions still get coldlength), `monsters/init.md` OQ10 (a unique's client name draws), OQ4 / §4.1, §14.3, §26 (rng hook with caller addresses during one Act V ancient-barbarian spawn: four item creations after the boss mods; and one warping-shrine use: the §17 draws on the chosen monster). The classic-SP 0x67 part of `init.md` OQ1 is [NO]; the population pass of OQ4 is in REC-07.
+- Steps: `record_packets.py --seconds 300` + `record_rng.py --seconds 300` on the same character: Normal for the minion stats, then a Nightmare character for the unique kinds; find the uniques by their overhead name in the Cold Plains / Stony Field / Dark Wood area and note the second of each sighting. Ancient barbarians: Arreat Summit (REC-30's save). Warping shrine: any act, reroll games with `--seed` until a room has one (not deterministic: record the seed that worked).
+- Output: `pc2rec-r38-{packets,rng}.jsonl`.
+- Compare: `check_rng`, `check_packets` pass; 0xAC / stat bytes against `umod-init-bodies.md` §2; draws against `init.md`. Fold: close the OQs.
+
+##### REC-39 [MANUAL] Necromancer pets and the 0x7A / 0x99 messages
+- Priority 3 (manual play; one Necromancer save).
+- Settles: `sim/pets.md` OQ3 count part (summon a 4th skeleton over max 3: expect three 0x7A action 0 for the removed one, §6 table) and §10 (summon two pet types of one group, then lower a `petmax` skill level so the resync trims; leave the game with a hireling: the free path, 0x7A removes), `client/msg-skills.md` OQ4 / `client/msg-ui.md` OQ7 (a pet summon with a pending skill: does any later message of the same receive change the 0x99 unit: 0x0A, 0x15, 0xA8 / 0xA9 state 118).
+- Steps: `d2s-tool` Necromancer `NecPets` (Raise Skeleton and Skeleton Mage so max is 3, Clay Golem not needed, a Rogue hireling). `record_packets.py --seconds 400` and `record_tick.py --seconds 400` over the same actions in the Blood Moor: summon three skeletons then a fourth; summon a skeleton and a mage; respec one point out of Raise Skeleton at Akara; leave the game (Save and Exit) with the hireling alive. Share the sitting with REC-40's `ai-bodies-6.md` logs.
+- Output: `pc2rec-r39-{packets,tick}.jsonl`.
+- Compare: `check_packets`, `check_tick` pass; 0x7A order against `pets.md` §6 / §8. Fold: close pets OQ3, msg-skills OQ4, msg-ui OQ7.
+
+##### REC-40 [MANUAL] Monster AI think logs (acts, Nightmare, freeze / knockback, NPCs)
+- Priority 3 (manual play; the acts II-IV area runs can be `--auto` with a strong prepared save, the Act V areas need REC-30's save).
+- Settles: `monsters/ai.md` OQ1 / OQ2 / OQ3 (freeze a monster with cold and knock back a fallen and a sand leaper; play one Nightmare area; log type-2 schedules (site, frame), timer type 12, state 1 on / off, mode changes. Expect a think at freeze apply + len + 1 and one at expiry + `aidel` (`0x0057B170`); knockback end +1 / 15 / gethit (`0x005A8520`); Nightmare mode-end delays = `aidel(N)` (zombie1 14)), `monsters/ai.md` OQ8 / OQ9 / OQ11 (a town walk clicking NPCs: C→S 0x13, 0x59; an Act I fight with a fallen shaman: command 4 next to each NPC think, every client message next to type-2 schedules, mode changes of fallens), `sim/units.md` OQ7 (answered statically: single player has game +0x6A = 3: a Nightmare single-player game, log monster event-2 sets (U10), expect the Nightmare `aidel`, 0 → 15), R2-23 / `monsters/ai-bodies-2.md` OQ1 / OQ2, `ai-bodies-3.md` OQ1 / OQ2, `ai-bodies-4.md` OQ1 / OQ2, `ai-bodies-5.md` OQ1 (one run per act II–V: Far Oasis, Arcane Sanctuary, Spider Forest, Durance of Hate, Chaos Sanctuary with Diablo, Arreat Summit, Worldstone Chamber; vultures, bat demons and frog demons also modes 8–11 / 14 and collision; for Diablo the mode chosen per think with the player's resistances), `monsters/ai-bodies-6.md` OQ1 (a necromancer game with golem, skeletons and a skeleton mage, a hireling following and fighting, an Act II town walk, a MinionSpawner, an EvilHole and a desert turret), `monsters/ai-bodies-7.md` OQ1 (arrow / poison / nova traps, the Act II palace guard before and after the door opens, the Dark Wanderer, druid summons (wolves, bear, ravens, vines), assassin shadows) and OQ2 (Uber Tristram: for Uber Mephisto, Diablo and Baal log the AI control's function (+0x04) and special state (+0x00) after creation and at each think, every type-2 schedule, every mode change with its caller and every `0x005B0E00` call on them; expect no attack or skill mode started by AI code, only gethit / knockback / death).
+- Steps: `record_tick.py --seconds 240` + `record_rng.py --seconds 240` per area, same character and seed; per think log the type-2 schedule frame, the unit-seed steps with caller, the mode requests (mode, target, point) and AI params 0–2. Reach acts II–IV by waypoint (`<T12>`, `<T23>`, `<T34>`, then the area's own waypoint entry); Chaos Sanctuary and the Uber areas need quest / key progress: a `d2s-tool` save. A character strong enough for Nightmare areas (prepared save `AiNm`). Uber Tristram: a Hell character with the keys and organs, portal from Harrogath (REC-30's save).
+- Output: `pc2rec-r40-<area>-{tick,rng}.jsonl`.
+- Compare: `check_tick`, `check_units`, `check_rng` pass; each think delay against the `ai.md` / `ai-bodies-*.md` tables. Fold: close the OQs; the AI-n rows named in them.
+
+##### REC-41 [ASSISTED] Skill use and level hooks
+- Priority 3 (assisted: `spawn.py` places monsters; prepared saves per skill).
+- Settles: `skills/use.md` OQ3–OQ7 (hook `0x0056FAF0` entry / return and `0x0056F7F0` entry: cast a non-`TargetAlly` skill on a party member, does the do run after start returned 0; `0x0056BFE0` for Teleport at level ≥ 25 with < 1 mana: cast free?; two C→S 0x06 two frames apart: does the second restart A1; `0x005A7670` (arg1, arg2, unit +0x4E) on monsters; arg1 of `0x005539B0` per type-0 timer during Strafe / Zeal), `skills/levels.md` OQ1 (hooks `0x00646460`, `0x00644D50` / `0x00644E40` entry / return with known skill levels, and `0x0056BFE0` mana before / after for a few skills), §7.5 / §7.6 (no OQ, unverified: equip an aura item, e.g. Dragon, and a charged item: log the `0x005BF510` / `0x00647320` calls and the type-9 timers they schedule), `skills/bodies-2.md` OQ1–OQ5, OQ7, OQ8, OQ12 (Jab / Smite monsters: stats 21, 22, 19 and element stats around `mode_damage`; Dragon Talon L6 / L12: kicks, last-kick knockback, E param 1; Find Potion per act and difficulty: codes, seed draws; Leap and monster Leap: E flags, landing frame, knockback, 0xA5; Shock Field: caster seed before / after; Conversion on a higher-level monster: stats 12, 6, 7 during and after; Holy Freeze pulses: state 107, target seed; Whirlwind with one and two weapons: E param 4, hits per do). `skills/bodies.md` OQ1–OQ3 / OQ9 are in REC-31.
+- Steps: one prepared save per skill group (`d2s-tool`; skills at the levels named); `record_tick.py` / `record_rng.py` / `record_stats.py` per OQ with the hook addresses above. The party-member cast needs a second player: mark it BLOCKED unless a second client joins.
+- Output: `pc2rec-r41-*`.
+- Compare: the logged values against each OQ's expectation. Fold: close each OQ.
+
+##### REC-42 [MANUAL] Combat on-hit events (knockback, freeze, slow, skill-on-hit, mana)
+- Priority 3 (manual play; prepared saves with the items).
+- Settles: `combat/events.md` OQ1 (items with knockback, freeze, slow, skill-on-hit and damage-to-mana; Energy Shield, Bone Armor and Iron Maiden in play: log each event function's entry / return (table `0x007325B0` targets), H's seed before / after, and the record).
+- Steps: prepared saves `EvtItems` (one item per property), `EvtSor` (Energy Shield), `EvtNec` (Bone Armor, Iron Maiden); Blood Moor fights, `record_rng.py --seconds 300` + `record_tick.py --seconds 300` with INT3 on the table targets (the hook list is in `combat/events.md`).
+- Output: `pc2rec-r42-{rng,tick}.jsonl`.
+- Compare: per event the record bytes and the seed before / after against `events.md`. Fold: close OQ1.
+
+##### REC-45 [MANUAL] Baal's portal opening (level 131 to 132)
+- Priority 3 (manual play; needs REC-30's Act V save at the Worldstone Chamber).
+- Settles: `world/objects-client.md` §26.15 (does the generic step reach mode 2 itself at the end of mode 1: the object speed +0x4C in mode 1 and the frame of the mode-2 change, for Baal's portal opening, level 131 → 132; REC-30 covers the Act V levels but not this object).
+- Steps: an Act V save with the Worldstone Chamber reachable (`d2s-tool` quest bits); `record_packets.py --seconds 300` and `record_tick.py --seconds 300` on the same actions: finish the Baal wave quest, wait for the portal to open, read the object's S→C 0x51 mode and the +0x4C speed per client update (NEW HOOK: log the object's +0x4C and mode at each client update).
+- Output: `pc2rec-r45-{packets,tick}.jsonl`.
+- Compare: the tick of the mode 1 → 2 change against the speed and the frame rule of `objects-client.md` §26. Fold: close §26.15.
+
+##### REC-46 [MANUAL] Classic single-player start (C→S 0x67 of a classic character)
+- Priority 3 (manual play; the forced start makes an expansion game and refuses a classic character, so it cannot be `--auto`).
+- Settles: `client/model.md` §7 r9 PROVISIONAL (the creation flags u32@0x27 a classic character sends; expected 0x00000004, the builder's default without bit 20), and the classic game type and flags the server stores (`sim/intents-events.md` §2.5, §8.1; `monsters/init.md` OQ1 is answered statically).
+- Steps: a new classic character made in the menu (Single Player → classic), start it at Normal; `record_packets.py --seconds 60` plain from the menu through the first frames in town; Save and Exit.
+- Output: `pc2rec-r46-packets.jsonl`.
+- Compare: the client_out 0x67 (seq 1) bytes @0x11–@0x14, @0x25, @0x27, @0x2B–@0x2D against §7 r9's table; S→C 0x01 u32@2 = u32@0x27 & 0x3179C7 and u8@6 = 0 (`intents-events.md` §8.1). Fold: replace the PROVISIONAL in `client/model.md` §7 r9.
+
+#### Deferred (not recorded; outside Phases 0–6)
+- IT-1 `formats/d2s.md` OQ1 (legacy loader `0x00534020`, pre-1.09 saves), IT-2 OQ2 (item records of save versions 0x5C–0x5F), `formats/d2s-legacy.md` and `items/bitstream-legacy.md` Pending lines (1.07 / 1.08 / 1.00–1.06 saves): need sample files and are only needed if old saves must load. Record only if the user opens that scope.
+- **REC-44** legacy saves, cited by the specs as the capture: `formats/d2s-legacy.md` OQ2 (load one 1.07 / 1.08 save, version 0x57 / 0x59, in 1.14d and compare the unit (stats, skills, items, hireling) with the rules), `items/bitstream-legacy.md` OQ1 (the same 1.07 / 1.08 save: every item against §2–§4, affix ids after the offset of §2 rule 3) and OQ2 (a 1.00–1.06 save, version 0x47, holding a stored, equipped, belt, cursor and socketed item, an ear and a corpse with an equipped item: compare with §6–§8 and edge cases 7–9). No such save exists on this PC; record only if the user opens that scope (steps: place the save in `%USERPROFILE%\Saved Games\Diablo II`, `record_packets.py --seconds 60` plain, then `tools/d2s_check.py`).
+
+#### [NO] Not reachable with the current setup (and why)
+- A classic game (REC-46; `monsters/init.md` OQ1 0x67 in classic SP; `client/model.md` §7 r8 / §17 r6 (a) joining a classic game with an expansion character; `quests-act4.md` OQ2 classic end; REC-29's classic part): the forced start always makes an expansion game; a classic character is refused. Needs a manual classic start.
+- Two-client games (a second client sees the owner's hireling, REC-10 / `hirelings.md` OQ7 and R1 on a hosted game; the Alkor broadcast of REC-28; the uncredited player of `quests-act4.md` OQ2): needs a second client joined over TCP/IP; not attempted.
+- Act V (levels 109–132, REC-30, REC-31 GH, and the Act V parts of REC-38 / REC-40): the waypoint panel of `TestSor` has tabs I–IV only.
+- Fights, kills, quest chains, hireling events: the input script has no combat loop, so these are [MANUAL] / [ASSISTED] (REC-07…11, 23…34) and never `--auto`.
+- `render/draw-order.md` OQ7 (TownE1 tile (950, 933)): off-screen from every reachable spot (`local-buddy-q9-rec` R2-1): REC-32 notes it.
 
 ## 8. Lessons (problems met, fixes)
 
@@ -6578,4 +5868,4 @@ are above)
 | Writers on one PC shared one scratchpad directory; one writer's helper script was overwritten by another's mid-run (2026-10-06) | give each writer its own scratch subfolder in the prompt (M21) |
 | DT1 `decode_rle` built a slice index for a skip-only `(skip, 0)` pair past the 32 × 32 block; the bounds check ran only for `count > 0` (panic; found 2026-10-06 by libFuzzer within minutes, missed by the 200k-case proptests) | the `dt1` fuzz target and the regress test; audit other parsers for a bounds check guarded by `count > 0` (M07, M21) |
 | GPU render exactness | R8Uint indices, sRGB palette via `textureLoad`, `Msaa::Off`, `Tonemapping::None`, pixel-aligned quads |
-
+| Two local sessions worked the same PC areas in parallel from different bases (2026-10-08, caught at the staging-6 merge: 8 of 9 PC 2 branches conflicted, "to reconcile" notes) | before writing, a lane diffs its files against every open integration branch (check: the lane start diffs its files against the open integration branches) |

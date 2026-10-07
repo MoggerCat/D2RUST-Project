@@ -343,8 +343,10 @@ fn game_start<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, args: 
         late::set_state(ctl, i, 3);
     } else if f.get(SLOT, bit::STARTED) {
         x(ctl, i).portal_wanted = true;
-        // A plain "status 1": the byte only (no "to all").
-        late::status_silent(ctl, i, 1);
+        // Status 1 to all, the flags byte kept (`0x0058BA86`: iterate 1,
+        // no flags write; `quests-act5-2.md` §6.8).
+        ctl.records[i].status = 1;
+        late::iterate_all(ctl, w, i);
         late::set_state(ctl, i, 2);
     }
 }

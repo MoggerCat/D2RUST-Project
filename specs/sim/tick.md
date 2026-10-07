@@ -31,15 +31,15 @@
 |   3. Tick steps in order | 143–173 |
 |   4. Room pass (step 3) | 174–209 |
 |   5. Timer events (step 4) | 210–376 |
-|   6. Client pass (step 5) | 377–429 |
-|   7. Periodic steps, summary | 430–439 |
-|   8. Wall-clock and host-only parts | 440–452 |
-| Constants & data dependencies | 453–466 |
-| Randomness | 467–474 |
-| Edge cases & original bugs | 475–506 |
-| Test vectors | 507–595 |
-| Provenance | 596–624 |
-| Open questions | 625–672 |
+|   6. Client pass (step 5) | 377–440 |
+|   7. Periodic steps, summary | 441–450 |
+|   8. Wall-clock and host-only parts | 451–463 |
+| Constants & data dependencies | 464–477 |
+| Randomness | 478–485 |
+| Edge cases & original bugs | 486–517 |
+| Test vectors | 518–606 |
+| Provenance | 607–637 |
+| Open questions | 638–685 |
 <!-- /index -->
 
 ## Summary
@@ -148,7 +148,7 @@ confirmed):
 | # | Step | 1.14d | When | Does |
 |---|---|---|---|---|
 | 0 | frame | `0x0052D870` | always | frame += 1; then debug trap switch on game +0x1DC8 (1, 2: write to an invalid address; 3: fatal error; 4: huge allocation), never set in normal play |
-| 1 | environment | `0x0052D7B0` | always | per act 0..4: advance the act's day/night cycle (`0x0061C040`); when the cycle index changes, every client (client-list order) gets its player's items refreshed (`0x0055FDE0`) and, if in-game (state 4) in that act, message 0x53 |
+| 1 | environment | `0x0052D7B0` | always | per act a = 0..4 with an act (game +0xBC + 4a): advance the act's day/night cycle (`0x0061C040(act, a)`: advance only, `A` = a, no `L`; returns 1 when the index or type changed or the hour moved more than 16 degrees since the last report, `render/lighting.md` §9.3 rule 5); on 1, the 0x53 values from `0x0061C330(act)`, then every client (client-list order) gets its player's items refreshed (`0x0055FDE0`) and, if in-game (state 4) in that act, message 0x53 |
 | 2 | frame-rate stats | `0x0052D720` | always | wall-clock statistics only (§8) |
 | 3 | rooms | `0x0052D160` | always | room pass (§4) |
 | 4 | **timer events** | `0x005414D0` | always | the timer-event queue (§5): all unit behaviour |
@@ -380,9 +380,13 @@ Owned by `units.md`; confirmed on the recordings by `check_units.py`
 
 1. Asserts the game's arena record (`0x0053FCA0`).
 2. Heartbeat (`0x0052D350`): host-only, wall-clock (§8).
-3. If frame % 8192 == 0 and no client was dropped by the heartbeat: for
-   each client, save its character (`0x00532400`) and report it to the
-   host callbacks (`0x0052CA10`). Host-only (§8).
+3. If frame % 8192 == 0 and no client was dropped by the heartbeat:
+   `0x0052CA10(game)` (`0x0052D4BD`; no host-callback gate on the
+   call): for each client (client-list order, next saved first) with a
+   player, save its character (`0x00532400`). This runs in single
+   player too. Only the ladder report after each save is host-only: it
+   needs host callbacks, a callback at +0x28 and game +0x74 (ladder).
+   Corrected 2026-10-08: the whole step was called host-only.
 4. For each client in client-list order (`unit-order.md` §7; next saved
    before the body), by client state (client +0x04):
    - 3 (joining): per-client update (`0x005380D0`); when the client's room
@@ -395,15 +399,20 @@ Owned by `units.md`; confirmed on the recordings by `check_units.py`
 5. Per-client update `0x005380D0`: removal messages for units deleted in
    the adjacent rooms (`0x0053A770`); unit update messages for the
    adjacent rooms' update queues (`0x0053A620`, `unit-order.md` §6);
-   player stat-change messages (`0x006258D0`); inventory refresh when the
-   player's flag requires it; `0x0055F4F0`; client counter +0x1B0 += 1;
+   player stat-change messages (`0x006258D0`); when the player's flag-ex
+   +0xC8 bit 21 is set, inventory refresh (`0x0055DF00`) then
+   `0x0055F4F0` (both skipped otherwise, `0x0053812F`–`0x00538152`;
+   corrected 2026-10-08, `0x0055F4F0` read as unconditional before);
+   client counter +0x1B0 += 1;
    if the player's room (`0x00620BB0`) differs from the client's: when
    the two rooms' level ids (`0x0061A1B0`) differ, from := the client
    room's level, to := the player room's level, quest event 3
    CHANGEDLEVEL `0x00543B90`(game, from, to, player) (`world/quests.md` §4.1)
    then the town-leave refresh `0x00537340`(game, player, from, to)
    (`world/vendors.md` §6 rule 1); then, levels equal or not, the room
-   switch (`0x00537B50`, new room) (`0x0053815E`–`0x0053819A`). This
+   switch (`0x00537B50`, new room) (`0x0053815E`–`0x0053819A`; the
+   level-change calls and their argument order confirmed 2026-10-08,
+   impl-pc1-s5). This
    step has no act logic: an act change happens only through the warp
    (`0x0053AEC0`, `world/waypoints.md`), which calls `0x00537340` and
    the act change `0x0053ACC0` itself; arena sync (`0x0053FC20`); queue the player for
@@ -423,7 +432,9 @@ Owned by `units.md`; confirmed on the recordings by `check_units.py`
    the per-client update's unit messages): recorded frame 2 of both
    recordings (`-022633` seq 219, after the units' 0xAC / 0x51 / 0x0E).
    Rule 4's message 4 is `0x0053B320(client, 4)` (1 byte; at
-   `0x0052D514` for state 3, `0x0052D5A2` for state 5).
+   `0x0052D5A2` for state 3, `0x0052D514` for state 5; corrected
+   2026-10-08: the state switch at `0x0052D4D1` jumps to `0x0052D555`
+   for 3).
 
 Message contents: `intents-events.md`.
 
@@ -621,6 +632,8 @@ equal the implementation's lists (`unit-order.md`, Test vectors).
   `0x0066BCF0`, the client pass `0x0052D440` (`0x0052D503`–`0x0052D520`,
   `0x0052D565`–`0x0052D5AE`); 0x04 position checked on
   `20261006-022633-packets.jsonl` seq 219 and `-015956` frame 2.
+- §3 step 1 arguments (2026-10-08): `0x0052D7D0`–`0x0052D7D2`,
+  `0x0061C040`; §6 rule 6 state-switch addresses `0x0052D4D1`–`0x0052D4ED`.
 
 ## Open questions
 

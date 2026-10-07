@@ -36,20 +36,20 @@
 |   3. File path | 174–190 |
 |   4. Groups and variants | 191–233 |
 |   5. Requests | 234–310 |
-|   6. Sound tick | 311–558 |
-|   7. Starting on a channel | 559–641 |
-|   8. Volume and pan | 642–777 |
-|   9. Settings | 778–797 |
-|   10. Sample cache | 798–846 |
-|   11. Live data (1.14d) | 847–863 |
-|   12. Edge cases kept | 864–879 |
-|   13. d2rs mapping | 880–890 |
-| Constants & data dependencies | 891–898 |
-| Randomness | 899–909 |
-| Edge cases & original bugs | 910–914 |
-| Test vectors | 915–959 |
-| Provenance | 960–1004 |
-| Open questions | 1005–1085 |
+|   6. Sound tick | 311–559 |
+|   7. Starting on a channel | 560–642 |
+|   8. Volume and pan | 643–778 |
+|   9. Settings | 779–798 |
+|   10. Sample cache | 799–847 |
+|   11. Live data (1.14d) | 848–864 |
+|   12. Edge cases kept | 865–880 |
+|   13. d2rs mapping | 881–891 |
+| Constants & data dependencies | 892–899 |
+| Randomness | 900–910 |
+| Edge cases & original bugs | 911–915 |
+| Test vectors | 916–960 |
+| Provenance | 961–1005 |
+| Open questions | 1006–1093 |
 <!-- /index -->
 
 ## Summary
@@ -535,6 +535,7 @@ At the end of the update, if the tick advanced:
    `docs/handoff/impl-audio.md` ST4); whether the original's
    end tick fits that model (and by how much it jitters) is open
    question 12 (Needs recording).
+   PROVISIONAL: a one-shot ends in the first upkeep at which elapsed ticks × 40 ms ≥ the sample's duration (because it is the reading the spec gives as most plausible and the implementation's choice); settled by REC-19.
 4. **Device side of the natural end** (ST-4 remainder, `0x005153C0`,
    `0x005155D0`, `0x00515180`, `0x00515300`, `0x00516250`). Each
    in-memory voice is a looping DirectSound buffer of 0x20000 bytes
@@ -1051,6 +1052,8 @@ sites, fade `0x00515F50`, front-end stream `0x00514780`, `0x00514840`,
     (d2rs has no load latency); compare voice logs for a fresh start.
     Needs recording (with 13): fresh start; per `Async Only`
     request, T of request, first attempt and start (or §6.3 r4 drop).
+    PROVISIONAL: a load completes by the next tick (because d2rs has no
+    load latency); settled by REC-19 (async loads).
 11. Answered (§12 r2): −2³¹ from `cvttsd2si`, then wrapping integer
     steps; silent at the device.
 12. Needs recording (ST-4, §6.6 r3): the sound tick at which one-shots
@@ -1062,6 +1065,9 @@ sites, fade `0x00515F50`, front-end stream `0x00514780`, `0x00514840`,
     Hz) or something else, and its spread. The device side is settled
     (§6.6 r4: strict played > size test per service pass, output
     padded with silence); only the tick offset needs the recording.
+    PROVISIONAL: end tick = start tick + ceil(frames / 882) (because
+    the device plays 882 frames per 40 ms tick); settled by REC-19
+    (one-shot lengths).
 13. Needs recording (ST-7, §10 r6): for `Async Only` sounds, the tick of
     the first start attempt (async read started, `0x00482AE4` path) and
     of the collecting preload pass (`0x00482BF0`, T); settles whether the
@@ -1073,7 +1079,9 @@ sites, fade `0x00515F50`, front-end stream `0x00514780`, `0x00514840`,
     reads at once and sets the event before returning or queues the
     sector reads (`0x00419790`) and the event is set later, depending on
     the file's archive state. Which branch the sound files take is not
-    settled statically.
+    settled statically. PROVISIONAL: the read is finished by the next
+    pass at T ≡ 0 (mod 25) (because the sound files sit in loaded
+    archives); settled by REC-19 (async loads).
 14. Answered (§8.3 r4): G = 255 at every send in game; the other
     writers are init, shutdown, video close, stop-all and the 180 ms
     stream-voice fade, each restoring 255 before returning.

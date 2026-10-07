@@ -39,20 +39,20 @@
 | Outputs / state changes | 84–90 |
 | Rules | 91–92 |
 |   1. Loop order (single player) | 93–114 |
-|   2. Client → server | 115–316 |
-|   3. Server → client | 317–529 |
-|   4. d2rs mapping and scope | 530–561 |
-|   5. Machine-readable tables | 562–598 |
-|   6. Exact-match comparison | 599–702 |
-|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 703–1102 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1103–1247 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1248–1392 |
-| Constants & data dependencies | 1393–1411 |
-| Randomness | 1412–1417 |
-| Edge cases & original bugs | 1418–1463 |
-| Test vectors | 1464–1550 |
-| Provenance | 1551–1652 |
-| Open questions | 1653–1772 |
+|   2. Client → server | 115–382 |
+|   3. Server → client | 383–595 |
+|   4. d2rs mapping and scope | 596–627 |
+|   5. Machine-readable tables | 628–664 |
+|   6. Exact-match comparison | 665–772 |
+|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 773–1195 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1196–1410 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1411–1567 |
+| Constants & data dependencies | 1568–1586 |
+| Randomness | 1587–1592 |
+| Edge cases & original bugs | 1593–1638 |
+| Test vectors | 1639–1725 |
+| Provenance | 1726–1842 |
+| Open questions | 1843–1962 |
 <!-- /index -->
 
 ## Summary
@@ -200,6 +200,11 @@ The host schedule is `tick.md` §1 (owner). Message-relevant facts:
    null), then writes **one 0 byte** and sends L1 + L2 + 6 bytes. The
    byte c of the size rule is therefore always 0 from the 1.14d
    client; a non-zero c reaches the server only from another client.
+   Recorded (`pc2rec-p1-packets`, `pc2rec-p2-packets`, single player,
+   9 typed chat lines): every C→S 0x15 is `15 01 00 <text> 00 00 00`
+   (type 1, language 0, empty name, c = 0), also for lines starting
+   `/w`, `/m`, `/msg`, `/whisper`, `*` or `@`: the single-player client
+   never fills the name, the whole line is the text.
 
 #### 2.2 Game message entry `0x0053F3D0`
 
@@ -296,16 +301,77 @@ ECX = buffer (client id, message), EDX = size. Switch on the id:
 
 | Id | Does (1.14d) |
 |---|---|
-| 0x67 | `0x0052C330` refuses (nothing happens) when host callbacks exist and u8@0x11 ≠ 0, the character name (cstr16@0x15) or the game name (cstr16@1) fails `0x0053EFC0(name, 16)`, u8@0x2D > 14, u32@0x27 has neither bit 1 nor bit 2, the name checks `0x00538B70` / `0x00538C60` fail, or class u8@0x12 ≥ 7. Else `0x00530BF0(client, game name, u8@0x11 → game +0x6A (type), class u8@0x12, character name, u16@0x25 (arena, `0x0053F4B0`), u32@0x27 (bit 20 → game +0x70 expansion, bit 21 → +0x74 ladder), u8@0x13 → game +0x6B, u8@0x2B, u8@0x2C (passed, never read), u8@0x14 → game +0x6D (difficulty), u8@0x2D → client +0x50C)` |
+| 0x67 | `0x0052C330` refuses (nothing happens) when host callbacks exist and u8@0x11 ≠ 0, the character name (cstr16@0x15) or the game name (cstr16@1) fails `0x0053EFC0(name, 16)`, u8@0x2D > 14, u32@0x27 has neither bit 1 nor bit 2, the name checks `0x00538B70` / `0x00538C60` fail, or class u8@0x12 ≥ 7 (checks: rule 1 below). Else `0x00530BF0(client, game name, u8@0x11 → game +0x6A (type), class u8@0x12, character name, u16@0x25 (passed in EDX to the arena record `0x0053F4B0`, which overwrites EDX before any use: never read), u32@0x27 (& 0x3179C7 → arena record +0x08, §8.1 rule 1; bit 20 → game +0x70 expansion, bit 21 → +0x74 ladder), u8@0x13 → game +0x6B and arena record byte +0x0C, u8@0x2B, u8@0x2C (passed, never read), u8@0x14 → game +0x6D (difficulty), u8@0x2D → client +0x50C)` |
 | 0x68 | join: optional check `0x0053EFF0` when host callbacks `0x00883D50` are absent; `0x0052C690` validates, `0x0052FA50` joins |
-| 0x69 | leave (`0x0052C8E0` → `0x005303D0`, which flushes the client) |
-| 0x6A | `0x0052DAF0` → `0x0052E9B0` |
+| 0x69 | leave (`0x0052C8E0` → `0x005303D0`, which flushes the client; rule 2) |
+| 0x6A | `0x0052DAF0` → `0x0052E9B0` (game list, rule 3) |
 | 0x6B | `0x0052C550` → `0x00530190` |
-| 0x6C | total (u32 at +2) ≥ 0x2000 → fatal assert; `0x0052DB00` → `0x0052DB10` → `0x00538CE0(client, data @6, len u8@1, total, 0, 0, 0)` (save upload chunk) |
+| 0x6C | total (u32 at +2) ≥ 0x2000 → fatal assert; `0x0052DB00` → `0x0052DB10` → `0x00538CE0(client, data @6, len u8@1, total, 0, 0, 0)` (save upload chunk, rule 4) |
 | 0x6D | `0x0052C400` → `0x005389A0(client, tick u32@1, value u32@5)`: the client's game found → `GetTickCount` − tick − value goes into a 16-entry ring (client +0x4B4, count +0x500), the mean of the stored entries → client +0x4F8 (64-bit), S→C 0x8F (`0x0053E020`: no arguments besides the client; 0x21 bytes, the id then 32 zero bytes, corrected 2026-10-08), client +0x3D8 := now (ping) |
-| 0x6E | `0x0052CBE0` → `0x00530270` |
-| 0x70 | client record +0x504 = 1, `0x005377A0` |
+| 0x6E | `0x0052CBE0` → `0x00530270` (no effect, rule 5) |
+| 0x70 | client record +0x504 = 1, `0x005377A0` (rule 6) |
 | others | ignored |
+
+Bodies (1.14d asm, 2026-10-08). "Client table" = the client records
+hashed by client id (bucket id & 0xFF at `0x008842A8`, chain +0x4AC,
+lock `0x008846A8`; "initialised" = `[0x008846D8]` ≠ 0).
+
+1. **0x67 checks** (`0x0052C330`, in its order): host callbacks and
+   u8@0x11 ≠ 0 → refuse; `0x0053EFC0(cstr@0x15, 16)` = 1 iff a NUL is
+   within the first 16 bytes (the character name), else refuse; u8@0x2D
+   > 14 → refuse; the same test on the game name cstr@1; u32@0x27 & 6
+   = 0 → refuse; `0x00538B70(client id, out)`: passes when the client
+   table is not initialised or holds no record with this id; a record
+   with the id (the client already has a game) → copies its character
+   name (+0x0D, 16) to `out` and refuses; `0x00538C60(character name,
+   out)`: the name table (bucket = `0x004112C0(name)` & 0xFF at
+   `0x00883EA8`, chain +0x4B0; `0x004112C0` is a 16-bit CRC-style hash
+   of the lower-cased bytes, table `0x00708140`, start 0xFFFF): passes
+   when no record has the same name by `_strnicmp(…, 16)`
+   (case-insensitive, `0x00413590`), else copies it and refuses; class
+   u8@0x12 ≥ 7 → refuse. A refusal sends nothing.
+2. **0x69 leave**: only when the client's record exists and its state
+   (client +0x04) = 4 (`0x00538930(id, 4)`). Then `0x005303D0(id, 1)`:
+   the game of the client (`0x0052B610`, `0x0052E860`, locked) and its
+   record in the game (`0x005381C0` / `0x00537810`; none → unlock,
+   stop). e := client +0x3D4 bit 5 (`0x00539030`). If e or game +0x6A
+   ≠ 0 (single player: type 3, so always): `0x0052CA10(game)`: every
+   client of the game with a player has its character saved
+   (`0x00532400`); the ladder report after it needs host callbacks and
+   game +0x74, so not in single player. Then for the client C: S→C **0x05**
+   (`0x0053B320(C, 5)`); game type 1 or 2: drain C's pending save
+   download (`0x00538FC0`, `0x0052E110`: 0xB3); S→C **0x06**; direct
+   **0xB0** (`0x0053B220`); flush C's buffers (`0x0052E320(game, 0)`);
+   build a 40-byte **0x5A** code 3 (u8@2 = 4, u32@3 = 0, character name
+   cstr16@8 from client +0x0D, account name from client +0x1D at @0x18
+   cut by byte 0x27 := 0); remove C (`0x00539DA0(game, id, e = 0)`);
+   then the 0x5A to the remaining clients (`0x0054AA40`, §8.3). If e: repeat for the game's next client (game
+   +0x88) until none. Unlock; game type 1 or 2: `Sleep(100)` (wall
+   clock, not modelled); `0x0052B570`. Single player: the leaving client
+   is the only one, so the 0x5A reaches nobody.
+3. **0x6A game list** (`0x0052DAF0` always 1; `0x0052E8E0`): for each
+   slot of the game table `0x00882D38`–`0x00883D37` (1,024 u32, skipping
+   0 and −1) whose game is found (`0x0052E860`): direct **S→C 0xB2**
+   (`0x0053B1B0`, 0x35 bytes) with name = game +0x2A (copied to 16
+   bytes), u16@0x31 = game +0x8C, u16@0x33 = game +0x28; bytes 0x11–0x30
+   are never written (stack contents; d2rs: zero). Then a terminator
+   0xB2 with an empty name, u16@0x31 = 0, u16@0x33 = 0xFFFF. The client
+   ignores 0xB2 (§3.4 rule 2).
+4. **0x6C save upload** (`0x0052DB00` always 1; `0x00538CE0`): the
+   client record (none, or table not initialised → nothing): when its
+   received count (+0x180) is 0, a buffer of `total` bytes from the
+   game's pool → +0x17C; count + len > total → fatal 0xB2F; the chunk
+   is appended, count += len, +0x178 := 0; count = total → client
+   +0x3D4 |= 8 and +0x18C := `0x00531E30(buffer)` (the save checksum,
+   `formats/d2s.md`).
+5. **0x6E**: proceeds only when `0x00538B70` passes (no client record
+   with the id), then `0x00530270(id, 0)`: game and record lookups as
+   rule 2; with argument 0, `0x0052CAF0` does nothing; unlock. No state
+   change and no message in 1.14d.
+6. **0x70**: the record found (`0x00537760`, which leaves the table
+   locked) → client +0x504 := 1, unlock. +0x504 is read only by the
+   heartbeat `0x0052D350` (`sim/tick.md` §6 rule 2), which with
+   host callbacks drops the client; single player: no effect.
 
 The ids are D2MOO's 1.10f system ids + 1: 1.14d inserted 0x66 (warden
 response) and shifted 0x66–0x6F of 1.10f to 0x67–0x70. Which of them a
@@ -477,7 +543,7 @@ Queue 2 (id 0xFF, 16 bytes, `0x0052CC20`) runs only when host callbacks
    widest, `0x00593CB0`, loops five u16 @3–@11, `0x00593D10`), so the
    TSV has code u16@1 and five u16 v0–v4 @3–@11 (PC 2's reading; the
    former u16@13 field is dropped; masks §6 rule 6). 0x58: kept as
-   GUID u32@1, code u8@5, arg u8@6, because code 5 writes byte 6
+   GUID u32@1, code u8@5, effect u8@6, because code 5 writes byte 6
    (`0x005853CD`, `0x005853E4`); PC 2's 7-byte form without @6 loses
    it. 0x63: kept as GUID u32@1, magic u16@5, bits u32@7, @11, @15,
    u16@19: `0x006610B0` copies the 16-byte waypoint record (u16 0x0102,
@@ -610,8 +676,10 @@ as in §2.1 rule 5 and §3.1 rule 1.
    compared too (packing is part of the protocol).
 3. Nothing is ignored by default, except bytes no 1.14d builder writes
    (stack contents of the sender's frame), which are masked: S→C 0x2A
-   bytes 3–6 (`0x0053D740`, `world/npc.md` §9), 0x58 byte 6 (every
-   caller of `0x0053D8D0` leaves it unwritten, `world/npc.md` §8.1), 0x50
+   bytes 3–6 (`0x0053D740`, `world/npc.md` §9), 0x58 byte 6 (`effect`)
+   for every code except 5 (only `0x005852E0`'s code-5 path writes it:
+   `0x005853CD` := 1 for object class 0x98, else `0x005853E4` := the
+   return of `0x00585240`; keyed, rule 6), 0x50
    bytes 12–14 for kind 1 and bytes 13–14 for kind 4
    (`world/quests.md` §6.2, §10.6). Values that come from the clock
    (ping/pong contents, 0x8F) are transport and excluded with their rows
@@ -688,9 +756,11 @@ as in §2.1 rule 5 and §3.1 rule 1.
      2, 0x24 and 13 forms).
    - Two more keyed ids (§3.5 rule 4; no record yet): **0x26** form 5
      never writes bytes 8–9, form 6 never writes byte 9 (rows `0x26
-     u8@1=0x05` 8 2, `0x26 u8@1=0x06` 9 1); **0x58** writes byte 6 only
-     with code 5 (rows `0x58 u8@5=0x00`, `=0x01`, `=0x04`, `=0x06`,
-     `=0x07`, each 6 1). Confirmed per form: the buffer is built on
+     u8@1=0x05` 8 2, `0x26 u8@1=0x06` 9 1); **0x58** writes byte 6
+     (`effect`) only with code 5, so byte 6 is masked for every code
+     except 5 (rows `0x58 u8@5=0x00`, `=0x01`, `=0x04`, `=0x06`,
+     `=0x07`, each 6 1: every code a 1.14d caller sends; a code-5 record
+     is compared whole). Confirmed per form: the buffer is built on
      the caller's stack and only byte 5 is stored before the copy for
      result 1 (`0x0058547C`), 4 (`0x00585392`), codes 6 / 7 of
      `0x00579D60` (`0x00579FC6`, `0x0057A002`, `0x0057A0E2`,
@@ -771,14 +841,37 @@ class is 291, 417 or 418; item → `0x0055BED0` (§7.3 rule 4); others nothing.
       `items/inventory-moves.md` §6.1 rule 3 for P); else a hireling class
       (`0x0063EE90`) whose owner (`0x0058F0D0`) is P →
       `0x00597890(game, unit, client, 0)`.
-   6. Unit flag 0x400: `0x00571740` (an 8-byte message, `0x0053D780`,
-      to P's own client only).
-   7. Unit flag 0x8000 (hit): S→C 0x0C (`0x00597CF0` → `0x0053B430`).
-   8. announced = 0 and `0x00639F20(unit)`: `0x00571580(unit, client,
-      0)` (`0x00570E30`, `0x005711D0`: stat messages).
-   9. `0x00625A20(unit)`: `0x005715A0` (0x11 `0x0053D850` under state
-      conditions).
-   10. Unit flag 0x800: `0x00597C70` (0x57 `0x0053D880`).
+   6. Unit flag 0x400: `0x00571740` (S→C 0x2C, 8 bytes, `0x0053D780`:
+      §3.5 table row 0x2C: unit type, GUID, event = unit u16 +0x6E;
+      only when unit +0x70 is 0 or the client's player).
+   7. Unit flag 0x8000 (hit): S→C **0x0C** (`0x00597CF0(unit, client)`
+      → `0x0053B430`, 9 bytes): u8@1 = 1 (monster), u32@2 = GUID (+0x0C),
+      u8@6 = 0x13, u8@7 = unit +0xB0, u8@8 = h where p :=
+      `0x005A5650(unit)` (life in 128ths, §7.4 rule 5) is first stored
+      as stat 352 `last_sent_hp_pct` (`0x00627260(unit, 0x160, p, 0)`),
+      h := p − 1 when p > 1, else p, | 0x80 when monster data +0x16 has
+      0x100 (`0x005A0180(unit, 0x100)`).
+   8. announced = 0 and `0x00639F20(unit)`: the unit's stat list is
+      extended (list +0x10 bit 31) and one of its W state-change words
+      (`sim/stat-lists.md` §9.1, the second W words at +0x58) is non-zero
+      → `0x00571580(unit, client, 0)` (`0x00570E30`, then
+      `0x005711D0`: the 0xA7 / 0xA8 / 0xA9 of §3.5 rule 6).
+   9. `0x00625A20(unit)`: the unit's stat list has flag 0x100 (list
+      +0x10, `sim/stat-lists.md` §2: set from the overlay list) →
+      `0x005715A0(unit, client)`: the unit's list with flag 0x80
+      (`0x00625760`; none → nothing); v := its stat 178
+      `unit_dooverlay` (`0x00625A50`, layer 0); 0 ≤ v ≤ the overlay
+      count (data tables +0xBC0; inclusive, so v = count is sent) →
+      S→C **0x11** (`0x0053D850`, 8 bytes): type u8@1 = unit +0x00, GUID
+      u32@2, overlay u16@6 = v.
+   10. Unit flag 0x800: `0x00597C70(unit, client)`: only when monster
+      data +0x5C has bit 1 (`0x00573540(unit, 1)`) and the unit has
+      monster data → S→C **0x57** (`0x0053D880`, 14 bytes): GUID u32@1,
+      type u8@5 = 1, u16@6 = the name seed (monster data +0x14,
+      `0x005A0140`), u16@8 = umod list bytes 0 | 1 << 8, u16@10 = byte
+      2 (monster data +0x1C; `monsters/umod-callbacks.md` §28.4), u16@12
+      = 1 when monster data +0x16 has bit 4 (`0x005A0180(unit, 4)`),
+      else 0.
 3. **Object** `0x00581AD0`: unit flag 0x1 → `0x00581A20` (0x0E
    `0x0053B470`; portal rows → 0x60; a mode-1 case → 0x4D with type 2);
    flag 0x400 → `0x00571740`; flag 0x100 → `0x00571620`; flag-ex 0x1 →
@@ -1112,16 +1205,24 @@ any tick; §8.3 is the next tick.
 Reached from §2.5. After the game record, its acts and the game seed
 (`sim/rng.md` §5.2), in order:
 
-1. The client record is allocated and prepended (`0x00539A30`,
-   `sim/unit-order.md` §7); the arena record (`0x0053FF90`, game
-   +0x1D28).
+1. The arena record (`0x0053F4B0(game, flags, template)` at
+   `0x00530D75`, game +0x1D28): 16 bytes from the game's pool; +0x00,
+   +0x04 := 0; +0x08 := 0x67's u32@0x27 & 0x3179C7; +0x0C (u32) := 0,
+   then its low byte := 0x67's u8@0x13. `0x0053FD40(game)` returns
+   +0x08 (no record → fatal 0x139); `0x0053FCE0` its bit 1. Then the
+   client record is allocated and prepended (`0x00539A30` at
+   `0x00530D9F`, `sim/unit-order.md` §7), and after it the party
+   record (`0x0053FF90` at `0x00530DC3`, game +0x1D2C: 8 bytes, u16
+   +0x00 := 3; already present → fatal 0x19). Corrected 2026-10-08:
+   `0x0053FF90` was named as the arena record.
 2. The seed derivations of `sim/rng.md` §5.2 (`0x00547D20`;
    `0x00546C60`, its result stored in game +0x80; `0x00536070`;
    `0x00545D80`), then `0x0052C110`.
 3. **S→C 0x01** (`0x0053B340(client, 1, game)`, 8 bytes): u8@1 = game
    +0x6D (difficulty); u32@2 = the arena record's flags (game +0x1D28 →
-   +0x08, `0x0053FD40`; recorded 0x00100004 in every join of both
-   recordings); u8@6 = 1 when game +0x70 ≠ 0 (expansion), else 0; u8@7
+   +0x08, `0x0053FD40`; = the client's flags & 0x3179C7, rule 1;
+   recorded 0x00100004 in every join of both recordings, the client
+   default of `client/model.md` §7 rule 9); u8@6 = 1 when game +0x70 ≠ 0 (expansion), else 0; u8@7
    = 1 when game +0x74 ≠ 0 (ladder), else 0.
 4. **S→C 0x00** (`0x0053B320(client, 0)`, 1 byte); client state (client
    +0x04) := 1 (`0x005386D0`).
@@ -1158,21 +1259,40 @@ rule 3), drained in a later frame (recorded: after tick 1).
       0x23 (`0x0053C590`), 0x5E (`0x0053D830`, from `0x00546270`), 0x28
       (`0x0053D670`), 0x29 (`0x0053D700`, from `0x00544520`).
       Static call order of the save path (`0x005344B0` → `0x005343A0` →
-      `0x00534330` → loader `0x00534020`, then `0x00546270`), which is
-      the recorded order: (a) player creation (`0x00534080` /
-      `0x00534098`) → `0x00571F90`: 0x59, 0xAA, 0x76; (b) `0x00532E90`
-      (`0x005341D5`) → 0x94 (`0x00532F03`); (c) `0x005701B0` at
-      `0x005341FD` / `0x00534210` (0x23 at `0x0057026C`; conditional,
-      not taken in the recordings); (d) items, `0x005337F0`
-      (`0x0053423F`) → … → `0x0055C110`: 0x22 (`0x0055C216`) and,
-      through `0x00570080`, 0x21 (`0x0057017B`); (e) `0x00533C70`
-      (`0x0053427C`) → inventory refresh `0x0055DF00` (`0x00533F1D`) →
-      `0x0055DBC0` → `0x0055DA70` → `0x005701B0` (`0x0055DAB3`,
-      `0x0055DAF7`): 0x23; (f) after the loader, `0x00546270`
-      (`0x005344EF`): 0x5E (`0x005465FE`), 0x28 (`0x0054662D`), 0x29
-      (`0x00544520` at `0x00544578`). 0x22 and 0x21 are reachable only
-      through the item calls of (d) and (e); their per-item conditions
-      belong to the item and save-load specs.
+      `0x00534330`, which sends versions ≥ 0x5C, every 1.14d save (0x60),
+      to loader `0x0056B180` (`0x00534387`) and older ones to the legacy
+      `0x00534020` (`0x0053437B`, `formats/d2s.md` §1 rule 6); then
+      `0x00546270`), which is the recorded order (sections:
+      `formats/d2s-load.md` §2): (a) header `0x0056A090` (`0x0056B1BB`):
+      player creation, then `0x00571F90` (`0x0056A24F`): 0x59, 0xAA,
+      0x76; (b) skills `0x0056A710` (`0x0056B2AF`) → 0x94
+      (`0x0053C5D0` at `0x0056A7B7`); (c) player items `0x0056A7E0`
+      (`0x0056B2D3`) → `0x005337F0` (`0x0056A802`) → … → `0x0055C110`:
+      0x22 (`0x0055C216`) and, through `0x00570080`, 0x21
+      (`0x0057017B`); the corpse (`0x0056A830`, `0x0056B2F6`) and, in an
+      expansion game only, the hireling's items (`0x0056AC10`,
+      `0x0056B32D`, with inventory refresh `0x0055DF00` at `0x0056ACA1`
+      on the hireling) run the same item reader; (d) post-load
+      `0x0056AF80` (`0x0056B3C3`) selects the mouse skills through
+      `0x005701B0` (`0x0056B0DF`, `0x0056B0F4`; 0x23 at `0x0057026C`,
+      conditional): the recorded single 0x23; (e) after the loader,
+      `0x00546270` (`0x005344EF`, mode 0): 0x5E (`0x005465FE`), 0x28
+      (`0x0054662D`), 0x29 (`0x00544520` at `0x00544578`). 0x22 and
+      0x21 are reachable only through the item calls of (c); their
+      per-item conditions belong to the item and save-load specs.
+      **New character (stub) load**: when the header returns 2 (status
+      bit 0, `formats/d2s.md` §9 rule 1), `0x0056B180` calls
+      `0x00569F80` (`0x0056B1E2`) instead of (b)–(d)
+      (`formats/d2s-load.md` §1): `0x00571F90` (`0x00569FC8`: 0x59,
+      0xAA, 0x76), start stats and start items, then, when the class's
+      `StartSkill` applies, one extra **S→C 0x23** from `0x005701B0(P,
+      hand 0, StartSkill, −1)` (`0x0056A05A`; item = the skill entry's
+      owner item +0x34 from `0x00643B00` when not −1, else −1 for a class
+      skill), then `0x00546270` mode 1
+      (`0x0056A072`) before the caller's mode-0 call. Nothing on this path
+      writes the record's item fields +0x78 / +0x7C, so the join's two 0x23 (rule
+      3.7) carry item 0, not −1 (`formats/d2s-load.md` §8 rule 3; static
+      reading, no new-character join recorded).
    2. **S→C 0x0B** (`0x00537930` → `0x0053B3D0`: type u8@1, GUID u32@2
       of P; no P → type 6, GUID −1).
    3. **S→C 0x5F** (`0x0053B400`): u32@1 = `0x00622230(P)`.
@@ -1183,6 +1303,13 @@ rule 3), drained in a later frame (recorded: after tick 1).
       flag u8 at +2, item u32 at +4) whose skill is in 0..skills count
       − 1: **S→C 0x7B** (`0x0053DB20`, 8 bytes: slot u8@1 = i, u16@2 =
       skill & 0xFFF, | 0x8000 when the flag is set, u32@4 = item).
+      Slots come only from the save or `0x005390A0` (the sole direct
+      writer of +0x3DC). PROVISIONAL: a brand-new character's client
+      record holds skill −1 in all 16 slots, so no 0x7B is sent
+      (because a d2s stores unbound slots as 0xFFFF and the recorded
+      join of a character with no hot key sends none; a zero-filled
+      record would instead send 16 × 0x7B with skill 0); settled by
+      REC-02 (count of S→C 0x7B in its new-character runs).
    7. When `0x006221A0(P)` gives a record: two **S→C 0x23**
       (`0x0053C590`, 13 bytes: type u8@1, GUID u32@2, hand u8@6, skill
       u16@7, item u32@9): hand 1 with record +0x74 / +0x7C, then hand 0
@@ -1216,6 +1343,28 @@ rule 3), drained in a later frame (recorded: after tick 1).
    bytes, Edge cases); followers and `0x005773D0` (`sim/path-placement.md`
    §13 rule 4).
 6. Client state := 3; unlock, log.
+7. **A new character in single player** (2026-10-08). The join's load
+   flag is 1 and there are no host callbacks, so `0x005345A0` always
+   takes the save path; `0x00532590` is not reached from a
+   single-player join (its callers: `0x005345A0` with flag 0, i.e.
+   host or the dead act re-creations, and the legacy parser,
+   `formats/d2s-legacy.md` §2 rule 6). A new character is the client's
+   335-byte stub save (`formats/d2s.md` §9 rule 1), loaded by the stub
+   branch of rule 3.1 (`0x00569F80`, `formats/d2s-load.md` §1).
+   `0x00532590` does the same steps (`0x00532520` instead of
+   `0x00569F20`): client +0x3D4 |= 1, the player allocated in no room,
+   the add messages (`0x00571F90`), start stats for the client act
+   (`0x005706D0`), start items (`0x00534F10`), player data +0x70 / +0x74
+   := 0, the `StartSkill` right skill (0x23 from `0x005701B0(P, 0,
+   skill, −1)`) when the act byte is 0 and the unit has the skill, the
+   quest entry mode 1 (`0x00546270`); result 0. Both allocate the
+   player with its player data record (`0x00555230`), so
+   `0x006221A0(P)` is never null and rules 3.2–3.10 run unchanged:
+   **S→C 0x5F** (rule 3.3) and the two **S→C 0x23** of rule 3.7 (item
+   0, rule 3.1) are sent for a new character as for a loaded one. A
+   loader that sends neither (d2rs `Character::New`) does not match
+   1.14d; it is the stub path with the class's start stats, items and
+   `StartSkill`.
 
 Recorded (`-022633` seq 142–155): 0x03, 0x53, 0x07 × 10, 0x15, 0x7E;
 the switch sent no add message (the town rooms are populated by the
@@ -1232,6 +1381,20 @@ refresh `0x0055DF00`, the join sequence `0x0052C410` (0x5B
 `0x0053C940`, 0x65 via `0x0053FC70`), `0x0055B620` (0x8D), host
 callback, 0x5A to all. Recorded frame 2 (`-022633` seq 157–224): units,
 0x1D / 0x1E, 0x48, **0x04**, 0x48, 0x5B, 0x65, 0x8D, 0x5A.
+
+**The join 0x5A** (`0x0052D63D`–`0x0052D6F2`, after the host callback,
+which needs host callbacks and is skipped in single player): a 40-byte
+message, all bytes zero first: u8@0 = 0x5A, code u8@1 = 2 (player
+joined), u8@2 = 4, u32@3 = 0, u8@7 = 0; the account name (client +0x1D,
+`0x005392F0`) is copied to a local buffer and, when not empty, its
+first 16 bytes to @0x18 with byte 0x27 := 0; the character name
+(client +0x0D, 16 bytes) to @8. Sent through `0x0054AA40(game, msg)`:
+only when a NUL is within bytes 8–23 (the character name shorter than
+16), then `0x0052DED0(game, 0x0054AA30)` sends it to every client of
+the game in state 4 (client-list order), the joiner included (its
+state became 4 just before, `0x0052D5AE`). Single player has no account name, so @0x18–@0x27
+are zero. Recorded seq 224: `5a 02 04 00000000 00` + "werwer" padded
+with zeros to 40 bytes. The leave 0x5A (code 3) is §2.5 rule 2.
 
 The first 0x48 is the per-client update's inventory refresh: in
 `0x005380D0` the order is removals (`0x0053A770`), unit updates
@@ -1273,7 +1436,7 @@ owned it yet, and states the handlers that are only message handling.
    | 0x4D PlayNpcMessage | rule 11; the intro record: `world/quests.md` §6.7 |
    | 0x51 BindHotkey | rule 12 (fields: §2.4 rule 7) |
    | 0x53 StaminaOn, 0x54 StaminaOff | rule 13 |
-   | 0x59 MakeEntityMove | `monsters/ai-bodies.md` §9.9 (AI params from NPC messages) |
+   | 0x59 MakeEntityMove | `monsters/ai-bodies.md` §9.9 (AI params from NPC messages); client sender: the interact code `0x00461DC0` (`0x004620F1`, through builder `0x00478700`) sends [type][GUID][x][y] with the NPC's current position when the clicked monster's `monstats` has `npc` and `interact` (`ui/controls.md` §6 rule 9) |
    | 0x5F UpdatePlayerPos | `sim/pathing.md` §1.6 |
    | 0x60 SwapWeapons | rule 14 (message part); `0x005616A0`: open question 16 |
 
@@ -1301,7 +1464,8 @@ owned it yet, and states the handlers that are only message handling.
    else 3; player missing or mode ≠ 0x11 → 0. Client flag 4
    (`0x00538670`, hardcore) → drop the client (`0x0052CAF0(game,
    client, 3)`, `tools/original-hooks.md` §6.1 rule 3), 0. Else in
-   order: `0x0053FDF0` (returns 0; its value is the warp's last
+   order: `0x0053FDF0` (returns 0, no other effect: its whole body is
+   `return 0`; its value is the warp's last
    argument); passive skill states re-applied (`0x0056DFA0`: each skill
    of the player with a passive state gets the state on and
    `0x00646D60`); stats 6, 8, 10 (life, mana, stamina) := their maxima
@@ -1333,7 +1497,11 @@ owned it yet, and states the handlers that are only message handling.
    command 0x0C; 0x47: a = x, b = y, command 0x0D): no monster with the
    merc GUID → 1; it is not the player's hireling (`0x00574EC0(game,
    player, 7, 0)`) → 1; else free its AI commands (`0x0058EDE0`), add
-   the command {command, a, b} (`0x0058EF40`), sound event 15 on the
+   the command {command, a, b} (`0x0058EF40`; it copies five dwords,
+   record +0x08..+0x18, from a 0x1C-byte stack record of which
+   `0x0054C430` writes only +0x08 command, +0x0C a, +0x10 b: params 3
+   and 4, +0x14 / +0x18, are uninitialized stack bytes; d2rs stores 0,
+   0), sound event 15 on the
    merc toward the player (`0x00553380`), 0. 0x47 returns 0 whatever
    `0x0054C430` returns; 0x46 returns its result.
 9. **0x48** (`0x0054C590`): size 1 else 3; player data +0x4C (busy,
@@ -1389,6 +1557,13 @@ owned it yet, and states the handlers that are only message handling.
     @8 = t); else `[0x008846E4]` clear (no client named t) → 0x5A code
     4 with t; else 0x26 form 6 to the sender (`0x0053C750`: u8@1 6,
     u8@2 0, u8@3 2, u32@4 0, u8@8 0, name @10 = t, the text). 0.
+    Recorded (`pc2rec-p1-packets`, `pc2rec-p2-packets`, single player,
+    9 lines, all with an empty t, §2.1 rule 8): each 0x15 gets exactly
+    one S→C 0x26 in the same input phase, from `0x0053C82F`, form 1:
+    `26 01 00 02 00000000 00 1e "TestSor" 00 <text> 00` (level 30 at
+    u8@9, the sender's name), and no 0x5A. The whisper branch is not
+    reachable from the single-player client (it never sends a
+    non-empty t).
 
 ## Constants & data dependencies
 
@@ -1650,6 +1825,21 @@ Handlers of §9: `0x0054A260`, `0x0054A290` (with `0x00661110`,
 `0x005724C0`, `0x0054C870` / `0x005356B0` / `0x005390A0`, `0x0054C940`,
 `0x0054C990`, `0x0054CE70`, `0x0054BF60`, `0x0054C760`, `0x0054CA10`.
 
+2026-10-08 (pc1-s7, asm): §2.5 rules 1–6: `0x0053F100` (cases
+`0x0053F130`–`0x0053F384`), `0x0052C330`, `0x0053EFC0`, `0x00538B70`,
+`0x00538C60`, `0x004112C0`, `0x00413590`, `0x0052C8E0`, `0x00538930`,
+`0x005303D0`, `0x00539030`, `0x005392F0`, `0x00538830`, `0x0052CA10`,
+`0x0052E8E0`, `0x0053B1B0`, `0x0052DB10`, `0x00538CE0`, `0x0052CBE0`,
+`0x00530270`, `0x0052CAF0`, `0x00537760`, `0x0052D350` (+0x504 reader).
+§8.1 rule 1: `0x00530BF0` (`0x00530CF6`–`0x00530DC3`), `0x0053F4B0`,
+`0x0053FD40`, `0x0053FCE0`, `0x0053FF90`. §8.2 rule 7: `0x00532590`,
+`0x005398E8`–`0x005398FF` (0x5F unconditional). §8.3 join 0x5A:
+`0x0052D440` (`0x0052D5CC`–`0x0052D6F2`), `0x0054AA40`, `0x0052DED0`;
+recorded seq 224. §7.3 rule 2 steps 6–10: `0x00597CF0`, `0x0053B430`,
+`0x00639F20`, `0x00625BE0`, `0x00625A20`, `0x005715A0`, `0x0053D850`,
+`0x00597C70`, `0x0053D880`, `0x00573540`, `0x005A0120`, `0x005A0140`,
+`0x005A0180`.
+
 ## Open questions
 
 1. R1–R7 on a hosted game and with more message ids (the single-player
@@ -1698,7 +1888,8 @@ Handlers of §9: `0x0054A260`, `0x0054A290` (with `0x00661110`,
    7); 0x4F (§9 rule 15); system ids 0x67 (adds `game_name`@1), 0x6C,
    0x6D (adds `tick`@1): §2.5.
 7. *Answered (2026-10-08)*: §2.1 rule 8 (the chat builder `0x004787B0`
-   always writes c = 0). Original question: the odd third term of the
+   always writes c = 0; recorded c = 0 in all 9 chat lines of
+   `pc2rec-p1-packets` / `pc2rec-p2-packets`). Original question: the odd third term of the
    C→S chat size rule (§2.1 rule 5): does the 1.14d client ever send a
    non-zero byte there?
 8. *Answered (2026-10-08)*: §2.1 rule 8 (no builder call site sends
@@ -1731,13 +1922,12 @@ Handlers of §9: `0x0054A260`, `0x0054A290` (with `0x00661110`,
     inventory refresh (`0x00538146` → `0x0055DBC0`, 0x48 at `0x0055DEEB`);
     the player update's 0x48 (`0x005808D9`) runs before the stat
     messages that precede it.
-14. C→S 0x15 Chat (`0x0054A5D0`) after its checks: which messages it
-    sends (0x26 through `0x0053C750`, `0x0053C850`) and to whom; one
-    chat line in a recording settles the single-player case.
-    *Answered statically* (§9 rule 16): single player gets its own line
-    back as 0x26 form 1 (or form 2 and the form-6 echo for a whisper to
-    its own name, 0x5A code 4 for any other name). The recording (PC 2
-    list) confirms it.
+14. *Answered (recorded, `pc2rec-p1-packets` / `pc2rec-p2-packets`)*:
+    §9 rule 16 (single player: one 0x26 form 1 per line from
+    `0x0053C82F`, no 0x5A; the whisper forms are not reachable from the
+    single-player client, §2.1 rule 8). Original question: C→S 0x15
+    Chat (`0x0054A5D0`) after its checks: which messages it sends (0x26
+    through `0x0053C750`, `0x0053C850`) and to whom.
 15. `0x005845D0` (0x3D, §9 rule 4): what a door highlight does to the
     object (object spec).
 16. `0x005616A0` (0x60, §9 rule 14): the weapon switch and its fail

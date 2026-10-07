@@ -30,15 +30,15 @@
 |   3. Superunique spawn at a point (`0x00545C30(game, unit U, &point, kind, id)`) | 128–145 |
 |   4. Quest missiles | 146–198 |
 |   5. End a player's interaction (`0x005351C0(game, player)`) | 199–231 |
-|   6. End the game (`0x00530590(game, client c)`) — host | 232–249 |
-|   7. Close a player's town portal (`0x00535430(game, player)`) | 250–273 |
-|   8. Find a player's item by code (`0x00558110(game, player, code)`) | 274–296 |
-| Constants & data dependencies | 297–310 |
-| Randomness | 311–315 |
-| Edge cases & original bugs | 316–324 |
-| Test vectors | 325–338 |
-| Provenance | 339–351 |
-| Open questions | 352–357 |
+|   6. End the game (`0x00530590(game, client c)`) — host | 232–254 |
+|   7. Close a player's town portal (`0x00535430(game, player)`) | 255–278 |
+|   8. Find a player's item by code (`0x00558110(game, player, code)`) | 279–301 |
+| Constants & data dependencies | 302–315 |
+| Randomness | 316–320 |
+| Edge cases & original bugs | 321–329 |
+| Test vectors | 330–343 |
+| Provenance | 344–356 |
+| Open questions | 357–362 |
 <!-- /index -->
 
 ## Summary
@@ -239,6 +239,11 @@ Caller (quest code): the classic Diablo credit `0x005B4A80`
    C2 := the **first** client in state 4 (callback `0x0052CBD0`); found
    → drop it the same way. Not found and c ≠ 0 → drop c.
 3. The quest code calls it with c = 0 (`quests-act4.md` §5.8).
+4. The removal `0x005303D0` tests the dropped client's flag (+0x3D4
+   bit 5, `0x00539030`) once: set → it keeps dropping the game's head
+   client (game +0x88, `0x00539070`) until none is left (the whole game
+   ends); clear → only that client is dropped (`quests-act4.md` §5.8,
+   2026-10-08).
 
 Owner (answers `quests-act4.md` open question 10): §6 and the save pass
 `0x0052E2A0` (`quests-act5-2.md` open question 3) are host code:

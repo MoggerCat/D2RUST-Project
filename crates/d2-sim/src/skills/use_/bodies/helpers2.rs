@@ -278,14 +278,19 @@ pub fn summon_class<W: BodyWorld>(
     skill: i32,
 ) -> (i32, i32) {
     let count = ct.monstats.len() as i32;
-    // TODO(spec: bodies.md §6.1): with R invalid `mode` is not written;
-    // d2rs reports 0 (every caller tests R first).
+    // `bodies-3.md` §2 answer 3: `0x0063EA70` writes `mode` only with a
+    // valid class from `summon`; R invalid or `summon` outside 0…count − 1
+    // leave the caller's variable unwritten, and every caller's is an
+    // uninitialised local: d2rs gives them 0 (no 1.14d row reaches it).
     let (c, mode) = match rec(t, skill) {
         Some(r) => {
             let c = s16(r.summon);
-            let m = i32::from(r.summode as i8);
-            let m = if (0..=15).contains(&m) { m } else { 1 };
-            (if c < 0 || c >= count { -1 } else { c }, m)
+            if c < 0 || c >= count {
+                (-1, 0)
+            } else {
+                let m = i32::from(r.summode as i8);
+                (c, if (0..=15).contains(&m) { m } else { 1 })
+            }
         }
         None => (-1, 0),
     };
@@ -446,9 +451,8 @@ fn stat_event<W: BodyWorld>(w: &mut W, m: W::Unit, s: i32) {
         return;
     };
     let key = guid(w, m) as i32;
-    // TODO(spec: bodies.md §6.5 step 2): whether the `itemevent2`
-    // registration shares the `itemevent1` / lookup condition; read as
-    // the same branch.
+    // `bodies-3.md` §2 answer 4: `itemevent2` is registered only inside
+    // the `itemevent1` > 0 and "no handler found" branch.
     if info.itemevent[0] > 0 && !w.has_handler(m, 2, key, s) {
         register(
             w,
@@ -600,8 +604,8 @@ pub fn skill_stats<W: BodyWorld>(
         w.combat().overlay(m, ov);
     }
     let mut ilvl = ilvl;
-    // TODO(spec: bodies.md §6.5 step 9): whether the clamps apply to a
-    // given ilvl too; read as part of the ilvl = 0 branch.
+    // `bodies-3.md` §2 answer 4: the clamps apply only when the given ilvl
+    // is 0; a non-zero ilvl is passed unchanged.
     if ilvl == 0 {
         ilvl = lvl.wrapping_mul(3);
         if ilvl < 1 {
@@ -997,8 +1001,13 @@ pub fn components<W: BodyWorld>(
         let r = w.seed(owner).step() % 100;
         shield = (r as i32) < p;
     }
-    // TODO(spec: bodies.md §6.15): a negative mastery level reads before
-    // the table; nothing is written then.
+    // `bodies-3.md` §2 answer 5: no lower clamp; a negative level reads
+    // before the table, unreachable with 1.14d data: a fatal assertion
+    // (refused in a release build).
+    debug_assert!(
+        row >= 0,
+        "negative skeleton mastery level {row} (bodies.md §6.15)"
+    );
     let Some(c) = usize::try_from(row).ok().and_then(|i| COMPONENTS.get(i)) else {
         return;
     };

@@ -1,4 +1,4 @@
-// Spec: specs/combat/vitals.md §4.6, §4.7; specs/sim/units.md §4.5
+// Spec: specs/combat/vitals.md §4.6, §4.7; specs/sim/units.md §4.5; specs/world/hirelings-2.md §15 r1
 //! A player's death on the action wiring: the penalties from the DT
 //! start, the corpse experience from the DD start and the pickup.
 
@@ -113,4 +113,20 @@ fn player_killer_takes_gold_only() {
         v.set_state(p, STATE_PLAYERBODY as u16, true)
     });
     assert_eq!(hooks_on(&mut fx, |h, sim| h.corpse_pickup(sim, q, p)), 0);
+}
+
+/// `hirelings-2.md` §15 rule 1: the DD start queues the player for the
+/// hireling host (`ActionHooks::owner_deaths`) after the corpse creation;
+/// without the queue nothing is recorded.
+// Covers: specs/world/hirelings-2.md §15 r1
+#[test]
+fn the_corpse_start_queues_the_owner_for_the_hireling_host() {
+    let (mut fx, p, _, c) = setup();
+    let guid = fx.sim.sys.units.get(p).unwrap().guid;
+    fx.sim.hooks().x.corpse = Some((c, guid));
+    hooks_on(&mut fx, |h, sim| h.player_corpse(sim, p));
+    assert_eq!(fx.sim.hooks().owner_deaths, None);
+    fx.sim.hooks().owner_deaths = Some(Vec::new());
+    hooks_on(&mut fx, |h, sim| h.player_corpse(sim, p));
+    assert_eq!(fx.sim.hooks().owner_deaths, Some(vec![p]));
 }

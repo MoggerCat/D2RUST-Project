@@ -34,6 +34,14 @@ impl WorldState {
 }
 
 impl<X: WorldPending> MonsterWorld<X> for WorldState {
+    fn region_classes(&self, level: u32) -> Option<Vec<i32>> {
+        let r = self.pop.regions.get(level as i32)?;
+        let n = usize::from(r.mon_count).min(r.entries.len());
+        Some(r.entries[..n].iter().map(|e| i32::from(e.class)).collect())
+    }
+    fn monstats_count(&self) -> u32 {
+        self.tables.monstats.len() as u32
+    }
     fn type_init(&mut self, sim: &mut Sim<'_>, h: &mut ActionHooks<X>, unit: UnitId) {
         let t = self.tables.clone();
         let mut wh = host(sim, h, self);
@@ -59,6 +67,18 @@ impl<X: WorldPending> MonsterWorld<X> for WorldState {
 
     fn monster(&self, unit: UnitId) -> Option<&MonsterData> {
         self.monsters.get(unit)
+    }
+
+    fn monster_mut(&mut self, unit: UnitId) -> Option<&mut MonsterData> {
+        self.monsters.get_mut(unit)
+    }
+
+    fn component_counts(&self, class: u32) -> Option<[u8; 16]> {
+        let m = self.tables.monstats.get(class as usize)?;
+        self.tables
+            .components
+            .get(usize::from(m.monstatsex))
+            .copied()
     }
 
     fn into_any(self: Box<Self>) -> Box<dyn Any> {

@@ -814,10 +814,11 @@ fn object_quest_functions_by_class() {
     // the object has no room here: 0x83 does nothing, 0xBD is not in Act I.
     // Classes 0x16F (lever) and 0x155 (bridge) run Act III code, tested in
     // `act3_tests` (`lever_event`, `bridge_event`).
-    // 0x1CD (dummy 461, `0x00589540`) is still unspecified.
+    // 0x1CD (dummy 461, `0x00589540`, `quests-act5.md` §5.9): no monster
+    // with GUID +0x9C → nothing.
     let mut f = Fake::new();
     object_event(&mut ctl, &mut f, obj, 0x1CD);
-    assert_eq!(f.log, ["unhandled 255 0x589540"]);
+    assert!(f.log.is_empty());
     // 0x178, the Hellforge (`0x005B6710`, quests-act4.md §4.7): a fresh
     // record (nothing smashed, no gems pending) does nothing; once
     // smashed, mode 4.

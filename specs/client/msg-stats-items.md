@@ -24,16 +24,16 @@
 | Outputs / state changes | 63–68 |
 | Rules | 69–70 |
 |   1. Local player stats: 0x19–0x1F (`0x0045D780`) | 71–100 |
-|   2. Item actions: 0x9C ItemActionWorld (`0x0045EB10`), 0x9D ItemActionOwned (`0x0045EC70`) | 101–210 |
-|   3. Other item messages | 211–281 |
-|   4. Hireling stats: 0x9E–0xA2 (`0x0045D540`) | 282–297 |
-|   5. Item state messages: 0x3E, 0x40, 0x7C, 0x7D, 0x92, 0x97, 0xA6 | 298–383 |
-| Constants & data dependencies | 384–392 |
-| Randomness | 393–396 |
-| Edge cases & original bugs | 397–416 |
-| Test vectors | 417–455 |
-| Provenance | 456–479 |
-| Open questions | 480–507 |
+|   2. Item actions: 0x9C ItemActionWorld (`0x0045EB10`), 0x9D ItemActionOwned (`0x0045EC70`) | 101–230 |
+|   3. Other item messages | 231–301 |
+|   4. Hireling stats: 0x9E–0xA2 (`0x0045D540`) | 302–317 |
+|   5. Item state messages: 0x3E, 0x40, 0x7C, 0x7D, 0x92, 0x97, 0xA6 | 318–403 |
+| Constants & data dependencies | 404–412 |
+| Randomness | 413–416 |
+| Edge cases & original bugs | 417–436 |
+| Test vectors | 437–475 |
+| Provenance | 476–505 |
+| Open questions | 506–539 |
 <!-- /index -->
 
 Owned ids: 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F, 0x20, 0x3F, 0x42,
@@ -207,6 +207,26 @@ stat-list links, `weapon_set`, the runtime item table (§5). No outputs.
       Model: `cursor_item` of the inventory's unit := the item's key (set)
       or none (clear). Outside the item actions: 0x42 (§3 rule 1) and 0x58
       code 5 (`client/msg-ui.md` §8) clear it.
+6. **Belt column-ready bytes** `ready[0..4]` (`[0x007BEFB0 + c]`, u8;
+   read by the belt keys, `ui/controls.md` §7 r2; 2026-10-08). The only
+   writer is `0x00498D50(c, v)`, which writes when c < 4 (unsigned) and
+   ignores larger c. c is the item's x (its belt slot, 0–15), so only
+   the bottom-row slots 0–3 write; slots 4–15 never touch a byte. It is
+   called from three action handlers, nothing else (no init or clear;
+   the static bytes start 0):
+
+   | Action (handler, call) | Write |
+   |---|---|
+   | 0x0E PutInBelt (`0x004C4130`, `0x004C4276`) | after the belt placement: ready[x] := 1, x = the placed item's x (an item, type 4, reads its static path +0x0C; types 0, 1, 3 would read `0x006488C0`) |
+   | 0x0F RemoveFromBelt (`0x004C42A0`, `0x004C433F`) | the item found in P's belt is removed (`0x0063C550(inventory, item, x)`), then ready[x] := 0, x = the stream header's x (header +4 u16) |
+   | 0x15 UpdateStats, header mode 2 (`0x004C4C70`, `0x004C500A`, `0x004C50E7`) | the old (4, GUID) present: removed from P's belt, ready[old x] := 0 (x `0x0045ADF0`), old unit freed; the item re-created (mode 2 required, else fatal 0xC69) and put in the belt, then ready[new x] := 1 |
+
+   No other code writes a byte (the four calls above are all the
+   references to `0x00498D50`): 0x10 SwapInBelt, the client belt use
+   and item removals by other messages (e.g. 0x0A's removal, a unit
+   remove) leave the bytes unchanged, so a byte stays 1 after its slot
+   empties by any path but 0x0F / 0x15 mode 2. d2rs:
+   `ClientWorld.belt_ready: [bool; 4]`, written only by these three rows.
 
 ### 3. Other item messages
 
@@ -477,6 +497,12 @@ Area 4 session (2026-10-07): §5 from `0x0045E130`, `0x004C1F30`
 `0x0045EAD0` → `0x0048A700`, `0x0045EDC0` → `0x00639CC0`, `0x00639D60`;
 stat names from `itemstatcost`.
 
+§2 r6 (2026-10-08, PC 2 request from spec-ui-s4): `0x00498D50` and its
+xrefs (`0x004C4276`, `0x004C433F`, `0x004C500A`, `0x004C50E7`), an
+all.asm scan of `0x007BEFB0`; disassembly of `0x004C4130`
+(`0x004C4245`–`0x004C4276`), `0x004C42A0` (`0x004C4329`–`0x004C433F`),
+`0x004C4C70` (`0x004C4FBE`–`0x004C50E7`).
+
 ## Open questions
 
 1. Which stat each recorded 0x1D / 0x1E sets is fixed by its byte; the
@@ -486,7 +512,13 @@ stat names from `itemstatcost`.
    2).
 2. `0x0045D3B0`, `0x0045D3E0`, `0x004C1C10` (level and attribute
    hooks): UI and requirement effects; Phase 6 UI spec.
-3. The item stream header (`0x0062E410`) and each action handler's
+3. *Answered (2026-10-08)*: `0x0062E410(stream, bytes, save, out)`
+   is `0x0062AE20(stream, bytes, save 0, out, version 0x60)`, the
+   record peek of `items/bitstream-legacy.md` §1 rule 1 (flags
+   +0x0C, mode +0x08, x / y +0x04 / +0x06 or body location +0x11 and
+   page +0x10, class +0x00, child count +0x14; no 0x4D4A word since
+   save = 0); the per-handler placement is §2 rule 5.3. Original
+   question: the item stream header (`0x0062E410`) and each action handler's
    placement rule: after `items/inventory.md` open question 1, a client
    item spec takes §2 rule 3 to the bar.
 4. *Answered (2026-10-08)*: §3 rule 3.1. Original question:

@@ -140,9 +140,8 @@ pub fn mode_damage<W: BodyWorld>(
     } else if ms.noratio {
         (mn0, mx0, th0)
     } else {
-        // TODO(spec: monsters/init.md §8.1 flag 8): "TH from TH / L-TH" is
-        // read as pct(monlvl TH, the monstats to-hit, 100), like the other
-        // monlvl outputs.
+        // `bodies-3.md` §2 answer 6 (`monsters/init.md` §8.1 flag 8): TH =
+        // pct(monlvl TH / L-TH, the monstats to-hit, 100).
         (pct(dm, mn0, 100), pct(dm, mx0, 100), pct(th_l, th0, 100))
     };
     mn = mn.wrapping_add(s.0);
@@ -962,10 +961,19 @@ pub fn burst<W: BodyWorld>(
         w.spawn_missile(req);
     }
     if step2 != 0 {
+        // `bodies-3.md` §2 answer 8: a negative step never ends the
+        // original's loop (it walks memory until it faults); no 1.14d
+        // caller passes one: a fatal assertion (ring 2 refused in a
+        // release build).
+        debug_assert!(
+            step2 > 0,
+            "negative burst step2 {step2} (bodies-2.md §2.16)"
+        );
+        if step2 < 0 {
+            return 1;
+        }
         req.velocity = p2.wrapping_shl(7);
-        // TODO(spec: bodies-2.md §2.16): a negative step2 is not stated;
-        // read as 1.
-        for i in (0..15).step_by(step2.max(1) as usize) {
+        for i in (0..15).step_by(step2 as usize) {
             req.target_x = BURST_X[i + 1];
             req.target_y = BURST_Y[i + 1];
             w.spawn_missile(req);
@@ -1208,8 +1216,9 @@ pub fn leap_strike<W: BodyWorld>(
         return 0;
     };
     let mut record = skill_melee(w, t, ct, u, k, skill, lvl);
-    // TODO(spec: bodies-2.md §2.19): the steps after "Hit:" up to the
-    // stun removal are read as part of the hit clause.
+    // `bodies-3.md` §2 answer 7: on a hit, the conversion (inside its
+    // `EType` clause), then `roll_elemental` always, `start_combat`,
+    // `apply_melee`, overlay and stun removal; a miss does none of them.
     if record.result & 1 != 0 {
         record.result |= 8;
         record.hit_class = w.combat().weapon_hit_class(u);

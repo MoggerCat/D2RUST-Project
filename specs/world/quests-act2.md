@@ -1085,4 +1085,4 @@ their own item seeds. No other Act II quest code draws.
 30. QB-20 (chest drop code, item level): Answered (`0x00599D08`,
     `0x00559AF8`); §1 item 20.
 31. ~~Byte 6 of the orifice's S→C 0x58 (results 0, 1, 4) is a stale stack
-    byte.~~ Needs recording: R-PQ-9 (`quests-act2-2.md` open question 1).
+    byte.~~ PROVISIONAL: sent as 0 (because the original byte is stale stack data; `quests-act2-2.md` open question 1); settled by REC-27. Needs recording: R-PQ-9 (`quests-act2-2.md` open question 1).

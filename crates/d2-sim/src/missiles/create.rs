@@ -84,9 +84,7 @@ pub fn frames_from_distance(d: i32, v: i32) -> u32 {
 /// §R8.1 steps 2–4: the pierce count from P and the owner's base
 /// pierce_idx counter: up to 4 `lo' % 100` draws on the local seed
 /// `{counter, 666}`, counting draws below P.
-///
-/// TODO(spec gap): the spec gives P = 0 → nothing (caller) but not how a
-/// negative P compares; this compares signed (a negative P never pierces).
+/// The compare is signed (§R8.1 step 3): a negative P never pierces.
 pub fn pierce_count(p: i32, counter: i32) -> i32 {
     let mut seed = Seed::init_low(counter as u32);
     let mut n = 0;

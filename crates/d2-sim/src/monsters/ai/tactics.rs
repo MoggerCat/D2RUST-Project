@@ -76,8 +76,9 @@ pub fn mode_at<W: AiHost + ?Sized>(
 ) -> bool {
     let t = match target {
         Some(t) => ModeTarget::Unit(t),
-        // TODO(spec gap): a mode request with no target unit (T = 0);
-        // the units spec decides what the mode start does with it.
+        // T = 0: the builder `0x005A7E60` zeroes the record, so the
+        // request carries no unit and the point (0, 0) (`ai.md` §7.1
+        // mode request record).
         None => ModeTarget::Point(0, 0),
     };
     cx.world.change_mode(game, unit, m, t)
@@ -176,8 +177,9 @@ pub fn move_to<W: AiHost + ?Sized>(
 fn unit_target(t: Option<UnitId>) -> ModeTarget {
     match t {
         Some(t) => ModeTarget::Unit(t),
-        // TODO(spec gap): moving toward target 0 (CorruptArcher edge case
-        // 7: "the move then fails"); the units spec's mode start decides.
+        // Target 0 (CorruptArcher edge case 7): the builder `0x005A7E60`
+        // zeroes the record, so the request carries no unit and the point
+        // (0, 0) (`ai.md` §7.1 mode request record).
         None => ModeTarget::Point(0, 0),
     }
 }
@@ -330,11 +332,17 @@ pub fn current_command<W: AiHost + ?Sized>(cx: &Ctx<'_, W>, unit: UnitId) -> Opt
     c.commands.get(c.cur).copied()
 }
 
-/// `0x0058ED10`: unlink and free the current command; current := its next.
+/// `0x0058ED10`: unlink and free the current command; current := its next
+/// (§8). The list is the ring in index order (each command's next is the
+/// following index, the last one's next is index 0), so freeing the last
+/// index makes index 0 current; freeing the only node empties the ring.
 pub fn free_current_command<W: AiHost + ?Sized>(cx: &mut Ctx<'_, W>, unit: UnitId) {
     if let Some(c) = cx.store.control_mut(unit) {
         if c.cur < c.commands.len() {
             c.commands.remove(c.cur);
+        }
+        if c.cur >= c.commands.len() {
+            c.cur = 0;
         }
     }
 }
@@ -382,13 +390,10 @@ pub fn command_minions<W: AiHost + ?Sized>(
     }
 }
 
-/// `0x0058EEF0(type, set)` `GetAiCommandFromParam`: the index of the first
-/// command of type `ty`, searching from the current one's next round to
-/// the current one; `set` makes it current.
-///
-/// TODO(spec: ai.md §8): the search start when the current command is
-/// gone (current past the end of the ring) is not stated; the list is
-/// searched from its first command.
+/// `0x0058EEF0(type, set)` `GetAiCommandFromParam` (§8): no current (the
+/// ring is empty) → `None`. Else the index of the first command of type
+/// `ty` in the order current's next, its next, …, current (current is
+/// tested last; a one-node ring tests only it); `set` makes it current.
 pub fn find_command<W: AiHost + ?Sized>(
     cx: &mut Ctx<'_, W>,
     unit: UnitId,
@@ -400,8 +405,9 @@ pub fn find_command<W: AiHost + ?Sized>(
     if len == 0 {
         return None;
     }
-    // With no current command, start before the first one.
-    let base = if c.cur < len { c.cur } else { len - 1 };
+    // A non-empty ring always has a current command (`0x0058ED10` keeps
+    // current and last both set or both 0).
+    let base = c.cur.min(len - 1);
     let at = (1..=len)
         .map(|i| (base + i) % len)
         .find(|&i| c.commands[i].params[0] == ty)?;
@@ -411,31 +417,28 @@ pub fn find_command<W: AiHost + ?Sized>(
     Some(at)
 }
 
-/// `0x0058EFA0(type, set)` `SetCurrentAiCommand`: [`find_command`], or a
-/// new command (type, 0, 0, 0, 0) when there is none. `None` only
-/// without an AI control.
-///
-/// TODO(spec: ai.md §8): where the new command goes is not stated; it is
-/// inserted as [`copy_command`] does (before the current one, becoming
-/// current).
+/// `0x0058EFA0(type, set)` `SetCurrentAiCommand` (§8): find by type
+/// ([`find_command`] without `set`); absent → create (type, 0, 0, 0, 0)
+/// through `0x0058EF40` ([`copy_command`]: allocator `0x0058EC90` links
+/// it before the current one, and it becomes current); then return
+/// `0x0058EEF0(type, set)`. `None` only without an AI control.
 pub fn get_or_create_command<W: AiHost + ?Sized>(
     cx: &mut Ctx<'_, W>,
     unit: UnitId,
     ty: i32,
     set: bool,
 ) -> Option<usize> {
-    if let Some(i) = find_command(cx, unit, ty, set) {
-        return Some(i);
-    }
     cx.store.control(unit)?;
-    copy_command(
-        cx,
-        unit,
-        AiCommand {
-            params: [ty, 0, 0, 0, 0],
-        },
-    );
-    cx.store.control(unit).map(|c| c.cur)
+    if find_command(cx, unit, ty, false).is_none() {
+        copy_command(
+            cx,
+            unit,
+            AiCommand {
+                params: [ty, 0, 0, 0, 0],
+            },
+        );
+    }
+    find_command(cx, unit, ty, set)
 }
 
 /// The command at `index` of the unit's list.
@@ -453,10 +456,7 @@ pub fn path_distance<W: AiHost + ?Sized>(cx: &Ctx<'_, W>, unit: UnitId, x: i32, 
     distance_no_size(cx.world.position(unit), (x, y))
 }
 
-/// `0x005DED90`: walk to coordinates (§7.2).
-///
-/// TODO(spec: ai.md §7.2): the step count of the coordinate walks is not
-/// given in the table; 1 is used, as for the unit walks.
+/// `0x005DED90`: walk to coordinates, path step count 1 (§7.2 table).
 pub fn walk_to_point<W: AiHost + ?Sized>(
     game: &mut Game,
     cx: &mut Ctx<'_, W>,
@@ -495,10 +495,7 @@ pub fn half_size_distance<W: AiHost + ?Sized>(
 }
 
 /// `0x005DEDE0`: run to coordinates (walk with the velocity reset under
-/// state 60, §7.2).
-///
-/// TODO(spec: ai.md §7.2): the step count of the coordinate runs is not
-/// given in the table; 1 is used, as for the unit runs.
+/// state 60), path step count 1 (§7.2 table).
 pub fn run_to_point<W: AiHost + ?Sized>(
     game: &mut Game,
     cx: &mut Ctx<'_, W>,
@@ -519,8 +516,11 @@ pub fn run_near<W: AiHost + ?Sized>(
     t: Option<UnitId>,
     n: i32,
 ) -> bool {
-    // TODO(spec gap): running near target 0 uses the own position.
-    let center = cx.world.position(t.unwrap_or(unit));
+    // `0x005DF680` reads t without a null test (an access violation in
+    // 1.14d): t = 0 is unreachable (`ai.md` §2.3 "Target 0 in mode-1 and
+    // mode-4 bodies"), asserted, not handled.
+    let t = t.expect("run near target 0 (ai.md §2.3)");
+    let center = cx.world.position(t);
     let (x, y) = wander_point(cx.world.seed(unit), center, i32::from(n as u8));
     move_to(game, cx, unit, ModeTarget::Point(x, y), mode::RUN, 1, 0)
 }

@@ -1045,13 +1045,26 @@ fn run_with(game_seed: u32) -> Transcript {
     // joined room's 0x07 is followed by the add messages of its units
     // (`intents-events.md` §7.8 rule 2): the waypoint's 0x51 (type 2,
     // class 0, its position, mode 1, interact 0: no object data in this
-    // game) after its room's; the monster and the client's own player
-    // send none (§7.2 monster part: not specified).
+    // game) after its room's. Each monster (the preset monster, GUID 2,
+    // then Akara, GUID 1, class 148) sends §7.2 part A: 0xAC
+    // (`monsters/init.md` §24: life 128, a one-byte stream of mode 1 and
+    // no optional blocks) and 0xAA (no states); part B's mode message
+    // needs the path provider, which this game does not run. The
+    // client's own player is skipped.
     record(&mut fx, &mut frames, vec![]);
     let mut want: Vec<Vec<u8>> = [(8000, 8000), (8000, 8008), (8008, 8000), (8008, 8008)]
         .map(|(x, y)| map_reveal(x, y, ISLE))
         .to_vec();
     want.insert(1, assign_object(wp, 0, WP_AT, 1, 0));
+    let monster_adds: [Vec<u8>; 4] = [
+        vec![0xAC, 2, 0, 0, 0, 0, 0, 76, 156, 74, 156, 128, 14, 1],
+        vec![0xAA, 1, 2, 0, 0, 0, 8, 0xFF],
+        vec![0xAC, 1, 0, 0, 0, 148, 0, 86, 156, 86, 156, 128, 14, 1],
+        vec![0xAA, 1, 1, 0, 0, 0, 8, 0xFF],
+    ];
+    for (i, m) in monster_adds.into_iter().enumerate() {
+        want.insert(1 + i, m);
+    }
     assert_eq!(frames[0].2, want);
     assert_eq!(fx.sim_ref().game.lists.active_rooms(0).len(), 4);
     let monsters = fx.monsters();
@@ -1715,8 +1728,9 @@ fn run_with(game_seed: u32) -> Transcript {
     let log = fx.bridge.log();
     assert!(log.unowned.is_empty(), "{:?}", log.unowned);
     // 35 before (the buy's 0x9C, 0x47, 0x48 among them) + 0x27, 0x28,
-    // 0x29 ×2 + 0x2A ×4 + Akara's 0xAC.
-    assert_eq!(log.handled, 46);
+    // 0x29 ×2 + 0x2A ×4 + Akara's 0xAC, + the join's monster adds
+    // (`intents-events.md` §7.2: 0xAC ×2, 0xAA ×2).
+    assert_eq!(log.handled, 50);
     let rejected: Vec<(u8, String)> = log
         .rejected
         .iter()

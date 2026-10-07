@@ -26,14 +26,14 @@
 |   1. Level map | 82–102 |
 |   2. Jungle placer (`0x00677880`, D2MOO `DRLG_GenerateJungles`) | 103–295 |
 |   3. Jungle stamping (`0x0067E910`, levels 76..78) | 296–325 |
-|   4. Act III rooms and links | 326–347 |
-|   5. Act V outdoor levels | 348–369 |
-| Constants & data dependencies | 370–391 |
-| Randomness | 392–426 |
-| Edge cases & original bugs | 427–450 |
-| Test vectors | 451–504 |
-| Provenance | 505–529 |
-| Open questions | 530–557 |
+|   4. Act III rooms and links | 326–351 |
+|   5. Act V outdoor levels | 352–373 |
+| Constants & data dependencies | 374–395 |
+| Randomness | 396–430 |
+| Edge cases & original bugs | 431–454 |
+| Test vectors | 455–530 |
+| Provenance | 531–556 |
+| Open questions | 557–595 |
 <!-- /index -->
 
 ## Summary
@@ -328,9 +328,13 @@ never share a file when there are three.
 1. Act III level build (`0x0067F450`): link flags (`outdoor.md` §5.5),
    §3, Kurast (`outdoor.md` §9.4), Travincal. No borders, waypoint or
    shrine placers run; Act III has no blank cells (grid-2 0x100).
-2. Rooms (`outdoor.md` §12.1): a stamped preset gives one preset room
-   at its top-left cell, sized by the preset; the other covered cells
-   give none. Every unstamped cell gives an 8×8 outdoor room: in the
+2. Rooms (`outdoor.md` §12.1): a stamped preset is built at its
+   top-left cell in multi-room mode (`0x006751E6` passes single-room 0
+   to `0x00667ED0`, `preset.md` §6), so it gives one preset room per
+   8×8 cell it covers (a 32×32 block 16, the 64×32 head or tail 32);
+   corrected 2026-10-08, the earlier "one preset room per stamp" is
+   contradicted by the recorded room count 192 of levels 76–78 (Test
+   vectors). Every unstamped cell gives an 8×8 outdoor room: in the
    jungles, the 16 cells of each block with id 0 (DT1 mask 0x4, floor
    flags 0x120000, `outdoor.md` §12.2); in Kurast, cells the random
    placer left (mask 0x1, floor 0x100000).
@@ -451,7 +455,9 @@ draws only in its room pass (15 × `roll(1)` plus `preset.md`).
 ## Test vectors
 
 **Derived from these rules** (a scratch simulation of §2, §3 and
-`outdoor.md` §2/§9.2; not recorded; CI-safe once the code exists).
+`outdoor.md` §2/§9.2; CI-safe once the code exists). The creation rows
+(draw counts, seed after, rects, block ids, clearings, Kurast chain)
+are recorded below.
 Input: init seed 644409375, difficulty 0 → DRLG seed after the start
 and jungle-link draws {1406222081, 1674353446} (`levels.md` vectors);
 docks (1000, 1000, 64, 48); SX 64, SY 192.
@@ -476,8 +482,28 @@ dwStartSeed 4014346869; stamps as (cell x, cell y, P, F):
 | 77 | 0 | (0,0,554,0) (4,0,587,0) (0,4,541,4) (0,8,539,1) (4,8,534,1) (4,12,541,0) (0,16,586,1) (4,16,569,0) (0,20,586,2) (4,20,566,0) | 7, {2370309536, 189899886} |
 | 78 | 1 | (0,0,574,0) (0,4,535,2) (4,4,565,0) (0,8,570,0) (4,8,602,1) (0,12,539,2) (4,12,534,2) (0,16,558,0) (4,16,565,0) (0,20,541,4) (4,20,601,0) | 8, {4128120053, 867080307} |
 
-Rooms then: 76 and 78: 11 preset rooms, no outdoor room; 77: 10 preset
-rooms and 32 outdoor rooms (blocks 3 and 6 have id 0).
+Rooms then (§4 rule 2): 76: head 32 + 10 blocks × 16 = 192 preset
+rooms, no outdoor room; 78: tail 32 + 10 × 16 = 192; 77: 10 × 16 = 160
+preset rooms and 32 outdoor rooms (blocks 3 and 6 have id 0) = 192.
+Every jungle level has 192 rooms = its 8 × 24 cells.
+
+**Recorded Act III creation** (`pc2rec-d1-rng`, TestSor, `-seed`
+644409375, sha256 8ac70b456cea9732…, Act III via waypoint; block ids
+from the same seed by `autostart.py --try TestSor --seed 644409375`,
+`dumpdrlg` of the +0x1BC array, log D1b of `pc2-rec-lane.md`):
+
+| Item | Recorded | Derived row |
+|---|---|---|
+| DRLG-seed draws | 246 at `0x00677966`–`0x006784D9` = 123 server + 123 client; DRLG seed after {4015082244, 577631236} | draw counts: equal |
+| 76 | (1000, 808, 64, 192); +0x1B8 3; ids 541, 533, 543, 565, 570, 582, 571, 575, 570, 575, 537, 0 | equal |
+| 77 | (936, 744, 64, 192); +0x1B8 3; ids 554, 577, 541, 0, 539, 534, 0, 541, 576, 569, 576, 566 | equal |
+| 78 | (1000, 616, 64, 192); +0x1B8 2; ids 0, 533, 535, 565, 570, 582, 539, 534, 558, 565, 541, 581 | equal |
+| Kurast chain | 79 (992, 552, 80, 64), 80 (992, 488), 81 (992, 424), 82 (1008, 408, 48, 16), 83 (1000, 344, 64, 64) | equal |
+| level +0x08 (room count, `levels.md` §1) of 76, 77, 78 (client copy, at the docks) | 192 each | equal to §4 rule 2 (192 = 8 × 24 cells); it refuted the earlier derivation 11 / 42 / 11 (OQ 3) |
+
+Mass check: `check_drlg_acts` on 12 more seeds × Acts I–III
+(`pc2rec-d2-sweep.log`, 36 records, 271 level seeds) 0 errors; the
+jungle bit is 0 for seed 555, 1 for the others.
 
 Act V placement, same init seed (`outdoor.md` §2.4, derived): A5 copy
 draws 1406222081 (B1: R0 1 → 160×64) and 3154683627 (B2: R0 1, offset
@@ -494,8 +520,8 @@ index 3 → (−160, 0)); A5T copy draws 1406222081 (BD: 160×64). Rects:
 | lvlprest 573, 574 | 64×32, Files 0 | `lvlprest.txt` (patch_d2) |
 | lvlprest 530..544, 545..572, 575..604 | 32×32; Files 3 (541: 5), 1, 1 | same |
 | level 110 stamps | 865 + i at cell (28 − 2i, 0), F 0, i = 0..14 (879 "Siege To Barricade" at x 0) | `outdoor.md` §11, lvlprest 865 SizeX 16 |
-| level 82 | one stamp 652 (48×16) at (0, 0), F 0: one preset room | `outdoor.md` §9.4 |
-| level 83 | six stamps 653..658, F −1: six build-list `roll(1)`, all file 0; six preset rooms covering 8×8 cells | `outdoor.md` §9.4, lvlprest Files 1 |
+| level 82 | one stamp 652 (48×16) at (0, 0), F 0: 12 preset rooms (6 × 2 cells, §4 rule 2) | `outdoor.md` §9.4 |
+| level 83 | six stamps 653..658, F −1: six build-list `roll(1)`, all file 0; together they cover the 8 × 8 cells: 64 preset rooms (§4 rule 2) | `outdoor.md` §9.4, lvlprest Files 1 |
 
 Comparison (exact): for an Act III creation, the sequence of (site,
 seed after) of every DRLG-seed draw and the rects and block ids of
@@ -524,19 +550,31 @@ stamp list and draw sequence equal the recording.
   return value, level 78.
 - **Live data**: `traces/raw/20261006-115547-tables/leveldefs.bin`,
   `game/extracted/patch_d2/.../lvlprest.txt`.
-- No Act III / Act V recording exists (`traces/raw/` checked: only Act I
-  DRLG draws in `20261005-232125-rng.jsonl`).
+- **Recorded** (2026-10-08): Act III creation in `pc2rec-d1-rng`
+  (PC 2 recording lane, kept on PC 2) and the D1b block-id log; no
+  Act III level build and no Act V recording yet.
 
 ## Open questions
 
 1. Record entering Act 3 (DRLG-seed draws at `0x00677966`…`0x006784D9`)
    and read levels 76..78 +0x1C..+0x28, +0x1B8, +0x1BC to confirm §2 and
    the derived vector (supersedes `outdoor.md` OQ 4 and 7).
+   *Answered (2026-10-08, recorded: `pc2rec-d1-rng`)*: draws, DRLG seed
+   after, rects, clearings, block ids and the Kurast chain equal the
+   derived vector (Test vectors, "Recorded Act III creation"); `outdoor.md`
+   OQ 4 and 7 are closed with it.
 2. Can any seed give a river block two attach bits (edge case 1)?
    Settle by enumerating §2 over all jungle-link-time DRLG seeds reachable
    from 32-bit init seeds, or by a recording that hits fatal 0x78C.
 3. Record a build of 76..78 (stamps, room count: are id-0 blocks 16
    outdoor rooms each?) and of 111, 112, 117 (`outdoor.md` OQ 9).
+   *Answered (2026-10-08, recorded: `pc2rec-d1-rng`)* for 76..78:
+   level +0x08 is the room count (`levels.md` §1: +1 in `0x0066B970`
+   per linked room, −1 in `0x0066C100`), and it reads 192 on 76, 77
+   and 78. Outdoor presets are built one room per 8×8 cell
+   (`0x00667ED0` multi-room mode), so §4 rule 2 is corrected; id-0
+   blocks are 16 outdoor rooms each. Act V (111, 112, 117) moves to
+   `outdoor.md` OQ 9 (not reachable with the TestSor save).
 4. *Answered* (`impl-drlg-act3-5` Q1): lookups outside rows 1..14 of T
    (row 0, rows 545..572, a third bit) are §2.7's table "Lookups outside
    rows 1..14": 0 → fatal 0x78C, V(r) stored then a crash in §3, a third

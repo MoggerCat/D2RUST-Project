@@ -35,8 +35,7 @@ const STAT_GOLD: u16 = 14;
 /// The per-client caches of a game (client +0x48C, `0x00539330`).
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct SyncState {
-    // TODO(spec: vitals.md §5.2): the cache's values when the client
-    // record is created are not written; read as all zero.
+    /// A new client's cache starts all 0 (§5.2).
     pub caches: BTreeMap<ClientId, SyncCache>,
 }
 
@@ -113,10 +112,10 @@ pub fn current<X>(sim: &ActionSim<X>, game: &Game, unit: UnitId, staged: (u16, u
 /// unit. `queued`: the client has a queued buffer (client +0x1B8,
 /// §5.1 rule 2); `staged`: the host's position of a player without a
 /// path record.
-// TODO(spec: vitals.md §5.1 rule 3): the fatal assert of a client whose
-// unit is not a player is read as "nothing runs".
-// TODO(spec: vitals.md §5.1 rule 4, OQ7): `0x0052DA00` before the routine
-// is not run.
+///
+/// A client whose unit is not a player is a fatal assert (§5.1 rule 3):
+/// a debug assertion, nothing runs in release. `0x0052DA00` before the
+/// routine is not run under `Ruleset::Original` (§5.1 rule 4).
 pub fn run<X>(
     sim: &mut ActionSim<X>,
     game: &mut Game,
@@ -130,7 +129,9 @@ pub fn run<X>(
         return None;
     }
     let unit = entry.player?;
-    if sim.sys.units.get(unit)?.ty != UnitType::Player {
+    let is_player = sim.sys.units.get(unit)?.ty == UnitType::Player;
+    debug_assert!(is_player, "vitals sync: client unit is not a player");
+    if !is_player {
         return None;
     }
     let force = sync::force(entry.update_count, queued);

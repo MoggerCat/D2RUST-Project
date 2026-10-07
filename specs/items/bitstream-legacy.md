@@ -43,7 +43,7 @@
 | Edge cases & original bugs | 409–436 |
 | Test vectors | 437–461 |
 | Provenance | 462–477 |
-| Open questions | 478–487 |
+| Open questions | 478–483 |
 <!-- /index -->
 
 ## Summary
@@ -477,10 +477,6 @@ from the live `patch_d2` `itemstatcost.bin`. D2MOO not used.
 
 ## Open questions
 
-1. Pending (recording): load a 1.07 / 1.08 save (v 0x57 / 0x59) in 1.14d
-   and compare every item with §2–§4 (affix ids after the offset of §2
-   rule 3, the 1.09-column values).
-2. Pending (recording): load a 1.00–1.06 save (v 0x47) holding a stored,
-   equipped, belt, cursor and socketed item, an ear and a corpse with an
-   equipped item, and compare with §6–§8 and edge cases 7–9. No such
+1. PROVISIONAL: items of 1.07 / 1.08 saves decode as §2–§4 (because the rules are read from the 1.14d reader); settled by REC-44 (Deferred).
+2. PROVISIONAL: 1.00–1.06 saves decode as §6–§8 and edge cases 7–9 (because the rules are read from the 1.14d reader); settled by REC-44 (Deferred). No such
    save exists on this PC.

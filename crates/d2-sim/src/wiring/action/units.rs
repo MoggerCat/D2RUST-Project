@@ -82,9 +82,15 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
         self.death_penalties(sim, unit);
     }
     /// `0x0057FCA0`: the corpse creation `0x0057F700` at `0x0057FD1C`
-    /// (`vitals.md` §4.7 rule 1, [`super::death`]).
+    /// (`vitals.md` §4.7 rule 1, [`super::death`]), then `0x00575BC0`
+    /// at `0x0057FD25` in every game type (`hirelings-2.md` §15 rule 1):
+    /// queued for the host that holds the hireling lists
+    /// ([`ActionHooks::owner_deaths`]).
     fn player_corpse(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
         self.corpse_creation(sim, unit);
+        if let Some(q) = self.owner_deaths.as_mut() {
+            q.push(unit);
+        }
     }
     /// `0x0057FB70` ([`super::death`]; the experience it returns is not
     /// read by the 0x16 caller).

@@ -279,10 +279,6 @@ pub(super) struct Fake {
     pub(super) npc_held: bool,
     /// `spawn_location` answer.
     pub(super) spawn_loc: Option<(i32, i32, RoomId)>,
-    /// `unit_distance` answers by (a, b); missing: `i32::MAX`.
-    pub(super) distances: BTreeMap<(UnitId, UnitId), i32>,
-    /// `living_player_within` answer.
-    pub(super) living_near: bool,
     // -- Act IV q1/q3 fake fields.
     /// `room_in_act_at`'s answer.
     pub(super) a4_room: Option<RoomId>,
@@ -346,6 +342,21 @@ pub(super) struct Fake {
     /// room); `unit_xy` answers these, then [`Fake::pos`].
     pub(super) xy: BTreeMap<UnitId, (i32, i32)>,
     // -- end Act I answers fake fields.
+
+    // -- Helper seam fake fields (`quests-helpers.md`).
+    /// `box_collides`: `Some(free)` → only these box origins are free;
+    /// `None` → everything is free.
+    pub(super) h_free: Option<Vec<(i32, i32)>>,
+    /// `spawn_missile` fails.
+    pub(super) h_missile_fails: bool,
+    /// `objects.txt` `Mode1` by object (missing: 0).
+    pub(super) h_mode1: BTreeMap<UnitId, bool>,
+    /// `room_warp_tiles` by object.
+    pub(super) h_tiles: BTreeMap<UnitId, Vec<UnitId>>,
+    /// Town portal GUIDs by player; portal partners.
+    pub(super) h_tp: BTreeMap<UnitId, u32>,
+    pub(super) h_partner: BTreeMap<UnitId, UnitId>,
+    // -- end helper seam fake fields.
 }
 
 pub(super) const P1: UnitId = UnitId(1);
@@ -767,13 +778,6 @@ impl QuestWorld for Fake {
             .push(format!("spot near {x} {y} {size} {mask:#x} {radius}"));
         self.spot.map(|(dx, dy)| (x + dx, y + dy, room))
     }
-    fn unit_distance(&mut self, a: UnitId, b: UnitId) -> i32 {
-        self.distances.get(&(a, b)).copied().unwrap_or(i32::MAX)
-    }
-    fn living_player_within(&mut self, _: UnitId, radius: i32) -> bool {
-        self.log.push(format!("living within {radius}"));
-        self.living_near
-    }
     fn npc_intro_heard(&mut self, p: UnitId, class: u16) -> bool {
         let d = usize::from(self.difficulty);
         self.p(p).quests.intro[d].contains(&class)
@@ -928,12 +932,6 @@ impl QuestWorld for Fake {
     fn warp_to_level(&mut self, p: UnitId, level: u32, arg: u32) {
         self.log.push(format!("warp {} {level} {arg}", p.0));
     }
-    fn end_game(&mut self) {
-        self.log.push("end game".into());
-    }
-    fn save_pass(&mut self) {
-        self.log.push("save pass".into());
-    }
     fn client_idle(&mut self, p: UnitId) -> bool {
         !self.q2_busy.contains(&p)
     }
@@ -1055,9 +1053,6 @@ impl QuestWorld for Fake {
         p.stats.insert(12, l);
         p.stats.insert(30, next as i32);
     }
-    fn close_town_portal(&mut self, player: UnitId, level: u32) {
-        self.log.push(format!("close portal {} {level}", player.0));
-    }
     fn object_stairs_warp(&mut self, player: UnitId, object: UnitId) {
         self.log.push(format!("stairs {} {}", player.0, object.0));
     }
@@ -1083,6 +1078,92 @@ impl QuestWorld for Fake {
         self.a5_zoo.contains(&class)
     }
     // -- end Act V part 2 seam fakes.
+
+    // -- Helper seam fakes (`quests-helpers.md`).
+    fn room_box(&mut self, room: RoomId) -> Option<crate::drlg::TileRect> {
+        self.rooms
+            .get(&room)
+            .map(|r| crate::drlg::TileRect::new(r.0, r.1, r.2 - r.0, r.3 - r.1))
+    }
+    fn box_collides(&mut self, _: RoomId, x: i32, y: i32, _: i32, _: u32) -> bool {
+        self.h_free.as_ref().is_some_and(|v| !v.contains(&(x, y)))
+    }
+    fn spawn_missile(&mut self, r: super::helpers::QuestMissile) -> Option<UnitId> {
+        self.log.push(format!(
+            "spawn missile {} owner {} origin {:?} flags {:#x} at {} {} target {} {} skill {} level {}",
+            r.class,
+            r.owner.0,
+            r.origin.map(|o| o.0),
+            r.flags,
+            r.x,
+            r.y,
+            r.target_x,
+            r.target_y,
+            r.skill,
+            r.level
+        ));
+        if self.h_missile_fails {
+            return None;
+        }
+        self.next_missile += 1;
+        Some(UnitId(0x9000 + self.next_missile))
+    }
+    fn set_missile_guid(&mut self, m: UnitId, v: u32) {
+        self.log.push(format!("missile guid {} {v:#x}", m.0));
+    }
+    fn unit_by_guid(&mut self, kind: u8, guid: u32) -> Option<UnitId> {
+        match kind {
+            0 => self.player_by_guid(guid),
+            1 => self.monster_by_guid(guid).map(|m| m.0),
+            2 => self.object_by_guid(guid).map(|o| o.0),
+            4 => self.item_codes.keys().find(|u| u.0 == guid).copied(),
+            _ => None,
+        }
+    }
+    fn monster_mode_at(&mut self, m: UnitId, mode: u8, x: i32, y: i32) {
+        self.log
+            .push(format!("mode request {} {mode} {x} {y}", m.0));
+    }
+    fn trade_button(&mut self, p: UnitId, button: u8) {
+        self.log.push(format!("trade button {} {button}", p.0));
+    }
+    fn free_chat_node(&mut self, n: UnitId, p: UnitId) {
+        self.log.push(format!("free chat {} {}", n.0, p.0));
+    }
+    fn clear_npc_chats(&mut self, n: UnitId) {
+        self.log.push(format!("clear chats {}", n.0));
+    }
+    fn obelisk_close(&mut self, p: UnitId, o: UnitId) {
+        self.log.push(format!("obelisk {} {}", p.0, o.0));
+    }
+    fn steeg_release(&mut self, o: UnitId, p: UnitId) {
+        self.log.push(format!("steeg {} {}", o.0, p.0));
+    }
+    fn close_cube(&mut self, p: UnitId) {
+        self.log.push(format!("close cube {}", p.0));
+    }
+    fn object_mode1(&mut self, o: UnitId) -> Option<bool> {
+        Some(self.h_mode1.get(&o).copied().unwrap_or(false))
+    }
+    fn clear_unit_flags(&mut self, u: UnitId, f: u32) {
+        self.log.push(format!("clear flags {} {f:#x}", u.0));
+    }
+    fn room_warp_tiles(&mut self, o: UnitId) -> Vec<UnitId> {
+        self.h_tiles.get(&o).cloned().unwrap_or_default()
+    }
+    fn warp_through(&mut self, p: UnitId, tile: UnitId) {
+        self.log.push(format!("warp tile {} {}", p.0, tile.0));
+    }
+    fn town_portal_guid(&mut self, p: UnitId) -> Option<u32> {
+        self.h_tp.get(&p).copied()
+    }
+    fn portal_partner(&mut self, o: UnitId) -> Option<UnitId> {
+        self.h_partner.get(&o).copied()
+    }
+    fn free_portal_object(&mut self, o: UnitId) {
+        self.log.push(format!("free portal {}", o.0));
+    }
+    // -- end helper seam fakes.
 }
 
 pub(super) fn control() -> (QuestControl, Seed) {

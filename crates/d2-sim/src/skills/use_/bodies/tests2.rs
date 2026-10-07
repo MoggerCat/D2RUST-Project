@@ -214,7 +214,7 @@ fn charge_add_counts_to_three() {
     assert_eq!(f.lists[l].callback, callback::CHARGE);
 }
 
-// Covers: specs/skills/bodies.md §6.1
+// Covers: specs/skills/bodies.md §6.1; specs/skills/bodies-3.md §2
 #[test]
 fn summon_class_from_the_record_or_the_ai_control() {
     let mut r = body_rec();
@@ -228,9 +228,11 @@ fn summon_class_from_the_record_or_the_ai_control() {
     r.summon = 9;
     r.summode = 3;
     let t = tabs(r, Code::new(), 1);
-    assert_eq!(summon_class(&f, &t, &ct, u, 1), (-1, 3));
+    // `summon` outside the monstats rows: `mode` is not written (the
+    // caller's 0), also on the AI-control fallback.
+    assert_eq!(summon_class(&f, &t, &ct, u, 1), (-1, 0));
     f.spawn_class = Some(1);
-    assert_eq!(summon_class(&f, &t, &ct, u, 1), (1, 3));
+    assert_eq!(summon_class(&f, &t, &ct, u, 1), (1, 0));
 }
 
 // Covers: specs/skills/bodies.md §6.2

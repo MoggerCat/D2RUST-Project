@@ -39,7 +39,7 @@
 | Edge cases & original bugs | 315–329 |
 | Test vectors | 330–349 |
 | Provenance | 350–361 |
-| Open questions | 362–372 |
+| Open questions | 362–370 |
 <!-- /index -->
 
 ## Summary
@@ -362,10 +362,8 @@ D2MOO not used.
 ## Open questions
 
 1. The version-0x47 item record (`0x00532F30`, 1,055 bytes) and its
-   placement (`0x00531040`, `0x00531390`): Pending; settle with a
-   Ghidra read of those three functions (only 1.00–1.06 saves use it).
+   placement (`0x00531040`, `0x00531390`) (only 1.00–1.06 saves use it).
    **Answered**: `items/bitstream-legacy.md` §6 (record `0x00532F30`),
    §7 (request `0x00530F40`), §8 (placement `0x00531040`,
    `0x00531390`); the list itself is §8 rule 2.
-2. Pending: load one 1.07/1.08 save (version 0x57 / 0x59) in 1.14d and
-   compare the unit (stats, skills, items, hireling) with these rules.
+2. PROVISIONAL: the rules above for 1.07/1.08 saves (version 0x57 / 0x59) (because they are read from the loader binary); settled by REC-44 (Deferred).

@@ -1,4 +1,4 @@
-// Spec: specs/world/hirelings.md
+// Spec: specs/world/hirelings.md; specs/world/hirelings-2.md
 //! Hirelings: the `hireling.txt` rows, offer and costs ([`rows`]), the
 //! hireling pet list and its messages ([`pets`]), creating, following,
 //! death and revive ([`life`]), level stats, experience and the stat
@@ -106,6 +106,11 @@ pub mod state {
 pub enum HirelingError {
     #[error("hireling table: {0}")]
     Table(String),
+    /// A fatal error of 1.14d, by its string id (`hirelings-2.md` §16:
+    /// 0x744 no row for an `Id` 0xFFFF restore, 0x1660 a null row in the
+    /// old loader's level loop).
+    #[error("hireling fatal error (string {0:#x})")]
+    Fatal(u16),
     /// §5 rule 5: the pet count went negative (fatal assertion).
     #[error("hireling pet count below zero")]
     NegativeCount,
@@ -340,6 +345,10 @@ pub trait HirelingWorld {
     fn set_flags2(&mut self, unit: UnitId, flags: u32);
     /// Whether the unit is in a room (§6 rule 4).
     fn in_room(&self, unit: UnitId) -> bool;
+    /// The unit's position as `hirelings-2.md` §18 rule 1 reads it: the
+    /// static path +0x0C / +0x10 for objects, items and tiles, else the
+    /// path's x / y (`0x006488C0` / `0x00648900`); no path → (0, 0).
+    fn position(&self, unit: UnitId) -> (i32, i32);
 
     // ---- stats, states, skills
     /// `0x00625480(unit, stat, 0)`: total value.
@@ -387,8 +396,20 @@ pub trait HirelingWorld {
     fn free_unit(&mut self, unit: UnitId);
     /// §6 rule 4: queue the unit's removal from its room only.
     fn queue_room_removal(&mut self, unit: UnitId);
-    /// The death event on a unit (§6 rule 4).
+    /// `hirelings-2.md` §15 rule 3 step 3 (§6 rule 4): the death mode
+    /// request on a unit in a room: `0x005A7E60(unit, 0, &req)` with the
+    /// target of `0x00552FD0` (as `sim/pets.md`'s expired-pet kill), then
+    /// `0x005A7C20(game, &req, 1)` (`monsters/ai.md` mode request).
     fn death_event(&mut self, unit: UnitId);
+    /// `0x00540E60(game, unit, type, a)` (`hirelings-2.md` §16 rule 6,
+    /// §17 rule 1; `sim/tick.md` §5): cancel the unit's pending timer
+    /// events of `ty` whose first argument (+0x14) equals `a`; `a` = 0:
+    /// any argument. Nothing is sent.
+    fn cancel_timers(&mut self, unit: UnitId, ty: u8, a: u32);
+    /// `hirelings-2.md` §16 rule 5: unit +0x60 = 0 (no inventory) →
+    /// `0x0063ABD0(game, merc)` creates one (`items/inventory.md`); an
+    /// inventory already there: nothing.
+    fn ensure_inventory(&mut self, unit: UnitId);
     /// §5 rule 5 / `pets.md` §7 (`0x00574450`): flags |= NOXP, then kill
     /// or a death mode request.
     fn dismiss(&mut self, unit: UnitId);

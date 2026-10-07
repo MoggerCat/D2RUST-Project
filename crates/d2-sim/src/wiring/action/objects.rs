@@ -440,6 +440,21 @@ impl<X: Pending> View<'_, X> {
         }
     }
 
+    /// Object population `0x00552610` of the room `info` describes
+    /// (`object-population.md`) on the object state. `None`: no object
+    /// state (the caller keeps its [`Pending`] answer).
+    pub fn populate_objects(
+        &mut self,
+        game: &mut Game,
+        info: &objects::populate::RoomInfo,
+    ) -> Option<objects::populate::Populated> {
+        self.h.objects.as_ref()?;
+        let r = with_objects(game, self, |ctl, t, w| {
+            objects::populate::populate_room(ctl, t, w, info)
+        })?;
+        log(self, r)
+    }
+
     /// The object mode change `0x00624690` of an object with object data
     /// ([`objects::set_object_mode`]); `false`: no object state or no
     /// data for `object` (the caller keeps its [`Pending`] answer).
@@ -518,7 +533,7 @@ impl<X: Pending> View<'_, X> {
 
     /// The object update pass `0x00581AD0` (§14) for one queued object and
     /// the client of `receiver`: S→C 0x0E / 0x4D sent to `receiver`
-    /// ([`Pending::send`]), 0x60 to [`Pending::object_portal_message`],
+    /// ([`Pending::send`]), 0x60 likewise,
     /// then rule 2 ([`MiscWorld::update_extras`]). `false`: not an object
     /// with object data (nothing ran).
     pub fn object_update(&mut self, game: &mut Game, receiver: UnitId, unit: UnitId) -> bool {
@@ -542,7 +557,7 @@ impl<X: Pending> View<'_, X> {
             match m {
                 UpdateMessage::State(b) => self.h.x.send(receiver, &b),
                 UpdateMessage::Shrine(b) => self.h.x.send(receiver, &b),
-                UpdateMessage::Portal(o) => self.h.x.object_portal_message(receiver, o),
+                UpdateMessage::Portal(b) => self.h.x.send(receiver, &b),
             }
         }
         true
@@ -634,6 +649,9 @@ impl<X: Pending> ObjectWorld for ObjectView<'_, X> {
         let room = self.room(unit)?;
         self.v.h.drlg.level_id(self.game, room)
     }
+    fn room_level(&self, room: RoomId) -> Option<u32> {
+        self.v.h.drlg.level_id(self.game, room)
+    }
     fn position(&self, unit: UnitId) -> (i32, i32) {
         self.v.h.path_position(unit)
     }
@@ -713,6 +731,148 @@ impl<X: Pending> ObjectWorld for ObjectView<'_, X> {
     fn staff_tomb_level(&self) -> u32 {
         self.v.h.x.object_staff_tomb()
     }
+    /// Unit +0x10 only (`objects-2.md` §18.1, §18.6).
+    fn store_mode(&mut self, unit: UnitId, mode: u8) {
+        if let Some(r) = self.record(unit) {
+            r.mode = u32::from(mode);
+        }
+    }
+    /// `0x00463740` on the act DRLG (`path-placement.md` §4 rule 1).
+    fn room_at(&self, room: RoomId, x: i32, y: i32) -> Option<RoomId> {
+        self.v.h.drlg.find_room(self.game, room, x, y)
+    }
+    /// `0x0064D800` with sizes 1, 1: the point query.
+    fn point_free(&self, room: RoomId, x: i32, y: i32, mask: u32) -> bool {
+        crate::path::collision::point_value(&self.v.h.drlg, Some(room), x, y, mask as u16) == 0
+    }
+}
+
+/// The part-2 seams (`objects-2.md` §16–§18) on the unit lists, records,
+/// the act DRLG and the path provider: interact (the unit record's
+/// interact info), messages ([`Pending::send`]), adjacency, free
+/// point and placement (`sim/path-placement.md` §7, §10), the 0x07 room
+/// reveal, flags 2, the town test and the player lookup. Item drops (the
+/// §20 helpers), trap damage, the gem test, the tome recount, the warp
+/// tile, the day period keep their defaults.
+impl<X: Pending> objects::MechWorld for ObjectView<'_, X> {
+    /// `0x00554D00` on the unit record's interact info.
+    fn interact_unit(&self, player: UnitId) -> Option<UnitId> {
+        // Only the obelisk reads it, comparing with an object (§16.3).
+        let (ty, g) = self.v.units.get(player)?.interact.get()?;
+        (ty == UnitType::Object as u8)
+            .then(|| self.game.lists.find_unit(UnitType::Object, g))
+            .flatten()
+    }
+    fn set_interact(&mut self, player: UnitId, unit_type: u8, guid: u32) {
+        if let Some(r) = self.v.units.get_mut(player) {
+            r.interact.set(unit_type, guid);
+        }
+    }
+    fn clear_interact(&mut self, player: UnitId) {
+        if let Some(r) = self.v.units.get_mut(player) {
+            r.interact.reset();
+        }
+    }
+    fn send(&mut self, player: UnitId, msg: &[u8]) {
+        self.v.h.x.send(player, msg);
+    }
+    fn adjacent_rooms(&self, room: RoomId) -> Vec<RoomId> {
+        use crate::path::collision::CollisionRooms;
+        let d = &self.v.h.drlg;
+        (0..d.adjacent_count(room))
+            .filter_map(|i| d.adjacent(room, i))
+            .collect()
+    }
+    fn free_point(
+        &self,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        size: i32,
+        mask: u32,
+    ) -> Option<(RoomId, i32, i32)> {
+        let mut p = crate::path::coords::Point::new(x, y);
+        let rooms = crate::wiring::path::place::Rooms(&self.v.h.drlg);
+        match crate::path::search::free_point(&rooms, Some(room), &mut p, size, mask, false) {
+            Ok(Some(r)) => Some((r, p.x, p.y)),
+            _ => None,
+        }
+    }
+    fn place_unit(&mut self, unit: UnitId, room: RoomId, x: i32, y: i32) -> bool {
+        if self.v.h.paths.is_none() {
+            return false;
+        }
+        let c = crate::wiring::path::PathCtx::of(&mut self.v, self.game);
+        crate::wiring::path::place::place_unit(c, unit, Some(room), x, y, false, false)
+    }
+    fn send_room_reveal(&mut self, player: UnitId, room: RoomId) {
+        let Some((d, r)) = self.v.h.drlg.drlg_room(self.game, room) else {
+            return;
+        };
+        let dr = d.room(r);
+        let level = d.level(dr.level).id;
+        let msg =
+            crate::wiring::path::place::map_reveal(dr.rect.x as u16, dr.rect.y as u16, level as u8);
+        self.v.h.x.send(player, &msg);
+    }
+    fn set_flags2(&mut self, unit: UnitId, bits: u32) {
+        if let Some(r) = self.record(unit) {
+            r.flags2 |= bits;
+        }
+    }
+    fn in_town(&self, room: RoomId) -> bool {
+        self.v.h.drlg.in_town(self.game, room)
+    }
+    fn find_player(&self, guid: u32) -> Option<UnitId> {
+        self.game.lists.find_unit(UnitType::Player, guid)
+    }
+}
+
+/// The population seams on the act DRLG: the active room seed (+0x6C),
+/// the level's populated-room count (`0x0061ABF0` → `0x00642BE0`), the
+/// collision queries of `0x0064D800` (`object-population.md` §6) and the
+/// unit record's class.
+impl<X: Pending> objects::populate::PopulateWorld for ObjectView<'_, X> {
+    fn room_seed(&mut self, room: RoomId) -> Option<&mut Seed> {
+        let act = self.game.lists.room(room)?.act;
+        let d = self
+            .v
+            .h
+            .drlg
+            .dungeon
+            .acts
+            .get_mut(usize::from(act))?
+            .as_mut()?;
+        let r = d.drlg_room_of(room)?;
+        d.active_room_seed_mut(r)
+    }
+    fn populated_room_count(&mut self, act: u8, level: u32) -> i32 {
+        let r = self.v.h.drlg.with_act(act, &mut self.game.lists, |d, svc| {
+            d.populated_room_count(svc.data, svc.types, level)
+        });
+        match r {
+            Some(Ok(n)) => n as i32,
+            Some(Err(e)) => {
+                self.v.h.errors.push(WiringError::Drlg(e));
+                0
+            }
+            None => 0,
+        }
+    }
+    fn box_query(&self, room: RoomId, x: i32, y: i32, sx: u32, sy: u32, mask: u32) -> u32 {
+        let mask = mask as u16;
+        let drlg = &self.v.h.drlg;
+        u32::from(if sx <= 1 && sy <= 1 {
+            crate::path::collision::point_value(drlg, Some(room), x, y, mask)
+        } else {
+            crate::path::collision::box_value(drlg, Some(room), x, y, (sx, sy), mask)
+        })
+    }
+    fn set_unit_class(&mut self, unit: UnitId, class: u16) {
+        if let Some(r) = self.record(unit) {
+            r.class = u32::from(class);
+        }
+    }
 }
 
 /// The chest seams on the providers the action wiring holds: the chest
@@ -762,6 +922,36 @@ impl<X: Pending> ChestWorld for ObjectView<'_, X> {
     }
     fn room_units(&self, room: RoomId) -> Vec<UnitId> {
         self.game.lists.room_units(room)
+    }
+    /// The lent monster world's region (`population.md` §2.2).
+    fn monster_region_classes(&self, level: u32) -> Option<Vec<i32>> {
+        self.v.h.monster_world.as_ref()?.region_classes(level)
+    }
+    fn monstats_count(&self) -> u32 {
+        self.v
+            .h
+            .monster_world
+            .as_ref()
+            .map_or(0, |m| m.monstats_count())
+    }
+    fn unit_class(&self, unit: UnitId) -> Option<u32> {
+        self.v.units.get(unit).map(|r| r.class)
+    }
+    /// `0x00620510` for an object (`SizeX`); other units: not read here.
+    fn unit_size(&self, unit: UnitId) -> i32 {
+        self.v
+            .units
+            .get(unit)
+            .filter(|r| r.ty == UnitType::Object)
+            .and_then(|r| self.tables.object(r.class as u16).ok())
+            .map_or(0, |o| o.sizex as i32)
+    }
+    fn room_rect(&self, room: RoomId) -> Option<(i32, i32, i32, i32)> {
+        self.v
+            .h
+            .drlg
+            .subtiles(self.game, room)
+            .map(|r| (r.x, r.y, r.w, r.h))
     }
 }
 /// The shrine seams on the unit's stat list (`sim/stats.md`: getter
@@ -813,6 +1003,46 @@ const STAT_LEVEL: u16 = 12;
 /// TODO(objects.md §11 rule 2): the client update of the vital set is
 /// the stat list host's; no separate message is sent here.
 impl<X: Pending> MiscWorld for ObjectView<'_, X> {
+    fn party_id(&self, unit: UnitId) -> u16 {
+        self.v.h.x.object_party_id(unit)
+    }
+    fn portal_partner(&mut self, object: UnitId) -> Option<UnitId> {
+        self.v.h.x.object_portal_partner(self.game, object)
+    }
+    fn has_quest_record(&self, player: UnitId) -> bool {
+        self.v.h.x.object_quest_record(player)
+    }
+    fn expansion(&self) -> bool {
+        self.v.data.expansion
+    }
+    fn player_quest_bit(&self, player: UnitId, quest: u32, bit: u8) -> bool {
+        self.v.h.x.object_quest_bit(player, quest, bit)
+    }
+    fn player_portal_guid(&self, player: UnitId) -> u32 {
+        self.v.h.x.object_portal_guid(player)
+    }
+    fn level_spawn_point(&mut self, level: u32) -> Option<(RoomId, i32, i32)> {
+        self.v.h.x.object_level_spawn(self.game, level)
+    }
+    fn quest_level_change(&mut self, player: UnitId, from: u32, to: u32) {
+        self.v.h.x.object_quest_level_change(player, from, to);
+    }
+    /// `0x005809D0` with the path provider ([`crate::wiring::path`]).
+    fn player_mode_xy(&mut self, player: UnitId, mode: u8, x: i32, y: i32) {
+        if self.v.h.paths.is_some() {
+            let mut c = crate::wiring::path::PathCtx::of(&mut self.v, self.game);
+            c.walk_to(player, u32::from(mode), x, y);
+        }
+    }
+    fn remove_portal(&mut self, object: UnitId) {
+        self.v.h.x.object_remove_portal(self.game, object);
+    }
+    fn portal_act5_hook(&mut self, partner: UnitId) {
+        self.v.h.x.object_portal_act5(partner);
+    }
+    fn just_portaled(&mut self, player: UnitId, expire: i32) {
+        self.v.h.x.object_just_portaled(self.game, player, expire);
+    }
     fn vital_stat(&self, unit: UnitId, id: u16) -> u32 {
         let st = &*self.v.stats;
         (match id {

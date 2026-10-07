@@ -6,7 +6,7 @@
 
 use super::placement::{flags, place_at, Placed};
 use super::room::pick;
-use super::seams::PopHost;
+use super::seams::{OwnerKey, PopHost};
 use super::spawn::{
     boss_minions_and_init, boss_spawn, champion_minions, members, random_boss, type_flag,
 };
@@ -214,8 +214,9 @@ pub const SPECIAL_PRESETS: [SpecialPreset; 20] = [
     ),
 ];
 
-/// The special preset row of `id`. TODO(spec: population.md §11.5): ids
-/// the TSV does not list are not described; read as spawning nothing.
+/// The special preset row of `id`.
+// PROVISIONAL (monsters/population.md §11.5): an id the TSV does not list
+// spawns nothing; settled by a bin read of the special-id switch.
 pub fn special(id: i32) -> Option<&'static SpecialPreset> {
     SPECIAL_PRESETS.iter().find(|r| r.id == id)
 }
@@ -387,9 +388,45 @@ fn regular<H: PopHost + ?Sized>(
     }
     let unit = placed.unit()?;
     if matches!(class, 432 | 433) && cx.tables.mon2(class).is_some_and(|m| m.obj_col) {
-        cx.host.barricade_object(unit, class);
+        barricade_object(cx, unit, class);
     }
     Some(unit)
+}
+
+/// §11.3 step 3 (open question 3): barricadedoor1 (432) creates object
+/// 571, barricadedoor2 (433) object 572 (`0x00555230(type 2, class)`; both
+/// objects.txt rows are `Dummy` "door blocker") at the monster's position.
+fn barricade_object<H: PopHost + ?Sized>(cx: &mut Ctx<'_, H>, unit: UnitId, class: i32) {
+    let object = if class == 432 { 571 } else { 572 };
+    let Some(room) = cx.host.unit_room(unit) else {
+        return;
+    };
+    let (x, y) = cx.host.unit_position(unit);
+    cx.host.create_object(room, object, x, y);
+}
+
+/// `0x005B24E0(game, boss, class, mode, r, count, flags)` (open question
+/// 4): `count` times `0x005B23C0(game, boss, class, mode, r, flags)` (§9
+/// near the boss, no coordinate record); each created unit gets owner
+/// data with the boss GUID (`0x0058F030(game, unit, GUID, 1, 0, 0)`) and
+/// joins the boss's minion list (`0x0058F100`).
+#[allow(clippy::too_many_arguments)]
+fn group_spawn<H: PopHost + ?Sized>(
+    cx: &mut Ctx<'_, H>,
+    boss: UnitId,
+    class: i32,
+    mode: u8,
+    r: i32,
+    count: i32,
+    flags: u16,
+) {
+    for _ in 0..count.max(0) {
+        if let Some(m) = super::placement::place_near(cx, None, boss, class, mode, r, flags).unit()
+        {
+            cx.host.set_owner_data(m, OwnerKey::Guid(boss), 1, 0, 0);
+            cx.host.add_minion(boss, m);
+        }
+    }
 }
 
 fn never_count_flags<H: ?Sized>(cx: &Ctx<'_, H>, class: i32) -> u16 {
@@ -438,8 +475,10 @@ pub fn superunique<H: PopHost + ?Sized>(
     boss_minions_and_init(cx, boss, min, max, None);
     match rec.hc_idx {
         10 => {
-            // TODO(spec: population.md §11.4 r6): the seed of `roll(5)` and
-            // the mode are not stated; the boss's unit seed and mode 1.
+            // PROVISIONAL (monsters/population.md §11.4 row hcIdx 10): the
+            // `roll(5)` is on the boss's unit seed and the mode is 1;
+            // settled by a Radament spawn RNG recording. HIGH-PRIORITY
+            // CAPTURE (RNG draw order).
             let n = cx.host.unit_seed(boss).roll(5) as i32 + 2;
             for _ in 0..n {
                 let _ = super::placement::place_near(cx, None, boss, 4, 1, 4, flags::NO_PARTY);
@@ -448,14 +487,19 @@ pub fn superunique<H: PopHost + ?Sized>(
                 let _ = super::placement::place_near(cx, None, boss, c, 1, 4, flags::NO_PARTY);
             }
         }
-        42 => cx.host.group_spawn(boss, 453, 1, 20, 20, 0),
+        // Open question 4: (mode, r, count, flags).
+        42 => group_spawn(cx, boss, 453, 1, 20, 20, 0),
         60 => {
-            cx.host.superunique_owner_data(boss);
+            // PROVISIONAL (population.md §11.4 hcIdx 60, open question 4):
+            // the boss's own owner data is `0x0058F030(game, boss, boss
+            // GUID, 1, 0, 0)`, the arguments open question 4 gives for the
+            // group; settled by a bin read of `0x005A49B0` (hcIdx 60 case).
+            cx.host.set_owner_data(boss, OwnerKey::Guid(boss), 1, 0, 0);
             let broom = cx.host.unit_room(boss).unwrap_or(room);
             let c = class_for_level(cx, broom, 453);
-            cx.host.group_spawn(boss, c, 1, 10, 20, flags::NO_PARTY);
+            group_spawn(cx, boss, c, 1, 10, 20, flags::NO_PARTY);
         }
-        62 => cx.host.group_spawn(boss, 381, 1, 20, 10, flags::NO_PARTY),
+        62 => group_spawn(cx, boss, 381, 1, 20, 10, flags::NO_PARTY),
         _ => {}
     }
     cx.host.add_modifier(boss, 22, cx.state);

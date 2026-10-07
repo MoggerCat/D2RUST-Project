@@ -1198,6 +1198,10 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
     fn chain_position(&self, class: i32) -> i32 {
         self.x().ai_chain_index(class)
     }
+    /// [`Pending::ai_class_for_level`] (`0x0063EC70`).
+    fn class_for_level(&self, room: Option<RoomId>, class: i32) -> i32 {
+        self.x().ai_class_for_level(self.cv.game, room, class)
+    }
     fn book_skills(&self, i: UnitId) -> Option<(i32, i32)> {
         self.x().body_book_skills(i)
     }
@@ -1233,8 +1237,15 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
 /// [`crate::wiring::action::ActionHooks::handlers`], GUIDs and list owners
 /// are real; the rest are [`Pending`]'s event seams.
 impl<X: Pending + UseRest> EventWorld for UseView<'_, X> {
+    /// `data/runtime-maps.md` §3 from the body tables' itemstatcost.
     fn layer_split(&self) -> (u32, u32) {
-        self.x().event_layer_split()
+        self.cv
+            .v
+            .h
+            .bodies
+            .as_ref()
+            .and_then(|b| b.layer_split)
+            .unwrap_or_else(|| self.x().event_layer_split())
     }
     /// The list's owner type / GUID (+0x08 / +0x0C) resolved by
     /// `0x00552F60` (the game's unit hash).

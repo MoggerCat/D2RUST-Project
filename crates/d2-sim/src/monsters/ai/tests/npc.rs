@@ -458,12 +458,14 @@ fn npc_out_of_town_portal_setup() {
     w.fake.class.insert(w.mon, 527);
     w.think_with(None, 0, false);
     assert!(w.fake.log.contains(&"quest setup Drehya".to_string()));
-    // Any other class: nothing.
+    // Any other class takes cain1's Act 1 quest 4 functions (`ai-bodies.md`
+    // §9.32, `ai.md` open question 17 AI5).
     let mut w = cain();
     w.fake.class.insert(w.mon, 147);
     w.think_with(None, 0, false);
-    assert!(w.fake.log.is_empty());
-    assert!(w.thinks().is_empty());
+    assert!(w.fake.log.contains(&"quest setup Cain".to_string()));
+    assert_eq!(w.commands(), [[3, 103, 103, 1, 0]]);
+    assert_eq!(w.thinks(), [1]);
 }
 
 // Covers: specs/monsters/ai-bodies.md §9.32 r2, §9.32 r3, §9.32 r4, §9.32 r5, §9.32 r6

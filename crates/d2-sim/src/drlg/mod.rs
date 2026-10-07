@@ -46,7 +46,7 @@ use thiserror::Error;
 pub use active::ActiveRoom;
 pub use collision::CollisionGrid;
 pub use data::{DoorTables, DrlgData, LevelDef, WallClass, WallRemap, WarpDef};
-pub use level::{Drlg, Dungeon, Level, SpawnTile, WarpRecord};
+pub use level::{BuildCursor, Drlg, Dungeon, Level, SpawnTile, WarpRecord};
 pub use logic::{CoordRec, LogicGrids, LogicInfo};
 pub use room::{DrlgRoom, RoomKind, WarpLink};
 pub use seams::{ActRooms, LevelTypes, NoLevelTypes, PresetUnit, Services, TileInfo, TileSource};
