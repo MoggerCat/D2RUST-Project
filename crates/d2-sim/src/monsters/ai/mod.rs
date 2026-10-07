@@ -1,4 +1,4 @@
-// Spec: specs/monsters/ai.md; specs/monsters/ai-bodies.md (§9)
+// Spec: specs/monsters/ai.md; specs/monsters/ai-bodies.md (§9); specs/monsters/ai-bodies-6.md; specs/monsters/ai-bodies-7.md
 //! Monster AI think: scheduling (§1), dispatch and prechecks (§2), the AI
 //! control record and tables (§3), AI parameters (§4), target selection
 //! (§5), distances (§6), tactics helpers (§7), commands (§8) and the
@@ -14,6 +14,8 @@ mod bodies2;
 mod bodies3;
 mod bodies4;
 mod bodies5;
+mod bodies6;
+mod bodies7;
 mod common;
 mod functions;
 mod npc;
@@ -35,12 +37,12 @@ use crate::units::{UnitId, UnitType};
 
 pub use functions::{implemented, run_function, run_init, INIT_IMPLEMENTED};
 pub use seams::{
-    AiActs, AiHost, AiModes, AiQuests, AiSkills, AiTargets, AiUnits, AiWorld, ModeTarget,
-    PortalNpc, QuestCall,
+    AiActs, AiHost, AiModes, AiQuests, AiSkills, AiSummons, AiTargets, AiUnits, AiWorld, HireRow,
+    ModeTarget, PortalNpc, QuestCall, QuestHook,
 };
 pub use table::{AiRecord, AI_TABLE, SPECIAL_TABLE};
 pub use tactics::*;
-pub use target::{main_search, precheck_a, precheck_b, precheck_c};
+pub use target::{main_search, main_search_with, precheck_a, precheck_b, precheck_c};
 
 /// Event types the AI handles (`tick.md` §5.6).
 pub const EVENT_THINK: u8 = 2;
@@ -114,8 +116,9 @@ pub struct AiControl {
     /// +0x34: GUIDs of this leader's minions (written by population
     /// code, `monsters/population.md`).
     pub minions: Vec<u32>,
-    /// +0x38: the Npc map-AI nodes (§9.9); `None` = no record. Who builds
-    /// it is open question 8.
+    /// +0x38: the Npc map-AI nodes (§9.9); `None` = no record. Built from
+    /// the preset's DS1 path by the preset spawn (open question 8,
+    /// `drlg/preset.md` §5, `population.md` §11.1).
     pub map_ai: Option<Vec<MapNode>>,
     /// +0x3C: the minion spawn class (Nihlathak, `ai-bodies-5.md` §23
     /// step 8).

@@ -1,4 +1,4 @@
-// Spec: specs/monsters/ai-bodies-2.md Summary, §2 (pack scan), §11 (land / take off); specs/monsters/ai-bodies-5.md Summary (walk to U, teleport in range); specs/monsters/ai.md §5.4 (scan mode 0), §6
+// Spec: specs/monsters/ai-bodies-2.md Summary, §2 (pack scan), §11 (land / take off), §13.1 (spawn info); specs/monsters/ai-bodies-5.md Summary (walk to U, teleport in range); specs/monsters/ai.md §5.4 (scan mode 0), §6
 //! Helpers the Act II–V bodies share: the scheduling and mode helpers of
 //! the `ai-bodies-*` summaries, the room scan of mode 0 with the unit
 //! tests the scan callbacks use, the pack scan and the Vulture land /
@@ -33,10 +33,7 @@ pub(super) fn mode_point<W: AiHost + ?Sized>(
 }
 
 /// `0x005DDFC0(m, x, y)` / `0x005DE490(x, y, m)`: mode m at the point
-/// with no path step set.
-///
-/// TODO(spec: ai.md §7.1): whether `0x005DDFC0` sets the path step count
-/// is not stated; read as `0x005DE490` ("no path step").
+/// with no path step set (`ai.md` §7.1, open question 14).
 pub(super) fn mode_point_raw<W: AiHost + ?Sized>(
     game: &mut Game,
     cx: &mut Ctx<'_, W>,
@@ -319,4 +316,109 @@ pub(super) fn take_off<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>,
     cx.world.set_path_pattern(u, 5);
     cx.world.set_move_mask(u, 0);
     wait(game, cx, u, 12);
+}
+
+/// What the spawn info `0x0063EFA0` gives (`ai-bodies-2.md` §13.1).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct SpawnInfo {
+    pub class: i32,
+    pub x: i32,
+    pub y: i32,
+    pub mode: u8,
+}
+
+/// "Chain(b)" (`ai-bodies-2.md` §13.1): `0x0054DA60(clamp(b), p)`, the
+/// `BaseId` of row b walked p steps along `NextInClass`
+/// (`monsters/population.md` §11.5 rule 3), p := the chain position of
+/// the unit's class (monstats +0x4B, `0x006510C0`; class −1 → 0).
+pub(super) fn chain<W: AiHost + ?Sized>(cx: &Ctx<'_, W>, u: UnitId, b: i32) -> i32 {
+    walk_chain(cx, base_id(cx, fixed_class(cx, b)), {
+        let class = cx.world.class(u);
+        if class < 0 {
+            0
+        } else {
+            cx.world.chain_index(class)
+        }
+    })
+}
+
+/// `y` walked `n` steps along `NextInClass`.
+fn walk_chain<W: AiHost + ?Sized>(cx: &Ctx<'_, W>, mut y: i32, n: i32) -> i32 {
+    for _ in 0..n.max(0) {
+        y = cx
+            .monstats(y)
+            .map_or(-1, |r| i32::from(r.nextinclass as i16));
+    }
+    y
+}
+
+/// baalclone, the incoming class key 544 tests (`ai-bodies-5.md` §21.3).
+const BAALCLONE: i32 = 570;
+/// State 146 set by the ancient statue key.
+const STATE_146: u16 = 146;
+
+/// The spawn info `0x0063EFA0(unit, &class, &x, &y, &mode, difficulty,
+/// pick 0)` (`ai-bodies-2.md` §13.1), keyed by the unit's `BaseId`.
+/// `class_in` is the incoming class (read by key 544 only).
+pub(super) fn spawn_info<W: AiHost + ?Sized>(
+    game: &Game,
+    cx: &mut Ctx<'_, W>,
+    u: UnitId,
+    class_in: i32,
+) -> SpawnInfo {
+    let class = cx.world.class(u);
+    let key = if is_monster(game, u) && cx.monstats(class).is_some() {
+        let b = base_id(cx, class);
+        if cx.monstats(b).is_some() {
+            b
+        } else {
+            -1
+        }
+    } else {
+        -1
+    };
+    let (ux, uy) = cx.world.position(u);
+    let (tx, ty) = cx.world.path_target_point(u);
+    let at = |class, x, y, mode| SpawnInfo { class, x, y, mode };
+    match key {
+        206 => at(chain(cx, u, 15), ux, uy + 3, 1),
+        228 => {
+            let c = fixed_class(cx, 96);
+            let c = cx.world.class_for_level(game, room_of(game, u), c);
+            at(c, ux, uy + 2, 1)
+        }
+        267 => at(fixed_class(cx, 6), tx, ty, 8),
+        284 => at(chain(cx, u, 68), ux + 8, uy, 8),
+        298 => at(chain(cx, u, 301), tx, ty, 1),
+        321 => {
+            let c = if class == 711 {
+                fixed_class(cx, 712)
+            } else {
+                fixed_class(cx, 19)
+            };
+            at(c, ux, uy, 1)
+        }
+        334 => at(chain(cx, u, 114), ux - 2, uy - 2, 1),
+        484 => at(chain(cx, u, 453), ux, uy + 3, 1),
+        526 | 528 => panic!("spawn info key {key} without a pick (ai-bodies-2.md §13.1, fatal)"),
+        537 => {
+            let c = chain(cx, u, 540);
+            cx.world.set_state(u, STATE_146, true);
+            at(c, ux, uy + 2, 1)
+        }
+        544 => {
+            // `ai-bodies-5.md` §21.3: the incoming class compared with 570.
+            let (c, m) = if class_in == BAALCLONE {
+                (class_in, 1)
+            } else {
+                let r = cx.world.seed(u).roll(2) as i32 + i32::from(cx.info.difficulty);
+                let c = walk_chain(cx, base_id(cx, fixed_class(cx, 562)), r);
+                (c, 4)
+            };
+            let x = ux + cx.world.seed(u).roll(24) as i32 - 12;
+            let y = uy + cx.world.seed(u).roll(24) as i32 - 12;
+            at(c, x, y, m)
+        }
+        _ => at(fixed_class(cx, 0), 0, 0, 1),
+    }
 }

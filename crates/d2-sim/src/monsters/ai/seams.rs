@@ -1,5 +1,6 @@
 // Spec: specs/monsters/ai.md (Related specs; the seams to other systems)
 // Spec: specs/monsters/ai-bodies.md (§9, split out of `ai.md`)
+// Spec: specs/monsters/ai-bodies-6.md; specs/monsters/ai-bodies-7.md (the `AiSummons` seams)
 //! What AI code needs from systems owned by other specs. Each trait names
 //! its expected provider; tests use small fakes. The decisions (draws,
 //! tests, delays) stay in the AI modules.
@@ -147,8 +148,8 @@ pub trait AiWorld {
     fn in_melee_range(&self, game: &Game, a: UnitId, b: UnitId) -> bool;
     /// `0x005DC640`: "can reach directly" (geometry D2MOO's, §6).
     fn can_reach_directly(&self, game: &Game, unit: UnitId, target: UnitId) -> bool;
-    /// `0x0054DC40`: a free spot for a teleport; its own draws (ai.md open
-    /// question 4). Returns the spot and its room.
+    /// `0x0054DC40`: a free spot for a teleport; its own draws on the room
+    /// seed (`monsters/population.md` §8). Returns the spot and its room.
     fn find_spot(&mut self, game: &mut Game, unit: UnitId) -> Option<(i32, i32, RoomId)>;
     /// The four last-dead GUIDs of a room (room +0x38..+0x44), as units.
     fn last_dead(&self, game: &Game, room: RoomId) -> [Option<UnitId>; 4];
@@ -478,9 +479,6 @@ pub trait AiActs {
         spread: i32,
         flags: u32,
     ) -> Option<UnitId>;
-    /// The class the spawn info `0x0063EFA0` gives SandMaggotQueen
-    /// (`0x0054DA60(68, …)`, `ai-bodies-2.md` open question 4).
-    fn queen_spawn_class(&self, unit: UnitId) -> i32;
     /// `0x0057CCB0(game, unit, killer, 1)` (`combat/damage.md` §7.2).
     fn kill(&mut self, game: &mut Game, unit: UnitId, killer: Option<UnitId>);
     /// The unit leaves its room and is removed (`0x0061A270`,
@@ -512,10 +510,331 @@ pub trait AiActs {
     fn quest_call(&mut self, game: &mut Game, unit: UnitId, call: QuestCall) -> bool;
 }
 
-/// Everything AI code needs.
-pub trait AiHost: AiUnits + AiModes + AiWorld + AiTargets + AiSkills + AiQuests + AiActs {}
+/// One hireling.txt row as the hireling skill pick reads it
+/// (`ai-bodies-6.md` §7 step 7, `world/hirelings.md` §1.2).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct HireRow {
+    /// `Level`.
+    pub level: i32,
+    /// `DefaultChance` (+0x64).
+    pub default_chance: i32,
+    /// `Skill1`..`Skill6` (+0x78 + 4i).
+    pub skill: [i32; 6],
+    /// `Chance1`..`Chance6` (+0x90 + 4i).
+    pub chance: [i32; 6],
+    /// `ChancePerLvl1`..`ChancePerLvl6` (+0xA8 + 4i).
+    pub chance_per_lvl: [i32; 6],
+    /// `Mode1`..`Mode6` (+0xC0 + i).
+    pub mode: [u8; 6],
+}
 
-impl<T: AiUnits + AiModes + AiWorld + AiTargets + AiSkills + AiQuests + AiActs + ?Sized> AiHost
-    for T
+/// Quest seams of the one-row AIs (`ai-bodies-6.md` §11,
+/// `ai-bodies-7.md` §7, §12, §24; `world/quests-act2.md` …
+/// `-act5.md`). The result is the call's return value where it has one.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum QuestHook {
+    /// `0x0059DF50(game, unit)`: Tyrael (class 251) may leave.
+    TyraelLeave,
+    /// `0x0059C750(game)`: Tyrael left.
+    TyraelGone,
+    /// `0x005B43F0(game, unit)`: Izual's ghost (class 406) may leave.
+    IzualGhostLeave,
+    /// `0x005B4440(game)`: Izual's ghost left.
+    IzualGhostGone,
+    /// `0x0059B8B0(game)`: the palace door is open (JarJar).
+    PalaceDoorOpen,
+    /// `0x0059AEC0(game)`: the palace guard steps aside (JarJar §7 step 3.2).
+    PalaceGuardAside,
+    /// `0x005BD4A0(game, unit)`: the Dark Wanderer's minion hook.
+    DarkWandererGone,
+    /// `0x00588830(game, unit)`: a caged barbarian leaves (Wussie).
+    WussieLeaving,
+    /// `0x00588880(game, 0, unit)`: the barbarian left.
+    WussieLeave,
+    /// `0x00588E10(game, P, unit)`: P can rescue the barbarian.
+    WussieCanRescue,
+    /// `0x005888D0(game, P, unit)`: rescue.
+    WussieRescue,
+    /// `0x00588DD0(game, P, unit)`: the barbarian waits for P.
+    WussieWait,
+}
+
+/// Seams of the bodies of `ai-bodies-6.md` and `ai-bodies-7.md` (pets,
+/// hirelings, summons, traps, spawners, quest NPCs). Every method has a
+/// narrow default (nothing found, nothing done) until its owner wires
+/// it; the owners are named per method.
+pub trait AiSummons {
+    // ---- paths (`sim/pathing.md`) ----
+
+    /// The path's final point (path +0x18 / +0x1A, `0x00648A20` /
+    /// `0x00648A30`): where the unit is heading. Default: (0, 0).
+    fn path_final_point(&self, _unit: UnitId) -> (i32, i32) {
+        (0, 0)
+    }
+    /// The path's target point (path +0x10 / +0x12). Default: (0, 0).
+    fn path_target_point(&self, _unit: UnitId) -> (i32, i32) {
+        (0, 0)
+    }
+    /// Boss pick slot 9 with no best (`ai-bodies-4.md` §7.1 step 3): path
+    /// target unit := 0 (type and GUID kept), path type 2, the path
+    /// computed toward its stored target point; whether it has points.
+    /// Default: none.
+    fn path_has_points_no_target(&mut self, _game: &mut Game, _unit: UnitId) -> bool {
+        false
+    }
+    /// `0x00648AD0`: the path target point := (x, y).
+    fn set_path_target_point(&mut self, _unit: UnitId, _x: i32, _y: i32) {}
+    /// `0x00621DC0` → `0x0064FDC0`: the 64-step direction from the unit's
+    /// position to (x, y). Default: 0.
+    fn direction64_to(&self, _unit: UnitId, _x: i32, _y: i32) -> i32 {
+        0
+    }
+    /// `0x006488A0(path, dir)`: snaps the path direction. Default: none.
+    fn snap_direction(&mut self, _unit: UnitId, _dir: i32) {}
+    /// `0x00622AA0(a, b, mask)`: the line a→b is blocked for `mask`
+    /// (`render/draw-order-2.md` §15–16). Default: clear.
+    fn line_blocked_mask(&self, _game: &Game, _a: UnitId, _b: UnitId, _mask: u16) -> bool {
+        false
+    }
+
+    // ---- rooms and placement (DRLG, `sim/path-placement.md`,
+    // `monsters/population.md`) ----
+
+    /// `0x0061B130(room, x, y)`: the coordinate index at (x, y). Default: 0.
+    fn coord_index(&self, _game: &Game, _room: Option<RoomId>, _x: i32, _y: i32) -> i32 {
+        0
+    }
+    /// `0x0061AD30(room, x, y)`: the spot class argument of the free spot
+    /// search. Default: 0.
+    fn spot_class(&self, _game: &Game, _room: Option<RoomId>, _x: i32, _y: i32) -> i32 {
+        0
+    }
+    /// `0x0054DC40(game, room, cl, class, &x, &y, 0)`
+    /// (`monsters/population.md` §8, room-seed draws). Default: none.
+    fn free_spot(
+        &mut self,
+        _game: &mut Game,
+        _room: Option<RoomId>,
+        _cl: i32,
+        _class: i32,
+    ) -> Option<(i32, i32)> {
+        None
+    }
+    /// `0x0064E7E0(room, &pt, size, mask, n)`: a free point near (x, y).
+    /// Default: none.
+    #[allow(clippy::too_many_arguments)]
+    fn free_point_masked(
+        &mut self,
+        _game: &mut Game,
+        _room: Option<RoomId>,
+        _x: i32,
+        _y: i32,
+        _size: i32,
+        _mask: u16,
+        _n: i32,
+    ) -> Option<(i32, i32)> {
+        None
+    }
+    /// `0x00619730`: the room's sub-tile box (x, y, w, h). Default: none.
+    fn room_box(&self, _game: &Game, _room: RoomId) -> Option<(i32, i32, i32, i32)> {
+        None
+    }
+    /// `0x005429B0(game, R, x, y, class)`: a dead monster of `class` in the
+    /// room at (x, y) (or an inactive record with the dead bit). Default:
+    /// false.
+    fn class_dead_at(&self, _game: &Game, _room: RoomId, _x: i32, _y: i32, _class: i32) -> bool {
+        false
+    }
+    /// The unit's target-node slot (unit +0xD0); 11 = none. Default: 11.
+    fn target_slot(&self, _unit: UnitId) -> i32 {
+        11
+    }
+    /// `0x005B1990(game, unit, 0, slot)`: a node pushed at the head of the
+    /// game's target-node list `slot`; unit +0xD0 := slot.
+    fn register_target_node(&mut self, _game: &mut Game, _unit: UnitId, _slot: i32) {}
+    /// Unit flags 2 (unit +0xC8) |= `mask`.
+    fn set_unit_flags2(&mut self, _unit: UnitId, _mask: u32) {}
+    /// The trap kind cached in the unit's level's monster region (+0x2D4,
+    /// `ai-bodies-7.md` §5); −1 = unset. Default: −1.
+    fn trap_kind(&self, _game: &Game, _unit: UnitId) -> i32 {
+        -1
+    }
+    /// Stores the trap kind in the unit's level's monster region.
+    fn set_trap_kind(&mut self, _game: &mut Game, _unit: UnitId, _kind: i32) {}
+    /// The monster classes of the unit's level's monster region (+0x14 +
+    /// 0x34·i, count +0x10; `monsters/population.md` §2.2). Default: none.
+    fn region_classes(&self, _game: &Game, _unit: UnitId) -> Vec<i32> {
+        Vec::new()
+    }
+
+    // ---- players and pets (`sim/pets.md`, `world/hirelings.md`) ----
+
+    /// Player data +0xA0 (next index) and +0xA8 (the 20 position history
+    /// entries, `sim/path-placement.md` §10 rule 7). Default: empty.
+    fn position_history(&self, _player: UnitId) -> (usize, [(i32, i32); 20]) {
+        (0, [(0, 0); 20])
+    }
+    /// Player data +0x148 / +0x14C: the last placed point. Default: (0, 0).
+    fn last_placed_point(&self, _player: UnitId) -> (i32, i32) {
+        (0, 0)
+    }
+    /// `0x00574DE0`: the living units of the owner's pet lists (types 1 …
+    /// count − 1, nodes without flag bit 0), in list order. Default: none.
+    fn pets(&self, _game: &Game, _owner: UnitId) -> Vec<UnitId> {
+        Vec::new()
+    }
+    /// `0x00574F40`: the owner's total pet count. Default: 0.
+    fn pet_count(&self, _owner: UnitId) -> i32 {
+        0
+    }
+    /// `0x00574A20`: the unit's pet type in the owner's lists; −1 = none.
+    fn pet_type_of(&self, _game: &Game, _owner: UnitId, _unit: UnitId) -> i32 {
+        -1
+    }
+    /// `0x00574BD0`: the hireling `Id` (+8 of the record) of the unit's
+    /// node in the owner's pet lists. Default: none.
+    fn hireling_id(&self, _game: &Game, _owner: UnitId, _unit: UnitId) -> Option<i32> {
+        None
+    }
+    /// `0x006562F0(game +0x70, id, level)`: the hireling row. Default: none.
+    fn hireling_row(&self, _game: &Game, _id: i32, _level: i32) -> Option<HireRow> {
+        None
+    }
+    /// `0x00622560`: the unit's attack rating. Default: 0.
+    fn attack_rating(&self, _unit: UnitId) -> i32 {
+        0
+    }
+    /// `0x00535BC0` + `0x00645830(unit, weapon, 0, 0)`: the weapon mastery
+    /// to-hit of the unit's weapon; `None` without a weapon.
+    fn mastery_tohit(&self, _unit: UnitId) -> Option<i32> {
+        None
+    }
+
+    // ---- skills (`skills/bodies.md`, `skills/use.md`) ----
+
+    /// `0x00646CA0(unit, calc, skill, level)`: a skills calc column
+    /// (`data/calc-expressions.md`). Default: 0.
+    fn skill_calc(&self, _unit: UnitId, _skill: i32, _calc: u32, _level: i32) -> i32 {
+        0
+    }
+    /// The mode of the unit's entry of `skill` with owner −1
+    /// (`0x006439B0`, entry +0x08). Default: none.
+    fn entry_mode(&self, _unit: UnitId, _skill: i32) -> Option<u8> {
+        None
+    }
+    /// `0x006442A0(unit, entry, 0)`: the base level of the unit's entry
+    /// of `skill`. Default: none.
+    fn skill_base_level(&self, _unit: UnitId, _skill: i32) -> Option<i32> {
+        None
+    }
+    /// The unit's skill list (`0x00643910` / `0x006438F0`), in list order:
+    /// skill id and level with bonus. Default: empty.
+    fn unit_skills(&self, _unit: UnitId) -> Vec<(i32, i32)> {
+        Vec::new()
+    }
+    /// The unit has a skill list (unit +0xA8). Default: false.
+    fn has_skill_list(&self, _unit: UnitId) -> bool {
+        false
+    }
+    /// The class skill list of a player class (data tables +0xBA4 /
+    /// +0xBAC, `0x00646140` / `0x006460F0`). Default: empty.
+    fn class_skills(&self, _class: i32) -> Vec<i32> {
+        Vec::new()
+    }
+    /// `0x005701B0(unit, skill, −1)`: make `skill` the right skill.
+    fn make_right_skill(&mut self, _game: &mut Game, _unit: UnitId, _skill: i32) {}
+    /// `0x00643BC0` (left) / `0x00643C50` (right): the hand skill := the
+    /// unit's entry of `skill`.
+    fn set_hand_skill(&mut self, _unit: UnitId, _skill: i32, _right: bool) {}
+    /// `0x0064F460(unit)`: the "both" range (3) reads as ranged (2) when
+    /// set (`0x00645460`). Default: false.
+    fn ranged_both(&self, _unit: UnitId) -> bool {
+        false
+    }
+    /// `0x0056EDE0(game, owner, skill, level, missile, x, y)`: a skill
+    /// missile from `owner` (`missiles/bodies.md`). Default: none.
+    #[allow(clippy::too_many_arguments)]
+    fn skill_missile(
+        &mut self,
+        _game: &mut Game,
+        _owner: UnitId,
+        _skill: i32,
+        _level: i32,
+        _missile: i32,
+        _x: i32,
+        _y: i32,
+    ) -> Option<UnitId> {
+        None
+    }
+    /// `0x00621CE0(a, b)`: a stores b as its owner.
+    fn link_owner(&mut self, _game: &mut Game, _a: UnitId, _b: UnitId) {}
+    /// `0x005D2F80(game, unit, ·, n)`: the corpse search (unit find flags
+    /// 0x1002, size n around the unit; corpse test `0x00623600`, hostile
+    /// `0x00554200`): the first match. Default: none.
+    fn corpse_find(&mut self, _game: &mut Game, _unit: UnitId, _n: i32) -> Option<UnitId> {
+        None
+    }
+
+    // ---- states (`sim/stat-lists.md`) ----
+
+    /// `0x005EB7F0`: a state of the same `group` (states +0x1E) as
+    /// `state` is active on the unit. Default: false.
+    fn state_group_active(&self, _unit: UnitId, _state: i32) -> bool {
+        false
+    }
+    /// `0x0063A2B0`: the unit has a `pgsv` state (state flag bit 4).
+    fn has_pgsv_state(&self, _unit: UnitId) -> bool {
+        false
+    }
+    /// The value of `stat` in the stat list of the unit's `state`
+    /// (`0x006256B0`); `None` without the list or the stat.
+    fn state_stat(&self, _unit: UnitId, _state: i32, _stat: i32) -> Option<i32> {
+        None
+    }
+    /// `0x005A0180`: the monster type flags (8 unique, …). Default: 0.
+    fn monster_type_flags(&self, _unit: UnitId) -> u32 {
+        0
+    }
+
+    // ---- quests and messages (`world/quests.md` and its act files) ----
+
+    /// A quest hook; the result where the call returns one. Default: 0.
+    fn quest_hook(
+        &mut self,
+        _game: &mut Game,
+        _unit: UnitId,
+        _player: Option<UnitId>,
+        _hook: QuestHook,
+    ) -> bool {
+        false
+    }
+    /// `0x0059B8F0(game, &(x, y))`: nonzero and the (possibly moved) point.
+    /// Default: (false, x, y).
+    fn palace_guard_point(&mut self, _game: &mut Game, x: i32, y: i32) -> (bool, i32, i32) {
+        (false, x, y)
+    }
+    /// `0x005BD0D0(game, unit, &x, &y)`: the Dark Wanderer's walk target.
+    fn dark_wanderer_target(&mut self, _game: &mut Game, _unit: UnitId) -> Option<(i32, i32)> {
+        None
+    }
+    /// `0x00588D60(game, unit, &P)`: `None` = no rescue portal; else the
+    /// portal unit P (`None` = 0).
+    fn rescue_portal(&mut self, _game: &mut Game, _unit: UnitId) -> Option<Option<UnitId>> {
+        None
+    }
+    /// S→C 0x8A NpcWantsInteract {1, the unit's GUID} to the player's
+    /// client (`0x005531C0`, `0x0053DFF0`).
+    fn npc_wants_interact(&mut self, _game: &mut Game, _player: UnitId, _unit: UnitId) {}
+}
+
+/// Everything AI code needs.
+pub trait AiHost:
+    AiUnits + AiModes + AiWorld + AiTargets + AiSkills + AiQuests + AiActs + AiSummons
+{
+}
+
+impl<
+        T: AiUnits + AiModes + AiWorld + AiTargets + AiSkills + AiQuests + AiActs + AiSummons + ?Sized,
+    > AiHost for T
 {
 }
