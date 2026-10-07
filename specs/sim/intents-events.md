@@ -14,7 +14,12 @@
   (branch `claude/phase3-server`), wired to `d2-proto` and `d2-sim`
   through adapters (`claude/phase3-wiring`; intent handlers are stubs
   until their system specs exist); the synthetic vectors pass as unit
-  tests; not yet run on a recording.
+  tests; not yet run on a recording. §7.4 / §7.7 (the monster mode
+  message, S→C 0x67–0x6D, and the death pair 0x69 codes 8 / 9) and the
+  flag part of §7.5 are implemented in `d2-sim`
+  (`monsters::mode_message`, `wiring::action::unit_update`; branch
+  `claude/impl-monster-death`): the §7.4 / §7.7 Test vectors pass as unit
+  tests; unverified against a recording of the wired host.
 - **Target version:** 1.14d
 - **Crate/module:** `d2-proto` (message ids, sizes, layouts: the two TSVs);
   `d2-server` (queues, drain, dispatch gate, per-client buffers, flush);
@@ -29,24 +34,24 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 52–68 |
-| Inputs | 69–77 |
-| Outputs / state changes | 78–84 |
-| Rules | 85–86 |
-|   1. Loop order (single player) | 87–108 |
-|   2. Client → server | 109–278 |
-|   3. Server → client | 279–378 |
-|   4. d2rs mapping and scope | 379–406 |
-|   5. Machine-readable tables | 407–443 |
-|   6. Exact-match comparison | 444–481 |
-|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 482–843 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 844–960 |
-| Constants & data dependencies | 961–979 |
-| Randomness | 980–985 |
-| Edge cases & original bugs | 986–1019 |
-| Test vectors | 1020–1083 |
-| Provenance | 1084–1159 |
-| Open questions | 1160–1216 |
+| Summary | 57–73 |
+| Inputs | 74–82 |
+| Outputs / state changes | 83–89 |
+| Rules | 90–91 |
+|   1. Loop order (single player) | 92–113 |
+|   2. Client → server | 114–283 |
+|   3. Server → client | 284–383 |
+|   4. d2rs mapping and scope | 384–411 |
+|   5. Machine-readable tables | 412–448 |
+|   6. Exact-match comparison | 449–486 |
+|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 487–848 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 849–965 |
+| Constants & data dependencies | 966–984 |
+| Randomness | 985–990 |
+| Edge cases & original bugs | 991–1024 |
+| Test vectors | 1025–1088 |
+| Provenance | 1089–1164 |
+| Open questions | 1165–1221 |
 <!-- /index -->
 
 ## Summary

@@ -29,6 +29,7 @@ pub mod objects;
 pub mod pending;
 pub mod reaction;
 pub mod rooms;
+pub mod unit_update;
 pub mod units;
 pub mod vitals_sync;
 pub mod waypoints;
@@ -105,6 +106,9 @@ pub enum WiringError {
     Place(crate::path::place_seams::PlaceError),
     /// An object fatal assert (`world/objects.md`).
     Object(crate::world::objects::ObjectError),
+    /// The monster mode message (`sim/intents-events.md` §7.4): a fatal
+    /// assert or a message the spec gives no layout for.
+    ModeMessage(unit_update::ModeMessageError),
 }
 
 /// The [`crate::units::hooks::UnitHooks`] of [`ActionSim`]'s unit system

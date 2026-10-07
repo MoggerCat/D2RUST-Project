@@ -118,13 +118,16 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
 
     /// Monster mode functions (`units.md` §4.6): the death start
     /// `0x005A6FF0` goes to [`Pending::monster_death_start`] with the
-    /// mode change's target; every other function keeps the default
-    /// (started, nothing done: monster spec).
+    /// mode change's target; DT's event functions `0x005A7350` /
+    /// `0x005A72B0` end the death in mode 12 (`intents-events.md` §7.7
+    /// rule 3, [`super::unit_update::death_function`]); every other
+    /// function keeps the default (started, nothing done: monster spec).
     fn monster_mode_function(&mut self, sim: &mut Sim<'_>, unit: UnitId, address: u32) -> bool {
         if address == MONSTER_MODES[0].start {
             let target = self.mode_target;
             return X::monster_death_start(self, sim, unit, target);
         }
+        super::unit_update::death_function(self, sim, unit, address);
         true
     }
 
