@@ -779,7 +779,7 @@ Aura; run by the aura timer and the immediate run (`use.md` §7).
    unit, 0, 0, eval(aurarangecalc), aurafilter, callback, context,
    noaura = 1)` (§2.12). Then, for a player with cost > 0: count > 0 →
    state 85 on and `0x0056C110(unit, cost)` (players only; blood mana
-   state 114 → `0x005D2B60`, `levels.md` Open question 8; mana < cost
+   state 114 → `0x005D2B60`, `levels.md` §4 `pay_with_life`; mana < cost
    → nothing; else mana −= cost (`0x006272B0`); result ignored); count
    = 0 → state 85 off.
 7. Return 1.

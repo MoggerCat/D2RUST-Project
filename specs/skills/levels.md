@@ -26,15 +26,15 @@
 |   1. Skill level | 71–125 |
 |   2. Special values | 126–171 |
 |   3. Skill damage | 172–288 |
-|   4. Mana cost | 289–310 |
-|   5. To-hit | 311–318 |
-|   6. Learning a skill | 319–346 |
-| Constants & data dependencies | 347–369 |
-| Randomness | 370–381 |
-| Edge cases & original bugs | 382–404 |
-| Test vectors | 405–441 |
-| Provenance | 442–461 |
-| Open questions | 462–483 |
+|   4. Mana cost | 289–328 |
+|   5. To-hit | 329–336 |
+|   6. Learning a skill | 337–364 |
+| Constants & data dependencies | 365–387 |
+| Randomness | 388–399 |
+| Edge cases & original bugs | 400–422 |
+| Test vectors | 423–465 |
+| Provenance | 466–489 |
+| Open questions | 490–512 |
 <!-- /index -->
 
 ## Summary
@@ -306,6 +306,24 @@ are below the maximum by at least one 1/256 point.
   `blood_mana` → pay with life (`0x005D2B60(unit, c)`); else `mana < c`
   → 0, nothing deducted; else `mana −= c` → 1. (D2MOO's "cost 0 at level
   1" does not hold in 1.14d.) When it runs: `skills/use.md`.
+- **Blood-mana payment** `pay_with_life(unit, c)` = `0x005D2B60` (ECX
+  unit, EDX c in 1/256 points; returned by `consume_mana`, ignored by
+  the aura tick `0x0056C110`, `bodies.md` §4.5 step 6). L = the unit's
+  state-114 list (`0x006256B0(unit, 114)`), k = L's skill id (list
+  +0x1C, `0x006260E0`; no null test: the callers test the state first).
+  1. life total (stat 6, `0x00625480(unit, 6, 0)`) < c (signed): L, if
+     any, is detached and freed (`sim/stat-lists.md` §8.2, §8.3 plain
+     free `0x00626CD0`; the state's remove callback ends `blood_mana`),
+     then base life := 256 (1 point; set `0x00627260(unit, 6, 0x100,
+     0)`); return 0 (nothing paid, the skill fails).
+  2. Else base life += −c (`0x006272B0(unit, 6, −c, 0)`). Then, with
+     k's skills record (k outside 0…count − 1 → none; a none record is
+     read anyway, a fault: unreachable since the list always carries
+     the casting curse's id): life total < `Param5` (+0x158) << 8 → L,
+     if any, is detached and freed as in step 1 (the curse breaks once
+     life falls under `Param5` points). Return 1.
+  In 1.14d the only state-114 skill is Blood Mana (id 310, `Param5` =
+  40), so the curse ends when the cursed unit's life drops below 40.
 - There is no mana-cost-reduction stat in 1.14d.
 
 ### 5. To-hit
@@ -435,6 +453,12 @@ Synthetic: `DM(1, 25, 70)`: q = 110/7 = 15, r = 15 × 45 / 100 = 6, 31.
 `bracket(29, 1, 2, 3, 4, 5)` = 7 + 16 + 18 + 24 + 5 = 70. Mastery and
 synergy use `pct` (`combat/damage.md` vectors).
 
+Synthetic `pay_with_life` (Blood Mana, `Param5` 40 → threshold 10,240):
+life 100 pt (25,600), c = 1,280 → life 24,320, curse kept, 1; life 45
+pt (11,520), c = 1,280 → 10,240, kept (not below), 1; c = 1,536 →
+9,984 < 10,240, curse removed, 1; life 4 pt (1,024), c = 1,280 → curse
+removed, base life := 256, 0.
+
 Mechanical check (M05, to add with the code): `skillcalc.tsv` and
 `misscalc.tsv` index/code columns equal the 1.14d `skillcalc.bin` /
 `misscalc.bin` code order (`data/calc-expressions.md` §5).
@@ -458,6 +482,10 @@ Mechanical check (M05, to add with the code): `skillcalc.tsv` and
 - 1.14d `skills.txt`, `skilldesc.txt`, `missiles.txt` (`patch_d2`) for
   counts and examples; 13,720 sampled (level, params) cases differ
   between the 1.14d and D2MOO DM orders.
+- `pay_with_life` read from `0x005D2B60`–`0x005D2C1D` (callers
+  `0x0056C0CA`, `0x0056C131`); 1.14d `skills.txt` row Blood Mana (310):
+  `auratargetstate` `blood_mana`, `Param5` 40; `states.txt` row 114
+  `blood_mana` is referenced by no other skill row.
 
 ## Open questions
 
@@ -477,6 +505,7 @@ Mechanical check (M05, to add with the code): `skillcalc.tsv` and
 7. `0x00623990`, `0x0063D340`, `0x00625EF0`, `0x00625E60` (weapon,
    wield type, item damage getters) named from D2MOO use: stats/items
    specs.
-8. Blood-mana life payment `0x005D2B60`: rule unspecified.
+8. Answered: blood-mana life payment `0x005D2B60` is specified in §4
+   (`pay_with_life`).
 9. DM with `b < a` overshoots below `b`; whether any 1.14d dm user has
    `Param_b < Param_a` was not measured.
