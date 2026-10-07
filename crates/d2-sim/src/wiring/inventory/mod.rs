@@ -77,6 +77,13 @@ pub enum InvError {
     /// A step whose rule the spec does not write (named); the call stops
     /// there.
     Unwritten(&'static str),
+    /// The item copy (`0x0055A2A0`) was given a source on the ground
+    /// (`world/vendors-2.md` §7.3 step 1.1): a caller error; no copy.
+    GroundCopySource(UnitId),
+    /// Placement into a page (`0x00560200`) was given an item that is
+    /// still in a room (`items/inventory.md` §2.4 rule 2): a caller error;
+    /// not placed.
+    PlacedWithRoom(UnitId),
 }
 
 /// The inventory state of a game: one [`Inventory`] per unit that owns

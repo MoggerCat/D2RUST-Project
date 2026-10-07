@@ -74,6 +74,25 @@ fn place_runs_section_2_4() {
     assert!(!w.desk(|d| d.place(p, gu, (0, 0), true, true)));
     assert_eq!(w.mode(g), 3);
     assert!(!w.state.holds(p, gu));
+    assert_eq!(w.state.errors, Vec::new());
+}
+
+/// §2.4 rule 2: an item in cursor mode that is still in a room (only an
+/// item copy from a ground source could be one) is a caller error:
+/// recorded, not placed, left in its room.
+// Covers: specs/items/inventory.md §2.4 r2
+#[test]
+fn placing_an_item_with_a_room_is_a_caller_error() {
+    let mut w = World::new();
+    let p = w.player;
+    let g = w.ground_item(CAP, 11, 11);
+    let gu = w.unit(g).unwrap();
+    w.units.get_mut(gu).unwrap().mode = 4;
+    w.items.get_mut(gu).unwrap().inv_page = 0;
+    assert!(!w.desk(|d| d.place(p, gu, (0, 0), true, true)));
+    assert!(w.in_room(g));
+    assert!(!w.state.holds(p, gu));
+    assert_eq!(w.state.errors, [InvError::PlacedWithRoom(gu)]);
 }
 
 /// §1.4 unlink by unit, then the free: the cells are cleared, the unit

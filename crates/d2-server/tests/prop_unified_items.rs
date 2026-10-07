@@ -103,7 +103,7 @@ use d2_sim::units::{RoomId, UnitId, UnitType};
 use d2_sim::wiring::action::{ActionHooks, ActionSim, ActionTables, DrlgWorld, Pending};
 use d2_sim::wiring::economy::{GameFields, ItemSpawn, QuestRest};
 use d2_sim::wiring::interaction::{HirelingRest, NpcRest, PlayerQuestsRef, VendorRest};
-use d2_sim::wiring::inventory::InvRest;
+use d2_sim::wiring::inventory::{InvError, InvRest};
 use d2_sim::world::cube::{
     input_flags, kind as cube_kind, CraftMod, CubeData, InputSlot, ItemRecord, OutputSlot, Recipe,
 };
@@ -2028,6 +2028,40 @@ fn faults(h: &Host) -> Vec<String> {
     e
 }
 
+/// A buy (0x32) with t ∉ {0, 2} skips the "item is offered" test
+/// (`vendors.md` §7.1 rule 2, edge case 3), so it can name a ground item;
+/// the copy of a ground source is a caller error (`vendors-2.md` §7.3
+/// step 1.1): the copy is refused (rule 9.2: code 9, result 1) and the
+/// error recorded. Expected here (changed 2026-10-08 from a copy left both
+/// on the ground and in the backpack): nothing moves, and the recorded
+/// error names an item that was on the ground before the op; it is taken
+/// out of the faults. Any other `GroundCopySource` stays a fault.
+fn expect_ground_buy_refusal(
+    h: &mut Host,
+    op: &Op,
+    before: &Snap,
+    after: &Snap,
+) -> Result<(), String> {
+    if !matches!(op, Op::Msg { id: 0x32, .. }) {
+        return Ok(());
+    }
+    let errors = &mut h.sim.world.inventory.as_mut().unwrap().state.errors;
+    let mut refused = Vec::new();
+    errors.retain(|e| match e {
+        InvError::GroundCopySource(u)
+            if before.get(u).is_some_and(|(p, _)| *p == Place::Ground) =>
+        {
+            refused.push(*u);
+            false
+        }
+        _ => true,
+    });
+    if !refused.is_empty() && before != after {
+        return Err(format!("refused buy of ground {refused:?} moved items"));
+    }
+    Ok(())
+}
+
 /// The mode a [`Place::Limbo`] item may be left in by the op's paths.
 fn limbo_mode(op: &Op) -> Option<u8> {
     match op {
@@ -2053,6 +2087,8 @@ fn run(seed: u32, ops: &[Op]) -> Result<(), String> {
             check_state(&mut h, limbo_mode(op)).map_err(|e| format!("op {i} {op:?}: {e}"))?;
         let after = snap(&h, after);
         check_stream(&h, &before, &after, &stale, (&direct, &ticked))
+            .map_err(|e| format!("op {i} {op:?}: {e}"))?;
+        expect_ground_buy_refusal(&mut h, op, &before, &after)
             .map_err(|e| format!("op {i} {op:?}: {e}"))?;
         let f = faults(&h);
         if !f.is_empty() {
@@ -2448,4 +2484,42 @@ fn auto_pickup_with_auto_equip_leaves_the_item_nowhere() {
     assert_eq!(h.sim.game.lists.unit(cap).unwrap().room(), None);
     assert!(h.inv().state.body_items(h.player).is_empty());
     assert!(faults(&h).is_empty(), "{:?}", faults(&h));
+}
+
+/// Counterexample kept (seed 271983823; `docs/handoff/
+/// prop-unified-items.md` Q4): a buy with t = 1 naming a ground item
+/// (`vendors.md` §7.1 edge case 3) used to copy it into the backpack while
+/// it stayed on the ground (one item in two places). The copy of a ground
+/// source is now refused (`vendors-2.md` §7.3 step 1.1): the item stays on
+/// the ground alone, the 0x2A answers code 9.
+#[test]
+fn buying_a_ground_item_is_refused() {
+    let mut h = host(271983823);
+    h.frame(&Op::OpenTrade);
+    h.frame(&Op::Spawn(0));
+    let before = check_state(&mut h, None).unwrap();
+    let ground: Vec<UnitId> = before
+        .iter()
+        .filter(|(_, p)| **p == Place::Ground)
+        .map(|(u, _)| *u)
+        .collect();
+    let (d, _) = h.frame(&Op::Msg {
+        id: 0x32,
+        a: 204,
+        b: 0,
+        x: 91,
+        y: 0,
+    });
+    let errors = &h.inv().state.errors;
+    assert!(
+        matches!(errors[..], [InvError::GroundCopySource(u)] if ground.contains(&u)),
+        "{errors:?}"
+    );
+    assert!(
+        d.iter()
+            .any(|m| m.len() == 15 && m[..3] == [0x2A, 0, 9] && m[7..11] == [0xFF; 4]),
+        "{d:02X?}"
+    );
+    let after = check_state(&mut h, None).unwrap();
+    assert_eq!(before, after);
 }
