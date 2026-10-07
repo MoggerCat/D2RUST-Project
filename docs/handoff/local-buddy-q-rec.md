@@ -13,6 +13,7 @@ Queue numbers are `docs/HANDOFF.md` §5 "Local run queue".
 |---|---|---|---|---|---|
 | 85 | game +0x80 in 0x03 | **done: all three equal** | `join1.jsonl`, `join1-packets.jsonl` (5,995 events) | `check_packets.py` **OK** (no 0x3E) | `0x00546C60` result = game +0x80 = 0x03 u32@8 = **0xF74A29B4** |
 | 83 | client room seeds | **recorded** (d2rs bridge replay is the cloud's) | same files | as 85 | 32 client monster creations, all at non-zero points; 32 / 32: the room's seed stepped exactly once and unit +0x28 = the new `lo'`; fresh client rooms hold `{x, 666}` |
+| 80 | hireling teleport follow | **done** (town portal, both ways) | `tp80-packets.jsonl` (16,358 events; side file of `tp80-spawn.jsonl`, no spawn made) | `check_packets.py` **OK** (no 0x3E) | per teleport: the merc's 0x0A in the input phase of the C→S 0x13, its 0xAC at the destination in the next tick before the player's 0x15; a merc 0x15 one frame later only on the first teleport |
 
 ## 85: game +0x80 in 0x03
 
@@ -56,3 +57,37 @@ numbers 2–5 reused), every one at a non-zero point.
   unit (GUID, class, point, seed, init seed, room), all 35 rooms' rect and
   seed before and after, and the server unit; the S→C stream (0x03 seed
   0x5A058973, the 0x07s, the 0xACs) is in `join1-packets.jsonl`.
+
+## 80: hireling teleport follow
+
+`bdMercTwo` (level 8 Barbarian, hireling Diane alive) with `spawn.py
+--packets --status --trigger <never made> -- -w -ns -nosave -name
+bdMercTwo -bar` (no spawn: the trigger file was never created, so the run
+is a plain packets recording; `-nosave`, the save is unchanged). The 0x81
+of the reload (frame 2) gives the hireling GUID **1** (type 1, class 271).
+Walked from the Rogue Encampment (level 1, tiles (832, 1128) 56 × 40) east
+into Blood Moor, read the Scroll of Town Portal the save already had
+(screenshot tooltips), entered the portal (C→S 0x13 type 2 GUID 0x1B,
+frame 2918), then went back through the town side (0x13 GUID 0x1C, frame
+3359). The hireling arrived next to the player both times (screenshots
+`out-q-rec\a07.png`, `a08.png`).
+
+| | Blood Moor → town | town → Blood Moor |
+|---|---|---|
+| C→S 0x13 (portal) | frame 2918, input | frame 3359, input |
+| merc removed: S→C 0x0A `0a0101000000` (caller `0x53BDC2`) | 2918, input phase, right after the 0x13 (after one 0x07) | 3359, input phase, right after the 0x13 |
+| room messages | tick 2919: 0x07s / 0x51s / 0xACs of the town rooms, then the 0x08s and 0x0As of the old rooms | tick 3360: the 0x0As of the town units (no 0x07 in that tick) |
+| merc added: S→C 0xAC GUID 1 class 0x10F (caller `0x53E81E`) | tick 2919 at (4333, 5743), **before** the player's 0x15, after the town NPC 0xACs | tick 3360 at (4471, 5721), **before** the player's 0x15 |
+| player S→C 0x15 type 0 GUID 1 (caller `0x53BC44`) | tick 2919 to (4333, 5743), after the room hides | tick 3360 to (4471, 5721) |
+| merc S→C 0x15 type 1 GUID 1 (caller `0x53BC44`) | tick **2920** to (4333, 5743) (the same point) | none |
+
+So the follow's effect reaches the client as the hireling's 0xAC at the
+player's destination point inside the tick that moves the player, queued
+before the player's own 0x15; on the first teleport a 0x15 of the
+hireling to that same point followed one frame later (not on the second).
+The 0x0A that removes the hireling is queued in the input phase of the
+interact, before the tick. For d2rs ("the follow runs when the handler
+returns", `hirelings.md` §6 r1, `path-placement.md` §10 r6): compare
+these positions in the message order. Not settled here: why only the
+first teleport had the extra hireling 0x15 (its placement point equalled
+the player's both times).
