@@ -72,3 +72,6 @@ specs/ui/panels.md	§10 r9	pointer to panels-2 §19
 specs/ui/panels.md	§11 r6	pointer to panels-2 §21
 specs/ui/panels.md	§13 r8	pointer to menus.md §1
 specs/ui/text.md	§edge-cases-original-bugs	aggregate list restating rules covered individually
+specs/ui/panels.md	§7 r4	tool-tip queueing owner is Open questions 1 (pointer)
+specs/ui/panels.md	§9 r1	table of inventory modes (narration of what other rules draw)
+specs/ui/panels.md	§11 r1	stash open goes through the server interaction (world/cube.md), no UI behaviour

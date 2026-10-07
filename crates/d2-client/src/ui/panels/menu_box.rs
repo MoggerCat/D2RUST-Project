@@ -526,7 +526,7 @@ mod tests {
         assert!(matches!(b.layout(640, 480, &m), Err(MenuError::TooTall(_))));
     }
 
-    // Covers: specs/ui/menus.md §2 r5
+    // Covers: specs/ui/menus.md §2 r5; specs/ui/panels-2.md §14 r3
     #[test]
     fn draw_style_color_and_pentspin() {
         let m = Ten;
