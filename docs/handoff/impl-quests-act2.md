@@ -1,5 +1,7 @@
 # Handoff: the Act II quests callback by callback — `claude/impl-quests-act2`
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the ninth fold (`claude/fold-handoff-night`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Ninth set" (PC 1 / PC 2).
+
 Cloud implementation session, 2026-10-06, from `claude/specs-staging`
 (`5844674`). Spec: `specs/world/quests-act2.md` (draft, read from the
 1.14d `Game.exe`; no Act II recording exists). The coordinator folds this
@@ -134,7 +136,7 @@ functions, `use_book_of_skill`, `staff_assembled`, `radament_ai`,
 14. OQ5 of the spec (chain 38's intro record) stays open; the seams keep
     the storage choice to the host.
 
-## Local run queue (for `docs/HANDOFF.md` §5)
+## Local run queue (HANDOFF §5 C91, S9-A3)
 
 - `missiles.txt` row 338 `horadricstaff` Range: expect 440 → orifice
   timer period (440 − 75) / 20 = 18. Add an `#[ignore]` test reading

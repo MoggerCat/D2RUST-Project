@@ -1,7 +1,6 @@
 # Handoff: client wiring of panels, feeds and audio — `claude/wire-client-staging`
 
-> Not yet folded into `docs/HANDOFF.md` §1–§4 (only the §5 queue entries
-> C76–C77 and `docs/PLAN.md` are edited here); the coordinator folds it.
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the ninth fold (`claude/fold-handoff-night`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Ninth set" (PC 1 / PC 2).
 
 Cloud implementation (wiring) session, 2026-10-06, task class:
 implementation from specs, medium. Base: `claude/specs-staging` at

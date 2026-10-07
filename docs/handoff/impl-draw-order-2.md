@@ -1,5 +1,7 @@
 # impl-draw-order-2 — `render/draw-order-2.md` and the draw-order answers in d2-client
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the ninth fold (`claude/fold-handoff-night`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Ninth set" (PC 1 / PC 2).
+
 Scope: branch `claude/impl-draw-order-2`, from `claude/specs-staging` @
 5844674. Cloud, repo only (no `game/`, `re/`, `../refs/`). Parallel
 sessions own lighting / blend and bridge / model code; this one kept to
@@ -146,7 +148,7 @@ assertion (UT5).
 linked unit's inventory (Decoy)?; §8 r4 "nothing happens while K is in
 DT/DD" — following missiles only?
 
-## Local checks queued (HANDOFF §5)
+## Local checks queued (HANDOFF §5 A "Draw order 2", S9-A1 (1)–(3))
 
 - `weather-0001` (spec Test vectors): Rogue Encampment in rain, 2 frames
   with the recorded player seed, pass 4 / 9 pixels; also count the

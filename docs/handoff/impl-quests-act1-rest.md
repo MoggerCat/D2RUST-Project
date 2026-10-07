@@ -1,5 +1,7 @@
 # Handoff: the Act I quest remainders — `claude/impl-quests-act1-rest`
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the ninth fold (`claude/fold-handoff-night`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Ninth set" (PC 1 / PC 2).
+
 Cloud implementation session, 2026-10-06, from `claude/specs-staging`
 (`5844674`). Implements `specs/world/quests-act1-rest.md` (§1–§8) and the
 `specs/world/quests.md` changes since `main` (§9.5 class 26, §10.6 step
@@ -113,7 +115,7 @@ table_check_mutants` 2, `skills::use_::tests` 4); clippy `-D warnings`
    dispatcher yet (objects spec not written, `quests-act1-rest.md` open
    question 2).
 
-## Local run queue (add to `docs/HANDOFF.md` §5)
+## Local run queue (HANDOFF §5 S9-A1 (12)–(13), S9-A2)
 
 1. Trace a Cain rescue (1.14d, single player): operate the gibbet; expect
    object mode 1, slot 4 = `0x2002`, 0x28 at once; 17 frames later the

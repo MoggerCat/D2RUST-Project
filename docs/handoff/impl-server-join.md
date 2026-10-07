@@ -1,8 +1,6 @@
 # Handoff: the server's single-player join — `claude/impl-server-join`
 
-> Not yet folded into `docs/HANDOFF.md` §1–§4 (only the §5 queue entries
-> C84–C86 and the text of C82 are edited there, plus `docs/PLAN.md`); the
-> coordinator folds it.
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the ninth fold (`claude/fold-handoff-night`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Ninth set" (PC 1 / PC 2).
 
 Cloud implementation session, 2026-10-07, task class: implementation
 from specs, medium. Base: `claude/specs-staging` at `5f90364` (merge of
