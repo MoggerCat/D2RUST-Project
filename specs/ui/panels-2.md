@@ -28,13 +28,13 @@
 |   17. Character panel details (`panels.md` §8; answers UP-6) | 242–356 |
 |   18. Inventory close button and click area (`panels.md` §9; answers UP-7, UP-8) | 357–381 |
 |   19. Skill tree input and draw order (`panels.md` §10; answers UP-21, UP-22, UP-23) | 382–452 |
-|   20. Stash and cube buttons (`panels.md` §11, §12; answers UP-10, `panels.md` OQ 13) | 453–504 |
-| Constants & data dependencies | 505–517 |
-| Randomness | 518–522 |
-| Edge cases & original bugs | 523–539 |
-| Test vectors | 540–559 |
-| Provenance | 560–581 |
-| Open questions | 582–601 |
+|   20. Stash and cube buttons (`panels.md` §11, §12; answers UP-10, `panels.md` OQ 13) | 453–520 |
+| Constants & data dependencies | 521–533 |
+| Randomness | 534–538 |
+| Edge cases & original bugs | 539–555 |
+| Test vectors | 556–575 |
+| Provenance | 576–597 |
+| Open questions | 598–617 |
 <!-- /index -->
 
 ## Summary
@@ -501,6 +501,22 @@ flag `[0x007C0A38 + 4i]` (−1 = not learnable, 0, 1 pressed), remap
    `0x00502EF0` call before it (this frame or an earlier one): §Open
    questions 4. Text: 4051 formatted with `0x005269D0` (100 units) and
    the cap `0x00623460(player)`, `DrawText` color 0, not centered.
+6. **GoldMax font** (answers UP-9, `panels.md` §11.3): font 1
+   (`Font16`). Every frame, step 7 of the UI pass runs the belt draw
+   `0x00499040`, which sets font 1 (`0x00499053`) and never restores it
+   (`ui/control-panel.md` §5 r4). In a frame with the stash open, every
+   other `0x00502EF0` caller reached between that step and step 5 of
+   the next frame saves and restores the font (static read of all 176
+   call sites: steps 8–10 `0x0047B720`, `0x004B8100`, `0x00503000`,
+   `0x004549F0`, `0x0046C060`, the text pass `0x0049DC40`,
+   `0x0049DEE0`, `0x0049D5A0`, `0x0049D8E0`; steps 1–4 `0x00454AD0`,
+   `0x004ADEA0`, `0x00492FA0`, `0x00493100`; the death text `0x00453100`
+   runs only for a dead player, who cannot have the stash open), so
+   `GoldMax` is drawn in font 1. Exceptions, reproduced: a refused
+   overhead bubble in the previous frame's text pass leaves font 13
+   (`ui/messages.md` §5 r4), and a frame in which a UI state changes
+   runs the open / close hooks (`0x00455720`, `0x00455AE0`) whose menu
+   builders are not covered here.
 
 ## Constants & data dependencies
 
@@ -592,7 +608,7 @@ names (+0, +0x3C) only. No capture yet.
 3. The caption of the transaction-result note box of `0x004B5640` (switch
    on `[0x007C0D89]` = 7, 8, 10, 11, 12, 15, 16 at `0x004B5660`…).
    Disassembly read.
-4. The font in effect when the stash draws `GoldMax` (§20.5): a static
+4. **Answered** (2026-10-07, §20.6: font 1, left by the belt draw). Was: The font in effect when the stash draws `GoldMax` (§20.5): a static
    read of every `0x00502EF0` caller reachable in the UI pass before
    step 5, or a capture of the stash at 800 × 600 (`GoldMax` glyph
    heights).
