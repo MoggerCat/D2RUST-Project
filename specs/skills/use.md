@@ -29,16 +29,16 @@
 |   2. `use_at_point(game, unit, skill, x, y)` = `0x00549AD0` | 111–133 |
 |   3. `use_on_unit(game, unit, skill, type, guid, run)` = `0x00549BA0` | 134–152 |
 |   4. Mode change gates | 153–186 |
-|   5. Start and do | 187–276 |
-|   6. Cooldown | 277–290 |
-|   7. Periodic skills and auras | 291–328 |
-|   8. Function tables | 329–348 |
-| Constants & data dependencies | 349–369 |
-| Randomness | 370–379 |
-| Edge cases & original bugs | 380–401 |
-| Test vectors | 402–415 |
-| Provenance | 416–432 |
-| Open questions | 433–470 |
+|   5. Start and do | 187–279 |
+|   6. Cooldown | 280–293 |
+|   7. Periodic skills and auras | 294–331 |
+|   8. Function tables | 332–351 |
+| Constants & data dependencies | 352–372 |
+| Randomness | 373–382 |
+| Edge cases & original bugs | 383–404 |
+| Test vectors | 405–418 |
+| Provenance | 419–435 |
+| Open questions | 436–476 |
 <!-- /index -->
 
 ## Summary
@@ -204,7 +204,10 @@ player type-0 handler `0x005811D0` dispatches by mode (table
 
 1. Store arg2 in unit +0x38 bits 8+ (`0x006212C0`).
 2. Skill flags bit 0 (moving skills): step the path (`0x00553490`,
-   `0x00554CA0`); finished (2) → flags |= 2 and run the do.
+   `0x00554CA0`); finished (2) → flags |= 2 and run the do. "Skill
+   flags" (E flags) are the skill entry's word +0x0C (get `0x006446A0`,
+   set `0x00644660`): value 1 = moving skill, mask 2 = the move ended
+   (`0x005804B3`). Bodies test mask 2 (`test al, 2`) and clear the word.
 3. Otherwise run the do only if unit flag 0x40 is clear and arg1 ∈ {1,
    2}.
 4. Return 1, or 2 when the unit died (ENDANIM runs at once).
@@ -442,7 +445,7 @@ their own (`combat/*`, `skills/levels.md`). The unit-seed reseeder
    `spec'd-here` in `functions.tsv`, so no re-export is needed.
 2. Answered: srvdo slot 121 holds `0x005C8AD0`, and Rabies (id 238) is
    the only 1.14d `skills.txt` row with `srvdofunc` 121; its body is
-   `skills/bodies-2.md` §6.14.
+   `skills/bodies-2b.md` §6.14.
 3. Recording: hook `0x0056FAF0` entry/return and `0x0056F7F0` entry; cast
    a non-`TargetAlly` skill on a party member: does the do still run after
    start returned 0?
@@ -467,3 +470,6 @@ their own (`combat/*`, `skills/levels.md`). The unit-seed reseeder
 10. Answered: every `functions.tsv` row is `spec'd-here` (bodies in
     `skills/bodies.md`, `bodies-2.md`, `bodies-3.md`, `bodies-4.md`),
     except the null slots and the 3 `unreferenced` rows.
+11. Answered (2026-10-08, `docs/handoff/impl-monster-skill-slots.md`): the
+    E flags "bit 2" of monster bodies is mask 2, the move-ended flag
+    (§5.2 rule 2).

@@ -32,19 +32,19 @@
 |   2. Path types | 230–269 |
 |   3. Path compute (`0x00649970(path, unit, town access)`) | 270–336 |
 |   4. Target preparation (flag 0x1000, `0x00648120`) | 337–353 |
-|   5. Toward (type 2, `0x00679C80`) | 354–413 |
-|   6. Straight (type 7, `0x00679ED0`) | 414–423 |
-|   7. A* (type 1, `0x0067B850`) | 424–461 |
-|   8. Velocity, direction vector, facing | 462–544 |
-|   9. Per-tick movement | 545–717 |
-|   10. Messages | 718–740 |
-|   11. Missile paths (`0x00649760`) | 741–790 |
-| Constants & data dependencies | 791–827 |
-| Randomness | 828–838 |
-| Edge cases & original bugs | 839–886 |
-| Test vectors | 887–924 |
-| Provenance | 925–962 |
-| Open questions | 963–1030 |
+|   5. Toward (type 2, `0x00679C80`) | 354–421 |
+|   6. Straight (type 7, `0x00679ED0`) | 422–431 |
+|   7. A* (type 1, `0x0067B850`) | 432–469 |
+|   8. Velocity, direction vector, facing | 470–552 |
+|   9. Per-tick movement | 553–725 |
+|   10. Messages | 726–748 |
+|   11. Missile paths (`0x00649760`) | 749–798 |
+| Constants & data dependencies | 799–835 |
+| Randomness | 836–846 |
+| Edge cases & original bugs | 847–894 |
+| Test vectors | 895–932 |
+| Provenance | 933–970 |
+| Open questions | 971–1042 |
 <!-- /index -->
 
 ## Summary
@@ -363,6 +363,14 @@ start, target, start room, target room, slack r (step 4), max distance
    - then dx := clamp to [−2, 2]; dy < −1 → o = 5·dx + 10; else o =
      5·dx + 12 + min(dy, 2).
    o is a row 0..24 of `testdir` and `altdir`.
+   "clamp(dy)" is the same [−2, 2] clamp as dx (`0x00678C79`–
+   `0x00678C94`: dy < −1 → −2, dy > 1 → 2), so every branch returns o =
+   5·dx' + dy' + 12 with dx', dy' ∈ [−2, 2]; the first branch has dx' =
+   −1 unclamped. In that branch ay ≥ 2·ax ≥ 2, so dy' is −2 or 2 and o
+   is 5 or 9. The middle case (ay < 2·ax and ax < 2·ay) changes neither
+   value before both clamps. Vectors (synthetic): (dx, dy) = (−1, −2) →
+   5; (−1, 5) → 9; (1, 2) → 1·5 + 2 + 12 = 19 (dx := 1 & 1); (3, 2) →
+   2·5 + 2 + 12 = 24 (middle case); (4, −1) → 2·5 − 1 + 12 = 21.
 2. Step of a direction d (`dir8_toward`, `0x006F1798`): 0 (1,0), 1 (1,1),
    2 (0,1), 3 (−1,1), 4 (−1,0), 5 (−1,−1), 6 (0,−1), 7 (1,−1).
 3. Path distance (`0x00679380`): ax = |Δx|, ay = |Δy|; both < 8 →
@@ -1001,6 +1009,10 @@ Real (recordings; message side):
    leaving precision alone. So §11.3 runs in 53-bit unless code outside
    `Game.exe` (a display driver DLL) changes the control word; the
    debugger read at `0x0067A140` still confirms it for the GDI mode.
+10. *Answered (2026-10-08)* (`mutants-path` §3, spec reading): §5.1
+    rule 1's clamp(dy) is [−2, 2] (dy < −1 → −2, dy > 1 → 2;
+    `0x00678C79`–`0x00678C94`); the code's reading is right (§5.1 rule
+    1, text after the rule, with vectors).
 
 Answered handoff questions (`docs/HANDOFF.md` §7):
 

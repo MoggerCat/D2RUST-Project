@@ -28,17 +28,17 @@
 |   1. Unit kinds | 77–96 |
 |   2. Unit record | 97–135 |
 |   3. Lifecycle | 136–297 |
-|   4. Modes and mode schedules | 298–558 |
-|   5. Event dispatch | 559–573 |
-|   6. Events per kind | 574–668 |
-|   7. Scheduler inventory (`unit-events.tsv`) | 669–690 |
-|   8. Collision line between two units | 691–695 |
-| Constants & data dependencies | 696–712 |
-| Randomness | 713–720 |
-| Edge cases & original bugs | 721–741 |
-| Test vectors | 742–801 |
-| Provenance | 802–852 |
-| Open questions | 853–918 |
+|   4. Modes and mode schedules | 298–629 |
+|   5. Event dispatch | 630–644 |
+|   6. Events per kind | 645–739 |
+|   7. Scheduler inventory (`unit-events.tsv`) | 740–761 |
+|   8. Collision line between two units | 762–766 |
+| Constants & data dependencies | 767–783 |
+| Randomness | 784–791 |
+| Edge cases & original bugs | 792–812 |
+| Test vectors | 813–872 |
+| Provenance | 873–929 |
+| Open questions | 930–1003 |
 <!-- /index -->
 
 ## Summary
@@ -438,6 +438,77 @@ none), schedules event 2: f + 45 with state 21, else f + `aidel`
 (monstats +0x4F, the Normal column, or +0x4F + difficulty (game +0x6D)
 when game +0x6A or game +0x74 is non-zero; 0 → 15).
 
+**Death and dead functions** (2026-10-08; this section owns them,
+`monsters/init.md` links here). All take ECX game, EDX the mode-change
+record R (unit U = R +4) and return 1; "set mode m" = the plain mode
+set `0x00553570(game, U, m)` (§4.1). **Mode 12 (DD) is always set by
+`0x00553570`**, from three places: DT event 0, DT event 1 and the DD
+start; `0x005A7C20` never writes it itself.
+
+1. **DT start** `0x005A6FF0`:
+   1. Set mode 0.
+   2. Death clean-up `0x005A6520(U, R byte +0x14)` (ESI U, EBX game,
+      `ret 4`): U's overhead record (+0xA4) non-null → freed
+      (`0x006611A0`), +0xA4 := 0, U queued for update (`0x0064C040`),
+      flags (+0xC4) |= 0x100; `0x0058F6C0(U)`; `0x005B1A90(game, U)`;
+      flags &= ~0x800C; `0x00627540(U)` (`stat-lists.md`);
+      `0x00639FB0(U, boss)` with boss = `0x0063E9F0(monstats row, U)`;
+      U has state group `hide` (`0x0063A320`) → flags &= ~0x2; the
+      class's monstats2 flag 0x13 (`0x004638A0(class, 0x13)`) clear →
+      dead-body footprint `0x00649F70(U, 1)` (`skills/bodies-3.md`
+      §3.9); `0x006488A0(path, R byte +0x14)`; `0x005738D0(game, U)`.
+   3. Treasure gate `0x005A6830(game, R, 0)` (`items/treasure.md` §3.1);
+      evil-killed counter `0x00547E50` (`monsters/population.md`);
+      `0x0061AFA0(U's room, U's GUID)`.
+   4. U's monstats `deathDmg` (+0x0E bit 4) clear → done. Else by
+      `BaseId` (row +0x02; a non-monster takes the last branch):
+      - 212 `bonefetish1`: (x, y) = U's position; m =
+        `skill_missile(game, 117, U, 0, 1, 0, 0, x, y, 1)`
+        (`skills/bodies.md` §2.4), none → done. H = pct(maxHP of stats
+        by level (`monsters/init.md` §8.1, L-flag = game +0x74, d =
+        game +0x6D, U's `level(12)`, flags 1), difficultylevels
+        `MonsterCEDamagePercent` (+0x3C), 100); b = pct(H, 60, 100)
+        (inline); dmg = b + `roll(H − b)` on U's seed; record (zeroed
+        0x70) physical (+0x08) := dmg << 7; area damage `0x0057E090(game,
+        m, x, y, r 5, rec, 0, 0, null, 0x581)` (`monsters/umod-callbacks.md`
+        §3.2): players only.
+      - 441 `siegebeast1` (`0x005A6EB0(game, U)`): O = U's owner
+        (`0x00552FD0`, the rider); none or no monstats row → done. At
+        O's position with a free spot (`0x0064E7B0(O's room, &pos,
+        0x00620510(O, 0x3C01, 0), …)` ≠ 0) and U's alignment
+        (`0x006259B0`) = 0: skill use `0x005DEAD0(game, O, mode = O's
+        monstats +0x180, skill = `Skill1` +0x170, 0, x, y)`; success →
+        delete O's thinks (`0x00540E60(game, O, 2, 0)`). Otherwise kill
+        O (`0x0057CCB0(game, O, 0, 1)`, `combat/damage.md` §7.2).
+      - other (`0x005A6DF0`, EDI U, EBX game): for each unit P of U's
+        own room list (+0x74, next +0xE8; no neighbour rooms): P a
+        player not in mode 17, distance `0x006416D0(U, P)` ≤ 2 and
+        `0x00622B50(P, U, 0x3C01)` = 0 → record (zeroed 0x70): result
+        flags (+0x04) := 1, | 4 when P lacks state 54
+        (`uninterruptable`); physical (+0x08) := P's `hitpoints(6)` >> 5;
+        prepare `0x0057C1E0`, apply `0x0057C6C0(game, U, P, 1, rec)`,
+        reaction `0x0057CEE0` (`combat/damage.md` §5, §7.1).
+2. **DT event 0** `0x005A7350`: BaseId 78 (`0x0063E8D0(U, 0)`): path
+   step `0x00554CA0`, animation refresh `0x00623E00`, and set mode 12
+   only when the animation is complete (`0x006217C0`); any other
+   monster: set mode 12 at once. (`sim/intents-events.md` §7 rule 3
+   gives the client messages.)
+3. **DT event 1** `0x005A72B0`: set mode 12; skill event 13
+   (`0x005C0C30(game, 13, U, 0, 0)`, `skills/bodies.md` §2.18); then
+   monstats `SplEndDeath` (+0x1A4): 1 → `minion1` (+0x26, i16) in 0 …
+   class count → class reinit `0x00574370(game, U, minion1, 1)`
+   (`monsters/init.md` §27) then think restart `0x00573780`; 2 → kill
+   U's owner (`0x00552FD0`) with `0x0057CCB0(game, O, 0, 1)`; else
+   nothing.
+4. **DD start** `0x005A7390` (a mode set straight to 12, e.g. creation
+   in mode 12 or a corpse restore): U in mode ≠ 0 → death clean-up
+   `0x005A6520(U, R byte +0x14)` (step 1.2); set mode 12; cancel U's
+   events of types 8 and 9 (`0x00540E60(game, U, 8, 0)`, then 9). A U
+   already in mode 0 skips the clean-up (its DT start ran it).
+
+Draws: only the bonefetish branch (U's seed, one `roll`, plus the
+missile creation's own); the siege-beast skill use per its spec.
+
 #### 4.7 Animation rate `0x00623F50` and frame bonus `0x00623B10`
 
 **Rate** `0x00623F50(unit U, file, line)` (`ret 0xC`; 23 callers: every
@@ -801,6 +872,12 @@ AI from AI functions, everything in "not yet observed" (open question 1).
 
 ## Provenance
 
+- §4.6 death functions (2026-10-08): `all.asm` `0x005A6FF0`,
+  `0x005A6520`, `0x005A6DF0`, `0x005A6EB0`; `disasm.py at 0x5A72B0` for
+  `0x005A72B0`, `0x005A7350`, `0x005A7390` (not in the export); monstats
+  bit `deathDmg` from `data/fields.tsv`, mask `[0x006CE278]` = 0x10
+  (mask table `0x006CE268` dumped: 1, 2, 4, …); BaseId 212 / 441 names
+  from `patch_d2` `monstats.txt`.
 - **1.14d `Game.exe`** (SHA-256 `631066c1…adaaf`): every address read
   from the disassembly (`tools/ghidra/disasm.py`) with the Ghidra
   decompile as a guide; scheduler sites by rel32 scan (`disasm.py xref`)
@@ -915,3 +992,11 @@ checked zero through `0x006E8FDC`), jump tables `0x00623C04` /
    `0x00573520`, `0x005A0140`, `0x00625D10`; whether a restored item
    keeps its GUID (`0x00541990`); a recording leaving and re-entering a
    wilderness area confirms the order (`unit-order.md` OQ3).
+9. Answered (2026-10-08, `docs/handoff/e2e-night-flows.md` and
+   `docs/handoff/impl-monster-death.md` Left 5): the bodies of the DT
+   start `0x005A6FF0`, DT event 1 `0x005A72B0` and DD start `0x005A7390`
+   and the mode-12 setter (`0x00553570`, never `0x005A7C20` itself) are
+   §4.6 "Death and dead functions". Open inside them: `0x0058F6C0`,
+   `0x005B1A90`, `0x00639FB0`, `0x0061AFA0`, `0x005738D0` and the
+   R +0x14 byte (named by address only); a recorded kill of a
+   bonefetish1 (area damage at death) confirms branch 1.4.

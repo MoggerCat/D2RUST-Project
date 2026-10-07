@@ -118,8 +118,8 @@ The hireling list is never trimmed here.
 
 ### 5. Append `0x00575C70(pet, extra)` (E in ESI, game in EAX)
 
-1. E.max = 0: resync `0x00575900(game, player)` (`skills/bodies.md` Open
-   question 5); still 0 → dismiss (§7) the pet's GUID (−1 without one);
+1. E.max = 0: resync `0x00575900(game, player)` (§10;
+   `skills/bodies.md` §2.17); still 0 → dismiss (§7) the pet's GUID (−1 without one);
    return 0.
 2. E.count = E.max: head none → fatal assertion (line 0x312); unlink
    `0x00574850(head GUID, E, kill 1)` (call at `0x00575CE5`; §6: one

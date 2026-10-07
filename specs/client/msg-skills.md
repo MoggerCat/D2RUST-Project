@@ -25,21 +25,21 @@
 | Outputs / state changes | 65–73 |
 | Rules | 74–75 |
 |   1. The client skill list (unit +0xA8) | 76–99 |
-|   2. Shared skill-list operations | 100–141 |
-|   3. 0x94 BaseSkillLevels (`0x0045DD60`) | 142–151 |
-|   4. 0x21 UpdateItemOSkill (`0x0045DCD0`) | 152–161 |
-|   5. 0x22 UpdateItemSkill (`0x0045DDB0`) | 162–171 |
-|   6. 0x23 SetSkill (`0x0045DE10`) | 172–178 |
-|   7. 0x99 / 0x9A skill events (`0x0045DE80` / `0x0045DEC0` → `0x004CA060`) | 179–222 |
-|   8. 0xA3 skill do (`0x0045D5E0`) | 223–236 |
-|   9. 0x93 skill bonus by element and page (`0x0045DD10` → `0x004C7990`) | 237–265 |
-|   10. 0xA5 skill end on a unit (`0x0045D6A0`) | 266–280 |
-| Constants & data dependencies | 281–292 |
-| Randomness | 293–296 |
-| Edge cases & original bugs | 297–306 |
-| Test vectors | 307–332 |
-| Provenance | 333–353 |
-| Open questions | 354–381 |
+|   2. Shared skill-list operations | 100–170 |
+|   3. 0x94 BaseSkillLevels (`0x0045DD60`) | 171–180 |
+|   4. 0x21 UpdateItemOSkill (`0x0045DCD0`) | 181–190 |
+|   5. 0x22 UpdateItemSkill (`0x0045DDB0`) | 191–200 |
+|   6. 0x23 SetSkill (`0x0045DE10`) | 201–207 |
+|   7. 0x99 / 0x9A skill events (`0x0045DE80` / `0x0045DEC0` → `0x004CA060`) | 208–251 |
+|   8. 0xA3 skill do (`0x0045D5E0`) | 252–265 |
+|   9. 0x93 skill bonus by element and page (`0x0045DD10` → `0x004C7990`) | 266–294 |
+|   10. 0xA5 skill end on a unit (`0x0045D6A0`) | 295–309 |
+| Constants & data dependencies | 310–321 |
+| Randomness | 322–325 |
+| Edge cases & original bugs | 326–335 |
+| Test vectors | 336–361 |
+| Provenance | 362–382 |
+| Open questions | 383–413 |
 <!-- /index -->
 
 Owned ids: 0x21, 0x22, 0x23, 0x94, 0x99, 0x9A, 0xA3; §9–§10: 0x93, 0xA5.
@@ -130,7 +130,8 @@ handlers (the server specs link here for the steps).
    and (`aurastate` ≤ 0 or the unit does not have state `aurastate`):
    L := `skill_level(unit, E, 1)`; the state list of p (`0x00643620`:
    found, or created with the unit as owner, state p, and attached to
-   the unit, `sim/stat-lists.md` §8.1) is updated only when its stat
+   the unit, `sim/stat-lists.md` §8.1; arguments `client/stat-lists.md`
+   §4 r3) is updated only when its stat
    351 ≠ L: for i = 1…5 while `passivestat_i` is a valid stat: set
    (`0x00627150`) stat `passivestat_i` with layer `passiveitype` (0 when
    ≤ 0) to `eval(passivecalc_i, skill, L)` (`0x00646CA0`); then stat 350
@@ -138,6 +139,34 @@ handlers (the server specs link here for the steps).
    (`0x00639E30`). Otherwise (no E, or the aura state is on) the state
    list of p, if any, is detached and freed (`0x006277E0`,
    `0x00626CD0`). L = 0 removes the list (`0x00643620` with level 0).
+5. **Remove in detail** `0x00646FD0` (unit in EBX, skill id s, flag d;
+   2026-10-08, read for `client/model.md` §17 r4; rule 2.2 passes its
+   `remove` argument as d, `0x006470F0(unit, s)` passes d = 1). No unit,
+   no skill list (+0xA8) or an empty list → nothing. In order: the
+   passive state of s, if any, off (`0x00639DB0(unit, state, 0)`); left
+   (+8) is the native entry of s (skill id = s, owner +0x34 = −1) →
+   select left (0, −1) (rule 3); same for right (+0xC, `0x00643C50`);
+   current (+0x10) is that entry → current := none. Then the native
+   entry of s in the list: none → refresh (rule 4) only; else with d = 0
+   it is unlinked and freed; with d ≠ 0 its base (+0x28) −= 1 and it is
+   unlinked and freed only when the base is now < 1; then refresh
+   (rule 4) for s.
+6. **A hand left on the removed entry** (2026-10-08; answers
+   `docs/handoff/impl-client-msgs-3.md` §3 Q6). The hand resets of rule
+   5 run before the unlink and only re-point the hand when select finds
+   the entry (0, −1) (rule 3: not found → unchanged). Two cases leave
+   left (+8) or right (+0xC) pointing at the entry that rule 5 then
+   frees (`0x0040B480`, `Skills.cpp` line 0x4AC): (a) the unit has no
+   native skill-0 entry; (b) s = 0, so select finds the entry being
+   removed (still linked) and keeps it. 1.14d keeps the freed pointer
+   (no test, no assert); the next read of that hand reads freed memory
+   (undefined). With d ≠ 0 and the base still ≥ 1 after the decrement
+   nothing is freed and the hand stays valid. **d2rs:** an assign or
+   remove that would leave a hand on a freed entry is refused as a
+   handler error (`client/bridge.md` §2.4; recorded, model unchanged),
+   the same choice as `client/model.md` §9 rule 5 for a 1.14d access
+   violation. Whether a 1.14d server ever sends such a removal is not
+   established.
 
 ### 3. 0x94 BaseSkillLevels (`0x0045DD60`)
 
@@ -378,3 +407,6 @@ bit 17 `enhanceable`, mask table `0x006CE268`), `0x00643AD0`,
 5. The client functions of 0xA5 (`0x004CA000`, `0x004C9420`,
    `0x004C8B80`) and which skills have `srvdofunc` 67, 76, 77, 78:
    Phase 6 client skill effect spec; and the name of state 18.
+6. *Answered (2026-10-08)* (`docs/handoff/impl-client-msgs-3.md` §3
+   Q6): a remove that leaves the left or right hand on the freed entry
+   (no native skill-0 entry, or skill 0 itself): §2 rule 6.

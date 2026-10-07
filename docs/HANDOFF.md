@@ -5277,6 +5277,7 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
 - `world/quests-act2-2.md` OQ1 (PC 2 spec-quests-act2, 2026-10-07): orifice insert (Act II, Horadric Staff assembled): operate the orifice (S→C 0x58 result 0), cancel the dialog (C→S 0x44 action 2 → 0x58 result 1), insert a wrong cursor item (result 4), then the staff (result 5, byte 6 = 1); log the 7 bytes of each 0x58, especially byte 6 for results 0, 1, 4.
 - `world/quests.md` OQ14 (PC 2 spec-quests-core, R-QC-1): a 1.14d expansion character that completed every Normal quest; save right after the last one, then after one more game; dump both quest sections and list the set bits per slot.
 - `world/quests-act1-rest.md` OQ12 (PC 2 spec-quests-core, R-QC-2, = §5 C79): creation of the town-Cain marker (class 385) after Cain left Tristram, packets + RNG: Cain's spawn draws must come between the marker's unit-seed step and the next preset unit's.
+- `skills/descriptions.md` OQ1 + OQ2 (PC 1 spec-xpc3-skills, 2026-10-07): character panel damage / attack-rating lines for one skill per `descdam` 1–24 and `descatt` 1–5 (kick: expect `v-(v+1)`; smite; dual-wield assassin for `descatt` 5), log the drawn strings, colors and the player's stats 0, 2, 17–25, 48–59, 119, 159, 160; and the title string of a skill whose skilldesc `str name` ≠ `str alt`.
 
 - `drlg/rooms.md` OQ15: client build timer (B, T, cursor) per client
   update over a level load.
@@ -6181,6 +6182,17 @@ a monster, a Druid summon, a Clay Golem, a Countess kill, a Cain rescue.
   0x2FD, `jf` / `kf` (OQ3; C66 (1)).
 - R2-38 `d2s-tool` characters load and re-save in 1.14d: quest bits, trailer
   bit, +0x88..+0xA7, flag 0x2000 (DS-2, DS-4, DS-5; C66 (2)).
+- `drlg/rooms.md` OQ23 (PC 1 spec-cloudq-area5, 2026-10-08): client build timer across a client level free: per client update log `[0x007A0498]`, client DRLG +0x98, +0x45C, +0x460 and the byte at (+0x460)+0x44, plus every room free address; shows whether a freed cursor room is reallocated before the next timed step (§4.6 rule 11).
+- `monsters/umod-callbacks.md` OQ7 / §28 (PC 1 spec-xpc3-umods, 2026-10-07): client side of a fire-enchanted unique's death (and a cold / lightning unique hit into GH / KB): log client missile creates (`0x004CD540` class, position), `0x004B9A00` id 2,458 and U's mode / +0x44 per client update; expect §28.2 rows (frame 4 / frame 2 tests).
+- `sim/units.md` OQ9 / `monsters/init.md` OQ13 (PC 1 spec-xpc3-umods, 2026-10-08): kill a bonefetish1 next to the player (death area damage, §4.6 branch 1.4: U-seed draw, physical-only hit) and log the server 0xAC of a hireling and of a boss with umods (§24 rules 4 and 6: umod terminator, owner GUID, `send other` stats); compare bytes.
+
+*`client/ui.md`, `client/model.md` (PC 1, 2026-10-08)*
+- R2-39 a UI-sound request log while clicking each control of
+  `client/ui.md` §B8.1 once (popups, configure controls, stash / cube /
+  trade buttons, NPC menu, text list) and an NPC talk → cancel with a
+  memory read of the NPC's unit flags, mode and the store items in S
+  (`client/model.md` §17 r1–r3); a character whose left skill drops to
+  level 0 (§17 r4).
 
 ## 8. Lessons (problems met, fixes)
 
