@@ -1,4 +1,4 @@
-// Spec: specs/world/quests-act3.md
+// Spec: specs/world/quests-act3.md; specs/world/quests-act3-2.md §11
 //! Act III quest records (chains 14–20, 28, 39), callback by callback:
 //! Hratli's gossip and the intro ([`q0`], [`intro`]), Lam Esen's Tome
 //! ([`q1`]), Khalim's Will ([`q2`]), the Blade of the Old Religion
@@ -30,18 +30,22 @@ pub use q2::{
     chest_operate, lever_event, lever_init, lever_operate, stairs_init, stairs_operate, will_cubed,
     KhalimChest,
 };
-pub use q3::{activate_altar, altar_init, altar_position, decoy_init, decoy_operate};
+pub use q3::{
+    activate_altar, altar_init, altar_position, decoy_init, decoy_operate, gidbinn_kill_test,
+};
 pub use q4::{
     alkor_bird_brought, alkor_bird_clear, bird_boss_removed, choose_bird_boss, potion_of_life,
 };
-pub use q5::{council_preset, durance_open, orb_init, orb_operate, stairs_r_init};
+pub use q5::{
+    council_preset, durance_open, orb_init, orb_operate, stairs_r_init, weapon_in_use, HandItem,
+};
 pub use q6::{bridge_event, bridge_init, durance_warp, hellgate_init, natalya_init};
 pub use q7::{wanderer_init, wanderer_minions, wanderer_target};
 
 use super::{
     bit, event, flags_of, EventArgs, QuestControl, QuestFlags, QuestRecord, QuestWorld, TextList,
 };
-use crate::units::UnitId;
+use crate::units::{RoomId, UnitId};
 
 /// The act index of Act III (`0x006427F0`).
 pub const ACT: u8 = 2;
@@ -83,6 +87,48 @@ pub enum Timer {
     MephistoStatus,
     /// `0x005BD390`: the Dark Wanderer's minions (period 2).
     WandererMinions,
+}
+
+/// The point of an object's init record (`world/objects.md` §3 step 6:
+/// room +0x08, x +0x14, y +0x18), the object's creation point.
+/// `quests-act3-2.md` §11.7: "its position" in §5.6, §5.7, §9.1 and §9.2
+/// is this point, and the room the decoy's boss and Hratli spawn in is
+/// this room.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InitPoint {
+    pub room: RoomId,
+    pub x: i32,
+    pub y: i32,
+}
+
+/// The source unit of `0x00559A30` (`quests-act3-2.md` §11.3), with the
+/// value its item level is read from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DropSource {
+    /// No source unit.
+    None,
+    /// Unit type 1: its total stat 12 (`0x00625480`).
+    Monster { level: i32 },
+    /// Unit type 0: its base stat 12 (`0x006253B0`).
+    Player { level: i32 },
+    /// Any other type (objects): the area level of the unit's room's
+    /// level (`0x0061DCA0`: `MonLvlEx` in an expansion game, else
+    /// `MonLvl`, by difficulty).
+    Other { area_level: i32 },
+}
+
+/// The `&level` output of `0x00559A30` (`quests-act3-2.md` §11.3), written
+/// at `0x00559AF8` before any read and then the drop's item level: the
+/// caller's incoming value is never used (so the Act III callers pass
+/// `None` to [`QuestWorld::quest_drop`]). A result ≤ 1, or no source
+/// unit, gives 1.
+pub fn drop_item_level(source: DropSource) -> i32 {
+    let level = match source {
+        DropSource::None => return 1,
+        DropSource::Monster { level } | DropSource::Player { level } => level,
+        DropSource::Other { area_level } => area_level,
+    };
+    level.max(1)
 }
 
 /// Per-quest extra data of the Act III records (record +0x18). One

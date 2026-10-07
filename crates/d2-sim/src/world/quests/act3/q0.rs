@@ -1,8 +1,8 @@
-// Spec: specs/world/quests-act3.md §9.1 (A3Q0 Hratli gossip, chain 14)
+// Spec: specs/world/quests-act3.md §9.1 (A3Q0 Hratli gossip, chain 14); specs/world/quests-act3-2.md §11.6, §11.7
 //! A3Q0: events 0, 11, 13, the active function and Hratli's start / end
 //! dummies (init 49, 50).
 
-use super::{add_state, npc, pf, set};
+use super::{add_state, npc, pf, set, InitPoint};
 use crate::units::UnitId;
 use crate::world::quests::{bit, event, EventArgs, QuestControl, QuestWorld, TextList};
 
@@ -29,7 +29,8 @@ pub struct Extra {
     pub hratli_guid: u32,
     /// +0x10: the map AI was applied.
     pub ai_applied: bool,
-    /// +0x18: a map AI is stored (`0x005B7230`, no caller in 1.14d).
+    /// +0x18: a map AI is stored. Only `0x005B7230` writes it and it has
+    /// no caller in 1.14d (`quests-act3-2.md` §11.6), so it stays false.
     pub map_ai: bool,
 }
 
@@ -90,19 +91,15 @@ fn hratli_exists<W: QuestWorld>(w: &W, guid: u32) -> bool {
     w.monster_by_guid(guid).is_some()
 }
 
-/// `0x005B2F20(game, room, x, y, 253, mode 1, −1, 0)` at the object.
-fn spawn_hratli<W: QuestWorld>(w: &mut W, object: UnitId, func: u32) -> Option<UnitId> {
-    let Some((x, y, room)) = w.unit_position(object) else {
-        // TODO(quests-act3 §9.1): an object without a room has no spawn
-        // position; the init is not described for it.
-        w.unhandled(CHAIN, func);
-        return None;
-    };
-    w.spawn_monster(room, x, y, npc::HRATLI, 1, u32::MAX)
+/// `0x005B2F20(game, room, x, y, 253, mode 1, −1, 0)` at the dummy's
+/// init record (room, x, y) (`quests-act3-2.md` §11.7 rule 3).
+fn spawn_hratli<W: QuestWorld>(w: &mut W, at: InitPoint) -> Option<UnitId> {
+    w.spawn_monster(at.room, at.x, at.y, npc::HRATLI, 1, u32::MAX)
 }
 
-/// Init 49 `0x005B70B0` (start dummy 378).
-pub fn hratli_start_init<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: UnitId) {
+/// Init 49 `0x005B70B0` (start dummy 378); `at` is the object's init
+/// record.
+pub fn hratli_start_init<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, at: InitPoint) {
     let Some(i) = ctl.find(CHAIN) else { return };
     if ctl.game.get(SLOT, bit::PRIMARY_GOAL_DONE) {
         return;
@@ -111,7 +108,7 @@ pub fn hratli_start_init<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, objec
     if x.start_spawned && hratli_exists(w, x.hratli_guid) {
         return;
     }
-    if let Some(h) = spawn_hratli(w, object, 0x005B_70B0) {
+    if let Some(h) = spawn_hratli(w, at) {
         let g = w.guid(h);
         let x = x0(ctl, i);
         x.hratli_guid = g;
@@ -119,17 +116,16 @@ pub fn hratli_start_init<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, objec
     }
 }
 
-/// Init 50 `0x005B7160` (end dummy 379).
-pub fn hratli_end_init<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: UnitId) {
+/// Init 50 `0x005B7160` (end dummy 379); `at` is the object's init
+/// record: +0x04 / +0x08 := its (x, y) before the game-flag test
+/// (`quests-act3-2.md` §11.7 rule 3).
+pub fn hratli_end_init<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, at: InitPoint) {
     let Some(i) = ctl.find(CHAIN) else { return };
-    let pos = w.unit_position(object);
     {
         let x = x0(ctl, i);
         x.end_seen = true;
-        if let Some((px, py, _)) = pos {
-            x.end_x = px;
-            x.end_y = py;
-        }
+        x.end_x = at.x;
+        x.end_y = at.y;
     }
     if !ctl.game.get(SLOT, bit::PRIMARY_GOAL_DONE) || ctl.records[i].extra.act3.q0.end_spawned {
         return;
@@ -141,7 +137,7 @@ pub fn hratli_end_init<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object:
         x0(ctl, i).start_present = true;
         return;
     }
-    let Some(h) = spawn_hratli(w, object, 0x005B_7160) else {
+    let Some(h) = spawn_hratli(w, at) else {
         return;
     };
     let g = w.guid(h);
@@ -152,7 +148,8 @@ pub fn hratli_end_init<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object:
     }
     w.or_unit_flags(h, 0x0300_0000);
     // The map AI (+0x18) is stored only by `0x005B7230`, which has no
-    // caller in 1.14d (edge case 17), so nothing is applied here.
+    // caller in 1.14d (edge cases 17, 20; `quests-act3-2.md` §11.6): this
+    // branch is dead there and `0x0058F000` is never reached.
     let x = x0(ctl, i);
     if x.map_ai && !x.ai_applied {
         x.ai_applied = true;
