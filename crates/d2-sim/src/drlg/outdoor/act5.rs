@@ -76,6 +76,14 @@ pub const SPECIALS: [SpecialRow; 15] = [
 pub const FATAL_SPECIAL: u32 = 0x219;
 /// Fatal error of fewer than 3 prisons.
 pub const FATAL_PRISONS: u32 = 0x259;
+/// [`OutdoorError::Crash`] of a ravine walk off the barricade pieces
+/// (§11 step 3).
+pub const CRASH_RAVINE_WALK: &str =
+    "ravine walk off the barricade pieces (outdoor.md §11 step 3: non-row stamp or endless walk)";
+/// [`OutdoorError::Crash`] of a barricade straight walk that never meets
+/// its end (§11 step 2; not reachable on §4 polygons).
+pub const CRASH_BARRICADE_WALK: &str =
+    "barricade straight walk that never meets its end (outdoor.md §11 step 2)";
 
 impl Gen<'_> {
     /// Act V `0x0067E600` (§11).
@@ -127,15 +135,17 @@ impl Gen<'_> {
             let (nx, ny) = (n.x & !1, n.y & !1);
             if !v.is_preset_link() {
                 let piece = border_piece(dx, dy, s);
-                // "Until it equals (nx, ny)": polygon edges are
-                // axis-aligned, so the cleared ends are a whole number of
-                // 2-cell steps apart along (dx, dy).
-                // TODO(outdoor.md §11 step 2): ends not on the walk's line
-                // (never met, the original would not stop) are not
-                // described; not reached by 1.14d polygons.
-                let len = (nx - vx).abs().max((ny - vy).abs()) / 2;
+                // `0x0067DD92`–`0x0067DDCD`: test (x, y) = (nx, ny) before
+                // every step. §4 edges are axis-aligned and both ends have
+                // bit 0 cleared, so the walk always meets (nx, ny); a guard
+                // past the grid size reports the (unreached) endless walk.
                 let (mut x, mut y) = (vx, vy);
-                for _ in 0..len {
+                let mut steps = 0;
+                while (x, y) != (nx, ny) {
+                    steps += 1;
+                    if steps > self.gw() + self.gh() {
+                        return Err(OutdoorError::Crash(CRASH_BARRICADE_WALK));
+                    }
                     x += 2 * dx;
                     y += 2 * dy;
                     if piece != 0 {
@@ -178,12 +188,11 @@ impl Gen<'_> {
             let k = self.g(0, x, y) as i32 - b;
             steps += 1;
             if !(0..12).contains(&k) || steps > gw * gh {
-                // TODO(outdoor.md §11 step 3): a cell outside the
-                // barricade straight/corner range reads outside D, and a
-                // walk that never reaches (0, gh − 2) would not end; the
-                // original's behaviour is not described. Treated as fatal
-                // with the walk's address.
-                return Err(OutdoorError::Fatal(0x0067_DEF0));
+                // §11 step 3: 1.14d has no range check on k and no end
+                // guard; an out-of-range k stamps a non-row id (crash in
+                // §5.1) or the walk never ends. Not reached with 1.14d
+                // data (every visited cell holds B + 0..11).
+                return Err(OutdoorError::Crash(CRASH_RAVINE_WALK));
             }
             self.stamp(x, y, (b2 + k) as u32, -1, false)?;
             let (ddx, ddy) = RAVINE_STEPS[k as usize];
