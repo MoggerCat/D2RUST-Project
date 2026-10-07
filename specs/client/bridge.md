@@ -44,13 +44,13 @@
 |   7. Bevy mirror | 234–252 |
 |   8. Frame pacing | 253–273 |
 |   9. Versioning | 274–284 |
-|   10. Client outputs (bridge → UI and audio) | 285–361 |
-| Constants & data dependencies | 362–376 |
-| Randomness | 377–380 |
-| Edge cases & original bugs | 381–389 |
-| Test vectors | 390–420 |
-| Provenance | 421–431 |
-| Open questions | 432–467 |
+|   10. Client outputs (bridge → UI and audio) | 285–363 |
+| Constants & data dependencies | 364–378 |
+| Randomness | 379–382 |
+| Edge cases & original bugs | 383–391 |
+| Test vectors | 392–422 |
+| Provenance | 423–433 |
+| Open questions | 434–469 |
 <!-- /index -->
 
 ## Summary
@@ -358,6 +358,8 @@ model state: 1.14d's handler calls a UI or sound function directly
 | `MercRevive` | u16, u16 | 0x9B | UI | `client/msg-ui.md` §15 |
 | `SkillEvent` | unit key, skill, level, target key or point, w | 0x99, 0x9A | effects | `client/msg-skills.md` §7 |
 | `SkillDo` | unit key, target key or none, skill, level, x, y, v | 0xA3 | effects | `client/msg-skills.md` §8 |
+| `ShrineFx` | kind (on-mode / on-use), shrine code u8, object key, player key or none, overlay ids (two i32, −1 = none) | 0x0E (code 3), 0x4D (code 0x15) | effects | `client/model.md` §15 rules 3–4 |
+| `ShrineSound` | sound id u32, player key | 0x4D (code 0x15) | audio | `client/model.md` §15 rule 4 (request: `audio/triggers.md` §1 rule 1) |
 
 ## Constants & data dependencies
 

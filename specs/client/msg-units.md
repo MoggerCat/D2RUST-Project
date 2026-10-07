@@ -25,15 +25,15 @@
 |   1. Unit add | 70–226 |
 |   2. 0x0A RemoveUnit (`0x0045CC10`) | 227–236 |
 |   3. 0x15 ReassignPlayer (`0x0045D160`) | 237–278 |
-|   4. Queued movement and action messages | 279–313 |
-|   5. Local player vitals: 0x18, 0x95, 0x96 | 314–335 |
-|   6. Unit states: 0xA7, 0xA8, 0xA9, 0xAA | 336–366 |
-| Constants & data dependencies | 367–378 |
-| Randomness | 379–386 |
-| Edge cases & original bugs | 387–401 |
-| Test vectors | 402–441 |
-| Provenance | 442–477 |
-| Open questions | 478–496 |
+|   4. Queued movement and action messages | 279–323 |
+|   5. Local player vitals: 0x18, 0x95, 0x96 | 324–345 |
+|   6. Unit states: 0xA7, 0xA8, 0xA9, 0xAA | 346–376 |
+| Constants & data dependencies | 377–388 |
+| Randomness | 389–396 |
+| Edge cases & original bugs | 397–411 |
+| Test vectors | 412–451 |
+| Provenance | 452–487 |
+| Open questions | 488–507 |
 <!-- /index -->
 
 Owned ids: 0x0A, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x15, 0x18, 0x4C, 0x4D,
@@ -310,6 +310,16 @@ requests (`client/model.md` §8); C→S 0x5F from the position check.
    base(328) + 1 (`0x006253B0`, `0x00627260`).
 4. 0x6E, 0x6F, 0x70, 0x71, 0x72: no effect (`client/model.md` §4 rule
    4).
+5. Objects (type 2; `client/model.md` §15): 0x0E's code u8@6 is the
+   client mode-request code 3 (object mode change; the server writes 3
+   for objects, `world/objects.md` §14 rule 1). 0x4D's code 0x15 handler
+   `0x004BD5C0` reads only record[0] (u32@6: in the shrine form the
+   operator's GUID, looked up as a player); the shrine code comes from
+   the client's own object (shrine record `Code`, else objects.txt
+   `ShrineFunction`), not from the message. record[2..4] (u16@0xB,
+   u16@0xD, u8@0xA) are never read, and u16@0xF is not copied into the
+   record; for objects these bytes carry no client effect (`Code` @10
+   and the zeros @11, @13, @15 of `world/objects.md` §14).
 
 ### 5. Local player vitals: 0x18, 0x95, 0x96
 
@@ -486,8 +496,9 @@ Act-switch session (2026-10-07): `0x004654C0` at `0x00465603`–`0x00465634`
    link to player GUID v).
 4. The party roster (0x5B, `0x0047A6F0`) that 0x0D's life percent
    updates: owner spec of 0x5B.
-5. `0x0063EA40` (0x15 rule 2) and `0x00621B00` / `0x004BD6B0` (0x51
-   rule 3): what they test.
+5. `0x0063EA40` (0x15 rule 2) and `0x004BD6B0` (0x51 rule 3): what
+   they test. *Answered* for `0x00621B00`: an object whose objects.txt
+   `SubClass` has bit 0 (shrine), `client/model.md` §15 rule 1.
 6. 0x16 UnitPositions (`0x0045D2E0`, also a position check) and 0x17:
    not seen in the single-player recordings; left TBD.
 7. A recording with a hireling (0x7A / 0x81, 0xAC of the hireling)

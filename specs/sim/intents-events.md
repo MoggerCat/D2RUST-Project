@@ -35,19 +35,19 @@
 | Rules | 86–87 |
 |   1. Loop order (single player) | 88–109 |
 |   2. Client → server | 110–279 |
-|   3. Server → client | 280–447 |
-|   4. d2rs mapping and scope | 448–479 |
-|   5. Machine-readable tables | 480–516 |
-|   6. Exact-match comparison | 517–607 |
-|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 608–990 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 991–1135 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1136–1280 |
-| Constants & data dependencies | 1281–1299 |
-| Randomness | 1300–1305 |
-| Edge cases & original bugs | 1306–1339 |
-| Test vectors | 1340–1426 |
-| Provenance | 1427–1528 |
-| Open questions | 1529–1634 |
+|   3. Server → client | 280–448 |
+|   4. d2rs mapping and scope | 449–480 |
+|   5. Machine-readable tables | 481–517 |
+|   6. Exact-match comparison | 518–616 |
+|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 617–1016 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1017–1161 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1162–1306 |
+| Constants & data dependencies | 1307–1325 |
+| Randomness | 1326–1331 |
+| Edge cases & original bugs | 1332–1365 |
+| Test vectors | 1366–1452 |
+| Provenance | 1453–1554 |
+| Open questions | 1555–1660 |
 <!-- /index -->
 
 ## Summary
@@ -409,6 +409,7 @@ Queue 2 (id 0xFF, 16 bytes, `0x0052CC20`) runs only when host callbacks
    | 0x58 | `0x0053D8D0` | `0x00579D60` (`0x00579F52`, `0x0057A28B`, `0x0057A4B3`: codes 6, 7), `0x00582610` (`0x005826D9`: 0), `0x005852E0` (`0x00585348`: 1, 4, 5), `0x0059DC70` (`0x0059DD54`: 0) | 0 | GUID u32@1 (−1 without a unit); u8@6 written only with code 5 (`0x005853CD` := 1, or `0x005853E4` := the result of `0x00585240`) |
    | 0x5D | `0x0053D710` | 18 call sites, `world/quests.md` §6.3 | 1 | |
    | 0x5A | `0x0053C850` | its callers build all 40 bytes: `0x00549A60` (code 0x0E, u8@2 1, rest 0; `skills/use.md` §2 step 6), `0x0054A5D0` (codes 0x0D, 4, §9 rule 16) | 0 | a copier: queues 40 bytes from the caller's buffer; asserts the name at @8 is shorter than 16 chars (fatal 0x5DA). Code u8@1, u8@2, u32@3, name @8 |
+   | 0x60 | `0x0053D900` | itself (`0x0053D90D`); callers: the add messages `0x00571F90` (§7.2, call `0x00572082`) and the object update `0x00581A20` (call `0x00581A72`, `world/objects.md` §14) | 0 | 7 bytes: portal flags u8@1 = object data +0x05 (`0x006222C0`, fatal 0xFE4 / 0xFE5 for a null or non-object unit), destination level u8@2 = object data +0x04, GUID u32@3 = unit +0x0C; every byte written |
    | 0x63 | `0x0053D960` | `0x00584E30` (`0x00584EEA`) | 3 | `world/waypoints.md` §5.3 |
    | 0x78 | `0x0053CAD0` | `0x00568060` (`0x005682F7`) | 0 | the other player's client name (`0x00538830`, 16 bytes, byte 16 := 0), u32@17 = the other player's GUID; trade only |
    | 0x89 | `0x0053DFE0` | `0x005456F0` (`0x00545700`), `0x00546270` (`0x00546687`, event 0) | 0 | `world/quests.md` §6.5 |
@@ -603,7 +604,15 @@ as in §2.1 rule 5 and §3.1 rule 1.
      never writes bytes 8–9, form 6 never writes byte 9 (rows `0x26
      u8@1=0x05` 8 2, `0x26 u8@1=0x06` 9 1); **0x58** writes byte 6 only
      with code 5 (rows `0x58 u8@5=0x00`, `=0x01`, `=0x04`, `=0x06`,
-     `=0x07`, each 6 1).
+     `=0x07`, each 6 1). Confirmed per form: the buffer is built on
+     the caller's stack and only byte 5 is stored before the copy for
+     result 1 (`0x0058547C`), 4 (`0x00585392`), codes 6 / 7 of
+     `0x00579D60` (`0x00579FC6`, `0x0057A002`, `0x0057A0E2`,
+     `0x0057A1B4`, `0x0057A2E6`, `0x0057A33B`, `0x0057A488`,
+     `0x0057A54A`, `0x0057A63F`) and code 0 (`0x005826EF`,
+     `0x0059DD6A`); code 5 stores byte 6 at `0x005853CD` / `0x005853E4`
+     (PC 2 request, `world/objects-2.md` §16.3: the obelisk's form is
+     one of these, byte 6 unwritten).
 
 ### 7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`)
 
@@ -971,6 +980,23 @@ or the new room equals the client's room (client +0x1B4, the old room).
    the client has a player and `0x00554200(unit)` holds; other ids
    nothing. The record fields are passed through. An empty list (every
    unit in both recordings' joins) sends nothing.
+   **Writers** (the only stores to unit +0xEC besides the clears): nine
+   functions (ECX unit, EDX first value) allocate a zeroed record,
+   write link +0x00 := 0 and the id byte +0x04, append it (head +0xEC
+   when empty, else the tail's link; tail +0xF0 := it) and call
+   `0x0064C040(unit)`:
+
+   | Writer | Id | Record bytes | Callers |
+   |---|---|---|---|
+   | `0x005717C0` | 0x99 | 0x14 | 1 |
+   | `0x00571840` | 0x9A | 0x14 | 1 |
+   | `0x005718C0` | 0x9E | 0x14 | 16 |
+   | `0x00571960` | 0xA1 | 0x18 | none (never runs) |
+   | `0x00571A10` | 0xAB | 0x14 | 5 (`0x00580610`, `0x005A6920`, `0x005BE3F0`, `0x005BE7B0`, `0x005BEAC0`) |
+   | `0x00571AA0` | 0xA3 | 0x28 | 5 |
+   | `0x00571B70` | 0xA5 | 0x14 | 10 |
+   | `0x00571C00` | 0xA4 | 0x0C (u16 class @8 := EDX) | 2 (`0x005EF320`) |
+   | `0x00571C60` | 0x23 | 0x10 | 2 |
 3. **Overhead text** `0x00571620(unit, client)`: unit +0xA4 = 0 →
    **S→C 0x76** (`0x0053B3D0`: type u8@1, GUID u32@2; recorded `76 00
    01000000` at the join). Else, unless the unit is a player and the
@@ -1585,9 +1611,9 @@ Handlers of §9: `0x0054A260`, `0x0054A290` (with `0x00661110`,
     *Partly answered*: `0x00570E30` (0xAA), `0x00571CD0` (pending event
     records), `0x00571620` (0x76 / overhead 0x26): §7.9; `0x005A5650` =
     the life fraction (§7.4 rule 5); `0x005711D0` (0xA7 / 0xA8 / 0xA9
-    per changed state): §3.5 rule 6. Open: `0x005715A0`, `0x00572EE0`,
-    who writes the unit +0xEC records, and who sets the state-change
-    bits `0x005711D0` reads.
+    per changed state): §3.5 rule 6; who writes the unit +0xEC records:
+    §7.9 rule 2 (nine writers). Open: `0x005715A0`, `0x00572EE0`, and
+    who sets the state-change bits `0x005711D0` reads.
 11. The §7.6 order (item 0x9C before the monster's 0x69 in a kill tick
     with a drop): a recording of a kill that drops an item. *0x65 part
     answered* (§7.6 rule 5, static): the kill sets arena flag 0x400
