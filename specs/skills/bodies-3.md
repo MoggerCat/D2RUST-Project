@@ -29,13 +29,13 @@
 |   2. Implementation questions answered | 94–190 |
 |   3. Shared helpers, batch 4 | 191–342 |
 |   4. Bodies used by several monster skills | 343–531 |
-|   5. Bodies used by one monster skill | 532–945 |
-| Constants & data dependencies | 946–981 |
-| Randomness | 982–998 |
-| Edge cases & original bugs | 999–1038 |
-| Test vectors | 1039–1053 |
-| Provenance | 1054–1072 |
-| Open questions | 1073–1092 |
+|   5. Bodies used by one monster skill | 532–946 |
+| Constants & data dependencies | 947–982 |
+| Randomness | 983–999 |
+| Edge cases & original bugs | 1000–1039 |
+| Test vectors | 1040–1054 |
+| Provenance | 1055–1073 |
+| Open questions | 1074–1095 |
 <!-- /index -->
 
 ## Summary
@@ -902,7 +902,8 @@ frame 1 when the target is in reach.
    (`bodies.md` §6.1); c < 0 → 0.
 2. K = T. No T: P exists and P's target y (+0x12, `0x00648A10`) = 2 → K
    := the object (type 2) whose GUID is P's target x (+0x10); otherwise
-   → 0 (Open question 6).
+   → 0. (+0x10 / +0x12 hold the path's target position, so this reads
+   a coordinate pair as (GUID, type); Open question 6.)
 3. K's room none or in town (`0x0061AB00`) → 0.
 4. Prison spawn `0x005B34C0(game, K's room, 0, 0, K, c, 0)`: c ≠ 340
    (`boneprison1`) or K none → nothing. Else the pattern spawn
@@ -1080,12 +1081,14 @@ steps call them (`bodies.md` Randomness).
    per do (§5.13, §5.14).
 4. Recording: a Maggot Queen / Sand Maggot egg cast: egg count and
    modes (§5.7).
-5. The unit finder `0x0065A950` / `0x0065AC70` (FetishAura) has no
-   owning spec (`missiles/bodies-2.md` Open question 3); FetishAura's
-   result does not depend on it (Edge case 9).
-6. DiabPrison without a target reads P +0x10 / +0x12 as (GUID, type 2)
-   of an object: which caller stores an object target that way (AI
-   `0x005FD55B` also calls `0x005B34C0`).
+5. Answered: the unit finder `0x0065A950` / `0x0065AC70` is specified
+   in `monsters/umod-callbacks.md` §3.1.
+6. Answered: P +0x10 / +0x12 are the path's target position (u16 x, y;
+   written by the path code `0x00648AD0`, `0x00648B00`, `0x006492F0`,
+   `0x006498A0`, `0x00649970`; `sim/pathing.md` §3, §11.1), never a
+   (GUID, type) pair. DiabPrison reinterprets them: the object branch
+   runs only when the target y is 2, with the target x as the GUID.
+   Implement the literal rule (§5.31 step 2).
 7. `0x005B3270` (pattern spawn with a coordinate table; also called by
    population `0x0054E1CB`): owner `monsters/init.md`; only the kinds
    1 and 3 used by DiabPrison are stated here.
