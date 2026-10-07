@@ -23,7 +23,9 @@ use d2_sim::units::{ClientId as SimClient, RoomId, UnitId, UnitType};
 
 use super::handlers;
 use super::handlers::player::{HotKey, HOTKEY_SLOTS};
+use super::handlers::world::ActionEvents;
 use super::handlers::world::{self as world_handlers, NoWorld, WorldError, WorldHost};
+use super::session_flow::{SessionFlow, SessionRunner};
 use crate::seams::{
     ClientId, Intents, MessageSink, PlayerGate, PlayerLookup, PointState, Pos, ResultCode, Tick,
     UnitTarget,
@@ -110,6 +112,10 @@ pub struct SimGame<D = Unspecified, W = NoWorld> {
     /// written by C→S 0x51, `intents-events.md` §9 rule 12; read by the
     /// join's S→C 0x7B, §8.2 rule 3.6).
     hotkeys: BTreeMap<ClientId, [HotKey; HOTKEY_SLOTS]>,
+    /// The session sequence of C→S 0x67 / 0x6B (`intents-events.md` §8,
+    /// [`super::session_flow`]); `None`: every system message goes to the
+    /// host's `SessionHandler`.
+    session: Option<Box<dyn SessionRunner<D, W>>>,
 }
 
 /// [`SimGame`]'s fields borrowed apart (for a handler).
@@ -150,7 +156,22 @@ impl<D: EventDispatch, W> SimGame<D, W> {
             world,
             tick_faults: Vec::new(),
             hotkeys: BTreeMap::new(),
+            session: None,
         }
+    }
+
+    /// Runs C→S 0x67 / 0x6B through `flow` from now on.
+    pub fn set_session(&mut self, flow: SessionFlow<D, W>)
+    where
+        D: ActionEvents + 'static,
+        W: 'static,
+    {
+        self.session = Some(Box::new(flow));
+    }
+
+    /// The session flow, if one is set.
+    pub fn session(&self) -> Option<&SessionFlow<D, W>> {
+        self.session.as_deref().map(|r| r.flow())
     }
 
     /// Adds a client record for transport client `client`
@@ -393,6 +414,22 @@ impl<D: EventDispatch, W: WorldHost<D>> Intents for SimGame<D, W> {
             .into_iter()
             .filter_map(|id| self.transport_ids.get(&id).copied())
             .collect()
+    }
+
+    /// The game's session flow, when set ([`SimGame::set_session`]).
+    fn session_message(
+        &mut self,
+        client: ClientId,
+        msg: &[u8],
+        _size: usize,
+        out: &mut dyn MessageSink,
+    ) -> bool {
+        let Some(mut flow) = self.session.take() else {
+            return false;
+        };
+        let handled = flow.run(self, client, msg, out);
+        self.session = Some(flow);
+        handled
     }
 }
 

@@ -218,7 +218,7 @@ impl<X: Pending> View<'_, X> {
     /// TODO(spec: intents-events.md §7.9 rule 3): with a hover text set,
     /// the overhead chat 0x26 (`0x0053C750`) carries the hover record's
     /// text, which d2rs does not keep; nothing is sent then.
-    fn overhead_message(&mut self, receiver: UnitId, unit: UnitId, ty: u8, guid: u32) {
+    pub(super) fn overhead_message(&mut self, receiver: UnitId, unit: UnitId, ty: u8, guid: u32) {
         if self.units.get(unit).is_some_and(|r| r.hover.is_none()) {
             self.h.x.send(receiver, &messages::unit_ref(0x76, ty, guid));
         }

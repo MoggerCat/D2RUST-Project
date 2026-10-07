@@ -251,6 +251,9 @@ pub struct ActEntry {
     /// Act +0x58: some room has unit-removal records (`tick.md` step 7).
     /// Set by the unit-removal message path (not specified yet).
     pub pending_removals: bool,
+    /// Act +0x04: the environment record (`render/lighting.md` §9.1),
+    /// created with the act.
+    pub environment: crate::world::environment::Environment,
     /// Room list head (+0x10).
     rooms_head: Option<RoomId>,
 }

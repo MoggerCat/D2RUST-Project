@@ -1,4 +1,4 @@
-// Spec: specs/sim/intents-events.md §8.1, §8.2; specs/sim/path-placement.md §11, §13; specs/client/model.md §11 rules 1, 3; specs/formats/d2s-load.md
+// Spec: specs/sim/intents-events.md §8.1, §8.2; specs/render/lighting.md §9.2; specs/sim/path-placement.md §11, §13; specs/client/model.md §11 rules 1, 3; specs/formats/d2s-load.md
 //! The single-player session sequence of a client whose player is not
 //! yet placed (`intents-events.md` §8): the game-creation messages of
 //! C→S 0x67 (`0x00530BF0`, [`create_game`]) and the join of C→S 0x6B
@@ -25,7 +25,9 @@
 //! 7. S→C 0x03 LoadAct (rule 4; `model.md` §11 rule 1, builder
 //!    `0x0053ABE0` → `0x0053B390`): the act, game +0x7C (the act DRLG's
 //!    init seed), the act's town level id (act +0x08), game +0x80
-//!    (`dwObjSeed`); client state 2;
+//!    (`dwObjSeed`), then S→C 0x53 with the act's environment record
+//!    (`render/lighting.md` §9.1, §9.2 rule 2; [`d2_sim::world::environment`]);
+//!    client state 2;
 //! 8. game entry `0x005394A0` (rule 5, `path-placement.md` §11):
 //!    S→C 0x07 for the spawn room of the act's town, the room switch
 //!    (`intents-events.md` §7.8: 0x07 and the add messages for every room
@@ -53,7 +55,6 @@
 //! - the item messages of rule 3.5 and the update-list reset of rule 3.10
 //!   (the item world is not reachable from the session), and
 //!   `0x0058A0A0` of an expansion game;
-//! - S→C 0x53 after 0x03 (rule 4: the three outputs of `0x0061C330`);
 //! - followers (`path-placement.md` §13 rule 4).
 
 use d2_formats::d2s::D2s;
@@ -297,6 +298,13 @@ pub fn enter_game<D: ActionEvents, W>(
         .hooks
         .x
         .send(player, &load_act(entry.act, map_seed, obj_seed).encode());
+    let env = s
+        .game
+        .lists
+        .act(entry.act)
+        .map(|r| r.environment)
+        .ok_or(JoinError::NoAct(entry.act))?;
+    a.sys.hooks.x.send(player, &env.message());
     if let Some(e) = s.game.lists.client_mut(id) {
         e.state = client_state::ACT_LOADED;
     }
