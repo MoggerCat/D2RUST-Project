@@ -48,17 +48,17 @@
 |   3. Checksum (`0x00411130`) | 375–385 |
 |   4. Quest section (298 bytes at 0x14F) | 386–406 |
 |   5. Waypoint section (80 bytes at 0x279) | 407–412 |
-|   6. NPC flag section (52 bytes at 0x2C9) | 413–451 |
-|   7. Stats and skills | 452–544 |
-|   8. Item sections | 545–729 |
-|   9. Load sequence (`0x0056B180`) | 730–754 |
-|   10. Errors | 755–801 |
-| Constants & data dependencies | 802–821 |
-| Randomness | 822–826 |
-| Edge cases & original bugs | 827–893 |
-| Test vectors | 894–933 |
-| Provenance | 934–1013 |
-| Open questions | 1014–1084 |
+|   6. NPC flag section (52 bytes at 0x2C9) | 413–458 |
+|   7. Stats and skills | 459–551 |
+|   8. Item sections | 552–736 |
+|   9. Load sequence (`0x0056B180`) | 737–761 |
+|   10. Errors | 762–808 |
+| Constants & data dependencies | 809–828 |
+| Randomness | 829–833 |
+| Edge cases & original bugs | 834–900 |
+| Test vectors | 901–940 |
+| Provenance | 941–1020 |
+| Open questions | 1021–1095 |
 <!-- /index -->
 
 ## Summary
@@ -433,14 +433,21 @@ Read failures are internal code 16.
    A class id not in the table uses bit 0.
 3. Field B is the intro record of `world/quests.md` §6.7 (set
    `0x00572420`, test `0x00572470`, clear `0x005724C0`; set in bulk
-   per act list on act transitions). Field A holds the per-NPC
+   per act list on act transitions). Field A (D2MOO 1.10f name
+   `pQuestIntroFlags`, the first of the two buffers) holds the per-NPC
    first-talk bits of the act intro quests (`world/quests.md` §10.3,
    Act I intro chain 37): set `0x00572360`(player, game, NPC class) by
-   the intro chains' event-11 callbacks (call sites `0x0058F8C2` in
-   Act I `0x0058F870`, `0x00598464` in Act II `0x005983E0`,
-   `0x005B6CCF` in Act III `0x005B6C60`, and `0x0058E9D4`,
-   `0x0058EA25` in code before the Act V intro init `0x0058EA50` that
-   Ghidra did not make a function; found with `disasm.py xref`), tested
+   the intro chains' event-11 callbacks. It has exactly five direct
+   calls, all outside Ghidra function bodies (so `all.asm` and
+   `index/calls.tsv` miss them; found with `disasm.py xref 0x00572360`
+   and each read with `disasm.py at` as a `call 0x572360` after the
+   class compare): `0x0058F8C2` in Act I `0x0058F870`, `0x00598464` in
+   Act II `0x005983E0` (chain 38 event 11), `0x005B6CCF` in Act III
+   `0x005B6C60`, and `0x0058E9D4`, `0x0058EA25` in code before the
+   Act V intro init `0x0058EA50`. The setter scans the rule 2 pairs
+   in order and sets only the bit of the first pair whose class id
+   matches (no extra bit 0); only when no pair matches does it set
+   bit 0. Tested
    by `0x005723C0` from those chains' event-0 and active functions.
    Confirmed on a save: after the player talked to Kashya (class 150,
    bit 3) in Normal, A of difficulty 0 is `08 00 …` and B stays zero.
@@ -1053,8 +1060,12 @@ and prints every field; it holds no save data.
    single-player game has type 3 (`sim/rng.md` Open question 2): two
    loads of one save produce the same map.
 10. **Answered** (§6 rule 3): field A is the act intro quests'
-    first-talk bits, set from five call sites the Ghidra export missed;
-    a save after talking to Kashya has her bit set in A. Still
+    first-talk bits (D2MOO `pQuestIntroFlags`), set by `0x00572360`
+    from its five direct calls `0x0058E9D4`, `0x0058EA25`,
+    `0x0058F8C2`, `0x00598464`, `0x005B6CCF`, which the Ghidra export
+    missed (they lie outside function bodies); the setter writes only
+    the first matching pair's bit. A save after talking to Kashya has
+    her bit set in A. Still
     unmeasured: the other Act I NPCs' bits (expected from the same
     table, §6 rule 2).
 11. Item unit +0xC8 bit 0x8000 (items skipped by the writer, §8.1
