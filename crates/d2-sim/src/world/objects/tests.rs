@@ -110,6 +110,7 @@ fn tables() -> ObjectTables {
         objects,
         shrines: shrines(),
         levels,
+        objgroup: Vec::new(),
     }
 }
 
@@ -164,8 +165,14 @@ fn control_build_seed_regions_and_shrine_lists() {
             ctl.regions[id],
             Some(Region {
                 act,
+                counted: 0,
                 w08: 0x7FFF_FFFF,
-                w1c: -1
+                health: 0,
+                shrines: 0,
+                wells: 0,
+                w1c: -1,
+                well_points: [(0, 0); 4],
+                shrine_points: [(0, 0); 10],
             })
         );
     }
@@ -326,7 +333,8 @@ fn selectable_uses_mode_before_init() {
 #[test]
 fn anim_vector_and_sync() {
     let mut t = tables();
-    let mut f = fake(0, 2);
+    // From mode 1 (a set to the current mode runs no setup, §4 rule 5).
+    let mut f = fake(1, 2);
     f.seeds.insert(O, Seed::new(12345, 666));
     set_mode(&t, &mut f, O, ANIM, 0, true).unwrap();
     let mut u = Seed::new(12345, 666);
@@ -342,7 +350,7 @@ fn anim_vector_and_sync() {
     );
     // Sync ≠ 0: speed = d, no draw.
     t.objects[ANIM as usize].sync = 1;
-    let mut f = fake(0, 2);
+    let mut f = fake(1, 2);
     set_mode(&t, &mut f, O, ANIM, 0, false).unwrap();
     assert_eq!(f.seeds[&O], Seed::init());
     assert_eq!(f.calls[1], Call::Anim(O, 20 * 256, 768, 256));
@@ -353,6 +361,13 @@ fn anim_vector_and_sync() {
     set_mode(&t, &mut f, O, ANIM, 1, true).unwrap();
     assert_eq!(f.seeds[&O], Seed::init());
     assert_eq!(f.calls[1], Call::Anim(O, 0, 0, 0));
+    // §4 rule 5 / `objects-2.md` §24 rule 1: the same mode only writes
+    // (queue, flag 0x1): no animation setup, no draw.
+    let mut f = fake(0, 2);
+    f.seeds.insert(O, Seed::new(12345, 666));
+    set_mode(&t, &mut f, O, ANIM, 0, true).unwrap();
+    assert_eq!(f.calls, vec![Call::Mode(O, 0, true)]);
+    assert_eq!(f.seeds[&O], Seed::new(12345, 666));
     // Mode ≥ 8: fatal.
     assert_eq!(
         set_mode(&t, &mut f, O, ANIM, 8, true),

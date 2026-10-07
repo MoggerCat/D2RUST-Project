@@ -103,8 +103,7 @@ pub fn door<W: ObjectHost>(
 ) -> Result<i32, ObjectError> {
     let obj = op.object;
     // Rule 1 (host clock, edge case 9).
-    // TODO(objects.md §10 rule 1): the sum is read as a wrapping u32 and
-    // the compare as unsigned (`GetTickCount` is a DWORD).
+    // §10: unsigned 32-bit compare against (+0xD4 + 500) mod 2^32.
     let now = w.host_tick();
     if now < ctl.get(obj)?.last_tick.wrapping_add(DOOR_DEBOUNCE) {
         return Ok(1);
@@ -114,17 +113,14 @@ pub fn door<W: ObjectHost>(
     match mode {
         0 => open_door(ctl, t, w, obj, now)?,
         6 => {
-            // TODO(objects.md §10 rule 2): read as the key test function
-            // `0x0055F140` alone; the assassin exemption of §8.1 rule 2 is
-            // in the chest code and not applied. No operator: no key.
-            let pass = match op.operator {
-                Some(p) => w.key_test(p),
-                None => false,
+            // §10: the key test with no assassin exemption; with no
+            // operator it is fatal as for chests (`objects-2.md` §24 rule 6,
+            // unreachable with live data).
+            let Some(p) = op.operator else {
+                return Err(ObjectError::KeyTestNoUnit);
             };
-            if !pass {
-                if let Some(p) = op.operator {
-                    w.sound(p, sound::LOCKED, None, false);
-                }
+            if !w.key_test(p) {
+                w.sound(p, sound::LOCKED, None, false);
                 return Ok(1);
             }
             open_door(ctl, t, w, obj, now)?;
@@ -191,14 +187,14 @@ pub fn portal<W: ObjectHost>(
     op: &Operate,
 ) -> Result<Option<i32>, ObjectError> {
     let obj = op.object;
-    // TODO(objects.md §12): the rules name a player operator; a monster or
-    // no operator is read as refused (result 0).
-    let Some(p) = op.operator else {
-        return Ok(Some(0));
+    // Rule 5: P must exist and be a player, else fatal (`0x0058494F`);
+    // monsters are stopped by §7.1 (`MonsterOK` 0) before this.
+    let Some(p) = op
+        .operator
+        .filter(|&p| matches!(w.operator(p), Operator::Player(_)))
+    else {
+        return Err(ObjectError::PortalOperator);
     };
-    if !matches!(w.operator(p), Operator::Player(_)) {
-        return Ok(Some(0));
-    }
     // Rule 1: busy `0x00535060` (`items/inventory.md` §5.2: interact info,
     // cursor item, player data +0x4C).
     if w.interact_active(p) || w.cursor_item(p) || w.player_busy(p) {
@@ -212,7 +208,7 @@ pub fn portal<W: ObjectHost>(
         }
     }
     // Rule 2 (host clock, edge case 9).
-    // TODO(objects.md §12 rule 2): wrapping u32 sum, unsigned compare.
+    // §10 last paragraph: (hostile + 5000) mod 2^32, unsigned compare.
     if w.host_tick() < w.hostile_time(p).wrapping_add(PORTAL_HOSTILE_DELAY) {
         w.sound(p, sound::PORTAL_REFUSED, None, false);
         return Ok(Some(0));
@@ -242,7 +238,7 @@ fn well_mode(c: u32, parm2: u32) -> Result<Option<u8>, ObjectError> {
 }
 
 /// `0x00585720` (§11 rule 2): heal one vital stat. Returns whether it
-/// changed.
+/// wrote (the total was below its maximum).
 fn heal_vital<W: ObjectHost>(w: &mut W, p: UnitId, id: u16, max_id: u16, parm1: u32) -> bool {
     let cur = w.vital_stat(p, id);
     let max = w.vital_stat(p, max_id);
@@ -251,8 +247,9 @@ fn heal_vital<W: ObjectHost>(w: &mut W, p: UnitId, id: u16, max_id: u16, parm1: 
     }
     let v = cur.wrapping_add(max.wrapping_mul(parm1) >> 8).min(max);
     w.set_vital_stat(p, id, v);
-    // TODO(objects.md §11 rule 2): "changed" read as the value differing.
-    v != cur
+    // `objects-2.md` §24 rule 5: "used" is set by the write, also when the
+    // value is unchanged.
+    true
 }
 
 /// Operate 22 `0x005858A0` (§11). Returns 0 always (edge case 10).
@@ -319,9 +316,9 @@ pub fn well_refill<W: ObjectHost>(
         return Err(ObjectError::WellCharges(c as u8));
     }
     if let Some(mode) = well_mode(c, parm2)? {
-        // TODO(objects.md §11 event 2): the mode set is read as not
-        // queueing; the explicit queue below does.
-        set_mode(t, w, obj, class, mode, false)?;
+        // `objects-2.md` §24 rule 7: the ordinary mode set (queues, flag
+        // 0x1); the explicit queue and flag below repeat it.
+        set_mode(t, w, obj, class, mode, true)?;
     }
     ctl.get_mut(obj)?.interact = c as u8;
     w.queue_update(obj);

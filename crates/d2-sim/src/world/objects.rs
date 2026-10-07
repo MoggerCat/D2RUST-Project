@@ -15,7 +15,7 @@
 
 use std::collections::BTreeMap;
 
-use d2_data::tables::{Levels, Objects, Shrines};
+use d2_data::tables::{Levels, Objects, Objgroup, Shrines};
 
 use crate::rng::Seed;
 use crate::units::{RoomId, UnitId};
@@ -24,6 +24,7 @@ pub mod chests;
 #[cfg(test)]
 pub(crate) mod fake;
 pub mod misc;
+pub mod populate;
 pub mod shrines;
 #[cfg(test)]
 mod tests;
@@ -104,6 +105,22 @@ pub enum ObjectError {
     NoData(UnitId),
     #[error("{table} has no row {row}")]
     NoRow { table: &'static str, row: u32 },
+    #[error("object {0} allocation failed (fatal)")]
+    AllocFailed(u16),
+    #[error("shrine effect with no operator (null read)")]
+    ShrineNoOperator,
+    #[error("portal operated with no player (0x0058494F)")]
+    PortalOperator,
+    #[error("key test with no unit (0x0055F173)")]
+    KeyTestNoUnit,
+    #[error("room {0:?} has no active room seed")]
+    NoActiveRoom(RoomId),
+    #[error("populate function {0} ≥ 10")]
+    PopulateFn(u8),
+    #[error("populate density {0} out of range")]
+    Density(u8),
+    #[error("room theme {0}: body not specified (object-population.md open question 5)")]
+    Theme(u32),
 }
 
 // ------------------------------------------------------------------ tables
@@ -114,6 +131,9 @@ pub struct ObjectTables {
     pub objects: Vec<Objects>,
     pub shrines: Vec<Shrines>,
     pub levels: Vec<Levels>,
+    /// `objgroup.txt` (`d2exp`; object population, `object-population.md`
+    /// §5).
+    pub objgroup: Vec<Objgroup>,
 }
 
 impl ObjectTables {
@@ -212,16 +232,45 @@ pub struct ObjectData {
     pub last_tick: u32,
 }
 
-/// A level's object region (§2 rule 4); the population fields are not
-/// covered yet (§15).
+/// A level's object region (§2 rule 4; the population fields:
+/// `object-population.md` §2).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Region {
     /// +0x00 `levels.Act`.
     pub act: u8,
-    /// +0x08.
+    /// +0x04: rooms counted so far.
+    pub counted: i32,
+    /// +0x08: populated-room total, 0x7FFFFFFF until set.
     pub w08: i32,
+    /// +0x10: health shrines.
+    pub health: i32,
+    /// +0x14: shrines (≤ 10).
+    pub shrines: i32,
+    /// +0x18: wells (≤ 4).
+    pub wells: i32,
     /// +0x1C.
     pub w1c: i32,
+    /// +0x20: well points.
+    pub well_points: [(i32, i32); 4],
+    /// +0x40: shrine points.
+    pub shrine_points: [(i32, i32); 10],
+}
+
+impl Region {
+    /// A region as the control build leaves it (§2 rule 4).
+    pub fn new(act: u8) -> Self {
+        Self {
+            act,
+            counted: 0,
+            w08: 0x7FFF_FFFF,
+            health: 0,
+            shrines: 0,
+            wells: 0,
+            w1c: -1,
+            well_points: [(0, 0); 4],
+            shrine_points: [(0, 0); 10],
+        }
+    }
 }
 
 /// The object control (game +0x10F0, §2) and the per-object data.
@@ -243,11 +292,7 @@ impl ObjectControl {
         let lo = game_seed.step();
         let mut regions = vec![None];
         for l in t.levels.iter().skip(1) {
-            regions.push(Some(Region {
-                act: l.act,
-                w08: 0x7FFF_FFFF,
-                w1c: -1,
-            }));
+            regions.push(Some(Region::new(l.act)));
         }
         let mut shrine_lists: [Vec<u16>; 8] = Default::default();
         for (i, s) in t.shrines.iter().enumerate() {
@@ -377,7 +422,13 @@ pub fn set_mode<W: ObjectWorld>(
         return Err(ObjectError::Mode(mode));
     }
     let o = t.object(class)?;
+    // Rule 5 / `sim/units.md` §4.1: the same mode only queues the unit and
+    // sets flag 0x1 (no animation setup, no draw).
+    let same = w.mode(obj) == mode;
     w.write_mode(obj, mode, queue);
+    if same {
+        return Ok(());
+    }
     let frame_count = frame_cnt(o, mode) as i32;
     let frame = i32::from(start(o, mode)) * 256;
     let d = frame_delta(o, mode) as i16;
@@ -385,8 +436,8 @@ pub fn set_mode<W: ObjectWorld>(
         d
     } else {
         let r = w.unit_seed(obj).map_or(0, |s| s.roll(i32::from(d >> 3))) as i32;
-        // TODO(objects.md §4 rule 3): the sum is read in 32 bits; only the
-        // shift is stated as 16-bit. The clamps then bound it.
+        // Rule 4: a 32-bit sum of the sign-extended values, clamped, low
+        // 16 bits stored.
         let s = r + i32::from(d) - i32::from(d >> 4);
         s.clamp(0, 0x7FFF) as i16
     };
@@ -905,7 +956,8 @@ pub fn create_preset<W: ObjectHost>(
                 d.interact = 3;
             }
             set_flag(w, obj, oflags::KEEP_MODE, true);
-            // TODO(objects.md §6): "mode 0" is read as the §4 mode set.
+            // `objects-2.md` §24 rule 1: the ordinary mode set (already in
+            // mode 0: no setup, no draw; queued, flag 0x1).
             set_mode(t, w, obj, 371, 0, true)?;
             Ok(Preset::Object(Some(obj)))
         }

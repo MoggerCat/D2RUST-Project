@@ -442,6 +442,21 @@ impl<X: Pending> View<'_, X> {
         }
     }
 
+    /// Object population `0x00552610` of the room `info` describes
+    /// (`object-population.md`) on the object state. `None`: no object
+    /// state (the caller keeps its [`Pending`] answer).
+    pub fn populate_objects(
+        &mut self,
+        game: &mut Game,
+        info: &objects::populate::RoomInfo,
+    ) -> Option<objects::populate::Populated> {
+        self.h.objects.as_ref()?;
+        let r = with_objects(game, self, |ctl, t, w| {
+            objects::populate::populate_room(ctl, t, w, info)
+        })?;
+        log(self, r)
+    }
+
     /// The object mode change `0x00624690` of an object with object data
     /// ([`objects::set_object_mode`]); `false`: no object state or no
     /// data for `object` (the caller keeps its [`Pending`] answer).
@@ -705,6 +720,53 @@ impl<X: Pending> ObjectWorld for ObjectView<'_, X> {
     }
 }
 
+/// The population seams on the act DRLG: the active room seed (+0x6C),
+/// the level's populated-room count (`0x0061ABF0` → `0x00642BE0`), the
+/// collision queries of `0x0064D800` (`object-population.md` §6) and the
+/// unit record's class.
+impl<X: Pending> objects::populate::PopulateWorld for ObjectView<'_, X> {
+    fn room_seed(&mut self, room: RoomId) -> Option<&mut Seed> {
+        let act = self.game.lists.room(room)?.act;
+        let d = self
+            .v
+            .h
+            .drlg
+            .dungeon
+            .acts
+            .get_mut(usize::from(act))?
+            .as_mut()?;
+        let r = d.drlg_room_of(room)?;
+        d.active_room_seed_mut(r)
+    }
+    fn populated_room_count(&mut self, act: u8, level: u32) -> i32 {
+        let r = self.v.h.drlg.with_act(act, &mut self.game.lists, |d, svc| {
+            d.populated_room_count(svc.data, svc.types, level)
+        });
+        match r {
+            Some(Ok(n)) => n as i32,
+            Some(Err(e)) => {
+                self.v.h.errors.push(WiringError::Drlg(e));
+                0
+            }
+            None => 0,
+        }
+    }
+    fn box_query(&self, room: RoomId, x: i32, y: i32, sx: u32, sy: u32, mask: u32) -> u32 {
+        let mask = mask as u16;
+        let drlg = &self.v.h.drlg;
+        u32::from(if sx <= 1 && sy <= 1 {
+            crate::path::collision::point_value(drlg, Some(room), x, y, mask)
+        } else {
+            crate::path::collision::box_value(drlg, Some(room), x, y, (sx, sy), mask)
+        })
+    }
+    fn set_unit_class(&mut self, unit: UnitId, class: u16) {
+        if let Some(r) = self.record(unit) {
+            r.class = u32::from(class);
+        }
+    }
+}
+
 /// The chest seams on the providers the action wiring holds: the chest
 /// drop on [`super::ActionHooks::object_drops`]
 /// ([`crate::wiring::economy::object_chest_drop`]), unit type (unit
@@ -752,6 +814,36 @@ impl<X: Pending> ChestWorld for ObjectView<'_, X> {
     }
     fn room_units(&self, room: RoomId) -> Vec<UnitId> {
         self.game.lists.room_units(room)
+    }
+    /// The lent monster world's region (`population.md` §2.2).
+    fn monster_region_classes(&self, level: u32) -> Option<Vec<i32>> {
+        self.v.h.monster_world.as_ref()?.region_classes(level)
+    }
+    fn monstats_count(&self) -> u32 {
+        self.v
+            .h
+            .monster_world
+            .as_ref()
+            .map_or(0, |m| m.monstats_count())
+    }
+    fn unit_class(&self, unit: UnitId) -> Option<u32> {
+        self.v.units.get(unit).map(|r| r.class)
+    }
+    /// `0x00620510` for an object (`SizeX`); other units: not read here.
+    fn unit_size(&self, unit: UnitId) -> i32 {
+        self.v
+            .units
+            .get(unit)
+            .filter(|r| r.ty == UnitType::Object)
+            .and_then(|r| self.tables.object(r.class as u16).ok())
+            .map_or(0, |o| o.sizex as i32)
+    }
+    fn room_rect(&self, room: RoomId) -> Option<(i32, i32, i32, i32)> {
+        self.v
+            .h
+            .drlg
+            .subtiles(self.game, room)
+            .map(|r| (r.x, r.y, r.w, r.h))
     }
 }
 /// The shrine seams on the unit's stat list (`sim/stats.md`: getter

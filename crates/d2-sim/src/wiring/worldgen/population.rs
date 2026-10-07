@@ -35,6 +35,42 @@ impl<X: WorldPending> WorldHost<'_, X> {
         Some((act, d.drlg_room_of(room)?))
     }
 
+    /// The room facts object population reads (`object-population.md` §1,
+    /// §3, §6): L0 (`0x0061A1B0`), the populated level (`0x0061A1F0`), the
+    /// waypoint flags 0x30000 (`0x0061A210`), the dirt-path test
+    /// (`0x0061ABB0`: room type 1 and outdoor room flags +0x54 bit 0x80)
+    /// and the sub-tile rect (`0x00619730`).
+    pub(super) fn object_room_info(
+        &self,
+        room: RoomId,
+    ) -> crate::world::objects::populate::RoomInfo {
+        let b = self.room_box(room);
+        let (waypoint, dirt_path) = self.drlg_room(room).map_or((false, false), |(act, r)| {
+            let d = self.v.h.drlg.dungeon.acts[usize::from(act)].as_ref();
+            let dr = d.map(|d| d.room(r));
+            let waypoint =
+                dr.is_some_and(|dr| dr.flags & crate::drlg::room_flags::ANY_WAYPOINT != 0);
+            let outdoor = dr.is_some_and(|dr| dr.kind == crate::drlg::RoomKind::Outdoor);
+            let dirt = outdoor
+                && self
+                    .w
+                    .types
+                    .borrow()
+                    .act_outdoor(act)
+                    .and_then(|o| o.room(r))
+                    .is_some_and(|o| o.flags & 0x80 != 0);
+            (waypoint, dirt)
+        });
+        crate::world::objects::populate::RoomInfo {
+            room,
+            level: self.room_level_id(room) as u32,
+            populated: self.populated_level(room) as u32,
+            waypoint,
+            dirt_path,
+            rect: (b.x, b.y, b.width, b.height),
+        }
+    }
+
     /// A scratch seed for a room without an active DRLG room (an error is
     /// logged with it).
     fn orphan_seed(&mut self, room: RoomId) -> &mut Seed {

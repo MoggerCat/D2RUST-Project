@@ -198,6 +198,7 @@ fn setup(code: u8) -> Setup {
         objects: vec![blank_object(), blank_object(), o],
         shrines: vec![blank_shrine(), s],
         levels: vec![blank_level(), blank_level(), blank_level()],
+        objgroup: Vec::new(),
     };
     let mut ctl = ObjectControl {
         seed: Seed::init(),
@@ -282,7 +283,7 @@ fn operate_full_sequence() {
             Call::Other(format!("create_hover 10 {}", 3683 + 1)),
             Call::Queue(OBJ),
             Call::Schedule(OBJ, oevent::HOVER, 1300),
-            Call::Other(format!("set 20 6 {}", 500 << 8)),
+            Call::Other(format!("add 20 6 {}", 500 << 8)),
             Call::Schedule(OBJ, oevent::SHRINE_RESET, 1000 + 2400 + 1),
             Call::Schedule(OBJ, oevent::END_ANIM, 1000 + 10 + 1),
         ]
@@ -309,9 +310,20 @@ fn operate_refusals() {
 // Covers: specs/world/objects.md §9.1 r2, §9.1 r4
 #[test]
 fn operate_without_operator_keeps_field_zero_and_runs_no_effect() {
+    // §9.1 "No guards": rules 1–3 run, then the effect reads the missing
+    // operator (fatal; unreachable with live data).
     let mut s = setup(2);
     s.w.stats.insert((P, K_MAX_LIFE), 100);
-    assert_eq!(s.op(None), 1);
+    let op = Operate {
+        object: OBJ,
+        operator: None,
+        class: CLASS,
+        operate_fn: 2,
+    };
+    assert_eq!(
+        operate(&mut s.ctl, &s.t, &mut s.w, &op),
+        Err(ObjectError::ShrineNoOperator)
+    );
     assert_eq!(s.ctl.data[&OBJ].operator, 0);
     assert_eq!(s.w.modes[&OBJ], 1);
     assert!(s.others().is_empty());
@@ -355,7 +367,7 @@ fn dispatch_runs_operate_2() {
     s.w.stats.insert((P, K_MAX_MANA), 300);
     let r = dispatch(&mut s.ctl, &s.t, &mut s.w, OBJ, Some(P)).unwrap();
     assert_eq!(r, Dispatch::Done(1));
-    assert_eq!(s.others(), vec!["set 20 8 300".to_string()]);
+    assert_eq!(s.others(), vec!["add 20 8 300".to_string()]);
 }
 
 // Covers: specs/world/objects.md §9.1 text
@@ -437,12 +449,13 @@ fn health_and_mana_shrines_only_fill() {
         s.w.stats.insert((P, stat::LIFE), 100);
         s.w.stats.insert((P, K_MAX_LIFE), 400);
     });
-    assert_eq!(got, vec!["set 20 6 400"]);
+    // Base-stat adds of max − total (§9.2).
+    assert_eq!(got, vec!["add 20 6 300"]);
     let got = run(3, |s| {
         s.w.stats.insert((P, stat::MANA), 0);
         s.w.stats.insert((P, K_MAX_MANA), 256);
     });
-    assert_eq!(got, vec!["set 20 8 256"]);
+    assert_eq!(got, vec!["add 20 8 256"]);
 }
 
 // Covers: specs/world/objects.md §9.2
@@ -459,8 +472,8 @@ fn life_to_mana_code_4() {
     assert_eq!(
         got,
         vec![
-            format!("set 20 6 {}", (1000 << 8) - 300 * 256),
-            format!("set 20 8 {}", 7 + 115_200),
+            format!("add 20 6 {}", -300 * 256),
+            format!("add 20 8 {}", 115_200),
         ]
     );
 }
@@ -475,7 +488,7 @@ fn mana_to_life_code_5() {
         s.w.stats.insert((P, stat::MANA), 999);
         s.w.stats.insert((P, stat::LIFE), 10);
     });
-    assert_eq!(got, vec!["set 20 8 700", "set 20 6 458"]);
+    assert_eq!(got, vec!["add 20 8 -299", "add 20 6 448"]);
 }
 
 // Covers: specs/world/objects.md §9.2
@@ -666,23 +679,23 @@ fn storm_shrine() {
         s.w.stats.insert((UnitId(31), stat::LIFE), 255);
         s.w.stats.insert((P, K_LEVEL), 47);
     });
-    // 30: (101 · 50 / 100) · 256 = 50 · 256; 31: life >> 8 = 0.
-    assert_eq!(got[0], format!("set 30 6 {}", (101 << 8) + 7 - 50 * 256));
-    assert_eq!(got[1], "set 31 6 255");
-    let missiles: Vec<&String> = got[2..].iter().collect();
+    // 30: (101 · 50 / 100) · 256 = 50 · 256, a base-stat add; 31: life >>
+    // 8 = 0, a 0 add writes nothing.
+    assert_eq!(got[0], format!("add 30 6 {}", -50 * 256));
+    let missiles: Vec<&String> = got[1..].iter().collect();
     assert_eq!(missiles.len(), 16);
     // Level 47 / 5 = 9 → 8.
     assert_eq!(
         missiles[0],
-        "missile 62 owner 20 from 10 (5, 5) lvl 8 flags 0x0"
+        "missile 62 owner 20 from 10 (5, 5) lvl 8 flags 0x3"
     );
     assert_eq!(
         missiles[1],
-        "missile 62 owner 20 from 10 (5, -10) lvl 8 flags 0x0"
+        "missile 62 owner 20 from 10 (5, -10) lvl 8 flags 0x3"
     );
     assert_eq!(
         missiles[15],
-        "missile 62 owner 20 from 10 (-20, -20) lvl 8 flags 0x0"
+        "missile 62 owner 20 from 10 (-20, -20) lvl 8 flags 0x3"
     );
     assert_eq!(missile_level(0), 1);
     assert_eq!(missile_level(4), 1);

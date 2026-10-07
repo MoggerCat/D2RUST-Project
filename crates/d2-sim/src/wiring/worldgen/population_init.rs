@@ -230,7 +230,15 @@ impl<X: WorldPending> MonsterInit for WorldHost<'_, X> {
         self.v.h.x.restore_inactive_units(room);
     }
 
+    /// `0x00552610` (`object-population.md`) on the action wiring's
+    /// object state with the room facts of the DRLG; a game without one:
+    /// [`WorldPending::populate_objects`].
     fn populate_objects(&mut self, room: RoomId) {
-        self.v.h.x.populate_objects(room);
+        if self.v.h.objects.is_none() {
+            self.v.h.x.populate_objects(room);
+            return;
+        }
+        let info = self.object_room_info(room);
+        self.v.populate_objects(self.game, &info);
     }
 }

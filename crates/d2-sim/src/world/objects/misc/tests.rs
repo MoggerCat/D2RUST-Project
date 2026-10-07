@@ -327,12 +327,13 @@ fn well_charge_vector() {
     assert_eq!(ctl.get(O).unwrap().interact, 2);
     assert_eq!(modes(&f), vec![1, 2, 1, 0]);
     assert_eq!(f.modes[&O], 0);
-    // Refill: mode set without queueing, then queue and flag 0x1.
+    // Refill: the ordinary mode set (queues), then queue and flag 0x1
+    // again (`objects-2.md` §24 rule 7).
     let n = f.calls.len();
     assert_eq!(
         f.calls[n - 3..],
         [
-            Call::Mode(O, 0, false),
+            Call::Mode(O, 0, true),
             Call::Anim(O, 0, 0, 0),
             Call::Queue(O)
         ]
@@ -403,9 +404,14 @@ fn portal_busy_and_owner() {
     let (mut ctl, mut f) = setup(PORTAL, 1);
     f.stats.insert((P, TRAVEL), 1);
     assert_eq!(run(&mut ctl, &t, &mut f, Some(P)), Dispatch::Done(1));
-    // Monster or no operator: refused.
-    assert_eq!(run(&mut ctl, &t, &mut f, Some(M)), Dispatch::Done(0));
-    assert_eq!(run(&mut ctl, &t, &mut f, None), Dispatch::Done(0));
+    // §12 rule 5: a monster or no operator is fatal (`0x0058494F`; §7.1
+    // stops monsters before the dispatch with live data).
+    for op in [Some(M), None] {
+        assert_eq!(
+            dispatch(&mut ctl, &t, &mut f, O, op),
+            Err(ObjectError::PortalOperator)
+        );
+    }
 }
 
 // Covers: specs/world/objects.md §12 r2, §12 r3, §edge-cases-original-bugs r9

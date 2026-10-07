@@ -53,6 +53,7 @@ fn tables() -> Arc<ObjectTables> {
         ],
         shrines: Vec::new(),
         levels,
+        objgroup: Vec::new(),
     })
 }
 

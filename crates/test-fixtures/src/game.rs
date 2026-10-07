@@ -154,6 +154,7 @@ impl GameData {
             objects: self.rows::<d2_data::tables::Objects>()?,
             shrines: self.rows::<d2_data::tables::Shrines>()?,
             levels: self.rows::<Levels>()?,
+            objgroup: self.rows::<d2_data::tables::Objgroup>()?,
         })
     }
 

@@ -107,6 +107,7 @@ fn fixture(objects: bool) -> Fx {
             objects: rows(),
             shrines: Vec::new(),
             levels: levels(),
+            objgroup: Vec::new(),
         }));
     }
     let mut alloc = |game: &mut Game, ty: UnitType, class: u32, x: i32| {

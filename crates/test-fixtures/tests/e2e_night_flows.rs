@@ -135,6 +135,7 @@ fn object_tables() -> ObjectTables {
         objects,
         shrines,
         levels: d.rows::<Levels>().unwrap(),
+        objgroup: Vec::new(),
     }
 }
 
