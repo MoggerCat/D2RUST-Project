@@ -37,7 +37,7 @@
 | Edge cases & original bugs | 715–735 |
 | Test vectors | 736–795 |
 | Provenance | 796–846 |
-| Open questions | 847–908 |
+| Open questions | 847–912 |
 <!-- /index -->
 
 ## Summary
@@ -125,7 +125,7 @@ offset seen in the 1.14d code named in the last column):
 | +0xAC | combat list | own entries dropped at every mode set | `0x0057C980` |
 | +0xC4 | flags | bit 0x1 changed (set by every mode set), 0x2 tile, 0x10 new, not yet announced to clients (every allocation; cleared with 0x1 by the room clean-up `0x00553220`; `items/inventory.md` §6.3; D2MOO `INITSEEDSET`), 0x40 cleared by attack-mode starts, 0x100 hover freed, 0x2000 queued (`unit-order.md` §6), 0x10000 dead, 0x80000 monster mode changing | `0x00555230`, `0x00624690`, `0x0057FED8`, `0x005541B8`, `0x005A7C20` |
 | +0xC8 | flags 2 | 0x2000000 expansion (game +0x70 ≠ 0), 0x4000000 server unit (every allocation) | `0x005552B6` |
-| +0xD0 | node index | 11 at allocation | `0x00555339` |
+| +0xD0 | node index: target-node list slot 0–9 (`monsters/ai.md` §5.2), 11 = in no list | 11 at allocation | `0x00555339` |
 | +0xDC | timer list head | `unit-order.md` §8 | `0x00553980` |
 | +0xE0, +0xE4, +0xE8 | update, hash, room links | `unit-order.md` | — |
 
@@ -899,9 +899,13 @@ checked zero through `0x006E8FDC`), jump tables `0x00623C04` /
    GUIDs are kept; other units come back with new GUIDs; restore order
    monsters, items, others, each newest first). Answered 2026-10-07:
    node index (`+0xD0`) is the unit's target-node list (game +0x10F8,
-   lists 0–7 per player, 8 and 9 special; inserts `0x005B1900`
-   (`skills/bodies.md` §6.3) and `0x005B1990` (`population.md` OQ7));
-   11 = in no list. Open: the meaning of the fields from `0x005B0D60`,
+   lists 0–7 per player, 8 and 9 special); 11 = in no list.
+   Answered 2026-10-07 (the inserts, owner `monsters/ai.md` §5.2 with
+   its slot table): a player gets the first empty slot 0–7 at join
+   (`0x005B1880`); its attached units go right after the head
+   (`0x005B1900`, `skills/bodies.md` §6.3); slots 8 and 9 are filled
+   newest first by `0x005B1990`. Each insert requires node index 11
+   and sets it to the slot. Open: the meaning of the fields from `0x005B0D60`,
    `0x00573520`, `0x005A0140`, `0x00625D10`; whether a restored item
    keeps its GUID (`0x00541990`); a recording leaving and re-entering a
    wilderness area confirms the order (`unit-order.md` OQ3).
