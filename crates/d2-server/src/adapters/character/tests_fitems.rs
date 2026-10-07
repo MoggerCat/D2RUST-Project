@@ -3,7 +3,7 @@
 
 use super::*;
 
-// Covers: specs/formats/d2s-load.md §5 r2
+// Covers: specs/formats/d2s-load.md §5 r1, §5 r2
 #[test]
 fn refusal_table() {
     assert_eq!(refusal_message(1, false), (0, 5365));
