@@ -296,8 +296,8 @@ level-8 path (`npc.md` §7.3 step 2: at level ≥ 8 no quest is needed).
     show).
 - Save `bdMercTwo.d2s` 1,079 bytes, `d2s_check.py`: **24 pass, 0 fail**.
   For OQ4 (merc): header hireling block **present = True** (flags 0,
-  seed = the 0x81 / 0x4E seed above, name index 21 = 0x0D68 − first name
-  id, hireling type id 0 (Fire, Normal), experience 39,482), the
+  seed = the 0x81 / 0x4E seed above, name index 21 (would match 0x0D68 if the row's first name
+  id is 0x0D53, not checked), hireling type id 0 (Fire, Normal), experience 39,482), the
   `+0xBF..+0xCE` rest zero (PASS); `jf` present, hireling item list count
   0 (PASS, she wears nothing); `kf` g = 0; corpse count 0.
 
