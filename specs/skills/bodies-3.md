@@ -26,16 +26,16 @@
 | Outputs / state changes | 58–63 |
 | Rules | 64–65 |
 |   1. Conventions | 66–93 |
-|   2. Implementation questions answered | 94–188 |
-|   3. Shared helpers, batch 4 | 189–340 |
-|   4. Bodies used by several monster skills | 341–529 |
-|   5. Bodies used by one monster skill | 530–943 |
-| Constants & data dependencies | 944–979 |
-| Randomness | 980–996 |
-| Edge cases & original bugs | 997–1036 |
-| Test vectors | 1037–1051 |
-| Provenance | 1052–1070 |
-| Open questions | 1071–1090 |
+|   2. Implementation questions answered | 94–190 |
+|   3. Shared helpers, batch 4 | 191–342 |
+|   4. Bodies used by several monster skills | 343–531 |
+|   5. Bodies used by one monster skill | 532–946 |
+| Constants & data dependencies | 947–982 |
+| Randomness | 983–999 |
+| Edge cases & original bugs | 1000–1039 |
+| Test vectors | 1040–1054 |
+| Provenance | 1055–1073 |
+| Open questions | 1074–1095 |
 <!-- /index -->
 
 ## Summary
@@ -97,12 +97,14 @@ Answers to `docs/handoff/impl-skill-slots-2.md` Open questions (numbers
 kept). Rules owned by `bodies.md` / `bodies-2.md` are corrected here and
 those files point to this section.
 
-1. Answered (rule owner `sim/pets.md` §8, not edited here): the add
-   record of `0x00575D90` is {+0 pet GUID, +4 owner GUID, +8 class u16,
-   +0xC pet type} and `0x0053CB30` writes record +0 at message byte 5 and
-   +4 at byte 9: S→C 0x7A carries the **pet** GUID at +5 and the
-   **owner** GUID at +9, as `sim/server-messages.tsv`. `pets.md` §8 and
-   its test vector have them swapped.
+1. Answered (rule owner `sim/pets.md` §8 and its Provenance, not
+   edited here): the add record of `0x00575D90` is {+0 pet GUID, +4
+   owner GUID, +8 class u16, +0xC pet type}; the callers `0x00574930`,
+   `0x00574410`, `0x00574F80` push record +0 (pet) as stack argument 2
+   and +4 (owner) as argument 3, and `0x0053CB30` writes argument 3 at
+   message byte 5 and argument 2 at byte 9: S→C 0x7A carries the
+   **owner** GUID at +5 and the **pet** GUID at +9, as `pets.md` §8
+   states.
 2. Answered (owner `sim/pets.md` §6–§7, not edited here): Remove with
    kill ≠ 0 of a GUID whose unit exists broadcasts 0x7A three times
    (unlink, the dismiss it calls, Remove step 4); twice when the unit is
@@ -900,7 +902,8 @@ frame 1 when the target is in reach.
    (`bodies.md` §6.1); c < 0 → 0.
 2. K = T. No T: P exists and P's target y (+0x12, `0x00648A10`) = 2 → K
    := the object (type 2) whose GUID is P's target x (+0x10); otherwise
-   → 0 (Open question 6).
+   → 0. (+0x10 / +0x12 hold the path's target position, so this reads
+   a coordinate pair as (GUID, type); Open question 6.)
 3. K's room none or in town (`0x0061AB00`) → 0.
 4. Prison spawn `0x005B34C0(game, K's room, 0, 0, K, c, 0)`: c ≠ 340
    (`boneprison1`) or K none → nothing. Else the pattern spawn
@@ -1078,12 +1081,14 @@ steps call them (`bodies.md` Randomness).
    per do (§5.13, §5.14).
 4. Recording: a Maggot Queen / Sand Maggot egg cast: egg count and
    modes (§5.7).
-5. The unit finder `0x0065A950` / `0x0065AC70` (FetishAura) has no
-   owning spec (`missiles/bodies-2.md` Open question 3); FetishAura's
-   result does not depend on it (Edge case 9).
-6. DiabPrison without a target reads P +0x10 / +0x12 as (GUID, type 2)
-   of an object: which caller stores an object target that way (AI
-   `0x005FD55B` also calls `0x005B34C0`).
+5. Answered: the unit finder `0x0065A950` / `0x0065AC70` is specified
+   in `monsters/umod-callbacks.md` §3.1.
+6. Answered: P +0x10 / +0x12 are the path's target position (u16 x, y;
+   written by the path code `0x00648AD0`, `0x00648B00`, `0x006492F0`,
+   `0x006498A0`, `0x00649970`; `sim/pathing.md` §3, §11.1), never a
+   (GUID, type) pair. DiabPrison reinterprets them: the object branch
+   runs only when the target y is 2, with the target x as the GUID.
+   Implement the literal rule (§5.31 step 2).
 7. `0x005B3270` (pattern spawn with a coordinate table; also called by
    population `0x0054E1CB`): owner `monsters/init.md`; only the kinds
    1 and 3 used by DiabPrison are stated here.
