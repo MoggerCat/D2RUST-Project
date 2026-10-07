@@ -41,7 +41,7 @@
 | Edge cases & original bugs | 446–476 |
 | Test vectors | 477–498 |
 | Provenance | 499–523 |
-| Open questions | 524–539 |
+| Open questions | 524–560 |
 <!-- /index -->
 
 ## Summary
@@ -102,7 +102,7 @@ The 0x90-byte region of a level (`world/objects.md` §2 rule 4;
 | +0x00 | act (u8) | control build |
 | +0x04 | rooms counted so far | §3 rule 4 |
 | +0x08 | populated-room total, 0x7FFFFFFF until set | §3 rule 3 |
-| +0x0C | theme count | no writer found (open question 4); 0 |
+| +0x0C | theme count | no writer: always 0 (open question 4) |
 | +0x10 | health shrines | §7.2 |
 | +0x14 | shrines (≤ 10) | §7.2 (`0x00547490`) |
 | +0x18 | wells (≤ 4) | §7.8 (`0x00547400`) |
@@ -523,16 +523,37 @@ Game-file (`#[ignore]`, `D2_GAME_DIR`): the §8 counts from the live
 
 ## Open questions
 
-1. No trace of a room population: record RNG + packets while entering a
+1. **Needs recording**: no trace of a room population: record RNG + packets while entering a
    fresh Act I level and compare object classes, positions and draw
    counts with §5–§7.
 2. Confirm in a live 1.14d process that `0x00731EB8` + 8q still reads 0
    (a debugger read of four dwords settles whether rogues on sticks are
-   never placed by fn 7).
+   never placed by fn 7). **Answered** from the binary: no instruction
+   writes them. Every reference to `0x00731EB4`–`0x00731ED4` in
+   `all.asm` is a read inside `0x00551200` (`0x00551364`, `0x0055136C`,
+   `0x00551383`, `0x00551393`, `0x00551424`); the image has no ASLR
+   (DllCharacteristics 0) and its base relocations there cover only the
+   pointer slots (`0x00731EB4` + 8q), so the counts are 0 at run time
+   (§7.7).
 3. Maze rooms: whether `0x0061ABB0`'s room type 1 also covers maze
    rooms (`drlg/rooms.md` +0x48 note) and what +0x20/+0x54 holds there.
+   **Answered**: it never covers them. `0x0061ABB0` → `0x0066BA90`
+   returns 0 unless DRLG room +0x48 = 1 and only then reads the type
+   data (`0x0067D7A0`). Every maze room is allocated with type 2
+   (`0x0066B3E0` with EDX = 2 at all maze sites, `0x00670D7F` …
+   `0x0067210F`, and the maze builder `0x00673B30`); the only type-1
+   allocation is the outdoor room `0x0067D540` (`drlg/outdoor.md`
+   §12.2). So maze rooms skip the dirt-path test without reading
+   +0x20 / +0x54.
 4. Region +0x0C (theme count): find a writer (all.asm search of region
-   offsets) or confirm it stays 0.
+   offsets) or confirm it stays 0. **Answered**: it stays 0. The region
+   is zeroed at the control build (`0x00546C60`: memset 0x90, then
+   +0x00, +0x08, +0x1C); regions are reached only through game +0x10F0
+   +0x48 + 4·level, i.e. `0x00546F90` (callers `0x00552560`,
+   `0x00552610`) and the helpers `0x00547300`–`0x005474C0`, none of
+   which stores to +0x0C; the only access is the theme gate's read
+   (`0x00552409`). Rule 1 of §4 (total < 0 · 10) is therefore never
+   true.
 5. Theme bodies 2, 4, 5/6 (`0x00552000`, `0x00552140`, `0x00552200`)
    are unreachable with live data; specify them only if a mod enables
    themes.
