@@ -46,13 +46,13 @@
 |   7. Bevy mirror | 237–255 |
 |   8. Frame pacing | 256–276 |
 |   9. Versioning | 277–287 |
-|   10. Client outputs (bridge → UI and audio) | 288–439 |
-| Constants & data dependencies | 440–454 |
-| Randomness | 455–458 |
-| Edge cases & original bugs | 459–467 |
-| Test vectors | 468–498 |
-| Provenance | 499–509 |
-| Open questions | 510–547 |
+|   10. Client outputs (bridge → UI and audio) | 288–440 |
+| Constants & data dependencies | 441–455 |
+| Randomness | 456–459 |
+| Edge cases & original bugs | 460–468 |
+| Test vectors | 469–499 |
+| Provenance | 500–510 |
+| Open questions | 511–548 |
 <!-- /index -->
 
 ## Summary
@@ -416,7 +416,7 @@ model state: 1.14d's handler calls a UI or sound function directly
 | `MercRevive` | u16, u16 | 0x9B | UI | `client/msg-ui.md` §15 |
 | `SkillEvent` | unit key, skill, level, target key or point, w | 0x99, 0x9A | effects | `client/msg-skills.md` §7 |
 | `SkillDo` | unit key, target key or none, skill, level, x, y, v | 0xA3 | effects | `client/msg-skills.md` §8 |
-| `ShrineFx` | kind (on-mode / on-use), shrine code u8, object key, player key or none, overlay ids (two i32, −1 = none) | 0x0E (code 3), 0x4D (code 0x15) | effects | `client/model.md` §15 rules 3–4 |
+| `ShrineFx` | kind (on-mode / on-use), shrine code u8, object key, player key or none, overlay ids (two i32, −1 = none) | 0x0E (code 3), 0x4D (code 0x15), 0x51 (shrine, `client/msg-units.md` §1.3 r3) | effects | `client/model.md` §15 rules 3–4 |
 | `ShrineSound` | sound id u32, player key | 0x4D (code 0x15) | audio | `client/model.md` §15 rule 4 (request: `audio/triggers.md` §1 rule 1) |
 | `UnitOverlay` | unit key, overlay u16, mode (2), sound id (0, 396 or 397) | 0x11 | effects | `client/msg-units.md` §7 r2 |
 | `UmodFx` | unit key, the nine umod bytes, flag bit 3 | 0x57 | effects | `client/msg-units.md` §7 r3 |
@@ -436,6 +436,7 @@ model state: 1.14d's handler calls a UI or sound function directly
 | `HotkeyAssign` | slot u8, skill i32, left u8, item GUID u32 | 0x7B | UI | `client/msg-ui.md` §22 |
 | `JoinRefused` | error number u8 (the mapped code) | 0xB4 | UI | `client/model.md` §7 rule 8 |
 | `TownExit` | local player key, GUIDs of the S monsters | update | UI | `client/model.md` §17 rule 6; delivery `client/bridge.md` §10 r11 |
+| `StateFx` | unit key, state u16, phase (on / hooks / off), bit set before, unit dead | 0xA8 (also 0xA7, 0xA9, 0xAA) | effects | `client/stat-lists.md` §3 rule 6 |
 
 ## Constants & data dependencies
 
