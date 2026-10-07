@@ -40,21 +40,16 @@ pub fn assign_merc(class: u16, owner: u32, merc: u32, seed: u32, name: u32) -> [
 }
 
 /// S→C 0x7A (`0x0053CB30`, 13 bytes, zeroed first): u8 action @1, u8 pet
-/// type @2, u16 class @3, u32 pet GUID @5, u32 owner GUID @9.
-///
-/// The GUID offsets follow `hirelings.md` §13 rule 2 and the confirmed
-/// row of `sim/server-messages.tsv` (`pet:u32@5 owner:u32@9`).
-/// TODO(sim/pets.md §8): `pets.md` §8 and its test vector put the owner
-/// @5 and the pet @9 (all cite `0x0053CB30`); the spec owners must
-/// settle it (`docs/handoff/impl-hirelings.md`).
-pub fn pet_action(action: u8, pet_type: u8, class: u16, pet: u32, owner: u32) -> [u8; 13] {
+/// type @2, u16 class @3, u32 owner GUID @5, u32 pet GUID @9 (§13 rule 2,
+/// layout owned by `pets.md` §8).
+pub fn pet_action(action: u8, pet_type: u8, class: u16, owner: u32, pet: u32) -> [u8; 13] {
     let mut b = [0u8; 13];
     b[0] = MSG_PET_ACTION;
     b[1] = action;
     b[2] = pet_type;
     b[3..5].copy_from_slice(&class.to_le_bytes());
-    b[5..9].copy_from_slice(&pet.to_le_bytes());
-    b[9..13].copy_from_slice(&owner.to_le_bytes());
+    b[5..9].copy_from_slice(&owner.to_le_bytes());
+    b[9..13].copy_from_slice(&pet.to_le_bytes());
     b
 }
 
@@ -79,7 +74,7 @@ pub fn broadcast<W: HirelingWorld>(w: &mut W, bytes: &[u8]) {
 /// The "remove" broadcast (`0x00574410`): 0x7A action 0 with only the
 /// GUID set (§13 rule 2, `pets.md` §8).
 pub fn broadcast_remove<W: HirelingWorld>(w: &mut W, guid: u32) {
-    broadcast(w, &pet_action(ACTION_REMOVE, 0, 0, guid, 0));
+    broadcast(w, &pet_action(ACTION_REMOVE, 0, 0, 0, guid));
 }
 
 /// The "add" broadcast (`0x00574930`, `pets.md` §8): record {pet GUID,
@@ -98,7 +93,7 @@ fn broadcast_add<W: HirelingWorld>(w: &mut W, owner: UnitId, unit: Option<UnitId
         )
         .to_vec()
     } else {
-        pet_action(ACTION_ADD, PET_HIRELING, class, node.guid, owner_guid).to_vec()
+        pet_action(ACTION_ADD, PET_HIRELING, class, owner_guid, node.guid).to_vec()
     };
     broadcast(w, &bytes);
 }

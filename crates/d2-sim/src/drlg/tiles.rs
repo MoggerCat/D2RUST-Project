@@ -76,13 +76,15 @@ pub mod rec_flags {
 /// A cached DT1 file and its key index (§9.3 "Library index").
 #[derive(Clone, Debug)]
 pub(super) struct Dt1File {
+    /// The path it was loaded by (the cache key, §9.3 "Entry identity").
+    pub(super) path: Vec<u8>,
     pub(super) tiles: Vec<TileInfo>,
     /// Key → tile indexes in reverse file order (head insertion).
     keys: BTreeMap<(u32, u32, u32), Vec<u32>>,
 }
 
 impl Dt1File {
-    fn new(tiles: &[TileInfo]) -> Self {
+    fn new(path: &[u8], tiles: &[TileInfo]) -> Self {
         let mut keys: BTreeMap<(u32, u32, u32), Vec<u32>> = BTreeMap::new();
         for (i, t) in tiles.iter().enumerate() {
             keys.entry((t.orientation, t.main, t.sub))
@@ -90,6 +92,7 @@ impl Dt1File {
                 .insert(0, i as u32);
         }
         Self {
+            path: path.to_vec(),
             tiles: tiles.to_vec(),
             keys,
         }
@@ -330,6 +333,13 @@ impl Drlg {
         &self.dt1_files[t.file as usize].tiles[t.index as usize]
     }
 
+    /// The DT1 path of a tile reference's file (§9.3 "Entry identity":
+    /// an entry is exactly one (DT1 file, tile index in file order); the
+    /// client keeps (path, index) per record to reach the block data).
+    pub fn dt1_path(&self, t: TileRef) -> &[u8] {
+        &self.dt1_files[t.file as usize].path
+    }
+
     fn dt1_id(&mut self, tiles: &dyn TileSource, path: &[u8]) -> Result<u32, DrlgError> {
         if let Some(&id) = self.dt1_by_path.get(path) {
             return Ok(id);
@@ -338,7 +348,7 @@ impl Drlg {
             .dt1(path)
             .ok_or_else(|| DrlgError::MissingDt1(String::from_utf8_lossy(path).into_owned()))?;
         let id = self.dt1_files.len() as u32;
-        self.dt1_files.push(Dt1File::new(t));
+        self.dt1_files.push(Dt1File::new(path, t));
         self.dt1_by_path.insert(path.to_vec(), id);
         Ok(id)
     }

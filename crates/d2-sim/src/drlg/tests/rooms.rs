@@ -528,3 +528,81 @@ fn client_in_sight_by_coordinates() {
     d.unset_in_sight_at(&mut svc, 2, 8, 0, None).unwrap();
     assert_eq!(d.room(r[1]).counts, [0; 4]);
 }
+
+// Covers: specs/drlg/rooms.md §4.6 r2, §4.6 r4, §4.6 r5, §4.6 r6, §4.6 r7, §4.6 r8
+#[test]
+fn client_build_timer_builds_status_2_rooms_one_per_run_out() {
+    let mut dat = data();
+    gen_level(&mut dat, 2, 2);
+    dat.levels[2].size = [(48, 8); 3];
+    let mut types = FakeTypes::default();
+    types
+        .rooms
+        .insert(2, (0..6).map(|i| preset(8 * i, 0, 8, 8)).collect());
+    types.default_grid = Some(floor_grid);
+    let mut w = World::new(dat, types);
+    let mut d = Drlg::create(0, INIT, 0, 0, true, &w.data, &mut w.types).unwrap();
+    // Zero at allocation; R = 5 on a client copy.
+    assert_eq!((d.build_timer, d.build_cursor), (0, None));
+    assert_eq!(d.build_timer_reset(), 5);
+    let mut svc = w.svc();
+    d.set_in_sight_at(&mut svc, 2, 8, 0, None).unwrap();
+    let r = d.level_rooms(d.find_level(2).unwrap());
+    // Set handler 1 built r1: B = 1, T := R.
+    assert_eq!((d.builds_since_update, d.build_timer), (1, 5));
+    let two = d.status_list(2).to_vec();
+    assert_eq!(two, [r[0], r[2]]);
+    let mut run = |d: &mut Drlg| {
+        let mut svc = w.svc();
+        d.client_build_timer(&mut svc).unwrap()
+    };
+    // Calls 1–4: T counts down, B (1) carries over.
+    for t in [4, 3, 2, 1] {
+        assert!(run(&mut d).is_empty());
+        assert_eq!((d.build_timer, d.builds_since_update), (t, 1));
+    }
+    // Call 5: T = 0 → T := 5; C := the first status-2 room; B was 1, so
+    // only that room is examined (and built).
+    assert_eq!(run(&mut d), [r[0]]);
+    assert!(d.active_room(r[0]).is_some() && d.active_room(r[2]).is_none());
+    assert_eq!((d.build_timer, d.builds_since_update), (5, 0));
+    assert_eq!(d.build_cursor, Some(r[2]));
+    // Statuses are unchanged by a timed build.
+    assert_eq!(d.status_list(2), &two[..]);
+    // Calls 6–10: the cursor's room is built; C := the head node.
+    for _ in 0..4 {
+        assert!(run(&mut d).is_empty());
+    }
+    assert_eq!(run(&mut d), [r[2]]);
+    assert_eq!(d.build_cursor, None);
+    // Calls 11–15: nothing left to build; the walk goes once round the
+    // list and C ends on its start.
+    for _ in 0..4 {
+        assert!(run(&mut d).is_empty());
+    }
+    assert!(run(&mut d).is_empty());
+    assert_eq!(d.build_cursor, Some(r[0]));
+    assert_eq!(d.build_timer, 5);
+}
+
+// Covers: specs/drlg/rooms.md §4.6 r2, §4.6 r4, §4.6 r5
+#[test]
+fn client_build_timer_skips_after_two_builds_and_wraps_from_zero() {
+    let mut dat = data();
+    gen_level(&mut dat, 2, 2);
+    let w = World::new(dat, FakeTypes::default());
+    let mut w = w;
+    let mut d = Drlg::create(0, INIT, 0, 0, true, &w.data, &mut w.types).unwrap();
+    // Rule 4: B > 1 → B := 0, no timer step.
+    d.builds_since_update = 2;
+    let mut svc = w.svc();
+    assert!(d.client_build_timer(&mut svc).unwrap().is_empty());
+    assert_eq!((d.builds_since_update, d.build_timer), (0, 0));
+    // Rule 5: T starts at 0 and wraps to 255 (u8).
+    let mut svc = w.svc();
+    d.client_build_timer(&mut svc).unwrap();
+    assert_eq!(d.build_timer, 255);
+    // A server DRLG resets to 7.
+    let s = Drlg::create(0, INIT, 0, 1, false, &w.data, &mut w.types).unwrap();
+    assert_eq!(s.build_timer_reset(), 7);
+}

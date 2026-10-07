@@ -401,6 +401,8 @@ impl Drlg {
                 let r = self.room(id);
                 if r.active.is_none() && r.flags & room_flags::HAS_ROOM == 0 {
                     self.bring_up(svc, id)?;
+                    // §4.6 rule 2 (`0x0061B2F8`): T := R after the build.
+                    self.build_timer = self.build_timer_reset();
                 }
                 if self.room(id).status > 1 {
                     self.force_status(id, 1);
@@ -649,5 +651,75 @@ impl Drlg {
         self.builds_since_update = self.builds_since_update.wrapping_add(1);
         self.rooms_built = self.rooms_built.wrapping_add(1);
         Ok(())
+    }
+
+    // ---- client build timer (§4.6) ----------------------------------------
+
+    /// Reset value R of the build timer (`0x00642A00`, §4.6 rule 2): 5 for
+    /// a client copy (DRLG flags bit 0), else 7.
+    pub fn build_timer_reset(&self) -> u8 {
+        if self.on_client {
+            5
+        } else {
+            7
+        }
+    }
+
+    /// The client build timer `0x0061B920` (§4.6 rules 4–8), once per
+    /// client update. The statistics copy of rule 3 changes no outcome
+    /// and is not modelled. Returns the rooms it built, in order (at most
+    /// one per call).
+    pub fn client_build_timer(
+        &mut self,
+        svc: &mut Services<'_>,
+    ) -> Result<Vec<DrlgRoomId>, DrlgError> {
+        // Rule 4.
+        if self.builds_since_update > 1 {
+            self.builds_since_update = 0;
+            return Ok(Vec::new());
+        }
+        // Rule 5: B is kept when the timer has not run out.
+        self.build_timer = self.build_timer.wrapping_sub(1);
+        if self.build_timer != 0 {
+            return Ok(Vec::new());
+        }
+        // Rule 6. The head node (cursor `None` after a walk that ended at
+        // the tail) is taken as not having status 2.
+        // TODO(spec: drlg/rooms.md §4.6 rule 6): the status (+0x44) of the
+        // list head node at drlg +0x278 is not stated; zero at allocation
+        // (`levels.md` §3 step 1) unless `0x0061B7E0` writes it.
+        self.build_timer = self.build_timer_reset();
+        let list = self.status_lists[2].clone();
+        let start = self
+            .build_cursor
+            .filter(|&c| self.try_room(c).is_some_and(|r| r.status == 2))
+            .and_then(|c| list.iter().position(|&r| r == c))
+            .unwrap_or(0);
+        // Rule 7: the circular walk from S = C; `None` is the head node.
+        let n = list.len();
+        let walk = (0..=n).map(|k| {
+            let i = (start + k) % (n + 1);
+            list.get(i).copied()
+        });
+        let mut built = Vec::new();
+        let mut next = None;
+        for (k, node) in walk.enumerate() {
+            if let Some(id) = node {
+                let r = self.room(id);
+                if r.active.is_none() && r.flags & room_flags::HAS_ROOM == 0 {
+                    self.bring_up(svc, id)?;
+                    built.push(id);
+                }
+            }
+            // Rule 8: C := the room after the last one examined.
+            let after = (start + k + 1) % (n + 1);
+            next = list.get(after).copied();
+            if k + 1 == n + 1 || self.builds_since_update >= 1 {
+                break;
+            }
+        }
+        self.build_cursor = next;
+        self.builds_since_update = 0;
+        Ok(built)
     }
 }

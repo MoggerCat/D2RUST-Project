@@ -162,6 +162,11 @@ pub struct TileInfo {
     pub material: u16,
     /// Sub-tile flags (+0x28), bottom row first (`rooms.md` §10.4).
     pub subtile_flags: [u8; 25],
+    /// Roof height (+0x04, u16). Read only by the client draw
+    /// (`rooms.md` §9.3 "Entry identity", `render/draw-order.md` §3 r2).
+    pub roof_height: u16,
+    /// Height (+0x08, i32). Read only by the client draw (as above).
+    pub height: i32,
 }
 
 /// Parsed DT1 files by path (no I/O in the sim). Paths are the

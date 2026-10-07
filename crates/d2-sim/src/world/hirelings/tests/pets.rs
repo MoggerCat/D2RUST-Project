@@ -32,7 +32,7 @@ fn node(guid: u32, dead: bool) -> PetNode {
 }
 
 fn remove_msg(guid: u32) -> Vec<u8> {
-    pet_action(ACTION_REMOVE, 0, 0, guid, 0).to_vec()
+    pet_action(ACTION_REMOVE, 0, 0, 0, guid).to_vec()
 }
 
 // Covers: specs/world/hirelings.md §13 r1
@@ -48,13 +48,16 @@ fn assign_merc_layout() {
 // Covers: specs/world/hirelings.md §13 r2
 #[test]
 fn pet_action_vector() {
-    // add, pet GUID 5, owner 1, class 363, type 4, in the confirmed
-    // `server-messages.tsv` layout (pet @5, owner @9; `hirelings.md` §13
-    // rule 2). `pets.md`'s vector puts them the other way round: a spec
-    // conflict, reported in `docs/handoff/impl-hirelings.md`.
+    // `pets.md` test vector: add, pet GUID 5, owner 1, class 363, type 4
+    // → owner @5, pet @9 (§13 rule 2).
     assert_eq!(
-        pet_action(1, 4, 363, 5, 1),
-        [0x7A, 0x01, 0x04, 0x6B, 0x01, 0x05, 0, 0, 0, 0x01, 0, 0, 0]
+        pet_action(1, 4, 363, 1, 5),
+        [0x7A, 0x01, 0x04, 0x6B, 0x01, 0x01, 0, 0, 0, 0x05, 0, 0, 0]
+    );
+    // A remove carries only the GUID, @9.
+    assert_eq!(
+        pet_action(ACTION_REMOVE, 0, 0, 0, 0x21),
+        [0x7A, 0, 0, 0, 0, 0, 0, 0, 0, 0x21, 0, 0, 0]
     );
 }
 
@@ -95,7 +98,7 @@ fn add_without_seed_or_name_sends_pet_action_add() {
     assert_eq!(pets::add(&mut w, &t, &mut st, p, m, 0, 0, 1), Ok(true));
     assert_eq!(
         w.sent_to(p),
-        vec![pet_action(1, 7, 271, M_GUID, P_GUID).to_vec()]
+        vec![pet_action(1, 7, 271, P_GUID, M_GUID).to_vec()]
     );
 }
 

@@ -62,7 +62,7 @@ fn with_nodes(player: UnitId, nodes: Vec<PetNode>) -> HirelingState {
 }
 
 fn remove_msg(guid: u32) -> Vec<u8> {
-    pet_action(0, 0, 0, guid, 0).to_vec()
+    pet_action(0, 0, 0, 0, guid).to_vec()
 }
 
 /// Asserts that `want` appears in `log` in this order (other entries may
