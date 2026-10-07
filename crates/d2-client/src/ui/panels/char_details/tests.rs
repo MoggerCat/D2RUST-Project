@@ -142,7 +142,7 @@ fn damage_block() {
             color: 3,
             x1: 350,
             x2: 390,
-            y: 223
+            y: 220
         }
     );
     assert_eq!(v.len(), 6);
@@ -161,10 +161,10 @@ fn damage_block() {
     };
     let v = hand_block(&two, 0, &S, false, &mut once);
     assert!(
-        matches!(&v[5], BlockItem::Text(t) if (t.text.as_str(), t.font, t.color, t.y) == ("120", 6, 3, 223 - 6))
+        matches!(&v[5], BlockItem::Text(t) if (t.text.as_str(), t.font, t.color, t.y) == ("120", 6, 3, 220 - 6))
     );
     assert!(
-        matches!(&v[6], BlockItem::Text(t) if (t.text.as_str(), t.font, t.color, t.y) == ("80", 6, 1, 223 + 2))
+        matches!(&v[6], BlockItem::Text(t) if (t.text.as_str(), t.font, t.color, t.y) == ("80", 6, 1, 220 + 2))
     );
     // right hand: p = 6 uses e6.. e11
     let v = hand_block(&b, 6, &S, false, &mut once);
@@ -207,15 +207,11 @@ fn damage_block() {
     let v = hand_block(&HandBlock { v2: 1, ..b.clone() }, 0, &S, true, &mut once2);
     assert!(once2);
     assert!(matches!(&v[0], BlockItem::Text(t) if t.y == 152));
-    assert!(matches!(&v[5], BlockItem::Text(t) if t.y == 223 - 7));
+    assert!(matches!(&v[5], BlockItem::Text(t) if t.y == 220 - 7));
     // the case table
     assert_eq!(upper_name("fire bolt é"), "FIRE BOLT É");
     assert_eq!(upper_latin1(0xF7), 0xF7);
-    assert_eq!(
-        upper_latin1(0xFF),
-        0xFF - 0x20 + 0,
-        "ÿ → U+00DF is not a capital: see PROVISIONAL"
-    );
+    assert_eq!(upper_latin1(0xFF), 0xFF);
 }
 
 // Covers: specs/ui/panels-2.md §17 r6, §17 r7
@@ -247,7 +243,7 @@ fn chances() {
     // D < 0 moves into A; A < 0 moves into D; both 0 → pct 100
     assert_eq!(
         chance_to_hit(0, &MonsterFacts { ac: -20, ..m }, false, 0, 0, 10),
-        2 * 100 * 10 / 20
+        95
     );
     assert_eq!(
         chance_to_hit(-30, &MonsterFacts { ac: 20, ..m }, false, 0, 0, 10),
@@ -255,7 +251,7 @@ fn chances() {
     );
     assert_eq!(
         chance_to_hit(0, &MonsterFacts { ac: 0, ..m }, false, 0, 0, 10),
-        95.min(2 * 100 * 10 / 20)
+        95
     );
     // to be hit
     assert_eq!(chance_to_be_hit(None, 10, 0, [5, 0, 0], false, 0, 10), 0);

@@ -477,10 +477,10 @@ impl DigitEdit {
     pub fn blink(&mut self) {
         self.counter += 1;
         if self.visible {
-            if self.counter % 20 == 0 {
+            if self.counter.is_multiple_of(20) {
                 self.visible = false;
             }
-        } else if self.counter % 10 == 0 {
+        } else if self.counter.is_multiple_of(10) {
             self.visible = true;
         }
     }

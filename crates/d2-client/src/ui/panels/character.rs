@@ -350,10 +350,9 @@ impl CharacterPanel {
         }
         if statpts != 0 {
             let hit = add_button_at(t, s, at, statpts);
-            for i in 0..4 {
+            for (i, &stat) in ADD_BUTTON_STATS.iter().enumerate() {
                 self.stat_pressed[i] = false;
                 if hit == Some(i) {
-                    let stat = ADD_BUTTON_STATS[i];
                     let mut count = if shift_held { statpts } else { 1 };
                     while count > 0 {
                         let n = count.min(STAT_CHUNK);

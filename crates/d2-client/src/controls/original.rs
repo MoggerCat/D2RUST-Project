@@ -795,7 +795,9 @@ impl BindingTable {
             return None;
         }
         Some(BindingTable(
-            b.chunks_exact(10)
+            b.as_chunks::<10>()
+                .0
+                .iter()
                 .map(|e| Binding {
                     cmd: i32::from_le_bytes([e[0], e[1], e[2], e[3]]),
                     key: u16::from_le_bytes([e[4], e[5]]),

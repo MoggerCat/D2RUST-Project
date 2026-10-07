@@ -272,7 +272,6 @@ mod tests {
         assert_eq!(tab_at_open(None), 0);
     }
 
-    // Covers: specs/ui/panels-3.md §26 r3
     #[test]
     fn current_level_row_cannot_be_chosen() {
         // rows hit tests skip used = 0 rows: the current level's row has

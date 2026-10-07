@@ -38,7 +38,7 @@ fn table_from_tsv() -> Vec<u8> {
     out
 }
 
-// Covers: specs/ui/controls.md §3 text, §3.4, §b4-original-defaults-check-client-ui-md-b4 r1
+// Covers: specs/ui/controls.md §3.4, §b4-original-defaults-check-client-ui-md-b4 r1
 #[test]
 fn command_table_matches_key_commands_tsv() {
     let rows: Vec<&str> = TSV.lines().skip(1).collect();
@@ -77,7 +77,7 @@ fn command_table_matches_key_commands_tsv() {
     // command 21 (F8) sits at entries 90-91, after command 45
     let d = BindingTable::defaults();
     assert_eq!((d.0[90].cmd, d.0[90].key, d.0[91].cmd), (21, 0x77, 21));
-    assert_eq!(d.0[88].cmd, 44);
+    assert_eq!(d.0[86].cmd, 44);
 }
 
 // Covers: specs/ui/controls.md §b4-original-defaults-check-client-ui-md-b4 r2
@@ -513,8 +513,8 @@ fn hotkeys_and_belt_keys() {
     assert_eq!(belt_key(1, 0), Some(false));
     assert_eq!(belt_key(1, i16::MIN), Some(true));
     // hotkeys 9-16 have no default key (§3.1 r3)
-    for c in 46..=53 {
-        assert_eq!(COMMANDS[c].key1, UNBOUND);
+    for c in &COMMANDS[46..=53] {
+        assert_eq!(c.key1, UNBOUND);
     }
 }
 

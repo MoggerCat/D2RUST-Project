@@ -283,7 +283,7 @@ fn wraps(text: &[u8]) -> bool {
 #[test]
 fn digit_edit_box() {
     let mut e = DigitEdit::new(5000);
-    let mut type_all = |e: &mut DigitEdit, s: &str| {
+    let type_all = |e: &mut DigitEdit, s: &str| {
         for c in s.bytes() {
             e.char(u32::from(c), false, &wraps);
         }

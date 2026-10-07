@@ -400,9 +400,8 @@ pub fn block_value(
     }
     let mut b = 0;
     for &(layer, v) in entries.iter().take(32) {
-        if layer == 0 {
-            b = v;
-        } else if hand_layers.iter().flatten().any(|&l| l == layer) && v > b {
+        // layer 0 sets; a matching hand layer raises when larger
+        if layer == 0 || (hand_layers.iter().flatten().any(|&l| l == layer) && v > b) {
             b = v;
         }
     }
@@ -441,7 +440,7 @@ pub fn group_digits(v: u32, buf: usize) -> String {
     let s = v.to_string();
     let mut out = String::new();
     for (i, c) in s.chars().enumerate() {
-        if i > 0 && (s.len() - i) % 3 == 0 {
+        if i > 0 && (s.len() - i).is_multiple_of(3) {
             out.push(',');
         }
         out.push(c);

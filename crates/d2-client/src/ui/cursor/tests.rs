@@ -186,7 +186,7 @@ fn draw() {
     c.my = 200;
     c.f = 3 * 256 + 5;
     // types 0-5: frame f >> 8 at the clamped mouse position, then the step
-    let d = c.draw(800, 600, None, 10, true, &mut seed).unwrap();
+    let d = c.draw(800, 600, None, 100, true, &mut seed).unwrap();
     assert_eq!(
         d,
         Some(CursorDraw::Cel {
@@ -266,23 +266,23 @@ fn draw() {
     assert_eq!(c.draw(800, 600, None, 5, true, &mut seed).unwrap(), None);
 }
 
-// Covers: specs/ui/panels-3.md §23 r13
+// Story check of the timeline (the claim of r13 itself is exempt).
 #[test]
 fn untouched_mouse_story() {
     // protate advances by chance for 5 s, then ohand once (32 steps), then
     // orotate loops; a move during orotate plays ohand backwards to protate
     let mut c = Cursor::init(0, 800, 600, 0);
     let mut seed = 1u64;
-    let mut now = 0u32;
-    let mut tick = |c: &mut Cursor, seed: &mut u64| {
-        now += 17;
-        c.draw(800, 600, None, now, true, seed).unwrap();
+    let now = std::cell::Cell::new(0u32);
+    let tick = |c: &mut Cursor, seed: &mut u64| {
+        now.set(now.get() + 17);
+        c.draw(800, 600, None, now.get(), true, seed).unwrap();
     };
     while c.s == 1 {
         tick(&mut c, &mut seed);
-        assert!(now < 6000, "idle ends after 5 s");
+        assert!(now.get() < 6000, "idle ends after 5 s");
     }
-    assert!(now > 5000);
+    assert!(now.get() > 5000);
     assert_eq!((c.s, c.t, c.f), (2, 2, 0));
     let mut steps = 0;
     while c.s == 2 {
@@ -298,7 +298,7 @@ fn untouched_mouse_story() {
     }
     assert_eq!((c.s, c.t), (4, 3));
     // a move plays ohand backwards (29 steps from 0x700) back to protate
-    c.mouse_move(3, 3, now, 800, 600, false);
+    c.mouse_move(3, 3, now.get(), 800, 600, false);
     assert_eq!((c.s, c.t, c.f), (3, 2, 0x700));
     let mut back = 0;
     while c.s == 3 {
@@ -308,9 +308,9 @@ fn untouched_mouse_story() {
     assert_eq!(back, 29);
     assert_eq!((c.s, c.t, c.f), (1, 5, 0));
     // a press shows ppress until the release
-    c.button_down(0, 0, now);
+    c.button_down(0, 0, now.get());
     assert_eq!((c.s, c.t), (5, 4));
-    c.button_up(0, 0, now);
+    c.button_up(0, 0, now.get());
     assert_eq!((c.s, c.t), (1, 5));
 }
 

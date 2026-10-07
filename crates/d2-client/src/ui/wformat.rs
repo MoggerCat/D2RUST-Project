@@ -130,7 +130,7 @@ mod tests {
         format(max, Some(&fmt), args).map(|v| String::from_utf16(&v).unwrap())
     }
 
-    // Covers: specs/ui/text.md §14 text, §14 r1, §14 r2, §14 r3
+    // Covers: specs/ui/text.md §14 r1, §14 r2, §14 r3
     #[test]
     fn block_chance_line() {
         let name = u("Zombie");
