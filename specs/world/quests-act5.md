@@ -34,17 +34,17 @@
 | Inputs | 65–75 |
 | Outputs / state changes | 76–84 |
 | Rules | 85–86 |
-|   1. Conventions | 87–164 |
-|   2. Act V records | 165–192 |
-|   3. A5Q1 Siege on Harrogath (chain 31, slot 35) | 193–279 |
-|   4. A5Q2 Rescue on Mount Arreat (chain 32, slot 36) | 280–402 |
-|   5. A5Q3 Prison of Ice (chain 33, slot 37) | 403–587 |
-| Constants & data dependencies | 588–605 |
-| Randomness | 606–615 |
-| Edge cases & original bugs | 616–642 |
-| Test vectors | 643–657 |
-| Provenance | 658–677 |
-| Open questions | 678–698 |
+|   1. Conventions | 87–169 |
+|   2. Act V records | 170–197 |
+|   3. A5Q1 Siege on Harrogath (chain 31, slot 35) | 198–284 |
+|   4. A5Q2 Rescue on Mount Arreat (chain 32, slot 36) | 285–409 |
+|   5. A5Q3 Prison of Ice (chain 33, slot 37) | 410–644 |
+| Constants & data dependencies | 645–662 |
+| Randomness | 663–672 |
+| Edge cases & original bugs | 673–707 |
+| Test vectors | 708–722 |
+| Provenance | 723–747 |
+| Open questions | 748–772 |
 <!-- /index -->
 
 ## Summary
@@ -109,6 +109,11 @@ removed (monster spec; `0x005A7E60`, `0x005A7C20`, `0x0061A270`,
 `0x00623830`, `0x0064C370`). "Drop inactive node of C" =
 `0x00543140(C, 4)` (the act-V inactive-unit record of class C is
 deleted; unit spec).
+
+"Radius" of a free-spot search: `0x00545340`'s sixth argument (stack
++0x14) is never read in 1.14d (body `0x00545340`–`0x0054547F`, `ret 0x14`); the ring
+search is bounded by the seventh argument (limit) only. Every "radius n"
+below is recorded for completeness and has no effect.
 
 #### 1.2 Message-list selection (event 0)
 
@@ -253,7 +258,7 @@ status < 3 → status 3 to all.
 #### 3.8 Larzuk and the siege boss
 
 - Init 71 (`0x00587840`, object 543): chain 31 present and +0x15 = 0:
-  free spot near the object (`0x00545340`, size 2, mask 0x100, radius 16,
+  free spot near the object (`0x00545340`, size 2, mask 0x100, radius 16 (unused),
   limit 100); found → spawn monster 511 there (`0x005B2F20`, mode 1, 5,
   0); created → +0x15 := 1, +0x10 := GUID, unit flags |= 0x3000000, and a
   stored map AI (+0x00 with its +4 ≠ 0) is applied once (`0x0058F000`,
@@ -359,18 +364,20 @@ the spawned barbarians (§4.7). Needs not-intro.
   than 15 to B: none → stop; found → target := its position + (2, 0),
   its room. +0x10E + g := 1. Object 189 at the target (`0x00555230`, type
   2, flags 1, 1, 0); failing, at x − 2; failing and a room exists, at a
-  free spot (`0x00545340`, size 2, mask 0x8000, radius 17, limit 100).
+  free spot (`0x00545340`, size 2, mask 0x8000, radius 17 (unused), limit 100).
   Created → +0xF8 + g := 1, +0xEC + 4g := GUID, object event 7 at frame +
   25, clear its room's portal flag.
 - Completion check (same call, P's flags): spawned = killed + freed and
   all three groups spawned: freed < 12 → completion flag from P; stop.
   Else status 3 to all; P lacking 36.0 and 36.1 → set 36.13, 36.1 and
-  36.5 (freed 15), 36.6 (14) or 36.7 (12–13); then from P: party
+  36.5 (freed = 15), 36.6 (freed = 14) or 36.7 (any other freed,
+  `0x00588B96`–`0x00588BA8`: equality tests only); then from P: party
   `0x005887A0` (36.13 → members `0x00587E60`: lacking 36.0, 36.1 and in
   Act V → 36.13, 36.1 and the same freed bit), completion flag
   `0x00587F60`, `0x005887F0` (36.13 → sound 81). Not all accounted: set
-  36.4 on P; killed < 5 → flags byte := 0x20, status 2 to all; +0x84 :=
-  0.
+  36.4 on P; killed < 5 → flags byte := 0x20, status 2 to all (the
+  flags are set to 0x20, not cleared, before the call, `0x00588C2A`);
+  then +0x84 := 0 whatever killed is (`0x00588C33`).
 
 #### 4.8 Rescue portals (class 189 event 7, `0x00588CA0`)
 
@@ -505,7 +512,20 @@ Chat end (`0x00588F80`, never cleared): malah: +0xAC → status 1 to all,
   `0x005890B0` (class 527: interacting → its interaction ends with
   `0x00589070`, which sends S5D(33, 0x20, 0); else killed in place; +0xE3
   := 1; returns 1); +0xE3 still 0 → drop inactive node of 527; +0xAD :=
-  1; +0x84 := 2; Anya to town (§5.9). Send flags. Without 37.1 (or with
+  1; +0x84 := 2; Anya to town (§5.9). Send flags.
+  Exact form of `0x005890B0` (re-read 2026-10-07): the first class-527
+  monster stops the walk (returns 1). If someone talks to it
+  (`0x00572DC0`), `0x00573180(game, 527, 0x00589070, 0)` runs and +0xE3
+  is **not** set; else it is killed in place (mode 12 request) and
+  +0xE3 := 1. `0x00573180` walks the NPC's interaction list (monster
+  data +0x30) in list order; for each entry's player: S→C 0x62 with
+  (1, the NPC's GUID) to that player (`0x0053D6D0`), the player's
+  interaction cleared (`0x00554190`, unconditional with last argument
+  0), then the callback for that player: `0x00589070` sends S5D(33,
+  0x20, 0) to it. Each entry is freed and the list emptied. So every
+  player chatting with iced Anya gets S5D(33, 0x20, 0) (the rewarded
+  player only if it is one of them); iced Anya stays in the world, and
+  the drop-inactive step still runs (Edge case 9). Without 37.1 (or with
   37.0): 37.0 or 37.15 set, +0x102 = 0, 37.8 set, 37.7 clear and no `tr2
   ` held → give `tr2 `; given → +0x102 := 1.
 - **Anya's item, msg 20136 (drehya)**: needs 37.1 set, 37.0 clear and
@@ -542,6 +562,31 @@ AI hooks (part 2 §10) make the outside portal (`0x0058A820`: +0xB1 set →
 1; +0x84 ≠ 0: no room at (+0xC4, +0xC8) → both += 3, returns 0; else
 object 189 there (flags 1, 1, 0) → +0xB1 := 1, +0xC0 := GUID, 1).
 
+Anya AI hooks (iced Anya 527, NpcOutOfTown `0x005E7880`, whose use of
+the results is `monsters/ai-bodies.md` §9.32; each looks up chain 33
+and does nothing / returns 0 without it):
+
+| Hook | Called from | Effect | Returns |
+|---|---|---|---|
+| `0x0058A940(game, unit)` | `0x005E7806` (portal setup) | +0xC4 / +0xC8 := the unit's position; +0xE0 := 1 | 1 (0 without the record) |
+| `0x0058A980(game)` | `0x005E780D`, `0x005E7951` (leave) | +0xAD := 1, +0x84 := 2, Anya to town (§5.9) | — |
+| `0x0058A820(game, unit)` | `0x005E7A49` (portal out of town) | above | 1 made or already made; 0 else |
+| `0x0058A8D0(game, unit, &xy)` | `0x005E794A` (portal coordinates) | +0x84 = 0 → nothing; +0xB1 clear → xy := the unit's position; set → xy := (+0xC4, +0xC8) | 1 when +0x84 ≠ 0, else 0 |
+| `0x0058A9F0(game)` | `0x005E79F9` | — | +0x84 = 0 (still frozen) |
+| `0x0058AA10(game)` | `0x005E78B9` (every think) | not-intro and status < 2 → status 2 to all | — |
+| `0x0058A7D0(game, &xy)` | no caller | not-intro, +0xB2 set and +0xAE clear → xy := (+0xB8, +0xBC) | 1 / 0 |
+| `0x0058A9B0(game)`, `0x0058A9D0(game)` | no caller | +0xAE := 1; returns +0xAF ≠ 0 | — |
+
+Map-AI stores (`0x00545C90`, from preset object placement `0x00555910`,
+with the preset's path data; object class 459 → `0x0058AD80`, 461 →
+`0x0058AE10`, 543 → `0x00587950`): chain 33 and a non-null path:
++0x104 (Anya) or +0x108 (Nihlathak) := a copy of the path
+(`0x006660B0`, game pool); then, if that NPC is in town (+0x91 / +0x93),
+its unit (GUID +0x94 / +0x9C, type 1) exists, the copy has +4 ≠ 0 and
++0x10C / +0x10D is clear: apply it (`0x00666120(copy, 0x0058F000(unit))`)
+and set +0x10C / +0x10D. The spawn sites of §5.9 apply the stored copy
+the same way ("map AI applied once").
+
 #### 5.9 Town NPCs and cleanup
 
 - Dummy 459 init 66 (`0x0058EAC0`): chain 33: +0xE4 := GUID, +0xE1 := 1,
@@ -553,6 +598,12 @@ object 189 there (flags 1, 1, 0) → +0xB1 := 1, +0xC0 := GUID, 1).
   +0x91 = 0 → critical spawn of 512 at the dummy (`0x005459A0` with the
   dummy's room) → +0x94, +0x91 := 1, map AI applied once; object 189 at
   her position → +0xB2 := 1, +0xB4 := GUID; then the own seq fn.
+  Exact nesting (`0x0058926C`, `0x0058928F`): the portal and the seq fn
+  run only after a successful spawn in this call (+0x91 already set or
+  a failed spawn → return). The portal: the room covering her position
+  (`0x00463740` from her room), object 189 type 2 there with flags (1,
+  1, 0) (`0x00589313`, same order as the outside portal); no room or no
+  object → no portal, the seq fn still runs.
 - Dummy 461 init 68 (`0x0058A610`): +0x110 := GUID; +0x88 = 0 and +0x93 =
   0 → critical spawn of 514 → +0x9C, +0x93 := 1, map AI applied once.
 - Dummy 462 init 69 (`0x0058A6C0`): +0x88 = 1 and +0x92 = 0 → preset
@@ -566,6 +617,12 @@ object 189 there (flags 1, 1, 0) → +0xB1 := 1, +0xC0 := GUID, 1).
   flags |= 1) and, the dummy +0x110 existing, its event 7 at frame + 1
   (which kills him again if he is back, `0x00589540`); +0x93 := 0. +0x88
   := 1 when 0.
+- Dummy 461 event 7 (`0x00589540`): chain 33; "back" = a monster unit
+  with GUID +0x9C still exists (`0x00552F60(game, 1, +0x9C)`); then
+  `0x00589340` runs on it again (interaction ended, path freed, AI event
+  2 deleted, stat 6 := 0, mode 12, refresh, unit flags |= 1). No other
+  test (not +0x93, not his mode): a corpse still in the unit list one
+  frame later is killed again. +0x9C is never cleared.
 
 #### 5.10 Game start, join, leave (events 13, 14, 10)
 
@@ -639,6 +696,14 @@ other Act V part-1 quest code draws.
 8. The scroll's resistance stat list is added on each use and at load,
    with the sum over all difficulties (§5.7); whether the earlier list is
    replaced is open (Open question 3).
+9. The scroll reward with iced Anya in a chat ends the chat for every
+   chatting player (0x62 and S5D(33, 0x20, 0) each) but neither kills
+   her nor sets +0xE3, so the drop-inactive step runs and iced Anya
+   stays where she was while Anya also appears in town (§5.7).
+10. Nihlathak's second town kill (`0x00589540`, frame + 1) tests only
+    that his GUID still names a monster (§5.9).
+11. Anya's town portal and the Prison of Ice seq fn are skipped when
+    Anya is already in town or her spawn fails (§5.9).
 
 ## Test vectors
 
@@ -674,6 +739,11 @@ other Act V part-1 quest code draws.
   same chain-3 party bug; no victim test in Shenk's kill; the 20169 /
   Ancients details are in part 2.
 - No packet or RNG recording of Act V exists yet.
+- 2026-10-07 answers (QE-1–QE-4, QE-8b/c): `disasm.py at` on
+  `0x00589540`, `0x00589340`, `0x005893E0`, `0x005890B0`, `0x00589070`,
+  `0x00573180`, `0x005891D0`, `0x0058A7D0`–`0x0058AA42`, `0x0058AD80`,
+  `0x0058AE10`, `0x00545C90`, `0x005E77A0`, `0x005E7880`, `0x00588B30`–
+  `0x00588C40`; `xref` for the hook pointers.
 
 ## Open questions
 
@@ -686,7 +756,11 @@ other Act V part-1 quest code draws.
    the stat-list spec (owner ids of `0x006251F0`) and a recording.
 4. Prisoner AI and Anya AI callers (`0x005EE3DB`…`0x005EE562`,
    `0x005E7806`…`0x005E7A49`) and what they do with the returned values:
-   AI spec (another owner).
+   AI spec (another owner). **Answered** (2026-10-07) for Anya: every
+   hook's effect and return value is in §5.8 (table, and the map-AI
+   stores `0x0058AD80` / `0x0058AE10`); the AI's use of the returns is
+   `monsters/ai-bodies.md` §9.32 (NpcOutOfTown). The prisoner hooks are
+   §4.10.
 5. Siege Boss state 118 set at creation (part 2 §10): states spec.
 6. `quests.tsv` column `spec` still says `catalogued` for rows 31–36;
    switch it to `specified` (with a link to these files) once
