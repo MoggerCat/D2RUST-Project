@@ -42,7 +42,7 @@
 | Edge cases & original bugs | 915–956 |
 | Test vectors | 957–1045 |
 | Provenance | 1046–1102 |
-| Open questions | 1103–1199 |
+| Open questions | 1103–1206 |
 <!-- /index -->
 
 ## Summary
@@ -1116,18 +1116,25 @@ Other recorded checks:
 3. The `0x005A8520` knockback-end branches have no recorded instance:
    record a knockback (e.g. a player skill with knockback on fallen and
    on a sand leaper) and check +1 / +15 / gethit.
-4. `0x0054DC40` (teleport spot search): which seed it draws from and in
-   what order (`monsters/population.md` owns spot search?).
-5. Who sets monster data `dwAiState` (+0x54) to 3 or 19, read by
-   `0x005734E0`.
-6. Forced targets `0x005DD610`: full 1.14d read (taunt/attract/confuse
-   records, the mode-3 draw).
-7. Target-node list slots 8 and 9 contents and order (game +0x10F8): read
-   the 1.14d target-node functions (D2MOO `Targets.cpp`).
-8. Who builds the Npc map-AI record (control +0x38: node count, 12-byte
-   nodes) and from which data (DS1 preset paths?), and the node order.
-   The idle-10 source itself is settled in `ai-bodies.md` §9.9 (command 4 delay);
-   confirm with a town recording that logs command 4 next to thinks.
+4. Answered (2026-10-07): `monsters/population.md` §8 owns it: the
+   room seed, up to 20 tries of x := `roll(w)` + left then y := `roll(h)`
+   + top, a test-only placement probe per try.
+5. Answered (2026-10-07): §3.1 (the damage reaction sets 19; the
+   monster mode set records the mode left, 19 → 3).
+6. Answered (2026-10-07): §5.1 read in full on 1.14d.
+7. Answered (2026-10-07): §5.2 "Target-node lists" (slot 8: rogue2
+   wanderers, act 5 barbarians; slot 9: bone walls / prisons, confused
+   units; both newest first; `population.md` OQ7 gives `0x005B1990`).
+8. Answered (2026-10-07) for the builder: the DS1 loader makes the
+   path of a preset unit from the DS1 path section (`drlg/preset.md`
+   §5 step 10: points in file order, action 1 below DS1 version 15),
+   the unit filter copy offsets every point with the preset
+   (`drlg/preset.md` §7, `0x00667510`), and the preset spawn
+   `0x00555910` (`population.md` §11.1) moves the pointer to control
+   +0x38 (`0x0058F000` gives &control +0x38; `0x00666120` moves and
+   clears the preset's). Quest code swaps it later
+   (`world/quests-act3.md`, `0x00587950`). The idle-10 source is settled in
+   `ai-bodies.md` §9.9 (command 4 delay). Left: confirm with a town recording that logs command 4 next to thinks.
 9. The 2 recorded fallen1 type-1 runs with no schedule and later
    activity: likely a death end followed by a shaman resurrect; check
    with a recording that hooks mode changes.
@@ -1182,17 +1189,17 @@ Other recorded checks:
     empty in 1.14d: `ai-bodies-7.md` §26 and its open question 2).
 17. Answered (2026-10-07), the implementation questions of
     `docs/handoff/impl-ai-act1.md` §4 and `gaps-combat-ai.md`, all
-    settled in the text: AI1 drehyaiced is class 527 (§9.32,
+    settled in the text: AI1 drehyaiced is class 527 (`ai-bodies.md` §9.32,
     `0x005E77A0` compares 0x20F; the catalogue row pairs were corrected,
-    Provenance); AI2 and AI3 §9.31 (the "Else" belongs to the first
-    30 % roll; no room counts as out of town); AI4 and AI5 §9.32 (the
+    Provenance); AI2 and AI3 `ai-bodies.md` §9.31 (the "Else" belongs to the first
+    30 % roll; no room counts as out of town); AI4 and AI5 `ai-bodies.md` §9.32 (the
     param writes and idle 1 follow a leave; any class other than 527
     with AI 31 takes cain1's Act 1 functions, it does not do nothing);
     AI6 §8 (`0x0058EFA0` creates through `0x0058EF40`, which makes the
     new command current; `0x0058EEF0` with no current returns 0); AI7
     §7.2 table (coordinate walk / run: path step count 1); AI8 OQ12 (G
     is per server process, not per game or per AI store: the code's
-    per-store G matches only the first game of a process); AI9 §9.26
-    (states through `0x00639DB0`); AI10 §9.28 (a state above 3 takes the
+    per-store G matches only the first game of a process); AI9 `ai-bodies.md` §9.26
+    (states through `0x00639DB0`); AI10 `ai-bodies.md` §9.28 (a state above 3 takes the
     above-ground steps; the function never writes one). Forced-target combat and flags: §5.1 end
     (§5.2 step 7 applies).

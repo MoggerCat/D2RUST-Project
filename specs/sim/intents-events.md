@@ -1192,7 +1192,7 @@ owned it yet, and states the handlers that are only message handling.
    | 0x4D PlayNpcMessage | rule 11; the intro record: `world/quests.md` §6.7 |
    | 0x51 BindHotkey | rule 12 (fields: §2.4 rule 7) |
    | 0x53 StaminaOn, 0x54 StaminaOff | rule 13 |
-   | 0x59 MakeEntityMove | `monsters/ai.md` §9.9 (AI params from NPC messages) |
+   | 0x59 MakeEntityMove | `monsters/ai-bodies.md` §9.9 (AI params from NPC messages) |
    | 0x5F UpdatePlayerPos | `sim/pathing.md` §1.6 |
    | 0x60 SwapWeapons | rule 14 (message part); `0x005616A0`: open question 16 |
 
