@@ -36,6 +36,7 @@ import sys
 
 sys.dont_write_bytecode = True  # no __pycache__ next to the scripts
 import record_rng as rr  # noqa: E402  (the shared Win32 debugger)
+import autostart  # noqa: E402  (unattended start, input script)
 
 TOOL = "trace-recorder record_packets 0.1.0"
 RAW_FORMAT = "packets-raw-1"
@@ -162,12 +163,15 @@ def main():
                     help="output .jsonl (default traces/raw/<time>-packets.jsonl)")
     ap.add_argument("game_args", nargs="*", default=["-w", "-ns"],
                     help="Game.exe arguments (default: -w -ns)")
+    autostart.add_options(ap)
     a = ap.parse_args()
+    gargs, auto = autostart.setup(a, a.game_args or ["-w", "-ns"])
     out = a.out or os.path.join(
         repo, "traces", "raw", datetime.datetime.now().strftime("%Y%m%d-%H%M%S") + "-packets.jsonl")
     rr.TOOL, rr.RAW_FORMAT = TOOL, RAW_FORMAT  # header written by the shared run()
-    r = PacketRecorder(os.path.abspath(a.game), a.game_args or ["-w", "-ns"], out, a.seconds,
+    r = PacketRecorder(os.path.abspath(a.game), gargs, out, a.seconds,
                        a.max_events)
+    r.auto = auto
     try:
         counts = r.run()
     except KeyboardInterrupt:

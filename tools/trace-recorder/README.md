@@ -22,6 +22,7 @@ code. Spec-role tool: the addresses it hooks are documented in
 | `check_stats.py` | Replays a stats recording through a model of those specs: must predict every callback, expiry and regeneration value and reproduce every snapshot; `--perturb-snap N`, `--perturb-cb N` must fail at the changed record; `--selftest` runs a hand-built recording of the specs' test vectors; `--files game` checks the specs' itemstatcost facts on the 1.14d table |
 | `check_units.py` | Checks the per-kind timer-event rules U1–U11 of `specs/sim/units.md` on a tick recording (tables from a `dump_tables.py` directory); `--perturb N` must fail at the changed record; `--selftest` runs a hand-built recording |
 | `record_frames.py` | Launches `game/Game.exe -w -ns` under the debugger (base: `record_tick.py`), and at each in-game `EndScene` (`0x4F6190`) reads the 8-bit index framebuffer and the GDI palette, ties the frame to the last server tick and logs the camera/player, level, cursor, seed, light-quality and weather state, and with `--draws-every N` every draw call of every N-th frame; writes `traces/raw/<time>-frames.jsonl` (format `frames-raw-2`) and palettized PNGs `frame-<seq>.png` to `game/captures/<time>/` (both gitignored); prints the stability verdict (`capture.md` §7); `--selftest` checks the PNG writer, the state readers (perturbation) and the stability count. Spec: `specs/render/capture.md` |
+| `autostart.py` | Unattended start for every `record_*.py`: `--auto CHAR [--seed N] [--input SCRIPT]` starts a single-player game with that expansion character (no player at the keyboard), optionally with a fixed map / game seed, then plays a scripted input (clicks, keys, screenshots) into the window; `--try CHAR` runs it alone; `--selftest` |
 | `dump_tables.py` | Launches `game/Game.exe` under the debugger, stops when the excel load and its fix-ups have finished, writes every loaded table and the runtime maps it knows to `traces/raw/<time>-tables/` (gitignored); compared by `data-tool dump-compare` |
 
 ## Use
@@ -91,6 +92,46 @@ game runs far slower (entering Act 1 takes over 40 s instead of ~2 s);
 new event kind, `rng_draw`, whose data fields are listed in the converter
 and in `specs/sim/rng.md` (Test vectors). `tick` is 0 (untimed), and the
 1.14d `site` is kept for reference and listed in `compare.ignore`.
+
+## autostart.py: unattended start and scripted input
+
+```
+py tools/trace-recorder/autostart.py --selftest                          # no game needed
+py tools/trace-recorder/autostart.py --try ScnAma --seed 1234            # start, report, kill (~9 s)
+py tools/trace-recorder/record_tick.py --seconds 40 --auto ScnAma --seed 1234
+py tools/trace-recorder/record_packets.py --seconds 60 --auto ScnAma --seed 7 \
+    --input "wait 2; click 600 300; wait 2; click 250 420; wait 2; end"
+```
+
+Every recorder (`record_rng`, `record_packets`, `record_tick`,
+`record_stats`, `record_frames`) takes the same options: `--auto CHAR`,
+`--seed N`, `--auto-after S` (default 6: the main menu must be up),
+`--input SCRIPT`, `--shots DIR`. Without `--auto` nothing changes. The
+recorder's debug loop calls `AutoStart.poll` (at most every 50 ms); the
+header's `args` keep the game arguments, so a recording names its
+character and seed.
+
+| Step | 1.14d fact |
+|---|---|
+| character, seed, no-save | game options `-name` (launcher config +0xBD), `-seed` (+0x21A), `-nosave` (+0x219), from the option table `0x705040` (0x5C-byte rows, reader `0x405450`); `--auto` appends `-nosave -name CHAR [-seed N]`, so the save file is never written |
+| leave the menu | in launcher mode 4 (`0x74C704`): next mode 1 into `0x7795E8`, 0 into the menu loop flag `0x72DDD4` (as `dump_tables.py`); client mode `0x44B8A0` starts a single-player game (config game type +0x19 = 0) |
+| seed | `-seed N` sets the fixed-seed global (`specs/sim/rng.md` §5.2): game seed `{N, 666}`, game +0x7C = N; the client act's init seed (`[0x7A0634]+0x0C`) is N. Without `-seed` it is the save's map ID (`.d2s` 0xAB), as `rng.md` §5.4 observed |
+| arrival | client player `0x7A6A70` → path +0x1C → room +0x10 → level +0x58 → id +0x1D0 (level 1 = Rogue Encampment); logged with the position and the act init seed |
+| input | `PostMessageW` to the game's visible top-level window: `WM_MOUSEMOVE`, `WM_L/RBUTTONDOWN/UP` (client pixels), `WM_KEYDOWN/UP`; works with the window in the background |
+| screenshots | `PrintWindow` from a helper thread (the window thread may sit at a debug event only the debugger thread continues), RGB PNG: for looking only; pixel captures are `record_frames.py` |
+
+The game creates an **expansion** game: the character must be an
+expansion character (`.d2s` 0x24 bit 0x20). A classic character gets "A
+Diablo II character cannot join a game created by a Diablo II Expansion
+character" and the client returns to the menu. Characters used so far:
+`ScnAma`, `ScnSor` (expansion, level 1) in the save folder of this PC.
+
+Input script (`;`-separated, run in order from the arrival): `wait S`,
+`move X Y`, `click X Y`, `rclick X Y`, `hold X Y S`, `key K [S]` (letter,
+digit, ESC, TAB, ENTER, SPACE, SHIFT, CTRL, ALT, F1–F12 or a number),
+`shot NAME`, `end` (stops the recording; the game is killed as always).
+Proved: a click at (600, 300) walks the player (position changes, the
+screenshot shows the walk). Arrival takes about 6.3 s after launch.
 
 ## dump_tables.py: the excel tables in 1.14d memory
 
