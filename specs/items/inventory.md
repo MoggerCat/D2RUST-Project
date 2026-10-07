@@ -33,16 +33,16 @@
 | Outputs / state changes | 79–86 |
 | Rules | 87–88 |
 |   1. Inventory model | 89–181 |
-|   2. Grid placement | 182–277 |
-|   3. Belt | 278–335 |
-|   4. Equipping | 336–521 |
-|   5. Shared checks | 522–715 |
-| Constants & data dependencies | 716–738 |
-| Randomness | 739–752 |
-| Edge cases & original bugs | 753–801 |
-| Test vectors | 802–850 |
-| Provenance | 851–910 |
-| Open questions | 911–1013 |
+|   2. Grid placement | 182–282 |
+|   3. Belt | 283–340 |
+|   4. Equipping | 341–526 |
+|   5. Shared checks | 527–720 |
+| Constants & data dependencies | 721–743 |
+| Randomness | 744–757 |
+| Edge cases & original bugs | 758–806 |
+| Test vectors | 807–855 |
+| Provenance | 856–915 |
+| Open questions | 916–1018 |
 <!-- /index -->
 
 ## Summary
@@ -247,6 +247,11 @@ quests.
 
 1. Game or owner missing → 0. Targeting reset (§5.3).
 2. The item must exist, be an item and be on the cursor (mode 4), else 0.
+   The mode test does not check the item's room: a mode-4 item that is
+   still linked in a room (only possible for an item copy made from a
+   ground source, `world/vendors-2.md` §7.3 step 1.1, which 1.14d never
+   does) would be placed and stay in the room as well. d2rs: such an item
+   is a caller error.
 3. Record from the item's page (§1.3). For a player owner: page 1 → the
    cursor is **not** cleared afterwards; page 2 → trade hook
    `0x00568770` after step 8 and before step 9 (multiplayer trade, out of

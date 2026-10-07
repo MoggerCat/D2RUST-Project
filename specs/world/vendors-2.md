@@ -21,9 +21,9 @@
 |---|---|
 | Summary | 29–38 |
 | Rules | 39–40 |
-|   7.3 Item copy (`0x0055A2A0`, ECX game, EDX source S, owner, fillers) | 41–99 |
-|   7.3.1 Fields the decoder rebuilds (Open question 8) | 100–147 |
-|   10. C→S 0x4F buttons (`0x0054C7C0` → `0x00568060`; answers `ui/panels.md` OQ 6) | 148–262 |
+|   7.3 Item copy (`0x0055A2A0`, ECX game, EDX source S, owner, fillers) | 41–110 |
+|   7.3.1 Fields the decoder rebuilds (Open question 8) | 111–158 |
+|   10. C→S 0x4F buttons (`0x0054C7C0` → `0x00568060`; answers `ui/panels.md` OQ 6) | 159–273 |
 <!-- /index -->
 
 ## Summary
@@ -47,6 +47,17 @@ socketing (`world/npc.md` §8.1); 17 call sites. The owner argument (stack
 1) is not read in 1.14d. Result: the copy, or none.
 
 1. R := S's room (`0x00620BB0`; none when S is not on the ground).
+   1.1. **A ground source** (2026-10-08). Every 1.14d caller passes a
+   held S (the sell item is the player's cursor or inventory item,
+   `world/vendors.md` §7.2 rule 3; the buy source is a store item; cube,
+   hireling and socketing sources are inventory items), so R is none and
+   the copy is created with no room. With a ground S the copy would be
+   allocated in R at S's position (step 3), i.e. on the ground, and no
+   later step unlinks it: the callers' mode set `0x00624690(copy, 4)`
+   only queues an update (`0x0064C040`), sets unit +0xC4 bit 0x1 and the
+   mode field, and refreshes; it does not take the copy out of R. d2rs:
+   a ground S is a caller error (assert); never place a copy that has a
+   room.
 2. Write S as a **save-format** stream with children
    (`items/bitstream.md`, `0x006313E0(S, buffer, 0x400, save 1,
    children 1, alt 0)`) into a 1,024-byte buffer. A stream that would
