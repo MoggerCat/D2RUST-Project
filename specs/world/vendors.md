@@ -36,15 +36,15 @@
 |   4. Opening trade or gamble (`0x00579430(npc, single, gamble)`) | 263–292 |
 |   5. Gambling | 293–360 |
 |   6. Refresh | 361–392 |
-|   7. Buying and selling | 393–582 |
-|   8. Repair | 583–637 |
-|   9. Prices | 638–831 |
-| Constants & data dependencies | 832–851 |
-| Randomness | 852–867 |
-| Edge cases & original bugs | 868–897 |
-| Test vectors | 898–920 |
-| Provenance | 921–959 |
-| Open questions | 960–1032 |
+|   7. Buying and selling | 393–586 |
+|   8. Repair | 587–641 |
+|   9. Prices | 642–835 |
+| Constants & data dependencies | 836–855 |
+| Randomness | 856–871 |
+| Edge cases & original bugs | 872–901 |
+| Test vectors | 902–924 |
+| Provenance | 925–963 |
+| Open questions | 964–1036 |
 <!-- /index -->
 
 ## Summary
@@ -529,6 +529,10 @@ client price (not read). Handler `0x0054BB20` → `0x00579510`:
    body location or belt), else 0. The same test as the owned-item
    predicate `0x00549220` (`items/inventory.md` §5) minus its GUID
    lookup. §8.1 rule 4 "in the player's inventory" is this routine.
+   An item on the ground is in neither (a drop unlinks it from the
+   inventory), so selling a ground item ends here with code 11, result
+   3: no copy is made, nothing moves (2026-10-08; the copy's placement
+   for a ground source is `world/vendors-2.md` §7.3 step 1.1).
 4. Item mode (unit +0x10) ≠ u16 @9 → code 9, result 3.
 5. Flag 0x1000 set, or a quest item (u8 +298 ≠ 0) or of type 39
    (`0x0062A130`) → code 9, result 3.
