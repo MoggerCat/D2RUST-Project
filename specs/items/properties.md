@@ -453,7 +453,7 @@ Functions (code → stat as stored in the table):
 | `0x0065D950` | 29 | format 0: `0x0065CF40`(17, kind 1), then (18, kind 1): two rolls, base reset each |
 | `0x0065D310` | 41 | format 0: `0x0065CF40`(39), (41), (43), (45), kind 0: four rolls |
 | `0x0065D4B0` | 42 | format 0: `0x0065CF40`(40), (42), (44), (46), kind 0 |
-| `0x0065D220` | 133 → 194 | set flag 0x800 and the socket count := `param` (`0x0062BE00`; no cap, unlike §5 rule 6) |
+| `0x0065D220` | 133 → 194 | set flag 0x800 and the socket count := `param` through `0x0062BE00`, which caps it as §5 rule 6 (min(max(`param`, 1), min(`invwidth` × `invheight`, 6), max sockets); flag 0x800 is set first in every case, w × h = 0 → no count; corrected 2026-10-07, disassembly `0x0062BE4E`–`0x0062BE9E`) |
 | `0x0065D270` | 242 | the extra unit if it is an item, else the item: base stats 73 and 72 := 0 |
 | `0x0065DBC0` | 243 → 204 | function 19 (§5 rule 9) with the same formulas (charges, level, roll(c − c / 8)), list set; returns 1 |
 | `0x0065E440` | 124–132, 178, 182–194, 231–241 | nothing (returns 1) |

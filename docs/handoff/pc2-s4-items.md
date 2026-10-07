@@ -118,3 +118,64 @@ and `MovePending::weapon_bookkeeping(owner)`
 implement §5.8 behind them.
 
 Cross-file requests: none.
+
+## Follow-up 2 (item records by save version, request from the audio/d2s lane)
+
+Written: new `items/bitstream-legacy.md` (`bitstream.md` stays 28 KB and
+keeps the writer; it now points to the new file).
+
+- §1: peek `0x0062AE20` (layout of the out record; `nec ` → `neg ` for
+  v < 0x5D), create `0x00558CB0` (ECX game, EDX room; class bound,
+  allocation `0x00555230`), decode `0x0062E430` (defaults, compact /
+  full dispatch), and the version each caller passes (save lists and
+  golem: the file's; copy `0x0055A2FE`, `0x005419AF`, client: 0x60).
+- §2: every version gate as one table: 1.09 column set for v < 0x5D
+  (`1.09-save bits` / `1.09-save add`, param bits record +0x28 = 0 in
+  all live rows), affix offsets P_v / A_v per version (jump table
+  `0x0062E294`; 0x4A–0x4F uncorrected), auto affix (< 0x59 dropped,
+  0x59 + 1), rare slots + 1 (< 0x5A), set index via `sets` (< 0x5D),
+  trailer (> 0x56, extra u32 > 0x5D), durability 8 bits (< 0x60),
+  quantity 8 bits (< 0x51), set lists (> 0x54), stat width / id / form
+  gates.
+- §3 full reader `0x0062CBE0` field order with the gates; §4 stat-list
+  entries (end / failure rules, fixed groups, old packed forms of
+  83–87 / 107 / 126 / 188 / 195–203 / 204–213, generic `0x0062AC80`
+  with the width and id remaps, the class-skill → 127 merge); §5 compact
+  reader `0x0062A970` (quest difficulty only for v > 0x5C).
+- §6 version-0x47 record `0x00532F30` (forms A / A-ear / B / C: 25 / 25
+  / 29 / 13 / 24 bytes, every field and width); §7 request built by
+  `0x00530F40` (field map, then file index and page overwritten); §8
+  placement `0x00531040` (modes 0, 1, 2, 4, 6) and `0x00531390` (0, 1,
+  6), result codes 0xC / 0xD.
+- `items/properties.md` §14 table row `0x0065D220`: corrected — the
+  socket setter `0x0062BE00` caps the count exactly as §5 rule 6 (the
+  row said "no cap").
+
+Pending: `bitstream-legacy.md` OQ1 (load a 1.07/1.08 save), OQ2 (load a
+1.00–1.06 save); both need a save file, none on this PC.
+
+CODE-TABLE CHANGE commits: none.
+
+Cross-file requests:
+
+- `formats/d2s.md` Open question 2: "Answered: `items/bitstream-legacy.md`
+  §1–§5 (every version gate of `0x0062AE20` / `0x00558CB0` /
+  `0x0062E430`)".
+- `formats/d2s-legacy.md` Open question 1: "Answered:
+  `items/bitstream-legacy.md` §6 (record `0x00532F30`), §7 (request
+  `0x00530F40`), §8 (placement `0x00531040`, `0x00531390`)"; §8 rule 1
+  "(`items/bitstream.md`, …)" → add `items/bitstream-legacy.md` §1–§5.
+- `formats/d2s-legacy.md` §8 rule 2 (version 0x47 list `0x00533350`):
+  the duplicate skip never fires. The table's count starts at 0
+  (`0x005333B2`) and grows only inside the compare loop, which is
+  entered only when the count is > 0 (`0x005333FE` `jle`), so no entry
+  is ever stored and every record is placed. Replace "an item whose five
+  identifying values … is skipped" with that. Also state the failures:
+  a top-level player-list placement failure (`0x00531040` ≠ 0) goes on
+  with the next entry (`0x0053352F` → `0x005334EB`), so that parent's
+  child records are then read as top-level entries of the count; a
+  child placement failure, or any corpse-list placement failure
+  (`0x00531390`), returns its code (0xC / 0xD) at once without the byte
+  count (`0x005335A9`, `0x00533497`); a record without "JM" → 14
+  (`0x005335C2`). The list keeps no length check (the remaining-length
+  word at ebp+0x10 is decremented, never tested).

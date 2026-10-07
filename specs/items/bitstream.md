@@ -16,26 +16,27 @@
   `items/properties.md` §9–§10 (fillers, runewords); `sim/stat-lists.md`
   (stat lists by state and flag); `sim/stats.md` (stat getters);
   `data/fields.tsv` (`itemstatcost`, `itemtypes`, `weapons` columns);
-  `sim/server-messages.tsv` rows 0x9C, 0x9D.
+  `sim/server-messages.tsv` rows 0x9C, 0x9D; `items/bitstream-legacy.md`
+  (the reader by save version).
 
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 41–52 |
-| Inputs | 53–63 |
-| Outputs / state changes | 64–74 |
-| Rules | 75–76 |
-|   1. Writer | 77–93 |
-|   2. Header (`0x006312B0`) | 94–122 |
-|   3. Compact record (`0x0062AF80`) | 123–154 |
-|   4. Full record (`0x0062FFF0`) | 155–291 |
-|   5. Save-format extras (never on the wire) | 292–309 |
-| Constants & data dependencies | 310–333 |
-| Randomness | 334–337 |
-| Edge cases & original bugs | 338–374 |
-| Test vectors | 375–397 |
-| Provenance | 398–422 |
-| Open questions | 423–494 |
+| Summary | 42–55 |
+| Inputs | 56–66 |
+| Outputs / state changes | 67–77 |
+| Rules | 78–79 |
+|   1. Writer | 80–96 |
+|   2. Header (`0x006312B0`) | 97–125 |
+|   3. Compact record (`0x0062AF80`) | 126–157 |
+|   4. Full record (`0x0062FFF0`) | 158–294 |
+|   5. Save-format extras (never on the wire) | 295–312 |
+| Constants & data dependencies | 313–336 |
+| Randomness | 337–340 |
+| Edge cases & original bugs | 341–377 |
+| Test vectors | 378–400 |
+| Provenance | 401–425 |
+| Open questions | 426–497 |
 <!-- /index -->
 
 ## Summary
@@ -49,6 +50,8 @@ fields, names, type-specific values (defense, durability, gold,
 quantity, sockets) and, for identified items, the property stat lists,
 each ended by 0x1FF. The same writer also produces the save format;
 the network stream is the case "save off, children off".
+The reader, with its gates for older save versions (0x47–0x5F),
+is `items/bitstream-legacy.md`.
 
 ## Inputs
 
