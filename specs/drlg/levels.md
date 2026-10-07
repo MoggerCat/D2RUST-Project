@@ -92,7 +92,7 @@ data; the drlg seed and level seeds advance as listed under Randomness.
 | drlg | | start seed (`dwStartSeed`); vis/warp record list; level list head | +0x470; +0x90; +0x47C |
 | drlg | | memory pool; act no (u8); act | +0x478; +0x480; +0x46C |
 | level | 0x230 | DRLG type (1 maze, 2 preset, 3 outdoor); flags (0x10 = automap reveal) | +0x00; +0x04 |
-| level | | room count; first room; activity count; inactive frames | +0x08; +0x10; +0x0C; +0x1D4 |
+| level | | room count (+1 per room linked at the list head, `0x0066B970`; −1 per room freed, `0x0066C100`; 0 when the rooms are freed, `0x00642010`, which also sizes +0x22C by it); first room; activity count; inactive frames | +0x08; +0x10; +0x0C; +0x1D4 |
 | level | | position x, y; width, height (tiles) | +0x1C, +0x20; +0x24, +0x28 |
 | level | | spawn-tile records (x, y, tile index; stride 12); count | +0x2C; +0x1D8 |
 | level | | next level; drlg; level type; level seed (lo, hi); level id | +0x1AC; +0x1B4; +0x1C0; +0x1C4, +0x1C8; +0x1D0 |
