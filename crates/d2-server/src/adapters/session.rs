@@ -72,7 +72,7 @@ use d2_sim::wiring::path::place::game_entry;
 use d2_sim::wiring::path::walk::PathCtx;
 
 use super::character::{self, ActionCharacter, CharacterWorld, LoadContext, LoadError, LoadReport};
-use super::handlers::world::ActionEvents;
+use super::handlers::world::{ActionEvents, StartItems, WiredWorld};
 use super::SimGame;
 use crate::seams::ClientId;
 
@@ -509,6 +509,28 @@ pub fn load_new_character<D: ActionEvents, W>(
         Entry::new_character(name, &portals, report.right_skill),
         report,
     )
+}
+
+/// [`load_new_character`] on the wired host, with the start items
+/// (`items/generation.md` §10.3) made on its economy and inventory model
+/// ([`WiredWorld::start_items`]) in place of the action wiring's
+/// unapplied step. Start stats and start items are the load's only steps
+/// before the start-skill selection that touch the player, and neither
+/// that selection nor the mouse skills draw, so running the items after
+/// the action wiring's load keeps the game-seed order of §10.3. The
+/// "start items" entry leaves the report's unapplied list when the items
+/// ran (no fault).
+pub fn load_new_character_with_items<D: ActionEvents, R, S>(
+    s: &mut SimGame<D, WiredWorld<R, S>>,
+    player: UnitId,
+    name: [u8; 16],
+) -> (Entry, LoadReport, StartItems) {
+    let (entry, mut report) = load_new_character(s, player, name);
+    let items = s.world.start_items(&mut s.game, &mut s.events, player);
+    if items.faults.is_empty() {
+        report.unapplied.retain(|u| u.step != "start items");
+    }
+    (entry, report, items)
 }
 
 #[cfg(test)]

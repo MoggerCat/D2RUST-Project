@@ -50,19 +50,20 @@ use d2_sim::world::waypoints::{ArrivalList, WaypointData, WaypointError, Waypoin
 use super::super::character::{self, StartItemWorld, StartPlace};
 use super::super::SimGame;
 use super::items::moves::MoveCall;
-use super::items::moves::{take_sent as inv_take_sent, InvParts};
+use super::items::moves::{take_sent as inv_take_sent, InvParts, MoveRest};
 use super::items::CubeCall;
 use super::player::{Outcome as PlayerOutcome, Run as PlayerRun};
 use super::skills::{Call as SkillCall, Handled as SkillHandled};
 use super::walk::{WalkCall, WalkResult};
 use crate::buffers::QueueError;
 use crate::seams::{ClientId, MessageSink, ResultCode};
-use d2_sim::items::inventory::UnitKind;
-use d2_sim::items::moves::{InventoryOps, MoveUnits, Owner};
+use d2_sim::items::inventory::{InvTables, UnitKind};
+use d2_sim::items::moves::{InventoryOps, MovePending, MoveUnits, Owner};
 use d2_sim::items::{flag, q, stat as istat, ItemStats, ListKey};
 use d2_sim::units::lifecycle::LifecycleHooks;
 use d2_sim::wiring::economy::quest_reward::create_reward;
 use d2_sim::wiring::economy::{find_list, Economy, StatCtx, UnitStats};
+use d2_sim::wiring::inventory::InvRest;
 
 /// Where a world-related C→S id's behaviour is specified.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -829,4 +830,67 @@ impl<H: LifecycleHooks> StartItemWorld for WiredStart<'_, '_, H> {
         });
         self.set_stat(item, istat::DURABILITY, max);
     }
+}
+
+/// The item-move seams no d2-sim module provides, answered for the first
+/// playable preview (`docs/PLAN.md` decisions, D1) so the play host can
+/// have an inventory model ([`preview_inv_parts`]): nothing is active,
+/// no own contribution, every location allowed, no quiver kind, player
+/// data +0x4C / +0x50 zero, no NPC talk, no player trade; the sends are
+/// collected for [`MoveRest::take_sent`].
+///
+/// d2rs-own, unverified: every answer here is a preview fill, not a
+/// spec'd behaviour; each one names the open point of `inventory.md` it
+/// stands in for (the `InvRest` method docs).
+#[derive(Debug, Default)]
+pub struct PreviewMoveRest {
+    sent: Vec<(Owner, Vec<u8>)>,
+}
+
+impl MovePending for PreviewMoveRest {
+    fn send(&mut self, player: Owner, bytes: Vec<u8>) {
+        self.sent.push((player, bytes));
+    }
+}
+
+impl InvRest for PreviewMoveRest {
+    fn item_active_on(&self, _: u32, _: Owner) -> bool {
+        false
+    }
+    fn own_contribution(&self, _: u32, _: Owner, _: u16) -> i32 {
+        0
+    }
+    fn one_or_two_handed(&self, _: Owner, _: u32) -> bool {
+        false
+    }
+    fn has_allowed_location(&self, _: u32) -> bool {
+        true
+    }
+    fn quiver_kind(&self, _: u32) -> bool {
+        false
+    }
+    fn player_data_4c(&self, _: Owner) -> u32 {
+        0
+    }
+    fn player_data_50(&self, _: Owner) -> u32 {
+        0
+    }
+    fn npc_talking(&self, _: Owner, _: Owner) -> bool {
+        false
+    }
+    fn player_trade_gate(&self, _: Owner) -> Option<bool> {
+        None
+    }
+}
+
+impl MoveRest for PreviewMoveRest {
+    fn take_sent(&mut self) -> Vec<(Owner, Vec<u8>)> {
+        std::mem::take(&mut self.sent)
+    }
+}
+
+/// An inventory model for the play host ([`WiredWorld::inventory`]) over
+/// `tables` (`InvTables::from_fixed`) with [`PreviewMoveRest`].
+pub fn preview_inv_parts(tables: InvTables) -> InvParts {
+    InvParts::new(tables, Box::new(PreviewMoveRest::default()))
 }

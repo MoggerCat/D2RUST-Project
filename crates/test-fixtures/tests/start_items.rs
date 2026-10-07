@@ -213,3 +213,38 @@ fn start_items_are_deterministic() {
     };
     assert_eq!(run(), run());
 }
+
+// Covers: specs/items/generation.md §10.3; specs/formats/d2s-load.md §1 r1
+#[test]
+fn the_new_character_load_makes_start_items_on_the_preview_inventory() {
+    use d2_server::adapters::handlers::world::preview_inv_parts;
+    use d2_server::adapters::session::load_new_character_with_items;
+    use d2_server::adapters::SimGame;
+    let Fx {
+        game,
+        sim,
+        mut world,
+        player,
+    } = fx(false, false);
+    world.inventory = Some(preview_inv_parts(
+        InvTables::from_fixed(&data().fixed).unwrap(),
+    ));
+    let mut s = SimGame::with_world(game, sim, world);
+    let (_, report, items) = load_new_character_with_items(&mut s, player, [0; 16]);
+    assert!(items.faults.is_empty(), "{:?}", items.faults);
+    assert_eq!(items.items.len(), 3);
+    assert_eq!(items.items[0].1, StartPlace::Equipped(RARM));
+    let steps: Vec<_> = report.unapplied.iter().map(|u| u.step).collect();
+    assert!(!steps.contains(&"start items"), "{steps:?}");
+    // Without an inventory model the step stays unapplied.
+    let Fx {
+        game,
+        sim,
+        world,
+        player,
+    } = fx(false, false);
+    let mut s = SimGame::with_world(game, sim, world);
+    let (_, report, items) = load_new_character_with_items(&mut s, player, [0; 16]);
+    assert_eq!(items.faults.len(), 1);
+    assert!(report.unapplied.iter().any(|u| u.step == "start items"));
+}
