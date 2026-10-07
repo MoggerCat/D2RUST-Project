@@ -50,6 +50,13 @@ pub const EVICTION_HOLD: u32 = 250;
 pub const RECENT_USE: u32 = 750;
 /// Cache limit on any machine above 500 MB (`0x00481840`, §10 r1).
 pub const CACHE_LIMIT: u32 = 5 * 1024 * 1024;
+
+/// Cache limit for a machine with `physical` bytes of memory (`0x00481840`,
+/// `sound-table.md` §10 r1): physical memory / 100, clamped to 3 MiB–5 MiB
+/// (5,242,880 bytes on any machine above 500 MB).
+pub fn cache_limit(physical: u64) -> u32 {
+    (physical / 100).clamp(3 * 1024 * 1024, u64::from(CACHE_LIMIT)) as u32
+}
 /// Duration of one sound tick in ms: one client tick (`render/camera.md`
 /// §9), used only by d2rs's channel-end model ([`SoundSystem`] upkeep).
 pub const TICK_MS: u64 = 40;
@@ -1113,11 +1120,7 @@ impl SoundSystem {
             r.pos = p;
             r.dist2 = d2;
         }
-        r.occlusion = if r.occlusion < target {
-            (r.occlusion + OCCLUSION_STEP).min(target)
-        } else {
-            (r.occlusion - OCCLUSION_STEP).max(target)
-        };
+        r.occlusion = occlusion_step(r.occlusion, target);
     }
 
     /// §6.3 r3.1–r3.2 (r9). Returns whether the request may start.
@@ -1508,6 +1511,16 @@ impl SoundSystem {
             pan: ch.pan,
             cause: format!("update h{handle}"),
         }));
+    }
+}
+
+/// §6.4 r4 step arithmetic (`0x004BA333`–`0x004BA398`): `occ` moves toward
+/// the target `t` by at most `s` = f32 0.05, each operation rounded to f32.
+pub fn occlusion_step(occ: f32, t: f32) -> f32 {
+    if occ < t {
+        (occ + OCCLUSION_STEP).min(t)
+    } else {
+        (occ - OCCLUSION_STEP).max(t)
     }
 }
 
