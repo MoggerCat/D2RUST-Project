@@ -30,3 +30,11 @@ Branch `claude/fin-desc-drlg`. Short session (45 min limit); most of it went to 
   caller (`ui/panels-2.md` §17.5).
 - drlg/levels, rooms, preset: not reached (15 / 10 / 10 uncovered rules; see
   `python3 tools/coverage.py`).
+
+## Verification caveat
+
+`d2-client` could not be built in this container (`wayland-client` system
+library missing for `wayland-sys`). The module and its tests were compiled
+and run standalone with `rustc --test` (9/9 pass); clippy and nextest on
+`d2-client` were not run. The local run should do
+`cargo nextest run -p d2-client ui::tests_fdesc` and clippy.

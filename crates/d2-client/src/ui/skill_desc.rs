@@ -5,8 +5,6 @@
 //! stat-reading callers (weapon physical, elements, hand swaps) feed these
 //! with already-read values.
 
-use d2_sim::combat::pct;
-
 /// Entries 1–24 of the `descdam` table are live (§1 rule 1).
 pub const DESCDAM_LIVE: u16 = 24;
 /// Entries 1–5 of the `descatt` table are live (§1 rule 1).
