@@ -3458,6 +3458,18 @@ set the default budgets from them.
 
 ### Blocked (not runnable yet)
 
+- Native assets full conversion (`specs/formats/native-assets.md` §7.2,
+  branch `claude/spec-native-assets`; blocked until `d2-convert` exists,
+  sessions N1–N4 of §8): `cargo run --release -p d2-convert -- convert
+  --game "$D2_GAME_DIR" --native "$TMP/d2native"`, then `cargo run
+  --release -p d2-convert -- verify --deep --game "$D2_GAME_DIR" --native
+  "$TMP/d2native"`. Expect exit 0 both, `manifest.toml` `complete = true`,
+  0 failed in every kind, converted counts equal to the winning copies
+  `mpq-tool formats` finds, C-TABLE 73/73 with exactly one override
+  (`monstats` 707 `NameStr`). Record in the spec: total and per-kind run
+  time, native root size, DT1 fallback tiles (OQ 5), `tbl` rebuild
+  differences (OQ 6), unnamed blocks per archive. Then `d2-client play`
+  and `verify` with `--source native` vs `--source mpq`: identical results.
 - Phase 6 §B1 decoded samples per live `.wav` (needs `formats/wav.md`).
 - Phase 6 GPU: the `map` case through the compute compositor is ported and
   queued as C28–C31 (it will show the index-0 question VM1); the `sprite` /
