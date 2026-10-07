@@ -836,7 +836,7 @@ fn message(fx: &mut Fx, msg: &Msg) -> Option<Vec<u8>> {
         }
         Msg::Stat(n) => bytes(&AddStatPoint {
             stat: *n % 8,
-            count_minus_one: 0,
+            repeat: 0,
         }),
         Msg::Travel(isle) => {
             let wp = fx.units().into_iter().find_map(|u| {

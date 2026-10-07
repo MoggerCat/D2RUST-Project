@@ -182,7 +182,6 @@ struct Props {
     req_percent: i32,
     quality: u8,
     sockets: bool,
-    probe: u32,
 }
 
 #[derive(Default)]
@@ -359,8 +358,17 @@ impl InvWorld for Fake {
     fn quiver_kind(&self, item: UnitId) -> bool {
         self.items[&item].record == R_ARROWS
     }
-    fn targeting_probe(&self, item: UnitId) -> u32 {
-        self.props[&item].probe
+    /// `0x0044BE50`: the unit's type (player 0, monster 1, object 2,
+    /// item 4), 6 for a unit with no kind.
+    fn targeting_probe(&self, unit: UnitId) -> u32 {
+        match self.kinds.get(&unit) {
+            Some(UnitKind::Player { .. }) => 0,
+            Some(UnitKind::Monster { .. }) => 1,
+            Some(UnitKind::Object { .. }) => 2,
+            Some(UnitKind::Item) => 4,
+            Some(UnitKind::Other) => 3,
+            None => 6,
+        }
     }
     fn queue_untarget(&mut self, _player: UnitId, item_guid: u32) {
         self.log.push(format!("0x3F {item_guid}"));
@@ -1475,10 +1483,11 @@ fn targeting_reset_in_list_order() {
     for (u, x) in [(c, 0), (a, 1), (b, 2)] {
         assert!(place_at_page(&mut inv, &mut w, &t, u, 0, x, 0));
     }
-    for u in [a, b, c] {
+    for u in [a, c] {
         w.items.get_mut(&u).unwrap().flags |= iflag::TARGETING;
     }
-    w.p(b).probe = 6;
+    // The items are no player (probe 6 for them): the probe is asked
+    // about the owner, so every flagged item of a player sends a 0x3F.
     w.log.clear();
     targeting_reset(&inv, &mut w);
     assert_eq!(
@@ -1493,6 +1502,21 @@ fn targeting_reset_in_list_order() {
     }
     w.log.clear();
     targeting_reset(&inv, &mut w);
+    assert!(w.log.is_empty());
+
+    // A mercenary owner: the flag is cleared, no 0x3F, even for an item
+    // whose own `0x0044BE50` would answer 0.
+    let merc = UnitId(60);
+    let class = 0x230;
+    w.kinds.insert(merc, UnitKind::Monster { class });
+    let mut minv = Inventory::new(merc, UnitKind::Monster { class }, 5);
+    let m = w.add(13, R_RING, mode::CURSOR);
+    assert!(place_at_page(&mut minv, &mut w, &t, m, 0, 0, 0));
+    w.kinds.insert(m, UnitKind::Player { class: 0 });
+    w.items.get_mut(&m).unwrap().flags |= iflag::TARGETING;
+    w.log.clear();
+    targeting_reset(&minv, &mut w);
+    assert_eq!(w.d(m).flags & iflag::TARGETING, 0);
     assert!(w.log.is_empty());
 }
 

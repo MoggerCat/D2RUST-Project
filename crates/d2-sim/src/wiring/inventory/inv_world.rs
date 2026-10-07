@@ -191,8 +191,10 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvWorld for InvDesk<'_, '_, H, R> 
         self.rest.quiver_kind(self.g(item))
     }
 
-    fn targeting_probe(&self, item: UnitId) -> u32 {
-        self.rest.targeting_probe(self.g(item))
+    /// `0x0044BE50` (§5.3): the unit's type, 6 (`Owner::NONE`) for a
+    /// missing unit.
+    fn targeting_probe(&self, unit: UnitId) -> u32 {
+        u32::from(self.o(unit).ty)
     }
     /// S→C 0x3F (code 0xFF, the item's GUID, 0xFFFF; §11) to the player.
     fn queue_untarget(&mut self, player: UnitId, item_guid: u32) {

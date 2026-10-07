@@ -390,7 +390,7 @@ fn blank_floor_rechosen_on_neighbour_seed_with_collision_update() {
     assert_eq!(rec.flags & rec_flags::HIDDEN, 0);
 }
 
-fn wall_pair(remap: Option<WallRemap>) -> Result<(World, Drlg, DrlgRoomId, DrlgRoomId), DrlgError> {
+fn wall_pair(remap: WallRemap) -> Result<(World, Drlg, DrlgRoomId, DrlgRoomId), DrlgError> {
     // A = (0, 0) with a linked type-1 wall column at x 8; B = (8, 0) with a
     // linked type-2 wall column at x 0.
     let mut dat = data();
@@ -442,9 +442,73 @@ fn wall_pair(remap: Option<WallRemap>) -> Result<(World, Drlg, DrlgRoomId, DrlgR
     Ok((w, d, r[0], r[1]))
 }
 
+// Covers: specs/drlg/wall-remap.md §1, §2 r1, §2 r2, §2 r3
 #[test]
-fn wall_merge_needs_the_remap_table() {
-    assert_eq!(wall_pair(None).err(), Some(DrlgError::MissingWallRemap));
+fn wall_remap_is_the_transcribed_table() {
+    use crate::drlg::WallClass::{Keep, Stop, Table};
+    let m = WallRemap::original();
+    assert_eq!(DrlgData::default().wall_remap, m);
+    // Test vectors of `wall-remap.md`.
+    let at = |t: u32, r: usize| match m.class(t) {
+        Some(Table(row)) => row[r],
+        c => panic!("type {t}: {c:?}"),
+    };
+    assert_eq!(at(1, 5), 1);
+    assert_eq!(at(5, 6), 6);
+    for r in [1, 2, 3, 5, 6, 7] {
+        assert_eq!(at(3, r), 3);
+    }
+    assert_eq!(at(2, 0), 1, "r0 = row 0's r7");
+    assert_eq!(at(1, 0), 0, "r0 of row 0 = dword 0x006EF574");
+    for t in [0, 4, 10, 11, 12, 14, 15, 16, 17, 18, 19] {
+        assert_eq!(m.class(t), Some(Keep), "type {t}");
+    }
+    for t in [8, 9, 13] {
+        assert_eq!(m.class(t), Some(Stop), "type {t}");
+    }
+    assert_eq!(m.class(20), None);
+    // `0x006EF578` rows (values equal D2MOO's `nWallTileTypeRemap`).
+    let rows: Vec<[u32; 7]> = [1, 2, 3, 5, 6, 7]
+        .into_iter()
+        .map(|t| core::array::from_fn(|c| at(t, c + 1)))
+        .collect();
+    assert_eq!(
+        rows,
+        [
+            [1, 3, 3, 4, 1, 3, 1],
+            [1, 2, 3, 4, 3, 2, 2],
+            [3, 3, 3, 4, 3, 3, 3],
+            [1, 3, 3, 4, 5, 6, 1],
+            [3, 2, 3, 4, 3, 6, 2],
+            [1, 2, 3, 4, 1, 2, 7],
+        ]
+    );
+    assert_eq!(WallRemap::with_rows(rows.clone().try_into().unwrap()), m);
+}
+
+// Covers: specs/drlg/wall-remap.md §1
+#[test]
+fn wall_remap_parse_is_strict() {
+    use crate::drlg::data::WALL_REMAP_TSV;
+    assert!(WallRemap::parse(WALL_REMAP_TSV).is_ok());
+    let bad = [
+        WALL_REMAP_TSV.replacen("new_type", "type", 1),
+        WALL_REMAP_TSV.replacen("\n4\tkeep", "\n5\tkeep", 1),
+        WALL_REMAP_TSV.replacen("0\tkeep", "0\tsame", 1),
+        WALL_REMAP_TSV.replacen("1\ttable\t0", "1\ttable\tx", 1),
+        WALL_REMAP_TSV.replacen("0\tkeep\t", "0\tkeep\t1", 1),
+        WALL_REMAP_TSV
+            .trim_end()
+            .rsplit_once('\n')
+            .unwrap()
+            .0
+            .to_string(),
+        format!("{WALL_REMAP_TSV}20\tkeep\t\t\t\t\t\t\t\t\n"),
+    ];
+    for (i, b) in bad.iter().enumerate() {
+        assert_ne!(b, WALL_REMAP_TSV, "perturbation {i} changed nothing");
+        assert!(WallRemap::parse(b).is_err(), "perturbation {i}");
+    }
 }
 
 // Covers: specs/drlg/rooms.md §9.6 r3
@@ -453,7 +517,7 @@ fn wall_merge_to_corner() {
     // Remap row for new type 2 (index 1), column R.type 1 → 3.
     let mut table = [[0u32; 7]; 6];
     table[1][0] = 3;
-    let (_w, d, a, b) = wall_pair(Some(WallRemap { table })).unwrap();
+    let (_w, d, a, b) = wall_pair(WallRemap::with_rows(table)).unwrap();
     let ta = d.room(a).tiles().unwrap();
     let tb = d.room(b).tiles().unwrap();
     // A's 7 linked walls became type 3, flagged layer 3 + hidden.
