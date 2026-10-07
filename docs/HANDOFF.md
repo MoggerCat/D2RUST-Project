@@ -2998,6 +2998,19 @@ the dev-dependency) and record results here.
     a failing test is corrected from the observation or its claim dropped.
     Overlap with `formats_game.rs` is intended (the new tests add the
     all-archive counts and the §Test vectors rows).
+    **Result 2026-10-07** (local, `claude/local-2026-10-07` @ `59e4c88`,
+    base `043d2be`; `docs/local/2026-10-07/RESULTS.md`): (1) **9 passed, 2
+    failed**, both count assertions, no file failed to decode.
+    `ds1_every_file_parses`: 2,372 files vs 2,456 expected (versions {3: 1,
+    8: 6, 12: 14, 13: 36, 15: 13, 16: 229, 17: 147, 18: 1926}): the same 84
+    missing as on 2026-10-06, so the enumeration fix (`patch_d2.mpq` names
+    without a listfile) still misses DS1s. `dt1_every_live_file_decodes`:
+    250 files; block formats {1: 226,996, 4097: 108,905, 8197: 15,712} vs
+    4097: 110,259 expected (1,354 fewer RLE blocks; the other two match).
+    Possibly the 250-vs-251 file question of `render/camera.md` OQ7 /
+    REC-61. Findings for the owners: fix the enumeration or re-derive the
+    count from `mpq-tool formats`, never just edit the numbers. (2), (3) not
+    run. Same run: `d2-sim --test game_core` **12 passed**.
 47. Composition on a real GPU (`render-composition` C-rc1): `cargo run -p
     d2-client --example gpu_compare` → 18/18 `0 differing bytes`; `-- --perturb
     7` → every case FAIL with exactly 7 / 7, exit 1; `cargo test -p d2-client
@@ -3414,6 +3427,15 @@ the dev-dependency) and record results here.
     `cpu_compositor_on_real_frames`; `game_wired_host`). Confirm the
     `mpq-tool formats` counts after the case fix (DC6 1,653, DT1 256) and
     re-derive `game_sweep`'s expected values (buddy note G1).
+    **Result 2026-10-07** (same local run, base `043d2be`): still panics,
+    exit 101 about 5 s in (frame 250, server tick 104), seed 1234; data
+    line `137 levels, 573 objects, waypoint object class 119; level files:
+    2043 DS1, 34 lvlsub DS1, 241 DT1`. Panic `d2-sim/src/drlg/room.rs:152`
+    "live DRLG room" via `free_inactive_rooms` → `Drlg::free_level_rooms` →
+    `Outdoor::reset_level` → `Drlg::level_rooms`. **Fixed after the run**
+    by `play-drlg` (`1c72b9f`, merged in `be60b147`): the outdoor reset
+    drops the records of freed rooms (`docs/handoff/play-drlg.md`). Rerun
+    `play --frames 3000` on a head that has it: expect no panic.
 99. Save appearance token table on live data (`formats/d2s-appearance.md`
     §1 r3, Open question 3): `D2_GAME_DIR=<install> cargo test -p
     d2-server --test character_save -- --ignored`

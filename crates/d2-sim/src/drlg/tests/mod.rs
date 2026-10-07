@@ -10,3 +10,4 @@ mod mutant_tests;
 mod rooms;
 mod tests_lsim;
 mod tiles;
+mod walk;
