@@ -504,7 +504,7 @@ arguments checked with `tools/ghidra/disasm.py`. §10: `0x0048FFE0`
 8. ~~Gold dialog control positions (§11 r2) at 800 × 600: the values are
    passed unshifted; does the box code (`0x004B7CD0`, `0x004BBD80`) add
    the panel shift?~~ Capture `inv-0003`.
-9. Item graphic draw `0x0046EE80` (partial answer to OQ 2, 2026-10-07):
+9. Answered (2026-10-08, by §8): item graphic draw `0x0046EE80` (partial answer to OQ 2, 2026-10-07):
    the cel is drawn with its top-left at the cell's top-left (draw y =
    top + cel height, `0x004F6480`), draw mode 5, or 1 when item flag
    0x400000 (ethereal) is set, palette from `0x0062C100`; a gold pile

@@ -424,7 +424,7 @@ Measured: 100 `monstats2` rows have `Light` > 0 (e.g. `fallenshaman1`–`5`:
 | +0x10 | `GetTickCount()` at creation |
 | +0x18..+0x1A | R, G, B |
 | +0x1C, +0x20, +0x24 | floats: −cos θ, 0, the sine term `s` (§9.3) |
-| +0x28 | speed (ticks per degree) = `[0x007443E4 + 4 · (+0x2C)]` (128, 4, 8); +0x2C: 0 (128) except during the Tainted Sun: its start `0x0061C450` writes 1 (speed `[0x007443E8]` = 4, `0x0061C465`), its end `0x0061C4D0` writes 0 (`world/quests-act2-2.md` §5.2) |
+| +0x28 | speed (ticks per degree) = `[0x007443E4 + 4 · (+0x2C)]` (128, 4, 8); +0x2C: 0 (128) except during the Tainted Sun (server writers only): the start `0x0061C450` writes +0x2C := 1, +0x28 := `[0x007443E8]` (4), index 0, ticks 0, type `[0x00744484]`, eclipse 1 (`0x0061C465`); the end `0x0061C4D0` writes +0x2C := 0, +0x28 := `[0x007443E4]` (128), index 2, ticks 0, type `[0x0074440C]`, eclipse 0 (`world/quests-act2.md` §5.9, `world/quests-act2-2.md` §5.2). So the server cycle (§9.3) runs at speed 4 during the eclipse. No client caller of `0x0061C450` is known, so a client record keeps +0x2C = 0 |
 | +0x30 | eclipse flag |
 | +0x34 | last reported hour (server, `0x0061C040`) |
 
