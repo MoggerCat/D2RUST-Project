@@ -157,6 +157,50 @@ pub fn walk_message<X: Pending>(
     }
 }
 
+/// C→S 0x5F UpdatePlayerPos (`0x0054CD50`, `pathing.md` §1.6): the
+/// handler result and what it did (`None`: a fatal path, logged in
+/// `ActionHooks::errors`, result 0).
+pub fn resync_message<X: Pending>(
+    v: &mut View<'_, X>,
+    game: &mut Game,
+    player: UnitId,
+    msg: &[u8],
+) -> (u32, Option<crate::path::walk::resync::Resync>) {
+    let mut c = PathCtx::of(v, game);
+    let t = c.tables();
+    match crate::path::walk::resync::handle_resync(&t, &mut c, player, msg) {
+        Ok((r, what)) => (r, Some(what)),
+        Err(e) => {
+            c.walk_error(e);
+            (0, None)
+        }
+    }
+}
+
+/// `0x005809D0(game, player, no skill, mode, x, y, re-entry 1)`: the
+/// player mode request with the interrupt gate skipped (`pathing.md`
+/// §1.2; C→S 0x41 starts mode 1 this way, `intents-events.md` §9 rule
+/// 6). `None`: a fatal path (logged).
+pub fn request_skip_gate<X: Pending>(
+    v: &mut View<'_, X>,
+    game: &mut Game,
+    player: UnitId,
+    mode: u32,
+    x: i32,
+    y: i32,
+) -> Option<Outcome> {
+    let mut c = PathCtx::of(v, game);
+    let t = c.tables();
+    let target = WalkTarget::Point(Point::new(x, y));
+    match request(&t, &mut c, player, None, mode, target, true) {
+        Ok(o) => Some(o),
+        Err(e) => {
+            c.walk_error(e);
+            None
+        }
+    }
+}
+
 /// Player event 0 of modes 2, 3, 6, 19: `0x00580C20` (`pathing.md`
 /// §9.2); the action result for `units.md` §4.5 (2 = stopped).
 pub fn player_step<X: Pending>(v: &mut View<'_, X>, game: &mut Game, unit: UnitId) -> u32 {

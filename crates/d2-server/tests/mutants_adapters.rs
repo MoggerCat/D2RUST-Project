@@ -120,8 +120,8 @@ impl SkillHost<Unspecified> for Recorder {
 }
 
 /// Only the ids the skill table marks handled reach the skill host:
-/// 0x51 (§2.4 rule 7 gives its fields only) and 0x41 stay stubs, and a
-/// non-skill id (0x01) is not routed here.
+/// 0x51 and 0x41 are `handlers::player`'s (`intents-events.md` §9), and
+/// a non-skill id (0x01) is not routed here.
 #[test]
 fn skill_routing() {
     let mut w = world();

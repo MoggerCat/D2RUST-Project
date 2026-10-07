@@ -49,6 +49,7 @@ use d2_sim::world::waypoints::{ArrivalList, WaypointData, WaypointError, Waypoin
 use super::super::SimGame;
 use super::items::moves::MoveCall;
 use super::items::CubeCall;
+use super::player::{Outcome as PlayerOutcome, Run as PlayerRun};
 use super::skills::{Call as SkillCall, Handled as SkillHandled};
 use super::walk::{WalkCall, WalkResult};
 use crate::buffers::QueueError;
@@ -121,15 +122,31 @@ pub const WORLD_IDS: &[(u8, &str, Status)] = &[
     // `quests.md` §9.4 names the item checks but not their result codes,
     // and `read_clue` has no item seam: stub.
     (0x3E, "world/quests.md §9.4 (partial)", Status::NoOwner),
-    (0x3F, "-", Status::NoOwner),
+    (
+        0x3F,
+        "sim/intents-events.md §9 r5 (handlers/player.rs)",
+        Status::OtherModule("player"),
+    ),
     (
         0x40,
         "world/quests.md §6.2",
         Status::Implemented(System::Quests),
     ),
-    (0x44, "-", Status::NoOwner),
-    (0x46, "-", Status::NoOwner),
-    (0x47, "-", Status::NoOwner),
+    (
+        0x44,
+        "world/quests-act2.md §8.6 (entry: sim/intents-events.md §9 r7, handlers/player.rs)",
+        Status::OtherModule("player"),
+    ),
+    (
+        0x46,
+        "sim/intents-events.md §9 r8 (handlers/player.rs)",
+        Status::OtherModule("player"),
+    ),
+    (
+        0x47,
+        "sim/intents-events.md §9 r8 (handlers/player.rs)",
+        Status::OtherModule("player"),
+    ),
     (
         0x49,
         "world/waypoints.md §6",
@@ -137,10 +154,14 @@ pub const WORLD_IDS: &[(u8, &str, Status)] = &[
     ),
     (
         0x4C,
-        "world/cube.md (handlers/items.rs)",
+        "world/cube.md §10 (item-use spec, not written; handlers/items.rs)",
         Status::OtherModule("items"),
     ),
-    (0x4D, "-", Status::NoOwner),
+    (
+        0x4D,
+        "sim/intents-events.md §9 r11 (handlers/player.rs)",
+        Status::OtherModule("player"),
+    ),
     (
         0x4F,
         "world/cube.md (handlers/items.rs)",
@@ -151,7 +172,13 @@ pub const WORLD_IDS: &[(u8, &str, Status)] = &[
         "world/quests.md §1.7",
         Status::Implemented(System::Quests),
     ),
-    (0x59, "-", Status::NoOwner),
+    // §9 rule 1 names `monsters/ai.md` §9.9; the AI params are
+    // `monsters/ai-bodies.md` §9.9's, the handler's entry is not written.
+    (
+        0x59,
+        "monsters/ai-bodies.md §9.9 (entry not written)",
+        Status::NoOwner,
+    ),
     (0x62, "world/npc.md §7.4", Status::Implemented(System::Npc)),
 ];
 
@@ -300,6 +327,16 @@ pub trait WorldHost<D> {
     }
     /// The skill handlers (`handlers::skills`).
     fn skill(&mut self, call: SkillCall<'_, D>) -> Option<SkillHandled> {
+        None
+    }
+    /// The small client-intent handlers of `intents-events.md` §9
+    /// (`handlers::player`) on the host's game state.
+    fn player(
+        &mut self,
+        game: &mut Game,
+        events: &mut D,
+        run: PlayerRun<'_>,
+    ) -> Option<PlayerOutcome> {
         None
     }
     /// The walk / run handlers (`handlers::walk`) on the path provider.

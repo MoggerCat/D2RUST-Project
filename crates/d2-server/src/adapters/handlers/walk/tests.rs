@@ -1144,3 +1144,29 @@ fn early_refusals_change_nothing() {
     }
     assert!(fx.sim.events.sys.hooks.x.sent.is_empty());
 }
+
+/// C→S 0x5F runs `pathing.md` §1.6 on the path provider (`RESYNC_ID`):
+/// a point less than 5 away is ignored (0, nothing moves); without the
+/// provider the id stays a stub (recorded, 0).
+// Covers: specs/sim/pathing.md §1.6 r2
+#[test]
+fn update_player_pos_routes_to_the_resync() {
+    let mut fx = Fx::new();
+    let a = fx.a;
+    let p = fx.player(0, a, 26, 10);
+    let before = fx.path(p);
+    assert_eq!(
+        fx.handle(0, &point(super::RESYNC_ID, 27, 11)),
+        (ResultCode::Done, vec![])
+    );
+    assert_eq!(fx.mode(p), 1);
+    assert_eq!(fx.path(p).precise_x, before.precise_x);
+    fx.assert_clean();
+    fx.sim.events.hooks().paths = None;
+    assert_eq!(
+        fx.handle(0, &point(super::RESYNC_ID, 27, 11)),
+        (ResultCode::Done, vec![])
+    );
+    let ids: Vec<u8> = fx.sim.unhandled.iter().map(|u| u.1).collect();
+    assert_eq!(ids, [super::RESYNC_ID]);
+}
