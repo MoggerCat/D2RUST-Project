@@ -20,6 +20,8 @@ pub mod late;
 pub mod tables;
 
 #[cfg(test)]
+mod act1_answers_tests;
+#[cfg(test)]
 mod act1_rest_misc_tests;
 #[cfg(test)]
 mod act1_rest_q4_tests;
@@ -455,6 +457,13 @@ pub trait QuestWorld {
     // Act I quest seams (§10.6–§10.8; paths, rooms, monsters, objects).
     /// `0x00620870`: the unit's position and room (`None`: no room).
     fn unit_position(&self, unit: UnitId) -> Option<(i32, i32, RoomId)>;
+    /// The unit's position alone (`0x0045ADF0` / `0x0045AE20`; an
+    /// object's static path +0x0C, +0x10), which an object keeps when its
+    /// room is freed (`drlg/rooms.md` §8.2 rule 4, `quests-act1-rest.md`
+    /// §9 item 2). `None`: no unit. Default: [`Self::unit_position`]'s.
+    fn unit_xy(&self, unit: UnitId) -> Option<(i32, i32)> {
+        self.unit_position(unit).map(|(x, y, _)| (x, y))
+    }
     /// `0x00619730`: (x, y) inside the room's tile rectangle, the last
     /// row and column excluded (§10.6 step 15).
     fn room_contains(&self, room: RoomId, x: i32, y: i32) -> bool;
@@ -1943,11 +1952,21 @@ pub fn progression(flags: u16, step: u8, difficulty: u8) -> u16 {
     ((u32::from(flags) & 0xE0FF) | (n << 8)) as u16
 }
 
-/// [`progression`] on the player's client (`0x005531C0`); nothing when
-/// the host has no client for it.
-pub fn raise_progression<W: QuestWorld>(w: &mut W, player: UnitId, step: u8, difficulty: u8) {
-    if let Some(f) = w.client_save_flags(player) {
-        w.set_client_save_flags(player, progression(f, step, difficulty));
+/// [`progression`] on the player's client (`0x005531C0`); `false` (and
+/// nothing changed) when the host has no client for it, which 1.14d
+/// never meets (`quests-act1-rest.md` §9 item 4: the caller reports it).
+pub fn raise_progression<W: QuestWorld>(
+    w: &mut W,
+    player: UnitId,
+    step: u8,
+    difficulty: u8,
+) -> bool {
+    match w.client_save_flags(player) {
+        Some(f) => {
+            w.set_client_save_flags(player, progression(f, step, difficulty));
+            true
+        }
+        None => false,
     }
 }
 
@@ -2132,7 +2151,7 @@ pub fn object_event<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: Un
             }
         }
         0xBD => match (w.unit_act(object), w.unit_level(object)) {
-            (Some(0), _) => record(ctl, w, 4, 0x0059_42C0),
+            (Some(0), _) => act1::q4::cain_portal_event(ctl, w, object),
             (_, Some(l)) if l == 109 || l >= 113 => {
                 if ctl.find(33).is_some() {
                     act5::q3::portal_event(ctl, w, object);

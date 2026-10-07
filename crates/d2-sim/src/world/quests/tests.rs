@@ -340,6 +340,12 @@ pub(super) struct Fake {
     pub(super) a5_monstats_rows: u32,
     pub(super) a5_zoo: Vec<u32>,
     // -- end Act V part 2 fake fields.
+
+    // -- Act I answers fake fields (`quests-act1-rest.md` §9).
+    /// Positions of units without a room (an object left in a freed
+    /// room); `unit_xy` answers these, then [`Fake::pos`].
+    pub(super) xy: BTreeMap<UnitId, (i32, i32)>,
+    // -- end Act I answers fake fields.
 }
 
 pub(super) const P1: UnitId = UnitId(1);
@@ -578,6 +584,12 @@ impl QuestWorld for Fake {
     }
     fn unit_position(&self, u: UnitId) -> Option<(i32, i32, RoomId)> {
         self.pos.get(&u).copied()
+    }
+    fn unit_xy(&self, u: UnitId) -> Option<(i32, i32)> {
+        self.xy
+            .get(&u)
+            .copied()
+            .or_else(|| self.pos.get(&u).map(|p| (p.0, p.1)))
     }
     fn room_contains(&self, room: RoomId, x: i32, y: i32) -> bool {
         self.rooms

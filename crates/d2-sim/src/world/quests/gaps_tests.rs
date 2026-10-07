@@ -874,7 +874,9 @@ fn object_quest_functions_by_class() {
     );
     object_event(&mut ctl, &mut f, obj, 0x83);
     assert_eq!(f.log, ["mode 112 2", "unhandled 255 0x5b23c0"]);
-    // 0xBD in Act I: chain 4's `0x005942C0`.
+    // 0xBD in Act I: chain 4's `0x005942C0` (stated since
+    // `quests-act1-rest.md` §9 item 10): mode 0 changes nothing, event 7
+    // again at frame + 25.
     let mut f = Fake::new();
     f.players.insert(
         obj,
@@ -885,7 +887,7 @@ fn object_quest_functions_by_class() {
         },
     );
     object_event(&mut ctl, &mut f, obj, 0xBD);
-    assert_eq!(f.log, ["unhandled 4 0x5942c0"]);
+    assert_eq!(f.log, ["event7 112 25"]);
     for class in [0x10B, 0x1CE, 0x1DD, 0] {
         let mut f = Fake::new();
         object_event(&mut ctl, &mut f, obj, class);
