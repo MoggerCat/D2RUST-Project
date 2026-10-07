@@ -37,7 +37,7 @@
 | Edge cases & original bugs | 446–463 |
 | Test vectors | 464–492 |
 | Provenance | 493–529 |
-| Open questions | 530–610 |
+| Open questions | 530–625 |
 <!-- /index -->
 
 ## Summary
@@ -544,8 +544,19 @@ command-line handlers `0x004776E0`…`0x00477720`, `composition.md` §1).
    fixed blend (`render/blend-modes.md` §5, branch
    `claude/spec-shading-blend`). Open: block placement (X, Y) of
    orientation-13 tiles (`camera.md` OQ4).
+   *Answered* (static): `camera.md` §6 shadow-tile row (wall position,
+   wall block placement; `camera.md` OQ4).
 5. Who reads cell flag 4 (§3 r2). Search the export for reads of the cell
    word.
+   *Answered* (static, `all.asm`): nobody. The cell array (view
+   +0xEAA8, side +0xEAB0) is loaded only by `0x004DCE60`, `0x004DCF10`,
+   `0x004DCF30` (allocation, free), the builder `0x004DDB70` and the
+   passes `0x004DEA70`, `0x004DF1C0`, `0x004DF480` (→ `0x004DEDF0`),
+   `0x004DF510`; the passes read the list heads only (cell +0x10, +0x14,
+   +0x1C, +0x20), and the only `& 4` tests in the draw module
+   (`0x004DC000`–`0x004E0FFF`) are the record-flag tests of the setters
+   `0x004DD180`, `0x004DD350` and the fade-state tests of record +0x24.
+   Cell flag 4 is written and never read in 1.14d; d2rs may drop it.
 6. ~~Fade group mode~~: answered in §8: the group mode is the only live
    mode in 1.14d (`[0x0072A968]` = 1, no writer); record +0x10 is the
    coordinate record of `drlg/levels.md` §11. Open: a capture walking
@@ -574,7 +585,9 @@ command-line handlers `0x004776E0`…`0x00477720`, `composition.md` §1).
    12–22 give 136, 23–31 keep 233, act 1 `pal.pl2`).
 8. Cross-spec (`drlg/rooms.md` §9.1 says roofs share the shadow list):
    the client reads roofs from the wall array (type 15, §3 r2); the DRLG
-   owner should reconcile its wording.
+   owner should reconcile its wording. *Answered*: `drlg/rooms.md` §9.1
+   and §10.4 now say roofs (type 15) are wall records from the wall
+   layers (§9.5.1 step 6), and the shadow list holds type 13 only.
 9. ~~The sight test~~: answered in `draw-order-2.md` §15 (leveldefs
    `LOSDraw`, size-shrunk ends) and §16 (the line test `0x0064E260`,
    which had no owner).
@@ -594,7 +607,9 @@ command-line handlers `0x004776E0`…`0x00477720`, `composition.md` §1).
     the slot whose file's tile array (+0x110, count +0x10C) contains it.
 13. Cross-spec (`render/sprite-placement.md` §7, not edited here): roofs
     go through the floor drawer (§6 r5), not with the wall drawer
-    `0x005131B0` (RC1).
+    `0x005131B0` (RC1). *Answered*: `sprite-placement.md` §7 already
+    says floors and roofs use the floor drawer (roof list `0x004DEA70`
+    calls only `0x004F68E0`).
 14. Whether any UI or cursor item is drawn between the world passes
     (`0x00456EE0` … `0x00477980` order): `client/ui.md` owner; a capture
     with a panel open.

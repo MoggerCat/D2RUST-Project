@@ -26,23 +26,23 @@
 | Outputs / state changes | 76–85 |
 | Rules | 86–91 |
 |   1. Structures (1.14d) | 92–151 |
-|   2. Act-wide placement (`0x00678AD0`, D2MOO `DRLGOUTPLACE_CreateLevelConnections`) | 152–300 |
-|   3. Level generation (`0x00675360`, D2MOO `DRLGOUTDOORS_GenerateLevel`) | 301–314 |
-|   4. Vertex polygon (`0x0067D050`, `0x0067CE20`; D2MOO `DRLGVER_CreateVertices`) | 315–339 |
-|   5. Preset primitives on the grids | 340–397 |
-|   6. Borders (`0x00675850`, D2MOO `PlaceAct1245OutdoorBorders`) | 398–452 |
-|   7. Act I (`0x006807F0`, D2MOO `OutWild`) | 453–620 |
-|   8. Act II (`0x0067F980`, D2MOO `OutDesr`) | 621–665 |
-|   9. Act III | 666–733 |
-|   10. Act IV (`0x0067E890`) | 734–745 |
-|   11. Act V (`0x0067E600`) | 746–837 |
-|   12. Rooms | 838–873 |
-| Constants & data dependencies | 874–896 |
-| Randomness | 897–918 |
-| Edge cases & original bugs | 919–940 |
-| Test vectors | 941–1066 |
-| Provenance | 1067–1107 |
-| Open questions | 1108–1162 |
+|   2. Act-wide placement (`0x00678AD0`, D2MOO `DRLGOUTPLACE_CreateLevelConnections`) | 152–307 |
+|   3. Level generation (`0x00675360`, D2MOO `DRLGOUTDOORS_GenerateLevel`) | 308–321 |
+|   4. Vertex polygon (`0x0067D050`, `0x0067CE20`; D2MOO `DRLGVER_CreateVertices`) | 322–346 |
+|   5. Preset primitives on the grids | 347–404 |
+|   6. Borders (`0x00675850`, D2MOO `PlaceAct1245OutdoorBorders`) | 405–459 |
+|   7. Act I (`0x006807F0`, D2MOO `OutWild`) | 460–627 |
+|   8. Act II (`0x0067F980`, D2MOO `OutDesr`) | 628–672 |
+|   9. Act III | 673–740 |
+|   10. Act IV (`0x0067E890`) | 741–752 |
+|   11. Act V (`0x0067E600`) | 753–844 |
+|   12. Rooms | 845–880 |
+| Constants & data dependencies | 881–903 |
+| Randomness | 904–925 |
+| Edge cases & original bugs | 926–947 |
+| Test vectors | 948–1073 |
+| Provenance | 1074–1114 |
+| Open questions | 1115–1188 |
 <!-- /index -->
 
 ## Summary
@@ -232,10 +232,17 @@ All draws are on the driver's seed copy.
 | B2 | `0x0067D980` | R1 := R0 := `lo' & 1` | r := (R0 = 0); if r = R1: false; else R0 := r | size as B1 from R0; offset table [(0, −160), (−96, −64), (−64, −96), (−160, 0)] at index R0 + 2·R0[link]: x, y := parent x, y + offset |
 
 The bodies of the linkers at `0x00676150`–`0x00676C00` are outside the
-function list of the export (no Ghidra function); the table above is from
-D2MOO, confirmed by the table pointers (`0x006F0750`…), the recorded draw
-sites and values (§Test vectors), and the recorded grid size of Blood Moor
-(area 50 = 10×5, i.e. 96×56 or 56×96).
+function list of the export (no Ghidra function); every row above is
+confirmed by their 1.14d disassembly (`disasm.py at`, Open question 2),
+besides the table pointers (`0x006F0750`…), the recorded draw sites and
+values (§Test vectors) and the recorded grid size of Blood Moor (area
+50 = 10×5, i.e. 96×56 or 56×96). The linkers do not call the §2.5
+functions: each writes its placement inline (driver state: rect C[i] at
++0x08 + 16i as x, y, w, h; R0 +0xFC, R1 +0x138, R2 +0x174, R3 +0x1B0,
+i +0x1EC, table pointer +0xF8, row link at row +0x08), with the same
+cases and variants as §2.5. Retry remainders are signed (`and
+0x80000003` with the negative fix-up), which never matters since R0 and
+R2 are ≥ 0.
 
 #### 2.5 Placement cases (child c next to parent p)
 
@@ -1112,6 +1119,25 @@ recording; level rects and outdoor flags equal a level-coordinate probe
    preset direction of levels 1 and 27 after act creation.
 2. Disassemble the linker bodies `0x00676150`–`0x00676DC0` (no function
    in the export) and compare with §2.4 (draw forms, B/A choice, BM size).
+   *Partly answered* (static, `tools/ghidra/disasm.py at`): R4
+   (`0x00676150`), R8 (`0x00676280`) and RW (`0x006769A0`) match §2.4:
+   first call = R1 (driver +0x138 + 4i) = −1, one inline step of the
+   driver seed copy, `lo' & 3` / `lo' & 7` / (`lo' & 1`) + 1 into R1 and
+   R0 (+0xFC + 4i); retry r := (R0 + 1) mod 4 (signed remainder) / RW
+   r := 2 if R0 = 1 else 1, false when r = R1. R4's placement is Place A
+   variant 1 written inline (not a call to `0x00675DE0`), same four
+   cases as §2.5. Still open: BM, RE, Fix, VS, OS bodies.
+   *Answered* (static, `disasm.py at`, jump tables read from the file
+   image): BM `0x00676650` (draws at `0x00676669`, `0x0067669F`; sizes
+   0x38 / 0x60 by R0's parity; inline Place A / B variant 1, tables
+   `0x006768A0` / `0x006768B0`), RE `0x00676450` (same draws, no size,
+   variant 2, tables `0x00676630` / `0x00676640`), Fix `0x006768C0` (R0
+   := R1 := 0, inline Place A case 0, no variant), VS `0x00676AE0`
+   (`lo' & 7`, R8 retry, inline Place C variant 0: cases 2k and 2k + 1
+   share one origin, table `0x00676BE0`) and OS `0x00676C00` (R0 := R1
+   := 3 on every call, one step; odd `lo'` → Place A case 3 variant 3
+   and `[0x0096D66C]` := 0x800000, even → Place B case 3 variant 3 and
+   0x400000) all match §2.4.
 3. Record entering Act 2 (desert chain, `R8` / `RW` / `VS` draws, Lut
    Gholein direction from R0[i+1]) and Act 4 (Outer Steppes flag).
 4. Record Act 3 entry: jungle placer draws on the DRLG seed

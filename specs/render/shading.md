@@ -24,17 +24,17 @@
 |   3. Light map of a cel draw | 110–123 |
 |   4. Light maps of DT1 tile blocks | 124–183 |
 |   5. Selected-unit highlight | 184–199 |
-|   6. Remap tables (`P`) | 200–273 |
-|   7. Mapped index 0 | 274–283 |
-|   8. Tables loaded but not drawn by GDI | 284–295 |
-|   9. Palettes per screen region | 296–301 |
-|   10. d2rs answers | 302–313 |
-| Constants & data dependencies | 314–321 |
-| Randomness | 322–326 |
-| Edge cases & original bugs | 327–334 |
-| Test vectors | 335–361 |
-| Provenance | 362–387 |
-| Open questions | 388–408 |
+|   6. Remap tables (`P`) | 200–291 |
+|   7. Mapped index 0 | 292–301 |
+|   8. Tables loaded but not drawn by GDI | 302–313 |
+|   9. Palettes per screen region | 314–319 |
+|   10. d2rs answers | 320–331 |
+| Constants & data dependencies | 332–339 |
+| Randomness | 340–344 |
+| Edge cases & original bugs | 345–352 |
+| Test vectors | 353–379 |
+| Provenance | 380–405 |
+| Open questions | 406–457 |
 <!-- /index -->
 
 ## Summary
@@ -225,8 +225,26 @@ of each component's `P` is `unit-composite.md` §7; the tables are:
    `0x00600C20` returns no map for `t` = 0, 3, 4 or ≥ 9, or `c` ≥ 21. In
    the world `t` is the item's `Transform` (items `+0x141`); the first
    source of `c` is an active state of the unit with `itemtrans`
-   (states `+0x2C`) < 21 whose `itemtype` (`+0x2A`) the item matches; the
-   remaining cases (by item quality and affixes) are Open question 4.
+   (states `+0x2C`) < 21 whose `itemtype` (`+0x2A`) the item matches
+   (states taken in the order of the list at data tables `+0x18C`, count
+   `+0x190`; this branch always uses `Transform`). Otherwise, by item
+   quality (item data `+0x00`; 2 for a non-item or no data;
+   `0x0062C100`, table `0x0062C57C`), with `inv` the caller's fourth
+   argument (≠ 0: inventory picture, `t` = the item's `InvTrans`
+   `+0x142` instead of `Transform` `+0x141`):
+
+   | Quality | Source of `c` (first hit wins) | None found |
+   |---|---|---|
+   | 4 magic, 6 rare | affix `transformcolor` (affix record `+0x56`, 0xFF = none; record `0x00633EE0`, id 0 → none) of magic suffix slots 0, 1, 2 (item data `+0x3E/+0x40/+0x42`), then prefix slots 0, 1, 2 (`+0x38/+0x3A/+0x3C`), then the automagic affix (`+0x36`) | no map |
+   | 5 set | `setitems` row of the file index (`0x00483440`): `chrtransform` `+0x40`, or `invtransform` `+0x41` when `inv` | no map when the row is missing or the value is negative |
+   | 7 unique | `uniqueitems` row (`0x00483470`): `chrtransform` `+0x38`, or `invtransform` `+0x39` when `inv` | as set |
+   | other (1, 2, 3, 8) | if the item's `hasinv` (items record `+0x137`) ≠ 0, max sockets (`0x0062BC20`) > 0, item flag 0x800 (socketed, item data `+0x18`), and the first item in its inventory (`0x0063B2C0` → `0x0063DFD0`) matches item type 20 (`gem`): that gem's `gems` row (its items record `gemoffset` `+0xF0`, `0x006372C0`) `transform` (`+0x2F`); else the automagic affix as above | no map |
+
+   Every branch that finds `c` (except the state branch) also writes a
+   byte to the caller's third argument: `(Transform << 5) + (c & 0x1F)`
+   when 1 ≤ `Transform` ≤ 8 and `c` ≤ 20, else 0 (`0x0062A250`; always
+   computed from `Transform` and the world value of `c`, even when
+   `inv`). The map is then `0x00600C20(t, c)`.
 5. **Text color** `k`: `ui/text.md` §4.
 6. **Monster palette shift index** `s` (gfx `+0x38`, read by
    `0x0046F250` through `0x00463EB0`; gfx `+0x34` gets the same value).
@@ -396,12 +414,43 @@ from the file; shift index writers `0x0046EBB0`, `0x0046F220` (from
 4. Item color `c` beyond the state rule: the quality / affix branches of
    `0x0062C100` (`colors.txt` codes in magic, unique and set rows). Ghidra
    read; a capture of a colored item on the ground.
+   *Answered* (static, asm of `0x0062C100`, `0x0062A250`; table
+   `0x0062C57C` read from the file image; item type 20 = `gem` in
+   `itemtypes.txt`): §6 r4 table. A capture of a colored item on the
+   ground remains the conformance check.
 5. Readers of the darkened shift (block `+0x110`) and of `R` (`+0x11C`)
    outside the GDI cel and tile paths (D2Win, automap, UI). Ghidra xref
    on `[0x007C9150]` users.
+   *Answered* (static, `all.asm`): no reader. The 26 instructions that
+   load `[0x007C9150]` are in 17 functions (`0x006C8250`, `0x00511D70`,
+   `0x006C84B0`, `0x006C85A0`, `0x006C87E0`, `0x006C8000`, `0x006B1D60`,
+   `0x006B5D40`, `0x006B63F0`, `0x005102D0`, `0x00511FB0`, `0x005120A0`,
+   `0x005122E0`, `0x00509400`, `0x0050A450`, `0x0050A9A0`, `0x004F8E40`,
+   the last keeping the copy `0x007D5458`); the offsets they read from the
+   block are +0x0C, +0x10, +0x18, +0x1C, +0x104, +0x108, +0x10C, +0x114,
+   +0x118 only, and no instruction in the driver and GDI ranges
+   (`0x00509000`–`0x00513FFF`, `0x004F5000`–`0x004F9FFF`,
+   `0x006B0000`–`0x006CAFFF`) reads +0x110 or +0x11C of anything. The
+   darkened shift and `R` are computed and never used in 1.14d.
 6. The light values themselves (unit `v`, wall `c0…c3`, floor grid,
    player light flicker, `capture.md` findings): `render/lighting.md`.
 7. The relation that `0x004791B0` tests for `Utrans` 255 (§6 r6.3):
    which owner list `[0x007BB5BC]` holds and what `0x004DC440(owner, 8)`
    decides (likely "owned by the local player or an ally"). Ghidra read
    of both.
+   *Answered* (static): `0x004791B0(unit)` looks the unit's GUID (+0x0C)
+   up as pet GUID in the client pet list `[0x007BB5BC]`
+   (`client/model.md` §14, filled by S→C 0x7A / 0x81). No record → 1.
+   Otherwise owner := the record's owner GUID; the local player
+   (`0x00463DD0`; fatal 0x225 if none or GUID −1) is looked up and the
+   result is `0x004DC440(owner, player GUID, 8)`: 0 when owner = player;
+   else the owner's roster record (`0x004792E0`, client roster
+   `[0x007BB5C0]`, GUID +0x10, link +0x80) → its relation list (pointer
+   at +0x34 to a block whose first field is the head; nodes GUID +0x00,
+   flags +0x04, next +0x08) → the node for the local
+   player: flags & 8; no roster record or no node → 0. The flags are the
+   u16 that S→C 0x8C (`0x0045EA70` → `0x0047A370`) stores. So `s` = 1
+   for a 255 unit owned by the local player or by a player whose
+   relation flags toward the local player lack bit 8 (D2MOO name:
+   hostile), and `s` = 0 for an unowned one or one whose owner has bit
+   8 set.

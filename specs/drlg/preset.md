@@ -41,7 +41,7 @@
 | Edge cases & original bugs | 572–589 |
 | Test vectors | 590–615 |
 | Provenance | 616–657 |
-| Open questions | 658–685 |
+| Open questions | 658–702 |
 <!-- /index -->
 
 ## Summary
@@ -660,6 +660,17 @@ the disassembly). Function map (D2MOO 1.10f names as hints):
 1. What reads the room flag `0x10 << style` from warp markers and the
    level tile-info list (warp placement, `drlg/levels.md`)? Needed to
    confirm the scan output is complete.
+   *Answered* (static, `all.asm` scan for tests of room +0x28 against
+   0xFF0 or a register mask built as `0x10 << i` / `1 << (i + 4)`):
+   five readers, all already specified: warp-room centres `0x006423D0`
+   (`levels.md` §5 r4), the spawn-room fallback `0x0066B1F0`
+   (`levels.md` §10), the rooms-near build `0x0066C370` with the warp
+   links `0x0066C220` / `0x0066BE80` (`rooms.md` §3 r3) and the level
+   free test `0x00643060` (`levels.md` §9 r3). Each tests only whether
+   bit `0x10 << i` is set (with the slot's warp id); none reads which
+   cell or tile set it. `0x0066B030` also builds the mask but has no
+   caller. So the scan's per-room flag set is the whole output the
+   readers need.
 2. 1.14d content of a truncated group's missing fields (trees.ds1 group
    14): the bytes come from the uninitialized 0x320 slack after the file
    buffer (`0x00517079`, Fog allocator, no clear). d2rs uses 0; settle by
@@ -668,14 +679,20 @@ the disassembly). Function map (D2MOO 1.10f names as hints):
    versus §9 (unit transfer at tile build) for rooms built before the
    first activation of their map: confirm with a recording that the
    river/navi units reach their rooms.
-4. Meaning of object ids 580–582 (beyond objects.txt) for the spawner
+4. *Answered* in the owner: `world/objects.md` §6 (`0x0054F490`, the
+   handler table `0x00731D28` for classes 574–582: 580 special chest,
+   581 random chest by act, 582 quest-chosen class).
+   Meaning of object ids 580–582 (beyond objects.txt) for the spawner
    (`claude/phase3-monsters`).
 5. The ~94 DS1s that `Patch_D2.mpq` overrides were not re-surveyed
    (no listfile): re-run the size/pops/unit counts with `mpq-tool
    formats`-style name lists to confirm the measurements.
-6. Whether the lvlprest loader's DS1 preload (`0x0061EBB0`) ever runs
-   (`data/loading.md` open question 9); it does not change results, only
-   load timing.
+6. *Answered* (static): never in 1.14d. `0x0061EBB0`'s only caller is
+   the load-all routine `0x00619300` (call `0x0061941D`), which passes
+   its input 2 in EDX; the preload loop calls `0x00665F40` only when
+   that value is non-zero (test at `0x0061EFAD`), and the routine's only
+   caller (`0x0044B937`) sets input 2 = 0 (`data/loading.md` OQ 9).
+   DS1s are loaded on first use (§5.1).
 7. Does any lvlprest DS1 with `Scan` ≠ 0 have a waypoint object outside
    its map (§6 step 9 writes without a bound check)? Scan the waypoint
    objects (objects `SubClass` bit 0x40) of those DS1s against w, h.

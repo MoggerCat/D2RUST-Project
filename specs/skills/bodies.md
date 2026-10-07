@@ -31,19 +31,19 @@
 | Outputs / state changes | 73–80 |
 | Rules | 81–82 |
 |   1. Conventions | 83–114 |
-|   2. Shared helpers | 115–524 |
-|   3. Start functions (srvst) | 525–615 |
-|   4. Do functions (srvdo) | 616–812 |
-|   5. `srvmissile` path | 813–828 |
-|   6. Shared helpers, batch 2 | 829–1167 |
-|   7. Start functions (srvst), batch 2 | 1168–1234 |
-|   8. Do functions (srvdo), batch 2 | 1235–1633 |
-| Constants & data dependencies | 1634–1680 |
-| Randomness | 1681–1699 |
-| Edge cases & original bugs | 1700–1749 |
-| Test vectors | 1750–1770 |
-| Provenance | 1771–1808 |
-| Open questions | 1809–1834 |
+|   2. Shared helpers | 115–527 |
+|   3. Start functions (srvst) | 528–618 |
+|   4. Do functions (srvdo) | 619–815 |
+|   5. `srvmissile` path | 816–831 |
+|   6. Shared helpers, batch 2 | 832–1170 |
+|   7. Start functions (srvst), batch 2 | 1171–1237 |
+|   8. Do functions (srvdo), batch 2 | 1238–1636 |
+| Constants & data dependencies | 1637–1683 |
+| Randomness | 1684–1702 |
+| Edge cases & original bugs | 1703–1752 |
+| Test vectors | 1753–1773 |
+| Provenance | 1774–1811 |
+| Open questions | 1812–1837 |
 <!-- /index -->
 
 ## Summary
@@ -439,8 +439,9 @@ without an inventory.
 
 **Empty-hand refill** `0x00580310`:
 
-1. Save the right and left skills as (skill id `0x00643CE0`, owner GUID
-   `0x00643AD0`; id 0 and GUID −1 when none) (`0x005801E0`).
+1. Save the left skill (skill list +0x08, `0x00620190`), then the right
+   skill (list +0x0C, `0x006201D0`), each as (skill id `0x00643CE0`,
+   owner GUID `0x00643AD0`; id 0 and GUID −1 when none) (`0x005801E0`).
 2. For the item at body location 4, then at 5 (`0x0063BDE0`), when
    present, `0x00580030(game, item)` (player in EBX):
    - an item that is neither a stack (`stackable` `0x006289F0`,
@@ -472,11 +473,13 @@ without an inventory.
    0)` succeeds: the location must be free (occupied → fatal error),
    and the item is equipped there (`0x00562A30`). In every case player
    data +0x90 := 0 (`0x006233A0(player, none)`).
-3. Restore the saved skills, right then left: a saved skill that still
-   exists (`0x006439B0(player, id, owner)`), differs from the current
-   one of that side and whose `0x00647960` kind is neither 2 nor 7 is
-   selected again (`0x005701B0(player, side 1 right / 0 left, id,
-   owner)`).
+3. Restore the saved skills, **left then right** (`0x00580280`): a
+   saved skill whose id ≠ 0, that still exists (`0x006439B0(player, id,
+   owner)`), differs from the current skill of that side (left
+   `0x00620190`, right `0x006201D0`) and whose `0x00647960` kind is
+   neither 2 nor 7 is selected again (`0x005701B0(player, EDX side, id,
+   owner)`: EDX 1 sets the left skill, EDX 0 the right; `bodies-3.md` §2
+   answer 10).
 
 **Break zero-durability weapons** `0x00580380`: walk the item list from
 its head; an item with node kind 3 (equipped, `0x0063E020`), item type
@@ -776,7 +779,7 @@ Aura; run by the aura timer and the immediate run (`use.md` §7).
    unit, 0, 0, eval(aurarangecalc), aurafilter, callback, context,
    noaura = 1)` (§2.12). Then, for a player with cost > 0: count > 0 →
    state 85 on and `0x0056C110(unit, cost)` (players only; blood mana
-   state 114 → `0x005D2B60`, `levels.md` Open question 8; mana < cost
+   state 114 → `0x005D2B60`, `levels.md` §4 `pay_with_life`; mana < cost
    → nothing; else mana −= cost (`0x006272B0`); result ignored); count
    = 0 → state 85 off.
 7. Return 1.

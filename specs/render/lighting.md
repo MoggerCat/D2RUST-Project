@@ -45,7 +45,7 @@
 | Edge cases & original bugs | 694–710 |
 | Test vectors | 711–744 |
 | Provenance | 745–788 |
-| Open questions | 789–850 |
+| Open questions | 789–884 |
 <!-- /index -->
 
 ## Summary
@@ -830,10 +830,45 @@ data: `states` setfunc, `missiles` rows 191/288, `objects` row 17,
    the light list (`[0x007B5668]`) at those frames.
 10. Where the lighting-quality option is loaded at start (registry or
     settings) and its default.
+    *Partly answered* (static): the registry. `0x0047CFE0`, the
+    lighting-quality item's callback (pointer in the options item
+    tables at `0x00718DD8` and `0x0071B858`), reads value "Light
+    Quality" of key "Diablo II" (strings `0x006D73A8`, `0x006CC8B8`)
+    through `0x00414F10` into item +0x124, then applies it as §5: 0 →
+    low (`[0x0072DA50]` := 1, `[0x0072A348]` := 0), 1 → medium (0, 0),
+    2 → high (0, 1), any other value → no change. With no value the
+    statics stand: (0, 1), high. The other writers are the menu change
+    handler (same three branches, `0x0047CFB2`…) and the toggle
+    `0x004F54F0` (low flag := not low flag; callers `0x00405DAB`, a
+    command-line/settings path, and `0x004776B0`). Still open: whether
+    the item callback runs before the first in-game draw (it may run
+    only when the options menu is built); a memory read of the two flags
+    at the first draw settles it.
 11. `0x004BC5E0(object, 0)` (the object refresh of §9.2 r4 step 4 when
     the day period changes): which object classes change (lights,
     torches, mode) and how; owner: the client object spec. A recording
     across a day-period change with objects in sight settles it.
+    *Answered* (static, 1.14d asm of `0x004BC5E0`; ECX object, EDX
+    flag): only objects whose objects `EnvEffect` (+0x139) ≠ 0 change;
+    others return 0. `p` := the act's period type (`0x0061C100(act,
+    0)` returns env +0x04, `env-periods.tsv` `type`: 0 day, 1–3 the
+    others). `p` 1–3: object mode 0 → mode := 1, the graphics refresh
+    `0x00470610(object)` (flag 0 only), the animation re-init
+    `0x00624390(object)` and client unit flag 0x2 (+0xC4) := objects
+    `Selectable1` ≠ 0; then, whatever the mode, the object light
+    `0x004BC580` with radius `Lit<mode>` / 2 and `Red`/`Green`/`Blue`
+    (§8 object row). `p` 0: mode 1 or 2 → mode := 0, the same refresh
+    and re-init, the light with `Lit0` (0 → removed), flag 0x2 :=
+    `Selectable0` ≠ 0; mode 0 → nothing (returns 0). `p` > 3 → fatal
+    0x66. Live data (`patch_d2` `objects.txt`, 574 rows): 4 rows have
+    `EnvEffect` 1 — `fire` (39: `Lit` 0, 19, 19, color 255, 236, 176,
+    never selectable), `AmbientSound` (45) and two `Dummy` (71, 72),
+    whose `Lit` and `Selectable` are all 0. So a day period puts fire 39
+    in mode 0 with no light; dusk, night and dawn put it in mode 1 with
+    light radius 9. Callers: the day refresh (§9.2 r4 step 4, flag 0),
+    `0x004BC720` (flag 1) and `0x004BDCC0` (flag 0, when the wall-clock
+    tick count exceeds object +0xD4); those two belong to the client
+    object spec.
 12. *Answered* (`impl-lighting-blend` "Not wired" 3): the eclipse branch
     of the 0x53 setter is the period reset `0x0061BDF0` (§9.2 r2): type
     and ticks from the eclipse table's entry of the index, discarding the
@@ -843,7 +878,6 @@ data: `states` setfunc, `missiles` rows 191/288, `objects` row 17,
     null) and the setter is fatal 0x547 on the null act before any
     write (§9.2 r4.2; `0x0045E31C`, `0x0061C247`, `0x0061AA60`).
 14. *Answered (2026-10-08)* (`impl-client-msgs-3` Q7): open question 11
-    covers only the object refresh `0x004BC5E0`, not the period value.
-    `0x0061C100`'s value is the record's period type, a function of
-    (index, eclipse flag) only (§9.2 r4.4, "The day period"). Open
-    question 11 stays open for `0x004BC5E0`.
+    gives `p` = env +0x04 but not its value per state; that value is
+    the period type of (index, eclipse flag) only, never ticks or the
+    act-4 table (§9.2 r4.4, "The day period").

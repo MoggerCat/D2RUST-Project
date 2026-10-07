@@ -26,16 +26,16 @@
 | Outputs / state changes | 58–63 |
 | Rules | 64–65 |
 |   1. Conventions | 66–93 |
-|   2. Implementation questions answered | 94–188 |
-|   3. Shared helpers, batch 4 | 189–340 |
-|   4. Bodies used by several monster skills | 341–529 |
-|   5. Bodies used by one monster skill | 530–943 |
-| Constants & data dependencies | 944–979 |
-| Randomness | 980–996 |
-| Edge cases & original bugs | 997–1036 |
-| Test vectors | 1037–1051 |
-| Provenance | 1052–1070 |
-| Open questions | 1071–1090 |
+|   2. Implementation questions answered | 94–190 |
+|   3. Shared helpers, batch 4 | 191–342 |
+|   4. Bodies used by several monster skills | 343–531 |
+|   5. Bodies used by one monster skill | 532–968 |
+| Constants & data dependencies | 969–1004 |
+| Randomness | 1005–1021 |
+| Edge cases & original bugs | 1022–1061 |
+| Test vectors | 1062–1076 |
+| Provenance | 1077–1099 |
+| Open questions | 1100–1123 |
 <!-- /index -->
 
 ## Summary
@@ -97,12 +97,14 @@ Answers to `docs/handoff/impl-skill-slots-2.md` Open questions (numbers
 kept). Rules owned by `bodies.md` / `bodies-2.md` are corrected here and
 those files point to this section.
 
-1. Answered (rule owner `sim/pets.md` §8, not edited here): the add
-   record of `0x00575D90` is {+0 pet GUID, +4 owner GUID, +8 class u16,
-   +0xC pet type} and `0x0053CB30` writes record +0 at message byte 5 and
-   +4 at byte 9: S→C 0x7A carries the **pet** GUID at +5 and the
-   **owner** GUID at +9, as `sim/server-messages.tsv`. `pets.md` §8 and
-   its test vector have them swapped.
+1. Answered (rule owner `sim/pets.md` §8 and its Provenance, not
+   edited here): the add record of `0x00575D90` is {+0 pet GUID, +4
+   owner GUID, +8 class u16, +0xC pet type}; the callers `0x00574930`,
+   `0x00574410`, `0x00574F80` push record +0 (pet) as stack argument 2
+   and +4 (owner) as argument 3, and `0x0053CB30` writes argument 3 at
+   message byte 5 and argument 2 at byte 9: S→C 0x7A carries the
+   **owner** GUID at +5 and the **pet** GUID at +9, as `pets.md` §8
+   states.
 2. Answered (owner `sim/pets.md` §6–§7, not edited here): Remove with
    kill ≠ 0 of a GUID whose unit exists broadcasts 0x7A three times
    (unlink, the dismiss it calls, Remove step 4); twice when the unit is
@@ -900,7 +902,8 @@ frame 1 when the target is in reach.
    (`bodies.md` §6.1); c < 0 → 0.
 2. K = T. No T: P exists and P's target y (+0x12, `0x00648A10`) = 2 → K
    := the object (type 2) whose GUID is P's target x (+0x10); otherwise
-   → 0 (Open question 6).
+   → 0. (+0x10 / +0x12 hold the path's target position, so this reads
+   a coordinate pair as (GUID, type); Open question 6.)
 3. K's room none or in town (`0x0061AB00`) → 0.
 4. Prison spawn `0x005B34C0(game, K's room, 0, 0, K, c, 0)`: c ≠ 340
    (`boneprison1`) or K none → nothing. Else the pattern spawn
@@ -912,6 +915,28 @@ frame 1 when the target is in reach.
    spawns its minion (`0x005B31B0(game, leader, x, y, class, 8, −1, 1,
    0)`) (`monsters/init.md` §1 table).
 5. Return 1 (whatever the spawn gave).
+
+**Pattern spawn `0x005B3270(game, room, x, y, leader, class, mode,
+table, flags)`.** Table: count (+0x00), header flags (+0x08: bit 0 →
+class += 1 after each piece), then 12-byte pieces (dx, dy, kind) from
++0x0C. Request R = (game, room, no coord list, class, mode, GUID 0,
+(x + dx, y + dy), spread −1, flags = `flags`; `monsters/init.md` §2).
+Each piece, in table order, by kind: 0 creation `0x005B2A00(R)`; 1
+leader `0x005B3130(game, room, x + dx, y + dy, class, mode, −1, 0, 0)`,
+remembered; 2 the same with sixth argument 1; 3 minion of the
+remembered leader `0x005B31B0(game, leader, …, −1, 1, 0)` (none yet →
+skipped); 4 creation `0x005B2A00(R)`, failure → return 0 at once; 5
+only with `leader` argument ≠ 0: `0x005B2F20(game, room, …, mode, −1,
+0)` then `0x0058F030(game, new unit, v)` with v read from the `leader`
+argument through `0x0044BE50` / `0x00451F50` (only reachable from the
+dead population caller); kind > 5 → skipped. Result 1 when any piece succeeded. **flags bit
+0 (probe, test only):** every piece is kind 4, so the result is 1 when
+all pieces fit, else 0. Prison test: `0x005B34C0` with its last argument 1
+is the placement test of `monsters/ai.md` §7 rule 5 (class 340): 1
+when all four pieces fit around K, else 0; K none or class ≠ 340 → 0.
+Live callers: only `0x005B34C0` (this do and that test); the
+population caller `0x0054E1CB` is in the dead branch of
+`monsters/population.md` §3.3.
 
 #### 5.32 srvdo 105 DesertTurret `0x005CD6A0`
 
@@ -1055,6 +1080,10 @@ steps call them (`bodies.md` Randomness).
   address; data-only entries (no Ghidra function) read with `at`:
   `0x0056CC20`, `0x005CAF80`, `0x005CB270`, `0x005BF3D0` (the Ghidra
   function is cut at `0x005BF3E9`).
+- §5.31 pattern spawn: `0x005B3270` (jump table `0x005B34A4`, kinds
+  0–5), `0x005B34C0`, table `0x0073D4F0` (count 4, header bit 0 set);
+  callers by `disasm.py xref` (`0x005B3559`, `0x0054E1CB`; `0x005B34C0`
+  from `0x005CD684` and `0x005FD55B`).
 - Tables read from the image: `0x00745600`, `0x006EA998`, `0x006EA978`,
   `0x006E3138`, `0x006E3140`, `0x006E3188`, `0x006EB690`, `0x006EB648`.
 - Column offsets from `data/fields.tsv`; the monstats +0x4A / +0x4B
@@ -1078,12 +1107,16 @@ steps call them (`bodies.md` Randomness).
    per do (§5.13, §5.14).
 4. Recording: a Maggot Queen / Sand Maggot egg cast: egg count and
    modes (§5.7).
-5. The unit finder `0x0065A950` / `0x0065AC70` (FetishAura) has no
-   owning spec (`missiles/bodies-2.md` Open question 3); FetishAura's
-   result does not depend on it (Edge case 9).
-6. DiabPrison without a target reads P +0x10 / +0x12 as (GUID, type 2)
-   of an object: which caller stores an object target that way (AI
-   `0x005FD55B` also calls `0x005B34C0`).
-7. `0x005B3270` (pattern spawn with a coordinate table; also called by
-   population `0x0054E1CB`): owner `monsters/init.md`; only the kinds
-   1 and 3 used by DiabPrison are stated here.
+5. Answered: the unit finder `0x0065A950` / `0x0065AC70` is specified
+   in `monsters/umod-callbacks.md` §3.1.
+6. Answered: P +0x10 / +0x12 are the path's target position (u16 x, y;
+   written by the path code `0x00648AD0`, `0x00648B00`, `0x006492F0`,
+   `0x006498A0`, `0x00649970`; `sim/pathing.md` §3, §11.1), never a
+   (GUID, type) pair. DiabPrison reinterprets them: the object branch
+   runs only when the target y is 2, with the target x as the GUID.
+   Implement the literal rule (§5.31 step 2).
+7. Answered: `0x005B3270` is stated in §5.31 (all kinds and the probe
+   flag); its only live caller is `0x005B34C0` (DiabPrison and the
+   `monsters/ai.md` §7 rule 5 placement test), the population caller
+   is dead code (`monsters/population.md` §3.3), so no other owner is
+   needed.

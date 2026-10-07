@@ -32,7 +32,7 @@
 | Edge cases & original bugs | 187–210 |
 | Test vectors | 211–224 |
 | Provenance | 225–237 |
-| Open questions | 238–256 |
+| Open questions | 238–289 |
 <!-- /index -->
 
 ## Summary
@@ -253,3 +253,36 @@ the two candidates; 1.14d code picks the second. No capture yet.
    null) can hand the drawer a cel built some other way than `0x0060BFF0`
    (e.g. a cached copy with changed fields). A Ghidra read of
    `0x005FEC90`/`0x005FEC50` settles it.
+   *Answered* (static): no. A DCC pool block is filled only by the
+   loader callback `0x005FF6E0`, the single caller of `0x0060BFF0`
+   (`0x005FF71E`). Both cache paths (`0x006001F0` at `0x006003A2`,
+   `0x005FFE90` at `0x005FFF7C`) run `0x005FEC90` once per block (block
+   +0x28 = 0): it walks the decoder's cels (cel size 0x23 + cel +0x14 +
+   cel +0x1C), checks first dword = 0, w ≤ 256, h ≤ 256 (else a fatal
+   error) and stores in cel +0x18 a pointer to a zeroed 0x2C-byte side
+   entry. Then `0x005FEC50` → `0x005FEB80` returns a pointer to the
+   chosen cel. No field §1 reads (+0x00 … +0x10, rows) is changed, so
+   the drawer sees exactly the `0x0060BFF0` cel.
+
+Answers 1–4 (game-file read, 2026-10-07: every `.dt1`, `.dc6` and `.dcc`
+that `d2data.mpq`, `d2exp.mpq` and `d2char.mpq` list, extracted with
+`mpq-tool extract` and counted by a scratch script; `Patch_D2.mpq` has no
+listfile and was not read; the 6 known-unused DT1s of `formats/dt1.md`
+excluded):
+
+- 1 *Answered*: no. 0 zero bytes in the copy runs of 1,651 DC6 files, in
+  the RLE runs or iso diamonds of the 397,668 blocks of 251 DT1 files
+  (the six unused DT1s do contain zeros: 2,845 blocks). `IndexFrame`
+  needs no opaque zero for 1.14d data.
+- 2 *Answered*: yes. `variable0` is 0 in all 3,305,132 frames of the
+  21,717 DCC files (no frame has optional bytes or the bottom-up bit).
+- 3 *Answered*: yes, `encoding` = 0 in all 1,651 DC6 files.
+- 4 *Answered*: `ui\MENU\EndGame.dc6` (8 frames: 256 × 256, 64 × 256,
+  256 × 224, 64 × 224, twice), `EndGame2.dc6` (12 frames, widths 256,
+  256, 256, 32, heights 256, 256, 88), `endgameok.dc6` (2 × 96 × 32),
+  `ui\PANEL\ctrlpnl7.DC6` (117 × 104, 128 × 55, 128 × 55, 54 × 55,
+  117 × 104, 128 × 55), `800ctrlpnl7.dc6` (117 × 104, 128 × 55 × 3,
+  86 × 55, 117 × 104, 128 × 55) and `ctrlpnl_popbelt.DC6` (125 × 32)
+  all have offset_x = offset_y = 0, so §2 draws each frame on rows
+  `y − height + 1 … y` of its draw call's y (the UI code supplies the
+  bottom row; owner of the layout: `client/ui.md`).

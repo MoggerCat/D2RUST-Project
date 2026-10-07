@@ -44,7 +44,7 @@
 | Edge cases & original bugs | 847–894 |
 | Test vectors | 895–932 |
 | Provenance | 933–970 |
-| Open questions | 971–1033 |
+| Open questions | 971–1042 |
 <!-- /index -->
 
 ## Summary
@@ -1000,6 +1000,15 @@ Real (recordings; message side):
    rounds cos · r to float32 before the truncation). Settle: a recording
    of a Blessed Hammer missile's per-tick positions, or a debugger read
    of the FPU control word in `0x0067A140`.
+   *Partly answered* (static): `Game.exe` sets 53-bit precision once,
+   in the C runtime start-up (`__setdefaultprecision` `0x0068E70A`:
+   `_controlfp_s(·, 0x10000, 0x30000)`, called from `0x00682FC4` and
+   `0x006ADD40`), and never changes it afterwards: `__set_controlfp` has
+   no caller, and every game `fldcw` (40 sites, e.g. `0x0067A1A9`) loads
+   the saved word OR 0xC00 (rounding = truncate) and then restores it,
+   leaving precision alone. So §11.3 runs in 53-bit unless code outside
+   `Game.exe` (a display driver DLL) changes the control word; the
+   debugger read at `0x0067A140` still confirms it for the GDI mode.
 10. *Answered (2026-10-08)* (`mutants-path` §3, spec reading): §5.1
     rule 1's clamp(dy) is [−2, 2] (dy < −1 → −2, dy > 1 → 2;
     `0x00678C79`–`0x00678C94`); the code's reading is right (§5.1 rule

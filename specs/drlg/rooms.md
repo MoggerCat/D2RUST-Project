@@ -34,15 +34,15 @@
 |   5. Active room creation (`0x006422A0`, `0x00619890`) | 396–429 |
 |   6. Adjacency array order (owner of `unit-order.md` §9) | 430–445 |
 |   7. Room clients and the inactivity counter | 446–466 |
-|   8. Deactivation (tick step 9) | 467–502 |
-|   9. Room tile grid | 503–1075 |
-|   10. Collision map from tiles | 1076–1154 |
-| Constants & data dependencies | 1155–1169 |
-| Randomness | 1170–1187 |
-| Edge cases & original bugs | 1188–1205 |
-| Test vectors | 1206–1253 |
-| Provenance | 1254–1291 |
-| Open questions | 1292–1378 |
+|   8. Deactivation (tick step 9) | 467–530 |
+|   9. Room tile grid | 531–1105 |
+|   10. Collision map from tiles | 1106–1184 |
+| Constants & data dependencies | 1185–1199 |
+| Randomness | 1200–1217 |
+| Edge cases & original bugs | 1218–1235 |
+| Test vectors | 1236–1283 |
+| Provenance | 1284–1327 |
+| Open questions | 1328–1435 |
 <!-- /index -->
 
 ## Summary
@@ -218,13 +218,13 @@ it at the **tail** of list s; status := s.
 
 | s | 1.14d | Effect |
 |---|---|---|
-| 0 | `0x0061B2C0` | force status 0 if the status is > 0 (D2MOO; open question 1) |
+| 0 | `0x0061B2C0` | force status 0 (unconditional call; force is a no-op when already 0) |
 | 1 | `0x0061B2D0` | **build** (§4.4) if the room has no active room and no flag 0x100000; then force status 1 if status > 1 |
-| 2 | `0x0061BB10` | (D2MOO) if the tile library is loaded and (type ≠ preset or preset units added): force 2 if status > 2, and if that changed it and count[1] ≠ 0, run handler 1 (open question 1) |
+| 2 | `0x0061BB10` | if flag 0x1000000 (tiles loaded) and (type +0x48 ≠ 2 or flag 0x2000000, preset units added) and status > 2: force 2, then if count[1] (+0x0E) ≠ 0 run set handler 1 (tail call `0x0061B2D0`); otherwise nothing |
 | 3 | `0x0061B320` | load the DT1 files if flag 0x1000000 is clear (`0x0066F240`); if type 2 and flag 0x2000000 clear, add the preset units (`0x00667890`, `drlg/preset.md`); force 3 if status > 3 |
 
 **Unset handlers** (table `0x00744394`): statuses 0, 1 (`0x0061B530`,
-`0x0061B540`) and, per D2MOO, 2 (`0x0061B550`, open question 1):
+`0x0061B540`) and 2 (`0x0061B550`, a jump to the same routine):
 recompute (`0x0061B4F0`):
 if status ≥ 4 or count[status] = 0, force the lowest s with count[s] ≠
 0 (4 if none). Status 3 (`0x0061B560`): if status ≠ 4, recompute; if it
@@ -468,9 +468,19 @@ A populated room that is removed and built again starts with flag bit 0:
 
 1. **Removal test** (`0x0061A3F0` → `0x0061BA30`; fatal error on a client
    copy or a null room): false if the DRLG room has flag 0x400000
-   (portal); else `0x0066C0B0`; false if status ≤ 1 (some client's room is
+   (portal); else the client-copy check (`0x0066C0B0` returns the
+   room's DRLG through level +0x1B4, fatal 0x42B/0x42C/0x42D on a null
+   room, level or DRLG; `0x00642A00` on it, fatal 0x2E7 for a client
+   copy); false if status ≤ 1 (some client's room is
    this room or next to it); if the level is a town (1, 40, 75, 103, 109)
    or level 120: false if any room of the level has status ≤ 1; else true.
+   **Flag 0x400000 setter** (owner): `0x0061AED0(active room, clear)`
+   does nothing for a null room, else calls `0x0061BAC0` on the DRLG
+   room (active room +0x10): clear = 0 sets DRLG flag 0x400000, clear ≠ 0
+   clears it. `0x0061BAC0` has no other caller and holds the only
+   immediate `or`/`and` of the bit on DRLG +0x28 in `all.asm`; 31 call
+   sites pass 0 or 1 (quest code passes 0 to keep a room, missile bodies
+   pass 1; per-site rules live in the quest and missile specs).
 2. If true, tick step 9 compresses each unit of the room to inactive
    storage (`0x005433F0`, room list order, next saved first; unit specs)
    and removes the room (`0x0061A910`): unlink from the act list (linear
@@ -496,16 +506,36 @@ A populated room that is removed and built again starts with flag bit 0:
      path room (+0x1C) itself is not cleared.
    - object, item, tile (static path): if its room (static +0x00) is
      set: room-list remove (`0x0064C370`); static room := null.
-   The units are not freed; who reads bits 0x800000 / flags-2 0x20
-   afterwards is open question 12. On the server this only runs for
-   units step 2's compression left behind.
+   The units are not freed. The only reader of the two bits is the
+   client unit update `0x00480810` (`client/model.md` §5 rule 5: C→S
+   0x4B, then both bits cleared at `0x0048084D`/`0x00480857`); no server
+   code tests them. Unit flag 0x400000 is set only together with
+   0x200000 on client-only units (`0x00466437`, `0x004667BF`), so on the
+   server every unit left here also gets flags-2 0x20.
+5. **Which server units step 2 leaves in the room** (per-unit compress
+   `0x005433F0`, called by the tick-step-9 loop at `0x0052D0A8`; type
+   dispatch table `0x00543504`):
+
+   | Type | Exit |
+   |---|---|
+   | 0 player | if `0x00639DF0(unit, 7)` ≠ 0: compressed, flags-2 \|= 0x100, saved (`0x00542E10`), leaves the room (`0x0064C450`), kept; else freed (`0x00555600`) |
+   | 1 monster | `0x005431F0`: saved and leaves the room (kept), or saved and freed |
+   | 2 object | class 59 or 60: as the kept player exit; else compressed, saved when the keep flag holds, freed |
+   | 3 missile | freed |
+   | 4 item | saved (`0x00542E10`) only: neither freed nor removed from the room |
+   | 5 tile | saved, freed |
+
+   So on the server rule 4 runs for the room's items (and nothing
+   else): each gets 0x800000 and flags-2 0x20 and leaves the room.
 
 ### 9. Room tile grid
 
 #### 9.1 Summary
 
 A DRLG room (RoomEx) turns its source grids into four lists of **tile
-records**: floors, walls, shadows (roofs share the shadow list), plus
+records**: floors, walls (roofs, type 15, are wall records from the wall
+layers, §9.5.1 step 6; the client files them by type, `render/draw-order.md`
+§3 r2), shadows (type 13), plus
 the extra frames of animated tiles. Each grid cell names a tile *key*
 (orientation, main index, sub index); the actual DT1 tile is chosen
 among the room's loaded tiles with that key, weighted by DT1 rarity,
@@ -1104,7 +1134,7 @@ stride W (sub-tiles).
 For each room R in the active room's room list (`0x00619790`: list at
 active room +0x00, count +0x24; it includes the room itself, §6.1), with R's collision grid header giving R's tile
 origin (so every listed room must already have a grid), for R's floor
-records, then wall records, then shadow/roof records (`0x00619660`,
+records, then wall records (roofs included), then shadow records (`0x00619660`,
 `0x006196A0`, `0x006196E0`), each record (`0x0064C790`):
 
 1. Sub-tile origin `(ox, oy)` = 5 · (R tile origin + record position).
@@ -1283,6 +1313,12 @@ counter (+0x0C), and per level all DRLG rooms in list order; then §3 and
 - **Entry identity (§9.3)**: `0x0060A440` (stride 0x60 over +0x110,
   count +0x10C) → `0x0060CFA0` (stores the header pointer);
   `0x0060D040` (lookup copies the stored pointers).
+- **Units left after compression (§8 rules 4–5)**: `all.asm` scan for
+  tests of unit +0xC4 bit 23 / +0xC8 bit 5 (`shr 0x17`, `0xC6` & 0x80,
+  `shr 5`) and writers of +0xC4 0x400000 (`or 0x600000` only);
+  `0x005433F0` disassembly with its table `0x00543504` read from the file
+  image.
+- **Flag 0x400000 setter (§8 rule 1)**: asm of `0x0061AED0` (null test, active room +0x10, `ret 8`) and `0x0061BAC0` (`edx` = clear; `and 0xFFBFFFFF` / `or 0x400000` on +0x28); `disasm.py xref`: `0x0061BAC0` has the single caller `0x0061AEE0`, `0x0061AED0` has 31 call sites. Requested by PC 2 (`world/quests-act1-rest.md` §9 item 12 links here).
 - **Room free, units left (§8.2 rule 4)**: asm of `0x0061A840`
   (`0x0061A851`–`0x0061A87F` loop), `0x0064C450` (unit leaves room),
   `0x0064FC20` (dynamic path reset), `0x0064C370` (room-list remove);
@@ -1291,16 +1327,32 @@ counter (+0x0C), and per level all DRLG rooms in list order; then §3 and
 
 ## Open questions
 
-1. Set handlers 0 and 2 (`0x0061B2C0`, `0x0061BB10`) and unset handler 2
-   (`0x0061B550`) are not functions in the Ghidra export: define them in
-   Ghidra and confirm the D2MOO behaviour in §4.
-2. `0x0066C0B0` in the removal test (§8.1): what it checks (not in
-   D2MOO 1.10f).
+1. *Answered* (static, `disasm.py at`): set handler 0 forces status 0;
+   set handler 2 tests tiles-loaded, preset-units-added and status > 2,
+   forces 2 and runs set handler 1 when count[1] ≠ 0; unset handler 2
+   is the recompute shared with unset 0 and 1 (§4 table). D2MOO's
+   behaviour holds; handler 0 has no "status > 0" test of its own.
+2. *Answered* (static): `0x0066C0B0` is the room → DRLG getter (via the
+   level, three null-pointer fatal errors); the removal test passes its
+   result to `0x00642A00` and raises fatal 0x2E7 for a client copy. It
+   decides nothing else (§8 rule 1).
 3. Run the queued checks C1–C4 and the full adjacency check (Test
    vectors).
 4. Client array order (§7.1): which server code iterates a room's client
    array (message fan-out?) and whether address order can change an
    outcome; with one client (single player) it cannot.
+   *Answered* (static, `all.asm`: every function reading both +0x48 and
+   +0x78 of one register, then each read): besides add / remove / sort
+   (`0x0061A660`, `0x0061A700`, `0x0061A5A0`) and their null-entry check
+   `0x0061A550` (fatal 0x453), two readers: the membership test
+   `0x005387F0` (is client C in unit U's room; order-free) and the
+   room-change messages `0x00554670` (`sim/pathing.md` §9.8), which
+   merge-walks the old and new rooms' arrays and relies on both being
+   sorted by address. Each client gets either the removal or the add
+   messages, so the address order changes only the order in which
+   different clients' queues are written, never what one client
+   receives. `0x0061A7E0` (array subset test) has no caller. No outcome
+   depends on the order.
 5. Maximum near-candidate count over all 1.14d levels (§3.1, 30 slots):
    measure from generated layouts once the type specs are implemented.
 6. Unit-order open question 3 (inactive-unit compress/restore order) is
@@ -1317,14 +1369,19 @@ counter (+0x0C), and per level all DRLG rooms in list order; then §3 and
 10. *Answered:* the door tables are transcribed in
     `drlg/preset-tables.tsv` (table `door`), rules in `drlg/preset.md`
     §11.
-11. Collision build (§10.4) reads each listed room's grid header: confirm
-    the new room's own header is allocated before the loop
-    (`0x0064C900`).
-12. §8.2 rule 4: which code reads unit flag 0x800000 and flags-2 0x20
-    after a room free, whether any server unit has flag 0x400000, and
-    whether step 2's compression (`0x005433F0`) can leave a unit in the
-    room at all. Settle: xref bit tests of unit +0xC4 / +0xC8 (byte
-    forms `+0xC6` & 0x80, `+0xC8` & 0x20) and of `0x005433F0`'s exits.
+11. *Answered* (static): `0x0064C900` allocates the header, copies the
+    8 coordinates, stores it at active room +0x20 (`0x0061A040`, call at
+    `0x0064C95A`) and zeroes the masks before the room-list loop; each
+    listed room's header is read through `0x0061A010` (active room
+    +0x20). The new room's own header therefore exists when the loop
+    reaches it; every other listed room is an active room, whose grid
+    was made at its own creation (§10.2).
+12. *Answered* (static, `all.asm` bit-test scan and `0x005433F0`
+    exits): §8 rule 4 (readers: client `0x00480810` only; server units
+    never have 0x400000) and rule 5 (items are the units compression
+    leaves in the room). Open inside it: whether `0x005421A0` (the item
+    save) unlinks the item some other way; a server memory read of a
+    freed room's +0x74 after an item was dropped there settles it.
 13. Merge corner case (§9.6 step 3): can R be a type-3 record with no
     successor in its chain (R +0x20 null) when the merged type is not 3?
     1.14d then writes through a null pointer. A dump of every link chain
