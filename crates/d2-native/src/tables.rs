@@ -313,7 +313,7 @@ mod tests {
         assert!(check_excel("weapons.txt", &src, &src[..5]).is_err());
     }
 
-    // Covers: specs/formats/native-assets.md §2.8 r3, §4.3 text
+    // Covers: specs/formats/native-assets.md §2.8 r3, §4.3
     #[test]
     fn monstats_707_override_derives_applies_and_round_trips() {
         let (ours, live) = monstats(5382, 710);
