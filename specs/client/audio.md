@@ -20,13 +20,13 @@
 | Outputs / state changes | 54–57 |
 | Rules | 58–59 |
 |   A. d2rs design (ours) | 60–182 |
-|   B. Original behavior to reproduce (not specified here) | 183–195 |
-| Constants & data dependencies | 196–200 |
-| Randomness | 201–205 |
-| Edge cases & original bugs | 206–212 |
-| Test vectors | 213–225 |
-| Provenance | 226–236 |
-| Open questions | 237–250 |
+|   B. Original behavior to reproduce (owners) | 183–197 |
+| Constants & data dependencies | 198–202 |
+| Randomness | 203–207 |
+| Edge cases & original bugs | 208–214 |
+| Test vectors | 215–227 |
+| Provenance | 228–238 |
+| Open questions | 239–252 |
 <!-- /index -->
 
 ## Summary
@@ -180,7 +180,9 @@ VoiceEvent { tick: u32, kind: Start | Stop | Param, file: CanonicalPath,
   `(tick, kind, file, vol, pan, looped)` for a replayed recording.
   `cause` is ours (debugging) and not compared.
 
-### B. Original behavior to reproduce (not specified here)
+### B. Original behavior to reproduce (owners)
+
+Owners (2026-10-08): B1 `formats/wav.md` §5; B3, B8 `audio/sound-table.md` (+ `audio/sound-table-2.md` §16–§17); B2, B6 `audio/triggers.md`, `audio/triggers-2.md`; B4, B5 `audio/environment.md`; B7 the Checks tables of those specs.
 
 | # | Behavior | Owner spec (to write) | Measure | Comparison |
 |---|---|---|---|---|

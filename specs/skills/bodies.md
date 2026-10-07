@@ -37,13 +37,13 @@
 |   5. `srvmissile` path | 816–831 |
 |   6. Shared helpers, batch 2 | 832–1170 |
 |   7. Start functions (srvst), batch 2 | 1171–1237 |
-|   8. Do functions (srvdo), batch 2 | 1238–1636 |
-| Constants & data dependencies | 1637–1683 |
-| Randomness | 1684–1702 |
-| Edge cases & original bugs | 1703–1752 |
-| Test vectors | 1753–1773 |
-| Provenance | 1774–1811 |
-| Open questions | 1812–1837 |
+|   8. Do functions (srvdo), batch 2 | 1238–1640 |
+| Constants & data dependencies | 1641–1687 |
+| Randomness | 1688–1706 |
+| Edge cases & original bugs | 1707–1756 |
+| Test vectors | 1757–1777 |
+| Provenance | 1778–1815 |
+| Open questions | 1816–1841 |
 <!-- /index -->
 
 ## Summary
@@ -1577,7 +1577,11 @@ Also MonBoneSpirit.
 5. Record (§R2.1, zeroed): flags 0x20, owner = origin = the unit, target
    unit T, class m, target (tx, ty), skill, L; v ≠ 0 → init callback
    `0x005DB6A0` (adds v to the missile's `damagepercent(25)`), argument
-   v. T none → flags := 0x420 (frames from distance).
+   v. The read is the unit total, layer 0 (`0x00625480`, `sim/stats.md`
+   §4.2); the write sets the base, layer 0, on the missile's own list
+   (`0x00627260`, `sim/stat-lists.md` §5 item 2). On a fresh missile
+   (`missiles.md` §R2.3 step 21) both are equal. Answered (2026-10-08,
+   impl-missile-init MI3). T none → flags := 0x420 (frames from distance).
 6. Create; none → return 1.
 7. Missile data +0x28 := 1 with T, 2 without (`0x0064A710`; homing bit,
    `missiles.md` §R9.5 item 4); data +0x2C := (ty − uy) << 16 + (tx −

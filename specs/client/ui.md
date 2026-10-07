@@ -169,12 +169,12 @@ in code) is accepted.
 
 | # | Behavior | Owner spec (to write) | Measure | Comparison |
 |---|---|---|---|---|
-| B1 | Panel art and layout: which DC6 files and frames each panel draws, positions at 800×600, control panel, belt, orbs (fill rule), minipanel | `ui/panels.md` | client UI draw path; captures | identical pixels on `ui` captures per panel |
-| B2 | Panel open/close/stack rules, which panels exclude each other, world view shift when panels open | `ui/panels.md` | UI state code; captures | identical pixels and identical intents per input sequence |
+| B1 | Panel art and layout: which DC6 files and frames each panel draws, positions at 800×600, control panel, belt, orbs (fill rule), minipanel | `ui/panels.md`, `ui/panels-2.md` §22, `ui/panels-3.md` §23 | client UI draw path; captures | identical pixels on `ui` captures per panel |
+| B2 | Panel open/close/stack rules, which panels exclude each other, world view shift when panels open | `ui/panels.md`, `ui/panels-2.md` §22, `ui/panels-3.md` §23 | UI state code; captures | identical pixels and identical intents per input sequence |
 | B3 | Text layout: advance (font `width` vs cell), line height, baseline, the font `.tbl` unknowns (`font-tbl.md` OQ 1), wrap, alignment, `ÿc` color codes, text-color PL2 maps, hover/item-name boxes | `ui/text.md` | text draw path; captures of known strings | identical pixels |
-| B4 | Default key configuration, configurable command list, mouse semantics (left/right/shift/alt), repeat behavior, at which tick held buttons send repeated intents | `ui/controls.md` | 1.14d key config and input path; packet trace with known inputs | identical action list; identical C→S messages and send ticks for a scripted input |
-| B5 | Inventory/stash/cube/belt grids: cell sizes, item graphic placement (`invfile`, sizes), hover highlight, cursor item drawing | `ui/inventory.md` | UI draw path; captures | identical pixels |
-| B6 | Cursor: images, hotspots, animation frames, when it changes | `ui/panels.md` | captures | identical pixels |
+| B4 | Default key configuration, configurable command list, mouse semantics (left/right/shift/alt), repeat behavior, at which tick held buttons send repeated intents | `ui/controls.md` (§3 command table `0x00712698`, defaults `0x00712220`; §6–§7) | 1.14d key config and input path; packet trace with known inputs | identical action list; identical C→S messages and send ticks for a scripted input |
+| B5 | Inventory/stash/cube/belt grids: cell sizes, item graphic placement (`invfile`, sizes), hover highlight, cursor item drawing | `ui/inventory.md` §8–§9 | UI draw path; captures | identical pixels |
+| B6 | Cursor: images, hotspots, animation frames, when it changes | `ui/panels-3.md` §23 (cursor), `ui/panels-2.md` §22 | captures | identical pixels |
 | B7 | Automap: drawing, fade, cells revealed | `ui/automap.md` | captures | identical pixels |
 | B8 | UI sounds triggered by panels and clicks | `client/audio.md` §B owners; site → control map below | audio trace | identical file and trigger tick |
 
