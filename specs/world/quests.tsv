@@ -39,4 +39,4 @@ index	chain	flag	act	version	no_set_state	init	filter	flag2	init_no	seq_id	callb
 37	37	-	0	-	-	0x0058FA20	42	-	-	-	0:0x0058F8F0 11:0x0058F870	0x0058F9B0	0x0058F9C0	0	0x007361F8	Act I intro	specified
 38	38	-	1	-	-	0x005985D0	42	-	-	-	0:0x005984C0 11:0x005983E0	0x005985B0	0x005985C0	0	0x00738D60	Act II intro	catalogued
 39	39	-	2	-	-	0x005B6E60	42	-	-	-	0:0x005B6D30 11:0x005B6C60	0x005B6E20	0x005B6E30	0	0x0073E850	Act III intro	specified
-40	40	-	4	-	-	0x0058EA50	?	?	?	?	?	?	?	?	?	Act V intro	catalogued
+40	40	-	4	-	-	0x0058EA50	42	-	-	-	0:0x00586B50 11:0x0058E990	0x00586C40	0x00586C50	0	0x00732FF8	Act V intro	specified

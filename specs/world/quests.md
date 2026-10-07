@@ -36,21 +36,21 @@
 | Outputs / state changes | 87–93 |
 | Rules | 94–95 |
 |   1. Quest flag records | 96–198 |
-|   2. Quest control and quest records | 199–294 |
-|   3. Game entry: picking the quest set | 295–327 |
-|   4. Events and dispatch | 328–412 |
-|   5. Quest updater and timers (tick step 8) | 413–434 |
-|   6. Status reporting | 435–526 |
-|   7. NPC dialog hooks | 527–559 |
-|   8. Act transitions, warps and portals | 560–641 |
-|   9. Quest items, rewards and helpers | 642–707 |
-|   11. Acts II–V | 708–713 |
-| Constants & data dependencies | 714–728 |
-| Randomness | 729–747 |
-| Edge cases & original bugs | 748–766 |
-| Test vectors | 767–798 |
-| Provenance | 799–820 |
-| Open questions | 821–853 |
+|   2. Quest control and quest records | 199–296 |
+|   3. Game entry: picking the quest set | 297–329 |
+|   4. Events and dispatch | 330–414 |
+|   5. Quest updater and timers (tick step 8) | 415–436 |
+|   6. Status reporting | 437–528 |
+|   7. NPC dialog hooks | 529–561 |
+|   8. Act transitions, warps and portals | 562–643 |
+|   9. Quest items, rewards and helpers | 644–709 |
+|   11. Acts II–V | 710–715 |
+| Constants & data dependencies | 716–730 |
+| Randomness | 731–749 |
+| Edge cases & original bugs | 750–768 |
+| Test vectors | 769–800 |
+| Provenance | 801–822 |
+| Open questions | 823–860 |
 <!-- /index -->
 
 ## Summary
@@ -288,8 +288,10 @@ generated from the 1.14d tables above and the init functions:
 | spec | `specified` (the state machine is written in the act's owner file: Act I `quests-act1.md` §10 and `quests-act1-rest.md`; Act II `quests-act2.md`; Act III `quests-act3.md` and `quests-act3-2.md`; Act IV `quests-act4.md`; Act V `quests-act5.md` and `quests-act5-2.md`) or `catalogued` (row only) |
 
 Values are what the init function stores (`-` = not stored, so 0 from
-the zeroed record). Row 40 (Act V intro, init `0x0058EA50`) is not
-disassembled in the exports (`?`; Open question 6). The `version` column
+the zeroed record). Row 40 (Act V intro, init `0x0058EA50`) was read
+with `tools/ghidra/disasm.py` (the function is missing from the exports;
+Open question 6), and its table `0x00732FF8` (4 states up to chain 31's
+table at `0x00733308`, state 3 empty) from `Game.exe`. The `version` column
 is never read by the 1.14d quest code found so far.
 
 ### 3. Game entry: picking the quest set
@@ -832,7 +834,12 @@ monster specs). Quest-seed sites outside Act I (for later specs):
 5. (Answered: `quests-act1-rest.md` §7: bytes 13–14 are confirmed never
    written by `0x00593CB0`; d2rs writes 0 and exact-match comparison
    masks them.)
-6. Act V intro init `0x0058EA50` (not disassembled): callbacks and table.
+6. (Answered 2026-10-07: `0x0058EA50` sets event 0 `0x00586B50`, event
+   11 `0x0058E990`, table `0x00732FF8`, active 1, state 0, status 0,
+   extra none, filter 42, status fn `0x00586C40`, active fn
+   `0x00586C50`; nothing else (`0x0058EA50`–`0x0058EAB4`). `quests.tsv`
+   row 40 and the table's 15 rows in `quest-messages.tsv` hold it; the
+   behaviour is `quests-act5-2.md` §9.)
 7. (Answered: `quests-act1-rest.md` §6 states what the quest code reads
    of the party list at game +0x1D2C (`0x00554630`, `0x00540710`,
    `0x00540510`); future owner `world/party.md`. The Act I iterate tests
