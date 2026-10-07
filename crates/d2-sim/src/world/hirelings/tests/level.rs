@@ -549,9 +549,12 @@ fn level_97_jump_stops_at_98_and_reload_gives_99() {
         (0xA0, &(start as u32).to_le_bytes()[..])
     );
     // Reload.
-    assert_eq!(restore_level(&s.t, 0, exp as u32, true), 99);
+    assert_eq!(restore_level(&s.t, 0, exp as u32, true), Some(99));
     let mut s2 = setup(rows, 0, 99);
-    restore_experience(&mut s2.w, &s2.t, &s2.st, s2.player, s2.merc, exp as u32).unwrap();
+    assert!(
+        restore_experience(&mut s2.w, &s2.t, &s2.st, s2.player, s2.merc, exp as u32, false)
+            .unwrap()
+    );
     assert_eq!(s2.w.base(s2.merc, stat::LEVEL), 99);
     assert_eq!(s2.w.base(s2.merc, stat::EXPERIENCE), exp);
     assert_eq!(s2.w.base(s2.merc, stat::NEXTEXP), 0);
@@ -566,25 +569,57 @@ fn level_97_jump_stops_at_98_and_reload_gives_99() {
 #[test]
 fn restore_level_walk() {
     let t = tables(ice_105());
-    assert_eq!(restore_level(&t, 1, 0, true), 1);
-    assert_eq!(restore_level(&t, 1, threshold(105, 2) as u32 - 1, true), 1);
-    assert_eq!(restore_level(&t, 1, threshold(105, 2) as u32, true), 2);
-    assert_eq!(restore_level(&t, 1, 26460, true), 6);
-    assert_eq!(restore_level(&t, 1, u32::MAX, true), 99);
-    // No row of the Id (classic rows absent) → level 1.
-    assert_eq!(restore_level(&t, 1, u32::MAX, false), 1);
+    assert_eq!(restore_level(&t, 1, 0, true), Some(1));
+    assert_eq!(
+        restore_level(&t, 1, threshold(105, 2) as u32 - 1, true),
+        Some(1)
+    );
+    assert_eq!(
+        restore_level(&t, 1, threshold(105, 2) as u32, true),
+        Some(2)
+    );
+    assert_eq!(restore_level(&t, 1, 26460, true), Some(6));
+    assert_eq!(restore_level(&t, 1, u32::MAX, true), Some(99));
+    // No row of the Id (classic rows absent): the level step finds no
+    // row (`hirelings-2.md` §16 rule 4).
+    assert_eq!(restore_level(&t, 1, u32::MAX, false), None);
     // Exp/Lvl of the row at the current level: bracket 36 doubles it.
     let mut rows = ice_105();
     rows[1].exp_lvl = 210;
     let t = tables(rows);
     // threshold(36) with 105 reaches 36; threshold(37) uses row 36 (210).
-    assert_eq!(restore_level(&t, 1, threshold(105, 37) as u32, true), 36);
-    assert_eq!(restore_level(&t, 1, threshold(210, 37) as u32, true), 37);
+    assert_eq!(
+        restore_level(&t, 1, threshold(105, 37) as u32, true),
+        Some(36)
+    );
+    assert_eq!(
+        restore_level(&t, 1, threshold(210, 37) as u32, true),
+        Some(37)
+    );
     // A saved value below the unit's experience leaves it.
     let mut s = ice_l6(10);
-    restore_experience(&mut s.w, &s.t, &s.st, s.player, s.merc, 100).unwrap();
+    assert!(restore_experience(&mut s.w, &s.t, &s.st, s.player, s.merc, 100, false).unwrap());
     assert_eq!(s.w.base(s.merc, stat::EXPERIENCE), 26460);
     assert_eq!(s.w.base(s.merc, stat::LEVEL), 6);
+}
+
+// Covers: specs/world/hirelings-2.md §16 r4
+#[test]
+fn restore_level_null_row_frees_or_is_fatal() {
+    // ≥ 0x5C loader: the unit is freed, no hireling, no error; the node
+    // stays.
+    let mut s = setup(ice_105(), 9, 10);
+    assert!(!restore_experience(&mut s.w, &s.t, &s.st, s.player, s.merc, 100, false).unwrap());
+    assert!(!s.w.units.contains_key(&s.merc));
+    assert!(s.w.log.contains(&"free 2".to_string()));
+    assert_eq!(s.st.list(s.player).unwrap().nodes.len(), 1);
+    // Old loader: fatal (string 0x1660).
+    let mut s = setup(ice_105(), 9, 10);
+    assert_eq!(
+        restore_experience(&mut s.w, &s.t, &s.st, s.player, s.merc, 100, true),
+        Err(HirelingError::Fatal(0x1660))
+    );
+    assert!(s.w.units.contains_key(&s.merc));
 }
 
 // Covers: specs/world/hirelings.md §edge-cases-original-bugs r2
