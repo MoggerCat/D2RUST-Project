@@ -3,8 +3,9 @@
 //! `a`'s `DATA\GLOBAL\palette\act<n>\pal.pl2` with `n = a + 1` (`n`
 //! outside 1…5 → 1), loaded at game start for act 0 and switched when the
 //! model's palette act changes (S→C 0x03, `model.md` §11 rule 2; a room
-//! change that crosses acts, §11 rule 4). The five files are read from
-//! the user's archives once, up front; a missing file is an error.
+//! change to a level whose Levels `Pal` (+0x02, not `Act`) differs, §11
+//! rule 4, which hands `Pal` as `a`). The five files are read from the
+//! user's archives once, up front; a missing file is an error.
 
 use bevy::prelude::*;
 use d2_formats::mpq::ArchiveSet;

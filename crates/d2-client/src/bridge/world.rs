@@ -294,7 +294,7 @@ pub struct ClientWorld {
     /// The pet list, newest first (§14 rule 5).
     pub pets: Vec<PetRecord>,
     /// The act whose palette is loaded (§11 rules 2, 4): the act of 0x03,
-    /// replaced by the Levels `Act` of the new level on a room change.
+    /// replaced by the Levels `Pal` of the new level on a room change.
     pub palette_act: Option<u8>,
     /// The client DRLG act (`[0x007A0634]`, §12 rule 1): built by 0x03
     /// from [`ModelInputs::drlg`], rooms set in sight by 0x07 / 0x08.
@@ -540,7 +540,9 @@ pub struct SkillRow {
 /// (§11 rules 3–4; `audio/environment.md` §1 r2).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct LevelRow {
-    /// `Act`.
+    /// `Pal` (+0x02): the palette act of the room change (§11 rule 4).
+    pub pal: u8,
+    /// `Act` (+0x03).
     pub act: u8,
     /// `BlankScreen` (record +0x218, `render/composition.md` §3 step 2).
     pub blank_screen: bool,

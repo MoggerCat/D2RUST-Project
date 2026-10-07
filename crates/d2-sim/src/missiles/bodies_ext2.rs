@@ -518,9 +518,7 @@ pub fn srv_hit_31<W: MissileWorld + ?Sized>(
         return 1;
     };
     let mut rec = crate::combat::DamageRecord::default();
-    // TODO(spec: bodies-2.md §41 step 2): v is `elem_roll`'s return,
-    // which `missiles.md` §R9.6 gives as `EType` (fire: 1); edge case 5
-    // reads it as a rolled amount. Implemented as stated (the return).
+    // §41 step 2: v is the rolled fire amount (§R9.6 return value).
     let v = elem_roll(cx, m, unit, &mut rec);
     heal(game, cx, o, v.max(0));
     if row.collidekill != 0 {
@@ -571,8 +569,8 @@ pub fn srv_do_18<W: MissileWorld + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>,
         let seed = cx.world.seed(m);
         px = px.wrapping_add((seed.roll(n) as i32).wrapping_sub(r));
         py = py.wrapping_add((seed.roll(n) as i32).wrapping_sub(r));
-        // TODO(spec: bodies-2.md §43 step 4.2): a missile without a room
-        // hands the floor drop a null room; not stated, skipped.
+        // §43 step 4.2: with no room every cell lookup of the search
+        // gives none, so the spot is none: no gold.
         if let Some(room) = room_of(game, m) {
             if let Some((out_room, ox, oy)) = cx.world.floor_drop_spot(game, room, (px, py)) {
                 cx.world.create_gold(game, m, out_room, (ox, oy));
@@ -618,10 +616,171 @@ pub fn corpse_effect<W: MissileWorld + ?Sized>(
     let Some(room) = cx.world.find_room(game, near, at.0, at.1) else {
         return;
     };
-    for u in cx.world.corpse_units(game, room, at, r, flags) {
+    let filter = FindFilter {
+        flags,
+        source: Some(unit),
+        at,
+        r,
+    };
+    for u in unit_find(game, cx, Some(room), &filter) {
         cx.world
             .redemption_effect(game, unit, u, skill, level, last);
     }
+}
+
+/// The filter record of the default filter `0x0065AA40` as `0x0056DCC0`
+/// builds it (§44 "Unit find"): flags F (+0x00), unit S (+0x08), centre
+/// (+0x0C, +0x10), radius (+0x14); limit, accepted count, coordinate
+/// list and extra test are zero.
+#[derive(Clone, Copy, Debug)]
+pub struct FindFilter {
+    pub flags: u32,
+    pub source: Option<UnitId>,
+    pub at: (i32, i32),
+    pub r: i32,
+}
+
+/// The unit find `0x0065A950` / `0x0065AC70` with the default filter
+/// `0x0065AA40` (§44): the units of `room` (or of its adjacency array,
+/// unless the square x ± r, y ± r lies strictly inside the room's sub-tile
+/// rectangle), in room order then each room's unit-list order. Town
+/// rooms (levels 1, 40, 75, 103, 109; `0x006426A0`) are
+/// `MissileRooms::in_town`.
+pub fn unit_find<W: MissileWorld + ?Sized>(
+    game: &mut Game,
+    cx: &mut Ctx<'_, W>,
+    room: Option<crate::units::RoomId>,
+    a: &FindFilter,
+) -> Vec<UnitId> {
+    let Some(room) = room else {
+        return Vec::new();
+    };
+    let (x, y, r) = (a.at.0, a.at.1, a.r);
+    // Step 2 (`0x0065A6B0`): strictly inside → the room alone.
+    let inside = cx
+        .world
+        .room_subtiles(game, room)
+        .is_some_and(|(rx, ry, rw, rh)| {
+            x.wrapping_sub(r) > rx
+                && y.wrapping_sub(r) > ry
+                && x.wrapping_add(r) < rx.wrapping_add(rw)
+                && y.wrapping_add(r) < ry.wrapping_add(rh)
+        });
+    let rooms = if inside {
+        vec![room]
+    } else {
+        game.lists
+            .room(room)
+            .map(|e| e.adjacent.clone())
+            .unwrap_or_default()
+    };
+    let mut accepted = 0;
+    let mut found = Vec::new();
+    for rm in rooms {
+        // Step 3: town rooms skipped under 0x2000; the overlap test
+        // `0x0065A710` never rejects for r ≥ 0 and is left to the filter.
+        if a.flags & 0x2000 != 0 && cx.world.in_town(game, rm) {
+            continue;
+        }
+        if r < 0 {
+            if let Some((rx, ry, rw, rh)) = cx.world.room_subtiles(game, rm) {
+                let off_x = x.wrapping_add(r) < rx && x.wrapping_sub(r) > rx.wrapping_add(rw);
+                let off_y = y.wrapping_add(r) < ry && y.wrapping_sub(r) > ry.wrapping_add(rh);
+                if off_x || off_y {
+                    continue;
+                }
+            }
+        }
+        for u in game.lists.room_units(rm) {
+            if default_filter(game, cx, u, a, &mut accepted) {
+                found.push(u);
+            }
+        }
+    }
+    found
+}
+
+/// The default filter `0x0065AA40` (§44 steps 1–5).
+fn default_filter<W: MissileWorld + ?Sized>(
+    game: &mut Game,
+    cx: &mut Ctx<'_, W>,
+    u: UnitId,
+    a: &FindFilter,
+    accepted: &mut i32,
+) -> bool {
+    let f = a.flags;
+    // Step 1: the limit (+0x18) is 0 in this record.
+    if f & 0x40 != 0 && *accepted >= 0 {
+        return false;
+    }
+    // Step 2.
+    let (ux, uy) = cx.world.position(u);
+    let (dx, dy) = (ux.wrapping_sub(a.at.0), uy.wrapping_sub(a.at.1));
+    if dx.wrapping_mul(dx).wrapping_add(dy.wrapping_mul(dy)) > a.r.wrapping_mul(a.r) {
+        return false;
+    }
+    // Step 3.
+    let Some(ty) = game.lists.unit(u).map(|e| e.ty) else {
+        return false;
+    };
+    let mode = cx.world.unit_mode(u);
+    let ok = match ty {
+        UnitType::Player => {
+            f & 1 != 0
+                && if f & 0x1000 == 0 {
+                    mode != 17 && mode != 0
+                } else {
+                    mode == 17
+                }
+                && Some(u) != a.source
+        }
+        UnitType::Monster => {
+            f & 2 != 0
+                && if f & 0x1000 == 0 {
+                    mode != 12 && mode != 0
+                } else {
+                    mode == 12
+                }
+                && (f & 4 == 0 || cx.world.is_undead(u))
+        }
+        UnitType::Object => f & 0x10 != 0,
+        UnitType::Missile => {
+            f & 8 != 0
+                && cx
+                    .store
+                    .get(u)
+                    .and_then(|d| cx.row(i32::from(d.class)))
+                    .is_some_and(|row| !row.explosion)
+        }
+        UnitType::Item => f & 0x20 != 0,
+        _ => false,
+    };
+    if !ok {
+        return false;
+    }
+    // Step 4. The coordinate list (+0x20) is empty in this record, so
+    // 0x200 rejects nothing; the extra test (+0x24) is null, which 0x800
+    // would call (the original reads through null).
+    if f & 0x80 != 0 && !cx.world.unit_flag(u, 0x4) {
+        return false;
+    }
+    if f & 0x400 != 0 && !cx.world.unit_flag(u, 0x8) {
+        return false;
+    }
+    if f & 0x100 != 0 {
+        if let Some(rm) = room_of(game, u) {
+            if cx.world.in_town(game, rm) {
+                return false;
+            }
+        }
+    }
+    if f & 0x800 != 0 {
+        fatal(cx, 0x0065AA40, u);
+        return false;
+    }
+    // Step 5.
+    *accepted += 1;
+    true
 }
 
 /// §44 Server-do 19 Radament death `0x005B0940`.
@@ -725,9 +884,11 @@ pub fn spawn_for_level<W: MissileWorld + ?Sized>(
     m: UnitId,
     at: (i32, i32),
 ) -> i32 {
-    // TODO(spec: bodies-2.md §47): a missile without a room hands the
-    // level lookup a null room; not stated, nothing is done.
+    // §47 step 1: no room reads level 0, which has no levels record:
+    // the `mon` count read goes through null (unreachable for a live
+    // missile, whose room is always set).
     let Some(room) = room_of(game, m) else {
+        fatal(cx, 0x005B3570, m);
         return 0;
     };
     let list = cx.world.level_mon_list(game, room);
@@ -736,8 +897,8 @@ pub fn spawn_for_level<W: MissileWorld + ?Sized>(
         fatal(cx, 0x005B3570, m);
         return 0;
     }
-    // TODO(spec: bodies-2.md §47 step 2): without a room seed provider
-    // there is no draw and nothing is spawned.
+    // §47 step 2: the active room's seed (+0x6C). A room without an
+    // seam without a provider answers none: nothing is drawn.
     let Some(seed) = cx.world.room_seed(game, room) else {
         return 0;
     };
@@ -762,13 +923,12 @@ pub fn spawn_for_level<W: MissileWorld + ?Sized>(
             Some(false) => {}
         }
     }
+    // Step 4: all n without `isSpawn` → fatal; the "c = −1 → 0" test is
+    // dead (an invalid class already failed inside the search).
     let Some(c) = found else {
         fatal(cx, 0x005B3570, m);
         return 0;
     };
-    if c == -1 {
-        return 0;
-    }
     i32::from(cx.world.create_monster(game, room, c, at))
 }
 
@@ -1248,6 +1408,7 @@ fn tyrael<W: MissileWorld + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, m: Uni
     if cx.world.quest_test(game, 36) {
         cx.world.spawn_tyrael(game, room, m);
     }
+    // The refresh is outside the test branch, whatever it gave.
     if let Some(r) = room {
         cx.world.refresh_room(game, r);
     }
