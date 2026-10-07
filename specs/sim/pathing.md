@@ -24,27 +24,28 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 50–65 |
-| Inputs | 66–75 |
-| Outputs / state changes | 76–82 |
-| Rules | 83–84 |
-|   1. Walk and run requests | 85–229 |
-|   2. Path types | 230–269 |
-|   3. Path compute (`0x00649970(path, unit, town access)`) | 270–336 |
-|   4. Target preparation (flag 0x1000, `0x00648120`) | 337–353 |
-|   5. Toward (type 2, `0x00679C80`) | 354–421 |
-|   6. Straight (type 7, `0x00679ED0`) | 422–431 |
-|   7. A* (type 1, `0x0067B850`) | 432–469 |
-|   8. Velocity, direction vector, facing | 470–552 |
-|   9. Per-tick movement | 553–725 |
-|   10. Messages | 726–748 |
-|   11. Missile paths (`0x00649760`) | 749–798 |
-| Constants & data dependencies | 799–835 |
-| Randomness | 836–846 |
-| Edge cases & original bugs | 847–894 |
-| Test vectors | 895–932 |
-| Provenance | 933–970 |
-| Open questions | 971–1042 |
+| Summary | 51–66 |
+| Inputs | 67–76 |
+| Outputs / state changes | 77–83 |
+| Rules | 84–85 |
+|   1. Walk and run requests | 86–230 |
+|   2. Path types | 231–270 |
+|   3. Path compute (`0x00649970(path, unit, town access)`) | 271–337 |
+|   4. Target preparation (flag 0x1000, `0x00648120`) | 338–354 |
+|   5. Toward (type 2, `0x00679C80`) | 355–422 |
+|   6. Straight (type 7, `0x00679ED0`) | 423–432 |
+|   7. A* (type 1, `0x0067B850`) | 433–470 |
+|   8. Velocity, direction vector, facing | 471–557 |
+|   9. Per-tick movement | 558–738 |
+|   10. Messages | 739–761 |
+|   11. Missile paths (`0x00649760`) | 762–814 |
+|   12. Other path types (1.14d-read 2026-10-08) | 815–881 |
+| Constants & data dependencies | 882–918 |
+| Randomness | 919–929 |
+| Edge cases & original bugs | 930–977 |
+| Test vectors | 978–1015 |
+| Provenance | 1016–1053 |
+| Open questions | 1054–1127 |
 <!-- /index -->
 
 ## Summary
@@ -397,7 +398,7 @@ start, target, start room, target room, slack r (step 4), max distance
 #### 5.2 Algorithm
 
 Index := 0, count := 0. Direction offset ≠ 0 (types 5, 6, 12) →
-`0x00679B30` (monster circling, open question 3).
+`0x00679B30` (monster circling, §12.1) and its result is returned.
 
 1. points[0] := target; next-position check. Clear → points = [target].
 2. P = the returned point. dist(P, target) ≤ slack → points = [P].
@@ -483,7 +484,11 @@ animation-speed half of it belongs to the future animation-rate spec,
    `velmod_monster_x` (class ≥ 410): column b ≠ 0, or column a ≠ 0 and
    the used skill's flags (`0x006446A0`, skill +0x0C) have bit 0x1 and
    not 0x1000. Column b: player modes 2, 3, 6; monster modes 2, 15
-   (and 8–11 for classes < 410). Then p = f + stat 67 (unit total `0x00625480`; a player's
+   (and 8–11 for classes < 410). "Skill +0x0C" is not a `skills.txt`
+   column: `0x006446A0` returns word +0x0C of the used skill **entry**
+   (`0x00620250`), the runtime E-flags word written by the skill start
+   and bodies (`0x00644660`; `skills/use.md` §5.2 step 2: 1 = moving
+   skill, 2 = move ended); no used skill → 0. Then p = f + stat 67 (unit total `0x00625480`; a player's
    base is 100 from creation, `combat/vitals.md` §1), at least 25, where f = stat 96
    (item/skill getter `0x00625500`) scaled by `animstat` row 4: f ≠ 0 →
    150·f / (150 + f) (truncated). Velocity := base · p / 100
@@ -624,6 +629,14 @@ flag 0x2) → room-change messages (rule 9.8). Result 1 if m, else 2.
    whose refreshed point is more than 5 from the previous target (+0x14)
    on either axis → re-path (finish 1). Otherwise: index < count, or
    position = final target → passes; else re-path (finish 1).
+   Stop distance writers (1.14d, every server write of path +0x93):
+   the allocation `0x00649D00` sets 0; `0x00649070(path, n)` sets n − 1
+   for n in 1…19, else 0, and is called only by monster AI mode
+   requests and skill functions (`monsters/ai.md` §7.1; e.g.
+   `0x005DE490`, `0x005DEAD0`, `0x005CB940`, `0x005C07A0`,
+   `0x005DA020`). No player walk / run (C→S) path sets it, so a
+   player's walk or run to a unit keeps 0: it stops only at unit
+   distance 0 or by the other tests of this rule.
 4. Wherever a rule says "re-path", the check's result is the re-path's
    result (§9.10): non-zero passes, 0 fails. The movement then tests
    index < count against the new path.
@@ -763,7 +776,10 @@ flag 0x20; type 4 with result 0 clears it. The result is the count.
    toward point 0 (§8.4; a target equal to the position sets velocity 0).
 4. Room-exit flag: the path room exists and the target lies outside its
    sub-tile rect (x in [room x, room x + w), y likewise, half-open) →
-   flag 0x1. Result count (1).
+   flag 0x1. Result count (1). Read again (2026-10-08, `0x006493BD`–
+   `0x006493EC`): no path room also sets 0x1 (the null test branches to
+   the `or`), and a target inside the room leaves +0x34 unchanged: the
+   flag is only ever set here, never cleared.
 
 #### 11.2 Type 10, charged bolt (`0x0067A240`)
 
@@ -795,6 +811,73 @@ The product of two float32 values is exact in 53-bit precision, so d2rs
 can compute it with integers (float32 = mantissa · 2^exponent); whether
 the x87 precision control is 53-bit (compiler default) or 24-bit while
 the game runs is open question 9.
+
+### 12. Other path types (1.14d-read 2026-10-08)
+
+Same calling form as §5 (path info I: start I+0x00, target I+0x04, max
+distance I+0x18, path I+0x30; points at path +0x9C, index +0x24, count
++0x28). Results are the count.
+
+#### 12.1 Circling walk (`0x00679B30`; types 5, 6, 12)
+
+Called by Toward (§5.2) when the direction offset (+0x98) k ≠ 0, after
+index and count := 0. It is §5.2 step 4 with these differences: n
+starts at the current count (+0x28); each of the `testdir` triple
+(`0x00678D70`) gets `(t + k) & 7` before the first-free pick
+(`0x006793E0`); the corner append of step 4.3 has no "unless cur =
+start" (the first step always appends the start); no clear-ray or slack
+shortcut (steps 1–3 of §5.2 are not run). End as §5.2 step 5; count :=
+n.
+
+#### 12.2 Type 3 (`0x00679E50`)
+
+Index := 0, then Toward (§5): the same as type 2.
+
+#### 12.3 Type 12, back-up turn (`0x00679E60`)
+
+Index := 0; k := −4; n := circling walk (§12.1, appending after the
+current count); n = 0 → result 0 (k left at −4). Else count := n; k :=
+−2, r := circling walk (appending after n); r = n (nothing added) → k :=
++2, r := circling walk. k := −4 again; result r.
+
+#### 12.4 Type 9, leap (`0x00679F70`)
+
+Index := 0; points[0] := target; next-position check (§5.1 rule 5) with
+P := target. P = start → result 0. Else points[0] := P, count := 1,
+result 1.
+
+#### 12.5 Type 8, knockback server (`0x0067A000`)
+
+k := (path +0x90 >> 1) + 1 (distance budget). With a target unit
+(+0x58; position: objects, items, tiles their static position, others
+their path cell, `0x006488C0` / `0x00648900`): dx := start x − its x,
+dy := start y − its y; m := max(|dx|, |dy|); m ≠ 0 → dx := k·dx / m,
+dy := k·dy / m (signed, truncating); P := start + (dx, dy) (16-bit
+adds). No target unit: P := target. Index is not reset. points[0] := P;
+ray test (§5.1 rule 4) from start to P (P := the last free cell);
+target := P (`0x00648AD0`, which also clears the target unit). P =
+start → result 0; else points[0] := P, count := 1, result 1.
+
+#### 12.6 Type 11, knockback client (`0x00679FD0`)
+
+Client only. Index := 0; points[0] := target; next-position check
+(§5.1 rule 5) on points[0]; result 1 (count not written).
+
+#### 12.7 Types 0 and 16, IDA* (`0x0067AD00`)
+
+Wrapper: info byte +0x14 is doubled in place; bounds := the start room's
+sub-tile box (`0x00619730`, x, y, w, h); with a target room different
+from the start room, the box is the union of both on each axis (left :=
+the smaller x, width := far edge − left; same for y). An axis whose
+width (height) still equals the start room's gets left −= 10, width +=
+20 (top −= 10, height += 20). Then the search `0x0067AAA0(bounds, I)`.
+Pending: the search itself (`0x0067AAA0` and its helpers) is not read.
+
+#### 12.8 Type 15, wall follow (`0x0067C2D0`)
+
+Pending: not read. It calls `0x0067B9F0`, the pattern query
+`0x0064D910`, `0x0067BDF0` and `0x0067C1E0`; used by the monster re-path
+(§9.10) and the C→S 0x5F reachability test (§1.6).
 
 ## Constants & data dependencies
 
@@ -981,7 +1064,9 @@ Real (recordings; message side):
 3. Path types of monster AI and skills (0, 3, 5, 6, 8, 9, 11, 12, 13,
    15, 16) and `0x00679B30` (direction offset): specify with the AI and
    skill specs (Ghidra on `0x0067AD00`, `0x0067A000`, `0x0067C2D0`).
-   The missile types 4, 10, 14 are answered in §11.
+   The missile types 4, 10, 14 are answered in §11. Answered (2026-10-08)
+   in §12 for 3, 5, 6, 8, 9, 11, 12 and `0x00679B30`; the IDA* search
+   (0, 16) and wall follow (15) are Pending there.
 4. *Answered:* target lead (`0x00679190`, `0x00679250`): table sine,
    truncation, and +0x68 has no reachable writer, so the lead is 0
    (§3, after the steps).

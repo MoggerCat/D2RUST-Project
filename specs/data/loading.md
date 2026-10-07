@@ -631,7 +631,7 @@ gives, against the live `.bin`:
 - `monstats`, `monstats2`, `monpreset`, `cubemain`: identical in every
   byte inside a field footprint. The other differing bytes (12,200 /
   118,780 / 430 / 1,657 in 734 / 609 / 213 / 151 records) lie outside
-  every footprint, where the unspecified table callbacks write
+  every footprint, where the table callbacks write
   (`field-types.md` §8.3); plus `monstats` record 707 `NameStr`
   (`field-types.md` §10).
 - The four code buffers byte-identical (196, 5,891, 4,252, 158 bytes).

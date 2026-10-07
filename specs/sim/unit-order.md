@@ -31,18 +31,18 @@
 |   2. Game unit hash lists | 100–138 |
 |   3. Unit placement and removal (list bookkeeping) | 139–150 |
 |   4. Act room lists (active rooms) | 151–161 |
-|   5. Room unit lists | 162–217 |
-|   6. Room update queues | 218–237 |
-|   7. Client list | 238–246 |
-|   8. Unit timer lists | 247–254 |
-|   9. Adjacent-room arrays (dependency) | 255–263 |
-|   10. Iteration and modification | 264–280 |
-| Constants & data dependencies | 281–291 |
-| Randomness | 292–298 |
-| Edge cases & original bugs | 299–309 |
-| Test vectors | 310–343 |
-| Provenance | 344–361 |
-| Open questions | 362–406 |
+|   5. Room unit lists | 162–219 |
+|   6. Room update queues | 220–239 |
+|   7. Client list | 240–248 |
+|   8. Unit timer lists | 249–256 |
+|   9. Adjacent-room arrays (dependency) | 257–265 |
+|   10. Iteration and modification | 266–282 |
+| Constants & data dependencies | 283–293 |
+| Randomness | 294–300 |
+| Edge cases & original bugs | 301–311 |
+| Test vectors | 312–345 |
+| Provenance | 346–363 |
+| Open questions | 364–408 |
 <!-- /index -->
 
 ## Summary
@@ -165,7 +165,9 @@ table `0x006E10E0`:
    `pRoomNext`).
 2. **Insert** (`0x0064C2C0`, also through `0x0064C350`): the unit is
    **prepended**. Then it is queued for update (§6). Players and good-
-   aligned monsters also raise the room's allied count (`0x00619EE0`).
+   aligned monsters also raise the room's allied count (`0x00619EE0`):
+   type 0, or type 1 with alignment `0x006259B0` = 2 (`0x0064C321`–
+   `0x0064C339`); missiles, objects, items and tiles never do.
 3. **Remove** (`0x0064C370`): unlink in place (linear search); remove from
    the update queue (`0x0064C1B0`, clears unit flag 0x2000 at +0xC4);
    allied count lowered for players and good-aligned monsters.
