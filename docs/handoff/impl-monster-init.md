@@ -106,10 +106,12 @@ provider must not repeat them.
 4. Readings taken where the spec is terse: `monster_playercount` = the
    §9 n; superunique step 2's difficulty picks run only inside the
    "fewer than 5 umods" branch; mode-1 callbacks read the unit's mode
-   after the change as "new mode"; umod 41's handler re-schedules only
-   when the monster is alive; umods 38/39 add the same delta to maxhp
+   after the change as "new mode" (**Answered 2026-10-07**: right,
+   `monsters/umod-callbacks.md` §2 r2); umod 41's handler re-schedules
+   only when the monster is alive (**Answered**: right, §26); umods 38/39 add the same delta to maxhp
    and hitpoints; +0x5C bit 2 is set from create flag 0x08.
-5. Callbacks other than §22's five bodies: logged (OQ8).
+5. Callbacks other than §22's five bodies: logged (OQ8). **Answered
+   2026-10-07**: every body is in `monsters/umod-callbacks.md`.
 6. The first AI setup's draws (OQ2) and allocator draws (OQ3) are the
    providers' (`ai_install`, `allocate`).
 

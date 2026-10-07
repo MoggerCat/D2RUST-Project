@@ -3953,12 +3953,13 @@ interpretation points are in §5 C34, C35).
   (start, animation, schedule), mode 0 first, so a type-7 event they
   schedule follows the mode's animation events in the timer queue (decides
   the run order of events on the same frame). Settled by §5 A RT-R1.
+  **Answered 2026-10-07** (`monsters/umod-callbacks.md` §2, read from the asm): mode 0 runs before the start function (after the mode damage rewrite `0x005A4F50`) and not at all when the requested mode is 3 (GH); mode 1 runs after the start function and the animation prepare but **before** the cancel of events 0 / 1 and the animation schedule, so a type-7 event it schedules sits **before** the mode's animation events in the timer queue. The reading above (both after the whole mode set) is wrong; RT-R1 now only confirms it.
 - RT2 (`action/ai.rs` `monster_level`; `ai.md` §2.4 step 2): the getter for
   the "level" of the teleport heal is not named; code takes stat 12 (`level`)
   unit total (`init.md` §7 rule 4).
 - RT3: umod mode 4 (`0x005A43A0`, called from the reaction `0x0057CEE0` at
   two sites) is not placed by `damage.md` §7.1 (call level only, OQ3); stays
-  inside `Pending::reaction`.
+  inside `Pending::reaction`. **Answered 2026-10-07** (`monsters/umod-callbacks.md` §2 r5): mode 4 runs on the monster defender, after the GH mode set (get-hit, stunned or `0x0057CB00` allows it) or after the soft-hit path (get-hit refused, or soft hit 0x4000); never on knockback, block or death.
 - RT4: monster data `dwAiState` (+0x54) has no writer in any spec (`ai.md`
   OQ5) and `MonsterData` has no field for it; `Pending::ai_state` stays.
 - RT5: `is_boss` `0x0063E9F0` (its test is not specified), superunique
@@ -4968,6 +4969,12 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
   0x65 in a kill tick).
 - `sim/intents-events.md` OQ13: breakpoint at join: caller of the first
   0x48 in frame 2.
+- `monsters/umod-callbacks.md` OQ1 + OQ2: a fire-enchanted unique dying
+  next to the player, and a suicide minion hit into GH (Act V); log
+  timer sets / runs (type 7, site), rng draws with caller, area-damage
+  targets.
+- `monsters/umod-callbacks.md` OQ6: dump the stat list of a missile
+  fired by a spectral-hit unique (is stat 12 present).
 
 ## 8. Lessons (problems met, fixes)
 
