@@ -23,35 +23,43 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 56–71 |
-| Inputs | 72–79 |
-| Outputs / state changes | 80–92 |
-| Rules | 93–94 |
-|   1. 0x5D quest status (`0x0045E540` → `0x004A2CB0`) | 95–167 |
-|   2. 0x63 waypoint menu (`0x0045E670` → `0x0049CF90`) | 168–191 |
-|   3. 0x77 UI action (`0x0045E800` → `0x004B8CF0`) | 192–229 |
-|   4. 0x26 chat and overhead text (`0x0045DFC0` → `0x0049F490`) | 230–280 |
-|   5. 0x27 NPC text (`0x0045E0A0` → `0x004A1600`) | 281–300 |
-|   6. 0x4E hire offer and 0x4F hire list reset | 301–313 |
-|   7. 0x50 quest special (`0x0045E370` → `0x004B9210`) | 314–337 |
-|   8. 0x58 UI open (`0x0045E490` → `0x004C0550`) | 338–357 |
-|   9. 0x8A NPC wants to interact (`0x0045EA40` → `0x004B3380`) | 358–376 |
-|   10. 0x91 NPC intros (`0x0045E580` → `0x004B3510`) | 377–387 |
-|   11. 0x78 trade partner (`0x0045E810` → `0x004B9010`) | 388–396 |
-|   12. 0x29 game quest flags (`0x0045D3A0` → `0x004B2620`) | 397–406 |
-|   13. 0x52 quest log status (`0x0045CC00` → `0x004A40D0`) | 407–417 |
-|   14. 0x5E game quest availability (`0x0045E570` → `0x004B92B0`) | 418–425 |
-|   15. 0x9B hireling revive state (`0x0045EAC0` → `0x004B6980`) | 426–436 |
-| Constants & data dependencies | 437–448 |
-| Randomness | 449–453 |
-| Edge cases & original bugs | 454–465 |
-| Test vectors | 466–505 |
-| Provenance | 506–538 |
-| Open questions | 539–578 |
+| Summary | 64–79 |
+| Inputs | 80–87 |
+| Outputs / state changes | 88–105 |
+| Rules | 106–107 |
+|   1. 0x5D quest status (`0x0045E540` → `0x004A2CB0`) | 108–180 |
+|   2. 0x63 waypoint menu (`0x0045E670` → `0x0049CF90`) | 181–204 |
+|   3. 0x77 UI action (`0x0045E800` → `0x004B8CF0`) | 205–242 |
+|   4. 0x26 chat and overhead text (`0x0045DFC0` → `0x0049F490`) | 243–293 |
+|   5. 0x27 NPC text (`0x0045E0A0` → `0x004A1600`) | 294–313 |
+|   6. 0x4E hire offer and 0x4F hire list reset | 314–326 |
+|   7. 0x50 quest special (`0x0045E370` → `0x004B9210`) | 327–350 |
+|   8. 0x58 UI open (`0x0045E490` → `0x004C0550`) | 351–370 |
+|   9. 0x8A NPC wants to interact (`0x0045EA40` → `0x004B3380`) | 371–389 |
+|   10. 0x91 NPC intros (`0x0045E580` → `0x004B3510`) | 390–400 |
+|   11. 0x78 trade partner (`0x0045E810` → `0x004B9010`) | 401–409 |
+|   12. 0x29 game quest flags (`0x0045D3A0` → `0x004B2620`) | 410–419 |
+|   13. 0x52 quest log status (`0x0045CC00` → `0x004A40D0`) | 420–430 |
+|   14. 0x5E game quest availability (`0x0045E570` → `0x004B92B0`) | 431–438 |
+|   15. 0x9B hireling revive state (`0x0045EAC0` → `0x004B6980`) | 439–449 |
+|   16. 0x28 NPC dialog start and quest flags (`0x0045D370` → `0x004B6DD0`) | 450–495 |
+|   17. 0x62 NPC dialog end (`0x0045D390` → `0x004B5320`) | 496–508 |
+|   18. 0x2A NPC transaction (`0x0045E0D0` → `0x004B6390`) | 509–519 |
+|   19. 0x5A event text (`0x0045E070` → `0x0049EB10`) | 520–539 |
+|   20. 0x61 act video (`0x0045E660`) | 540–547 |
+|   21. 0x76 overhead clear (`0x0045E050` → `0x0049F8C0`) | 548–555 |
+|   22. 0x7B skill hotkey (`0x0045E8D0` → `0x004AA0C0`) | 556–565 |
+| Constants & data dependencies | 566–577 |
+| Randomness | 578–582 |
+| Edge cases & original bugs | 583–599 |
+| Test vectors | 600–647 |
+| Provenance | 648–689 |
+| Open questions | 690–744 |
 <!-- /index -->
 
 Owned ids: 0x26, 0x27, 0x29, 0x4E, 0x4F, 0x50, 0x52, 0x58, 0x5D, 0x5E,
-0x63, 0x77, 0x78, 0x8A, 0x91, 0x9B.
+0x63, 0x77, 0x78, 0x8A, 0x91, 0x9B; §16–§22: 0x28, 0x62, 0x2A, 0x5A,
+0x61, 0x76, 0x7B.
 
 ## Summary
 
@@ -87,8 +95,13 @@ layer.
   `HireListReset` (0x4F), `QuestSpecial` (0x50), `OpenUi` (0x58),
   `NpcInteract` (0x8A), `NpcIntro` (0x91), `TradePartner` (0x78),
   `GameQuestFlags` (0x29), `QuestLog` (0x52), `QuestAvailability`
-  (0x5E), `MercRevive` (0x9B), each
-  applied by the UI layer.
+  (0x5E), `MercRevive` (0x9B), `QuestFlags`, `NpcGone`, `NpcDialog`
+  (0x28), `NpcDialogEnd` (0x62), `NpcTransaction` (0x2A), `EventText`
+  (0x5A), `ActVideo` (0x61), `OverheadClear` (0x76), `HotkeyAssign`
+  (0x7B), each applied by the UI layer.
+- Model (§16–§19): unit flag 0x2 (0x28, 0x62), `outgoing` C→S 0x2F /
+  0x30 (0x28), the local player's player data +0x150…+0x15C (0x28),
+  the act environment (0x5A code 0x12).
 
 ## Rules
 
@@ -434,6 +447,122 @@ layer.
    with stack argument 0; the NPC-menu Resurrect edit of `ui/panels.md`
    §14).
 
+### 16. 0x28 NPC dialog start and quest flags (`0x0045D370` → `0x004B6DD0`)
+
+1. Layout (103 bytes; sender `0x0053D670`): type T u8@1, GUID G u32@2,
+   R u8@6, quest flags Q (96 bytes) @7. Recorded: `28 06 00000000 00
+   01 00…` (T 6, at join) and `28 01 06000000 00 01 00…` (T 1, an NPC,
+   `-015956` seq 37353).
+2. **T = 6**: model state none; one `QuestFlags` output {Q}: the UI
+   layer copies Q into the client quest flags record `[0x007C0D43]`
+   (`0x0065C4D0(record, Q, 0x60, 0)`; read by §1 r7, §2 r2.3).
+3. **T ≠ 6, unit (T, G) absent**: model part: the local player's player
+   data +0x150, +0x154, +0x158, +0x15C := 0 (when the local player is
+   a player with data; as 0x04, `client/model.md` §7 r5); C→S **0x30**
+   (`0x004786A0`: `30`, u32 R, u32 G; appended to `outgoing`). Output
+   `NpcGone` {G}: UI `0x004B3830(G)`.
+4. **T ≠ 6, unit U present.** Model part, in 1.14d order: unit flag 0x2
+   := 1; C→S **0x2F** (`2F`, u32 T, u32 G). Output `NpcDialog`
+   {T, G, Q, captured: U's key and class, U's monstats `interact` flag
+   (bit 9, `0x00457490(class, 9)`), `0x004B1A10(class)`, whether the
+   local player has a cursor item (`0x0063C1E0` on its inventory), and
+   the keys of the S monsters whose monstats `npc` flag (bit 8) is set}.
+   The UI layer runs, in order:
+   1. overlay 72 off on each of those monsters (`0x00464990` →
+      `0x004B2390` → `0x0046F0C0(unit, 72)`; the overlay of §9 r3);
+   2. `[0x007C0D43]` := Q; `0x004B2250`; `0x0044DA40`;
+   3. the dialog branch:
+
+      | Case (first that holds) | 1.14d effect |
+      |---|---|
+      | B0: `[0x007C0C68]` ≠ 0 | `[0x007C0C69]` := 1; `0x004B1640(U)`; **unit flag 0x2 := 0** |
+      | (always next) | txt := the NPC text record (`0x0049F900`, §5; none → fatal 0x1060); m := `0x00661400(txt, 0)`; class has `interact` and is not 537, 538, 539 or 527 → **U's mode := 1 and U faces the local player** (`0x00464420`: `0x00624690(U, 1)`, `0x00649EF0` on U's path) |
+      | B1: the local player has a cursor item | `[0x007C0D29]` := 1, `[0x007C0D25]` := G, `[0x007C0D2D]` := class; `0x004B3C20`; `0x00455F20(8, 1, 0)` |
+      | B2: m ≠ 0xFFFF | `[0x007C0DAE]` := 0; `0x00456300(0, 0)`; `[0x007C0C77]` := m; `0x004A10E0(U, m, 1)`; `0x004B1980(m)`; `[0x007C0C79]` := `0x004B1830()`; **C→S 0x31** (`31`, u32 G, u32 m; the server reads u16@5, `client-messages.tsv`); `[0x007C0C69]` := 1; `0x0049E7E0(0x004B6A30, 0)`; `0x004B1640(U)`; `[0x007C0DB0]` := 0 |
+      | (next) | m2 := `0x00661440(txt, 0)`; class ≠ 527 → **the local player faces U** when its mode is 1 or 5 (`0x004644E0`); U has a path → **U's path stops** (`0x00648730`: path flag 0x20 cleared, point count +0x28 := 0) |
+      | B3: m2 ≠ 0xFFFF | `0x00487990`; `0x00456300(0, 0)`; `[0x007C0C77]` := m2; `[0x007C0C79]` := `0x004B1830()`; `0x004B4FD0(U)`; `[0x007C0DB0]` := 0 |
+      | B4: class without `interact` | `0x004B3C20`; `0x00455F20(8, 1, 0)`; `[0x007C0DB0]` := 0 |
+      | B5: `0x004B1A10(class)` ≠ 0 | as B1 |
+      | B6: otherwise | `0x00487990`; `0x00456300(0, 0)`; `0x004B66B0(0)`; `[0x007C0DB0]` := 0 |
+
+5. **Split.** The model part (rules 3–4 before the output) and the
+   captured inputs are exact. The dialog branch decides on UI state
+   (`[0x007C0C68]`, the NPC text record of 0x27), and four of its
+   effects (bold) write the model (unit flag 0x2, U's mode and path, U's
+   and the local player's facing) and one sends C→S 0x31. Under
+   `client/bridge.md` §10 r6 a consumer may send (the send path) but
+   not write the model: open question 10.
+
+### 17. 0x62 NPC dialog end (`0x0045D390` → `0x004B5320`)
+
+1. Layout (7 bytes; sender `0x0053D6D0`): type T u8@1, GUID u32@2.
+2. T = 1: unit (1, GUID) present → model: unit flag 0x2 := 1. Output
+   `NpcDialogEnd` {T}: the UI layer closes the NPC panel by its state
+   `[0x007C0C6B]`: 1 → `[0x007C0C69]` := 0, `0x004B3DE0`; 3–6 →
+   `0x004B3ED0`, `0x0048A6A0`; 7 → `0x004C0440`; other → when
+   `[0x007C0C69]` ≠ 0 the same as 1; then (every case) `0x004B2110`
+   and `[0x007C0C6B]` := 0.
+3. T = 2, 4, 6: model none; output `NpcDialogEnd` {T}: UI
+   `0x00456300(1, 0)` (jump table `0x004B53CC`, read from the image).
+   T = 0, 3, 5, ≥ 7: nothing.
+
+### 18. 0x2A NPC transaction (`0x0045E0D0` → `0x004B6390`)
+
+1. Layout (15 bytes; sender `0x0053D740`): the handler reads only u8@2
+   itself and hands all 15 bytes on. Recorded `2a 03 01 05 a4f61907
+   000000 f4010000` (`-015956` seq 77950).
+2. Model state: none. Output `NpcTransaction` {the 15 bytes, the local
+   player's gold captured at receive (stat 14, `0x00625480(P, 14, 0)`)}.
+   The UI layer: `[0x007C0D87…0x007C0D95]` := the 15 bytes,
+   `[0x007C0C73]` := gold; then by `[0x007C0C6B]`: 5 → `0x004B53F0`;
+   10 → `0x004B5640`; else u8@2 = 1 → UI sound 221 (no unit).
+
+### 19. 0x5A event text (`0x0045E070` → `0x0049EB10`)
+
+1. Layout (40 bytes; `sim/intents-events.md` §3.5): code u8@1, u8@2,
+   u32@3, u8@7, name @8 (cut to 15 characters: byte 0x17 := 0 when the
+   name is longer), second name @0x18. Recorded `5a 02 04 00000000 00
+   "charactertest"` (player joined, at join).
+2. Code 0x12 only, model part: with a client act, its environment is
+   set to period 5, ticks 0, eclipse 1 (`0x0061C240(act, room of the
+   local player, 5, 0, 1)`, `render/lighting.md` §9.2 r2).
+3. Every code: one `EventText` output {the 40 bytes, the local
+   player's name captured}. The UI layer builds the line (string table,
+   `0x0049E3A0`): codes 0–5, 0xD build a text line (built length ≥ 0x104
+   → fatal 0x114C, 0x1152, 0x115C, 0x116A, 0x1178, 0x1184, 0x117E);
+   code 2 with the local player's own name builds no text (the empty
+   buffer goes to `0x0049E3A0`); codes 6, 8–11,
+   0xF, 0x10, 0x11 other forms; 7 → `0x0049E8F0` / `0x0049E5C0`; 0x12
+   also a screen shake (`0x00476A80(6, 4000, 10000, 4000)`,
+   `render/camera.md` §8) and sound 4640 (`audio/triggers.md`); codes
+   0xC, 0xE and > 0x12 nothing. The line formats: `ui/*`.
+
+### 20. 0x61 act video (`0x0045E660`)
+
+1. Layout (2 bytes; sender `0x0053D940`): video u8@1. Model state none.
+2. Output `ActVideo` {video}: UI `0x00482EF0(video)` (video table
+   `0x00721D9C`, 12-byte entries, count `[0x00721D94]`; video ≥ count →
+   fatal 0xEF), then `0x0047F1D0` (display mode restored from the
+   registry, `0x0044BA20`).
+
+### 21. 0x76 overhead clear (`0x0045E050` → `0x0049F8C0`)
+
+1. Layout (6 bytes; sender `0x0053B3D0`, `sim/intents-events.md` §7.9
+   r3): type u8@1, GUID u32@2. Recorded `76 00 01000000` at both joins.
+2. Model state none. Output `OverheadClear` {unit key}: the UI layer
+   frees the unit's overhead record (+0xA4, `0x006611A0`) and sets it
+   to none (§4 r4); unit absent → nothing.
+
+### 22. 0x7B skill hotkey (`0x0045E8D0` → `0x004AA0C0`)
+
+1. Layout (8 bytes; sender `0x0053DB20`): slot u8@1, skill u16@2 (bits
+   0–11 skill, bit 15 left), item GUID u32@4.
+2. Model state none. Output `HotkeyAssign` {slot, skill := u16@2 & 0xFFF,
+   or −1 when that is greater than the skill count (a skill equal to the
+   count passes), left := bit 15, item GUID}: UI tables
+   `[0x007C06C8 + 4·slot]` := skill, `[0x007C07B8 + 4·slot]` := left,
+   `[0x007C0768 + 4·slot]` := item GUID. The slot is not range-checked.
+
 ## Constants & data dependencies
 
 | Item | Value | Source |
@@ -462,6 +591,11 @@ None on the game seeds. §1 r7's counter uses the client draw
   stored.
 - 0x63: the first row rebuild runs on the old record.
 - 0x77 codes 0x00 and 0x01 can send C→S 0x4F during the receive.
+- 0x28 for an absent NPC sends C→S 0x30 with u8@6 (not the type) in
+  its first u32.
+- 0x7B accepts a skill id equal to the skill count (off by one) and
+  any slot byte.
+- 0x62 with type 6 is handled without a unit lookup.
 
 ## Test vectors
 
@@ -502,6 +636,14 @@ Synthetic unless a recording is named ("A" = `-015956`, "B" =
 | `29` + 96 bytes | `GameQuestFlags`; UI: `[0x007C0D47]` record loaded | §12 |
 | `52` + 41 × `00` | `QuestLog`; UI: 41 status bytes 0 | §13 |
 | `9b ffff 0000 0000` | `MercRevive`; UI: `[0x00725494]` = 0xFFFF, the five menu edits | `world/npc.md` §7.3 |
+| `28 06 00000000 00` + 96 × `00` | `QuestFlags` {96 zero bytes}; model unchanged | A seq 133 (bytes after @7 differ) |
+| `28 01 06000000 00 01 00…`, monster (1, 6) present | unit flag 0x2 set; `outgoing` += `2f 01000000 06000000`; `NpcDialog`; the UI branch B2 then sends `31 06000000 25000000` (m = 0x25) | A seq 37353; recorded client sends seq 37408, 37410 |
+| same with (1, 6) absent | `outgoing` += `30 00000000 06000000`; `NpcGone` {6} | synthetic, §16 r3 |
+| `62 01 06000000`, (1, 6) present | unit flag 0x2 set; `NpcDialogEnd` {1} | synthetic, §17 |
+| `62 03 06000000` | nothing | synthetic, §17 r3 |
+| `76 00 01000000` | `OverheadClear` {(0, 1)} | A seq 128 |
+| `5a 12 …` with a client act | act environment period 5, eclipse 1; `EventText` | synthetic, §19 r2 |
+| `7b 02 0580 07000000` | `HotkeyAssign` {slot 2, skill 5, left 1, item 7} | synthetic, §22 |
 
 ## Provenance
 
@@ -536,11 +678,23 @@ the image), `0x004A28A0`, `0x004B3340`, `0x004939B0`, `0x004B25C0`,
 object 318 from `patch_d2` `monstats.txt` / `objects.txt`. Recorded:
 0x27 × 7 (A), 0x8A (A, B).
 
+Area 4 session (2026-10-07): §16 `0x004B6DD0` read in full (register
+arguments of `0x004786A0`: CL id, EDX u32@1, stack u32@5),
+`0x00457490`, `0x004B2390`, `0x00464420`, `0x004644E0`, `0x00648730`;
+§17 `0x004B5320` (table `0x004B53CC` from the image); §18
+`0x004B6390`; §19 `0x0049EB10` (code 0x12 tail `0x0049F320`–
+`0x0049F36E`); §20 `0x0045E660`, `0x00482EF0`, `0x0047F1D0`; §21
+`0x0049F8C0`; §22 `0x0045E8D0`, `0x004AA0C0`. Recorded bytes: both
+recordings (0x28 × 10, 0x2A × 3, 0x5A × 4, 0x76 × 4).
+
 ## Open questions
 
 1. `0x0046F870(row, 1)` (0x5D f bit 0, c 13; also `render/lighting.md`
    §10 r4): which client effect a monstats row starts; owner the client
-   effect spec.
+   effect spec. *Partly answered* (`client/msg-units.md` §7 r10):
+   `0x0046F870(class, f)` loads the class's graphics for each mode its
+   monstats2 row marks (15-mode table `0x00712AC4`, `0x0046F650`); open:
+   what the flag f = 1 changes.
 2. The full client unit flag word +0xC4 (initial value per kind, other
    writers), so `quest_untargetable` can become a real flag field;
    owner `client/msg-units.md`.
@@ -553,10 +707,8 @@ object 318 from `patch_d2` `monstats.txt` / `objects.txt`. Recorded:
    `[0x007C0D47]`, 0x52 and 0x5E write quest-log bytes, not the record.
    `[0x007C0D43]` is written by 0x28 (`0x0045D370` → `0x004B6DD0`: type
    6, and the NPC-interaction path with a unit, both
-   `0x0065C4D0([0x007C0D43], bytes @7, 0x60, 0)`); 0x28 stays unowned:
-   its NPC path also writes the model (unit flag +0xC4 bit 2, the unit's
-   path `0x00648730`, a send `0x004786A0`) between UI calls, so its
-   split into model part and output needs that path read in full.
+   `0x0065C4D0([0x007C0D43], bytes @7, 0x60, 0)`). *0x28 answered*:
+   owned and split in §16 (residue: open question 10).
 5. The trade helpers `0x004B8BF0`, `0x004B85E0`, `0x004B8AD0`,
    `0x00489360`, `0x004897E0`, `0x00487B30` (trade screen; out of Phase
    0–6 single-player scope except code 0x0C's close path).
@@ -575,3 +727,17 @@ object 318 from `patch_d2` `monstats.txt` / `objects.txt`. Recorded:
    session state.
 9. The text filter object `0x00611560` (methods +8, +0x14) used by
    §4 r3.2: what it rejects (a squelch / profanity list?); UI spec.
+10. 0x28's dialog branch (§16 r4.3) writes the model from the UI layer
+    (unit flag 0x2 cleared, the NPC's mode and facing, the local
+    player's facing, the NPC's path stop), which `client/bridge.md` §10
+    r6 forbids. Either the inputs it decides on (`[0x007C0C68]`, the NPC
+    text record of 0x27 and its first entries `0x00661400` /
+    `0x00661440`, `0x004B1A10(class)`) move into the model so the
+    handler takes the branch at receive, or §10 gets a rule for model
+    writes requested by a UI output. Same question for the send of
+    C→S 0x31: 1.14d sends it inside the receive, the UI layer after the
+    frame's other sends (`client/bridge.md` §10 r6).
+11. 0x61's video table entries and the display-mode reset (`0x0047F1D0`
+    reads a registry value): Phase 6 UI / video spec; 0x2A's panel
+    functions `0x004B53F0`, `0x004B5640` and the meaning of its bytes:
+    `ui/*` with `world/vendors.md`.

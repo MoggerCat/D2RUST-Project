@@ -16,7 +16,9 @@
   ids of `sim/intents-events.md` OQ18 (`msg-ui.md` §4–§11,
   `msg-skills.md` §7–§8, 0x89 `render/lighting.md` §10 r4) and the
   no-effect ids of §6 rule 6; the out-of-scope ids stay `TBD` (§6
-  rule 7).
+  rule 7). 2026-10-07 (area 4): the last 32 in-scope ids have owners
+  (`msg-units.md` §7–§8, `msg-stats-items.md` §5, `msg-skills.md`
+  §9–§10, `msg-ui.md` §16–§22); only the §6 rule 7 ids are `TBD`.
 - **Target version:** 1.14d (the message bytes it carries); the bridge
   itself has no 1.14d counterpart to match.
 - **Crate/module:** `d2-client::bridge` (`link`, `intent`, `receive`,
@@ -31,26 +33,26 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 56–70 |
-| Inputs | 71–79 |
-| Outputs / state changes | 80–91 |
-| Rules | 92–93 |
-|   1. Boundary | 94–109 |
-|   2. Receive path | 110–132 |
-|   3. Server link | 133–151 |
-|   4. Send path (intents) | 152–172 |
-|   5. Client world model | 173–192 |
-|   6. Dispatch table | 193–233 |
-|   7. Bevy mirror | 234–252 |
-|   8. Frame pacing | 253–273 |
-|   9. Versioning | 274–284 |
-|   10. Client outputs (bridge → UI and audio) | 285–370 |
-| Constants & data dependencies | 371–385 |
-| Randomness | 386–389 |
-| Edge cases & original bugs | 390–398 |
-| Test vectors | 399–429 |
-| Provenance | 430–440 |
-| Open questions | 441–476 |
+| Summary | 58–72 |
+| Inputs | 73–81 |
+| Outputs / state changes | 82–93 |
+| Rules | 94–95 |
+|   1. Boundary | 96–111 |
+|   2. Receive path | 112–134 |
+|   3. Server link | 135–153 |
+|   4. Send path (intents) | 154–174 |
+|   5. Client world model | 175–194 |
+|   6. Dispatch table | 195–235 |
+|   7. Bevy mirror | 236–254 |
+|   8. Frame pacing | 255–275 |
+|   9. Versioning | 276–286 |
+|   10. Client outputs (bridge → UI and audio) | 287–381 |
+| Constants & data dependencies | 382–396 |
+| Randomness | 397–400 |
+| Edge cases & original bugs | 401–409 |
+| Test vectors | 410–440 |
+| Provenance | 441–451 |
+| Open questions | 452–487 |
 <!-- /index -->
 
 ## Summary
@@ -367,6 +369,15 @@ model state: 1.14d's handler calls a UI or sound function directly
 | `MonsterPreload` | monster class u16 | 0xA4 | effects | `client/msg-units.md` §7 r10 |
 | `RosterChanged` | the active roster records (§8 r1 fields) | 0x5B, 0x5C, 0x65 | UI | `client/msg-units.md` §8 |
 | `SkillEndFx` | unit key, skill u16, srvdofunc | 0xA5 | effects | `client/msg-skills.md` §10 |
+| `QuestFlags` | 96 bytes | 0x28 (type 6) | UI | `client/msg-ui.md` §16 r2 |
+| `NpcGone` | GUID u32 | 0x28 (unit absent) | UI | `client/msg-ui.md` §16 r3 |
+| `NpcDialog` | type, GUID, 96 bytes, unit key, class, `interact` flag, `0x004B1A10(class)`, cursor item present, keys of `npc` monsters | 0x28 (unit present) | UI | `client/msg-ui.md` §16 r4 |
+| `NpcDialogEnd` | type u8 | 0x62 | UI | `client/msg-ui.md` §17 |
+| `NpcTransaction` | 15 bytes, local player gold | 0x2A | UI | `client/msg-ui.md` §18 |
+| `EventText` | 40 bytes, local player name | 0x5A | UI | `client/msg-ui.md` §19 |
+| `ActVideo` | video u8 | 0x61 | UI | `client/msg-ui.md` §20 |
+| `OverheadClear` | unit key | 0x76 | UI | `client/msg-ui.md` §21 |
+| `HotkeyAssign` | slot u8, skill i32, left u8, item GUID u32 | 0x7B | UI | `client/msg-ui.md` §22 |
 
 ## Constants & data dependencies
 
