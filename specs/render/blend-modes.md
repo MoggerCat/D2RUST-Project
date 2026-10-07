@@ -27,13 +27,13 @@
 |   5. Shadows (the darkening blend) | 186–248 |
 |   6. Translucent walls and roofs | 249–266 |
 |   7. d2rs answers | 267–277 |
-|   8. Lines and rectangles (GDI) | 278–302 |
-| Constants & data dependencies | 303–311 |
-| Randomness | 312–315 |
-| Edge cases & original bugs | 316–326 |
-| Test vectors | 327–354 |
-| Provenance | 355–381 |
-| Open questions | 382–400 |
+|   8. Lines and rectangles (GDI) | 278–312 |
+| Constants & data dependencies | 313–321 |
+| Randomness | 322–325 |
+| Edge cases & original bugs | 326–340 |
+| Test vectors | 341–373 |
+| Provenance | 374–402 |
+| Open questions | 403–425 |
 <!-- /index -->
 
 ## Summary
@@ -288,12 +288,22 @@ UI. `W`, `H` = the GDI surface size (`[0x007C9138]`, display height).
    major axis, the minor axis advancing when the error (start 0, plus
    the minor distance per step) **exceeds** the major distance (then
    minus it). Pixels outside [0, `W`) × [0, `H`) are skipped one by one.
-   A zero-length line sets one pixel.
+   A zero-length line sets one pixel. **Major axis:** y only when |Δx| <
+   |Δy|; x otherwise, so a 45° line (|Δx| = |Δy|) is x-major. Closed
+   form: after step i (1 … M, M = major, m = minor distance) the minor
+   offset is 0 when m = 0, else ⌊(i·m − 1) / M⌋; the last pixel is
+   (x1, y1) only when m = 0, otherwise one short on the minor axis
+   (offset m − 1). The pixel address is `[0x007C9154]` + y · `W` + x
+   (pitch = `W`).
 2. **Rectangle** (`D2GFX_DrawRectangle` `0x004F6300` → slot `+0xB8`, GDI
    `0x006C8A60`; arguments x0, y0, x1, y1, color, draw mode): each
    coordinate is clamped to [0, `W` − 1] (x) or [0, `H` − 1] (y), values
-   ≤ 0 becoming 0; nothing is drawn when x0 = x1 or y0 = y1; y1 < y0 is
-   fatal 0x32. Pixels: columns x0 … x1 − 1, rows y0 … y1 − 1 (so the
+   ≤ 0 becoming 0; nothing is drawn when x0 = x1 (tested first, after
+   clamping x) or y0 = y1; y1 < y0 is fatal 0x32. **x1 < x0** (after the
+   clamp) has no check: the row width x1 − x0 is negative, the per-row
+   fill (`memset` for `k` = 0, a count-down loop for `k` = 1, 2) runs
+   2³² − (x0 − x1) bytes and faults: the original crashes; d2rs reports
+   it as fatal, like 0x32. Pixels: columns x0 … x1 − 1, rows y0 … y1 − 1 (so the
    last screen column and row are never reached). The blend getter (§1)
    gives `T` and its per-mode value `k` (table `0x0074C5A0`): `k` = 0
    (modes 5, 7, other) → `d' = color`; `k` = 1 (modes 3, 4, 6) → `d' =
@@ -323,6 +333,10 @@ None.
 4. Override layers are never highlighted (§3).
 5. Overlays lose their blood map (§4).
 6. Draw modes outside 0–7 from data draw as mode 5 (§1).
+7. GDI lines with a non-zero minor distance end one pixel short of
+   (x1, y1) on the minor axis; 45° lines take one straight step first
+   (§8 r1).
+8. A GDI rectangle with x1 < x0 crashes (§8 r2).
 
 ## Test vectors
 
@@ -350,6 +364,11 @@ Real values: act 1 `Pal.PL2` (`shading.md` Test vectors, SHA-256
 | no override, player, RH ethereal | mode 1; SH ethereal → 2 | §3 |
 | missile Trans 2, not hovered | mode 4 | §4 |
 | cel `h = 10`, `yoff = −7`, at (100, 50), shadow | `y0 = 47`, `x0 = 100 + xoff − 3`, 5 rows on screen rows 47…43 from source rows 0, 2, 4, 6, 8, row `k` starting at `x0 − k` | §5 |
+| GDI line (0, 0) → (3, 3) | x-major: (0, 0), (1, 0), (2, 1), (3, 2) | §8 r1 |
+| GDI line (0, 0) → (5, 2) | (0, 0), (1, 0), (2, 0), (3, 1), (4, 1), (5, 1) | §8 r1 |
+| GDI line (10, 10) → (8, 15) | y-major: (10, 10), (10, 11), (10, 12), (9, 13), (9, 14), (9, 15) | §8 r1 |
+| GDI line (4, 4) → (4, 0) | (4, 4), (4, 3), (4, 2), (4, 1), (4, 0) | §8 r1 |
+| GDI rectangle x0 = 5, x1 = 5 | nothing (before any y test) | §8 r2 |
 | capture run 2 (`20261006-141725`), frames 566 → 590, inventory open, static camera, Town Portal opening (objects `TP`, `TPONHTH.COF`: layer HD override level 3, layer TR none) | 8,641 of the 9,445 pixels that were stable before and changed after hold a value of row `d` of `ADD` (the rest: the opaque TR layer, the portal's light, rain) | §1 mode 3, capture |
 
 ## Provenance
@@ -377,7 +396,9 @@ Ghidra backlog (2026-10-06): unit shadow `0x00471620` (composite) and
 from their pushes), GDI slots `+0xB8` = `0x006C8A60`, `+0xC0` =
 `0x006C8C80` (read from the table `0x0074C4A8`; DirectDraw `0x00512710`,
 `0x00512930`, not read), the line's `ret 0x10` and stack reads (alpha
-unused).
+unused). Major-axis test (`cmp |Δx|, |Δy|; jge` → x branch) and the
+rectangle's unchecked negative width read in the disassembly of
+`0x006C8C80` / `0x006C8A60`.
 
 ## Open questions
 
@@ -397,3 +418,7 @@ unused).
    GDI ignores that argument (§5). `unit-composite.md` §7 r1 says
    "shift table row +0x6C"; the row is `+0x6C − 1` (`shading.md` §6 r1).
    Both on branch `claude/spec-unit-draw`, edit when merged.
+6. *Answered* (`impl-lighting-blend` "Not wired" 3): a 45° GDI line is
+   x-major (§8 r1, with the closed form and vectors); a GDI rectangle
+   with x1 < x0 crashes in 1.14d and is fatal in d2rs (§8 r2). A weather
+   or Arcane-star capture still confirms the pixels.

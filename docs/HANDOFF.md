@@ -4249,12 +4249,13 @@ interpretation points are in §5 C34, C35).
   (start, animation, schedule), mode 0 first, so a type-7 event they
   schedule follows the mode's animation events in the timer queue (decides
   the run order of events on the same frame). Settled by §5 A RT-R1.
+  **Answered 2026-10-07** (`monsters/umod-callbacks.md` §2, read from the asm): mode 0 runs before the start function (after the mode damage rewrite `0x005A4F50`) and not at all when the requested mode is 3 (GH); mode 1 runs after the start function and the animation prepare but **before** the cancel of events 0 / 1 and the animation schedule, so a type-7 event it schedules sits **before** the mode's animation events in the timer queue. The reading above (both after the whole mode set) is wrong; RT-R1 now only confirms it.
 - RT2 (`action/ai.rs` `monster_level`; `ai.md` §2.4 step 2): the getter for
   the "level" of the teleport heal is not named; code takes stat 12 (`level`)
   unit total (`init.md` §7 rule 4).
 - RT3: umod mode 4 (`0x005A43A0`, called from the reaction `0x0057CEE0` at
   two sites) is not placed by `damage.md` §7.1 (call level only, OQ3); stays
-  inside `Pending::reaction`.
+  inside `Pending::reaction`. **Answered 2026-10-07** (`monsters/umod-callbacks.md` §2 r5): mode 4 runs on the monster defender, after the GH mode set (get-hit, stunned or `0x0057CB00` allows it) or after the soft-hit path (get-hit refused, or soft hit 0x4000); never on knockback, block or death.
 - RT4: monster data `dwAiState` (+0x54) has no writer in any spec (`ai.md`
   OQ5) and `MonsterData` has no field for it; `Pending::ai_state` stays.
 - RT5: `is_boss` `0x0063E9F0` (its test is not specified), superunique
@@ -5245,6 +5246,66 @@ one large unit and the unnarrowed `§edge-cases-original-bugs` claims (step 7u
 (e)). NP1 the `wire` and `worldsim` deep groups were not run at full counts;
 GitHub runners may be 1.5–2× slower than the measured 670 s.
 
+### PC 2 recording list (spec answers that need a recording or capture)
+
+Spec writers append here (one line: spec + open question, what to record,
+what to log); PC 2 (Local2) records them and moves each line to §5 Done
+with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
+- `world/hirelings.md` R2-27 rest / OQ7 / OQ2 (PC 2 spec-hirelings, 2026-10-07): with `bdMercTwo`: level-up (0xA1 / 0xA2 and the second stats batch), death (0x9B name id + cost, 0x7A remove), resurrect at an NPC (0x9B `ffff 00000000`, 0x81, 0x2A code 5), give / take an item (two 0x540E60 notices, new GUIDs); a two-player game where the second client sees the owner's hireling level up (expect 0x9E–0xA0 stats there, not 0xA1 / 0xA2); die, change level, return and resurrect (OQ2).
+- `world/quests-act2-2.md` OQ1 (PC 2 spec-quests-act2, 2026-10-07): orifice insert (Act II, Horadric Staff assembled): operate the orifice (S→C 0x58 result 0), cancel the dialog (C→S 0x44 action 2 → 0x58 result 1), insert a wrong cursor item (result 4), then the staff (result 5, byte 6 = 1); log the 7 bytes of each 0x58, especially byte 6 for results 0, 1, 4.
+- `world/quests.md` OQ14 (PC 2 spec-quests-core, R-QC-1): a 1.14d expansion character that completed every Normal quest; save right after the last one, then after one more game; dump both quest sections and list the set bits per slot.
+- `world/quests-act1-rest.md` OQ12 (PC 2 spec-quests-core, R-QC-2, = §5 C79): creation of the town-Cain marker (class 385) after Cain left Tristram, packets + RNG: Cain's spawn draws must come between the marker's unit-seed step and the next preset unit's.
+
+- `drlg/rooms.md` OQ15: client build timer (B, T, cursor) per client
+  update over a level load.
+- `sim/unit-order.md` OQ5: client room unit-list order before each draw
+  sort, one town scene.
+- `client/model.md` OQ9: the client side of the join stream (see the
+  spec).
+- `render/draw-order.md` OQ7: town river-bank cells, capture at `TownE1`
+  tile (950, 933).
+- `sim/intents-events.md` OQ11 (order part; the 0x65 path is answered
+  statically, §7.6 rule 5): a monster kill that drops an item; log that
+  tick's 0x9C / 0x69 / 0x65 order with callers (expect 0x9C, 0x69, then
+  0x65 from `0x0053FB30` called by `0x0053FC20`).
+- `sim/intents-events.md` OQ14: type one chat line (C→S 0x15) in single
+  player; log the S→C messages of that frame with callers.
+- `client/bridge.md` OQ6: a 0x2C followed by a 0x0A in one chunk.
+- `render/lighting.md` OQ11: a day-period change with objects in sight.
+- `client/msg-skills.md` OQ1: equipping a charged item.
+- `client/stat-lists.md` OQ6: a buff (0xA8 bytes).
+- `client/model.md` OQ10: a game with a hireling (0x7A / 0x81).
+- `monsters/umod-callbacks.md` OQ1 + OQ2: a fire-enchanted unique dying
+  next to the player, and a suicide minion hit into GH (Act V); log
+  timer sets / runs (type 7, site), rng draws with caller, area-damage
+  targets.
+- `monsters/umod-callbacks.md` OQ6: dump the stat list of a missile
+  fired by a spectral-hit unique (is stat 12 present).
+- `render/draw-order-2.md` OQ1 / OQ9 (W5): Rogue Encampment in rain:
+  per frame the player seed, rain target `[0x007A89E0]`, `k` (context
+  `0x007C8A38`), `last_s` and the splash pool count; check splashes
+  spawn only when `r` < ⌊target × 1000 / 256⌋.
+- `render/blend-modes.md` OQ6: a weather or Arcane-star capture with the
+  line endpoints logged (45° lines x-major, end one short on the minor
+  axis).
+- `missiles/bodies.md` OQ1 / OQ3: Plague Javelin hit, cloud positions
+  per tick (velocity 192 / 384, no extra << 8).
+- `sim/intents-events.md` OQ11: breakpoint, no new play: return address
+  one level up of `0x0053FB30` during a monster kill (which path sends the
+  0x65 in a kill tick).
+- `sim/intents-events.md` OQ13: breakpoint at join: caller of the first
+  0x48 in frame 2.
+- `skills/bodies-3.md` OQ1–4: Fetish Shaman / Baal Inferno (E param 1,
+  timers, missile frames per do of `0x005CC4E0`), Greater Mummy resurrect
+  (T mode, used skill, life after `0x005CCB10`), Sand Leaper jump (E
+  flags, path type, target per do of `0x005CB940`), Sand Maggot egg cast
+  (egg count, modes, `0x005CAFA0`).
+- `skills/bodies-4.md` OQ1–3: Royal Strike / Claws of Thunder charge
+  release (zigzag path points and missile seeds, `0x005D4870`,
+  `0x005D4150`), Overseer whip (transform rate and class, `0x005D1F70`),
+  imps on a barricade tower (state 143, type-5 event, release below 10 %
+  life, `0x005D1AB0`).
+
 **Ninth set (2026-10-07; the 22 notes `impl-ai-acts2-5`, `impl-skill-slots-2`,
 `impl-missile-bodies-2`, `impl-quests-act1-rest`, `impl-quests-act2`,
 `impl-quests-act3`, `impl-quests-act4-5`, `impl-objects`, `impl-hirelings`,
@@ -5879,31 +5940,6 @@ a monster, a Druid summon, a Clay Golem, a Countess kill, a Cain rescue.
   0x2FD, `jf` / `kf` (OQ3; C66 (1)).
 - R2-38 `d2s-tool` characters load and re-save in 1.14d: quest bits, trailer
   bit, +0x88..+0xA7, flag 0x2000 (DS-2, DS-4, DS-5; C66 (2)).
-
-### PC 2 recording list (spec answers that need a recording or capture)
-
-Spec writers append here (one line: spec + open question, what to record,
-what to log); PC 2 (Local2) records them and moves each line to §5 Done
-with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
-
-- `drlg/rooms.md` OQ15: client build timer (B, T, cursor) per client
-  update over a level load.
-- `sim/unit-order.md` OQ5: client room unit-list order before each draw
-  sort, one town scene.
-- `client/model.md` OQ9: the client side of the join stream (see the
-  spec).
-- `render/draw-order.md` OQ7: town river-bank cells, capture at `TownE1`
-  tile (950, 933).
-- `sim/intents-events.md` OQ11: breakpoint, no new play: return address
-  one level up of `0x0053FB30` during a monster kill (which path sends the
-  0x65 in a kill tick).
-- `sim/intents-events.md` OQ13: breakpoint at join: caller of the first
-  0x48 in frame 2.
-- `client/bridge.md` OQ6: a 0x2C followed by a 0x0A in one chunk.
-- `render/lighting.md` OQ11: a day-period change with objects in sight.
-- `client/msg-skills.md` OQ1: equipping a charged item.
-- `client/stat-lists.md` OQ6: a buff (0xA8 bytes).
-- `client/model.md` OQ10: a game with a hireling (0x7A / 0x81).
 
 ## 8. Lessons (problems met, fixes)
 
