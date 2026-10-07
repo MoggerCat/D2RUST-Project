@@ -26,17 +26,17 @@
 | Outputs / state changes | 63–71 |
 | Rules | 72–73 |
 |   6. A5Q4 Betrayal of Harrogath (chain 34, slot 38) | 74–176 |
-|   7. A5Q5 Rite of Passage (chain 35, slot 39) | 177–346 |
-|   8. A5Q6 Eve of Destruction (chain 36, slot 40) | 347–474 |
-|   9. Act V intro (chain 40, slot 42) | 475–501 |
-|   10. Hooks called from other systems | 502–523 |
-|   11. NPC services and game completion | 524–537 |
-| Constants & data dependencies | 538–557 |
-| Randomness | 558–569 |
-| Edge cases & original bugs | 570–605 |
-| Test vectors | 606–620 |
-| Provenance | 621–643 |
-| Open questions | 644–711 |
+|   7. A5Q5 Rite of Passage (chain 35, slot 39) | 177–349 |
+|   8. A5Q6 Eve of Destruction (chain 36, slot 40) | 350–477 |
+|   9. Act V intro (chain 40, slot 42) | 478–504 |
+|   10. Hooks called from other systems | 505–526 |
+|   11. NPC services and game completion | 527–540 |
+| Constants & data dependencies | 541–560 |
+| Randomness | 561–572 |
+| Edge cases & original bugs | 573–608 |
+| Test vectors | 609–623 |
+| Provenance | 624–646 |
+| Open questions | 647–714 |
 <!-- /index -->
 
 ## Summary
@@ -329,6 +329,9 @@ stats 13 / 30 are read with the base getter `0x006253B0`, the level with
   `0x005550B0(game, player, tile)` (`sim/path-placement.md` §12.2).
 - Object 561 operate 69 (`0x0058D5E0`): 39.0 set and 39.4 clear → scroll
   message 20169.
+  The client sends the C→S 0x13 that triggers operate 69 by itself
+  (`ClientFn` 13: distance < 25, quest bit 39.0 set and 39.4 clear;
+  `world/objects-client.md` §26.13).
 - The warp check `0x0058D090` (`quests.md` §8.2) reads +0x00: leaving
   the summit for levels 118 or 128 is closed until the Ancients are
   defeated (in a not-intro record).
