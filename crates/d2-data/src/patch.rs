@@ -21,6 +21,8 @@ mod robust_tests;
 mod syntax;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_c2fmt;
 
 use std::fmt;
 
