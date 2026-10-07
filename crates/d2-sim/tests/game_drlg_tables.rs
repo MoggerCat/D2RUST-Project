@@ -264,12 +264,6 @@ fn lvlmaze_rows_as_stated() {
     }
 }
 
-/// `maze.md` §1, §3.3, §3.6, §4–§7 fixed defs (HANDOFF §5 C12).
-const MAZE_FIXED_DEFS: [u32; 29] = [
-    167, 288, 289, 290, 333, 336, 444, 445, 446, 447, 480, 735, 736, 737, 738, 836, 852, 853, 854,
-    855, 856, 1038, 1039, 1040, 1041, 1074, 1075, 1076, 1077,
-];
-
 // Spec: specs/drlg/maze.md §1 (lvlmaze row), §3.3 (pick-shape def), §3.6 + specs/drlg/maze-specials.tsv (special defs), §4–§7 (fixed defs), Constants (lvlprest `Files` +64)
 // Intended claim (unconfirmed until the first local run): specs/drlg/maze.md §1 r1, §3.3 (every def the maze code can name exists in the live lvlprest with Files >= 1)
 #[test]
@@ -315,7 +309,7 @@ fn maze_defs_exist_in_live_lvlprest() {
             missing.extend(check(r.special, format!("special {k}[{i}]")));
         }
     }
-    for &def in &MAZE_FIXED_DEFS {
+    for &def in MAZE_FIXED_DEFS {
         missing.extend(check(def, "fixed def".to_string()));
     }
     println!(
@@ -594,7 +588,7 @@ const MAZE_LEVEL_TYPES: [u32; 20] = [
 fn defs_without_files(maze: &MazeData, wanted: impl IntoIterator<Item = u32>) -> Vec<u32> {
     let bad: BTreeSet<u32> = wanted
         .into_iter()
-        .filter(|&d| maze.prest_files.get(&d).map_or(true, |&f| f < 1))
+        .filter(|&d| maze.prest_files.get(&d).is_none_or(|&f| f < 1))
         .collect();
     bad.into_iter().collect()
 }
