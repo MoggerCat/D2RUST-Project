@@ -624,9 +624,9 @@ Game-file vectors: Open question 1.
 3. Answered (2026-10-07): the unit find `0x0065A950` / `0x0065AC70`
    (rooms, found order, filter) is owned by `monsters/umod-callbacks.md`
    §3.1.
-4. Who calls the FrogDemon and FetishShaman alternates (`ai.md` §3.3
-   re-install while running): the skill or event paths that re-install
-   AIs 52 and 65.
+4. Answered (2026-10-07): `ai.md` §3.3 "When an alternate runs": the
+   curse AI, terror and `0x005D6520` installs over the running think
+   (both rows have `switchai`) run the alternate for one think.
 5. Answered (`docs/handoff/impl-ai-acts2-5.md` reading 3): §5 step
    1.1 with a failed skill check goes on to step 1.2; the cooldown stays
    spent. 1.14d-confirmed (`0x005F72D0`).

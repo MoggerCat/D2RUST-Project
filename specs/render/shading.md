@@ -24,17 +24,17 @@
 |   3. Light map of a cel draw | 110–123 |
 |   4. Light maps of DT1 tile blocks | 124–183 |
 |   5. Selected-unit highlight | 184–199 |
-|   6. Remap tables (`P`) | 200–273 |
-|   7. Mapped index 0 | 274–283 |
-|   8. Tables loaded but not drawn by GDI | 284–295 |
-|   9. Palettes per screen region | 296–301 |
-|   10. d2rs answers | 302–313 |
-| Constants & data dependencies | 314–321 |
-| Randomness | 322–326 |
-| Edge cases & original bugs | 327–334 |
-| Test vectors | 335–361 |
-| Provenance | 362–387 |
-| Open questions | 388–435 |
+|   6. Remap tables (`P`) | 200–291 |
+|   7. Mapped index 0 | 292–301 |
+|   8. Tables loaded but not drawn by GDI | 302–313 |
+|   9. Palettes per screen region | 314–319 |
+|   10. d2rs answers | 320–331 |
+| Constants & data dependencies | 332–339 |
+| Randomness | 340–344 |
+| Edge cases & original bugs | 345–352 |
+| Test vectors | 353–379 |
+| Provenance | 380–405 |
+| Open questions | 406–457 |
 <!-- /index -->
 
 ## Summary
@@ -225,8 +225,26 @@ of each component's `P` is `unit-composite.md` §7; the tables are:
    `0x00600C20` returns no map for `t` = 0, 3, 4 or ≥ 9, or `c` ≥ 21. In
    the world `t` is the item's `Transform` (items `+0x141`); the first
    source of `c` is an active state of the unit with `itemtrans`
-   (states `+0x2C`) < 21 whose `itemtype` (`+0x2A`) the item matches; the
-   remaining cases (by item quality and affixes) are Open question 4.
+   (states `+0x2C`) < 21 whose `itemtype` (`+0x2A`) the item matches
+   (states taken in the order of the list at data tables `+0x18C`, count
+   `+0x190`; this branch always uses `Transform`). Otherwise, by item
+   quality (item data `+0x00`; 2 for a non-item or no data;
+   `0x0062C100`, table `0x0062C57C`), with `inv` the caller's fourth
+   argument (≠ 0: inventory picture, `t` = the item's `InvTrans`
+   `+0x142` instead of `Transform` `+0x141`):
+
+   | Quality | Source of `c` (first hit wins) | None found |
+   |---|---|---|
+   | 4 magic, 6 rare | affix `transformcolor` (affix record `+0x56`, 0xFF = none; record `0x00633EE0`, id 0 → none) of magic suffix slots 0, 1, 2 (item data `+0x3E/+0x40/+0x42`), then prefix slots 0, 1, 2 (`+0x38/+0x3A/+0x3C`), then the automagic affix (`+0x36`) | no map |
+   | 5 set | `setitems` row of the file index (`0x00483440`): `chrtransform` `+0x40`, or `invtransform` `+0x41` when `inv` | no map when the row is missing or the value is negative |
+   | 7 unique | `uniqueitems` row (`0x00483470`): `chrtransform` `+0x38`, or `invtransform` `+0x39` when `inv` | as set |
+   | other (1, 2, 3, 8) | if the item's `hasinv` (items record `+0x137`) ≠ 0, max sockets (`0x0062BC20`) > 0, item flag 0x800 (socketed, item data `+0x18`), and the first item in its inventory (`0x0063B2C0` → `0x0063DFD0`) matches item type 20 (`gem`): that gem's `gems` row (its items record `gemoffset` `+0xF0`, `0x006372C0`) `transform` (`+0x2F`); else the automagic affix as above | no map |
+
+   Every branch that finds `c` (except the state branch) also writes a
+   byte to the caller's third argument: `(Transform << 5) + (c & 0x1F)`
+   when 1 ≤ `Transform` ≤ 8 and `c` ≤ 20, else 0 (`0x0062A250`; always
+   computed from `Transform` and the world value of `c`, even when
+   `inv`). The map is then `0x00600C20(t, c)`.
 5. **Text color** `k`: `ui/text.md` §4.
 6. **Monster palette shift index** `s` (gfx `+0x38`, read by
    `0x0046F250` through `0x00463EB0`; gfx `+0x34` gets the same value).
@@ -396,6 +414,10 @@ from the file; shift index writers `0x0046EBB0`, `0x0046F220` (from
 4. Item color `c` beyond the state rule: the quality / affix branches of
    `0x0062C100` (`colors.txt` codes in magic, unique and set rows). Ghidra
    read; a capture of a colored item on the ground.
+   *Answered* (static, asm of `0x0062C100`, `0x0062A250`; table
+   `0x0062C57C` read from the file image; item type 20 = `gem` in
+   `itemtypes.txt`): §6 r4 table. A capture of a colored item on the
+   ground remains the conformance check.
 5. Readers of the darkened shift (block `+0x110`) and of `R` (`+0x11C`)
    outside the GDI cel and tile paths (D2Win, automap, UI). Ghidra xref
    on `[0x007C9150]` users.

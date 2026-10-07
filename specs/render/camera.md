@@ -25,17 +25,17 @@
 |   3. Camera origins (once per drawn frame) | 118–133 |
 |   4. Units | 134–152 |
 |   5. Panel shift for floors | 153–158 |
-|   6. Tiles | 159–182 |
-|   7. View culling | 183–216 |
-|   8. Screen shake | 217–248 |
-|   9. Time base: no interpolation | 249–275 |
-|   10. What d2rs hooks get | 276–284 |
-| Constants & data dependencies | 285–291 |
-| Randomness | 292–297 |
-| Edge cases & original bugs | 298–307 |
-| Test vectors | 308–329 |
-| Provenance | 330–348 |
-| Open questions | 349–392 |
+|   6. Tiles | 159–191 |
+|   7. View culling | 192–225 |
+|   8. Screen shake | 226–257 |
+|   9. Time base: no interpolation | 258–284 |
+|   10. What d2rs hooks get | 285–293 |
+| Constants & data dependencies | 294–300 |
+| Randomness | 301–306 |
+| Edge cases & original bugs | 307–316 |
+| Test vectors | 317–338 |
+| Provenance | 339–358 |
+| Open questions | 359–404 |
 <!-- /index -->
 
 ## Summary
@@ -164,7 +164,16 @@ With `left` from §1 and `top = 0`, tile cell `(tx, ty)` is drawn at:
 |---|---|---|---|
 | floors | `0x004DE730` → `0x004DE410` → `DrawGroundTile 0x004F68E0` (driver slot `+0x7C`: floor drawer, DirectDraw `0x005132C0`, GDI `0x006C95D0`) | `(sx − cx_t, sy − cy_t)` | `(sx − 80 + bx − cx_t + left, sy + by − cy_t)` |
 | walls (wall-layer list) | `0x004DF1C0` → `DrawWallTile 0x004F6920` (slot `+0x9C`: wall drawer, DirectDraw `0x005131B0`, GDI `0x006C94B0`) / translucent `0x004F6950` (slot `+0xA0`, DirectDraw `0x005130A0`, GDI `0x006C93A0`) | `(sx − 80 − cx_t + left, sy + 80 − cy_t + top)` | `(sx − 80 + bx − cx_t + left, sy + 80 + by − cy_t)` |
+| shadow tiles (shadow pass kind 1) | `0x004DF510` → `0x004F6980` (slot `+0xA4`, GDI `0x006C9290`) | as walls: `(sx − 80 − cx_t + left, sy + 80 − cy_t + top)` | as walls |
 | roofs (fading list) | `0x004DEA70` → `DrawGroundTile 0x004F68E0` (the floor drawer, as floors) | `(sx − cx_t, sy − roof_height − cy_t)` | `(sx − 80 + bx − cx_t + left, sy − roof_height + by − cy_t)` |
+
+Shadow tiles take the wall position by the same expression: in GDI
+(`0x004F51D0` = 0) `0x004DF5C6`–`0x004DF5D8` add the view offsets to the
+tile record's +0x00 / +0x04 exactly as the wall walk does
+(`0x004DF145`–`0x004DF156`); with a 3D renderer both pass the list
+item's own +0x04 / +0x08. The GDI drawer places block `i` at (X + block
+x, Y + block y) (s16 pair at block +0x00 / +0x02), as the wall drawer
+`0x006C94B0`.
 
 Roofs go through the floor drawer (`0x004DEA70` calls `0x004F68E0`
 only), so they take its −80 and panel shift (§5) and its whole-tile
@@ -329,7 +338,8 @@ not touch server RNG.
 
 ## Provenance
 
-1.14d `Game.exe`: draw frame `0x0044C990`, client loop `0x0044EFA0`,
+1.14d `Game.exe`: shadow tiles `0x004DF510`/`0x004F51D0`/`0x006C9290`;
+draw frame `0x0044C990`, client loop `0x0044EFA0`,
 view `0x00476000`/`0x00476070`/`0x004760A0`, open mode `0x0045AEA0`,
 unit origin `0x0045B440`, unit draw `0x00471EC0`/`0x004DC7B0`, tile lists
 `0x004DE730`/`0x004DE410`/`0x004DF1C0`/`0x004DEA70`, tile entries
@@ -364,8 +374,10 @@ by the `frames-raw-1` capture runs (`capture.md` Test vectors).
    unit's client motion record (gfx +0x30, `0x0046F060`; 0 without one),
    and missiles add `missiles` xoffset / yoffset + zoffset (+0xA2/+0xA4/
    +0xA6). §4 now links there.
-4. Shadows (orientation 13 list, `0x004DF510`): their (X, Y). Owner
-   `draw-order.md`; Ghidra read of `0x004DF510`/`0x004DEF80`.
+4. *Answered* (static, asm of `0x004DF510`, `0x004DEF80`, `0x006C9290`):
+   §6 shadow-tile row, the wall position and wall block placement.
+   Shadow pass kind 0 / 2 units are placed as units (§4,
+   `render/blend-modes.md` §5).
 5. The client update between server tick and draw (`0x0044C790`): confirm
    that unit path positions advance exactly once per tick there (Ghidra
    read), so a capture's state equals the server state after the same

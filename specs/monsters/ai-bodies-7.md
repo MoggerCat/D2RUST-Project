@@ -53,14 +53,14 @@
 |   23. GenericSpawner (129) `0x005E61B0`, init `0x005E6190` | 565–593 |
 |   24. Wussie (131) `0x005EE3C0` | 594–621 |
 |   25. UberIzual (144) `0x005F8C80` | 622–637 |
-|   26. UberBaal (145), UberMephisto (146), UberDiablo (147) | 638–651 |
-|   27. ShadowMaster (106) `0x005EB970`, init `0x005EB490`; ShadowMasterNoInit (143), init `0x005EB5C0` | 652–786 |
-| Constants & data dependencies | 787–809 |
-| Randomness | 810–817 |
-| Edge cases & original bugs | 818–834 |
-| Test vectors | 835–852 |
-| Provenance | 853–876 |
-| Open questions | 877–886 |
+|   26. UberBaal (145), UberMephisto (146), UberDiablo (147) | 638–690 |
+|   27. ShadowMaster (106) `0x005EB970`, init `0x005EB490`; ShadowMasterNoInit (143), init `0x005EB5C0` | 691–825 |
+| Constants & data dependencies | 826–848 |
+| Randomness | 849–856 |
+| Edge cases & original bugs | 857–873 |
+| Test vectors | 874–891 |
+| Provenance | 892–923 |
+| Open questions | 924–935 |
 <!-- /index -->
 
 ## Summary
@@ -643,11 +643,50 @@ reconstructs full bodies for these addresses; the 1.14d bytes are `ret
 4` followed by padding.) The table gives UberBaal BaalCrab's alternate
 (`0x005FCF30`, `ai-bodies-5.md` §21) and UberDiablo Diablo's
 (`0x005E8480`, `ai-bodies-4.md` §7); they run only on a re-install
-over the running AI (`ai.md` §3.3). What drives these monsters in play
-is Open question 2. `0x005E9DD0` (a summon of class 711 demonhole
-around a unit through `0x005B23C0`) sits beside the UberDiablo stub
-with no caller found. 1.14d-confirmed (bytes at the three addresses,
-AI table `0x0073CA18` records 145–147).
+over the running AI (`ai.md` §3.3). 1.14d-confirmed (bytes at the
+three addresses, AI table `0x0073CA18` records 145–147; `monstats.bin`
+of `patch_d2` gives rows 704, 705, 709 the AI 146, 147, 145).
+
+**No other driver.** Nothing in 1.14d replaces these thinks:
+
+- The AI table is read only by the lookup `0x005B15D0` (by the
+  monster data's monstats row +0x1E); no code writes an AI function
+  pointer as a constant, and every `0x005B0E00` call site installs a
+  special state (`ai.md` §3.3) that the three rows (no `switchai`)
+  resolve back to their base record.
+- Boss mods `0x005B1CF0` (`monsters/init.md` §14.2) give only umods:
+  704 ubermephisto {22, 30, 17, 8, 6}, 705 uberdiablo {22, 8, 6}, 709
+  uberbaal {22, 18, 8, 6} (questcomplete, aura, lightning, resist,
+  fast, cold). None installs an AI or teleport (umod 26), and the umod
+  callbacks act on mode sets and event 7 only (`umod-callbacks.md`).
+- Monster event 7 (`0x005A4370`) is the umod event; the Pandemonium
+  room code `0x005559A0` only places presets (`population.md` §11.1);
+  the uber death handler `0x005E0070` (umod 22, game +0x1DE8 / +0x1DEC
+  / +0x1DF0, the torch drop) runs at death.
+- The 1.11 uber helpers survive without callers: minion summons
+  `0x005F7F10` (Mephisto), `0x005E9DD0` (Diablo's demonhole),
+  `0x005FD0F0` (Baal), the uber-minion target pick `0x005F8010` and the
+  scan callback `0x005DD140` that counts ubers and their minions near a
+  unit. No pointer to them exists in the file.
+
+**Resulting behaviour in 1.14d** (a rule, not a guess: it follows from
+the dispatcher, `ai.md` §2, with an empty AI function). Each think runs
+the prechecks: stun idles 3; the door check (`opendoors` = 1) needs a
+blocked path, which never exists since the AI starts no move; target
+mode 1 finds a target or schedules by distance (`ai.md` §2.3; with AI
+state 3/19 and no target it wanders 5); with a target, precheck C plays
+the boss sound once (all three are `boss`) and idles 20; no teleport
+(no umod 26), no special walk (`isMelee` 0). After that, a think with a
+target returns from the stub with **nothing scheduled**, so the
+monster stands until something else schedules a think: a mode end
+(gethit, knockback, block; then `aidel`, in Hell 6 / 12 / 12 for
+Mephisto / Diablo / Baal), the end of a
+freeze, a player entering its room while it is neutral (+2), or an
+install over the running think (UberBaal and UberDiablo then run their
+alternate for one think: command 10 kept, state 12 off, idle 1). They
+never start an attack or a skill from AI code; their aura (umod 30)
+and umod effects still work; the AI never casts `Skill8`. 1.14d-confirmed by
+the reads above; the recording check is Open question 2.
 
 ### 27. ShadowMaster (106) `0x005EB970`, init `0x005EB490`; ShadowMasterNoInit (143), init `0x005EB5C0`
 
@@ -869,6 +908,14 @@ Game-file vectors: Open question 1.
   from the file; jump tables `0x005EC634`, `0x005EC650`, `0x005EC660`
   read from the file. Decompiler text read first; every call's register and
   stack arguments checked in the disassembly (`tools/ghidra/disasm.py`).
+- §26 driver search (2026-10-07): AI table records 145–147 dumped;
+  readers of `0x0073CA18` / `0x0073D358` (only `0x005B15D0`); the 33
+  `0x005B0E00` call sites; `0x005B1CF0` boss-mod cases 0x2C0 / 0x2C1 /
+  0x2C5; `0x005A4370`; `0x005559A0`; `0x005E0070`; every
+  `cmp`/`push` of 0x2C0, 0x2C1, 0x2C5 in `all.asm`; no-reference checks
+  of `0x005F7F10`, `0x005F8010`, `0x005E9DD0`, `0x005FD0F0`,
+  `0x005DD140` (rel32 and 4-byte pointer scans); `monstats.bin`
+  (`patch_d2`) AI words of rows 704–709.
 - Live data (`patch_d2`): monstats.txt (`AI`, `aip*`, skills, missiles),
   skills.txt (rows named) — read by a throwaway script (scratch, not
   committed).
@@ -879,7 +926,9 @@ Game-file vectors: Open question 1.
 1. No recording covers any AI of this file: record traps, the Act II
    palace, the Dark Wanderer and the Ubers (tick recorder) and compare
    think schedules and draws.
-2. Uber Mephisto, Diablo and Baal have empty think functions in 1.14d
-   (§26): find what drives them (a special-state install, a quest or
-   event callback of the Uber Tristram code, or a different AI index
-   at spawn) — record an Uber Tristram run with AI think logging.
+2. Answered statically (2026-10-07): nothing drives them; §26 "No
+   other driver" lists what was read (AI table readers, every
+   `0x005B0E00` site, boss mods, umods, event 7, the Pandemonium room
+   code, the orphaned 1.11 helpers) and "Resulting behaviour" gives the
+   rule. Left as a check, not a question: an Uber Tristram recording
+   (PC 2 list) should show no AI-started attack or skill mode.

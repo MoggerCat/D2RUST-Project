@@ -29,13 +29,13 @@
 |   4. Mana cost | 301–340 |
 |   5. To-hit | 341–348 |
 |   6. Learning a skill | 349–382 |
-|   7. Skill stat callbacks | 383–469 |
-| Constants & data dependencies | 470–492 |
-| Randomness | 493–504 |
-| Edge cases & original bugs | 505–527 |
-| Test vectors | 528–570 |
-| Provenance | 571–601 |
-| Open questions | 602–636 |
+|   7. Skill stat callbacks | 383–542 |
+| Constants & data dependencies | 543–565 |
+| Randomness | 566–577 |
+| Edge cases & original bugs | 578–600 |
+| Test vectors | 601–652 |
+| Provenance | 653–689 |
+| Open questions | 690–721 |
 <!-- /index -->
 
 ## Summary
@@ -384,9 +384,11 @@ success returns 0. The dispatcher ignores the result
 
 The server stat callback `0x0055B800` (`sim/stat-lists.md` §7.2) runs,
 for these stats, a skill or state handler (jump table `0x0055BDD8`,
-index bytes `0x0055BE04`, by stat − 7). Arguments: ECX game, EDX unit,
-the stat id with its layer (low 16 bits = layer), old and new value.
-The handlers do not test new ≠ old.
+index bytes `0x0055BE04`, by stat − 7). Arguments: ECX game, EDX unit
+(the list's owner), the propagation unit I (`sim/stat-lists.md` §7.1;
+the item whose stats propagate, or none), the stat id with its layer
+(low 16 bits = layer), old and new value. G := I's GUID (unit +0x0C),
+0 when there is no I. The handlers do not test new ≠ old.
 
 | Stat | Handler |
 |---|---|
@@ -394,8 +396,8 @@ The handlers do not test new ≠ old.
 | 83 `item_addclassskills`, 188 `item_addskill_tab` | §7.2 |
 | 126 `item_elemskill`, 127 `item_allskills` | refresh all (§7.2) |
 | 98 `state` | §7.3 |
-| 151 `item_aura` | `0x005BF510` (new ≠ 0) / `0x005BF5D0` (new = 0); Open question 10 |
-| 204 `item_charged_skill` | `0x00647320` through `0x00647530`; Open question 10 |
+| 151 `item_aura` | §7.5 |
+| 204 `item_charged_skill` | §7.6 |
 
 #### 7.1 Oskill entries (stats 97, 107)
 
@@ -466,6 +468,77 @@ P's skill list is built after loading (`0x00613F80`, at `0x00617BB2`):
 every `skills` row in id order whose `pettype` p is in 0…count − 1 is
 appended to row p's list while it holds fewer than 15. In 1.14d
 `pettype.bin` leaves these bytes unwritten (`data/tables.tsv`).
+
+#### 7.5 Item auras (stat 151)
+
+s = the layer, L = new. New ≠ 0 → aura on `0x005BF510(game, unit, G,
+s, L)`; new = 0 → aura off `0x005BF5D0(game, unit, G, s)`. Both do
+nothing unless: unit present; s in 0…skills count − 1 with a record;
+s has `aura` (flags bit 5, mask byte `0x006CE27C`); its `aurastate`
+(i16 +0x80) is in 0…states count − 1.
+
+**On:**
+1. Cancel the unit's type-9 timers whose arg1 is G, all type-9 timers
+   when G = 0 (`0x00540E60(unit, 9, G)`, `sim/tick.md` §5.4).
+2. Schedule a type-9 timer (arg1 G, arg2 s) at `period(s, L)`
+   (`0x0056CD50`, `use.md` §7; `0x005417D0`, `sim/tick.md` §5.2). Its
+   handler re-applies the aura each period (`sim/stat-lists.md` §10.3).
+3. s has `immediate` (flags bit 15, mask byte `0x006CE284`): do core
+   `0x0056F7F0(game, unit, s, L, charge 1, item 1, aim 0)` (`use.md`
+   §5.4) now.
+
+**Off:**
+1. State `aurastate` off (`0x00639DB0(unit, state, 0)`); its state list
+   (`0x006256B0`), if any, detached and freed (`0x006277E0`,
+   `0x00626CD0`; `sim/stat-lists.md` §8.2, §8.3).
+2. Cancel type-9 timers as in On step 1.
+
+Consequences: a level change (new ≠ 0 after new ≠ 0) restarts the
+period and, for `immediate` skills, re-applies at once. Two items with
+the same aura: removing one turns the state off and cancels only its
+own timer; the other's timer re-applies at its next period (total of
+151 still > 0). A null I (G = 0) cancels every type-9 timer of the unit.
+
+1.14d data: 26 `skills.txt` rows have `aura`; 10 also `immediate`
+(Might, Resist Fire, Defiance, Resist Cold, Blessed Aim, Resist
+Lightning, Concentration, Vigor, Fanaticism, Salvation). Sword, Axe
+and Mace Mastery have `aura` but no `aurastate`: the handler ignores
+them. Oak Sage, Wolverine and Barbs Aura have no `perdelay`: period 5.
+
+#### 7.6 Item charged skills (stat 204)
+
+Needs I present; otherwise nothing. s = layer >> shift, l = layer &
+mask (shift, mask: data +0xC6C / +0xC70; `items/properties.md` §5 rule
+9). c := (I's own total of 204 at this layer (`0x00625480(I, 204,
+layer)`)) & 0xFF: the current charges. The value argument is not read.
+
+1. c > 0 and I's stats are attached to the unit (`0x00625820(I)`: I's
+   list's parent is extended and owned by the unit): **set charges**
+   (unit, G, s, l, c).
+2. Else: **remove charges** (unit, G, s, l), then the pet maximum of s
+   (§7.4).
+
+`0x00647320(unit, G, s, l, c, remove)` (also via `0x00647530`). Does
+nothing unless: unit is a player (type 0); l > 0; s in 0…count − 1
+with a record; the unit has a skill list. Entries match on skill and
+owner GUID (+0x34) = G; the level is not compared.
+
+- **Set** (remove = 0): the first matching entry in list order gets
+  base (+0x28) := l, charges (+0x38) := c, has-charges (+0x3C) := 1.
+  None: a new 0x40-byte zeroed entry, skill s, mode := `anim` when it
+  is 7 A1, 8 A2, 10 SC, 11 TH or 18 SQ, else 10 SC (jump table
+  `0x00647518`, index bytes `0x00647520`); base l, charges c,
+  has-charges 1, owner G; appended at the tail.
+- **Remove** (remove = 1): old left / right read first. Left has skill s
+  and owner G → left := Attack (skill 0, owner −1, `0x00643BC0`). Right
+  has skill s and owner G → right := Attack (`0x00643C50`). Current
+  skill (+0x10) has skill s (owner not compared) → current := none.
+  Then the first matching entry is unlinked and freed.
+
+Neither path turns passive states on or off, refreshes (`0x00646D60`)
+or sends a message. Monsters and hirelings never get charge entries.
+A charge used up (current 0) removes the entry, and the selected
+left / right falls back to Attack.
 
 ## Constants & data dependencies
 
@@ -564,6 +637,15 @@ pt (11,520), c = 1,280 → 10,240, kept (not below), 1; c = 1,536 →
 9,984 < 10,240, curse removed, 1; life 4 pt (1,024), c = 1,280 → curse
 removed, base life := 256, 0.
 
+Synthetic stat callbacks (§7.5, §7.6; 1.14d `skills.txt` rows): item
+GUID 7 gives 151 Might (98) = 5 at frame 1000 → type-9 timers with arg1
+7 cancelled, a type-9 timer (7, 98) at frame 1001 (`perdelay` 50:
+((1000 + 49) / 50) × 50 + 1), do core now (`immediate`); the same with
+Prayer (99) → timer only, no do. 204 on GUID 7 with layer (54 << shift)
++ 3 and item value 0x0F0A (max 15, current 10), item attached → entry
+(Teleport, owner 7) base 3, charges 10, has-charges 1; value 0x0F00 →
+entry removed, left / right on it → Attack. A monster owner → no entry.
+
 Mechanical check (M05, to add with the code): `skillcalc.tsv` and
 `misscalc.tsv` index/code columns equal the 1.14d `skillcalc.bin` /
 `misscalc.bin` code order (`data/calc-expressions.md` §5).
@@ -591,6 +673,12 @@ Mechanical check (M05, to add with the code): `skillcalc.tsv` and
   `0x0056C0CA`, `0x0056C131`); 1.14d `skills.txt` row Blood Mana (310):
   `auratargetstate` `blood_mana`, `Param5` 40; `states.txt` row 114
   `blood_mana` is referenced by no other skill row.
+- §7.5 read from `0x005BF510`, `0x005BF5D0`, `0x00540E60`; §7.6 from
+  `0x0055BCF9`–`0x0055BD7B`, `0x00625820`, `0x00647320` (jump table
+  `0x00647518` / `0x00647520` decoded from the image); flag masks from
+  the bit table at `0x006CE268` (bit n at +4n) and `data/fields.tsv`
+  (`aura` bit 5, `immediate` bit 15); counts from 1.14d `patch_d2`
+  `skills.txt`.
 - §7 read from `0x0055B800` (jump table decoded from the image),
   `0x0056DFA0`, `0x0056C740`, `0x0056BD90`, `0x00617BB2`–`0x00617C17`;
   §1 cap from `0x00613D30` (strings `experience`, `ExpRatio` in the
@@ -615,12 +703,12 @@ Mechanical check (M05, to add with the code): `skillcalc.tsv` and
    `range` i8 +0x14; no direct caller in the export); the effective
    range used by the game is `0x00645460(unit, entry)` (`skills/use.md`
    §3 step 6: value 3 resolves to 1 or 2).
-7. Partly answered: `0x00625EF0` / `0x00625E60` are specified in §3.3;
+7. Answered: `0x00625EF0` / `0x00625E60` are specified in §3.3;
    `0x0063D340` (grip / wield type) is owned by
-   `render/unit-composite.md` and `combat/damage.md`. Open:
-   `0x00623990(unit, 0)` (the weapon a skill uses: skill weapon kind
-   via `0x00644140` +0x168, hands 4 / 5 through `0x0063C050`, item type
-   45 tests `0x00629BB0`, `0x0062A4E0`): owner `items/inventory.md`.
+   `render/unit-composite.md` and `combat/damage.md`; the attack weapon
+   `0x00623990(unit, flag)` (by the skill's `weapsel` +0x168) is
+   `sim/units.md` §4.7, with the dual-wield stat toggle `0x00623C80`
+   and the frame bonus `0x00623B10` there.
 8. Answered: blood-mana life payment `0x005D2B60` is specified in §4
    (`pay_with_life`).
 9. Answered: no 1.14d user has `b < a`. `skills.txt` uses dm 86 times
@@ -628,8 +716,5 @@ Mechanical check (M05, to add with the code): `skillcalc.tsv` and
    all with `Param_b ≥ Param_a`; no 1.14d `missiles.txt` calc uses a
    missile DM (sd12, sd34, cd12, cd34, shd1, chd1, dd12). The
    overshoot stays reproduced for mod data.
-10. Stat callbacks 151 `item_aura` (`0x005BF510` / `0x005BF5D0`: aura
-    state of the skill's `aurastate` (+0x80), unit events of type 9,
-    `0x0056CD50`, `0x0056F7F0`) and 204 `item_charged_skill`
-    (`0x00647320`: item-owned entries with charges +0x38 and the flag
-    +0x3C) are not specified yet (§7); static, next skills batch.
+10. Answered: stat 151 `item_aura` is §7.5, stat 204
+    `item_charged_skill` is §7.6.

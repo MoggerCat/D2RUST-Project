@@ -30,14 +30,14 @@
 |   1. Creation values | 73–95 |
 |   2. Spending stat points (message 0x3A) | 96–133 |
 |   3. Level-up `0x00570880` (D2MOO `PLAYERSTATS_LevelUp`) | 134–155 |
-|   4. Experience | 156–195 |
-|   5. Client vitals sync (`0x00548760`) | 196–307 |
-| Constants & data dependencies | 308–324 |
-| Randomness | 325–328 |
-| Edge cases & original bugs | 329–340 |
-| Test vectors | 341–361 |
-| Provenance | 362–382 |
-| Open questions | 383–411 |
+|   4. Experience | 156–288 |
+|   5. Client vitals sync (`0x00548760`) | 289–400 |
+| Constants & data dependencies | 401–417 |
+| Randomness | 418–421 |
+| Edge cases & original bugs | 422–433 |
+| Test vectors | 434–454 |
+| Provenance | 455–481 |
+| Open questions | 482–510 |
 <!-- /index -->
 
 ## Summary
@@ -91,7 +91,7 @@ Then, if `act > 0` (and `act <` the table count 5 at `0x007326B4`,
 else index 0): raise experience to the target level of table
 `0x006E1520` {1, 15, 20, 26, 32} by index `act` (`0x0057EB10`, D2MOO
 `SUNITDMG_SetExperienceForTargetLevel`: add `threshold(class, target) −
-experience` if positive, through §4.3, which levels up).
+experience` if positive, through the add §4.5, which levels up).
 
 ### 2. Spending stat points (message 0x3A)
 
@@ -150,8 +150,8 @@ quest reward) belong to the quests spec.
    0x00570850)`, `0x0055F500`, `0x0055FDE0(…, 1)` (client updates),
    host callback `[0x00883D50]+0x2C` if present.
 
-The caller of level-up (§4.3) triggers unit event 12 (`levelup`) after
-it (D2MOO; Open question 2).
+The caller of level-up (the add, §4.5) triggers unit event 12 (`levelup`) after
+it (`0x0057E58A`).
 
 ### 4. Experience
 
@@ -177,21 +177,114 @@ alvl, 10)]`, `T2` (`0x006E1694`) = 256, 256, 256, 256, 256, 256, 225,
 174, 92, 38, 5. Result `f = 256` → `exp`; else `pct(exp, f, 256)`
 (`combat/damage.md` §0). Signed comparisons.
 
-#### 4.3 Gain on a kill (D2MOO structure, partly confirmed)
+#### 4.3 Gain `0x0057E480`
 
-`0x0057E480` (D2MOO `SUNITDMG_ComputeExperienceGain`) calls §4.2 with
-the defender's base experience and both levels; D2MOO then applies the
-`ExpRatio` column of the attacker's level, `item_addexperience` (stat
-85) as a percent, and for hirelings a cap from `hireling.txt`. The kill
-path (D2MOO `SUNITDMG_DistributeExperience`: pets and minions credit
-their player owner; a hireling gets 86/256 when it did not land the
-kill; a party of `n` members within 80 units (squared distance 6400)
-shares `exp + 89 × exp × (n − 1) / 256` in proportion to member levels,
-using floating point) and the add function (D2MOO
-`SUNITDMG_AddExperienceForPlayer`: cap at `threshold(class, max_level −
-1)`, set `lastexp(29)`, level-up §3 and event 12 when the level changes)
-are not yet confirmed in 1.14d (Open question 2). The party share's
-float arithmetic must be reproduced exactly once confirmed.
+Registers: EAX experience e, EBX gainer U, EDI attacker level alvl;
+stack game, defender level dlvl. Returns the gain.
+
+1. e > 0x7FFFFF → e := 0x7FFFFF; else e ≤ 0 → return 1.
+2. alvl ≥ `max_level(class)` (U's class when U is a player, else class
+   0; §4.1) → 0.
+3. g := level factor(e, alvl, dlvl) (§4.2).
+4. `ExpRatio` step `0x0057E390(g, alvl)`: ratio(L) = `0x00613E60(L)`:
+   no table → 0; L < 1 → the `MaxLvl` row's `ExpRatio`; 1 ≤ L ≤ that
+   row's class-0 value (99) → the `ExpRatio` of level L (table word 8·L
+   + 15); above → 0. g ≤ 0 → unchanged. r := ratio(alvl), s :=
+   ratio(0) (10 in 1.14d); s − 1 ≥ 31 unsigned → unchanged. limit :=
+   0x7FFFFFFF >> (((r >> s) + s) & 31); g > limit (signed) → (g >> s)
+   · r; else (r · g) >> s (32-bit signed, arithmetic shifts). Live
+   `ExpRatio`: 1024 for levels 0–69, −48 per level to 256 at 85, then
+   192, 144, 108, 81, 61, 46, 35, 26, 20, 15, 11, 8, 6, 5 (86–99).
+   Players and hirelings alike (`world/hirelings.md` §7.2 rule 3).
+5. x := U's total `item_addexperience` (85); x ≠ 0 → g += pct(g, x,
+   100) (`combat/damage.md` §0).
+6. Cap `0x0057E3F0(U, alvl, game, g)`: U a player → g. Otherwise U's
+   owner (`0x0058F0D0`) must be a player with a pet node for U and a
+   hireling row: g := min(g, (threshold(alvl + 1) − threshold(alvl))
+   >> 6) (unsigned; `world/hirelings.md` §7.2 rule 4); no such owner,
+   node or row → 0.
+
+#### 4.4 Distribution on a kill `0x0057E990(game, attacker A, defender D)`
+
+Called by the kill (`combat/damage.md` §7.2 step 2) when D lacks unit
+flag 0x04000000. Stats here are **base** reads (`0x006253B0`) unless
+marked total.
+
+1. A or D none, or A neither player nor monster → nothing. e := D's
+   experience (13) ≤ 0 → nothing.
+2. Credited player P (`0x0057E7B0`): A a player → A. A a monster: P :=
+   A's owner (`0x0058F0D0`); then a stat list with flag 0x800
+   (`0x00625760`) is looked up on A (when A has a stat holder) and then
+   on D (when D has one; D's result replaces A's, even when none); a
+   list found → P := the unit of that list's owner type and GUID
+   (`0x00552F60`). P must be a player, else nothing.
+3. dl := D's level (12). Hireling H of P (`0x00574EC0(game, P, 7,
+   0)`): g := gain(e, U = H, alvl = H's level, dlvl = dl); A ≠ H → g :=
+   g · 86 / 256 (signed, toward zero); add to H (`0x0057E860`,
+   `world/hirelings.md` §7.3).
+4. pl := P's level (12). P in a party (`0x00554630(P)` ≠ 0xFFFF) →
+   party share (rule 6) with (e, D, pl, dl). Else g := gain(e, P, pl,
+   dl); add(P, pl, g) (§4.5).
+5. The hireling share does not reduce the player's.
+6. **Party share** `0x0057E6C0`: members are collected in order by
+   `0x005405A0(game, P, cb, ctx)`: P without a room or without a party
+   → P only; else each party member (`0x00540290` list, GUID →
+   player) whose room's level (`0x0061A1B0`) equals P's. The callback
+   `0x0057E5A0` skips a dead member (`0x005541B0`); with D, it skips a
+   member when D's x or the member's x is 0, or when (Δx² + Δy²) >
+   6400 (unsigned; positions from the static or dynamic path); a 9th
+   member is fatal (assert 0xF25). Each kept member i stores the unit,
+   L_i := its **total** level (12), and adds L_i to S. n := count.
+   - n ≤ 0 or S ≤ 0 → nothing.
+   - n = 1 → g := gain(e, **P**, pl, dl); add(P, pl, g) (P, not the
+     counted member).
+   - n ≥ 2: t := e + ((n − 1) · e · 89) / 256 (32-bit signed, toward
+     zero). q := t / S as x87 `fild`/`fidiv` stored to a float32. For
+     each member in order: share := L_i × q (x87 `fild` L_i × float32
+     q) truncated toward zero by `0x00682FD0`; g := gain(share, member,
+     L_i, dl); add(member, L_i, g).
+
+#### 4.5 Add `0x0057E510(game, level L0, gain g)` (ESI = player U)
+
+U none or not a player → nothing. old := U's experience (13, base);
+new := old + g (32-bit); cap := threshold(class, max_level(class) − 1)
+(§4.1); new > cap (unsigned) → cap. Stat 29 (`lastexp`) := new − old;
+stat 13 := new. `level_from_exp(class, new)` ≠ L0 → level-up §3
+(`0x00570880`) and unit event 12 (`0x005C0C30(game, 12, U, 0, 0)`).
+
+#### 4.6 Death penalties `0x00535AB0(game, player P, killer K)`
+
+Caller `0x00580F59` (player death). In order:
+
+1. **Gold** `0x005357D0` (ESI P; game, K). L := level (12, total), gi
+   := gold (14), gs := goldbank (15) (totals), T := gi + gs. q :=
+   (min(L, 20) × T) / 100 (signed, toward zero); keep := T − q; base :=
+   L × 500. pvp := K present, K ≠ P, and K a player or a monster whose
+   owner is a player.
+   - Game type (game +0x6A) = 3 (the value on every tick of the
+     single-player traces, `sim/intents-events.md`): keep < base → q :=
+     max(T − base, 0). Then q := min(q, gi).
+   - pvp, q > gi (other game types only): stat 15 := gs − (q − gi) (0
+     when < 0 or above the stash limit `0x00623460`); stat 14 := q (0
+     when < 0 or above the gold limit `0x00622E70`). Then (pvp, any q)
+     drop q gold (`0x00535510(game, P, P's GUID, q)`,
+     `items/inventory.md` §7.22).
+   - Not pvp, q ≤ gi: drop gi − q gold the same way; then stat 14 := 0.
+     Not pvp, q > gi (other game types only): stat 15 := gs − (q − gi)
+     with the same clamps; stat 14 := 0.
+   - Finally stat 175 (`goldlost`) := q (0 when q < 0).
+2. **Experience** `0x005359F0`, skipped when K is a player or a
+   monster owned by a player: c := P's class, L := level (total); L ≤ 1
+   → nothing. lo := threshold(c, L − 1), hi := threshold(c, L); x :=
+   experience (13, total); loss := (`DeathExpPenalty` × (hi − lo)) /
+   100 (32-bit unsigned product and division; `difficultylevels` +0x04
+   of the game's difficulty: 0 / 5 / 10). loss = 0 → nothing. new := x
+   − loss; new ≤ lo (unsigned) → loss := max(x − lo, 0) (signed), new
+   := lo + 1. Message `0x005391E0(client, loss)` to P's client
+   (`0x005531C0`); stat 13 := new.
+
+So a death never lowers the level: experience stops at the level's
+first point plus one.
 
 ### 5. Client vitals sync (`0x00548760`)
 
@@ -361,6 +454,12 @@ stat points: three spends succeed, the fourth fails, result 2.
 
 ## Provenance
 
+- §4.3–§4.6: `0x0057E480`, `0x0057E390`, `0x00613E60`, `0x0057E3F0`,
+  `0x0057E2F0`, `0x0057E990`, `0x0057E7B0`, `0x0057E6C0`, `0x0057E5A0`,
+  `0x005405A0`, `0x0057E510`, `0x00535AB0`, `0x005357D0`, `0x005359F0`
+  (caller `0x00580F59`); 1.14d `difficultylevels.txt` `DeathExpPenalty`
+  0 / 5 / 10, `experience.txt` `ExpRatio`, `itemstatcost.txt` 29
+  `lastexp`, 175 `goldlost`.
 - 1.14d `Game.exe` disassembly: `0x005706D0`, `0x0054BD10`,
   `0x00570D60` (jump table `0x00570DF8`), `0x00570A80`, `0x00570B60`,
   `0x00570C80`, `0x00570880`, `0x00611800`, `0x00611830`, `0x00611860`,
@@ -385,22 +484,22 @@ stat points: three spends succeed, the fourth fails, result 2.
 1. No trace check. Recording request: hook `0x00570880` entry/exit and
    `0x00570D60` (log stats 4–13 before/after) during a level-up and
    while spending points.
-2. Ghidra request: read `0x0057E480` (experience gain: `ExpRatio`, stat
-   85, hireling cap) and its callers `0x0057E6C0` / `0x0057E990`
-   (distribution, party share with its float math, add function and
-   event 12) against §4.3. The hireling part (86/256 share, 1/64-level
-   cap, 1.14d adds 2·gain) is confirmed in `world/hirelings.md` §7.
-3. §4.2 branch for `dlvl > alvl`: confirm the operand roles of the
-   `pct(exp, alvl, dlvl)` call (the read gives EAX = defender level,
-   EDX = attacker level, ECX = experience).
+2. Answered: §4.3–§4.5 read from `0x0057E480`, `0x0057E390`,
+   `0x0057E3F0`, `0x0057E990`, `0x0057E7B0`, `0x0057E6C0`, `0x0057E5A0`,
+   `0x005405A0`, `0x0057E510`. Open only for the x87 party share: the
+   precision-control word in force (§4.4 rule 6, as
+   `sim/stat-lists.md` open question 1); settle with a party recording
+   (multiplayer, Phase 7).
+3. Answered: `0x0057E2F0` takes ECX = experience, EDX = alvl, EAX =
+   dlvl; for dlvl > alvl ≥ 25 it calls `pct(ECX exp, EDX alvl, stack
+   dlvl)`, i.e. exp × alvl / dlvl as §4.2 states.
 4. `client-messages.tsv` row 0x3A says `stat:u16@1`; the handler reads
    byte +1 as the stat and byte +2 as count − 1.
-5. Monster life, mana, attack rating, defense, damage and experience at
-   spawn (`monstats` + `monlvl`, champion / unique bonuses, player
-   count; D2MOO `D2Common` `Monsters.cpp`, 1.14d `0x0063EFA0` area):
-   owner is the monsters spec; not specified here.
-6. Player death penalties (`DeathExpPenalty`, gold loss) and the stat
-   reset callers: not specified.
+5. Answered: monster stats at spawn are `monsters/init.md` §6–§9,
+   §13 and §19.
+6. Partly answered: death penalties are §4.6. Still open: the stat
+   reset callers (§2) and the layout of the experience-loss message
+   `0x005391E0` (owner `sim/intents-events.md`).
 7. §5.1 rule 4: the setting is answered (registry `PlayerPos`, off in a
    standard install). Still unread, only for `PlayerPos` ≠ 0:
    `0x00537FD0(client, n)` and `0x0053E130`; not needed for

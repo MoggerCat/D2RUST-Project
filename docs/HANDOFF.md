@@ -5130,6 +5130,59 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
   no 0x0A / 0x15 / 0xAC for GUID 1 before it), and the same window at
   the second teleport; one shrine use (any shrine) logging 0x0E / 0x4D
   bytes and the `0x004B9A00` request (id = table +0x10 for the code).
+- `sim/units.md` §4.7 (OQ1, OQ2 answered statically): log unit +0x4C,
+  +0x3C and the §4.2 start index per `anim` record for a player with
+  IAS / FCR / FHR / FBR / FRW items in every mode (dual-wield
+  Assassin or Barbarian, a were-form, Holy Shield block) and for a
+  monster walking, running, attacking, casting and knocked back.
+- `sim/units.md` OQ3: move a player with a hireling following (20
+  history entries of player data +0xA8 per frame, and a town-portal
+  teleport frame).
+- `monsters/init.md` §4.1, §14.3, §26 (OQ4): rng hook with caller
+  addresses during one Act 5 ancient-barbarian spawn (four item
+  creations after the boss mods) and one warping-shrine use (§17 draws
+  on the chosen monster).
+- `sim/pets.md` §10 (OQ3): summon two pet types of one group, then
+  lower a `petmax` skill level (resync trims), and leave the game with
+  a hireling (free path: 0x7A removes).
+- `monsters/ai.md` OQ1 / OQ2 / OQ3 (AI, spec area 1): freeze a monster
+  (cold damage with freeze) and knock back a fallen and a sand leaper;
+  play one Nightmare area; log type-2 schedules (site, frame), timer
+  type 12, state 1 on / off, mode changes. Expect: a think at freeze
+  apply + len + 1 and one at expiry + `aidel` (`0x0057B170`); knockback
+  end +1 / 15 / gethit (`0x005A8520`); Nightmare mode-end delays =
+  `aidel(N)` (zombie1 14).
+- `monsters/ai.md` OQ8 / OQ9 / OQ11 (AI): a town walk clicking NPCs
+  (C→S 0x13, 0x59) and an Act I fight with a fallen shaman; log command
+  4 next to each NPC think, every client message next to type-2
+  schedules, and mode changes of fallens (death end, resurrect).
+- `monsters/ai-bodies-2.md` OQ1 / OQ2, `ai-bodies-3.md` OQ1 / OQ2,
+  `ai-bodies-4.md` OQ1 / OQ2, `ai-bodies-5.md` OQ1 (AI): one run per act
+  II–V (Far Oasis, Arcane Sanctuary, Spider Forest, Durance, Chaos
+  Sanctuary with Diablo, Arreat Summit, Worldstone Chamber); log per
+  think the type-2 schedule, unit-seed steps with caller, mode requests
+  (mode, target, point), AI params 0–2; for vultures, bat demons and
+  frog demons also modes 8–11 / 14 and collision; for Diablo the mode
+  chosen per think with the player's resistances.
+- `monsters/ai-bodies-7.md` OQ2 (AI, refined 2026-10-07): the static
+  read finds no driver for Uber Mephisto / Diablo / Baal (§26). In the
+  Uber Tristram run also log every mode change of the three with its
+  caller and every `0x005B0E00` call on them; expect no attack or skill
+  mode started by AI code (only gethit / knockback / death).
+- `sim/units.md` OQ7 (answered statically 2026-10-07: single player has
+  game +0x6A = 3, so the difficulty's `aidel` column): a Nightmare
+  single-player game; log monster event-2 sets (U10) and check the
+  delay = Nightmare `aidel` (0 → 15).
+- `monsters/init.md` §27: kill a fetish shaman (Act III); log the
+  `0x00574370` call (class 278–282 → 141–145, mode 1) and its rng draws
+  with callers.
+- `combat/events.md` OQ1: items with knockback, freeze, slow,
+  skill-on-hit, damage-to-mana; Energy Shield, Bone Armor, Iron Maiden
+  in play. Log each event function's entry / return (table
+  `0x007325B0` targets), H's seed before / after, and the record.
+- `skills/levels.md` §7.5 / §7.6 (no OQ, unverified): equip an aura
+  item (e.g. Dragon) and a charged item; log `0x005BF510` /
+  `0x00647320` calls and the type-9 timers they schedule.
 
 ## 8. Lessons (problems met, fixes)
 

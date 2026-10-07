@@ -28,22 +28,22 @@
 | Inputs | 68–79 |
 | Outputs / state changes | 80–90 |
 | Rules | 91–92 |
-|   1. Think scheduling | 93–224 |
-|   2. Think dispatch `0x005B1740` | 225–353 |
-|   3. AI control and AI tables | 354–449 |
-|   4. AI parameters | 450–468 |
-|   5. Target selection | 469–551 |
-|   6. Distances and line tests | 552–566 |
-|   7. Tactics helpers | 567–684 |
-|   8. AI commands and minions | 685–709 |
-|   9. Per-AI behaviours | 710–1509 |
-|   10. The catalogue `ai-functions.tsv` | 1510–1530 |
-| Constants & data dependencies | 1531–1554 |
-| Randomness | 1555–1576 |
-| Edge cases & original bugs | 1577–1618 |
-| Test vectors | 1619–1707 |
-| Provenance | 1708–1756 |
-| Open questions | 1757–1829 |
+|   1. Think scheduling | 93–238 |
+|   2. Think dispatch `0x005B1740` | 239–368 |
+|   3. AI control and AI tables | 369–510 |
+|   4. AI parameters | 511–529 |
+|   5. Target selection | 530–655 |
+|   6. Distances and line tests | 656–670 |
+|   7. Tactics helpers | 671–788 |
+|   8. AI commands and minions | 789–813 |
+|   9. Per-AI behaviours | 814–1619 |
+|   10. The catalogue `ai-functions.tsv` | 1620–1640 |
+| Constants & data dependencies | 1641–1664 |
+| Randomness | 1665–1686 |
+| Edge cases & original bugs | 1687–1728 |
+| Test vectors | 1729–1817 |
+| Provenance | 1818–1874 |
+| Open questions | 1875–1978 |
 <!-- /index -->
 
 ## Summary
@@ -99,8 +99,22 @@ args 0, 0, default handler. The monster class handler `0x005A7F80`
 dispatches it to `0x005B1740` through table `0x006E2490` entry 2, but
 drops it without running when the monster has state 1 (D2MOO
 `STATE_FREEZE`) and is not dead (`0x005541B0`); `tick.md` §5.6. A dropped
-think is not rescheduled by the dispatcher: the frozen monster's next
-think comes from whoever ends the freeze (open question 1).
+think is not rescheduled by the dispatcher. The freeze itself schedules
+the next think twice:
+
+1. Freeze apply `0x0057B230` (combat spec owns the length): delete the
+   monster's thinks and schedule one at frame + len + 1 (§1.2), len the
+   new length (after the monster divisor); the freeze stat list's
+   expiry (timer type 12) is set to max(old expiry, frame + len). A
+   longer freeze already running makes the len + 1 think land while
+   still frozen, so the gate drops it.
+2. Freeze end: the freeze stat list's remove callback `0x0057B170`
+   (registered with `0x00625CE0` by the apply) does nothing when the
+   unit is dead and `0x0063A4A0(unit, 1)` holds; otherwise state 1 off,
+   unit refresh (`0x00553570`), and for a monster: delete its thinks and
+   schedule one at frame + `aidel` with the column rule of §1.3 rule 1
+   (0 → 15; no stun override). 1.14d-confirmed (`0x0057B170`,
+   `0x0057B230`); D2MOO `SUNITDMG_RemoveFreezeState` is the same.
 
 When a think is scheduled for a monster that has state 54 (D2MOO
 `STATE_UNINTERRUPTABLE`), `0x005544B0(unit, 0)` runs first
@@ -337,7 +351,8 @@ Only when a target was found:
    2. "melee" = monstats `isMelee`, or base class 10, 345 or 557
       (bighead1, councilmember1, baalhighpriest). If life% < 30, or not
       melee and target distance < 10: `roll(100)` < 15 → find a free spot
-      (`0x0054DC40`; its own draws: open question 4) in the room. If found
+      (`0x0054DC40`, `monsters/population.md` §8: room seed, up to 20
+      x-then-y tries) in the room. If found
       and its room is not in town: if life% < 30, `roll(100)` < 25 and no
       state 52 (D2MOO `STATE_PREVENTHEAL`): add life = level × 256,
       capped at max life. Then use skill 184 (monster teleport) in mode
@@ -372,9 +387,25 @@ D2MOO `D2AiControlStrc`, 0x40 bytes:
 | +0x3C | nMinionSpawnClassId | spawner AIs |
 
 "AI state" (`0x005DD2B0`, D2MOO `sub_6FCF2E70`) is the monster data
-`dwAiState` read through `0x005734E0`; it is "true" for values 3 and 19.
-Who sets it is owned by `sim/units.md` / `monsters/init.md` (open
-question 5).
+`dwAiState` (+0x54) read through `0x005734E0` (a non-monster reads 1);
+it is "true" for values 3 and 19, i.e. "hit recently". Its only setter
+is `0x005734C0(unit, v)`, called from two places:
+
+1. Damage reaction `0x0057CEE0` (`combat/damage.md` §7.1), monster
+   defender: v := 19 when a hit starts no reaction mode: a block that
+   is not played (result flag 0x4000, class 243 diablo, 333
+   diabloclone or 705 uberdiablo, or a class without mode 6), a get-hit
+   that §6.2 there refuses, or a soft hit (flag 0x4000 without
+   get-hit).
+2. Monster mode set `0x005A7C20` (`sim/units.md`), when the unit's
+   current mode m (unit +0x10, the mode being left) is not 1:
+   `0x005A68E0`: old state s ≥ 16 → s − 16 (so 19 becomes 3); s = 13
+   and m = 3 → stays 13; else s := m.
+
+So the state is the last non-neutral mode the monster left (3 after a
+get-hit), and 19 marks a reaction-less hit until the next mode change
+turns it into 3. 1.14d-confirmed (`0x005734C0`, `0x005A68E0`,
+`0x0057CEE0` sites `0x0057D083` / `0x0057D119`).
 
 #### 3.2 AI tables
 
@@ -447,6 +478,36 @@ Callers: monster creation (`0x005A49B0`, `monsters/init.md`), skills
 and special states (32 sites; `0x005B14E0`, `0x005E8140`, … switch back
 to state 0). 1.14d-confirmed.
 
+**When an alternate runs.** Step 3 looks up the record of the
+control's *current* state through `0x005B15D0` (so states 10–12 of a
+class without `switchai` read the base record) and ignores the new
+state's value. So any install over a running base AI whose record has
+an alternate (BatDemon 29, FrogDemon 52, FetishShaman 65, Diablo 51,
+Hireable 61, BaalCrab 135, BaalCrabClone 140, UberBaal 145,
+UberDiablo 147) makes the alternate the function for **one**
+think; the alternate then re-installs the control's state (now the new
+one), which is step 4 because the function is no longer the record's
+think. Installers that reach a running monster: curse AI `0x005C34B0`
+(10 / 11 / 12 / 0 by skill state, `ai-bodies-2.md` §16), terror
+`0x005DDD00` (11), `0x005D6520` (10), suicide minion `0x005D1E10`
+(15), imp possess `0x005D18E0` (16), and the special-state thinks'
+own switch back to 0. Monster creation, the class reinit
+(`0x00574250`) and the inactive restore (`0x005424F0`) install on a
+fresh control (function 0), so never step 3.
+
+**Installed special states in 1.14d.** Literal states pushed: 0, 5, 6
+(Hireable `0x005E52D0`), 10 (`0x005D6520`), 11 (`0x005DDD00`), 13
+(`0x005A49B0`, Countess), 15 (`0x005D1E10`), 16 (`0x005D18E0`), and
+10 / 11 / 12 through `0x005C34B0`. The summon spawn `0x0056D940`
+passes its request's state, and all 15 callers set it to 0. The other
+sites pass the control's own state. So special-state records 1, 2, 3, 4,
+7, 8, 9, 14 and 17 are never selected in 1.14d: the thinks only they
+hold (`0x005B14E0`, `0x005E5870`, `0x005E7DC0`, `0x005E7F80`,
+`0x005E2610`) never run; those shared with base AIs (Hireable 61,
+GoodNpcRanged 60, NecroPet 67) run from the base table.
+1.14d-confirmed (all 33 call sites, `all.asm`; `0x00570530`, a state-0
+re-install, has no caller and no pointer to it).
+
 ### 4. AI parameters
 
 | Column (fields.tsv) | Offset | Read as | By |
@@ -470,13 +531,45 @@ headers are comments, not data.
 
 #### 5.1 Forced targets `0x005DD610`
 
-D2MOO `sub_6FCF2920`. Runs first. A monster carrying a target override
-(D2MOO `sub_6FC61EC0`: 1 player, 2 monster, 4 missile by GUID; 3 =
-alignment switch) returns that unit (distance full-size, §6) unless it
-is gone, dead, or (when asked) blocked; a failing override is cleared.
-Mode 3 draws one raw step (`lo'` bit 0) for neutral-aligned units. Owned
-here as D2MOO-derived; 1.14d address confirmed as the first call of
-`0x005DD7F0`, details open (question 6).
+D2MOO `sub_6FCF2920` (EAX game, ESI unit; stack: a, s, &target,
+&distance). Callers: the main search §5.2 step 3 with (a = its
+line-of-sight flag T, s = 0), and `0x005DDC30` (§5.3) with (a = 0, s =
+1). Runs first. The override is monster data
+kind k (+0x38) and GUID g (+0x34). Setter `0x00573090(unit, k, g)`:
+monsters whose monstats `switchai` bit is set, k < 5; callers: terror
+special-state init `0x005E80E0` (k by the type of its path target
+unit: player 1, monster 2, missile 4; g its GUID), skill callback
+`0x005C3B30` (k 1 or 2 by the record's byte +0x10, g from +0x14) and
+the confuse skill `0x005C3DE0` (k 3, g 0, after putting the unit in
+target-node list 9). Clear `0x00573120` (k, g := 0): event type 10
+(§1.6), `0x005C5653`, the terror think's end `0x005E8217`, and every
+failure below.
+
+1. Not a monster, or k = 0 → return 0.
+2. k = 1 / 2 / 4: U := the unit of type 0 / 1 / 3 with GUID g
+   (`0x00552F60`); none → clear, 0. d := full-size distance U→unit
+   (`0x005DC380`, §6). s ≠ 0 and the collision test `0x00622AA0(U,
+   unit, 4)` hits → clear, 0.
+3. k = 3: A := the unit's alignment (`0x006259B0`); r := one raw step
+   of the unit seed, `& 1` (`0x00472210(seed, 2)`). Temporary
+   alignment (`0x005543B0(unit, value, 1)`): A = 1 → r ? 2 : 0; A = 0
+   and r → 2; A = 2 and r → 0; else unchanged. Then scan 5 (s = 0;
+   context {best 0, d 0x7FFFFFFF, a, 35, coordinate index of the
+   unit's position `0x0061B130`, 0, 0x7FFFFFFF}) or scan 6 (s ≠ 0;
+   context {0, 0x7FFFFFFF, 0, 0x7FFFFFFF}) (§5.4); U := best, d := its
+   distance; restore alignment A (`0x005543B0(unit, A, 1)`).
+4. Accept U when it is a player or monster that is not dead
+   (`0x005541B0`), or a missile (type 3): target := U, distance := d,
+   return 1. Anything else (none, object, item, tile, dead) → clear, 0.
+
+From the main search the accepted U then takes §5.2 step 7 like any
+target (control flag 0x08 and vision +0x24 unless the unit is good,
+combat := melee-range test, distance := d).
+
+The k = 3 draw is the only one, and it is made on every think while
+the override holds. 1.14d-confirmed (`0x005DD610`, jump table
+`0x005DD7D8`, `0x00573090`, `0x00573120`, `0x005730E0`,
+`0x00573100`).
 
 #### 5.2 Main search `0x005DD7F0`
 
@@ -511,10 +604,21 @@ D2MOO `sub_6FCF2110`. Returns target, distance, combat:
    +0x24 := (it was 0). Combat := melee-range test `0x00622C40(unit,
    target, 0)` (`sim/units.md`). Distance := B.
 
-Draws: none here (except §5.1 mode 3). Ties keep the earlier node.
-Slot order and node order are the target-node list order (owned by
-`sim/units.md` / clients; open question 7). 1.14d-confirmed
-(`0x005DD7F0`); the slot meanings are D2MOO's.
+Draws: none here (except §5.1 k = 3). Ties keep the earlier node.
+
+**Target-node lists** (game +0x10F8 + 4·slot; node 0x10 bytes {unit,
+a, next, prev}; unit +0xD0 = its slot, 11 = none):
+
+| Slot | Inserted by | Holds |
+|---|---|---|
+| 0–7 | `0x005B1880` (player join: the first empty slot, only while game +0x8C ≤ 8) | the player, as head |
+| 0–7 | `0x005B1900` (`skills/bodies.md` §6.3) | the player's attached units, each inserted right after the head (newest first) |
+| 8 | `0x005B1990` from the rogue2 wanderers (`population.md` §12, `0x0054EF50`), NpcBarb `0x005EDC50`, Wussie `0x005EE3C0`, inactive restore `0x005424F0` | good NPCs that evil monsters attack (step 5.2) |
+| 9 | `0x005B1990` from Bone Wall `0x005C58B0`, Bone Prison `0x005C5BC0`, the bone wall maker missile `0x005AEDA0`, skill `0x005C3BCC`, confuse `0x005C3DE0`, inactive restore | alternative targets (step 5.3) |
+
+`0x005B1990` prepends, so slots 8 and 9 are walked newest first.
+1.14d-confirmed (`0x005DD7F0`, `0x005B1880`, `0x005B1900`,
+`0x005B1990` and its 9 call sites).
 
 #### 5.3 Secondary helpers
 
@@ -900,6 +1004,12 @@ AI params 0–2 come from NPC messages: `0x00548B00` (interaction start,
 MakeEntityMove, `sim/client-messages.tsv`: unit type, GUID, x, y) sets
 param 0 := 40 and params 1, 2 := x, y; both stop the path and schedule a think at +1 (§1.2). Param 1 is
 also the greeting countdown of step 6 (one field, two uses: kept).
+Effect of param 0 := 40 (every C→S 0x13 within distance 50,
+`0x00548D4A`): the next 40 thinks take step 4; while param 0 > 36 (the
+first 4) an NPC more than 2 from (param 1, param 2) walks there
+(params 1 and 2 are set only by 0x59; a 0x13 leaves them as they are);
+otherwise it stops its path and idles 8. So a click holds the NPC in place for about 40 thinks
+of 8 frames, and each further 0x13 restarts the count.
 
 **Commands `0x005E6AE0`** (D2MOO `sub_6FCE69A0`). Commands are found
 with `0x0058EEF0(type, 0)`. G = the u32 at `0x0088CADC` (zero-initialised
@@ -1728,7 +1838,15 @@ Other recorded checks:
   `0x0061AB00`, `0x00620BB0`, `0x0058EC90`, `0x0058ED10`,
   `0x0058EF40`, `0x0058EFA0`, `0x005DED90`, `0x005DEDE0`,
   `0x005DEE50`, `0x005DE4E0`, `0x005DE6D0`, `0x005F1800`,
-  `0x00625480`, `0x00625D10`; G's references by a scan of `all.asm`.
+  `0x00625480`, `0x00625D10`; G's references by a scan of `all.asm`;
+  for the 2026-10-07 answers: `0x0057B170`, `0x0057B230`,
+  `0x005734C0`, `0x005A68E0`, `0x0057CEE0` (AI-state sites),
+  `0x005DD610`, `0x00573090`, `0x00573120`, `0x005E80E0`,
+  `0x005B1880`, `0x005B1900`, `0x005B1990` (9 call sites),
+  `0x0058F000`, `0x00666120`, `0x00665950` (DS1 path section),
+  `0x006660B0`, `0x00667510`, and the 33 `0x005B0E00` call sites
+  with the state each passes (15 `0x0056D940` callers checked for
+  the request's state field).
 - Tables dumped from the file's .rdata/.data with a PE-section parser:
   AI and special-state tables (`0x0073CA18`, 166 records), monster
   event table `0x006E2490`, mode table `0x006E2260`, inline-think bytes
@@ -1756,33 +1874,43 @@ Other recorded checks:
 
 ## Open questions
 
-1. What reschedules a frozen monster's think when the freeze ends in
-   1.14d (D2MOO `SUNITDMG_RemoveFreezeState` has no 1.14d `aidel` copy;
-   only `0x005A73E0` and three AIs read `aidel`)? Settle: find the state
-   1 remove callback and record a freeze (cold damage) on a monster.
-2. Game +0x6A and +0x74 values in single player (decides whether Nightmare
-   and Hell `aidel` columns are ever used): record a Nightmare game and
-   compare mode-end delays with `aidel(N)` (14 for zombie1).
+1. Answered (2026-10-07): the freeze stat list's remove callback
+   `0x0057B170` deletes the thinks and schedules frame + `aidel` (§1.1
+   item 2); it reads `aidel` itself (monstats +0x4F), so the earlier
+   "only `0x005A73E0` reads `aidel`" was incomplete. A freeze recording
+   remains a check (PC 2 list), not a question.
+2. Answered (2026-10-07): game +0x6A is the game type, 3 on every tick
+   of the single-player packet recordings (`sim/intents-events.md`
+   §Provenance, `-015956`); +0x74 is the ladder flag (game creation
+   flags bit 21, `0x00530D59`). +0x6A ≠ 0 in single player, so §1.3
+   rule 1 takes `aidel(N)` / `aidel(H)` by difficulty there. Confirm
+   with a Nightmare recording (PC 2 list).
 3. The `0x005A8520` knockback-end branches have no recorded instance:
    record a knockback (e.g. a player skill with knockback on fallen and
    on a sand leaper) and check +1 / +15 / gethit.
-4. `0x0054DC40` (teleport spot search): which seed it draws from and in
-   what order (`monsters/population.md` owns spot search?).
-5. Who sets monster data `dwAiState` (+0x54) to 3 or 19, read by
-   `0x005734E0`.
-6. Forced targets `0x005DD610`: full 1.14d read (taunt/attract/confuse
-   records, the mode-3 draw).
-7. Target-node list slots 8 and 9 contents and order (game +0x10F8): read
-   the 1.14d target-node functions (D2MOO `Targets.cpp`).
-8. Who builds the Npc map-AI record (control +0x38: node count, 12-byte
-   nodes) and from which data (DS1 preset paths?), and the node order.
-   The idle-10 source itself is settled in §9.9 (command 4 delay);
-   confirm with a town recording that logs command 4 next to thinks.
+4. Answered (2026-10-07): `monsters/population.md` §8 owns it: the
+   room seed, up to 20 tries of x := `roll(w)` + left then y := `roll(h)`
+   + top, a test-only placement probe per try.
+5. Answered (2026-10-07): §3.1 (the damage reaction sets 19; the
+   monster mode set records the mode left, 19 → 3).
+6. Answered (2026-10-07): §5.1 read in full on 1.14d.
+7. Answered (2026-10-07): §5.2 "Target-node lists" (slot 8: rogue2
+   wanderers, act 5 barbarians; slot 9: bone walls / prisons, confused
+   units; both newest first; `population.md` OQ7 gives `0x005B1990`).
+8. Answered (2026-10-07) for the builder: the DS1 loader makes the
+   path of a preset unit from the DS1 path section (`drlg/preset.md`
+   §5 step 10: points in file order, action 1 below DS1 version 15),
+   the unit filter copy offsets every point with the preset
+   (`drlg/preset.md` §7, `0x00667510`), and the preset spawn
+   `0x00555910` (`population.md` §11.1) moves the pointer to control
+   +0x38 (`0x0058F000` gives &control +0x38; `0x00666120` moves and
+   clears the preset's). Quest code swaps it later
+   (`world/quests-act3.md`, `0x00587950`). The idle-10 source is settled in
+   §9.9 (command 4 delay). Left: confirm with a town recording that logs command 4 next to thinks.
 9. The 2 recorded fallen1 type-1 runs with no schedule and later
    activity: likely a death end followed by a shaman resurrect; check
    with a recording that hooks mode changes.
-10. The AI functions still `unread` or `D2MOO-only` in
-    `ai-functions.tsv` (status column).
+10. Answered (see 16): no AI function is `unread` or `D2MOO-only`.
 11. `0x0054CA10` is C→S 0x59 and `0x00548B00` is reached from C→S 0x13
     (`world/npc.md` §2); still open: confirm the 12 recorded "+1"
     schedules between ticks with a recording that logs client messages
@@ -1816,13 +1944,34 @@ Other recorded checks:
     `0x00573930` → `monsters/init.md`, `monsters/population.md`; kill
     `0x0057CCB0` → `combat/damage.md` §7.2; stat lists `0x006251F0`,
     curse flag `0x00625760` → `sim/stat-lists.md`; quest seams →
-    `world/quests.md` and its act files. Still without an owner: the
-    reinit-as-class `0x00574370` (named only in
-    `sim/intents-events.md`), the unit find `0x0065A950`
-    (`ai-bodies-3.md` OQ3), the client preload `0x00571C00` (S→C 0xA4)
-    and the spawn info `0x0063EFA0` beyond the cases read in
-    `ai-bodies-2.md` §13 and `ai-bodies-5.md` §21.3.
+    `world/quests.md` and its act files. The last four (2026-10-07): the
+    reinit-as-class `0x00574370(game, unit, class, mode)` →
+    `monsters/init.md` (it rebuilds the monster data of an existing
+    unit; callers are the death action of `sim/intents-events.md`, a
+    skill class change `skills/bodies-4.md` and BaalThrone
+    `ai-bodies-5.md` §20, so it is not AI-only); the unit find
+    `0x0065A950` / `0x0065AC70` → `monsters/umod-callbacks.md` §3.1; the
+    client preload `0x00571C00` (only caller BaalThrone) → its rule is in
+    `ai-bodies-5.md` §20 step 5 (a pending event record on the unit),
+    the record list and the send → `sim/intents-events.md` §7.9; the
+    spawn info `0x0063EFA0` → `ai-bodies-2.md` §13.1 (every key).
 16. Answered (open question 10): no `unread` row is left in
     `ai-functions.tsv`; the last 55 bodies are `ai-bodies-6.md` and
     `ai-bodies-7.md` (the Uber Mephisto, Diablo and Baal thinks are
     empty in 1.14d: `ai-bodies-7.md` §26 and its open question 2).
+17. Answered (2026-10-07), the implementation questions of
+    `docs/handoff/impl-ai-act1.md` §4 and `gaps-combat-ai.md`, all
+    settled in the text: AI1 drehyaiced is class 527 (§9.32,
+    `0x005E77A0` compares 0x20F; the catalogue row pairs were corrected,
+    Provenance); AI2 and AI3 §9.31 (the "Else" belongs to the first
+    30 % roll; no room counts as out of town); AI4 and AI5 §9.32 (the
+    param writes and idle 1 follow a leave; any class other than 527
+    with AI 31 takes cain1's Act 1 functions, it does not do nothing);
+    AI6 §8 (`0x0058EFA0` creates through `0x0058EF40`, which makes the
+    new command current; `0x0058EEF0` with no current returns 0); AI7
+    §7.2 table (coordinate walk / run: path step count 1); AI8 OQ12 (G
+    is per server process, not per game or per AI store: the code's
+    per-store G matches only the first game of a process); AI9 §9.26
+    (states through `0x00639DB0`); AI10 §9.28 (a state above 3 takes the
+    above-ground steps; the function never writes one). Forced-target combat and flags: §5.1 end
+    (§5.2 step 7 applies).

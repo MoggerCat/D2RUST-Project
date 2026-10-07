@@ -23,22 +23,22 @@
 | Outputs / state changes | 67–73 |
 | Rules | 74–75 |
 |   1. Records | 76–124 |
-|   2. Flags (+0x10) | 125–141 |
-|   3. Stat arrays | 142–157 |
-|   4. Allocation and ownership | 158–181 |
-|   5. Base writes | 182–206 |
-|   6. Full values | 207–265 |
-|   7. Value-change notification | 266–294 |
-|   8. Chain operations | 295–394 |
-|   9. States | 395–426 |
-|   10. Timer event handlers | 427–502 |
-|   11. Mod array and stat messages | 503–520 |
-| Constants & data dependencies | 521–532 |
-| Randomness | 533–536 |
-| Edge cases & original bugs | 537–555 |
-| Test vectors | 556–592 |
-| Provenance | 593–616 |
-| Open questions | 617–634 |
+|   2. Flags (+0x10) | 125–162 |
+|   3. Stat arrays | 163–178 |
+|   4. Allocation and ownership | 179–202 |
+|   5. Base writes | 203–227 |
+|   6. Full values | 228–286 |
+|   7. Value-change notification | 287–317 |
+|   8. Chain operations | 318–417 |
+|   9. States | 418–449 |
+|   10. Timer event handlers | 450–530 |
+|   11. Mod array and stat messages | 531–548 |
+| Constants & data dependencies | 549–560 |
+| Randomness | 561–564 |
+| Edge cases & original bugs | 565–583 |
+| Test vectors | 584–620 |
+| Provenance | 621–644 |
+| Open questions | 645–667 |
 <!-- /index -->
 
 ## Summary
@@ -137,7 +137,28 @@ prev.
 | 0x80000000 | EXTENDED | the 0x64-byte form |
 
 Callers pass other bits (e.g. 0x08, 0x20, 0x40) for their own lookups
-(§9.3); this spec gives them no rule.
+(§9.3); this spec gives them no rule. Who sets each bit (1.14d, every
+allocation site of `0x006251F0` (70) and `0x00626D40` (9), and every
+store to list +0x10 in `0x00625000`–`0x00628000`):
+
+| Bit | Set by |
+|---|---|
+| 0x1 | the monster base list only (`0x00573CB0` at `0x0057407D`, `monsters/init.md` §6) |
+| 0x2 | expiry setters `0x00625310` (4 callers) and `0x006260B0` (26), always on a plain list just allocated or found as a state's list (`0x006256B0`); allocations with 2 / 0x802; attach rule 4 on the unit's own list |
+| 0x4 | allocations by `0x0056E520`, `0x0056F1F0`, `0x005D7EA0`, `0x00620E80` (server), `0x004C7BE0`, `0x004C7950` (client); `0x005A6380` with 0x4004 |
+| 0x8 | `apply_state` `0x0056E970` for a state with `aura` (`skills/bodies.md` §2.7 step 6) |
+| 0x20 | `apply_state` for a curse state (step 3) |
+| 0x40 | item class-skill lists: `0x00557AB0` (generation), `0x0062A970` (load), `0x005C0D70`, `0x005C0F90` (staffmods, `items/generation.md` §6.2), `0x00534C70` (start items); client `0x0045F190`, `0x004C1910` |
+| 0x80 | the overlay list `0x00621E40` (§8.8) |
+| 0x100 | `0x00625A00(unit)` on the unit's own list, called only from `0x00621E40`; cleared by `0x00627410` |
+| 0x800 | `apply_state` for a state with `exp` (step 6); allocations 0x802 by `0x005D0350` and `0x005D7430` (Conversion) |
+| 0x4000 | `0x005A6380` only (with TEMPONLY) |
+
+Variable flags: `0x0056E970` (above), item property lists
+`0x0065CBF0` (flags from its 14 callers, `items/properties.md`),
+item load `0x0062CBE0` (its argument), `0x005543B0` and `0x00621C30`
+(0: they allocate only when no list was found). Every extended list is
+allocated with flags 0.
 
 ### 3. Stat arrays
 
@@ -288,7 +309,9 @@ Players and monsters (§4.3). Invalid stat → return. Then:
      §5.2). For stat 7 on a monster whose monstats `DamageRegen` (u32
      +0x1A0) ≠ 0: set stat 74 := ((new >> 8) · DamageRegen) >> 4.
    - 83, 97, 98, 107, 126, 127, 151, 188, 204: skill and state handlers
-     (skills spec).
+     (skills spec). Stats 97 / 107, 83 / 188 / 126 / 127 and 98 and the
+     pet-maximum helper `0x0056BD90` are `skills/levels.md` §7 "Skill
+     stat callbacks" (owner; dispatch inside `0x0055B800`).
 
 The client callback `0x004609F0` is client-only.
 
@@ -439,6 +462,11 @@ changed. 1.14d-confirmed (asm of `0x00639DB0`).
    256; set stat 6 := hp. Then f := life fraction (`stats.md` §9.3); if
    |f − (stat 352 & 0xFF)| > 4: message `0x00571A10`(unit, f) and set
    stat 352 := f.
+   Both the life write and the fraction update are inside "r ≠ 0" (r =
+   0 jumps straight to the return). `0x00580610` returns 1 on every
+   path (`0x005806DD`), so the "regenerate if `0x00580610`" test of
+   `units.md` §6.1 never stops steps 4 and 5 (2026-10-07, implementation
+   question in `docs/handoff/impl-units-stats.md` §5 item 3).
 4. Stamina (`0x00580500`): s := total(10), b := total(28). By unit mode:
    1, 5 → shift 8; 2 → shift 9, but only if s & 0xFFFFFF00 ≠ 0; 6 →
    shift 9; any other mode → only if b ≥ 1000, shift 8. Else stop.
@@ -625,9 +653,14 @@ replaces it under the same comparison.
    room's level id (`0x0066BAB0`) is 1, 40, 75, 103 or 109 (`0x006426A0`,
    byte table `0x006426C8`); null room → 0. Also used by the unit find
    (`monsters/umod-callbacks.md` §3.1).
-3. Who sets list flags 0x08, 0x20, 0x40, 0x80, 0x100 and 0x1 (skills,
-   curses, items); this spec only needs their tests.
+3. Answered (2026-10-07): §2, table after the flag list (every
+   allocation site and flag store of 1.14d).
 4. Recording: the whole spec is unverified until `record_stats.py`
    passes `check_stats.py` (queued).
-5. Is an extended list ever given NEWLENGTH (would hang §10.4)? None
-   found statically.
+5. Answered (2026-10-07): no. All 9 extended allocations pass flags 0;
+   the expiry setters `0x00625310` / `0x006260B0` are called only on
+   plain lists (a fresh `0x006251F0` list or a state's list, which
+   `apply_state` allocates plain); attach rule 4 sets NEWLENGTH only on
+   the unit's own list, the root, which is never in an active chain;
+   and every TEMPONLY list (§2 table) is attached to a player or monster,
+   never to an item's extended list.
