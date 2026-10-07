@@ -23,6 +23,7 @@
 //! at a seam method (each names its open question or address).
 
 pub mod belt;
+pub mod bookkeeping;
 pub mod checks;
 pub mod equip;
 pub mod grid;

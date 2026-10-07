@@ -14,6 +14,8 @@ mod death;
 mod e2e;
 pub mod fight;
 #[cfg(test)]
+mod inactive;
+#[cfg(test)]
 mod missiles;
 #[cfg(test)]
 mod objects;
@@ -21,6 +23,8 @@ mod objects;
 mod player_death;
 #[cfg(test)]
 mod rooms;
+#[cfg(test)]
+mod sound;
 #[cfg(test)]
 mod waypoints;
 

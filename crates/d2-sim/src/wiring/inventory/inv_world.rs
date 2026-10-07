@@ -6,6 +6,7 @@
 //! interaction from the unit record's interact info; the
 //! rest through [`InvRest`] / [`MovePending`].
 
+use super::equip_rules::EquipCall;
 use super::{InvDesk, InvRest};
 use crate::items::inventory::{
     active_inventory_item, find_free_position, InteractionTarget, InvItem, InvWorld, Inventory,
@@ -95,6 +96,9 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvWorld for InvDesk<'_, '_, H, R> 
         }
     }
     fn charm_relink(&mut self, owner: UnitId, item: UnitId) {
+        if self.state.equip_rules {
+            return self.queue_equip(EquipCall::SkillLink(owner, item));
+        }
         let (o, i) = (self.o(owner), self.g(item));
         self.rest.charm_relink(o, i)
     }
@@ -114,6 +118,9 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvWorld for InvDesk<'_, '_, H, R> 
         self.state.refresh.push(owner);
     }
     fn inventory_pass(&mut self, owner: UnitId) {
+        if self.state.equip_rules {
+            return self.queue_equip(EquipCall::Pass(owner));
+        }
         let o = self.o(owner);
         self.rest.inventory_pass(o)
     }
@@ -130,6 +137,9 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvWorld for InvDesk<'_, '_, H, R> 
         self.rest.stat_link(o, i)
     }
     fn weapon_bookkeeping(&mut self, unit: UnitId, _item: UnitId) {
+        if self.state.equip_rules {
+            return self.queue_equip(EquipCall::Weapons(unit));
+        }
         let o = self.o(unit);
         self.rest.weapon_bookkeeping(o)
     }

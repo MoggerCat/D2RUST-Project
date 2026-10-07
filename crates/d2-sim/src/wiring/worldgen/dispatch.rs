@@ -145,9 +145,12 @@ impl<X: WorldPending> TickHooks for WorldSim<X> {
     fn spawn_presets(&mut self, game: &mut Game, r: RoomId) {
         self.population(game, |cx| preset::place_presets(cx, r));
     }
-    /// Step 3 `0x00542B40`.
+    /// Step 3 `0x00542B40` (`units.md` §3.4 rule 4): on the action
+    /// wiring's inactive store when it is on, else the host's.
     fn restore_inactive_units(&mut self, game: &mut Game, r: RoomId) {
-        self.host(game, |h| h.v.h.x.restore_inactive_units(r));
+        if !self.lend(|a| a.restore(game, r)) {
+            self.host(game, |h| h.v.h.x.restore_inactive_units(r));
+        }
     }
     /// Step 3 `0x00552610`.
     fn populate_objects(&mut self, game: &mut Game, r: RoomId) {

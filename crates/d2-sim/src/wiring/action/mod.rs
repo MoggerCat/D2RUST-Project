@@ -25,6 +25,7 @@ pub mod combat;
 pub mod death;
 pub mod dispatch;
 pub mod hirelings;
+pub mod inactive;
 pub mod missiles;
 pub mod monster_add;
 pub mod monsters;
@@ -264,6 +265,10 @@ pub struct ActionHooks<X> {
     /// (`sim/intents-events.md` §8; [`switch`]): player names, hot keys,
     /// skill hands, portal flags.
     pub session: switch::SessionState,
+    /// The inactive-unit store (game +0xD8, `units.md` §3.4;
+    /// [`inactive`]). `None` (the default): tick step 9 compresses
+    /// nothing and the restore is the host's, as before.
+    pub inactive: Option<crate::units::inactive::InactiveStore>,
     /// Seams with no provider yet.
     pub x: X,
     /// Scratch seed handed out for a unit without a record (an error is
@@ -310,6 +315,7 @@ impl<X> ActionHooks<X> {
             sync: None,
             death: death::DeathState::default(),
             session: switch::SessionState::default(),
+            inactive: None,
             x,
             orphan_seed: Seed::init(),
             errors: Vec::new(),

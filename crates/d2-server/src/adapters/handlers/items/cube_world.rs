@@ -1,4 +1,4 @@
-// Spec: specs/world/cube.md §1, §2, §8; specs/items/inventory.md §1.4, §2.4, §5.1, §5.3; specs/items/inventory-moves.md §6.4; specs/sim/intents-events.md §2.4; specs/world/vendors.md §7.3 (the item copy)
+// Spec: specs/world/cube.md §1, §2, §8; specs/audio/triggers-2.md §14; specs/items/inventory.md §1.4, §2.4, §5.1, §5.3; specs/items/inventory-moves.md §6.4; specs/sim/intents-events.md §2.4; specs/world/vendors.md §7.3 (the item copy); specs/world/vendors-2.md §10.2
 //! [`CubeWorld`] for the server: the economy wiring's [`EconomyCube`]
 //! for items, stats, unit records and creation (the player's interact
 //! info on the unit record too); the game's one inventory model
@@ -7,18 +7,22 @@
 //! targeting reset (`0x0055BF50`, §5.3), placement (`0x00560200`, §2.4)
 //! and removal (§8 step 1: the direct 0x9D of §6.4, the §1.4 unlink, the
 //! free) and the item copy (`0x0055A2A0`, `vendors.md` §7.3,
-//! `InvDesk::copy_of`); the staged date and sounds; and [`ItemPending`] for the calls
+//! `InvDesk::copy_of`); the staged date; the game's sound slots
+//! (`audio/triggers-2.md` §14, `d2_sim::units::sound`); and [`ItemPending`] for the calls
 //! no written spec owns.
 
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 
+use d2_sim::game::GameError;
 use d2_sim::items::moves::{iflag, page};
 use d2_sim::rng::Seed;
-use d2_sim::units::UnitId;
-use d2_sim::wiring::economy::{CubeRest, EconomyCube};
+use d2_sim::units::sound::queue_sound;
+use d2_sim::units::{UnitId, UnitType};
+use d2_sim::wiring::economy::{CubeRest, EconomyCube, EconomyError};
 use d2_sim::wiring::inventory::InvDesk;
 use d2_sim::world::cube::{CraftProperty, CubeWorld, ItemRequest, StatRead};
+use d2_sim::world::stash::StashWorld;
 
 use super::moves::{take_sent, InvParts, MoveRest};
 use super::{CubeHooks, ItemError, ItemPending, Staged};
@@ -219,8 +223,16 @@ impl<H: CubeHooks> CubeWorld for ServerCube<'_, '_, '_, H> {
     fn set_stat(&mut self, unit: UnitId, stat: u16, value: i32) {
         self.ec_mut().set_stat(unit, stat, value)
     }
+    /// `0x00553380(player, event, player)` on the game's sound slots
+    /// (`cube.md` §8 rule 3: the cube passes the player as target, so
+    /// only its own client hears the S→C 0x2C of its unit update).
     fn attach_sound(&mut self, player: UnitId, event: u8) {
         self.staged.sounds.push((player, event));
+        let game = &mut *self.ec_mut().econ.game;
+        if let Err(e) = queue_sound(game, player, u16::from(event), Some(player)) {
+            self.errors
+                .push(ItemError::Economy(EconomyError::Game(GameError::from(e))));
+        }
     }
     /// Only the acting player's client receives (every cube path sends
     /// to the player it acts for).
@@ -415,5 +427,67 @@ impl<H: CubeHooks> CubeWorld for ServerCube<'_, '_, '_, H> {
     }
     fn cow_portal(&mut self, player: UnitId) -> bool {
         self.pending.cow_portal(player)
+    }
+}
+
+/// The stash buttons (`vendors-2.md` §10.2) on the same providers: the
+/// interact info on the player's unit record, the game's unit lists and
+/// unit records for the stash object, the hooks' DRLG for the town test,
+/// the stat lists and the game's sound slots.
+impl<H: CubeHooks> StashWorld for ServerCube<'_, '_, '_, H> {
+    fn interaction(&self, player: UnitId) -> Option<(u8, u32)> {
+        CubeWorld::interaction(self, player)
+    }
+    fn reset_interaction(&mut self, player: UnitId) {
+        CubeWorld::reset_interaction(self, player)
+    }
+    fn inventory_pass(&mut self, player: UnitId) {
+        CubeWorld::inventory_pass(self, player)
+    }
+    fn send(&mut self, player: UnitId, msg: &[u8]) {
+        CubeWorld::send(self, player, msg)
+    }
+    fn object_by_guid(&self, guid: u32) -> Option<(UnitId, u32)> {
+        let ec = self.ec();
+        let u = ec.econ.game.lists.find_unit(UnitType::Object, guid)?;
+        Some((u, ec.econ.units.get(u)?.class))
+    }
+    fn in_town(&self, unit: UnitId) -> bool {
+        let ec = self.ec();
+        let game = &*ec.econ.game;
+        game.lists
+            .unit(unit)
+            .and_then(|e| e.room())
+            .is_some_and(|room| ec.econ.hooks.room_in_town(game, room))
+    }
+    fn stat(&self, unit: UnitId, stat: u16) -> i32 {
+        self.ec().econ.stats.unit_total(unit, stat, 0)
+    }
+    fn set_base(&mut self, unit: UnitId, stat: u16, value: i32) {
+        let e = &mut *self.ec_mut().econ;
+        e.stats.unit_set(e.hooks, unit, stat, value, 0);
+    }
+    fn add_base(&mut self, unit: UnitId, stat: u16, d: i32) {
+        let e = &mut *self.ec_mut().econ;
+        let v = e.stats.unit_base(unit, stat, 0).wrapping_add(d);
+        e.stats.unit_set(e.hooks, unit, stat, v, 0);
+    }
+    fn is_player(&self, unit: UnitId) -> bool {
+        self.ec()
+            .econ
+            .game
+            .lists
+            .unit(unit)
+            .is_some_and(|e| e.ty == UnitType::Player)
+    }
+    /// Receive's overflow drop (`0x0055A090`): the withdraw checks the
+    /// carried cap first (§10.2 rule 2), so the stash never reaches it.
+    fn drop_gold(&mut self, _: UnitId, _: i32) {}
+    fn sound(&mut self, unit: UnitId, event: u16, target: Option<UnitId>) {
+        let game = &mut *self.ec_mut().econ.game;
+        if let Err(e) = queue_sound(game, unit, event, target) {
+            self.errors
+                .push(ItemError::Economy(EconomyError::Game(GameError::from(e))));
+        }
     }
 }

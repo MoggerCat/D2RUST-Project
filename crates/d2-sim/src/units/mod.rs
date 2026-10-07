@@ -9,6 +9,7 @@ pub mod event_records;
 #[cfg(test)]
 mod gap_tests;
 pub mod hooks;
+pub mod inactive;
 pub mod lifecycle;
 pub mod lists;
 pub mod messages;
@@ -18,6 +19,7 @@ pub mod modes;
 mod mutant_tests;
 pub mod record;
 pub mod replenish;
+pub mod sound;
 #[cfg(test)]
 mod tests;
 

@@ -670,3 +670,88 @@ fn without_the_field_the_drop_keeps_the_free_spot_seam() {
         .is_none());
     fx.assert_clean();
 }
+
+fn run_quest_drop(
+    fx: &mut Fx,
+    d: &mut DeathDrops,
+    unit: UnitId,
+    code: [u8; 4],
+    quality: u8,
+) -> Option<UnitId> {
+    let s = &mut fx.sim.sys;
+    let mut sim = Sim {
+        game: &mut fx.game,
+        units: &mut s.units,
+        stats: &mut s.stats,
+        data: &s.data,
+    };
+    crate::wiring::economy::unit_quest_drop(
+        &mut s.hooks,
+        &mut sim,
+        d,
+        &mut Here,
+        unit,
+        Some(code),
+        quality,
+        -1,
+        0,
+    )
+}
+
+/// `treasure.md` §9 on the action wiring: the drop code names the class
+/// (no draw on the unit seed); item level = the monster's level stat
+/// (rule 2); the request (rule 5: spawn mode 3, init flags 1, quality)
+/// creates a real item at the floor-drop start spot (rule 4, §7 rule 2),
+/// on two game-seed steps.
+// Covers: specs/items/treasure.md §9 r2, §9 r3, §9 r4, §9 r5
+#[test]
+fn the_quest_drop_creates_the_drop_code_item_at_the_unit() {
+    let mut fx = Fx::new();
+    let (mut d, _p, mon) = drop_setup(&mut fx);
+    let want_mon = fx.sim.sys.units.get(mon).unwrap().seed;
+    let mut want_game = fx.sim.hooks().game_seed;
+    want_game.step();
+    want_game.step();
+    let item = run_quest_drop(&mut fx, &mut d, mon, *b"gld ", 2).expect("item");
+    assert!(d.failures.is_empty() && d.errors.is_empty());
+    let a = fx.a;
+    assert_eq!(
+        d.placed,
+        [(
+            item,
+            DropSpot {
+                room: Some(a),
+                x: 15,
+                y: 13
+            }
+        )]
+    );
+    let r = fx.sim.sys.units.get(item).unwrap();
+    assert_eq!((r.ty, r.class, r.mode), (UnitType::Item, 0, 3));
+    assert_eq!(fx.sim.sys.hooks.items.get(item).unwrap().ilvl, 3);
+    assert_eq!(fx.sim.sys.units.get(mon).unwrap().seed, want_mon);
+    assert_eq!(fx.sim.hooks().game_seed, want_game);
+    fx.assert_clean();
+}
+
+/// §9 rule 3: a drop code missing from the items table is fatal 0x9EA
+/// (logged; no item, no draw).
+// Covers: specs/items/treasure.md §9 r3
+#[test]
+fn the_quest_drop_with_an_unknown_code_is_fatal() {
+    let mut fx = Fx::new();
+    let (mut d, _p, mon) = drop_setup(&mut fx);
+    let game = fx.sim.hooks().game_seed;
+    assert_eq!(run_quest_drop(&mut fx, &mut d, mon, *b"zzz ", 2), None);
+    // The one `0x00559A30` (`drop_helpers::source_drop`) records its pick
+    // fatals in `pick_errors`.
+    assert_eq!(
+        d.pick_errors,
+        [crate::treasure::class_pick::PickError::Code(
+            u32::from_le_bytes(*b"zzz ")
+        )]
+    );
+    assert!(d.errors.is_empty());
+    assert!(d.placed.is_empty());
+    assert_eq!(fx.sim.hooks().game_seed, game);
+}

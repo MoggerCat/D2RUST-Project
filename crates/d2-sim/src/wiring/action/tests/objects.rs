@@ -599,6 +599,7 @@ fn picks_fx(armor: usize) -> Fx {
         }],
         weapons: 0,
         armor,
+        parts: None,
     };
     let h = fx.sim.hooks();
     let d = h.object_drops.take().unwrap();

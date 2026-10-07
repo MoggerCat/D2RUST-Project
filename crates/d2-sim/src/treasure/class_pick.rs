@@ -23,6 +23,9 @@ pub const WEAPON_TRIES: u32 = 6;
 /// The quality-4 loop's random-class re-picks before it switches to the
 /// weapon pick (§20.4 rule 4).
 pub const MAGIC_RANDOM_REPICKS: u32 = 11;
+/// d2rs guard for the unbounded quality-4 loop (§20.4 rule 4, edge case
+/// 4; `treasure.md` §9 rule 3): picks before [`PickError::Hang`].
+pub const MAGIC_LOOP_GUARD: u32 = 1 << 20;
 /// The gold code `gld `.
 pub const GOLD_CODE: [u8; 4] = *b"gld ";
 
@@ -68,6 +71,21 @@ macro_rules! pick_row {
 }
 pick_row!(Weapons, Armor, Misc);
 
+impl From<&crate::items::tables::ItemRec> for PickRow {
+    fn from(r: &crate::items::tables::ItemRec) -> Self {
+        PickRow {
+            code: r.code,
+            spawnable: r.spawnable,
+            quest: r.quest,
+            level: r.level,
+            rarity: r.rarity,
+            type_: r.type_,
+            version: r.version,
+            bitfield1: r.bitfield1,
+        }
+    }
+}
+
 /// A part of the combined items array (§9.1: the header's (start, count)
 /// pairs).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -83,6 +101,11 @@ pub struct ClassPicks {
     pub rows: Vec<PickRow>,
     pub weapons: usize,
     pub armor: usize,
+    /// The header's (start, count) per part (weapons, armor, misc) when
+    /// given (`ItemTables::parts`; `None` in a slot: the part is absent,
+    /// start pointer 0); `None`: the parts follow from `weapons` and
+    /// `armor`, misc to the end.
+    pub parts: Option<[Option<(usize, usize)>; 3]>,
 }
 
 /// A fatal assert of the picks.
@@ -97,6 +120,11 @@ pub enum PickError {
     /// §20.4 rule 3: the drop code is not an items code (fatal 0x9EA).
     #[error("drop code {0:#010x} is not an items code (fatal 0x9EA)")]
     Code(u32),
+    /// §20.4 rule 4 / `treasure.md` §9 rule 3: the quality-4 loop found no
+    /// magic class in [`MAGIC_LOOP_GUARD`] picks (1.14d never leaves it;
+    /// d2rs stops, edge case 4).
+    #[error("quality-4 class loop without a magic class (1.14d hangs)")]
+    Hang,
 }
 
 impl ClassPicks {
@@ -108,11 +136,35 @@ impl ClassPicks {
             rows,
             weapons: weapons.len(),
             armor: armor.len(),
+            parts: None,
+        }
+    }
+
+    /// The pick rows of the combined items array with its header's parts
+    /// (`treasure.md` §9.1).
+    pub fn of_items(
+        items: &[crate::items::tables::ItemRec],
+        parts: [Option<(usize, usize)>; 3],
+    ) -> Self {
+        Self {
+            rows: items.iter().map(PickRow::from).collect(),
+            weapons: parts[0].map_or(0, |p| p.1),
+            armor: parts[1].map_or(0, |p| p.1),
+            parts: Some(parts),
         }
     }
 
     /// The part's combined index range.
     pub fn part(&self, p: Part) -> std::ops::Range<usize> {
+        if let Some(parts) = self.parts {
+            let n = self.rows.len();
+            // Misc runs from its start to the array end (§9.1).
+            return match parts[p as usize] {
+                None => 0..0,
+                Some((s, _)) if p == Part::Misc => s.min(n)..n,
+                Some((s, c)) => s.min(n)..(s + c).min(n),
+            };
+        }
         let a = self.weapons;
         let m = (a + self.armor).min(self.rows.len());
         match p {
@@ -255,8 +307,9 @@ pub fn weapon_rack_pick(
 /// The class of `0x00559A30` (§20.4 r3, §20.4 r4 / §9 rule 3): the drop
 /// code's index when `code` ≠ 0 (no draw), else the random class on the
 /// unit seed; quality 4 re-picks while the record is missing or lacks
-/// `bitfield1` bit 0 (11 random-class re-picks, then weapon picks; no
-/// bound, edge case 4).
+/// `bitfield1` bit 0 (11 random-class re-picks, then weapon picks; 1.14d
+/// has no bound, edge case 4: d2rs stops after [`MAGIC_LOOP_GUARD`] picks
+/// with [`PickError::Hang`]).
 #[allow(clippy::too_many_arguments)]
 pub fn source_class(
     p: &ClassPicks,
@@ -279,6 +332,9 @@ pub fn source_class(
     if quality == 4 {
         let mut n = 0u32;
         while p.bit(id, 0) != Some(true) {
+            if n + 1 >= MAGIC_LOOP_GUARD {
+                return Err(PickError::Hang);
+            }
             id = if n < MAGIC_RANDOM_REPICKS {
                 random_class(p, seed, l, t, skip_act, monster, expansion)?
             } else {
@@ -318,6 +374,7 @@ mod tests {
             ],
             weapons: 2,
             armor: 1,
+            parts: None,
         }
     }
 

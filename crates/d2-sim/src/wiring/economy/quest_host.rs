@@ -144,6 +144,23 @@ impl<'e, 'a, X: Pending, R: QuestRest> HostQuests<'e, 'a, X, R> {
         f(&mut *e.game, &mut v)
     }
 
+    /// `0x00559A30` with the drop code `code` (`treasure.md` §9,
+    /// [`super::unit_quest_drop`]) when the game holds the drop state
+    /// (`ActionHooks::object_drops`) and `unit` has a record; `None`: no
+    /// drop state (the caller keeps the rest's answer).
+    fn econ_quest_drop(
+        &mut self,
+        unit: UnitId,
+        code: [u8; 4],
+        quality: u8,
+        p7: i32,
+    ) -> Option<Option<UnitId>> {
+        self.inner.econ.units.get(unit)?;
+        self.with_drop_state(|h, sim, d, _, spots| {
+            super::unit_quest_drop(h, sim, d, spots, unit, Some(code), quality, -1, p7)
+        })
+    }
+
     /// `0x005417D0` on the game's timer queue (`tick.md` §5.2); a refused
     /// schedule is a unit error of the action wiring.
     fn schedule(&mut self, object: UnitId, ev: u8, frame: i32) {
@@ -423,15 +440,12 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
         }
         self.reward_on_host(player, code, level, quality, droppable)
     }
-    /// `0x00559A30(game, unit, quality, …, −1, 0)` with `code` as the
-    /// drop code ([`super::drop_helpers::source_drop`]) on the game's
-    /// drop state; without one, the rest's answer.
+    /// `0x00559A30(game, unit, quality, &out, 0, −1, 0)` with the drop
+    /// code `code` ([`Self::econ_quest_drop`]); without the drop state,
+    /// the rest's answer.
     fn drop_item_at(&mut self, unit: UnitId, code: [u8; 4], quality: u8) -> bool {
-        let c = u32::from_le_bytes(code);
-        match self.with_drop_state(|h, sim, d, levels, spots| {
-            super::drop_helpers::source_drop(h, sim, d, levels, spots, unit, c, quality, -1, false)
-        }) {
-            Some((item, _)) => item.is_some(),
+        match self.econ_quest_drop(unit, code, quality, 0) {
+            Some(item) => item.is_some(),
             None => self.inner.drop_item_at(unit, code, quality),
         }
     }
@@ -667,14 +681,9 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
         droppable: bool,
     ) -> Option<UnitId> {
         // `level` is the out-parameter `0x00559A30` overwrites before it
-        // reads it (`quests-act3-2.md` §11.3): not an input here.
-        let c = u32::from_le_bytes(code);
-        match self.with_drop_state(|h, sim, d, levels, spots| {
-            super::drop_helpers::source_drop(
-                h, sim, d, levels, spots, unit, c, quality, -1, droppable,
-            )
-        }) {
-            Some((item, _)) => item,
+        // reads it (§9 rule 2, `quests-act3-2.md` §11.3): not an input here.
+        match self.econ_quest_drop(unit, code, quality, i32::from(droppable)) {
+            Some(item) => item,
             None => self.inner.quest_drop(unit, code, quality, level, droppable),
         }
     }

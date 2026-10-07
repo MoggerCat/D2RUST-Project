@@ -3414,6 +3414,14 @@ the dev-dependency) and record results here.
     `cpu_compositor_on_real_frames`; `game_wired_host`). Confirm the
     `mpq-tool formats` counts after the case fix (DC6 1,653, DT1 256) and
     re-derive `game_sweep`'s expected values (buddy note G1).
+99. Save appearance token table on live data (`formats/d2s-appearance.md`
+    §1 r3, Open question 3): `D2_GAME_DIR=<install> cargo test -p
+    d2-server --test character_save -- --ignored`
+    (`token_positions_on_the_users_install`): expect `hax` 4 … `ktr` 45,
+    `cap` 57, `buc` 79, `sst`→`bst` 0x25 with the PROVISIONAL reference
+    slots (`ReferenceSlots::provisional_1_14d`). A miss means the
+    reconstruction is wrong; then read the 256 × 8 bytes at `0x00744CA8`
+    of the 1.14d image into the spec (settles Open question 3).
 
 Kept entries (unchanged):
 
@@ -5690,6 +5698,27 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 - Steps: `py tools/trace-recorder/record_tick.py --seconds 300 --auto TestSor --seed 644409375` + NEW INT3 hook on `0x00554EA0` entry logging caller return address, unit type (unit +0x00) and path pointer +0x2C over a waypoint walk, a town portal, a Teleport cast and an item / object placement.
 - Output: `traces/raw/pc2rec-r90-tick.jsonl`.
 - Compare: no entry with unit type 2, 4 or 5 expected; if one shows up, write the 1.14d effect into §10 r1 and drop the d2rs static-set choice. Fold: write the result into the cited rule and drop its PROVISIONAL line.
+
+##### REC-91 [NO RUN] formats/d2s-appearance.md §1 r2, §1 r3, Open question 3 (reference table `0x00744CA8`)
+- Priority P2.
+- Settles: formats/d2s-appearance.md §1 r2 / Open question 3 (PROVISIONAL: slots 57–124 are `weap` slots, no other slot reserved; `ReferenceSlots::provisional_1_14d`).
+- Steps: (no game run) read the 256 × 8 bytes at `0x00744CA8` of the 1.14d image; also local run queue item 99 (`D2_GAME_DIR=<install> cargo test -p d2-server --test character_save -- --ignored`, `token_positions_on_the_users_install`).
+- Output: the 256 entries.
+- Compare: the reconstruction (weapons 4–56, `cap` 57, `buc` 79, potions 125–134); a miss → write the table into §1 r2. Fold: write the result into the cited rule and drop its PROVISIONAL line.
+
+##### REC-92 [MANUAL] formats/d2s-appearance.md §2 r1, Open question 4 (empty `alternategfx`)
+- Priority P2.
+- Settles: formats/d2s-appearance.md §2 r1 / Open question 4 (PROVISIONAL: an empty `alternategfx` is compared like any code, matching the first unfilled entry).
+- Steps: IT-6 save (`docs/handoff/pc2-rec-pc2-items.md`): a character holding an item whose `code` sits above the first hole (a throwing potion) in a hand; save; read the appearance bytes of the d2s header.
+- Output: the save file's appearance block.
+- Compare: the token written vs `AppearanceTable::lookup`. Fold: write the result into the cited rule and drop its PROVISIONAL line.
+
+##### REC-93 [MANUAL] audio/triggers-2.md §14 r2 (chest at-once key sound sent twice)
+- Priority P2.
+- Settles: audio/triggers-2.md §14 r2 (PROVISIONAL: the chest's at-once send leaves +0x6E and flag 0x400 set, so the player's unit update of the same tick sends event 11 again).
+- Steps: `py tools/trace-recorder/record_packets.py --seconds 120` while opening a locked chest with a key.
+- Output: `traces/raw/pc2rec-r93-packets.jsonl`.
+- Compare: count of S→C 0x2C event 11 in the opening tick (2 expected by the provisional reading, 1 otherwise). Fold: write the result into the cited rule and drop its PROVISIONAL line.
 
 ##### REC-50 [NO RUN] client/stat-lists.md §6 r6.5 setfunc 15 (+0xC4 bit 0x80000000 reader), client/model.md §14
 - Priority P2.
