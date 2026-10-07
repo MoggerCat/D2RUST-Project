@@ -55,13 +55,13 @@ use crate::skills::{KickItems, SkillEntry, SkillTables};
 /// `srvst` slots whose body reads and changes nothing ([`start`]).
 pub const PURE_START: &[u16] = &[18];
 /// `srvst` slots with a body over [`BodyWorld`] (`functions.tsv` status
-/// `spec'd-here`: `bodies.md` §3, §7, `bodies-2.md`).
+/// `spec'd-here`: `bodies.md` §3, §7, `bodies-2.md`, `bodies-2b.md`).
 pub const START_BODIES: &[u16] = &[
     1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
     27, 28, 29, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 46, 56, 57, 58, 65,
 ];
 /// `srvdo` slots with a body over [`BodyWorld`] (status `spec'd-here`:
-/// `bodies.md` §4, §8, `bodies-2.md`).
+/// `bodies.md` §4, §8, `bodies-2.md`, `bodies-2b.md`).
 pub const DO_BODIES: &[u16] = &[
     1, 2, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28,
     29, 30, 31, 32, 33, 34, 35, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 54, 55, 56, 57, 58, 59,
@@ -94,17 +94,17 @@ pub mod callback {
     pub const CHARGE: u32 = 0x005D_3310;
     /// Inferno `0x005C8BF0` (`bodies.md` §6.16): state off, flags |= 0x40.
     pub const INFERNO: u32 = 0x005C_8BF0;
-    /// Blade Fury `0x005D69B0` (`bodies-2.md` §6.16): as Inferno's.
+    /// Blade Fury `0x005D69B0` (`bodies-2b.md` §6.16): as Inferno's.
     pub const BLADE_FURY: u32 = 0x005D_69B0;
     /// Werewolf / Werebear `0x005C6C50` (`bodies.md` §8.15).
     pub const SHAPE: u32 = 0x005C_6C50;
-    /// Whirlwind `0x005D8EF0` (`bodies-2.md` §8.10).
+    /// Whirlwind `0x005D8EF0` (`bodies-2b.md` §8.10).
     pub const WHIRLWIND: u32 = 0x005D_8EF0;
-    /// Holy Freeze self list `0x005D0770` (`bodies-2.md` §6.10).
+    /// Holy Freeze self list `0x005D0770` (`bodies-2b.md` §6.10).
     pub const HOLY_FREEZE: u32 = 0x005D_0770;
-    /// Confuse `0x005C3DB0` (`bodies-2.md` §6.6).
+    /// Confuse `0x005C3DB0` (`bodies-2b.md` §6.6).
     pub const CONFUSE: u32 = 0x005C_3DB0;
-    /// Attract `0x005C3B00` (`bodies-2.md` §7.8).
+    /// Attract `0x005C3B00` (`bodies-2b.md` §7.8).
     pub const ATTRACT: u32 = 0x005C_3B00;
     /// Conversion `0x005D01A0` (`bodies-2.md` §2.23).
     pub const CONVERSION: u32 = 0x005D_01A0;
@@ -487,7 +487,7 @@ pub trait BodyWorld: UseWorld + KickItems {
     /// `0x00571AA0`: queue message 0xA3 on the unit.
     fn queue_progressive(&mut self, u: Self::Unit, msg: ProgressiveMsg<Self::Unit>);
 
-    // ---- batch 2 and 3 (`bodies.md` §6–§8, `bodies-2.md`)
+    // ---- batch 2 and 3 (`bodies.md` §6–§8, `bodies-2.md`, `bodies-2b.md`)
     /// A call into another system whose result the bodies do not read.
     fn effect(&mut self, e: BodyEffect<Self::Unit, Self::Item, Self::Room>);
     /// A path operation on the unit's path; returns the compute result
@@ -649,7 +649,7 @@ pub trait BodyWorld: UseWorld + KickItems {
     fn shield_damage(&self, i: Self::Item) -> Option<(i32, i32)>;
     /// weapons `missiletype` (+0xFA) of the item's class.
     fn item_missile_type(&self, i: Self::Item) -> i32;
-    /// Iron Golem start (`bodies-2.md` §7.11): an item unit in mode 3
+    /// Iron Golem start (`bodies-2b.md` §7.11): an item unit in mode 3
     /// whose class has `bitfield1` bit 1, with item flag 0x10, not active
     /// on a unit (Open question 9).
     fn golem_item(&self, t: Self::Unit) -> bool;
@@ -699,7 +699,7 @@ pub fn run_start<W: BodyWorld>(
         15 => raise(w, ct, u),
         16 => l6::poison_dagger_start(w, t, ct, u, skill, lvl),
         17 => s2::corpse_explosion(w, ct, u),
-        // `bodies-2.md` §7.7: the pure body of [`start`].
+        // `bodies-2b.md` §7.7: the pure body of [`start`].
         18 => 1,
         19 => l24::bone_prison_start(w, u),
         20 => l24::iron_golem_start(w, u),

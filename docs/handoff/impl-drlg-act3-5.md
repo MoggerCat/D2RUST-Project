@@ -1,5 +1,7 @@
 # Handoff: DRLG Acts III–V level generation (`impl-drlg-act3-5`)
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the ninth fold (`claude/fold-handoff-night`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Ninth set" (PC 1 / PC 2).
+
 Branch `claude/impl-drlg-act3-5`, from `claude/specs-staging` at
 `5844674` (cloud, 2026-10-06). Specs: `specs/drlg/outdoor-act3-act5.md`,
 `specs/drlg/outdoor.md` §9.1–§9.4, §11, `specs/drlg/maze.md` and
@@ -88,7 +90,7 @@ r6 (memory only); outdoor.md §3 text, §7 text, §7.5 text, §12.2.
 13. `maze.md` §5.5: the spiral geometry never makes branches edge-adjacent,
     so the after-all-branches pass is indistinguishable from the old one.
 
-## Checks to queue (HANDOFF §5, local)
+## Checks to queue (HANDOFF §5 C65, S9-A1 (4); local)
 
 - **C65** (game files): `D2_GAME_DIR=<install> cargo test -p d2-sim
   --test game_drlg_tables act3_act5 -- --ignored`: `act3_act5_table_values`

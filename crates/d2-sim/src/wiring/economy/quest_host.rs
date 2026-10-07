@@ -1,4 +1,4 @@
-// Spec: specs/world/quests.md §9, §10; specs/world/quests-act1-rest.md §1–§3; specs/world/quests-act2.md §1.5; specs/world/objects.md §3, §4, §7; specs/world/npc.md §2 (the interaction owner); specs/sim/tick.md §5.2
+// Spec: specs/world/quests.md §9; specs/world/quests-act1.md §10; specs/world/quests-act1-rest.md §1–§3; specs/world/quests-act2.md §1.5; specs/world/objects.md §3, §4, §7; specs/world/npc.md §2 (the interaction owner); specs/sim/tick.md §5.2
 //! [`HostQuests`]: the quests' world on the wired host. Every
 //! [`QuestWorld`] call goes to [`EconomyQuests`] (the economy plus the
 //! rest), except those the action wiring provides:

@@ -1,5 +1,7 @@
 # Handoff: Act IV and Act V quests — `claude/impl-quests-act4-5`
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the ninth fold (`claude/fold-handoff-night`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Ninth set" (PC 1 / PC 2).
+
 Cloud implementation session, 2026-10-06, task class: implementation
 from a clear spec, medium (METHODS M14). Base: `claude/specs-staging` at
 `5844674` (Act IV / V specs merged from PC 2). Repo only, no game files
@@ -111,14 +113,14 @@ providers do.
 7. Part 2 OQ8: row 40 of `quests.tsv` is `?` and its 15 message rows are not in `quest-messages.tsv`. `act5::intro::init` writes what init `0x0058EA50` stores, and `intro::TABLE` holds the spec's §9 rows. Spec task: fill the TSVs (and the 779-row count in `tables_parse_and_check`), then drop the constant.
 8. Readings marked in code:
    - Plain "status n" is a byte write.
-   - "status n (silent)" leaves flags alone (`late::status_silent`, from `quests.md` §10.1 status(S)).
+   - "status n (silent)" leaves flags alone (`late::status_silent`, from `quests-act1.md` §10.1 status(S)).
    - §4.7 keeps flags 0x20 through "status 2 to all".
    - Freed > 15 → 36.5.
    - §7.6's post-kill steps sit inside not-intro.
    - §8.5 "none → stop" ends step 1 only.
    - Experience stats 13 / 29 are written through `add_stat` (no set-stat function named).
 
-## 4. Local checks to queue (M02, HANDOFF §5)
+## 4. Local checks to queue (M02, HANDOFF §5 S9-A3)
 
 - **A (player):** record a full Act IV run with packets and RNG (act4 OQ13).
   - Izual and the ghost, the Hellforge drops, the seals and seal bosses.

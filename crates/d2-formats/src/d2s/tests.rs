@@ -446,7 +446,7 @@ fn stats_reader_columns() {
     assert_eq!((e.internal(), e.result()), (Some(18), Some(4)));
 }
 
-// Covers: specs/formats/d2s.md §7.1 r6
+// Covers: specs/formats/d2s.md §7.1 r6, §edge-cases-original-bugs r2
 #[test]
 fn stats_without_terminator_rejected() {
     // Edge case 2: the game never ends; d2rs rejects with 18. Build a file
@@ -688,7 +688,7 @@ fn player_list_errors() {
     assert_eq!(code_of(&fix(b), &opts(false)), Some(20));
 }
 
-// Covers: specs/formats/d2s.md §8.3 r3, §8.3 r4
+// Covers: specs/formats/d2s.md §8.3 r3, §8.3 r4, §edge-cases-original-bugs r1
 #[test]
 fn corpse_rules() {
     let t = Tables::v114d();
@@ -715,7 +715,7 @@ fn corpse_rules() {
     assert_eq!(code_of(&fix(b), &opts(false)), Some(21));
 }
 
-// Covers: specs/formats/d2s.md §8.4 r2, §8.5 r2
+// Covers: specs/formats/d2s.md §8.4 r2, §8.5 r2, §edge-cases-original-bugs r10
 #[test]
 fn expansion_sections() {
     let t = Tables::v114d();
@@ -803,4 +803,388 @@ fn checksum_catches_every_byte() {
             "byte {at:#x}"
         );
     }
+}
+
+// ------------------------------------------------- gap tests (coverage)
+
+/// The 1.14d tables, but the loader finds no hireling row (edge case 8).
+struct NoHirelingRow(Tables);
+
+impl SaveTables for NoHirelingRow {
+    fn stat_save(&self, id: u16) -> Option<StatSave> {
+        self.0.stat_save(id)
+    }
+    fn item_entry_len(&self, buf: &[u8]) -> Result<usize, String> {
+        self.0.item_entry_len(buf)
+    }
+    fn hireling_restored(&self, _: &Hireling) -> bool {
+        false
+    }
+}
+
+/// Offset of the `if` marker in a `sample` file.
+fn skills_at() -> usize {
+    STATS_OFFSET + stats_bytes(&[st(0, 30), st(6, 55 << 8), st(12, 1), st(13, 500)]).len()
+}
+
+// Covers: specs/formats/d2s.md §2.2 text
+#[test]
+fn header_check_order_and_unread_fields() {
+    let t = Tables::v114d();
+    let good = write(&D2s::new_stub(b"Test", 0, 0, 0).unwrap(), &t).unwrap();
+    // Rule 1 before rule 2: a short buffer with a wrong checksum → 4.
+    let mut short = good[..0x100].to_vec();
+    short[0x0C] ^= 1;
+    assert_eq!(code_of(&short, &opts(false)), Some(4));
+    // Checksum before version: bad checksum and version 0x61 → 6.
+    let mut b = good.clone();
+    b[4] = 0x61;
+    assert_eq!(code_of(&b, &opts(false)), Some(6));
+    // Size before version: size 336 (checksum recomputed) and 0x61 → 5.
+    let mut b = good.clone();
+    b[4] = 0x61;
+    b[8..12].copy_from_slice(&336u32.to_le_bytes());
+    b[0x0C..0x10].fill(0);
+    let c = checksum(&b);
+    b[0x0C..0x10].copy_from_slice(&c.to_le_bytes());
+    assert_eq!(code_of(&b, &opts(false)), Some(5));
+    // Version before the name: 0x61 and a wrong client name → 7 (version).
+    let other = ReadOptions {
+        expansion: false,
+        game: Some(GameContext {
+            client_name: b"Other".to_vec(),
+            ..GameContext::default()
+        }),
+    };
+    let mut b = good.clone();
+    b[4] = 0x61;
+    let e = read(&fix(b), &other, &t).unwrap_err();
+    assert_eq!(e, fail(7, "version", 0x04));
+    // Status (rule 5) before class (rule 6): expansion character in a
+    // classic game with class 9 → 8.
+    let mut b = good.clone();
+    b[0x24] |= 0x20;
+    b[0x28] = 9;
+    let ctx = ReadOptions {
+        expansion: false,
+        game: Some(GameContext {
+            client_name: b"Test".to_vec(),
+            ..GameContext::default()
+        }),
+    };
+    assert_eq!(code_of(&fix(b), &ctx), Some(8));
+    // Not read on load: +0x29, +0x2B, +0x30, +0x34, +0x88..+0xA7, +0xD0..
+    let f = write(&sample(false), &t).unwrap();
+    let mut b = f.clone();
+    b[0x29] = 0;
+    b[0x2B] = 99;
+    b[0x30..0x38].fill(0x5A);
+    b[0x88..0xA8].fill(0x33);
+    b[0xD0..HEADER_SIZE].fill(0x77);
+    let ctx = ReadOptions {
+        expansion: false,
+        game: Some(GameContext {
+            client_name: b"tester".to_vec(),
+            ..GameContext::default()
+        }),
+    };
+    let back = read(&fix(b), &ctx, &t).unwrap();
+    assert_eq!(back.body, read(&f, &ctx, &t).unwrap().body);
+}
+
+// Covers: specs/formats/d2s.md §2.5 text
+#[test]
+fn hireling_block_layout() {
+    let t = Tables::v114d();
+    let mut s = sample(false);
+    s.header.hireling = Hireling {
+        flags: Hireling::DEAD,
+        seed: 0x0102_0304,
+        name_index: 0x0506,
+        id: 0x0708,
+        experience: 0x090A_0B0C,
+        rest: [0; 16],
+    };
+    let f = write(&s, &t).unwrap();
+    assert_eq!(
+        &f[0xAF..0xCF],
+        &[
+            0x00, 0x00, 0x01, 0x00, // flags 0x10000
+            0x04, 0x03, 0x02, 0x01, // seed
+            0x06, 0x05, // name index
+            0x08, 0x07, // Id
+            0x0C, 0x0B, 0x0A, 0x09, // experience
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // +0xBF: 16 zero bytes
+        ]
+    );
+    let back = read(&f, &opts(false), &t).unwrap();
+    assert_eq!(back.header.hireling, s.header.hireling);
+}
+
+// Covers: specs/formats/d2s.md §4 text
+#[test]
+fn quest_section_layout() {
+    let t = Tables::v114d();
+    let mut s = sample(false);
+    {
+        let q = &mut s.body.as_mut().unwrap().quests;
+        q.records[0][95] = 0x11;
+        q.records[1][0] = 0x22;
+        q.records[1][95] = 0x33;
+        q.records[2][0] = 0x44;
+        q.records[2][95] = 0x55;
+    }
+    let f = write(&s, &t).unwrap();
+    let q = &f[QUEST_OFFSET..QUEST_OFFSET + QUEST_SIZE];
+    assert_eq!(u32_at(q, 0), 0x216F_6F57);
+    assert_eq!(u32_at(q, 4), 6);
+    assert_eq!(u16_at(q, 8), 0x012A);
+    // Record d at +10 + 96d.
+    assert_eq!((q[10], q[10 + 95]), (1, 0x11));
+    assert_eq!((q[106], q[106 + 95]), (0x22, 0x33));
+    assert_eq!((q[202], q[202 + 95]), (0x44, 0x55));
+    // 10 + 3 × 96 = 298: the waypoint section follows.
+    assert_eq!(QUEST_OFFSET + 10 + 3 * 96, WAYPOINT_OFFSET);
+    assert_eq!(&f[WAYPOINT_OFFSET..WAYPOINT_OFFSET + 2], b"WS");
+    let back = read(&f, &opts(false), &t).unwrap();
+    assert_eq!(back.body.unwrap().quests, s.body.unwrap().quests);
+}
+
+// Covers: specs/formats/d2s.md §7.1 text
+#[test]
+fn stats_layout_by_version_and_table() {
+    let t = Tables::v114d();
+    // Version 0x5F takes the bit-field layout, like 0x60.
+    let mut s = sample(false);
+    s.header.version = 0x5F;
+    let f = write(&s, &t).unwrap();
+    assert_eq!(
+        &f[STATS_OFFSET..STATS_OFFSET + 4],
+        &stats_bytes(&[st(0, 30), st(6, 55 << 8), st(12, 1), st(13, 500)])[..4]
+    );
+    let back = read(&f, &opts(false), &t).unwrap();
+    assert_eq!(back.body, s.body);
+    // The widths come from the loaded table: strength patched to 12 bits.
+    let patched = Tables {
+        extra: vec![(
+            0,
+            StatSave {
+                bits: 12,
+                param: 0,
+                signed: false,
+            },
+        )],
+    };
+    // 9 bits id 0, 12 bits 30, 9 bits 0x1FF = 30 bits.
+    assert_eq!(
+        write_stats(&[st(0, 30)], &patched),
+        [0x67, 0x66, 0x00, 0x3C, 0xE0, 0x3F]
+    );
+    assert_eq!(
+        write_stats(&[st(0, 30)], &t),
+        [0x67, 0x66, 0x00, 0x3C, 0xF8, 0x0F]
+    );
+    let mut s = sample(false);
+    s.body.as_mut().unwrap().stats = Stats::Bits(vec![st(0, 3000)]);
+    let f = write(&s, &patched).unwrap();
+    let back = read(&f, &opts(false), &patched).unwrap();
+    assert_eq!(back.body.unwrap().stats, Stats::Bits(vec![st(0, 3000)]));
+    // The same bytes misread with the 1.14d widths do not give 3000.
+    assert_ne!(
+        read(&f, &opts(false), &t)
+            .ok()
+            .and_then(|d| d.body)
+            .map(|b| b.stats),
+        Some(Stats::Bits(vec![st(0, 3000)]))
+    );
+}
+
+// Covers: specs/formats/d2s.md §7.2 r4
+#[test]
+fn class_7_has_no_skill_list() {
+    let t = Tables::v114d();
+    let mut s = sample(false);
+    s.header.class = 0;
+    let mut f = write(&s, &t).unwrap();
+    f[0x28] = 7;
+    // The header check passes and the file loads ...
+    let back = read(&fix(f), &opts(false), &t).unwrap();
+    assert_eq!(back.header.class, 7);
+    // ... but there is no class list to write the skills from.
+    assert_eq!(write(&back, &t), Err(WriteError::Class(7)));
+}
+
+// Covers: specs/formats/d2s.md §8.1 r5
+#[test]
+fn item_that_does_not_fit_fails() {
+    let t = Tables::v114d();
+    let mut s = sample(false);
+    s.body.as_mut().unwrap().items.clear();
+    let base = write(&s, &t).unwrap().len();
+    // Fill the player list up to exactly 0x2000 bytes.
+    let mut left = MAX_FILE - base;
+    let mut items = Vec::new();
+    while left > 0 {
+        let mut n = left.min(250);
+        if (1..3).contains(&(left - n)) {
+            n -= 3;
+        }
+        items.push(item(n as u8, 0x11));
+        left -= n;
+    }
+    s.body.as_mut().unwrap().items = items;
+    let f = write(&s, &t).unwrap();
+    assert_eq!(f.len(), MAX_FILE);
+    assert!(read(&f, &opts(false), &t).is_ok());
+    // One more byte in the last item no longer fits.
+    let last = s.body.as_mut().unwrap().items.last_mut().unwrap();
+    let n = last.bytes.len() as u8 + 1;
+    *last = item(n, 0x11);
+    assert_eq!(write(&s, &t), Err(WriteError::Overflow(MAX_FILE + 1)));
+}
+
+// Covers: specs/formats/d2s.md §9 r3
+#[test]
+fn load_sequence_after_stats() {
+    let t = Tables::v114d();
+    let f = write(&sample(true), &t).unwrap();
+    let skills = skills_at();
+    let items = skills + 32;
+    let corpse = items + 4 + 10 + 5;
+    let jf = f.windows(2).rposition(|w| w == [0x6A, 0x66]).unwrap();
+    let kf = f.windows(2).rposition(|w| w == [0x6B, 0x66]).unwrap();
+    assert_eq!(&f[skills..skills + 2], b"if");
+    assert_eq!(&f[items..items + 4], &[0x4A, 0x4D, 2, 0]);
+    assert_eq!(&f[corpse..corpse + 4], &[0x4A, 0x4D, 1, 0]);
+    // Two sections broken: the earlier one in the sequence reports.
+    for (a, b, code) in [
+        (skills, items, 19),
+        (items, corpse, 20),
+        (corpse, jf, 21),
+        (jf, kf, 22),
+    ] {
+        let mut x = f.clone();
+        x[a] ^= 0x40;
+        x[b] ^= 0x40;
+        assert_eq!(code_of(&fix(x), &opts(true)), Some(code), "{a:#x}/{b:#x}");
+    }
+    // The hireling from the header decides whether the jf list is read
+    // before the golem.
+    let mut s = sample(true);
+    s.header.hireling = Hireling::default();
+    s.body.as_mut().unwrap().hireling_items = Some(None);
+    let back = read(&write(&s, &t).unwrap(), &opts(true), &t).unwrap();
+    assert_eq!(back.body.unwrap().golem.unwrap().flag, 1);
+}
+
+// Covers: specs/formats/d2s.md §10 r5
+#[test]
+fn section_order_and_missing_fixed_sections() {
+    let t = Tables::v114d();
+    let f = write(&sample(false), &t).unwrap();
+    let cut = |from: usize, len: usize| {
+        let mut b = f[..from].to_vec();
+        b.extend_from_slice(&f[from + len..]);
+        fix(b)
+    };
+    // A missing fixed section: the next section sits at its offset.
+    assert_eq!(
+        code_of(&cut(QUEST_OFFSET, QUEST_SIZE), &opts(false)),
+        Some(15)
+    );
+    assert_eq!(
+        code_of(&cut(WAYPOINT_OFFSET, WAYPOINT_SIZE), &opts(false)),
+        Some(16)
+    );
+    assert_eq!(code_of(&cut(NPC_OFFSET, NPC_SIZE), &opts(false)), Some(17));
+    // Waypoint and NPC sections swapped: fails on the waypoint marker.
+    let mut b = f[..WAYPOINT_OFFSET].to_vec();
+    b.extend_from_slice(&f[NPC_OFFSET..NPC_OFFSET + NPC_SIZE]);
+    b.extend_from_slice(&f[WAYPOINT_OFFSET..NPC_OFFSET]);
+    b.extend_from_slice(&f[NPC_OFFSET + NPC_SIZE..]);
+    assert_eq!(code_of(&fix(b), &opts(false)), Some(16));
+    // Skills before stats: fails on the stats marker.
+    let skills = skills_at();
+    let mut b = f[..STATS_OFFSET].to_vec();
+    b.extend_from_slice(&f[skills..skills + 32]);
+    b.extend_from_slice(&f[STATS_OFFSET..skills]);
+    b.extend_from_slice(&f[skills + 32..]);
+    assert_eq!(code_of(&fix(b), &opts(false)), Some(18));
+}
+
+// Covers: specs/formats/d2s.md §edge-cases-original-bugs r5
+#[test]
+fn mask_stats_bound_counts_whole_last_byte() {
+    let t = Tables::v114d();
+    let mk = |mask: Vec<u8>| {
+        let mut s = sample(false);
+        s.header.version = 0x5E;
+        s.header.stat_count = 9; // m = 2 mask bytes, bits 9..15 unused
+        s.header.skill_count = 0;
+        let b = s.body.as_mut().unwrap();
+        b.stats = Stats::Mask {
+            mask,
+            values: vec![(0, 30), (8, 5)],
+        };
+        b.skills.clear();
+        b.items.clear();
+        b.corpses.clear();
+        s
+    };
+    // Bit 9 (≥ k) set: counted by the bound (2 + 2 + 12 ≤ 22 bytes left),
+    // but no value is consumed for it; the next section follows two values.
+    let s = mk(vec![0x01, 0x03]);
+    let f = write(&s, &t).unwrap();
+    assert_eq!(f.len() - STATS_OFFSET, 2 + 2 + 8 + 2 + 4 + 4);
+    let back = read(&f, &opts(false), &t).unwrap();
+    assert_eq!(back.body, s.body);
+    // Bits 9..15 all set: the bound needs 2 + 2 + 4 × 9 = 40 bytes but 22
+    // are left → 18, although only two values would be read.
+    let f = write(&mk(vec![0x01, 0xFF]), &t).unwrap();
+    assert_eq!(code_of(&f, &opts(false)), Some(18));
+}
+
+// Covers: specs/formats/d2s.md §edge-cases-original-bugs r7
+#[test]
+fn csvparam_layer_sign_extended() {
+    let t = Tables {
+        extra: vec![(
+            20,
+            StatSave {
+                bits: 6,
+                param: 4,
+                signed: false,
+            },
+        )],
+    };
+    for (layer, want) in [(0x0008, 0xFFF8), (0x0007, 0x0007), (0x000F, 0xFFFF)] {
+        let mut s = sample(false);
+        s.body.as_mut().unwrap().stats = Stats::Bits(vec![StatEntry {
+            id: 20,
+            layer,
+            value: 5,
+        }]);
+        let f = write(&s, &t).unwrap();
+        let back = read(&f, &opts(false), &t).unwrap();
+        assert_eq!(
+            back.body.unwrap().stats,
+            Stats::Bits(vec![StatEntry {
+                id: 20,
+                layer: want,
+                value: 5
+            }]),
+            "layer {layer:#x}"
+        );
+    }
+}
+
+// Covers: specs/formats/d2s.md §edge-cases-original-bugs r8
+#[test]
+fn missing_hireling_row_fails_on_kf() {
+    let f = write(&sample(true), &Tables::v114d()).unwrap();
+    assert!(read(&f, &opts(true), &Tables::v114d()).is_ok());
+    // The header has a hireling, but its row is missing: the jf list is not
+    // consumed and the kf check sees its `JM` → 23.
+    let e = read(&f, &opts(true), &NoHirelingRow(Tables::v114d())).unwrap_err();
+    assert_eq!((e.internal(), e.result()), (Some(23), Some(10)));
 }

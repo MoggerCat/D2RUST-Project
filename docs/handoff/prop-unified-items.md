@@ -70,7 +70,7 @@ pad); every built message is now padded to and checked against its
 
 | Path | What | Spec |
 |---|---|---|
-| `crates/d2-server/tests/prop_unified_items.rs` | state-machine properties of the one item store + inventory model + S→C stream on one wired host; pinned counterexamples Q1–Q3 | `inventory.md` §1–§2, §6, §7, §8.1, §11; `vendors.md` §7; `cube.md` §2, §8 |
+| `crates/d2-server/tests/prop_unified_items.rs` | state-machine properties of the one item store + inventory model + S→C stream on one wired host; pinned counterexamples Q1–Q3 | `inventory.md` §1–§2, `inventory-moves.md` §6, §7, §8.1, §11; `vendors.md` §7; `cube.md` §2, §8 |
 
 ## 3. Counterexamples and spec questions
 
@@ -79,7 +79,7 @@ asserts the current (spec-literal) behaviour; the property accepts
 "limbo" only on these paths, with the mode each leaves.
 
 - **Q1** (`swap_with_a_failed_placement_leaves_the_cursor_item_nowhere`;
-  `inventory.md` §7.10): 0x1F takes the target first (unlinked, cursor
+  `inventory-moves.md` §7.10): 0x1F takes the target first (unlinked, cursor
   := T, mode 4, command flag 0x40000, update list), then the cursor
   item's §2.2 placement at (x, y) fails (e.g. a 2 × 2 at x = 9) → out 1 →
   result 3. The old cursor item is left in mode 4, linked nowhere and
@@ -102,7 +102,7 @@ asserts the current (spec-literal) behaviour; the property accepts
   cursor item)? Record R2 or a new recording (hold an item, transmute)
   would answer it.
 - **Q3** (`auto_pickup_with_auto_equip_leaves_the_item_nowhere`;
-  `inventory.md` §8.1 step 5): the auto pick-up takes the item out of
+  `inventory-moves.md` §8.1 step 5): the auto pick-up takes the item out of
   its room, then calls `0x00562E00(item, 0)`, which no spec writes; its
   seam (`MovePending::equip_picked`) defaults to failure, so every auto
   pick-up of an identified equippable item with a free slot leaves the

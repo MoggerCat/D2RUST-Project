@@ -1301,7 +1301,7 @@ fn identify_refusals() {
 
 // ------------------------------------------------------------ §7.3
 
-// Covers: specs/world/npc.md §7.3 text, §7.3 r3, §7.3 r4, §7.3 r5, §7.3 r6, §7.3 r7, §7.3 r8
+// Covers: specs/world/npc.md §7.3 text, §7.3 r3, §7.3 r4, §7.3 r5, §7.3 r6, §7.3 r7, §7.3 r8; specs/world/hirelings.md §3.1 r1
 #[test]
 fn hire_greiz_and_refill() {
     let mut c = control(0);
@@ -1418,7 +1418,7 @@ fn hire_refusals() {
 
 // ------------------------------------------------------------ §7.4
 
-// Covers: specs/world/npc.md §7.4 text, §7.4 r1, §7.4 r2, §7.4 r3, §7.4 r4
+// Covers: specs/world/npc.md §7.4 text, §7.4 r1, §7.4 r2, §7.4 r3, §7.4 r4; specs/world/hirelings.md §9 r2
 #[test]
 fn resurrect_at_tyrael() {
     let mut c = control(0);
@@ -1470,7 +1470,7 @@ fn resurrect_at_tyrael() {
 
 // ------------------------------------------------------------ §7.5
 
-// Covers: specs/world/npc.md §7.5
+// Covers: specs/world/npc.md §7.5; specs/world/hirelings.md §3.1 r2
 #[test]
 fn quest_mercenary() {
     let mut c = control(0);

@@ -491,7 +491,7 @@ fn skill_slots_loop() {
     assert!(s.w.unit(s.merc).skills.is_empty());
 }
 
-// Covers: specs/world/hirelings.md §7.3 r1, §7.3 r3
+// Covers: specs/world/hirelings.md §7.3 text, §7.3 r1, §7.3 r3
 #[test]
 fn add_experience_guards() {
     // merc level ≥ player level → nothing.
@@ -512,7 +512,7 @@ fn add_experience_guards() {
     assert!(s.w.sent.is_empty());
 }
 
-// Covers: specs/world/hirelings.md §7.3 r5, §7.3 r6
+// Covers: specs/world/hirelings.md §4 text, §7.3 text, §7.3 r5, §7.3 r6
 #[test]
 fn one_gain_raises_several_levels() {
     // 26460 + 2·29295 = 85050 = threshold(9) < threshold(10) = 115500.
@@ -536,7 +536,7 @@ fn one_gain_raises_several_levels() {
     assert_eq!(s.w.sent.len(), 1);
 }
 
-// Covers: specs/world/hirelings.md §7.3 r5, §10 r5, §10 r6, §edge-cases-original-bugs r6
+// Covers: specs/world/hirelings.md §4 text, §7.3 r5, §10 r5, §10 r6, §edge-cases-original-bugs r6
 #[test]
 fn level_97_jump_stops_at_98_and_reload_gives_99() {
     let mut r = row(100, 0, 1, 1, 3);
@@ -595,4 +595,36 @@ fn restore_level_walk() {
     restore_experience(&mut s.w, &s.t, &s.st, s.player, s.merc, 100).unwrap();
     assert_eq!(s.w.base(s.merc, stat::EXPERIENCE), 26460);
     assert_eq!(s.w.base(s.merc, stat::LEVEL), 6);
+}
+
+// Covers: specs/world/hirelings.md §edge-cases-original-bugs r2
+#[test]
+fn offer_uses_the_lowest_bracket_unit_its_own() {
+    // Ice brackets 3 / 36 with different HP columns: at L 40 the offer
+    // reads bracket 3 (d = 37), the unit bracket 36 (d = 4).
+    let mut rows = ice_105();
+    (rows[0].hp, rows[0].hp_lvl) = (45, 9);
+    (rows[1].hp, rows[1].hp_lvl) = (390, 6);
+    (rows[0].ar, rows[0].ar_lvl) = (10, 5);
+    (rows[1].ar, rows[1].ar_lvl) = (450, 13);
+    // L = (lo' mod 5) + player level − 5: pick the player level that
+    // gives L 40 for this seed.
+    let t = tables(rows.clone());
+    let l10 = t
+        .rows
+        .offer(true, 10, 22_752_887, 0, 0)
+        .expect("offer")
+        .level;
+    let o = t
+        .rows
+        .offer(true, 50 - l10, 22_752_887, 0, 0)
+        .expect("offer");
+    assert_eq!((o.row, o.level), (0, 40));
+    assert_eq!(o.life, 45 + 9 * 37);
+    let mut s = setup(rows, 1, 50);
+    apply_level(&mut s.w, &s.t, &s.st, s.player, Some(s.merc), o.level);
+    assert_eq!(s.w.base(s.merc, stat::MAXHP), (6 * 4 + 390) * 256);
+    assert_ne!(s.w.base(s.merc, stat::MAXHP), o.life * 256);
+    // Attack rating only on the unit (no offer word).
+    assert_eq!(s.w.base(s.merc, stat::TOHIT), 450 + 13 * 4);
 }

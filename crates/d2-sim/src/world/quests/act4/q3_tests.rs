@@ -614,3 +614,42 @@ fn hephasto_drops_a_hammer_per_kill() {
     assert_eq!(f.chains[&hfh].0, [24]);
     mephisto_killed();
 }
+
+// Covers: specs/world/quests-act4.md §edge-cases-original-bugs r6
+#[test]
+fn a_round_without_gems_ends_all_drops() {
+    // Every drop of the first round fails: count 0 → stop, no event 7
+    // rescheduled, +0x03 stays 1, the tier is kept and no rune follows.
+    let (mut ctl, _) = control();
+    let mut f = fake(3);
+    f.drop_at_fails = true;
+    smashed(&mut ctl, 2);
+    forge_event(&mut ctl, &mut f, FORGE);
+    assert_eq!(drops(&f), ["gpy", "gpy"]);
+    assert!(!f.log.iter().any(|l| l.starts_with("event7")));
+    let e = &ctl.record(24).unwrap().extra.a4.q3;
+    assert!(e.gems_pending);
+    assert_eq!(e.tier, 4);
+}
+
+// Covers: specs/world/quests-act4.md §3.1, §4.2, §5.1
+#[test]
+fn extra_data_zeroed_at_init() {
+    // The three records' extra data start at 0 (the Hellforge mode to
+    // restore 0, no hits, no sets, no timers) and init clears stale data.
+    let (mut ctl, _) = control();
+    for chain in [22, 23, 24] {
+        let r = ctl.record(chain).unwrap();
+        assert_eq!(r.extra.a4.q1, super::super::q1::Extra::default());
+        assert_eq!(r.extra.a4.q2, super::super::q2::Extra::default());
+        assert_eq!(r.extra.a4.q3, Extra::default());
+    }
+    let r = ctl.record_mut(24).unwrap();
+    (
+        r.extra.a4.q3.hits,
+        r.extra.a4.q3.sets,
+        r.extra.a4.q3.smashed,
+    ) = (3, 2, true);
+    super::super::init(r);
+    assert_eq!(r.extra.a4.q3, Extra::default());
+}

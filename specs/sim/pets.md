@@ -79,7 +79,7 @@ request; S→C 0x7A to every player's client.
 ### 2. Add `0x00575D90(game, player, pet, t, max)`
 
 ECX game, EDX player; stack pet, t, max; `ret 0xC`. Called by the summon
-spawn (`skills/bodies.md` §6.2 step 4) and Revive (`skills/bodies-2.md`
+spawn (`skills/bodies.md` §6.2 step 4) and Revive (`skills/bodies-2b.md`
 §8.7 step 9).
 
 1. Player none or not type 0 → nothing. t not in 1…pettype count − 1 →

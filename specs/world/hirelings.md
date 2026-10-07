@@ -114,7 +114,7 @@ the player's pet list (node per hireling), unit removal, S→C 0x81, 0x7A,
    Normal ids have 3 brackets, Nightmare 2, Hell 1. Expansion Normal
    bracket levels: Act 1 3/36/67, Act 2 9/43/75, Act 3 15/49/79, Act 5
    28/58/80; classic: 3/25/49, 9/31/55, 15/37/61, 28/42/75.
-5. Unused in 1.14d: class 560 (`act5hire1`, no row; inventory.md §7.23
+5. Unused in 1.14d: class 560 (`act5hire1`, no row; inventory-moves.md §7.23
    still lists it); the version-0 Act 5 rows (no classic Act 5);
    `WType1`/`WType2` (not in the binary record, `fields.tsv`); the
    item types a hireling may use are code constants (§11). The columns
@@ -475,7 +475,7 @@ version ≥ 0x5C, `0x00533C70` for older):
 
 ### 11. Items (expansion)
 
-C→S 0x61 and the allowed item types: `inventory.md` §7.23 (owner). The
+C→S 0x61 and the allowed item types: `inventory-moves.md` §7.23 (owner). The
 swap itself (`0x0054CED0(game, player, merc, item C)`), reached when §7.23
 allows C:
 
@@ -505,8 +505,8 @@ allows C:
      `0x00628280(old, 0xFF)`), merc refresh (`0x0055C460`,
      `0x0055F4F0(0)`). Result 0.
 5. Every give or take therefore creates new item units (new GUIDs);
-   take (`inventory.md` §7.23) duplicates as well.
-6. Potions given to the hireling are used on it (`inventory.md`
+   take (`inventory-moves.md` §7.23) duplicates as well.
+6. Potions given to the hireling are used on it (`inventory-moves.md`
    §7.23, item-use spec); C→S 0x26 `on_merc` (belt) likewise.
 7. Death keeps the items (§8 rule 3); a replaced hireling's items are
    freed with it (§3.2 rule 4).

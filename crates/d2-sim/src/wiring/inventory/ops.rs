@@ -1,4 +1,5 @@
 // Spec: specs/items/inventory.md §1–§5
+// Spec: specs/items/inventory-moves.md (§6–§11, split out of `inventory.md`)
 //! [`InventoryOps`] on [`InvDesk`]: each operation is the
 //! `items::inventory` function of the same rule, on the owner's
 //! [`crate::items::inventory::Inventory`] (lent out of the state for a

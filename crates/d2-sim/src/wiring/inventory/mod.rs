@@ -1,6 +1,6 @@
-// Spec: specs/items/inventory.md (wiring of the inventory and item-move seams); specs/sim/units.md §2; specs/sim/unit-order.md §5–§6; specs/items/generation.md §1.3
+// Spec: specs/items/inventory.md, specs/items/inventory-moves.md (wiring of the inventory and item-move seams); specs/sim/units.md §2; specs/sim/unit-order.md §5–§6; specs/items/generation.md §1.3
 //! The inventory seams on their real providers: the item-move code
-//! (`items::moves`, `inventory.md` §6–§11) runs on the inventory model
+//! (`items::moves`, `inventory-moves.md` §6–§11) runs on the inventory model
 //! (`items::inventory`, §1–§5), the unit records and lists, the stat lists
 //! and the economy's item store.
 //!

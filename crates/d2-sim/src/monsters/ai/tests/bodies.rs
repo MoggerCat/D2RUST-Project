@@ -1,4 +1,4 @@
-// Spec: specs/monsters/ai.md §9.9 (Npc), §9.15–§9.29, Test vectors; fakes from the parent test module
+// Spec: specs/monsters/ai-bodies.md §9.9 (Npc), §9.15–§9.29, Test vectors; fakes from the parent test module
 use super::npc::{seed_with, steps_since, unit_mode};
 use super::*;
 
@@ -32,7 +32,7 @@ fn other(w: &mut World, at: (i32, i32)) -> UnitId {
 
 // ---- §9.15 CorruptRogue ----------------------------------------------
 
-// Covers: specs/monsters/ai.md §9.15 text, §9.15 r1, §9.15 r2, §9.15 r3, §9.15 r4
+// Covers: specs/monsters/ai-bodies.md §9.15 text, §9.15 r1, §9.15 r2, §9.15 r3, §9.15 r4
 #[test]
 fn corrupt_rogue_vectors() {
     let setup = || World::new(row(10, &[60, 15, 75, 100, 20]));
@@ -86,7 +86,7 @@ fn corrupt_rogue_vectors() {
 
 // ---- §9.16 SkeletonBow -----------------------------------------------
 
-// Covers: specs/monsters/ai.md §9.16 text, §9.16 r1, §9.16 r2, §9.16 r3, §9.16 r4
+// Covers: specs/monsters/ai-bodies.md §9.16 text, §9.16 r1, §9.16 r2, §9.16 r3, §9.16 r4
 #[test]
 fn skeleton_bow_vectors() {
     let setup = || {
@@ -145,7 +145,7 @@ fn skeleton_bow_vectors() {
 
 // ---- §9.17 FoulCrowNest ----------------------------------------------
 
-// Covers: specs/monsters/ai.md §9.17 text, §9.17 r1, §9.17 r2, §9.17 r3, §9.17 r4
+// Covers: specs/monsters/ai-bodies.md §9.17 text, §9.17 r1, §9.17 r2, §9.17 r3, §9.17 r4
 #[test]
 fn foul_crow_nest_vectors() {
     // D ≤ 20, summon not due: idle `lo' % 10` + 20 = 21, 27, 23, 20.
@@ -198,7 +198,7 @@ fn raven() -> World {
     w
 }
 
-// Covers: specs/monsters/ai.md §9.18 text, §9.18 r1, §9.18 r4
+// Covers: specs/monsters/ai-bodies.md §9.18 text, §9.18 r1, §9.18 r4
 #[test]
 fn blood_raven_raise_vector() {
     // D = 8, at home, not C, param 0 = 0 → 3, param 1 = 0: 51 ≥ 3, no
@@ -219,7 +219,7 @@ fn blood_raven_raise_vector() {
     }
 }
 
-// Covers: specs/monsters/ai.md §9.18 r2, §9.18 r3, §9.18 r5, §9.18 r6, §9.18 r7
+// Covers: specs/monsters/ai-bodies.md §9.18 r2, §9.18 r3, §9.18 r5, §9.18 r6, §9.18 r7
 #[test]
 fn blood_raven_leash_and_moves() {
     // D > 45 → idle 5.
@@ -277,7 +277,7 @@ fn blood_raven_leash_and_moves() {
 
 // ---- §9.19 SkeletonMage ----------------------------------------------
 
-// Covers: specs/monsters/ai.md §9.19 text, §9.19 r1, §9.19 r2, §9.19 r3
+// Covers: specs/monsters/ai-bodies.md §9.19 text, §9.19 r1, §9.19 r2, §9.19 r3
 #[test]
 fn skeleton_mage_vectors() {
     let setup = || {
@@ -315,7 +315,7 @@ fn skeleton_mage_vectors() {
 
 // ---- §9.20 Arach -----------------------------------------------------
 
-// Covers: specs/monsters/ai.md §9.20 text, §9.20 r3
+// Covers: specs/monsters/ai-bodies.md §9.20 text, §9.20 r3
 #[test]
 fn arach_vectors() {
     // State 0, not C, AI state 0, params 1, 2 = 0: param 2 → 1;
@@ -342,7 +342,7 @@ fn arach_vectors() {
     assert_eq!(w.thinks(), [15]);
 }
 
-// Covers: specs/monsters/ai.md §9.20 r1, §9.20 r2
+// Covers: specs/monsters/ai-bodies.md §9.20 r1, §9.20 r2
 #[test]
 fn arach_retreat_and_combat() {
     let setup = || World::new(row(26, &[45, 33, 15, 8, 25]));
@@ -395,7 +395,7 @@ fn arach_retreat_and_combat() {
 
 // ---- §9.21 Fetish ----------------------------------------------------
 
-// Covers: specs/monsters/ai.md §9.21 text, §9.21 r4
+// Covers: specs/monsters/ai-bodies.md §9.21 text, §9.21 r4
 #[test]
 fn fetish_vectors() {
     // State 2, D = 15, param 1 = 0: param 1 → 1; 51, 87, 53 → idle 10 |
@@ -428,7 +428,7 @@ fn fetish_vectors() {
     assert_eq!(w.thinks(), [10]);
 }
 
-// Covers: specs/monsters/ai.md §9.21 r1, §9.21 r2, §9.21 r3, §9.21 r5
+// Covers: specs/monsters/ai-bodies.md §9.21 r1, §9.21 r2, §9.21 r3, §9.21 r5
 #[test]
 fn fetish_rhythm_and_commands() {
     let setup = || World::new(row(30, &[100, 10, 4, 33]));
@@ -475,7 +475,7 @@ fn fetish_rhythm_and_commands() {
 
 // ---- §9.22 Vampire ---------------------------------------------------
 
-// Covers: specs/monsters/ai.md §9.22 text, §9.22 r4
+// Covers: specs/monsters/ai-bodies.md §9.22 text, §9.22 r4
 #[test]
 fn vampire_vectors() {
     // State 0, not C, D = 10, L ≥ 33, no S, param 2 = 0: 51 ≥ 40; 31 < 50
@@ -496,7 +496,7 @@ fn vampire_vectors() {
     }
 }
 
-// Covers: specs/monsters/ai.md §9.22 r1, §9.22 r2, §9.22 r3, §edge-cases-original-bugs r15
+// Covers: specs/monsters/ai.md §edge-cases-original-bugs r15; specs/monsters/ai-bodies.md §9.22 r1, §9.22 r2, §9.22 r3
 #[test]
 fn vampire_bolts_upgrades_and_flight() {
     let setup = || {
@@ -556,7 +556,7 @@ fn vampire_bolts_upgrades_and_flight() {
 
 // ---- §9.23 Bighead, §9.24 BloodHawk, §9.25 HellMeteor -----------------
 
-// Covers: specs/monsters/ai.md §9.23 text, §9.23 r1, §9.23 r2, §9.23 r3
+// Covers: specs/monsters/ai-bodies.md §9.23 text, §9.23 r1, §9.23 r2, §9.23 r3
 #[test]
 fn bighead_vectors() {
     // Hurt, D = 10, no S: 51, 87, 53 ≥ 40 → idle 10 | 0 → circle 3.
@@ -608,7 +608,7 @@ fn bighead_vectors() {
     assert_eq!(w.fake.modes(), [unit_mode(mode::ATTACK2, w.player)]);
 }
 
-// Covers: specs/monsters/ai.md §9.24 text, §9.24 r1, §9.24 r2, §9.24 r3, §9.24 r4, §9.24 r5
+// Covers: specs/monsters/ai-bodies.md §9.24 text, §9.24 r1, §9.24 r2, §9.24 r3, §9.24 r4, §9.24 r5
 #[test]
 fn blood_hawk_vectors() {
     // Not C, D = 10, param 0 = 0: 51 ≥ 30; 31 < 90 → speed −50, wander 4
@@ -657,7 +657,7 @@ fn blood_hawk_vectors() {
     assert_eq!(w.vel_request(), VelocityRequest::default());
 }
 
-// Covers: specs/monsters/ai.md §9.25 text, §9.25 r1, §9.25 r2
+// Covers: specs/monsters/ai-bodies.md §9.25 text, §9.25 r1, §9.25 r2
 #[test]
 fn hell_meteor_vectors() {
     // 51, 87, 53 ≥ 50 → idle 50 | 0 < 50: roll(20) 2, 13 → `Skill1` at
@@ -693,7 +693,7 @@ fn raider() -> World {
     w
 }
 
-// Covers: specs/monsters/ai.md §9.26 text, §9.26 r1, §9.26 r2, §9.26 r3, §9.26 r7
+// Covers: specs/monsters/ai-bodies.md §9.26 text, §9.26 r1, §9.26 r2, §9.26 r3, §9.26 r7
 #[test]
 fn sand_raider_charges_glows_and_hits() {
     // A fresh counter clears states 90 and 91.
@@ -737,7 +737,7 @@ fn sand_raider_charges_glows_and_hits() {
     assert_eq!(w.fake.modes(), [unit_mode(mode::ATTACK2, w.player)]);
 }
 
-// Covers: specs/monsters/ai.md §9.26 r4, §9.26 r5, §9.26 r6, §9.26 r8
+// Covers: specs/monsters/ai-bodies.md §9.26 r4, §9.26 r5, §9.26 r6, §9.26 r8
 #[test]
 fn sand_raider_help_circle_and_rest() {
     // Hurt below aip1: walk to the nearest evil monster.
@@ -783,7 +783,7 @@ fn sand_raider_help_circle_and_rest() {
 
 // ---- §9.27 Baboon ----------------------------------------------------
 
-// Covers: specs/monsters/ai.md §9.27 text, §9.27 r2
+// Covers: specs/monsters/ai-bodies.md §9.27 text, §9.27 r2
 #[test]
 fn baboon_fights_and_starts_regenerating() {
     let setup = || {
@@ -830,7 +830,7 @@ fn baboon_fights_and_starts_regenerating() {
     assert_eq!(w.thinks(), [15]);
 }
 
-// Covers: specs/monsters/ai.md §9.27 r1
+// Covers: specs/monsters/ai-bodies.md §9.27 r1
 #[test]
 fn baboon_regeneration_countdown() {
     let setup = || {
@@ -884,7 +884,7 @@ fn maggot() -> World {
     w
 }
 
-// Covers: specs/monsters/ai.md §9.28 text, §9.28 r1, §9.28 r2
+// Covers: specs/monsters/ai-bodies.md §9.28 text, §9.28 r1, §9.28 r2
 #[test]
 fn sand_maggot_burrows_and_surfaces() {
     // Above ground, no T, no S, frame past param 1: burrow at (0, 0).
@@ -918,7 +918,7 @@ fn sand_maggot_burrows_and_surfaces() {
     assert_eq!(w.thinks(), [85]);
 }
 
-// Covers: specs/monsters/ai.md §9.28 r3
+// Covers: specs/monsters/ai-bodies.md §9.28 r3
 #[test]
 fn sand_maggot_above_ground() {
     // C and P(aip4) → A1.
@@ -964,7 +964,7 @@ fn sand_maggot_above_ground() {
     assert_eq!(w.store.control(w.mon).unwrap().params[0], 3);
 }
 
-// Covers: specs/monsters/ai.md §9.28 r3
+// Covers: specs/monsters/ai-bodies.md §9.28 r3
 #[test]
 fn sand_maggot_alternate() {
     // Re-installed while running: the alternate. Command 14 with param 4
@@ -995,7 +995,7 @@ fn sand_maggot_alternate() {
 
 // ---- §9.29 Scarab ----------------------------------------------------
 
-// Covers: specs/monsters/ai.md §9.29 text, §9.29 r1, §9.29 r4
+// Covers: specs/monsters/ai-bodies.md §9.29 text, §9.29 r1, §9.29 r4
 #[test]
 fn scarab_vectors() {
     // C, D = 25, no command: 51 < 75; 31 < 35 → `Skill1` at T | 87 → idle
@@ -1035,7 +1035,7 @@ fn scarab_vectors() {
     assert_eq!(w.fake.modes(), [unit_mode(10, w.player)]);
 }
 
-// Covers: specs/monsters/ai.md §9.29 r2, §9.29 r3
+// Covers: specs/monsters/ai-bodies.md §9.29 r2, §9.29 r3
 #[test]
 fn scarab_commands_and_circling() {
     let setup = || World::new(row(20, &[75, 50, 15, 35, 20]));
@@ -1081,7 +1081,7 @@ fn npc_world(nodes: Option<Vec<MapNode>>) -> World {
     w
 }
 
-// Covers: specs/monsters/ai.md §9.9 text, §9.9 r5, §9.9 r6, §9.9 l4 r1, §9.9 l4 r2, §9.9 l4 r3
+// Covers: specs/monsters/ai-bodies.md §9.9 text, §9.9 r5, §9.9 r6, §9.9 l4 r1, §9.9 l4 r2, §9.9 l4 r3
 #[test]
 fn npc_map_ai_vector() {
     // Map AI with 3 nodes: 51 < 66; node 0 | 87 ≥ 66 → 0, idle 8 | 53;
@@ -1151,7 +1151,7 @@ fn npc_map_ai_vector() {
     assert_eq!(w.thinks(), [8]);
 }
 
-// Covers: specs/monsters/ai.md §9.9 l3 r1, §9.9 l3 r2, §edge-cases-original-bugs r12
+// Covers: specs/monsters/ai.md §edge-cases-original-bugs r12; specs/monsters/ai-bodies.md §9.9 l3 r1, §9.9 l3 r2
 #[test]
 fn npc_commands_walk_and_wander() {
     // Command 4 far: velocity method by G (0 → 5, then 1 → 7), walk step
@@ -1204,7 +1204,7 @@ fn npc_commands_walk_and_wander() {
     assert_eq!(w.thinks(), [30]);
 }
 
-// Covers: specs/monsters/ai.md §9.9 l3 r3
+// Covers: specs/monsters/ai-bodies.md §9.9 l3 r3
 #[test]
 fn npc_command_7_mode_actions() {
     let cmd7 = |m: i32, n: i32| AiCommand {
@@ -1269,7 +1269,7 @@ fn npc_command_7_mode_actions() {
     assert!(w.commands().contains(&[7, 0, 100, 100, 4]));
 }
 
-// Covers: specs/monsters/ai.md §9.9 r2, §9.9 r3, §9.9 r4
+// Covers: specs/monsters/ai-bodies.md §9.9 r2, §9.9 r3, §9.9 r4
 #[test]
 fn npc_class_cases() {
     // jerhyn, palace inactive → idle 40.
@@ -1325,7 +1325,7 @@ fn npc_class_cases() {
 
 // ---- boundaries (M08: each failed a deliberate off-by-one) -------------
 
-// Covers: specs/monsters/ai.md §9.18 r4, §9.18 r3, §9.20 r3, §9.29 r3, §9.9 l3 r1, §9.9 l4 r2
+// Covers: specs/monsters/ai-bodies.md §9.18 r4, §9.18 r3, §9.20 r3, §9.29 r3, §9.9 l3 r1, §9.9 l4 r2
 #[test]
 fn boundaries() {
     // BloodRaven raises at most 2 × difficulty + 8 times (8 in Normal).

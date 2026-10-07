@@ -1,4 +1,4 @@
-// Spec: specs/monsters/ai.md §1–§9; specs/monsters/init.md §7; specs/monsters/ai-bodies-2.md..ai-bodies-5.md (seams `AiUnits`, `AiModes`, `AiWorld`, `AiTargets`, `AiSkills`, `AiQuests`, `AiActs`)
+// Spec: specs/monsters/ai.md §1–§8; specs/monsters/ai-bodies.md §9; specs/monsters/init.md §7; specs/monsters/ai-bodies-2.md..ai-bodies-5.md (seams `AiUnits`, `AiModes`, `AiWorld`, `AiTargets`, `AiSkills`, `AiQuests`, `AiActs`)
 //! Monster AI ↔ units, modes, timer events and the DRLG: [`View`]
 //! implements [`crate::monsters::ai::AiHost`]. Real providers: seeds,
 //! class, mode, states (`stat-lists.md` §9), the state-54 clear of
@@ -77,7 +77,7 @@ impl<X: Pending> AiUnits for View<'_, X> {
     }
     /// Life in percent of max life.
     ///
-    /// TODO(ai.md §9.2, §2.4): the rounding of "life %" is not stated;
+    /// TODO(ai-bodies.md §9.2, ai.md §2.4): the rounding of "life %" is not stated;
     /// `100 · life / max` truncating (0 with max 0).
     fn life_percent(&self, unit: UnitId) -> i32 {
         let life = i64::from(self.stats.unit_total(unit, stat::HITPOINTS, 0));
@@ -153,7 +153,7 @@ impl<X: Pending> AiUnits for View<'_, X> {
     }
     /// The state toggle `0x00625A70` (`stat-lists.md` §9.2).
     ///
-    /// TODO(spec: ai.md §9.26): SandRaider calls `0x00639DB0`; read as the
+    /// TODO(spec: ai-bodies.md §9.26): SandRaider calls `0x00639DB0`; read as the
     /// state toggle of `stat-lists.md` §9.2.
     fn set_state(&mut self, unit: UnitId, s: u16, on: bool) {
         View::set_state(self, unit, s, on);

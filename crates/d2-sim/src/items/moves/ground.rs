@@ -1,4 +1,5 @@
-// Spec: specs/items/inventory.md
+// Spec: specs/items/inventory-moves.md
+// Spec: specs/items/inventory.md (the sections other than §6–§11)
 //! Pickup from the ground (§8), drop to the ground (§9) and gold (§10).
 
 use super::deferred::{owner_refresh, send_item_page};
@@ -49,7 +50,7 @@ pub fn pickup_auto<W: MoveWorld>(
             return Ok(Outcome::REFUSED);
         }
         leave_room(w, item);
-        // TODO(spec: inventory.md §8.1 r5): the result of a failed
+        // TODO(spec: inventory-moves.md §8.1 r5): the result of a failed
         // `0x00562E00` is not written; read as "nothing".
         let ok = w.equip_picked(player, item);
         if ok {
@@ -93,7 +94,7 @@ pub fn pickup_auto<W: MoveWorld>(
         return Ok(Outcome::NOTHING);
     }
     leave_room(w, item);
-    // TODO(spec: inventory.md §8.1 r7): the link's failure is not written
+    // TODO(spec: inventory-moves.md §8.1 r7): the link's failure is not written
     // (`0x005600A0`); ignored.
     w.link_check(player, item, 1);
     w.set_cursor(player, None);
@@ -452,7 +453,7 @@ pub fn cube_spill<W: MoveWorld>(w: &mut W, player: Owner) -> Result<(), MoveFata
     for it in list {
         send_item_page(w, player, it, iflag::COPIED, page::CUBE)?;
         let (x, y) = w.pos(Owner::item(it));
-        // TODO(spec: inventory.md §9.3): an unlink failure here is not
+        // TODO(spec: inventory-moves.md §9.3): an unlink failure here is not
         // written; ignored.
         w.unlink(player, it);
         w.room_change_notice(it, x, y);
@@ -516,7 +517,7 @@ pub fn gold_piles<W: MoveWorld>(w: &mut W, unit: Owner, amount: i32, max: usize)
         let Some(spot) = drop_spot(w, unit, 0) else {
             break;
         };
-        // TODO(spec: inventory.md §10.2): a failed creation is not
+        // TODO(spec: inventory-moves.md §10.2): a failed creation is not
         // written; read as "stop".
         let Some(g) = w.create_gold(unit, spot) else {
             break;

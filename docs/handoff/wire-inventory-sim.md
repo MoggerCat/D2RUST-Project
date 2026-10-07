@@ -41,7 +41,7 @@ no rule of its own. No recording R1–R6 exists.
 
 | Path | What | Spec |
 |---|---|---|
-| `wiring/inventory/mod.rs` | `InvState` (inventories per owner unit, the `InvItem` per item unit, ground expiry, errors), `InvRest` (seams without a provider), `InvDesk` (`new` fills the item copies; `with_inv` lends an inventory out for a mutating call, writes the copies back, runs the owner refreshes asked for; `update_done` = §6.1 rule 4), `InvError` | `inventory.md` §1.1, §6.1 |
+| `wiring/inventory/mod.rs` | `InvState` (inventories per owner unit, the `InvItem` per item unit, ground expiry, errors), `InvRest` (seams without a provider), `InvDesk` (`new` fills the item copies; `with_inv` lends an inventory out for a mutating call, writes the copies back, runs the owner refreshes asked for; `update_done` = §6.1 rule 4), `InvError` | `inventory.md` §1.1, `inventory-moves.md` §6.1 |
 | `wiring/inventory/inv_world.rs` | `InvWorld` for `InvDesk` | §1–§5 seams |
 | `wiring/inventory/ops.rs` | `InventoryOps` for `InvDesk` (each op = the `items::inventory` function of its rule) | §1–§5 |
 | `wiring/inventory/units.rs` | `MoveUnits` for `InvDesk` | §1.1, `units.md` §2, `generation.md` §1.3 |
@@ -144,7 +144,7 @@ the item stays in the belt; no gold pile is made without
 
 ## 6. Questions (for the spec owner; each pinned by a test)
 
-- **WV1** (`inventory.md` §6.3 vs `units.md` §2 / §3.1 step 5): the
+- **WV1** (`inventory-moves.md` §6.3 vs `units.md` §2 / §3.1 step 5): the
   allocator sets unit flag 0x10 ("seed set") on **every** unit, and §6.3
   sends a ground message only for items *without* unit flag 0x10, so on
   real units `items::moves::ground_update` never builds 0x9C action 2 /
@@ -152,7 +152,7 @@ the item stays in the belt; no gold pile is made without
   is wrong. Pinned by `ground::assert_ground_update` (with the bit
   cleared by hand the spec's 0x9C action 2 comes out). Settle: Ghidra
   `0x0055BF30` / `0x0055BED0` (which field the test reads), or R1.
-- **WV2** (`inventory.md` §7.6): X "becomes the cursor item", then N goes
+- **WV2** (`inventory-moves.md` §7.6): X "becomes the cursor item", then N goes
   to the location "as §4.6 step 5", whose text includes "cursor :=
   none"; read literally (as `items::moves::swap_2handed` does), X ends in
   mode 4, unlinked and not the cursor item. An original quirk (like
@@ -181,7 +181,7 @@ the item stays in the belt; no gold pile is made without
   (`d2_server::adapters::handlers::items`) except 0x4C (`cube.md` §10:
   item-use spec) are exactly `items::moves::HANDLED` (23 ids; checked by
   reading both lists on this branch); their owner becomes
-  `specs/items/inventory.md` §7.
+  `specs/items/inventory-moves.md` §7.
 - Per client in the player unit update (`unit-order.md` §6, `tick.md`
   §6): `items::moves::player_update(&mut desk, client, player)` returns
   the 0x9C / 0x9D / 0x7D and 0x47 / 0x48 bytes in order; then

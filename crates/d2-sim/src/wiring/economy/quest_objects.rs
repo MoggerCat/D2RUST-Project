@@ -79,11 +79,11 @@ pub fn run<W: QuestWorld>(
 /// the table address.
 pub fn init_fn(n: u8) -> Option<u32> {
     Some(match n {
-        // TowerTome (`quests.md` §10.7).
+        // TowerTome (`quests-act1.md` §10.7).
         4 => 0x0059_5A00,
         // CairnStone, objects 17–21 (`quests-act1-rest.md` §2.2).
         6 => 0x0059_35E0,
-        // MalusStand (`quests.md` §10.5).
+        // MalusStand (`quests-act1.md` §10.5).
         15 => 0x0054_4950,
         // TaintedAltar → `0x0059A3F0` (`quests-act2.md` §5.8).
         20 => 0x0054_4910,
@@ -111,15 +111,15 @@ pub fn init_fn(n: u8) -> Option<u32> {
 /// part for 34), by `OperateFn` index, with the table address.
 pub fn operate_fn(n: u8) -> Option<u32> {
     Some(match n {
-        // TowerTome (`quests.md` §10.7).
+        // TowerTome (`quests-act1.md` §10.7).
         6 => 0x0059_4E70,
-        // Monolith (Cairn stone, `quests.md` §10.6).
+        // Monolith (Cairn stone, `quests-act1.md` §10.6).
         9 => 0x0059_3710,
         // CainGibbet (`quests-act1-rest.md` §1.1).
         10 => 0x0059_3480,
-        // InifussTree (`quests.md` §10.6).
+        // InifussTree (`quests-act1.md` §10.6).
         12 => 0x0059_3AF0,
-        // HoradrimMalus (`quests.md` §10.5).
+        // HoradrimMalus (`quests-act1.md` §10.5).
         21 => 0x0059_1AC0,
         // TaintedSunAltar (`quests-act2.md` §5.7).
         24 => 0x0059_A7E0,

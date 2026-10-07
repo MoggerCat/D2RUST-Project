@@ -527,7 +527,7 @@ The room argument of rule 2 is the caller's `room` unchanged
 (`0x00555DEC`), not the room rule 1's lookup found. `items/treasure.md`
 §7 step 2 (`0x0055A550`) is one of the callers: room of the dropper
 (`0x00620BB0`), its position, size 1, fallback 1. The inventory drops
-(`items/inventory.md` §9.1, §9.3) also pass size 1, fallback 1; the gold
+(`items/inventory-moves.md` §9.1, §9.3) also pass size 1, fallback 1; the gold
 piles (§10.2 there) call `0x0064E810` directly with fallback 0. Item size is 1, so the size
 query is a single cell against 0x3E01.
 

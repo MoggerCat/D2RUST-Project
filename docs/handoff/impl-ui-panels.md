@@ -1,5 +1,7 @@
 # Handoff: UI panels (`ui/panels.md`) in `d2-client`
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the ninth fold (`claude/fold-handoff-night`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Ninth set" (PC 1 / PC 2).
+
 Branch `claude/impl-ui-panels`, based on `claude/specs-staging` at
 `5844674` (2026-10-06, cloud). Spec: `specs/ui/panels.md` (draft) with
 `ui-states.tsv`, `panel-layout.tsv`, `npc-menus.tsv`. Status:
@@ -109,7 +111,7 @@ branches and the client handler table has no entry for them. This branch
 changes nothing in `bridge/`, `d2-proto` or `specs/sim/` (bridge/model
 session's area).
 
-## 5. Local run queue
+## 5. Local run queue (HANDOFF §5 C71, S9-A7)
 
 1. HANDOFF §5 C71: `D2_GAME_DIR=<install> cargo test -p d2-client --test
    game_panels -- --ignored` (panel DC6 sizes, counts, offsets).

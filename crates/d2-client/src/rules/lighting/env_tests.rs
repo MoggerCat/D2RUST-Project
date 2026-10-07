@@ -432,7 +432,7 @@ fn eclipse_triggers() {
     assert!(tr.on_act_load(1));
 }
 
-// Covers: specs/render/lighting.md §3.1 r1, §3.1 r2, §3.1 r3
+// Covers: specs/render/lighting.md §3.1 text, §3.1 r1, §3.1 r2, §3.1 r3
 #[test]
 fn room_ambient_order() {
     let t = tables();
@@ -737,7 +737,7 @@ fn umod3_light() {
     assert_eq!(seed, s);
 }
 
-// Covers: specs/render/lighting.md §8 text
+// Covers: specs/render/lighting.md §8 text, §8 r4
 #[test]
 fn overlay_object_horadric_cursecenter() {
     let c = (10, 20, 30);
@@ -818,4 +818,23 @@ fn missile_flicker() {
         Some(want)
     );
     assert_eq!(seed, s);
+}
+
+// Covers: specs/render/lighting.md §10 text
+#[test]
+fn overrides_are_keyed_by_the_room_level() {
+    // One override state; only the level id picks the rule: the Den (8)
+    // glows, the levels 107 / 108 rule needs its own flag, any other level
+    // falls through (R, G, B 0) while no darkness event runs.
+    let o = Overrides::default();
+    assert!(o.ambient(8, 1).has_color());
+    for level in [1, 7, 9, 107, 108, 120] {
+        assert_eq!(o.ambient(level, 1), Ambient::ZERO, "level {level}");
+    }
+    let glow = Overrides {
+        glow_flag: true,
+        ..Overrides::default()
+    };
+    assert!(glow.ambient(107, 0).has_color() && glow.ambient(108, 0).has_color());
+    assert_eq!(glow.ambient(9, 0), Ambient::ZERO);
 }

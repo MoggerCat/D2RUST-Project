@@ -1,4 +1,4 @@
-// Spec: specs/skills/bodies-2.md §6
+// Spec: specs/skills/bodies-2b.md §6
 //! Batch 3 bodies of required level 18 (§6): Charged Strike, Fire Wall,
 //! Enchant, Chain Lightning, Teleport, Confuse, Poison Explosion,
 //! Vengeance, Blessed Hammer, Holy Freeze, Leap Attack, Rabies, Fire
@@ -391,7 +391,7 @@ pub fn vengeance<W: BodyWorld>(
         let len = elem_len(w, t, Some(u), skill, lvl);
         record.cold_len = record.cold_len.wrapping_add(len);
         let k = w.entry_param(u, &e, 1);
-        // TODO(spec: bodies-2.md §6.8): a stored value outside 0…2 sets
+        // TODO(spec: bodies-2b.md §6.8): a stored value outside 0…2 sets
         // no hit class here.
         match k {
             0 => record.hit_class = 0x20,

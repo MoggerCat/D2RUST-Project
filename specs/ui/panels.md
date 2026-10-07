@@ -445,7 +445,7 @@ after both.
    other buttons (`0x004845A0`), the cursor item and hover box: owner
    `ui/inventory.md` (`client/ui.md` §B5, §Open questions 1).
 7. Clicks on the grid and body locations send the item intents (§15);
-   their validation is `items/inventory.md` §7.
+   their validation is `items/inventory-moves.md` §7.
 
 ### 10. Skill tree (ui 4, right; `0x004AC690`)
 
@@ -647,8 +647,8 @@ call):
 |---|---|---|
 | character | release on an add button | 0x3A × ⌈n / 32⌉ (`combat/vitals.md` §2) |
 | skill tree | release on a pressed icon, points left | 0x3B (`skills/levels.md` §6.4) |
-| inventory, stash, cube, trade pages | grid click (`0x0048FFE0`) | 0x19 lift, 0x18 place, 0x1F swap, 0x20 use, 0x21 stack, 0x27 use on item, 0x28 socket, 0x29 scroll to tome, 0x2A to cube, 0x33 sell, 0x63 to belt, 0x4C (`items/inventory.md` §7) |
-| inventory | body location click (`0x00490780`, `0x00490BA0`, `0x00490FC0`) | 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x21, 0x27, 0x4C (`items/inventory.md` §7) |
+| inventory, stash, cube, trade pages | grid click (`0x0048FFE0`) | 0x19 lift, 0x18 place, 0x1F swap, 0x20 use, 0x21 stack, 0x27 use on item, 0x28 socket, 0x29 scroll to tome, 0x2A to cube, 0x33 sell, 0x63 to belt, 0x4C (`items/inventory-moves.md` §7) |
+| inventory | body location click (`0x00490780`, `0x00490BA0`, `0x00490FC0`) | 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x21, 0x27, 0x4C (`items/inventory-moves.md` §7) |
 | inventory | socket fill (`0x004912A0`) | 0x28 |
 | inventory | weapon swap (`0x0048A730`) | 0x60 |
 | mercenary | item on merc (`0x0048B7C0`, `0x004936E0`) | 0x61 |
@@ -663,7 +663,7 @@ call):
 | skill select | `0x004A9BD0`, `0x004AA030` / hot keys `0x004A9D70`… | 0x3C / 0x51 |
 
 Exact grid-to-message rules (which cell, which item state) are
-`items/inventory.md` §7 and `ui/inventory.md` (§Open questions 1).
+`items/inventory-moves.md` §7 and `ui/inventory.md` (§Open questions 1).
 
 ### 16. Machine tables
 

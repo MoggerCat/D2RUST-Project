@@ -1012,3 +1012,85 @@ fn update_message_bytes() {
         ])
     );
 }
+
+// Covers: specs/world/objects.md §1
+#[test]
+fn object_data_fields_and_flags() {
+    // The §1 flag bits.
+    assert_eq!(
+        [
+            oflags::CHANGED,
+            oflags::SELECTABLE,
+            oflags::ATTACKABLE,
+            oflags::INIT_CLEARED,
+            oflags::KEEP_MODE,
+            oflags::HOVER_FREED,
+            oflags::SOUND_QUEUED,
+        ],
+        [0x1, 0x2, 0x4, 0x8, 0x80, 0x100, 0x400]
+    );
+    // The data is zeroed at allocation: stale fields of a reused unit are
+    // gone; only the GUID, the class and the timer owner −1 are set by
+    // creation of a class without an init function.
+    let t = tables();
+    let mut ctl = control(&t, Seed::init());
+    ctl.data.insert(
+        O,
+        ObjectData {
+            guid: 7,
+            class: 1,
+            interact: 0x88,
+            shrine: Some(3),
+            operator: 21,
+            spark: 2,
+            owner: Some(5),
+            drop_code: 0x2020_6B6B,
+            last_tick: 99,
+        },
+    );
+    let mut f = fake(0, 2);
+    run_create(&mut ctl, &t, &mut f, ANIM, 0).unwrap();
+    assert_eq!(
+        ctl.get(O).unwrap(),
+        &ObjectData {
+            guid: 0x1234,
+            class: ANIM,
+            owner: Some(-1),
+            ..ObjectData::default()
+        }
+    );
+    // `InteractType` of a chest: trap type in bits 0–6, locked in bit 7.
+    let mut ctl = control(&t, Seed::new(410, 666));
+    run_create(&mut ctl, &t, &mut f, CHEST, 0).unwrap();
+    let it = ctl.get(O).unwrap().interact;
+    assert_eq!((it & 0x7F, it & 0x80), (8, 0x80));
+}
+
+// Covers: specs/world/objects.md §edge-cases-original-bugs text, §edge-cases-original-bugs r2
+#[test]
+fn chest_and_urn_read_classic_normal_monlvl() {
+    // Only `MonLvl1` feeds the trap and lock thresholds: the Nightmare,
+    // Hell and expansion columns change nothing.
+    let base = tables();
+    let mut other = tables();
+    for l in &mut other.levels {
+        (l.monlvl2, l.monlvl3) = (200, 200);
+        (l.monlvl1ex, l.monlvl2ex, l.monlvl3ex) = (200, 200, 200);
+    }
+    let mut high = tables();
+    high.levels[2].monlvl1 = 200;
+    let run = |t: &ObjectTables, class: u16, lo: u32| {
+        let mut ctl = control(t, Seed::new(lo, 666));
+        let mut f = fake(0, 2);
+        run_create(&mut ctl, t, &mut f, class, 0).unwrap();
+        (ctl.get(O).unwrap().interact, ctl.seed)
+    };
+    let mut differs = false;
+    for lo in 1..200 {
+        for class in [URN, CHEST] {
+            assert_eq!(run(&base, class, lo), run(&other, class, lo), "lo {lo}");
+            differs |= run(&base, class, lo) != run(&high, class, lo);
+        }
+    }
+    assert!(differs, "MonLvl1 itself is read");
+}

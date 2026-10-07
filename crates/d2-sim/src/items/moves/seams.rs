@@ -1,5 +1,6 @@
-// Spec: specs/items/inventory.md
-//! Seams of the item-move code (`inventory.md` §6–§11).
+// Spec: specs/items/inventory-moves.md
+// Spec: specs/items/inventory.md (the sections other than §6–§11)
+//! Seams of the item-move code (`inventory-moves.md` §6–§11).
 //!
 //! - [`InventoryOps`]: exactly the `inventory.md` §1–§5 operations the
 //!   handlers call (provider: `items::inventory`, parallel session). No

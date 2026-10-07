@@ -317,7 +317,7 @@ mod tests {
     }
 
     // Partial: §11 r2 (art; the right-half inventory is §9).
-    // Covers: specs/ui/panels.md §11 r3
+    // Covers: specs/ui/panels.md §11 r2, §11 r3
     #[test]
     fn stash_draw_exp_and_classic() {
         let t = PanelTables::load().unwrap();

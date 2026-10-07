@@ -11,7 +11,7 @@ fn ground(f: &mut Fake, g: u32) -> &mut FItem {
     f.item(g, mode::GROUND)
 }
 
-// Covers: specs/items/inventory.md §8.1 r1, §8.1 r2, §8.3
+// Covers: specs/items/inventory-moves.md §8.1 r1, §8.1 r2, §8.3
 #[test]
 fn auto_pickup_gates_and_refusal() {
     let mut f = Fake::new();
@@ -37,7 +37,7 @@ fn auto_pickup_gates_and_refusal() {
     assert!(f.logged("sound 0x17"));
 }
 
-// Covers: specs/items/inventory.md §8.1 r3, §8.1 r4, §8.1 r5
+// Covers: specs/items/inventory-moves.md §8.1 r3, §8.1 r4, §8.1 r5
 #[test]
 fn auto_pickup_gold_specials_equip() {
     let mut f = Fake::new();
@@ -69,7 +69,7 @@ fn auto_pickup_gold_specials_equip() {
     assert!(f.logged("equip_picked 10") && f.logged("quest_picked 10"));
 }
 
-// Covers: specs/items/inventory.md §8.1 r6
+// Covers: specs/items/inventory-moves.md §8.1 r6
 #[test]
 fn auto_pickup_to_belt() {
     let mut f = Fake::new();
@@ -90,7 +90,7 @@ fn auto_pickup_to_belt() {
     assert_eq!(f.it(10).cmd, 0x80);
 }
 
-// Covers: specs/items/inventory.md §8.1 r7
+// Covers: specs/items/inventory-moves.md §8.1 r7
 #[test]
 fn auto_pickup_no_room() {
     let mut f = Fake::new();
@@ -102,7 +102,7 @@ fn auto_pickup_no_room() {
     assert_eq!(f.unit_flags(Owner::item(10)), 0x1000);
 }
 
-// Covers: specs/items/inventory.md §8.4 r1, §8.4 r2, §8.4 r3, §8.4 r6
+// Covers: specs/items/inventory-moves.md §8.4 r1, §8.4 r2, §8.4 r3, §8.4 r6
 #[test]
 fn can_pick_uniques_and_inventory() {
     let mut f = Fake::new();
@@ -127,7 +127,7 @@ fn can_pick_uniques_and_inventory() {
     assert!(!can_pick(&f, me(), 10));
 }
 
-// Covers: specs/items/inventory.md §8.4 r4, §8.4 r5, §8.4 r6
+// Covers: specs/items/inventory-moves.md §8.4 r4, §8.4 r5, §8.4 r6
 #[test]
 fn can_pick_quest_items() {
     let check = |code: &[u8; 4], quest: u8, flags: &[(u8, u8)]| {
@@ -168,7 +168,7 @@ fn can_pick_quest_items() {
     assert!(can_pick(&f, me(), 10));
 }
 
-// Covers: specs/items/inventory.md §9.1 r1, §9.1 r2, §9.1 r3, §9.1 r4
+// Covers: specs/items/inventory-moves.md §9.1 r1, §9.1 r2, §9.1 r3, §9.1 r4
 #[test]
 fn drop_places_on_ground() {
     let mut f = Fake::new();
@@ -202,7 +202,7 @@ fn drop_places_on_ground() {
     assert_eq!(f.spot_calls.borrow()[0], ((100, 100), (100, 100), 0));
 }
 
-// Covers: specs/items/inventory.md §9.2 text, §9.2 r15000
+// Covers: specs/items/inventory-moves.md §9.2 text, §9.2 r15000
 #[test]
 fn ground_expiry_values() {
     let exp = |q: u8, quest: u8, types: Vec<u16>, gold: i32, filler: bool| {
@@ -228,7 +228,7 @@ fn ground_expiry_values() {
     assert_eq!(exp(4, 0, vec![], 0, true), 31000);
 }
 
-// Covers: specs/items/inventory.md §9.3, §6.4
+// Covers: specs/items/inventory-moves.md §9.3, §6.4
 #[test]
 fn cube_spill_moves_contents() {
     let mut f = Fake::new();
@@ -258,7 +258,7 @@ fn cube_spill_moves_contents() {
     assert!(!f.inv().list.contains(&11));
 }
 
-// Covers: specs/items/inventory.md §10.1
+// Covers: specs/items/inventory-moves.md §10.1
 #[test]
 fn gold_pickup_g2() {
     let mut f = Fake::new();
@@ -278,7 +278,7 @@ fn gold_pickup_g2() {
     assert!(!f.logged("rest_pile 0"));
 }
 
-// Covers: specs/items/inventory.md §10.2
+// Covers: specs/items/inventory-moves.md §10.2
 #[test]
 fn gold_piles_caps() {
     let mut f = Fake::new();
@@ -302,7 +302,7 @@ fn gold_piles_caps() {
     assert!(InventoryOps::items(&f, me()).is_empty());
 }
 
-// Covers: specs/items/inventory.md §10.3
+// Covers: specs/items/inventory-moves.md §10.3
 #[test]
 fn gold_messages_g3() {
     assert_eq!(layouts::gold(120, 100), Some(vec![0x19, 0x14]));

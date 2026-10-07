@@ -1,4 +1,4 @@
-// Spec: specs/world/quests.md §3, §5, §10.1, §10.4–§10.8
+// Spec: specs/world/quests.md §3, §5; specs/world/quests-act1.md §10.1, §10.4–§10.8
 //! Every Act I quest chain (A1Q1–A1Q6) through its states on the wired
 //! host (`WiredWorld`: the real `QuestControl` on `EconomyQuests` over the action sim's own
 //! units and stat lists). Messages go through the real host frame
@@ -147,7 +147,7 @@ fn done(slots: &[u8]) -> impl FnOnce(&mut PlayerQuests) + '_ {
     }
 }
 
-// Covers: specs/world/quests.md §10.4 text, §10.4 l2 r1, §10.4 l2 r2, §10.4 l3 r5, §10.4 l3 r6, §10.4 l4 r1, §10.4 l4 r2, §10.1 r3
+// Covers: specs/world/quests-act1.md §10.4 text, §10.4 l2 r1, §10.4 l2 r2, §10.4 l3 r5, §10.4 l3 r6, §10.4 l4 r1, §10.4 l4 r2, §10.1 r3
 #[test]
 fn den_of_evil_through_every_state() {
     let mut f = Fx::new(|_| {});
@@ -200,7 +200,7 @@ fn den_of_evil_through_every_state() {
     assert_eq!(f.errors(), Vec::<String>::new());
 }
 
-// Covers: specs/world/quests.md §3 r2, §10.1 r2, §10.5 r2, §10.5 r3, §10.5 r4, §10.5 r5, §10.5 r7; specs/world/quests-act1-rest.md §8 r8
+// Covers: specs/world/quests.md §3 r2; specs/world/quests-act1.md §10.1 r2, §10.5 r2, §10.5 r3, §10.5 r4, §10.5 r5, §10.5 r7; specs/world/quests-act1-rest.md §8 r8
 #[test]
 fn burial_grounds_through_every_state() {
     // Den of Evil done by the first player: switched off, so its
@@ -282,7 +282,7 @@ fn quest_item(f: &mut Fx, index: i32) -> UnitId {
         .unwrap()
 }
 
-// Covers: specs/world/quests.md §10.1 r1, §10.5 l2 r1, §10.5 l2 r2, §10.5 l2 r4, §10.5 l2 r5, §10.5 l2 r10, §10.5 l2 r13, §10.5 l2 r16
+// Covers: specs/world/quests-act1.md §10.1 r1, §10.5 l2 r1, §10.5 l2 r2, §10.5 l2 r4, §10.5 l2 r5, §10.5 l2 r10, §10.5 l2 r13, §10.5 l2 r16
 #[test]
 fn tools_of_the_trade_through_every_state() {
     // Quests 1, 2 and 4 done: the walk 1 → 2 → 4 → 3 opens chain 3.
@@ -337,7 +337,7 @@ fn tools_of_the_trade_through_every_state() {
     assert_eq!(f.errors(), Vec::<String>::new());
 }
 
-// Covers: specs/world/quests.md §10.6 r1, §10.6 r2, §10.6 r9, §10.6 r18, §10.6 text
+// Covers: specs/world/quests-act1.md §10.6 r1, §10.6 r2, §10.6 r9, §10.6 r18, §10.6 text
 #[test]
 fn search_for_cain_through_every_state() {
     // Quests 1 and 2 done: the walk 1 → 2 → 4 opens chain 4.
@@ -411,7 +411,7 @@ fn search_for_cain_through_every_state() {
     assert_eq!(f.errors(), Vec::<String>::new());
 }
 
-// Covers: specs/world/quests.md §10.7 r2, §10.7 r3, §10.7 r4, §10.7 r6, §10.7 r9
+// Covers: specs/world/quests-act1.md §10.7 r2, §10.7 r3, §10.7 r4, §10.7 r6, §10.7 r9
 #[test]
 fn forgotten_tower_through_every_state() {
     let mut f = Fx::new(|_| {});
@@ -459,7 +459,7 @@ fn forgotten_tower_through_every_state() {
     assert_eq!(f.errors(), Vec::<String>::new());
 }
 
-// Covers: specs/world/quests.md §10.1 r1, §10.8 r2, §10.8 r3, §10.8 r4, §10.8 r5, §10.8 r7, §10.8 r10
+// Covers: specs/world/quests-act1.md §10.1 r1, §10.8 r2, §10.8 r3, §10.8 r4, §10.8 r5, §10.8 r7, §10.8 r10
 #[test]
 fn sisters_to_the_slaughter_through_every_state() {
     // Quests 1–4 done: the walk reaches chain 6, whose timer (period 20)

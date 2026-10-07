@@ -1,5 +1,7 @@
 # Handoff: audio implementation — `claude/impl-audio`
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the ninth fold (`claude/fold-handoff-night`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Ninth set" (PC 1 / PC 2).
+
 Cloud implementation session, 2026-10-06, medium effort. Base
 `claude/specs-staging` at `5844674` (the merges of `spec-formats-wav`,
 `spec-audio-buddy`). Repo only, no game files. Every result below is

@@ -17,7 +17,7 @@ pub const GOSSIP_SLOTS: usize = 12;
 s2c_message! {
     /// 0x0B GameHandshake (6 bytes), sender `0x0053B3D0`: the unit's type
     /// and GUID (`client/model.md` §3 rule 1, the receive layout;
-    /// `items/inventory.md` §9.1, the builder). At a single-player join it
+    /// `items/inventory-moves.md` §9.1, the builder). At a single-player join it
     /// names the joining player (`client/model.md` §11 rule 3).
     0x0B GameHandshake 6 {
         /// `u8` at 1.

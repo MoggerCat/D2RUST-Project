@@ -730,7 +730,7 @@ fn click_button_closes_the_cube() {
 
 /// 0x18 with the cube open: the ring in the cube (page 3 of the
 /// player's inventory) matches the recipe; the amulet is created on a
-/// real unit; the ring gets S→C 0x9D action 5 now (`inventory.md` §6.4,
+/// real unit; the ring gets S→C 0x9D action 5 now (`inventory-moves.md` §6.4,
 /// §11: owner the player, the ring's item bit stream; its stored page
 /// set to 3), is unlinked and freed; sound 4; the amulet is placed by
 /// §2.4 into the cube (page 3) and identified (§8). Empty cube: nothing

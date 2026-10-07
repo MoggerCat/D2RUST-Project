@@ -1,4 +1,4 @@
-// Spec: specs/items/inventory.md §7
+// Spec: specs/items/inventory-moves.md §7
 //! Property test of the item-move intent handlers (`handle`, §7) on
 //! arbitrary message payloads against the fake world of `tests` (every
 //! seam answered from random state and random knobs).

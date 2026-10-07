@@ -74,7 +74,7 @@ mercenary spawn fails, unit act 0, one `hireling` row for Kashya
 | Seam / callback | Where | Owner |
 |---|---|---|
 | `unhandled 37 0x58f870` | chain 37 (Act I intro) event 11, every 0x31 | `quests.tsv` chain 37; `wire-open-seams.md` open question (order vs. the mercenary reward) |
-| `unhandled 37 0x58f8f0`, `6 0x595e20`, `5 0x594c50`, `4 0x592580`, `3 0x5916a0`, `2 0x590b10`, `1 0x58ff90` | event 0 (NPC activate) of the text refresh after Akara's 64 (§7.2): text list comes out empty | Act I event-0 callbacks (`quests.md` §10, not written) |
+| `unhandled 37 0x58f8f0`, `6 0x595e20`, `5 0x594c50`, `4 0x592580`, `3 0x5916a0`, `2 0x590b10`, `1 0x58ff90` | event 0 (NPC activate) of the text refresh after Akara's 64 (§7.2): text list comes out empty | Act I event-0 callbacks (`quests-act1.md` §10, not written) |
 | `QuestRest::send_text_list` | 0x27 of the refresh | `0x00661480` builder |
 | `NpcRest::spawn_mercenary`, `init_mercenary` | quest mercenary after 0x50 | monster spec |
 | `QuestRest::*` player data (records, act, level) | every call | player spec |

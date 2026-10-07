@@ -1,4 +1,5 @@
 // Spec: specs/items/inventory.md
+// Spec: specs/items/inventory-moves.md (§6–§11, split out of `inventory.md`)
 //! The inventory model and its placement, belt, equip and shared checks
 //! (§1–§5): records and fields ([`Inventory`], [`Grid`], [`InvItem`]),
 //! grids and the grid record by page ([`grid_record`]), the item list and

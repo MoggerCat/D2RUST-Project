@@ -1,4 +1,5 @@
 // Spec: specs/items/inventory.md §4
+// Spec: specs/items/inventory-moves.md (§6–§11, split out of `inventory.md`)
 //! Equipping: body-location compatibility (§4.1), requirements (§4.2), the
 //! equip check (§4.3), hands compatible (§4.4), the stack test (§4.5),
 //! equip from the cursor (§4.6) and auto-equip on pickup (§4.7).

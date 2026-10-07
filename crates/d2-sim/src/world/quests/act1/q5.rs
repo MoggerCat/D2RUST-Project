@@ -1,5 +1,6 @@
-// Spec: specs/world/quests.md §10.7 (A1Q5 The Forgotten Tower, chain 5)
+// Spec: specs/world/quests-act1.md §10.7 (A1Q5 The Forgotten Tower, chain 5)
 // Spec: specs/world/quests-act1-rest.md §4 (the chest trap step)
+// Spec: specs/world/quests.md (the sections other than §10)
 //! A1Q5 callback by callback: events 0, 3, 8 (the Countess), 10, 11, 13,
 //! the timer `0x005954C0`, the active function, the tome operate, the
 //! chest init and event 7, the trap step `0x005954F0` and the object

@@ -1,7 +1,6 @@
 # Handoff: client S→C handlers for the wired UI and audio — `claude/impl-client-msgs-2`
 
-> Not yet folded into `docs/HANDOFF.md` §1–§4 (only `docs/PLAN.md` is
-> edited here); the coordinator folds it.
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the ninth fold (`claude/fold-handoff-night`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Ninth set" (PC 1 / PC 2).
 
 Cloud implementation session, 2026-10-06, task class: implementation from
 specs, medium. Base: `claude/specs-staging` at `d33adcf` (re-fetched at

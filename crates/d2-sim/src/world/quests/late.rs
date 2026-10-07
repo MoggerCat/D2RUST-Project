@@ -72,7 +72,7 @@ pub fn status_to_all<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize,
 }
 
 /// "status n (silent)": `0x00544300` with iterate 0 — status := n,
-/// nothing sent (`quests.md` §10.1 status(S)).
+/// nothing sent (`quests-act1.md` §10.1 status(S)).
 pub fn status_silent(ctl: &mut QuestControl, i: usize, n: u8) {
     ctl.records[i].status = n;
 }

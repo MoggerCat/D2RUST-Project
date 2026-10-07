@@ -426,6 +426,7 @@ mod tests {
         penalty: i32,
         effect: ResistEffect,
         popup: Option<i32>,
+        language: u8,
     }
     impl CharacterView for View {
         fn stat(&self, id: u16) -> i32 {
@@ -438,7 +439,7 @@ mod tests {
             self.alive
         }
         fn language(&self) -> u8 {
-            0
+            self.language
         }
         fn resist_penalty(&self) -> i32 {
             self.penalty
@@ -547,6 +548,7 @@ mod tests {
         assert_eq!(images(&out).iter().filter(|i| i.0 == f).count(), 4);
     }
 
+    // Covers: specs/ui/panels.md §7 r3
     #[test]
     fn close_button_frames() {
         let t = tables();
@@ -701,6 +703,7 @@ mod tests {
         assert!(texts(&d).contains(&("0".into(), 288, 270, 1, 0)));
     }
 
+    // Covers: specs/ui/panels.md §8 r8
     #[test]
     fn font8_fallback() {
         let v = View {
@@ -745,6 +748,47 @@ mod tests {
             &Strings(vec![]),
         );
         assert!(!texts(&d).iter().any(|t| t.0 == "50"));
+    }
+
+    // Covers: specs/ui/panels.md §8 r8
+    #[test]
+    fn defense_popup_test_only_for_language_6() {
+        // Defense 500 with a popup width ≥ the span: Font8 only in
+        // language 6; any other language keeps Font16 without the test.
+        let v = View {
+            stats: vec![(31, 500, 500)],
+            popup: Some(40),
+            language: 6,
+            ..View::default()
+        };
+        let d = draws(
+            &CharacterPanel::default(),
+            Screen::R640,
+            &v,
+            &Strings(vec![]),
+        );
+        assert!(texts(&d).iter().any(|t| t.0 == "500" && t.3 == FONT8));
+        let v = View { language: 0, ..v };
+        let d = draws(
+            &CharacterPanel::default(),
+            Screen::R640,
+            &v,
+            &Strings(vec![]),
+        );
+        assert!(texts(&d).iter().any(|t| t.0 == "500" && t.3 == 1));
+        // Language 6, popup narrower than the span: Font16.
+        let v = View {
+            language: 6,
+            popup: Some(10),
+            ..v
+        };
+        let d = draws(
+            &CharacterPanel::default(),
+            Screen::R640,
+            &v,
+            &Strings(vec![]),
+        );
+        assert!(texts(&d).iter().any(|t| t.0 == "500" && t.3 == 1));
     }
 
     // Covers: specs/ui/panels.md §8 r9
@@ -842,7 +886,7 @@ mod tests {
         assert!(p.release(&t, &s, Point::new(130, 100), false, 0).is_empty());
     }
 
-    // Covers: specs/ui/panels.md §8 r3
+    // Covers: specs/ui/panels.md §8 r3, §7 r3
     #[test]
     fn close_release_without_press() {
         let t = tables();

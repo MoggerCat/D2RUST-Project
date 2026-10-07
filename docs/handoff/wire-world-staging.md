@@ -1,5 +1,7 @@
 # Handoff: world wiring of objects, quest objects and hireling callers — `claude/wire-world-staging`
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the ninth fold (`claude/fold-handoff-night`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Ninth set" (PC 1 / PC 2).
+
 Cloud wiring session, 2026-10-06, task class: implementation from clear
 specs, medium (METHODS M14). Base: `claude/specs-staging` at `2f860d1`.
 Repo only, synthetic tables, no game files (M09). Inputs: the handoff
@@ -65,7 +67,7 @@ check).
    an init's draws and allocations (the marker init's town Cain, `0x005940E0`)
    come after the rest of the hook's allocations. Fix path: lend the
    quest control (and the quests' rest) into the action wiring the way
-   `monster_world` is lent. Queued as HANDOFF §5 #79.
+   `monster_world` is lent. Queued as HANDOFF §5 C79.
 2. **Hireling death** (`hirelings.md` §8 r1): the `0x00457490` test and
    the death flag argument in the kill path are open question 8, and
    `damage.md` §7.2 does not place `0x005751A0` among the kill's steps.
@@ -99,15 +101,15 @@ check).
    touched here: their providers sit in skills / monsters / quests and
    the missile wiring is another session's.
 
-## 4. Local run queue (added to HANDOFF §5 as #78–#80)
+## 4. Local run queue (added to HANDOFF §5 as C78–C80)
 
-- #78: trace a Cairn stone, gibbet and tome interaction in Act I with
+- C78: trace a Cairn stone, gibbet and tome interaction in Act I with
   packets + RNG (tick numbers of the 0x0E mode messages, event 7 at
   operate frame + 17): the wired host must give the same tick and bytes.
-- #79: trace the creation of the town-Cain marker object (385) after
+- C79: trace the creation of the town-Cain marker object (385) after
   Cain left Tristram: the RNG draw order of Cain's spawn against the
   room's other object allocations decides whether the drained init
   (§3 item 1) is exact.
-- #80: a teleport with a living hireling (packets): the hireling's warp
+- C80: a teleport with a living hireling (packets): the hireling's warp
   messages relative to the player's 0x15 / room messages (the follow runs
   after the handler here).

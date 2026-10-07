@@ -1,5 +1,6 @@
-// Spec: specs/items/inventory.md §6–§11; specs/sim/intents-events.md §2.3, §2.4, §3.2; specs/sim/tick.md §6
-//! The item-move intents (C→S 0x16–0x29, 0x50, 0x61, 0x63; `inventory.md`
+// Spec: specs/items/inventory-moves.md §6–§11; specs/sim/intents-events.md §2.3, §2.4, §3.2; specs/sim/tick.md §6
+// Spec: specs/items/inventory.md (the sections other than §6–§11)
+//! The item-move intents (C→S 0x16–0x29, 0x50, 0x61, 0x63; `inventory-moves.md`
 //! §7) and the deferred item messages (§6, §11) on the wired host.
 //!
 //! A handler finds the client's player unit and hands the message to
@@ -37,37 +38,65 @@ use crate::seams::{ClientId, Intents, MessageSink, ResultCode};
 /// Every item-move C→S id: (id, `client-messages.tsv` name, owner spec
 /// section). Exactly `d2_sim::items::moves::HANDLED`, in id order.
 pub const MOVE_IDS: &[(u8, &str, &str)] = &[
-    (0x16, "PickItem", "specs/items/inventory.md §7.1"),
-    (0x17, "DropItem", "specs/items/inventory.md §7.2"),
-    (0x18, "InsertItemInBuffer", "specs/items/inventory.md §7.3"),
+    (0x16, "PickItem", "specs/items/inventory-moves.md §7.1"),
+    (0x17, "DropItem", "specs/items/inventory-moves.md §7.2"),
+    (
+        0x18,
+        "InsertItemInBuffer",
+        "specs/items/inventory-moves.md §7.3",
+    ),
     (
         0x19,
         "RemoveItemFromBuffer",
-        "specs/items/inventory.md §7.4",
+        "specs/items/inventory-moves.md §7.4",
     ),
-    (0x1A, "EquipItem", "specs/items/inventory.md §7.5"),
-    (0x1B, "Swap2HandedItem", "specs/items/inventory.md §7.6"),
-    (0x1C, "RemoveBodyItem", "specs/items/inventory.md §7.7"),
-    (0x1D, "SwapCursorWithBody", "specs/items/inventory.md §7.8"),
-    (0x1E, "Swap1HWith2H", "specs/items/inventory.md §7.9"),
+    (0x1A, "EquipItem", "specs/items/inventory-moves.md §7.5"),
+    (
+        0x1B,
+        "Swap2HandedItem",
+        "specs/items/inventory-moves.md §7.6",
+    ),
+    (
+        0x1C,
+        "RemoveBodyItem",
+        "specs/items/inventory-moves.md §7.7",
+    ),
+    (
+        0x1D,
+        "SwapCursorWithBody",
+        "specs/items/inventory-moves.md §7.8",
+    ),
+    (0x1E, "Swap1HWith2H", "specs/items/inventory-moves.md §7.9"),
     (
         0x1F,
         "SwapCursorBufferItem",
-        "specs/items/inventory.md §7.10",
+        "specs/items/inventory-moves.md §7.10",
     ),
-    (0x20, "UseGridItem", "specs/items/inventory.md §7.11"),
-    (0x21, "StackItems", "specs/items/inventory.md §7.12"),
-    (0x22, "UnstackItems", "specs/items/inventory.md §7.13"),
-    (0x23, "ItemToBelt", "specs/items/inventory.md §7.14"),
-    (0x24, "ItemFromBelt", "specs/items/inventory.md §7.15"),
-    (0x25, "SwitchBeltItem", "specs/items/inventory.md §7.16"),
-    (0x26, "UseBeltItem", "specs/items/inventory.md §7.17"),
-    (0x27, "UseItemAction", "specs/items/inventory.md §7.18"),
-    (0x28, "SocketItem", "specs/items/inventory.md §7.19"),
-    (0x29, "ScrollToBook", "specs/items/inventory.md §7.20"),
-    (0x50, "DropGold", "specs/items/inventory.md §7.22"),
-    (0x61, "MercItem", "specs/items/inventory.md §7.23"),
-    (0x63, "ItemToBeltShift", "specs/items/inventory.md §7.24"),
+    (0x20, "UseGridItem", "specs/items/inventory-moves.md §7.11"),
+    (0x21, "StackItems", "specs/items/inventory-moves.md §7.12"),
+    (0x22, "UnstackItems", "specs/items/inventory-moves.md §7.13"),
+    (0x23, "ItemToBelt", "specs/items/inventory-moves.md §7.14"),
+    (0x24, "ItemFromBelt", "specs/items/inventory-moves.md §7.15"),
+    (
+        0x25,
+        "SwitchBeltItem",
+        "specs/items/inventory-moves.md §7.16",
+    ),
+    (0x26, "UseBeltItem", "specs/items/inventory-moves.md §7.17"),
+    (
+        0x27,
+        "UseItemAction",
+        "specs/items/inventory-moves.md §7.18",
+    ),
+    (0x28, "SocketItem", "specs/items/inventory-moves.md §7.19"),
+    (0x29, "ScrollToBook", "specs/items/inventory-moves.md §7.20"),
+    (0x50, "DropGold", "specs/items/inventory-moves.md §7.22"),
+    (0x61, "MercItem", "specs/items/inventory-moves.md §7.23"),
+    (
+        0x63,
+        "ItemToBeltShift",
+        "specs/items/inventory-moves.md §7.24",
+    ),
 ];
 
 /// An item-move id (one [`MOVE_IDS`] row).
