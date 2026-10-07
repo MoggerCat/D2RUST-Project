@@ -6,7 +6,8 @@ Scope: specs/monsters/*.md, specs/missiles/*.md. Time-boxed session
 ## Counts
 
 Uncovered before: 12 spec files with gaps, ~50 rules. Claimed in this
-session: `umod-init-bodies.md` §4 r2, §4 r3 (new test
+session (3 files touched; also `ai.md` §3.3 text and `ai-bodies.md` §9.12 text added
+to existing tests that already cover them): `umod-init-bodies.md` §4 r2, §4 r3 (new test
 `teleport_assigns_skill_184_level_1_and_mode_4` in
 `crates/d2-sim/src/monsters/init/tests_c2mon.rs`, registered with one
 `#[path]` line in `init/tests.rs`). No code fixes.
@@ -48,15 +49,17 @@ specs/monsters/ai.md	§2.1 r4	fatal assert on bad code pointer; no d2rs counterp
 specs/missiles/missiles.md	§r2-4-client-message	0x73 message builder: server-messages / client spec
 specs/missiles/missiles.md	§edge-cases-original-bugs r10	crash-if-used rows; no behaviour
 
+specs/monsters/ai-bodies-3.md	§edge-cases-original-bugs r6	dead branch / unreachable case note (no behaviour)
+specs/monsters/ai-bodies-4.md	§edge-cases-original-bugs r4	reads address 0x18E (crash) for invalid skill; unreachable
+specs/missiles/bodies.md	§edge-cases-original-bugs r6	ordering of owner vs pointer check; no observable effect in the seam model
+specs/monsters/ai.md	§5.1 text	prose on callers/setters/clear of the forced target (pointers to other specs)
+
 ## Rules left (need real tests, not done for lack of time)
 
 - specs/monsters/ai-bodies-7.md §27 r3, r5, r7–r11 (ShadowMaster think:
   code exists in `ai/bodies7.rs`; needs a scan-callback harness like
   `tests/act7.rs`).
-- specs/monsters/ai.md §2.1 r4 / §3.3 text / §5.1 text / edge r13
-  (BloodRaven halved distance: code exists, needs a test).
-- specs/monsters/ai-bodies.md §9.12 text (Andariel), ai-bodies-3 edge r6,
-  ai-bodies-4 edge r4 (each: code exists, claim + short test).
+- specs/monsters/ai.md edge r13 (BloodRaven keeps the halved distance after a
+  failed run-near: code exists, needs a fake whose run_near fails).
 - specs/missiles/bodies-2.md edge r2 (server-hit 21 state request with
   stat 0 value 0: not modelled by the `apply_state` seam),
-  bodies.md edge r6.
