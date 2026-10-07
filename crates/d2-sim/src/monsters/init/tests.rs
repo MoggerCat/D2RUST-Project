@@ -2121,6 +2121,15 @@ fn assign_fields() {
     c[0] = 2;
     let f = components_field(&c, &[3; 16]).unwrap();
     assert_eq!(f[0], (2, 2));
+    // §24 rule 3: one presence bit, then the components (here 16 × 2 bits).
+    let mut w = BitWriter::new();
+    write_components(&mut w, &[0; 16], &[3; 16]);
+    assert_eq!((w.bits, w.bytes.clone()), (1, vec![0]));
+    let mut w = BitWriter::new();
+    write_components(&mut w, &c, &[3; 16]);
+    assert_eq!(w.bits, 1 + 16 * 2);
+    // Bit 0 = 1 (present), bits 1–2 = component 0 (2).
+    assert_eq!(w.bytes[0] & 0b111, 0b101);
     // Boss section: none without umods.
     let mut w = BitWriter::new();
     assert!(!write_boss_section(&mut w, &MonsterData::default()));

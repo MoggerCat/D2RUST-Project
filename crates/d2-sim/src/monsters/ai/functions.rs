@@ -891,10 +891,8 @@ fn corrupt_archer<W: AiHost + ?Sized>(
     }
 }
 
-/// §9.10 Navi.
-///
-/// TODO(spec gap): "clamp param 1 at 0 and count it down": read as
-/// `max(param1, 0)`, then − 1 while > 0.
+/// §9.10 Navi. "Clamp and count down" (`ai-bodies.md` §9.10 step 2):
+/// param 1 < 0 → 0 (and stays 0); param 1 > 0 → param 1 − 1.
 fn navi<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitId, _p: &TickParam) {
     // 1.
     if cx.world.interacting(u) {
