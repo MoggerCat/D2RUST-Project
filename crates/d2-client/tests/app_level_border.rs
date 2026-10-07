@@ -123,7 +123,7 @@ fn server_player(server: &app_support::Server<StepClock>) -> Option<(i32, i32)> 
     })
 }
 
-// Covers: specs/client/model.md §3 r3, §12 r2; specs/drlg/rooms.md §3.3; specs/sim/intents-events.md §7.8
+// Covers: specs/client/model.md §3 r3, §12 r2; specs/sim/intents-events.md §2.4 r3
 #[test]
 fn walking_east_out_of_the_town_the_map_follows_into_the_blood_moor() {
     use d2_client::app::play::{add_walk, predict_link};
@@ -186,10 +186,8 @@ fn walking_east_out_of_the_town_the_map_follows_into_the_blood_moor() {
         let g = &mut l.host_mut().game;
         let hooks = g.events.action.hooks();
         let mut t = (*hooks.tables).clone();
-        let mut row: d2_data::tables::Charstats = d2_data::tables::Record::decode(&vec![
-            0u8;
-            <d2_data::tables::Charstats as d2_data::tables::Record>::SIZE
-        ]);
+        use d2_data::tables::{Charstats, Record};
+        let mut row = Charstats::decode(&[0u8; Charstats::SIZE]);
         row.walkvelocity = 6;
         row.runvelocity = 9;
         t.combat.charstats = vec![row; 7];

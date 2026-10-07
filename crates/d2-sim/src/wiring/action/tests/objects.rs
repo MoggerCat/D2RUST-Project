@@ -327,7 +327,7 @@ fn update_pass_sends_the_state_message() {
     fx.assert_clean();
 }
 
-// Covers: specs/sim/intents-events.md §7.1 r2.1, §7.2
+// Covers: specs/sim/intents-events.md §7.1 r2, §7.2
 #[test]
 fn update_pass_announces_a_new_object_first() {
     // An object created in a room the client already holds (unit flag
