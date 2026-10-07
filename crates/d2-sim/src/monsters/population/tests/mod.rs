@@ -842,6 +842,12 @@ fn random_boss_flow() {
         .all(|m| m.class == 31 && m.type_flags == type_flag::MINION));
     assert_eq!(f.calls("xfer 0"), minions.len());
     assert_eq!(f.calls("setowner"), minions.len());
+    // Owner data `0x0058F030(game, minion, boss GUID, 1, 0, 0)` (open
+    // question 4).
+    for m in 1..=minions.len() {
+        let owner = format!("owner {m} Guid(UnitId(0)) 1 0 0");
+        assert!(f.log.contains(&owner), "{owner}");
+    }
     assert!(f.log.last().unwrap().starts_with("modinit 0"));
     // The minion count comes from the boss's seed, as derived at its
     // allocation: replay it.
@@ -1473,9 +1479,11 @@ fn regular_presets() {
     for c in [229, 284, 288, 392, 393] {
         assert!(preset_spawn(&mut cx, R0, c, 20, 20, 1).is_none(), "{c}");
     }
-    // barricadedoor1 with objCol: its object.
+    // barricadedoor1 with objCol: object 571 at its position (open
+    // question 3).
     let u = preset_spawn(&mut cx, R0, 432, 30, 30, 1).unwrap();
-    assert!(f.log.contains(&format!("barricade {} 432", u.0)));
+    let (x, y) = (cx.host.unit(u).x, cx.host.unit(u).y);
+    assert!(f.log.contains(&format!("object 571 {x} {y}")));
 }
 
 // Covers: specs/monsters/population.md §11.4 text, §11.4 r1, §11.4 r2, §11.4 r3, §11.4 r4, §11.4 r5, §11.4 r6, §6.3 r3, §edge-cases-original-bugs r11
@@ -1518,7 +1526,11 @@ fn superunique_presets() {
     // minions; hcIdx 42 group spawn; modifier 22 last.
     let n0 = cx.host.units.len();
     let b = preset_spawn(&mut cx, R0, 601, 40, 40, 1).unwrap();
-    assert_eq!(cx.host.units.len(), n0 + 1, "no minions");
+    // No unique minions; the hcIdx 42 group (open question 4: mode 1,
+    // r 20, 20 spawns of 453, flags 0) is the only other creation.
+    let group: Vec<_> = (n0 + 1..cx.host.units.len()).collect();
+    assert!(group.iter().all(|&i| cx.host.units[i].class == 453));
+    assert_eq!(group.len(), 20, "the hcIdx 42 group");
     // The boss seed: derived at allocation, then roll(1) (one step).
     let mut g = steps(Seed::init(), n0);
     let bs = g.derive();
@@ -1529,13 +1541,16 @@ fn superunique_presets() {
         "stacks"
     );
     let log = &f.log;
-    assert!(log.contains(&format!("group {} 453 1 20 20 0x0", b.0)));
+    // Each group unit: owner data (boss GUID, 1, 0, 0) and the boss's
+    // minion list, before the closing modifier 22.
+    let g0 = crate::units::UnitId(group[0] as u32);
+    let owner = format!("owner {} Guid(UnitId({})) 1 0 0", g0.0, b.0);
+    assert!(log.contains(&owner), "{log:?}");
+    assert!(log.contains(&format!("minion {} {}", b.0, g0.0)));
     let last_b = log
         .iter()
         .rposition(|l| l.starts_with(&format!("mod {} 22", b.0)));
-    let group_b = log
-        .iter()
-        .position(|l| l.starts_with(&format!("group {}", b.0)));
+    let group_b = log.iter().position(|l| *l == owner);
     assert!(group_b < last_b);
     // Class < 0 or difficulty ≥ 3: nothing.
     let mut f = Fake::new();

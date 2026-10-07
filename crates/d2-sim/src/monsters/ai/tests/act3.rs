@@ -386,8 +386,11 @@ fn high_priest_vectors() {
     s.step();
     s.step();
     let k = (s.step() & 3) as usize;
-    let off = [(-5, -5), (5, -5), (5, 5), (-5, 5)][k];
-    assert_eq!(w.fake.modes(), [point_mode(10, 105 + off.0, 100 + off.1)]);
+    // The request holds T and the offset point; T ≠ 0 wins (`ai.md` §7.1
+    // mode request record, open question 13): the point is drawn but
+    // not used by the mode set.
+    let _off = [(-5, -5), (5, -5), (5, 5), (-5, 5)][k];
+    assert_eq!(w.fake.modes(), [unit_mode(10, w.player)]);
     assert_eq!(param_of(&w, 1), 110);
     // e = 0, C: P(aip1) → e := 1, A1.
     let (mut w, _) = seeded(act_row(85, &council), 1, |v| v[0] < 75);

@@ -83,8 +83,9 @@ pub fn boss_spawn<H: PopHost + ?Sized>(
     if x == 0 && y == 0 {
         (x, y) = spawn_point(cx, room, cl, class, warp_check)?;
     }
-    // TODO(spec: population.md §6.3): the creation mode is not stated;
-    // mode 1 (neutral) as for every other population spawn.
+    // PROVISIONAL (monsters/population.md §6.3): the creation mode is 1
+    // (neutral), as for every other population spawn; settled by a bin
+    // read of 0x005A09E0. HIGH-PRIORITY CAPTURE? (spawn state)
     let mode = 1;
     let at = |cx: &mut Ctx<'_, H>, x, y, r, f| {
         let req = placement::SpawnReq {
@@ -114,8 +115,9 @@ pub fn boss_spawn<H: PopHost + ?Sized>(
                 at(cx, px, py, -1, f)
             })
             .or_else(|| {
-                // TODO(spec: population.md §6.3 r4): the room of the nearest
-                // free point is used for the placement.
+                // PROVISIONAL (monsters/population.md §6.3 r4): the
+                // placement uses the room of the nearest free point; settled
+                // by a bin read of 0x005A09E0.
                 let (_, px, py) = cx.host.nearest_free_point(room, x, y)?;
                 at(cx, px, py, -1, f)
             })
@@ -178,7 +180,8 @@ pub fn unique_minions<H: PopHost + ?Sized>(
             continue;
         };
         cx.host.transfer_modifiers(boss, m);
-        cx.host.unique_minion_owner_data(boss, m);
+        // `0x0058F030(game, minion, boss GUID, 1, 0, 0)` (open question 4).
+        cx.host.set_owner_data(m, OwnerKey::Guid(boss), 1, 0, 0);
         cx.host.add_minion(boss, m);
         cx.host.set_owner(m, boss);
         cx.host.set_type_flags(m, type_flag::MINION);
@@ -304,9 +307,9 @@ fn tentacles<H: PopHost + ?Sized>(
             flags: flags::NO_PARTY,
         };
         if let Placed::Unit(m) = placement::place(cx, req) {
-            // TODO(spec: population.md §10.3 r1): "as in 10.2.3" read as
-            // the same calls without the SetBoss condition (the leader's
-            // owner data is set always here).
+            // PROVISIONAL (monsters/population.md §10.3 r1): "as in 10.2.3"
+            // is the same calls without the SetBoss condition (always
+            // made); settled by a bin read of 0x005B2570.
             cx.host.set_owner_data(m, OwnerKey::DataOf(leader), 1, 0, 0);
             cx.host.add_minion(leader, m);
         }

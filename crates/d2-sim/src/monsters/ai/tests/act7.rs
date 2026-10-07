@@ -65,6 +65,15 @@ fn flying_scimitar_reads_aip1_twice() {
     assert_eq!(steps_since(&w, lo), 3);
 }
 
+// T = 0 is unreachable in a target-mode-1 body and asserted (`ai.md` §2.3
+// "Target 0 in mode-1 and mode-4 bodies").
+#[test]
+#[should_panic(expected = "GargoyleTrap think without a target")]
+fn gargoyle_trap_asserts_a_target() {
+    let mut w = world(act_row(63, &[24, 20, 12, 15]));
+    w.think_with(None, 0, false);
+}
+
 // Covers: specs/monsters/ai-bodies-7.md §4 text, §4 r1, §4 r2, §4 r3, §4 r4, §4 r5, §4 r6, §4 r7
 #[test]
 fn gargoyle_trap_vectors() {

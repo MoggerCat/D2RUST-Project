@@ -30,9 +30,8 @@ pub fn component_bits(count: u8) -> u32 {
 }
 
 /// The 16 components as (value, bits) pairs, `None` when all are 0
-/// (the field is omitted).
-/// TODO(spec: monsters/init.md §24): how the reader learns the field is
-/// omitted (a presence bit or header flag) is not stated.
+/// (the field is omitted). The reader learns it from 1 presence bit
+/// before the field (§24 full layout rule 3; [`write_components`]).
 pub fn components_field(components: &[u8; 16], counts: &[u8; 16]) -> Option<Vec<(u32, u32)>> {
     if components.iter().all(|&c| c == 0) {
         return None;
@@ -44,6 +43,22 @@ pub fn components_field(components: &[u8; 16], counts: &[u8; 16]) -> Option<Vec<
             .map(|(&c, &n)| (u32::from(c), component_bits(n)))
             .collect(),
     )
+}
+
+/// The components part of 0xAC (§24 full layout rule 3): 1 bit = any of
+/// the 16 component bytes ≠ 0 (`0x00573AE0`); set → each byte in its
+/// width ([`component_bits`] of the class's choice count); clear → no
+/// component bits.
+pub fn write_components(w: &mut BitWriter, components: &[u8; 16], counts: &[u8; 16]) {
+    match components_field(components, counts) {
+        Some(f) => {
+            w.write(1, 1);
+            for (v, n) in f {
+                w.write(v, n);
+            }
+        }
+        None => w.write(0, 1),
+    }
 }
 
 /// A bit writer, low bit first (§24).

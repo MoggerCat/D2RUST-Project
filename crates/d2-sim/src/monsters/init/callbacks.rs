@@ -246,8 +246,9 @@ pub fn quest_death<H: InitHost + ?Sized>(cx: &Ctx<'_>, h: &mut H, u: UnitId, cal
         0x005D_FE00 => purge(cx, h, u, 35, 1, 51, false),
         0x005D_FE20 => {
             // `m` = max(missile 348 `Range` − 100, 100).
-            // TODO(spec: umod-callbacks.md §15.2): without row 348 the
-            // original reads through a null record; d2rs does nothing.
+            // Fewer than 349 missile rows: the original reads through a
+            // null record (umod-callbacks.md §15.2; never with the game's
+            // data, which has the row); nothing is done here.
             let Some(range) = h.missile_range(missile::RADAMENT_HAND_OF_GOD) else {
                 return;
             };

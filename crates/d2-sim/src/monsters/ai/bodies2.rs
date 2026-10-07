@@ -443,7 +443,7 @@ pub fn claw_viper<W: AiHost + ?Sized>(
     let g = glow(cx.aip(p, 6));
     // 1. Param 0 is never cleared (edge case 4).
     if let Some(st) = g.filter(|_| param(cx, u, 0) != 0) {
-        cx.world.set_state(u, st, false);
+        cx.world.set_state(game, u, st, false);
     }
     // 3.
     if p.combat {
@@ -463,7 +463,7 @@ pub fn claw_viper<W: AiHost + ?Sized>(
         if cx.world.skill_check(game, u, s1, t, tx, ty) {
             use_skill(game, cx, u, m1, s1, target_of(t));
             if let Some(st) = g {
-                cx.world.set_state(u, st, true);
+                cx.world.set_state(game, u, st, true);
             }
             set_param(cx, u, 0, 1);
             return;
@@ -829,8 +829,9 @@ const STAT_COLDRESIST: u16 = 43;
 
 /// Skill k in `Skkmode` at `x` (`0x005DEAD0(mode, skill, x, X, Y)`).
 ///
-/// TODO(spec: ai-bodies-2.md §15): the request also carries T's position
-/// (X, Y); a mode request holds one target here, the unit.
+/// The request holds the unit and T's position (X, Y) at once; the mode
+/// set aims at the unit whenever it is ≠ 0 and uses (X, Y) only for a
+/// unit of 0 (`ai.md` §7.1 mode request record, open question 13).
 fn summoner_cast<W: AiHost + ?Sized>(
     game: &mut Game,
     cx: &mut Ctx<'_, W>,
@@ -839,7 +840,15 @@ fn summoner_cast<W: AiHost + ?Sized>(
     k: usize,
     x: Option<UnitId>,
 ) {
-    skill_k(game, cx, u, p, k, x);
+    let at = match x {
+        Some(x) => ModeTarget::Unit(x),
+        None => {
+            let (tx, ty) = p.target.map_or((0, 0), |t| cx.world.position(t));
+            ModeTarget::Point(tx, ty)
+        }
+    };
+    let (s, m) = cx.skill(p, k);
+    use_skill(game, cx, u, m, s, at);
 }
 
 /// §15 Summoner (53) `0x005F85C0`.

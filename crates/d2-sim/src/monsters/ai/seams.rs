@@ -82,8 +82,10 @@ pub trait AiUnits {
     /// Sets bits of the unit flags (unit +0xC4; FoulCrowNest's 0x20000).
     fn set_unit_flag(&mut self, unit: UnitId, mask: u32);
     /// State on / off (`0x00639DB0(unit, state, on)`, `stat-lists.md`
-    /// §9.2; SandRaider's states 90, 91).
-    fn set_state(&mut self, unit: UnitId, state: u16, on: bool);
+    /// §9.2; SandRaider's states 90, 91): a state outside 0 … count − 1
+    /// does nothing; else the toggle, then the unit's update-queue insert
+    /// whether or not the bit changed.
+    fn set_state(&mut self, game: &mut Game, unit: UnitId, state: u16, on: bool);
     /// `0x00553540`: the unit's path target unit (`None` when there is
     /// none).
     fn path_target(&self, unit: UnitId) -> Option<UnitId>;

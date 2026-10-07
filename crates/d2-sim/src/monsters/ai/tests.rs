@@ -262,7 +262,7 @@ impl AiUnits for Fake {
     fn set_unit_flag(&mut self, _: UnitId, mask: u32) {
         self.log.push(format!("flag {mask:#x}"));
     }
-    fn set_state(&mut self, unit: UnitId, state: u16, on: bool) {
+    fn set_state(&mut self, _: &mut Game, unit: UnitId, state: u16, on: bool) {
         if on {
             self.states.insert((unit, state));
         } else {
@@ -1569,6 +1569,39 @@ fn commands() {
         assert_eq!(current_command(cx, mon).unwrap().params[0], 1);
         free_current_command(cx, mon);
         assert_eq!(current_command(cx, mon), None);
+    });
+}
+
+// Freeing the current command makes its ring next current, also when it
+// is the last index (its next is index 0); the search then starts after
+// that new current (`ai.md` §8: `0x0058ED10`, `0x0058EEF0`).
+// Covers: specs/monsters/ai.md §8
+#[test]
+fn freeing_the_last_command_wraps_to_its_next() {
+    let mut w = World::new(monstats(6, [0; 5], 15));
+    let mon = w.mon;
+    w.with(|_, cx| {
+        let c = cx.store.control_mut(mon).unwrap();
+        c.commands = [[4, 1, 0, 0, 0], [4, 2, 0, 0, 0], [5, 3, 0, 0, 0]]
+            .map(|params| AiCommand { params })
+            .to_vec();
+        c.cur = 2;
+        free_current_command(cx, mon);
+        // Ring 0 → 1 → 0: index 0 (the freed node's next) is current.
+        assert_eq!(current_command(cx, mon).unwrap().params, [4, 1, 0, 0, 0]);
+        // The type-4 search tests current's next (index 1) first.
+        assert_eq!(find_command(cx, mon, 4, false), Some(1));
+        // `0x0058EF40` links the new command before current (index 0).
+        copy_command(
+            cx,
+            mon,
+            AiCommand {
+                params: [6, 0, 0, 0, 0],
+            },
+        );
+        let c = cx.store.control(mon).unwrap();
+        assert_eq!(c.cur, 0);
+        assert_eq!(c.commands[1].params, [4, 1, 0, 0, 0]);
     });
 }
 
