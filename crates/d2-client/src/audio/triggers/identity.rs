@@ -21,15 +21,15 @@ const S1: u8 = 8;
 /// The fallback of a monster mode whose `monstats2` mode bit is clear.
 fn fallback(m: u8) -> u8 {
     match m {
-        2 | 3 | 4 => NU,    // WL, GH, A1
-        5 => A1,            // A2
-        6 => GH,            // BL
-        7 => A1,            // SC
-        8 => NU,            // S1
-        9..=11 => S1,       // S2, S3, S4
-        12..=14 => NU,      // DD, KB, SQ
-        15 => WL,           // RN
-        _ => NU,            // DT and anything else
+        2..=4 => NU,   // WL, GH, A1
+        5 => A1,       // A2
+        6 => GH,       // BL
+        7 => A1,       // SC
+        8 => NU,       // S1
+        9..=11 => S1,  // S2, S3, S4
+        12..=14 => NU, // DD, KB, SQ
+        15 => WL,      // RN
+        _ => NU,       // DT and anything else
     }
 }
 
@@ -126,5 +126,7 @@ pub fn monsounds_row(r: &RecordInputs) -> Option<i32> {
         }
     }
     // r3.3.
-    (0..r.monsounds_rows).contains(&r.monsound).then_some(r.monsound)
+    (0..r.monsounds_rows)
+        .contains(&r.monsound)
+        .then_some(r.monsound)
 }

@@ -2612,3 +2612,26 @@ fn global_gain_is_255_at_every_game_send() {
         assert_eq!(device_occluded(v, 0.0), v);
     }
 }
+
+// Covers: specs/audio/triggers-2.md §19 r5
+#[test]
+fn unit_free_detaches_loops_and_leaves_one_shots() {
+    use crate::audio::triggers::detach_all;
+    let mut r = rows(4);
+    r[1].looped = 1;
+    let mut sys = system(r);
+    let mut w = World::new();
+    let mut q = TriggerQueue::new();
+    let lp = sys.request(&mut w, 1, Some(MONSTER), 0, 0, 0);
+    let one = sys.request(&mut w, 2, Some(MONSTER), 0, 0, 0);
+    ticks(&mut sys, &mut w, &mut q, 1);
+    detach_all(&mut sys.with(&mut w), MONSTER, false);
+    // The loop lost its last unit and stops; the one-shot keeps playing at
+    // its last position; the unit's list is empty.
+    assert!(sys.request_by_handle(lp).unwrap().stop);
+    assert!(!sys.request_by_handle(one).unwrap().stop);
+    assert!(sys.unit_requests(MONSTER).is_empty());
+    // A second pass (the per-type frees) finds nothing to do.
+    detach_all(&mut sys.with(&mut w), MONSTER, true);
+    assert!(!sys.request_by_handle(one).unwrap().stop);
+}

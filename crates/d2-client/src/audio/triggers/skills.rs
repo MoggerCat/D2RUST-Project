@@ -367,11 +367,7 @@ pub fn player_generic_do(
     flag_c4_40_set: bool,
     event: u8,
 ) -> bool {
-    movement_entry == 2
-        && has_skill
-        && !flag0_path_ran
-        && !flag_c4_40_set
-        && matches!(event, 1..=3)
+    movement_entry == 2 && has_skill && !flag0_path_ran && !flag_c4_40_set && matches!(event, 1..=3)
 }
 
 /// §15 r2, monster update (`0x004AF4C0`): +0x4E = 4 runs the do; 1, 2 or 3

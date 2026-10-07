@@ -2018,7 +2018,7 @@ fn panel_and_effect_sounds() {
     let mut g = Globals::default();
     // r3.
     let mut f = Fake::default();
-    run(&mut f, &mut g, 0, |cx| waypoint_row_chosen(cx));
+    run(&mut f, &mut g, 0, waypoint_row_chosen);
     assert_eq!(f.reqs(), vec![(2231, None, 0)]);
     // r4: a step needs more than 50 ms; symbol i plays on the step where
     // counter − start = 1.
@@ -2070,7 +2070,7 @@ fn missiles(fx: &[Effect]) -> Vec<(i32, i32, i32)> {
         .collect()
 }
 
-// Covers: specs/audio/triggers-2.md §13.1 r1, §13.1 r2, §13.1 r3, §13.1 r6
+// Covers: specs/audio/triggers-2.md §13.1 r1, §13.1 r2, §13.1 r3, §13.1 r6, §edge-cases-original-bugs r3
 #[test]
 fn umod_fire_and_goboom_explode_at_frame_4() {
     assert_eq!(hooks::umod_hook_slot(9, 2), 2 + 5 * 9);
@@ -2124,7 +2124,7 @@ fn umod_fire_and_goboom_explode_at_frame_4() {
     assert_eq!(f.reqs().len(), 3);
 }
 
-// Covers: specs/audio/triggers-2.md §13.1 r4, §13.1 r5
+// Covers: specs/audio/triggers-2.md §13.1 r4, §13.1 r5, §edge-cases-original-bugs r2
 #[test]
 fn worms_have_no_test() {
     let mut g = Globals::default();
@@ -2233,18 +2233,24 @@ fn leap_landing_sound() {
     assert!(f.made().is_empty());
 }
 
-// Covers: specs/audio/triggers-2.md §13.4 r1, §13.4 r2
+// Covers: specs/audio/triggers-2.md §13.4 r1, §13.4 r2, §edge-cases-original-bugs r4
 #[test]
 fn spider_lay_sound() {
     let mut g = Globals::default();
     let u = Unit::new(M, 100);
     // d16 = [10, 8, 22, 20, 18, 16, 14, 12][d8].
     assert_eq!(
-        (0..8).map(|d8| hooks::spider_offset_index(d8 * 8)).collect::<Vec<_>>(),
+        (0..8)
+            .map(|d8| hooks::spider_offset_index(d8 * 8))
+            .collect::<Vec<_>>(),
         vec![10, 8, 22, 20, 18, 16, 14, 12]
     );
     // Needs state 22, a path with flag 0x08, and not a town room.
-    for (st, flag, town) in [(false, true, false), (true, false, false), (true, true, true)] {
+    for (st, flag, town) in [
+        (false, true, false),
+        (true, false, false),
+        (true, true, true),
+    ] {
         let mut f = Fake::default();
         let mut made = false;
         run(&mut f, &mut g, 0, |cx| {
@@ -2350,7 +2356,9 @@ fn sound_identity_substitution() {
     };
     assert_eq!(sound_identity(1, 7, 3, None, Some(wolf), &all), (1, 7, 3));
     // A wolf: monster class 430 with the player→monster mode map T1.
-    let expect = [0, 1, 2, 15, 3, 1, 2, 4, 5, 6, 7, 4, 11, 8, 9, 10, 11, 12, 14, 13];
+    let expect = [
+        0, 1, 2, 15, 3, 1, 2, 4, 5, 6, 7, 4, 11, 8, 9, 10, 11, 12, 14, 13,
+    ];
     for (pm, want) in expect.iter().enumerate() {
         assert_eq!(
             sound_identity(0, 2, pm as u8, None, Some(wolf), &all),
@@ -2385,7 +2393,10 @@ fn sound_identity_substitution() {
         sound_identity(0, 2, 9, None, Some(wolf), &bits_without(&[6])),
         (1, 430, 3)
     );
-    assert_eq!(sound_identity(0, 2, 0, None, Some(wolf), &none), (1, 430, 1));
+    assert_eq!(
+        sound_identity(0, 2, 0, None, Some(wolf), &none),
+        (1, 430, 1)
+    );
     // gfxtype 2 keeps a player, class from gfxclass, mode unchanged.
     let doppel = DrawSubstitution {
         gfxtype: 2,
@@ -2408,9 +2419,21 @@ fn monsounds_record_choice() {
     // r3.3: MonSound in 0 … rows − 1.
     assert_eq!(monsounds_row(&base), Some(55));
     for bad in [-1, 400, 9999] {
-        assert_eq!(monsounds_row(&RecordInputs { monsound: bad, ..base }), None);
+        assert_eq!(
+            monsounds_row(&RecordInputs {
+                monsound: bad,
+                ..base
+            }),
+            None
+        );
     }
-    assert_eq!(monsounds_row(&RecordInputs { monsound: 0, ..base }), Some(0));
+    assert_eq!(
+        monsounds_row(&RecordInputs {
+            monsound: 0,
+            ..base
+        }),
+        Some(0)
+    );
     // r3.1: class outside the row count → row 0.
     assert_eq!(monsounds_row(&RecordInputs { class: 700, ..base }), Some(0));
     assert_eq!(monsounds_row(&RecordInputs { class: -1, ..base }), Some(0));
@@ -2441,7 +2464,10 @@ fn monsounds_record_choice() {
         };
         assert_eq!(monsounds_row(&u), Some(90));
         assert_eq!(monsounds_row(&RecordInputs { umonsound: 0, ..u }), Some(55));
-        assert_eq!(monsounds_row(&RecordInputs { umonsound: -2, ..u }), Some(55));
+        assert_eq!(
+            monsounds_row(&RecordInputs { umonsound: -2, ..u }),
+            Some(55)
+        );
     }
     // The raw type decides, not the identity: a player (raw 0) never uses
     // the unique rows.
