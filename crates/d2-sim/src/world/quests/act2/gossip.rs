@@ -1,8 +1,9 @@
 // Spec: specs/world/quests-act2.md §9 (A2Q0, A2Q7, A2Q8, the Act II intro)
+// Spec: specs/world/quests-act2-2.md §1 items 2, 3, 15, 18
 //! The Act II gossip and intro records: A2Q0 Jerhyn (chain 7, slot 8),
 //! the A2Q7 guard (chain 26, slot 30), the A2Q8 guard (chain 27, slot
 //! 31) and the Act II intro record (chain 38). Their status functions
-//! are not specified and stay with the dispatch (`act2::status_fn`).
+//! return false (`act2::status_fn`, `quests-act2-2.md` §1 item 18).
 
 use super::{add_state, guid_of, pf, rec, set_bit};
 use crate::units::UnitId;
@@ -22,11 +23,11 @@ const MSG_JERHYN: u32 = 253;
 const MSG_CAIN: u32 = 125;
 /// act2guard5's line.
 const MSG_GUARD5: u32 = 303;
-/// `0x005940A0`: the Act I hook chain 7's Cain line calls (`quests.md`;
-/// not specified).
+/// `0x005940A0`: the Act I hook chain 7's Cain line calls
+/// (`quests-act2-2.md` §1 item 18).
 const CAIN_HOOK: u32 = 0x0059_40A0;
-/// `0x005985C0`: chain 38's active function (not specified).
-const INTRO_ACTIVE: u32 = 0x0059_85C0;
+/// Chain 26's messages that set 30.13 and install the chat end.
+const MSG_GUARD4_INTRO: [u32; 2] = [59, 60];
 
 /// Chain 38: the special class per NPC (meshif1 amazon, drognan
 /// sorceress, elzix necromancer, fara paladin, geglash barbarian;
@@ -72,8 +73,8 @@ pub(super) fn callback<W: QuestWorld>(
     match (ctl.records[i].chain, args.event) {
         (7, event::NPC_ACTIVATE) => jerhyn_text(ctl, w, i, args, list),
         (7, event::PLAYER_LEAVES_GAME) => {
-            // `0x005987B0`. TODO(quests-act2 §9): "remove" does not name
-            // the list; the extra list is the only one chain 7 fills.
+            // `0x005987B0` (`quests-act2-2.md` §1 item 2): the extra list,
+            // no bit test and no count test.
             let g = guid_of(w, args.player);
             ctl.records[i].extra.a2.q0.remove(g);
         }
@@ -86,13 +87,25 @@ pub(super) fn callback<W: QuestWorld>(
         }
         (26, event::NPC_ACTIVATE) => guard4_text(ctl, w, i, args, list),
         (26, event::SCROLL_MESSAGE) => {
-            // `0x0059E0E0`. TODO(quests-act2 §9): no NPC test is named.
-            if let Some(p) = args.player {
-                match args.b {
-                    59 | 60 => set_bit(w, p, 30, bit::PRIMARY_GOAL_DONE),
-                    61..=63 => set_bit(w, p, 30, bit::REWARD_GRANTED),
-                    _ => {}
+            // `0x0059E0E0` (`quests-act2-2.md` §1 item 3): NPC 377 only;
+            // 59 / 60 → 30.13 and callback 2 := `0x0059E0B0`; any other
+            // message → 30.0.
+            if let (Some(p), true) = (args.player, args.a == u32::from(GUARD4)) {
+                if MSG_GUARD4_INTRO.contains(&args.b) {
+                    set_bit(w, p, 30, bit::PRIMARY_GOAL_DONE);
+                    ctl.records[i].callbacks |= 1 << event::NPC_DEACTIVATE;
+                } else {
+                    set_bit(w, p, 30, bit::REWARD_GRANTED);
                 }
+            }
+        }
+        (26, event::NPC_DEACTIVATE) => {
+            // `0x0059E0B0` (edge case 1 of `quests-act2-2.md`): extra
+            // +0x00 is never written with 1, so the body never runs.
+            let class = args.target.and_then(|n| w.monster_class(n));
+            if class == Some(GUARD4) && ctl.records[i].extra.a2.q7_chat == 1 {
+                ctl.records[i].extra.a2.q7_chat = 0;
+                ctl.records[i].clear_callback(event::NPC_DEACTIVATE);
             }
         }
         // `0x0059E2A0`: a bare `ret`.
@@ -105,14 +118,17 @@ pub(super) fn callback<W: QuestWorld>(
             }
         }
         (27, event::SCROLL_MESSAGE) => {
-            // `0x0059E3C0`. TODO(quests-act2 §9): no NPC test is named.
-            if let (Some(p), MSG_GUARD5) = (args.player, args.b) {
+            // `0x0059E3C0` (`quests-act2-2.md` §1 item 3): NPC 378 and
+            // message 303 → 31.0.
+            if let (Some(p), MSG_GUARD5, true) = (args.player, args.b, args.a == u32::from(GUARD5))
+            {
                 set_bit(w, p, 31, bit::REWARD_GRANTED);
             }
         }
         (38, event::NPC_ACTIVATE) => intro_text(ctl, w, i, args, list),
         (38, event::SCROLL_MESSAGE) => {
-            // `0x005983E0`.
+            // `0x005983E0`; `0x00572360` sets the bit in intro field A
+            // (`quests-act2-2.md` §1 item 15), apart from the 0x91 field B.
             let hit = INTRO_MSGS
                 .iter()
                 .any(|&(m, c)| m == args.b && u32::from(c) == args.a);
@@ -126,7 +142,8 @@ pub(super) fn callback<W: QuestWorld>(
 }
 
 /// Active functions: chain 7 `0x00598780`, 26 `0x0059E2C0`, 27
-/// `0x0059E4B0`; chain 38's `0x005985C0` is reported.
+/// `0x0059E4B0`; chain 38's `0x005985C0` returns false
+/// (`quests-act2-2.md` §1 item 18).
 pub(super) fn active<W: QuestWorld>(
     ctl: &QuestControl,
     w: &mut W,
@@ -149,10 +166,7 @@ pub(super) fn active<W: QuestWorld>(
                 && !f.get(14, bit::REWARD_PENDING)
                 && !f.get(14, bit::REWARD_GRANTED)
         }
-        c => {
-            w.unhandled(c, INTRO_ACTIVE);
-            false
-        }
+        _ => false,
     }
 }
 
@@ -174,9 +188,21 @@ fn jerhyn_text<W: QuestWorld>(
                 && !ctl.records[i].extra.a2.q0.contains(guid_of(w, args.player)) =>
         {
             add_state(ctl, w, i, list, args.target, 1);
-            w.unhandled(7, CAIN_HOOK);
+            cain_hook(ctl, w, args.player);
         }
         _ => {}
+    }
+}
+
+/// `0x005940A0(game, player)` (`quests-act2-2.md` §1 item 18): remove
+/// the player's GUID (−1 without one) from chain 4's +0xB4 list. The
+/// original does not test that chain 4 exists; without its record the
+/// call is reported.
+fn cain_hook<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, p: Option<UnitId>) {
+    let g = guid_of(w, p);
+    match ctl.record_mut(4) {
+        Some(r) => r.extra.q4.credited.remove(g),
+        None => w.unhandled(7, CAIN_HOOK),
     }
 }
 

@@ -816,6 +816,14 @@ pub trait QuestWorld {
         let _ = (player, class);
         self.unhandled(0xFF, 0x0057_2360);
     }
+    /// Object +0xB8 := `code`: the drop code `0x00559A30` reads on every
+    /// call and never clears. The Act II chests store it once, before
+    /// they count the players (`0x00599C28`, `0x00599D08`, `0x00599E08`;
+    /// `quests-act2-2.md` §1 item 20).
+    fn set_drop_code(&mut self, object: UnitId, code: [u8; 4]) {
+        let _ = (object, code);
+        self.unhandled(0xFF, 0x0059_9C28);
+    }
 
     // Act IV / V seams. Each has a default that reports the 1.14d
     // function through `unhandled` (chain 0xFE) so hosts that do not

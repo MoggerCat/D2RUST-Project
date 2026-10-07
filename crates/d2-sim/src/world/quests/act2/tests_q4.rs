@@ -1,4 +1,5 @@
 // Spec: specs/world/quests-act2.md §6, §10, §4.9 (Test vectors)
+// Spec: specs/world/quests-act2-2.md §1, §2 (Test vectors)
 //! Tests for [`super::q4`] (A2Q4 Arcane Sanctuary, chain 11, slot 12).
 
 use super::q4;
@@ -244,7 +245,7 @@ fn tome_message_opens_the_canyon_portal() {
     assert!(f.log.is_empty());
 }
 
-// Covers: specs/world/quests-act2.md §6.6, §6.10
+// Covers: specs/world/quests-act2.md §6.6
 #[test]
 fn level_changes() {
     // Entering the Sanctuary: state 4, status 4 to all, iterate (12.5).
@@ -272,14 +273,15 @@ fn level_changes() {
     level(&mut ctl, &mut f, i, 40, 50);
     assert_eq!(f.flags(P1).word(12), 1 << 7 | 1 << 8);
     // Leaving town at state 3 without 12.0/12.1: state 4, iterate; the
-    // Jerhyn handling runs first (palace spawn not specified).
+    // Jerhyn handling runs first (act2-2 §2 item 3: no start Jerhyn, no
+    // harem blocker → nothing).
     let (mut ctl, mut f, i) = setup();
     ctl.records[i].state = 3;
     ctl.records[i].status = 2;
     level(&mut ctl, &mut f, i, 40, 41);
     assert_eq!(ctl.records[i].state, 4);
     assert_eq!(f.flags(P1).word(12), 1 << 4);
-    assert_eq!(f.log, ["unhandled 11 0x59ef70"]);
+    assert!(f.log.is_empty());
     // With 12.1: state stays 3.
     let (mut ctl, mut f, i) = setup();
     ctl.records[i].state = 3;
@@ -290,34 +292,275 @@ fn level_changes() {
     assert!(f.log.is_empty());
 }
 
-// Covers: specs/world/quests-act2.md §6.10
+const JERHYN2_U: UnitId = UnitId(0x23);
+const START_OBJ: UnitId = UnitId(0x53);
+const PALACE_OBJ: UnitId = UnitId(0x54);
+const R9: RoomId = RoomId(9);
+
+// Covers: specs/world/quests-act2-2.md §2 r3
 #[test]
-fn jerhyn_start_side() {
-    // Started, unit present, chat held: stop.
+fn jerhyn_leaving_town() {
+    // Started, unit present, chat held: `0x00573180` only, +0x0C kept.
     let (mut ctl, mut f, i) = setup();
     ctl.records[i].extra.a2.q4.jerhyn_start = true;
     ctl.records[i].extra.a2.q4.jerhyn_guid = JERHYN_U.0;
     f.npc_held = true;
-    q4::jerhyn(&mut ctl, &mut f);
+    level(&mut ctl, &mut f, i, 40, 41);
     assert_eq!(f.log, ["hold chat 33"]);
     assert!(x4(&ctl, i).jerhyn_start);
-    // No chat: removed, +0x0C cleared, then the palace spawn.
+    // No chat: removed, +0x0C cleared; no blocker → no palace spawn.
     f.npc_held = false;
     f.log.clear();
-    q4::jerhyn(&mut ctl, &mut f);
+    level(&mut ctl, &mut f, i, 40, 41);
+    assert_eq!(f.log, ["hold chat 33", "remove unit 33"]);
+    assert!(!x4(&ctl, i).jerhyn_start);
+    // Started but the unit is gone: +0x0C := 0, nothing else.
+    let (mut ctl, mut f, i) = setup();
+    ctl.records[i].extra.a2.q4.jerhyn_start = true;
+    ctl.records[i].extra.a2.q4.jerhyn_guid = 0x77;
+    level(&mut ctl, &mut f, i, 40, 41);
+    assert!(f.log.is_empty());
+    assert!(!x4(&ctl, i).jerhyn_start);
+    // Old level other than 40: nothing.
+    let (mut ctl, mut f, i) = setup();
+    ctl.records[i].extra.a2.q4.jerhyn_start = true;
+    ctl.records[i].extra.a2.q4.jerhyn_guid = JERHYN_U.0;
+    level(&mut ctl, &mut f, i, 41, 40);
+    assert!(f.log.is_empty() && x4(&ctl, i).jerhyn_start);
+}
+
+/// The harem blocker at (50, 60) in R9, created (+0x11, +0x38).
+fn with_blocker(ctl: &mut QuestControl, f: &mut Fake, i: usize) {
+    f.objects.insert(BLOCKER, (0x51, 318, 0));
+    f.pos.insert(BLOCKER, (50, 60, R9));
+    let x = &mut ctl.records[i].extra.a2.q4;
+    x.blocker_made = true;
+    x.blocker_guid = 0x51;
+}
+
+// Covers: specs/world/quests-act2-2.md §2 r3, §2 r4, §edge-cases-original-bugs r6
+#[test]
+fn jerhyn_palace_spawn_from_the_blocker() {
+    // Chain 13 not-intro, state 0: (50 − 10, 60 − 3) = (40, 57).
+    let (mut ctl, mut f, i) = setup();
+    with_blocker(&mut ctl, &mut f, i);
+    f.spot = Some((0, 0));
+    f.spawns = vec![Some(JERHYN2_U)];
+    level(&mut ctl, &mut f, i, 40, 41);
     assert_eq!(
         f.log,
-        ["hold chat 33", "remove unit 33", "unhandled 11 0x59ef70"]
+        [
+            "spot at 40 57 3 0x100 9 100",
+            "spawn 201 40 57 room 9 mode 1 spread -1 flags 0x0",
+            "flags 35 0x3000000",
+        ]
     );
-    assert!(!x4(&ctl, i).jerhyn_start);
-    // Already at the palace: nothing.
-    ctl.records[i].extra.a2.q4.jerhyn_palace = true;
+    let x = x4(&ctl, i);
+    assert!(x.jerhyn_palace && x.jerhyn_pos_stored);
+    assert_eq!((x.jerhyn_x, x.jerhyn_y), (40, 57));
+    // The palace Jerhyn's GUID is not stored.
+    assert_eq!(x.jerhyn_guid, 0);
+    // Spawned (+0x0D = 1): nothing more.
     f.log.clear();
-    q4::jerhyn(&mut ctl, &mut f);
+    level(&mut ctl, &mut f, i, 40, 41);
+    assert!(f.log.is_empty());
+    // Edge case 6: the start Jerhyn talking → `0x00573180` twice, no
+    // spawn.
+    let (mut ctl, mut f, i) = setup();
+    with_blocker(&mut ctl, &mut f, i);
+    ctl.records[i].extra.a2.q4.jerhyn_start = true;
+    ctl.records[i].extra.a2.q4.jerhyn_guid = JERHYN_U.0;
+    f.npc_held = true;
+    level(&mut ctl, &mut f, i, 40, 41);
+    assert_eq!(f.log, ["hold chat 33", "hold chat 33"]);
+    assert!(!x4(&ctl, i).jerhyn_palace);
+    // Chain 13 at state 2: x + 15; the free spot moves the point; the
+    // first spawn fails → again with spread 2; +0x28/+0x2C kept once
+    // stored.
+    let (mut ctl, mut f, i) = setup();
+    with_blocker(&mut ctl, &mut f, i);
+    ctl.record_mut(13).unwrap().state = 2;
+    ctl.records[i].extra.a2.q4.jerhyn_pos_stored = true;
+    f.spot = Some((1, 2));
+    f.spawns = vec![None, Some(JERHYN2_U)];
+    level(&mut ctl, &mut f, i, 40, 41);
+    assert_eq!(
+        f.log,
+        [
+            "spot at 65 57 3 0x100 9 100",
+            "spawn 201 66 59 room 9 mode 1 spread -1 flags 0x0",
+            "spawn 201 66 59 room 9 mode 1 spread 2 flags 0x0",
+            "flags 35 0x3000000",
+        ]
+    );
+    let x = x4(&ctl, i);
+    assert!(x.jerhyn_palace);
+    assert_eq!((x.jerhyn_x, x.jerhyn_y), (0, 0));
+    // Both spawns fail: +0x0D stays 0.
+    let (mut ctl, mut f, i) = setup();
+    with_blocker(&mut ctl, &mut f, i);
+    f.spot = Some((0, 0));
+    level(&mut ctl, &mut f, i, 40, 41);
+    assert_eq!(f.log.len(), 3);
+    assert!(!x4(&ctl, i).jerhyn_palace);
+    // No free spot: the null-room spawn (edge case 5) is reported.
+    let (mut ctl, mut f, i) = setup();
+    with_blocker(&mut ctl, &mut f, i);
+    level(&mut ctl, &mut f, i, 40, 41);
+    assert_eq!(
+        f.log,
+        ["spot at 40 57 3 0x100 9 100", "unhandled 11 0x59ef70"]
+    );
+    // The blocker object is gone: nothing.
+    let (mut ctl, mut f, i) = setup();
+    with_blocker(&mut ctl, &mut f, i);
+    f.objects.clear();
+    level(&mut ctl, &mut f, i, 40, 41);
     assert!(f.log.is_empty());
 }
 
+/// The palace-Jerhyn object 122 at (100, 200) in R9.
+fn palace_init(ctl: &mut QuestControl, f: &mut Fake) {
+    f.objects.insert(PALACE_OBJ, (0x54, 122, 0));
+    f.pos.insert(PALACE_OBJ, (100, 200, R9));
+    q4::palace_jerhyn_init(ctl, f, PALACE_OBJ);
+}
+
+// Covers: specs/world/quests-act2-2.md §2 r2, §2 r4
+#[test]
+fn jerhyn_palace_init() {
+    // Vector: chain 13 not-intro state 0, game 8.13, free spot at once →
+    // Kaelan at (101, 200); Jerhyn at (90, 197); +0x28/+0x2C = 90/197.
+    let (mut ctl, mut f, i) = setup();
+    ctl.game.set(8, bit::PRIMARY_GOAL_DONE);
+    f.frame = 40;
+    f.spot = Some((0, 0));
+    f.spawns = vec![Some(KAELAN_U), Some(JERHYN2_U)];
+    palace_init(&mut ctl, &mut f);
+    assert_eq!(
+        f.log,
+        [
+            "spawn 331 101 200 room 9 mode 1 spread -1 flags 0x0",
+            "event7 84 41",
+            "spot at 90 197 3 0x100 9 100",
+            "spawn 201 90 197 room 9 mode 1 spread -1 flags 0x0",
+            "flags 35 0x3000000",
+        ]
+    );
+    let x = x4(&ctl, i);
+    assert_eq!((x.guard_x, x.guard_y), (101, 200));
+    assert_eq!((x.jerhyn_x, x.jerhyn_y), (90, 197));
+    assert!(x.jerhyn_palace && x.jerhyn_pos_stored);
+    // Vector: the same with chain 13 at state 2 → Jerhyn at (115, 197).
+    let (mut ctl, mut f, i) = setup();
+    ctl.game.set(8, bit::PRIMARY_GOAL_DONE);
+    ctl.record_mut(13).unwrap().state = 2;
+    f.spot = Some((0, 0));
+    f.spawns = vec![Some(KAELAN_U), Some(JERHYN2_U)];
+    palace_init(&mut ctl, &mut f);
+    assert_eq!(
+        f.log[3],
+        "spawn 201 115 197 room 9 mode 1 spread -1 flags 0x0"
+    );
+    assert_eq!((x4(&ctl, i).jerhyn_x, x4(&ctl, i).jerhyn_y), (115, 197));
+    // Game 14.13: no Kaelan. Game 9.13 alone also opens the spawn.
+    let (mut ctl, mut f, _) = setup();
+    ctl.game.set(14, bit::PRIMARY_GOAL_DONE);
+    ctl.game.set(9, bit::PRIMARY_GOAL_DONE);
+    f.spot = Some((0, 0));
+    f.spawns = vec![Some(JERHYN2_U)];
+    palace_init(&mut ctl, &mut f);
+    assert_eq!(f.log[0], "event7 84 1");
+    assert_eq!(
+        f.log[2],
+        "spawn 201 90 197 room 9 mode 1 spread -1 flags 0x0"
+    );
+    // Neither 8.13 nor 9.13, chain 13 not-intro state < 2: Kaelan and the
+    // blocker event only.
+    let (mut ctl, mut f, i) = setup();
+    palace_init(&mut ctl, &mut f);
+    assert_eq!(
+        f.log,
+        [
+            "spawn 331 101 200 room 9 mode 1 spread -1 flags 0x0",
+            "event7 84 1",
+        ]
+    );
+    assert!(!x4(&ctl, i).jerhyn_palace);
+    // Chain 13 absent: x + 15 and the spawn opens.
+    let (mut ctl, mut f, _) = setup();
+    ctl.records.retain(|r| r.chain != 13);
+    ctl.game.set(14, bit::PRIMARY_GOAL_DONE);
+    f.spot = Some((0, 0));
+    palace_init(&mut ctl, &mut f);
+    assert_eq!(f.log[1], "spot at 115 197 3 0x100 9 100");
+    // Already spawned (+0x0D): no palace spawn, Kaelan still.
+    let (mut ctl, mut f, i) = setup();
+    ctl.game.set(8, bit::PRIMARY_GOAL_DONE);
+    ctl.records[i].extra.a2.q4.jerhyn_palace = true;
+    palace_init(&mut ctl, &mut f);
+    assert_eq!(f.log.len(), 2);
+    // Chain 11 absent: nothing.
+    let (mut ctl, mut f, _) = setup();
+    ctl.records.retain(|r| r.chain != 11);
+    palace_init(&mut ctl, &mut f);
+    assert!(f.log.is_empty());
+}
+
+// Covers: specs/world/quests-act2-2.md §2 r1
+#[test]
+fn jerhyn_start_init() {
+    let start = |ctl: &mut QuestControl, f: &mut Fake| {
+        f.objects.insert(START_OBJ, (0x53, 121, 0));
+        f.pos.insert(START_OBJ, (30, 40, R9));
+        q4::start_jerhyn_init(ctl, f, START_OBJ);
+    };
+    // Chain 13 not-intro state 0, no game 8.13 / 12.13: free spot (size 2,
+    // sixth argument 10), Jerhyn there; +0x0C := 1, +0x3C := his GUID.
+    let (mut ctl, mut f, i) = setup();
+    f.spot = Some((1, 1));
+    f.spawns = vec![Some(JERHYN2_U)];
+    start(&mut ctl, &mut f);
+    assert_eq!(
+        f.log,
+        [
+            "spot at 30 40 2 0x100 10 100",
+            "spawn 201 31 41 room 9 mode 1 spread -1 flags 0x0",
+        ]
+    );
+    let x = x4(&ctl, i);
+    assert!(x.jerhyn_start);
+    assert_eq!(x.jerhyn_guid, JERHYN2_U.0);
+    // Spawn failed: nothing stored.
+    let (mut ctl, mut f, i) = setup();
+    f.spot = Some((0, 0));
+    start(&mut ctl, &mut f);
+    assert!(!x4(&ctl, i).jerhyn_start);
+    // Not found: not in the spec, reported.
+    let (mut ctl, mut f, _) = setup();
+    start(&mut ctl, &mut f);
+    assert_eq!(
+        f.log,
+        ["spot at 30 40 2 0x100 10 100", "unhandled 11 0x59f380"]
+    );
+    // Each guard alone stops it.
+    for case in 0..5 {
+        let (mut ctl, mut f, i) = setup();
+        match case {
+            0 => ctl.records[i].extra.a2.q4.jerhyn_palace = true,
+            1 => ctl.game.set(8, bit::PRIMARY_GOAL_DONE),
+            2 => ctl.game.set(12, bit::PRIMARY_GOAL_DONE),
+            3 => ctl.record_mut(13).unwrap().state = 2,
+            _ => ctl.record_mut(13).unwrap().not_intro = false,
+        }
+        f.spot = Some((0, 0));
+        start(&mut ctl, &mut f);
+        assert!(f.log.is_empty(), "case {case}");
+    }
+}
+
 // Covers: specs/world/quests-act2.md §6.7
+// Covers: specs/world/quests-act2-2.md §1 r7
 #[test]
 fn horazon_journal() {
     let (mut ctl, mut f, i) = setup();
@@ -342,12 +585,34 @@ fn horazon_journal() {
     // Completion flag: P3 only.
     assert_eq!(f.flags(P3).word(12), 1 << 14);
     assert_eq!(f.sent, [(P3, hex("5d 0b 00 0c 0000"))]);
-    // Read again (mode 1): no animation, the message again.
+    // Read again (mode 1): no animation, the message again; state 5 →
+    // no iterate runs (act2-2 §1 item 7), so no completion flag either.
     f.log.clear();
     f.sent.clear();
     q4::tome_operate(&mut ctl, &mut f, TOME, P1);
     assert_eq!(f.log, ["message 1 80 396"]);
-    assert_eq!(f.sent, [(P3, hex("5d 0b 00 0c 0000"))]);
+    assert!(f.sent.is_empty());
+}
+
+// Covers: specs/world/quests-act2-2.md §1 r7
+#[test]
+fn horazon_journal_intro_grants_nothing() {
+    let (mut ctl, mut f, i) = setup();
+    f.objects.insert(TOME, (0x50, 357, 1));
+    f.pos.insert(TOME, (5, 5, RoomId(9)));
+    f.p(P1).level = Some(74);
+    add_player(&mut f, P3, 40);
+    ctl.records[i].not_intro = false;
+    ctl.records[i].state = 4;
+    q4::tome_operate(&mut ctl, &mut f, TOME, P1);
+    // The 396 text and +0x08 still happen; state, grants and the
+    // completion flag do not.
+    assert_eq!(f.log, ["message 1 80 396"]);
+    assert_eq!(x4(&ctl, i).tome_room, Some(RoomId(9)));
+    assert_eq!(ctl.records[i].state, 4);
+    assert_eq!(f.flags(P1).word(12), 0);
+    assert_eq!(f.flags(P3).word(12), 0);
+    assert!(f.sent.is_empty());
 }
 
 // Covers: specs/world/quests-act2.md §6.8, §10
@@ -436,6 +701,7 @@ fn sanctuary_portal() {
 }
 
 // Covers: specs/world/quests-act2.md §6.11
+// Covers: specs/world/quests-act2-2.md §1 r2, §1 r6
 #[test]
 fn game_start() {
     let start = args(event::PLAYER_STARTED_GAME, Some(P1), 0, 0);
@@ -478,8 +744,10 @@ fn game_start() {
         assert!(opened(&ctl, i));
         assert!(f.sent.is_empty());
     }
-    // Event 10.
+    // Event 10 (`0x00545530` needs 12.0 and 12.1, act2-2 §1 item 2).
     let (mut ctl, mut f, i) = setup();
+    f.p(P1).quests.flags[0].set(12, 0);
+    f.p(P1).quests.flags[0].set(12, 1);
     ctl.records[i].guids.add(1);
     ev(
         &mut ctl,

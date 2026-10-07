@@ -1,4 +1,5 @@
 // Spec: specs/world/quests-act2.md §5 (Test vectors, Edge cases 7–9)
+// Spec: specs/world/quests-act2-2.md §1 items 2, 4, 5, 6, 7, 20
 //! Tests for [`super::q3`] (A2Q3 Tainted Sun, chain 10, slot 11).
 
 use super::q3;
@@ -238,6 +239,7 @@ fn chat_and_wants_to_talk() {
 }
 
 // Covers: specs/world/quests-act2.md §5.6
+// Covers: specs/world/quests-act2-2.md §1 r7
 #[test]
 fn messages_start_and_reward() {
     let (mut ctl, mut f, i) = setup();
@@ -266,14 +268,20 @@ fn messages_start_and_reward() {
     assert!(fl.get(11, 0) && !fl.get(11, 1));
     assert_eq!(f.sent_ids(), [0x27, 0x29]);
     assert!(!ctl.game.get(11, 13));
-    // A reward message in an intro game: game 11.13, no state change.
+    // A reward message in an intro game: game 11.13 only inside the 11.1
+    // block (act2-2 §1 item 7), no state change.
     let (mut ctl, mut f, i) = setup();
     ctl.records[i].not_intro = false;
     f.p(P1).quests.flags[0].set(11, 13);
     say(&mut ctl, &mut f, i, ATMA_U, 176, 362);
     assert_eq!(ctl.records[i].state, 0);
-    assert!(ctl.game.get(11, 13));
+    assert!(!ctl.game.get(11, 13));
     assert!(!f.flags(P1).get(11, 0));
+    f.p(P1).quests.flags[0].set(11, 1);
+    say(&mut ctl, &mut f, i, ATMA_U, 176, 362);
+    assert_eq!(ctl.records[i].state, 0);
+    assert!(ctl.game.get(11, 13));
+    assert!(f.flags(P1).get(11, 0));
     // 373 is not a Tainted Sun message.
     let (mut ctl, mut f, i) = setup();
     say(&mut ctl, &mut f, i, ATMA_U, 176, 373);
@@ -281,6 +289,7 @@ fn messages_start_and_reward() {
 }
 
 // Covers: specs/world/quests-act2.md §5.6, §5.2
+// Covers: specs/world/quests-act2-2.md §1 r2, §1 r6
 #[test]
 fn game_start_and_leave() {
     // 11.0 → game 11.13 only.
@@ -312,8 +321,11 @@ fn game_start_and_leave() {
         assert_eq!(f.log, ["sun start 1"]);
         assert_eq!(f.sent[1].1, hex(DARK));
     }
-    // Event 10: both lists.
+    // Event 10: both lists (the record list needs 11.0 and 11.1, act2-2
+    // §1 item 2).
     let (mut ctl, mut f, i) = setup();
+    f.p(P1).quests.flags[0].set(11, 0);
+    f.p(P1).quests.flags[0].set(11, 1);
     ctl.records[i].guids.add(1);
     ctl.records[i].extra.a2.q3.list.add(1);
     ctl.records[i].extra.a2.q3.list.add(9);
@@ -350,11 +362,14 @@ fn altar_setup() -> (QuestControl, Fake, usize) {
 }
 
 // Covers: specs/world/quests-act2.md §5.7 r3, §1.3, §edge-cases-original-bugs r8
+// Covers: specs/world/quests-act2-2.md §1 r4, §1 r20
 #[test]
 fn altar_operate_vector() {
     let (mut ctl, mut f, i) = altar_setup();
     ctl.records[i].extra.a2.q3.dark = true;
     f.p(P2).items.push(*b"hst "); // no amulet for P2
+                                  // The altar never calls the quest-chest gate (act2-2 §1 item 4).
+    f.gate_closed = true;
     assert_eq!(q3::altar_operate(&mut ctl, &mut f, ALTAR, P1), 0);
     // Act II clients get the 0x53; every player 0x28 then `89 06`.
     let light = hex(LIGHT);
@@ -386,18 +401,19 @@ fn altar_operate_vector() {
             (3, hex("89 06")),
         ]
     );
-    // Amulets: P1 and P3 qualify; quality 7, level argument = the altar
-    // level (edge case 8), identified; treasure; 7 gold piles (lo'
-    // 22752887 mod 5 = 2).
+    // Amulets: P1 and P3 qualify; quality 7, the level computed by the
+    // drop (`&level` is an out parameter, edge case 8 and act2-2 §1 item
+    // 20), identified; no quest-chest gate (act2-2 §1 item 4); treasure;
+    // 7 gold piles (lo' 22752887 mod 5 = 2).
     let mut want = vec![
         "mode 80 1".to_string(),
         "sun end".into(),
         "sound 1 52".into(),
         "sound 2 52".into(),
         "sound 3 52".into(),
-        "qdrop 80 vip  7 Some(61) false".into(),
+        "qdrop 80 vip  7 None false".into(),
         "identify 600".into(),
-        "qdrop 80 vip  7 Some(61) false".into(),
+        "qdrop 80 vip  7 None false".into(),
         "identify 601".into(),
         "treasure 80 4".into(),
     ];
@@ -470,7 +486,7 @@ fn altar_refusals_and_intro() {
     assert_eq!(
         f.log
             .iter()
-            .filter(|l| l.starts_with("qdrop 80 vip  7 Some(61)"))
+            .filter(|l| l.starts_with("qdrop 80 vip  7 None"))
             .count(),
         2
     );
@@ -483,6 +499,31 @@ fn altar_refusals_and_intro() {
     assert_eq!(ctl.record(9).unwrap().extra.a2.q2.amulet_count, 2);
     assert_eq!(f.flags(P2).word(11), 0);
     assert!(!ctl.game.get(11, 13));
+}
+
+// Covers: specs/world/quests-act2-2.md §1 r5
+#[test]
+fn altar_init_status_test_outside_the_state_block() {
+    // State ≥ 2 with status 0 (unreachable in 1.14d, kept): the status
+    // test still runs inside not-intro → status 2 to all, no darken.
+    let (mut ctl, mut f, i) = altar_setup();
+    ctl.records[i].state = 3;
+    ctl.records[i].status = 0;
+    ctl.records[i].flags = 5;
+    q3::altar_init(&mut ctl, &mut f, ALTAR);
+    let r = &ctl.records[i];
+    assert_eq!((r.state, r.status, r.flags), (3, 2, 0));
+    assert!(!f.log.iter().any(|l| l.starts_with("sun")));
+    assert!(f.sent.iter().any(|m| m.1 == hex("5d 0a 00 02 0000")));
+    // An intro record: neither block.
+    let (mut ctl, mut f, i) = altar_setup();
+    ctl.records[i].not_intro = false;
+    ctl.records[i].state = 0;
+    ctl.records[i].status = 0;
+    q3::altar_init(&mut ctl, &mut f, ALTAR);
+    let r = &ctl.records[i];
+    assert_eq!((r.state, r.status), (0, 0));
+    assert!(f.sent.is_empty());
 }
 
 // Covers: specs/world/quests-act2.md §5.8, §edge-cases-original-bugs r9

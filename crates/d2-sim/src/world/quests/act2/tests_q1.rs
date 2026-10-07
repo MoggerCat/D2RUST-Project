@@ -235,6 +235,7 @@ fn radament_start_chat_end_and_leaving_town() {
 }
 
 // Covers: specs/world/quests-act2.md §3.6
+// Covers: specs/world/quests-act2-2.md §1 r19
 #[test]
 fn radament_ai_hook() {
     let (mut ctl, _) = control();
@@ -270,13 +271,16 @@ fn radament_ai_hook() {
     assert_eq!((rec(&ctl).state, rec(&ctl).status), (3, 2));
     assert!(f.sent.is_empty());
     assert_eq!(word(&f, P1), 1 << bit::ENTER_AREA);
-    // Status ≥ 2 with a state below 3 is not specified: state := 3, then
-    // reported.
+    // Status ≥ 2 with a state below 3 (act2-2 §1 item 19): state := 3,
+    // then the flag iterate only (status ≠ 1 → 9.4); no 0x5D.
+    f.p(P1).quests.flags[0] = QuestFlags::default();
     rec_mut(&mut ctl).state = 2;
     rec_mut(&mut ctl).status = 3;
     q1::radament_ai(&mut ctl, &mut f, RAD_U);
     assert_eq!((rec(&ctl).state, rec(&ctl).status), (3, 3));
-    assert_eq!(f.log.last().unwrap(), "unhandled 8 0x599420");
+    assert!(f.sent.is_empty());
+    assert_eq!(word(&f, P1), 1 << bit::ENTER_AREA);
+    assert!(!f.log.iter().any(|l| l.starts_with("unhandled")));
 }
 
 /// Radament with chain 8 dies, killed by P1.
@@ -547,15 +551,25 @@ fn radament_game_start() {
 }
 
 // Covers: specs/world/quests-act2.md §1.1
+// Covers: specs/world/quests-act2-2.md §1 r2
 #[test]
 fn radament_player_leaves() {
-    let (mut ctl, _) = control();
-    let mut f = fake();
-    rec_mut(&mut ctl).guids.add(1);
-    rec_mut(&mut ctl).guids.add(7);
-    ctl.player_leaves(&mut f, P1);
-    assert_eq!(rec(&ctl).guids.0, [7]);
-    assert!(!f.log.iter().any(|l| l.starts_with("unhandled 8 ")));
+    // `0x00598980` → `0x00545530`: removed only when P1 has 9.0 and 9.1.
+    for (bits, kept) in [
+        (&[][..], vec![1, 7]),
+        (&[bit::REWARD_GRANTED][..], vec![1, 7]),
+        (&[bit::REWARD_PENDING][..], vec![1, 7]),
+        (&[bit::REWARD_GRANTED, bit::REWARD_PENDING][..], vec![7]),
+    ] {
+        let (mut ctl, _) = control();
+        let mut f = fake();
+        set(&mut f, P1, bits);
+        rec_mut(&mut ctl).guids.add(1);
+        rec_mut(&mut ctl).guids.add(7);
+        ctl.player_leaves(&mut f, P1);
+        assert_eq!(rec(&ctl).guids.0, kept, "{bits:?}");
+        assert!(!f.log.iter().any(|l| l.starts_with("unhandled 8 ")));
+    }
 }
 
 // Covers: specs/world/quests-act2.md §3.8
