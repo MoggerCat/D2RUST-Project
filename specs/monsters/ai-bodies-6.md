@@ -26,22 +26,26 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 47–59 |
-| Inputs | 60–69 |
-| Outputs / state changes | 70–76 |
-| Rules | 77–78 |
-|   1. Scope and order | 79–94 |
-|   2. Shared pet helpers | 95–200 |
-|   3. NecroPet (67) `0x005E4CF0` | 201–249 |
-|   4. MinionSpawner (121) `0x005E2BD0`, init `0x005F6630` | 250–269 |
-|   5. Towner (41) `0x005E7540` | 270–283 |
-|   6. EvilHole (76) `0x005FB410` | 284–311 |
-| Constants & data dependencies | 312–322 |
-| Randomness | 323–331 |
-| Edge cases & original bugs | 332–340 |
-| Test vectors | 341–354 |
-| Provenance | 355–371 |
-| Open questions | 372–379 |
+| Summary | 51–63 |
+| Inputs | 64–73 |
+| Outputs / state changes | 74–80 |
+| Rules | 81–82 |
+|   1. Scope and order | 83–102 |
+|   2. Shared pet helpers | 103–208 |
+|   3. NecroPet (67) `0x005E4CF0` | 209–257 |
+|   4. MinionSpawner (121) `0x005E2BD0`, init `0x005F6630` | 258–277 |
+|   5. Towner (41) `0x005E7540` | 278–291 |
+|   6. EvilHole (76) `0x005FB410` | 292–319 |
+|   7. Hireable (61) `0x005E52D0`, alternate `0x005E5280` | 320–438 |
+|   8. QuillMother (75) `0x005FB2A0` | 439–453 |
+|   9. BaalTentacle (139) `0x005EF820` | 454–467 |
+|   10. ElementalBeast (46) `0x005F6B70` | 468–486 |
+| Constants & data dependencies | 487–500 |
+| Randomness | 501–509 |
+| Edge cases & original bugs | 510–518 |
+| Test vectors | 519–536 |
+| Provenance | 537–556 |
+| Open questions | 557–564 |
 <!-- /index -->
 
 ## Summary
@@ -88,6 +92,10 @@ index, rows, section:
 | MinionSpawner (121) | 9 | §4 |
 | Towner (41) | 6 | §5 |
 | EvilHole (76) | 6 | §6 |
+| Hireable (61) | 5 | §7 |
+| QuillMother (75) | 5 | §8 |
+| BaalTentacle (139) | 5 | §9 |
+| ElementalBeast (46) | 4 | §10 |
 
 (Continued as the bodies are written; the remaining `unread` rows stay
 listed in `ai-functions.tsv`.)
@@ -309,6 +317,173 @@ The `spawn` column (fallen1, megademon6) is not read here; the spawn
 info table gives the same classes. No draws (the spawn's own:
 `monsters/population.md` §9). 1.14d-confirmed.
 
+### 7. Hireable (61) `0x005E52D0`, alternate `0x005E5280`
+
+Target mode 0. Rows: roguehire (271), act2hire (338), act3hire (359),
+act5hire1 (560), act5hire2 (561); aip1 = 1 on 338, 560, 561 (melee),
+0 on 271, 359. AI param 0 = "frustration" p (raised by the attack
+helper below). cls := the unit's class (−1 for none). O := the minion
+owner (`0x0058F0D0`). The alternate is Nihlathak's (`ai-bodies-5.md`
+§23). "Hireling move" = `0x005E3930` (below).
+
+1. O = 0, or O is not a player → install special state 5
+   (GoodNpcRanged, `ai.md` §9.31) when cls = 271, else 6
+   (SpecialState06, `0x005E7C10`) through `0x005B0E00(game, unit,
+   control, state)` (`ai.md` §3.3); idle 10. End.
+2. The unit has state 12 → state 12 off (`0x00639DB0(unit, 12, 0)`).
+3. m := the unit's anim mode; m = 2 (walk) or 15 (run) → return,
+   nothing scheduled (the move's end re-thinks inline, `ai.md` §1.4).
+4. Range: 16 < p < 20 → far := 2p, near := p, h := p >> 1
+   (arithmetic); else far := 24, near := 16, h := 5. (The current
+   command is read, `0x0058EE80`, and not used.)
+5. D := full-size distance unit→O (`0x005DC380`, compared unsigned).
+   D > 100 → hireling move k 3 (run 0, speed 0, n 0). End. D > far →
+   hireling move k 1 (run 1, speed 60, n 0). End. D > near: O in mode 2
+   or 6 → hireling move k 0 (0, 0, 0), end; O in mode 3 → k 0 (1, 60,
+   0), end.
+6. m ≠ 1 → delete the unit's thinks; idle 5. End.
+7. q := 0 for cls 338, 560, 561, else 1. B := the unit's position
+   collides with mask 0x40 over its pattern (`0x0064D910(room, x, y,
+   pattern 0x00649180, 0x40)`). B: one step `mask(128)`
+   (`0x00472210(seed, 128)`: `lo' & 127`) < (q ? 12 : 6) → wander 5.
+   End.
+8. The unit's room not in town: S, E := `0x005DDC30(unit)` (`ai.md`
+   §5.3); S ≠ 0 and E < 25 (unsigned) → hireling attack (game, unit,
+   cls, O, S, tick) (below). End.
+9. B → wander 5. End.
+10. The coordinate index at O's position ≠ the one at the unit's
+    (`0x0061B130`, each from its own room) → hireling move k 0 (1, 60,
+    0). End.
+11. D2 := full-size distance unit→O ≤ 1: h −= 1 (as a byte); velocity
+    (7, 0, 0); wander near O by h (`0x005DF530`) started → end. Delete
+    thinks; escape from O by h with think delete (`0x005DEFE0(O, h,
+    1)`) started → end. Velocity (0, 0, 40); walk to O's final point F
+    (`0x005DED90`). End.
+12. `roll(100)` < 5 → wander near O by near. End.
+13. Idle 5.
+
+**Hireling attack** `0x005E5050(game, U, cls, O, S, seed, tick)`:
+
+1. a := 98 for cls 338, 560, 561; else a := p + 40 + 2 × U's stat 12
+   (`level`, `0x00625480`), at most 95.
+2. d := full-size distance U→S.
+3. Node := U's node in O's pet lists by U's GUID (`0x00574BD0`,
+   `world/hirelings.md` §5 rule 4); none → idle 10. End. w := the node's
+   hireling `Id` (node +0x10).
+4. Draw r. r < a → ok := 1, p := 0; else ok := 0, p += 10.
+5. aip1 = 0 (ranged): d < 4 and a second draw < 50 → wander near O 4
+   started → end; delete thinks; escape from S by 4 with delete started
+   → end; else hireling skill (step 7) whatever ok. Otherwise ok →
+   hireling skill; not ok → idle 10.
+6. aip1 ≠ 0 (melee): d ≥ 3, or U not in melee range of S
+   (`0x00622C40(U, S, 0)` = 0) → path step count := monstats2
+   `MeleeRng` (byte +0x0E, `0x00649070`; overwritten at once by the
+   run's step count 1, so without effect); run to S with flags 1
+   (`0x005DED00(S, 1)`). End. Else ok → hireling skill; not ok → idle
+   10.
+7. **Hireling skill** `0x005E4D30(game, U, cls, w, S, seed)`:
+   1. cls has no monstats row → return, **nothing scheduled**.
+   2. L := U's level; H := the hireling row of id w at level L
+      (`0x006562F0(game +0x70, w, L)`, `world/hirelings.md` §1.2 rule
+      2); none → return, nothing scheduled.
+   3. Δ := max(0, L − H.`Level`). acc := H.`DefaultChance` (+0x64).
+      For i = 0..5 with k := H.`Skill<i+1>` (+0x78 + 4i): stop at the
+      first k < 1 or ≥ the skills count. c_i := 0. When U has the skill
+      (entry `0x006439B0(U, k, −1)` with level `0x006442A0(U, entry, 1)`
+      > 0) and (skills `aitype` (+0x230) ≠ 1, or its `aurastate` is
+      outside the states, or U lacks that state): k = 41 (Inferno), S ≠
+      0 and level / 2 + 4 < `0x006416D0(U, S)` → skip (c_i stays 0);
+      else acc += H.`Chance<i+1>` (+0x90 + 4i) + H.`ChancePerLvl<i+1>`
+      (+0xA8 + 4i) × Δ / 4 (signed, toward 0); c_i := acc.
+   4. r := `roll(acc + 1)` (one step; none when acc + 1 < 1, r := 0).
+   5. r ≥ H.`DefaultChance`: i := the first index 0..5 with c_i ≥ r
+      (signed); found and k := H.`Skill<i+1>` > 0: k's skills row has
+      the `aura` flag (+4 bit 5) → make k the right skill
+      (`0x005701B0(U, k, −1)`) and idle 10; else `0x005DEAD0(H.`Mode<i+1>`
+      (+0xC0 + i), k, S, 0, 0)`. End.
+   6. Fallback: cls 271 → `Skill1` at S. cls 338, 359, 560, 561 → U in
+      melee range of S → A1 at S, else idle 10. Any other → idle 10.
+
+**Hireling move** `0x005E3930(game, O, U, k, run, speed, n)` → 1 / 0;
+F, walk-del, run, velocity and wander' as §2. By k:
+
+- **0:** as pet move k 0 (`§2`, the same direction table, here
+  `0x006E34F0`), but each try is only velocity (0, speed, 40) and
+  walk-del to Q (run is ignored; no midpoint). After the 8 tries: delete
+  thinks; wander' 4; return 1.
+- **1:** O in mode 2 → velocity (0, 0, 100); walk to F; return 1.
+  Else s := speed, or `roll(15)` + 50 when speed = 0; the 20 history
+  entries as pet move k 1, without the x, y ≠ 0 test: path distance > 5
+  → velocity (0, s, 100), walk-del → 1; delete thinks; velocity (15, s,
+  100); run ≠ 0 → run, else walk-del → 1; delete thinks; once per call:
+  `0x005A6260(record, 1, s, 100)`, run / walk-del → 1; delete thinks.
+  After the 20: d := full-size distance >> 2, at least 4; velocity (15,
+  0, 0); wander' d; return 1.
+- **2:** `roll(100)` ≥ 10 → idle 15, return 1. Else wander' (`roll(3)`
+  + 3) → 1; delete thinks; velocity (0, 0, 40); walk to F; return 1.
+- **3:** as pet move k 3 (free spot near O for class 363, place U, idle
+  5).
+- **4:** O's other pets within 1 of U (as pet move k 4): none → idle
+  15, 1. Else delete thinks; escape from O by n with delete → 1; delete
+  thinks; wander' n; return 1.
+- **5:** velocity (0, 0, 0); wander near O by n → 1; delete thinks;
+  escape from O by n with delete → 1; velocity (0, 0, 40); walk to F;
+  return 1.
+- Other k: 0.
+
+Draws, in order: step 7's `mask(128)`; the attack's r, the ranged
+second draw, the skill `roll(acc + 1)`; step 12's `roll(100)`; the
+helpers'. 1.14d-confirmed (`0x005E52D0`, `0x005E5050`, `0x005E4D30`,
+`0x005E3930`, `0x00574BD0`); D2MOO same.
+
+### 8. QuillMother (75) `0x005FB2A0`
+
+Brackets: quillbear1 [60, 50, 16, 15].
+
+1. AI state 3/19 (`0x005DD2B0`): command {type 1, T's unit type (6
+   when T = 0), T's GUID (−1)} copied to every minion of the unit's
+   minion owner (`0x0058F730`, `ai.md` §8; params 3 and 4 are not
+   written: uninitialised stack words in 1.14d, read by no minion AI
+   here). Then C → A1 at T, else walk to T with flags 7. End.
+2. Not C: draw < aip2 [50] → walk to T with flags 7; else idle aip4
+   [15]. End.
+3. C: draw < aip1 [60] → A1 at T; else idle aip3 [16].
+
+1.14d-confirmed.
+
+### 9. BaalTentacle (139) `0x005EF820`
+
+Brackets: baaltentacle1 [70, 24, 10]. AI param 2 = expiry frame e.
+
+1. The unit's owner (`0x00552FD0`) missing or dead (`0x005541B0`) →
+   kill the unit (`0x0057CCB0(game, unit, 0, 1)`, `combat/damage.md`
+   §7.2). End.
+2. e = 0 → e := frame + (`roll(aip3)` + aip3) × 25 [250–475 frames].
+3. frame > e → kill as step 1. End.
+4. C and `roll(100)` < aip1 [70] → A1 at T. End.
+5. Idle aip2 [24].
+
+1.14d-confirmed.
+
+### 10. ElementalBeast (46) `0x005F6B70`
+
+Brackets: firebeast [20, 16, 20]; firebeast and iceglobe have
+`SplEndGeneric`, so they re-think inline at the end of any mode
+(`ai.md` §1.4). AI param 0 = state s.
+
+1. s = 2 → kill the unit with T as killer (`0x0057CCB0(game, unit, T,
+   1)`). End.
+2. s = 0 and (D < aip2 [16; 20, 24] or AI state 3/19) → S1 (mode 8)
+   at T; s := 1. End.
+3. s ≠ 1 → idle aip3 [20]. End.
+4. C → S1 at T; add a timer event of type 0 (MODECHANGE) on the unit
+   at frame + 1 (`0x005417D0(game, unit, 0, frame + 1, 0, 0)`, no
+   delete; `sim/tick.md` §5); s := 2. End.
+5. `roll(100)` < aip1 [20] → walk to T with flags 0; else wander 8.
+
+So a beast wakes with S1 when a target comes within aip2, chases, casts
+S1 again on contact and dies on the next think. 1.14d-confirmed.
+
 ## Constants & data dependencies
 
 | Item | Value | Source |
@@ -318,6 +493,9 @@ info table gives the same classes. No draws (the spawn's own:
 | pet follow | R = n + pets / 2 ≤ 36; D 1 / 28 / 30 / 50 / 80; last placed point < 28 | `0x005E45D0` |
 | NecroPet | far 50, ahead 28, owner-view range 36 (melee) / 20 (ranged), own search 24 / 15, r < 15 quiet | `0x005E4830`, `0x005E4AC0` |
 | minion scan | `BaseId` 453, 461; alignment 0 | `0x005E2B70` |
+| hireling | range 24 / 16 / 5 or 2p / p / p >> 1 (17 ≤ p ≤ 19); D 100; attack chance 98 or p + 40 + 2·level ≤ 95; p += 10 on a miss; skill weights from hireling.txt `DefaultChance`, `Chance*`, `ChancePerLvl*` / 4; Inferno reach level / 2 + 4 | `0x005E52D0`, `0x005E5050`, `0x005E4D30` |
+| hireling move | k 1 speed `roll(15)` + 50 | `0x005E3930` |
+| BaalTentacle | life (`roll(aip3)` + aip3) × 25 frames | `0x005EF820` |
 | EvilHole | modes 1 → 10 → 11 → spawn → 0; trigger D ≤ 5; spawn classes 19 / 712; flags 0x04020000; state 184, overlay 202 for class 711 | `0x005FB410`, `0x0063EFA0` |
 
 ## Randomness
@@ -349,6 +527,10 @@ Synthetic (CI-safe), draws given as `lo' % 100`:
 | EvilHole, evilhole1, f = 0, m = 1, D = 3 | none | f := frame + 50, n := 10, mode 10, wait 20 |
 | EvilHole, m = 11, n = 0 | none | mode 0 |
 | NecroPet melee, D = 60 | none | pet move k 3 |
+| QuillMother, C = 1, quillbear1 Normal, no AI state | 59 (< 60) | A1 at T |
+| BaalTentacle, e = 0, frame 1000, baaltentacle1 | `roll(10)` = 3 | e := 1325 |
+| ElementalBeast, s = 0, D = 10, firebeast Normal | none | S1 at T, s := 1 |
+| Hireable, act2hire, p = 0, level 20, S at d = 2 in melee range, draw 79 | 79 (< 98) | p := 0; hireling skill |
 
 Game-file vectors: Open question 1.
 
@@ -358,8 +540,11 @@ Game-file vectors: Open question 1.
   `0x005E45D0`, `0x005E3900`, `0x00574DE0`, `0x00574F40`, `0x005DF400`,
   `0x005DEEB0`, `0x005DDE50`, `0x005E4CF0`, `0x005E4830`, `0x005E4AC0`,
   `0x005E2BD0`, `0x005E2B70`, `0x005F6630`, `0x005E7540`, `0x005FB410`,
-  `0x0063EFA0` (cases 0x141, 0x220, default), `0x00621E40`; tables
-  `0x006E34F8` read from the file. Decompiler text read first; every
+  `0x0063EFA0` (cases 0x141, 0x220, default), `0x00621E40`, `0x005E52D0`,
+  `0x005E5050`, `0x005E4D30`, `0x005E3930` (jump table `0x005E3E7C`),
+  `0x00574BD0`, `0x005DED00`, `0x005FB2A0`, `0x0058F730`, `0x005EF820`,
+  `0x005F6B70`; tables
+  `0x006E34F8`, `0x006E34F0` read from the file. Decompiler text read first; every
   call's register and stack arguments checked in the disassembly
   (`tools/ghidra/disasm.py`).
 - Live data (`patch_d2`): monstats.txt (`AI`, `aip*`, skills, `spawn`,
