@@ -4963,6 +4963,11 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
   spec).
 - `render/draw-order.md` OQ7: town river-bank cells, capture at `TownE1`
   tile (950, 933).
+- `sim/intents-events.md` OQ11: breakpoint, no new play: return address
+  one level up of `0x0053FB30` during a monster kill (which path sends the
+  0x65 in a kill tick).
+- `sim/intents-events.md` OQ13: breakpoint at join: caller of the first
+  0x48 in frame 2.
 
 ## 8. Lessons (problems met, fixes)
 
