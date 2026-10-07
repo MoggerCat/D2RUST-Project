@@ -14,6 +14,7 @@ struct Rest {
     player: UnitId,
     quests: PlayerQuests,
     inventory: Vec<UnitId>,
+    cursor: Option<UnitId>,
     log: Vec<String>,
 }
 
@@ -23,6 +24,7 @@ impl Rest {
             player,
             quests: PlayerQuests::default(),
             inventory: Vec::new(),
+            cursor: None,
             log: Vec::new(),
         }
     }
@@ -72,6 +74,9 @@ impl QuestRest for Rest {
     fn send_text_list(&mut self, _: UnitId, _: UnitId, _: &[(u16, u32)]) {}
     fn inventory(&self, _: UnitId) -> Vec<UnitId> {
         self.inventory.clone()
+    }
+    fn quest_cursor_item(&self, _: UnitId) -> Option<UnitId> {
+        self.cursor
     }
     fn delete_item(&mut self, _: UnitId, code: [u8; 4]) {
         self.log
@@ -402,4 +407,64 @@ fn quest_updater_runs_at_tick_step_8() {
     run(&mut game, &mut ctl, &mut rest, 100);
     assert_eq!(ctl.tick, 5);
     assert_eq!(rest.log, ["send 5d"]);
+}
+
+/// `quests-helpers.md` §8 (`0x00558110`): the cursor item first (its
+/// record's `quest` and stat 356 against the difficulty,
+/// `questdiffcheck` not tested), then the inventory list in order with
+/// page 1 skipped (`quest`, `questdiffcheck` and stat 356 tested); none
+/// otherwise.
+// Covers: specs/world/quests-helpers.md §8 text, §8 r2, §8 r3, §8 r4
+#[test]
+fn find_item_by_code_cursor_then_list() {
+    let mut w = World::new();
+    let p = w.spawn(UnitType::Player, 0);
+    w.fields.difficulty = 1;
+    let make = |w: &mut World| {
+        let mut rq = ItemRequest {
+            item: HORADRIC_MALUS as i32,
+            format: 101,
+            quality: q::NORMAL,
+            ..ItemRequest::default()
+        };
+        let spawn = ItemSpawn {
+            room: None,
+            mode: 0,
+            init_flags: 1,
+        };
+        w.econ().create_item(&mut rq, false, spawn).unwrap()
+    };
+    let a = make(&mut w);
+    let b = make(&mut w);
+    let mut rest = Rest::new(p);
+    let find = |w: &mut World, rest: &mut Rest| {
+        let mut e = w.econ();
+        EconomyQuests::new(&mut e, rest).find_item(p, *b"hdm ")
+    };
+    // Rule 4: nothing anywhere.
+    assert_eq!(find(&mut w, &mut rest), None);
+    // The malus record is a quest item; with questdiffcheck set, stat 356
+    // (0) < difficulty (1) skips the list entry.
+    assert_ne!(w.tables.items[HORADRIC_MALUS].quest, 0);
+    w.tables.items[HORADRIC_MALUS].questdiffcheck = 1;
+    rest.inventory = vec![a, b];
+    assert_eq!(find(&mut w, &mut rest), None);
+    // Stat 356 ≥ difficulty on the second item: it is the one found.
+    w.set_stat(b, 356, 1);
+    assert_eq!(find(&mut w, &mut rest), Some(b));
+    // Items on page 1 (trade) are skipped.
+    w.items.get_mut(b).unwrap().inv_page = 1;
+    assert_eq!(find(&mut w, &mut rest), None);
+    w.items.get_mut(b).unwrap().inv_page = 0;
+    // Rule 2: the cursor item is tried first (stat test applies since
+    // `quest` ≠ 0).
+    rest.cursor = Some(a);
+    assert_eq!(find(&mut w, &mut rest), Some(b), "a: stat 0 < 1, skipped");
+    w.set_stat(a, 356, 1);
+    assert_eq!(find(&mut w, &mut rest), Some(a), "cursor before the list");
+    // Without questdiffcheck the list does not test the stat.
+    w.tables.items[HORADRIC_MALUS].questdiffcheck = 0;
+    w.set_stat(a, 356, 0);
+    rest.cursor = None;
+    assert_eq!(find(&mut w, &mut rest), Some(a), "first in list order");
 }

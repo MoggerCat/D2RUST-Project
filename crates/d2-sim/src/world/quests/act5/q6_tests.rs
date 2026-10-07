@@ -624,3 +624,44 @@ fn sequence_chain_34_to_36() {
     assert!(super::sequence(&mut ctl, &mut f, i));
     assert_eq!(ctl.records[i].state, 0);
 }
+
+// Covers: specs/world/quests-act5-2.md §edge-cases-original-bugs r11
+#[test]
+fn baal_without_a_victim_room_sends_only_fx_19() {
+    let (mut ctl, _) = control();
+    let mut f = fake();
+    f.pos.remove(&BAAL_U);
+    let i = rec(&ctl);
+    let before = (ctl.records[i].state, ctl.records[i].status);
+    kill_baal(&mut ctl, &mut f, Some(P1));
+    assert!(f.log.is_empty(), "no credit, gold or missile 625");
+    assert!(f.sent.iter().any(|m| m.1 == [0x89, 19]));
+    assert!(!f.flags(P1).get(40, 0));
+    assert_eq!((ctl.records[i].state, ctl.records[i].status), before);
+    assert!(ctl.take_host_requests().is_empty());
+}
+
+// Covers: specs/world/quests-act5-2.md §edge-cases-original-bugs r13
+#[test]
+fn last_portal_is_tried_once_even_without_a_free_spot() {
+    let (mut ctl, _) = control();
+    let mut f = fake();
+    let i = rec(&ctl);
+    f.pos.insert(P1, (10, 20, RoomId(3)));
+    f.spot = None;
+    call(
+        &mut ctl,
+        &mut f,
+        ev(event::NPC_DEACTIVATE, Some(TYRAEL_U), 0, 0),
+    );
+    // One search, no object, and +0x98 is set: the walk ended at the
+    // first player in level 132 and nothing retries.
+    assert_eq!(f.log, ["spot at 15 20 5 0x400 18 100"]);
+    assert!(ctl.records[i].extra.a5.q6.last_portal_made);
+    call(
+        &mut ctl,
+        &mut f,
+        ev(event::NPC_DEACTIVATE, Some(TYRAEL_U), 0, 0),
+    );
+    assert_eq!(f.log.len(), 1);
+}

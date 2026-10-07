@@ -16,7 +16,7 @@ fn world() -> Fake {
     f
 }
 
-// Covers: specs/world/quests-helpers.md §1
+// Covers: specs/world/quests-helpers.md §1; specs/world/quests-act2-2.md §edge-cases-original-bugs r4
 #[test]
 fn free_spot_lattice() {
     // Everything free: ring k = 1 tests the corner (48, 50) only → spot

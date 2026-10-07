@@ -750,7 +750,7 @@ mod sun_tests {
     use super::{tainted_sun_end, tainted_sun_start};
     use crate::world::environment::Environment;
 
-    // Covers: specs/world/quests-act2-2.md §5.2
+    // Covers: specs/world/quests-act2-2.md §5.2; specs/world/quests-act2.md §5.9 r2, §5.9 r4, §5.9 l2 r2, §5.9 l2 r3
     #[test]
     fn tainted_sun_start_and_end_on_the_record() {
         let mut e = Environment::CREATED;
