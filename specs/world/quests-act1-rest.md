@@ -31,13 +31,13 @@
 |   6. Party list as read by the quest code | 286–311 |
 |   7. Cairn stone-order 0x50: bytes 13–14 | 312–321 |
 |   8. Act I clarifications (implementation questions, 2026-10-06) | 322–392 |
-|   9. Implementation and wiring questions (2026-10-07) | 393–550 |
-| Constants & data dependencies | 551–566 |
-| Randomness | 567–573 |
-| Edge cases & original bugs | 574–597 |
-| Test vectors | 598–629 |
-| Provenance | 630–663 |
-| Open questions | 664–691 |
+|   9. Implementation and wiring questions (2026-10-07) | 393–552 |
+| Constants & data dependencies | 553–568 |
+| Randomness | 569–575 |
+| Edge cases & original bugs | 576–599 |
+| Test vectors | 600–631 |
+| Provenance | 632–665 |
+| Open questions | 666–693 |
 <!-- /index -->
 
 ## Summary
@@ -424,7 +424,9 @@ given.
 
    d2rs reproduces these effects instead of reporting a fatal error;
    only the gibbet portal row is fatal (the original's internal-error
-   exit at `0x0056D147`).
+   exit at `0x0056D147`). This replaces the "invariant violation" reading of
+   §8 item 3 for a marker without a room: the town Cain spawn simply
+   finds no room and spawns nothing.
 3. **QA-3: the L4 party step (`quests-act1.md` §10.6 L4, `0x00593130`).**
    The party walk (`0x00554630`, then `0x00540510` with `0x005930B0`;
    `0x00593195`–`0x005931AF`) is inside the test: it runs only after P
