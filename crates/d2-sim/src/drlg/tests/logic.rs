@@ -426,7 +426,10 @@ fn tree_marks_change_nothing() {
     for id in [plain, tree] {
         d.build_logic_grid(id, &LogicGrids::default());
     }
-    let (a, b) = (d.room(plain).logic().unwrap(), d.room(tree).logic().unwrap());
+    let (a, b) = (
+        d.room(plain).logic().unwrap(),
+        d.room(tree).logic().unwrap(),
+    );
     assert_eq!(a.index_grid.len(), b.index_grid.len());
     // The counter runs on through the second room; compare the shapes.
     let strip = |g: &[u32]| g.iter().map(|&v| v & !0x00FF_FFFF).collect::<Vec<_>>();
@@ -447,4 +450,43 @@ fn coordinate_indexes_follow_the_build_order() {
     };
     assert_eq!(build(0), (vec![2, 0], vec![5, 0]));
     assert_eq!(build(1), (vec![5, 0], vec![2, 0]));
+}
+
+// Covers: specs/drlg/levels.md §11.2 r1, §11.2 r3
+#[test]
+fn coordinate_lists_by_room_kind_when_the_tiles_fill() {
+    let mut dat = data();
+    gen_level(&mut dat, 2, 2);
+    let mut types = FakeTypes::default();
+    types.rooms.insert(
+        2,
+        vec![
+            preset(0, 0, 8, 8),
+            preset(8, 0, 8, 8),
+            RoomSpec {
+                kind: RoomKind::Other(5),
+                ..preset(16, 0, 8, 8)
+            },
+        ],
+    );
+    types.default_grid = Some(floor_grid);
+    // Room 0: a preset room whose lvlprest has `Logicals` (the grid build).
+    let mut g = floor_grid(TileRect::new(0, 0, 8, 8));
+    g.logicals = Some(LogicGrids::default());
+    types.grids.insert((2, 0), g);
+    let mut w = World::new(dat, types);
+    let mut d = w.drlg(INIT);
+    let l = d.get_or_alloc_level(&w.data, &mut w.types, 2).unwrap();
+    d.generate_level(&w.data, &mut w.types, l).unwrap();
+    let r = d.level_rooms(l);
+    let mut svc = w.svc();
+    for &id in &r {
+        d.stream_room(&mut svc, id).unwrap();
+    }
+    // r1: a `Logicals` preset room gets the grid lists; every other
+    // preset room one record.
+    assert_eq!(d.room(r[0]).logic().unwrap().flags, INFO_GRID);
+    assert_eq!(d.room(r[1]).logic().unwrap().flags, INFO_ONE);
+    // r3: rooms of other types get no info.
+    assert!(d.room(r[2]).logic().is_none());
 }

@@ -351,19 +351,163 @@ fn wind_retarget_and_lightning_timer() {
 
 // Covers: specs/render/draw-order-2.md §11.2 r3
 #[test]
-fn moving_live_particles_is_open_question_3() {
+fn live_particles_move_before_the_rain_cycle() {
+    // r3: with particles live, the update moves them (§11.9) and counts
+    // the move in `F`; with none live there is no move.
     let lv = level(1, 0, true, false);
     let mut w = loaded(lv);
     w.particles.alloc(particle(5, 5, false));
     let mut seed = Seed::new(1, 0);
-    let r = w.update(
+    w.update(
         Some(LocalPlayer {
             seed: &mut seed,
             level: lv,
         }),
         &input(1),
-    );
-    assert!(matches!(r, Err(WeatherError::Open { question: 3, .. })));
+    )
+    .unwrap();
+    assert_eq!(w.move_counter, 1);
+    let mut empty = loaded(lv);
+    let mut seed = Seed::new(1, 0);
+    empty
+        .update(
+            Some(LocalPlayer {
+                seed: &mut seed,
+                level: lv,
+            }),
+            &input(1),
+        )
+        .unwrap();
+    assert_eq!(empty.move_counter, 0);
+}
+
+/// A rain weather with wind 0 (`Wc` = 1, `Ws` = 0) and intensity 0
+/// (f = float32(0.85)), one particle with +0x14 = 20 (A = 17).
+fn mover(p: Particle) -> Weather {
+    let mut w = loaded(level(1, 0, true, false));
+    assert_eq!(sine_table()[128], 1.0);
+    assert_eq!(sine_table()[0], 0.0);
+    w.wind = 0;
+    w.intensity_256 = 0;
+    w.particles.alloc(Particle { shape_14: 20, ..p });
+    w
+}
+
+fn step(w: &mut Weather, delta: (i32, i32)) {
+    let mut seed = Seed::new(3, 0);
+    let input = UpdateInput {
+        camera_delta: delta,
+        ..input(1)
+    };
+    w.move_particles(&mut seed, &input).unwrap();
+}
+
+// Covers: specs/render/draw-order-2.md §11.9 text, §11.9 r1, §11.9 r2, §11.9 r3
+#[test]
+fn particle_move_rain_vectors() {
+    // f = float32(0 × 0.15 + 0.85); A = trunc(20 × f) = 17; ux = trunc(
+    // Wc(0) × 17) = 17, uy = trunc(Ws(0) × 17) = 0. y += uy − dY;
+    // x += ux − dX.
+    let mut w = mover(particle(100, 50, false));
+    w.particles.free(0);
+    w.particles.alloc(Particle {
+        ground_y: 100,
+        shape_14: 20,
+        ..particle(100, 50, false)
+    });
+    step(&mut w, (3, 2));
+    let p = *w.particles.get(0).unwrap();
+    assert_eq!((p.x, p.y, p.landed, p.bounces), (114, 48, false, 3));
+    assert_eq!(w.move_counter, 1);
+    // x ≥ W wraps once down by W, x < 0 once up by W (W = 800).
+    for (x, want) in [(795, 9), (-20, 794), (786, 0)] {
+        let mut w = mover(Particle {
+            ground_y: 100,
+            ..particle(x, 50, false)
+        });
+        step(&mut w, (3, 0));
+        assert_eq!(w.particles.get(0).unwrap().x, want, "x {x}");
+    }
+    // F counts every call and never resets.
+    step(&mut w, (0, 0));
+    assert_eq!(w.move_counter, 2);
+}
+
+// Covers: specs/render/draw-order-2.md §11.9 r2
+#[test]
+fn particle_move_landing_bounces_then_frees_and_respawns() {
+    // y > ground y → landed; with bounces left: ux := 0, +0x14 := 0,
+    // bounce count − 1 (x moves by −dX only).
+    let mut w = mover(Particle {
+        ground_y: 100,
+        ..particle(100, 99, false)
+    });
+    step(&mut w, (3, -5));
+    let p = *w.particles.get(0).unwrap();
+    assert_eq!((p.y, p.landed, p.bounces, p.shape_14), (104, true, 2, 0));
+    assert_eq!(p.x, 97);
+    // No bounces left: the slot is freed; with live < target one particle
+    // spawns on the player seed (the lowest free slot: the same one) and
+    // is moved in the same loop with the freed particle's ux (17).
+    let mut w = mover(Particle {
+        ground_y: 100,
+        bounces: 0,
+        landed: true,
+        ..particle(100, 99, true)
+    });
+    w.target = 1;
+    let mut seed = Seed::new(3, 0);
+    let mut probe = seed;
+    let spawn_x = probe.roll_range(0, 800);
+    w.move_particles(&mut seed, &input(1)).unwrap();
+    assert_eq!(w.particles.live(), 1);
+    let p = *w.particles.get(0).unwrap();
+    assert_eq!((p.bounces, p.landed), (3, false));
+    assert_eq!(p.x, (spawn_x + 17).rem_euclid(800));
+    // At the target: freed and not replaced; no draw on the seed.
+    let mut w = mover(Particle {
+        ground_y: 100,
+        bounces: 0,
+        landed: true,
+        ..particle(100, 99, true)
+    });
+    w.target = 0;
+    let mut seed = Seed::new(3, 0);
+    w.move_particles(&mut seed, &input(1)).unwrap();
+    assert_eq!(w.particles.live(), 0);
+    assert_eq!(seed, Seed::new(3, 0));
+}
+
+// Covers: specs/render/draw-order-2.md §11.9 r1, §11.9 r2, §11.9 r3
+#[test]
+fn particle_move_snow_sway_uses_the_counter() {
+    // Snow: f = max(|Wc|, 0.25) = 1, A = 20, ux = 20; a particle that has
+    // not landed adds trunc(2 × Ws(F × 512 / 25 + phase)).
+    let mut w = mover(particle(100, 50, false));
+    w.snow_mode = true;
+    w.move_counter = 10; // 5120 / 25 = 204
+    let want = (2.0 * (204.0f64 * std::f64::consts::PI / 256.0).sin()) as i32;
+    assert_eq!(want, 1);
+    step(&mut w, (0, 0));
+    assert_eq!(w.particles.get(0).unwrap().x, 100 + 20 + want);
+    assert_eq!(w.move_counter, 11);
+    // A landed snow flake does not sway (the bounce zeroed ux).
+    let mut w = mover(Particle {
+        ground_y: 100,
+        ..particle(100, 99, false)
+    });
+    w.snow_mode = true;
+    w.move_counter = 10;
+    step(&mut w, (0, -5));
+    assert_eq!(w.particles.get(0).unwrap().x, 100);
+    // The product wraps at 32 bits before the divide.
+    let mut w = mover(particle(100, 50, false));
+    w.snow_mode = true;
+    w.move_counter = 0x0200_0000 + 50; // × 512 wraps to 50 × 512
+    let arg = (50u32 * 512) / 25;
+    let want = (2.0 * (f64::from(arg & 511) * std::f64::consts::PI / 256.0).sin()) as i32;
+    step(&mut w, (0, 0));
+    assert_eq!(w.particles.get(0).unwrap().x, 100 + 20 + want);
 }
 
 /// A seed whose rain / snow spawn at `H` 600 draws ground y `g`.
@@ -1083,4 +1227,35 @@ fn level_presets_snow_levels() {
     let before = seed;
     w.level_presets(&mut seed, &level(115, 4, true, false));
     assert_eq!(seed, before);
+}
+
+// Covers: specs/render/draw-order-2.md §11.3 text
+#[test]
+fn locked_rain_cycle_becomes_phase_2_and_then_keeps_it() {
+    let lv = level(1, 0, true, false);
+    // Snow lock set and the phase not 2: the phase becomes 2 and the level
+    // presets run instead of the cycle (no countdown or length change).
+    let mut w = loaded(lv);
+    w.snow_lock = true;
+    w.phase = 1;
+    w.countdown = 77;
+    let mut seed = Seed::new(5, 0);
+    w.rain_cycle(&mut seed, &lv).unwrap();
+    assert_eq!((w.phase, w.countdown), (2, 77));
+    // Locked in phase 2 with the countdown run out: the cycle runs with
+    // p = 3 (draws D, phase entry 3 does nothing under the lock), the
+    // stored phase stays 2 and r3 uses p = 3: target = peak × countdown / D.
+    let mut w = loaded(lv);
+    w.snow_lock = true;
+    w.phase = 2;
+    w.countdown = 0;
+    w.peak = 100;
+    let mut probe = Seed::new(5, 0);
+    let d = probe.roll_range(w.cycle_min[3], w.cycle_n[3]) as u32;
+    let mut seed = Seed::new(5, 0);
+    w.rain_cycle(&mut seed, &lv).unwrap();
+    assert_eq!(w.phase, 2);
+    assert_eq!((w.length, w.countdown), (d, d - 1));
+    assert_eq!(w.target, 100 * (d - 1) / d);
+    assert_eq!(seed, probe);
 }
