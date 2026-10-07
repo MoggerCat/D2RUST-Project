@@ -5322,6 +5322,7 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
 - `world/hirelings.md` §8 rule 5 (optional confirmation, PC 2 spec-hirelings pass 3): hireling dies in the wilderness, player goes to town and waits > 11 room passes (132 frames) so the room is freed, then resurrects: expected 0x81, the merc's 0xAC at the player, `9b ffff 00000000`, 0x2A code 5, and no 0x4B / error.
 - `world/quests-status.md` OQ1 (PC 2 spec-quests-status): open the quest log in several states of one quest (e.g. Den of Evil: started; D = 3 monsters left; just completed; completed in an earlier game) and record the screen plus packets: drawn text, icon frame, and the C→S 0x58 sent after the completion animation.
 - `items/bitstream.md` OQ2 (PC 2 spec-items pass 2): pickup and stash of a set, unique, rare, runeword, ear, gold pile, tome and a socket-filled item with `record_packets.py`: the S→C 0x9C / 0x9D streams of each.
+- `items/treasure.md` OQ5 (PC 2 spec-items pass 3): the x87 control word at `0x0055A935` (treasure float math) under each video mode (DirectDraw / Direct3D / Glide, windowed `-w`): is precision still 53-bit (CRT default) or did the video layer switch it to 24-bit (SetCooperativeLevel flags 0x11 / 0x411 lack FPU-preserve).
 
 **Ninth set (2026-10-07; the 22 notes `impl-ai-acts2-5`, `impl-skill-slots-2`,
 `impl-missile-bodies-2`, `impl-quests-act1-rest`, `impl-quests-act2`,
