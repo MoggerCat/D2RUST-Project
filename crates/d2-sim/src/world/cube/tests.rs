@@ -185,6 +185,7 @@ pub(super) struct Fake {
     pub(super) ladder: bool,
     pub(super) difficulty: u8,
     pub(super) date: (u8, u8),
+    pub(super) date_reads: std::cell::Cell<u32>,
     pub(super) seed: Seed,
     pub(super) class: u8,
     pub(super) player_stats: BTreeMap<u16, i32>,
@@ -276,6 +277,7 @@ impl CubeWorld for Fake {
         }
     }
     fn local_date(&self) -> (u8, u8) {
+        self.date_reads.set(self.date_reads.get() + 1);
         self.date
     }
     fn game_seed(&mut self) -> &mut Seed {
@@ -1470,4 +1472,50 @@ fn first_match_wins_even_if_outputs_fail() {
     }
     let t = d.transmute(&mut f, P);
     assert_eq!((t.record, t.committed), (Some(0), false));
+}
+
+// Covers: specs/world/cube.md §3 r1, §3 r2
+#[test]
+fn transmute_reads_the_date_once_and_only_with_contents() {
+    // Several records are tried (day-of-month op 1: param ≤ day ≤ value).
+    let mut late = gem_recipe();
+    (late.op, late.param, late.value) = (1, 20, 31);
+    let mut early = gem_recipe();
+    (early.op, early.param, early.value) = (1, 1, 10);
+    let d = data(vec![late, early, gem_recipe()]);
+    let mut f = Fake::new();
+    for _ in 0..3 {
+        f.add(GCV, 2);
+    }
+    let t = d.transmute(&mut f, P);
+    // Day 15 fails records 0 and 1; record 2 (no op) wins; one read.
+    assert_eq!(t.record, Some(2));
+    assert_eq!(f.date_reads.get(), 1);
+    // No page-3 item: nothing, and the date is not read.
+    let mut f = Fake::new();
+    assert_eq!(d.transmute(&mut f, P), Transmute::default());
+    assert_eq!(f.date_reads.get(), 0);
+    assert!(f.log.is_empty() && f.sent.is_empty());
+}
+
+// Covers: specs/world/cube.md §6.1 r3
+#[test]
+fn slot_item_class_or_any() {
+    use input_flags as fl;
+    let run = |slot: u32, held: u32| {
+        let d = data(vec![recipe(
+            1,
+            &[input(fl::USEANY, slot, 0)],
+            out(kind::ITEMCODE, RIN),
+        )]);
+        let mut f = Fake::new();
+        f.add(held, 2);
+        d.transmute(&mut f, P).record.is_some()
+    };
+    // 0xFFFF: no record fetched, any item passes the class test.
+    assert!(run(0xFFFF, HAX));
+    assert!(run(0xFFFF, GCV));
+    // Otherwise the item's class must be the slot's.
+    assert!(run(HAX, HAX));
+    assert!(!run(GCV, HAX));
 }

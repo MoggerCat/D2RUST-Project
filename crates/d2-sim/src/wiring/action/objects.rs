@@ -521,8 +521,8 @@ impl<X: Pending> View<'_, X> {
     /// ([`ObjectCase::Waypoint`]); quest and `todo` routes go to
     /// [`Pending::object_route`]. `None`: no object state.
     ///
-    /// TODO(waypoints.md §5.2): the result after the operate (and after
-    /// the walk) is not stated; read as 0.
+    /// Result after the operate (`objects.md` §7.3 rule 5): the entry's
+    /// result 0 → 3, else 0; after the walk 0.
     pub fn object_message(
         &mut self,
         game: &mut Game,
@@ -541,7 +541,11 @@ impl<X: Pending> View<'_, X> {
             ObjectReach::Walk => return Some(ObjectCase::Code(0)),
             ObjectReach::Operate => {}
         }
-        let (_, d) = self.operate_object(game, Some(player), guid)?;
+        let (result, d) = self.operate_object(game, Some(player), guid)?;
+        // Objects §7.3 rule 5: the entry's result 0 (object gone) → 3.
+        if result == 0 {
+            return Some(ObjectCase::Code(3));
+        }
         Some(match d {
             Some(Dispatch::Waypoint(op)) => ObjectCase::Waypoint(op),
             Some(d @ (Dispatch::Quest(_) | Dispatch::NotCovered(_))) => {

@@ -640,7 +640,7 @@ fn item_to_cube_checks() {
 /// item gets page 3; the placement (§2.4 step 2: the item must be on the
 /// cursor) refuses a ground item, its result is ignored (§2 step 3.5):
 /// result 0, the ring stays on the ground, unlinked.
-// Covers: specs/world/cube.md §2 r1
+// Covers: specs/world/cube.md §2 r1, §edge-cases-original-bugs r15
 #[test]
 fn item_to_cube_ground_item() {
     let mut t = setup(3);
