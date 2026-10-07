@@ -10,6 +10,8 @@
 //! rooms of Cold Plains, every cell a floor); the NPC, vendor and quest
 //! seams of the wired host are no-op rests no walk reaches.
 
+mod mutants_handlers_fx;
+
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -38,14 +40,10 @@ use d2_sim::units::lifecycle::AllocRequest;
 use d2_sim::units::lists::client_state;
 use d2_sim::units::{RoomId, UnitId, UnitType};
 use d2_sim::wiring::action::{ActionHooks, ActionSim, ActionTables, DrlgWorld, Pending};
-use d2_sim::wiring::economy::QuestRest;
-use d2_sim::wiring::interaction::{NpcRest, PlayerQuestsRef, VendorRest};
-use d2_sim::world::npc::{ImbueMods, InvEntry, ItemFacts, MercInit, NpcControl};
-use d2_sim::world::quests::{
-    PlayerQuests, QuestChain, QuestControl, QuestTables, TextList, UnitKind,
-};
-use d2_sim::world::vendors::price::Bonus;
-use d2_sim::world::vendors::{Transaction, VendorTables};
+use d2_sim::world::npc::NpcControl;
+use d2_sim::world::quests::{QuestControl, QuestTables};
+use d2_sim::world::vendors::VendorTables;
+use mutants_handlers_fx::Rest;
 
 // ---- fixture -----------------------------------------------------------------------------
 
@@ -65,256 +63,6 @@ impl Outbox for ActionRest {
     fn take_sent(&mut self) -> Vec<(UnitId, Vec<u8>)> {
         std::mem::take(&mut self.sent)
     }
-}
-
-/// The wired host's interaction seams: nothing a walk reaches.
-#[derive(Default)]
-struct Rest;
-
-impl Outbox for Rest {
-    fn take_sent(&mut self) -> Vec<(UnitId, Vec<u8>)> {
-        Vec::new()
-    }
-}
-
-impl PlayerQuestsRef for Rest {
-    fn quests_ref(&self, _: UnitId) -> Option<&PlayerQuests> {
-        None
-    }
-}
-
-impl NpcRest for Rest {
-    fn item_format(&self) -> u16 {
-        1
-    }
-    fn distance(&self, _: UnitId, _: UnitId) -> i32 {
-        0
-    }
-    fn axis_check(&self, _: UnitId, _: UnitId) -> u32 {
-        0
-    }
-    fn unit_check(&self, _: UnitId, _: u32) -> u32 {
-        0
-    }
-    fn clear_path(&mut self, _: UnitId) {}
-    fn approach(&mut self, _: UnitId, _: UnitId) {}
-    fn player_busy(&self, _: UnitId) -> u32 {
-        0
-    }
-    fn start_allowed(&self, _: UnitId, _: UnitId) -> bool {
-        false
-    }
-    fn tristram_cain_busy(&self, _: UnitId, _: UnitId) -> bool {
-        false
-    }
-    fn interact_unit(&self, _: UnitId) -> Option<(u8, u32)> {
-        None
-    }
-    fn set_interact(&mut self, _: UnitId, _: u8, _: u32) {}
-    fn reset_interact(&mut self, _: UnitId) {}
-    fn pet(&self, _: UnitId, _: u8, _: u8) -> Option<UnitId> {
-        None
-    }
-    fn pets(&self, _: UnitId) -> Vec<UnitId> {
-        Vec::new()
-    }
-    fn player_name(&self, _: UnitId) -> Vec<u8> {
-        Vec::new()
-    }
-    fn reset_stats(&mut self, _: UnitId) {}
-    fn reset_skills(&mut self, _: UnitId) {}
-    fn act_change(&mut self, _: UnitId, _: u32, _: u32) {}
-    fn activate_waypoint(&mut self, _: UnitId, _: u32) {}
-    fn npc_ai_param(&mut self, _: UnitId, _: u32) {}
-    fn stat_sent(&mut self, _: UnitId, _: u16, _: u32) {}
-    fn respec_sound(&mut self, _: UnitId) {}
-    fn encode_text_list(&self, _: &TextList) -> [u8; 34] {
-        [0; 34]
-    }
-    fn socket_granted(&mut self, _: UnitId) {}
-    fn personalize_granted(&mut self, _: UnitId) {}
-    fn inventory_entries(&self, _: UnitId) -> Vec<InvEntry> {
-        Vec::new()
-    }
-    fn identify(&mut self, _: UnitId) {}
-    fn cursor_item(&self, _: UnitId) -> Option<UnitId> {
-        None
-    }
-    fn item_facts(&self, _: UnitId) -> ItemFacts {
-        ItemFacts::default()
-    }
-    fn put_back(&mut self, _: UnitId, _: UnitId) {}
-    fn remove_cursor_item(&mut self, _: UnitId, _: UnitId) -> bool {
-        false
-    }
-    fn duplicate(&mut self, _: UnitId, _: UnitId) -> Option<UnitId> {
-        None
-    }
-    fn create_imbued(&mut self, _: UnitId, _: UnitId, _: &ImbueMods) -> Option<UnitId> {
-        None
-    }
-    fn item_refresh(&mut self, _: UnitId) {}
-    fn personal_name(&self, _: UnitId) -> Vec<u8> {
-        Vec::new()
-    }
-    fn set_personal_name(&mut self, _: UnitId, _: &[u8]) {}
-    fn place_or_drop(&mut self, _: UnitId, _: UnitId) {}
-    fn set_mode(&mut self, _: UnitId, _: u8) {}
-    fn spawn_mercenary(&mut self, _: UnitId, _: u32, _: u8) -> Option<UnitId> {
-        None
-    }
-    fn init_mercenary(&mut self, _: UnitId, _: UnitId, _: &MercInit) {}
-    fn revive_mercenary(&mut self, _: UnitId, _: UnitId) {}
-}
-
-impl VendorRest for Rest {
-    fn players_in_level(&self, _: u16) -> i32 {
-        1
-    }
-    fn player_level_id(&self, _: UnitId) -> u16 {
-        0
-    }
-    fn gold_cap(&self, _: UnitId) -> i32 {
-        0
-    }
-    fn stash_cap(&self, _: UnitId) -> i32 {
-        0
-    }
-    fn drop_gold(&mut self, _: UnitId, _: i32) {}
-    fn last_bought(&self, _: UnitId) -> u32 {
-        u32::MAX
-    }
-    fn set_last_bought(&mut self, _: UnitId, _: u32) {}
-    fn has_cursor_item(&self, _: UnitId) -> bool {
-        false
-    }
-    fn copy_item(&mut self, _: UnitId) -> Option<UnitId> {
-        None
-    }
-    fn has_filled_sockets(&self, _: UnitId) -> bool {
-        false
-    }
-    fn socketed(&self, _: UnitId) -> Vec<UnitId> {
-        Vec::new()
-    }
-    fn price_bonuses(&self, _: UnitId) -> Vec<Bonus> {
-        Vec::new()
-    }
-    fn recharge(&mut self, _: UnitId) {}
-    fn repair_broken(&mut self, _: UnitId) {}
-    fn send_item_stat(&mut self, _: UnitId, _: UnitId, _: u16) {}
-    fn send_transaction(&mut self, _: UnitId, _: Transaction) {}
-    fn new_store_inventory(&mut self, _: u16, _: Option<UnitId>) {}
-    fn place_in_store(&mut self, _: u16, _: UnitId) -> bool {
-        false
-    }
-    fn remove_store_item(&mut self, _: u16, _: UnitId) {}
-    fn take_from_store(&mut self, _: u16, _: UnitId) {}
-    fn place_in_gamble(&mut self, _: u16, _: u32, _: UnitId) -> bool {
-        false
-    }
-    fn remove_gamble_item(&mut self, _: u16, _: u32, _: UnitId) {}
-    fn refresh_npc_inventory(&mut self, _: UnitId) {}
-    fn add_trade_inventory(&mut self, _: u16, _: UnitId) {}
-    fn owns_item(&self, _: UnitId, _: UnitId) -> bool {
-        false
-    }
-    fn in_inventory(&self, _: UnitId, _: UnitId) -> bool {
-        false
-    }
-    fn equipped_items(&self, _: UnitId) -> Vec<UnitId> {
-        Vec::new()
-    }
-    fn find_tome(&self, _: UnitId, _: UnitId) -> Option<(UnitId, i32)> {
-        None
-    }
-    fn add_to_tome(&mut self, _: UnitId, _: i32) {}
-    fn find_partial_stack(&self, _: UnitId, _: UnitId) -> Option<(UnitId, i32)> {
-        None
-    }
-    fn can_belt(&self, _: UnitId, _: UnitId) -> bool {
-        false
-    }
-    fn put_in_belt(&mut self, _: UnitId, _: UnitId) -> bool {
-        false
-    }
-    fn equip_ammo(&mut self, _: UnitId, _: UnitId) -> bool {
-        false
-    }
-    fn place_in_backpack(&mut self, _: UnitId, _: UnitId) -> bool {
-        false
-    }
-    fn take_from_cursor(&mut self, _: UnitId, _: UnitId) -> bool {
-        false
-    }
-    fn lower_book_skill(&mut self, _: UnitId, _: UnitId, _: i32) {}
-    fn remove_stored(&mut self, _: UnitId, _: UnitId) {}
-    fn unequip(&mut self, _: UnitId, _: UnitId) -> bool {
-        false
-    }
-}
-
-impl QuestRest for Rest {
-    fn has_act2(&self) -> bool {
-        false
-    }
-    fn players(&self) -> Vec<UnitId> {
-        Vec::new()
-    }
-    fn first_client_player(&self) -> Option<UnitId> {
-        None
-    }
-    fn quests(&mut self, _: UnitId) -> Option<&mut PlayerQuests> {
-        None
-    }
-    fn player_byte_4c(&self, _: UnitId) -> u8 {
-        0
-    }
-    fn set_player_byte_4c(&mut self, _: UnitId, _: u8) {}
-    fn quest_chain(&mut self, _: UnitId) -> Option<&mut QuestChain> {
-        None
-    }
-    fn unit_act(&self, _: UnitId) -> Option<u8> {
-        Some(0)
-    }
-    fn unit_level(&self, _: UnitId) -> Option<u32> {
-        Some(COLD_PLAINS)
-    }
-    fn unit_kind(&self, _: UnitId) -> UnitKind {
-        UnitKind::Other
-    }
-    fn players_near(&self, _: UnitId) -> Vec<UnitId> {
-        Vec::new()
-    }
-    fn attach_sound(&mut self, _: UnitId, _: u16) {}
-    fn send(&mut self, _: UnitId, _: &[u8]) {}
-    fn send_text_list(&mut self, _: UnitId, _: UnitId, _: &[(u16, u32)]) {}
-    fn inventory(&self, _: UnitId) -> Vec<UnitId> {
-        Vec::new()
-    }
-    fn delete_item(&mut self, _: UnitId, _: [u8; 4]) {}
-    fn reward_item(&mut self, _: UnitId, _: [u8; 4], _: i32, _: u8, _: bool) -> Option<UnitId> {
-        None
-    }
-    fn drop_item_at(&mut self, _: UnitId, _: [u8; 4], _: u8) -> bool {
-        false
-    }
-    fn den_region(&self) -> (u32, u32, u32, u32) {
-        (0, 0, 0, 0)
-    }
-    fn true_tomb_level(&self) -> u32 {
-        0
-    }
-    fn free_spot(&mut self, _: UnitId, _: u32, _: u32, _: u32, _: u32) -> Option<(i32, i32)> {
-        None
-    }
-    fn create_portal(&mut self, _: UnitId, _: i32, _: i32, _: u16, _: u32) -> bool {
-        false
-    }
-    fn schedule_quest_event(&mut self, _: UnitId, _: i32) {}
-    fn set_object_opened(&mut self, _: UnitId) {}
-    fn mercenary_reward(&mut self, _: UnitId, _: u16) {}
-    fn unhandled(&mut self, _: u8, _: u32) {}
 }
 
 /// Every message queued, in order.
@@ -550,7 +298,7 @@ impl Fx {
             quests,
             npc,
             VendorTables::default(),
-            Rest,
+            Rest::default(),
             1000,
         );
         Self {
