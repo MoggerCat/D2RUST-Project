@@ -264,7 +264,6 @@ line and gold buttons: `ui/panels-2.md` §21.
    h / 2, 0)` (w, h = frame size, halves rounded down): the item's own
    overlays centred on the picture (owner: the render overlay spec,
    `render/draw-order.md`); none for a plain item.
-
 6. **Gold picture frame** (answers §Open questions 7). The amount class
    of r2 is stored in the cel context's direction field (+0x40; the
    other fields: +0x34 cel file := none, +0 frame := 0, `0x004DBB50`).
@@ -279,6 +278,7 @@ line and gold buttons: `ui/panels-2.md` §21.
    no visible effect in 1.14d: every gold pile in a grid draws frame 0
    of `invgld`. (`invgldm` / `invgldh`, also 1 × 1 frames of 28 × 28, are
    named by no 1.14d table or string and are not drawn by this path.)
+
 ### 9. Item checks used by the tints (answers OQ 6)
 
 1. `0x0062A4E0(item)` "usable state": 1 unless the item data flags
