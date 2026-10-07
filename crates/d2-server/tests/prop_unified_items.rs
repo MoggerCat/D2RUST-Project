@@ -784,8 +784,10 @@ impl VendorRest for Rest {
     fn remove_store_item(&mut self, _: u16, item: UnitId) {
         self.store.remove(&item);
     }
+    /// `0x005766D0`: removed from the grid, then re-added to the trade
+    /// inventory (`vendors.md` §7.1 rule 12): it stays the store's.
     fn take_from_store(&mut self, _: u16, item: UnitId) {
-        self.store.remove(&item);
+        self.store.insert(item);
     }
     fn place_in_gamble(&mut self, _: u16, _: u32, item: UnitId) -> bool {
         self.store.insert(item);

@@ -16,6 +16,7 @@ mod ground;
 mod host;
 mod mutant_tests;
 mod queries;
+mod save_index;
 mod stack;
 
 use std::cell::RefCell;

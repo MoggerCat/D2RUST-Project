@@ -774,10 +774,15 @@ fn inv_vendors_pass_other_calls_through() {
             // Items.
             let made = w.create_item(0, AMULET, q::NORMAL, 5).expect("created");
             assert_eq!(w.item_record(made), AMULET);
-            assert_eq!(w.copy_item(ring), Some(UnitId(ring.0 + 1000)));
+            // The copy is the inventory model's (`InvDesk::copy_of`,
+            // `vendors.md` §7.3), not the rest's.
+            let copy = w.copy_item(ring).expect("copied");
+            assert_ne!(copy, UnitId(ring.0 + 1000));
+            assert_eq!(w.item_record(copy), w.item_record(ring));
             assert_eq!(w.item_quality(ring), q::NORMAL);
             assert_eq!(w.item_file_index(ring), 5);
-            assert_eq!(w.item_flags(ring), flag::IDENTIFIED | 0x4);
+            // §7.3 step 6: the copied source carries 0x8000000.
+            assert_eq!(w.item_flags(ring), flag::IDENTIFIED | 0x4 | 0x800_0000);
             w.set_item_flags(ring, 0x30);
             assert_eq!(w.item_flags(ring), 0x30);
             w.or_unit_flags(ring, 0x40);

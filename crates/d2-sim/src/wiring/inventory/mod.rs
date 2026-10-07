@@ -41,6 +41,7 @@ pub mod inv_world;
 pub mod ops;
 pub mod pending;
 pub mod queries;
+pub mod save_index;
 pub mod units;
 
 #[cfg(test)]
