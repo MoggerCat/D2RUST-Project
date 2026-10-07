@@ -5306,6 +5306,9 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
   imps on a barricade tower (state 143, type-5 event, release below 10 %
   life, `0x005D1AB0`).
 - `world/quests-act4.md` OQ2 / QD-1 (PC 2 spec-quests-act4-5, R-QD-1): one classic Diablo kill with frames logged — the kill, each credited player's warp, the uncredited player's 0x50 and the game end — ideally once on an idle and once on a loaded machine (settles whether the GetTickCount end-of-game timers can be expressed in ticks).
+- `world/objects.md` OQ1 (PC 2 spec-objects): with `record_objects.py`, operate one chest, shrine, door, well and portal (packets + RNG): the draw order of §8–§12 and the 0x0E / 0x4D / 0x60 bytes of §14.
+- `world/objects.md` OQ10 (PC 2 spec-objects): a fire object (class 160–162) for a few seconds: no 0x0E 1 → 2 update expected.
+- `world/objects.md` OQ14 (PC 2 spec-objects): in the existing `obj1-objects.jsonl` (PC 2 raw), the mode argument of the two class-37 allocations with speed 0 (expected 2).
 
 **Ninth set (2026-10-07; the 22 notes `impl-ai-acts2-5`, `impl-skill-slots-2`,
 `impl-missile-bodies-2`, `impl-quests-act1-rest`, `impl-quests-act2`,
