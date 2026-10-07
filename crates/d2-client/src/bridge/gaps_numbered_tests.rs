@@ -218,7 +218,12 @@ fn client_world_holds_only_stated_fields() {
         roster_inactive,
         weapon_set,
         item_table_ext,
+        // `client/model.md` §7 r10–r11; `msg-units.md` §8 r10 (pet pass).
+        connected,
+        ping,
+        pet_palette,
     } = ClientWorld::default();
+    assert!(!connected && ping == Default::default() && pet_palette.is_empty());
     assert!(overrides == Default::default() && roster.is_empty() && roster_inactive.is_empty());
     assert!(weapon_set == 0 && item_table_ext.is_empty());
     assert!(pets.is_empty() && palette_act.is_none() && active_rooms.is_none());

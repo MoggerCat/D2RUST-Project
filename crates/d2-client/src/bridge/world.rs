@@ -350,8 +350,25 @@ pub struct PetRecord {
     pub extra: Option<[u32; 3]>,
 }
 
+/// `PingState` (`model.md` §7 r11): the fields 0x8F writes.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct PingState {
+    /// `[0x007A04A4]`: last round trip in ms (0 until a 0x8F; d2rs sends
+    /// no ping, so it stays 0).
+    pub rtt: u32,
+    /// `[0x007A04CC]`.
+    pub samples: u32,
+    /// `[0x007A04D0]`.
+    pub mean: u32,
+    /// `[0x007A04D4]`…`[0x007A04F0]`.
+    pub pong: [u32; 8],
+}
+
 /// The pet type of a hireling (§14 rule 4).
 pub const PET_HIRELING: u8 = 7;
+
+/// The pet type the 0x75 pet pass visits (`msg-units.md` §8 r10).
+pub const PET_TYPE_PASS: u8 = 4;
 
 /// One player roster record (`msg-units.md` §8 r1; 0xD8 bytes in
 /// 1.14d, the UI handle +0x34 and the formatted string +0x66 are UI
@@ -485,6 +502,13 @@ pub struct ClientWorld {
     pub in_game: bool,
     pub unloaded: bool,
     pub exit_requested: bool,
+    /// `connected` `[0x007A0618]` (`model.md` §7 r10): 0xAF sets, 0xB0 clears.
+    pub connected: bool,
+    /// The ping state (`model.md` §7 r11), written by 0x8F.
+    pub ping: PingState,
+    /// Palette level of pet monsters set by the 0x75 pet pass (render
+    /// state, `msg-units.md` §8 r10; PROVISIONAL).
+    pub pet_palette: BTreeMap<UnitKey, u8>,
     pub rooms_in_sight: Vec<RoomSight>,
     /// C→S messages the client sends on its own (§6 rule 8, §7 rule 3),
     /// until the bridge hands them to its send path. An empty entry is a

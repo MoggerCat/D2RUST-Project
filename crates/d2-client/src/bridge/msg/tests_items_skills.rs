@@ -292,8 +292,9 @@ fn no_op_and_out_of_scope_ids() {
     m.recv(&msg);
     assert!(m.log.unowned.is_empty() && m.log.rejected.is_empty());
     assert_eq!(m.w, ClientWorld::default());
-    let mut msg = vec![0x75];
-    msg.resize(13, 0);
+    let mut msg = vec![0x79];
+    msg.resize(6, 0);
     m.recv(&msg);
-    assert_eq!(m.log.unowned.get(&0x75), Some(&1));
+    assert!(m.log.unowned.is_empty() && m.log.rejected.is_empty());
+    assert_eq!(m.w, ClientWorld::default());
 }

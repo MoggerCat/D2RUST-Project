@@ -11,6 +11,10 @@ pub enum Status {
     /// Full layout in the TSV `layout` column: a type in
     /// [`crate::generated::server`], re-exported by [`super`].
     Generated,
+    /// Empty `layout` that is complete (`intents-events.md` §3.5 r4): the
+    /// builder writes only the id, so the message has no field (0x7E: 5
+    /// bytes queued, bytes 1–4 stack leftovers, masked). No type.
+    IdOnly,
     /// Some bytes are given (fields, a prefix, recorded bytes); not all.
     Partial,
     /// Only the size rule is given.
@@ -161,7 +165,7 @@ pub const AUDIT: [Audit; 0xB5] = [
     Audit { id: 0x7B, status: Generated, builder: Some("AssignHotkey"), note: "TSV layout" },
     Audit { id: 0x7C, status: Generated, builder: Some("UseScroll"), note: "TSV layout" },
     Audit { id: 0x7D, status: Generated, builder: Some("SetItemState"), note: "TSV layout; senders: impl-moves (inventory-moves.md §11)" },
-    Audit { id: 0x7E, status: Unspecified, builder: None, note: "size rule only" },
+    Audit { id: 0x7E, status: IdOnly, builder: None, note: "empty layout complete (id only; bytes 1-4 unwritten)" },
     Audit { id: 0x7F, status: Generated, builder: Some("AllyPartyInfo"), note: "TSV layout" },
     Audit { id: 0x80, status: Never, builder: None, note: "size 0 (client expects 4; never receivable, §3.1 r2)" },
     Audit { id: 0x81, status: Generated, builder: Some("AssignMerc"), note: "TSV layout" },

@@ -6,7 +6,9 @@
 
 use super::super::dispatch::{HandlerError, Message};
 use super::super::output::Output;
-use super::super::world::{ClientWorld, KindData, RosterRecord, UnitKey, OBJECT};
+use super::super::world::{
+    ClientWorld, KindData, RosterRecord, UnitKey, MONSTER, OBJECT, PET_TYPE_PASS,
+};
 use super::Bytes;
 
 fn changed(w: &ClientWorld, msg: &Message<'_>) {
@@ -186,4 +188,50 @@ pub fn corpse_assign(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handl
         }
     }
     Ok(())
+}
+
+/// 0x75 PlayerPartyInfo (§8 r10, 13 bytes): GUID u32@1, party u16@5,
+/// level u16@7, u16@9 (not stored), u16@11.
+pub fn player_party_info(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerError> {
+    let b = Bytes(msg.bytes);
+    if msg.bytes.len() != 13 {
+        return Err(HandlerError::Invalid("0x75 is 13 bytes"));
+    }
+    let guid = b.u32(1)?;
+    let Some(i) = w.roster_find(guid) else {
+        return Ok(());
+    };
+    // Found as a corpse holder only: nothing.
+    if w.roster[i].guid != guid {
+        return Ok(());
+    }
+    let r = &mut w.roster[i];
+    r.f22 = b.u16(5)?;
+    r.f20 = b.u16(7)?;
+    r.f30 = b.u16(11)?;
+    pet_pass(w);
+    changed(w, msg);
+    Ok(())
+}
+
+/// The pet pass `0x00478FA0` (§8 r10). PROVISIONAL (msg-units.md §8 r10,
+/// open question 11): for each type-4 pet record whose monster is
+/// present, the palette level is 1 when the pet is not the local
+/// player's (stand-in for `0x00478E70(local player, U)` = 0), else 0;
+/// it is render state, kept in `pet_palette`.
+fn pet_pass(w: &mut ClientWorld) {
+    let local = w.local_player.map(|k| k.guid);
+    let levels: Vec<(UnitKey, u8)> = w
+        .pets
+        .iter()
+        .filter(|p| p.pet_type == PET_TYPE_PASS)
+        .map(|p| {
+            (
+                UnitKey::new(MONSTER, p.pet),
+                u8::from(Some(p.owner) != local),
+            )
+        })
+        .filter(|(k, _)| w.units.contains_key(k))
+        .collect();
+    w.pet_palette.extend(levels);
 }

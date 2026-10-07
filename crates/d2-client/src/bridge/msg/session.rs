@@ -221,3 +221,38 @@ pub fn game_handshake(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Hand
     }
     Ok(())
 }
+
+/// 0xAF ConnectionInfo (`model.md` §7 r10): `connected` := 1; u8@1 is
+/// not read.
+pub fn connection_info(w: &mut ClientWorld, _: &Message<'_>) -> Result<(), HandlerError> {
+    w.connected = true;
+    Ok(())
+}
+
+/// 0xB0 ConnectionTerminated (`model.md` §7 r10): `connected` := 0.
+pub fn connection_terminated(w: &mut ClientWorld, _: &Message<'_>) -> Result<(), HandlerError> {
+    w.connected = false;
+    Ok(())
+}
+
+/// 0x8F Pong (`model.md` §7 r11 item 2, 33 bytes): `pong[i]` :=
+/// u32@(1 + 4i); `pong[4]` := now; `rtt` := now − `sent_ms`; the mean
+/// over the first 10 samples. d2rs has no clock in the model and sends
+/// no 0x6D, so now and `sent_ms` are both 0 and `rtt` is 0.
+pub fn pong(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerError> {
+    let b = super::Bytes(msg.bytes);
+    if msg.bytes.len() != 33 {
+        return Err(HandlerError::Invalid("0x8F is 33 bytes"));
+    }
+    let p = &mut w.ping;
+    for i in 0..8 {
+        p.pong[i] = b.u32(1 + 4 * i)?;
+    }
+    p.pong[4] = 0;
+    p.rtt = 0;
+    if p.samples < 10 {
+        p.mean = p.mean.wrapping_mul(p.samples) / (p.samples + 1);
+        p.samples += 1;
+    }
+    Ok(())
+}

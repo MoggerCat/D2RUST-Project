@@ -271,6 +271,8 @@ fn create_routes_inits_owned_elsewhere() {
         (8, Route::Here),
         (0, Route::Null),
         (35, Route::Null),
+        (36, Route::Null),
+        (40, Route::Null),
     ] {
         t.objects[QUEST_INIT as usize].initfn = n;
         let r = run_create(&mut ctl, &t, &mut f, QUEST_INIT, 0).unwrap();
@@ -856,6 +858,25 @@ fn dispatch_table_rules() {
     );
 }
 
+// Covers: specs/world/objects.md §7.2 r3
+#[test]
+fn null_operate_slots_return_zero_and_do_nothing() {
+    // Steeg stone, guild vault, trophy case, message board (35–38) and 60.
+    for n in [35u8, 36, 37, 38, 60] {
+        let mut t = tables();
+        t.objects[TORCH as usize].operatefn = n;
+        let mut ctl = control(&t, Seed::init());
+        let mut f = operate_fake(&mut ctl, TORCH);
+        assert_eq!(
+            operate_in_range(&mut ctl, &t, &mut f, Some(P), 0x1234),
+            Ok((1, Some(Dispatch::Done(0)))),
+            "operate {n}"
+        );
+        assert_eq!(f.modes[&O], 0, "operate {n}");
+        assert_eq!(ctl.seed, Seed::init(), "operate {n}");
+    }
+}
+
 // ------------------------------------------------------------------ M05
 
 /// Every init/operate row of `object-functions.tsv` against
@@ -871,7 +892,9 @@ fn route_mismatches(text: &str) -> Result<Vec<(String, u32)>, TsvError> {
         let index = tsv_num(tn, line, "index", c[1])?;
         let address = tsv_num(tn, line, "address", c[2])?;
         let want = match (c[5], address) {
-            ("-", 0) => Some(Route::Null),
+            // Null slot: `-` or the rule that says it does nothing
+            // (§7.2 operate 35–38 / 60, §3 init 35, 36, 40).
+            ("-" | "§7.2" | "§3", 0) => Some(Route::Null),
             (o, a) if o.starts_with("world/quests") && a != 0 => Some(Route::Quest),
             ("world/waypoints.md", a) if a != 0 => Some(Route::Waypoint),
             ("todo", a) if a != 0 => Some(Route::NotCovered),
@@ -916,7 +939,7 @@ fn route_check_catches_perturbations() {
     assert!(FUNCS_TSV.contains(wp));
     let text = FUNCS_TSV.replace(wp, "init\t17\t0");
     assert_eq!(route_mismatches(&text), Ok(vec![("init".into(), 17)]));
-    let null = "init\t35\t0\t-\t1\t-";
+    let null = "init\t35\t0\t-\t1\t§3";
     assert!(FUNCS_TSV.contains(null));
     let text = FUNCS_TSV.replace(null, "init\t35\t0\t-\t1\tworld/quests.md");
     assert_eq!(route_mismatches(&text), Ok(vec![("init".into(), 35)]));
