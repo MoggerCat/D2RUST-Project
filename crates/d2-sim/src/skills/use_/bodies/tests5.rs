@@ -1698,3 +1698,454 @@ fn srvmissile_path_of_the_do_core() {
     do_core(&mut f, &t, p, 1, 1, false, true, true);
     assert_eq!(f.take_log(), [format!("missile {p} 1 1 0 false None")]);
 }
+
+// ---------------------------------------------------------------- §6
+
+/// Tables over `recs` (record 0 blank), the code buffer and one missile.
+fn tabs_n(recs: Vec<d2_data::tables::Skills>, code: Code) -> crate::skills::SkillTables {
+    let mut t = crate::skills::fake::skill_tables(recs);
+    t.skills_code = code.0;
+    t
+}
+
+// Covers: specs/skills/bodies.md §6.3
+#[test]
+fn node_insert_guards() {
+    let (mut f, u) = world();
+    let m = monster(&mut f, (1, 1));
+    f.node.insert(m, 11);
+    f.take_log();
+    helpers2::node_insert(&mut f, m, 3);
+    assert_eq!(f.take_log(), [format!("NodeInsert {{ m: {m}, slot: 3 }}")]);
+    // slot ≥ 8 or negative, m already in a list, m not a player or
+    // monster: nothing.
+    helpers2::node_insert(&mut f, m, 8);
+    helpers2::node_insert(&mut f, m, -1);
+    f.node.insert(m, 2);
+    helpers2::node_insert(&mut f, m, 3);
+    let o = f.add(FUnit::new(UnitType::Object, 0), (1, 1));
+    f.node.insert(o, 11);
+    helpers2::node_insert(&mut f, o, 3);
+    assert!(f.take_log().is_empty());
+    // The player is allowed too; the owner's node index gives the slot.
+    f.node.insert(u, 5);
+    f.node.insert(m, 11);
+    helpers2::node_insert_owner(&mut f, m, u);
+    assert_eq!(f.take_log(), [format!("NodeInsert {{ m: {m}, slot: 5 }}")]);
+    f.node.insert(u, 11);
+    f.node.insert(m, 11);
+    helpers2::node_insert_owner(&mut f, m, u);
+    assert!(f.take_log().is_empty(), "the owner in no list: slot 11");
+}
+
+// Covers: specs/skills/bodies.md §6.6
+#[test]
+fn prog_missile_picks_the_column_by_the_charge_count() {
+    let mut r = body_rec();
+    r.progressive = true;
+    r.aurastate = 40;
+    r.aurastat1 = 25;
+    r.srvmissilea = 10;
+    r.srvmissileb = 11;
+    r.srvmissilec = 12;
+    let t = tabs(r, Code::new(), 1);
+    let (mut f, u) = world();
+    assert_eq!(helpers2::prog_missile(&mut f, &t, u, 99), -1, "R invalid");
+    assert_eq!(helpers2::prog_missile(&mut f, &t, u, 1), 10, "no list");
+    let l = f.alloc_list(0, 0, None).unwrap();
+    f.set_list_state(l, 40);
+    f.attach(u, l);
+    for (n, want) in [(0, 10), (1, 10), (2, 11), (3, 12), (7, 12)] {
+        f.list_set(l, 25, n);
+        assert_eq!(helpers2::prog_missile(&mut f, &t, u, 1), want, "n = {n}");
+    }
+    // Not `progressive`, or an invalid aurastate / aurastat1: srvmissilea.
+    f.list_set(l, 25, 3);
+    for edit in [0, 1, 2] {
+        let mut t2 = t.clone();
+        match edit {
+            0 => t2.skills[1].progressive = false,
+            1 => t2.skills[1].aurastate = 0xFFFF,
+            _ => t2.skills[1].aurastat1 = 0xFFFF,
+        }
+        assert_eq!(helpers2::prog_missile(&mut f, &t2, u, 1), 10, "edit {edit}");
+    }
+}
+
+/// The skill record of the §6.5 test: record 1 (the summon skill) and
+/// record 2 (an aura skill the summon learns).
+fn summon_skill_tables() -> crate::skills::SkillTables {
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.passivestat1 = 30;
+    r.passivecalc1 = c.f(4);
+    r.passivestat2 = 0xFFFF;
+    r.passivecalc2 = c.f(5);
+    r.passivestat3 = 31;
+    r.passivecalc3 = c.f(6);
+    r.aurastat1 = 26;
+    r.aurastatcalc1 = c.f(8);
+    r.aurastat2 = 27;
+    r.aurastatcalc2 = c.f(0);
+    r.aurastat3 = 28;
+    r.aurastatcalc3 = c.f(2);
+    r.aurastate = 40;
+    r.calc1 = c.f(50);
+    r.sumskill1 = 2;
+    r.sumsk1calc = c.f(3);
+    r.sumskill2 = 3;
+    r.sumsk2calc = c.f(0);
+    r.sumskill3 = 0;
+    r.sumsk3calc = c.f(5);
+    r.sumskill4 = 9;
+    r.sumsk4calc = c.f(5);
+    r.sumskill5 = 3;
+    r.sumsk5calc = c.f(-1);
+    r.auraevent1 = 5;
+    r.auraeventfunc1 = 3;
+    r.sumumod = 7;
+    r.sumoverlay = 9;
+    let mut aura = body_rec();
+    aura.aura = true;
+    let plain = body_rec();
+    tabs_n(vec![body_rec(), r, aura, plain], c)
+}
+
+fn summoner() -> (BodyFake, usize, usize) {
+    let (mut f, u) = world();
+    f.c.set(u, 12, 30);
+    let m = monster(&mut f, (5, 5));
+    f.c.set(m, 7, 200);
+    (f, u, m)
+}
+
+// Covers: specs/skills/bodies.md §6.5 text, §6.5 r1, §6.5 r2, §6.5 r3
+#[test]
+fn skill_stats_passive_and_aura_stats_with_stat_events() {
+    let t = summon_skill_tables();
+    let (mut f, u, m) = summoner();
+    let key = f.c.units[m].guid as i32;
+    // Stat 30 carries two item events, stat 28 none.
+    f.stat_infos.insert(
+        30,
+        BodyStat {
+            itemevent: [5, 6],
+            itemeventfunc: [3, 4],
+            maxstat: -1,
+            ..BodyStat::default()
+        },
+    );
+    // r1: skill 0 → 0 and nothing happens; an invalid skill is refused.
+    f.take_log();
+    assert_eq!(helpers2::skill_stats(&mut f, &t, u, m, 0, 1, 0), 0);
+    assert_eq!(helpers2::skill_stats(&mut f, &t, u, m, 99, 1, 0), 0);
+    assert!(f.take_log().is_empty());
+    assert_eq!(helpers2::skill_stats(&mut f, &t, u, m, 1, 4, 0), 1);
+    // r2: passive stats added to m (invalid slot skipped).
+    assert_eq!(f.c.get(m, 30), 4);
+    assert_eq!(f.c.get(m, 31), 6);
+    // …and the item events of stat 30 registered with `s << 16`, type 2,
+    // key m's GUID, once.
+    let hs = &f.handlers[&m];
+    let ev: Vec<_> = hs
+        .iter()
+        .filter(|h| h.skill == 30 << 16)
+        .map(|h| (h.event, h.func, h.key_type, h.key, h.level))
+        .collect();
+    assert!(ev.contains(&(5, 3, 2, key, 0)) && ev.contains(&(6, 4, 2, key, 0)));
+    // The lookup is by `s`, the registration by `s << 16` (Edge case 10):
+    // a second call registers the pair again.
+    let n = hs.len();
+    helpers2::skill_stats(&mut f, &t, u, m, 1, 4, 0);
+    assert_eq!(f.handlers[&m].len(), n + 2);
+    // A handler with the skill field `s` (type 2, key m) suppresses the
+    // registration for that stat.
+    let (mut f2, u2, m2) = summoner();
+    f2.stat_infos.insert(30, f.stat_infos[&30]);
+    let key2 = f2.c.units[m2].guid as i32;
+    f2.handlers.entry(m2).or_default().push(Handler {
+        event: 9,
+        key_type: 2,
+        key: key2,
+        skill: 30,
+        level: 0,
+        func: 1,
+    });
+    helpers2::skill_stats(&mut f2, &t, u2, m2, 1, 4, 0);
+    assert!(f2.handlers[&m2].iter().all(|h| h.skill != 30 << 16));
+    // r3: aura stats: v ≠ 0 into one list (flags 0, expire 0, owner m,
+    // attached); the zero value is not set; its state id := aurastate.
+    let l = f.list_of(m, 40).expect("list with the state id").clone();
+    assert_eq!(
+        (l.flags, l.expire, l.owner, l.unit),
+        (0, 0, Some(m), Some(m))
+    );
+    assert_eq!((l.stats.get(&26), l.stats.get(&28)), (Some(&8), Some(&2)));
+    assert!(!l.stats.contains_key(&27));
+    assert!(f.has_state(m, 40));
+}
+
+// Covers: specs/skills/bodies.md §6.5 r4, §6.5 r5, §6.5 r6, §6.5 r7
+#[test]
+fn skill_stats_state_life_skills_events() {
+    let t = summon_skill_tables();
+    let (mut f, u, m) = summoner();
+    f.take_log();
+    helpers2::skill_stats(&mut f, &t, u, m, 1, 4, 0);
+    let log = f.take_log();
+    // r5: maxhp := h + pct(h, calc1 = 50, 100) = 300; hitpoints too.
+    assert_eq!((f.c.get(m, 7), f.c.get(m, 6)), (300, 300));
+    // r6: sumskill 1 (v 3) and the aura skill → right skill := k; skill 2
+    // has aura (SelectSkill); k = 3 (v 0 / −1), k = 0 and k = 9 (≥ count)
+    // are skipped.
+    assert!(log.contains(&format!("SetSkill {{ m: {m}, skill: 2, lvl: 3 }}")));
+    assert!(log.contains(&format!(
+        "SelectSkill {{ u: {m}, side: 0, skill: 2, owner: -1 }}"
+    )));
+    assert_eq!(log.iter().filter(|l| l.starts_with("SetSkill")).count(), 1);
+    // r7: auraevent1 ≥ 0: unregister (1, aurastate), then register the
+    // events.
+    assert!(log.contains(&format!("unhandle {m} 1 40")));
+    assert!(log.contains(&format!("handler {m} 5 3 40")));
+    // r4: aurastate in 1…count (the count itself accepted), else no state.
+    for (st, on) in [(0u16, false), (200, true), (201, false)] {
+        let mut t2 = t.clone();
+        t2.skills[1].aurastate = st;
+        let (mut f, u, m) = summoner();
+        helpers2::skill_stats(&mut f, &t2, u, m, 1, 4, 0);
+        assert_eq!(f.has_state(m, i32::from(st) as u16), on, "state {st}");
+    }
+    // A aurastate of 0xFFFF registers no events.
+    let mut t3 = t.clone();
+    t3.skills[1].auraevent1 = 0xFFFF;
+    let (mut f, u, m) = summoner();
+    helpers2::skill_stats(&mut f, &t3, u, m, 1, 4, 0);
+    assert!(!f.take_log().iter().any(|l| l.starts_with("handler {m} 5")));
+}
+
+// Covers: specs/skills/bodies.md §6.5 r8, §6.5 r9
+#[test]
+fn skill_stats_umod_overlay_and_equipment_level() {
+    let t = summon_skill_tables();
+    let eq = |f: &mut BodyFake| -> Vec<String> {
+        f.take_log()
+            .into_iter()
+            .filter(|l| l.starts_with("Equipment") || l.starts_with("Umod"))
+            .collect()
+    };
+    // r8: sumumod 1…42 and overlay 1…count − 1.
+    for (um, shown) in [(0u16, false), (1, true), (42, true), (43, false)] {
+        let mut t2 = t.clone();
+        t2.skills[1].sumumod = um;
+        let (mut f, u, m) = summoner();
+        helpers2::skill_stats(&mut f, &t2, u, m, 1, 4, 0);
+        let log = eq(&mut f);
+        assert_eq!(
+            log.contains(&format!("Umod {{ m: {m}, umod: {um}, arg: 1 }}")),
+            shown,
+            "umod {um}"
+        );
+    }
+    for (ov, shown) in [(0u16, false), (1, true), (199, true), (200, false)] {
+        let mut t2 = t.clone();
+        t2.skills[1].sumoverlay = ov;
+        let (mut f, u, m) = summoner();
+        helpers2::skill_stats(&mut f, &t2, u, m, 1, 4, 0);
+        assert_eq!(
+            f.take_log().contains(&format!("overlay {m} {ov}")),
+            shown,
+            "overlay {ov}"
+        );
+    }
+    // r9: ilvl 0 → 3L, at least 1, at most the owner's level (30); a
+    // non-zero ilvl is passed unchanged.
+    for (lvl, ilvl, want) in [
+        (4, 0, 12),
+        (20, 0, 30),
+        (10, 0, 30),
+        (-2, 0, 1),
+        (4, 99, 99),
+    ] {
+        let (mut f, u, m) = summoner();
+        helpers2::skill_stats(&mut f, &t, u, m, 1, lvl, ilvl);
+        let log = eq(&mut f);
+        let want =
+            format!("Equipment {{ owner: {u}, m: {m}, skill: 1, lvl: {lvl}, ilvl: {want} }}");
+        assert!(log.contains(&want), "{lvl}/{ilvl}: {log:?}");
+    }
+}
+
+// Covers: specs/skills/bodies.md §6.9 text, §6.9 r1, §6.9 r2, §6.9 r3, §6.9 r4, §6.9 r5, §6.9 r6, §6.9 r7, §6.9 r8, §6.9 r9
+#[test]
+fn sentry_spawns_for_the_owning_player() {
+    let ct = ct3();
+    let mut r = body_rec();
+    r.summon = 1;
+    r.summode = 5;
+    r.pettype = 3;
+    r.intown = false;
+    let mut c = Code::new();
+    r.petmax = c.f(2);
+    let t = tabs(r, c, 1);
+    let (mut f, u) = world();
+    f.c.set(u, 12, 30);
+    let log_since = |f: &mut BodyFake| f.take_log();
+    // r1: summon class −1 → none.
+    let mut t_bad = t.clone();
+    t_bad.skills[1].summon = 0xFFFF;
+    assert_eq!(
+        helpers2::sentry(&mut f, &t_bad, &ct, u, (50, 60), 1, 4),
+        None
+    );
+    // r2–r9 in the normal case: position given.
+    f.take_log();
+    let m = helpers2::sentry(&mut f, &t, &ct, u, (50, 60), 1, 4).expect("sentry");
+    assert_eq!(f.pos[&m], (50, 60));
+    assert_eq!(f.c.units[m].class, 1);
+    assert_eq!(f.c.units[m].flags & 0x2_0000, 0x2_0000);
+    let log = log_since(&mut f);
+    // r2: pet type 3 (valid), petmax 2 → the pet list add.
+    assert!(log.contains(&format!("PetAdd {{ owner: {u}, pet: {m}, t: 3, max: 2 }}")));
+    // r8: base_stats: level 4 + 3·30/4 = 26; skill_stats ran (Equipment).
+    assert_eq!(f.c.get(m, 12), 26);
+    assert!(log.iter().any(|l| l.starts_with("Equipment")));
+    // r9: alignment (2, 1) and the mode change to `mode`.
+    assert!(log.contains(&format!("Alignment {{ u: {m}, a: 2, v: 1 }}")));
+    assert!(log.contains(&format!("moderequest {m} 5 None")));
+    // A pettype outside 0…count − 1 uses 0.
+    let mut t2 = t.clone();
+    t2.skills[1].pettype = 99;
+    f.take_log();
+    let m2 = helpers2::sentry(&mut f, &t2, &ct, u, (50, 60), 1, 4).unwrap();
+    assert!(f
+        .take_log()
+        .contains(&format!("PetAdd {{ owner: {u}, pet: {m2}, t: 0, max: 2 }}")));
+    // r3: x or y = 0 → the unit's position; r5: still 0 → the owner's
+    // target position; failure → none.
+    f.pos.insert(u, (7, 8));
+    let m3 = helpers2::sentry(&mut f, &t, &ct, u, (0, 9), 1, 4).unwrap();
+    assert_eq!(f.pos[&m3], (7, 8));
+    f.pos.insert(u, (0, 0));
+    assert_eq!(helpers2::sentry(&mut f, &t, &ct, u, (0, 0), 1, 4), None);
+    f.tpos.insert(u, (21, 22));
+    let m4 = helpers2::sentry(&mut f, &t, &ct, u, (0, 0), 1, 4).unwrap();
+    assert_eq!(f.pos[&m4], (21, 22));
+    // r4: a monster caster lays the trap for its minion owner; none → 0.
+    let mon = monster(&mut f, (1, 1));
+    assert_eq!(helpers2::sentry(&mut f, &t, &ct, mon, (50, 60), 1, 4), None);
+    f.minion_owner.insert(mon, u);
+    f.take_log();
+    let m5 = helpers2::sentry(&mut f, &t, &ct, mon, (50, 60), 1, 4).unwrap();
+    assert!(f
+        .take_log()
+        .contains(&format!("PetAdd {{ owner: {u}, pet: {m5}, t: 3, max: 2 }}")));
+    // r6: no room at the point → none; a town room without InTown →
+    // none, with it → ok.
+    f.point_rooms.insert((50, 61), None);
+    assert_eq!(helpers2::sentry(&mut f, &t, &ct, u, (50, 61), 1, 4), None);
+    f.town.insert(1);
+    assert_eq!(helpers2::sentry(&mut f, &t, &ct, u, (50, 60), 1, 4), None);
+    let mut t3 = t.clone();
+    t3.skills[1].intown = true;
+    assert!(helpers2::sentry(&mut f, &t3, &ct, u, (50, 60), 1, 4).is_some());
+    // r7: the spawn failing → none.
+    f.town.clear();
+    f.no_monsters = true;
+    assert_eq!(helpers2::sentry(&mut f, &t, &ct, u, (50, 60), 1, 4), None);
+}
+
+// Covers: specs/skills/bodies.md §6.11
+#[test]
+fn golem_stats_and_summon_resistance() {
+    let t = summon_skill_tables();
+    let (mut f, u, m) = summoner();
+    // No passive_summon_resist: no list at all.
+    f.take_log();
+    helpers2::summon_resist(&mut f, u, m);
+    assert!(f.lists.is_empty());
+    f.c.set(u, 349, 35);
+    helpers2::summon_resist(&mut f, u, m);
+    let l = &f.lists[0];
+    assert_eq!(
+        (l.flags, l.expire, l.owner, l.unit),
+        (0, 0, Some(m), Some(m))
+    );
+    assert_eq!(
+        (
+            l.stats.get(&39),
+            l.stats.get(&41),
+            l.stats.get(&43),
+            l.stats.get(&45)
+        ),
+        (Some(&35), Some(&35), Some(&35), Some(&35))
+    );
+    // An absorb > 0 keeps its resistance out of the list; 45 always.
+    f.lists.clear();
+    f.c.set(m, 142, 5);
+    f.c.set(m, 148, 1);
+    helpers2::summon_resist(&mut f, u, m);
+    let l = &f.lists[0];
+    assert_eq!(
+        (
+            l.stats.get(&39),
+            l.stats.get(&41),
+            l.stats.get(&43),
+            l.stats.get(&45)
+        ),
+        (None, Some(&35), None, Some(&35))
+    );
+    // golem_stats = base_stats, skill_stats, summon_resist in that order.
+    let (mut f, u, m) = summoner();
+    f.c.set(u, 349, 10);
+    f.take_log();
+    helpers2::golem_stats(&mut f, &t, u, m, 1, 4);
+    assert_eq!(f.c.get(m, 12), 26, "base_stats");
+    assert_eq!((f.c.get(m, 7), f.c.get(m, 6)), (300, 300), "skill_stats");
+    assert!(
+        f.lists.iter().any(|l| l.stats.get(&45) == Some(&10)),
+        "resist"
+    );
+}
+
+// Covers: specs/skills/bodies.md §6.19 text, §6.19 r1, §6.19 r2, §6.19 r3, §6.19 r4, §6.19 r5
+#[test]
+fn shadow_stats_use_the_second_formula_on_the_shadow() {
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.param1 = 10;
+    r.aurastat1 = 26;
+    r.aurastatcalc1 = c.f(1);
+    r.aurastat2 = 27;
+    r.aurastatcalc2 = c.f(9);
+    r.aurastat3 = 0xFFFF;
+    r.aurastat4 = 28;
+    r.passivestat1 = 30;
+    r.passivecalc1 = c.f(2);
+    r.passivecalc2 = c.f(4);
+    r.passivestat2 = 0xFFFF;
+    r.sumumod = 5;
+    let t = tabs(r, c, 1);
+    // r1: L ≤ 1 → nothing.
+    let (mut f, _, m) = summoner();
+    f.take_log();
+    helpers2::shadow_stats(&mut f, &t, m, 1, 1);
+    helpers2::shadow_stats(&mut f, &t, m, 1, 0);
+    assert!(f.lists.is_empty() && f.take_log().is_empty());
+    // r2: maxhp := h + pct(h, (L − 1)·Param1, 100): 200 + 80 = 280.
+    helpers2::shadow_stats(&mut f, &t, m, 1, 5);
+    assert_eq!((f.c.get(m, 7), f.c.get(m, 6)), (280, 280));
+    // r3–r4: one list on m (flags 0, expire 0), every valid stat set from
+    // the second formula (aurastatcalc2 = 9, passivecalc2 = 4).
+    let l = &f.lists[0];
+    assert_eq!(
+        (l.flags, l.expire, l.owner, l.unit),
+        (0, 0, Some(m), Some(m))
+    );
+    assert_eq!((l.stats.get(&26), l.stats.get(&27)), (Some(&9), Some(&9)));
+    assert_eq!(l.stats.get(&28), Some(&9), "slot 4 after an invalid slot 3");
+    assert_eq!(l.stats.get(&30), Some(&4));
+    // r5: sumumod in 1…42.
+    assert!(f
+        .take_log()
+        .contains(&format!("Umod {{ m: {m}, umod: 5, arg: 1 }}")));
+}
