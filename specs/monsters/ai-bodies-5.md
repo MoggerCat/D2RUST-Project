@@ -33,29 +33,29 @@
 |   4. Succubus (118) `0x005E1E00` | 190–209 |
 |   5. BloodLord (125) `0x005E36F0` | 210–220 |
 |   6. SuccubusWitch (119) `0x005E2120` | 221–245 |
-|   7. Overseer (120) `0x005E27A0` | 246–280 |
-|   8. ReanimatedHorde (114) `0x005E1540` | 281–294 |
-|   9. ClawViperEx (142) `0x005F1DE0` | 295–312 |
-|   10. DeathMauler (130) `0x005EE260` | 313–323 |
-|   11. PutridDefiler (137) `0x005EFA90` | 324–341 |
-|   12. Ancient (133) `0x005EF1A0` | 342–396 |
-|   13. AncientStatue (132) `0x005EEAA0` | 397–404 |
-|   14. FrozenHorror (124) `0x005E3530` | 405–419 |
-|   15. SiegeBeast (115) `0x005E1900` | 420–447 |
-|   16. SuicideMinion (117) `0x005E1D30` | 448–459 |
-|   17. BaalMinion (141) `0x005EF910` | 460–471 |
-|   18. BaalTaunt (136) `0x005EF710` | 472–488 |
-|   19. BaalToStairs (138) `0x005EF620` | 489–504 |
-|   20. BaalThrone (134) `0x005EF320`, init `0x005EF310` | 505–544 |
-|   21. BaalCrab (135) `0x005FCFE0`, alternate `0x005FCF30` | 545–656 |
-|   22. BaalCrabClone (140) `0x005FD210`, alternate `0x005FCF30` | 657–667 |
-|   23. Nihlathak (128) `0x005EE5D0`, init `0x005EE5C0`, alternate `0x005E5280` | 668–705 |
-| Constants & data dependencies | 706–724 |
-| Randomness | 725–733 |
-| Edge cases & original bugs | 734–748 |
-| Test vectors | 749–763 |
-| Provenance | 764–789 |
-| Open questions | 790–824 |
+|   7. Overseer (120) `0x005E27A0` | 246–281 |
+|   8. ReanimatedHorde (114) `0x005E1540` | 282–295 |
+|   9. ClawViperEx (142) `0x005F1DE0` | 296–313 |
+|   10. DeathMauler (130) `0x005EE260` | 314–324 |
+|   11. PutridDefiler (137) `0x005EFA90` | 325–342 |
+|   12. Ancient (133) `0x005EF1A0` | 343–397 |
+|   13. AncientStatue (132) `0x005EEAA0` | 398–405 |
+|   14. FrozenHorror (124) `0x005E3530` | 406–420 |
+|   15. SiegeBeast (115) `0x005E1900` | 421–448 |
+|   16. SuicideMinion (117) `0x005E1D30` | 449–460 |
+|   17. BaalMinion (141) `0x005EF910` | 461–472 |
+|   18. BaalTaunt (136) `0x005EF710` | 473–489 |
+|   19. BaalToStairs (138) `0x005EF620` | 490–505 |
+|   20. BaalThrone (134) `0x005EF320`, init `0x005EF310` | 506–550 |
+|   21. BaalCrab (135) `0x005FCFE0`, alternate `0x005FCF30` | 551–662 |
+|   22. BaalCrabClone (140) `0x005FD210`, alternate `0x005FCF30` | 663–673 |
+|   23. Nihlathak (128) `0x005EE5D0`, init `0x005EE5C0`, alternate `0x005E5280` | 674–711 |
+| Constants & data dependencies | 712–730 |
+| Randomness | 731–739 |
+| Edge cases & original bugs | 740–754 |
+| Test vectors | 755–769 |
+| Provenance | 770–795 |
+| Open questions | 796–834 |
 <!-- /index -->
 
 ## Summary
@@ -253,7 +253,8 @@ minion minion1. AI param 0 = cry cooldown frame. "Has k" =
 
 1. Quest seam `0x00587900(game, unit)` (acts only when the unit is
    superunique 42, Shenk; `world/quests.md`).
-2. V := the unit's current target unit (`0x005DE830`: `0x00553010`; a
+2. V := the unit's last attacker (`0x005DE830`: the last-attacker
+   lookup `0x00553010`, `skills/bodies-2.md` §2.8; kept when it is a
    player not in mode 0 or 17, or a monster not in mode 0 or 12 that is
    hostile `0x00554200(game, unit, V)`; else 0).
 3. `Skill1` ≥ 0, AI state 3/19, frame > param 0, V and has 1 →
@@ -522,7 +523,12 @@ q. Waves are superuniques 61..65 (Baal Subject 1..5, table
 5. n = 0, flag 1 clear: w ≤ 4 (unsigned) → wave record of w
    (`0x006556E0`); none or its class < 0 → return with nothing
    scheduled; else queue S→C message 0xA4 with the class on the unit
-   (`0x00571C00`, client preload), and for class 62 (fallenshaman5) also
+   (`0x00571C00`, client preload: a 12-byte pending event record {id
+   0xA4 at +4, class as u16 at +8} appended to the unit's record list,
+   head unit +0xEC, tail +0xF0, then the unit is queued for update
+   `0x0064C040`, `sim/unit-order.md` §6; each client's update sends it,
+   `sim/intents-events.md` §7.9, layout `sim/server-messages.tsv`
+   0xA4), and for class 62 (fallenshaman5) also
    23 (fallen5), for 105 (unraveler5) also 381 (skmage_cold3). Then (any
    w) `0x005DEAD0(10, 285
    Baal Corpse Explode, unit, 0, 0)`; flags |= 1; q := frame + 250;
@@ -634,7 +640,7 @@ The unit's monstats row must exist (else nothing). By k:
 living one (`0x0058F380` with callback `0x005FC830`) or the unit has a
 living owner (`0x00552FD0`). Class := 570 (baalclone; −1 when monstats
 has ≤ 570 rows), mode 1, through the spawn info `0x0063EFA0(unit,
-&class, &x, &y, &mode, difficulty, 0)` (`monsters/population.md`).
+&class, &x, &y, &mode, difficulty, 0)` (`ai-bodies-2.md` §13.1).
 For the unit's `BaseId` 544 (baalcrab; uberbaal shares it) and class
 570 the spawn info keeps the class, draws x := own x + `roll(24)` −
 12, then y := own y + `roll(24)` − 12 (two unit-seed steps,
@@ -792,11 +798,15 @@ Game-file vectors: Open question 1.
 1. No recording of any Act V AI: record a Bloody Foothills / Arreat
    Summit / Worldstone Chamber run (tick recorder) and compare think
    schedules and draws with §2–§23.
-2. Baal §21.3: the draws of the free-point search `0x0054DC40` (case
-   14, `ai.md` open question 4) and of the spawn info `0x0063EFA0` for
-   the clone (owner `monsters/population.md`).
-3. Who sets the Imp mount (§3 AI param 0) besides SiegeBeast §15, and
-   the client side of message 0xA4 (§20).
+2. Answered (2026-10-07): the free-point search `0x0054DC40` draws on
+   the room seed, x then y per try, up to 20 tries
+   (`monsters/population.md` §8); the clone's spawn info is
+   `ai-bodies-2.md` §13.1 (key 544, as OQ10).
+3. Answered (2026-10-07): besides SiegeBeast §15 (`0x005E17E0`) the
+   imp's param 0 is written by its init (−1), its own think (§3) and
+   the inactive restore `0x00541E20` (param 0 := the stored record's
+   +0x4C, every monster; `sim/units.md` §3.4). The 0xA4 record is §20
+   step 5; what the client does with it belongs to the client specs.
 4. Answered (`docs/handoff/impl-ai-acts2-5.md` reading 11): §3 step 5's
    "else" is the distance test (E ≥ I3.aip3), not a failed I3 draw; a
    failed I3 draw goes to step 6 (`0x005E2FF0`). A missing imp row

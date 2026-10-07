@@ -5139,6 +5139,30 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
 - `sim/pets.md` §10 (OQ3): summon two pet types of one group, then
   lower a `petmax` skill level (resync trims), and leave the game with
   a hireling (free path: 0x7A removes).
+- `monsters/ai.md` OQ1 / OQ2 / OQ3 (AI, spec area 1): freeze a monster
+  (cold damage with freeze) and knock back a fallen and a sand leaper;
+  play one Nightmare area; log type-2 schedules (site, frame), timer
+  type 12, state 1 on / off, mode changes. Expect: a think at freeze
+  apply + len + 1 and one at expiry + `aidel` (`0x0057B170`); knockback
+  end +1 / 15 / gethit (`0x005A8520`); Nightmare mode-end delays =
+  `aidel(N)` (zombie1 14).
+- `monsters/ai.md` OQ8 / OQ9 / OQ11 (AI): a town walk clicking NPCs
+  (C→S 0x13, 0x59) and an Act I fight with a fallen shaman; log command
+  4 next to each NPC think, every client message next to type-2
+  schedules, and mode changes of fallens (death end, resurrect).
+- `monsters/ai-bodies-2.md` OQ1 / OQ2, `ai-bodies-3.md` OQ1 / OQ2,
+  `ai-bodies-4.md` OQ1 / OQ2, `ai-bodies-5.md` OQ1 (AI): one run per act
+  II–V (Far Oasis, Arcane Sanctuary, Spider Forest, Durance, Chaos
+  Sanctuary with Diablo, Arreat Summit, Worldstone Chamber); log per
+  think the type-2 schedule, unit-seed steps with caller, mode requests
+  (mode, target, point), AI params 0–2; for vultures, bat demons and
+  frog demons also modes 8–11 / 14 and collision; for Diablo the mode
+  chosen per think with the player's resistances.
+- `monsters/ai-bodies-7.md` OQ2 (AI, refined 2026-10-07): the static
+  read finds no driver for Uber Mephisto / Diablo / Baal (§26). In the
+  Uber Tristram run also log every mode change of the three with its
+  caller and every `0x005B0E00` call on them; expect no attack or skill
+  mode started by AI code (only gethit / knockback / death).
 
 ## 8. Lessons (problems met, fixes)
 

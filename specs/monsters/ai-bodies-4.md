@@ -42,7 +42,7 @@
 | Edge cases & original bugs | 478–494 |
 | Test vectors | 495–510 |
 | Provenance | 511–535 |
-| Open questions | 536–557 |
+| Open questions | 536–559 |
 <!-- /index -->
 
 ## Summary
@@ -542,8 +542,10 @@ Game-file vectors: Open question 1.
    chosen mode per think against the player's resistances and skills.
 3. The skill 199 (DiabPrison) check reads the point (portal GUID, 2) in
    §7 case 15: owner is the skills spec (how the skill resolves it).
-4. Who calls the Diablo alternate (`ai.md` §3.3 re-install while
-   running).
+4. Answered (2026-10-07): `ai.md` §3.3 "When an alternate runs". Diablo
+   has no `switchai`, so a curse 10–12 or terror install reads the base
+   record: the alternate runs one think, then re-installs Diablo's own
+   think with params cleared and command 10 kept (§7 alternate).
 5. Answered (`docs/handoff/impl-ai-acts2-5.md` reading 8): §5 step 2
    sets s := 3 and idles 8 after the walk and in the near case alike;
    only the k ≥ 6 case resets and wanders. 1.14d-confirmed
