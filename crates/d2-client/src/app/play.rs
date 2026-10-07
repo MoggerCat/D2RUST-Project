@@ -178,6 +178,7 @@ pub fn add_walk(app: &mut App, tap: WalkTap, speeds: Option<crate::bridge::predi
         .get_resource::<ui::UnitArt>()
         .map(|a| a.0.art.clone());
     add_preview_walk(app, walk);
+    crate::world_view::walk_room::add_preview_walk_room(app);
 }
 
 /// One log line every [`LOG_EVERY`] bridge frames.
@@ -186,6 +187,7 @@ fn log_progress(
     state: Res<WorldViewState>,
     runs: Option<Res<NodeRuns>>,
     audio: Option<Res<GameAudio>>,
+    walk: Option<Res<PreviewWalk>>,
 ) {
     let w = bridge.0.world();
     if w.frames == 0 || !w.frames.is_multiple_of(LOG_EVERY) {
@@ -201,6 +203,29 @@ fn log_progress(
         runs.map_or(0, |r| r.get()),
         audio.map(|a| a.stats.clone()),
     );
+    info!("frame {}: {}", w.frames, where_line(w, walk.as_deref()));
+}
+
+/// The local player's place in the model for the progress log: its model
+/// sub-tile, the predicted one, its room, the client's active rooms by
+/// level and the model's units by type (0 player, 1 monster, 2 object…).
+fn where_line(w: &crate::bridge::world::ClientWorld, walk: Option<&PreviewWalk>) -> String {
+    let mut levels = std::collections::BTreeMap::<u16, usize>::new();
+    for r in w.active_rooms.as_deref().unwrap_or(&[]) {
+        *levels.entry(r.level).or_default() += 1;
+    }
+    let mut types = std::collections::BTreeMap::<u8, usize>::new();
+    for k in w.units.keys() {
+        *types.entry(k.unit_type).or_default() += 1;
+    }
+    format!(
+        "local cell {:?}, predicted {:?}, local room {:?}, active rooms by level {:?}, units by type {:?}",
+        w.local().map(|u| u.cell()),
+        walk.and_then(|p| p.predict.cell()),
+        w.local_room().map(|r| (r.level, r.x0, r.y0, r.w, r.h)),
+        levels,
+        types,
+    )
 }
 
 /// What `d2-client play` runs.
