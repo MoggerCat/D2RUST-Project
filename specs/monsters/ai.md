@@ -30,20 +30,20 @@
 | Rules | 91–92 |
 |   1. Think scheduling | 93–238 |
 |   2. Think dispatch `0x005B1740` | 239–368 |
-|   3. AI control and AI tables | 369–510 |
-|   4. AI parameters | 511–529 |
-|   5. Target selection | 530–655 |
-|   6. Distances and line tests | 656–670 |
-|   7. Tactics helpers | 671–788 |
-|   8. AI commands and minions | 789–813 |
-|   9. Per-AI behaviours | 814–1619 |
-|   10. The catalogue `ai-functions.tsv` | 1620–1640 |
-| Constants & data dependencies | 1641–1664 |
-| Randomness | 1665–1686 |
-| Edge cases & original bugs | 1687–1728 |
-| Test vectors | 1729–1817 |
-| Provenance | 1818–1874 |
-| Open questions | 1875–1978 |
+|   3. AI control and AI tables | 369–540 |
+|   4. AI parameters | 541–559 |
+|   5. Target selection | 560–685 |
+|   6. Distances and line tests | 686–700 |
+|   7. Tactics helpers | 701–818 |
+|   8. AI commands and minions | 819–843 |
+|   9. Per-AI behaviours | 844–1649 |
+|   10. The catalogue `ai-functions.tsv` | 1650–1670 |
+| Constants & data dependencies | 1671–1694 |
+| Randomness | 1695–1716 |
+| Edge cases & original bugs | 1717–1758 |
+| Test vectors | 1759–1847 |
+| Provenance | 1848–1904 |
+| Open questions | 1905–2008 |
 <!-- /index -->
 
 ## Summary
@@ -407,6 +407,15 @@ get-hit), and 19 marks a reaction-less hit until the next mode change
 turns it into 3. 1.14d-confirmed (`0x005734C0`, `0x005A68E0`,
 `0x0057CEE0` sites `0x0057D083` / `0x0057D119`).
 
+**Control getter** `0x00541860(ECX unit)` (no stack argument): the AI
+control (monster data +0x28) when the unit exists, is a monster (type
+1) and has monster data (unit +0x14); else 0. No side effects, no
+draws. Callers (6): the raise `0x005C07A0` (`combat/events.md`
+function 31, §3.3 "Re-install on a fresh monster"), Hydra
+`0x005CA910`, imp release `0x005D19D0`, `0x005DCA70`, `0x005E1720`,
+BaalThrone `0x005EF320`. 1.14d-confirmed (`0x00541860`–`0x00541876`,
+`all.asm` call sites).
+
 #### 3.2 AI tables
 
 Both tables are arrays of 16-byte records (D2MOO `D2AiTableStrc`):
@@ -507,6 +516,27 @@ hold (`0x005B14E0`, `0x005E5870`, `0x005E7DC0`, `0x005E7F80`,
 GoodNpcRanged 60, NecroPet 67) run from the base table.
 1.14d-confirmed (all 33 call sites, `all.asm`; `0x00570530`, a state-0
 re-install, has no caller and no pointer to it).
+
+**Re-install on a fresh monster (raise).** The reanimate raise
+`0x005C07A0` (`combat/events.md` function 31) spawns N through the
+monster allocator, whose type init already ran the first install
+(state 0, `monsters/init.md` §5 step 5), then calls this function
+again at `0x005C08A0` with (ECX game, EDX N, control = `0x00541860
+(N)`, state 0). With the rules above, on N's fresh control:
+
+1. N's class AI record has an alternate (the 9 AIs listed under "When
+   an alternate runs") and the first install left the record's think
+   as control function: step 3. The control's state stays 0 and its
+   function becomes the alternate, so N's first think runs the
+   alternate, which re-installs state 0 through step 4 (params
+   cleared, init run, think installed).
+2. Otherwise step 4 a second time: AI params 0–2 := 0, commands freed,
+   the record's init function (if any) runs again with its draws
+   (`monsters/init.md` OQ2 lists the init functions that draw), then
+   function := the record's think (or Idle).
+
+The leash, owner and node steps of the raise follow this install.
+1.14d-confirmed (`0x005C0888`–`0x005C08A5`, §3.3 steps 3–4).
 
 ### 4. AI parameters
 
