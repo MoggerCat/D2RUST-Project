@@ -298,11 +298,19 @@ pub fn enter_game<D: ActionEvents, W>(
         .hooks
         .x
         .send(player, &load_act(entry.act, map_seed, obj_seed).encode());
+    // The act is built here when its slot is empty: a fresh environment
+    // record (`render/lighting.md` §9.1 creation).
     let env = s
         .game
         .lists
-        .act(entry.act)
-        .map(|r| r.environment)
+        .act_mut(entry.act)
+        .map(|r| {
+            if !r.built {
+                r.built = true;
+                r.environment = d2_sim::world::environment::Environment::CREATED;
+            }
+            r.environment
+        })
         .ok_or(JoinError::NoAct(entry.act))?;
     a.sys.hooks.x.send(player, &env.message());
     if let Some(e) = s.game.lists.client_mut(id) {

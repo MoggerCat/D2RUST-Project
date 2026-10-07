@@ -213,9 +213,12 @@ impl<X: Pending> EventDispatch for ActionSim<X> {
 impl<X: Pending> TickHooks for ActionSim<X> {
     /// Step 1 `0x0061C040(act, a)` (`render/lighting.md` §9.3 rule 5):
     /// the act's environment record advanced with `A` = the act index.
+    /// An act no join has built yet ([`crate::units::lists::ActEntry::built`])
+    /// does not exist in 1.14d and is skipped.
     fn advance_environment(&mut self, game: &mut Game, act: u8) -> bool {
         game.lists
             .act_mut(act)
+            .filter(|a| a.built)
             .is_some_and(|a| a.environment.server_advance(act))
     }
 

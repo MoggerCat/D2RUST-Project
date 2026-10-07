@@ -371,6 +371,14 @@ fn overhead_message_sends_the_kept_record() {
 #[test]
 fn environment_report_sends_0x53_to_the_act_s_clients() {
     let (mut fx, p, _) = setup();
+    let act = fx.game.lists.room(fx.a).unwrap().act;
+    // Not built by a join: no advance (the setup tick left it untouched).
+    assert_eq!(
+        fx.game.lists.act(act).unwrap().environment,
+        crate::world::environment::Environment::CREATED
+    );
+    fx.game.lists.act_mut(act).unwrap().built = true;
+    fx.tick();
     let env = |fx: &mut Fx| {
         let s: Vec<_> = fx.sim.hooks().x.sent.drain(..).collect();
         s.into_iter()
@@ -386,6 +394,5 @@ fn environment_report_sends_0x53_to_the_act_s_clients() {
         env(&mut fx),
         vec![(p, vec![0x53, 2, 0, 0, 0, 0x80, 0x08, 0, 0, 0])]
     );
-    let act = fx.game.lists.room(fx.a).unwrap().act;
     assert_eq!(fx.game.lists.act(act).unwrap().environment.last_hour, 17);
 }
