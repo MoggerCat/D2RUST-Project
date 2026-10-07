@@ -8,4 +8,5 @@ mod levels;
 mod logic;
 mod mutant_tests;
 mod rooms;
+mod tests_lsim;
 mod tiles;
