@@ -36,6 +36,9 @@ const STAT_LIFE: u16 = 6;
 /// request (cleared by the room clean-up, §7.5 step 3).
 const REASSIGN_EX: u32 = 0x1_0000;
 
+/// §7.3 rule 2 step 7: unit flag 0x8000, the monster was hit.
+pub const HIT: u32 = 0x8000;
+
 /// Unit flags (+0xC4) and flag-ex bits (+0xC8) of the room clean-up.
 pub mod cleanup {
     /// §7.5 step 3: unit flags 0x1, 0x10, 0x400, 0x8000.
@@ -65,10 +68,6 @@ const STEPPING_DEATH_BASE: u16 = 78;
 pub enum ModeMessageError {
     /// §7.4 rule 4: the unit has no (dynamic) path (fatal 0xE6).
     NoPath(UnitId),
-    /// §7.4 rule 3: the skill message (0x4C / 0x4D) is due, whose layout
-    /// the spec does not give (`server-messages.tsv` rows 0x4C / 0x4D
-    /// `partial`): nothing was sent.
-    SkillMessage { unit: UnitId, to_unit: bool },
 }
 
 impl<X: Pending> View<'_, X> {
@@ -84,15 +83,16 @@ impl<X: Pending> View<'_, X> {
     ///    := 0;
     /// 4. unit flag 0x100: the overhead message `0x00571620` (§7.9 rule 3);
     /// 6. unit flag 0x400: S→C 0x2C (`0x00571740`, `audio/triggers-2.md`
-    ///    §14 rule 2, [`crate::units::sound::sound_message`]).
+    ///    §14 rule 2, [`crate::units::sound::sound_message`]);
+    /// 7. unit flag 0x8000 (hit): S→C 0x0C (`0x00597CF0`,
+    ///    [`skill_message::monster_hit`]).
     ///
     /// First (§7.1 rule 2.1): a monster with unit flag 0x10 (not yet
     /// announced) gets its add messages (§7.2, [`View::monster_add`]:
     /// 0xAC, 0x98, 0x21, 0xAA, part B with a mode message). Of rule 2,
     /// step 3 has nothing to send
     /// (d2rs keeps no pending event records, §7.9 rule 2) and steps 5 and
-    /// 7–10 are not sent: step 5 needs the item world, step 7's 0x0C
-    /// fields (`0x00597CF0`), step 8's test
+    /// 8–10 are not sent: step 5 needs the item world, step 8's test
     /// `0x00639F20` and stat sender `0x005711D0`, step 9's `0x00625A20` /
     /// `0x005715A0` conditions and step 10's 0x57 (`0x00597C70`) are not
     /// specified.
@@ -137,6 +137,10 @@ impl<X: Pending> View<'_, X> {
         if let Some(m) = crate::units::sound::sound_message(game, unit, receiver) {
             self.h.x.send(receiver, &m);
         }
+        // Step 7.
+        if unit_flags & HIT != 0 {
+            self.hit_message(receiver, unit, guid);
+        }
     }
 
     /// §7.3 rule 2 step 2: the mode message (§7.4), then unit flag
@@ -166,13 +170,15 @@ impl<X: Pending> View<'_, X> {
                     self.stats
                         .unit_set(&mut *self.h, unit, STAT_POSITION, v.wrapping_add(1), 0);
                 }
-                ModeMessage::Skill { to_unit } => {
-                    self.h
-                        .errors
-                        .push(WiringError::ModeMessage(ModeMessageError::SkillMessage {
-                            unit,
-                            to_unit,
-                        }))
+                ModeMessage::Skill { .. } => {
+                    self.skill_message(
+                        game,
+                        receiver,
+                        unit,
+                        (UnitType::Monster as u8, input.guid),
+                        input.target,
+                        input.path_target,
+                    );
                 }
                 ModeMessage::Nothing => {}
             }
@@ -414,6 +420,8 @@ pub fn death_function<X: Pending>(
     }
     true
 }
+
+pub mod skill_message;
 
 #[cfg(test)]
 mod tests;

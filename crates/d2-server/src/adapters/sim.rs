@@ -5,8 +5,9 @@
 //! What the seams read that `d2-sim` does not hold yet (unit mode, state
 //! 54, player data, positions, owners, acts of units outside rooms) is
 //! owned by unit, path and item specs not written yet. Until they are,
-//! the caller stages those fields here ([`PlayerFields`], [`UnitFacts`]);
-//! nothing here derives or defaults them.
+//! the caller stages those fields here ([`PlayerFields`], [`UnitFacts`]),
+//! or names a [`FactsSource`] that reads the unit facts from the sim's
+//! own records ([`world_sim_facts`]); nothing here defaults them.
 //!
 //! The game's systems beyond the event dispatch (world, items, skills)
 //! are one host value `W` ([`WorldHost`]): the intent handlers
@@ -20,6 +21,7 @@ use d2_sim::game::Game;
 use d2_sim::tick::timer::TimerRun;
 use d2_sim::tick::{EventDispatch, TickHooks};
 use d2_sim::units::{ClientId as SimClient, RoomId, UnitId, UnitType};
+use d2_sim::wiring::worldgen::{WorldPending, WorldSim};
 use d2_sim::world::quests::HostRequest;
 
 use super::handlers;
@@ -62,6 +64,35 @@ pub struct UnitFacts {
     pub owner: Option<UnitId>,
 }
 
+/// Reads a unit's [`UnitFacts`] from the sim's own state (the unit
+/// record's act, the path record's position) for units with no staged
+/// facts ([`SimGame::set_facts_source`]).
+pub type FactsSource<D> = fn(&Game, &D, UnitId) -> Option<UnitFacts>;
+
+/// The [`FactsSource`] of a `WorldSim` game: the unit record's act and
+/// the path position (`path-placement.md` §2.1; a unit without a path
+/// reads (0, 0)). Item owners are not read (no inventory owner seam
+/// here), so an item target counts as not owned.
+pub fn world_sim_facts<X: WorldPending>(
+    game: &Game,
+    sim: &WorldSim<X>,
+    unit: UnitId,
+) -> Option<UnitFacts> {
+    game.lists.unit(unit)?;
+    let rec = sim.action.sys.units.get(unit)?;
+    let (x, y) = sim.action.sys.hooks.path_position(unit);
+    Some(UnitFacts {
+        act: rec.act,
+        pos: Pos { x, y },
+        owner: None,
+    })
+}
+
+/// Lets the host's seams read the game before the sim runs on it
+/// ([`SimGame::set_host_sync`]): called before each handled intent and at
+/// the start of each tick.
+pub type HostSync<D> = fn(&Game, &mut D);
+
 /// Misuse of the adapter's client bookkeeping.
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum AdapterError {
@@ -97,6 +128,10 @@ pub struct SimGame<D = Unspecified, W = NoWorld> {
     transport_ids: BTreeMap<SimClient, ClientId>,
     players: BTreeMap<UnitId, PlayerFields>,
     units: BTreeMap<UnitId, UnitFacts>,
+    /// Facts of units without staged ones, read live from the sim.
+    facts_source: Option<FactsSource<D>>,
+    /// The host's seam refresh, if set.
+    host_sync: Option<HostSync<D>>,
     /// Clients the point parser asked to resync with S→C 0x15, in order.
     /// Not queued: the 11-byte layout of 0x15 is not in
     /// `server-messages.tsv` (`docs/HANDOFF.md` §7).
@@ -158,6 +193,8 @@ impl<D: EventDispatch, W> SimGame<D, W> {
             transport_ids: BTreeMap::new(),
             players: BTreeMap::new(),
             units: BTreeMap::new(),
+            facts_source: None,
+            host_sync: None,
             resyncs: Vec::new(),
             unhandled: Vec::new(),
             world,
@@ -249,6 +286,34 @@ impl<D: EventDispatch, W> SimGame<D, W> {
         self.units.insert(unit, facts);
     }
 
+    /// Answers the facts of every unit without staged ones from `source`
+    /// (the sim's live unit and path records), so a host that never
+    /// stages facts still has them for the point and unit-target parse.
+    pub fn set_facts_source(&mut self, source: FactsSource<D>) {
+        self.facts_source = Some(source);
+    }
+
+    /// Runs `sync` before each handled intent and at the start of each
+    /// tick (a host whose seams answer from a copy of the game's units).
+    pub fn set_host_sync(&mut self, sync: HostSync<D>) {
+        self.host_sync = Some(sync);
+    }
+
+    fn run_host_sync(&mut self) {
+        if let Some(f) = self.host_sync {
+            f(&self.game, &mut self.events);
+        }
+    }
+
+    /// A unit's facts: the staged ones, else the facts source's.
+    pub fn facts(&self, unit: UnitId) -> Option<UnitFacts> {
+        if let Some(f) = self.units.get(&unit) {
+            return Some(*f);
+        }
+        self.facts_source
+            .and_then(|f| f(&self.game, &self.events, unit))
+    }
+
     /// The client's player unit, if it is a player (unit type 0).
     fn player_unit(&self, client: ClientId) -> Option<UnitId> {
         let id = self.clients.get(&client)?;
@@ -277,7 +342,7 @@ impl<D: EventDispatch, W> SimGame<D, W> {
     /// The staged position of the client's player ([`UnitFacts`]).
     pub fn player_pos(&self, client: ClientId) -> Option<Pos> {
         let unit = self.player_unit(client)?;
-        Some(self.units.get(&unit)?.pos)
+        Some(self.facts(unit)?.pos)
     }
 
     /// The client's player unit (unit type 0), for the handlers.
@@ -342,7 +407,7 @@ impl<D: EventDispatch, W: WorldHost<D>> Intents for SimGame<D, W> {
     fn point_state(&self, client: ClientId) -> Option<PointState> {
         let unit = self.player_unit(client)?;
         let data = self.players.get(&unit)?.data?;
-        let player = self.units.get(&unit)?.pos;
+        let player = self.facts(unit)?.pos;
         Some(PointState {
             player,
             last_accept: data.last_accept,
@@ -375,14 +440,14 @@ impl<D: EventDispatch, W: WorldHost<D>> Intents for SimGame<D, W> {
         let Some(target) = self.game.lists.find_unit(ty, unit_id) else {
             return UnitTarget::Missing;
         };
-        let Some(t) = self.units.get(&target) else {
+        let Some(t) = self.facts(target) else {
             return UnitTarget::Missing;
         };
         let player = self.player_unit(client);
         if ty == UnitType::Item && player.is_some() && t.owner == player {
             return UnitTarget::OwnedItem;
         }
-        let Some(p) = player.and_then(|u| self.units.get(&u)) else {
+        let Some(p) = player.and_then(|u| self.facts(u)) else {
             return UnitTarget::Missing;
         };
         if p.act != t.act {
@@ -408,6 +473,7 @@ impl<D: EventDispatch, W: WorldHost<D>> Intents for SimGame<D, W> {
         size: usize,
         out: &mut dyn MessageSink,
     ) -> ResultCode {
+        self.run_host_sync();
         if let Some(r) = handlers::items::handle(self, client, msg, out) {
             return r;
         }
@@ -473,6 +539,7 @@ impl<D: EventDispatch + TickHooks, W: WorldHost<D>> Tick for SimGame<D, W> {
     /// (`handlers::items::moves::update_pass`, `inventory-moves.md` §6.1), then
     /// the client vitals sync ([`SimGame::vitals_sync`]).
     fn tick(&mut self, out: &mut dyn MessageSink) {
+        self.run_host_sync();
         self.world.run_tick(&mut self.game, &mut self.events);
         self.world.after_tick(&mut self.game, &mut self.events);
         let requests = self.world.take_host_requests();
@@ -508,7 +575,7 @@ impl<D: EventDispatch + TickHooks, W: WorldHost<D>> SimGame<D, W> {
                 .lists
                 .client(sc)
                 .and_then(|r| r.player)
-                .and_then(|p| self.units.get(&p))
+                .and_then(|p| self.facts(p))
                 .map_or((0, 0), |f| (f.pos.x as u16, f.pos.y as u16));
             let queued = out.has_queued(c);
             let Some(msgs) =

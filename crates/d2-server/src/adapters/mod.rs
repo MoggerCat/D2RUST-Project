@@ -12,5 +12,8 @@ pub mod session_flow;
 mod sim;
 mod sizes;
 
-pub use sim::{AdapterError, PlayerData, PlayerFields, SimGame, UnitFacts, Unspecified};
+pub use sim::{
+    world_sim_facts, AdapterError, FactsSource, HostSync, PlayerData, PlayerFields, SimGame,
+    UnitFacts, Unspecified,
+};
 pub use sizes::ProtoSizes;

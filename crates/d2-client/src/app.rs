@@ -15,6 +15,7 @@ pub mod rest;
 pub mod save;
 pub mod server_thread;
 pub mod single_player;
+pub mod skill_rest;
 pub mod sound;
 pub mod ui;
 

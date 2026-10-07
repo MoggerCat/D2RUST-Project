@@ -431,8 +431,11 @@ fn post_load(
 /// The load steps on the action wiring's unit side (`d2_sim::wiring::action::View`):
 /// the player's stat list (set, totals, `maxstamina`), the start stats
 /// (`combat/vitals.md` `init_player_stats`), `StartSkill` and the
-/// experience table (`VitalsTables`). Every other step has no provider in
-/// `d2-sim` yet and is reported as [`Unapplied`] with its owner.
+/// experience table (`VitalsTables`), and the player's skill list on the
+/// `Pending` value that owns it (`Pending::skill_list`,
+/// `select_hand_skill`, `assign_skill_level`; a provider without a list
+/// is reported). Every other step has no provider in `d2-sim` yet and is
+/// reported as [`Unapplied`] with its owner.
 pub struct ActionCharacter<'v, 'a, X> {
     pub v: &'v mut View<'a, X>,
     pub player: UnitId,
@@ -475,17 +478,42 @@ impl<X: Pending> CharacterWorld for ActionCharacter<'_, '_, X> {
         };
         Ok(t.charstats(self.class()).map_or(0, |c| c.startskill))
     }
-    fn has_skill(&self, _: u16) -> Result<bool, Unapplied> {
-        unapplied(
-            "has skill",
-            "the player's skill list (`0x006439F0`) has no provider here",
-        )
+    /// `0x006439F0` on the provider's list (`Pending::skill_list`): an
+    /// entry of the skill, any owner. An empty list is "no provider": a
+    /// player's list always holds skill 0 once its native skills ran
+    /// (`client/msg-skills.md` §2 rule 8, the server player init
+    /// `0x005348C0`).
+    fn has_skill(&self, skill: u16) -> Result<bool, Unapplied> {
+        let list = self.v.h.x.skill_list(self.player);
+        if list.is_empty() {
+            return unapplied(
+                "has skill",
+                "the player has no skill list (no provider ran `0x00647EE0`)",
+            );
+        }
+        Ok(list.iter().any(|e| e.skill == i32::from(skill)))
     }
-    fn set_mouse_skills(&mut self, _: Option<u16>) -> Result<(), Unapplied> {
-        unapplied(
-            "mouse skills",
-            "player data +0x70..+0x8C and `0x005701B0` are not in d2-sim",
-        )
+    /// The list part of `0x005701B0`: the right hand := the entry
+    /// (`right`, −1) (`Pending::select_hand_skill`). Player data +0x70 /
+    /// +0x74 have no home in d2-sim; the join's 0x23 carry the session's
+    /// record (`session::PlayerRecord`).
+    fn set_mouse_skills(&mut self, right: Option<u16>) -> Result<(), Unapplied> {
+        let selected = match right {
+            Some(s) => self
+                .v
+                .h
+                .x
+                .select_hand_skill(self.player, false, i32::from(s)),
+            None => !self.v.h.x.skill_list(self.player).is_empty(),
+        };
+        if selected {
+            Ok(())
+        } else {
+            unapplied(
+                "mouse skills",
+                "no skill-list provider for `0x005701B0` (player data +0x70..+0x8C are not in d2-sim)",
+            )
+        }
     }
     fn quest_entry(&mut self, _: u8) -> Result<(), Unapplied> {
         unapplied(
@@ -522,11 +550,45 @@ impl<X: Pending> CharacterWorld for ActionCharacter<'_, '_, X> {
         }
         Ok(self.v.stats.unit_total(self.player, id, 0))
     }
-    fn add_skill_level(&mut self, _: usize, _: u8) -> Result<(), Unapplied> {
-        unapplied(
-            "skills",
-            "`0x0056DEB0` on a player unit (skills/levels.md) has no provider here",
-        )
+    /// `formats/d2s.md` §7.2 rule 2: skill = the class list's entry
+    /// `index` (`data/runtime-maps.md` §5: the `skills` rows whose
+    /// `charclass` is the class, in record order; class > 6 or index past
+    /// the count → −1, a skill outside the table: assign adds nothing,
+    /// `client/msg-skills.md` §2 rule 2.1), then `0x0056DEB0(unit, skill,
+    /// level, 1)` on the provider's list (`Pending::assign_skill_level`).
+    fn add_skill_level(&mut self, index: usize, level: u8) -> Result<(), Unapplied> {
+        const NO_PROVIDER: &str = "`0x0056DEB0` on a player unit: no skill-list provider";
+        if self.v.h.x.skill_list(self.player).is_empty() {
+            return unapplied("skills", NO_PROVIDER);
+        }
+        let class = self.class();
+        let skill = if (0..7).contains(&class) {
+            self.v
+                .h
+                .tables
+                .skills
+                .skills
+                .iter()
+                .enumerate()
+                .filter(|(_, r)| i32::from(r.charclass as i8) == class)
+                .nth(index)
+                .map_or(-1, |(i, _)| i as i32)
+        } else {
+            -1
+        };
+        if skill < 0 {
+            return Ok(());
+        }
+        if self
+            .v
+            .h
+            .x
+            .assign_skill_level(self.player, skill, i32::from(level))
+        {
+            Ok(())
+        } else {
+            unapplied("skills", NO_PROVIDER)
+        }
     }
     fn create_items(&mut self, _: ItemList, entries: &[ItemEntry]) -> Result<(), Unapplied> {
         if entries.is_empty() {

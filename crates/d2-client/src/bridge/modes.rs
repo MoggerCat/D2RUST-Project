@@ -85,7 +85,11 @@ pub fn mode_request(
             Ok(())
         }
         MONSTER => {
-            if let Some(m) = monster_mode(code) {
+            let m = match code {
+                0x15 | 0x16 => skill_mode(inputs, record[0], MONSTER),
+                _ => monster_mode(code),
+            };
+            if let Some(m) = m {
                 w.units.get_mut(&key).expect("present").mode = m;
             }
             Ok(())
@@ -216,7 +220,11 @@ fn player(
         // The client skill start (`0x004C6F40` / `0x004C6EB0`) after the
         // target fix-up: render/lighting.md §8 r3 (cast light); the
         // skill's mode is the client animation's (open question 1).
-        0x15 | 0x16 => {}
+        0x15 | 0x16 => {
+            if let Some(m) = skill_mode(inputs, r[0], PLAYER) {
+                set(w, m);
+            }
+        }
         0x17 | 0x18 => set(w, player_mode::RUN),
         0x19 => {
             set(w, player_mode::BLOCK);
@@ -280,6 +288,25 @@ fn item(w: &mut ClientWorld, key: UnitKey, code: u8, r: [i32; 7]) {
     let u = w.units.get_mut(&key).expect("checked by the caller");
     u.mode = r[1] as u32;
     u.flag_2 = Some(r[0] != 0);
+}
+
+/// The mode of the client skill start of codes 0x15 / 0x16 (S→C 0x4D /
+/// 0x4C, `msg-units.md` §4 rule 1: record[0] = the skill id): the
+/// skill's `skills.txt` `anim` (player modes) or `monanim` (monster
+/// modes); a skill without a row or a mode past the type's table:
+/// `None` (mode unchanged).
+///
+/// PROVISIONAL (client/model.md OQ 1; REC-51): the client skill start
+/// `0x004C6F40` / `0x004C6EB0` is not specified; read as "mode := the
+/// skill's animation mode". d2rs-own, unverified.
+pub fn skill_mode(inputs: &ModelInputs, skill: i32, unit_type: u8) -> Option<u32> {
+    let row = inputs.tables.skills.get(usize::try_from(skill).ok()?)?;
+    let (m, count) = if unit_type == PLAYER {
+        (row.anim, 20)
+    } else {
+        (row.monanim, MODE_ROWS.len() as u8)
+    };
+    (m < count).then_some(u32::from(m))
 }
 
 /// The monster machine `0x004AFF60` (open question 1).

@@ -755,6 +755,14 @@ town access 0.
    unit set: code, target type, target GUID, x, y) or 0x0F (code, target
    x, y, 0, x, y). Codes: walk 1 / unit 0, run 0x17 / 0x18 (walk and
    town walk share the row).
+   PROVISIONAL: the skill modes A1 7, A2 8, SC 10, TH 11, KK 12, S1–S4
+   13–16, SQ 18 with a used skill run `0x00548090`: the skill message of
+   `sim/intents-events.md` §3.5 rule 5 (flag 0, w 0; the path's target
+   unit → `0x0053D530`, else `0x0053D4D0` at the path target), sent to
+   every client including the player's own (d2rs-own: the client applies
+   no mode request for its click, `ui/controls.md` §6 r7) (because the
+   table's other rows are not read and `0x00548090` is the other named
+   caller of the builders); settled by REC-94.
 3. Same pass, before it: a player with flags 2 bit 0x10000, or bit 0x800
    when the client's player is not this unit → S→C 0x15 (`0x00548010`:
    type, GUID, x, y, flag 1 for 0x10000 else 0). Waypoint arrival and

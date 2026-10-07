@@ -242,8 +242,11 @@ pub fn build_path<X: Pending>(v: &mut View<'_, X>, game: &mut Game, unit: UnitId
 /// client of the per-client update (`tick.md` §6.5; `pathing.md` §10
 /// rules 3 and 2, in that order): S→C 0x15 when the unit's flags 2 ask
 /// for it (`0x00548010`), then, for a player whose mode changed (unit
-/// flag 0x1), the walk modes' update function `0x00548180` (0x0F / 0x10;
-/// other modes have their own rows, not specified: nothing). Sent through
+/// flag 0x1), the walk modes' update function `0x00548180` (0x0F / 0x10);
+/// the skill modes send the skill message 0x4C / 0x4D
+/// ([`crate::wiring::action::unit_update::skill_message::player_skill_mode`],
+/// PROVISIONAL); other modes' rows are not
+/// specified: nothing. Sent through
 /// [`Pending::send`] to the client's player. Units other than players
 /// with a dynamic path, and clients without a player, get nothing.
 ///
@@ -258,6 +261,7 @@ pub fn update_messages<X: Pending>(
     unit: UnitId,
 ) {
     use crate::path::walk::messages::{mode_update, reassign_flag, reassign_player};
+    use crate::wiring::action::unit_update::skill_message::player_skill_mode;
     let Some(receiver) = game.lists.client(client).and_then(|c| c.player) else {
         return;
     };
@@ -279,6 +283,26 @@ pub fn update_messages<X: Pending>(
     if flags & crate::units::record::flags::CHANGED != 0 {
         if let Some(msg) = mode_update(mode, ty, guid, &path, own) {
             v.h.x.send(receiver, &msg);
+        } else if player_skill_mode(mode) {
+            // PROVISIONAL (sim/pathing.md §10 rule 2): the skill rows of
+            // `0x007319E8` read as `0x00548090` (the skill message with
+            // the path's target unit, else its target point). d2rs-own,
+            // unverified: sent to the own client too (the click's mode
+            // request is not applied, `ui/controls.md` §6 r7, so the
+            // client sets the attack mode from this echo); settled by
+            // REC-94.
+            let target = path
+                .target_unit
+                .filter(|t| game.lists.find_unit(t.ty, t.guid) == Some(t.unit))
+                .map(|t| (t.ty as u8, t.guid));
+            v.skill_message(
+                game,
+                receiver,
+                unit,
+                (ty, guid),
+                target,
+                (path.target_x, path.target_y),
+            );
         }
     }
 }

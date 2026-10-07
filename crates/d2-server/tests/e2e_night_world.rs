@@ -1168,15 +1168,14 @@ fn a_population_monster_killed_with_a_missile() {
     // `intents-events.md` §7.4 rule 7 states the death messages (0x69
     // code 8 at the kill, code 9 when the death animation ends) and §7.6
     // the drop's 0x9C. Both come from the client pass's per-unit update
-    // (`0x0053A500`), which the tick wiring does not run (HANDOFF IS2):
-    // nothing is sent for the cast, the missile, the kill or the drop.
-    // When it is wired this transcript must hold the §7.4 / §7.6 bytes.
-    assert_eq!(transcript, Vec::<Vec<u8>>::new());
-    // The cast's S→C 0x4C / 0x4D skill message has no written layout
-    // (`docs/handoff/impl-monster-death.md` §3): the host logs it as a
-    // gap, once per cast message; nothing else may be logged.
-    assert_eq!(
-        fx.errors(),
-        vec!["ModeMessage(SkillMessage { unit: UnitId(4), to_unit: false })".to_string(); 2]
-    );
+    // (`0x0053A500`), which the tick wiring does not run here (HANDOFF
+    // IS2) for the kill or the drop. The monster's two mode changes while
+    // its skill is in use send the skill message instead of a mode
+    // message (§7.4 rule 3, `0x00597D70` → `0x0053D4D0`, §3.5 rule 5):
+    // 0x4D type 1, GUID 3, skill 1 (u32), level 10 (PROVISIONAL, REC-94:
+    // base + bonus), the path target (0, 0: no target point), w 0.
+    let skill_4d = vec![0x4D, 1, 3, 0, 0, 0, 1, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0];
+    assert_eq!(transcript, vec![skill_4d; 2]);
+    // Nothing is logged.
+    assert_eq!(fx.errors(), Vec::<String>::new());
 }
