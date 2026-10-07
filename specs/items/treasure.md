@@ -31,20 +31,20 @@
 | Inputs | 61–77 |
 | Outputs / state changes | 78–84 |
 | Rules | 85–86 |
-|   1. TC runtime form (load step 46) | 87–215 |
-|   2. TC by id and level (`0x00654E00`) | 216–222 |
-|   3. Monster drop | 223–275 |
-|   4. Chest drop (`0x00585B90`) | 276–302 |
-|   5. The TC walk (`0x0055A6D0`) | 303–409 |
-|   6. Drop quality (`0x00558640`) | 410–441 |
-|   7. Creation inputs and placement (`0x0055A550`) | 442–466 |
-|   8. Gold amount | 467–479 |
-| Constants & data dependencies | 480–509 |
-| Randomness | 510–526 |
-| Edge cases & original bugs | 527–550 |
-| Test vectors | 551–580 |
-| Provenance | 581–605 |
-| Open questions | 606–629 |
+|   1. TC runtime form (load step 46) | 87–216 |
+|   2. TC by id and level (`0x00654E00`) | 217–223 |
+|   3. Monster drop | 224–276 |
+|   4. Chest drop (`0x00585B90`) | 277–303 |
+|   5. The TC walk (`0x0055A6D0`) | 304–410 |
+|   6. Drop quality (`0x00558640`) | 411–442 |
+|   7. Creation inputs and placement (`0x0055A550`) | 443–467 |
+|   8. Gold amount | 468–480 |
+| Constants & data dependencies | 481–510 |
+| Randomness | 511–527 |
+| Edge cases & original bugs | 528–551 |
+| Test vectors | 552–581 |
+| Provenance | 582–606 |
+| Open questions | 607–630 |
 <!-- /index -->
 
 ## Summary
@@ -98,7 +98,7 @@ TC records (0x2C bytes, array `0x0096C5EC`, count `0x0096C5F0`; index =
 | count | 0x04 | i32 | entries |
 | total classic | 0x08 | i32 | sum of classic probs |
 | total expansion | 0x0C | i32 | sum of expansion probs |
-| picks | 0x10 | i32 | never 0 (§1.4) |
+| picks | 0x10 | i32 | never 0 for TCs 1+ (§1.4); TC 0 is all zero (§1.2) |
 | nodrop | 0x14 | i32 | |
 | mods | 0x1A | 6 × u16 | magic, rare, set, unique, slot 5, slot 6 |
 | entries | 0x28 | ptr | `count` entries |
@@ -122,7 +122,8 @@ does).
 
 #### 1.2 Order
 
-TC 0 (empty name, no entries), the automatic TCs (§1.3), then
+TC 0 (empty name, no entries, all fields 0 including picks: the 1.14d
+memory dump `traces/raw/20261006-201456-tables` has an all-zero record 0), the automatic TCs (§1.3), then
 `treasureclassex` rows (§1.4); list and name order: `loading.md` §10.6.
 Each TC's name is added to `@treasureclass` when its record is created,
 so a name lookup during §1.4 sees only TCs created before (`field-types.md`

@@ -33,14 +33,14 @@
 |   7. Vis and warp records | 225–248 |
 |   8. Coordinates to rooms | 249–262 |
 |   9. Level lifecycle: activity and freeing | 263–311 |
-|   10. Spawn room in a level (`0x0066B2B0`) | 312–351 |
-|   11. Logical rooms (coordinate lists) and population queries | 352–631 |
-| Constants & data dependencies | 632–652 |
-| Randomness | 653–671 |
-| Edge cases & original bugs | 672–696 |
-| Test vectors | 697–740 |
-| Provenance | 741–773 |
-| Open questions | 774–834 |
+|   10. Spawn room in a level (`0x0066B2B0`) | 312–356 |
+|   11. Logical rooms (coordinate lists) and population queries | 357–636 |
+| Constants & data dependencies | 637–657 |
+| Randomness | 658–676 |
+| Edge cases & original bugs | 677–701 |
+| Test vectors | 702–745 |
+| Provenance | 746–778 |
+| Open questions | 779–839 |
 <!-- /index -->
 
 ## Summary
@@ -312,7 +312,12 @@ status lists; 1.14d moved it to step 5. No outcome differs (no draws).
 ### 10. Spawn room in a level (`0x0066B2B0`)
 
 Used when a unit enters a level without a fixed position (waypoint,
-town arrival, act change: D2MOO `DUNGEON_FindActSpawnLocation`):
+town arrival, act change: D2MOO `DUNGEON_FindActSpawnLocation`).
+Arguments: ECX the act's DRLG record, EDX level id; stack tile index,
+&x, &y. Entry points: `0x0061B060` (`sim/path-placement.md` §11) and
+`0x00619E50`(act, level, tile index, &x, &y; callers `0x0054DBE9`,
+`0x00585094`), which only asserts the act (null → fatal) and passes its
+DRLG (act +0x48): both are this one search, with the same draws.
 
 1. Get-or-allocate the level; generate it if it has no rooms.
 2. If leveldefs `Position` (+0x90) ≠ 0 (levels 1, 38, 40, 46, 54, 73,

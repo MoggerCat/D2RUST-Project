@@ -25,20 +25,20 @@
 | Inputs | 58–67 |
 | Outputs / state changes | 68–74 |
 | Rules | 75–76 |
-|   1. Messages | 77–110 |
-|   2. `use_at_point(game, unit, skill, x, y)` = `0x00549AD0` | 111–133 |
-|   3. `use_on_unit(game, unit, skill, type, guid, run)` = `0x00549BA0` | 134–152 |
-|   4. Mode change gates | 153–186 |
-|   5. Start and do | 187–276 |
-|   6. Cooldown | 277–290 |
-|   7. Periodic skills and auras | 291–328 |
-|   8. Function tables | 329–348 |
-| Constants & data dependencies | 349–369 |
-| Randomness | 370–379 |
-| Edge cases & original bugs | 380–401 |
-| Test vectors | 402–415 |
-| Provenance | 416–432 |
-| Open questions | 433–470 |
+|   1. Messages | 77–108 |
+|   2. `use_at_point(game, unit, skill, x, y)` = `0x00549AD0` | 109–150 |
+|   3. `use_on_unit(game, unit, skill, type, guid, run)` = `0x00549BA0` | 151–169 |
+|   4. Mode change gates | 170–203 |
+|   5. Start and do | 204–324 |
+|   6. Cooldown | 325–338 |
+|   7. Periodic skills and auras | 339–388 |
+|   8. Function tables | 389–408 |
+| Constants & data dependencies | 409–429 |
+| Randomness | 430–439 |
+| Edge cases & original bugs | 440–461 |
+| Test vectors | 462–475 |
+| Provenance | 476–492 |
+| Open questions | 493–533 |
 <!-- /index -->
 
 ## Summary
@@ -86,14 +86,12 @@ Handlers (addresses in `client-messages.tsv`):
 | 0x0D / 0x0E | right | unit | yes / no (shift) |
 | 0x08, 0x09, 0x0A, 0x0F, 0x10, 0x11 | "hold" forms | call 0x05, 0x06, 0x07, 0x0C, 0x0D, 0x0E | |
 
-1. Point validator `0x005496F0`: size 5; unit has player data; `|dx| ≤
-   50` and `|dy| ≤ 50` from the unit. Success stores the frame in player
-   data +0x168; failure returns 1 (far), 2 (no player data) or 3 (size),
-   and if more than 25 frames passed since the last success sends server
-   message 0x15 (resync).
-2. Unit validator `0x00549830` → `0x00548F80`: size 9; type < 6; unit not
-   found → 1; an item (type 4) in the player's own inventory passes;
-   other act → 2; distance test `0x00548EF0` (50).
+1. Point validator `0x005496F0`: `sim/intents-events.md` §2.4 rule 3
+   (results 3 size, 2 no player data, 1 far; the 0x15 resync is sent
+   only on 1, never on 2).
+2. Unit validator `0x00549830` → `0x00548F80`: `sim/intents-events.md`
+   §2.4 rule 4 (results 3 size ≠ 9, 2 type ≥ 6 or another act, 1 unit
+   not found or farther than 50 on either axis, 0 accepted; no resync).
 3. No left skill (left messages) or right skill (right messages) → 3.
 4. `pierce_idx(328)` = base + 1 (`0x006253B0` / `0x00627260`), before the
    use attempt, whether or not it succeeds.
@@ -127,9 +125,28 @@ read by server code (client `0x004AA3A0` only).
    own client (`0x00549A60`: client `0x005531C0`, send `0x0053C850`),
    40 bytes: `5A 0E 01` then 37 zero bytes; return 2. Other states: 2.
 
-`use_state` parts: mana `can_afford` (`skills/levels.md` §4), quantity
-and throw `0x00647640`, charges `0x00647840`, shape `0x00644060`, item
-type `0x00643F80`, start stat `0x006440F0`, cooldown `0x006478F0` (§6).
+`use_state(unit, entry)` (`0x00647960`) tests in this order and returns
+at the first failure (entry null → fatal assert):
+
+| # | Test | Code |
+|---|---|---|
+| 1 | entry's skill record missing, or its `InGame` flag clear | 3 |
+| 2 | `skill_level(unit, entry, 1)` = 0 (`0x006442A0`) | 7 |
+| 3 | `aura` | 6 |
+| 4 | `passive` | 5 |
+| 5 | quantity and throw `0x00647640`, then item type `0x00643F80` | 2 |
+| 6 | mana `can_afford` `0x00647540` (`skills/levels.md` §4) | 1 |
+| 7 | shape `0x00644060` | 4 |
+| 8 | start stat `0x006440F0` | 1 |
+| 9 | charges `0x00647840` | 2 |
+| 10 | cooldown `0x006478F0` (§6) returns 0 | 8 |
+
+Else 0. So `InGame` is read on the server, inside `use_state` (no
+message handler reads it). The step 4 fallback looks Attack up with
+`0x006439B0`(ECX unit, EDX id 0, item GUID −1): the first entry of the
+unit's skill list (+0xA8, list +4, next +4) whose record id equals the
+id and whose owner item GUID (+0x34) equals the argument; none → null,
+and `use_state(null)` is fatal.
 
 ### 3. `use_on_unit(game, unit, skill, type, guid, run)` = `0x00549BA0`
 
@@ -214,12 +231,16 @@ Open question 6).
 
 #### 5.3 Start `0x0056FAF0` → core `0x0056F640`
 
-1. No used skill → stop.
-2. Target checks `0x0056CC60`: with `TargetableOnly` the target must be
-   hostile (`0x00554200`), a pet (`0x005542C0`) or an ally (`0x00554D20`),
-   else fail; a target without unit flag 2 is dropped; a dead monster
-   (mode 12) is dropped unless `TargetCorpse`; a living one is dropped if
-   `TargetCorpse`. Failure: player → mode 5 (neutral), return 0.
+1. No used skill → return 0 (no neutral reset).
+2. Target checks `0x0056CC60`: no target → pass. Skill id invalid →
+   fail. With `TargetableOnly` the target must be hostile (`0x00554200`),
+   a pet (`0x005542C0`) or an ally (`0x00554D20`), else fail. A target
+   without unit flag 2 is dropped (pass). The corpse rule tests only
+   "monster in mode 12": such a target is kept with `TargetCorpse`, else
+   dropped; **any other target** (players in mode 0 or 17 included) is
+   dropped when the skill has `TargetCorpse`. Dropping clears the unit's
+   target (`0x00620C10`) and passes. Failure: player → mode 5
+   (neutral), return 0. Skill id invalid after step 3 → return 0.
 3. `L = skill_level(unit, entry, 1)`. Item skill with 0 charges → return
    0 (no neutral reset; Edge case 3).
 4. Target is an ally and the skill lacks `TargetAlly` → return 0 (no
@@ -232,40 +253,50 @@ Open question 6).
       charges (+0x38) > 0; else `(mana + max(L − 1, 0) × lvlmana) <<
       manashift ≤ mana(8)`; `srvdofunc` 116 while shapeshifted is free.
    3. `InTown` again.
-   4. `lineofsight` (+0x18F) 1–5: target position (`0x0056D2C0`); line
-      test `0x00645950` with collision mask 4 / 0x1C09 / 0x180 / 0x804 /
-      0x805 by value; failure → 0; value > 5 → 0. (1.14d: only value 4,
+   4. `lineofsight` (+0x18F) ≠ 0: target position (`0x0056D2C0`); no
+      position → the test is skipped (passes). Else by value 1–5 the
+      line test `0x00645950` with collision mask 4 / 0x1C09 / 0x180 /
+      0x804 / 0x805; failure → 0; value > 5 → 0. (1.14d: only value 4,
       48 skills.)
-   5. `srvstfunc` ∉ 0…90 → 0. Null entry → result 1, nothing charged.
+   5. `srvstfunc` ∉ 0…90 → 0. Null entry → result 1, nothing charged
+      (step 7 still runs).
    6. Else `r = srvst[srvstfunc](game, unit, skill, L)` (table
-      `0x00732140`; ECX game, EDX unit). `r ≠ 0` and no `usemanaondo` →
-      `consume_mana` (`skills/levels.md` §4; result ignored).
+      `0x00732140`; ECX game, EDX unit). `r ≠ 0`, no `usemanaondo` and
+      `noManaCheck` = 0 → `consume_mana` (`skills/levels.md` §4; result
+      ignored).
    7. `r ≠ 0` and `periodic` → delete type-8 timers with arg1 0.
 7. Player and result 0 → neutral (cancels the frame events).
 
 #### 5.4 Do: wrapper `0x0056FC50` → core `0x0056F7F0(game, unit, skill, L, charge = 1, item = 0, aim = 0)`
 
-1. Living player or monster, used skill without flags bit 0, skill
-   without `InTown`: no room or room in town → clear used skill, player →
-   neutral, 0.
-2. `item = 0` and the used skill is not this id with level > 0: the
-   unit's highest entry must have level > 0.
+1. Player or monster (no death test here), used skill without flags
+   bit 0 (`0x006446A0`), skill without `InTown`: no room or room in town
+   (`0x0061AB00`) → clear used skill, player → neutral, 0. Other unit
+   types skip steps 1, 2 and 4.
+2. `item = 0`: pass when the used skill has this id and
+   `skill_level(unit, used, 1)` > 0 (with bonuses); else the entry
+   `0x006439F0`(unit, skill) must exist with `skill_level(…, 1)` > 0,
+   else 0.
 3. `srvdofunc` ∉ 0…190 → 0.
 4. Living unit and `usemanaondo` → mana check (§5.3 6.2); fail → 0.
-5. `aim` and `item` and `ItemEffect` (+0x16A) > 1 → do index =
-   `ItemEffect`.
+5. `aim` and `item` and `ItemEffect` (i16 +0x16A) > 1 → do index =
+   `ItemEffect`. This index is **not** bounds-checked (the table has
+   191 entries): a value > 190 reads past the table.
 6. `r = srvdo[index](…)` when the entry is non-null (table
    `0x007322B0`).
-7. `srvmissile` (+0x46) is a valid missile: set unit flag 0x40 (later
-   code-1/2 events of this animation skip); position 0 unless `item` and
-   `aim` (then offset = target − unit and aim = 2 × target − unit); create
-   the missile (`lob` → `0x0056EE90`, else `0x0056ECB0`; monsters
-   branch); `r = 1`.
+7. `srvmissile` (i16 +0x46) ≥ 0 and its `missiles` row exists
+   (`0x0046ACE0`): set unit flag 0x40 (later code-1/2 events of this
+   animation skip); offset and aim 0 unless `item` and `aim` and the
+   target position (`0x0056D2C0`) has both coordinates ≠ 0 (then offset
+   = target − unit, aim = 2 × target − unit); create the missile (`lob`
+   → `0x0056EE90`, else `0x0056ECB0`; §5.5) with (unit, skill, L,
+   offset, aim, 0); `r = 1` whatever the helper returned.
 8. `r = 0` → 0.
 9. `charge ≠ 0`: living unit: if the start entry is null or
    `usemanaondo` → `consume_mana`; `decquant` → `0x0056C3F0`. `d =
-   eval(delay)` (+0x190); `d > 0`, player, and (mode ≠ SQ (18) or unit
-   +0x38 bits 8+ = 0) → `set_delay(d)` (§6).
+   eval(delay)` (+0x190, `0x00646CA0`); `d > 0`, player, and (the
+   skill's `anim` (+0x10) ≠ SQ (18) or unit +0x38 bits 8+ = 0) →
+   `set_delay(d)` (§6).
 10. Return `r`. The wrapper then calls `schedule_periodic(…, aura = 0)`
     (§7).
 
@@ -273,6 +304,23 @@ So **mana is charged at start** when the skill has a start function and
 no `usemanaondo`, **otherwise at do**. 1.14d data: 274 skills have a
 do function, 112 a start function, 48 only `srvmissile`, none both
 `srvdofunc` and `srvmissile`; `usemanaondo`: Plague Javelin, Blade Fury.
+
+#### 5.5 Skill missile helpers (`0x0056ECB0`, `0x0056EE90`)
+
+(ECX game, EDX missile class; stack unit, skill, L, dx, dy, aim x, aim
+y, take ammo). Both fill a zeroed `missiles.md` §R2.1 record: owner :=
+unit, class, skill, L; target := (aim x, aim y) when both are ≠ 0, else
+the unit's target position (`0x0056D2C0`; none → return null, no
+missile). If take ammo ≠ 0 and the unit is a player: `0x0056C3F0` ≤ 0 →
+return null. Then create (`0x0059FA30`) and return the missile.
+
+| | `0x0056ECB0` (straight) | `0x0056EE90` (`lob`) |
+|---|---|---|
+| flags | 0x21 (start given, target absolute) | 0x420 (target absolute, frames from distance) |
+| origin unit (+0x08) | none | the unit |
+| start x, y | unit position + (dx, dy) | filled the same way, but unused (flag 1 clear: start = origin) |
+| target found with a 0 coordinate | return null | used as is |
+| attack bonus | monster with stat 19 (`tohit`, total) ≠ 0: +0x48 := it, flag 0x1000 | none |
 
 ### 6. Cooldown
 
@@ -299,11 +347,20 @@ frames ≡ 1 mod `d`.
 −1, schedule type 8 (−1, 0) at `period`; else delete type 8 with arg
 `skill`, schedule type 8 (`skill`, `L`).
 
-Type-8 handler `0x0056FCB0`: arg −1 → the right skill; if `aura` and the
-unit is alive: do core (…, 1, 0, 0), reschedule in aura form; else
-delete. Arg > 0 → the skill's `aurastate` (+0x80) must be on the unit
-with stat 350 = skill in its list; level from stat 351; the unit must own
-the skill (`0x006439F0`); do core, reschedule; else delete.
+Type-8 handler `0x0056FCB0`(game, unit, arg1):
+- arg1 = −1: the right skill entry (`0x006201D0`); it exists, its id is
+  valid, it is `aura` and the unit is not dead (`0x005541B0`) → L :=
+  `skill_level(unit, entry, 1)`, do core (skill, L, 1, 0, 0), then
+  `schedule_periodic` in aura form; else delete the unit's type-8
+  events with arg −1.
+- arg1 = 0 or < −1: nothing (no do, no delete, no reschedule).
+- arg1 > 0 (a skill id): id < skills count, record present, `aurastate`
+  (+0x80) a valid state, the unit has that state, its list exists
+  (`0x006256B0`), the unit owns the skill (`0x006439F0`) and the list's
+  base stat 350 = the id → L := the list's base stat 351, do core
+  (skill, L, 1, 0, 0), `schedule_periodic` (skill, L, aura 0). Any
+  failure → delete type-8 events with arg1. No death test on this
+  path.
 
 0x3C SelectSkill → `assign(…)` `0x005701B0`: size 9; skill = low 31 bits
 of u32 at +1, left = bit 31, owner GUID = u32 at +5; the skill must exist
@@ -319,9 +376,12 @@ Aura do (`srvdofunc` 65, `0x005CF010`): body in `skills/bodies.md`
 §4.5 (duration, stats on self and targets, `aurafilter` scan, mana and
 state 85).
 
-Type-9 handler `0x0056FE40`: item auras from stat 151; do core (…, 1, 1,
-0). Type-5 handler `0x0056D790`: `srvdo[states.srvactivefunc]` of the
-skill's aura state (1.14d: hurricane 145, armageddon 146, attached 147).
+Type-9 handler `0x0056FE40`: `sim/stat-lists.md` §10.3 (skill = arg2,
+L = total of stat 151 at layer = skill; do core (…, 1, 1, 0)). Type-5
+handler `0x0056D790`: calls `srvdo[states.srvactivefunc]` of the
+skill's aura state **directly** (ECX game, EDX unit; skill = arg1, L =
+arg2), not through the do core: no charge, item, aim, mana, missile or
+delay step (1.14d: hurricane 145, armageddon 146, attached 147).
 
 Passives: learning (0x3B, `skills/levels.md` §6.4) and refreshes call
 `0x0056DE40` → `0x00646F20`; stat math belongs to `sim/stats.md`.
@@ -438,11 +498,14 @@ their own (`combat/*`, `skills/levels.md`). The unit-seed reseeder
    0x005CB270, 0x005CB4D0, 0x005CBBF0, 0x005CC1D0, 0x005CC220,
    0x005CDF00, 0x005D0180, 0x005D1BF0, 0x005D2B20, 0x005D32F0,
    0x005D6330, 0x005D80C0, 0x005D8760, 0x005DA8B0) were read from the
-   raw disassembly (`tools/ghidra/disasm.py`); every one is
-   `spec'd-here` in `functions.tsv`, so no re-export is needed.
+   raw disassembly (`tools/ghidra/disasm.py at`, first checked on
+   0x0056CAB0 and 0x005DA8B0); every one is `spec'd-here` in
+   `functions.tsv` (open question 10), so no re-export is needed.
 2. Answered: srvdo slot 121 holds `0x005C8AD0`, and Rabies (id 238) is
    the only 1.14d `skills.txt` row with `srvdofunc` 121; its body is
-   `skills/bodies-2.md` §6.14.
+   `skills/bodies-2.md` §6.14. The 1.14d body does not follow D2MOO's
+   SrvDo121 (used-skill param check, `0x005C8980`, `apply_melee`
+   `0x0057D4F0`, `elem_len` `0x00644F20`, `0x005C7DB0`, `0x005C7C20`).
 3. Recording: hook `0x0056FAF0` entry/return and `0x0056F7F0` entry; cast
    a non-`TargetAlly` skill on a party member: does the do still run after
    start returned 0?

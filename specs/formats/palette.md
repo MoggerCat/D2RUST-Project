@@ -103,8 +103,9 @@ No Blizzard code or decompiler output was consulted.
 ## Open questions
 
 1. ~~Byte order of the PL2 base palette~~: R, G, B, x, and it is not
-   ignored: 1.14d presents it (`render/composition.md` §4). Whether it
-   equals the `.dat` colors is `composition.md` OQ1.
+   ignored: 1.14d presents it (`render/composition.md` §4). It equals
+   the `.dat` colors (B and R swapped) in all 17 live pairs, entry 0
+   black (`composition.md` §4 measurement).
 2. ~~Index order of the alpha / additive / multiplicative 256×256
    tables~~: the file stores `T[256·i + j]`; cel drawers read `i` =
    destination, `j` = source, the lit translucent wall drawer the
