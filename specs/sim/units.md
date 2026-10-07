@@ -27,18 +27,18 @@
 | Rules | 75–76 |
 |   1. Unit kinds | 77–96 |
 |   2. Unit record | 97–135 |
-|   3. Lifecycle | 136–316 |
-|   4. Modes and mode schedules | 317–678 |
-|   5. Event dispatch | 679–693 |
-|   6. Events per kind | 694–816 |
-|   7. Scheduler inventory (`unit-events.tsv`) | 817–838 |
-|   8. Collision line between two units | 839–843 |
-| Constants & data dependencies | 844–860 |
-| Randomness | 861–868 |
-| Edge cases & original bugs | 869–889 |
-| Test vectors | 890–949 |
-| Provenance | 950–1006 |
-| Open questions | 1007–1086 |
+|   3. Lifecycle | 136–378 |
+|   4. Modes and mode schedules | 379–740 |
+|   5. Event dispatch | 741–755 |
+|   6. Events per kind | 756–878 |
+|   7. Scheduler inventory (`unit-events.tsv`) | 879–900 |
+|   8. Collision line between two units | 901–905 |
+| Constants & data dependencies | 906–922 |
+| Randomness | 923–930 |
+| Edge cases & original bugs | 931–951 |
+| Test vectors | 952–1011 |
+| Provenance | 1012–1079 |
+| Open questions | 1080–1159 |
 <!-- /index -->
 
 ## Summary
@@ -153,6 +153,68 @@ fixed GUID):
 6. GUID: a monster with flags bit 2 takes the fixed GUID; every other
    unit draws one (`0x00552EE0`, `unit-order.md` §1.3).
 7. Per-kind init (§1 table).
+   7.1. Not linked yet (read 2026-10-07). Steps 1–7 put the unit in no
+      list and give it no room or position: `0x00620290` zero-fills the
+      record (0xF4 bytes; monster data 0x60 bytes), so the path (+0x2C)
+      of a player, monster or missile is 0, and the static path that
+      `0x00623520` allocates for an object, item or tile is zeroed
+      (room 0, x = y = 0). Room and position are written only by
+      `SUNIT_Add` (step 8): path `0x00649D00(…, room, x, y, unit, 0)`
+      (types 0, 1, 3) or static position `0x00620AE0(unit, room, x, y)`
+      (types 2, 5, item mode 3), then room-list insert, hash insert
+      `0x00553060` and update queue `0x0064C040` (`unit-order.md` §3.1).
+      During step 7 the unit's room (`0x00620BB0`) is 0 for every kind.
+   7.2. Room and level source: the allocation's `room` argument (stack
+      argument 4), the value step 3 takes the act from and step 8 passes
+      to `SUNIT_Add`; no per-kind init reads the unit's own room or
+      position.
+      - Monster `0x00574250` (ECX game, EDX room; stack unit, GUID; no
+        x/y): room → region data `0x00547BC0(game +0xF0, room, unit)`;
+        → stats and skills `0x00573CB0(game, room, …)` (level from
+        `0x0061A1B0(room)`, `monsters/init.md` §7; player-count bonus
+        `0x00573930(room, unit)`); monster data +0x58 :=
+        `0x0061A1B0(room)` (level id); mode ≠ 0, 12 → quest chain
+        `0x00545CD0(game, unit, room, 1)` (level record of
+        `0x0061A1B0(room)`). `monsters/init.md` §5 owns the steps.
+      - Object `0x0054F5D0` (ECX game, EDX unit; stack GUID, room, x,
+        y): room, x and y go only into the InitFn record {game, object,
+        room, control, objects record, x, y} (`world/objects.md` §3
+        step 6); the control getter `0x00546FA0` ignores the room. An
+        InitFn that needs the level or the position reads it from the
+        record.
+   7.3. The unit's own (empty) placement as seen by an init: a mode set
+      inside the init (`0x00624690`: monster mode 0 / 12 through
+      `0x00553570`, and many object InitFns) calls `0x0064C040`, which
+      finds room 0 and queues nothing (step 8 queues). The monster's
+      `0x005533D0` finds +0x2C = 0 and takes the `0x00620F00` branch,
+      not `0x00623F50`. HaremBlocker (InitFn 30, `0x0059B7D0`) in quest
+      mode 2 frees its footprint (`0x00623830`) at room 0, (0, 0):
+      `0x0064DC00` → `0x00463740(room 0)` returns 0, no collision change.
+   7.4. Unit lists read by a per-kind init: never a room unit list
+      (room +0x74) or the update queue; only game hash lists
+      (`unit-order.md` §2), and never for this unit except CountessChest:
+      - Monster: player count `0x00535790` walks the player hash (game
+        +0x1120, `0x005538D0`); monequip (`0x005D6B60` → `0x00573B20` →
+        `0x005606B0`) looks up the item it just created in the item hash
+        (`0x00552F60(game, 4, GUID)`).
+      - CountessChest (InitFn 47, `0x00595A50`) appends its own GUID to
+        the quest's chest list, then `0x005954F0` looks every listed
+        GUID up in the object hash (`0x00552F60(…, 2, …)`) and reads the
+        room and position (`0x00620BB0`, `0x00620870`) of each one
+        found. The new chest is not linked yet, so its own lookup fails
+        and it is skipped.
+      - HratliStart (49, `0x005B70B0`), NatalyaStart (52, `0x005BCE80`):
+        a monster by stored GUID (`0x00552F60(…, 1, …)`). Zoo (79,
+        `0x0058E830`) and `0x00544300` (CagedWussie 62, HellForge 48,
+        FrozenAnya 74): walk the player / monster hashes (`0x005537D0`,
+        game +0x1120, +0x1320).
+   7.5. Units created inside a per-kind init (monster spawns of object
+      InitFns through `0x005B2F20` / `0x005B3090` → `0x005B2A00`, which
+      adds them, `monsters/init.md` §4; GoldPlaceHolder's item; monequip
+      items) are allocated, and spawned monsters linked, before this
+      unit's step 8. This unit's GUID was drawn first (step 6); its
+      room-list insert comes after theirs (prepend: it ends up ahead of
+      them in the room list).
 8. Flags & 0x1 (`0x00555443`): `SUNIT_Add` `0x00554850(unit, x, y,
    game, room, 1)` (`unit-order.md` §3.1), after the per-kind init of
    step 7; its result is not tested. Then a player in mode 0 or 17, or a
@@ -949,6 +1011,17 @@ AI from AI functions, everything in "not yet observed" (open question 1).
 
 ## Provenance
 
+- §3.1 steps 7.1–7.5 (2026-10-07): `all.asm` `0x00555230` jump-table
+  cases (argument registers at `0x00555393`, `0x005553ED`), `0x00574250`,
+  `0x0054F5D0`, `0x00554850`, `0x00620290`, `0x00623520`, `0x00620AE0`,
+  `0x00620BB0`, `0x0064C040`, `0x005533D0`, `0x00623830`, `0x0064DC00`,
+  `0x00463740`; list reads found by a call-graph walk (depth 3–4) from
+  `0x00574250` and every InitFn of `world/object-functions.tsv` for calls
+  to `0x00620BB0`, `0x00620870`, `0x00552F60`, the room-list routines and
+  references to room +0x74 / unit +0xE4, +0xE8 / game +0x1120…+0x1B20,
+  each hit read (`0x005954F0`, `0x005B70B0`, `0x005BCE80`, `0x005537D0`,
+  `0x005538D0`, `0x005606B0`, `0x005435C0` = quest list, not a unit
+  list; `0x0058EAC0` +0xE8 = quest data).
 - §4.6 death functions (2026-10-08): `all.asm` `0x005A6FF0`,
   `0x005A6520`, `0x005A6DF0`, `0x005A6EB0`; `disasm.py at 0x5A72B0` for
   `0x005A72B0`, `0x005A7350`, `0x005A7390` (not in the export); monstats
