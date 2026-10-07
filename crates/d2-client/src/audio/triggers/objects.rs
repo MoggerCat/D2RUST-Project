@@ -72,14 +72,12 @@ pub fn object_mode(
     } else {
         0
     };
-    let reqs = cx.s.unit_requests(u.key);
     if s != 0 {
-        let base = cx.s.group_base(s);
-        if !reqs.iter().any(|&(_, id)| cx.s.group_base(id) == base) {
+        if !super::request_in_group(&*cx.s, u.key, s) {
             cx.req(s, Some(u.key), 0);
         }
     } else {
-        for (h, id) in reqs {
+        for (h, id) in cx.s.unit_requests(u.key) {
             if cx.s.looping(id) {
                 cx.s.detach(h, u.key, false);
             }
@@ -99,4 +97,106 @@ pub fn object_mode(
     us.obj_prev_mode = m;
     us.obj_seen = true;
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// triggers-2.md §20: when object units make their mode sounds
+// ---------------------------------------------------------------------------
+
+/// Entries of the client object function table `0x007277F0`; a `ClientFn`
+/// at or above it is fatal (`0x546`) (§20 r1).
+pub const CLIENT_FN_COUNT: u8 = 19;
+/// `ClientFn` of the keeper (class 568), §20 r2.
+pub const CLIENT_FN_KEEPER: u8 = 18;
+/// `barbarian_grunt_small_1` (§20 r2).
+pub const KEEPER_GRUNT: i32 = 2505;
+
+/// The client object function `0x004BDEE0` for the functions that make
+/// the mode sound call themselves (§20 r2): `ClientFn` 3 calls it and
+/// returns 1 (so the update calls it again: twice); 4, 5, 6 call it and
+/// return 0 (once); case 0 returns 1 at once; other functions make no
+/// call here. Returns the function's return value.
+pub fn client_function_sound(
+    cx: &mut Ctx,
+    table: &ObjectSounds,
+    u: &Unit,
+    us: &mut UnitSound,
+    client_fn: u8,
+) -> Result<bool, TriggerError> {
+    match client_fn {
+        3 => {
+            object_mode(cx, table, u, us)?;
+            Ok(true)
+        }
+        4..=6 => {
+            object_mode(cx, table, u, us)?;
+            Ok(false)
+        }
+        0 => Ok(true),
+        _ => Ok(false),
+    }
+}
+
+/// §20 r1: the object part of a client update, after the light update.
+/// `ClientFn` ≤ 3 → the mode sound call; ≥ 4 → the client object function
+/// first (≥ 19 fatal), then the mode sound call only if it returned
+/// non-zero. `client_fn_result` is that function's result for the
+/// functions this module does not own (`client_function_sound` covers 3–6).
+pub fn object_update_sounds(
+    cx: &mut Ctx,
+    table: &ObjectSounds,
+    u: &Unit,
+    us: &mut UnitSound,
+    client_fn: u8,
+    client_fn_result: bool,
+) -> Result<(), TriggerError> {
+    if client_fn <= 3 {
+        return object_mode(cx, table, u, us);
+    }
+    if client_fn >= CLIENT_FN_COUNT {
+        return Err(TriggerError::ClientFn(client_fn));
+    }
+    let r = match client_fn {
+        4..=6 => client_function_sound(cx, table, u, us, client_fn)?,
+        _ => client_fn_result,
+    };
+    if r {
+        object_mode(cx, table, u, us)?;
+    }
+    Ok(())
+}
+
+/// §20 r4: the client-only (C) object walk runs the client function once
+/// more for type-2 units, for every `ClientFn`.
+pub fn client_only_second_call(
+    cx: &mut Ctx,
+    table: &ObjectSounds,
+    u: &Unit,
+    us: &mut UnitSound,
+    client_fn: u8,
+) -> Result<bool, TriggerError> {
+    client_function_sound(cx, table, u, us, client_fn)
+}
+
+/// `ClientFn` 18 (`0x004BDD50`, §20 r2): when `GetTickCount` > U+0xD4
+/// (unsigned), one step of U's own seed r1; r1 mod 100 < 10 (low dword,
+/// unsigned) → request 2,505 on U; a second step r2; U+0xD4 :=
+/// `GetTickCount` + (r2 mod 60) × 1,000. `step` is the seed step (low
+/// dword). Wall-clock driven.
+pub fn keeper_grunt(
+    cx: &mut Ctx,
+    u: &Unit,
+    now_ms: u32,
+    next_ms: &mut u32,
+    step: &mut dyn FnMut() -> u32,
+) {
+    if now_ms <= *next_ms {
+        return;
+    }
+    let r1 = step();
+    if r1 % 100 < 10 {
+        cx.req(KEEPER_GRUNT, Some(u.key), 0);
+    }
+    let r2 = step();
+    *next_ms = now_ms.wrapping_add((r2 % 60).wrapping_mul(1000));
 }

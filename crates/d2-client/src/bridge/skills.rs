@@ -196,36 +196,57 @@ pub fn select(
     Ok(())
 }
 
-/// Remove `0x00646FD0` (§2 rule 2.2): the native entry's passive state
-/// off, a left / right reference to it reset to (skill 0, native), a
-/// current reference cleared, then the entry is unlinked.
-pub fn remove(list: &mut SkillList, rows: &[SkillRow], skill: u16) -> Result<(), SkillError> {
+/// Remove `0x00646FD0(unit, s, d)` (§2 rules 2.2, 5, 6). In order: the
+/// passive state off; a left or right hand on the native entry of `s`
+/// is selected back to (skill 0, native) (rule 3: not found → the hand
+/// stays); a current reference to it is cleared. Then the native entry:
+/// none → refresh only; `d` false → unlinked and freed; `d` true → its
+/// base −= 1 and it is unlinked and freed only when the base is now
+/// below 1. A hand left on a freed entry is refused (rule 6): the list
+/// is then unchanged ([`SkillError::Dangling`]).
+pub fn remove(
+    list: &mut SkillList,
+    rows: &[SkillRow],
+    skill: u16,
+    d: bool,
+) -> Result<(), SkillError> {
     let Some(i) = list.native(skill) else {
-        return Ok(());
+        return refresh(rows, skill);
     };
     let state_off = refresh(rows, skill);
-    if list.left == Some(i) {
-        select(list, rows, true, 0, NATIVE)?;
+    let mut w = list.clone();
+    if w.left == Some(i) {
+        select(&mut w, rows, true, 0, NATIVE)?;
     }
-    if list.right == Some(i) {
-        select(list, rows, false, 0, NATIVE)?;
+    if w.right == Some(i) {
+        select(&mut w, rows, false, 0, NATIVE)?;
     }
-    if list.current == Some(i) {
-        list.current = None;
+    if w.current == Some(i) {
+        w.current = None;
     }
-    if list.left == Some(i) || list.right == Some(i) {
-        return Err(SkillError::Dangling);
-    }
-    list.entries.remove(i);
-    for j in [&mut list.left, &mut list.right, &mut list.current]
-        .into_iter()
-        .flatten()
-    {
-        if *j > i {
-            *j -= 1;
+    let free = if d {
+        w.entries[i].base -= 1;
+        w.entries[i].base < 1
+    } else {
+        true
+    };
+    if free {
+        if w.left == Some(i) || w.right == Some(i) {
+            return Err(SkillError::Dangling);
+        }
+        w.entries.remove(i);
+        for j in [&mut w.left, &mut w.right, &mut w.current]
+            .into_iter()
+            .flatten()
+        {
+            if *j > i {
+                *j -= 1;
+            }
         }
     }
-    state_off
+    *list = w;
+    state_off?;
+    refresh(rows, skill)
 }
 
 /// Assign `0x00647280(unit, skill, level, remove)` (§2 rule 2).
@@ -248,8 +269,8 @@ pub fn assign(
         return refresh(rows, skill);
     }
     if remove_flag {
-        remove(list, rows, skill)?;
-        return refresh(rows, skill);
+        // `0x00646FD0` with d = the remove flag (§2 rule 5); it refreshes.
+        return remove(list, rows, skill, true);
     }
     let e = match list.native(skill) {
         Some(i) => Some(i),
@@ -265,6 +286,99 @@ pub fn assign(
     refresh(rows, skill)
 }
 
+/// The native entry after the add path of the level-bonus writers
+/// (§2 rule 7.1): add, look the native entry up again, adding once more
+/// when still none; a found entry gets base 0 and a refresh.
+fn add_for_bonus(
+    list: &mut SkillList,
+    rows: &[SkillRow],
+    unit: Owner,
+    skill: u16,
+) -> (Option<usize>, Result<(), SkillError>) {
+    let mut r = add(list, rows, unit, skill).map(|_| ());
+    let mut e = list.native(skill);
+    if e.is_none() {
+        let r2 = add(list, rows, unit, skill).map(|_| ());
+        r = r.and(r2);
+        e = list.native(skill);
+    }
+    if let Some(i) = e {
+        list.entries[i].base = 0;
+        r = r.and(refresh(rows, skill));
+    }
+    (e, r)
+}
+
+/// Set `0x00647AA0(unit, skill, v)` (§2 rule 7.1): the native entry's
+/// level bonus := `v`. No entry and `v` ≤ 0 → nothing; no entry and
+/// `v` > 0 → the add path ([`add_for_bonus`]). Then the bonus is
+/// written and the skill refreshed.
+pub fn set_bonus(
+    list: &mut SkillList,
+    rows: &[SkillRow],
+    unit: Owner,
+    skill: u16,
+    v: i32,
+) -> Result<(), SkillError> {
+    bonus_write(list, rows, unit, skill, v, |_, v| v, true)
+}
+
+/// Add `0x00647B20(unit, skill, v)` (§2 rule 7.2): as [`set_bonus`] with
+/// bonus += `v`, a negative result clamped to 0, and no refresh after
+/// the write.
+pub fn add_bonus(
+    list: &mut SkillList,
+    rows: &[SkillRow],
+    unit: Owner,
+    skill: u16,
+    v: i32,
+) -> Result<(), SkillError> {
+    bonus_write(list, rows, unit, skill, v, |old, v| (old + v).max(0), false)
+}
+
+fn bonus_write(
+    list: &mut SkillList,
+    rows: &[SkillRow],
+    unit: Owner,
+    skill: u16,
+    v: i32,
+    f: impl Fn(i32, i32) -> i32,
+    refresh_after: bool,
+) -> Result<(), SkillError> {
+    let (e, mut r) = match list.native(skill) {
+        Some(i) => (Some(i), Ok(())),
+        None if v <= 0 => return Ok(()),
+        None => add_for_bonus(list, rows, unit, skill),
+    };
+    if let Some(i) = e {
+        list.entries[i].level_bonus = f(list.entries[i].level_bonus, v);
+        if refresh_after {
+            r = r.and(refresh(rows, skill));
+        }
+    }
+    r
+}
+
+/// Split level (§2 rule 7.3): with M := `maxlvl` of the skill (≤ 0 or no
+/// row → 20) and a level `l`: `l` > M → assign (skill, M, remove 0) then
+/// set the bonus to `l` − M; else assign (skill, `l`, remove 0) and the
+/// bonus keeps its old value.
+pub fn split_level(
+    list: &mut SkillList,
+    rows: &[SkillRow],
+    unit: Owner,
+    skill: u16,
+    l: i32,
+) -> Result<(), SkillError> {
+    let m = row(rows, skill).map_or(20, max_level);
+    if l > m {
+        let a = assign(list, rows, unit, skill, m, false);
+        a.and(set_bonus(list, rows, unit, skill, l - m))
+    } else {
+        assign(list, rows, unit, skill, l, false)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -278,7 +392,7 @@ mod tests {
         class: 0,
     };
 
-    // Covers: specs/client/msg-skills.md §2 r1
+    // Covers: specs/client/msg-skills.md §2 r1, §1 r3
     #[test]
     fn add_appends_then_raises_up_to_max_level() {
         let mut t = rows(4);
@@ -405,5 +519,155 @@ mod tests {
         );
         assert_eq!(l.entries.len(), 1, "the list itself is updated");
         assert_eq!(refresh(&t, 2), Ok(()));
+    }
+
+    fn entry(skill: u16, base: i32, owner: u32) -> SkillEntry {
+        SkillEntry {
+            skill,
+            base,
+            owner,
+            ..SkillEntry::default()
+        }
+    }
+
+    // Covers: specs/client/msg-skills.md §1 r4
+    #[test]
+    fn the_entry_of_skill_and_owner_is_the_first_in_list_order() {
+        let l = SkillList {
+            entries: vec![entry(5, 1, 77), entry(5, 2, NATIVE), entry(5, 3, NATIVE)],
+            ..SkillList::default()
+        };
+        assert_eq!(l.find(5, NATIVE), Some(1));
+        assert_eq!(l.native(5), Some(1));
+        assert_eq!(l.find(5, 77), Some(0));
+        assert_eq!(l.find(5, 78), None);
+        assert_eq!(l.find(6, NATIVE), None);
+    }
+
+    // Covers: specs/client/msg-skills.md §2 r5
+    #[test]
+    fn remove_with_d_decrements_and_frees_below_one() {
+        let t = rows(40);
+        let list = |hand: Option<usize>| SkillList {
+            entries: vec![
+                entry(0, 1, NATIVE),
+                entry(7, 3, NATIVE),
+                entry(8, 1, NATIVE),
+            ],
+            left: hand,
+            right: hand,
+            current: hand,
+        };
+        // d = 0: unlinked and freed whatever the base; hands reset to
+        // skill 0, current cleared.
+        let mut l = list(Some(1));
+        remove(&mut l, &t, 7, false).unwrap();
+        assert_eq!(
+            l.entries.iter().map(|e| e.skill).collect::<Vec<_>>(),
+            [0, 8]
+        );
+        assert_eq!((l.left, l.right, l.current), (Some(0), Some(0), None));
+        // d != 0, base 3: base 2, nothing freed, hands still reset.
+        let mut l = list(Some(1));
+        remove(&mut l, &t, 7, true).unwrap();
+        assert_eq!(l.entries.len(), 3);
+        assert_eq!(l.entries[1].base, 2);
+        assert_eq!((l.left, l.right, l.current), (Some(0), Some(0), None));
+        // d != 0, base 1: base 0 < 1, freed (indices after it shift).
+        let mut l = list(Some(2));
+        remove(&mut l, &t, 8, true).unwrap();
+        assert_eq!(l.entries.len(), 2);
+        assert_eq!((l.left, l.right), (Some(0), Some(0)));
+        // No native entry: nothing but the refresh (Ok for no passive).
+        let mut l = list(None);
+        remove(&mut l, &t, 9, true).unwrap();
+        assert_eq!(l, list(None));
+        // A passive state: the list is updated, then the error.
+        let mut tp = rows(40);
+        tp[7].passivestate = 3;
+        let mut l = list(None);
+        assert_eq!(
+            remove(&mut l, &tp, 7, true),
+            Err(SkillError::PassiveState { skill: 7, state: 3 })
+        );
+        assert_eq!(l.entries[1].base, 2);
+        // No list entries at all: nothing.
+        let mut e = SkillList::default();
+        remove(&mut e, &t, 7, true).unwrap();
+        assert!(e.entries.is_empty());
+    }
+
+    // Covers: specs/client/msg-skills.md §2 r6
+    #[test]
+    fn a_hand_left_on_a_freed_entry_is_refused_and_the_list_unchanged() {
+        let t = rows(40);
+        // (a) no native skill-0 entry: select (0, native) finds nothing.
+        let l0 = SkillList {
+            entries: vec![entry(7, 1, NATIVE), entry(8, 1, NATIVE)],
+            left: Some(0),
+            right: Some(1),
+            current: Some(0),
+        };
+        let mut l = l0.clone();
+        assert_eq!(remove(&mut l, &t, 7, false), Err(SkillError::Dangling));
+        assert_eq!(l, l0, "refused: the model is unchanged");
+        // (b) s = 0: the select finds the entry being removed.
+        let l1 = SkillList {
+            entries: vec![entry(0, 1, NATIVE), entry(8, 1, NATIVE)],
+            left: Some(0),
+            right: Some(1),
+            current: None,
+        };
+        let mut l = l1.clone();
+        assert_eq!(remove(&mut l, &t, 0, false), Err(SkillError::Dangling));
+        assert_eq!(l, l1);
+        // With d != 0 and the base still >= 1 after the decrement nothing
+        // is freed and the hand stays valid.
+        let mut l2 = l1.clone();
+        l2.entries[0].base = 2;
+        remove(&mut l2, &t, 0, true).unwrap();
+        assert_eq!(
+            (l2.entries.len(), l2.entries[0].base, l2.left),
+            (2, 1, Some(0))
+        );
+    }
+
+    // Covers: specs/client/msg-skills.md §2 r7
+    #[test]
+    fn level_bonus_set_add_and_split() {
+        let mut t = rows(6);
+        t[2].maxlvl = 10;
+        let mut l = SkillList::default();
+        // Set with no entry and v <= 0: nothing.
+        set_bonus(&mut l, &t, PLAYER0, 2, 0).unwrap();
+        assert!(l.entries.is_empty());
+        // v > 0 adds the entry, base := 0, bonus := v.
+        set_bonus(&mut l, &t, PLAYER0, 2, 3).unwrap();
+        assert_eq!((l.entries[0].base, l.entries[0].level_bonus), (0, 3));
+        // Set overwrites; add accumulates and clamps at 0.
+        set_bonus(&mut l, &t, PLAYER0, 2, 1).unwrap();
+        assert_eq!(l.entries[0].level_bonus, 1);
+        add_bonus(&mut l, &t, PLAYER0, 2, 4).unwrap();
+        assert_eq!(l.entries[0].level_bonus, 5);
+        add_bonus(&mut l, &t, PLAYER0, 2, -9).unwrap();
+        assert_eq!(l.entries[0].level_bonus, 0);
+        // Add with no entry and v <= 0: nothing; v > 0: the entry with
+        // base 0 and bonus v.
+        add_bonus(&mut l, &t, PLAYER0, 3, -2).unwrap();
+        assert!(l.native(3).is_none());
+        add_bonus(&mut l, &t, PLAYER0, 3, 2).unwrap();
+        let e3 = l.entries[l.native(3).unwrap()];
+        assert_eq!((e3.base, e3.level_bonus), (0, 2));
+        // Split level: above maxlvl (10) the excess is the bonus.
+        let mut l = SkillList::default();
+        split_level(&mut l, &t, PLAYER0, 2, 14).unwrap();
+        assert_eq!((l.entries[0].base, l.entries[0].level_bonus), (10, 4));
+        // At or below: assign only, the old bonus is kept.
+        split_level(&mut l, &t, PLAYER0, 2, 7).unwrap();
+        assert_eq!((l.entries[0].base, l.entries[0].level_bonus), (7, 4));
+        // maxlvl <= 0 means 20; a skill with no row: 20.
+        let mut l = SkillList::default();
+        split_level(&mut l, &t, PLAYER0, 4, 25).unwrap();
+        assert_eq!((l.entries[0].base, l.entries[0].level_bonus), (20, 5));
     }
 }

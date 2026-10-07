@@ -4,6 +4,9 @@
 //! owning features' (open question 10).
 
 use super::Ctx;
+use crate::audio::calls::Handle;
+use crate::audio::sound_table::volume::ftol;
+use crate::bridge::world::UnitKey;
 
 /// §11 UI sound ids (`client/ui.md` §B8 owns which control is which).
 pub mod id {
@@ -88,4 +91,124 @@ pub mod fixed {
     pub const DRUID_POD_DEATH: i32 = 790;
     pub const BARBARIAN_LEAP_LAND: i32 = 2517;
     pub const SPIDER_WEB_1: i32 = 1830;
+}
+
+// ---------------------------------------------------------------------------
+// §12 conditions
+// ---------------------------------------------------------------------------
+
+/// §12 r1: `0x00464E50(U, overlay o, n)` after it created overlay `o` on
+/// U: o = 151 → 396 `impact_steal_life`, o = 152 → 397
+/// `impact_steal_mana`, on U.
+pub fn impact_overlay(cx: &mut Ctx, unit: UnitKey, overlay: i32) {
+    match overlay {
+        151 => cx.req(fixed::IMPACT_STEAL_LIFE, Some(unit), 0),
+        152 => cx.req(fixed::IMPACT_STEAL_MANA, Some(unit), 0),
+        _ => 0,
+    };
+}
+
+/// Volume step of the quake loop per call (§12 r2).
+pub const QUAKE_STEP: i32 = 6;
+
+/// §12 r2 state: `[0x007B8D2C]`, the quake loop request (0 = none).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct QuakeLoop {
+    pub handle: Handle,
+}
+
+impl QuakeLoop {
+    /// The shake level `l = trunc(a × 255 / 20)` clamped to 0–255 (a = the
+    /// shake amplitude of `render/camera.md` §8).
+    pub fn level(amplitude: f32) -> i32 {
+        ftol(amplitude * 255.0 / 20.0).clamp(0, 255)
+    }
+
+    /// `0x004769D0` (called twice per drawn frame): with no loop request
+    /// and l > 0, request 452 with no unit and volume := l; with a
+    /// request, its volume moves toward l by at most 6 (a gone request
+    /// reads 0); a new volume of 0 stops the request and clears the
+    /// state, otherwise volume := the new value. Wall-clock driven by the
+    /// shake envelope.
+    pub fn update(&mut self, cx: &mut Ctx, amplitude: f32) {
+        let l = Self::level(amplitude);
+        if self.handle == 0 {
+            if l > 0 {
+                self.handle = cx.req(fixed::ANDARIEL_QUAKE_LOOP, None, 0);
+                cx.s.set_volume(self.handle, l);
+            }
+            return;
+        }
+        let w = cx.s.request_volume(self.handle).unwrap_or(0);
+        let w = if w < l {
+            (w + QUAKE_STEP).min(l)
+        } else {
+            (w - QUAKE_STEP).max(l)
+        };
+        if w == 0 {
+            cx.s.stop_handle(self.handle);
+            self.handle = 0;
+        } else {
+            cx.s.set_volume(self.handle, w);
+        }
+    }
+}
+
+/// §12 r3 (`0x0049D010`): the waypoint panel row choice plays 2,231
+/// `player_townportal_enter`, no unit.
+pub fn waypoint_row_chosen(cx: &mut Ctx) {
+    cx.req(fixed::PLAYER_TOWNPORTAL_ENTER, None, 0);
+}
+
+/// §12 r4 (`0x0049FBA0`): the deciphered Scroll of Inifuss panel.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct InifussPanel {
+    /// The step counter.
+    pub counter: u32,
+    /// `GetTickCount` of the last step (ms).
+    pub last_ms: u32,
+    /// Per symbol, the counter value at its start (`0x00722F08 + 4i`).
+    pub starts: [u32; 5],
+}
+
+/// Wall-clock gap of a panel step (ms; strictly more advances).
+pub const INIFUSS_STEP_MS: u32 = 50;
+
+impl InifussPanel {
+    /// One panel update at wall-clock `now_ms`: the counter advances when
+    /// more than 50 ms passed since the last step; on a step, each of the
+    /// 5 symbols whose counter − start = 1 plays 2,671 (no unit).
+    pub fn update(&mut self, cx: &mut Ctx, now_ms: u32) {
+        if now_ms.wrapping_sub(self.last_ms) <= INIFUSS_STEP_MS {
+            return;
+        }
+        self.last_ms = now_ms;
+        self.counter = self.counter.wrapping_add(1);
+        for i in 0..5 {
+            if self.counter.wrapping_sub(self.starts[i]) == 1 {
+                cx.req(fixed::SHRINE_PORTAL, None, 0);
+            }
+        }
+    }
+}
+
+/// S→C 0x5A EventMessage type of the Diablo taunt (§12 r5).
+pub const EVENT_MESSAGE_DIABLO: u8 = 18;
+
+/// §12 r5 (`0x0049EB10`): EventMessage type 18 plays 4,640
+/// `monster_diablo_taunt_ex`, no unit (the file is missing: silent).
+pub fn event_message_sound(cx: &mut Ctx, message_type: u8) {
+    if message_type == EVENT_MESSAGE_DIABLO {
+        cx.req(fixed::MONSTER_DIABLO_TAUNT_EX, None, 0);
+    }
+}
+
+/// §12 r6 (`0x004D6540`): client missile function 37 (missile 372 `diablo
+/// appears`). Returns whether a screen shake starts (frames left 150);
+/// at frames left 50 it requests 4,638, no unit.
+pub fn diablo_appears(cx: &mut Ctx, frames_left: u32) -> bool {
+    if frames_left == 50 {
+        cx.req(fixed::MONSTER_DIABLO_TAUNT_1, None, 0);
+    }
+    frames_left == 150
 }

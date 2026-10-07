@@ -1716,6 +1716,13 @@ impl crate::audio::triggers::TriggerSound for SoundCtx<'_> {
         self.sys.table.base(id)
     }
 
+    fn group_size(&self, base: i32) -> i32 {
+        self.sys
+            .table
+            .get(base)
+            .map_or(0, |e| i32::from(e.group_size))
+    }
+
     fn looping(&self, id: i32) -> bool {
         self.sys.table.get(id).is_some_and(|e| e.row.looped != 0)
     }
@@ -1733,5 +1740,9 @@ impl crate::audio::triggers::TriggerSound for SoundCtx<'_> {
         self.sys
             .table
             .pick_variant(id, &mut |n| SoundSystem::roll(world, n))
+    }
+
+    fn request_volume(&self, h: Handle) -> Option<i32> {
+        self.sys.request_by_handle(h).map(|r| r.volume)
     }
 }

@@ -350,8 +350,10 @@ impl NpcSpeech {
         T.get_or_init(|| NpcSpeech::parse(NPC_SPEECH_TSV).expect("npc-speech.tsv"))
     }
 
-    /// Sound of the first row whose key = `key` (first wins), else 0.
+    /// Sound of the first row whose key = the 16-bit `key` (first wins),
+    /// else 0 (§10 r6, `0x004E0650`).
     pub fn sound(&self, key: i32) -> i32 {
+        let key = i32::from(key as u16);
         self.rows
             .iter()
             .find(|r| r.key == key)

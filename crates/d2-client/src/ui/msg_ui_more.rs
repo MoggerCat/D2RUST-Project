@@ -27,8 +27,6 @@ pub mod skip {
         "0x52: 0x00483350 and the tab rebuild 0x004A23D0 / 0x004A3220 (msg-ui §13 r2; ui/*)";
     pub const MERC_MENU: &str =
         "0x9B: the NPC-menu edit 0x004B6440 (ui/panels.md §14; msg-ui §15 r2)";
-    pub const CHAT_LINE: &str =
-        "0x26: the chat line / screen message of the type (msg-ui §4 r3.4; ui/*)";
     pub const CHAT_FILTER: &str =
         "0x26: the text filter object 0x00611560 (msg-ui §4 r3.2) is not specified: nothing is filtered";
 }

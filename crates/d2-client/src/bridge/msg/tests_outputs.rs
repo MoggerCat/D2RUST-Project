@@ -41,7 +41,7 @@ fn skills_of(m: &Model) -> Vec<(u16, i32, u32)> {
 const A_273: &str = "94 0a 01 00 00 00 00 00 01 02 00 01 01 00 01 d9 00 01 da 00 01 db 00 01 \
                      dc 00 01 04 00 01 05 00 01 03 00 01";
 
-// Covers: specs/client/msg-skills.md §3 r1, §3 r2, §1 r2
+// Covers: specs/client/msg-skills.md §3 r1, §3 r2, §3 r3, §1 r2
 #[test]
 fn base_skill_levels_a273() {
     let mut m = with_player(221);
@@ -449,4 +449,52 @@ fn darkness_object_day_refresh() {
     m.hex("53 02 00 00 00 00 00 00 00 00");
     assert_eq!((m.unit(fire).mode, lights(&m)), (0, before));
     assert!(m.log.rejected.is_empty());
+}
+
+// Covers: specs/client/msg-skills.md §1 r5
+#[test]
+fn the_local_players_skills_come_from_four_messages() {
+    let mut m = with_player(221);
+    // 0x94: native entries and levels (join).
+    m.hex("94 02 01 00 00 00 00 00 01 db 00 02");
+    // 0x21: a later change of a native level.
+    m.hex("21 00 00 01 00 00 00 db 00 05 01 05");
+    // 0x22: the quantity of a tome / scroll skill.
+    m.hex("22 00 19 01 00 00 00 db 00 03 41 00");
+    // 0x23: left and right.
+    m.hex("23 00 01 00 00 00 01 db 00 ff ff ff ff");
+    let l = m.unit(P1).skills.clone().unwrap();
+    let e = l.entries[l.native(219).unwrap()];
+    assert_eq!((e.base, e.quantity), (5, 3));
+    assert_eq!(l.left_entry().map(|e| e.skill), Some(219));
+    assert_eq!(l.right, None, "right unchanged");
+    assert!(m.log.rejected.is_empty());
+}
+
+// Covers: specs/client/msg-skills.md §edge-cases-original-bugs
+#[test]
+fn skill_message_edge_cases() {
+    let mut m = with_player(221);
+    // 0x94 with level 0 creates the entry at base 0.
+    m.hex("94 01 01 00 00 00 24 00 00");
+    assert_eq!(skills_of(&m), [(36, 0, NATIVE)]);
+    // 0x21 with level 0 and the remove flag deletes it.
+    m.hex("21 00 01 01 00 00 00 24 00 00 00 00");
+    assert!(skills_of(&m).is_empty());
+    // 0x22 and 0x23 ignore the unit-type byte: players only.
+    m.hex("94 01 01 00 00 00 db 00 01");
+    m.hex("22 07 19 01 00 00 00 db 00 04 41 00");
+    m.hex("23 05 01 00 00 00 01 db 00 ff ff ff ff");
+    let l = m.unit(P1).skills.clone().unwrap();
+    assert_eq!(l.entries[0].quantity, 4);
+    assert_eq!(l.left_entry().map(|e| e.skill), Some(219));
+    // The bytes the sender never writes are not read: 0x22 @2 / @10 and
+    // 0x21 @10 / @11 vary without effect.
+    let before = m.w.clone();
+    m.hex("22 00 55 01 00 00 00 db 00 04 99 00");
+    m.hex("21 00 00 01 00 00 00 db 00 01 77 66");
+    assert_eq!(skills_of(&m), [(219, 1, NATIVE)]);
+    assert_eq!(m.unit(P1).skills.as_ref().unwrap().entries[0].quantity, 4);
+    assert_eq!(m.w, before, "the unread bytes change nothing");
+    // A monster's add may exceed max_level (checked on the list: skills.rs).
 }
