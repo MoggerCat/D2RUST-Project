@@ -26,32 +26,42 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 57–69 |
-| Inputs | 70–79 |
-| Outputs / state changes | 80–86 |
-| Rules | 87–88 |
-|   1. Scope and order | 89–114 |
-|   2. Shared pet helpers | 115–220 |
-|   3. NecroPet (67) `0x005E4CF0` | 221–269 |
-|   4. MinionSpawner (121) `0x005E2BD0`, init `0x005F6630` | 270–289 |
-|   5. Towner (41) `0x005E7540` | 290–303 |
-|   6. EvilHole (76) `0x005FB410` | 304–331 |
-|   7. Hireable (61) `0x005E52D0`, alternate `0x005E5280` | 332–450 |
-|   8. QuillMother (75) `0x005FB2A0` | 451–465 |
-|   9. BaalTentacle (139) `0x005EF820` | 466–479 |
-|   10. ElementalBeast (46) `0x005F6B70` | 480–498 |
-|   11. NpcStationary (54) `0x005E73A0` | 499–526 |
-|   12. MosquitoNest (83) `0x005E0260` | 527–544 |
-|   13. DesertTurret (94) `0x005E0980` | 545–583 |
-|   14. AssassinSentry (101) `0x005EA3D0`, init `0x005EA290` | 584–618 |
-|   15. Catapult (123) `0x005E34C0` | 619–623 |
-|   16. CatapultSpotter (126) `0x005EE040` | 624–662 |
-| Constants & data dependencies | 663–681 |
-| Randomness | 682–690 |
-| Edge cases & original bugs | 691–699 |
-| Test vectors | 700–720 |
-| Provenance | 721–743 |
-| Open questions | 744–751 |
+| Summary | 67–79 |
+| Inputs | 80–89 |
+| Outputs / state changes | 90–96 |
+| Rules | 97–98 |
+|   1. Scope and order | 99–134 |
+|   2. Shared pet helpers | 135–240 |
+|   3. NecroPet (67) `0x005E4CF0` | 241–289 |
+|   4. MinionSpawner (121) `0x005E2BD0`, init `0x005F6630` | 290–309 |
+|   5. Towner (41) `0x005E7540` | 310–323 |
+|   6. EvilHole (76) `0x005FB410` | 324–351 |
+|   7. Hireable (61) `0x005E52D0`, alternate `0x005E5280` | 352–470 |
+|   8. QuillMother (75) `0x005FB2A0` | 471–485 |
+|   9. BaalTentacle (139) `0x005EF820` | 486–499 |
+|   10. ElementalBeast (46) `0x005F6B70` | 500–518 |
+|   11. NpcStationary (54) `0x005E73A0` | 519–546 |
+|   12. MosquitoNest (83) `0x005E0260` | 547–564 |
+|   13. DesertTurret (94) `0x005E0980` | 565–603 |
+|   14. AssassinSentry (101) `0x005EA3D0`, init `0x005EA290` | 604–638 |
+|   15. Catapult (123) `0x005E34C0` | 639–643 |
+|   16. CatapultSpotter (126) `0x005EE040` | 644–682 |
+|   17. Tentacle (56) `0x005F8F80` | 683–707 |
+|   18. TentacleHead (57) `0x005F9270` | 708–725 |
+|   19. Hydra (86) `0x005E9E60` | 726–736 |
+|   20. Totem (109) `0x005ED9E0` | 737–757 |
+|   21. Vendor (42) `0x005E9E00` | 758–763 |
+|   22. Trap-Missile (77) `0x005FB5B0` | 764–776 |
+|   23. TrappedSoul (99) `0x005E9F10` | 777–793 |
+|   24. DruidWolf (108) `0x005ED710` | 794–867 |
+|   25. CycleOfLife (111) `0x005EC8C0`, init `0x005EC6A0` | 868–896 |
+|   26. NpcBarb (127) `0x005EDC50`, init `0x005EDC40` | 897–917 |
+| Constants & data dependencies | 918–942 |
+| Randomness | 943–951 |
+| Edge cases & original bugs | 952–960 |
+| Test vectors | 961–985 |
+| Provenance | 986–1012 |
+| Open questions | 1013–1020 |
 <!-- /index -->
 
 ## Summary
@@ -108,6 +118,16 @@ index, rows, section:
 | AssassinSentry (101) | 4 | §14 |
 | Catapult (123) | 4 | §15 |
 | CatapultSpotter (126) | 4 | §16 |
+| Tentacle (56) | 3 | §17 |
+| TentacleHead (57) | 3 | §18 |
+| Hydra (86) | 3 | §19 |
+| Totem (109) | 3 | §20 |
+| Vendor (42) | 2 | §21 |
+| Trap-Missile (77) | 2 | §22 |
+| TrappedSoul (99) | 2 | §23 |
+| DruidWolf (108) | 2 | §24 |
+| CycleOfLife (111) | 2 | §25 |
+| NpcBarb (127) | 2 | §26 |
 
 (Continued as the bodies are written; the remaining `unread` rows stay
 listed in `ai-functions.tsv`.)
@@ -660,6 +680,241 @@ the dead bit (+0x18 & 4) in the area node of rx (`0x00541D20`,
 Draws, in order: step 1's draw (when f ≠ 0), step 4's, `roll(5)` (step
 5, when v < 1), the two point draws. 1.14d-confirmed.
 
+### 17. Tentacle (56) `0x005F8F80`
+
+Target mode 2. Brackets: tentacle1 [70, 5, 16, 12, 20, 12]; `Skill1`
+Submerge (`seq_tentaclesubmerge`), `Skill2` Emerge (`S1`). AI params:
+1 = timer frame t, 2 = state s (0 new, 1 submerged, 2 up). O := the
+minion owner (the tentacle head, §18).
+
+1. O = 0 → kill the unit (`0x0057CCB0(game, unit, 0, 1)`). End.
+2. O in mode 12 (dead) and draw < 40 → kill the unit with killer O's
+   path target unit (`0x00553540(game, O)`). End.
+3. `Skill1` ≥ 0:
+   1. s = 0 → **submerge**: `Skill1` at T; wait 8; t := frame + aip3 ×
+      25 [400]; s := 1. End.
+   2. s = 2, frame > t and (D > aip6 [12], or (C = 0 and draw < aip2
+      [5]), or (O in mode 14 and draw < 50)) → submerge as 3.1. End.
+      (Each draw only when the tests before it in its group hold.)
+4. `Skill2` ≥ 0: s ≠ 1 → step 6. s = 1, frame > t and (C ≠ 0, or D <
+   aip6, or (O not in mode 14 and draw < 5)) → **emerge**: `Skill2` at
+   the unit itself (`0x005DEAD0(Sk2mode, Skill2, unit, 0, 0)`); t :=
+   frame + aip4 × 25 [300]; s := 2. End.
+5. s = 1 → wait aip5 [20]. End.
+6. C and draw < aip1 [70] → A1 at T. Else idle aip5.
+
+1.14d-confirmed.
+
+### 18. TentacleHead (57) `0x005F9270`
+
+Target mode 2. Brackets: tentaclehead1 [70, 5, 16, 12, 20, 12];
+`Skill1` Submerge, `Skill2` Emerge; minion tentacle1. Params as §17.
+
+1. `Skill1` ≥ 0: s = 0 → `Skill1` at T; wait 8; t := frame + aip3 ×
+   25; s := 1. End. s = 2, frame > t and (D > aip6 or (C = 0 and draw
+   < aip2)) → `Skill1` at T; **wait 20**; t := frame + aip3 × 25; s :=
+   1. End.
+2. `Skill2` ≥ 0: s ≠ 1 → step 4. s = 1, frame > t and (C ≠ 0 or D <
+   aip6) → `Skill2` at the unit itself; t := frame + aip4 × 25; s := 2.
+   End.
+3. s = 1 → wait aip5. End.
+4. S := `0x005DDC30(unit)` (`ai.md` §5.3; S may be 0). Draw < aip1 →
+   A1 at S (`0x005DDF90(4, S)`); else idle aip5.
+
+No owner checks and no random emerge (unlike §17). 1.14d-confirmed.
+
+### 19. Hydra (86) `0x005E9E60`
+
+Target mode 2. Rows hydra1–3; `Skill1` HydraMissile (`A1`). AI param 0
+is the expiry frame set by the Hydra skill (`skills/bodies-2.md` §8.5).
+
+1. frame > param 0 → mode 0 (death) at (0, 0). End.
+2. T ≠ 0, D < 25 and draw < 60 → `Skill1` at T. End.
+3. Idle 10.
+
+1.14d-confirmed.
+
+### 20. Totem (109) `0x005ED9E0`
+
+Target mode 0. Rows: spiritofbarbs, heartofwolverine, oaksage (druid
+spirits). Brackets [20, 30, 30, 20]. O := the minion owner.
+
+1. O = 0 → idle 10. End.
+2. S, E, M := search capped (unit, control, 24) (§2). M ≠ 0 and S ≠ 0:
+   draw < aip1 [20] and escape from S by 6 with think delete started →
+   end.
+3. Draw < aip2 [30] → S := 0, M := 0.
+4. d := `0x006416D0(unit, O)` (`missiles/missiles.md`). d > aip3 [30]:
+   place the unit at O's position (`0x00554EA0(game, unit, O's room,
+   O.x, O.y, 0, 0)`, `sim/path-placement.md` §10); placed → idle 25.
+   End.
+5. d > aip4 [20]: O in mode 2 or 6 → pet move k 0 (0, 0, 0) started →
+   end; O in mode 3 → pet move k 0 (run 0, speed 60, 0) started → end.
+6. Pet follow (S, O, M, quiet 0, n 6) ≠ 0 → end.
+7. Idle 25.
+
+Draws: step 2's (when M, S), step 3's, the helpers'. 1.14d-confirmed.
+
+### 21. Vendor (42) `0x005E9E00`
+
+Target mode 0. Rows act2vendor1, act2vendor2. Draw < 20 → mode 8 at (0,
+0) (`0x005DDFC0`, the vendor's idle animation); else idle 30.
+1.14d-confirmed.
+
+### 22. Trap-Missile (77) `0x005FB5B0`
+
+Target mode 2. Brackets: trap-firebolt [25, 1, 15] (`MissA1`
+trapfirebolt); trap-lightning (chainlightning). AI params: 0 = shots n,
+1 = toggle.
+
+1. T ≠ 0, D ≤ aip1 [25; 30, 32] and n < aip2 [1]: toggle = 0 → A1 at
+   T, n += 1, toggle := 1; else toggle := 0, idle aip3 [15]. End.
+2. Otherwise unit flag 0x20000 (no drop); mode 0 (death) at (0, 0).
+
+So the trap fires aip2 times on alternate thinks and dies on the first
+think without a target in range. 1.14d-confirmed.
+
+### 23. TrappedSoul (99) `0x005E9F10`
+
+Rows trappedsoul1, trappedsoul2 (`SplEndGeneric`: inline re-think at
+every mode end, `ai.md` §1.4). AI params: 0 = awake, 1 = next frame f.
+(xu, yu) := the unit's position, (xt, yt) := T's (`0x00620870`),
+compared unsigned.
+
+1. Unit flag 0x20000 (no drop), every think.
+2. T = 0 or D > 4: param 0 ≠ 0 → S1 (mode 8) at T; else idle 15. End.
+3. param 0 = 0 → param 0 := 1, f := frame, S2 (mode 9) at T. End.
+4. C = 0 or frame ≤ f → S1 at T. End.
+5. xt ≤ xu and yt ≥ yu → A1 at T, f := frame + 35. End.
+6. xt ≥ xu and yt ≤ yu → A2 at T, f := frame + 35. End.
+7. S1 at T, f := frame + 5.
+
+No draws. 1.14d-confirmed.
+
+### 24. DruidWolf (108) `0x005ED710`
+
+Target mode 0. The unit's class 420 (spiritwolf) → **wolf**
+`0x005ECEE0`; any other (421 fenris) → **fenris** `0x005ED2A0`.
+Brackets: spiritwolf [22, 20, 14, 20, 26]; fenris [22, 20, 25, 24,
+30]. Spiritwolf `Skill1` Teleport 2; fenris `Skill1` fenris rage,
+`Skill2` Teleport 2. "Port" := the teleport skill (wolf `Skill1`, fenris
+`Skill2`) in its mode with no target at a point (`0x005DEAD0(mode,
+skill, 0, x, y)`). AI params: 0 = rage flag (fenris), 1 = rage corpse
+GUID (fenris, written only), 2 = owner GUID. v := `Run` × 100 /
+`Velocity` − 100, 100 when `Velocity` ≤ 0 or v ≥ 100. r := aip4. O :=
+the minion owner.
+
+Common start (both):
+
+1. O = 0: param 2 ≠ 0, the player with that GUID exists and the port
+   skill ≥ 0 → port to that player's position; a timer event of type 0
+   (MODECHANGE) at frame + 6 (`0x005417D0`, no delete); wait 8. End.
+   Else idle 10. End.
+2. param 2 := O's GUID.
+3. The unit's room in town → pet follow (0, O, 0, quiet 0, n 6) ≠ 0 →
+   end; else idle 33. End.
+4. S, E, M := search capped (unit, control, r). T0 := the main search
+   for O with the unit's control (as §3).
+
+**Wolf:**
+
+5. S ≠ 0 and not directly reachable (`0x005DC640(unit, S)` = 0) → S :=
+   0. Then, when S is now 0: T0 ≠ 0, full-size distance unit→T0 < r and
+   T0 **not** directly reachable → S := T0 (bug kept: the reachable
+   case is the one refused).
+6. d := `0x006416D0(O, unit)`. `Skill1` ≥ 0 and d > 50 → port to O's
+   position; MODECHANGE timer at frame + 4; wait 10. End.
+7. d > aip5 [26] → pet move k 0 (run 1, speed 100, n 0) started → end.
+   d > aip3 [14]: O in mode 2 or 6 → pet move k 0 (0, 0, 0) started →
+   end; O in mode 3 → k 0 (1, 100, 0) started → end. Pet follow (S, O,
+   M, quiet 1, n 6) ≠ 0 → end.
+8. S ≠ 0: M ≠ 0 → A1 at S; wait aip1 [22]. End. `0x006416D0(O, S)` <
+   r → velocity (0, v, 0); run to S (`0x005DED20`). End. d > 10 → walk
+   in radius of O (`0x005DE6D0(O, 8, 6)`). End. Else idle 15. End.
+9. `roll(100)` < aip2 [20] → wander 10; else idle 15.
+
+**Fenris:**
+
+5. S ≠ 0 and not directly reachable → S := 0. When S is now 0: T0 ≠ 0,
+   T0's search distance (from O) < r and T0 directly reachable → S :=
+   T0, E := that distance.
+6. d := `0x006416D0(O, unit)`. S ≠ 0, d > r and `0x006416D0(O, S)` >
+   r → S := 0.
+7. `Skill2` ≥ 0 and d > 50 → port to O's position; MODECHANGE timer at
+   frame + 2; wait 10. End.
+8. d > aip5 [30] → pet move k 0 (1, 100, 0); end (whatever it
+   returned). d > r: O in mode 3 → the same, end; O in mode 2 or 6 →
+   pet move k 0 (0, 0, 0), end.
+9. Pet follow (S, O, M, quiet 1, n 6) ≠ 0 → end.
+10. Rage: `Skill1` < 0, or the unit has state 138, or (`roll(100)` ≥
+    aip3 [25], S ≠ 0 and param 0 = 0) → param 0 := 0, step 11. Else K
+    := the corpse search `0x005D2F80(game, unit, O, 10)` (below); K and
+    `0x006416D0(K, unit)` < r / 2 (signed halving): the unit in melee
+    range of K → param 0 := 0, `Skill1` at K, end; else M = 0 → run to
+    K, param 0 := 1, param 1 := K's GUID, end; else step 11's A1 branch.
+    No K, or too far → step 11.
+11. M ≠ 0 → A1 at S; wait aip1. End. S ≠ 0 → velocity (0, v, 0); run
+    to S. End. `roll(100)` < aip2 → wander 10; else idle 15.
+
+**Corpse search** `0x005D2F80(game, U, X, n)`: X is not read. Unit find
+(`0x0065A950` init, `0x0065AC70` collect, `0x0065AA00` free; flags
+0x1002, size n, around U's position, U's room; `ai-bodies-3.md` open
+question 3) → the first found unit that passes the corpse test
+`0x00623600` (skills spec) and the hostility test `0x00554200(game, U,
+·)` (`combat/hit.md`); else 0. No draws.
+
+1.14d-confirmed (all three functions).
+
+### 25. CycleOfLife (111) `0x005EC8C0`, init `0x005EC6A0`
+
+Target mode 2. Rows: cycleoflife (426, `Skill1` CorpseCycler),
+vinecreature (427, `Skill1` VineCycler); brackets [50, 20, 25, 10, 35].
+Init: AI param 0 := 0. AI param 1 = last cast frame f. O := the minion
+owner.
+
+1. O = 0 → return, nothing scheduled.
+2. d := `0x006416D0(unit, O)`. d ≥ aip5 [35] → pet move k 3 (run 0,
+   speed 0, n 6) ≠ 0 → end.
+3. T ≠ 0 and T dead (`0x005541B0`) → T := 0, C := 0.
+4. K := 0, dK := 0. `Skill1` > 0, its row exists and the unit has its
+   entry: n := the skill's `aurarangecalc` (skills +0x64) at the entry's
+   level (`0x00646CA0`), clamped to 5..50; K := corpse search (game,
+   unit, O, n) (§24); K → dK := `0x006416D0(unit, K)`.
+5. dK < aip2 [20]: K → mK := melee range unit→K. Else K := 0.
+6. Pet follow (K, O, mK, quiet 0, n 6) ≠ 0 → end.
+7. need := 1; class 426: need := O's life (stat 6) < O's max life
+   (`0x00625D10`); class 427: need := O's mana (stat 8) < max mana
+   (`0x00625D60`).
+8. K, mK, need and frame > f + aip1 [50] → `0x005DEAD0(8, Skill1, K, 0,
+   0)` (mode 8 fixed); f := frame. End.
+9. C, T and `roll(100)` < 25 → escape from T by aip4 [10] (byte), no
+   delete. End.
+10. K = 0 → idle aip3 [25]. End.
+11. Walk to K with flags 7.
+
+1.14d-confirmed.
+
+### 26. NpcBarb (127) `0x005EDC50`, init `0x005EDC40`
+
+Target mode 2. Rows act5barb1, act5barb2 (Harrogath's defenders);
+brackets [15, 85, 15]. The init returns at once.
+
+1. The unit's target-node slot (unit +0xD0) is 11 (none) → register it
+   in slot 8 of the game's target-node lists (`0x005B1990(game, unit,
+   0, 8)`: a node {unit, 0} pushed at the head of game +0x10F8 + 8 × 4;
+   unit +0xD0 := 8; `ai.md` §5.2 slot 8).
+2. T ≠ 0: C → A1 at T; wait aip1 [15]. End. D < aip3 [15] and draw <
+   aip2 [85] → velocity (0, 100, 0); run to T (`0x005DED20`). End.
+3. Roam, three tries, each a walk-del to a point (§2), ending on the
+   first that starts:
+   1. Two steps a, b: (own x + a % 20 − 40, own y + b % 20 − 10).
+   2. Three steps c, d, e; σ := +1 when `c & 1` = 1, else −1: (own x + d
+      % 20 − 10, own y + e % 20 − 10 − 30σ).
+   3. Two steps f, g: (own x + f % 20 − 10, own y + g % 20 − 10 + 30σ).
+   All three fail → idle 15.
+
+`%` is unsigned on the step's low word. 1.14d-confirmed.
+
 ## Constants & data dependencies
 
 | Item | Value | Source |
@@ -677,6 +932,12 @@ Draws, in order: step 1's draw (when f ≠ 0), step 4's, `roll(5)` (step
 | DesertTurret | aim tables J (8 × 8) and V (8) | `0x006E33E0`, `0x006E33A0` |
 | sentry charges | skills `calc4` at the entry's level | `0x005EA2B0` |
 | spotter | skills 287, 288, 303, 304, 305; check 3 % of thinks; catapult class − 19; 3 rooms back along table `0x006EA9D0` | `0x005EE040`, `0x005EDF70` |
+| tentacles | timers aip3 / aip4 × 25 frames; owner-dead kill 40 %; random emerge 5 %, owner-skill submerge 50 % | `0x005F8F80`, `0x005F9270` |
+| Hydra | range 25, 60 % | `0x005E9E60` |
+| druid summons | teleport beyond 50; MODECHANGE +6 / +4 / +2; rage corpse within r / 2, state 138 | `0x005ECEE0`, `0x005ED2A0` |
+| corpse search | unit find flags 0x1002 around the unit | `0x005D2F80` |
+| CycleOfLife | search size `aurarangecalc` 5..50; mode 8; cooldown aip1 | `0x005EC8C0` |
+| NpcBarb | target-node slot 8; roam offsets x −40..−21 then ±30 rows | `0x005EDC50`, `0x005B1990` |
 | EvilHole | modes 1 → 10 → 11 → spawn → 0; trigger D ≤ 5; spawn classes 19 / 712; flags 0x04020000; state 184, overlay 202 for class 711 | `0x005FB410`, `0x0063EFA0` |
 
 ## Randomness
@@ -714,6 +975,10 @@ Synthetic (CI-safe), draws given as `lo' % 100`:
 | DesertTurret, turret1 Normal, f = 0, `Skill1` ≥ 0 | none | deploy, j := 0, f := frame |
 | CatapultSpotter, f = 500, frame 510, T ≠ 0 | 50 (> 2: no check) | idle 25 (510 − 500 < 25) |
 | AssassinSentry, c = 1, S at E2 10, lightningsentry | 40 (< 100) | c := 0, shot; next think: death |
+| Tentacle, s = 1, frame > t, C = 1 | none | Emerge at itself, t := frame + 300, s := 2 |
+| Hydra, frame > expiry | none | mode 0 |
+| TrappedSoul, awake, C = 1, frame > f, T at (xu − 1, yu + 1) | none | A1, f := frame + 35 |
+| Trap-Missile, n = 1 = aip2 | none | death |
 | Hireable, act2hire, p = 0, level 20, S at d = 2 in melee range, draw 79 | 79 (< 98) | p := 0; hireling skill |
 
 Game-file vectors: Open question 1.
@@ -729,7 +994,11 @@ Game-file vectors: Open question 1.
   `0x00574BD0`, `0x005DED00`, `0x005FB2A0`, `0x0058F730`, `0x005EF820`,
   `0x005F6B70`, `0x005E73A0`, `0x005E7350`, `0x005E0260`, `0x005FD350`,
   `0x005E0980`, `0x005EA3D0`, `0x005EA290`, `0x005EA2B0`, `0x00646CA0`,
-  `0x005E34C0`, `0x005EE040`, `0x005EDF70`, `0x005429B0`, `0x0063EE10`; tables
+  `0x005E34C0`, `0x005EE040`, `0x005EDF70`, `0x005429B0`, `0x0063EE10`,
+  `0x005F8F80`, `0x005F9270`, `0x005E9E60`, `0x005ED9E0`, `0x005E9E00`,
+  `0x005FB5B0`, `0x005E9F10`, `0x00620870`, `0x005ED710`, `0x005ECEE0`,
+  `0x005ED2A0`, `0x005D2F80`, `0x005EC6A0`, `0x005EC8C0`, `0x005EDC40`,
+  `0x005EDC50`, `0x005B1990`; tables
   `0x006E34F8`, `0x006E34F0`, `0x006E33E0`, `0x006E33A0`, `0x006E3514`,
   `0x006EA9D0` read from the file. Decompiler text read first; every
   call's register and stack arguments checked in the disassembly
