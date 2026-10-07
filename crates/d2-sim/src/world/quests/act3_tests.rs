@@ -473,7 +473,7 @@ impl QuestWorld for Fake3 {
     fn drop_gold(&mut self, object: UnitId) {
         self.f.log.push(format!("gold {}", object.0));
     }
-    fn object_treasure(&mut self, object: UnitId, kind: u8) {
+    fn object_treasure(&mut self, object: UnitId, _: UnitId, kind: u8) {
         self.f.log.push(format!("treasure {} {kind}", object.0));
     }
     fn spawn_monster_in_room(&mut self, room: RoomId, class: u16) -> Option<UnitId> {

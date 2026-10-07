@@ -106,8 +106,9 @@ pub fn trading<W: InvWorld + ?Sized>(inv: &Inventory, w: &W) -> bool {
 }
 
 /// Targeting reset (`0x0055BF50`, §5.3): every item of the player's item
-/// list with item flag 0x4 loses it; when `0x0044BE50` returns 0, S→C 0x3F
-/// is queued for it. Items are visited in list order.
+/// list with item flag 0x4 loses it; when `0x0044BE50` of the owner (the
+/// argument of `0x0055BF50`, never the item) returns 0, S→C 0x3F is queued
+/// for it. Items are visited in list order.
 pub fn targeting_reset<W: InvWorld + ?Sized>(inv: &Inventory, w: &mut W) {
     for &item in inv.items() {
         let Some(d) = w.item_mut(item) else { continue };
@@ -116,7 +117,7 @@ pub fn targeting_reset<W: InvWorld + ?Sized>(inv: &Inventory, w: &mut W) {
         }
         d.flags &= !iflag::TARGETING;
         let guid = d.guid;
-        if w.targeting_probe(item) == 0 {
+        if w.targeting_probe(inv.owner) == 0 {
             w.queue_untarget(inv.owner, guid);
         }
     }

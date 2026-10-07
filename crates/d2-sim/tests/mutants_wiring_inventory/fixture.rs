@@ -264,7 +264,6 @@ pub struct Answers {
     pub ammo: Option<i16>,
     pub interaction: Option<InteractionTarget>,
     pub trade_gate: Option<bool>,
-    pub probe: u32,
     /// `stack_quality_ok`, `has_allowed_location`, `auto_equip_allows`.
     pub open_ok: bool,
     pub code2: u32,
@@ -557,10 +556,6 @@ impl InvRest for Rest {
     }
     fn trade_hook(&mut self, owner: Owner, item: Guid) {
         self.note(format!("trade_hook {} {item}", og(owner)));
-    }
-    fn targeting_probe(&self, item: Guid) -> u32 {
-        self.note(format!("targeting_probe {item}"));
-        self.a.probe
     }
     fn item_active_on(&self, item: Guid, unit: Owner) -> bool {
         self.note(format!("item_active_on {item} {}", og(unit)));

@@ -175,7 +175,7 @@ fn warp_tile_inputs_type_tile_and_packed_value() {
     assert_eq!(warp_tile_preset(&mut d, 0, 11, 41, 27, v), Ok(true));
     // Type 10 at the room's first tile.
     assert_eq!(warp_tile_preset(&mut d, 0, 10, 40, 24, v), Ok(true));
-    assert_eq!(d.added, [(5, 31, 0, 6, 17), (5, 30, 0, 1, 2)]);
+    assert_eq!(d.added, [(5, 30, 0, 6, 17), (5, 31, 0, 1, 2)]);
     // Another slot has no record: fatal.
     assert_eq!(
         warp_tile_preset(&mut d, 0, 10, 40, 24, 6 << 20),

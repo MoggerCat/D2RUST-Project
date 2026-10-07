@@ -768,7 +768,7 @@ fn link_pair(
 ) -> (Drlg, DrlgRoomId, DrlgRoomId) {
     let mut dat = data();
     gen_level(&mut dat, 2, 2);
-    dat.wall_remap = Some(WallRemap { table });
+    dat.wall_remap = WallRemap::with_rows(table);
     // (A origin, B origin, A cell of step k, B cell of step k).
     type Cells = fn(usize) -> (usize, usize);
     let (ao, bo, ac, bc): ((i32, i32), (i32, i32), Cells, Cells) = match shared {
@@ -851,25 +851,27 @@ fn wall_remap_rows_by_new_type() {
     }
 }
 
-/// `rooms.md` §9.6 r3: new types 8, 9 and 13 "keep" R's type (no stop):
-/// the flag rules re-run on R with the new cell (here its unwalkable
-/// bit). A new door off this room's top/left edge takes this path.
+/// `rooms.md` §9.6 r3 / `wall-remap.tsv`: new types 8 (a door off this
+/// room's top/left edge) and 13 "stop": R is left as it was, no flag
+/// rules. A "keep" type (12) takes the new type over R and re-runs the
+/// flag rules (here the new cell's unwalkable bit).
 #[test]
-fn wall_remap_keep_reruns_the_flag_rules() {
+fn wall_remap_keep_and_stop() {
     for tb in [8, 13] {
         let (d, a) = merge_pair(1, tb, cell::UNWALKABLE, false, [[2; 7]; 6]);
         let kinds = linked_kinds(&d, a);
         assert_eq!(kinds.len(), 7);
         for (k, f) in kinds {
             assert_eq!(k, 1, "new type {tb}");
-            assert_ne!(f & rec_flags::UNWALKABLE, 0, "new type {tb}");
+            assert_eq!(f & rec_flags::UNWALKABLE, 0, "new type {tb}");
         }
     }
-    // A "stop" type (12) over a normal wall leaves R as it was.
     let (d, a) = merge_pair(1, 12, cell::UNWALKABLE, false, [[2; 7]; 6]);
-    for (k, f) in linked_kinds(&d, a) {
-        assert_eq!(k, 1);
-        assert_eq!(f & rec_flags::UNWALKABLE, 0);
+    let kinds = linked_kinds(&d, a);
+    assert_eq!(kinds.len(), 7);
+    for (k, f) in kinds {
+        assert_eq!(k, 12);
+        assert_ne!(f & rec_flags::UNWALKABLE, 0);
     }
 }
 
@@ -938,12 +940,13 @@ fn new_door_on_own_top_left_edge_keeps_its_type() {
 
 /// `rooms.md` §9.6 r3 door cases: a new non-door cell over an existing
 /// door stops when the tile is on the neighbour's top or left edge (left
-/// column and top row here); elsewhere the door is kept and its flags
-/// re-run.
+/// column and top row here); elsewhere the class of the new type decides
+/// (a "keep" type 12 replaces the door and re-runs the flag rules; a
+/// "table" type 1 over R type 8 > 7 stops).
 #[test]
 fn non_door_over_door_on_neighbours_edge_stops() {
     let door = (WALL, 8);
-    let new = (WALL | cell::UNWALKABLE, 1);
+    let new = (WALL | cell::UNWALKABLE, 12);
     for shared in [Shared::ALeft, Shared::ATop] {
         let (d, a, _) = link_pair(shared, door, new, [[2; 7]; 6]);
         let kinds = linked_kinds(&d, a);
@@ -953,11 +956,19 @@ fn non_door_over_door_on_neighbours_edge_stops() {
             assert_eq!(f & rec_flags::UNWALKABLE, 0);
         }
     }
-    // B's left edge is not A's: no stop, R is no normal wall → kept.
+    // B's left edge is not A's: no edge stop; "keep" → type 12.
     let (d, a, _) = link_pair(Shared::BLeft, door, new, [[2; 7]; 6]);
+    let kinds = linked_kinds(&d, a);
+    assert_eq!(kinds.len(), 7);
+    for (k, f) in kinds {
+        assert_eq!(k, 12);
+        assert_ne!(f & rec_flags::UNWALKABLE, 0);
+    }
+    // "table" type 1 over the door (type 8 > 7): stop.
+    let (d, a, _) = link_pair(Shared::BLeft, door, (new.0, 1), [[2; 7]; 6]);
     for (k, f) in linked_kinds(&d, a) {
         assert_eq!(k, 8);
-        assert_ne!(f & rec_flags::UNWALKABLE, 0);
+        assert_eq!(f & rec_flags::UNWALKABLE, 0);
     }
 }
 
@@ -1011,4 +1022,20 @@ fn animation_only_for_animated_tiles_and_frames_hidden() {
             assert_ne!(t.floors[f].flags & rec_flags::HIDDEN, 0);
         }
     }
+}
+
+/// `rooms.md` §9.6 step 3 rule 1: a new cell with v bit 7 merges to its
+/// own type, without the table (which would give 3) or R's type (1).
+// Covers: specs/drlg/rooms.md §9.6 r3
+#[test]
+fn bit_7_merges_to_the_new_type() {
+    let (d, a, _) = link_pair(
+        Shared::BLeft,
+        (WALL, 1),
+        (WALL | cell::LAYER_ABOVE, 2),
+        [[3; 7]; 6],
+    );
+    let kinds = linked_kinds(&d, a);
+    assert_eq!(kinds.len(), 7);
+    assert!(kinds.iter().all(|&(k, _)| k == 2), "{kinds:?}");
 }

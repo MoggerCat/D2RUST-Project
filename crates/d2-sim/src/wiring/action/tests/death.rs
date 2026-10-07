@@ -297,7 +297,7 @@ fn kill_guards() {
 // ---- the drop ---------------------------------------------------------------------------
 
 /// Gold only (type 4 under misc), TC 1 = one pick of gold.
-fn drop_tables() -> DropTables {
+pub(super) fn drop_tables() -> DropTables {
     let n: usize = 40;
     let words = n.div_ceil(32);
     let mut equiv = EquivMatrix {

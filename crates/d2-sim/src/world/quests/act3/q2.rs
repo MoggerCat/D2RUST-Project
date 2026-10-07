@@ -410,7 +410,7 @@ pub fn chest_operate<W: QuestWorld>(
             }
         }
     }
-    w.object_treasure(object, 4);
+    w.object_treasure(object, player, 4);
 }
 
 /// The end-animation event `0x005417D0` type 1 at frame +

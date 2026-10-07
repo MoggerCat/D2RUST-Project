@@ -351,7 +351,7 @@ pub fn altar_operate<W: QuestWorld>(
         x.altar_mode = 2;
         x.altar_destroyed = true;
         drop_amulets(ctl, w, i, object);
-        w.object_treasure(object, 4);
+        w.object_treasure(object, player, 4);
         chest_gold(ctl, w, object);
         return 0;
     }
@@ -419,7 +419,7 @@ pub fn altar_operate<W: QuestWorld>(
     }
     ctl.game.set(SLOT, bit::PRIMARY_GOAL_DONE);
     drop_amulets(ctl, w, i, object);
-    w.object_treasure(object, 4);
+    w.object_treasure(object, player, 4);
     chest_gold(ctl, w, object);
     // `0x00599FE0`.
     completion_flag(w, CHAIN, SLOT);
