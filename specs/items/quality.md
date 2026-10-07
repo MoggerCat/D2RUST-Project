@@ -35,7 +35,7 @@
 | Edge cases & original bugs | 268–286 |
 | Test vectors | 287–299 |
 | Provenance | 300–319 |
-| Open questions | 320–326 |
+| Open questions | 320–333 |
 <!-- /index -->
 
 ## Summary
@@ -294,7 +294,7 @@ Synthetic, from the rules (`sim/rng.md` generator):
 | §3, format 101, quality 0, `misc` item, row Magic 34/3 …: L = 1 | c(unique) = 400 − 1 = 399 → first draw roll(399) | synthetic |
 | §5 downgrade, saved s = 0xDEADBEEF | item seed `{3735928559, 666}`, start seed 0xDEADBEEF | synthetic |
 | §8 weights: candidates rarity 1, 0, 3 | starts 0, 1, 2; total 5; r = 1 → 2nd, r = 4 → 3rd | synthetic |
-| §8.1 idx 4097 | not markable, unique fails (unless `nolimit`) | synthetic |
+| §8.1 idx 4097 | not markable; a non-quest item with a game fails at §8 step 6's accept test whatever `nolimit` says (Open question 3); a quest item passes the accept test and then succeeds only with `nolimit` | synthetic |
 | §7.1 row (weapon=1), item `axe` | fits; item `staf` with only `weapon` → no | synthetic |
 
 ## Provenance
@@ -323,3 +323,10 @@ Synthetic, from the rules (`sim/rng.md` generator):
    session report; `items/generation.md` Open question 2).
 2. Which non-treasure callers pass request quality 0 (vendors, quests,
    cube) and so draw §3: owned by those specs; check when written.
+3. Answered (handoff `impl-items` OQ-Q1): the §8.1 vector is reworded,
+   the rules stand. In `0x005566B0` the accept test (`0x005569B0`–`0x005569C0`: items `quest` ≠ 0, or game none, or idx < 0x1001 and its bit
+   clear) runs before the marking `0x00556530`; for idx 4097 on a
+   non-quest item with a game it fails, so the file index becomes −1
+   and the routine returns 0 before `nolimit` (uniqueitems +0x2C bit,
+   tested only inside `0x00556530`) is read. Unreachable with 1.14d data
+   (the uniqueitems table is far below 4,097 rows).

@@ -34,7 +34,7 @@
 | Edge cases & original bugs | 284–322 |
 | Test vectors | 323–341 |
 | Provenance | 342–364 |
-| Open questions | 365–388 |
+| Open questions | 365–396 |
 <!-- /index -->
 
 ## Summary
@@ -385,3 +385,11 @@ Synthetic, from the rules:
    the normal routine for these bases. The remaining sweep failures, if
    any after the check skips the slot, need the next local run to print
    all failures grouped by (item, error).
+5. Answered (handoff `impl-items` OQ-A1): the roller's force argument
+   is the value 1 in all three routines. Pushes at the calls of
+   `0x005C1560` (item, spawnable, force, assign, prefix, p, g): rare
+   `0x005C1CFC` / `0x005C1D79` (1, 1, 0, 0 or 1, p, 0); crafted
+   `0x005C2322` / `0x005C2402` (1, 1, 0, 1 or 0, p, 0); automagic
+   `0x005579E1` through `0x005C1940` (EDX spawnable 0; force 1, assign 0,
+   prefix 1, p 0, g = items +0xF8 `auto prefix`). So §7, §8 and §11 call
+   §3 with force = 1 (the coin of edge case 6 is drawn and ignored).

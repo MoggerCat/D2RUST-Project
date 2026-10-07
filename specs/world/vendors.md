@@ -34,15 +34,15 @@
 |   4. Opening trade or gamble (`0x00579430(npc, single, gamble)`) | 229–253 |
 |   5. Gambling | 254–309 |
 |   6. Refresh | 310–341 |
-|   7. Buying and selling | 342–525 |
-|   8. Repair | 526–562 |
-|   9. Prices | 563–714 |
-| Constants & data dependencies | 715–734 |
-| Randomness | 735–750 |
-| Edge cases & original bugs | 751–780 |
-| Test vectors | 781–803 |
-| Provenance | 804–842 |
-| Open questions | 843–873 |
+|   7. Buying and selling | 342–529 |
+|   8. Repair | 530–569 |
+|   9. Prices | 570–721 |
+| Constants & data dependencies | 722–741 |
+| Randomness | 742–757 |
+| Edge cases & original bugs | 758–787 |
+| Test vectors | 788–810 |
+| Provenance | 811–849 |
+| Open questions | 850–880 |
 <!-- /index -->
 
 ## Summary
@@ -345,7 +345,11 @@ timer only matters while another player stays in town.
 
 Layout: NPC GUID u32 @1, item GUID u32 @5, u32 @9 = transaction t (bits
 0–15) | unused (bits 16–30) | fill (bit 31), u32 @13 = client price
-(**never read**). Handler `0x0054BAC0` → `0x00577F30`: NPC missing or
+(**never read**). What the 1.14d client writes in bits 16–31: the
+item's mode (unit +0x10, u16) shifted left 16 (`0x004B2713`,
+`0x004B2760`–`0x004B2763`), then bit 31 OR-ed for fill; store items are
+in mode 0, so bits 16–30 arrive 0 (the server never reads them either
+way). Handler `0x0054BAC0` → `0x00577F30`: NPC missing or
 not the player's interact unit → 0x2A code 9, result 1. Then
 `0x00577830`:
 
@@ -528,7 +532,10 @@ item GUID; `sim/units.md` numbering).
 #### 8.1 C→S 0x35 (17 bytes)
 
 Layout: NPC GUID u32 @1, item GUID u32 @5, u16 @9 (not read), u32 @13:
-bit 31 = repair all. Handler `0x0054BB60` → `0x00578050`:
+bit 31 = repair all. For a one-item repair the 1.14d client writes the
+item's mode at @9 and the item's total stat 72 (durability, `0x00625480`
+at `0x004B27F1`) as the u32 @13, so bit 31 is clear unless the
+durability is ≥ 2^31. Handler `0x0054BB60` → `0x00578050`:
 
 1. NPC missing or not the interact unit → code 9.
 2. Class not charsi 154, fara 178, hratli 253, halbu 257, larzuk 511 →

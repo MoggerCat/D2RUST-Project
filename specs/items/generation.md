@@ -39,14 +39,14 @@
 |   6. Normal quality and class skill mods | 325–371 |
 |   7. Sockets | 372–403 |
 |   8. Ethereal | 404–424 |
-|   9. Forced requests, ears, names, timers | 425–450 |
-|   10. Items from a code: the create wrapper and start items | 451–521 |
-| Constants & data dependencies | 522–544 |
-| Randomness | 545–563 |
-| Edge cases & original bugs | 564–578 |
-| Test vectors | 579–594 |
-| Provenance | 595–621 |
-| Open questions | 622–639 |
+|   9. Forced requests, ears, names, timers | 425–458 |
+|   10. Items from a code: the create wrapper and start items | 459–529 |
+| Constants & data dependencies | 530–552 |
+| Randomness | 553–571 |
+| Edge cases & original bugs | 572–586 |
+| Test vectors | 587–602 |
+| Provenance | 603–629 |
+| Open questions | 630–664 |
 <!-- /index -->
 
 ## Summary
@@ -429,6 +429,14 @@ draw. Also used by property function 23 and craft lists
 2. Format 0 only: forced socket count (not specified, §1.2). Then flag
    0x800 := flags1 & 0x800; 0x100 := flags1 & 0x100; 0x20000 := flags1 &
    0x20000.
+   Scope (handoff `impl-items` OQ-G2, `gaps-items-stats` question 1,
+   re-read in `0x00558D90`): only the socket step is format-0; the three
+   flag copies (`0x00558F80`–`0x00558FB4`) run for **every** forced
+   request. The format-0 socket step (`0x00558F01`–`0x00558F60`): item
+   format 0, the item not of type 3 (`tors`), flags1 has 0x800 and the
+   item's flags do not → max sockets m (`0x0062BC20`); m = 0 → clear
+   flag 0x800; else socket count := (item data +0x10, the start seed,
+   mod m) + 1 (`0x0062BCB0`). No draw.
 3. Quantity: primary type `gold` → gold := request quantity (through the
    gold setter `0x00530EA0`); else set stat 70 := request quantity.
 4. max dur := min(request max dur, 255) (unsigned); min dur := min(min dur,
@@ -636,3 +644,20 @@ Real 1.14d vectors need the recording in Open questions 2.
    `0x00532590` (D2MOO: the new-character branch), and what
    `0x005345A0` and `0x0056B180` are (character creation, ladder or
    realm paths).
+5. Answered (handoff `impl-items` OQ-G2, `gaps-items-stats` question 1):
+   §9 rule 2, only the socket count is format-0; the flag copies run for
+   every forced request (`0x00558F80`–`0x00558FB4`).
+6. Answered (handoff `mutants-items-treasure` MT2): §3 step 9 is dead
+   inside the pipeline. It tests the item's own flags (`0x00628110` at
+   `0x0055906B`), which no step 1–8 can give 0x1000000: allocation
+   starts from 0, the forced copies take only 0x10, 0x1000, 0x800,
+   0x100, 0x20000 (and 0x8000 for ears), and the only `0x006280D0(…,
+   0x1000000, 1)` in the exports is `0x00579D60` (the NPC
+   personalization service, `world/npc.md`), which runs on an existing
+   item. A d2rs test of the name step must build the flag by hand.
+7. Answered (handoff `gaps-items-stats` question 2): §4 rule 5, the
+   quest-difficulty step (§5.3) runs only inside the "quest and a request
+   is given" branch of `0x00557AB0` (both arguments tested together
+   before the dispatch `0x00557450`; the stat 356 set and the
+   identified flag follow inside the same branch). Without a request
+   neither the dispatch nor §5.3 runs.

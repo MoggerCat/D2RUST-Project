@@ -52,6 +52,27 @@ addresses in the specs.
   suffix slot 0 for types `scro` / `book`; then print every remaining
   failure grouped by (item, error).
 - xpc-to-pc2 line: cube.md §1 0x77 — done in 2a72110.
+- Orchestrator relay #2 (ui worker) -> `vendors.md` §7.1 and §8.1:
+  confirmed; the client writes the item mode (u16 unit +0x10) << 16 in
+  0x32's u32 @9 (`0x004B2713`, `0x004B2760`–`0x004B2763`), and for a
+  one-item 0x35 the mode at @9 and total stat 72 at @13 (`0x004B27F1`).
+- `impl-items` OQ-G1 -> `treasure.md` §8 step 1: the gold override is
+  request +0x54 (`0x00557AF9`).
+- `impl-items` OQ-G2 / `gaps-items-stats` Q1 -> `generation.md` §9 rule 2,
+  OQ5: only the socket count is format-0 (now specified); flag copies for
+  every forced request.
+- `gaps-items-stats` Q2 -> `generation.md` OQ7: §5.3 only with quest and a
+  request.
+- `mutants-items-treasure` MT2 -> `generation.md` OQ6: §3 step 9 is dead
+  inside the pipeline (only `0x00579D60` sets 0x1000000).
+- `impl-items` OQ-A1 -> `affixes.md` OQ5: force = 1 in rare, crafted,
+  automagic (pushes listed).
+- `impl-items` OQ-P1, P2 (and MT1), P3, P4 -> `properties.md` OQ5–OQ8:
+  functions 18 / 19 use the plain list set (no valshift); function 14
+  with cap < 1 writes nothing; runeword rows match with exactly c runes;
+  set bonus lists use flags 0.
+- `impl-items` OQ-Q1 -> `quality.md` OQ3 and the §8.1 vector reworded:
+  the accept test precedes `nolimit`.
 
 ## Still open
 

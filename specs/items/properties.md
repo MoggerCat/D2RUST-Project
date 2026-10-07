@@ -39,7 +39,7 @@
 | Edge cases & original bugs | 319–328 |
 | Test vectors | 329–347 |
 | Provenance | 348–367 |
-| Open questions | 368–379 |
+| Open questions | 368–406 |
 <!-- /index -->
 
 ## Summary
@@ -376,3 +376,30 @@ Synthetic, from the rules:
    rune longer than its sockets). Settle: a stack trace of the slot at
    `0x0062BFBA` for a 2-socket item of a 3-rune word, or accept d2rs's
    "no match".
+5. Answered (handoff `impl-items` OQ-P1): §5 rules 8 and 9 "**set**" is
+   not §4.2. Functions 18 (`0x0065F870`) and 19 (`0x0065F6A0`) take the
+   list through the same owner-or-item lookup as §4.2 (`0x0065CBF0`,
+   created if missing; no list → return 0), then write the packed value
+   with the plain list set `0x00627150` → `0x006270B0` (`sim/stat-lists.md`
+   §5 rule 1) at `0x0065F947` / `0x0065F853`: no `valshift` (a value 0
+   follows that set rule), no itemstatcost range test, no stat-58 rule.
+6. Answered (handoff `impl-items` OQ-P2, `mutants-items-treasure` MT1):
+   function 14 (`0x0065F590`) returns 0 and writes nothing (no flag
+   0x800, no stat 194) in each of: no property record; the target not an
+   item; `invwidth` × `invheight` = 0; and the final cap (after the max
+   sockets `0x0062BC20`) < 1 while max(n, 1) ≥ it. Only the write path
+   sets the flag (`0x006280D0`) and stat 194 on the item itself
+   (`0x00627260`, unit set).
+7. Answered (handoff `impl-items` OQ-P3): §10.1's exact form (step 4)
+   is the rule: rune i is compared for i = 0 … while `rune`i+1 > 0, and
+   a row with more runes than fillers reads the unwritten slot c (Open
+   question 4); a row with fewer runes fails "matched ≥ c". So with the
+   stale slot read as no class a row matches only with exactly c runes,
+   as d2rs does.
+8. Answered (handoff `impl-items` OQ-P4): §11's two dispatcher calls
+   (`0x006601E1` for `pcode*`, `0x00660220` for `fcode*`, through the
+   wrapper `0x0065FE10`) pass state = the caller's s (the routine's first
+   stack argument) and **flags 0**, extra 0 (the pushes of the last two
+   function arguments at `0x006601D2` / `0x006601D4` and `0x00660211` /
+   `0x00660213`), so the bonus stats go into the owner's list (state s,
+   flags 0).

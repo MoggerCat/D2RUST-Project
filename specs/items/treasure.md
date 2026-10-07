@@ -38,14 +38,14 @@
 |   5. The TC walk (`0x0055A6D0`) | 304–410 |
 |   6. Drop quality (`0x00558640`) | 411–442 |
 |   7. Creation inputs and placement (`0x0055A550`) | 443–467 |
-|   8. Gold amount | 468–480 |
-|   9. Quest drop helper (`0x00559A30`) | 481–522 |
-| Constants & data dependencies | 523–552 |
-| Randomness | 553–569 |
-| Edge cases & original bugs | 570–593 |
-| Test vectors | 594–623 |
-| Provenance | 624–648 |
-| Open questions | 649–682 |
+|   8. Gold amount | 468–483 |
+|   9. Quest drop helper (`0x00559A30`) | 484–525 |
+| Constants & data dependencies | 526–555 |
+| Randomness | 556–572 |
+| Edge cases & original bugs | 573–596 |
+| Test vectors | 597–626 |
+| Provenance | 627–651 |
+| Open questions | 652–685 |
 <!-- /index -->
 
 ## Summary
@@ -470,6 +470,9 @@ Inputs: item id, `L`, game, `U`, `R`, the slot mods. Draws are `roll`
 1. Base (in item creation `0x00557AB0`, item type 4): `g` =
    `roll(5 × ilvl)` on the new item unit's seed (unit +0x20) + ilvl; `g`
    ≤ 0 → 1; a drop-request quantity > 0 replaces it.
+   "Quantity" here is the request's quantity override +0x54 (not +0x34;
+   `0x00557AF9`, handoff `impl-items` OQ-G1); with no request the gold is 1
+   and nothing is drawn.
 2. TC multiplier: §5.7 step 7.
 3. Gold find (`0x005589A0`), when `R` exists and the item's type is
    exactly 4 (`0x0062B400`): `G` =
