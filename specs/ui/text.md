@@ -20,29 +20,30 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 48–60 |
-| Inputs | 61–71 |
-| Outputs / state changes | 72–75 |
-| Rules | 76–77 |
-|   1. Fonts and locale | 78–117 |
-|   2. Strings: decoding and lookup by id | 118–135 |
-|   3. Glyph lookup | 136–150 |
-|   4. Glyph pixels | 151–188 |
-|   5. Color codes | 189–224 |
-|   6. Measuring | 225–244 |
-|   7. The draw call | 245–270 |
-|   8. Framed text (hover boxes) | 271–291 |
-|   9. Variants of the draw call | 292–331 |
-|   10. Word wrap | 332–369 |
-|   11. Alignment | 370–377 |
-|   12. Clipping (decision CG2) | 378–388 |
-|   13. d2rs answers (hooks in `d2-client`) | 389–403 |
-| Constants & data dependencies | 404–419 |
-| Randomness | 420–423 |
-| Edge cases & original bugs | 424–446 |
-| Test vectors | 447–482 |
-| Provenance | 483–513 |
-| Open questions | 514–572 |
+| Summary | 49–61 |
+| Inputs | 62–72 |
+| Outputs / state changes | 73–76 |
+| Rules | 77–78 |
+|   1. Fonts and locale | 79–118 |
+|   2. Strings: decoding and lookup by id | 119–136 |
+|   3. Glyph lookup | 137–151 |
+|   4. Glyph pixels | 152–189 |
+|   5. Color codes | 190–225 |
+|   6. Measuring | 226–245 |
+|   7. The draw call | 246–271 |
+|   8. Framed text (hover boxes) | 272–292 |
+|   9. Variants of the draw call | 293–332 |
+|   10. Word wrap | 333–370 |
+|   11. Alignment | 371–378 |
+|   12. Clipping (decision CG2) | 379–389 |
+|   13. d2rs answers (hooks in `d2-client`) | 390–404 |
+|   14. Wide formatter `0x005269D0` (added 2026-10-07) | 405–452 |
+| Constants & data dependencies | 453–468 |
+| Randomness | 469–472 |
+| Edge cases & original bugs | 473–502 |
+| Test vectors | 503–538 |
+| Provenance | 539–572 |
+| Open questions | 573–639 |
 <!-- /index -->
 
 ## Summary
@@ -401,6 +402,54 @@ arguments (§13), not a rectangle.
 | `client/assets.md` §B2 (locale font directory) | §1: `latin` for English |
 | `formats/tbl.md` OQ2 (`DEFAULT.TBL`, `FONTER.TBL`) | not opened by the font path (§1.4) |
 
+### 14. Wide formatter `0x005269D0` (added 2026-10-07)
+
+`format(max, dest, fmt, args…)` (cdecl; `max` in UTF-16 units including
+the terminator) is the D2Lang `swprintf` that UI code uses with string
+table formats (84 call sites, e.g. the block / chance line `0x004A7180`).
+It is **not** C `swprintf`:
+
+1. fmt null → return (dest untouched); dest[0] := 0. Then repeat: find the next `%`
+   (`0x00526940`); copy the literal units before it (or to the end of
+   fmt) to dest; dest full (count ≥ `max`) → the last written unit := 0,
+   return. fmt ended → terminate, return.
+2. The unit after `%` selects the conversion (byte table `0x00526C7C`,
+   pointers `0x00526C68`):
+
+   | After `%` | Output |
+   |---|---|
+   | `d` | the next argument as signed decimal (`_itoa`, base 10, then widened by `0x00526320`, at most 15 units) |
+   | `u` | the next argument as unsigned decimal (`_ultoa`) |
+   | `s` | the next argument as a UTF-16 string pointer, copied |
+   | `%` | one `%` — **and the next argument is consumed** |
+   | NUL (fmt ends in a lone `%`) | one `%`, terminated, return |
+   | anything else (`x`, `c`, `i`, a width, …) | fatal assert (line 0x154, `0x00408A60`), process exit −1 |
+
+3. Every conversion of rule 2 except the last two rows advances the
+   argument pointer by 4 and fmt past the two units, then continues
+   with rule 1 (it also loads the next argument slot each time, so the
+   last conversion reads one stack word past the list, unused). So
+   callers pass one argument per `%` pair, `%%` included:
+   `0x004A7180` (`0x004A727C`–`0x004A72B6`) passes (block, chance,
+   name, chance) with string 0x2779 and (name, chance) with string
+   0x2778. With the English texts "Chance to Block: %d%%\nAverage
+   chance %s will hit you: %d%%" and "Average chance %s will hit you:
+   %d%%" (OQ 10) the first chance fills the first `%%` slot and each
+   trailing `%%` consumes the never-pushed slot after the list.
+4. A number (with its terminator) that does not fit (length + count +
+   1 ≥ `max`), or a `%%` that does not fit, ends formatting with no
+   further write (see Edge cases).
+5. `%s` with an empty string, or one that does not fit: the string is
+   appended with a bounded concatenation (`0x00526740`, at most
+   `max` − count − 1 units, then a terminator) and formatting **ends**:
+   the rest of fmt is dropped. A null `%s` pointer is dereferenced (a
+   fault) unless `max` − count − 1 = 0.
+
+d2rs: the client's format helper implements rules 1–5 with an argument
+list whose length is the number of `%` pairs; rule 2's fatal row is an
+error, and rule 5's null pointer is an error. Rule 4's unterminated
+return is replaced by terminating at the current position (Edge cases).
+
 ## Constants & data dependencies
 
 - `text-fonts.tsv` (code consumes it): one row per font id. Columns: `id`,
@@ -443,6 +492,13 @@ Reproduced by default.
 - Code units above 0xFF draw record 0 in Latin fonts.
 - Framed variant `0x00502480` doubles `y'` when the box would start above
   row 0.
+- Wide formatter (§14): literal runs are copied without a terminator, so
+  when rule 4 returns right after one, dest is not terminated at the
+  current position (whatever was in the buffer follows), and rule 5's
+  concatenation starts at the first 0 at or after that position, not
+  necessarily at it. Callers pass zeroed or short-lived stack buffers;
+  d2rs terminates at the current position (an observable difference
+  only when a formatted line overflows `max`).
 
 ## Test vectors
 
@@ -499,7 +555,10 @@ D2Client `0x004A7080`; GDI colored cel draw `0x006C85A0` (slot `+0x88`
 = D2MOO `pfCelDrawColor`, 1.10f slot order confirmed by the `+0x84` /
 `+0x88` bodies), palette-table block `0x004FB010`, PL2 copy
 `0x004FB1E0`; D2Lang decode `0x005259C0`, `0x00526320`, `0x00526100`,
-lookup `0x00524A30`, `0x00524930`. Names `D2Win_*` / `D2Client_*` /
+lookup `0x00524A30`, `0x00524930`; wide formatter `0x005269D0`
+(§14: search `0x00526940`, widen `0x00526320`, append `0x00526740`,
+copy `0x005267E0`, jump tables `0x00526C68` / `0x00526C7C` read from the
+image, caller `0x004A7180`; request from PC 2 `ui/panels-2.md`). Names `D2Win_*` / `D2Client_*` /
 `D2Lang_GetStringByIndex` from `refs/1.14d-notes`. Game files: the 14
 font `.tbl` / `.dc6` (`d2data.mpq`, `d2exp.mpq`; `Patch_D2.mpq` checked
 by hash lookup), the 17 PL2 files, the English string tables (`d2data`,
@@ -569,3 +628,11 @@ pushed `k` (214 sites).
    runs in the start-up "C" locale.
 9. Pixel proof: capture cases `text-0001` / `text-0002` (§Test vectors)
    against the CPU reference.
+10. String ids of §14 rule 3: in the `d2exp.mpq` `patchstring.tbl` the
+    two texts are elements 104 (`charmontohit2X`) and 103
+    (`charmontohit1X`), i.e. ids 10104 / 10103, while `0x004A7180`
+    loads 0x2779 / 0x2778 (10105 / 10104). The 1.14d `Patch_D2.mpq`
+    copy (1,179 elements, no listfile) was not opened here; read its
+    elements 103–105 to confirm it is shifted by one and that every
+    format string in the 1.14d English tables uses only `%d`, `%u`,
+    `%s`, `%%` (§14 rule 2).

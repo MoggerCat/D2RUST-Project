@@ -27,34 +27,34 @@
 | Inputs | 80–87 |
 | Outputs / state changes | 88–105 |
 | Rules | 106–107 |
-|   1. 0x5D quest status (`0x0045E540` → `0x004A2CB0`) | 108–180 |
-|   2. 0x63 waypoint menu (`0x0045E670` → `0x0049CF90`) | 181–204 |
-|   3. 0x77 UI action (`0x0045E800` → `0x004B8CF0`) | 205–242 |
-|   4. 0x26 chat and overhead text (`0x0045DFC0` → `0x0049F490`) | 243–293 |
-|   5. 0x27 NPC text (`0x0045E0A0` → `0x004A1600`) | 294–313 |
-|   6. 0x4E hire offer and 0x4F hire list reset | 314–326 |
-|   7. 0x50 quest special (`0x0045E370` → `0x004B9210`) | 327–350 |
-|   8. 0x58 UI open (`0x0045E490` → `0x004C0550`) | 351–370 |
-|   9. 0x8A NPC wants to interact (`0x0045EA40` → `0x004B3380`) | 371–389 |
-|   10. 0x91 NPC intros (`0x0045E580` → `0x004B3510`) | 390–400 |
-|   11. 0x78 trade partner (`0x0045E810` → `0x004B9010`) | 401–409 |
-|   12. 0x29 game quest flags (`0x0045D3A0` → `0x004B2620`) | 410–419 |
-|   13. 0x52 quest log status (`0x0045CC00` → `0x004A40D0`) | 420–430 |
-|   14. 0x5E game quest availability (`0x0045E570` → `0x004B92B0`) | 431–438 |
-|   15. 0x9B hireling revive state (`0x0045EAC0` → `0x004B6980`) | 439–449 |
-|   16. 0x28 NPC dialog start and quest flags (`0x0045D370` → `0x004B6DD0`) | 450–495 |
-|   17. 0x62 NPC dialog end (`0x0045D390` → `0x004B5320`) | 496–508 |
-|   18. 0x2A NPC transaction (`0x0045E0D0` → `0x004B6390`) | 509–519 |
-|   19. 0x5A event text (`0x0045E070` → `0x0049EB10`) | 520–539 |
-|   20. 0x61 act video (`0x0045E660`) | 540–547 |
-|   21. 0x76 overhead clear (`0x0045E050` → `0x0049F8C0`) | 548–555 |
-|   22. 0x7B skill hotkey (`0x0045E8D0` → `0x004AA0C0`) | 556–565 |
-| Constants & data dependencies | 566–577 |
-| Randomness | 578–582 |
-| Edge cases & original bugs | 583–599 |
-| Test vectors | 600–647 |
-| Provenance | 648–689 |
-| Open questions | 690–744 |
+|   1. 0x5D quest status (`0x0045E540` → `0x004A2CB0`) | 108–186 |
+|   2. 0x63 waypoint menu (`0x0045E670` → `0x0049CF90`) | 187–210 |
+|   3. 0x77 UI action (`0x0045E800` → `0x004B8CF0`) | 211–248 |
+|   4. 0x26 chat and overhead text (`0x0045DFC0` → `0x0049F490`) | 249–299 |
+|   5. 0x27 NPC text (`0x0045E0A0` → `0x004A1600`) | 300–319 |
+|   6. 0x4E hire offer and 0x4F hire list reset | 320–332 |
+|   7. 0x50 quest special (`0x0045E370` → `0x004B9210`) | 333–356 |
+|   8. 0x58 UI open (`0x0045E490` → `0x004C0550`) | 357–376 |
+|   9. 0x8A NPC wants to interact (`0x0045EA40` → `0x004B3380`) | 377–395 |
+|   10. 0x91 NPC intros (`0x0045E580` → `0x004B3510`) | 396–406 |
+|   11. 0x78 trade partner (`0x0045E810` → `0x004B9010`) | 407–415 |
+|   12. 0x29 game quest flags (`0x0045D3A0` → `0x004B2620`) | 416–425 |
+|   13. 0x52 quest log status (`0x0045CC00` → `0x004A40D0`) | 426–438 |
+|   14. 0x5E game quest availability (`0x0045E570` → `0x004B92B0`) | 439–446 |
+|   15. 0x9B hireling revive state (`0x0045EAC0` → `0x004B6980`) | 447–457 |
+|   16. 0x28 NPC dialog start and quest flags (`0x0045D370` → `0x004B6DD0`) | 458–503 |
+|   17. 0x62 NPC dialog end (`0x0045D390` → `0x004B5320`) | 504–516 |
+|   18. 0x2A NPC transaction (`0x0045E0D0` → `0x004B6390`) | 517–527 |
+|   19. 0x5A event text (`0x0045E070` → `0x0049EB10`) | 528–547 |
+|   20. 0x61 act video (`0x0045E660`) | 548–555 |
+|   21. 0x76 overhead clear (`0x0045E050` → `0x0049F8C0`) | 556–563 |
+|   22. 0x7B skill hotkey (`0x0045E8D0` → `0x004AA0C0`) | 564–573 |
+| Constants & data dependencies | 574–585 |
+| Randomness | 586–590 |
+| Edge cases & original bugs | 591–607 |
+| Test vectors | 608–655 |
+| Provenance | 656–697 |
+| Open questions | 698–752 |
 <!-- /index -->
 
 Owned ids: 0x26, 0x27, 0x29, 0x4E, 0x4F, 0x50, 0x52, 0x58, 0x5D, 0x5E,
@@ -177,6 +177,12 @@ layer.
    of `0x00410A80` + 5 when it is 0; `render/lighting.md` §10); v = 5
    and c ≠ 23 → T; v ≠ 5 → the status byte of the entry whose +8 = 1
    := s (no T).
+8. Related (added 2026-10-07, no rule change): the status bytes T and
+   r7 write (`[0x007BF356 + index]`) are read by the quest-log row
+   derivation, `world/quests-status.md` §4 (PC 2); the counters
+   `[0x007BF2A4]`, `[0x007BF2A8]`, `[0x007BF2AC]` (r7, §7 code 1
+   `0x004A28A0`: u16@3, @5, @7 copied only when u16@1 = 1) feed its §4
+   rule 7 and §5 rule 6.
 
 ### 2. 0x63 waypoint menu (`0x0045E670` → `0x0049CF90`)
 
@@ -426,7 +432,9 @@ layer.
    (so entry i's status byte `[0x007BF356 + i]` := byte @1+i);
    `[0x007BF2B0]` := 0; then, when `0x00483350()` is 0: latch
    `[0x007BF298]` = 2 → `0x004A23D0`; and `0x004A3220([0x007C0255],
-   1)` (the act tab shown). The quest log: `ui/*` (PC 2).
+   1)` (the act tab shown). The quest log: `ui/*` (PC 2); the meaning
+   of the 41 bytes and the tab rebuild `0x004A3220`:
+   `world/quests-status.md` §1 rule 1, §3 rule 3, §4 (PC 2).
 
 ### 14. 0x5E game quest availability (`0x0045E570` → `0x004B92B0`)
 
