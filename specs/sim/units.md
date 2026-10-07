@@ -30,14 +30,14 @@
 |   3. Lifecycle | 135–296 |
 |   4. Modes and mode schedules | 297–439 |
 |   5. Event dispatch | 440–454 |
-|   6. Events per kind | 455–543 |
-|   7. Scheduler inventory (`unit-events.tsv`) | 544–565 |
-| Constants & data dependencies | 566–582 |
-| Randomness | 583–590 |
-| Edge cases & original bugs | 591–609 |
-| Test vectors | 610–669 |
-| Provenance | 670–709 |
-| Open questions | 710–751 |
+|   6. Events per kind | 455–549 |
+|   7. Scheduler inventory (`unit-events.tsv`) | 550–571 |
+| Constants & data dependencies | 572–588 |
+| Randomness | 589–596 |
+| Edge cases & original bugs | 597–615 |
+| Test vectors | 616–675 |
+| Provenance | 676–715 |
+| Open questions | 716–758 |
 <!-- /index -->
 
 ## Summary
@@ -479,7 +479,7 @@ event 3 at f + 1, then event 11 at f + 250.
 | Type | Scheduled by | Expire, args | Handler does |
 |---|---|---|---|
 | 0, 1 | §4.6; skills `0x005CC4E0`, `0x005CC690`, `0x005CC3B0`; AI `0x005ECEE0`, `0x005ED2A0`, `0x005F6B70` | §4.2 / §4.4; per caller | mode functions, §4.6 |
-| 2 | neutral start `0x005A73E0`; `0x005A74E0` (f + 15); `0x005A8520` (f + 1, or f + 15 / f + 45 for base id 78); NPC talk `0x00548B00`, `0x0054CA10` (f + 1); restore `0x00542B40`; damage `0x0057B170`, `0x0057B230`; `0x00573780` (f + 2); AI and skill code (30 sites) | §4.6 or per AI | `0x005B1740`: AI think (AI spec; per-class AI record from monster data +0x28, pre-checks `0x005B10E0`, `0x005B1650`, `0x005B13E0`, then the AI function at record +4) |
+| 2 | neutral start `0x005A73E0`; `0x005A74E0` (f + 15); `0x005A8520` (f + 1, or f + 15 / f + 45 for base id 78); NPC talk `0x00548B00`, `0x0054CA10` (f + 1); damage `0x0057B170`, `0x0057B230`; `0x00573780` (f + 2); AI and skill code (30 sites) | §4.6 or per AI | `0x005B1740`: AI think (AI spec; per-class AI record from monster data +0x28, pre-checks `0x005B10E0`, `0x005B1650`, `0x005B13E0`, then the AI function at record +4) |
 | 3 | damage `0x0057AC50`, `0x0057ADD0`, `0x0057C6C0`; skill items; handler | f + 1, (0, 0) | `0x005A6920`: life regeneration (stat 74, `sim/stats.md`); reschedules at f + 1 unless state 52 holds and the rate is ≥ 0; a zero rate cancels its type-3 events |
 | 6 | `0x005DE330`; handler | timeout | `0x005A7F00`, as the player's |
 | 7 | monster unique mods `0x005A1330`–`0x005A4230`, quests, skills | per caller | `0x005A4370` (monster spec) |
@@ -489,6 +489,12 @@ event 3 at f + 1, then event 11 at f + 250.
 
 Types 0, 1, 2, 6, 7, 9, 10, 11, 13, 14 are dropped for a frozen monster
 (`tick.md` §5.6).
+
+Restore `0x00542B40` schedules no monster event (corrected
+2026-10-07): its only two timer sites, `0x00542C87` (type 5) and
+`0x00542D89` (type 2), sit after its saved-record type test = 2
+(object; `0x00542C33`), so they schedule on restored objects only
+(§6.4; `unit-events.tsv`, proof `code`).
 
 Type 7 (`0x005A4370`) runs every mode-2 umod callback of the monster,
 whoever scheduled the event; the bodies, the type-7 and type-2 sites of
@@ -516,10 +522,10 @@ column value), `Parm0` +0x178, `Parm1` +0x17C.
 |---|---|---|
 | 0 | `0x00581700` (trap tick, D2MOO) | object inits `0x0054F860`, `0x0054FB40` (f + 25); handler (f + 15 + roll mod 35) |
 | 1 | `0x00581490`: mode 1 (OP) → 2 (ON) when `Mode2` ≠ 0 (no update queued), then, if `HasCollision2` = 0, `0x00623830` | operate and init functions: f + fc1 + 1 (29 sites), f + fc1 (17 sites, e.g. `0x00545850`, quest objects `0x0058BD50`…), f + 2·fc1 (`0x005B5630`) |
-| 2 | `0x00581510` (D2MOO: well refill) | `0x005858A0`: f + `Parm0` + 1 |
+| 2 | `0x00581510` (D2MOO: well refill) | `0x005858A0`: f + `Parm0` + 1; restore `0x00542B40` (site `0x00542D89`) |
 | 3 | `0x005818B0` | `0x0054FB90` (f + 25); handler (f + 15, f + fc1 + 1) |
 | 4 | `0x005817A0` (trap) | `0x00582510` (f + 35) |
-| 5 | `0x005814D0` (shrine reset: mode 0, data +0x0C := 0) | shrine operate `0x00583C70` (f + 1200·minutes + 1); restore `0x00542B40` |
+| 5 | `0x005814D0` (shrine reset: mode 0, data +0x0C := 0) | shrine operate `0x00583C70` (f + 1200·minutes + 1); restore `0x00542B40` (site `0x00542C87`) |
 | 6 | `0x00581620` (hover) | `0x00583C70` (f + 300) |
 | 7 | `0x00581A10` → `0x005449E0` (quest object event) | quest code (`unit-events.tsv`) |
 | 8 | `0x00581250` | `0x0054F860` (f + 60), `0x0054FDB0` (f + 25 + roll mod 250); handler (f + 25 + roll mod 250, f + 1000, f + 600; and event 1 at f + fc1 + 1) |
@@ -728,7 +734,8 @@ Ghidra backlog (2026-10-06): store `0x00542E10` (falls through to
 6. Partly answered (2026-10-07): 130 of the 208 `file` rows were read
    and are now `code`. Corrections: restore `0x00542B40` schedules types
    5 and 2 on objects only (saved type-2 records; §6.2's "restore" entry
-   for monster type 2 is wrong, and object type 2 also comes from it);
+   for monster type 2 was wrong, and object type 2 also comes from it;
+   §6.2 and §6.4 corrected 2026-10-07);
    the quest event-7 sites schedule on objects except `0x0059584E`
    (the Countess, a monster); `0x0054D11F` on the hireling (monster);
    freeze `0x0057B216`, `0x0057B3E9` on monsters only; the wisp buff
