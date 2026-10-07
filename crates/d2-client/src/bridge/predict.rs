@@ -257,24 +257,47 @@ impl Predict {
     }
 }
 
+/// The walks a [`PredictLink`] recorded, shared with whoever runs
+/// [`Predict::frame`] (the play app boxes the link, so it cannot be
+/// reached through the bridge's `link_mut`).
+#[derive(Clone, Debug, Default)]
+pub struct WalkTap(std::sync::Arc<std::sync::Mutex<Vec<Walk>>>);
+
+impl WalkTap {
+    /// The walks sent since the last call, in send order.
+    pub fn take(&self) -> Vec<Walk> {
+        std::mem::take(&mut *self.0.lock().unwrap_or_else(|e| e.into_inner()))
+    }
+
+    fn push(&self, w: Walk) {
+        self.0.lock().unwrap_or_else(|e| e.into_inner()).push(w);
+    }
+}
+
 /// A [`ServerLink`] that records the walk intents sent through it for
 /// [`Predict::frame`]; everything else passes through unchanged.
 pub struct PredictLink<L> {
     inner: L,
-    walks: Vec<Walk>,
+    walks: WalkTap,
 }
 
 impl<L> PredictLink<L> {
     pub fn new(inner: L) -> Self {
         Self {
             inner,
-            walks: Vec::new(),
+            walks: WalkTap::default(),
         }
     }
 
     /// The walks sent since the last call, in send order.
     pub fn take_walks(&mut self) -> Vec<Walk> {
-        std::mem::take(&mut self.walks)
+        self.walks.take()
+    }
+
+    /// A handle on the recorded walks ([`WalkTap::take`] drains the same
+    /// list as [`Self::take_walks`]).
+    pub fn tap(&self) -> WalkTap {
+        self.walks.clone()
     }
 
     pub fn inner(&self) -> &L {

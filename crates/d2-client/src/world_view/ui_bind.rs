@@ -478,11 +478,18 @@ pub fn run_ui_with<L: ServerLink>(
 /// order; then the held repeat (kinds 1 and 4); then the per-pass latch
 /// is cleared (`0x00462920`). Returns what the UI layer applies (sounds,
 /// hover calls, the pending record).
+///
+/// `mods` is the §4.3 r1 word (`RunMods::word`; 0 without the play
+/// preview's bindings) and `local_at` the local player's position the
+/// click reads (the preview's prediction, decision D2; `None`: the
+/// model's cell).
 pub fn world_clicks<L: ServerLink>(
     bridge: &mut Bridge<L>,
     st: &mut ClickState,
     view: ClickView,
     unhandled: &[UiEvent],
+    mods: u32,
+    local_at: Option<(u32, u32)>,
 ) -> Result<Vec<ClickOut>, BridgeError> {
     let mut rest = Vec::new();
     for e in unhandled {
@@ -505,12 +512,10 @@ pub fn world_clicks<L: ServerLink>(
             } => (Kind::RightUp, Some((at.x, at.y))),
             _ => continue,
         };
-        // `mods`: the Stand Still / Run commands (§4.3 r1) are not bound
-        // to the d2rs input yet.
-        let (r, _) = bridge.world_click(st, view, kind, at, 0)?;
+        let (r, _) = bridge.world_click_at(st, view, kind, at, mods, local_at)?;
         rest.extend(r);
     }
-    let (r, _) = bridge.click_repeat(st, view, 0)?;
+    let (r, _) = bridge.click_repeat_at(st, view, mods, local_at)?;
     rest.extend(r);
     st.end_pass();
     Ok(rest)

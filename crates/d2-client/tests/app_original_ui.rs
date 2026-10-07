@@ -103,6 +103,8 @@ fn hotkey_opens_the_inventory_in_the_apps_frame() {
             source: Arc::new(panel_files()),
             inv_areas: None,
             expansion_installed: false,
+            fonts: None,
+            resist_penalties: None,
         },
     )
     .unwrap();

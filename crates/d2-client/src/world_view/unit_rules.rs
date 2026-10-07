@@ -76,13 +76,14 @@ impl<R: ViewRules> ViewRules for UnitRules<R> {
         world: &ClientWorld,
         unit: &ClientUnit,
     ) -> Result<Option<UnitPose>, ViewError> {
+        let art = self.art.read().unwrap_or_else(|e| e.into_inner());
+        let unit = &*art.posed(unit);
         let Some(name) = unit_cof(&self.looks, unit) else {
             return Ok(None);
         };
         let Ok(path) = name.path() else {
             return Ok(None);
         };
-        let art = self.art.read().unwrap_or_else(|e| e.into_inner());
         let Some(cof) = art.cofs.get(&path) else {
             return Ok(None);
         };
@@ -133,13 +134,14 @@ impl<R: ViewRules> ViewRules for UnitRules<R> {
         _: &UnitPose,
         req: &ComponentRequest<'_>,
     ) -> Result<Option<ComponentFrame>, CompositeError> {
+        let art = self.art.read().unwrap_or_else(|e| e.into_inner());
+        let unit = &*art.posed(unit);
         let Some(name) = unit_cof(&self.looks, unit) else {
             return Ok(None);
         };
         let Some(codes) = component_codes(&self.looks, unit, &name, req.layer) else {
             return Ok(None);
         };
-        let art = self.art.read().unwrap_or_else(|e| e.into_inner());
         let Some(Some((path, facts))) = art.files.get(&codes.name()) else {
             return Ok(None);
         };

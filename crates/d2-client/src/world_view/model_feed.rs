@@ -121,6 +121,9 @@ pub struct ModelFeed<F = NoFeed> {
     /// unit facts and offsets the model lacks, each `d2rs-own,
     /// unverified`. `None` (the default): the strict path.
     pub preview: Option<Preview>,
+    /// The local player's predicted 16.16 position (decision D2,
+    /// `bridge::predict`); read only with a [`Preview`].
+    pub local_at: Option<(UnitKey, (u32, u32))>,
 }
 
 impl<F> ModelFeed<F> {
@@ -131,6 +134,7 @@ impl<F> ModelFeed<F> {
             ui_open_mode: None,
             map: None,
             preview: None,
+            local_at: None,
         }
     }
 
@@ -149,9 +153,23 @@ impl<F> ModelFeed<F> {
     }
 }
 
+impl<F> ModelFeed<F> {
+    /// The unit's position: with a preview, the local player is at its
+    /// predicted position (d2rs-own, unverified: decision D2); otherwise
+    /// [`unit_position`].
+    fn position_of(&self, unit: &ClientUnit) -> Result<UnitPosition, String> {
+        match (&self.preview, self.local_at) {
+            (Some(_), Some((key, (x16, y16)))) if key == unit.key => {
+                Ok(UnitPosition::Moving { x16, y16 })
+            }
+            _ => unit_position(unit),
+        }
+    }
+}
+
 impl<F: ViewSource> ViewSource for ModelFeed<F> {
     fn unit_position(&self, unit: &ClientUnit) -> Result<UnitPosition, String> {
-        unit_position(unit)
+        self.position_of(unit)
     }
 
     /// Preview: `(0, 0)` ([`preview::unit_offset`]); else the inner
@@ -183,7 +201,7 @@ impl<F: ViewFeed> ViewFeed for ModelFeed<F> {
         let Some(unit) = world.local() else {
             return Ok(None);
         };
-        unit_position(unit)
+        self.position_of(unit)
             .map(Some)
             .map_err(|message| ViewError::Unresolved {
                 what: "local player position",
@@ -203,6 +221,15 @@ impl<F: ViewFeed> ViewFeed for ModelFeed<F> {
 
     fn set_ui_open_mode(&mut self, mode: OpenMode) {
         self.ui_open_mode = Some(mode);
+    }
+
+    fn set_local_prediction(&mut self, at: Option<(UnitKey, (u32, u32))>) {
+        self.local_at = at;
+    }
+
+    /// The preview places cels cut by the frame edge (D1).
+    fn edge_clip(&self) -> bool {
+        self.preview.is_some()
     }
 
     fn shake(&self, world: &ClientWorld) -> Result<Option<RunningShake>, ViewError> {

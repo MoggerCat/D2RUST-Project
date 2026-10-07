@@ -292,6 +292,49 @@ impl<L: ServerLink> Bridge<L> {
     /// bridge applies the branch's model writes and C→S 0x31 in 1.14d
     /// order ([`msg::ui_npc::apply_dialog_branch`]), then sends the
     /// messages that waited behind the slot. Returns how many were sent.
+    /// [`Self::world_click`] with the local player read at `local_at`
+    /// (`click::world_click_at`; the `play` preview's predicted position,
+    /// decision D2, d2rs-own, unverified).
+    #[allow(clippy::too_many_arguments)]
+    pub fn world_click_at(
+        &mut self,
+        st: &mut crate::controls::click::ClickState,
+        view: click::ClickView,
+        kind: crate::controls::click::Kind,
+        at: Option<(i32, i32)>,
+        mods: u32,
+        local_at: Option<(u32, u32)>,
+    ) -> Result<(Vec<crate::controls::click::ClickOut>, Vec<output::Output>), BridgeError> {
+        let r = click::world_click_at(
+            &mut self.world,
+            &self.inputs,
+            st,
+            view,
+            kind,
+            at,
+            mods,
+            local_at,
+        )
+        .map_err(BridgeError::Click)?;
+        self.send_outgoing()?;
+        Ok(r)
+    }
+
+    /// [`Self::click_repeat`] with the local player read at `local_at`
+    /// (`click::held_repeat_at`).
+    pub fn click_repeat_at(
+        &mut self,
+        st: &mut crate::controls::click::ClickState,
+        view: click::ClickView,
+        mods: u32,
+        local_at: Option<(u32, u32)>,
+    ) -> Result<(Vec<crate::controls::click::ClickOut>, Vec<output::Output>), BridgeError> {
+        let r = click::held_repeat_at(&mut self.world, &self.inputs, st, view, mods, local_at)
+            .map_err(BridgeError::Click)?;
+        self.send_outgoing()?;
+        Ok(r)
+    }
+
     pub fn npc_dialog_branch(
         &mut self,
         dialog: &output::NpcDialog,

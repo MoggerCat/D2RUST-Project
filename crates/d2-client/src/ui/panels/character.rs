@@ -20,10 +20,9 @@
 //!   §8.4 names for the stat points); §8.7 does not name it.
 //! - §8.7 compares "value" with "base" for stats 7, 9, 11: read here as the
 //!   unshifted stat values (the `>> 8` is named for the display only).
-//! - §8.9 resistance color when no effect is active: the §8.7 `cmp` rule
-//!   (the resistances are in its list); when a raising and a lowering
-//!   effect are both active: not specified ([`ResistEffect`] has no such
-//!   case).
+//! - §8.9 resistance color: both effects active is one case for
+//!   [`ResistEffect`] (lowering wins, so `Lowered`); the effect tests
+//!   themselves are not wired (the view answers them).
 //! - the damage / attack-rating block, the name and class lines and the
 //!   hover texts (§8.10, §Open questions 3) are not drawn; the close
 //!   button tool tip (§8.2) is queued by the hover owner (§7.4).
@@ -175,15 +174,28 @@ fn cmp_color(value: i32, base: i32) -> u16 {
 }
 
 /// §8.9: shown resist = stat − penalty, clamped to [−100, cap], cap =
-/// min(75 + max-resist stat, 95); blue / red by active effect.
+/// min(75 + max-resist stat, 95). Colour in the original's order
+/// (`0x004A8570`–`0x004A86A0`): 3 when a raising effect is active, then 1
+/// when a lowering one is (lowering wins); then at the cap, colour 4
+/// unless it is 3; below it, a shown value < 0 is 1 (also over 3).
 fn resist_value(view: &dyn CharacterView, stat: u16, max_stat: u16) -> (i32, u16) {
     let cap = (75 + view.stat(max_stat)).min(95);
-    let shown = (view.stat(stat) - view.resist_penalty()).max(-100).min(cap);
-    let color = match view.resist_effect(stat) {
+    let mut color = match view.resist_effect(stat) {
         ResistEffect::Raised => 3,
         ResistEffect::Lowered => 1,
-        // Open: no effect → the §8.7 `cmp` rule (resistances are listed).
-        ResistEffect::None => cmp_color(view.stat(stat), view.base(stat)),
+        ResistEffect::None => 0,
+    };
+    let v = (view.stat(stat) - view.resist_penalty()).max(-100);
+    let shown = if v >= cap {
+        if color != 3 {
+            color = 4;
+        }
+        cap
+    } else {
+        if v < 0 {
+            color = 1;
+        }
+        v
     };
     (shown, color)
 }
@@ -862,9 +874,42 @@ mod tests {
             &v,
             &Strings(vec![]),
         );
+        // §8 r9: at the cap, colour 4 unless it is 3 (over the lowering 1).
         assert!(texts(&d)
             .iter()
-            .any(|t| t.0 == "85" && t.2 == 348 && t.4 == 1));
+            .any(|t| t.0 == "85" && t.2 == 348 && t.4 == 4));
+    }
+
+    // Covers: specs/ui/panels.md §8 r9
+    #[test]
+    fn resist_colour_order() {
+        let colour = |effect, value: i32, max: i32| {
+            let v = View {
+                stats: vec![(39, value, value), (40, max, max)],
+                effect,
+                ..View::default()
+            };
+            let d = draws(
+                &CharacterPanel::default(),
+                Screen::R640,
+                &v,
+                &Strings(vec![]),
+            );
+            let tx = texts(&d);
+            let t = tx.iter().find(|t| t.2 == 348).expect("fire value drawn");
+            (t.0.clone(), t.4)
+        };
+        // No effect: 0 below the cap, 4 at it, 1 below zero.
+        assert_eq!(colour(ResistEffect::None, 30, 0), ("30".into(), 0));
+        assert_eq!(colour(ResistEffect::None, 80, 0), ("75".into(), 4));
+        assert_eq!(colour(ResistEffect::None, -5, 0), ("-5".into(), 1));
+        // Raised: 3, kept at the cap, replaced by 1 below zero.
+        assert_eq!(colour(ResistEffect::Raised, 30, 0), ("30".into(), 3));
+        assert_eq!(colour(ResistEffect::Raised, 80, 0), ("75".into(), 3));
+        assert_eq!(colour(ResistEffect::Raised, -5, 0), ("-5".into(), 1));
+        // Lowered: 1, replaced by 4 at the cap.
+        assert_eq!(colour(ResistEffect::Lowered, 30, 0), ("30".into(), 1));
+        assert_eq!(colour(ResistEffect::Lowered, 99, 5), ("80".into(), 4));
     }
 
     // Covers: specs/ui/panels.md §8 r5

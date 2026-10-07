@@ -861,6 +861,34 @@ pub fn client_resist_penalties(archives: &ArchiveSet) -> Result<Vec<i32>, BuildE
     Ok(rows.iter().map(|r| r.resistpenalty as i32).collect())
 }
 
+/// The charstats walk / run speeds of `character`'s class
+/// (`sim/pathing.md` §8.1 r2, §8.2) for the play preview's walk
+/// prediction (decision D2); `None` on synthetic data (no charstats rows)
+/// or a class past the rows.
+pub fn walk_speeds(
+    data: &GameData,
+    character: &Character,
+) -> Result<Option<crate::bridge::predict::Speeds>, BuildError> {
+    let GameData::Live(d) = data else {
+        return Ok(None);
+    };
+    let class = match character {
+        Character::New => PLAYER_CLASS as u8,
+        Character::Named(c) => c.class,
+        Character::Save(save, _) => save.header.class,
+    };
+    let rows: Vec<d2_data::tables::Charstats> = d
+        .tables
+        .rows()
+        .map_err(|e| BuildError::Tables(e.to_string()))?;
+    Ok(rows
+        .get(usize::from(class))
+        .map(|r| crate::bridge::predict::Speeds {
+            walk: r.walkvelocity,
+            run: r.runvelocity,
+        }))
+}
+
 /// The `skills` fields the client skill list reads (`client/msg-skills.md`
 /// Inputs: `anim`, `monanim`, `passivestate`; §9–§10: `enhanceable`,
 /// `EType`, `skilldesc`, `srvdofunc`; `skills/levels.md` §1, §6:
