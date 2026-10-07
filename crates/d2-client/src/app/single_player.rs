@@ -913,6 +913,8 @@ pub fn client_skill_rows(archives: &ArchiveSet) -> Result<Vec<SkillRow>, BuildEr
             enhanceable: s.enhanceable,
             skilldesc: s.skilldesc,
             etype: s.etype,
+            range: s.range,
+            flags: crate::bridge::combat::skill_flags(s),
         })
         .collect())
 }

@@ -30,6 +30,7 @@
 
 pub mod feed;
 pub mod model_feed;
+pub mod monster_walk;
 pub mod near_rooms;
 pub mod node;
 pub mod overlay;
