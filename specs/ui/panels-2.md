@@ -4,7 +4,9 @@
   yet). Continues `ui/panels.md` (owner of the UI states, the open mode,
   the panel art and every § not listed here); section numbers continue
   its numbering: §14 moved here unchanged from `panels.md` (size), §17–§20
-  are new detail sections for `panels.md` §8–§12.
+  are new detail sections for `panels.md` §8–§12, §21 the gold lines,
+  buttons and dialog, §22 the d2rs widget answers. Continued in
+  `ui/panels-3.md` (§23–§27).
 - **Target version:** 1.14d, English install
 - **Crate/module:** `d2-client::ui` (`PanelRules`, panel draw lists, hit
   tests), `d2-client::ui::panels` (`character`, `skill_tree`, `stash`,
@@ -20,21 +22,23 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 40–49 |
-| Inputs | 50–59 |
-| Outputs / state changes | 60–64 |
-| Rules | 65–66 |
-|   14. NPC menu (ui 8) and NPC shop (ui 0x0C) | 67–241 |
-|   17. Character panel details (`panels.md` §8; answers UP-6) | 242–356 |
-|   18. Inventory close button and click area (`panels.md` §9; answers UP-7, UP-8) | 357–381 |
-|   19. Skill tree input and draw order (`panels.md` §10; answers UP-21, UP-22, UP-23) | 382–452 |
-|   20. Stash and cube buttons (`panels.md` §11, §12; answers UP-10, `panels.md` OQ 13) | 453–520 |
-| Constants & data dependencies | 521–533 |
-| Randomness | 534–538 |
-| Edge cases & original bugs | 539–555 |
-| Test vectors | 556–575 |
-| Provenance | 576–597 |
-| Open questions | 598–617 |
+| Summary | 44–53 |
+| Inputs | 54–63 |
+| Outputs / state changes | 64–68 |
+| Rules | 69–70 |
+|   14. NPC menu (ui 8) and NPC shop (ui 0x0C) | 71–245 |
+|   17. Character panel details (`panels.md` §8; answers UP-6) | 246–360 |
+|   18. Inventory close button and click area (`panels.md` §9; answers UP-7, UP-8) | 361–385 |
+|   19. Skill tree input and draw order (`panels.md` §10; answers UP-21, UP-22, UP-23) | 386–456 |
+|   20. Stash and cube buttons (`panels.md` §11, §12; answers UP-10, `panels.md` OQ 13) | 457–524 |
+|   21. Gold amounts, gold buttons and the gold dialog (`panels.md` §9 r6, §11 r6; answers `panels.md` OQ 5) | 525–612 |
+|   22. d2rs widget answers (`client/ui.md` §B1, §B2; code `TODO(spec: ui/panels.md …)`) | 613–670 |
+| Constants & data dependencies | 671–685 |
+| Randomness | 686–690 |
+| Edge cases & original bugs | 691–711 |
+| Test vectors | 712–737 |
+| Provenance | 738–766 |
+| Open questions | 767–792 |
 <!-- /index -->
 
 ## Summary
@@ -518,6 +522,152 @@ flag `[0x007C0A38 + 4i]` (−1 = not learnable, 0, 1 pressed), remap
    runs the open / close hooks (`0x00455720`, `0x00455AE0`) whose menu
    builders are not covered here.
 
+### 21. Gold amounts, gold buttons and the gold dialog (`panels.md` §9 r6, §11 r6; answers `panels.md` OQ 5)
+
+1. **Gold line** `0x00488100(k)` (k in ECX). The inventory family
+   (`0x0048EDF0`) calls it with k = 2 in the NPC trade modes 1–9 (after
+   `0x00488400`, at `0x0048EE72`), k = 0 in the stash modes 0x0C / 0x0D
+   (at `0x0048F350`, after the stash grid) and k = 1 in every mode (at
+   `0x0048FF31`, after the equipped items `0x004845A0`, `ui/inventory.md`
+   §6, and the shop extras `0x004886C0`). It sets font 1 (Font16) and
+   restores the previous font on return. The value is the full stat
+   (`0x00625480(P, stat, 0)`), formatted `%d` (`_snprintf`, 20 bytes,
+   widened to u16), drawn with `DrawText` color 0, not centered:
+
+   | k | Stat | Value pen | Button (`Panel\goldcoinbtn`, frame `p`) |
+   |---|---|---|---|
+   | 0 stash | 15 `goldbank` | (`sx + 165`, `H + sy − 440`) expansion game, (`sx + 165`, `H + sy − 244`) classic | `p` = (`[0x007BCE34]` ≠ 0), at (`sx + 75`, `H + sy − 440 + p`) / (`sx + 75`, `H + sy − 244 + p`) |
+   | 1 inventory | 14 `gold` | (`W − sx − 212`, `H + sy − 72`) | `p` = (`[0x007BCE30]` ≠ 0), at (`W − sx − 236`, `H + sy − 71 + p`) |
+   | 2 shop | 15 `goldbank` | right-aligned: x = `sx + 198 −` width A of the value (`text.md` §6), y = `H + sy − 106` | none; then the label 3315 `stash` "Stash" at (`sx + 21`, `H + sy − 106`) |
+
+   The button is a cel draw (draw mode 5, light 0xFF, no remap) of the
+   cel `[0x007BCC34]` (`Panel\goldcoinbtn`, loaded by `0x004868B0`): 2
+   frames of 20 × 18, offsets 0 (d2data, measured). Pressed = frame 1,
+   drawn one row lower.
+2. **Stash hover** (k = 0, current mouse, `0x00486820(x0, y0, 20, 18)`,
+   inclusive): x in [`sx + 73`, `sx + 93`], y in [`Y − 18`, `Y`], `Y` =
+   `H + sy − 438` expansion / `H + sy − 242` classic → tool tip 4124
+   `strGoldWithdraw` "Withdraw" queued at (`sx + 53`, `H + sy − 458` /
+   `H + sy − 262`), color 0, not centered (queue `0x00502280`,
+   `ui/control-panel.md` §Outputs).
+3. **Hit rectangles.** Inventory gold button (`0x00486DA0`, x in EDI, y
+   in ESI): no cursor item and x in [`W − sx − 237`, `W − sx − 217`], y
+   in [`H + sy − 87`, `H + sy − 69`] (inclusive). Stash gold button:
+   §20.1 (`0x00489920`).
+4. **Press.** Inventory mode 0 (`0x00492310`): a press in the inventory
+   gold rectangle sets `[0x007BCE30]` := 1 and plays sound 4
+   (`0x004B9A00(4, 0, 0, 0)`); consumed. Stash modes: §20.1
+   (`[0x007BCE34]`).
+5. **Release.** Inventory mode 0: §18.1 (flag set → cleared; release in
+   the rectangle and `[0x007BCE2C]` = 0 → gold dialog kind 1). Stash
+   modes (`0x00489AC0`, `0x00489BD2`–`0x00489C0A`; no pressed-flag
+   check): release in the inventory gold rectangle and `[0x007BCE2C]` =
+   0 → gold dialog kind 3; then release in the stash gold rectangle and
+   `[0x007BCE2C]` = 0 → kind 4; then, unless the mouse is over the belt,
+   `[0x007BCE34]` := 0 and `[0x007BCE30]` := 0.
+6. **Gold dialog** `0x00454150(k)` (k in ECX): nothing without a player,
+   with a cursor item or while a dialog is open (`[0x007A27A0]` ≠ 0).
+   Else: if the latch `[0x007A27B4]` = 0, key mode 0 with key-up kept
+   (`0x0046AA20(0, 1)`, `ui/controls.md` §4.1 r5) and latch := 1; value
+   `[0x007A2A68]` := 0; then by k (jump table `0x00454558`):
+
+   | k | Set-up | Max (full stat) | Prompt (string id) |
+   |---|---|---|---|
+   | 0 | `[0x007C02EC]` := 1 (`0x004A7A90`) | 14 | 4033 `strDropGoldHowMuch` |
+   | 1 drop | `0x004898A0` | 14 | 4033 |
+   | 2 trade offer | `0x004898A0` | 14 | 4046 `strTradeGoldHowMuch` |
+   | 3 deposit | `0x004898A0` | 14 | 4049 `strBankGoldDeposit` |
+   | 4 withdraw | `0x004898A0` | 15 | 4050 `strBankGoldWithdraw` |
+   | ≥ 5 | close (rule 7) only | — | — |
+
+   `0x004898A0` sets `[0x007BCE2C]` := 1, inventory mode 0x0D → 0x0C,
+   and closes the chat box (`SetUIState(5, off, 0)`). k is kept in
+   `[0x007A279C]`. The dialog is a menu box (`0x004B7CD0(215, 140,
+   callback 0x00453FC0, 0, 0, 1)`, the `ui/menus.md` §2 family) holding
+   the prompt (font 1, word-wrapped to 200 pixels by `0x00502970`, one
+   box line per wrapped line, `0x004B85F0(24, 0, 4, 1, 0, 0)`) and four
+   controls, coordinates as passed: `0x004BC480(223, 219, 0, callback
+   0x00453FE0)`, a numeric edit box `0x004BBD80(258, 228, 100, 1, max,
+   10, callback 0x00453FD0, 1)`, OK `0x004BB0F0(250, 287, 0, callback
+   0x00454080)`, Cancel `0x004BB0F0(355, 287, 1, callback 0x00454140)`.
+   Kind 3 pre-fills the edit box with the max (the test also names kinds
+   6 and 7, which never get this far); kind 2 then calls `0x004B90B0`. The controls' art, caret and key input: §Open questions
+   6.
+7. **Close** `0x00453EE0` (Cancel, and the first step of OK): latch set
+   → key mode 1 (`0x0046AA20`), latch := 0; value `[0x007A2A68]` := the
+   edit box's value (its +0x2C method); the box and the four controls
+   are freed; kinds 1–4 → `0x00489880` (`[0x007BCE2C]` := 0, mode 0x0D →
+   0x0C); kind 0 → `0x004A7A80`.
+8. **OK** `0x00454080`: close (rule 7), then with `v` = the value:
+   - `v` = 0: kind 2 → `0x004B9110`; other kinds nothing;
+   - kinds 0, 1: C→S **0x50** [P's GUID u32 (−1 without P)][`v` u32]
+     (`0x004786A0`; `sim/client-messages.tsv` `DropGold`); no sound;
+   - kind 2: `0x004B9110` (player trade), sound 0xDD;
+   - kind 3: C→S **0x4F** [button 0x14 u16][p1 = `v >> 16` u16][p2 =
+     `v & 0xFFFF` u16] (`0x00478600`), sound 0xDD;
+   - kind 4: C→S 0x4F [button 0x13][`v >> 16`][`v & 0xFFFF`], sound 0xDD.
+
+   Sound 0xDD = `0x004B9A00(0xDD, 0, 0, 0)` (`audio/triggers.md` §1 r1).
+   Server meaning of 0x4F 0x13 / 0x14 and of 0x50: `panels.md` OQ 6.
+
+### 22. d2rs widget answers (`client/ui.md` §B1, §B2; code `TODO(spec: ui/panels.md …)`)
+
+1. **Button frames** (`Button`, §B1). No panel button of `panels.md`
+   §7–§13 or of §14, §17–§21 here changes its image on hover: hover only
+   queues a tool tip, fills a rectangle (`panels.md` §13 r4) or changes
+   the remap of a skill icon (`panels.md` §10.3, `panels-3.md` §25). The
+   image changes only with the button's pressed flag (or a state), as
+   each rule states: close buttons frame 10 released / 11 pressed
+   (`panels.md` §7.2); add buttons `Panel\Level` frame 0 / 1 (§8.4);
+   cube transmute `Panel\miniconvert` frame 0 / 1 (§12.3); gold buttons
+   frame 0 / 1 one row lower (§21.1); shop buttons and tabs §14.11,
+   §14.12; skill icons `IconCel` / `IconCel + 1` (§10.3); waypoint tabs
+   `2t` / `2t + 1` (§13.3, a state, not a press).
+2. **Label pen** (`Label`, §B1). A label's pen is never the widget rect
+   origin: each text rule gives the pen (x, y), y being the bottom row of
+   the glyph cell (`ui/text.md` §4 r2) and x given or centered over a
+   span (`panels.md` §1.6). A d2rs `Label` built from a
+   `panel-layout.tsv` `text` row takes pen x from `x` (centered over `w`
+   when `cond` has `centered`; `x − width / 2` for `half_centered`) and
+   pen y from `y`; its rect is only the hit / clip area.
+3. **Wheel scrolling** (`ScrollList`, §B2). No panel of `panels.md`
+   §8–§14 or of this file scrolls with the mouse wheel. The handler
+   tables of 1.14d hold `WM_MOUSEWHEEL` (0x20A) entries only for the
+   game window (`0x0070F2C8` → `0x0044C400`: the commands bound to keys
+   0x103 / 0x104, `ui/controls.md` §4.2 r3), the key-config screen
+   (`0x006D6028` → `0x004A59D0`: one list step per event with |delta| ≥
+   120 and click sound 0; `0x00724790` → `0x004A63B0`: assigns the wheel
+   as a key, `ui/controls.md` §5), the menu box (`0x007273E8` →
+   `0x004B7610`: the event is offered to each control of the open box in
+   order) and the out-of-game controls (`0x0072DDCC` → `0x004FA340`)
+   (scan of every 0x20A dword outside `.text`). A d2rs list in an
+   original-UI panel uses step 0.
+4. **UI image request** (`UiRules::ui_image`, §B1, §B6). An image request
+   names a DC6 file (under `data\global\ui\`, or the explicit path of its
+   rule), a frame and direction 0; the archive is `client/assets.md`'s.
+   The request's point is the rule's **cel draw point** (X, Y): the frame
+   covers columns `X + xoff … X + xoff + w − 1`, rows `Y + yoff − h + 1 …
+   Y + yoff` (`render/sprite-placement.md` §2). Shading
+   (`render/composition.md` §5): the plain cel draw `0x004F6480` with
+   light 0xFF has no light map and no remap; the colored cel draw
+   `0x004F64B0` with remap `k` uses text-color map `k` (none for `k` =
+   0), exactly as glyphs (`ui/text.md` §4 r3–r4). Blend: draw mode 5
+   (every UI cel unless a rule names another) → `Opaque` (DC6
+   transparency only); mode 3 (Horadric animation `panels.md` §12.4,
+   scroll symbols `panels-3.md` §27) → `IndexTable(ADD)`; mode 1
+   (ethereal item graphic, `ui/inventory.md` §8) → `IndexTable(A1)`
+   (`render/blend-modes.md` §1, §7). Filled rectangles (`0x004F6300`:
+   tool-tip boxes, tints) follow `render/blend-modes.md` §8 r2 (mode 0 →
+   `d' = A2[256·d + color]`, mode 2 → `A0`, mode 5 → `color`, mode 6 →
+   `MAX[256·d]`).
+5. **Open mode for the camera** (`ViewFeed::open_mode`, `render/camera.md`
+   §1). The screen open mode is UI state only: the value `panels.md` §4.2
+   gives after the last `SetUIState` (`SetScreenOpenMode` `0x0045AEA0`,
+   read by `0x0045AE90`); no server message and no world-model field
+   carries it. A feed without the original UI answers 0 (no panel open);
+   with it, the feed answers what the UI set (`set_ui_open_mode`).
+6. **Cursor** (`client/ui.md` §B6): `panels-3.md` §23.
+
 ## Constants & data dependencies
 
 - Tables read from the image: `0x0072D840` (12 × 3 i32), `0x006DA430`
@@ -527,6 +677,8 @@ flag `[0x007C0A38 + 4i]` (−1 = not learnable, 0, 1 pressed), remap
 - Strings (English; ids ≥ 10,000 from the `Patch_D2` `patchstring.tbl`,
   1,179 entries): 3335, 3336, 3338, 4061, 4063, 4065, 4144, 4159, 4224–
   4226, 5382, 10095, 10103–10105.
+- Gold (§21): `Panel\goldcoinbtn` (2 frames, 20 × 18); strings 3315,
+  4033, 4046, 4049, 4050, 4124; sound ids 4, 0xDD; stats 14, 15.
 - `charstats` +0 (class name), +0x3C (ToHitFactor); `monstats` +6, +0x4C,
   +0xAA; `monstats2` `isAtt`, `inert`; `skills.txt` flags +4;
   `skilldesc` +0x0E, +0x12, +0x14; `itemstatcost` 348.
@@ -552,6 +704,10 @@ Reproduced by default.
 - A cube that disappears while open sends 0x4F 0x17 twice (§20.4).
 - The trade-NPC shop draws button record 2 although it is disabled
   (§14.11).
+- Gold-button releases in the stash do not check the press flags: a
+  release on the button opens the dialog even when the press began
+  elsewhere (§21.5).
+- A gold dialog OK with 0 sends nothing (§21.8).
 
 ## Test vectors
 
@@ -572,6 +728,12 @@ Reproduced by default.
 | 640 × 480 shop (mode 3), mouse down (140, 400) | button 0 (116 < 140 < 161, 371 < 400 < 415) | §14.13 |
 | stash close (expansion, 640 × 480) press at (272, 416) / (273, 416) | none / pressed | §20.1 |
 | cube vanishes while ui 0x1A open | 0x4F 0x17 twice | §20.4 |
+| 800 × 600, inventory open, 1,234 gold | `1234` at (508, 468) Font16; button frame 0 at (484, 469) | §21.1 |
+| 640 × 480 expansion stash, 50,000 in stash | `50000` at (165, 40); button at (75, 40) | §21.1 |
+| deposit dialog OK with 70,000 | `4F 14 00 01 00 70 11` | §21.8 |
+| withdraw dialog OK with 5 | `4F 13 00 00 00 05 00` | §21.8 |
+| drop dialog OK with 100, player GUID 1 | `50 01 00 00 00 64 00 00 00` | §21.8 |
+| any panel, wheel event | no list scroll (step 0) | §22.3 |
 
 ## Provenance
 
@@ -589,7 +751,14 @@ handler `0x004B6390`, Cain reset `0x004B5640`; shop `0x00487ED0`,
 skill tree `0x004AB7E0`, `0x004ABC30`, `0x004AB5F0`, `0x004AB630`,
 `0x004AB310`, `0x004AC690`, `0x004AC200`, `0x004ABF60`; stash / cube
 `0x00492510`, `0x00489920`, `0x00489980`, `0x004927C0`, `0x00489FB0`,
-`0x0048A000`, `0x0048A190`, `0x0048EDF0`, close hook `0x00455AE0`.
+`0x0048A000`, `0x0048A190`, `0x0048EDF0`, close hook `0x00455AE0`;
+gold `0x00488100` (call sites `0x0048EE72`, `0x0048F350`, `0x0048FF31`
+with ECX 2, 0, 1), `0x00486820`, `0x00486DA0`, `0x00492310`,
+`0x00489AC0`, dialog `0x00454150` (table `0x00454558`), `0x00453EE0`,
+`0x00454080` (table `0x00454124`), `0x00454140`, `0x004898A0`,
+`0x00489880`, `0x00478600`; wheel handler entries found by a scan of
+the non-code sections for 0x20A (script outside the repo); DC6 header
+of `goldcoinbtn` read with Python.
 Table values read from the image and the English string tables
 (`d2data` `string.tbl`, `Patch_D2` `patchstring.tbl`) with Python
 scripts outside the repo. D2MOO (1.10f) gave the `charstats` field
@@ -614,3 +783,9 @@ names (+0, +0x3C) only. No capture yet.
    heights).
 5. Meaning of the shop button fields +0x0A and +0x10 (§14.11), read by
    `0x00488B00` / the hover code. Ghidra read.
+6. Gold dialog controls (§21.6): the art, layout, caret, digit entry,
+   max clamp and Enter / Esc handling of `0x004BBD80` (edit box),
+   `0x004BB0F0` (buttons) and `0x004BC480`, and the box `0x004B7CD0`
+   draw; the server effect of 0x4F 0x13 / 0x14. Disassembly read of
+   those constructors and their vtables; a capture of the drop-gold
+   dialog.

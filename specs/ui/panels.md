@@ -22,7 +22,7 @@
   `combat/vitals.md` §2 (0x3A), `skills/levels.md` §6.4 (0x3B),
   `sim/client-messages.tsv` (layouts). Machine tables: `ui-states.tsv`,
   `panel-layout.tsv`, `npc-menus.tsv` (this spec, §16). Continued in
-  `ui/panels-2.md` (§14, §17–§20).
+  `ui/panels-2.md` (§14, §17–§22) and `ui/panels-3.md` (§23–§27).
 
 <!-- index -->
 | Section | Lines |
@@ -39,20 +39,20 @@
 |   6. 800 × 600 border and control panel art (`0x00499450`) | 293–313 |
 |   7. Shared panel parts | 314–331 |
 |   8. Character panel (ui 2, left; `0x004A7D00`) | 332–434 |
-|   9. Inventory panel family (`0x0048EDF0`) | 435–491 |
-|   10. Skill tree (ui 4, right; `0x004AC690`) | 492–554 |
-|   11. Stash (ui 0x19, full; inventory modes 0x0C / 0x0D) | 555–590 |
-|   12. Horadric Cube (ui 0x1A, full; inventory mode 0x0E) | 591–641 |
-|   13. Waypoint menu (ui 0x14, left; `0x0049C9C0`) | 642–694 |
-|   14. NPC menu (ui 8) and NPC shop (ui 0x0C) | 695–700 |
-|   15. Event → intent summary | 701–728 |
-|   16. Machine tables | 729–763 |
-| Constants & data dependencies | 764–784 |
-| Randomness | 785–789 |
-| Edge cases & original bugs | 790–810 |
-| Test vectors | 811–849 |
-| Provenance | 850–890 |
-| Open questions | 891–959 |
+|   9. Inventory panel family (`0x0048EDF0`) | 435–495 |
+|   10. Skill tree (ui 4, right; `0x004AC690`) | 496–558 |
+|   11. Stash (ui 0x19, full; inventory modes 0x0C / 0x0D) | 559–594 |
+|   12. Horadric Cube (ui 0x1A, full; inventory mode 0x0E) | 595–645 |
+|   13. Waypoint menu (ui 0x14, left; `0x0049C9C0`) | 646–698 |
+|   14. NPC menu (ui 8) and NPC shop (ui 0x0C) | 699–704 |
+|   15. Event → intent summary | 705–732 |
+|   16. Machine tables | 733–767 |
+| Constants & data dependencies | 768–788 |
+| Randomness | 789–793 |
+| Edge cases & original bugs | 794–814 |
+| Test vectors | 815–853 |
+| Provenance | 854–894 |
+| Open questions | 895–970 |
 <!-- /index -->
 
 ## Summary
@@ -481,9 +481,13 @@ after both.
    1.14d instruction sets non-zero (all.asm scan): the tab draws never
    run. A second hand-background pass after them (`0x0048F950`) can never
    draw. Both: reproduce as no-ops.
-6. Then the grid and equipped items (`0x00483FF0`, page 0), gold and
-   other buttons (`0x004845A0`), the cursor item and hover box: owner
-   `ui/inventory.md` (`client/ui.md` §B5, §Open questions 1).
+6. Then the grid (`0x00483FF0`, page 0) and the equipped items
+   (`0x004845A0`: the equipment boxes, not buttons; `ui/inventory.md`
+   §3–§6), the shop extras in modes 1–9 (`0x004886C0`), the gold line and
+   gold button (`0x00488100(1)`, `panels-2.md` §21), the close button,
+   then the hover box (`0x0048DD90`); the cursor item: `panels-3.md`
+   §23. (Corrected 2026-10-07: `0x004845A0` was named here as the gold
+   buttons.)
 7. Clicks on the grid and body locations send the item intents (§15);
    their validation is `items/inventory-moves.md` §7.
 8. Mouse-up order, the area test (bottom inclusive) and the belt test:
@@ -572,8 +576,8 @@ after both.
    ui 0x19 via the close hook `0x00489EE0`): `SetUIState(0x19, off, 0)`,
    inventory mode 0, and C→S `0x4F` button 0x12 (p1 = p2 = 0). Server
    meaning of 0x12: §Open questions 6.
-6. Grid clicks: stash page 4 intents (§15). Stash gold buttons:
-   §Open questions 5.
+6. Grid clicks: stash page 4 intents (§15). Stash gold line, button
+   and dialog: `panels-2.md` §21.
 7. **How many 0x4F 0x12.** The close hook `0x00489EE0` sends one only
    while the inventory mode is 0x0C or 0x0D (it sets mode 0 first and
    calls `SetUIState(0x19, off, 0)` again, a no-op); there is no latch.
@@ -903,9 +907,12 @@ repo; HANDOFF §5 C71 found frame 1 at (−205, 17)); cube close
    states, icons and the 0x58 replay: `world/quests-status.md` §3, §5
    (`0x004A34F0`, `0x004A3220`, `0x004A23D0`, `0x004A27D0`); only its
    layout, hit rectangles and draw order belong here.
-2. Which key toggles which state and with which `jump` (CmdTbl
-   `0x004A5…`, `default.key`): owner `ui/controls.md` (`client/ui.md`
-   §B4). Read of the command table.
+2. **Answered** (2026-10-07, `ui/controls.md` §3: command table
+   `0x00712698`, compiled default keys `0x00712220`; each command's
+   `SetUIState(ui, mode, jump)` is in its row). Was: Which key toggles
+   which state and with which `jump` (CmdTbl `0x004A5…`, `default.key`):
+   owner `ui/controls.md` (`client/ui.md` §B4). Read of the command
+   table.
 3. **Answered** (2026-10-07, `panels-2.md` §17; the `descdam` /
    `descatt` functions: `panels-2.md` OQ 1). Was: Character panel: damage / attack-rating block, name and class lines,
    per-stat hover texts (§8.10). Disassembly of `0x004A7D00` after
@@ -916,7 +923,11 @@ repo; HANDOFF §5 C71 found frame 1 at (−205, 17)); cube close
    open as below): the free-points box (`0x004AC200`), the tab tool tips
    (`0x004AB310`), the no-points mouse-down message (§10.5), the exact
    remap `k` per state (verify by capture).
-5. Stash gold buttons, gold dialog and the inventory gold button
+5. **Answered** (2026-10-07, `panels-2.md` §21: gold lines
+   `0x00488100`, buttons `0x00486DA0` / `0x00489920`, dialog
+   `0x00454150`; `0x004845A0` is the equipment draw, `ui/inventory.md`
+   §6; the dialog's generic controls: `panels-2.md` OQ 6). Was: Stash
+   gold buttons, gold dialog and the inventory gold button
    (`0x004845A0`, `0x00489580`, `0x004891xx`). Ghidra read.
 6. Server meaning of C→S 0x4F button 0x12 (stash close) and of the
    player-trade buttons 2, 4, 7, 8: `0x0054C7C0` → `0x00568060`.
