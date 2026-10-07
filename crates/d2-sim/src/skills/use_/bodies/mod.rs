@@ -46,9 +46,9 @@ pub(crate) mod tests2;
 #[cfg(test)]
 mod tests3;
 #[cfg(test)]
-mod tests5;
-#[cfg(test)]
 mod tests4;
+#[cfg(test)]
+mod tests5;
 #[cfg(test)]
 mod tests6;
 

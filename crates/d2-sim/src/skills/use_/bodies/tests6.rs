@@ -898,7 +898,7 @@ fn dragon_tail_start_attack_rate_list_and_refusals() {
     let l = f.lists.last().expect("attack rate list");
     assert_eq!(l.flags, 4);
     assert_eq!(l.unit, Some(u));
-    assert_eq!(l.stats.get(&(stat::ATTACKRATE as i32)), Some(&40));
+    assert_eq!(l.stats.get(&(stat::ATTACKRATE)), Some(&40));
     assert!(f.take_log().contains(&format!("anim {u}")));
 }
 
@@ -973,7 +973,7 @@ fn dragon_tail_do_refusals() {
 // Covers: specs/skills/bodies-2b.md §6.19 r2, §6.19 r3
 #[test]
 fn dragon_tail_do_finishes_and_splashes_fire() {
-    let (t, ct, mut f, u, m, m2) = tail_do_world();
+    let (t, ct, mut f, u, _m, m2) = tail_do_world();
     f.c.set(u, 329, 20);
     f.take_log();
     assert_eq!(b3_lvl18::dragon_tail(&mut f, &t, &ct, u, 1, 1), 1);
@@ -1734,7 +1734,7 @@ fn hunger_run(p: i16, l: i16, m: i16, miss: bool) -> (i32, BodyFake, usize, usiz
         f.c.set(tg, 31, 100_000);
     }
     let r = b3_lvl24::hunger(&mut f, &t, &ct, u, 1, 1);
-    (r, f, u, tg, 10_000_000 - 0)
+    (r, f, u, tg, 10_000_000)
 }
 
 // Covers: specs/skills/bodies-2b.md §7.17 r1, §7.17 r2
@@ -1824,7 +1824,7 @@ fn mind_blast_refusals_and_range() {
     assert!(f.list_of(m, 53).is_none());
 }
 
-// Covers: specs/skills/bodies-2b.md §7.19 r3, §7.19 r4, §7.19 r5
+// Covers: specs/skills/bodies-2b.md §7.19 text, §7.19 r3, §7.19 r4, §7.19 r5
 #[test]
 fn mind_blast_converts_with_the_chance_or_hits() {
     // chance DM(1, 100, 100) = 100: always converted.
