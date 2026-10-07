@@ -120,6 +120,10 @@ pub struct BodyFake {
     pub scan_town: Vec<usize>,
     pub frame_bonus_v: i32,
     pub unsummon_ok: bool,
+    /// `inventory_busy` answers this.
+    pub busy: bool,
+    /// `item_missile_type` by item (default 0).
+    pub item_missiles: BTreeMap<usize, i32>,
 }
 
 impl BodyFake {
@@ -640,6 +644,7 @@ impl BodyWorld for BodyFake {
     fn set_item_stat(&mut self, i: usize, s: u16, v: i32) {
         self.item_stats.insert((i, s), v);
         self.log(format!("itemstat {i} {s} {v}"));
+        self.item_stats.insert((i, s), v);
     }
     fn item_max_stack(&self, i: usize) -> i32 {
         self.max_stack.get(&i).copied().unwrap_or(0)
@@ -685,6 +690,12 @@ impl BodyWorld for BodyFake {
     }
     fn path_op(&mut self, u: usize, op: PathOp<usize>) -> i32 {
         self.log(format!("path {u} {op:?}"));
+        if let PathOp::TargetUnit(t) = op {
+            match t {
+                Some(t) => self.targets.insert(u, t),
+                None => self.targets.remove(&u),
+            };
+        }
         i32::from(op == PathOp::Compute)
     }
     fn monlvl(&self) -> &[Monlvl] {
@@ -864,7 +875,7 @@ impl BodyWorld for BodyFake {
         (self.c.unit_type(u) == UnitType::Item).then_some(self.c.units[u].class as usize)
     }
     fn inventory_busy(&self, _: usize) -> bool {
-        false
+        self.busy
     }
     fn has_inventory(&self, _: usize) -> bool {
         self.inventory
@@ -890,8 +901,8 @@ impl BodyWorld for BodyFake {
     fn shield_damage(&self, i: usize) -> Option<(i32, i32)> {
         Some(self.c.items[i].damage)
     }
-    fn item_missile_type(&self, _: usize) -> i32 {
-        0
+    fn item_missile_type(&self, i: usize) -> i32 {
+        self.item_missiles.get(&i).copied().unwrap_or(0)
     }
     fn golem_item(&self, t: usize) -> bool {
         self.c.unit_type(t) == UnitType::Item

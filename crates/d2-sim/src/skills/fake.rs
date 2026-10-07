@@ -118,6 +118,11 @@ pub struct Fake {
     /// Every unit is shapeshifted (`ManaUnits::shapeshifted`).
     pub shifted: bool,
     pub log: Vec<String>,
+    /// The (attacker, defender, record) of every `reaction` call.
+    pub reactions: Vec<(usize, usize, DamageRecord)>,
+    /// Per-unit override of the monster type flags (`monster_flag`); a
+    /// unit without an entry uses its `flags`.
+    pub mflags: BTreeMap<usize, u32>,
 }
 
 impl Fake {
@@ -247,7 +252,12 @@ impl CombatWorld for Fake {
         self.units[u].moving
     }
     fn monster_flag(&self, u: usize, mask: u32) -> bool {
-        self.units[u].type_flags.unwrap_or(self.units[u].flags) & mask != 0
+        self.units[u]
+            .type_flags
+            .or_else(|| self.mflags.get(&u).copied())
+            .unwrap_or(self.units[u].flags)
+            & mask
+            != 0
     }
     fn is_boss(&self, u: usize) -> bool {
         self.units[u].boss
@@ -385,8 +395,9 @@ impl CombatWorld for Fake {
     fn thorns(&mut self, a: usize, d: usize, _r: &mut DamageRecord) {
         self.log.push(format!("thorns {a} {d}"));
     }
-    fn reaction(&mut self, a: usize, d: usize, _r: &mut DamageRecord) {
+    fn reaction(&mut self, a: usize, d: usize, r: &mut DamageRecord) {
         self.log.push(format!("reaction {a} {d}"));
+        self.reactions.push((a, d, *r));
     }
 }
 
