@@ -23,16 +23,16 @@
 | Outputs / state changes | 54–58 |
 | Rules | 59–60 |
 |   1. Answers (QB-1–QB-20) | 61–239 |
-|   2. Jerhyn's objects and spawns (replaces `quests-act2.md` §6.10) | 240–296 |
-|   3. The staff in the orifice (C→S 0x44, S→C 0x58) | 297–342 |
-|   4. `quests.tsv` addresses not named in part 1 | 343–359 |
-|   5. Helpers the Act II–III quest code calls (QuestWorld seams) | 360–444 |
-| Constants & data dependencies | 445–454 |
-| Randomness | 455–459 |
-| Edge cases & original bugs | 460–478 |
-| Test vectors | 479–497 |
-| Provenance | 498–510 |
-| Open questions | 511–518 |
+|   2. Jerhyn's objects and spawns (replaces `quests-act2.md` §6.10) | 240–300 |
+|   3. The staff in the orifice (C→S 0x44, S→C 0x58) | 301–346 |
+|   4. `quests.tsv` addresses not named in part 1 | 347–363 |
+|   5. Helpers the Act II–III quest code calls (QuestWorld seams) | 364–448 |
+| Constants & data dependencies | 449–458 |
+| Randomness | 459–463 |
+| Edge cases & original bugs | 464–482 |
+| Test vectors | 483–501 |
+| Provenance | 502–514 |
+| Open questions | 515–522 |
 <!-- /index -->
 
 ## Summary
@@ -251,6 +251,10 @@ blocker GUID, +0x3C start Jerhyn's GUID.
    0x100, sixth argument 10, limit 100); spawn jerhyn (201) there
    (`0x005B2F20`: the free spot's room, x, y, class 201, mode 1, spread
    −1, flags 0); created → +0x0C := 1, +0x3C := its GUID (`0x0059F42F`).
+   No free spot: the spawn is still made, with room 0 and the object's
+   own (x, y) (the search leaves the point as passed and returns room 0,
+   `quests-helpers.md` §1 rule 3); the null-room outcome is
+   `monsters/init.md`'s (as Edge case 5).
    This is the only writer of +0x3C.
 2. **Init 19, palace Jerhyn object 122 (`0x005448E0` → `0x0059F440`).**
    Chain 11 absent → nothing. Else:

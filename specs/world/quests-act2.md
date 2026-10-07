@@ -32,19 +32,19 @@
 |   1. Conventions | 88–176 |
 |   2. Act II records | 177–196 |
 |   3. A2Q1 Radament's Lair (chain 8, slot 9) | 197–280 |
-|   4. A2Q2 The Horadric Staff (chain 9, slot 10) | 281–383 |
-|   5. A2Q3 Tainted Sun (chain 10, slot 11) | 384–478 |
-|   6. A2Q4 Arcane Sanctuary (chain 11, slot 12) | 479–594 |
-|   7. A2Q5 The Summoner (chain 12, slot 13) | 595–630 |
-|   8. A2Q6 The Seven Tombs (chain 13, slot 14) | 631–798 |
-|   9. Act II gossip and intro records | 799–807 |
-|   10. Hooks called from other systems | 808–824 |
-| Constants & data dependencies | 825–838 |
-| Randomness | 839–853 |
-| Edge cases & original bugs | 854–887 |
-| Test vectors | 888–908 |
-| Provenance | 909–931 |
-| Open questions | 932–1017 |
+|   4. A2Q2 The Horadric Staff (chain 9, slot 10) | 281–386 |
+|   5. A2Q3 Tainted Sun (chain 10, slot 11) | 387–485 |
+|   6. A2Q4 Arcane Sanctuary (chain 11, slot 12) | 486–605 |
+|   7. A2Q5 The Summoner (chain 12, slot 13) | 606–641 |
+|   8. A2Q6 The Seven Tombs (chain 13, slot 14) | 642–816 |
+|   9. Act II gossip and intro records | 817–825 |
+|   10. Hooks called from other systems | 826–842 |
+| Constants & data dependencies | 843–856 |
+| Randomness | 857–871 |
+| Edge cases & original bugs | 872–905 |
+| Test vectors | 906–926 |
+| Provenance | 927–949 |
+| Open questions | 950–1035 |
 <!-- /index -->
 
 ## Summary
@@ -360,7 +360,10 @@ When a transmute places an `hst ` (`world/cube.md` §8 step 3): +0x2A :=
 count +1; send flags; then set 10.11 (after the 0x28, so the client sees
 10.11 only with the next 0x28); then the Arcane hook `0x0059B660`: chain
 11 intro → open the palace (§6.2); else state 0 → state := 1, and status
-0 → status 1 to all (chain 11's F).
+0 → status 1 to all (chain 11's F). The two tests are independent
+(`0x0059B67A`, `0x0059B696`); the status step also clears the record's
+flags byte (+0x14 := 0) before the 0x5D iterate. Chain 11 absent →
+nothing.
 
 #### 4.10 Joining, starting and leaving (events 9, 13, 14)
 
@@ -412,6 +415,10 @@ outcome as below.
 - Event 3, new level 40 with +0x03 = 1: darken; success → flag iterate,
   +0x03 := 0.
 - Event 3, old level 40: quick remove; state 2 → state := 3.
+- The three event-3 items above are independent tests run in this
+  order (`0x0059EE0E`, `0x0059EE37`, `0x0059EE66`); one level change
+  can meet two of them (old level 40 → new 44: the timer start and the
+  quick remove).
 - Act load (`0x0059AC40(act, n)`, from `0x0053ACB3`): n = 1 and +0x03 =
   1: start the Tainted Sun on that act, +0x03 := 0, +0x02 := 1.
 - Altar init (§5.8) and game start (§5.6).
@@ -567,7 +574,11 @@ C→S 0x31 (§6.5) to open the portal.
 
 - Init 29 (`0x0059BA40`): in level 74 mode := +0x42, in level 54 mode
   := +0x44; if that value was 1 it becomes 2 and an end-animation event
-  is set at frame + (`FrameCnt1` >> 8) + 1.
+  is set at frame + (`FrameCnt1` >> 8) + 1. Exactly (`0x0059BA6B`–
+  `0x0059BAE6`): chain 11 absent → nothing; the object's mode is set to
+  the stored value first; only the stored u16 becomes 2 (the object stays
+  in mode 1 until its ENDANIM event, `world/objects-2.md` §18.6). Other
+  levels: nothing.
 - Operate 34 (`0x005846B0`, object spec) calls `0x0059BAF0(level)`:
   level 74 with +0x44 = 0 → +0x44 := 1, +0x42 := 2; level 54 with +0x42
   = 0 → +0x42 := 1, +0x44 := 2.
@@ -715,7 +726,11 @@ members in Act II without 10.0 get 10.0, 10.13 and, unless trading
 `horadricstaff`; read only when the table has ≥ 339 rows), callback
 `0x0059D870`, +0x03 := 1; orifice mode := 1; clear the has-portal flag
 (`0x0061AED0`) of the orifice's room and of the room at its position + 3
-(y).
+(y). Chain 13's record is read without a null test (`0x0059DE53`) after
+the bits, item deletions, party step and FX: absent → null read (crash);
+unreachable in 1.14d (every record exists from game start, `quests.md`
+§2). Likewise `missiles.txt` with ≤ 338 rows reads through a null row
+pointer (`0x0059DE1C`), not a default; live tables have more rows.
 
 #### 8.8 Lair objects
 
@@ -742,7 +757,10 @@ members in Act II without 10.0 get 10.0, 10.13 and, unless trading
 Base list (`0x00738FAC`): 313, 312, 308, 310, 311, 309, 307 for tombs
 66–72. First use: copy the six entries whose index ≠ staff tomb − 66, in
 order, to +0x48. Each call: index 6 → 0; return entry[index], index +=
-1. Staff tomb unknown, or chain 13 absent → 307.
+1. Staff tomb unknown, or chain 13 absent → 307. A staff tomb outside
+66–72 skips no entry: the copy loop runs 7 times and stops copying at
+six, so +0x48 holds the first six entries 313, 312, 308, 310, 311, 309
+(`0x0059D756`–`0x0059D784`).
 
 #### 8.10 Clue item 0x50 (`0x0059D6A0`, `quests.md` §9.4)
 
@@ -813,7 +831,7 @@ Its trigger code `trs ` is not an item code in the 1.14d tables
 | Summoner AI `0x005F85C0` | `0x0059C330` | §7.2 |
 | palace guard AI `0x005E7130` | `0x0059B6E0` | +0x0F = 1 and +0x10 = 0 → +0x10 := 1, true |
 | palace guard AI `0x005E7590` | `0x0059B8B0`, `0x0059B8F0`, `0x0059AEC0` | guard at end position (+0x18, +0x19 clear and +0x40 = 2; true without chain 11); guard target (+0x30, +0x34, y − 4 with +0x19); blocker open (+0x40 = 2) |
-| Jerhyn / palace NPC logic `0x0059F580` | `0x0059D7C0`, `0x0059D7E0`, `0x0059B820` | chain 13 not-intro with state < 2 → 0 else 1; not-intro with state 1; a player without 14.0, 14.1 within 30 of the blocker (`0x005DC5C0` < 31): +0x1A := 1, +0x1C := GUID |
+| Jerhyn / palace NPC logic `0x0059F580` | `0x0059D7C0`, `0x0059D7E0`, `0x0059B820` | chain 13 not-intro with state < 2 → 0 else 1; not-intro with state 1; a player without 14.0, 14.1 within 30 of the blocker (`0x005DC5C0` < 31): +0x1A := 1, +0x1C := GUID. Exactly: +0x1A := 0 and +0x1C := 0 first (`0x0059F75F`), then the player walk `0x005537D0` (`sim/unit-order.md` §2 r5) with `0x0059B820`, which returns 1 for the first qualifying player (distance unsigned ≤ 30 to the stored blocker point +0x20 / +0x24) and so stops the walk: the **first** such player in walk order is stored |
 | `0x0059F510` | `0x0059DFB0` | chain 13 not-intro with state < 4 → 0, else 1 |
 | Tyrael AI `0x005E73A0` | `0x0059DF50`, `0x0059C750` | +0x3D → true; +0x0F → true when no living player is within 12 (`0x006416D0`); else false. Exactly (2026-10-07): chain 13 record absent → false; +0x3D ≠ 0 → true; +0x0F ≠ 0 → +0x40 := Tyrael, +0x44 := 0, then for every player without state 7 (`0x005538D0`, callback `0x0059DF30`): d := `0x006416D0(player, Tyrael)` < 12 → +0x44 := 1; result = (+0x44 = 0). `0x006416D0` is the size-adjusted distance of two units (`missiles/missiles.md` §R9.5 item 4) and takes no radius: a host seam bound to it is a distance (`distance_between(a, b)`), and the "< 12" and the living-player loop belong to the caller (a `living_player_within(unit, radius)` seam must be built from both, not bound to `0x006416D0` alone). `0x0059C750` runs the §8.11 flag iterate for all |
 | monster class hook `0x005447A0` | `0x0059B6C0`, `0x0059B6D0` | jerhyn / act2guard2: bare `ret` |
