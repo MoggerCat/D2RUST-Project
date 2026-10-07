@@ -15,10 +15,14 @@
 //! behavior.
 
 pub mod automap;
+pub mod cursor;
 pub mod draw;
 pub mod edge;
+pub mod edit_box;
 pub mod frame;
 pub mod geom;
+pub mod gold;
+pub mod inv_grid;
 pub mod layout;
 pub mod original;
 pub mod panel;
@@ -26,6 +30,7 @@ pub mod panels;
 pub mod root;
 pub mod states;
 pub mod text;
+pub mod wformat;
 pub mod widget;
 
 #[cfg(test)]

@@ -9,13 +9,19 @@
 //! emitter and the close button (§7).
 
 pub mod border;
+pub mod char_details;
+pub mod char_inputs;
 pub mod character;
 pub mod inventory;
 pub mod npc;
+pub mod scroll;
 pub mod shop;
+pub mod skill_inputs;
 pub mod skilltree;
 pub mod stash_cube;
+pub mod stash_input;
 pub mod waypoint;
+pub mod waypoint_rows;
 
 #[cfg(test)]
 mod tests;
