@@ -1,0 +1,405 @@
+// Spec: specs/client/msg-skills.md, specs/client/msg-ui.md, specs/audio/triggers.md (§2 r4), specs/render/lighting.md (§9.2 r3–r4), specs/client/bridge.md (§10)
+//! Test vectors of the skill messages (0x21–0x23, 0x94), the UI messages
+//! (0x5D, 0x63, 0x77), 0x2C and 0x53. "A" = `20261006-015956`, "B" =
+//! `20261006-022633` recordings; the rest synthetic.
+
+use super::super::output::Output;
+use super::super::skills::NATIVE;
+use super::super::world::{SkillRow, UnitKey, MONSTER, PLAYER};
+use super::support::{hex, Model};
+
+const P1: UnitKey = UnitKey::new(PLAYER, 1);
+
+/// 0x59 for player 1 (class 1) at (x, y).
+fn assign_player(x: u16, y: u16) -> Vec<u8> {
+    let mut b = hex("59 01 00 00 00 01 77 65 72 77 65 72");
+    b.resize(0x16, 0);
+    b.extend_from_slice(&x.to_le_bytes());
+    b.extend_from_slice(&y.to_le_bytes());
+    b
+}
+
+/// A model with `n` skills rows (no passive state) and player 1.
+fn with_player(n: usize) -> Model {
+    let mut m = Model::default();
+    m.inputs.tables.skills = vec![SkillRow::default(); n];
+    m.recv(&assign_player(0, 0));
+    m
+}
+
+fn skills_of(m: &Model) -> Vec<(u16, i32, u32)> {
+    m.unit(P1)
+        .skills
+        .as_ref()
+        .unwrap()
+        .entries
+        .iter()
+        .map(|e| (e.skill, e.base, e.owner))
+        .collect()
+}
+
+const A_273: &str = "94 0a 01 00 00 00 00 00 01 02 00 01 01 00 01 d9 00 01 da 00 01 db 00 01 \
+                     dc 00 01 04 00 01 05 00 01 03 00 01";
+
+// Covers: specs/client/msg-skills.md §3 r1, §3 r2, §1 r2
+#[test]
+fn base_skill_levels_a273() {
+    let mut m = with_player(221);
+    m.hex(A_273);
+    let want: Vec<(u16, i32, u32)> = [0, 2, 1, 217, 218, 219, 220, 4, 5, 3]
+        .iter()
+        .map(|&s| (s, 1, NATIVE))
+        .collect();
+    assert_eq!(skills_of(&m), want);
+    assert!(m.log.rejected.is_empty());
+    // §3 r3: no skill-tree flag.
+    assert_eq!(m.w.skill_tree_flag, None);
+    // An unknown GUID: no change.
+    let before = m.w.clone();
+    m.hex("94 01 02 00 00 00 24 00 01");
+    assert_eq!(m.w, before);
+}
+
+// Covers: specs/client/msg-skills.md §5 r1, §5 r2
+#[test]
+fn update_item_skill_quantities() {
+    // B seq 227: 8 entries (the entry list is synthetic), then 0x22.
+    let mut m = with_player(221);
+    m.hex(
+        "94 08 01 00 00 00 00 00 01 02 00 01 01 00 01 d9 00 01 da 00 01 db 00 01 dc 00 01 03 00 01",
+    );
+    assert_eq!(skills_of(&m).len(), 8);
+    m.hex("22 00 19 01 00 00 00 db 00 01 41 00");
+    let q = |m: &Model| {
+        let l = m.unit(P1).skills.as_ref().unwrap();
+        l.entries[l.native(219).unwrap()].quantity
+    };
+    assert_eq!(q(&m), 1);
+    // A seq 273.
+    m.hex("22 00 19 01 00 00 00 db 00 00 55 00");
+    assert_eq!(q(&m), 0);
+    // Byte @11 = 1: no change.
+    m.hex("22 00 19 01 00 00 00 db 00 07 55 01");
+    assert_eq!(q(&m), 0);
+    assert!(m.log.rejected.is_empty());
+    // A skill the player lacks: fatal 0xAD6.
+    m.hex("22 00 19 01 00 00 00 24 00 01 41 00");
+    assert_eq!(m.rejected(), [(0x22, "fatal assert 0xAD6".to_owned())]);
+}
+
+// Covers: specs/client/msg-skills.md §6 r1, §6 r2, §2 r3
+#[test]
+fn set_skill_left_and_right() {
+    let mut m = with_player(221);
+    m.hex(A_273);
+    // A seq 274.
+    m.hex("23 00 01 00 00 00 01 00 00 ff ff ff ff")
+        .hex("23 00 01 00 00 00 00 00 00 ff ff ff ff");
+    let l = m.unit(P1).skills.clone().unwrap();
+    assert_eq!(l.left_entry().map(|e| e.skill), Some(0));
+    assert_eq!(l.right_entry().map(|e| e.skill), Some(0));
+    // B seq 227 (list state synthetic): skill 36 without an entry.
+    m.hex("23 00 01 00 00 00 00 24 00 ff ff ff ff");
+    assert_eq!(m.unit(P1).skills.as_ref().unwrap().right, l.right);
+    assert!(m.log.rejected.is_empty());
+    // A skill outside the table: fatal 0x668.
+    m.hex("23 00 01 00 00 00 00 dd 00 ff ff ff ff");
+    assert_eq!(m.rejected(), [(0x23, "fatal assert 0x668".to_owned())]);
+}
+
+// Covers: specs/client/msg-skills.md §4 r1, §4 r2, §2 r2
+#[test]
+fn update_item_oskill_b46370_b61126() {
+    let mut m = with_player(221);
+    // B seq 46370: no skill 36 → added, then base 0; the flag cleared.
+    m.hex("21 00 00 01 00 00 00 24 00 00 01 05");
+    assert_eq!(skills_of(&m), [(36, 0, NATIVE)]);
+    assert_eq!(m.w.skill_tree_flag, Some(0));
+    // B seq 61126.
+    m.hex("21 00 00 01 00 00 00 24 00 01 01 05");
+    assert_eq!(skills_of(&m), [(36, 1, NATIVE)]);
+    // Synthetic: level 0 with the remove flag.
+    m.hex("21 00 01 01 00 00 00 24 00 00 00 00");
+    assert!(skills_of(&m).is_empty());
+    assert!(m.log.rejected.is_empty());
+}
+
+// Covers: specs/client/msg-skills.md §1 r1; specs/client/msg-units.md §1.1 r3
+#[test]
+fn players_and_monsters_get_a_list_at_creation() {
+    let m = with_player(0);
+    assert_eq!(m.unit(P1).skills.as_ref().map(|l| l.entries.len()), Some(0));
+    // A unit without a list: the messages do nothing.
+    let mut m = Model::default();
+    m.inputs.tables.skills = vec![SkillRow::default(); 40];
+    m.put(P1);
+    m.hex("21 00 00 01 00 00 00 24 00 01 01 05")
+        .hex("94 01 01 00 00 00 24 00 01")
+        .hex("23 00 01 00 00 00 00 24 00 ff ff ff ff");
+    assert_eq!(m.unit(P1).skills, None);
+    assert!(m.log.rejected.is_empty());
+}
+
+// Covers: specs/client/msg-skills.md §2 r4
+#[test]
+fn a_passive_skill_is_rejected_as_pending() {
+    let mut m = with_player(40);
+    m.inputs.tables.skills[36].passivestate = 30;
+    m.hex("21 00 00 01 00 00 00 24 00 01 01 05");
+    assert_eq!(skills_of(&m), [(36, 1, NATIVE)]);
+    assert_eq!(m.log.rejected.len(), 1);
+    assert!(m.rejected()[0]
+        .1
+        .starts_with("TODO(spec: client/msg-skills.md §2 r4"));
+    // 0x94 assigns every entry, then reports the pending part.
+    m.hex("94 02 01 00 00 00 24 00 02 25 00 01");
+    assert_eq!(skills_of(&m), [(36, 2, NATIVE), (37, 1, NATIVE)]);
+    assert_eq!(m.log.rejected.len(), 2);
+}
+
+// --------------------------------------------------------------- 0x5D
+
+/// The outputs of the model so far.
+fn outs(m: &Model) -> Vec<Output> {
+    m.out.clone()
+}
+
+// Covers: specs/client/msg-ui.md §1 r1, §1 r2, §1 r5
+#[test]
+fn quest_status_output_rows() {
+    let mut m = Model::default();
+    // A seq 129118.
+    m.hex("5d 01 00 01 00 00");
+    assert_eq!(
+        outs(&m),
+        [Output::QuestUi {
+            chain: 1,
+            flags: 0,
+            status: 1,
+            extra: 0
+        }]
+    );
+    assert_eq!(m.w, Model::default().w, "no model change");
+    m.out.clear();
+    m.hex("5d 08 02 00 00 00").hex("5d 21 10 00 05 00");
+    assert_eq!(
+        outs(&m),
+        [
+            Output::QuestUi {
+                chain: 8,
+                flags: 2,
+                status: 0,
+                extra: 0
+            },
+            Output::QuestUi {
+                chain: 0x21,
+                flags: 0x10,
+                status: 0,
+                extra: 5
+            },
+        ]
+    );
+    m.out.clear();
+    // f = 3, c = 8: the bit-0 table has no 8 (edge case 1): a "nothing"
+    // row, not an output row (rule 5).
+    m.hex("5d 08 03 00 00 00");
+    assert!(outs(&m).is_empty());
+    // The extra word is read signed.
+    m.hex("5d 05 20 03 ff ff");
+    assert_eq!(
+        outs(&m),
+        [Output::QuestUi {
+            chain: 5,
+            flags: 0x20,
+            status: 3,
+            extra: -1
+        }]
+    );
+    assert!(m.log.rejected.is_empty());
+}
+
+// Covers: specs/client/msg-ui.md §1 r2, §1 r3, §1 r4
+#[test]
+fn quest_status_model_rows() {
+    let mut m = Model::default();
+    m.hex("5d 17 01 00 00 00");
+    assert!(m.w.exit_requested && outs(&m).is_empty());
+    let mut m = Model::default();
+    let (a, b, c) = (
+        UnitKey::new(MONSTER, 5),
+        UnitKey::new(MONSTER, 6),
+        UnitKey::new(MONSTER, 9),
+    );
+    m.put(a).class = 146;
+    m.put(b).class = 147;
+    m.put(c).class = 527;
+    m.put(UnitKey::new(PLAYER, 146)).class = 146;
+    m.hex("5d 04 01 00 00 00");
+    assert!(m.unit(a).quest_untargetable && !m.unit(b).quest_untargetable);
+    assert!(!m.unit(c).quest_untargetable);
+    assert!(!m.unit(UnitKey::new(PLAYER, 146)).quest_untargetable);
+    m.hex("5d 21 20 00 00 00");
+    assert!(m.unit(c).quest_untargetable);
+    assert!(outs(&m).is_empty());
+    assert!(m.log.rejected.is_empty());
+}
+
+// Covers: specs/client/msg-ui.md §1 r3; specs/render/lighting.md §9.2 r3
+#[test]
+fn quest_status_eclipse() {
+    // No client act: the pending flag.
+    let mut m = Model::default();
+    m.hex("5d 0a 01 00 00 00");
+    assert!(m.w.eclipse_pending && outs(&m).is_empty());
+    // With a client act the setter runs with the eclipse flag, whose
+    // branch (`0x0061BDF0`) no spec describes: pending, not guessed.
+    let mut m = Model::default();
+    m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
+    let env = m.w.environment;
+    m.hex("5d 0a 01 00 00 00");
+    assert_eq!(m.log.rejected.len(), 1);
+    assert!(m.rejected()[0].1.contains("0x0061BDF0"));
+    assert_eq!(m.w.environment, env, "the record is unchanged");
+    assert!(!m.w.eclipse_pending && outs(&m).is_empty());
+    // A pending eclipse turns into the setter call at the act-2 load.
+    let mut m = Model::default();
+    m.hex("5d 0a 01 00 00 00");
+    m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
+    assert!(m.log.rejected.is_empty(), "act 1: nothing");
+    m.hex("03 01 c4 88 38 10 01 00 61 d1 e0 9f");
+    assert!(m.rejected()[0].1.contains("0x0061BDF0"));
+}
+
+// Covers: specs/client/msg-ui.md §2 r1
+#[test]
+fn waypoint_menu_b7852() {
+    let mut m = Model::default();
+    m.hex("63 0a 00 00 00 02 01 03 00 00 00 00 00 00 00 00 00 00 00 00 00");
+    let mut record = [0u8; 16];
+    record[..4].copy_from_slice(&[2, 1, 3, 0]);
+    assert_eq!(outs(&m), [Output::WaypointMenu { guid: 0x0A, record }]);
+    assert_eq!(m.w, Model::default().w, "no model change");
+}
+
+// Covers: specs/client/msg-ui.md §3 r1
+#[test]
+fn trade_action_a104179() {
+    let mut m = Model::default();
+    m.hex("77 10").hex("77 16");
+    assert_eq!(
+        outs(&m),
+        [
+            Output::TradeAction { code: 0x10 },
+            Output::TradeAction { code: 0x16 }
+        ]
+    );
+    assert_eq!(m.w, Model::default().w);
+}
+
+// --------------------------------------------------------------- 0x2C
+
+// Covers: specs/audio/triggers.md §2 r1, §2 r4
+#[test]
+fn play_sound_captures_key_and_class() {
+    let mut m = Model::default();
+    let npc = UnitKey::new(MONSTER, 0x26);
+    m.put(npc).class = 0x93;
+    // A seq 293508; then a unit not in S: nothing.
+    m.hex("2c 01 26 00 00 00 12 00")
+        .hex("2c 01 27 00 00 00 12 00");
+    assert_eq!(
+        outs(&m),
+        [Output::ServerSound {
+            unit: npc,
+            class: 0x93,
+            event: 18
+        }]
+    );
+    assert!(m.log.rejected.is_empty());
+}
+
+// Covers: specs/client/bridge.md §10 r2, §10 r3
+#[test]
+fn outputs_keep_message_order_and_capture_at_receive() {
+    let mut m = Model::default();
+    let npc = UnitKey::new(MONSTER, 0x26);
+    m.put(npc).class = 0x93;
+    // One chunk: 0x2C on (1, 0x26), 0x77 0x10, then 0x0A removing the
+    // unit: the sound keeps the class read at receive.
+    let chunk = [
+        hex("2c 01 26 00 00 00 12 00"),
+        hex("77 10"),
+        hex("0a 01 26 00 00 00"),
+    ]
+    .concat();
+    m.recv(&chunk);
+    assert!(m.w.units.is_empty());
+    assert_eq!(
+        outs(&m),
+        [
+            Output::ServerSound {
+                unit: npc,
+                class: 0x93,
+                event: 18
+            },
+            Output::TradeAction { code: 0x10 }
+        ]
+    );
+}
+
+// --------------------------------------------------------------- 0x53
+
+/// Act 1 loaded, player 1 placed at (x, y) and local.
+fn placed(x: u16, y: u16) -> Model {
+    let mut m = Model::default();
+    m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
+    m.recv(&assign_player(x, y)).hex("0b 00 01 00 00 00");
+    m
+}
+
+// Covers: specs/render/lighting.md §9.2 r4, §9.1
+#[test]
+fn darkness_b228_b146616() {
+    let mut m = placed(0x1241, 0x11C4);
+    let env = m.w.environment.unwrap();
+    assert_eq!((env.index, env.ticks, env.intensity), (2, 0, 128), "§9.1");
+    // B seq 228 and seq 146616.
+    m.hex("53 02 00 00 00 00 00 00 00 00");
+    let e = m.w.environment.unwrap();
+    assert_eq!((e.index, e.ticks), (2, 0));
+    m.hex("53 02 00 00 00 80 08 00 00 00");
+    let e = m.w.environment.unwrap();
+    assert_eq!((e.index, e.ticks, e.eclipse), (2, 0x880, false));
+    assert!(m.log.rejected.is_empty() && outs(&m).is_empty());
+    // Ticks past speed × 360 → 0.
+    m.hex("53 03 00 00 00 01 b4 00 00 00");
+    assert_eq!(m.w.environment.unwrap().ticks, 0);
+}
+
+// Covers: specs/render/lighting.md §9.2 r2, §9.2 r4
+#[test]
+fn darkness_needs_the_players_act() {
+    // An unplaced player has no act: ignored.
+    let mut m = Model::default();
+    m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
+    m.recv(&assign_player(0, 0)).hex("0b 00 01 00 00 00");
+    let before = m.w.environment;
+    m.hex("53 04 00 00 00 00 00 00 00 00");
+    assert_eq!(m.w.environment, before);
+    assert!(m.log.rejected.is_empty());
+    // No local player: 1.14d reads through a null pointer.
+    let mut m = Model::default();
+    m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
+    m.hex("53 02 00 00 00 00 00 00 00 00");
+    assert_eq!(m.log.rejected.len(), 1);
+    // Fatal values and the eclipse branch.
+    let mut m = placed(0x1241, 0x11C4);
+    m.hex("53 06 00 00 00 00 00 00 00 00")
+        .hex("53 02 00 00 00 ff ff ff ff 00")
+        .hex("53 05 00 00 00 00 00 00 00 01");
+    let r = m.rejected();
+    assert_eq!(r.len(), 3);
+    assert!(r[0].1.contains("period index") && r[1].1.contains("negative ticks"));
+    assert!(r[2].1.contains("0x0061BDF0"));
+    assert_eq!(m.w.environment.unwrap().index, 2);
+}

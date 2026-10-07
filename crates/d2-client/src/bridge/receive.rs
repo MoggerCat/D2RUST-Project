@@ -10,6 +10,7 @@ use std::collections::BTreeMap;
 use d2_proto::transport::{split_server_buffer, SplitError};
 
 use super::dispatch::{Dispatch, Handle, HandlerError, Message};
+use super::output::{Output, Outputs};
 use super::world::{addressed_unit, ClientWorld, ModelInputs};
 
 /// Bytes a split discarded (§2 rule 3).
@@ -59,11 +60,15 @@ pub struct ChunkReport {
 
 /// Splits `chunk` and dispatches its messages in order. A chunk 1.14d
 /// asserts on (§2 rule 4) is refused whole: nothing in it is dispatched.
+/// The handlers' outputs are appended to `outputs` in message order
+/// (§10 rule 2); a rejected message's outputs are dropped with its
+/// effect (§6 rule 4).
 pub fn receive_chunk(
     world: &mut ClientWorld,
     inputs: &ModelInputs,
     dispatch: &Dispatch,
     log: &mut ReceiveLog,
+    outputs: &mut Vec<Output>,
     chunk: &[u8],
 ) -> Result<ChunkReport, SplitError> {
     let split = split_server_buffer(chunk)?;
@@ -72,11 +77,13 @@ pub fn receive_chunk(
         ..ChunkReport::default()
     };
     for bytes in split.messages {
+        let sink = Outputs::default();
         let msg = Message {
             id: bytes[0],
             bytes,
             unit: addressed_unit(bytes),
             inputs,
+            out: &sink,
         };
         match dispatch.get(msg.id).map(|e| e.handle) {
             None => {
@@ -98,6 +105,7 @@ pub fn receive_chunk(
                 Ok(()) => {
                     log.handled += 1;
                     report.handled += 1;
+                    outputs.extend(sink.take());
                 }
                 Err(error) => {
                     log.rejected.push(Rejected { id: msg.id, error });

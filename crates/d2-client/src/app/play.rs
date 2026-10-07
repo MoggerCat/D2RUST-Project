@@ -171,6 +171,11 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
     add_game(&mut app, Box::new(link), true)?;
     add_client_data(&mut app, drlg_source, level_rows);
     if let Some(archives) = archives {
+        let skills = single_player::client_skill_rows(&archives)?;
+        app.world_mut()
+            .resource_mut::<BridgeResource>()
+            .0
+            .set_skill_rows(skills);
         let palettes = ActPalettes::live(&archives).map_err(anyhow::Error::msg)?;
         palette::add_act_palettes(&mut app, palettes);
         let parts = ui::UiParts::live(archives.clone()).map_err(anyhow::Error::msg)?;

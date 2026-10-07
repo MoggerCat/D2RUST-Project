@@ -35,7 +35,7 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use d2_data::tables::{decode_all, Levels, Objects, Record};
+use d2_data::tables::{decode_all, Levels, Objects, Record, Skills};
 use d2_formats::mpq::ArchiveSet;
 use d2_server::adapters::handlers::world::{ActionWorld, Outbox};
 use d2_server::adapters::session::{enter_game, Entry};
@@ -70,7 +70,7 @@ use d2_sim::drlg::preset::{Ds1Input, Ds1Source};
 use super::server_thread::{ThreadLink, ThreadStopped};
 use crate::bridge::drlg::DrlgSource;
 use crate::bridge::local::{LocalLink, PendingSession};
-use crate::bridge::world::LevelRow;
+use crate::bridge::world::{LevelRow, SkillRow};
 use crate::bridge::LOCAL_CLIENT;
 
 /// The game's dispatch and world host.
@@ -508,6 +508,26 @@ pub fn client_level_rows(data: &GameData) -> Vec<LevelRow> {
             sound_env: l.soundenv,
         })
         .collect()
+}
+
+/// The `skills` fields the client skill list reads (`client/msg-skills.md`
+/// Inputs: `anim`, `monanim`, `passivestate`; `skills/levels.md` §6:
+/// `maxlvl`), one row per skill id, from the user's `skills` table.
+pub fn client_skill_rows(archives: &ArchiveSet) -> Result<Vec<SkillRow>, BuildError> {
+    let set = d2_data::bin::load(archives, "eng").map_err(|e| BuildError::Tables(e.to_string()))?;
+    let table = set
+        .table("skills")
+        .ok_or_else(|| BuildError::Tables("skills not loaded".to_owned()))?;
+    let rows: Vec<Skills> = decode_all(table).map_err(|e| BuildError::Tables(e.to_string()))?;
+    Ok(rows
+        .iter()
+        .map(|s| SkillRow {
+            anim: s.anim,
+            monanim: s.monanim,
+            passivestate: s.passivestate,
+            maxlvl: s.maxlvl,
+        })
+        .collect())
 }
 
 /// A built game and the units the app and tests address.
