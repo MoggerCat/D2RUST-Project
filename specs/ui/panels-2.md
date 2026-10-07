@@ -31,14 +31,14 @@
 |   18. Inventory close button and click area (`panels.md` §9; answers UP-7, UP-8) | 361–385 |
 |   19. Skill tree input and draw order (`panels.md` §10; answers UP-21, UP-22, UP-23) | 386–456 |
 |   20. Stash and cube buttons (`panels.md` §11, §12; answers UP-10, `panels.md` OQ 13) | 457–524 |
-|   21. Gold amounts, gold buttons and the gold dialog (`panels.md` §9 r6, §11 r6; answers `panels.md` OQ 5) | 525–615 |
-|   22. d2rs widget answers (`client/ui.md` §B1, §B2; code `TODO(spec: ui/panels.md …)`) | 616–673 |
-| Constants & data dependencies | 674–688 |
-| Randomness | 689–693 |
-| Edge cases & original bugs | 694–714 |
-| Test vectors | 715–740 |
-| Provenance | 741–769 |
-| Open questions | 770–795 |
+|   21. Gold amounts, gold buttons and the gold dialog (`panels.md` §9 r6, §11 r6; answers `panels.md` OQ 5) | 525–619 |
+|   22. d2rs widget answers (`client/ui.md` §B1, §B2; code `TODO(spec: ui/panels.md …)`) | 620–677 |
+| Constants & data dependencies | 678–692 |
+| Randomness | 693–697 |
+| Edge cases & original bugs | 698–718 |
+| Test vectors | 719–744 |
+| Provenance | 745–773 |
+| Open questions | 774–800 |
 <!-- /index -->
 
 ## Summary
@@ -592,7 +592,7 @@ flag `[0x007C0A38 + 4i]` (−1 = not learnable, 0, 1 pressed), remap
    0x00454080)`, Cancel `0x004BB0F0(355, 287, 1, callback 0x00454140)`.
    Kind 3 pre-fills the edit box with the max (the test also names kinds
    6 and 7, which never get this far); kind 2 then calls `0x004B90B0`. The controls' art, caret and key input: §Open questions
-   6.
+   6 (answered: r9).
 7. **Close** `0x00453EE0` (Cancel, and the first step of OK): latch set
    → key mode 1 (`0x0046AA20`), latch := 0; value `[0x007A2A68]` := the
    edit box's value (its +0x2C method); the box and the four controls
@@ -612,6 +612,10 @@ flag `[0x007C0A38 + 4i]` (−1 = not learnable, 0, 1 pressed), remap
    Server side of 0x4F 0x13 / 0x14 (withdraw / deposit checks; the
    stash maximum is a flat 2,500,000; carried gold over level × 10000 →
    S→C 0x2C event 19 only): `world/vendors-2.md` §10.2.
+
+9. **Gold dialog box and controls** (the box, OK / Cancel buttons, the
+   numeric edit box, the spinner; their art, input and value rules):
+   `panels-3.md` §28.
 
 ### 22. d2rs widget answers (`client/ui.md` §B1, §B2; code `TODO(spec: ui/panels.md …)`)
 
@@ -786,7 +790,8 @@ names (+0, +0x3C) only. No capture yet.
    heights).
 5. Meaning of the shop button fields +0x0A and +0x10 (§14.11), read by
    `0x00488B00` / the hover code. Ghidra read.
-6. Gold dialog controls (§21.6): the art, layout, caret, digit entry,
+6. **Answered** (2026-10-07, `panels-3.md` §28; the server side:
+   `world/vendors-2.md` §10.2). Was: Gold dialog controls (§21.6): the art, layout, caret, digit entry,
    max clamp and Enter / Esc handling of `0x004BBD80` (edit box),
    `0x004BB0F0` (buttons) and `0x004BC480`, and the box `0x004B7CD0`
    draw; the server effect of 0x4F 0x13 / 0x14. Disassembly read of
