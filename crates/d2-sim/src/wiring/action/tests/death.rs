@@ -294,6 +294,44 @@ fn kill_guards() {
     );
 }
 
+/// `damage.md` §7.2 step 2: a victim with unit flag 0x04000000 gives no
+/// experience, the rest of the kill runs; a player victim in mode 0 / 17
+/// stops at the guard, a live one runs steps 1–2 only (no death mode
+/// request, no quest parse).
+// Covers: specs/combat/damage.md §7.2 r1, §7.2 r2, §7.2 r3
+#[test]
+fn kill_without_experience_and_player_victims() {
+    let mut fx = Fx::new();
+    let (p, m) = kill_setup(&mut fx);
+    fx.sim.sys.units.get_mut(m).unwrap().flags |=
+        crate::wiring::action::reaction::UNIT_FLAG_NO_EXPERIENCE;
+    fx.sim.combat(&mut fx.game, |w, _| {
+        crate::wiring::action::reaction::kill(w, m, p);
+    });
+    assert_eq!(fx.stat(p, EXPERIENCE), 0);
+    assert_eq!(fx.sim.sys.units.get(m).unwrap().mode, monster_mode::DT);
+    // A player victim: dead (17) → nothing; alive → no death mode here.
+    let mut fx = Fx::new();
+    let (p, m) = kill_setup(&mut fx);
+    let q = fx.spawn(UnitType::Player, 1, fx.a, 11, 10);
+    fx.sim.sys.units.get_mut(q).unwrap().mode = 17;
+    fx.sim.combat(&mut fx.game, |w, _| {
+        crate::wiring::action::reaction::kill(w, q, m);
+    });
+    assert!(fx.sim.hooks().x.log.is_empty());
+    fx.sim.sys.units.get_mut(q).unwrap().mode = 1;
+    fx.sim.combat(&mut fx.game, |w, _| {
+        crate::wiring::action::reaction::kill(w, q, m);
+    });
+    let (qi, mi) = (q.0, m.0);
+    assert_eq!(
+        fx.sim.hooks().x.log,
+        [format!("kill AttackerBookkeeping {qi} {mi}")]
+    );
+    assert_eq!(fx.sim.sys.units.get(q).unwrap().mode, 1);
+    let _ = p;
+}
+
 // ---- the drop ---------------------------------------------------------------------------
 
 /// Gold only (type 4 under misc), TC 1 = one pick of gold.

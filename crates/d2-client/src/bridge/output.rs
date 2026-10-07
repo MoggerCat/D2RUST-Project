@@ -9,12 +9,12 @@
 
 use std::cell::RefCell;
 
-use super::world::UnitKey;
+use super::world::{RosterRecord, UnitKey};
 
-/// One output: a 1.14d UI or sound entry point with the values it read
-/// when the handler ran (§10 rules 1, 3). Each variant is owned by the
-/// spec of its producer ([`ROWS`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// One output: a 1.14d UI, sound or client-effect entry point with the
+/// values it read when the handler ran (§10 rules 1, 3). Each variant is
+/// owned by the spec of its producer ([`ROWS`]).
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Output {
     /// S→C 0x2C (`audio/triggers.md` §2 r4): the event unit's key and
     /// class at receive, and the event.
@@ -35,6 +35,199 @@ pub enum Output {
     WaypointMenu { guid: u32, record: [u8; 16] },
     /// S→C 0x77 (`client/msg-ui.md` §3): the code.
     TradeAction { code: u8 },
+    /// S→C 0x26 (`client/msg-ui.md` §4 r1–r2): the record fields, whether
+    /// the unit was in S, and a present player's name.
+    ChatLine {
+        kind: u8,
+        lang: u8,
+        unit: UnitKey,
+        b8: u8,
+        b9: u8,
+        /// The name as copied (at most 16 bytes, up to its NUL).
+        name: Vec<u8>,
+        /// The text as copied (at most 256 bytes, up to its NUL).
+        text: Vec<u8>,
+        present: bool,
+        /// The `name` of a present player unit (type 0).
+        player_name: Option<[u8; 16]>,
+    },
+    /// S→C 0x27 (`client/msg-ui.md` §5 r1): the 40 bytes, whether the unit
+    /// of type 1 or 2 was in S, and a type-2 object's class (0 when
+    /// absent).
+    NpcText {
+        bytes: [u8; 40],
+        present: bool,
+        object_class: u32,
+    },
+    /// S→C 0x4E (`client/msg-ui.md` §6).
+    HireOffer { name: u16, seed: u32 },
+    /// S→C 0x4F (`client/msg-ui.md` §6).
+    HireListReset,
+    /// S→C 0x50 codes 1–4, 23, 36 (`client/msg-ui.md` §7 r3).
+    QuestSpecial { code: u16, words: [u16; 6] },
+    /// S→C 0x58 (`client/msg-ui.md` §8 r3).
+    OpenUi { guid: u32, code: u8, arg: u8 },
+    /// S→C 0x78 (`client/msg-ui.md` §11).
+    TradePartner { name: [u8; 16], guid: u32 },
+    /// S→C 0x8A (`client/msg-ui.md` §9 r2).
+    NpcInteract {
+        unit: UnitKey,
+        present: bool,
+        class: u32,
+        /// Monster data +0x3C (`0x004AE130`); `None`: not in the model.
+        /// TODO(spec: client/msg-ui.md §9 r2): no model rule writes
+        /// monster data +0x3C, so its value cannot be captured.
+        mdata_3c: Option<i32>,
+        /// S holds an object of class 318 in mode 2.
+        blocker_open: bool,
+    },
+    /// S→C 0x91 (`client/msg-ui.md` §10).
+    NpcIntro { slots: [u16; 12] },
+    /// S→C 0x29 (`client/msg-ui.md` §12).
+    GameQuestFlags { record: [u8; 96] },
+    /// S→C 0x52 (`client/msg-ui.md` §13).
+    QuestLog { status: [u8; 41] },
+    /// S→C 0x5E (`client/msg-ui.md` §14).
+    QuestAvailability { bytes: [u8; 37] },
+    /// S→C 0x9B (`client/msg-ui.md` §15).
+    MercRevive { state: u16, value: u16 },
+    /// S→C 0x99, 0x9A (`client/msg-skills.md` §7 r3).
+    SkillEvent {
+        unit: UnitKey,
+        skill: u16,
+        level: u8,
+        target: SkillTarget,
+        w: u16,
+    },
+    /// S→C 0xA3 (`client/msg-skills.md` §8 r3).
+    SkillDo {
+        unit: UnitKey,
+        target: Option<UnitKey>,
+        skill: u16,
+        level: i16,
+        x: u32,
+        y: u32,
+        v: u8,
+    },
+    /// The shrine functions of S→C 0x0E code 3 and 0x4D code 0x15
+    /// (`client/model.md` §15 rules 3–4).
+    ShrineFx {
+        kind: ShrineFxKind,
+        code: u8,
+        object: UnitKey,
+        player: Option<UnitKey>,
+        /// Entry +0x08, +0x0C (−1 = none).
+        overlays: [i32; 2],
+    },
+    /// The shrine sound of S→C 0x4D code 0x15 (`client/model.md` §15
+    /// rule 4 step 4).
+    ShrineSound { sound: u32, player: UnitKey },
+    /// S→C 0x11 (`client/msg-units.md` §7 r2).
+    UnitOverlay {
+        unit: UnitKey,
+        overlay: u16,
+        mode: u8,
+        /// 0 (none), 396 or 397.
+        sound: u32,
+    },
+    /// S→C 0x57 (`client/msg-units.md` §7 r3): the nine umod bytes and
+    /// flags bit 3.
+    UmodFx {
+        unit: UnitKey,
+        umods: [u8; 9],
+        flag8: bool,
+    },
+    /// S→C 0x73 (`client/msg-units.md` §7 r6): the local player's key and
+    /// the message fields.
+    ClientMissile {
+        owner: Option<UnitKey>,
+        class: u16,
+        f07: u32,
+        f0b: u32,
+        f0f: u32,
+        f13: u32,
+        f17: u16,
+        source: UnitKey,
+        f1e: u8,
+        f1f: u8,
+    },
+    /// S→C 0x7E (`client/msg-units.md` §7 r8): the act index.
+    CommonCof { act: u32 },
+    /// S→C 0xA4 (`client/msg-units.md` §7 r10).
+    MonsterPreload { class: u16 },
+    /// S→C 0x5B, 0x5C, 0x65 (`client/msg-units.md` §8): the active roster
+    /// records after the message.
+    RosterChanged { roster: Vec<RosterRecord> },
+    /// S→C 0xA5 (`client/msg-skills.md` §10 r3).
+    SkillEndFx {
+        unit: UnitKey,
+        skill: u16,
+        srvdofunc: i16,
+    },
+    /// S→C 0x28 type 6 (`client/msg-ui.md` §16 r2).
+    QuestFlags { record: [u8; 96] },
+    /// S→C 0x28, unit absent (`client/msg-ui.md` §16 r3).
+    NpcGone { guid: u32 },
+    /// S→C 0x28, unit present (`client/msg-ui.md` §16 r4).
+    NpcDialog(Box<NpcDialog>),
+    /// S→C 0x62 (`client/msg-ui.md` §17).
+    NpcDialogEnd { kind: u8 },
+    /// S→C 0x2A (`client/msg-ui.md` §18).
+    NpcTransaction { bytes: [u8; 15], gold: i32 },
+    /// S→C 0x5A (`client/msg-ui.md` §19 r3): the 40 bytes (name cut) and
+    /// the local player's name.
+    EventText {
+        bytes: [u8; 40],
+        local_name: Option<[u8; 16]>,
+    },
+    /// S→C 0x61 (`client/msg-ui.md` §20).
+    ActVideo { video: u8 },
+    /// S→C 0x76 (`client/msg-ui.md` §21).
+    OverheadClear { unit: UnitKey },
+    /// S→C 0x7B (`client/msg-ui.md` §22).
+    HotkeyAssign {
+        slot: u8,
+        skill: i32,
+        left: bool,
+        item: u32,
+    },
+}
+
+/// The target of a skill event (`client/msg-skills.md` §7).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SkillTarget {
+    Unit(UnitKey),
+    Point(u16, u16),
+}
+
+/// Which shrine function a `ShrineFx` runs (`client/model.md` §15).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ShrineFxKind {
+    /// Entry +0x00, run by a code-3 mode change.
+    OnMode,
+    /// Entry +0x04, run by a code-0x15 request.
+    OnUse,
+}
+
+/// The payload of `NpcDialog` (`client/msg-ui.md` §16 r4).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct NpcDialog {
+    pub kind: u8,
+    pub guid: u32,
+    pub quest_flags: [u8; 96],
+    pub unit: UnitKey,
+    pub class: u32,
+    /// The monstats `interact` flag of the class (bit 9).
+    pub interact: bool,
+    /// `0x004B1A10(class)`; `None`: not captured. TODO(spec:
+    /// client/msg-ui.md open question 10): the function's result is not
+    /// specified.
+    pub f4b1a10: Option<u32>,
+    /// The local player has a cursor item.
+    pub cursor_item: bool,
+    /// The S monsters whose monstats `npc` flag (bit 8) is set, in key
+    /// order.
+    pub npc_monsters: Vec<UnitKey>,
 }
 
 /// Who applies an output (§10 rule 5).
@@ -42,6 +235,9 @@ pub enum Output {
 pub enum Consumer {
     Ui,
     Audio,
+    /// The client effect layer (client missiles, overlays, client skill
+    /// code; Phase 6).
+    Effects,
 }
 
 /// One row of the §10 table: variant name, producer id, consumer.
@@ -52,29 +248,56 @@ pub struct Row {
     pub consumer: Consumer,
 }
 
+const fn row(variant: &'static str, producer: u8, consumer: Consumer) -> Row {
+    Row {
+        variant,
+        producer,
+        consumer,
+    }
+}
+
+use Consumer::{Audio, Effects, Ui};
+
 /// The variants in code, in the §10 table's order (checked against the
 /// table, §10 rule 8).
-pub const ROWS: [Row; 4] = [
-    Row {
-        variant: "ServerSound",
-        producer: 0x2C,
-        consumer: Consumer::Audio,
-    },
-    Row {
-        variant: "QuestUi",
-        producer: 0x5D,
-        consumer: Consumer::Ui,
-    },
-    Row {
-        variant: "WaypointMenu",
-        producer: 0x63,
-        consumer: Consumer::Ui,
-    },
-    Row {
-        variant: "TradeAction",
-        producer: 0x77,
-        consumer: Consumer::Ui,
-    },
+pub const ROWS: [Row; 37] = [
+    row("ServerSound", 0x2C, Audio),
+    row("QuestUi", 0x5D, Ui),
+    row("WaypointMenu", 0x63, Ui),
+    row("TradeAction", 0x77, Ui),
+    row("ChatLine", 0x26, Ui),
+    row("NpcText", 0x27, Ui),
+    row("HireOffer", 0x4E, Ui),
+    row("HireListReset", 0x4F, Ui),
+    row("QuestSpecial", 0x50, Ui),
+    row("OpenUi", 0x58, Ui),
+    row("TradePartner", 0x78, Ui),
+    row("NpcInteract", 0x8A, Ui),
+    row("NpcIntro", 0x91, Ui),
+    row("GameQuestFlags", 0x29, Ui),
+    row("QuestLog", 0x52, Ui),
+    row("QuestAvailability", 0x5E, Ui),
+    row("MercRevive", 0x9B, Ui),
+    row("SkillEvent", 0x99, Effects),
+    row("SkillDo", 0xA3, Effects),
+    row("ShrineFx", 0x0E, Effects),
+    row("ShrineSound", 0x4D, Audio),
+    row("UnitOverlay", 0x11, Effects),
+    row("UmodFx", 0x57, Effects),
+    row("ClientMissile", 0x73, Effects),
+    row("CommonCof", 0x7E, Effects),
+    row("MonsterPreload", 0xA4, Effects),
+    row("RosterChanged", 0x5B, Ui),
+    row("SkillEndFx", 0xA5, Effects),
+    row("QuestFlags", 0x28, Ui),
+    row("NpcGone", 0x28, Ui),
+    row("NpcDialog", 0x28, Ui),
+    row("NpcDialogEnd", 0x62, Ui),
+    row("NpcTransaction", 0x2A, Ui),
+    row("EventText", 0x5A, Ui),
+    row("ActVideo", 0x61, Ui),
+    row("OverheadClear", 0x76, Ui),
+    row("HotkeyAssign", 0x7B, Ui),
 ];
 
 impl Output {
@@ -85,6 +308,39 @@ impl Output {
             Output::QuestUi { .. } => 1,
             Output::WaypointMenu { .. } => 2,
             Output::TradeAction { .. } => 3,
+            Output::ChatLine { .. } => 4,
+            Output::NpcText { .. } => 5,
+            Output::HireOffer { .. } => 6,
+            Output::HireListReset => 7,
+            Output::QuestSpecial { .. } => 8,
+            Output::OpenUi { .. } => 9,
+            Output::TradePartner { .. } => 10,
+            Output::NpcInteract { .. } => 11,
+            Output::NpcIntro { .. } => 12,
+            Output::GameQuestFlags { .. } => 13,
+            Output::QuestLog { .. } => 14,
+            Output::QuestAvailability { .. } => 15,
+            Output::MercRevive { .. } => 16,
+            Output::SkillEvent { .. } => 17,
+            Output::SkillDo { .. } => 18,
+            Output::ShrineFx { .. } => 19,
+            Output::ShrineSound { .. } => 20,
+            Output::UnitOverlay { .. } => 21,
+            Output::UmodFx { .. } => 22,
+            Output::ClientMissile { .. } => 23,
+            Output::CommonCof { .. } => 24,
+            Output::MonsterPreload { .. } => 25,
+            Output::RosterChanged { .. } => 26,
+            Output::SkillEndFx { .. } => 27,
+            Output::QuestFlags { .. } => 28,
+            Output::NpcGone { .. } => 29,
+            Output::NpcDialog(_) => 30,
+            Output::NpcDialogEnd { .. } => 31,
+            Output::NpcTransaction { .. } => 32,
+            Output::EventText { .. } => 33,
+            Output::ActVideo { .. } => 34,
+            Output::OverheadClear { .. } => 35,
+            Output::HotkeyAssign { .. } => 36,
         };
         &ROWS[i]
     }
@@ -117,11 +373,13 @@ pub fn dispatch<E>(
     outputs: &[Output],
     ui: &mut dyn FnMut(&Output) -> Result<(), E>,
     audio: &mut dyn FnMut(&Output) -> Result<(), E>,
+    effects: &mut dyn FnMut(&Output) -> Result<(), E>,
 ) -> Result<(), E> {
     for o in outputs {
         match o.consumer() {
             Consumer::Ui => ui(o)?,
             Consumer::Audio => audio(o)?,
+            Consumer::Effects => effects(o)?,
         }
     }
     Ok(())
@@ -132,7 +390,9 @@ pub fn dispatch<E>(
 pub enum TableError {
     #[error("bridge.md has no §10 rows table")]
     NoTable,
-    #[error("§10 row {0:?}: expected | `Variant` | payload | 0xNN … | ui or audio | owner |")]
+    #[error(
+        "§10 row {0:?}: expected | `Variant` | payload | 0xNN … | ui, audio or effects | owner |"
+    )]
     Row(String),
 }
 
@@ -173,6 +433,7 @@ pub fn parse_table(spec: &str) -> Result<Vec<TableRow>, TableError> {
         let consumer = match cells[4] {
             "UI" | "ui" => Consumer::Ui,
             "audio" => Consumer::Audio,
+            "effects" => Consumer::Effects,
             _ => return Err(bad()),
         };
         rows.push(TableRow {
@@ -252,16 +513,21 @@ mod tests {
                 class: 0,
                 event: 2,
             },
+            Output::MonsterPreload { class: 7 },
         ];
         let seen = RefCell::new(Vec::new());
         dispatch::<()>(
             &list,
             &mut |o| {
-                seen.borrow_mut().push(("ui", *o));
+                seen.borrow_mut().push(("ui", o.clone()));
                 Ok(())
             },
             &mut |o| {
-                seen.borrow_mut().push(("audio", *o));
+                seen.borrow_mut().push(("audio", o.clone()));
+                Ok(())
+            },
+            &mut |o| {
+                seen.borrow_mut().push(("effects", o.clone()));
                 Ok(())
             },
         )
@@ -269,8 +535,8 @@ mod tests {
         let seen = seen.into_inner();
         assert_eq!(
             seen.iter().map(|s| s.0).collect::<Vec<_>>(),
-            ["audio", "ui", "audio"]
+            ["audio", "ui", "audio", "effects"]
         );
-        assert_eq!(seen.iter().map(|s| s.1).collect::<Vec<_>>(), list);
+        assert_eq!(seen.into_iter().map(|s| s.1).collect::<Vec<_>>(), list);
     }
 }

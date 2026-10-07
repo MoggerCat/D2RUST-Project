@@ -42,7 +42,7 @@ pub mod starts2;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
-mod tests2;
+pub(crate) mod tests2;
 #[cfg(test)]
 mod tests3;
 

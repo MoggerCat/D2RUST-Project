@@ -1,4 +1,4 @@
-// Spec: specs/monsters/init.md §16–§22; specs/monsters/umods.tsv; specs/monsters/umod-callbacks.md §2
+// Spec: specs/monsters/init.md §16–§22, §26; specs/monsters/umods.tsv; specs/monsters/umod-callbacks.md §2; specs/monsters/umod-init-bodies.md
 //! Boss spawns after the spawn (§16), umod choice (§17), boss minions
 //! and umod init (§18), the umod init functions (§19), superuniques
 //! (§20), restore paths (§21), and the umod callback dispatcher with the
@@ -552,7 +552,7 @@ pub fn run_umod_init<H: InitHost + ?Sized>(
         8 | 27 | 28 => resist(h, unit, umod),
         9 | 17 | 18 | 23 | 25 => elemental(cx, h, unit, umod, unique, d),
         16 => champion_fn(cx, h, unit, 16, d),
-        26 => teleport(cx, h, unit),
+        26 => teleport(cx, h, unit, unique),
         30 => aura(cx, h, unit),
         36 => ghostly(cx, h, unit, d),
         37 => {
@@ -709,10 +709,8 @@ fn resist<H: InitHost + ?Sized>(h: &mut H, unit: UnitId, umod: u8) {
     }
 }
 
-/// Umods 9, 17, 18, 23, 25 (§19.4).
-/// TODO(spec: monsters/init.md open question 7): 17, 18, 23, 25 follow
-/// D2MOO; the constants are read "as fire" (`umods.tsv`), the mana
-/// drain ×256 is applied to the added value.
+/// Umods 9, 17, 18, 23, 25: the shared elemental body
+/// (`monsters/umod-init-bodies.md` §2, values §3).
 fn elemental<H: InitHost + ?Sized>(
     cx: &Ctx<'_>,
     h: &mut H,
@@ -721,27 +719,65 @@ fn elemental<H: InitHost + ?Sized>(
     unique: bool,
     d: usize,
 ) {
+    // Step 3: d' = min(d, 2); o = the L-flag.
+    let dp = d.min(2);
+    let o = h.info().l_flag();
+    // Step 4: the monlvl row, clamped to 1..rows − 1 (never rejected).
     let level = h.stat(unit, stat::LEVEL);
-    let dm = monlvl_dm(cx.tables.monlvl, h.info().l_flag(), d, level);
-    let (kmin, kmax) = if unique {
-        (cx.k(d + 28), cx.k(d + 31))
+    let rows = cx.tables.monlvl.len() as i32;
+    let r = if level.max(1) >= rows - 1 {
+        rows - 1
+    } else if level <= 1 {
+        1
     } else {
-        (cx.k(d + 16), cx.k(d + 19))
+        level
     };
-    let (smin, smax, mul) = match umod {
+    // Steps 4–5: an empty table returns before the stats and the tail.
+    let Some(row) = usize::try_from(r)
+        .ok()
+        .and_then(|i| cx.tables.monlvl.get(i))
+    else {
+        return;
+    };
+    // Step 6: `DM` / `L-DM` of difficulty d'.
+    let v = if o {
+        [row.l_dm, row.l_dm_n, row.l_dm_h]
+    } else {
+        [row.dm, row.dm_n, row.dm_h]
+    }[dp] as i32;
+    // Step 7.
+    let (kmin, kmax) = if unique {
+        (cx.k(dp + 28), cx.k(dp + 31))
+    } else {
+        (cx.k(dp + 16), cx.k(dp + 19))
+    };
+    let (smin, smax, scale) = match umod {
         9 => (stat::FIREMINDAM, stat::FIREMAXDAM, 1),
         17 => (stat::LIGHTMINDAM, stat::LIGHTMAXDAM, 1),
         18 => (stat::COLDMINDAM, stat::COLDMAXDAM, 1),
         23 => (stat::POISONMINDAM, stat::POISONMAXDAM, 1),
         _ => (stat::MANADRAINMINDAM, stat::MANADRAINMAXDAM, 256),
     };
-    add(h, unit, smin, dm.wrapping_mul(kmin) / 100 * mul);
-    add(h, unit, smax, dm.wrapping_mul(kmax) / 100 * mul);
+    // Steps 8–9: divide, then scale (shift left 8 after the division).
+    add(
+        h,
+        unit,
+        smin,
+        (kmin.wrapping_mul(v) / 100).wrapping_mul(scale),
+    );
+    add(
+        h,
+        unit,
+        smax,
+        (kmax.wrapping_mul(v) / 100).wrapping_mul(scale),
+    );
+    // Step 10: the length stat of the clamped row r, not the level.
     match umod {
-        18 => add(h, unit, stat::COLDLENGTH, 5 * level + 100),
-        23 => add(h, unit, stat::POISONLENGTH, 2 * (5 * level + 150)),
+        18 => add(h, unit, stat::COLDLENGTH, 5 * r + 100),
+        23 => add(h, unit, stat::POISONLENGTH, 2 * (5 * r + 150)),
         _ => {}
     }
+    // Step 11: the resistance tail does nothing for a minion.
     if unique {
         resist(h, unit, umod);
     }
@@ -769,10 +805,12 @@ fn ghostly<H: InitHost + ?Sized>(cx: &Ctx<'_>, h: &mut H, unit: UnitId, d: usize
     add(h, unit, stat::COLDLENGTH, 150);
 }
 
-/// Umod 26 teleport (§19.6).
-/// TODO(spec: monsters/init.md open question 7): body `0x005A1600`
-/// unread; D2MOO's effect as the spec states it.
-fn teleport<H: InitHost + ?Sized>(cx: &Ctx<'_>, h: &mut H, unit: UnitId) {
+/// Umod 26 teleport `0x005A1600` (`monsters/umod-init-bodies.md` §4):
+/// bosses only; skill 184 at level 1, its mode 4, AI flag 0x20.
+fn teleport<H: InitHost + ?Sized>(cx: &Ctx<'_>, h: &mut H, unit: UnitId, unique: bool) {
+    if !unique {
+        return;
+    }
     if let Some(sk) = cx.tables.ids.monteleport {
         h.give_skill(unit, sk, 1, Some(4));
     }
@@ -890,12 +928,139 @@ pub fn superunique_finish<H: InitHost + ?Sized>(
     superunique_quest(h, unit, su.hcidx);
 }
 
+/// The per-`hcIdx` cases of `0x005A49B0` (§20.1), before the closing
+/// umod 22.
 fn superunique_quest<H: InitHost + ?Sized>(h: &mut H, unit: UnitId, hc_idx: u32) {
-    h.superunique_quest(unit, hc_idx);
-    if hc_idx == 6 {
-        h.set_state(unit, 118);
-        h.ai_install(unit, 13);
+    match hc_idx {
+        6 => {
+            h.set_state(unit, 118);
+            h.quest_chain(unit, 5);
+            h.ai_install(unit, 13);
+        }
+        10 => {
+            // U `roll(5)` + 2 class-4 spawns, then one of each class.
+            let n = seed(h, unit).roll(5) as i32 + 2;
+            for _ in 0..n {
+                h.spawn_near_unit(unit, 4, 1, 4, 0x40);
+            }
+            for c in [276, 382, 385, 389] {
+                h.spawn_near_unit(unit, c, 1, 4, 0x40);
+            }
+        }
+        26 | 27 | 29 => {
+            h.quest_chain(unit, 19);
+            h.quest_preset_boss(unit);
+        }
+        36..=38 => h.quest_chain(unit, 23),
+        39 => h.quest_chain(unit, 4),
+        42 => {
+            h.spawn_group(unit, 453, 20, 20, 0);
+            h.quest_chain(unit, 31);
+            h.quest_preset_boss(unit);
+            h.set_state(unit, 118);
+        }
+        43..=45 => {
+            h.quest_chain(unit, 35);
+            h.quest_preset_boss(unit);
+        }
+        60 => {
+            h.owner_data_self(unit);
+            let c = h.class_for_level(unit, 453);
+            h.spawn_group(unit, c, 10, 20, 0x40);
+            h.quest_chain(unit, 34);
+        }
+        62 => h.spawn_group(unit, 381, 20, 10, 0x40),
+        _ => {}
     }
+}
+
+// ---- §26 ----
+
+/// Make unique `0x005A4940(game, unit)` (§26), the warping shrine's
+/// effect on the monster it picked: boss flag, unique mark, umods with
+/// the champion test, umod init without minions, then unit flag 0x800
+/// and monster data +0x5C bit 0.
+pub fn make_unique<H: InitHost + ?Sized>(cx: &Ctx<'_>, h: &mut H, unit: UnitId) {
+    let monster = h
+        .units()
+        .get(unit)
+        .is_some_and(|r| r.ty == crate::units::UnitType::Monster);
+    if !monster || h.monsters().get(unit).is_none() {
+        return;
+    }
+    flags_or(h, unit, type_flag::BOSS);
+    mark_unique(h, unit);
+    choose_umods(cx, h, unit, true);
+    boss_minions_and_init(cx, h, unit, 0, 0, None, false);
+    if let Some(r) = h.units().get_mut(unit) {
+        r.flags |= 0x800;
+    }
+    h.monsters().entry(unit).data_flag1 = true;
+}
+
+/// What the eligibility test `0x00582750(M, P)` reads (§26).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct WarpCandidate {
+    /// M is P itself.
+    pub is_operator: bool,
+    /// M is a monster (type 1).
+    pub monster: bool,
+    /// `0x00650D70(P, M)`.
+    pub relation: i32,
+    /// `0x006259B0(M)`.
+    pub alignment: i32,
+    /// `0x0063EA40(M)` ≠ 0.
+    pub test_63ea40: bool,
+    /// M's mode.
+    pub mode: u32,
+    /// `0x0046C140(class, 2)`: the class has mode 2.
+    pub has_walk: bool,
+    /// monstats2 byte +0x0B (`None` without a record).
+    pub m2_byte_0b: Option<u8>,
+    /// Monster data dword 0 ≠ 0 (`0x0055B7E0`).
+    pub has_data: bool,
+    /// `0x0063E9F0(v, M)` boss.
+    pub boss: bool,
+    /// `0x0063EDC0` prime evil.
+    pub prime_evil: bool,
+    /// Type flags (monster data +0x16).
+    pub type_flags: u16,
+}
+
+/// Eligibility `0x00582750(M, P)` (§26): all ten tests in order.
+pub fn warp_eligible(c: &WarpCandidate) -> bool {
+    !c.is_operator
+        && c.monster
+        && c.relation != 1
+        && c.alignment == 0
+        && !c.test_63ea40
+        && matches!(c.mode, 1 | 2)
+        && c.has_walk
+        && c.m2_byte_0b.is_some_and(|b| b != 0)
+        && c.has_data
+        && !c.boss
+        && !c.prime_evil
+        && c.type_flags & 0x1F == 0
+}
+
+/// The nearest eligible monster `0x0065A800(P, x, y, limit, cb)` (§26)
+/// over `(unit, distance, eligible)` in room-list then unit-list order:
+/// limit 0 means 0x10000; the best starts at 0xFFFF; the first of equal
+/// distances wins.
+pub fn nearest_eligible<U: Copy>(
+    candidates: impl IntoIterator<Item = (U, i32, bool)>,
+    limit: i32,
+) -> Option<U> {
+    let limit = if limit == 0 { 0x10000 } else { limit };
+    let mut best = 0xFFFF;
+    let mut pick = None;
+    for (u, d, ok) in candidates {
+        if d < limit && d < best && ok {
+            pick = Some(u);
+            best = d;
+        }
+    }
+    pick
 }
 
 /// A saved boss or minion (`0x005424F0` restore, §21).

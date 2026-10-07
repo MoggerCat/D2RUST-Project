@@ -59,8 +59,8 @@ pub static CLIENT_MESSAGES: [ClientMessage; 113] = [
     ClientMessage { id: 0x2F, name: "InitEntityChat", transport_size: SizeRule::Fixed(9), handler_size: HandlerSize::Exact(9), layout: &[Field { name: "id", ty: FieldType::U32, offset: Some(5) }], handler: Some(0x0054B930), kind: Kind::Handler, gate: Gate::Alive, request: "start talking to an NPC", scope: Scope::Sim, confirmed: Confirmed::Yes },
     ClientMessage { id: 0x30, name: "TerminateEntityChat", transport_size: SizeRule::Fixed(9), handler_size: HandlerSize::Exact(9), layout: &[Field { name: "id", ty: FieldType::U32, offset: Some(5) }], handler: Some(0x0054B9F0), kind: Kind::Handler, gate: Gate::Alive, request: "stop talking to an NPC", scope: Scope::Sim, confirmed: Confirmed::Yes },
     ClientMessage { id: 0x31, name: "QuestMessage", transport_size: SizeRule::Fixed(9), handler_size: HandlerSize::Exact(9), layout: &[Field { name: "npc", ty: FieldType::U32, offset: Some(1) }, Field { name: "msg", ty: FieldType::U16, offset: Some(5) }], handler: Some(0x0054BA90), kind: Kind::Handler, gate: Gate::Alive, request: "quest message shown by an NPC", scope: Scope::Sim, confirmed: Confirmed::Yes },
-    ClientMessage { id: 0x32, name: "BuyItem", transport_size: SizeRule::Fixed(17), handler_size: HandlerSize::Exact(17), layout: &[Field { name: "npc", ty: FieldType::U32, offset: Some(1) }, Field { name: "item", ty: FieldType::U32, offset: Some(5) }, Field { name: "mode", ty: FieldType::U32, offset: Some(9) }, Field { name: "cost", ty: FieldType::U32, offset: Some(13) }], handler: Some(0x0054BAC0), kind: Kind::Handler, gate: Gate::Alive, request: "buy from an NPC", scope: Scope::Sim, confirmed: Confirmed::Yes },
-    ClientMessage { id: 0x33, name: "SellItem", transport_size: SizeRule::Fixed(17), handler_size: HandlerSize::Exact(17), layout: &[Field { name: "npc", ty: FieldType::U32, offset: Some(1) }, Field { name: "item", ty: FieldType::U32, offset: Some(5) }, Field { name: "tab", ty: FieldType::U16, offset: Some(9) }, Field { name: "cost", ty: FieldType::U32, offset: Some(13) }], handler: Some(0x0054BB20), kind: Kind::Handler, gate: Gate::Alive, request: "sell to an NPC", scope: Scope::Sim, confirmed: Confirmed::Yes },
+    ClientMessage { id: 0x32, name: "BuyItem", transport_size: SizeRule::Fixed(17), handler_size: HandlerSize::Exact(17), layout: &[Field { name: "npc", ty: FieldType::U32, offset: Some(1) }, Field { name: "item", ty: FieldType::U32, offset: Some(5) }, Field { name: "transaction", ty: FieldType::U32, offset: Some(9) }, Field { name: "client_price", ty: FieldType::U32, offset: Some(13) }], handler: Some(0x0054BAC0), kind: Kind::Handler, gate: Gate::Alive, request: "buy from an NPC", scope: Scope::Sim, confirmed: Confirmed::Yes },
+    ClientMessage { id: 0x33, name: "SellItem", transport_size: SizeRule::Fixed(17), handler_size: HandlerSize::Exact(17), layout: &[Field { name: "npc", ty: FieldType::U32, offset: Some(1) }, Field { name: "item", ty: FieldType::U32, offset: Some(5) }, Field { name: "item_mode", ty: FieldType::U16, offset: Some(9) }, Field { name: "client_price", ty: FieldType::U32, offset: Some(13) }], handler: Some(0x0054BB20), kind: Kind::Handler, gate: Gate::Alive, request: "sell to an NPC", scope: Scope::Sim, confirmed: Confirmed::Yes },
     ClientMessage { id: 0x34, name: "IdentifyWithNpc", transport_size: SizeRule::Fixed(5), handler_size: HandlerSize::Exact(5), layout: &[Field { name: "npc", ty: FieldType::U32, offset: Some(1) }], handler: Some(0x0054BBA0), kind: Kind::Handler, gate: Gate::Alive, request: "identify all items at an NPC (Cain)", scope: Scope::Sim, confirmed: Confirmed::Yes },
     ClientMessage { id: 0x35, name: "Repair", transport_size: SizeRule::Fixed(17), handler_size: HandlerSize::Exact(17), layout: &[Field { name: "npc", ty: FieldType::U32, offset: Some(1) }, Field { name: "item", ty: FieldType::U32, offset: Some(5) }, Field { name: "unread", ty: FieldType::U16, offset: Some(9) }, Field { name: "repair_flags", ty: FieldType::U32, offset: Some(13) }], handler: Some(0x0054BB60), kind: Kind::Handler, gate: Gate::Alive, request: "repair at an NPC", scope: Scope::Sim, confirmed: Confirmed::Yes },
     ClientMessage { id: 0x36, name: "HireMerc", transport_size: SizeRule::Fixed(9), handler_size: HandlerSize::Exact(9), layout: &[Field { name: "npc", ty: FieldType::U32, offset: Some(1) }, Field { name: "merc", ty: FieldType::U16, offset: Some(5) }], handler: Some(0x0054BBD0), kind: Kind::Handler, gate: Gate::Alive, request: "hire a mercenary", scope: Scope::Sim, confirmed: Confirmed::Yes },
@@ -1642,9 +1642,9 @@ pub mod client {
         /// `u32` at 5.
         pub item: u32,
         /// `u32` at 9.
-        pub mode: u32,
+        pub transaction: u32,
         /// `u32` at 13.
-        pub cost: u32,
+        pub client_price: u32,
     }
 
     impl FixedMessage for BuyItem {
@@ -1655,16 +1655,16 @@ pub mod client {
             Ok(Self {
                 npc: u32_at(b, 1),
                 item: u32_at(b, 5),
-                mode: u32_at(b, 9),
-                cost: u32_at(b, 13),
+                transaction: u32_at(b, 9),
+                client_price: u32_at(b, 13),
             })
         }
         fn write(&self, out: &mut [u8]) {
             start(out, Self::ID, Self::SIZE);
             put_u32(out, 1, self.npc);
             put_u32(out, 5, self.item);
-            put_u32(out, 9, self.mode);
-            put_u32(out, 13, self.cost);
+            put_u32(out, 9, self.transaction);
+            put_u32(out, 13, self.client_price);
         }
     }
 
@@ -1685,9 +1685,9 @@ pub mod client {
         /// `u32` at 5.
         pub item: u32,
         /// `u16` at 9.
-        pub tab: u16,
+        pub item_mode: u16,
         /// `u32` at 13.
-        pub cost: u32,
+        pub client_price: u32,
     }
 
     impl FixedMessage for SellItem {
@@ -1698,16 +1698,16 @@ pub mod client {
             Ok(Self {
                 npc: u32_at(b, 1),
                 item: u32_at(b, 5),
-                tab: u16_at(b, 9),
-                cost: u32_at(b, 13),
+                item_mode: u16_at(b, 9),
+                client_price: u32_at(b, 13),
             })
         }
         fn write(&self, out: &mut [u8]) {
             start(out, Self::ID, Self::SIZE);
             put_u32(out, 1, self.npc);
             put_u32(out, 5, self.item);
-            put_u16(out, 9, self.tab);
-            put_u32(out, 13, self.cost);
+            put_u16(out, 9, self.item_mode);
+            put_u32(out, 13, self.client_price);
         }
     }
 

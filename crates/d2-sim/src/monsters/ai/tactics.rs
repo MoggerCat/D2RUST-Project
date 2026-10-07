@@ -274,8 +274,9 @@ pub fn wander_near<W: AiHost + ?Sized>(
     move_to(game, cx, unit, ModeTarget::Point(x, y), mode::WALK, 1, 0)
 }
 
-/// `0x005DEFE0` / `0x005DF140` escape from t by n (walk / run): n > 5 →
-/// velocity steps n; target own + sign(own − t)·n per axis.
+/// `0x005DEFE0` / `0x005DF140` escape from t by n (walk / run): t = 0 →
+/// false, nothing done (`ai.md` §7.2); n > 5 → velocity steps n; target
+/// own + sign(own − t)·n per axis.
 pub fn escape<W: AiHost + ?Sized>(
     game: &mut Game,
     cx: &mut Ctx<'_, W>,
@@ -285,12 +286,14 @@ pub fn escape<W: AiHost + ?Sized>(
     del: bool,
     run: bool,
 ) -> bool {
+    let Some(t) = t else {
+        return false;
+    };
     if n > 5 {
         set_velocity(cx, unit, 0, 0, n);
     }
     let own = cx.world.position(unit);
-    // TODO(spec gap): escaping from target 0 uses the own position.
-    let from = t.map_or(own, |t| cx.world.position(t));
+    let from = cx.world.position(t);
     let x = own
         .0
         .wrapping_add((own.0.wrapping_sub(from.0)).signum() * n);

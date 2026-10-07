@@ -344,6 +344,29 @@ fn out_of_scope_rows() {
     assert!(h.session.seen.is_empty() && h.game.handled.is_empty());
 }
 
+// The S→C ids no server function queues (§3.5 rule 2): `produced_by`
+// none, though the client has handlers for them; 0x77 stays a `sim` row
+// (§4 rule 4). Every other none row is an id with no size entry or no
+// client handler (`bridge-dispatch.tsv` owner `bridge.md`).
+// Covers: specs/sim/intents-events.md §3.5 r2, §4 r4
+#[test]
+fn server_none_rows_include_the_never_queued_ids() {
+    let none = server_ids(ProducedBy::None);
+    for id in [
+        0x12, 0x13, 0x14, 0x16, 0x24, 0x25, 0x45, 0x54, 0x66, 0x6E, 0x6F, 0x70, 0x71, 0x72,
+    ] {
+        assert!(none.contains(&id), "{id:#x} is not a none row");
+        let m = &SERVER_MESSAGES[id as usize];
+        assert!(
+            m.client_handler.is_some() || m.client_unit_handler.is_some(),
+            "{id:#x} has a client handler"
+        );
+        assert!(m.senders.is_empty(), "{id:#x} has no sender");
+    }
+    assert!(!none.contains(&0x77));
+    assert!(server_ids(ProducedBy::Sim).contains(&0x77));
+}
+
 // Covers: specs/sim/intents-events.md §4 r5
 #[test]
 fn none_rows_are_rejected_like_the_original() {

@@ -22,14 +22,14 @@ const VILEMOTHER1: i32 = 298;
 
 /// The 64 → 8 direction table `0x00745600`: 0–3 → 0, then 8 per step,
 /// 60–63 → 0.
-fn dir8(d: i32) -> usize {
+pub(super) fn dir8(d: i32) -> usize {
     ((d.wrapping_add(4) >> 3) & 7) as usize
 }
 
 /// Birth offsets: e by k, dx `0x006EA998`, dy `0x006EA978` (§2).
 const BIRTH_E: [usize; 8] = [6, 4, 2, 2, 2, 0, 6, 6];
-const DIR_DX: [i32; 8] = [0, -1, -1, -1, 0, 1, 1, 1];
-const DIR_DY: [i32; 8] = [-1, -1, 0, 1, 1, 1, 0, -1];
+pub(super) const DIR_DX: [i32; 8] = [0, -1, -1, -1, 0, 1, 1, 1];
+pub(super) const DIR_DY: [i32; 8] = [-1, -1, 0, 1, 1, 1, 0, -1];
 
 /// The child class Y: row 301's `BaseId` followed n steps along
 /// `NextInClass` (`monsters/population.md` §11.5 rule 3), n = the chain
@@ -271,8 +271,8 @@ pub fn regurgitator<W: AiHost + ?Sized>(
             return;
         }
         // 2. Walk then idle on the same think (edge case 2).
-        // TODO(spec: ai-bodies-4.md §5 step 2): "Then s := 3; idle 8" is
-        // read as following both the walk and the near case (d ≤ 4).
+        // "Then s := 3; idle 8" follows both the walk and the near case
+        // (§5 step 2, open question 5).
         2 => {
             let Some(k) = corpse else {
                 regurg_reset(cx, u);
@@ -561,8 +561,7 @@ pub(super) fn score<W: AiHost + ?Sized>(
         return 0;
     }
     // 6.
-    // TODO(spec: ai-bodies-4.md §7.2 step 6): "d58 >> 8 + d55 + …" is read
-    // as (d58 >> 8) + d55 + … (poison damage is per 256 frames).
+    // Only d58 is shifted (§7.2 step 6, open question 7).
     let dmg = (st(58) >> 8)
         .wrapping_add(st(55))
         .wrapping_add(st(53))
@@ -644,15 +643,14 @@ pub(super) fn boss_pick<W: AiHost + ?Sized>(
     }
     if let Some((a, sa)) = alt {
         if distance_no_size(cx.world.position(a), cx.world.position(boss)) < 5 {
-            // TODO(spec: ai-bodies-4.md §7.1 step 3): with no best the
-            // melee test and the path compute see unit 0; read as "not in
-            // melee, no path".
+            // With no best the melee test is false and the path is computed
+            // toward its stored target point (§7.1 step 3, open question 6).
             let swap = match best {
                 Some(b) => {
                     !cx.world.in_melee_range(game, boss, b)
                         && !cx.world.path_has_points(game, boss, b)
                 }
-                None => true,
+                None => !cx.world.path_has_points_no_target(game, boss),
             };
             if swap {
                 best = Some(a);
@@ -1047,6 +1045,21 @@ fn aidel_raw<W: AiHost + ?Sized>(cx: &Ctx<'_, W>, p: &TickParam) -> i32 {
 
 /// §8 Izual (55) `0x005F89B0`.
 pub fn izual<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitId, p: &TickParam) {
+    // 1.
+    if param(cx, u, 0) == 0 {
+        set_param(cx, u, 0, 1);
+        cx.world.quest_call(game, u, QuestCall::IzualActivated);
+    }
+    izual_steps(game, cx, u, p);
+}
+
+/// Izual's steps 2–6 (§8; also UberIzual, `ai-bodies-7.md` §25 step 3).
+pub(super) fn izual_steps<W: AiHost + ?Sized>(
+    game: &mut Game,
+    cx: &mut Ctx<'_, W>,
+    u: UnitId,
+    p: &TickParam,
+) {
     let t = p.target;
     // "Nova": `0x005DEAD0(Sk1mode, Skill1, T, x, y)` with (x, y) = T's
     // position (one target, T, here); s := aip5, w := aip6.
@@ -1055,11 +1068,6 @@ pub fn izual<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitId
         set_param(cx, u, 1, cx.aip(p, 5));
         set_param(cx, u, 2, cx.aip(p, 6));
     };
-    // 1.
-    if param(cx, u, 0) == 0 {
-        set_param(cx, u, 0, 1);
-        cx.world.quest_call(game, u, QuestCall::IzualActivated);
-    }
     // 2.
     let s = param(cx, u, 1);
     if s != 0 {

@@ -1,4 +1,4 @@
-// Spec: specs/monsters/ai.md §1–§8; specs/monsters/ai-bodies.md §9; specs/monsters/init.md §7; specs/monsters/ai-bodies-2.md..ai-bodies-5.md (seams `AiUnits`, `AiModes`, `AiWorld`, `AiTargets`, `AiSkills`, `AiQuests`, `AiActs`)
+// Spec: specs/monsters/ai.md §1–§8; specs/monsters/ai-bodies.md §9; specs/monsters/init.md §7; specs/monsters/ai-bodies-2.md..ai-bodies-7.md (seams `AiUnits`, `AiModes`, `AiWorld`, `AiTargets`, `AiSkills`, `AiQuests`, `AiActs`, `AiSummons`)
 //! Monster AI ↔ units, modes, timer events and the DRLG: [`View`]
 //! implements [`crate::monsters::ai::AiHost`]. Real providers: seeds,
 //! class, mode, states (`stat-lists.md` §9), the state-54 clear of
@@ -11,8 +11,8 @@
 
 use crate::game::Game;
 use crate::monsters::ai::{
-    AiActs, AiModes, AiQuests, AiSkills, AiTargets, AiUnits, AiWorld, ModeTarget, PortalNpc,
-    QuestCall,
+    AiActs, AiModes, AiQuests, AiSkills, AiSummons, AiTargets, AiUnits, AiWorld, ModeTarget,
+    PortalNpc, QuestCall,
 };
 use crate::rng::Seed;
 use crate::stats::stat;
@@ -614,9 +614,6 @@ impl<X: Pending> AiActs for View<'_, X> {
             .x
             .ai_spawn_monster(game, room, x, y, class, mode, spread, flags)
     }
-    fn queen_spawn_class(&self, unit: UnitId) -> i32 {
-        self.h.x.ai_queen_spawn_class(unit)
-    }
     fn kill(&mut self, game: &mut Game, unit: UnitId, killer: Option<UnitId>) {
         self.h.x.ai_kill(game, unit, killer);
     }
@@ -649,5 +646,19 @@ impl<X: Pending> AiActs for View<'_, X> {
     }
     fn quest_call(&mut self, game: &mut Game, unit: UnitId, call: QuestCall) -> bool {
         self.h.x.ai_quest_call(game, unit, call)
+    }
+}
+
+/// The seams of `ai-bodies-6.md` / `ai-bodies-7.md`: unit flags 2 (+0xC8)
+/// and the target-node slot (+0xD0) are real (`units.md` §2); everything
+/// else keeps the narrow default of [`AiSummons`] until its owner wires it.
+impl<X: Pending> AiSummons for View<'_, X> {
+    fn set_unit_flags2(&mut self, unit: UnitId, mask: u32) {
+        if let Some(r) = self.units.get_mut(unit) {
+            r.flags2 |= mask;
+        }
+    }
+    fn target_slot(&self, unit: UnitId) -> i32 {
+        self.units.get(unit).map_or(11, |r| r.node_index as i32)
     }
 }

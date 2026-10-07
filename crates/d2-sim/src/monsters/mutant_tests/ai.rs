@@ -183,38 +183,38 @@ fn install_ignores_state_18_and_non_monsters() {
     assert!(w.store.unhandled.is_empty());
 }
 
-/// The first AI table index whose record has an init function without a
-/// body here (a logged stub: FoulCrowNest's and BloodRaven's run, §9.17,
-/// §9.18), and one without an init function.
-fn ai_with_init(has: bool) -> u16 {
+/// Raven (107): its init `0x005ECB70` (`ai-bodies-7.md` §19) writes
+/// param 0 := −1 and draws one step, so a call is visible.
+const RAVEN: u16 = 107;
+
+/// The first AI table index whose record has no init function.
+fn ai_without_init() -> u16 {
     table::AI_TABLE
         .iter()
-        .position(|r| (r.init != 0) == has && r.think != 0 && !INIT_IMPLEMENTED.contains(&r.init))
+        .position(|r| r.init == 0 && r.think != 0)
         .expect("an AI") as u16
 }
 
-fn init_logged(w: &World) -> bool {
-    w.store
-        .unhandled
-        .iter()
-        .any(|u| matches!(u, Unhandled::Function { unit, .. } if *unit == w.mon))
+fn init_ran(w: &World) -> bool {
+    w.store.control(w.mon).unwrap().params[0] == -1
 }
 
 // Covers: specs/monsters/ai.md §3.3 r4
 #[test]
 fn install_init_only_with_a_function_and_both_records() {
+    assert!(INIT_IMPLEMENTED.contains(&table::AI_TABLE[RAVEN as usize].init));
     // No init function: nothing is called.
-    let w = World::new(monstats(ai_with_init(false), [0; 5], 15));
-    assert!(!init_logged(&w));
-    // An init function with both records: called (a logged stub).
-    let w = World::new(monstats(ai_with_init(true), [0; 5], 15));
-    assert!(init_logged(&w));
+    let w = World::new(monstats(ai_without_init(), [0; 5], 15));
+    assert!(!init_ran(&w) && w.store.unhandled.is_empty());
+    // An init function with both records: called.
+    let w = World::new(monstats(RAVEN, [0; 5], 15));
+    assert!(init_ran(&w));
     // An init function, but `MonStatsEx` = the monstats2 count (no record):
     // not called.
-    let mut row = monstats(ai_with_init(true), [0; 5], 15);
+    let mut row = monstats(RAVEN, [0; 5], 15);
     row.monstatsex = 1;
     let w = World::new(row);
-    assert!(!init_logged(&w));
+    assert!(!init_ran(&w));
 }
 
 // ---- §9: per-AI behaviours -----------------------------------------------

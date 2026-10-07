@@ -40,19 +40,19 @@
 | Rules | 91–92 |
 |   1. Loop order (single player) | 93–114 |
 |   2. Client → server | 115–315 |
-|   3. Server → client | 316–527 |
-|   4. d2rs mapping and scope | 528–559 |
-|   5. Machine-readable tables | 560–596 |
-|   6. Exact-match comparison | 597–700 |
-|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 701–1100 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1101–1245 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1246–1390 |
-| Constants & data dependencies | 1391–1409 |
-| Randomness | 1410–1415 |
-| Edge cases & original bugs | 1416–1461 |
-| Test vectors | 1462–1548 |
-| Provenance | 1549–1650 |
-| Open questions | 1651–1770 |
+|   3. Server → client | 316–528 |
+|   4. d2rs mapping and scope | 529–560 |
+|   5. Machine-readable tables | 561–597 |
+|   6. Exact-match comparison | 598–701 |
+|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 702–1101 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1102–1246 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1247–1391 |
+| Constants & data dependencies | 1392–1410 |
+| Randomness | 1411–1416 |
+| Edge cases & original bugs | 1417–1462 |
+| Test vectors | 1463–1549 |
+| Provenance | 1550–1651 |
+| Open questions | 1652–1771 |
 <!-- /index -->
 
 ## Summary
@@ -485,10 +485,11 @@ Queue 2 (id 0xFF, 16 bytes, `0x0052CC20`) runs only when host callbacks
    `repeat:u8@2`; `0x0054BD10` spends repeat + 1 points (stat < 16,
    repeat < 100, else result 3), the same quantity PC 2 calls
    `count_minus_one` (`combat/vitals.md` owns the spend).
-   Field names taken from PC 2 (same offsets; code on staging-5 uses
-   them): C→S 0x32 `mode:u32@9 cost:u32@13`, 0x33 `tab:u16@9
-   cost:u32@13` (the vendor meaning is `world/vendors.md`'s), S→C 0x22
-   `unit:u32@3 body_state:u8@11` (`items/inventory-moves.md` §11).
+   Field names: C→S 0x32 / 0x33 keep PC 1's (`transaction`,
+   `client_price`, `item_mode`; the staging-5 code uses them; PC 2's
+   `mode` / `tab` / `cost` are the same bytes, vendor meaning
+   `world/vendors.md`); S→C 0x22 takes PC 2's `unit:u32@3
+   body_state:u8@11` (`items/inventory-moves.md` §11).
 5. **0x4C / 0x4D / 0x99 / 0x9A.** `0x0053D530` (ECX client, DL unit
    type; stack: GUID, target type u8, target GUID, skill u16, w u16, b
    u8, flag): id base 0x4C (16 bytes) or 0x4D (17 bytes), + 0x4D when

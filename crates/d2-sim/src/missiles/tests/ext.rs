@@ -1122,8 +1122,10 @@ fn find_world() -> (World, UnitId, RoomId) {
 }
 
 fn find(w: &mut World, room: RoomId, flags: u32, r: i32) -> Vec<UnitId> {
+    // G := flags, as the corpse effect `0x0056DCC0` sets it.
     let filter = crate::missiles::bodies_ext2::FindFilter {
         flags,
+        room_flags: flags,
         source: Some(w.owner),
         at: (100, 100),
         r,
@@ -1132,7 +1134,7 @@ fn find(w: &mut World, room: RoomId, flags: u32, r: i32) -> Vec<UnitId> {
     crate::missiles::bodies_ext2::unit_find(&mut w.game, &mut cx, Some(room), &filter)
 }
 
-// Covers: specs/missiles/bodies-2.md §44 l3 r3, §44 l4 r1, §44 l4 r2, §44 l4 r3, §44 l4 r4, §44 l4 r5
+// Covers: specs/monsters/umod-callbacks.md §3.1 r3, §3.1 l2 r1, §3.1 l2 r2, §3.1 l2 r3, §3.1 l2 r4, §3.1 l2 r5
 #[test]
 fn unit_find_default_filter_by_type_mode_and_distance() {
     let (mut w, _, room) = find_world();
@@ -1167,12 +1169,14 @@ fn unit_find_default_filter_by_type_mode_and_distance() {
     assert_eq!(find(&mut w, room, 0x2, 10), vec![mon]);
 }
 
-// Covers: specs/missiles/bodies-2.md §44 l2 r4, §44 l3 r1, §44 l3 r2, §44 l3 r4
+// Covers: specs/missiles/bodies-2.md §44 l2 r4
+// Covers: specs/monsters/umod-callbacks.md §3.1 r1, §3.1 r2, §3.1 r4
 #[test]
 fn unit_find_rooms_and_found_order() {
     let (mut w, _, room) = find_world();
     let filter = crate::missiles::bodies_ext2::FindFilter {
         flags: 0x1002,
+        room_flags: 0x1002,
         source: None,
         at: (100, 100),
         r: 10,

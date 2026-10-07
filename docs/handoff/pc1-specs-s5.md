@@ -9,11 +9,11 @@ Branch `claude/pc1-s5` = `origin/claude/specs-staging-5` (merged in twice, lates
 - **Message tables (CODE-TABLE CHANGE).**
   - `9d063f2`: 46 S→C layouts filled in `server-messages.tsv`, from the 1.14d builders.
   - `abfd624`: 0x2A, 0x50 and 0xAC filled.
-  - `d221d77`: C→S 0x32 `mode`/`cost` and 0x33 `tab`/`cost`, PC 2's names.
-  - Each change has its `generated.rs` regeneration as a separate CODE-TABLE CHANGE commit: `795d8f8`, `adeed19`, `7b2ff7a`, and the regeneration in the staging-5 re-merge `cd1a436`.
+  - `d221d77` renamed C→S 0x32 / 0x33 to PC 2's names; it is undone in the final staging-5 merge, because the staging-5 code had moved back to PC 1's (`transaction`, `client_price`, `item_mode`). Net: no change to 0x32 / 0x33.
+  - Each change has its `generated.rs` regeneration as a separate CODE-TABLE CHANGE commit: `795d8f8`, `adeed19`, `7b2ff7a`, and the regenerations in the staging-5 re-merge `cd1a436`.
   - Every row decision is recorded in `sim/intents-events.md` §3.5 r4.1.
 - **The layout grammar needs a fixed-length byte-array type** (for example `bytesN`) before four rows can be filled: 0x28 @7 (96 bytes), 0x29 @1 (96), 0x52 @1 (41) and 0x5E @1 (37). 0x16 ends in a tail of 9-byte entries (type u8, GUID u32, x u16, y u16); a count of 0 is fatal 0x855.
-- **Code fix `b606060`.** C→S 0x3A is `stat:u8@1 repeat:u8@2`. The character panel's `add_stat_point` and two tests are updated. Without this, staging-5's d2-client does not build.
+- **Code fix `b606060`.** C→S 0x3A is `stat:u8@1 repeat:u8@2`: the character panel's `add_stat_point` and two tests. The cloud made the same fix on staging-5 independently; the final merge takes theirs.
 - **Bridge §10 table (CODE-TABLE CHANGE).**
   - `4010567`: new rows `JoinRefused` (0xB4) and `TownExit`. `TownExit` has producer `update`, so `parse_table` must accept it.
   - `bridge-dispatch.tsv` makes 0xB4's owner `client/model.md`; register a system handler for it.

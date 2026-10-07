@@ -364,7 +364,7 @@ fn value_font(
 }
 
 /// A C→S 0x3A spending `n` (1–32) points on `stat`: `[0x3A][stat][n − 1]`
-/// (§8.5; proto fields `stat:u8@1 repeat:u8@2`).
+/// (§8.5; proto fields `stat:u8@1`, `repeat:u8@2`).
 pub fn add_stat_point(stat: u16, n: i32) -> ClientIntent {
     let repeat = (u16::try_from(n - 1).unwrap_or(0) & 0xFF) as u8;
     ClientIntent::from_message(&d2_proto::client::AddStatPoint {

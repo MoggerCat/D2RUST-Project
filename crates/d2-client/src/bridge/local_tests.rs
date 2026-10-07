@@ -606,10 +606,11 @@ fn unknown_and_unowned_ids() {
     fx.bridge.send(&PlayAudio { sound: 7 }).unwrap();
     // A system message: drained to the session handler, unanswered.
     assert_eq!(fx.bridge.send_bytes(&[0x6B]).unwrap(), Sent::Queued);
-    // An S→C id no client spec owns, sent by the server directly.
+    // An S→C id no client spec owns (0x79, out of scope: `bridge.md` §6
+    // rule 7), sent by the server directly.
     fx.link()
         .host_mut()
-        .send_direct(LOCAL_CLIENT, &[0x61, 0x07])
+        .send_direct(LOCAL_CLIENT, &[0x79, 1, 2, 3, 4, 5])
         .unwrap();
     fx.advance(40);
     let r = fx.bridge.frame().unwrap();
@@ -632,8 +633,8 @@ fn unknown_and_unowned_ids() {
         fx.link().host().session.received,
         vec![(LOCAL_CLIENT, vec![0x6B], 1)]
     );
-    assert_eq!(fx.bridge.link().chunks, vec![vec![0x61, 0x07]]);
+    assert_eq!(fx.bridge.link().chunks, vec![vec![0x79, 1, 2, 3, 4, 5]]);
     assert_eq!((r.chunks, r.unowned, r.handled), (1, 1, 0));
-    assert_eq!(fx.bridge.log().unowned, BTreeMap::from([(0x61, 1)]));
+    assert_eq!(fx.bridge.log().unowned, BTreeMap::from([(0x79, 1)]));
     assert_eq!(fx.bridge.world().units, BTreeMap::new());
 }

@@ -41,7 +41,7 @@ pub use calc::{
 };
 pub use create::{
     assign_umod, boss_mods, components, create, monequip, monprop, normal_mods, normal_mods_for,
-    stats_and_skills, type_init,
+    reinit, stats_and_skills, type_init,
 };
 pub use message::{
     assign_mode, component_bits, components_field, unique_name, write_boss_section, BitWriter,
@@ -50,9 +50,10 @@ pub use message::{
 pub use seams::InitHost;
 pub use umods::{
     aura_choice, boss_minions_and_init, callback, champion_pack_member, choose_umods, dispatch,
-    eligible, handle_event7, mark_boss, mark_unique, pick_champion, pick_unique, random_boss,
-    restore_boss, restore_minion, run_umod_init, superunique_finish, superunique_init,
-    superunique_mods, xfer_umods, Gate, Saved, UmodRow, AURAS, UMODS, UMODS_TSV,
+    eligible, handle_event7, make_unique, mark_boss, mark_unique, nearest_eligible, pick_champion,
+    pick_unique, random_boss, restore_boss, restore_minion, run_umod_init, superunique_finish,
+    superunique_init, superunique_mods, warp_eligible, xfer_umods, Gate, Saved, UmodRow,
+    WarpCandidate, AURAS, UMODS, UMODS_TSV,
 };
 
 /// Stat ids (`itemstatcost.txt` rows) init reads or writes.
@@ -186,6 +187,9 @@ pub struct MonsterData {
     pub level_id: i32,
     /// +0x5C bit 2: summoner "not counted" (§4 step 2).
     pub not_counted: bool,
+    /// +0x5C bit 0: set by the summoner's boss mods (§14.3,
+    /// `0x00573570(unit, 1, set)`).
+    pub data_flag1: bool,
 }
 
 impl MonsterData {
@@ -329,8 +333,6 @@ pub fn component_counts(t: &BinTable) -> Vec<[u8; 16]> {
 pub struct NamedIds {
     /// skills `monteleport` (umod 26, §19.6).
     pub monteleport: Option<u16>,
-    /// monstats `BaseId` of bloodraven (§14.2).
-    pub bloodraven: Option<u16>,
 }
 
 /// The tables init reads, typed `d2-data` records (`data/loading.md`).

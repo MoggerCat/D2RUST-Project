@@ -49,8 +49,8 @@ id	name	transport_size	handler_size	layout	handler	kind	gate	request	scope	confi
 0x2F	InitEntityChat	9	==9	id:u32@5	0x0054B930	handler	alive	start talking to an NPC	sim	yes
 0x30	TerminateEntityChat	9	==9	id:u32@5	0x0054B9F0	handler	alive	stop talking to an NPC	sim	yes
 0x31	QuestMessage	9	==9	npc:u32@1 msg:u16@5	0x0054BA90	handler	alive	quest message shown by an NPC	sim	yes
-0x32	BuyItem	17	==17	npc:u32@1 item:u32@5 mode:u32@9 cost:u32@13	0x0054BAC0	handler	alive	buy from an NPC	sim	yes
-0x33	SellItem	17	==17	npc:u32@1 item:u32@5 tab:u16@9 cost:u32@13	0x0054BB20	handler	alive	sell to an NPC	sim	yes
+0x32	BuyItem	17	==17	npc:u32@1 item:u32@5 transaction:u32@9 client_price:u32@13	0x0054BAC0	handler	alive	buy from an NPC	sim	yes
+0x33	SellItem	17	==17	npc:u32@1 item:u32@5 item_mode:u16@9 client_price:u32@13	0x0054BB20	handler	alive	sell to an NPC	sim	yes
 0x34	IdentifyWithNpc	5	==5	npc:u32@1	0x0054BBA0	handler	alive	identify all items at an NPC (Cain)	sim	yes
 0x35	Repair	17	==17	npc:u32@1 item:u32@5 unread:u16@9 repair_flags:u32@13	0x0054BB60	handler	alive	repair at an NPC	sim	yes
 0x36	HireMerc	9	==9	npc:u32@1 merc:u16@5	0x0054BBD0	handler	alive	hire a mercenary	sim	yes
