@@ -340,7 +340,7 @@ Chat end (`0x005B8020`): cain3 with +0x01 = 1: status 1 to all (chain
 | 406 brain | `0x005B8A20` | `qbr ` | +0x14, +0x25 |
 | 407 eye | `0x005B8940` | `qey ` | +0x10, +0x24 |
 
-Each: passes the quest-chest gate `0x00545850` or returns 0; one
+Each: passes the quest-chest gate `0x00545850` (`quests-act2.md` §1.3) or returns 0; one
 quest-seed step: n = (lo' mod 5) + 5 piles of gold (`0x00585970(game,
 object, 'gld ', 2)`) **before** the items; drop code := the part; with
 chain 16: +0x0C := 0, for each player (from the operating player) that

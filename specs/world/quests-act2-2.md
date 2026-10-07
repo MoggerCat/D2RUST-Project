@@ -31,7 +31,7 @@
 | Edge cases & original bugs | 374–392 |
 | Test vectors | 393–407 |
 | Provenance | 408–420 |
-| Open questions | 421–428 |
+| Open questions | 421–429 |
 <!-- /index -->
 
 ## Summary
@@ -420,8 +420,9 @@ draws once on the player's seed in `0x00585240` (object spec).
 
 ## Open questions
 
-1. Byte 6 of S→C 0x58 for results 0, 1, 4 is stale stack data: a
+1. ~~Byte 6 of S→C 0x58 for results 0, 1, 4 is stale stack data: a
    recording of an orifice operate (result 0), a cancel (1) and a wrong
-   item (4) shows what the client receives; until then d2rs sends 0 and
-   the conformance comparison masks byte 6 for these results.
-   **Needs recording.**
+   item (4) shows what the client receives.~~ Until recorded d2rs sends 0
+   and the conformance comparison masks byte 6 for these results.
+   **Needs recording:** R-PQ-9 (`docs/handoff/pc2-rec-pc2-quests.md`, =
+   HANDOFF §7 PC 2 list, `quests-act2-2.md` OQ1 line).

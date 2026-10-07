@@ -29,22 +29,22 @@
 | Inputs | 64–76 |
 | Outputs / state changes | 77–85 |
 | Rules | 86–87 |
-|   1. Conventions | 88–176 |
-|   2. Act II records | 177–196 |
-|   3. A2Q1 Radament's Lair (chain 8, slot 9) | 197–280 |
-|   4. A2Q2 The Horadric Staff (chain 9, slot 10) | 281–383 |
-|   5. A2Q3 Tainted Sun (chain 10, slot 11) | 384–478 |
-|   6. A2Q4 Arcane Sanctuary (chain 11, slot 12) | 479–594 |
-|   7. A2Q5 The Summoner (chain 12, slot 13) | 595–630 |
-|   8. A2Q6 The Seven Tombs (chain 13, slot 14) | 631–798 |
-|   9. Act II gossip and intro records | 799–807 |
-|   10. Hooks called from other systems | 808–824 |
-| Constants & data dependencies | 825–838 |
-| Randomness | 839–853 |
-| Edge cases & original bugs | 854–887 |
-| Test vectors | 888–908 |
-| Provenance | 909–931 |
-| Open questions | 932–1006 |
+|   1. Conventions | 88–195 |
+|   2. Act II records | 196–215 |
+|   3. A2Q1 Radament's Lair (chain 8, slot 9) | 216–299 |
+|   4. A2Q2 The Horadric Staff (chain 9, slot 10) | 300–402 |
+|   5. A2Q3 Tainted Sun (chain 10, slot 11) | 403–527 |
+|   6. A2Q4 Arcane Sanctuary (chain 11, slot 12) | 528–646 |
+|   7. A2Q5 The Summoner (chain 12, slot 13) | 647–682 |
+|   8. A2Q6 The Seven Tombs (chain 13, slot 14) | 683–850 |
+|   9. Act II gossip and intro records | 851–859 |
+|   10. Hooks called from other systems | 860–876 |
+| Constants & data dependencies | 877–890 |
+| Randomness | 891–905 |
+| Edge cases & original bugs | 906–939 |
+| Test vectors | 940–960 |
+| Provenance | 961–983 |
+| Open questions | 984–1065 |
 <!-- /index -->
 
 ## Summary
@@ -127,15 +127,34 @@ record state to table state are read from the image (§Constants).
 #### 1.3 Chest pattern (scroll, staff and cube chests, Tainted Sun altar)
 
 A quest chest's operate function: passes `0x00545850(op)` (the shared
-quest-chest gate, object spec) or returns 0 (the three chests only; the
+quest-chest gate, below) or returns 0 (the three chests only; the
 altar has its own guards, §5.7, and never calls the gate); sets the
 object's drop code once, before the count; counts qualifying players (for each player, starting at the
 operating player); creates that many quest items with `0x00559A30(game,
 object, quality, &level, 0, −1, droppable)` (item spec; `&level` is an
 out parameter, `quests-act2-2.md` §1 item 20); drops the
-chest's own treasure with `0x00585B90(op, 4)` (magic, object spec);
-then one quest-seed step: n = (lo' mod 5) + 5; n times `0x00585970(game,
+chest's own treasure with `0x00585B90(op, 4)` (magic; `items/treasure.md`
+§4 owns its tests and draws); then one quest-seed step: n = (lo' mod 5) + 5; n times `0x00585970(game,
 object, 'gld ', 2)` (normal-quality gold). The chests return 0.
+
+Quest-chest gate `0x00545850(op)` (op = the operate record {game,
+object, player, ?, class}; used by the Act II chests here and the Act
+III part chests, `quests-act3.md` §4; no draw):
+
+1. The object exists and its mode (u32 +0x10) ≠ 0 → return 0 (already
+   opened).
+2. The object's position is read (`0x00620870`); nothing uses it.
+3. r = the `objects.txt` row of op's class (`0x00640E90`). `Mode1`
+   (+0x140) = 0 → set mode 2 (`0x00624690`, `world/objects.md` §4).
+   Else set mode 1 and queue the end-animation event (type 1,
+   `0x005417D0`) at frame game +0xA8 + (`FrameCnt1` (+0xDC) >> 8).
+4. If the object exists: clear unit flag 0x2 (selectable,
+   `world/objects.md` §1) at +0xC4.
+5. Return 1.
+
+(`0x00545859`–`0x005458D9`.) With a null object step 3's mode set and
+event get a null unit (the original's behaviour; every caller passes
+its own object).
 
 #### 1.4 Sequence chain
 
@@ -394,7 +413,7 @@ event 10 touches it); +0x98 altar level; +0x9C amulet drop count.
 #### 5.2 Darken (`0x0059A350`)
 
 Status 1 to all; state 0 → state := 1. If the game has Act II (game
-+0xC0): start the Tainted Sun on it (`0x0061C450`, environment spec),
++0xC0): start the Tainted Sun on it (`0x0061C450`, §5.9),
 then for each player whose client is in Act II (`0x005382B0`): S→C
 0x53 `53 05000000 00000000 01` (`0x0053C900`) and `5D 0A 10 00 0000`;
 return 1. Without Act II: +0x03 := 1, return 0. Callers record the
@@ -449,7 +468,7 @@ not fara 178 — or NPC drognan 177 with state 1).
 2. If the object's mode ≠ 0: return 0.
 3. Not-intro: +0x10 := altar room, +0x98 := its level; mode := 1; +0x08
    := 2; +0x05 := 1; +0x0C := GUID; +0x04 := 1; if Act II exists: +0x02
-   := 0, end the Tainted Sun (`0x0061C4D0`), Act II clients get `53
+   := 0, end the Tainted Sun (`0x0061C4D0`, §5.9), Act II clients get `53
    02000000 00000000 00` (`0x0059A170`); state := 4; FX 6; amulet count
    := 0 and count (for each player from the player, `0x0059A770`: holds
    neither `vip ` nor `hst ` and lacks 10.0); this player, if 11.0 is
@@ -475,6 +494,36 @@ Else `0x0059A3F0`: +0x05 := 1, +0x0C := GUID; if not-intro: (state ≤
 flags := 0); then, still inside not-intro, status = 0 → status 2 to all
 (never true in 1.14d, `quests-act2-2.md` §1 item 5). Then mode := +0x08. So the
 quest reaches state 3 when the altar's room is first populated.
+
+#### 5.9 The server's Tainted Sun (`0x0061C450`, `0x0061C4D0`)
+
+Both act on the Act II environment record (`render/lighting.md` §9.1
+layout; fetched with `0x0061AA60`), on the server; no draw, nothing
+sent (the 0x53 above is the quest's own).
+
+Start (`0x0061C450`):
+
+1. Speed index +0x2C := 1; speed +0x28 := `[0x007443E8]` (4).
+2. Period index +0x00 := 0; ticks +0x08 := 0; type +0x04 :=
+   `[0x00744484]` (the eclipse table's entry 0 type).
+3. A := `0x006427F0(0)` (act index of level 0: 0).
+4. Intensity (`0x0061BB80`, `render/lighting.md` §9.3 rule 4) with the
+   eclipse flag still as it was; eclipse flag +0x30 := 1; period reset
+   (`0x0061BDF0`, §9.2 rule 2 there: type and ticks from the eclipse
+   table's entry of the index); intensity again; color (`0x0061BCE0`,
+   §9.4 there) with A.
+
+End (`0x0061C4D0`):
+
+1. Speed index +0x2C := 0; speed +0x28 := `[0x007443E4]` (128).
+2. Period index := 2; ticks := 0; type := `[0x0074440C]` (the normal
+   table's entry 2 type).
+3. `0x006427F0(0)` (result unused); intensity (`0x0061BB80`); eclipse
+   flag := 0. No period reset and no color: the next per-update advance
+   recomputes them.
+
+So during the eclipse the server cycle runs at speed 4 (a full 360°
+cycle in 1,440 ticks before the per-update extra steps), not 128.
 
 ### 6. A2Q4 Arcane Sanctuary (chain 11, slot 12)
 
@@ -542,8 +591,11 @@ callback 2; flag iterate.
 
 If the object's mode is 0: mode := 1, end-animation event at frame +
 (objects `FrameCnt1` >> 8) (`0x005417D0` type 1). With chain 11: send
-the player the scroll text 396 (`0x005456A0`: an S→C 0x27 of type 2;
-bytes: Open question 4); +0x08 := the tome's room; only if not-intro
+the player the scroll text 396 (`0x005456A0(player, object, msg)`: an
+S→C 0x27 of 40 bytes: u8 0x27, u8 2, u32 the object's GUID (+0x0C;
+0xFFFFFFFF without an object) at 2, u8 count 1 at 6, u8 kind 0 at 8, u16
+msg at 10; bytes 7, 9 and 12–39 unwritten, `sim/intents-events.md` §6;
+`0x005456A6`–`0x005456E4`); +0x08 := the tome's room; only if not-intro
 and state ≠ 5 (no grants in intro games): state := 5; for each player: in level 74 without 12.0 and
 12.1 (`0x0059B3F0`): set 12.13, 12.1, 12.0, clear bits 2–11
 (`0x0065C3E0`), set 12.8, 12.7, and their party members in Act II
@@ -933,13 +985,19 @@ their own item seeds. No other Act II quest code draws.
 
 1. Status meanings 1–13 per Act II quest (client quest log): settle with
    `quests.md` open question 1. **Answered** (2026-10-07): `world/quests-status.md`: the client (0x52 `0x0045CC00` → `0x004A40D0` stores the list; row build `0x004A1950`, tables `0x00723F30` and the per-quest status tables) maps each status to a description string id, a replay speech id and an icon state (§4, §5); Act II tables §8; Seven Tombs rows 5–7 and the tomb symbol §4 rule 2, §5 rule 6.
-2. `0x00545850` (quest-chest gate) and `0x00585B90` (chest treasure):
+2. ~~`0x00545850` (quest-chest gate) and `0x00585B90` (chest treasure):
    their exact tests and draws belong to the object spec; until written,
-   record one chest opening (packets + RNG).
-3. Act II light change (`0x0061C450` / `0x0061C4D0`) effect and 0x53
-   field names: environment spec; record a Tainted Sun start.
-4. Bytes of the 0x27 type-2 scroll text sent by `0x005456A0` (tome
-   message 396).
+   record one chest opening (packets + RNG).~~ **Answered** (2026-10-07):
+   the gate is §1.3 (`0x00545859`–`0x005458D9`); the chest treasure is
+   `items/treasure.md` §4. The Act II run (R-PQ-8) still records a chest.
+3. ~~Act II light change (`0x0061C450` / `0x0061C4D0`) effect and 0x53
+   field names: environment spec; record a Tainted Sun start.~~
+   **Answered** (2026-10-07): §5.9 (`0x0061C450`, `0x0061C4D0`); the
+   0x53 fields (period index, ticks, eclipse) are `render/lighting.md`
+   §9.2 rule 2. The Act II run (R-PQ-8) records a start.
+4. ~~Bytes of the 0x27 type-2 scroll text sent by `0x005456A0` (tome
+   message 396).~~ **Answered** (2026-10-07): §6.7 (`0x005456A6`–`0x005456E4`):
+   `27 02 <journal GUID u32> 01 ?? 00 ?? 8C01` + 28 unwritten bytes.
 5. ~~Chain 38's intro storage~~ Answered: they act on field A (record
    +0) of the player's NPC record, `quests.md` §6.7's pair on field B
    (record +4); `quests-act2-2.md` §1 item 15 (`0x00572360`,
@@ -961,9 +1019,10 @@ their own item seeds. No other Act II quest code draws.
    §2.4 names the owner per act; rows 8–16 and 38 switched to
    `specified` (quests-fixups CODE-TABLE commit); the row addresses part
    1 does not name are in `quests-act2-2.md` §4.
-10. Record a full Act II run (packets + RNG, `docs/HANDOFF.md` §5) to
+10. ~~Record a full Act II run (packets + RNG, `docs/HANDOFF.md` §5) to
     confirm message order: chat-end status, kill timers, Tyrael's
-    portal, Meshif's completion.
+    portal, Meshif's completion.~~ Needs recording: R-PQ-8
+    (`docs/handoff/pc2-rec-pc2-quests.md`, = HANDOFF §5 S9-A3 Act II).
 11. QB-1 (test vector 1 messages): Answered, typo fixed (315–324);
     `quests-act2-2.md` §1 item 1.
 12. QB-2 (event-10 bodies of chains 7 / 8, `0x005987B0` / `0x00598980`):
@@ -1001,5 +1060,5 @@ their own item seeds. No other Act II quest code draws.
     (`0x005994C8`, `0x0059DCFC`); §1 item 19.
 30. QB-20 (chest drop code, item level): Answered (`0x00599D08`,
     `0x00559AF8`); §1 item 20.
-31. Byte 6 of the orifice's S→C 0x58 (results 0, 1, 4) is a stale stack
-    byte: Needs recording (`quests-act2-2.md` open question 1).
+31. ~~Byte 6 of the orifice's S→C 0x58 (results 0, 1, 4) is a stale stack
+    byte.~~ Needs recording: R-PQ-9 (`quests-act2-2.md` open question 1).
