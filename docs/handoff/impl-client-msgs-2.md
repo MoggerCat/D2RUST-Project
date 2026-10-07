@@ -80,13 +80,15 @@ sets the owner, the code side is small. Register the handler in
 
 ## 3. Gate
 
-No code changed. Run on this branch:
+No code changed (docs only). Run on this branch:
 
-- `cargo fmt --all --check`: clean.
-- `python3 tools/coverage.py --check`, `python3 tools/spec_index.py
-  --check`, `python3 tools/methods.py check`: see the commit message.
-- `cargo test` / `clippy` not run: no Rust file changed since `d33adcf`,
-  where `wire-client-staging` §4 records them green.
+- `cargo test -p d2-client -p d2-proto`: every target passes, 0 failed
+  (d2-client lib 822 passed, 8 ignored).
+- `cargo clippy -p d2-client -p d2-proto --all-targets -- -D warnings`:
+  clean. `cargo fmt --all --check`: clean.
+- `python3 tools/coverage.py --check`: 8,087 claims, 0 errors.
+  `python3 tools/spec_index.py --check`: ok. `python3 tools/methods.py
+  check`: 21 methods OK.
 
 ## 4. Next steps
 
