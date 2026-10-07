@@ -17,6 +17,19 @@ fn drlg_seed_and_start_seed() {
     assert_eq!((d.staff_tomb, d.boss_tomb, d.jungle_link), (0, 0, false));
 }
 
+// Covers: specs/sim/rng.md §5.4 text, §5.4 row1, §5.4 row2
+#[test]
+fn client_copy_has_the_same_seeds() {
+    let mut w = World::new(data(), FakeTypes::default());
+    let server = Drlg::create(1, INIT, 0, 0, false, &w.data, &mut w.types).unwrap();
+    let client = Drlg::create(1, INIT, 0, 0, true, &w.data, &mut w.types).unwrap();
+    assert_eq!(
+        (server.seed, server.start_seed, server.init_seed),
+        (client.seed, client.start_seed, client.init_seed)
+    );
+    assert_eq!(server.start_seed, START);
+}
+
 // Covers: specs/drlg/levels.md §3 r4
 #[test]
 fn act2_tombs_and_act3_jungle_bit() {

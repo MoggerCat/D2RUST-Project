@@ -706,7 +706,7 @@ fn per_kind_init_runs_before_the_unit_is_linked() {
     assert_eq!(sys.hooks.inits.len(), 2);
 }
 
-// Covers: specs/sim/units.md §3.1 r1, §3.1 r4, §3.1 r6
+// Covers: specs/sim/units.md §3.1 r1, §3.1 r4, §3.1 r6, §3.1 r9
 #[test]
 fn allocation_seeds_and_rejections() {
     let mut game = Game::new();
@@ -774,11 +774,27 @@ fn allocation_seeds_and_rejections() {
         .unwrap();
     assert_eq!(seed, expect);
     assert_eq!(sys.units.get(p).unwrap().node_index, 11);
+    // Flags bit 1 clear (§3.1 r9): the unit is returned after step 7 in no
+    // list (no hash entry, no duplicate-GUID check), seeds and GUID drawn.
     req.add = false;
-    let r = sys.with(&mut game, |sim, hooks| {
-        allocate(sim, hooks, &mut seed, &req)
-    });
-    assert_eq!(r, Err(UnitError::NotAdded));
+    req.ty = UnitType::Monster;
+    req.fixed_guid = Some(77);
+    let before = seed;
+    let u = sys
+        .with(&mut game, |sim, hooks| {
+            allocate(sim, hooks, &mut seed, &req)
+        })
+        .unwrap()
+        .unwrap();
+    assert_ne!(seed, before);
+    assert_eq!(sys.units.get(u).unwrap().guid, 77);
+    assert_ne!(game.lists.find_unit(UnitType::Monster, 77), Some(u));
+    assert_eq!(game.lists.find_unit(UnitType::Monster, 77), Some(m));
+    assert!(sys.stats.unit_list(u).is_some());
+    sys.with(&mut game, |sim, hooks| remove(sim, hooks, u))
+        .unwrap();
+    assert!(sys.units.get(u).is_none());
+    assert_eq!(game.lists.find_unit(UnitType::Monster, 77), Some(m));
 }
 
 // Covers: specs/sim/units.md §6.3

@@ -351,7 +351,7 @@ fn spawn_tile_without_match_reads_record_0() {
 
 // ---- rooms.md -----------------------------------------------------------
 
-// Covers: specs/drlg/rooms.md §2 text, §2 r1
+// Covers: specs/drlg/rooms.md §2 text, §2 r1; specs/sim/rng.md §5.4 row3, §5.4 row4
 #[test]
 fn room_creation_fields_and_seed_by_index() {
     let mut dat = data();
@@ -411,7 +411,7 @@ fn near_array_mixes_levels_sorted_by_global_coordinates() {
     assert_eq!(d.room(r[0]).near(), Some(&[t, r[0], r[1]][..]));
 }
 
-// Covers: specs/drlg/rooms.md §4.4 r1, §4.4 r3, §4.4 r4, §9.2 r3
+// Covers: specs/drlg/rooms.md §4.4 r1, §4.4 r3, §4.4 r4, §9.2 r3; specs/sim/rng.md §5.4 row5, §7 row16
 #[test]
 fn build_sequence_and_stop_when_built() {
     let (mut w, mut d, l, r) = row(3);
