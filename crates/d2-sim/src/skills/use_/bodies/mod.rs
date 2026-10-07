@@ -58,6 +58,10 @@ mod tests5;
 #[cfg(test)]
 mod tests6;
 #[cfg(test)]
+mod tests_b1a;
+#[cfg(test)]
+mod tests_b1b;
+#[cfg(test)]
 mod tests_b3a;
 
 pub use b4_helpers::{diab_wall_cb, zigzag_cb, zigzag_ring_cb, PathMissile};

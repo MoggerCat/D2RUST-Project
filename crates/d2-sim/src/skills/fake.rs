@@ -42,6 +42,10 @@ pub struct FUnit {
     pub combat: Vec<CombatEntry>,
     pub room: RoomKind,
     pub guid: u32,
+    /// Monster type flags (`monster_flag`); `None` reads `flags`.
+    pub type_flags: Option<u32>,
+    pub align: i32,
+    pub no_walk: bool,
 }
 
 impl FUnit {
@@ -74,6 +78,9 @@ impl FUnit {
             combat: Vec::new(),
             room: RoomKind::Field,
             guid: 0,
+            type_flags: None,
+            align: 0,
+            no_walk: false,
         }
     }
 
@@ -117,6 +124,11 @@ pub struct Fake {
     /// Units' alignment (default 0).
     pub aligned: BTreeMap<usize, i32>,
     pub log: Vec<String>,
+    /// The (attacker, defender, record) of every `reaction` call.
+    pub reactions: Vec<(usize, usize, DamageRecord)>,
+    /// Per-unit override of the monster type flags (`monster_flag`); a
+    /// unit without an entry uses its `flags`.
+    pub mflags: BTreeMap<usize, u32>,
 }
 
 impl Fake {
@@ -246,7 +258,12 @@ impl CombatWorld for Fake {
         self.units[u].moving
     }
     fn monster_flag(&self, u: usize, mask: u32) -> bool {
-        self.units[u].flags & mask != 0
+        self.units[u]
+            .type_flags
+            .or_else(|| self.mflags.get(&u).copied())
+            .unwrap_or(self.units[u].flags)
+            & mask
+            != 0
     }
     fn is_boss(&self, u: usize) -> bool {
         self.units[u].boss
@@ -267,7 +284,7 @@ impl CombatWorld for Fake {
         self.units[u].revived
     }
     fn alignment(&self, u: usize) -> i32 {
-        self.aligned.get(&u).copied().unwrap_or(0)
+        self.aligned.get(&u).copied().unwrap_or(self.units[u].align)
     }
     fn hostile(&self, _a: usize, _d: usize) -> bool {
         self.hostile
@@ -299,8 +316,8 @@ impl CombatWorld for Fake {
     fn is_dead(&self, u: usize) -> bool {
         self.dead_units.contains(&u)
     }
-    fn monster_has_mode(&self, _u: usize, _mode: i32) -> bool {
-        true
+    fn monster_has_mode(&self, u: usize, _mode: i32) -> bool {
+        !self.units[u].no_walk
     }
     fn converted_type(&self, u: usize) -> i32 {
         self.units[u].kind as i32
@@ -387,6 +404,7 @@ impl CombatWorld for Fake {
     fn reaction(&mut self, a: usize, d: usize, r: &mut DamageRecord) {
         self.last_reaction = Some(*r);
         self.log.push(format!("reaction {a} {d}"));
+        self.reactions.push((a, d, *r));
     }
 }
 

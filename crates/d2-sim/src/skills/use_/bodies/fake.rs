@@ -133,6 +133,19 @@ pub struct BodyFake {
     pub finds: std::cell::RefCell<Vec<FindCall>>,
     /// Base stats given to every missile `spawn_missile` creates.
     pub missile_base: Vec<(u16, i32)>,
+    // ---- coverage tests (bodies.md §2)
+    pub shoots: BTreeSet<usize>,
+    pub max_stack: BTreeMap<usize, i32>,
+    pub max_dura: BTreeMap<usize, i32>,
+    pub composit_class: i32,
+    /// Units of a second (town) room every scan visits after `scan`.
+    pub scan_town: Vec<usize>,
+    pub frame_bonus_v: i32,
+    pub unsummon_ok: bool,
+    /// `inventory_busy` answers this.
+    pub busy: bool,
+    /// `item_missile_type` by item (default 0).
+    pub item_missiles: BTreeMap<usize, i32>,
 }
 
 impl BodyFake {
@@ -598,10 +611,17 @@ impl BodyWorld for BodyFake {
         }
     }
     fn scan_rooms(&self, _: usize, _: Option<(i32, i32)>) -> Option<Vec<ScanRoom<usize>>> {
-        Some(vec![ScanRoom {
+        let mut v = vec![ScanRoom {
             town: false,
             units: self.scan.clone(),
-        }])
+        }];
+        if !self.scan_town.is_empty() {
+            v.push(ScanRoom {
+                town: true,
+                units: self.scan_town.clone(),
+            });
+        }
+        Some(v)
     }
     fn allied(&self, a: usize, b: usize) -> bool {
         a == b || self.allies.contains(&(a, b))
@@ -613,10 +633,10 @@ impl BodyWorld for BodyFake {
         self.minion_owner.get(&u).copied()
     }
     fn pet_unsummonable(&self, _: usize, _: usize) -> bool {
-        false
+        self.unsummon_ok
     }
     fn frame_bonus(&self, _: usize) -> i32 {
-        0
+        self.frame_bonus_v
     }
     fn set_anim_frame(&mut self, u: usize, v: i32) {
         self.anim_frame.insert(u, v);
@@ -629,13 +649,13 @@ impl BodyWorld for BodyFake {
         self.c.stat(u, s + 1, 0)
     }
     fn composit_weapon_class(&self, _: usize) -> i32 {
-        0
+        self.composit_class
     }
     fn hand_class(&self, _: usize) -> i32 {
         self.hand_class
     }
-    fn item_shoots(&self, _: usize) -> bool {
-        false
+    fn item_shoots(&self, i: usize) -> bool {
+        self.shoots.contains(&i)
     }
     fn item_stackable(&self, i: usize) -> bool {
         self.c.items[i].throw
@@ -644,16 +664,19 @@ impl BodyWorld for BodyFake {
         self.item_stats.get(&(i, s)).copied().unwrap_or(0)
     }
     fn set_item_stat(&mut self, i: usize, s: u16, v: i32) {
+        self.item_stats.insert((i, s), v);
         self.log(format!("itemstat {i} {s} {v}"));
     }
-    fn item_max_stack(&self, _: usize) -> i32 {
-        0
+    fn item_max_stack(&self, i: usize) -> i32 {
+        self.max_stack.get(&i).copied().unwrap_or(0)
     }
-    fn item_max_durability(&self, _: usize) -> i32 {
-        0
+    fn item_max_durability(&self, i: usize) -> i32 {
+        self.max_dura.get(&i).copied().unwrap_or(0)
     }
     fn quantity_timer(&mut self, _: usize) {}
-    fn send_item_stat(&mut self, _: usize, _: usize, _: u16, _: i32) {}
+    fn send_item_stat(&mut self, u: usize, i: usize, s: u16, v: i32) {
+        self.log(format!("send0x3E {u} {i} {s} {v}"));
+    }
     fn attack_cleanup(&mut self, u: usize) {
         self.log(format!("attackcleanup {u}"));
     }
@@ -691,6 +714,12 @@ impl BodyWorld for BodyFake {
     }
     fn path_op(&mut self, u: usize, op: PathOp<usize>) -> i32 {
         self.log(format!("path {u} {op:?}"));
+        if let PathOp::TargetUnit(t) = op {
+            match t {
+                Some(t) => self.targets.insert(u, t),
+                None => self.targets.remove(&u),
+            };
+        }
         i32::from(op == PathOp::Compute)
     }
     fn monlvl(&self) -> &[Monlvl] {
@@ -873,7 +902,7 @@ impl BodyWorld for BodyFake {
         (self.c.unit_type(u) == UnitType::Item).then_some(self.c.units[u].class as usize)
     }
     fn inventory_busy(&self, _: usize) -> bool {
-        false
+        self.busy
     }
     fn has_inventory(&self, _: usize) -> bool {
         self.inventory
@@ -899,8 +928,8 @@ impl BodyWorld for BodyFake {
     fn shield_damage(&self, i: usize) -> Option<(i32, i32)> {
         Some(self.c.items[i].damage)
     }
-    fn item_missile_type(&self, _: usize) -> i32 {
-        0
+    fn item_missile_type(&self, i: usize) -> i32 {
+        self.item_missiles.get(&i).copied().unwrap_or(0)
     }
     fn golem_item(&self, t: usize) -> bool {
         self.c.unit_type(t) == UnitType::Item
