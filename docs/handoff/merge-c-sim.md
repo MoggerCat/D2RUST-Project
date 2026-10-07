@@ -1,4 +1,4 @@
-# merge-c-sim: claude/impl-c-sim into the staging head
+# merge-c-sim: impl-c-sim, impl-c-client and staging-7 into the staging head
 
 Branch `claude/merge-c-sim` (staging head e7ae40f0). Two tasks:
 merge `origin/claude/impl-c-sim` (b020f06e, `--no-ff`), then fix the six
@@ -127,8 +127,84 @@ in another level of the same act (the act check of §6.2 still passes).
 | d2-server `tests/mutants_handlers_world.rs` `unqueued_message_is_a_recorded_fault` | both halves send from `side_wp` | unchanged (Malformed, one `Sink` fault) |
 | d2-client `bridge::local_tests::waypoint_travel_end_to_end`, `spec_table_drops_a_unit_message_for_an_unknown_unit` | see below | see below |
 
-(pending: d2-client fixture fix in progress)
+d2-client `bridge/local_tests.rs`: the shared `game()` fixture gains the
+Rogue Encampment (level 1, act 0, waypoint index 0) with its own room;
+the waypoint object moves there (still at (20, 20), still allocated
+before the player). The player stays a sorceress at (42, 20) in Cold
+Plains, so the act check and the 22-sub-tile reach are unchanged and the
+player is in Cold Plains' spawn room for the arrival. Both tests' expectations are unchanged:
+`waypoint_travel_end_to_end` (0x49 bytes, `Done`, 0x0D at (45, 23), warp
+3 0, arrival mode, menu closed) and
+`spec_table_drops_a_unit_message_for_an_unknown_unit` (counters, dropped
+`{0x0D: 1}`).
+
+Also changed by the merge (not one of the six): `tests/e2e_single_player.rs`
+step 25. impl-c-sim's sound slot now puts the transmute's sound 4 on the
+wire, as its notes predicted. The test now expects S→C 0x2C (unit type 0,
+the player's GUID, sound 4) after the update pass's 0x47/0x48, in the
+player's update (`cube.md` §8 "Exact" item 3 / OQ2). The handled count
+goes from 53 to 54. This fixes all three e2e tests
+(`single_player_end_to_end`, `same_seed_same_run`, `other_seed_other_run`).
+
+## Task 3: merge claude/impl-c-client (c2d3b39e)
+
+The conflicts were in `d2-client/src/bridge/skills.rs` (3 hunks) and `bridge/msg/skills.rs`
+(2 hunks). Both sides were combined against `client/msg-skills.md` §2:
+
+- `skills::remove(list, rows, skill, d)`: staging's `d` flag, working
+  copy and dangling refusal (rule 6) are kept. impl-c-client's passive
+  `SkillFx::StateOff` is pushed into the working copy, so a refused
+  remove leaves the list and its fx unchanged. The final refresh is
+  impl-c-client's `refresh(list, rows, skill)`, which pushes
+  `SkillFx::Refresh`. The no-native-entry path refreshes the same way.
+- `assign` with the remove flag: staging's `remove(list, rows, skill, true)`
+  (it refreshes).
+- `add_for_bonus` / `bonus_write` (staging) call the new `refresh(list, …)`.
+- The 0x?? bonus handler (`msg/skills.rs`) keeps staging's `unit_class` /
+  `Owner` and `add_bonus`, with its error converted to `HandlerError`.
+  Its remove is `remove(list, rows, s, true)` followed by
+  `passive::apply(w, inputs, key, fx)` on the drained fx
+  (impl-c-client, §2 r4).
+
+Changed test expectations:
+
+- `skills::tests::remove_with_d_decrements_and_frees_below_one`: the
+  passive case expected `Err(SkillError::PassiveState { skill: 7, state: 3 })`.
+  That variant no longer exists on impl-c-client, where the state is owed
+  to the unit as fx. The test now expects `Ok`, base 2, and
+  `fx == [StateOff(3), Refresh(7)]`.
+- `SkillList` literals in the staging tests gain `fx: Vec::new()`.
+
+## Staging merge
+
+`origin/claude/specs-staging-7` (d17f8aac, with cov-world-objects) was
+merged with `--no-ff` without conflicts.
 
 ## Gate
 
-(pending)
+On the final head:
+- `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets -- -D warnings`: clean.
+- `python3 tools/coverage.py --check`: 12496 claims, 0 errors.
+- `python3 tools/spec_index.py --check`: clean.
+- `cargo nextest run --workspace --no-fail-fast`: 7262 run, 7261 passed,
+  1 failed, 237 skipped.
+
+The one failure is **`scenario-run::scenarios server_messages_are_captured_at_their_tick`**.
+It was already red on staging (e7ae40f0 carries both the test and 4eb119b0)
+and was not in the list of six, but it has the same cause. Its
+`travel()` rewrites the waypoint-travel scenario to travel town → town
+(level 1), which §7 r2 now makes close-only, so nothing is sent at tick 50.
+The fixture cannot express a fix cleanly:
+the shared synthetic install (`test-fixtures/src/content.rs`) has exactly
+one waypoint level per act (town 1 in act 0, town 5 in act 1). Two attempts
+were tried and reverted:
+1. Cross-act travel to level 5: still no reply at tick 50; the scenario
+   host does not complete an act-change warp.
+2. Giving the field (level 2) waypoint index 2 and travelling there: still
+   no reply at tick 50, and extra messages appeared at tick 32. Making it
+   work needs a waypoint object in the field's preset and the host's warp
+   into a non-town level. That widens the shared synthetic data many
+   suites use.
+Proposed follow-up (its own task): add an act-0 waypoint level with a
+waypoint object to the synthetic content, then point `travel()` at it.
+
