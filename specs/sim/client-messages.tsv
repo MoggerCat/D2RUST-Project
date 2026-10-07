@@ -19,8 +19,8 @@ id	name	transport_size	handler_size	layout	handler	kind	gate	request	scope	confi
 0x11	ShiftRightSkillOnUnitHold	9	==9	type:u32@1 id:u32@5	0x0054A200	handler	alive	right skill on a unit, shift and button held	sim	yes
 0x12	EndInferno	1	==1		0x0054A260	handler	alive	clear state 12 (inferno) on the player	sim	yes
 0x13	InteractWithEntity	9	==9	type:u32@1 id:u32@5	0x0054AA90	handler	alive	interact with a unit (NPC, object, portal)	sim	yes
-0x14	OverheadChat	chat	4..275	unread:u8@1 lang:u8@2 msg:cstr@3 name:cstr	0x0054A290	handler	none	overhead chat text	sim	partial
-0x15	Chat	chat	chat	type:u8@1 lang:u8@2 msg:cstr@3 target:cstr	0x0054A5D0	handler	none	chat message	sim	partial
+0x14	OverheadChat	chat	4..275	unread:u8@1 lang:u8@2 msg:cstr@3 name:cstr	0x0054A290	handler	none	overhead chat text	sim	yes
+0x15	Chat	chat	chat	unread:u8@1 lang:u8@2 msg:cstr@3 target:cstr	0x0054A5D0	handler	none	chat message	sim	yes
 0x16	PickItem	13	==13	type:u32@1 id:u32@5 cursor:u32@9	0x0054AAD0	handler	alive	pick an item up from the ground	sim	yes
 0x17	DropItem	5	==5	item:u32@1	0x0054AB40	handler	alive	drop the cursor item	sim	yes
 0x18	InsertItemInBuffer	17	==17	item:u32@1 x:u32@5 y:u32@9 page:u32@13	0x0054ABB0	handler	alive	put the cursor item into a grid page	sim	yes
@@ -67,7 +67,7 @@ id	name	transport_size	handler_size	layout	handler	kind	gate	request	scope	confi
 0x41	Resurrect	1	==1		0x0054C0E0	handler	dead	respawn after death	sim	yes
 0x42	Unused42	1	-		0x0054C360	stub0	alive	nothing (handler returns 0)	none	yes
 0x43	Unused43	1	-		0x0054C370	stub0	none	nothing (handler returns 0)	none	yes
-0x44	StaffInOrifice	17	==17	orifice:u32@5 item:u32@9 state:u16@13	0x0054C380	handler	alive	insert the Horadric staff	sim	partial
+0x44	StaffInOrifice	17	==17	orifice:u32@5 item:u32@9 action:u16@13	0x0054C380	handler	alive	insert the Horadric staff	sim	yes
 0x45	ChangeTpLocation	9	-		0x0054C420	stub3	alive	rejected (handler returns 3)	none	yes
 0x46	MercInteract	13	==13	merc:u32@1 id:u32@5 type:u32@9	0x0054C4B0	handler	alive	mercenary interacts with a unit	sim	yes
 0x47	MoveMerc	13	==13	merc:u32@1 x:u16@5 y:u16@9	0x0054C520	handler	alive	move the mercenary	sim	yes
@@ -78,7 +78,7 @@ id	name	transport_size	handler_size	layout	handler	kind	gate	request	scope	confi
 0x4C	Transmogrify	5	==5	item:u32@1	0x0054C760	handler	alive	use a Transmogrify item (misc.txt); not the cube	sim	yes
 0x4D	PlayNpcMessage	3	==3	npc_class:u16@1	0x0054C690	handler	alive	clear an NPC's intro bit for the player	sim	yes
 0x4E	-	0	-		-	none	-	no handler; never queued (size table 0)	none	yes
-0x4F	ClickButton	7	==7	button:u16@1 p1:u16@3 p2:u16@5	0x0054C7C0	handler	alive	UI button (trade, stash gold, ...)	sim	partial
+0x4F	ClickButton	7	==7	button:u16@1 p1:u16@3 p2:u16@5	0x0054C7C0	handler	alive	UI button (trade, stash gold, ...)	sim	yes
 0x50	DropGold	9	==9	unit:u32@1 amount:u32@5	0x0054C800	handler	alive	drop gold	sim	yes
 0x51	BindHotkey	9	==9	skill:u15@1 left:bit15@1 slot:u16@3 item:u32@5	0x0054C870	handler	alive	bind a skill to a hotkey	sim	yes
 0x52	Unused52	5	-		0x0054C930	stub3	alive	rejected (handler returns 3)	none	yes
@@ -102,13 +102,13 @@ id	name	transport_size	handler_size	layout	handler	kind	gate	request	scope	confi
 0x64	-	0	-		-	none	-	no handler; never queued (size table 0)	none	yes
 0x65	-	0	-		-	none	-	no handler; never queued (size table 0)	none	yes
 0x66	WardenResponse	u16@1+3;cap=0x1FD;min=3	any	len:u16@1 data@3	0x0054D740	stub0	none	anti-cheat reply; handler does nothing	out	yes
-0x67	CreateGame	46	-	game_type:u8@0x11 class:u8@0x12 template:u8@0x13 difficulty:u8@0x14 char_name:cstr16@0x15 arena:u16@0x25 flags:u32@0x27 unk:u8@0x2B unk:u8@0x2C locale:u8@0x2D	0x0053F100	system	system	create a game	session	partial
-0x68	JoinGame	37	-	token:u32@1 game:u16@5 class:u8@7 unk:u32@8 unk:u8@0x14 char_name:cstr16@0x15	0x0053F100	system	system	join a hosted game	out	partial
-0x69	LeaveGame	1	-		0x0053F100	system	system	leave the game	session	partial
-0x6A	Sys6A	1	-		0x0053F100	system	system	system message	session	partial
-0x6B	Sys6B	1	-		0x0053F100	system	system	system message sent by the client while entering a game	session	partial
-0x6C	UploadSave	u8@1+7;min=6	-	len:u8@1 total:u32@2 data@6	0x0053F100	system	system	character save upload chunk (total < 0x2000)	session	partial
-0x6D	Ping	13	-	value:u32@5	0x0053F100	system	system	keep-alive ping	out	partial
-0x6E	Sys6E	1	-		0x0053F100	system	system	system message	session	partial
+0x67	CreateGame	46	-	game_name:cstr16@1 game_type:u8@0x11 class:u8@0x12 template:u8@0x13 difficulty:u8@0x14 char_name:cstr16@0x15 arena:u16@0x25 flags:u32@0x27 unk:u8@0x2B unk:u8@0x2C locale:u8@0x2D	0x0053F100	system	system	create a game	session	yes
+0x68	JoinGame	37	-	token:u32@1 game:u16@5 class:u8@7 unk:u32@8 unk:u8@0x14 char_name:cstr16@0x15	0x0053F100	system	system	join a hosted game	out	yes
+0x69	LeaveGame	1	-		0x0053F100	system	system	leave the game	session	yes
+0x6A	Sys6A	1	-		0x0053F100	system	system	system message	session	yes
+0x6B	Sys6B	1	-		0x0053F100	system	system	system message sent by the client while entering a game	session	yes
+0x6C	UploadSave	u8@1+7;min=6	-	len:u8@1 total:u32@2 data@6	0x0053F100	system	system	character save upload chunk (total < 0x2000)	session	yes
+0x6D	Ping	13	-	tick:u32@1 value:u32@5	0x0053F100	system	system	keep-alive ping	out	yes
+0x6E	Sys6E	1	-		0x0053F100	system	system	system message	session	yes
 0x6F	-	0	-		-	none	-	not handled by 0x0053F100; never queued (size table 0)	none	yes
-0x70	Sys70	1	-		0x0053F100	system	system	system message (sets client +0x504)	session	partial
+0x70	Sys70	1	-		0x0053F100	system	system	system message (sets client +0x504)	session	yes

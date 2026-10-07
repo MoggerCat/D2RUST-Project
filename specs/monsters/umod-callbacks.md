@@ -63,7 +63,7 @@
 |   Synthetic (CI-safe) | 742–766 |
 |   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 767–774 |
 | Provenance | 775–814 |
-| Open questions | 815–842 |
+| Open questions | 815–850 |
 <!-- /index -->
 
 ## Summary
@@ -831,10 +831,18 @@ Per callback, in order (U = the monster's seed unless named):
 4. Quest death effects `0x005DFD90`, `0x005DFDB0`, `0x005DFE00`,
    `0x005DFE20`, `0x005E0020`, `0x005E0040`, `0x005E0060`,
    `0x005E0070` (§15) have no spec: the quests specs should own them.
-5. No 1.14d site assigns umods 40 or 41 (only the restore copy
-   `0x005424F0`, which copies saved lists): confirm by tracing the
-   table-driven assigns of `0x005B21B0` (`0x005B22DC` / `0x005B22F4`)
-   and the boss mods `0x005B1CF0` per case (`init.md` Open question 6).
+5. Answered (2026-10-07): no fixed site assigns 40 or 41. The
+   table-driven assigns of `0x005B21B0` give 14, 33, 34, 35 and 22
+   (`init.md` §14.1), the boss mods 6, 8, 12, 17, 18, 22, 23, 29, 30, 31
+   (`init.md` §14.3), the superunique cases 22 (§20.1). Of the 52
+   `0x005A4850` sites only four take a non-constant umod: the restore
+   copy `0x005424F0` (saved lists) and the summon sites `0x005C4470`,
+   `0x005D1E10`, `0x005D6CF0`, which pass skills `sumumod` (+0xE4) when
+   it is 1…42; 1.14d skills.txt uses 32, 33 and 42 only. The
+   data-driven appends cannot reach them either: superuniques.txt
+   `Mod1`–`Mod3` use 1, 5–9, 17, 18, 23–28, 30 and monumod rows 40, 41
+   have no `cpick` / `upick`. So 40 and 41 occur only through modded
+   data or a saved list.
 6. A missile's `level(12)` (§3.4 step 2 for §18.2): `missiles.md`
    §R2.3 step 23 does not list stat 12 among a missile's stats; if it
    is 0 the monlvl row is 1. Settle with the missile stat list dump of

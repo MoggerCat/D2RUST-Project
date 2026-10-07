@@ -151,6 +151,13 @@ consulted.
 1. Meaning of the unknown fields and of each orientation value: map spec.
 2. Sub-tile flag row order relative to screen and world coordinates: map
    spec (Riiablo reverses rows).
+   *Answered* in the owner: `drlg/rooms.md` §10.4 rule 3 (1.14d's
+   collision build reads the 25 bytes bottom row first: mask at
+   (ox + c, oy + r) |= flags[5·(4 − r) + c]).
 3. Whole-file block limit (`file length / 20`, §Block header) assumes
    tiles never share block headers: confirm on every 1.14d `.dt1`
    (`mpq-tool formats`).
+   *Answered* (game-file read, 2026-10-07, the 251 used DT1s of
+   d2data + d2exp, 15,928 tiles, 397,668 blocks; `Patch_D2.mpq`
+   unlisted): no two tiles' block-header ranges overlap and every file's
+   block total is within `length / 20`.

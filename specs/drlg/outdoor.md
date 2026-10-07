@@ -42,7 +42,7 @@
 | Edge cases & original bugs | 919–940 |
 | Test vectors | 941–1060 |
 | Provenance | 1061–1101 |
-| Open questions | 1102–1151 |
+| Open questions | 1102–1159 |
 <!-- /index -->
 
 ## Summary
@@ -1106,6 +1106,14 @@ recording; level rects and outdoor flags equal a level-coordinate probe
    preset direction of levels 1 and 27 after act creation.
 2. Disassemble the linker bodies `0x00676150`–`0x00676DC0` (no function
    in the export) and compare with §2.4 (draw forms, B/A choice, BM size).
+   *Partly answered* (static, `tools/ghidra/disasm.py at`): R4
+   (`0x00676150`), R8 (`0x00676280`) and RW (`0x006769A0`) match §2.4:
+   first call = R1 (driver +0x138 + 4i) = −1, one inline step of the
+   driver seed copy, `lo' & 3` / `lo' & 7` / (`lo' & 1`) + 1 into R1 and
+   R0 (+0xFC + 4i); retry r := (R0 + 1) mod 4 (signed remainder) / RW
+   r := 2 if R0 = 1 else 1, false when r = R1. R4's placement is Place A
+   variant 1 written inline (not a call to `0x00675DE0`), same four
+   cases as §2.5. Still open: BM, RE, Fix, VS, OS bodies.
 3. Record entering Act 2 (desert chain, `R8` / `RW` / `VS` draws, Lut
    Gholein direction from R0[i+1]) and Act 4 (Outer Steppes flag).
 4. Record Act 3 entry: jungle placer draws on the DRLG seed

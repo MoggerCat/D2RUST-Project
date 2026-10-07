@@ -35,7 +35,7 @@
 | Edge cases & original bugs | 298–307 |
 | Test vectors | 308–329 |
 | Provenance | 330–348 |
-| Open questions | 349–382 |
+| Open questions | 349–392 |
 <!-- /index -->
 
 ## Summary
@@ -143,8 +143,8 @@ Y = py + oy − cy_u + 8
 
 `(ox, oy)` are per-unit extra offsets owned by `unit-composite.md`
 (objects: `objects.txt` Xoffset/Yoffset and skipped when Draw = 0, record
-`+0x148/+0x14C/+0x150`; missiles and the offsets of `0x004DA0B0`–
-`0x004DA0F0`; Open question 3). Each component cel is then placed at
+`+0x148/+0x14C/+0x150`; missiles and the motion-record offsets of
+`0x004DA0B0`–`0x004DA0F0`: `unit-composite.md` §8). Each component cel is then placed at
 (X, Y) by `sprite-placement.md` §2.
 
 So the local player (offsets 0, no shake) is drawn at
@@ -352,13 +352,18 @@ by the `frames-raw-1` capture runs (`capture.md` Test vectors).
    (§6); `map-preview.md` places roofs at `sy + 80 − roof_height`. Which
    y range do live roof (orientation 15) blocks use? A game-file read of
    roof block y's plus a capture under a roof settles it.
+   *Partly answered* (game-file read, d2data + d2exp DT1s, the 6 unused
+   ones excluded): the 13,432 orientation-15 blocks have block y in
+   0 … 64 (multiples of 8 almost always) and block x on a 16-pixel grid.
+   Still open: the capture under a roof that decides between the two y
+   formulas.
 2. ~~Unit culling~~: answered in §7 (no view test; visibility test
    `0x004DC710`). Open: what `0x00622AA0(player, unit, 2)` and
    `0x00642840` test (line of sight vs room; owner `draw-order.md`).
-3. The extra unit offsets of `0x004DA0B0`/`0x004DA0D0`/`0x004DA0F0`
-   (record of `0x0046F060`, fields `+0x34/+0x38/+0x3C`) and the missile
-   offsets (`0x0046ACE0` record `+0xA2/+0xA4/+0xA6`): what they are and
-   when non-zero. Owner `unit-composite.md`; Ghidra read of `0x0046F060`.
+3. *Answered* in `unit-composite.md` §8: the three getters read the
+   unit's client motion record (gfx +0x30, `0x0046F060`; 0 without one),
+   and missiles add `missiles` xoffset / yoffset + zoffset (+0xA2/+0xA4/
+   +0xA6). §4 now links there.
 4. Shadows (orientation 13 list, `0x004DF510`): their (X, Y). Owner
    `draw-order.md`; Ghidra read of `0x004DF510`/`0x004DEF80`.
 5. The client update between server tick and draw (`0x0044C790`): confirm
@@ -376,6 +381,11 @@ by the `frames-raw-1` capture runs (`capture.md` Test vectors).
 7. Wall blocks: is every live wall block 32 pixels wide with an x on a 32
    grid of its tile (§7 clip equivalence)? Game-file count with the C52
    DT1 counts.
+   *Answered* (game-file read, 2026-10-07, 251 used DT1s of d2data +
+   d2exp; `Patch_D2.mpq` unlisted): yes. Every block is 32 pixels wide
+   by format (`formats/dt1.md`), and all 104,780 blocks of orientations
+   1–12, 14 and 16–19 have x ≡ 0 (mod 32). (The six unused DT1s are the
+   only files with off-grid wall blocks.)
 8. Draws with no server tick between them (118 frames of run 1 while not
    paused, `capture.md` §4, OQ8) against §9's "passes without a tick do
    not draw"; the `frames-raw-2` client-update counter settles it.

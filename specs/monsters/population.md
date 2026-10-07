@@ -40,15 +40,15 @@
 |   9. Placement search and creation call (`0x005B2A00`) | 488–602 |
 |   10. Party minions (monstats minion columns, `0x005B2830`) | 603–646 |
 |   11. Preset monsters (DS1 presets) | 647–778 |
-|   12. Ambient (wandering) spawns (`0x0054F060(game, room)`) | 779–802 |
-|   13. Region bookkeeping | 803–835 |
-|   14. Other table-driven and AI spawns | 836–860 |
-| Constants & data dependencies | 861–931 |
-| Randomness | 932–975 |
-| Edge cases & original bugs | 976–1016 |
-| Test vectors | 1017–1088 |
-| Provenance | 1089–1111 |
-| Open questions | 1112–1158 |
+|   12. Ambient (wandering) spawns (`0x0054F060(game, room)`) | 779–803 |
+|   13. Region bookkeeping | 804–836 |
+|   14. Other table-driven and AI spawns | 837–861 |
+| Constants & data dependencies | 862–932 |
+| Randomness | 933–976 |
+| Edge cases & original bugs | 977–1017 |
+| Test vectors | 1018–1089 |
+| Provenance | 1090–1112 |
+| Open questions | 1113–1165 |
 <!-- /index -->
 
 ## Summary
@@ -792,7 +792,8 @@ use the active room seed:
    list at `0x00731B2C` = {270 rogue2}.
 6. Point: §8 with cl null and no warp check. Failure → done. Then
    `0x005B2F20(x, y, class, mode 1, r −1, flags 0)`. Created → 
-   `0x005B1990(game, unit, 0, 8)` (alignment change; `monsters/init.md`)
+   `0x005B1990(game, unit, 0, 8)` (insert into the game's target-node
+   list 8, the targets of evil monsters; Open question 7)
    and wanderers spawned += 1.
 
 So in 1.14d only Act 1 levels with `MonWndr` get them, and only rogue2
@@ -1155,3 +1156,9 @@ unique with 3 minions), and placement points.
    callees (2 call levels) contain no generator step (constant
    0x6AC690C5) and no `rng.md` helper call, on any seed; §Randomness
    step 4.3 is complete for them (superunique extra spawns: §11.4).
+   Corrected 2026-10-07: wrong for `0x005B1CF0`. Its BaseId 540 case
+   (ancientbarb1, and ancientbarb2/3 whose BaseId is 540) creates four
+   items three call levels down (`0x005B1C50` → `0x00573B20` →
+   `0x00559CE0`), each taking game-seed steps (the item's unit seed and
+   item seed) and the item's own rolls (`monsters/init.md` §14.3,
+   Randomness step 9). `0x005B21B0` draws nothing (6 levels scanned).

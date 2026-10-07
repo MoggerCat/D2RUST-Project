@@ -45,7 +45,7 @@
 | Edge cases & original bugs | 679–695 |
 | Test vectors | 696–729 |
 | Provenance | 730–773 |
-| Open questions | 774–826 |
+| Open questions | 774–840 |
 <!-- /index -->
 
 ## Summary
@@ -815,6 +815,20 @@ data: `states` setfunc, `missiles` rows 191/288, `objects` row 17,
    the light list (`[0x007B5668]`) at those frames.
 10. Where the lighting-quality option is loaded at start (registry or
     settings) and its default.
+    *Partly answered* (static): the registry. `0x0047CFE0`, the
+    lighting-quality item's callback (pointer in the options item
+    tables at `0x00718DD8` and `0x0071B858`), reads value "Light
+    Quality" of key "Diablo II" (strings `0x006D73A8`, `0x006CC8B8`)
+    through `0x00414F10` into item +0x124, then applies it as §5: 0 →
+    low (`[0x0072DA50]` := 1, `[0x0072A348]` := 0), 1 → medium (0, 0),
+    2 → high (0, 1), any other value → no change. With no value the
+    statics stand: (0, 1), high. The other writers are the menu change
+    handler (same three branches, `0x0047CFB2`…) and the toggle
+    `0x004F54F0` (low flag := not low flag; callers `0x00405DAB`, a
+    command-line/settings path, and `0x004776B0`). Still open: whether
+    the item callback runs before the first in-game draw (it may run
+    only when the options menu is built); a memory read of the two flags
+    at the first draw settles it.
 11. `0x004BC5E0(object, 0)` (the object refresh of §9.2 r4 step 4 when
     the day period changes): which object classes change (lights,
     torches, mode) and how; owner: the client object spec. A recording

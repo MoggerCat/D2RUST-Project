@@ -42,7 +42,7 @@
 | Edge cases & original bugs | 424–446 |
 | Test vectors | 447–482 |
 | Provenance | 483–513 |
-| Open questions | 514–542 |
+| Open questions | 514–555 |
 <!-- /index -->
 
 ## Summary
@@ -535,7 +535,20 @@ pushed `k` (214 sites).
 7. Does any code outside D2Win read the record fields other than `width`
    and `frame` (e.g. `height`, `unknown*`)? Ghidra scan of uses of the
    record pointer returned by `[0x00841DA0]`.
+   *Partly answered* (static, `all.asm`): the 20 loads of
+   `[0x00841DA0]` are all inside D2Win, in 11 functions from
+   `0x00501730` to `0x00502EF0` (`0x00501730`, `0x005017D0`,
+   `0x00501840`, `0x00501910`, `0x00501A80`, `0x00501C30`, `0x00501DF0`,
+   `0x00501FE0`, `0x00502190`, `0x00502C60`, `0x00502EF0`); no code
+   outside D2Win loads the font pointer itself. Still open: whether one
+   of these hands a record pointer to an outside caller.
 8. CRT `isspace` assumes the "C" locale: confirm no `setlocale` call
    changes it (Ghidra xref of `setlocale`).
+   *Answered* (static): nothing can change it. The statically linked
+   CRT's locale category table (`LC_ALL` … names at `0x006F3120`–
+   `0x006F315C`, table pointer at `0x006F3168`) has no code reference in
+   `Game.exe`, and `___get_qualified_locale` (`0x0069FED4`) has no
+   caller, so `setlocale` is never reached and `isspace` (`0x00687006`)
+   runs in the start-up "C" locale.
 9. Pixel proof: capture cases `text-0001` / `text-0002` (§Test vectors)
    against the CPU reference.

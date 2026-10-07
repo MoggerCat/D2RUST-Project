@@ -47,7 +47,7 @@
 | Edge cases & original bugs | 616–624 |
 | Test vectors | 625–664 |
 | Provenance | 665–706 |
-| Open questions | 707–757 |
+| Open questions | 707–766 |
 <!-- /index -->
 
 ## Summary
@@ -754,3 +754,12 @@ visibility `0x004DBF20`, `0x0045AFC0`, `0x0045AFD0`, `0x004709A0`,
     the same step as `0x00466200` (0x59) and `0x00466360` (0xAC).
     `client/msg-units.md` Randomness, which named only 0x59 and 0xAC,
     is corrected.
+13. *Answered* (static, open question 8): the act change path
+    `0x0053ACC0` uses the same builder. After its room switch
+    (`0x005381F0`, call `0x0053AE30`) it queues S→C 0x05
+    (`0x0053B320(client, 5)`, `0x0053AE39`), stores the new act in client
+    +0x1AC (`0x005382E0`, `0x0053AE43`), then calls `0x0053ABE0`
+    (`0x0053AE5B`): 0x03 with u8@1 = the new act, u32@2 = game +0x7C
+    (the map seed, unchanged), u16@6 = the new act's town level id,
+    u32@8 = game +0x80, followed by 0x53 (§11 rule 1). A recording with
+    an act change still confirms the bytes (PC 2 recording list).

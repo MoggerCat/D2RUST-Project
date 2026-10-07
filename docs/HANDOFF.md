@@ -3126,6 +3126,7 @@ Carried-over open questions not yet in a spec's list:
 1. 8 unflagged invisible collision tiles in `townN1.ds1` draw as blue
    patches (`map-preview.md` OQ3; needs RE of the client tile draw path).
 2. DS1 v12/13 trailing bytes (possibly an early NPC-path section).
+   Answered: never read by 1.14d (`formats/ds1.md` OQ4).
 3. DC6/DCC vertical placement (one-row disagreement between sources). Owner: `render/sprite-placement.md` (`specs/client/render-pipeline.md` §B1).
 4. Meaning of the PL2 rendering tables (Phase 6). Owner: `render/shading.md` (`render-pipeline.md` §B3).
 5. `client-messages.tsv` repeats the field name `unk` in one layout
@@ -5063,6 +5064,81 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
   after); Conversion on a higher-level monster (stats 12, 6, 7 during
   and after); Holy Freeze pulses (state 107, target seed); Whirlwind
   with one and two weapons (E param 4, hits per do).
+- DRLG act entries (one run, RNG hooks on): enter Act 2 and Act 3
+  (`drlg/levels.md` OQ1: drlg +0x94/+0x484/+0x474; `outdoor.md` OQ3/OQ4,
+  `outdoor-act3-act5.md` OQ1: levels 76..78 +0x1C..+0x28, +0x1B8,
+  +0x1BC), Act 4 (Outer Steppes flag) and Act 5 levels 111, 112, 117
+  (`outdoor.md` OQ9, `outdoor-act3-act5.md` OQ3: stamps, room counts of
+  76..78); after Act I creation read level +0x1C..+0x28 of 1–7, 17, 26,
+  39 and preset direction of 1 and 27 (`outdoor.md` OQ1).
+- `drlg/levels.md` OQ3: a town arrival and an act change, draws at
+  `0x0066ACB0`–`0x0066ACE0` on the level seed.
+- `drlg/levels.md` OQ7: a crypt level (`Logicals` 1) and an outdoor
+  level, dump DRLG room +0x64 records after activation.
+- `drlg/maze.md` OQ1: enter Den of Evil (8) and Cave Level 1 (9) with
+  RNG hooks; compare with the maze vectors.
+- `drlg/outdoor.md` OQ5: Stony Field, Dark Wood, Black Marsh, Tamoe
+  builds (sites `0x00680251`, `0x0068034F`).
+- `drlg/outdoor-tilesub.md` OQ2 + OQ4: Cold Plains far enough to build a
+  waypoint and a shrine room; also read the `Trees` substitution DS1's
+  group records (+0x14 of each 0x18-byte group) after its first load.
+- `drlg/preset.md` OQ3: a level whose river/navi units are added at
+  first activation; log §8 adds versus §9 transfers per room.
+- `drlg/rooms.md` OQ7: the entry `0x0066D820` returns for seq
+  6822–6835 of the RNG recording's run.
+- `render/camera.md` OQ1: a capture standing under a roof (decides the
+  roof y formula; roof blocks y 0…64 from the files).
+- `render/camera.md` OQ8 + `render/capture.md` OQ8: `frames-raw-2` with
+  the client-update counter per frame (draws with no tick between).
+- `render/blend-modes.md` OQ2 + OQ3: a ghostly / ethereal unit or a
+  blended shadow over a known background, static camera; log
+  `[0x0072DA5C]` (Blended Shadows).
+- `render/lighting.md` OQ6 + OQ10: a game join; log whether S→C 0x53
+  precedes the first world draw, and `[0x0072DA50]` / `[0x0072A348]` at
+  that draw.
+- `render/capture.md` OQ7 + `render/lighting.md` OQ9: rerun of run 1b
+  f 13,486–14,636 with `--draws-every` and the light-map digest.
+- `sim/rng.md` OQ2: a brand-new character's first game and a
+  save-and-exit reload; log game +0x7C and the S→C 0x03 map seed.
+- `sim/path-placement.md` OQ8: load a character saved in Act III; log
+  writes of client +0x1AC (sites `0x0052FB97`, `0x00530E17`,
+  `0x00532690` path) in order.
+- `sim/pathing.md` OQ9: FPU control word at `0x0067A140` (or a Blessed
+  Hammer's per-tick positions).
+- `formats/ds1.md` OQ3 + `drlg/preset.md` OQ2: after the Trees
+  substitution DS1 loads, dump its 14 group records (0x18 bytes each)
+  and the 0x320 slack after the file buffer.
+- `tools/original-hooks.md` OQ9: breakpoint on `0x00552E6C` over a full
+  scenario; log the allocating caller (unit-seed fallback).
+- `client/model.md` OQ8 (static answer 13) + OQ9: a waypoint to another
+  act (log S→C 0x05, 0x03, 0x53 bytes), and a monster's client +0x20
+  seed after 0xAC against the server unit's seed.
+- `client/msg-ui.md` §4–§11 (client side, no new play beyond the
+  §3.5 line above): in the same session log the client handlers'
+  inputs: type one chat line and one whisper to the own name (0x26
+  forms 1, 2, 6; overhead form 5 from C→S 0x14), talk to Akara (0x27
+  count, kinds), open and close the hire list (0x4F, 0x4E × n, 0x50
+  code 2); breakpoint `0x0049F410` (overhead set: unit, text, lang) and
+  `0x004A1600` (record bytes).
+- `client/msg-skills.md` OQ4 / `client/msg-ui.md` OQ7: a pet summon with
+  a pending skill (0x99 / 0x9A, line above) — log whether any later
+  message of the same receive changes the 0x99 unit (0x0A, 0x15,
+  0xA8 / 0xA9 state 118).
+- `sim/units.md` §4.7 (OQ1, OQ2 answered statically): log unit +0x4C,
+  +0x3C and the §4.2 start index per `anim` record for a player with
+  IAS / FCR / FHR / FBR / FRW items in every mode (dual-wield
+  Assassin or Barbarian, a were-form, Holy Shield block) and for a
+  monster walking, running, attacking, casting and knocked back.
+- `sim/units.md` OQ3: move a player with a hireling following (20
+  history entries of player data +0xA8 per frame, and a town-portal
+  teleport frame).
+- `monsters/init.md` §4.1, §14.3, §26 (OQ4): rng hook with caller
+  addresses during one Act 5 ancient-barbarian spawn (four item
+  creations after the boss mods) and one warping-shrine use (§17 draws
+  on the chosen monster).
+- `sim/pets.md` §10 (OQ3): summon two pet types of one group, then
+  lower a `petmax` skill level (resync trims), and leave the game with
+  a hireling (free path: 0x7A removes).
 
 ## 8. Lessons (problems met, fixes)
 

@@ -19,23 +19,24 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 40–52 |
-| Inputs | 53–59 |
-| Outputs / state changes | 60–64 |
-| Rules | 65–66 |
-|   1. Local player stats: 0x19–0x1F (`0x0045D780`) | 67–96 |
-|   2. Item actions: 0x9C ItemActionWorld (`0x0045EB10`), 0x9D ItemActionOwned (`0x0045EC70`) | 97–167 |
-|   3. Other item messages | 168–197 |
-| Constants & data dependencies | 198–206 |
-| Randomness | 207–210 |
-| Edge cases & original bugs | 211–220 |
-| Test vectors | 221–248 |
-| Provenance | 249–263 |
-| Open questions | 264–285 |
+| Summary | 41–53 |
+| Inputs | 54–60 |
+| Outputs / state changes | 61–65 |
+| Rules | 66–67 |
+|   1. Local player stats: 0x19–0x1F (`0x0045D780`) | 68–97 |
+|   2. Item actions: 0x9C ItemActionWorld (`0x0045EB10`), 0x9D ItemActionOwned (`0x0045EC70`) | 98–168 |
+|   3. Other item messages | 169–198 |
+|   4. Hireling stats: 0x9E–0xA2 (`0x0045D540`) | 199–214 |
+| Constants & data dependencies | 215–223 |
+| Randomness | 224–227 |
+| Edge cases & original bugs | 228–237 |
+| Test vectors | 238–269 |
+| Provenance | 270–287 |
+| Open questions | 288–309 |
 <!-- /index -->
 
 Owned ids: 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F, 0x20, 0x3F, 0x42,
-0x47, 0x48, 0x9C, 0x9D.
+0x47, 0x48, 0x9C, 0x9D, 0x9E, 0x9F, 0xA0, 0xA1, 0xA2.
 
 ## Summary
 
@@ -195,6 +196,22 @@ of the cursor item (0x42), item flag 4 (0x3F).
    `0x006280D0(item, 0x4000, …)`); the rule body is open question 4.
    Model: no field until then.
 
+### 4. Hireling stats: 0x9E–0xA2 (`0x0045D540`)
+
+1. Layout (`sim/server-messages.tsv`; senders `0x0053BEE0`,
+   `0x0053BFD0`): stat u8@1, GUID u32@2, value @6: 0x9E u8 (set), 0x9F
+   u16 (set), 0xA0 u32 (set), 0xA1 u8 (add), 0xA2 u16 (add) (jump
+   table `0x0045D5C4`, read from the image).
+2. Look up (1, GUID) (monsters only, whatever the sender's unit;
+   `client/model.md` §2 rule 2); none → nothing.
+3. Stat 12 (level) → first the requirement refresh of 0x47 on that
+   unit (`0x0045D3B0`: it builds `47 <type> 00 <GUID>` and calls
+   `0x004C1BC0`, §3 rule 3).
+4. Then set (`0x00627260(unit, stat, value, 0)`, base layer 0) for
+   0x9E–0xA0, or add (`0x006272B0`, same arguments) for 0xA1, 0xA2
+   (`sim/stat-lists.md` §5 rules 2, 3). No hook (contrast §1 rule 5).
+5. Model: the unit's `stats` entry for the stat.
+
 ## Constants & data dependencies
 
 | Item | Value | Source |
@@ -245,8 +262,15 @@ From `traces/raw/20261006-022633-packets.jsonl` ("B") and
 | `3f ff 05 00 00 00 ff ff` with item (4, 5) | item flag 4 := 0; use cursor none | synthetic |
 | `3f 04 05 00 00 00 ff ff` with item (4, 5) | item flag 4 := 1; use cursor {(4, 5), 4} | synthetic |
 | `47 00 00 01 00 00 00 00 00 00 00` | (0, 1) found → requirement refresh | A 76132 |
+| `9e 07 0a000000 05`, monster (1, 10) | stat 7 := 5 | synthetic, §4 |
+| `a2 0d 0a000000 6400`, (1, 10) stat 13 = 1000 | stat 13 = 1100 | synthetic, §4 |
+| `a0 0c 0a000000 0b000000`, (1, 10) | requirement refresh, then stat 12 := 11 | §4 rule 3 |
+| `9e 07 0a000000 05`, only player (0, 10) | nothing | §4 rule 2 |
 
 ## Provenance
+
+§4 (2026-10-07): `0x0045D540` (table `0x0045D5C4`), `0x0045D3B0`,
+`0x004C1BC0`, `0x00627260`, `0x006272B0`.
 
 1.14d `Game.exe`: stats `0x0045D780` (jump table `0x0045D85C`, 7
 entries), `0x0045D880`, hook `0x0045D4B0`; items `0x0045EB10` (byte

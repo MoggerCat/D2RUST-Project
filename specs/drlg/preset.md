@@ -41,7 +41,7 @@
 | Edge cases & original bugs | 572–589 |
 | Test vectors | 590–615 |
 | Provenance | 616–657 |
-| Open questions | 658–685 |
+| Open questions | 658–688 |
 <!-- /index -->
 
 ## Summary
@@ -673,9 +673,12 @@ the disassembly). Function map (D2MOO 1.10f names as hints):
 5. The ~94 DS1s that `Patch_D2.mpq` overrides were not re-surveyed
    (no listfile): re-run the size/pops/unit counts with `mpq-tool
    formats`-style name lists to confirm the measurements.
-6. Whether the lvlprest loader's DS1 preload (`0x0061EBB0`) ever runs
-   (`data/loading.md` open question 9); it does not change results, only
-   load timing.
+6. *Answered* (static): never in 1.14d. `0x0061EBB0`'s only caller is
+   the load-all routine `0x00619300` (call `0x0061941D`), which passes
+   its input 2 in EDX; the preload loop calls `0x00665F40` only when
+   that value is non-zero (test at `0x0061EFAD`), and the routine's only
+   caller (`0x0044B937`) sets input 2 = 0 (`data/loading.md` OQ 9).
+   DS1s are loaded on first use (§5.1).
 7. Does any lvlprest DS1 with `Scan` ≠ 0 have a waypoint object outside
    its map (§6 step 9 writes without a bound check)? Scan the waypoint
    objects (objects `SubClass` bit 0x40) of those DS1s against w, h.

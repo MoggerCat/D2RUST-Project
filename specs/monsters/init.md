@@ -22,44 +22,45 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 65–83 |
-| Inputs | 84–94 |
-| Outputs / state changes | 95–119 |
-| Rules | 120–121 |
-|   1. Entry points | 122–144 |
-|   2. The create request | 145–162 |
-|   3. Placement | 163–171 |
-|   4. Creation sequence after placement (`0x005B2A00`) | 172–189 |
-|   5. Monster type init (`0x00574250`) | 190–207 |
-|   6. Stats and skills (`0x00573CB0`) | 208–247 |
-|   7. Monster level | 248–263 |
-|   8. Base values from monlvl | 264–298 |
-|   9. Player-count bonus (`0x00573930`) | 299–310 |
-|   10. Components (`0x005739D0`) | 311–321 |
-|   11. monprop (`monprop.txt`) | 322–330 |
-|   12. monequip (`0x005D6B60`) | 331–347 |
-|   13. Classic scaling (`0x0063EEF0`) | 348–355 |
-|   14. Normal mods and boss mods | 356–390 |
-|   15. Party minions | 391–395 |
-|   16. Boss spawns | 396–431 |
-|   17. Choosing umods (`0x005A0760`) | 432–475 |
-|   18. Boss minions and umod init (`0x005A2120`) | 476–493 |
-|   19. Umod init functions | 494–579 |
-|   20. Superuniques (`0x005A49B0`) | 580–603 |
-|   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 604–618 |
-|   22. Umod callbacks and the type-7 event | 619–666 |
-|   23. Unique names (client) | 667–676 |
-|   24. Monster assign message | 677–689 |
-|   25. Calling the spawn functions outside population (tools) | 690–780 |
-| Constants & data dependencies | 781–802 |
-| Randomness | 803–838 |
-| Edge cases & original bugs | 839–864 |
-| Test vectors | 865–866 |
-|   Synthetic (CI-safe) | 867–889 |
-|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 890–920 |
-|   Recorded checks (monster assign 0xAC) | 921–933 |
-| Provenance | 934–997 |
-| Open questions | 998–1037 |
+| Summary | 66–84 |
+| Inputs | 85–95 |
+| Outputs / state changes | 96–120 |
+| Rules | 121–122 |
+|   1. Entry points | 123–145 |
+|   2. The create request | 146–163 |
+|   3. Placement | 164–172 |
+|   4. Creation sequence after placement (`0x005B2A00`) | 173–231 |
+|   5. Monster type init (`0x00574250`) | 232–249 |
+|   6. Stats and skills (`0x00573CB0`) | 250–289 |
+|   7. Monster level | 290–305 |
+|   8. Base values from monlvl | 306–340 |
+|   9. Player-count bonus (`0x00573930`) | 341–352 |
+|   10. Components (`0x005739D0`) | 353–363 |
+|   11. monprop (`monprop.txt`) | 364–372 |
+|   12. monequip (`0x005D6B60`) | 373–389 |
+|   13. Classic scaling (`0x0063EEF0`) | 390–397 |
+|   14. Normal mods and boss mods | 398–499 |
+|   15. Party minions | 500–504 |
+|   16. Boss spawns | 505–540 |
+|   17. Choosing umods (`0x005A0760`) | 541–584 |
+|   18. Boss minions and umod init (`0x005A2120`) | 585–602 |
+|   19. Umod init functions | 603–688 |
+|   20. Superuniques (`0x005A49B0`) | 689–737 |
+|   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 738–752 |
+|   22. Umod callbacks and the type-7 event | 753–800 |
+|   23. Unique names (client) | 801–810 |
+|   24. Monster assign message | 811–823 |
+|   25. Calling the spawn functions outside population (tools) | 824–914 |
+|   26. Making an existing monster unique (`0x005A4940`) and the warping shrine's pick | 915–973 |
+| Constants & data dependencies | 974–995 |
+| Randomness | 996–1038 |
+| Edge cases & original bugs | 1039–1064 |
+| Test vectors | 1065–1066 |
+|   Synthetic (CI-safe) | 1067–1089 |
+|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1090–1120 |
+|   Recorded checks (monster assign 0xAC) | 1121–1133 |
+| Provenance | 1134–1204 |
+| Open questions | 1205–1246 |
 <!-- /index -->
 
 ## Summary
@@ -186,6 +187,47 @@ Steps 1–4 are listed in `monsters/population.md` §9.6; summary:
    §10; one owner-unit-seed `roll(PartyMax − PartyMin + 1)` when
    `PartyMin` < `PartyMax`).
 6. Return the unit.
+
+#### 4.1 Inside the allocator after the type init (`0x00555230`)
+
+Population passes allocator flag 1 or 3 (`population.md` §9.6), so
+bit 1 ("add") is set. After `0x00574250` returns, in order:
+
+1. Add to the world `0x00554850(unit, x, y, game, room, 1)`
+   (`sim/path-placement.md` §2.5): act fields; dynamic path allocation
+   (`0x00649D00`); then the monster branch:
+   1. `0x005735A0(game, unit, x, y)`: path speed := monstats
+      `Velocity` (+0x32) · 256 (`0x00648690`), animation rate
+      `0x00623F50` (`sim/units.md` §4.7), then a mode-change request
+      for the unit's current mode (+0x10 = the creation mode;
+      `0x005A7E60`) with target point (x, y), run through the mode set
+      `0x005A7C20(game, request, 1)` (`sim/units.md` §4.6).
+   2. `0x00553160(unit)` ≠ 0 → think restart `0x00573780`
+      (`monsters/ai.md` §1.5); else room clean-up `0x00553220`
+      (`sim/intents-events.md` §7.5).
+2. Hash insert and room queueing (`sim/unit-order.md` §3.1).
+3. Path settings when `0x0063EA40` holds and `0x004638A0(class, 0x13)`
+   does not (`sim/units.md` §3.1 step 8).
+
+Draws in this sequence (static scan of every direct callee, 6–7 call
+levels, for the generator constant 0x6AC690C5 and the `rng.md` helpers;
+the indirect calls, mode start and umod callbacks, checked by hand):
+
+| Step | Draws |
+|---|---|
+| path allocation, path settings, hash/room insert, act lookup | none |
+| path speed, animation rate `0x00623F50`, request build `0x005A7E60` | none |
+| mode set: path target and compute (`0x005A63F0`, `0x005A6290`) | none (`sim/pathing.md` Randomness 1; the only path type that draws is the charged-bolt missile path `0x0067A240`) |
+| mode set: monster mode damage `0x005A4F50(unit, creation mode)` | per element slot i with `El{i}Mode` = the creation mode: U `roll(100)` when `El{i}Pct` < 100, U `roll(5)` for type `rand` (`skills/bodies-2.md` §2.1 step 9) |
+| mode set: umod dispatch `0x005A4350` | none: the umod list is still empty (umods are assigned after the allocator returns, §4 steps 3–4) |
+| mode set: the creation mode's start function (`sim/units.md` §4.6 table) | mode 1 (`0x005A73E0`) and 12 (`0x005A7390`): none; the mode change's animation re-init `0x00624390` draws only for objects (`world/objects.md`); other modes: that start function's owner |
+| think restart `0x00573780` / clean-up `0x00553220` | none (the timer path into `0x005544B0` needs state 54, which a new monster lacks) |
+
+1.14d live data: `El1Mode`–`El3Mode` take only A1, A2, S1 and SC
+(monstats.txt: 230 + 53 + 12 rows in slot 1, 19 + 13 + 8 in slot 2,
+none in slot 3), never NU (1) or DD (12). So a monster created in mode
+1 (population) or 12 draws nothing between the type init and the
+allocator's return.
 
 ### 5. Monster type init (`0x00574250`)
 
@@ -385,8 +427,75 @@ records (`0x005436B0`), states, flags and umod assignments for the act
 bosses and quest monsters. The Act 1 case is bloodraven: umod 12
 (bloodraven) and 22 (questcomplete) with unique = 1, quest chain 2, state
 corpse_noselect. The full case list matches D2MOO
-`MONSTERSPAWN_SetupBossMods` (call pattern checked at `0x005B1CF0`; per
-case details open question 6).
+`MONSTERSPAWN_SetupBossMods` (call pattern checked at `0x005B1CF0`;
+every 1.14d case: §14.3).
+
+#### 14.3 Boss mods per case (`0x005B1CF0`, 1.14d)
+
+Request in EAX (game +0x00, room +0x04, class +0x0C), unit in ECX. The
+switch key is the class's `BaseId` (monstats +0x02; the class itself
+when the row is missing; −1, no case, when the BaseId is out of range).
+Some cases test the class itself for the uber monsters (704–709).
+"umod n" = `0x005A4850(game, unit, n, 1)` (§14.1) unless marked (0);
+"chain n" = `0x005436B0(game, unit, n)`. Cases in code order:
+
+| BaseId | Class test | Effect, in order |
+|---|---|---|
+| 156 andariel | class 707 (uberandariel) | umod 23 poisonhit, 6 fast, 29 multishot |
+| | other | umod 22, chain 6 |
+| 175 warriv2 | — | class hook `0x005447A0(game, room, x, y, 175)` with the unit's position (`0x0045ADF0`, `0x0045AE20`); the hook acts only for classes 201 and 331 (`world/quests-act2.md` §10), so nothing happens |
+| 211 duriel | class 708 (uberduriel) | umod 6, 18 cold |
+| | other | chain 13, chain 9 |
+| 229 radament | — | chain 8 |
+| 242 mephisto | class 704 (ubermephisto) | umod 22, 30 aura, 17 lightning, 8 resist, 6 |
+| | other | chain 20, umod 22 |
+| 243 diablo | class 705 (uberdiablo) | umod 22, 8, 6 |
+| | other | umod 22, chain 23 |
+| 250 summoner | — | chain 12; unit flags (+0xC4) \|= 0x800; monster data +0x5C \|= 1 (`0x00573570(unit, 1, set)`) |
+| 256 izual | class 706 (uberizual) | umod 6, 18 |
+| | other | umod 22, chain 22 |
+| 267 bloodraven | — | umod 12 bloodraven, 22; chain 2; state 118 on (`0x00639DB0(unit, 118, 1)`) |
+| 284 maggotqueen1 | — | umod 23, 22 |
+| 292 firegolem | — | umod 31 (0) |
+| 340–343 boneprison1–4 | — | unit flags \|= 0x20000 |
+| 366 compellingorb | — | chain 19; unit flags \|= 0x20000; umod 22 |
+| 402 smith | — | umod 22 |
+| 407 fetish11 | — | chain 17 |
+| 409 hephasto | — | chain 24 |
+| 434 prisondoor | — | chain 32 |
+| 526 nihlathakboss | — | chain 34, umod 22 |
+| 540 ancientbarb1 | — | equipment `0x005B1C50`, below |
+| 544 baalcrab | class 709 (uberbaal) | umod 22, 18, 8, 6 |
+| | other | chain 36, umod 22 |
+
+No case assigns umods 40 or 41. A null unit skips only the flag writes
+(the compellingorb case then still runs umod 22).
+
+**Ancient barbarian equipment** `0x005B1C50` (unit in EBX): game =
+`0x00554010(unit)`, L = the unit's `level(12)` (`0x00625480(unit, 12,
+0)`). For k = 0..3: entry = table `0x006E1BB0` + 8 · class + 0x18 · k
+(4-byte item code, then a body-location byte; the key is the class, so
+classes 540–542 read their own rows):
+
+| k | 540 | 541 | 542 |
+|---|---|---|---|
+| 0 | `bsd`, loc 4 | `tax`, loc 4 | `vou`, loc 4 |
+| 1 | `tow`, loc 5 | `tax`, loc 5 | `rin`, loc 6 |
+| 2 | `fld`, loc 3 | `hgl`, loc 10 | `fld`, loc 3 |
+| 3 | `hbt`, loc 9 | `hbt`, loc 9 | `crn`, loc 1 |
+
+Difficulty (game +0x6D) 1 replaces the code by the item's `ubercode`
+(+0x88 of its items row, found with `0x00633640`), 2 by `ultracode`
+(+0x8C). Then `0x00573B20(game, unit, &entry, L, 4)`, the monster equip
+helper also used by monequip (§12): no inventory → one is created
+(`0x0063ABD0`); the code is looked up (unknown → nothing); the item is
+created by `0x00559CE0` (`items/generation.md` §10.2: source = the
+monster, spawn mode 4, quality 4 (magic), no sockets, never ethereal,
+ilvl = L, no seeds); item flag 0x1000 set (`0x006280D0`); body location
+:= the entry byte (`0x00627D70`); location ≠ 0 → placed with
+`0x005606B0`: failure → the item is removed (`0x00555600`), success →
+stat 72 (durability) := its maximum (`0x00625E00`). Each creation takes
+game-seed and item-seed draws (Randomness step 9).
 
 ### 15. Party minions
 
@@ -601,6 +710,31 @@ The `TC`, `TC(N)`, `TC(H)` columns are read when the boss dies (treasure
 spec); `Utrans` columns are client colour. `MonSound`, `EClass`,
 `Replaceable` are not read here.
 
+#### 20.1 Per-`hcIdx` cases (`0x005A49B0`, 1.14d)
+
+After §20 step 4, a switch on the row's `hcIdx` (+0x08; −1 for a
+missing row), tables `0x005A4EA4` / `0x005A4E7C` on hcIdx − 6. Every
+case ends with umod 22, unique = 1. "spawn(c, r, n, f)" =
+`0x005B24E0(game, boss, c, mode 1, r, n, f)` (`population.md` Open
+question 4); "chain n" as in §14.3; `0x00545B50(game, unit)` is the
+quest preset-boss hook (`world/quests-act3.md`, `world/quests-act5.md`).
+
+| hcIdx | Rows (1.14d) | Effect before umod 22 |
+|---|---|---|
+| 6 | The Countess | state 118 on; chain 5; AI install `0x005B0E00(game, unit, AI control, 13)` |
+| 10 | Radament | U `roll(5)` + 2 times `0x005B23C0(game, unit, class 4, mode 1, r 4, flags 0x40)`; then one each of classes 276, 382, 385, 389 the same way |
+| 26, 27, 29 | Ismail Vilehand, Geleb Flamefinger, Toorc Icefist | chain 19; `0x00545B50` |
+| 36, 37, 38 | Infector of Souls, Lord De Seis, Grand Vizier of Chaos | chain 23 |
+| 39 | The Cow King | chain 4 |
+| 42 | Siege Boss | spawn(453, 20, 20, 0); chain 31; `0x00545B50`; state 118 on |
+| 43, 44, 45 | Ancient Barbarian 1–3 | chain 35; `0x00545B50` |
+| 60 | Nihlathak Boss | owner data `0x0058F030(game, unit, own GUID, 1, 1, 0)`; spawn(class-for-level(the unit's room, 453) by `0x0063EC70`, 10, 20, 0x40); chain 34 |
+| 62 | Baal Subject 2 | spawn(381, 20, 10, 0x40) |
+| any other | — | nothing |
+
+Draws: only Radament's `roll(5)` (unit seed) and the creations of the
+spawned monsters (their own §4 draws).
+
 ### 21. Restore paths (`0x005A4440`, `0x005A46E0`)
 
 Called from the inactive-unit restore `0x005424F0` (room reactivation,
@@ -778,6 +912,65 @@ searches that room and its adjacency array (`drlg/rooms.md` §6).
 4. With type flag 4, `0x005A2120` spawns no minions (§18 step 1) and
    runs the umod inits with unique = 1, as for a population champion.
 
+### 26. Making an existing monster unique (`0x005A4940`) and the warping shrine's pick
+
+Used by the shrine effect 20 `0x00583050` (`world/objects.md` §9.2);
+no other caller (xref).
+
+**Make unique** `0x005A4940(ECX game, EDX unit)`: unit none, not a
+monster or without monster data → nothing. Then, in order:
+
+1. Type flags (monster data +0x16) |= 1.
+2. Unique mark `0x005A0320(unit, game)` (`population.md` §6.3 step 5:
+   type flag 8 and the region boss counter when not yet set).
+3. Choose umods `0x005A0760(unit, game, champion allowed 1)` (§17):
+   the champion test runs, so the result is a champion in `constants`
+   % of cases (live 20).
+4. `0x005A2120(min 0, cl none, max 0, game, unit, spawn minions 0)`
+   (§18): no minions; umods 1–4 and the list run with unique = 1.
+5. Unit flags (+0xC4) |= 0x800; monster data +0x5C |= 1
+   (`0x00573570(unit, 1, set)`), as for the Summoner (§14.3).
+
+Draws: those of §17 and of the umod init functions (Randomness step
+11 without minions), on the unit's seed.
+
+**Nearest eligible monster** `0x0065A800(P, x, y, limit, cb)` (`ret
+0x14`), called with P = the shrine's operator, (x, y) = P's position
+(`0x00648900` / `0x006488C0` from the dynamic path for a player; the
+static path's +0x10 / +0x0C for unit types 2, 4, 5), limit 0, cb
+`0x00582750`:
+
+1. P's room (`0x00620BB0`); none → fatal assertion. Its room list
+   (`0x00619790`, the adjacency array, in order).
+2. limit 0 → 0x10000. best := 0xFFFF, M := none. cb must be a valid
+   code pointer (`IsBadCodePtr`), else fatal.
+3. Per room passing the overlap test `0x0065A710(room, x, y, limit)`
+   (`umod-callbacks.md` §3.1 step 3: it never rejects), per unit U of the
+   room's list (+0x74, next +0xE8) in order: d := `0x006417F0(U, x, y)`;
+   d < limit, d < best and cb(ECX U, EDX P) ≠ 0 → M := U, best := d. The
+   first of equal distances wins.
+4. Return M. The shrine then runs make unique on M when found.
+
+**Eligibility** `0x00582750(M, P)` is 1 only when all hold, tested in
+this order:
+
+1. M ≠ P, M exists and is a monster (type 1).
+2. `0x00650D70(P, M)` ≠ 1 (the alignment test between them).
+3. M's alignment (`0x006259B0`) = 0 (evil).
+4. `0x0063EA40(M)` = 0.
+5. M's mode is 1 (NU) or 2 (WL).
+6. M's class has monstats2 mode bit 2 (`0x0046C140(class, 2)`: the
+   +0xF0 mode bits through monstats +0x18, `render/unit-composite.md`
+   §1.1).
+7. M's monstats2 record exists (`0x00451FE0`) and its byte +0x0B ≠ 0.
+8. v := `0x0055B7E0(M)` (monster data +0x14, dword 0) ≠ 0 and
+   `0x0063E9F0(v, M)` = 0 (not a boss).
+9. `0x0063EDC0(M)` = 0 (not a prime evil).
+10. `0x005A0180(M, 0x1F)` = 0: none of type flags 1, 2, 4, 8, 0x10
+    (already unique, superunique, champion, boss or minion).
+
+The search and the test draw nothing.
+
 ## Constants & data dependencies
 
 | Table | Columns read at creation (fields.tsv names) |
@@ -817,8 +1010,15 @@ seed (room +0x6C); G = game seed (game +0xD0). For one call of
 7. monequip: per processed row with slots, U `roll(slot count)`; item
    creation draws (treasure spec).
 8. First AI setup `0x005B0E00` (draws, if any, per `monsters/ai.md`).
+   Then the add-to-world sequence §4.1: U draws only from mode damage
+   when an `El{i}Mode` equals the creation mode (none for modes 1 and
+   12 with 1.14d data).
 9. Normal / boss mods: umod init functions draw nothing except as listed
-   in 11; superunique extra spawns per `population.md` §11.4.
+   in 11; superunique extra spawns per `population.md` §11.4. Boss mods
+   (§14.3): only BaseId 540 draws: four item creations (`0x00559CE0`,
+   each one game-seed step for the item's unit seed and one for its
+   item seed, then the item's own rolls; `items/generation.md`), in
+   table order k = 0..3.
 10. Party minions: U `roll(PartyMax − PartyMin + 1)` when `PartyMin` <
     `PartyMax`; then each minion's own creation (1–10, recursively,
     with that minion's unit seed).
@@ -957,7 +1157,14 @@ Bosses, Normal, Blood Moor (L-flag 1):
   `0x005A0D20`, `0x005A0E40`, `0x005A0E80`, `0x005A1080`, `0x005A11F0`,
   `0x005A1230`, `0x005A1280`, `0x005A1330`, `0x005A1370`, `0x005A17E0`,
   `0x005A1910`, `0x005A1990`, `0x005A1650` (aura table `0x0073BF68`);
-  `0x005A49B0`, `0x005A4440`, `0x005A46E0`; dispatcher `0x005A4270`,
+  `0x005A49B0` (hcIdx tables `0x005A4EA4`, `0x005A4E7C`), `0x005A4440`,
+  `0x005A46E0`; boss-mod case tables `0x005B20A4` / `0x005B2060`,
+  `0x005B1C50` (table `0x006E1BB0`), `0x00573B20`, `0x005447A0`;
+  make unique `0x005A4940` (caller `0x005830CC`), `0x0065A800`,
+  `0x00582750`;
+  add-to-world `0x00554850` (table `0x00554A18`), `0x005735A0`,
+  `0x005A7C20`, `0x00624390` (type table `0x0062467C`); dispatcher
+  `0x005A4270`,
   callback table `0x0073C0B8`, `0x005A4370` (bytes), monster handler
   table `0x006E2490`; `0x005A4230`, `0x005A25F0`, `0x005A37D0`,
   `0x005A3800`; client names `0x004AC870`, `0x00653ED0`–`0x00653F50`;
@@ -1008,14 +1215,16 @@ Bosses, Normal, Blood Moor (L-flag 1):
    other 12 draw nothing (scan for the generator constant 0x6AC690C5 and
    the `rng.md` helpers, 3 call levels deep). Ordinary room monsters
    (AIs without init) draw nothing at step 8 of Randomness.
-3. Draws taken by the allocator after the type init (room insert, path
-   init) are not listed here; `sim/units.md` to confirm none.
+3. Answered (2026-10-07): §4.1 lists the allocator's steps after the
+   type init and their draws; for creation modes 1 and 12 with 1.14d
+   data there are none (Randomness step 8).
 4. No RNG trace of a spawn exists: record one population pass (rng hook
    with caller addresses) to confirm the order in Randomness.
 5. Answered (2026-10-07): `0x0054DC40` and its draws are owned by
    `monsters/population.md` §8.
-6. Per-case details of boss mods `0x005B1CF0` and superunique hcIdx cases
-   in `0x005A49B0` beyond those listed: read the asm case by case.
+6. Answered (2026-10-07): every case read from the asm: boss mods §14.3
+   (with the ancient barbarian equipment and its item draws),
+   superunique hcIdx cases §20.1.
 7. Answered (2026-10-07): umods 17, 18, 23, 25, 26 init bodies read on
    1.14d (`0x005A1B00`, `0x005A1C70`, `0x005A1E00`, `0x005A1F90`,
    `0x005A1600`): `monsters/umod-init-bodies.md`.
