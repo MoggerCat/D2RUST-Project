@@ -1,5 +1,7 @@
 # Handoff: PC 2 spec worker, quests-act3 — `claude/spec-quests-act3`
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the tenth fold (`claude/fold-handoff-10`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Tenth set" (PC 1 / PC 2).
+
 Answers to the Act III implementation questions (`impl-quests-act3.md`
 open questions 1–7; HANDOFF §7 Ninth set QC-1 … QC-7). The spec now
 has a part 2 (`specs/world/quests-act3-2.md` §11) so that part 1 stays

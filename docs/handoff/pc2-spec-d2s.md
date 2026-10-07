@@ -1,5 +1,7 @@
 # PC 2 spec worker: `formats/d2s.md` (topic d2s), 2026-10-07
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the tenth fold (`claude/fold-handoff-10`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Tenth set" (PC 1 / PC 2).
+
 Branch `claude/spec-d2s` (from `claude/local-pc2-integration`, with
 `claude/spec-d2s-buddy` f254d8f merged first: it was not in the
 integration branch). Owned files: `specs/formats/d2s.md` and the new split

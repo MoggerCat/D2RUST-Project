@@ -1,5 +1,7 @@
 # Handoff: client S→C handlers for UI, audio and skills, the bridge output channel — `claude/impl-client-msgs-3`
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the tenth fold (`claude/fold-handoff-10`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Tenth set" (PC 1 / PC 2).
+
 Cloud implementation session, 2026-10-07, task class: implementation from
 specs, medium. Base: `claude/specs-staging-2` at `ddbfe0b` (M09: every
 claim below is about this branch on that base; repo only, no `game/`, no

@@ -1,5 +1,7 @@
 # Handoff: client DRLG answers (PC 1) — `claude/impl-client-drlg-2`
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the tenth fold (`claude/fold-handoff-10`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Tenth set" (PC 1 / PC 2).
+
 Cloud implementation session, 2026-10-07, task class: implementation
 from specs, medium. Base: `claude/specs-staging-2` at `ddbfe0b`. Repo
 only: no `game/`, no `re/`, no recordings (M09: every claim below holds on

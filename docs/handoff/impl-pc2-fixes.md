@@ -1,5 +1,7 @@
 # Handoff: impl-pc2-fixes (2026-10-07)
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the tenth fold (`claude/fold-handoff-10`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Tenth set" (PC 1 / PC 2).
+
 Cloud implementation session. Base `claude/specs-staging-5` @ `666e2f2`;
 branch `claude/impl-pc2-fixes`. Task: the code fixes of
 `docs/handoff/local2-2026-10-06.md` §3 (PC 2's list), numbered here as

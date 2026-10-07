@@ -1,5 +1,7 @@
 # Handoff: PC 1 wiring — `claude/impl-pc1-wiring`
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the tenth fold (`claude/fold-handoff-10`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Tenth set" (PC 1 / PC 2).
+
 Cloud implementation session, 2026-10-07. Base `claude/specs-staging-5`
 @ 2675253. Task: the "Open" items 1–2 of `impl-pc1-final.md` and the UI
 side of `client/msg-ui.md` OQ10. One subagent (the client part).

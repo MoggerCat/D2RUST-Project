@@ -1,5 +1,7 @@
 # Handoff: PC 1's render and missile answers in code — `claude/impl-render-missile-answers`
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the tenth fold (`claude/fold-handoff-10`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Tenth set" (PC 1 / PC 2).
+
 Cloud implementation session, 2026-10-07. Base `claude/specs-staging-2`
 (`b222388`). Repo only, synthetic fixtures, no game files (M09). Wrapped
 up early on the coordinator's budget cut. Everything here is still

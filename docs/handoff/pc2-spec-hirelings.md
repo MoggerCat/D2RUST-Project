@@ -1,5 +1,7 @@
 # Handoff: PC 2 spec worker — hirelings (`claude/spec-hirelings`)
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the tenth fold (`claude/fold-handoff-10`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Tenth set" (PC 1 / PC 2).
+
 Local spec session, 2026-10-07. Owner files: `specs/world/hirelings.md`,
 `specs/world/npc.md` (GN1 and hireling rules only). Inputs:
 `docs/handoff/impl-hirelings.md` HL1–HL9, `docs/HANDOFF.md` §7 Ninth set

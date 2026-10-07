@@ -1,6 +1,7 @@
 # Handoff: mutation testing of the walk / run handlers and `d2_sim::wiring::path` — `claude/mutants-walk-handlers`
 
-> Not yet folded into `docs/HANDOFF.md` (§1, §3, §8) and `docs/PLAN.md`; a docs session folds it, then this file stays as the detailed record.
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the tenth fold (`claude/fold-handoff-10`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Tenth set" (PC 1 / PC 2).
+
 
 Cloud test session, 2026-10-06, medium effort (METHODS M08). Base:
 `claude/tender-meitner-mphas3` at `01dff69`, merged again at the end

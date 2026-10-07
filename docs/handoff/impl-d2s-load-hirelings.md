@@ -1,5 +1,7 @@
 # Handoff: save load effects and hireling answers — `claude/impl-d2s-load-hirelings`
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the tenth fold (`claude/fold-handoff-10`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Tenth set" (PC 1 / PC 2).
+
 Cloud implementation session, 2026-10-07, implementation from specs
 (medium). Base: `claude/specs-staging-2` at `b222388`. Repo only, no game
 files (M09): every claim holds on this branch, on synthetic data. Stopped
