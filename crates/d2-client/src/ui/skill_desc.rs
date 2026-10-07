@@ -94,8 +94,8 @@ pub fn entry9(
 ) -> (i32, i32) {
     let sh = hit_shift & 31;
     (
-        (((min_dam << sh) + elem_min) * 75 >> 8) + weapon.0,
-        (((max_dam << sh) + elem_max) * 75 >> 8) + weapon.1,
+        ((((min_dam << sh) + elem_min) * 75) >> 8) + weapon.0,
+        ((((max_dam << sh) + elem_max) * 75) >> 8) + weapon.1,
     )
 }
 
