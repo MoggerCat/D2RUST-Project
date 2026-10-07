@@ -48,6 +48,9 @@ mod tests3;
 #[cfg(test)]
 mod tests_use;
 
+#[cfg(test)]
+mod tests_b3b;
+
 pub use b4_helpers::{diab_wall_cb, zigzag_cb, zigzag_ring_cb, PathMissile};
 pub use effects::{BodyEffect, PathOp};
 pub use helpers::*;
