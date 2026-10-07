@@ -15,31 +15,32 @@
   evaluator); `sim/rng.md` (draw helpers; unit seed at unit +0x20);
   `sim/stats.md`, `sim/stat-lists.md` (getters, stat lists, states,
   curses); `sim/units.md` (modes, unit events, overlays); `sim/tick.md`
-  §5 (timer events 3 STATREGEN, 12 REMOVESTATE, 2 AITHINK).
+  §5 (timer events 3 STATREGEN, 12 REMOVESTATE, 2 AITHINK); `combat/events.md`
+  (event functions other than 15 and 16).
 
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 45–57 |
-| Inputs | 58–70 |
-| Outputs / state changes | 71–78 |
-| Rules | 79–80 |
-|   0. Shared integer helpers | 81–103 |
-|   1. Damage record | 104–137 |
-|   2. Pipeline | 138–152 |
-|   3. Rolling: `start_combat` = `0x0057DBF0` | 153–292 |
-|   4. Totals and resistances: `totals` = `0x0057C1E0` | 293–384 |
-|   5. Application | 385–551 |
-|   6. Hit class and hit recovery | 552–582 |
-|   7. Reaction and death trigger | 583–672 |
-|   8. Event functions (table `0x007325B0`, 32 entries) | 673–733 |
-|   9. Durability `0x0057D3D0` | 734–753 |
-| Constants & data dependencies | 754–775 |
-| Randomness | 776–808 |
-| Edge cases & original bugs | 809–843 |
-| Test vectors | 844–876 |
-| Provenance | 877–902 |
-| Open questions | 903–941 |
+| Summary | 46–58 |
+| Inputs | 59–71 |
+| Outputs / state changes | 72–79 |
+| Rules | 80–81 |
+|   0. Shared integer helpers | 82–104 |
+|   1. Damage record | 105–138 |
+|   2. Pipeline | 139–153 |
+|   3. Rolling: `start_combat` = `0x0057DBF0` | 154–293 |
+|   4. Totals and resistances: `totals` = `0x0057C1E0` | 294–385 |
+|   5. Application | 386–552 |
+|   6. Hit class and hit recovery | 553–583 |
+|   7. Reaction and death trigger | 584–673 |
+|   8. Event functions (table `0x007325B0`, 32 entries) | 674–735 |
+|   9. Durability `0x0057D3D0` | 736–755 |
+| Constants & data dependencies | 756–777 |
+| Randomness | 778–810 |
+| Edge cases & original bugs | 811–845 |
+| Test vectors | 846–878 |
+| Provenance | 879–904 |
+| Open questions | 905–943 |
 <!-- /index -->
 
 ## Summary
@@ -493,7 +494,7 @@ registered on `unit` for `event` (`events.txt` index: 0 hitbymissile,
 functions through `itemstatcost` `itemevent1/2` + `itemeventfunc1/2`;
 skills register their own. Function table §8. Handler records,
 registration (prepend) and unregistration: `skills/bodies.md` §2.13;
-iteration order belongs to `sim/units.md` (Open question 4).
+iteration: §2.18 there. The functions also receive EDX = the event id.
 
 #### 5.5 Stun `0x0057AAE0`
 
@@ -584,8 +585,8 @@ Draws 5 and 6 are taken only when their size test passes.
 
 #### 7.1 Reaction `0x0057CEE0` (D2MOO `SUNITDMG_ExecuteMissileDamage`)
 
-ECX game, EDX attacker A; stack defender D, record R. F = R hit flags
-(u16 +0x04). "Mode request m" for a monster = `0x005A7E60(D, m, &req)`
+ECX game, EDX attacker A; stack defender D, record R. F = R result
+flags (u16 +0x04). "Mode request m" for a monster = `0x005A7E60(D, m, &req)`
 then `0x005A7C20(game, &req, 1)` (`monsters/ai.md` mode request record);
 for a player = `0x005809D0` / `0x00580A70` (`sim/pathing.md` §1.2).
 "Soft" = queue D for update (`0x0064C040`) and D unit flags (+0xC4) |=
@@ -709,7 +710,8 @@ Drops are not started here (`items/treasure.md`).
 
 Signature (D2MOO): (game, event, attacker, unit, record, stat id <<16 |
 layer, level); the chance stat is read with the item/skill getter from
-`(arg >> 16, arg)`. Two are specified here; the rest are Open question 5.
+`(arg >> 16, arg)`. 15 and 16 are specified here; every other function is
+`combat/events.md`.
 
 **Crushing blow (16)**: `c` = chance stat; `c ≤ 0` → 0. Draw (attacker
 seed, inline `lo′ mod 100`); `r ≥ c` → 0. Divisor: player defender 10;
@@ -917,8 +919,8 @@ Real 1.14d data (`#[ignore]`): the resistance rows of §4.3 equal
    (called, not specified).
 4. Answered: registration, unregistration and iteration of unit events
    are `skills/bodies.md` §2.13 and §2.18.
-5. Event functions other than 15 and 16 (table §8): behaviour and draws
-   unspecified. Ghidra request: each address in §8.
+5. Answered: every event function other than 15 and 16 is
+   `combat/events.md`.
 6. Answered statically: `0x0088CAD0` is read and written only by
    `0x0057CE30` (the two direct references in `all.asm`), lies in the
    zero-filled part of `.data` (past the section's raw data) and is
