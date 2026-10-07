@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "note": "Walk (0x01, x:u16@1 y:u16@3) to a point near the Act 1 town start; coordinates are a guess until the start position is read from a first recording",
+  "seed": 12345,
+  "save": "Scenario",
+  "difficulty": 0,
+  "ticks": 200,
+  "streams": ["units", "packets", "rng"],
+  "steps": [
+    {"tick": 10, "c2s": "01 f1 13 b5 13"}
+  ]
+}
