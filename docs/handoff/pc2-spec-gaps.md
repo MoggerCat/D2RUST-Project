@@ -1,4 +1,6 @@
-# PC 2 spec-gap audit (2026-10-07)
+# PC 2 spec gap audit
+
+Pointer: PC 2 gap audit for the "spec-complete" goal (2026-10-07). Read the totals line, then one area table.
 
 Base `origin/claude/specs-staging-4` `a8a7458` (staging-5 not pushed).
 Grep only, no Ghidra: every open-question item and every "not specified /
@@ -24,7 +26,81 @@ Deliverables outside this list: `ui/controls.md` and `ui/inventory.md`
 `sim`); message rows 0x2A, 0x50, 0x58, 0x63 to `xpc-to-pc1.md` (0x58 is
 already there).
 
-Totals (heuristic): 112 binary-answerable, 79 need a recording, 90 unspecified / Pending markers. Binary cost S/M/L = 33/15/64.
+**All areas:** bin 112, rec 79, unspec lines 90; estimated cost to close the bin and unspec items ~128M.
+
+Cost (one focused worker reading the export, as PC 1's audit): bin S ≈ 0.3M, M ≈ 0.6M, L ≈ 1.0M per question; an unspec line ≈ 0.5M; rec items cost nothing here (recording lane).
+
+## Summary by area
+
+### 1 items / inventory
+
+Totals: bin 28, rec 14, unspec lines 17, est. ~29.4M.
+
+| Spec | bin | rec | unspec | est. cost |
+|---|---|---|---|---|
+| `specs/formats/d2s-load.md` | 1 | 0 | 0 | ~1.0M |
+| `specs/formats/d2s.md` | 11 | 2 | 2 | ~9.9M |
+| `specs/items/affixes.md` | 1 | 1 | 1 | ~1.5M |
+| `specs/items/bitstream.md` | 3 | 1 | 0 | ~1.9M |
+| `specs/items/generation.md` | 3 | 1 | 2 | ~3.3M |
+| `specs/items/inventory-moves.md` | 0 | 0 | 4 | ~2.0M |
+| `specs/items/inventory.md` | 2 | 4 | 1 | ~1.8M |
+| `specs/items/properties.md` | 1 | 2 | 3 | ~1.8M |
+| `specs/items/quality.md` | 1 | 1 | 3 | ~2.5M |
+| `specs/items/treasure.md` | 5 | 2 | 1 | ~3.7M |
+
+### 2 quests
+
+Totals: bin 36, rec 19, unspec lines 48, est. ~49.6M.
+
+| Spec | bin | rec | unspec | est. cost |
+|---|---|---|---|---|
+| `specs/world/quests-act1-rest.md` | 3 | 2 | 2 | ~4.0M |
+| `specs/world/quests-act1.md` | 0 | 0 | 5 | ~2.5M |
+| `specs/world/quests-act2-2.md` | 0 | 1 | 0 | ~0.0M |
+| `specs/world/quests-act2.md` | 7 | 4 | 4 | ~6.8M |
+| `specs/world/quests-act3.md` | 1 | 1 | 10 | ~6.0M |
+| `specs/world/quests-act4.md` | 10 | 3 | 10 | ~10.7M |
+| `specs/world/quests-act5-2.md` | 7 | 1 | 6 | ~7.5M |
+| `specs/world/quests-act5.md` | 5 | 2 | 8 | ~8.3M |
+| `specs/world/quests.md` | 3 | 5 | 3 | ~3.8M |
+
+### 3 objects / hirelings
+
+Totals: bin 11, rec 6, unspec lines 0, est. ~7.8M.
+
+| Spec | bin | rec | unspec | est. cost |
+|---|---|---|---|---|
+| `specs/world/hirelings.md` | 5 | 4 | 0 | ~4.6M |
+| `specs/world/objects.md` | 6 | 2 | 0 | ~3.2M |
+
+### 4 NPC / vendors / cube / waypoints
+
+Totals: bin 8, rec 20, unspec lines 8, est. ~9.9M.
+
+| Spec | bin | rec | unspec | est. cost |
+|---|---|---|---|---|
+| `specs/world/cube.md` | 1 | 5 | 1 | ~0.8M |
+| `specs/world/npc.md` | 1 | 6 | 2 | ~1.3M |
+| `specs/world/vendors.md` | 3 | 5 | 5 | ~5.5M |
+| `specs/world/waypoints.md` | 3 | 4 | 0 | ~2.3M |
+
+### 5 UI / audio
+
+Totals: bin 29, rec 20, unspec lines 17, est. ~31.2M.
+
+| Spec | bin | rec | unspec | est. cost |
+|---|---|---|---|---|
+| `specs/audio/environment.md` | 4 | 3 | 7 | ~6.7M |
+| `specs/audio/sound-table.md` | 5 | 6 | 4 | ~4.9M |
+| `specs/audio/triggers.md` | 8 | 4 | 0 | ~6.5M |
+| `specs/client/audio.md` | 3 | 0 | 1 | ~3.5M |
+| `specs/client/ui.md` | 3 | 0 | 2 | ~4.0M |
+| `specs/formats/wav.md` | 0 | 3 | 0 | ~0.0M |
+| `specs/ui/panels.md` | 6 | 4 | 3 | ~5.6M |
+
+
+## Details per spec (heuristic classes)
 
 ## 1 items / inventory
 
