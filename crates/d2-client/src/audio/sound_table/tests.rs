@@ -343,7 +343,7 @@ fn request_rejects() {
     assert_eq!(sys.request(&mut w, 1, None, 0, 0, 0), 1);
 }
 
-// Covers: specs/audio/sound-table.md §5 text, §5 r3
+// Covers: specs/audio/sound-table.md §5 text, §5 r3; specs/audio/triggers.md §1 r1
 #[test]
 fn request_fields_and_pool_limit() {
     let mut r = rows(3);
@@ -1386,4 +1386,207 @@ mod game {
             .count();
         assert_eq!((openers, nested), (698, 7));
     }
+}
+
+// Covers: specs/audio/sound-table.md §1 t2 row3, §1 t2 row5, §1 t2 row8
+#[test]
+fn runtime_fields_sample_load_state_and_last_use() {
+    // +0x86 load state 0 → 1 (pending) → 2 (loaded) with the sample handle
+    // (+0x6C) held once loaded; +0x7C follows the sound tick of every
+    // update in which the playing request used the sample.
+    let mut r = rows(3);
+    r[1].looped = 1;
+    r[1].async_only = 1;
+    let mut sys = system(r);
+    let mut w = World::new();
+    let mut q = TriggerQueue::new();
+    let e = sys.table().get(1).unwrap();
+    assert_eq!(
+        (e.load, e.sample.is_some(), e.last_use),
+        (LoadState::None, false, 0)
+    );
+    sys.request(&mut w, 1, None, 0, 0, 0);
+    ticks(&mut sys, &mut w, &mut q, 1);
+    let e = sys.table().get(1).unwrap();
+    assert_eq!((e.load, e.sample.is_some()), (LoadState::Pending, false));
+    ticks(&mut sys, &mut w, &mut q, 1);
+    let e = sys.table().get(1).unwrap();
+    assert_eq!((e.load, e.sample.is_some()), (LoadState::Loaded, true));
+    assert_eq!(starts(&mut q).len(), 1);
+    for _ in 0..4 {
+        ticks(&mut sys, &mut w, &mut q, 1);
+        assert_eq!(sys.table().get(1).unwrap().last_use, sys.tick() - 1);
+    }
+    // Row 2 was never requested: untouched.
+    let e = sys.table().get(2).unwrap();
+    assert_eq!((e.load, e.last_use), (LoadState::None, 0));
+}
+
+// Covers: specs/audio/sound-table.md §9 r9
+#[test]
+fn mixer_modes_1_and_2_play_as_mode_0() {
+    // d2rs reproduces mixer mode 0 only: a positioned start sends the same
+    // volume and pan whatever `Sound Mixer` holds.
+    let run = |mode: u8| {
+        let mut sys = system(rows(3));
+        sys.set_settings(SoundSettings {
+            mixer_mode: mode,
+            ..SoundSettings::default()
+        });
+        let mut w = World::new();
+        let mut q = TriggerQueue::new();
+        w.positions.insert(MONSTER, (1100, 1000));
+        sys.request(&mut w, 1, Some(MONSTER), 0, 0, 0);
+        ticks(&mut sys, &mut w, &mut q, 2);
+        starts(&mut q)
+    };
+    let mode0 = run(0);
+    assert_eq!(mode0.len(), 1);
+    assert_eq!(run(1), mode0);
+    assert_eq!(run(2), mode0);
+}
+
+// --- audio/triggers.md §1 conventions on the real system ----------------------
+
+/// `n` rows, every row playable and `Fade Out` 10.
+fn faded_rows(n: usize) -> Vec<SoundRow> {
+    let mut r = rows(n);
+    for x in r.iter_mut().skip(1) {
+        x.fade_out = 10;
+    }
+    r
+}
+
+// Covers: specs/audio/triggers.md §1 r2
+#[test]
+fn volume_set_is_applied_by_the_next_update() {
+    let mut sys = system(rows(3));
+    let mut w = World::new();
+    let mut q = TriggerQueue::new();
+    let h = sys.request(&mut w, 1, None, 0, 0, 0);
+    ticks(&mut sys, &mut w, &mut q, 2);
+    assert_eq!(starts(&mut q).len(), 1);
+    ticks(&mut sys, &mut w, &mut q, 1);
+    assert!(cues(&mut q).is_empty(), "nothing changed: nothing sent");
+    sys.set_volume(h, 100);
+    assert_eq!(sys.request_by_handle(h).unwrap().volume, 100);
+    assert!(cues(&mut q).is_empty(), "not sent by the call itself");
+    ticks(&mut sys, &mut w, &mut q, 1);
+    let sent: Vec<i32> = cues(&mut q)
+        .into_iter()
+        .filter_map(|c| match c {
+            Cue::Param(p) => Some(p.vol),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(sent.len(), 1);
+    assert!(sent[0] < 255);
+    // No request with that handle: nothing.
+    sys.set_volume(999, 7);
+    assert!(sys.request_by_handle(999).is_none());
+}
+
+// Covers: specs/audio/triggers.md §1 r3
+#[test]
+fn detach_stops_only_the_last_unit_of_a_loop_or_by_force() {
+    let mut r = rows(4);
+    r[2].looped = 1;
+    let mut sys = system(r);
+    let mut w = World::new();
+    w.positions.insert(MONSTER2, (1000, 1000));
+    // A one-shot on MONSTER: detaching another unit does nothing; the last
+    // unit leaves and the one-shot keeps playing.
+    let h1 = sys.request(&mut w, 1, Some(MONSTER), 0, 0, 0);
+    sys.detach(h1, MONSTER2, false);
+    assert_eq!(sys.request_by_handle(h1).unwrap().units, [MONSTER]);
+    sys.detach(h1, MONSTER, false);
+    let q = sys.request_by_handle(h1).unwrap();
+    assert!(q.units.is_empty() && !q.stop);
+    // A loop: stopped when its last unit leaves.
+    let h2 = sys.request(&mut w, 2, Some(MONSTER), 0, 0, 0);
+    sys.detach(h2, MONSTER, false);
+    assert!(sys.request_by_handle(h2).unwrap().stop);
+    // Force stops a one-shot too.
+    let h3 = sys.request(&mut w, 3, Some(MONSTER), 0, 0, 0);
+    sys.detach(h3, MONSTER, true);
+    assert!(sys.request_by_handle(h3).unwrap().stop);
+}
+
+// Covers: specs/audio/triggers.md §1 r4
+#[test]
+fn group_stops_select_by_handle_id_range_and_speech() {
+    let mut sys = system(faded_rows(3000));
+    let mut w = World::new();
+    let mut q = TriggerQueue::new();
+    // The second id-5 request waits (delay 100) so both exist: a second
+    // start of the same id in the same tick is suppressed (§7 r1) and the
+    // one-shot removed (§6.3 r4).
+    let ids = [5, 5, 52, 60, 71, 72, 150, 2934, 2999];
+    let hs: Vec<crate::audio::calls::Handle> = ids
+        .iter()
+        .enumerate()
+        .map(|(i, &id)| sys.request(&mut w, id, None, if i == 1 { 100 } else { 0 }, 0, 0))
+        .collect();
+    ticks(&mut sys, &mut w, &mut q, 2);
+    let stopped = |sys: &SoundSystem| -> Vec<bool> {
+        hs.iter()
+            .map(|&h| sys.request_by_handle(h).unwrap().stop)
+            .collect()
+    };
+    // Every request of id 5; playing with Fade Out: a fade to 0 over 10.
+    sys.stop_id(5);
+    assert_eq!(stopped(&sys)[..2], [true, true]);
+    let f = sys.request_by_handle(hs[0]).unwrap().fade.unwrap();
+    assert_eq!((f.end, f.t1 - f.t0), (0, 10));
+    // 52–71 except the group bases 60 and 61.
+    sys.stop_range_except(52, 71, 60, 61);
+    assert_eq!(stopped(&sys)[2..5], [true, false, true]);
+    // 72–201 except 150.
+    sys.stop_range_except(72, 201, 150, 0);
+    assert_eq!(stopped(&sys)[5..7], [true, false]);
+    // Speech: 2,934–4,656.
+    sys.stop_speech();
+    assert_eq!(stopped(&sys)[7..], [true, true]);
+    // One handle.
+    sys.stop_handle(hs[3]);
+    assert!(stopped(&sys)[3]);
+}
+
+// Covers: specs/audio/triggers.md §1 r8
+#[test]
+fn speaking_needs_a_playing_speech_request_on_the_unit() {
+    let mut sys = system(rows(3000));
+    let mut w = World::new();
+    let mut q = TriggerQueue::new();
+    assert!(!sys.any_speech() && !sys.speaking(MONSTER));
+    sys.request(&mut w, 2950, Some(MONSTER), 0, 0, 0);
+    // Waiting: any_speech (not ended), not speaking (not playing).
+    assert!(sys.any_speech());
+    assert!(!sys.speaking(MONSTER));
+    ticks(&mut sys, &mut w, &mut q, 2);
+    assert!(sys.speaking(MONSTER));
+    assert!(!sys.speaking(PLAYER), "other unit");
+    // A non-speech id on PLAYER does not count.
+    sys.request(&mut w, 100, Some(PLAYER), 0, 0, 0);
+    ticks(&mut sys, &mut w, &mut q, 2);
+    assert!(!sys.speaking(PLAYER));
+}
+
+// Covers: specs/audio/triggers.md §1 r7
+#[test]
+fn draw_helpers_on_the_client_seed() {
+    use crate::audio::calls::{jitter, uniform};
+    let mut sys = system(rows(3));
+    let mut w = World::new();
+    w.seed = Some(Seed::new(12345, 666));
+    let mut want = Seed::new(12345, 666);
+    let mut ctx = SoundCtx {
+        sys: &mut sys,
+        world: &mut w,
+    };
+    let r = ctx.roll(7);
+    assert_eq!(r, want.roll(7));
+    assert_eq!(uniform(&mut ctx, 450, 750), 450 + want.roll(301) as i32);
+    assert_eq!(jitter(&mut ctx, 100), want.roll(201) as i32 - 100);
+    assert_eq!(w.seed, Some(want));
 }

@@ -148,6 +148,8 @@ fn tile(o: u32, main: u32, sub: u32, rarity: u32) -> TileInfo {
         rarity,
         material: 0,
         subtile_flags: [0; 25],
+        roof_height: 0,
+        height: 0,
     }
 }
 
@@ -598,8 +600,9 @@ fn unknown_and_unowned_ids() {
     ));
     assert!(fx.link().host().queues.is_empty());
 
-    // C→S 0x3F (no written owner): the server keeps its stub — recorded,
-    // result 0, nothing sent back.
+    // C→S 0x3F: owned by `sim/intents-events.md` §9 rule 5 (PlayAudio);
+    // sound 7 is outside 25–32 → result 0, nothing done, nothing sent
+    // back, and no longer recorded as an unhandled stub.
     fx.bridge.send(&PlayAudio { sound: 7 }).unwrap();
     // A system message: drained to the session handler, unanswered.
     assert_eq!(fx.bridge.send_bytes(&[0x6B]).unwrap(), Sent::Queued);
@@ -624,7 +627,7 @@ fn unknown_and_unowned_ids() {
             (0x3F, Handled::Game(Outcome::Dispatched(ResultCode::Done))),
         ]
     );
-    assert_eq!(fx.sim().unhandled, vec![(LOCAL_CLIENT, 0x3F, 3)]);
+    assert_eq!(fx.sim().unhandled, vec![]);
     assert_eq!(
         fx.link().host().session.received,
         vec![(LOCAL_CLIENT, vec![0x6B], 1)]

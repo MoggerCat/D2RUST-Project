@@ -91,7 +91,7 @@ fn to_5d(f: &Fake3) -> Vec<UnitId> {
 #[test]
 fn boss_choice() {
     let (mut ctl, mut f) = setup();
-    act3::choose_bird_boss(&mut ctl, &mut f, MON, 100, 0xBF);
+    act3::choose_bird_boss(&mut ctl, &mut f, MON, 100, Some(0xBF));
     let i = idx(&ctl);
     assert_eq!(f.f.chains[&MON].0, vec![C]);
     assert!(ctl.records[i].has_callback(event::MONSTER_KILLED));
@@ -102,14 +102,14 @@ fn boss_choice() {
     let other = UnitId(0x52);
     f.f.chains.insert(other, QuestChain::default());
     f.acts.insert(other, 2);
-    act3::choose_bird_boss(&mut ctl, &mut f, other, 100, 0);
+    act3::choose_bird_boss(&mut ctl, &mut f, other, 100, Some(0));
     assert!(f.f.chains[&other].0.is_empty());
     // Removal of another monster: nothing; of the boss: chosen again.
     act3::bird_boss_removed(&mut ctl, &mut f, other);
     assert!(x(&ctl).chosen);
     act3::bird_boss_removed(&mut ctl, &mut f, MON);
     assert!(!x(&ctl).chosen && x(&ctl).may_choose);
-    act3::choose_bird_boss(&mut ctl, &mut f, other, 100, 0);
+    act3::choose_bird_boss(&mut ctl, &mut f, other, 100, Some(0));
     assert_eq!(f.f.chains[&other].0, vec![C]);
     assert_eq!(x(&ctl).boss_guid, other.0);
     // Removal when no boss is chosen: nothing.
@@ -146,7 +146,7 @@ fn boss_choice_refusals() {
     for (n, tweak) in cases.iter().enumerate() {
         let (mut ctl, mut f) = setup();
         let (class, flags) = tweak(&mut ctl, &mut f);
-        act3::choose_bird_boss(&mut ctl, &mut f, MON, class, flags);
+        act3::choose_bird_boss(&mut ctl, &mut f, MON, class, Some(flags));
         assert!(f.f.chains[&MON].0.is_empty(), "case {n}");
         assert!(!x(&ctl).chosen, "case {n}");
         assert!(!ctl.record(C).unwrap().has_callback(event::MONSTER_KILLED));
@@ -155,7 +155,7 @@ fn boss_choice_refusals() {
     let (mut ctl, mut f) = setup();
     let j = ctl.find(17).unwrap();
     ctl.records.remove(j);
-    act3::choose_bird_boss(&mut ctl, &mut f, MON, 100, 0);
+    act3::choose_bird_boss(&mut ctl, &mut f, MON, 100, Some(0));
     assert!(x(&ctl).chosen);
 }
 
@@ -166,7 +166,7 @@ fn boss_choice_refusals() {
 fn boss_kill_drops_the_figurine() {
     let (mut ctl, mut f) = setup();
     f.add_player(P2, 75);
-    act3::choose_bird_boss(&mut ctl, &mut f, MON, 100, 0);
+    act3::choose_bird_boss(&mut ctl, &mut f, MON, 100, Some(0));
     // Drop fails → a boss may be chosen again.
     f.drops = vec![false];
     ctl.monster_killed(&mut f, MON, Some(P1));
@@ -177,7 +177,7 @@ fn boss_kill_drops_the_figurine() {
     ctl.monster_killed(&mut f, MON, Some(P1));
     assert_eq!(f.log().len(), 1);
     // Chosen again and killed: created.
-    act3::choose_bird_boss(&mut ctl, &mut f, MON, 100, 0);
+    act3::choose_bird_boss(&mut ctl, &mut f, MON, 100, Some(0));
     ctl.monster_killed(&mut f, MON, Some(P1));
     let r = ctl.record(C).unwrap();
     assert!(!r.has_callback(event::MONSTER_KILLED));
@@ -193,7 +193,7 @@ fn boss_kill_drops_the_figurine() {
 fn boss_kill_guards() {
     // A killer with 20.0 → nothing.
     let (mut ctl, mut f) = setup();
-    act3::choose_bird_boss(&mut ctl, &mut f, MON, 100, 0);
+    act3::choose_bird_boss(&mut ctl, &mut f, MON, 100, Some(0));
     bits(&mut f, P1, S, &[0]);
     ctl.monster_killed(&mut f, MON, Some(P1));
     assert!(f.log().is_empty() && x(&ctl).chosen);
@@ -202,7 +202,7 @@ fn boss_kill_guards() {
     assert_eq!(f.log().len(), 1);
     // State ≠ 0 and status ≠ 0 stay.
     let (mut ctl, mut f) = setup();
-    act3::choose_bird_boss(&mut ctl, &mut f, MON, 100, 0);
+    act3::choose_bird_boss(&mut ctl, &mut f, MON, 100, Some(0));
     let i = idx(&ctl);
     (ctl.records[i].state, ctl.records[i].status) = (2, 2);
     ctl.monster_killed(&mut f, MON, Some(P1));
@@ -210,7 +210,7 @@ fn boss_kill_guards() {
     assert!(sent_5d(&f).is_empty());
     // +0x0C clear or intro → nothing.
     let (mut ctl, mut f) = setup();
-    act3::choose_bird_boss(&mut ctl, &mut f, MON, 100, 0);
+    act3::choose_bird_boss(&mut ctl, &mut f, MON, 100, Some(0));
     xm(&mut ctl).to_drop = false;
     ctl.monster_killed(&mut f, MON, Some(P1));
     assert!(f.log().is_empty() && x(&ctl).chosen);
@@ -818,4 +818,20 @@ fn status_function() {
     assert_eq!(status_of(&ctl, &mut f, P1), 6);
     ctl.record_mut(C).unwrap().not_intro = false;
     assert_eq!(status_of(&ctl, &mut f, P1), 0);
+}
+
+// Covers: specs/world/quests-act3.md §6.1
+#[test]
+fn extra_data_at_init() {
+    // +0x01 (a boss may be chosen) and +0x0C (figurine still to drop) are
+    // 1 at init; every other field is 0.
+    let (ctl, _) = control();
+    assert_eq!(
+        x(&ctl),
+        &act3::q4::Extra {
+            may_choose: true,
+            to_drop: true,
+            ..act3::q4::Extra::default()
+        }
+    );
 }

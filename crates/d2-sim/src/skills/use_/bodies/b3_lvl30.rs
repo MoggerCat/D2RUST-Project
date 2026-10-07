@@ -1,4 +1,4 @@
-// Spec: specs/skills/bodies-2.md §8
+// Spec: specs/skills/bodies-2b.md §8
 //! Batch 3 bodies of required level 30 (§8): Valkyrie, Lightning
 //! Strike, Hydra, Revive, Fist of the Heavens, Redemption, Whirlwind,
 //! Berserk, Blade Shield.
@@ -507,7 +507,7 @@ pub fn redemption<W: BodyWorld>(
 // ---------------------------------------------------------------- §8.10
 
 /// Walk velocity `0x0056E5B0(unit)` (§8.10 step 6).
-fn walk_velocity<W: BodyWorld>(w: &W, ct: &CombatTables, u: W::Unit) -> i32 {
+pub(crate) fn walk_velocity<W: BodyWorld>(w: &W, ct: &CombatTables, u: W::Unit) -> i32 {
     match w.unit_type(u) {
         UnitType::Player => ct
             .charstats(w.class_id(u))

@@ -90,8 +90,8 @@ impl HirelingItems for Fake {
     fn set_mode(&mut self, item: Guid, mode: u8) {
         self.note(format!("mode {item} {mode}"));
     }
-    fn notice(&mut self, _player: Owner, a: u32, b: u32) {
-        self.note(format!("notice {a} {b}"));
+    fn notice(&mut self, unit: Owner, a: u32, b: u32) {
+        self.note(format!("notice {} {a} {b}", u(unit)));
     }
     fn equip_from_cursor(&mut self, unit: Owner, item: Guid, loc: u8, skip: bool) {
         self.note(format!("equip {} {item} {loc} {skip}", u(unit)));
@@ -102,14 +102,14 @@ impl HirelingItems for Fake {
     fn clear_cursor(&mut self, player: Owner) {
         self.note(format!("cursor none {}", u(player)));
     }
-    fn inventory_pass(&mut self, _player: Owner, _merc: Owner) {
-        self.note("0055DF00".into());
+    fn inventory_pass(&mut self, unit: Owner) {
+        self.note(format!("0055DF00 {}", u(unit)));
     }
-    fn refresh_0055f4f0(&mut self, _player: Owner, _merc: Owner) {
-        self.note("0055F4F0 0".into());
+    fn refresh_0055f4f0(&mut self, unit: Owner) {
+        self.note(format!("0055F4F0 {} 0", u(unit)));
     }
-    fn event_next_frame(&mut self, _player: Owner, _merc: Owner, id: u32) {
-        self.note(format!("event {id} +1"));
+    fn event_next_frame(&mut self, unit: Owner, id: u32) {
+        self.note(format!("event {} {id} +1", u(unit)));
     }
     fn unlink(&mut self, unit: Owner, item: Guid) {
         self.note(format!("unlink {} {item}", u(unit)));
@@ -152,8 +152,8 @@ fn rule3(copy: Guid, loc: u8) -> Vec<String> {
     vec![
         format!("duplicate M {C} -> {copy}"),
         format!("mode {copy} 4"),
-        format!("notice 9 {C}"),
-        format!("notice 9 {C}"),
+        format!("notice M 9 {C}"),
+        format!("notice P 9 {C}"),
         format!("equip M {copy} {loc} true"),
         format!("consume {C}"),
         "cursor none P".into(),
@@ -162,10 +162,10 @@ fn rule3(copy: Guid, loc: u8) -> Vec<String> {
 
 fn rule3_tail() -> Vec<String> {
     vec![
-        "0055DF00".into(),
-        "0055F4F0 0".into(),
-        "notice 3 0".into(),
-        "event 3 +1".into(),
+        "0055DF00 M".into(),
+        "0055F4F0 M 0".into(),
+        "notice M 3 0".into(),
+        "event M 3 +1".into(),
     ]
 }
 
@@ -193,7 +193,7 @@ fn no_player_inventory_is_0_and_missing_merc_inventory_is_created() {
     assert_eq!(f.log[0], "create_inventory M");
 }
 
-// Covers: specs/world/hirelings.md §11 r2, §11 r3
+// Covers: specs/world/hirelings.md §11 text, §11 r2, §11 r3
 #[test]
 fn empty_target_duplicates_equips_and_consumes() {
     let mut f = Fake::new();
@@ -242,6 +242,7 @@ fn occupied_pass_swaps_and_gives_old_copy_to_cursor() {
         format!("unlink M {OLD}"),
         "clear_slot M 4".into(),
         "0055C730 M".into(),
+        "0055DF00 M".into(),
         format!("flag {OLD} 0x10"),
         format!("flag {OLD} 0x20"),
         format!("leave M {OLD}"),
@@ -265,11 +266,12 @@ fn occupied_fail_puts_old_back() {
         format!("unlink M {OLD}"),
         "clear_slot M 4".into(),
         "0055C730 M".into(),
+        "0055DF00 M".into(),
         format!("put_back M {OLD} 3 4"),
         format!("mode {OLD} 1"),
         format!("00628280 {OLD} 0xff"),
         "0055C460 M".into(),
-        "0055F4F0 0".into(),
+        "0055F4F0 M 0".into(),
     ];
     assert_eq!(f.log, want);
 }

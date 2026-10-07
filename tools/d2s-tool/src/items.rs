@@ -16,7 +16,9 @@
 //!   items carry the 1-bit-1 form is not named; every item is written
 //!   with the 1-bit-0 form;
 //! - item flags set by the inventory pass (`inventory.md` §5.7) after a
-//!   placement are not specified; the flags are the creation's plus 0x10.
+//!   placement are not specified; the flags are the creation's plus 0x10,
+//!   without 0x2000 (instore), which every load clears (`d2s.md` §8.2
+//!   rule 7), so the file is what the game saves after loading it.
 
 use std::collections::BTreeMap;
 
@@ -380,8 +382,10 @@ pub fn make_item(
             })
             .collect()
     });
+    // `d2s.md` §8.2 rule 7, edge case 17: the flags a game save of a
+    // loaded character holds (0x2000 cleared by the load).
     let view = StreamItem {
-        flags: item.flags,
+        flags: item.flags & !d2_formats::d2s::ITEM_FLAG_INSTORE,
         alt: false,
         compact: rec.compactsave != 0,
         version: item.format,

@@ -1,4 +1,4 @@
-// Spec: specs/world/quests.md §2.2, §4, §5, §10.4, §10.8
+// Spec: specs/world/quests.md §2.2, §4, §5; specs/world/quests-act1.md §10.4, §10.8
 //! Mutation-testing kills (METHODS M08): each test pins an outcome the
 //! spec decides that no earlier test checked.
 
@@ -77,7 +77,7 @@ fn forced_class_without_superunique() {
     assert_eq!(f.log.iter().filter(|l| l.starts_with("drop")).count(), 3);
 }
 
-// From specs/world/quests.md §10.4: event 3 leaving level 1 while state 2
+// From specs/world/quests-act1.md §10.4: event 3 leaving level 1 while state 2
 // sets state 3 (the old level travels in the first argument).
 #[test]
 fn den_leaving_town_uses_the_old_level() {
@@ -175,7 +175,7 @@ fn status_message_filter_36_reads_barbarians() {
     assert_eq!(f.sent.last().unwrap().1[4..6], [10, 0]);
 }
 
-// From specs/world/quests.md §8.1, §10.8: Warriv calls chain 6's callback
+// From specs/world/quests.md §8.1, specs/world/quests-act1.md §10.8: Warriv calls chain 6's callback
 // 3 (a = 1, b = 40: state 4 → 5) only when slot 6 bits 13 and 0 are set
 // and the record is not-intro.
 #[test]
@@ -278,7 +278,7 @@ fn scroll(ctl: &mut QuestControl, f: &mut Fake, chain: u8, npc_class: u16, msg: 
     call(ctl, f, chain, args);
 }
 
-// From specs/world/quests.md §10.2, §10.5–§10.8: each start message counts
+// From specs/world/quests-act1.md §10.2, §10.5–§10.8: each start message counts
 // only from the quest's NPC.
 #[test]
 fn start_messages_need_the_quest_npc() {
@@ -298,7 +298,7 @@ fn start_messages_need_the_quest_npc() {
     }
 }
 
-// From specs/world/quests.md §10.1: the start sets bit 2 only for players
+// From specs/world/quests-act1.md §10.1: the start sets bit 2 only for players
 // without bit 0 or 1.
 #[test]
 fn start_skips_players_with_reward_bits() {
@@ -318,7 +318,7 @@ fn start_skips_players_with_reward_bits() {
     assert!(f.flags(P2).get(2, bit::STARTED));
 }
 
-// From specs/world/quests.md §10.3: Warriv's message 0 or 1 sets 0.0.
+// From specs/world/quests-act1.md §10.3: Warriv's message 0 or 1 sets 0.0.
 #[test]
 fn warriv_gossip_message_needs_warriv_and_0_or_1() {
     for (npc_class, msg, set) in [
@@ -337,7 +337,7 @@ fn warriv_gossip_message_needs_warriv_and_0_or_1() {
     }
 }
 
-// From specs/world/quests.md §10.4–§10.8: reward messages need the NPC
+// From specs/world/quests-act1.md §10.4–§10.8: reward messages need the NPC
 // and the player's bit 1 (or the item).
 #[test]
 fn reward_messages_need_their_condition() {
@@ -389,7 +389,7 @@ fn reward_messages_need_their_condition() {
     }
 }
 
-// From specs/world/quests.md §10.8: Akara 179, Kashya 181, Cain 184 remove
+// From specs/world/quests-act1.md §10.8: Akara 179, Kashya 181, Cain 184 remove
 // the player from that NPC's list; other NPCs do not.
 #[test]
 fn chain6_list_removal_by_npc() {
@@ -421,7 +421,7 @@ fn chain6_list_removal_by_npc() {
     }
 }
 
-// From specs/world/quests.md §10.7: town messages 140–145 finish the
+// From specs/world/quests-act1.md §10.7: town messages 140–145 finish the
 // tower quest (state 5) once, for a player with 5.13 after the kill.
 #[test]
 fn tower_town_messages_complete() {
@@ -463,7 +463,7 @@ fn area(chain: u8, state: u8, bits: &[u8], old: u32, new: u32) -> (u8, QuestFlag
     (ctl.record(chain).unwrap().state, f.flags(P1))
 }
 
-// From specs/world/quests.md §10.4, §10.5: entering the area from state 1
+// From specs/world/quests-act1.md §10.4, §10.5: entering the area from state 1
 // or 2 → state 3 and, through I2 after status 2, bit 4 for every player
 // with neither 0 nor 1; leaving level 1 in state 2 while the status is
 // still 0 → state 3 and bit 4 (I2 before the status, bug kept).
@@ -489,7 +489,7 @@ fn area_event_states_and_bits() {
     assert_eq!(area(2, 3, &[], 2, 17).0, 3);
 }
 
-// From specs/world/quests.md §10.3: chain 25's callback 8 is a bare `ret`.
+// From specs/world/quests-act1.md §10.3: chain 25's callback 8 is a bare `ret`.
 #[test]
 fn flavie_kill_callback_does_nothing() {
     let (mut ctl, _) = control();
@@ -504,7 +504,7 @@ fn flavie_kill_callback_does_nothing() {
     assert!(f.log.is_empty() && f.sent.is_empty());
 }
 
-// From specs/world/quests.md §10.5: Blood Raven's kill sets 2.13 and 2.1
+// From specs/world/quests-act1.md §10.5: Blood Raven's kill sets 2.13 and 2.1
 // for players near her, sound 34, state 4.
 #[test]
 fn blood_raven_kill() {
@@ -529,7 +529,7 @@ fn blood_raven_kill() {
     assert_eq!(ctl.record(2).unwrap().state, 4);
 }
 
-// From specs/world/quests.md §10.6: the Cow King's death (killer with
+// From specs/world/quests-act1.md §10.6: the Cow King's death (killer with
 // 40.0 in an expansion game) sets 4.10 for players in level 39 and drops 8
 // `vps `.
 #[test]
@@ -552,10 +552,10 @@ fn cow_king_kill() {
     );
 }
 
-// From specs/world/quests.md §6.1 and §6.2 r2: of the status functions
-// `quests.tsv` registers, only Act II's chains 27 and 26 still have no
-// body (reported, nothing written); a function with no body on any
-// chain takes the same fallback.
+// From specs/world/quests.md §6.1 and §6.2 r2: every status function
+// `quests.tsv` registers has a body now (Act II's chains 26 and 27 return
+// false and write nothing, quests-act2-2.md §1 item 18); a function with
+// no body on any chain is reported and nothing is written for it.
 #[test]
 fn unspecified_status_function_is_reported() {
     let (mut ctl, _) = control();
@@ -564,7 +564,7 @@ fn unspecified_status_function_is_reported() {
         r.status = u8::from(r.status_fn.is_some());
     }
     ctl.request_quest_data(&mut f, P1).unwrap();
-    assert_eq!(f.log, ["unhandled 27 0x59e4a0", "unhandled 26 0x59e2b0"]);
+    assert!(f.log.is_empty(), "{:?}", f.log);
     let list = &f.sent.last().unwrap().1;
     assert_eq!((list[1 + 30], list[1 + 31]), (0, 0));
     // Chain 1 has no status function in 1.14d; one with no body is
@@ -581,7 +581,7 @@ fn unspecified_status_function_is_reported() {
     assert!(list[1..].iter().all(|&b| b == 0));
 }
 
-// From specs/world/quests.md §10.4: message 76 runs the state-5 step only
+// From specs/world/quests-act1.md §10.4: message 76 runs the state-5 step only
 // with 1.13; the grant always follows.
 #[test]
 fn den_reward_without_goal_bit() {
@@ -595,7 +595,7 @@ fn den_reward_without_goal_bit() {
     assert!(f.flags(P1).get(1, bit::REWARD_GRANTED));
 }
 
-// From specs/world/quests.md §10.4: "rooms ≤ room count and monsters left
+// From specs/world/quests-act1.md §10.4: "rooms ≤ room count and monsters left
 // < 6, or status = 4 and monsters left > 5" → flags 0x20.
 #[test]
 fn den_kill_few_left_conditions() {
@@ -624,7 +624,7 @@ fn den_kill_few_left_conditions() {
     }
 }
 
-// From specs/world/quests.md §10.5: Blood Raven's kill skips players with
+// From specs/world/quests-act1.md §10.5: Blood Raven's kill skips players with
 // 2.0 or 2.1.
 #[test]
 fn blood_raven_kill_skips_rewarded_players() {
@@ -645,7 +645,7 @@ fn blood_raven_kill_skips_rewarded_players() {
     }
 }
 
-// From specs/world/quests.md §10.6: the stone order is drawn on the quest
+// From specs/world/quests-act1.md §10.6: the stone order is drawn on the quest
 // seed once and kept; reading the deciphered scroll computes it.
 #[test]
 fn stone_order_draws_on_the_quest_seed() {
@@ -659,7 +659,7 @@ fn stone_order_draws_on_the_quest_seed() {
     assert_eq!(act1::stone_order(&mut ctl), want);
 }
 
-// From specs/world/quests.md §10.6: a run with no piles left drops nothing.
+// From specs/world/quests-act1.md §10.6: a run with no piles left drops nothing.
 #[test]
 fn wirt_body_with_no_piles() {
     let (mut ctl, _) = control();
@@ -670,7 +670,7 @@ fn wirt_body_with_no_piles() {
     assert_eq!(ctl.record(4).unwrap().extra.wirt_piles, Some(0));
 }
 
-// From specs/world/quests.md §10.5: the Malus drops only for a player with
+// From specs/world/quests-act1.md §10.5: the Malus drops only for a player with
 // neither 3.0 nor 3.1.
 #[test]
 fn malus_skips_rewarded_players() {
@@ -684,7 +684,7 @@ fn malus_skips_rewarded_players() {
     }
 }
 
-// From specs/world/quests.md §10.5: the imbue grant sets 3.0, clears 3.1.
+// From specs/world/quests-act1.md §10.5: the imbue grant sets 3.0, clears 3.1.
 #[test]
 fn imbue_grant_bits() {
     let (mut ctl, _) = control();

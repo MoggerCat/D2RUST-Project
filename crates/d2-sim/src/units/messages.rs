@@ -1,0 +1,352 @@
+// Spec: specs/sim/intents-events.md §7.2, §7.8, §7.9, §8 (unit add / remove, room and session message layouts)
+//! The byte layouts of the S→C messages a client gets when units come
+//! into or leave its rooms (`intents-events.md` §7.2, §7.8, §7.9) and
+//! during the single-player session sequence (§8): pure builders, the
+//! callers (`wiring::action::switch`, `d2-server`'s session join) pick
+//! the values.
+//!
+//! Little-endian; bytes not listed are 0.
+
+use crate::monsters::init::BitWriter;
+
+/// S→C 0x00 GameLoading (`0x0053B320(client, 0)`, §8.1 rule 4).
+pub const GAME_LOADING: [u8; 1] = [0x00];
+/// S→C 0x02 LoadSuccessful (`0x0053B320(client, 2)`, §8.1 rule 6).
+pub const LOAD_SUCCESSFUL: [u8; 1] = [0x02];
+/// S→C 0x04 LoadComplete (`0x0053B320(client, 4)`, `tick.md` §6 rule 6).
+pub const LOAD_COMPLETE: [u8; 1] = [0x04];
+
+/// S→C 0x01 GameFlags (`0x0053B340`, 8 bytes, §8.1 rule 3): difficulty
+/// u8@1 (game +0x6D), the arena record's flags u32@2, expansion u8@6 (1
+/// when game +0x70 ≠ 0), ladder u8@7 (1 when game +0x74 ≠ 0).
+pub fn game_flags(difficulty: u8, arena_flags: u32, expansion: bool, ladder: bool) -> [u8; 8] {
+    let f = arena_flags.to_le_bytes();
+    [
+        0x01,
+        difficulty,
+        f[0],
+        f[1],
+        f[2],
+        f[3],
+        u8::from(expansion),
+        u8::from(ladder),
+    ]
+}
+
+/// The 6-byte (id, unit type u8@1, GUID u32@2) layout of `0x0053B3D0`:
+/// 0x0B GameHandshake (§8.2 rule 3.2), 0x76 PlayerInProximity (§7.9
+/// rule 3).
+pub fn unit_ref(id: u8, unit_type: u8, guid: u32) -> [u8; 6] {
+    let g = guid.to_le_bytes();
+    [id, unit_type, g[0], g[1], g[2], g[3]]
+}
+
+/// S→C 0x0A RemoveUnit (`0x00571600` → `0x0053BDA0`, §7.8 rule 3.1):
+/// type u8@1, GUID u32@2.
+pub fn remove_unit(unit_type: u8, guid: u32) -> [u8; 6] {
+    unit_ref(0x0A, unit_type, guid)
+}
+
+/// S→C 0x08 MapHide (`0x0053BC90`, §7.8 rule 3.3), the layout of 0x07:
+/// the room's tile x u16@1, tile y u16@3, level id u8@5.
+pub fn map_hide(x: u16, y: u16, level: u8) -> [u8; 6] {
+    let [x0, x1] = x.to_le_bytes();
+    let [y0, y1] = y.to_le_bytes();
+    [0x08, x0, x1, y0, y1, level]
+}
+
+/// S→C 0x51 AssignObject (`0x0053BD10`, 14 bytes, §7.2 part A): type 2
+/// u8@1, GUID u32@2, class u16@6, x u16@8, y u16@0xA, mode u8@0xC,
+/// interact u8@0xD (`client/msg-units.md` §1.3: the only caller passes
+/// type 2).
+pub fn assign_object(guid: u32, class: u16, x: u16, y: u16, mode: u8, interact: u8) -> [u8; 14] {
+    let mut b = [0u8; 14];
+    b[0] = 0x51;
+    b[1] = 2;
+    b[2..6].copy_from_slice(&guid.to_le_bytes());
+    b[6..8].copy_from_slice(&class.to_le_bytes());
+    b[8..10].copy_from_slice(&x.to_le_bytes());
+    b[10..12].copy_from_slice(&y.to_le_bytes());
+    b[12] = mode;
+    b[13] = interact;
+    b
+}
+
+/// S→C 0x09 AssignLevelWarp (`0x0053BCD0`, 11 bytes, §7.2 part A, unit
+/// type 5): type u8@1, GUID u32@2, class u8@6, x u16@7, y u16@9.
+pub fn assign_warp(unit_type: u8, guid: u32, class: u8, x: u16, y: u16) -> [u8; 11] {
+    let mut b = [0u8; 11];
+    b[0] = 0x09;
+    b[1] = unit_type;
+    b[2..6].copy_from_slice(&guid.to_le_bytes());
+    b[6] = class;
+    b[7..9].copy_from_slice(&x.to_le_bytes());
+    b[9..11].copy_from_slice(&y.to_le_bytes());
+    b
+}
+
+/// S→C 0x5F PortalFlags (`0x0053B400`, 5 bytes, §8.2 rule 3.3): u32@1.
+pub fn portal_flags(v: u32) -> [u8; 5] {
+    let v = v.to_le_bytes();
+    [0x5F, v[0], v[1], v[2], v[3]]
+}
+
+/// S→C 0x7B AssignHotkey (`0x0053DB20`, 8 bytes, §8.2 rule 3.6): slot
+/// u8@1, u16@2 = skill & 0xFFF, | 0x8000 when the slot's flag is set,
+/// item u32@4.
+pub fn assign_hotkey(slot: u8, skill: i16, flag: bool, item: u32) -> [u8; 8] {
+    let s = (skill as u16 & 0xFFF) | if flag { 0x8000 } else { 0 };
+    let [s0, s1] = s.to_le_bytes();
+    let i = item.to_le_bytes();
+    [0x7B, slot, s0, s1, i[0], i[1], i[2], i[3]]
+}
+
+/// S→C 0x23 SetSkill (`0x0053C590`, 13 bytes, §8.2 rule 3.7): type
+/// u8@1, GUID u32@2, hand u8@6, skill u16@7, item u32@9.
+pub fn set_skill(unit_type: u8, guid: u32, hand: u8, skill: u16, item: u32) -> [u8; 13] {
+    let mut b = [0u8; 13];
+    b[0] = 0x23;
+    b[1] = unit_type;
+    b[2..6].copy_from_slice(&guid.to_le_bytes());
+    b[6] = hand;
+    b[7..9].copy_from_slice(&skill.to_le_bytes());
+    b[9..13].copy_from_slice(&item.to_le_bytes());
+    b
+}
+
+/// S→C 0x7E (`0x0053DB70`, 5 bytes, `path-placement.md` §11): 1.14d
+/// writes only the id byte; bytes 1–4 are uninitialised stack memory
+/// there. d2rs sends zeros (edge case 10; the scenario comparison masks
+/// them, `specs/tools/scenario-masks.tsv`).
+pub const GAME_ENTRY_DONE: [u8; 5] = [0x7E, 0, 0, 0, 0];
+
+/// One `itemstatcost` row as 0xAA reads it (§7.9 rule 1.3): `send bits`
+/// (+0x08), `send param bits` (+0x09), `signed` (+0x04 bit 1).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SendStat {
+    pub bits: u8,
+    pub param_bits: u8,
+    pub signed: bool,
+}
+
+/// One state of the unit for 0xAA: its id and its stat list's entries
+/// {param, id, value} in list order (`0x00625C90`); `None` when the
+/// state has no list.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct SentState {
+    pub state: u16,
+    pub entries: Option<Vec<(u16, u16, i32)>>,
+}
+
+/// Entries of a state's list written at most (§7.9 rule 1.3).
+pub const STATE_LIST_ENTRIES: usize = 16;
+/// The stream stops before a state when its byte length + 7 would exceed
+/// this (§7.9 rule 1.2).
+pub const STATE_STREAM_LIMIT: usize = 218;
+/// The bit writer's buffer (§7.9 rule 1: past it the rest is dropped).
+pub const STATE_WRITER_BYTES: usize = 0xF4;
+
+/// `value` clamped for `n` send bits (§7.9 rule 1.3): only when n < 32;
+/// signed rows to −2^(n−1)..2^(n−1)−1, others to 0..2^n−1.
+pub fn clamp_send(value: i32, n: u8, signed: bool) -> i32 {
+    if n >= 32 {
+        return value;
+    }
+    let n = u32::from(n);
+    if signed {
+        let (lo, hi) = if n == 0 {
+            (0, 0)
+        } else {
+            (-(1i64 << (n - 1)), (1i64 << (n - 1)) - 1)
+        };
+        i64::from(value).clamp(lo, hi) as i32
+    } else {
+        i64::from(value).clamp(0, (1i64 << n) - 1) as i32
+    }
+}
+
+/// S→C 0xAA, unit states (`0x00570E30`, §7.9 rule 1): byte 0 0xAA, unit
+/// type u8@1, GUID u32@2, size u8@6 = 7 + the stream's byte length, the
+/// bit stream from byte 7 (LSB first). `states`: the unit's states in
+/// ascending order that pass rule 1.1 (below the `states` count, no
+/// `nosend` bit; the caller's filter); `stat(id)`: the row of `id`
+/// (`None`: no row).
+pub fn unit_states(
+    unit_type: u8,
+    guid: u32,
+    states: &[SentState],
+    stat: impl Fn(u16) -> Option<SendStat>,
+) -> Vec<u8> {
+    let mut w = BitWriter::new();
+    for s in states {
+        // Rule 1.2.
+        if w.bytes.len() + 7 > STATE_STREAM_LIMIT {
+            break;
+        }
+        // Rule 1.3.
+        w.write(u32::from(s.state), 8);
+        match s.entries.as_deref() {
+            None | Some([]) => w.write(0, 1),
+            Some(entries) => {
+                w.write(1, 1);
+                for &(param, id, value) in entries.iter().take(STATE_LIST_ENTRIES) {
+                    let Some(row) = stat(id).filter(|r| r.bits != 0) else {
+                        continue;
+                    };
+                    w.write(u32::from(id), 9);
+                    if row.param_bits != 0 {
+                        w.write(u32::from(param), u32::from(row.param_bits));
+                    }
+                    let v = clamp_send(value, row.bits, row.signed);
+                    w.write(v as u32, u32::from(row.bits).min(32));
+                }
+                w.write(0x1FF, 9);
+            }
+        }
+    }
+    // Rule 1.4.
+    w.write(0xFF, 8);
+    let mut stream = w.bytes;
+    stream.truncate(STATE_WRITER_BYTES);
+    let g = guid.to_le_bytes();
+    let mut b = vec![
+        0xAA,
+        unit_type,
+        g[0],
+        g[1],
+        g[2],
+        g[3],
+        (7 + stream.len()) as u8,
+    ];
+    b.extend(stream);
+    b
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Covers: specs/sim/intents-events.md §7.9 r1
+    #[test]
+    fn unit_states_matches_the_recorded_join() {
+        // `-022633` seq 103: state 105 with stat 172 (send bits 2) = 2.
+        let states = [SentState {
+            state: 105,
+            entries: Some(vec![(0, 172, 2)]),
+        }];
+        let row = |id| {
+            (id == 172).then_some(SendStat {
+                bits: 2,
+                param_bits: 0,
+                signed: false,
+            })
+        };
+        assert_eq!(
+            unit_states(0, 1, &states, row),
+            [0xAA, 0x00, 0x01, 0, 0, 0, 0x0C, 0x69, 0x59, 0xF9, 0xFF, 0x1F]
+        );
+        // No state: the end marker only.
+        assert_eq!(unit_states(0, 1, &[], row), [0xAA, 0, 1, 0, 0, 0, 8, 0xFF]);
+        // A state without a list: 8 bits, bit 0.
+        let none = [SentState {
+            state: 3,
+            entries: None,
+        }];
+        assert_eq!(
+            unit_states(1, 2, &none, row),
+            [0xAA, 1, 2, 0, 0, 0, 10, 0x03, 0xFE, 0x01]
+        );
+    }
+
+    // Covers: specs/sim/intents-events.md §7.9 r1
+    #[test]
+    fn unit_states_skips_rows_without_send_bits_and_clamps() {
+        let row = |id: u16| match id {
+            1 => Some(SendStat {
+                bits: 3,
+                param_bits: 0,
+                signed: true,
+            }),
+            2 => Some(SendStat {
+                bits: 0,
+                param_bits: 0,
+                signed: false,
+            }),
+            _ => None,
+        };
+        // Stat 1 = 100 → clamped to 3; stat 2 (no send bits) and stat 9
+        // (no row) are skipped.
+        let s = [SentState {
+            state: 0,
+            entries: Some(vec![(0, 2, 5), (0, 9, 5), (0, 1, 100)]),
+        }];
+        let mut w = BitWriter::new();
+        w.write(0, 8);
+        w.write(1, 1);
+        w.write(1, 9);
+        w.write(3, 3);
+        w.write(0x1FF, 9);
+        w.write(0xFF, 8);
+        let mut expect = vec![0xAA, 0, 0, 0, 0, 0, (7 + w.bytes.len()) as u8];
+        expect.extend(w.bytes);
+        assert_eq!(unit_states(0, 0, &s, row), expect);
+        assert_eq!(clamp_send(-9, 3, true), -4);
+        assert_eq!(clamp_send(-9, 3, false), 0);
+        assert_eq!(clamp_send(9, 3, false), 7);
+        assert_eq!(clamp_send(-9, 32, false), -9);
+    }
+
+    // Covers: specs/sim/intents-events.md §7.9 r1
+    #[test]
+    fn unit_states_stops_at_the_stream_limit() {
+        // States without lists: 9 bits each; the stream stops once its
+        // length + 7 exceeds 218 bytes.
+        let states: Vec<SentState> = (0..250)
+            .map(|s| SentState {
+                state: s,
+                entries: None,
+            })
+            .collect();
+        let m = unit_states(0, 0, &states, |_| None);
+        let len = usize::from(m[6]) - 7;
+        assert_eq!(m.len(), 7 + len);
+        // 9 bits a state: after k states the length is ⌈9k / 8⌉; the
+        // last state starts at a length ≤ 211, the end marker follows.
+        assert!(len <= STATE_STREAM_LIMIT - 7 + 3, "{len}");
+        assert_eq!(len, (9 * 188 + 8usize).div_ceil(8));
+    }
+
+    // Covers: specs/sim/intents-events.md §8.1 r3, §8.2 r3, §7.8 r3, §7.2
+    #[test]
+    fn session_and_room_layouts() {
+        // Recorded seq 5–7 of both recordings.
+        assert_eq!(
+            game_flags(0, 0x0010_0004, true, false),
+            [0x01, 0x00, 0x04, 0x00, 0x10, 0x00, 0x01, 0x00]
+        );
+        // §8.2 rule 3.6 vector: slot 3, skill 36, flag set, item −1.
+        assert_eq!(
+            assign_hotkey(3, 36, true, u32::MAX),
+            [0x7B, 0x03, 0x24, 0x80, 0xFF, 0xFF, 0xFF, 0xFF]
+        );
+        // Recorded `08 c803 6004 01` (`-015956` frame 149).
+        assert_eq!(map_hide(968, 1120, 1), [0x08, 0xC8, 0x03, 0x60, 0x04, 0x01]);
+        // Recorded `76 00 01000000` (the join).
+        assert_eq!(unit_ref(0x76, 0, 1), [0x76, 0, 1, 0, 0, 0]);
+        assert_eq!(remove_unit(1, 0x13), [0x0A, 1, 0x13, 0, 0, 0]);
+        assert_eq!(
+            assign_object(0x10, 0x77, 0x1234, 0x0567, 1, 2),
+            [0x51, 2, 0x10, 0, 0, 0, 0x77, 0, 0x34, 0x12, 0x67, 0x05, 1, 2]
+        );
+        assert_eq!(
+            assign_warp(5, 7, 3, 0x0102, 0x0304),
+            [0x09, 5, 7, 0, 0, 0, 3, 0x02, 0x01, 0x04, 0x03]
+        );
+        assert_eq!(portal_flags(0x8000_0001), [0x5F, 1, 0, 0, 0x80]);
+        assert_eq!(
+            set_skill(0, 1, 0, 36, u32::MAX),
+            [0x23, 0, 1, 0, 0, 0, 0, 36, 0, 0xFF, 0xFF, 0xFF, 0xFF]
+        );
+        assert_eq!(GAME_ENTRY_DONE, [0x7E, 0, 0, 0, 0]);
+    }
+}

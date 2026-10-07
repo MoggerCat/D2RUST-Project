@@ -1,4 +1,4 @@
-// Spec: specs/items/inventory.md §1, §1.4, §7.19
+// Spec: specs/items/inventory.md §1, §1.4; specs/items/inventory-moves.md §7.19
 //! Mutation-testing additions (METHODS M08) for the model's host API
 //! (`host.rs`): checks that fail when a read returns a fixed answer.
 
@@ -8,7 +8,7 @@ use crate::items::inventory::UnitKind;
 /// §1 / §7.19 step 3: a socketed item owns an inventory, and its fillers
 /// are that inventory's item list in link order. `fillers` reads it back
 /// (the cube's `socketed`), and the fillers are not the player's items.
-// Rule (one clause; no claim): inventory.md §7.19 step 3 (link into the
+// Rule (one clause; no claim): inventory-moves.md §7.19 step 3 (link into the
 // target's inventory).
 #[test]
 fn fillers_are_the_items_own_inventory_list() {

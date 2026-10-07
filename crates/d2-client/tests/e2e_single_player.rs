@@ -1,4 +1,6 @@
-// Spec: specs/client/bridge.md §3; specs/sim/intents-events.md §1–§3; specs/sim/tick.md §3, §4; specs/drlg/levels.md §5; specs/drlg/preset.md §3, §8, §9; specs/drlg/rooms.md §4.1; specs/monsters/population.md §11.1; specs/skills/use.md §1, §4, §5.2, §5.4; specs/formats/animdata.md §5; specs/sim/units.md §4.1, §4.2, §4.6; specs/missiles/missiles.md §R2–§R6; specs/combat/damage.md §5.2, §7.1, §7.2; specs/combat/vitals.md §2, §3, §4.2, §4.3; specs/items/treasure.md §3, §7, §8; specs/world/npc.md §2, §3, §9; specs/world/vendors.md §3, §4, §7, §9; specs/world/quests.md §1.5; specs/world/cube.md §1, §2, §3, §8; specs/world/waypoints.md §6, §7; specs/items/inventory.md §6, §7, §11 (end to end)
+// Spec: specs/client/bridge.md §3; specs/sim/intents-events.md §1–§3; specs/sim/tick.md §3, §4; specs/drlg/levels.md §5; specs/drlg/preset.md §3, §8, §9; specs/drlg/rooms.md §4.1; specs/monsters/population.md §11.1; specs/skills/use.md §1, §4, §5.2, §5.4; specs/formats/animdata.md §5; specs/sim/units.md §4.1, §4.2, §4.6; specs/missiles/missiles.md §R2–§R6; specs/combat/damage.md §5.2, §7.1, §7.2; specs/combat/vitals.md §2, §3, §4.2, §4.3; specs/items/treasure.md §3, §7, §8; specs/world/npc.md §2, §3, §9; specs/world/vendors.md §3, §4, §7, §9; specs/world/quests.md §1.5; specs/world/cube.md §1, §2, §3, §8; specs/world/waypoints.md §6, §7; specs/items/inventory-moves.md §6, §7, §11 (end to end)
+// Spec: specs/world/quests-act1.md (§10, split out of `quests.md`)
+// Spec: specs/items/inventory.md (the sections other than §6–§11)
 //! End-to-end single player: the bridge (`d2_client::bridge`) on its
 //! local link (`bridge::local::LocalLink`) over the in-process
 //! `d2-server` host, whose game is `SimGame` on the fully wired `d2-sim`
@@ -27,14 +29,14 @@
 //!    item unit in the monster's room (`treasure.md` §3, §7, §8); the
 //!    kill's experience levels the player up (`vitals.md` §4.3 → §3);
 //!    then (step 7) a stat point is spent (C→S 0x3A, `vitals.md` §2);
-//!    (step 5b) pick-up of that gold (C→S 0x16, `inventory.md` §7.1 →
+//!    (step 5b) pick-up of that gold (C→S 0x16, `inventory-moves.md` §7.1 →
 //!    §8.1 → §10.1): the drop created it in the game's one item store,
 //!    so the item-move handler finds it and the gold is credited;
 //! 8. (steps 8–10) Akara on the server's `WiredWorld` (the same units):
 //!    talk (C→S 0x13: S→C 0x27, 0x29, 0x28, `npc.md` §2), chat (0x2F),
 //!    trade (0x38: the store generated, `vendors.md` §3, §4);
 //! 9. (steps 11–18) item moves on the game's one inventory model
-//!    (`inventory.md` §7, `d2_sim::wiring::inventory` under
+//!    (`inventory-moves.md` §7, `d2_sim::wiring::inventory` under
 //!    `handlers::items::moves`): a cap on the ground is picked to the
 //!    cursor (0x16), placed in the grid (0x18), lifted (0x19), equipped
 //!    (0x1A), unequipped (0x1C), dropped (0x17), picked and placed
@@ -899,6 +901,11 @@ struct Transcript {
 /// A recording bridge frame.
 /// S→C 0x07 MapReveal of the room at tile (x, y) of `level`
 /// (`server-messages.tsv`: x u16 @1, y u16 @3, level u8 @5).
+/// S→C 0x51 AssignObject (`intents-events.md` §7.2 part A).
+fn assign_object(guid: u32, class: u16, (x, y): (i32, i32), mode: u8, interact: u8) -> Vec<u8> {
+    d2_sim::units::messages::assign_object(guid, class, x as u16, y as u16, mode, interact).to_vec()
+}
+
 fn map_reveal(x: u16, y: u16, level: u32) -> Vec<u8> {
     let mut b = vec![0x07];
     b.extend(x.to_le_bytes());
@@ -986,14 +993,18 @@ fn run_with(game_seed: u32) -> Transcript {
     // near the player's (`rooms.md` §4.1: 4 rooms) and sends one S→C 0x07
     // per room of the player's adjacency array, in its order
     // (`path-placement.md` §11 "Recipients"); the room pass creates the
-    // DS1's preset monster at its sub-tile (`population.md` §11.1).
+    // DS1's preset monster at its sub-tile (`population.md` §11.1). Each
+    // joined room's 0x07 is followed by the add messages of its units
+    // (`intents-events.md` §7.8 rule 2): the waypoint's 0x51 (type 2,
+    // class 0, its position, mode 1, interact 0: no object data in this
+    // game) after its room's; the monster and the client's own player
+    // send none (§7.2 monster part: not specified).
     record(&mut fx, &mut frames, vec![]);
-    assert_eq!(
-        frames[0].2,
-        [(8000, 8000), (8000, 8008), (8008, 8000), (8008, 8008)]
-            .map(|(x, y)| map_reveal(x, y, ISLE))
-            .to_vec()
-    );
+    let mut want: Vec<Vec<u8>> = [(8000, 8000), (8000, 8008), (8008, 8000), (8008, 8008)]
+        .map(|(x, y)| map_reveal(x, y, ISLE))
+        .to_vec();
+    want.insert(1, assign_object(wp, 0, WP_AT, 1, 0));
+    assert_eq!(frames[0].2, want);
     assert_eq!(fx.sim_ref().game.lists.active_rooms(0).len(), 4);
     let monsters = fx.monsters();
     assert_eq!(monsters.len(), 1, "the DS1 preset monster");
@@ -1026,13 +1037,17 @@ fn run_with(game_seed: u32) -> Transcript {
     assert_eq!(frames[1].2, none);
     assert_eq!(fx.mode(player), 10);
     assert_eq!(fx.stat(player, 8), 4000 - 3328);
-    assert_eq!(fx.book.get().log, ["srvst 42 1 10"]);
+    // The start (srvst 53, `bodies-3.md` §4.1) ran with skill 1 at level
+    // 10: the used entry's param 1 := frame + 10, at the dispatch frame
+    // (1: messages run before the frame's tick, which makes it 2).
+    let started = format!("param1 1 {}", fx.sim_ref().game.frame - 1 + 10);
+    assert_eq!(fx.book.get().log, std::slice::from_ref(&started));
     assert_eq!(fx.player_timers(), [(0, 5), (1, 9)]);
     assert!(fx.errors().is_empty(), "{:?}", fx.errors());
 
     // Frames 3–5. On frame 5 the action frame `0x00580460` runs the used
-    // skill's do function (`use.md` §5.2, §5.4): srvdo 3 (body
-    // catalogued only, `use.md` OQ10: the seam), then the generic
+    // skill's do function (`use.md` §5.2, §5.4): srvdo 53 (no body,
+    // `unreferenced`, `use.md` OQ10: the seam), then the generic
     // `srvmissile` 0 through the real missile creation (`missiles.md`
     // §R2) at the player, aimed at the cast point.
     for _ in 3..=5 {
@@ -1045,7 +1060,7 @@ fn run_with(game_seed: u32) -> Transcript {
     );
     assert_eq!(
         fx.book.get().log,
-        ["srvst 42 1 10", "srvdo 3 1 10 true false false"]
+        [started, "srvdo 53 1 10 true false false".to_string()]
     );
     assert_eq!(fx.player_timers(), [(1, 9)]);
     let shot = fx.missiles();
@@ -1093,8 +1108,11 @@ fn run_with(game_seed: u32) -> Transcript {
         ]
     );
     assert_eq!(fx.stat(player, 13), 100);
-    // The death animation: 4 frames → event 1 at 19.
-    assert_eq!(fx.timers(monster), [(1, 19)]);
+    // The death animation: 4 frames → event 1 at 19. Tick 1's room
+    // switch woke the monster created by that tick's room pass
+    // (`intents-events.md` §7.8 rule 2.3, `0x00573780`: think at frame
+    // 1 + 2; Idle → the next think at 203), which is still pending.
+    assert_eq!(fx.timers(monster), [(1, 19), (2, 203)]);
 
     // 5a. The drop (`treasure.md` §3): the death start's gate passes
     // (no flag 0x20000, no wall / door at the monster's sub-tile); TC 1
@@ -1152,7 +1170,7 @@ fn run_with(game_seed: u32) -> Transcript {
     assert_eq!(fx.stat(player, STATPTS), 4);
     assert_eq!(fx.stat(player, STRENGTH), 1);
 
-    // 5b. Pick-up of the kill's gold (C→S 0x16 cursor 0, `inventory.md`
+    // 5b. Pick-up of the kill's gold (C→S 0x16 cursor 0, `inventory-moves.md`
     // §7.1 → §8.1 → §10.1) through the item-move handler. The drop
     // created the pile in the game's one item store, so the inventory
     // model finds it: the staged distance 3 (< 5); not busy; can-pick
@@ -1253,7 +1271,7 @@ fn run_with(game_seed: u32) -> Transcript {
     assert_eq!(store_rows.last().unwrap().1, CAP, "permanent codes last");
     assert!(store_rows[..store.len() - 1].iter().all(|r| r.1 == BUC));
 
-    // 11–16. Item moves (`inventory.md` §7) on the game's inventory
+    // 11–16. Item moves (`inventory-moves.md` §7) on the game's inventory
     // model, with Akara's trade open (the item-move seams answer no
     // interaction: `InvFx`): a cap on the ground beside the player, made
     // by the economy wiring on the game seed into the game's one item
@@ -1509,7 +1527,7 @@ fn run_with(game_seed: u32) -> Transcript {
     // the cube open. The cube's opening (item use, `cube.md` §10) has no
     // spec: the interaction (type 4, the cube's GUID) is staged at the
     // host's one owner. The ring matches the recipe: the amulet is
-    // created; the ring gets 0x9D action 5 now (§8 step 1, `inventory.md`
+    // created; the ring gets 0x9D action 5 now (§8 step 1, `inventory-moves.md`
     // §6.4: owner the player) and is removed from the inventory and
     // freed; sound 4; the amulet is placed on page 3 (§2.4, "send"),
     // identified: its 0x9C action 4 in the tick's update pass.
@@ -1583,13 +1601,16 @@ fn run_with(game_seed: u32) -> Transcript {
     // made the three items it names; 0x9D needs the local player, which
     // this staged game never announces (no 0x59 / 0x0B), so it changes
     // nothing (§2 rule 3); the join's four 0x07 (frame 2) are rejected,
-    // fatal 0x58A (no client act: this staged game sends no 0x03);
+    // fatal 0x58A (no client act: this staged game sends no 0x03); the
+    // join's 0x51 made the waypoint (`intents-events.md` §7.8 rule 2);
     // nothing discarded.
     let w = fx.bridge.world();
     let client = (w.frames, w.server_ticks, w.units.len());
-    assert_eq!(client, (37, 36, 3));
+    assert_eq!(client, (37, 36, 4));
     assert_eq!(w.local_player, None);
-    for (k, u) in &w.units {
+    let object = d2_client::bridge::world::UnitKey::new(d2_client::bridge::world::OBJECT, wp);
+    assert!(w.units.contains_key(&object));
+    for (k, u) in w.units.iter().filter(|(k, _)| **k != object) {
         assert_eq!(k.unit_type, d2_client::bridge::world::ITEM);
         let d2_client::bridge::world::KindData::Item(d) = &u.kind else {
             panic!("item data");
@@ -1601,7 +1622,7 @@ fn run_with(game_seed: u32) -> Transcript {
         log.unowned,
         BTreeMap::from([(0x27, 1), (0x28, 1), (0x29, 1), (0x2A, 4)])
     );
-    assert_eq!(log.handled, 31);
+    assert_eq!(log.handled, 32);
     let rejected: Vec<(u8, String)> = log
         .rejected
         .iter()

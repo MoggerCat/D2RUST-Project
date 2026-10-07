@@ -1,4 +1,4 @@
-// Spec: specs/monsters/ai.md §1.1, §2, §3.3, §9 (Idle, GoodNpcRanged); specs/sim/tick.md §5.2 rule 4, §5.6; specs/sim/units.md §4.6
+// Spec: specs/monsters/ai.md §1.1, §2, §3.3; specs/monsters/ai-bodies.md §9 (Idle, GoodNpcRanged); specs/sim/tick.md §5.2 rule 4, §5.6; specs/sim/units.md §4.6
 //! Monster AI ↔ units (modes, timer events): the think run by the unit
 //! dispatch, the freeze drop, mode changes through the real monster mode
 //! set, the state-54 rule before a think is scheduled.
@@ -30,7 +30,7 @@ fn thinks(fx: &Fx, m: UnitId) -> Vec<i32> {
 
 #[test]
 fn think_runs_through_the_unit_dispatch_and_reschedules() {
-    // `ai.md` §9 Idle: the next think 200 frames later (vector "idle AI
+    // `ai-bodies.md` §9 Idle: the next think 200 frames later (vector "idle AI
     // thinks every 200"), scheduled through the real timer queue.
     let mut fx = Fx::new();
     let m = monster(&mut fx);
@@ -131,10 +131,10 @@ fn think_scheduled_with_state_54_clears_it_first() {
     fx.assert_clean();
 }
 
-// Covers: specs/monsters/ai.md §9.31 r3
+// Covers: specs/monsters/ai-bodies.md §9.31 r3
 #[test]
 fn good_npc_ranged_takes_ai_turns() {
-    // `ai.md` §9.31 on the wired host: a class-0 monster with AI 60
+    // `ai-bodies.md` §9.31 on the wired host: a class-0 monster with AI 60
     // (GoodNpcRanged). No secondary target (the pending default), so each
     // think ends in step 3: `lo' % 100` < 20 → wander 5, else idle 10.
     let mut fx = Fx::new();

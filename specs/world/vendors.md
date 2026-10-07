@@ -464,7 +464,7 @@ copy appears next frame as 0x9C action 11, GUID 0x35.
 
 The copy routine of every caller that needs a second item equal to an
 existing one: buy (§7.1 rule 9.2), sell (§7.2 rule 8), cube outputs
-(`world/cube.md` §7.3), hireling take (`items/inventory.md` §7.23), NPC
+(`world/cube.md` §7.3), hireling take (`items/inventory-moves.md` §7.23), NPC
 socketing (`world/npc.md` §8.1); 17 call sites. The owner argument (stack
 1) is not read in 1.14d. Result: the copy, or none.
 
@@ -488,7 +488,7 @@ socketing (`world/npc.md` §8.1); 17 call sites. The owner argument (stack
    order: read it as in step 3 with no room (failure → result none;
    the copy and the children read so far are not freed); child mode
    := 4; socket it into the copy through `0x00562660(child GUID, copy
-   GUID, &out, 0, 1, 0, 0)` (`items/inventory.md` §7.19; result 0 →
+   GUID, &out, 0, 1, 0, 0)` (`items/inventory-moves.md` §7.19; result 0 →
    fatal assert, line 0xDD4); child item flags 0x80000 set, 0x2000
    cleared; child command flag 0x1 cleared (`0x00628170`).
    fillers = 0: the children are not read; the copy keeps the stream's
@@ -500,7 +500,7 @@ socketing (`world/npc.md` §8.1); 17 call sites. The owner argument (stack
    + 1 (`0x005417D0`; `sim/unit-events.tsv` rows `0x0055a4be`,
    `0x0055a500`; the handler is `sim/units.md` §6.5).
 8. Per-item reset of the deferred-message bits (`0x005979B0`,
-   `items/inventory.md` §6.1 rule 4); command flag 0x1 cleared. Result:
+   `items/inventory-moves.md` §6.1 rule 4); command flag 0x1 cleared. Result:
    the copy.
 
 What carries over is exactly what the save stream carries

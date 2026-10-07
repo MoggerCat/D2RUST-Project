@@ -1,4 +1,5 @@
-// Spec: specs/monsters/ai.md §9.30 Smith / Griswold, §9.31 GoodNpcRanged, §9.32 NpcOutOfTown, §9.9 (interaction handler); fakes from the parent test module
+// Spec: specs/monsters/ai-bodies.md §9.30 Smith / Griswold, §9.31 GoodNpcRanged, §9.32 NpcOutOfTown, §9.9 (interaction handler); fakes from the parent test module
+// Spec: specs/monsters/ai.md (the sections other than §9)
 use super::*;
 
 /// AI indices (monstats `AI`).
@@ -71,7 +72,7 @@ impl World {
 
 // ---- §9.30 Smith, Griswold --------------------------------------------
 
-// Covers: specs/monsters/ai.md §9.30 text, §9.30 r1, §9.30 r2
+// Covers: specs/monsters/ai-bodies.md §9.30 text, §9.30 r1, §9.30 r2
 #[test]
 fn smith_attacks_or_walks_by_life() {
     // C → A1 at T, no draw.
@@ -123,7 +124,7 @@ fn smith_attacks_or_walks_by_life() {
     assert_eq!(w.fake.modes().len(), 2);
 }
 
-// Covers: specs/monsters/ai.md §9.30 l2 r1, §9.30 l2 r2
+// Covers: specs/monsters/ai-bodies.md §9.30 l2 r1, §9.30 l2 r2
 #[test]
 fn griswold_vectors() {
     // Draws `lo' % 100` 51, 87, 53, 0 (Test vectors).
@@ -163,7 +164,7 @@ fn ranged_world() -> World {
     World::new(monstats(GOOD_NPC_RANGED, [0; 5], 15))
 }
 
-// Covers: specs/monsters/ai.md §9.31 text, §9.31 r1
+// Covers: specs/monsters/ai-bodies.md §9.31 text, §9.31 r1
 #[test]
 fn good_npc_ranged_not_neutral_idles_5() {
     let mut w = ranged_world();
@@ -179,7 +180,7 @@ fn good_npc_ranged_not_neutral_idles_5() {
     assert!(implemented(SPECIAL_TABLE[5].think));
 }
 
-// Covers: specs/monsters/ai.md §9.31 r3
+// Covers: specs/monsters/ai-bodies.md §9.31 r3
 #[test]
 fn good_npc_ranged_in_town_wanders_or_idles() {
     // In town: no secondary search; `lo' % 100` < 20 → wander 5, else
@@ -205,7 +206,7 @@ fn good_npc_ranged_in_town_wanders_or_idles() {
     }
 }
 
-// Covers: specs/monsters/ai.md §9.31 r2
+// Covers: specs/monsters/ai-bodies.md §9.31 r2
 #[test]
 fn good_npc_ranged_out_of_town() {
     // S at E < 20: roll(100) < 30 → A1 at S (any class but 271).
@@ -290,7 +291,7 @@ fn interact(w: &mut World) -> bool {
     w.with(|g, cx| super::super::npc::npc_interaction_think(g, cx, mon))
 }
 
-// Covers: specs/monsters/ai.md §9.9 l2 r1, §9.9 l2 r2, §9.9 l2 r5
+// Covers: specs/monsters/ai-bodies.md §9.9 l2 r1, §9.9 l2 r2, §9.9 l2 r5
 #[test]
 fn interaction_needs_a_block_and_a_player() {
     let mut w = interaction_world(10);
@@ -309,7 +310,7 @@ fn interaction_needs_a_block_and_a_player() {
     assert!(w.thinks().is_empty());
 }
 
-// Covers: specs/monsters/ai.md §9.9 l2 r3, §9.9 l2 r4, §edge-cases-original-bugs r11
+// Covers: specs/monsters/ai.md §edge-cases-original-bugs r11; specs/monsters/ai-bodies.md §9.9 l2 r3, §9.9 l2 r4
 #[test]
 fn interaction_talking_or_busy() {
     let set = |w: &mut World, p: [i32; 3]| {
@@ -356,7 +357,7 @@ fn interaction_talking_or_busy() {
     }
 }
 
-// Covers: specs/monsters/ai.md §9.9 l2 r6
+// Covers: specs/monsters/ai-bodies.md §9.9 l2 r6
 #[test]
 fn interaction_greets_close_or_far_players() {
     for d in [2, 24] {
@@ -387,7 +388,7 @@ fn interaction_greets_close_or_far_players() {
     assert!(!w.fake.log.iter().any(|l| l.starts_with("sound")));
 }
 
-// Covers: specs/monsters/ai.md §9.9 l2 r7, §9.9 r1
+// Covers: specs/monsters/ai-bodies.md §9.9 l2 r7, §9.9 r1
 #[test]
 fn interaction_home_check_and_walk_around() {
     // No home command: the home step makes one at the NPC's position.
@@ -431,7 +432,7 @@ fn set_portal(w: &mut World, p: [i32; 5]) {
     w.store.control_mut(w.mon).unwrap().commands = vec![AiCommand { params: p }];
 }
 
-// Covers: specs/monsters/ai.md §9.32 text, §9.32 r1
+// Covers: specs/monsters/ai-bodies.md §9.32 text, §9.32 r1
 #[test]
 fn npc_out_of_town_portal_setup() {
     let mut w = cain();
@@ -465,7 +466,7 @@ fn npc_out_of_town_portal_setup() {
     assert!(w.thinks().is_empty());
 }
 
-// Covers: specs/monsters/ai.md §9.32 r2, §9.32 r3, §9.32 r4, §9.32 r5, §9.32 r6
+// Covers: specs/monsters/ai-bodies.md §9.32 r2, §9.32 r3, §9.32 r4, §9.32 r5, §9.32 r6
 #[test]
 fn npc_out_of_town_gates() {
     // Talking → idle 40 (drehyaiced's update runs first).
@@ -496,7 +497,7 @@ fn npc_out_of_town_gates() {
     assert_eq!(w.thinks(), [20]);
 }
 
-// Covers: specs/monsters/ai.md §9.32 r8
+// Covers: specs/monsters/ai-bodies.md §9.32 r8
 #[test]
 fn npc_out_of_town_walks_to_the_portal_point() {
     // Farther than 1 and fewer than 6 tries: tries + 1, walk.
@@ -548,7 +549,7 @@ fn npc_out_of_town_walks_to_the_portal_point() {
     assert_eq!(w.thinks(), [20]);
 }
 
-// Covers: specs/monsters/ai.md §9.32 r7
+// Covers: specs/monsters/ai-bodies.md §9.32 r7
 #[test]
 fn npc_out_of_town_goes_through_the_portal() {
     // Phase ≥ 2: phase + 1; coordinates found and not there → walk.

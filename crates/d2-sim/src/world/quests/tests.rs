@@ -1,5 +1,6 @@
 // Spec: specs/world/quests.md (Test vectors, Edge cases); quests.tsv,
 // quest-messages.tsv
+// Spec: specs/world/quests-act1.md (§10, split out of `quests.md`)
 use std::collections::BTreeMap;
 
 use super::act1;
@@ -117,7 +118,7 @@ fn check_tables(t: &QuestTables) -> Vec<String> {
 #[test]
 fn tables_parse_and_check() {
     let t = QuestTables::load().unwrap();
-    assert_eq!(t.messages.len(), 779);
+    assert_eq!(t.messages.len(), 794);
     assert_eq!(check_tables(&t), Vec::<String>::new());
     let r1 = &t.rows[1];
     assert_eq!(
@@ -126,10 +127,49 @@ fn tables_parse_and_check() {
     );
     assert_eq!(r1.callbacks.len(), 7);
     assert!(r1.specified && r1.status_fn.is_none());
-    assert!(t.rows[40].unknown && t.rows[40].callbacks.is_empty());
+    // Row 40 (Act V intro, `0x0058EA50`) is specified (open question 6).
+    let r40 = &t.rows[40];
+    assert!(!r40.unknown && r40.specified);
+    assert_eq!(r40.callbacks, [(0, 0x0058_6B50), (11, 0x0058_E990)]);
     // Chains 25 and 30 share Flavie's table (edge case 2).
     assert_eq!(t.rows[7].msgs, t.rows[29].msgs);
     assert_eq!(t.rows[24].filter, Some(16)); // edge case 4
+}
+
+/// The Act V intro's own init and table (`act5::intro`) equal row 40
+/// and the table `0x00732FF8` of the TSVs (M05).
+// Covers: specs/world/quests.md §2.4
+#[test]
+fn act5_intro_matches_its_rows() {
+    use super::act5::intro;
+    let t = QuestTables::load().unwrap();
+    let row = &t.rows[40];
+    let ctl = QuestControl::new(&t, &mut Seed::new(1, 2)).unwrap();
+    let r = ctl.record(40).unwrap();
+    let cbs: Vec<u8> = row.callbacks.iter().map(|c| c.0).collect();
+    for ev in 0..16u8 {
+        assert_eq!(
+            r.callbacks & (1 << ev) != 0,
+            cbs.contains(&ev),
+            "event {ev}"
+        );
+    }
+    assert_eq!(
+        (r.status_fn, r.active_fn, r.msgs, Some(r.filter)),
+        (row.status_fn, row.active_fn, row.msgs, row.filter)
+    );
+    let tsv: Vec<(u8, u16, u16)> = t
+        .messages
+        .iter()
+        .filter(|m| m.table == intro::TABLE_ADDR)
+        .map(|m| (m.state, m.npc, m.string))
+        .collect();
+    assert_eq!(tsv, intro::TABLE);
+    assert!(t
+        .messages
+        .iter()
+        .filter(|m| m.table == intro::TABLE_ADDR)
+        .all(|m| m.menu == 0));
 }
 
 /// M08: the checks report a changed cell.
@@ -221,6 +261,8 @@ pub(super) struct Fake {
     pub(super) gate_closed: bool,
     /// `quest_drop` fails.
     pub(super) drop_fails: bool,
+    /// `drop_item_at` creates nothing (it still logs the attempt).
+    pub(super) drop_at_fails: bool,
     /// Items made by `quest_drop`, in order (ids from 600).
     pub(super) dropped: Vec<UnitId>,
     /// `spawn_quest_object` results in order (empty: fails).
@@ -298,6 +340,12 @@ pub(super) struct Fake {
     pub(super) a5_monstats_rows: u32,
     pub(super) a5_zoo: Vec<u32>,
     // -- end Act V part 2 fake fields.
+
+    // -- Act I answers fake fields (`quests-act1-rest.md` §9).
+    /// Positions of units without a room (an object left in a freed
+    /// room); `unit_xy` answers these, then [`Fake::pos`].
+    pub(super) xy: BTreeMap<UnitId, (i32, i32)>,
+    // -- end Act I answers fake fields.
 }
 
 pub(super) const P1: UnitId = UnitId(1);
@@ -486,7 +534,7 @@ impl QuestWorld for Fake {
     fn drop_item_at(&mut self, _: UnitId, code: [u8; 4], quality: u8) -> bool {
         self.log
             .push(format!("drop {} {quality}", String::from_utf8_lossy(&code)));
-        true
+        !self.drop_at_fails
     }
     fn quest_items(&self, _: UnitId) -> Vec<(UnitId, u8)> {
         Vec::new()
@@ -536,6 +584,12 @@ impl QuestWorld for Fake {
     }
     fn unit_position(&self, u: UnitId) -> Option<(i32, i32, RoomId)> {
         self.pos.get(&u).copied()
+    }
+    fn unit_xy(&self, u: UnitId) -> Option<(i32, i32)> {
+        self.xy
+            .get(&u)
+            .copied()
+            .or_else(|| self.pos.get(&u).map(|p| (p.0, p.1)))
     }
     fn room_contains(&self, room: RoomId, x: i32, y: i32) -> bool {
         self.rooms
@@ -1219,7 +1273,7 @@ fn default_status_rule() {
     );
 }
 
-// Covers: specs/world/quests.md §6.3, §7.2, §7.3, §10.4
+// Covers: specs/world/quests.md §6.3, §7.2, §7.3; specs/world/quests-act1.md §10.4
 #[test]
 fn akara_start_and_chat_end() {
     // `015956` frames 1729–1751.
@@ -1407,7 +1461,7 @@ fn kill_parse_force_and_chain() {
     assert!(ctl.record(1).unwrap().extra.guids.contains(1));
 }
 
-// Covers: specs/world/quests.md §3 r8, §10.4
+// Covers: specs/world/quests.md §3 r8; specs/world/quests-act1.md §10.4
 #[test]
 fn den_of_evil_cleared() {
     let (mut ctl, _) = control();
@@ -1454,7 +1508,7 @@ fn den_of_evil_cleared() {
     assert_eq!(f.sent_ids(), [0x5E, 0x28, 0x29, 0x89]);
 }
 
-// Covers: specs/world/quests.md §10.4
+// Covers: specs/world/quests-act1.md §10.4
 #[test]
 fn den_of_evil_few_left() {
     let (mut ctl, _) = control();
@@ -1467,7 +1521,7 @@ fn den_of_evil_few_left() {
     assert_eq!(f.sent[0].1, hex("5d 01 20 04 0500"));
 }
 
-// Covers: specs/world/quests.md §10.4
+// Covers: specs/world/quests-act1.md §10.4
 #[test]
 fn den_of_evil_reward() {
     let (mut ctl, _) = control();
@@ -1489,7 +1543,7 @@ fn den_of_evil_reward() {
 
 // ------------------------------------------------------------ Act I
 
-// Covers: specs/world/quests.md §10.6
+// Covers: specs/world/quests-act1.md §10.6
 #[test]
 fn cairn_stone_order_vector() {
     let mut seq = [2u32, 2, 0, 4, 1, 3].into_iter();
@@ -1505,7 +1559,7 @@ fn cairn_stone_order_vector() {
     assert_eq!(ctl.seed, seed);
 }
 
-// Covers: specs/world/quests.md §10.8
+// Covers: specs/world/quests-act1.md §10.8
 #[test]
 fn andariel_gem_vector() {
     assert_eq!(&act1::gem_code(&act1::CHIPPED_GEMS, 9), b"gcb ");
@@ -1543,7 +1597,7 @@ fn andariel_gem_vector() {
     assert!(!f.log.iter().any(|l| l.starts_with("drop")));
 }
 
-// Covers: specs/world/quests.md §10.3, §edge-cases-original-bugs r2
+// Covers: specs/world/quests.md §edge-cases-original-bugs r2; specs/world/quests-act1.md §10.3
 #[test]
 fn flavie_draws_per_record() {
     // Edge case 2: chains 25 and 30 both handle event 0: two draws.
@@ -1566,7 +1620,7 @@ fn flavie_draws_per_record() {
     assert_eq!(list[0], line(a));
 }
 
-// Covers: specs/world/quests.md §10.3
+// Covers: specs/world/quests-act1.md §10.3
 #[test]
 fn warriv_gossip() {
     let (mut ctl, _) = control();
@@ -1582,7 +1636,7 @@ fn warriv_gossip() {
     assert!(f.flags(P1).get(0, 0));
 }
 
-// Covers: specs/world/quests.md §10.6
+// Covers: specs/world/quests-act1.md §10.6
 #[test]
 fn cain_rewards() {
     let (mut ctl, _) = control();
@@ -1611,7 +1665,7 @@ fn cain_rewards() {
     }
 }
 
-// Covers: specs/world/quests.md §10.6
+// Covers: specs/world/quests-act1.md §10.6
 #[test]
 fn wirt_body_gold() {
     let (mut ctl, _) = control();
@@ -1639,7 +1693,7 @@ fn wirt_body_gold() {
     );
 }
 
-// Covers: specs/world/quests.md §10.5 l2 r2, §edge-cases-original-bugs r7
+// Covers: specs/world/quests.md §edge-cases-original-bugs r7; specs/world/quests-act1.md §10.5 l2 r2
 #[test]
 fn malus_level_gate() {
     let (mut ctl, _) = control();
@@ -1739,7 +1793,7 @@ fn warp_and_portal_checks() {
     assert_eq!(portal_check(74), WarpCheck::Open);
 }
 
-// Covers: specs/world/quests.md §10.3
+// Covers: specs/world/quests-act1.md §10.3
 #[test]
 fn respec_flags() {
     let (mut ctl, _) = control();
@@ -1752,7 +1806,7 @@ fn respec_flags() {
     assert!(!ctl.record(30).unwrap().active);
 }
 
-// Covers: specs/world/quests.md §3 r2, §10.1
+// Covers: specs/world/quests.md §3 r2; specs/world/quests-act1.md §10.1
 #[test]
 fn restore_from_bits() {
     let (mut ctl, _) = control();

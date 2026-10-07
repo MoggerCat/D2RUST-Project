@@ -3,7 +3,7 @@
 Cloud implementation session, 2026-10-06, task class: implementation
 from a clear spec, medium (METHODS M14). Base: `claude/tender-meitner-mphas3`
 at `b435f5a` (spec commits `346f245` … `9f64a3a`, "1.14d bodies for …").
-Repo only, no game files (M09). Inputs: `specs/monsters/ai.md` §3.3, §6–§9,
+Repo only, no game files (M09). Inputs: `specs/monsters/ai.md` §3.3, §6–§8, `specs/monsters/ai-bodies.md` §9,
 Test vectors, Edge cases; `specs/monsters/ai-functions.tsv`.
 
 Task: the four bodies of `9f64a3a` (Smith, Griswold, GoodNpcRanged,

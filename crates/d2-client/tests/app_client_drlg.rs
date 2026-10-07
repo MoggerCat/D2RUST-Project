@@ -94,13 +94,15 @@ impl Clock for StepClock {
     }
 }
 
-// Covers: specs/client/model.md §12 r1, §11 r3, §11 r5, §9 r1; specs/sim/path-placement.md §13 r3
+// Covers: specs/client/model.md §12 r1, §11 r3, §11 r5, §9 r1; specs/sim/path-placement.md §13 r3; specs/sim/tick.md §6 r6; specs/sim/intents-events.md §8.3
 #[test]
 fn the_join_builds_the_client_drlg_in_the_app() {
     let data = GameData::Synthetic;
-    // The app's own game on its server thread: the session join queues
-    // 0x59, 0x0B, 0x03, 0x07 and 0x15 for the first tick, whose room
-    // switch adds the 0x07s of the spawn room's adjacency array.
+    // The app's own game on its server thread: game creation and the
+    // session join queue 0x01, 0x00, 0x02, 0x59, 0xAA, 0x76, 0x0B, 0x03,
+    // then game entry's 0x07, its room switch's 0x07s (and the add
+    // messages of the rooms' units), 0x15 and 0x7E for the first flush;
+    // the first tick adds 0x04 (`intents-events.md` §8).
     let ms = Arc::new(AtomicU32::new(1000));
     let (mut link, started) = single_player::start(
         data.clone(),
@@ -173,9 +175,10 @@ fn the_join_builds_the_client_drlg_in_the_app() {
         Some(1),
         "the one room of the town"
     );
-    // TODO(spec: tick.md §6 rule 4, `0x0061A460`): the server sends no
-    // 0x04, so the client is not in game.
-    assert!(!w.in_game);
+    // The first tick populated the town room, so the client's room was
+    // ready and the client pass sent 0x04 (`tick.md` §6 rule 6): the
+    // client is in game.
+    assert!(w.in_game);
     // The feed answers BlankScreen from the player's level's row (the
     // synthetic rows have BlankScreen 0).
     let state = app.world().resource::<WorldViewState>();

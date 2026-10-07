@@ -1,4 +1,4 @@
-// Spec: specs/monsters/ai.md §9.15–§9.29 (CorruptRogue, SkeletonBow, FoulCrowNest, BloodRaven, SkeletonMage, Arach, Fetish, Vampire, Bighead, BloodHawk, HellMeteor, SandRaider, Baboon, SandMaggot, Scarab)
+// Spec: specs/monsters/ai-bodies.md §9.15–§9.29 (CorruptRogue, SkeletonBow, FoulCrowNest, BloodRaven, SkeletonMage, Arach, Fetish, Vampire, Bighead, BloodHawk, HellMeteor, SandRaider, Baboon, SandMaggot, Scarab)
 //! Monster thinks of §9.15–§9.29, with the init functions of FoulCrowNest
 //! (also Sarcophagus and MinionSpawner) and BloodRaven, and SandMaggot's
 //! alternate function. Brackets in the comments are the spec's Normal
@@ -1122,7 +1122,7 @@ pub fn sand_maggot<W: AiHost + ?Sized>(
         }
         return;
     }
-    // TODO(spec: ai.md §9.28): states above 3 are not stated; they take
+    // TODO(spec: ai-bodies.md §9.28): states above 3 are not stated; they take
     // the above-ground steps.
     // 3.1.
     if cx.world.life_percent(u) < 25

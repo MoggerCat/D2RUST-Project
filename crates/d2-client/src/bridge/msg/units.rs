@@ -1,4 +1,4 @@
-// Spec: specs/client/msg-units.md, specs/client/model.md (§2 rule 6, §8, §11, §12 rules 2–3, §14 rule 4, Randomness)
+// Spec: specs/client/msg-units.md, specs/client/model.md (§2 rule 6, §8, §11, §12 rules 2–3, §14 rule 4, Randomness), specs/sim/unit-order.md (§5 rule 6)
 //! Unit messages: add (0x59 players, 0xAC monsters, 0x51 objects),
 //! remove (0x0A), re-place (0x15), the queued movement and action
 //! messages (0x0C–0x10, 0x4C, 0x4D, 0x67–0x72: a position check, then a
@@ -15,39 +15,63 @@ use d2_sim::rng::Seed;
 use super::super::bits::BitReader;
 use super::super::check::check;
 use super::super::dispatch::{HandlerError, Message, UnitMessage};
+use super::super::drlg::DrlgRoomId;
+use super::super::skills::SkillList;
 use super::super::world::{
     ClientUnit, ClientWorld, KindData, ModeRequest, MonsterData, ObjectData, PlayerData, UnitKey,
     INIT_SEED, MISSILE, MONSTER, OBJECT, PLAYER,
 };
 use super::Bytes;
 
+/// A unit being created and the room of its point.
+struct Created {
+    unit: ClientUnit,
+    room: Option<DrlgRoomId>,
+}
+
+impl Created {
+    /// Adds the unit (§2 rule 4) and links it at the head of its creation
+    /// room's list when it has one (`sim/unit-order.md` §5 rule 6: the
+    /// dynamic path set-up of players and monsters, the object init).
+    fn add(self, w: &mut ClientWorld) {
+        let key = self.unit.key;
+        w.add(self.unit);
+        if self.room.is_some() {
+            w.room_units.place(key, self.room);
+        }
+    }
+}
+
 /// Common creation fields (model §2 rule 6): type, class, GUID, and the
 /// seed: {1, 666} at (0, 0); at another point the room of the point
 /// (§2 rule 7, fatal 0x13C when none) has its seed stepped once and the
-/// unit seed is `init_low(lo')` (§12 rule 5). Without a client DRLG the
-/// room's seed is not in the model, so the seed is `None`.
+/// unit seed is `init_low(lo')` (§12 rule 5; 0x59, 0xAC and 0x51 alike,
+/// `msg-units.md` Randomness). Without a client DRLG the room's seed is
+/// not in the model, so the seed is `None`.
 fn create(
     w: &mut ClientWorld,
     key: UnitKey,
     class: u32,
     x: u16,
     y: u16,
-) -> Result<ClientUnit, HandlerError> {
+) -> Result<Created, HandlerError> {
     let mut u = ClientUnit::new(key);
     u.class = class;
     let placed = (x, y) != (0, 0);
     u.seed = (!placed).then_some(INIT_SEED);
+    let mut room = None;
     if placed && w.drlg.is_some() {
-        let room = w.room_at(x, y).ok_or(HandlerError::Fatal(0x13C))?;
+        let r = w.room_at(x, y).ok_or(HandlerError::Fatal(0x13C))?;
         let seed = w
             .drlg
             .as_mut()
-            .and_then(|d| d.unit_seed(room.room))
+            .and_then(|d| d.unit_seed(r.room))
             .expect("a listed room is active");
         u.seed = Some((seed.lo, seed.hi));
+        room = Some(r.room);
     }
     u.position = placed.then_some((x, y));
-    Ok(u)
+    Ok(Created { unit: u, room })
 }
 
 /// 0x59 AssignPlayer (§1.1).
@@ -58,11 +82,14 @@ pub fn assign_player(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handl
     }
     let key = UnitKey::new(PLAYER, b.u32(1)?);
     let (x, y) = (b.u16(0x16)?, b.u16(0x18)?);
-    let mut u = create(w, key, u32::from(b.u8(5)?), x, y)?;
+    let mut c = create(w, key, u32::from(b.u8(5)?), x, y)?;
+    let u = &mut c.unit;
     // Player init (`0x00460BF0`, rule 3).
     for s in [68, 67, 69] {
         u.stats.insert(s, 100);
     }
+    // A skill list (`0x006438B0`, +0xA8; `msg-skills.md` §1 rule 1).
+    u.skills = Some(SkillList::default());
     u.mode = 5;
     // Randomness rule 2: unless the new record is already the local
     // player (never: the local player pointer is the old record while the
@@ -78,7 +105,7 @@ pub fn assign_player(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handl
         name,
         cursor_item: None,
     });
-    w.add(u);
+    c.add(w);
     Ok(())
 }
 
@@ -154,7 +181,8 @@ pub fn assign_monster(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Hand
     if class_row.is_none() {
         return Ok(());
     }
-    let mut u = create(w, key, u32::from(class), x, y)?;
+    let mut c = create(w, key, u32::from(class), x, y)?;
+    let u = &mut c.unit;
     // A monster's seed is init_low(+0x28), {0, 666} without a room.
     if u.position.is_none() {
         u.seed = Some((0, INIT_SEED.1));
@@ -166,6 +194,10 @@ pub fn assign_monster(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Hand
     u.stats.insert(7, 0x8000);
     u.stats.insert(6, i32::from(life) << 8);
     u.stats.insert(328, i32::from(x.wrapping_add(y)));
+    // Rule 7: `+0xA8` := a skill list (`0x006438B0(0)`). TODO(spec:
+    // msg-units.md §1.2 rule 8): the `monstats` Skill / level / mode
+    // columns are not in the client tables, so no skill is added.
+    u.skills = Some(SkillList::default());
     // Rule 4.
     if r.read(1) == 1 {
         // TODO(spec: msg-units.md open question 3): what `0x00621CC0`
@@ -203,7 +235,7 @@ pub fn assign_monster(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Hand
         }
     }
     u.kind = KindData::Monster(Box::new(data));
-    w.add(u);
+    c.add(w);
     Ok(())
 }
 
@@ -222,7 +254,8 @@ pub fn assign_object(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handl
     }
     let key = UnitKey::new(ty, b.u32(2)?);
     let (x, y) = (b.u16(8)?, b.u16(0xA)?);
-    let mut u = create(w, key, u32::from(b.u16(6)?), x, y)?;
+    let mut c = create(w, key, u32::from(b.u16(6)?), x, y)?;
+    let u = &mut c.unit;
     if ty == OBJECT {
         u.mode = u32::from(b.u8(0xC)?);
         u.kind = KindData::Object(ObjectData {
@@ -236,7 +269,7 @@ pub fn assign_object(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handl
             "msg-units.md §1.3 rule 2: 0x51 for a unit type other than 2",
         ));
     }
-    w.add(u);
+    c.add(w);
     Ok(())
 }
 
@@ -285,21 +318,22 @@ pub fn reassign_player(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Han
         return Err(HandlerError::Fatal(0x538));
     }
     // Rule 4.4 / `model.md` §11 rule 4: the local player moving to a room
-    // whose level's `Act` differs from the old room's switches the act
-    // palette; the first placement (no old room) does not.
+    // whose level's `Pal` (+0x02, not `Act`) differs from the old room's
+    // switches the palette to `Pal`; the first placement (no old room)
+    // does not.
     if w.local_player == Some(key) {
         if let (Some(old), Some(new)) = (w.local_room().copied(), new_room) {
-            let act = |level: u16| {
+            let pal = |level: u16| {
                 msg.inputs
                     .tables
                     .levels
                     .get(usize::from(level))
-                    .map(|l| l.act)
+                    .map(|l| l.pal)
                     .ok_or(HandlerError::Invalid("room level past the Levels rows"))
             };
-            let new_act = act(new.level)?;
-            if act(old.level)? != new_act {
-                w.palette_act = Some(new_act);
+            let new_pal = pal(new.level)?;
+            if pal(old.level)? != new_pal {
+                w.palette_act = Some(new_pal);
             }
         }
     }
@@ -308,6 +342,11 @@ pub fn reassign_player(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Han
     // (`0x0064E7B0`), which needs the client's collision map.
     if let Some(u) = w.units.get_mut(&key) {
         u.position = Some((x, y));
+    }
+    // The teleport's room recache (`sim/unit-order.md` §5 rule 6): leave
+    // the old room's list, head of room''s.
+    if w.active_rooms.is_some() {
+        w.room_units.place(key, new_room.map(|r| r.room));
     }
     Ok(())
 }

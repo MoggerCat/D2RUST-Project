@@ -49,6 +49,8 @@ struct Fake {
     interact: BTreeMap<UnitId, (u8, u32)>,
     pets: Vec<UnitId>,
     hireling: Option<UnitId>,
+    /// The hireling's node is living (bit 0 clear): `(7, 0)` finds it.
+    hireling_living: bool,
     curable: BTreeSet<u16>,
     states_count: u16,
     flags: QuestFlags,
@@ -220,9 +222,13 @@ impl NpcWorld for Fake {
         self.interact.remove(&player);
         self.log.push("reset interact".into());
     }
-    fn pet(&self, _: UnitId, kind: u8, _: u8) -> Option<UnitId> {
-        // The fake answers (7, 0) and (7, 1) with the one hireling.
+    fn pet(&self, _: UnitId, kind: u8, arg: u8) -> Option<UnitId> {
+        // The fake answers (7, 1) with the one hireling, and (7, 0) with
+        // it only while its node is living.
         assert_eq!(kind, 7);
+        if arg == 0 && !self.hireling_living {
+            return None;
+        }
         self.hireling
     }
     fn pets(&self, _: UnitId) -> Vec<UnitId> {
@@ -1301,7 +1307,7 @@ fn identify_refusals() {
 
 // ------------------------------------------------------------ §7.3
 
-// Covers: specs/world/npc.md §7.3 text, §7.3 r3, §7.3 r4, §7.3 r5, §7.3 r6, §7.3 r7, §7.3 r8
+// Covers: specs/world/npc.md §7.3 text, §7.3 r3, §7.3 r4, §7.3 r5, §7.3 r6, §7.3 r7, §7.3 r8; specs/world/hirelings.md §3.1 r1
 #[test]
 fn hire_greiz_and_refill() {
     let mut c = control(0);
@@ -1418,7 +1424,7 @@ fn hire_refusals() {
 
 // ------------------------------------------------------------ §7.4
 
-// Covers: specs/world/npc.md §7.4 text, §7.4 r1, §7.4 r2, §7.4 r3, §7.4 r4
+// Covers: specs/world/npc.md §7.4 text, §7.4 r1, §7.4 r2, §7.4 r3, §7.4 r4; specs/world/hirelings.md §9 r2
 #[test]
 fn resurrect_at_tyrael() {
     let mut c = control(0);
@@ -1468,9 +1474,40 @@ fn resurrect_at_tyrael() {
     assert_eq!(c.resurrect(&mut w, PLAYER, &msg5(0x62, 6)), 3);
 }
 
+// Covers: specs/world/npc.md §7.4 r2, §edge-cases-original-bugs r11; specs/world/hirelings.md §9 r3, §edge-cases-original-bugs r5
+#[test]
+fn resurrect_refuses_a_living_hireling() {
+    // Test vector "crafted 0x62 at Kashya, hireling living": 0x2A code 9;
+    // no gold taken, no 0x9B, nothing changed (d2rs policy).
+    let mut c = control(0);
+    let mut w = Fake::new();
+    let kashya = w.npc(class::KASHYA, 0x30);
+    let merc = UnitId(60);
+    w.units.insert(
+        merc,
+        Unit {
+            guid: 60,
+            ty: 1,
+            max: [300, 0, 0],
+            ..Unit::default()
+        },
+    );
+    w.set(merc, stat::LEVEL, 10);
+    w.set(PLAYER, stat::GOLD, 1000);
+    w.hireling = Some(merc);
+    w.hireling_living = true;
+    talk(&mut c, &mut w, kashya);
+    w.sent.clear();
+    w.log.clear();
+    assert_eq!(c.resurrect(&mut w, PLAYER, &msg5(0x62, 0x30)), 0);
+    assert_eq!(w.sent, [transaction(0, 9, u32::MAX, 1000).to_vec()]);
+    assert_eq!(w.get(PLAYER, stat::GOLD), 1000);
+    assert!(w.log.is_empty(), "{:?}", w.log);
+}
+
 // ------------------------------------------------------------ §7.5
 
-// Covers: specs/world/npc.md §7.5
+// Covers: specs/world/npc.md §7.5; specs/world/hirelings.md §3.1 r2
 #[test]
 fn quest_mercenary() {
     let mut c = control(0);
@@ -1506,6 +1543,7 @@ fn quest_mercenary() {
     assert_eq!(w.log.len(), 3);
     // Expansion player with a hireling: only the refill check.
     w.hireling = Some(UnitId(60));
+    w.hireling_living = true;
     w.sent.clear();
     c.quest_mercenary(&mut w, PLAYER, class::KASHYA).unwrap();
     assert!(w.sent.is_empty());

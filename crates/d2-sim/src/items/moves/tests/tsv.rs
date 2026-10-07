@@ -75,7 +75,7 @@ fn check_actions(tsv: &str) -> Vec<String> {
     out
 }
 
-// Covers: specs/items/inventory.md §6.2
+// Covers: specs/items/inventory-moves.md §6.2
 #[test]
 fn item_actions_match_tsv() {
     assert_eq!(check_actions(ACTIONS_TSV), Vec::<String>::new());
@@ -257,7 +257,7 @@ fn check_layouts(tsv: &str) -> Vec<String> {
     out
 }
 
-// Covers: specs/items/inventory.md §11, §10.3
+// Covers: specs/items/inventory-moves.md §11, §10.3
 #[test]
 fn layouts_match_server_tsv() {
     assert_eq!(check_layouts(SERVER_TSV), Vec::<String>::new());
@@ -302,7 +302,7 @@ fn check_handled(tsv: &str) -> Vec<String> {
     out
 }
 
-// Covers: specs/items/inventory.md §7 text
+// Covers: specs/items/inventory-moves.md §7 text
 #[test]
 fn handled_ids_match_client_tsv() {
     assert_eq!(check_handled(CLIENT_TSV), Vec::<String>::new());

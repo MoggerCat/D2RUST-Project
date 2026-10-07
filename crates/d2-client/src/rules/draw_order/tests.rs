@@ -307,6 +307,44 @@ fn shadow_array_appends() {
     assert_eq!(records, [0, 1]);
 }
 
+// Covers: specs/render/draw-order.md §3 r4; specs/sim/unit-order.md §5 r7
+#[test]
+fn the_fill_sorts_each_rooms_units_by_y_stably() {
+    let mut r = room();
+    for g in 1..=4 {
+        r.units.push(unit(g, MONSTER, 1));
+    }
+    let mut n = near(vec![r]);
+    let ys = [30, 10, 30, 10];
+    let positions: BTreeMap<_, _> = n.rooms[0]
+        .units
+        .iter()
+        .zip(ys)
+        .map(|(u, y)| (u.key, pos(1000, 2000 + y)))
+        .collect();
+    // "Skip units": no sort.
+    fill(&grid(), &mut n, &positions, CLOCK, true).unwrap();
+    assert!(!n.rooms[0].units_sorted);
+    fill(&grid(), &mut n, &positions, CLOCK, false).unwrap();
+    let guids: Vec<u32> = n.rooms[0].units.iter().map(|u| u.key.guid).collect();
+    // Ascending y; equal y keep their list order.
+    assert_eq!(guids, [2, 4, 1, 3]);
+    assert!(n.rooms[0].units_sorted);
+    // A room failing the room test (§3 r1) is not sorted.
+    let mut far = room();
+    far.tiles.x = 100_000;
+    far.units.push(unit(9, MONSTER, 1));
+    far.units.push(unit(8, MONSTER, 1));
+    let mut n = near(vec![far]);
+    let positions: BTreeMap<_, _> = [(9, 5), (8, 1)]
+        .map(|(g, y)| (n.rooms[0].units[if g == 9 { 0 } else { 1 }].key, pos(0, y)))
+        .into_iter()
+        .collect();
+    fill(&grid(), &mut n, &positions, CLOCK, false).unwrap();
+    assert!(!n.rooms[0].units_sorted);
+    assert_eq!(n.rooms[0].units[0].key.guid, 9);
+}
+
 // Covers: specs/render/draw-order.md §3 r4
 #[test]
 fn units_file_by_flatness() {
@@ -322,7 +360,8 @@ fn units_file_by_flatness() {
     for g in 1..=3 {
         positions.insert(n.rooms[0].units[g - 1].key, pos(1000, 2000));
     }
-    positions.insert(n.rooms[0].units[3].key, pos(-100_000, 0));
+    // Same y as the others, so the Y sort (§3 r4) keeps the list order.
+    positions.insert(n.rooms[0].units[3].key, pos(-100_000, 2000));
     let lists = fill(&grid(), &mut n, &positions, CLOCK, false).unwrap();
     let cell = &lists.cells[587];
     assert_eq!(cell.unit, vec![Entry::Unit { room: 0, unit: 0 }]);

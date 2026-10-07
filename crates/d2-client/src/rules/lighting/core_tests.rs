@@ -7,8 +7,8 @@ use std::cell::RefCell;
 use super::contribute::{self, oct};
 use super::map::{Ambient, AmbientScene, LightMap, NearRoom, MAP_BYTES};
 use super::records::{
-    unit_light_pos, unit_type, LightError, LightKind, LightList, LightRecord, LightWorld, Owner,
-    RoomId,
+    unit_light_pos, unit_type, LightError, LightKind, LightList, LightRecord, LightRooms,
+    LightWorld, Owner, RoomId,
 };
 
 /// An owner entry: (owner, precise position, sub-tile, room).
@@ -32,7 +32,7 @@ impl World {
     }
 }
 
-impl LightWorld for World {
+impl LightRooms for World {
     fn owner_position(&self, owner: &Owner) -> Option<(i32, i32)> {
         self.find(owner).map(|e| e.1)
     }
@@ -42,15 +42,18 @@ impl LightWorld for World {
     fn owner_room(&self, owner: &Owner) -> Option<RoomId> {
         self.find(owner).and_then(|e| e.3)
     }
+    fn cell_room(&self, _room: RoomId, x: i32, y: i32) -> Option<RoomId> {
+        self.probes.borrow_mut().push((x, y));
+        Some(self.rooms.iter().find(|e| e.0 == (x, y)).map_or(1, |e| e.1))
+    }
+}
+
+impl LightWorld for World {
     fn is_local_player(&self, owner: &Owner) -> bool {
         self.local == Some(*owner)
     }
     fn owner_blocks(&self, _owner: &Owner, x: i32, y: i32) -> bool {
         self.blocked.contains(&(x, y))
-    }
-    fn cell_room(&self, _room: RoomId, x: i32, y: i32) -> Option<RoomId> {
-        self.probes.borrow_mut().push((x, y));
-        Some(self.rooms.iter().find(|e| e.0 == (x, y)).map_or(1, |e| e.1))
     }
 }
 
@@ -537,7 +540,7 @@ fn frame_dispatch_by_kind_and_q() {
 
 // Covers: specs/render/lighting.md §6.4
 #[test]
-fn room_leave_invalidates_cache() {
+fn new_room_invalidates_cache() {
     let o = owner(unit_type::OBJECT, 3);
     let mut world = World {
         owners: vec![(o, (100 << 16, 100 << 16), (100, 100), Some(1))],
@@ -554,13 +557,13 @@ fn room_leave_invalidates_cache() {
     l.frame(&mut map, 2, &world).unwrap();
     assert!(l.get(a).unwrap().cache_valid);
 
-    // The owner's own room leaving: nothing, no probe.
-    l.room_leaving(1, &world).unwrap();
+    // The owner's own room is the new room: nothing, no probe.
+    l.room_created(1, &world).unwrap();
     assert!(l.get(a).unwrap().cache_valid);
     assert!(world.probes.borrow().is_empty());
 
     // Room 3 is not reached: all four probes in order, cache kept.
-    l.room_leaving(3, &world).unwrap();
+    l.room_created(3, &world).unwrap();
     assert!(l.get(a).unwrap().cache_valid);
     assert_eq!(
         *world.probes.borrow(),
@@ -570,7 +573,7 @@ fn room_leave_invalidates_cache() {
     // Room 2 holds (100, 103): the third probe ends the tests; the cache
     // memory is kept.
     world.probes.borrow_mut().clear();
-    l.room_leaving(2, &world).unwrap();
+    l.room_created(2, &world).unwrap();
     let r = l.get(a).unwrap();
     assert!(!r.cache_valid);
     assert_eq!(r.cache.len(), 49);
@@ -581,10 +584,10 @@ fn room_leave_invalidates_cache() {
 
     // Owner not found: fatal 0x591.
     world.owners.clear();
-    assert_eq!(l.room_leaving(2, &world), Err(LightError::Fatal0x591));
+    assert_eq!(l.room_created(2, &world), Err(LightError::Fatal0x591));
     let mut l2 = LightList::new();
     l2.create(None, (0, 0), LightKind::Cached, 3, 255, 0, 0, 0);
-    assert_eq!(l2.room_leaving(2, &world), Err(LightError::Fatal0x591));
+    assert_eq!(l2.room_created(2, &world), Err(LightError::Fatal0x591));
 }
 
 fn amb(i: u8) -> Ambient {
@@ -782,4 +785,52 @@ fn bytes_and_digest() {
     // Zero map: SHA-256 of 18,432 zero bytes.
     let zero: [u8; 32] = Sha256::digest(vec![0u8; MAP_BYTES]).into();
     assert_eq!(empty_map().digest(), zero);
+}
+
+// Covers: specs/render/lighting.md §12 r1, §12 r2
+#[test]
+fn build_is_a_pure_function_of_its_inputs() {
+    // The same window, ambients, flags, q and records give the same bytes
+    // (no seed is an input, so the build draws nothing); changing one
+    // input (q, a record's radius) changes the map.
+    let world = World::default();
+    let scene = AmbientScene {
+        player_ambient: amb(10),
+        near: vec![],
+    };
+    let lights = || {
+        let mut l = LightList::new();
+        l.create(
+            None,
+            (804, 804),
+            LightKind::Shadowed,
+            13,
+            255,
+            255,
+            255,
+            255,
+        );
+        l.create(None, (820, 790), LightKind::Plain, 6, 200, 255, 0, 0);
+        l
+    };
+    let build = |q: u8, l: &mut LightList| {
+        LightMap::build(
+            (100, 100),
+            Some(&scene),
+            |x, y| (x, y) == (102, 100),
+            q,
+            l,
+            &world,
+        )
+        .unwrap()
+    };
+    let a = build(2, &mut lights());
+    let b = build(2, &mut lights());
+    assert_eq!(a.bytes(), b.bytes());
+    assert_eq!(a.digest(), b.digest());
+    assert_ne!(build(0, &mut lights()).digest(), a.digest(), "q");
+    let mut l = lights();
+    let first = l.iter().next().unwrap().0;
+    l.set_radius(first, 3);
+    assert_ne!(build(2, &mut l).digest(), a.digest(), "radius");
 }

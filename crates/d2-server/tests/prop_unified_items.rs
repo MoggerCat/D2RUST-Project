@@ -1,4 +1,4 @@
-// Spec: specs/items/inventory.md §1.1–§1.4, §2.2, §2.4, §6.1, §6.4, §7, §11; specs/world/vendors.md §7; specs/world/cube.md §2, §8; specs/items/generation.md §2–§3
+// Spec: specs/items/inventory.md §1.1–§1.4, §2.2, §2.4; specs/items/inventory-moves.md §6.1, §6.4, §7, §11; specs/world/vendors.md §7; specs/world/cube.md §2, §8; specs/items/generation.md §2–§3
 //! State-machine properties of the game's one item store and one
 //! inventory model on a wired host (`docs/handoff/unify-items.md`):
 //! random sequences of item moves (C→S 0x16–0x29, 0x50, 0x61, 0x63),
@@ -8,7 +8,7 @@
 //! creation a death drop runs), one frame each (dispatch, then the host
 //! tick with its update pass), on `SimGame<ActionSim<_>, WiredWorld<_>>`.
 //!
-//! After every frame (`inventory.md` §1.1–§1.4, §2.2, §6, §11):
+//! After every frame (`inventory.md` §1.1–§1.4, §2.2, `inventory-moves.md` §6, §11):
 //!
 //! 1. **One place.** Every live item unit has its item data in the one
 //!    store (`ActionHooks::items`) and the store holds nothing else; it
@@ -250,6 +250,8 @@ fn tile(orientation: u32, main: u32, sub: u32, rarity: u32) -> TileInfo {
         rarity,
         material: 0,
         subtile_flags: [0; 25],
+        roof_height: 0,
+        height: 0,
     }
 }
 

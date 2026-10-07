@@ -1,7 +1,7 @@
 // Spec: specs/world/hirelings.md §11
 //! The hireling item swap `0x0054CED0(game, player, merc, item C)`
 //! (§11), reached from the 0x61 give `0x0054D230`
-//! (`items/inventory.md` §7.23, [`crate::items::moves::handlers`]) when
+//! (`items/inventory-moves.md` §7.23, [`crate::items::moves::handlers`]) when
 //! C is allowed. Item placement, requirements (§4.2), the cursor equip
 //! (§4.6), duplication and messages are other specs' and are reached
 //! through [`HirelingItems`]. Units and items are the 0x61 path's
@@ -42,8 +42,8 @@ pub const NOTICE_3: u32 = 3;
 pub const EVENT_3: u32 = 3;
 
 /// Everything the swap reaches outside §11. `player` and `merc` are the
-/// swap's units; where §11 names a call without its unit, the method takes
-/// both and the provider picks (see the method's doc).
+/// swap's units; each call takes the unit 1.14d passes it (rule 4 "Order
+/// and units").
 pub trait HirelingItems {
     /// The unit has an inventory.
     fn has_inventory(&self, unit: Owner) -> bool;
@@ -65,8 +65,9 @@ pub trait HirelingItems {
     fn duplicate(&mut self, owner: Owner, item: Guid) -> Guid;
     /// The item's mode.
     fn set_mode(&mut self, item: Guid, mode: u8);
-    /// `0x00540E60(a, b)` (rule 3: `(9, C's GUID)` twice, `(3, 0)`).
-    fn notice(&mut self, player: Owner, a: u32, b: u32);
+    /// `0x00540E60(game, unit, a, b)` (rule 3: `(9, C's GUID)` to the
+    /// merc then to the player, `(3, 0)` to the merc).
+    fn notice(&mut self, unit: Owner, a: u32, b: u32);
     /// `inventory.md` §4.6 `0x005606B0(game, unit, item, loc, skip)`;
     /// §11 does not read its result.
     fn equip_from_cursor(&mut self, unit: Owner, item: Guid, loc: u8, skip: bool);
@@ -74,12 +75,14 @@ pub trait HirelingItems {
     fn consume(&mut self, item: Guid);
     /// The player's cursor item := none.
     fn clear_cursor(&mut self, player: Owner);
-    /// `0x0055DF00` (the hireling inventory pass, `inventory.md` §7.23).
-    fn inventory_pass(&mut self, player: Owner, merc: Owner);
-    /// `0x0055F4F0(0)`.
-    fn refresh_0055f4f0(&mut self, player: Owner, merc: Owner);
-    /// `0x005417D0`: event `id` at the current frame + 1.
-    fn event_next_frame(&mut self, player: Owner, merc: Owner, id: u32);
+    /// `0x0055DF00(game, unit, 0, 0)` (the inventory pass,
+    /// `inventory-moves.md` §7.23); §11 calls it on the merc.
+    fn inventory_pass(&mut self, unit: Owner);
+    /// `0x0055F4F0(game, unit, 0)`; §11 calls it on the merc.
+    fn refresh_0055f4f0(&mut self, unit: Owner);
+    /// `0x005417D0(game, unit, id, frame + 1, 0, 0)`: event `id` at the
+    /// current frame + 1; §11 queues it on the merc.
+    fn event_next_frame(&mut self, unit: Owner, id: u32);
     /// Unlink `item` from the unit's inventory; §11: it must be the item at
     /// the slot.
     fn unlink(&mut self, unit: Owner, item: Guid);
@@ -138,10 +141,12 @@ pub fn swap<W: HirelingItems>(
         equip_copy(w, player, merc, item, target, None);
         return res::SWAPPED;
     };
-    // Rule 4.
+    // Rule 4: `0x0055C730(old, merc)`, `0x0055DF00(merc)`, then the
+    // requirement check.
     w.unlink(merc, old);
     w.clear_slot(merc, target);
     w.stat_refresh_unlink(merc);
+    w.inventory_pass(merc);
     if w.requirements(item, merc, false) {
         w.item_flag_on(old, FLAG_10);
         w.item_flag_on(old, FLAG_20);
@@ -154,7 +159,7 @@ pub fn swap<W: HirelingItems>(
         w.set_mode(old, MODE_EQUIPPED);
         w.call_00628280(old, 0xFF);
         w.refresh_0055c460(merc);
-        w.refresh_0055f4f0(player, merc);
+        w.refresh_0055f4f0(merc);
         res::NONE
     }
 }
@@ -171,20 +176,19 @@ fn equip_copy<W: HirelingItems>(
 ) {
     let copy = w.duplicate(merc, item);
     w.set_mode(copy, MODE_CURSOR);
-    w.notice(player, NOTICE_REMOVED, item);
+    w.notice(merc, NOTICE_REMOVED, item);
     w.notice(player, NOTICE_REMOVED, item);
     w.equip_from_cursor(merc, copy, target, true);
     w.consume(item);
     w.clear_cursor(player);
-    // TODO(spec: hirelings.md §11 r4): "after C's copy is equipped" does
-    // not place the old item's duplicate among rule 3's later calls; it
-    // goes after "cursor := none" so that call does not clear it.
+    // Rule 4: the old item's duplicate after "cursor := none", before
+    // the refresh calls (all four on the merc).
     if let Some(old) = old {
         let back = w.duplicate(player, old);
         w.become_cursor(player, back);
     }
-    w.inventory_pass(player, merc);
-    w.refresh_0055f4f0(player, merc);
-    w.notice(player, NOTICE_3, 0);
-    w.event_next_frame(player, merc, EVENT_3);
+    w.inventory_pass(merc);
+    w.refresh_0055f4f0(merc);
+    w.notice(merc, NOTICE_3, 0);
+    w.event_next_frame(merc, EVENT_3);
 }

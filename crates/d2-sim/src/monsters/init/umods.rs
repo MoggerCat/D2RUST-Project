@@ -1,4 +1,4 @@
-// Spec: specs/monsters/init.md §16–§22; specs/monsters/umods.tsv
+// Spec: specs/monsters/init.md §16–§22; specs/monsters/umods.tsv; specs/monsters/umod-callbacks.md §2
 //! Boss spawns after the spawn (§16), umod choice (§17), boss minions
 //! and umod init (§18), the umod init functions (§19), superuniques
 //! (§20), restore paths (§21), and the umod callback dispatcher with the
@@ -233,20 +233,9 @@ pub const UMODS: [UmodRow; 43] = [
     ),
 ];
 
-/// Callback addresses with bodies here (§22).
-pub mod callback {
-    /// Umod 9 mode 1: unique and new mode 0 → event 7 at frame + 4.
-    pub const FIRE_MODE: u32 = 0x005A_25F0;
-    /// Umod 17 mode 1: unique and new mode 3 → frame + 2.
-    pub const LIGHTNING_MODE: u32 = 0x005A_37D0;
-    /// Umods 10, 18, 31, 32, 42 mode 1: new mode 0 (18: and unique) →
-    /// frame + 4.
-    pub const DEATH_MODE: u32 = 0x005A_3800;
-    /// Umod 34 mode 1 (revive draw).
-    pub const AI_AFTER_DEATH: u32 = 0x005A_3840;
-    /// Umod 41 event 7 handler.
-    pub const ALWAYS_RUN_AI: u32 = 0x005A_4230;
-}
+/// Callback addresses (§22); every one has a body in
+/// [`super::callbacks`] (`umod-callbacks.md`).
+pub use super::callbacks::addr as callback;
 
 /// The aura table `0x0073BF68` (§19.5): (min level, level offset,
 /// multiplier, divisor, skill).
@@ -1008,55 +997,13 @@ fn run_callback<H: InitHost + ?Sized>(
     mode: u8,
     addr: u32,
 ) {
-    // The "new mode" of the mode-1 callbacks is the unit's mode after
-    // the change (`0x005A7C20` calls them once it is set).
-    let cur = h.units().get(unit).map_or(u32::MAX, |r| r.mode);
-    match addr {
-        callback::FIRE_MODE => {
-            if unique && cur == super::mode::DEATH {
-                schedule(h, unit, 4);
-            }
-        }
-        callback::LIGHTNING_MODE => {
-            if unique && cur == super::mode::GETHIT {
-                schedule(h, unit, 2);
-            }
-        }
-        callback::DEATH_MODE => {
-            if cur == super::mode::DEATH && (umod != 18 || unique) {
-                schedule(h, unit, 4);
-            }
-        }
-        callback::AI_AFTER_DEATH => {
-            if cur == super::mode::DEATH && !h.umod34_gate(unit) {
-                h.game()
-                    .timers
-                    .cancel_unit_events(unit, EVENT_UMOD as u8, None);
-                let d = h.info().d();
-                let class = class_of(h, unit);
-                let (aip8, aip1) = cx.monstats(class).map_or((0, 0), |m| {
-                    (
-                        s16([m.aip8, m.aip8_n, m.aip8_h][d]),
-                        s16([m.aip1, m.aip1_n, m.aip1_h][d]),
-                    )
-                });
-                if ((seed(h, unit).step() % 100) as i32) < aip8 {
-                    schedule(h, unit, 10 * aip1 + 1);
-                }
-            }
-        }
-        callback::ALWAYS_RUN_AI => {
-            if !h.units().is_dead(unit) {
-                h.run_ai_tick(unit);
-                schedule(h, unit, 75);
-            }
-        }
-        _ => h.monsters().unhandled.push(Unhandled::Callback {
+    if !super::callbacks::run(cx, h, unit, umod, unique, addr) {
+        h.monsters().unhandled.push(Unhandled::Callback {
             addr,
             unit,
             umod,
             mode,
-        }),
+        });
     }
 }
 

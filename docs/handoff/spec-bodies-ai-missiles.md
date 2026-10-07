@@ -52,7 +52,7 @@ would invent behaviour. Stubs unchanged (log `Unhandled`, §4 of
 ## 3. Missing spec, per entry (for the local spec coordinator)
 
 What every entry below needs to become implementable is the same bar as
-`ai.md` §9.3–§9.13 / `missiles.md` §R4: the 1.14d body read as a numbered
+`ai-bodies.md` §9.3–§9.13 / `missiles.md` §R4: the 1.14d body read as a numbered
 step list with every branch, every draw in order and on which seed,
 every constant and column/skill-calc read, the seam calls with their
 arguments, and (missiles) the return value. Then set the row's `status`
@@ -330,7 +330,7 @@ Idle (states 2–17: `0x005B14E0`, `0x005E5870`, `0x005E52D0`, `0x005E7AC0`,
 
 Priority from `missiles.md` open question 8: server-do 2, 3, 5, 7
 (Act 1–2 monsters); server-hit 1, 4, 12, 13 (common skills). For AI,
-the D2MOO-only Act I rows (3.2) come first (`ai.md` §9.14).
+the D2MOO-only Act I rows (3.2) come first (`ai-bodies.md` §9.14).
 
 ## 4. Seams
 

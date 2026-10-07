@@ -10,6 +10,8 @@ use crate::rng::Seed;
 
 impl ChestWorld for Fake {}
 
+mod mutant_tests;
+
 const OBJ: UnitId = UnitId(10);
 const PLAYER: UnitId = UnitId(20);
 const ROOM: RoomId = RoomId(3);
@@ -1008,4 +1010,25 @@ fn chest_through_dispatch_opens_and_arms_trap() {
     assert_eq!(d, Dispatch::Done(1));
     assert_eq!(h.drop_qs(), s(&["drop 0 UnitId(10)"]));
     assert_eq!(h.f.schedules(), vec![(OBJ, oevent::TRAP, 135)]);
+}
+
+// ------------------------------------------------------------------ §8 common
+
+// Covers: specs/world/objects.md §8 text
+#[test]
+fn magic_test_is_item_type_4_quality_4_to_9() {
+    let mut h = H::default();
+    for q in 0..=12u8 {
+        let i = UnitId(2000 + u32::from(q));
+        h.types.insert(i, unit_type::ITEM);
+        h.item_q.insert(i, q);
+        assert_eq!(is_magic(&h, Some(i)), (4..=9).contains(&q), "quality {q}");
+    }
+    // Not an item (type 1, a monster) with a magic quality: not magic.
+    let m = UnitId(3000);
+    h.types.insert(m, 1);
+    h.item_q.insert(m, 4);
+    assert!(!is_magic(&h, Some(m)));
+    // No item (the chest drop returned none).
+    assert!(!is_magic(&h, None));
 }

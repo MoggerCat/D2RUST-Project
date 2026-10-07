@@ -20,3 +20,9 @@ workspace = true
 
 [dev-dependencies]
 proptest.workspace = true
+# The game constructor and the wired-host session (`tests/game_wired_host.rs`).
+test-fixtures.workspace = true
+# The wired-host e2e test (`tests/e2e_night_world.rs`) shares the e2e
+# world fixture of `d2-client/tests/e2e_support`, whose combat / missile
+# tables are `d2_sim::bench_fixtures::combat`'s.
+d2-sim = { workspace = true, features = ["bench-fixtures"] }

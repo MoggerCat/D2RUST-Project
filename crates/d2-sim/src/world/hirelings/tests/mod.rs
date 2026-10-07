@@ -3,6 +3,7 @@
 //! ([`fake`]) and one file per module.
 
 mod fake;
+mod game;
 mod items;
 mod level;
 mod life;

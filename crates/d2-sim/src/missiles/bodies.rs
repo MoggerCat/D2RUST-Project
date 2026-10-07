@@ -237,7 +237,9 @@ pub fn srv_do_25<W: MissileWorld + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>,
 // ---------------------------------------------------------------- §R9.6
 
 /// `elem_roll(game, missile, unit, record)` = `0x005A8C70`: rolls only
-/// the row's `EType` element on the missile's seed; returns `EType`.
+/// the row's `EType` element on the missile's seed; returns the rolled
+/// amount (8.8): the final physical, the fire / lightning / magic / cold
+/// roll, poison or burn × 25, else 0 (§R9.6 return value).
 pub fn elem_roll<W: MissileWorld + ?Sized>(
     cx: &mut Ctx<'_, W>,
     m: UnitId,
@@ -275,15 +277,20 @@ pub fn elem_roll<W: MissileWorld + ?Sized>(
                 }
             }
             rec.physical = ph;
+            ph
         }
-        1 => rec.fire = roll(cx, stat::FIREMINDAM, stat::FIREMAXDAM, stat::FIRE_MASTERY),
+        1 => {
+            rec.fire = roll(cx, stat::FIREMINDAM, stat::FIREMAXDAM, stat::FIRE_MASTERY);
+            rec.fire
+        }
         2 => {
             rec.lightning = roll(
                 cx,
                 stat::LIGHTMINDAM,
                 stat::LIGHTMAXDAM,
                 stat::LIGHT_MASTERY,
-            )
+            );
+            rec.lightning
         }
         3 => {
             rec.magic = roll(
@@ -291,11 +298,13 @@ pub fn elem_roll<W: MissileWorld + ?Sized>(
                 stat::MAGICMINDAM,
                 stat::MAGICMAXDAM,
                 stat::MAGIC_MASTERY,
-            )
+            );
+            rec.magic
         }
         4 => {
             rec.cold = roll(cx, stat::COLDMINDAM, stat::COLDMAXDAM, stat::COLD_MASTERY);
             rec.cold_len = cx.world.stat(m, stat::COLDLENGTH);
+            rec.cold
         }
         5 => {
             rec.poison = roll(
@@ -310,11 +319,24 @@ pub fn elem_roll<W: MissileWorld + ?Sized>(
                 len /= count;
             }
             rec.poison_len = len;
+            rec.poison.wrapping_mul(25)
         }
-        6 => rec.life_leech = cx.world.stat(m, stat::LIFEDRAINMINDAM),
-        7 => rec.mana_leech = cx.world.stat(m, stat::MANADRAINMINDAM),
-        8 => rec.stamina_leech = cx.world.stat(m, stat::STAMDRAINMINDAM),
-        9 => rec.stun_len = cx.world.stat(m, stat::STUNLENGTH),
+        6 => {
+            rec.life_leech = cx.world.stat(m, stat::LIFEDRAINMINDAM);
+            0
+        }
+        7 => {
+            rec.mana_leech = cx.world.stat(m, stat::MANADRAINMINDAM);
+            0
+        }
+        8 => {
+            rec.stamina_leech = cx.world.stat(m, stat::STAMDRAINMINDAM);
+            0
+        }
+        9 => {
+            rec.stun_len = cx.world.stat(m, stat::STUNLENGTH);
+            0
+        }
         11 => {
             rec.burn = roll(
                 cx,
@@ -323,14 +345,15 @@ pub fn elem_roll<W: MissileWorld + ?Sized>(
                 stat::FIRE_MASTERY,
             );
             rec.burn_len = cx.world.stat(m, stat::BURNINGLENGTH);
+            rec.burn.wrapping_mul(25)
         }
         12 => {
             rec.cold = roll(cx, stat::COLDMINDAM, stat::COLDMAXDAM, stat::COLD_MASTERY);
             rec.freeze_len = cx.world.stat(m, stat::COLDLENGTH);
+            rec.cold
         }
-        _ => {}
+        _ => 0,
     }
-    etype
 }
 
 /// `elem_len(record, len)` = `0x005A8F20` by `EType`.
@@ -603,7 +626,8 @@ pub fn srv_hit_13<W: MissileWorld + ?Sized>(
             .skill_calc(game, owner, k, SkillCalc::AuraLen, level),
     };
     let mut rec = DamageRecord::default();
-    let etype = elem_roll(cx, m, unit, &mut rec);
+    elem_roll(cx, m, unit, &mut rec);
+    let etype = i32::from(row.etype);
     if len > 0 {
         elem_len(&mut rec, etype, len);
     }

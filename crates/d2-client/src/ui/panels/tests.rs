@@ -583,3 +583,20 @@ fn cursor_jump() {
     assert_eq!(jump(&[], 0x19, ON, r8, 500, true), None);
     assert_eq!(jump(&[], 0x0E, ON, r8, 500, true), None);
 }
+
+// Covers: specs/ui/panels.md §2 r4
+#[test]
+fn a_refused_request_changes_nothing() {
+    // Stash open, inventory on / toggle: C[0x19][1] = 2 refuses. The call
+    // returns 0 with no effect; every flag and the open mode stay.
+    let mut e = env(Screen::R800);
+    let mut s = states();
+    set(&mut s, &mut e, 0x19, ON);
+    let open: Vec<bool> = (0..0x26).map(|ui| s.is_open(ui)).collect();
+    let mode_before = s.open_mode().get();
+    for m in [ON, TOGGLE] {
+        assert_eq!(set(&mut s, &mut e, 1, m), (false, vec![]));
+        assert_eq!((0..0x26).map(|ui| s.is_open(ui)).collect::<Vec<_>>(), open);
+        assert_eq!(s.open_mode().get(), mode_before);
+    }
+}

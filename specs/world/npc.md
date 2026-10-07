@@ -3,8 +3,9 @@
 - **Status:** draft: every rule is read from the 1.14d `Game.exe` (addresses
   below) and the talk / trade / buy / sell message sequences match the
   hand-played recording `traces/raw/20261006-015956-packets.jsonl`
-  (Charsi, Akara, Warriv, Flavie; Test vectors); hire, resurrect, heal and
-  the service actions have no recording yet.
+  (Charsi, Akara, Warriv, Flavie; Test vectors); a hire at Kashya is
+  recorded (`traces-raw-buddy/merc1-spawn-packets.jsonl`, Test vectors);
+  resurrect, heal and the service actions have no recording yet.
 - **Target version:** 1.14d
 - **Crate/module:** `d2-sim::world::npc`
 - **Related specs:** `world/vendors.md` (store inventories, gamble lists,
@@ -24,26 +25,26 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 49–62 |
-| Inputs | 63–73 |
-| Outputs / state changes | 74–81 |
-| Rules | 82–83 |
-|   1. NPC control and records | 84–138 |
-|   2. Starting an interaction (C→S 0x13) | 139–200 |
-|   3. Chat open and close (C→S 0x2F, 0x30) | 201–219 |
-|   4. Menu actions (C→S 0x38) | 220–241 |
-|   5. Healing on chat open | 242–266 |
-|   6. Cain identify (C→S 0x34) | 267–284 |
-|   7. Mercenaries | 285–382 |
-|   8. NPC services (C→S 0x38, action ∉ {1, 2, 3}) | 383–440 |
-|   9. S→C 0x2A NPC transaction (15 bytes) | 441–474 |
-|   10. Dead code in 1.14d (no caller, no pointer reference) | 475–486 |
-| Constants & data dependencies | 487–499 |
-| Randomness | 500–512 |
-| Edge cases & original bugs | 513–546 |
-| Test vectors | 547–565 |
-| Provenance | 566–601 |
-| Open questions | 602–625 |
+| Summary | 50–63 |
+| Inputs | 64–74 |
+| Outputs / state changes | 75–82 |
+| Rules | 83–84 |
+|   1. NPC control and records | 85–139 |
+|   2. Starting an interaction (C→S 0x13) | 140–201 |
+|   3. Chat open and close (C→S 0x2F, 0x30) | 202–220 |
+|   4. Menu actions (C→S 0x38) | 221–242 |
+|   5. Healing on chat open | 243–267 |
+|   6. Cain identify (C→S 0x34) | 268–285 |
+|   7. Mercenaries | 286–387 |
+|   8. NPC services (C→S 0x38, action ∉ {1, 2, 3}) | 388–445 |
+|   9. S→C 0x2A NPC transaction (15 bytes) | 446–479 |
+|   10. Dead code in 1.14d (no caller, no pointer reference) | 480–491 |
+| Constants & data dependencies | 492–504 |
+| Randomness | 505–517 |
+| Edge cases & original bugs | 518–558 |
+| Test vectors | 559–580 |
+| Provenance | 581–616 |
+| Open questions | 617–646 |
 <!-- /index -->
 
 ## Summary
@@ -362,6 +363,10 @@ Handler `0x0054BC00`: expansion game and size 5, else 3; `0x00579C00
 1. NPC missing or not the interact unit → 0x2A code 9; class not kashya,
    greiz, asheara, tyrael2, qual-kehk → code 9.
 2. Dead hireling of the player (`0x00574EC0(7, 1)`) missing → code 9.
+   `(7, 1)` returns the first hireling node dead or alive; 1.14d does
+   not test the dead bit (edge case 11). d2rs: a living node is
+   answered like a missing one (code 9, nothing changed;
+   `world/hirelings.md` edge case 5).
 3. cost = min((L·L / 2)·15, 50000), L = mercenary level (stat 12),
    signed division, unsigned cap (`0x006637B0`). Pay → else code 12.
 4. Clear unit flag 0x10000, mode 1, life := max, revive `0x00579AA0`
@@ -425,7 +430,7 @@ Hell only (difficulty 2): if slot 1 bit 0 is set and slot 41 bits 1 and
 0 are clear → `0x0058FD20` (sets 41.13, 41.1). Then any difficulty: if
 slot 41 bit 1 is set → reset stats (`0x00570360`) and skills
 (`0x00570C80`) (player spec), sound for the player (`0x00553380`),
-`0x0058FD50` (41.0 set, 41.1 cleared; `quests.md` §10.3).
+`0x0058FD50` (41.0 set, 41.1 cleared; `quests-act1.md` §10.3).
 
 #### 8.3 Act travel
 
@@ -539,7 +544,14 @@ Reproduced by default.
 11. §7.4 step 2 uses `0x00574EC0(7, 1)`, which returns the first
     hireling node whether dead or alive: a crafted 0x62 with a living
     hireling is charged and reaches the revive (`world/hirelings.md`
-    §9, edge case 5).
+    §9, edge case 5). Settled 2026-10-07 (`docs/handoff/gaps-night-specs.md`
+    GN1): the revive (`0x00579AA0`) then frees that same unit and keeps
+    using the freed record (`world/hirelings.md` §9 rule 3), so 1.14d's
+    outcome is undefined and is **not** reproduced. d2rs refuses: when
+    the node `(7, 1)` returns is living (bit 0 clear), S→C 0x2A code 9
+    as in step 2, before the cost (no gold taken, no message other than
+    the 0x2A, no unit, node or flag change). Both specs state this one
+    policy.
 12. The §7.3 step 1 cap (12, 20, 28, 36, 45) only feeds the Kashya
     `lvl < 8` gate; the offer level and price use the uncapped player
     level (`world/hirelings.md` §2).
@@ -558,6 +570,9 @@ Reproduced by default.
 | hire init, slot seed 22752887, 2 candidate rows, player level 10 | row 1, L = 6 | synthetic (§7.3 step 5) |
 | price: row gold 100, row level 3, L = 5 / 7 / 9 | 130 / 160 / 190 | synthetic |
 | resurrect L = 10 / 30 / 82 | 750 / 6750 / 50000 | synthetic (§7.4) |
+| crafted 0x62 at Kashya, hireling living | 0x2A code 9; no gold taken, no 0x9B (d2rs policy, edge case 11) | synthetic (§7.4) |
+| C→S `13 01000000 03000000` (Kashya, GUID 3), player level 8 | S→C 0x4F, ten 0x4E (name ids 0x0D56, 0x0D5A, 0x0D5B, 0x0D60, 0x0D66, 0x0D67, 0x0D68, 0x0D6F, 0x0D70, 0x0D76; u16 name, u32 slot seed), then 0x27, 0x29, 0x28, all in the input phase (§2 steps 3, 5) | `merc1-spawn-packets`, frame 969 |
+| C→S `36 03000000 680d` (hire 0x0D68), gold 296 | S→C 0x81 (`world/hirelings.md` Test vectors), 0x27 (level speech), 0x4F + nine 0x4E (0x0D68 gone), 0x2A `2a 00 05 ?? ?? ?? ?? 0d000000 88000000` (code 5, GUID 13, 136 = gold left), all in the input phase; S→C 0x1D gold 136 next frame; price 160 | same, frames 1730–1731 (§7.3 steps 5–8; Kashya at level ≥ 8 needs no quest, step 2) |
 | identify, 3 unidentified, slot 4 bits 0, 1 clear | pay 300; 0x2A code 3 | synthetic (§6) |
 
 Game-file test (`#[ignore]`): with live `monstats.txt`, §1.1 yields 47
@@ -610,8 +625,14 @@ records in row order; the 43 table entries (`vendors.tsv`) attach.
 4. Personalize after a failed duplicate (edge case 6): trace the drehya
    branch of `0x00579D60` with a null duplicate.
 5. 0x9B bytes: confirm `9b ffff 00000000` with a resurrect recording.
+   (The 2026-10-07 hire recording has no 0x9B: the replace branch of
+   `world/hirelings.md` §3.2 rule 4 did not run, no hireling before.)
 6. Hire / resurrect / heal / Cain / services: record one of each
-   (`packets-0002`, HANDOFF §5) to confirm message order.
+   (`packets-0002`, HANDOFF §5) to confirm message order. Hire:
+   **answered** by recording 2026-10-07 (Test vectors, frames 969–1731:
+   0x81, 0x27, list, 0x2A code 5 in the input phase, as §7.3 steps 7–8
+   and `world/hirelings.md` §3.2). Resurrect, heal, Cain, services:
+   still open.
 7. Talk on arrival (§2 rule 3.4) contradicts `sim/pathing.md` §9.2
    rule 6 ("no 1.14d server code stores a non-zero value" at player
    data +0x150): `0x00460780` stores 1 (callers `0x00641F20` ←

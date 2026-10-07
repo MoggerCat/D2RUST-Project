@@ -8,7 +8,7 @@
   questions 1–2).
 - **Target version:** 1.14d
 - **Crate/module:** `d2-sim::monsters::ai` (per-AI functions beside the
-  `ai.md` §9 bodies)
+  `ai-bodies.md` §9 bodies)
 - **Related specs:** `monsters/ai.md` (owner of scheduling §1, dispatch
   §2, AI control and tables §3, aip reads §4, target search §5,
   distances §6, tactics helpers §7, commands §8, the conventions of §9);
@@ -56,9 +56,9 @@ Act II levels (levels.txt `Act` = 1: `mon1`–`mon25`, `nmon*`, `umon*`),
 the Act II superuniques (rows 10–19) and the bosses Radament, the
 Summoner and Duriel, plus the minions and spawns those rows name
 (monstats `minion1`, `minion2`, `spawn`), give 70 monstats rows. Their
-AIs not yet specified in `ai.md` §9 are written here, in descending
+AIs not yet specified in `ai-bodies.md` §9 are written here, in descending
 order of how many of those rows use them (§1). Every body follows the
-`ai.md` §9 conventions: T, D, C from the dispatch record, P(aipN) one
+`ai-bodies.md` §9 conventions: T, D, C from the dispatch record, P(aipN) one
 unit-seed step tested `lo' % 100 < aipN`, draws listed in order, "idle
 N" = `0x005DE080(N)` (neutral, then think at +N). Two more scheduling
 helpers appear often here:
@@ -97,13 +97,13 @@ before this spec:
 
 | AI (index) | Act II rows | Rows | § |
 |---|---|---|---|
-| SkeletonMage (64) | 7 | skmage_cold4, skmage_fire3/4, skmage_ltng3/4, skmage_pois3/4 | `ai.md` §9.19 |
+| SkeletonMage (64) | 7 | skmage_cold4, skmage_fire3/4, skmage_ltng3/4, skmage_pois3/4 | `ai-bodies.md` §9.19 |
 | PantherJavelin (95) | 5 | slinger1, 2, 4, 5, 6 | §2 |
-| Scarab (20), Skeleton (2) | 4 each | | `ai.md` §9.29, §9.11 |
+| Scarab (20), Skeleton (2) | 4 each | | `ai-bodies.md` §9.29, §9.11 |
 | GreaterMummy (22) | 4 | radament, unraveler1–3 | §3 |
 | Mummy (21) | 4 | mummy1–4 | §4 |
 | PantherWoman (18) | 4 | pantherwoman1–4 | §5 |
-| SandRaider (8), SandMaggot (15) | 3 each | | `ai.md` §9.26, §9.28 |
+| SandRaider (8), SandMaggot (15) | 3 each | | `ai-bodies.md` §9.26, §9.28 |
 | MaggotLarva (38) | 3 | maggotbaby1–3 (sandmaggot egg spawns) | §6 |
 | SandLeaper (17) | 3 | sandleaper1–3 | §7 |
 | MaggotEgg (40) | 3 | maggotegg1–3 (sandmaggot `spawn`) | §8 |
@@ -296,7 +296,7 @@ Brackets: blunderbore1 [75, 15, 60, 12, 40, 0]; `Skill1` Smite
 Brackets: clawviper1 [40, 8, 75, 50, 15, 1]; `Skill1` SerpentCharge
 (`seq_serpentcharge`). AI param 0 = "has charged". G = aip6 as a glow
 selector: 0 none, 2 state 91, any other value state 90 (D2MOO blue /
-red glow; same states as SandRaider, `ai.md` §9.26).
+red glow; same states as SandRaider, `ai-bodies.md` §9.26).
 
 1. Param 0 ≠ 0 and G ≠ 0 → state off (`0x00639DB0(unit, state, 0)`).
    Param 0 is never cleared, so this runs every think after the first

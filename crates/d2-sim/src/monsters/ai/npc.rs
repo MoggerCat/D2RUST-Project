@@ -1,4 +1,5 @@
-// Spec: specs/monsters/ai.md §9.9 Npc (home step, class cases, interaction handler, commands, map AI), §9.31 GoodNpcRanged, §9.32 NpcOutOfTown
+// Spec: specs/monsters/ai-bodies.md §9.9 Npc (home step, class cases, interaction handler, commands, map AI), §9.31 GoodNpcRanged, §9.32 NpcOutOfTown
+// Spec: specs/monsters/ai.md (the sections other than §9)
 //! Town and quest NPC thinks: Npc (32), GoodNpcRanged (60, also special
 //! state 5), NpcOutOfTown (31, which calls the Npc interaction handler).
 
@@ -67,12 +68,12 @@ pub fn good_npc_ranged<W: AiHost + ?Sized>(
         return;
     }
     // 2.
-    // TODO(spec: ai.md §9.31): `0x0061AB00` on a unit without a room is
+    // TODO(spec: ai-bodies.md §9.31): `0x0061AB00` on a unit without a room is
     // not stated; such a unit is read as out of town.
     let room = game.lists.unit(u).and_then(|e| e.room());
     let in_town = room.is_some_and(|r| cx.world.in_town(game, r));
     if !in_town {
-        // TODO(spec: ai.md §9.31 step 2): the "Else" is read as the else
+        // TODO(spec: ai-bodies.md §9.31 step 2): the "Else" is read as the else
         // of the first 30 % test (the catalogue summary: "secondary target
         // under 20: 30% A1, else 30% circle 4, else idle 10"); without S
         // under 20 the think goes on to step 3.
@@ -231,7 +232,7 @@ fn portal_setup<W: AiHost + ?Sized>(
     set_cmd(cx, u, k, 1, x.wrapping_add(3));
     set_cmd(cx, u, k, 2, y.wrapping_add(3));
     if !cx.world.portal_setup(game, u, npc) {
-        // TODO(spec: ai.md §9.32 step 1): read as written, the setup goes
+        // TODO(spec: ai-bodies.md §9.32 step 1): read as written, the setup goes
         // on after "leave" (params 3, 4 and idle 1).
         leave(game, cx, u, npc);
     }
@@ -251,7 +252,7 @@ pub fn npc_out_of_town<W: AiHost + ?Sized>(
     let npc = match cx.world.class(u) {
         class::CAIN1 => PortalNpc::Cain,
         class::DREHYAICED => PortalNpc::Drehya,
-        // TODO(spec: ai.md §9.32): the quest functions of any other class
+        // TODO(spec: ai-bodies.md §9.32): the quest functions of any other class
         // are not stated; nothing is done.
         _ => return,
     };

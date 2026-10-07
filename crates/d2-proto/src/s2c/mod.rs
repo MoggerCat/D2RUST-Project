@@ -5,7 +5,7 @@
 //! after the id is a field, a constant or a byte the 1.14d builder does
 //! not write). Layout sources, per type: `world/npc.md` §7, §8.1, §9;
 //! `world/quests.md` §1.5, §6.2–§6.7; `world/waypoints.md` §5.3, §7 rule
-//! 7; `world/cube.md` §1; `items/inventory.md` §11 and the
+//! 7; `world/cube.md` §1; `items/inventory-moves.md` §11 and the
 //! `server-messages.tsv` `layout` column (those rows are typed in
 //! [`crate::generated::server`] and re-exported here).
 //!

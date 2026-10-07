@@ -1,4 +1,4 @@
-// Spec: specs/monsters/init.md §5, §22; specs/sim/units.md §3.1, §3.2, §4.6; specs/combat/damage.md §5.2 step 9; specs/missiles/missiles.md rule 28; specs/monsters/ai.md §2.4
+// Spec: specs/monsters/init.md §5, §22; specs/monsters/umod-callbacks.md §2; specs/sim/units.md §3.1, §3.2, §4.6; specs/combat/damage.md §5.2 step 9; specs/missiles/missiles.md rule 28; specs/monsters/ai.md §2.4
 //! The action hooks' monster routes on the wired sim ([`WorldSim`] with
 //! its world state lent to the action hooks): monster init on an
 //! allocation made by action code, the world state's part of a removal
@@ -13,14 +13,12 @@ use crate::combat::CombatWorld;
 use crate::drlg::TileRect;
 use crate::missiles::MissileHooks;
 use crate::monsters::ai::AiUnits;
-use crate::monsters::init::{type_flag, Unhandled};
+use crate::monsters::init::type_flag;
 use crate::monsters::population::{Alloc, MonsterInit};
 use crate::rng::Seed;
 use crate::stats::stat;
 use crate::units::lifecycle::AllocRequest;
 use crate::units::{RoomId, UnitId, UnitType};
-
-use super::super::action::monsters::umod_mode;
 
 /// [`ISLE`] generated, its room at (8000, 8000) streamed, the regions
 /// created; the active room.
@@ -55,21 +53,6 @@ fn lent_monster(fx: &mut Fx, room: RoomId) -> UnitId {
     fx.sim
         .with(&mut fx.game, |g, v| v.allocate(g, &req, 40010, 40010))
         .expect("monster")
-}
-
-/// The umod callbacks recorded without a body since `from`.
-fn unhandled(fx: &Fx, from: usize) -> Vec<(u32, UnitId, u8, u8)> {
-    fx.sim.world.monsters.unhandled[from..]
-        .iter()
-        .map(|u| match *u {
-            Unhandled::Callback {
-                addr,
-                unit,
-                umod,
-                mode,
-            } => (addr, unit, umod, mode),
-        })
-        .collect()
 }
 
 // Covers: specs/monsters/init.md §5 r3, §5 r6
@@ -165,80 +148,99 @@ fn action_removal_frees_the_world_state() {
     fx.assert_clean();
 }
 
+// Covers: specs/monsters/umod-callbacks.md §2 r1
 #[test]
 fn monster_mode_change_runs_umod_modes_0_then_1() {
     let mut fx = Fx::new(isle_ds1s());
     let a = room(&mut fx);
     let u = lent_monster(&mut fx, a);
-    // Umod 14 (spcdamage) has a mode-0 callback, umod 15 (partydead) a
-    // mode-1 callback; neither body is specified (`init.md` OQ8), so
-    // the dispatcher records them.
-    fx.sim.world.monsters.get_mut(u).unwrap().umods[..2].copy_from_slice(&[14, 15]);
-    let n = fx.sim.world.monsters.unhandled.len();
+    // Umod 14 (spcdamage) has a mode-0 callback (level and tohit from
+    // the area level, §8).
+    fx.sim.world.monsters.get_mut(u).unwrap().umods[0] = 14;
+    fx.sim
+        .with(&mut fx.game, |_, v| v.set_base(u, stat::LEVEL, 77));
+    let level = |fx: &mut Fx| {
+        fx.sim
+            .with(&mut fx.game, |_, v| (v.stat(u, 12), v.stat(u, 19)))
+    };
+    // GH is not exercised: the fixture has no GH animation record.
+    // NU: mode 0 sets level n and tohit min(n + 50, 90).
     let ok = fx
         .sim
         .with(&mut fx.game, |g, v| v.monster_set_mode(g, u, 1));
     assert!(ok);
-    fx.assert_clean();
-    assert_eq!(
-        unhandled(&fx, n),
-        [
-            (0x005A_3B50, u, 14, umod_mode::MODE_CHANGE),
-            (0x005A_2D10, u, 15, umod_mode::MODE_SET),
-        ]
-    );
+    let (n, th) = level(&mut fx);
+    assert!(n >= 1 && n != 77 && th == (n + 50).min(90), "{n} {th}");
     // Without the world lent the mode still changes; no callback runs.
-    let n = fx.sim.world.monsters.unhandled.len();
+    fx.sim
+        .with(&mut fx.game, |_, v| v.set_base(u, stat::LEVEL, 77));
     let ok = fx
         .sim
         .action
         .with(&mut fx.game, |g, v| v.monster_set_mode(g, u, 1));
     assert!(ok);
-    assert_eq!(unhandled(&fx, n), []);
+    assert_eq!(level(&mut fx).0, 77);
+    assert!(fx.sim.world.monsters.unhandled.is_empty());
 }
 
+// Covers: specs/monsters/umod-callbacks.md §2 r4
 #[test]
 fn monster_hit_hook_runs_umod_mode_3() {
     let mut fx = Fx::new(isle_ds1s());
     let a = room(&mut fx);
     let u = lent_monster(&mut fx, a);
-    // Umod 7 (curse): mode-3 callback `0x005A2530` (body unread).
-    fx.sim.world.monsters.get_mut(u).unwrap().umods[0] = 7;
-    let n = fx.sim.world.monsters.unhandled.len();
+    // Umod 7 (curse): mode-3 callback `0x005A2530`: a unique steps its
+    // seed once (§5 step 2) whatever follows.
+    let m = fx.sim.world.monsters.get_mut(u).unwrap();
+    m.umods[0] = 7;
+    m.type_flags |= type_flag::UNIQUE;
+    let seed = |fx: &mut Fx| fx.sim.with(&mut fx.game, |_, v| *AiUnits::seed(v, u));
+    let mut want = seed(&mut fx);
+    want.step();
     let game = &mut fx.game;
     fx.sim
         .lend(|s| s.combat(game, |cv, _| cv.monster_hit_hook(u)));
-    assert_eq!(unhandled(&fx, n), [(0x005A_2530, u, 7, umod_mode::HIT)]);
-    let n = fx.sim.world.monsters.unhandled.len();
+    assert_eq!(seed(&mut fx), want);
+    let before = seed(&mut fx);
     fx.sim
         .action
         .combat(&mut fx.game, |cv, _| cv.monster_hit_hook(u));
-    assert_eq!(unhandled(&fx, n), []);
+    assert_eq!(seed(&mut fx), before);
     fx.assert_clean();
 }
 
+// Covers: specs/monsters/umod-callbacks.md §2 r6, §18.2
 #[test]
 fn missile_hook_runs_umod_mode_5_on_the_missile() {
     let mut fx = Fx::new(isle_ds1s());
     let a = room(&mut fx);
     let owner = lent_monster(&mut fx, a);
-    // The missile's id (the dispatcher hands it to the callbacks in mode
-    // 5); a second unit stands in for it.
-    let missile = lent_monster(&mut fx, a);
-    // Umod 29 (multishot): mode-5 callback `0x005A3610` (body unread).
-    fx.sim.world.monsters.get_mut(owner).unwrap().umods[0] = 29;
-    let n = fx.sim.world.monsters.unhandled.len();
+    let req = AllocRequest {
+        ty: UnitType::Missile,
+        ..request(a)
+    };
+    let missile = fx
+        .sim
+        .with(&mut fx.game, |g, v| v.allocate(g, &req, 40010, 40010))
+        .expect("missile");
+    // Umod 27 (spectral hit): mode-5 callback `0x005A30B0` steps the
+    // missile's own seed (§18.2) for a unique owner.
+    let m = fx.sim.world.monsters.get_mut(owner).unwrap();
+    m.umods[0] = 27;
+    m.type_flags |= type_flag::UNIQUE;
+    let seed = |fx: &mut Fx, u| fx.sim.with(&mut fx.game, |_, v| *AiUnits::seed(v, u));
+    let mut want = seed(&mut fx, missile);
+    want.step();
+    let owner_seed = seed(&mut fx, owner);
     fx.sim
         .with(&mut fx.game, |g, v| v.unique_mod_missile(g, owner, missile));
-    assert_eq!(
-        unhandled(&fx, n),
-        [(0x005A_3610, missile, 29, umod_mode::MISSILE)]
-    );
-    let n = fx.sim.world.monsters.unhandled.len();
+    assert_eq!(seed(&mut fx, missile), want);
+    assert_eq!(seed(&mut fx, owner), owner_seed);
+    let before = seed(&mut fx, missile);
     fx.sim
         .action
         .with(&mut fx.game, |g, v| v.unique_mod_missile(g, owner, missile));
-    assert_eq!(unhandled(&fx, n), []);
+    assert_eq!(seed(&mut fx, missile), before);
     fx.assert_clean();
 }
 

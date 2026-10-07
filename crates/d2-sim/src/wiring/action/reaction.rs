@@ -99,6 +99,13 @@ pub fn kill<X: Pending>(cv: &mut CombatView<'_, X>, d: UnitId, a: UnitId) {
         _ => return,
     }
     let game = &mut *cv.game;
+    // `hirelings.md` §8 rule 1: flag 1 here, so a hireling with a player
+    // owner gets `0x005751A0` (on the host that holds the hireling
+    // lists, `ActionHooks::pet_deaths`); the other pet types stay on the
+    // seam.
+    if let Some(q) = cv.v.h.pet_deaths.as_mut() {
+        q.push(d);
+    }
     cv.v.h.x.kill_step(game, KillStep::PetCredit, d, a);
     cv.v.h
         .x

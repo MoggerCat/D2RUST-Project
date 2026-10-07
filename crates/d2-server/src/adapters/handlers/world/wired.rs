@@ -1,4 +1,4 @@
-// Spec: specs/world/npc.md §1.1, §2–§4, §7.5; specs/world/vendors.md §1, §3, §4, §7; specs/world/quests.md §1.7, §6.2, §7.3, §10.2; specs/world/cube.md §1, §2; specs/world/waypoints.md §6
+// Spec: specs/world/npc.md §1.1, §2–§4, §7.5; specs/world/vendors.md §1, §3, §4, §7; specs/world/quests.md §1.7, §6.2, §7.3; specs/world/quests-act1.md §10.2; specs/world/cube.md §1, §2; specs/world/waypoints.md §6
 //! [`WiredWorld`]: the wired single-player host. The NPC, vendor, quest
 //! and cube systems on their `d2-sim` providers
 //! (`d2_sim::wiring::interaction`: [`Desk`] for `NpcWorld +
@@ -48,7 +48,7 @@ use d2_sim::units::{RoomId, UnitId};
 use d2_sim::wiring::action::Pending;
 use d2_sim::wiring::action::{ActionHooks, ObjectCase};
 use d2_sim::wiring::economy::{
-    quest_objects, Economy, EconomyQuests, GameFields, HostQuests, QuestRest,
+    quest_objects, Economy, EconomyQuests, GameFields, HostQuests, QuestLoan, QuestRest,
 };
 use d2_sim::wiring::interaction::{
     Desk, InteractionError, InteractionState, NpcRest, PlayerQuestsRef, VendorDesk, VendorRest,
@@ -63,12 +63,14 @@ use d2_sim::world::waypoints::{
 
 use super::super::items::moves::{InvParts, MoveCall};
 use super::super::items::{CubeCall, CubeParts, Interact, InvVendors};
+use super::super::player::{self, HostFacts, Outcome as PlayerOutcome, Run as PlayerRun};
 use super::super::skills::{Call as SkillCall, Handled as SkillHandled, NoSkills, SkillHost};
 use super::super::walk::{WalkCall, WalkResult};
 use super::{
     ActionEvents, ActionWorld, NpcCall, Outbox, QuestCall, VendorCall, WaypointCall, WorldFault,
     WorldHost,
 };
+use d2_sim::world::npc::NpcWorld;
 
 /// The seams of the NPC and vendor wiring without a provider: the
 /// interaction rests of `d2_sim::wiring::interaction`
@@ -225,7 +227,7 @@ impl<R, S> WiredWorld<R, S> {
 /// A quest call on the desk's economy and rest ([`HostQuests`]: the
 /// [`EconomyQuests`] calls with the object, level, interaction and
 /// identify calls answered by the action wiring and the NPC rest): the
-/// mercenary rewards `0x00579180` an Act I quest grants (`quests.md`
+/// mercenary rewards `0x00579180` an Act I quest grants (`quests-act1.md`
 /// §10.2) are queued during the call with the sends that follow them
 /// ([`d2_sim::wiring::economy::QuestDeferred`]) and run on the NPC
 /// control block right after it, then the queued sends
@@ -280,6 +282,56 @@ fn quest_objects<X: Pending, R: TradeRest>(
     }
 }
 
+impl<R: TradeRest + Default + 'static, S> WiredWorld<R, S> {
+    /// Runs `f` with this world's quest parts (the quest control, the
+    /// rest, the item tables, the unique bits) lent to the action hooks
+    /// ([`QuestLoan`], `ActionHooks::quest_host`), so a quest init,
+    /// operate or object event 7 the object module hands back during `f`
+    /// runs at once, inside its allocation, dispatch or timer event
+    /// (`quests-act1-rest.md` §9 item 7; `objects.md` §3 rule 6). The
+    /// parts come back after `f`; `f` must not use them through `self`
+    /// (it gets only the action world). Hooks that already hold a quest
+    /// host keep it.
+    fn lend_quests<D: ActionEvents, T>(
+        &mut self,
+        events: &mut D,
+        f: impl FnOnce(&mut ActionWorld<S>, &mut D) -> T,
+    ) -> T {
+        if events.action().sys.hooks.quest_host.is_some() {
+            return f(&mut self.action, events);
+        }
+        let empty = self.quests.emptied();
+        let loan = QuestLoan {
+            quests: std::mem::replace(&mut self.quests, empty),
+            rest: std::mem::take(&mut self.rest),
+            tables: std::mem::take(&mut self.tables),
+            uniques: std::mem::take(&mut self.uniques),
+        };
+        events.action().sys.hooks.quest_host = Some(Box::new(loan));
+        let out = f(&mut self.action, events);
+        let back = events
+            .action()
+            .sys
+            .hooks
+            .quest_host
+            .take()
+            .map(|h| h.into_any().downcast::<QuestLoan<R>>());
+        match back {
+            Some(Ok(l)) => {
+                let l = *l;
+                self.quests = l.quests;
+                self.rest = l.rest;
+                self.tables = l.tables;
+                self.uniques = l.uniques;
+            }
+            // `f` took the loan out of the hooks or put another one in:
+            // the game's quest state is gone (API misuse, fatal).
+            _ => panic!("WiredWorld::lend_quests: the lent quest parts did not come back"),
+        }
+        out
+    }
+}
+
 impl<R: TradeRest, S> WiredWorld<R, S> {
     /// The pet follows `0x005754B0` the placements queued
     /// (`path-placement.md` §10 rule 6, `ActionHooks::pet_follows`, on
@@ -307,6 +359,37 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
             desk.with_hirelings(|w, t, st| {
                 for p in q {
                     life::follow(w, t, st, p);
+                }
+            })
+        });
+    }
+
+    /// The hireling deaths the kill queued (`ActionHooks::pet_deaths`, on
+    /// from the first frame): `hirelings.md` §8 rule 1 → `0x005751A0`
+    /// ([`life::on_kill`] with flag 1) for each killed monster with a
+    /// player owner and a hireling node. Without hireling tables the
+    /// game has no hireling: the queue is dropped.
+    ///
+    /// TODO(hirelings.md §8 r1): in 1.14d `0x005751A0` runs inside the
+    /// kill, before the killer bookkeeping and the death mode; here it
+    /// runs when the handler or tick that killed returns, so its 0x9B /
+    /// 0x7A follow the kill's other messages.
+    pub fn pet_deaths<D: ActionEvents>(&mut self, game: &mut Game, events: &mut D) {
+        let q = events
+            .action()
+            .sys
+            .hooks
+            .pet_deaths
+            .as_mut()
+            .map(std::mem::take)
+            .unwrap_or_default();
+        if q.is_empty() || self.state.hireling_tables.is_none() {
+            return;
+        }
+        self.desk(game, events, |desk, _, _| {
+            desk.with_hirelings(|w, _, st| {
+                for m in q {
+                    life::on_kill(w, st, m, true);
                 }
             })
         });
@@ -436,7 +519,8 @@ impl<C: WaypointCall, R: NpcRest> WaypointCall for HostWaypointRun<'_, C, R> {
     }
 }
 
-impl<D: ActionEvents, R: TradeRest, S: SkillHost<D>> WorldHost<D> for WiredWorld<R, S>
+impl<D: ActionEvents, R: TradeRest + Default + 'static, S: SkillHost<D>> WorldHost<D>
+    for WiredWorld<R, S>
 where
     D::X: Outbox,
 {
@@ -485,6 +569,7 @@ where
             difficulty,
         };
         let out = WorldHost::<D>::waypoints(&mut self.action, game, events, run);
+        self.pet_deaths(game, events);
         self.pet_follows(game, events);
         out
     }
@@ -500,21 +585,35 @@ where
         player: UnitId,
         guid: u32,
     ) -> Option<ObjectCase> {
-        let out = WorldHost::<D>::objects(&mut self.action, game, events, player, guid);
+        let out = self.lend_quests(events, |a, ev| {
+            WorldHost::<D>::objects(a, game, ev, player, guid)
+        });
         self.desk(game, events, |desk, ctl, _| quest_objects(desk, ctl));
         out
     }
 
-    /// The quest routes the tick's allocations and object events queued
-    /// ([`quest_objects`]), before the tick's sends are taken.
+    /// The tick with this world's quest parts lent to the action hooks
+    /// ([`WiredWorld::lend_quests`]): quest object inits run inside their
+    /// allocation and object event 7 inside its timer event, in the tick
+    /// that runs them (`quests-act1-rest.md` §9 item 7; `tick.md` §3).
+    fn run_tick(&mut self, game: &mut Game, events: &mut D)
+    where
+        D: d2_sim::tick::EventDispatch + d2_sim::tick::TickHooks,
+    {
+        self.lend_quests(events, |_, ev| d2_sim::tick::tick(game, ev));
+    }
+
+    /// The quest routes queued outside a lent call (a quest call's own
+    /// allocations, [`quest_objects`]), before the tick's sends are taken.
     fn after_tick(&mut self, game: &mut Game, events: &mut D) {
         self.desk(game, events, |desk, ctl, _| quest_objects(desk, ctl));
+        self.pet_deaths(game, events);
         self.pet_follows(game, events);
     }
 
     /// The quest control on the desk's economy and rest
     /// ([`EconomyQuests`]). The mercenary rewards `0x00579180` an Act I
-    /// quest grants (`quests.md` §10.2) are queued during the call, with
+    /// quest grants (`quests-act1.md` §10.2) are queued during the call, with
     /// the sends that follow them
     /// ([`d2_sim::wiring::economy::QuestDeferred`]), and run on the NPC
     /// control block right after it (`npc.md` §7.5,
@@ -574,12 +673,40 @@ where
             staged,
         };
         let out = WorldHost::<D>::skill(&mut self.action, call);
+        self.pet_deaths(game, events);
         self.pet_follows(game, events);
         out
     }
 
+    /// The action wiring's provider with this host's answers: the
+    /// interaction owner's part of `0x00535060` (the rest's
+    /// `NpcRest::interact_unit`) and, for 0x46 / 0x47, the hireling list
+    /// (`0x00574EC0(game, player, 7, 0)`, `NpcWorld::pet` on the desk);
+    /// then the pet follows a warp queued ([`WiredWorld::pet_follows`]).
+    fn player(
+        &mut self,
+        game: &mut Game,
+        events: &mut D,
+        run: PlayerRun<'_>,
+    ) -> Option<PlayerOutcome> {
+        let p = run.player;
+        let hireling = matches!(run.msg.first(), Some(0x46 | 0x47)).then(|| {
+            self.desk(game, events, |desk, _, _| {
+                NpcWorld::pet(desk, p, d2_sim::world::hirelings::PET_HIRELING, 0)
+            })
+        });
+        let facts = HostFacts {
+            hireling,
+            interacting: self.rest.interact_unit(p).is_some(),
+        };
+        let out = player::action::run(game, events, &run, facts);
+        self.pet_follows(game, events);
+        Some(out)
+    }
+
     fn walk(&mut self, game: &mut Game, events: &mut D, call: WalkCall) -> Option<WalkResult> {
-        let out = WorldHost::<D>::walk(&mut self.action, game, events, call);
+        let out = self.lend_quests(events, |a, ev| WorldHost::<D>::walk(a, game, ev, call));
+        self.pet_deaths(game, events);
         self.pet_follows(game, events);
         out
     }
@@ -624,6 +751,7 @@ where
         events.action().route_quest_objects();
         let h = &mut events.action().sys.hooks;
         h.pet_follows.get_or_insert_with(Vec::new);
+        h.pet_deaths.get_or_insert_with(Vec::new);
         WorldHost::<D>::host_tick(&mut self.action, events, ms);
     }
 

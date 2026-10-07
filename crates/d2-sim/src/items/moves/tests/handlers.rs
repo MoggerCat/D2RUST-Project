@@ -31,7 +31,7 @@ fn run(f: &mut Fake, msg: &[u8]) -> u32 {
     handle(f, P, msg).expect("handled id").expect("no fatal")
 }
 
-// Covers: specs/items/inventory.md §7 text
+// Covers: specs/items/inventory-moves.md §7 text
 #[test]
 fn size_check_first_and_foreign_ids() {
     let mut f = Fake::new();
@@ -47,7 +47,7 @@ fn size_check_first_and_foreign_ids() {
 
 // ---- 0x16
 
-// Covers: specs/items/inventory.md §7.1 r1, §7.1 r2
+// Covers: specs/items/inventory-moves.md §7.1 r1, §7.1 r2
 #[test]
 fn pick_item_validation() {
     let mut f = Fake::new();
@@ -71,7 +71,7 @@ fn pick_item_validation() {
     assert_eq!(f.it(11).mode, mode::GROUND);
 }
 
-// Covers: specs/items/inventory.md §7.1 r2, §8.2, §edge-cases-original-bugs r8
+// Covers: specs/items/inventory.md §edge-cases-original-bugs r8; specs/items/inventory-moves.md §7.1 r2, §8.2
 #[test]
 fn pick_item_to_cursor_only_when_asked() {
     let mut f = Fake::new();
@@ -122,7 +122,7 @@ fn pick_item_to_cursor_only_when_asked() {
     assert_eq!(f.inv().cursor, None);
 }
 
-// Covers: specs/items/inventory.md §7.1 r2
+// Covers: specs/items/inventory-moves.md §7.1 r2
 #[test]
 fn pick_other_unit_types() {
     let mut f = Fake::new();
@@ -136,7 +136,7 @@ fn pick_other_unit_types() {
     assert_eq!(run(&mut f, &m32(0x16, &[5, 77, 0])), res::RANGE);
 }
 
-// Covers: specs/items/inventory.md §7.1 r2
+// Covers: specs/items/inventory-moves.md §7.1 r2
 #[test]
 fn pick_player_and_tile() {
     let other = Owner::player(77);
@@ -174,7 +174,7 @@ fn pick_player_and_tile() {
 
 // ---- 0x17
 
-// Covers: specs/items/inventory.md §7.2 r1, §7.2 r2, §7.2 r3
+// Covers: specs/items/inventory-moves.md §7.2 r1, §7.2 r2, §7.2 r3
 #[test]
 fn drop_item() {
     let mut f = Fake::new();
@@ -200,7 +200,7 @@ fn insert(f: &mut Fake, page: u32) -> u32 {
     run(f, &m32(0x18, &[10, 4, 1, page]))
 }
 
-// Covers: specs/items/inventory.md §7.3 text, §7.3 r1, §7.3 r3, §7.3 r4, §edge-cases-original-bugs r3, §edge-cases-original-bugs r7
+// Covers: specs/items/inventory.md §edge-cases-original-bugs r3, §edge-cases-original-bugs r7; specs/items/inventory-moves.md §7.3 text, §7.3 r1, §7.3 r3, §7.3 r4
 #[test]
 fn insert_item_pages() {
     let mut f = Fake::new();
@@ -229,7 +229,7 @@ fn insert_item_pages() {
     assert_eq!(insert(&mut f, 2), res::OK);
 }
 
-// Covers: specs/items/inventory.md §7.3 r2
+// Covers: specs/items/inventory-moves.md §7.3 r2
 #[test]
 fn insert_item_non_player() {
     use crate::items::moves::handlers::insert_item;
@@ -246,7 +246,7 @@ fn insert_item_non_player() {
 
 // ---- 0x19
 
-// Covers: specs/items/inventory.md §7.4 text, §7.4 r1, §7.4 r2, §7.4 r3, §7.4 r4
+// Covers: specs/items/inventory-moves.md §7.4 text, §7.4 r1, §7.4 r2, §7.4 r3, §7.4 r4
 #[test]
 fn remove_from_buffer() {
     let mut f = Fake::new();
@@ -286,7 +286,7 @@ fn remove_from_buffer() {
 
 // ---- 0x1A
 
-// Covers: specs/items/inventory.md §7.5
+// Covers: specs/items/inventory-moves.md §7.5
 #[test]
 fn equip_item() {
     let mut f = Fake::new();
@@ -303,7 +303,7 @@ fn equip_item() {
 
 // ---- 0x1B
 
-// Covers: specs/items/inventory.md §7.6
+// Covers: specs/items/inventory-moves.md §7.6
 #[test]
 fn swap_two_handed() {
     let mut f = Fake::new();
@@ -339,7 +339,7 @@ fn swap_two_handed() {
 
 // ---- 0x1C
 
-// Covers: specs/items/inventory.md §7.7
+// Covers: specs/items/inventory-moves.md §7.7
 #[test]
 fn remove_body_item() {
     let mut f = Fake::new();
@@ -375,7 +375,7 @@ fn remove_body_item() {
 
 // ---- 0x1D
 
-// Covers: specs/items/inventory.md §7.8
+// Covers: specs/items/inventory-moves.md §7.8
 #[test]
 fn swap_cursor_with_body() {
     let mut f = Fake::new();
@@ -402,7 +402,7 @@ fn swap_cursor_with_body() {
 
 // ---- 0x1E
 
-// Covers: specs/items/inventory.md §7.9
+// Covers: specs/items/inventory-moves.md §7.9
 #[test]
 fn swap_1h_with_2h() {
     let mut f = Fake::new();
@@ -419,7 +419,7 @@ fn swap_1h_with_2h() {
 
 // ---- 0x1F
 
-// Covers: specs/items/inventory.md §7.10 text, §7.10 r1, §7.10 r2, §7.10 r3
+// Covers: specs/items/inventory-moves.md §7.10 text, §7.10 r1, §7.10 r2, §7.10 r3
 #[test]
 fn swap_cursor_buffer() {
     let mut f = Fake::new();
@@ -452,7 +452,7 @@ fn swap_cursor_buffer() {
     assert_eq!(f.inv().update, vec![11, 10]);
 }
 
-// Covers: specs/items/inventory.md §7.10 r3
+// Covers: specs/items/inventory-moves.md §7.10 r3
 #[test]
 fn swap_cursor_buffer_placement_fails() {
     let mut f = Fake::new();
@@ -466,7 +466,7 @@ fn swap_cursor_buffer_placement_fails() {
 
 // ---- 0x20
 
-// Covers: specs/items/inventory.md §7.11
+// Covers: specs/items/inventory-moves.md §7.11
 #[test]
 fn use_grid_item_range() {
     let mut f = Fake::new();
@@ -479,7 +479,7 @@ fn use_grid_item_range() {
 
 // ---- 0x21
 
-// Covers: specs/items/inventory.md §7.12
+// Covers: specs/items/inventory-moves.md §7.12
 #[test]
 fn stack_items() {
     let mut f = Fake::new();
@@ -516,7 +516,7 @@ fn stack_items() {
     assert_eq!(f.inv().cursor, None);
 }
 
-// Covers: specs/items/inventory.md §7.12
+// Covers: specs/items/inventory-moves.md §7.12
 #[test]
 fn stack_books() {
     let mut f = Fake::new();
@@ -532,7 +532,7 @@ fn stack_books() {
 
 // ---- 0x22
 
-// Covers: specs/items/inventory.md §7.13, §edge-cases-original-bugs r1
+// Covers: specs/items/inventory.md §edge-cases-original-bugs r1; specs/items/inventory-moves.md §7.13
 #[test]
 fn unstack_items_x1() {
     let mut f = Fake::new();
@@ -543,7 +543,7 @@ fn unstack_items_x1() {
 
 // ---- 0x23
 
-// Covers: specs/items/inventory.md §7.14, §edge-cases-original-bugs r6
+// Covers: specs/items/inventory.md §edge-cases-original-bugs r6; specs/items/inventory-moves.md §7.14
 #[test]
 fn item_to_belt() {
     let mut f = Fake::new();
@@ -569,7 +569,7 @@ fn item_to_belt() {
 
 // ---- 0x24
 
-// Covers: specs/items/inventory.md §7.15
+// Covers: specs/items/inventory-moves.md §7.15
 #[test]
 fn item_from_belt() {
     let mut f = Fake::new();
@@ -591,7 +591,7 @@ fn item_from_belt() {
 
 // ---- 0x25
 
-// Covers: specs/items/inventory.md §7.16, §edge-cases-original-bugs r6
+// Covers: specs/items/inventory.md §edge-cases-original-bugs r6; specs/items/inventory-moves.md §7.16
 #[test]
 fn switch_belt_item() {
     let mut f = Fake::new();
@@ -624,7 +624,7 @@ fn switch_belt_item() {
 
 // ---- 0x26
 
-// Covers: specs/items/inventory.md §7.17
+// Covers: specs/items/inventory-moves.md §7.17
 #[test]
 fn use_belt_item() {
     let mut f = Fake::new();
@@ -655,7 +655,7 @@ fn use_belt_item() {
 
 // ---- 0x27
 
-// Covers: specs/items/inventory.md §7.18
+// Covers: specs/items/inventory-moves.md §7.18
 #[test]
 fn use_item_action() {
     let mut f = Fake::new();
@@ -667,7 +667,7 @@ fn use_item_action() {
 
 // ---- 0x28
 
-// Covers: specs/items/inventory.md §7.19 r1, §7.19 r2, §7.19 r3
+// Covers: specs/items/inventory-moves.md §7.19 r1, §7.19 r2, §7.19 r3
 #[test]
 fn socket_item() {
     let mut f = Fake::new();
@@ -705,7 +705,7 @@ fn socket_item() {
 
 // ---- 0x29
 
-// Covers: specs/items/inventory.md §7.20
+// Covers: specs/items/inventory-moves.md §7.20
 #[test]
 fn scroll_to_book() {
     let mut f = Fake::new();
@@ -735,7 +735,7 @@ fn scroll_to_book() {
 
 // ---- 0x50
 
-// Covers: specs/items/inventory.md §7.22
+// Covers: specs/items/inventory-moves.md §7.22
 #[test]
 fn drop_gold_g1_and_checks() {
     let mut f = Fake::new();
@@ -765,7 +765,7 @@ fn drop_gold_g1_and_checks() {
 
 // ---- 0x61
 
-// Covers: specs/items/inventory.md §7.23 text, §7.23 r1, §7.23 r2, §7.23 r3
+// Covers: specs/items/inventory-moves.md §7.23 text, §7.23 r1, §7.23 r2, §7.23 r3
 #[test]
 fn merc_item_gates() {
     let mut f = Fake::new();
@@ -790,7 +790,7 @@ fn merc_item_gates() {
     assert_eq!(run(&mut f, &m16(0x61, 1)), res::REFUSED);
 }
 
-// Covers: specs/items/inventory.md §7.23 r3
+// Covers: specs/items/inventory-moves.md §7.23 r3
 #[test]
 fn merc_take_copies_to_cursor() {
     let mut f = Fake::new();
@@ -819,7 +819,7 @@ fn merc_take_copies_to_cursor() {
     assert!(f.logged("stat_refresh_unlink 1:60 0"));
 }
 
-// Covers: specs/items/inventory.md §7.23 r3
+// Covers: specs/items/inventory-moves.md §7.23 r3
 #[test]
 fn merc_give_rules() {
     use crate::items::moves::handlers::merc_give;
@@ -877,7 +877,7 @@ fn merc_give_rules() {
 
 // ---- 0x63
 
-// Covers: specs/items/inventory.md §7.24 r1, §7.24 r2, §7.24 r3, §7.24 r4, §6.4
+// Covers: specs/items/inventory-moves.md §7.24 r1, §7.24 r2, §7.24 r3, §7.24 r4, §6.4
 #[test]
 fn item_to_belt_shift() {
     let mut f = Fake::new();
@@ -911,7 +911,7 @@ fn item_to_belt_shift() {
     assert!(f.logged("room_change 10 3,0"));
 }
 
-// Covers: specs/items/inventory.md §7.24 r4, §edge-cases-original-bugs r4
+// Covers: specs/items/inventory.md §edge-cases-original-bugs r4; specs/items/inventory-moves.md §7.24 r4
 #[test]
 fn item_to_belt_shift_limbo() {
     let mut f = Fake::new();

@@ -8,7 +8,7 @@
   covers these bodies yet (Open questions 1–2).
 - **Target version:** 1.14d
 - **Crate/module:** `d2-sim::monsters::ai` (per-AI functions beside the
-  `ai.md` §9 bodies)
+  `ai-bodies.md` §9 bodies)
 - **Related specs:** `monsters/ai.md` (owner of scheduling §1, dispatch
   §2, AI control and tables §3, aip reads §4, target search §5,
   distances §6, tactics helpers §7, commands §8, the conventions of §9);
@@ -49,7 +49,7 @@
 
 Act IV levels (levels.txt `Act` = 3), the Act IV superuniques
 (superuniques.txt rows 36–38: Infector of Souls, Lord De Seis, Grand
-Vizier of Chaos; row 41 Hephasto uses the Smith AI, `ai.md` §9.30),
+Vizier of Chaos; row 41 Hephasto uses the Smith AI, `ai-bodies.md` §9.30),
 Izual and Diablo, plus their minions and spawns, give 29 monstats rows
 (Provenance). Their AIs not yet specified are written here, in
 descending order of rows (§1). The conventions are those of

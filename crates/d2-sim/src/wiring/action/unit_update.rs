@@ -1,0 +1,315 @@
+// Spec: specs/sim/intents-events.md §7.3, §7.4, §7.5, §7.7; specs/sim/units.md §4.1, §4.6
+//! The monster part of the per-unit update (`0x00598220`, §7.3 rule 2
+//! step 2: the mode message `0x00597E20`, S→C 0x67–0x6D, built by
+//! [`crate::monsters::mode_message`]), the flag part of the room
+//! clean-up `0x00553220` (§7.5 steps 3 and 7), and the two death-mode
+//! event functions that end a monster's death in mode 12 (§7.7 rule 3:
+//! event 0 `0x005A7350`, event 1 `0x005A72B0`).
+//!
+//! Who reads what: the mode message runs in the client pass (`tick.md`
+//! §6 step 5, [`View::monster_update`] from `ActionSim::send_unit_update`)
+//! for each queued monster with unit flag 0x1; the clean-up runs on every
+//! unit of every update queue after all clients (`tick.md` §3 step 6,
+//! [`View::room_cleanup`]), so each mode set is sent once per client.
+
+use crate::game::Game;
+use crate::monsters::mode_message::{self, ModeInput, ModeMessage, MODE_ROWS};
+use crate::path::record::flags as path_flags;
+use crate::path::UnitPath;
+use crate::units::hooks::Sim;
+use crate::units::lists::ClientId;
+use crate::units::modes::{self, monster_mode};
+use crate::units::record::{flags, Anim};
+use crate::units::{UnitId, UnitType};
+
+use super::{ActionHooks, Pending, View, WiringError};
+
+/// Stat 67 `velocitypercent` (§7.7 rule 4).
+const STAT_VELOCITY: u16 = 67;
+/// Stat 328, the position stat (§7.4 rule 5, mode 1).
+const STAT_POSITION: u16 = 328;
+/// Stat 6 `hitpoints`.
+const STAT_LIFE: u16 = 6;
+
+/// Unit flags (+0xC4) and flag-ex bits (+0xC8) of the room clean-up.
+pub mod cleanup {
+    /// §7.5 step 3: unit flags 0x1, 0x10, 0x400, 0x8000.
+    pub const UNIT_FLAGS: u32 = 0x1 | 0x10 | 0x400 | 0x8000;
+    /// §7.5 step 3: flag-ex 0x800, 0x1000, 0x10000, 0x200000.
+    pub const FLAGS_EX: u32 = 0x800 | 0x1000 | 0x10000 | 0x200000;
+    /// §7.5 step 7: unit flag 0x100 (players, monsters, objects).
+    pub const FLAG_100: u32 = 0x100;
+    /// §7.5 step 7: a monster's unit flag 0x800.
+    pub const MONSTER_800: u32 = 0x800;
+    /// §7.5 step 7: a monster's flag-ex 0x10000.
+    pub const MONSTER_EX: u32 = 0x10000;
+    /// §7.5 step 7: an item's unit flag 0x1000.
+    pub const ITEM_1000: u32 = 0x1000;
+}
+
+/// Monster mode functions of mode DT (`units.md` §4.6 table).
+pub const DT_EVENT0: u32 = 0x005A_7350;
+pub const DT_EVENT1: u32 = 0x005A_72B0;
+
+/// The `monstats` base id (row +0x02, `0x0063E8D0(unit, 0)`) whose death
+/// walks until its animation ends (§7.7 rule 3).
+const STEPPING_DEATH_BASE: u16 = 78;
+
+/// Fatal assertions and gaps of the mode message.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ModeMessageError {
+    /// §7.4 rule 4: the unit has no (dynamic) path (fatal 0xE6).
+    NoPath(UnitId),
+    /// §7.4 rule 3: the skill message (0x4C / 0x4D) is due, whose layout
+    /// the spec does not give (`server-messages.tsv` rows 0x4C / 0x4D
+    /// `partial`): nothing was sent.
+    SkillMessage { unit: UnitId, to_unit: bool },
+}
+
+impl<X: Pending> View<'_, X> {
+    /// §7.3 rule 2 step 2 for the client `client`: a monster with unit
+    /// flag 0x1 gets its mode message (§7.4), sent to the client's player
+    /// ([`Pending::send`]), then unit flag 0x80000 := 0. Needs the path
+    /// provider (the caller checks it); a client without a player gets
+    /// nothing.
+    ///
+    /// TODO(spec: intents-events.md §7.1 rule 2.1, §7.2): a monster
+    /// with unit flag 0x10 (not yet announced) first gets its add
+    /// messages (0xAC, 0x98, 0x21, part B with a second mode message);
+    /// they are not sent here. Steps 1 and 3–10 of rule 2 (0x15, the
+    /// class / hireling messages, 0x0C, the stat messages) are not sent
+    /// either.
+    pub fn monster_update(&mut self, game: &mut Game, client: ClientId, unit: UnitId) {
+        let Some(receiver) = game.lists.client(client).and_then(|c| c.player) else {
+            return;
+        };
+        let Some(r) = self.units.get(unit) else {
+            return;
+        };
+        if r.ty != UnitType::Monster || r.flags & flags::CHANGED == 0 {
+            return;
+        }
+        if let Some(input) = self.mode_input(game, client, unit) {
+            match mode_message::mode_message(&input) {
+                ModeMessage::Send(b) => self.h.x.send(receiver, &b),
+                ModeMessage::Stop(b) => {
+                    self.h.x.send(receiver, &b);
+                    let v = self.stats.unit_base(unit, STAT_POSITION, 0);
+                    self.stats
+                        .unit_set(&mut *self.h, unit, STAT_POSITION, v.wrapping_add(1), 0);
+                }
+                ModeMessage::Skill { to_unit } => {
+                    self.h
+                        .errors
+                        .push(WiringError::ModeMessage(ModeMessageError::SkillMessage {
+                            unit,
+                            to_unit,
+                        }))
+                }
+                ModeMessage::Nothing => {}
+            }
+        }
+        if let Some(r) = self.units.get_mut(unit) {
+            r.flags &= !flags::MODE_CHANGING;
+        }
+    }
+
+    /// The reads of `0x00597E20` (§7.4 rules 2–5, §7.7 rule 4). `None`:
+    /// no dynamic path (rule 4's fatal, logged).
+    fn mode_input(&mut self, game: &Game, client: ClientId, unit: UnitId) -> Option<ModeInput> {
+        let r = self.units.get(unit)?;
+        let (mode, guid) = (r.mode, r.guid);
+        let row = MODE_ROWS.get(mode as usize).copied();
+        let target = self.mode_target(game, client, unit);
+        let target = target.filter(|_| row.is_some_and(|e| e.use_target));
+        let Some(path) = self.h.paths.as_ref().and_then(|p| p.dynamic(unit)) else {
+            self.h
+                .errors
+                .push(WiringError::ModeMessage(ModeMessageError::NoPath(unit)));
+            return None;
+        };
+        let life = crate::stats::life_fraction(
+            self.stats.unit_total(unit, STAT_LIFE, 0),
+            crate::combat::vitals::VitalsUnits::max_life(self, unit),
+        );
+        Some(ModeInput {
+            mode,
+            guid,
+            skill_in_use: self.h.x.used_skill(unit).is_some(),
+            target,
+            cell: (path.x() as u16, path.y() as u16),
+            path_target: (path.target_x, path.target_y),
+            direction: path.direction,
+            path_type: path.path_type,
+            path_90: path.dist_budget,
+            max_distance: path.max_distance,
+            stop_distance: path.stop_distance,
+            unit_b0: self.h.x.unit_b0(unit),
+            life: life as u8,
+            flag_100: self.h.x.monster_flag_100(unit),
+            velocity: self.stats.unit_total(unit, STAT_VELOCITY, 0),
+        })
+    }
+
+    /// T of §7.4 rule 2: the unit's target `0x00553540` (`skills/bodies.md`
+    /// §2.1: the refresh `0x00553490` clears a stale or picked-up path
+    /// target; the unit itself is none), kept only when its room's client
+    /// array holds `client` (`0x005387F0`, `drlg/rooms.md` §7 rule 1).
+    /// Returns (type, GUID).
+    fn mode_target(&mut self, game: &Game, client: ClientId, unit: UnitId) -> Option<(u8, u32)> {
+        let tu = self.h.paths.as_ref()?.dynamic(unit)?.target_unit?;
+        let found = game.lists.find_unit(tu.ty, tu.guid);
+        let stale = match found {
+            Some(f) if f == tu.unit => self
+                .units
+                .get(f)
+                .is_some_and(|r| r.ty == UnitType::Item && matches!(r.mode, 1 | 2)),
+            _ => true,
+        };
+        if stale {
+            if let Some(d) = self.h.paths.as_mut().and_then(|p| p.dynamic_mut(unit)) {
+                d.target_unit = None;
+            }
+            return None;
+        }
+        if tu.unit == unit {
+            return None;
+        }
+        let room = game.lists.unit(tu.unit)?.room()?;
+        let (drlg, id) = self.h.drlg.drlg_room(game, room)?;
+        drlg.active_room(id)?
+            .clients
+            .contains(&client)
+            .then_some((tu.ty as u8, tu.guid))
+    }
+
+    /// The flag part of the room clean-up `0x00553220(game, unit)` (§7.5):
+    /// step 3 (unit flags 0x1, 0x10, 0x400, 0x8000; the path's
+    /// room-changed flag `0x00620FA0(unit, 0)`; flag-ex 0x800, 0x1000,
+    /// 0x10000, 0x200000) and the flag bits of step 7 (players, monsters
+    /// and objects: unit flag 0x100; a monster's flag 0x800 and flag-ex
+    /// 0x10000; an item's unit flag 0x1000).
+    ///
+    /// TODO(spec: intents-events.md §7.5): not run here: step 1 (the
+    /// changed-stat buffer, `stat-lists.md` §11.3), step 2 (the pending
+    /// event records: no model), step 4 (state-changed bits), step 5 (the
+    /// update-list reset: the server's item update pass runs it after
+    /// the tick, `d2-server` `handlers::items::moves::update_pass`), step
+    /// 6 (overlay removal), and of step 7 the player's stat 29 := −1, the
+    /// client record's +0x34 → +4, the monster data +0x5C bit 0x1 and the
+    /// item flags 0x20 / 0x2000 (the item pass reads them after the tick).
+    pub fn room_cleanup(&mut self, unit: UnitId) {
+        let Some(r) = self.units.get_mut(unit) else {
+            return;
+        };
+        r.flags &= !cleanup::UNIT_FLAGS;
+        r.flags2 &= !cleanup::FLAGS_EX;
+        match r.ty {
+            UnitType::Player | UnitType::Object => r.flags &= !cleanup::FLAG_100,
+            UnitType::Monster => {
+                r.flags &= !(cleanup::FLAG_100 | cleanup::MONSTER_800);
+                r.flags2 &= !cleanup::MONSTER_EX;
+            }
+            UnitType::Item => r.flags &= !cleanup::ITEM_1000,
+            UnitType::Missile | UnitType::Tile => {}
+        }
+        match self.h.paths.as_mut().and_then(|p| p.records.get_mut(&unit)) {
+            Some(UnitPath::Dynamic(d)) => d.flags &= !path_flags::ROOM_CHANGED,
+            Some(UnitPath::Static(s)) => s.room_changed = 0,
+            None => {}
+        }
+    }
+}
+
+/// `0x006217C0`: the animation is complete (§7.7 rule 3): no sequence →
+/// current frame (+0x44) + speed (+0x4C) ≥ frame count (+0x48); with a
+/// sequence → frame count ≤ 0.
+pub fn anim_complete(a: &Anim) -> bool {
+    match a.sequence {
+        None => a.frame + i32::from(a.speed) >= a.frame_count,
+        Some(_) => a.frame_count <= 0,
+    }
+}
+
+impl<X: Pending> ActionHooks<X> {
+    /// Mode DT's event-0 function `0x005A7350` (§7.7 rule 3): a monster
+    /// of `monstats` base id 78 takes a path step (`0x00554CA0`),
+    /// refreshes its animation (`0x00623E00`, [`Pending::refresh_animation`])
+    /// and sets mode 12 only once its animation is complete
+    /// ([`anim_complete`]); every other monster sets mode 12 at once.
+    pub fn death_event0(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
+        let class = sim.units.get(unit).map(|r| r.class);
+        let base = class.and_then(|c| {
+            self.tables
+                .combat
+                .monstats
+                .get(c as usize)
+                .map(|m| m.baseid)
+        });
+        if base == Some(STEPPING_DEATH_BASE) {
+            {
+                let mut v = View::of(sim.units, sim.stats, sim.data, self);
+                if v.h.paths.is_some() {
+                    crate::wiring::path::walk::unit_step(&mut v, sim.game, unit);
+                } else {
+                    v.h.x.step(sim.game, unit);
+                }
+            }
+            self.x.refresh_animation(sim.game, unit);
+            if !sim.units.get(unit).is_some_and(|r| anim_complete(&r.anim)) {
+                return;
+            }
+        }
+        self.death_mode(sim, unit);
+    }
+
+    /// Mode DT's event-1 function `0x005A72B0` (§7.7 rule 3): mode 12,
+    /// unit event 13 (`0x005C0C30(game, 13, unit, 0, 0)`,
+    /// [`Pending::unit_event`]), then the `monstats` `SplEndDeath` (row
+    /// +0x1A4) action 1 or 2 ([`Pending::death_end_action`] with
+    /// `minion1`, row +0x26).
+    pub fn death_event1(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
+        self.death_mode(sim, unit);
+        self.x.unit_event(13, Some(unit), None, None);
+        let class = sim.units.get(unit).map(|r| r.class);
+        let row = class.and_then(|c| self.tables.combat.monstats.get(c as usize));
+        if let Some((action, minion)) = row.map(|m| (m.splenddeath, m.minion1)) {
+            if matches!(action, 1 | 2) {
+                self.x.death_end_action(sim.game, unit, action, minion);
+            }
+        }
+    }
+
+    /// "Sets mode 12" of §7.7 rule 3 as the mode set `0x00553570`
+    /// (`units.md` §4.1): mode, unit flag 0x1, the update queue.
+    ///
+    /// TODO(spec: intents-events.md §7.7 rule 3): the setter the two DT
+    /// functions call is not named (`0x00553570` or the monster mode set
+    /// `0x005A7C20`, whose DD start `0x005A7390` has no written body).
+    /// Both give mode 12, flag 0x1 and the queueing the message reads;
+    /// the second also prepares the animation and cancels events 0 / 1.
+    fn death_mode(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
+        if let Err(e) = modes::set_mode(sim, self, unit, monster_mode::DD) {
+            self.errors.push(WiringError::Unit(e));
+        }
+    }
+}
+
+/// [`crate::units::hooks::UnitHooks::monster_mode_function`] for the two DT event functions:
+/// `true` when `address` is one of them (and it ran).
+pub fn death_function<X: Pending>(
+    h: &mut ActionHooks<X>,
+    sim: &mut Sim<'_>,
+    unit: UnitId,
+    address: u32,
+) -> bool {
+    match address {
+        DT_EVENT0 => h.death_event0(sim, unit),
+        DT_EVENT1 => h.death_event1(sim, unit),
+        _ => return false,
+    }
+    true
+}
+
+#[cfg(test)]
+mod tests;

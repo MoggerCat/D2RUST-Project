@@ -7,18 +7,12 @@ use super::fake::*;
 use crate::units::UnitId;
 use crate::world::hirelings::level::*;
 use crate::world::hirelings::{
-    stat, threshold, HirelingError, HirelingRow, HirelingState, HirelingTables, PetNode,
+    stat, threshold, ExpRatios, HirelingError, HirelingRow, HirelingState, HirelingTables, PetNode,
 };
 
 const PLAYER_GUID: u32 = 0x10;
 const MERC_GUID: u32 = 0x4433_2211;
 const G: [u8; 4] = MERC_GUID.to_le_bytes();
-
-/// The ExpRatio stand-in of the synthetic vectors: identity (the spec's
-/// vectors are fixed by the cap, not by ExpRatio; §7.2 rule 3 TODO).
-fn same(g: i32, _alvl: i32) -> i32 {
-    g
-}
 
 struct Setup {
     w: Fake,
@@ -83,12 +77,12 @@ fn defender(w: &mut Fake) -> UnitId {
 fn cap_exp_lvl_105_alvl_6_is_229() {
     let s = ice_l6(10);
     assert_eq!((threshold(105, 7) - threshold(105, 6)) >> 6, 229);
-    let g = gain(&s.w, &s.t, &s.st, s.player, s.merc, 100_000, 6, 6, same);
+    let g = gain(&s.w, &s.t, &s.st, s.player, s.merc, 100_000, 6, 6);
     assert_eq!(g, 229);
     // Without the owner link the cap does not apply.
     let mut s = s;
     s.w.unit_mut(s.merc).owner = None;
-    let g = gain(&s.w, &s.t, &s.st, s.player, s.merc, 100_000, 6, 6, same);
+    let g = gain(&s.w, &s.t, &s.st, s.player, s.merc, 100_000, 6, 6);
     assert_eq!(g, 100_000);
 }
 
@@ -97,23 +91,22 @@ fn cap_exp_lvl_105_alvl_6_is_229() {
 fn gain_clamps_max_level_and_stat_85() {
     let mut s = ice_l6(10);
     s.w.unit_mut(s.merc).owner = None;
-    let g = |s: &Setup, exp, alvl| gain(&s.w, &s.t, &s.st, s.player, s.merc, exp, alvl, alvl, same);
+    let g = |s: &Setup, exp, alvl| gain(&s.w, &s.t, &s.st, s.player, s.merc, exp, alvl, alvl);
     assert_eq!(g(&s, 0, 6), 1);
     assert_eq!(g(&s, -5, 6), 1);
     assert_eq!(g(&s, 0x0100_0000, 6), 0x7F_FFFF);
     assert_eq!(g(&s, 1000, 99), 0);
     assert_eq!(g(&s, 1000, 98), 1000);
     // The ExpRatio step runs between the level factor and stat 85.
-    let r = gain(&s.w, &s.t, &s.st, s.player, s.merc, 1000, 6, 6, |v, a| {
-        assert_eq!(a, 6);
-        v / 2
-    });
+    s.t.exp_ratios = ratios(&[(6, 512)]);
+    let r = gain(&s.w, &s.t, &s.st, s.player, s.merc, 1000, 6, 6);
     assert_eq!(r, 500);
+    s.t.exp_ratios = Default::default();
     // Stat 85 (total, items count): + pct(gain, 85, 100).
     s.w.unit_mut(s.merc).bonus.insert(stat::ADDEXPERIENCE, 50);
     assert_eq!(g(&s, 1000, 6), 1500);
     // Level factor: defender 7 levels below → 159/256.
-    let r = gain(&s.w, &s.t, &s.st, s.player, s.merc, 256, 13, 6, same);
+    let r = gain(&s.w, &s.t, &s.st, s.player, s.merc, 256, 13, 6);
     assert_eq!(r, 159 + 159 / 2);
 }
 
@@ -122,7 +115,7 @@ fn gain_clamps_max_level_and_stat_85() {
 fn merc_kill_gain_229_gives_26918() {
     let mut s = ice_l6(10);
     let d = defender(&mut s.w);
-    kill_share(&mut s.w, &s.t, &s.st, s.merc, d, Some(s.player), same).unwrap();
+    kill_share(&mut s.w, &s.t, &s.st, s.merc, d, Some(s.player)).unwrap();
     assert_eq!(s.w.base(s.merc, stat::EXPERIENCE), 26918);
     let mut want = vec![0xA2, 0x0D];
     want.extend_from_slice(&G);
@@ -137,7 +130,7 @@ fn merc_kill_gain_229_gives_26918() {
 fn player_kill_gives_76_then_26612() {
     let mut s = ice_l6(10);
     let d = defender(&mut s.w);
-    kill_share(&mut s.w, &s.t, &s.st, s.player, d, None, same).unwrap();
+    kill_share(&mut s.w, &s.t, &s.st, s.player, d, None).unwrap();
     assert_eq!(229 * 86 / 256, 76);
     assert_eq!(s.w.base(s.merc, stat::EXPERIENCE), 26612);
     let mut want = vec![0xA1, 0x0D];
@@ -153,20 +146,20 @@ fn kill_share_needs_a_player_and_experience() {
     let mut s = ice_l6(10);
     let d = defender(&mut s.w);
     let pet = s.w.add(4, 1, 0, 0x77);
-    kill_share(&mut s.w, &s.t, &s.st, pet, d, Some(s.player), same).unwrap();
+    kill_share(&mut s.w, &s.t, &s.st, pet, d, Some(s.player)).unwrap();
     assert_eq!(s.w.base(s.merc, stat::EXPERIENCE), 26612);
     // No player owner → nothing.
     let mut s = ice_l6(10);
     let d = defender(&mut s.w);
     let pet = s.w.add(4, 1, 0, 0x77);
-    kill_share(&mut s.w, &s.t, &s.st, pet, d, None, same).unwrap();
+    kill_share(&mut s.w, &s.t, &s.st, pet, d, None).unwrap();
     assert_eq!(s.w.base(s.merc, stat::EXPERIENCE), 26460);
     // Attacker type 2 (object) → nothing.
     let obj = s.w.add(5, 2, 0, 0x78);
-    kill_share(&mut s.w, &s.t, &s.st, obj, d, Some(s.player), same).unwrap();
+    kill_share(&mut s.w, &s.t, &s.st, obj, d, Some(s.player)).unwrap();
     // Defender without experience → nothing.
     s.w.set(d, stat::EXPERIENCE, 0);
-    kill_share(&mut s.w, &s.t, &s.st, s.player, d, None, same).unwrap();
+    kill_share(&mut s.w, &s.t, &s.st, s.player, d, None).unwrap();
     assert_eq!(s.w.base(s.merc, stat::EXPERIENCE), 26460);
     assert!(s.w.sent.is_empty());
 }
@@ -246,19 +239,14 @@ fn send_stats_order_and_sums() {
     }
     s.w.unit_mut(m).bonus.insert(stat::STRENGTH, 100);
     send_stats(&mut s.w, &s.st, s.player).unwrap();
-    let got: Vec<(u8, u32)> =
-        s.w.sent_to(s.player)
-            .iter()
-            .map(|b| {
-                assert_eq!(&b[2..6], &G);
-                let v = match b[0] {
-                    0x9E => u32::from(b[6]),
-                    0x9F => u32::from(u16::from_le_bytes([b[6], b[7]])),
-                    _ => u32::from_le_bytes([b[6], b[7], b[8], b[9]]),
-                };
-                (b[1], v)
-            })
-            .collect();
+    // Queued on the merc, nothing sent (§13 rule 4, HL8).
+    assert!(s.w.sent.is_empty());
+    let got = s.w.queued[&m].clone();
+    // The flush encodes each record with the merc's GUID.
+    for b in flush_stats(MERC_GUID, &got).unwrap() {
+        assert_eq!(&b[2..6], &G);
+    }
+    let got: Vec<(u8, u32)> = got.iter().map(|&(st, v)| (st as u8, v)).collect();
     assert_eq!(
         got,
         vec![
@@ -270,8 +258,8 @@ fn send_stats_order_and_sums() {
             (31, 39),
             (13, 26461),
             (30, 41161),
-            (23, 3),
-            (24, 7),
+            (21, 3),
+            (22, 7),
             (39, 6),
             (41, 7),
             (43, 8),
@@ -283,6 +271,7 @@ fn send_stats_order_and_sums() {
     s.st.list_mut(s.player).nodes[0].dead = true;
     send_stats(&mut s.w, &s.st, s.player).unwrap();
     assert!(s.w.sent.is_empty());
+    assert!(s.w.queued.is_empty());
 }
 
 // Covers: specs/world/hirelings.md §4 r3, §13 r6
@@ -491,7 +480,7 @@ fn skill_slots_loop() {
     assert!(s.w.unit(s.merc).skills.is_empty());
 }
 
-// Covers: specs/world/hirelings.md §7.3 r1, §7.3 r3
+// Covers: specs/world/hirelings.md §7.3 text, §7.3 r1, §7.3 r3
 #[test]
 fn add_experience_guards() {
     // merc level ≥ player level → nothing.
@@ -512,7 +501,7 @@ fn add_experience_guards() {
     assert!(s.w.sent.is_empty());
 }
 
-// Covers: specs/world/hirelings.md §7.3 r5, §7.3 r6
+// Covers: specs/world/hirelings.md §4 text, §7.3 text, §7.3 r5, §7.3 r6
 #[test]
 fn one_gain_raises_several_levels() {
     // 26460 + 2·29295 = 85050 = threshold(9) < threshold(10) = 115500.
@@ -521,12 +510,13 @@ fn one_gain_raises_several_levels() {
     assert_eq!(s.w.base(s.merc, stat::EXPERIENCE), 85050);
     assert_eq!(s.w.base(s.merc, stat::LEVEL), 9, "past the player's 8");
     let sent = s.w.sent_to(s.player);
-    // Delta, speech, then the 14 stat messages.
-    assert_eq!(sent.len(), 16);
+    // Delta and speech sent; the 14 stats queued on the merc (§13 rule 4).
+    assert_eq!(sent.len(), 2);
     assert_eq!(sent[0][0], 0xA2);
     assert_eq!(sent[1][0], 0x27);
-    assert_eq!(&sent[2][..2], &[0x9E, 12]);
-    assert_eq!(sent[2][6], 9);
+    let q = &s.w.queued[&s.merc];
+    assert_eq!(q.len(), 14);
+    assert_eq!(q[0], (12, 9));
     assert_eq!(s.w.log.last().unwrap(), "level_events 1 2");
     // One short of threshold(7): no level change, no events.
     let mut s = ice_l6(10);
@@ -536,7 +526,7 @@ fn one_gain_raises_several_levels() {
     assert_eq!(s.w.sent.len(), 1);
 }
 
-// Covers: specs/world/hirelings.md §7.3 r5, §10 r5, §10 r6, §edge-cases-original-bugs r6
+// Covers: specs/world/hirelings.md §4 text, §7.3 r5, §10 r5, §10 r6, §edge-cases-original-bugs r6
 #[test]
 fn level_97_jump_stops_at_98_and_reload_gives_99() {
     let mut r = row(100, 0, 1, 1, 3);
@@ -565,11 +555,11 @@ fn level_97_jump_stops_at_98_and_reload_gives_99() {
     assert_eq!(s2.w.base(s2.merc, stat::LEVEL), 99);
     assert_eq!(s2.w.base(s2.merc, stat::EXPERIENCE), exp);
     assert_eq!(s2.w.base(s2.merc, stat::NEXTEXP), 0);
-    // Speech (from §4) first, then the queued stat 13.
+    // The §4 speech is sent; stat 13 is queued on the merc (§13 rule 4).
     let sent = s2.w.sent_to(s2.player);
-    assert_eq!(sent.len(), 2);
+    assert_eq!(sent.len(), 1);
     assert_eq!(sent[0][0], 0x27);
-    assert_eq!(sent[1], stat_message(13, MERC_GUID, exp as u32).unwrap());
+    assert_eq!(s2.w.queued[&s2.merc], [(13, exp as u32)]);
 }
 
 // Covers: specs/world/hirelings.md §10 r5, §10 r6
@@ -595,4 +585,95 @@ fn restore_level_walk() {
     restore_experience(&mut s.w, &s.t, &s.st, s.player, s.merc, 100).unwrap();
     assert_eq!(s.w.base(s.merc, stat::EXPERIENCE), 26460);
     assert_eq!(s.w.base(s.merc, stat::LEVEL), 6);
+}
+
+// Covers: specs/world/hirelings.md §edge-cases-original-bugs r2
+#[test]
+fn offer_uses_the_lowest_bracket_unit_its_own() {
+    // Ice brackets 3 / 36 with different HP columns: at L 40 the offer
+    // reads bracket 3 (d = 37), the unit bracket 36 (d = 4).
+    let mut rows = ice_105();
+    (rows[0].hp, rows[0].hp_lvl) = (45, 9);
+    (rows[1].hp, rows[1].hp_lvl) = (390, 6);
+    (rows[0].ar, rows[0].ar_lvl) = (10, 5);
+    (rows[1].ar, rows[1].ar_lvl) = (450, 13);
+    // L = (lo' mod 5) + player level − 5: pick the player level that
+    // gives L 40 for this seed.
+    let t = tables(rows.clone());
+    let l10 = t
+        .rows
+        .offer(true, 10, 22_752_887, 0, 0)
+        .expect("offer")
+        .level;
+    let o = t
+        .rows
+        .offer(true, 50 - l10, 22_752_887, 0, 0)
+        .expect("offer");
+    assert_eq!((o.row, o.level), (0, 40));
+    assert_eq!(o.life, 45 + 9 * 37);
+    let mut s = setup(rows, 1, 50);
+    apply_level(&mut s.w, &s.t, &s.st, s.player, Some(s.merc), o.level);
+    assert_eq!(s.w.base(s.merc, stat::MAXHP), (6 * 4 + 390) * 256);
+    assert_ne!(s.w.base(s.merc, stat::MAXHP), o.life * 256);
+    // Attack rating only on the unit (no offer word).
+    assert_eq!(s.w.base(s.merc, stat::TOHIT), 450 + 13 * 4);
+}
+
+/// An `experience` `ExpRatio` column: `MaxLvl` 99, the `MaxLvl` row's
+/// ratio 10, every level 1024 except the given ones.
+fn ratios(set: &[(usize, u32)]) -> ExpRatios {
+    let mut levels = vec![1024u32; 100];
+    for &(l, r) in set {
+        levels[l] = r;
+    }
+    ExpRatios {
+        max_level: 99,
+        max_row: 10,
+        levels,
+    }
+}
+
+/// The 1.14d `experience.txt` `ExpRatio` column (§7.2 rule 3): 1024 for
+/// levels 0–69, −48 per level to 256 at 85, then the listed tail.
+fn ratios_114d() -> ExpRatios {
+    let mut levels = vec![1024u32; 70];
+    for l in 70..=85u32 {
+        levels.push(1024 - 48 * (l - 69));
+    }
+    levels.extend([192, 144, 108, 81, 61, 46, 35, 26, 20, 15, 11, 8, 6, 5]);
+    assert_eq!(levels.len(), 100);
+    assert_eq!(levels[85], 256);
+    ExpRatios {
+        max_level: 99,
+        max_row: 10,
+        levels,
+    }
+}
+
+// Covers: specs/world/hirelings.md §7.2 r3
+#[test]
+fn exp_ratio_vectors() {
+    let t = ratios_114d();
+    assert_eq!(t.ratio(6), 1024);
+    assert_eq!(t.ratio(80), 496);
+    assert_eq!(t.ratio(97), 8);
+    assert_eq!(t.ratio(0), 10);
+    assert_eq!(t.ratio(-3), 10);
+    assert_eq!(t.ratio(100), 0);
+    // Test vectors: 229 / 2421 / 23432 / 1999872.
+    assert_eq!(t.apply(229, 6), 229);
+    assert_eq!(t.apply(5000, 80), 2421);
+    assert_eq!(t.apply(3_000_000, 97), 23432);
+    assert_eq!(t.apply(2_000_000, 6), 1_999_872);
+    // e ≤ 1048575 with r = 1024: unchanged; e ≤ 0 unchanged.
+    assert_eq!(t.apply(1_048_575, 6), 1_048_575);
+    assert_eq!(t.apply(0, 6), 0);
+    assert_eq!(t.apply(-7, 6), -7);
+    // s − 1 ≥ 31 (s = 0 or s > 31): unchanged; no table: unchanged.
+    let mut z = ratios(&[]);
+    z.max_row = 0;
+    assert_eq!(z.apply(5000, 6), 5000);
+    z.max_row = 32;
+    assert_eq!(z.apply(5000, 6), 5000);
+    assert_eq!(ExpRatios::default().apply(5000, 6), 5000);
 }

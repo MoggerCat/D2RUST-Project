@@ -507,6 +507,7 @@ mod tests {
 
     // Row icons (frame sel / 3 + sel, frame 0 again for the current
     // level), positions, text colors.
+    // Covers: specs/ui/panels.md §13 r5
     #[test]
     fn rows_icons_and_text() {
         let mut v = view();
@@ -586,6 +587,7 @@ mod tests {
         assert_eq!((title.at.x, title.at.y), (118, 48));
     }
 
+    // Covers: specs/ui/panels.md §13 r1, §13 r7
     #[test]
     fn messages_choose_and_close() {
         let mut p = WaypointPanel::new();
@@ -622,6 +624,7 @@ mod tests {
     }
 
     // §13.1: player gone → close, 0x49 level 0 once (latch).
+    // Covers: specs/ui/panels.md §13 r1
     #[test]
     fn self_close_latch() {
         let mut p = WaypointPanel::new();

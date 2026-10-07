@@ -1,5 +1,7 @@
 # Handoff: every missile server-do / server-hit body — `claude/impl-missile-bodies-2`
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the ninth fold (`claude/fold-handoff-night`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Ninth set" (PC 1 / PC 2).
+
 Cloud implementation session, 2026-10-06, task class: implementation
 from clear specs, medium (METHODS M14). Base: `claude/specs-staging` at
 `f294bbf`. Repo only, synthetic data, no game files (M09). Branch
@@ -100,7 +102,7 @@ several (`skills::use_::bodies::helpers` `scan_unit`, `aura_fill`,
    `Partial`, no builder; no sender in `d2-server` / `d2-sim`). Adding
    code 8 / 9 needs that pass first; it is not a small fix. Next step
    below.
-2. **A1Q6 Catacombs entry keeps states 4 and 5** (`quests.md` §10.8
+2. **A1Q6 Catacombs entry keeps states 4 and 5** (`quests-act1.md` §10.8
    event 3 step 1): fixed in `world/quests/act1/q6.rs` (state := 3 only
    below 3; otherwise unchanged and not "changed"); the slaughter test
    enters Catacombs 1 at states 4 and 5.
@@ -146,7 +148,8 @@ several (`skills::use_::bodies::helpers` `scan_unit`, `aura_fill`,
 2. Wire the new `MissileBodies` seams to the existing providers (§1
    Seams); until then the wired game runs these bodies with no-op
    effects for everything another spec owns.
-3. Recordings (`bodies.md` / `bodies-2.md` Open question 1): Cairn
+3. Recordings (`bodies.md` / `bodies-2.md` Open question 1; HANDOFF §5
+   S9-A4): Cairn
    Stones portal, Baal's taunt, Royal Strike, Plague Javelin, Blade
    Fury, a lightning trailing javelin explosion, Lightning Fury, Bone
    Wall, Battle Cry, Fist of the Heavens, the panther potions.

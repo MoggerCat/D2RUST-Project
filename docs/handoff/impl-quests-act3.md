@@ -1,5 +1,7 @@
 # Handoff: the Act III quests callback by callback — `claude/impl-quests-act3`
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the ninth fold (`claude/fold-handoff-night`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Ninth set" (PC 1 / PC 2).
+
 Cloud implementation session, 2026-10-06, from `claude/specs-staging`
 (`5844674`). Spec: `specs/world/quests-act3.md` (draft, read from the
 1.14d disassembly; no Act III recording exists). The coordinator folds
@@ -128,7 +130,7 @@ d2-sim tests of other sessions (`missiles::tests_bodies` 2,
 `tools/coverage.py --check`, `tools/spec_index.py --check` pass. 145 new
 `act3` tests.
 
-## Local run queue (add to `docs/HANDOFF.md` §5)
+## Local run queue (HANDOFF §5 S9-A3)
 
 1. Record a full Act III run (spec open question 8; `tools/trace-recorder`,
    1.14d, single player): Alkor 564 with a second player in Act III and a

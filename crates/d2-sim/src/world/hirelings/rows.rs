@@ -223,16 +223,30 @@ impl HirelingRows {
         result
     }
 
-    /// §1.2 rule 3 (`0x00663750`): `Act − 1` of the row whose name range
-    /// holds `name`, 0 when none.
-    ///
-    /// TODO(hirelings.md §1.2 rule 3): the fallback `0x00656390` is not
-    /// described; the range test alone is applied.
-    pub fn act_of_name(&self, name: u16) -> u32 {
+    /// §1.2 rule 3 (`0x00663750(expansion, class, name)`): `Act − 1` of
+    /// the first row of the game's version (100 expansion, else 0) whose
+    /// `Class` equals `class` (`0x00656440`), else of the first such row
+    /// whose `NameFirst` ≤ `name` ≤ `NameLast` (`0x00656390`, unsigned);
+    /// neither → 0. Every 1.14d caller passes class 0 ([`Self::act_of_name`]).
+    pub fn act_of(&self, expansion: bool, class: u32, name: u16) -> u32 {
+        let version = if expansion { 100 } else { 0 };
+        let same = |r: &&HirelingRow| r.version == version;
         self.rows
             .iter()
-            .find(|r| (r.name_first..=r.name_last).contains(&name))
+            .filter(same)
+            .find(|r| r.class == class)
+            .or_else(|| {
+                self.rows
+                    .iter()
+                    .filter(same)
+                    .find(|r| r.name_first <= name && name <= r.name_last)
+            })
             .map_or(0, |r| r.act.wrapping_sub(1))
+    }
+
+    /// [`Self::act_of`] with class 0, as every 1.14d caller calls it.
+    pub fn act_of_name(&self, expansion: bool, name: u16) -> u32 {
+        self.act_of(expansion, 0, name)
     }
 
     /// §2 (`0x006637F0`): the offer of a slot seed. `None`: no candidate.

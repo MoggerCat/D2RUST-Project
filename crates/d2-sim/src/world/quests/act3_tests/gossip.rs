@@ -5,10 +5,21 @@
 use super::*;
 use act3::Timer;
 
-const OBJ: UnitId = UnitId(0x40);
 const SPAWNED: UnitId = UnitId(0x50);
 const WANDERER: UnitId = UnitId(0x60);
 const R1: RoomId = RoomId(1);
+/// The dummies' / the wanderer object's init records
+/// (`quests-act3-2.md` §11.7).
+const START_AT: act3::InitPoint = act3::InitPoint {
+    room: R1,
+    x: 100,
+    y: 200,
+};
+const END_AT: act3::InitPoint = act3::InitPoint {
+    room: R1,
+    x: 300,
+    y: 400,
+};
 
 fn scroll(p: UnitId, class: u16, msg: u32) -> EventArgs {
     EventArgs {
@@ -120,16 +131,15 @@ fn hratli_messages_and_start() {
 fn hratli_start_dummy() {
     let (mut ctl, _) = control();
     let mut f = Fake3::new();
-    f.f.pos.insert(OBJ, (100, 200, R1));
     // Spawn fails: nothing stored.
-    act3::hratli_start_init(&mut ctl, &mut f, OBJ);
+    act3::hratli_start_init(&mut ctl, &mut f, START_AT);
     assert_eq!(
         ctl.record(14).unwrap().extra.act3.q0,
         act3::q0::Extra::default()
     );
     // Spawned: +0x0C := GUID, +0x00 := 1.
     f.f.spawns = vec![Some(SPAWNED)];
-    act3::hratli_start_init(&mut ctl, &mut f, OBJ);
+    act3::hratli_start_init(&mut ctl, &mut f, START_AT);
     let x = &ctl.record(14).unwrap().extra.act3.q0;
     assert!(x.start_spawned && x.hratli_guid == SPAWNED.0);
     assert_eq!(
@@ -142,18 +152,18 @@ fn hratli_start_dummy() {
     // +0x00 and Hratli exists: no spawn.
     monster(&mut f, SPAWNED, act3::npc::HRATLI);
     f.f.log.clear();
-    act3::hratli_start_init(&mut ctl, &mut f, OBJ);
+    act3::hratli_start_init(&mut ctl, &mut f, START_AT);
     assert!(f.log().is_empty());
     // Hratli gone: spawned again.
     f.f.monsters.remove(&SPAWNED);
     f.f.spawns = vec![Some(UnitId(0x51))];
-    act3::hratli_start_init(&mut ctl, &mut f, OBJ);
+    act3::hratli_start_init(&mut ctl, &mut f, START_AT);
     assert_eq!(ctl.record(14).unwrap().extra.act3.q0.hratli_guid, 0x51);
     // Game 16.13: nothing.
     ctl.game.set(16, bit::PRIMARY_GOAL_DONE);
     f.f.log.clear();
     f.f.spawns = vec![Some(UnitId(0x52))];
-    act3::hratli_start_init(&mut ctl, &mut f, OBJ);
+    act3::hratli_start_init(&mut ctl, &mut f, START_AT);
     assert!(f.log().is_empty());
     assert_eq!(ctl.record(14).unwrap().extra.act3.q0.hratli_guid, 0x51);
 }
@@ -163,10 +173,9 @@ fn hratli_start_dummy() {
 fn hratli_end_dummy() {
     let (mut ctl, _) = control();
     let mut f = Fake3::new();
-    f.f.pos.insert(OBJ, (300, 400, R1));
     // Game 16.13 clear: only +0x02 and the position.
     f.f.spawns = vec![Some(SPAWNED)];
-    act3::hratli_end_init(&mut ctl, &mut f, OBJ);
+    act3::hratli_end_init(&mut ctl, &mut f, END_AT);
     let x = ctl.record(14).unwrap().extra.act3.q0.clone();
     assert!(x.end_seen && (x.end_x, x.end_y) == (300, 400));
     assert!(!x.end_spawned && x.hratli_guid == 0);
@@ -179,7 +188,7 @@ fn hratli_end_dummy() {
         x.start_spawned = true;
         x.hratli_guid = HRATLI_U.0;
     }
-    act3::hratli_end_init(&mut ctl, &mut f, OBJ);
+    act3::hratli_end_init(&mut ctl, &mut f, END_AT);
     let x = ctl.record(14).unwrap().extra.act3.q0.clone();
     assert!(x.start_present && !x.end_spawned);
     assert!(f.log().is_empty());
@@ -187,7 +196,7 @@ fn hratli_end_dummy() {
     // Otherwise spawn there: GUID, +0x01, unit flags 0x3000000; no map
     // AI stored in 1.14d, so none applied.
     ctl.record_mut(14).unwrap().extra.act3.q0.start_spawned = false;
-    act3::hratli_end_init(&mut ctl, &mut f, OBJ);
+    act3::hratli_end_init(&mut ctl, &mut f, END_AT);
     let x = ctl.record(14).unwrap().extra.act3.q0.clone();
     assert!(x.end_spawned && x.hratli_guid == SPAWNED.0 && !x.ai_applied);
     assert_eq!(
@@ -200,15 +209,14 @@ fn hratli_end_dummy() {
     // +0x01 set: nothing more.
     f.f.log.clear();
     f.f.spawns = vec![Some(UnitId(0x51))];
-    act3::hratli_end_init(&mut ctl, &mut f, OBJ);
+    act3::hratli_end_init(&mut ctl, &mut f, END_AT);
     assert!(f.log().is_empty());
 
     // A failed spawn stores nothing.
     let (mut ctl, _) = control();
     let mut f = Fake3::new();
-    f.f.pos.insert(OBJ, (300, 400, R1));
     ctl.game.set(16, bit::PRIMARY_GOAL_DONE);
-    act3::hratli_end_init(&mut ctl, &mut f, OBJ);
+    act3::hratli_end_init(&mut ctl, &mut f, END_AT);
     let x = ctl.record(14).unwrap().extra.act3.q0.clone();
     assert!(!x.end_spawned && x.hratli_guid == 0 && x.end_seen);
     assert_eq!(f.log(), ["spawn 253 300 400 mode 1 r 4294967295"]);
@@ -250,18 +258,17 @@ fn wanderer_start_and_no_other_callbacks() {
 fn wanderer_object_init() {
     let (mut ctl, _) = control();
     let mut f = Fake3::new();
-    f.f.pos.insert(OBJ, (100, 200, R1));
     f.f.rooms.insert(R1, (0, 0, 1000, 1000));
     // Spawn fails: +0x01 stays, +0x00 := 1.
-    act3::wanderer_init(&mut ctl, &mut f, OBJ);
+    act3::wanderer_init(&mut ctl, &mut f, START_AT);
     let x = ctl.record(28).unwrap().extra.act3.q7.clone();
     assert!(x.to_spawn && x.seen && (x.target_x, x.target_y) == (107, 200));
     // Spawned at (x + 7, y): +0x01 := 0.
     f.f.spawns = vec![Some(WANDERER)];
-    act3::wanderer_init(&mut ctl, &mut f, OBJ);
+    act3::wanderer_init(&mut ctl, &mut f, START_AT);
     assert!(!ctl.record(28).unwrap().extra.act3.q7.to_spawn);
     // +0x01 clear: no spawn.
-    act3::wanderer_init(&mut ctl, &mut f, OBJ);
+    act3::wanderer_init(&mut ctl, &mut f, START_AT);
     assert_eq!(
         f.log(),
         [
@@ -272,9 +279,8 @@ fn wanderer_object_init() {
     // Without +0x01 from the start: only +0x00.
     let (mut ctl, _) = control();
     let mut f = Fake3::new();
-    f.f.pos.insert(OBJ, (100, 200, R1));
     ctl.record_mut(28).unwrap().extra.act3.q7.to_spawn = false;
-    act3::wanderer_init(&mut ctl, &mut f, OBJ);
+    act3::wanderer_init(&mut ctl, &mut f, START_AT);
     let x = ctl.record(28).unwrap().extra.act3.q7.clone();
     assert!(x.seen && (x.target_x, x.target_y) == (0, 0));
     assert!(f.log().is_empty());

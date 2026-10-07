@@ -1,7 +1,7 @@
-// Spec: specs/world/quests.md §7.3, §10.2; specs/world/quests-act1-rest.md §8; specs/world/npc.md §7.5
+// Spec: specs/world/quests.md §7.3; specs/world/quests-act1.md §10.2; specs/world/quests-act1-rest.md §8; specs/world/npc.md §7.5
 //! Quests → the NPC control block: the mercenary reward `0x00579180`
 //! (`npc.md` §7.5, [`NpcControl::quest_mercenary`]) that an Act I quest
-//! grants from C→S 0x31 (`quests.md` §10.2, Kashya's message 92).
+//! grants from C→S 0x31 (`quests-act1.md` §10.2, Kashya's message 92).
 //!
 //! The quest code reaches the reward through its world
 //! ([`crate::world::quests::QuestWorld::mercenary_reward`]) while it holds

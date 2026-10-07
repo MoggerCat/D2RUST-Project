@@ -138,7 +138,7 @@ pub fn nova<W: BodyWorld>(w: &mut W, t: &SkillTables, u: W::Unit, skill: i32, lv
 
 /// srvdo 66 Holy Fire, Holy Shock, Sanctuary, Conviction `0x005CF3A0`
 /// (§8.5); with `freeze`, srvdo 81 Holy Freeze `0x005D0920`
-/// (`bodies-2.md` §6.10).
+/// (`bodies-2b.md` §6.10).
 pub fn damage_aura<W: BodyWorld>(
     w: &mut W,
     t: &SkillTables,

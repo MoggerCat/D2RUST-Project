@@ -13,6 +13,17 @@ const DECOY: UnitId = UnitId(0x40);
 const ALTAR: UnitId = UnitId(0x41);
 const BOSS: UnitId = UnitId(0x42);
 const ITEM: UnitId = UnitId(0x43);
+/// The decoy's and the altar's init records (`quests-act3-2.md` §11.7).
+const DECOY_AT: act3::InitPoint = act3::InitPoint {
+    room: RoomId(7),
+    x: 100,
+    y: 200,
+};
+const ALTAR_AT: act3::InitPoint = act3::InitPoint {
+    room: RoomId(3),
+    x: 300,
+    y: 400,
+};
 
 fn bits(f: &mut Fake3, p: UnitId, slot: u8, bs: &[u8]) {
     let d = usize::from(f.f.difficulty);
@@ -367,7 +378,6 @@ fn both_rewards_finish_the_quest() {
 
 fn decoy(f: &mut Fake3) {
     f.f.objects.insert(DECOY, (0x40, 252, 0));
-    f.f.pos.insert(DECOY, (100, 200, RoomId(7)));
 }
 
 // Covers: specs/world/quests-act3.md §5.6
@@ -422,14 +432,14 @@ fn decoy_operate_refused_and_intro() {
 fn decoy_init() {
     let (mut ctl, mut f) = setup();
     decoy(&mut f);
-    act3::decoy_init(&mut ctl, &mut f, DECOY);
+    act3::decoy_init(&mut ctl, &mut f, DECOY, DECOY_AT);
     assert!(x(&ctl).decoy_known);
     assert_eq!((x(&ctl).decoy_x, x(&ctl).decoy_y), (100, 200));
     assert!(f.log().is_empty());
     // Activated, no boss → spawn in the object's room.
     xm(&mut ctl).decoy_active = true;
     f.f.spawns.push(Some(BOSS));
-    act3::decoy_init(&mut ctl, &mut f, DECOY);
+    act3::decoy_init(&mut ctl, &mut f, DECOY, DECOY_AT);
     assert_eq!(f.log(), vec!["spawn in room 7 407"]);
     let e = x(&ctl);
     assert!(e.boss_spawned && !e.decoy_active && !e.boss_spawning);
@@ -440,7 +450,7 @@ fn decoy_init() {
     let (mut ctl, mut f) = setup();
     decoy(&mut f);
     ctl.record_mut(C).unwrap().not_intro = false;
-    act3::decoy_init(&mut ctl, &mut f, DECOY);
+    act3::decoy_init(&mut ctl, &mut f, DECOY, DECOY_AT);
     assert_eq!(f.log(), vec!["mode 64 2"]);
     assert!(!x(&ctl).decoy_known);
 }
@@ -456,7 +466,7 @@ fn run_timer(ctl: &mut QuestControl, f: &mut Fake3) {
 fn boss_timer_spawns_near_a_player() {
     let (mut ctl, mut f) = setup();
     decoy(&mut f);
-    act3::decoy_init(&mut ctl, &mut f, DECOY);
+    act3::decoy_init(&mut ctl, &mut f, DECOY, DECOY_AT);
     act3::decoy_operate(&mut ctl, &mut f, DECOY, P1);
     f.room_covering = Some(RoomId(9));
     f.player_in_rooms = true;
@@ -481,7 +491,7 @@ fn boss_timer_spawns_near_a_player() {
 fn boss_timer_tries_once() {
     let (mut ctl, mut f) = setup();
     decoy(&mut f);
-    act3::decoy_init(&mut ctl, &mut f, DECOY);
+    act3::decoy_init(&mut ctl, &mut f, DECOY, DECOY_AT);
     act3::decoy_operate(&mut ctl, &mut f, DECOY, P1);
     f.room_covering = Some(RoomId(9));
     f.player_in_rooms = false;
@@ -497,7 +507,7 @@ fn boss_timer_tries_once() {
     run_timer(&mut ctl, &mut f);
     assert!(!x(&ctl).boss_spawned);
     f.f.spawns.push(Some(BOSS));
-    act3::decoy_init(&mut ctl, &mut f, DECOY);
+    act3::decoy_init(&mut ctl, &mut f, DECOY, DECOY_AT);
     assert!(x(&ctl).boss_spawned);
 }
 
@@ -509,7 +519,7 @@ fn boss_timer_preconditions() {
         let (mut ctl, mut f) = setup();
         decoy(&mut f);
         if case != 0 {
-            act3::decoy_init(&mut ctl, &mut f, DECOY);
+            act3::decoy_init(&mut ctl, &mut f, DECOY, DECOY_AT);
         }
         act3::decoy_operate(&mut ctl, &mut f, DECOY, P1);
         f.act3 = case != 1;
@@ -526,7 +536,7 @@ fn boss_timer_preconditions() {
     // is still installed.
     let (mut ctl, mut f) = setup();
     decoy(&mut f);
-    act3::decoy_init(&mut ctl, &mut f, DECOY);
+    act3::decoy_init(&mut ctl, &mut f, DECOY, DECOY_AT);
     act3::decoy_operate(&mut ctl, &mut f, DECOY, P1);
     f.room_covering = Some(RoomId(9));
     f.player_in_rooms = true;
@@ -595,8 +605,7 @@ fn boss_kill_drops_the_gidbinn() {
 fn altar_and_ormus() {
     let (mut ctl, mut f) = setup();
     f.f.objects.insert(ALTAR, (0x41, 251, 0));
-    f.f.pos.insert(ALTAR, (300, 400, RoomId(3)));
-    act3::altar_init(&mut ctl, &mut f, ALTAR);
+    act3::altar_init(&mut ctl, &mut f, ALTAR, ALTAR_AT);
     assert_eq!(f.log(), vec!["mode 65 0"]);
     let e = x(&ctl);
     assert_eq!((e.altar_guid, e.altar_x, e.altar_y), (0x41, 300, 400));
@@ -627,7 +636,7 @@ fn altar_and_ormus() {
     assert_eq!(act3::altar_position(&ctl), None);
     // A later init takes mode +0x2C.
     f.f.log.clear();
-    act3::altar_init(&mut ctl, &mut f, ALTAR);
+    act3::altar_init(&mut ctl, &mut f, ALTAR, ALTAR_AT);
     assert_eq!(f.log(), vec!["mode 65 2"]);
 }
 
@@ -926,4 +935,14 @@ fn status_reaches_the_0x5d() {
     ctl.records[i].flags = 0x40;
     ctl.send_status(&mut f, P1, C).unwrap();
     assert_eq!(sent_5d(&f), vec![(P1, vec![0x5D, 17, 0x40, 6, 0, 0])]);
+}
+
+// Covers: specs/world/quests-act3.md §5.1
+#[test]
+fn extra_data_at_init() {
+    // Chain 17's init only switches the record on: the extra data is 0.
+    let (ctl, _) = control();
+    assert_eq!(x(&ctl), &act3::q3::Extra::default());
+    let r = &ctl.records[idx(&ctl)];
+    assert!(r.active);
 }

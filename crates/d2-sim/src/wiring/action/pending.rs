@@ -290,7 +290,7 @@ pub trait Pending {
     fn footprint_ok(&self, game: &Game, class: i32, room: Option<RoomId>, x: i32, y: i32) -> bool {
         false
     }
-    /// SandRaider's help search (scan 1, `ai.md` §9.26 step 4).
+    /// SandRaider's help search (scan 1, `ai-bodies.md` §9.26 step 4).
     fn nearest_evil_monster(&mut self, game: &mut Game, unit: UnitId) -> Option<UnitId> {
         None
     }
@@ -595,7 +595,7 @@ pub trait Pending {
     ) -> (Option<UnitId>, u32) {
         (None, 0)
     }
-    // ---- AI quest calls (ai.md §9.32; world/quests.md) -----------------
+    // ---- AI quest calls (ai-bodies.md §9.32; world/quests.md) -----------------
 
     /// Portal coordinates set up; `true` (nothing to report) by default.
     fn portal_setup(&mut self, game: &mut Game, unit: UnitId, npc: PortalNpc) -> bool {
@@ -618,7 +618,7 @@ pub trait Pending {
     fn drehya_wait(&mut self, game: &mut Game) -> bool {
         false
     }
-    /// The Npc class cases (`ai.md` §9.9 step 2); defaults: no quest
+    /// The Npc class cases (`ai-bodies.md` §9.9 step 2); defaults: no quest
     /// state (jerhyn's palace inactive, nothing brought or found).
     fn jerhyn_palace_active(&mut self, game: &mut Game) -> bool {
         false
@@ -923,6 +923,30 @@ pub trait Pending {
         true
     }
 
+    // ---- the monster mode message and the death end (`intents-events.md` §7.4, §7.7)
+
+    /// Unit +0xB0, read as e of a mode-0 and mode-3 message and f of a
+    /// mode-13 message (§7.4 rule 5). Its writers are not specified
+    /// (`stat-lists.md` §10: the regeneration kill sets it to 0;
+    /// `audio/triggers.md` OQ3 reads the client copy as the hit class of
+    /// the last hit). Default: 0.
+    fn unit_b0(&self, unit: UnitId) -> u8 {
+        0
+    }
+    /// `0x005A0180(unit, 0x100)`, which sets bit 0x80 of a mode-3
+    /// message's d (§7.4 rule 5; not specified). Default: false.
+    fn monster_flag_100(&self, unit: UnitId) -> bool {
+        false
+    }
+    /// The animation refresh `0x00623E00` of the stepping death (§7.7
+    /// rule 3, base id 78; not specified).
+    fn refresh_animation(&mut self, game: &mut Game, unit: UnitId) {}
+    /// The `monstats` `SplEndDeath` action of the death end (§7.7 rule
+    /// 3): 1 → `0x00574370(game, unit, minion, 1)` then `0x00573780`; 2 →
+    /// the kill `0x0057CCB0` of `0x00552FD0(unit)`. Neither callee is
+    /// specified. Default: nothing.
+    fn death_end_action(&mut self, game: &mut Game, unit: UnitId, action: u8, minion: u16) {}
+
     // ---- skill bodies (`skills/bodies.md`; their other systems) ---------
 
     /// `0x00554DE0`: allies (same unit after the monster owner
@@ -995,7 +1019,7 @@ pub trait Pending {
     ) {
     }
 
-    // ---- skill bodies, batch 2 and 3 (`bodies.md` §6–§8, `bodies-2.md`) --
+    // ---- skill bodies, batch 2 and 3 (`bodies.md` §6–§8, `bodies-2.md`, `bodies-2b.md`) --
 
     /// A call of the bodies into a system with no provider here
     /// ([`crate::skills::use_::bodies::BodyEffect`]). Default: nothing.
@@ -1172,7 +1196,7 @@ pub trait Pending {
     fn item_missile_type(&self, item: UnitId) -> i32 {
         0
     }
-    /// The Iron Golem item test (`bodies-2.md` §7.11). Default: false.
+    /// The Iron Golem item test (`bodies-2b.md` §7.11). Default: false.
     fn golem_item(&self, unit: UnitId) -> bool {
         false
     }
@@ -1186,6 +1210,62 @@ pub trait Pending {
     }
     /// `0x0062A710`: attack frames. Default: none (fatal).
     fn attack_frames(&self, unit: UnitId, item: UnitId) -> Option<i32> {
+        None
+    }
+
+    // ---- skill bodies, batch 4 (`bodies-3.md`, `bodies-4.md`) --
+
+    /// `0x00621DC0`: the 64-step direction from the unit to (x, y)
+    /// (`sim/pathing.md` §8.3). Default: 0.
+    fn body_dir64(&self, unit: UnitId, at: (i32, i32)) -> i32 {
+        0
+    }
+    /// A missile's total frames. Default: 0.
+    fn body_missile_frames(&self, missile: UnitId) -> i32 {
+        0
+    }
+    /// A missile's total frames and frames left (`0x0064A2B0`,
+    /// `0x0064A330`). Default: nothing.
+    fn body_set_missile_frames(&mut self, missile: UnitId, total: i32, left: i32) {}
+    /// `0x00621920`: an action event in the frames (a, b]. Default: none.
+    fn body_action_event_between(&self, unit: UnitId, a: i32, b: i32) -> bool {
+        false
+    }
+    /// The books row of an item's spell index: (`scrollskill`,
+    /// `bookskill`). Default: none.
+    fn body_book_skills(&self, item: UnitId) -> Option<(i32, i32)> {
+        None
+    }
+    /// The unit's inventory nodes (item, node kind) in list order.
+    /// Default: none.
+    fn body_inventory_nodes(&self, unit: UnitId) -> Vec<(UnitId, i32)> {
+        Vec::new()
+    }
+    /// The unit find of `missiles/bodies-2.md` §44. Default: nothing found.
+    fn body_unit_find(&self, room: RoomId, at: (i32, i32), r: i32, f: u32) -> Vec<UnitId> {
+        Vec::new()
+    }
+    /// `0x0064CB30(room, x, y, mask)`. Default: collides.
+    fn body_point_collides(&self, room: RoomId, at: (i32, i32), mask: u32) -> bool {
+        true
+    }
+    /// A monster creation entry point (`monsters/init.md` §1). Default:
+    /// none.
+    /// `0x00554EA0(game, unit, room, x, y, a, 0)` with a ≠ 0. Default: not
+    /// placed.
+    fn body_place_unit_flag(
+        &mut self,
+        unit: UnitId,
+        room: Option<RoomId>,
+        at: (i32, i32),
+        a: i32,
+    ) -> bool {
+        false
+    }
+    fn body_spawn_monster(
+        &mut self,
+        q: crate::skills::use_::bodies::MonsterSpawn<UnitId, RoomId>,
+    ) -> Option<UnitId> {
         None
     }
     /// `0x00627910` for the kick damage: weapon lists off / back on
@@ -1243,6 +1323,80 @@ pub trait Pending {
         Self: Sized,
     {
         1
+    }
+
+    // ---- client intents (`sim/intents-events.md` §9; d2-server's
+    // `handlers::player`) -------------------------------------------------
+
+    /// `0x00413490(text, −1)` (C→S 0x14, §9 rule 3): non-zero ends the
+    /// handler with nothing done. What it tests is not stated. Default:
+    /// 0 (the text passes).
+    fn overhead_text_test(&self, text: &[u8]) -> bool {
+        false
+    }
+    /// The player's overhead record (unit +0xA4) replaced (`0x006611A0`
+    /// free, `0x00661110(game +0x1C, text, frame)` new, byte +8 :=
+    /// `byte8`, `0x00661230`; §9 rule 3). Its timeout frame is
+    /// `UnitRecord::hover`, which the caller sets; the record's other
+    /// contents (hover/chat spec, S→C 0x26 §7.9) live here. Default:
+    /// nothing kept.
+    fn replace_overhead(&mut self, player: UnitId, text: &[u8], byte8: u8, end: i32) {}
+    /// `0x005845D0(game, player, GUID)`: the door highlight of C→S 0x3D
+    /// (§9 rule 4, open question 15). Default: nothing.
+    fn highlight_door(&mut self, game: &mut Game, player: UnitId, guid: u32) {}
+    /// Client flag 4 (`0x00538670`, hardcore) of the player's client (§9
+    /// rule 6). Default: softcore.
+    fn client_hardcore(&self, player: UnitId) -> bool {
+        false
+    }
+    /// `0x0052CAF0(game, client, reason)`: drop the player's client
+    /// (`tools/original-hooks.md` §6.1 rule 3; session code). Default:
+    /// nothing.
+    fn drop_client(&mut self, player: UnitId, reason: u32) {}
+    /// The SetStat message part of `0x00548520` (S→C 0x1D–0x1F, after the
+    /// stat is set). Default: nothing sent.
+    fn stat_sent(&mut self, player: UnitId, stat: u16, value: u32) {}
+    /// C→S 0x41's last step (§9 rule 6): the left skill (`0x00620190`)
+    /// re-selected with EDX = 1, then the right skill (`0x006201D0`) with
+    /// EDX = 0 (`0x005701B0`; owner: the skill list, `UseRest`).
+    /// Default: nothing.
+    fn reselect_hand_skills(&mut self, game: &mut Game, player: UnitId) {}
+    /// `0x005678A0(…, 1)`: the player is trading (C→S 0x44, §9 rule 7).
+    /// Default: not trading.
+    fn player_trading(&self, player: UnitId) -> bool {
+        false
+    }
+    /// `0x00549520(game, player, object, item, action)` and its result
+    /// (C→S 0x44, `world/quests-act2.md` §8.6, `quests-act2-2.md` §3.2).
+    /// `None` (the default): no provider, the id stays a stub.
+    fn staff_in_orifice(
+        &mut self,
+        game: &mut Game,
+        player: UnitId,
+        object: u32,
+        item: u32,
+        action: u16,
+    ) -> Option<u32> {
+        None
+    }
+    /// `0x00574EC0(game, player, 7, 0)`: the player's hireling (§9 rule
+    /// 8; `hirelings.md` §5 rule 4; the wired host answers it from the
+    /// hireling list). Default: none.
+    fn player_hireling(&self, player: UnitId) -> Option<UnitId> {
+        None
+    }
+    /// Player data +0x4C := 0 (`0x005350B0`, C→S 0x48, §9 rule 9; read
+    /// by [`Pending::object_player_busy`]). Default: nothing.
+    fn clear_player_busy(&mut self, player: UnitId) {}
+    /// `0x005724C0`: clear NPC `class`'s intro bit in the player's record
+    /// for `difficulty` (C→S 0x4D, §9 rule 11; which of the two bit fields
+    /// of `quests.md` §6.7 is not stated). Default: nothing.
+    fn clear_npc_intro(&mut self, player: UnitId, difficulty: u8, class: u16) {}
+    /// `0x005616A0(game, player, &fail)`: the weapon switch of C→S 0x60
+    /// (§9 rule 14, open question 16): (result, fail). `None` (the
+    /// default): no provider, the id stays a stub.
+    fn weapon_switch(&mut self, game: &mut Game, player: UnitId) -> Option<(u32, bool)> {
+        None
     }
 }
 

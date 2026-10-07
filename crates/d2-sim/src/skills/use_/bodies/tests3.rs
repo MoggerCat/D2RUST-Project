@@ -1,4 +1,4 @@
-// Spec: specs/skills/bodies-2.md
+// Spec: specs/skills/bodies-2.md, specs/skills/bodies-2b.md
 //! Tests of the batch 3 bodies and helpers on [`super::fake::BodyFake`].
 
 use super::fake::{stored, BodyFake};
@@ -154,7 +154,7 @@ fn charge_hit_frame_reads_record_zero() {
     assert_eq!(hit_frame(&f, u), -1);
 }
 
-// Covers: specs/skills/bodies-2.md §2.16, §6.7
+// Covers: specs/skills/bodies-2.md §2.16; specs/skills/bodies-2b.md §6.7
 #[test]
 fn poison_explosion_burst_offsets() {
     let mut r = body_rec();
@@ -430,7 +430,7 @@ fn find_item_bands() {
 
 // ---------------------------------------------------------------- §6
 
-// Covers: specs/skills/bodies-2.md §6.1
+// Covers: specs/skills/bodies-2b.md §6.1
 #[test]
 fn charged_strike_bolts_from_the_target() {
     let mut c = Code::new();
@@ -448,7 +448,7 @@ fn charged_strike_bolts_from_the_target() {
     assert_eq!((m0.x, m0.y, m0.target_x, m0.target_y), (4, 2, 8, 4));
 }
 
-// Covers: specs/skills/bodies-2.md §6.2
+// Covers: specs/skills/bodies-2b.md §6.2
 #[test]
 fn fire_wall_targets() {
     let mut r = body_rec();
@@ -467,7 +467,7 @@ fn fire_wall_targets() {
     assert_eq!(got, [(10, -9), (10, 11)]);
 }
 
-// Covers: specs/skills/bodies-2.md §6.8
+// Covers: specs/skills/bodies-2b.md §6.8
 #[test]
 fn vengeance_hit_classes_cycle() {
     let t = tabs(body_rec(), Code::new(), 1);
@@ -491,7 +491,7 @@ fn vengeance_hit_classes_cycle() {
     assert_eq!(f.entry_param(u, &e, 1), (hits as i32) % 3);
 }
 
-// Covers: specs/skills/bodies-2.md §6.17
+// Covers: specs/skills/bodies-2b.md §6.17
 #[test]
 fn blade_fury_one_blade_per_gap() {
     let mut c = Code::new();
@@ -512,7 +512,7 @@ fn blade_fury_one_blade_per_gap() {
     assert_eq!(b3_lvl18::blade_fury(&mut f, &t, &ct, u, 1, 1), 1);
 }
 
-// Covers: specs/skills/bodies-2.md §2.19, §6.11
+// Covers: specs/skills/bodies-2.md §2.19; specs/skills/bodies-2b.md §6.11
 #[test]
 fn leap_attack_aim_beyond_the_target() {
     let (mut f, u) = world();
@@ -524,7 +524,7 @@ fn leap_attack_aim_beyond_the_target() {
 
 // ---------------------------------------------------------------- §7
 
-// Covers: specs/skills/bodies-2.md §7.1, §7.4
+// Covers: specs/skills/bodies-2b.md §7.1, §7.4
 #[test]
 fn strafe_and_fend_counts() {
     assert_eq!(b3_lvl24::strafe_count(7, 2, 5), 5);
@@ -548,7 +548,7 @@ fn strafe_and_fend_counts() {
     assert_eq!(f.entry_param(u, &e, 1), 3);
 }
 
-// Covers: specs/skills/bodies-2.md §7.10
+// Covers: specs/skills/bodies-2b.md §7.10
 #[test]
 fn bone_prison_segment_positions() {
     let mut r = body_rec();
@@ -568,7 +568,7 @@ fn bone_prison_segment_positions() {
     assert!(at[11].starts_with("monster 1 (47, 47)"));
 }
 
-// Covers: specs/skills/bodies-2.md §7.18
+// Covers: specs/skills/bodies-2b.md §7.18
 #[test]
 fn volcano_stores_its_seed_word() {
     let mut r = body_rec();
@@ -584,7 +584,7 @@ fn volcano_stores_its_seed_word() {
 
 // ---------------------------------------------------------------- §8
 
-// Covers: specs/skills/bodies-2.md §8.5
+// Covers: specs/skills/bodies-2b.md §8.5
 #[test]
 fn hydra_positions() {
     let mut r = body_rec();
@@ -610,7 +610,7 @@ fn hydra_positions() {
     );
 }
 
-// Covers: specs/skills/bodies-2.md §8.9
+// Covers: specs/skills/bodies-2b.md §8.9
 #[test]
 fn redemption_counts_corpses_and_pays() {
     let mut c = Code::new();
@@ -641,7 +641,7 @@ fn redemption_counts_corpses_and_pays() {
     assert_eq!(f.c.get(u, 6), 256);
 }
 
-// Covers: specs/skills/bodies-2.md §8.10
+// Covers: specs/skills/bodies-2b.md §8.10
 #[test]
 fn whirlwind_start_in_melee_range_swings() {
     let t = tabs(body_rec(), Code::new(), 1);

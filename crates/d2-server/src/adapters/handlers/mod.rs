@@ -5,6 +5,7 @@
 //! `d2-sim` module that owns their behaviour.
 
 pub mod items;
+pub mod player;
 pub mod skills;
 pub mod walk;
 pub mod world;

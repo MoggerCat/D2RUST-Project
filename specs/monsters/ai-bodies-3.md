@@ -7,7 +7,7 @@
   recording covers these bodies yet (Open questions 1–2).
 - **Target version:** 1.14d
 - **Crate/module:** `d2-sim::monsters::ai` (per-AI functions beside the
-  `ai.md` §9 bodies)
+  `ai-bodies.md` §9 bodies)
 - **Related specs:** `monsters/ai.md` (owner of scheduling §1, dispatch
   §2, AI control and tables §3, aip reads §4, target search §5,
   distances §6, tactics helpers §7, commands §8, the conventions of §9);
@@ -54,7 +54,7 @@ Riftwing and the six council members) and Mephisto, plus the minions
 and spawns those rows name (monstats `minion1`, `minion2`, `spawn`),
 give 65 monstats rows. Their AIs not yet specified are written here, in
 descending order of how many of those rows use them (§1). Every body
-follows the `ai.md` §9 conventions: T, D, C from the dispatch record,
+follows the `ai-bodies.md` §9 conventions: T, D, C from the dispatch record,
 P(aipN) one unit-seed step tested `lo' % 100 < aipN`, "draw" = one
 unit-seed step read as `lo' % 100` (inline or `roll(100)` `0x0045C390`,
 same value), draws listed in order, "idle N" = `0x005DE080(N)`, "wait
@@ -106,7 +106,7 @@ levels.txt and superuniques.txt (Provenance; the same script gives the
 
 Ties are listed by index. The other Act III rows use AIs already
 specified: Fetish (6 rows), Arach, Baboon, BatDemon, Vampire (3 each),
-Mummy, Vulture (2 each) and 14 single-row AIs (`ai.md` §9,
+Mummy, Vulture (2 each) and 14 single-row AIs (`ai-bodies.md` §9,
 `ai-bodies-2.md`). 63 of the 65 rows have the monstats `switchai` bit,
 so the special states 10, 11 and 12 apply (`ai-bodies-2.md` §16). None
 of the bodies below installs a special state: the two alternates (§6,
@@ -314,7 +314,7 @@ Minions fetish and fetishblow rows of the same rank.
    the corpse 10 (`0x005DF530(corpse, 10)`). End.
 6. Draw < aip4 [66] → circle 4 at T (no delete); else idle 10.
 
-The minions read commands 1 and 14 in their own AIs (Fetish `ai.md`
+The minions read commands 1 and 14 in their own AIs (Fetish `ai-bodies.md`
 §9.21, FetishBlowgun §9). **Alternate** `0x005F9950`: state 12 set →
 off; re-install the AI for the control's current state (`0x005B0E00`);
 idle 1. No draws. 1.14d-confirmed (both); same as D2MOO.

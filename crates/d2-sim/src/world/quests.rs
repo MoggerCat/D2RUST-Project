@@ -1,4 +1,5 @@
 // Spec: specs/world/quests.md
+// Spec: specs/world/quests-act1.md (§10, split out of `quests.md`)
 //! The quest system: flag records (§1), quest control and records (§2),
 //! game entry (§3), event dispatch (§4), the updater and its timers (§5),
 //! status messages (§6), NPC dialog hooks (§7), act transitions and
@@ -18,6 +19,8 @@ pub mod act5;
 pub mod late;
 pub mod tables;
 
+#[cfg(test)]
+mod act1_answers_tests;
 #[cfg(test)]
 mod act1_rest_misc_tests;
 #[cfg(test)]
@@ -107,7 +110,7 @@ pub enum QuestError {
     Table(#[from] crate::world::TsvError),
     #[error("quests.tsv: {0}")]
     TableShape(&'static str),
-    /// A fatal assert inside a quest callback (`quests.md` §10): the
+    /// A fatal assert inside a quest callback (`quests-act1.md` §10): the
     /// function's 1.14d address.
     #[error("quest callback {0:#x}: fatal assert")]
     Fatal(u32),
@@ -454,6 +457,13 @@ pub trait QuestWorld {
     // Act I quest seams (§10.6–§10.8; paths, rooms, monsters, objects).
     /// `0x00620870`: the unit's position and room (`None`: no room).
     fn unit_position(&self, unit: UnitId) -> Option<(i32, i32, RoomId)>;
+    /// The unit's position alone (`0x0045ADF0` / `0x0045AE20`; an
+    /// object's static path +0x0C, +0x10), which an object keeps when its
+    /// room is freed (`drlg/rooms.md` §8.2 rule 4, `quests-act1-rest.md`
+    /// §9 item 2). `None`: no unit. Default: [`Self::unit_position`]'s.
+    fn unit_xy(&self, unit: UnitId) -> Option<(i32, i32)> {
+        self.unit_position(unit).map(|(x, y, _)| (x, y))
+    }
     /// `0x00619730`: (x, y) inside the room's tile rectangle, the last
     /// row and column excluded (§10.6 step 15).
     fn room_contains(&self, room: RoomId, x: i32, y: i32) -> bool;
@@ -805,6 +815,14 @@ pub trait QuestWorld {
     fn set_npc_intro(&mut self, player: UnitId, class: u16) {
         let _ = (player, class);
         self.unhandled(0xFF, 0x0057_2360);
+    }
+    /// Object +0xB8 := `code`: the drop code `0x00559A30` reads on every
+    /// call and never clears. The Act II chests store it once, before
+    /// they count the players (`0x00599C28`, `0x00599D08`, `0x00599E08`;
+    /// `quests-act2-2.md` §1 item 20).
+    fn set_drop_code(&mut self, object: UnitId, code: [u8; 4]) {
+        let _ = (object, code);
+        self.unhandled(0xFF, 0x0059_9C28);
     }
 
     // Act IV / V seams. Each has a default that reports the 1.14d
@@ -1201,9 +1219,9 @@ impl QuestControl {
                 init_no: row.init_no.unwrap_or(0),
                 seq_id: row.seq_id,
                 flags: 0,
-                // TODO(quests OQ6): row 40's init (Act V intro) is not
-                // disassembled; its filter is taken as the intros' 42.
-                filter: row.filter.unwrap_or(42),
+                // Every row states its filter (row 40 since `quests.md`
+                // open question 6 was answered); `-` would be 0.
+                filter: row.filter.unwrap_or(0),
                 flag2: row.flag2,
                 guids: GuidList::default(),
                 callbacks: row.callbacks.iter().fold(0, |m, &(ev, _)| m | 1 << ev),
@@ -1232,6 +1250,24 @@ impl QuestControl {
             messages: tables.messages.clone(),
             faults: Vec::new(),
         })
+    }
+
+    /// An empty control with this one's tables (a placeholder while the
+    /// host lends the control out, `wiring::economy::QuestLoan`).
+    pub fn emptied(&self) -> Self {
+        Self {
+            records: Vec::new(),
+            executing: false,
+            picked: false,
+            game: QuestFlags::default(),
+            timers: Vec::new(),
+            tick: 0,
+            seed: self.seed,
+            fx: 0,
+            rows: Vec::new(),
+            messages: Vec::new(),
+            faults: Vec::new(),
+        }
     }
 
     /// `0x00543640`: the record index of `chain`.
@@ -1942,11 +1978,21 @@ pub fn progression(flags: u16, step: u8, difficulty: u8) -> u16 {
     ((u32::from(flags) & 0xE0FF) | (n << 8)) as u16
 }
 
-/// [`progression`] on the player's client (`0x005531C0`); nothing when
-/// the host has no client for it.
-pub fn raise_progression<W: QuestWorld>(w: &mut W, player: UnitId, step: u8, difficulty: u8) {
-    if let Some(f) = w.client_save_flags(player) {
-        w.set_client_save_flags(player, progression(f, step, difficulty));
+/// [`progression`] on the player's client (`0x005531C0`); `false` (and
+/// nothing changed) when the host has no client for it, which 1.14d
+/// never meets (`quests-act1-rest.md` §9 item 4: the caller reports it).
+pub fn raise_progression<W: QuestWorld>(
+    w: &mut W,
+    player: UnitId,
+    step: u8,
+    difficulty: u8,
+) -> bool {
+    match w.client_save_flags(player) {
+        Some(f) => {
+            w.set_client_save_flags(player, progression(f, step, difficulty));
+            true
+        }
+        None => false,
     }
 }
 
@@ -2107,12 +2153,6 @@ fn true_tomb_clue<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, player: Unit
 /// `0x005449E0` (§9.5): object timer event 7 by object class. The Act
 /// II–V functions are catalogued only (§11) and reported.
 pub fn object_event<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: UnitId, class: u16) {
-    // "Record c": no record → nothing.
-    let record = |ctl: &QuestControl, w: &mut W, chain: u8, f: u32| {
-        if ctl.find(chain).is_some() {
-            w.unhandled(chain, f);
-        }
-    };
     match class {
         // Cain's gibbet (`quests-act1-rest.md` §1.2).
         0x1A => act1::q4::gibbet_event(ctl, w, object),
@@ -2131,7 +2171,7 @@ pub fn object_event<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: Un
             }
         }
         0xBD => match (w.unit_act(object), w.unit_level(object)) {
-            (Some(0), _) => record(ctl, w, 4, 0x0059_42C0),
+            (Some(0), _) => act1::q4::cain_portal_event(ctl, w, object),
             (_, Some(l)) if l == 109 || l >= 113 => {
                 if ctl.find(33).is_some() {
                     act5::q3::portal_event(ctl, w, object);

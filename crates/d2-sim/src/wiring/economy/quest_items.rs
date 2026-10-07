@@ -34,7 +34,7 @@ pub trait QuestRest {
     fn unit_level(&self, unit: UnitId) -> Option<u32>;
     /// Superunique hcIdx and minion owner (monsters spec).
     fn unit_kind(&self, unit: UnitId) -> UnitKind;
-    /// `quests.md` §10.5 J3's room test (DRLG rooms).
+    /// `quests-act1.md` §10.5 J3's room test (DRLG rooms).
     fn players_near(&self, unit: UnitId) -> Vec<UnitId>;
     /// The party list at game +0x1D2C (no party spec; `quests.md` open
     /// question 7).
@@ -77,7 +77,7 @@ pub trait QuestRest {
     fn object_mode(&self, object: UnitId) -> i32;
     fn set_object_mode(&mut self, object: UnitId, mode: i32);
     fn mercenary_reward(&mut self, player: UnitId, npc: u16);
-    /// Act I quest seams (`quests.md` §10.6–§10.8: paths, rooms,
+    /// Act I quest seams (`quests-act1.md` §10.6–§10.8: paths, rooms,
     /// monsters, objects; `QuestWorld` documents each).
     fn unit_position(&self, unit: UnitId) -> Option<(i32, i32, RoomId)>;
     fn room_contains(&self, room: RoomId, x: i32, y: i32) -> bool;

@@ -41,9 +41,14 @@ impl Gen<'_> {
             .jungle_ids
             .clone()
             .ok_or(OutdoorError::Fatal(fatal::NO_IDS))?;
-        // TODO(spec §3): an id array shorter than SXb·SYb (leveldefs 76
-        // changed between creation and build) is not described; read as 0.
-        let id_at = |i: i32| ids.get(i as usize).copied().unwrap_or(0);
+        // §3: creation and build read leveldefs 76 at the same difficulty,
+        // so the array always holds SXb·SYb ids; a shorter one is a d2rs
+        // error, not a 1.14d state.
+        let want = (sxb * syb).max(0) as usize;
+        if ids.len() < want {
+            return Err(OutdoorError::JungleIdsShort(ids.len(), want));
+        }
+        let id_at = |i: i32| ids[i as usize];
         // Step 3.
         let mut idx = 0i32;
         let mut c = 0usize;

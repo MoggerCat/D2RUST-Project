@@ -398,12 +398,6 @@ fn server_setter() {
         e.set_from_server(&t, 3, -5, 0, 0, 1),
         Err(EnvError::NegativeTicks(-5))
     );
-    let before = e;
-    assert_eq!(
-        e.set_from_server(&t, 5, 0, 1, 0, 1),
-        Err(EnvError::EclipsePending)
-    );
-    assert_eq!(e, before);
 
     e.set_from_server(&t, 3, SPEED * 360 + 1, 0, 0, 1).unwrap();
     assert_eq!((e.index, e.kind, e.ticks, e.intensity), (3, 1, 0, 128));
@@ -414,6 +408,27 @@ fn server_setter() {
     assert_eq!((e.r, e.g, e.b), (255, 255, 255), "no color step");
     e.set_from_server(&t, 2, 90 * SPEED, 0, 0, 120).unwrap();
     assert_eq!((e.intensity, e.r, e.g, e.b), (200, 245, 240, 255));
+}
+
+// Covers: specs/render/lighting.md §9.2 r2
+#[test]
+fn server_setter_eclipse_resets_the_period() {
+    // The spec vector: index 5, ticks 0, eclipse 1, previous flag 0, act 2
+    // (`A` = 1, `L` = 40).
+    let t = tables();
+    let mut e = Environment::new(&t, 0);
+    e.set_from_server(&t, 2, 0, 0, 1, 40).unwrap();
+    assert_eq!(e.intensity, 128, "θ = 0 without the flag");
+    e.set_from_server(&t, 5, 0, 1, 1, 40).unwrap();
+    assert!(e.eclipse);
+    // Period reset: eclipse entry 5 → type 2, ticks 240 × speed, the
+    // received ticks discarded.
+    assert_eq!((e.index, e.kind, e.ticks), (5, 2, 240 * SPEED));
+    assert_eq!(240 * SPEED, 30_720);
+    // First intensity with the previous flag (θ = 0: 128), then with the
+    // eclipse: 128 − 8.
+    assert_eq!(e.intensity, 120);
+    assert_eq!((e.r, e.g, e.b), (0, 30, 243), "eclipse entry 5");
 }
 
 // Covers: specs/render/lighting.md §9.2 r3
@@ -432,7 +447,7 @@ fn eclipse_triggers() {
     assert!(tr.on_act_load(1));
 }
 
-// Covers: specs/render/lighting.md §3.1 r1, §3.1 r2, §3.1 r3
+// Covers: specs/render/lighting.md §3.1 text, §3.1 r1, §3.1 r2, §3.1 r3
 #[test]
 fn room_ambient_order() {
     let t = tables();
@@ -737,7 +752,7 @@ fn umod3_light() {
     assert_eq!(seed, s);
 }
 
-// Covers: specs/render/lighting.md §8 text
+// Covers: specs/render/lighting.md §8 text, §8 r4
 #[test]
 fn overlay_object_horadric_cursecenter() {
     let c = (10, 20, 30);
@@ -818,4 +833,23 @@ fn missile_flicker() {
         Some(want)
     );
     assert_eq!(seed, s);
+}
+
+// Covers: specs/render/lighting.md §10 text
+#[test]
+fn overrides_are_keyed_by_the_room_level() {
+    // One override state; only the level id picks the rule: the Den (8)
+    // glows, the levels 107 / 108 rule needs its own flag, any other level
+    // falls through (R, G, B 0) while no darkness event runs.
+    let o = Overrides::default();
+    assert!(o.ambient(8, 1).has_color());
+    for level in [1, 7, 9, 107, 108, 120] {
+        assert_eq!(o.ambient(level, 1), Ambient::ZERO, "level {level}");
+    }
+    let glow = Overrides {
+        glow_flag: true,
+        ..Overrides::default()
+    };
+    assert!(glow.ambient(107, 0).has_color() && glow.ambient(108, 0).has_color());
+    assert_eq!(glow.ambient(9, 0), Ambient::ZERO);
 }

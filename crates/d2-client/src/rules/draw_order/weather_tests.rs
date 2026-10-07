@@ -10,6 +10,8 @@ fn colors() -> ColorTables {
         period0: [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21],
         period13: [30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41],
         period2: [50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61],
+        snow: [70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81],
+        snow_alt: [90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101],
     }
 }
 
@@ -36,6 +38,7 @@ fn input(c: u32) -> UpdateInput {
         frame: F800,
         camera_delta: (0, 0),
         day_period: 2,
+        video_mode: 3,
     }
 }
 
@@ -73,8 +76,8 @@ fn particle(x: i32, y: i32, landed: bool) -> Particle {
         x,
         y,
         ground_y: y,
-        shape_10: None,
-        shape_14: None,
+        shape_10: 4,
+        shape_14: 15,
         phase: 0,
         landed,
         bounces: 3,
@@ -124,6 +127,7 @@ fn rain_off_clears_particles_and_splashes() {
     let mut w = loaded(level(1, 0, false, false));
     w.rain_flag = true;
     w.mud_flag = true;
+    (w.target, w.intensity_256) = (100, 100);
     let (p, s, b) = w.pools_mut();
     p.alloc(particle(1, 1, false));
     s.alloc(rec(1, 1, 2));
@@ -142,7 +146,8 @@ fn rain_off_clears_particles_and_splashes() {
     assert_eq!((w.particles().live(), w.splashes().live()), (0, 0));
     assert_eq!(w.bubbles().live(), 1);
     assert!(!w.rain_flag && w.mud_flag);
-    assert_eq!(w.target, 0);
+    // §11.2 r3: intensity := 0.0, the target is kept.
+    assert_eq!((w.target, w.intensity_256), (100, 0));
     assert_eq!(seed, before, "rain off draws nothing");
     // Mud off now: bubbles cleared.
     w.update(
@@ -226,7 +231,12 @@ fn first_rain_update_enters_phase_one_and_spawns() {
         let (_, p) = w.particles().iter().next().unwrap();
         assert_eq!((p.x, p.ground_y, p.y, p.phase), (x, g, y, phase));
         assert_eq!((p.color, p.alpha), (colors().period2[ci], 0xFF));
-        assert_eq!((p.bounces, p.landed, p.shape_10), (3, false, None));
+        assert_eq!((p.bounces, p.landed), (3, false));
+        let (num, den) = (g - 40, 600 - 87);
+        assert_eq!(
+            (p.shape_10, p.shape_14),
+            (4 + 8 * num / den, 15 + 15 * num / den)
+        );
     }
     assert_eq!(w.particles().live() as u32, target);
     // Wind already on its goal; retarget countdown −1.
@@ -356,20 +366,55 @@ fn moving_live_particles_is_open_question_3() {
     assert!(matches!(r, Err(WeatherError::Open { question: 3, .. })));
 }
 
+/// A seed whose rain / snow spawn at `H` 600 draws ground y `g`.
+fn seed_with_ground(g: i32) -> Seed {
+    (1..)
+        .map(|lo| Seed::new(lo, 0))
+        .find(|s| {
+            let mut s = *s;
+            s.roll_range(0, 800);
+            s.roll_range(40, 513) == g
+        })
+        .unwrap()
+}
+
 // Covers: specs/render/draw-order-2.md §11.4 r5
 #[test]
-fn snow_spawn_is_unspecified_and_day_period_tables() {
+fn spawn_shape_values_and_snow_spawn() {
     let lv = level(1, 0, true, false);
+    // Test vectors: H 600, g = 296. Rain: +0x10 = 4 + ⌊2048 / 513⌋ = 7,
+    // +0x14 = 15 + ⌊3840 / 513⌋ = 22.
+    let mut w = loaded(lv);
+    let mut seed = seed_with_ground(296);
+    let mut e = seed;
+    assert!(w.spawn_particle(&mut seed, &input(1)).unwrap());
+    let (_, p) = w.particles().iter().next().unwrap();
+    assert_eq!((p.ground_y, p.shape_10, p.shape_14), (296, 7, 22));
+    for _ in 0..5 {
+        e.step();
+    }
+    assert_eq!(seed, e, "rain: x, g, y, phase, color");
+    // Snow, no bump: s = 1792 / 513 = 3, +0x14 = 8 + 13 = 21; one more raw
+    // step after the phase step, no color step; bounce count 1; color and
+    // alpha from 0x00472FB0 (day period 2, video mode 3: S[(36 / 8) / 4]).
     let mut w = loaded(lv);
     w.snow_mode = true;
-    w.target = 1;
-    let mut seed = Seed::new(1, 0);
-    let before = seed;
-    assert!(matches!(
-        w.top_up(&mut seed, &input(1)),
-        Err(WeatherError::Unspecified { .. })
-    ));
-    assert_eq!(seed, before);
+    let mut seed = seed_with_ground(296);
+    let mut e = seed;
+    assert!(w.spawn_particle(&mut seed, &input(1)).unwrap());
+    let (_, p) = w.particles().iter().next().unwrap();
+    assert_eq!((p.shape_10, p.shape_14, p.bounces), (3, 21, 1));
+    assert_eq!((p.color, p.alpha), (colors().snow[1], 80));
+    for _ in 0..5 {
+        e.step();
+    }
+    assert_eq!(seed, e);
+    // Size bump: s + 1.
+    let mut w = loaded(lv);
+    (w.snow_mode, w.size_bump) = (true, true);
+    let mut seed = seed_with_ground(296);
+    w.spawn_particle(&mut seed, &input(1)).unwrap();
+    assert_eq!(w.particles().iter().next().unwrap().1.shape_10, 4);
     for (period, table, alpha) in [
         (0, colors().period0, 0x7F),
         (1, colors().period13, 0xFF),
@@ -390,6 +435,47 @@ fn snow_spawn_is_unspecified_and_day_period_tables() {
         let (_, p) = w.particles().iter().next().unwrap();
         assert_eq!((p.color, p.alpha), (table[i], alpha));
     }
+}
+
+// Covers: specs/render/draw-order-2.md §11.4 r5
+#[test]
+fn snow_color_by_period_and_video_mode() {
+    let c = colors();
+    // Test vector: s = 5, day period 2, video mode 3 → i = 7, S[7 / 4].
+    assert_eq!(snow_color(&c, 5, 2, 3), Ok((c.snow[1], 80)));
+    assert_eq!(snow_color(&c, 5, 0, 6), Ok((c.snow[7], 200)));
+    assert_eq!(snow_color(&c, 5, 1, 1), Ok((c.snow[3], 160)));
+    assert_eq!(snow_color(&c, 5, 3, 2), Ok((c.snow[3], 160)));
+    // Other video modes: S'[i] whatever the period.
+    assert_eq!(snow_color(&c, 5, 2, 4), Ok((c.snow_alt[7], 80)));
+    assert_eq!(snow_color(&c, 7, 0, 0), Ok((c.snow_alt[10], 200)));
+    assert_eq!(snow_color(&c, 5, 4, 3), Err(WeatherError::Fatal(0x356)));
+}
+
+// Covers: specs/render/draw-order-2.md §11.4 r5
+#[test]
+fn color_tables_from_the_ramps() {
+    use d2_formats::palette::{Palette, Rgb};
+    // A palette whose entry j is (j, j, j) except a few probe colors.
+    let mut colors: Vec<Rgb> = (0..=255u8).map(|j| Rgb { r: j, g: j, b: j }).collect();
+    colors[200] = Rgb {
+        r: 25,
+        g: 50,
+        b: 25,
+    };
+    colors[201] = Rgb { r: 3, g: 8, b: 3 };
+    let pal = Palette {
+        colors: colors.try_into().unwrap(),
+    };
+    let t = ColorTables::build(&pal);
+    // Test vector, i = 11: [0x007A8980] v = 98 − 73 = 25 → nearest(25, 50,
+    // 25); [0x007A89A4] v = 3 → nearest(3, 8, 3).
+    assert_eq!(t.period0[11], 200);
+    assert_eq!(t.period2[11], 201);
+    assert_eq!(t.period0[0], nearest(&pal, 98, 123, 98));
+    assert_eq!(t.period13[11], nearest(&pal, 9, 19, 9));
+    assert_eq!(t.snow[11], 120 + 73);
+    assert_eq!(t.snow_alt[0], 170);
 }
 
 // Covers: specs/render/draw-order-2.md §11.5 r1, §edge-cases-original-bugs
@@ -413,25 +499,62 @@ fn water_floor_rain_off_draws_once() {
 fn floor_context_gates() {
     let mut w = Weather::new();
     let mut ctx = FloorContext::default();
-    w.intensity_256 = 255;
+    // k = 0: no splash, but last_s still advances.
     ctx.begin_frame(25, &w, true);
-    assert!(!ctx.splash, "int(255/256) = 0");
+    assert!(!ctx.splash, "k = 0");
+    assert_eq!(ctx.last_s, 25, "last_s advances whatever k is");
     assert!(!ctx.bubble, "25 is not > 0 + 25");
     ctx.begin_frame(26, &w, true);
     assert!(ctx.bubble);
     assert_eq!(ctx.last_b, 26);
-    w.intensity_256 = 256;
-    ctx.begin_frame(26, &w, true);
-    assert!(ctx.splash && !ctx.bubble, "flags cleared each frame");
-    assert_eq!(ctx.last_s, 26);
+    w.intensity_256 = 255;
+    ctx.begin_frame(28, &w, true);
+    assert!(
+        !ctx.splash && !ctx.bubble,
+        "28 is not > 25 + 3; flags cleared"
+    );
+    assert_eq!(ctx.k, 996);
     ctx.begin_frame(29, &w, true);
-    assert!(!ctx.splash, "29 is not > 26 + 3");
-    ctx.begin_frame(30, &w, true);
     assert!(ctx.splash);
+    assert_eq!(ctx.last_s, 29);
     ctx.begin_frame(52, &w, false);
     assert!(!ctx.bubble, "no Mud");
     ctx.begin_frame(52, &w, true);
     assert!(ctx.bubble);
+}
+
+// Covers: specs/render/draw-order-2.md §11.5 text, §11.5 r2
+#[test]
+fn splash_threshold_vectors() {
+    let mut w = Weather::new();
+    for (target, k) in [
+        (32, 125),
+        (224, 875),
+        (255, 996),
+        (128, 500),
+        (0, 0),
+        (256, 1000),
+    ] {
+        w.intensity_256 = target;
+        assert_eq!(w.splash_threshold(), k, "target {target}");
+    }
+    // Target 128: r = 499 spawns, r = 500 does not.
+    w.intensity_256 = 128;
+    let ctx = FloorContext {
+        k: w.splash_threshold(),
+        splash: true,
+        ..Default::default()
+    };
+    for (r, spawns) in [(499, true), (500, false)] {
+        let seed0 = (1..)
+            .map(|lo| Seed::new(lo, 0))
+            .find(|s| s.clone().roll_range(0, 1_000) == r)
+            .unwrap();
+        let mut w = Weather::new();
+        let mut seed = seed0;
+        w.water_floor(&ctx, 10, 20, &mut seed);
+        assert_eq!(w.splashes().live() == 1, spawns, "r = {r}");
+    }
 }
 
 /// A seed whose first `roll_range(0, 80)` gives `a`.
@@ -753,16 +876,97 @@ fn particles_draw_only_landed_drops() {
         )
         .unwrap();
     assert!(out.draws.is_empty());
-    // A falling drop needs the float vector.
-    w.particles.alloc(particle(20, 20, false));
-    let r = w.pass9(
-        Some(LocalPlayer {
-            seed: &mut seed,
-            level: lv,
-        }),
-        &p9(30),
+}
+
+// Covers: specs/render/draw-order-2.md §11.7 r3
+#[test]
+fn falling_drops_and_snow_lines() {
+    let lv = level(1, 0, true, false);
+    let pass = |w: &mut Weather| {
+        let mut seed = Seed::new(1, 0);
+        w.pass9(
+            Some(LocalPlayer {
+                seed: &mut seed,
+                level: lv,
+            }),
+            &p9(30),
+        )
+    };
+    let t = crate::rules::lighting::overrides::sine_table();
+    // Wind 128: u = trunc(Wt[256] × len), v = trunc(Wt[128] × len).
+    let mut w = Weather::new();
+    w.wind = 128;
+    let mut p = particle(20, 20, false);
+    (p.ground_y, p.shape_10) = (100, 7);
+    w.particles.alloc(p);
+    let u = (f64::from(t[256]) * 7.0) as i32;
+    let v = (f64::from(t[128]) * 7.0) as i32;
+    assert_eq!((u, v), (0, 7));
+    let out = pass(&mut w).unwrap();
+    let want = SkyDraw::Line {
+        x0: 20,
+        y0: 20,
+        x1: 20 + u,
+        y1: 20 + v,
+        color: 77,
+        alpha: 0xFF,
+    };
+    assert_eq!(out.draws, [want]);
+    // Cut at the ground: v > g − y → u := (g − y) × u / v, v := g − y.
+    let mut w = Weather::new();
+    w.wind = 100;
+    let mut p = particle(20, 20, false);
+    (p.ground_y, p.shape_10) = (23, 10);
+    w.particles.alloc(p);
+    let u = (f64::from(t[228]) * 10.0) as i32;
+    let v = (f64::from(t[100]) * 10.0) as i32;
+    assert!(v > 3 && u != 0);
+    let out = pass(&mut w).unwrap();
+    assert_eq!(
+        out.draws,
+        [SkyDraw::Line {
+            x0: 20,
+            y0: 20,
+            x1: 20 + 3 * u / v,
+            y1: 23,
+            color: 77,
+            alpha: 0xFF
+        }]
     );
-    assert!(matches!(r, Err(WeatherError::Open { question: 3, .. })));
+    // Either end in range draws: origin out (y < 0), end in.
+    let mut w = Weather::new();
+    w.wind = 128;
+    let mut p = particle(20, -3, false);
+    (p.ground_y, p.shape_10) = (100, 7);
+    w.particles.alloc(p);
+    assert_eq!(pass(&mut w).unwrap().draws.len(), 1);
+    let mut w = Weather::new();
+    w.wind = 128;
+    let mut p = particle(20, -30, false);
+    (p.ground_y, p.shape_10) = (100, 7);
+    w.particles.alloc(p);
+    assert!(pass(&mut w).unwrap().draws.is_empty());
+    // Snow: size s draws T[s] then T[s + 1]; s outside 0–7 draws nothing.
+    let mut w = Weather::new();
+    w.snow_mode = true;
+    let mut p = particle(50, 60, false);
+    p.shape_10 = 7;
+    w.particles.alloc(p);
+    let mut q = particle(70, 60, false);
+    q.shape_10 = 8;
+    w.particles.alloc(q);
+    let out = pass(&mut w).unwrap();
+    let l = |a: [i32; 4]| SkyDraw::Line {
+        x0: 50 + a[0],
+        y0: 60 + a[1],
+        x1: 50 + a[2],
+        y1: 60 + a[3],
+        color: 77,
+        alpha: 0xFF,
+    };
+    assert_eq!(out.draws, [l([2, 1, -2, -1]), l([2, -1, -2, 2])]);
+    assert_eq!(SNOW_LINES[0], [0, 0, 0, 1]);
+    assert_eq!(SNOW_LINES[3], [1, 0, -1, 1]);
 }
 
 // Covers: specs/render/draw-order-2.md §11.8 r2
@@ -792,11 +996,26 @@ fn act5_lock_levels() {
     w.target = 0;
     w.rain_cycle(&mut seed, &lv).unwrap();
     assert_eq!((w.phase, w.target), (2, 256));
+    // [0x007A8A20] is always 0: every locked cycle off phase 2 is forced.
     w.phase = 3;
-    w.snow_lock_hold = 1;
     w.target = 0;
     w.rain_cycle(&mut seed, &lv).unwrap();
-    assert_eq!((w.phase, w.target), (3, 0), "held: nothing runs");
+    assert_eq!((w.phase, w.target), (2, 256));
+    // At phase 2 the cycle runs; its countdown ends: p = 3, the locked
+    // entry keeps phase 2, but this call ramps with p = 3.
+    (w.countdown, w.peak) = (0, 200);
+    (w.cycle_min, w.cycle_n) = (CYCLE_MIN, CYCLE_N);
+    let mut e = seed;
+    w.rain_cycle(&mut seed, &lv).unwrap();
+    let d = e.roll_range(125, 50) as u32;
+    assert_eq!(seed, e, "the locked entry draws nothing");
+    assert_eq!((w.phase, w.length, w.countdown), (2, d, d - 1));
+    assert_eq!(w.target, 200 * (d - 1) / d);
+    // p > 3: fatal 0x12A.
+    assert_eq!(
+        w.phase_entry(4, &mut seed, &lv),
+        Err(WeatherError::Fatal(0x12A))
+    );
 }
 
 // Covers: specs/render/draw-order-2.md §11.8 r1, §11.8 r2

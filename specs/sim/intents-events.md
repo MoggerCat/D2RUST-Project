@@ -14,7 +14,12 @@
   (branch `claude/phase3-server`), wired to `d2-proto` and `d2-sim`
   through adapters (`claude/phase3-wiring`; intent handlers are stubs
   until their system specs exist); the synthetic vectors pass as unit
-  tests; not yet run on a recording.
+  tests; not yet run on a recording. §7.4 / §7.7 (the monster mode
+  message, S→C 0x67–0x6D, and the death pair 0x69 codes 8 / 9) and the
+  flag part of §7.5 are implemented in `d2-sim`
+  (`monsters::mode_message`, `wiring::action::unit_update`; branch
+  `claude/impl-monster-death`): the §7.4 / §7.7 Test vectors pass as unit
+  tests; unverified against a recording of the wired host.
 - **Target version:** 1.14d
 - **Crate/module:** `d2-proto` (message ids, sizes, layouts: the two TSVs);
   `d2-server` (queues, drain, dispatch gate, per-client buffers, flush);
@@ -29,25 +34,25 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 53–69 |
-| Inputs | 70–78 |
-| Outputs / state changes | 79–85 |
-| Rules | 86–87 |
-|   1. Loop order (single player) | 88–109 |
-|   2. Client → server | 110–279 |
-|   3. Server → client | 280–448 |
-|   4. d2rs mapping and scope | 449–480 |
-|   5. Machine-readable tables | 481–517 |
-|   6. Exact-match comparison | 518–616 |
-|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 617–1016 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1017–1161 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1162–1306 |
-| Constants & data dependencies | 1307–1325 |
-| Randomness | 1326–1331 |
-| Edge cases & original bugs | 1332–1365 |
-| Test vectors | 1366–1452 |
-| Provenance | 1453–1554 |
-| Open questions | 1555–1660 |
+| Summary | 58–74 |
+| Inputs | 75–83 |
+| Outputs / state changes | 84–90 |
+| Rules | 91–92 |
+|   1. Loop order (single player) | 93–114 |
+|   2. Client → server | 115–284 |
+|   3. Server → client | 285–453 |
+|   4. d2rs mapping and scope | 454–485 |
+|   5. Machine-readable tables | 486–522 |
+|   6. Exact-match comparison | 523–621 |
+|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 622–1021 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1022–1166 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1167–1311 |
+| Constants & data dependencies | 1312–1330 |
+| Randomness | 1331–1336 |
+| Edge cases & original bugs | 1337–1370 |
+| Test vectors | 1371–1457 |
+| Provenance | 1458–1559 |
+| Open questions | 1560–1665 |
 <!-- /index -->
 
 ## Summary
@@ -617,7 +622,7 @@ as in §2.1 rule 5 and §3.1 rule 1.
 ### 7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`)
 
 The owner of "the unit-update spec" named by `sim/pathing.md` §10 and
-OQ7, `missiles/missiles.md` R2.4 and `items/inventory.md` §6.3: which
+OQ7, `missiles/missiles.md` R2.4 and `items/inventory-moves.md` §6.3: which
 S→C messages a changed unit produces at the end of a tick, and what the
 clean-up resets so that they are sent once.
 
@@ -654,7 +659,7 @@ room-change merge (`sim/pathing.md` §9.8). Part A by type:
 | monster | 0xAC (`0x0053E2E0`, `monsters/init.md` §24) | skipped when `0x005541B0(unit)` and `0x0063A320(unit)` both hold; then stat 328 := (x + y) & 0xFFFF; class 528 → 0x98 (`0x0053E0A0`); for each `monstats` skill slot i = 0..7 whose bit i of row +0x16C is set and skill id (row +0x170 + 2i) is valid and the unit has that skill: 0x21 (`0x0053C4A0`); then `0x00570E30`, `0x00571CD0` (§7.3 rule 2 steps 3 and 8) |
 | object | 0x51 (`0x0053BD10`, type 2: GUID, class u16, x, y, mode u8 +0x10, interact u8) | then `objects` row +0x167 bit 2 → 0x60 (`0x0053D900`); class 59 → 0x82 (`0x0053DB90`) |
 | missile | 0x73 (`0x0059FEE0`, `missiles/missiles.md` R2.4) | with `0x006486C0(path)` |
-| item | only with unit flag 0x10: mode 3 and unit flag 0x1000 → 0x9C action 2 (`0x0053EC90`), else 0x9C action 0 (`0x0053EC00`) (`items/inventory.md` §6.3) | |
+| item | only with unit flag 0x10: mode 3 and unit flag 0x1000 → 0x9C action 2 (`0x0053EC90`), else 0x9C action 0 (`0x0053EC00`) (`items/inventory-moves.md` §6.3) | |
 | other (5) | 0x09 (`0x0053BCD0`: type, GUID, class u8, x, y) | |
 
 Part B by type: player → `0x005489F0`, then a corpse 0x74
@@ -667,7 +672,7 @@ class is 291, 417 or 418; item → `0x0055BED0` (§7.3 rule 4); others nothing.
 #### 7.3 Type updates
 
 1. **Player** `0x00580860`: `sim/pathing.md` §10 rules 2–3 (0x15, 0x0F,
-   0x10) and `items/inventory.md` §6.1 rule 2 (item dispatcher, 0x47,
+   0x10) and `items/inventory-moves.md` §6.1 rule 2 (item dispatcher, 0x47,
    0x48).
 2. **Monster** `0x00598220(game, unit, client, announced)`, in order:
    1. Flag-ex (+0xC8) bit 0x10000: S→C 0x15 (`0x0053BC10`: type, GUID,
@@ -682,7 +687,7 @@ class is 291, 417 or 418; item → `0x0055BED0` (§7.3 rule 4); others nothing.
    4. Unit flag 0x100: `0x00571620` (0x76 and `0x0053C750`).
    5. Flag-ex bit 0x1 (inventory changed): if P exists and
       `0x00572EE0(unit, P)` → `0x00537680` (item dispatcher of
-      `items/inventory.md` §6.1 rule 3 for P); else a hireling class
+      `items/inventory-moves.md` §6.1 rule 3 for P); else a hireling class
       (`0x0063EE90`) whose owner (`0x0058F0D0`) is P →
       `0x00597890(game, unit, client, 0)`.
    6. Unit flag 0x400: `0x00571740` (an 8-byte message, `0x0053D780`,
@@ -699,7 +704,7 @@ class is 291, 417 or 418; item → `0x0055BED0` (§7.3 rule 4); others nothing.
    `0x00597890(game, unit, client, 0)`; always `0x00571CD0`.
 4. **Item** `0x0055BF30`: only with unit flag 0x1 → `0x0055BED0`: an
    item in mode 3 without unit flag 0x10 → 0x9C action 2 when unit flag
-   0x1000, else action 3 (`items/inventory.md` §6.3 part 2).
+   0x1000, else action 3 (`items/inventory-moves.md` §6.3 part 2).
 
 #### 7.4 Monster mode message (`0x00597E20(game, unit, client)`)
 
@@ -775,7 +780,7 @@ order:
    (`0x00620FA0(unit, 0)`); unit flags 0x400, 0x8000 := 0; flag-ex
    0x800, 0x1000, 0x10000, 0x200000 := 0.
 4. The unit's state-changed bits are zeroed (`0x00639EE0`).
-5. The update-list reset `0x00597B00` (`items/inventory.md` §6.1 rule
+5. The update-list reset `0x00597B00` (`items/inventory-moves.md` §6.1 rule
    4).
 6. Twice: if `0x00625A20(unit)`, `0x00627410(unit)`.
 7. By type: player: stat 29 `lastexp` := −1 (`0x00627260(unit, 29, −1,
@@ -1187,7 +1192,7 @@ owned it yet, and states the handlers that are only message handling.
    | 0x4D PlayNpcMessage | rule 11; the intro record: `world/quests.md` §6.7 |
    | 0x51 BindHotkey | rule 12 (fields: §2.4 rule 7) |
    | 0x53 StaminaOn, 0x54 StaminaOff | rule 13 |
-   | 0x59 MakeEntityMove | `monsters/ai.md` §9.9 (AI params from NPC messages) |
+   | 0x59 MakeEntityMove | `monsters/ai-bodies.md` §9.9 (AI params from NPC messages) |
    | 0x5F UpdatePlayerPos | `sim/pathing.md` §1.6 |
    | 0x60 SwapWeapons | rule 14 (message part); `0x005616A0`: open question 16 |
 

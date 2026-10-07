@@ -83,8 +83,8 @@ run, now on one item store and one inventory model per game.
 
 | Path | What | Spec |
 |---|---|---|
-| `crates/d2-sim/src/wiring/inventory/host.rs` | the model for the other item systems: `InvState::{of, items_of, cursor_of, holds, body_items, fillers}`; `InvDesk::{place, remove, free, reset_targeting, check_stored, check_ground_or_owned, send_item_page}` | `inventory.md` §1.4, §2.4, §5.1, §5.3, §6.4 |
-| `crates/d2-sim/src/wiring/inventory/tests/host.rs` | 5 integration tests of that API | `inventory.md` §2.4, §5.1, §5.3, §6.4 |
+| `crates/d2-sim/src/wiring/inventory/host.rs` | the model for the other item systems: `InvState::{of, items_of, cursor_of, holds, body_items, fillers}`; `InvDesk::{place, remove, free, reset_targeting, check_stored, check_ground_or_owned, send_item_page}` | `inventory.md` §1.4, §2.4, §5.1, §5.3, `inventory-moves.md` §6.4 |
+| `crates/d2-sim/src/wiring/inventory/tests/host.rs` | 5 integration tests of that API | `inventory.md` §2.4, §5.1, §5.3, `inventory-moves.md` §6.4 |
 | `crates/d2-server/src/adapters/handlers/items/vendor_inv.rs` | `InvVendors`: the vendor world with its player-inventory calls on the model | `vendors.md` §7, §8; `inventory.md` §1.2, §1.4, §2.4 |
 | `crates/d2-sim/src/wiring/action/mod.rs` | `ActionHooks::items`: the game's one item store | `generation.md` §2–§3 |
 

@@ -1,4 +1,5 @@
 // Spec: specs/items/inventory.md §1.3, §2
+// Spec: specs/items/inventory-moves.md (§6–§11, split out of `inventory.md`)
 //! Grid record by page (§1.3), the fit test (§2.1), place at a position
 //! (§2.2), the free-position search and its weight (§2.3) and the item
 //! placement into a page (§2.4).

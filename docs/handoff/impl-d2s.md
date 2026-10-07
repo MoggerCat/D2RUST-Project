@@ -1,5 +1,7 @@
 # Handoff: character save (`.d2s`) reader, writer and dev tool — `claude/impl-d2s`
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the ninth fold (`claude/fold-handoff-night`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Ninth set" (PC 1 / PC 2).
+
 Cloud implementation session, 2026-10-06, task class: implementation
 from a clear spec, medium (METHODS M14). Base: `claude/specs-staging` at
 `5844674`. Repo only, no game files, no saves (M09): every claim below

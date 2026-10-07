@@ -595,6 +595,7 @@ mod tests {
 
     // Test vector "skill in column 2, row 3 at 800 × 600: icon at
     // (484, 258); hit 485–531 × 211–257" (§10.3 position, §10.5 strict hit).
+    // Covers: specs/ui/panels.md §10 r3, §10 r5
     #[test]
     fn icon_position_and_strict_hit() {
         let s = Screen::R800;
@@ -639,6 +640,7 @@ mod tests {
     }
 
     // Only skills of the current page are drawn; frame IconCel (+1 pressed).
+    // Covers: specs/ui/panels.md §10 r3
     #[test]
     fn icons_of_current_tab() {
         let s = Screen::R800;
@@ -744,6 +746,7 @@ mod tests {
     }
 
     // §10.5 with free points: press marks, release on it sends 0x3B.
+    // Covers: specs/ui/panels.md §10 r5
     #[test]
     fn icon_press_release_sends_add_skill_point() {
         let e = env(Screen::R800);
@@ -800,6 +803,7 @@ mod tests {
     }
 
     // §10.3 remap order, literal (unverified: spec OQ4).
+    // Covers: specs/ui/panels.md §10 r3
     #[test]
     fn icon_remap_literal_order() {
         let at = Point::new(484, 258);

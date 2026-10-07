@@ -1,7 +1,7 @@
 // Spec: specs/render/lighting.md (§6 light records and the list)
 //! Light records (§6.1), their operations (§6.2), the list (§6.3), the
 //! per-drawn-frame update (§6.4) and the room-leave rule (§6.4, last
-//! paragraph). The client world is read through [`LightWorld`]; fatal
+//! paragraph: a new client active room). The client world is read through [`LightWorld`]; fatal
 //! cases of 1.14d are [`LightError`]s, never panics.
 
 use super::contribute;
@@ -60,8 +60,9 @@ pub struct Owner {
     pub client_only: bool,
 }
 
-/// What the light code reads from the client world.
-pub trait LightWorld {
+/// What the new-room rule (§6.4, last paragraph) reads from the client
+/// world: owner lookups and the cell lookup.
+pub trait LightRooms {
     /// The owner's precise position (16.16) when the lookup of §6.4 r1
     /// finds it (set C when `client_only`, else set S).
     fn owner_position(&self, owner: &Owner) -> Option<(i32, i32)>;
@@ -71,14 +72,18 @@ pub trait LightWorld {
     fn owner_subtile(&self, owner: &Owner) -> Option<(i32, i32)>;
     /// The owner's room (`0x00620BB0`); `None` when it has none.
     fn owner_room(&self, owner: &Owner) -> Option<RoomId>;
+    /// The cell lookup `0x00463740(room, x, y)`: the room holding sub-tile
+    /// `(x, y)` searched from `room` (§6.4 last paragraph).
+    fn cell_room(&self, room: RoomId, x: i32, y: i32) -> Option<RoomId>;
+}
+
+/// What the light code reads from the client world.
+pub trait LightWorld: LightRooms {
     /// Whether the owner is the local player (`0x00463DE0`, §7.2).
     fn is_local_player(&self, owner: &Owner) -> bool;
     /// The collision point test with mask 0x22 searched from the owner's
     /// room at sub-tile `(x, y)` is non-zero (§7.4 r1).
     fn owner_blocks(&self, owner: &Owner, x: i32, y: i32) -> bool;
-    /// The cell lookup `0x00463740(room, x, y)`: the room holding sub-tile
-    /// `(x, y)` searched from `room` (§6.4 last paragraph).
-    fn cell_room(&self, room: RoomId, x: i32, y: i32) -> Option<RoomId>;
 }
 
 /// The kind of a record (§6.1 `+0x0C`).
@@ -182,7 +187,7 @@ impl LightList {
         self.records.iter().find(|(i, _)| *i == id).map(|(_, r)| r)
     }
 
-    fn get_mut(&mut self, id: LightId) -> Option<&mut LightRecord> {
+    pub(crate) fn get_mut(&mut self, id: LightId) -> Option<&mut LightRecord> {
         self.records
             .iter_mut()
             .find(|(i, _)| *i == id)
@@ -351,13 +356,11 @@ impl LightList {
         Ok(())
     }
 
-    /// A room leaving the client (`0x00475930`, §6.4 last paragraph):
-    /// kind-2 records whose cache may cover `leaving` become invalid.
-    pub fn room_leaving(
-        &mut self,
-        leaving: RoomId,
-        world: &impl LightWorld,
-    ) -> Result<(), LightError> {
+    /// A new client active room (`0x00475930`, the act room callback of
+    /// `drlg/rooms.md` §5 rule 9; §6.4 last paragraph): kind-2 records
+    /// whose radius reaches into `new` drop their cache (valid := 0, the
+    /// memory is kept).
+    pub fn room_created(&mut self, new: RoomId, world: &impl LightRooms) -> Result<(), LightError> {
         for (_, rec) in self.records.iter_mut() {
             if rec.kind != LightKind::Cached {
                 continue;
@@ -369,7 +372,7 @@ impl LightList {
             let room = world
                 .owner_room(&owner)
                 .ok_or(LightError::OwnerWithoutRoom)?;
-            if room == leaving {
+            if room == new {
                 continue;
             }
             let (ux, uy) = world.owner_subtile(&owner).ok_or(LightError::Fatal0x591)?;
@@ -377,7 +380,7 @@ impl LightList {
             let probes = [(ux + m, uy), (ux - m, uy), (ux, uy + m), (ux, uy - m)];
             if probes
                 .iter()
-                .any(|&(px, py)| world.cell_room(room, px, py) == Some(leaving))
+                .any(|&(px, py)| world.cell_room(room, px, py) == Some(new))
             {
                 rec.cache_valid = false;
             }

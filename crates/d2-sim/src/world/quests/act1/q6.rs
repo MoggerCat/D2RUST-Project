@@ -1,5 +1,6 @@
-// Spec: specs/world/quests.md §10.8 (A1Q6 Sisters to the Slaughter, chain 6), §8.1
+// Spec: specs/world/quests-act1.md §10.8 (A1Q6 Sisters to the Slaughter, chain 6), §8.1
 // Spec: specs/world/quests-act1-rest.md §5, §8 items 6, 7
+// Spec: specs/world/quests.md (the sections other than §10)
 //! A1Q6 callback by callback: events 0, 2, 3, 8 (Andariel), 10, 11, 13,
 //! the portal timer `0x00596500`, the active function and the credit,
 //! with the iterate functions O2–O7 (O1 is the shared status iterate).
@@ -9,7 +10,7 @@ use super::{add_state, broadcast, player_flags, rec, restore, send_completed_now
 use crate::units::UnitId;
 use crate::world::quests::{
     bit, event, flags_of, npc, raise_progression, send_player_flags, EventArgs, GuidList,
-    QuestControl, QuestWorld, TextList, TimerFn,
+    QuestControl, QuestError, QuestWorld, TextList, TimerFn,
 };
 
 const SLOT: u8 = 6;
@@ -117,13 +118,18 @@ fn iterate_progress<W: QuestWorld>(ctl: &QuestControl, w: &mut W, i: usize) {
 
 /// Credit `0x00596210`: 6.13, 6.1, then the character progression
 /// `0x00538680(P's client, 1, difficulty)` (`quests-act1-rest.md` §5).
-fn credit<W: QuestWorld>(w: &mut W, p: UnitId) {
+/// The client is passed without a test and read at once
+/// (`quests-act1-rest.md` §9 item 4, `0x00538684`): a player without a
+/// client is an invariant violation, reported as fatal.
+fn credit<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, p: UnitId) {
     if let Some(f) = flags_of(w, p) {
         f.set(SLOT, bit::PRIMARY_GOAL_DONE);
         f.set(SLOT, bit::REWARD_PENDING);
     }
     let d = w.difficulty();
-    raise_progression(w, p, 1, d);
+    if !raise_progression(w, p, 1, d) {
+        ctl.faults.push(QuestError::Fatal(0x0053_8684));
+    }
 }
 
 /// Adds the player to the three lists and credits it (O3, O4).
@@ -133,7 +139,7 @@ fn list_and_credit<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, p
     x.cain.add(g);
     x.akara.add(g);
     x.kashya.add(g);
-    credit(w, p);
+    credit(ctl, w, p);
 }
 
 /// Event 0 `0x00595E20`.
@@ -239,7 +245,7 @@ fn kill<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, args: EventA
             !f.get(SLOT, bit::REWARD_GRANTED) && !f.get(SLOT, bit::REWARD_PENDING)
         });
         if let Some(k) = killer {
-            credit(w, k);
+            credit(ctl, w, k);
             if let Some(v) = args.target {
                 for list in [&CHIPPED_GEMS, &CHIPPED_GEMS, &NORMAL_GEMS] {
                     let lo = ctl.seed.step();

@@ -1,4 +1,5 @@
 // Spec: specs/items/inventory.md (mutation tests of the inventory wiring, METHODS M08)
+// Spec: specs/items/inventory-moves.md (§6–§11, split out of `inventory.md`)
 //! Tests written against the surviving mutants of
 //! `crates/d2-sim/src/wiring/inventory/` (`cargo mutants`; record in
 //! `docs/handoff/mutants-wiring-inventory.md`). Two kinds:

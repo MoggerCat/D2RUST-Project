@@ -199,8 +199,9 @@ fn elem_roll_and_len_by_etype() {
         store: &mut w.store,
         world: &mut w.fake,
     };
-    assert_eq!(elem_roll(&mut cx, m, Some(mon), &mut rec), 0);
-    // 10 + 50 % = 15, deadly strike × 2 and 0x2000.
+    // 10 + 50 % = 15, deadly strike × 2 and 0x2000; the return is the
+    // final physical (§R9.6 return value), not the `EType`.
+    assert_eq!(elem_roll(&mut cx, m, Some(mon), &mut rec), 30);
     assert_eq!((rec.physical, rec.result), (30, 0x2000));
     let mut rec = DamageRecord::default();
     elem_len(&mut rec, 4, 25);

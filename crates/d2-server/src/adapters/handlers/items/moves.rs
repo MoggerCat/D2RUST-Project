@@ -1,5 +1,6 @@
-// Spec: specs/items/inventory.md §6–§11; specs/sim/intents-events.md §2.3, §2.4, §3.2; specs/sim/tick.md §6
-//! The item-move intents (C→S 0x16–0x29, 0x50, 0x61, 0x63; `inventory.md`
+// Spec: specs/items/inventory-moves.md §6–§11; specs/sim/intents-events.md §2.3, §2.4, §3.2; specs/sim/tick.md §6
+// Spec: specs/items/inventory.md (the sections other than §6–§11)
+//! The item-move intents (C→S 0x16–0x29, 0x50, 0x61, 0x63; `inventory-moves.md`
 //! §7) and the deferred item messages (§6, §11) on the wired host.
 //!
 //! A handler finds the client's player unit and hands the message to
@@ -37,37 +38,65 @@ use crate::seams::{ClientId, Intents, MessageSink, ResultCode};
 /// Every item-move C→S id: (id, `client-messages.tsv` name, owner spec
 /// section). Exactly `d2_sim::items::moves::HANDLED`, in id order.
 pub const MOVE_IDS: &[(u8, &str, &str)] = &[
-    (0x16, "PickItem", "specs/items/inventory.md §7.1"),
-    (0x17, "DropItem", "specs/items/inventory.md §7.2"),
-    (0x18, "InsertItemInBuffer", "specs/items/inventory.md §7.3"),
+    (0x16, "PickItem", "specs/items/inventory-moves.md §7.1"),
+    (0x17, "DropItem", "specs/items/inventory-moves.md §7.2"),
+    (
+        0x18,
+        "InsertItemInBuffer",
+        "specs/items/inventory-moves.md §7.3",
+    ),
     (
         0x19,
         "RemoveItemFromBuffer",
-        "specs/items/inventory.md §7.4",
+        "specs/items/inventory-moves.md §7.4",
     ),
-    (0x1A, "EquipItem", "specs/items/inventory.md §7.5"),
-    (0x1B, "Swap2HandedItem", "specs/items/inventory.md §7.6"),
-    (0x1C, "RemoveBodyItem", "specs/items/inventory.md §7.7"),
-    (0x1D, "SwapCursorWithBody", "specs/items/inventory.md §7.8"),
-    (0x1E, "Swap1HWith2H", "specs/items/inventory.md §7.9"),
+    (0x1A, "EquipItem", "specs/items/inventory-moves.md §7.5"),
+    (
+        0x1B,
+        "Swap2HandedItem",
+        "specs/items/inventory-moves.md §7.6",
+    ),
+    (
+        0x1C,
+        "RemoveBodyItem",
+        "specs/items/inventory-moves.md §7.7",
+    ),
+    (
+        0x1D,
+        "SwapCursorWithBody",
+        "specs/items/inventory-moves.md §7.8",
+    ),
+    (0x1E, "Swap1HWith2H", "specs/items/inventory-moves.md §7.9"),
     (
         0x1F,
         "SwapCursorBufferItem",
-        "specs/items/inventory.md §7.10",
+        "specs/items/inventory-moves.md §7.10",
     ),
-    (0x20, "UseGridItem", "specs/items/inventory.md §7.11"),
-    (0x21, "StackItems", "specs/items/inventory.md §7.12"),
-    (0x22, "UnstackItems", "specs/items/inventory.md §7.13"),
-    (0x23, "ItemToBelt", "specs/items/inventory.md §7.14"),
-    (0x24, "ItemFromBelt", "specs/items/inventory.md §7.15"),
-    (0x25, "SwitchBeltItem", "specs/items/inventory.md §7.16"),
-    (0x26, "UseBeltItem", "specs/items/inventory.md §7.17"),
-    (0x27, "UseItemAction", "specs/items/inventory.md §7.18"),
-    (0x28, "SocketItem", "specs/items/inventory.md §7.19"),
-    (0x29, "ScrollToBook", "specs/items/inventory.md §7.20"),
-    (0x50, "DropGold", "specs/items/inventory.md §7.22"),
-    (0x61, "MercItem", "specs/items/inventory.md §7.23"),
-    (0x63, "ItemToBeltShift", "specs/items/inventory.md §7.24"),
+    (0x20, "UseGridItem", "specs/items/inventory-moves.md §7.11"),
+    (0x21, "StackItems", "specs/items/inventory-moves.md §7.12"),
+    (0x22, "UnstackItems", "specs/items/inventory-moves.md §7.13"),
+    (0x23, "ItemToBelt", "specs/items/inventory-moves.md §7.14"),
+    (0x24, "ItemFromBelt", "specs/items/inventory-moves.md §7.15"),
+    (
+        0x25,
+        "SwitchBeltItem",
+        "specs/items/inventory-moves.md §7.16",
+    ),
+    (0x26, "UseBeltItem", "specs/items/inventory-moves.md §7.17"),
+    (
+        0x27,
+        "UseItemAction",
+        "specs/items/inventory-moves.md §7.18",
+    ),
+    (0x28, "SocketItem", "specs/items/inventory-moves.md §7.19"),
+    (0x29, "ScrollToBook", "specs/items/inventory-moves.md §7.20"),
+    (0x50, "DropGold", "specs/items/inventory-moves.md §7.22"),
+    (0x61, "MercItem", "specs/items/inventory-moves.md §7.23"),
+    (
+        0x63,
+        "ItemToBeltShift",
+        "specs/items/inventory-moves.md §7.24",
+    ),
 ];
 
 /// An item-move id (one [`MOVE_IDS`] row).
@@ -244,8 +273,9 @@ impl MoveCall for UpdateRun {
         // `0x00553220` → `0x00597B00`; §6.1 rule 4, `InvDesk::update_done`):
         // +0xC8 bit 0 cleared (bit 1, "save pending", stays: IS1), the
         // per-item resets, the update lists freed. The unit-flag part of
-        // `0x00553220` (`items::moves::room_cleanup`) belongs to the tick
-        // wiring, which does not run it yet (IS2).
+        // `0x00553220` runs in the tick wiring's step 6
+        // (`d2_sim::wiring::action::View::room_cleanup`, `intents-events.md`
+        // §7.5 step 3), before this pass.
         for &p in &self.players {
             let Some(o) = d.owner_of(p) else {
                 continue;
@@ -269,18 +299,20 @@ impl MoveCall for UpdateRun {
 ///
 /// Reading: in 1.14d this runs inside the client pass (`tick.md` §6,
 /// step 5) and the clean-up in step 6; here it runs after
-/// `d2_sim::tick::tick`, whose wiring implements neither the per-client
-/// unit update nor `0x00553220` (the hooks keep their defaults), so no
-/// step of the tick reads or changes what this pass does. Every player
+/// `d2_sim::tick::tick`. The tick wiring's per-client unit update sends
+/// no item message and its clean-up (`intents-events.md` §7.5, flags
+/// only) clears no bit this pass reads (+0xC8 bits 0 and 1, the item and
+/// command flags), so no step of the tick changes what this pass does. Every player
 /// is queued for update by its own per-client update (`tick.md` §6 step
 /// 5, last), so the queue membership test is the room test above. The
 /// client's room is read after the tick's room switch (`0x00537B50`, in
 /// the per-client update after the unit updates): in the tick of a
 /// switch 1.14d walks the old room's adjacent rooms. The ground items' unit update (§6.3,
 /// `d2_sim::items::moves::item_unit_update`) is not run: it belongs to the
-/// per-unit update `0x0053A500` over the client's rooms, and its flag 0x10
-/// is cleared by the room clean-up `0x00553220`, neither of which the
-/// tick wiring implements yet (IS2, IS3).
+/// per-unit update `0x0053A500` over the client's rooms, which the tick
+/// wiring does not run for items; run here, after the tick, it would find
+/// unit flags 0x1 and 0x10 already cleared by the room clean-up (IS2,
+/// IS3).
 pub fn update_pass<D: EventDispatch, W: WorldHost<D>>(
     sim: &mut SimGame<D, W>,
     out: &mut dyn MessageSink,

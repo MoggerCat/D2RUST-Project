@@ -41,6 +41,8 @@ pub mod vertex;
 pub mod wild;
 
 #[cfg(test)]
+mod cold_plains_tests;
+#[cfg(test)]
 mod gaps_tests;
 #[cfg(test)]
 mod mutant_tests;
@@ -59,7 +61,7 @@ use super::tiles::{CellGrid, RoomGrids};
 use super::{act_of_level, DrlgError, DrlgRoomId, LevelIdx};
 
 pub use grid::Grid;
-pub use tilesub::SubRow;
+pub use tilesub::{SubHit, SubRow};
 
 /// DRLG type of outdoor levels (leveldefs `DrlgType`).
 pub const DRLG_OUTDOOR: u32 = 3;
@@ -97,6 +99,12 @@ pub enum OutdoorError {
     LevelMissing(u32),
     #[error("fatal error {0:#x} (outdoor-act3-act5.md)")]
     Fatal(u32),
+    /// A state on which 1.14d crashes or reads memory outside its image
+    /// (no error id): reported as fatal.
+    #[error("1.14d crashes here: {0}")]
+    Crash(&'static str),
+    #[error("jungle id array of {0} entries, SXb·SYb = {1} (outdoor-act3-act5.md §3)")]
+    JungleIdsShort(usize, usize),
 }
 
 // ---- data ----------------------------------------------------------------
@@ -370,6 +378,9 @@ pub struct OutdoorLevel {
     pub jungle_ids: Option<Vec<u32>>,
     /// Act III jungle clearing count (level +0x1B8, §2.8).
     pub jungle_clearings: i32,
+    /// Border substitution replacements of the last generation, in order
+    /// (not original state; see [`SubHit`]).
+    pub sub_hits: Vec<SubHit>,
 }
 
 impl OutdoorLevel {
@@ -622,9 +633,9 @@ impl LevelTypes for OutdoorTypes<'_> {
         wy: i32,
         cell: u32,
         orientation: u32,
-    ) {
+    ) -> bool {
         self.others
-            .door_unit(drlg, data, room, wx, wy, cell, orientation);
+            .door_unit(drlg, data, room, wx, wy, cell, orientation)
     }
 
     fn warp_unit(&mut self, drlg: &mut Drlg, room: DrlgRoomId, wx: i32, wy: i32, cell: u32) {

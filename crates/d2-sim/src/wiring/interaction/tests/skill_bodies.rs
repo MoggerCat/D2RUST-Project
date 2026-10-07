@@ -518,12 +518,12 @@ fn the_view_runs_exactly_the_specified_slots() {
     });
     assert_eq!(starts, START_BODIES);
     assert_eq!(dos, DO_BODIES);
-    // A slot without a body goes to the seam (the fixture's fake logs
-    // it); a body slot does not.
+    // A slot without a body (only the unreferenced ones are left) goes
+    // to the seam (the fixture's fake logs it); a body slot does not.
     fx.sim.sys.hooks.x.log.clear();
     fx.sim.skill_use(&mut fx.game, |w| {
-        w.srvdo(3, p, 99, 1, true, false, false);
+        w.srvdo(53, p, 99, 1, true, false, false);
         w.srvdo(18, p, 99, 1, true, false, false);
     });
-    assert_eq!(fx.sim.sys.hooks.x.log, ["srvdo 3"]);
+    assert_eq!(fx.sim.sys.hooks.x.log, ["srvdo 53"]);
 }

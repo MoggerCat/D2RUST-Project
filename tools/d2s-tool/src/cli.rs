@@ -8,7 +8,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use d2_formats::d2s::{self, status, D2s};
 
 use crate::dump::dump;
-use crate::save::{apply, new_save, parse_class, parse_difficulty, Edits};
+use crate::save::{apply, new_save, parse_class, parse_difficulty, resave, Edits};
 use crate::tables::Tables;
 use crate::{read_options, round_trip, RoundTrip};
 
@@ -251,6 +251,9 @@ pub fn run(args: &[String], out: &mut dyn Write) -> Result<i32> {
             let mut save = d2s::read(&bytes, &opts, &t)
                 .map_err(|e| anyhow!("read: {e} (load result {:?})", e.result()))?;
             apply(&mut save, &e, &t)?;
+            for n in resave(&mut save, &t)? {
+                writeln!(out, "note: {n}")?;
+            }
             let bytes = write_checked(&save, &t)?;
             let p = write_out(&c, &bytes)?;
             writeln!(out, "wrote {} ({} bytes)", p.display(), bytes.len())?;
