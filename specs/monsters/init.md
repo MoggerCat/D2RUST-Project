@@ -44,24 +44,24 @@
 |   16. Boss spawns | 506–541 |
 |   17. Choosing umods (`0x005A0760`) | 542–585 |
 |   18. Boss minions and umod init (`0x005A2120`) | 586–603 |
-|   19. Umod init functions | 604–689 |
-|   20. Superuniques (`0x005A49B0`) | 690–738 |
-|   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 739–753 |
-|   22. Umod callbacks and the type-7 event | 754–805 |
-|   23. Unique names (client) | 806–815 |
-|   24. Monster assign message | 816–828 |
-|   25. Calling the spawn functions outside population (tools) | 829–919 |
-|   26. Making an existing monster unique (`0x005A4940`) and the warping shrine's pick | 920–978 |
-|   27. Class reinit (`0x00574370`) | 979–1024 |
-| Constants & data dependencies | 1025–1046 |
-| Randomness | 1047–1089 |
-| Edge cases & original bugs | 1090–1120 |
-| Test vectors | 1121–1122 |
-|   Synthetic (CI-safe) | 1123–1145 |
-|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1146–1176 |
-|   Recorded checks (monster assign 0xAC) | 1177–1189 |
-| Provenance | 1190–1268 |
-| Open questions | 1269–1325 |
+|   19. Umod init functions | 604–690 |
+|   20. Superuniques (`0x005A49B0`) | 691–739 |
+|   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 740–754 |
+|   22. Umod callbacks and the type-7 event | 755–806 |
+|   23. Unique names (client) | 807–816 |
+|   24. Monster assign message | 817–829 |
+|   25. Calling the spawn functions outside population (tools) | 830–920 |
+|   26. Making an existing monster unique (`0x005A4940`) and the warping shrine's pick | 921–980 |
+|   27. Class reinit (`0x00574370`) | 981–1026 |
+| Constants & data dependencies | 1027–1048 |
+| Randomness | 1049–1091 |
+| Edge cases & original bugs | 1092–1122 |
+| Test vectors | 1123–1124 |
+|   Synthetic (CI-safe) | 1125–1147 |
+|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1148–1178 |
+|   Recorded checks (monster assign 0xAC) | 1179–1191 |
+| Provenance | 1192–1270 |
+| Open questions | 1271–1327 |
 <!-- /index -->
 
 ## Summary
@@ -608,7 +608,8 @@ unique). Catalogue with every id, its init function and its callbacks:
 `monsters/umods.tsv` (columns: `id`; `uniquemod` name; `init_fn` 1.14d
 address or `-`; `unique_gate` yes = does nothing when unique = 0, no =
 ignores it, branch = different constants; `init_effect`; `cb_mode0`…
-`cb_mode5` callback addresses of §22; `status`). K[i] below is monumod row
+`cb_mode5` callback addresses of §22; `cl_phase0`…`cl_phase4` client
+hook addresses, `umod-callbacks.md` §28; `status`). K[i] below is monumod row
 i `constants` (live: 20, 100, 75, 50, 200, 150, 100, 300, 200, 100, 75,
 100, 50, 100, 75, 150, 0, 33, 33, 0, 50, 50, 33, 33, 33, 50, 50, 50, 66,
 66, 66, 100, 100, 100); B = difficultylevels `ChampionDamageBonus` (90 /
@@ -964,10 +965,11 @@ this order:
 3. M's alignment (`0x006259B0`) = 0 (evil).
 4. `0x0063EA40(M)` = 0.
 5. M's mode is 1 (NU) or 2 (WL).
-6. M's class has monstats2 mode bit 2 (`0x0046C140(class, 2)`: the
+6. M's class has monstats2 mode bit 2, WL (`0x0046C140(class, 2)`: the
    +0xF0 mode bits through monstats +0x18, `render/unit-composite.md`
    §1.1).
-7. M's monstats2 record exists (`0x00451FE0`) and its byte +0x0B ≠ 0.
+7. M's monstats2 record exists (`0x00451FE0`) and its byte +0x0B (`Height`,
+   `data/fields.tsv`) ≠ 0.
 8. v := `0x0055B7E0(M)` (monster data +0x14, dword 0) ≠ 0 and
    `0x0063E9F0(v, M)` = 0 (not a boss).
 9. `0x0063EDC0(M)` = 0 (not a prime evil).
