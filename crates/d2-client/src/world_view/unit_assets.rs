@@ -276,6 +276,12 @@ pub struct UnitArt {
     /// walk prediction moves it (decision D2, `bridge::predict`: 2 walk,
     /// 3 run). d2rs-own, unverified.
     pub pose_mode: Option<(UnitKey, u32)>,
+    /// The direction (`dir64`, 0–63) the local player is drawn facing in
+    /// the play preview: the facing of its predicted movement
+    /// (`bridge::predict::Predict::facing`), kept after it stops.
+    /// d2rs-own, unverified. PROVISIONAL (client/model.md OQ2; REC-51).
+    /// Only `play` sets it; the strict path never does.
+    pub pose_dir: Option<(UnitKey, u8)>,
 }
 
 impl UnitArt {
@@ -289,6 +295,16 @@ impl UnitArt {
                 std::borrow::Cow::Owned(u)
             }
             _ => std::borrow::Cow::Borrowed(unit),
+        }
+    }
+
+    /// `dir64` of `unit` (`render/unit-composite.md` §3 r1):
+    /// [`Self::pose_dir`] for its key, else 0 (d2rs-own, unverified: the
+    /// model holds no client path record).
+    pub fn dir64(&self, unit: &ClientUnit) -> u8 {
+        match self.pose_dir {
+            Some((key, d)) if key == unit.key => d & 63,
+            _ => 0,
         }
     }
 }

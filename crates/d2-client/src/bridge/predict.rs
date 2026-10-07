@@ -1,4 +1,4 @@
-// Spec: specs/client/model.md (§3 r3, open question 2), specs/sim/pathing.md (§8.1–8.2, §9.4, case M1), specs/ui/controls.md (§6 r7)
+// Spec: specs/client/model.md (§3 r3, open question 2), specs/sim/pathing.md (§8.1–8.3, §9.4, case M1), specs/ui/controls.md (§6 r7)
 //! Provisional own-walk motion of the local player (first playable
 //! preview, decision D2 in `docs/PLAN.md`).
 //!
@@ -14,7 +14,13 @@
 //!   straight line at the charstats walk / run speed ([`Speeds`]);
 //! - every change of the model's local position or server point (0x15
 //!   placement, 0x0F / position-check correction) snaps it back to the
-//!   model ([`Predict::observe`]).
+//!   model ([`Predict::observe`]);
+//! - each step sets the facing ([`Predict::facing`], `dir64` 0–63) to the
+//!   direction of the step vector (target − position) by the direction
+//!   vector rule of `sim/pathing.md` §8.3 (`d2_sim`'s `direction_vector`);
+//!   it is kept when the walk ends and drawn by the unit art
+//!   (`render/unit-composite.md` §3 r1, r4). The original's client turns
+//!   toward the new direction step by step (§8.5); the preview snaps.
 //!
 //! The server stays the authority (rule 7): nothing here is sent or
 //! written to the model; the prediction only feeds the view and the
@@ -27,6 +33,22 @@
 
 use super::link::{LinkError, Pumped, SendQueue, Sent, ServerLink};
 use super::world::{ClientWorld, UnitKey, PLAYER};
+
+use d2_sim::path::walk::geom::direction_vector;
+use d2_sim::path::PathTables;
+
+/// The direction (`dir64`, 0–63) of the vector from precise `from` to
+/// precise `to` (`sim/pathing.md` §8.3 r1–r3; the path flag 0x200 flip
+/// of r4 is not applied); `None` for a zero vector or without the spec tables.
+pub fn facing_of(from: (i64, i64), to: (i64, i64)) -> Option<u8> {
+    static TABLES: std::sync::OnceLock<Option<PathTables>> = std::sync::OnceLock::new();
+    if from == to {
+        return None;
+    }
+    let t = TABLES.get_or_init(|| PathTables::spec().ok()).as_ref()?;
+    let p = |(x, y): (i64, i64)| (x as u32, y as u32);
+    Some(direction_vector(t, p(from), p(to)).1)
+}
 
 /// The charstats speeds of the local player's class (`WalkVelocity`
 /// +0x40, `RunVelocity`; `sim/pathing.md` §8.1 r2, §8.2).
@@ -124,6 +146,9 @@ pub struct Predict {
     at: Option<(i64, i64)>,
     /// The walk under way.
     walk: Option<Walk>,
+    /// The facing (`dir64`, 0–63) of the last predicted step; kept when
+    /// the walk ends (module doc: facing).
+    facing: Option<u8>,
 }
 
 impl Predict {
@@ -153,6 +178,7 @@ impl Predict {
                 seen: Some(now),
                 at: Some(centre(pos)),
                 walk: None,
+                facing: None,
             };
             return;
         }
@@ -197,6 +223,9 @@ impl Predict {
             return;
         };
         let (tx, ty) = centre(target);
+        if let Some(d) = facing_of((x, y), (tx, ty)) {
+            self.facing = Some(d);
+        }
         let (dx, dy) = (tx - x, ty - y);
         let step = speeds.step(walk.run);
         let dist = isqrt(dx.unsigned_abs().pow(2) + dy.unsigned_abs().pow(2)) as i64;
@@ -248,6 +277,13 @@ impl Predict {
     /// The walk under way, if any.
     pub fn walking(&self) -> Option<Walk> {
         self.walk
+    }
+
+    /// The direction (`dir64`, 0–63) the view draws the local player
+    /// facing: that of the last predicted step, kept after the walk ends
+    /// (module doc); `None` before the first step.
+    pub fn facing(&self) -> Option<u8> {
+        self.facing
     }
 
     /// The player mode the view shows while the prediction moves: 2
@@ -495,6 +531,116 @@ mod tests {
         w.units.remove(&npc);
         p.frame(&w, [], true, SPEEDS);
         assert_eq!(p.walking(), None);
+    }
+
+    /// The COF row of `dir64` in a `d`-direction COF (`render/unit-composite.md`
+    /// §3 r4, n = d).
+    fn cof_dir(d: u8, dir64: u8) -> u8 {
+        crate::rules::unit_composite::unit_direction(d, d, dir64, false)
+            .unwrap()
+            .cof_dir
+    }
+
+    /// One predicted step from (100, 100) by sub-tile vector (dx, dy).
+    fn facing_after_step(dx: i32, dy: i32) -> Option<u8> {
+        let (w, _) = world_at(100, 100);
+        let mut p = Predict::new();
+        let to = walk_point((100 + 10 * dx) as u16, (100 + 10 * dy) as u16, false);
+        p.frame(&w, [to], true, SPEEDS);
+        p.facing()
+    }
+
+    // Covers: specs/sim/pathing.md §8.3, specs/render/unit-composite.md §3 r4,
+    // specs/render/unit-directions.tsv
+    #[test]
+    fn eight_compass_moves_face_their_direction() {
+        // Sub-tile +x is screen down-right, +y screen down-left. Rows:
+        // (vector, dir64 by §8.3, 8-direction COF row, DCC direction of
+        // unit-directions.tsv: 0 SW, 1 NW, 2 NE, 3 SE, 4 S, 5 W, 6 N, 7 E).
+        let cases = [
+            ((1, 1), 0, 0, 4),    // S
+            ((0, 1), 7, 1, 0),    // SW
+            ((-1, 1), 15, 2, 5),  // W
+            ((-1, 0), 23, 3, 1),  // NW
+            ((-1, -1), 32, 4, 6), // N
+            ((0, -1), 40, 5, 2),  // NE
+            ((1, -1), 47, 6, 7),  // E
+            ((1, 0), 56, 7, 3),   // SE
+        ];
+        for ((dx, dy), dir64, row, dcc) in cases {
+            let d = facing_after_step(dx, dy).unwrap();
+            assert_eq!(d, dir64, "({dx}, {dy})");
+            assert_eq!(cof_dir(8, d), row, "({dx}, {dy})");
+            let tsv = include_str!("../../../../specs/render/unit-directions.tsv");
+            let line = format!("8\t{d}\t{row}\t{dcc}");
+            assert!(tsv.lines().any(|l| l == line), "{line}");
+        }
+    }
+
+    // Covers: specs/sim/pathing.md §8.3, specs/render/unit-composite.md §3 r4
+    #[test]
+    fn sixteen_compass_moves_face_consecutive_rows() {
+        // Counter-clockwise on screen from S, half-steps between the eight.
+        let moves = [
+            (1, 1),
+            (1, 2),
+            (0, 1),
+            (-1, 2),
+            (-1, 1),
+            (-2, 1),
+            (-1, 0),
+            (-2, -1),
+            (-1, -1),
+            (-1, -2),
+            (0, -1),
+            (1, -2),
+            (1, -1),
+            (2, -1),
+            (1, 0),
+            (2, 1),
+        ];
+        for (k, (dx, dy)) in moves.into_iter().enumerate() {
+            let d = facing_after_step(dx, dy).unwrap();
+            assert_eq!(usize::from(cof_dir(16, d)), k, "({dx}, {dy}) dir64 {d}");
+        }
+    }
+
+    #[test]
+    fn facing_is_kept_when_the_walk_stops() {
+        let (w, key) = world_at(100, 100);
+        let mut p = Predict::new();
+        p.observe(&w);
+        assert_eq!(p.facing(), None);
+        // Toward −x (NW), then arrive: the facing stays.
+        p.frame(&w, [walk_point(98, 100, false)], true, SPEEDS);
+        assert_eq!(p.facing(), Some(23));
+        for _ in 0..20 {
+            p.frame(&w, [], true, SPEEDS);
+        }
+        assert_eq!(p.walking(), None);
+        assert_eq!(p.mode(), None);
+        assert_eq!(p.facing(), Some(23));
+        // Standing still with no walk: no change.
+        p.frame(&w, [], true, SPEEDS);
+        assert_eq!(p.facing(), Some(23));
+        // A walk to the cell it stands on: no step vector, facing kept.
+        p.frame(&w, [walk_point(98, 100, false)], true, SPEEDS);
+        assert_eq!(p.facing(), Some(23));
+        // The unit art draws it for the local player only.
+        let mut art = crate::world_view::unit_assets::UnitArt {
+            pose_dir: Some((key, p.facing().unwrap())),
+            ..Default::default()
+        };
+        assert_eq!(art.dir64(&ClientUnit::new(key)), 23);
+        assert_eq!(art.dir64(&ClientUnit::new(UnitKey::new(1, 7))), 0);
+        art.pose_dir = None;
+        assert_eq!(art.dir64(&ClientUnit::new(key)), 0);
+    }
+
+    #[test]
+    fn facing_of_zero_vector_is_none() {
+        assert_eq!(facing_of((5, 5), (5, 5)), None);
+        assert_eq!(facing_of((0, 0), (0, 1 << 16)), Some(7));
     }
 
     fn walk_point(x: u16, y: u16, run: bool) -> Walk {

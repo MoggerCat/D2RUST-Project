@@ -5,7 +5,9 @@
 //!
 //! The play preview (D1, `docs/PLAN.md` "First playable preview") fills
 //! what the model lacks, each fill marked `d2rs-own, unverified`:
-//! - direction: `dir64` = 0 (the model holds no client path record);
+//! - direction: `dir64` = 0 (the model holds no client path record),
+//!   except the local player's predicted facing in the play preview
+//!   (`UnitArt::dir64`; PROVISIONAL, client/model.md OQ2; REC-51);
 //! - frame: the model's +0x44 frame when set, else the COF's animation
 //!   rate advanced by the server tick count (the client model runs no
 //!   animation yet);
@@ -49,11 +51,6 @@ impl<R> UnitRules<R> {
         // d2rs-own, unverified (D1): 8.8 animation rate per tick.
         ((world.server_ticks.wrapping_mul(u64::from(rate)) >> 8) % frames as u64) as usize
     }
-
-    /// `dir64` of the unit (d2rs-own, unverified: 0).
-    fn dir64(_: &ClientUnit) -> u8 {
-        0
-    }
 }
 
 fn unresolved(req: &ComponentRequest<'_>, what: &'static str, message: String) -> CompositeError {
@@ -88,8 +85,7 @@ impl<R: ViewRules> ViewRules for UnitRules<R> {
             return Ok(None);
         };
         let dead = name.kind != CompositeKind::Object && unit.is_dead();
-        let Ok(dir) = unit_direction(cof.directions, cof.directions, Self::dir64(unit), dead)
-        else {
+        let Ok(dir) = unit_direction(cof.directions, cof.directions, art.dir64(unit), dead) else {
             return Ok(None);
         };
         Ok(Some(UnitPose {
@@ -148,7 +144,7 @@ impl<R: ViewRules> ViewRules for UnitRules<R> {
         let dir = unit_direction(
             req.cof.directions,
             req.cof.directions,
-            Self::dir64(unit),
+            art.dir64(unit),
             false,
         )
         .map_err(|e| unresolved(req, "direction", e.to_string()))?;
