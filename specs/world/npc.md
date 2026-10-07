@@ -36,15 +36,15 @@
 |   5. Healing on chat open | 260–284 |
 |   6. Cain identify (C→S 0x34) | 285–302 |
 |   7. Mercenaries | 303–404 |
-|   8. NPC services (C→S 0x38, action ∉ {1, 2, 3}) | 405–463 |
-|   9. S→C 0x2A NPC transaction (15 bytes) | 464–497 |
-|   10. Dead code in 1.14d (no caller, no pointer reference) | 498–509 |
-| Constants & data dependencies | 510–522 |
-| Randomness | 523–535 |
-| Edge cases & original bugs | 536–594 |
-| Test vectors | 595–617 |
-| Provenance | 618–662 |
-| Open questions | 663–728 |
+|   8. NPC services (C→S 0x38, action ∉ {1, 2, 3}) | 405–464 |
+|   9. S→C 0x2A NPC transaction (15 bytes) | 465–498 |
+|   10. Dead code in 1.14d (no caller, no pointer reference) | 499–510 |
+| Constants & data dependencies | 511–523 |
+| Randomness | 524–536 |
+| Edge cases & original bugs | 537–595 |
+| Test vectors | 596–618 |
+| Provenance | 619–663 |
+| Open questions | 664–729 |
 <!-- /index -->
 
 ## Summary
@@ -446,8 +446,9 @@ Gate bit clear or predicate false → refuse.
 
 Hell only (difficulty 2): if slot 1 bit 0 is set and slot 41 bits 1 and
 0 are clear → `0x0058FD20` (sets 41.13, 41.1). Then any difficulty: if
-slot 41 bit 1 is set → reset stats (`0x00570360`) and skills
-(`0x00570C80`) (player spec), sound for the player (`0x00553380`),
+slot 41 bit 1 is set → reset skills (`0x00570360`, `skills/levels.md`
+§6.5; call `0x0057A242`) then stats (`0x00570C80`, `combat/vitals.md`
+§2.1; call `0x0057A24B`), sound for the player (`0x00553380`),
 `0x0058FD50` (41.0 set, 41.1 cleared; `quests-act1.md` §10.3).
 
 #### 8.3 Act travel

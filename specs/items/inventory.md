@@ -35,14 +35,14 @@
 |   1. Inventory model | 89–181 |
 |   2. Grid placement | 182–277 |
 |   3. Belt | 278–335 |
-|   4. Equipping | 336–520 |
-|   5. Shared checks | 521–645 |
-| Constants & data dependencies | 646–668 |
-| Randomness | 669–682 |
-| Edge cases & original bugs | 683–727 |
-| Test vectors | 728–776 |
-| Provenance | 777–833 |
-| Open questions | 834–933 |
+|   4. Equipping | 336–521 |
+|   5. Shared checks | 522–646 |
+| Constants & data dependencies | 647–669 |
+| Randomness | 670–683 |
+| Edge cases & original bugs | 684–728 |
+| Test vectors | 729–777 |
+| Provenance | 778–834 |
+| Open questions | 835–934 |
 <!-- /index -->
 
 ## Summary
@@ -516,7 +516,8 @@ are the whole routine. Neither game nor U's inventory (unit +0x60) is
 tested for none; L is written into the skip argument's slot after step
 1. When each caller tries it: `inventory-moves.md` §8.1 step 5 (after §4.3), `world/vendors.md`
 §7.1.1 (buy), and `0x00562F30` (the corpse take-back of `0x0057FB70`,
-`inventory-moves.md` §7.1 step 2; corpse spec, not specified here).
+`inventory-moves.md` §7.1 step 2; the pickup's experience part is
+`combat/vitals.md` §4.7).
 
 ### 5. Shared checks
 

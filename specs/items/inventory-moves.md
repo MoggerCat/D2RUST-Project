@@ -16,11 +16,11 @@
 | Summary | 26–32 |
 | Rules | 33–34 |
 |   6. Deferred item messages | 35–128 |
-|   7. Intents | 129–539 |
-|   8. Pickup from the ground | 540–646 |
-|   9. Drop to the ground | 647–694 |
-|   10. Gold | 695–734 |
-|   11. Message layouts | 735–764 |
+|   7. Intents | 129–543 |
+|   8. Pickup from the ground | 544–650 |
+|   9. Drop to the ground | 651–698 |
+|   10. Gold | 699–738 |
+|   11. Message layouts | 739–768 |
 <!-- /index -->
 
 ## Summary
@@ -141,7 +141,10 @@ Every handler checks its exact size first (→ 3, `intents-events.md`
    distance > 50 → 1; distance > 8 → walk to P (`0x00548A50`, as below)
    → 0; P in mode 17 (dead) and the player passes the busy test
    `0x005678A0(1)` = 0 → corpse pickup `0x0057FB70(game, player, P)`
-   (needs P's state 7 `playerbody`; corpse spec, not specified here) →
+   (needs P's state 7 `playerbody`; its experience part, 75 % of the
+   last death's loss on the player's own corpse only, is
+   `combat/vitals.md` §4.7; its item take-back `0x00562F30`
+   (`0x0057FBE5`) is `items/inventory.md` §4.9) →
    0; else `0x00566E60` (player-to-player interaction, wall-clock
    throttled with `GetTickCount`; multiplayer, out of scope) → 0. Type 5
    (tile): missing or distance > 50 → 1; distance < 5 → warp
@@ -337,8 +340,9 @@ unwritten item-use spec, `world/cube.md` OQ7); refused with out → 3:
      1.
    - `tr2`: targeting reset; (37, 8) set and (37, 7) clear → set (37,
      7), `0x0058A0A0`, `0x005458E0`, consume I, 1.
-   - `toa`: targeting reset, `0x00570360`, `0x00570C80` (skills and
-     stats reset; skills / character owner), consume I, sound
+   - `toa`: targeting reset, skill reset `0x00570360`
+     (`skills/levels.md` §6.5; call `0x0055E549`) then stat reset
+     `0x00570C80` (`combat/vitals.md` §2.1; call `0x0055E552`), consume I, sound
      `0x00553380`, 1.
    - Other codes → 0. A failed flag test above → sound `0x00553380`,
      1.
