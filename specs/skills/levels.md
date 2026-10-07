@@ -122,7 +122,7 @@ them; entries with base 0 are created by the stat 97 / 107 callback
 (§7.1). On the server the level bonus +0x2C is always 0: entries are
 allocated zeroed (`0x00647110`) and its only writers, set `0x00647AA0`
 and add `0x00647B20`, are called from client code alone (`0x004C6140`,
-`0x004D88A0`, `0x004C7990`; `client/msg-skills.md` Open question 2).
+`0x004D88A0`, `0x004C7990`; `client/msg-skills.md` §2 r7).
 
 **`highest_entry(unit, skill)`** = `0x00643810` (wrapper `0x006439F0`):
 walk the unit's skill list (unit +0xA8 → +0x04 first, +0x04 next);
