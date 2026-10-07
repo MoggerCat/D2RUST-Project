@@ -14,13 +14,12 @@
   `VoicePolicy`, `GainCurve` hooks of `client/audio.md` §A2–§A4; §13
   below maps each rule to a hook). The table is parsed with the
   `d2-data` `.txt` reader.
-- **Related specs:** `audio/sound-table-2.md` (part 2: §14, the other
-  users of the sound seed), `client/audio.md` (design; this spec owns its §B3
+- **Related specs:** `audio/sound-table-2.md` (part 2: §14 seed users,
+  §15 sliders, §16 cache, §17 start failures), `client/audio.md` (design; this spec owns its §B3
   and §B8), `data/loading.md` §3.4 (the two runtime `.txt` files),
   `data/txt-format.md` §5–§7 and `data/field-types.md` §3 (parsing and
   cell types), `data/fields.tsv` row `sounds` (the compile-only name
-  linker other tables link through), `formats/wav.md` (WAV decoding; to
-  be written), `audio/triggers.md` (when sounds are requested),
+  linker other tables link through), `formats/wav.md` (WAV decoding), `audio/triggers.md` (when sounds are requested),
   `audio/environment.md` (`soundenviron` meaning, ambience, music),
   `formats/mpq.md` §11 (archive order),
   `sim/rng.md` §2–§3 (generator), `render/camera.md` §9 (client tick).
@@ -28,29 +27,29 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 56–70 |
-| Inputs | 71–81 |
-| Outputs / state changes | 82–89 |
-| Rules | 90–91 |
-|   1. Loading the table | 92–154 |
-|   2. Sound environment table (load only) | 155–174 |
-|   3. File path | 175–191 |
-|   4. Groups and variants | 192–234 |
-|   5. Requests | 235–311 |
-|   6. Sound tick | 312–519 |
-|   7. Starting on a channel | 520–601 |
+| Summary | 55–69 |
+| Inputs | 70–80 |
+| Outputs / state changes | 81–88 |
+| Rules | 89–90 |
+|   1. Loading the table | 91–153 |
+|   2. Sound environment table (load only) | 154–173 |
+|   3. File path | 174–190 |
+|   4. Groups and variants | 191–233 |
+|   5. Requests | 234–310 |
+|   6. Sound tick | 311–518 |
+|   7. Starting on a channel | 519–601 |
 |   8. Volume and pan | 602–737 |
 |   9. Settings | 738–757 |
-|   10. Sample cache | 758–805 |
-|   11. Live data (1.14d) | 806–822 |
-|   12. Edge cases kept | 823–838 |
-|   13. d2rs mapping | 839–849 |
-| Constants & data dependencies | 850–857 |
-| Randomness | 858–868 |
-| Edge cases & original bugs | 869–873 |
-| Test vectors | 874–918 |
-| Provenance | 919–963 |
-| Open questions | 964–1044 |
+|   10. Sample cache | 758–806 |
+|   11. Live data (1.14d) | 807–823 |
+|   12. Edge cases kept | 824–839 |
+|   13. d2rs mapping | 840–850 |
+| Constants & data dependencies | 851–858 |
+| Randomness | 859–869 |
+| Edge cases & original bugs | 870–874 |
+| Test vectors | 875–919 |
+| Provenance | 920–964 |
+| Open questions | 965–1045 |
 <!-- /index -->
 
 ## Summary
@@ -545,7 +544,8 @@ At the end of the update, if the tick advanced:
    (§8) and play.
 5. **Stream** (`Stream = 1`): path (§3), start offset (+0x24) and
    `Loop` go to the stream player (`0x00515D70`); no cache. Whether
-   `Block 1/2` reach it is open question 7.
+   `Block 1/2` reach it is open question 7. Failed attach, play or
+   stream open: `audio/sound-table-2.md` §17.
 6. **Variant and records** (answers ST-3). The pick (r1) runs on the
    request's current id and **overwrites the request's id** (+0x04)
    with the variant (`0x004E01D5`), before the duplicate test; a
@@ -766,7 +766,8 @@ and EAX hardware paths).
    skipping locked (+0x8A) and `Cache` rows and (when asked) samples
    used within the last 750 ticks; if not enough is freed the load is
    abandoned. Sync load reads the whole file; async opens a handle
-   (pending loads counter `0x007BC9C8`).
+   (pending loads counter `0x007BC9C8`). Exact order, LRU list and
+   arguments: `audio/sound-table-2.md` §16 (the T = 0 preload is sync).
 3. **Preload** (`0x00482B40`, at most every 25 ticks): every row with
    state 0 and (lock count > 0 or `Cache`) starts an async load while
    fewer than 15 are pending and no eviction failed in the last 250

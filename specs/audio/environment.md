@@ -20,22 +20,22 @@
 | Inputs | 59–70 |
 | Outputs / state changes | 71–75 |
 | Rules | 76–77 |
-|   1. Sound environment | 78–108 |
-|   2. Music (`0x004DCAA0(T)`) | 109–164 |
-|   3. Quest stingers (`0x004DCD40(M, dM, H, k, S, dS, play)`) | 165–224 |
-|   4. Level-entry lines (`0x004CC270`) | 225–271 |
-|   5. Ambience loop (`0x004E42E0(T)`, first part) | 272–293 |
-|   6. Rain (`0x004E42E0`, second part) | 294–324 |
-|   7. Event cues (`0x004E42E0`, third part) | 325–349 |
-|   8. Sample pins on level change (`0x004E42E0`, last part) | 350–357 |
-|   9. Front-end music (`Options Music`; answers open question 5) | 358–407 |
-| Constants & data dependencies | 408–417 |
-| Randomness | 418–426 |
-| Edge cases & original bugs | 427–436 |
-| Test vectors | 437–463 |
-|   Checks (hook addresses for `record_sound.py`) | 464–473 |
-| Provenance | 474–497 |
-| Open questions | 498–534 |
+|   1. Sound environment | 78–128 |
+|   2. Music (`0x004DCAA0(T)`) | 129–184 |
+|   3. Quest stingers (`0x004DCD40(M, dM, H, k, S, dS, play)`) | 185–244 |
+|   4. Level-entry lines (`0x004CC270`) | 245–291 |
+|   5. Ambience loop (`0x004E42E0(T)`, first part) | 292–313 |
+|   6. Rain (`0x004E42E0`, second part) | 314–344 |
+|   7. Event cues (`0x004E42E0`, third part) | 345–369 |
+|   8. Sample pins on level change (`0x004E42E0`, last part) | 370–377 |
+|   9. Front-end music (`Options Music`; answers open question 5) | 378–427 |
+| Constants & data dependencies | 428–437 |
+| Randomness | 438–446 |
+| Edge cases & original bugs | 447–456 |
+| Test vectors | 457–483 |
+|   Checks (hook addresses for `record_sound.py`) | 484–493 |
+| Provenance | 494–517 |
+| Open questions | 518–555 |
 <!-- /index -->
 
 ## Summary
@@ -105,6 +105,26 @@ sounds; the state variables named in each section.
    id), 13 different day and night event ids; 6 rows have no event
    (both 0); `Event Delay` 150–800 (250 in 28 rows); `Indoors` = 1 in
    26 rows.
+5. **Inputs owned elsewhere** (the driver's contract; nothing here is
+   restated). Day phase: the period index (+0x00) of the environment
+   record of the client act `[0x007A0634]` (act +0x04), read when the
+   rule runs (`0x0061C220`); its value is set by the client update's
+   advance and by S→C 0x53 (`render/lighting.md` §9.2 r1–r4, §9.3; act 4
+   uses its own period table there, the index meaning stays 0–5).
+   Before the first 0x53 the record holds its creation values (index 2,
+   so "day", `render/lighting.md` §9.1). Weather active and intensity:
+   `render/draw-order-2.md` §11.1–§11.3 (open question 4). Level L and
+   its row: `client/model.md` §11 r5 (room → level), `data/fields.tsv`
+   `levels.SoundEnv`. Client quest state for §4 r2: `world/quests.md`
+   §1, `world/quests-status.md`.
+6. **Play position by id** (`0x004B9610`, `0x004B9D50`; the music reads
+   of §2 r6, r8): "the request with id X" is the first request of the
+   active list (its current order, `audio/sound-table.md` §6.2 r1) whose
+   **current** id (+0x04, the variant after a start) is X; its handle
+   is then used. Song rows have `Group Size` 0 (live, all 42 rows
+   4,657–4,698), so a song's current id is the requested id. Reading the
+   position of a request without a channel is fatal (`0x45A`); §2 r8
+   asks only for a playing one.
 
 ### 2. Music (`0x004DCAA0(T)`)
 
@@ -507,7 +527,8 @@ Fourth pass (§9): `0x005148F0`, `0x00514860`, `0x00514990`,
    requests, compared with §2–§7 per T (entry 74 has the wilderness
    and a day change only).
 2. Answered (`sound-table.md` §7 r8): 4-byte units of the stream's
-   `data`, i.e. sample frames for the (all stereo 16-bit) songs.
+   `data`, i.e. sample frames for the (all stereo 16-bit) songs. The
+   request is found by its current id (§1 r6).
 3. Answered (§1 r3): the period index of `render/lighting.md` §9;
    values 0–5, day = 1–3 (recorded, entries 69 and 74).
 4. Weather: when it is active (`0x00473C40`: `[0x007A8A14]` = 0 and
