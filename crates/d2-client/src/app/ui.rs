@@ -90,7 +90,7 @@ pub fn add_original_ui(app: &mut App, parts: UiParts) -> Result<(), OriginalUiEr
     ui.original = Some(original);
     ui.bindings = Preset::Dev.bindings();
     ui.art = Some(PanelArtLoader {
-        source: parts.source,
+        source: parts.source.clone(),
         files: files.clone(),
     });
     app.insert_non_send(ui).init_resource::<UiSounds>();

@@ -211,7 +211,7 @@ fn cof_and_component_names_from_the_looks() {
     assert!(unit_cof(&l, &unit(4, 5, 0, 0)).is_none());
 }
 
-// Covers: specs/render/unit-composite.md §6 r2, §10
+// Covers: specs/render/unit-composite.md §6 r2
 #[test]
 fn an_object_loads_draws_and_animates() {
     let mut src = MemorySource::default();
