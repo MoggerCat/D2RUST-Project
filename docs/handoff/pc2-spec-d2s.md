@@ -51,6 +51,12 @@ spec.
 - WW save restore (wire-world-staging §3 item 4) -> §9 rule 7 -> `formats/d2s-load.md` §2: the load
   effects in order with code and owner spec, for `d2-server` character
   storage.
+- quests-act2 cross-file request (§6 rule 3, OQ10) -> §6 rule 3: field A
+  = D2MOO `pQuestIntroFlags`; setter `0x00572360` has five direct calls
+  (`0x0058E9D4`, `0x0058EA25`, `0x0058F8C2`, `0x00598464` chain 38
+  event 11, `0x005B6CCF`), each re-read with `disasm.py at`; it sets only
+  the first matching pair's bit (bit 0 only when no pair matches).
+  `formats/d2s-load.md` had no "no caller" claim; unchanged.
 
 ## Still open
 
