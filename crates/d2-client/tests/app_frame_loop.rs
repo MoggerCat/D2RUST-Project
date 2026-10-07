@@ -27,6 +27,7 @@
 //! rule 3: the link owns it; Bevy time never reaches the server). Rules,
 //! fonts, sounds and cues here are test fixtures, not original rules.
 
+use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -138,13 +139,17 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
 
     // An intent sent between frames 1 and 2 is drained by frame 2's pump;
     // the tick's flush reaches the bridge in the same frame, after the
-    // session join queued at build time (0x59, 0x0B, 0x03, 0x07, 0x15:
-    // the player in the town): the waypoint travel to Cold Plains (0x07
-    // of the destination room, the arrival 0x0D, `waypoints.md` §7), then
-    // the first tick's room switch (0x07). The 0x0D is a unit-handler
-    // message (`client/msg-units.md` §4) for the local player, known
-    // from 0x59. The world view composes the model of tick 1 on the CPU
-    // (no render world).
+    // session sequence queued at build time (`intents-events.md` §8: 0x01,
+    // 0x00, 0x02, 0x59, 0xAA, 0x76, 0x0B, 0x03, then game entry's 0x07,
+    // its room switch's 0x07 and the waypoint's 0x51, 0x15, 0x7E: the
+    // player in the town): the waypoint travel to Cold Plains (0x07 of the
+    // destination room, the arrival 0x0D, `waypoints.md` §7), then the
+    // first tick's room switch (§7.8: 0x07 for Cold Plains, the town's
+    // leave: 0x0A for the waypoint, 0x08, the player update's 0x15) and,
+    // the room being ready, 0x04 (`tick.md` §6 rule 6). The 0x0D is a
+    // unit-handler message (`client/msg-units.md` §4) for the local
+    // player, known from 0x59. The world view composes the model of tick
+    // 1 on the CPU (no render world).
     let sent = app
         .world_mut()
         .resource_mut::<BridgeResource>()
@@ -159,9 +164,15 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     app.update();
     let b = &bridge(&app).0;
     assert_eq!((b.world().frames, b.world().server_ticks), (2, 1));
-    // Seven applied at receive; the 0x0D waits on its unit's queue for
-    // the update pass (`client/model.md` §4, §5).
-    assert_eq!((b.log().handled, b.log().queued), (7, 1));
+    // Sixteen applied at receive; the 0x0D waits on its unit's queue for
+    // the update pass (`client/model.md` §4, §5); 0x76, 0x7E and 0xAA
+    // have no client handler (`client/bridge.md` §6 rule 3).
+    assert_eq!((b.log().handled, b.log().queued), (16, 1));
+    assert_eq!(
+        b.log().unowned,
+        BTreeMap::from([(0x76, 1), (0x7E, 1), (0xAA, 1)])
+    );
+    assert!(b.world().in_game, "0x04 received");
     assert!(b.log().dropped.is_empty(), "{:?}", b.log().dropped);
     assert_eq!(
         b.world().local_player.map(|k| k.guid),
@@ -171,10 +182,18 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
         .world()
         .rooms_in_sight
         .iter()
-        .map(|r| (r.level, r.x, r.y))
+        .map(|r| (r.show, r.level, r.x, r.y))
         .collect();
-    assert_eq!(sight, [(1, 16, 0), (3, 0, 0), (3, 0, 0)]);
-    assert!(b.log().unowned.is_empty());
+    assert_eq!(
+        sight,
+        [
+            (true, 1, 16, 0),
+            (true, 1, 16, 0),
+            (true, 3, 0, 0),
+            (true, 3, 0, 0),
+            (false, 1, 16, 0)
+        ]
+    );
     assert!(b.log().rejected.is_empty() && b.log().discarded.is_empty());
     assert_eq!(
         stats(&app),
@@ -219,14 +238,13 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
         (304, 302)
     );
     // Nothing dropped. The client update pass runs only while in game
-    // (`client/model.md` §5 rule 1), which takes S→C 0x04; the session
-    // join sends none (TODO(spec: tick.md §6 rule 4)), so the queued 0x0D
-    // still waits and the model keeps the player at its game-entry point.
+    // (`client/model.md` §5 rule 1); tick 1's 0x04 put the client in
+    // game, so the queued 0x0D was drained by the update pass.
     let log = bridge(&app).0.log();
-    assert_eq!((log.queued, log.drained), (1, 0));
+    assert_eq!((log.queued, log.drained), (1, 1));
     assert!(log.dropped.is_empty());
     let w = bridge(&app).0.world();
-    assert!(!w.in_game);
+    assert!(w.in_game);
     // 0x03 arrived; without a DRLG source (`add_client_data` is not
     // called here) the client builds no DRLG, so no room and no level.
     assert_eq!(w.act.map(|a| a.act), Some(0));

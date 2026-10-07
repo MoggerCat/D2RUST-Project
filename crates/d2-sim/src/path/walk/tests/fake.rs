@@ -382,6 +382,9 @@ impl WalkUnits for Ctx {
     fn send_unit_add(&mut self, client: ClientId, unit: UnitId) {
         self.u.log.push(format!("add {} to {}", unit.0, client.0));
     }
+    fn clear_ai_room_memo(&mut self, unit: UnitId) {
+        self.u.log.push(format!("memo {}", unit.0));
+    }
     fn state13_step(&mut self, _unit: UnitId) {
         self.u.log.push("state13".into());
     }

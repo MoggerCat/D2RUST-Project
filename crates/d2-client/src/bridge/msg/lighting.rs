@@ -25,9 +25,6 @@ impl From<EnvError> for HandlerError {
             EnvError::NegativeTicks(_) => {
                 HandlerError::Invalid("0x53: negative ticks (fatal in 1.14d)")
             }
-            EnvError::EclipsePending => HandlerError::Unspecified(
-                "render/lighting.md §9.2 r2: the eclipse branch calls 0x0061BDF0",
-            ),
         }
     }
 }

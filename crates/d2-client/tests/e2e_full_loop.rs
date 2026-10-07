@@ -49,7 +49,7 @@ use d2_proto::client::{
     BuyItem, EntityAction, InsertItemInBuffer, InteractWithEntity, PickItem, RightSkill, Run,
     RunToUnit, SellItem, TakeOrCloseWp, Walk, WalkToUnit,
 };
-use d2_proto::server::{MapReveal, PlayerStop};
+use d2_proto::server::{MapReveal, PlayerStop, ReassignPlayer};
 use d2_server::adapters::handlers::skills::wired::WiredSkills;
 use d2_server::adapters::handlers::skills::LearnRest;
 use d2_server::adapters::handlers::walk::enable_paths;
@@ -280,6 +280,9 @@ impl Pending for TestPending {
         }
         true
     }
+    fn set_entry_param_of(&mut self, _: UnitId, e: &SkillEntry, i: u8, v: i32) {
+        self.book.param(e, i, v);
+    }
 }
 
 /// The free-spot search `0x0064E810` (collision spec, not written): the
@@ -475,6 +478,11 @@ impl Book {
         } else {
             7
         }
+    }
+    /// The used entry's param `i` := v (srvst 53 writes param 1 := frame +
+    /// level): logged.
+    fn param(&self, e: &SkillEntry, i: u8, v: i32) {
+        self.get().log.push(format!("param{i} {} {v}", e.skill));
     }
     fn srvst(&self, index: u16, _: UnitId, skill: i32, lvl: i32) -> i32 {
         self.get().log.push(format!("srvst {index} {skill} {lvl}"));
@@ -873,13 +881,15 @@ fn arrow() -> MissileRow {
 fn skills() -> SkillTables {
     let mut v = vec![skill_rec(), skill_rec()];
     let m = &mut v[MULTI as usize];
-    (m.srvstfunc, m.mana, m.lvlmana, m.manashift) = (42, 4, 1, 8);
-    (m.srvdofunc, m.srvmissile) = (3, 0);
+    // Start 53 / do 53 as `d2_sim::bench_fixtures::combat::skills` (its
+    // doc): `calc2` = formula 0 = `lvl`.
+    (m.srvstfunc, m.mana, m.lvlmana, m.manashift) = (53, 4, 1, 8);
+    (m.srvdofunc, m.srvmissile, m.calc2) = (53, 0, 0);
     SkillTables {
         skills: v,
         skilldesc: vec![blank::<Skilldesc>()],
         missiles: vec![arrow()],
-        skills_code: Vec::new(),
+        skills_code: vec![0x04, 0x10, 0x00],
         miss_code: Vec::new(),
         level_cap: LEVEL_CAP_114D,
         stat_count: 359,
@@ -1683,6 +1693,11 @@ fn streams(fx: &Fx, msgs: &[Vec<u8>]) -> Vec<Vec<u8>> {
 
 /// S→C 0x07 MapReveal of the room at tile (x, y) of `level`
 /// (`server-messages.tsv`: x u16 @1, y u16 @3, level u8 @5).
+/// S→C 0x51 AssignObject (`intents-events.md` §7.2 part A).
+fn assign_object(guid: u32, class: u16, (x, y): (i32, i32), mode: u8, interact: u8) -> Vec<u8> {
+    d2_sim::units::messages::assign_object(guid, class, x as u16, y as u16, mode, interact).to_vec()
+}
+
 fn map_reveal(x: u16, y: u16, level: u32) -> Vec<u8> {
     let mut b = vec![0x07];
     b.extend(x.to_le_bytes());
@@ -1790,15 +1805,20 @@ fn run_with(game_seed: u32) -> Transcript {
     // S→C 0x07 per room of the player's adjacency array, in its order
     // (`path-placement.md` §11 "Recipients": tile x, tile y, level); the
     // room pass creates the DS1's preset monster at its sub-tile
-    // (`population.md` §11.1), placed on its path. This staged game sends
-    // no 0x03, so the client refuses each 0x07 (fatal 0x58A).
+    // (`population.md` §11.1), placed on its path. Each joined room's
+    // 0x07 is followed by the add messages of its units
+    // (`intents-events.md` §7.8 rule 2): the waypoint's 0x51 (type 2,
+    // class 0, its position, mode 1, interact 0: no object data in this
+    // game) after its room's; Akara (a monster) and the player send none
+    // (§7.2 monster part: not specified; the client's own player is
+    // skipped). This staged game sends no 0x03, so the client refuses
+    // each 0x07 (fatal 0x58A).
     record(&mut fx, &mut frames, vec![]);
-    assert_eq!(
-        frames[0].2,
-        [(8000, 8000), (8000, 8008), (8008, 8000), (8008, 8008)]
-            .map(|(x, y)| map_reveal(x, y, ISLE))
-            .to_vec()
-    );
+    let mut want: Vec<Vec<u8>> = [(8000, 8000), (8000, 8008), (8008, 8000), (8008, 8008)]
+        .map(|(x, y)| map_reveal(x, y, ISLE))
+        .to_vec();
+    want.insert(1, assign_object(wp, 0, WP_AT, 1, 0));
+    assert_eq!(frames[0].2, want);
     assert_eq!(fx.sim_ref().game.lists.active_rooms(0).len(), 4);
     let monsters = fx.monsters();
     assert_eq!(monsters.len(), 1, "the DS1 preset monster");
@@ -1841,8 +1861,8 @@ fn run_with(game_seed: u32) -> Transcript {
     walks.push(w);
 
     // 5. Right skill at the monster (C→S 0x0C, `use.md` §1) from there:
-    // accepted, mana charged at start (3,328 of 4,000), srvst 4, mode SC
-    // (10); the action frame (event 0, 3 frames on) runs srvdo 3 and the
+    // accepted, mana charged at start (3,328 of 4,000), srvst 53, mode SC
+    // (10); the action frame (event 0, 3 frames on) runs srvdo 53 and the
     // generic `srvmissile` 0 through the real missile creation
     // (`missiles.md` §R2.3) at the player, aimed at the monster.
     fx.stage_combat(monster);
@@ -1861,7 +1881,12 @@ fn run_with(game_seed: u32) -> Transcript {
     }
     assert_eq!(
         fx.book.get().log,
-        ["srvst 42 1 10", "srvdo 3 1 10 true false false"]
+        [
+            // srvst 53 ran at the dispatch frame f0 − 1 (before the tick)
+            // with level 10: param 1 := f0 − 1 + 10.
+            format!("param1 1 {}", f0 - 1 + 10),
+            "srvdo 53 1 10 true false false".to_string()
+        ]
     );
     let shot = fx.missiles();
     assert_eq!(shot.len(), 1);
@@ -1929,8 +1954,11 @@ fn run_with(game_seed: u32) -> Transcript {
     );
     assert_eq!(fx.stat(player, 13), 100);
     assert_eq!(fx.stat(player, LEVEL), 2);
-    // The death animation: 4 frames → event 1 four frames on.
-    assert_eq!(fx.timers(monster), [(1, f_hit + 4)]);
+    // The death animation: 4 frames → event 1 four frames on. Tick 1's
+    // room switch woke the monster created by that tick's room pass
+    // (`intents-events.md` §7.8 rule 2.3, `0x00573780`: think at frame
+    // 1 + 2; Idle → the next think at 203), which is still pending.
+    assert_eq!(fx.timers(monster), [(1, f_hit + 4), (2, 203)]);
     // The drop (`treasure.md` §3): TC 1 picks gold on the monster's
     // seed; the item is created on the game seed (`generation.md` §3),
     // placed at the start spot (x + 2, y + 3, §7 step 2) in mode 3, its
@@ -2133,13 +2161,14 @@ fn run_with(game_seed: u32) -> Transcript {
     // 0x9C made one item unit, holding the last message with its item bit
     // stream (`items/bitstream.md`; placement from the stream is not
     // wired in the model yet). 0x47 / 0x48 name
-    // the player, which the model does not hold (no 0x59): no change.
+    // the player, which the model does not hold (no 0x59): no change. The
+    // waypoint is there since the join's room switch sent its 0x51.
     {
-        use d2_client::bridge::world::{ItemData, ItemRecord, KindData, ITEM};
+        use d2_client::bridge::world::{ItemData, ItemRecord, KindData, ITEM, OBJECT};
         let w = fx.bridge.world();
         assert_eq!(
             w.units.keys().copied().collect::<Vec<_>>(),
-            [UnitKey::new(ITEM, cg)]
+            [UnitKey::new(OBJECT, wp), UnitKey::new(ITEM, cg)]
         );
         let item = &w.units[&UnitKey::new(ITEM, cg)];
         assert_eq!(item.position, None);
@@ -2351,9 +2380,13 @@ fn run_with(game_seed: u32) -> Transcript {
         b: 0,
         life_pct: 0,
     };
-    // Then the tick's room switch: one 0x07 per room of the placement
-    // room's adjacency array (none of them was in the old array, which
-    // held the Isle's rooms), in its order (`path-placement.md` §11).
+    // Then the tick's room switch (`intents-events.md` §7.8): one 0x07
+    // per room of the placement room's adjacency array (none of them was
+    // in the old array, which held the Isle's rooms), in its order, with
+    // no unit in them; then the leave of each Isle room in the old array's
+    // order: 0x0A for each of its units (list order; no missile is left),
+    // 0x08, and after the client's old room the player update (rule 3.4:
+    // 0x15 with flag 1 at the player's new cell, flags 2 bit 0x10000).
     let switch: Vec<Vec<u8>> = {
         let s = fx.sim_ref();
         let (d, r) = s
@@ -2375,12 +2408,54 @@ fn run_with(game_seed: u32) -> Transcript {
             .collect()
     };
     assert_eq!(switch.len(), 6);
+    let leave: Vec<Vec<u8>> = {
+        let s = fx.sim_ref();
+        let old = start_room.expect("the player's Isle room");
+        let (d, r) = s
+            .events
+            .action
+            .sys
+            .hooks
+            .drlg
+            .drlg_room(&s.game, old)
+            .unwrap();
+        let mut v = Vec::new();
+        for &a in &d.active_room(r).unwrap().adjacency {
+            let rr = d.room(a);
+            let id = rr.active().expect("still active").id;
+            for u in s.game.lists.room_units(id) {
+                let e = s.game.lists.unit(u).unwrap();
+                assert_ne!(e.ty, UnitType::Missile);
+                v.push(d2_sim::units::messages::remove_unit(e.ty as u8, e.guid).to_vec());
+            }
+            v.push(
+                d2_sim::units::messages::map_hide(rr.rect.x as u16, rr.rect.y as u16, ISLE as u8)
+                    .to_vec(),
+            );
+            if id == old {
+                let p15 = ReassignPlayer {
+                    type_: 0,
+                    guid: pg,
+                    x: at.0 as u16,
+                    y: at.1 as u16,
+                    flag: 1,
+                };
+                v.push(p15.encode().to_vec());
+            }
+        }
+        v
+    };
+    // The Isle's four rooms; the waypoint, Akara and the dead monster in
+    // the player's.
+    assert_eq!(leave.iter().filter(|m| m[0] == 0x08).count(), 4);
+    assert_eq!(leave.iter().filter(|m| m[0] == 0x0A).count(), 3);
     let mut want = vec![reveal.encode().to_vec(), stop.encode().to_vec()];
     want.extend(switch);
+    want.extend(leave);
     assert_eq!(frames.last().unwrap().2, want);
     assert!(!fx.sim_ref().world.rest.interact.contains_key(&player));
-    // The next tick: no 0x15 (`docs/handoff/wire-path-server.md` §4
-    // finding 1; §8 rule 3's room messages are the unit-update spec's).
+    // The next tick: nothing (the 0x15 of `docs/handoff/wire-path-server.md`
+    // §4 finding 1 came with the room switch's player update).
     record(&mut fx, &mut frames, vec![]);
     assert_eq!(streams(&fx, &frames.last().unwrap().2), none);
 
@@ -2391,19 +2466,21 @@ fn run_with(game_seed: u32) -> Transcript {
     assert_eq!(client.0, frames.len() as u64 + 1);
     let log = fx.bridge.log();
     // The S→C stream drove the client model (`client/model.md`,
-    // `msg-units.md`, `msg-stats-items.md`): 0x9C ×2, 0x47 ×2, 0x48 ×2
-    // applied; 0x0D dropped (the player was never announced: the server
-    // sends no 0x59 / 0x0B in this staged game) and the monster's two
-    // 0x69 (codes 8 and 9) dropped too (no 0xAC announced it:
-    // `msg-units.md` §4, the unit is not in the model); every 0x07 rejected (no
-    // client act: this staged game sends no 0x03, fatal 0x58A): the join's
-    // four, the warp's one and the six of its room switch; the NPC /
-    // quest / trade ids have no owner spec yet.
+    // `msg-units.md`, `msg-stats-items.md`): 0x9C ×2, 0x47 ×2, 0x48 ×2,
+    // the waypoint's 0x51, the leave's three 0x0A and its 0x15 applied;
+    // 0x0D dropped (the player was never announced: the server sends no
+    // 0x59 / 0x0B in this staged game) and the monster's two 0x69 (codes
+    // 8 and 9) dropped too (no 0xAC announced it: `msg-units.md` §4, the
+    // unit is not in the model); every 0x07 and 0x08 rejected (no client
+    // act: this staged game sends no 0x03, fatal 0x58A / 0x59E): the
+    // join's four 0x07, the warp's one and the six of its room switch,
+    // the switch's four 0x08; the NPC / quest / trade ids have no owner
+    // spec yet.
     assert_eq!(
         log.unowned,
         BTreeMap::from([(0x27, 1), (0x28, 1), (0x29, 1), (0x2A, 2)])
     );
-    assert_eq!(log.handled, 6);
+    assert_eq!(log.handled, 11);
     assert_eq!(log.dropped, BTreeMap::from([(0x0D, 1), (0x69, 2)]));
     assert_eq!((log.queued, log.drained), (0, 0));
     assert_eq!(fx.due, None, "the death end's 0x69 code 9 arrived");
@@ -2412,7 +2489,9 @@ fn run_with(game_seed: u32) -> Transcript {
         .iter()
         .map(|r| (r.id, r.error.to_string()))
         .collect();
-    assert_eq!(rejected, vec![(0x07, "fatal assert 0x58A".to_owned()); 11]);
+    let mut want = vec![(0x07, "fatal assert 0x58A".to_owned()); 11];
+    want.extend(vec![(0x08, "fatal assert 0x59E".to_owned()); 4]);
+    assert_eq!(rejected, want);
     assert!(log.discarded.is_empty());
     // No local player: the world view has no camera (`model.md` §3 rule 3).
     assert_eq!(w.local_player, None);

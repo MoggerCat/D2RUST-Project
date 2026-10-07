@@ -293,6 +293,9 @@ impl Pending for TestPending {
         }
         true
     }
+    fn set_entry_param_of(&mut self, _: UnitId, e: &SkillEntry, i: u8, v: i32) {
+        self.book.param(e, i, v);
+    }
 }
 
 /// The free-spot search `0x0064E810` (collision spec, not written): the
@@ -484,6 +487,11 @@ impl Book {
         } else {
             7
         }
+    }
+    /// The used entry's param `i` := v (srvst 53 writes param 1 := frame +
+    /// level): logged.
+    fn param(&self, e: &SkillEntry, i: u8, v: i32) {
+        self.get().log.push(format!("param{i} {} {v}", e.skill));
     }
     fn srvst(&self, index: u16, _: UnitId, skill: i32, lvl: i32) -> i32 {
         self.get().log.push(format!("srvst {index} {skill} {lvl}"));
@@ -1135,14 +1143,18 @@ fn a_population_monster_killed_with_a_missile() {
     // 1 `0x005A72B0`) has no written body (monster spec): the wired host
     // runs nothing there (`UnitHooks::monster_mode_function` default), so
     // the monster stays in mode 0 instead of reaching DD (12).
+    // The AI think the client's room join scheduled
+    // (`intents-events.md` §7.8 rule 2.3, `0x00573780`; Idle → 203) is
+    // still pending beside it.
     let timers = fx.timers(monster);
-    assert_eq!(timers.len(), 1, "{timers:?}");
+    assert_eq!(timers.len(), 2, "{timers:?}");
+    assert_eq!(timers[1], (2, 203));
     let (ev, end) = timers[0];
     assert_eq!(ev, 1);
     while fx.host.game.game.frame < end + 2 {
         transcript.extend(fx.step(&[]).1);
     }
-    assert!(fx.timers(monster).is_empty());
+    assert_eq!(fx.timers(monster), [(2, 203)]);
     // `impl-monster-death`: DT event 1 (`0x005A72B0`) now sets mode 12 (DD).
     assert_eq!(fx.mode(monster), 12, "the DT end sets DD");
     // `intents-events.md` §7.4 rule 7 states the death messages (0x69

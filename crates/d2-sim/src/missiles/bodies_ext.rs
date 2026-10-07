@@ -126,12 +126,20 @@ pub fn full_record<W: MissileWorld + ?Sized>(
         stun_len: d.stun_length,
         ..DamageRecord::default()
     };
-    // The crit flag is the record's critical result bit (`combat/hit.md`
-    // result 0x2000, as `elem_roll` sets it, `missiles.md` §R9.6).
-    // TODO(spec: missiles.md §R6.2): where the 103 / 104 / 106 bypass
-    // flags land in the 0x70-byte record is not stated; not carried.
+    // §R6.2: deadly strike → result flags 0x2000; bypass stats 103 / 104
+    // / 106 → hit flags 0x100 / 0x200 / 0x400 (`combat/damage.md` §1).
     if d.crit {
         rec.result |= crate::combat::result::CRITICAL;
+    }
+    use crate::combat::hitflag;
+    if d.ignore_target_ac != 0 {
+        rec.hit_flags |= hitflag::BYPASS_UNDEAD;
+    }
+    if d.fractional_target_ac != 0 {
+        rec.hit_flags |= hitflag::BYPASS_DEMONS;
+    }
+    if d.ignore_target_defense != 0 {
+        rec.hit_flags |= hitflag::BYPASS_BEASTS;
     }
     rec
 }
@@ -449,10 +457,8 @@ pub fn ring<W: MissileWorld + ?Sized>(
         level,
         ..MissileParams::default()
     };
-    // §6 step 2: flags 0x17 (1, 2, 4 and 0x10 as read).
-    // TODO(spec: bodies.md §6 step 2): 0x17 holds 0x10 (velocity already
-    // fixed point), which §R2.3 reads as "no << 8"; step 3 says the
-    // creation shifts it << 8. Flag 0x10 is kept as the number states.
+    // §6 steps 2–3: flags 0x17 (1, 2, 4 and 0x10): 0x10 marks the
+    // velocity as fixed point, so creation does not shift it again.
     if loops > 0 {
         p.flags |= pf::LOOPS;
         p.loops = loops;

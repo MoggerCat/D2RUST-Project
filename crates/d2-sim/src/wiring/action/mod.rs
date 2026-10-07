@@ -29,6 +29,7 @@ pub mod objects;
 pub mod pending;
 pub mod reaction;
 pub mod rooms;
+pub mod switch;
 pub mod unit_update;
 pub mod units;
 pub mod vitals_sync;
@@ -106,6 +107,9 @@ pub enum WiringError {
     Place(crate::path::place_seams::PlaceError),
     /// An object fatal assert (`world/objects.md`).
     Object(crate::world::objects::ObjectError),
+    /// Room ready `0x0061A460` on a client without a room: fatal assert
+    /// 0x3EF in 1.14d (`sim/tick.md` §6 rule 6).
+    NoClientRoom(crate::units::ClientId),
     /// The monster mode message (`sim/intents-events.md` §7.4): a fatal
     /// assert or a message the spec gives no layout for.
     ModeMessage(unit_update::ModeMessageError),
@@ -187,6 +191,10 @@ pub struct ActionHooks<X> {
     /// `None` (the default): the sync is off;
     /// [`ActionHooks::enable_vitals_sync`] turns it on.
     pub sync: Option<vitals_sync::SyncState>,
+    /// The session state of the clients and players
+    /// (`sim/intents-events.md` §8; [`switch`]): player names, hot keys,
+    /// skill hands, portal flags.
+    pub session: switch::SessionState,
     /// Seams with no provider yet.
     pub x: X,
     /// Scratch seed handed out for a unit without a record (an error is
@@ -221,6 +229,7 @@ impl<X> ActionHooks<X> {
             bodies: None,
             handlers: BTreeMap::new(),
             sync: None,
+            session: switch::SessionState::default(),
             x,
             orphan_seed: Seed::init(),
             errors: Vec::new(),

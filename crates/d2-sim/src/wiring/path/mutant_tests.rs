@@ -338,6 +338,7 @@ fn game_entry_places_the_player_in_the_town_and_sends_0x07_then_0x15() {
         vec![
             (p, map_reveal(0, 16, TOWN as u8)),
             (p, reassign(0, g, x as u16, y as u16, 1)),
+            (p, vec![0x7E, 0, 0, 0, 0]),
         ]
     );
     fx.assert_clean();

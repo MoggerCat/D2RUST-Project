@@ -45,6 +45,61 @@ game-file tests, as on main), `cargo clippy -p d2-sim -p d2-server
 disabled. Next: §4 (measure kills; `step.rs` survivors). Sections 1–3
 describe the tests as written at `e7c10b5`.
 
+## 0.1 step.rs survivors (2026-10-07, branch `claude/mutants-path-step`)
+
+Cloud session from `claude/mutants-path` @ `7d72615`; repo only (M09).
+Tool: `cargo-mutants` 27.1.0, `-p d2-sim --file
+'crates/d2-sim/src/path/walk/step.rs' -j 4 --timeout 60
+--cargo-arg=--lib`, `CARGO_PROFILE_DEV_DEBUG=0`. Run with
+`CARGO_INCREMENTAL=1` (one mutant build ~20 s instead of ~100 s; scratch
+target dirs, deleted after). **Stopped on the coordinator's budget call
+after step.rs**: the full `path/**` baseline (1,757 more mutants) was
+started and cancelled at 10 tested, so the other files are not measured.
+
+| step.rs (250 mutants) | Caught | Timeout | Missed | Unviable |
+|---|---|---|---|---|
+| before (tree at `7d72615`) | 169 | 4 | 74 | 3 |
+| after (this branch, `--iterate` on the 78 not caught) | 234 | 2 | 11 | 3 |
+
+New tests (15, `walk/mutant_tests.rs` §9 block, each with `// Covers:`):
+movement guards (flag 0x20, count > 0, index < count), base ≤ 0,
+acceleration (counter, + / clamp / max clears), no aim after the last
+point, arrival refresh > 5 per axis and the target-unit tail (re-path
+result decides), distance budget (types 8 / 11), cell-walk halving
+boundary (exactly 0x10000), saved steps and flag 0x8 (blocked walk too:
+`path-placement.md` §2.3 "the step crossed at least one cell"), forced
+move walkers only, missile refusal 0x1 / 0x4 only, mask 0x3401 → 0x3C01,
+set position recache only with flag 0x1, room-change flag / monster memo
+/ merge order, run drain floor 1 and stamina exactly 0. One test seam
+added: `tests/fake.rs` `clear_ai_room_memo` logs `memo <unit>`. No
+production code changed: no survivor showed code contradicting a spec.
+
+The 11 missed after are exactly the equivalent survivors below (the two
+timeouts are the halving loop `> → <`, an endless loop: not missed).
+
+Equivalent survivors (no test possible from the spec):
+- `step` 124 `&` → `|` / `^` (×2): `room_change_messages` tests flag 0x2
+  itself and returns (§9.8 "only when path flag 0x2 is set").
+- `one_step` 236 `PATH_POINTS − 1` → `+` / `/` (×2): the index clamp acts
+  only at index ≥ 78; rule 2 moves only with index < count ≤ 78.
+- `cell_walk` 302 `guard += 1` → `*=`, 303 `>` → `==` / `>=` (×3): the
+  1 << 20 loop guard has no spec value; a valid walk never reaches it.
+- `room_change_messages` 460 `<` → `<=` (×2): with both indexes at their
+  ends both elements are none and the `_ => break` arm ends the loop;
+  468 `x < y` → `x <= y`: equal clients are taken by the earlier arm.
+- `run_drain` 497 `d < 1` → `d <= 1`: d = 1 is set to 1.
+
+Gate on this branch: `CARGO_INCREMENTAL=0 cargo test -p d2-sim -p
+d2-server` all pass (d2-sim lib 3,211), `cargo clippy -p d2-sim -p
+d2-server --all-targets -- -D warnings`, `cargo fmt --check`,
+`coverage.py --check` (0 errors), `spec_index.py --check`, `methods.py
+check`. No test disabled or weakened.
+
+Left: §4 step 1 for every file but step.rs (full `path/**` run, ~5 h at
+4 cores with incremental builds; the old m1 / m2 counts of §2 are the
+only data), then tests for those survivors (§4 steps 2–3 beyond step.rs),
+then §4 step 4.
+
 ## 1. State
 
 New tests only, in two new files plus one `mod` line each:

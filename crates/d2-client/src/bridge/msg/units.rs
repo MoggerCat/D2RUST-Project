@@ -318,21 +318,22 @@ pub fn reassign_player(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Han
         return Err(HandlerError::Fatal(0x538));
     }
     // Rule 4.4 / `model.md` §11 rule 4: the local player moving to a room
-    // whose level's `Act` differs from the old room's switches the act
-    // palette; the first placement (no old room) does not.
+    // whose level's `Pal` (+0x02, not `Act`) differs from the old room's
+    // switches the palette to `Pal`; the first placement (no old room)
+    // does not.
     if w.local_player == Some(key) {
         if let (Some(old), Some(new)) = (w.local_room().copied(), new_room) {
-            let act = |level: u16| {
+            let pal = |level: u16| {
                 msg.inputs
                     .tables
                     .levels
                     .get(usize::from(level))
-                    .map(|l| l.act)
+                    .map(|l| l.pal)
                     .ok_or(HandlerError::Invalid("room level past the Levels rows"))
             };
-            let new_act = act(new.level)?;
-            if act(old.level)? != new_act {
-                w.palette_act = Some(new_act);
+            let new_pal = pal(new.level)?;
+            if pal(old.level)? != new_pal {
+                w.palette_act = Some(new_pal);
             }
         }
     }

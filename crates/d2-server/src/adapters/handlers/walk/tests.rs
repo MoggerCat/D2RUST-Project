@@ -12,7 +12,9 @@ use std::sync::Arc;
 use d2_data::bin::BinTable;
 use d2_data::fixup::records::stat_ops;
 use d2_data::tables::{Charstats, Itemstatcost, Levels, Objects, Record};
-use d2_proto::server::{MapReveal, PlayerMove, PlayerStop, PlayerToTarget, ReassignPlayer};
+use d2_proto::server::{
+    MapHide, MapReveal, PlayerMove, PlayerStop, PlayerToTarget, ReassignPlayer, RemoveUnit,
+};
 use d2_sim::combat::CombatTables;
 use d2_sim::drlg::room::LinkAt;
 use d2_sim::drlg::{
@@ -688,7 +690,7 @@ fn travel(fx: &mut Fx, level: u32) -> (UnitId, (ResultCode, Queued)) {
     (p, r)
 }
 
-// Covers: specs/sim/path-placement.md §10 r6, §11; specs/world/waypoints.md §7 r5, §7 r7
+// Covers: specs/sim/path-placement.md §10 r6, §11; specs/world/waypoints.md §7 r5, §7 r7; specs/sim/intents-events.md §7.8 r3, §7.8 r5
 #[test]
 fn waypoint_to_the_town_places_the_player_and_sends_0x0d() {
     // The e2e step-6 condition: the same-act warp places the player in
@@ -698,8 +700,17 @@ fn waypoint_to_the_town_places_the_player_and_sends_0x0d() {
     // (`waypoints.md` §8 rule 3).
     let mut fx = Fx::new();
     let c = fx.c;
+    let a = fx.a;
     let (p, r) = travel(&mut fx, TOWN);
     let guid = fx.guid(p);
+    let wp = fx
+        .sim
+        .game
+        .lists
+        .room_units(a)
+        .into_iter()
+        .find(|&u| u != p)
+        .expect("the waypoint stays in A");
     let d = fx.path(p);
     assert_eq!(d.room, Some(c));
     assert_eq!(fx.sim.game.lists.unit(p).unwrap().room(), Some(c));
@@ -729,16 +740,41 @@ fn waypoint_to_the_town_places_the_player_and_sends_0x0d() {
         )
     );
     assert_ne!(fx.sim.events.sys.units.get(p).unwrap().flags2 & 0x10000, 0);
-    // Finding (`docs/handoff/wire-path-server.md` §4): no 0x15 follows.
-    // The placement queued the player in C's update queue, but tick 1's
-    // per-client update walks the client's room (still A) adjacency
-    // before the room switch (`tick.md` §6.5), and step 6 clears C's
-    // queue; the recording R3 (`path-placement.md`) has 0x15 the next
-    // tick. Spec question, not a fix here. That room switch sends 0x07
-    // for each room of C's adjacency array the client joins
-    // (`path-placement.md` §11 "Recipients"; the one-room town: C), then
-    // nothing.
-    assert_eq!(fx.tick(), vec![(0, reveal.encode().to_vec())]);
+    // Tick 1's per-client update walks the client's room (still A)
+    // adjacency before the room switch (`tick.md` §6.5), so C's queued
+    // player sends nothing there. The room switch (`intents-events.md`
+    // §7.8) then sends 0x07 for each room of C's array the client joins
+    // (the one-room town: C), and leaves A's array {A, B} in its order:
+    // 0x0A for each unit of A (the waypoint), 0x08 A, then, A being the
+    // client's old room, the player update (rule 3.4: 0x15 with flag 1
+    // for flags 2 bit 0x10000, as the recording R3 of
+    // `path-placement.md` has the next tick), then 0x08 B.
+    let hide = |x: u16| MapHide {
+        x,
+        y: 0,
+        level: COLD_PLAINS as u8,
+    };
+    let remove = RemoveUnit {
+        type_: 2,
+        guid: fx.guid(wp),
+    };
+    let reassign = ReassignPlayer {
+        type_: 0,
+        guid,
+        x: d.x() as u16,
+        y: d.y() as u16,
+        flag: 1,
+    };
+    assert_eq!(
+        fx.tick(),
+        vec![
+            (0, reveal.encode().to_vec()),
+            (0, remove.encode().to_vec()),
+            (0, hide(0).encode().to_vec()),
+            (0, reassign.encode().to_vec()),
+            (0, hide(8).encode().to_vec()),
+        ]
+    );
     for _ in 0..2 {
         assert!(fx.tick().is_empty());
     }

@@ -120,23 +120,26 @@ fn skill_rec() -> Skills {
 
 /// Skill ids of the synthetic table.
 const ATTACK: i32 = 0;
-/// Multiple Shot as `use.md` gives it: srvst 42; mana 4, +1, shift 8.
+/// Multiple Shot as `use.md` gives it: srvst 52; mana 4, +1, shift 8.
 const MULTI: i32 = 1;
-/// Might: aura, immediate, perdelay 50, srvdo 111.
+/// Might: aura, immediate, perdelay 50, srvdo 53.
 const MIGHT: i32 = 2;
 /// A learnable skill: max level 3.
 const LEARN: i32 = 3;
 
-/// Start slot of the synthetic start skills: srvst 42 (status `mapped`)
-/// stands in for Multiple Shot's srvst 4, whose body (`skills/bodies.md`
-/// §3.4, ammunition) now runs on the wired host; the do slot 66 stands
-/// in for Might's 65 (§4.5) the same way, so the fake's seam answers.
+/// Start slot of the synthetic start skills: srvst 52 (Emerge,
+/// `skills/bodies-3.md` §5.23: unit flags |= 0xE, return 1) stands in for
+/// Multiple Shot's srvst 4, whose body (`skills/bodies.md` §3.4,
+/// ammunition) needs items; every filled start slot has a body since
+/// batch 4, so the start is seen through its flags. The do slot 53 (filled,
+/// `unreferenced`, no body) stands in for Might's 65 (§4.5), so the fake's
+/// seam answers.
 fn skills() -> SkillTables {
     let mut v: Vec<Skills> = (0..4).map(|_| skill_rec()).collect();
     let m = &mut v[MULTI as usize];
-    (m.srvstfunc, m.mana, m.lvlmana, m.manashift) = (42, 4, 1, 8);
+    (m.srvstfunc, m.mana, m.lvlmana, m.manashift) = (52, 4, 1, 8);
     let m = &mut v[MIGHT as usize];
-    (m.aura, m.immediate, m.perdelay, m.srvdofunc, m.aurastate) = (true, true, 0, 111, 33);
+    (m.aura, m.immediate, m.perdelay, m.srvdofunc, m.aurastate) = (true, true, 0, 53, 33);
     v[LEARN as usize].maxlvl = 3;
     SkillTables {
         skills: v,
@@ -508,6 +511,19 @@ impl Fx {
         });
     }
 
+    /// The caster's unit flags (+0xC4).
+    fn flags(&mut self) -> &mut u32 {
+        &mut self
+            .host
+            .game
+            .events
+            .sys
+            .units
+            .get_mut(self.player)
+            .unwrap()
+            .flags
+    }
+
     fn mode(&self) -> u32 {
         self.host
             .game
@@ -608,6 +624,7 @@ fn caster() -> Fx {
 #[test]
 fn right_skill_at_point_starts_and_charges_at_start() {
     let mut fx = caster();
+    *fx.flags() &= !0xE;
     let (codes, recv) = fx.frame(&[&point(0x0C, 110, 90)]);
     assert_eq!((codes, recv), (vec![Done], NONE));
     assert_eq!(fx.pierce(), 1);
@@ -615,7 +632,9 @@ fn right_skill_at_point_starts_and_charges_at_start() {
     assert_eq!(fx.take_errors(), [no_anim_record()]);
     assert_eq!(fx.stat(8), 4000 - 3328);
     assert_eq!(fx.book().used, Some(entry(MULTI, 10)));
-    assert_eq!(fx.book().log, ["srvst 42 1 10"]);
+    // The start body ran (srvst 52: flags |= 0xE), not the seam.
+    assert_eq!(*fx.flags() & 0xE, 0xE);
+    assert!(fx.book().log.is_empty());
     // The point validator stored the frame (player data +0x168).
     let p = fx.player;
     let data = fx.host.game.player_fields(p).unwrap().data;
@@ -745,7 +764,7 @@ fn select_skill_might_and_refusals() {
     );
     assert_eq!(
         fx.book().log,
-        ["right 2", "srvdo 111 2 1 true false false", "left 0"]
+        ["right 2", "srvdo 53 2 1 true false false", "left 0"]
     );
     let g = &fx.host.game.game;
     let timers: Vec<_> = g

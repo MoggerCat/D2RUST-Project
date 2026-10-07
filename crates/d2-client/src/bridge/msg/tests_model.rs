@@ -513,12 +513,15 @@ fn remove_unit_keeps_the_local_hireling() {
 fn levels() -> Vec<LevelRow> {
     let mut v = vec![LevelRow::default(); 41];
     v[1] = LevelRow {
+        pal: 0,
         act: 0,
         blank_screen: true,
         sound_env: 0,
         draw_edges: false,
     };
-    v[40].act = 1;
+    (v[40].pal, v[40].act) = (1, 1);
+    // A level whose `Pal` differs from its `Act` (as 125–127, 133–136).
+    (v[3].pal, v[3].act) = (4, 0);
     v
 }
 
@@ -622,6 +625,29 @@ fn room_change_to_another_act_switches_the_palette() {
     m.hex("15 00 01 00 00 00 96 00 6e 00 00");
     assert_eq!(m.w.palette_act, Some(3));
     // Level 2 → 40: act 1.
+    m.hex("15 00 01 00 00 00 2c 01 2c 01 00");
+    assert_eq!(m.w.palette_act, Some(1));
+    assert!(m.log.rejected.is_empty());
+}
+
+// Covers: specs/client/model.md §11 r4
+#[test]
+fn room_change_reads_levels_pal_not_act() {
+    let mut m = Model::default();
+    m.inputs.tables.levels = levels();
+    m.recv(&assign_player(0, 0)).hex("0b 00 01 00 00 00");
+    m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
+    m.w.active_rooms = Some(vec![
+        room(100, 100, 40, 40, 1),
+        room(140, 100, 40, 40, 3),
+        room(300, 300, 40, 40, 40),
+    ]);
+    m.hex("15 00 01 00 00 00 6e 00 6e 00 00");
+    assert_eq!(m.w.palette_act, Some(0));
+    // Level 1 → 3: the same `Act` 0, but `Pal` 4: the palette switches.
+    m.hex("15 00 01 00 00 00 96 00 6e 00 00");
+    assert_eq!(m.w.palette_act, Some(4));
+    // Level 3 (`Act` 0, `Pal` 4) → 40 (`Act` 1, `Pal` 1): to `Pal` 1.
     m.hex("15 00 01 00 00 00 2c 01 2c 01 00");
     assert_eq!(m.w.palette_act, Some(1));
     assert!(m.log.rejected.is_empty());
