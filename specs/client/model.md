@@ -34,24 +34,24 @@
 |   4. Receive and the unit message queue | 205–242 |
 |   5. Client update pass | 243–291 |
 |   6. Position check (`0x004804E0`) | 292–331 |
-|   7. Session messages | 332–408 |
-|   8. Mode requests | 409–493 |
-|   9. Room-in-sight messages | 494–528 |
-|   10. Bit reader | 529–543 |
-|   11. Current act and level (join and later) | 544–589 |
-|   12. Client DRLG and the room of a point | 590–631 |
-|   13. Visibility predicate (`0x004DBF20`) | 632–659 |
-|   14. Pet list and the hireling GUID | 660–686 |
-|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 687–753 |
-|   16. C→S 0x4B after a teleport (the hireling case) | 754–788 |
-|   17. Model writes made by 1.14d UI code | 789–906 |
-|   18. Audio driver inputs and the client object functions | 907–937 |
-| Constants & data dependencies | 938–950 |
-| Randomness | 951–962 |
-| Edge cases & original bugs | 963–971 |
-| Test vectors | 972–1019 |
-| Provenance | 1020–1086 |
-| Open questions | 1087–1169 |
+|   7. Session messages | 332–443 |
+|   8. Mode requests | 444–528 |
+|   9. Room-in-sight messages | 529–563 |
+|   10. Bit reader | 564–578 |
+|   11. Current act and level (join and later) | 579–624 |
+|   12. Client DRLG and the room of a point | 625–666 |
+|   13. Visibility predicate (`0x004DBF20`) | 667–694 |
+|   14. Pet list and the hireling GUID | 695–721 |
+|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 722–788 |
+|   16. C→S 0x4B after a teleport (the hireling case) | 789–823 |
+|   17. Model writes made by 1.14d UI code | 824–941 |
+|   18. Audio driver inputs and the client object functions | 942–972 |
+| Constants & data dependencies | 973–985 |
+| Randomness | 986–997 |
+| Edge cases & original bugs | 998–1006 |
+| Test vectors | 1007–1054 |
+| Provenance | 1055–1126 |
+| Open questions | 1127–1209 |
 <!-- /index -->
 
 ## Summary
@@ -85,7 +85,7 @@ position check of the local player.
 ## Outputs / state changes
 
 - `ClientWorld` fields of §1, changed only by the rules below.
-- C→S messages the client itself sends: 0x6B (§7 rule 3), 0x5F (§6
+- C→S messages the client itself sends: 0x67 (§7 rule 9), 0x6B (§7 rule 3), 0x5F (§6
   rule 8). They go through the bridge send path (`client/bridge.md` §4).
 - Mode requests handed to the unit-type mode machines (§8).
 
@@ -405,6 +405,41 @@ position check of the local player.
       := false; §10 r10 there). Applying them at delivery (§10 r4) is
       exact because no message follows 0xB4 in its frame (rule 8
       preamble).
+9. **C→S 0x67** create game (2026-10-08). The client's game start
+   `0x0044F360` calls the builder `0x00477CA0` (at `0x0044F45E`) when
+   the client game type `[0x007A0610]` is not 3, 7 or 9, with ECX =
+   the game name buffer `0x007A05DC` (EDX = `0x0047A990()`, unused).
+   The builder fills 46 bytes on the stack and sends them through
+   `0x0052AE50(0x2E, 0, msg)` (system queue, `client/bridge.md` §4
+   rule 2), then adds 0x2E to `[0x007A6AF8]` and 1 to `[0x007A6B00]`
+   (send counters). C = the start-up configuration `[0x007A0438]`
+   (`tools/original-hooks.md`):
+
+   | Bytes | Value | Single player (recorded seq 1, both recordings) |
+   |---|---|---|
+   | @0 | 0x67 | |
+   | @1 | game name `0x007A05DC`, copied up to its NUL (`0x004135D0`); the bytes after the NUL keep stack contents | empty (byte 1 = 0) |
+   | @0x11 | game type: `[0x007A0610]` 0 → 3, 6 → 1, 8 → 2, else 0 | 3 (type 0) |
+   | @0x12 | class: `0x0047AA20()` (`[0x00712F00]`) when `[0x00712EFC]` bit 8, else byte `[0x007A0522]` | the selected character's class |
+   | @0x13 | template: C +0x20D | 0 |
+   | @0x14 | difficulty: C +0x210 (0–2; read as such by `0x0044CF20`) | 0 (Normal) |
+   | @0x15 | character name `0x007A05C4`, copied up to its NUL | the character |
+   | @0x25 | u16 C +0x207 (the server never reads it, `sim/intents-events.md` §2.5) | 0 |
+   | @0x27 | u32 C +0x209; when it is 0 the builder first stores 4 \| 0x100000 there | 0x00100004 |
+   | @0x2B, @0x2C | C +0x20E, C +0x20F (passed, never read by the server) | 0, 0 |
+   | @0x2D | language id `0x00525150()` (0–13; the server refuses > 14) | 0 |
+
+   d2rs: the app builds these bytes from its own state: name empty, type
+   3, the character's class and name, template 0, the chosen difficulty,
+   u16@0x25 = 0, flags 0x00100004 for an expansion character, @0x2B =
+   @0x2C = 0, the language id. PROVISIONAL: a classic character sends
+   0x00000004 (because the server reads only bit 20 for expansion and
+   bits 1–2 for its check, and the builder's default sets bit 2; the
+   menu writer of C +0x209 is UI code not read here); settled by a new
+   capture: C→S 0x67 of a single-player start with a classic
+   character. Bytes after a
+   name's NUL: zero (the original's stack contents are not
+   reproducible and no reader uses them).
 
 ### 8. Mode requests
 
@@ -1083,6 +1118,11 @@ build `0x004809A2`–`0x00480A34`), `0x004786A0`, `0x004786D0`,
 `0x006439B0`; code-0x13 path `0x00480D20`, `0x004CC5B0` and its direct
 callees (no call of `0x00478350`). §18 r1–r2 restate
 `audio/triggers-2.md` §19–§21 (PC 2, read there).
+
+§7 rule 9 (2026-10-08, asm): `0x00477CA0` (`0x00477CDF` game type),
+its only caller `0x0044F360` (`0x0044F43E`–`0x0044F45E`),
+`0x0047AA30`, `0x0047AA20`; the recorded C→S 0x67 is seq 1 of
+`20261006-022633-packets.jsonl`.
 
 ## Open questions
 
