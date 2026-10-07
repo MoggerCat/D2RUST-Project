@@ -73,6 +73,12 @@ addresses in the specs.
   set bonus lists use flags 0.
 - `impl-items` OQ-Q1 -> `quality.md` OQ3 and the §8.1 vector reworded:
   the accept test precedes `nolimit`.
+- `impl-treasure` questions 2, 5, 6, 8 -> `treasure.md` §3.1 (exact gate
+  order: bone wall fatal before the collision test), OQ11.
+- `impl-vendors` V1 -> `vendors.md` §7.2 rule 7: mask `0x006CE270` = 4,
+  the uniqueitems `carry1` bit. V11 -> §7.2 rule 8: stat 70 := maxstack
+  + stat 254 (cap 511) on every restored copy.
+- `server-items` SI1 -> `cube.md` §2 step 1: the range test returns 1.
 
 ## Still open
 
@@ -81,6 +87,10 @@ addresses in the specs.
 - `treasure.md` OQ10 (new): sub-pickers of the quest drop with no drop
   code.
 - `cube.md` OQ4: item init, item request, free-spot, portal draws.
+- Not taken up this session (readings in their notes, no answer yet):
+  `impl-vendors` V2–V10, V12–V14; `impl-treasure` 1, 3, 4, 7, 9–14;
+  `server-items` SI2–SI4; `impl-world` W1–, C1–C5; `impl-items` "stat vs
+  base" readings; `gaps-items-stats` 3–6 (not items specs).
 
 ## CODE-TABLE CHANGE commits
 

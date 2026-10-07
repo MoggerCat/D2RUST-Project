@@ -34,15 +34,15 @@
 |   4. Opening trade or gamble (`0x00579430(npc, single, gamble)`) | 229–253 |
 |   5. Gambling | 254–309 |
 |   6. Refresh | 310–341 |
-|   7. Buying and selling | 342–529 |
-|   8. Repair | 530–569 |
-|   9. Prices | 570–721 |
-| Constants & data dependencies | 722–741 |
-| Randomness | 742–757 |
-| Edge cases & original bugs | 758–787 |
-| Test vectors | 788–810 |
-| Provenance | 811–849 |
-| Open questions | 850–880 |
+|   7. Buying and selling | 342–538 |
+|   8. Repair | 539–578 |
+|   9. Prices | 579–730 |
+| Constants & data dependencies | 731–750 |
+| Randomness | 751–766 |
+| Edge cases & original bugs | 767–796 |
+| Test vectors | 797–819 |
+| Provenance | 820–858 |
+| Open questions | 859–889 |
 <!-- /index -->
 
 ## Summary
@@ -444,13 +444,22 @@ client price (not read). Handler `0x0054BB20` → `0x00579510`:
    (ear); personalized (0x1000000); ethereal (0x400000); filled
    sockets; a unique whose `uniqueitems` flag byte +0x2C has the bit
    of mask `0x006CE270` (`0x00575FA0`); the player's vendor-chain node
-   at this NPC is in gamble mode.
+   at this NPC is in gamble mode. The mask is entry 2 of the bit table
+   `0x006CE268` (1, 2, 4, 8, …; read from the image): value 4, the
+   `carry1` bit of the flag byte (`data/fields.tsv` uniqueitems
+   `carry1`, bit 2 of +0x2C), so a carry-one unique (in 1.14d `uniqueitems.txt`: Gheed's Fortune,
+   Annihilus, Hellfire Torch) is not re-stocked (handoff `impl-vendors` V1).
 8. Re-sellable and not a permanent item / NM-Hell hp4-5 mp4-5
    (`0x00576ED0`): copy into the NPC (§7.3, `0x0055A2A0`, fillers 1; null → code 9,
    result 3); mode 4; store page (§3.1 step 3; 0xFF → destroy, no
    copy); place, page 1 → 2 retry (fail → destroy); placed: mark
    (§3.1 step 5), durability := max, quantity := max stack, and price
    := min(price, cost(1) of the restored copy).
+   Exact (handoff `impl-vendors` V11, `0x00579510` after the placement
+   `0x00560200`): stat 72 := the max durability (`0x00625E00`) and stat
+   70 := `0x006295B0` = items `maxstack` (+0xE8) + total stat 254, capped
+   at 511, for **every** placed copy, stackable or not (a non-stack item
+   with `maxstack` 0 gets stat 70 = its stat 254, usually 0).
 9. Take the item from the player by mode: 4 (cursor) → `0x0055EEA0`
    (fail → code 9, result 1); 0 (stored): scroll (type 22) lowers the
    matching scroll skill quantity by 1, a book (type 18) by its

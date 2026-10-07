@@ -33,19 +33,19 @@
 | Rules | 86–87 |
 |   1. TC runtime form (load step 46) | 88–216 |
 |   2. TC by id and level (`0x00654E00`) | 217–223 |
-|   3. Monster drop | 224–276 |
-|   4. Chest drop (`0x00585B90`) | 277–303 |
-|   5. The TC walk (`0x0055A6D0`) | 304–410 |
-|   6. Drop quality (`0x00558640`) | 411–442 |
-|   7. Creation inputs and placement (`0x0055A550`) | 443–467 |
-|   8. Gold amount | 468–483 |
-|   9. Quest drop helper (`0x00559A30`) | 484–525 |
-| Constants & data dependencies | 526–555 |
-| Randomness | 556–572 |
-| Edge cases & original bugs | 573–596 |
-| Test vectors | 597–626 |
-| Provenance | 627–651 |
-| Open questions | 652–685 |
+|   3. Monster drop | 224–282 |
+|   4. Chest drop (`0x00585B90`) | 283–309 |
+|   5. The TC walk (`0x0055A6D0`) | 310–416 |
+|   6. Drop quality (`0x00558640`) | 417–448 |
+|   7. Creation inputs and placement (`0x0055A550`) | 449–473 |
+|   8. Gold amount | 474–489 |
+|   9. Quest drop helper (`0x00559A30`) | 490–531 |
+| Constants & data dependencies | 532–561 |
+| Randomness | 562–578 |
+| Edge cases & original bugs | 579–602 |
+| Test vectors | 603–632 |
+| Provenance | 633–657 |
+| Open questions | 658–703 |
 <!-- /index -->
 
 ## Summary
@@ -230,6 +230,12 @@ collision at the monster's position (room, x, y, mask 0x801;
 `0x0064CB30`) is nonzero. A monster of class 344 (`bonewall`) without
 the flag is a fatal error (d2rs: error). Then §3.2 with `F` = 0 and the
 death mode change (target = `R`).
+
+Exact order in `0x005A6830` (handoff `impl-treasure` question 8): no unit
+→ fatal 0x1ED; flag bit 17 → no drop; class 344 → fatal 0x1F8, **before**
+the collision test (so a bone wall on a blocked spot is fatal too);
+collision ≠ 0 → no drop; the monster has no room → fatal 0x1FF; its
+monstats record missing (`0x00451F80`) → fatal 0x204; else §3.2.
 
 #### 3.2 Which TC (`0x005A6600`)
 
@@ -682,3 +688,15 @@ Real 1.14d (game-file tests, `#[ignore]`, from the live `.bin` set):
     `world/quests-act1.md`), so the path matters only for a caller that
     leaves +0xB8 at 0; settle with `disasm.py fn` on the three
     functions.
+11. Answered (handoff `impl-treasure` questions 2, 5, 6, 8): §6 step 2's
+    last test is one conjunction (itemtypes +0x14 `magic` and items +0x12A
+    `quest`, `0x00558640`); §5.7 step 7's gold test is `0x00629BB0(item,
+    4)` on the created item unit (`0x0055AEF5`: the `type` row or, when
+    `type2` > 0, the `type2` row equivalent to 4); the class-index test
+    `0x00629A90` differs only for a negative `type2` (taken as a row
+    there), which 1.14d data has not. §6 step 3 compares the itemratio
+    bytes for equality with the two 0 / 1 results (`0x00637910`: record
+    +0x43 `Class Specific` = `0x00629F70`, +0x42 `Uber` = `0x0062B4D0`), so
+    a stored 2 matches neither; the uber test's type 38 is the item's own
+    `type` field (items +0x11E), its weapon / armor test is the class-index
+    test with `type2`. §3.1's order is given there.

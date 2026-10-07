@@ -22,21 +22,21 @@
 | Outputs / state changes | 67–77 |
 | Rules | 78–79 |
 |   1. Routing | 80–96 |
-|   2. Put an item into the cube (C→S 0x2A) | 97–129 |
-|   3. Transmute entry (`0x005665F0`) | 130–142 |
-|   4. Recipe eligibility | 143–157 |
-|   5. Ops | 158–177 |
-|   6. Input matching | 178–242 |
-|   7. Outputs | 243–346 |
-|   8. Commit | 347–374 |
-|   9. Portals | 375–394 |
-|   10. C→S 0x4C is not the cube | 395–409 |
-| Constants & data dependencies | 410–433 |
-| Randomness | 434–452 |
-| Edge cases & original bugs | 453–487 |
-| Test vectors | 488–532 |
-| Provenance | 533–571 |
-| Open questions | 572–602 |
+|   2. Put an item into the cube (C→S 0x2A) | 97–133 |
+|   3. Transmute entry (`0x005665F0`) | 134–146 |
+|   4. Recipe eligibility | 147–161 |
+|   5. Ops | 162–181 |
+|   6. Input matching | 182–246 |
+|   7. Outputs | 247–350 |
+|   8. Commit | 351–378 |
+|   9. Portals | 379–398 |
+|   10. C→S 0x4C is not the cube | 399–413 |
+| Constants & data dependencies | 414–437 |
+| Randomness | 438–456 |
+| Edge cases & original bugs | 457–491 |
+| Test vectors | 492–536 |
+| Provenance | 537–575 |
+| Open questions | 576–606 |
 <!-- /index -->
 
 ## Summary
@@ -103,6 +103,10 @@ Handler `0x0054B790`, size == 9 else 3.
    2, distance test `0x00548EF0` (range argument 10) fails → non-zero;
    modes 0–2, 4: the item must be in the player's inventory or be its
    cursor item, else 1. Non-zero ends the handler with that result.
+   The distance test's result is exactly 1 (handoff `server-items` SI1):
+   `0x00548EF0` returns 0 when |unit x − item x| ≤ 10 and |unit y − item
+   y| ≤ 10 (the unit's static-path position for types 2, 4, 5, else its
+   path position; a unit without a path counts as (0, 0)), else 1.
 2. Cube check `0x00549150(cube)`: the cube must exist, be in mode 0
    (stored) and be in the player's inventory, else result 1.
 3. `0x005628C0`, with a "refused" flag cleared first:
