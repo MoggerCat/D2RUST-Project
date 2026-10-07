@@ -47,21 +47,21 @@
 |   19. Umod init functions | 604–689 |
 |   20. Superuniques (`0x005A49B0`) | 690–738 |
 |   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 739–753 |
-|   22. Umod callbacks and the type-7 event | 754–801 |
-|   23. Unique names (client) | 802–811 |
-|   24. Monster assign message | 812–824 |
-|   25. Calling the spawn functions outside population (tools) | 825–915 |
-|   26. Making an existing monster unique (`0x005A4940`) and the warping shrine's pick | 916–974 |
-|   27. Class reinit (`0x00574370`) | 975–1020 |
-| Constants & data dependencies | 1021–1042 |
-| Randomness | 1043–1085 |
-| Edge cases & original bugs | 1086–1116 |
-| Test vectors | 1117–1118 |
-|   Synthetic (CI-safe) | 1119–1141 |
-|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1142–1172 |
-|   Recorded checks (monster assign 0xAC) | 1173–1185 |
-| Provenance | 1186–1264 |
-| Open questions | 1265–1321 |
+|   22. Umod callbacks and the type-7 event | 754–805 |
+|   23. Unique names (client) | 806–815 |
+|   24. Monster assign message | 816–828 |
+|   25. Calling the spawn functions outside population (tools) | 829–919 |
+|   26. Making an existing monster unique (`0x005A4940`) and the warping shrine's pick | 920–978 |
+|   27. Class reinit (`0x00574370`) | 979–1024 |
+| Constants & data dependencies | 1025–1046 |
+| Randomness | 1047–1089 |
+| Edge cases & original bugs | 1090–1120 |
+| Test vectors | 1121–1122 |
+|   Synthetic (CI-safe) | 1123–1145 |
+|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1146–1176 |
+|   Recorded checks (monster assign 0xAC) | 1177–1189 |
+| Provenance | 1190–1268 |
+| Open questions | 1269–1325 |
 <!-- /index -->
 
 ## Summary
@@ -773,7 +773,11 @@ call `0x005A4270(game, unit, 0, 2)`. Mode-1 callbacks schedule the
 type-7 event: 9 fire (`0x005A25F0`: unique and new mode 0 → frame + 4),
 17 lightning (`0x005A37D0`: unique and new mode 3 → frame + 2), and
 `0x005A3800` for 10, 18, 31, 32, 42 (new mode 0, and for 18 only when
-unique → frame + 4). The only type-7 event scheduled at init is umod 41's
+unique → frame + 4), and 33 suicideminion_explode (`0x005A3E70`,
+table entry 199 = 33 × 6 + 1: new mode 0 or 12 → frame + 4; new mode 3
+(GH) first sets mode 0, whose own mode-1 pass schedules one, then
+schedules a second at frame + 4; `umod-callbacks.md` §22.1). The only
+type-7 event scheduled at init is umod 41's
 (frame + 75); its handler `0x005A4230` checks the monster is alive
 (`0x005541B0`), runs `0x00573780` and re-schedules at frame + 75.
 
