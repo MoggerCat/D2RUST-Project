@@ -17,23 +17,24 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 39–46 |
-| Inputs | 47–53 |
-| Outputs / state changes | 54–59 |
-| Rules | 60–64 |
-|   1. New-character start (`0x00569F80`) | 65–90 |
-|   2. Load effects (`0x0056B180`) | 91–117 |
-|   3. Join after the load: Iron Golem re-summon (`0x005394A0`) | 118–143 |
-|   4. Hotkey and mouse-skill item indices after a reload | 144–161 |
-|   5. Load failure: result codes and the message shown | 162–199 |
-|   6. Runeword items that no longer match (`0x00563470`) | 200–225 |
-|   7. Map seed restore in single player | 226–237 |
-| Constants & data dependencies | 238–242 |
-| Randomness | 243–247 |
-| Edge cases & original bugs | 248–256 |
-| Test vectors | 257–262 |
-| Provenance | 263–297 |
-| Open questions | 298–311 |
+| Summary | 40–47 |
+| Inputs | 48–54 |
+| Outputs / state changes | 55–60 |
+| Rules | 61–65 |
+|   1. New-character start (`0x00569F80`) | 66–91 |
+|   2. Load effects (`0x0056B180`) | 92–118 |
+|   3. Join after the load: Iron Golem re-summon (`0x005394A0`) | 119–144 |
+|   4. Hotkey and mouse-skill item indices after a reload | 145–162 |
+|   5. Load failure: result codes and the message shown | 163–200 |
+|   6. Runeword items that no longer match (`0x00563470`) | 201–226 |
+|   7. Map seed restore in single player | 227–238 |
+|   8. Player-record values sent at the join (`sim/intents-events.md` §8.2 rule 3) | 239–275 |
+| Constants & data dependencies | 276–280 |
+| Randomness | 281–285 |
+| Edge cases & original bugs | 286–294 |
+| Test vectors | 295–302 |
+| Provenance | 303–343 |
+| Open questions | 344–361 |
 <!-- /index -->
 
 ## Summary
@@ -235,6 +236,43 @@ own sections are written "load §1", "load §2".
    writer sets 0x80 only in that byte, `0x00569231`). Loaded in another
    difficulty, that byte is 0: act 0 and the game's own new map seed.
 
+### 8. Player-record values sent at the join (`sim/intents-events.md` §8.2 rule 3)
+
+The join (`0x00539760`) sends, after a successful load, S→C 0x5F with
+player data +0x2C (`0x00622230`) and two S→C 0x23 with the hand
+records (`0x006221A0(P)` = player data, unit +0x14): hand 1 with +0x74
+(skill, u16) and +0x7C (item), then hand 0 with +0x70 and +0x78. The
+values, for both load paths:
+
+1. **+0x2C (0x5F value).** Player data is allocated zero-filled (0x16C
+   bytes, `0x00621F90`, inside the player unit creation `0x005348C0`)
+   and +0x2C := `0x0061AE30(1)`: 1 << i, i = the position of level 1 in
+   the portal level list (`data/runtime-maps.md` `leveldefs_portals`,
+   `[0x0096C9F4]`, count `[0x0096C9F8]`; 0 if absent). Live: 1. Neither
+   load path writes it (its only other writers are the room switch,
+   `sim/intents-events.md` §7.8 rule 4, and the client `0x00460E70`;
+   the `.d2s` has no field for it), so every join sends `5F 01000000`.
+   Recorded: every join of the local recordings (`dru1-spawn`,
+   `golem1-spawn`, `join1`, `kill1-spawn`, seq 28–29).
+2. **Loaded save** (`formats/d2s.md` §2.4 rules 4–6): +0x70 / +0x78
+   right and +0x74 / +0x7C left as decoded from the header and resolved
+   after the items (`0x0056AF80`). Recorded: `23 00 01000000 01 0000
+   ffffffff` then `23 00 01000000 00 0000 ffffffff` (skill 0, item −1)
+   on the fresh saves; skill 0x42 (66) on a played one.
+3. **New character** (the stub, load §1): +0x74 := 0 and +0x70 :=
+   `StartSkill` under load §1 rule 1's conditions, else 0. +0x78 and
+   +0x7C are not written by that path, so they keep the zero fill: the
+   join's 0x23 are hand 1 (skill 0, item **0**) and hand 0 (skill
+   `StartSkill` or 0, item 0). The `StartSkill` selection
+   (`0x005701B0(P, hand 0, skill, −1)`) also sends one S→C 0x23 of its
+   own during the load (hand 0, the skill, item = the skill entry's
+   owner item +0x34 when not −1, `0x00643B00`; −1 for a class skill), so
+   a fresh Sorceress or Necromancer gets three 0x23 in its join. Static
+   reading; no new-character join is recorded yet (Open question 4).
+4. d2rs: `d2-server::adapters::session::PlayerRecord` = {+0x2C,
+   hands} from r1–r3; `Entry::record` is always known once the save
+   (or stub) is parsed.
+
 ## Constants & data dependencies
 
 `charstats` `StartSkill` (record +0xAC, `data/fields.tsv`); the rest is
@@ -259,6 +297,8 @@ the owner specs' (`items/generation.md` §10.3).
 | Input | Expected output | Source |
 |---|---|---|
 | a classic Necromancer stub (status 0x0001), loaded and saved | full save: status 0, +0x2C = 0, town `80 00 00`, seven start items, no `jf` / `kf`; 953 bytes | load §1 rule 1 (C66 run) |
+| join of a fresh 1.14d save | `5F 01000000`; `23 00 <GUID> 01 0000 ffffffff`, `23 00 <GUID> 00 0000 ffffffff` | load §8 r1, r2 (recorded `join1`) |
+| join of a Sorceress stub (act 0) | load: `23 … 00 2400 ffffffff`; join: `5F 01000000`, `23 … 01 0000 00000000`, `23 … 00 2400 00000000` | load §8 r3 (static) |
 
 ## Provenance
 
@@ -294,6 +334,12 @@ the owner specs' (`items/generation.md` §10.3).
   message `0x00477CA0` (game type byte at `0x00477CDF`), handler
   `0x0053F100` → `0x00530BF0` (+0x6A at `0x00530CFF`); town byte
   `0x00569231`.
+- Load §8 (2026-10-07): `0x00539760`, `0x00622230`, `0x006221E0` (its
+  two callers), `0x00621F90`, `0x005348C0`, `0x0061AE30`, `0x0061DDF0`,
+  `0x00569F20`, `0x00569F80`, `0x005701B0`, `0x00643B00`, `0x0056AF80`;
+  a scan of the export for stores to player data +0x2C / +0x78 / +0x7C.
+  Recorded 0x5F / 0x23 bytes from the local packet logs
+  (`traces-raw-buddy/*-packets.jsonl`, not in the repo).
 
 ## Open questions
 
@@ -308,3 +354,7 @@ the owner specs' (`items/generation.md` §10.3).
    save with a Tome of Town Portal hotkeyed (inventory) and an equipped
    weapon linked before it, saved, reloaded and saved again (header
    +0x38.. and the item order).
+4. Load §8 rule 3 (new character's join): record the join of a
+   335-byte stub (e.g. a Sorceress) and check the three 0x23 (one from
+   the load with item −1, then hand 1 and hand 0 with item 0) and
+   `5F 01000000`.
