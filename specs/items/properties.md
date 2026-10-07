@@ -18,28 +18,29 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 45–56 |
-| Inputs | 57–64 |
-| Outputs / state changes | 65–70 |
-| Rules | 71–72 |
-|   1. Property record and slots | 73–81 |
-|   2. Modes (`0x0065FEC0`, D2MOO `ITEMMODS_AssignProperty`) | 82–100 |
-|   3. Dispatcher (`0x0065FD70`; wrapper `0x0065FE10` for format ≥ 1) | 101–110 |
-|   4. Shared helpers | 111–143 |
-|   5. Property functions | 144–198 |
-|   6. Superior (mode 1) and affixes (mode 0) | 199–203 |
-|   7. Uniques (mode 3) | 204–207 |
-|   8. Set items | 208–218 |
-|   9. Socket fillers (`0x0055C2C0`) | 219–234 |
-|   10. Runewords | 235–288 |
-|   11. Set bonuses (`0x00660120`) | 289–301 |
-|   12. Craft property lists (`0x00660240`) | 302–307 |
-| Constants & data dependencies | 308–317 |
-| Randomness | 318–323 |
-| Edge cases & original bugs | 324–333 |
-| Test vectors | 334–352 |
-| Provenance | 353–372 |
-| Open questions | 373–411 |
+| Summary | 46–57 |
+| Inputs | 58–65 |
+| Outputs / state changes | 66–71 |
+| Rules | 72–73 |
+|   1. Property record and slots | 74–82 |
+|   2. Modes (`0x0065FEC0`, D2MOO `ITEMMODS_AssignProperty`) | 83–101 |
+|   3. Dispatcher (`0x0065FD70`; wrapper `0x0065FE10` for format ≥ 1) | 102–111 |
+|   4. Shared helpers | 112–144 |
+|   5. Property functions | 145–199 |
+|   6. Superior (mode 1) and affixes (mode 0) | 200–204 |
+|   7. Uniques (mode 3) | 205–208 |
+|   8. Set items | 209–219 |
+|   9. Socket fillers (`0x0055C2C0`) | 220–239 |
+|   10. Runewords | 240–293 |
+|   11. Set bonuses (`0x00660120`) | 294–306 |
+|   12. Craft property lists (`0x00660240`) | 307–312 |
+|   13. Set-item state update (`0x00663CC0`) | 313–368 |
+| Constants & data dependencies | 369–378 |
+| Randomness | 379–384 |
+| Edge cases & original bugs | 385–394 |
+| Test vectors | 395–413 |
+| Provenance | 414–433 |
+| Open questions | 434–481 |
 <!-- /index -->
 
 ## Summary
@@ -227,8 +228,12 @@ inventory spec; `0x00562660`):
    helm, 2 shield).
 2. Filler of type `rune` (74): the same with mode 5 (extra unit = the
    socketed item).
-3. Otherwise, a filler of quality 5: `0x00663CC0` (not specified, open
-   question 2).
+3. Otherwise, an item of quality 5 (set): `0x00663CC0(owner, item, 0,
+   0)`, §13. (`0x0055C2C0`(EDX item, owner, flag) is the stat refresh of
+   any item placed with an owner, a player or an item, not only of a
+   filler; the gem and rune branches need an item owner and return at
+   once otherwise. Rule 3 is the branch a set item takes when it is
+   equipped by a player; a set item never is a filler.)
 4. The properties land in the filler's own list; they reach the socketed
    item through stat-list linking (`sim/stat-lists.md`).
 
@@ -289,7 +294,7 @@ timers (`items/generation.md` §9 step 6).
 ### 11. Set bonuses (`0x00660120`)
 
 For an equipped set item (quality 5) with state s (given by the caller,
-the equip logic of `sim/units.md`): mask := the set slots
+the owner-list step of §13, step 6): mask := the set slots
 (setitems +0x2E) of the owner's equipped set items of the same set,
 including this one, excluding items flagged no-equip (0x4000) or broken
 (0x100) (`0x0062A370`). c := popcount(mask) (table `0x006EDA40`, masks ≥
@@ -304,6 +309,62 @@ first < 0).
 Mode 7 for one record list (owner none, flags 0x40); then, if the item
 is flagged ethereal (0x400000), re-apply ethereal (`items/generation.md`
 §8.2). The list and when it runs belong to the cube spec.
+
+### 13. Set-item state update (`0x00663CC0`)
+
+`0x00663CC0`(owner O, item I, remove r, repark p) (stdcall, 4
+arguments). Callers and arguments: the stat refresh `0x0055C2C0` (§9
+rule 3) (0, 0); the repair `0x0055F900` (0, 0); the deactivation
+`0x0055C730` (1, 0); the break `0x0055F850` (1, 1); `0x0057F410` (1, 1);
+the client equip (`client/stat-lists.md`) (0, 0).
+
+1. O none → return 0. I none, not an item (type ≠ 4), or O without an
+   inventory (unit +0x60) → return 0.
+2. mask := 0. If I is in O's inventory (`0x0063E070`: item data +0x5C =
+   O's inventory) and its node page (item data +0x69, `0x0063E020`) is
+   3 (body), mask := the set mask of §11 with I included
+   (`0x0062A370(O, I, 1)`).
+3. If p ≠ 0 or r = 0: park / unpark I's partial lists (`0x00663A20`(ECX
+   I, EDX mask)), step 5.
+4. Owner list (`0x00663B40`(ECX O, EDX I, r)), step 6. Return 1.
+5. Partial lists of I (`0x00663A20`). Nothing unless I has quality 5
+   and a setitems row (file index item data +0x28 below the count;
+   `0x0062A490`). f := setitems +0x87 (`add func`, u8). Park and unpark
+   are `sim/stat-lists.md` §8.5 on I's own lists of the states
+   S[0..5] = 165, 166, 167, 168, 169, 170 (table `0x006EE424`); a state
+   without a list on I does nothing.
+   - f = 0: nothing.
+   - f = 1: n := setitems +0x2E (I's set slot, i16, `0x0062B3A0`). For
+     i = 0 … 5, i ≠ n: k := i, minus 1 when i > n; mask bit i set →
+     unpark S[k], clear → park S[k].
+   - f = 2: b := popcount(mask) (table `0x006EE440`; mask ≥ 64 → 0),
+     k := b − 1. Unpark S[0..k−1]; then, when k < 5, park S[k..4]. For
+     mask 0 (k = −1) the first park reads the dword before the table
+     (`0x006EE420` = 3375), a state no list has (nothing), then parks
+     S[0..4].
+   - any other f: nothing.
+   So the partial records of §8.1 (states 165 + j / 2) are active for
+   exactly the equipped set slots (f = 1) or for the first b − 1 pairs
+   (f = 2).
+6. Owner list (`0x00663B40`). r > 1 (signed) → 0. O or I none, I not an
+   item, I's quality ≠ 5 → 0. O an item of quality 4–9 (`0x0062A0F0`) →
+   0. set := setitems +0x2C (i16) of I's row (`0x00483440`; no row → 0);
+   set < 0 or ≥ the sets count (table +0xC10) → 0. free := −1. For j =
+   0 … 5: L := O's list of state S[j] (`0x006256B0`).
+   - No L: free := j when free < 0; next j.
+   - L's stat 71 (layer 0, `0x00625D00`) ≠ set: next j.
+   - Else: r = 0 → remove all of L's stats (`0x00627340`), add stat 71
+     := set (`0x00627030(L, 71, set, 0)`), then the set bonuses §11
+     (`0x00660120`(ECX O, EDX I, state S[j])); r = 1 → detach L from O
+     (`0x006277E0`) and free it (`0x00626CD0`); r < 0 → nothing. Return
+     1.
+   After the loop: r = 1 or free < 0 → 0. Else a new list
+   (`0x006251F0`(O's pool, flags 0, expiry 0, I's unit type, I's GUID
+   +0x0C)) attached to O with reset 1 (`0x00626E10`), state S[free]
+   (`0x006252D0`); then r = 0 → stat 71 := set and §11 with S[free] (no
+   remove-all; the list is new); r < 0 → nothing. Return 1.
+   So each equipped set has one owner list (states 165–170, at most six
+   sets at once) tagged with stat 71 = the set id, which §11 refills.
 
 ## Constants & data dependencies
 
@@ -373,7 +434,16 @@ Synthetic, from the rules:
 ## Open questions
 
 1. No recording confirms any rule (request R1 in the session report).
-2. The quality-5 socket-filler branch `0x00663CC0` is not specified.
+2. Answered (2026-10-07, `disasm.py fn` on `0x0055C2C0`, `0x00663CC0`,
+   `0x00663A20`, `0x00663B40`; tables `0x006EE424` = 165–170 and
+   `0x006EE440` read from the binary): §13. The branch is not a socket
+   filler: `0x0055C2C0` refreshes any item placed with an owner, and an
+   item of quality 5 (set) takes `0x00663CC0(owner, item, 0, 0)`: the
+   item's partial lists (states 165–169) are parked / unparked by the
+   equipped-set mask per `add func`, and the owner gets (or reuses) one
+   list of state 165–170 tagged with stat 71 = set id, refilled by §11.
+   d2rs's no-op (`docs/handoff/impl-items.md`) differs whenever a set
+   item is equipped.
 3. The owner-vs-item list choice in §4.2 is read from `0x0065CBF0`'s two
    branches and D2MOO; confirm the register mapping (Ghidra request G1).
 4. §10.1 edge: whether the stale class-id slot can ever equal a rune's
