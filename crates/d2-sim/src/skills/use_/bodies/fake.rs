@@ -109,6 +109,15 @@ pub struct BodyFake {
     pub found: Vec<usize>,
     pub point_collide: bool,
     pub components: BTreeMap<(usize, usize), i32>,
+    // ---- coverage tests (bodies.md §2)
+    /// Item stats read by `item_stat_of`; written by `set_item_stat`.
+    pub item_stats: BTreeMap<(usize, u16), i32>,
+    pub shoots: BTreeSet<usize>,
+    pub max_stack: BTreeMap<usize, i32>,
+    pub max_dura: BTreeMap<usize, i32>,
+    pub composit_class: i32,
+    /// Units of a second (town) room every scan visits after `scan`.
+    pub scan_town: Vec<usize>,
 }
 
 impl BodyFake {
@@ -574,10 +583,17 @@ impl BodyWorld for BodyFake {
         }
     }
     fn scan_rooms(&self, _: usize, _: Option<(i32, i32)>) -> Option<Vec<ScanRoom<usize>>> {
-        Some(vec![ScanRoom {
+        let mut v = vec![ScanRoom {
             town: false,
             units: self.scan.clone(),
-        }])
+        }];
+        if !self.scan_town.is_empty() {
+            v.push(ScanRoom {
+                town: true,
+                units: self.scan_town.clone(),
+            });
+        }
+        Some(v)
     }
     fn allied(&self, a: usize, b: usize) -> bool {
         a == b || self.allies.contains(&(a, b))
@@ -605,31 +621,34 @@ impl BodyWorld for BodyFake {
         self.c.stat(u, s + 1, 0)
     }
     fn composit_weapon_class(&self, _: usize) -> i32 {
-        0
+        self.composit_class
     }
     fn hand_class(&self, _: usize) -> i32 {
         self.hand_class
     }
-    fn item_shoots(&self, _: usize) -> bool {
-        false
+    fn item_shoots(&self, i: usize) -> bool {
+        self.shoots.contains(&i)
     }
     fn item_stackable(&self, i: usize) -> bool {
         self.c.items[i].throw
     }
-    fn item_stat_of(&self, _: usize, _: u16) -> i32 {
-        0
+    fn item_stat_of(&self, i: usize, s: u16) -> i32 {
+        self.item_stats.get(&(i, s)).copied().unwrap_or(0)
     }
     fn set_item_stat(&mut self, i: usize, s: u16, v: i32) {
+        self.item_stats.insert((i, s), v);
         self.log(format!("itemstat {i} {s} {v}"));
     }
-    fn item_max_stack(&self, _: usize) -> i32 {
-        0
+    fn item_max_stack(&self, i: usize) -> i32 {
+        self.max_stack.get(&i).copied().unwrap_or(0)
     }
-    fn item_max_durability(&self, _: usize) -> i32 {
-        0
+    fn item_max_durability(&self, i: usize) -> i32 {
+        self.max_dura.get(&i).copied().unwrap_or(0)
     }
     fn quantity_timer(&mut self, _: usize) {}
-    fn send_item_stat(&mut self, _: usize, _: usize, _: u16, _: i32) {}
+    fn send_item_stat(&mut self, u: usize, i: usize, s: u16, v: i32) {
+        self.log(format!("send0x3E {u} {i} {s} {v}"));
+    }
     fn attack_cleanup(&mut self, u: usize) {
         self.log(format!("attackcleanup {u}"));
     }
