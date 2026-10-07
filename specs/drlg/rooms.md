@@ -34,15 +34,15 @@
 |   5. Active room creation (`0x006422A0`, `0x00619890`) | 345–378 |
 |   6. Adjacency array order (owner of `unit-order.md` §9) | 379–394 |
 |   7. Room clients and the inactivity counter | 395–415 |
-|   8. Deactivation (tick step 9) | 416–454 |
-|   9. Room tile grid | 455–1018 |
-|   10. Collision map from tiles | 1019–1097 |
-| Constants & data dependencies | 1098–1112 |
-| Randomness | 1113–1130 |
-| Edge cases & original bugs | 1131–1148 |
-| Test vectors | 1149–1196 |
-| Provenance | 1197–1234 |
-| Open questions | 1235–1311 |
+|   8. Deactivation (tick step 9) | 416–461 |
+|   9. Room tile grid | 462–1025 |
+|   10. Collision map from tiles | 1026–1104 |
+| Constants & data dependencies | 1105–1119 |
+| Randomness | 1120–1137 |
+| Edge cases & original bugs | 1138–1155 |
+| Test vectors | 1156–1203 |
+| Provenance | 1204–1242 |
+| Open questions | 1243–1319 |
 <!-- /index -->
 
 ## Summary
@@ -423,6 +423,13 @@ A populated room that is removed and built again starts with flag bit 0:
    copy); false if status ≤ 1 (some client's room is
    this room or next to it); if the level is a town (1, 40, 75, 103, 109)
    or level 120: false if any room of the level has status ≤ 1; else true.
+   **Flag 0x400000 setter** (owner): `0x0061AED0(active room, clear)`
+   does nothing for a null room, else calls `0x0061BAC0` on the DRLG
+   room (active room +0x10): clear = 0 sets DRLG flag 0x400000, clear ≠ 0
+   clears it. `0x0061BAC0` has no other caller and holds the only
+   immediate `or`/`and` of the bit on DRLG +0x28 in `all.asm`; 31 call
+   sites pass 0 or 1 (quest code passes 0 to keep a room, missile bodies
+   pass 1; per-site rules live in the quest and missile specs).
 2. If true, tick step 9 compresses each unit of the room to inactive
    storage (`0x005433F0`, room list order, next saved first; unit specs)
    and removes the room (`0x0061A910`): unlink from the act list (linear
@@ -1226,6 +1233,7 @@ counter (+0x0C), and per level all DRLG rooms in list order; then §3 and
 - **Entry identity (§9.3)**: `0x0060A440` (stride 0x60 over +0x110,
   count +0x10C) → `0x0060CFA0` (stores the header pointer);
   `0x0060D040` (lookup copies the stored pointers).
+- **Flag 0x400000 setter (§8 rule 1)**: asm of `0x0061AED0` (null test, active room +0x10, `ret 8`) and `0x0061BAC0` (`edx` = clear; `and 0xFFBFFFFF` / `or 0x400000` on +0x28); `disasm.py xref`: `0x0061BAC0` has the single caller `0x0061AEE0`, `0x0061AED0` has 31 call sites. Requested by PC 2 (`world/quests-act1-rest.md` §9 item 12 links here).
 - **Room free, units left (§8.2 rule 4)**: asm of `0x0061A840`
   (`0x0061A851`–`0x0061A87F` loop), `0x0064C450` (unit leaves room),
   `0x0064FC20` (dynamic path reset), `0x0064C370` (room-list remove);
