@@ -32,6 +32,15 @@ rects (town of `bdBar`: level 1 at tiles (1200, 960) 56 × 40, Blood Moor
 |---|---|---|---|---|---|
 | 1 | monster kill with item drop | **done** | `kill1-spawn.jsonl` (spawn-raw-1), `kill1-spawn-packets.jsonl` (packets-raw-1, 40,284 events) | `check_rng.py`: OK (46 inline draws, 0 unresolved, 7 `chain_unexplained`, 10 draw sites); `check_packets.py`: **6 failures**, all `s2c id 0x3e size 34 != rule 7 (R5)` (finding F1) | see "Item 1" |
 | 7 | Kick / Bash on a monster | **Bash done; Kick blocked** | same files | as item 1 | see "Item 7" |
+| 6 | Might aura in a party | **partly: Might solo done; party blocked** | `pal1-spawn.jsonl`, `pal1-spawn-packets.jsonl` (25,922 events) | `check_rng.py` OK (10 draw sites); `check_packets.py` 3 failures, all F1 (0x3E) | see "Item 6" |
+| 8 | Druid summon | **done (Raven)** | `dru1-spawn.jsonl`, `dru1-spawn-packets.jsonl` (30,133 events) | `check_rng.py` OK (4 `chain_unexplained`, 9 sites); `check_packets.py` 3 failures, all F1 | see "Item 8" |
+| 2 | Countess kill | **blocked** | — | — | needs a character that reaches the Forgotten Tower (Black Marsh, Act I, area level ~ 8–10 Normal) and survives five tower levels: a level ~10+ character; our characters are level 1–2 |
+| 3 | Cain rescue | **blocked** | — | — | needs the Scroll of Inifuss (Dark Wood tree), Akara's decoding, the Cairn Stones order in Stony Field, then Tristram: quest chain plus a level ~8+ character |
+| 4 | act change | **blocked** | — | — | needs Andariel killed (Catacombs level 4, Act I end) or a quest flag; level ~15+ |
+| 5 | hireling game | **blocked** | — | — | Kashya's hire needs Sisters' Burial Grounds (Blood Raven) done plus gold (`local-buddy-saves.md`) |
+| 9 | Clay Golem | **blocked** | — | — | Clay Golem reqlevel 6 (`skills.txt`); a level-6 Necromancer is ~14,000 experience from level 1 (champion packs give ~80 each here) |
+| 10 | Act III entry | **blocked** | — | — | Acts I–II completed (Andariel, Duriel) |
+| 11 | levels 74 and 120 | **blocked** | — | — | Arcane Sanctuary (Act II, via the Palace) and Arreat Summit (Act V, Ancients): far story progression |
 | 12 | weather-0001 (Rogue Encampment in rain) | **done (recorded; it rained)** | `wx1-frames.jsonl` (frames-raw-2 + `weather_pools`), PNGs `captures\20261007-084753\` (1,851) | `record_frames.py --selftest` ok; recorder verdict `stability: 0 state keys seen twice or more … NOT ENOUGH` (expected: rain, cursor and the player seed change every frame); no `weather-0001` case file exists to verify against | see "Item 12" |
 | 13 | draw-order OQ7 (`TownE1` tile (950, 933) of run 2) | **blocked (cells not reachable on screen)** | `oq7-frames.jsonl`, PNGs `captures\20261007-085541\` (856; draws every 20th) | recorder verdict `NOT ENOUGH` (walking) | see "Item 13" |
 
@@ -74,6 +83,34 @@ seeds (game seed before / after the call, room seed) are in the
   would need an injected C→S 0x3C select of skill 1 (`run_scenario.py`
   can inject, but cannot spawn yet) — a message no unmodified client
   sends, so it was not done.
+
+## Item 6: Might (solo)
+
+`bdPal` (west town exit, gate guard in the passage), `spawn.py --level 2
+--trigger --status --packets -- -w -ns -name bdPal -pal`. Natural Blood
+Moor monsters (2 quill rats, zombies) and one spawned champion fallen pack
+(spawn frame ~3,100) took it to level 2 (xp 501). C→S 0x3B `6200`
+(point into Might, skill 98) at frame 4418; C→S 0x3C `62000000ffffffff`
+(Might as right skill, which turns the aura on) at frame 4843; S→C 0xA8
+(state set on the player, type 0 GUID 1) `a8000100000011211950c0ab98af01ff01`
+in frame 4844, then 0xAA at frame 4979. A spawned normal zombie was killed
+with left attacks under Might (frame ~5110). Save And Exit kept the
+level-2 Paladin with Might. **Party part blocked:** single player has no
+other player; the only party member could be a hireling (item 5,
+blocked).
+
+## Item 8: Druid summon (Raven)
+
+`bdDru` (`TownE1`, east over the bridge), same options. Natural fallen
+packs (xp 459) plus one spawned normal fallen pack (frame 4372, 3 units)
+→ level 2 (xp 513). C→S 0x3B `dd00` (point into Raven, skill 221) at
+frame 5027; 0x3C `dd000000ffffffff` at 5446; first cast C→S 0x0C (right
+skill at location (5690, 4654)) at frame 5485 → S→C 0x7A `7a010aa301…32`
+and 0xAC (new monster GUID 50, class 419 Raven) in frame 5495; second cast
+at frame 5816 → frame 5826: 0x7A removes GUID 50 (twice), 0x7A adds and
+0xAC creates GUID 52; the raven attacked a spawned zombie (class 5, spawn
+frame 5761), killed by left clicks; 0x7A removes GUID 52 at frame 6271.
+Saved (level 2 Druid with Raven).
 
 ## Town variants of the saves (spawn.py `--status`, `-nosave`)
 
