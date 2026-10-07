@@ -461,3 +461,81 @@ fn every_request_but_get_hit_refills_the_budget_and_retargets() {
     assert_eq!(d.repath_budget, 20);
     assert_eq!((d.target_x, d.target_y, d.target_unit), (27, 11, None));
 }
+
+// Covers: specs/sim/pathing.md §13.1 r1
+#[test]
+fn step_counts_use_the_low_byte_capped_at_77() {
+    use crate::wiring::path::missiles::step_count_byte;
+    // §13.1 rule 1: −1 → 255 → 77, −256 → 0, −200 → 56; 300 → 44 (low
+    // byte); 77 and 50 as given.
+    for (n, b) in [
+        (-1, 77),
+        (-256, 0),
+        (-200, 56),
+        (300, 44),
+        (77, 77),
+        (50, 50),
+        (78, 77),
+    ] {
+        assert_eq!(step_count_byte(n), b, "n {n}");
+    }
+    let mut fx = fx();
+    let a = fx.a;
+    let owner = fx.spawn(UnitType::Monster, 0, a, 41, 30);
+    let m = fire(&mut fx, owner, 79, 30);
+    fx.sim.with(&mut fx.game, |_, v| {
+        crate::missiles::MissileBodies::set_path_distance(v, m, -200)
+    });
+    let d = dynamic(&mut fx, m);
+    assert_eq!((d.dist_budget, d.max_distance), (56, 56));
+}
+
+// Covers: specs/sim/pathing.md §13.2 r1, §13.2 r2, §13.2 r3
+#[test]
+fn target_position_clears_a_stale_target_and_reads_the_point() {
+    use crate::path::TargetUnit;
+    let mut fx = fx();
+    let a = fx.a;
+    let owner = fx.spawn(UnitType::Monster, 0, a, 41, 30);
+    let p = fx.spawn(UnitType::Player, 0, a, 50, 33);
+    let m = fire(&mut fx, owner, 79, 30);
+    let guid = fx.game.lists.unit(p).unwrap().guid;
+    let set_target = |fx: &mut Fx, g: u32| {
+        fx.sim
+            .hooks()
+            .paths
+            .as_mut()
+            .unwrap()
+            .dynamic_mut(m)
+            .unwrap()
+            .target_unit = Some(TargetUnit {
+            unit: p,
+            ty: UnitType::Player,
+            guid: g,
+        });
+    };
+    let pos = |fx: &mut Fx| {
+        fx.sim.with(&mut fx.game, |g, v| {
+            crate::missiles::MissileBodies::target_position(v, g, m)
+        })
+    };
+    // A live target: its position, the target kept.
+    set_target(&mut fx, guid);
+    assert_eq!(pos(&mut fx), Some((50, 33)));
+    assert!(dynamic(&mut fx, m).target_unit.is_some());
+    // A stale one (its GUID no longer resolves to it): cleared, and the
+    // stored point (79, 30) is read instead.
+    set_target(&mut fx, guid.wrapping_add(1000));
+    assert_eq!(pos(&mut fx), Some((79, 30)));
+    assert!(dynamic(&mut fx, m).target_unit.is_none());
+    // A point with x = 0: result 0.
+    fx.sim
+        .hooks()
+        .paths
+        .as_mut()
+        .unwrap()
+        .dynamic_mut(m)
+        .unwrap()
+        .target_x = 0;
+    assert_eq!(pos(&mut fx), None);
+}

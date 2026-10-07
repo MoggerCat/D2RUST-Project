@@ -13,6 +13,7 @@
 //! | [`place`] | §9 floor drop, §10 placing a unit, §11 level spawn ([`place_seams`]: its seams) |
 //! | [`warp`] | §12 warp tiles and arrival |
 //! | [`history`] | §10 rule 7 player position history |
+//! | [`line`] | `sim/pathing.md` §13.3 cell line test `0x0064E260` |
 //! | [`walk`] | `sim/pathing.md`: walk / run requests, path compute, per-tick movement, missile paths, the 0x5F resync |
 //!
 //! No function of `path-placement.md` draws (spec "Randomness"); in
@@ -23,6 +24,7 @@ pub mod collision;
 pub mod coords;
 pub mod footprint;
 pub mod history;
+pub mod line;
 pub mod place;
 pub mod place_seams;
 pub mod record;
