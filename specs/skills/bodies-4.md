@@ -633,7 +633,7 @@ The riding imp (§2.3) follows its tower or siege beast every tick.
 3. (dx, dy) = T's position − the unit's, or (0, 0) without T.
 4. M = straight `skill_missile(game, m, unit, skill, L, dx, dy, 0, 0,
    quant 0)` (starts on T, aims at the target position); none → 0.
-5. M data +0x28 := n (jump count, as srvdo 26 `bodies-2.md` §6.4).
+5. M data +0x28 := n (jump count, as srvdo 26 `bodies-2b.md` §6.4).
    Return 1.
 
 ## Constants & data dependencies

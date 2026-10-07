@@ -445,7 +445,7 @@ their own (`combat/*`, `skills/levels.md`). The unit-seed reseeder
    `spec'd-here` in `functions.tsv`, so no re-export is needed.
 2. Answered: srvdo slot 121 holds `0x005C8AD0`, and Rabies (id 238) is
    the only 1.14d `skills.txt` row with `srvdofunc` 121; its body is
-   `skills/bodies-2.md` §6.14.
+   `skills/bodies-2b.md` §6.14.
 3. Recording: hook `0x0056FAF0` entry/return and `0x0056F7F0` entry; cast
    a non-`TargetAlly` skill on a party member: does the do still run after
    start returned 0?
