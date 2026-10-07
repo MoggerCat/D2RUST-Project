@@ -1,4 +1,4 @@
-// Spec: specs/sim/intents-events.md; specs/combat/vitals.md §5.1
+// Spec: specs/sim/intents-events.md; specs/combat/vitals.md §5.1; specs/world/quests-helpers.md §6
 //! [`Intents`] and [`Tick`] on `d2_sim::game::Game` (§2.2–§2.4, §4;
 //! `tick.md` §3; client list order `unit-order.md` §7).
 //!

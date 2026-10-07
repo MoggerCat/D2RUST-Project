@@ -1,4 +1,4 @@
-// Spec: specs/world/quests.md §9; specs/world/quests-act1.md §10; specs/world/quests-act1-rest.md §1–§3; specs/world/quests-act2.md §1.5; specs/world/objects.md §3, §4, §7; specs/sim/tick.md §5.2
+// Spec: specs/world/quests.md §9; specs/world/quests-helpers.md §4.2, §5, §7; specs/world/quests-act3.md §6; specs/world/vendors-2.md §10.1; specs/world/quests-act1.md §10; specs/world/quests-act1-rest.md §1–§3; specs/world/quests-act2.md §1.5; specs/world/objects.md §3, §4, §7; specs/sim/tick.md §5.2
 //! [`HostQuests`]: the quests' world on the wired host. Every
 //! [`QuestWorld`] call goes to [`EconomyQuests`] (the economy plus the
 //! rest), except those the action wiring provides:
@@ -15,7 +15,21 @@
 //! - `0x006280D0(item, 0x10)` on an item of the game's item store;
 //! - `missiles.txt` `Range` from the action tables;
 //! - the chest treasure `0x00585B90(op, kind)` on the object drop state
-//!   (`ActionHooks::object_drops`, [`super::object_chest_drop`]).
+//!   (`ActionHooks::object_drops`, [`super::object_chest_drop`]);
+//! - the quest helpers' host calls: the path target `0x0056D2C0` (path
+//!   provider), the trade button `0x00568060` (`vendors-2.md` §10.1), the
+//!   obelisk's 0x44 cancel, the town portal GUID / partner / removal
+//!   (the action wiring's portal seams, one home with `objects.md` §12),
+//!   the mode request `0x005DDFC0` (the monster mode change), the item
+//!   level `0x00558200`;
+//!
+//! and those of the host parts a caller lends ([`HostQuests::inventory`]:
+//! the reward `0x005466B0`, [`super::quest_reward`], and the cube close's
+//! `0x0055FA40`; [`HostQuests::chats`]: the chat-node frees `0x00572E00`,
+//! `0x00573180`).
+//!
+//! Left to the rest: the Steeg Stone release `0x00584820` (no object data
+//! +0 for class 337 in d2-sim: no object spec states that object).
 //!
 //! An object without object data, a unit outside a DRLG room and an item
 //! outside the store keep the rest's answer, as before.

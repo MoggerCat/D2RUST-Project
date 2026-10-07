@@ -1,4 +1,4 @@
-// Spec: specs/world/npc.md §1.1, §2–§4, §7.5; specs/world/vendors.md §1, §3, §4, §7; specs/world/quests.md §1.7, §6.2, §7.3; specs/world/quests-act1.md §10.2; specs/world/cube.md §1, §2; specs/world/waypoints.md §6; specs/world/hirelings.md §6 r1, §8 r1; specs/world/hirelings-2.md §15, §19
+// Spec: specs/world/npc.md §1.1, §2–§4, §7.5; specs/world/vendors.md §1, §3, §4, §7; specs/world/quests.md §1.7, §6.2, §7.3, §9.1; specs/world/quests-helpers.md §5, §6; specs/world/quests-act1.md §10.2; specs/world/cube.md §1, §2; specs/world/waypoints.md §6; specs/world/hirelings.md §6 r1, §8 r1; specs/world/hirelings-2.md §15, §19
 //! [`WiredWorld`]: the wired single-player host. The NPC, vendor, quest
 //! and cube systems on their `d2-sim` providers
 //! (`d2_sim::wiring::interaction`: [`Desk`] for `NpcWorld +
@@ -253,15 +253,16 @@ fn quest_call<X: Pending, R: TradeRest, T>(
         let mut lent = inv
             .as_deref_mut()
             .map(|p| QuestInv::new(&p.tables, &mut p.state, p.rest.as_mut()));
-        let mut inner = EconomyQuests::new(&mut *desk.econ, &mut *desk.rest);
-        inner.deferred = Some(&mut deferred);
-        let mut w = HostQuests::new(inner);
-        w.chats = Some(&mut desk.state.lists);
-        w.inventory = lent
-            .as_mut()
-            .map(|q| q as &mut dyn QuestInventory<ActionHooks<X>>);
-        let out = f(&mut *desk.quests, &mut w);
-        drop(w);
+        let out = {
+            let mut inner = EconomyQuests::new(&mut *desk.econ, &mut *desk.rest);
+            inner.deferred = Some(&mut deferred);
+            let mut w = HostQuests::new(inner);
+            w.chats = Some(&mut desk.state.lists);
+            w.inventory = lent
+                .as_mut()
+                .map(|q| q as &mut dyn QuestInventory<ActionHooks<X>>);
+            f(&mut *desk.quests, &mut w)
+        };
         if let Some(q) = lent {
             errors = q.errors;
         }

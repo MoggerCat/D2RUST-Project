@@ -66,7 +66,7 @@ fn a_reward_is_created_at_the_players_level_and_placed_identified() {
     assert!(w.state.holds(p, item), "in the player's inventory");
 }
 
-// Covers: specs/world/quests.md §9.1; specs/items/generation.md §10.1, §10.2; specs/world/quests-act5.md open question 2
+// Covers: specs/world/quests.md §9.1; specs/items/generation.md §10.1, §10.2
 #[test]
 fn an_explicit_level_is_used_and_an_unknown_code_makes_nothing() {
     let mut w = World::new();

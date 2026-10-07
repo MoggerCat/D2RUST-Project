@@ -931,3 +931,26 @@ fn same_seed_same_run() {
     };
     assert_eq!(run(), run());
 }
+
+/// `quests-helpers.md` §6: the host requests a quest rule raised (here
+/// queued on the quest control directly, as `QuestControl::end_game` /
+/// `save_pass` do from the rules) are drained after the next tick's
+/// steps into `SimGame::host_requests`, in call order, for the session
+/// layer; the quest control keeps none.
+// Covers: specs/world/quests-helpers.md §6
+#[test]
+fn quest_host_requests_are_drained_after_the_tick_in_call_order() {
+    use d2_sim::world::quests::HostRequest;
+    let mut f = Fx::new(|_| {});
+    f.world().quests.save_pass();
+    f.world().quests.end_game();
+    assert!(f.h.game.host_requests.is_empty(), "not before the tick");
+    f.h.clock.0 += 40;
+    assert!(f.h.frame().unwrap().ticked);
+    assert!(f.world().quests.host_requests.is_empty());
+    assert_eq!(
+        f.h.game.take_host_requests(),
+        [HostRequest::SavePass, HostRequest::EndGame]
+    );
+    assert!(f.h.game.take_host_requests().is_empty());
+}

@@ -1461,3 +1461,51 @@ fn early_refusals_change_nothing() {
     let mut t = setup_with(false);
     t.refused(&loc16(0x61, 1), Malformed, "§7.23 classic");
 }
+
+// ---- quests.md §9.1: a quest reward on the wired host's inventory model ---------------
+
+/// A quest call giving `code` (`0x005466B0(game, player, code, 0, 2, 1)`).
+struct Reward(UnitId, [u8; 4]);
+
+impl crate::adapters::handlers::world::QuestCall for Reward {
+    type Out = Option<UnitId>;
+    fn call<W: d2_sim::world::quests::QuestWorld>(
+        self,
+        _: &mut QuestControl,
+        w: &mut W,
+    ) -> Option<UnitId> {
+        w.reward_item(self.0, self.1, 0, 2, true)
+    }
+}
+
+/// `WiredWorld::quests` lends the inventory model to the quest call: the
+/// reward is created on the game's item store, placed in the player's
+/// inventory (§2.4, page 0, send 1: the update list) and identified; the
+/// next tick's update pass sends it (0x9C action 4, §6.1).
+// Covers: specs/world/quests.md §9.1
+#[test]
+fn a_quest_reward_lands_in_the_hosts_inventory_model() {
+    let mut t = setup();
+    let p = t.player;
+    let sim = &mut t.host.game;
+    let item = WorldHost::quests(
+        &mut sim.world,
+        &mut sim.game,
+        &mut sim.events,
+        Reward(p, *b"key "),
+    )
+    .flatten()
+    .expect("rewarded");
+    assert!(sim.world.state.errors.is_empty());
+    let it = sim.events.sys.hooks.items.get(item).expect("in the store");
+    assert_ne!(it.flags & 0x10, 0);
+    assert_eq!(sim.events.sys.units.get(item).unwrap().mode, 0);
+    assert!(t.inv().state.holds(p, item));
+    let g = t.sim().events.sys.units.get(item).unwrap().guid;
+    let got = t.idle();
+    assert!(
+        got.iter()
+            .any(|m| m[..2] == [0x9C, 4] && m[4..8] == g.to_le_bytes()),
+        "{got:?}"
+    );
+}
