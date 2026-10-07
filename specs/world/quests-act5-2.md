@@ -36,7 +36,7 @@
 | Edge cases & original bugs | 569–604 |
 | Test vectors | 605–619 |
 | Provenance | 620–642 |
-| Open questions | 643–677 |
+| Open questions | 643–685 |
 <!-- /index -->
 
 ## Summary
@@ -674,3 +674,11 @@ Spawned Ancients, Tyrael and the missiles draw from their own code
    row-40 cells and 15 rows are in `docs/handoff/pc2-spec-quests-act4-5.md`
    "Cross-file requests" for PC 2 quests-core (`quests.tsv`,
    `quest-messages.tsv` and the 779 → 794 count change together).
+   Done (2026-10-07): quests-core commits `b242ee7` (row 40) and
+   `39dabf1` (15 rows, right after the header, before the first
+   `0x00733308` row); re-checked by quests-fixups against the image:
+   all 15 values equal `0x00732FF8`'s entries (4 states of 0xC4 bytes up
+   to `0x00733308`, counts 5, 5, 5, 0). Row order matters only within one
+   table: `d2-sim` filters by (table, state, NPC) and keeps file order,
+   so slot order inside a table is what must hold, not the table's place
+   in the file.
