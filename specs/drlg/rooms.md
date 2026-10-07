@@ -35,14 +35,14 @@
 |   6. Adjacency array order (owner of `unit-order.md` §9) | 379–394 |
 |   7. Room clients and the inactivity counter | 395–415 |
 |   8. Deactivation (tick step 9) | 416–454 |
-|   9. Room tile grid | 455–1016 |
-|   10. Collision map from tiles | 1017–1095 |
-| Constants & data dependencies | 1096–1110 |
-| Randomness | 1111–1128 |
-| Edge cases & original bugs | 1129–1146 |
-| Test vectors | 1147–1194 |
-| Provenance | 1195–1232 |
-| Open questions | 1233–1309 |
+|   9. Room tile grid | 455–1018 |
+|   10. Collision map from tiles | 1019–1097 |
+| Constants & data dependencies | 1098–1112 |
+| Randomness | 1113–1130 |
+| Edge cases & original bugs | 1131–1148 |
+| Test vectors | 1149–1196 |
+| Provenance | 1197–1234 |
+| Open questions | 1235–1311 |
 <!-- /index -->
 
 ## Summary
@@ -457,7 +457,9 @@ A populated room that is removed and built again starts with flag bit 0:
 #### 9.1 Summary
 
 A DRLG room (RoomEx) turns its source grids into four lists of **tile
-records**: floors, walls, shadows (roofs share the shadow list), plus
+records**: floors, walls (roofs, type 15, are wall records from the wall
+layers, §9.5.1 step 6; the client files them by type, `render/draw-order.md`
+§3 r2), shadows (type 13), plus
 the extra frames of animated tiles. Each grid cell names a tile *key*
 (orientation, main index, sub index); the actual DT1 tile is chosen
 among the room's loaded tiles with that key, weighted by DT1 rarity,
@@ -1045,7 +1047,7 @@ stride W (sub-tiles).
 For each room R in the active room's room list (`0x00619790`: list at
 active room +0x00, count +0x24; it includes the room itself, §6.1), with R's collision grid header giving R's tile
 origin (so every listed room must already have a grid), for R's floor
-records, then wall records, then shadow/roof records (`0x00619660`,
+records, then wall records (roofs included), then shadow records (`0x00619660`,
 `0x006196A0`, `0x006196E0`), each record (`0x0064C790`):
 
 1. Sub-tile origin `(ox, oy)` = 5 · (R tile origin + record position).

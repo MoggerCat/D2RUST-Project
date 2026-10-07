@@ -34,7 +34,7 @@
 | Edge cases & original bugs | 327–334 |
 | Test vectors | 335–361 |
 | Provenance | 362–387 |
-| Open questions | 388–408 |
+| Open questions | 388–435 |
 <!-- /index -->
 
 ## Summary
@@ -399,9 +399,36 @@ from the file; shift index writers `0x0046EBB0`, `0x0046F220` (from
 5. Readers of the darkened shift (block `+0x110`) and of `R` (`+0x11C`)
    outside the GDI cel and tile paths (D2Win, automap, UI). Ghidra xref
    on `[0x007C9150]` users.
+   *Answered* (static, `all.asm`): no reader. The 26 instructions that
+   load `[0x007C9150]` are in 17 functions (`0x006C8250`, `0x00511D70`,
+   `0x006C84B0`, `0x006C85A0`, `0x006C87E0`, `0x006C8000`, `0x006B1D60`,
+   `0x006B5D40`, `0x006B63F0`, `0x005102D0`, `0x00511FB0`, `0x005120A0`,
+   `0x005122E0`, `0x00509400`, `0x0050A450`, `0x0050A9A0`, `0x004F8E40`,
+   the last keeping the copy `0x007D5458`); the offsets they read from the
+   block are +0x0C, +0x10, +0x18, +0x1C, +0x104, +0x108, +0x10C, +0x114,
+   +0x118 only, and no instruction in the driver and GDI ranges
+   (`0x00509000`–`0x00513FFF`, `0x004F5000`–`0x004F9FFF`,
+   `0x006B0000`–`0x006CAFFF`) reads +0x110 or +0x11C of anything. The
+   darkened shift and `R` are computed and never used in 1.14d.
 6. The light values themselves (unit `v`, wall `c0…c3`, floor grid,
    player light flicker, `capture.md` findings): `render/lighting.md`.
 7. The relation that `0x004791B0` tests for `Utrans` 255 (§6 r6.3):
    which owner list `[0x007BB5BC]` holds and what `0x004DC440(owner, 8)`
    decides (likely "owned by the local player or an ally"). Ghidra read
    of both.
+   *Answered* (static): `0x004791B0(unit)` looks the unit's GUID (+0x0C)
+   up as pet GUID in the client pet list `[0x007BB5BC]`
+   (`client/model.md` §14, filled by S→C 0x7A / 0x81). No record → 1.
+   Otherwise owner := the record's owner GUID; the local player
+   (`0x00463DD0`; fatal 0x225 if none or GUID −1) is looked up and the
+   result is `0x004DC440(owner, player GUID, 8)`: 0 when owner = player;
+   else the owner's roster record (`0x004792E0`, client roster
+   `[0x007BB5C0]`, GUID +0x10, link +0x80) → its relation list (pointer
+   at +0x34 to a block whose first field is the head; nodes GUID +0x00,
+   flags +0x04, next +0x08) → the node for the local
+   player: flags & 8; no roster record or no node → 0. The flags are the
+   u16 that S→C 0x8C (`0x0045EA70` → `0x0047A370`) stores. So `s` = 1
+   for a 255 unit owned by the local player or by a player whose
+   relation flags toward the local player lack bit 8 (D2MOO name:
+   hostile), and `s` = 0 for an unowned one or one whose owner has bit
+   8 set.

@@ -25,22 +25,22 @@
 | Outputs / state changes | 72–77 |
 | Rules | 78–79 |
 |   1. Structures (1.14d layout, for recorders and checks) | 80–105 |
-|   2. Act creation (server) | 106–120 |
-|   3. DRLG creation (`0x00642DA0`) | 121–155 |
-|   4. Level list, get-or-allocate | 156–173 |
-|   5. Level generation (`0x006424A0`, D2MOO `DRLG_InitLevel`) | 174–205 |
-|   6. Level position, size, act number | 206–222 |
-|   7. Vis and warp records | 223–246 |
-|   8. Coordinates to rooms | 247–260 |
-|   9. Level lifecycle: activity and freeing | 261–309 |
-|   10. Spawn room in a level (`0x0066B2B0`) | 310–349 |
-|   11. Logical rooms (coordinate lists) and population queries | 350–629 |
-| Constants & data dependencies | 630–650 |
-| Randomness | 651–669 |
-| Edge cases & original bugs | 670–694 |
-| Test vectors | 695–738 |
-| Provenance | 739–771 |
-| Open questions | 772–832 |
+|   2. Act creation (server) | 106–122 |
+|   3. DRLG creation (`0x00642DA0`) | 123–157 |
+|   4. Level list, get-or-allocate | 158–175 |
+|   5. Level generation (`0x006424A0`, D2MOO `DRLG_InitLevel`) | 176–207 |
+|   6. Level position, size, act number | 208–224 |
+|   7. Vis and warp records | 225–248 |
+|   8. Coordinates to rooms | 249–262 |
+|   9. Level lifecycle: activity and freeing | 263–311 |
+|   10. Spawn room in a level (`0x0066B2B0`) | 312–351 |
+|   11. Logical rooms (coordinate lists) and population queries | 352–631 |
+| Constants & data dependencies | 632–652 |
+| Randomness | 653–671 |
+| Edge cases & original bugs | 672–696 |
+| Test vectors | 697–740 |
+| Provenance | 741–773 |
+| Open questions | 774–834 |
 <!-- /index -->
 
 ## Summary
@@ -116,7 +116,9 @@ Coordinates are in tiles; subtile = tile × 5 (`0x00643560`).
    seed, act number, client flag and pool; server: stores the town level
    id and creates the DRLG with that town id and flags 0; client copy:
    town id 0 and flags 1. Then the environment (`0x0061BE40`, day/night,
-   not DRLG) and the act's animated-tile cache (`0x00642A30`).
+   not DRLG) and the act's edge floor record at act +0x18 (`0x00642A30`:
+   first tile of a fixed key from the base tile library, no draw;
+   `render/draw-order-2.md` OQ 2).
 
 ### 3. DRLG creation (`0x00642DA0`)
 
