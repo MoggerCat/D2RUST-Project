@@ -200,8 +200,10 @@ Missile-owned helpers: `0x005A9720` (D2MOO
    flies at 75 % of its table speed.
 8. If v ≠ 0: if a target unit is given, is not the owner and stands on
    the owner's subtile → drop the target unit and add (1, 1) to the target
-   point (D2MOO order; the 1.14d comparison helpers are register-passed,
-   open question 6). With no target unit and target point = start → add
+   point (1.14d `0x0059FBBE`–`0x0059FC11`: the target unit's x
+   (`0x0045ADF0`, unit in ECX) against the owner's (record +0x04), then
+   the y (`0x0045AE20`); both equal → drop; open question 6). With no
+   target unit and target point = start → add
    (1, 1). Aim = target unit position or target point; `|aim.x − x| ≥ 100`
    or `|aim.y − y| ≥ 100` → fail. With v = 0 none of this runs.
 9. Allocate the unit `0x00555230(x, y, game, room, …, mode = CollideType)`
@@ -398,8 +400,8 @@ footprint removal, no room or town checks. By path type (+0x3C):
 | Type | Function | Result |
 |---|---|---|
 | 4 (every missile created by §R2.3) | `0x006492F0`, below | 0 → path flag 0x20 cleared, result 0; else flag 0x20 set, result = point count (+0x28) |
-| 10 | `0x0067A240` (charged-bolt zigzag, open question 12) | flag 0x20 set, result = point count |
-| 14 | `0x0067A140` (blessed-hammer spiral, open question 12) | flag 0x20 set, result = point count |
+| 10 | `0x0067A240` (charged-bolt zigzag, `sim/pathing.md` §11.2; open question 12) | flag 0x20 set, result = point count |
+| 14 | `0x0067A140` (blessed-hammer spiral, `sim/pathing.md` §11.3; open question 12) | flag 0x20 set, result = point count |
 | any other | fatal assert | — |
 
 Type 4, straight line to the target (`0x006492F0`):
@@ -608,10 +610,11 @@ piercing.
 
 The null pattern equals D2MOO 1.10f's tables entry for entry; 1.14d
 entries 23 and 24 of server-do share `0x005AF790`, as in D2MOO.
-`0x005AD9D0` (other caller of the server-hit table; no direct callers,
-reached through a pointer) runs the row's server-hit function with no
-unit when its flag argument is non-zero, then removes the missile
-(`0x00555600`). Its users are not identified (open question 10).
+`0x005AD9D0` (other caller of the server-hit table) runs the row's
+server-hit function with no unit when its flag argument is non-zero,
+then removes the missile (`0x00555600`). It is dead code in 1.14d: no
+call, jump or stored pointer reaches it (open question 10); d2rs does
+not implement it.
 
 #### R9.2 TSV columns (`srvdo.tsv`, `srvhit.tsv`)
 
@@ -1117,9 +1120,12 @@ Reading:
 2. Collide-type callbacks `0x005A87B0`, `0x005A87F0`, `0x005A8850`,
    `0x005A8890` are not in the disassembly export; their unit tests are
    D2MOO's. Settle: disassemble them.
-3. Position and direction units of the path step (R4.1.3): is the
-   direction vector normalised to 4096 and the position 16.16 subtiles?
-   Owned by `units.md`; settle there.
+3. Answered (2026-10-08), R4.1 rule 3: yes to both. The direction
+   vector comes from the 128-row `tan` table with x² + y² ≈ 4096²
+   (`sim/pathing.md` §8.3, `0x0064FC60`); the position is two u32 16.16
+   sub-tile values (`sim/path-placement.md` §1 rule 2), and the step
+   vector is 16.16 per tick (`sim/pathing.md` §9.4 rule 2.1,
+   `0x006502D0`). Owners: those two specs.
 4. Damage application, to-hit formula, block/dodge and the server-damage
    functions' formulas are the skills spec's; their draw counts complete
    the hit draw order here.
@@ -1127,9 +1133,11 @@ Reading:
    (e.g. through the room update queues "qin"/"qout" seen for missiles
    in the recording)? Settle: a packets recording during a firebolt cast
    compared with `0x73`/`0x4C`/`0x4D` counts.
-6. R2.3 step 8 compares the target with the owner's position (D2MOO);
-   the 1.14d helper calls take the units in registers. Settle: asm read
-   of `0x0059FBC0`–`0x0059FC09`.
+6. Answered (2026-10-08), R2.3 step 8: asm read of
+   `0x0059FBBE`–`0x0059FC11` confirms the owner (record +0x04): x
+   compared first, then y, via `0x0045ADF0` / `0x0045AE20` with the unit
+   in ECX; a target unit equal to the owner is skipped before the
+   compare. As D2MOO.
 7. Server reads of `InitSteps`, `Qty`, `SpecialSetup`,
    `ExplosionMissile` were searched heuristically only (functions that
    index the missile table). Settle: a full xref of record offsets
@@ -1140,19 +1148,29 @@ Reading:
 9. The level passed by monster attacks for spike1 (VelLev 8 makes its
    speed level-dependent) is the AI/skills spec's; a recording with
    positions would confirm the speed formula.
-10. Who calls `0x005AD9D0` (pointer only)? Settle: search `.rdata`/code
-    for the immediate `0x005AD9D0`.
+10. Answered (2026-10-08), R9.1: nobody. A search of `Game.exe` 1.14d
+    for the absolute value `0x005AD9D0` (all sections) and for E8 / E9
+    / 0F 8x rel32 branches to it in `.text` finds nothing; the export
+    lists 0 callers. Dead code; not implemented.
 11. Can a missile be created before the timer-queue run of a frame (e.g.
     while client messages are handled)? It would then run in its creation
     frame. Settle: a recording hooking `0x0059FA30` with the tick step
     in progress.
-12. Path types 10 and 14 (`0x0067A240`, `0x0067A140`, R4.3): who sets
-    them (a skill init callback, R2.3 step 21?), which seed
-    `0x0067A240` draws on (a seed pointer passed in a register; one
-    draw per point, 8-way turns over max distance / 2 points) and
-    `0x0067A140`'s x87 sine/cosine spiral (77 points). Settle: asm read
-    of both and of their callers; d2rs needs a bit-exact replacement of
-    the x87 part (hard rule 6).
+12. Answered (2026-10-08), R4.3 table: the computes are owned by
+    `sim/pathing.md` §11.2 (type 10) and §11.3 (type 14, the x87 part
+    as integer math; its precision-control question is pathing Open
+    question 9). Seed: `0x00649760` passes EDX = unit + 0x20 with the
+    unit asserted equal to the path's unit (`0x0064998A`), so the draws
+    are on the **missile's own seed**, which the setter re-seeded just
+    before. Server setters of type 10 (`0x00648CF0`): init callbacks
+    `0x005C9290` (`skills/bodies-2.md` §2.3), `0x005CD110`
+    (`skills/bodies-3.md`), `0x005D40F0`, `0x005D4680`
+    (`skills/bodies-4.md`) and `0x005AC040` (`bodies.md` §19); type 14:
+    srvdo 73 Blessed Hammer `0x005D0040` (`skills/bodies-2b.md` §6.9).
+    The other setters (`0x004C95E0`, `0x004D62B0`, `0x004E1C80`,
+    `0x004E2ED0`, `0x004F2AC0`, `0x004F2BE0`) are client-side mirrors
+    of these callbacks (e.g. `0x004E1C80` = `0x005CD110`'s shape);
+    owners: the client specs.
 13. *Answered* (`impl-missile-bodies-2` Q2): `elem_roll` returns the
     rolled amount of its element, not the `EType` (§R9.6 return list;
     `0x005A8C70`).
