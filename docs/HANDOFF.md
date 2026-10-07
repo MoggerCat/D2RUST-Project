@@ -3126,6 +3126,7 @@ Carried-over open questions not yet in a spec's list:
 1. 8 unflagged invisible collision tiles in `townN1.ds1` draw as blue
    patches (`map-preview.md` OQ3; needs RE of the client tile draw path).
 2. DS1 v12/13 trailing bytes (possibly an early NPC-path section).
+   Answered: never read by 1.14d (`formats/ds1.md` OQ4).
 3. DC6/DCC vertical placement (one-row disagreement between sources). Owner: `render/sprite-placement.md` (`specs/client/render-pipeline.md` §B1).
 4. Meaning of the PL2 rendering tables (Phase 6). Owner: `render/shading.md` (`render-pipeline.md` §B3).
 5. `client-messages.tsv` repeats the field name `unk` in one layout
