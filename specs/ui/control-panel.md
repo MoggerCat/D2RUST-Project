@@ -28,15 +28,15 @@
 |   5. Belt | 187–278 |
 |   6. Run / walk and menu buttons | 279–297 |
 |   7. Skill buttons | 298–320 |
-|   8. New-stats and new-skills buttons | 321–348 |
-|   9. Mini panel (state 0x15) | 349–409 |
-|   10. Control panel mouse input | 410–439 |
-| Constants & data dependencies | 440–448 |
-| Randomness | 449–452 |
-| Edge cases & original bugs | 453–465 |
-| Test vectors | 466–484 |
-| Provenance | 485–501 |
-| Open questions | 502–524 |
+|   8. New-stats and new-skills buttons | 321–369 |
+|   9. Mini panel (state 0x15) | 370–430 |
+|   10. Control panel mouse input | 431–460 |
+| Constants & data dependencies | 461–469 |
+| Randomness | 470–473 |
+| Edge cases & original bugs | 474–486 |
+| Test vectors | 487–505 |
+| Provenance | 506–522 |
+| Open questions | 523–548 |
 <!-- /index -->
 
 ## Summary
@@ -344,7 +344,28 @@ draw mode 5 unless a rule says otherwise.
    < x < x0 + 34 in open mode 2, else 41 ≤ x ≤ 73; new skills x0' − 73 <
    x < x0' − 40 with x0' = W (W − W/2 in open mode 1); y H − 139 < y <
    H − 102 / H − 138 < y < H − 102 (`0x004A6580`, `0x004A6630`).
-3. Press and release handling of these buttons: §Open questions 5.
+3. Press and release handling of these buttons: rules 4–5 (was §Open
+   questions 5).
+4. **Press** (WM_LBUTTONDOWN entries of the handler tables `0x006D5FE0`
+   / `0x006D6004`: new stats `0x004A66E0`, new skills `0x004A6790`):
+   nothing at 800 × 600 while state 9 is open. Hit: 800 × 600 the hover
+   rectangles of rule 1 (current mouse, `0x004A65E0` / `0x004A6690`);
+   640 × 480 the "inside" rectangles of rule 2 with the event's x, y and
+   the open mode (`0x004A6580` / `0x004A6630`). A hit sets the pressed
+   flag (`[0x007C02E4]` / `[0x007C02E8]`), plays sound 0
+   (`0x004B9A00(0, 0, 0)`), runs the cursor press (`ui/panels-3.md` §23
+   r5) and consumes the event, except when the open mode is 2 (new
+   stats) / 1 (new skills) and `0x004B3470()` ≠ 0 (then not consumed).
+   A miss is not consumed.
+5. **Release** (WM_LBUTTONUP entries: `0x004A6840` / `0x004A6920`):
+   nothing at 800 × 600 while state 9 is open; else the cursor release
+   (`ui/panels-3.md` §23 r6). Pressed and a hit (800 × 600: current mouse; 640 × 480: the
+   event) → pressed := 0 and, 800 × 600: `SetUIState(2, on, 0)` (new
+   stats) / `SetUIState(4, on, 0)` (new skills); 640 × 480:
+   `SetUIState(6, off, 0)` then `SetUIState(2, on, 0)` / `SetUIState(7,
+   off, 0)` then `SetUIState(4, on, 0)`; consumed. Otherwise pressed :=
+   0, not consumed. No press check beyond the flag (a press elsewhere
+   never set it).
 
 ### 9. Mini panel (state 0x15)
 
@@ -516,8 +537,11 @@ with Python scripts outside the repo. No capture yet.
    `0x004AA7E0`): Ghidra read; owner this spec or a skill-select spec.
 4. `[0x007BEFEC]` (set to 60 on a level change): its reader (level name
    display) and units.
-5. New-stats / new-skills press and release handlers (writers of
-   `[0x007C02E4]` `0x004A66E0`, `[0x007C02E8]` `0x004A6790`) and
-   `[0x007BEFD4]` (toggled by the menu-button release).
+5. *Partly answered* (2026-10-07, §8 r4–r5: the press and release
+   handlers; still open: `[0x007BEFD4]`, toggled by the menu-button
+   release, and `0x004B3470`). Was: New-stats / new-skills press and
+   release handlers (writers of `[0x007C02E4]` `0x004A66E0`,
+   `[0x007C02E8]` `0x004A6790`) and `[0x007BEFD4]` (toggled by the
+   menu-button release).
 6. **Needs recording.** Pixel proof of §3–§9 at 640 × 480 and 800 × 600
    (globes at several fills, belt popped, mini panel in layouts 1–3).
