@@ -269,6 +269,8 @@ impl CombatTables {
 }
 
 #[cfg(test)]
+mod cov_tests;
+#[cfg(test)]
 mod damage_tests;
 #[cfg(test)]
 mod events_tests;

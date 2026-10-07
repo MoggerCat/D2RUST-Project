@@ -262,6 +262,7 @@ fn the_kill_queues_the_defender_for_the_hireling_host() {
 
 /// A dead monster is not killed again (§7.2 guard), and an uninterruptible
 /// defender only gets `death_delay` (§7.1).
+// Covers: specs/combat/damage.md §7.1 r3
 #[test]
 fn kill_guards() {
     let mut fx = Fx::new();
