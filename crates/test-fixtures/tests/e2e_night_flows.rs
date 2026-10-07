@@ -848,10 +848,15 @@ fn reading_horazons_journal() {
     let done = vec![0x5D, A2Q4, 0x00, 0x0C, 0x00, 0x00];
     assert!(got.contains(&done), "{got:02x?}");
     assert!(got.contains(&object_state(g, true, 1)), "{got:02x?}");
-    // The scroll text 396 (`0x005456A0`, S→C 0x27 type 2) has no byte
-    // layout in the spec (`quests-act2.md` OQ4): the rest's
-    // `open_quest_message` seam, nothing sent.
-    assert!(!got.iter().any(|m| m[0] == 0x27), "{got:02x?}");
+    // The scroll text 396 (`0x005456A0`, `quests-act2-2.md` §5.4): S→C
+    // 0x27 type 2, the journal's GUID, count 1, entry 0 kind 0 with the
+    // string; bytes 7, 9, 12–39 are 0 here (unwritten in 1.14d, masked).
+    let mut scroll = vec![0x27, 2];
+    scroll.extend_from_slice(&g.to_le_bytes());
+    scroll.extend_from_slice(&[1, 0, 0, 0]);
+    scroll.extend_from_slice(&396u16.to_le_bytes());
+    scroll.resize(40, 0);
+    assert!(got.contains(&scroll), "{got:02x?}");
     // +0x08 := the tome's room (`unit_position` on the wired host,
     // finding N-2 fixed).
     let room = fx
