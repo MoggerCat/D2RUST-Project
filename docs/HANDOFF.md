@@ -5309,6 +5309,10 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
 - `world/objects.md` OQ1 (PC 2 spec-objects): with `record_objects.py`, operate one chest, shrine, door, well and portal (packets + RNG): the draw order of §8–§12 and the 0x0E / 0x4D / 0x60 bytes of §14.
 - `world/objects.md` OQ10 (PC 2 spec-objects): a fire object (class 160–162) for a few seconds: no 0x0E 1 → 2 update expected.
 - `world/objects.md` OQ14 (PC 2 spec-objects): in the existing `obj1-objects.jsonl` (PC 2 raw), the mode argument of the two class-37 allocations with speed 0 (expected 2).
+- `ui/panels.md` §12.4 / OQ11 (PC 2 spec-ui): transmute in the Horadric Cube at 800 × 600 and 640 × 480: frames at animation steps 1, 15, 29 and the step after 29 (no frame), proving the offsets and draw mode 3.
+- `ui/panels.md` §8.11 (PC 2 spec-ui): character panel of a level-99 character (experience 3,520,485,254) and of a level-1 character: the grouped strings and the next-level value.
+- `ui/menus.md` OQ1 / OQ4 (PC 2 spec-ui): Akara's menu, Charsi's menu and Kashya's hire list at 800 × 600 (box position, item rows, highlight).
+- `ui/menus.md` §1 / `ui/panels.md` §13 (PC 2 spec-ui): the waypoint menu with each tab clicked and a row hovered.
 
 **Ninth set (2026-10-07; the 22 notes `impl-ai-acts2-5`, `impl-skill-slots-2`,
 `impl-missile-bodies-2`, `impl-quests-act1-rest`, `impl-quests-act2`,
