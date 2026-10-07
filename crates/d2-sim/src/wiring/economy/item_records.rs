@@ -8,8 +8,8 @@
 //! save load (`d2s.md` §8.2).
 //!
 //! What the record carries goes where the writer read it from: the item
-//! data to the item store, unit +0x28 (§4.1 rule 7) to the unit record's
-//! init seed, the base values (`0x006253B0`: defense, max durability,
+//! data to the item store, the save-only 32 bits (§4.1 rule 7) to the
+//! item seed (`sim/rng.md` §5.3, `0x0062CBE0`), the base values (`0x006253B0`: defense, max durability,
 //! sockets) and the totals the writer sent (durability, gold, quantity,
 //! quest difficulty) as base stats, the property lists to their keyed
 //! lists. The record's position, body location and page are the item
@@ -23,6 +23,7 @@ use super::{Economy, EconomyError};
 use crate::items::bitstream::read::ReadItem;
 use crate::items::bitstream::{hflag, StatEntry, RUNEWORD_STATE, SET_STATES};
 use crate::items::{flag, replenish_timer, stat, Item, ItemStats, ListKey};
+use crate::rng::Seed;
 use crate::units::hooks::Sim;
 use crate::units::lifecycle::{self, AllocRequest, LifecycleHooks};
 use crate::units::{RoomId, UnitId, UnitType};
@@ -92,9 +93,14 @@ impl<H: LifecycleHooks> Economy<'_, H> {
             .units
             .get_mut(unit)
             .ok_or(EconomyError::NoRecord(unit))?;
-        if !it.compact && !it.alt {
-            r.init_seed = it.unit28;
-        }
+        // `rng.md` §5.3 "item seed from a save": the full record's 32 bits
+        // (`0x0062CBE0`); the compact reader `0x0062A970` sets 0.
+        // TODO(spec: sim/rng.md §5.3): whether the decoder writes the
+        // whole seed (`init_low`, high word 666) or the low word only; read
+        // as `init_low`. The start seed stays the allocation's.
+        let v = if it.compact || it.alt { 0 } else { it.unit28 };
+        let start = r.item_seed.map_or(0, |(_, st)| st);
+        r.item_seed = Some((Seed::init_low(v), start));
         let frame = self.game.frame as u32;
         let event3_at = {
             let ctx = RefCell::new(StatCtx::new(self.stats, self.hooks));

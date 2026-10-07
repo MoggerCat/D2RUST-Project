@@ -59,7 +59,10 @@ fn copy_of_a_ground_item() {
     assert_ne!(c, su);
     let cg = w.units.get(c).unwrap().guid;
     assert_eq!(cg, s + 1, "the next item GUID");
-    assert_eq!(w.units.get(c).unwrap().init_seed, init, "unit +0x28");
+    // The save's 32 bits (unit +0x28) become the copy's item seed
+    // (`rng.md` §5.3).
+    let seed = w.units.get(c).unwrap().item_seed.unwrap().0;
+    assert_eq!(seed, crate::rng::Seed::init_low(init));
     assert_eq!(w.units.get(c).unwrap().mode, 3);
     assert_eq!(
         w.game.lists.unit(c).unwrap().room(),
