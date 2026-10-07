@@ -64,9 +64,9 @@ git fetch origin claude/play-integrate
 git checkout claude/play-integrate
 ```
 
-Known blocker: until the DRLG room fix (another session) is merged, the
-server may still panic at about tick 104 (`drlg/room.rs`
-`expect("live DRLG room")`). Use `--frames 90` to stop before it if so.
+The DRLG room-free fix (play-drlg, G1) is merged into this branch, so the
+tick-104 panic (`drlg/room.rs` `expect("live DRLG room")`) should be gone.
+If it still appears, copy the panic line into `docs/HANDOFF.md`.
 
 ### 1. New character
 
@@ -123,7 +123,7 @@ cargo run -p d2-client --release -- play --new sorceress Test --frames 600
 
 What to see: the window opens, the log has `frame 250:` and `frame 500:`
 lines, then `play: exiting after 600 frames`, exit code 0. No panic
-(unless the DRLG blocker above). `git status` shows no new file.
+(the DRLG fix is merged; a panic is a bug to report). `git status` shows no new file.
 
 ## What is left
 
@@ -133,6 +133,8 @@ lines, then `play: exiting after 600 frames`, exit code 0. No panic
 - Character labels / class line (need a string table in play), resist
   effect tests, the damage block.
 - Predicted facing; REC-51 to replace `bridge/predict.rs`.
+- play-drlg's seam request (a synthetic level-2 room next to the town in
+  `app/single_player.rs` for `tests/app_level_border.rs`) is not done here.
 - Queue in `docs/HANDOFF.md` §5 (not done here): the capture compares for
   the map, units and the character panel once a `SceneSource` exists, and
   REC-51.
