@@ -21,16 +21,16 @@
 | Outputs / state changes | 54–59 |
 | Rules | 60–63 |
 |   1. Header | 64–70 |
-|   2. Chunk walk (no pad bytes) | 71–106 |
-|   3. Samples | 107–118 |
-|   4. Format checks by the game | 119–131 |
-| Constants & data dependencies | 132–139 |
-| Randomness | 140–143 |
-| Survey (1.14d data) | 144–196 |
-| Edge cases & original bugs | 197–210 |
-| Test vectors | 211–249 |
-| Provenance | 250–265 |
-| Open questions | 266–283 |
+|   2. Chunk walk (no pad bytes) | 71–112 |
+|   3. Samples | 113–136 |
+|   4. Format checks by the game | 137–149 |
+| Constants & data dependencies | 150–157 |
+| Randomness | 158–161 |
+| Survey (1.14d data) | 162–214 |
+| Edge cases & original bugs | 215–228 |
+| Test vectors | 229–267 |
+| Provenance | 268–284 |
+| Open questions | 285–306 |
 <!-- /index -->
 
 ## Summary
@@ -103,6 +103,12 @@ The Storm streaming loader (0x41B280, chunk search 0x41B210, used through
 0x515D70) performs the same walk by seeking in the archive file: same
 `fmt ` size ≥ 16 check, same pad-free skipping, `data` searched after
 `fmt `.
+Refined (third pass): the Storm walk keeps no `remaining` count. It
+reads 8-byte headers (`0x0041B050`) and seeks past each non-matching
+body (`0x004165A0`, relative) until the ID matches or a read fails at
+the end of the file; the RIFF/WAVE test reads only the first 12 bytes
+(no 32-byte minimum), and the `data` size is not checked against the
+file length. Every live stream file passes both walks (Survey).
 
 ### 3. Samples
 
@@ -113,7 +119,19 @@ for 8-bit, 0 otherwise). Every voice buffer is created with a fixed
 format built by 0x516720: PCM, 22,050 Hz, 16-bit, `channels` = 1 or 2
 (voices 0x5153C0, primary buffer 0x5140D0 is 22,050 Hz 16-bit stereo).
 So the samples the game outputs are the `data` bytes read as i16
-little-endian, interleaved by channel. d2rs: `samples[i]` = i16 at
+little-endian, interleaved by channel.
+Correction (third pass): stream voices are not 0x516720 buffers. Storm
+creates their DirectSound buffer itself (`0x0041B280`, through the
+device object `[0x00778F20]`) with the file's own first 16 `fmt ` bytes
+as its format (`cbSize` 0), no rate or bit check; buffer size = the
+requested size rounded up to the read unit `[0x00779038]` (0x4000 bytes
+by default), at least two units; start offset = the given offset mod
+the `data` size. Its reader (`0x00419C00`, from `0x0041A550`) reads
+the `data` through the archive (`0x00419790`) into a staging buffer and
+`memcpy`s it unchanged into the locked buffer (`0x004157C0`), padding
+the rest of a unit after the end with the silence byte (0x80 for
+8-bit, else 0). With the live files (every stream file stereo 16-bit
+22,050 Hz, Survey) the output equals the in-memory path's. d2rs: `samples[i]` = i16 at
 `data[2i..2i+2]` for `i < size / 2`.
 
 ### 4. Format checks by the game
@@ -251,7 +269,8 @@ regressions; equality with the original's output is Open question 1.
 
 - 1.14d `Game.exe`: 0x516760 (RIFF/WAVE check, `fmt `/`data` lookup),
   0x5166D0 (in-memory chunk search), 0x41B280 / 0x41B210 (Storm streaming
-  begin and chunk search, via 0x515D70), 0x516720 (voice WAVEFORMATEX),
+  begin and chunk search, via 0x515D70), 0x41B050, 0x4165A0, 0x419C00,
+  0x41A550, 0x419790, 0x4157C0 (stream reads, third pass), 0x516720 (voice WAVEFORMATEX),
   0x5153C0 (voice buffer create), 0x5140D0 (DirectSound init, primary
   format), 0x515180 (buffer fill, `memcpy`), 0x5155D0 (attach data to a
   voice), 0x4DF630 and 0x514E10 (format checks), 0x4359D0 (UI preload
@@ -273,6 +292,10 @@ regressions; equality with the original's output is Open question 1.
 2. The Storm stream path (0x41B280) is assumed to copy bytes unchanged
    like 0x515180; its refill thread was not traced. Settled by the same
    dump on a `Stream`=1 sound (e.g. `music\act1\crypt.wav`).
+   Answered (static, §3 correction): the refill thread `0x00419C00`
+   copies the archive's decoded bytes unchanged (`memcpy` in
+   `0x004157C0`) and pads with the silence byte; the buffer takes the
+   file's own format. Sample equality itself is open question 1.
 3. Answered: on a stereo voice. All 30 rows are non-`Stream`, so their
    sample is loaded through `0x00482970` / `0x00481720`, both of which
    run 0x4DF630; on success it overwrites the row's `Stereo` byte with

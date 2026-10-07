@@ -34,7 +34,7 @@
 | Test vectors | 386–412 |
 |   Checks (hook addresses for `record_sound.py`) | 413–422 |
 | Provenance | 423–442 |
-| Open questions | 443–460 |
+| Open questions | 443–469 |
 <!-- /index -->
 
 ## Summary
@@ -452,6 +452,15 @@ period indices) and 74 (ambience / roll / cue logs, raw
 4. Weather: when it is active (`0x00473C40`: `[0x007A8A14]` = 0 and
    the level's weather flag) and how the intensity moves (owner: a
    future weather spec; thunder 202 is `audio/triggers.md` §12).
+   Answered: active = snow mode `[0x007A8A14]` = 0 and the `Rain` byte
+   (`levels.txt` record +5, `0x0061DBA0`) of the local player's level is
+   non-zero (`0x00620BB0` → `0x0061A1B0`); no player → not active
+   (`0x00473C40`; the flag `[0x007A8A14]` is the one
+   `render/draw-order-2.md` §11.1 calls snow mode). The
+   intensity `[0x007A89A0]` (target particle count / 256) and the rain
+   cycle that moves it are owned by `render/draw-order-2.md` §11.1–§11.3
+   (which is the weather spec); it is zeroed in every weather update of
+   a level without `Rain` (§11.2 r3 there).
 5. Front-end music (`Options Music` setting, `music_options`,
    `0x00514D80` callers `0x0042FB20`–`0x004FA160`): out of game, owner
    a front-end spec.

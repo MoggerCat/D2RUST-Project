@@ -38,14 +38,14 @@
 |   9. Items | 530–553 |
 |   10. NPC speech | 554–616 |
 |   11. UI sounds | 617–640 |
-|   12. Other fixed requests | 641–670 |
-| Constants & data dependencies | 671–687 |
-| Randomness | 688–707 |
-| Edge cases & original bugs | 708–724 |
-| Test vectors | 725–756 |
-|   Checks (hook addresses for `record_sound.py`, `client/audio.md` §B7) | 757–770 |
-| Provenance | 771–798 |
-| Open questions | 799–841 |
+|   12. Other fixed requests | 641–705 |
+| Constants & data dependencies | 706–722 |
+| Randomness | 723–746 |
+| Edge cases & original bugs | 747–763 |
+| Test vectors | 764–795 |
+|   Checks (hook addresses for `record_sound.py`, `client/audio.md` §B7) | 796–809 |
+| Provenance | 810–837 |
+| Open questions | 838–927 |
 <!-- /index -->
 
 ## Summary
@@ -648,13 +648,48 @@ v. All none (open question 9).
 | 2,231 | `player_townportal_enter` | `0x0049D010` | none |
 | 2,671 | `shrine_portal` | `0x0049FBA0` | none |
 | 4,640 | `monster_diablo_taunt_ex` | `0x0049EB10` (missing file: silent, `sound-table.md` §11) | none |
-| 4,638 | `monster_diablo_taunt_1` | `0x004D6540` | yes |
+| 4,638 | `monster_diablo_taunt_1` | `0x004D6540` | none (corrected: `0x004D6574` passes no unit) |
 | 2,458 | `necromancer_corpseexp_1` | `0x004AD0C0`, `0x004AD1A0`, `0x004ADCE0` | yes |
 | 1,308 / 1,311 / 1,314 / 1,317, 2,419, 790 | minion deaths, fireball impact, druid pod death | `0x004AFF60` (monster mode machine) | yes |
 | 2,517 | `barbarian_leap_land` (+ a running footstep) | `0x004C8970` | yes |
 | 1,830 | `spider_web_1` | `0x004E2D40` | yes |
 
 Their conditions are the owning features' (open question 10).
+
+Conditions found (third pass, partly answers open question 10):
+
+1. 396 / 397: `0x00464E50(U, overlay o, n)` (from the monster mode
+   machine `0x004AFF60`, 5 sites) first creates overlay o on U (type 1
+   with n if n ≥ 1, else type 2; no seed draw), then o = 151 → 396
+   `impact_steal_life`, o = 152 → 397 `impact_steal_mana`, on U.
+2. 452: the shake level `l = trunc(a × 255 / 20)` clamped to 0–255 (a =
+   the shake amplitude of `render/camera.md` §8, `0x004769D0`, called
+   twice per drawn frame from `0x00476D40`). l > 0 with no loop request
+   (`[0x007B8D2C]` = 0) → request 452 with no unit, then volume := l
+   (`0x004B9B50`); with a request, its volume moves toward l by at most
+   6 per call (`0x004B9B20` read); when the new volume is 0 the request
+   is stopped (`0x004BA840`: stop flag, plus a `Fade Out` fade if it is
+   playing, as `sound-table.md` §6.2 r3's switch-off) and
+   `[0x007B8D2C]` := 0; otherwise volume := the new value. Wall-clock
+   driven (the shake envelope).
+3. 2,231 at `0x0049D010`: the waypoint panel row choice
+   (`ui/menus.md` mouse-up rule), no unit.
+4. 2,671 at `0x0049FBA0`: the deciphered Scroll of Inifuss panel (UI
+   state 16, item code `bkd `, from `0x0049FF10`): a step counter
+   advances when more than 50 ms of `GetTickCount` time passed; each of
+   the 5 symbols plays 2,671 (no unit) on the step where counter − its
+   start (`0x00722F08 + 4i`) = 1. Wall-clock driven.
+5. 4,640 at `0x0049EB10`: S→C 0x5A EventMessage type 18 (`0x0049F35B`;
+   handler `0x0045E070`, also `0x0048A630`), after the message, the
+   level effect `0x0061C240` and a shake: no unit (file missing, silent).
+6. 4,638 at `0x004D6540`: client missile function 37 (table
+   `0x0072A398`, missile 372 `diablo appears`): at frames left 150 a
+   screen shake (`0x00476A80`), at frames left 50 the request, no unit.
+
+Still open: 2,458 (`0x004AD0C0`, `0x004AD1A0`, `0x004ADCE0`, reached
+through tables `0x0072509C`, `0x00724EE4` and `0x004D93A0`), the
+`0x004AFF60` death sounds, 2,517 (`0x004C8970`) and 1,830
+(`0x004E2D40`, from `0x004807E9`).
 
 **Thunder, draws** (`0x00473910`, weather; the timer and when it runs
 are the weather spec's): at a thunder step (`0x004739B4`) the code draws
@@ -703,7 +738,11 @@ Within one client update the order follows the unit update order of
 `client/model.md` §5 r3 (monster: neutral, then footsteps). Variant
 draws of requests happen later, in the sound update's request order
 (`sound-table.md` §6.2). How these interleave with other users of the
-seed is `sound-table.md` open question 3.
+seed is `sound-table.md` open question 3 (answered statically in
+`sound-table-2.md` §14). Also on this seed, outside `0x004E40A0`:
+Nihlathak's hurry-up deadline (open question 8, `roll(30)` via
+`0x0045C3E0`, once per interaction, during a drawn frame) and the
+thunder draws (§12).
 
 ## Edge cases & original bugs
 
@@ -812,15 +851,62 @@ entry 74 (id-0 requests).
    values come from the mode event records those machines consume
    (e.g. record +0x08 at `0x00461494`, +0x18 at `0x004B0546`). Which
    S→C message field fills them belongs to `client/msg-units.md`; the
-   write watch still settles it end to end.
+   write watch still settles it end to end. The writer list is
+   complete for client code: a scan of every store to `[reg + 0xB0]` in
+   `0x00440000`–`0x0050FFFF` finds only these sites plus `0x00447BB0`,
+   `0x00449050`, `0x004493E0`, which use +0xB0 as the next link of the
+   list at `[0x00798F34]` (not a unit).
 4. Event 12: which skill/record `0x006256B0(U, 0x44)` and
-   `0x00625D00(·, 350, 0)` select.
+   `0x00625D00(·, 350, 0)` select. Answered (`0x004CBE6B`–`0x004CBEB9`):
+   U's stat list of state 68 (`evade`); its stat 350
+   (`modifierlist_skill`) = the skill that set the state; if U has that
+   skill (`0x006439F0`) and its `skills.txt` record exists
+   (`0x0045C4B0`), its `stsound` (+0xFC) > 0 is requested on U, delay
+   0. Live: Dodge (13), Avoid (18) and Evade (29) all have `stsound`
+   2,236 `amazon_dodge_1`; no state 68 or no skill → nothing.
 5. `dosound a`/`dosound b` use in `0x004C9B40`, `0x004F4590`.
+   Answered: `0x004F4590` is `cltdofunc` 16 (table `0x00727BA8`; live:
+   Jab only): when the caster's action frame (unit byte +0x4E,
+   `sim/units.md`) is 3, a player caster requests `dosound a` (+0x102)
+   and a monster caster `dosound b` (+0x104), on the caster, delay 0,
+   when > 0 (Jab: 286 `weapon_1ht_1` / 292 `weapon_2ht_1`). It
+   returns 1 either way. `0x004C9B40` is `cltstfunc` 25 (table
+   `0x00727A90`; live: Charge 107, SerpentCharge 352): unless it hands
+   over to `0x004C7630` (player with a target in reach, `0x00622C40`),
+   a player requests `dosound a` (> 0) and a monster the sound of its
+   monstats skill slot holding this skill (`0x004F4F40`: slots 0–3 →
+   `monsounds` Skill1–Skill4, +0x44–+0x50; other slots or −1 → none),
+   on the caster, delay 0 (after its entry checks: skill record, path,
+   and not the local player re-casting its current skill with the
+   skill flag bit 0 set, `0x006446A0`). Both live skills have no
+   `dosound a`.
 6. ProgSound conditions per client progressive function (owner: the
    client part of `missiles/missiles.md`).
 7. Answered (§10 r6): no; only the options menu calls the setter.
 8. Conditions of `0x004B3380`, `0x004B4380` (Act II guard, Act V
-   soldiers, Nihlathak).
+   soldiers, Nihlathak). Answered: `0x004B3380` is the S→C 0x8A
+   NpcWantsInteract handler (`0x0045EA40`; type u8@1, GUID u32@2). Unit
+   not found → nothing. Class 534 (`act5pow`): monster data +0x3C ≠ −1
+   (`0x004AE130`) → 4,603, else 4,607, on U; done. Any other U that is
+   not the NPC of the active interaction (`[0x007C0D29]`,
+   `[0x007C0D25]`): overlay 0x48 (type 3, no draw) on U; then if U is
+   class 331 (`act2guard2`), no interaction is active (`0x004B1620`), the
+   client quest record `[0x007C0D43]` exists, slot 12 (Arcane
+   Sanctuary) has neither bit 8 nor bit 1 (`0x0065C310`), and no object
+   of class 318 (`eunuch harem blocker`) in mode 2 is in the client
+   object set (`0x004649D0` with callback `0x004B3360`): 3,983
+   `guard_halt` on U. `0x004B4380` runs in the UI pass `0x00456EE0`
+   (once per drawn frame); in its branch with the NPC menu flag
+   `[0x007C0D67]` set (and `[0x007C0D6B]`, `[0x007C0D63]` clear,
+   `ui/menus.md`), when the interaction NPC is class 514 (`nihlathak`)
+   and `[0x007C0DBC]` = 0: the first time (`[0x007C0DC0]` = 0) it sets
+   `[0x007C0DC0]`, draws `roll(30)` on the sound seed and sets a
+   deadline = `GetTickCount` + (roll + 120) × 1,000; then if
+   `GetTickCount` < deadline (true at once) it sets `[0x007C0DBC]` and
+   requests 4,560 `nihlathak_hurryup` with no unit. So the line plays
+   on the first such frame, not after the delay (original bug, kept);
+   both flags are cleared by `0x004B23E0` (from `0x00456970`,
+   `0x004B32F0`).
 9. Answered by `client/msg-ui.md` §1 (full `0x004A2CB0` dispatch; the
    message is `world/quests.md` §6.3's one-quest status: code = chain,
    value = extra). §11's 0x5D paragraph is the sound subset of it.
