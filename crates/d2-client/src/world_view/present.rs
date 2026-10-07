@@ -91,6 +91,12 @@ pub struct WorldViewState {
     /// The game's automap (`ui/automap.md`), when the app supplied its
     /// tables; `None`: no automap.
     pub automap: Option<crate::ui::automap::session::AutomapSession>,
+    /// The play preview (decision D1, [`super::preview`]): a frame whose
+    /// build fails is logged (each message once) and not presented,
+    /// instead of failing the app. `false`: strict (M07).
+    pub preview: bool,
+    /// The last logged preview frame error.
+    preview_error: Option<String>,
 }
 
 impl WorldViewState {
@@ -108,6 +114,8 @@ impl WorldViewState {
             last: None,
             click: Default::default(),
             automap: None,
+            preview: false,
+            preview_error: None,
         }
     }
 }
@@ -559,13 +567,28 @@ fn world_view_frame(
         None => None,
     };
     let draws = ui_frame.as_ref().map_or(&[][..], |f| &f.draws[..]);
-    let frame = build_frame(
+    state.feed.prepare(bridge.0.world(), &mut state.assets)?;
+    let built = build_frame(
         bridge.0.world(),
         draws,
         state.rules.as_ref(),
         state.feed.as_mut(),
         &state.assets,
-    )?;
+    );
+    let frame = match built {
+        Ok(f) => f,
+        // d2rs-own, unverified (D1): the preview keeps running; the
+        // frame is not presented.
+        Err(e) if state.preview => {
+            let message = e.to_string();
+            if state.preview_error.as_deref() != Some(message.as_str()) {
+                warn!("preview (d2rs-own, unverified): frame not drawn: {message}");
+                state.preview_error = Some(message);
+            }
+            return Ok(());
+        }
+        Err(e) => return Err(e.into()),
+    };
     // `ui/automap.md` §5 r1: the reveal of this frame, after the draw
     // marked its records (from the frame `0x0044C7EB`).
     if let Some(a) = state.automap.as_mut() {

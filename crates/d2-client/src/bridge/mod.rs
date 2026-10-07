@@ -31,6 +31,7 @@ pub mod output;
 pub mod passive;
 #[cfg(test)]
 mod passive_tests;
+pub mod predict;
 pub mod receive;
 pub mod skills;
 pub mod update;

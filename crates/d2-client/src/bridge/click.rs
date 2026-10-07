@@ -14,6 +14,11 @@
 //! - the `skills.txt` flag columns and `range` are not in the client
 //!   tables: [`ModelClick::skill_row`] answers `None`, which §6 r8.2 reads
 //!   as a point click.
+//!
+//! The `mods` word of §4.3 r1 comes from [`RunMods`] (commands 34–36).
+//! In the `play` preview the local player's position the dispatcher reads
+//! may be the predicted one ([`ModelClick::local_at`],
+//! [`super::predict`]).
 
 use crate::controls::click::{
     self, ClickOut, ClickState, ClickWorld, Kind, Pending, SkillRef, SkillRowFacts,
@@ -45,6 +50,47 @@ pub struct ModelClick<'a> {
     pub world: &'a ClientWorld,
     pub inputs: &'a ModelInputs,
     pub view: ClickView,
+    /// The local player's predicted precise position (16.16 sub-tiles,
+    /// [`super::predict::Predict::position`]); `None`: the model's cell.
+    /// d2rs-own, unverified. PROVISIONAL (client/model.md OQ2; REC-51):
+    /// in the preview the server sends the walker nothing, so the model
+    /// cell stays at the walk's start while the view follows the
+    /// prediction; the camera and the walk clamp read the prediction so a
+    /// click lands where the player sees it.
+    pub local_at: Option<(u32, u32)>,
+}
+
+/// The modifier keys of the world click (`ui/controls.md` §3 commands
+/// 34 CfgRun, 35 CfgRunLock, 36 CfgStandStill; §4.3 r1).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct RunMods {
+    /// Run held (command 34 down / up).
+    pub run_held: bool,
+    /// The run lock (command 35 toggles it).
+    pub run_lock: bool,
+    /// Stand Still held (command 36 down / up).
+    pub stand_still: bool,
+}
+
+impl RunMods {
+    /// Command 35 (`0x00469060`): run lock := not run lock.
+    pub fn toggle_run(&mut self) {
+        self.run_lock = !self.run_lock;
+    }
+
+    /// The `mods` word passed to `0x00462D00` (§4.3 r1): 8 when Run held
+    /// or the run lock is set (no inversion), plus 4 when Stand Still is
+    /// held.
+    pub fn word(self) -> u32 {
+        let mut m = 0;
+        if self.run_held || self.run_lock {
+            m |= click::mods::RUN;
+        }
+        if self.stand_still {
+            m |= click::mods::STAND_STILL;
+        }
+        m
+    }
 }
 
 /// `0x00464600(P, skill)` (§6 r4 kind 0): 0 when P holds a cursor item
@@ -66,10 +112,10 @@ impl ModelClick<'_> {
     fn camera(&self) -> Option<Camera> {
         let p = self.world.local()?;
         let (x, y) = p.cell();
-        let at = crate::rules::camera::moving_to_client(
-            (u32::from(x) << 16) | 0x8000,
-            (u32::from(y) << 16) | 0x8000,
-        );
+        let (px, py) = self
+            .local_at
+            .unwrap_or(((u32::from(x) << 16) | 0x8000, (u32::from(y) << 16) | 0x8000));
+        let at = crate::rules::camera::moving_to_client(px, py);
         let mode = OpenMode::new(self.view.open_mode).unwrap_or(OpenMode::NONE);
         Some(Camera::new(self.view.size, mode, at, (0, 0)))
     }
@@ -137,6 +183,11 @@ impl ClickWorld for ModelClick<'_> {
         self.camera().map_or((0, 0), |c| screen_to_world(&c, x, y))
     }
     fn position(&self, u: UnitKey) -> Option<(i32, i32)> {
+        if let (Some((x, y)), Some(_)) =
+            (self.local_at, self.world.local_player.filter(|k| *k == u))
+        {
+            return Some(((x >> 16) as i32, (y >> 16) as i32));
+        }
         let u = self.world.units.get(&u)?;
         let (x, y) = u.position?;
         Some((i32::from(x), i32::from(y)))
@@ -358,12 +409,29 @@ pub fn world_click(
     at: Option<(i32, i32)>,
     mods: u32,
 ) -> Result<(Vec<ClickOut>, Vec<Output>), HandlerError> {
+    world_click_at(world, inputs, st, view, kind, at, mods, None)
+}
+
+/// [`world_click`] with the local player read at `local_at`
+/// ([`ModelClick::local_at`]; the `play` preview's predicted position).
+#[allow(clippy::too_many_arguments)]
+pub fn world_click_at(
+    world: &mut ClientWorld,
+    inputs: &ModelInputs,
+    st: &mut ClickState,
+    view: ClickView,
+    kind: Kind,
+    at: Option<(i32, i32)>,
+    mods: u32,
+    local_at: Option<(u32, u32)>,
+) -> Result<(Vec<ClickOut>, Vec<Output>), HandlerError> {
     let mut outs = Vec::new();
     {
         let m = ModelClick {
             world,
             inputs,
             view,
+            local_at,
         };
         click::click(st, &m, kind, at, mods, &mut outs);
     }
@@ -378,14 +446,148 @@ pub fn held_repeat(
     view: ClickView,
     mods: u32,
 ) -> Result<(Vec<ClickOut>, Vec<Output>), HandlerError> {
+    held_repeat_at(world, inputs, st, view, mods, None)
+}
+
+/// [`held_repeat`] with the local player read at `local_at`
+/// ([`ModelClick::local_at`]).
+pub fn held_repeat_at(
+    world: &mut ClientWorld,
+    inputs: &ModelInputs,
+    st: &mut ClickState,
+    view: ClickView,
+    mods: u32,
+    local_at: Option<(u32, u32)>,
+) -> Result<(Vec<ClickOut>, Vec<Output>), HandlerError> {
     let mut outs = Vec::new();
     {
         let m = ModelClick {
             world,
             inputs,
             view,
+            local_at,
         };
         click::held_repeat(st, &m, mods, &mut outs);
     }
     apply(world, inputs, outs)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::bridge::predict::{walk_of, Walk, WalkTo};
+    use crate::bridge::skills::{SkillEntry, SkillList};
+    use crate::bridge::world::ClientUnit;
+
+    // Synthetic fixture: in game, the local player in town mode 1 at
+    // (100, 100) with stamina, its left skill Attack (mode 0).
+    fn world() -> ClientWorld {
+        let key = UnitKey::new(PLAYER, 1);
+        let mut u = ClientUnit::new(key);
+        u.position = Some((100, 100));
+        u.server_point = (100, 100);
+        u.mode = 1;
+        u.stats.insert(10, 100 << 8);
+        u.skills = Some(SkillList {
+            entries: vec![SkillEntry {
+                skill: click::ATTACK,
+                ..SkillEntry::default()
+            }],
+            left: Some(0),
+            ..SkillList::default()
+        });
+        let mut w = ClientWorld::default();
+        w.units.insert(key, u);
+        w.local_player = Some(key);
+        w.in_game = true;
+        w
+    }
+
+    fn view(mouse: (i32, i32)) -> ClickView {
+        ClickView {
+            size: FrameSize::D2RS,
+            open_mode: 0,
+            right_panel_bottom: FrameSize::D2RS.play_height(),
+            skill_y_limit: FrameSize::D2RS.play_height(),
+            mouse,
+            game_menu_open: false,
+        }
+    }
+
+    /// One left press at `at` with `mods`; the walk the client sent.
+    fn press(mods: u32, at: (i32, i32), local_at: Option<(u32, u32)>) -> Option<Walk> {
+        let mut w = world();
+        let inputs = ModelInputs::default();
+        let mut st = ClickState::default();
+        world_click_at(
+            &mut w,
+            &inputs,
+            &mut st,
+            view(at),
+            Kind::LeftDown,
+            Some(at),
+            mods,
+            local_at,
+        )
+        .unwrap();
+        let walks: Vec<Walk> = w.outgoing.iter().filter_map(|m| walk_of(m)).collect();
+        assert!(walks.len() <= 1, "{walks:?}");
+        walks.first().copied()
+    }
+
+    // Covers: specs/ui/controls.md §4.3 r1
+    #[test]
+    fn run_mods_word() {
+        let mut m = RunMods::default();
+        assert_eq!(m.word(), 0);
+        m.toggle_run();
+        assert_eq!(m.word(), click::mods::RUN);
+        // No inversion: Run held with the lock on still runs.
+        m.run_held = true;
+        assert_eq!(m.word(), click::mods::RUN);
+        m.toggle_run();
+        assert_eq!(m.word(), click::mods::RUN);
+        m.run_held = false;
+        m.stand_still = true;
+        assert_eq!(m.word(), click::mods::STAND_STILL);
+        m.toggle_run();
+        assert_eq!(m.word(), click::mods::STAND_STILL | click::mods::RUN);
+    }
+
+    // Covers: specs/ui/controls.md §6 r7, §4.3 r1
+    #[test]
+    fn ground_click_walks_or_runs_with_the_toggle() {
+        let at = (500, 200);
+        let walk = press(0, at, None).expect("a walk");
+        assert!(!walk.run);
+        let mut run = RunMods::default();
+        run.toggle_run();
+        let r = press(run.word(), at, None).expect("a run");
+        assert!(r.run);
+        assert_eq!(r.to, walk.to);
+        // Stand Still: no walk.
+        let ss = RunMods {
+            stand_still: true,
+            ..RunMods::default()
+        };
+        assert_eq!(press(ss.word(), at, None), None);
+    }
+
+    #[test]
+    fn ground_click_reads_the_predicted_position() {
+        let at = (500, 200);
+        let WalkTo::Point(x, y) = press(0, at, None).unwrap().to else {
+            panic!("a point walk");
+        };
+        // The player predicted 3 sub-tiles further in x: the camera and
+        // the clamp follow it, so the target moves by the same 3.
+        let local = ((103 << 16) | 0x8000, (100 << 16) | 0x8000);
+        let WalkTo::Point(px, py) = press(0, at, Some(local)).unwrap().to else {
+            panic!("a point walk");
+        };
+        assert_eq!((px, py), (x + 3, y));
+        // The model's cell read as the prediction: the same as none.
+        let same = ((100 << 16) | 0x8000, (100 << 16) | 0x8000);
+        assert_eq!(press(0, at, Some(same)).unwrap().to, WalkTo::Point(x, y));
+    }
 }
