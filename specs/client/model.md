@@ -47,7 +47,7 @@
 | Edge cases & original bugs | 612–620 |
 | Test vectors | 621–660 |
 | Provenance | 661–702 |
-| Open questions | 703–745 |
+| Open questions | 703–753 |
 <!-- /index -->
 
 ## Summary
@@ -742,3 +742,11 @@ visibility `0x004DBF20`, `0x0045AFC0`, `0x0045AFD0`, `0x004709A0`,
     (`impl-client-drlg` §3 Q1): §9 rule 5 (0x07 reads through the null
     room, an access violation at `0x0061B672`; 0x08 tests it and does
     nothing).
+12. *Answered:* whether object creation steps the room seed
+    (`impl-client-drlg` §3 Q3): yes, §2 rule 6 stands. 0x51 creates
+    through `0x00466300` → `0x00465FD0` (call at `0x00466332`), which
+    for (x, y) ≠ (0, 0) steps the room's active-room seed (+0x6C/+0x70)
+    and sets the unit seed `init_low(lo')` (`0x0046606A`–`0x00466093`),
+    the same step as `0x00466200` (0x59) and `0x00466360` (0xAC).
+    `client/msg-units.md` Randomness, which named only 0x59 and 0xAC,
+    is corrected.

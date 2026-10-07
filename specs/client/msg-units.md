@@ -22,17 +22,17 @@
 | Inputs | 55–61 |
 | Outputs / state changes | 62–66 |
 | Rules | 67–68 |
-|   1. Unit add | 69–224 |
-|   2. 0x0A RemoveUnit (`0x0045CC10`) | 225–234 |
-|   3. 0x15 ReassignPlayer (`0x0045D160`) | 235–271 |
-|   4. Queued movement and action messages | 272–306 |
-|   5. Local player vitals: 0x18, 0x95, 0x96 | 307–328 |
-| Constants & data dependencies | 329–340 |
-| Randomness | 341–346 |
-| Edge cases & original bugs | 347–361 |
-| Test vectors | 362–395 |
-| Provenance | 396–421 |
-| Open questions | 422–440 |
+|   1. Unit add | 69–225 |
+|   2. 0x0A RemoveUnit (`0x0045CC10`) | 226–235 |
+|   3. 0x15 ReassignPlayer (`0x0045D160`) | 236–272 |
+|   4. Queued movement and action messages | 273–307 |
+|   5. Local player vitals: 0x18, 0x95, 0x96 | 308–329 |
+| Constants & data dependencies | 330–341 |
+| Randomness | 342–349 |
+| Edge cases & original bugs | 350–364 |
+| Test vectors | 365–398 |
+| Provenance | 399–424 |
+| Open questions | 425–443 |
 <!-- /index -->
 
 Owned ids: 0x0A, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x15, 0x18, 0x4C, 0x4D,
@@ -208,8 +208,9 @@ requests (`client/model.md` §8); C→S 0x5F from the position check.
    (`client/model.md` §2 rule 6). Type 2: object init `0x004BC720(unit,
    room, x, y, class, mode)` (mode := the mode byte; static path at
    (x, y)). Type 1 is a fatal assert 0x202. Types 0, 3, 4, 5 take their
-   kind's init (player `0x00460BF0`, missile `0x004C1910`, item
-   `0x004CD0A0`, tile: unit flags |= 0x22, static path). Add; an object
+   kind's init (player `0x00460BF0`, missile `0x004CD0A0`, item
+   `0x004C1910`, tile: unit flags |= 0x22, static path; jump table
+   `0x004661A0` read from the file). Add; an object
    then gets `0x004BC8D0`.
 3. Object data +4 := interact. If `0x00621B00(unit)` → `0x004BD6B0`.
 4. Model: `class`, `position` (x, y), `mode` (mode byte), kind data
@@ -340,8 +341,10 @@ requests (`client/model.md` §8); C→S 0x5F from the position check.
 
 ## Randomness
 
-Seeds only (`client/model.md` Randomness): 0x59 and 0xAC creation at a
-point step the room seed once; 0x59 steps the new player's seed once
+Seeds only (`client/model.md` Randomness): 0x59, 0xAC and 0x51 creation
+at a point ≠ (0, 0) step the room seed once (`client/model.md` §2 rule
+6; for 0x51 through `0x00466300` → `0x00465FD0`, so every recorded 0x51,
+all at non-zero points, steps it); 0x59 steps the new player's seed once
 unless it is already the local player. No other draw.
 
 ## Edge cases & original bugs
