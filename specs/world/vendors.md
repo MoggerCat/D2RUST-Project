@@ -120,7 +120,7 @@ spec; recorded action 11 = shown in a store, 12 = taken out of a store,
 5. Record flags set at the same time: has gamble list (+0x0C := 1) for
    gheed, elzix, alkor, jamella, drehya, nihlathak; +0x24 and +0x25 := 1
    for gheed, charsi, fara, hratli, asheara, halbu, jamella, larzuk,
-   drehya (no reader found, `npc.md` Open question 3). A record whose
+   drehya (no reader in 1.14d, `npc.md` Open question 3). A record whose
    NPC table byte "trader" is 0 gets empty lists.
 
 ### 2. Store item level
