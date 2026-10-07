@@ -28,15 +28,15 @@
 |   5. Ops | 174–193 |
 |   6. Input matching | 194–262 |
 |   7. Outputs | 263–397 |
-|   8. Commit | 398–465 |
-|   9. Portals | 466–485 |
-|   10. C→S 0x4C is not the cube | 486–500 |
-| Constants & data dependencies | 501–524 |
-| Randomness | 525–543 |
-| Edge cases & original bugs | 544–578 |
-| Test vectors | 579–623 |
-| Provenance | 624–662 |
-| Open questions | 663–771 |
+|   8. Commit | 398–466 |
+|   9. Portals | 467–486 |
+|   10. C→S 0x4C is not the cube | 487–501 |
+| Constants & data dependencies | 502–525 |
+| Randomness | 526–544 |
+| Edge cases & original bugs | 545–579 |
+| Test vectors | 580–624 |
+| Provenance | 625–663 |
+| Open questions | 664–772 |
 <!-- /index -->
 
 ## Summary
@@ -417,8 +417,9 @@ is sent; outputs already made in out[] are neither placed nor freed
    `0x00560200(game, player, id, 0, 0, 1, 1, 0)`. Failed placement → free
    the unit (`0x00555600`), the output is lost. Placed → item flag 0x10
    (identified) set; if its items record `quest` ≠ 0: code `hst ` →
-   `0x0059E5C0` (Act 2 Horadric Staff hook), `qf2 ` → `0x005B86E0` (Act 3
-   Khalim's Will hook); quest state changes: `world/quests.md`.
+   `0x0059E5C0` (Act 2 Horadric Staff hook, `world/quests-act2.md`
+   §4.9), `qf2 ` → `0x005B86E0` (Act 3 Khalim's Will hook,
+   `world/quests-act3.md` §4.8); quest state changes: `world/quests.md`.
 4. Fillers in order: page 3, place; failure frees, success sets
    identified.
 
