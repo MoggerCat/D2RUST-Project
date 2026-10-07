@@ -40,17 +40,17 @@
 |   3. Game entry: picking the quest set | 336–368 |
 |   4. Events and dispatch | 369–453 |
 |   5. Quest updater and timers (tick step 8) | 454–475 |
-|   6. Status reporting | 476–579 |
-|   7. NPC dialog hooks | 580–612 |
-|   8. Act transitions, warps and portals | 613–694 |
-|   9. Quest items, rewards and helpers | 695–858 |
-|   11. Acts II–V | 859–867 |
-| Constants & data dependencies | 868–882 |
-| Randomness | 883–909 |
-| Edge cases & original bugs | 910–928 |
-| Test vectors | 929–960 |
-| Provenance | 961–989 |
-| Open questions | 990–1051 |
+|   6. Status reporting | 476–580 |
+|   7. NPC dialog hooks | 581–613 |
+|   8. Act transitions, warps and portals | 614–695 |
+|   9. Quest items, rewards and helpers | 696–859 |
+|   11. Acts II–V | 860–868 |
+| Constants & data dependencies | 869–883 |
+| Randomness | 884–910 |
+| Edge cases & original bugs | 911–929 |
+| Test vectors | 930–961 |
+| Provenance | 962–990 |
+| Open questions | 991–1052 |
 <!-- /index -->
 
 ## Summary
@@ -558,9 +558,10 @@ hold 6, 11, 7, 0 and 7 NPCs for acts I–V.
 - `0x00544FA0(act)` / `0x00544F60(list, n)` set the intro bit of every
   NPC of the act's list (act transitions, §8.1).
 - `0x00545100(game, player, act)` (caller `0x00537340`): for acts 0, 1,
-  2, 4 build 0x91 (26 bytes, `0x0053E060`): u8 0x91, u8 (D2MOO: act),
-  then 12 u16 slots preset to 0xFFFF; for each NPC of the act's list in
-  order whose intro bit is set, write its class id into the **next**
+  2, 4 build 0x91 (26 bytes, `0x0053E060`): u8 0x91, u8 act (the act
+  argument, stored from BL at `0x00545176`; the function switches on it,
+  table `0x0054519C`, acts 0–4), then 12 u16 slots preset to 0xFFFF;
+  for each NPC of the act's list in order whose intro bit is set, write its class id into the **next**
   slot (`0x00545090`: introduced NPCs are packed at the front; D2MOO
   1.10f writes slot i for list entry i). Sent only if at least one is
   set. Act 3 (IV) sends nothing.

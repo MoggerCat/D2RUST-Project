@@ -30,21 +30,21 @@
 | Outputs / state changes | 75–82 |
 | Rules | 83–84 |
 |   1. NPC control and records | 85–139 |
-|   2. Starting an interaction (C→S 0x13) | 140–201 |
-|   3. Chat open and close (C→S 0x2F, 0x30) | 202–220 |
-|   4. Menu actions (C→S 0x38) | 221–258 |
-|   5. Healing on chat open | 259–283 |
-|   6. Cain identify (C→S 0x34) | 284–301 |
-|   7. Mercenaries | 302–403 |
-|   8. NPC services (C→S 0x38, action ∉ {1, 2, 3}) | 404–462 |
-|   9. S→C 0x2A NPC transaction (15 bytes) | 463–496 |
-|   10. Dead code in 1.14d (no caller, no pointer reference) | 497–508 |
-| Constants & data dependencies | 509–521 |
-| Randomness | 522–534 |
-| Edge cases & original bugs | 535–593 |
-| Test vectors | 594–616 |
-| Provenance | 617–661 |
-| Open questions | 662–727 |
+|   2. Starting an interaction (C→S 0x13) | 140–202 |
+|   3. Chat open and close (C→S 0x2F, 0x30) | 203–221 |
+|   4. Menu actions (C→S 0x38) | 222–259 |
+|   5. Healing on chat open | 260–284 |
+|   6. Cain identify (C→S 0x34) | 285–302 |
+|   7. Mercenaries | 303–404 |
+|   8. NPC services (C→S 0x38, action ∉ {1, 2, 3}) | 405–463 |
+|   9. S→C 0x2A NPC transaction (15 bytes) | 464–497 |
+|   10. Dead code in 1.14d (no caller, no pointer reference) | 498–509 |
+| Constants & data dependencies | 510–522 |
+| Randomness | 523–535 |
+| Edge cases & original bugs | 536–594 |
+| Test vectors | 595–617 |
+| Provenance | 618–662 |
+| Open questions | 663–728 |
 <!-- /index -->
 
 ## Summary
@@ -148,7 +148,8 @@ Handler `0x0054AA90`: size 9 else 3; unit type (u32 @1) > 5 → 2; then
    its path (`0x00648730`), call `0x0058EC00` with 0x28 (AI parameter;
    monster spec), cancel its AI-think events (type 2) and schedule one
    at frame + 1 (`tick.md` §5.2–5.4). This happens for every distance
-   ≤ 50.
+   ≤ 50. What the NPC AI then does with param 0 = 40: `monsters/ai.md`
+   §9.9 (after "Interaction", "Effect of param 0 := 40").
 3. Distance 9..50: result 0, no interaction. Distance 7..8: approach
    (`0x00548A50`), result 0:
    1. Run request to the NPC: `0x00580A70(no skill, mode 3, type 1,

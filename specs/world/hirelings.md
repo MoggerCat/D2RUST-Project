@@ -43,13 +43,13 @@
 |   11. Items (expansion) | 639–692 |
 |   12. Services (links) | 693–702 |
 |   13. Messages | 703–769 |
-|   14. Skill pick of the Hireable AI (`0x005E4D30`) | 770–774 |
-| Constants & data dependencies | 775–798 |
-| Randomness | 799–809 |
-| Edge cases & original bugs | 810–859 |
-| Test vectors | 860–910 |
-| Provenance | 911–967 |
-| Open questions | 968–1050 |
+|   14. Skill pick of the Hireable AI (`0x005E4D30`) | 770–776 |
+| Constants & data dependencies | 777–800 |
+| Randomness | 801–811 |
+| Edge cases & original bugs | 812–862 |
+| Test vectors | 863–913 |
+| Provenance | 914–970 |
+| Open questions | 971–1053 |
 <!-- /index -->
 
 ## Summary
@@ -769,8 +769,10 @@ allows C:
 
 ### 14. Skill pick of the Hireable AI (`0x005E4D30`)
 
-Moved to `world/hirelings-ai.md` §1 (size split, 2026-10-07): the one
-reader of `DefaultChance` and the `Chance` columns (§1.1 rule 6).
+Moved to `monsters/ai-bodies-6.md` §7 step 7 "Hireling skill" (PC 1's
+AI spec, 2026-10-07; first split to `world/hirelings-ai.md` §1, now a
+pointer): the one reader of `DefaultChance` and the `Chance` columns
+(§1.1 rule 6).
 
 ## Constants & data dependencies
 
@@ -849,10 +851,11 @@ Reproduced by default.
     rule 8).
 11. Classic: changing acts turns the hireling into a dead node with no
     way to revive it; only a new hire clears it.
-12. Skill pick with no counting slot (§14 rule 7): 1.14d reads stack
-    words that this call did not write, so the chosen slot is not
-    defined by the inputs. d2rs: an unwritten w counts as −1 (never
-    ≥ r), so the search ends in the fallback (§14 rule 6). Not
+12. Skill pick with no counting slot (§14 → `monsters/ai-bodies-6.md`
+    §7 step 7.5, its edge case 4): 1.14d reads stack words that this
+    call did not write, so the chosen slot is not defined by the
+    inputs. d2rs: an unwritten w counts as −1 (never ≥ r), so the
+    search ends in the fallback (step 7.6). Not
     reproducible in 1.14d; recorded so the deviation is explicit.
 13. A dead hireling whose room is deactivated is kept without a room
     (§8 rule 5) and keeps flags 2 bit 0x100 after a revive.
