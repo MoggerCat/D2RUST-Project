@@ -67,6 +67,7 @@ fn fx(prb: u8) -> Fx {
         shrines,
         levels,
         objgroup: vec![blank_group(), g],
+        leveldefs: Vec::new(),
     };
     let (ctl, _) = ObjectControl::new(&mut Seed::new(7, 666), &t);
     let mut f = Fake {

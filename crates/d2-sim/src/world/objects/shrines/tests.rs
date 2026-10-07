@@ -199,6 +199,7 @@ fn setup(code: u8) -> Setup {
         shrines: vec![blank_shrine(), s],
         levels: vec![blank_level(), blank_level(), blank_level()],
         objgroup: Vec::new(),
+        leveldefs: Vec::new(),
     };
     let mut ctl = ObjectControl {
         seed: Seed::init(),

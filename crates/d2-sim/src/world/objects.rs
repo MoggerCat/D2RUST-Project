@@ -15,7 +15,7 @@
 
 use std::collections::BTreeMap;
 
-use d2_data::tables::{Levels, Objects, Objgroup, Shrines};
+use d2_data::tables::{Leveldefs, Levels, Objects, Objgroup, Shrines};
 
 use crate::rng::Seed;
 use crate::units::{RoomId, UnitId};
@@ -113,6 +113,10 @@ pub enum ObjectError {
     ShrineNoOperator,
     #[error("portal operated with no player (0x0058494F)")]
     PortalOperator,
+    #[error("portal {0:?}: no destination room")]
+    NoPortalDestination(UnitId),
+    #[error("portal travel: placing {0:?} failed (fatal)")]
+    PortalPlacement(UnitId),
     #[error("object {0:?}: no warp tile in its room (fatal)")]
     NoWarpTile(UnitId),
     #[error("key test with no unit (0x0055F173)")]
@@ -138,6 +142,9 @@ pub struct ObjectTables {
     /// `objgroup.txt` (`d2exp`; object population, `object-population.md`
     /// §5).
     pub objgroup: Vec<Objgroup>,
+    /// `leveldefs` (0x9C-byte records, `0x0061E470`): the portal quest
+    /// gate (§12 rule 7).
+    pub leveldefs: Vec<Leveldefs>,
 }
 
 impl ObjectTables {
@@ -222,6 +229,8 @@ pub struct ObjectData {
     pub class: u16,
     /// +0x04 `InteractType`.
     pub interact: u8,
+    /// +0x05 portal flags (§1; portal creation ORs 0x3, travel 0x5).
+    pub portal_flags: u8,
     /// +0x08 the shrines.txt row.
     pub shrine: Option<u16>,
     /// +0x0C operator GUID + 1 (0 = none).
@@ -366,6 +375,11 @@ pub trait ObjectWorld {
     fn room(&self, unit: UnitId) -> Option<RoomId>;
     /// The level id of the unit's room (DRLG).
     fn level(&self, unit: UnitId) -> Option<u32>;
+    /// The level id of a room (DRLG). Default: none.
+    fn room_level(&self, room: RoomId) -> Option<u32> {
+        let _ = room;
+        None
+    }
     /// Sub-tile position (path).
     fn position(&self, unit: UnitId) -> (i32, i32);
     /// Schedule object event `ev` at `frame` (`tick.md` §5).

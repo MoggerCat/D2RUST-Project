@@ -41,6 +41,22 @@ impl MechWorld for Fake {
     fn in_town(&self, _room: RoomId) -> bool {
         true
     }
+    /// The point itself in the same room.
+    fn free_point(
+        &self,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        _size: i32,
+        _mask: u32,
+    ) -> Option<(RoomId, i32, i32)> {
+        Some((room, x, y))
+    }
+    fn place_unit(&mut self, unit: UnitId, room: RoomId, x: i32, y: i32) -> bool {
+        self.calls
+            .push(Call::Other(format!("place {} {} {x} {y}", unit.0, room.0)));
+        true
+    }
     fn recount_tomes(&mut self, player: UnitId) {
         self.calls
             .push(Call::Other(format!("recount {}", player.0)));

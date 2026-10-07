@@ -111,6 +111,7 @@ fn tables() -> ObjectTables {
         shrines: shrines(),
         levels,
         objgroup: Vec::new(),
+        leveldefs: Vec::new(),
     }
 }
 
@@ -1063,6 +1064,7 @@ fn object_data_fields_and_flags() {
             guid: 7,
             class: 1,
             interact: 0x88,
+            portal_flags: 3,
             shrine: Some(3),
             operator: 21,
             spark: 2,

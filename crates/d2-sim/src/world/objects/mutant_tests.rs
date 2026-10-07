@@ -23,6 +23,7 @@ fn tables() -> ObjectTables {
         shrines: vec![blank_shrine(); 3],
         levels,
         objgroup: Vec::new(),
+        leveldefs: Vec::new(),
     }
 }
 

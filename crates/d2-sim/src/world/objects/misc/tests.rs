@@ -16,8 +16,12 @@ const HOSTILE: u16 = 0xFFFD;
 const CURABLE: u16 = 0xFFFC;
 /// Nonzero: a pet is healed.
 const PETS: u16 = 0xFFFB;
-/// Nonzero: `portal_travel` runs and returns this value.
-const TRAVEL: u16 = 0xFFFA;
+/// Nonzero on unit 0: `level_spawn_point` finds (room 9, 50, 60).
+const SPAWN: u16 = 0xFFFA;
+/// Nonzero: the player has a quest record.
+const QREC: u16 = 0xFFF9;
+/// The unit's party id (absent: 0xFFFF).
+const PARTY: u16 = 0xFFF8;
 /// State `s` is present when key 0xF000 + s is nonzero.
 const STATE: u16 = 0xF000;
 
@@ -56,10 +60,26 @@ impl MiscWorld for Fake {
     fn hostile_time(&self, player: UnitId) -> u32 {
         self.stats.get(&(player, HOSTILE)).copied().unwrap_or(0) as u32
     }
-    fn portal_travel(&mut self, object: UnitId, player: UnitId) -> Option<i32> {
+    fn party_id(&self, unit: UnitId) -> u16 {
+        self.stats.get(&(unit, PARTY)).map_or(0xFFFF, |&v| v as u16)
+    }
+    fn has_quest_record(&self, player: UnitId) -> bool {
+        self.stats.get(&(player, QREC)).is_some_and(|&v| v != 0)
+    }
+    fn level_spawn_point(&mut self, level: u32) -> Option<(RoomId, i32, i32)> {
+        self.calls.push(Call::Other(format!("spawn {level}")));
+        self.stats
+            .get(&(UnitId(0), SPAWN))
+            .is_some_and(|&v| v != 0)
+            .then_some((RoomId(9), 50, 60))
+    }
+    fn player_mode_xy(&mut self, player: UnitId, mode: u8, x: i32, y: i32) {
         self.calls
-            .push(Call::Other(format!("travel {object:?} {player:?}")));
-        self.stats.get(&(player, TRAVEL)).copied()
+            .push(Call::Other(format!("walk {} {mode} {x} {y}", player.0)));
+    }
+    fn just_portaled(&mut self, player: UnitId, expire: i32) {
+        self.calls
+            .push(Call::Other(format!("portaled {} {expire}", player.0)));
     }
 }
 
@@ -398,12 +418,14 @@ fn portal_busy_and_owner() {
     assert_eq!(run(&mut ctl, &t, &mut f, Some(P)), Dispatch::Done(0));
     assert!(f.calls.is_empty());
     ctl.get_mut(O).unwrap().owner = Some(0x77);
-    f.stats.insert((P, TRAVEL), 1);
-    assert_eq!(run(&mut ctl, &t, &mut f, Some(P)), Dispatch::Done(1));
+    f.stats.insert((UnitId(0), SPAWN), 1);
+    assert_eq!(run(&mut ctl, &t, &mut f, Some(P)), Dispatch::Done(0));
+    assert!(f.calls.contains(&Call::Other("place 20 9 50 60".into())));
     // Iterate-players 0: anyone.
     let (mut ctl, mut f) = setup(PORTAL, 1);
-    f.stats.insert((P, TRAVEL), 1);
-    assert_eq!(run(&mut ctl, &t, &mut f, Some(P)), Dispatch::Done(1));
+    f.stats.insert((UnitId(0), SPAWN), 1);
+    assert_eq!(run(&mut ctl, &t, &mut f, Some(P)), Dispatch::Done(0));
+    assert!(f.calls.contains(&Call::Other("place 20 9 50 60".into())));
     // §12 rule 5: a monster or no operator is fatal (`0x0058494F`; §7.1
     // stops monsters before the dispatch with live data).
     for op in [Some(M), None] {
@@ -426,17 +448,69 @@ fn portal_hostile_delay_and_travel_seam() {
         f.calls,
         vec![Call::Sound(P, sound::PORTAL_REFUSED, None, false)]
     );
-    // 5000 ms later: rule 3, which the default host does not run.
+    // 5000 ms later: the travel (rules 4–13), O without a room and no
+    // partner: the spawn point of `InteractType`'s level.
     f.tick = 15_000;
     f.calls.clear();
-    let op = Operate {
-        object: O,
-        operator: Some(P),
-        class: PORTAL,
-        operate_fn: 15,
-    };
-    assert_eq!(run(&mut ctl, &t, &mut f, Some(P)), Dispatch::NotCovered(op));
-    assert_eq!(f.calls, vec![Call::Other(format!("travel {O:?} {P:?}"))]);
+    ctl.get_mut(O).unwrap().interact = 37;
+    f.stats.insert((UnitId(0), SPAWN), 1);
+    f.guids.insert(P, 0x77);
+    f.frame = 100;
+    assert_eq!(run(&mut ctl, &t, &mut f, Some(P)), Dispatch::Done(0));
+    let mut stop = vec![0x0D, 0];
+    stop.extend_from_slice(&0x77u32.to_le_bytes());
+    stop.extend_from_slice(&[1, 55, 0, 65, 0, 0, 0]);
+    assert_eq!(
+        f.calls,
+        vec![
+            Call::Other("spawn 37".into()),
+            Call::Other("place 20 9 50 60".into()),
+            Call::Sound(P, sound::PORTAL, None, false),
+            Call::Other("walk 20 2 55 65".into()),
+            Call::Other(format!("send 20 {stop:02x?}")),
+            Call::Schedule(O, oevent::END_ANIM, 100 + 1),
+            Call::Other("portaled 20 175".into()),
+        ]
+    );
+    assert_eq!(ctl.get(O).unwrap().portal_flags, 5);
+}
+
+// Covers: specs/world/objects.md §12 r4, §12 r7, §12 r10
+#[test]
+fn portal_owner_party_and_quest_gates() {
+    let t = tables();
+    // Owner 0x99 ≠ P, P without a party: refused, sound 19 with target P.
+    let (mut ctl, mut f) = setup(PORTAL, 1);
+    f.guids.insert(P, 0x77);
+    ctl.get_mut(O).unwrap().owner = Some(0x99);
+    assert_eq!(run(&mut ctl, &t, &mut f, Some(P)), Dispatch::Done(0));
+    assert_eq!(
+        f.calls,
+        vec![Call::Sound(P, sound::PORTAL_REFUSED, Some(P), false)]
+    );
+    // P in a party, owner not found: goes on (no spawn: error).
+    f.calls.clear();
+    f.stats.insert((P, PARTY), 3);
+    assert_eq!(
+        dispatch(&mut ctl, &t, &mut f, O, Some(P)),
+        Err(ObjectError::NoPortalDestination(O))
+    );
+    // O in a room: no quest record → refused.
+    let (mut ctl, mut f) = setup(PORTAL, 1);
+    f.rooms.insert(O, RoomId(4));
+    assert_eq!(run(&mut ctl, &t, &mut f, Some(P)), Dispatch::Done(0));
+    assert_eq!(
+        f.calls,
+        vec![Call::Sound(P, sound::PORTAL_REFUSED, Some(P), false)]
+    );
+    // Record, but no leveldefs row for the destination → refused.
+    f.calls.clear();
+    f.stats.insert((P, QREC), 1);
+    assert_eq!(run(&mut ctl, &t, &mut f, Some(P)), Dispatch::Done(0));
+    assert_eq!(
+        f.calls,
+        vec![Call::Sound(P, sound::PORTAL_REFUSED, Some(P), false)]
+    );
 }
 
 // ------------------------------------------------------------------ §13

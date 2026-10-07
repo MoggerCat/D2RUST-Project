@@ -928,6 +928,40 @@ pub trait Pending {
     fn object_staff_tomb(&self) -> u32 {
         u32::MAX
     }
+    /// The portal travel's host facts and steps (`objects.md` §12 rules
+    /// 4–13; [`crate::world::objects::MiscWorld`]): the party id
+    /// (`0x00554630`, default 0xFFFF none).
+    fn object_party_id(&self, unit: UnitId) -> u16 {
+        0xFFFF
+    }
+    /// `0x00553720`: the partner portal. Default: none.
+    fn object_portal_partner(&mut self, game: &mut Game, object: UnitId) -> Option<UnitId> {
+        None
+    }
+    /// The player's quest record for the difficulty exists. Default: no.
+    fn object_quest_record(&self, player: UnitId) -> bool {
+        false
+    }
+    /// `0x0065C310(Q, q, bit)`. Default: clear.
+    fn object_quest_bit(&self, player: UnitId, quest: u32, bit: u8) -> bool {
+        false
+    }
+    /// `0x005353F0`: player data +0x48. Default 0.
+    fn object_portal_guid(&self, player: UnitId) -> u32 {
+        0
+    }
+    /// `0x0061B060(act, level, 0, &x, &y, 3)`. Default: none.
+    fn object_level_spawn(&mut self, game: &mut Game, level: u32) -> Option<(RoomId, i32, i32)> {
+        None
+    }
+    /// `0x00543B90(game, from, to, P)`. Default: nothing.
+    fn object_quest_level_change(&mut self, player: UnitId, from: u32, to: u32) {}
+    /// A portal's removal (§12 rule 12). Default: nothing.
+    fn object_remove_portal(&mut self, game: &mut Game, object: UnitId) {}
+    /// `0x0058CF50(game, L)`. Default: nothing.
+    fn object_portal_act5(&mut self, partner: UnitId) {}
+    /// State 102 on P until `expire` (§12 rule 13). Default: nothing.
+    fn object_just_portaled(&mut self, game: &mut Game, player: UnitId, expire: i32) {}
     /// What the object module handed back without running it: quest,
     /// waypoint and `todo` inits, operates and events, uncovered presets
     /// ([`super::objects::ObjectRoute`]).

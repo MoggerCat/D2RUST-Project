@@ -651,6 +651,9 @@ impl<X: Pending> ObjectWorld for ObjectView<'_, X> {
         let room = self.room(unit)?;
         self.v.h.drlg.level_id(self.game, room)
     }
+    fn room_level(&self, room: RoomId) -> Option<u32> {
+        self.v.h.drlg.level_id(self.game, room)
+    }
     fn position(&self, unit: UnitId) -> (i32, i32) {
         self.v.h.path_position(unit)
     }
@@ -982,6 +985,46 @@ const STAT_LEVEL: u16 = 12;
 /// TODO(objects.md §11 rule 2): the client update of the vital set is
 /// the stat list host's; no separate message is sent here.
 impl<X: Pending> MiscWorld for ObjectView<'_, X> {
+    fn party_id(&self, unit: UnitId) -> u16 {
+        self.v.h.x.object_party_id(unit)
+    }
+    fn portal_partner(&mut self, object: UnitId) -> Option<UnitId> {
+        self.v.h.x.object_portal_partner(self.game, object)
+    }
+    fn has_quest_record(&self, player: UnitId) -> bool {
+        self.v.h.x.object_quest_record(player)
+    }
+    fn expansion(&self) -> bool {
+        self.v.data.expansion
+    }
+    fn player_quest_bit(&self, player: UnitId, quest: u32, bit: u8) -> bool {
+        self.v.h.x.object_quest_bit(player, quest, bit)
+    }
+    fn player_portal_guid(&self, player: UnitId) -> u32 {
+        self.v.h.x.object_portal_guid(player)
+    }
+    fn level_spawn_point(&mut self, level: u32) -> Option<(RoomId, i32, i32)> {
+        self.v.h.x.object_level_spawn(self.game, level)
+    }
+    fn quest_level_change(&mut self, player: UnitId, from: u32, to: u32) {
+        self.v.h.x.object_quest_level_change(player, from, to);
+    }
+    /// `0x005809D0` with the path provider ([`crate::wiring::path`]).
+    fn player_mode_xy(&mut self, player: UnitId, mode: u8, x: i32, y: i32) {
+        if self.v.h.paths.is_some() {
+            let mut c = crate::wiring::path::PathCtx::of(&mut self.v, self.game);
+            c.walk_to(player, u32::from(mode), x, y);
+        }
+    }
+    fn remove_portal(&mut self, object: UnitId) {
+        self.v.h.x.object_remove_portal(self.game, object);
+    }
+    fn portal_act5_hook(&mut self, partner: UnitId) {
+        self.v.h.x.object_portal_act5(partner);
+    }
+    fn just_portaled(&mut self, player: UnitId, expire: i32) {
+        self.v.h.x.object_just_portaled(self.game, player, expire);
+    }
     fn vital_stat(&self, unit: UnitId, id: u16) -> u32 {
         let st = &*self.v.stats;
         (match id {
