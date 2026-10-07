@@ -96,3 +96,13 @@ the last section.
 - `world::objects::tests::routes_match_function_table` and
   `route_check_catches_perturbations` fail on the base already
   (`object-functions.tsv` vs routes; impl-pc2-s4-world's area).
+
+## Gate (`CARGO_INCREMENTAL=0 sh tools/gate.sh`, head of this branch)
+
+All steps pass except four tests, none from this branch:
+`world::objects::tests::routes_match_function_table` and
+`route_check_catches_perturbations` (fail on `ea3a6d1` too, checked in a
+clean worktree) and `e2e_full_loop::{full_single_player_loop,
+other_seed_other_run}` (step 13 expects the buy refused at the item
+copy, which now succeeds: the fixture impl-items-wiring is fixing).
+spec_index and coverage failures of the first run are fixed.
