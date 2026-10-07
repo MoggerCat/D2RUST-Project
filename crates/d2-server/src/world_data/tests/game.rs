@@ -180,7 +180,7 @@ fn outdoor_levels_generate_through_the_dispatcher() {
     let (l2, blood) = act.generate(2);
     assert_eq!(act.drlg.level(l2).rect, TileRect::new(904, 1064, 56, 96));
     assert_eq!(blood.len(), 81);
-    let (_, cold) = act.generate(3);
+    let (l3, cold) = act.generate(3);
     let outdoor = |rooms: &[DrlgRoomId]| {
         rooms
             .iter()
@@ -196,9 +196,97 @@ fn outdoor_levels_generate_through_the_dispatcher() {
         cold.len() - outdoor(&cold),
         outdoor(&cold)
     );
+    // The grid and the border substitutions against the spec's derived
+    // build (`outdoor.md` Test vectors, "Cold Plains grid"): every
+    // difference is printed before the asserts, the first one names the
+    // step that differs.
+    let (grid_diffs, hit_diffs) = cold_plains_diffs(&act, l3);
+    eprintln!("Cold Plains grid differences: {grid_diffs:#?}");
+    eprintln!("Cold Plains substitution differences: {hit_diffs:#?}");
+    assert_eq!(grid_diffs, Vec::<String>::new());
+    assert_eq!(hit_diffs, Vec::<String>::new());
     assert_eq!(cold.len(), 98);
     assert_eq!((outdoor(&blood), outdoor(&cold)), (33, 37));
     // Streaming a room loads its DT1 library from the live files
     // (no recorded expectation: the call must not fail).
     act.stream(blood[0]);
+}
+
+/// `outdoor.md` Test vectors, "Cold Plains grid": grid 0 per cell after
+/// §7, rows y = 0..9; `o` outdoor room, `A` one of 48 / 29 / 30, `-`
+/// blank (0x100, no room).
+const COLD_PLAINS: [&str; 10] = [
+    " 9  6  6  6  6  6  6  6  6 10",
+    " 5  o  A  o  o  o  o  A 44  7",
+    " 5  o  o  o 15  4  4 12  o  7",
+    " 5  o  o  o 14  6 10  5  o  7",
+    " 5  o 51  o  o  o  7  5  o  7",
+    " 5  o  o  o  A  o 14 13  o  7",
+    " 8  4 12  o  o  o  o  o  o  7",
+    " 9  6 13  o 15 12  o  o  o  7",
+    " 5  o  o  o  7  5  o 15  4 11",
+    " 8  4  4  4 11  8  4 11  -  -",
+];
+
+/// The border substitution replacements of the recorded Cold Plains
+/// build (`outdoor.md` Test vectors): (lvlsub type, group, snapped cell,
+/// variant, level seed lo' after the variant roll). Type 1: seq 8447
+/// `0x0066F8DB` lo' 1833932632 mod 10 = 2; type 2: seq 8644 `0x0066F905`
+/// lo' 3559729267 & 1 = 1; type 3: seq 10204 and 10499 (N 1). Seq s is
+/// level-seed draw s − 6897 from {4014346872, 666} (both given lo'
+/// values sit at draws 1550 and 1747), so the type-3 lo' are draws 3307
+/// and 3602 of that seed.
+const COLD_PLAINS_HITS: [(i32, usize, i32, i32, i32, u32); 4] = [
+    (1, 0, 3, 1, 2, 1_833_932_632),
+    (2, 1, 6, 6, 1, 3_559_729_267),
+    (3, 8, 3, 6, 0, 1_651_351_014),
+    (3, 11, 0, 5, 0, 2_564_466_130),
+];
+
+/// Per-cell (grid 0, grid 2) and per-substitution differences between
+/// the live Cold Plains build and the spec's; prints the grid.
+fn cold_plains_diffs(act: &Act, l: LevelIdx) -> (Vec<String>, Vec<String>) {
+    let types = act.types.borrow();
+    let info = types
+        .act_outdoor(0)
+        .and_then(|o| o.level(l))
+        .expect("Cold Plains outdoor info");
+    let mut grid = Vec::new();
+    for (y, row) in COLD_PLAINS.iter().enumerate() {
+        let mut line = String::new();
+        for (x, want) in row.split_whitespace().enumerate() {
+            let (x, y) = (x as i32, y as i32);
+            let (g0, g2) = (info.grids[0].get(x, y), info.grids[2].get(x, y));
+            line.push_str(&format!(" {g0:3}/{g2:05x}"));
+            let blank = g2 & 0x100 != 0;
+            let preset = g2 & 0x200 != 0;
+            let ok = match want {
+                "o" => g0 == 0 && !blank && !preset,
+                "-" => g0 == 0 && blank && !preset,
+                "A" => matches!(g0, 48 | 29 | 30) && preset,
+                n => g0 == n.parse::<u32>().unwrap() && preset,
+            };
+            if !ok {
+                grid.push(format!(
+                    "({x}, {y}): want {want}, grid 0 {g0}, grid 2 {g2:#x}"
+                ));
+            }
+        }
+        eprintln!("{line}");
+    }
+    let got: Vec<_> = info
+        .sub_hits
+        .iter()
+        .map(|h| (h.t, h.group, h.x, h.y, h.variant, h.lo))
+        .collect();
+    eprintln!(
+        "Cold Plains substitutions (type, row, group, x, y, v, lo'): {:?}",
+        info.sub_hits
+    );
+    let hits = if got == COLD_PLAINS_HITS {
+        Vec::new()
+    } else {
+        vec![format!("got {got:?}, want {COLD_PLAINS_HITS:?}")]
+    };
+    (grid, hits)
 }

@@ -124,9 +124,10 @@ impl<X: WorldPending> PopWorld for WorldHost<'_, X> {
     /// `0x0061B130` → `0x0066CE30` (`levels.md` §11.4): the room holding
     /// the point among the room and its adjacency array; none → 0; that
     /// room's record at the point → its index; null record → −1.
-    // TODO(levels.md §11.4): a point outside the room's (W+1) × (H+1)
-    // cells reads outside the grid in the original (no bound check);
-    // here it reads as a null record (−1).
+    // `levels.md` §11.4 table: a column outside the room wraps within the
+    // record block ([`crate::drlg::Drlg::coord_at`]); reads outside the
+    // block are not reproducible and give a null record (−1) here. Only
+    // the spread search of `0x005B2A00` can pass such a point.
     fn coord_index_at(&self, room: RoomId, x: i32, y: i32) -> i32 {
         let Some(at) = self.v.h.drlg.find_room(self.game, room, x, y) else {
             return 0;
