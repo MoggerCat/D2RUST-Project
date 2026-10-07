@@ -1,8 +1,8 @@
-// Spec: specs/world/quests-act3.md §9.2 (A3Q7 Dark Wanderer, chain 28)
+// Spec: specs/world/quests-act3.md §9.2 (A3Q7 Dark Wanderer, chain 28); specs/world/quests-act3-2.md §11.7
 //! A3Q7: event 13, the wanderer object (init 43), its walk target and
 //! the minion hook and timer.
 
-use super::{in_act3, npc, pf, set, Timer};
+use super::{in_act3, npc, pf, set, InitPoint, Timer};
 use crate::units::UnitId;
 use crate::world::quests::{bit, event, EventArgs, QuestControl, QuestWorld, TextList, TimerFn};
 
@@ -75,38 +75,25 @@ pub(super) fn callback<W: QuestWorld>(
     }
 }
 
-/// Init 43 `0x005BD1F0` (object 368).
-pub fn wanderer_init<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: UnitId) {
+/// Init 43 `0x005BD1F0` (object 368); `at` is the object's init record
+/// (`quests-act3-2.md` §11.7 rule 4). With +0x01: target := (x + 7, y);
+/// its room is `0x00463740(init room, x + 7, y)`. No room → the spawn
+/// `0x005B2F20` fails before any draw and +0x01 stays 1, so a later init
+/// tries again (edge case 21). +0x00 := 1 in every case.
+pub fn wanderer_init<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, at: InitPoint) {
     let Some(i) = ctl.find(CHAIN) else { return };
     if ctl.records[i].extra.act3.q7.to_spawn {
-        match w.unit_position(object) {
-            Some((x, y, room)) => {
-                let (tx, ty) = (x + 7, y);
-                {
-                    let e = x7(ctl, i);
-                    e.target_x = tx;
-                    e.target_y = ty;
-                }
-                match w.room_at(room, tx, ty) {
-                    Some(r) => {
-                        if w.spawn_monster(r, tx, ty, npc::DARK_WANDERER, 1, u32::MAX)
-                            .is_some()
-                        {
-                            x7(ctl, i).to_spawn = false;
-                        }
-                    }
-                    None => {
-                        // TODO(quests-act3 §9.2): `0x00463740` finds no
-                        // room at (x + 7, y); the spawn with a null room
-                        // is not described.
-                        w.unhandled(CHAIN, 0x005B_D1F0);
-                    }
-                }
-            }
-            None => {
-                // TODO(quests-act3 §9.2): an object without a room has
-                // no position; the init is not described for it.
-                w.unhandled(CHAIN, 0x005B_D1F0);
+        let (tx, ty) = (at.x + 7, at.y);
+        {
+            let e = x7(ctl, i);
+            e.target_x = tx;
+            e.target_y = ty;
+        }
+        if let Some(r) = w.room_at(at.room, tx, ty) {
+            if w.spawn_monster(r, tx, ty, npc::DARK_WANDERER, 1, u32::MAX)
+                .is_some()
+            {
+                x7(ctl, i).to_spawn = false;
             }
         }
     }
@@ -114,7 +101,10 @@ pub fn wanderer_init<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: U
 }
 
 /// `0x005BD0D0` (the wanderer's AI): the walk target. The collision
-/// tests use the wanderer's room.
+/// tests `0x006229F0` use the wanderer's own room; a wanderer without a
+/// room tests every point free, so the first candidate (X, Y − 20)
+/// becomes the target (`quests-act3-2.md` §11.7 rule 5, part 2 edge
+/// case 1).
 pub fn wanderer_target<W: QuestWorld>(
     ctl: &mut QuestControl,
     w: &mut W,
@@ -129,17 +119,12 @@ pub fn wanderer_target<W: QuestWorld>(
         return Some((e.target_x, e.target_y));
     }
     let (x, y) = (e.target_x, e.target_y);
-    let Some((_, _, room)) = w.unit_position(wanderer) else {
-        // TODO(quests-act3 §9.2): a wanderer without a room has no
-        // collision map to test; not described.
-        w.unhandled(CHAIN, 0x005B_D0D0);
-        return None;
-    };
+    let room = w.unit_position(wanderer).map(|(_, _, r)| r);
     x7(ctl, i).target_fixed = true;
     let (tx, ty) = TARGET_TRIES
         .iter()
         .map(|&(dx, dy)| (x + dx, y + dy))
-        .find(|&(tx, ty)| !w.blocked(room, tx, ty, 0x3C01))
+        .find(|&(tx, ty)| room.is_none_or(|r| !w.blocked(r, tx, ty, 0x3C01)))
         .unwrap_or((x, y - 3));
     let e = x7(ctl, i);
     e.target_x = tx;
@@ -165,7 +150,11 @@ pub fn wanderer_minions<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, wander
     }
 }
 
-/// Timer `0x005BD390`; returns 1.
+/// Timer `0x005BD390`; returns 1. The free-spot search starts in the
+/// wanderer's room from its position + offset; dummy 131 goes into the
+/// room the search returns. A wanderer without a room finds no spot (no
+/// dummies); the bits, +0x0C, +0x0D and the quest-seed draw still happen
+/// (`quests-act3-2.md` §11.7 rule 6).
 pub(super) fn minion_timer<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize) -> bool {
     if ctl.records[i].extra.act3.q7.minions {
         return true;
@@ -187,12 +176,10 @@ pub(super) fn minion_timer<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: 
     };
     let lo = ctl.seed.step();
     let Some((x, y, room)) = w.unit_position(wanderer) else {
-        // TODO(quests-act3 §9.2): a wanderer without a room; the spot
-        // search is not described for it.
-        w.unhandled(CHAIN, 0x005B_D390);
         return true;
     };
     for &(dx, dy) in &MINION_OFFSETS[(lo & 1) as usize..] {
+        // Radius 11 is passed but never read by `0x00545340`.
         if let Some((sx, sy, sr)) = w.free_spot_at(room, x + dx, y + dy, 3, 0x3F11, 11, 100) {
             w.spawn_quest_object(sr, sx, sy, MINION_DUMMY);
         }

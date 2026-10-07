@@ -1,4 +1,4 @@
-// Spec: specs/world/quests-act3.md §6 (A3Q4 The Golden Bird, chain 18)
+// Spec: specs/world/quests-act3.md §6 (A3Q4 The Golden Bird, chain 18); specs/world/quests-act3-2.md §11.3, §11.4
 //! A3Q4: events 0, 2, 3, 4, 8, 9, 10, 11, 13, 14, the status and active
 //! functions, the boss choice and removal hooks, Alkor's map-AI hooks and
 //! the Potion of Life.
@@ -21,8 +21,9 @@ pub const FIGURINE: [u8; 4] = *b"j34 ";
 pub const BIRD: [u8; 4] = *b"g34 ";
 /// The Potion of Life.
 pub const POTION: [u8; 4] = *b"xyz ";
-/// Monstats flags byte +0x0D bit 6 (open question 3).
-const FLAGS_0D_BIT6: u8 = 0x40;
+/// `0x006CE280` (0x40) on monstats flags byte +0x0D: flag word bit 14,
+/// the `flying` column (`quests-act3-2.md` §11.4).
+pub const FLYING_0D: u8 = 0x40;
 /// Stat 7 (`maxhp`) and the potion's bonus (20 << 8).
 const MAXHP: u16 = 7;
 const LIFE_BONUS: i32 = 0x1400;
@@ -312,7 +313,9 @@ fn picked_up<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, args: E
     }
 }
 
-/// Event 8 `0x005BAB60` (§6.3; installed by the boss choice).
+/// Event 8 `0x005BAB60` (§6.3; installed by the boss choice). The
+/// figurine's item level is the victim's stat 12 (`quests-act3-2.md`
+/// §11.3).
 fn killed<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, args: EventArgs) {
     let e = &ctl.records[i].extra.act3.q4;
     if !ctl.records[i].not_intro || !e.chosen || !e.to_drop {
@@ -406,20 +409,29 @@ pub(super) fn status<W: QuestWorld>(
 
 /// `0x00544E80` → `0x005BAC70` (§6.2): from special monster creation
 /// for a monster in Act III; `flags_0d` is its monstats flags byte
-/// +0x0D.
+/// +0x0D, `None` when the class has no monstats row (class ≥ count).
+/// Flying monsters (`flying`, [`FLYING_0D`]) never carry the Golden Bird
+/// (`quests-act3-2.md` §11.4).
 pub fn choose_bird_boss<W: QuestWorld>(
     ctl: &mut QuestControl,
     w: &mut W,
     unit: UnitId,
     class: u16,
-    flags_0d: u8,
+    flags_0d: Option<u8>,
 ) {
     let Some(i) = ctl.find(CHAIN) else { return };
-    if !in_act3(w, unit)
-        || !ctl.records[i].not_intro
-        || class == npc::FETISH11
-        || flags_0d & FLAGS_0D_BIT6 != 0
-    {
+    if !in_act3(w, unit) || !ctl.records[i].not_intro || class == npc::FETISH11 {
+        return;
+    }
+    let Some(flags_0d) = flags_0d else {
+        // TODO(quests-act3-2 §11.4): "the test runs only when the monstats
+        // row exists"; whether a class without a row is then still chosen
+        // (flying test skipped) or not (whole test skipped) is not
+        // stated. Reported, nothing linked.
+        w.unhandled(CHAIN, 0x0054_4E80);
+        return;
+    };
+    if flags_0d & FLYING_0D != 0 {
         return;
     }
     let e = &ctl.records[i].extra.act3.q4;

@@ -349,23 +349,28 @@ fn trap<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize) {
         let Some((c, _)) = w.object_by_guid(g) else {
             continue;
         };
-        let Some((cx, cy, croom)) = w.unit_position(c) else {
-            // An object always has a room (its static path); one without
-            // is an invariant violation, reported as fatal.
+        // The chest's position (static path); its room (static path
+        // +0x00) is null for a chest left in a freed room: both room
+        // lookups are then null and both spawns fail, while an existing
+        // T still gets its missile at the chest (`quests-act1-rest.md`
+        // §9 item 2).
+        let Some((cx, cy)) = w.unit_xy(c) else {
+            // An object found by GUID always has a static path.
             ctl.faults.push(QuestError::Fatal(0x0059_54F0));
             continue;
         };
+        let croom = w.unit_position(c).map(|p| p.2);
         if trap.is_none() {
             let (x, y) = x5(ctl, i).death_pos;
-            trap = w
-                .room_at(croom, x, y)
+            trap = croom
+                .and_then(|r| w.room_at(r, x, y))
                 .and_then(|room| w.spawn_monster_flags(room, x, y, TRAP_MONSTER, 12, -1, 8));
             if trap.is_none() {
                 // The retry's room is not tested by the original; no
-                // room here means no spawn.
+                // room here means no spawn (§9 item 1).
                 let (x, y) = (cx + 5, cy + 5);
-                trap = w
-                    .room_at(croom, x, y)
+                trap = croom
+                    .and_then(|r| w.room_at(r, x, y))
                     .and_then(|room| w.spawn_monster_flags(room, x, y, TRAP_MONSTER, 12, -1, 8));
             }
         }

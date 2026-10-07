@@ -1,4 +1,5 @@
 // Spec: specs/world/quests-act2.md §4 (Test vectors, Edge cases 3, 4)
+// Spec: specs/world/quests-act2-2.md §1 items 2, 13, 20
 //! Tests for [`super::q2`]: the Horadric Staff record on the quests'
 //! fake world.
 
@@ -275,6 +276,7 @@ fn status_function() {
 // ------------------------------------------------------------ §4.7
 
 // Covers: specs/world/quests-act2.md §4.7, §1.3
+// Covers: specs/world/quests-act2-2.md §1 r20
 #[test]
 fn scroll_chest_gold_vector() {
     let (mut ctl, _) = control();
@@ -283,7 +285,10 @@ fn scroll_chest_gold_vector() {
     set(&mut f, P2, 10, 3);
     ctl.seed = Seed::new(12345, 666);
     assert_eq!(q2::scroll_chest(&mut ctl, &mut f, CHEST, P1), 0);
+    // The drop code is stored first (act2-2 §1 item 20; the fake has no
+    // body for that seam, so the default reports it).
     let mut want = vec![
+        DROP_CODE.to_string(),
         "qdrop 64 tr1  7 None true".to_string(),
         "treasure 64 4".to_string(),
     ];
@@ -299,11 +304,31 @@ fn scroll_chest_gold_vector() {
     assert_eq!(q2::scroll_chest(&mut ctl, &mut f, CHEST, P1), 0);
     assert!(f.log.is_empty());
     assert_eq!(ctl.seed, s);
-    // 10.0 also disqualifies.
+    // 10.0 also disqualifies; the drop code is still stored.
     let mut f = fake(false);
     set(&mut f, P1, 10, 0);
     q2::scroll_chest(&mut ctl, &mut f, CHEST, P1);
-    assert_eq!(f.log[0], "treasure 64 4");
+    assert_eq!(f.log[..2], [DROP_CODE, "treasure 64 4"]);
+}
+
+/// The default body of the drop-code seam (the fake has none).
+const DROP_CODE: &str = "unhandled 255 0x599c28";
+
+// Covers: specs/world/quests-act2-2.md §1 r20
+#[test]
+fn chests_without_chain_9() {
+    // No chain 9: the drop code, no count and no items; treasure and gold
+    // still drop (one quest-seed step).
+    let (mut ctl, _) = control();
+    ctl.records.retain(|r| r.chain != 9);
+    ctl.seed = Seed::new(12345, 666);
+    for chest in [q2::scroll_chest::<Fake>, q2::staff_chest, q2::cube_chest] {
+        let mut f = fake(true);
+        assert_eq!(chest(&mut ctl, &mut f, CHEST, P1), 0);
+        assert_eq!(f.log[..2], [DROP_CODE, "treasure 64 4"]);
+        assert!(f.log[2..].iter().all(|l| l == "gold 64"));
+        assert!(f.log.len() >= 7);
+    }
 }
 
 // Covers: specs/world/quests-act2.md §4.7, §edge-cases-original-bugs r4
@@ -315,8 +340,13 @@ fn staff_and_cube_chests() {
     give(&mut f, P2, &[b"hst "]);
     q2::staff_chest(&mut ctl, &mut f, CHEST, P1);
     assert_eq!(
-        f.log[..3],
-        ["qdrop 64 msf  7 None true", "identify 600", "treasure 64 4"]
+        f.log[..4],
+        [
+            DROP_CODE,
+            "qdrop 64 msf  7 None true",
+            "identify 600",
+            "treasure 64 4"
+        ]
     );
     // Edge case 4: the Staff-of-Kings count (+0x18), not the cube's.
     assert_eq!((x(&ctl).staff_count, x(&ctl).cube_count), (1, 0));
@@ -325,14 +355,18 @@ fn staff_and_cube_chests() {
     f.drop_fails = true;
     f.log.clear();
     q2::staff_chest(&mut ctl, &mut f, CHEST, P1);
-    assert_eq!(f.log[..2], ["qdrop 64 msf  7 None true", "treasure 64 4"]);
+    assert_eq!(
+        f.log[..3],
+        [DROP_CODE, "qdrop 64 msf  7 None true", "treasure 64 4"]
+    );
     assert_eq!(x(&ctl).staff_count, 1);
     // Cube: every player without a `box `, normal quality.
     let mut f = fake(true);
     q2::cube_chest(&mut ctl, &mut f, CHEST, P2);
     assert_eq!(
-        f.log[..3],
+        f.log[..4],
         [
+            DROP_CODE,
             "qdrop 64 box  2 None true",
             "qdrop 64 box  2 None true",
             "treasure 64 4"
@@ -355,6 +389,23 @@ fn item_ev(ctl: &mut QuestControl, f: &mut Fake, e: u8, p: UnitId, code: &[u8; 4
     f.item_codes.insert(ITEM, *code);
     f.chains.insert(ITEM, QuestChain(vec![9]));
     ctl.item_event(f, e, p, ITEM);
+}
+
+// Covers: specs/world/quests-act2-2.md §1 r13
+#[test]
+fn pick_up_scroll_after_reading() {
+    // Vector: pick-up `tr1 `, 10.3 set → flags := 0; status unchanged, no
+    // 0x5D (even though F would send one).
+    let (mut ctl, _) = control();
+    let mut f = fake(false);
+    set(&mut f, P1, 7, 0);
+    set(&mut f, P1, 10, 3);
+    ctl.record_mut(9).unwrap().flags = 3;
+    ctl.record_mut(9).unwrap().status = 4;
+    item_ev(&mut ctl, &mut f, event::ITEM_PICKED_UP, P1, b"tr1 ");
+    assert_eq!(ctl.record(9).unwrap().flags, 0);
+    assert_eq!(ctl.record(9).unwrap().status, 4);
+    assert!(f.sent.is_empty());
 }
 
 // Covers: specs/world/quests-act2.md §4.8, §edge-cases-original-bugs r3
@@ -589,12 +640,16 @@ fn leaving_with_pieces() {
 }
 
 // Covers: specs/world/quests-act2.md §4.10, §1.1
+// Covers: specs/world/quests-act2-2.md §1 r2
 #[test]
 fn leaving_town_and_game() {
     let (mut ctl, _) = control();
     let mut f = fake(true);
     ctl.record_mut(9).unwrap().guids.add(1);
     ctl.record_mut(9).unwrap().guids.add(2);
+    // Event 10's `0x00545530` needs 10.0 and 10.1 (act2-2 §1 item 2).
+    set(&mut f, P2, 10, 0);
+    set(&mut f, P2, 10, 1);
     let lvl = |a, b| EventArgs {
         event: event::CHANGED_LEVEL,
         target: Some(P1),

@@ -1,4 +1,4 @@
-// Spec: specs/world/quests-act3.md §4 (A3Q2 Khalim's Will, chain 16)
+// Spec: specs/world/quests-act3.md §4 (A3Q2 Khalim's Will, chain 16); specs/world/quests-act3-2.md §11.3
 //! A3Q2: events 0, 2, 3, 4, 10, 11, 13, the status and active functions,
 //! Khalim's chests (operate 57 / 59 / 58), the sewer lever and stairs and
 //! the cube hook `0x005B86E0`.
@@ -388,6 +388,8 @@ pub fn chest_operate<W: QuestWorld>(
                 ctl.records[i].extra.act3.q2.drop_count += 1;
             }
         }
+        // Item level: the area level of the chest's level (§11.3; the
+        // `&level` slot is an output, no incoming value).
         for _ in 0..ctl.records[i].extra.act3.q2.drop_count {
             if w.quest_drop(object, code, 2, None, true).is_some() {
                 let x = &mut ctl.records[i].extra.act3.q2;

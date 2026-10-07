@@ -1,4 +1,5 @@
 // Spec: specs/world/quests-act2.md §5 (A2Q3 Tainted Sun, chain 10, slot 11)
+// Spec: specs/world/quests-act2-2.md §1 items 4, 5, 6, 7, 20
 //! A2Q3 callback by callback: darken (§5.2), the darkening triggers and
 //! the act-load hook (§5.3), the flag iterate (§5.4), chat and its
 //! active function (§5.5), messages, game start and leave (§5.6), the
@@ -278,11 +279,11 @@ fn messages<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, args: Ev
         set_bit(w, p, SLOT, bit::REWARD_GRANTED);
         super::clear_bit(w, p, SLOT, bit::REWARD_PENDING);
         add_guid(ctl, w, i, p);
-    }
-    // TODO(quests-act2 §5.6): read as a separate step after the 11.1
-    // block (the spec's ";"), not nested in it.
-    if !ctl.records[i].not_intro {
-        ctl.game.set(SLOT, bit::PRIMARY_GOAL_DONE);
+        // Inside the 11.1 block (`0x0059ED63`, `quests-act2-2.md` §1
+        // item 7).
+        if !ctl.records[i].not_intro {
+            ctl.game.set(SLOT, bit::PRIMARY_GOAL_DONE);
+        }
     }
 }
 
@@ -304,7 +305,8 @@ fn game_start<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, args: 
         x3(ctl, i).dark_pending = true;
         w.send(p, &[0x5D, CHAIN, 0x01, 0, 0, 0]);
     }
-    // "status n, state m": the record bytes only (as Act I's restore).
+    // "status n, state m": direct byte stores, flags kept, nothing sent
+    // (`quests-act2-2.md` §1 item 6).
     let r = &mut ctl.records[i];
     (r.status, r.state) = if f.get(SLOT, 4) {
         (2, 3)
@@ -318,7 +320,9 @@ fn game_start<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, args: 
 // ------------------------------------------------------------ §5.7
 
 /// Altar operate 24 `0x0059A7E0` (§5.7, objects.txt row 149): `player`
-/// operates `object`. Returns the operate result (always 0).
+/// operates `object`. Returns the operate result (always 0). It never
+/// calls the quest-chest gate `0x00545850` (`quests-act2-2.md` §1 item
+/// 4): steps 1–2 are its own guards.
 pub fn altar_operate<W: QuestWorld>(
     ctl: &mut QuestControl,
     w: &mut W,
@@ -346,7 +350,7 @@ pub fn altar_operate<W: QuestWorld>(
         let x = x3(ctl, i);
         x.altar_mode = 2;
         x.altar_destroyed = true;
-        drop_amulets(ctl, w, i, object, level);
+        drop_amulets(ctl, w, i, object);
         w.object_treasure(object, 4);
         chest_gold(ctl, w, object);
         return 0;
@@ -414,7 +418,7 @@ pub fn altar_operate<W: QuestWorld>(
         }
     }
     ctl.game.set(SLOT, bit::PRIMARY_GOAL_DONE);
-    drop_amulets(ctl, w, i, object, level);
+    drop_amulets(ctl, w, i, object);
     w.object_treasure(object, 4);
     chest_gold(ctl, w, object);
     // `0x00599FE0`.
@@ -425,15 +429,9 @@ pub fn altar_operate<W: QuestWorld>(
 
 /// §5.7: amulet count := the players (`0x0059A770`) holding neither
 /// `vip ` nor `hst ` and lacking 10.0; that many `vip ` drops of quality
-/// 7 with the altar level as level argument (edge case 8); the created
-/// ones identified and added to chain 9's amulet count.
-fn drop_amulets<W: QuestWorld>(
-    ctl: &mut QuestControl,
-    w: &mut W,
-    i: usize,
-    object: UnitId,
-    level: u32,
-) {
+/// 7 (the item level is computed by `0x00559A30`, edge case 8); the
+/// created ones identified and added to chain 9's amulet count.
+fn drop_amulets<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, object: UnitId) {
     let mut n = 0;
     for p in w.players() {
         if !w.has_item(p, VIPER_AMULET)
@@ -446,13 +444,10 @@ fn drop_amulets<W: QuestWorld>(
     x3(ctl, i).amulets = n;
     let mut made = 0;
     for _ in 0..n {
-        if let Some(item) = w.quest_drop(
-            object,
-            VIPER_AMULET,
-            AMULET_QUALITY,
-            Some(level as i32),
-            false,
-        ) {
+        // The level variable holds the altar's level id, but `&level` is
+        // an out parameter that `0x00559A30` overwrites unread
+        // (`quests-act2-2.md` §1 item 20): passed as `None`.
+        if let Some(item) = w.quest_drop(object, VIPER_AMULET, AMULET_QUALITY, None, false) {
             w.identify_item(item);
             made += 1;
         }
@@ -485,17 +480,21 @@ pub fn altar_init<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: Unit
     let x = x3(ctl, i);
     x.altar_seen = true;
     x.altar_guid = guid;
-    let r = &ctl.records[i];
-    if r.not_intro && r.state <= 1 {
-        if darken(ctl, w, i) {
-            x3(ctl, i).dark = true;
-        } else {
-            x3(ctl, i).dark_pending = true;
+    if ctl.records[i].not_intro {
+        if ctl.records[i].state <= 1 {
+            if darken(ctl, w, i) {
+                x3(ctl, i).dark = true;
+            } else {
+                x3(ctl, i).dark_pending = true;
+            }
+            // A direct byte store (`0x0059A434`).
+            ctl.records[i].state = 3;
+            ctl.records[i].flags = 0;
         }
-        ctl.records[i].state = 3;
-        ctl.records[i].flags = 0;
-        // Darken has just sent status 1 to all, so this test is false
-        // whenever the branch runs (kept as the original has it).
+        // Still inside not-intro, also when the state was ≥ 2
+        // (`0x0059A455`); never true in 1.14d: every path that moves the
+        // state off 0 writes status ≥ 1 first (`quests-act2-2.md` §1
+        // item 5). Kept as the original has it.
         if ctl.records[i].status == 0 {
             status_all(ctl, w, i, 2);
         }

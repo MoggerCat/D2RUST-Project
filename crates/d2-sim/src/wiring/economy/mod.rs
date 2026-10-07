@@ -54,7 +54,7 @@ pub use item_stats::{find_list, StatCtx, UnitStats};
 pub use item_units::{Economy, ItemScope, ItemSpawn, ItemStore};
 pub use quest_host::HostQuests;
 pub use quest_items::{EconomyQuests, QuestDeferred, QuestRest};
-pub use quest_objects::QuestObjectRun;
+pub use quest_objects::{QuestLoan, QuestObjectRun};
 pub use quest_tick::{QuestTick, UnitSide};
 pub use treasure_items::{dropper, recipient, DropPlacer, DropSpot, ItemDrops};
 

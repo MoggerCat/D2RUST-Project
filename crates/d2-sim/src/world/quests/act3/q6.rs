@@ -1,4 +1,4 @@
-// Spec: specs/world/quests-act3.md §8 (A3Q6 The Guardian, chain 20)
+// Spec: specs/world/quests-act3.md §8 (A3Q6 The Guardian, chain 20); specs/world/quests-act3-2.md §11.2, §11.3, §11.6
 //! A3Q6: events 0, 2, 3, 8, 10, 11, 13, the active function, the status
 //! timer, the Hellgate (init 44), Mephisto's bridge (init 45, event 7),
 //! Natalya (init 52) and the Durance warp `0x005BCFD0`.
@@ -9,7 +9,9 @@ use super::{
     Timer, DOCKS,
 };
 use crate::units::UnitId;
-use crate::world::quests::{bit, event, EventArgs, QuestControl, QuestWorld, TextList, TimerFn};
+use crate::world::quests::{
+    bit, event, raise_progression, EventArgs, QuestControl, QuestWorld, TextList, TimerFn,
+};
 
 const CHAIN: u8 = 20;
 const SLOT: u8 = 22;
@@ -22,10 +24,11 @@ const RUINED_FANE: u32 = 98;
 const DURANCE_1: u32 = 100;
 const DURANCE_3: u32 = 102;
 const OUTER_STEPPES: u32 = 104;
-/// `0x00538680(client, 3, difficulty)`: character act progression (save
-/// spec, open question 5).
-const ACT_PROGRESS: u32 = 0x0053_8680;
-/// `0x0058F000`: applying Natalya's stored map AI (NPC map AI spec).
+/// The progression step of Mephisto's credit (`0x005BC17B`,
+/// `quests-act3-2.md` §11.2).
+const PROGRESSION_STEP: u8 = 3;
+/// `0x0058F000`: applying Natalya's stored map AI (NPC map AI spec);
+/// never reached from Act III code in 1.14d (`quests-act3-2.md` §11.6).
 const APPLY_MAP_AI: u32 = 0x0058_F000;
 const SOULSTONE: [u8; 4] = *b"mss ";
 /// Mephisto's status timer period (updater ticks).
@@ -57,7 +60,8 @@ pub struct Extra {
     /// +0x20: Natalya was spawned; +0x2C her GUID.
     pub natalya_spawned: bool,
     pub natalya_guid: u32,
-    /// +0x24: her map AI is stored (`0x005BD040`, no caller in 1.14d).
+    /// +0x24: her map AI is stored. Only `0x005BD040` writes it and it
+    /// has no caller in 1.14d (`quests-act3-2.md` §11.6): stays false.
     pub map_ai: bool,
     /// +0x30: the map AI was applied.
     pub ai_applied: bool,
@@ -242,8 +246,10 @@ fn changed_level<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, arg
     }
 }
 
-/// Credit `0x005BC140`: 22.13, 22.0, 22.11, then the character act
-/// progression `0x00538680` (open question 5: reported).
+/// Credit `0x005BC140`: 22.13, 22.0, 22.11, then the character
+/// progression `0x00538680(P's client, 3, game difficulty)` at
+/// `0x005BC182` (`quests-act3-2.md` §11.2, `quests-act1-rest.md` §5):
+/// n = (4 or 5)·difficulty + 3, never lowered.
 fn credit<W: QuestWorld>(w: &mut W, p: UnitId) {
     set(
         w,
@@ -251,7 +257,8 @@ fn credit<W: QuestWorld>(w: &mut W, p: UnitId) {
         SLOT,
         &[bit::PRIMARY_GOAL_DONE, bit::REWARD_GRANTED, PENDING],
     );
-    w.unhandled(CHAIN, ACT_PROGRESS);
+    let d = w.difficulty();
+    raise_progression(w, p, PROGRESSION_STEP, d);
 }
 
 /// Event 8 `0x005BC8B0` (§8.5): Mephisto's death (victim = target,
@@ -448,7 +455,8 @@ pub fn natalya_init<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: Un
     e.natalya_spawned = true;
     e.natalya_guid = g;
     // +0x24 is stored only by `0x005BD040`, which has no caller in 1.14d
-    // (edge case 17): this branch never runs there.
+    // (edge cases 17, 20; `quests-act3-2.md` §11.6): this branch never
+    // runs there.
     if e.map_ai && !e.ai_applied {
         e.ai_applied = true;
         w.unhandled(CHAIN, APPLY_MAP_AI);

@@ -760,7 +760,7 @@ fn cairn_stone_inits_on_the_created_quest_control() {
     fx.assert_clean();
 }
 
-// Covers: specs/world/quests-act1-rest.md §1.1 r3, §1.1 r4, §1.1 r5, §1.1 r6, §1.1 r8, §1.2 r3, §1.2 r4; specs/world/quests.md §6.6
+// Covers: specs/world/quests-act1-rest.md §1.1 r3, §1.1 r4, §1.1 r5, §1.1 r6, §1.1 r8, §1.2 r3, §1.2 r4, §9 r7; specs/world/quests.md §6.6
 #[test]
 fn opening_cains_gibbet_and_its_event_7() {
     let mut fx = Fx::new();
@@ -788,36 +788,35 @@ fn opening_cains_gibbet_and_its_event_7() {
     assert!(got.contains(&info), "{got:02x?}");
     assert!(got.contains(&object_state(g, true, 1)), "{got:02x?}");
     // §1.2 at frame + 17: X +0x54 := 3, object mode := 3 (sent as 0x0E).
-    let mut later = Vec::new();
+    // Event 7 runs in tick step 4 on the host's lent quest control, so
+    // the client pass (step 5) of the same tick sends the 0x0E
+    // (`sim/tick.md` §3; `quests-act1-rest.md` §9 item 7; finding N-3
+    // fixed): no 0x0E in the ticks before, exactly one in that tick.
+    let mut last = Vec::new();
     while fx.frame() < f + 17 {
         assert_eq!(fx.mode(gibbet), 1);
-        later.extend(fx.frames(1));
+        assert!(!last.iter().any(|m: &Vec<u8>| m[0] == 0x0E), "{last:02x?}");
+        last = fx.frames(1);
     }
     assert_eq!(fx.mode(gibbet), 3);
-    // In 1.14d event 7 runs in tick step 4 and the client pass (step 5)
-    // of the same tick sends the 0x0E (`sim/tick.md` §3); d2rs runs the
-    // queued quest call after the tick, so the 0x0E comes with the next
-    // tick (finding N-3). Both ticks are collected; the tick itself is
-    // not asserted.
-    later.extend(fx.frames(1));
-    let states: Vec<_> = later.iter().filter(|m| m[0] == 0x0E).cloned().collect();
+    let states: Vec<_> = last.iter().filter(|m| m[0] == 0x0E).cloned().collect();
     assert_eq!(states, [object_state(g, true, 3)]);
-    // Step 3's position of the object (`0x0045ADF0`) is the quest seam
-    // `unit_position`, which the wired host leaves on the rest (no
-    // answer), so the function stops with its fatal report before Cain's
-    // spawn: the Pending seam, reported on the quest control
-    // (`docs/handoff/e2e-night-flows.md` finding N-2).
-    let faults = fx.world().quests.faults.clone();
-    assert_eq!(faults, [QuestError::Fatal(0x0059_3290)]);
+    // Step 3's position and room come from the path provider and the
+    // object's list room (`HostQuests::unit_position`, finding N-2
+    // fixed): no fault. The cain1 spawn and the free-spot search are the
+    // rest's (no provider: none), so step 4 runs: nobody in Tristram, no
+    // portal; X +0x52 := 1 (Cain still to spawn in town), X +0x62 := 1.
+    assert_eq!(fx.world().quests.faults, Vec::<QuestError>::new());
     let x = fx.world().quests.record(A1Q4).unwrap().extra.q4.clone();
-    assert!(!x.town_cain_due && !x.cain_failed);
+    assert!(x.town_cain_due && x.cain_failed);
+    assert!(!x.out_portal && x.found_player.is_none());
     assert!(fx.routes().is_empty());
     fx.assert_clean();
 }
 
 // ---- 4. Act II: Horazon's journal -------------------------------------------------------
 
-// Covers: specs/world/quests-act2.md §6.7, §1.1; specs/world/quests.md §6.3
+// Covers: specs/world/quests-act2.md §6.7, §1.1; specs/world/quests.md §6.3; specs/world/quests-act2-2.md §1 r7
 #[test]
 fn reading_horazons_journal() {
     let mut fx = Fx::new();
@@ -849,12 +848,27 @@ fn reading_horazons_journal() {
     // layout in the spec (`quests-act2.md` OQ4): the rest's
     // `open_quest_message` seam, nothing sent.
     assert!(!got.iter().any(|m| m[0] == 0x27), "{got:02x?}");
-    // A second read: the mode stays 1 (the mode-0 test); the player
-    // still lacks 12.0 and 12.1, so the completion flag sends again.
+    // +0x08 := the tome's room (`unit_position` on the wired host,
+    // finding N-2 fixed).
+    let room = fx
+        .world()
+        .quests
+        .record(A2Q4)
+        .unwrap()
+        .extra
+        .a2
+        .q4
+        .tome_room;
+    assert!(room.is_some());
+    // A second read: the mode stays 1 (the mode-0 test); state is 5
+    // now, and the grants and the completion flag run only inside "not
+    // intro and state ≠ 5" (`quests-act2-2.md` §1.7, QB-7): nothing is
+    // sent again.
     fx.frames(5);
     let (_, again) = fx.step(&[interact(g)]);
     assert_eq!(fx.mode(tome), 1);
-    assert!(again.contains(&done), "{again:02x?}");
+    assert!(!again.contains(&done), "{again:02x?}");
+    assert!(!again.iter().any(|m| m[0] == 0x5D), "{again:02x?}");
     assert!(fx.routes().is_empty());
     fx.assert_clean();
 }

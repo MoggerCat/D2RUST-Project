@@ -1,4 +1,5 @@
 // Spec: specs/world/quests-act2.md §8, §10 (Test vectors)
+// Spec: specs/world/quests-act2-2.md §1, §3 (Test vectors)
 //! Tests for [`super::q6`]: A2Q6 The Seven Tombs callback by callback,
 //! the true-tomb choice, the lair objects and the chain-13 hooks, on the
 //! quests' fake world.
@@ -11,6 +12,7 @@ use crate::world::quests::tests::*;
 use crate::world::quests::*;
 
 const P3: UnitId = UnitId(3);
+const P4: UnitId = UnitId(4);
 const JERHYN_U: UnitId = UnitId(0x30);
 const TYRAEL_U: UnitId = UnitId(0x31);
 const MESHIF_U: UnitId = UnitId(0x32);
@@ -411,6 +413,7 @@ fn status_function() {
 // ------------------------------------------------------------ §8.6
 
 // Covers: specs/world/quests-act2.md §8.6
+// Covers: specs/world/quests-act2-2.md §3.1, §3.3
 #[test]
 fn orifice_operate_and_insert() {
     let mut f = fake();
@@ -418,20 +421,16 @@ fn orifice_operate_and_insert() {
     // Mode 0 without `hst `: sound 19, 1.
     assert_eq!(orifice_operate(&mut f, ORIFICE_U, P1), 1);
     assert_eq!(f.log, ["sound 1 19"]);
-    // With it: interact unit, mode 1, the insert dialog, 0.
+    // With it: interact unit, mode 1, S→C 0x58 result 0 (byte 6 sent as
+    // 0, act2-2 §3.3), 0.
     f.log.clear();
     f.p(P1).items.push(*b"hst ");
     assert_eq!(orifice_operate(&mut f, ORIFICE_U, P1), 0);
-    assert_eq!(
-        f.log,
-        [
-            "interact 1 Some((2, 80))",
-            "mode 80 1",
-            "insert dialog 1 80"
-        ]
-    );
+    assert_eq!(f.log, ["interact 1 Some((2, 80))", "mode 80 1"]);
+    assert_eq!(f.sent, [(P1, hex("58 50000000 00 00"))]);
     // Mode 1, the orifice is the interact unit: reset, mode 2, 0.
     f.log.clear();
+    f.sent.clear();
     assert_eq!(orifice_operate(&mut f, ORIFICE_U, P1), 0);
     assert_eq!(f.log, ["interact 1 None", "mode 80 2"]);
     // Mode 1, another interact unit: nothing.
@@ -440,15 +439,63 @@ fn orifice_operate_and_insert() {
     f.interact.insert(P1, (2, 0x99));
     assert_eq!(orifice_operate(&mut f, ORIFICE_U, P1), 0);
     assert!(f.log.is_empty());
-    // A busy player: not specified, reported.
-    f.objects.get_mut(&ORIFICE_U).unwrap().2 = 0;
+    // Mode 2: 0, nothing.
+    f.objects.get_mut(&ORIFICE_U).unwrap().2 = 2;
+    assert_eq!(orifice_operate(&mut f, ORIFICE_U, P1), 0);
+    assert!(f.log.is_empty() && f.sent.is_empty());
+}
+
+// Covers: specs/world/quests-act2-2.md §1 r19, §3.1
+#[test]
+fn orifice_busy_player_and_no_chain() {
+    // Vector: mode 0, player busy → 1; no 0x58, no sound.
+    let (mut ctl, _) = control();
+    let mut f = fake();
+    f.objects.insert(ORIFICE_U, (0x50, ORIFICE, 0));
+    f.p(P1).items.push(*b"hst ");
     f.busy.push(P1);
-    assert_eq!(orifice_operate(&mut f, ORIFICE_U, P1), 1);
-    assert_eq!(f.log, ["unhandled 13 0x59dc70"]);
-    // C→S 0x44: an orifice refuses any other cursor item (result 4).
-    assert_eq!(insert_result(ORIFICE, *b"vip "), 4);
-    assert_eq!(insert_result(ORIFICE, *b"hst "), 5);
-    assert_eq!(insert_result(153, *b"vip "), 5);
+    assert_eq!(orifice_operate_checked(&ctl, &mut f, ORIFICE_U, P1), 1);
+    assert!(f.log.is_empty() && f.sent.is_empty());
+    assert_eq!(f.objects[&ORIFICE_U].2, 0);
+    // Chain 13 absent: 0 before anything.
+    ctl.records.retain(|r| r.chain != 13);
+    f.busy.clear();
+    assert_eq!(orifice_operate_checked(&ctl, &mut f, ORIFICE_U, P1), 0);
+    assert!(f.log.is_empty() && f.sent.is_empty());
+}
+
+// Covers: specs/world/quests-act2-2.md §3.2, §3.3
+#[test]
+fn item_into_orifice() {
+    const ITEM: UnitId = UnitId(0x70);
+    let (mut ctl, _) = control();
+    let mut f = fake();
+    f.objects.insert(ORIFICE_U, (0x50, ORIFICE, 1));
+    f.item_codes.insert(ITEM, *b"msf ");
+    // Vector: action 3, cursor item `msf ` → result 4; nothing else.
+    item_to_object(&mut ctl, &mut f, P1, 0x50, Some(ITEM), INSERT_ITEM);
+    assert_eq!(f.sent, [(P1, hex("58 50000000 04 00"))]);
+    assert!(f.log.is_empty());
+    // No cursor item: refused the same way.
+    f.sent.clear();
+    item_to_object(&mut ctl, &mut f, P1, 0x50, None, INSERT_ITEM);
+    assert_eq!(f.sent, [(P1, hex("58 50000000 04 00"))]);
+    // Action 2 (cancel): result 1, mode 0, the interact unit reset.
+    f.sent.clear();
+    item_to_object(&mut ctl, &mut f, P1, 0x50, Some(ITEM), INSERT_CANCEL);
+    assert_eq!(f.sent, [(P1, hex("58 50000000 01 00"))]);
+    assert_eq!(f.log, ["mode 80 0", "interact 1 None"]);
+    // Any other action, or an unknown object GUID: nothing.
+    f.log.clear();
+    f.sent.clear();
+    item_to_object(&mut ctl, &mut f, P1, 0x50, Some(ITEM), 1);
+    item_to_object(&mut ctl, &mut f, P1, 0x99, Some(ITEM), INSERT_CANCEL);
+    assert!(f.log.is_empty() && f.sent.is_empty());
+    // Another object class: the generic path (object spec), reported.
+    f.objects.insert(UnitId(0x60), (0x60, 153, 0));
+    item_to_object(&mut ctl, &mut f, P1, 0x60, Some(ITEM), INSERT_ITEM);
+    assert_eq!(f.log, ["unhandled 13 0x5852e0"]);
+    assert!(f.sent.is_empty());
 }
 
 // ------------------------------------------------------------ §8.7
@@ -462,6 +509,7 @@ fn orifice_world(f: &mut Fake) {
 }
 
 // Covers: specs/world/quests-act2.md §8.6, §8.7
+// Covers: specs/world/quests-act2-2.md §3.2
 #[test]
 fn staff_hand_in() {
     let (mut ctl, _) = control();
@@ -477,9 +525,12 @@ fn staff_hand_in() {
     }
     f.party.insert(P1, vec![P1, P2, P3]);
     ctl.tick = 7;
-    staff_inserted(&mut ctl, &mut f, P1, ORIFICE_U);
+    // Vector (act2-2 §3.2): 0x44 action 3 with the cursor item `hst `:
+    // `58 <guid> 05 01`, mode 1 → 2, the staff handed in.
+    f.item_codes.insert(UnitId(0x70), *b"hst ");
+    item_to_object(&mut ctl, &mut f, P1, 0x50, Some(UnitId(0x70)), INSERT_ITEM);
     let del = ["delete hst ", "delete vip ", "delete msf "];
-    let mut want = vec!["mode 80 1", "mode 80 2"];
+    let mut want = vec!["interact 1 None", "mode 80 1", "mode 80 2"];
     want.extend(del);
     want.extend(del);
     want.extend([
@@ -500,6 +551,7 @@ fn staff_hand_in() {
     assert_eq!(
         f.sent,
         [
+            (P1, hex("58 50000000 05 01")),
             (P1, s28(&f, P1)),
             (P1, hex("89 03")),
             (P2, s28(&f, P2)),
@@ -721,35 +773,39 @@ fn true_tomb_clue_item() {
 // ------------------------------------------------------------ §8.11
 
 // Covers: specs/world/quests-act2.md §8.11
+// Covers: specs/world/quests-act2-2.md §1 r17
 #[test]
 fn tyrael_portal() {
     let (mut ctl, _) = control();
     let mut f = fake();
     let i = i13(&ctl);
-    // P1 in Duriel's Lair, P2 there with 14.3, P3 in town.
+    // P1 in Duriel's Lair, P2 there with 14.3, P3 in town (P1's party),
+    // P4 in town alone.
     f.p(P1).level = Some(73);
     f.pos.insert(P1, (10, 20, R1));
     f.players.insert(P2, act2_player(2, 73));
     set(&mut f, P2, 14, 3);
     f.players.insert(P3, act2_player(3, 40));
+    f.players.insert(P4, act2_player(4, 40));
     f.party.insert(P1, vec![P1, P3]);
     ctl.records[i].callbacks &= !(1 << 2);
     say(&mut ctl, &mut f, TYRAEL_U, TYRAEL1, 302);
     assert_eq!(ctl.records[i].state, 4);
     assert!(f.flags(P1).get(14, 13) && f.flags(P1).get(14, 3));
-    assert!(!f.flags(P3).get(14, 13));
-    // Completion flag: only P3 lacks 14.0, 14.3, 14.4.
-    assert!(f.flags(P3).get(14, 14));
-    assert!(!f.flags(P1).get(14, 14) && !f.flags(P2).get(14, 14));
-    assert_eq!(f.sent, [(P3, hex("5D 0D 00 0C 0000"))]);
+    // P3 through P1's party (act2-2 §1 item 17): 14.13, 14.3 and the
+    // progression, no 0x28.
+    assert!(f.flags(P3).get(14, 13) && f.flags(P3).get(14, 3));
+    // Completion flag: only P4 lacks 14.0, 14.3, 14.4.
+    assert!(f.flags(P4).get(14, 14));
+    assert!(![P1, P2, P3].iter().any(|&p| f.flags(p).get(14, 14)));
+    assert_eq!(f.sent, [(P4, hex("5D 0D 00 0C 0000"))]);
     assert_eq!(
         f.log,
         [
             "portal 10 20 59 40",
-            // `0x00538680` (open question 7) for P1.
-            "unhandled 13 0x538680",
-            // P1's party (`0x0059C9A0`, not fully specified).
-            "unhandled 13 0x59c9a0",
+            // `0x00538680(client, 2, difficulty)` for P1, then P3.
+            "progression 1 2 0",
+            "progression 3 2 0",
         ]
     );
     let e = ex(&ctl);
@@ -770,6 +826,7 @@ fn tyrael_portal() {
 }
 
 // Covers: specs/world/quests-act2.md §8.11
+// Covers: specs/world/quests-act2-2.md §1 r10
 #[test]
 fn jerhyn_and_meshif_messages() {
     let (mut ctl, _) = control();
@@ -841,6 +898,7 @@ fn jerhyn_and_meshif_messages() {
 }
 
 // Covers: specs/world/quests-act2.md §8.11
+// Covers: specs/world/quests-act2-2.md §1 r10, §edge-cases-original-bugs r3
 #[test]
 fn townsfolk_messages() {
     let (mut ctl, _) = control();
@@ -852,6 +910,123 @@ fn townsfolk_messages() {
         assert!(f.flags(P1).get(14, b));
     }
     assert!(f.sent.is_empty() && f.log.is_empty());
+    // 448, 450, 451 from a non-Meshif NPC: nothing (raw jump table).
+    let (mut ctl, _) = control();
+    let mut f = fake();
+    for m in [448, 450, 451] {
+        say(&mut ctl, &mut f, ATMA_U, ATMA, m);
+    }
+    assert_eq!(f.flags(P1).word(14), 0);
+    // Jerhyn and Meshif return for any message but theirs.
+    for m in 444..=452 {
+        say(&mut ctl, &mut f, JERHYN_U, JERHYN, m);
+        if m != 450 {
+            say(&mut ctl, &mut f, MESHIF_U, npc::MESHIF1, m);
+        }
+    }
+    assert_eq!(f.flags(P1).word(14), 0);
+    // Tyrael falls through to the switch after the 302 block.
+    say(&mut ctl, &mut f, TYRAEL_U, TYRAEL1, 444);
+    assert_eq!(f.flags(P1).word(14), 1 << 9);
+}
+
+// Covers: specs/world/quests-act2-2.md §1 r17
+#[test]
+fn tyrael_portal_party_members() {
+    let (mut ctl, _) = control();
+    let mut f = fake();
+    // P1 in the lair; P1's party: P2 with 14.13 already but lacking 14.0,
+    // 14.3, 14.4 (granted: own 14.13 not tested), P3 outside Act II, P4
+    // with 14.4 (skipped). P5 had 14.13 before (not in the lair): its
+    // party (P6, in Act II, any level) is credited too.
+    const P5: UnitId = UnitId(5);
+    const P6: UnitId = UnitId(6);
+    f.p(P1).level = Some(73);
+    f.pos.insert(P1, (10, 20, R1));
+    for (p, level) in [(P2, 40), (P3, 40), (P4, 74), (P5, 40), (P6, 46)] {
+        f.players.insert(p, act2_player(p.0, level));
+    }
+    f.p(P3).act = Some(0);
+    set(&mut f, P2, 14, 13);
+    set(&mut f, P4, 14, 4);
+    set(&mut f, P5, 14, 13);
+    f.party.insert(P1, vec![P1, P2, P3, P4]);
+    f.party.insert(P5, vec![P5, P6]);
+    say(&mut ctl, &mut f, TYRAEL_U, TYRAEL1, 302);
+    let progressed: Vec<&String> = f
+        .log
+        .iter()
+        .filter(|l| l.starts_with("progression"))
+        .collect();
+    assert_eq!(
+        progressed,
+        [
+            "progression 1 2 0",
+            "progression 2 2 0",
+            "progression 5 2 0",
+            "progression 6 2 0",
+        ]
+    );
+    for p in [P1, P2, P5, P6] {
+        assert!(f.flags(p).get(14, 13) && f.flags(p).get(14, 3), "{}", p.0);
+    }
+    assert!(!f.flags(P3).get(14, 3) && !f.flags(P4).get(14, 3));
+    // No 0x28 for the grants: only the completion flag's 0x5D (P3).
+    assert!(f.sent.iter().all(|m| m.1[0] == 0x5D));
+}
+
+// Covers: specs/world/quests-act2-2.md §1 r9
+#[test]
+fn tyrael_chat_returns() {
+    // Tyrael: table state 2 only with door mode 2; the 14.13 / 14.3 /
+    // 14.4 / GUID rules never apply to him.
+    let (mut ctl, _) = control();
+    let mut f = fake();
+    let i = i13(&ctl);
+    ctl.records[i].state = 1;
+    ctl.records[i].guids.add(1);
+    for b in [3, 4, 13] {
+        set(&mut f, P1, 14, b);
+    }
+    assert_eq!(text(&mut ctl, &mut f, TYRAEL_U), []);
+    exm(&mut ctl).door_mode = 2;
+    assert_eq!(text(&mut ctl, &mut f, TYRAEL_U), [(302, 0)]);
+}
+
+// Covers: specs/world/quests-act2-2.md §1 r12
+#[test]
+fn duriel_kill_party_members() {
+    // Vector: P has no 14.x; his party member M in Lut Gholein lacking
+    // 14.0/14.3–14.5 → both get 14.5; no 0x28. A member outside Act II
+    // or with 14.3 gets nothing.
+    let (mut ctl, _) = control();
+    let mut f = fake();
+    f.players.insert(P2, act2_player(2, 40));
+    f.players.insert(P3, act2_player(3, 40));
+    f.players.insert(P4, act2_player(4, 40));
+    f.p(P3).act = Some(0);
+    set(&mut f, P4, 14, 3);
+    f.party.insert(P1, vec![P1, P2, P3, P4]);
+    let args = EventArgs {
+        event: event::MONSTER_KILLED,
+        target: Some(DURIEL_U),
+        player: Some(P1),
+        ..EventArgs::default()
+    };
+    ev(&mut ctl, &mut f, args);
+    assert!(f.flags(P1).get(14, 5) && f.flags(P2).get(14, 5));
+    assert!(!f.flags(P3).get(14, 5) && !f.flags(P4).get(14, 5));
+    let s28s = f.sent.iter().filter(|m| m.1[0] == 0x28).count();
+    // Only FX 8's 0x28 per player.
+    assert_eq!(s28s, 4);
+    // The killer already credited (14.5): his party is not.
+    let (mut ctl, _) = control();
+    let mut f = fake();
+    f.players.insert(P2, act2_player(2, 40));
+    set(&mut f, P1, 14, 5);
+    f.party.insert(P1, vec![P1, P2]);
+    ev(&mut ctl, &mut f, args);
+    assert!(!f.flags(P2).get(14, 5));
 }
 
 // Covers: specs/world/quests-act2.md §8.11, §edge-cases-original-bugs r12, §edge-cases-original-bugs r13
@@ -1023,8 +1198,13 @@ fn start_join_and_leave() {
     assert!(ex(&ctl).completed_before && !ex(&ctl).staff_in);
     assert_eq!((ctl.records[i].state, ctl.records[i].status), (0, 0));
     assert!(f.sent.is_empty());
-    // Event 10: the player leaves the record list.
+    // Event 10: the player leaves the record list only with 14.0 and
+    // 14.1 (`0x00545530`, act2-2 §1 item 2).
     ctl.records[i].guids.add(1);
+    start(&mut ctl, &mut f, event::PLAYER_LEAVES_GAME);
+    assert_eq!(ctl.records[i].guids.0, [1]);
+    set(&mut f, P1, 14, 0);
+    set(&mut f, P1, 14, 1);
     start(&mut ctl, &mut f, event::PLAYER_LEAVES_GAME);
     assert!(ctl.records[i].guids.0.is_empty());
 }

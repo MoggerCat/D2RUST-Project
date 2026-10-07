@@ -460,6 +460,7 @@ fn forgotten_tower_through_every_state() {
 }
 
 // Covers: specs/world/quests-act1.md §10.1 r1, §10.8 r2, §10.8 r3, §10.8 r4, §10.8 r5, §10.8 r7, §10.8 r10
+// Covers: specs/world/quests-act1-rest.md §9 r4
 #[test]
 fn sisters_to_the_slaughter_through_every_state() {
     // Quests 1–4 done: the walk reaches chain 6, whose timer (period 20)
@@ -490,6 +491,10 @@ fn sisters_to_the_slaughter_through_every_state() {
     let log = f.take_log();
     assert_eq!(log.iter().filter(|l| l.starts_with("drop ")).count(), 3);
     assert!(log.contains(&format!("sound {} 33", p.0)));
+    // The credit's progression `0x00538680(client, 1, 0)` on the player's
+    // client (classic, difficulty 0: n = 1; `quests-act1-rest.md` §5,
+    // §9 item 4).
+    assert_eq!(f.world().rest.client_flags.get(&p), Some(&0x0100));
     // Status 3 at the 11th firing (22 updater ticks); the portal step
     // (counter 10) needs the player's position (no path seam here).
     assert!(ticks(&mut f, 21).is_empty());

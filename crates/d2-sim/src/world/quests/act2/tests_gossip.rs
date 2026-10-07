@@ -1,4 +1,5 @@
 // Spec: specs/world/quests-act2.md §9 (A2Q0, A2Q7, A2Q8, the Act II intro)
+// Spec: specs/world/quests-act2-2.md §1 items 2, 3, 18
 //! The Act II gossip and intro records on the quests' fake world.
 
 use crate::rng::Seed;
@@ -96,6 +97,7 @@ fn active(ctl: &QuestControl, f: &mut Fake, chain: u8, npc: u16) -> bool {
 // ------------------------------------------------------------ chain 7
 
 // Covers: specs/world/quests-act2.md §9
+// Covers: specs/world/quests-act2-2.md §1 r2, §1 r18
 #[test]
 fn jerhyn_gossip() {
     let (mut ctl, _) = control();
@@ -105,11 +107,14 @@ fn jerhyn_gossip() {
     assert_eq!(text(&mut ctl, &mut f, 7, CAIN_U), []);
     assert!(active(&ctl, &mut f, 7, 201));
     assert!(!active(&ctl, &mut f, 7, 244));
-    // Cain with 4.14, not listed → table state 1 (125) and `0x005940A0`
-    // (not specified: reported).
+    // Cain with 4.14, not listed → table state 1 (125) and `0x005940A0`:
+    // P1 leaves chain 4's +0xB4 list (act2-2 §1 item 18).
     set(&mut f, 4, bit::COMPLETED_NOW);
+    ctl.record_mut(4).unwrap().extra.q4.credited.add(1);
+    ctl.record_mut(4).unwrap().extra.q4.credited.add(9);
     assert_eq!(text(&mut ctl, &mut f, 7, CAIN_U), [(125, 0)]);
-    assert_eq!(f.log.last().unwrap(), "unhandled 7 0x5940a0");
+    assert_eq!(ctl.record(4).unwrap().extra.q4.credited.0, [9]);
+    assert!(f.log.is_empty());
     // 125 from another NPC: nothing; from Cain: P1 joins the extra list.
     say(&mut ctl, &mut f, JERHYN_U, 125);
     assert!(ctl.record(7).unwrap().extra.a2.q0.0.is_empty());
@@ -202,18 +207,21 @@ fn guard4_lines_draw_from_the_player_seed() {
 }
 
 // Covers: specs/world/quests-act2.md §9
+// Covers: specs/world/quests-act2-2.md §1 r3
 #[test]
 fn guard4_messages_kill_and_active() {
     let (mut ctl, _) = control();
     let mut f = fake();
     assert!(active(&ctl, &mut f, 26, 377));
     assert!(!active(&ctl, &mut f, 26, 378));
-    // 59, 60 → 30.13; 61–63 → 30.0; others nothing.
-    for (msg, slot_word) in [(58, 0), (59, 0x2000), (60, 0x2000), (64, 0)] {
+    // 59, 60 → 30.13; any other message from 377 → 30.0 (act2-2 §1
+    // item 3).
+    for (msg, slot_word) in [(58, 1), (59, 0x2000), (60, 0x2000), (64, 1)] {
         f.p(P1).quests.flags[0] = QuestFlags::default();
         say(&mut ctl, &mut f, GUARD4_U, msg);
         assert_eq!(f.flags(P1).word(30), slot_word, "msg {msg}");
     }
+    f.p(P1).quests.flags[0] = QuestFlags::default();
     // 30.13 set: no talk unless 9.13.
     set(&mut f, 30, bit::PRIMARY_GOAL_DONE);
     assert!(!active(&ctl, &mut f, 26, 377));
@@ -324,8 +332,74 @@ fn act2_intro_record() {
         f.p(P1).quests.intro[0].iter().copied().collect::<Vec<_>>(),
         [198, 199, 210]
     );
-    // The active function `0x005985C0` is not specified: reported.
+    // The active function `0x005985C0` returns false (act2-2 §1 item 18).
     f.log.clear();
-    assert!(!active(&ctl, &mut f, 38, 199));
-    assert_eq!(f.log, ["unhandled 38 0x5985c0"]);
+    for npc in [199, 198, 210, 176] {
+        assert!(!active(&ctl, &mut f, 38, npc));
+    }
+    assert!(f.log.is_empty());
+}
+
+// Covers: specs/world/quests-act2-2.md §1 r3, §edge-cases-original-bugs r1
+#[test]
+fn guard4_chat_end_callback() {
+    // Vector: msg 61 from NPC 377 → 30.0; callback 2 unchanged.
+    let (mut ctl, _) = control();
+    let mut f = fake();
+    let i = ctl.find(26).unwrap();
+    assert!(!ctl.records[i].has_callback(event::NPC_DEACTIVATE));
+    say(&mut ctl, &mut f, GUARD4_U, 61);
+    assert_eq!(f.flags(P1).word(30), 1);
+    assert!(!ctl.records[i].has_callback(event::NPC_DEACTIVATE));
+    // The same messages from another NPC: nothing (NPC 377 only).
+    f.p(P1).quests.flags[0] = QuestFlags::default();
+    for msg in [59, 61] {
+        say(&mut ctl, &mut f, GUARD5_U, msg);
+    }
+    assert_eq!(f.flags(P1).word(30), 0);
+    assert!(!ctl.records[i].has_callback(event::NPC_DEACTIVATE));
+    // Vector: msg 60 from 377 → 30.13 and callback 2 = `0x0059E0B0`; the
+    // chat end leaves it set (extra +0x00 is never 1).
+    say(&mut ctl, &mut f, GUARD4_U, 60);
+    assert_eq!(f.flags(P1).word(30), 0x2000);
+    assert!(ctl.records[i].has_callback(event::NPC_DEACTIVATE));
+    f.log.clear();
+    call(&mut ctl, &mut f, 26, event::NPC_DEACTIVATE, GUARD4_U);
+    assert!(ctl.records[i].has_callback(event::NPC_DEACTIVATE));
+    assert!(f.log.is_empty() && f.sent.iter().all(|m| m.1[0] != 0x5D));
+    // With +0x00 = 1 (unreachable in 1.14d) the body clears both.
+    ctl.records[i].extra.a2.q7_chat = 1;
+    call(&mut ctl, &mut f, 26, event::NPC_DEACTIVATE, ATMA_U);
+    assert_eq!(ctl.records[i].extra.a2.q7_chat, 1);
+    call(&mut ctl, &mut f, 26, event::NPC_DEACTIVATE, GUARD4_U);
+    assert_eq!(ctl.records[i].extra.a2.q7_chat, 0);
+    assert!(!ctl.records[i].has_callback(event::NPC_DEACTIVATE));
+}
+
+// Covers: specs/world/quests-act2-2.md §1 r3
+#[test]
+fn guard5_message_needs_its_npc() {
+    let (mut ctl, _) = control();
+    let mut f = fake();
+    say(&mut ctl, &mut f, GUARD4_U, 303);
+    say(&mut ctl, &mut f, ATMA_U, 303);
+    assert_eq!(f.flags(P1).word(31), 0);
+    say(&mut ctl, &mut f, GUARD5_U, 303);
+    assert_eq!(f.flags(P1).word(31), 1);
+}
+
+// Covers: specs/world/quests-act2-2.md §1 r18
+#[test]
+fn gossip_status_functions_report_nothing() {
+    let (ctl, _) = control();
+    let mut f = fake();
+    let pf = QuestFlags::default();
+    for chain in [7, 26, 27] {
+        let i = ctl.find(chain).unwrap();
+        let Some(sf) = ctl.records[i].status_fn else {
+            continue;
+        };
+        assert_eq!(act2::status_fn(&ctl, &mut f, i, P1, &pf, sf), None);
+    }
+    assert!(f.log.is_empty());
 }

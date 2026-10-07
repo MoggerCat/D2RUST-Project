@@ -1,10 +1,12 @@
 // Spec: specs/world/quests-act2.md §6 (A2Q4 Arcane Sanctuary, chain 11, slot 12), §10 (chain 11 hooks), §4.9 (Arcane hook)
+// Spec: specs/world/quests-act2-2.md §1 items 6, 7, 16; §2 (Jerhyn's objects and spawns, replaces act2 §6.10)
 //! A2Q4 callback by callback: opening the palace (§6.2), the flag
 //! iterate (§6.3), chat with Kaelan's quest-seed draw (§6.4), messages
 //! and chat end (§6.5), level changes (§6.6), Horazon's journal (§6.7),
 //! the harem blocker (§6.8), the Sanctuary portal (§6.9), Jerhyn's
-//! start-side handling (§6.10), game start (§6.11) and the hooks other
-//! systems call (§10, §4.9).
+//! objects and spawns (`quests-act2-2.md` §2: inits 18 and 19, event 3,
+//! the palace spawn), game start (§6.11) and the hooks other systems call
+//! (§10, §4.9).
 
 use super::{
     add_guid, add_state, completion_flag, guid_listed, in_act2, party, pf, quick_remove, rec,
@@ -310,7 +312,7 @@ fn changed_level<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, arg
         }
     }
     if args.a == TOWN {
-        jerhyn(ctl, w);
+        jerhyn_leaving_town(ctl, w, i);
         quick_remove(ctl, w, i, args.player);
         let f = rec(w, args.player);
         if args.player.is_some()
@@ -345,12 +347,12 @@ pub fn tome_operate<W: QuestWorld>(
     let room = w.unit_position(object).map(|p| p.2);
     x4(ctl, i).tome_room = room;
     let r = &mut ctl.records[i];
-    if r.not_intro && r.state != 5 {
-        r.state = 5;
+    // The three player iterates run only inside "not-intro and state ≠ 5"
+    // (`0x0059B9E4`–`0x0059BA34`, `quests-act2-2.md` §1 item 7).
+    if !r.not_intro || r.state == 5 {
+        return;
     }
-    // TODO(quests-act2 §6.7): the grants, the completion flag and
-    // `0x0059B940` are read as following the state test (the spec's ";"),
-    // not nested in it.
+    r.state = 5;
     // `0x0059B3F0`.
     for p in w.players() {
         if w.unit_level(p) == Some(SANCTUARY) && idle(w, p) {
@@ -469,26 +471,149 @@ pub fn portal_operate<W: QuestWorld>(ctl: &mut QuestControl, _w: &mut W, level: 
 
 // ------------------------------------------------------------ §6.10
 
-/// `0x0059EF70` (§6.10, from event 3 and the palace init `0x0059F510`):
-/// Jerhyn's start-side handling.
-pub fn jerhyn<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W) {
-    let Some(i) = ctl.find(CHAIN) else { return };
+/// The start Jerhyn's +0x0C handling (`quests-act2-2.md` §2 items 3.1
+/// and 4.1). True when he is talking (`0x00573180` ran).
+fn start_jerhyn_check<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize) -> bool {
     let x = &ctl.records[i].extra.a2.q4;
-    if x.jerhyn_start {
-        if let Some((j, _)) = w.monster_by_guid(x.jerhyn_guid) {
+    if !x.jerhyn_start {
+        return false;
+    }
+    match w.monster_by_guid(x.jerhyn_guid) {
+        None => x4(ctl, i).jerhyn_start = false,
+        Some((j, _)) => {
             if w.npc_hold_chat(j) {
-                return;
+                return true;
             }
             w.remove_unit(j);
             x4(ctl, i).jerhyn_start = false;
         }
     }
-    if !ctl.records[i].extra.a2.q4.jerhyn_palace {
-        // TODO(quests-act2 §6.10): the point the offsets (x + 15, or − 10
-        // when chain 13 is not-intro with state < 2; y − 3) apply to, the
-        // spawn's `r` argument and who stores +0x3C are not specified;
-        // the palace spawn is reported instead of guessed.
+    false
+}
+
+/// Event 3 with old level 40 (`0x0059F0C0`, before the quick remove;
+/// `quests-act2-2.md` §2 item 3).
+fn jerhyn_leaving_town<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize) {
+    start_jerhyn_check(ctl, w, i);
+    let x = &ctl.records[i].extra.a2.q4;
+    if x.jerhyn_palace || !x.blocker_made {
+        return;
+    }
+    let Some((blocker, _)) = w.object_by_guid(x.blocker_guid) else {
+        return;
+    };
+    match w.unit_position(blocker) {
+        Some((bx, by, room)) => palace_spawn(ctl, w, i, bx, by, room),
+        // An object without a room: not in the spec.
+        None => w.unhandled(CHAIN, 0x0059_F0C0),
+    }
+}
+
+/// True when chain 13 is not-intro with state < 2 (the palace offsets
+/// and the init 18 / 19 tests).
+fn tombs_not_started(ctl: &QuestControl) -> bool {
+    ctl.record(13).is_some_and(|r| r.not_intro && r.state < 2)
+}
+
+/// Palace spawn `0x0059EF70(record, &point, room)` (`quests-act2-2.md`
+/// §2 item 4): Jerhyn (201) near (x, y), the free-spot search starting
+/// in `room`.
+fn palace_spawn<W: QuestWorld>(
+    ctl: &mut QuestControl,
+    w: &mut W,
+    i: usize,
+    x: i32,
+    y: i32,
+    room: RoomId,
+) {
+    if start_jerhyn_check(ctl, w, i) || ctl.records[i].extra.a2.q4.jerhyn_palace {
+        return;
+    }
+    let x = if tombs_not_started(ctl) {
+        x - 10
+    } else {
+        x + 15
+    };
+    let y = y - 3;
+    // `0x00545340`: size 3, mask 0x100, sixth argument 9 (never read),
+    // limit 100.
+    let Some((sx, sy, spot_room)) = w.free_spot_at(room, x, y, 3, 0x100, 9, 100) else {
+        // Not found: the spawn is tried at the unchanged point with a null
+        // room (edge case 5); the monster spec decides. Reported.
         w.unhandled(CHAIN, 0x0059_EF70);
+        return;
+    };
+    let Some(j) = w
+        .spawn_monster_flags(spot_room, sx, sy, JERHYN, 1, -1, 0)
+        .or_else(|| w.spawn_monster_flags(spot_room, sx, sy, JERHYN, 1, 2, 0))
+    else {
+        return;
+    };
+    w.or_unit_flags(j, 0x0300_0000);
+    // The palace Jerhyn's GUID is not stored.
+    let e = x4(ctl, i);
+    e.jerhyn_palace = true;
+    if !e.jerhyn_pos_stored {
+        e.jerhyn_pos_stored = true;
+        e.jerhyn_x = sx;
+        e.jerhyn_y = sy;
+    }
+}
+
+/// Init 18, the start Jerhyn object 121 (`0x005448B0` → `0x0059F380`,
+/// `quests-act2-2.md` §2 item 1): the only writer of +0x3C.
+pub fn start_jerhyn_init<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: UnitId) {
+    let Some(i) = ctl.find(CHAIN) else { return };
+    if ctl.records[i].extra.a2.q4.jerhyn_palace
+        || ctl.game.get(8, bit::PRIMARY_GOAL_DONE)
+        || ctl.game.get(SLOT, bit::PRIMARY_GOAL_DONE)
+        || !tombs_not_started(ctl)
+    {
+        return;
+    }
+    let Some((ox, oy, room)) = w.unit_position(object) else {
+        return;
+    };
+    // `0x00545340`: size 2, mask 0x100, sixth argument 10 (never read),
+    // limit 100.
+    let Some((sx, sy, spot_room)) = w.free_spot_at(room, ox, oy, 2, 0x100, 10, 100) else {
+        // TODO(quests-act2-2 §2.1): what init 18 does when no free spot is
+        // found is not in the spec; reported.
+        w.unhandled(CHAIN, 0x0059_F380);
+        return;
+    };
+    if let Some(j) = w.spawn_monster_flags(spot_room, sx, sy, JERHYN, 1, -1, 0) {
+        let g = w.guid(j);
+        let e = x4(ctl, i);
+        e.jerhyn_start = true;
+        e.jerhyn_guid = g;
+    }
+}
+
+/// Init 19, the palace Jerhyn object 122 (`0x005448E0` → `0x0059F440`,
+/// `quests-act2-2.md` §2 item 2): Kaelan, the harem blocker's event 7,
+/// then the palace spawn.
+pub fn palace_jerhyn_init<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: UnitId) {
+    let Some(i) = ctl.find(CHAIN) else { return };
+    let Some((ox, oy, room)) = w.unit_position(object) else {
+        return;
+    };
+    if !ctl.game.get(14, bit::PRIMARY_GOAL_DONE) {
+        let e = x4(ctl, i);
+        e.guard_x = ox + 1;
+        e.guard_y = oy;
+        // `0x005B3090`: mode 1, spread −1, flags 0.
+        w.spawn_monster_flags(room, ox + 1, oy, KAELAN, 1, -1, 0);
+    }
+    // `0x005417D0(game, object, 7, frame + 1)`: the harem blocker (§6.8).
+    let at = w.frame() + 1;
+    w.schedule_object_event(object, 7, at);
+    if !ctl.records[i].extra.a2.q4.jerhyn_palace
+        && (ctl.game.get(8, bit::PRIMARY_GOAL_DONE)
+            || ctl.game.get(9, bit::PRIMARY_GOAL_DONE)
+            || !tombs_not_started(ctl))
+    {
+        palace_spawn(ctl, w, i, ox, oy, room);
     }
 }
 
@@ -511,7 +636,8 @@ fn game_start<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, args: 
         open(ctl);
         return;
     }
-    // "status n, state m": the record bytes only (as Act I's restore).
+    // "status n, state m": direct byte stores, flags kept, nothing sent
+    // (`quests-act2-2.md` §1 item 6).
     if w.has_item(p, *b"hst ") {
         let r = &mut ctl.records[i];
         (r.status, r.state) = (1, 1);

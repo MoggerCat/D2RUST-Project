@@ -48,7 +48,7 @@ use d2_sim::units::{RoomId, UnitId};
 use d2_sim::wiring::action::Pending;
 use d2_sim::wiring::action::{ActionHooks, ObjectCase};
 use d2_sim::wiring::economy::{
-    quest_objects, Economy, EconomyQuests, GameFields, HostQuests, QuestRest,
+    quest_objects, Economy, EconomyQuests, GameFields, HostQuests, QuestLoan, QuestRest,
 };
 use d2_sim::wiring::interaction::{
     Desk, InteractionError, InteractionState, NpcRest, PlayerQuestsRef, VendorDesk, VendorRest,
@@ -282,6 +282,56 @@ fn quest_objects<X: Pending, R: TradeRest>(
     }
 }
 
+impl<R: TradeRest + Default + 'static, S> WiredWorld<R, S> {
+    /// Runs `f` with this world's quest parts (the quest control, the
+    /// rest, the item tables, the unique bits) lent to the action hooks
+    /// ([`QuestLoan`], `ActionHooks::quest_host`), so a quest init,
+    /// operate or object event 7 the object module hands back during `f`
+    /// runs at once, inside its allocation, dispatch or timer event
+    /// (`quests-act1-rest.md` §9 item 7; `objects.md` §3 rule 6). The
+    /// parts come back after `f`; `f` must not use them through `self`
+    /// (it gets only the action world). Hooks that already hold a quest
+    /// host keep it.
+    fn lend_quests<D: ActionEvents, T>(
+        &mut self,
+        events: &mut D,
+        f: impl FnOnce(&mut ActionWorld<S>, &mut D) -> T,
+    ) -> T {
+        if events.action().sys.hooks.quest_host.is_some() {
+            return f(&mut self.action, events);
+        }
+        let empty = self.quests.emptied();
+        let loan = QuestLoan {
+            quests: std::mem::replace(&mut self.quests, empty),
+            rest: std::mem::take(&mut self.rest),
+            tables: std::mem::take(&mut self.tables),
+            uniques: std::mem::take(&mut self.uniques),
+        };
+        events.action().sys.hooks.quest_host = Some(Box::new(loan));
+        let out = f(&mut self.action, events);
+        let back = events
+            .action()
+            .sys
+            .hooks
+            .quest_host
+            .take()
+            .map(|h| h.into_any().downcast::<QuestLoan<R>>());
+        match back {
+            Some(Ok(l)) => {
+                let l = *l;
+                self.quests = l.quests;
+                self.rest = l.rest;
+                self.tables = l.tables;
+                self.uniques = l.uniques;
+            }
+            // `f` took the loan out of the hooks or put another one in:
+            // the game's quest state is gone (API misuse, fatal).
+            _ => panic!("WiredWorld::lend_quests: the lent quest parts did not come back"),
+        }
+        out
+    }
+}
+
 impl<R: TradeRest, S> WiredWorld<R, S> {
     /// The pet follows `0x005754B0` the placements queued
     /// (`path-placement.md` §10 rule 6, `ActionHooks::pet_follows`, on
@@ -469,7 +519,8 @@ impl<C: WaypointCall, R: NpcRest> WaypointCall for HostWaypointRun<'_, C, R> {
     }
 }
 
-impl<D: ActionEvents, R: TradeRest, S: SkillHost<D>> WorldHost<D> for WiredWorld<R, S>
+impl<D: ActionEvents, R: TradeRest + Default + 'static, S: SkillHost<D>> WorldHost<D>
+    for WiredWorld<R, S>
 where
     D::X: Outbox,
 {
@@ -534,13 +585,26 @@ where
         player: UnitId,
         guid: u32,
     ) -> Option<ObjectCase> {
-        let out = WorldHost::<D>::objects(&mut self.action, game, events, player, guid);
+        let out = self.lend_quests(events, |a, ev| {
+            WorldHost::<D>::objects(a, game, ev, player, guid)
+        });
         self.desk(game, events, |desk, ctl, _| quest_objects(desk, ctl));
         out
     }
 
-    /// The quest routes the tick's allocations and object events queued
-    /// ([`quest_objects`]), before the tick's sends are taken.
+    /// The tick with this world's quest parts lent to the action hooks
+    /// ([`WiredWorld::lend_quests`]): quest object inits run inside their
+    /// allocation and object event 7 inside its timer event, in the tick
+    /// that runs them (`quests-act1-rest.md` §9 item 7; `tick.md` §3).
+    fn run_tick(&mut self, game: &mut Game, events: &mut D)
+    where
+        D: d2_sim::tick::EventDispatch + d2_sim::tick::TickHooks,
+    {
+        self.lend_quests(events, |_, ev| d2_sim::tick::tick(game, ev));
+    }
+
+    /// The quest routes queued outside a lent call (a quest call's own
+    /// allocations, [`quest_objects`]), before the tick's sends are taken.
     fn after_tick(&mut self, game: &mut Game, events: &mut D) {
         self.desk(game, events, |desk, ctl, _| quest_objects(desk, ctl));
         self.pet_deaths(game, events);
@@ -641,7 +705,7 @@ where
     }
 
     fn walk(&mut self, game: &mut Game, events: &mut D, call: WalkCall) -> Option<WalkResult> {
-        let out = WorldHost::<D>::walk(&mut self.action, game, events, call);
+        let out = self.lend_quests(events, |a, ev| WorldHost::<D>::walk(a, game, ev, call));
         self.pet_deaths(game, events);
         self.pet_follows(game, events);
         out

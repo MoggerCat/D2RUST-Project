@@ -366,7 +366,7 @@ fn kill(ctl: &mut QuestControl, f: &mut Fake3, killer: Option<UnitId>) {
     );
 }
 
-// Covers: specs/world/quests-act3.md §8.5 text, §8.5 r1, §8.5 r2, §10
+// Covers: specs/world/quests-act3.md §8.5 text, §8.5 r1, §8.5 r2, §10; specs/world/quests-act3-2.md §11.2
 #[test]
 fn mephisto_death() {
     let (mut ctl, mut f, i) = setup();
@@ -388,6 +388,9 @@ fn mephisto_death() {
     f.p(p5).act = Some(0);
     setf(&mut f, p4, S, 11);
     f.f.party.insert(P2, vec![P2, p3, p5]);
+    for p in [P1, P2, p3, p4, p5, p6] {
+        f.f.client_flags.insert(p, 0);
+    }
     kill(&mut ctl, &mut f, Some(P1));
     let r = ctl.record(CH).unwrap();
     assert_eq!(r.state, 6);
@@ -400,13 +403,24 @@ fn mephisto_death() {
     }
     assert!(!f.flags(p4).get(S, 0));
     assert!(!f.flags(p6).get(S, 0));
-    // The act progression is reported once per credit.
-    let unh = f
+    // The character progression once per credit, in credit order (the
+    // level-102 walk before the party pass; `quests-act3-2.md` §11.2:
+    // classic, normal → 4·0 + 3 into bits 8–12).
+    let prog: Vec<String> = f
         .log()
-        .iter()
-        .filter(|l| *l == "unhandled 20 0x538680")
-        .count();
-    assert_eq!(unh, 4);
+        .into_iter()
+        .filter(|l| l.starts_with("progression"))
+        .collect();
+    assert_eq!(
+        prog,
+        [
+            "progression 1 0x0300",
+            "progression 2 0x0300",
+            "progression 5 0x0300",
+            "progression 3 0x0300"
+        ]
+    );
+    assert!(!f.log().iter().any(|l| l.contains("0x538680")));
     // Completion flag: P6 only (P4 has 22.11).
     assert!(f.flags(p6).get(S, 14) && !f.flags(p4).get(S, 14));
     let done: Vec<UnitId> = sent_5d(&f)
@@ -467,6 +481,7 @@ fn mephisto_killer_with_pending_bit() {
     kill(&mut ctl, &mut f, Some(P1));
     assert!(!f.flags(P1).get(S, 13));
     assert!(!f.log().iter().any(|l| l.contains("0x538680")));
+    assert!(!f.log().iter().any(|l| l.starts_with("progression")));
 }
 
 // Covers: specs/world/quests-act3.md §8.5 r2, §edge-cases-original-bugs r11

@@ -301,13 +301,44 @@ impl<X: Pending, R: QuestRest + NpcRest> QuestWorld for HostQuests<'_, '_, X, R>
     fn mercenary_reward(&mut self, player: UnitId, npc: u16) {
         self.inner.mercenary_reward(player, npc)
     }
+    /// `0x00620870` on a unit of the game's lists: its path position and
+    /// its list room (an object's static path +0x00; `None` for a unit
+    /// left in a freed room, `quests-act1-rest.md` §9 item 2).
     fn unit_position(&self, unit: UnitId) -> Option<(i32, i32, RoomId)> {
-        self.inner.unit_position(unit)
+        let e = &*self.inner.econ;
+        match e.game.lists.unit(unit) {
+            Some(u) => {
+                let room = u.room()?;
+                let (x, y) = e.hooks.path_position(unit);
+                Some((x, y, room))
+            }
+            None => self.inner.unit_position(unit),
+        }
     }
+    /// The path position of a unit of the game's lists, with or without
+    /// a room.
+    fn unit_xy(&self, unit: UnitId) -> Option<(i32, i32)> {
+        let e = &*self.inner.econ;
+        match e.game.lists.unit(unit) {
+            Some(_) => Some(e.hooks.path_position(unit)),
+            None => self.inner.unit_position(unit).map(|(x, y, _)| (x, y)),
+        }
+    }
+    /// `0x00619730`: the active room's sub-tile box, the last row and
+    /// column excluded.
     fn room_contains(&self, room: RoomId, x: i32, y: i32) -> bool {
-        self.inner.room_contains(room, x, y)
+        let e = &*self.inner.econ;
+        match e.hooks.drlg.subtiles(e.game, room) {
+            Some(t) => t.contains(x, y),
+            None => self.inner.room_contains(room, x, y),
+        }
     }
+    /// `0x00463740` (`DrlgWorld::find_room`) from a room with a DRLG room.
     fn room_at(&self, room: RoomId, x: i32, y: i32) -> Option<RoomId> {
+        let e = &*self.inner.econ;
+        if e.hooks.drlg.drlg_room(e.game, room).is_some() {
+            return e.hooks.drlg.find_room(e.game, room, x, y);
+        }
         self.inner.room_at(room, x, y)
     }
     #[allow(clippy::too_many_arguments)]
@@ -401,7 +432,17 @@ impl<X: Pending, R: QuestRest + NpcRest> QuestWorld for HostQuests<'_, '_, X, R>
     fn set_missile_target(&mut self, missile: UnitId, a: u32, b: u32) {
         self.inner.set_missile_target(missile, a, b)
     }
+    /// `0x0061AED0(room, 0)` on the unit's room
+    /// ([`crate::wiring::action::DrlgWorld::refresh_room`]); a unit of
+    /// the lists without a room: nothing (`0x0061AED6`).
     fn refresh_room(&mut self, unit: UnitId) {
+        let e = &mut *self.inner.econ;
+        if let Some(u) = e.game.lists.unit(unit) {
+            let Some(room) = u.room() else { return };
+            if e.hooks.drlg.refresh_room(e.game, room, false) {
+                return;
+            }
+        }
         self.inner.refresh_room(unit)
     }
     fn client_save_flags(&self, player: UnitId) -> Option<u16> {
