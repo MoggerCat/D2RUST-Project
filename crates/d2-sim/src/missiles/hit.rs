@@ -346,8 +346,9 @@ pub fn hit_handler<W: MissileWorld + ?Sized>(
     // Step 1.
     let owner = cx.owner(game, m);
     let Some(row) = cx.row_of(m).cloned() else {
-        // TODO(spec gap): the handler with no record (§R4 step 1) reads the
-        // row's columns; the spec does not say what a missing record gives.
+        // Unreachable (§R5 step 1: creation fails without a record), so
+        // the record is asserted; release builds return 1.
+        debug_assert!(false, "missile hit handler: no missiles.txt record");
         return 1;
     };
     let srv_hit = row.srv_hit();
