@@ -530,3 +530,790 @@ fn iteration_continues_with_the_live_records_ahead() {
     assert_eq!(surviving_tail(&[n, a, b], &[c, d]), 0);
     assert_eq!(surviving_tail(&[], &[c, d]), 0);
 }
+
+// Covers: specs/combat/events.md §2.1
+#[test]
+fn chilling_armor_return_fire() {
+    let mut r = body_rec();
+    r.srvmissilea = 0;
+    let mut t = tabs(r, Code::new(), 1);
+    let ct = monsters(1);
+    let mut f = BodyFake::new();
+    f.c.hostile = true;
+    let h = unit(&mut f, UnitType::Player, &[]);
+    let p = unit(&mut f, UnitType::Monster, &[]);
+    f.pos.insert(p, (40, 50));
+    let m = unit(&mut f, UnitType::Missile, &[]);
+    f.missile_owners.insert(m, p);
+    let go = |f: &mut BodyFake, t: &SkillTables| {
+        call(f, tb(t, &ct), 1, ev(0, Some(h), Some(m), 1, 3), None)
+    };
+    // The missile row lacks ReturnFire: nothing.
+    assert_eq!(go(&mut f, &t), 0);
+    assert!(f.missiles.is_empty());
+    // With ReturnFire: flags 0x20, owner and origin H, target P's
+    // position, skill k and level L.
+    t.missiles[0].returnfire = true;
+    assert_eq!(go(&mut f, &t), 1);
+    let q = f.missiles[0];
+    assert_eq!((q.flags, q.owner, q.origin), (0x20, h, Some(h)));
+    assert_eq!((q.class, q.target_x, q.target_y), (0, 40, 50));
+    assert_eq!((q.skill, q.level), (1, 3));
+    // H may not attack P: nothing more.
+    f.c.hostile = false;
+    assert_eq!(go(&mut f, &t), 0);
+    assert_eq!(f.missiles.len(), 1);
+    // Level < 0 reads as 1.
+    f.c.hostile = true;
+    call(&mut f, tb(&t, &ct), 1, ev(0, Some(h), Some(m), 1, -5), None);
+    assert_eq!(f.missiles[1].level, 1);
+}
+
+// Covers: specs/combat/events.md §2.2
+#[test]
+fn frozen_armor_freezes_the_attacker() {
+    let mut r = body_rec();
+    r.cltoverlaya = 7;
+    let mut code = Code::new();
+    r.calc1 = code.f(60);
+    let t = tabs(r, code, 1);
+    let ct = monsters(1);
+    let mut f = BodyFake::new();
+    f.c.hostile = true;
+    let h = unit(
+        &mut f,
+        UnitType::Player,
+        &[(6, 0, 100_000), (7, 0, 100_000)],
+    );
+    let o = unit(
+        &mut f,
+        UnitType::Player,
+        &[(6, 0, 100_000), (7, 0, 100_000)],
+    );
+    let obj = unit(&mut f, UnitType::Object, &[]);
+    let run = |f: &mut BodyFake, o, phys| {
+        let mut rec = DamageRecord {
+            physical: phys,
+            ..DamageRecord::default()
+        };
+        call(
+            f,
+            tb(&t, &ct),
+            2,
+            ev(1, Some(h), Some(o), 1, 1),
+            Some(&mut rec),
+        )
+    };
+    // R physical must be > 0; O a player or monster.
+    assert_eq!(run(&mut f, o, 0), 0);
+    assert_eq!(run(&mut f, obj, 5), 0);
+    assert!(f.c.log.is_empty());
+    // Freeze length := eval(calc1) = 60 (a player gets the cold rule);
+    // overlay 7 on O.
+    assert_eq!(run(&mut f, o, 5), 1);
+    assert!(f.c.log.contains(&format!("overlay {o} 7")), "{:?}", f.c.log);
+    // No record at all also acts.
+    f.c.log.clear();
+    assert_eq!(
+        call(&mut f, tb(&t, &ct), 2, ev(1, Some(h), Some(o), 1, 1), None),
+        1
+    );
+}
+
+// Covers: specs/combat/events.md §2.3
+#[test]
+fn shiver_armor_elemental_hit() {
+    let mut r = body_rec();
+    r.cltoverlaya = 9;
+    let t = tabs(r, Code::new(), 1);
+    let ct = monsters(1);
+    let mut f = BodyFake::new();
+    f.c.hostile = true;
+    let h = unit(&mut f, UnitType::Player, &[]);
+    let o = unit(&mut f, UnitType::Monster, &[(6, 0, 100_000)]);
+    let obj = unit(&mut f, UnitType::Object, &[]);
+    assert_eq!(
+        call(
+            &mut f,
+            tb(&t, &ct),
+            3,
+            ev(3, Some(h), Some(obj), 1, 1),
+            None
+        ),
+        0
+    );
+    assert_eq!(
+        call(&mut f, tb(&t, &ct), 3, ev(3, None, Some(o), 1, 1), None),
+        0
+    );
+    assert_eq!(
+        call(&mut f, tb(&t, &ct), 3, ev(3, Some(h), Some(o), 1, 1), None),
+        1
+    );
+    // Reaction on O after the apply (attacker H), then overlay 9.
+    let log = &f.c.log;
+    let re = log
+        .iter()
+        .position(|l| l.starts_with(&format!("reaction {h} {o}")));
+    let ov = log.iter().position(|l| *l == format!("overlay {o} 9"));
+    assert!(re.unwrap() < ov.unwrap(), "{log:?}");
+}
+
+// Covers: specs/combat/events.md §2.4
+#[test]
+fn iron_maiden_reflects_physical() {
+    let mut r = body_rec();
+    let mut code = Code::new();
+    r.calc1 = code.f(50);
+    r.calc2 = code.f(30);
+    r.calc3 = code.f(10);
+    r.auratargetstate = 12;
+    r.resultflags = 0;
+    let t = tabs(r, code, 1);
+    let ct = monsters(1);
+    let mut f = BodyFake::new();
+    f.c.hostile = true;
+    // H: a player carrying the state; its list's owner C is a player.
+    let h = unit(
+        &mut f,
+        UnitType::Player,
+        &[(6, 0, 100_000), (7, 0, 100_000)],
+    );
+    let o = unit(
+        &mut f,
+        UnitType::Monster,
+        &[(6, 0, 100_000), (7, 0, 100_000)],
+    );
+    let rec0 = DamageRecord {
+        physical: 1_000,
+        ..DamageRecord::default()
+    };
+    let run = |f: &mut BodyFake| {
+        let mut rec = rec0;
+        call(
+            f,
+            tb(&t, &ct),
+            4,
+            ev(5, Some(h), Some(o), 1, 1),
+            Some(&mut rec),
+        )
+    };
+    // No state on H: nothing.
+    assert_eq!(run(&mut f), 0);
+    let l = f.alloc_list(0, 0, Some(h)).unwrap();
+    f.set_list_state(l, 12);
+    f.attach(h, l);
+    f.c.units[h].states.push(12);
+    // calc1 (H a plain player): p = 50 % of 1000 = 500, taken by H with
+    // O as the attacker.
+    assert_eq!(run(&mut f), 1);
+    assert_eq!(f.c.get(h, 6), 100_000 - 500);
+    assert_eq!(f.c.get(o, 6), 100_000);
+    // R physical must be > 0.
+    let mut zero = DamageRecord::default();
+    assert_eq!(
+        call(
+            &mut f,
+            tb(&t, &ct),
+            4,
+            ev(5, Some(h), Some(o), 1, 1),
+            Some(&mut zero)
+        ),
+        0
+    );
+}
+
+// Covers: specs/combat/events.md §2.5
+#[test]
+fn life_tap_heals_the_victim() {
+    let mut r = body_rec();
+    let mut code = Code::new();
+    r.calc1 = code.f(50);
+    r.auratargetstate = 12;
+    r.prgoverlay = 4;
+    let t = tabs(r, code, 1);
+    let ct = monsters(1);
+    let mut f = BodyFake::new();
+    let h = unit(&mut f, UnitType::Monster, &[]);
+    let o = unit(&mut f, UnitType::Player, &[(6, 0, 300), (7, 0, 1_000)]);
+    let l = f.alloc_list(0, 0, Some(o)).unwrap();
+    f.set_list_state(l, 12);
+    f.attach(h, l);
+    f.c.units[h].states.push(12);
+    let mut rec = DamageRecord {
+        physical: 1_000,
+        ..DamageRecord::default()
+    };
+    // x = 50 % of 1000 = 500: life 300 + 500 = 800 (of 1000).
+    assert_eq!(
+        call(
+            &mut f,
+            tb(&t, &ct),
+            5,
+            ev(1, Some(h), Some(o), 1, 1),
+            Some(&mut rec)
+        ),
+        1
+    );
+    assert_eq!(f.c.get(o, 6), 800);
+    assert!(f.c.log.contains(&format!("overlay {o} 4")));
+    // Clamped to the maximum.
+    call(
+        &mut f,
+        tb(&t, &ct),
+        5,
+        ev(1, Some(h), Some(o), 1, 1),
+        Some(&mut rec),
+    );
+    assert_eq!(f.c.get(o, 6), 1_000);
+    // R physical 0, or a dead O: 0.
+    let mut zero = DamageRecord::default();
+    assert_eq!(
+        call(
+            &mut f,
+            tb(&t, &ct),
+            5,
+            ev(1, Some(h), Some(o), 1, 1),
+            Some(&mut zero)
+        ),
+        0
+    );
+    f.dead.insert(o);
+    assert_eq!(
+        call(
+            &mut f,
+            tb(&t, &ct),
+            5,
+            ev(1, Some(h), Some(o), 1, 1),
+            Some(&mut rec)
+        ),
+        0
+    );
+}
+
+// Covers: specs/combat/events.md §2.8
+#[test]
+fn howl_terrifies_plain_monsters() {
+    let (t, ct) = plain();
+    let mut f = BodyFake::new();
+    let h = unit(&mut f, UnitType::Player, &[(112, 0, 128)]);
+    let o = unit(&mut f, UnitType::Monster, &[]);
+    // v = 128 > any mask(128) draw: always terror (skill 130, 20, 20).
+    assert_eq!(
+        call(
+            &mut f,
+            tb(&t, &ct),
+            8,
+            ev(5, Some(h), Some(o), k(112, 0), 0),
+            None
+        ),
+        1
+    );
+    assert!(
+        f.c.log.contains(&format!("terror {h} {o} 130 20 20")),
+        "{:?}",
+        f.c.log
+    );
+    // v = 0: nothing; a champion / unique (flag 4 or 8): nothing.
+    f.c.log.clear();
+    let h0 = unit(&mut f, UnitType::Player, &[(112, 0, 0)]);
+    assert_eq!(
+        call(
+            &mut f,
+            tb(&t, &ct),
+            8,
+            ev(5, Some(h0), Some(o), k(112, 0), 0),
+            None
+        ),
+        0
+    );
+    f.c.units[o].flags |= 4;
+    assert_eq!(
+        call(
+            &mut f,
+            tb(&t, &ct),
+            8,
+            ev(5, Some(h), Some(o), k(112, 0), 0),
+            None
+        ),
+        0
+    );
+    assert!(f.c.log.is_empty());
+}
+
+fn item_cast_tables(check_start: bool, target: u8) -> SkillTables {
+    let mut r = body_rec();
+    r.itemeffect = 1;
+    r.itemtarget = target;
+    r.itemcheckstart = check_start;
+    r.srvdofunc = 1;
+    r.intown = false;
+    tabs(r, Code::new(), 1)
+}
+
+// Covers: specs/combat/events.md §3 r2, §3 r5, §3 r6
+#[test]
+fn item_cast_core_start_and_do() {
+    let ct = monsters(1);
+    // Step 6: the do core runs with the item flag; its result is the
+    // core's. Step 2/7: unit flag 0x40 is saved and restored.
+    for saved in [0u32, 0x40] {
+        let t = item_cast_tables(false, 1);
+        let mut f = BodyFake::new();
+        f.srvdo_result = 1;
+        let u = unit(&mut f, UnitType::Player, &[]);
+        f.c.units[u].flags |= saved;
+        let (res, out) = core(&mut f, tb(&t, &ct), u, 1, 2, None, (5, 6), true);
+        assert_eq!(res, 1);
+        assert_eq!(out.unit, (0, f.c.units[u].guid));
+        assert!(
+            f.c.log.contains(&format!("srvdo 1 {u} 1 2")),
+            "{:?}",
+            f.c.log
+        );
+        assert_eq!(f.c.units[u].flags & 0x40, saved);
+    }
+    // Step 5: `ItemCheckStart`: the start core runs first; failing it,
+    // the result is 0 and the do core does not run.
+    let t = item_cast_tables(true, 1);
+    let mut f = BodyFake::new();
+    f.srvdo_result = 1;
+    // Not `InTown`, in a town room: the start core fails.
+    f.town.insert(1);
+    let u = unit(&mut f, UnitType::Player, &[]);
+    let (res, _) = core(&mut f, tb(&t, &ct), u, 1, 1, None, (5, 6), false);
+    assert_eq!(res, 0);
+    assert!(!f.c.log.iter().any(|l| l.starts_with("srvdo")));
+}
+
+// Covers: specs/combat/events.md §3 text
+#[test]
+fn item_cast_queues_the_client_messages() {
+    let ct = monsters(1);
+    // cast: kind 1 chooses U itself; the 0x99 entry names that unit.
+    let t = item_cast_tables(false, 1);
+    let mut f = BodyFake::new();
+    f.srvdo_result = 1;
+    let u = unit(&mut f, UnitType::Player, &[]);
+    let o = unit(&mut f, UnitType::Monster, &[]);
+    assert_eq!(cast(&mut f, tb(&t, &ct), Some(u), 1, 4, Some(o), true), 1);
+    let want = format!(
+        "cast {u} {:?}",
+        ItemCastMsg::Unit {
+            skill: 1,
+            level: 4,
+            target: (0, f.c.units[u].guid),
+            aim: true
+        }
+    );
+    assert!(f.c.log.contains(&want), "{:?}", f.c.log);
+    // Kind 0 chooses nothing: the entry names T.
+    let t = item_cast_tables(false, 0);
+    f.c.log.clear();
+    assert_eq!(cast(&mut f, tb(&t, &ct), Some(u), 1, 4, Some(o), false), 1);
+    let want = format!(
+        "cast {u} {:?}",
+        ItemCastMsg::Unit {
+            skill: 1,
+            level: 4,
+            target: (1, f.c.units[o].guid),
+            aim: false
+        }
+    );
+    assert!(f.c.log.contains(&want), "{:?}", f.c.log);
+    // cast_point: the core's point when its x is non-zero, else (x, y).
+    f.c.log.clear();
+    assert_eq!(
+        cast_point(&mut f, tb(&t, &ct), Some(u), 1, 4, (7, 8), false),
+        1
+    );
+    let want = format!(
+        "cast {u} {:?}",
+        ItemCastMsg::Point {
+            skill: 1,
+            level: 4,
+            at: (7, 8),
+            aim: false
+        }
+    );
+    assert!(f.c.log.contains(&want), "{:?}", f.c.log);
+    // A failed core queues nothing.
+    f.c.log.clear();
+    f.srvdo_result = 0;
+    assert_eq!(cast(&mut f, tb(&t, &ct), Some(u), 1, 4, Some(o), false), 0);
+    assert!(!f.c.log.iter().any(|l| l.starts_with("cast ")));
+}
+
+// Covers: specs/combat/events.md §2.14, §edge-cases-original-bugs r4
+#[test]
+fn skill_on_attack_kill_hit() {
+    let ct = monsters(1);
+    let mut r = body_rec();
+    r.itemeffect = 1;
+    r.itemtarget = 1;
+    r.srvdofunc = 1;
+    r.intown = false;
+    let mut t = tabs(r, Code::new(), 1);
+    let mut f = BodyFake::new();
+    f.srvdo_result = 1;
+    // Layer = skill 1 << 6 | level 3 (split (6, 0x3F)); v = 100 always.
+    let lay = (1 << 6) | 3;
+    let h = unit(&mut f, UnitType::Player, &[(195, lay, 100)]);
+    let o = unit(&mut f, UnitType::Monster, &[]);
+    let kk = k(195, lay);
+    let casts = |f: &BodyFake| f.c.log.iter().filter(|l| l.starts_with("cast ")).count();
+    // 20 needs hit flag 0x20 on a present record.
+    let mut r0 = DamageRecord::default();
+    assert_eq!(
+        call(
+            &mut f,
+            tb(&t, &ct),
+            20,
+            ev(7, Some(h), Some(o), kk, 0),
+            Some(&mut r0)
+        ),
+        0
+    );
+    r0.hit_flags = 0x20;
+    assert_eq!(
+        call(
+            &mut f,
+            tb(&t, &ct),
+            20,
+            ev(7, Some(h), Some(o), kk, 0),
+            Some(&mut r0)
+        ),
+        1
+    );
+    assert_eq!(casts(&f), 1);
+    assert!(f
+        .c
+        .log
+        .iter()
+        .any(|l| l.starts_with(&format!("cast {h} Unit"))));
+    assert!(f.c.log.iter().any(|l| l.contains("aim: true")));
+    // 30: no aim; without O a point cast at H's path target.
+    f.c.log.clear();
+    assert_eq!(
+        call(
+            &mut f,
+            tb(&t, &ct),
+            30,
+            ev(10, Some(h), Some(o), kk, 0),
+            None
+        ),
+        1
+    );
+    assert!(f.c.log.iter().any(|l| l.contains("aim: false")));
+    f.c.log.clear();
+    assert_eq!(
+        call(&mut f, tb(&t, &ct), 30, ev(12, Some(h), None, kk, 0), None),
+        1
+    );
+    assert!(f
+        .c
+        .log
+        .iter()
+        .any(|l| l.starts_with(&format!("cast {h} Point"))));
+    // v = 0: nothing.
+    let h0 = unit(&mut f, UnitType::Player, &[(195, lay, 0)]);
+    assert_eq!(
+        call(
+            &mut f,
+            tb(&t, &ct),
+            30,
+            ev(10, Some(h0), Some(o), kk, 0),
+            None
+        ),
+        0
+    );
+    // Edge case 4: `ItemTgtDo` on 20 makes O cast on itself.
+    t.skills[1].itemtgtdo = true;
+    f.c.log.clear();
+    assert_eq!(
+        call(
+            &mut f,
+            tb(&t, &ct),
+            20,
+            ev(7, Some(h), Some(o), kk, 0),
+            Some(&mut r0)
+        ),
+        1
+    );
+    assert!(f
+        .c
+        .log
+        .iter()
+        .any(|l| l.starts_with(&format!("cast {o} Unit"))));
+    // ...and with no O nothing is cast.
+    f.c.log.clear();
+    assert_eq!(
+        call(
+            &mut f,
+            tb(&t, &ct),
+            20,
+            ev(7, Some(h), None, kk, 0),
+            Some(&mut r0)
+        ),
+        1
+    );
+    assert_eq!(casts(&f), 0);
+}
+
+// Covers: specs/combat/events.md §2.15
+#[test]
+fn skill_on_get_hit_needs_a_get_hit_result() {
+    let ct = monsters(1);
+    let mut r = body_rec();
+    r.itemeffect = 1;
+    r.itemtarget = 1;
+    r.srvdofunc = 1;
+    r.intown = false;
+    let t = tabs(r, Code::new(), 1);
+    let mut f = BodyFake::new();
+    f.srvdo_result = 1;
+    let lay = (1 << 6) | 3;
+    let h = unit(&mut f, UnitType::Player, &[(196, lay, 100)]);
+    let o = unit(&mut f, UnitType::Monster, &[]);
+    let kk = k(196, lay);
+    let mut rec = DamageRecord::default();
+    let run = |f: &mut BodyFake, rec: &mut DamageRecord, o| {
+        call(f, tb(&t, &ct), 21, ev(1, Some(h), o, kk, 0), Some(rec))
+    };
+    // Result without get-hit (4): nothing.
+    assert_eq!(run(&mut f, &mut rec, Some(o)), 0);
+    rec.result = 4;
+    assert_eq!(run(&mut f, &mut rec, Some(o)), 1);
+    assert!(f.c.log.iter().any(|l| l.contains("aim: false")));
+    // No O: a point cast.
+    f.c.log.clear();
+    assert_eq!(run(&mut f, &mut rec, None), 1);
+    assert!(f
+        .c
+        .log
+        .iter()
+        .any(|l| l.starts_with(&format!("cast {h} Point"))));
+    // No record: 0.
+    assert_eq!(
+        call(
+            &mut f,
+            tb(&t, &ct),
+            21,
+            ev(1, Some(h), Some(o), kk, 0),
+            None
+        ),
+        0
+    );
+}
+
+// Covers: specs/combat/events.md §2.19
+#[test]
+fn blood_golem_shares_damage_with_its_owner() {
+    let mut ct = monsters(300);
+    ct.monstats[290].skill1 = 1;
+    let mut r = body_rec();
+    r.param5 = 30;
+    let t = tabs(r, Code::new(), 1);
+    let mut f = BodyFake::new();
+    let q = unit(&mut f, UnitType::Player, &[(6, 0, 1_000)]);
+    let h = f.add(FUnit::new(UnitType::Monster, 290), (0, 0));
+    f.minion_owner.insert(h, q);
+    let mut rec = DamageRecord {
+        total: 1_000,
+        ..DamageRecord::default()
+    };
+    // x = 30 % of 1000 = 300: Q 1000 -> 700, R total 1000 -> 700.
+    assert_eq!(
+        call(
+            &mut f,
+            tb(&t, &ct),
+            26,
+            ev(1, Some(h), None, 1, 1),
+            Some(&mut rec)
+        ),
+        1
+    );
+    assert_eq!((f.c.get(q, 6), rec.total), (700, 700));
+    // Q's life floors at 256.
+    rec.total = 10_000;
+    call(
+        &mut f,
+        tb(&t, &ct),
+        26,
+        ev(1, Some(h), None, 1, 1),
+        Some(&mut rec),
+    );
+    assert_eq!((f.c.get(q, 6), rec.total), (256, 7_000));
+    // Q below 256 life, or R total 0: 0.
+    let mut rec = DamageRecord {
+        total: 100,
+        ..DamageRecord::default()
+    };
+    f.c.set(q, 6, 255);
+    assert_eq!(
+        call(
+            &mut f,
+            tb(&t, &ct),
+            26,
+            ev(1, Some(h), None, 1, 1),
+            Some(&mut rec)
+        ),
+        0
+    );
+    let mut zero = DamageRecord::default();
+    f.c.set(q, 6, 5_000);
+    assert_eq!(
+        call(
+            &mut f,
+            tb(&t, &ct),
+            26,
+            ev(1, Some(h), None, 1, 1),
+            Some(&mut zero)
+        ),
+        0
+    );
+}
+
+// Covers: specs/combat/events.md §2.20
+#[test]
+fn rest_in_peace_marks_the_victim() {
+    let (t, ct) = plain();
+    let mut f = BodyFake::new();
+    let h = unit(&mut f, UnitType::Player, &[]);
+    let o = unit(&mut f, UnitType::Monster, &[]);
+    assert_eq!(
+        call(&mut f, tb(&t, &ct), 29, ev(9, Some(h), None, 1, 1), None),
+        0
+    );
+    assert_eq!(
+        call(&mut f, tb(&t, &ct), 29, ev(9, Some(h), Some(o), 1, 1), None),
+        1
+    );
+    assert!(f.c.units[o].states.contains(&172));
+    assert!(!f.c.units[h].states.contains(&172));
+}
+
+// Covers: specs/combat/events.md §2 text; specs/combat/damage.md §8
+#[test]
+fn function_table_dispatch() {
+    let (t, ct) = plain();
+    // Table slot 0 and every index past 31 are no function: 0, no effect.
+    let mut f = BodyFake::new();
+    let h = unit(&mut f, UnitType::Player, &[]);
+    let o = unit(&mut f, UnitType::Monster, &[]);
+    for func in [0, 32, 33, 40, -1] {
+        assert_eq!(
+            call(
+                &mut f,
+                tb(&t, &ct),
+                func,
+                ev(1, Some(h), Some(o), 1, 1),
+                None
+            ),
+            0
+        );
+    }
+    assert!(f.c.log.is_empty());
+    // With a holder, another unit, a valid skill and no record, only
+    // Frozen Armor (2), Shiver Armor (3: no record needed) and Rest in
+    // peace (29) act; every other slot is a distinct function that needs
+    // its inputs.
+    let acting: Vec<i32> = (1..=31)
+        .filter(|&func| {
+            let mut f = BodyFake::new();
+            let h = unit(&mut f, UnitType::Player, &[]);
+            let o = unit(&mut f, UnitType::Monster, &[]);
+            call(
+                &mut f,
+                tb(&t, &ct),
+                func,
+                ev(1, Some(h), Some(o), 1, 1),
+                None,
+            ) != 0
+        })
+        .collect();
+    assert_eq!(acting, [2, 3, 29]);
+    // Function 15 / 16 are `damage.md` §8's open wounds / crushing blow.
+    let mut f = BodyFake::new();
+    let h = unit(&mut f, UnitType::Player, &[]);
+    let o = unit(&mut f, UnitType::Monster, &[]);
+    let mut rec = DamageRecord::default();
+    assert_eq!(
+        call(
+            &mut f,
+            tb(&t, &ct),
+            16,
+            ev(5, Some(h), Some(o), 1, 1),
+            Some(&mut rec)
+        ),
+        0
+    );
+}
+
+// Covers: specs/combat/events.md §edge-cases-original-bugs r1
+#[test]
+fn iron_maiden_blood_golem_heals_holder_and_owner_not_the_golem() {
+    let mut ct = monsters(300);
+    ct.monstats[290].drain = 100;
+    let mut r = body_rec();
+    let mut code = Code::new();
+    r.calc1 = code.f(50);
+    r.auratargetstate = 12;
+    let t = tabs(r, code, 1);
+    let mut f = BodyFake::new();
+    f.c.hostile = true;
+    let q = unit(&mut f, UnitType::Player, &[(6, 0, 100), (7, 0, 1_000)]);
+    let h = unit(&mut f, UnitType::Player, &[(6, 0, 1_000), (7, 0, 1_000)]);
+    let o = f.add(
+        FUnit::new(UnitType::Monster, 290)
+            .with(6, 5_000)
+            .with(7, 5_000),
+        (0, 0),
+    );
+    f.minion_owner.insert(h, q);
+    let l = f.alloc_list(0, 0, Some(h)).unwrap();
+    f.set_list_state(l, 12);
+    f.attach(h, l);
+    f.c.units[h].states.push(12);
+    let mut rec = DamageRecord {
+        physical: 1_000,
+        ..DamageRecord::default()
+    };
+    assert_eq!(
+        call(
+            &mut f,
+            tb(&t, &ct),
+            4,
+            ev(5, Some(h), Some(o), 1, 1),
+            Some(&mut rec)
+        ),
+        1
+    );
+    // Reflected 500 to H (1000 -> 500). x = 20 % of 500 = 100: Q gets
+    // half (50), H the rest (50). The golem is not healed.
+    assert_eq!(f.c.get(q, 6), 150);
+    assert_eq!(f.c.get(h, 6), 550);
+    assert_eq!(f.c.get(o, 6), 5_000);
+    assert!(f.c.log.contains(&format!("overlay {h} 151")));
+    assert!(f.c.log.contains(&format!("overlay {q} 151")));
+}
+
+// Covers: specs/combat/events.md §edge-cases-original-bugs r7
+#[test]
+fn item_cast_free_point_is_tested_in_the_casters_room() {
+    let ct = monsters(1);
+    let t = item_cast_tables(false, 2);
+    let mut f = BodyFake::new();
+    f.srvdo_result = 1;
+    let u = f.add(FUnit::new(UnitType::Player, 0), (100, 100));
+    // The first candidate: two seed draws, x then y, each `mod 40 - 20`
+    // from U's position; far from U, in no room check of its own.
+    let mut seed = f.c.units[u].seed;
+    let x = 100 + (seed.step() % 40) as i32 - 20;
+    let y = 100 + (seed.step() % 40) as i32 - 20;
+    f.collides = true;
+    f.path_target = (x, y);
+    let (res, out) = core(&mut f, tb(&t, &ct), u, 1, 1, None, (0, 0), false);
+    assert_eq!(res, 1);
+    assert_eq!(out.at, (x, y));
+}
