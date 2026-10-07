@@ -5163,6 +5163,13 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
   Uber Tristram run also log every mode change of the three with its
   caller and every `0x005B0E00` call on them; expect no attack or skill
   mode started by AI code (only gethit / knockback / death).
+- `combat/events.md` OQ1: items with knockback, freeze, slow,
+  skill-on-hit, damage-to-mana; Energy Shield, Bone Armor, Iron Maiden
+  in play. Log each event function's entry / return (table
+  `0x007325B0` targets), H's seed before / after, and the record.
+- `skills/levels.md` §7.5 / §7.6 (no OQ, unverified): equip an aura
+  item (e.g. Dragon) and a charged item; log `0x005BF510` /
+  `0x00647320` calls and the type-9 timers they schedule.
 
 ## 8. Lessons (problems met, fixes)
 
