@@ -44,13 +44,13 @@
 |   7. Bevy mirror | 234–252 |
 |   8. Frame pacing | 253–273 |
 |   9. Versioning | 274–284 |
-|   10. Client outputs (bridge → UI and audio) | 285–363 |
-| Constants & data dependencies | 364–378 |
-| Randomness | 379–382 |
-| Edge cases & original bugs | 383–391 |
-| Test vectors | 392–422 |
-| Provenance | 423–433 |
-| Open questions | 434–469 |
+|   10. Client outputs (bridge → UI and audio) | 285–370 |
+| Constants & data dependencies | 371–385 |
+| Randomness | 386–389 |
+| Edge cases & original bugs | 390–398 |
+| Test vectors | 399–429 |
+| Provenance | 430–440 |
+| Open questions | 441–476 |
 <!-- /index -->
 
 ## Summary
@@ -360,6 +360,13 @@ model state: 1.14d's handler calls a UI or sound function directly
 | `SkillDo` | unit key, target key or none, skill, level, x, y, v | 0xA3 | effects | `client/msg-skills.md` §8 |
 | `ShrineFx` | kind (on-mode / on-use), shrine code u8, object key, player key or none, overlay ids (two i32, −1 = none) | 0x0E (code 3), 0x4D (code 0x15) | effects | `client/model.md` §15 rules 3–4 |
 | `ShrineSound` | sound id u32, player key | 0x4D (code 0x15) | audio | `client/model.md` §15 rule 4 (request: `audio/triggers.md` §1 rule 1) |
+| `UnitOverlay` | unit key, overlay u16, mode (2), sound id (0, 396 or 397) | 0x11 | effects | `client/msg-units.md` §7 r2 |
+| `UmodFx` | unit key, the nine umod bytes, flag bit 3 | 0x57 | effects | `client/msg-units.md` §7 r3 |
+| `ClientMissile` | local player key, the fields of 0x73 | 0x73 | effects | `client/msg-units.md` §7 r6 |
+| `CommonCof` | act index | 0x7E | effects | `client/msg-units.md` §7 r8 |
+| `MonsterPreload` | monster class u16 | 0xA4 | effects | `client/msg-units.md` §7 r10 |
+| `RosterChanged` | the active roster records (§8 r1 fields) | 0x5B, 0x5C, 0x65 | UI | `client/msg-units.md` §8 |
+| `SkillEndFx` | unit key, skill u16, srvdofunc | 0xA5 | effects | `client/msg-skills.md` §10 |
 
 ## Constants & data dependencies
 
