@@ -692,11 +692,11 @@ not re-measured here. No `re/` or `../refs/` read.
 1. Expected run time and native root size: measured by the §7.2 run, not
    guessed (§4.6 r4).
 2. Tiled import / export for DS1 + DT1 over the native TOML: wanted, and
-   **User decision 2026-10-07: yes**, Tiled import / export is wanted (a later implementation session; not part of N1–N4).
    when? (§2.3 r5). Decision for the user.
+   **User decision 2026-10-07: yes**, Tiled import / export is wanted (a later implementation session; not part of N1–N4).
 3. FLAC instead of WAV for music and speech to save disk (§2.7 r2):
-   **User decision 2026-10-07: deferred; no sound for now.** Audio kinds (`wav`, music, speech) are not converted or played until the user decides; the converter skips them.
    settled by the native root size of the §7.2 run. Decision for the user.
+   **User decision 2026-10-07: deferred; no sound for now.** Audio kinds (`wav`, music, speech) are not converted or played until the user decides; the converter skips them.
 4. How a mod adds or changes strings: a `tbl` patch kind in
    `patch-layers.md` (owner) — not designed yet (§6 r3).
 5. DT1 assembled vs block-strip layout: PROVISIONAL assembled, settled by
