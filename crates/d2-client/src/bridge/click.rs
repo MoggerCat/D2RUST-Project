@@ -43,6 +43,9 @@ pub struct ClickView {
     pub mouse: (i32, i32),
     /// UI 9 (game menu) open.
     pub game_menu_open: bool,
+    /// The `play` preview picks the hover target ([`super::hover::pick`],
+    /// d2rs-own, unverified); `false`: no hover model (strict).
+    pub pick: bool,
 }
 
 /// The client model as the dispatcher reads it.
@@ -176,8 +179,12 @@ impl ClickWorld for ModelClick<'_> {
         self.view.mouse
     }
     fn hover(&self) -> Option<UnitKey> {
-        // TODO(spec: client/model.md hover `0x00467A10`): no hover model.
-        None
+        // TODO(spec: client/model.md hover `0x00467A10`): no hover model;
+        // the preview's pick is d2rs-own, unverified.
+        if !self.view.pick {
+            return None;
+        }
+        super::hover::pick(self.world, &self.camera()?, self.view.mouse)
     }
     fn to_world(&self, x: i32, y: i32) -> (i32, i32) {
         self.camera().map_or((0, 0), |c| screen_to_world(&c, x, y))
@@ -230,8 +237,10 @@ impl ClickWorld for ModelClick<'_> {
     }
     fn skill_row(&self, _id: u16) -> Option<SkillRowFacts> {
         // TODO(spec: ui/controls.md §6 r8): the client `skills` rows hold
-        // no flag columns or `range` yet.
-        None
+        // no flag columns or `range` yet. d2rs-own, unverified (D1): the
+        // preview answers a row with no flags and range 0, so a click on
+        // a picked unit takes the unit path (§6 r8.3 → 3.6 interact).
+        self.view.pick.then(SkillRowFacts::default)
     }
     fn range(&self, _skill: SkillRef) -> u8 {
         click::range::NONE
@@ -271,8 +280,15 @@ impl ClickWorld for ModelClick<'_> {
     fn hostile(&self, _u: UnitKey) -> bool {
         false
     }
-    fn monster_npc_interact(&self, _u: UnitKey) -> (bool, bool) {
-        (false, false)
+    /// The `monstats` `npc` / `interact` bits of U's class
+    /// ([`super::world::MonsterClass`]); no row: neither.
+    fn monster_npc_interact(&self, u: UnitKey) -> (bool, bool) {
+        self.world
+            .units
+            .get(&u)
+            .and_then(|u| self.inputs.tables.monsters.get(u.class as usize))
+            .and_then(|c| c.as_ref())
+            .map_or((false, false), |c| (c.npc, c.interact))
     }
     fn object_has_row(&self, u: UnitKey) -> bool {
         self.world
@@ -511,6 +527,7 @@ mod tests {
             skill_y_limit: FrameSize::D2RS.play_height(),
             mouse,
             game_menu_open: false,
+            pick: false,
         }
     }
 

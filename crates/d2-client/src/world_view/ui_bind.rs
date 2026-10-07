@@ -512,6 +512,12 @@ pub fn world_clicks<L: ServerLink>(
             } => (Kind::RightUp, Some((at.x, at.y))),
             _ => continue,
         };
+        // d2rs-own, unverified (D1): the preview's hover pick reads the
+        // event position.
+        let view = match at {
+            Some(p) if view.pick => ClickView { mouse: p, ..view },
+            _ => view,
+        };
         let (r, _) = bridge.world_click_at(st, view, kind, at, mods, local_at)?;
         rest.extend(r);
     }
