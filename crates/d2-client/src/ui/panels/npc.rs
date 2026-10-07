@@ -178,6 +178,124 @@ pub fn option_intent(kind: OptionKind, npc_guid: u32) -> Option<Vec<PanelOutput>
     Some(vec![PanelOutput::Intent(i)])
 }
 
+/// The inserted Resurrect string id, a placeholder replaced at build time
+/// (§14.2; `ui/menus.md` §2.3).
+pub const STR_RESURRECT_PLACEHOLDER: u16 = 0x1507;
+/// Cain's record ids whose count `0x004B5640` resets (§14.10).
+pub const CAIN_RECORDS: [u8; 5] = [16, 17, 18, 19, 38];
+
+/// §14.7 record lookup (`0x004B2E30`): no unit → `None` (−1); else the
+/// first record whose npc class matches; no match → record 0.
+pub fn record_index(records: &[NpcMenuRecord], unit_class: Option<u32>) -> Option<usize> {
+    let c = unit_class?;
+    Some(records.iter().position(|r| r.npc == c).unwrap_or(0))
+}
+
+/// §14.2 `0x004B6440(record, insert)`: Resurrect insert / remove. Does
+/// nothing unless the expansion is installed and the game is an expansion
+/// game.
+pub fn resurrect_edit(r: &mut NpcMenuRecord, insert: bool, expansion_game: bool) {
+    if !expansion_game {
+        return;
+    }
+    let res = |o: &Option<MenuOption>| matches!(o, Some(m) if m.kind == OptionKind::Resurrect);
+    let n = (r.count as usize).min(r.options.len());
+    let item = Some(MenuOption {
+        string: STR_RESURRECT_PLACEHOLDER,
+        kind: OptionKind::Resurrect,
+    });
+    if insert {
+        if r.options[..n].iter().any(res) {
+            return;
+        }
+        let at = match r.options[..n]
+            .iter()
+            .position(|o| matches!(o, Some(m) if m.kind == OptionKind::Hire))
+        {
+            Some(j) => {
+                for k in (j..n.min(r.options.len() - 1)).rev() {
+                    r.options[k + 1] = r.options[k];
+                }
+                j
+            }
+            None => n.saturating_sub(1),
+        };
+        r.options[at] = item;
+        r.count += 1;
+    } else if let Some(j) = r.options[..n].iter().position(res) {
+        for k in j..r.options.len() - 1 {
+            r.options[k] = r.options[k + 1];
+        }
+        let last = r.options.len() - 1;
+        r.options[last] = None;
+        r.count -= 1;
+    }
+}
+
+/// §14.8 what a talk sequence ending does.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TalkEnd {
+    /// `[0x007C0C6B]` := 1 and the NPC menu is built again.
+    RebuildMenu,
+    /// Menu state 0, interaction ends (C→S 0x30), `SetUIState(8, off, 0)`.
+    EndInteraction,
+}
+
+/// Classes of `0x004B1A10` (§14.8).
+pub const TALK_END_CLASSES: [u32; 13] = [
+    146, 251, 266, 331, 377, 378, 406, 408, 521, 527, 537, 538, 539,
+];
+
+/// §14.8: a talk sequence ended with no next message.
+pub fn talk_end(npc_present: bool, npc_class: u32, flag: u8) -> TalkEnd {
+    if npc_present && !TALK_END_CLASSES.contains(&npc_class) && flag != 0 {
+        TalkEnd::RebuildMenu
+    } else {
+        TalkEnd::EndInteraction
+    }
+}
+
+/// §14.10 Cain's count reset: result 3 or 6 with the interaction NPC one
+/// of Cain's classes sets the counts of records 16, 17, 18, 19, 38 to 2.
+pub fn cain_count_reset(records: &mut [NpcMenuRecord], interaction_npc: u32, result: u8) {
+    if (result == 3 || result == 6) && NPC_CAIN.contains(&interaction_npc) {
+        for r in records
+            .iter_mut()
+            .filter(|r| CAIN_RECORDS.contains(&r.record))
+        {
+            r.count = 2;
+        }
+    }
+}
+
+/// §14.9 the 9-byte talk messages (helper `0x004786A0`).
+pub fn talk_msg_bytes(id: u8, a: u32, b: u32) -> [u8; 9] {
+    let mut o = [0u8; 9];
+    o[0] = id;
+    o[1..5].copy_from_slice(&a.to_le_bytes());
+    o[5..9].copy_from_slice(&b.to_le_bytes());
+    o
+}
+/// C→S 0x2F: unit type @1, GUID @5.
+pub fn msg_chat_start(unit_type: u32, guid: u32) -> [u8; 9] {
+    talk_msg_bytes(0x2F, unit_type, guid)
+}
+/// C→S 0x30 (NPC not found): `a4` low byte zero-extended @1, GUID @5.
+pub fn msg_chat_not_found(a4: u32, guid: u32) -> [u8; 9] {
+    talk_msg_bytes(0x30, a4 & 0xFF, guid)
+}
+/// C→S 0x30 (interaction end): 1 @1, GUID @5.
+pub fn msg_chat_end(guid: u32) -> [u8; 9] {
+    talk_msg_bytes(0x30, 1, guid)
+}
+/// C→S 0x31: NPC GUID @1, message id (u16, zero-extended) @5.
+pub fn msg_quest(guid: u32, msg: u16) -> [u8; 9] {
+    talk_msg_bytes(0x31, guid, msg as u32)
+}
+
+#[cfg(test)]
+mod tests_c2ui;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -293,7 +411,8 @@ mod tests {
         assert_eq!(m.menu(150).unwrap().count, 2);
     }
 
-    // Partial: §14 r1 (every handler but talk and hire).
+    // Covers: specs/ui/panels-2.md §14 r1
+    // (every handler; talk sends nothing, hire opens the list).
     #[test]
     fn option_handlers_bytes() {
         let g = 0x1122_3344u32;

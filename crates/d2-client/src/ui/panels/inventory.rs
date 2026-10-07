@@ -230,6 +230,12 @@ pub fn close_rect(t: &PanelTables, s: &Screen) -> Option<Rect> {
         .find_map(|r| r.hit_rect(s))
 }
 
+/// The area test (`panels-2.md` §18 r2, `0x00483AB0`): `left <= x < right`
+/// (right exclusive) and `top <= y <= bottom` (bottom **inclusive**).
+pub fn in_panel_area(left: i32, right: i32, top: i32, bottom: i32, x: i32, y: i32) -> bool {
+    left <= x && x < right && top <= y && y <= bottom
+}
+
 /// Pressed state of the inventory close button (`[0x007BCE90]`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct InventoryPanel {

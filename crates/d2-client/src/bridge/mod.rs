@@ -42,6 +42,8 @@ mod gaps_numbered_tests;
 mod local_tests;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_c2cli;
 
 use d2_proto::transport::SplitError;
 use d2_proto::{FixedMessage, PROTOCOL_VERSION};

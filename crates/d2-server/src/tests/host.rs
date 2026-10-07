@@ -282,6 +282,7 @@ fn direct_sends_overtake_buffered_messages() {
     assert_eq!(got, [0xB0, 0x06, 0x0C]);
 }
 
+// Covers: specs/sim/intents-events.md §3.2 r3, §3.2 r4, §3.3 r4
 #[test]
 fn flush_throttle_unless_forced() {
     let mut h = host();

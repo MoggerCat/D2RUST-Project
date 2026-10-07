@@ -249,3 +249,6 @@ pub enum PanelOutput {
 pub fn utf16(s: &str) -> Vec<u16> {
     s.encode_utf16().collect()
 }
+
+#[cfg(test)]
+mod tests_c2ui;

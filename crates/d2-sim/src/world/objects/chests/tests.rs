@@ -27,6 +27,8 @@ impl ChestWorld for Fake {
 }
 
 mod mutant_tests;
+#[cfg(test)]
+mod tests_c2world;
 
 const OBJ: UnitId = UnitId(10);
 const PLAYER: UnitId = UnitId(20);

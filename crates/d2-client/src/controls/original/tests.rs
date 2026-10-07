@@ -208,6 +208,7 @@ fn binding_table_and_lookups() {
 }
 
 // Covers: specs/ui/controls.md §2 r1, §2 r2, §2 r3, §2 r4, §2 r5
+// Covers: specs/ui/controls.md §edge-cases-original-bugs r3
 #[test]
 fn key_files() {
     let d = BindingTable::defaults();
@@ -299,6 +300,7 @@ fn key_config_menu_tables() {
 }
 
 // Covers: specs/ui/controls.md §4.1 r1, §4.1 r2, §4.1 r3, §4.1 r4, §4.1 r5, §4.1 r6
+// Covers: specs/ui/controls.md §edge-cases-original-bugs r1, §edge-cases-original-bugs r5
 #[test]
 fn keyboard_dispatch() {
     let t = BindingTable::defaults();
@@ -360,6 +362,7 @@ fn keyboard_dispatch() {
 }
 
 // Covers: specs/ui/controls.md §4.2 r1, §4.2 r2, §4.2 r3
+// Covers: specs/ui/controls.md §edge-cases-original-bugs r2, §edge-cases-original-bugs r4
 #[test]
 fn mouse_buttons_and_wheel() {
     let mut t = BindingTable::defaults();

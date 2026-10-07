@@ -470,3 +470,47 @@ fn height_added(u: HeightUnit, row: &OverlayRow) -> i32 {
         HeightUnit::Other => row.height[0],
     }
 }
+
+/// The light an overlay row asks for (§2 rule 9, `0x00474160`): `Radius`
+/// (+0x74) ≠ 0 → one light; when `Radius` ≠ `InitRadius` (+0x70) its
+/// target radius is set (`0x00474290`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct OverlayLight {
+    pub init_radius: i32,
+    pub target_radius: Option<i32>,
+}
+
+/// §2 rule 9: the light of a new overlay record, if any.
+pub fn overlay_light(row: &OverlayRow) -> Option<OverlayLight> {
+    if row.radius == 0 {
+        return None;
+    }
+    Some(OverlayLight {
+        init_radius: row.init_radius,
+        target_radius: (row.radius != row.init_radius).then_some(row.radius),
+    })
+}
+
+/// §5 r4 of `unit-composite.md`: whether the overlay draw (`0x0046E300`)
+/// draws `rec` in the back call (`back`, records with `PreDraw` ≠ 0) or the
+/// front call. Skipped: kind 6 with +0x08 = 0, kind 8 with +0x3C = 0;
+/// drawn only while `f < +0x1C >> 8`.
+pub fn overlay_draws(rec: &Overlay, back: bool) -> bool {
+    if rec.pre_draw != back {
+        return false;
+    }
+    if (rec.kind == 6 && rec.a == 0) || (rec.kind == 8 && !rec.active) {
+        return false;
+    }
+    rec.frame_index() < (rec.frames >> 8)
+}
+
+/// The wall clock of kind 6 (§3 rule 7): 40 ms per client update since game
+/// start, as `camera.md` §9 does for the shake.
+pub fn kind6_clock_ms(updates_since_start: u32) -> u32 {
+    updates_since_start.wrapping_mul(40)
+}
+
+#[cfg(test)]
+#[path = "overlay_c2ui_tests.rs"]
+mod tests_c2ui;

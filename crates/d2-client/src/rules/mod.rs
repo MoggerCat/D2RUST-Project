@@ -11,6 +11,7 @@
 //! - [`unit_composite`]: COF and component file names, directions and
 //!   cels, component requests, colormap sources, COF box culling, extra
 //!   offsets and single-cel units (`render/unit-composite.md`).
+//! - [`unit_visibility`]: the visibility predicate of `client/model.md` §13.
 //! - [`view`]: [`view::OriginalView`], the `ViewRules` implementation that
 //!   answers `tiles`, `unit_params` and `place` with the two modules above
 //!   and hands every other hook (pose, component frame, draw keys,
@@ -38,6 +39,7 @@ pub mod placement;
 pub mod shading;
 pub mod umod_hooks;
 pub mod unit_composite;
+pub mod unit_visibility;
 pub mod view;
 
 #[cfg(test)]

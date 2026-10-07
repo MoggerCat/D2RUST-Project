@@ -1807,7 +1807,7 @@ fn dosound_a_and_b() {
     );
 }
 
-// Covers: specs/audio/triggers-2.md §16
+// Covers: specs/audio/triggers-2.md §16 text, §16 row1, §16 row2, §16 row3, §16 row4
 #[test]
 fn prog_sound_functions() {
     let mut g = Globals::default();

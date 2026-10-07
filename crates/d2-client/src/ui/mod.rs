@@ -31,6 +31,7 @@ pub mod panels;
 pub mod quest_log;
 pub mod root;
 pub mod skill_desc;
+pub mod skill_desc_more;
 pub mod states;
 pub mod text;
 pub mod wformat;
@@ -38,6 +39,10 @@ pub mod widget;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_c2skills;
+#[cfg(test)]
+mod tests_c2ui;
 #[cfg(test)]
 mod tests_fdesc;
 
