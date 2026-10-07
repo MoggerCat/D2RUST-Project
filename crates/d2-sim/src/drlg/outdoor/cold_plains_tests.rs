@@ -302,3 +302,30 @@ fn cold_plains_grid_reproduces_the_table() {
     assert_eq!(b.presets.calls.len() + outdoor, 98);
     assert_eq!(rooms.len(), outdoor);
 }
+
+/// `levels.md` §9.4 on a real outdoor level (gap G1): freeing the Cold
+/// Plains rooms resets the outdoor type data after the rooms are freed;
+/// the reset drops their room records without reading a freed room.
+// Covers: specs/drlg/levels.md §9 r4
+#[test]
+fn cold_plains_rooms_free_with_their_outdoor_records() {
+    let mut b = build();
+    let rooms = b.drlg.level_rooms(b.level);
+    assert!(!rooms.is_empty());
+    assert!(rooms.iter().all(|r| b.outdoor.room(*r).is_some()));
+    let od = od();
+    let subs = SubFileMap::default();
+    let mut rec = Rec::default();
+    let mut types = OutdoorTypes {
+        outdoor: &mut b.outdoor,
+        od: &od,
+        subs: &subs,
+        presets: &mut b.presets,
+        others: &mut rec,
+        last_error: None,
+    };
+    b.drlg.free_level_rooms(&mut types, b.level);
+    assert!(rooms.iter().all(|&r| b.drlg.try_room(r).is_none()));
+    assert!(b.outdoor.rooms.is_empty());
+    assert!(b.drlg.level_rooms(b.level).is_empty());
+}
