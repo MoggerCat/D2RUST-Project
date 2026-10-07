@@ -22,20 +22,20 @@
 | Inputs | 60–66 |
 | Outputs / state changes | 67–74 |
 | Rules | 75–76 |
-|   1. Unit add | 77–233 |
-|   2. 0x0A RemoveUnit (`0x0045CC10`) | 234–243 |
-|   3. 0x15 ReassignPlayer (`0x0045D160`) | 244–285 |
-|   4. Queued movement and action messages | 286–329 |
-|   5. Local player vitals: 0x18, 0x95, 0x96 | 330–351 |
-|   6. Unit states: 0xA7, 0xA8, 0xA9, 0xAA | 352–382 |
-|   7. Other unit messages (general handlers, act at receive) | 383–498 |
-|   8. Player roster (0x5B, 0x5C, 0x65, 0x82, 0x8E; life from 0x0D, 0xAB) | 499–571 |
-| Constants & data dependencies | 572–583 |
-| Randomness | 584–591 |
-| Edge cases & original bugs | 592–614 |
-| Test vectors | 615–665 |
-| Provenance | 666–708 |
-| Open questions | 709–741 |
+|   1. Unit add | 77–258 |
+|   2. 0x0A RemoveUnit (`0x0045CC10`) | 259–268 |
+|   3. 0x15 ReassignPlayer (`0x0045D160`) | 269–311 |
+|   4. Queued movement and action messages | 312–355 |
+|   5. Local player vitals: 0x18, 0x95, 0x96 | 356–377 |
+|   6. Unit states: 0xA7, 0xA8, 0xA9, 0xAA | 378–408 |
+|   7. Other unit messages (general handlers, act at receive) | 409–524 |
+|   8. Player roster (0x5B, 0x5C, 0x65, 0x82, 0x8E; life from 0x0D, 0xAB) | 525–602 |
+| Constants & data dependencies | 603–614 |
+| Randomness | 615–622 |
+| Edge cases & original bugs | 623–645 |
+| Test vectors | 646–696 |
+| Provenance | 697–739 |
+| Open questions | 740–774 |
 <!-- /index -->
 
 Owned ids: 0x0A, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x15, 0x18, 0x4C, 0x4D,
@@ -128,6 +128,19 @@ The player roster (§8). Outputs (`client/bridge.md` §10): `UnitOverlay`
    path, a mode set through `0x00624690` whose argument is not traced;
    open question 2); path byte from `monstats2`
    +0x0E (`0x00649070`); gfx; add.
+   1. **Hireling re-init in detail** (2026-10-08; answers
+      `docs/handoff/impl-client-staging.md` Q1). The test is the 0xAC
+      GUID = `0x00478F20(local player, 7)` and a monster (1, GUID) in S
+      (`0x00463940`). Then, in order: `0x0046EC10(U)` frees U's
+      graphics record (+0x54: its component chain +0x28 and its overlay
+      chain +0x2C, each overlay's light removed, `0x004743D0`; none →
+      fatal 0x814), `0x004DC510(U)` rebuilds the graphics (both Phase 6
+      render), **U's mode := the 4-bit mode** (`0x00624690`); the
+      existing U is returned. Nothing else of the message (class,
+      position, type data, components, seed) is written. The caller
+      `0x0045F190` then runs rules 3 and 4 on U as for a new monster.
+      **Hireling classes** (`0x0063EE90`, monsters only, class →
+      kind): 271 → 1, 338 → 2, 359 → 3, 560 and 561 → 4, others 0.
 3. After creation (none → stop): `0x00470B70(unit)`. Unless the unit is
    a hireling class (`0x0063EE90`) whose GUID is the local player's
    hireling GUID: stat 7 := 0x8000, stat 6 := life << 8 (set). A
@@ -220,7 +233,19 @@ The player roster (§8). Outputs (`client/bridge.md` §10): `UnitOverlay`
    `0x004C1910`, tile: unit flags |= 0x22, static path; jump table
    `0x004661A0` read from the file). Add; an object
    then gets `0x004BC8D0`.
-3. Object data +4 := interact. If `0x00621B00(unit)` → `0x004BD6B0`.
+3. Object data +4 := interact. If `0x00621B00(unit)` → `0x004BD6B0`:
+   object data +8 := the shrines record of index interact (`0x006414B0`:
+   table `[0x0096D468]`, 0xB8-byte rows, count `[0x0096D46C]`; out of
+   range → fatal 0x15F / 0x160, handler error), then `0x004BD650`: the
+   record's code byte +0 (≥ `[0x0072779C]` → fatal 0x37B) selects an
+   entry of the shrine table `0x006DA8C0` (0x14-byte entries) whose
+   function +0, when non-null, is called (ECX unit, EDX record): the
+   on-mode function of `client/model.md` §15 rules 2–3 (`0x004BD4A0`,
+   codes 6–15). Model: kind data {interact, shrine record index}. The
+   call is one `ShrineFx` output {on-mode, code, object key, no player,
+   the code's two overlay ids} (`client/bridge.md` §10), emitted at
+   receive (0x51 is a general handler), only when the code's +0x00
+   function is set.
 4. Model: `class`, `position` (x, y), `mode` (mode byte), kind data
    {interact}.
 5. **Types 0, 3, 4, 5 are never sent.** The only 1.14d builder of 0x51,
@@ -249,7 +274,8 @@ The player roster (§8). Outputs (`client/bridge.md` §10): `UnitOverlay`
 2. Unit not in S → nothing. Else place (`0x004654C0`, rule 4). The unit
    must then have a room (fatal 0x538); act := the room's act. A player
    gets `0x00649CA0(unit)` and move-test mask 0x1C09 (`0x00648CE0`); a
-   monster for which `0x0063EA40` is 0 gets footprint mask 0x100
+   monster for which `0x0063EA40` is 0 (`0x0063EA40(U)`: U is a monster
+   in mode 0 or 12, i.e. dying or dead) gets footprint mask 0x100
    (`0x00648C30`, `sim/path-placement.md` §5.3 rule 1).
 3. Local player: `0x0061AB30(room)` ≠ 0 → fatal 0x81E; then
    `0x0044DB40(3000)` (a wall-clock hold, not modelled).
@@ -537,12 +563,17 @@ The player roster (§8). Outputs (`client/bridge.md` §10): `UnitOverlay`
    Recorded `5b 2400 01000000 04 "charactertest" 0100 ffff 0000 0000
    0000 00 00` (`-015956` seq 267): GUID 1, class 4, +0x20 = 1, +0x22 =
    0xFFFF.
-4. **0x5C** PlayerLeft (`0x0045E530` → `0x0047A8B0`, 5 bytes): GUID
-   u32@1 (−1 → fatal 0x121). The active record with GUID +0x10 = GUID
-   (not the corpse list) is unlinked, its handle freed, its corpse
-   nodes and the record freed. Then `RosterChanged` (found or not).
-5. **0x65** PlayerKillCount (`0x0045E6B0` → `0x00479B10`, 7 bytes):
-   GUID u32@1, count u16@5. Record found (rule 2) → +0x18 := count,
+4. **0x5C** PlayerLeft (`0x0045E530` → `0x0047A8B0`, 5 bytes;
+   `sim/server-messages.tsv` `guid:u32@1`, sender `0x0053CA90`): GUID
+   u32@1 (−1 → fatal 0x121). Its own walk of the active list (not rule
+   2: the corpse lists are not searched): the first record with GUID
+   +0x10 = GUID is unlinked, its handle +0x34 freed (`0x004DC2B0`), its
+   corpse nodes and then the record freed. Then `RosterChanged`, found
+   or not (`0x00479AB0`, `0x0049A640`). 0x5C reads no count and writes
+   no other record (re-read 2026-10-08 to separate it from rule 5).
+5. **0x65** PlayerKillCount (`0x0045E6B0` → `0x00479B10`, 7 bytes;
+   `sim/server-messages.tsv` `guid:u32@1 count:u16@5`, sender
+   `0x0053D9C0`): GUID u32@1, count u16@5. Record found (rule 2) → +0x18 := count,
    sign-extended from 16 bits; `RosterChanged`. Not found → nothing.
    Recorded at join `65 01000000 0000` and after kills 1, 2, 3, …
    (`-015956` seq 222604 ff.).
@@ -719,7 +750,9 @@ Act-switch session (2026-10-07): `0x004654C0` at `0x00465603`–`0x00465634`
    rule 6). Open: the meaning of the 0x5B words u16@0x18 … u16@0x20 and
    the two strings (D2MOO: level, party id, account names; nothing
    reads them in the single-player recordings).
-5. `0x0063EA40` (0x15 rule 2) and `0x004BD6B0` (0x51 rule 3): what
+5. *Answered (2026-10-08)*: §3 rule 2 (`0x0063EA40`: dying or dead
+   monster) and §1.3 rule 3 (`0x004BD6B0`: shrine record set and the
+   shrine function called). Original question: `0x0063EA40` (0x15 rule 2) and `0x004BD6B0` (0x51 rule 3): what
    they test. *Answered* for `0x00621B00`: an object whose objects.txt
    `SubClass` has bit 0 (shrine), `client/model.md` §15 rule 1.
 6. 0x16 UnitPositions (`0x0045D2E0`, also a position check) and 0x17:

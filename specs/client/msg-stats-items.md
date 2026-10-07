@@ -25,15 +25,15 @@
 | Rules | 69–70 |
 |   1. Local player stats: 0x19–0x1F (`0x0045D780`) | 71–100 |
 |   2. Item actions: 0x9C ItemActionWorld (`0x0045EB10`), 0x9D ItemActionOwned (`0x0045EC70`) | 101–210 |
-|   3. Other item messages | 211–240 |
-|   4. Hireling stats: 0x9E–0xA2 (`0x0045D540`) | 241–256 |
-|   5. Item state messages: 0x3E, 0x40, 0x7C, 0x7D, 0x92, 0x97, 0xA6 | 257–342 |
-| Constants & data dependencies | 343–351 |
-| Randomness | 352–355 |
-| Edge cases & original bugs | 356–371 |
-| Test vectors | 372–410 |
-| Provenance | 411–434 |
-| Open questions | 435–461 |
+|   3. Other item messages | 211–281 |
+|   4. Hireling stats: 0x9E–0xA2 (`0x0045D540`) | 282–297 |
+|   5. Item state messages: 0x3E, 0x40, 0x7C, 0x7D, 0x92, 0x97, 0xA6 | 298–383 |
+| Constants & data dependencies | 384–392 |
+| Randomness | 393–396 |
+| Edge cases & original bugs | 397–416 |
+| Test vectors | 417–455 |
+| Provenance | 456–479 |
+| Open questions | 480–507 |
 <!-- /index -->
 
 Owned ids: 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F, 0x20, 0x3F, 0x42,
@@ -235,8 +235,49 @@ stat-list links, `weapon_set`, the runtime item table (§5). No outputs.
    an argument, unused here). Unit in S → `0x004C1350(unit)`: if the
    unit is a player, or has unit flag 0x200, and has an inventory, the
    requirement flag 0x4000 of its items is recomputed (item flags,
-   `0x006280D0(item, 0x4000, …)`); the rule body is open question 4.
-   Model: no field until then.
+   `0x006280D0(item, 0x4000, …)`); the rule body is rule 3.1.
+   Model: item flag 0x4000 on the items' kind data, and the attach /
+   detach of their lists (`client/stat-lists.md` §2).
+   1. **Requirement refresh `0x004C1350(U)` in full** (2026-10-08;
+      answers open question 4). It is the client twin of the server's
+      inventory pass (`items/inventory.md` §5.7, whose terms it uses:
+      "usable" §5.6 is here `0x004C10E0(U, item)` = §4.2 not equipping
+      plus the quiver test; "active inventory item" `0x0062FF70`;
+      "linked" = `0x00625820(item)` ≠ 0, `client/stat-lists.md` §2 r3.1).
+      Runs only for a player or a unit with flag +0xC4 bit 0x200, with
+      an inventory. In order:
+      1. Save the left and right skill (skill id, owner GUID; id 0 and
+         owner −1 when none) and stats 6, 8, 10 (`0x004C1160`; the
+         stats are not read again).
+      2. Charms: each item node of kind 1 (+0x69, `0x0063E020`) whose
+         item is an active inventory item, not linked and usable →
+         flag 0x4000 := 0, equip `0x004C0D20(0)` (`client/stat-lists.md`
+         §2 r2).
+      3. Switch off: body locations 0–10, each item X with (flag 0x100
+         clear or linked) and (flag 0x4000 clear or linked) and not
+         usable → flag 0x4000 := 1, `0x004C1290(location of X on U,
+         0x00623D60)` (gfx refresh and detach, `client/stat-lists.md`
+         §2 r4.1); changed := yes.
+      4. Switch on, sweeps over locations 0–10 repeated while the last
+         sweep changed something, at most 101 sweeps: each X with flag
+         0x100 clear and (flag 0x4000 set or not linked) and usable →
+         flag 0x4000 := 0; unless X's location is 11 or 12: X is taken
+         off the body (`0x0063D2B0`), gfx refresh (`0x0046F280`), X in
+         mode 1 and not linked → equip `0x004C0D20(1)`, X put back on
+         the body (`0x0063D1D0`); changed := yes.
+      5. Set items: locations 0–10, each X of quality 5 (item data +0,
+         `0x00627E70`) with flags 0x100 and 0x4000 clear: detach
+         (`0x006277F0`) and equip `0x004C0D20(0)` again (set bonuses
+         re-applied).
+      6. Restore hands (`0x004C1200`): saved left id ≠ 0, its entry
+         (id, owner) exists and is not the current left, and the
+         skill-use check `0x004D9FC0(U, entry)` gives neither 2 nor 7
+         → select left (id, owner) (`client/msg-skills.md` §2 r3); the
+         same for right. (The meaning of `0x004D9FC0`'s results beyond
+         "2 / 7 refuse": Pending.)
+      7. Changed: a player → `0x0046F950`, `0x00470610` (gfx, effects);
+         any other unit → `0x004AFF60(U, 0)` (the monster mode machine,
+         `client/model.md` §8; Phase 6).
 
 ### 4. Hireling stats: 0x9E–0xA2 (`0x0045D540`)
 
@@ -355,6 +396,10 @@ None.
 
 ## Edge cases & original bugs
 
+- 0x3E always arrives with 0x20 − L zero bytes after its stream (L =
+  the stream length; `sim/intents-events.md` Edge cases, 0x3E padding):
+  the bridge splits them as 1-byte 0x00 messages (no effect, `client/
+  model.md` §7 rule 1); no 0x3E rule changes.
 - 0x19, 0x1A, 0x1B add to the **total** (with item and state bonuses)
   and store the sum as the **base**: with a non-zero bonus on gold or
   experience the base drifts by the bonus on every message.
@@ -444,7 +489,8 @@ stat names from `itemstatcost`.
 3. The item stream header (`0x0062E410`) and each action handler's
    placement rule: after `items/inventory.md` open question 1, a client
    item spec takes §2 rule 3 to the bar.
-4. `0x004C1350` requirement refresh: the full rule (it walks the body
+4. *Answered (2026-10-08)*: §3 rule 3.1. Original question:
+   `0x004C1350` requirement refresh: the full rule (it walks the body
    locations and the grid, tests requirements `0x004C10E0`, sets item
    flag 0x4000).
 5. Answered: 0x21, 0x22, 0x23, 0x94 are owned by `client/msg-skills.md`

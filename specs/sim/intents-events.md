@@ -49,10 +49,10 @@
 |   9. C→S handlers: owners, and the small handlers owned here | 1242–1386 |
 | Constants & data dependencies | 1387–1405 |
 | Randomness | 1406–1411 |
-| Edge cases & original bugs | 1412–1448 |
-| Test vectors | 1449–1535 |
-| Provenance | 1536–1637 |
-| Open questions | 1638–1757 |
+| Edge cases & original bugs | 1412–1457 |
+| Test vectors | 1458–1544 |
+| Provenance | 1545–1646 |
+| Open questions | 1647–1766 |
 <!-- /index -->
 
 ## Summary
@@ -301,7 +301,7 @@ ECX = buffer (client id, message), EDX = size. Switch on the id:
 | 0x6A | `0x0052DAF0` → `0x0052E9B0` |
 | 0x6B | `0x0052C550` → `0x00530190` |
 | 0x6C | total (u32 at +2) ≥ 0x2000 → fatal assert; `0x0052DB00` → `0x0052DB10` → `0x00538CE0(client, data @6, len u8@1, total, 0, 0, 0)` (save upload chunk) |
-| 0x6D | `0x0052C400` → `0x005389A0(client, tick u32@1, value u32@5)`: the client's game found → `GetTickCount` − tick − value goes into a 16-entry ring (client +0x4B4, count +0x500), the mean of the stored entries → client +0x4F8 (64-bit), S→C 0x8F (`0x0053E020`, with tick), client +0x3D8 := now (ping) |
+| 0x6D | `0x0052C400` → `0x005389A0(client, tick u32@1, value u32@5)`: the client's game found → `GetTickCount` − tick − value goes into a 16-entry ring (client +0x4B4, count +0x500), the mean of the stored entries → client +0x4F8 (64-bit), S→C 0x8F (`0x0053E020`: no arguments besides the client; 0x21 bytes, the id then 32 zero bytes, corrected 2026-10-08), client +0x3D8 := now (ping) |
 | 0x6E | `0x0052CBE0` → `0x00530270` |
 | 0x70 | client record +0x504 = 1, `0x005377A0` |
 | others | ignored |
@@ -1445,6 +1445,15 @@ their systems (`rng.md` §7), in dispatch order, before the tick's draws
     the client handles both (`client/model.md` §9).
 12. `0x0053B5F0` (0x68 for a moving monster) dereferences the unit
     looked up by GUID without a null check (§7.7 rule 5).
+13. **0x3E padding** (2026-10-08). The builder `0x0053D130` writes the
+    item stream into a 0x20-byte area, sets size u8@1 = stream length L
+    + 2, but always queues 0x22 bytes (`push 0x22` at `0x0053D1F5`). The
+    0x20 − L bytes after the stream are 0, so the client's split (§3.4
+    rule 3, size rule u8@1, `server-messages.tsv`) reads them as that
+    many 1-byte S→C 0x00 messages, whose handler `0x0045C900` is empty
+    (`client/model.md` §7 rule 1). d2rs reproduces the padding bytes
+    exactly (they are flushed bytes, §6), and the client counts them as
+    0x00 messages with no effect.
 
 ## Test vectors
 

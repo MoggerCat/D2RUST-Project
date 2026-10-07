@@ -54,7 +54,7 @@
 | Edge cases & original bugs | 672–688 |
 | Test vectors | 689–736 |
 | Provenance | 737–787 |
-| Open questions | 788–874 |
+| Open questions | 788–884 |
 <!-- /index -->
 
 Owned ids: 0x26, 0x27, 0x29, 0x4E, 0x4F, 0x50, 0x52, 0x58, 0x5D, 0x5E,
@@ -829,7 +829,17 @@ re-read on the 1.14d export): §5 r3 `0x004A1600` (`0x004A167A`,
    `[0x007C0D25]`; presence is captured), 0x50 code 3 has no
    observable effect (§7 r5). Residue: `0x004B3E10` runs from the local
    player's update (`client/model.md` §17 r5, open question 16 there).
-8. `[0x0070EE8C]` and `[0x007A0674]` (0x50 code 23): what the client
+8. *Answered (2026-10-08)*: `[0x007A0674]` has no reader in the image
+   (writers only: `0x0044C860`, `0x0044DD60`, `0x0044E0B0`,
+   `0x0044E200`), so its write has no effect. `[0x0070EE8C]` is read
+   once, by the client's top-level loop `0x0044B8A0` after its state
+   machine (table `0x0070EE54`, state `[0x0070EE4C]`) ends: ≠ 0 → the
+   loop returns 0 with `[0x007A0440]` := 0; 0 (written by 0x50 code 23
+   and by 0xB4's `0x0044E380`, `client/model.md` §7 r8) → the result is
+   chosen by the game type byte +0x19 of the session record (table
+   `0x0044BA08` / `0x0044B9FC`; values Pending). Both are front-end
+   state (where the program goes after the game), not model; the
+   front-end flow is Phase 6 UI. Original question: `[0x0070EE8C]` and `[0x007A0674]` (0x50 code 23): what the client
    loop does with them after the exit (`0x0044B8A0`, `0x0044DD60`,
    `0x0044E0B0`, `0x0044E200`); owner `client/model.md` §7 if they are
    session state.

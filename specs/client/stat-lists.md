@@ -25,14 +25,14 @@
 | Rules | 64–65 |
 |   1. The list of a client unit | 66–101 |
 |   2. Items | 102–188 |
-|   3. States (S→C 0xA7, 0xA8, 0xA9) | 189–228 |
-|   4. Skills | 229–260 |
-| Constants & data dependencies | 261–271 |
-| Randomness | 272–276 |
-| Edge cases & original bugs | 277–284 |
-| Test vectors | 285–296 |
-| Provenance | 297–309 |
-| Open questions | 310–347 |
+|   3. States (S→C 0xA7, 0xA8, 0xA9) | 189–279 |
+|   4. Skills | 280–311 |
+| Constants & data dependencies | 312–322 |
+| Randomness | 323–327 |
+| Edge cases & original bugs | 328–335 |
+| Test vectors | 336–347 |
+| Provenance | 348–360 |
+| Open questions | 361–400 |
 <!-- /index -->
 
 ## Summary
@@ -183,7 +183,7 @@ by `total(unit, stat, layer)` and `base(unit, stat, layer)`.
       §5 r4, and from `0x004C1350`; it detaches without the flag
       test). The requirement refresh `0x004C1350` also detaches and
       re-equips some body items itself (its rule:
-      `client/msg-stats-items.md` open question 4). An item placed
+      `client/msg-stats-items.md` §3 rule 3.1). An item placed
       again is attached by the equip rule (rule 2).
 
 ### 3. States (S→C 0xA7, 0xA8, 0xA9)
@@ -198,9 +198,7 @@ by `total(unit, stat, layer)` and `base(unit, stat, layer)`.
    §10 rule 3) when that is > 0, else 0; value := the next `Send Bits`
    bits, read signed when `Send Bits` < 32 and the stat's flags (+0x04)
    have bit `[0x006CE26C]` (= 2, `signed`; open question 5), else unsigned; add the stat to the state's list (rule 2). After the
-   stream: `0x004D9E60(unit, state)` (state on hooks: the states-table
-   `setfunc` (+0x1A, table `0x0072A690`, 31 entries) and, when the state
-   has a missile (+0x30 ≥ 0), a client missile from stats 350 / 351).
+   stream: `0x004D9E60(unit, state)` (state on hooks, rule 6.2).
 2. **State stat** `0x004D9D70(unit, list, state, stat, value, param)`:
    no list given → the unit's list of that state (`0x006256B0`), else a
    new list (owner = the unit's type and GUID, `0x006251F0`), its state
@@ -212,19 +210,72 @@ by `total(unit, stat, layer)` and `base(unit, stat, layer)`.
 3. **State on** `0x004D9B20(unit, state)` (also 0xA7): a state with the
    flag `[0x006CE284]` (+0x14 & 0x80 = `notondead`) on a dead unit
    (monster mode 12, player mode 17) only sets the state bit
-   (`0x00639DB0`, `sim/stat-lists.md` §9.2). Otherwise an existing list
-   of the state is freed unless the state has the flag `[0x006CE278]`
-   (+0x14 & 0x10 = `noclear`) (`0x00627340`); the bit is set; then
-   overlay, light and anim refreshes (open question 6); last, a state
-   with `[0x006CE274]` (+0x10 & 8 = `transform`) runs `0x004D9AD0`.
+   (`0x00639DB0`, `sim/stat-lists.md` §9.2). Otherwise, when the bit is
+   already set, the existing list of the state is emptied (every base
+   stat removed, `0x00627340`; the list stays attached) unless the state
+   has the flag `[0x006CE278]` (+0x14 & 0x10 = `noclear`); the bit is
+   set; then the effect calls and the dead-unit flags of rule 6.1; last,
+   a state with `[0x006CE274]` (+0x10 & 8 = `transform`) runs
+   `0x004D9AD0` (rule 6.4).
 4. **0xA7 DelayedState** (`0x0045EDE0`) and **0xA9 EndState**
    (`0x0045EF60`): 7 bytes, unit type u8@1, GUID u32@2, state u8@6;
    unit in S → 0xA7: state on (rule 3) then `0x004D9E60`; 0xA9: state
-   off `0x004D9F40` then `0x004D9C30` (the list is detached and freed:
-   open question 6).
-5. These three ids keep owner `TBD` in `client/bridge-dispatch.tsv`
-   until open question 6 is settled; this section is their stat-list
-   rule.
+   off `0x004D9F40` then `0x004D9C30` (rule 6.3).
+5. Owner in `client/bridge-dispatch.tsv`: `client/msg-units.md` §6
+   (2026-10-08: the earlier "TBD" here was stale); this section is their
+   stat-list rule.
+6. **State on / off in full** (2026-10-08; answers open question 6).
+   States record (0x3C bytes, `data/fields.tsv` states rows): overlay1
+   +2, overlay2 +4, castoverlay +0xA, removerlay +0xC, flag bits from
+   +0x10, setfunc +0x1A, remfunc +0x1C, colorshift +0x21, onsound +0x26,
+   offsound +0x28, cltevent +0x30, clteventfunc +0x32. Model writes are
+   in bold; every other call is effect state (render, audio, client
+   events) carried by one `StateFx` output per call of rules 6.1–6.3
+   (`client/bridge.md` §10 table; captured: unit key, state, the phase,
+   whether the bit was set before, the unit's dead test); the effect
+   layer runs the named 1.14d calls for it.
+   1. On (`0x004D9B20`, after rule 3's notondead exit and list empty):
+      bit already clear and onsound ≥ 0 → sound (`0x004B9A00`); **bit
+      := 1**; colorshift ≠ 0 → `0x004D97F0` (color); `0x004D9920`
+      (overlays castoverlay / overlay1 / overlay2, skipped for
+      `nooverlays`, +0x14 & 8); the unit dead (`0x00464820`) and
+      `0x0063A320(unit)` → **flag-ex +0xC8 |= 0x40000, flags +0xC4 :=
+      (flags & ~0x2) | 0x20**; transform → rule 6.4.
+   2. Hooks (`0x004D9E60`, after 0xA8's stream and 0xA7's state on):
+      nothing for a `notondead` state on a dead unit (rule 3's test);
+      else setfunc s (0 ≤ s < 31, table `0x0072A690`, non-null entry)
+      is called; entry 3 is `0x004D88A0`, the **skill-level split** of
+      `client/msg-skills.md` §2 r7 (model). Table read from the image:
+      entries 0 and 20–30 are null; 1–19 are `0x004D86A0`,
+      `0x004D87E0`, `0x004D88A0`, `0x004D8960`, `0x004D89B0`,
+      `0x004D8B90`, `0x004D9090`, `0x004D8E60`, `0x004D9160`,
+      `0x004D9180`, `0x004D9310`, `0x004D9320`, `0x004D9360`
+      (`render/unit-composite.md`), `0x004D93B0`, `0x004D9450`,
+      `0x004D9480`, `0x004D96B0`, `0x004D9740`, `0x004D97E0`; the
+      bodies other than entry 3 are Pending (treated as effects until
+      read). Then cltevent ≥ 0 and the state's
+      list exists → client event `0x004C7C40(stat 350, stat 351,
+      clteventfunc, 1, state)` (effects).
+   3. Off (0xA9: `0x004D9F40` then `0x004D9C30`): remfunc r (0 ≤ r <
+      30, table `0x0072A710`: entries 1–12 `0x004D8760`, `0x004D89A0`,
+      `0x004D8A60`, `0x004D90F0`, `0x004D8D90`, `0x004D9170`,
+      `0x004D9260`, `0x004D9340`, `0x004D9380`, `0x004D93A0`,
+      `0x004D9630`, `0x004D97E0`, the rest null) is called (bodies
+      Pending, effects);
+      cltevent ≥ 0 and the list exists → `0x004DC190(state)` (event
+      end). Then, when the bit is set: **the unit's list of that state,
+      if its state id matches, is detached and freed** (`0x006277E0`,
+      `0x00626CD0`), offsound ≥ 0 → sound; **bit := 0** (always);
+      colorshift ≠ 0 → `0x004D97F0`; removerlay ≥ 0 → overlay
+      `0x00470390(4, …)` (with `0x00664740` / `0x0045C3E0`); overlay1
+      / overlay2 ≥ 0 → `0x004D8660`; transform → rule 6.4; last the
+      animation-rate refresh `0x00623F50(unit)`.
+   4. Transform `0x004D9AD0(unit)`: `0x0046F000` (gfx); a player in
+      mode 0x12 → stop. A player or monster gets **the mode set
+      `0x00480E70(unit, 1)`** (`client/model.md` §17 r1.7); then
+      `0x00470610(unit, 1)` and `0x00624390(unit)` (animation reset,
+      Phase 6), **unit +0x44 := 0**, **current skill := none**
+      (`0x00620210(unit, 0)`).
 
 ### 4. Skills
 
@@ -336,7 +387,9 @@ code), `0x00460930`, `0x004609A0`, `0x00643620` (caller `0x00646E30`),
    `noclear`) and `[0x006CE274]` = 8 at +0x10 (bit 3 `transform`);
    itemstatcost +0x04 & `[0x006CE26C]` = `signed`, +0x05 & 2 =
    `updateanimrate`.
-6. The rest of the state on / off paths (`0x004D97F0`, `0x004D9920`,
+6. *Answered (2026-10-08)*: §3 rule 6 (model parts; effect calls as
+   `StateFx`; setfunc / remfunc bodies other than setfunc 3 Pending).
+   Original question: the rest of the state on / off paths (`0x004D97F0`, `0x004D9920`,
    `0x004D9AD0`, `0x004D9F40`, `0x004D9C30`) and their owner (a client
    states spec taking 0xA7–0xA9). A recording with a buff (e.g. a
    shrine) gives 0xA8 bytes to check the stream rule.

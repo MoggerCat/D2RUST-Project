@@ -202,7 +202,7 @@ handlers (the server specs link here for the steps).
      bonuses (`0x006442A0(U, E, 1)`). So for remote units the event's level is
      what the client stores, the part above `maxlvl` in the bonus.
    - **State set-function 3** `0x004D88A0(U, state)` (setfunc table
-     `0x0072A690` entry 3, `client/stat-lists.md` §3 r1): U not the
+     `0x0072A690` entry 3, `client/stat-lists.md` §3 r6.2): U not the
      local player and U has the state's list: S := its stat 350, L :=
      its stat 351; when the level with bonuses of U's native entry of S
      (0 when none) ≠ L → split level (rule 7.3) with L.
