@@ -1244,6 +1244,80 @@ pub trait Pending {
     {
         1
     }
+
+    // ---- client intents (`sim/intents-events.md` §9; d2-server's
+    // `handlers::player`) -------------------------------------------------
+
+    /// `0x00413490(text, −1)` (C→S 0x14, §9 rule 3): non-zero ends the
+    /// handler with nothing done. What it tests is not stated. Default:
+    /// 0 (the text passes).
+    fn overhead_text_test(&self, text: &[u8]) -> bool {
+        false
+    }
+    /// The player's overhead record (unit +0xA4) replaced (`0x006611A0`
+    /// free, `0x00661110(game +0x1C, text, frame)` new, byte +8 :=
+    /// `byte8`, `0x00661230`; §9 rule 3). Its timeout frame is
+    /// `UnitRecord::hover`, which the caller sets; the record's other
+    /// contents (hover/chat spec, S→C 0x26 §7.9) live here. Default:
+    /// nothing kept.
+    fn replace_overhead(&mut self, player: UnitId, text: &[u8], byte8: u8, end: i32) {}
+    /// `0x005845D0(game, player, GUID)`: the door highlight of C→S 0x3D
+    /// (§9 rule 4, open question 15). Default: nothing.
+    fn highlight_door(&mut self, game: &mut Game, player: UnitId, guid: u32) {}
+    /// Client flag 4 (`0x00538670`, hardcore) of the player's client (§9
+    /// rule 6). Default: softcore.
+    fn client_hardcore(&self, player: UnitId) -> bool {
+        false
+    }
+    /// `0x0052CAF0(game, client, reason)`: drop the player's client
+    /// (`tools/original-hooks.md` §6.1 rule 3; session code). Default:
+    /// nothing.
+    fn drop_client(&mut self, player: UnitId, reason: u32) {}
+    /// The SetStat message part of `0x00548520` (S→C 0x1D–0x1F, after the
+    /// stat is set). Default: nothing sent.
+    fn stat_sent(&mut self, player: UnitId, stat: u16, value: u32) {}
+    /// C→S 0x41's last step (§9 rule 6): the left skill (`0x00620190`)
+    /// re-selected with EDX = 1, then the right skill (`0x006201D0`) with
+    /// EDX = 0 (`0x005701B0`; owner: the skill list, `UseRest`).
+    /// Default: nothing.
+    fn reselect_hand_skills(&mut self, game: &mut Game, player: UnitId) {}
+    /// `0x005678A0(…, 1)`: the player is trading (C→S 0x44, §9 rule 7).
+    /// Default: not trading.
+    fn player_trading(&self, player: UnitId) -> bool {
+        false
+    }
+    /// `0x00549520(game, player, object, item, action)` and its result
+    /// (C→S 0x44, `world/quests-act2.md` §8.6, `quests-act2-2.md` §3.2).
+    /// `None` (the default): no provider, the id stays a stub.
+    fn staff_in_orifice(
+        &mut self,
+        game: &mut Game,
+        player: UnitId,
+        object: u32,
+        item: u32,
+        action: u16,
+    ) -> Option<u32> {
+        None
+    }
+    /// `0x00574EC0(game, player, 7, 0)`: the player's hireling (§9 rule
+    /// 8; `hirelings.md` §5 rule 4; the wired host answers it from the
+    /// hireling list). Default: none.
+    fn player_hireling(&self, player: UnitId) -> Option<UnitId> {
+        None
+    }
+    /// Player data +0x4C := 0 (`0x005350B0`, C→S 0x48, §9 rule 9; read
+    /// by [`Pending::object_player_busy`]). Default: nothing.
+    fn clear_player_busy(&mut self, player: UnitId) {}
+    /// `0x005724C0`: clear NPC `class`'s intro bit in the player's record
+    /// for `difficulty` (C→S 0x4D, §9 rule 11; which of the two bit fields
+    /// of `quests.md` §6.7 is not stated). Default: nothing.
+    fn clear_npc_intro(&mut self, player: UnitId, difficulty: u8, class: u16) {}
+    /// `0x005616A0(game, player, &fail)`: the weapon switch of C→S 0x60
+    /// (§9 rule 14, open question 16): (result, fail). `None` (the
+    /// default): no provider, the id stays a stub.
+    fn weapon_switch(&mut self, game: &mut Game, player: UnitId) -> Option<(u32, bool)> {
+        None
+    }
 }
 
 /// Every default.

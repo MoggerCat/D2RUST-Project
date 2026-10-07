@@ -11,6 +11,12 @@ use crate::game::Game;
 use crate::units::record::Units;
 use crate::units::UnitId;
 
+use crate::combat::DamageRecord;
+use crate::skills::use_::bodies::MissileRequest;
+use crate::stats::lists::ListId;
+
+use super::callbacks::{AuraFields, SkillCalc, StateApply};
+use super::find::FindQuery;
 use super::{CreateRequest, GameInfo, MonsterStore};
 
 #[allow(unused_variables)]
@@ -179,12 +185,170 @@ pub trait InitHost {
         None
     }
 
-    // ---- callbacks (§22) ----
+    // ---- callbacks (§22; `monsters/umod-callbacks.md`) ----
 
-    /// Umod 41's handler: `0x00573780` (`monsters/ai.md` §1).
-    fn run_ai_tick(&mut self, unit: UnitId) {}
-    /// Umod 34's gate `0x006259B0` (true = do nothing).
-    fn umod34_gate(&mut self, unit: UnitId) -> bool {
+    /// A stat total (`0x00625480(unit, stat, 0)`, `stat-lists.md`):
+    /// level(12), the damage stats, tohit. Default: the base value.
+    fn stat_total(&self, unit: UnitId, stat: u16) -> i32 {
+        self.stat(unit, stat)
+    }
+    /// "Base list set": list set `0x00627150` on the unit's flag-1 list
+    /// (`umod-callbacks.md` §1 rule 3). Default: [`InitHost::set_stat`].
+    fn set_base_list_stat(&mut self, unit: UnitId, stat: u16, value: i32) {
+        self.set_stat(unit, stat, value);
+    }
+    /// The unit's position (static path for types 2, 4, 5, else the
+    /// dynamic path; (0, 0) without a path; `skills/bodies.md` §1).
+    fn position(&self, unit: UnitId) -> (i32, i32) {
+        (0, 0)
+    }
+    /// "Has s" `0x00639DF0` (`stat-lists.md` §9).
+    fn has_state(&self, unit: UnitId, state: u16) -> bool {
         false
+    }
+    /// A state of flag group `group` (`0x0063A770`,
+    /// `data/runtime-maps.md` §4).
+    fn has_state_in_group(&self, unit: UnitId, group: u8) -> bool {
+        false
+    }
+    /// "Mode set m": `0x005A7E60` + `0x005A7C20(game, &rec, 1)`
+    /// (`units.md` §4.6), which runs the umod dispatcher again.
+    fn set_mode(&mut self, unit: UnitId, mode: u32) {}
+    /// Owner `0x00552FD0` (unit flags +0xC8 bit 10, owner +0x98).
+    fn owner(&self, unit: UnitId) -> Option<UnitId> {
+        None
+    }
+    /// Minion owner `0x0058F0D0` (`ai.md` §3.1).
+    fn minion_owner(&mut self, unit: UnitId) -> Option<UnitId> {
+        None
+    }
+    /// Alignment `0x006259B0` (0, 1, 2).
+    fn alignment(&self, unit: UnitId) -> u8 {
+        0
+    }
+    /// Hostility `0x00554200(game, a, b)` (`combat/hit.md`).
+    fn hostile(&self, a: UnitId, b: UnitId) -> bool {
+        false
+    }
+    /// Target `skills/bodies.md` §2.1 (the unit's target unit).
+    fn target(&self, unit: UnitId) -> Option<UnitId> {
+        None
+    }
+    /// Target position `0x0056D2C0` (`skills/bodies.md` §2.4).
+    fn target_position(&self, unit: UnitId) -> Option<(i32, i32)> {
+        None
+    }
+    /// The target point of a missile's path (`0x00648A00` /
+    /// `0x00648A10`).
+    fn path_target_point(&self, missile: UnitId) -> (i32, i32) {
+        (0, 0)
+    }
+    /// Missile creation `0x0059FA30` with a parameter record
+    /// (`missiles.md` §R2.1, §R2.3). Runs the owner's mode-5 umods.
+    fn create_missile(&mut self, req: MissileRequest<UnitId>) -> Option<UnitId> {
+        None
+    }
+    /// missiles row `class` flags dword (+0x04); `None` without a row
+    /// (`0x0046ACE0`).
+    fn missile_row_flags(&self, class: i32) -> Option<u32> {
+        None
+    }
+    /// The velocity of missile `class` at `level` (`0x00663270`).
+    fn missile_velocity(&self, class: i32, level: i32) -> i32 {
+        0
+    }
+    /// A missile's (skill, level) (`0x0064A280`, `0x0064A210`).
+    fn missile_skill_level(&self, missile: UnitId) -> (i32, i32) {
+        (0, 0)
+    }
+    /// The unit find `0x0065A950` around (x, y) from the room
+    /// containing the point, searched from `near`'s room
+    /// (`umod-callbacks.md` §3.1, `super::find`): the found units in
+    /// order.
+    fn find_units(&mut self, near: UnitId, q: FindQuery) -> Vec<UnitId> {
+        Vec::new()
+    }
+    /// The line test of area damage: `0x00645950(x, y, V, 0x805)` is 0
+    /// (§3.2 step 3).
+    fn line_clear(&mut self, from: (i32, i32), unit: UnitId) -> bool {
+        false
+    }
+    /// `0x005AD730(game, src, V, rec)` (`missiles.md` §R6: hit flags,
+    /// block, damage apply and reaction); nothing unless `src` is a
+    /// missile with an owner.
+    fn missile_hit(&mut self, src: UnitId, unit: UnitId, rec: &DamageRecord) {}
+    /// A skill-calc field of a skill at a level (`skills/levels.md`
+    /// `eval`) with `unit` as the caster.
+    fn skill_calc(&mut self, unit: UnitId, skill: u16, calc: SkillCalc, level: i32) -> i32 {
+        0
+    }
+    /// The aura columns of a skill row (`None` past the skills count).
+    fn aura_fields(&self, skill: u16) -> Option<AuraFields> {
+        None
+    }
+    /// itemstatcost and states row counts.
+    fn stat_and_state_counts(&self) -> (i32, i32) {
+        (0, 0)
+    }
+    /// `apply_state` (`skills/bodies.md` §2.7); the state list made.
+    fn apply_state(&mut self, req: StateApply) -> Option<ListId> {
+        None
+    }
+    /// List set `0x00627150` on a state list.
+    fn set_list_stat(&mut self, list: ListId, stat: u16, value: i32) {}
+    /// The unit's minion list freed (`0x0058F160`, `ai.md`).
+    fn free_minions(&mut self, unit: UnitId) {}
+    /// Owner data `0x0058F030(game, unit, −1, 1, 0, 0)` (`ai.md`).
+    fn clear_owner_data(&mut self, unit: UnitId) {}
+    /// Pet remove `0x005750E0(game, owner, GUID, kill 1)` (`sim/pets.md`
+    /// §6).
+    fn remove_pet(&mut self, owner: UnitId, pet: UnitId) {}
+    /// A quest death call (ECX game, EDX unit) at its 1.14d address
+    /// (§15; owner: the quests specs, `umod-callbacks.md` OQ4).
+    fn quest_death(&mut self, unit: UnitId, call: u32) {}
+    /// Umod 24's steal (§17 steps 3–4: belt slot, copy, drop; items
+    /// spec seams). Unreachable in 1.14d.
+    fn steal_belt_item(&mut self, unit: UnitId, target: UnitId) {}
+    /// `0x005B2490(game, unit, class, mode, spread, flags)`
+    /// (`init.md` §1).
+    fn spawn_near(&mut self, unit: UnitId, class: u32, mode: u32, spread: i32, flags: u32) {}
+    /// §23.2 step 3: `0x0064D870(room, x, y, 1, 0x3C01)` ≠ 0
+    /// (`sim/path-placement.md`).
+    fn footprint_occupied(&mut self, unit: UnitId) -> bool {
+        false
+    }
+    /// AI param 0 (`0x0058EC50(unit, 1)`).
+    fn ai_param0(&mut self, unit: UnitId) -> i32 {
+        0
+    }
+    /// `0x0058EC00`: AI param 0 := v.
+    fn set_ai_param0(&mut self, unit: UnitId, v: i32) {}
+    /// The raise test `0x00645510(unit, 0)`.
+    fn can_raise(&mut self, unit: UnitId) -> bool {
+        false
+    }
+    /// `0x005DEAD0(game, unit, mode, skill, 0, 0, 0)` (`ai.md` skill
+    /// use).
+    fn ai_use_skill(&mut self, unit: UnitId, mode: u32, skill: u16) {}
+    /// Unit flags +0xC4 &= !mask.
+    fn clear_unit_flags(&mut self, unit: UnitId, mask: u32) {
+        if let Some(r) = self.units().get_mut(unit) {
+            r.flags &= !mask;
+        }
+    }
+    /// The level of the unit's skill `skill` (`0x006439F0` +
+    /// `0x006442A0(unit, entry, 1)`); `None` without the entry.
+    fn skill_level(&mut self, unit: UnitId, skill: u16) -> Option<i32> {
+        None
+    }
+    /// Life percent `0x00621F20`.
+    fn life_percent(&self, unit: UnitId) -> i32 {
+        0
+    }
+    /// The area level of the unit's room (`0x0061DCA0(level id, d,
+    /// expansion)`, `init.md` §7 rule 2); `None` when the room has no
+    /// level id.
+    fn room_area_level(&mut self, unit: UnitId) -> Option<i32> {
+        None
     }
 }

@@ -8,8 +8,8 @@
 
 use super::population::{isle, monsters};
 use super::*;
-use crate::monsters::init::Unhandled;
 use crate::monsters::population::preset;
+use crate::stats::stat;
 use crate::stats::states::state;
 use crate::tick::events::event;
 
@@ -47,8 +47,9 @@ fn event_7_runs_the_umod_dispatcher_on_the_real_monster_data() {
     let mut fx = Fx::new(isle_ds1s());
     let u = monster(&mut fx);
     let f0 = fx.game.frame;
-    // Umod 41 (`always_run_ai`): its event-7 handler runs the AI tick
-    // (a seam) and schedules event 7 again at frame + 75.
+    // Umod 41 (`always_run_ai`): its event-7 handler restarts the think
+    // (`umod-callbacks.md` §3.5) and schedules event 7 again at frame +
+    // 75 (§26).
     fx.sim.world.monsters.get_mut(u).unwrap().umods[0] = 41;
     fx.game
         .schedule_event(u, u32::from(event::MON_UMOD), f0 + 1, None, 0, 0)
@@ -61,28 +62,36 @@ fn event_7_runs_the_umod_dispatcher_on_the_real_monster_data() {
     fx.assert_clean();
 }
 
-// Covers: specs/monsters/init.md §22
+// Covers: specs/monsters/umod-callbacks.md §14, §1 r4
 #[test]
-fn event_7_reaches_a_callback_without_a_body_as_unhandled() {
+fn event_7_killself_sets_death_through_the_nested_mode_set() {
     let mut fx = Fx::new(isle_ds1s());
     let u = monster(&mut fx);
     let f0 = fx.game.frame;
-    // Umod 21 (`killself`): its mode-2 callback `0x005A3AA0` has no body.
-    fx.sim.world.monsters.get_mut(u).unwrap().umods[0] = 21;
+    // Umod 21 (`killself`), no minion owner: mode set 0 on the unit
+    // (§14 step 4) from inside the event-7 dispatcher, with the world
+    // state lent back to the action hooks for the nested mode set, whose
+    // own dispatcher runs umod 14's mode-0 callback (level := area level
+    // n, tohit := min(n + 50, 90), §8).
+    fx.sim.world.monsters.get_mut(u).unwrap().umods[..2].copy_from_slice(&[21, 14]);
+    fx.sim
+        .action
+        .with(&mut fx.game, |_, v| v.set_base(u, stat::LEVEL, 77));
     fx.game
         .schedule_event(u, u32::from(event::MON_UMOD), f0 + 1, None, 0, 0)
         .unwrap();
     run_to(&mut fx, f0 + 1);
-    assert_eq!(
-        fx.sim.world.monsters.unhandled,
-        [Unhandled::Callback {
-            addr: 0x005A_3AA0,
-            unit: u,
-            umod: 21,
-            mode: 2,
-        }]
+    assert!(fx.sim.world.monsters.unhandled.is_empty());
+    assert!(
+        fx.sim.world.monsters.get(u).is_some(),
+        "the world came back"
     );
     fx.assert_clean();
+    let (n, th) = fx
+        .sim
+        .action
+        .with(&mut fx.game, |_, v| (v.stat(u, 12), v.stat(u, 19)));
+    assert!(n != 77 && th == (n + 50).min(90), "{n} {th}");
 }
 
 // Covers: specs/sim/tick.md §5.6

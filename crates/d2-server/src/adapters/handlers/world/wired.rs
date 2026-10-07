@@ -63,12 +63,14 @@ use d2_sim::world::waypoints::{
 
 use super::super::items::moves::{InvParts, MoveCall};
 use super::super::items::{CubeCall, CubeParts, Interact, InvVendors};
+use super::super::player::{self, HostFacts, Outcome as PlayerOutcome, Run as PlayerRun};
 use super::super::skills::{Call as SkillCall, Handled as SkillHandled, NoSkills, SkillHost};
 use super::super::walk::{WalkCall, WalkResult};
 use super::{
     ActionEvents, ActionWorld, NpcCall, Outbox, QuestCall, VendorCall, WaypointCall, WorldFault,
     WorldHost,
 };
+use d2_sim::world::npc::NpcWorld;
 
 /// The seams of the NPC and vendor wiring without a provider: the
 /// interaction rests of `d2_sim::wiring::interaction`
@@ -576,6 +578,32 @@ where
         let out = WorldHost::<D>::skill(&mut self.action, call);
         self.pet_follows(game, events);
         out
+    }
+
+    /// The action wiring's provider with this host's answers: the
+    /// interaction owner's part of `0x00535060` (the rest's
+    /// `NpcRest::interact_unit`) and, for 0x46 / 0x47, the hireling list
+    /// (`0x00574EC0(game, player, 7, 0)`, `NpcWorld::pet` on the desk);
+    /// then the pet follows a warp queued ([`WiredWorld::pet_follows`]).
+    fn player(
+        &mut self,
+        game: &mut Game,
+        events: &mut D,
+        run: PlayerRun<'_>,
+    ) -> Option<PlayerOutcome> {
+        let p = run.player;
+        let hireling = matches!(run.msg.first(), Some(0x46 | 0x47)).then(|| {
+            self.desk(game, events, |desk, _, _| {
+                NpcWorld::pet(desk, p, d2_sim::world::hirelings::PET_HIRELING, 0)
+            })
+        });
+        let facts = HostFacts {
+            hireling,
+            interacting: self.rest.interact_unit(p).is_some(),
+        };
+        let out = player::action::run(game, events, &run, facts);
+        self.pet_follows(game, events);
+        Some(out)
     }
 
     fn walk(&mut self, game: &mut Game, events: &mut D, call: WalkCall) -> Option<WalkResult> {
