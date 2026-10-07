@@ -886,10 +886,10 @@ impl SoundSystem {
                     self.load(id, false, true, now);
                 }
             }
-            // PROVISIONAL (specs/audio/sound-table.md §10 r6, OQ 13): a
-            // read is finished by the first pass after the tick it started
-            // (d2rs has no read latency); one started in this pass is not
-            // collected until the next; settled by recording ST-7.
+            // PROVISIONAL (specs/audio/sound-table.md OQ 10, OQ 13, §10
+            // r6): a read is finished by the first pass after the tick it
+            // started (d2rs has no read latency); one started in this pass
+            // is not collected until the next; settled by recording ST-7.
             if self.cache.reads.get(&id).is_some_and(|&(t, _)| t != now) {
                 self.collect(id);
             }
