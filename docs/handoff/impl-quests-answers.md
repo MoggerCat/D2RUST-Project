@@ -40,25 +40,31 @@ against 1.14d (M02). Stopped early on a coordinator budget cut; the
 5. `set_room_portal(room, on)` (Act II, IV, V) stays on the rest: its
    `on` ↔ 0x0061AED0 `clear` mapping is not stated per site.
 6. `QuestTick` (d2-sim only) still drains after hooks (no lent host).
-7. New reds this branch leaves (each a test whose spec or finding
-   changed; not edited, never weakened):
-   - `test-fixtures` `e2e_night_flows::opening_cains_gibbet_and_its_event_7`:
-     asserted N-2's `Fatal(0x00593290)`; with the provider the fault is
-     gone. Update to Cain's spawn / §1.2 step 4 outcome.
-   - `e2e_night_flows::reading_horazons_journal` (line 845): QB-7 (act2-2
-     §1.7) now grants / flags only in not-intro games with state ≠ 5;
-     re-derive the expected bytes.
-   - `d2-server` `world::tests::quest_objects::a_quest_operate_no_spec_states_is_handed_back`
-     and `quests_act1::sisters_to_the_slaughter_through_every_state`: not
-     investigated (likely operate 33 now stated, and the A1Q6 client
-     fatal of QA-4 on a host without client save flags).
-8. clippy `-D warnings` and `spec_index --check` were not run after the
-   last edits.
+7. (Done in the follow-up, see "Follow-up" below.)
+
+## Follow-up: merge of `claude/specs-staging-2` (614df71) and the four reds
+
+Merged (a merge commit); the one conflict (`d2-server` `wired.rs` walk)
+keeps both: `self.lend_quests(events, |a, ev| WorldHost::<D>::walk(a, game, ev, call))`
+then `self.pet_deaths(game, events)`.
+
+Changed expectations (each because a spec answer or a finding changed):
+
+| Test | Before | Now | Why |
+|---|---|---|---|
+| `d2-server` `world::tests::quest_objects::a_quest_operate_no_spec_states_is_handed_back` | object with operate 33 handed back to `Pending::object_route` | object class 29 with operate 28 (Lam Esen's tome, no dispatcher entry) handed back | operate 33 is stated (`quests-act1-rest.md` §9 item 11) |
+| new `wirts_body_operate_runs_on_the_quest_code` (same file) | — | operate 33 runs: no hand-back, the drop `0x00559A30` reported by the rest (no provider), mode stays 0 | §9 item 11, edge case 9 |
+| `world::tests::quests_act1::sisters_to_the_slaughter_through_every_state` | fixture rest had no client: the credit's progression was skipped | fixture `trade_quests::Rest` answers `client_save_flags` for every player with a quest record (field `client_flags`, default 0); the test asserts the progression 0x0100 after Andariel's kill | QA-4 (§9 item 4): a host gives every player a client; without one the credit is fatal |
+| `test-fixtures` `e2e_night_flows::opening_cains_gibbet_and_its_event_7` | asserted `Fatal(0x00593290)` (N-2) and collected the 0x0E over two ticks (N-3) | no fault; Cain spawn and free spot are the rest's (none) so §1.2 step 4: X +0x52 and +0x62 set, no portal, no player in Tristram; the mode-3 0x0E arrives in the tick that reaches frame + 17, none before | N-2 and N-3 fixed (§9 item 7) |
+| `e2e_night_flows::reading_horazons_journal` | second read resent the completion flag `5D 0B 00 0C 0000` | second read sends no 0x5D; the tome's room (+0x08) is set | QB-7 (`quests-act2-2.md` §1 item 7): grants and flag only in not-intro games with state ≠ 5; N-2 fixed |
 
 ## Gate
 
-`CARGO_INCREMENTAL=0 cargo test -p d2-sim -p d2-server -p test-fixtures`:
-d2-sim 3244 passed, 6 failed (the known `skills::*`); d2-server lib 3
-failed (known `gaps::out_of_scope_rows` + 2 new, item 7); test-fixtures
-e2e_night_flows 2 failed (item 7). `tables_parse_and_check` green.
-`python3 tools/coverage.py --check`: 8,480 claims, 0 errors.
+After the follow-up merge: `CARGO_INCREMENTAL=0 cargo test --workspace
+--exclude d2-client --no-fail-fast`: 4,594 passed, 0 failed (106 test
+binaries). `d2-client` cannot build in this container (`wayland-sys`
+build script: no Wayland development files, as `wire-world-staging`
+noted), so `cargo test --workspace` stops there; run it locally. clippy
+`-D warnings` (workspace minus `d2-client`, all targets) clean; `cargo
+fmt --check` clean; `python3 tools/coverage.py --check`: 8,852 claims,
+0 errors; `python3 tools/spec_index.py --check` clean.

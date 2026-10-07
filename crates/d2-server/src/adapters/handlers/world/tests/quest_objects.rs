@@ -23,17 +23,20 @@ use crate::adapters::handlers::world::WorldHost;
 
 const STONE: u32 = 17;
 const GIBBET: u32 = 26;
+const LAM_ESEN_TOME: u32 = 29;
 const WIRT: u32 = 30;
 
 /// objects.txt rows 0–30: a Cairn stone (17: init 6, operate 9), the
 /// gibbet (26: operate 10, `FrameCnt1` 15 × 256), an object with quest
-/// operate 33 (no quest spec states it).
+/// operate 28 (Lam Esen's tome: no dispatcher entry states it), Wirt's
+/// body (operate 33, `quests-act1-rest.md` §9 item 11).
 fn tables() -> ObjectTables {
     let mut rows = vec![blank::<Objects>(); 31];
     rows[STONE as usize].initfn = 6;
     rows[STONE as usize].operatefn = 9;
     rows[GIBBET as usize].operatefn = 10;
     rows[GIBBET as usize].framecnt1 = 15 << 8;
+    rows[LAM_ESEN_TOME as usize].operatefn = 28;
     rows[WIRT as usize].operatefn = 33;
     ObjectTables {
         objects: rows,
@@ -139,20 +142,46 @@ fn the_gibbet_operate_and_its_event_7_run_on_the_quest_control() {
 // Covers: specs/world/objects.md §7.2 r4
 #[test]
 fn a_quest_operate_no_spec_states_is_handed_back() {
+    // Operate 28 has no entry in the wired dispatcher
+    // (`quest_objects::operate_fn`; Wirt's 33 has one since
+    // `quests-act1-rest.md` §9 item 11 stated it).
+    let mut fx = fixture();
+    let tome = fx.object(LAM_ESEN_TOME);
+    fx.frames(1);
+    let g = fx.guid(tome);
+    let (code, _) = send(&mut fx.h, &operate(g));
+    assert_eq!(code, ResultCode::Done);
+    let p = fx.player;
+    let want = ObjectRoute::Operate(Dispatch::Quest(Operate {
+        object: tome,
+        operator: Some(p),
+        class: LAM_ESEN_TOME as u16,
+        operate_fn: 28,
+    }));
+    assert_eq!(fx.h.game.events.hooks().x.routes, vec![want]);
+}
+
+// Covers: specs/world/quests-act1-rest.md §9 r11, §edge-cases-original-bugs r9
+#[test]
+fn wirts_body_operate_runs_on_the_quest_code() {
+    // Operate 33 runs `0x00583E70`: mode 0, drop code `leg ` and the drop
+    // `0x00559A30`, which this host does not provide (the rest reports
+    // it): no item, so the mode stays 0 and no event is scheduled; the
+    // route is not handed back.
     let mut fx = fixture();
     let wirt = fx.object(WIRT);
     fx.frames(1);
     let g = fx.guid(wirt);
     let (code, _) = send(&mut fx.h, &operate(g));
     assert_eq!(code, ResultCode::Done);
-    let p = fx.player;
-    let want = ObjectRoute::Operate(Dispatch::Quest(Operate {
-        object: wirt,
-        operator: Some(p),
-        class: WIRT as u16,
-        operate_fn: 33,
-    }));
-    assert_eq!(fx.h.game.events.hooks().x.routes, vec![want]);
+    assert!(fx.h.game.events.hooks().x.routes.is_empty());
+    assert_eq!(fx.mode(wirt), 0);
+    assert!(fx
+        .world()
+        .rest
+        .log
+        .iter()
+        .any(|l| l == "unhandled 255 0x559a30"));
 }
 
 /// A quest call reading back the calls `HostQuests` answers.
