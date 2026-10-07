@@ -87,7 +87,7 @@ pub const ISLE_MONSTER: (u32, u32) = (12, 10);
 pub const PLAYER_AT: (i32, i32) = (40_020, 40_020);
 /// The waypoint object's position.
 pub const WP_AT: (i32, i32) = (40_024, 40_020);
-/// Skills of the synthetic table: attack, and a right skill (srvst 42
+/// Skills of the synthetic table: attack, and a right skill (srvst 53
 /// standing in for Multiple Shot's 4, mana 4 + 1 per level, shift 8;
 /// `use.md`'s Multiple Shot vector).
 pub const ATTACK: i32 = 0;
@@ -264,6 +264,9 @@ impl Pending for TestPending {
             h.x.drops = Some(d);
         }
         true
+    }
+    fn set_entry_param_of(&mut self, _: UnitId, e: &SkillEntry, i: u8, v: i32) {
+        self.book.param(e, i, v);
     }
 }
 
@@ -456,6 +459,11 @@ impl Book {
         } else {
             7
         }
+    }
+    /// The used entry's param `i` := v (srvst 53, the fixture's start,
+    /// writes param 1 := frame + level): logged.
+    pub fn param(&self, e: &SkillEntry, i: u8, v: i32) {
+        self.get().log.push(format!("param{i} {} {v}", e.skill));
     }
     pub fn srvst(&self, index: u16, _: UnitId, skill: i32, lvl: i32) -> i32 {
         self.get().log.push(format!("srvst {index} {skill} {lvl}"));

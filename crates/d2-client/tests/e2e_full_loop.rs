@@ -280,6 +280,9 @@ impl Pending for TestPending {
         }
         true
     }
+    fn set_entry_param_of(&mut self, _: UnitId, e: &SkillEntry, i: u8, v: i32) {
+        self.book.param(e, i, v);
+    }
 }
 
 /// The free-spot search `0x0064E810` (collision spec, not written): the
@@ -475,6 +478,11 @@ impl Book {
         } else {
             7
         }
+    }
+    /// The used entry's param `i` := v (srvst 53 writes param 1 := frame +
+    /// level): logged.
+    fn param(&self, e: &SkillEntry, i: u8, v: i32) {
+        self.get().log.push(format!("param{i} {} {v}", e.skill));
     }
     fn srvst(&self, index: u16, _: UnitId, skill: i32, lvl: i32) -> i32 {
         self.get().log.push(format!("srvst {index} {skill} {lvl}"));
@@ -871,13 +879,15 @@ fn arrow() -> MissileRow {
 fn skills() -> SkillTables {
     let mut v = vec![skill_rec(), skill_rec()];
     let m = &mut v[MULTI as usize];
-    (m.srvstfunc, m.mana, m.lvlmana, m.manashift) = (42, 4, 1, 8);
-    (m.srvdofunc, m.srvmissile) = (3, 0);
+    // Start 53 / do 53 as `d2_sim::bench_fixtures::combat::skills` (its
+    // doc): `calc2` = formula 0 = `lvl`.
+    (m.srvstfunc, m.mana, m.lvlmana, m.manashift) = (53, 4, 1, 8);
+    (m.srvdofunc, m.srvmissile, m.calc2) = (53, 0, 0);
     SkillTables {
         skills: v,
         skilldesc: vec![blank::<Skilldesc>()],
         missiles: vec![arrow()],
-        skills_code: Vec::new(),
+        skills_code: vec![0x04, 0x10, 0x00],
         miss_code: Vec::new(),
         level_cap: LEVEL_CAP_114D,
         stat_count: 359,
@@ -1839,8 +1849,8 @@ fn run_with(game_seed: u32) -> Transcript {
     walks.push(w);
 
     // 5. Right skill at the monster (C→S 0x0C, `use.md` §1) from there:
-    // accepted, mana charged at start (3,328 of 4,000), srvst 4, mode SC
-    // (10); the action frame (event 0, 3 frames on) runs srvdo 3 and the
+    // accepted, mana charged at start (3,328 of 4,000), srvst 53, mode SC
+    // (10); the action frame (event 0, 3 frames on) runs srvdo 53 and the
     // generic `srvmissile` 0 through the real missile creation
     // (`missiles.md` §R2.3) at the player, aimed at the monster.
     fx.stage_combat(monster);
@@ -1859,7 +1869,12 @@ fn run_with(game_seed: u32) -> Transcript {
     }
     assert_eq!(
         fx.book.get().log,
-        ["srvst 42 1 10", "srvdo 3 1 10 true false false"]
+        [
+            // srvst 53 ran at the dispatch frame f0 − 1 (before the tick)
+            // with level 10: param 1 := f0 − 1 + 10.
+            format!("param1 1 {}", f0 - 1 + 10),
+            "srvdo 53 1 10 true false false".to_string()
+        ]
     );
     let shot = fx.missiles();
     assert_eq!(shot.len(), 1);

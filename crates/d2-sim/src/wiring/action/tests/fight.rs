@@ -115,21 +115,25 @@ pub fn arrow() -> MissileRow {
     r
 }
 
-/// The right skill: start function 42 (a `mapped` slot standing in for
-/// Multiple Shot's 4, whose body, `skills/bodies.md` §3.4, runs on the
-/// wired host), do function 3 (a `mapped` slot standing in for Multiple
-/// Shot's 8, whose body is `skills/bodies.md` §8.6), `srvmissile` 0 (the
-/// generic missile of `use.md` §5.4 step 7).
+/// The right skill: start function 53 (MonInferno start,
+/// `skills/bodies-3.md` §4.1, standing in for Multiple Shot's 4, whose
+/// body, `skills/bodies.md` §3.4, needs items; every filled start slot
+/// has a body since batch 4: with `calc2` = `lvl` it sets the used
+/// entry's param 1 := frame + level, which the e2e fakes log, and returns
+/// 1), do function 53 (filled, `unreferenced`, no body: the seam, standing
+/// in for Multiple Shot's 8, `skills/bodies.md` §8.6), `srvmissile` 0
+/// (the generic missile of `use.md` §5.4 step 7).
 pub fn skills() -> SkillTables {
     let mut v = vec![skill_rec(), skill_rec()];
     let m = &mut v[MULTI as usize];
-    (m.srvstfunc, m.mana, m.lvlmana, m.manashift) = (42, 4, 1, 8);
-    (m.srvdofunc, m.srvmissile) = (3, 0);
+    (m.srvstfunc, m.mana, m.lvlmana, m.manashift) = (53, 4, 1, 8);
+    (m.srvdofunc, m.srvmissile, m.calc2) = (53, 0, 0);
     SkillTables {
         skills: v,
         skilldesc: vec![blank::<Skilldesc>()],
         missiles: vec![arrow()],
-        skills_code: Vec::new(),
+        // Formula 0: `lvl` (`calc-expressions.md`).
+        skills_code: vec![0x04, 0x10, 0x00],
         miss_code: Vec::new(),
         level_cap: LEVEL_CAP_114D,
         stat_count: 359,

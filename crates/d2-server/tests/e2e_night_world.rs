@@ -293,6 +293,9 @@ impl Pending for TestPending {
         }
         true
     }
+    fn set_entry_param_of(&mut self, _: UnitId, e: &SkillEntry, i: u8, v: i32) {
+        self.book.param(e, i, v);
+    }
 }
 
 /// The free-spot search `0x0064E810` (collision spec, not written): the
@@ -484,6 +487,11 @@ impl Book {
         } else {
             7
         }
+    }
+    /// The used entry's param `i` := v (srvst 53 writes param 1 := frame +
+    /// level): logged.
+    fn param(&self, e: &SkillEntry, i: u8, v: i32) {
+        self.get().log.push(format!("param{i} {} {v}", e.skill));
     }
     fn srvst(&self, index: u16, _: UnitId, skill: i32, lvl: i32) -> i32 {
         self.get().log.push(format!("srvst {index} {skill} {lvl}"));
