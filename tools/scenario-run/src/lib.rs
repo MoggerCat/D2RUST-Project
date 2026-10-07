@@ -348,9 +348,7 @@ fn build(s: &Scenario, data: &Data) -> Result<Built, RunError> {
             // are generated too, so a travel there finds its rooms (the
             // synthetic act is created town only).
             for &w in &c.waypoints {
-                if w != u32::from(c.area)
-                    && act_of_level(w) == 0
-                    && wp_levels.map.index_of_level(w).is_some()
+                if w != c.area && act_of_level(w) == 0 && wp_levels.map.index_of_level(w).is_some()
                 {
                     let other = dr.get_or_alloc_level(svc.data, svc.types, w)?;
                     if dr.level_rooms(other).is_empty() {
