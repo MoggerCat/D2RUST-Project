@@ -41,17 +41,17 @@
 |   11. Current act and level (join and later) | 578–623 |
 |   12. Client DRLG and the room of a point | 624–665 |
 |   13. Visibility predicate (`0x004DBF20`) | 666–693 |
-|   14. Pet list and the hireling GUID | 694–720 |
-|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 721–787 |
-|   16. C→S 0x4B after a teleport (the hireling case) | 788–822 |
-|   17. Model writes made by 1.14d UI code | 823–940 |
-|   18. Audio driver inputs and the client object functions | 941–971 |
-| Constants & data dependencies | 972–984 |
-| Randomness | 985–996 |
-| Edge cases & original bugs | 997–1005 |
-| Test vectors | 1006–1053 |
-| Provenance | 1054–1125 |
-| Open questions | 1126–1208 |
+|   14. Pet list and the hireling GUID | 694–733 |
+|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 734–800 |
+|   16. C→S 0x4B after a teleport (the hireling case) | 801–835 |
+|   17. Model writes made by 1.14d UI code | 836–953 |
+|   18. Audio driver inputs and the client object functions | 954–984 |
+| Constants & data dependencies | 985–997 |
+| Randomness | 998–1009 |
+| Edge cases & original bugs | 1010–1018 |
+| Test vectors | 1019–1066 |
+| Provenance | 1067–1138 |
+| Open questions | 1139–1231 |
 <!-- /index -->
 
 ## Summary
@@ -707,8 +707,21 @@ player is in", the input of `render/composition.md` §3 step 2
    is kept with gone := 1, else it is unlinked and freed.
 3. **S→C 0x81** AssignMerc (`0x0045E890`, 20 bytes): `0x00478BB0(pet
    GUID u32@8, owner GUID u32@4, type u8@1, class u16@2, {u32@0xC,
-   u32@0x10, 0})`: set as rule 2, then the three extra values are stored
-   in the record (+0x24…); a missing record afterwards is fatal 0x95.
+   u32@0x10, 0})`: set as rule 2 (a missing record afterwards is fatal
+   0x95), then pet GUID, owner GUID and type are rewritten and **+0x24
+   := u32@0xC, +0x28 := u32@0x10, +0x2C := 0**. Type 7 with the
+   monster (1, pet GUID) in S (`0x00463990`): the client hireling setup
+   `0x004B1090(U, {u16 := u32@0x10 & 0xFFFF, u32 at +4 := u32@0xC})` (U +0xC4 |= 0x202, hireling
+   skills from the hireling record, `client/msg-ui.md` OQ 2), the dead
+   flag clear `0x004647D0(U)`, `0x004AE210(U)` and mode set
+   `0x00624690(U, 1)` (2026-10-08 read of `0x00478BB0`). The 0xAC create
+   (`0x00466360`, pet type 7) passes the same pair from the record
+   (`0x00478E40`): +0x28 low 16 bits and +0x24; `0x004B1090` hands the
+   u16 to `0x00663750` / `0x0044DCC0` (hireling row lookup) and the u32
+   to `0x00463DD0` / `0x006637F0`. PROVISIONAL: +0x1C (100 at
+   creation) has no model reader, UI only (because no client reader was
+   traced); settled by REC-50 (reader scan of +0x1C) and REC-10 (0x81
+   bytes of a hireling).
 4. **Hireling GUID** (`0x00478F20(player, 7, any = 1)`, the call of
    `msg-units.md` §1.2 rule 2 and §2 rule 2): no player → −1; else the
    first record in list order with type 7 and owner GUID = the player's
@@ -1130,11 +1143,18 @@ its only caller `0x0044F360` (`0x0044F43E`–`0x0044F45E`),
    (3,678 bytes, 10 callers) per code, and the effects of the helpers
    the tables name (`0x00480E70` mode set, `0x004804A0` / `0x00480780`,
    `0x00480930` (answered: §8 rule 7), `0x00480EF0`, `0x004BCF60`, `0x004BD5C0`): Phase 6
-   client unit-modes spec.
+   client unit-modes spec. PROVISIONAL: a client monster changes mode
+   only as the S→C messages state (§8), with no client-side mode steps
+   and no client seed draws beyond those the message rules name
+   (because the server stream carries every mode change the recordings
+   show); settled by REC-51 (HIGH-PRIORITY CAPTURE: client seed draws).
 2. Local walk prediction and per-update path stepping of the local
    player (input → path, `0x00463390`): needed for a smooth
    `ViewFeed::player`; Phase 6 movement spec; check against
-   `record_frames.py` positions.
+   `record_frames.py` positions. PROVISIONAL: the local player is drawn
+   at the last server-sent position (the message rules of §8 /
+   `client/msg-units.md`), no local prediction (because d2rs runs client and server in one
+   process with no latency); settled by REC-51.
 3. ~~`[0x007A04A4]`~~: answered in §6 rule 4 (only zeroed; L = 0). A
    memory read during play confirms.
 4. ~~Unit flag 0x800000~~: answered in §5 rule 5 (room free
@@ -1158,7 +1178,10 @@ its only caller `0x0044F360` (`0x0044F43E`–`0x0044F45E`),
    client active room's seed (+0x6C) equals the server's for the same
    DRLG room; check by comparing a monster's client `+0x20` seed after
    0xAC at a non-zero point with the server unit's seed (memory read).
-10. The pet record fields +0x24… written by 0x81 (§14 rule 3) and who
+10. *Answered (2026-10-08)*: the 0x81 writes are §14 rule 3 (+0x24,
+    +0x28, +0x2C and the type-7 unit setup); the reader of +0x1C
+    stays PROVISIONAL there (settled by REC-10, REC-50).
+    Original question: the pet record fields +0x24… written by 0x81 and who
     reads +0x1C: UI (Phase 6); and a recording with a hireling (0x7A /
     0x81 seen) to confirm §14.
 11. *Answered:* 0x07 / 0x08 at a point in no DRLG room of the level
