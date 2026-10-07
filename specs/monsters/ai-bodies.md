@@ -14,7 +14,7 @@
 |---|---|
 | Summary | 20–26 |
 | Rules | 27–28 |
-|   9. Per-AI behaviours | 29–828 |
+|   9. Per-AI behaviours | 29–834 |
 <!-- /index -->
 
 ## Summary
@@ -219,6 +219,12 @@ AI params 0–2 come from NPC messages: `0x00548B00` (interaction start,
 MakeEntityMove, `sim/client-messages.tsv`: unit type, GUID, x, y) sets
 param 0 := 40 and params 1, 2 := x, y; both stop the path and schedule a think at +1 (`ai.md` §1.2). Param 1 is
 also the greeting countdown of step 6 (one field, two uses: kept).
+Effect of param 0 := 40 (every C→S 0x13 within distance 50,
+`0x00548D4A`): the next 40 thinks take step 4; while param 0 > 36 (the
+first 4) an NPC more than 2 from (param 1, param 2) walks there
+(params 1 and 2 are set only by 0x59; a 0x13 leaves them as they are);
+otherwise it stops its path and idles 8. So a click holds the NPC in place for about 40 thinks
+of 8 frames, and each further 0x13 restarts the count.
 
 **Commands `0x005E6AE0`** (D2MOO `sub_6FCE69A0`). Commands are found
 with `0x0058EEF0(type, 0)`. G = the u32 at `0x0088CADC` (zero-initialised
