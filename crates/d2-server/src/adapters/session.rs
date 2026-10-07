@@ -349,6 +349,22 @@ pub fn enter_game_from_save<D: ActionEvents, W>(
         return Err(JoinError::NotJoined(client));
     }
     let player = s.player_of(client).ok_or(JoinError::NoPlayer(client))?;
+    let (entry, report) = load_save(s, player, save, ctx)?;
+    let placed = enter_game(s, client, &entry)?;
+    Ok((placed, report))
+}
+
+/// The load part of [`enter_game_from_save`] on `player` (no room yet):
+/// the load of `save` on the action wiring, then, for a full save, the
+/// quest entry with mode 0; returns the join's [`Entry`] (the save's act
+/// and name). A session flow's character loader calls it
+/// (`super::session_flow::CharacterLoader`).
+pub fn load_save<D: ActionEvents, W>(
+    s: &mut SimGame<D, W>,
+    player: UnitId,
+    save: &D2s,
+    ctx: &LoadContext,
+) -> Result<(Entry, LoadReport), LoadError> {
     let report = s.events.action().with(&mut s.game, |_, v| {
         let mut cw = ActionCharacter { v, player };
         let mut r = character::load(save, ctx, &mut cw)?;
@@ -359,7 +375,5 @@ pub fn enter_game_from_save<D: ActionEvents, W>(
         }
         Ok::<_, LoadError>(r)
     })?;
-    let entry = Entry::new(report.act, save.header.name);
-    let placed = enter_game(s, client, &entry)?;
-    Ok((placed, report))
+    Ok((Entry::new(report.act, save.header.name), report))
 }

@@ -8,14 +8,20 @@
 //! rows 3j, 3k): the tick driver, the timer queue, the path provider, and
 //! the intents whose handler runs on a real provider (0x49 waypoints). Two
 //! acts are created and one room is streamed in Cold Plains (act 0) and
-//! Lut Gholein (act 1). The local player enters through the session join
-//! (`d2_server::adapters::session::{create_game, enter_game}`,
+//! Lut Gholein (act 1). The local player enters through the server's
+//! session flow (`d2_server::adapters::session_flow`,
 //! `sim/intents-events.md` §8, `sim/path-placement.md` §13): the client
-//! receives with the first flush 0x01, 0x00, 0x02, the player's 0x59,
-//! 0xAA, 0x76, 0x0B, 0x5F, 0x23 × 2, 0x03, then game entry's 0x07, the
-//! room switch's 0x07s (with the add messages of the rooms' units),
-//! 0x15, 0x7E, and the first tick's 0x04; it builds its own DRLG and is
-//! in game.
+//! sends C→S 0x67 ([`create_request`]) through the system queue before
+//! its first frame ([`super::play::send_create_game`]); the drain runs
+//! game creation (§8.1) and the next flush carries 0x01, 0x00, 0x02; the
+//! client answers 0x02 with C→S 0x6B (`client/model.md` §7 rule 3, the
+//! bridge's own answer), whose drain runs the join (§8.2): the
+//! [`Character`] loader creates the player (a new character, or a parsed
+//! `.d2s` through `session::load_save`), then the player's 0x59, 0xAA,
+//! 0x76, 0x0B, …, 0x03, 0x53, game entry's 0x07, the room switch's 0x07s
+//! (with the add messages of the rooms' units), 0x15, 0x7E leave with
+//! the next flush, and the following tick's 0x04; the client builds its
+//! own DRLG and is in game.
 //!
 //! [`GameData::Live`] (with `D2_GAME_DIR`, [`LiveData::load`]) takes
 //! everything from the user's own files: the `levels` and `objects` tables
@@ -40,13 +46,18 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use d2_data::tables::{decode_all, Levels, Objects, Record, Skills};
+use d2_formats::d2s::D2s;
 use d2_formats::mpq::ArchiveSet;
+use d2_server::adapters::character::LoadContext;
 use d2_server::adapters::handlers::world::{ActionWorld, Outbox};
-use d2_server::adapters::session::{create_game, enter_game, Entry, GameSetup};
+use d2_server::adapters::session::{load_save, Entry, GameSetup};
+use d2_server::adapters::session_flow::{
+    create_flags, CharacterLoader, CreateGame, Loaded, SessionFlow,
+};
 use d2_server::adapters::{PlayerData, PlayerFields, ProtoSizes, SimGame};
 use d2_server::host::Host;
 use d2_server::host::SystemClock;
-use d2_server::seams::{Clock, PlayerGate};
+use d2_server::seams::{ClientId, Clock, PlayerGate};
 use d2_server::world_data::tables::LevelTables;
 use d2_server::world_data::{archive as world_archive, Dt1Files, WorldFiles};
 use d2_sim::combat::CombatTables;
@@ -108,6 +119,55 @@ pub const GAME_SETUP: GameSetup = GameSetup {
     expansion: true,
     ladder: false,
 };
+
+/// The local client's C→S 0x67 (`intents-events.md` §2.5): the
+/// character class and name above, Normal, expansion (flags bit 20) with
+/// bit 2 set, locale 0; passes the server's stated checks.
+///
+/// TODO(spec: the client's 0x67 sender, the character-select / game
+/// menus): the game name, game type, template, arena and the bytes 43–44
+/// the original client fills are not specified; they are zero here (no
+/// server rule d2rs runs reads them, `session_flow` module docs).
+pub fn create_request() -> CreateGame {
+    let mut char_name = [0u8; 16];
+    char_name[..PLAYER_NAME.len()].copy_from_slice(PLAYER_NAME);
+    CreateGame {
+        class: PLAYER_CLASS as u8,
+        difficulty: GAME_SETUP.difficulty,
+        char_name,
+        flags: create_flags::EXPANSION | 0x4,
+        locale: 0,
+        ..CreateGame::default()
+    }
+}
+
+/// The character the session flow's loader gives the join (§8.2 rule 2,
+/// `0x005345A0`: a new character or a save).
+#[derive(Debug, Clone, Default)]
+pub enum Character {
+    /// A new character of the 0x67 request's class and name, as the save
+    /// loader leaves a player (no room, at (0, 0), mode 1), knowing Cold
+    /// Plains' waypoint on Normal (the server tests' staging).
+    ///
+    /// TODO(spec: formats/d2s.md, intents-events.md §8.2 rule 3): the new
+    /// character's record (`0x00532590`) is not specified, so its entry
+    /// carries no player record (no 0x5F / 0x23 at the join).
+    #[default]
+    New,
+    /// A parsed `.d2s` loaded onto the new player
+    /// (`d2_server::adapters::session::load_save`). The app has no
+    /// production `d2s::SaveTables` yet, so only callers that parse a save
+    /// themselves give one.
+    Save(Box<D2s>, LoadContext),
+}
+
+/// The load result the loader gives when the player unit cannot be
+/// allocated. d2rs diagnostic, not an original code (the original's
+/// allocation does not fail this way); a save that does not load gives
+/// its `formats/d2s.md` §10 result instead (`LoadError::result`). The
+/// flow records either as `SessionFault::LoadRefused` and removes the
+/// client (its S→C 0xB4 is not sent, `session_flow` module docs).
+pub const LOAD_FAILED: u32 = u32::MAX;
 
 /// Errors building the game.
 #[derive(Debug, thiserror::Error)]
@@ -554,12 +614,10 @@ pub fn client_skill_rows(archives: &ArchiveSet) -> Result<Vec<SkillRow>, BuildEr
         .collect())
 }
 
-/// A built game and the units the app and tests address.
+/// A built game and the units the app and tests address. The player
+/// exists only after the join (C→S 0x6B): [`local_player`].
 pub struct LocalGame {
     pub sim: Sim,
-    pub player: UnitId,
-    /// The player's GUID (0x59, 0x0B).
-    pub player_guid: u32,
     pub waypoint: UnitId,
     /// The waypoint object's GUID.
     pub waypoint_guid: u32,
@@ -567,11 +625,19 @@ pub struct LocalGame {
 
 /// Builds the game on `seed`: the DRLG of both acts, one room streamed
 /// in the Rogue Encampment, Cold Plains and Lut Gholein, the waypoint
-/// object in the town's room, the path provider on, the local player
-/// allocated without a room, its record joined as [`LOCAL_CLIENT`] and
-/// entered by the session join (`enter_game`: game entry places it at the
-/// town's spawn point, `sim/path-placement.md` §13).
+/// object in the town's room, the path provider on, and the session flow
+/// set: no client record and no player until the client's C→S 0x67 and
+/// 0x6B are drained (the loader creates a [`Character::New`]).
 pub fn build(data: &GameData, seed: u32) -> Result<LocalGame, BuildError> {
+    build_with(data, seed, Character::New)
+}
+
+/// [`build`] with the character the join loads (module docs).
+pub fn build_with(
+    data: &GameData,
+    seed: u32,
+    character: Character,
+) -> Result<LocalGame, BuildError> {
     let wp_tables = data.tables();
     let mut levels = match data {
         GameData::Synthetic => LevelSource::synthetic(),
@@ -683,21 +749,6 @@ pub fn build(data: &GameData, seed: u32) -> Result<LocalGame, BuildError> {
         ox + WAYPOINT_X,
         oy + UNIT_Y,
     )?;
-    // The player as the character load leaves it: no room, at (0, 0).
-    let player = spawn(UnitType::Player, PLAYER_CLASS, None, 0, 0)?;
-    if let Some(u) = sim.sys.units.get_mut(player) {
-        u.mode = 1;
-    }
-    // The player knows Cold Plains' waypoint (Normal difficulty).
-    if let Some(index) = wp_tables.waypoint(COLD_PLAINS) {
-        sim.hooks()
-            .waypoints
-            .entry(player)
-            .or_default()
-            .get_mut(0)
-            .set(u32::from(index))
-            .map_err(|e| BuildError::Setup(format!("waypoint {index}: {e:?}")))?;
-    }
     let waypoint_guid = game
         .lists
         .unit(waypoint)
@@ -705,52 +756,120 @@ pub fn build(data: &GameData, seed: u32) -> Result<LocalGame, BuildError> {
         .guid;
     let mut s: Sim = SimGame::with_events(game, sim);
     s.world.waypoints = Some(WaypointData::new(&wp_tables.levels, &wp_tables.objects));
-    // The client record as its allocation leaves it (no room, state 0),
-    // then the session sequence (`intents-events.md` §8): game creation
-    // (0x01, 0x00, 0x02; state 1) and the join (the player's add
-    // messages, 0x0B, …, 0x03, game entry with its room switch; state 3).
-    // The first tick then populates the town's rooms, the client's room is
-    // ready and the client pass sends 0x04 (`tick.md` §6 rule 6): the
-    // client is in game.
-    s.join(LOCAL_CLIENT, Some(player), None, 0)
-        .map_err(|e| BuildError::Setup(e.to_string()))?;
-    create_game(&mut s, LOCAL_CLIENT, &GAME_SETUP)
-        .map_err(|e| BuildError::Setup(format!("game creation: {e}")))?;
-    let mut name = [0u8; 16];
-    name[..PLAYER_NAME.len()].copy_from_slice(PLAYER_NAME);
-    enter_game(&mut s, LOCAL_CLIENT, &Entry::new(0, name))
-        .map_err(|e| BuildError::Setup(format!("game entry: {e}")))?;
-    s.set_player(
-        player,
-        PlayerFields {
-            gate: PlayerGate {
-                mode: 1,
-                uninterruptable: false,
-            },
-            data: Some(PlayerData { last_accept: 0 }),
-        },
-    );
-    let player_guid = s
-        .game
-        .lists
-        .unit(player)
-        .ok_or_else(|| BuildError::Setup("player unit missing".into()))?
-        .guid;
+    // The session sequence (`intents-events.md` §8) runs on the client's
+    // C→S 0x67 / 0x6B: game creation (the client record, 0x01, 0x00,
+    // 0x02; state 1), then the join (this loader, the player's add
+    // messages, 0x0B, …, 0x03, 0x53, game entry with its room switch;
+    // state 3). The next tick populates the town's rooms, the client's room
+    // is ready and the client pass sends 0x04 (`tick.md` §6 rule 6).
+    let cold_plains_wp = wp_tables.waypoint(COLD_PLAINS);
+    s.set_session(SessionFlow::new(
+        GAME_SETUP.arena_flags,
+        loader(character, cold_plains_wp),
+    ));
     Ok(LocalGame {
         sim: s,
-        player,
-        player_guid,
         waypoint,
         waypoint_guid,
     })
 }
 
-/// The units of a started game, for the caller.
+/// The character load of the session flow (§8.2 rule 2): the player of
+/// the request's class, as the save loader leaves it (no room, at (0, 0),
+/// mode 1), then the [`Character`]'s values. What did not apply is
+/// logged in [`LocalSeams::log`].
+fn loader(
+    character: Character,
+    cold_plains_wp: Option<u8>,
+) -> CharacterLoader<ActionSim<LocalSeams>, ActionWorld> {
+    Box::new(move |s: &mut Sim, _: ClientId, r: &CreateGame| {
+        let req = AllocRequest {
+            ty: UnitType::Player,
+            class: u32::from(r.class),
+            room: None,
+            add: true,
+            fixed_guid: None,
+            mode: 1,
+            allied: true,
+        };
+        let Some(player) = s.events.with(&mut s.game, |g, v| v.allocate(g, &req, 0, 0)) else {
+            s.events
+                .hooks()
+                .x
+                .log
+                .push(format!("join: allocating player class {} failed", r.class));
+            return Err(LOAD_FAILED);
+        };
+        if let Some(u) = s.events.sys.units.get_mut(player) {
+            u.mode = 1;
+        }
+        let entry = match &character {
+            Character::New => {
+                if let Some(index) = cold_plains_wp {
+                    let set = s
+                        .events
+                        .hooks()
+                        .waypoints
+                        .entry(player)
+                        .or_default()
+                        .get_mut(0)
+                        .set(u32::from(index));
+                    if let Err(e) = set {
+                        s.events
+                            .hooks()
+                            .x
+                            .log
+                            .push(format!("join: waypoint {index}: {e:?}"));
+                    }
+                }
+                Entry::new(0, r.char_name)
+            }
+            Character::Save(save, ctx) => match load_save(s, player, save, ctx) {
+                Ok((entry, report)) => {
+                    let log = &mut s.events.hooks().x.log;
+                    log.extend(
+                        report
+                            .unapplied
+                            .iter()
+                            .map(|u| format!("join: save load: {u:?}")),
+                    );
+                    entry
+                }
+                Err(e) => {
+                    s.events
+                        .hooks()
+                        .x
+                        .log
+                        .push(format!("join: save load failed: {e}"));
+                    return Err(e.result());
+                }
+            },
+        };
+        s.set_player(
+            player,
+            PlayerFields {
+                gate: PlayerGate {
+                    mode: 1,
+                    uninterruptable: false,
+                },
+                data: Some(PlayerData { last_accept: 0 }),
+            },
+        );
+        Ok(Loaded { player, entry })
+    })
+}
+
+/// The local client's player and its GUID once the join has run (C→S
+/// 0x6B drained), else `None`.
+pub fn local_player(s: &Sim) -> Option<(UnitId, u32)> {
+    let p = s.player_of(LOCAL_CLIENT)?;
+    Some((p, s.game.lists.unit(p)?.guid))
+}
+
+/// The units of a started game, for the caller (the player exists after
+/// the join: [`local_player`]).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Started {
-    pub player: UnitId,
-    /// The player's GUID (0x59, 0x0B).
-    pub player_guid: u32,
     pub waypoint: UnitId,
     pub waypoint_guid: u32,
 }
@@ -766,8 +885,6 @@ pub fn start<C: Clock + Send + 'static>(
     let link = ThreadLink::spawn(move || {
         let g = build(&data, seed)?;
         let _ = tx.send(Started {
-            player: g.player,
-            player_guid: g.player_guid,
             waypoint: g.waypoint,
             waypoint_guid: g.waypoint_guid,
         });
