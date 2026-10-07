@@ -535,7 +535,7 @@ impl<X: Pending> View<'_, X> {
 
     /// The object update pass `0x00581AD0` (§14) for one queued object and
     /// the client of `receiver`: S→C 0x0E / 0x4D sent to `receiver`
-    /// ([`Pending::send`]), 0x60 to [`Pending::object_portal_message`],
+    /// ([`Pending::send`]), 0x60 likewise,
     /// then rule 2 ([`MiscWorld::update_extras`]). `false`: not an object
     /// with object data (nothing ran).
     pub fn object_update(&mut self, game: &mut Game, receiver: UnitId, unit: UnitId) -> bool {
@@ -559,7 +559,7 @@ impl<X: Pending> View<'_, X> {
             match m {
                 UpdateMessage::State(b) => self.h.x.send(receiver, &b),
                 UpdateMessage::Shrine(b) => self.h.x.send(receiver, &b),
-                UpdateMessage::Portal(o) => self.h.x.object_portal_message(receiver, o),
+                UpdateMessage::Portal(b) => self.h.x.send(receiver, &b),
             }
         }
         true

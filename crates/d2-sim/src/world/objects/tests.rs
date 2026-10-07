@@ -21,10 +21,8 @@ const SHRINE_CLASS: [u8; 23] = [
 /// other row, which makes ids 13, 19 and 22 (the vectors' accepted picks)
 /// pass at level 2.
 ///
-/// TODO(objects.md §5.1 test vectors): the first vector says pick 4 is id
-/// 8, but the §2 class-4 list {1, 6, 7, …, 15} holds id 9 at index 4 (id
-/// 8 is index 3). Id 9 gets `LevelMin` 5 so the vector's draws (4, 8) and
-/// result (id 13) hold under either reading; the spec's id needs a fix.
+/// The §5.1 vector's pick 4 is id 9 (fixed in the spec, `objects.md`
+/// Test vectors); id 9 gets `LevelMin` 5 so the draws (4, 8) give id 13.
 fn shrines() -> Vec<Shrines> {
     SHRINE_CLASS
         .iter()
@@ -1025,14 +1023,24 @@ fn update_message_bytes() {
     // Mode 0 or no operator: no 0x4D.
     f.modes.insert(O, 0);
     assert_eq!(update_messages(&ctl, &t, &f, O).unwrap().len(), 1);
-    // Subclass bit 2: the portal message instead.
+    // Subclass bit 2: the portal message instead (flags, destination,
+    // GUID).
+    assert_eq!(
+        portal_message(&ObjectData {
+            guid: 0x0403_0201,
+            portal_flags: 3,
+            interact: 40,
+            ..ObjectData::default()
+        }),
+        [0x60, 3, 40, 1, 2, 3, 4]
+    );
     f.modes.insert(O, 1);
     t.objects[SHRINE3 as usize].subclass = 5;
     assert_eq!(
         update_messages(&ctl, &t, &f, O),
         Ok(vec![
             UpdateMessage::State(state_message(0x1234, true, 1)),
-            UpdateMessage::Portal(O),
+            UpdateMessage::Portal(portal_message(ctl.get(O).unwrap())),
         ])
     );
 }

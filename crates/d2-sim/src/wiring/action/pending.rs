@@ -966,10 +966,6 @@ pub trait Pending {
     /// waypoint and `todo` inits, operates and events, uncovered presets
     /// ([`super::objects::ObjectRoute`]).
     fn object_route(&mut self, game: &mut Game, route: super::objects::ObjectRoute) {}
-    /// S→C 0x60 for the object `object` to `receiver`'s client
-    /// (`0x0053D900`, `objects.md` §14 rule 1; layout owned by
-    /// `intents-events.md`).
-    fn object_portal_message(&mut self, receiver: UnitId, object: UnitId) {}
     /// The C→S 0x13 object case's reach step (`waypoints.md` §5.2,
     /// `0x00548B00`: distance > 50 → refuse; in range and unobstructed →
     /// stop the player and operate; else walk and operate on arrival;

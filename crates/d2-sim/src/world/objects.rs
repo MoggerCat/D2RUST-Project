@@ -1238,14 +1238,20 @@ pub fn shrine_message(object: u32, operator: u32, code: u8) -> [u8; 17] {
     m
 }
 
+/// S→C 0x60 (`0x0053D900`, 7 bytes, §14 builder details): portal flags
+/// (+0x05), `InteractType` (destination level), object GUID.
+pub fn portal_message(d: &ObjectData) -> [u8; 7] {
+    let g = d.guid.to_le_bytes();
+    [0x60, d.portal_flags, d.interact, g[0], g[1], g[2], g[3]]
+}
+
 /// What the update pass sends for one queued object (§14 rule 1).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UpdateMessage {
     State([u8; 12]),
     Shrine([u8; 17]),
-    /// S→C 0x60 (`0x0053D900`): layout owned by `intents-events.md`; the
-    /// caller builds it.
-    Portal(UnitId),
+    /// S→C 0x60 ([`portal_message`]).
+    Portal([u8; 7]),
 }
 
 /// `0x00581AD0` rule 1 for one queued object: the messages it sends to
@@ -1271,14 +1277,14 @@ pub fn update_messages<W: ObjectWorld>(
     )));
     let o = t.object(d.class)?;
     if o.subclass & 4 != 0 {
-        out.push(UpdateMessage::Portal(obj));
+        out.push(UpdateMessage::Portal(portal_message(d)));
     } else if mode == 1 && o.subclass & 1 != 0 && d.operator != 0 {
         let code = match d.shrine {
             Some(id) => t.shrine(id)?.code,
             None => 0,
         };
-        // TODO(objects.md §14 rule 1, open question 4): "operator GUID" is
-        // read as the stored field − 1 (the field holds GUID + 1).
+        // §14 builder details: the operator field − 1 (the operator's
+        // GUID).
         out.push(UpdateMessage::Shrine(shrine_message(
             d.guid,
             d.operator.wrapping_sub(1),

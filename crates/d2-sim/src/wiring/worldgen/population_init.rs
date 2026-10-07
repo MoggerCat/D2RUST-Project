@@ -187,8 +187,8 @@ impl<X: WorldPending> MonsterInit for WorldHost<'_, X> {
     /// ([`crate::wiring::action::View::create_object`]); a game without
     /// one: [`WorldPending::create_object`].
     ///
-    /// TODO(population.md §7 step 6, objects.md §3): the allocation
-    /// mode of this creation is not stated; mode 0 is used.
+    /// Allocated in mode 0 with flag 1 and GUID 0 (`objects-2.md` §22
+    /// rule 4: evilhut and barricade-door objects).
     fn create_object(&mut self, room: RoomId, class: i32, x: i32, y: i32) {
         match u32::try_from(class) {
             Ok(c) if self.v.h.objects.is_some() => {

@@ -274,7 +274,7 @@ impl<X: Pending> View<'_, X> {
 
     /// Object part A (§7.2): S→C 0x51 (GUID, class, x, y, mode, the
     /// object data's interact byte), then the portal message 0x60 for a
-    /// `SubClass` bit 2 row ([`Pending::object_portal_message`]).
+    /// `SubClass` bit 2 row (`objects.md` §14 builder details).
     ///
     /// A game without the object control (`ActionHooks::objects` `None`,
     /// no object data) sends interact 0, as its 0x03 sends game +0x80 = 0.
@@ -294,13 +294,13 @@ impl<X: Pending> View<'_, X> {
         let interact = data.map_or(0, |d| d.interact);
         let portal = st
             .zip(data)
-            .and_then(|(s, d)| s.tables.object(d.class).ok())
-            .is_some_and(|o| o.subclass & 4 != 0);
+            .filter(|(s, d)| s.tables.object(d.class).is_ok_and(|o| o.subclass & 4 != 0))
+            .map(|(_, d)| crate::world::objects::portal_message(d));
         let m =
             messages::assign_object(guid, class as u16, x as u16, y as u16, mode as u8, interact);
         self.h.x.send(receiver, &m);
-        if portal {
-            self.h.x.object_portal_message(receiver, unit);
+        if let Some(b) = portal {
+            self.h.x.send(receiver, &b);
         }
     }
 
