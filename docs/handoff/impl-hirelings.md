@@ -1,5 +1,7 @@
 # Handoff: hirelings (`specs/world/hirelings.md`) — `claude/impl-hirelings`
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the ninth fold (`claude/fold-handoff-night`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Ninth set" (PC 1 / PC 2).
+
 Cloud implementation session, 2026-10-06, task class: implementation from
 a clear spec, medium (METHODS M14); three parallel agents on independent
 files (level / XP, pets + life, item swap), the coordinator on rows, the
@@ -78,7 +80,7 @@ sessions (`monsters::ai::tests::specd_here_*`, `skills::use_::tests::*`,
 - HL8 §13 r4 / OQ7: stats sent to the owner only, at once (not queued).
 - HL9 §1.2 r3: the fallback `0x00656390` is not described; range test only.
 
-## 5. Local run queue (add to HANDOFF §5)
+## 5. Local run queue (HANDOFF §5 C90; recordings S9-A1 (6))
 
 - Game-file test of the Test-vector table (`#[ignore]`, `D2_GAME_DIR`):
   `HirelingTables::from_tables` on the live `hireling` / `pettype`, then

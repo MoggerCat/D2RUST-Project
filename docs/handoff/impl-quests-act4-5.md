@@ -1,5 +1,7 @@
 # Handoff: Act IV and Act V quests — `claude/impl-quests-act4-5`
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the ninth fold (`claude/fold-handoff-night`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Ninth set" (PC 1 / PC 2).
+
 Cloud implementation session, 2026-10-06, task class: implementation
 from a clear spec, medium (METHODS M14). Base: `claude/specs-staging` at
 `5844674` (Act IV / V specs merged from PC 2). Repo only, no game files
@@ -118,7 +120,7 @@ providers do.
    - §8.5 "none → stop" ends step 1 only.
    - Experience stats 13 / 29 are written through `add_stat` (no set-stat function named).
 
-## 4. Local checks to queue (M02, HANDOFF §5)
+## 4. Local checks to queue (M02, HANDOFF §5 S9-A3)
 
 - **A (player):** record a full Act IV run with packets and RNG (act4 OQ13).
   - Izual and the ghost, the Hellforge drops, the seals and seal bosses.

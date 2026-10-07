@@ -1,4 +1,4 @@
-# Handoff (updated 2026-10-06, branch `claude/docs-fold-8` on `claude/tender-meitner-mphas3` at `62fcef6`: the eighth fold (ci-nightly-props, unify-items, mutants-inventory, mutants-combat-skills, mutants-core, s2c-use, spec-unit-numbering, prop-fixes, path-update-pass, prop-walk-gaps, fixedset-game, mpq-huffman, drop-freespot, wire-path-server, game-tests-wired-host, mutants-world, mutants-items-treasure; 17 notes in this fold, 115 folded in all) on top of `claude/docs-fold-7` (the seventh fold: host-merge, host-merge-port, impl-path-core, impl-walk, wire-path-sim, wire-inventory-sim, wire-inventory-server, render-camera-placement, render-wire, conformance-path-render, bench-baselines, prop-client, prop-inventory, prop-path-place, prop-walk, fix-statlist-prop, mutants-server, mutants-monsters-missiles, game-tests-inventory-path, gaps-path-render, gaps-new-specs; 21 notes))
+# Handoff (updated 2026-10-07, branch `claude/fold-handoff-night` on `main` at `674996d`: the ninth fold (impl-ai-acts2-5, impl-skill-slots-2, impl-missile-bodies-2, impl-quests-act1-rest, impl-quests-act2, impl-quests-act3, impl-quests-act4-5, impl-objects, impl-hirelings, impl-drlg-act3-5, impl-room-population, impl-client-staging, impl-lighting-blend, impl-draw-order-2, impl-ui-panels, impl-audio, impl-d2s, wire-client-staging, wire-world-staging, impl-client-msgs-2, impl-client-drlg, impl-server-join; 22 notes in this fold, 137 folded in all) on top of the eighth fold (`claude/docs-fold-8`: ci-nightly-props, unify-items, mutants-inventory, mutants-combat-skills, mutants-core, s2c-use, spec-unit-numbering, prop-fixes, path-update-pass, prop-walk-gaps, fixedset-game, mpq-huffman, drop-freespot, wire-path-server, game-tests-wired-host, mutants-world, mutants-items-treasure; 17 notes))
 
 Start here in a fresh session, after `CLAUDE.md` and `docs/METHODS.md`.
 This file holds state, the next steps, the code and command map, and the
@@ -38,6 +38,31 @@ landed"). Coverage at this fold (`py tools/coverage.py --summary`): 4,194
 claims over 3,339 rule units, unit 2,858 (85.6%), game-file 197 (5.9%), trace
 30 (0.9%), verified 227 (6.8%), any tier 2,911 (87.2%).
 
+The ninth fold (2026-10-07) took the 22 notes the night's sessions landed on
+`main` (PRs #35–#38 through `claude/specs-staging`; list in the title line).
+Facts that §1–§3 and §7 stated before change in these places: every
+`spec'd-here` AI function (93 of 148), skill slot (130) and every non-null
+server-do / server-hit body has code, and Acts I–V quests, world objects,
+hirelings and the Act III / V DRLG exist (rows 3aj–3am; read the "3 not
+implemented" row and step 12 as rewritten); rooms populate from the act DRLG
+(F1 / GH1 closed); the in-process server sends the game part of the join and
+the bridge owns a client DRLG (rows 3ao, 5, 6; step 4); 53 of 181 S→C ids
+have an owner and a handler (read "every S→C id still unowned" as stale); the
+original UI and audio run in `play` with game files; the 47 `d2-client` and
+ten `d2-sim` reds the night's notes report are gone (workspace green at
+`ef00681`). Every open question of the 22 notes is in §7 "Ninth set", split
+by answerer: **PC 1** (RE / spec answers, 288) and **PC 2** (recordings and
+captures, 38; S9-A1 is PC 1's recording list). The §5 queue numbers C65–C86
+were already unique and in order; the fold adds C87–C91 and S9-A1–S9-A7. The
+other 34 notes without a pointer line (`impl-ai-act1`, `impl-quests-act1`,
+`impl-skill-bodies`, `impl-ui-text`, `impl-draw-order`, `impl-unit-composite`,
+`render-followups-impl`, `local-buddy-*`, the 2026-10-06 `mutants-*`, …) are
+not in this fold. Coverage at this fold (`python3 tools/coverage.py
+--summary` on `674996d`): 8,149 claims over 7,342 rule units, unit 5,846
+(79.6%), game-file 270 (3.7%), trace 61 (0.8%), verified 331 (4.5%), any
+tier 5,934 (80.8%); the share fell because the rule units grew by about
+4,000 since the eighth fold (the specs that landed for these sessions).
+
 Index (this file is long; read by section, METHODS M11): §1 State ·
 §2 Next steps · §3 Code map (Phase 0–2 crates, tick / server, Phase 3
 systems, wiring, Phase 6 client, tools) · §4 Command map · §5 Local run
@@ -57,7 +82,9 @@ RW1–RW5, WN1–WN4, IS1–IS6, PN1, KP1–KP2, MS1, MM1–MM3, BB1, SF1, plus
 "Resolved in the seventh fold"; eighth set: UI1–UI7, DF1–DF3, WS1–WS5,
 PU1–PU2, SL1–SL4, PG1–PG2, FG1–FG2, GH1–GH7, MI1–MI3, MW1–MW3, MT1–MT2,
 MK1–MK2, MC1, MH1, S2C1–S2C2, SU1, NP1, plus "Resolved in the eighth fold";
-Phase 6 by owner spec) ·
+ninth set by answerer: PC 1 I-1–I-7, AI, SK, MB, QA–QE, OB, WW, HL, DR, RP,
+CS, CD, SJ, CM, LB, DW, UP, WC, ST, TR, EN, DS; PC 2 R2-1–R2-38, plus
+"Resolved in the ninth fold"; Phase 6 by owner spec) ·
 §8 Lessons.
 
 ## 1. State
@@ -109,14 +136,22 @@ merged tree (the coordinator's gate runs it).
 | 3ag Walk / run on the server and the update pass (`wire-path-server`, `path-update-pass`) | **Wired, unverified** (no rule added; no per-tick recording, `pathing.md` OQ1). **Eighth fold: C→S 0x01–0x04 run** (`d2_server::adapters::handlers::walk`: `WALK_IDS`, `handle` reads x, y or type + GUID and returns result 0 in every case (§1.1), `run` calls `wiring::path::walk::walk_message` through `ActionSim::with`, `enable_paths`); `WorldHost::walk` (default `None`, implemented by `ActionWorld` and `WiredWorld`), tried in `SimGame::handle` after skills and before the stub; without the provider the ids stay stubs (recorded in `unhandled`), so every earlier host and test is unchanged. **Update pass** (`pathing.md` §10 rules 3 then 2): `tick::client_update` → `TickHooks::send_unit_update` (`0x0053A5D0`) → `ActionSim` (forwarded by `WorldSim` and `QuestTick`) → `wiring::path::walk::update_messages`: S→C 0x15 from flags 2 (0x10000 → flag 1; 0x800 for the other clients → flag 0), then for a player with unit flag 0x1 in modes 2 / 3 / 6 0x0F or 0x10 to every client but its own; sent through `Pending::send`, reaching the clients by `SimGame::tick`'s `take_sent`. 0x0D is the placement's and the waypoint arrival's (`waypoints.md` §7 r7): with the provider on the same-act warp places the player in the spawn room and the client gets 0x07 then 0x0D (e2e step 6 holds on `e2e_walk.rs`; `e2e_single_player.rs` keeps the provider off because its step 4 flies a missile, blocker WP1). 0x96 has no sender spec (`pathing.md` §10 r5, OQ6): never sent; rule 4 (monsters 0x67 / 0x68, `0x00598220`) has no spec owner: `update_messages` sends nothing for non-players. The sim builds the bytes (`path::walk::messages`); every test states them with `d2-proto`'s typed builders (`PlayerMove`, `PlayerToTarget`, `PlayerStop`, `ReassignPlayer`, `MapReveal`). Readings to settle: no 0x15 after a waypoint warp to another level (WS1), flags 2 0x10000 / 0x800 and unit flag 0x1 never cleared (WS2), the dispatcher's range checks read the staged `UnitFacts` (WS3), run velocity = walk velocity (WS4), a same-level two-room waypoint travel sends no 0x0D (WS5), the second client's 0x0F per tick (PU1) | d2-server walk tests 9 → 14 (`walk/tests.rs`: `walk_to_point_moves_the_player_and_tells_the_other_client` = vector M1 translated, x = 0x1AE000 + k · 0x6000, tick 14 at 0x1F8000; run to a point (stamina − 14 · 40, code 0x17); walk / run to a unit (0x10, codes 0 / 0x18); room change A → B; refused requests still 0; stubs without the provider; the waypoint to the town (0x07 then 0x0D); a warp within the level (0x15 next pass); `walk_ids_match_client_messages_tsv` with three perturbations; the five update-pass branches: 0x800 before the mode update, 0x10000 to both clients, town walk, only players, nothing without the provider); `d2-client/tests/e2e_walk.rs` 2 (walk A → B 62 frames, run back 56, walk to the waypoint object, 0x49 to the town: 0x07 + 0x0D exact bytes; same run twice). Gates PASS: wire-path-server (tests in its commit), path-update-pass d2-sim + conformance 1,876, rest 604, d2-client 362 |
 | 3ah Tests and tooling, eighth fold (`prop-fixes`, `prop-walk-gaps`, `mutants-core`, `mutants-inventory`, `mutants-world`, `mutants-items-treasure`, `mutants-combat-skills`, `ci-nightly-props`, `game-tests-wired-host`, `spec-unit-numbering`) | **Fixes the property tests deferred** (step 7n, each test written first and seen failing on the base): `StatLists::expire_lists` returns `Result` and stops with `StatListError::EndlessExpiry(list)` at the first expired extended list (the state 1.14d spins in; event 12 passes it up as `UnitError::Stats`; the replay reports it as a mismatch); a stale `ListId` acts as a null list in every public `StatLists` method (the lists stay byte-for-byte unchanged); `TimerId { slot, generation }` (the generation is d2rs's own, so `cancel` of a reused id no longer reaches the new timer); `dispatch::in_range` uses `abs_diff` (exact abs(dx) ≤ 50 and abs(dy) ≤ 50 for any positions); the `remove_active_room` item stays open (Q3 = SL3). **Property tests for the walk gaps**: `prop_walk_rooms.rs` (multi-room walk: room recache §9.6 r9, §9.8 messages, flag 0x1; the messages as set differences; `set_position_recaches_by_spec`), `prop_walk_motion.rs` (knockback keeps the distance budget, `set_path_type_follows_the_table`, `chase_a_moving_target`), `prop_path_footprint_ops.rs` (`set_foot_mask_restamps`, `corpse_footprint_is_a_plus_of_0x8000`, `teleport_follows_the_spec`) on the shared fake `walk_rooms_fake`; 17 M08 mutants caught (one survived the first run until the generator picked a teleport onto its own cell 15 % of the time); `PROPTEST_CASES=30000` release hunt passes; no code bug found; `// Covers:` on 16 rules (`pathing.md` §1.5 r2, §2, §3 r10, §9.2 r1, r3, §9.5 r3, §9.6 r4, r8, r9, §9.7, §9.8, §9.10; `path-placement.md` §5.1, §5.3 r1, r3, §6 r4). **Mutation testing** (`cargo-mutants` 27.1.0, base `4b5b0bf` / `edd9925`; no code was found wrong against its spec and none was changed; every test names its spec rule): `d2-sim` tick / units / stats 1,342 mutants, 149 missed → 47 (rng + game 48, 0 missed; the conformance replay killed **0** of the 149, its traces do not reach stats, regeneration or the stat-list chain); `d2-proto` 844 mutants, 32 missed → 9 (14 of 993 after merging `Packed` fields and `s2c`); `items::inventory` + `items::moves` 1,304 mutants, 135 missed → 64 (33 of the 64 are `MovePending` default bodies); `d2-sim::world` 2,385 mutants, 389 missed → 34 (115 tests); `items` + `treasure` 1,819 mutants, 222 missed → 48 (62 tests; 1,686 caught); combat + skills 1,940 mutants, 358 missed → 47 (105 tests; missed rate 18.8 % → 2.5 % of viable; 5 timeouts). Every survivor is classified equivalent, unreachable or not decided by the spec (listed in the notes); claims only where the assertions check the whole rule (`stats.md` §2 r2, §5 r2, r3, §8 r2, r3, §9 r3; `intents-events.md` §2.4 r10; `callbacks.md` §2 text; the treasure and item rules named in `mutants-items-treasure`; `coverage --check` 3,315 claims at that gate). **Nightly deep property job** (`.github/workflows/nightly-props.yml`, 03:17 UTC + `workflow_dispatch`, input `cases`, three matrix jobs `sim`, `wire`, `worldsim`, 90 min timeout; `tools/props-deep.sh [sim, wire, worldsim or all] [cases]` holds the filters so local == CI; on failure it prints each `minimal failing input` and uploads `target/props-deep/` as `proptest-<group>`): `sim` at 20,000 cases **measured 670 s** (`floor_drop_never_blocked` 630 s, `nearest_with_field_matches_reference` 597 s), `wire` ≈ 10–20 min and `worldsim` ≈ 12 min **estimates**, not run; the first deep run found the stat-list failure (fixed on the model side, `fix-statlist-prop`, plus `prop-fixes` item 1) and `anim_schedule_matches_the_closed_form` aborting with "Too many global rejects" (fixed by the coordinator: `schedule_inputs()` doubles a positive step until the §4.2 loop is under `MAX_LOOP`); after both, `stats::prop_tests` at 20,000, `prop_timer` at 3,000 and `prop_units` at 20,000 pass. **`game-tests-wired-host`**: 7 `#[ignore]` tests in `crates/d2-server/tests/game_wired_host.rs`, one per `charstats` class (`wired_host_amazon` … `_assassin`; §5 C59), each runs twice and compares FNV-1a 64 digests; no claim (`Intended claim: none`), **none has run**. **`spec-unit-numbering`**: the `Edge cases & original bugs` lists of 15 specs became numbered lists (`N. `, text unchanged) and 8 claims were narrowed after reading each test (cube r1–r7, txt-format r1, r3, r5, r8, preset, animdata r1–r4, camera r1 / r2, sprite-placement r1, loading r1, r2, r4); `tools/coverage.py` + `docs/COVERAGE.md` §1 gained **table-row units** (a table directly under a `<!-- rows -->` line gives `§<s> row<N>`, `§<s> t<K> row<N>` for the K-th marked table; opt-in per table; selftest extended): `sim/rng.md` §5.2–§7 are 39 units, only §5.4 row1–2 claimed (`setters_and_derive`); the rest is trace / RE material | prop-fixes: `gate.sh` PASS (13 steps; d2-sim + conformance 1,880 passed / 107 skipped, rest 601 / 75, d2-client 362 / 16); prop-walk-gaps `--no-client` PASS (d2-sim + conformance 1,885, rest 599; 4,143 claims, 0 errors); the five mutation notes' gates PASS (mutants-combat-skills: d2-sim 1,337 passed, 5 ignored; mutants-items-treasure 1,294 passed, 5 ignored; mutants-core 1,273 passed, 5 ignored); `coverage` before → after of `spec-unit-numbering`: rules 3,106 → 3,190, any 2,839 (91.4 %) → 2,896 (90.8 %), verified 219 → 227 (7.1 %): the dips are real (camera 100 → 85.7 %, sprite-placement 77.8 → 58.3 %, cube 93.9 → 82.5 %) |
 | 3ai Test installs, MPQ Huffman and the S→C builders, eighth fold (`fixedset-game`, `mpq-huffman`, `s2c-use`) | **Game from a `FixedSet`** (`test-fixtures`, step 7e, repo only): DS1 writer (`test_fixtures::ds1::write`, v1–18, round trips v7–18 × tag types 0 / 1 / 2 and the spec vectors) and DT1 writer (`dt1::write`; iso and RLE blocks; the spec vectors); synthetic DRLG files (`drlg`: a 9 × 9 town with one waypoint object, keep, cave, field, sub, six DT1; archive names `DATA\GLOBAL\TILES\` + table string); a lvlprest row Def 3 for level 2 ("Synth Field", DrlgType 2: the town's `Vis0` links it, so the first tick's room update builds it); `GameData { bins, anim, fixed, level, files }` with `load` / `from_install` and the builders `action_tables`, `world_tables`, `vitals`, `stat_data`, `unit_data`, `waypoints`, `level_types`, `drlg_world`, `world_sim` (the ones `game_wired_host.rs` assembles by hand on the live set; they work for the user's install too), `Seams`, `type Sim = SimGame<WorldSim<Seams>, ActionWorld>`; `test-fixtures` now depends on `d2-sim` and `d2-server` (normal dependencies, still test-only, no Bevy). `crates/test-fixtures/tests/synthetic_game.rs` (CI, no `#[ignore]`): archives → `bin::load` → `fixup::apply` → table views and `world_data` providers → `WorldSim` → a one-room town generated and streamed (81 floor records, the waypoint preset unit, a class-3 player) → `SimGame::join` → `Host::frame` × 51, no fault, no wiring error, a second run equal. **Seam: `ActCreation::TownOnly`** (`Drlg::create` with `NoLevelTypes` and then the town allocated and generated): `ActCreation::Full` (the act placer of `levels.md` §3 step 7 allocates 1.14d ids 1–7, 17, 26, 39 and expects their types, which the 8-row made-up levels table lacks: `UnknownLevel(17)`) works on the user's real data only, and the TownOnly DRLG seed skips the placer's draws (a fixture state, not a 1.14d one) (FG1); no server message reaches the idle client in 50 frames (no join sequence is wired; FG2). **MPQ Huffman** (`mpq-huffman`, BB1 of step 7r; `specs/formats/mpq.md` §9, §11 unchanged): the encoder `huffman::compress` is now `cfg(any(test, feature = "test-support"))` (weight tables 0–8, O(1) symbol lookup, word accumulator), `writer::Method::Huffman { table, pkware }` (mask 0x01, or 0x09 with PKWARE over the Huffman stream, a sector longer than the sector stored raw) and `writer::huffman`, `WriteError::BadHuffmanTable`; **decoder speed-up with unchanged output and errors**: a 256-slot leader cache `weight % 256 → node` used only as a hint (`Tree::leader` accepts an entry only if that node has weight `w` and its predecessor does not) and a static fast path for tables 1–8 (the tree stays borrowed from the template until the first escape; a 1024-entry lookup resolves up to 10 bits). Cause of the BB1 figure: not a rebuild per sector (cloning costs 30 ns for table 0, 1.2 µs for the 515-node tables) but one Increment per tree level per symbol with about four SipHash operations each. Criterion `mpq_huffman` (256 KiB, 512-byte sectors, cloud 4 vCPU Xeon 2.10 GHz, medians, order of magnitude): text table 0 74.7 ms (3.35 MiB/s) → 22.2 ms (11.3 MiB/s), table 0 + PKWARE 72.4 → 25.2 ms, table 1 6.10 → 1.78 ms (140 MiB/s), table 2 3.82 → 1.90, table 3 6.01 → 2.03; deltas table 0 51.3 → 13.8 ms, table 1 7.43 → 2.27, tables 4 and 6 about unchanged (escapes early), table 5 1.26×. Tests (`mpq/huffman_tests.rs`): `huffman_round_trip` (every table × three data shapes against the model), `decoder_matches_the_model` (arbitrary and truncated streams), `archive_huffman_round_trip` (tables, ± PKWARE, sector shifts 0–3, encryption + FIX_KEY, SECTOR_CRC), `huffman_then_adpcm` (masks 0x41 / 0x81), `leader_cache_is_only_a_hint`; M08: ignoring the fast path's `consume` error is caught, a broken leader test never finishes, wrong cache nodes survive by design. **S→C builders** (`s2c-use`, step 7k): **blocked, then decided: `d2-sim` keeps no dependency on `d2-proto`** (option A; `tools/depcheck` `FORBIDDEN` has had `("d2-sim", "d2-proto")` since Phase 0; the task text and `s2c-builders.md` §5 item 3 said it was allowed, §8 lesson). The sim keeps its byte builders; new `world::cube::trade_action` (0x77) used by the three inline `[0x77, …]` sends; `d2-sim/tests/s2c_bytes.rs` (7 tests; pins the bytes of `npc::{transaction, service_result, resurrect_message}`, `waypoints::{menu_message, arrival_message}`, `path::walk::messages::player_stop`, `cube::trade_action`); `conformance/tests/s2c_builders.rs` (7 tests, one per builder: sim bytes == `d2_proto::s2c::{NpcTransaction, OpenUi, Unknown9B, WaypointMenu, PlayerStop, TradeAction}::encode()` and `parse(bytes)` == the same `Message` over every edge combination plus a fixed xorshift sweep; 0x77 over all 256 actions), which settles J13 "one maker per id" as a check; M08: flipping bit 0 of `trade_action`'s byte fails exactly the two 0x77 tests. `bridge-dispatch.tsv` stays all `TBD` (no client spec owns an S→C id; the typed variant for each is in `s2c-use` §3) | `synthetic_game` 2 tests (`providers_hold_the_named_files`, `town_join_and_frames`) and the writers' round trips pass; mpq-huffman: `--no-client` gate PASS (1,876 + 607 tests); s2c-use: every non-client step PASS, the three `d2-client` steps fail in that container only (`wayland-sys` finds no `wayland-client`; `tools/cloud-setup.sh` installs it); `cargo clippy --workspace --exclude d2-client --all-targets -- -D warnings` clean |
-| 3 not implemented | object operate / init, the per-skill function bodies (`use.md` OQ10), kill experience (`kill_experience` in `wiring::interaction` applies `vitals.md` §4.2 and §4.3's add only; nothing calls it, the kill has no provider, §7 WI10), walk / run in `d2-server` for monsters and without the provider (C→S 0x01–0x04 run for players on the path provider since the eighth fold, 3ag; they stay stubs when `ActionHooks::paths` is off), missile flight on the path provider (`pathing.md` OQ3), item-use bodies, hirelings, player data, sockets and the other `InvRest` seams (the item moves are wired and served, 3z), the item bit stream of 0x9C / 0x9D, message 0x73 (`missiles.md` R2.4, needs a protocol seam outside `missiles/`), Act II–V quests, the other 131 AI functions, server-do / server-hit bodies, mercenary spawn / init (spec not written) | specs exist as drafts or are unwritten |
+| 3aj Bodies: monster AI Acts II–V, skill bodies batch 2 / 3, every missile body (`impl-ai-acts2-5`, `impl-skill-slots-2`, `impl-missile-bodies-2`) | **Implemented, unverified** (no recording of any Act II–V AI, skill body or missile body). **AI:** 56 more functions in `monsters::ai::{bodies2, bodies3, bodies4, bodies5, common}` (93 of 148 indices have bodies; the 55 `unread` stay stubs that log `Unhandled::Function`), seam `AiActs` (part of `AiHost`) answered by `wiring::action::View` for unit flags, max life, state groups, states count, move mask and path stop, every other call a `Pending::ai_*` default; `AiTables` gains `skills` and `missiles`, `skill_modes` is `[u8; 8]`. **Skills:** every `functions.tsv` row of status `spec'd-here` has a body (45 start and 85 do slots: `skills::use_::bodies::{helpers2, helpers3, starts2, dos2, b3_lvl01..b3_lvl30}`), seam `BodyWorld` (+ command seams `BodyEffect`, `PathOp`), `UseView` answers on real data where the wired host has it, the rest goes to `Pending`; player pet lists `player::pets` (`sim/pets.md` §1–§9 over `PetWorld`; no host yet). **Missiles:** every non-null server-do (36) and server-hit (53) body (`missiles::{bodies_ext, bodies_ext2}`), new `MissileBodies` seams defaulted (the wired `View` answers `skill_field` and `Calc4` only), `Unhandled::Fatal { addr, missile }` where 1.14d asserts. Also: the A1Q6 Catacombs entry keeps states 4 and 5; `HratliMagicLvl` pinned by a compile test | `cargo test -p d2-sim --lib monsters::ai` (86 tests in `tests/act2.rs`..`act5.rs`; `specd_here_matches_tsv` + perturbation), `… skills::use_` (`bodies/tests2.rs` 23, `tests3.rs` 29; `function_tables_match_tsv`, `bodies_match_tsv_notes` + perturbations), `… player::pets` (27), `… missiles` (`tests/ext.rs` 64; `bodies_match_catalogue_status`, `bodies_check_catches_perturbations`); unit coverage `ai-bodies-2..5` 108/109, 70/72, 82/84, 142/143; checks C87, §5 S9-A4 |
+| 3ak Quests Acts I–V (`impl-quests-act1-rest`, `impl-quests-act2`, `impl-quests-act3`, `impl-quests-act4-5`) | **Implemented, unverified** (no recording of Acts II–V; no trace of a Cain rescue, a Cairn stone 0x50, a Countess kill or a Catacombs entry): `world::quests::{act1 (q4, q5, q6 remainders), act2, act3, act4, act5, late}`: every callback, active / status function, timer, quest object init / operate (as `pub fn`s) and other-system hook the specs describe; `QuestControl::new` inits Acts II–V; `TimerFn::{Act2, Act3, Act4, Act5}`; Kashya's deferred reward order (`wiring::economy::QuestDeferred`) and the bucket-order player walk (`quest_players`). About a hundred new `QuestWorld` seams with default bodies that report `unhandled(0xFF / 0xFE, addr)`; on the wired host `HostQuests` (row 3al) answers object mode, timers, allocation, room level, the interaction owner and identify, the rest stay on the rest with a reason (`wire-world-staging.md` §3 item 6). Quest-object callers from objects, AI, monster creation, cube and item use are wired only for the Act I / II objects the dispatcher routes | `cargo test -p d2-sim --lib world::quests` (Act II 81 tests, Act III 145, `world::quests` 246 on `impl-quests-act4-5`; Act I rest `act1_rest_q4_tests.rs`, `act1_rest_misc_tests.rs`); every Test-vector row a test with `// Covers:`; §5 S9-A1 (12)–(13), S9-A2, S9-A3, C91 |
+| 3al Objects, hirelings, game creation and quest-object routing (`impl-objects`, `impl-hirelings`, `wire-world-staging`) | **Implemented and wired, unverified**: `world::objects` (+ `chests`, `shrines`, `misc`: control, init / operate dispatch, presets 574–580, chests, breakables, traps, the 24 shrine codes, doors, wells, torch, portal rules 1–2, events 1, 2, 4, 5, 6, 11, S→C 0x0E / 0x4D) kept in `ActionHooks::objects` and lent per call; C→S 0x13 with unit type 2 → `WorldHost::objects` on `ActionWorld` and `WiredWorld`; `ChestWorld` / `ShrineWorld` / `MiscWorld` are empty on the wired host (no drops, no shrine effects, no keys). `world::hirelings` (rows, offer, init / replace, level stats, experience, death, revive, follow, classic act change, restore steps, item swap) on the interaction desk (`HireView`, `HirelingRest`); no production loader sets `HirelingTables`. `WorldSim::create_game` runs regions → object control → NPC control → quest control in `rng.md` §5.2 order (the app's game does not call it); the server frame's clock is the object host tick; quest inits / operates / event 7 are queued and run on the host's quest control (`wiring::economy::quest_objects`, `HostQuests`); the hireling teleport follow has a caller (death, 0x61 swap, save restore and the act change have none) | `cargo test -p d2-sim --lib world::objects` (84), `wiring::action::tests::objects` (7), `world::hirelings` (53), `wiring::worldgen::tests::creation`, `wiring::economy::quest_objects::tests`; `cargo test -p d2-server` `world/tests/objects.rs` (3 + the host tick), `world/tests/quest_objects.rs` (5); checks C78–C80, C90, §5 S9-A5 |
+| 3am DRLG Acts III–V and live room population (`impl-drlg-act3-5`, `impl-room-population`) | **Implemented, unverified**: `drlg::outdoor::{jungle, act3, kurast, act5}` (jungle placer on the DRLG seed, Kurast chain anchored on 78, jungle stamping, Kurast / Travincal, the Act V §11 build; `OutdoorError::Fatal(id)`), the maze link rules of f71ee9b and the preset door flag; every derived vector of `outdoor-act3-act5.md` is reproduced. `drlg::logic` (room +0x64 logical rooms, `levels.md` §11.1–§11.4) and the §11.5 queries on `Level` answer `PopWorld` from the act DRLG, so rooms populate when activated (closes F1 and GH1); `WorldPending` keeps only `nearest_free_point`; `seed-finder` answers champion / unique queries on the live host (its F2, activation order, still holds). Cold Plains 97 vs 98 rooms stays an outdoor finding | `cargo test -p d2-sim --lib drlg` (367 on that branch: `kurast_tests` 13, `act5_tests` 13, `maze/links_tests` 6, `tests::logic` 13), `wiring::worldgen::tests::population::drlg_population_reads_are_the_act_drlgs`; coverage `outdoor-act3-act5.md` 40/45, `outdoor.md` 78/82; checks C65, C89, §5 S9-A1 (4), S9-A6 |
+| 3an Character save `.d2s` (`impl-d2s`) | **Implemented, unverified** (no 1.14d save compared, `d2s.md` OQ3): `d2_formats::d2s` reads and writes byte-identically every file it accepts (the whole header, every section, the loader's codes and 27-entry result table; item entries opaque, sized by `d2_proto::item_bits::save_entry_len`); the item save format's writer `items::bitstream::write_save` and reader `item_bits::decode_save_record`; `tools/d2s-tool` (`new`, `new-stub`, `dump`, `check`, `set`) for local game testing. The load effects (`d2s.md` §9: `d2-server` character storage) have no code | `cargo test -p d2-formats d2s` (27 incl. a perturbation test), `-p d2-sim items::bitstream::save_tests` (6), `-p d2-proto item_bits::save_tests` (7), `-p d2s-tool` (9 + 1 ignored); C66, `docs/LOCAL-RUN.md` 2.18 and 6.7 |
+| 3ao Session join from the in-process server (`impl-server-join`) | **Implemented, unverified** (C84–C86): `d2_server::adapters::session::enter_game` queues S→C 0x59 (part A), 0x0B, 0x03 (act, init seed = game +0x7C, town level, game +0x80 = `ObjectState::obj_seed`), then game entry (`wiring::path::place::game_entry`: 0x07 of the spawn room, 0x15); the room switch sends 0x07 for each joined room (`ActionSim::client_level_change`); `d2_proto::s2c` builds 0x0B and 0x59; the app's game joins its player through it, so `play` builds the client DRLG (row 6, ninth fold). Not sent: 0x01 / 0x00 / 0x02, the messages between 0x0B and 0x03, 0x53, 0x04 (the client never reaches `in_game`, so its update pass never runs), the switch's add messages, 0x08; the app's 0x03 carries game +0x80 = 0 (no game-creation sequence in the app); the staged e2e games still skip the join and refuse their 0x07s | `CARGO_INCREMENTAL=0 cargo test --workspace` at `ef00681`: 5,263 passed, 0 failed, 218 ignored; `test-fixtures` `synthetic_game::town_entry_sends_the_join_sequence`, `d2-client --test app_client_drlg`, `d2-proto s2c::tests::recorded_join_messages` |
+| 3 not implemented | **Ninth fold (the list is current):** the 55 `unread` AI functions of `ai-functions.tsv`, the `mapped` skill slots behind `SkillFunctions` (`use.md` OQ10), the providers behind the night's new seams (`Pending::ai_*`, `BodyWorld` / `BodyEffect`, `MissileBodies`, the `QuestWorld` calls left on the rest, `ChestWorld` / `ShrineWorld` / `MiscWorld`, `PetWorld`; rows 3aj–3al), kill experience (`kill_experience` applies `vitals.md` §4.2 and §4.3's add only; nothing calls it, §7 WI10) and the hireling's death / 0x61 swap / save restore / act change callers, walk / run for monsters and without the path provider, missile flight on the provider (`pathing.md` OQ3), item-use bodies, player data (HM3), sockets and the other `InvRest` seams, the item bit stream of 0x9C / 0x9D, message 0x73, the §7.3 client pass 0x67–0x6D (so no 0x69 at death), object population (`objects.md` §15), the `.d2s` load effects (`d2s.md` §9), a game-creation sequence in the app, the join messages of row 3ao | specs exist as drafts or are unwritten (§7 ninth set) |
 | 4 Conformance | recording proven feasible; coverage tool done; **eighth fold (`py tools/coverage.py --summary`): 4,194 claims over 3,339 rule units: unit 2,858 (85.6%), game-file 197 (5.9%), trace 30 (0.9%), verified 227 (6.8%), any tier 2,911 (87.2%); `--check` passes; the denominator grew with the three new specs (`ui/text.md` 39, `render/draw-order.md` 23, `render/unit-composite.md` 41 units, no claim yet) and with 39 table-row units of `sim/rng.md` §5.2–§7 and the numbered edge-case lists (`spec-unit-numbering`: rules 3,106 → 3,190 on its own base), so the any-tier share fell from 91.4% at the seventh fold; the tool's `verified` count counts game-file claims on `#[ignore]` tests that never ran** | `tools/trace-recorder`: 32,543 recorded RNG draws match the spec exactly. `py tools/coverage.py --summary` at `edd9925` (all branches merged, sixth fold): 3,542 claims over 3,106 rule units: unit 2,612 (84.1%), game-file 189 (6.1%), trace 30 (1.0%), verified 219 (7.1%), any 2,660 (85.6%) — tested (any tier) 85.6%, verified 7.1%; the percentages fell because the denominator grew by 402 rule units of specs written since (`inventory` 148, `pathing` 125, `path-placement` 84, `composition` 16, `camera` 11, `capture` 9, `sprite-placement` 9; `pathing`, `camera` and `sprite-placement` have no claim) while claims grew by 283; for the `4b5b0bf` figure: 3,259 claims over 2,704 units, unit 2,404 (88.9%), game-file 187, trace 30, verified 217, any 2,459 (90.9%); the 28 game-tier claims the `gaps-data-formats` session added and the one of `gaps-client-formats` (`ds1.md` edge cases) sit on `#[ignore]` tests that have never run, and the tool counts them (verified was 188 before the first 28), while that note and `docs/COVERAGE.md` §3 count a game claim as verified only while its latest local run passes: read 219 as an upper bound until §5 C17, C20 and C38 are run (the two game claims added since sit on `path::search::tests::expfield_live`); the 67 game-file tests of the sixth fold carry no claim yet (§1 3w), so none of them is in 189 (history: `--summary` total line on main at `fd37fba` was 3,164 claims, unit 86.6%, any 88.6%, verified 216; the `coverage-claims` branch measured 1,520 claims, unit 1,072, verified 180 before the implementation notes landed; per-branch figures of the gap-test notes, 67.1% → 71.6–73.5% any tier on their own bases and 88.8% → 89.2–89.9% for the second four, are not additive; the 90.9% above is the one merged run). Verified units come from the sim-0006/0007/0008 replays (tick.md 14, unit-order.md 12, rng.md §3 r2 / r4) and three ignored game-file tests (§5 C1, C8): the unit tier is claims by synthetic tests, not fidelity; seventh fold (all branches merged one by one, merged tree at this fold: `py tools/coverage.py --check` 4,038 claims, 0 errors; `--summary` 2,839 of 3,106 rules any tier (91.4%), unit 2,791 (89.9%), verified 219 (7.1%, unchanged: tick, rng and the game-file / trace checks of earlier folds); the notes' own gates reported 3,403, 3,813 and 3,869 claims; `pathing.md` 114 of 125 units any tier, `path-placement.md` 77 of 84, `camera.md` 11 of 11, `sprite-placement.md` 7 of 9, repository 2,827 of 3,106 (91.0%) any tier on `gaps-path-render`'s base; `prop-*` and `game-tests-inventory-path` add no claim; `mutants-monsters-missiles` adds 115 unit-tier claims. Replay harnesses for movement and placement exist but have never run on a 1.14d recording (row 3ab). Still no verified unit from this fold |
-| 5 Local server + bridge | bridge design `specs/client/bridge.md` and skeleton `d2-client::bridge` done; `bridge::local::LocalLink` implements `ServerLink` on `d2_server::host::Host` (`claude/p5-local-server`, synthetic data only, unverified; `d2-client` now depends on `d2-server`); every S→C id still unowned (`bridge-dispatch.tsv` all `TBD`); session code is the placeholder `PendingSession`; the app now builds the single-player game on a server thread (row 6) | `cargo test -p d2-client bridge`: every synthetic vector of `bridge.md`, the dispatch TSV check with its perturbation test, a windowless Bevy `App` mirror test; `bridge/local_tests.rs` headless end to end on the real host, `ProtoSizes` and `SimGame<ActionSim, ActionWorld>` (two-act synthetic DRLG, seed 1234, a sorceress at (42, 20) beside a Cold Plains waypoint): C→S 0x49 drained, dispatched (result 0), ticked, flushed, and the exact S→C `0D 00 <guid> 01 2D00 1700 0000` reaches a synthetic 0x0D handler that adds unit (0, guid) to `ClientWorld`; duplicate filter, protocol version check (a wrapper reporting version + 1 refused), unknown / unowned ids; `app_frame_loop` and `app_single_player` (row 6) run the same link through a Bevy `App` for 300 ticks |
+| 5 Local server + bridge | **Ninth fold:** the in-process server sends the session join (row 3ao); 53 of the 181 S→C ids of `bridge-dispatch.tsv` have an owner spec and a handler (0x7A / 0x81 from `impl-client-staging`, the rest from the `client/msg-*` and `model.md` specs), so the line "every S→C id still unowned" below is stale; 0x2C, 0x53, 0x5D, 0x63, 0x77, 0x94 stay `TBD` (`impl-client-msgs-2`, §7 CM-1–CM-6); the bridge owns a client DRLG (row 6, ninth fold). Earlier: bridge design `specs/client/bridge.md` and skeleton `d2-client::bridge` done; `bridge::local::LocalLink` implements `ServerLink` on `d2_server::host::Host` (`claude/p5-local-server`, synthetic data only, unverified; `d2-client` now depends on `d2-server`); every S→C id still unowned (`bridge-dispatch.tsv` all `TBD`); session code is the placeholder `PendingSession`; the app now builds the single-player game on a server thread (row 6) | `cargo test -p d2-client bridge`: every synthetic vector of `bridge.md`, the dispatch TSV check with its perturbation test, a windowless Bevy `App` mirror test; `bridge/local_tests.rs` headless end to end on the real host, `ProtoSizes` and `SimGame<ActionSim, ActionWorld>` (two-act synthetic DRLG, seed 1234, a sorceress at (42, 20) beside a Cold Plains waypoint): C→S 0x49 drained, dispatched (result 0), ticked, flushed, and the exact S→C `0D 00 <guid> 01 2D00 1700 0000` reaches a synthetic 0x0D handler that adds unit (0, guid) to `ClientWorld`; duplicate filter, protocol version check (a wrapper reporting version + 1 refused), unknown / unowned ids; `app_frame_loop` and `app_single_player` (row 6) run the same link through a Bevy `App` for 300 ticks |
 | 6 Client | design drafts `specs/client/{render-pipeline,assets,ui,audio}.md` (d2rs-own). Cloud tasks implemented (plain-Rust infrastructure, no original behavior): **C1** paths + loaders, **C2** residency cache, **C3** frames + atlas, **C4** scene + CPU compositor, **C5** GPU compute compositor (`gpu_compositor`: WGSL, integer math, no sampler, 16×16 workgroups), **C6** verify harness (`verify`: case files version 1, `--perturb`, `GpuCompositor` seam), **C6×C5** GPU half of the synthetic cases wired (`verify::gpu::Wgpu`, `[[unit]]` COF cases), **C7** COF composite mechanics (`composite`), **C8** UI core, **C9** controls file, **C10** audio core. Nothing original-behavior is reproduced: every §B point is a `TODO(spec: …)` hook or a `ComponentResolver` method. GPU byte-exactness **proven on a real GPU** (Intel HD Graphics 630, Vulkan: `gpu_compare` 12/12, `d2-client verify` 11/11, perturbations exact, §5 Done 2026-10-06) and on Mesa llvmpipe 25.2.8 | CI unit tests from each spec's vectors (`d2-client` per branch: frames 53 pass + 1 ignored, scene 20 tests, ui 20, controls 16, audio 25; `gpu_compositor` 11 + 2 ignored, `composite` 11 + 1 ignored, `verify` 191 lib tests pass, 5 ignored on the `p6-verify-gpu` branch); llvmpipe: all 12 `gpu_compare` cases and all 10 synthetic verify cases 0 differing, `--perturb 7` reports exactly 7 on every half; game-file and real-GPU halves queued (§5) |
 | 6 Client, fifth fold (`p6-window`, `verify-map`, `client-own-gaps`) | **The client is an app on a window** (`cargo run -p d2-client`, subcommand `play`, now the default; `view` stays): `SimGame<ActionSim<LocalSeams>, ActionWorld>` (two-act synthetic DRLG, sorceress beside the Cold Plains waypoint, 0x49 on its real provider) behind `d2_server::host::Host` in `bridge::local::LocalLink`, **on a server thread** (`app::server_thread::ThreadLink`, `Send + Sync` for any link; the game is not `Send`: `DrlgWorld` holds un-`Send` boxed `TileSource` / `LevelTypes` and `wiring::worldgen::SharedTypes` is an `Rc<RefCell<_>>`; `d2-sim` unchanged); per frame `BridgePlugin` pumps the server in `PreUpdate`, the world view packs the frame in `Update`, and the render-graph system `compose_node` runs the compute compositor on Bevy's own device (`Gpu::from_device`) and copies its RGBA rows into the presented texture, no readback. With `D2_GAME_DIR` (and no `--synthetic`) the `levels` / `objects` tables are the user's and the waypoint object is the first `objects` row with operate function 23 and init function 17 (`waypoints.md` §5.1 r1); the DRLG stays synthetic. **The window is black by design:** no S→C id has an owner spec, every §B rule is `Unspecified`, the frame palette is all zeros. **Frame store done** (`frames::FrameStore`: `(FrameSetKey, index)` → dense `scene::FrameId`, a `scene::FrameSource`, builds a C3 atlas; `composite::build_with` takes ids from it) and **the `map` verify case ported to the compositor** (`verify/map.rs`, chunks of ≤ 1024², three byte comparisons, `--perturb N` flips N indices and N RGBA pixels). **d2rs-own gaps now with code** (`client-own-gaps`): `audio::pool::SoundPool` (audio §A1 r1, r3; assets §A5 `sounds`), `assets::prefetch::PrefetchQueue` + `Pool::offer` (assets §A4 r3), `ui::text::layout_text` + `TextRules` (ui §A3); `WavDecoder`, the sound-id → file map and the text rules stay `TODO(spec: …)`. **Bug found and fixed in the staging** by the first window run: joining with `Some(room)` skips the client room switch (`rooms.md` §4.1), so tick step 9 freed the player's room and the next client update panicked (PW1) | `app_frame_loop` (2 tests: 300 ticks, 0x49 → unowned S→C 0x0D, presented image = CPU reference; GPU node output read back = CPU reference byte for byte, skipped without an adapter), `app_single_player` (4 + 1 ignored: `Send + Sync`, failing builder, deterministic build on the thread, live tables); `d2-client` lib 224 pass, 6 ignored. llvmpipe only (Xvfb, `xvfb-run cargo run -p d2-client -- play --frames 1000`, synthetic): 1,000 frames, 419 server ticks (~25/s at ~60 fps), `gpu: true`, node frames 999, exit 0; ignored GPU tests, `gpu_compare` 12/12 and `--perturb 7` exactly 7 re-run after the `device.rs` refactor; `verify::map::tests::gpu_map_matches_cpu_reference` (synthetic 100×70 map, chunk sides 32 / 64 / 1024) 0 differing, `--perturb 7` exactly 7 on CPU binned, GPU indices and GPU RGBA, `gpu_half` still 10/10; real `townN1` and a real GPU not run (§5 C24–C31). Coverage: audio 6 → 8 of 10 units, assets 8 → 9 of 12, ui 9 → 10 of 13 (unit tier); `bridge.md` §8 r1–r3 claimed on the frame loop; `render-pipeline.md` §a10 two claims (the map comparison and the exact `--perturb` count) |
 | 6 Client, render composition and capture (`render-composition`, `render-capture`) | **Composition** (`render/composition.md` §2–§6, implemented in both compositors, byte-identical on llvmpipe, **unverified** against 1.14d: no capture): the pixel write is now `dest' = map[base + dest][src]` (**behavior change**: was `[base + src][dest]`; `MapTable::push_table` takes `table[dest][src]`, the PL2 layout, so a PL2 table is pushed unchanged; `verify/mod.rs` fills `[[table]]` rows as `table[dest][src] = rule(src, dest)` so existing case files keep their meaning); `scene::frame::FrameCycle` / `FramePlan` (persistent index framebuffer, `plan(blank_screen)` = `{clear_rows: H − 47 or 0, clear_after}`, `UNCLEARED_ROWS` = 47, `compose` / `commit`, `set_post_clear`); GPU params 32 → 48 bytes (`clear_rows`, `clear_after`) and a storage binding 9 `base`; `scene::present_palette(pl2)` (index i = `pl2[4i..4i+3]`, 0 included). Kept as TODOs: `composition.md` OQ2 (order of `L` and `T`), §7 DirectDraw (display type 3 only), §1, §3 r1 / r3 (`camera.md`, `draw-order.md`). **Capture** (`render/capture.md` §4–§8): case kind `scene` (`verify::capture`, `capture_case`, `capture_tests`; `crates/d2-client/capture-cases/{stability,placement,camera,composition}-0001.toml`, `raw = "latest"`): `check = "stability"` complete (PNG re-hash, `clear_counter > 0` frames all index 0, one `index_sha256` per state group, at least two keys seen at least twice); `check = "compare"` composes the recorded state with the CPU reference and compares indices (count + first mismatch) and the 768 palette bytes, then the GPU half, but **no `SceneSource` is wired**: `main.rs` passes `SceneNotWired`, so a compare case ends `SCENE NOT WIRED` (exit 2, never a pass) after its integrity checks. Implemented, **unverified** (never run on a recording) | composition: `cargo test -p d2-client`: lib 257 pass, 6 ignored on its branch; `gpu_compare` 12 → 18 cases (`frame-blank-screen`, `frame-no-clear`, `frame-post-clear`, `pixel-write`, `blend-ops`, `frame-stress`), 18/18 0 differing and `--perturb 7` 7 / 7 on llvmpipe; M08 by hand on the old read order; `composition.md` 9 of 16 units claimed. Capture: 17 tests on generated captures (`--perturb N` → exactly N on CPU indices, GPU indices and GPU RGBA; stability `--perturb` → N re-hashes); the PNG reader decodes the bytes `record_frames.py` writes for its selftest image; `capture.md` 6 of 9 units claimed |
 | 6 Client, integration (`p6-integrate`, `p6-world-view`) | **World view** (`d2_client::world_view`, `p6-world-view`, d2rs-own, no original behavior): per frame bridge → UI (`run_ui`, intents forwarded) → `build` (tiles, units through `composite`, UI items, stable sort by key) → compose (GPU compositor on Bevy's device, else the CPU reference) → an 800×600 image on a sprite at the integer scale. Every original rule is a hook trait (`ViewRules`, `UiRules`; `Unspecified` draws nothing the model does not state and errors on a rule it lacks, never guesses); the hook table with owner specs is in the note. **Integration** (`p6-integrate`, wired, headless tests on synthetic data, live-file and real-GPU halves queued §5 C40–C44, **unverified**): `ViewAssets::frames: frames::FrameStore` (ids = the store's insertion order, `GpuAtlas` packs it incrementally, `ViewError::AtlasAhead`; `FrameTable` / `BoundFrames` removed); `verify` runs every case on one shared `verify::gpu::Wgpu` (`map::run_with`); UI text through `world_view::text_sprites` (`ui::text::layout_text`; hook trait `TextHooks`, `Unspecified` refuses); sound through `app::sound` (`GameAudio`, `PoolBank` → `SoundPool`; placeholders `NoSoundTable`, `NoWavDecoder`, `NoCues`, so the window plays nothing yet, by design); live levels: `GameData::Live(Arc<LiveData>)` = waypoint tables + `LevelTables` + `WorldFiles` + `ArchiveSet` (`GameData::select`: no directory or `--synthetic` → synthetic, a directory that does not load is an error), `WorldTypes` behind `SharedTypes`, acts 0 and 1 created with town level ids 1 and 40, init seed = `--seed` (game +0x7C, source unspecified, §7 PI1), Cold Plains generated and the first rooms of Cold Plains and Lut Gholein streamed. Not wired: the spawn room and position of a joining player, the waypoint object from level presets, every §B rendering rule (the window stays black), `app::Mode::Verify` and `render/` cleanup | world_view 9 tests (205 lib pass on its branch; golden FNV hash `0x03866d4be03b3500` of the CPU frame, perturbation tests, `gpu_packing_emulates_to_the_cpu_image`); p6-integrate: `app_frame_loop.rs` new `frame_loop_uses_the_frame_store_text_layout_and_sound_pool` and `placeholder_hooks_refuse_text_and_sounds`, `app_single_player.rs` `data_selection_falls_back_only_without_game_files`, `world_view/tests.rs` `frame_ids_are_the_frame_stores`; `sh tools/gate.sh` PASS, llvmpipe `adapter: llvmpipe (LLVM 20.1.2, 256 bits)`, `xvfb-run … play --synthetic --frames 600` exit 0 |
 | 6 Client, specs landed from the local session (eighth fold; no handoff note) | **New specs, all draft, no claim yet**: `specs/ui/text.md` (+ `text-fonts.tsv`, 39 rule units: 1.14d text rendering: fonts, glyphs, colour codes, wrap, and the answer to CG2), `specs/render/draw-order.md` (23 units, items B6 and B10), `specs/render/unit-composite.md` (41 units, item B4) with `unit-directions.tsv` (449 lines), and a render follow-up pass over `camera.md`, `capture.md`, `composition.md`, `sprite-placement.md` (answers RC1–RC6, RW1, RW5, RN1–RN3, CP1–CP4: roofs use the floor drawer `0x004F68E0`, per-block wall culling (camera §7), exact shake arithmetic with no zero divisor reached (camera §8), composition §5 `T[256d + L[s]]` with P dropped, act load sets the clear counter, the capture's hooks / level / cursor rule / light quality / weather / draw log; **the "light flicker" is the cursor animation**) plus `record_frames.py` 0.2.0 (capture format 2, `frames-raw-2`, `--draws-every` draw log, celfile records, selftest with perturbation checks; `traces/FORMAT.md`). **Implementation sessions are running: `impl-ui-text`, `impl-draw-order`, `impl-unit-composite`, `render-followups-impl`**; their notes are the next fold's input. Until they land the code keeps its `TODO(spec)` hooks and the app's window stays black (§2 step 7q) | spec index check passes (`py tools/spec_index.py --check`); `py tools/coverage.py --summary` at this fold lists `ui/text.md` 0 of 39, `draw-order.md` 0 of 23, `unit-composite.md` 0 of 41 |
+| 6 Client, ninth fold: rules (`impl-lighting-blend`, `impl-draw-order-2`, `impl-ui-panels`, `impl-audio`, `impl-client-staging`) | **Implemented, unverified** (no capture compared, no game-file run): `rules::lighting` (light map, records, sources, environment, overrides, per-draw values, `LitRules` through `ViewFeed::light`; `specs/render/{env-periods,wall-light-points}.tsv`), shading §6 colormap shifts, blend §5 shadow positions and §8 GDI lines / rectangles (harness case `gdi-lines-rects`); `rules::draw_order::{sight, weather, background, edges}` and the draw-order answers (group-mode fade, pool overflow, clock arithmetic, flag 0x20000 after the draw, automap reveal), UC2–UC5, UT1–UT5; `ui::{layout, states, panels::*}` (`SetUIState` with gate, open mode and cursor jump; character, inventory, skill tree, stash, cube, waypoint, NPC menus, shop, border); audio `d2_formats::wav`, `d2_data::sounds`, `audio::{sound_table, triggers, environment}`; client model 0x7A / 0x81 (`ClientWorld::pets`, the hireling GUID), the 0x15 level and palette act; the formats sweep and four S→C masks follow PC 1's answers. Strict errors remain for passes 1, 4, 9, edge floors, sight without collision rooms, the eclipse, |dx| = |dy| lines and unit shadows (no draw-order item) | `cargo test -p d2-client --lib rules::` (lighting 25 + 32 + 7 + 3, shading shifts 8, GDI 8), `--lib ui::panels` (86), `--lib audio` (132), `cargo test -p d2-formats wav`; GPU harness `--include-ignored` 0 differing on llvmpipe; coverage `blend-modes` 20/20, `shading` 29/32, `lighting` 81/90, `draw-order-2` 43/44; checks C67–C75, C88 |
+| 6 Client, ninth fold: wiring and the client DRLG (`wire-client-staging`, `impl-client-drlg`, `impl-client-msgs-2`) | **Wired, unverified**: with game files `play` runs the original UI (`ui::original::OriginalUi`: `UiStates` the authority, inventory / skill tree / character / border adapters, `dev` hotkeys I / C / T, panel art from the archives, the UI open mode is the camera's) and the original audio (sound table, `D2Wav`, `SoundDriver`: one `run_tick` per server tick, UI sounds the only trigger feed). The bridge owns a client DRLG (`bridge::drlg::ClientDrlg`: built by 0x03, rooms in / out of sight by 0x07 / 0x08, `active_rooms`, the room of a point, unit seeds from the room seed with fatal 0x13C, the player's level, BlankScreen, `Indoors`); the act palette is presented from the first frame (`app::palette`). Pending with named reasons (`world_view::model_feed::PENDING`, `audio::driver::PENDING`, `ui::original::PENDING`): near rooms, map tiles, tile art and blocks (CD-6, CD-7), light, weather, the environment machines (day phase, weather), sound `blocked`, the S→C handlers 0x2C, 0x53, 0x5D, 0x63, 0x77, 0x94 (`impl-client-msgs-2`: no owner spec, no code), character totals (CM-8), the client seed (WC-10). The world itself is not drawn yet (no map tiles) | `cargo test -p d2-client` (lib 822 and every target on `wire-client-staging`; `tests/app_original_ui.rs`, `tests/app_client_drlg.rs`, `bridge::msg::tests_drlg` 5, `app::palette::tests` 2); checks C76, C77, C81–C83, C86, §5 S9-A7 |
 | 7–9 | deferred (out of current scope) | |
 
 ## 2. Next steps (in order)
@@ -199,6 +234,10 @@ Cloud (repo only):
    `View::path_place` after the join puts the player in a room), call
    `wiring::path::walk::walk_message(v, game, player, id, a, b)` after
    `intents-events.md` §2.4 (returns `(0, Some(Outcome))`); step 7p.
+   **Ninth fold:** C→S 0x13 with unit type 2 runs the object code
+   (`WorldHost::objects`, row 3al) and quest objects run on the host's quest
+   control; the hireling ids C→S 0x46 / 0x47 stay `NoOwner` (AI spec); what
+   is left of this step is in 7v.
 4. **Bridge ↔ `d2-server` adapter, remaining** (the adapter is done as
    `d2_client::bridge::local::LocalLink` over `Host`, §1 row 5: `send` →
    `send_game` / `send_system`, `pump` → `frame`, `receive` →
@@ -220,6 +259,13 @@ Cloud (repo only):
    its thread. Open: a `Send` game would need `d2-sim` changes (not
    needed now); the session spec; `bridge/local_tests.rs` still joins with
    `Some(rooms[0])` (runs ≤ 2 ticks; the app joins with `None`, PW1).
+   **Ninth fold (`impl-server-join`, row 3ao): the game part of the join is
+   done** (`adapters::session::enter_game`: 0x59, 0x0B, 0x03, game entry;
+   the room switch's 0x07s), and `play` builds the client DRLG. **Left:**
+   0x04 and client state 3 (SJ-4), the messages between 0x0B and 0x03 and
+   0x53 (SJ-3), 0x01 / 0x00 / 0x02 (SJ-5), the switch's add messages (SJ-8),
+   0x08 (SJ-6); a session spec for the C→S 0x67 / 0x6B path; folding the
+   staged e2e games onto `enter_game` (7v (f)).
 5. **Phase 6 in-app wiring: done** in the fifth fold (§1 row 6):
    render-graph node `compose_node` on Bevy's own device (owns the atlas
    array, re-uploads on a version change), `FrameStore`, the `map` case on
@@ -253,6 +299,13 @@ Cloud (repo only):
    `place_unit` in step 7j), the waypoint object from level presets (the app
    runs `ActionSim` + `ActionWorld`, not `WorldSim`), PI1 / PI2 (§7), and
    the frame cycle / `SceneSource` of step 7l.
+   **Ninth fold:** (e) in part (the `dev` hotkeys I / C / T open the
+   original panels, `UiRoot` is in play mode; `wire-client-staging`), the
+   audio half of (f) (`SoundDriver` and the sound table in `app::sound`),
+   the join-time placement (row 3ao) and the act palette (row 6, ninth
+   fold) are done. Still open: (a), (d), the prefetch half of (f), the
+   waypoint object from presets in the app (the app's game still runs no
+   `WorldSim::create_game`), PI1 / PI2, step 7l.
 6. **Coverage** (`coverage-claims` and eight gap-test sessions are done,
    §1; the rest is test and tool work). Next test-writing targets are the
    units no claim names (`py tools/coverage.py` lists them per spec) and
@@ -364,7 +417,10 @@ Cloud (repo only):
    of a created monster (§7 WG8); `NpcControl::new` steps the game seed
    once, third among the game-creation seeds, after the object-control seed
    and before `QuestControl::new`; `SkillFunctions` bodies
-   (`use.md` OQ10).
+   (`use.md` OQ10). **Ninth fold:** the seed order is code
+   (`WorldSim::create_game`, `wire-world-staging`); every `spec'd-here` skill
+   slot has a body (row 3aj; the 83 `mapped` slots stay behind
+   `SkillFunctions`).
 7c. **One game, one unit world and one item store** (`e2e-next` §5, §7 J7 /
    J8, not done): the single-player e2e now runs on `SimGame<WorldSim<_>,
    TradeWorld<Rest>>` with the cube on `ItemWorld`, and the run shows the
@@ -652,7 +708,13 @@ Cloud (repo only):
    landed") and the implementation sessions `impl-ui-text`, `impl-draw-order`,
    `impl-unit-composite` and `render-followups-impl` are running: do not start
    the hooks they own; read their notes in the next fold and delete what they
-   close here. The app's window stays black
+   close here. **Ninth fold:** `impl-lighting-blend`, `impl-draw-order-2`,
+   `impl-ui-panels`, `impl-audio`, `wire-client-staging` and `impl-client-drlg`
+   landed (row 6, ninth fold): the open mode, the level and BlankScreen, the
+   act palette and the light / weather / tile-block hooks exist; the feeds
+   that fill them wait on the items of 7v (d). The notes of `impl-ui-text`,
+   `impl-draw-order`, `impl-unit-composite` and `render-followups-impl` are
+   still unfolded (no pointer line). The app's window stays black
    until the owners fill the `ViewFeed` hooks (RW2): local player position
    (S→C owner of positions), open mode (`ui/panels.md`), shake start
    (effect specs), player seed (camera OQ6), unit positions and offsets
@@ -767,6 +829,59 @@ Cloud (repo only):
    deep run reports as a counterexample (a regression test first, `fix-statlist-prop`).
    (g) `drop-freespot` DF1 / DF2 and `unify-items` UI1–UI7 are spec or wiring
    readings: the cloud work is in step 7o.
+7v. **Follow-ups of the ninth fold** (cloud, repo only; rows 3aj–3ao and
+   the two ninth-fold rows of 6; the spec answers they wait on are §7
+   ninth set). (a) **Providers for the night's seams**, owner by owner:
+   `Pending::ai_*` (skills: entries, checks, corpse search; path: patterns,
+   placement, free points, 64-direction; population / init: spawn, queen
+   class, chain byte, class for level; damage: kill; stat lists: curse flag,
+   wisp buff, change-class list; quests: `QuestCall`; `impl-ai-acts2-5` OQ19);
+   the `BodyWorld` `Pending` defaults (monster creation, skill-move paths,
+   entry params / flags, collision and free points, room levels, item reads)
+   and `PetWorld` on a host (`player::pets`; `BodyEffect::PetAdd` goes to
+   `Pending`); `init_cb::JITTER` / `DAMAGE_PERCENT` in the missile wiring
+   (`Pending::missile_init_callback`); the `MissileBodies` seams onto the
+   providers that exist (`skills::use_::bodies::helpers` `scan_unit`,
+   `aura_fill`, `apply_state`, `accepts`; `population::preset` `0x0054E600`;
+   `world::quests` `0x0056D130`; `path::footprint`, `path::place`); the
+   object extension seams `ChestWorld` (treasure drop, key test),
+   `ShrineWorld`, `MiscWorld` (footprints, trap spawn, stats / states /
+   missiles); the `QuestWorld` calls left on the rest (`wire-world-staging`
+   §3 item 6) and the callers of the Act II–V object / AI / cube / item-use
+   hooks; fold the seams that reach one function under two names
+   (`impl-quests-act4-5` §2: `spawn_object` / `place_object`, the three
+   `0x0061AED0` names, `spawn_superunique` / `_at_unit`,
+   `create_object_at` / `create_missile_at`, `kill_in_place` /
+   `remove_monster`). (b) **Hireling callers**: death from the kill path
+   (after WW-2), C→S 0x61 (needs `MoveWorld::equip_on_merc` with a player
+   and a result, then `HirelingItems` over `InvDesk`, and the item copy
+   `0x0055A2A0`), the classic act change, the save restore (after the
+   `.d2s` load effects), a production loader for `HirelingTables`. (c) **The
+   app's game creation**: call `WorldSim::create_game` (regions, objects,
+   NPC, quests) so 0x03 carries game +0x80 and the town's objects exist;
+   a missile flight / object population follow later. (d) **Client feeds**
+   once CD-2, CD-6, CD-7 are answered: `near_rooms` / `map_tiles` /
+   `tile_art` / `tile_blocks` from `ClientDrlg` (the local player's
+   adjacency array), then the light feed (`FrameLight`, `LookFeed`), the
+   weather frame, the sound `blocked` line test over the client collision
+   grids (`draw-order-2.md` §16, a follow-up with no spec gap), the client
+   seed as a mutable model field (WC-10); the S→C handlers of CM-1–CM-6 as
+   soon as a spec takes each id (register in `bridge::msg::HANDLERS`, hand
+   0x63 / 0x77 to `ui::original`, 0x2C / 0x5D to `audio::driver`, drop the
+   `PENDING` rows). (e) **Server messages**: the §7.3 client pass
+   (0x67–0x6D), then 0x69 code 8 at death and code 9 at the end of the
+   death animation (`intents-events.md` §7.4 r7; MB-8); the join messages
+   of step 4. (f) **Tests**: fold the staged e2e games (`e2e_full_loop`,
+   `e2e_single_player`, `e2e_walk`, `game_wired_host`, `synthetic_game::run`)
+   onto `enter_game` (their scenarios then start at the spawn point); the
+   real-data `#[ignore]` tests `impl-audio` §2 item 2 asks for (environment:
+   50 `soundenviron` rows, songs 4,657–4,684; triggers: every TSV id
+   resolves) on `SoundTableData::from_txt`; C90 and C91 need their tests
+   written. (g) **Small code items**: UC1 (`composite::check` rejects
+   duplicate layer records, §5.1 r5 says first match), the `ui/text.rs`
+   vertical window (now detailed in `ui/text.md` §9), mixer modes 1–2, start
+   offset and loop start in the core mixer (`impl-audio` §2 item 3),
+   `WiredWorld::now` (vendors) still the caller's clock.
 
 
 Local (spec / recording / game files; the coordinator batches them, §5):
@@ -780,6 +895,9 @@ Local (spec / recording / game files; the coordinator batches them, §5):
    `specs/client/bridge-dispatch.tsv` and registers handlers in
    `bridge::dispatch::HANDLERS` (the test `dispatch_table_matches_spec`
    enforces both). `bridge.md` open questions 2–5 go to them.
+   **Ninth fold:** 53 of 181 ids are owned; the next six are §7 CM-1–CM-8
+   (owners for 0x2C, 0x53, 0x5D, 0x63, 0x77, 0x94, a bridge → UI / sound
+   output channel, the client's stat-list extension), then CD-1–CD-7.
 10. **Phase 6 RE specs**, in the order of `docs/PLAN.md` Phase 6: the first
     four are written as drafts (`render/{sprite-placement,camera,
     composition,capture}.md`, with the recorder `tools/trace-recorder/
@@ -787,13 +905,26 @@ Local (spec / recording / game files; the coordinator batches them, §5):
     recordings (§5 A, `stability-0001` first) and for the answers RN1,
     RN2, CP1–CP4 (§7); then unit composite and draw order; shading, blend
     modes, lighting; audio; UI text, panels, controls, inventory, automap.
+    **Ninth fold:** shading, blend modes, lighting, `draw-order-2.md`, audio
+    and `ui/panels.md` are implemented (row 6, ninth fold); their answers are
+    §7 LB, DW, UP, ST / TR / EN; still unwritten: `ui/controls.md` (key table,
+    WC-4), `ui/inventory.md`, `ui/automap.md`, the client build timer (CD-2).
 11. **Spec and code questions of the fourth fold** (spec writing / Ghidra,
     §5 B, §7): GD8–GD11 (patch-layers report order and A05, the `.bin`
     automap check, numbering the `rng.md` cross-reference tables), GT1,
     GP1, GB1, QH1 and EN1; plus the earlier GD items the new notes
     extend (`loading.md` §7.3 also omits `setitems.set` → `sets.index`).
 
-12. **Spec text the sixth-fold audits found missing** (spec writing /
+12. **Spec text the sixth-fold audits found missing** (**ninth fold: mostly
+    done.** On main `ai-functions.tsv` has 93 `spec'd-here` and 55 `unread`
+    rows (no `summarized` or `D2MOO-only` left), `srvdo.tsv` 53 and `srvhit.tsv`
+    71 rows all `spec'd-here`, Acts II–V quests have specs and code
+    (`quests.tsv`'s `spec` column still says `catalogued`, QC-7, QE-7),
+    `functions.tsv` has 130 `spec'd-here` slots with bodies and 83 `mapped`
+    (64 `srvdo`, 19 `srvst`) without; left: the 55 `unread` AI rows, the 83
+    `mapped` skill slots, any Act I callback still reported `unhandled`, the quest
+    bodies of §7 QB-2, QB-17–QB-19, QE-1–QE-6. The counts below are the
+    sixth fold's and are kept for the record.) (spec writing /
     Ghidra, `spec-bodies-*` §3; every entry needs the bar of `ai.md`
     §9.3–§9.13 / `missiles.md` §R4: the 1.14d body as a numbered step list
     with every branch, every draw in order and on which seed, every
@@ -878,6 +1009,18 @@ Local (spec / recording / game files; the coordinator batches them, §5):
     code, not spec. Reconcile first: RC1 (roof drawer), WN1 (unit flag
     0x10 vs §6.3), PQ1 (V1–V3 rows), GX1 (record 29).
 
+15. **Spec answers and recordings of the ninth fold** (2026-10-07): §7
+    "Ninth set". **PC 1** (Ghidra / spec edits, 288 questions by spec file):
+    start with the integration items I-1 (0x7A field order: server and client
+    disagree on the wire today), I-2, I-3, I-6, then the owners the client
+    waits on (CM-1–CM-8, CD-1–CD-7, SJ-2–SJ-8), then the spec-table edits
+    (QC-7, QE-7, CS-4–CS-8, OB-1). **PC 2** (recordings / captures, 38
+    questions): §5 A S9-A1 (PC 1's list: draw-order OQ7, `weather-0001`,
+    levels 74 / 120, Act III entry, a kill with a drop, a hireling game, an
+    act change, Might in a party, Kick / Bash, a Druid summon, a Clay Golem,
+    a Countess kill, a Cain rescue), S9-A2–S9-A7, and the C entries that need
+    the game running (C69, C70, C74, C75, C78–C80, C83–C85).
+
 Done (kept for the record): step "tick trace replay" (`claude/phase3-tick-replay`,
 2026-10-06: `conformance::tick::replay`, d2-sim `UnitLists::alloc_unit` /
 `add_allocated`, `Game::alloc_unit`, findings TR1–TR4 in §7); step "wire the
@@ -924,12 +1067,25 @@ source; 7q), `conformance-path-render` (harnesses; recordings §5),
 `prop-path-place`, `prop-walk`, `fix-statlist-prop` (7s opened),
 `mutants-server`, `mutants-monsters-missiles`, `gaps-path-render` and
 `gaps-new-specs` (step 6) and `game-tests-inventory-path` (§5 C51).
+In the ninth fold (2026-10-07, 22 notes): `impl-ai-acts2-5`,
+`impl-skill-slots-2`, `impl-missile-bodies-2` and the four quest sessions
+(step 12 in the main), `impl-objects`, `impl-hirelings`, `wire-world-staging`
+(steps 2, 3, 7b: objects, hirelings, the creation seed order),
+`impl-drlg-act3-5`, `impl-room-population` (step 7: the DRLG population
+reads), `impl-d2s`, `impl-server-join` (step 4, the game part of the join),
+`impl-client-staging`, `impl-lighting-blend`, `impl-draw-order-2`,
+`impl-ui-panels`, `impl-audio`, `wire-client-staging`, `impl-client-drlg`
+(steps 5, 7q, 10 in part) and `impl-client-msgs-2` (no code: step 9's next
+owners).
 
 Per-session notes live in `docs/handoff/*.md` (detailed record of seams,
-public APIs, design choices and per-site open questions). The ones for the
-97 sessions above are folded into this file as of this commit (all notes);
-read the note of a module before you change it. Every note in `docs/handoff/`
-starts with the pointer line.
+public APIs, design choices and per-site open questions). 137 of the 171
+notes are folded into this file as of the ninth fold and start with the
+pointer line; the 34 others (e.g. `impl-ai-act1`, `impl-quests-act1`,
+`impl-skill-bodies`, `impl-ui-text`, `impl-draw-order`,
+`impl-unit-composite`, `render-followups-impl`, `local-buddy-*`,
+`mutants-*` of 2026-10-06) have no pointer line and are a later fold's
+input. Read the note of a module before you change it.
 
 ## 3. Code map
 
@@ -1249,6 +1405,28 @@ nightly-props.yml`, `tools/props-deep.sh`, and the `mutant_tests.rs` files
 (`stats/`, `units/`, `d2-proto` ×3, `items/inventory/`, `items/moves/`,
 `items/tests/mutants.rs`, `treasure/`, `world/` ×8, `combat/`, `skills/`).
 
+**Ninth fold (METHODS M21; each in its note):** new code map entries, one
+line each (the notes list every public item and seam).
+
+| Path | What | Spec |
+|---|---|---|
+| `crates/d2-sim/src/monsters/ai/{bodies2,bodies3,bodies4,bodies5,common}.rs` (+ `tests/act2.rs`..`act5.rs`) | the Act II–V AI bodies, seam `AiActs` in `seams.rs`; `View` answers part of it, `Pending::ai_*` the rest | `monsters/ai-bodies-2.md`..`-5.md`, `ai.md` §3, §7, §10 |
+| `crates/d2-sim/src/skills/use_/bodies/{helpers2,helpers3,starts2,dos2,b3_lvl01..b3_lvl30,fake,tests2,tests3}.rs` | batch 2 / 3 skill bodies, `BodyWorld` (+ `BodyEffect`, `PathOp`, `MissileRequest`), `START_BODIES` / `DO_BODIES` | `skills/bodies.md` §6–§8, `bodies-2.md` |
+| `crates/d2-sim/src/player/pets.rs` (+ `pets_tests.rs`) | player pet lists over `PetWorld` | `sim/pets.md` §1–§9 |
+| `crates/d2-sim/src/missiles/{bodies_ext,bodies_ext2}.rs` (+ `tests/ext.rs`) | every non-null server-do / server-hit body; `MissileBodies` seams in `seams.rs`; `hit::damage_tail`, `create.rs` zigzag callback | `missiles/bodies.md` §1–§30, `bodies-2.md` §31–§62 |
+| `crates/d2-sim/src/world/quests/{act2,act3,act4,act5,late}.rs` (+ subdirectories and tests), `act1/{q4,q5,q6}.rs` | Acts II–V quest records, callbacks, objects, timers, hooks; the Act I remainders | `world/quests-act1-rest.md`, `quests-act2.md`, `quests-act3.md`, `quests-act4.md`, `quests-act5.md`, `quests-act5-2.md` |
+| `crates/d2-sim/src/world/objects.rs`, `objects/{chests,shrines,misc}.rs` | object control, init / operate dispatch, chests, shrines, doors, wells, torch, portal | `world/objects.md`, `object-functions.tsv` |
+| `crates/d2-sim/src/wiring/action/objects.rs` | `ObjectState` (control, tables, host tick, `obj_seed`), `ObjectView`, quest-object queue (`QuestObjectCall`) | `objects.md` §3, §7, §14; `rng.md` §5.2 |
+| `crates/d2-sim/src/world/hirelings/{rows,pets,life,level,items}.rs`, `wiring/interaction/hirelings.rs` | hirelings (`HirelingWorld`, `HirelingItems`); `HireView` on the desk, `HirelingRest` | `world/hirelings.md` |
+| `crates/d2-sim/src/wiring/worldgen/creation.rs`, `wiring/economy/{quest_objects,quest_host}.rs` | `WorldSim::create_game`; the quest-object dispatcher and `HostQuests` on the wired host | `rng.md` §5.2; `world/quests*.md` |
+| `crates/d2-sim/src/drlg/outdoor/{jungle,act3,kurast,act5}.rs`, `drlg/logic.rs` | Acts III / V outdoor builds; logical rooms and the §11.5 population reads | `drlg/outdoor-act3-act5.md`, `outdoor.md` §9, §11; `drlg/levels.md` §11 |
+| `crates/d2-formats/src/{d2s,wav}.rs`, `tools/d2s-tool` | `.d2s` reader / writer and the dev tool; WAV parser | `formats/d2s.md`, `formats/wav.md` |
+| `crates/d2-server/src/adapters/session.rs` | `enter_game`, `load_act`, `JoinError` | `sim/path-placement.md` §11, §13; `client/model.md` §11 |
+| `crates/d2-client/src/rules/lighting/`, `rules/{shading,blend}.rs` additions, `rules/draw_order/{sight,weather,background,edges}.rs` | light map, environment, overrides, per-draw light; colormap shifts; GDI and shadows; weather, backgrounds, edges, sight | `render/lighting.md`, `shading.md`, `blend-modes.md`, `draw-order-2.md` |
+| `crates/d2-client/src/ui/{layout,states,original}.rs`, `ui/panels/`, `world_view/panel_art.rs` | panel tables, `SetUIState`, the panels, the original UI in the app | `ui/panels.md` (+ TSVs) |
+| `crates/d2-client/src/audio/{sound_table,triggers,environment,calls,driver}`, `crates/d2-data/src/sounds.rs` | sound table, triggers, environment, the sound layer and its driver | `audio/sound-table.md`, `triggers.md`, `environment.md` |
+| `crates/d2-client/src/bridge/{drlg.rs,msg/pets.rs}`, `app/palette.rs` | the client DRLG copy, 0x7A / 0x81, the act palette | `client/model.md` §9, §12, §14; `render/composition.md` §4 |
+
 ## 4. Command map (what proves what)
 
 | Command | Proves | Needs |
@@ -1319,6 +1497,11 @@ nightly-props.yml`, `tools/props-deep.sh`, and the `mutant_tests.rs` files
 | `cargo test -p conformance --test movement_replay --test placement_replay --test recordings_needed`; `cargo run -p conformance --bin recordings-needed` (`D2_TRACES_RAW=<dir>` for another folder) | the synthetic movement / placement fixtures and their perturbations; the list of recordings still needed with MISSING / present / BLOCKED per entry | repo (`traces/raw/` for the last) |
 | `cargo bench -p d2-sim --bench sim`, `cargo bench -p d2-formats --bench formats`, `cargo bench -p d2-proto --bench proto`, `cargo bench -p d2-client --bench compose` (append `-- --warm-up-time 1 --measurement-time 2` for a quick pass; `compose` builds Bevy) | criterion baselines (§1 3ad); not in CI; `cargo bench --no-run` and `cargo clippy --workspace --all-targets` compile all four | repo |
 | `cargo mutants -p d2-server --timeout 60`; `cargo mutants -p d2-sim --file 'crates/d2-sim/src/missiles/**' --file 'crates/d2-sim/src/monsters/**' --timeout 10 -j 3 -- --lib` (re-test only the survivors: `--iterate --timeout 20`) | mutation counts of §1 3ad (METHODS M08); `mutants.out/` is not committed | repo, `cargo-mutants` 27.1.0 |
+| `cargo test -p d2-sim --lib monsters::ai`, `--lib skills::use_`, `--lib player::pets`, `--lib missiles`, `--lib world::quests`, `--lib world::objects`, `--lib world::hirelings`, `--lib drlg` (ninth fold) | the Act II–V AI bodies (86 + catalogue check), batch 2 / 3 skill bodies (52 + table checks), pets (27), missile bodies (64 + catalogue check), quests Acts I–V, objects (84), hirelings (53), Acts III / V DRLG and logical rooms, each on synthetic fakes (row 3aj–3am) | repo |
+| `cargo test -p d2-sim --lib wiring::worldgen::tests::creation`, `--lib wiring::economy::quest_objects`; `cargo test -p d2-server --lib world::tests` (`objects`, `quest_objects`) | game-creation seed order (perturbed without the object step); quest-object routing table vs `object-functions.tsv`; the host tick, quest objects and the hireling follow through host frames | repo |
+| `cargo test -p d2-formats d2s`, `cargo test -p d2s-tool`; `cargo run -p d2s-tool -- new --name N --class C -o OUT` / `dump` / `check` / `set` | `.d2s` vectors, round trip and perturbation; generated saves read back (`D2_SAVE_DIR` + `D2_GAME_DIR`: `--test real_saves -- --ignored`, C66) | repo (`game/`, saves for C66) |
+| `cargo test -p test-fixtures --test synthetic_game town_entry_sends_the_join_sequence`; `cargo test -p d2-client --test app_client_drlg` (`-- --ignored`: C81, C86) | the session join's exact bytes on the synthetic town; the app builds the client DRLG from the real join | repo (`game/` for the ignored tests) |
+| `cargo test -p d2-client --test app_original_ui` (`-- --ignored`: C76), `--lib ui::panels`, `--lib audio`, `--lib rules::lighting`, `--lib rules::draw_order`, `--lib bridge::msg::tests_drlg` | the original UI and audio in a headless app; panels, sound system, lighting, weather / backgrounds / edges / sight, the client DRLG | repo |
 | `D2_GAME_DIR=<install> cargo test -p d2-sim --test game_inventory_path -- --ignored --nocapture`; `py tools/trace-recorder/path_tables.py` | the 6 game-file tests of the inventory grids, belts and path tables (§5 C51); `path_tables.py` must agree (exit 0) with `live_path_tables_equal_game_exe` | `game/` |
 
 CI job layout (`.github/workflows/ci.yml`, `ci-speed`): five independent
@@ -1457,6 +1640,19 @@ nightly runs on GitHub), `unify-items`, `path-update-pass`, `prop-fixes`,
 `prop-walk-gaps`, `mutants-core`, `mutants-combat-skills`, `s2c-use`,
 `spec-unit-numbering`, `fixedset-game` (C60 optional), `drop-freespot` (S8-A3),
 `wire-path-server` (S8-A1).
+
+Ninth fold (2026-10-07, 22 notes): C65–C86 were queued by the sessions
+themselves as they merged (numbers unique and in order; the merges
+renumbered `wire-world-staging`'s #78–#80, `impl-client-drlg`'s C81–C83 and
+`impl-server-join`'s C84–C86; C75's "C65 files" now reads C72, the eight
+`wav.md` files of C72). The fold adds C87–C91 from notes whose checks had
+not reached the queue (`impl-ai-acts2-5`, `impl-client-staging`,
+`impl-room-population`, `impl-hirelings`, `impl-quests-act2`), A additions
+S9-A1–S9-A7 (S9-A1 is PC 1's recording list for PC 2) and one B pointer to
+§7 ninth set. Notes with no local check of their own: `impl-skill-slots-2`
+(its e2e fixtures ran green in `impl-server-join`'s workspace gate at
+`ef00681`),
+`impl-client-msgs-2` (no code).
 
 Index: Done · A player · B Ghidra / spec edits · C game files and GPU · Blocked.
 
@@ -2006,7 +2202,77 @@ ones, but they need `traces/raw/`, so local):
   Stats entry) would let the conformance replay reach the stat code, which
   killed **0** of the 149 `d2-sim` mutant survivors today.
 
+**Ninth-fold additions to A** (2026-10-07, the night's 22 notes; PC 2 runs
+them; each settles the §7 ninth-set questions named. C74, C78, C80, C83,
+C84, C85 also need the game running: they are numbered in C but batch with
+these).
+- *S9-A1 PC 1's recording list for PC 2* (`record_packets.py` +
+  `record_rng.py`, `record_tick.py` where a per-tick list is asked,
+  `record_frames.py` for (1)–(3)): (1) capture `order-0003` beside a
+  visible river-bank cell, run-2 seed `TownE1` tile (950, 933) (`townN1`
+  (44, 32), (51, 32)): `draw-order.md` OQ7; (2) `weather-0001` (Draw order
+  2 (1) above: W5); (3) levels 74 / 120, Arcane Sanctuary and Arreat
+  Summit with `[0x00712C4C]` / `[0x00712C50]` recorded (Draw order 2 (3),
+  pass 1); (4) Act III entry: DRLG-seed draws `0x00677966`…`0x006784D9`,
+  levels 76..78 +0x1C..+0x28, +0x1B8, +0x1BC, then builds of 76..78, 111,
+  112, 117 (`outdoor-act3-act5.md` OQ1, OQ3); (5) a kill with an item
+  drop (the drop position of S8-A3 and the treasure walk); (6) a hireling
+  game: hire, level-up, death, resurrect, give / take, a teleport
+  (`hirelings.md` OQ9: HL2, HL3, HL7, HL8; C80); (7) an act change (the
+  classic hireling act change `hirelings.md` §6 r3–4, the act palette
+  switch `model.md` §11 r4 vs `msg-units.md` §3 r4.4); (8) Might in a
+  party (aura bodies on party members, `bodies.md` §7–§8); (9) Kick /
+  Bash on a monster (srvst 2, srvdo 2: kick damage and hit,
+  `bodies-2.md` §2); (10) a Druid summon and (11) a Clay Golem (summon
+  class / spawn `bodies.md` §6, golem stats, the pet lists `sim/pets.md`,
+  the 0x7A order of §7 ninth set I-1); (12) a Countess kill with a listed
+  chest (one monster 326 mode 12 at the death position, one missile 332
+  per chest: `quests-act1-rest.md` §4); (13) a Cain rescue (gibbet: mode
+  1, slot 4 = `0x2002`, 0x28 at once, 17 frames later class 146 at gibbet
+  + (3, 3) and `5d 04 00 06 0000`; also C78).
+- *S9-A2 Act I remainders* (`impl-quests-act1-rest` queue 3–4): entering
+  Catacombs 1 after Andariel (state 4: no 0x5D, state kept, §8 item 6);
+  the save header after Andariel on Normal (progression bits 8–12, §5).
+- *S9-A3 Act II–V quest runs* (packets + RNG, one run per act): Act II
+  (`quests-act2.md` OQ10: chat-end status, kill timers, Tyrael's portal,
+  Meshif); Act III (`quests-act3.md` OQ8: Alkor 564 with a second player
+  in Act III and a third elsewhere, a Khalim chest, a council kill's 0x5D
+  status byte, two orb hits, Mephisto's timer and Hellgate, Natalya, the
+  Dark Wanderer's 7 / 8 minions); Act IV (`quests-act4.md` OQ13: Izual,
+  Hellforge, seals and bosses, Diablo in classic with one uncredited
+  player (OQ3) and expansion, the classic end frames (OQ2), the Harrogath
+  portal); Act V (`quests-act5.md` OQ7: Shenk, the rescue portals, the
+  rune, Anya's thaw / scroll / item, the Ancients' experience, Baal, the
+  last portal).
+- *S9-A4 Monster AI and skill / missile bodies* (`record_tick.py` +
+  `record_rng.py`): Act II–V monsters per `ai-bodies-2.md`..`-5.md` OQ1;
+  the skill bodies (`bodies.md`, `bodies-2.md` OQ1); the missile list of
+  `impl-missile-bodies-2` §5.3 (Cairn Stones portal, Baal's taunt, Royal
+  Strike, Plague Javelin, Blade Fury, a lightning trailing javelin
+  explosion, Lightning Fury, Bone Wall, Battle Cry, Fist of the Heavens,
+  the panther potions).
+- *S9-A5 Objects* (`objects.md` OQ1–2, `impl-objects` §3.4): packets + RNG
+  of a chest, shrine, door, well and portal operate, and an object
+  allocation with `Sync` = 0.
+- *S9-A6 Room population* (`impl-room-population` §4 items 3–4): dump the
+  DRLG room +0x64 lists of a crypt level (`Logicals` 1) and an outdoor
+  level after activation and compare with `drlg::logic` on the same tiles
+  (`levels.md` OQ7); the first population of a Blood Moor room through
+  `WorldSim` against the spawn RNG recording (`population.md`
+  "Recordings", now runnable).
+- *S9-A7 Panel captures* (`impl-ui-panels` §5, `wire-client-staging` §5):
+  `placement-0001` (inventory frames), `ui-0001`, `ui-0002` (`ui/panels.md`
+  §Test vectors); the act palette is presented since `impl-client-drlg`.
+
 ### B. Ghidra / spec edits only (no game run, no player)
+
+**Ninth fold (2026-10-07):** every RE / spec question of the night's 22
+notes is in §7 "Ninth set", part **PC 1**, grouped by spec file (none is
+repeated here). Spec-table edits it names: `quests.tsv` `spec` column for
+the Act III rows (QC-7) and row 40 with its 15 `quest-messages.tsv` rows
+(QE-7), the 0x7A field names (I-1), `scenario.md` §6 vs
+`specs/tools/scenario-masks.tsv` (CS-4–CS-7), `tbl.md` OQ3's stale "33"
+(CS-8).
 
 **`impl-draw-order-2` questions** (owner `render/draw-order-2.md`, also
 `unit-composite.md`): W1–W7 (weather state, snow spawn draws, snow line
@@ -2753,7 +3019,7 @@ the dev-dependency) and record results here.
     Kurast chain; Act V rects of 110, 111, 112, 117) to pass. A mismatch is
     a finding for `outdoor-act3-act5.md`. Recordings of Act 3 creation and
     of builds of 76..78, 111, 112, 117 stay `outdoor-act3-act5.md` OQ 1, 3.
-66. **C66 Character saves** (`claude/impl-d2s`, note
+66. Character saves (`claude/impl-d2s`, note
     `docs/handoff/impl-d2s.md` §4; `docs/LOCAL-RUN.md` 2.18 and 6.7).
     (1) `D2_SAVE_DIR=<Saved Games\Diablo II>` `cargo test --release -p
     d2s-tool --test real_saves -- --ignored --nocapture`: every 1.14d
@@ -2823,7 +3089,7 @@ the dev-dependency) and record results here.
     `(tick, kind, file, vol, pan, looped)` (`client/audio.md` §A5).
 75. Decoded samples (`wav.md` OQ 1–2, `client/audio.md` §B1): dump the
     DirectSound buffer after `0x515180` (and a `Stream`=1 sound such as
-    `music\act1\crypt.wav`) for the C65 files; expect byte equality with
+    `music\act1\crypt.wav`) for the C72 files; expect byte equality with
     our `data`.
 76. Original UI on game files (`wire-client-staging`): `D2_GAME_DIR=<install>
     cargo test -p d2-client --test app_original_ui -- --ignored`. Expect the
@@ -2920,6 +3186,36 @@ the dev-dependency) and record results here.
     the recorded join (C84: same count, and the first at the spawn room).
     A spawn search failure (`game entry failed`) is a finding for
     `drlg/levels.md` §10 / `path-placement.md` §11 on the live town.
+87. AI index rows after the Act II–V bodies (`impl-ai-acts2-5` "Local run
+    queue"): `D2_GAME_DIR=<install> cargo test -p d2-sim --test
+    game_monsters -- --ignored ai_index_of_every_row`. Expect a pass with
+    0 differing counts and rows: the rebuilt `monstats_rows` (93
+    `spec'd-here` indices, 527 listed) equals the live `monstats`.
+88. Formats sweeps after PC 1's answers (`impl-client-staging` §2):
+    `D2_GAME_DIR=<install> cargo test -p d2-formats --test game_sweep --
+    --ignored cof_every_live_file_parses string_tables_every_key_resolves`.
+    Expect both to pass: names `ambl1hs`, `ambl1ht`, `amblhth`, `amblxbow`
+    (the first three parse); 29 copies of 20 `.tbl` paths in 10 language
+    folders, 63,167 used entries, 16,786 non-ASCII values strict UTF-8, 0
+    raw `FF`, 130 `C3 BF`. Another count is a finding for `formats/tbl.md`.
+89. Room population on the live files (`impl-room-population` §4 items
+    1–2): `D2_GAME_DIR=<install> cargo test -p d2-server world_data --
+    --ignored`, then `cargo test -p seed-finder --test game_seed_finder --
+    --ignored`. Expect the C23 expectations unchanged and no panic or
+    `WorldgenError` in the Den of Evil / Blood Moor rooms (their
+    `Logicals` rows now run the grid build; an error names the room);
+    seeds 1–8 build twice with the same result; record the
+    room-population monsters the views now list.
+90. Hireling rows on the live tables (`impl-hirelings` §5; **test to
+    write locally**, the cloud has no tables to check the decode): an
+    `#[ignore]` test building `HirelingTables::from_tables` from the live
+    `hireling` / `pettype`, then `offer` and `level::apply_level` on each
+    row of `hirelings.md` Test vectors. Expect every offer and unit column
+    equal to the spec's table.
+91. `missiles.txt` row 338 `horadricstaff` (`impl-quests-act2` "Local run
+    queue"; **test to write** once a missiles loader is reachable from the
+    quest tests): expect Range 440, so the orifice timer period
+    (440 − 75) / 20 = 18.
 
 Kept entries (unchanged):
 
@@ -4948,6 +5244,641 @@ change to `bridge.md` §6 rule 1 plus `dispatch::parse`. SU1 the sections still
 one large unit and the unnarrowed `§edge-cases-original-bugs` claims (step 7u
 (e)). NP1 the `wire` and `worldsim` deep groups were not run at full counts;
 GitHub runners may be 1.5–2× slower than the measured 670 s.
+
+**Ninth set (2026-10-07; the 22 notes `impl-ai-acts2-5`, `impl-skill-slots-2`,
+`impl-missile-bodies-2`, `impl-quests-act1-rest`, `impl-quests-act2`,
+`impl-quests-act3`, `impl-quests-act4-5`, `impl-objects`, `impl-hirelings`,
+`impl-drlg-act3-5`, `impl-room-population`, `impl-client-staging`,
+`impl-lighting-blend`, `impl-draw-order-2`, `impl-ui-panels`, `impl-audio`,
+`impl-d2s`, `wire-client-staging`, `wire-world-staging`, `impl-client-msgs-2`,
+`impl-client-drlg`, `impl-server-join`).** Grouped by who answers, then by
+spec file. **PC 1** answers from Ghidra / the 1.14d binary and edits the spec;
+**PC 2** records or captures on the original game (§5 A, S9-A*). Each line
+names d2rs's current reading (a `TODO(spec…)` at the site, "here" = d2rs).
+IDs are `<tag>-<n>`, n the note's own number where it has one; the tag names
+the note: AI `impl-ai-acts2-5` (Open questions), SK `impl-skill-slots-2` (Open
+questions), MB `impl-missile-bodies-2` (§3–§4), QA `impl-quests-act1-rest`,
+QB `impl-quests-act2`, QC `impl-quests-act3`, QD / QE `impl-quests-act4-5`
+(§3 Act IV / Act V), OB `impl-objects` (§4), HL `impl-hirelings` (§4), DR
+`impl-drlg-act3-5`, RP `impl-room-population` (§3), CS `impl-client-staging`
+(§4), LB `impl-lighting-blend` ("Not wired" 3–5), DW `impl-draw-order-2`
+("Questions"), UP `impl-ui-panels` (§3), ST / TR / EN `impl-audio` (§3), DS
+`impl-d2s` (§5), WC `wire-client-staging` (§2–§3), WW `wire-world-staging`
+(§3), CM `impl-client-msgs-2` (§2), CD `impl-client-drlg` (§3), SJ
+`impl-server-join` (§2–§3), I integration (two specs or two sides disagree),
+R2 a recording or capture.
+
+**Resolved in the ninth fold:** the 47 `d2-client` failures
+`Table(Mismatch([NoHandler { id: 122 }, NoHandler { id: 129 }]))` (0x7A and
+0x81 handlers, `impl-client-staging`); the ten `d2-sim` reds the night's
+sessions reported for each other (`missiles::tests_bodies`,
+`monsters::ai::tests::specd_here_*`, `skills::use_::tests`,
+`skills::mutant_tests::table_check_mutants`: each closed by its own branch;
+`impl-server-join`'s workspace gate at `ef00681`: 5,263 passed, 0 failed);
+F1 "no room population with the default `WorldPending`" and GH1 (population
+places presets only) (`impl-room-population`; `seed-finder.md` F1); "the
+in-process server sends no join" (`impl-client-drlg` §2, closed by
+`impl-server-join`); `quests-act1-rest.md` OQ2 (gibbet / stone / marker
+functions without a dispatcher: routed by `wire-world-staging`);
+`vendors.md` §1 r1 `HratliMagicLvl` (no code change; pinned by
+`hratli_magic_lvl_header_does_not_bind`); the A1Q6 Catacombs entry keeps
+states 4 and 5 (`quests.md` §10.8 event 3, fixed in `act1/q6.rs`).
+
+**PC 1 — RE / spec answers** (Ghidra and spec edits; 288 questions)
+
+*Integration*
+- I-1 0x7A order: `pets.md` §8 and `model.md` §14 r2 say owner@5, pet@9; the TSV
+  and `hirelings.md` §13 r2 say pet@5, owner@9. Server and client now differ.
+- I-2 `0x006416D0`: Acts IV / V bind it as `distance_between`, Act II as
+  `living_player_within(unit, radius)` (act4 §3.6, act5 §4.6). [QD §2]
+- I-3 `0x00538680` progression: A1Q6 calls it, Act III (OQ5) and Act IV (OQ9)
+  report `unhandled`, Act V uses a seam; settle once with `d2s.md`.
+- I-4 act palette switch: `model.md` §11 r4 compares the Levels `Act` byte,
+  `msg-units.md` §3 r4.4 the area byte of `0x0061DB70`. [CS Q3]
+- I-5 client room seed: `model.md` §2 r6 has `0x00465FD0` (objects …) step it,
+  `msg-units.md` names only 0x59 / 0xAC; code: 0x51 steps it. [CD Q3; C83]
+- I-6 join order: `path-placement.md` §11 text gives 0x07, 0x15, 0x07 × 9; its
+  R2 and `model.md` §11 r3 record 0x07 × 10, 0x15; code: the text. [SJ Q1; C84]
+- I-7 0x3A AddStatPoint: the proto TSV has one u16 at byte 1, `panels.md` two
+  bytes `[stat][n − 1]` (same bytes); `vitals.md` §2 owns the names. [UP §1]
+
+*`monsters/ai-bodies-2.md` … `-5.md`, `monsters/ai.md`*
+- AI-1 `-2` §11 s1: Vulture with T = 0 and a failed landing (1.14d reads a
+  null unit): stops here.
+- AI-2 `0x005DEAD0` with a unit and a point (`-2` §15, `-3` §8 s1.3, `-4` §8):
+  the request holds one (Summoner, Izual: T; HighPriest hydra: the point).
+- AI-3 `-3` §5 s1.1: a failed teleport check goes on to s1.2 (cooldown spent)?
+- AI-4 `-3` §8 s1.2: the heal-scan callback does not exclude the scanner?
+- AI-5 `-3` §10: ritual slot ≤ 0 reads an uninitialised stack entry ((0, 0)
+  used); ritual points with T = 0 use the own position.
+- AI-6 `-3` §11 case 2, n = 0 skills: does the closing `50 − K` draw follow the
+  wander? (not here)
+- AI-7 `-3` §4 s1: a monster T without an owner record keeps Q = T.
+- AI-8 `-4` §5 s2: "Then s := 3; idle 8" read as following both the walk and
+  the near case.
+- AI-9 `-4` §7.1 s3: no best → melee test and path compute see unit 0; read as
+  "swap to the alternative".
+- AI-10 `-4` §7.2 s6: `d58 >> 8 + d55 + …` read as `(d58 >> 8) + d55 + …`.
+- AI-11 `-5` §3 s5: "else" = the I3 draw failing; a missing Imp row reads
+  aips 0 (1.14d: null pointer).
+- AI-12 `-5` §6 s3.1: the aip8 draw only when S was found.
+- AI-13 `-5` §7 s4: C with a draw ≥ aip6 goes on to s5.
+- AI-14 `-5` §12 A s3: the whirlwind request byte +0x15 := 100 has no field
+  in the mode request.
+- AI-15 `-5` §15 s2: "nearer" read as squared distance.
+- AI-16 `-5` §20 s7: a missing wave record passes −1 as the skill param
+  (1.14d: fatal).
+- AI-17 `-5` OQ2: the clone's spawn info `0x0063EFA0` (draws, class / point /
+  mode) not modelled; class 570, mode 1, ±12 used.
+- AI-18 `ai.md` §7.1: `0x005DDFC0` (WillOWisp) read as not setting the path
+  step count, like `0x005DE490`.
+- AI-19 `-3` OQ3 the wisp find `0x0065A950`'s order, `-2` OQ4 the queen spawn
+  class: seams only.
+
+*`skills/bodies.md`, `skills/bodies-2.md`, `monsters/init.md`*
+- SK-3 `bodies.md` §6.1: an invalid skill leaves `summon_class`'s `mode`
+  unwritten (0 here; every caller tests R first).
+- SK-4 §6.5 s2: does `itemevent2` share the `itemevent1` condition (read:
+  yes)?
+- SK-5 §6.5 s9: do the ilvl clamps apply to a given ilvl (read: only in the
+  ilvl = 0 branch)?
+- SK-6 §6.15: a negative skeleton-mastery level reads before the component
+  table (nothing written here).
+- SK-7 `init.md` §8.1 flag 8: "TH from TH / L-TH" read as pct(monlvl TH,
+  monstats to-hit, 100) in `mode_damage`.
+- SK-8 `bodies-2.md` ";" after "Hit:" / "EType ≠ 0:": read as inside the clause
+  (`claw_hit`, Fend, Poison Dagger, §2.19, §2.26), as §4.3 says.
+- SK-9 `bodies-2.md` §2.16: a negative `step2` (read as 1).
+- SK-10 §6.8: a stored hit-class index outside 0…2 (no class set).
+- SK-11 §7.2 s8: the Strafe rewind is made whether or not K2 exists.
+- SK-12 §7.10: Bone Prison "pet type ≥ count → 0" read as pt := 0.
+- SK-13 `bodies.md` §6.2: `0x0057CCB0(it, 1)` on a replaced linked unit has
+  no full argument list (`BodyEffect::KillReplaced`).
+- SK-14 §6.5 s6: `0x005701B0(m, 0, k, −1)` is "right skill" but §2.16 calls
+  side 0 left; passed raw.
+
+*`sim/pets.md`*
+- SK-2a a remove broadcasts 0x7A three times while the monster exists
+  (unlink → dismiss) against the "twice" of edge cases 1 and 4.
+- SK-2b a GUID in two lists makes §3 / §4 loop forever: state the rule.
+- SK-2c the add record's +0x10 / +0x14 are never set (read 0 → always 0x7A).
+- HL-3 §5 r3 full-list eviction: `hirelings.md` "removed with kill" (two
+  broadcasts) vs `pets.md` §5 r2 unlink (one); code: `pets.md`.
+- HL-4 §5 r3 max recompute `0x00575900` (`pets.md` OQ2): max 0 → `basemax`.
+
+*`missiles/bodies.md`, `bodies-2.md`, `missiles.md`, `sim/intents-events.md`*
+- MB-1 `bodies.md` §6 s2: plague ring flags 0x17 (`ring8` 0x1F) hold 0x10
+  "fixed point" (§R2.1) yet s3 / OQ3 shift << 8; flags used here.
+- MB-2 `bodies-2.md` §41 s2: `elem_roll` returns `EType` (§R9.6), edge case 5
+  reads a rolled amount; the return is used.
+- MB-3 `missiles.md` §R6.2: where the full roll's crit and the 103 / 104 / 106
+  bypass flags land in the 0x70-byte area record (crit → 0x2000).
+- MB-4 `bodies-2.md` §60 `tyrael`: room refresh inside or after the quest-test
+  branch? (after, always)
+- MB-5 §47 `spawn_for_level`: s4's "c = −1 → return 0" vs s3's fatal read for
+  an invalid class (fatal here).
+- MB-6 §47 / §43 s4.2: what a missile with no room passes (no spawn, no gold
+  here).
+- MB-7 §44 / §47: corpse finder `0x0065A950` (OQ3) and the room seed have no
+  spec'd provider.
+- MB-8 `intents-events.md` §7.3: no sender for the 0x67–0x6D client pass, so
+  0x69 codes 8 / 9 at death (§7.4 r7) cannot go out. [MB §3 item 1]
+
+*`world/quests-act1-rest.md`*
+- QA-1 §4 s2.3.2: the retry's room (`0x00463740`) is not null-tested; what
+  does `0x005B2F20` do with a null room? (spawn skipped here)
+- QA-2 an object or marker without a room (gibbet event, Cain leaves, trap
+  chest): `QuestError::Fatal`; confirm it is never null in 1.14d.
+- QA-3 §1 L4 `0x00593130`: party step read as inside the "neither 4.0 nor 4.1
+  and in Tristram" test.
+- QA-4 §5: a player without a client gets no progression.
+- QA-5 §8 item 1: +0x38 (the scroll's GUID) not kept; confirm no reader.
+- QA-6 chain 37's `0x0058F870` runs before Kashya's deferred reward; body
+  unwritten.
+
+*`world/quests-act2.md`*
+- QB-1 Test vector 1 "table state 2 (msgs 325–334)" vs chain 8's 315–324;
+  tests follow §1.2.
+- QB-2 chain 8 event 10 `0x00598980` and chain 7 event 10 (list removal) are
+  not described.
+- QB-3 do chains 26 / 27's event-11 handlers test the NPC class?
+- QB-4 §5.7: the altar does not call the quest-chest gate (§1.3 lists it).
+- QB-5 §5.8: darken sends status 1 first, so "status 0 → status 2 to all" is
+  unreachable; confirm.
+- QB-6 "status n, state m" in game-start callbacks: bytes only, no flags
+  reset, nothing sent.
+- QB-7 §5.6 / §6.7 ";" scope: "if intro: game 11.13" after the 11.1 block;
+  §6.7 grants also in intro games.
+- QB-8 §7.2: +0x09 := 0 on every kill; the 13.2 iterate inside "status < 2".
+- QB-9 §8.3: Tyrael only adds table state 2 and stops.
+- QB-10 §8.11 msg 442: only state := 5 depends on 14.13; msg 430: refresh
+  before state := 2.
+- QB-11 §8.6: 0x44 with a non-orifice class returns 5; the 0x58 layout is not
+  in the spec.
+- QB-12 §8.11 kill party credit: members get the player's test (without 14.0,
+  14.3–14.5).
+- QB-13 §4.8 pick-up: 0x5D also for `tr1 ` with 10.3 set.
+- QB-14 events 13 / 14 count at most one item per code (yes / no seam).
+- QB-15 spec OQ5: where chain 38's intro record is stored.
+- QB-16 §6.10 Jerhyn's palace spawn: base point of the offsets, the `r`
+  argument, who stores +0x3C (`unhandled 0x0059EF70`).
+- QB-17 §8.11 Tyrael's party tail `0x0059C9A0` → `0x0059C920` ("per D2MOO,
+  not re-read"): members get no bits.
+- QB-18 bodies: `0x005940A0` (chain 7 Cain hook), chain 38's active fn
+  `0x005985C0`, the status fns of chains 26 / 27 / 38.
+- QB-19 §3.6 status ≥ 2 with state < 3, and the orifice operate with a busy
+  player: not described.
+- QB-20 §1.3: chest drop code set once before the count (per item here); the
+  chest item level (`None` here).
+
+*`world/quests-act3.md`*
+- QC-1 17.3 (Lam Esen "left town"): which code sets it? §3.7 event 13 restores
+  state 3 from it.
+- QC-3a spec OQ2: `0x00559A30`'s `&level`.
+- QC-3b OQ3: monstats +0x0D bit 6 (used as 0x40).
+- QC-3c OQ4: `0x005A0180` / `0x0063E9F0` (the `special_monster` seam).
+- QC-3d OQ6: `0x0063BEF0`, the weapon slot (`weapon_code` seam).
+- QC-4 Natalya / Hratli map AI (`0x005BD040`, `0x005B7230`) have no 1.14d
+  caller, so +0x24 / +0x18 are never set: confirm.
+- QC-5 decoy, altar, Hratli dummies, wanderer without a room: no form given.
+- QC-7 `quests.tsv` `spec` column still `catalogued` for the Act III rows
+  (OQ7, table edit).
+
+*`world/quests-act4.md`, `quests-act5.md`, `quests-act5-2.md`*
+- QD-3 OQ4: `drop_item_at` has no `&level`, so the gem / rune slot 50 and the
+  hammer's slot are not passed.
+- QD-5a OQ5: `0x005A4850` (owner: monsters).
+- QD-5b OQ6: the ghost removal `0x005E7350` (owner: AI).
+- QD-5c OQ7: `0x0061AED0` after the dummy (owner: objects / rooms).
+- QD-5d OQ8: the +0xAE0 superunique table (owner: data).
+- QD-6 Hellforge delays use `FrameCnt1` = `FrameCnt3` = 22 as constants; name
+  the reading function.
+- QD-7 §8 creation links exist for chains 22 / 24 only; chain 23's (bases 243,
+  hcIdx 36–38) are not stated for its caller.
+- QD-8a the Diablo spawn tries r = −1 / 5 / 10 at one spot; a missing
+  start-point object counts as a failed spawn.
+- QD-8b Q1 event 3's silent status sits inside the state-2 test.
+- QD-8c Hadriel's wish to talk tests "26.13 and 26.0 both clear".
+- QE-1 `0x00589540` (part 1 §5.9): "kills him again if he is back" has no
+  test for "back".
+- QE-2 §5.7 scroll reward with iced Anya interacting: `0x00589070`; which
+  player gets S5D(33, 0x20, 0)?
+- QE-3 §5.9: Anya's to-town portal flag arguments ((1, 1, 0) here).
+- QE-4 Anya AI hooks `0x0058A7D0` … `0x0058AA10`, map-AI stores
+  `0x0058AD80` / `0x0058AE10` (part 1 OQ4).
+- QE-5 part 2: Tyrael's last portal `0x0058D7D0` and spawn `0x0058E920` lack
+  the free-spot limit; the spawn needs flags 0x42.
+- QE-6 part 2 §7.8: summit door 564 in mode 0 after the Ancients names no warp
+  function (`0x0058D6A0`).
+- QE-7 part 2 OQ8: `quests.tsv` row 40 is `?` and its 15 rows are missing from
+  `quest-messages.tsv`; fill both, then drop `intro::TABLE`.
+- QE-8a plain "status n" read as a byte write; "status n (silent)" leaves the
+  flags (`quests.md` §10.1).
+- QE-8b §4.7 keeps flags 0x20 through "status 2 to all".
+- QE-8c freed > 15 → 36.5.
+- QE-8d §7.6's post-kill steps sit inside not-intro.
+- QE-8e §8.5 "none → stop" ends step 1 only.
+- QE-8f experience stats 13 / 29 written through `add_stat` (no set-stat named).
+
+*`world/objects.md`, `object-functions.tsv`, `sim/units.md` §6.4*
+- OB-1 §5.1 Test vector 1: the fifth class-4 pick is id 9 (index 4 of
+  {1, 6..15}), not 8; fix the vector.
+- OB-2 §4 r3: speed sum read in 32 bits, then clamped to 0..0x7FFF.
+- OB-3 `units.md` §6.4 type 1: footprint free read as inside the mode-1
+  branch.
+- OB-4 §14: the 0x4D "operator GUID" written as stored − 1 (OQ4).
+- OB-5 §14: the 0x60 portal message layout is not in the spec.
+- OB-6 §6: 580 outside level 25 → 581's path (OQ6); 581 / 582 not covered.
+- OB-7 §8 locked chest with no operator = "no key".
+- OB-8 §8 null drops in the class-397 bands count as neither magic nor
+  non-magic.
+- OB-9 §8 breakables return 1 on every path.
+- OB-10 §8 exploding barrel: distance metric and bound inclusivity (provider's).
+- OB-11 §8 trap 8 / 9: the trap monster id is read after the control-seed step
+  (OQ3).
+- OB-12 §8 fire objects 162 / 160 allocated in mode 0.
+- OB-13 §9 no shrine record → `Err(NoRow)` before any change; no operator → no
+  effect.
+- OB-14 §9 codes 4 / 5 written as `set_stat` of the new value.
+- OB-15 §9 code 16 does nothing; code 17 without a free spot creates nothing.
+- OB-16 §9 storm: the life writer, loop nesting (i outer) and missile flags
+  (0) are not stated.
+- OB-17 §9 the potion drop has no address (own seam).
+- OB-18 §10 locked door: key test without the assassin exemption.
+- OB-19 §10 debounce and hostile delay compared as wrapping u32 sums.
+- OB-20 §12 well: "used" = a value changed; the refill mode set is queued
+  explicitly after; `Parm2` = 0 → error.
+- OB-21 §13 portal with a monster or no operator refused; rule 3 (OQ7) not
+  run.
+- OB-22 wiring: the init's footprint stamp sees no path record (the path is
+  placed after the per-kind init).
+- OB-23 the 0x13 result after an operate or a walk read as 0.
+- OB-24 §15 `PopulateFn` unspecified: population creates objects in mode 0.
+- WW-6 quest object bodies not stated: Jerhyn inits 18 / 19, gibbet init 7,
+  tree init 9, Cain portal init 61, Wirt's body operate 33 / init 37.
+- WW-7 Act II `spawn_quest_object`: the argument form's mode is not stated.
+
+*`world/quests.md` seams, `items/*`, `render/lighting.md` (functions no spec states)*
+- WW-8 `0x0061C450` the Tainted Sun environment (environment spec).
+- WW-9 `0x00559A30` `quest_drop` is in no items spec.
+- WW-10 `0x0061AED0` (`set_room_portal` / `refresh_room`) is not specified.
+- WW-11 the 0x58 insert dialog layout (`open_insert_dialog`).
+- WW-12 `npc_intro_heard` / `set_npc_intro` storage (= QB-15's question).
+
+*`world/hirelings.md`*
+- HL-1 §7.2 r3: the `ExpRatio` step (`0x0057E390`, "shift from the MaxLvl
+  row") has no formula (also `vitals.md` §4.3).
+- HL-5 §3.2 r6: does the init stop when the add fails? (continues here)
+- HL-6 §7.1 r2: "defender level" base or total? (base)
+- HL-7a §11 r4: where the copy of the old item goes relative to r3's "cursor
+  := none" (after it, before the refresh calls).
+- HL-7b which unit `0x0055DF00`, `0x0055F4F0`, `0x00540E60`, `0x005417D0` act
+  on.
+- HL-8 §13 r4 / OQ7: stats sent to the owner only, at once (not queued).
+- HL-9 §1.2 r3: the fallback `0x00656390` is not described.
+- WW-2 §8 r1: the death test `0x00457490` and the death flag argument (OQ8);
+  `damage.md` §7.2 does not place `0x005751A0` among the kill's steps.
+
+*`drlg/outdoor-act3-act5.md`, `outdoor.md`, `maze.md`, `preset.md`, `rooms.md`*
+- DR-1 §2.7 jungle code lookup outside rows 1..14 (and row 0 slot 3):
+  `Fatal(0x78C)`; the image value is not given (OQ2).
+- DR-2 §2.4 s4: fewer than i + 1 blocks with C = 2 is not described; nothing
+  dropped, n still decrements.
+- DR-3 a jungle id array shorter than SXb·SYb at build: read as 0.
+- DR-4 `outdoor.md` §9.4 Kurast border order: confirm against `0x0067EAD0`,
+  `0x0067EC30`, `0x0067ED70`.
+- DR-5 random placer R: stamps at the tried cell, no margin / offset.
+- DR-6 §11 s3 ravine walk: grid value − B outside 0..11, or no reach of
+  (0, gh − 2): placeholder `Fatal(0x0067DEF0)`.
+- DR-7 §11 s2 barricade walk: fixed count of 2-cell steps; ends that never
+  meet are not described.
+- DR-8 §11 s5, s9 caves / specials tall-wide: the level tile rect used.
+- DR-9 prisons helper `0x0045C390` read as `roll`.
+- DR-10 `maze.md` §7.1 cross-level sorted insert: "otherwise at the tail".
+- DR-11 built rooms' orth links are dropped after maze generation (no link
+  list on `drlg::room`).
+- DR-12 `preset.md` §6 s10 link bit 0 needs a link-record type; door flag 0x20
+  (`rooms.md` §9.5.1) is not set by the tile code.
+- DR-13 `maze.md` §5.5: the spiral never makes branches edge-adjacent, so the
+  after-all-branches pass is unobservable; confirm.
+
+*`drlg/levels.md` §11*
+- RP-1 §11.3 s6: orientations above 19 read past T1 (rule 0 here).
+- RP-2 §11.3 s4: the local blocker grid's layout (1,024 cells, 256 rows) is
+  not given; (W + 1) × (H + 1) here.
+- RP-3 §11.4: lookups outside the cells read outside the grid in 1.14d; −1
+  here.
+- RP-4 s8 "same index": the full cell value is compared.
+- RP-5 §11.3 s9: the wall record +0x10 is not stored (read only by drawing).
+
+*`client/model.md`, `client/msg-units.md`, `drlg/rooms.md`*
+- CS-1 `msg-units.md` §1.2 r2–3: what the hireling re-init `0x0046EC10` resets,
+  whether r3–4 run after it, the class set of `0x0063EE90`.
+- CD-1 §9 r1–r2: do `0x0061B640` / `0x0061B690` null-test a point in no room?
+  (refused here)
+- CD-2 the client build timer (`rooms.md` §4.6, `0x0061B920`) is unwritten:
+  only rooms set in sight are built here.
+- CD-4 the act's room callbacks (`rooms.md` §5 r8, act +0x4C, `0x0061AF60`
+  from `0x00475B40`): not specified, not run.
+- CD-6 client room unit lists (room +0x74) and the draw path's Y sort
+  `0x0064C0C0` via `0x00619EA0`: no owner.
+- CD-7 DT1 roof height (+0x04) and height (+0x08) of a tile record: extend
+  `TileInfo` or read DT1 headers (`draw-order.md` OQ12).
+
+*`sim/path-placement.md` §11, `sim/intents-events.md`, `sim/tick.md` §6*
+- SJ-2 the spawn room's own 0x07 twice (game entry, then the switch); both
+  sent here; confirm.
+- SJ-3 the rest of the 0x6B path `0x00530190` between 0x0B and 0x03, and where
+  0x59 / 0x0B are sent from.
+- SJ-4 0x04 / room ready `0x0061A460` and the client's state at join (3).
+- SJ-5 0x01 / 0x00 / 0x02 at game creation: sender, trigger, 0x01's u32@2
+  (`intents-events.md` OQ2).
+- SJ-6 0x08's server sender, if any (`0x0053A9B0` states no message).
+- SJ-7 the 0x59 name: from the save (`d2s.md`) or the session (`Entry::name`
+  here)?
+- SJ-8 `intents-events.md` §7.2 part B: the room switch's add messages
+  (`0x00571F90`) are unspecified; the client hears of no unit.
+
+*`client/bridge.md`, `bridge-dispatch.tsv` owners*
+- CM-1 0x2C PlaySound: owner, plus event 12's `stsound`, event 18's greeting
+  record, events 84–87's overhead text.
+- CM-2 0x53 Darkness: owner; the act-environment record in the model and its
+  client data sources.
+- CM-3 0x5D: owner; the full `0x004A2CB0` dispatch in one place (field names
+  differ, `triggers.md` vs `quests.md` §6.3); a client quest store?
+- CM-4 0x63 WaypointMenu: owner, where its record lives, the load copy
+  `0x00661030`, the tab inputs `0x004B32D0` / `0x0065C310`.
+- CM-5 0x77 TradeAction: owner; the client handler `0x0045E800`'s code →
+  action table (stash, cube, close, refuse).
+- CM-6 0x94 BaseSkillLevels: layout, the client skill list, an owner with
+  0x21–0x23 (`msg-stats-items.md` OQ5).
+- CM-7 a bridge → UI / sound output channel in `bridge.md`: handlers only
+  write `ClientWorld` today.
+- CM-8 character totals: how the client extends the local player's stat list
+  (items, states, 0x21 / 0x22) for `0x00625480`.
+
+*`tools/scenario.md`, `formats/tbl.md`*
+- CS-4 0x27 masks (7, 9, 12–39) are keyed by sender; §6 rows carry no sender.
+- CS-5 0x50 masks are keyed by the u16 at bytes 1–2; no key column (the
+  unkeyed `0x50 13 2` over-masks the u16 1 form).
+- CS-6 0x82 (name bytes after the NUL through 20) is content-dependent.
+- CS-7 `scenario.md` names `tools/scenario-masks.tsv`; the file is
+  `specs/tools/scenario-masks.tsv`.
+- CS-8 `tbl.md` OQ3 still says "all 33 1.14d tables" (29).
+
+*`render/lighting.md`, `shading.md`, `blend-modes.md`*
+- LB-1 lighting §9.2 r2: the 0x53 setter's eclipse branch calls `0x0061BDF0`,
+  undescribed (`EnvError::EclipsePending`).
+- LB-2 §11 r2 / edge 7: wall direction 0 (uninitialised), > 9, and block
+  columns needing point 6 are errors.
+- LB-3 blend §8 r2: x1 < x0 after the clamp (error here); "empty" tested
+  before the fatal y1 < y0.
+- LB-4 §6.4: room leave with an owner without a room (error here).
+- LB-5 blend §5 r4: objects take r3 by type dispatch, so r4's object branch is
+  unreachable: is `0x004DB180` a type ≥ 3 test?
+- LB-6 §7.4 r1: the cached grid's ray centres use the grid's own sub-tiles.
+- LB-7 §9.2 r2: the intensity step uses the player room's act and level.
+- LB-8 §9.2 r3: the pending flag `[0x007A060E]` is left set after the act
+  load.
+- LB-9 §9.3 r4: `ticks / speed` as a double division.
+- LB-10 §10 r2: "resets flag and counter" = 0 and −1.
+- LB-11 §8: the monster level-8 radius 3 applied before "none when 0".
+- LB-12 §11 r3 / r4: floor and roof reads use the clamping read.
+- LB-13 §3 r1: with no local player the light map still needs an origin.
+- LB-14 shading §6: `RandTransforms.dat` read as 30 headerless 256-byte maps,
+  `GreenBlood.dat` as its first 256 bytes (C68 sizes).
+- LB-15 shading §6: palshift offsets from the class base; missile
+  `LocalBlood` read as a bool.
+- LB-16 `0x004791B0` (shading OQ7) and `0x00410A80` (lighting §10 r4 id 13)
+  are taken as caller inputs.
+- LB-17 §7.1 r6: white on black gives 254, not 255 (`65536 / i` truncates);
+  confirm.
+- LB-18 unit shadows have rules but no draw-order item (`draw-order.md` OQ3
+  refuses `UnitShadow`).
+
+*`render/draw-order-2.md`, `draw-order.md`, `unit-composite.md`*
+- DW-1 W1 `[0x007A8A20]` (read by §11.3 with the snow lock): no writer.
+- DW-2 W2 snow spawn draws: "one more step" than what; does `0x00472FB0`
+  draw?
+- DW-3 W3 the values of the snow line table `0x006D6E78`.
+- DW-4 W4 grey / tinted colour ramps (input here); alpha 0x7F only for day
+  period 0?; landed drop colour = +0x24?
+- DW-5 W5 intensity = target / 256 gives int 0 at every rain peak, yet run 2
+  saw splashes: the scale or the `r < int` test.
+- DW-6 W6 §11.7 r3: lightning on at ≤ 9 fps (no flash): do particles draw?
+  (yes here)
+- DW-7 W7 initial phase / countdown / length and `last_s` / `last_b` (0 here).
+- DW-8 §12: the two seed globals are 4 bytes apart: `init_low(time_value)`
+  with hi 666?
+- DW-9 §12: the initial star tick; which palette `nearest` searches.
+- DW-10 §12: build order of the extra summit frame (x0 − 256) and of
+  mountains vs clouds.
+- DW-11 §14: extents before any floor is drawn and when they reset.
+- DW-12 §14: does a drawn edge floor widen by its strip sub-tile?
+  `draw-order.md` §10 has no edge-floor key row.
+- DW-13 §16: a room whose rectangle holds the cell but whose grid lacks it
+  (`NoGridCell` here).
+- DW-14 §16: the stop cell written back when r1 blocks; unit size signedness
+  in `0x00622AA0`.
+- DW-15 `unit-composite.md`: does body armour / "no inventory" read the
+  linked unit's inventory (Decoy)?
+- DW-16 `unit-composite.md` §8 r4 "nothing happens while K is in DT / DD":
+  following missiles only?
+
+*`ui/panels.md`, `ui/controls.md`*
+- UP-1 §8: thousands grouping `0x00525350` (level, experience, next level not
+  drawn until given).
+- UP-2 §8: popup width `0x00502520` (Font8 fallback below 1,000).
+- UP-3 §8: number format of the other values (`%i` assumed).
+- UP-4 §8: cmp on unshifted vs shifted values for 7, 9, 11; color of 6, 8, 10.
+- UP-5 §8: which resist effect wins when both are active; clamp order when
+  the cap < −100.
+- UP-6 §8: add buttons with 0 points; damage block, name / class lines,
+  hovers (OQ3).
+- UP-7 §9: does mouse-up clear `[0x007BCE90]`?; the `panel\inv_*` files have
+  no layout rows.
+- UP-8 §4.4: the inventory click area's bottom edge (read exclusive, WC
+  reading 1).
+- UP-9 §11: GoldMax font ("current font").
+- UP-10 §11 / §12: stash and cube button press / release rectangles (only
+  hover given).
+- UP-11 §11: does a stash close send 0x4F 0x12 once (here) or twice
+  (release + close hook)?
+- UP-12 §12: does the cube close button also call `SetUIState(0x1A, off)`?
+- UP-13 §12: Horadric frame 30 drawn or not; draw mode 3 has no field in
+  `ImageRequest`.
+- UP-14 §14.1: Resurrect insert / remove slot `0x004B6440`; Cain's count reset
+  `0x004B5640`.
+- UP-15 §14: talk message bytes; the hire sender and the menu box (OQ8).
+- UP-16 §14: the lookup of NPC 257 (two records, first used); the flag byte.
+- UP-17 §14.4: shop button file, mode derivation, tab / button hit rects,
+  `0x004B3500`.
+- UP-18 §14.5: buy / sell / repair client fields (price, 0x35 u16,
+  transaction mapping).
+- UP-19 §10: the class icon file prefix `CC`; remap k (OQ4).
+- UP-20 §10: close-button offsets for classes other than amazon
+  (`0x00724CE4`).
+- UP-21 §10: the no-points mouse-down message, free-points box, tab tool tips
+  (OQ4).
+- UP-22 §10: close press rect and its test order against the column 3 / row 6
+  icon; free points re-checked at release?
+- UP-23 §10: draw order of icons / numbers / close (section order here).
+- UP-24 §13: tab and row click rectangles and the tab switch (OQ7); the filled
+  hover rectangle extent.
+- UP-25 §13: mode and jump of the self-close (off, 0 here) and when its latch
+  resets.
+- UP-26 §13: does a close via `0x0049CEC0` send 0x49 twice (release + hook)?
+- UP-27 §13: color of an unknown selected row; tab / row on open.
+- UP-28 §6.3: control panel overlays (OQ1).
+- WC-2 §2.5 "P alive" uses the mode only; unit flag 0x10000 is not in the
+  model (`model.md` OQ4).
+- WC-4 the original key table (`ui/controls.md` OQ2): hotkeys use the `dev`
+  bindings with jump 0.
+
+*`audio/sound-table.md`, `triggers.md`, `environment.md`*
+- ST-1 §2: EAX column names are not in the spec (22 read columns vs named +
+  12 EAX = 21); not bound.
+- ST-2 §7 r3: the channel kinds `0x004E0050` gives in mode 0 (`Any` here).
+- ST-3 which record after a variant pick (the variant's for sample, Stream,
+  Async, Loop, blocks, Stereo here).
+- ST-5 §5 r2: a merged compound call attaches no unit.
+- ST-6 §6.4 r1: option flag `0x007A061C`, meaning and default (off here).
+- ST-7 §10: async latency one tick (OQ10); preload at tick 0 then every 25;
+  no eviction.
+- ST-8 no local player when rolling: returns 0, no seed step.
+- ST-9 §6.3 reading order: r1's restart in the same pass; r5 only for
+  requests playing before r3; new requests at the list end.
+- ST-11 `play_position` in bytes (environment OQ2); `set_position` writes no
+  distance²; `unit_requests` in active-list order.
+- TR-1 §7 r1: 120 of 573 object classes have no TSV row (no call).
+- TR-2 §7 r4: the cairn ids of class 61 (table `0x00728338`) are not given.
+- TR-3 §10 r1: NPC class → greeting record table (35 classes, 28 records) is
+  not in the spec as data.
+- TR-4 §4.3 r2.2: a multi-unit request detached with force, else faded to 0
+  over 6.
+- TR-5 §5 r4: signedness of `f ± s` (u32 wrapping here).
+- TR-6 a request with id 0 where the spec has no guard is still made.
+- TR-7 Test vectors' "115 distinct records" counts addresses (106 contents);
+  `npc-speech.tsv` key 506 duplicated.
+- TR-8 triggers OQ4, 5, 6, 8, 9, 11 are left to the callers (module docs).
+- EN-A §5 r2: the second exception of the 72–201 stop passed as 0; "when
+  raining" = this tick's weather flag.
+- EN-B §6 r3: rain handle gone → volume 0 → rain stops.
+- EN-C §3 r1: k ≠ 0 on a song without that block → resume −1, offset
+  0xFFFFFFFF.
+- EN-D T / C differences unsigned wrapping (only §7 r3 says so).
+- EN-E §4 r1: order of last-checked := L vs the flag check.
+- EN-F day phase (OQ3) and weather (OQ4) inputs: plain parameters until their
+  specs exist.
+- WC-7 `sound-table.md` §6.5 r2 (OQ6): the state-duck condition taken as never
+  holding (no menu, no pause).
+- WC-8 `sound-table.md` OQ2: units per type for `SoundWorld::position`.
+- WC-10 the local player's client seed is read-only in the model, shared with
+  the camera shake (`camera.md` OQ6, `sound-table.md` §4 r5).
+
+*`formats/d2s.md`, `items/bitstream.md`*
+- DS-1 d2s OQ1–OQ16 stand (OQ3 is the save comparison, C66).
+- DS-2a an alt-code record ends after its base code: no unit +0x28, no
+  trailer written or read.
+- DS-2b compact and alt-code records have no socketed children.
+- DS-2c children's write-backs (§4.1 r8, §4.3 r7) are not returned by
+  `write_save`; `filled == children.len()` is not checked.
+- DS-3 `kf` with its marker but no g byte: rejected with 23 (unspecified).
+- DS-4 which quest bits a completed quest leaves (`--quests all` refused;
+  `acts=N` sets bit 0 of the §8.1 slots).
+- DS-5 every item gets the 1-bit 0 trailer (`bitstream.md` OQ3).
+
+**PC 2 — recordings and captures on the original game** (§5 A S9-A*, and the
+C entries that need the game running; 38 questions)
+
+*PC 1's recording list* (§5 S9-A1, 13 items): draw-order OQ7 (`TownE1` tile
+(950, 933)), `weather-0001`, levels 74 / 120, Act III entry, a kill with an
+item drop, a hireling game, an act change, Might in a party, Kick / Bash on
+a monster, a Druid summon, a Clay Golem, a Countess kill, a Cain rescue.
+
+*`render/draw-order.md`, `draw-order-2.md`, `lighting.md`, `blend-modes.md`*
+- R2-1 `order-0003`: the 8 `townN1` river-bank cells hidden or shown
+  (`draw-order.md` OQ7; S9-A1 (1)).
+- R2-2 `weather-0001`: pass 4 / 9 pixels, player-seed draws per water floor,
+  splashes at int 0 (DW-5; S9-A1 (2)).
+- R2-3 Arcane Sanctuary / Arreat Summit with the two seed globals (DW-8–DW-10;
+  S9-A1 (3)).
+- R2-4 a `Logicals` preset walk (levels 18, 19): the group-mode fade on pixels
+  (`draw-order.md` OQ6).
+- R2-5 a weather line / Arcane star vs `gdi_line_pixels`: the |dx| = |dy| major
+  axis and the end pixel (blend §8 r1; C70).
+- R2-6 the player's shadow on a flat floor vs `unit_shadow_position` (blend
+  OQ1; C70).
+- R2-7 env +0x0C and RGB per client update over a day vs `Environment::update`
+  (lighting OQ7, light-map digest OQ9; C69).
+
+*`client/model.md`, `sim/path-placement.md`, `world/objects.md` (the join)*
+- R2-8 frame-1 S→C order and callers from 0x59 to 0x15 (I-6, SJ-2, SJ-3; C84).
+- R2-9 game +0x80 = `0x00546C60`'s result = 0x03 u32@8 (C85).
+- R2-10 the client unit seed and room seed step vs the bridge (I-5,
+  `model.md` OQ9; C83).
+- R2-11 the act palette switch at an act change (I-4; S9-A1 (7)).
+
+*`world/quests-act1-rest.md`, `world/objects.md`, `sim/rng.md` §5.2*
+- R2-12 Cain rescue: gibbet mode 1, slot 4, 0x28, Cain at + 17 frames
+  (S9-A1 (13), C78).
+- R2-13 Countess kill with a listed chest: monster 326, missiles 332
+  (S9-A1 (12); QA-1).
+- R2-14 Catacombs 1 after Andariel: no 0x5D, state kept (S9-A2).
+- R2-15 the save header's progression bits 8–12 after Andariel (S9-A2; I-3).
+- R2-16 quest init order: Cain's spawn draw vs the room's other allocations
+  (the drained init, `wire-world-staging` §3 item 1; C79).
+- R2-17 a Cairn stone, gibbet and tome operate: 0x0E ticks and bytes (C78).
+- R2-18 chest, shrine, door, well, portal operates and a `Sync` = 0
+  allocation (`objects.md` OQ1–2; S9-A5; OB-*).
+
+*`world/quests-act2.md` … `quests-act5-2.md`*
+- R2-19 Act II run: chat-end status, kill timers, Tyrael's portal, Meshif
+  (OQ10; S9-A3; QB-*).
+- R2-20 Act III run (OQ8; S9-A3): settles the 19 "Readings taken literally"
+  of `impl-quests-act3` (each names its test).
+- R2-21 Act IV run (OQ13; S9-A3): the classic end on `GetTickCount` (OQ2,
+  needs a `sim/tick.md` exception), uncredited 0x50 bytes 3–14 (OQ3).
+- R2-22 Act V run (OQ7; S9-A3; QE-*).
+
+*`monsters/ai-bodies-*.md`, `skills/bodies*.md`, `missiles/bodies*.md`, `sim/pets.md`*
+- R2-23 Act II–V monster AI per `ai-bodies-2.md`..`-5.md` OQ1 (S9-A4; AI-*).
+- R2-24 Might in a party, Kick / Bash, a Druid summon, a Clay Golem (S9-A1
+  (8)–(11)), with the `bodies.md` / `bodies-2.md` OQ1 list (SK-*).
+- R2-25 the missile list of `impl-missile-bodies-2` §5.3 (S9-A4; MB-1–MB-6).
+- R2-26 the 0x7A order and the remove broadcasts on the wire (I-1, SK-2a,
+  HL-3) from S9-A1 (6), (10), (11).
+
+*`world/hirelings.md`*
+- R2-27 hire, level-up, death, resurrect, give / take (OQ9: HL-7, HL-8;
+  S9-A1 (6)).
+- R2-28 teleport with a living hireling: its warp messages vs the player's
+  room / 0x15 messages (C80).
+- R2-29 an act change with a hireling (classic act change §6 r3–4; S9-A1 (7)).
+
+*`drlg/outdoor-act3-act5.md`, `drlg/levels.md` §11, `monsters/population.md`*
+- R2-30 Act III creation draws and the 76..78 / 111 / 112 / 117 builds
+  (OQ1, OQ3; S9-A1 (4); DR-*).
+- R2-31 DRLG room +0x64 lists of a crypt and an outdoor level (`levels.md`
+  OQ7; RP-*; S9-A6).
+- R2-32 the first population of a Blood Moor room vs the spawn RNG (S9-A6).
+- R2-33 a kill with an item drop: the drop position (S8-A3) and the treasure
+  walk (S9-A1 (5)).
+
+*`audio/*`, `formats/wav.md`*
+- R2-34 the sound request log (C74): settles ST-3, ST-4 (channel end / steal
+  position, × 40 ms here), ST-9, ST-10 (x87 vs `log2` / `powf`), TR-4, EN-*.
+- R2-35 decoded DirectSound buffers vs ours (`wav.md` OQ1–2; C75).
+
+*`ui/panels.md`*
+- R2-36 `placement-0001`, `ui-0001`, `ui-0002` (S9-A7): the rectangle and draw
+  order readings of UP-7–UP-27.
+
+*`formats/d2s.md`*
+- R2-37 1.14d saves round trip; header +0x10..+0x37, +0x88..+0xA7, stats at
+  0x2FD, `jf` / `kf` (OQ3; C66 (1)).
+- R2-38 `d2s-tool` characters load and re-save in 1.14d: quest bits, trailer
+  bit, +0x88..+0xA7, flag 0x2000 (DS-2, DS-4, DS-5; C66 (2)).
 
 ## 8. Lessons (problems met, fixes)
 

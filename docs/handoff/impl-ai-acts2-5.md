@@ -1,5 +1,7 @@
 # Handoff: Act II–V monster AI bodies — `claude/impl-ai-acts2-5`
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the ninth fold (`claude/fold-handoff-night`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Ninth set" (PC 1 / PC 2).
+
 Cloud implementation session, 2026-10-06. Base `claude/specs-staging` @
 `f294bbf`. Repo only, synthetic fakes, no game files. Specs:
 `specs/monsters/ai-bodies-2.md`, `ai-bodies-3.md`, `ai-bodies-4.md`,
@@ -138,7 +140,7 @@ d2-sim` passes; clippy, fmt, coverage and spec_index checks pass.
     (kill), stat lists (curse flag, wisp buff, change-class list) and
     quests (`QuestCall`).
 
-## Local run queue (for HANDOFF §5)
+## Local run queue (HANDOFF §5 C87; recordings S9-A4)
 
 - `cargo test -p d2-sim --test game_monsters -- --ignored
   ai_index_of_every_row` with `D2_GAME_DIR`: the rebuilt
