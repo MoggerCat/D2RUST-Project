@@ -118,6 +118,8 @@ pub struct BodyFake {
     pub composit_class: i32,
     /// Units of a second (town) room every scan visits after `scan`.
     pub scan_town: Vec<usize>,
+    pub frame_bonus_v: i32,
+    pub unsummon_ok: bool,
 }
 
 impl BodyFake {
@@ -605,10 +607,10 @@ impl BodyWorld for BodyFake {
         self.minion_owner.get(&u).copied()
     }
     fn pet_unsummonable(&self, _: usize, _: usize) -> bool {
-        false
+        self.unsummon_ok
     }
     fn frame_bonus(&self, _: usize) -> i32 {
-        0
+        self.frame_bonus_v
     }
     fn set_anim_frame(&mut self, u: usize, v: i32) {
         self.anim_frame.insert(u, v);

@@ -6,7 +6,7 @@ use super::tests2::{body_rec, monster, tabs, world, Code};
 use super::*;
 use crate::combat::{CombatEntry, DamageRecord};
 use crate::skills::fake::{combat_tables, monster_rec, FItem, FUnit};
-use crate::skills::SkillEntry;
+use crate::skills::{SkillEntry, SkillUnits};
 use crate::units::UnitType;
 
 // Covers: specs/skills/bodies.md §2.1 text, §2.1 r2
@@ -562,4 +562,403 @@ fn scan_point_uses_the_target_point_and_keeps_f() {
         1
     });
     assert_eq!(seen, vec![a], "r = 0 keeps d² = 0 only");
+}
+
+// ---------------------------------------------------------------- §3
+
+/// A world where the player (unit 0) attacks a player in run mode
+/// (always hit), hostile and in melee range, with a fixed damage roll.
+fn duel() -> (BodyFake, usize, usize) {
+    let (mut f, u) = world();
+    let mut d = FUnit::new(UnitType::Player, 1);
+    d.mode = 3;
+    let m = f.add(d, (1, 0));
+    f.c.hostile = true;
+    f.c.in_range = true;
+    f.targets.insert(u, m);
+    f.c.set(u, 21, 100);
+    f.c.set(u, 22, 100);
+    (f, u, m)
+}
+
+fn last_entry(f: &mut BodyFake, u: usize) -> CombatEntry {
+    f.c.units[u].combat[0].clone()
+}
+
+fn ct3() -> crate::combat::CombatTables {
+    combat_tables(vec![monster_rec(), monster_rec()])
+}
+
+// Covers: specs/skills/bodies.md §3.1 r1, §3.1 r2, §3.1 r3, §3.1 r4
+#[test]
+fn attack_start_frame_meleeonly_and_ammo() {
+    let t = tabs(body_rec(), Code::new(), 1);
+    let ct = ct3();
+    let (mut f, u, m) = duel();
+    // r1: the animation frame := frame bonus << 8.
+    f.frame_bonus_v = 3;
+    assert_eq!(starts::attack(&mut f, &t, &ct, u, 1), 1);
+    assert_eq!(f.anim_frame[&u], 768);
+    // r4: a plain attack (no bow, no meleeonly state) needs nothing else.
+    assert!(f.c.units[u].combat.is_empty());
+    // r3: a bow without ammunition is refused and the cleanups run.
+    f.composit_class = 1;
+    f.take_log();
+    assert_eq!(starts::attack(&mut f, &t, &ct, u, 1), 0);
+    let log = f.take_log();
+    let i = log.iter().position(|l| *l == format!("attackcleanup {u}"));
+    assert_eq!(
+        log.iter().position(|l| *l == format!("weaponcleanup {u}")),
+        i.map(|i| i + 1)
+    );
+    assert!(i.is_some());
+    // …with ammunition, 1.
+    player_with_stack(&mut f, u);
+    f.item_stats.insert((0, 70), 9);
+    assert_eq!(starts::attack(&mut f, &t, &ct, u, 1), 1);
+    assert!(f.take_log().iter().all(|l| !l.contains("cleanup")));
+    // r2: a unit in a meleeonly (group 38) state runs the shape start,
+    // even with a bow without ammunition.
+    f.item_stats.insert((0, 70), 0);
+    f.max_stack.insert(0, 10);
+    f.state_flags.insert((139, group::MELEEONLY));
+    f.c.units[u].states.push(139);
+    f.targets.remove(&u);
+    assert_eq!(starts::attack(&mut f, &t, &ct, u, 1), 0, "no target");
+    f.targets.insert(u, m);
+    assert_eq!(starts::attack(&mut f, &t, &ct, u, 1), 1);
+    assert_eq!(f.c.units[u].combat.len(), 1);
+    assert_eq!(last_entry(&mut f, u).record.hit_class, 1);
+}
+
+// Covers: specs/skills/bodies.md §3.2
+#[test]
+fn kick_makes_a_forced_hit_record() {
+    let mut r = body_rec();
+    r.mindam = 5;
+    r.hitshift = 3;
+    let t = tabs(r, Code::new(), 1);
+    let ct = ct3();
+    let (mut f, u, m) = duel();
+    f.targets.remove(&u);
+    assert_eq!(starts::kick(&mut f, &t, &ct, u, 1), 0);
+    f.targets.insert(u, m);
+    // The body hands `start_combat` the forced-hit record: compare with
+    // the same call made by hand on a copy of the world.
+    let mut g = f.clone();
+    let mut want = DamageRecord {
+        hit_flags: 2,
+        result: 9,
+        physical: 5 << 3,
+        hit_class: 1,
+        ..DamageRecord::default()
+    };
+    crate::combat::start_combat(&mut g.c, &t, &ct, Some(u), Some(m), &mut want, 128);
+    assert_eq!(starts::kick(&mut f, &t, &ct, u, 1), 1);
+    let e = last_entry(&mut f, u);
+    assert_eq!(e.record, want);
+    assert_eq!((e.record.hit_class, e.record.hit_flags & 2), (1, 2));
+    assert_eq!(e.record.result & 9, 9, "hit + knockback");
+    // An invalid skill reads no record (the original is fatal).
+    assert_eq!(starts::kick(&mut f, &t, &ct, u, 99), 0);
+}
+
+// Covers: specs/skills/bodies.md §3.3
+#[test]
+fn unsummon_needs_the_owner_and_an_unsummonable_pet() {
+    let (mut f, u) = world();
+    let m = monster(&mut f, (5, 5));
+    f.targets.insert(u, m);
+    assert_eq!(starts::unsummon(&mut f, u), 0, "not the owner");
+    f.minion_owner.insert(m, u);
+    assert_eq!(starts::unsummon(&mut f, u), 0, "pet type not unsummonable");
+    f.unsummon_ok = true;
+    assert_eq!(starts::unsummon(&mut f, u), 1);
+    assert_eq!(f.entries[&(u, 1, 1)], f.c.units[m].guid as i32);
+    // No used skill entry → 0.
+    f.c.units[u].used = None;
+    assert_eq!(starts::unsummon(&mut f, u), 0);
+    f.c.units[u].used = f.c.units[u].skills.first().copied();
+    // The caster must be a player, the target a monster.
+    let p = f.add(FUnit::new(UnitType::Player, 2), (9, 9));
+    f.targets.insert(u, p);
+    f.minion_owner.insert(p, u);
+    assert_eq!(starts::unsummon(&mut f, u), 0);
+    f.targets.remove(&u);
+    assert_eq!(starts::unsummon(&mut f, u), 0);
+    f.targets.insert(m, m);
+    f.minion_owner.insert(u, m);
+    f.c.units[m].skills = f.c.units[u].skills.clone();
+    f.c.units[m].used = f.c.units[u].used;
+    f.targets.insert(m, u);
+    assert_eq!(starts::unsummon(&mut f, m), 0, "a monster caster");
+}
+
+// Covers: specs/skills/bodies.md §3.4
+#[test]
+fn arrow_bolt_and_throw_starts_need_ammunition() {
+    let t = tabs(body_rec(), Code::new(), 1);
+    let ct = ct3();
+    for slot in [4u16, 65] {
+        let (mut f, u) = world();
+        assert_eq!(run_start(&mut f, &t, &ct, slot, u, 1, 1), Some(0));
+        let log = f.take_log();
+        assert!(log.contains(&format!("attackcleanup {u}")), "slot {slot}");
+        assert!(log.contains(&format!("weaponcleanup {u}")), "slot {slot}");
+        let i = player_with_stack(&mut f, u);
+        f.item_stats.insert((i, 70), 3);
+        assert_eq!(run_start(&mut f, &t, &ct, slot, u, 1, 1), Some(1));
+        assert!(f.take_log().iter().all(|l| !l.contains("cleanup")));
+    }
+}
+
+// Covers: specs/skills/bodies.md §3.5
+#[test]
+fn jab_start_needs_a_target() {
+    let t = tabs(body_rec(), Code::new(), 1);
+    let (mut f, u) = world();
+    let m = monster(&mut f, (5, 5));
+    assert_eq!(starts::jab(&mut f, &t, u, 1), 0);
+    f.targets.insert(u, m);
+    assert_eq!(starts::jab(&mut f, &t, u, 1), 1);
+    assert_eq!(starts::jab(&mut f, &t, u, 77), 0, "R invalid");
+}
+
+fn corpse_world() -> (BodyFake, usize, usize, crate::combat::CombatTables) {
+    let mut ct = combat_tables(vec![monster_rec()]);
+    ct.monstats2[0].corpsesel = true;
+    ct.monstats2[0].soft = true;
+    let (mut f, u) = world();
+    let mut c = FUnit::new(UnitType::Monster, 0);
+    c.mode = 12;
+    let m = f.add(c, (4, 4));
+    f.targets.insert(u, m);
+    (f, u, m, ct)
+}
+
+// Covers: specs/skills/bodies.md §3.6
+#[test]
+fn raise_start_needs_a_raisable_corpse() {
+    let (mut f, u, m, mut ct) = corpse_world();
+    assert_eq!(starts::raise(&mut f, &ct, u), 1);
+    // In a town room → 0.
+    f.town.insert(1);
+    assert_eq!(starts::raise(&mut f, &ct, u), 0);
+    f.town.clear();
+    // Not dead (mode 12), a udead state (group 33), no corpseSel, no
+    // Velocity, not a monster, no target.
+    f.c.units[m].mode = 1;
+    assert_eq!(starts::raise(&mut f, &ct, u), 0);
+    f.c.units[m].mode = 12;
+    f.state_flags.insert((77, group::UDEAD));
+    f.c.units[m].states.push(77);
+    assert_eq!(starts::raise(&mut f, &ct, u), 0);
+    f.c.units[m].states.clear();
+    ct.monstats[0].velocity = 0;
+    assert_eq!(starts::raise(&mut f, &ct, u), 0);
+    ct.monstats[0].velocity = 1;
+    ct.monstats2[0].corpsesel = false;
+    assert_eq!(starts::raise(&mut f, &ct, u), 0);
+    ct.monstats2[0].corpsesel = true;
+    f.targets.remove(&u);
+    assert_eq!(starts::raise(&mut f, &ct, u), 0);
+}
+
+// Covers: specs/skills/bodies.md §3.9
+#[test]
+fn find_potion_start_needs_a_soft_unmarked_corpse() {
+    let (mut f, u, m, mut ct) = corpse_world();
+    assert_eq!(starts::find_potion(&mut f, &ct, u), 1);
+    f.c.units[m].states.push(118);
+    assert_eq!(starts::find_potion(&mut f, &ct, u), 0, "corpse_noselect");
+    f.c.units[m].states.clear();
+    ct.monstats2[0].soft = false;
+    assert_eq!(starts::find_potion(&mut f, &ct, u), 0);
+    ct.monstats2[0].soft = true;
+    f.c.units[m].mode = 1;
+    assert_eq!(starts::find_potion(&mut f, &ct, u), 0);
+    f.c.units[m].mode = 12;
+    f.targets.remove(&u);
+    assert_eq!(starts::find_potion(&mut f, &ct, u), 0);
+}
+
+// Covers: specs/skills/bodies.md §3.10
+#[test]
+fn andrial_spray_start_stores_the_target_position() {
+    let (mut f, u) = world();
+    let m = monster(&mut f, (123, -45));
+    assert_eq!(starts::andrial_spray(&mut f, u), 0);
+    f.targets.insert(u, m);
+    assert_eq!(starts::andrial_spray(&mut f, u), 1);
+    assert_eq!((f.entries[&(u, 1, 1)], f.entries[&(u, 1, 2)]), (123, -45));
+    f.c.units[u].used = None;
+    assert_eq!(starts::andrial_spray(&mut f, u), 0);
+}
+
+/// The skills record the Sacrifice / Bash tests use: formulas 40, 3,
+/// −25 and 30 in calc1–calc4, EType 3, SrcDam `src`.
+fn strike_tables(src: u8, hitflags: u32, hitclass: u32) -> (crate::skills::SkillTables, Code) {
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.calc1 = c.f(40);
+    r.calc2 = c.f(3);
+    r.calc3 = c.f(-25);
+    r.calc4 = c.f(30);
+    r.etype = 3;
+    r.srcdam = src;
+    r.resultflags = 0x0400;
+    r.hitflags = hitflags;
+    r.hitclass = hitclass;
+    let t = tabs(r, Code(c.0.clone()), 1);
+    (t, c)
+}
+
+// Covers: specs/skills/bodies.md §3.7
+#[test]
+fn sacrifice_start_rolls_a_melee_hit_and_always_starts_combat() {
+    use crate::combat::{bonuses, melee_result, start_combat};
+    let ct = ct3();
+    let (t, _) = strike_tables(0, 2, 0);
+    // Refusals: R invalid, no used skill, no target, not in range.
+    let (mut f, u, m) = duel();
+    assert_eq!(starts::sacrifice(&mut f, &t, &ct, u, 99, 1), 0);
+    f.c.in_range = false;
+    assert_eq!(starts::sacrifice(&mut f, &t, &ct, u, 1, 1), 0);
+    f.c.in_range = true;
+    f.targets.remove(&u);
+    assert_eq!(starts::sacrifice(&mut f, &t, &ct, u, 1, 1), 0);
+    f.targets.insert(u, m);
+    let used = f.c.units[u].used.take();
+    assert_eq!(starts::sacrifice(&mut f, &t, &ct, u, 1, 1), 0);
+    f.c.units[u].used = used;
+    assert!(f.c.units[u].combat.is_empty());
+    // A hit: physical from bonuses(get, pct = calc1, s = SrcDam), the
+    // conversion (EType ≠ 0, calc4 > 0), roll_elemental, ResultFlags,
+    // hit flags = HitFlags | 1; replayed by hand on a copy.
+    let mut g = f.clone();
+    let bonus = crate::skills::to_hit(&mut g, &t, Some(u), 1, 1);
+    let mut want = DamageRecord {
+        result: melee_result(&mut g.c, &t, &ct, Some(u), Some(m), bonus, 0),
+        ..DamageRecord::default()
+    };
+    assert_eq!(want.result & 1, 1, "run mode: always a hit");
+    want.physical = bonuses(&mut g.c, &t, u, true, None, 0, 0, 40, 0, 0);
+    want.conv_pct = 30;
+    want.conv_elem = 3;
+    crate::skills::roll_elemental(&mut g, &t, u, &mut want, 1, 1);
+    want.result |= 0x0400;
+    want.hit_flags = 2 | 1;
+    start_combat(&mut g.c, &t, &ct, Some(u), Some(m), &mut want, 128);
+    assert_eq!(starts::sacrifice(&mut f, &t, &ct, u, 1, 1), 1);
+    assert_eq!(last_entry(&mut f, u).record, want);
+    assert_eq!(f.c.units[u].seed, g.c.units[u].seed, "same draws");
+    // SrcDam is passed on to bonuses (and 0 stays 0).
+    let (t2, _) = strike_tables(64, 2, 0);
+    let mut g = f.clone();
+    g.c.units[u].combat.clear();
+    f.c.units[u].combat.clear();
+    assert_eq!(starts::sacrifice(&mut f, &t2, &ct, u, 1, 1), 1);
+    let want_phys = bonuses(&mut g.c, &t2, u, true, None, 0, 0, 40, 0, 64);
+    assert_ne!(want_phys, 0);
+    assert_eq!(last_entry(&mut f, u).record.physical, {
+        let mut r = DamageRecord {
+            physical: want_phys,
+            ..DamageRecord::default()
+        };
+        crate::combat::totals(&mut g.c, &ct, Some(u), m, &mut r);
+        r.physical
+    });
+    // A miss: nothing but the melee result is stored, and combat still
+    // starts (an entry exists).
+    f.c.hostile = false;
+    f.c.units[u].combat.clear();
+    assert_eq!(starts::sacrifice(&mut f, &t, &ct, u, 1, 1), 1);
+    let e = last_entry(&mut f, u);
+    assert_eq!(
+        (e.record.result, e.record.physical, e.record.hit_flags),
+        (0, 0, 0)
+    );
+}
+
+// Covers: specs/skills/bodies.md §3.8
+#[test]
+fn bash_start_attackrate_list_record_pair_bonus_and_aura_state() {
+    use crate::combat::{melee_result, start_combat};
+    let ct = ct3();
+    let (mut t, _) = strike_tables(0, 2, 7);
+    // aurastate 40 with aurastat1 = 25 (value calc2 = 3).
+    t.skills[1].aurastate = 40;
+    t.skills[1].aurastat1 = 25;
+    t.skills[1].aurastatcalc1 = t.skills[1].calc2;
+    // Refusals: R invalid, no target, target in a town room.
+    let (mut f, u, m) = duel();
+    assert_eq!(starts::bash(&mut f, &t, &ct, u, 99, 1), 0);
+    f.town.insert(1);
+    assert_eq!(starts::bash(&mut f, &t, &ct, u, 1, 1), 0);
+    f.town.clear();
+    f.targets.remove(&u);
+    assert_eq!(starts::bash(&mut f, &t, &ct, u, 1, 1), 0);
+    f.targets.insert(u, m);
+    assert!(f.lists.is_empty() && f.c.units[u].combat.is_empty());
+    // The full run, replayed by hand on a copy.
+    let mut g = f.clone();
+    let bonus = crate::skills::to_hit(&mut g, &t, Some(u), 1, 1);
+    let mut want = DamageRecord {
+        result: melee_result(&mut g.c, &t, &ct, Some(u), Some(m), bonus, 0),
+        ..DamageRecord::default()
+    };
+    assert_eq!(want.result & 1, 1);
+    want.result |= 0x0400;
+    want.hit_flags |= 2;
+    want.hit_class = 7;
+    want.enh_pct = 40;
+    want.conv_pct = 30;
+    want.conv_elem = 3;
+    crate::skills::roll_elemental(&mut g, &t, u, &mut want, 1, 1);
+    start_combat(&mut g.c, &t, &ct, Some(u), Some(m), &mut want, 128);
+    want.physical += 3 << 8;
+    f.take_log();
+    assert_eq!(starts::bash(&mut f, &t, &ct, u, 1, 1), 1);
+    assert_eq!(
+        last_entry(&mut f, u).record,
+        want,
+        "pair bonus after the roll"
+    );
+    // The temporary attack-rate list: flags 4, expire 0, no state.
+    let tmp = f
+        .lists
+        .iter()
+        .find(|l| l.stats.get(&68) == Some(&-25))
+        .unwrap();
+    assert_eq!(
+        (tmp.flags, tmp.expire, tmp.owner, tmp.unit),
+        (4, 0, Some(u), Some(u))
+    );
+    assert!(f.take_log().contains(&format!("anim {u}")));
+    // The aurastate list: state 40, flags 4, default callback, on the
+    // unit, filled by aura_fill; the state is on.
+    let a = f.list_of(u, 40).expect("aura list");
+    assert_eq!((a.flags, a.expire, a.callback), (4, 0, callback::DEFAULT));
+    assert_eq!(a.stats.get(&25), Some(&3));
+    assert!(f.has_state(u, 40));
+    // A second run reuses the list.
+    let n = f.lists.len();
+    assert_eq!(starts::bash(&mut f, &t, &ct, u, 1, 1), 1);
+    assert_eq!(f.lists.iter().filter(|l| l.state == 40).count(), 1);
+    assert_eq!(f.lists.len(), n + 1, "only the attack-rate list is new");
+    // SrcDam 0 → 128; a miss stores a bare record (no hit work).
+    f.c.hostile = false;
+    f.c.units[u].combat.clear();
+    assert_eq!(starts::bash(&mut f, &t, &ct, u, 1, 1), 1);
+    let e = last_entry(&mut f, u);
+    assert_eq!(
+        (e.record.result, e.record.hit_class, e.record.enh_pct),
+        (0, 0, 0)
+    );
+    // aurastate invalid (−1): no state list.
+    let mut t3 = t.clone();
+    t3.skills[1].aurastate = 0xFFFF;
+    let (mut f, u, _) = duel();
+    assert_eq!(starts::bash(&mut f, &t3, &ct, u, 1, 1), 1);
+    assert!(f.lists.iter().all(|l| l.state != 40));
 }
