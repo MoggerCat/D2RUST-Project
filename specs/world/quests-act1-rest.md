@@ -37,7 +37,7 @@
 | Edge cases & original bugs | 576–599 |
 | Test vectors | 600–631 |
 | Provenance | 632–665 |
-| Open questions | 666–693 |
+| Open questions | 666–698 |
 <!-- /index -->
 
 ## Summary
@@ -668,7 +668,12 @@ object row 189 from live `objects.txt`.
 1. ~~`0x005944F0`~~: answered in §3 (caller: the `cain1`
    NpcOutOfTown AI, `monsters/ai-bodies.md` §9.32).
 2. Object modes set here (gibbet 1 / 3, stones 0 / 2, `quests-act1.md` §10.6)
-   and object events 1 / 7 belong to the objects spec (not written).
+   and object events 1 / 7 belong to the objects spec (not written). **Answered**
+   (2026-10-07): the objects spec now exists: a mode set is
+   `world/objects.md` §4 (all Act I quest object rows have `Sync` = 1,
+   so no draw), event 1 (ENDANIM) is `world/objects-2.md` §18.6, event 7
+   (QUESTFN) dispatches through `quests.md` §9.5; the quest object
+   inits / operates are §9 items 8–11 here and `quests.md` §9.6.
 3. A recording of a Cain rescue (gibbet operate → event 7 17 frames
    later: 0x28, 0x5D, Cain spawn) and of a Countess kill (trap monster,
    chest missiles) would confirm §1 and §4.

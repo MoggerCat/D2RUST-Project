@@ -44,7 +44,7 @@
 | Edge cases & original bugs | 673–707 |
 | Test vectors | 708–722 |
 | Provenance | 723–747 |
-| Open questions | 748–776 |
+| Open questions | 748–783 |
 <!-- /index -->
 
 ## Summary
@@ -750,7 +750,14 @@ other Act V part-1 quest code draws.
 1. Status meanings per Act V quest (client quest log): settle with
    `quests.md` open question 1.
 2. `0x00558200(player, 0)`, the item level of Anya's rare item: item
-   spec.
+   spec. **Answered** (2026-10-07): `0x00558200(unit, level)` (ECX unit,
+   EDX level id): player → base stat 12 (`0x006253B0`), monster → total
+   stat 12 (`0x00625480`), any other unit → `levels.txt` `MonLvl` /
+   `MonLvlEx` (by difficulty, game +0x6D / +0x70) of its room's level
+   (`0x0061DCA0`); null unit with level id 0 → 1, with a level id ≠ 0 →
+   fatal (the game lookup `0x00554010` asserts a unit); a result ≤ 1 → 1 (`0x00558256`). So Anya's item level
+   is the player's character level (base stat 12), at least 1; the same
+   helper as `items/generation.md` §10 and `items/treasure.md` §7.
 3. Does a second `0x0058A0A0` stat list (scroll used again in a later
    difficulty, or at load) stack with or replace the first? Settle with
    the stat-list spec (owner ids of `0x006251F0`) and a recording.
