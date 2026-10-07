@@ -59,6 +59,8 @@ pub struct Fake {
     pub collide_calls: std::cell::RefCell<Vec<(i32, i32, i32, u16)>>,
     /// The nearest free point, if set; else the asked point.
     pub nearest: Option<(i32, i32)>,
+    /// The room of the nearest free point, if set; else the asked room.
+    pub nearest_room: Option<RoomId>,
 }
 
 impl Fake {
@@ -185,7 +187,7 @@ impl PopWorld for Fake {
     }
     fn nearest_free_point(&self, room: RoomId, x: i32, y: i32) -> Option<(RoomId, i32, i32)> {
         let (x, y) = self.nearest.unwrap_or((x, y));
-        Some((room, x, y))
+        Some((self.nearest_room.unwrap_or(room), x, y))
     }
 }
 

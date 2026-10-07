@@ -439,6 +439,36 @@ fn mode_1_no_target_wanders() {
     }
 }
 
+// Covers: specs/monsters/ai.md §2.3 text
+#[test]
+fn mode_4_no_target_wanders_only_on_collision_with_a_walk_mode() {
+    // `0x005DE9D0`: collision (mask 0x40) and the class can walk → wander
+    // 5; collision without a walk mode, or no collision → idle 20, no
+    // mode change, no draw.
+    let ((x, y), _) = wander_after(1, 0, (100, 100), 5);
+    for (collides, walk_off, wanders) in [
+        (true, false, true),
+        (true, true, false),
+        (false, false, false),
+    ] {
+        let mut w = World::new(monstats(15, [0; 5], 15));
+        w.game.frame = 100;
+        w.fake.collides = collides;
+        w.fake.can_walk_off = walk_off;
+        w.seed(1);
+        w.think_now();
+        let case = format!("{collides} {walk_off}");
+        if wanders {
+            assert_eq!(last_mode(&w), walk_point(x, y), "{case}");
+            assert!(w.thinks().is_empty(), "{case}");
+        } else {
+            assert!(w.fake.modes().is_empty(), "{case}");
+            assert_eq!(w.thinks(), [120], "{case}");
+            assert_eq!(draws(&w, 1), 0, "{case}");
+        }
+    }
+}
+
 // Covers: specs/monsters/ai.md §2.4 text
 #[test]
 fn precheck_c_needs_a_target() {

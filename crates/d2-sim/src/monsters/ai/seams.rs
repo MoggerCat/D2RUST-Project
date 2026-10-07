@@ -708,6 +708,11 @@ pub trait AiSummons {
     fn pet_type_of(&self, _game: &Game, _owner: UnitId, _unit: UnitId) -> i32 {
         -1
     }
+    /// The `pettype.txt` row count (data tables +0xBF0;
+    /// `ai-bodies-7.md` §18 Allowed). Default: 0.
+    fn pettype_count(&self) -> i32 {
+        0
+    }
     /// `0x00574BD0`: the hireling `Id` (+8 of the record) of the unit's
     /// node in the owner's pet lists. Default: none.
     fn hireling_id(&self, _game: &Game, _owner: UnitId, _unit: UnitId) -> Option<i32> {

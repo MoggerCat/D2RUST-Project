@@ -7,7 +7,7 @@ use d2_data::tables::{Levels, Monstats, Monstats2, Record, Superuniques};
 
 use crate::monsters::population::data::{chain_lengths, composits};
 use crate::monsters::population::{LevelPop, MonPop, RoomBox, SuperPop};
-use crate::units::UnitId;
+use crate::units::{RoomId, UnitId};
 
 // ---- data readers (Constants & data dependencies) -----------------------
 
@@ -404,13 +404,17 @@ fn superunique_hcidx_spawns() {
         assert!((2..=6).contains(&n(4)), "seed {lo}: {}", n(4));
         assert_eq!([276, 382, 385, 389].map(n), [1; 4]);
     }
-    // hcIdx 60: owner data, then class-for-level(453) (here 454 by the mon
-    // list, §11.6 r2), mode 1, r 10, 20 spawns, 0x40 (open question 4).
+    // hcIdx 60: owner data (own GUID, 1, 1, 0; `monsters/init.md` §20.1),
+    // then class-for-level(453) (here 454 by the mon list, §11.6 r2),
+    // mode 1, r 10, 20 spawns, 0x40 (open question 4). The §6.3 step 5
+    // call writes the same owner data first; the hcIdx call is the second.
     t.levels[2].mon = vec![454];
     t.monstats[454].base_id = 453;
     let (f, b) = su_hc(60, Seed::init(), &mut t);
-    let boss_owner = format!("owner {} Guid({b:?}) 1 0 0", b.0);
-    let owner = f.log.iter().position(|l| *l == boss_owner);
+    let boss_owner = format!("owner {} Guid({b:?}) 1 1 0", b.0);
+    assert_eq!(f.log.iter().filter(|l| **l == boss_owner).count(), 2);
+    assert!(!f.log.contains(&format!("owner {} Guid({b:?}) 1 0 0", b.0)));
+    let owner = f.log.iter().rposition(|l| *l == boss_owner);
     let members: Vec<_> = (0..f.units.len())
         .map(|i| UnitId(i as u32))
         .filter(|&u| f.unit(u).class == 454)
@@ -879,6 +883,51 @@ fn boss_restore_paths() {
     )
     .unwrap();
     assert_eq!((f.unit(b).x, f.unit(b).y), (10, 10));
+}
+
+// Covers: specs/monsters/population.md §6.3 r4
+#[test]
+fn boss_spawn_nearest_free_point_uses_its_room() {
+    // The last fallback places in the room holding the nearest free point
+    // (PROVISIONAL, REC-80): a point outside the asked room's box but
+    // inside its own room's box is accepted there.
+    let t = tables();
+    let mut st = state_with(&t, 2);
+    let mut f = Fake::new();
+    let r1 = RoomId(1);
+    f.boxes.insert(
+        R0,
+        RoomBox {
+            x: 10,
+            y: 10,
+            width: 1,
+            height: 1,
+        },
+    );
+    f.boxes.insert(
+        r1,
+        RoomBox {
+            x: 290,
+            y: 290,
+            width: 20,
+            height: 20,
+        },
+    );
+    f.nearest = Some((300, 300));
+    f.nearest_room = Some(r1);
+    let b = boss_spawn(
+        &mut ctx(&t, &mut st, &mut f),
+        R0,
+        None,
+        5000,
+        5000,
+        Some(9),
+        5,
+        false,
+    )
+    .unwrap();
+    let u = f.unit(b);
+    assert_eq!((u.x, u.y, u.room), (300, 300, r1));
 }
 
 // Covers: specs/monsters/population.md §7 r5

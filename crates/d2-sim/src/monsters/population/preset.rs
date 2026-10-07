@@ -215,8 +215,8 @@ pub const SPECIAL_PRESETS: [SpecialPreset; 20] = [
 ];
 
 /// The special preset row of `id`.
-// PROVISIONAL (monsters/population.md §11.5): an id the TSV does not list
-// spawns nothing; settled by a bin read of the special-id switch.
+// PROVISIONAL (monsters/population.md §11.5 rule 6; REC-80): an id the TSV
+// does not list (and no rule names) creates nothing and draws nothing.
 pub fn special(id: i32) -> Option<&'static SpecialPreset> {
     SPECIAL_PRESETS.iter().find(|r| r.id == id)
 }
@@ -475,10 +475,9 @@ pub fn superunique<H: PopHost + ?Sized>(
     boss_minions_and_init(cx, boss, min, max, None);
     match rec.hc_idx {
         10 => {
-            // PROVISIONAL (monsters/population.md §11.4 row hcIdx 10): the
-            // `roll(5)` is on the boss's unit seed and the mode is 1;
-            // settled by a Radament spawn RNG recording. HIGH-PRIORITY
-            // CAPTURE (RNG draw order).
+            // PROVISIONAL (monsters/population.md §11.4 row hcIdx 10;
+            // REC-81): the `roll(5)` is on the boss's unit seed and each
+            // spawn is in mode 1. HIGH-PRIORITY CAPTURE (RNG draw order).
             let n = cx.host.unit_seed(boss).roll(5) as i32 + 2;
             for _ in 0..n {
                 let _ = super::placement::place_near(cx, None, boss, 4, 1, 4, flags::NO_PARTY);
@@ -490,11 +489,9 @@ pub fn superunique<H: PopHost + ?Sized>(
         // Open question 4: (mode, r, count, flags).
         42 => group_spawn(cx, boss, 453, 1, 20, 20, 0),
         60 => {
-            // PROVISIONAL (population.md §11.4 hcIdx 60, open question 4):
-            // the boss's own owner data is `0x0058F030(game, boss, boss
-            // GUID, 1, 0, 0)`, the arguments open question 4 gives for the
-            // group; settled by a bin read of `0x005A49B0` (hcIdx 60 case).
-            cx.host.set_owner_data(boss, OwnerKey::Guid(boss), 1, 0, 0);
+            // §11.4 hcIdx 60 / `monsters/init.md` §20.1: the boss's owner
+            // data `0x0058F030(game, unit, own GUID, 1, 1, 0)`.
+            cx.host.set_owner_data(boss, OwnerKey::Guid(boss), 1, 1, 0);
             let broom = cx.host.unit_room(boss).unwrap_or(room);
             let c = class_for_level(cx, broom, 453);
             group_spawn(cx, boss, c, 1, 10, 20, flags::NO_PARTY);

@@ -243,23 +243,22 @@ pub(super) fn pet_move<W: AiHost + ?Sized>(
             for _ in 0..8 {
                 let j = PET_J[e];
                 let q = (f.0 + 8 * DIR_DX[j], f.1 + 8 * DIR_DY[j]);
-                // PROVISIONAL (monsters/ai-bodies-6.md §2 pet move k 0):
-                // "Else the same to the midpoint" is the else of the
-                // coordinate-index test (Q in another area → the midpoint);
-                // settled by a pet-move recording. HIGH-PRIORITY CAPTURE
-                // (RNG draw order).
+                // §2 pet move k 0: the midpoint try belongs to the "index
+                // is c0" case only (Q's try did not start; no second
+                // velocity call); an index ≠ c0 tries nothing. The
+                // hireling move (§7) has no midpoint try.
                 if cx.world.coord_index(game, o_room, q.0, q.1) == c0 {
                     set_velocity(cx, u, 0, speed, 40);
                     if go_del(game, cx, u, run && !hire, q.0, q.1) {
                         return true;
                     }
-                } else if !hire {
-                    let (ux, uy) = cx.world.position(u);
-                    let mx = ((ux.wrapping_add(q.0) as u32) >> 1) as i32;
-                    let my = ((uy.wrapping_add(q.1) as u32) >> 1) as i32;
-                    set_velocity(cx, u, 0, speed, 40);
-                    if go_del(game, cx, u, run, mx, my) {
-                        return true;
+                    if !hire {
+                        let (ux, uy) = cx.world.position(u);
+                        let mx = ((ux.wrapping_add(q.0) as u32) >> 1) as i32;
+                        let my = ((uy.wrapping_add(q.1) as u32) >> 1) as i32;
+                        if go_del(game, cx, u, run, mx, my) {
+                            return true;
+                        }
                     }
                 }
                 e = (e + 1) & 7;
@@ -1334,13 +1333,11 @@ pub fn desert_turret<W: AiHost + ?Sized>(
     let (vx, vy) = TURRET_V[j as usize];
     let (qx, qy) = (ox.wrapping_add(a5 * vx), oy.wrapping_add(a5 * vy));
     cx.world.set_path_target(u, t);
-    // 5.
-    // PROVISIONAL (monsters/ai-bodies-6.md §13 step 5): the check at the
-    // own position is `0x005FD470(Skill1, T, own x, own y)`; settled by a
-    // bin read of 0x005E0980.
+    // 5. The second check is at T's own position (§13 step 5).
+    let (tx, ty) = cx.world.position(t);
     if s1 >= 0
         && cx.world.skill_check(game, u, s1, p.target, qx, qy)
-        && cx.world.skill_check(game, u, s1, p.target, ox, oy)
+        && cx.world.skill_check(game, u, s1, p.target, tx, ty)
     {
         use_skill(game, cx, u, m1, s1, ModeTarget::Point(qx, qy));
         cx.world.set_path_target_point(u, qx, qy);
@@ -1954,10 +1951,8 @@ fn spirit_wolf<W: AiHost + ?Sized>(
             return;
         }
     }
-    // PROVISIONAL (monsters/ai-bodies-6.md §24.1 step 7): the pet follow is
-    // evaluated after the d > aip3 tests whatever d (its own sentence);
-    // settled by a DruidWolf recording. HIGH-PRIORITY CAPTURE (RNG draw
-    // order).
+    // §24.1 step 7: the pet follow is evaluated whatever d is (d ≤ aip3
+    // and every not-started pet move fall through to it, `0x005ED199`).
     if pet_follow(game, cx, u, s, o, m, true, 6) {
         return;
     }
@@ -2123,10 +2118,8 @@ pub fn cycle_of_life<W: AiHost + ?Sized>(
     let mut dk = 0;
     if s1 > 0 {
         if let Some(row) = skill_row(cx, s1) {
-            // PROVISIONAL (monsters/ai-bodies-6.md §25 step 4): "the unit
-            // has its entry" is the highest entry (`0x006439F0`) and its
-            // level with bonus (skills/levels.md highest_entry); settled by
-            // a bin read.
+            // §25 step 4: E := the highest entry (`0x006439F0`), L := its
+            // level with bonus 1 (`0x006442A0`).
             if let Some(lvl) = cx.world.skill_level(u, s1, true) {
                 let n = cx
                     .world
