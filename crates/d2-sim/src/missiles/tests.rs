@@ -2625,7 +2625,7 @@ fn null_table_entries_are_flagged() {
     }
 }
 
-// Covers: specs/missiles/missiles.md §R6.3
+// Covers: specs/missiles/missiles.md §r6-3-server-damage-functions-psrvdmgfunc-1-14d-confirmed-2026-10-08
 #[test]
 fn server_damage_functions_adjust_the_record() {
     // (function, dParam1, dParam2, setup) → the record the damage
@@ -2680,7 +2680,7 @@ fn server_damage_functions_adjust_the_record() {
     assert_eq!(w.fake.logged("record result 0x0"), 1);
 }
 
-// Covers: specs/missiles/missiles.md §R6.3
+// Covers: specs/missiles/missiles.md §r6-3-server-damage-functions-psrvdmgfunc-1-14d-confirmed-2026-10-08
 #[test]
 fn add_elem_and_clear_elems_by_etype() {
     use crate::combat::DamageRecord;
