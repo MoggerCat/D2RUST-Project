@@ -35,7 +35,7 @@
 | Edge cases & original bugs | 321–357 |
 | Test vectors | 358–380 |
 | Provenance | 381–405 |
-| Open questions | 406–449 |
+| Open questions | 406–477 |
 <!-- /index -->
 
 ## Summary
@@ -336,7 +336,7 @@ None.
    name setter `0x00628370` and the readers (`0x0062D298`) are unbounded
    copies too. The buffer is 16 bytes (+0x4A–+0x59); the 1.14d names are
    player names (ears, personalization), which fit with their
-   terminator, so a 16-character name is not expected (Open question 4). A name with no 0 in its 16 bytes
+   terminator, so a 16-character name is not expected (Open question 4: the one exception is a version-0x47 save's ear, up to 17 characters). A name with no 0 in its 16 bytes
    would read on into +0x5A…; d2rs stores at most 15 characters and
    rejects a longer one at the setter instead (handoff BV7).
 8. A compact ear has no item code on the wire (§3 rule 4). The reader
@@ -425,7 +425,35 @@ with `Save Add` 0 in 8 bits → 0xFF.
    and +0x20 (D2MOO `dwRealmData`), written only when +0x20 ≠ 0; read only
    when the save version > 0x56, with one discarded u32 when > 0x5D; the
    setter `0x00629EA0` is called only by the two save readers.
-4. Partly answered (source of each call site, disassembled):
+4. Answered (2026-10-07, disassembly of the 20 callers of `0x00558D90`
+   and of the legacy save reader): the edge-case-7 claim does **not**
+   hold for one path. Of the 20 callers (`disasm.py xref 0x558D90`: all
+   direct, no pointer), only `0x00530F40` sets the request's forced
+   field +0x2C (`0x00530FDA`, := 1); the 19 others build their request
+   at ebp−0x88 (`0x00579D60` at ebp−0xEC) and never store to +0x2C or
+   to +0x58..+0x67, so after the zeroing memset they reach the
+   unforced branches (`0x005590A4`, player name). `0x00530F40` (callers
+   `0x00531040`, `0x00531390`, both only from `0x00533350`) copies the
+   name with an unbounded byte loop (`0x00530FE3`–`0x00530FED`) from
+   +0x32 of a 0x48-byte legacy record into request +0x58; that record
+   is filled by `0x00532F30`, the reader `formats/d2s.md` §8.2 rule 1
+   selects for save version 0x47. Its ear branches read 16 characters
+   of 7 bits each into +0x32..+0x41: in the "flags 0x100000 clear"
+   ear branch the loop stops at the first 0 and +0x42 (u16) was set to
+   0, so at most 16 characters; in the "0x100000 set, 0x200000 set,
+   0x10000 set" branch all 16 are read with no stop, and +0x42 holds
+   the low byte of a 10-bit field read before them (+0x43 = 0), so a
+   version-0x47 ear name can be 17 characters (16 + that byte) before
+   its terminator. `0x00558D90` then passes request +0x58 to the
+   setter `0x00628370` (unbounded) at `0x0055903B` (type 7 ear) and
+   `0x0055910E` (flag 0x1000000), so up to 18 bytes (17 + 0) are
+   written from item data +0x4A, i.e. 2 bytes past the 16-byte field
+   (+0x5A, +0x5B). Every non-legacy path passes at most 15 characters
+   (the five sites below). d2rs (edge case 7: at most 15 characters,
+   rejected at the setter) therefore differs from 1.14d only for a
+   version-0x47 save holding an ear whose name has ≥ 16 characters; the
+   rejection stays a Ruleset choice and is recorded as such.
+   Earlier partial answer (source of each call site, disassembled):
    `0x005590A4` and `0x0057A625` copy the player's name (player data
    +0x00, `0x006221A0`), which the character load bounds to 15
    characters (`formats/d2s.md` load rule 4: byte +0x23 := 0, and it must

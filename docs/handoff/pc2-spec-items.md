@@ -130,13 +130,29 @@ addresses in the specs.
 - Relay: `properties.md` §10.1 load rule for broken runewords
   (`0x00563470`); `generation.md` §1.4 callers were already listed.
 
+### Third pass (worktree `w-spec-items3`, 2026-10-07)
+
+- `bitstream.md` OQ4 → Answered: only `0x00530F40` (legacy save
+  version 0x47 reader `0x00533350`) builds a forced request; it copies
+  the legacy record's name (+0x32, filled by `0x00532F30`) unbounded
+  into request +0x58; a version-0x47 ear name can be 17 characters, so
+  `0x00628370` writes up to 2 bytes past item data +0x59. Edge case 7
+  annotated.
+- `cube.md` OQ4 → Answered: portal creation `0x0056D130` /
+  `0x0056CF40` = one game-seed step (object 1 unit seed), then the
+  destination level build and room population `0x0052D0F0`, then one
+  game-seed step (object 2); free spots, inits 11/12, the same-mode
+  mode sets and the linking draw nothing.
+- `treasure.md` OQ5 → Partly answered: CRT `__setdefaultprecision`
+  (PC = 53, RC = nearest, masked) at startup; game code never changes
+  the precision (14 local RC-chop `fldcw` pairs); §5.4 then equals
+  binary64. The runtime word after the video layer: Needs recording.
+
 ## Still open
 
-- `bitstream.md` OQ2: Needs recording (see Recording list). OQ4: the
-  two request-name sites (`0x0055903B`, `0x0055910E`): writer of
-  request +0x58.
-- `cube.md` OQ4: portal creation `0x0056D130` draws.
-- `treasure.md` OQ5 (x87 precision control), OQ12 tail (d2rs value for
+- `bitstream.md` OQ2: Needs recording (see Recording list).
+- `treasure.md` OQ5: Needs recording (x87 control word at `0x0055A935`
+  under each video mode), OQ12 tail (d2rs value for
   the sub-picker n = 0 result: a Ruleset choice).
 - Not items: `impl-items` "stat vs base" readings; `gaps-items-stats`
   3–6.
@@ -154,3 +170,6 @@ None.
 - `bitstream.md` OQ2: pick up and store a set, unique, rare, runeword,
   ear, gold pile, tome and a socket-filled item; record S→C 0x9C / 0x9D;
   each stream must decode to its end and re-encode byte for byte.
+- `treasure.md` OQ5: in single player under each video mode (DirectDraw,
+  Direct3D, Glide), read the x87 control word (`fnstcw`) at
+  `0x0055A935` on a kill with a nodrop TC and n ≥ 2; expect 0x027F.

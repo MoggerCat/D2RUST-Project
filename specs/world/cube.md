@@ -36,7 +36,7 @@
 | Edge cases & original bugs | 530–564 |
 | Test vectors | 565–609 |
 | Provenance | 610–648 |
-| Open questions | 649–696 |
+| Open questions | 649–735 |
 <!-- /index -->
 
 ## Summary
@@ -682,6 +682,45 @@ jump table, `0x00566AA8` op jump table, the two Pandemonium stubs at
    allocation `0x00555230`, mode set `0x00624690(obj, 1)` and the
    destination half `0x0056CF40`); owner: objects / quests specs, settle
    with `disasm.py fn 0x0056CF40` and an rng trace of record 2.
+   Answered (2026-10-07; disassembly of both functions, plus a
+   reachability scan of every callee for the step constant 0x6AC690C5
+   and the draw helpers, `rng.md` §3/§6): portal creation draws, in
+   this order, on these seeds:
+   1. Free spot `0x0064E810` (only when the last argument is 0),
+      cell lookup `0x00463740`: no draw.
+   2. Object 1 (`0x0056D249`: `0x00555230`, type 2, the class
+      argument, mode 1, flags 1, GUID 0): **one game-seed step** (unit
+      seed `0x00552DF0`, `0x0055530E`; the item seed `0x00552E90` only
+      for type 4; the GUID `0x00552EE0` is a counter). The init dispatch
+      `0x0054F5D0` draws only for `PreOperate` ≠ 0 (rule 8; 0 for
+      classes 59 and 60 in the live table); inits 11 (`0x00550140`) and
+      12 (`0x0054FE70`) draw nothing (their `0x005417D0` scheduling
+      draws only for a monster, `sim/tick.md` §5.2 rule 4; init 12's
+      mode set runs only for mode 0); the object branch of
+      `0x00554850` draws nothing.
+   3. Mode set `0x00624690(obj, 1)` (`0x0056D25C`): the object is
+      already in mode 1, so no animation setup and no draw
+      (`sim/units.md` §4.1; the `roll` at `0x00624563` runs only on a
+      real mode change).
+   4. `0x0056CF40`: the spawn point `0x0061B060` may build the
+      destination level (`0x0066B2B0`: level / DRLG room seed draws,
+      `drlg/*`), then the room population `0x0052D0F0` (draws of
+      `monsters/population.md`, on the game seed and the room seeds),
+      both before the null test; for level 73 the A2Q6 arrival
+      `0x00545830` → `0x0059DFD0` does the same for level 40; the free
+      point `0x0064E7E0` draws nothing; the fallback `0x0061B060`
+      (`0x0056D033`) runs only when that point is not found.
+   5. Object 2 (`0x0056D092`: same class as object 1 (+0x04), mode 2,
+      flags 1): **one game-seed step** (its unit seed), init as in 2
+      (no draw: init 11 acts only in mode 1, init 12 only in mode 0).
+   6. `0x00624690(obj2, 2)` (`0x0056D107`): same mode, no draw;
+      `0x00553590`, `0x00621CE0` (twice), `0x00622300`, `0x0061AED0`:
+      no draw.
+   So outside the level build and the population the cube's portal
+   costs exactly two game-seed steps, one before and one after
+   `0x0052D0F0`. The failure paths free object 1 (`0x00555600`), whose
+   draws are that function's. All five functions of this question are
+   now answered.
 5. Answered by the inventory spec: link order (`items/inventory.md`
    §1.4 rule 1: `0x0063AF20` appends at the tail). Original text:
    Inventory list order of `0x0063B2C0`/`0x0063DFA0` (decides capture
