@@ -34,6 +34,8 @@ mod act3_tests;
 mod gaps_tests;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_lworld_world;
 
 use std::collections::BTreeSet;
 
