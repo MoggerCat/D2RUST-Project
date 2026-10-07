@@ -1174,10 +1174,7 @@ fn a_stub_starts_a_new_character_before_the_join_sequence() {
         .take_while(|m| (0x1D..=0x1F).contains(&m[0]))
         .collect();
     let n = stats.len();
-    assert!(
-        stats.contains(&&vec![0x1D, 0, cs.str as u8]),
-        "{stats:02X?}"
-    );
+    assert!(stats.contains(&&vec![0x1D, 0, cs.str]), "{stats:02X?}");
     assert_eq!(j.received[9 + n], hand(1, [0, 0], [0; 4]));
     assert_eq!(j.received[10 + n], hand(0, k, [0; 4]));
     let again: Vec<&Vec<u8>> = j.received[11 + n..11 + 2 * n].iter().collect();
