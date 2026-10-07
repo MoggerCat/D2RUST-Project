@@ -222,10 +222,9 @@ pub fn unit_step<X: Pending>(v: &mut View<'_, X>, game: &mut Game, unit: UnitId)
 
 /// Path compute `0x00649970(path, unit, town access)` (`pathing.md` §3)
 /// toward the path's target.
-///
-/// TODO(spec: missiles.md §R2.3 step 16): the town-access argument of
-/// the missile build is not stated; 0 is passed (as the re-path,
-/// `pathing.md` §9.10).
+// PROVISIONAL (missiles/missiles.md §R2.3 step 16): the missile build
+// passes town access 0 (as the re-path, `pathing.md` §9.10); settled by a
+// bin read (the missile compute likely ignores it).
 pub fn build_path<X: Pending>(v: &mut View<'_, X>, game: &mut Game, unit: UnitId) {
     let mut c = PathCtx::of(v, game);
     let Some(mut d) = c.load_path(unit) else {

@@ -382,11 +382,9 @@ impl<X: Pending> ActionHooks<X> {
     /// "Sets mode 12" of §7.7 rule 3 as the mode set `0x00553570`
     /// (`units.md` §4.1): mode, unit flag 0x1, the update queue.
     ///
-    /// TODO(spec: intents-events.md §7.7 rule 3): the setter the two DT
-    /// functions call is not named (`0x00553570` or the monster mode set
-    /// `0x005A7C20`, whose DD start `0x005A7390` has no written body).
-    /// Both give mode 12, flag 0x1 and the queueing the message reads;
-    /// the second also prepares the animation and cancels events 0 / 1.
+    /// Mode 12 is always set by the plain mode set `0x00553570`
+    /// (`sim/units.md` §4.6 "Death and dead functions"), never by
+    /// `0x005A7C20`.
     fn death_mode(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
         if let Err(e) = modes::set_mode(sim, self, unit, monster_mode::DD) {
             self.errors.push(WiringError::Unit(e));

@@ -712,10 +712,9 @@ fn talic<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitId, p:
         let skill = cx.world.skill_entry(u, s1).map_or(s1, |e| e.0);
         cx.world.set_current_skill(u, skill);
         cx.world.set_path_steps(u, 1);
-        // TODO(spec: ai-bodies-5.md §12 A step 3): the request byte +0x15
-        // := 100 has no field in the mode request here.
+        // The request byte +0x15 := 100: no path (ai.md §7.1).
         cx.world
-            .change_mode(game, u, m1, ModeTarget::Point(tx + dx, ty + dy));
+            .change_mode_path_byte(game, u, m1, ModeTarget::Point(tx + dx, ty + dy), 100);
         return;
     }
     // 4.

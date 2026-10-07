@@ -188,7 +188,19 @@ impl<X: Pending> AiModes for View<'_, X> {
     /// (state 54, bad mode).
     fn change_mode(&mut self, game: &mut Game, unit: UnitId, mode: u8, target: ModeTarget) -> bool {
         self.h.x.set_mode_target(unit, target);
-        crate::wiring::path::monsters::stage_request(self.h, unit, target);
+        crate::wiring::path::monsters::stage_request(self.h, unit, target, None);
+        self.monster_set_mode(game, unit, u32::from(mode))
+    }
+    fn change_mode_path_byte(
+        &mut self,
+        game: &mut Game,
+        unit: UnitId,
+        mode: u8,
+        target: ModeTarget,
+        path_byte: u8,
+    ) -> bool {
+        self.h.x.set_mode_target(unit, target);
+        crate::wiring::path::monsters::stage_request(self.h, unit, target, Some(path_byte));
         self.monster_set_mode(game, unit, u32::from(mode))
     }
     /// The anim mode (unit +0x10) without a mode change.

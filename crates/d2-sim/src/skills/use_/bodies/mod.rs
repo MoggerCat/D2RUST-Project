@@ -186,6 +186,18 @@ pub struct BodyTables {
     pub monlvl: Vec<d2_data::tables::Monlvl>,
     /// `pettype.txt` record count.
     pub pettype_count: i32,
+    /// The item-event layer split (data +0xC6C shift, +0xC70 mask;
+    /// `data/runtime-maps.md` §3): `stuff` of itemstatcost record 0
+    /// (+0x140) when in 1..8, else 6; mask (1 << stuff) − 1. `None`
+    /// without itemstatcost rows.
+    pub layer_split: Option<(u32, u32)>,
+}
+
+/// The layer split of `data/runtime-maps.md` §3 from `stuff` of
+/// itemstatcost record 0.
+pub fn layer_split(stuff: u32) -> (u32, u32) {
+    let s = if (1..=8).contains(&stuff) { stuff } else { 6 };
+    (s, (1 << s) - 1)
 }
 
 impl BodyTables {
@@ -231,6 +243,7 @@ impl BodyTables {
             overlay_count: i32::try_from(overlay.count).unwrap_or(i32::MAX),
             monlvl: Vec::new(),
             pettype_count: 0,
+            layer_split: isc.first().map(|r| layer_split(r.stuff)),
         })
     }
 

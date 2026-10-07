@@ -97,6 +97,21 @@ pub trait AiModes {
     /// Requests a mode change; false when the mode start failed (which
     /// then falls into the neutral start, [`super::neutral_mode_start`]).
     fn change_mode(&mut self, game: &mut Game, unit: UnitId, mode: u8, target: ModeTarget) -> bool;
+    /// [`Self::change_mode`] with the request record's path-type byte
+    /// (+0x15, §7.1) overwritten with `path_byte` after the builder set
+    /// it (100 = no path, 101 = type 13, else the path type). Default:
+    /// the plain request.
+    fn change_mode_path_byte(
+        &mut self,
+        game: &mut Game,
+        unit: UnitId,
+        mode: u8,
+        target: ModeTarget,
+        path_byte: u8,
+    ) -> bool {
+        let _ = path_byte;
+        self.change_mode(game, unit, mode, target)
+    }
     /// Sets the anim mode without a mode change (inline thinks, §1.4).
     fn set_anim_mode(&mut self, unit: UnitId, mode: u8);
     /// The path step count.
