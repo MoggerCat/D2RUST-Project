@@ -24,16 +24,16 @@
 | Outputs / state changes | 63–68 |
 | Rules | 69–70 |
 |   1. Local player stats: 0x19–0x1F (`0x0045D780`) | 71–100 |
-|   2. Item actions: 0x9C ItemActionWorld (`0x0045EB10`), 0x9D ItemActionOwned (`0x0045EC70`) | 101–171 |
-|   3. Other item messages | 172–201 |
-|   4. Hireling stats: 0x9E–0xA2 (`0x0045D540`) | 202–217 |
-|   5. Item state messages: 0x3E, 0x40, 0x7C, 0x7D, 0x92, 0x97, 0xA6 | 218–303 |
-| Constants & data dependencies | 304–312 |
-| Randomness | 313–316 |
-| Edge cases & original bugs | 317–332 |
-| Test vectors | 333–371 |
-| Provenance | 372–395 |
-| Open questions | 396–421 |
+|   2. Item actions: 0x9C ItemActionWorld (`0x0045EB10`), 0x9D ItemActionOwned (`0x0045EC70`) | 101–210 |
+|   3. Other item messages | 211–240 |
+|   4. Hireling stats: 0x9E–0xA2 (`0x0045D540`) | 241–256 |
+|   5. Item state messages: 0x3E, 0x40, 0x7C, 0x7D, 0x92, 0x97, 0xA6 | 257–342 |
+| Constants & data dependencies | 343–351 |
+| Randomness | 352–355 |
+| Edge cases & original bugs | 356–371 |
+| Test vectors | 372–410 |
+| Provenance | 411–434 |
+| Open questions | 435–461 |
 <!-- /index -->
 
 Owned ids: 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F, 0x20, 0x3F, 0x42,
@@ -167,7 +167,46 @@ stat-list links, `weapon_set`, the runtime item table (§5). No outputs.
    `0x004C3380`, `0x004C3760`, `0x004C3B30`, `0x004C3F60`,
    `0x004C4130`, `0x004C42A0`, `0x004C44D0`, `0x004C4740`,
    `0x004C4990`, `0x004C4C70`) set or clear it as part of their
-   placement rule: open question 6.
+   placement rule: rule 5.3.
+   3. **Cursor writes of the other actions** (2026-10-08; answers open
+      question 6). Terms: the stream header (`0x0062E410`, open question
+      3) has the item's mode byte at +8 (0 stored, 1 body, 2 belt, 4
+      cursor; the GroundToCursor test of rule 5.2 is "mode 4"), the item
+      flags u32 at +0x0C (D2MOO names as hints: 0x1 `NEWITEM`, 0x8
+      `DELETED`, 0x20 `QUANTITY`, 0x40 `SWITCHIN`, 0x80 `SWITCHOUT`), the
+      storage page byte at +0x10 and the body location byte at +0x11.
+      "Re-created" = the item unit (4, GUID) is removed and created again
+      from the stream (`0x00465EE0`, `0x004C0FF0` / `0x004C0F20`), else the
+      existing unit is updated from the header (`0x004C2540`). P = the
+      local player; "set" = `0x0063C180(inventory, item)`, "clear" =
+      `0x0063C180(inventory, none)`; each write is followed by the UI
+      cursor refresh (`0x00468070`). A handler not listed here (0x00, 0x03,
+      0x14, 0x17, and 0x09 / 0x0D / 0x10 on their other branches) never
+      writes the cursor. Every write below is to P's inventory unless the
+      row says otherwise.
+
+      | Action (handler, call) | Cursor write |
+      |---|---|
+      | 0x02 (`0x004C26F0`, `0x004C2740`) | the item (4, GUID) is in S and is P's cursor item → clear (before the item is re-created when header flag 0x1) |
+      | 0x04 PutInContainer (`0x004C2AD0` → `0x004C2970`, `0x004C2A77`); 0x0B, 0x0C (`0x004C3C00` → `0x004C2970`) | after the item is placed in P's grid (`0x0063B210`, `0x0063BCC0` both succeed) and the owner is P: page byte = 1 → no write (an item sound, `0x004C1D60`, `0x004B9A00`); else clear |
+      | 0x05 RemoveFromContainer (`0x004C2C80`, `0x004C2E1F`; 0x9D) | the item was in the **owner's** grid and header flag 0x20 is clear → set the owner's cursor := the item (re-created when flag 0x1); flag 0x20 → the item is removed, no write |
+      | 0x06 Equip (`0x004C2E90`, `0x004C300F`) | the owner is P, the owner's type < 2 and the equip succeeded: header flag 0x8 clear → clear |
+      | 0x07 IndirectlySwapBodyItem (`0x004C3070`, `0x004C3207`) | owner P: set := the item taken off the body location (header +0x11 4 or 11 → 5, 5 or 12 → 4: the other hand), then the message's item is equipped |
+      | 0x08 Unequip (`0x004C3380`, `0x004C354F`) | owner P and header flag 0x20 clear: set := the unequipped item (re-created when flag 0x1); flag 0x20 → removed, no write |
+      | 0x09 SwapBodyItem (`0x004C3920`): flag 0x80 → `0x004C3760` (`0x004C38F5`); flag 0x40 → `0x004C35F0`, no write | owner P: set := the item taken off body location +0x11 (re-created when flag 0x1) |
+      | 0x0A AddQuantity (`0x004C3B30`, `0x004C3BC8`) | `0x0062E430` reads the stream into the existing item; its result flag set → the item is removed (`0x00465EE0`), no write; else (P none → fatal 0x7B3, no inventory → fatal 0x7B6) the item unit's own flags (`0x00628110`) bit 0x8 clear → clear |
+      | 0x0D SwapInContainer (`0x004C40D0`): item mode 0 → `0x004C3F60` (`0x004C40A9`); mode 4 → `0x004C3E00`, no write | set := the message's item, taken out of P's grid (re-created when flag 0x1) |
+      | 0x0E PutInBelt (`0x004C4130`, `0x004C4233`) | always clear (after the belt placement) |
+      | 0x0F RemoveFromBelt (`0x004C42A0`, `0x004C439A`) | the item was in P's belt and header flag 0x20 is clear → set := the item; flag 0x20 → removed, no write |
+      | 0x10 SwapInBelt (`0x004C45C0`): item mode 2 → `0x004C44D0` (`0x004C459B`); mode 4 → `0x004C43E0`, no write | set := the message's item, taken out of P's belt |
+      | 0x11 AutoUnequip (`0x004C4740`, `0x004C494C`) | owner P and the item is placed in P's grid → clear |
+      | 0x13 socket filler (`0x004C4990`, `0x004C4A6D`; 0x9D) | the item is placed in the owner's inventory (`0x0063B210(…, 1)`) and header flag 0x8 is clear → clear **P's** cursor (whoever the owner is; P without an inventory → fatal 0xB3A) |
+      | 0x15 UpdateStats (`0x004C4C70`; owner a player with an inventory) | by header mode: 0 (owner P) → the item is placed again through `0x004C2970` (the 0x04 row: page 1 → no write, else clear, `0x004C4DC3`); 1 → owner P and header flag 0x8 clear → clear (`0x004C4F8C`); 2 (owner P) → no write; 4 (owner P) → the old unit removed, the item re-created and set := it (`0x004C517F`) |
+      | 0x16 (`0x004C2340`, `0x004C23C5`; 0x9D) | the owner unit found: the old (4, GUID) removed, the item re-created, its stat 70 := 1 (`0x00627260`), set the **owner's** cursor := it |
+
+      Model: `cursor_item` of the inventory's unit := the item's key (set)
+      or none (clear). Outside the item actions: 0x42 (§3 rule 1) and 0x58
+      code 5 (`client/msg-ui.md` §8) clear it.
 
 ### 3. Other item messages
 
@@ -410,7 +449,8 @@ stat names from `itemstatcost`.
    flag 0x4000).
 5. Answered: 0x21, 0x22, 0x23, 0x94 are owned by `client/msg-skills.md`
    (skill list, §3–§6 there).
-6. `cursor_item` in the other item actions (§2 rule 5's list): per
+6. *Answered (2026-10-08)*: §2 rule 5.3 (per handler, with the header
+   mode byte +8 named). Original question: `cursor_item` in the other item actions (§2 rule 5's list): per
    handler, whether it passes the action's item, a swapped-out item or
    0 to `0x0063C180`; with the header byte +8 of the GroundToCursor
    test named (open question 3's header spec).

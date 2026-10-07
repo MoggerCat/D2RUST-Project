@@ -28,29 +28,29 @@
 | Inputs | 74–82 |
 | Outputs / state changes | 83–89 |
 | Rules | 90–91 |
-|   1. Model contents | 92–130 |
-|   2. Unit table | 131–176 |
-|   3. Local player | 177–199 |
-|   4. Receive and the unit message queue | 200–237 |
-|   5. Client update pass | 238–274 |
-|   6. Position check (`0x004804E0`) | 275–314 |
-|   7. Session messages | 315–351 |
-|   8. Mode requests | 352–403 |
-|   9. Room-in-sight messages | 404–438 |
-|   10. Bit reader | 439–453 |
-|   11. Current act and level (join and later) | 454–499 |
-|   12. Client DRLG and the room of a point | 500–541 |
-|   13. Visibility predicate (`0x004DBF20`) | 542–569 |
-|   14. Pet list and the hireling GUID | 570–596 |
-|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 597–663 |
-|   16. C→S 0x4B after a teleport (the hireling case) | 664–698 |
-|   17. Model writes made by 1.14d UI code | 699–778 |
-| Constants & data dependencies | 779–791 |
-| Randomness | 792–803 |
-| Edge cases & original bugs | 804–812 |
-| Test vectors | 813–860 |
-| Provenance | 861–919 |
-| Open questions | 920–1000 |
+|   1. Model contents | 92–131 |
+|   2. Unit table | 132–177 |
+|   3. Local player | 178–200 |
+|   4. Receive and the unit message queue | 201–238 |
+|   5. Client update pass | 239–275 |
+|   6. Position check (`0x004804E0`) | 276–315 |
+|   7. Session messages | 316–392 |
+|   8. Mode requests | 393–444 |
+|   9. Room-in-sight messages | 445–479 |
+|   10. Bit reader | 480–494 |
+|   11. Current act and level (join and later) | 495–540 |
+|   12. Client DRLG and the room of a point | 541–582 |
+|   13. Visibility predicate (`0x004DBF20`) | 583–610 |
+|   14. Pet list and the hireling GUID | 611–637 |
+|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 638–704 |
+|   16. C→S 0x4B after a teleport (the hireling case) | 705–739 |
+|   17. Model writes made by 1.14d UI code | 740–857 |
+| Constants & data dependencies | 858–870 |
+| Randomness | 871–882 |
+| Edge cases & original bugs | 883–891 |
+| Test vectors | 892–939 |
+| Provenance | 940–998 |
+| Open questions | 999–1081 |
 <!-- /index -->
 
 ## Summary
@@ -104,9 +104,10 @@ position check of the local player.
    | `ladder: u8` (stored as u32) | `[0x007A04F8]` | 0x01 |
    | `game_flags: u32` | `[0x00712EFC]` | 0x01 |
    | `act: Option<ActLoad>` | client DRLG act `[0x007A0634]`; `[0x007A0638]` → {seed, u32@8}; `[0x007A063C]` | 0x03 (§7 rule 4) |
-   | `in_game: bool` | `[0x007A061C]` | 0x04 (1), 0x05 (0) |
+   | `in_game: bool` | `[0x007A061C]` | 0x04 (1), 0x05 (0), 0xB4 through the UI (0, §7 rule 8) |
    | `unloaded: bool` | `[0x007A0624]` | 0x04 (0), 0x05 (1) |
-   | `exit_requested: bool` | `[0x007A0620]` | 0x06 |
+   | `exit_requested: bool` | `[0x007A0620]` | 0x06; 0xB4 through the UI (§7 rule 8) |
+   | `town_flag: bool` | `[0x007A5260]` | player creation (`msg-units.md` §1.1 r3), §17 rule 6 |
    | `rooms_in_sight: Vec<RoomSight>` | client DRLG room status (`drlg/rooms.md` §4) | 0x07, 0x08 (§9) |
    | `outgoing: Vec<Vec<u8>>` | client send path | §6 rule 8, §7 rule 3 |
    | `pets: Vec<PetRecord>` | pet list `[0x007BB5BC]` | 0x7A, 0x81 (§14) |
@@ -348,6 +349,46 @@ position check of the local player.
    out of scope) may call `0x0044E380(8)`; types 2 and 3 with `in_game`
    call `0x0044E380(7)`; single player (type 0) does neither;
    `exit_requested` := true.
+8. **0xB4** load refusal (2026-10-08; answers `client/bridge.md` open
+   question 7). The single-player server sends it as a direct send, so
+   it is drained from the system list ahead of buffered game messages
+   (`sim/intents-events.md` §3.3 rule 5, §3.4 rules 1–2), when the join's
+   load fails (§8.2 rule 2 there: codes 0x13, 0x14, 0x15, 0x17, 0x18),
+   and the server then removes the client, so no message follows it.
+   1. Handler `0x0045C6D0` (system handler `0x0045C850`, 5 bytes):
+      code c = u32@1; n := the error number of the map below (jump table
+      `0x0045C7E8`, 26 entries, read from the image); c = 0 or c > 26 →
+      n = 9. Then `0x0044E380(n)`, nothing else.
+
+      | c | 1–6 | 7–21 | 22 | 23 | 24 | 25 | 26 |
+      |---|---|---|---|---|---|---|---|
+      | n | c − 1 | c + 3 | 9 | 0x19 | 0x1A | 0x1C | 0x1B |
+
+      The single-player codes give 0x13 → 0x16, 0x14 → 0x17, 0x15 →
+      0x18, 0x17 → 0x19, 0x18 → 0x1A.
+   2. `0x0044E380(n)` (the client's "leave with an error" entry, also
+      called by rule 7 for hosted game types) is UI code. In order: it does nothing when the 2,500 ms error timer
+      `[0x007A0684]` / `[0x007A0688]` is still running (`0x0044E040`,
+      wall clock) or `[0x007A0604]` (video-5 flag, `client/msg-ui.md` §1
+      r2) or `[0x007A062C]` is set. Else the error number `[0x007A05D4]`
+      := n (n ≥ 0x1D → 9; the map above never gives one); every open
+      panel is closed (`0x00456300(1, 0)`); the timer is started
+      (`GetTickCount`, 0x9C4 ms); **`exit_requested` := true**
+      (`[0x007A0620]`); **`in_game` := false** (`[0x007A061C]`); the
+      connection flag `[0x007A0618]` (0xAF / 0xB0, out of scope) := 0;
+      `[0x0070EE8C]` := 0 (`0x0044B880`, the flag of `client/msg-ui.md`
+      open question 8). The error screen
+      (`0x0044CB60`: the string of error n; codes 0x14 / 0x15 add a line
+      when the character record byte +0x1EF has bit 0x20) and the game
+      loop's wait for the timer (`0x0044F360`) are Phase 6 UI.
+   3. d2rs: the handler emits one `JoinRefused` output {n}
+      (`client/bridge.md` §10 table); it writes no model field itself.
+      The UI layer applies `0x0044E380(n)` from its own state (the guard
+      is UI state, §10 r5 there) and, when the guard passes, returns the
+      two model writes as requests (`exit_requested` := true, `in_game`
+      := false; §10 r10 there). Applying them at delivery (§10 r4) is
+      exact because no message follows 0xB4 in its frame (rule 8
+      preamble).
 
 ### 8. Mode requests
 
@@ -774,7 +815,45 @@ bit 0x2 is the bit of `client/msg-ui.md` §1 r4 and §16).
    of the new room) goes from 1 to 0. It re-arms the NPC greetings and,
    with an active interaction whose NPC is present, runs `E` (rule 1)
    (`ui/messages.md` §13 r4). It is reached from a model update, not
-   from a message output: open question 16.
+   from a message output: rule 6 hands it to the UI layer.
+6. **Local player room change** (`0x00460E70`; 2026-10-08, answers open
+   question 16 and `client/msg-units.md` open question 8). In the player
+   update `0x00463390` of any player U, when U's path room-changed flag
+   is set (path +0x34 bit 0x2, `0x00620F50` → `0x00648B30`; set by the
+   path code when the unit's room changes, the flag `sim/pathing.md`
+   §9.8 names; client movement is Phase 6) the flag is cleared
+   (`0x00620FA0(U, 0)`) and, only when U is the local player, this step
+   runs (`0x004636D5`). In 1.14d order:
+   1. R := U's room (`0x00620BB0`); none → nothing more.
+   2. **Portal flags**: L := R's level id (`0x0061A1B0`); the local
+      player's player data +0x2C (`pdata_2c` of `client/msg-units.md`
+      §7 r4, read `0x00622230`, written `0x006221E0`) |= 1 << i, i = the
+      index of L in the portal level list (leveldefs rows whose `Portal`
+      +0x8C ≠ 0, in row order; `0x0061AE30` over `0x0096C9F4` / count
+      `0x0096C9F8`, `data/runtime-maps.md` `leveldefs_portals`); L not in
+      the list → no bit. This is the only client reader of +0x2C: the
+      getter's other three callers are server code (`0x00537B00`, no
+      static caller; `0x00537B50`, the same OR on the server,
+      `sim/intents-events.md` §7.8 rule 4; `0x00539760`, the join, which
+      sends the value as 0x5F). Nothing on the client consumes the
+      value, so it has no observable client effect; the model keeps it
+      so a memory read can compare it with the server's.
+   3. `0x00648AA0(path, R)` → `0x0061AF10(client act, …)`: Phase 6
+      (not a model write named here).
+   4. **Town flag**: T := (`0x0061AB00(R)` ≠ 0) (R is a town room). When
+      `town_flag` ≠ T and T is false, the **town exit** `0x004B3E10(U)`
+      (rule 5) runs; then `town_flag` := T. d2rs: `ClientWorld.town_flag:
+      bool` (`[0x007A5260]`), added by this rule; also written by every
+      player creation (`client/msg-units.md` §1.1 r3), which this rule
+      does not change.
+   5. `0x0061AA40(R)` → `0x00473C90`, `0x0046BF30(R)`: Phase 6.
+   d2rs: the update pass runs steps 1–5 at the local player's per-type
+   update (§5 rule 2; the rest of `0x00463390` stays Phase 6). The town
+   exit is the output `TownExit` (`client/bridge.md` §10 r11): the pass
+   emits it at step 4, the bridge delivers it to the UI layer at once
+   and applies the UI's model-write requests (rule 1's parts of `E`)
+   before the pass continues, so later units' updates and queue drains
+   see the writes as in 1.14d.
 
 ## Constants & data dependencies
 
@@ -984,7 +1063,9 @@ mode 1; rule 2's refusal also runs the stock discard.
 15. The on-mode / on-use shrine functions (`0x004BD4A0`, `0x004BD090`,
     `0x004BD0C0`, `0x004BD220`, `0x004BD360`) and the overlay calls
     `0x0046F0C0` / `0x00470390` (§15): Phase 6 effects spec.
-16. §17 rule 5: the town exit runs UI code (greeting re-arm, interaction
+16. *Answered (2026-10-08)*: §17 rule 6 (the room-change step that
+    reaches the town exit, emitted as `TownExit`, `client/bridge.md` §10
+    r11 and table). Original question: §17 rule 5: the town exit runs UI code (greeting re-arm, interaction
     end with model writes) from the local player's update, outside any
     message output. d2rs needs a way for the update pass to hand it to
     the UI layer in 1.14d order (e.g. a new `client/bridge.md` §10

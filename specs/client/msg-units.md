@@ -28,14 +28,14 @@
 |   4. Queued movement and action messages | 286–329 |
 |   5. Local player vitals: 0x18, 0x95, 0x96 | 330–351 |
 |   6. Unit states: 0xA7, 0xA8, 0xA9, 0xAA | 352–382 |
-|   7. Other unit messages (general handlers, act at receive) | 383–488 |
-|   8. Player roster (0x5B, 0x5C, 0x65, 0x82, 0x8E; life from 0x0D, 0xAB) | 489–561 |
-| Constants & data dependencies | 562–573 |
-| Randomness | 574–581 |
-| Edge cases & original bugs | 582–604 |
-| Test vectors | 605–655 |
-| Provenance | 656–698 |
-| Open questions | 699–726 |
+|   7. Other unit messages (general handlers, act at receive) | 383–498 |
+|   8. Player roster (0x5B, 0x5C, 0x65, 0x82, 0x8E; life from 0x0D, 0xAB) | 499–571 |
+| Constants & data dependencies | 572–583 |
+| Randomness | 584–591 |
+| Edge cases & original bugs | 592–614 |
+| Test vectors | 615–665 |
+| Provenance | 666–708 |
+| Open questions | 709–741 |
 <!-- /index -->
 
 Owned ids: 0x0A, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x15, 0x18, 0x4C, 0x4D,
@@ -417,7 +417,9 @@ The player roster (§8). Outputs (`client/bridge.md` §10): `UnitOverlay`
    the local player's player data +0x2C := u32@1 (`0x006221E0`: fatal
    0xFBF for a null unit, 0xFC0 for a non-player). Model: local player
    `pdata_2c`. Recorded `5f 01000000` at both joins (`-015956` seq 136,
-   `-022633` seq 114). Its reader is open question 8.
+   `-022633` seq 114). Meaning and only client reader (2026-10-08, open
+   question 8): the portal flags, ORed by the local player's room-change
+   step (`client/model.md` §17 r6 step 2); no client code consumes them.
 5. **0x60** TownPortalState (`0x0045E610` → `0x004BDF30`, 7 bytes):
    portal flags u8@1, destination level u8@2, object GUID u32@3
    (`sim/intents-events.md` §3.5, `world/objects.md` §14). No local
@@ -469,8 +471,16 @@ The player roster (§8). Outputs (`client/bridge.md` §10): `UnitOverlay`
    (`-015956` seq 179) and `7e 00000041` (`-022633` seq 155).
 9. **0x98** (`0x0045DE50` → `0x004B1240`, 7 bytes): GUID u32@1, u16@5.
    Monster (1, GUID) with monster data → data +0x40 := u16@5, or −1
-   when u16@5 = 0xFFFF. Model: monster kind data `mdata_40`; meaning
-   open question 9.
+   when u16@5 = 0xFFFF. Model: monster kind data `mdata_40`. No client
+   reader (2026-10-08, open question 9): no instruction in the client
+   code reads monster data +0x40 (a scan of every `[r + 0x40]` read
+   whose base was loaded from a unit's +0x14 finds only this writer;
+   the shared accessors `0x00554040` / `0x00554070` are called from
+   server code alone, `0x0056D840` / `0x0056D8D0`), so the field has no
+   observable client effect. The server sends 0x98 only for class 528
+   (`sim/intents-events.md` §7.2 monster row), u16@5 = its AI control
+   +0x3C (`0x0058F710`, the spawner pick of `monsters/ai-bodies-2.md`
+   §13.1).
 10. **0xA4** BaalWave (`0x0045D760`, 3 bytes): class u16@1. Class ≥
     the monstats count → nothing. Else one `MonsterPreload` output
     {class}: `0x0046F870(class, 0)` loads, for each of the 15 modes of
@@ -717,9 +727,14 @@ Act-switch session (2026-10-07): `0x004654C0` at `0x00465603`–`0x00465634`
 7. A recording with a hireling (0x7A / 0x81, 0xAC of the hireling)
    confirms §1.2 rules 2–3 and §2 rule 2 with a real pet list
    (`client/model.md` open question 10).
-8. Who reads the local player's player data +0x2C (0x5F, §7 r4; the
-   server's meaning: sender `0x0053B400`), so the field can be named.
-9. Monster data +0x40 (0x98, §7 r9): its reader and meaning.
+8. *Answered (2026-10-08)*: §7 r4 (portal flags; the only client
+   reader is the room-change step, `client/model.md` §17 r6 step 2).
+   Original question: who reads the local player's player data +0x2C
+   (0x5F, §7 r4; the server's meaning: sender `0x0053B400`), so the
+   field can be named.
+9. *Answered (2026-10-08)*: §7 r9 (no client reader; the server's
+   value is the class-528 AI control +0x3C). Original question: monster
+   data +0x40 (0x98, §7 r9): its reader and meaning.
 10. The client missile body of 0x73 (`0x004CD540`, `0x0064A330`,
     `0x0045C3E0`) and the umod client functions of 0x57 (table
     `0x00724D78`): Phase 6 effects spec.

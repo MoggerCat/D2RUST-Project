@@ -6193,6 +6193,7 @@ a monster, a Druid summon, a Clay Golem, a Countess kill, a Cain rescue.
   memory read of the NPC's unit flags, mode and the store items in S
   (`client/model.md` §17 r1–r3); a character whose left skill drops to
   level 0 (§17 r4).
+- `client/model.md` §7 r8 / §17 r6 (PC 1 spec-s3-client, 2026-10-08): (a) join a classic single-player game with an expansion-class character: log the S→C 0xB4 bytes (expect code 0x18) and the error string shown (error number 0x1A); (b) walk out of town (once plainly, once right after starting an NPC talk): log the town flag `[0x007A5260]`, the interact NPC fields and the C→S 0x30 of the town exit, and player data +0x2C before and after entering a portal level.
 
 ## 8. Lessons (problems met, fixes)
 

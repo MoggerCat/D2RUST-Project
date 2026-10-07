@@ -24,15 +24,15 @@
 | Outputs / state changes | 59–63 |
 | Rules | 64–65 |
 |   1. The list of a client unit | 66–101 |
-|   2. Items | 102–142 |
-|   3. States (S→C 0xA7, 0xA8, 0xA9) | 143–180 |
-|   4. Skills | 181–212 |
-| Constants & data dependencies | 213–223 |
-| Randomness | 224–228 |
-| Edge cases & original bugs | 229–236 |
-| Test vectors | 237–248 |
-| Provenance | 249–261 |
-| Open questions | 262–291 |
+|   2. Items | 102–188 |
+|   3. States (S→C 0xA7, 0xA8, 0xA9) | 189–228 |
+|   4. Skills | 229–260 |
+| Constants & data dependencies | 261–271 |
+| Randomness | 272–276 |
+| Edge cases & original bugs | 277–284 |
+| Test vectors | 285–296 |
+| Provenance | 297–309 |
+| Open questions | 310–347 |
 <!-- /index -->
 
 ## Summary
@@ -133,12 +133,58 @@ by `total(unit, stat, layer)` and `base(unit, stat, layer)`.
    inventory (`0x0063B2C0`, `0x0063DFD0`) that is an item unit with a
    list for which `0x00625820(item, &r)` ≠ 0: detach it
    (`0x006277F0`) and equip again (`0x00627910(player, item, r)`); then
-   the left and right skills saved at entry are re-selected (open
-   question 3).
+   the left and right skills saved at entry are re-selected (rule 3.1).
+   1. In detail (2026-10-08; answers open question 3). `0x0045D3E0(P)`:
+      P without an inventory (+0x60) → nothing. The skill list (+0xA8)
+      is read without a null test (the local player always has one,
+      `client/msg-units.md` §1.1). Saved: the skill id of the left
+      entry (+8) and of the right entry (+0xC), 0 for no entry. Walk
+      the inventory's item nodes (`0x0063B2C0` first, `0x0063DFA0`
+      next, read before the item is handled; `0x0063DFD0` the node's
+      unit); an item unit (type 4) is re-equipped when
+      `0x00625820(item, &r)` ≠ 0: the item's list L (+0x5C) has a
+      parent (L +0x34, `sim/stat-lists.md` §1) that is EXTENDED (flag
+      0x80000000); the result is the parent's owner unit (+0x44), and r
+      := 1 when L is not DYNAMIC (flag 0x40000000), else 0. So every
+      item whose list is attached (active or parked) is detached and
+      attached again with the same static / dynamic state
+      (`sim/stat-lists.md` §8.2, §8.4); an item whose list has no
+      parent (never attached, or detached, e.g. by rule 2.3) is
+      skipped.
+      Then select left (saved left id, owner −1) and select right
+      (saved right id, owner −1) (`0x00643BC0` / `0x00643C50`,
+      `client/msg-skills.md` §2 rule 3): a hand that was on an
+      item-granted entry moves to the native entry of the same skill
+      when one exists, else stays (select not found → unchanged).
 4. Unequip and removal: an item unit freed by `client/model.md` §2
    rule 5 frees its lists (detach first, `sim/stat-lists.md` §8.2–§8.3);
    per-action detach (swap locations 11 / 12 through §8.4's swap rule):
-   open question 4.
+   rule 4.1.
+   1. **Detach per item action** (2026-10-08; answers open question 4).
+      Every client path that takes an item out of an owner's grid, body
+      location or belt runs, right after the removal (`0x0063AD90`,
+      body slot `0x0063D2B0` / `0x0063BE30`, belt `0x0063C550`), the
+      same two steps: owner a player → `0x0063BEF0(owner inventory)`
+      (a getter whose result is dropped: no effect); then, when the
+      item's flag 0x100 is clear (`0x006280A0`), detach its list
+      (`0x006277F0(owner, item)` → `sim/stat-lists.md` §8.2). Sites:
+      0x9C / 0x9D actions 0x03 (`0x004C2810`), 0x04 (`0x004C2AD0`,
+      header flag 0x1 path), 0x05 (`0x004C2C80`), 0x07 (`0x004C3070`,
+      the item taken off the other hand), 0x08 (`0x004C3380`), 0x09
+      switch-out (`0x004C3760`), 0x0D (`0x004C3F60`), 0x0F
+      (`0x004C42A0`), 0x10 (`0x004C44D0`), 0x11 (`0x004C4740`), 0x15
+      (`0x004C4C70`, three sites: modes 0, 1, 2); the helpers
+      `0x004C1C90` (from action 0x06 `0x004C2E90` and action 0x17
+      through `0x004C3980`: the item leaving its old place) and
+      `0x004C0EC0` (from 0x74, `0x00462F60`, `client/msg-units.md` §7
+      r7, and from `0x00466CB0`; it detaches also when its third
+      argument ≠ 0); S→C 0x92 (`0x004C23E0`); `0x004C1290` (a body
+      slot cleared; from 0x7D `0x004C2270`, `client/msg-stats-items.md`
+      §5 r4, and from `0x004C1350`; it detaches without the flag
+      test). The requirement refresh `0x004C1350` also detaches and
+      re-equips some body items itself (its rule:
+      `client/msg-stats-items.md` open question 4). An item placed
+      again is attached by the equip rule (rule 2).
 
 ### 3. States (S→C 0xA7, 0xA8, 0xA9)
 
@@ -151,7 +197,7 @@ by `total(unit, stat, layer)` and `base(unit, stat, layer)`.
    next `Send Param Bits` (+0x09) bits read signed (`client/model.md`
    §10 rule 3) when that is > 0, else 0; value := the next `Send Bits`
    bits, read signed when `Send Bits` < 32 and the stat's flags (+0x04)
-   have bit `[0x006CE26C]` (open question 5), else unsigned; add the stat to the state's list (rule 2). After the
+   have bit `[0x006CE26C]` (= 2, `signed`; open question 5), else unsigned; add the stat to the state's list (rule 2). After the
    stream: `0x004D9E60(unit, state)` (state on hooks: the states-table
    `setfunc` (+0x1A, table `0x0072A690`, 31 entries) and, when the state
    has a missile (+0x30 ≥ 0), a client missile from stats 350 / 351).
@@ -162,13 +208,15 @@ by `total(unit, stat, layer)` and `base(unit, stat, layer)`.
    1)`). Then the stat is set on it (`0x00627150(list, stat, value,
    param)`, `sim/stat-lists.md` §5). Stat 172 (0xAC) also calls
    `0x00463C00(value)`; a stat whose flags (+0x05) have bit
-   `[0x006CE26C]` also runs `0x00623F50(unit)`.
+   `[0x006CE26C]` (= 2, `updateanimrate`) also runs `0x00623F50(unit)`.
 3. **State on** `0x004D9B20(unit, state)` (also 0xA7): a state with the
-   flag `[0x006CE284]` (+0x14) on a dead unit (monster mode 12, player
-   mode 17) only sets the state bit (`0x00639DB0`, `sim/stat-lists.md`
-   §9.2). Otherwise an existing list of the state is freed unless the
-   state has the flag `[0x006CE278]` (`0x00627340`); the bit is set;
-   then overlay, light and anim refreshes (open question 6).
+   flag `[0x006CE284]` (+0x14 & 0x80 = `notondead`) on a dead unit
+   (monster mode 12, player mode 17) only sets the state bit
+   (`0x00639DB0`, `sim/stat-lists.md` §9.2). Otherwise an existing list
+   of the state is freed unless the state has the flag `[0x006CE278]`
+   (+0x14 & 0x10 = `noclear`) (`0x00627340`); the bit is set; then
+   overlay, light and anim refreshes (open question 6); last, a state
+   with `[0x006CE274]` (+0x10 & 8 = `transform`) runs `0x004D9AD0`.
 4. **0xA7 DelayedState** (`0x0045EDE0`) and **0xA9 EndState**
    (`0x0045EF60`): 7 bytes, unit type u8@1, GUID u32@2, state u8@6;
    unit in S → 0xA7: state on (rule 3) then `0x004D9E60`; 0xA9: state
@@ -269,17 +317,25 @@ code), `0x00460930`, `0x004609A0`, `0x00643620` (caller `0x00646E30`),
 2. The item stream's stat section (which lists an item gets: base,
    magic, set, runeword) — `items/inventory.md` open question 1 and
    `client/msg-stats-items.md` open question 3.
-3. `0x00625820` (which items are re-equipped on a level change) and the
+3. *Answered (2026-10-08)*: §2 rule 3.1. Original question:
+   `0x00625820` (which items are re-equipped on a level change) and the
    left / right skill restore of `0x0045D3E0`.
-4. Detach per item action (unequip, swap, move to the grid): which
-   handlers detach the list and when.
+4. *Answered (2026-10-08)*: §2 rule 4.1. Original question: detach per
+   item action (unequip, swap, move to the grid): which handlers detach
+   the list and when.
 5. The flag masks `[0x006CE26C]`, `[0x006CE274]`, `[0x006CE278]`,
    `[0x006CE284]` (itemstatcost / states flag bits read through globals):
    dump their values. *Partly answered* (2026-10-08): the table
    `0x006CE268` holds 1 << i (dumped: 1, 2, 4, …), so they are 2, 8,
    0x10, 0x80; itemstatcost +0x04 & 2 = `signed`, +0x05 & 2 =
    `updateanimrate` (`data/fields.tsv`); the states +0x14 bit names
-   remain.
+   remain. *Answered (2026-10-08)*: §3 rules 1–3. The states flag bits
+   start at record +0x10 (`data/fields.tsv` states rows: bit n at byte
+   0x10 + n / 8, mask 1 << (n % 8)); `0x004D9B20` reads `[0x006CE284]`
+   = 0x80 and `[0x006CE278]` = 0x10 at +0x14 (bits 39 `notondead`, 36
+   `noclear`) and `[0x006CE274]` = 8 at +0x10 (bit 3 `transform`);
+   itemstatcost +0x04 & `[0x006CE26C]` = `signed`, +0x05 & 2 =
+   `updateanimrate`.
 6. The rest of the state on / off paths (`0x004D97F0`, `0x004D9920`,
    `0x004D9AD0`, `0x004D9F40`, `0x004D9C30`) and their owner (a client
    states spec taking 0xA7–0xA9). A recording with a buff (e.g. a
