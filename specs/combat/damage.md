@@ -31,15 +31,15 @@
 |   4. Totals and resistances: `totals` = `0x0057C1E0` | 293–384 |
 |   5. Application | 385–551 |
 |   6. Hit class and hit recovery | 552–582 |
-|   7. Reaction and death trigger | 583–669 |
-|   8. Event functions (table `0x007325B0`, 32 entries) | 670–730 |
-|   9. Durability `0x0057D3D0` | 731–750 |
-| Constants & data dependencies | 751–772 |
-| Randomness | 773–805 |
-| Edge cases & original bugs | 806–834 |
-| Test vectors | 835–867 |
-| Provenance | 868–893 |
-| Open questions | 894–931 |
+|   7. Reaction and death trigger | 583–672 |
+|   8. Event functions (table `0x007325B0`, 32 entries) | 673–733 |
+|   9. Durability `0x0057D3D0` | 734–753 |
+| Constants & data dependencies | 754–775 |
+| Randomness | 776–808 |
+| Edge cases & original bugs | 809–843 |
+| Test vectors | 844–876 |
+| Provenance | 877–902 |
+| Open questions | 903–941 |
 <!-- /index -->
 
 ## Summary
@@ -607,13 +607,16 @@ except inside the get-hit test (§6.2).
    4. F has 8 → mode request 13 (`KB`) with req +0x08 := A; return.
    5. F has 0x10 (block): F has 0x4000, or D's class is 243 (`diablo`),
       333 (`diabloclone`) or 705 (`uberdiablo`), or the class lacks mode
-      6 (`BL`) → `0x005734C0(D, 19)`; else mode request 6. Return.
+      6 (`BL`) → AI state := 19 (`0x005734C0(D, 19)` at `0x0057D083`,
+      `monsters/ai.md` §3 "AI state"; no block mode); else mode request
+      6. Return.
    6. F has 4: D has a state-21 (`stunned`) list (`0x006256B0`), or the
       get-hit test (§6.2, `0x0057CB00(D, R, R +0x60)`) is false → mode
       request 3 (`GH`), then `0x005A43A0(game, D)` (umod mode 4,
       `monsters/umod-callbacks.md` §2 rule 5). Test true → step 4.7's
       soft path. Return.
-   7. F has 0x4000: soft, `0x005734C0(D, 19)`, `0x005A43A0(game, D)`.
+   7. F has 0x4000: soft, AI state := 19 (`0x005734C0(D, 19)` at
+      `0x0057D119`), `0x005A43A0(game, D)`.
       Return.
    8. F has 1 and total (R +0x4C) > 0: b := low byte of D's stat 352
       (`last_sent_hp_pct`, total); c := D's life percent byte
@@ -831,6 +834,12 @@ armor piece (order of §9).
    and its combat record holds no damage.
 10. Leech requires physical > 0 for player attackers; monster leech
     uses the amounts themselves.
+11. Leech rows (9–11) have no resist stat, so §4.5 starts from r = 0
+    and step 3 still applies (the test is "not 36 or 37", and −1 is
+    neither; `0x0057BE44`–`0x0057BE6D`): against a non-monster defender
+    in an expansion game r := `ResistPenalty`, and §4.6 step 4 scales
+    the leech by (100 − r) / 100: a monster draining a Hell player
+    takes ×2 (Nightmare ×1.4; classic −20 / −50 → ×1.2 / ×1.5).
 
 ## Test vectors
 
@@ -840,7 +849,7 @@ Synthetic (CI-safe):
 |---|---|
 | `pct(0x200000, 50, 100)` | `(2097152 / 100) × 50` = 1,048,550 (exact 1,048,576) |
 | `pct(1000, 0x20000, 100)` | `(131072 / 100) × 1000` = 1,310,000 |
-| `pct(0x200000, 50, 0x30000)` | 64-bit: 34 |
+| `pct(0x200000, 50, 0x30000)` | d > v >> 4 (0x20000) → 64-bit 104,857,600 / 196,608 = 533 |
 | `pct(−50, 30, 100)` | −15 |
 | `pct(7, 9, 0)` | 0 |
 | `bonuses`: weapon 2–7 (min/max stats 2, 7), StrBonus 100, str 30, no other stats, s 128, current 0 | `pct` 30; min 512 → 665; max 1792 → 2329; result 665 + roll(1664) |
@@ -903,8 +912,9 @@ Real 1.14d data (`#[ignore]`): the resistance rows of §4.3 equal
    confirm rules H/M and Edge case 6.
 3. Answered: §7.1 and §7.2 are read branch by branch from the 1.14d
    disassembly (block frame test, soft-hit path, sand leaper knockback,
-   barricade doors). Still unowned: `0x005734C0(unit, 19)` and
-   `0x0066A220(killer, class)` (called, not specified).
+   barricade doors). `0x005734C0` is the AI-state setter
+   (`monsters/ai.md` §3). Still unowned: `0x0066A220(killer, class)`
+   (called, not specified).
 4. Answered: registration, unregistration and iteration of unit events
    are `skills/bodies.md` §2.13 and §2.18.
 5. Event functions other than 15 and 16 (table §8): behaviour and draws
