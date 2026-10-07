@@ -349,6 +349,32 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
         }
     }
 
+    /// The mercenary's creation (`npc.md` §7.3 step 7): a monster of
+    /// `class` in the room of `near`, a few subtiles beside it.
+    // d2rs-own, unverified: the offset (+2, +2) stands in for the
+    // placement `hirelings.md` §3.1 leaves to the path code's free-spot
+    // search; the allocation's path part validates the spot.
+    fn spawn_near(
+        &mut self,
+        sim: &mut Sim<'_>,
+        near: UnitId,
+        class: u32,
+        mode: u8,
+    ) -> Option<UnitId> {
+        let room = sim.game.lists.unit(near)?.room()?;
+        let (x, y) = self.path_position(near);
+        let req = AllocRequest {
+            ty: UnitType::Monster,
+            class,
+            room: Some(room),
+            add: true,
+            fixed_guid: None,
+            mode: u32::from(mode),
+            allied: false,
+        };
+        View::of(sim.units, sim.stats, sim.data, self).allocate(sim.game, &req, x + 2, y + 2)
+    }
+
     /// Step 8 linked the unit: its room is the list's from now on.
     fn added(&mut self, _: &mut Sim<'_>, unit: UnitId) {
         self.alloc_rooms.retain(|&(u, _)| u != unit);

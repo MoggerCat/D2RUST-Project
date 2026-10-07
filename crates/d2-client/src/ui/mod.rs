@@ -22,6 +22,7 @@ pub mod edit_box;
 pub mod frame;
 pub mod geom;
 pub mod gold;
+pub mod hire_list;
 pub mod inv_grid;
 pub mod layout;
 pub mod messages;

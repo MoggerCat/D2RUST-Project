@@ -221,6 +221,8 @@ impl OriginalUi {
                 self.more.quest_avail = bytes;
                 self.more.quest_avail_set = true;
             }
+            Output::HireListReset => self.hire.borrow_mut().reset(),
+            Output::HireOffer { name, seed } => self.hire.borrow_mut().offer(name, seed),
             Output::MercRevive { state, value } => self.merc_revive(state, value),
             Output::QuestFlags { record } => self.more.client_quest = record,
             Output::OverheadClear { unit } => {

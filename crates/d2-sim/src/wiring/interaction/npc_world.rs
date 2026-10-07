@@ -463,6 +463,15 @@ impl<'a, H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> NpcWorld
     // ---- mercenaries
 
     fn spawn_mercenary(&mut self, near: UnitId, class: u32, mode: u8) -> Option<UnitId> {
+        let mut sim = crate::units::hooks::Sim {
+            game: &mut *self.econ.game,
+            units: &mut *self.econ.units,
+            stats: &mut *self.econ.stats,
+            data: self.econ.data,
+        };
+        if let Some(u) = self.econ.hooks.spawn_near(&mut sim, near, class, mode) {
+            return Some(u);
+        }
         self.rest.spawn_mercenary(near, class, mode)
     }
     /// `hirelings.md` §3.2.

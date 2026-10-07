@@ -225,6 +225,7 @@ impl OriginalUi {
     /// effect here.
     pub fn apply_output(&mut self, o: &Output, world: &ClientWorld) -> Result<(), OriginalUiError> {
         self.refresh_facts(world);
+        self.hire_auto_open(o, world);
         if self.apply_more(o)? {
             return Ok(());
         }
