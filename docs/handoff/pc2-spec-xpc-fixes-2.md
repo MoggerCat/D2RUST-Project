@@ -8,8 +8,8 @@ Branch `claude/spec-xpc-fixes-2` (from `claude/local-pc2-integration`
 - Line 24 (`world/npc.md` §8.2 reset addresses swapped): fixed in place;
   `0x00570360` = skill reset (`skills/levels.md` §6.5, call `0x0057A242`),
   then `0x00570C80` = stat reset (`combat/vitals.md` §2.1, call
-  `0x0057A24B`). Verified with `disasm.py at 0x0057A230`. Commit: see
-  the commit that adds this note (sha in the orchestrator report).
+  `0x0057A24B`). Verified with `disasm.py at 0x0057A230`. Commit:
+  `15b9899`.
 - Line 25 (`items/inventory.md` §7.1 rule 2 and §7.11 `toa`): §7–§11 now
   live in `items/inventory-moves.md` (split of `inventory.md`, commit
   82ef79d, same owner), so the edits are there: §7.1 rule 2 links
@@ -18,7 +18,7 @@ Branch `claude/spec-xpc-fixes-2` (from `claude/local-pc2-integration`
   names skill reset `0x00570360` (§6.5, call `0x0055E549`) then stat
   reset `0x00570C80` (§2.1, call `0x0055E552`). `inventory.md` §4.9's
   "corpse spec, not specified here" replaced with the §4.7 link.
-  Verified with `disasm.py xref` and `index/calls.tsv`. Commit: same.
+  Verified with `disasm.py xref` and `index/calls.tsv`. Commit: `15b9899`.
 
 ## Answered
 
