@@ -25,21 +25,21 @@
 | Outputs / state changes | 65–73 |
 | Rules | 74–75 |
 |   1. The client skill list (unit +0xA8) | 76–99 |
-|   2. Shared skill-list operations | 100–170 |
-|   3. 0x94 BaseSkillLevels (`0x0045DD60`) | 171–180 |
-|   4. 0x21 UpdateItemOSkill (`0x0045DCD0`) | 181–190 |
-|   5. 0x22 UpdateItemSkill (`0x0045DDB0`) | 191–200 |
-|   6. 0x23 SetSkill (`0x0045DE10`) | 201–207 |
-|   7. 0x99 / 0x9A skill events (`0x0045DE80` / `0x0045DEC0` → `0x004CA060`) | 208–251 |
-|   8. 0xA3 skill do (`0x0045D5E0`) | 252–265 |
-|   9. 0x93 skill bonus by element and page (`0x0045DD10` → `0x004C7990`) | 266–294 |
-|   10. 0xA5 skill end on a unit (`0x0045D6A0`) | 295–309 |
-| Constants & data dependencies | 310–321 |
-| Randomness | 322–325 |
-| Edge cases & original bugs | 326–335 |
-| Test vectors | 336–361 |
-| Provenance | 362–382 |
-| Open questions | 383–413 |
+|   2. Shared skill-list operations | 100–215 |
+|   3. 0x94 BaseSkillLevels (`0x0045DD60`) | 216–225 |
+|   4. 0x21 UpdateItemOSkill (`0x0045DCD0`) | 226–235 |
+|   5. 0x22 UpdateItemSkill (`0x0045DDB0`) | 236–245 |
+|   6. 0x23 SetSkill (`0x0045DE10`) | 246–252 |
+|   7. 0x99 / 0x9A skill events (`0x0045DE80` / `0x0045DEC0` → `0x004CA060`) | 253–296 |
+|   8. 0xA3 skill do (`0x0045D5E0`) | 297–310 |
+|   9. 0x93 skill bonus by element and page (`0x0045DD10` → `0x004C7990`) | 311–339 |
+|   10. 0xA5 skill end on a unit (`0x0045D6A0`) | 340–354 |
+| Constants & data dependencies | 355–366 |
+| Randomness | 367–370 |
+| Edge cases & original bugs | 371–380 |
+| Test vectors | 381–406 |
+| Provenance | 407–427 |
+| Open questions | 428–459 |
 <!-- /index -->
 
 Owned ids: 0x21, 0x22, 0x23, 0x94, 0x99, 0x9A, 0xA3; §9–§10: 0x93, 0xA5.
@@ -94,8 +94,8 @@ layer; the skill events write no model state. 0x93 writes level bonuses
 5. Where the local player's skills come from: native entries and levels
    from 0x94 (join) and 0x21 (later changes); quantities of tome and
    scroll skills from 0x22; left / right from 0x23. Item-granted
-   entries (owner = item GUID, charges) and the level bonus +0x2C have
-   other client writers (open questions 1, 2).
+   entries (owner = item GUID, charges) have other client writers (open
+   question 1); the level bonus +0x2C: §2 rule 7.
 
 ### 2. Shared skill-list operations
 
@@ -167,6 +167,51 @@ handlers (the server specs link here for the steps).
    the same choice as `client/model.md` §9 rule 5 for a 1.14d access
    violation. Whether a 1.14d server ever sends such a removal is not
    established.
+7. **Level bonus +0x2C** (2026-10-08; answers open question 2). Only
+   two functions write it, both with a native entry (owner −1) only;
+   entries are allocated zeroed (rule 1) and assign (rule 2) never
+   touches +0x2C.
+   1. **Set** `0x00647AA0(unit, skill, v)`: no unit → nothing. E := the
+      native entry; none and v ≤ 0 → nothing; none and v > 0 → add
+      (rule 1), then the native entry is looked up again (adding once
+      more when still none) and, when found, its base := 0 and refresh
+      (rule 4). Then, when E is native: bonus := v, refresh.
+   2. **Add** `0x00647B20(unit, skill, v)`: the same, with bonus += v
+      and a negative result clamped to 0; no refresh after the add.
+   3. **Split level** (callers below): with M := `maxlvl` of the skill
+      (skills +0x12C, `skills/levels.md` §1; ≤ 0 or no row → 20;
+      `0x004AA8B0`) and a level L: L > M → assign (skill, M, remove 0)
+      then set (skill, L − M); else assign (skill, L, remove 0) and the
+      bonus keeps its old value.
+   Writers and when (`0x00647AA0` call sites `0x004C6295`, `0x004C6326`,
+   `0x004D892F`; `0x00647B20` call site `0x004C7AC7`; no server call):
+   - **Client skill start** `0x004C6140(U, skill S in EAX, owner o,
+     level L)`, from the skill event (§7 r4.3 via `0x004C6660`, o = −1)
+     and the player and monster mode machines (`0x004C6EB0` from
+     `0x00461314`, `0x00480A34`, `0x004B0CA4`; `0x004C6F40` from
+     `0x00461347`, `0x004B0D24`; S, o, L = request record entries 0, 1,
+     4; `client/model.md` §8). (a) When U's current skill entry
+     (`0x00620250`) is not of S: the entry (S, o) is looked up; none →
+     add S, look (S, o) up again; if found, U is the local player and o
+     = −1 → `0x00644660(entry, 8)`; then split level (rule 7.3) with L;
+     still no entry (S, o) → the start returns 0. Then current := the
+     entry (`0x00620210`). (b) o ≠ −1: the entry's charges check
+     `0x00643B00` must pass, else the start returns 0. Then U not the
+     local player → split level with L again (before the start function
+     and sounds); the local player instead takes L := its level with
+     bonuses (`0x006442A0(U, E, 1)`). So for remote units the event's level is
+     what the client stores, the part above `maxlvl` in the bonus.
+   - **State set-function 3** `0x004D88A0(U, state)` (setfunc table
+     `0x0072A690` entry 3, `client/stat-lists.md` §3 r1): U not the
+     local player and U has the state's list: S := its stat 350, L :=
+     its stat 351; when the level with bonuses of U's native entry of S
+     (0 when none) ≠ L → split level (rule 7.3) with L.
+   - **0x93** (§9 rule 3): add with the message's bonus on each
+     qualifying native entry.
+   The local player's bonus thus changes through 0x93 and through its
+   own skill start only in step (a) (the entry (S, o) missing); a
+   remote unit's through every skill start, set-function-3 states and
+   0x93.
 
 ### 3. 0x94 BaseSkillLevels (`0x0045DD60`)
 
@@ -387,7 +432,8 @@ bit 17 `enhanceable`, mask table `0x006CE268`), `0x00643AD0`,
    no direct caller in the export; find the client path (item equip,
    `client/stat-lists.md` §2) and the message that carries charges.
    Settle with a recording equipping a charged item.
-2. The level bonus +0x2C on the client: writers `0x00647AA0` (set,
+2. *Answered (2026-10-08)*: §2 rule 7 (all writers, the split level,
+   when each runs). Original question: the level bonus +0x2C on the client: writers `0x00647AA0` (set,
    called from `0x004C6140` and `0x004D88A0`) and `0x00647B20` (add,
    from `0x004C7990`); which stats or states drive them (oskills,
    `item_singleskill`). *Partly answered*: the `0x004C7990` path is

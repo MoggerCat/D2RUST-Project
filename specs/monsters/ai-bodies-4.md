@@ -42,7 +42,7 @@
 | Edge cases & original bugs | 478–494 |
 | Test vectors | 495–510 |
 | Provenance | 511–535 |
-| Open questions | 536–559 |
+| Open questions | 536–561 |
 <!-- /index -->
 
 ## Summary
@@ -540,8 +540,10 @@ Game-file vectors: Open question 1.
    schedules and draws with §2–§11.
 2. Diablo §7.3: confirm the weight table on a recording that logs the
    chosen mode per think against the player's resistances and skills.
-3. The skill 199 (DiabPrison) check reads the point (portal GUID, 2) in
-   §7 case 15: owner is the skills spec (how the skill resolves it).
+3. *Answered (2026-10-08)*: the skill 199 (DiabPrison) point of §7
+   case 15 is owned by `skills/bodies-3.md` §5.31 step 2 (answered
+   there as its open question 6: the path target x / y, object branch
+   only when y = 2, x read as the GUID).
 4. Answered (2026-10-07): `ai.md` §3.3 "When an alternate runs". Diablo
    has no `switchai`, so a curse 10–12 or terror install reads the base
    record: the alternate runs one think, then re-installs Diablo's own

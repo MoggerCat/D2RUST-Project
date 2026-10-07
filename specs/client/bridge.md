@@ -42,17 +42,17 @@
 |   3. Server link | 135–153 |
 |   4. Send path (intents) | 154–174 |
 |   5. Client world model | 175–194 |
-|   6. Dispatch table | 195–235 |
-|   7. Bevy mirror | 236–254 |
-|   8. Frame pacing | 255–275 |
-|   9. Versioning | 276–286 |
-|   10. Client outputs (bridge → UI and audio) | 287–415 |
-| Constants & data dependencies | 416–430 |
-| Randomness | 431–434 |
-| Edge cases & original bugs | 435–443 |
-| Test vectors | 444–474 |
-| Provenance | 475–485 |
-| Open questions | 486–521 |
+|   6. Dispatch table | 195–236 |
+|   7. Bevy mirror | 237–255 |
+|   8. Frame pacing | 256–276 |
+|   9. Versioning | 277–287 |
+|   10. Client outputs (bridge → UI and audio) | 288–439 |
+| Constants & data dependencies | 440–454 |
+| Randomness | 455–458 |
+| Edge cases & original bugs | 459–467 |
+| Test vectors | 468–498 |
+| Provenance | 499–509 |
+| Open questions | 510–547 |
 <!-- /index -->
 
 ## Summary
@@ -228,10 +228,11 @@ receive).
      0x16 (`0x0045D2E0`), 0x54 (`0x0045E3B0` → `0x00473CA0`).
 7. **Out of scope** (`sim/intents-events.md` §4 rule 4: multiplayer,
    Battle.net, transport): 0x75, 0x79, 0x7F, 0x8B–0x8D, 0x8F, 0x90,
-   0xAE–0xB0, 0xB2–0xB4 keep owner `TBD` and stay unowned (rule 3)
+   0xAE–0xB0, 0xB2, 0xB3 keep owner `TBD` and stay unowned (rule 3)
    until Phase 7. 0xB4 is also the single-player load refusal
    (`sim/intents-events.md` §8.2 rule 2; client `0x0045C6D0` maps its
-   code to `0x0044E380(n)`): open question 7.
+   code to `0x0044E380(n)`): owner `client/model.md` §7 rule 8
+   (2026-10-08, open question 7).
 
 ### 7. Bevy mirror
 
@@ -356,9 +357,9 @@ model state: 1.14d's handler calls a UI or sound function directly
    - 0x50 code 3 (`client/msg-ui.md` §7 r5): the unit is not the
      message's; its only effect writes two fields that nothing reads,
      so the UI layer may skip it.
-   One UI writer runs outside any output: the town exit `0x004B3E10`
-   from the local player's update (`client/model.md` §17 r5, open
-   question 16 there).
+   One UI writer runs outside any message: the town exit `0x004B3E10`
+   from the local player's update (`client/model.md` §17 r5–r6); it is
+   the update-pass output `TownExit` of rule 11.
 10. **UI-requested model writes** (2026-10-08, user decision; answers
    `client/msg-ui.md` open question 10). Rule 6 stands: a consumer never
    writes `ClientWorld`. The model writes that 1.14d makes inside UI code
@@ -371,6 +372,27 @@ model state: 1.14d's handler calls a UI or sound function directly
    1.14d makes them (inside the receive). The UI layer decides from its
    own state; the bridge does not re-decide. A C→S send the same code
    makes (0x28's 0x31) uses the send path of rule 6.
+11. **Update-pass outputs** (2026-10-08; answers `client/model.md` open
+   question 16). The client update pass (`client/model.md` §5) may emit
+   an output too; its producer in the table is `update`, not a message
+   id. The one such output is `TownExit` (`client/model.md` §17 r6
+   step 4). In 1.14d the town exit runs inside the local player's
+   update, after every UI call of the frame's receive and before the
+   rest of the pass, so the bridge delivers it at the point it is
+   emitted, as an exception to rule 4: it first hands the UI layer
+   every output still in the list (rule 2 order), then `TownExit`, then
+   applies the requests the UI layer returns (rule 10: `E`'s model
+   writes, `client/model.md` §17 r1) and only then continues the pass.
+   The payload captures the local player's key and the GUIDs of every
+   monster (type 1) in S at that point, because the UI layer's test
+   "the interact NPC (1, `[0x007C0D25]`) is present" (`0x00463990` at
+   `0x004B3E71`) looks up a unit that is not the payload's own (rule 9);
+   with the GUID set the test is exact. The UI layer then runs
+   `0x004B3E10` (greeting re-arm; with the interaction active and the
+   NPC present: `[0x007C0C6B]` := 0, `0x00487990`, `E(G)`,
+   `0x00455F20(8, 1, 0)`, interaction active := 0;
+   `ui/messages.md` §13 r4). Its C→S 0x30 (inside `E`) uses the send
+   path (rule 6).
 
 <!-- rows -->
 | Variant | Payload | Producer | Consumer | Owner (what the consumer does) |
@@ -412,6 +434,8 @@ model state: 1.14d's handler calls a UI or sound function directly
 | `ActVideo` | video u8 | 0x61 | UI | `client/msg-ui.md` §20 |
 | `OverheadClear` | unit key | 0x76 | UI | `client/msg-ui.md` §21 |
 | `HotkeyAssign` | slot u8, skill i32, left u8, item GUID u32 | 0x7B | UI | `client/msg-ui.md` §22 |
+| `JoinRefused` | error number u8 (the mapped code) | 0xB4 | UI | `client/model.md` §7 rule 8 |
+| `TownExit` | local player key, GUIDs of the S monsters | update | UI | `client/model.md` §17 rule 6; delivery `client/bridge.md` §10 r11 |
 
 ## Constants & data dependencies
 
@@ -513,7 +537,9 @@ from `specs/`, `docs/` and `crates/` only.
    drop the position tracking follows `audio/triggers.md` §1's rule for a
    freed unit. Settle with the request log (`audio/triggers.md` Checks)
    on a 0x2C followed by 0x0A in one chunk.
-7. 0xB4 in single player (the load refusal, `sim/intents-events.md`
+7. *Answered (2026-10-08)*: `client/model.md` §7 rule 8 (the code map
+   read from the jump table, `0x0044E380` in full, the `JoinRefused`
+   output) and §6 rule 7 here (owner). Original question: 0xB4 in single player (the load refusal, `sim/intents-events.md`
    §8.2 rule 2): its client handler (`0x0045C6D0`: code u32@1, 1–26 →
    `0x0044E380(n)` with a fixed code map, else 9) ends the game with an
    error screen; owner `client/model.md` §7 (session messages) when the

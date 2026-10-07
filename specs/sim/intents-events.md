@@ -39,20 +39,20 @@
 | Outputs / state changes | 84–90 |
 | Rules | 91–92 |
 |   1. Loop order (single player) | 93–114 |
-|   2. Client → server | 115–290 |
-|   3. Server → client | 291–498 |
-|   4. d2rs mapping and scope | 499–530 |
-|   5. Machine-readable tables | 531–567 |
-|   6. Exact-match comparison | 568–671 |
-|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 672–1071 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1072–1216 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1217–1361 |
-| Constants & data dependencies | 1362–1380 |
-| Randomness | 1381–1386 |
-| Edge cases & original bugs | 1387–1423 |
-| Test vectors | 1424–1510 |
-| Provenance | 1511–1612 |
-| Open questions | 1613–1728 |
+|   2. Client → server | 115–315 |
+|   3. Server → client | 316–523 |
+|   4. d2rs mapping and scope | 524–555 |
+|   5. Machine-readable tables | 556–592 |
+|   6. Exact-match comparison | 593–696 |
+|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 697–1096 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1097–1241 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1242–1386 |
+| Constants & data dependencies | 1387–1405 |
+| Randomness | 1406–1411 |
+| Edge cases & original bugs | 1412–1448 |
+| Test vectors | 1449–1535 |
+| Provenance | 1536–1637 |
+| Open questions | 1638–1757 |
 <!-- /index -->
 
 ## Summary
@@ -175,6 +175,31 @@ The host schedule is `tick.md` §1 (owner). Message-relevant facts:
    (client id + message) into a stack buffer but returns the full size:
    a message longer than 0x1FC bytes is truncated in the copy while the
    handler sees the full size (only id 0x66 can be that long).
+8. **Client builders** (2026-10-08; answers open questions 7 and 8).
+   Every C→S game message (ids < 0x67) passes the sender of rule 1,
+   whose 13 call sites are all in the builders `0x00478590`–`0x00478830`
+   (by layout: `0x00478590` [id], `0x004785B0` [id][u16], `0x004785D0`
+   [id][u16][u16], `0x00478600`, `0x00478640` (no caller), `0x00478680`
+   [id][u32], `0x004786A0` [id][u32][u32], `0x004786D0`, `0x00478700`
+   take the id in CL; `0x00478740` writes 0x5D, `0x00478780` 0x5E,
+   `0x004787B0` chat, `0x00478830` 0x66). The system senders (rule 2)
+   use only ids 0x67–0x70. The ids at every builder call site are
+   constants, except:
+   - `0x00480B40` (the only caller passing a variable id to
+     `0x004785D0` / `0x004786A0`): its id comes from `0x00481030`,
+     whose switch (table `0x004812B4`) sends ids 1–0x11 and 0x13 to
+     their cases and takes 0x0B, 0x12 and every id outside 1–0x13 to a
+     fatal assert (0x352) before anything is sent; `0x00480B40` sends nothing for 0x13;
+   - `0x004B2650` → `0x00478700` with 0x32, 0x33 or 0x35;
+   - the chat builder `0x004787B0` with the record's id byte, written
+     as 0x14 or 0x15 by its two callers (`0x0047C1F0`, `0x0047C420`).
+   So the 1.14d client never sends 0x0B, 0x2E, 0x42 or 0x43.
+   **Chat third term** (rule 5): `0x004787B0` copies id, type and
+   language bytes, the text (at most 0x100 bytes with its NUL), then
+   the name (at most 0x10 with its NUL; the name pointer is never
+   null), then writes **one 0 byte** and sends L1 + L2 + 6 bytes. The
+   byte c of the size rule is therefore always 0 from the 1.14d
+   client; a non-zero c reaches the server only from another client.
 
 #### 2.2 Game message entry `0x0053F3D0`
 
@@ -1657,9 +1682,13 @@ Handlers of §9: `0x0054A260`, `0x0054A290` (with `0x00661110`,
    rule 16), renamed `unread`; 0x44 u16@13 renamed `action` (§9 rule
    7); 0x4F (§9 rule 15); system ids 0x67 (adds `game_name`@1), 0x6C,
    0x6D (adds `tick`@1): §2.5.
-7. The odd third term of the C→S chat size rule (§2.1 rule 5): does the
-   1.14d client ever send a non-zero byte there?
-8. 0x0B, 0x2E, 0x42, 0x43: does the 1.14d client ever send them?
+7. *Answered (2026-10-08)*: §2.1 rule 8 (the chat builder `0x004787B0`
+   always writes c = 0). Original question: the odd third term of the
+   C→S chat size rule (§2.1 rule 5): does the 1.14d client ever send a
+   non-zero byte there?
+8. *Answered (2026-10-08)*: §2.1 rule 8 (no builder call site sends
+   them; 0x0B is a fatal assert in `0x00481030`). Original question:
+   0x0B, 0x2E, 0x42, 0x43: does the 1.14d client ever send them?
 9. Client receive handlers' behaviour (§3.4 rule 3) belongs to client
    specs (Phase 5–6); not covered here.
 10. The conditions inside `0x00571CD0`, `0x00571620`, `0x005715A0`,
