@@ -20,6 +20,7 @@ use d2_sim::game::Game;
 use d2_sim::tick::timer::TimerRun;
 use d2_sim::tick::{EventDispatch, TickHooks};
 use d2_sim::units::{ClientId as SimClient, RoomId, UnitId, UnitType};
+use d2_sim::world::quests::HostRequest;
 
 use super::handlers;
 use super::handlers::player::{HotKey, HOTKEY_SLOTS};
@@ -108,6 +109,12 @@ pub struct SimGame<D = Unspecified, W = NoWorld> {
     pub world: W,
     /// Messages sent during a tick that could not be queued, in order.
     pub tick_faults: Vec<(ClientId, WorldError)>,
+    /// The host calls the quest rules raised (`quests-helpers.md` §6:
+    /// game end `0x00530590`, save pass `0x0052E2A0`), drained from the
+    /// world after each tick's steps, in call order. Running them is the
+    /// session layer's (client removal `0x005303D0`, the save): it takes
+    /// them with [`SimGame::take_host_requests`].
+    pub host_requests: Vec<HostRequest>,
     /// The hot-key slots of each client (client +0x3DC, 16 × 8 bytes;
     /// written by C→S 0x51, `intents-events.md` §9 rule 12; read by the
     /// join's S→C 0x7B, §8.2 rule 3.6).
@@ -155,9 +162,16 @@ impl<D: EventDispatch, W> SimGame<D, W> {
             unhandled: Vec::new(),
             world,
             tick_faults: Vec::new(),
+            host_requests: Vec::new(),
             hotkeys: BTreeMap::new(),
             session: None,
         }
+    }
+
+    /// The quests' host requests drained so far ([`SimGame::host_requests`]),
+    /// in call order, for the session layer to run.
+    pub fn take_host_requests(&mut self) -> Vec<HostRequest> {
+        std::mem::take(&mut self.host_requests)
     }
 
     /// Runs C→S 0x67 / 0x6B through `flow` from now on.
@@ -438,7 +452,9 @@ impl<D: EventDispatch + TickHooks, W: WorldHost<D>> Tick for SimGame<D, W> {
     /// [`WorldHost::run_tick`] (`tick.md` §3:
     /// the wired dispatch's room, DRLG and population steps run; a
     /// dispatch without them keeps the defaults), then the host's
-    /// [`WorldHost::after_tick`]. What the host's seams
+    /// [`WorldHost::after_tick`]; the quests' host requests are drained
+    /// into [`SimGame::host_requests`] (`quests-helpers.md` §6: after the
+    /// frame's quest step, in call order). What the host's seams
     /// sent during the tick ([`WorldHost::take_sent`]) is queued to the
     /// receivers' clients in send order (§3.2 rule 1: a player without a
     /// client receives nothing); a queueing failure is recorded in
@@ -448,6 +464,8 @@ impl<D: EventDispatch + TickHooks, W: WorldHost<D>> Tick for SimGame<D, W> {
     fn tick(&mut self, out: &mut dyn MessageSink) {
         self.world.run_tick(&mut self.game, &mut self.events);
         self.world.after_tick(&mut self.game, &mut self.events);
+        let requests = self.world.take_host_requests();
+        self.host_requests.extend(requests);
         for (unit, bytes) in self.world.take_sent(&mut self.events) {
             if let Some(c) = self.client_of(unit) {
                 if let Err(e) = out.queue(c, &bytes) {

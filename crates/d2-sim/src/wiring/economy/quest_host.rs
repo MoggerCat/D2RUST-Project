@@ -32,17 +32,36 @@ use crate::wiring::path::place::Rooms;
 use crate::world::quests::helpers::{self, QuestMissile};
 use crate::world::quests::{PlayerQuests, QuestChain, QuestWorld, UnitKind};
 
+use super::quest_reward::{self, Placed, QuestInventory};
 use super::{EconomyQuests, QuestRest};
+use crate::items::moves::Spot;
+use crate::monsters::ai::seams::{AiModes, ModeTarget};
+use crate::world::cube::trade_action;
+use crate::world::npc::InteractionList;
+use crate::world::quests::act2;
+use std::collections::BTreeMap;
 
 /// [`EconomyQuests`] on the action wiring's hooks, with the calls the
-/// action wiring provides answered there (module doc).
+/// action wiring provides answered there (module doc), and the host
+/// parts a caller may lend for the call.
 pub struct HostQuests<'e, 'a, X, R> {
     pub inner: EconomyQuests<'e, 'a, ActionHooks<X>, R>,
+    /// The host's inventory model (the reward `0x005466B0`, the cube
+    /// close's `0x0055FA40`); `None`: the rest's answers.
+    pub inventory: Option<&'e mut dyn QuestInventory<ActionHooks<X>>>,
+    /// The NPCs' interaction lists (monster data +0x30, `npc.md` §2;
+    /// `InteractionState::lists`); `None`: the chat-node calls are
+    /// reported unhandled.
+    pub chats: Option<&'e mut BTreeMap<UnitId, InteractionList>>,
 }
 
 impl<'e, 'a, X: Pending, R: QuestRest> HostQuests<'e, 'a, X, R> {
     pub fn new(inner: EconomyQuests<'e, 'a, ActionHooks<X>, R>) -> Self {
-        Self { inner }
+        Self {
+            inner,
+            inventory: None,
+            chats: None,
+        }
     }
 
     /// The object has object data (a created object state knows it).
@@ -79,6 +98,73 @@ impl<'e, 'a, X: Pending, R: QuestRest> HostQuests<'e, 'a, X, R> {
             let mut v = View::of(&mut *e.units, &mut *e.stats, e.data, &mut *e.hooks);
             v.unit_error(err.into());
         }
+    }
+}
+
+impl<X: Pending, R: QuestRest> HostQuests<'_, '_, X, R> {
+    /// `0x005466B0` (`quests.md` §9.1) on the lent inventory model
+    /// ([`quest_reward`]): create, place, else drop next to the player
+    /// when droppable, else free.
+    fn reward_on_host(
+        &mut self,
+        player: UnitId,
+        code: [u8; 4],
+        level: i32,
+        quality: u8,
+        droppable: bool,
+    ) -> Option<UnitId> {
+        let made = quest_reward::create_reward(&mut *self.inner.econ, player, code, level, quality);
+        let item = match made {
+            Ok(Some(item)) => item,
+            Ok(None) => return None,
+            Err(e) => {
+                if let Some(inv) = self.inventory.as_deref_mut() {
+                    inv.fault(e);
+                }
+                return None;
+            }
+        };
+        let inv = self.inventory.as_deref_mut()?;
+        if let Placed::Stored(item) =
+            quest_reward::place_reward(&mut *self.inner.econ, inv, player, item)
+        {
+            return Some(item);
+        }
+        let spot = if droppable {
+            self.reward_spot(player)
+        } else {
+            None
+        };
+        let inv = self.inventory.as_deref_mut()?;
+        quest_reward::drop_or_free(&mut *self.inner.econ, inv, item, spot)
+    }
+
+    /// §9.1's drop spot: `0x00545340` ([`helpers::free_spot`]) from the
+    /// player's path position and room, size 1, mask 0x3E01, limit 100.
+    /// `None`: the player has no position (the reward is freed).
+    ///
+    /// PROVISIONAL (quests.md §9.1; REC-none): when the search accepts
+    /// nothing (or the player's room has no DRLG room here) the item is
+    /// dropped at the player's own position and room (`0x00545340` leaves
+    /// the point as passed; what the drop does with its null out room is
+    /// not written).
+    fn reward_spot(&mut self, player: UnitId) -> Option<Spot> {
+        let (x, y, room) = self.unit_position(player)?;
+        let found = if self.drlg_room(room) {
+            helpers::free_spot(
+                self,
+                room,
+                x,
+                y,
+                quest_reward::DROP_SIZE,
+                quest_reward::DROP_MASK,
+                quest_reward::DROP_LIMIT,
+            )
+        } else {
+            None
+        };
+        let (x, y, room) = found.unwrap_or((x, y, room));
+        Some(Spot { room, x, y })
     }
 }
 
@@ -273,8 +359,12 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
         quality: u8,
         droppable: bool,
     ) -> Option<UnitId> {
-        self.inner
-            .reward_item(player, code, level, quality, droppable)
+        if self.inventory.is_none() {
+            return self
+                .inner
+                .reward_item(player, code, level, quality, droppable);
+        }
+        self.reward_on_host(player, code, level, quality, droppable)
     }
     fn drop_item_at(&mut self, unit: UnitId, code: [u8; 4], quality: u8) -> bool {
         self.inner.drop_item_at(unit, code, quality)
@@ -723,6 +813,130 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
                 room,
                 class,
             )
+        });
+    }
+
+    // -- The quest helpers' host seams (`quests-helpers.md` §4.2, §5, §7;
+    // `quests-act3.md` §6) on the action wiring and the lent host parts.
+
+    /// `0x00558200(player, 0)` (`quests-act5.md` open question 2,
+    /// [`quest_reward::item_level`]) on the unit's record and stats.
+    fn quest_item_level(&mut self, player: UnitId) -> i32 {
+        match quest_reward::item_level(&*self.inner.econ, player) {
+            Some(v) => v,
+            None => self.inner.quest_item_level(player),
+        }
+    }
+    /// `0x0056D2C0` (`skills/bodies.md` §2.4) on the path provider: the
+    /// path target unit's position, else the target point; `None` when
+    /// a coordinate is 0. No path provider: the rest's.
+    fn path_target_xy(&mut self, unit: UnitId) -> Option<(i32, i32)> {
+        match self.view(|g, v| v.path_target_position(g, unit)) {
+            Some(p) => p,
+            None => self.inner.path_target_xy(unit),
+        }
+    }
+    /// `0x00568060(game, player, button, 0)` (`world/vendors-2.md` §10.1):
+    /// no player → nothing; no active interaction → S→C 0x77 0x0C;
+    /// buttons 0x12–0x14, 0x17, 0x18 (stash, cube) → their owners (the
+    /// rest); an interaction other than a player → 0x77 0x0D; a trade
+    /// partner gone → 0x77 0x0C; with the partner, buttons 5 and 6 and
+    /// those outside 2–8 do nothing, the other trade buttons are the
+    /// player-trade flow's (no spec, §10.3: the rest).
+    ///
+    /// PROVISIONAL (world/vendors-2.md §10.1 rule 5; REC-none): with the
+    /// partner gone `0x00597A20(game, P)` is read as 0 (its body is not
+    /// written), so 0x77 0x0C is sent.
+    fn trade_button(&mut self, player: UnitId, button: u8) {
+        if self.inner.econ.units.get(player).is_none() {
+            return;
+        }
+        let Some((ty, guid)) = self.interact_unit(player) else {
+            return self.send(player, &trade_action(0x0C));
+        };
+        match button {
+            0x12..=0x14 | 0x17 | 0x18 => self.inner.trade_button(player, button),
+            _ if ty != 0 => self.send(player, &trade_action(0x0D)),
+            _ if self.player_by_guid(guid).is_none() => {
+                self.send(player, &trade_action(0x0C));
+            }
+            2..=4 | 7 | 8 => self.inner.trade_button(player, button),
+            _ => {}
+        }
+    }
+    /// `0x00572E00` on the NPC's interaction list (lent with
+    /// [`HostQuests::chats`]): the player's node unlinked; nothing for a
+    /// unit without a list (not an `interact` monster).
+    fn free_chat_node(&mut self, npc: UnitId, player: UnitId) {
+        let Some(chats) = self.chats.as_deref_mut() else {
+            return self.inner.free_chat_node(npc, player);
+        };
+        if let Some(l) = chats.get_mut(&npc) {
+            if let Some(i) = l.nodes.iter().position(|n| n.0 == player) {
+                l.nodes.remove(i);
+            }
+        }
+    }
+    /// `0x00573180`'s end (`quests-act5.md` §5.7) on the NPC's interaction
+    /// list: every node freed, the list emptied.
+    fn clear_npc_chats(&mut self, npc: UnitId) {
+        let Some(chats) = self.chats.as_deref_mut() else {
+            return self.inner.clear_npc_chats(npc);
+        };
+        if let Some(l) = chats.get_mut(&npc) {
+            l.nodes.clear();
+        }
+    }
+    /// `0x005852E0(game, player GUID, object GUID, 0, 2)`: the C→S 0x44
+    /// cancel (`quests-act2-2.md` §3.2 step 3, [`act2::q6::insert_cancel`]).
+    fn obelisk_close(&mut self, player: UnitId, object: UnitId) {
+        let g = self.guid(object);
+        act2::q6::insert_cancel(self, player, object, g);
+    }
+    /// `0x00567330` → `0x0055FA40` (`items/inventory.md` §5.5) on the lent
+    /// inventory model; none lent: the rest's.
+    fn close_cube(&mut self, player: UnitId) {
+        match self.inventory.as_deref_mut() {
+            Some(inv) => inv.inventory_pass(&mut *self.inner.econ, player),
+            None => self.inner.close_cube(player),
+        }
+    }
+    /// `0x005353F0`: player data +0x48 through the action wiring's one
+    /// seam for it (`Pending::object_portal_guid`, the portal operate's,
+    /// `objects.md` §12); a unit other than a player has no player data.
+    fn town_portal_guid(&mut self, player: UnitId) -> Option<u32> {
+        match self.inner.econ.units.get(player).map(|r| r.ty) {
+            Some(UnitType::Player) => Some(self.inner.econ.hooks.x.object_portal_guid(player)),
+            Some(_) => None,
+            None => self.inner.town_portal_guid(player),
+        }
+    }
+    /// `0x00553720` through the action wiring's seam the portal operate
+    /// uses (`Pending::object_portal_partner`, `objects.md` §12 rule 6).
+    fn portal_partner(&mut self, portal: UnitId) -> Option<UnitId> {
+        self.view(|g, v| v.h.x.object_portal_partner(g, portal))
+    }
+    /// `quests-helpers.md` §7 step 4 = `objects.md` §12 rule 12's removal
+    /// (`0x0061A270`, `0x00555600`, `0x0061AED0(room, 1)`) through the
+    /// action wiring's seam for it (`Pending::object_remove_portal`).
+    fn free_portal_object(&mut self, portal: UnitId) {
+        self.view(|g, v| v.h.x.object_remove_portal(g, portal));
+    }
+    /// `0x005DDFC0(game, monster, mode, x, y)` (`monsters/ai.md` §7.1: the
+    /// mode request at a point, no path step set) on the action wiring's
+    /// monster mode change; a unit that is not a monster: the rest's.
+    fn monster_mode_at(&mut self, monster: UnitId, mode: u8, x: i32, y: i32) {
+        let is_monster = self
+            .inner
+            .econ
+            .units
+            .get(monster)
+            .is_some_and(|r| r.ty == UnitType::Monster);
+        if !is_monster {
+            return self.inner.monster_mode_at(monster, mode, x, y);
+        }
+        self.view(|g, v| {
+            AiModes::change_mode(v, g, monster, mode, ModeTarget::Point(x, y));
         });
     }
 }

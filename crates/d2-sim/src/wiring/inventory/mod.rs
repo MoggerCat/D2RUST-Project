@@ -45,7 +45,7 @@ pub mod save_index;
 pub mod units;
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
 
 use std::cell::RefCell;
 use std::collections::BTreeMap;

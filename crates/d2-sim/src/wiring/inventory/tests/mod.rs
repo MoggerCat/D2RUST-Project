@@ -156,7 +156,7 @@ const ROWS: [Row; 10] = [
 ];
 
 /// The items creation reads (`items::ItemTables`).
-fn item_tables() -> ItemTables {
+pub fn item_tables() -> ItemTables {
     let mut ratio = Itemratio::decode(&[0u8; Itemratio::SIZE]);
     ratio.version = 1;
     let itemtypes = (0..N_TYPES)
