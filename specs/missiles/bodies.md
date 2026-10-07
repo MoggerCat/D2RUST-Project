@@ -60,7 +60,7 @@
 | Edge cases & original bugs | 843–872 |
 | Test vectors | 873–901 |
 | Provenance | 902–932 |
-| Open questions | 933–952 |
+| Open questions | 933–953 |
 <!-- /index -->
 
 ## Summary
@@ -935,8 +935,9 @@ Created missiles draw on their own seeds (`missiles.md` §R2.3).
 1. No recording: record the Cairn Stones portal opening, Baal's taunt
    in the Worldstone Chamber and a Royal Strike, and compare created
    missiles and their ticks.
-2. Flag 0x100 of the volcano record is not among the flags
-   `0x0059FA30` reads (`missiles.md` §R2.1): confirm it is ignored.
+2. Answered (2026-10-08): ignored. `0x0059FA30` loads the flags word
+   only into a register (`0x0059FACF`, `0x0059FC84`), tests the bits of
+   `missiles.md` §R2.1 and never 0x100, and does not keep the record.
 3. *Answered* (`impl-missile-bodies-2` Q1): the ring's flags 0x17 /
    0x1F hold 0x10, so `0x0059FA30` takes the velocity field as fixed
    point without the << 8 (its flag-4 branch shifts only when 0x10 is
