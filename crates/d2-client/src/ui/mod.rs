@@ -27,6 +27,7 @@ pub mod layout;
 pub mod original;
 pub mod panel;
 pub mod panels;
+pub mod quest_log;
 pub mod root;
 pub mod states;
 pub mod text;
