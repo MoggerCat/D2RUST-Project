@@ -636,3 +636,86 @@ fn placing_a_unit_in_its_own_room_queues_it_for_update() {
     assert_eq!(fx.game.lists.update_queue(a), vec![m]);
     fx.assert_clean();
 }
+
+// Covers: specs/sim/path-placement.md §10 r6, §10 r7
+#[test]
+fn placing_a_player_writes_its_position_history() {
+    // Rule 7 (`0x00554FD0`): entry[index] := the placed point, index + 1.
+    // A monster's placement writes nothing (rule 5 has no history).
+    let mut fx = fx();
+    let a = fx.a;
+    let p = player(&mut fx, 26, 10);
+    let m = fx.spawn(UnitType::Monster, 0, a, 30, 10);
+    let before = fx
+        .sim
+        .hooks()
+        .paths
+        .as_ref()
+        .unwrap()
+        .history
+        .get(&p)
+        .cloned();
+    let next = before.as_ref().map_or(0, |h| h.next);
+    assert!(place(&mut fx, p, Some(a), 33, 12, true, false));
+    assert!(place(&mut fx, m, Some(a), 35, 12, true, false));
+    let paths = fx.sim.hooks().paths.as_ref().unwrap();
+    let h = paths.history.get(&p).expect("history written");
+    assert_eq!(h.newest(), (33, 12));
+    assert_eq!(h.entries[usize::from(next)], (33, 12));
+    assert_eq!(h.next, (next + 1) % 20);
+    assert!(!paths.history.contains_key(&m));
+    sent(&mut fx);
+    fx.assert_clean();
+}
+
+// Covers: specs/sim/path-placement.md §11
+#[test]
+fn the_wired_game_entry_reports_placed_or_a_missing_spawn_room() {
+    // `wiring::path::place::game_entry`: true when the player is placed
+    // in the town; with no room of the town level the spawn lookup has
+    // no room (fatal assert): logged as `WiringError::Place`, false.
+    let alloc = |fx: &mut Fx| {
+        let req = AllocRequest {
+            ty: UnitType::Player,
+            class: 0,
+            room: None,
+            add: true,
+            fixed_guid: None,
+            mode: 1,
+            allied: true,
+        };
+        fx.sim
+            .with(&mut fx.game, |g, v| v.allocate(g, &req, 0, 0))
+            .unwrap()
+    };
+    let mut town = fx_with(&[
+        (LEVEL, TileRect::new(0, 0, 8, 8)),
+        (TOWN, TileRect::new(0, 16, 8, 8)),
+    ]);
+    let fx = &mut town;
+    let p = alloc(fx);
+    let r = fx.sim.with(&mut fx.game, |g, v| {
+        super::place::game_entry(PathCtx::of(v, g), p, 0)
+    });
+    assert!(r);
+    assert!(fx.game.lists.unit(p).unwrap().room().is_some());
+    sent(fx);
+    fx.assert_clean();
+
+    let mut fx = self::fx();
+    let p = alloc(&mut fx);
+    let r = fx.sim.with(&mut fx.game, |g, v| {
+        super::place::game_entry(PathCtx::of(v, g), p, 0)
+    });
+    assert!(!r);
+    // The level view's lookup logs its own DRLG error first.
+    let errors = std::mem::take(&mut fx.sim.hooks().errors);
+    assert_eq!(
+        errors.last(),
+        Some(&WiringError::Place(PlaceError::NoSpawnRoom)),
+        "{errors:?}"
+    );
+    assert_eq!(fx.game.lists.unit(p).unwrap().room(), None);
+    assert_eq!(sent(&mut fx), vec![]);
+    fx.assert_clean();
+}
