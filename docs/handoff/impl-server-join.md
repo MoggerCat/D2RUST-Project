@@ -118,6 +118,16 @@ player hidden by the placeholder rules; the UI open mode set as in
 7. **0x59 name** (player data): d2rs takes it from `Entry::name`; the
    save's name field is `formats/d2s.md`'s, not wired here.
 
+Answers (spec session `claude/spec-server-join`, 2026-10-07):
+Q1, Q2 → `sim/path-placement.md` §11 (game entry runs the room switch
+itself: 0x07, 0x07 × array, 0x15, 0x7E, before the first tick) and
+`sim/intents-events.md` §7.8; Q3 → `intents-events.md` §8.2; Q4 →
+`sim/tick.md` §6 rule 6 and `intents-events.md` §8.3; Q5 →
+`intents-events.md` §8.1 (0x01 u32@2 = the arena flags); Q6 →
+`intents-events.md` §7.8 rule 3 (`0x0053BC90`, room leave); room-switch
+add messages → §7.8 rule 2, §7.9; monster messages 0x67–0x6D → §7.7.
+Q7 unchanged.
+
 ## 4. Gate (this branch, head in the commit)
 
 - `CARGO_INCREMENTAL=0 cargo test --workspace --no-fail-fast`: 5,263

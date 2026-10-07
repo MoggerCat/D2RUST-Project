@@ -5880,6 +5880,31 @@ a monster, a Druid summon, a Clay Golem, a Countess kill, a Cain rescue.
 - R2-38 `d2s-tool` characters load and re-save in 1.14d: quest bits, trailer
   bit, +0x88..+0xA7, flag 0x2000 (DS-2, DS-4, DS-5; C66 (2)).
 
+### PC 2 recording list (spec answers that need a recording or capture)
+
+Spec writers append here (one line: spec + open question, what to record,
+what to log); PC 2 (Local2) records them and moves each line to §5 Done
+with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
+
+- `drlg/rooms.md` OQ15: client build timer (B, T, cursor) per client
+  update over a level load.
+- `sim/unit-order.md` OQ5: client room unit-list order before each draw
+  sort, one town scene.
+- `client/model.md` OQ9: the client side of the join stream (see the
+  spec).
+- `render/draw-order.md` OQ7: town river-bank cells, capture at `TownE1`
+  tile (950, 933).
+- `sim/intents-events.md` OQ11: breakpoint, no new play: return address
+  one level up of `0x0053FB30` during a monster kill (which path sends the
+  0x65 in a kill tick).
+- `sim/intents-events.md` OQ13: breakpoint at join: caller of the first
+  0x48 in frame 2.
+- `client/bridge.md` OQ6: a 0x2C followed by a 0x0A in one chunk.
+- `render/lighting.md` OQ11: a day-period change with objects in sight.
+- `client/msg-skills.md` OQ1: equipping a charged item.
+- `client/stat-lists.md` OQ6: a buff (0xA8 bytes).
+- `client/model.md` OQ10: a game with a hireling (0x7A / 0x81).
+
 ## 8. Lessons (problems met, fixes)
 
 | Problem | Fix |
