@@ -3464,18 +3464,26 @@ set the default budgets from them.
 
 ### Blocked (not runnable yet)
 
-- Native assets full conversion (`specs/formats/native-assets.md` §7.2,
-  branch `claude/spec-native-assets`; blocked until `d2-convert` exists,
-  sessions N1–N4 of §8): `cargo run --release -p d2-convert -- convert
-  --game "$D2_GAME_DIR" --native "$TMP/d2native"`, then `cargo run
-  --release -p d2-convert -- verify --deep --game "$D2_GAME_DIR" --native
-  "$TMP/d2native"`. Expect exit 0 both, `manifest.toml` `complete = true`,
-  0 failed in every kind, converted counts equal to the winning copies
-  `mpq-tool formats` finds, C-TABLE 73/73 with exactly one override
-  (`monstats` 707 `NameStr`). Record in the spec: total and per-kind run
-  time, native root size, DT1 fallback tiles (OQ 5), `tbl` rebuild
-  differences (OQ 6), unnamed blocks per archive. Then `d2-client play`
-  and `verify` with `--source native` vs `--source mpq`: identical results.
+- Native assets full conversion (`specs/formats/native-assets.md` §7.2).
+  `d2-convert` exists (N3, `docs/handoff/native-n3.md`) with the excel copy
+  wired; the full result needs N1/N2's kinds hooked into
+  `tools/d2-convert/src/kinds.rs` (N4 or the merge), so this stays here
+  until then. Command (local, `D2_GAME_DIR` = the 1.14d install):
+  `cargo run --release -p d2-convert -- convert --install "$D2_GAME_DIR"
+  --out "$TMP/d2native"`, then `cargo run --release -p d2-convert -- verify
+  --deep --install "$D2_GAME_DIR" --out "$TMP/d2native"` (`--game` /
+  `--native` are accepted as the spec's spellings). Expect: exit 0 both;
+  stderr ends `done: N files, 0 failed (…s)` and `verify: all files pass`;
+  `manifest.toml` `complete = true` and `[counts.<kind>]` with `failed = 0`
+  in every kind; per-kind `converted` equal to the winning copies
+  `mpq-tool formats` finds; `report.txt` with C-TABLE 73/73 and exactly one
+  override (`monstats` 707 `NameStr`). A rerun of `convert` must be
+  near-instant and leave `files.tsv` byte-identical (resume). Record in the
+  spec: total and per-kind work time (`report.txt`), native root size
+  (`du -sh`), DT1 fallback tiles (OQ 5), `tbl` rebuild differences (OQ 6),
+  unnamed blocks per archive and the unconverted extensions (both in
+  `report.txt`). Then `d2-client play` and `verify` with `--source native`
+  vs `--source mpq`: identical results.
 - Phase 6 §B1 decoded samples per live `.wav` (needs `formats/wav.md`).
 - Phase 6 GPU: the `map` case through the compute compositor is ported and
   queued as C28–C31 (it will show the index-0 question VM1); the `sprite` /
