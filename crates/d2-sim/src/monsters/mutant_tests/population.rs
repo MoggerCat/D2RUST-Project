@@ -967,3 +967,28 @@ fn pack_object_needs_evilhut_and_objcol() {
     pack(&mut ctx(&t, &mut st, &mut f), R0, rect(2, 2, 4, 4), 528).unwrap();
     assert_eq!(f.calls("object"), 0);
 }
+
+// Covers: specs/monsters/population.md §11.5 r6
+#[test]
+fn unlisted_special_preset_ids_create_and_draw_nothing() {
+    // PROVISIONAL (§11.5 r6; REC-80): an id with no TSV row and no rule
+    // makes nothing and draws nothing.
+    let t = tables();
+    let mut st = state_with(&t, 2);
+    let mut f = Fake::new();
+    use crate::monsters::population::seams::PopWorld;
+    let (room_before, game_before) = (*f.room_seed(R0), *f.game_seed());
+    let mut cx = ctx(&t, &mut st, &mut f);
+    for id in [0, 1, 25, 27, 28, 33, 34, 99, 1000] {
+        assert!(
+            preset_spawn(&mut cx, R0, sp(id), 90, 90, 1).is_none(),
+            "{id}"
+        );
+    }
+    assert!(f.units.is_empty());
+    assert!(f.log.is_empty(), "{:?}", f.log);
+    assert_eq!(
+        (*f.room_seed(R0), *f.game_seed()),
+        (room_before, game_before)
+    );
+}
