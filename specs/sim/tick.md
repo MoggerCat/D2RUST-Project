@@ -31,15 +31,15 @@
 |   3. Tick steps in order | 143–173 |
 |   4. Room pass (step 3) | 174–209 |
 |   5. Timer events (step 4) | 210–376 |
-|   6. Client pass (step 5) | 377–406 |
-|   7. Periodic steps, summary | 407–416 |
-|   8. Wall-clock and host-only parts | 417–429 |
-| Constants & data dependencies | 430–443 |
-| Randomness | 444–451 |
-| Edge cases & original bugs | 452–483 |
-| Test vectors | 484–572 |
-| Provenance | 573–597 |
-| Open questions | 598–615 |
+|   6. Client pass (step 5) | 377–422 |
+|   7. Periodic steps, summary | 423–432 |
+|   8. Wall-clock and host-only parts | 433–445 |
+| Constants & data dependencies | 446–459 |
+| Randomness | 460–467 |
+| Edge cases & original bugs | 468–499 |
+| Test vectors | 500–588 |
+| Provenance | 589–617 |
+| Open questions | 618–635 |
 <!-- /index -->
 
 ## Summary
@@ -401,6 +401,22 @@ Owned by `units.md`; confirmed on the recordings by `check_units.py`
    hooks `0x00543B90`, NPC proxies `0x00537340`) and room switch
    (`0x00537B50`); arena sync (`0x0053FC20`); queue the player for
    update (`0x0064C040`).
+6. **Room ready** `0x0061A460(R)`, R = the client's room (client
+   +0x1B4, written by the room switch, `intents-events.md` §7.8; null R
+   is fatal assert 0x3EF): ready iff R's adjacency count (active room
+   +0x24) equals its DRLG room's rooms-near count (DRLG room +0x2C,
+   `0x0066BCF0`; `drlg/rooms.md` §1) **and** every entry of R's
+   adjacency array (+0x00, array order) has the populated bit (active
+   room +0x34 bit 0, set by §4 rule 2). A count of 0 is ready. So a
+   client is ready once every neighbour of its room exists as an active
+   room and has been populated. At a single-player join the client
+   enters state 3 inside the C→S 0x6B handling (`intents-events.md`
+   §8.2), the join activates the town rooms, step 3 of the **next** tick
+   populates them, and step 5 of that same tick sends 0x04 (rule 4, after
+   the per-client update's unit messages): recorded frame 2 of both
+   recordings (`-022633` seq 219, after the units' 0xAC / 0x51 / 0x0E).
+   Rule 4's message 4 is `0x0053B320(client, 4)` (1 byte; at
+   `0x0052D514` for state 3, `0x0052D5A2` for state 5).
 
 Message contents: `intents-events.md`.
 
@@ -594,6 +610,10 @@ equal the implementation's lists (`unit-order.md`, Test vectors).
   entry, the eleven step call sites, the ten timer-run sites, schedule
   (entry and after allocation), cancel, and the list primitives of
   `unit-order.md`; `check_tick.py` confirms §2, §3 and §5 (Test vectors).
+- §6 rule 6 (server-join session, 2026-10-07): `0x0061A460`,
+  `0x0066BCF0`, the client pass `0x0052D440` (`0x0052D503`–`0x0052D520`,
+  `0x0052D565`–`0x0052D5AE`); 0x04 position checked on
+  `20261006-022633-packets.jsonl` seq 219 and `-015956` frame 2.
 
 ## Open questions
 

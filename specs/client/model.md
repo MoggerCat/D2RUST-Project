@@ -38,16 +38,16 @@
 |   8. Mode requests | 347–397 |
 |   9. Room-in-sight messages | 398–418 |
 |   10. Bit reader | 419–433 |
-|   11. Current act and level (join and later) | 434–475 |
-|   12. Client DRLG and the room of a point | 476–517 |
-|   13. Visibility predicate (`0x004DBF20`) | 518–545 |
-|   14. Pet list and the hireling GUID | 546–572 |
-| Constants & data dependencies | 573–585 |
-| Randomness | 586–597 |
-| Edge cases & original bugs | 598–606 |
-| Test vectors | 607–646 |
-| Provenance | 647–685 |
-| Open questions | 686–724 |
+|   11. Current act and level (join and later) | 434–477 |
+|   12. Client DRLG and the room of a point | 478–519 |
+|   13. Visibility predicate (`0x004DBF20`) | 520–547 |
+|   14. Pet list and the hireling GUID | 548–574 |
+| Constants & data dependencies | 575–587 |
+| Randomness | 588–599 |
+| Edge cases & original bugs | 600–608 |
+| Test vectors | 609–648 |
+| Provenance | 649–687 |
+| Open questions | 688–726 |
 <!-- /index -->
 
 ## Summary
@@ -462,7 +462,9 @@ player is in", the input of `render/composition.md` §3 step 2
    room, §7 rule 5). The level is the room's level id (`0x0061A1B0`:
    active room +0x10 → DRLG room → level, `0x0066BAB0`), read each frame
    by `0x0044C990` (`render/composition.md` §3 step 2); no room → no
-   level (BlankScreen treated as 0, nothing cleared).
+   level (BlankScreen treated as 0, nothing cleared). The full server
+   order (the "…" between 0x0B and 0x03, 0x53 after 0x03, the 0x7E after
+   0x15, and the units before 0x04) is `sim/intents-events.md` §8.
 4. **Room change** (`0x004654C0`, `msg-units.md` §3 rule 4.4): when the
    local player moves to a room whose level's Levels `Act` byte differs
    from the old room's, the act palette switches (`0x004FB480`); the
