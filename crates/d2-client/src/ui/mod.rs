@@ -24,12 +24,15 @@ pub mod original;
 pub mod panel;
 pub mod panels;
 pub mod root;
+pub mod skill_desc;
 pub mod states;
 pub mod text;
 pub mod widget;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_fdesc;
 
 pub use draw::{ImageRef, ImageRequest, TextRequest, TextStyle, UiDraw, UiDrawSink};
 pub use frame::{FrameError, FramePos, Presentation};
