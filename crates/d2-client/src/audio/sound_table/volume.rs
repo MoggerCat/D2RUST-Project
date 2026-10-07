@@ -49,11 +49,11 @@ pub struct SoundSettings {
     pub positional_bias: i32,
     pub npc_speech: i32,
     pub options_music: i32,
-    /// The option flag `0x007A061C` gating `Tracking` (§6.4 r1).
-    ///
-    /// TODO(spec: audio/sound-table.md §6.4 r1): which option this is and
-    /// its default; off is the narrowest choice (no position updates).
-    pub tracking_option: bool,
+    /// The flag `0x007A061C` gating `Tracking` (§6.4 r1): not an option
+    /// but the client's game-loaded flag (set by S→C 0x04, cleared by 0x05
+    /// and at game init / end). Every request update runs in game, so it
+    /// is on (§6.4 r1, answered ST-6).
+    pub game_loaded: bool,
 }
 
 impl Default for SoundSettings {
@@ -65,7 +65,7 @@ impl Default for SoundSettings {
             positional_bias: 50,
             npc_speech: 2,
             options_music: 1,
-            tracking_option: false,
+            game_loaded: true,
         }
     }
 }
@@ -188,18 +188,37 @@ pub fn device_pan(pan: i32) -> (i32, i32) {
     }
 }
 
+/// The device gain `G` (`[0x0072F9B0]`) at every volume send of a game
+/// sound tick (§8.3 r4).
+pub const DEVICE_GAIN: i32 = 255;
+
+/// The device volume after `G` and occlusion (`0x005157B0`, §8.3 r3):
+/// `v1 = trunc(v × G / 255)`, `v2 = trunc((1 − occ) × v1)` (mixer mode 0:
+/// no voice is an EAX voice).
+pub fn device_occluded(v: i32, occlusion: f32) -> i32 {
+    let v1 = v.wrapping_mul(DEVICE_GAIN) / 255;
+    ftol((1.0 - occlusion) * v1 as f32)
+}
+
 /// The §8.3 ratios as the mixer's Q8 gains (`client/audio.md` §A4):
-/// amplitude `v / 255`; `pan < 128` scales the right side by `pan / 127`,
-/// `pan > 128` the left by `(255 − pan) / 127`. The Q8 rounding is ours
-/// (the mix is not compared, `client/audio.md` §A4).
+/// amplitude `v2 / 255` after `G` and occlusion (r3); `pan < 128` scales
+/// the right side by `pan / 127`, `pan > 128` the left by `(255 − pan) /
+/// 127` (r2). A volume at or below 0 is silent (r1: `x ≤ 0.0001` gives
+/// −10,000, §12 r2's negative sends). The Q8 rounding is ours (the mix is
+/// not compared, `client/audio.md` §A4).
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DeviceGain;
 
 impl GainCurve for DeviceGain {
     fn gains(&self, vol: i32, pan: i32) -> Result<Gains, AudioError> {
-        if !(0..=255).contains(&vol) || !(0..=255).contains(&pan) {
+        self.gains_occluded(vol, pan, 0.0)
+    }
+
+    fn gains_occluded(&self, vol: i32, pan: i32, occlusion: f32) -> Result<Gains, AudioError> {
+        if vol > 255 || !(0..=255).contains(&pan) {
             return Err(AudioError::GainDomain { vol, pan });
         }
+        let vol = device_occluded(vol, occlusion).max(0);
         let q = |n: i32, d: i32| (n * GAIN_UNITY / d).min(GAIN_UNITY);
         let (l, r) = match pan {
             p if p < 128 => (GAIN_UNITY, q(p, 127)),

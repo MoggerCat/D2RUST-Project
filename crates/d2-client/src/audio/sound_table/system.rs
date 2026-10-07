@@ -1,5 +1,7 @@
 // Spec: specs/audio/sound-table.md (§5 requests, §6 sound tick, §7 channels, §8 volume and pan, §10 sample cache)
+// Spec: specs/audio/sound-table-2.md (§16 sample cache, §17 start failures)
 // Spec: specs/audio/triggers.md (§1 r2–r4, r8: volume set, detach, group stops, speaking)
+// Spec: specs/audio/triggers-2.md (§19 a unit's request list)
 //! The request layer and the 16 channels (`sound-table.md` §5–§7), driven
 //! one sound tick at a time (§6). Every channel start, stop and volume/pan
 //! send becomes a cue on the audio core's [`TriggerQueue`] stamped with the
@@ -10,17 +12,20 @@
 //! Unit positions, the listener, occlusion and the client RNG seed come
 //! through the narrow [`SoundWorld`] trait, never from Bevy.
 
+use std::collections::BTreeMap;
+use std::sync::Arc;
+
 use crate::audio::calls::{Handle, SoundCalls, FLAG_EXACT, FLAG_NO_FADE_IN};
 use crate::audio::{
-    Cue, CueId, ParamChange, SoundBank, SoundId, Stop, StopTarget, Trigger, TriggerQueue,
-    TriggerSource, VoiceParams,
+    sound_bytes, Cue, CueId, DeviceChange, ParamChange, Sound, SoundBank, SoundId, Stop,
+    StopTarget, Trigger, TriggerQueue, TriggerSource, VoiceParams,
 };
 use crate::bridge::world::UnitKey;
 use d2_sim::rng::Seed;
 
 use super::table::{is_music_path, is_speech, LoadState, SoundTableData, SoundTableError};
 use super::volume::{
-    chain, falloff, linear_falloff, mode0_gain_pan, record_volume, ChainInputs, SoundSettings,
+    chain, falloff, ftol, linear_falloff, mode0_gain_pan, record_volume, ChainInputs, SoundSettings,
 };
 
 /// Request pool size (`0x007C0ED0`, §5).
@@ -32,9 +37,19 @@ pub const SOLO_DUCK_MIN: i32 = 70;
 /// Fade-in length after a resume (§6.3 r3).
 pub const RESUME_FADE: u32 = 3;
 /// Async loads pending at most during a preload (§10 r3).
-pub const MAX_PENDING_LOADS: usize = 15;
-/// Preload period in sound ticks (§10 r3).
+pub const MAX_PENDING_LOADS: u32 = 15;
+/// Preload period in sound ticks (§10 r3, r5).
 pub const PRELOAD_PERIOD: u32 = 25;
+/// Highest id the preload pass walks (`0x00482C01`, §10 r5).
+pub const PRELOAD_LAST_ID: i32 = 2_933;
+/// Ticks after a failed eviction during which the preload starts nothing
+/// (§10 r3, r5).
+pub const EVICTION_HOLD: u32 = 250;
+/// Ticks a recently used sample is kept by an eviction with `recent`
+/// (`sound-table-2.md` §16 r3).
+pub const RECENT_USE: u32 = 750;
+/// Cache limit on any machine above 500 MB (`0x00481840`, §10 r1).
+pub const CACHE_LIMIT: u32 = 5 * 1024 * 1024;
 /// Duration of one sound tick in ms: one client tick (`render/camera.md`
 /// §9), used only by d2rs's channel-end model ([`SoundSystem`] upkeep).
 pub const TICK_MS: u64 = 40;
@@ -42,21 +57,31 @@ pub const TICK_MS: u64 = 40;
 const AXIS_CLAMP: f32 = 2000.0;
 /// Group base of `event_thunder_*` (§6.4 r2).
 const THUNDER_BASE: i32 = 202;
+/// `object_river` (§8.1 r1, River).
+const RIVER: i32 = 2599;
+/// z of a unit request (`0x006DA67C`, §8.1 r1) and the offset of a set
+/// position (`0x006DA698`, §5 r8).
+const UNIT_Z: f32 = 640.0;
+/// z of a request without a unit (`0x006DA6A0`, §5 r3).
+const NO_UNIT_Z: f32 = 320.0;
+/// Occlusion step per tick (`0x006DA6B0`, f32 0.05 widened, §6.4 r4).
+const OCCLUSION_STEP: f32 = 0.05;
 
 /// What the sound layer needs from the game world (§8.1, §6.4, §4 r5).
 pub trait SoundWorld {
     /// The local player unit `[0x007A6A70]`.
     fn local_player(&self) -> Option<UnitKey>;
-    /// A unit's client position (`0x00620900`).
-    ///
-    /// TODO(spec: audio/sound-table.md open question 2): the units of
-    /// these coordinates per unit type.
+    /// A unit's client position (`0x00620900`): its client **pixel
+    /// point** (§8.1 r1, answers open question 2): dynamic path +0x08 /
+    /// +0x0C for unit types 0, 1, 3; static path +0x04 / +0x08 for types
+    /// 2, 4, 5 (`client/model.md` §8 rule 6).
     fn position(&self, unit: UnitKey) -> Option<(i32, i32)>;
     /// `0x00622AA0(player, unit, 2) ≠ 0` (§6.4 r2).
     fn blocked(&self, unit: UnitKey) -> bool;
     /// `Indoors` of the current sound environment (§6.4 r2).
     fn indoors(&self) -> bool;
-    /// The state-duck condition at `0x004BA640` (§6.5 r2; open question 6).
+    /// The state-duck condition at `0x004BA640` (§6.5 r2: single player
+    /// with the ESC menu or the options panel open).
     fn state_duck(&self) -> bool;
     /// The local player's client unit seed (player + 0x20, §4 r5).
     fn client_seed(&mut self) -> Option<&mut Seed>;
@@ -105,10 +130,9 @@ impl Fade {
 pub struct Request {
     /// Pool slot (its address order).
     pub slot: usize,
-    /// +0x04, the requested id.
+    /// +0x04, the current id: the requested id, overwritten by the variant
+    /// at every start attempt (§7 r6).
     pub id: i32,
-    /// The variant chosen at the last start attempt (§7 r1); `id` before.
-    pub variant: i32,
     /// +0x08.
     pub handle: Handle,
     /// +0x0C … +0x14.
@@ -119,9 +143,11 @@ pub struct Request {
     pub volume: i32,
     /// +0x20.
     pub occlusion: f32,
-    /// +0x24, bytes.
+    /// +0x24, in 4-byte units (§7 r8: the stream starts at `offset × 4`
+    /// bytes).
     pub start_offset: u32,
-    /// +0x28.
+    /// +0x28, newest first (§5 r6). A compound request can hold several
+    /// units, or one unit twice (§5 r2).
     pub units: Vec<UnitKey>,
     /// +0x2C.
     pub channel: Option<usize>,
@@ -134,44 +160,60 @@ pub struct Request {
     pub priority: u8,
     /// +0x3D.
     pub stop: bool,
-    /// +0x41, bytes (§7 r3).
-    pub resume_offset: Option<u32>,
+    /// +0x41, in 4-byte units; 0 is "none" (§6.3 r8, §7 r8).
+    pub resume_offset: u32,
     pub fade: Option<Fade>,
 }
 
-/// Channel kind (§7 r3).
+/// Channel kind (§7 r7).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ChannelKind {
-    /// Takes any request. d2rs's layout until the mode-0 slot kinds are
-    /// specified (TODO(spec: audio/sound-table.md §7 r3): the kinds
-    /// `0x004E0050` gives the 16 slots in mixer mode 0).
-    Any,
+    /// Kind 0: plain mono buffer (slots 4–15 in mixer mode 0).
     Plain,
+    /// Kind 1: stereo buffer (slots 0–3 in every mode).
     Stereo,
+    /// Kind 2: slots 4–15 in mixer mode 1 (not reproduced, §9).
     Positional,
+    /// Kind 6: slots 4–15 in mixer mode 2 (not reproduced, §9).
     Eax,
 }
+
+/// The slot kinds of mixer mode 0 (`0x004DFAA0`, §7 r7): 4 stereo and 12
+/// mono channels. d2rs reproduces mode 0 only (§9).
+pub const MODE0_LAYOUT: [ChannelKind; CHANNELS] = {
+    let mut l = [ChannelKind::Plain; CHANNELS];
+    let mut i = 0;
+    while i < 4 {
+        l[i] = ChannelKind::Stereo;
+        i += 1;
+    }
+    l
+};
 
 /// One busy channel.
 #[derive(Clone, Debug)]
 struct Channel {
     request: usize,
-    /// The variant playing on it.
-    id: i32,
     cue: CueId,
     start_tick: u32,
+    /// First frame played (the stream start offset, §7 r8; 0 otherwise).
     offset_frames: u64,
     frames: u64,
     rate: u64,
     block_align: u64,
     looped: bool,
     stereo: bool,
+    stream: bool,
     /// Loop start in bytes (`Block 1` × 2, §7 r4), when the block count is 1.
     loop_start: Option<u32>,
     vol: i32,
     pan: i32,
-    /// (v after §8.2 r5, occlusion, position) last sent (§8.2 r7).
-    last_sent: (i32, f32, [f32; 3]),
+    /// (v after §8.2 r5, occlusion, position) last sent (§8.2 r7); none
+    /// right after the start, so the update of the start tick sends again
+    /// (§6.3 r6).
+    last_sent: Option<(i32, f32, [f32; 3])>,
+    /// Occlusion last handed to the device (§8.3 r3).
+    device_occlusion: f32,
 }
 
 /// A fatal condition of 1.14d, kept instead of aborting (M07).
@@ -185,6 +227,51 @@ pub enum SoundError {
     /// A request for an id outside the table (1.14d reads a null record).
     #[error("sound id {0} outside the table")]
     OutOfTable(i32),
+    /// `sound-table-2.md` §16 r4: unloading a sample a channel plays
+    /// (fatal `0x259`).
+    #[error("sound {0}: unload while a channel plays it")]
+    UnloadPlaying(i32),
+    /// §4 r6: a variant draw with no local player (1.14d crashes).
+    #[error("variant draw roll({0}) without a local player")]
+    NoLocalPlayer(i32),
+}
+
+/// The sample cache state (§10, `sound-table-2.md` §16).
+#[derive(Clone, Debug)]
+pub struct Cache {
+    /// `0x00481840` (§10 r1).
+    pub limit: u32,
+    /// `0x007BC9D0`: bytes charged by loaded and pending samples.
+    pub total: u32,
+    /// `[0x007BC9B8]`: ids, least recently used first (§16 r1).
+    pub lru: Vec<i32>,
+    /// `0x007BC9C8`: pending async loads (§16 r4: not decremented for an
+    /// abandoned read).
+    pub pending: u32,
+    /// `[0x007BC9C4]`: the tick of the last failed eviction (§16 r2).
+    pub failed_eviction: u32,
+    /// The tick of the last preload pass (§10 r5).
+    pub last_pass: u32,
+    /// Async reads in flight: id → (tick started, sample).
+    reads: BTreeMap<i32, (u32, Arc<Sound>)>,
+}
+
+impl Default for Cache {
+    fn default() -> Self {
+        Cache {
+            limit: CACHE_LIMIT,
+            total: 0,
+            lru: Vec::new(),
+            pending: 0,
+            // PROVISIONAL (specs/audio/sound-table.md §10 r5, OQ 13): the
+            // stamp starts at 0 like the other counters sound init resets,
+            // so the T ≠ 0 passes before T = 250 start no async preload;
+            // settled by recording ST-7.
+            failed_eviction: 0,
+            last_pass: 0,
+            reads: BTreeMap::new(),
+        }
+    }
 }
 
 /// The sound table, the request pool and the channels (§1–§10).
@@ -198,15 +285,16 @@ pub struct SoundSystem {
     /// Active list `0x007C5458`: slot indices.
     active: Vec<usize>,
     next_handle: u32,
-    layout: [ChannelKind; CHANNELS],
     channels: [Option<Channel>; CHANNELS],
+    /// Each unit's request list (U +0x78, `triggers-2.md` §19), newest
+    /// first.
+    unit_lists: BTreeMap<UnitKey, Vec<Handle>>,
     /// `0x007BC9BC`.
     tick: u32,
     last_update: Option<u32>,
     solo_duck: i32,
     state_duck: i32,
-    pending_loads: Vec<i32>,
-    last_preload: Option<u32>,
+    cache: Cache,
     errors: Vec<SoundError>,
 }
 
@@ -220,14 +308,13 @@ impl SoundSystem {
             slots: vec![None; REQUEST_SLOTS],
             active: Vec::new(),
             next_handle: 0,
-            layout: [ChannelKind::Any; CHANNELS],
             channels: Default::default(),
+            unit_lists: BTreeMap::new(),
             tick: 0,
             last_update: None,
             solo_duck: 100,
             state_duck: 100,
-            pending_loads: Vec::new(),
-            last_preload: None,
+            cache: Cache::default(),
             errors: Vec::new(),
         }
     }
@@ -252,8 +339,12 @@ impl SoundSystem {
         self.enabled = on;
     }
 
-    pub fn set_layout(&mut self, layout: [ChannelKind; CHANNELS]) {
-        self.layout = layout;
+    pub fn cache(&self) -> &Cache {
+        &self.cache
+    }
+
+    pub fn cache_mut(&mut self) -> &mut Cache {
+        &mut self.cache
     }
 
     pub fn tick(&self) -> u32 {
@@ -293,10 +384,9 @@ impl SoundSystem {
         Some((ch.vol, ch.pan))
     }
 
-    /// Loop start in bytes of channel `c` (§7 r4).
-    ///
-    /// TODO(spec: audio/sound-table.md §7 r4): the core mixer has no loop
-    /// start or start offset yet; the values are kept here.
+    /// Loop start in bytes of channel `c` (§7 r4: `Block 1` × 2 when the
+    /// block count is 1). The mixer gets it as a frame through the start's
+    /// [`DeviceChange`].
     pub fn channel_loop_start(&self, c: usize) -> Option<u32> {
         self.channels.get(c)?.as_ref()?.loop_start
     }
@@ -326,18 +416,18 @@ impl SoundSystem {
 
     // ------------------------------------------------------------ §5
 
-    /// Relative position and distance² of `unit` (§8.1 r1).
-    ///
-    /// TODO(spec: audio/sound-table.md open question 8): sound 2599
-    /// (`object_river`) uses a projected position; it gets this rule.
-    fn unit_position(world: &dyn SoundWorld, unit: UnitKey) -> Option<([f32; 3], f32)> {
-        let p = world.position(world.local_player()?)?;
-        let u = world.position(unit)?;
-        let x = u.0 as f32 - p.0 as f32;
-        let y = 2.0 * (u.1 as f32 - p.1 as f32);
-        let cx = x.clamp(-AXIS_CLAMP, AXIS_CLAMP);
-        let cy = y.clamp(-AXIS_CLAMP, AXIS_CLAMP);
-        Some(([x, y, 0.0], cx * cx + cy * cy))
+    /// Position and distance² of `unit` relative to the local player
+    /// (`0x004B97D0`, `0x004B98F0`, §8.1 r1), for a request whose current
+    /// id is `id` (2599 `object_river` uses the projected point).
+    fn unit_position(world: &dyn SoundWorld, unit: UnitKey, id: i32) -> Option<([f32; 3], f32)> {
+        let (a, b) = world.position(world.local_player()?)?;
+        let (mut c, mut e) = world.position(unit)?;
+        if id == RIVER {
+            (c, e) = river_point((a, b), (c, e));
+        }
+        let x = c.wrapping_sub(a) as f32;
+        let y = 2.0 * (e.wrapping_sub(b) as f32);
+        Some(([x, y, UNIT_Z], dist2(x, y)))
     }
 
     /// A unit's occlusion value (`0x004B9890`, §6.4 r2).
@@ -360,7 +450,25 @@ impl SoundSystem {
         }
     }
 
-    /// `0x004B9A00` (§5 r1–r4).
+    /// Pushes `h` at the head of `unit`'s request list (`0x004CA8A0`,
+    /// `triggers-2.md` §19 r1).
+    fn push_unit_handle(&mut self, unit: UnitKey, h: Handle) {
+        self.unit_lists.entry(unit).or_default().insert(0, h);
+    }
+
+    /// Removes the first node holding `h` from `unit`'s list (`0x004CA8D0`).
+    fn drop_unit_handle(&mut self, unit: UnitKey, h: Handle) {
+        if let Some(list) = self.unit_lists.get_mut(&unit) {
+            if let Some(i) = list.iter().position(|&x| x == h) {
+                list.remove(i);
+            }
+            if list.is_empty() {
+                self.unit_lists.remove(&unit);
+            }
+        }
+    }
+
+    /// `0x004B9A00` (§5 r1–r4, r6).
     pub fn request(
         &mut self,
         world: &mut dyn SoundWorld,
@@ -384,23 +492,26 @@ impl SoundSystem {
         let (compound, base, priority) = (e.row.compound, e.group_base, e.row.priority);
         let now = self.tick;
         let local = unit.is_some() && unit == world.local_player();
-        // §5 r2. TODO(spec: audio/sound-table.md §5 r2): whether a merged
-        // call attaches its unit to the existing request's unit list; d2rs
-        // attaches nothing.
+        // §5 r2: the window test is unsigned (`0x004B97AD`); the merged
+        // call still attaches its unit at the list heads (§5 r6).
         if compound != 0 {
             let hit = self.active.iter().copied().find(|&s| {
                 let r = self.req(s);
                 self.table.base(r.id) == base
                     && !r.stop
-                    && (compound < 0
-                        || (now.wrapping_sub(r.start_tick) as i32) <= i32::from(compound))
+                    && (compound < 0 || now.wrapping_sub(r.start_tick) <= compound as u32)
             });
             if let Some(s) = hit {
                 let r = self.req_mut(s);
                 if local {
                     r.priority = r.priority.wrapping_add(80);
                 }
-                return r.handle;
+                let h = r.handle;
+                if let Some(u) = unit {
+                    r.units.insert(0, u);
+                    self.push_unit_handle(u, h);
+                }
+                return h;
             }
         }
         // §5 r3: first free slot.
@@ -410,21 +521,22 @@ impl SoundSystem {
         self.next_handle = self.next_handle.wrapping_add(1);
         let (pos, dist2, occlusion) = match unit {
             Some(u) => {
-                let (pos, d2) = Self::unit_position(world, u).unwrap_or(([0.0; 3], 0.0));
+                let (pos, d2) =
+                    Self::unit_position(world, u, id).unwrap_or(([0.0, 0.0, UNIT_Z], 0.0));
                 (pos, d2, self.unit_occlusion(world, id, u))
             }
-            None => ([0.0; 3], 0.0, 0.0),
+            None => ([0.0, 0.0, NO_UNIT_Z], 0.0, 0.0),
         };
         let mut priority = priority;
         // §5 r4 (§12 r1): byte wrap.
         if local {
             priority = priority.wrapping_add(80);
         }
+        let h = self.next_handle;
         self.slots[slot] = Some(Request {
             slot,
             id,
-            variant: id,
-            handle: self.next_handle,
+            handle: h,
             pos,
             dist2,
             volume: 255,
@@ -437,11 +549,15 @@ impl SoundSystem {
             flags,
             priority,
             stop: false,
-            resume_offset: None,
+            resume_offset: 0,
             fade: None,
         });
-        self.active.push(slot);
-        self.next_handle
+        // §5 r6: at the head of the active list.
+        self.active.insert(0, slot);
+        if let Some(u) = unit {
+            self.push_unit_handle(u, h);
+        }
+        h
     }
 
     /// `0x004B9B50(h, v)` (`triggers.md` §1 r2).
@@ -451,7 +567,7 @@ impl SoundSystem {
         }
     }
 
-    /// `0x004B9EF0(h, target, delay, len)` (§5 r5).
+    /// `0x004B9EF0(h, target, delay, len)` in its exact order (§5 r7).
     pub fn fade(&mut self, h: Handle, target: i32, delay: u32, len: u32) {
         let Some(s) = self.handle_slot(h) else { return };
         let now = self.tick;
@@ -462,24 +578,31 @@ impl SoundSystem {
         let Some(e) = self.table.get(r.id) else {
             return;
         };
-        let same = r.channel.is_some() && r.fade.is_some_and(|f| f.end == target);
-        let mut len = len;
-        if !same {
-            if target == 255 {
-                len = len.max(u32::from(e.row.fade_in));
-            } else if target == 0 {
-                len = len.max(u32::from(e.row.fade_out));
+        let len = match target {
+            255 => len.max(u32::from(e.row.fade_in)),
+            0 => len.max(u32::from(e.row.fade_out)),
+            _ => len,
+        };
+        if let Some(f) = r.fade {
+            let end = now.wrapping_add(delay).wrapping_add(len);
+            if f.end == target && end >= f.t1 {
+                return;
             }
-        }
-        if len == 0 && delay != 0 {
-            self.errors.push(SoundError::FadeDelay { handle: h, delay });
-            return;
+            if f.end == 0 && target != 0 {
+                return;
+            }
         }
         let r = self.req_mut(s);
         if target == 0 {
             r.stop = true;
         }
-        if len > 0 {
+        if len == 0 {
+            if delay != 0 {
+                self.errors.push(SoundError::FadeDelay { handle: h, delay });
+                return;
+            }
+            r.volume = target;
+        } else {
             let t0 = now.wrapping_add(delay);
             r.fade = Some(Fade {
                 start: r.volume,
@@ -487,16 +610,20 @@ impl SoundSystem {
                 t0,
                 t1: t0.wrapping_add(len),
             });
-        } else {
-            r.volume = target;
         }
     }
 
-    /// `0x004BA790(h, unit, force)` (`triggers.md` §1 r3).
+    /// `0x004BA790(h, unit, force)` (`triggers.md` §1 r3, `triggers-2.md`
+    /// §19 r2 b): the first node holding `h` leaves the unit's list
+    /// whether or not the request exists; then one `unit` leaves the
+    /// request's unit list.
     pub fn detach(&mut self, h: Handle, unit: UnitKey, force: bool) {
+        self.drop_unit_handle(unit, h);
         let Some(s) = self.handle_slot(h) else { return };
         let r = self.req_mut(s);
-        r.units.retain(|&u| u != unit);
+        if let Some(i) = r.units.iter().position(|&u| u == unit) {
+            r.units.remove(i);
+        }
         if !r.units.is_empty() {
             return;
         }
@@ -580,12 +707,26 @@ impl SoundSystem {
             .is_some_and(|r| r.state != RequestState::Ended)
     }
 
-    /// `roll(n)` on the client seed (§4 r5).
-    ///
-    /// TODO(spec: audio/sound-table.md §4 r5): with no local player 1.14d
-    /// reads a null unit; d2rs returns 0 without a step.
+    /// `roll(n)` on the client seed (`0x004E40A0`, §4 r5). §4 r6: with no
+    /// local player 1.14d crashes on any draw with `n ≥ 1` (`n < 1` returns
+    /// 0 first); no 1.14d path draws without one. d2rs treats such a draw
+    /// as an internal error (debug assert) and returns 0 without a step in
+    /// release, which is a fallback, not a fidelity rule.
     pub fn roll(world: &mut dyn SoundWorld, n: i32) -> u32 {
-        world.client_seed().map_or(0, |s| s.roll(n))
+        if n < 1 {
+            return 0;
+        }
+        match world.client_seed() {
+            Some(s) => s.roll(n),
+            None => {
+                debug_assert!(
+                    world.local_player().is_some(),
+                    "{}",
+                    SoundError::NoLocalPlayer(n)
+                );
+                0
+            }
+        }
     }
 
     // ------------------------------------------------------------ §10
@@ -595,80 +736,175 @@ impl SoundSystem {
         Ok(self.table.lock(id, delta)?)
     }
 
-    /// Collects finished async loads. d2rs has no load latency: a load
-    /// started in one tick completes at the next tick's cache step.
-    ///
-    /// TODO(spec: audio/sound-table.md open question 10): the original's
-    /// async latency.
-    fn collect_loads(&mut self) {
-        for id in std::mem::take(&mut self.pending_loads) {
-            let sample = self.bank.samples(SoundId(id as u32));
-            if let Some(e) = self.table.get_mut(id) {
-                match sample {
-                    Some(s) => {
-                        e.sample = Some(s);
-                        e.load = LoadState::Loaded;
-                    }
-                    None => {
-                        e.failed = true;
-                        e.load = LoadState::None;
-                    }
-                }
-            }
-        }
-    }
-
-    fn begin_async(&mut self, id: i32) {
+    /// The use stamp `0x00482860` (`sound-table-2.md` §16 r1): last use :=
+    /// T and the id moves to the tail of the use list.
+    fn stamp(&mut self, id: i32, now: u32) {
         if let Some(e) = self.table.get_mut(id) {
-            if e.load == LoadState::None && !e.failed {
-                e.load = LoadState::Pending;
-                self.pending_loads.push(id);
-            }
+            e.last_use = now;
+        }
+        self.cache.lru.retain(|&x| x != id);
+        self.cache.lru.push(id);
+    }
+
+    /// The format check of a non-stream load (`0x004DF630`, §7 r7):
+    /// `Stereo` := (file channels = 2).
+    fn loaded(&mut self, id: i32, sample: Arc<Sound>) {
+        if let Some(e) = self.table.get_mut(id) {
+            e.row.stereo = u8::from(sample.channels() == 2);
+            e.sample = Some(sample);
+            e.load = LoadState::Loaded;
         }
     }
 
-    /// Preload (`0x00482B40`, §10 r3). No eviction fails in d2rs (no
-    /// cache limit: TODO(spec: audio/sound-table.md §10 r2): eviction
-    /// order), so the 250-tick hold never applies.
-    ///
-    /// TODO(spec: audio/sound-table.md §10 r3): the phase of the 25-tick
-    /// period; d2rs runs at the first tick and every 25 after.
-    fn preload(&mut self, now: u32) {
-        if self
-            .last_preload
-            .is_some_and(|t| now.wrapping_sub(t) < PRELOAD_PERIOD)
-        {
+    /// Collect a finished async read (`0x00481720`, §10 r5).
+    fn collect(&mut self, id: i32) {
+        if let Some((_, sample)) = self.cache.reads.remove(&id) {
+            self.loaded(id, sample);
+            self.cache.pending = self.cache.pending.saturating_sub(1);
+        }
+    }
+
+    /// `0x00482970(id, sync, recent)` (`sound-table-2.md` §16 r2).
+    fn load(&mut self, id: i32, sync: bool, recent: bool, now: u32) {
+        let Some(e) = self.table.get(id) else { return };
+        if e.failed || e.load == LoadState::Loaded {
             return;
         }
-        self.last_preload = Some(now);
-        let wanted: Vec<i32> = self
-            .table
-            .entries()
-            .iter()
-            .enumerate()
-            .filter(|(_, e)| {
-                e.load == LoadState::None && !e.failed && (e.locks > 0 || e.row.cache != 0)
-            })
-            .map(|(i, _)| i as i32)
-            .collect();
-        for id in wanted {
-            if self.pending_loads.len() >= MAX_PENDING_LOADS {
-                break;
+        if e.load == LoadState::Pending {
+            if sync {
+                self.collect(id);
             }
-            self.begin_async(id);
+            return;
+        }
+        let Some(sample) = self.bank.samples(SoundId(id as u32)) else {
+            self.table.get_mut(id).expect("in table").failed = true;
+            return;
+        };
+        let size = self
+            .bank
+            .file_size(SoundId(id as u32))
+            .unwrap_or(sound_bytes(&sample) + 44);
+        let size = u32::try_from(size).unwrap_or(u32::MAX);
+        let after = self.cache.total.wrapping_add(size);
+        if after > self.cache.limit && !self.evict(after - self.cache.limit, sync, recent, now) {
+            self.cache.failed_eviction = now;
+            return;
+        }
+        self.cache.total = self.cache.total.wrapping_add(size);
+        self.table.get_mut(id).expect("in table").size = size;
+        self.stamp(id, now);
+        if sync {
+            self.loaded(id, sample);
+        } else {
+            self.table.get_mut(id).expect("in table").load = LoadState::Pending;
+            self.cache.reads.insert(id, (now, sample));
+            self.cache.pending = self.cache.pending.wrapping_add(1);
+        }
+    }
+
+    /// `0x004DF9D0(id)` (`sound-table-2.md` §17 r3): among the channels
+    /// whose request's current id is `id`, the one with the smallest start
+    /// tick.
+    fn playing_channel_of(&self, id: i32) -> Option<usize> {
+        let mut best: Option<(usize, u32)> = None;
+        for (c, ch) in self.channels.iter().enumerate() {
+            let Some(ch) = ch else { continue };
+            let r = self.req(ch.request);
+            if r.id == id && best.is_none_or(|(_, t)| r.start_tick < t) {
+                best = Some((c, r.start_tick));
+            }
+        }
+        best.map(|(c, _)| c)
+    }
+
+    /// Eviction `0x004824A0(need, second, recent)` (`sound-table-2.md` §16
+    /// r3). True when enough was freed.
+    fn evict(&mut self, need: u32, second: bool, recent: bool, now: u32) -> bool {
+        let target = self.cache.total.wrapping_sub(need);
+        while self.cache.total > target {
+            let mut any = false;
+            for walk in 0..if second { 2 } else { 1 } {
+                let pick = self.cache.lru.iter().copied().find(|&id| {
+                    let Some(e) = self.table.get(id) else {
+                        return false;
+                    };
+                    let kept = (walk == 0 && (e.locks > 0 || e.row.cache != 0))
+                        || (recent && now.wrapping_sub(e.last_use) < RECENT_USE)
+                        || self.playing_channel_of(id).is_some();
+                    !kept
+                });
+                if let Some(id) = pick {
+                    self.unload(id);
+                    any = true;
+                }
+            }
+            if !any {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Unload `0x004823E0(id)` (`sound-table-2.md` §16 r4). An abandoned
+    /// async read keeps its pending count (original bug, reproduced).
+    fn unload(&mut self, id: i32) {
+        let Some(e) = self.table.get(id) else { return };
+        if e.load == LoadState::None {
+            return;
+        }
+        if self.playing_channel_of(id).is_some() {
+            self.errors.push(SoundError::UnloadPlaying(id));
+            return;
+        }
+        let size = e.size;
+        self.cache.total = self.cache.total.wrapping_sub(size);
+        self.cache.lru.retain(|&x| x != id);
+        self.cache.reads.remove(&id);
+        let e = self.table.get_mut(id).expect("in table");
+        e.last_use = 0;
+        e.sample = None;
+        e.load = LoadState::None;
+    }
+
+    /// The preload pass `0x00482B40(T)` (§10 r3, r5; `sound-table-2.md`
+    /// §16 r2): at T = 0 and every 25 ticks after, over ids 1–2,933; at T =
+    /// 0 the loads are synchronous.
+    fn preload(&mut self, now: u32) {
+        if now != 0 && now.wrapping_sub(self.cache.last_pass) < PRELOAD_PERIOD {
+            return;
+        }
+        self.cache.last_pass = now;
+        let last = PRELOAD_LAST_ID.min(self.table.count() as i32 - 1);
+        for id in 1..=last {
+            let e = &self.table.entries()[id as usize];
+            if e.load == LoadState::None && (e.locks > 0 || e.row.cache != 0) {
+                if now == 0 {
+                    self.load(id, true, true, now);
+                } else if self.cache.pending < MAX_PENDING_LOADS
+                    && now.wrapping_sub(self.cache.failed_eviction) >= EVICTION_HOLD
+                {
+                    self.load(id, false, true, now);
+                }
+            }
+            // PROVISIONAL (specs/audio/sound-table.md §10 r6, OQ 13): a
+            // read is finished by the first pass after the tick it started
+            // (d2rs has no read latency); one started in this pass is not
+            // collected until the next; settled by recording ST-7.
+            if self.cache.reads.get(&id).is_some_and(|&(t, _)| t != now) {
+                self.collect(id);
+            }
         }
     }
 
     // ------------------------------------------------------------ §6
 
-    /// One sound tick (`0x00482C20`, §6.1): cache work, preload, the
-    /// request update at the current tick, channel upkeep, then tick + 1.
+    /// One sound tick (`0x00482C20`, §6.1): preload, the request update at
+    /// the current tick, channel upkeep, then tick + 1.
     pub fn run_tick(&mut self, world: &mut dyn SoundWorld, queue: &mut TriggerQueue) {
         let now = self.tick;
-        self.collect_loads();
         self.preload(now);
         self.update(world, queue, now);
-        self.upkeep(queue, now);
+        self.upkeep(now);
         self.tick = now.wrapping_add(1);
     }
 
@@ -714,8 +950,15 @@ impl SoundSystem {
         (max as f32) * (max as f32)
     }
 
+    /// Frees a request (`0x004B94E0`): for each unit of its list, the first
+    /// node holding its handle leaves that unit's list (`triggers-2.md` §19
+    /// r2 a).
     fn free(&mut self, s: usize) {
-        self.slots[s] = None;
+        if let Some(r) = self.slots[s].take() {
+            for u in r.units {
+                self.drop_unit_handle(u, r.handle);
+            }
+        }
         self.active.retain(|&a| a != s);
     }
 
@@ -765,9 +1008,11 @@ impl SoundSystem {
         self.last_update = Some(now);
     }
 
-    /// §6.3 for one request, in list order. Reading: the rules run in
-    /// sequence, so a request restarted by r1 can start in the same pass
-    /// (r3), and r5 applies to requests playing before r3.
+    /// §6.3 for one request, in list order, read as §6.3 r6: an ended
+    /// request only does r1; any other runs tracking, r2, r3–r4, then r5
+    /// if it is playing at that point (one started by r3 included). r4 and
+    /// r5 read the record of the current id, which r3 may have changed to
+    /// the variant (§7 r6).
     fn update_one(
         &mut self,
         world: &mut dyn SoundWorld,
@@ -779,7 +1024,7 @@ impl SoundSystem {
         let id = self.req(s).id;
         let Some(e) = self.table.get(id) else { return };
         let row = e.row.clone();
-        // r1. Reading: the pending fade ends with its end volume.
+        // r1. A restarted loop waits for the next update.
         if self.req(s).state == RequestState::Ended {
             let r = self.req_mut(s);
             if row.looped != 0 && row.duration == 0 && !r.stop {
@@ -789,11 +1034,11 @@ impl SoundSystem {
                 }
             } else {
                 self.free(s);
-                return;
             }
+            return;
         }
         // §6.4 r1.
-        if self.settings.tracking_option && row.tracking != 0 && !self.req(s).units.is_empty() {
+        if self.settings.game_loaded && row.tracking != 0 && !self.req(s).units.is_empty() {
             self.track(world, s);
         }
         // r2.
@@ -805,82 +1050,77 @@ impl SoundSystem {
                 r.fade = None;
             }
         }
-        let was_playing = r.state == RequestState::Playing;
         let due = now >= r.start_tick && r.volume != 0;
-        let audible = self.audible(id);
-        let in_range = self.req(s).dist2 <= self.max2(id);
         // r3.
         if self.req(s).state == RequestState::Waiting
             && due
-            && audible
-            && in_range
+            && self.audible(id)
+            && self.req(s).dist2 <= self.max2(id)
             && self.instance_rules(s, &row)
         {
-            self.fade_in(s, &row, now);
-            if self.start_channel(world, queue, now, s) {
-                self.req_mut(s).state = RequestState::Playing;
-            }
+            self.start_with_fade_in(world, queue, now, s, &row);
         }
-        // r4.
+        // r4, with the current id's record.
+        let id = self.req(s).id;
+        let Some(e) = self.table.get(id) else { return };
+        let row = e.row.clone();
         let r = self.req(s);
         if due && r.channel.is_none() && row.looped == 0 {
-            let loading = row.async_only != 0
-                && self
-                    .table
-                    .get(r.variant)
-                    .is_some_and(|e| e.load == LoadState::Pending);
+            let loading = row.async_only != 0 && e.load == LoadState::Pending;
             if !loading {
                 removal.push(s);
             }
         }
-        // r5.
-        if was_playing && self.req(s).state == RequestState::Playing {
-            let r = self.req(s);
+        // r5 (the `Duration` test is unsigned).
+        if r.state == RequestState::Playing {
             let over = row.duration > 0 && now.wrapping_sub(r.start_tick) > u32::from(row.duration);
-            if over || !audible || !in_range {
+            if over || !self.audible(id) || r.dist2 > self.max2(id) {
                 self.stop_channel(s, queue, now, "end");
             } else {
-                let v = r.variant;
                 self.send(queue, now, s);
-                if let Some(e) = self.table.get_mut(v) {
-                    if e.load == LoadState::Loaded {
-                        e.last_use = now;
-                    }
+                if self
+                    .table
+                    .get(id)
+                    .is_some_and(|e| e.load == LoadState::Loaded)
+                {
+                    self.stamp(id, now);
                 }
             }
         }
     }
 
-    /// §6.4 r1: nearest unit's position; occlusion toward the units' mean
-    /// by at most 0.05.
+    /// §6.4 r1, r4: position of the nearest unit (unclamped squared length,
+    /// strictly nearer replaces, so the earlier unit in the list wins a
+    /// tie); occlusion toward the units' mean by at most 0.05.
     fn track(&mut self, world: &mut dyn SoundWorld, s: usize) {
         let r = self.req(s);
         let id = r.id;
-        let mut nearest: Option<([f32; 3], f32)> = None;
+        let mut nearest: Option<([f32; 3], f32, f32)> = None;
         let mut sum = 0.0f32;
         let units = r.units.clone();
         for &u in &units {
-            if let Some((p, d2)) = Self::unit_position(world, u) {
-                if nearest.is_none_or(|(_, n)| d2 < n) {
-                    nearest = Some((p, d2));
+            if let Some((p, d2)) = Self::unit_position(world, u, id) {
+                let len2 = p[0] * p[0] + p[1] * p[1];
+                if nearest.is_none_or(|(_, _, n)| len2 < n) {
+                    nearest = Some((p, d2, len2));
                 }
             }
             sum += self.unit_occlusion(world, id, u);
         }
         let target = sum / units.len() as f32;
         let r = self.req_mut(s);
-        if let Some((p, d2)) = nearest {
+        if let Some((p, d2, _)) = nearest {
             r.pos = p;
             r.dist2 = d2;
         }
         r.occlusion = if r.occlusion < target {
-            (r.occlusion + 0.05).min(target)
+            (r.occlusion + OCCLUSION_STEP).min(target)
         } else {
-            (r.occlusion - 0.05).max(target)
+            (r.occlusion - OCCLUSION_STEP).max(target)
         };
     }
 
-    /// §6.3 r3.1–r3.2. Returns whether the request may start.
+    /// §6.3 r3.1–r3.2 (r9). Returns whether the request may start.
     fn instance_rules(&mut self, s: usize, row: &d2_data::sounds::SoundRow) -> bool {
         let r = self.req(s);
         let id = r.id;
@@ -927,33 +1167,53 @@ impl SoundSystem {
         true
     }
 
-    /// §6.3 r3.3.
-    fn fade_in(&mut self, s: usize, row: &d2_data::sounds::SoundRow, now: u32) {
+    /// §6.3 r3.3–r3.4 with r7–r8: a stored resume offset (≠ 0) becomes
+    /// the start offset with a 3-tick fade-in, else `Fade In` without a
+    /// running fade or flag bit 1 gives a `Fade In`-tick one. A fade-in
+    /// writes volume 0 before the start; only a successful start sets the
+    /// fade back to the saved volume (a failed one leaves volume 0, the
+    /// original bug of r7).
+    fn start_with_fade_in(
+        &mut self,
+        world: &mut dyn SoundWorld,
+        queue: &mut TriggerQueue,
+        now: u32,
+        s: usize,
+        row: &d2_data::sounds::SoundRow,
+    ) {
         let r = self.req_mut(s);
-        let len = if let Some(off) = r.resume_offset.take() {
-            r.start_offset = off;
-            RESUME_FADE
+        let len = if r.resume_offset != 0 {
+            r.start_offset = std::mem::take(&mut r.resume_offset);
+            Some(RESUME_FADE)
         } else if row.fade_in > 0 && r.fade.is_none() && r.flags & FLAG_NO_FADE_IN == 0 {
-            u32::from(row.fade_in)
+            Some(u32::from(row.fade_in))
         } else {
-            return;
+            None
         };
-        r.fade = Some(Fade {
-            start: 0,
-            end: r.volume,
-            t0: now,
-            t1: now.wrapping_add(len),
-        });
-        r.volume = 0;
+        let saved = r.volume;
+        if len.is_some() {
+            r.volume = 0;
+        }
+        if self.start_channel(world, queue, now, s) {
+            let r = self.req_mut(s);
+            r.state = RequestState::Playing;
+            if let Some(len) = len {
+                r.fade = Some(Fade {
+                    start: 0,
+                    end: saved,
+                    t0: now,
+                    t1: now.wrapping_add(len),
+                });
+            }
+        }
     }
 
     // ------------------------------------------------------------ §7
 
-    /// `0x004E01B0` (§7). Which record a variant start reads:
-    /// TODO(spec: audio/sound-table.md §7): after a variant pick, d2rs
-    /// reads the variant's record for the sample (load state, `Stream`,
-    /// `Async Only`, `Loop`, blocks, `Stereo`) and the requested id's
-    /// record for everything else.
+    /// `0x004E01B0` (§7, `sound-table-2.md` §17). The variant pick
+    /// overwrites the request's id before the duplicate test; the history
+    /// goes on the record of the id before the pick; everything after the
+    /// pick reads the variant's record (§7 r6).
     fn start_channel(
         &mut self,
         world: &mut dyn SoundWorld,
@@ -969,13 +1229,10 @@ impl SoundSystem {
         } else {
             self.table.pick_variant(id, &mut |n| Self::roll(world, n))
         };
-        self.req_mut(s).variant = variant;
-        let dup = self.channels.iter().flatten().any(|c| {
-            let q = self.req(c.request);
-            c.id == variant
-                && !q.stop
-                && start_tick.wrapping_sub(q.start_tick) <= 1
-                && q.priority >= priority
+        self.req_mut(s).id = variant;
+        let dup = self.playing_channel_of(variant).is_some_and(|c| {
+            let q = self.req(self.channels[c].as_ref().expect("busy").request);
+            !q.stop && start_tick.wrapping_sub(q.start_tick) <= 1 && q.priority >= priority
         });
         if dup {
             return false;
@@ -986,49 +1243,31 @@ impl SoundSystem {
             self.errors.push(SoundError::OutOfTable(variant));
             return false;
         };
+        let stream = e.row.stream != 0;
+        if !stream {
+            let sync = e.row.async_only == 0;
+            self.load(variant, sync, false, now);
+            let e = self.table.get(variant).expect("in table");
+            if e.load != LoadState::Loaded {
+                return false;
+            }
+        }
+        let e = self.table.get(variant).expect("in table");
         let vrow = e.row.clone();
         let block_count = e.block_count;
-        if e.failed {
-            return false;
-        }
-        let sample = if vrow.stream != 0 {
-            // TODO(spec: audio/sound-table.md §7 r5): what a stream that
-            // fails to open does; d2rs treats it as a failed file.
-            let s = self.bank.samples(SoundId(variant as u32));
-            if s.is_none() {
-                self.table.get_mut(variant).expect("in table").failed = true;
-            }
-            s
-        } else if e.load == LoadState::Loaded {
-            e.sample.clone()
-        } else if vrow.async_only != 0 {
-            self.begin_async(variant);
-            None
-        } else {
-            let s = self.bank.samples(SoundId(variant as u32));
-            let e = self.table.get_mut(variant).expect("in table");
-            match &s {
-                Some(x) => {
-                    e.sample = Some(x.clone());
-                    e.load = LoadState::Loaded;
-                }
-                None => e.failed = true,
-            }
-            s
-        };
-        let Some(sample) = sample else { return false };
+        // r3, r7: the kind is the variant's `Stereo` (after the format
+        // check of a load); slots match by equal kind only.
         let stereo = vrow.stereo != 0;
-        // r3.
         let want = if stereo {
             ChannelKind::Stereo
         } else {
             ChannelKind::Plain
         };
-        let fits = |k: ChannelKind| k == ChannelKind::Any || k == want;
-        let mut slot = (0..CHANNELS).find(|&c| fits(self.layout[c]) && self.channels[c].is_none());
+        let fits = |c: usize| MODE0_LAYOUT[c] == want;
+        let mut slot = (0..CHANNELS).find(|&c| fits(c) && self.channels[c].is_none());
         if slot.is_none() {
             let mut victim: Option<usize> = None;
-            for c in (0..CHANNELS).filter(|&c| fits(self.layout[c])) {
+            for c in (0..CHANNELS).filter(|&c| fits(c)) {
                 let Some(ch) = &self.channels[c] else {
                     continue;
                 };
@@ -1043,20 +1282,39 @@ impl SoundSystem {
                 let vs = self.channels[c].as_ref().expect("busy").request;
                 let v = self.req(vs);
                 if priority > v.priority || (priority == v.priority && s > v.slot) {
-                    let pos = self.play_position_at(c, now);
-                    self.req_mut(vs).resume_offset = Some(pos);
                     self.stop_channel(vs, queue, now, "steal");
                     slot = Some(c);
                 }
             }
         }
         let Some(c) = slot else { return false };
-        // r4.
+        // `sound-table-2.md` §17 r1–r2: the sample is attached (cached) or
+        // the stream opens; a stream that fails to open fails the start
+        // with the slot left free and sets no file-failed flag.
+        let sample = if stream {
+            match self.bank.samples(SoundId(variant as u32)) {
+                Some(x) => x,
+                None => return false,
+            }
+        } else {
+            match self.table.get(variant).and_then(|e| e.sample.clone()) {
+                Some(x) => x,
+                None => return false,
+            }
+        };
+        // r4, r5, r8.
         let looped = vrow.looped != 0;
         let block_align = u64::from(sample.channels()) * 2;
+        let data = sample.frames() as u64 * block_align;
         let r = self.req(s);
-        let offset_frames = u64::from(r.start_offset) / block_align;
-        let (pre, vol, pan) = self.compute(s, stereo);
+        let offset_frames = if stream {
+            (u64::from(r.start_offset.wrapping_mul(4)) % data) / block_align
+        } else {
+            0
+        };
+        let loop_start =
+            (!stream && block_count == 1).then(|| (vrow.blocks[0] as u32).wrapping_mul(2));
+        let (_, vol, pan) = self.compute(s, stereo);
         let r = self.req(s);
         let cause = format!("sound {id}->{variant} h{}", r.handle);
         let trigger = Trigger {
@@ -1072,11 +1330,19 @@ impl SoundSystem {
             },
             cause,
         };
-        let last_sent = (pre, r.occlusion, r.pos);
+        let occlusion = r.occlusion;
         let cue = queue.push(Cue::Start(trigger));
+        if offset_frames != 0 || loop_start.is_some() || occlusion != 0.0 {
+            queue.push(Cue::Device(DeviceChange {
+                tick: now,
+                target: cue,
+                start_frame: Some(offset_frames),
+                loop_start: loop_start.map(|b| u64::from(b) / block_align),
+                occlusion: occlusion.to_bits(),
+            }));
+        }
         self.channels[c] = Some(Channel {
             request: s,
-            id: variant,
             cue,
             start_tick: now,
             offset_frames,
@@ -1085,10 +1351,12 @@ impl SoundSystem {
             block_align,
             looped,
             stereo,
-            loop_start: (block_count == 1).then(|| (vrow.blocks[0] as u32).wrapping_mul(2)),
+            stream,
+            loop_start,
             vol,
             pan,
-            last_sent,
+            last_sent: None,
+            device_occlusion: occlusion,
         });
         self.req_mut(s).channel = Some(c);
         true
@@ -1097,29 +1365,46 @@ impl SoundSystem {
     /// Frames played on channel `c` by tick `now` (d2rs's model: elapsed
     /// sound ticks × 40 ms at the file rate).
     ///
-    /// TODO(spec: audio/sound-table.md §6.1, §7 r3): when 1.14d's channel
-    /// upkeep sees a buffer finish, and the play position it saves on a
-    /// steal, come from the device; d2rs derives both from the tick.
+    /// PROVISIONAL (specs/audio/sound-table.md §6.6 r3, OQ 12): 1.14d's
+    /// upkeep sees a buffer finish when the voice service thread (50 ms
+    /// wall-clock passes) has seen the end, and the play position it saves
+    /// comes from the device; d2rs derives both from the tick (ended at the
+    /// first upkeep with elapsed ticks × 40 ms ≥ the sample's duration);
+    /// settled by recording ST-4.
     fn played_frames(ch: &Channel, now: u32) -> u64 {
         u64::from(now.wrapping_sub(ch.start_tick)) * TICK_MS * ch.rate / 1000
     }
 
-    /// The play position in bytes saved as a resume offset (§7 r3).
-    fn play_position_at(&self, c: usize, now: u32) -> u32 {
+    /// The play position saved as a resume offset (`0x005159B0`, §7 r8):
+    /// for a stream, the bytes of `data` played (capped at the data size;
+    /// a looping stream wraps) in 4-byte units; 0 for every other voice.
+    fn resume_position(&self, c: usize, now: u32) -> u32 {
         let ch = self.channels[c].as_ref().expect("busy");
+        if !ch.stream {
+            return 0;
+        }
         let mut f = ch.offset_frames + Self::played_frames(ch, now);
         if ch.looped && ch.frames > 0 {
             f %= ch.frames;
         } else {
             f = f.min(ch.frames);
         }
-        (f * ch.block_align) as u32
+        ((f * ch.block_align) >> 2) as u32
     }
 
+    /// The stop `0x004DF7B0` (§6.6 r1): the play position becomes the
+    /// resume offset, the voice stops, the request ends and the slot is
+    /// freed. A steal (§7 r3) does the same.
     fn stop_channel(&mut self, s: usize, queue: &mut TriggerQueue, now: u32, why: &str) {
+        let Some(c) = self.req(s).channel else {
+            self.req_mut(s).state = RequestState::Ended;
+            return;
+        };
+        let resume = self.resume_position(c, now);
         let r = self.req_mut(s);
         r.state = RequestState::Ended;
-        let Some(c) = r.channel.take() else { return };
+        r.channel = None;
+        r.resume_offset = resume;
         let handle = r.handle;
         if let Some(ch) = self.channels[c].take() {
             queue.push(Cue::Stop(Stop {
@@ -1130,10 +1415,11 @@ impl SoundSystem {
         }
     }
 
-    /// Channel upkeep: a one-shot channel whose sample has played to its
-    /// end frees itself and its request ends (no stop cue: the voice ends
+    /// Channel upkeep `0x004DF890` (§6.6 r2): a non-`Loop` channel whose
+    /// sample has played to its end frees itself and its request ends,
+    /// with the stream's play position saved (no stop cue: the voice ends
     /// by itself in the mixer).
-    fn upkeep(&mut self, _queue: &mut TriggerQueue, now: u32) {
+    fn upkeep(&mut self, now: u32) {
         for c in 0..CHANNELS {
             let Some(ch) = &self.channels[c] else {
                 continue;
@@ -1142,19 +1428,21 @@ impl SoundSystem {
                 continue;
             }
             let s = ch.request;
+            let resume = self.resume_position(c, now);
             self.channels[c] = None;
             if let Some(r) = self.slots[s].as_mut() {
                 r.channel = None;
                 r.state = RequestState::Ended;
+                r.resume_offset = resume;
             }
         }
     }
 
     // ------------------------------------------------------------ §8
 
-    /// The §8.2 chain for request `s`: (v after r5, sent volume, pan).
-    /// Mixer mode 0 (§9: modes 1–2 are not reproduced; r6 is
-    /// [`super::volume::positional_bias`], unused).
+    /// The §8.2 chain for request `s` with its current id's record: (v
+    /// after r5, sent volume, pan). Mixer mode 0 (§9: modes 1–2 are not
+    /// reproduced; r6 is [`super::volume::positional_bias`], unused).
     fn compute(&self, s: usize, stereo: bool) -> (i32, i32, i32) {
         let r = self.req(s);
         let Some(e) = self.table.get(r.id) else {
@@ -1183,24 +1471,35 @@ impl SoundSystem {
         (pre, v, pan)
     }
 
-    /// §8.2 r7–r11 for a playing request: send unless unchanged.
+    /// §8.2 r7–r11 for a playing request: send unless unchanged; the
+    /// occlusion goes to the device with it (§8.3 r3).
     fn send(&mut self, queue: &mut TriggerQueue, now: u32, s: usize) {
         let Some(c) = self.req(s).channel else { return };
         let stereo = self.channels[c].as_ref().is_some_and(|ch| ch.stereo);
         let (pre, vol, pan) = self.compute(s, stereo);
         let r = self.req(s);
         let key = (pre, r.occlusion, r.pos);
-        let handle = r.handle;
+        let (handle, occlusion) = (r.handle, r.occlusion);
         let Some(ch) = self.channels[c].as_mut() else {
             return;
         };
-        if ch.last_sent == key {
+        if ch.last_sent == Some(key) {
             return;
         }
-        ch.last_sent = key;
+        ch.last_sent = Some(key);
         ch.vol = vol;
         if !stereo {
             ch.pan = pan;
+        }
+        if ch.device_occlusion != occlusion {
+            ch.device_occlusion = occlusion;
+            queue.push(Cue::Device(DeviceChange {
+                tick: now,
+                target: ch.cue,
+                start_frame: None,
+                loop_start: None,
+                occlusion: occlusion.to_bits(),
+            }));
         }
         queue.push(Cue::Param(ParamChange {
             tick: now,
@@ -1210,6 +1509,26 @@ impl SoundSystem {
             cause: format!("update h{handle}"),
         }));
     }
+}
+
+/// Distance² for ordering and range: each axis clamped to ±2,000, z not in
+/// it (`0x004B98F0`, §8.1 r1).
+fn dist2(x: f32, y: f32) -> f32 {
+    let cx = x.clamp(-AXIS_CLAMP, AXIS_CLAMP);
+    let cy = y.clamp(-AXIS_CLAMP, AXIS_CLAMP);
+    cx * cx + cy * cy
+}
+
+/// The river point of 2599 `object_river` (§8.1 r1, River): with P = (a,
+/// b) and U = (c, e), t = f32((b − 2a − c/2 − e) / −2.5); U' = (trunc(t),
+/// trunc(f32(b − 2·(a − t)))): the foot of P on the slope −1/2 line
+/// through U.
+pub fn river_point(p: (i32, i32), u: (i32, i32)) -> (i32, i32) {
+    let (a, b) = (f64::from(p.0), f64::from(p.1));
+    let (c, e) = (f64::from(u.0), f64::from(u.1));
+    let t = ((b + -2.0 * a - c * 0.5 - e) / -2.5) as f32;
+    let y = (b - 2.0 * (a - f64::from(t))) as f32;
+    (ftol(t), ftol(y))
 }
 
 /// [`SoundSystem`] with a world: the [`SoundCalls`] surface the trigger
@@ -1307,40 +1626,41 @@ impl SoundSystem {
             .any(|r| is_music_path(r.id) && r.state != RequestState::Ended)
     }
 
-    /// `0x004B9D50`: the play position (bytes, d2rs's tick model, see
-    /// [`Self::channel_loop_start`]) of the first playing request of `id`
-    /// in list order.
-    ///
-    /// TODO(spec: audio/environment.md open question 2): the units of the
-    /// position and whether `id` is the requested id or the variant; d2rs
-    /// matches the requested id.
+    /// `0x004B9D50`: the play position of the request with id `id`
+    /// (`audio/environment.md` §1 r6): the first request of the active
+    /// list whose **current** id is `id`, if it is playing; the position
+    /// is `0x005159B0`'s, in 4-byte units (§7 r8: a frame of a 16-bit
+    /// stereo song; 0 for a non-stream voice). A request without a channel
+    /// has none (1.14d: fatal `0x45A`, never asked).
     pub fn play_position(&self, id: i32) -> Option<u32> {
-        let r = self
-            .requests()
-            .find(|r| r.id == id && r.state == RequestState::Playing)?;
-        Some(self.play_position_at(r.channel?, self.tick))
+        let r = self.requests().find(|r| r.id == id)?;
+        if r.state != RequestState::Playing {
+            return None;
+        }
+        Some(self.resume_position(r.channel?, self.tick))
     }
 
-    /// `0x004B99A0(h, x, y, z)`: the request's position.
-    ///
-    /// TODO(spec: audio/sound-table.md §8.1): whether this also updates
-    /// distance² (+0x18); d2rs writes the position only.
+    /// `0x004B99A0(h, x, y, z)` (§5 r8): position := (x, y, z + 640) and
+    /// distance² recomputed from x, y (`0x004B98F0`); no unit is written.
     pub fn set_position(&mut self, h: Handle, x: i32, y: i32, z: i32) {
         if let Some(s) = self.handle_slot(h) {
-            self.req_mut(s).pos = [x as f32, y as f32, z as f32];
+            let (fx, fy) = (x as f32, y as f32);
+            let r = self.req_mut(s);
+            r.pos = [fx, fy, (f64::from(z) + f64::from(UNIT_Z)) as f32];
+            r.dist2 = dist2(fx, fy);
         }
     }
 
-    /// The requests attached to `unit` that have not ended, as (handle,
-    /// requested id).
-    ///
-    /// TODO(spec: audio/triggers.md §1 r6): the order of the unit's own
-    /// list (+0x78); d2rs uses the active list order.
+    /// `unit`'s request list (U +0x78, `triggers-2.md` §19 r1–r2, r6),
+    /// newest first, as (handle, current id): waiting, playing and
+    /// ended-not-yet-freed requests; a handle whose request was freed
+    /// reads id 0 (`0x004B9CA0`).
     pub fn unit_requests(&self, unit: UnitKey) -> Vec<(Handle, i32)> {
-        self.requests()
-            .filter(|r| r.state != RequestState::Ended && r.units.contains(&unit))
-            .map(|r| (r.handle, r.id))
-            .collect()
+        self.unit_lists.get(&unit).map_or_else(Vec::new, |l| {
+            l.iter()
+                .map(|&h| (h, self.request_by_handle(h).map_or(0, |r| r.id)))
+                .collect()
+        })
     }
 
     pub fn enabled(&self) -> bool {

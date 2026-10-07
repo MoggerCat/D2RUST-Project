@@ -4,19 +4,22 @@
 //! (no Bevy, no float, no I/O) so it runs in CI without an audio device;
 //! [`output`] is the only Bevy/rodio edge.
 //!
-//! Original behavior the design leaves to unwritten owner specs is not
-//! invented. Each such place is a hook with the narrowest neutral behavior,
-//! marked `TODO(spec: <owner spec>)`:
+//! Original behavior lives behind hooks, each owned by its spec:
 //! - which events make sounds and their parameters ([`CueSource`]):
-//!   `audio/triggers.md`, `audio/environment.md`;
+//!   `audio/triggers.md`, `audio/triggers-2.md` §21, `audio/environment.md`
+//!   ([`driver::SoundDriver`]);
 //! - sound ids to files, variants and their RNG ([`SoundBank`]):
-//!   `audio/sound-table.md`;
-//! - volume and pan curves ([`GainCurve`], placeholder [`UnityGain`]):
-//!   `audio/sound-table.md`;
-//! - voice limits, stealing, repeat suppression ([`VoicePolicy`],
-//!   placeholder [`Unlimited`]): `audio/sound-table.md`;
-//! - the WAV decode giving [`Sound`] ([`pool::D2Wav`]; the pool
-//!   reading and keeping each file once is ours): `formats/wav.md`.
+//!   `audio/sound-table.md` §1–§7, §13, `audio/sound-table-2.md` §16–§17
+//!   ([`sound_table`]);
+//! - volume and pan curves ([`GainCurve`]): `audio/sound-table.md` §8.3
+//!   ([`sound_table::DeviceGain`]; [`UnityGain`] is the neutral curve of
+//!   the hook-only play mode);
+//! - voice limits, stealing, repeat suppression ([`VoicePolicy`]):
+//!   `audio/sound-table.md` §6–§7, decided by [`sound_table::SoundSystem`]
+//!   before a cue is queued, so the core admits every start
+//!   ([`Unlimited`]);
+//! - the WAV decode giving [`Sound`] ([`pool::D2Wav`], `formats/wav.md`
+//!   §5; the pool reading and keeping each file once is ours).
 
 pub mod calls;
 pub mod driver;
@@ -145,6 +148,9 @@ pub enum Cue {
     Start(Trigger),
     Stop(Stop),
     Param(ParamChange),
+    /// Device state of a started voice that the voice log does not
+    /// record.
+    Device(DeviceChange),
 }
 
 impl Cue {
@@ -153,8 +159,26 @@ impl Cue {
             Cue::Start(t) => t.tick,
             Cue::Stop(s) => s.tick,
             Cue::Param(p) => p.tick,
+            Cue::Device(d) => d.tick,
         }
     }
+}
+
+/// Device-side state of a playing voice (`sound-table.md` §7 r4, r8,
+/// §8.3 r3): where it starts, where it loops to, and the occlusion the
+/// device applies to its volume. Not a voice-log record: the log keeps the
+/// volume and pan sent (§8.2), so these change only the mix.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DeviceChange {
+    pub tick: u32,
+    pub target: CueId,
+    /// First frame played (`Some` only right after the start: the stream
+    /// start offset of §7 r8).
+    pub start_frame: Option<u64>,
+    /// Frame a looping voice wraps to (§7 r4: `Block 1` × 2 bytes).
+    pub loop_start: Option<u64>,
+    /// Occlusion (request +0x20, §6.4) as `f32` bits.
+    pub occlusion: u32,
 }
 
 /// Pending cues in emission order (`audio.md` §A2). Cues are released by
@@ -200,13 +224,14 @@ impl TriggerQueue {
 }
 
 /// The narrow seam through which sound-bearing sim and UI events reach the
-/// audio core. The bridge implements it later: its rule functions (one per
-/// cause class) turn snapshots and events into cues and push them in
-/// emission order.
+/// audio core: its rule functions (one per cause class) turn snapshots and
+/// events into cues and push them in emission order.
 ///
-/// TODO(spec: audio/triggers.md, audio/environment.md): which events make
-/// sounds and with which parameters (`audio.md` §B2, §B4–§B6). Until then
-/// nothing in the client implements this.
+/// Which events make requests and with which parameters is
+/// `audio/triggers.md` (per cause class), `audio/triggers-2.md` §21 (the
+/// inputs each rule reads) and `audio/environment.md` (music, ambience,
+/// rain, level lines); [`driver::SoundDriver`] implements it over the
+/// sound layer.
 pub trait CueSource {
     /// Push every cue produced since the last call, in emission order.
     fn drain_cues(&mut self, queue: &mut TriggerQueue);
@@ -214,15 +239,24 @@ pub trait CueSource {
 
 /// Sound ids to files and decoded samples.
 ///
-/// TODO(spec: audio/sound-table.md): the `sounds.txt` mapping, variants
-/// and their client RNG (`audio.md` §B3); TODO(spec: formats/wav.md): the
-/// decode giving [`Sound`] (`audio.md` §A1, §B1).
+/// The id → path rule, groups and variants are `audio/sound-table.md`
+/// §1, §3, §4 (`sound_table::SoundPaths`, `SoundTableData::pick_variant`
+/// on the client seed of §4 r5); the cache that decides when a sample is
+/// available is `audio/sound-table-2.md` §16–§17; the decode giving
+/// [`Sound`] is `formats/wav.md` §5 ([`pool::D2Wav`]).
 pub trait SoundBank {
     /// Canonical archive path of the sound's file, or `None` if the id
     /// names no file.
     fn file(&self, id: SoundId) -> Option<Arc<str>>;
     /// Decoded samples of the sound's file, or `None` if it is missing.
     fn samples(&self, id: SoundId) -> Option<Arc<Sound>>;
+    /// The file's size in bytes as the archive reports it (the
+    /// uncompressed WAV), charged by the sample cache
+    /// (`sound-table-2.md` §16 r5). `None` when the bank does not know it;
+    /// the cache then charges the decoded data plus a 44-byte header.
+    fn file_size(&self, _id: SoundId) -> Option<u64> {
+        None
+    }
 }
 
 /// What the voice policy decides for a start.
@@ -237,13 +271,16 @@ pub enum Admit {
 
 /// Voice limits, stealing and repeat suppression (`audio.md` §A3).
 ///
-/// TODO(spec: audio/sound-table.md): the original's rules (§B3). The
-/// placeholder [`Unlimited`] admits every start.
+/// The original's rules (`audio/sound-table.md` §6.2 r1, §7 r1, r3, r7:
+/// 4 stereo and 12 mono channels, priority stealing, duplicate
+/// suppression) are applied by [`sound_table::SoundSystem`] before a cue
+/// is queued, so with it the core runs [`Unlimited`], which admits every
+/// start.
 pub trait VoicePolicy {
     fn admit(&mut self, trigger: &Trigger, playing: &[Voice]) -> Admit;
 }
 
-/// Placeholder policy: no limit, no stealing, no suppression.
+/// Admits every start: no limit, no stealing, no suppression.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Unlimited;
 
@@ -333,6 +370,7 @@ impl AudioEngine {
                 Cue::Start(t) => self.start(id, t),
                 Cue::Stop(s) => self.stop(s),
                 Cue::Param(p) => self.param(p),
+                Cue::Device(d) => self.device(d),
             }
         }
         mix(&mut self.voices)
@@ -408,7 +446,13 @@ impl AudioEngine {
     }
 
     /// Stopping a voice that is not playing (ended, never started) logs
-    /// nothing. TODO(spec: audio/sound-table.md): confirm against §B7.
+    /// nothing. The sound layer sends a stop only for a channel it holds
+    /// (`sound-table.md` §6.6 r1: the stop of §6.2 r2 and §6.3 r5, the
+    /// steal of §7 r3; a fade to 0 of §5 r5 / r7 and the detach and group
+    /// stops of `triggers.md` §1 r3–r4 reach a voice only through it), so
+    /// a stop that finds no voice is one whose one-shot sample already
+    /// ran out in the mixer, which the original's device also stops
+    /// without a sound (§6.6 r4: silence past the end).
     fn stop(&mut self, s: Stop) {
         let mut stopped = Vec::new();
         self.voices.retain(|v| {
@@ -435,11 +479,27 @@ impl AudioEngine {
         }
     }
 
+    /// `sound-table.md` §7 r4, r8, §8.3 r3: start frame, loop start and
+    /// occlusion of a playing voice; its gains are recomputed. Not logged.
+    fn device(&mut self, d: DeviceChange) {
+        let Some(v) = self.voices.iter_mut().find(|v| v.id() == d.target) else {
+            return;
+        };
+        v.set_device(d.start_frame, d.loop_start, f32::from_bits(d.occlusion));
+        match self
+            .gain
+            .gains_occluded(v.params().vol, v.params().pan, v.occlusion())
+        {
+            Ok(g) => v.set_gains(g),
+            Err(e) => self.errors.push(e),
+        }
+    }
+
     fn param(&mut self, p: ParamChange) {
         let Some(v) = self.voices.iter_mut().find(|v| v.id() == p.target) else {
             return;
         };
-        match self.gain.gains(p.vol, p.pan) {
+        match self.gain.gains_occluded(p.vol, p.pan, v.occlusion()) {
             Ok(g) => {
                 v.set_params(p.vol, p.pan, g);
                 self.log.push(VoiceEvent {

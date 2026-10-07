@@ -1,4 +1,7 @@
 // Spec: specs/client/audio.md (A1 decode path, A3 scheduler), specs/client/assets.md (A5 sounds)
+// Spec: specs/audio/sound-table.md (§1–§7, §13 sound table hooks), specs/audio/sound-table-2.md (§16–§17)
+// Spec: specs/audio/triggers.md, specs/audio/triggers-2.md (§21 driver inputs)
+// Spec: specs/formats/wav.md (§5 decoder hook)
 //! The play mode's audio: the audio core ([`AudioEngine`]) reading its
 //! samples through the sound pool ([`SoundPool`], `audio.md` §A1: each
 //! file read and decoded once, kept under the `sounds` budget), driven
@@ -8,13 +11,16 @@
 //! ([`crate::audio::output`]) mixes on the audio thread when the app has
 //! an audio device.
 //!
-//! Plumbing only. Every original rule is a hook with the narrowest
-//! answer: which events make sounds ([`CueSource`], [`NoCues`]:
-//! TODO(spec: audio/triggers.md)), sound ids to files ([`SoundTable`],
-//! [`NoSoundTable`]: TODO(spec: audio/sound-table.md)), the WAV decode
-//! ([`WavDecoder`], [`NoWavDecoder`]: TODO(spec: formats/wav.md §B1)),
-//! gain and voice policy (the core's placeholders). With those, the app
-//! starts no voice.
+//! Plumbing only; the original rules sit behind hooks. With a sound table
+//! ([`AudioParts::original`]) the cues come from the sound layer
+//! ([`SoundDriver`]: requests per `audio/triggers.md` with the inputs of
+//! `audio/triggers-2.md` §21; channels, stealing and volume / pan per
+//! `audio/sound-table.md` §5–§8), sound ids map to files by
+//! `sound-table.md` §1, §3, §4 ([`SoundTable`]), the WAV decode is
+//! `formats/wav.md` §5 ([`D2Wav`]) and the gain curve is §8.3
+//! ([`DeviceGain`]). [`AudioParts::unspecified`] keeps every hook at its
+//! neutral implementation ([`NoCues`], [`NoSoundTable`], [`NoWavDecoder`],
+//! [`UnityGain`], [`Unlimited`]): the app then starts no voice.
 
 use std::sync::{Arc, Mutex};
 
@@ -36,15 +42,16 @@ use crate::audio::{
 use crate::bridge::BridgeResource;
 use crate::world_view::UiSounds;
 
-/// Sound ids to archive paths.
-///
-/// TODO(spec: audio/sound-table.md) (`audio.md` §B3): the `sounds.txt`
-/// mapping and its variants.
+/// Sound ids to archive paths: the `sounds.txt` mapping of
+/// `audio/sound-table.md` §1 (id = data-line index) and §3 (path prefix by
+/// id range, then `FileName`); variants are picked by the sound layer (§4
+/// r3) before an id reaches this hook. The implementation is
+/// [`crate::audio::sound_table::SoundPaths`].
 pub trait SoundTable: Send + Sync {
     fn file(&self, id: SoundId) -> Option<Arc<str>>;
 }
 
-/// No sound table yet: no id names a file.
+/// No sound table (the hook-only play mode): no id names a file.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct NoSoundTable;
 
@@ -54,17 +61,18 @@ impl SoundTable for NoSoundTable {
     }
 }
 
-/// No WAV decoder yet: every decode is an error naming the spec.
+/// No WAV decoder (the hook-only play mode): every decode is an error. The
+/// decoder of `formats/wav.md` §5 is [`D2Wav`].
 #[derive(Debug, Clone, Copy, Default)]
 pub struct NoWavDecoder;
 
 impl WavDecoder for NoWavDecoder {
     fn decode(&self, _: &CanonicalPath, _: &[u8]) -> Result<Sound, String> {
-        Err("no WAV decoder: TODO(spec: formats/wav.md §B1)".into())
+        Err("no WAV decoder in this play mode (formats/wav.md §5 is D2Wav)".into())
     }
 }
 
-/// No cue source yet: no event makes a sound.
+/// No cue source (the hook-only play mode): no event makes a sound.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct NoCues;
 
@@ -86,6 +94,13 @@ impl SoundBank for PoolBank {
         self.table.file(id)
     }
 
+    /// The file's byte size as read, charged by the sample cache
+    /// (`sound-table-2.md` §16 r5, `formats/wav.md` §5).
+    fn file_size(&self, id: SoundId) -> Option<u64> {
+        let file = self.table.file(id)?;
+        self.pool.lock().ok()?.file_size(&file)
+    }
+
     fn samples(&self, id: SoundId) -> Option<Arc<Sound>> {
         let file = self.table.file(id)?;
         let loaded = self.pool.lock().ok()?.load(&file);
@@ -101,8 +116,8 @@ impl SoundBank for PoolBank {
     }
 }
 
-/// The parts of the play mode's audio; each hook defaults to its
-/// placeholder.
+/// The parts of the play mode's audio; each hook defaults to its neutral
+/// implementation.
 pub struct AudioParts {
     pub source: Arc<dyn FileSource>,
     pub decoder: Box<dyn WavDecoder>,
@@ -118,7 +133,7 @@ pub struct AudioParts {
 }
 
 impl AudioParts {
-    /// Every hook at its placeholder over `source` (the user's archives,
+    /// Every hook at its neutral implementation over `source` (the user's archives,
     /// or an empty source without game files).
     pub fn unspecified(source: Arc<dyn FileSource>) -> Self {
         AudioParts {
