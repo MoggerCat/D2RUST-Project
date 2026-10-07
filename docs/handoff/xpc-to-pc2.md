@@ -11,4 +11,4 @@ direction is `xpc-to-pc1.md`.
 
 ## Open
 
-- `world/cube.md` §1: says `server-messages.tsv` marks 0x77 `out`; since PC 1 commit e2fa8c2 it is `sim` (single player sends it too; `sim/intents-events.md` §4 rule 4). Update the sentence.
+- ~~`world/cube.md` §1: says `server-messages.tsv` marks 0x77 `out`; since PC 1 commit e2fa8c2 it is `sim` (single player sends it too; `sim/intents-events.md` §4 rule 4). Update the sentence.~~ Done by PC 2 in `2a72110` (claude/spec-items).
