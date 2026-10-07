@@ -1176,7 +1176,6 @@ fn bit_7_merges_to_the_new_type() {
     assert!(kinds.iter().all(|&(k, _)| k == 2), "{kinds:?}");
 }
 
-// Covers: specs/drlg/wall-remap.md §2 r4
 /// Column `r4` is never read: the find step skips type-4 records, so a
 /// linked cell over a type-4 record finds nothing and builds its own.
 #[test]

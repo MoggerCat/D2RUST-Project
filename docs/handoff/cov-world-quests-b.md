@@ -7,22 +7,22 @@ the rule list was triaged from `tools/coverage.py` and the spec text.
 
 ## Rules covered (unit tier, before -> after, `tools/coverage.py`)
 
-| Spec | Before | After | Rules now claimed |
+| Spec (rules, unit-tier covered, base bf602bf) | Before | After | Rules now claimed |
 |---|---|---|---|
-| drlg/wall-remap.md | 4 / 7 | 7 / 7 | §2 r4, §edge r1, §edge r2 |
-| drlg/levels.md | 59 / 80 | 68 / 80 | §3 r7, §6 r2, §10 r6, §10 r7, §11.2 r1, §11.2 r3, §11.3 r2, §11.6 r2, §11.6 r3 |
-| drlg/outdoor.md | 78 / 82 | 79 / 82 | §12.2 |
-| drlg/rooms.md | 90 / 108 | 92 / 108 | §4.6 r9, §4.6 r11 |
-| render/blend-modes.md | 20 / 22 | 22 / 22 | §edge r7, §edge r8 |
-| render/draw-order-2.md | 43 / 55 | 51 / 55 | §11.3 text, §11.9 text, §11.9 r1-r3, §15.1 r3-r5 |
-| render/draw-order.md | 19 / 25 | 20 / 25 | §5 r4 |
-| render/unit-composite.md | 33 / 45 | 36 / 45 | §2 r4, §3 r2, §9 |
+| drlg/wall-remap.md (6) | 4 | 6 | §edge r1, §edge r2 (§2 r4 is exempt: claim dropped) |
+| drlg/levels.md (74) | 59 | 68 | §3 r7, §6 r2, §10 r6, §10 r7, §11.2 r1, §11.2 r3, §11.3 r2, §11.6 r2, §11.6 r3 |
+| drlg/outdoor.md (82) | 78 | 79 | §12.2 |
+| drlg/rooms.md (102) | 92 | 93 | §4.6 r11 |
+| render/blend-modes.md (22) | 20 | 22 | §edge r7, §edge r8 |
+| render/draw-order-2.md (53) | 43 | 50 | §11.3 text, §11.9 r1-r3, §15.1 r3-r5 (§11.9 text is exempt) |
+| render/draw-order.md (24) | 19 | 20 | §5 r4 |
+| render/unit-composite.md (43) | 33 | 36 | §2 r4, §3 r2, §9 |
 
 (Render tests live in `d2-client::rules`; DRLG tests in `d2-sim::drlg`.)
 
 ## Code fixes found by the tests
 
-1. `d2-sim` `Drlg::client_build_timer` (`drlg/rooms.md` §4.6 r9, r11): the
+1. (Superseded at rebase: bf602bf already fixed this with `BuildCursor`; my fix was dropped, only the r11 test remains.) `d2-sim` `Drlg::client_build_timer` (`drlg/rooms.md` §4.6 r9, r11): the
    cursor C "none" and the status-2 list's head node were one state
    (`None`), so a walk that ended on the head restarted at the first room
    next time instead of keeping the head (rule 6 reads the head's status 2).

@@ -402,7 +402,7 @@ fn step(w: &mut Weather, delta: (i32, i32)) {
     w.move_particles(&mut seed, &input).unwrap();
 }
 
-// Covers: specs/render/draw-order-2.md §11.9 text, §11.9 r1, §11.9 r2, §11.9 r3
+// Covers: specs/render/draw-order-2.md §11.9 r1, §11.9 r2, §11.9 r3
 #[test]
 fn particle_move_rain_vectors() {
     // f = float32(0 × 0.15 + 0.85); A = trunc(20 × f) = 17; ux = trunc(
