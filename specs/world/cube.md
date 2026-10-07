@@ -669,7 +669,7 @@ jump table, `0x00566AA8` op jump table, the two Pandemonium stubs at
    (0x200000) of its game-flags argument (`0x00530D4C`–`0x00530D59`;
    +0x70 = bit 20). The recorded single-player games show game type 3
    on every tick and S→C 0x01 u8@7 = 0 (u8@7 = (+0x74 ≠ 0)), so in
-   single player +0x6A = 3 and +0x74 = 0: §2's test 3 passes through
+   single player +0x6A = 3 and +0x74 = 0: §4's test 3 passes through
    its first term, so `ladder` cube records are usable in single
    player.
 4. RNG draws inside duplicate `0x0055A2A0`, item init `0x00557AB0`, item
