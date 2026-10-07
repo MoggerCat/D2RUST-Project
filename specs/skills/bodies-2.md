@@ -37,7 +37,7 @@
 | Edge cases & original bugs | 2109–2178 |
 | Test vectors | 2179–2216 |
 | Provenance | 2217–2232 |
-| Open questions | 2233–2260 |
+| Open questions | 2233–2262 |
 <!-- /index -->
 
 ## Summary
@@ -2257,3 +2257,5 @@ steps call them (`bodies.md` Randomness). Draws named here:
     a monster with a right skill.
 12. Recording: Whirlwind with one and two weapons: E param 4 and hits per
     do (§2.25 pacing).
+
+Implementation questions on §2.1, §2.12, §2.16, §2.19, §2.26, §6.8, §7.2 and §7.10, and Open question 11, are answered in `skills/bodies-3.md` §2.

@@ -4990,6 +4990,21 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
   axis).
 - `missiles/bodies.md` OQ1 / OQ3: Plague Javelin hit, cloud positions
   per tick (velocity 192 / 384, no extra << 8).
+- `sim/intents-events.md` OQ11: breakpoint, no new play: return address
+  one level up of `0x0053FB30` during a monster kill (which path sends the
+  0x65 in a kill tick).
+- `sim/intents-events.md` OQ13: breakpoint at join: caller of the first
+  0x48 in frame 2.
+- `skills/bodies-3.md` OQ1–4: Fetish Shaman / Baal Inferno (E param 1,
+  timers, missile frames per do of `0x005CC4E0`), Greater Mummy resurrect
+  (T mode, used skill, life after `0x005CCB10`), Sand Leaper jump (E
+  flags, path type, target per do of `0x005CB940`), Sand Maggot egg cast
+  (egg count, modes, `0x005CAFA0`).
+- `skills/bodies-4.md` OQ1–3: Royal Strike / Claws of Thunder charge
+  release (zigzag path points and missile seeds, `0x005D4870`,
+  `0x005D4150`), Overseer whip (transform rate and class, `0x005D1F70`),
+  imps on a barricade tower (state 143, type-5 event, release below 10 %
+  life, `0x005D1AB0`).
 
 ## 8. Lessons (problems met, fixes)
 
