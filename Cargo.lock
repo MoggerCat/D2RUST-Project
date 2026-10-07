@@ -2418,6 +2418,7 @@ dependencies = [
  "criterion",
  "d2-data",
  "d2-formats",
+ "d2-native",
  "d2-net",
  "d2-proto",
  "d2-server",
@@ -2501,6 +2502,7 @@ version = "0.0.0"
 dependencies = [
  "d2-data",
  "d2-formats",
+ "d2-native",
  "d2-net",
  "d2-proto",
  "d2-sim",

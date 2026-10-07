@@ -53,7 +53,11 @@ fn write_native(dir: &Path, p: &str, a: &NativeAsset) {
         NativeAsset::Dt1(x) => x.write(p, &view).unwrap(),
         NativeAsset::Pal(x) => x.write(p, &view).unwrap(),
         NativeAsset::Ds1(x) => {
-            put(dir, &format!("{p}.toml"), d2_native::toml_kinds::write_ds1(p, x).unwrap().as_bytes());
+            put(
+                dir,
+                &format!("{p}.toml"),
+                d2_native::toml_kinds::write_ds1(p, x).unwrap().as_bytes(),
+            );
             return;
         }
         NativeAsset::Tbl(x) => {
@@ -173,7 +177,11 @@ fn native_equals_mpq_assets_and_tables() {
     assert_eq!(a.soundenviron, b.soundenviron);
     for base in [0u32, 10_000, 20_000] {
         for id in base..base + 64 {
-            assert_eq!(a.strings.by_index(id), b.strings.by_index(id), "string {id}");
+            assert_eq!(
+                a.strings.by_index(id),
+                b.strings.by_index(id),
+                "string {id}"
+            );
         }
     }
 }

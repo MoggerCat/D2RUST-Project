@@ -1,10 +1,14 @@
 // Spec: specs/formats/mpq.md (archive set); specs/data/loading.md
+// Spec: specs/formats/native-assets.md §5 r3 (table source switch)
 //! The server's reads from the user's archives: the fixed-up table set
-//! and the DRLG files, through `d2_formats::mpq::ArchiveSet`.
+//! and the DRLG files, through `d2_formats::mpq::ArchiveSet`; and the same
+//! table set from a converted native folder ([`fixed_tables_native`]).
 
-use d2_data::bin;
+use d2_data::bin::{self, TableFiles};
 use d2_data::fixup::{self, FixedSet};
+use d2_formats::animdata::AnimData;
 use d2_formats::mpq::ArchiveSet;
+use d2_native::source::{NativeAsset, NativeSource};
 
 use super::tables::LevelTables;
 use super::{WorldDataError, WorldFiles};
@@ -17,13 +21,42 @@ pub fn reader(set: &ArchiveSet) -> impl FnMut(&str) -> Result<Vec<u8>, String> +
 /// Loads, fixes up and returns the live table set (`bin::load`,
 /// `AnimData.d2`, `fixup::apply`).
 pub fn fixed_tables(set: &ArchiveSet) -> Result<FixedSet, WorldDataError> {
-    let err = |table: &str, detail: String| WorldDataError::Table {
+    let anim = fixup::read_animdata(set).map_err(|e| err("AnimData.d2", e.to_string()))?;
+    fixed_tables_from(set, &anim)
+}
+
+fn err(table: &str, detail: String) -> WorldDataError {
+    WorldDataError::Table {
         table: table.to_owned(),
         detail,
+    }
+}
+
+/// [`fixed_tables`] over any table source and a loaded `AnimData.d2`.
+pub fn fixed_tables_from(
+    tables: &dyn TableFiles,
+    anim: &AnimData,
+) -> Result<FixedSet, WorldDataError> {
+    let data =
+        bin::load_from(tables, bin::DEFAULT_LANGUAGE).map_err(|e| err("bin", e.to_string()))?;
+    fixup::apply(&data, anim).map_err(|e| err("fixup", e.to_string()))
+}
+
+/// The fixed-up table set from a native folder (`native-assets.md` §5 r3):
+/// the native `.txt` compiled (mod patches and overrides applied) and the
+/// native `animdata.d2.tsv`.
+pub fn fixed_tables_native(src: &NativeSource) -> Result<FixedSet, WorldDataError> {
+    let tables = src
+        .tables(bin::DEFAULT_LANGUAGE)
+        .map_err(|e| err("bin", e.to_string()))?;
+    let path = "data/global/animdata.d2";
+    let anim = match src.read_native(path) {
+        Some(Ok(NativeAsset::AnimData(a))) => a,
+        Some(Ok(_)) => unreachable!("animdata path reads as animdata"),
+        Some(Err(e)) => return Err(err("AnimData.d2", e)),
+        None => return Err(err("AnimData.d2", format!("{path}: no native file"))),
     };
-    let data = bin::load(set, bin::DEFAULT_LANGUAGE).map_err(|e| err("bin", e.to_string()))?;
-    let anim = fixup::read_animdata(set).map_err(|e| err("AnimData.d2", e.to_string()))?;
-    fixup::apply(&data, &anim).map_err(|e| err("fixup", e.to_string()))
+    fixed_tables_from(&tables, &anim)
 }
 
 /// The level-type table views and every DRLG file, from the archives.
