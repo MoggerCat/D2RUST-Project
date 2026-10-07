@@ -452,7 +452,7 @@ fn swap_cursor_buffer() {
     assert_eq!(f.inv().update, vec![11, 10]);
 }
 
-// Covers: specs/items/inventory-moves.md §7.10 r3
+// Covers: specs/items/inventory-moves.md §7.10 r3, §7.10 r4
 #[test]
 fn swap_cursor_buffer_placement_fails() {
     let mut f = Fake::new();
@@ -462,6 +462,9 @@ fn swap_cursor_buffer_placement_fails() {
     assert_eq!(run(&mut f, &m32(0x1F, &[10, 11, 2, 3])), res::REFUSED);
     // The target already went to the cursor (no rollback).
     assert_eq!(f.inv().cursor, Some(11));
+    // C stays in mode 4, in no grid and not the cursor.
+    assert_eq!(f.it(10).mode, mode::CURSOR);
+    assert_eq!(f.it(11).mode, mode::CURSOR);
 }
 
 // ---- 0x20

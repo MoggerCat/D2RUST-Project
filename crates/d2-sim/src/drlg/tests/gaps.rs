@@ -311,8 +311,9 @@ fn spawn_room_allocates_and_generates_the_level_once() {
     assert_eq!(w.types.generated, [2]);
 }
 
-// Checks the first half of specs/drlg/levels.md edge case 4 only (no claim:
-// the "loop runs out" half cannot occur in this code).
+// The "loop runs out" half of the rule cannot occur in 1.14d (spec §10
+// step 2: k <= n matches), so the record-0 read is the whole behaviour.
+// Covers: specs/drlg/levels.md §edge-cases-original-bugs r4
 #[test]
 fn spawn_tile_without_match_reads_record_0() {
     let (mut w, mut d) = spawn_world(1);
