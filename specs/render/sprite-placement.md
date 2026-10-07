@@ -32,7 +32,7 @@
 | Edge cases & original bugs | 203–226 |
 | Test vectors | 227–241 |
 | Provenance | 242–262 |
-| Open questions | 263–283 |
+| Open questions | 263–323 |
 <!-- /index -->
 
 ## Summary
@@ -262,21 +262,61 @@ the two candidates; 1.14d code picks the second. No capture yet.
 
 ## Open questions
 
-1. ~~Index 0 inside DC6 runs / DT1 blocks~~: none in live data (§6); no
-   "opaque zero" needed.
-2. ~~DCC `variable0` parity~~: 0 in every live frame (§4).
-3. ~~DC6 `encoding`~~: 0 in every live file (§1).
-4. ~~Real-data vector~~: the end-game frames (`EndGame.dc6`,
-   `EndGame2.dc6`, `endgameok.dc6`) and the control panel frames
-   (`PANEL\ctrlpnl7.DC6`, `800ctrlpnl7.dc6`, `ctrlpnl_popbelt.DC6`) all
-   have offsets (0, 0); end-game rows in §Test vectors (draw positions
-   read at `0x0044E8C5`–`0x0044EB2E`). The control panel's draw (X, Y)
-   belongs to `client/ui.md`.
-5. ~~Can the DCC cache path build a cel another way~~: no (§3, cache
-   path). Open: when `0x006001F0` takes the cache branch, and whether
-   the 37 live DCC frames wider or taller than 256 (`GTTRLITA1HTH.dcc` 20
+1. Do live DC6 copy runs or DT1 block pixels contain index 0 (§6)? Settle
+   with a game-file count (`mpq-tool formats` extension: count zero bytes
+   inside DC6 runs, DT1 RLE runs and DT1 iso diamonds). If any exist,
+   `IndexFrame` needs an "opaque zero" representation.
+2. Is `variable0` of every live DCC frame even (§3, §4)? Same tool, one
+   count. An odd value would draw that frame top-down.
+3. Is the DC6 `encoding` field 0 in every live file? `0x006014C0` indexes
+   the drawer table `0x006E3688` by it and only entry 0 is a row drawer.
+   Same tool.
+4. Real-data vector: `offset_x/offset_y` of the `data\global\ui\menu\
+   endgame*.dc6` frames and of the control panel frames, to pin one
+   full-screen layout to exact rows (game-file read).
+5. Whether the DCC cache path (`0x006001F0` when the cel file pointer is
+   null) can hand the drawer a cel built some other way than `0x0060BFF0`
+   (e.g. a cached copy with changed fields). A Ghidra read of
+   `0x005FEC90`/`0x005FEC50` settles it.
+   *Answered* (static): no. A DCC pool block is filled only by the
+   loader callback `0x005FF6E0`, the single caller of `0x0060BFF0`
+   (`0x005FF71E`). Both cache paths (`0x006001F0` at `0x006003A2`,
+   `0x005FFE90` at `0x005FFF7C`) run `0x005FEC90` once per block (block
+   +0x28 = 0): it walks the decoder's cels (cel size 0x23 + cel +0x14 +
+   cel +0x1C), checks first dword = 0, w ≤ 256, h ≤ 256 (else a fatal
+   error) and stores in cel +0x18 a pointer to a zeroed 0x2C-byte side
+   entry. Then `0x005FEC50` → `0x005FEB80` returns a pointer to the
+   chosen cel. No field §1 reads (+0x00 … +0x10, rows) is changed, so
+   the drawer sees exactly the `0x0060BFF0` cel (also §3, cache path).
+   Open: when `0x006001F0` takes the cache branch, and whether the 37
+   live DCC frames wider or taller than 256 (`GTTRLITA1HTH.dcc` 20
    frames 345 × 324, `GTTRLITNUHTH.dcc` 4, `THS1LITDTHTH.dcc` 12 with
    heights 257–274, `RedemptionGhost Big.dcc` 1 at 257 × 214) ever reach
-   it (they would draw nothing). A Ghidra read of `0x005FE990` /
-   `0x0060ACE0` (cache lookup) plus a capture of one of these monsters
-   (`GT`, `THS1`) settles it.
+   it (the getter would return no cel, the one-time pass a fatal error).
+   A Ghidra read of `0x005FE990` / `0x0060ACE0` (cache lookup) plus a
+   capture of one of these monsters (`GT`, `THS1`) settles it.
+
+Answers 1–4 (game-file read, 2026-10-07: every `.dt1`, `.dc6` and `.dcc`
+that `d2data.mpq`, `d2exp.mpq` and `d2char.mpq` list, extracted with
+`mpq-tool extract` and counted by a scratch script; `Patch_D2.mpq` has no
+listfile and was not read; the 6 known-unused DT1s of `formats/dt1.md`
+excluded):
+
+- 1 *Answered*: no. 0 zero bytes in the copy runs of 1,651 DC6 files, in
+  the RLE runs or iso diamonds of the 397,668 blocks of 251 DT1 files
+  (the six unused DT1s do contain zeros: 2,845 blocks). `IndexFrame`
+  needs no opaque zero for 1.14d data (§6).
+- 2 *Answered*: yes. `variable0` is 0 in all 3,305,132 frames of the
+  21,717 DCC files (no frame has optional bytes or the bottom-up bit;
+  §4).
+- 3 *Answered*: yes, `encoding` = 0 in all 1,651 DC6 files (§1).
+- 4 *Answered*: `ui\MENU\EndGame.dc6` (8 frames: 256 × 256, 64 × 256,
+  256 × 224, 64 × 224, twice), `EndGame2.dc6` (12 frames, widths 256,
+  256, 256, 32, heights 256, 256, 88), `endgameok.dc6` (2 × 96 × 32),
+  `ui\PANEL\ctrlpnl7.DC6` (117 × 104, 128 × 55, 128 × 55, 54 × 55,
+  117 × 104, 128 × 55), `800ctrlpnl7.dc6` (117 × 104, 128 × 55 × 3,
+  86 × 55, 117 × 104, 128 × 55) and `ctrlpnl_popbelt.DC6` (125 × 32)
+  all have offset_x = offset_y = 0, so §2 draws each frame on rows
+  `y − height + 1 … y` of its draw call's y (the UI code supplies the
+  bottom row; owner of the layout: `client/ui.md`). End-game rows are in
+  §Test vectors (draw positions read at `0x0044E8C5`–`0x0044EB2E`).

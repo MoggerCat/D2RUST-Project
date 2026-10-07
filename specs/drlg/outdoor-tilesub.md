@@ -29,7 +29,7 @@
 | Edge cases & original bugs | 267–278 |
 | Test vectors | 279–293 |
 | Provenance | 294–311 |
-| Open questions | 312–322 |
+| Open questions | 312–333 |
 <!-- /index -->
 
 ## Summary
@@ -311,11 +311,22 @@ the resulting tile grids (via the tile-fill check of `rooms.md`).
 
 ## Open questions
 
-1. Confirm that the 1.14d DS1 loader (`0x00665F40`, `preset.md`) stores
-   the DS1 group `unknown` value at group +0x14 (used here as the
-   variant count) and what +0x10 holds.
+1. *Answered* (static, parser `0x00665950`, groups at `0x00665DA5`–
+   `0x00665E44`): group records are 0x18 bytes, allocated together
+   (count · 24, Fog allocator `0x0040B430`, no clear) at DS1 +0x50 with
+   the count at +0x4C; the parser writes x +0x00, y +0x04, w +0x08,
+   h +0x0C and, only if v ≥ 13, the extra value at +0x14 (`0x00665E34`).
+   +0x10 is never written by the parser and is not read by §1–§4. For a
+   v12 group file +0x14 is not written either (open question 4).
 2. Waypoint and shrine substitution (types 4/5, `Trials` −1 shuffles,
    theme 0) are not in the recording (no Act 1 waypoint/shrine room
    built): record entering Cold Plains far enough to build those rooms.
-3. CheckAll rows (none in 1.14d LvlSub: all `CheckAll` = 0) — the §4.1
-   path is untested by data; keep it for mods.
+3. *Answered* (data): patch_d2 `lvlsub.txt` (35 rows) has `CheckAll`
+   only 0 or empty, so 1.14d never takes the §4.1 CheckAll path; it is
+   kept for mods and tested with synthetic data only.
+4. v12 substitution DS1s (`ds1.md`: `ACT1\OUTDOORS\trees.ds1`, LvlSub
+   "Trees") store no per-group variant value, so N (+0x14) is whatever
+   the uninitialized group allocation holds. Settle by a memory read of
+   the Trees file's group records after its first load (`0x006704E0`),
+   or by showing that the Fog pool allocator (`0x0040A080`) returns
+   zeroed blocks.

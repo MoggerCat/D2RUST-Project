@@ -18,26 +18,31 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 42–54 |
-| Inputs | 55–61 |
-| Outputs / state changes | 62–66 |
-| Rules | 67–68 |
-|   1. Unit add | 69–225 |
-|   2. 0x0A RemoveUnit (`0x0045CC10`) | 226–235 |
-|   3. 0x15 ReassignPlayer (`0x0045D160`) | 236–277 |
-|   4. Queued movement and action messages | 278–312 |
-|   5. Local player vitals: 0x18, 0x95, 0x96 | 313–334 |
-| Constants & data dependencies | 335–346 |
-| Randomness | 347–354 |
-| Edge cases & original bugs | 355–369 |
-| Test vectors | 370–405 |
-| Provenance | 406–435 |
-| Open questions | 436–454 |
+| Summary | 47–59 |
+| Inputs | 60–66 |
+| Outputs / state changes | 67–74 |
+| Rules | 75–76 |
+|   1. Unit add | 77–233 |
+|   2. 0x0A RemoveUnit (`0x0045CC10`) | 234–243 |
+|   3. 0x15 ReassignPlayer (`0x0045D160`) | 244–285 |
+|   4. Queued movement and action messages | 286–329 |
+|   5. Local player vitals: 0x18, 0x95, 0x96 | 330–351 |
+|   6. Unit states: 0xA7, 0xA8, 0xA9, 0xAA | 352–382 |
+|   7. Other unit messages (general handlers, act at receive) | 383–488 |
+|   8. Player roster (0x5B, 0x5C, 0x65, 0x82, 0x8E; life from 0x0D, 0xAB) | 489–561 |
+| Constants & data dependencies | 562–573 |
+| Randomness | 574–581 |
+| Edge cases & original bugs | 582–604 |
+| Test vectors | 605–655 |
+| Provenance | 656–698 |
+| Open questions | 699–726 |
 <!-- /index -->
 
 Owned ids: 0x0A, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x15, 0x18, 0x4C, 0x4D,
 0x51, 0x59, 0x67, 0x68, 0x69, 0x6A, 0x6B, 0x6C, 0x6D, 0x6E, 0x6F, 0x70,
-0x71, 0x72, 0x95, 0x96, 0xAC.
+0x71, 0x72, 0x95, 0x96, 0xA7, 0xA8, 0xA9, 0xAA, 0xAC; §7–§8: 0x09,
+0x11, 0x57, 0x5B, 0x5C, 0x5F, 0x60, 0x65, 0x73, 0x74, 0x7E, 0x82, 0x8E,
+0x98, 0xA4, 0xAB.
 
 ## Summary
 
@@ -63,6 +68,9 @@ local player gets 0x15, 0x0D, 0x18, 0x95, 0x96.
 
 Client units added, removed, placed; their stats, seed, kind data; mode
 requests (`client/model.md` §8); C→S 0x5F from the position check.
+The player roster (§8). Outputs (`client/bridge.md` §10): `UnitOverlay`
+(0x11), `UmodFx` (0x57), `ClientMissile` (0x73), `CommonCof` (0x7E),
+`MonsterPreload` (0xA4), `RosterChanged` (0x5B, 0x5C, 0x65).
 
 ## Rules
 
@@ -303,12 +311,21 @@ requests (`client/model.md` §8); C→S 0x5F from the position check.
    check that the unit is not null (always true for a drained message).
 2. 0x0D also: if type u8@1 = 0, `0x0047A690(GUID u32@2, u8@0xC)`: the
    party roster entry of that GUID (if any) gets life percent := u8@0xC
-   (roster +0x14; the roster belongs to the owner of 0x5B, open
-   question 4).
+   (roster +0x14, §8 rule 6).
 3. 0x6D also, between the check and the request: stat 328 (0x148) :=
    base(328) + 1 (`0x006253B0`, `0x00627260`).
 4. 0x6E, 0x6F, 0x70, 0x71, 0x72: no effect (`client/model.md` §4 rule
    4).
+5. Objects (type 2; `client/model.md` §15): 0x0E's code u8@6 is the
+   client mode-request code 3 (object mode change; the server writes 3
+   for objects, `world/objects.md` §14 rule 1). 0x4D's code 0x15 handler
+   `0x004BD5C0` reads only record[0] (u32@6: in the shrine form the
+   operator's GUID, looked up as a player); the shrine code comes from
+   the client's own object (shrine record `Code`, else objects.txt
+   `ShrineFunction`), not from the message. record[2..4] (u16@0xB,
+   u16@0xD, u8@0xA) are never read, and u16@0xF is not copied into the
+   record; for objects these bytes carry no client effect (`Code` @10
+   and the zeros @11, @13, @15 of `world/objects.md` §14).
 
 ### 5. Local player vitals: 0x18, 0x95, 0x96
 
@@ -331,6 +348,216 @@ requests (`client/model.md` §8); C→S 0x5F from the position check.
 4. 0x18 and 0x95 only: if life ≠ 0 and the local player's mode is 0x11
    (dead): `0x00480E70` and `0x004647D0` (leave the dead mode; Phase 6
    player modes, `client/model.md` open question 1).
+
+### 6. Unit states: 0xA7, 0xA8, 0xA9, 0xAA
+
+1. Dispatch owner of 0xA7, 0xA8, 0xA9 and 0xAA (general handlers, act
+   at receive). 0xA7 DelayedState, 0xA8 SetState, 0xA9 EndState: the
+   rules of `client/stat-lists.md` §3 rules 1–4 (layouts, state on /
+   off, state stats, hooks); this section adds only 0xAA. Server side:
+   `sim/intents-events.md` §3.5 rule 6 (0xA7–0xA9), §7.9 rule 1 (0xAA).
+2. **0xAA** (`0x0045EFA0`; size u8@6): unit (type u8@1, GUID u32@2) not
+   in S → nothing. Bit reader (`client/model.md` §10) over bytes 7 …
+   size − 1. Loop:
+   1. s := 8 bits; s ≥ 255 → end (the server's closing 0xFF).
+   2. State on (`0x004D9B20(unit, s)`, `client/stat-lists.md` §3 rule
+      3); list := none.
+   3. 1 bit = 1 → stats: id := 9 bits; id = 0x1FF ends the stats. An id
+      outside the itemstatcost table, or with `Send Bits` (+0x08) = 0,
+      **ends the whole message** (no hooks for s, later states lost).
+      Else param := the next `Send Param Bits` (+0x09) bits read signed,
+      kept as u16, when that is > 0, else 0; value := `Send Bits` bits,
+      read signed when `Send Bits` < 32 and the row's flags (+0x04) have
+      bit `[0x006CE26C]`, else unsigned; list := the state stat call
+      (`0x004D9D70(unit, list, s, id, value, param)`, §3 rule 2 there:
+      the first stat makes the list, later ones reuse it).
+   4. Hooks `0x004D9E60(unit, s)` (state on hooks, §3 rule 1 there);
+      next s.
+3. The reader's overflow flag is never tested; past the end it returns
+   0 bits (`client/model.md` §10 rule 2), so a stream without its
+   closing 0xFF would read state 0 over and over. 1.14d servers always
+   close it (`sim/intents-events.md` §7.9 rule 1 step 4). d2rs: when a
+   state read overflows, the handler stops and returns an error
+   (`client/bridge.md` §6 rule 4); the states applied before stay.
+
+### 7. Other unit messages (general handlers, act at receive)
+
+1. **0x09** AssignLevelWarp (`0x0045CB90` → `0x004661C0`, 11 bytes;
+   server `0x0053BCD0`, called from the add messages at `0x005721E2`
+   with the unit's type, GUID, class byte, x, y): type u8@1, GUID
+   u32@2, class u8@6, x u16@7, y u16@9. Create with the type of byte 1
+   (`0x00465FD0`, as 0x51 in §1.3 rule 2: common fields, the room seed
+   step at (x, y) ≠ (0, 0); type 5 (tile): unit flags |= 0x22, static
+   path at (x, y)); add (`client/model.md` §2 rule 4). If the created
+   unit is type 1, `0x00470B70` runs too (no 1.14d sender passes type
+   1). Model: a unit with `class`, `position`.
+2. **0x11** (`0x0045D0F0` → `0x00464E50`, 8 bytes): type u8@1, GUID
+   u32@2, overlay u16@6. Unit absent, or overlay ≥ the overlay count
+   (data tables +0xBC0) → nothing. Else one `UnitOverlay` output {unit
+   key, overlay, mode 2, sound}: the effect layer adds the overlay
+   (`0x00470390(U, overlay, 2, 0, …)`, `render/unit-composite.md`),
+   then overlay 151 (0x97) → sound 396 (`impact_steal_life`), 152
+   (0x98) → sound 397 (`impact_steal_mana`) on U (`0x004B9A00`,
+   `audio/triggers.md`). Model state: none.
+3. **0x57** NpcEnchants (`0x0045E400`, 14 bytes): GUID u32@1, u8@5,
+   name u16@6, umods u8@8, u8@9, u8@0xA (low byte of u16@0xA), u16@0xC.
+   u8@5 ≠ 1, or no monster (1, GUID) → nothing. Else, on the monster
+   data (+0x14; only for a type-1 unit with data): +0x14 (u16) := name
+   (`0x004AC780`); the umod bytes +0x1C, +0x1D, +0x1E := u8@8, u8@9,
+   u8@0xA (`0x004AC740`); u16@0xC ≠ 0 → flags +0x16 |= 4; then
+   flags +0x16 |= 8 (`0x004AC810`). Model: those monster-data fields
+   (`ClientUnit` kind data, the fields 0xAC writes, §1.2). Then one
+   `UmodFx` output {unit key, the nine umod bytes +0x1C…+0x24, flags
+   +0x16 bit 3}: `0x004AD020` runs, when umod byte 0 ≠ 0, the client
+   umod function of table `0x00724D78` for the four fixed ids at
+   `0x006DA4C8` and then for each of the nine umod bytes (argument:
+   flags bit 3); Phase 6 effects.
+4. **0x5F** PortalFlags (`0x0045E5D0`, 5 bytes; server `0x0053B400`):
+   u32@1. No local player → fatal 0xD15 (bridge: handler error). Else
+   the local player's player data +0x2C := u32@1 (`0x006221E0`: fatal
+   0xFBF for a null unit, 0xFC0 for a non-player). Model: local player
+   `pdata_2c`. Recorded `5f 01000000` at both joins (`-015956` seq 136,
+   `-022633` seq 114). Its reader is open question 8.
+5. **0x60** TownPortalState (`0x0045E610` → `0x004BDF30`, 7 bytes):
+   portal flags u8@1, destination level u8@2, object GUID u32@3
+   (`sim/intents-events.md` §3.5, `world/objects.md` §14). No local
+   player → fatal 0xD21. Object (2, GUID) absent → nothing; its class
+   not 59 or 60 → fatal 0x560. Else object data +0x04 := level; portal
+   flags (object data +0x05, `0x006222C0` / `0x00622300`) |= u8@1 & 3
+   (bits 1 and 0 are only ever set here, never cleared). Model: the
+   object's kind data {interact (+0x04), portal flags (+0x05)}.
+6. **0x73** (`0x0045E6D0`, 32 bytes): creates a **client-only missile**
+   (set C, not `ClientWorld`, `client/model.md` §2 rule 2). Bytes 1–4
+   are not read. One `ClientMissile` output with the captured local
+   player key and fields: class u16@5, u32@7, u32@0xB, u32@0xF, u32@0x13,
+   u16@0x17, source type u8@0x19, source GUID u32@0x1A, u8@0x1E, u8@0x1F.
+   The effect layer builds the 0x5C-byte create record (`0x004CD540`;
+   owner = the local player, class, +0x14 := u32@7, +0x18 := u32@0xB,
+   +0x30 := u8@0x1E; flags 0x40000001, or 0x40000021 with +0x1C :=
+   u32@0xF and +0x20 := u32@0x13 when both are ≠ 0), then on the new
+   missile: source link (`0x00621CC0(m, u8@0x19, u32@0x1A)`), stat 328
+   := u8@0x1F when ≠ 0, `0x0064A330(m, u16@0x17)`, and +0x44 :=
+   `0x0045C3E0(seed +0x20, +0x48 >> 8)` << 8 (a draw on the missile's
+   own seed). Owner of the missile body: Phase 6 client missiles.
+7. **0x74** PlayerCorpseAssign (`0x0045E7B0` → `0x00462F60`, 10 bytes):
+   u8@1, player GUID u32@2, corpse GUID u32@6 (both type 0). u8@1 = 0,
+   or player P absent → nothing.
+   1. P not dead (`0x00464820`, `msg-skills.md` §7 r4.3) → mode := 0
+      (`0x00480E70(P, 0)`).
+   2. P is the local player: corpse K (0, u32@6) absent → stop. Else K's
+      path is reset (`0x00648CE0(path, 0)`, `0x00649190(K, 5)`) and K
+      is placed in P's room at P's position (`0x00650BE0(path, K,
+      room, x, y)` with x, y from `0x0045ADF0` / `0x0045AE20`; failure
+      fatal 0xABA), then K's path direction := P's (`0x006487F0` →
+      `0x006488A0`).
+   3. For every node of P's inventory (+0x60) in list order with kind 3
+      (body): the item is taken off P (`0x0063D2B0`), the body-location
+      fix-up `0x00462EE0`, P's gfx for that location refreshed
+      (`0x0046F280`), the item removed from the inventory again
+      (`0x0063AD90`: none → fatal 0xAC8, another item → fatal 0xAC9),
+      `0x004C0EC0(item, P, 0, 0)`, body slot cleared (`0x0063BE30`),
+      `0x00470610(P, 0)`, and the item unit removed from S
+      (`client/model.md` §2 rule 5).
+   Model: P's mode, K's position and direction, P's inventory and the
+   removed item units.
+8. **0x7E** (`0x0045E970`, 5 bytes): the message bytes are not read.
+   Act index A of the local player's room level (`0x00463DD0` →
+   `0x00620BB0` → `0x0061A1B0` → `0x006427F0`, `render/lighting.md`
+   §9.2 r1) → one `CommonCof` output {A}: the effect layer loads
+   `DATA\GLOBAL\` + the act's common COF list name (table `0x006D6C30`,
+   `0x0046F310` → `0x0046DDF0`; Phase 6 assets). Recorded `7e 000000ff`
+   (`-015956` seq 179) and `7e 00000041` (`-022633` seq 155).
+9. **0x98** (`0x0045DE50` → `0x004B1240`, 7 bytes): GUID u32@1, u16@5.
+   Monster (1, GUID) with monster data → data +0x40 := u16@5, or −1
+   when u16@5 = 0xFFFF. Model: monster kind data `mdata_40`; meaning
+   open question 9.
+10. **0xA4** BaalWave (`0x0045D760`, 3 bytes): class u16@1. Class ≥
+    the monstats count → nothing. Else one `MonsterPreload` output
+    {class}: `0x0046F870(class, 0)` loads, for each of the 15 modes of
+    table `0x00712AC4` (12, 0, 1, 2, 15, 4, 3, 5, 7, 6, 13, 8, 9, 10,
+    11; count `[0x00712B00]` = 15) whose bit is set in the class's
+    monstats2 row (+0xF0 bit field), that mode's graphics
+    (`0x0046F650`; Phase 6 assets). Model state: none.
+11. **0xAB** NpcHeal (`0x0045F120`, 7 bytes; server `0x0053C150`, the
+    0xAB pending records of `sim/intents-events.md` §7.9 r2): type
+    u8@1, GUID u32@2, life u8@6 (fraction of 128). Unit absent, the
+    local player, or unit flag 0x200 set → nothing. A monster → stat 6
+    (life) := u8@6 << 8 (`0x00627260`, layer 0). Any other type →
+    roster life percent (§8 rule 6) := (u8@6 × 100) / 128, truncated
+    toward zero. Recorded `ab 01 13000000 30` (`-015956` seq 219061).
+
+### 8. Player roster (0x5B, 0x5C, 0x65, 0x82, 0x8E; life from 0x0D, 0xAB)
+
+1. The client keeps two lists of 0xD8-byte player records, linked at
+   +0x80: **active** `[0x007BB5C0]` and **inactive** `[0x007BB5C4]`.
+   Record fields:
+
+   | Offset | Field | Writer |
+   |---|---|---|
+   | +0x00 | name (NUL-terminated, 16 bytes) | 0x5B |
+   | +0x10 | player GUID | 0x5B, 0x8E (new record) |
+   | +0x14 | life percent | 0x0D (§4 r2), 0xAB |
+   | +0x18 | kill count | 0x65 |
+   | +0x1C | class (u32) | 0x5B u8@7 |
+   | +0x20, +0x22 | u16@0x18, u16@0x1A of 0x5B | 0x5B |
+   | +0x30 | u16@0x1E of 0x5B | 0x5B |
+   | +0x34 | a UI handle (`0x004DC270`; freed `0x004DC2B0`) | 0x5B |
+   | +0x38 | corpse list: 8-byte nodes {corpse GUID, next} | 0x8E |
+   | +0x3C, +0x40 | portal GUIDs | 0x82 |
+   | +0x44 | u16@0x20 of 0x5B | 0x5B |
+   | +0x46, +0x4A | the two strings of 0x5B (see rule 2) | 0x5B |
+   | +0x66 | the two names formatted (`0x006D4E34`) when string 1 is not empty | 0x5B |
+
+2. **Lookup** `0x004792E0(GUID)`: GUID = −1 → none; else the first
+   active record with GUID +0x10 = GUID, or holding it in its corpse
+   list. Inactive records are never found by it.
+3. **0x5B** PlayerJoined (`0x0045E4E0` → `0x0047A6F0`; size u16@1,
+   min 34): GUID u32@3, class u8@7, name @8 (16 bytes), u16@0x18,
+   u16@0x1A, u16@0x1C, u16@0x1E, u16@0x20, string 1 @0x22, string 2
+   after string 1's NUL. GUID −1 → fatal 0xB3. A record found by GUID
+   or by name (`0x00479360`, active list) is updated in place; else an
+   inactive record with that GUID is moved out of the inactive list,
+   else a new record is allocated (first 0x84 bytes zeroed); +0x34 :=
+   a new handle; fields filled (`0x004793C0`): name, GUID, class,
+   +0x20, +0x22, +0x30, +0x44 as in rule 1; string 1 copied to +0x46,
+   then string 2 copied to +0x4A (so string 1 keeps only its first 4
+   bytes when longer than 3 characters); u16@0x1C is not stored. A new
+   or moved record is prepended to the active list. Then the party UI
+   refresh `0x00479AB0`, `0x0049A640` (output `RosterChanged`).
+   Recorded `5b 2400 01000000 04 "charactertest" 0100 ffff 0000 0000
+   0000 00 00` (`-015956` seq 267): GUID 1, class 4, +0x20 = 1, +0x22 =
+   0xFFFF.
+4. **0x5C** PlayerLeft (`0x0045E530` → `0x0047A8B0`, 5 bytes): GUID
+   u32@1 (−1 → fatal 0x121). The active record with GUID +0x10 = GUID
+   (not the corpse list) is unlinked, its handle freed, its corpse
+   nodes and the record freed. Then `RosterChanged` (found or not).
+5. **0x65** PlayerKillCount (`0x0045E6B0` → `0x00479B10`, 7 bytes):
+   GUID u32@1, count u16@5. Record found (rule 2) → +0x18 := count,
+   sign-extended from 16 bits; `RosterChanged`. Not found → nothing.
+   Recorded at join `65 01000000 0000` and after kills 1, 2, 3, …
+   (`-015956` seq 222604 ff.).
+6. **Life percent** `0x0047A690(GUID, v)`: record found → +0x14 := v.
+7. **0x82** PortalOwnership (`0x0045E9D0`, 29 bytes; server: owner
+   GUID u32@1, owner name @5–@20, u32@21, u32@25, `sim/intents-events.md`
+   §6 r6): object (2, u32@21) present → its object data +0x28 := the
+   name (bounded copy, 16 bytes, `0x004BDFE0`). u32@25 = −1 → stop
+   (the roster is not touched). Else object (2, u32@25) present → the
+   same name copy; then the owner's record (rule 2) +0x3C := u32@21,
+   +0x40 := u32@25. Model: objects' kind data `owner_name`; roster.
+8. **0x8E** CorpseAssign (`0x0045EAA0`, 10 bytes): u8@1, player GUID
+   u32@2, corpse GUID u32@6. u8@1 ≠ 0 (`0x0047A3D0`): record found
+   (rule 2), else a new 0x84-byte zeroed record with GUID +0x10 is
+   prepended to the **inactive** list (allocation failure fatal
+   0x687); the corpse GUID is prepended to its corpse list unless
+   present (node allocation failure fatal 0x698). u8@1 = 0
+   (`0x0047A490`): the record found → the first node with that corpse
+   GUID is unlinked and freed. No UI refresh.
+9. d2rs: `roster: Vec<RosterRecord>` (active, in list order, newest
+   first) and `roster_inactive` in `ClientWorld`, written only by the
+   messages above; the handle +0x34 and the formatted string +0x66 are
+   UI fields and not modelled. `RosterChanged` {} tells the UI layer to
+   rebuild the party view from the roster captured in the output
+   (`client/bridge.md` §10 r3: the payload carries the active records).
 
 ## Constants & data dependencies
 
@@ -364,6 +591,14 @@ unless it is already the local player. No other draw.
 - 0x0A never removes the local player's hireling (it stays when it
   leaves the player's rooms).
 - The sign rule of §5 rule 3 maps dx = 0x80 to +128, not −128.
+- 0x5B copies string 2 over string 1 from byte 4 on (§8 rule 3).
+- 0x8E may create a record in the inactive list, which the lookup of §8
+  rule 2 never finds; a later 0x5B with that GUID moves it to the
+  active list.
+- 0x82 with u32@25 = −1 leaves the roster unchanged (§8 rule 7).
+- 0x60 only ORs the portal flags; 0x60 never clears a bit.
+- 0x11 / 0x73 / 0xA4 / 0x7E have no model effect; their outputs are
+  the whole message.
 - 0x96 for a dead local player: stamina is set, the check does nothing
   (`client/model.md` §6 rule 2).
 
@@ -393,12 +628,27 @@ From `traces/raw/20261006-022633-packets.jsonl` ("B") and
 | `95 1c 80 0a 80 12 a0 5b 22 72 c2 bf 00` | life 0x1C, mana 0x15, stamina 0x4A, check (0x12DD, 0x1391) target (0x12DB, 0x1396) | B 32694 |
 | `18 24 80 0c 80 12 80 0c e8 98 08 9c 00 00 00` | stats 6 := 0x2400, 8 := 0x1900, 10 := 0x4A00, 74 := 0x64, 26 := 0; check (0x131D, 0x1381) | B 12323 |
 | 0x6D for (1, 7) not in S | dropped at receive | synthetic |
+| `aa 00 01000000 0c 69 59 f9 ff 1f`, player (0, 1) in S | state 105 on; its list: stat 172 := 2 (param 0); hooks for 105; then 8 bits 0xFF end | B 103, §6 rule 2 |
+| `aa 01 08000000 0c 69 59 f9 ff 1f` | the same on monster (1, 8) | A 184 |
+| 0xAA with state 5, list bit 1, first stat id with `Send Bits` 0 | state 5 on, no stat, no hooks; rest ignored | synthetic, §6 rule 2.3 |
+| 0xAA whose stream lacks the closing 0xFF | states before applied; handler error | synthetic, §6 rule 3 |
 | 0x15 for a dead monster | position unchanged | synthetic, §3 rule 4.3 |
 | 0x0A type 1, GUID = local player's hireling | nothing | synthetic |
 | 0x96 with dx 0x80 | tx = x + 128 | synthetic |
 | 0xAC component bits for counts 7, 3, 3, 3, 3, 10, 0, 5, 12, 12, 0 × 6 (`skeleton1`, `data/callbacks.md` §5 example) | 3, 2, 2, 2, 2, 4, 1, 3, 4, 4, 1 × 6 = 33 bits | §1.2 rule 7 |
 | 0xAC with class ≥ `monstats` row count, or a row whose `MonStatsEx` is −1 | no component reads, no unit | synthetic, §1.2 rule 7 |
 | 0x51 with type 4 | handler error | synthetic, §1.3 rule 5 |
+| 0x5F `5f 01000000`, local player present | local player data +0x2C = 1 | `-022633` seq 114, §7 r4 |
+| 0x60 `60 03 01 09000000`, object (2, 9) class 59, flags 0 | object +0x04 = 1, flags 3 | synthetic, §7 r5 |
+| 0x60 for object class 2 | handler error (fatal 0x560) | synthetic, §7 r5 |
+| 0x11 type 1, overlay 0x97 | output `UnitOverlay` {(1, GUID), 151, mode 2, sound 396}; model unchanged | synthetic, §7 r2 |
+| 0xAB `ab 01 13000000 30`, monster (1, 0x13) | stat 6 = 0x3000 | `-015956` seq 219061, §7 r11 |
+| 0xAB type 0, GUID 1, life 0x40, roster has GUID 1 | roster +0x14 = 50 | synthetic, §7 r11, §8 r6 |
+| 0x5B seq 267 bytes then 0x65 `65 01000000 0100` | roster [{name "charactertest", GUID 1, class 4, +0x20 1, +0x22 0xFFFF, kills 1}]; two `RosterChanged` | `-015956` seq 267, 222604 |
+| 0x65 count 0x8001 | kills = −32767 | synthetic, §8 r5 |
+| 0x8E add (player 1, corpse 7), then 0x65 for GUID 7 | 0x65 updates the record of player 1 (corpse-list match) | synthetic, §8 r2, r8 |
+| 0x5C GUID 1 | record unlinked and freed; `RosterChanged` | synthetic, §8 r4 |
+| 0x7E `7e 000000ff`, local player in level 1 | `CommonCof` {act 0} | `-015956` seq 179, §7 r8 |
 | 0x0A type 1, GUID 0x21, pet list empty | (1, 0x21) removed (hireling GUID −1) | synthetic, §2 rule 3 |
 | local player placed from a room of level 109 (Pal 4, Act 4) into a room of level 133 (Pal 0, Act 4) | palette switch to act 1 (`act1\pal.pl2`) | §3 rule 4.4; patch_d2 `levels.txt` |
 | local player placed from level 1 (Pal 0) into level 2 (Pal 0) | no palette switch | §3 rule 4.4 |
@@ -428,6 +678,19 @@ Join-update session (2026-10-06): 0xAC table reads `0x0045F1F1`–
 `0x0053BD10` and its single caller `0x00572067` (type pushed as 2),
 type bytes counted in both recordings (206 × 2). The code bytes'
 server meaning: `sim/intents-events.md` §7.4.
+Area 4 session (2026-10-07): §7–§8 read from the handlers `0x0045CB90`,
+`0x0045D0F0`, `0x0045E400`, `0x0045E4E0`, `0x0045E530`, `0x0045E5D0`,
+`0x0045E610`, `0x0045E6B0`, `0x0045E6D0`, `0x0045E7B0`, `0x0045E970`,
+`0x0045E9D0`, `0x0045EAA0`, `0x0045DE50`, `0x0045D760`, `0x0045F120`
+and their callees named above (register arguments from the
+disassembly); table `0x00712AC4` and its count read from the image;
+recorded bytes from both recordings.
+States session (2026-10-07, spec-senders-area-2): 0xAA `0x0045EFA0`
+read in full (`0x0045EFC3`–`0x0045F104`: the 8-bit state loop, the
+list bit at `0x0045F003`, 0x1FF → hooks at `0x0045F030`, the table and
+send-bits exits at `0x0045F038`–`0x0045F067` jumping to the return); 0xA7–0xA9 left to
+`client/stat-lists.md` §3; the recorded 0xAA bytes decode as in the
+table (269 records, both recordings).
 Act-switch session (2026-10-07): `0x004654C0` at `0x00465603`–`0x00465634`
 (byte +2 of both `0x0061DB70` records compared, CL = new +2 into
 `0x004FB480`, whose palette act is CL + 1); `levels` offsets from
@@ -442,12 +705,21 @@ Act-switch session (2026-10-07): `0x004654C0` at `0x00465603`–`0x00465634`
    `0x0046C570` (client monster AI / animation set-up, Phase 6).
 3. ~~`0x00621CC0(unit, 0, v)`~~: answered in §1.2 rule 4 (source-unit
    link to player GUID v).
-4. The party roster (0x5B, `0x0047A6F0`) that 0x0D's life percent
-   updates: owner spec of 0x5B.
-5. `0x0063EA40` (0x15 rule 2) and `0x00621B00` / `0x004BD6B0` (0x51
-   rule 3): what they test.
+4. ~~The party roster~~: answered in §8 (0x0D's life percent is §8
+   rule 6). Open: the meaning of the 0x5B words u16@0x18 … u16@0x20 and
+   the two strings (D2MOO: level, party id, account names; nothing
+   reads them in the single-player recordings).
+5. `0x0063EA40` (0x15 rule 2) and `0x004BD6B0` (0x51 rule 3): what
+   they test. *Answered* for `0x00621B00`: an object whose objects.txt
+   `SubClass` has bit 0 (shrine), `client/model.md` §15 rule 1.
 6. 0x16 UnitPositions (`0x0045D2E0`, also a position check) and 0x17:
    not seen in the single-player recordings; left TBD.
 7. A recording with a hireling (0x7A / 0x81, 0xAC of the hireling)
    confirms §1.2 rules 2–3 and §2 rule 2 with a real pet list
    (`client/model.md` open question 10).
+8. Who reads the local player's player data +0x2C (0x5F, §7 r4; the
+   server's meaning: sender `0x0053B400`), so the field can be named.
+9. Monster data +0x40 (0x98, §7 r9): its reader and meaning.
+10. The client missile body of 0x73 (`0x004CD540`, `0x0064A330`,
+    `0x0045C3E0`) and the umod client functions of 0x57 (table
+    `0x00724D78`): Phase 6 effects spec.

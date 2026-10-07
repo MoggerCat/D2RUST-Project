@@ -12,7 +12,13 @@
   lands (§3, open question 1). 2026-10-07: 62 ids have an owner in
   `bridge-dispatch.tsv` (new: `audio/triggers.md`, `render/lighting.md`,
   `client/msg-ui.md`, `client/msg-skills.md`); the output channel (§10)
-  is specified, not implemented.
+  is specified, not implemented. 2026-10-07 (area 3): owners for the
+  ids of `sim/intents-events.md` OQ18 (`msg-ui.md` §4–§11,
+  `msg-skills.md` §7–§8, 0x89 `render/lighting.md` §10 r4) and the
+  no-effect ids of §6 rule 6; the out-of-scope ids stay `TBD` (§6
+  rule 7). 2026-10-07 (area 4): the last 32 in-scope ids have owners
+  (`msg-units.md` §7–§8, `msg-stats-items.md` §5, `msg-skills.md`
+  §9–§10, `msg-ui.md` §16–§22); only the §6 rule 7 ids are `TBD`.
 - **Target version:** 1.14d (the message bytes it carries); the bridge
   itself has no 1.14d counterpart to match.
 - **Crate/module:** `d2-client::bridge` (`link`, `intent`, `receive`,
@@ -27,26 +33,26 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 52–66 |
-| Inputs | 67–75 |
-| Outputs / state changes | 76–87 |
-| Rules | 88–89 |
-|   1. Boundary | 90–105 |
-|   2. Receive path | 106–128 |
-|   3. Server link | 129–147 |
-|   4. Send path (intents) | 148–168 |
-|   5. Client world model | 169–188 |
-|   6. Dispatch table | 189–211 |
-|   7. Bevy mirror | 212–230 |
-|   8. Frame pacing | 231–251 |
-|   9. Versioning | 252–262 |
-|   10. Client outputs (bridge → UI and audio) | 263–322 |
-| Constants & data dependencies | 323–337 |
-| Randomness | 338–341 |
-| Edge cases & original bugs | 342–350 |
-| Test vectors | 351–379 |
-| Provenance | 380–390 |
-| Open questions | 391–421 |
+| Summary | 58–72 |
+| Inputs | 73–81 |
+| Outputs / state changes | 82–93 |
+| Rules | 94–95 |
+|   1. Boundary | 96–111 |
+|   2. Receive path | 112–134 |
+|   3. Server link | 135–153 |
+|   4. Send path (intents) | 154–174 |
+|   5. Client world model | 175–194 |
+|   6. Dispatch table | 195–235 |
+|   7. Bevy mirror | 236–254 |
+|   8. Frame pacing | 255–275 |
+|   9. Versioning | 276–286 |
+|   10. Client outputs (bridge → UI and audio) | 287–381 |
+| Constants & data dependencies | 382–396 |
+| Randomness | 397–400 |
+| Edge cases & original bugs | 401–409 |
+| Test vectors | 410–440 |
+| Provenance | 441–451 |
+| Open questions | 452–487 |
 <!-- /index -->
 
 ## Summary
@@ -208,6 +214,24 @@ receive).
    and a row has an owner other than `TBD` if and only if
    `dispatch::HANDLERS` registers a handler for its id, with the same
    owner. A perturbed TSV must fail with exactly the changed row.
+6. **No-effect ids** (owner `specs/client/bridge.md`): the
+   implementation registers one shared no-op handler for each.
+   - Size 0 in the S→C size table (`sim/intents-events.md` §3.1): 0x17,
+     0x2B, 0x2D–0x3D, 0x41, 0x43, 0x44, 0x46, 0x49–0x4B, 0x55, 0x56,
+     0x64, 0x80, 0x83–0x88, 0xAD, 0xB1. The split stops before such an
+     id (§2 rule 3), so the handler is never called.
+   - Handlers that do nothing: 0x12, 0x13, 0x14, 0x45, 0x66 (a bare
+     `ret`: `0x0045D130`, `0x0045D140`, `0x0045D150`, `0x0045E290`,
+     `0x0045E6C0`); 0x24, 0x25 (the empty handler `0x0045C900`).
+   - Never produced (no 1.14d function queues them,
+     `sim/intents-events.md` §3.5 rule 2, so their handlers never run):
+     0x16 (`0x0045D2E0`), 0x54 (`0x0045E3B0` → `0x00473CA0`).
+7. **Out of scope** (`sim/intents-events.md` §4 rule 4: multiplayer,
+   Battle.net, transport): 0x75, 0x79, 0x7F, 0x8B–0x8D, 0x8F, 0x90,
+   0xAE–0xB0, 0xB2–0xB4 keep owner `TBD` and stay unowned (rule 3)
+   until Phase 7. 0xB4 is also the single-player load refusal
+   (`sim/intents-events.md` §8.2 rule 2; client `0x0045C6D0` maps its
+   code to `0x0044E380(n)`): open question 7.
 
 ### 7. Bevy mirror
 
@@ -293,7 +317,9 @@ model state: 1.14d's handler calls a UI or sound function directly
    calling the UI handler or the audio handler per item (§7 rule 1: before
    the input and UI systems of the frame). One frame's outputs are all
    applied before the next frame's receive.
-5. **Consumers.** Each variant has exactly one consumer. A 1.14d UI
+5. **Consumers.** Each variant has exactly one consumer: UI, audio or
+   effects (the client effect layer: client missiles, overlays and the
+   sounds of client skill code, Phase 6). A 1.14d UI
    function that itself plays sounds or changes UI states is one UI
    output; the UI layer makes those sounds through its own request path
    (`audio/triggers.md` §11). Likewise a 1.14d sound function that also
@@ -319,6 +345,39 @@ model state: 1.14d's handler calls a UI or sound function directly
 | `QuestUi` | chain u8, flags u8, status u8, extra i16 | 0x5D (every case except the eclipse) | UI | `client/msg-ui.md` §1 |
 | `WaypointMenu` | object GUID u32, record 16 bytes (as received) | 0x63 | UI | `client/msg-ui.md` §2 |
 | `TradeAction` | code u8 | 0x77 | UI | `client/msg-ui.md` §3 |
+| `ChatLine` | the 0x26 record (type, lang, unit type, GUID, u8@8, u8@9, name, text); unit present; a player unit's name | 0x26 | UI | `client/msg-ui.md` §4 |
+| `NpcText` | the 40 bytes; unit present; object class (type 2) | 0x27 | UI | `client/msg-ui.md` §5 |
+| `HireOffer` | name u16, seed u32 | 0x4E | UI | `client/msg-ui.md` §6 |
+| `HireListReset` | — | 0x4F | UI | `client/msg-ui.md` §6 |
+| `QuestSpecial` | code u16, six u16 words | 0x50 (codes 1–4, 23, 36) | UI | `client/msg-ui.md` §7 |
+| `OpenUi` | GUID u32, code u8, arg u8 | 0x58 | UI | `client/msg-ui.md` §8 |
+| `TradePartner` | name 16 bytes, GUID u32 | 0x78 | UI | `client/msg-ui.md` §11 |
+| `NpcInteract` | unit key; present; class; monster-data +0x3C; blocker-open flag | 0x8A | UI | `client/msg-ui.md` §9 |
+| `NpcIntro` | 12 class slots u16 | 0x91 | UI | `client/msg-ui.md` §10 |
+| `GameQuestFlags` | 96 bytes | 0x29 | UI | `client/msg-ui.md` §12 |
+| `QuestLog` | 41 bytes | 0x52 | UI | `client/msg-ui.md` §13 |
+| `QuestAvailability` | 37 bytes | 0x5E | UI | `client/msg-ui.md` §14 |
+| `MercRevive` | u16, u16 | 0x9B | UI | `client/msg-ui.md` §15 |
+| `SkillEvent` | unit key, skill, level, target key or point, w | 0x99, 0x9A | effects | `client/msg-skills.md` §7 |
+| `SkillDo` | unit key, target key or none, skill, level, x, y, v | 0xA3 | effects | `client/msg-skills.md` §8 |
+| `ShrineFx` | kind (on-mode / on-use), shrine code u8, object key, player key or none, overlay ids (two i32, −1 = none) | 0x0E (code 3), 0x4D (code 0x15) | effects | `client/model.md` §15 rules 3–4 |
+| `ShrineSound` | sound id u32, player key | 0x4D (code 0x15) | audio | `client/model.md` §15 rule 4 (request: `audio/triggers.md` §1 rule 1) |
+| `UnitOverlay` | unit key, overlay u16, mode (2), sound id (0, 396 or 397) | 0x11 | effects | `client/msg-units.md` §7 r2 |
+| `UmodFx` | unit key, the nine umod bytes, flag bit 3 | 0x57 | effects | `client/msg-units.md` §7 r3 |
+| `ClientMissile` | local player key, the fields of 0x73 | 0x73 | effects | `client/msg-units.md` §7 r6 |
+| `CommonCof` | act index | 0x7E | effects | `client/msg-units.md` §7 r8 |
+| `MonsterPreload` | monster class u16 | 0xA4 | effects | `client/msg-units.md` §7 r10 |
+| `RosterChanged` | the active roster records (§8 r1 fields) | 0x5B, 0x5C, 0x65 | UI | `client/msg-units.md` §8 |
+| `SkillEndFx` | unit key, skill u16, srvdofunc | 0xA5 | effects | `client/msg-skills.md` §10 |
+| `QuestFlags` | 96 bytes | 0x28 (type 6) | UI | `client/msg-ui.md` §16 r2 |
+| `NpcGone` | GUID u32 | 0x28 (unit absent) | UI | `client/msg-ui.md` §16 r3 |
+| `NpcDialog` | type, GUID, 96 bytes, unit key, class, `interact` flag, `0x004B1A10(class)`, cursor item present, keys of `npc` monsters | 0x28 (unit present) | UI | `client/msg-ui.md` §16 r4 |
+| `NpcDialogEnd` | type u8 | 0x62 | UI | `client/msg-ui.md` §17 |
+| `NpcTransaction` | 15 bytes, local player gold | 0x2A | UI | `client/msg-ui.md` §18 |
+| `EventText` | 40 bytes, local player name | 0x5A | UI | `client/msg-ui.md` §19 |
+| `ActVideo` | video u8 | 0x61 | UI | `client/msg-ui.md` §20 |
+| `OverheadClear` | unit key | 0x76 | UI | `client/msg-ui.md` §21 |
+| `HotkeyAssign` | slot u8, skill i32, left u8, item GUID u32 | 0x7B | UI | `client/msg-ui.md` §22 |
 
 ## Constants & data dependencies
 
@@ -373,6 +432,8 @@ Synthetic, run as unit tests in `crates/d2-client/src/bridge/tests.rs`.
 | link version ≠ `PROTOCOL_VERSION` | bridge refuses the link | §9 rule 1 |
 | test handlers add units (1, 7), (2, 9); Bevy `App` update | 2 `UnitView` entities in key order; after removing (1, 7) and one update, 1 entity | §7 rule 3 |
 | dispatch TSV with one owner changed | check reports exactly that id | §6 rule 5 |
+| chunk `12 …` (26 bytes) | no-op handler runs; nothing recorded as unowned | §6 rule 6 |
+| chunk `75 …` (13 bytes) | unowned count for 0x75 = 1 | §6 rules 3, 7 |
 | chunk [0x2C for (1, 0x26) event 18; 0x77 code 0x10] | outputs = [`ServerSound` (1, 0x26) 18, `TradeAction` 0x10], in that order, delivered once after the frame | §10 rules 2, 4 |
 | frame with no outputs | dispatcher not called; list empty | §10 rule 4 |
 | 0x2C for (1, 0x26), then 0x0A removing (1, 0x26), same chunk | `ServerSound` still delivered with the class captured at receive | §10 rule 3 |
@@ -418,3 +479,8 @@ from `specs/`, `docs/` and `crates/` only.
    drop the position tracking follows `audio/triggers.md` §1's rule for a
    freed unit. Settle with the request log (`audio/triggers.md` Checks)
    on a 0x2C followed by 0x0A in one chunk.
+7. 0xB4 in single player (the load refusal, `sim/intents-events.md`
+   §8.2 rule 2): its client handler (`0x0045C6D0`: code u32@1, 1–26 →
+   `0x0044E380(n)` with a fixed code map, else 9) ends the game with an
+   error screen; owner `client/model.md` §7 (session messages) when the
+   join failure path is specified.

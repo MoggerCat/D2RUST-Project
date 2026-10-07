@@ -1,13 +1,14 @@
-# Spec: Client — Skill list and skill messages (0x21, 0x22, 0x23, 0x94)
+# Spec: Client — Skill list and skill messages (0x21, 0x22, 0x23, 0x94, 0x99, 0x9A, 0xA3)
 
 - **Status:** draft: handlers and the shared skill-list functions read in
   the 1.14d `Game.exe` (addresses below); layouts checked against the
   join of both single-player recordings
   (`traces/raw/20261006-015956-packets.jsonl`, `-022633-packets.jsonl`);
-  unverified: no executable check runs it yet.
+  unverified: no executable check runs it yet. 2026-10-07: §7–§8
+  (skill events 0x99, 0x9A, 0xA3) read the same way; none recorded.
 - **Target version:** 1.14d
 - **Crate/module:** `d2-client::bridge` handlers for 0x21, 0x22, 0x23,
-  0x94 over the model of `client/model.md`.
+  0x94, 0x99, 0x9A, 0xA3 over the model of `client/model.md`.
 - **Related specs:** `client/model.md` §1–§3 (unit table, local player);
   `client/msg-units.md` §1.1 (a player's skill list is allocated at
   creation); `skills/levels.md` §1 (entry fields, `skill_level`,
@@ -16,7 +17,32 @@
   (what the passive refresh adds to the stat totals); `ui/panels.md`
   §10 (skill tree).
 
-Owned ids: 0x21, 0x22, 0x23, 0x94.
+<!-- index -->
+| Section | Lines |
+|---|---|
+| Summary | 47–56 |
+| Inputs | 57–64 |
+| Outputs / state changes | 65–73 |
+| Rules | 74–75 |
+|   1. The client skill list (unit +0xA8) | 76–99 |
+|   2. Shared skill-list operations | 100–141 |
+|   3. 0x94 BaseSkillLevels (`0x0045DD60`) | 142–151 |
+|   4. 0x21 UpdateItemOSkill (`0x0045DCD0`) | 152–161 |
+|   5. 0x22 UpdateItemSkill (`0x0045DDB0`) | 162–171 |
+|   6. 0x23 SetSkill (`0x0045DE10`) | 172–178 |
+|   7. 0x99 / 0x9A skill events (`0x0045DE80` / `0x0045DEC0` → `0x004CA060`) | 179–222 |
+|   8. 0xA3 skill do (`0x0045D5E0`) | 223–236 |
+|   9. 0x93 skill bonus by element and page (`0x0045DD10` → `0x004C7990`) | 237–265 |
+|   10. 0xA5 skill end on a unit (`0x0045D6A0`) | 266–280 |
+| Constants & data dependencies | 281–292 |
+| Randomness | 293–296 |
+| Edge cases & original bugs | 297–306 |
+| Test vectors | 307–332 |
+| Provenance | 333–353 |
+| Open questions | 354–381 |
+<!-- /index -->
+
+Owned ids: 0x21, 0x22, 0x23, 0x94, 0x99, 0x9A, 0xA3; §9–§10: 0x93, 0xA5.
 
 ## Summary
 
@@ -40,7 +66,10 @@ list, which feeds the character totals (`client/stat-lists.md`).
 
 `ClientUnit.skills` (§1) of player units; passive-state stat lists on
 the unit (§2 rule 4, consumed by `client/stat-lists.md`); a skill-tree
-redraw flag for 0x21. No `client/bridge.md` §10 output.
+redraw flag for 0x21. Outputs (`client/bridge.md` §10): `SkillEvent`
+(0x99, 0x9A, §7) and `SkillDo` (0xA3, §8), both for the client effect
+layer; the skill events write no model state. 0x93 writes level bonuses
+(§9); 0xA5 turns state 18 off and emits `SkillEndFx` (§10).
 
 ## Rules
 
@@ -147,6 +176,108 @@ handlers (the server specs link here for the steps).
 2. Look up (0, GUID) (players only); none → nothing. Hand ≠ 0 → select
    left (skill, owner), else select right (§2 rule 3).
 
+### 7. 0x99 / 0x9A skill events (`0x0045DE80` / `0x0045DEC0` → `0x004CA060`)
+
+The server sends these for a unit's pending skill records
+(`sim/intents-events.md` §3.5 rule 5, §7.9 rule 2): a skill event at a
+level on a unit, toward a unit (0x99, the 16-byte form) or a point
+(0x9A, the 17-byte form).
+
+1. **0x99** layout (16 bytes): unit type u8@1, GUID u32@2, skill
+   u16@6, level u8@8, target type u8@9, target GUID u32@10, w u16@14.
+   The unit (u8@1, GUID) and the target (u8@9, u32@10) are looked up
+   in S; either missing → nothing. Else `0x004CA200(unit, skill, level,
+   target, w)` → `0x004CA060(unit, skill, level, target, 0, 0, w)`.
+2. **0x9A** layout (17 bytes): unit type u8@1, GUID u32@2, skill u32@6
+   (the handler reads the low u16), level u8@10, x u16@11, y u16@13, w
+   u16@15. Unit missing → nothing; x = 0 or y = 0 → nothing
+   (`0x004CA230`). Else `0x004CA060(unit, skill, level, none, x, y, w)`.
+3. Model state written: none. Each emits one `SkillEvent` output
+   {unit key, skill, level, target key or point (x, y), w}, consumed by
+   the client effect layer, which runs rule 4 at delivery against the
+   units it resolves from the keys (open question 4).
+4. **Client skill event** `0x004CA060(U, skill, level, target T,
+   x, y, w)`:
+   1. Skill outside 0 … count − 1 → nothing (returns 0).
+   2. Save U's current target unit (`0x004648F0`), its path target
+      point (`0x00648A00` / `0x00648A10`) and bit 0x40 of U's flags
+      +0xC4. Set U's target: T (`0x00620C10`) or the point (x, y)
+      (`0x00648AD0`).
+   3. When the skill has `ItemCltCheckStart` (bit 34: record byte +8
+      & `[0x006CE270]` = 4): if T exists, T is dead (`0x00464820`:
+      unit flag +0xC4 bit 0x10000, or a player in mode 0 or 17, or a
+      monster in mode 0 or 12) and T has state 118, state 118 is turned off
+      on T (`0x00639DB0(T, 118, 0)`) for the call; the client start
+      `0x004C6660(U, skill, level, −1)` → `0x004C6140` (skill start,
+      `audio/triggers.md` §8 r1); state 118 is turned back on after a
+      non-zero start; a zero start skips step 4.
+   4. `ItemCastSound` (+0x122) ≥ 0 → sound request on U
+      (`0x004B9A00`); `ItemCastOverlay` (+0x124) valid (< the overlay
+      count, data +0xBC0) → overlay on U (`0x00470390(U, overlay, 2,
+      …)`); then the client do `0x004C6680(U, skill, level, w)` (the
+      skill's `cltdofunc` +0xF4 through table `0x00727BA8`, its sounds
+      `audio/triggers.md` §8 r2).
+   5. Restore U's target (unit, or the saved point) and its flag bit
+      0x40 (set or cleared as saved).
+
+### 8. 0xA3 skill do (`0x0045D5E0`)
+
+1. Layout (24 bytes; server record `skills/bodies-2.md` §2.21, builder
+   `0x0053C0E0`): v u8@1, skill u16@2, level i16@4, unit type u8@6,
+   GUID u32@7, target type u8@0xB, target GUID u32@0xC, x u32@0x10, y
+   u32@0x14.
+2. Unit missing → nothing. Target looked up (may be none). Skill
+   outside 0 … count − 1 → nothing. The skill's `progressive` bit
+   (bit 2, record byte +4 & `[0x006CE270]`) → `0x004C6AC0(U, T, skill,
+   level, x, y, v)`, else `0x004C6930(U, T, skill, level, x, y, v)`
+   (client do / target, `audio/triggers.md` §8 r2).
+3. Model state written: none. One `SkillDo` output {unit key, target
+   key or none, skill, level, x, y, v} for the client effect layer.
+
+### 9. 0x93 skill bonus by element and page (`0x0045DD10` → `0x004C7990`)
+
+1. Layout (8 bytes; sender `0x0053C6F0`): player GUID u32@1, bonus
+   i8@5 (u8@5 > 0x80 → u8@5 − 0x100; 0x80 stays +128), element u8@6,
+   page u8@7.
+2. Player (0, GUID) absent → nothing. Bonus 0 → fatal 0x96B; no skill
+   list → fatal 0x96D (bridge: handler errors).
+3. For each entry E of the list, in order (the next entry is read
+   before E is handled), with skill s := E's skill id; E qualifies when
+   all hold:
+   - s is a valid skill row and its `skilldesc` (+0x194) is a valid
+     skilldesc row D;
+   - E's level with bonuses `0x006442A0(U, E, 1)` > 0;
+   - s is `enhanceable` (skills bit 17, `0x00645FB0`);
+   - element u8@6 = 0, or `EType` (+0x1DC) = u8@6;
+   - page u8@7 = 4, or D's `skillpage` (+2, signed) = u8@7 + 1;
+   - E is native (owner +0x34 = −1, `0x00643AD0`).
+   A qualifying E gets the level bonus `0x00647B20(U, s, bonus)`
+   (+0x2C, `skills/levels.md` §1; it adds a native entry when none
+   exists and the bonus is ≥ 1); then, when the native entry of s now
+   exists with level-with-bonuses 0, it is removed (`0x006470F0` →
+   `0x00646FD0(entry, 1)`, §2 rule 2.2).
+4. Then `0x00646F20(U)`: every skill of the passive list (data tables
+   +0xBB4, count +0xBB0) whose `passivestate` (+0x94) > 0 and which the
+   unit has (`0x00643810`) and whose state is on (`0x00639DF0`) is
+   refreshed (§2 rule 4).
+5. Model: the entries' level bonus and the passive-state lists. No
+   output.
+
+### 10. 0xA5 skill end on a unit (`0x0045D6A0`)
+
+1. Layout (8 bytes; `sim/intents-events.md` §3.5, pending record
+   `skills/bodies-2.md` §2.13): unit type u8@1, GUID u32@2, skill
+   u16@6.
+2. Unit absent, or skill ≥ the skill count → nothing.
+3. By the skill's `srvdofunc` (+0x2E, read signed; jump table
+   `0x0045D738` / byte map `0x0045D748`, read from the image): 67 →
+   `0x004CA000(U)`; 76 → `0x004C9420(U)`; 77, 78 → `0x004C8B80(U)`; any
+   other value → none. Each is one `SkillEndFx` output {unit key, skill,
+   srvdofunc} for the client effect layer (Phase 6).
+4. Then, for every skill in range, state 18 off on U
+   (`0x00639DB0(U, 18, 0)`, `client/stat-lists.md` §3). Model: U's
+   states.
+
 ## Constants & data dependencies
 
 | Item | Value | Source |
@@ -156,6 +287,8 @@ handlers (the server specs link here for the steps).
 | passive stats | 5 (`passivestat1–5`); markers 350 (skill), 351 (level) | `0x00646D60` |
 | fatal asserts | 0xAD6 (0x22 without the native entry), 0x668 (select, bad skill) | §5, §2 |
 | skill-tree flag | `[0x007C0C3C]` := 0 | `0x004AA8F0` |
+| skill flag masks | `[0x006CE270]` = 0x04 (byte +8: bit 34 `ItemCltCheckStart`; byte +4: bit 2 `progressive`) | image byte, `data/fields.tsv` `skills` |
+| state | 118 (lifted around the start check) | `0x004CA10B` |
 
 ## Randomness
 
@@ -183,11 +316,19 @@ None.
 | `22 …` with byte @11 = 1 | no change | §5 rule 2 |
 | `22` for a skill the player lacks | handler error (fatal 0xAD6) | synthetic |
 | `23 00 01000000 01 0000 ffffffff`, then `23 00 01000000 00 0000 ffffffff` | left = skill 0, right = skill 0 | A seq 274 |
+| 0x93 `93 01000000 01 00 04` on player (0, 1) with native entries of an `enhanceable` skill (level 1, desc page 1) and a non-enhanceable one | the first gets bonus +1; the second unchanged | synthetic, §9 |
+| 0x93 with bonus byte 0 | handler error (fatal 0x96B) | synthetic, §9 r2 |
+| 0x93 bonus byte 0x80 | bonus +128 | synthetic, §9 r1 |
+| 0xA5 for a skill with `srvdofunc` 5 | no output; state 18 off on the unit | synthetic, §10 |
 | `23 00 01000000 00 2400 ffffffff` without a skill-36 entry | right unchanged | B seq 227 (list state synthetic) |
 | `21 00 00 01000000 2400 00 01 05` on a player without skill 36 | entry 36 added, then base 0; skill-tree flag 0 | B seq 46370 |
 | `21 00 00 01000000 2400 01 01 05` | skill 36 base 1 | B seq 61126 |
 | `21 00 01 01000000 2400 00 00 00` with entry 36 | entry 36 removed | synthetic, §2 rule 2.2 |
 | 0x94 for an unknown GUID | no change | synthetic |
+| `99 01 05000000 4000 03 00 01000000 0000`, (1, 5) and (0, 1) in S | no model change; `SkillEvent` {(1, 5), skill 64, level 3, target (0, 1), w 0} | synthetic, §7 r1 |
+| `99 …` with the target missing | nothing | §7 r1 |
+| `9a 01 05000000 40000000 03 0000 2000 0000` | nothing (x = 0) | §7 r2 |
+| `a3 00 4000 0300 01 05000000 06 ffffffff 00000000 00000000`, (1, 5) in S | `SkillDo` {(1, 5), none, 64, 3, 0, 0, 0} | synthetic, §8 |
 
 ## Provenance
 
@@ -196,10 +337,19 @@ the Ghidra exports): handlers `0x0045DD60`, `0x0045DCD0`, `0x0045DDB0`,
 `0x0045DE10`; senders `0x0053C4A0` (with `0x00644300` → `0x00644180`),
 `0x0053C520`, `0x0053C590`; list functions `0x006439B0`, `0x00647110`,
 `0x00647280`, `0x00646FD0`, `0x00643BC0`, `0x00643C50`, `0x00645120`,
-`0x00646D60`, `0x00643620`, `0x004AA8F0`. Recorded join messages of A
+`0x00646D60`, `0x00643620`, `0x004AA8F0`. §7–§8: `0x0045DE80`,
+`0x0045DEC0`, `0x004CA200`, `0x004CA230`, `0x004CA060`, `0x004C6660`,
+`0x004C6680`, `0x004648F0`, `0x00464820`, `0x0045D5E0`, `0x0053C0E0`;
+`[0x006CE270]` read from the image; skill columns by offset from
+`data/fields.tsv`. Recorded join messages of A
 and B, split with the S→C size rule (0x94 n = 10 and 8 in A and B; B's
 later 0x94 at seq 127716 has n = 9 with skill 36 added). D2MOO 1.10f
 `D2SkillStrc` names the entry fields (hint; offsets read in 1.14d).
+
+Area 4 session (2026-10-07): §9 `0x0045DD10`, `0x004C7990`,
+`0x00647B20`, `0x006470F0`, `0x00646F20`, `0x00645FB0` (byte +6 & 2 =
+bit 17 `enhanceable`, mask table `0x006CE268`), `0x00643AD0`,
+`0x006442A0`; §10 `0x0045D6A0` and its jump tables.
 
 ## Open questions
 
@@ -211,7 +361,20 @@ later 0x94 at seq 127716 has n = 9 with skill 36 added). D2MOO 1.10f
 2. The level bonus +0x2C on the client: writers `0x00647AA0` (set,
    called from `0x004C6140` and `0x004D88A0`) and `0x00647B20` (add,
    from `0x004C7990`); which stats or states drive them (oskills,
-   `item_singleskill`).
+   `item_singleskill`). *Partly answered*: the `0x004C7990` path is
+   S→C 0x93 (§9: element / page bonus on `enhanceable` skills).
 3. Skill-tree inputs (`ui/panels.md` §10 r3): which entry fields the
    tree shows (base, bonus, quantity) and the redraw flag
    `[0x007C0C3C]`; Phase 6 UI spec.
+4. The skill events (§7, §8) run 1.14d's client skill code at receive;
+   the effect layer runs it at delivery, after every message of the
+   frame. They differ when a later message of the same frame changes
+   the unit, its target or state 118 (`client/bridge.md` §10 r3).
+   Settle with the effect layer's spec: either the layer runs inside
+   the receive for these outputs, or a recording shows no such frame.
+   The bodies of `0x004C6140`, `0x004C6680`, `0x004C6930`,
+   `0x004C6AC0` (client missiles, overlays) are owned by the client
+   skill effect spec (not written).
+5. The client functions of 0xA5 (`0x004CA000`, `0x004C9420`,
+   `0x004C8B80`) and which skills have `srvdofunc` 67, 76, 77, 78:
+   Phase 6 client skill effect spec; and the name of state 18.

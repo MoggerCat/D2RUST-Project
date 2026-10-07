@@ -31,7 +31,7 @@
 | Edge cases & original bugs | 306–315 |
 | Test vectors | 316–327 |
 | Provenance | 328–356 |
-| Open questions | 357–389 |
+| Open questions | 357–412 |
 <!-- /index -->
 
 ## Summary
@@ -356,9 +356,21 @@ Ghidra backlog (2026-10-06): act palette at game start from
 
 ## Open questions
 
-1. ~~PL2 base palette vs `.dat`, entry 0~~: answered in §4 (equal with B
-   and R swapped in all 17 pairs; entry 0 is black everywhere). Open
-   only as a live-frame check: a capture's presented palette (PNG `PLTE`,
+1. For every act palette: does the PL2 base palette (R, G, B at bytes
+   `4i…4i + 2`) equal the `.dat` palette (B, G, R at `3i…`), and is entry 0
+   (0, 0, 0)? Game-file check (`mpq-tool` extension); decides whether
+   d2rs may keep reading `.dat`. Each capture also holds the presented
+   palette (PNG `PLTE`, `capture.md` §5): comparing it with the act's
+   `pal.pl2` first 1,024 bytes and its `.dat` settles §4 on live frames.
+   *Answered* (game-file read, 2026-10-07, `mpq-tool extract
+   "data\global\palette\*"` from d2data and d2exp): yes. For all 17
+   palette folders with both files (ACT1–ACT5 in d2data, ACT5 and
+   EndGame2 in d2exp, EndGame, Menu0–4, Sky, Trademark, fechar, loading)
+   the PL2's 256 (R, G, B) equal the `.dat`'s (B, G, R) reversed, every
+   fourth byte is 0, and entry 0 is (0, 0, 0). d2rs may keep reading the
+   `.dat` for the base palette (`Patch_D2.mpq`, unlisted, not read).
+   Also §4 (equal with B and R swapped in all 17 pairs). Open only as a
+   live-frame check: a capture's presented palette (PNG `PLTE`,
    `capture.md` §5) equals the act's `pal.pl2` first 1,024 bytes.
 2. ~~Write order when both `L` and `T` are present~~: answered in §5
    (`T[256 × d + L[s]]`, `P` dropped; dispatcher `0x00608540`). The
@@ -371,11 +383,22 @@ Ghidra backlog (2026-10-06): act palette at game start from
    that order; `0x00608540` uses the first as the outer table of `L[P[s]]`
    and the one kept with `T`. A capture of a lit, remapped, translucent
    draw remains a pixel check, not an open rule.
-3. ~~Clear arguments of the out-of-game `StartDraw` callers~~: answered
-   in §3 (all 1 except the D2Win control drawer, 0). Open: which screen
-   each of `0x0044CB60`, `0x004565E0`, `0x0045FDE0`, `0x00460190`,
-   `0x00460490` draws (Ghidra read of their state-table owners, owner
-   `client/ui.md`), for `ui/` capture cases.
+3. Out-of-game screens (menus, loading screens, cut-scenes) use other
+   callers of `StartDraw` (`0x0044CB60`, `0x0044D100`, `0x0044E770`,
+   `0x004565E0`, `0x00460190`, `0x004F98E0`): their clear arguments, for
+   `ui/` capture cases. *Answered* (static, pushes before each call of
+   `0x004F60F0`): `0x0044CB60`, `0x0044D100`, `0x0044E770`, `0x004565E0`,
+   `0x00460190` and the two callers outside the export's function list
+   (`0x0045FDEE`, `0x004604A3`) all pass `StartDraw(1, 0, 0, 0)` (the
+   other three arguments are a register zeroed or holding 0 just before);
+   `0x004F98E0` passes `(0, 0, 0, 0)`. Every one of them calls
+   `0x004F6070` first (its result gates the draw). GDI therefore clears
+   rows 0 … H − 48 on every out-of-game screen (§3 step 2); DirectDraw
+   clears everything (§7).
+   Also §3 table (D2Win control drawer `0x004F98E0`: 0). Open: which
+   screen each of `0x0044CB60`, `0x004565E0`, `0x0045FDE0`,
+   `0x00460190`, `0x00460490` draws (Ghidra read of their state-table
+   owners, owner `client/ui.md`), for `ui/` capture cases.
 4. ~~What sets the post-draw clear counter~~: the act load (S→C 0x03,
    §3 step 4).
 5. ~~Act palette at game start outside act 1~~: answered in §4 (the act

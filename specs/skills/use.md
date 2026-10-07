@@ -26,19 +26,19 @@
 | Outputs / state changes | 68–74 |
 | Rules | 75–76 |
 |   1. Messages | 77–108 |
-|   2. `use_at_point(game, unit, skill, x, y)` = `0x00549AD0` | 109–149 |
-|   3. `use_on_unit(game, unit, skill, type, guid, run)` = `0x00549BA0` | 150–168 |
-|   4. Mode change gates | 169–202 |
-|   5. Start and do | 203–323 |
-|   6. Cooldown | 324–337 |
-|   7. Periodic skills and auras | 338–387 |
-|   8. Function tables | 388–407 |
-| Constants & data dependencies | 408–428 |
-| Randomness | 429–438 |
-| Edge cases & original bugs | 439–460 |
-| Test vectors | 461–474 |
-| Provenance | 475–491 |
-| Open questions | 492–524 |
+|   2. `use_at_point(game, unit, skill, x, y)` = `0x00549AD0` | 109–150 |
+|   3. `use_on_unit(game, unit, skill, type, guid, run)` = `0x00549BA0` | 151–169 |
+|   4. Mode change gates | 170–203 |
+|   5. Start and do | 204–324 |
+|   6. Cooldown | 325–338 |
+|   7. Periodic skills and auras | 339–388 |
+|   8. Function tables | 389–408 |
+| Constants & data dependencies | 409–429 |
+| Randomness | 430–439 |
+| Edge cases & original bugs | 440–461 |
+| Test vectors | 462–475 |
+| Provenance | 476–492 |
+| Open questions | 493–533 |
 <!-- /index -->
 
 ## Summary
@@ -121,8 +121,9 @@ read by server code (client `0x004AA3A0` only).
    and recompute.
 5. Skill mode (skill entry +8, §5.1) = 0 → 2.
 6. State 0: `set_mode_xy(game, unit, skill, mode, x, y, reenter = 0)`
-   (`0x005809D0`), return 0. State 1: server message 0x5A (bytes `5A 0E
-   01 …`, built by `0x00549A60`), return 2. Other states: 2.
+   (`0x005809D0`), return 0. State 1: server message 0x5A to the unit's
+   own client (`0x00549A60`: client `0x005531C0`, send `0x0053C850`),
+   40 bytes: `5A 0E 01` then 37 zero bytes; return 2. Other states: 2.
 
 `use_state(unit, entry)` (`0x00647960`) tests in this order and returns
 at the first failure (entry null → fatal assert):
@@ -492,15 +493,19 @@ their own (`combat/*`, `skills/levels.md`). The unit-seed reseeder
 ## Open questions
 
 1. Answered: the 24 table targets missing from the Ghidra export
-   (0x0056CAB0 … 0x005DA8B0) are read with `tools/ghidra/disasm.py at`
-   (checked on 0x0056CAB0 and 0x005DA8B0); no re-export is needed.
-   Their bodies are open question 10.
-2. Answered: srvdo 121 (`0x005C8AD0`) is the do function of the Rabies
-   row (1.14d `skills.txt` `srvdofunc` = 121, `functions.tsv`); its body
-   does not follow D2MOO's SrvDo121 (1.14d: used-skill param check,
-   `0x005C8980`, `apply_melee` `0x0057D4F0`, `elem_len` `0x00644F20`,
-   `0x005C7DB0`, `0x005C7C20`), so its behaviour belongs to open
-   question 10.
+   (0x0056CAB0, 0x0056CBA0, 0x0056CC20, 0x005C3070, 0x005C31C0,
+   0x005C3260, 0x005C3270, 0x005C3350, 0x005C4CD0, 0x005CAF80,
+   0x005CB270, 0x005CB4D0, 0x005CBBF0, 0x005CC1D0, 0x005CC220,
+   0x005CDF00, 0x005D0180, 0x005D1BF0, 0x005D2B20, 0x005D32F0,
+   0x005D6330, 0x005D80C0, 0x005D8760, 0x005DA8B0) were read from the
+   raw disassembly (`tools/ghidra/disasm.py at`, first checked on
+   0x0056CAB0 and 0x005DA8B0); every one is `spec'd-here` in
+   `functions.tsv` (open question 10), so no re-export is needed.
+2. Answered: srvdo slot 121 holds `0x005C8AD0`, and Rabies (id 238) is
+   the only 1.14d `skills.txt` row with `srvdofunc` 121; its body is
+   `skills/bodies-2.md` §6.14. The 1.14d body does not follow D2MOO's
+   SrvDo121 (used-skill param check, `0x005C8980`, `apply_melee`
+   `0x0057D4F0`, `elem_len` `0x00644F20`, `0x005C7DB0`, `0x005C7C20`).
 3. Recording: hook `0x0056FAF0` entry/return and `0x0056F7F0` entry; cast
    a non-`TargetAlly` skill on a party member: does the do still run after
    start returned 0?
@@ -512,12 +517,16 @@ their own (`combat/*`, `skills/levels.md`). The unit-seed reseeder
    the event argument: hook it, log arg1/arg2 and +0x4E (monsters branch).
 7. Frame codes 1–4 of `0x005539B0`: log arg1 per type-0 timer for a
    multi-hit animation (Strafe, Zeal) (`sim/units.md`).
-8. The type-12 timer 1715 → 4115 in recording 022304 (2,400 frames) is
-   not a skill delay; identify its source (probably a shrine).
-9. Server message 0x5A layout for "can't do that" (`5A 0E 01 …`):
-   `server-messages.tsv`.
-10. Per-skill start/do bodies (`functions.tsv` status `mapped`): to be
-    specified skill by skill in `skills/bodies.md`. Done there: srvdo 1,
-    2, 18, 30, 65, the srvmissile path, srvst 1–5, 15, 29, 32, 33, 46,
-    65. Next: the remaining Act I monster starts (srvst 49 Nest, 50
-    Quick Strike) and the do functions of the level-1 class skills.
+8. Answered from `traces/raw/20261006-022304-tick.jsonl`: a shrine. In
+   the client-message phase after frame 1715 the object GUID 34
+   (`objects.txt` class 2, `Shrine`) gets timers type 6 at 2015 and
+   type 5 at 7716, and the player a type-12 (state expiry) timer at
+   4115 = 1715 + 2400, the `shrines.txt` duration of Armor, Combat,
+   Skill and Recharge Boost. Which of the four is not recorded; not a
+   skill rule.
+9. Answered: the 40-byte layout sent by the skill path is in §2 step 6
+   (`5A 0E 01`, rest zero); its field names belong to
+   `sim/server-messages.tsv` (row 0x5A, layout empty).
+10. Answered: every `functions.tsv` row is `spec'd-here` (bodies in
+    `skills/bodies.md`, `bodies-2.md`, `bodies-3.md`, `bodies-4.md`),
+    except the null slots and the 3 `unreferenced` rows.

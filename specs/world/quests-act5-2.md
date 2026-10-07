@@ -25,18 +25,18 @@
 | Inputs | 53–62 |
 | Outputs / state changes | 63–71 |
 | Rules | 72–73 |
-|   6. A5Q4 Betrayal of Harrogath (chain 34, slot 38) | 74–166 |
-|   7. A5Q5 Rite of Passage (chain 35, slot 39) | 167–325 |
-|   8. A5Q6 Eve of Destruction (chain 36, slot 40) | 326–439 |
-|   9. Act V intro (chain 40, slot 42) | 440–466 |
-|   10. Hooks called from other systems | 467–488 |
-|   11. NPC services and game completion | 489–502 |
-| Constants & data dependencies | 503–522 |
-| Randomness | 523–534 |
-| Edge cases & original bugs | 535–561 |
-| Test vectors | 562–576 |
-| Provenance | 577–593 |
-| Open questions | 594–618 |
+|   6. A5Q4 Betrayal of Harrogath (chain 34, slot 38) | 74–176 |
+|   7. A5Q5 Rite of Passage (chain 35, slot 39) | 177–346 |
+|   8. A5Q6 Eve of Destruction (chain 36, slot 40) | 347–473 |
+|   9. Act V intro (chain 40, slot 42) | 474–500 |
+|   10. Hooks called from other systems | 501–522 |
+|   11. NPC services and game completion | 523–536 |
+| Constants & data dependencies | 537–556 |
+| Randomness | 557–568 |
+| Edge cases & original bugs | 569–604 |
+| Test vectors | 605–619 |
+| Provenance | 620–642 |
+| Open questions | 643–698 |
 <!-- /index -->
 
 ## Summary
@@ -146,7 +146,17 @@ Intro: state := 5 (direct write); the player's Halls of Pain (level 123)
 waypoint (`0x00660E00`, `0x00660E50` on player data +0x1C + 4·d) is not
 active → +0x89 := 1. Not-intro and 38.1 clear: 38.3 → +0x87 := 1, status
 2 (to all, flags kept), state := 3; else 38.2 → +0x87 := 1, status 1,
-state := 2.
+state := 2. Both statuses are sent to all with the flags byte kept
+(`0x0058BA3A`, `0x0058BA86`: `0x00544300` with iterate 1, no flags
+write).
+
+Status notation (re-read 2026-10-07): `0x00544300(record, n, arg, F,
+iterate)` writes the status byte (+0x0B) and, with iterate 1, calls F
+for every player; it never touches the flags byte (+0x14). "Status n"
+without "to all" in an event-13 rule of Act V is a plain status-byte
+write (e.g. `0x00587665`); "status n to all" clears the flags first
+unless a rule says "flags kept"; the one Act V "(silent)" call (part 1
+§4.4, 20110, `0x00587C1E`) clears the flags first too.
 
 #### 6.9 Status function (`0x0058AF00`, always true)
 
@@ -250,7 +260,10 @@ Chat end (`0x0058BE80`): qual-kehk with +0x01 = 1 → status 1 to all, +0x01
   `0x0058C6D0` lacking 39.0, passing G, in Act V → 39.0, 39.13, reward),
   completion flag `0x0058C780` (lacking 39.0, 39.13). state := 5; object
   561 (the invisible Ancient) at the victim (type 2, flags 1, 0, 0);
-  chain 36's seq fn; status ≠ 13 → status 13 to all.
+  chain 36's seq fn; status ≠ 13 → status 13 to all. Nesting confirmed
+  (`0x0058CA47`): everything after "+0x00 := 1" — the killer reward, both
+  player passes, state 5, object 561, the chain-36 seq fn and status 13 —
+  is skipped in an intro record.
 - Statue timer (`0x0058BD50`, period 2): no town portal open and armed:
   each statue with its respawn byte set: exists → mode 1 with an
   end-animation event at frame + (`FrameCnt1` >> 8), byte := 0, stored
@@ -281,6 +294,10 @@ Send flags first. A = 1,400,000 (normal), 20,000,000 (nightmare),
 while A ≠ 0 and L < M: gap = stat 30 (next experience) − stat 13
 (experience); A < gap → stat 13 += A, A := 0; else stat 13 := stat 30,
 stat 29 := gap, level up (`0x00570880`), A −= gap, L re-read.
+Every write is a set of the base stat (`0x00627260(player, stat, value,
+0)`: stat 13 := stat 30, stat 29 := gap, or stat 13 := stat 13 + A);
+stats 13 / 30 are read with the base getter `0x006253B0`, the level with
+`0x00625480`; "A < gap" is unsigned (`0x0058C673`).
 
 #### 7.8 Altar, doors and the invisible Ancient
 
@@ -291,6 +308,7 @@ stat 29 := gap, level up (`0x00570880`), A −= gap, L re-read.
   20002 to the player. Not-intro and state < 4: the same; state < 2 →
   state := 2; status ≠ 3 → status 3 (the flags byte is not cleared).
   Not-intro with state ≥ 4: neither. Then altar mode 1, +0x4C := 2.
+  The status 3 is sent to all (`0x0058D3CA`, iterate 1, flags kept).
   Returns 0.
 - Statue operates 62–64: sound 19, return 0. Statue inits 63–65 store
   the GUID and set the stored mode for the class (`0x0058D0C0`).
@@ -305,7 +323,10 @@ stat 29 := gap, level up (`0x00570880`), A −= gap, L re-read.
   warp. Mode 1: not defeated → sound 19, mode 2; defeated → mode 0,
   +0x60 := 0. Mode 2: not defeated → sound 19 twice, mode 2; defeated →
   (fight started → mode 0, +0x60 := 0) then mode 0, +0x60 := 0. Other
-  modes: nothing. Returns 0.
+  modes: nothing. Returns 0. The warp (mode 0, defeated; `0x0058D758`)
+  is `0x0059D9D0`, the same as door 547's: for each unit of the door's
+  room's unit list (+0x74, next +0xE8) of type 5 (warp tile),
+  `0x005550B0(game, player, tile)` (`sim/path-placement.md` §12.2).
 - Object 561 operate 69 (`0x0058D5E0`): 39.0 set and 39.4 clear → scroll
   message 20169.
 - The warp check `0x0058D090` (`quests.md` §8.2) reads +0x00: leaving
@@ -364,15 +385,22 @@ tyrael3 40.7 clear; cain6 with 40.10 clear and 40.5 clear.
   table `0x0058D9D0`).
 - Event 2 (`0x0058D870`): tyrael3 and +0x98 = 0: for each player
   `0x0058D7D0` (the first one in level 132: object 565 at a free spot
-  near (x + 5, y), `0x00545340` size 5, mask 0x400, radius 18; returns 1
-  and the walk stops); +0x98 := 1.
+  near (x + 5, y), `0x00545340` size 5, mask 0x400, radius 18 (unused); returns 1
+  and the walk stops); +0x98 := 1. Exact form of `0x0058D7D0`: needs the
+  player's room with level 132; spot := player position + (5, 0),
+  searched from the player's room with limit 100 (`0x0058D80A`); a spot
+  found → object 565 (type 2, flags 1, 1, 0) there; it returns 1 for the
+  first player in level 132 whether or not a spot or object was made, so
+  +0x98 is set and nothing retries.
 
 #### 8.5 Baal's death (event 8, `0x0058DF20`)
 
 Baal (base 544, not class 709) gets the chain-36 link at creation (§10);
 class 544 kills are forced. FX 19 (always).
 
-1. Not-intro: +0x8C := victim room (none → stop); status 4 to all. With a
+1. Not-intro: +0x8C := victim room (none → the whole callback returns,
+   step 2 included, `0x0058DF5C` → `0x0058E110`); status 4 to all (flags
+   kept: no flags write, `0x0058DF72`). With a
    killing player: b = the killer lacks 40.0; +0x88 := 0; for each player
    from the victim `0x0058DEA0` (lacking 40.0 and 40.1, in level 132 →
    credit `0x0058DD30`: set 40.13, 40.0, character progression
@@ -428,7 +456,13 @@ class 544 kills are forced. FX 19 (always).
   = 1.
 - Tyrael (`0x0058E920`, from `0x005AD952`, `0x005AD9AB`, `0x005B0A7F`):
   free spot near (x − 5, y − 5) of the given unit (size 5, mask 0x400,
-  radius 19) → monster 521 there (`0x005B2F20`, mode 1, 4, 0x42).
+  radius 19 (unused)) → monster 521 there (`0x005B2F20`, mode 1, 4, 0x42).
+  Exact form: `0x0058E920(game, room, unit)`; spot := unit position −
+  (5, 5), searched from the given room with limit 100 (`0x0058E940`);
+  spot found → `0x005B2F20(game, found room, x, y, 521, mode 1, spread
+  4, flags 0x42)`; flags 0x42 = 0x02 skip normal mods + 0x40 skip party
+  minions (`monsters/init.md` §2). No spot → nothing. Caller
+  `0x005AD952` passes the caller unit's room.
 
 #### 8.9 Sequence function (`0x0058E390`)
 
@@ -558,6 +592,15 @@ Spawned Ancients, Tyrael and the missiles draw from their own code
    Baal status 2 (§8.6).
 10. `0x0058B900`, `0x0058CFE0`, `0x0058D000`, `0x0058D030` have no
     caller in 1.14d.
+11. Baal killed with no victim room in a not-intro game: FX 19 only, no
+    credit and no missile 625 (§8.5); in an intro game the missile is
+    still made.
+12. Baal's status 4 and Betrayal's event-13 statuses keep the flags byte
+    (§8.5, §6.8).
+13. The last portal is tried once: the first player in level 132 ends
+    the walk and sets +0x98 even when no free spot was found (§8.4).
+14. The free-spot "radius" arguments of §8.4 / §8.8 are unused (part 1
+    §1.1).
 
 ## Test vectors
 
@@ -590,17 +633,38 @@ Spawned Ancients, Tyrael and the missiles draw from their own code
   39.4–39.9 set by the post-quest messages (D2MOO returns), the 20169
   bit, 40.4–40.9 via a jump table.
 - No packet or RNG recording of Act V exists yet.
+- 2026-10-07 answers (QE-5–QE-8): `disasm.py at` on `0x0058D7D0`,
+  `0x0058E920`, `0x0058D6A0`, `0x0059D9D0`, `0x0058B990`, `0x0058C5C0`,
+  `0x0058C9A0`, `0x0058DF20`–`0x0058E116`, `0x0058EA50`, `0x00544300`;
+  raw dump of the table `0x00732FF8`; a scan of every `0x00544300` call
+  in `0x00586B50`–`0x0058EB00` for the iterate argument and a preceding
+  flags write.
 
 ## Open questions
 
 1. Status meanings per quest (client quest log): `quests.md` open
-   question 1.
+   question 1. **Answered** (2026-10-07): `world/quests-status.md`: the client (0x52 `0x0045CC00` → `0x004A40D0` stores the list; row build `0x004A1950`, tables `0x00723F30` and the per-quest status tables) maps each status to a description string id, a replay speech id and an icon state (§4, §5); Act V tables §11 (Rite of Passage, Eve of Destruction).
 2. `0x00538680(client, 5, difficulty)`: which save progression field
-   (save spec; with `quests-act3.md` open question 5).
+   (save spec; with `quests-act3.md` open question 5). **Answered**
+   (2026-10-07): `quests-act1-rest.md` §5 (client +0x0A bits 8–12 raised
+   to 5 · difficulty + 5; never lowered).
 3. `0x0052E2A0(game)`, called after Baal's credits and by the last
-   portal: owner and effect (game / save spec).
+   portal: owner and effect (game / save spec). **Answered** (2026-10-07,
+   effect): only in game types 1 and 2 (game +0x6A; any other type →
+   nothing): for each client of the game's client list (game +0x88, next
+   +0x4A8) with a player (`0x00537860(client, 0)`): save its character
+   (`0x00532400(game, player, 0x00538830(client, 0))`, the save of
+   `sim/tick.md` §3 step 3), then, while the client has a pending save
+   download (client +0x3D4 bit 0x10 and buffer +0x17C, `0x00538FC0`),
+   call the 0xB3 DownloadSave sender `0x0052E110` (`sim/intents-events.md`
+   §3.2 step 5). No game state changes and no draw: it is host save /
+   transport code (owner: the host side with `sim/tick.md` §8); `d2-sim`
+   only raises it as a host call.
 4. Monstats flags byte +0x0E bit 6 (zoo eligibility): name the column
-   (monster spec).
+   (monster spec). **Answered** (2026-10-07): the `zoo` column: `data/fields.tsv`
+   lays it out as `bit(22)` of the flags dword at offset 12, i.e. byte
+   +0x0E mask 0x40; `0x0058E8B8` reads that byte and ANDs it with the
+   mask table entry `0x006CE280` (= 0x40, read from the image).
 5. The Baal throne AI condition that calls `0x0058E600` and the callers
    of `0x0058E920`: AI / monster specs.
 6. `0x00545C30(position, 2, superunique)` (Ancient spawn) and missile
@@ -615,3 +679,19 @@ Spawned Ancients, Tyrael and the missiles draw from their own code
    that every message table is referenced by a row, so the rows, the row
    40 cells and that test must change together in one implementation
    commit (rows: `0x00732FF8 40 40 <state> <slot> <npc> <string> 0`).
+   **Answered** (2026-10-07, TSV change handed to the TSV owner): init
+   `0x0058EA50` re-read (callbacks +0xA0 / +0xCC, table +0xDC, filter
+   +0xE0 = 42, status fn +0xE8, active fn +0xEC, no seq fn, active 1)
+   and the table dumped (states 0–2: 5 entries each as §9, menus 0;
+   state 3 count 0; state 4 = chain 31's table `0x00733308`). The exact
+   row-40 cells and 15 rows are in `docs/handoff/pc2-spec-quests-act4-5.md`
+   "Cross-file requests" for PC 2 quests-core (`quests.tsv`,
+   `quest-messages.tsv` and the 779 → 794 count change together).
+   Done (2026-10-07): quests-core commits `b242ee7` (row 40) and
+   `39dabf1` (15 rows, right after the header, before the first
+   `0x00733308` row); re-checked by quests-fixups against the image:
+   all 15 values equal `0x00732FF8`'s entries (4 states of 0xC4 bytes up
+   to `0x00733308`, counts 5, 5, 5, 0). Row order matters only within one
+   table: `d2-sim` filters by (table, state, NPC) and keeps file order,
+   so slot order inside a table is what must hold, not the table's place
+   in the file.

@@ -29,15 +29,15 @@
 |   5. The slot loop (`0x00470EC0`) | 243–363 |
 |   6. Component file and cel | 364–397 |
 |   7. Colormap source per component | 398–422 |
-|   8. Extra offsets (`0x004DA0B0`, `0x004DA0D0`, `0x004DA0F0`) | 423–483 |
-|   9. Single-cel units (missiles, items) | 484–498 |
-|   10. d2rs mapping | 499–513 |
-| Constants & data dependencies | 514–527 |
-| Randomness | 528–531 |
-| Edge cases & original bugs | 532–546 |
-| Test vectors | 547–567 |
-| Provenance | 568–615 |
-| Open questions | 616–654 |
+|   8. Extra offsets (`0x004DA0B0`, `0x004DA0D0`, `0x004DA0F0`) | 423–518 |
+|   9. Single-cel units (missiles, items) | 519–533 |
+|   10. d2rs mapping | 534–548 |
+| Constants & data dependencies | 549–562 |
+| Randomness | 563–566 |
+| Edge cases & original bugs | 567–581 |
+| Test vectors | 582–602 |
+| Provenance | 603–650 |
+| Open questions | 651–711 |
 <!-- /index -->
 
 ## Summary
@@ -434,7 +434,7 @@ Record fields (i32; positions 16.16 subtile, so `>> 11` is 1/32 subtile):
 
 | Index | Field |
 |---|---|
-| 0 | flags: 1 done, 2 timed, 4 bounce, 0x10 follow linked unit, 0x20 stop when reaching limits from below |
+| 0 | flags: 1 done, 2 timed, 4 bounce, 8 restarted (read only by `0x004DA6B0`), 0x10 follow linked unit, 0x20 stop when reaching limits from below |
 | 1–3 | x, y, z |
 | 4–6 | velocity |
 | 7–9 | acceleration |
@@ -477,9 +477,44 @@ per-unit client tick, before the type update); nothing when flag 1 is set:
 Created (`0x004DA000`, zeroed) and freed (`0x004DA080`) by client effect
 code: 16 creation sites (`0x00465716` … `0x004F0BCC`), fields set through
 `0x004DA1D0` (position, `<< 11`), `0x004DA200` (velocity), `0x004DA250`,
-`0x004DA2A0` (others). Which effects create one and with which values
-belongs to those effect specs (knockback, leap, item drop, corpse throw…;
-Open question 7). With no record every offset is 0.
+`0x004DA2A0` (others). With no record every offset is 0.
+
+Creation `0x004DA000`: reuses the unit's record when it has one, else
+allocates **0x48** bytes; then zeroes **0x4C** bytes and attaches it
+(`0x0046F070`). A new record's last 4 bytes (ticks left, index 18) lie
+past the allocation (1.14d heap overrun; d2rs allocates 0x4C). Setters
+(unit first, stack arguments; "≪" = the value is shifted `<< 11` when
+the last argument is non-zero): position `0x004DA1D0(x, y, z)` (always
+≪), velocity `0x004DA200`, acceleration `0x004DA250`, limits
+`0x004DA2A0`; flag 0x20 `0x004DA6E0` (EDX ≠ 0 sets, 0 clears), flag
+0x10 `0x004DA620` (same), bounce `0x004DA2F0(count, factor)` (flag 4),
+timed arc `0x004DA5B0` (EDX = height `h`, stack `n`: flag 2, ticks :=
+max(`n`, 1), x = y = 0, z := `h` ≪, vx = vy = 0, az := −0x1000 when 0,
+vz := (−`h`·2048 − az·`n`²/2) / `n`, C division), done `0x004DA640`
+(flag 1), restart `0x004DA690` (clears flag 1, sets flag 8; flag 8 has
+no other reader than `0x004DA6B0`, which reports "still moving" unless
+flag 1 is set and flag 8 clear).
+
+Creators (all 16 sites, 1.14d asm; values left out are 0):
+
+| Site(s) | Function: trigger | Values |
+|---|---|---|
+| `0x00465716`, `0x00465729`, `0x0046573C`, `0x0046574F` | `0x004656C0` (client monster class hook): `boneprison1`–`4` (340–343) | position (−32, −32), (−32, 32), (32, 32), (32, −32), z 0 |
+| `0x004657D5` | same: `izualghost` (406), after overlay 270 | position z −55; vz 1 ≪; limit z 50; flag 0x20 set |
+| `0x0046C00E` | `0x0046BFF0` (same hook, `tyrael3` 521, when `0x0065A620(room, 3, 625)` finds a unit) | position z 300; vz −2 ≪; limit z 5; flag 0x20 clear |
+| `0x004AE4D2` | `0x004AE400`: client missile linked both ways to the monster | flag 0x10 (follow) |
+| `0x004AFDE9` | `0x004AFCE0` first branch (path `0x00649190(unit, 5)`, mask `0x00648CE0(path, 0)`), only when the unit's oz is 0 | restart; flag 0x20 set; vz 2 ≪; limit z 160 |
+| (same record, no creation) | `0x004AFCE0` second branch (`0x00649190(unit, 1)`, mask 0x3C01), only when oz ≠ 0 | restart; flag 0x20 clear; vz −8 ≪; limit z 0 |
+| `0x004C8726` | `0x004C8670(unit, point)` (callers `0x004C8D58`, `0x004C902F`), when the unit's path speed `s` = `0x006486C0` >> 8 ≠ 0 | `d` := max(`0x006417F0(unit, point)`, 1); `n` := (`d` << 16) / (`s` << 12), −1 when > 1; `g` := −270`d` + 8,462 when `d` < 27, else −72`d` + 1,224 (table `0x006DAE70`), at least 500; az := −`g` (unshifted); timed arc, height 0, `n` |
+| `0x004CD9B5` | `0x004CD540` client missile create (every missile) | restart; with creation flag 0x100 only: timed arc (height = creation record +0x24, `n` = total frames `0x0064A300`), then one update `0x004DA350` |
+| `0x004CE7F6` | `0x004CE650` | position from its arguments; vz ≪ from a register, az ≪ from field +0x60 of a record it reads (not traced) |
+| `0x004CEC4E` | `0x004CEA00` | position z from a register; vz ≪ from field +0x5C of a record it reads (not traced) |
+| `0x004D17D7` | `0x004D16C0` | position 0; vz 2 ≪ |
+| `0x004D9364` | `0x004D9360` (client missile function, pointer `0x0072A6C4`) | flag 0x10 (follow) |
+| `0x004F04A0` | `0x004F0430` (client skill function 74, `Imp Teleport` 330 `cltdofunc`) | position x := the result of `0x004706E0` (EDX = 14, component S7), z := its second output |
+| `0x004F0BCC` | `0x004F0B50` (client skill function 77, `mon inferno sentry` 311 `cltdofunc`) | position z from `0x00646CA0`; flag 0x20 set |
+
+Free `0x004DA080` (callers `0x00465895`, `0x004CD180`).
 
 ### 9. Single-cel units (missiles, items)
 
@@ -508,7 +543,7 @@ overlays are drawn (after the cel).
 | `UnitParams.sub` | slot index; back overlays share sub 0 and are built before slot 0, front overlays sub 255, an inline unit (§5 r1) the host's slot (stable sort keeps build order) |
 | duplicate layer records | first match (§5.1 r5); not an error |
 | `armtype` index above 2 (Edge cases) | the request fails (slot not drawn) and d2rs reports it: the original reads unrelated memory, unreproducible; no 1.14d armor row reaches it |
-| inputs of an open question | refused as unresolved, never guessed. Since 2026-10-06 OQ1 (mode overrides, §2 r2), OQ2 / OQ3 (§1.1, §2.1), OQ4 (graphics-ready flag, §3 r3: with synchronous loading d2rs treats a loaded class and mode as ready), OQ5 (§5.2) and the follow branch of OQ7 (§8 r4) are specified; still open: motion-record creators (OQ7) |
+| inputs of an open question | refused as unresolved, never guessed. Since 2026-10-06 OQ1 (mode overrides, §2 r2), OQ2 / OQ3 (§1.1, §2.1), OQ4 (graphics-ready flag, §3 r3: with synchronous loading d2rs treats a loaded class and mode as ready), OQ5 (§5.2) and the follow branch of OQ7 (§8 r4) are specified; motion-record creators answered in §8 (OQ7) |
 | §3 r5 write-back | applied once per drawn frame (`camera.md` §9), to the client unit state |
 
 ## Constants & data dependencies
@@ -628,26 +663,48 @@ gfxclass / bossinv columns of `patch_d2`.
 5. ~~Monster armor-class override tables~~: answered in §5.2 (act II,
    base classes `skeleton1` / `sk_archer1`). A capture of an act II
    skeleton (e.g. Halls of the Dead) confirms the `des` files.
-6. S8 blood map: `0x0044DC60` (an option?) and `0x00477680`; owner
-   `render/shading.md`.
+6. *Answered* in the owner: `render/shading.md` §6 r3 (blood map
+   `0x00477680`) and r7 (`0x0044DC60` = the green-blood switch
+   `[0x007A05FC]`, its OQ 3).
 7. Motion record creators and their initial values (16 sites; the
    follow branch is answered in §8 r4). Open: what the loaded-COF field
    `+0x14` tested by `0x004706E0` means. Ghidra reads; a capture of a
    knockback or item drop.
+   *Answered* (static) for `+0x14`: the gfx mode node (+0x00 mode,
+   +0x08 loaded COF, +0x10 next; `0x0046E740`) points at a loaded-COF
+   record whose `+0x14` is the pointer to the COF file bytes. Records
+   loaded one by one (`0x0046DCC0`, store `0x007A8100`: 0x1C bytes,
+   +0x04 flag 1, +0x08 size, +0x0C name) get it from the file read and
+   are linked only when the read succeeded; records of the per-act
+   bundle `DATA\GLOBAL\cmncof_a1.d2` … (`0x0046F310` → `0x0046DDF0`,
+   store `0x007A78F0`) are 0x18-byte headers inside the bundle and get
+   header + 0x18. So in every linked record `+0x14` ≠ 0 and the test in
+   `0x004706E0` never fails; d2rs drops it. Open: the 16 creator sites.
+   *Answered* (static, 1.14d asm of the 16 sites and the setters
+   `0x004DA000`–`0x004DA6E0`; table `0x006DAE70` read from `Game.exe`):
+   §8 "Creators". Found on the way: flag 8 (restart), the 0x48-byte
+   allocation zeroed as 0x4C bytes. A capture of a bone prison, a
+   leaping unit or a missile with creation flag 0x100 checks the values.
 8. ~~`[0x007A8928]`~~: set once per game (`0x00470200` →
    `0x004FAC90`): 0 when `d2char.mpq` is found (install directory or
    current directory, `GetFileAttributesA`), else 1 unless `[0x0074C82C]`
    ≠ 0. A full install has it, so the local player uses 16 directions.
-9. Draw mode inputs `0x004DB360`, `0x00464370`, the shadow argument:
-   owner `render/blend-modes.md`.
-10. Cross-spec (`camera.md`, not edited here): §4 answers camera OQ2 for
-    types 0–2 and §8 answers camera OQ3; camera §4's object and missile
-    offset sentence should link here.
-11. Cross-spec (`formats/cof.md`): the game's row offset ignores event
-    padding (§3 r6); `cof.md` keeps the file-format reading.
+9. *Answered* in the owner: `render/blend-modes.md` draw-mode inputs
+   `r` (unit override `0x004DB360`) and `h` (hover `0x00464370`).
+10. *Answered*: `camera.md` §4 now links §8 for the object, missile and
+    motion offsets; camera OQ 3 is marked answered by §8.
+11. *Answered*: `formats/cof.md` Edge cases ("Game read of the draw
+    order") links §3 r6.
 12. `CompressedData` = 0 (every composite part DC6): never the case in the
     reference install; d2rs supports 1 only until a capture needs 0.
 13. Overlay files and their back/front split: the split, order,
     position and blend are answered in §5 r4; the creation of overlay
     records (who adds which `overlay.txt` row, frame advance) stays with
-    the overlay owner (no spec yet; `0x00470390`).
+    the overlay owner (no spec yet; `0x00470390`). That spec must own
+    the three draws of `0x00470390` on the **local player's** client
+    unit seed (unit from `0x00463DD0`, +0x20; for any unit's overlay):
+    type 6 `roll(frames)` → +0x18 (`0x004704DD`); argument a ≠ 0
+    `roll(a × 256)` → +0x18 (`0x004705B6`); argument b ≠ 0
+    `roll(b × 16)` added to +0x14 (`0x004705D7`). They share the sound
+    seed (`sim/rng.md` §7; stated meanwhile in `audio/sound-table-2.md`
+    §14.3, PC 2).
