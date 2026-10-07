@@ -121,7 +121,7 @@ id	name	size	layout	sender	client_handler	client_unit_handler	produced_by	confir
 0x77	TradeAction	2		0x0053CAB0	0x0045E800	-	out	yes
 0x78	TradeAccepted	21		-	0x0045E810	-	out	partial
 0x79	GoldInTrade	6		0x0053CBE0	0x0045E850	-	out	yes
-0x7A	PetAction	13	action:u8@1 pet_type:u8@2 class:u16@3 pet:u32@5 owner:u32@9	0x0053CB30	0x0045E860	-	sim	yes
+0x7A	PetAction	13	action:u8@1 pet_type:u8@2 class:u16@3 owner:u32@5 pet:u32@9	0x0053CB30	0x0045E860	-	sim	yes
 0x7B	AssignHotkey	8		0x0053DB20	0x0045E8D0	-	sim	yes
 0x7C	UseScroll	6		0x0053B3D0	0x0045E910	-	sim	yes
 0x7D	SetItemState	18	type:u8@1 unit:u32@2 item:u32@6 flag:u32@10 state:u32@14	0x0053D440	0x0045E930	-	sim	yes
