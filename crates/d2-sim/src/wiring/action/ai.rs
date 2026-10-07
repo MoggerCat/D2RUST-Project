@@ -159,6 +159,9 @@ impl<X: Pending> AiUnits for View<'_, X> {
         View::set_state(self, unit, s, on);
     }
     fn path_target(&self, unit: UnitId) -> Option<UnitId> {
+        if self.h.paths.is_some() {
+            return crate::wiring::path::monsters::path_target(self.h, unit);
+        }
         self.h.x.path_target(unit)
     }
 }
@@ -173,6 +176,7 @@ impl<X: Pending> AiModes for View<'_, X> {
     /// (state 54, bad mode).
     fn change_mode(&mut self, game: &mut Game, unit: UnitId, mode: u8, target: ModeTarget) -> bool {
         self.h.x.set_mode_target(unit, target);
+        crate::wiring::path::monsters::stage_request(self.h, unit, target);
         self.monster_set_mode(game, unit, u32::from(mode))
     }
     /// The anim mode (unit +0x10) without a mode change.
@@ -185,7 +189,8 @@ impl<X: Pending> AiModes for View<'_, X> {
         self.h.x.set_path_steps(unit, steps);
     }
     fn path_blocked(&self, unit: UnitId) -> bool {
-        self.h.x.path_blocked(unit)
+        crate::wiring::path::monsters::path_blocked(self.h, unit)
+            .unwrap_or_else(|| self.h.x.path_blocked(unit))
     }
     fn stop_path(&mut self, unit: UnitId) {
         self.h.x.stop_path(unit);

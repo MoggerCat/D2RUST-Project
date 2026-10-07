@@ -217,6 +217,9 @@ pub trait WalkUnits {
     /// State 13 event-0 call (`0x005C9D90`); its result is ignored and
     /// the step goes on (§9.2 step 2). Owner: the skills spec.
     fn state13_step(&mut self, unit: UnitId) {}
+    /// State 22 call of the monster walk event 0 (`0x005CE4F0`, §9.1).
+    /// Owner: the skills spec.
+    fn state22_step(&mut self, unit: UnitId) {}
     /// A monster's AI room memo (monster data +0x50) := 0.
     fn clear_ai_room_memo(&mut self, unit: UnitId) {}
     /// The client's player (client record); `None` = none.
