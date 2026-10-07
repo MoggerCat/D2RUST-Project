@@ -775,7 +775,7 @@ fn inv_vendors_pass_other_calls_through() {
             let made = w.create_item(0, AMULET, q::NORMAL, 5).expect("created");
             assert_eq!(w.item_record(made), AMULET);
             // The copy is the inventory model's (`InvDesk::copy_of`,
-            // `vendors.md` §7.3), not the rest's.
+            // `vendors-2.md` §7.3), not the rest's.
             let copy = w.copy_item(ring).expect("copied");
             assert_ne!(copy, UnitId(ring.0 + 1000));
             assert_eq!(w.item_record(copy), w.item_record(ring));

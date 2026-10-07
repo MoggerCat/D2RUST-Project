@@ -36,7 +36,7 @@ fn world() -> World {
 /// mode and position, the record's fields and stats, unit +0x28,
 /// item flag 0x80000 set and 0x2000 cleared, the source marked
 /// 0x8000000, the per-item reset (item flags 0x1 … cleared).
-// Covers: specs/world/vendors.md §7.3 r1, §7.3 r2, §7.3 r3, §7.3 r4, §7.3 r6, §7.3 r8
+// Covers: specs/world/vendors-2.md §7.3 r1, §7.3 r2, §7.3 r3, §7.3 r4, §7.3 r6, §7.3 r8
 #[test]
 fn copy_of_a_ground_item() {
     let mut w = world();
@@ -91,7 +91,7 @@ fn copy_of_a_ground_item() {
 
 /// Step 2: a stream that does not fit 1,024 bytes gives length 0 and
 /// the read fails: no copy.
-// Covers: specs/world/vendors.md §7.3 r2
+// Covers: specs/world/vendors-2.md §7.3 r2
 #[test]
 fn a_stream_over_the_buffer_copies_nothing() {
     let mut w = world();
@@ -111,7 +111,7 @@ fn a_stream_over_the_buffer_copies_nothing() {
 /// Step 5: with fillers 0 the children are not read: the copy keeps the
 /// socketed flag and its socket count, without fillers; with fillers 1
 /// the socketing call's arguments are unwritten: none, logged.
-// Covers: specs/world/vendors.md §7.3 r5
+// Covers: specs/world/vendors-2.md §7.3 r5
 #[test]
 fn children_and_the_fillers_argument() {
     let mut w = world();

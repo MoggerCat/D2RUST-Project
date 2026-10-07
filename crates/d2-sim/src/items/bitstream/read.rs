@@ -1,4 +1,4 @@
-// Spec: specs/items/bitstream.md (save format, §2–§5, read as the inverse of the writer); specs/formats/d2s.md §8.1 rule 2, §8.2 rules 4, 7, 8; specs/world/vendors.md §7.3 step 3
+// Spec: specs/items/bitstream.md (save format, §2–§5, read as the inverse of the writer); specs/formats/d2s.md §8.1 rule 2, §8.2 rules 4, 7, 8; specs/world/vendors-2.md §7.3 step 3
 //! The save-format record reader on the server side: the inverse of
 //! [`super::write_save`] into the writer's own view ([`StreamItem`]), so a
 //! record read back writes the same bytes. `world/vendors.md` §7.3 step
@@ -25,7 +25,7 @@ pub enum ReadError {
     #[error("save marker is {0:#06x}, not 0x4D4A (\"JM\")")]
     BadMarker(u32),
     /// The class lookup of the header peek (`0x0062E410`): a code outside
-    /// the items table (`vendors.md` §7.3 step 3: none).
+    /// the items table (`vendors-2.md` §7.3 step 3: none).
     #[error("unknown item code {0:?}")]
     UnknownCode([u8; 4]),
     #[error("stat {0} has no save bits but is in a list")]

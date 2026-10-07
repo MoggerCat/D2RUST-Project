@@ -1,4 +1,4 @@
-// Spec: specs/world/vendors.md §7.3 (item copy `0x0055A2A0`); specs/items/bitstream.md §5 (save format with children); specs/items/inventory-moves.md §6.1 rule 4.2 (per-item reset)
+// Spec: specs/world/vendors-2.md §7.3 (item copy `0x0055A2A0`); specs/items/bitstream.md §5 (save format with children); specs/items/inventory-moves.md §6.1 rule 4.2 (per-item reset)
 //! The item copy on the real item: the source written as a save-format
 //! stream with children ([`InvDesk::save_view`], `items::bitstream`), the
 //! first record read back (`items::bitstream::read`) and made an item
@@ -86,12 +86,12 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
             first.item.filled
         };
         if fillers && n != 0 {
-            // TODO(spec: vendors.md §7.3 step 5): the children are socketed
+            // TODO(spec: vendors-2.md §7.3 step 5): the children are socketed
             // through `0x00562660(child, copy, &out, 0, 1, 0, 0)`; what its
             // four flag arguments switch off of `inventory-moves.md` §7.19
             // is not written. The copy fails here (none) instead.
             self.state.errors.push(InvError::Unwritten(
-                "vendors.md §7.3 step 5: 0x00562660 flag arguments",
+                "vendors-2.md §7.3 step 5: 0x00562660 flag arguments",
             ));
             return None;
         }

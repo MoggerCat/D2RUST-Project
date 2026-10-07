@@ -1,10 +1,10 @@
-// Spec: specs/world/vendors.md §7.3 step 3 (an item from a save record, `0x00558CB0`); specs/formats/d2s.md §8.2 rules 2, 7; specs/items/generation.md §1.4, §9 step 6
+// Spec: specs/world/vendors-2.md §7.3 step 3 (an item from a save record, `0x00558CB0`); specs/formats/d2s.md §8.2 rules 2, 7; specs/items/generation.md §1.4, §9 step 6
 //! An item unit made from one save record read back
 //! (`items::bitstream::read`): the allocation (`0x00555230`, `units.md`
 //! §3.1, a new GUID) at the record's mode, the decode into it
 //! (`0x0062E430`, the inverse of `items/bitstream.md`, `vendors.md` Open
 //! question 8), then item flag 0x80000 set and 0x2000 cleared and the
-//! replenish timers. Used by the item copy (`vendors.md` §7.3) and the
+//! replenish timers. Used by the item copy (`vendors-2.md` §7.3) and the
 //! save load (`d2s.md` §8.2).
 //!
 //! What the record carries goes where the writer read it from: the item
@@ -42,7 +42,7 @@ impl<H: LifecycleHooks> Economy<'_, H> {
     /// `0x00558CB0` on a record read back: allocates an item unit of the
     /// record's class in `room` at the record's mode, decodes the record
     /// into it, sets item flag 0x80000 and clears 0x2000 (`d2s.md` §8.2
-    /// rule 7, `vendors.md` §7.3 step 3) and schedules the replenish event
+    /// rule 7, `vendors-2.md` §7.3 step 3) and schedules the replenish event
     /// (`generation.md` §9 step 6). No item-roll draw: the record holds
     /// the item's fields.
     pub fn item_from_record(
