@@ -41,6 +41,69 @@ pub fn unit_ref(id: u8, unit_type: u8, guid: u32) -> [u8; 6] {
     [id, unit_type, g[0], g[1], g[2], g[3]]
 }
 
+/// S→C 0x26 form 5, the overhead text of a unit (`0x0053C750`,
+/// `intents-events.md` §7.9 rule 3, §3 0x26 row): u8@1 5, u8@2 the
+/// overhead record's byte +8, u8@3 unit type, u32@4 GUID, bytes 8–9 never
+/// written (0 here), an empty name at 10, then the text and its NUL.
+pub fn overhead_chat(byte8: u8, unit_type: u8, guid: u32, text: &[u8]) -> Vec<u8> {
+    let mut m = Vec::with_capacity(12 + text.len());
+    m.extend_from_slice(&[0x26, 5, byte8, unit_type]);
+    m.extend_from_slice(&guid.to_le_bytes());
+    m.extend_from_slice(&[0, 0, 0]);
+    m.extend_from_slice(text);
+    m.push(0);
+    m
+}
+
+/// S→C 0x82 PortalOwnership (`0x0053DB90`, `intents-events.md` §6
+/// rule 6; 29 bytes): owner GUID u32@1, the owner's name at 5 (at most
+/// 15 characters + NUL; bytes after the NUL through 20 are never
+/// written, 0 here), u32@21, u32@25.
+pub fn portal_ownership(owner: u32, name: &[u8], portal: u32, portal2: u32) -> [u8; 29] {
+    let mut m = [0u8; 29];
+    m[0] = 0x82;
+    m[1..5].copy_from_slice(&owner.to_le_bytes());
+    let n = name
+        .iter()
+        .position(|&b| b == 0)
+        .unwrap_or(name.len())
+        .min(15);
+    m[5..5 + n].copy_from_slice(&name[..n]);
+    m[21..25].copy_from_slice(&portal.to_le_bytes());
+    m[25..29].copy_from_slice(&portal2.to_le_bytes());
+    m
+}
+
+/// S→C 0x98 (`0x0053E0A0`, 7 bytes): GUID u32@1, u16@5.
+pub fn unknown98(guid: u32, v: u16) -> [u8; 7] {
+    let g = guid.to_le_bytes();
+    let w = v.to_le_bytes();
+    [0x98, g[0], g[1], g[2], g[3], w[0], w[1]]
+}
+
+/// S→C 0x21 UpdateItemOSkill (`0x0053C4A0`, 12 bytes;
+/// `client/msg-skills.md` §4): unit type u8@1, remove u8@2, GUID u32@3,
+/// skill u16@7, base level u8@9, bonus level u8@10; byte 11 is never
+/// written (0 here).
+pub fn update_oskill(
+    unit_type: u8,
+    remove: bool,
+    guid: u32,
+    skill: u16,
+    base: u8,
+    bonus: u8,
+) -> [u8; 12] {
+    let mut m = [0u8; 12];
+    m[0] = 0x21;
+    m[1] = unit_type;
+    m[2] = u8::from(remove);
+    m[3..7].copy_from_slice(&guid.to_le_bytes());
+    m[7..9].copy_from_slice(&skill.to_le_bytes());
+    m[9] = base;
+    m[10] = bonus;
+    m
+}
+
 /// S→C 0x0A RemoveUnit (`0x00571600` → `0x0053BDA0`, §7.8 rule 3.1):
 /// type u8@1, GUID u32@2.
 pub fn remove_unit(unit_type: u8, guid: u32) -> [u8; 6] {

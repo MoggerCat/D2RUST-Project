@@ -100,6 +100,10 @@ pub struct BodyFake {
     pub anim_data: Option<(u32, Vec<u8>)>,
     pub action_event: bool,
     pub chains: BTreeMap<i32, i32>,
+    /// `class_for_level` remaps (class → class); absent → unchanged.
+    pub level_classes: BTreeMap<i32, i32>,
+    /// `missile_owner` answers (default none).
+    pub missile_owners: BTreeMap<usize, usize>,
     pub books: BTreeMap<usize, (i32, i32)>,
     pub inv_nodes: Vec<(usize, i32)>,
     pub found: Vec<usize>,
@@ -578,8 +582,8 @@ impl BodyWorld for BodyFake {
     fn allied(&self, a: usize, b: usize) -> bool {
         a == b || self.allies.contains(&(a, b))
     }
-    fn missile_owner(&self, _: usize) -> Option<usize> {
-        None
+    fn missile_owner(&self, u: usize) -> Option<usize> {
+        self.missile_owners.get(&u).copied()
     }
     fn minion_owner(&self, u: usize) -> Option<usize> {
         self.minion_owner.get(&u).copied()
@@ -918,6 +922,9 @@ impl BodyWorld for BodyFake {
     }
     fn chain_position(&self, class: i32) -> i32 {
         self.chains.get(&class).copied().unwrap_or(0)
+    }
+    fn class_for_level(&self, _: Option<usize>, class: i32) -> i32 {
+        self.level_classes.get(&class).copied().unwrap_or(class)
     }
     fn book_skills(&self, i: usize) -> Option<(i32, i32)> {
         self.books.get(&i).copied()

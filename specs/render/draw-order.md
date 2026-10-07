@@ -420,12 +420,12 @@ A shadow tile item carries no draw mode: its blend is the shadow-tile
 rule of `render/blend-modes.md` §5, whatever mode the caller names (§6
 r3). A unit's items keep the order's `pass` / `major` / `minor` and take
 `sub` from the composite; the unit's own position and offsets are
-`camera.md` §4 and `unit-composite.md` §8. An item this order emits whose
-drawing has no spec yet makes the frame an error, never a silent skip.
+`camera.md` §4 and `unit-composite.md` §8. An item this order emits
+without a drawing rule in the render specs makes the frame an error,
+never a silent skip.
 Since 2026-10-06 the former gaps are specified: water effects and passes
-4 and 9 (`draw-order-2.md` §11; the particle floats are its Open
-question 3, so a frame with live rain or snow particles stays an error
-until it is answered), level backgrounds (§12; they need the recorded
+4 and 9 (`draw-order-2.md` §11; the particle move is §11.9, answered
+from its Open question 3), level backgrounds (§12; they need the recorded
 background seed), pass 8 (§13: emits nothing), edge floors (§14; the act
 edge record is its Open question 2), the sight test (§15, §16) and the
 fade group mode (§8). Pass 10 has no d2rs input (screen fade timer).

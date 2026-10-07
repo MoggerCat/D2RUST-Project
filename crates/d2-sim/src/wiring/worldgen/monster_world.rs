@@ -69,6 +69,18 @@ impl<X: WorldPending> MonsterWorld<X> for WorldState {
         self.monsters.get(unit)
     }
 
+    fn monster_mut(&mut self, unit: UnitId) -> Option<&mut MonsterData> {
+        self.monsters.get_mut(unit)
+    }
+
+    fn component_counts(&self, class: u32) -> Option<[u8; 16]> {
+        let m = self.tables.monstats.get(class as usize)?;
+        self.tables
+            .components
+            .get(usize::from(m.monstatsex))
+            .copied()
+    }
+
     fn into_any(self: Box<Self>) -> Box<dyn Any> {
         self
     }

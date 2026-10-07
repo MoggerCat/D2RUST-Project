@@ -78,6 +78,15 @@ pub trait MonsterWorld<X> {
     fn monstats_count(&self) -> u32 {
         0
     }
+    /// The monster data of `unit`, mutable. Default: none.
+    fn monster_mut(&mut self, _unit: UnitId) -> Option<&mut MonsterData> {
+        None
+    }
+    /// The choice counts of the class's 16 components (`0x006647C0`,
+    /// monstats2 of `MonStatsEx`). Default: none.
+    fn component_counts(&self, _class: u32) -> Option<[u8; 16]> {
+        None
+    }
     /// The concrete state back (the lender downcasts it).
     fn into_any(self: Box<Self>) -> Box<dyn Any>;
 }

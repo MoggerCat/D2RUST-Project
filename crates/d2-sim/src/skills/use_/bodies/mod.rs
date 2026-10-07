@@ -161,6 +161,9 @@ pub struct BodyStat {
     pub send_bits: u8,
     pub send_param_bits: u8,
     pub signed: bool,
+    /// `send other` (+0x04 bit 0): read by the monster assign 0xAC
+    /// (`monsters/init.md` §24 rule 6).
+    pub send_other: bool,
 }
 
 /// The table data the bodies read beyond [`SkillTables`] and
@@ -183,6 +186,18 @@ pub struct BodyTables {
     pub monlvl: Vec<d2_data::tables::Monlvl>,
     /// `pettype.txt` record count.
     pub pettype_count: i32,
+    /// The item-event layer split (data +0xC6C shift, +0xC70 mask;
+    /// `data/runtime-maps.md` §3): `stuff` of itemstatcost record 0
+    /// (+0x140) when in 1..8, else 6; mask (1 << stuff) − 1. `None`
+    /// without itemstatcost rows.
+    pub layer_split: Option<(u32, u32)>,
+}
+
+/// The layer split of `data/runtime-maps.md` §3 from `stuff` of
+/// itemstatcost record 0.
+pub fn layer_split(stuff: u32) -> (u32, u32) {
+    let s = if (1..=8).contains(&stuff) { stuff } else { 6 };
+    (s, (1 << s) - 1)
 }
 
 impl BodyTables {
@@ -219,6 +234,7 @@ impl BodyTables {
                     send_bits: r.send_bits,
                     send_param_bits: r.send_param_bits,
                     signed: r.signed,
+                    send_other: r.send_other,
                 })
                 .collect(),
             state_group: states.iter().map(|r| i32::from(r.group as i16)).collect(),
@@ -227,6 +243,7 @@ impl BodyTables {
             overlay_count: i32::try_from(overlay.count).unwrap_or(i32::MAX),
             monlvl: Vec::new(),
             pettype_count: 0,
+            layer_split: isc.first().map(|r| layer_split(r.stuff)),
         })
     }
 
@@ -724,6 +741,9 @@ pub trait BodyWorld: UseWorld + KickItems {
     /// `0x006510C0(class, 0, &v)`: the monstats chain position (+0x4B,
     /// `data/fixups.md`); 0 for an invalid class.
     fn chain_position(&self, class: i32) -> i32;
+    /// `0x0063EC70(room, class)`: the class of `class`'s chain for the
+    /// room's level (`monsters/population.md` §11.6).
+    fn class_for_level(&self, room: Option<Self::Room>, class: i32) -> i32;
     /// The books row of an item's spell index (item data +0x3E,
     /// `0x00627F80` → `0x006374B0`): (`scrollskill`, `bookskill`).
     fn book_skills(&self, i: Self::Item) -> Option<(i32, i32)>;

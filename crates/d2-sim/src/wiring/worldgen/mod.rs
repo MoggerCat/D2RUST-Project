@@ -136,9 +136,7 @@ pub trait WorldPending: Pending {
     /// `0x0058F030` (`monsters/ai.md`).
     fn set_owner_data(&mut self, unit: UnitId, owner: OwnerKey, a: i32, b: i32, c: i32) {}
     fn unique_minion_owner_data(&mut self, boss: UnitId, minion: UnitId) {}
-    fn superunique_owner_data(&mut self, boss: UnitId) {}
-    /// `0x005B24E0` (`population.md` open question 4).
-    fn group_spawn(&mut self, boss: UnitId, class: i32, a: i32, b: i32, c: i32, flags: u16) {}
+
     /// `0x005B1990`.
     fn change_alignment(&mut self, unit: UnitId, a: i32, b: i32) {}
 
@@ -211,7 +209,7 @@ pub trait WorldPending: Pending {
     // ---- objects and units restore ---------------------------------------
 
     fn create_object(&mut self, room: RoomId, class: i32, x: i32, y: i32) {}
-    fn barricade_object(&mut self, unit: UnitId, class: i32) {}
+
     /// `0x0058F000`, `0x00666120` after a preset monster's creation.
     fn preset_created(&mut self, unit: UnitId, preset: &pop::PresetUnit) {}
     /// `0x00542B40` (`sim/units.md`).

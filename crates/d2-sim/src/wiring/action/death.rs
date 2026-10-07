@@ -13,10 +13,11 @@
 //!
 //! Client +0x508 ("experience lost", §4.7) is [`DeathState::exp_lost`],
 //! keyed by the player (`0x005531C0`: one client per player).
-//!
-//! TODO(spec: sim/units.md §4.5): the rest of `0x00580EC0` (before and
-//! after `0x00580F59`) and of `0x0057FCA0` (character save) are not
-//! written; only the calls above run.
+
+// PROVISIONAL (sim/units.md §4.5): of `0x00580EC0` (before and after
+// `0x00580F59`) and `0x0057FCA0` (character save) only the calls above
+// run; settled by a bin read and a save capture on death (HIGH PRIORITY:
+// saved bytes).
 
 use std::collections::BTreeMap;
 
@@ -131,9 +132,8 @@ impl<X: Pending> ActionHooks<X> {
     /// Corpse creation `0x0057F700` (§4.7 rule 1): the corpse
     /// ([`Pending::create_corpse`]) gets stat 13 := `pct(v, 75, 100)` of
     /// client +0x508, then +0x508 := 0.
-    ///
-    /// TODO(spec: vitals.md §4.7): with no corpse created the field is
-    /// left as is (the creation's failure path is not written).
+    // PROVISIONAL (combat/vitals.md §4.7): with no corpse created the
+    // field is left unchanged; settled by a bin read of `0x0057F700`.
     pub fn corpse_creation(&mut self, sim: &mut Sim<'_>, p: UnitId) {
         let Some(c) = self.x.create_corpse(sim.game, p) else {
             return;

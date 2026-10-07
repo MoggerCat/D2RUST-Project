@@ -132,14 +132,14 @@ pub fn strafe<W: BodyWorld>(
         return 0;
     }
     let g = guid(w, k);
+    // `bodies-3.md` §2 answer 8: the rewind runs only when K2 exists
+    // (`0x005DBC10`–`0x005DBC33`); the body returns 1 either way.
     if let Some(k2) = next_unit(w, t, ct, u, (0, 0), rr, 3, g).0 {
         let (ty, g2) = (type_index(w, k2), guid(w, k2));
         w.set_entry_param_of(u, &e, 2, ty);
         w.set_entry_param_of(u, &e, 3, g2 as i32);
+        w.anim_rewind(u, param(t, skill, 6));
     }
-    // TODO(spec: bodies-2b.md §7.2 step 8): the rewind is read as made
-    // whether or not K2 exists.
-    w.anim_rewind(u, param(t, skill, 6));
     1
 }
 
@@ -447,8 +447,7 @@ fn prison_segment<W: BodyWorld>(
     }
     let r = rec(t, skill)?;
     let (pet, petmax) = (i32::from(r.pettype), r.petmax);
-    // TODO(spec: bodies-2b.md §7.10): "≥ count → 0" in a function that
-    // returns a unit is read as pt := 0.
+    // `bodies-3.md` §2 answer 8: `pettype` ≥ count → pt := 0.
     let pt = if pet >= w.pettype_count() { 0 } else { pet };
     if let Some(room) = w.unit_room(u).and_then(|r| w.room_at(r, x, y)) {
         if w.room_in_town(room) {

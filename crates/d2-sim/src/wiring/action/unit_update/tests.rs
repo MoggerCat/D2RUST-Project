@@ -210,6 +210,21 @@ fn room_cleanup_clears_the_listed_flags() {
     assert_eq!(path(&mut fx, m).flags, !0x2);
 }
 
+/// §7.5 steps 4 and 7: the state-changed bits are zeroed and a player's
+/// stat 29 `lastexp` := −1.
+// Covers: specs/sim/intents-events.md §7.5 r4, §7.5 r7
+#[test]
+fn room_cleanup_resets_changed_states_and_lastexp() {
+    let (mut fx, p, _) = setup();
+    fx.sim.sys.stats.set_state_changed(p, 1, true);
+    let s = &mut fx.sim.sys;
+    let mut v = View::of(&mut s.units, &mut s.stats, &s.data, &mut s.hooks);
+    v.room_cleanup(p);
+    let (_, changed) = fx.sim.sys.stats.state_bits(p).expect("state bits");
+    assert!(changed.iter().all(|&w| w == 0), "{changed:?}");
+    assert_eq!(fx.sim.sys.stats.unit_base(p, 29, 0), -1);
+}
+
 /// §7.4 rule 4: with the provider on and no path record, the mode
 /// message is the fatal 0xE6 (logged, nothing sent).
 // Covers: specs/sim/intents-events.md §7.4 r4

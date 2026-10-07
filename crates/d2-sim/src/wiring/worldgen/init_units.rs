@@ -204,13 +204,11 @@ impl<X: WorldPending> InitHost for WorldHost<'_, X> {
         self.w.owners.insert(minion, boss);
     }
 
-    /// `0x005A0070` (`init.md` §17.3): the class's MonType is `ty` or
-    /// nested in it, bit (montype, ty) of the montype matrix
-    /// (`runtime-maps.md` §2; out-of-range rows and columns are 0).
-    // TODO(spec: init.md §17.3): `0x005A0070` is not listed among the
-    // matrix readers (`runtime-maps.md` §2 names `0x00629B50`); that it
-    // reads the matrix rather than walking the links itself is to be
-    // confirmed (same answers except the walk's depth / bad-link cases).
+    /// `0x005A0070` (`init.md` §17.3 rule 2, `runtime-maps.md` §2): type
+    /// `montype` is `ty` or nested in it, bit (row `montype`, column `ty`)
+    /// of the montype matrix itself (out-of-range rows and columns are 0).
+    /// The eligibility test asks it with row = the exclude type and
+    /// column = the class's MonType.
     fn montype_is(&mut self, montype: u16, ty: u16) -> bool {
         self.w
             .tables

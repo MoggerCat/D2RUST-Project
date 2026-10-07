@@ -35,14 +35,14 @@
 |   6. Adjacency array order (owner of `unit-order.md` §9) | 430–445 |
 |   7. Room clients and the inactivity counter | 446–466 |
 |   8. Deactivation (tick step 9) | 467–530 |
-|   9. Room tile grid | 531–1172 |
-|   10. Collision map from tiles | 1173–1251 |
-| Constants & data dependencies | 1252–1266 |
-| Randomness | 1267–1284 |
-| Edge cases & original bugs | 1285–1302 |
-| Test vectors | 1303–1353 |
-| Provenance | 1354–1397 |
-| Open questions | 1398–1505 |
+|   9. Room tile grid | 531–1174 |
+|   10. Collision map from tiles | 1175–1253 |
+| Constants & data dependencies | 1254–1268 |
+| Randomness | 1269–1286 |
+| Edge cases & original bugs | 1287–1304 |
+| Test vectors | 1305–1355 |
+| Provenance | 1356–1399 |
+| Open questions | 1400–1507 |
 <!-- /index -->
 
 ## Summary
@@ -636,14 +636,16 @@ name. The `LvlTypes` field address (row + 0x3C·i, never null) goes
 to the slot load, which takes the next free slot. Its cache lookup by
 path (`0x00600710`) misses, and the file is opened by that path:
 `0x005FDF80` gives size 0 when the open fails. The load then continues
-on a zero-size buffer (`0x00600790`). *Pending*:
-- whether that load is fatal or leaves an empty library slot;
-- whether any 1.14d `LvlTypes` row has an empty `File` under a mask bit
-  that a lvlprest / lvlmaze / outdoor source sets. The survey is
-  `data-tool tables` over `LvlTypes` `File1`–`File32` against every
-  `Dt1Mask`.
-d2rs skips such a bit (unverified). With 1.14d data only the second
-point decides whether this path ever runs. DT1 files are cached process-wide by path (`0x00600710`), so rooms
+on a zero-size buffer (`0x00600790`): the buffer is zeroed, parsed
+(`0x0060A390`), cached under the path and returned; only an allocation
+failure is fatal (errors 0x6C / 0x7C). The load is not fatal: it takes
+a library slot whose zeroed header holds no tiles. 1.14d data runs this
+path: `lvlprest.txt` `Dt1Mask` against the level's `LvlTypes` row has
+set bits with an empty (or "0") `File`, e.g. Act 5 town (level 109, row
+"Expansion", bits 17–20), levels 120 / 121 (row "Act 5 - Siege") and
+131 / 132 (row "Act 5 - Ice Caves"). An empty library adds no tile, so
+skipping the bit picks the same tiles; the slot still counts toward the
+32-slot limit above. DT1 files are cached process-wide by path (`0x00600710`), so rooms
 share library objects. Example (Act 1 town, `LvlTypes` "Act 1 - Town",
 lvlprest Dt1Mask 959 = bits 0–5, 7–9): slots = Floor, Objects, Fence
 (Town), River, stonewall, trees, Objects (Outdoors), TreeGroups, Bridge,

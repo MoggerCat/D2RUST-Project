@@ -348,7 +348,9 @@ pub fn eligible<H: InitHost + ?Sized>(cx: &Ctx<'_>, h: &mut H, class: u32, id: u
         return false;
     };
     for ex in [r.exclude1, r.exclude2] {
-        if s16(ex) > 0 && h.montype_is(m.montype, ex) {
+        // `0x005A0070(unit, ex)`: matrix row = the exclude type, column =
+        // the class's MonType, so set when `ex` is MonType or nested in it.
+        if s16(ex) > 0 && h.montype_is(ex, m.montype) {
             return false;
         }
     }

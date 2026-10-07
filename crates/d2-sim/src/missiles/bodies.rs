@@ -392,8 +392,8 @@ pub fn area_damage<W: MissileWorld + ?Sized>(
 /// The per-unit area hit `0x0056B9C0(game, attacker, U, copy)` (§R9.6):
 /// block or dodge (avoid 1, block 0), get-hit, the monster critical hit,
 /// the damage application and the reaction.
-// TODO(spec: missiles.md §R9.6): "a missile attacker becomes its owner"
-// is the provider's (the attacker handed here is the missile's owner).
+/// The attacker is the missile's owner (§R9.6 area_damage: a missile
+/// attacker becomes its owner before the walk).
 pub fn area_hit<W: CombatWorld>(
     w: &mut W,
     ct: &CombatTables,
@@ -411,8 +411,7 @@ pub fn area_hit<W: CombatWorld>(
         BlockResult::Dodge => 0x80,
         BlockResult::WeaponBlock => 0x8000,
         BlockResult::Block => 0x10,
-        // TODO(spec: missiles.md §R9.6): evade's result bit is not
-        // listed; only the hit bit is cleared.
+        // Evade sets no result bit (§R9.6); only the hit bit is cleared.
         BlockResult::Evade | BlockResult::None => 0,
     };
     if b != BlockResult::None {
@@ -617,8 +616,8 @@ pub fn srv_hit_13<W: MissileWorld + ?Sized>(
             .skill_calc(game, owner, k, SkillCalc::AuraRange, level)
             .max(1),
     };
-    // TODO(spec: missiles.md §R9.6 body 4): "len = sHitPar2, or eval(…)"
-    // read as: the formula when sHitPar2 ≤ 0, as for the radius.
+    // §R9.6 body 4: len = sHitPar2 when > 0, else the `auralencalc`
+    // formula.
     let len = match row.shitpar2 as i32 {
         v if v > 0 => v,
         _ => cx

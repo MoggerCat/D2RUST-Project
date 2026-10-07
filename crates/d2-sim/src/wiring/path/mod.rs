@@ -77,6 +77,9 @@ pub struct PathState {
     /// (the request record's target, `monsters/ai.md` §7.1), taken by
     /// [`ActionHooks::monster_path_setup`](crate::wiring::action::ActionHooks).
     pub mode_request: Option<(UnitId, crate::monsters::ai::ModeTarget)>,
+    /// The staged request's path-type byte (+0x15) when the AI
+    /// overwrote the builder's value (`ai.md` §7.1).
+    pub mode_request_byte: Option<(UnitId, u8)>,
 }
 
 impl PathState {
@@ -88,6 +91,7 @@ impl PathState {
             field: None,
             history: BTreeMap::new(),
             mode_request: None,
+            mode_request_byte: None,
         })
     }
 

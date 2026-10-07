@@ -44,8 +44,8 @@ pub use create::{
     reinit, stats_and_skills, type_init,
 };
 pub use message::{
-    assign_mode, component_bits, components_field, unique_name, write_boss_section, BitWriter,
-    UniqueName, LIFE_AT_SPAWN,
+    assign_mode, component_bits, components_field, unique_name, write_boss_section,
+    write_components, BitWriter, UniqueName, LIFE_AT_SPAWN,
 };
 pub use seams::InitHost;
 pub use umods::{

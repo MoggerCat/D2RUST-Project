@@ -25,16 +25,16 @@
 | Outputs / state changes | 55–60 |
 | Rules | 61–62 |
 |   1. Conventions | 63–74 |
-|   2. Shared helpers, batch 3 | 75–652 |
-|   3. Bodies, required level 1 | 653–828 |
-|   4. Bodies, required level 6 | 829–1038 |
-|   5. Bodies, required level 12 | 1039–1214 |
-| Constants & data dependencies | 1215–1249 |
-| Randomness | 1250–1288 |
-| Edge cases & original bugs | 1289–1358 |
-| Test vectors | 1359–1396 |
-| Provenance | 1397–1416 |
-| Open questions | 1417–1451 |
+|   2. Shared helpers, batch 3 | 75–658 |
+|   3. Bodies, required level 1 | 659–834 |
+|   4. Bodies, required level 6 | 835–1044 |
+|   5. Bodies, required level 12 | 1045–1220 |
+| Constants & data dependencies | 1221–1255 |
+| Randomness | 1256–1294 |
+| Edge cases & original bugs | 1295–1364 |
+| Test vectors | 1365–1402 |
+| Provenance | 1403–1422 |
+| Open questions | 1423–1457 |
 <!-- /index -->
 
 ## Summary
@@ -166,6 +166,12 @@ record's callback argument a):
 3. Path type := 10 (`0x00648CF0`; charged bolt, `sim/pathing.md` §2,
    §11.2); path step counts (+0x90, +0x91) := n (`0x00648E70`, capped
    77); compute the path (`0x00649970(P, missile, 0)`).
+
+n is signed (16-bit frame count, sign-extended; the step-1 test is a
+signed `n ≥ 78`), so a negative n skips step 1's frame writes; step 3
+stores the low byte of n, compared unsigned against 77 (`0x00648E7D`):
+low byte ≥ 77 → 77 (e.g. n = −1 → 77), else that byte. No 1.14d row
+reaches this (frame counts are ≥ 0).
 
 Every missile of one cast gets a different seed (a = 0, 1, …) and so a
 different jittered path.

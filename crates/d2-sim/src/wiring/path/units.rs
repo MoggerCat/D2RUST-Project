@@ -123,11 +123,9 @@ impl<X: Pending> ActionHooks<X> {
     }
 
     /// The path free at removal (`units.md` §2 +0x2C "freed at removal",
-    /// §3.2 footprint removal `0x00649F50` for types 0–3).
-    ///
-    /// TODO(spec: units.md §3.2, `0x00649F50`): the conditions of the
-    /// removal's footprint clear are not stated (the §5.2 table belongs to
-    /// `0x00649560`); the footprint is cleared unconditionally.
+    /// §3.2 footprint removal `0x00649F50` for types 0–3). Removal clears
+    /// the footprint with force (`path-placement.md` §5.3 rule 4), so the
+    /// §5.2 mode conditions do not apply.
     pub(crate) fn path_free(&mut self, unit: UnitId, ty: Option<UnitType>, mode: u32) {
         let Some(p) = self.paths.as_mut() else {
             return;
@@ -308,12 +306,13 @@ impl<X: Pending> View<'_, X> {
     /// and tile: static set and footprint; object: static set (footprint:
     /// see [`View::path_shape`]); item in another mode: no path.
     ///
-    /// TODO(spec: path-placement.md §2.5): the `set0x10` argument
-    /// `0x00554850` passes to the allocation is not stated; 0 is passed.
-    /// The monster calls after the allocation (`0x005735A0`, then
-    /// `0x00573780` or `0x00553220`) and the corpse path settings of
-    /// `units.md` §3.1 step 8 (player mode 0 / 17, monsters with
-    /// `0x0063EA40`) are not specified as rules: not run.
+    /// The three dynamic allocations pass `set0x10` = 0 (§2.5).
+    // PROVISIONAL (path-placement.md §2.5): the monster calls after the
+    // allocation (`0x005735A0`, then `0x00573780` or `0x00553220`) are
+    // only named, and the corpse path settings of `units.md` §3.1 step 8
+    // (player mode 0 / 17, monsters with `0x0063EA40`) have no rules:
+    // not run here; settled by a bin read of `0x005735A0` / `0x00553220`
+    // (spec work).
     pub fn path_place(&mut self, game: &Game, unit: UnitId, x: i32, y: i32) {
         if self.h.paths.is_none() {
             self.h.x.place(unit, x, y);

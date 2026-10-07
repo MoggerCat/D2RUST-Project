@@ -29,14 +29,14 @@
 |   1. Writer | 80–96 |
 |   2. Header (`0x006312B0`) | 97–125 |
 |   3. Compact record (`0x0062AF80`) | 126–157 |
-|   4. Full record (`0x0062FFF0`) | 158–294 |
-|   5. Save-format extras (never on the wire) | 295–312 |
-| Constants & data dependencies | 313–336 |
-| Randomness | 337–340 |
-| Edge cases & original bugs | 341–377 |
-| Test vectors | 378–400 |
-| Provenance | 401–425 |
-| Open questions | 426–497 |
+|   4. Full record (`0x0062FFF0`) | 158–305 |
+|   5. Save-format extras (never on the wire) | 306–323 |
+| Constants & data dependencies | 324–347 |
+| Randomness | 348–351 |
+| Edge cases & original bugs | 352–388 |
+| Test vectors | 389–411 |
+| Provenance | 412–436 |
+| Open questions | 437–508 |
 <!-- /index -->
 
 ## Summary
@@ -202,6 +202,14 @@ P = the prefix part's first combined index (747 in 1.14d; table +0x0C −
 suffix ids are sent unchanged (suffixes come first in the combined
 array, `items/affixes.md` §1).
 
+Reader (`0x0062CBE0`, format version ≥ 0x5A; older versions shift P
+and A, `items/bitstream-legacy.md`): a prefix field p′ ≠ 0 → p′ + P,
+p′ = 0 → 0; an auto field a′ ≠ 0 → a′ + A (§4.1 rule 11), 0 → 0. The
+reader does not invert the writer for a prefix id p ≤ P or an auto id
+a ≤ A (sent unchanged, read back + P / + A); an id is its combined
+index + 1 (`items/affixes.md` §1 rule 1), so every 1.14d prefix id is
+> P and every auto id > A, and the pair round-trips.
+
 #### 4.3 By quality
 
 "Shown" = save format, or F has 0x10 (identified).
@@ -291,6 +299,9 @@ In this order; "base" = the item's own value (`0x006253B0`), "total"
 5. Terminator: 9 bits 0x1FF after list c when c = −1, or the list
    exists, or the item is a runeword (so a runeword item ends every
    list slot, present or not).
+6. Reader (`0x0062CBE0`): a set list of mask bit i is found or created
+   with flags 0x2040 (never 0x40 alone); the runeword list with state
+   171, flags 0x40 (`world/vendors-2.md` §7.3.1 rule 6).
 
 ### 5. Save-format extras (never on the wire)
 

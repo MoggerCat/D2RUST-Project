@@ -391,15 +391,16 @@ pub fn vengeance<W: BodyWorld>(
         let len = elem_len(w, t, Some(u), skill, lvl);
         record.cold_len = record.cold_len.wrapping_add(len);
         let k = w.entry_param(u, &e, 1);
-        // TODO(spec: bodies-2b.md §6.8): a stored value outside 0…2 sets
-        // no hit class here.
+        // `bodies-3.md` §2 answer 8: k outside 0…2 sets no hit class; E
+        // param 1 := (k + 1) rem 3 (C remainder: a negative k can stay
+        // negative).
         match k {
             0 => record.hit_class = 0x20,
             1 => record.hit_class = 0x30,
             2 => record.hit_class = 0x40,
             _ => {}
         }
-        w.set_entry_param_of(u, &e, 1, k.wrapping_add(1).rem_euclid(3));
+        w.set_entry_param_of(u, &e, 1, k.wrapping_add(1) % 3);
     }
     start_combat(w.combat(), t, ct, Some(u), Some(tg), &mut record, 128);
     1
