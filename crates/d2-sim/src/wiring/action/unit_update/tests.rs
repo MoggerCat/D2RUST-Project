@@ -380,7 +380,7 @@ fn environment_report_sends_0x53_to_the_act_s_clients() {
     fx.game.lists.act_mut(act).unwrap().built = true;
     fx.tick();
     let env = |fx: &mut Fx| {
-        let s: Vec<_> = fx.sim.hooks().x.sent.drain(..).collect();
+        let s = std::mem::take(&mut fx.sim.hooks().x.sent);
         s.into_iter()
             .filter(|(_, m)| m[0] == 0x53)
             .collect::<Vec<_>>()
