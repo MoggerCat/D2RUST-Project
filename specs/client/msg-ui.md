@@ -27,34 +27,34 @@
 | Inputs | 80–87 |
 | Outputs / state changes | 88–105 |
 | Rules | 106–107 |
-|   1. 0x5D quest status (`0x0045E540` → `0x004A2CB0`) | 108–186 |
-|   2. 0x63 waypoint menu (`0x0045E670` → `0x0049CF90`) | 187–210 |
-|   3. 0x77 UI action (`0x0045E800` → `0x004B8CF0`) | 211–248 |
-|   4. 0x26 chat and overhead text (`0x0045DFC0` → `0x0049F490`) | 249–299 |
-|   5. 0x27 NPC text (`0x0045E0A0` → `0x004A1600`) | 300–329 |
-|   6. 0x4E hire offer and 0x4F hire list reset | 330–342 |
-|   7. 0x50 quest special (`0x0045E370` → `0x004B9210`) | 343–383 |
-|   8. 0x58 UI open (`0x0045E490` → `0x004C0550`) | 384–417 |
-|   9. 0x8A NPC wants to interact (`0x0045EA40` → `0x004B3380`) | 418–443 |
-|   10. 0x91 NPC intros (`0x0045E580` → `0x004B3510`) | 444–454 |
-|   11. 0x78 trade partner (`0x0045E810` → `0x004B9010`) | 455–463 |
-|   12. 0x29 game quest flags (`0x0045D3A0` → `0x004B2620`) | 464–473 |
-|   13. 0x52 quest log status (`0x0045CC00` → `0x004A40D0`) | 474–486 |
-|   14. 0x5E game quest availability (`0x0045E570` → `0x004B92B0`) | 487–494 |
-|   15. 0x9B hireling revive state (`0x0045EAC0` → `0x004B6980`) | 495–505 |
-|   16. 0x28 NPC dialog start and quest flags (`0x0045D370` → `0x004B6DD0`) | 506–559 |
-|   17. 0x62 NPC dialog end (`0x0045D390` → `0x004B5320`) | 560–572 |
-|   18. 0x2A NPC transaction (`0x0045E0D0` → `0x004B6390`) | 573–583 |
-|   19. 0x5A event text (`0x0045E070` → `0x0049EB10`) | 584–603 |
-|   20. 0x61 act video (`0x0045E660`) | 604–611 |
-|   21. 0x76 overhead clear (`0x0045E050` → `0x0049F8C0`) | 612–619 |
-|   22. 0x7B skill hotkey (`0x0045E8D0` → `0x004AA0C0`) | 620–629 |
-| Constants & data dependencies | 630–641 |
-| Randomness | 642–646 |
-| Edge cases & original bugs | 647–663 |
-| Test vectors | 664–711 |
-| Provenance | 712–762 |
-| Open questions | 763–835 |
+|   1. 0x5D quest status (`0x0045E540` → `0x004A2CB0`) | 108–196 |
+|   2. 0x63 waypoint menu (`0x0045E670` → `0x0049CF90`) | 197–227 |
+|   3. 0x77 UI action (`0x0045E800` → `0x004B8CF0`) | 228–272 |
+|   4. 0x26 chat and overhead text (`0x0045DFC0` → `0x0049F490`) | 273–323 |
+|   5. 0x27 NPC text (`0x0045E0A0` → `0x004A1600`) | 324–353 |
+|   6. 0x4E hire offer and 0x4F hire list reset | 354–366 |
+|   7. 0x50 quest special (`0x0045E370` → `0x004B9210`) | 367–407 |
+|   8. 0x58 UI open (`0x0045E490` → `0x004C0550`) | 408–441 |
+|   9. 0x8A NPC wants to interact (`0x0045EA40` → `0x004B3380`) | 442–467 |
+|   10. 0x91 NPC intros (`0x0045E580` → `0x004B3510`) | 468–478 |
+|   11. 0x78 trade partner (`0x0045E810` → `0x004B9010`) | 479–487 |
+|   12. 0x29 game quest flags (`0x0045D3A0` → `0x004B2620`) | 488–497 |
+|   13. 0x52 quest log status (`0x0045CC00` → `0x004A40D0`) | 498–510 |
+|   14. 0x5E game quest availability (`0x0045E570` → `0x004B92B0`) | 511–518 |
+|   15. 0x9B hireling revive state (`0x0045EAC0` → `0x004B6980`) | 519–529 |
+|   16. 0x28 NPC dialog start and quest flags (`0x0045D370` → `0x004B6DD0`) | 530–583 |
+|   17. 0x62 NPC dialog end (`0x0045D390` → `0x004B5320`) | 584–596 |
+|   18. 0x2A NPC transaction (`0x0045E0D0` → `0x004B6390`) | 597–607 |
+|   19. 0x5A event text (`0x0045E070` → `0x0049EB10`) | 608–627 |
+|   20. 0x61 act video (`0x0045E660`) | 628–635 |
+|   21. 0x76 overhead clear (`0x0045E050` → `0x0049F8C0`) | 636–643 |
+|   22. 0x7B skill hotkey (`0x0045E8D0` → `0x004AA0C0`) | 644–653 |
+| Constants & data dependencies | 654–665 |
+| Randomness | 666–670 |
+| Edge cases & original bugs | 671–687 |
+| Test vectors | 688–735 |
+| Provenance | 736–786 |
+| Open questions | 787–869 |
 <!-- /index -->
 
 Owned ids: 0x26, 0x27, 0x29, 0x4E, 0x4F, 0x50, 0x52, 0x58, 0x5D, 0x5E,
@@ -129,7 +129,7 @@ layer.
    | bit 0 set | other | nothing | – |
    | bit 0 clear, bit 1 set | 4 | sound 241 | output |
    | bit 1 | 8, 15, 18, 22, 35 | sound 7 | output |
-   | bit 1 | 23 | expansion game (`0x0044DCC0`: `[0x007A04F4]` ≠ 0) → `[0x007BC9D8]` := 1; else `0x0044EC80` (video-5 flag `[0x007A0604]` := 1, `render/composition.md` §4, and the character record's word +0x1EF bits 10–12 := difficulty + 1) then `[0x007BC9D4]` := 1 | output |
+   | bit 1 | 23 | expansion game (`0x0044DCC0`: `[0x007A04F4]` ≠ 0) → `[0x007BC9D8]` := 1; else `0x0044EC80` (video-5 flag `[0x007A0604]` := 1, `render/composition.md` §4, and the character record's word +0x1EF bits 10–12 := difficulty + 1) then `[0x007BC9D4]` := 1; `[0x007BC9D4]` is set on this classic branch only (`0x004A2D75`–`0x004A2D8C`: the expansion branch tail-jumps to `0x00483340`, the classic one to `0x00483300`) | output |
    | bit 1 | 32 | sound 217 | output |
    | bit 1 | 33 | sound 243 | output |
    | bit 1 | 36 | video-7 flag `[0x007A0628]` := 1 (`0x0044D530(1)`, `render/composition.md` §4) | output |
@@ -155,11 +155,21 @@ layer.
    (open question 2).
 5. Every row marked output becomes one `QuestUi` output {c, f, s, v};
    the UI layer runs that row (and T or r7) at delivery. The UI layer
-   reads its own state (latch, UI flags) then, not at receive.
+   reads its own state (latch, UI flags) then, not at receive. A row
+   marked "–" (nothing) and the model rows emit no output: in 1.14d
+   they call no UI or sound function, and which row matches depends
+   only on f and c, never on UI state (`0x004A2CB0`, the two jump
+   tables of r2). Answered for `docs/handoff/impl-client-msgs-3.md` §3
+   Q1.
 6. **Quest-log tail T.** The quest-log table `0x00723F30` has 41
    entries of 16 bytes: +2 slot within the act tab (0–5), +3 act (0–4;
    9 = unused), +8 chain (37 = none); "the entry of c" is the first
-   entry whose +8 = c (`0x004A1910`, `0x004A2C30`), else none.
+   entry whose +8 = c (`0x004A1910`, `0x004A2C30`), else none. The 41
+   entries are `client/quest-log-table.tsv` (dumped from the 1.14d image:
+   +0 u8, +1 u8, +2 slot, +3 act, +4 u32 pointer into the image, read
+   by the quest-log draw `0x004A1950`, +8 chain, +0xC u32 = the entry
+   index in every entry; meanings of +0, +1, +4 and +0xC beyond that:
+   open question 3).
    1. Latch `[0x007BF298]` = 0: `SetUIState(17 UI_QUESTLOG, on, 0)`
       (`ui/panels.md` §2; the quest-log alert button). Returned 1 → the
       entry of c, if any, sets the selected slot of its act
@@ -192,7 +202,14 @@ layer.
 2. The UI layer, at delivery (`0x0049CF90`):
    1. `SetUIState(20 UI_WAYPOINT, on, jump 1)` (`ui/panels.md` §2,
       §13 r1). Returned ≠ 1 → nothing more (the record is not stored).
-   2. Input reset `0x0044DA40`.
+   2. Input reset `0x0044DA40` (2026-10-08): reads nothing; writes
+      only client input state, none of it model: `[0x0070F2BC]` and
+      `[0x0070F234]` := 0x10 (otherwise set to 4, 8 or 0x10 by
+      `0x0044BF40`, `0x0044C000`, `0x0044C060` for `[0x0070F234]` and
+      `0x0044C180`, `0x0044C2C0`, `0x0044C370` for `[0x0070F2BC]`), `[0x007A0650]`, `[0x007A0654]`, `[0x007A066C]`,
+      `[0x007A0670]` := 0, then `0x00466FE0`: `[0x007A6A94]`,
+      `[0x007A6A98]` := 0. Owner of their meaning: the input spec
+      (`client/ui.md` §B4).
    3. Tab `[0x007BF086]`: the local player's room → level → act index a
       (`0x006427F0`); no player, room or level → tab 0. Else
       `0x0049C760(a)`: a ≥ the tab count `[0x007224E4]` (5 in the
@@ -211,7 +228,7 @@ layer.
 ### 3. 0x77 UI action (`0x0045E800` → `0x004B8CF0`)
 
 1. Layout: code u8@1 (2 bytes). Model state written: none. The handler
-   emits one `TradeAction` output {code}.
+   emits one `TradeAction` output {code, `dead_or_absent` (r4)}.
 2. The UI layer, at delivery, dispatches on the code (pointer table
    `0x004B8F7C`, 22 entries; code > 0x15 → nothing). Trade state
    `[0x007C0E7C]` (0 none … 7 refused); "decline" = C→S 0x4F button 2
@@ -245,6 +262,13 @@ layer.
    `SetUIState(1 inventory, toggle, 0)`; ui 5 open → `SetUIState(5, off,
    0)`. Then state ≠ 0 → decline and state := 0. (0x0C and 0x0D set the
    state to 0 first, so they never decline.)
+4. **`0x00463DF0`** (2026-10-08) reads the model and writes nothing: 1
+   when there is no local player (`[0x007A6A70]` = 0) or its mode
+   (+0x10) is 0x11 (dead), else 0. So the inventory toggle of close
+   trade(1) needs a live local player. The UI layer does not read the
+   model (`client/bridge.md` §10 r3): the 0x77 handler captures this
+   value at receive into the `TradeAction` payload (`dead_or_absent`),
+   and close trade uses the captured value.
 
 ### 4. 0x26 chat and overhead text (`0x0045DFC0` → `0x0049F490`)
 
@@ -674,7 +698,7 @@ Synthetic unless a recording is named ("A" = `-015956`, "B" =
 | `5d 04 01 00 0000`, monsters (1, 5) class 146, (1, 6) class 147 | (1, 5) `quest_untargetable`; (1, 6) unchanged | §1 r4 |
 | `5d 21 20 00 0000`, monster (1, 9) class 527 | (1, 9) `quest_untargetable` | §1 r2 |
 | `5d 08 02 00 0000` | output; UI plays sound 7 | §1 r2 |
-| `5d 08 03 00 0000` | output; UI does nothing (bit-0 table has no 8) | edge case 1 |
+| `5d 08 03 00 0000` | no model change; no output (bit-0 table has no 8) | edge case 1, r5 |
 | `5d 21 10 00 0500` | output; UI plays sound 5 | §1 r2 |
 | `5d 05 20 03 0200`, quest 1 bits 0, 1 clear | `[0x007BF2A4]` = 2; status byte of the chain-1 entry := 3 | §1 r7 |
 | `5d 05 20 03 0700`, quest 1 bits clear | `[0x007BF2A4]` = 666; status byte of the chain-1 entry := 3 | §1 r7 |
@@ -832,3 +856,13 @@ re-read on the 1.14d export): §5 r3 `0x004A1600` (`0x004A167A`,
     reads a registry value): Phase 6 UI / video spec; 0x2A's panel
     functions `0x004B53F0`, `0x004B5640` and the meaning of its bytes:
     `ui/*` with `world/vendors.md`.
+12. *Answered (2026-10-08)* (`docs/handoff/impl-client-msgs-3.md` §3
+    Q1): a 0x5D row marked "–" (e.g. `5d 08 03 00 0000`) emits no
+    `QuestUi` output (§1 r5); the test vector and the `client/bridge.md`
+    §10 row now say the same.
+13. *Answered (2026-10-08)* (same note, Q2): `[0x007BC9D4]` := 1 only on
+    the classic branch of f bit 1, c 23 (§1 r2 table).
+14. *Answered (2026-10-08)* (same note, Q3): the quest-log table is
+    `client/quest-log-table.tsv` (§1 r6).
+15. *Answered (2026-10-08)* (same note, Q4): `0x0044DA40` (§2 r2.2) and
+    `0x00463DF0` (§3 r4, now captured in `TradeAction`).

@@ -39,20 +39,20 @@
 | Outputs / state changes | 84–90 |
 | Rules | 91–92 |
 |   1. Loop order (single player) | 93–114 |
-|   2. Client → server | 115–284 |
-|   3. Server → client | 285–453 |
-|   4. d2rs mapping and scope | 454–485 |
-|   5. Machine-readable tables | 486–522 |
-|   6. Exact-match comparison | 523–621 |
-|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 622–1021 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1022–1166 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1167–1311 |
-| Constants & data dependencies | 1312–1330 |
-| Randomness | 1331–1336 |
-| Edge cases & original bugs | 1337–1370 |
-| Test vectors | 1371–1457 |
-| Provenance | 1458–1559 |
-| Open questions | 1560–1665 |
+|   2. Client → server | 115–287 |
+|   3. Server → client | 288–467 |
+|   4. d2rs mapping and scope | 468–499 |
+|   5. Machine-readable tables | 500–536 |
+|   6. Exact-match comparison | 537–635 |
+|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 636–1035 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1036–1180 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1181–1325 |
+| Constants & data dependencies | 1326–1344 |
+| Randomness | 1345–1350 |
+| Edge cases & original bugs | 1351–1384 |
+| Test vectors | 1385–1471 |
+| Provenance | 1472–1573 |
+| Open questions | 1574–1689 |
 <!-- /index -->
 
 ## Summary
@@ -241,8 +241,11 @@ of them has a consequence in 1.14d; d2rs keeps them as a diagnostic only.
    act than the player → 2; else the same 50-subtile test (→ 1).
 5. Skill messages (0x05–0x11 except 0x0B), after parsing: player stat
    `pierce_idx` (328, `0x148`) += 1, then the skill request.
-6. 0x14 (`0x0054A290`): msg = cstr at +3, 1 ≤ strlen < 256 else 2; name =
-   cstr after it (≤ 16). 0x15 (`0x0054A5D0`): msg strlen < 256 and
+6. 0x14 (`0x0054A290`): msg = cstr at +3; strlen ≥ 256 → 2; strlen 0
+   → 0 with no effect (`0x0054A2D5` jumps to the `xor eax, eax` exit at
+   `0x0054A3F0`; §9 rule 3; corrected 2026-10-08 for
+   `docs/handoff/impl-umods-cs-handlers.md`, which found "else 2" here);
+   name = cstr after it (≤ 16). 0x15 (`0x0054A5D0`): msg strlen < 256 and
    strlen + 4 < size, else rejected.
 7. 0x3C: u32 at +1, bit 31 = left hand, bits 0–30 = skill id, must be <
    the skills count (data +0xBA0); item u32 at +5. 0x51: u32 at +1: bits
@@ -450,6 +453,17 @@ Queue 2 (id 0xFF, 16 bytes, `0x0052CC20`) runs only when host callbacks
    the entries exactly as §7.9 rule 1 step 3 after its list bit, then
    0x1FF; size u8@6 = 8 + the stream's bytes. Has s, no list or no
    entry → 0xA7 (`0x0053E260`). Not set → 0xA9 (`0x0053E290`).
+7. **0x1D / 0x1E / 0x1F choice** (2026-10-08; answers
+   `docs/handoff/impl-server-join-2.md` §3 "0x0053BE40's choice").
+   `0x0053BE40(client, stat s in DX, value v)`: s > 0xFE → fatal assert
+   0x3CB. Then by v as an unsigned u32: v < 0xFF → **0x1D** [s u8@1][v
+   u8@2] (3 bytes); else v < 0xFFFF → **0x1E** [s u8@1][v u16@2] (4
+   bytes); else **0x1F** [s u8@1][v u32@2] (6 bytes). So 0xFF goes to
+   0x1E, 0xFFFF to 0x1F, and a negative v (≥ 0x80000000 unsigned) to
+   0x1F. The gold sender `0x0053E9B0(client, new n, old o)` first
+   tests d = n − o: 1 ≤ d ≤ 0xFE (unsigned `d − 1 < 0xFE`) → **0x19**
+   [d u8@1] (2 bytes); else the same three-way choice with s = 14
+   (gold) and v = n.
 
 ### 4. d2rs mapping and scope
 
@@ -1398,8 +1412,8 @@ Synthetic (from the rules; CI-safe):
 | client sends `0C 10 00 20 00` twice 60 ms apart | both sent (50 ms window) | §2.1 rule 1 |
 | unit update: missile with unit flag 0x10 | nothing sent | §7.1 rule 2.1 |
 | unit update: new item (flag 0x10), mode 3, flag 0x1000 | 0x9C action 2 once; after the clean-up and no change: nothing | §7.1, §7.5 |
-| unit update: monster mode 0 (flag 0x1), no target, cell (4757, 5461), d 0x38, +0xB0 6, GUID 0x13 | `69 13000000 08 9512 5515 38 06` | §7.4; recorded `-015956` frame 2724 |
-| same monster later in mode 12 at (4756, 5461) | `69 13000000 09 9412 5515 38 00` | §7.4; recorded frame 2748 |
+| unit update: monster mode 0 (flag 0x1), no target, path target (4757, 5461) (the (a, b) of §7.4 rule 7, not the unit's cell; the next row's mode 12 sends the cell (4756, 5461)), d 0x38, +0xB0 6, GUID 0x13 | `69 13000000 08 9512 5515 38 06` | §7.4; recorded `-015956` frame 2724 |
+| same monster later in mode 12, its cell (4756, 5461) | `69 13000000 09 9412 5515 38 00` | §7.4; recorded frame 2748 |
 | monster mode 1 (flag 0x1) with GUID 6 at (4634, 4537), d 0x80 | `6d 06000000 1a12 b911 80`; stat 328 += 1 | §7.4 rule 5; recorded `-022633` seq 159 (after its 0xAC) |
 | monster mode 6 (block), no target, GUID 0x22 | `69 22000000 12 0000 ffff 00 00` | §7.4 rule 5; recorded `-015956` seq 264400 |
 | monster with a skill in use, target in the client's rooms | 0x4C, not a mode message | §7.4 rule 3 |
@@ -1662,3 +1676,13 @@ Handlers of §9: `0x0054A260`, `0x0054A290` (with `0x00661110`,
     code 23 (C→S 0x69, `exit_requested`), 0x58 code 5 (`cursor_item`);
     the rest is UI or effect state. Display rules stay with `ui/*`
     (`docs/handoff/xpc-to-pc2.md`).
+19. *Answered (2026-10-08)* (`docs/handoff/impl-monster-death.md` §3
+    Finding 1): the first death test vector's (4757, 5461) is the path
+    target sent as (a, b), not the unit's cell; the row now says so.
+20. *Answered (2026-10-08)* (`docs/handoff/impl-server-join-2.md` §3):
+    the 0x1D / 0x1E / 0x1F choice of `0x0053BE40` and the 0x19 case of
+    `0x0053E9B0`: §3.5 rule 7.
+21. *Answered (2026-10-08)* (`docs/handoff/impl-umods-cs-handlers.md`,
+    subagent questions): C→S 0x14 with empty text returns 0 (§9 rule 3
+    is right; §2.4 rule 6 corrected). The 0x59 owner pointer already
+    names `monsters/ai-bodies.md` §9.9 (§9 table).
