@@ -798,3 +798,520 @@ fn blade_pulse_hits_every_unit_in_range() {
     // Invalid skill: 0.
     assert_eq!(blade_pulse(&mut f, &t, &ct, u, 99, 1), 0);
 }
+
+// ---------------------------------------------------------------- §3
+
+// Covers: specs/skills/bodies-2.md §3.1 text, §3.1 r1, §3.1 r2, §3.1 r3, §3.1 r4, §3.1 r5
+#[test]
+fn jab_rolls_on_a_hit_and_stores_the_entry() {
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.calc1 = c.f(25);
+    r.etype = 1;
+    r.calc4 = c.f(50);
+    r.emin = 7;
+    r.emax = 7;
+    r.hitshift = 8;
+    let t = tabs(r, c, 1);
+    let ct = combat_tables(vec![monster_rec()]);
+    let (mut f, u, m) = hit_world();
+    f.c.units[u].seed = hit_seed(&f, &t, &ct, u, m);
+    f.c.units[u].mode = 0; // keeps the stored entry after apply_melee
+    assert_eq!(b3_lvl01::jab(&mut f, &t, &ct, u, 1, 1), 1);
+    let rec = stored_record(&f, u, m).expect("start_combat stored");
+    assert_eq!(rec.result & 1, 1);
+    assert_eq!(rec.enh_pct, 25, "enhanced damage % := eval(calc1)");
+    assert_eq!((rec.conv_pct, rec.conv_elem), (50, 1), "EType conversion");
+    // A miss: no rolls, nothing stored for the apply.
+    let (mut f, u, _m) = hit_world();
+    f.c.in_range = false;
+    let seed0 = f.c.units[u].seed;
+    assert_eq!(b3_lvl01::jab(&mut f, &t, &ct, u, 1, 1), 1);
+    assert_eq!(f.c.units[u].seed, seed0, "no roll_elemental on a miss");
+    // R invalid / T none: 0.
+    assert_eq!(b3_lvl01::jab(&mut f, &t, &ct, u, 99, 1), 0);
+    f.targets.clear();
+    assert_eq!(b3_lvl01::jab(&mut f, &t, &ct, u, 1, 1), 0);
+}
+
+// Covers: specs/skills/bodies-2.md §3.2 text, §3.2 r1, §3.2 r2, §3.2 r3, §3.2 r4, §3.2 r5, §3.2 r6
+#[test]
+fn charged_bolt_makes_n_jittered_missiles() {
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.calc1 = c.f(3);
+    r.srvmissilea = 1;
+    let t = tabs(r, c, 2);
+    let (mut f, u) = world();
+    f.tpos.insert(u, (12, 7));
+    assert_eq!(b3_lvl01::charged_bolt(&mut f, &t, u, 1, 4), 1);
+    assert_eq!(f.c.units[u].flags & 0x40, 0x40, "unit flags |= 0x40");
+    assert_eq!(f.missiles.len(), 3);
+    for (i, q) in f.missiles.iter().enumerate() {
+        assert_eq!(q.flags, 0x21);
+        assert_eq!((q.owner, q.class, q.skill, q.level), (u, 1, 1, 4));
+        assert_eq!((q.x, q.y), (0, 0), "the unit's position");
+        assert_eq!((q.target_x, q.target_y), (12, 7));
+        assert_eq!(q.init, Some((init_cb::JITTER, i as u32)));
+    }
+    // A zero coordinate: that i makes nothing; still returns 1.
+    f.missiles.clear();
+    f.tpos.insert(u, (12, 0));
+    assert_eq!(b3_lvl01::charged_bolt(&mut f, &t, u, 1, 4), 1);
+    assert!(f.missiles.is_empty());
+    // n ≤ 0: returns 1, nothing.
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.calc1 = c.f(0);
+    r.srvmissilea = 1;
+    let t0 = tabs(r, c, 2);
+    f.tpos.insert(u, (12, 7));
+    assert_eq!(b3_lvl01::charged_bolt(&mut f, &t0, u, 1, 4), 1);
+    assert!(f.missiles.is_empty());
+    // Missile out of range (≥ count): 0; the flag was set before.
+    f.c.units[u].flags = 0;
+    let mut r = body_rec();
+    r.srvmissilea = 5;
+    let t5 = tabs(r, Code::new(), 2);
+    assert_eq!(b3_lvl01::charged_bolt(&mut f, &t5, u, 1, 4), 0);
+    assert_eq!(f.c.units[u].flags & 0x40, 0x40, "flag set before the test");
+    // R invalid: 0.
+    assert_eq!(b3_lvl01::charged_bolt(&mut f, &t, u, 99, 4), 0);
+}
+
+// Covers: specs/skills/bodies-2.md §3.6 text, §3.6 r1, §3.6 r2, §3.6 r3, §3.6 r4, §3.6 r5
+#[test]
+fn raven_spawns_without_a_target_node() {
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.summon = 0;
+    r.summode = 1;
+    r.pettype = 3;
+    r.petmax = c.f(4);
+    r.calc2 = c.f(2);
+    let t = tabs(r, c, 1);
+    let ct = combat_tables(vec![monster_rec()]);
+    let (mut f, u) = world();
+    f.monlvl = vec![crate::skills::fake::blank::<d2_data::tables::Monlvl>(); 10];
+    for row in &mut f.monlvl {
+        row.ac = 7;
+        row.th = 11;
+    }
+    f.c.units[u].flags = 0;
+    assert_eq!(b3_lvl01::raven(&mut f, &t, &ct, u, 1, 3), 1);
+    assert_eq!(f.c.units[u].flags & 0x40, 0x40);
+    let log = f.take_log();
+    assert!(log.iter().any(|s| s.starts_with("monster 1 (0, 0) 0 1 -1")));
+    let m = 1; // the spawned monster
+    assert!(log.contains(&format!("set {m} 74 0")), "hpregen := 0");
+    assert!(log.contains(&format!("set {m} 12 2")), "base_stats level");
+    assert!(log.contains(&format!("add {m} 31 7")));
+    assert!(log.contains(&format!("add {m} 19 11")));
+    assert!(log
+        .iter()
+        .any(|s| s.starts_with("PetAdd") && s.contains("t: 3, max: 4")));
+    assert!(!log.iter().any(|s| s.starts_with("NodeInsert")), "no node");
+    assert_eq!(f.c.units[m].flags & 0x4, 0, "m flags &= ~0x4");
+    // pettype out of range: 0, no flag; spawn failure: 0 with the flag.
+    f.c.units[u].flags = 0;
+    f.pettypes = 3;
+    assert_eq!(b3_lvl01::raven(&mut f, &t, &ct, u, 1, 3), 0);
+    assert_eq!(f.c.units[u].flags & 0x40, 0);
+    f.pettypes = 15;
+    f.no_monsters = true;
+    assert_eq!(b3_lvl01::raven(&mut f, &t, &ct, u, 1, 3), 0);
+    assert_eq!(f.c.units[u].flags & 0x40, 0x40);
+    // R invalid: 0.
+    assert_eq!(b3_lvl01::raven(&mut f, &t, &ct, u, 99, 3), 0);
+}
+
+// Covers: specs/skills/bodies-2.md §3.7 r1, §3.7 r2, §3.7 r3, §3.7 r4
+#[test]
+fn firestorm_is_a_fan_with_one_straight_missile() {
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.calc1 = c.f(4);
+    r.srvmissilea = 1;
+    let t = tabs(r, c, 2);
+    let (mut f, u) = world();
+    f.tpos.insert(u, (12, 7));
+    assert_eq!(b3_lvl01::firestorm(&mut f, &t, u, 1, 5), 1);
+    assert_eq!(f.c.units[u].flags & 0x40, 0x40);
+    let log = f.take_log();
+    let _ = log;
+    assert_eq!(f.missiles.len(), 4, "1 straight + (n − 1) jittered");
+    assert_eq!(f.missiles[0].init, None, "the straight skill_missile");
+    for (i, q) in f.missiles[1..].iter().enumerate() {
+        assert_eq!(q.init, Some((init_cb::JITTER, i as u32)), "argument 0…n−2");
+        assert_eq!((q.target_x, q.target_y), (12, 7));
+    }
+    // n ≤ 0: 0 (after the flag); an invalid missile: 0 (before the flag).
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.calc1 = c.f(0);
+    r.srvmissilea = 1;
+    let t0 = tabs(r, c, 2);
+    assert_eq!(b3_lvl01::firestorm(&mut f, &t0, u, 1, 5), 0);
+    f.c.units[u].flags = 0;
+    let mut r = body_rec();
+    r.srvmissilea = 9;
+    let t9 = tabs(r, Code::new(), 2);
+    assert_eq!(b3_lvl01::firestorm(&mut f, &t9, u, 1, 5), 0);
+    assert_eq!(f.c.units[u].flags & 0x40, 0);
+    assert_eq!(b3_lvl01::firestorm(&mut f, &t, u, 99, 5), 0);
+}
+
+// Covers: specs/skills/bodies-2.md §3.8
+#[test]
+fn psychic_hammer_start_tests_target_and_towns() {
+    let (mut f, u) = world();
+    assert_eq!(b3_lvl01::psychic_hammer_start(&mut f, u), 0, "T none");
+    let m = monster(&mut f, (3, 3));
+    f.targets.insert(u, m);
+    assert_eq!(b3_lvl01::psychic_hammer_start(&mut f, u), 1);
+    // T's room in town → 0; the unit's room in town → 0.
+    f.room_of.insert(m, 2);
+    f.town.insert(2);
+    assert_eq!(b3_lvl01::psychic_hammer_start(&mut f, u), 0);
+    f.room_of.insert(m, 1);
+    f.town.clear();
+    f.town.insert(1);
+    f.room_of.insert(m, 2);
+    assert_eq!(b3_lvl01::psychic_hammer_start(&mut f, u), 0);
+    f.town.clear();
+    // A target that is neither player nor monster: 0.
+    let o = f.add(FUnit::new(UnitType::Object, 0), (4, 4));
+    f.targets.insert(u, o);
+    assert_eq!(b3_lvl01::psychic_hammer_start(&mut f, u), 0);
+    let p = f.add(FUnit::new(UnitType::Player, 0), (5, 5));
+    f.targets.insert(u, p);
+    assert_eq!(b3_lvl01::psychic_hammer_start(&mut f, u), 1);
+}
+
+// Covers: specs/skills/bodies-2.md §3.9 text, §3.9 r1, §3.9 r2, §3.9 r3, §3.9 r4, §3.9 r5, §3.9 r6, §3.9 r7
+#[test]
+fn psychic_hammer_applies_then_flags_the_reaction() {
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.mindam = 1;
+    r.maxdam = 1;
+    r.hitshift = 8;
+    r.calc1 = c.f(100);
+    let t = tabs(r, c, 1);
+    let ct = combat_tables(vec![monster_rec()]);
+    let (mut f, u) = world();
+    let m = monster(&mut f, (3, 3));
+    f.targets.insert(u, m);
+    f.c.hostile = true;
+    f.c.set(m, 6, 10_000);
+    let seed0 = f.c.units[u].seed;
+    assert_eq!(b3_lvl01::psychic_hammer(&mut f, &t, &ct, u, 1, 1), 1);
+    // k = calc1 = 100 > 0: one draw, r < 100 → knockback; life ≥ 256 →
+    // no will-die; result |= 1.
+    let (a, d, res) = *f.c.reactions.last().expect("reaction");
+    assert_eq!((a, d, res), (u, m, 1 | 8));
+    assert!(f.c.get(m, 6) < 10_000, "the damage was applied first");
+    // roll_physical (1 draw) + the knock draw.
+    assert_ne!(f.c.units[u].seed, seed0);
+    // Life below 256 after the apply: will die (|= 2).
+    f.c.set(m, 6, 300);
+    b3_lvl01::psychic_hammer(&mut f, &t, &ct, u, 1, 1);
+    let (_, _, res) = *f.c.reactions.last().unwrap();
+    assert_eq!(res & 2, 2, "life < 256 → will die");
+    // k ≤ 0: no knock draw, no knockback bit.
+    let mut r = body_rec();
+    r.mindam = 1;
+    r.maxdam = 1;
+    r.hitshift = 8;
+    let t0 = tabs(r, Code::new(), 1);
+    f.c.set(m, 6, 10_000);
+    b3_lvl01::psychic_hammer(&mut f, &t0, &ct, u, 1, 1);
+    let (_, _, res) = *f.c.reactions.last().unwrap();
+    assert_eq!(res & 8, 0);
+    // The start test failing (T none): 0, nothing applied.
+    f.targets.clear();
+    let n = f.c.reactions.len();
+    assert_eq!(b3_lvl01::psychic_hammer(&mut f, &t, &ct, u, 1, 1), 0);
+    assert_eq!(f.c.reactions.len(), n);
+    assert_eq!(b3_lvl01::psychic_hammer(&mut f, &t, &ct, u, 99, 1), 0);
+}
+
+// Covers: specs/skills/bodies-2.md §3.11 text, §3.11 r1, §3.11 r2, §3.11 r3, §3.11 r4, §3.11 r5, §3.11 r6
+#[test]
+fn dragon_talon_do_counts_down_the_kicks() {
+    let mut r = body_rec();
+    r.param1 = 5;
+    r.param2 = 7;
+    let t = tabs(r, Code::new(), 1);
+    let ct = combat_tables(vec![monster_rec()]);
+    let (mut f, u, m) = hit_world();
+    let e = f.c.units[u].used.unwrap();
+    f.c.units[u].mode = 0; // keeps the kick's entry after apply_melee
+    f.c.units[u].seed = hit_seed(&f, &t, &ct, u, m);
+    f.set_entry_param_of(u, &e, 1, 3);
+    f.c.units[u].flags = 0x40;
+    f.take_log();
+    assert_eq!(b3_lvl01::dragon_talon(&mut f, &t, &ct, u, 1, 1), 1);
+    // n = 3 − 1 = 2 > 0: stored, flag 0x40 cleared, rewind(100), no knock.
+    assert_eq!(f.entry_param(u, &e, 1), 2);
+    assert_eq!(f.c.units[u].flags & 0x40, 0);
+    assert!(f.take_log().contains(&format!("rewind {u} 100")));
+    let rec = stored_record(&f, u, m).expect("kick entry");
+    assert_eq!((rec.result & 8, rec.hit_class), (0, 1), "no knockback yet");
+    // The last kick: ordinary target → chance 100 (no formula) → knock.
+    f.c.units[u].combat.clear();
+    f.set_entry_param_of(u, &e, 1, 1);
+    f.c.units[u].seed = hit_seed(&f, &t, &ct, u, m);
+    assert_eq!(b3_lvl01::dragon_talon(&mut f, &t, &ct, u, 1, 1), 1);
+    assert_eq!(f.entry_param(u, &e, 1), 0);
+    let rec = stored_record(&f, u, m).expect("kick entry");
+    assert_eq!(rec.result & 0xC, 0xC, "get-hit and knockback");
+    assert!(!f.take_log().contains(&format!("rewind {u} 100")));
+    // A unique target with calc2 = 0: k < 1, no draw, no knock.
+    f.c.units[u].combat.clear();
+    f.c.units[m].flags = 8;
+    f.set_entry_param_of(u, &e, 1, 1);
+    f.c.units[u].seed = hit_seed(&f, &t, &ct, u, m);
+    b3_lvl01::dragon_talon(&mut f, &t, &ct, u, 1, 1);
+    let rec = stored_record(&f, u, m).expect("kick entry");
+    assert_eq!(rec.result & 8, 0);
+    // Param 1 − 1 < 0: 0. T none / R invalid: 0.
+    f.set_entry_param_of(u, &e, 1, 0);
+    assert_eq!(b3_lvl01::dragon_talon(&mut f, &t, &ct, u, 1, 1), 0);
+    assert_eq!(b3_lvl01::dragon_talon(&mut f, &t, &ct, u, 99, 1), 0);
+    f.targets.clear();
+    assert_eq!(b3_lvl01::dragon_talon(&mut f, &t, &ct, u, 1, 1), 0);
+}
+
+// ---------------------------------------------------------------- §2.1
+
+/// A monster (class 0) with a base list (flag 1) holding a stale stat, and
+/// a one-row monlvl; returns the world, the monster, the list and tables.
+fn mode_world(
+    edit: impl FnOnce(&mut d2_data::tables::Monstats),
+) -> (BodyFake, usize, usize, SkillTables, CombatTables) {
+    let mut ms = monster_rec();
+    ms.noratio = true;
+    ms.a1mind = 10;
+    ms.a1maxd = 20;
+    ms.a1th = 100;
+    ms.a2mind = 30;
+    ms.a2maxd = 40;
+    ms.a2th = 110;
+    ms.s1mind = 50;
+    ms.s1maxd = 60;
+    ms.s1th = 120;
+    edit(&mut ms);
+    let ct = combat_tables(vec![ms]);
+    let t = tabs(body_rec(), Code::new(), 1);
+    let (mut f, _u) = world();
+    f.monlvl = vec![crate::skills::fake::blank::<d2_data::tables::Monlvl>(); 1];
+    let m = monster(&mut f, (4, 4));
+    let l = give_list(&mut f, m, 0, &[(99, 1)]);
+    f.lists[l].flags = 1;
+    (f, m, l, t, ct)
+}
+
+fn stats3(f: &BodyFake, l: usize) -> (i32, i32, i32) {
+    (f.list_get(l, 21), f.list_get(l, 22), f.list_get(l, 19))
+}
+
+// Covers: specs/skills/bodies-2.md §2.1 text, §2.1 r1, §2.1 r2, §2.1 r3, §2.1 r4, §2.1 r5, §2.1 r6, §2.1 r7
+#[test]
+fn mode_damage_rewrites_the_base_stats() {
+    let (mut f, m, l, t, ct) = mode_world(|_| {});
+    // Step 3: all stats of the base list are removed first; mode 5 → A2,
+    // 7 / 8 → S1, other (4, and 6 block in 1.14d) → A1; noRatio columns.
+    mode_damage(&mut f, &t, &ct, m, 5);
+    assert_eq!(f.list_get(l, 99), 0, "stale stats removed");
+    assert_eq!(stats3(&f, l), (30, 40, 110));
+    mode_damage(&mut f, &t, &ct, m, 7);
+    assert_eq!(stats3(&f, l), (50, 60, 120));
+    mode_damage(&mut f, &t, &ct, m, 8);
+    assert_eq!(stats3(&f, l), (50, 60, 120));
+    mode_damage(&mut f, &t, &ct, m, 4);
+    assert_eq!(stats3(&f, l), (10, 20, 100));
+    mode_damage(&mut f, &t, &ct, m, 6);
+    assert_eq!(stats3(&f, l), (10, 20, 100), "block takes the A1 row");
+    // Step 1: not a monster / no list / no record: nothing.
+    let (mut f2, m2, l2, t2, ct2) = mode_world(|_| {});
+    f2.lists[l2].flags = 2;
+    mode_damage(&mut f2, &t2, &ct2, m2, 4);
+    assert_eq!(f2.list_get(l2, 99), 1, "no base list: untouched");
+    f2.lists[l2].flags = 1;
+    mode_damage(&mut f2, &t2, &ct2, 0, 4);
+    assert_eq!(f2.list_get(l2, 99), 1, "a player is not a monster");
+    let ct_none = combat_tables(vec![]);
+    mode_damage(&mut f2, &t2, &ct_none, m2, 4);
+    assert_eq!(f2.list_get(l2, 99), 1, "no monstats record");
+    // Without noRatio: pct(monlvl DM, value, 100) and TH likewise.
+    let (mut f, m, l, t, ct) = mode_world(|ms| ms.noratio = false);
+    f.monlvl[0].dm = 150;
+    f.monlvl[0].th = 200;
+    mode_damage(&mut f, &t, &ct, m, 4);
+    assert_eq!(stats3(&f, l), (15, 30, 200));
+    // The L-flag picks the L-DM / L-TH columns.
+    f.l_flag = true;
+    f.monlvl[0].l_dm = 300;
+    f.monlvl[0].l_th = 50;
+    mode_damage(&mut f, &t, &ct, m, 4);
+    assert_eq!(stats3(&f, l), (30, 60, 50));
+}
+
+// Covers: specs/skills/bodies-2.md §2.1 r5, §2.1 r7
+#[test]
+fn mode_damage_difficulty_and_player_count() {
+    // Classic (not expansion), d = 1, Align ≠ 1: 10/12 and 10/15.
+    let (mut f, m, l, t, ct) = mode_world(|ms| {
+        ms.a1mind_n = 120;
+        ms.a1maxd_n = 240;
+        ms.a1th_n = 150;
+    });
+    f.c.difficulty = 1;
+    mode_damage(&mut f, &t, &ct, m, 4);
+    assert_eq!(stats3(&f, l), (100, 200, 100));
+    // Align = 1 (neutral) is exempt.
+    let (mut f, m, l, t, ct) = mode_world(|ms| {
+        ms.a1mind_n = 120;
+        ms.a1maxd_n = 240;
+        ms.a1th_n = 150;
+        ms.align = 1;
+    });
+    f.c.difficulty = 1;
+    mode_damage(&mut f, &t, &ct, m, 4);
+    assert_eq!(stats3(&f, l), (120, 240, 150));
+    // Expansion, 3 players on Nightmare: mult = 16, v += trunc(v·16/128).
+    let (mut f, m, l, t, ct) = mode_world(|ms| {
+        ms.a1mind_n = 80;
+        ms.a1maxd_n = 130;
+        ms.a1th_n = 100;
+    });
+    f.c.difficulty = 1;
+    f.c.expansion = true;
+    f.c.set(m, 100, 3);
+    mode_damage(&mut f, &t, &ct, m, 4);
+    assert_eq!(stats3(&f, l), (90, 146, 112));
+    // Normal difficulty: no multiplier whatever the count.
+    f.c.difficulty = 0;
+    f.c.set(m, 100, 5);
+    mode_damage(&mut f, &t, &ct, m, 4);
+    assert_eq!(stats3(&f, l), (10, 20, 100));
+}
+
+// Covers: specs/skills/bodies-2.md §2.1 r8, §2.1 r9
+#[test]
+fn mode_damage_element_slots() {
+    // Slot 1 cold on mode 5 (El1 columns, scaled by the monlvl DM), slot 2
+    // poison on mode 5 reading the El1 columns too (Edge case 1), slot 3
+    // on another mode: skipped.
+    let (mut f, m, l, t, ct) = mode_world(|ms| {
+        ms.noratio = false;
+        ms.el1mode = 5;
+        ms.el1type = 4;
+        ms.el1pct = 100;
+        ms.el1mind = 4;
+        ms.el1maxd = 8;
+        ms.el1dur = 30;
+        ms.el2mode = 5;
+        ms.el2type = 5;
+        ms.el2pct = 100;
+        ms.el3mode = 4;
+        ms.el3type = 1;
+        ms.el3pct = 100;
+    });
+    f.monlvl[0].dm = 150;
+    f.monlvl[0].th = 100;
+    mode_damage(&mut f, &t, &ct, m, 5);
+    assert_eq!(
+        (f.list_get(l, 54), f.list_get(l, 55), f.list_get(l, 56)),
+        (6, 12, 30)
+    );
+    assert_eq!(
+        (f.list_get(l, 57), f.list_get(l, 58), f.list_get(l, 59)),
+        (60, 120, 60),
+        "poison: 10·min, 10·max, 2·len"
+    );
+    assert_eq!(f.list_get(l, 48), 0, "slot 3 has another mode");
+    // Expansion with mult ≠ 0: min, max, len each += trunc(v·mult/128).
+    f.c.expansion = true;
+    f.c.difficulty = 1;
+    f.c.set(m, 100, 3);
+    f.lists[l].stats.clear();
+    f.monlvl[0].dm_n = 100;
+    let mut ct2 = ct.clone();
+    ct2.monstats[0].el1pct_n = 100;
+    ct2.monstats[0].el2pct_n = 100;
+    ct2.monstats[0].el1mind_n = 64;
+    ct2.monstats[0].el1maxd_n = 128;
+    ct2.monstats[0].el1dur_n = 64;
+    mode_damage(&mut f, &t, &ct2, m, 5);
+    assert_eq!(
+        (f.list_get(l, 54), f.list_get(l, 55), f.list_get(l, 56)),
+        (72, 144, 72)
+    );
+    // noRatio: min = max = 0 and len = El1Dur (fire has no length).
+    let (mut f, m, l, t, ct) = mode_world(|ms| {
+        ms.el1mode = 5;
+        ms.el1type = 11;
+        ms.el1pct = 100;
+        ms.el1mind = 4;
+        ms.el1maxd = 8;
+        ms.el1dur = 30;
+    });
+    mode_damage(&mut f, &t, &ct, m, 5);
+    assert_eq!(
+        (f.list_get(l, 316), f.list_get(l, 317), f.list_get(l, 315)),
+        (0, 0, 30)
+    );
+    // The chance: p < 100 draws once on the unit's seed; r ≥ p skips.
+    let (mut f, m, l, t, ct) = mode_world(|ms| {
+        ms.el1mode = 5;
+        ms.el1type = 11;
+        ms.el1pct = 50;
+        ms.el1dur = 30;
+    });
+    f.c.units[m].seed = seed_with(0..50);
+    mode_damage(&mut f, &t, &ct, m, 5);
+    assert_eq!(f.list_get(l, 315), 30, "r < p: applied");
+    f.lists[l].stats.clear();
+    f.c.units[m].seed = seed_with(50..100);
+    let before = f.c.units[m].seed;
+    mode_damage(&mut f, &t, &ct, m, 5);
+    assert_eq!(f.list_get(l, 315), 0, "r ≥ p: skipped");
+    assert_eq!(f.c.units[m].seed, stepped(before), "exactly one draw");
+    // Type 10 (random): one more draw, t = roll(5) + 1; len 0 → 25.
+    let (mut f, m, l, t, ct) = mode_world(|ms| {
+        ms.el1mode = 5;
+        ms.el1type = 10;
+        ms.el1pct = 100;
+        ms.el1dur = 0;
+    });
+    let mut s = f.c.units[m].seed;
+    let ty = s.roll(5) as i32 + 1;
+    mode_damage(&mut f, &t, &ct, m, 5);
+    assert_eq!(f.c.units[m].seed, s, "one draw (pct 100 draws none)");
+    if ty == 4 {
+        assert_eq!(f.list_get(l, 56), 25);
+    }
+    if ty == 5 {
+        assert_eq!(f.list_get(l, 59), 50);
+    }
+    if ty == 9 {
+        assert_eq!(f.list_get(l, 66), 25);
+    }
+}
+
+// Covers: specs/skills/bodies-2.md §3.1 r2
+#[test]
+fn jab_of_a_monster_sets_the_s1_damage() {
+    let t = tabs(body_rec(), Code::new(), 1);
+    let (mut f, m, l, _t, ct) = mode_world(|_| {});
+    let p = 0; // the player of the world
+    f.targets.insert(m, p);
+    f.c.set(m, 12, 1);
+    f.c.set(p, 12, 1);
+    f.c.hostile = true;
+    f.c.in_range = true;
+    assert_eq!(b3_lvl01::jab(&mut f, &t, &ct, m, 1, 1), 1);
+    assert_eq!(stats3(&f, l), (50, 60, 120), "mode_damage(unit, 8)");
+}

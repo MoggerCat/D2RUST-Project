@@ -111,6 +111,8 @@ pub struct Fake {
     /// Every unit is shapeshifted (`ManaUnits::shapeshifted`).
     pub shifted: bool,
     pub log: Vec<String>,
+    /// The (attacker, defender, result) of every `reaction` call.
+    pub reactions: Vec<(usize, usize, u16)>,
 }
 
 impl Fake {
@@ -378,8 +380,9 @@ impl CombatWorld for Fake {
     fn thorns(&mut self, a: usize, d: usize, _r: &mut DamageRecord) {
         self.log.push(format!("thorns {a} {d}"));
     }
-    fn reaction(&mut self, a: usize, d: usize, _r: &mut DamageRecord) {
+    fn reaction(&mut self, a: usize, d: usize, r: &mut DamageRecord) {
         self.log.push(format!("reaction {a} {d}"));
+        self.reactions.push((a, d, r.result));
     }
 }
 
