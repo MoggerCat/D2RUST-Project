@@ -22,45 +22,46 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 66–84 |
-| Inputs | 85–95 |
-| Outputs / state changes | 96–120 |
-| Rules | 121–122 |
-|   1. Entry points | 123–145 |
-|   2. The create request | 146–163 |
-|   3. Placement | 164–172 |
-|   4. Creation sequence after placement (`0x005B2A00`) | 173–231 |
-|   5. Monster type init (`0x00574250`) | 232–249 |
-|   6. Stats and skills (`0x00573CB0`) | 250–289 |
-|   7. Monster level | 290–305 |
-|   8. Base values from monlvl | 306–340 |
-|   9. Player-count bonus (`0x00573930`) | 341–352 |
-|   10. Components (`0x005739D0`) | 353–363 |
-|   11. monprop (`monprop.txt`) | 364–372 |
-|   12. monequip (`0x005D6B60`) | 373–389 |
-|   13. Classic scaling (`0x0063EEF0`) | 390–397 |
-|   14. Normal mods and boss mods | 398–499 |
-|   15. Party minions | 500–504 |
-|   16. Boss spawns | 505–540 |
-|   17. Choosing umods (`0x005A0760`) | 541–584 |
-|   18. Boss minions and umod init (`0x005A2120`) | 585–602 |
-|   19. Umod init functions | 603–688 |
-|   20. Superuniques (`0x005A49B0`) | 689–737 |
-|   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 738–752 |
-|   22. Umod callbacks and the type-7 event | 753–800 |
-|   23. Unique names (client) | 801–810 |
-|   24. Monster assign message | 811–823 |
-|   25. Calling the spawn functions outside population (tools) | 824–914 |
-|   26. Making an existing monster unique (`0x005A4940`) and the warping shrine's pick | 915–973 |
-| Constants & data dependencies | 974–995 |
-| Randomness | 996–1038 |
-| Edge cases & original bugs | 1039–1064 |
-| Test vectors | 1065–1066 |
-|   Synthetic (CI-safe) | 1067–1089 |
-|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1090–1120 |
-|   Recorded checks (monster assign 0xAC) | 1121–1133 |
-| Provenance | 1134–1204 |
-| Open questions | 1205–1246 |
+| Summary | 67–85 |
+| Inputs | 86–96 |
+| Outputs / state changes | 97–121 |
+| Rules | 122–123 |
+|   1. Entry points | 124–146 |
+|   2. The create request | 147–164 |
+|   3. Placement | 165–173 |
+|   4. Creation sequence after placement (`0x005B2A00`) | 174–232 |
+|   5. Monster type init (`0x00574250`) | 233–250 |
+|   6. Stats and skills (`0x00573CB0`) | 251–290 |
+|   7. Monster level | 291–306 |
+|   8. Base values from monlvl | 307–341 |
+|   9. Player-count bonus (`0x00573930`) | 342–353 |
+|   10. Components (`0x005739D0`) | 354–364 |
+|   11. monprop (`monprop.txt`) | 365–373 |
+|   12. monequip (`0x005D6B60`) | 374–390 |
+|   13. Classic scaling (`0x0063EEF0`) | 391–398 |
+|   14. Normal mods and boss mods | 399–500 |
+|   15. Party minions | 501–505 |
+|   16. Boss spawns | 506–541 |
+|   17. Choosing umods (`0x005A0760`) | 542–585 |
+|   18. Boss minions and umod init (`0x005A2120`) | 586–603 |
+|   19. Umod init functions | 604–689 |
+|   20. Superuniques (`0x005A49B0`) | 690–738 |
+|   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 739–753 |
+|   22. Umod callbacks and the type-7 event | 754–801 |
+|   23. Unique names (client) | 802–811 |
+|   24. Monster assign message | 812–824 |
+|   25. Calling the spawn functions outside population (tools) | 825–915 |
+|   26. Making an existing monster unique (`0x005A4940`) and the warping shrine's pick | 916–974 |
+|   27. Class reinit (`0x00574370`) | 975–1020 |
+| Constants & data dependencies | 1021–1042 |
+| Randomness | 1043–1085 |
+| Edge cases & original bugs | 1086–1116 |
+| Test vectors | 1117–1118 |
+|   Synthetic (CI-safe) | 1119–1141 |
+|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1142–1172 |
+|   Recorded checks (monster assign 0xAC) | 1173–1185 |
+| Provenance | 1186–1264 |
+| Open questions | 1265–1309 |
 <!-- /index -->
 
 ## Summary
@@ -971,6 +972,52 @@ this order:
 
 The search and the test draw nothing.
 
+### 27. Class reinit (`0x00574370`)
+
+`reinit(game, unit, class, mode)` (ECX game, EDX unit; stack class,
+mode; `ret 8`) turns an existing monster into another class in place.
+Returns 1 when done, else 0 with nothing changed.
+
+1. Unit missing or not a monster (type ≠ 1) → 0.
+2. `class` < 0, ≥ the monstats count, or its row lacks `enabled`
+   (monstats byte +0xF & 0x02, bit 25 of the flags dword +0x0C) → 0.
+3. R := the unit's room (`0x00620BB0`), G := unit +0x0C (its GUID),
+   both read before the teardown.
+4. Teardown `0x005736A0(game, unit)` (also the monster branch of the
+   unit free, call at `0x005556C9`), with the old class:
+   1. Drop the unit's own combat-list entries (`0x0057C980`,
+      `sim/units.md` §2 row +0xAC).
+   2. Unless the old class is a valid row with `interact` (monstats
+      byte +0xD & 0x02): remove the inventory's items (`0x00555AE0`)
+      and free the inventory (`0x0063AC40(unit +0x60)`). An `interact`
+      monster (NPC) keeps its inventory.
+   3. Hover record (unit +0xA4) non-zero → returned to the game pool
+      (`0x006611A0`); the pointer is not cleared (Edge cases 13).
+   4. Free monster data +0x28 AI control (`0x0058F810`), +0x2C AI
+      params (`0x005A64D0`), +0x30 interaction block (`0x00572BC0`).
+      The monster data record itself is kept.
+   5. Cancel all the unit's timers (`0x00540EE0`).
+5. unit +0x04 := `class`.
+6. Rebuild with the type init `0x00574250(game, R, unit, G)` (§5, with
+   §6): new AI control, AI params and interaction block, monstats
+   pointer, region data, stats and skills (draws on the unit seed, which
+   is not re-derived), first AI setup with state 0 (the call at
+   `0x00574307`; its draws: Open question 2), level id. §5 step 7 tests
+   the unit's **old** mode (+0x10 is not yet changed). Monster-data
+   fields that §5 and §6 do not write (type flags, umods, name seed)
+   keep their values; no umod init or boss mods run.
+7. Mode := `mode` through the plain mode set `0x00624690`
+   (`sim/units.md` §4.1), not the monster mode change `0x005A7C20`.
+8. Return 1.
+
+Callers (all three in 1.14d):
+
+| Call site | Function | Class, mode |
+|---|---|---|
+| `0x005A733E` | `0x005A72B0`, the death mode's event-1 function (`sim/units.md` §4.6 table, mode 0 DT) | monstats `SplEndDeath` (+0x1A4) = 1 and `minion1` (+0x26, s16) ≥ 0 and ≤ the count: `minion1`, mode 1; then think restart `0x00573780` (`monsters/ai.md` §1.5). 1.14d data: fetishshaman1–5 (278–282) and 6–8 (662–664) become fetish1–5 (141–145) and 6–8 (656–658). `SplEndDeath` 2 (barricadetower, 435) takes the other branch, no reinit |
+| `0x005D1EA1` | `0x005D1E10`, the skill body Transform (`skills/bodies-4.md`) | the summon class mapped along `NextInClass`, the skill's mode |
+| `0x005EF450` | `0x005EF320`, the BaalThrone AI (`monsters/ai-bodies-5.md` §20 step 6) | 559 baalcrabstairs, mode 1 |
+
 ## Constants & data dependencies
 
 | Table | Columns read at creation (fields.tsv names) |
@@ -1061,6 +1108,11 @@ Then, for bosses:
 11. Classic scaling leaves hitpoints at the unscaled value while maxhp
     is halved.
 12. `0x00573930` writes difficulty 2 into the game when it finds ≥ 3.
+13. The class reinit teardown (§27 step 4.3) frees the hover record
+    (unit +0xA4) but does not clear the pointer; whether a later write
+    replaces it before any read is Open question 11.
+14. A reinit monster keeps its umods, type flags and name seed but gets
+    the new class's stats with no umod init re-run (§27 step 6).
 
 ## Test vectors
 
@@ -1133,6 +1185,14 @@ Bosses, Normal, Blood Moor (L-flag 1):
 
 ## Provenance
 
+- §27 class reinit from the 1.14d asm: `0x00574370` (`ret 8`, unit
+  type test, bounds and `enabled` test against the bit table
+  `0x006CE26C` = 2 read from `game/Game.exe`), `0x005736A0` (`interact`
+  test byte +0xD), the tail of `0x00574250` (`0x00574300`–`0x0057434A`),
+  callers from `disasm.py xref 0x574370` and `0x005A72B0`–`0x005A734E`;
+  `SplEndDeath` / `minion1` rows from the live 1.14d monstats.txt;
+  monstats bits from `data/fields.tsv` (`enabled` bit 25, `interact`
+  bit 9).
 - §25 conventions from the prologues, `ret n` and call sites of
   `0x005B2A00`, `0x005A09E0`, `0x005A43E0` (`0x005A43E0`–`0x005A4437`),
   `0x005A0760`, `0x005A2120` (`ret 0xc` at `0x005A21CA`), `0x005A48C0`,
@@ -1243,3 +1303,6 @@ Answered 2026-10-07: 7 → read on 1.14d; bodies in
 `monsters/umod-init-bodies.md` (one difference from the old summary: the
 cold / poison length stats use the clamped monlvl row, not the level);
 no `umods.tsv` row is D2MOO-only any more.
+11. After a class reinit (§27), unit +0xA4 still points at the freed
+    hover record (Edge cases 13): find every reader of +0xA4 on a
+    monster and whether one can run before a new record is written.
