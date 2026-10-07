@@ -22,7 +22,7 @@ use d2_data::tables::{Itemratio, Itemstatcost, Itemtypes, Record, States};
 use d2_sim::combat::CombatTables;
 use d2_sim::game::Game;
 use d2_sim::items::inventory::tables::{GridRec, InvItemRec, InvTypeRec};
-use d2_sim::items::inventory::{InteractionTarget, InvItem, UnitKind};
+use d2_sim::items::inventory::{InvItem, UnitKind};
 use d2_sim::items::moves::{stat, ty, Guid, MovePending, Spot};
 use d2_sim::items::tables::ItemRec;
 use d2_sim::items::{q, ItemRequest, ItemTables};
@@ -386,10 +386,6 @@ impl InvRest for MRest {
     fn quiver_kind(&self, _: Guid) -> bool {
         false
     }
-    fn interaction(&self, _: Owner) -> InteractionTarget {
-        InteractionTarget::None
-    }
-    fn clear_interaction(&mut self, _: Owner) {}
     fn player_data_4c(&self, _: Owner) -> u32 {
         0
     }
@@ -1368,7 +1364,7 @@ impl T {
         let s = &sim.events.sys;
         let w = &sim.world;
         format!(
-            "{:?}|{:?}|{:?}|{:?}|{:?}|{:?}{:?}{:?}|{:?}{:?}{:?}{:?}{:?}|{log:?}{sent:?}",
+            "{:?}|{:?}|{:?}|{:?}|{:?}|{:?}{:?}{:?}|{:?}{:?}{:?}{:?}|{log:?}{sent:?}",
             sim.game,
             s.units,
             s.stats,
@@ -1380,7 +1376,6 @@ impl T {
             s.hooks.x.sent,
             w.rest.sent,
             w.rest.log,
-            w.rest.interact,
             w.action.faults,
         )
     }

@@ -42,17 +42,17 @@
 |   3. Server link | 135–153 |
 |   4. Send path (intents) | 154–174 |
 |   5. Client world model | 175–194 |
-|   6. Dispatch table | 195–235 |
-|   7. Bevy mirror | 236–254 |
-|   8. Frame pacing | 255–275 |
-|   9. Versioning | 276–286 |
-|   10. Client outputs (bridge → UI and audio) | 287–381 |
-| Constants & data dependencies | 382–396 |
-| Randomness | 397–400 |
-| Edge cases & original bugs | 401–409 |
-| Test vectors | 410–440 |
-| Provenance | 441–451 |
-| Open questions | 452–487 |
+|   6. Dispatch table | 195–236 |
+|   7. Bevy mirror | 237–255 |
+|   8. Frame pacing | 256–276 |
+|   9. Versioning | 277–287 |
+|   10. Client outputs (bridge → UI and audio) | 288–440 |
+| Constants & data dependencies | 441–455 |
+| Randomness | 456–459 |
+| Edge cases & original bugs | 460–468 |
+| Test vectors | 469–499 |
+| Provenance | 500–510 |
+| Open questions | 511–548 |
 <!-- /index -->
 
 ## Summary
@@ -228,10 +228,11 @@ receive).
      0x16 (`0x0045D2E0`), 0x54 (`0x0045E3B0` → `0x00473CA0`).
 7. **Out of scope** (`sim/intents-events.md` §4 rule 4: multiplayer,
    Battle.net, transport): 0x75, 0x79, 0x7F, 0x8B–0x8D, 0x8F, 0x90,
-   0xAE–0xB0, 0xB2–0xB4 keep owner `TBD` and stay unowned (rule 3)
+   0xAE–0xB0, 0xB2, 0xB3 keep owner `TBD` and stay unowned (rule 3)
    until Phase 7. 0xB4 is also the single-player load refusal
    (`sim/intents-events.md` §8.2 rule 2; client `0x0045C6D0` maps its
-   code to `0x0044E380(n)`): open question 7.
+   code to `0x0044E380(n)`): owner `client/model.md` §7 rule 8
+   (2026-10-08, open question 7).
 
 ### 7. Bevy mirror
 
@@ -337,14 +338,69 @@ model state: 1.14d's handler calls a UI or sound function directly
 8. Mechanical check (with §6 rule 5): every variant in code has exactly
    one row in the table below with the same producer id, and every row
    has a variant.
+9. **UI-keyed lookups** (2026-10-08; answers `client/msg-ui.md` open
+   question 7). Some 1.14d handlers look a unit up by a key held in UI
+   state; the interact NPC (`[0x007C0D25]` GUID, `[0x007C0D29]` active)
+   is written only by UI code (`ui/messages.md` §14), so it is UI state
+   in d2rs. Such a lookup is made by the UI layer when it applies the
+   output, from its own fields at that moment and the facts captured in
+   the payload (rule 3); the handler never reads UI state and the UI
+   layer never reads the model. This is exact because every UI write
+   that 1.14d makes before the handler runs is, in d2rs, either an
+   earlier output of the same list (rule 2 keeps their order) or made by
+   input between frames, as in 1.14d. A lookup whose unit is not the
+   message's own (so its presence cannot be captured at receive) is
+   allowed only when its result has no observable effect; otherwise the
+   owner spec must add a captured field. Cases:
+   - 0x8A (`client/msg-ui.md` §9 r4): exact; the test compares the
+     message key with the UI fields, presence is captured.
+   - 0x50 code 3 (`client/msg-ui.md` §7 r5): the unit is not the
+     message's; its only effect writes two fields that nothing reads,
+     so the UI layer may skip it.
+   One UI writer runs outside any message: the town exit `0x004B3E10`
+   from the local player's update (`client/model.md` §17 r5–r6); it is
+   the update-pass output `TownExit` of rule 11.
+10. **UI-requested model writes** (2026-10-08, user decision; answers
+   `client/msg-ui.md` open question 10). Rule 6 stands: a consumer never
+   writes `ClientWorld`. The model writes that 1.14d makes inside UI code
+   (the 0x28 dialog branch, `client/msg-ui.md` §16 r4.3 / r5; interaction
+   end, menu open and stock discard, `client/model.md` §17 r1–r4) go
+   through the bridge: the UI layer, while it applies the output, returns
+   each write as a request (unit, the field and value of the owning model
+   rule); the bridge applies the requests to the model in request order
+   before it handles the next message of the frame, which is the point
+   1.14d makes them (inside the receive). The UI layer decides from its
+   own state; the bridge does not re-decide. A C→S send the same code
+   makes (0x28's 0x31) uses the send path of rule 6.
+11. **Update-pass outputs** (2026-10-08; answers `client/model.md` open
+   question 16). The client update pass (`client/model.md` §5) may emit
+   an output too; its producer in the table is `update`, not a message
+   id. The one such output is `TownExit` (`client/model.md` §17 r6
+   step 4). In 1.14d the town exit runs inside the local player's
+   update, after every UI call of the frame's receive and before the
+   rest of the pass, so the bridge delivers it at the point it is
+   emitted, as an exception to rule 4: it first hands the UI layer
+   every output still in the list (rule 2 order), then `TownExit`, then
+   applies the requests the UI layer returns (rule 10: `E`'s model
+   writes, `client/model.md` §17 r1) and only then continues the pass.
+   The payload captures the local player's key and the GUIDs of every
+   monster (type 1) in S at that point, because the UI layer's test
+   "the interact NPC (1, `[0x007C0D25]`) is present" (`0x00463990` at
+   `0x004B3E71`) looks up a unit that is not the payload's own (rule 9);
+   with the GUID set the test is exact. The UI layer then runs
+   `0x004B3E10` (greeting re-arm; with the interaction active and the
+   NPC present: `[0x007C0C6B]` := 0, `0x00487990`, `E(G)`,
+   `0x00455F20(8, 1, 0)`, interaction active := 0;
+   `ui/messages.md` §13 r4). Its C→S 0x30 (inside `E`) uses the send
+   path (rule 6).
 
 <!-- rows -->
 | Variant | Payload | Producer | Consumer | Owner (what the consumer does) |
 |---|---|---|---|---|
 | `ServerSound` | unit key (type, GUID), unit class, event u16 | 0x2C | audio | `audio/triggers.md` §2 r4 |
-| `QuestUi` | chain u8, flags u8, status u8, extra i16 | 0x5D (every case except the eclipse) | UI | `client/msg-ui.md` §1 |
+| `QuestUi` | chain u8, flags u8, status u8, extra i16 | 0x5D (the rows marked output in `client/msg-ui.md` §1 r2; none for model rows or "nothing" rows, §1 r5) | UI | `client/msg-ui.md` §1 |
 | `WaypointMenu` | object GUID u32, record 16 bytes (as received) | 0x63 | UI | `client/msg-ui.md` §2 |
-| `TradeAction` | code u8 | 0x77 | UI | `client/msg-ui.md` §3 |
+| `TradeAction` | code u8, local player absent or dead (`0x00463DF0`, captured) | 0x77 | UI | `client/msg-ui.md` §3 |
 | `ChatLine` | the 0x26 record (type, lang, unit type, GUID, u8@8, u8@9, name, text); unit present; a player unit's name | 0x26 | UI | `client/msg-ui.md` §4 |
 | `NpcText` | the 40 bytes; unit present; object class (type 2) | 0x27 | UI | `client/msg-ui.md` §5 |
 | `HireOffer` | name u16, seed u32 | 0x4E | UI | `client/msg-ui.md` §6 |
@@ -360,7 +416,7 @@ model state: 1.14d's handler calls a UI or sound function directly
 | `MercRevive` | u16, u16 | 0x9B | UI | `client/msg-ui.md` §15 |
 | `SkillEvent` | unit key, skill, level, target key or point, w | 0x99, 0x9A | effects | `client/msg-skills.md` §7 |
 | `SkillDo` | unit key, target key or none, skill, level, x, y, v | 0xA3 | effects | `client/msg-skills.md` §8 |
-| `ShrineFx` | kind (on-mode / on-use), shrine code u8, object key, player key or none, overlay ids (two i32, −1 = none) | 0x0E (code 3), 0x4D (code 0x15) | effects | `client/model.md` §15 rules 3–4 |
+| `ShrineFx` | kind (on-mode / on-use), shrine code u8, object key, player key or none, overlay ids (two i32, −1 = none) | 0x0E (code 3), 0x4D (code 0x15), 0x51 (shrine, `client/msg-units.md` §1.3 r3) | effects | `client/model.md` §15 rules 3–4 |
 | `ShrineSound` | sound id u32, player key | 0x4D (code 0x15) | audio | `client/model.md` §15 rule 4 (request: `audio/triggers.md` §1 rule 1) |
 | `UnitOverlay` | unit key, overlay u16, mode (2), sound id (0, 396 or 397) | 0x11 | effects | `client/msg-units.md` §7 r2 |
 | `UmodFx` | unit key, the nine umod bytes, flag bit 3 | 0x57 | effects | `client/msg-units.md` §7 r3 |
@@ -378,6 +434,9 @@ model state: 1.14d's handler calls a UI or sound function directly
 | `ActVideo` | video u8 | 0x61 | UI | `client/msg-ui.md` §20 |
 | `OverheadClear` | unit key | 0x76 | UI | `client/msg-ui.md` §21 |
 | `HotkeyAssign` | slot u8, skill i32, left u8, item GUID u32 | 0x7B | UI | `client/msg-ui.md` §22 |
+| `JoinRefused` | error number u8 (the mapped code) | 0xB4 | UI | `client/model.md` §7 rule 8 |
+| `TownExit` | local player key, GUIDs of the S monsters | update | UI | `client/model.md` §17 rule 6; delivery `client/bridge.md` §10 r11 |
+| `StateFx` | unit key, state u16, phase (on / hooks / off), bit set before, unit dead, hook number u8 (setfunc / remfunc, 0 = none), two hook values i32 (`client/stat-lists.md` §3 r6.7) | 0xA8 (also 0xA7, 0xA9, 0xAA) | effects | `client/stat-lists.md` §3 rule 6 |
 
 ## Constants & data dependencies
 
@@ -479,7 +538,9 @@ from `specs/`, `docs/` and `crates/` only.
    drop the position tracking follows `audio/triggers.md` §1's rule for a
    freed unit. Settle with the request log (`audio/triggers.md` Checks)
    on a 0x2C followed by 0x0A in one chunk.
-7. 0xB4 in single player (the load refusal, `sim/intents-events.md`
+7. *Answered (2026-10-08)*: `client/model.md` §7 rule 8 (the code map
+   read from the jump table, `0x0044E380` in full, the `JoinRefused`
+   output) and §6 rule 7 here (owner). Original question: 0xB4 in single player (the load refusal, `sim/intents-events.md`
    §8.2 rule 2): its client handler (`0x0045C6D0`: code u32@1, 1–26 →
    `0x0044E380(n)` with a fixed code map, else 9) ends the game with an
    error screen; owner `client/model.md` §7 (session messages) when the

@@ -179,4 +179,4 @@ id	name	owner
 0xB1	GamesInfo	specs/client/bridge.md
 0xB2	GameList	TBD
 0xB3	DownloadSave	TBD
-0xB4	ConnectionRefused	TBD
+0xB4	ConnectionRefused	specs/client/model.md

@@ -111,7 +111,26 @@ asserts the current (spec-literal) behaviour; the property accepts
   `0x00562E00` (it is likely §4.6 without the cursor; vendors.md §7.1
   rule 9.7 calls it too), and the result of its failure.
 
-No fix was made in `crates/`: Q1 and Q2 are what the specs say; Q3 is
+- **Q4, answered** (`buying_a_ground_item_is_refused`; seed 271983823,
+  `[OpenTrade, Spawn(0), Msg{0x32, a: 204, b: 0, x: 91, y: 0}]`, and
+  seed 2739320417: the rare failure of `item_moves_keep_one_place`): a
+  buy with t ∉ {0, 2} skips the "item is offered" test (`vendors.md`
+  §7.1 edge case 3) and could name a ground item; the copy was made in
+  the source's room and then placed in the backpack, one item in two
+  places. PC 1 answered (claude/pc1-vendor-copy 91e4a92): 1.14d refuses
+  a sale of a ground item at `0x00557FF0` (`vendors.md` §7.2 rule 3,
+  code 11, result 3) before any copy; a copy from a ground source
+  (`vendors-2.md` §7.3 step 1.1) and placing a cursor-mode item that
+  still has a room (`inventory.md` §2.4 rule 2) are caller errors. Fixed
+  in `crates/` (merge-items-wiring): `InvDesk::copy_of` records
+  `InvError::GroundCopySource` and copies nothing (the buy answers code
+  9, result 1); `InvDesk::place` records `InvError::PlacedWithRoom` and
+  places nothing. **Changed expectation** in the property: a 0x32 whose
+  copy is refused for a source on the ground before the op is expected
+  (`expect_ground_buy_refusal`: nothing moves, that error is taken out
+  of the faults); any other caller error stays a fault.
+
+No fix was made in `crates/` for Q1–Q3: Q1 and Q2 are what the specs say; Q3 is
 an unwritten routine. When a spec answers one, change the pinned test's
 expectation and narrow `limbo_mode` in the property.
 

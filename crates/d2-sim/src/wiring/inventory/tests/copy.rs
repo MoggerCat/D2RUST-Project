@@ -31,16 +31,17 @@ fn world() -> World {
     w
 }
 
-/// §7.3 steps 2–8 on a ground cap with defense, durability and a main
-/// list: a new unit (the next GUID) of the same class in the same room,
-/// mode and position, the record's fields and stats, unit +0x28,
+/// §7.3 steps 2–8 on a held cap (the cursor item) with defense,
+/// durability and a main list: a new unit (the next GUID) of the same
+/// class in no room, in the source's mode and position, the record's
+/// fields and stats, unit +0x28,
 /// item flag 0x80000 set and 0x2000 cleared, the source marked
 /// 0x8000000, the per-item reset (item flags 0x1 … cleared).
 // Covers: specs/world/vendors-2.md §7.3 r1, §7.3 r2, §7.3 r3, §7.3 r4, §7.3 r6, §7.3 r8
 #[test]
-fn copy_of_a_ground_item() {
+fn copy_of_a_held_item() {
     let mut w = world();
-    let s = w.ground_item(CAP, 20, 21);
+    let s = w.cursor_item(CAP);
     let su = w.unit(s).unwrap();
     w.set_stat(su, stat::ARMORCLASS, 7);
     w.set_stat(su, stat::MAXDURABILITY, 12);
@@ -63,12 +64,9 @@ fn copy_of_a_ground_item() {
     // (`rng.md` §5.3).
     let seed = w.units.get(c).unwrap().item_seed.unwrap().0;
     assert_eq!(seed, crate::rng::Seed::init_low(init));
-    assert_eq!(w.units.get(c).unwrap().mode, 3);
-    assert_eq!(
-        w.game.lists.unit(c).unwrap().room(),
-        w.game.lists.unit(su).unwrap().room()
-    );
-    assert_eq!((w.data(cg).x, w.data(cg).y), (20, 21));
+    assert_eq!(w.units.get(c).unwrap().mode, w.units.get(su).unwrap().mode);
+    assert_eq!(w.game.lists.unit(c).unwrap().room(), None);
+    assert_eq!((w.data(cg).x, w.data(cg).y), (w.data(s).x, w.data(s).y));
     let (a, b) = (w.items.get(su).unwrap(), w.items.get(c).unwrap());
     assert_eq!((b.record, b.ilvl, b.quality), (a.record, 17, a.quality));
     assert_ne!(b.flags & flag::INIT, 0);
@@ -89,13 +87,28 @@ fn copy_of_a_ground_item() {
     assert!(w.state.errors.is_empty());
 }
 
+/// Step 1.1: a source on the ground (in a room) is a caller error: no
+/// copy, no new unit, the source unmarked, the error recorded.
+// Covers: specs/world/vendors-2.md §7.3 r1
+#[test]
+fn a_ground_source_is_a_caller_error() {
+    let mut w = world();
+    let s = w.ground_item(CAP, 20, 21);
+    let su = w.unit(s).unwrap();
+    let before = w.items.len();
+    assert_eq!(w.desk(|d| d.copy_of(su, true)), None);
+    assert_eq!(w.items.len(), before);
+    assert_eq!(w.items.get(su).unwrap().flags & COPIED, 0);
+    assert_eq!(w.state.errors, [InvError::GroundCopySource(su)]);
+}
+
 /// Step 2: a stream that does not fit 1,024 bytes gives length 0 and
 /// the read fails: no copy.
 // Covers: specs/world/vendors-2.md §7.3 r2
 #[test]
 fn a_stream_over_the_buffer_copies_nothing() {
     let mut w = world();
-    let s = w.ground_item(CAP, 20, 21);
+    let s = w.cursor_item(CAP);
     let su = w.unit(s).unwrap();
     w.econ().with_stats(|ctx| {
         let mut st = crate::wiring::economy::UnitStats::new(ctx, su);
@@ -115,7 +128,7 @@ fn a_stream_over_the_buffer_copies_nothing() {
 #[test]
 fn children_and_the_fillers_argument() {
     let mut w = world();
-    let s = w.ground_item(SWORD, 20, 21);
+    let s = w.cursor_item(SWORD);
     let su = w.unit(s).unwrap();
     w.items.get_mut(su).unwrap().flags |= 0x800;
     w.set_stat(su, stat::NUMSOCKETS, 2);

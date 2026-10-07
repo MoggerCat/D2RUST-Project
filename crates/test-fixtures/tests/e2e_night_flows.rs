@@ -26,7 +26,6 @@
 //! reaches such a seam is named in the test and in
 //! `docs/handoff/e2e-night-flows.md`.
 
-use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
 
@@ -143,27 +142,17 @@ fn object_tables() -> ObjectTables {
 // ---- the action wiring's seams ----------------------------------------------------------
 
 /// The action wiring's `Pending` (no spec provides these): the
-/// interaction owner kept as set, the interact range `0x00623660`
+/// interact range `0x00623660`
 /// answered "in range" (`objects.md` §7.1 rule 3; the path spec does not
 /// write it), the routes the object module hands back logged
 /// (`Pending::object_route`), and every send collected for the host.
 #[derive(Default)]
 struct Night {
-    interact: BTreeMap<UnitId, (u8, u32)>,
     sent: Vec<(UnitId, Vec<u8>)>,
     routes: Vec<ObjectRoute>,
 }
 
 impl Pending for Night {
-    fn set_interact(&mut self, player: UnitId, unit_type: u8, guid: u32) {
-        self.interact.entry(player).or_insert((unit_type, guid));
-    }
-    fn reset_interact(&mut self, player: UnitId) {
-        self.interact.remove(&player);
-    }
-    fn interact_guid(&self, player: UnitId) -> Option<u32> {
-        self.interact.get(&player).map(|i| i.1)
-    }
     fn send(&mut self, player: UnitId, msg: &[u8]) {
         self.sent.push((player, msg.to_vec()));
     }

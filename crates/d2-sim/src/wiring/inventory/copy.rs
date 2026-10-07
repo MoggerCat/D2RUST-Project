@@ -5,7 +5,9 @@
 //! unit (`Economy::item_from_record`), then the steps of §7.3 after it.
 //! Callers: the vendors' buy and sell, the cube outputs, the hireling
 //! take and the NPC socketing hand their source here (fillers as their
-//! rule says); the interaction and cube wirings still ask their rests.
+//! rule says); the server's cube copies here too; the interaction
+//! wiring's NPC socketing and the economy cube's own `CubeRest` still
+//! ask their rests.
 
 use super::{InvDesk, InvError, InvRest};
 use crate::items::bitstream::{self, read, BitWriter, StreamItem};
@@ -50,8 +52,22 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
     /// `0x0055A2A0` (§7.3): a copy of `src`, or none. `fillers`: read
     /// and socket the source's children into the copy (step 5).
     pub fn copy_of(&mut self, src: UnitId, fillers: bool) -> Option<UnitId> {
-        // 1. R: the source's room (none off the ground).
-        let room = self.econ.game.lists.unit(src).and_then(|e| e.room());
+        // 1. R: the source's room (none off the ground). 1.1: a ground
+        // source would put the copy in R, on the ground, and no caller
+        // takes it out; every 1.14d caller passes a held source, so a
+        // ground one is a caller error (no copy).
+        if self
+            .econ
+            .game
+            .lists
+            .unit(src)
+            .and_then(|e| e.room())
+            .is_some()
+        {
+            self.state.errors.push(InvError::GroundCopySource(src));
+            return None;
+        }
+        let room = None;
         // 2. The save stream with children into 1,024 bytes; one that does
         // not fit has length 0 and step 3's read fails.
         let view = self.save_view(src)?;

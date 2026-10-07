@@ -5,10 +5,11 @@
   `Game.exe` disassembly (addresses per section; register arguments
   checked in `re/exports/all.asm`), with the helpers they need that no
   other spec owns (unit find, area damage, elemental fill, think
-  restart). No recording covers a callback yet (Open question 1).
+  restart), and the client's own hook table `0x00724E28` (§28). No
+  recording covers a callback yet (Open question 1).
 - **Target version:** 1.14d
 - **Crate/module:** `d2-sim::monsters::init` (dispatcher and callbacks,
-  beside `umods.rs`)
+  beside `umods.rs`); §28: `d2-client` (Phase 6)
 - **Related specs:** `monsters/init.md` (umod catalogue §19, dispatcher
   §22, `umods.tsv`); `sim/units.md` (§4.6 monster mode set, §6.2 monster
   events); `sim/tick.md` (§5.2 scheduling, §5.6 dispatch);
@@ -25,45 +26,46 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 69–79 |
-| Inputs | 80–89 |
-| Outputs / state changes | 90–96 |
-| Rules | 97–98 |
-|   1. Scope, order and conventions | 99–131 |
-|   2. Where the dispatcher runs | 132–169 |
-|   3. Shared helpers | 170–322 |
-|   4. Death event `0x005A3800` (mode 1; umods 10, 18, 31, 32, 42) | 323–332 |
-|   5. Umod 7 curse: mode 3 `0x005A2530` | 333–362 |
-|   6. Umod 9 fire | 363–388 |
-|   7. Umod 10 poisondead: mode 2 `0x005A2C20` | 389–394 |
-|   8. Umod 14 spcdamage: mode 0 `0x005A3B50` (traps) | 395–413 |
-|   9. Umod 15 partydead: mode 1 `0x005A2D10` | 414–423 |
-|   10. Umod 17 lightning | 424–444 |
-|   11. Umod 18 cold: mode 2 `0x005A2BD0` | 445–451 |
-|   12. Umod 19 hireable | 452–467 |
-|   13. Umod 20 scarab | 468–478 |
-|   14. Umod 21 killself: mode 2 `0x005A3AA0` | 479–489 |
-|   15. Umod 22 questcomplete: mode 1 `0x005A3250` | 490–535 |
-|   16. Umod 23 poisonhit: mode 0 `0x005A3490` | 536–540 |
-|   17. Umod 24 thief: mode 3 `0x005A30E0` | 541–557 |
-|   18. Umod 27 spectralhit | 558–578 |
-|   19. Umod 29 multishot: mode 5 `0x005A3610` | 579–600 |
-|   20. Umod 31 goboom: mode 2 `0x005A2840` | 601–607 |
-|   21. Umod 32 firespike_explode: mode 2 `0x005A3D20` | 608–618 |
-|   22. Umod 33 suicideminion_explode | 619–643 |
-|   23. Umod 34 ai_after_death | 644–669 |
-|   24. Umod 35 shatter_on_death: mode 1 `0x005A3A80` | 670–673 |
-|   25. Umod 40 worms_on_death: mode 1 `0x005A4200` | 674–680 |
-|   26. Umod 41 always_run_ai: mode 2 `0x005A4230` | 681–686 |
-|   27. Umod 42 lightningdeath: mode 2 `0x005A2910` | 687–700 |
-| Constants & data dependencies | 701–716 |
-| Randomness | 717–735 |
-| Edge cases & original bugs | 736–765 |
-| Test vectors | 766–767 |
-|   Synthetic (CI-safe) | 768–792 |
-|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 793–800 |
-| Provenance | 801–845 |
-| Open questions | 846–883 |
+| Summary | 71–81 |
+| Inputs | 82–91 |
+| Outputs / state changes | 92–98 |
+| Rules | 99–100 |
+|   1. Scope, order and conventions | 101–139 |
+|   2. Where the dispatcher runs | 140–177 |
+|   3. Shared helpers | 178–347 |
+|   4. Death event `0x005A3800` (mode 1; umods 10, 18, 31, 32, 42) | 348–357 |
+|   5. Umod 7 curse: mode 3 `0x005A2530` | 358–387 |
+|   6. Umod 9 fire | 388–413 |
+|   7. Umod 10 poisondead: mode 2 `0x005A2C20` | 414–419 |
+|   8. Umod 14 spcdamage: mode 0 `0x005A3B50` (traps) | 420–438 |
+|   9. Umod 15 partydead: mode 1 `0x005A2D10` | 439–448 |
+|   10. Umod 17 lightning | 449–469 |
+|   11. Umod 18 cold: mode 2 `0x005A2BD0` | 470–476 |
+|   12. Umod 19 hireable | 477–492 |
+|   13. Umod 20 scarab | 493–503 |
+|   14. Umod 21 killself: mode 2 `0x005A3AA0` | 504–514 |
+|   15. Umod 22 questcomplete: mode 1 `0x005A3250` | 515–560 |
+|   16. Umod 23 poisonhit: mode 0 `0x005A3490` | 561–565 |
+|   17. Umod 24 thief: mode 3 `0x005A30E0` | 566–582 |
+|   18. Umod 27 spectralhit | 583–603 |
+|   19. Umod 29 multishot: mode 5 `0x005A3610` | 604–625 |
+|   20. Umod 31 goboom: mode 2 `0x005A2840` | 626–632 |
+|   21. Umod 32 firespike_explode: mode 2 `0x005A3D20` | 633–643 |
+|   22. Umod 33 suicideminion_explode | 644–670 |
+|   23. Umod 34 ai_after_death | 671–696 |
+|   24. Umod 35 shatter_on_death: mode 1 `0x005A3A80` | 697–700 |
+|   25. Umod 40 worms_on_death: mode 1 `0x005A4200` | 701–707 |
+|   26. Umod 41 always_run_ai: mode 2 `0x005A4230` | 708–713 |
+|   27. Umod 42 lightningdeath: mode 2 `0x005A2910` | 714–727 |
+|   28. Client umod hooks (table `0x00724E28`) | 728–816 |
+| Constants & data dependencies | 817–832 |
+| Randomness | 833–851 |
+| Edge cases & original bugs | 852–890 |
+| Test vectors | 891–892 |
+|   Synthetic (CI-safe) | 893–925 |
+|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 926–933 |
+| Provenance | 934–992 |
+| Open questions | 993–1045 |
 <!-- /index -->
 
 ## Summary
@@ -123,7 +125,13 @@ data +0x16 bits 0x80 and 0x100 and +0x18, and unit-seed draws.
 5. "Dead" = `0x005541B0(unit)` ≠ 0. "Owner" O(u) = `0x00552FD0(game,
    u)`: when unit flags +0xC8 bit 10 is set, the unit stored as its
    owner (+0x98 type / GUID, looked up by `0x00552F60`), else none.
-   "Minion owner" = `0x0058F0D0` (`ai.md` §3.1). Alignment =
+   "Minion owner" = `0x0058F0D0` (`ai.md` §3.1): from the AI control
+   record (monster data +0x28): +0x28 game ≠ 0 → the unit looked up by
+   (type +0x30, GUID +0x2C) in the game's unit table (`0x00552F60`)
+   at every call, no pointer kept; `0x0058F030(game, u, GUID, type, f1,
+   f2)` writes +0x2C, +0x30 and +0x28 := game (f1 / f2 ≠ 0 restart the
+   AI, `0x005DD230`). Owner data (−1, 1, 0, 0) therefore drops the link:
+   the lookup of GUID −1 finds no unit. Alignment =
    `0x006259B0`. "Hostile" = `0x00554200(game, a, b)` (`combat/hit.md`).
 6. U = the unit's own seed (unit +0x20, `rng.md` §5.3). "One U step" =
    one generator step; lo' = its new low word. `roll(n)` = `rng.md`
@@ -240,6 +248,23 @@ Filter `0x0065AA40(U, A)` (`ret 8`):
    U's room (`0x0064CB30(room, px, py, mask 4)`) equals 4 rejects;
    F & 0x800 → the extra test A +0x24 (ECX U, EDX A) non-zero rejects.
 5. Accept: accepted count += 1, return 1.
+
+**Excluded unit and negative radius** (2026-10-08, asm of `0x0065AA40`,
+`0x0065A6B0`, `0x0065A710`):
+
+1. E (A +0x08) is compared only in the player branch (`0x0065AB16`,
+   reached after the mode tests, also on the F & 0x1000 mode-17 path):
+   a monster, object, missile or item equal to E is not rejected.
+2. r < 0, with a = |r|: the filter's d² ≤ r² is d² ≤ a² (r² is the
+   32-bit square). Collect step 2 takes R only when the square x ± a,
+   y ± a overlaps R's box (open bounds), else the adjacency array; step
+   3's overlap test then **rejects** a room whose box spans [x0, x0 +
+   w] lie strictly inside (x − a, x + a) or whose [y0, y0 + h] lies
+   strictly inside (y − a, y + a) (both comparisons of one axis hold).
+3. F & 0x200 does not use r or the room box: it steps the caller's line
+   iterator (A +0x20, step `0x0066A5D0`, `formats/animdata.md`) over
+   U's room only (U without a room → the test is skipped), and any point
+   with `0x0064CB30(room, px, py, 4)` = 4 rejects U.
 
 Flags used in this spec: 3 (players, monsters), 0x581 (players only,
 live, unit flags 4 and 8, not in town), 0x583 (the same plus monsters).
@@ -631,7 +656,9 @@ GH leaves two events (Edge case 5).
 #### 22.2 Mode 2 `0x005A3EF0`
 
 1. M = monstats row; a = `aip1` for d. Stats by level (`init.md` §8.1,
-   flags 8) at the unit's level: A1 min p, A1 max q (out +0x14, +0x18).
+   flags 8) at the unit's level: A1 min p, A1 max q (out +0x14, +0x18;
+   p = pct(monlvl `DM`/`L-DM`, `A1MinD`, 100), q the same with
+   `A1MaxD`; raw columns under `noRatio`).
 2. v = (p + `roll(q − p)` on U) × 256.
 3. Record (zeroed): result flags |= 8 (knockback); physical = v. a = 1:
    fire = v, missile 427 `suicidefireexplode`. a ≥ 2: cold (+0x24) =
@@ -698,6 +725,95 @@ Shadow Warrior and Shadow Master give umod 42 (`sumumod`). The event
 comes from §4 (death), where life is 0, so step 3 changes L only on
 another type-7 event.
 
+### 28. Client umod hooks (table `0x00724E28`)
+
+The client has its own hook table, separate from §1–§27; its hooks only
+create client missiles, overlays, a client monster and sounds (no
+damage, no server state). Crate: `d2-client` (Phase 6); this section
+owns the rules, `audio/triggers-2.md` §13.1 links here for the sound.
+
+#### 28.1 Table and dispatcher
+
+1. Table `0x00724E28` in `.data`, read only (no instruction writes
+   it): 43 rows (umod 0…42) × 5 dwords, entry = `0x00724E28 + 4 × (5 ×
+   umod + phase)`, phases 0–4. Null = no hook.
+2. Dispatcher `0x004ADD90(U, arg, phase)` (`ret 0xC`): U none, not type
+   1, or without monster data → nothing. unique = type flag 8 of U
+   (monster data +0x16 bit 3). For each of the 9 bytes of U's umod list
+   (monster data +0x1C) in order, **including bytes after a 0** (the
+   loop does not stop; umod 0's row is all null): the hook of (byte,
+   phase), when non-null, is called with ECX = U (phase 4: ECX = arg,
+   the missile), EDX = the umod, stack = unique; each hook `ret 4`.
+3. Wrappers and call sites (ECX = U):
+
+   | Phase | Wrapper | Site | When |
+   |---|---|---|---|
+   | 0 | `0x004ADE40` | `0x004B001B` in the monster mode machine `0x004AFF60` (`client/model.md` §8) | a request with a record and code ≠ 0x13, 0x15, 0x16: after the path setup and `0x00620210(U, 0)`, **before** the code switch (U's mode is still the old one) |
+   | 1 | `0x004ADE50` | `0x004B0D81`, the machine's common tail `0x004B0D38` | after every case that ends in the tail (the stat-67 fix-up first); early exits to `0x004B0DB5` (class out of range, the code-8 vine branch `0x004B05F7`) skip it |
+   | 2 | `0x004ADE60` | `0x004B1556` in the monster update `0x004B13A0` (`client/model.md` §5 r2) | every client update of a monster whose mode is < 16 and whose mode record `0x004AF400(U)` exists; a unit with state 1 (`freeze`) runs only when `0x00464820(U)` ≠ 0. After the animation step `0x004AF2E0`, before the path step `0x00648640` |
+   | 3 | `0x004ADE70` | `0x004B03ED` (code 6: mode 3 GH), `0x004B0475` (code 0x13: mode 13 KB) | after the new mode is set |
+   | 4 | `0x004ADE80(owner, missile)` | `0x004CDB2B`, end of the client missile create `0x004CD540` | owner (record +4) and missile non-null, owner type 1; arg = the missile |
+
+4. Conventions below: "frame" = U +0x44 >> 8 (`0x00621810`), (x, y) =
+   U's position (`0x0045ADF0` / `0x0045AE20`, or the path fields as in
+   §1 r3), "level" = U's `level(12)` (`0x00625480(U, 12, 0)`).
+   "missile(m, at, L)" = client missile create `0x004CDB40(U, m, x', y',
+   skill 0, level L)` (record flags 1) or `0x004CDBA0` (flags 0x20,
+   owner resolved through `0x004639D0`); both build a 0x5C record and
+   run `0x004CD540`. "request(2,458)" = `audio/triggers.md` §1.
+
+#### 28.2 Non-null entries
+
+| Umod | Phase | Hook | Effect |
+|---|---|---|---|
+| 9 fire | 2 | `0x004AD1A0` | unique, mode 0 (DT) and frame 4 → missiles 117 at (x, y), (x+1, y+1), (x+1, y−1), (x−1, y+1), (x−1, y−1), then 82 at the same five points, L 1; request(2,458) |
+| 10 poisondead | 2 | `0x004AD510` | mode 0 and frame 4 → missile 155 `corpsepoisoncloud` at (x, y), L = level (no clamp); no unique test |
+| 11 durieldead | 2 | `0x004AD5F0` | mode 0 and frame 13 → remove all of U's overlays (`0x0046F170`), overlays 52 `durieldead_fwd` and 156 `durieldead_rear` (`0x00470390(U, id, 5, 0…)`), U +0x4E := 0. Mode 12 (DD): one step of U's seed (+0x20 / +0x24, `sim/rng.md`); lo' mod 100 = 0 (unsigned) and monster data +0x18 < 100 → client monster `0x0046C320(U, class 227 maggot, 4)` (its own draws on U's seed; Phase 6), +0x18 += 4 |
+| 17 lightning | 2 | `0x004AD890` | unique, mode 3 (GH) and frame 2 → burst (§28.3) of 195 with L = level >> 1 |
+| 17 lightning | 3 | `0x004AD8E0` | unique and mode ≠ 3 → the same burst (so after code 0x13 / KB at once; after code 6 / GH only through phase 2) |
+| 18 cold | 2 | `0x004AD510` | unique, mode 0 and frame 4 → ring (§28.3) of 194 `coldunique`, L = level (not halved), v = velocity of 119 at level 0 (`0x00663270`) |
+| 20 scarab | 2 | `0x004AD920` | mode 3 or 0 and frame 2 → burst of 225 `buglightning`, L = level; no unique test |
+| 22 questcomplete | 1 | `0x004AD2F0` | by class (jump tables `0x004AD444` / `0x004AD428`): mode 0 → 45 `0x0046B710`, 156 andariel `0x0046BA50`, 211 duriel `0x0046BB90`, 229 radament `0x0046BA90`, 242 mephisto `0x0046B9A0`, 243 diablo `0x0046BC70`, 256 izual `0x0046BC10`, 267 bloodraven `0x0046B680`, 366 compellingorb `0x0046B850`, 479 overseer1 `0x0046B3C0`, 540–542 ancientbarb1–3 `0x0046B530`, 544 baalcrab `0x0046BC90`; mode 14 → 284 maggotqueen1 `0x0046BB10`. Other classes: nothing. Callees are client quest effects (Phase 6; e.g. `0x0046BA50` creates client missile 307) |
+| 23 poisonhit | 0 | `0x004AD890` | the **lightning** hook: unique, old mode 3 and frame 2 → burst of 195, L = level >> 1 |
+| 29 multishot | 4 | `0x004AD970` | client copy of §19: unique; arg a missile (type 3) of class m in range (count +0xB6C, rows 0x1A4) without `NoMultiShot` (row +5 & `[0x006CE278]`); O = the missile's owner (`0x004639D0`) without type flag 0x80 (`0x004AC7E0`); target T = O's target unit (`0x004648F0`) position, else the missile path's target (`0x00648A00` / `0x00648A10`); local seed 'SEIS' built, never drawn; sx, sy as §19 step 5 (63–66 → 0); O +0x16 |= 0x80; `0x004CDBA0(O, m, tx − sy, ty + sx, skill, level)` then (tx + sy, ty − sx), skill / level of the missile (`0x0064A280`, `0x0064A210`); O +0x16 &= ~0x80 |
+| 31 goboom | 2 | `0x004AD0C0` | unique, mode 0 and frame 4 → missile 82 at the five points of umod 9, L 1; request(2,458) |
+| 32 firespike_explode | 2 | `0x004ADB20` | mode 0 and frame 4 → missile 42 `explodingarrowexp` at (x, y), L 1; no unique test |
+| 33 suicideminion_explode | 2 | `0x004ADBC0` | a = monstats `aip1` for the client difficulty (`[0x007A060C]`, +0x56 + 2d); mode 0 and frame 4 → a = 1: missile 427, a ≥ 2: 428 (each L 1); then in every case 426, all at (x, y); no unique test |
+| 40 worms_on_death | 2 | `0x004ADD80` → `0x004ADCE0` | no test: missiles 117 and 545 `pain worm appear` at (x, y), L 1, then request(2,458) |
+| 42 lightningdeath | 2 | `0x004AD510` | mode 0 → ring of 90 `nova`, L = level, v = velocity of 90 at level 0; no unique and no frame test |
+
+Every other (umod, phase) entry is null: umods 1–8, 12–16, 19, 21,
+24–28, 30, 34–39, 41 have no client hook.
+
+#### 28.3 Client burst and ring
+
+1. Burst `0x004AD6E0(U, m, L in EAX)`: L = 0 → 1. m = 195 needs U a
+   monster with monster data +0x16 bit 0x100, else nothing; the client
+   sets that bit from record bit 0x80 of request code 6 (record[2],
+   `0x004B0364`) or 0x13 (record[1], `0x004B0410`) and clears it
+   otherwise (`0x004AC840`). Record: flags 0x21, owner U, source = U's
+   position, class m, skill 0, level L, init callback `0x004E2ED0`
+   unless m = 321. For (X, Y) = (0, −1), (1, 0), (0, 1), (−1, 0), for j
+   = 0, 1: target (x + X, y + Y), init argument j; create. 8 missiles,
+   as the server's §3.3.
+2. Ring `0x004C70D0(U, U, m, −1, skill 0, L, v)`: record flags 3, | 4
+   when v ≠ 0 (velocity v); source U's position; 64 creates with target
+   offsets from tables `0x006DACC0` (x) / `0x006DABC0` (y), entry i =
+   0…63 in order (m = 176 toggles record flag 0x4000).
+
+#### 28.4 Can a client monster carry umod 40?
+
+The client's list is written only by S→C 0xAC (`client/msg-units.md`
+§1.2: the server list, 8 bits each until 0) and S→C 0x57 (client
+`0x0045E400`: list bytes 0, 1, 2 := u16@8 low, high, u16@10 low; sent
+by `0x00597C70` from the server list's first three bytes). Both copy the
+server's umods, and no 1.14d server path assigns 40 (Open question 5).
+So with 1.14d data no client monster carries umod 40 (nor 41) and the
+§28.2 umod-40 hook never runs; it runs every update only with modded
+data that gives a monster umod 40. The same body `0x004ADCE0` is
+reached through state 110's remove hook (`audio/triggers-2.md` §13.1
+r5).
+
 ## Constants & data dependencies
 
 | Item | Value / column |
@@ -762,6 +878,15 @@ Per callback, in order (U = the monster's seed unless named):
     the four base classes).
 11. Lightningdeath's level rule reads the owner's Shadow Warrior skill
     even for a Shadow Master (skill 279).
+12. Client hooks differ from the server's (§28.2): poisonhit (23) runs
+    the lightning burst; cold (18) and poisondead (10) use the full
+    level; lightningdeath (42) needs no unique and rings 64 novas on
+    every client update in mode 0; the umod-40 hook has no mode or
+    frame test (unreachable with 1.14d data, §28.4).
+13. A frame value held over several updates (animation speed below 256
+    per tick) repeats every frame-tested client hook of §28.2.
+14. The client dispatcher walks all 9 list bytes, also past a 0
+    (§28.1 r2); 0x57 rewrites only bytes 0–2 and leaves 3–8.
 
 ## Test vectors
 
@@ -789,6 +914,14 @@ Per callback, in order (U = the monster's seed unless named):
 | revive, AI param 0 = 2 | nothing (type-2 events cancelled) | §23.2 |
 | lightningdeath, owner SW level 1 / 2 / 40, life 0 % | L = 1 / 2 / 15 | §27 |
 | think restart, mode 2 (WL), base class 19 / 110 | type 2 cancelled, none scheduled / event 2 at F + 2 | §3.5 |
+| client table entry of umod 40, phase 2 | address `0x00724E28 + 4 × 202` = `0x00725150` holds `0x004ADD80` | §28.1 |
+| client, umods [9], unique, mode 0, frame 0x400 / 0x3FF | 10 missiles (117 ×5, 82 ×5) and 2,458 / nothing | §28.2 |
+| client, umods [23], unique, old mode 3, frame 2, +0x16 bit 0x100 set, level 9 | 8 missiles 195, L 4 | §28.2, §28.3 |
+| same, bit 0x100 clear | nothing | §28.3 |
+| client, umods [33], aip1 0 / 1 / 3, mode 0, frame 4 | 426 / 427 then 426 / 428 then 426 | §28.2 |
+| client, umods [42], not unique, mode 0, any frame, level 7 | 64 missiles 90 at L 7 each update | §28.2 |
+| client, umods [17], unique, code 0x13 (KB) / code 6 (GH) | burst at once (phase 3) / none at phase 3, burst at frame 2 (phase 2) | §28.2 |
+| client list [9, 0, 40, …] | the umod-40 hook still runs (bytes past the 0 are walked) | §28.1 r2 |
 
 ### Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`)
 
@@ -826,6 +959,20 @@ Per callback, in order (U = the monster's seed unless named):
   `0x005E0060`, `0x005E0070` (rel32 scan: each called only from
   `0x005A3250`); missile and monster names from `patch_d2`
   `missiles.txt` / `monstats.txt`.
+- §28 (2026-10-07, PC 2 audio pass 3 request): table `0x00724E28`
+  read from `game/Game.exe` with `pefile` (43 × 5 dwords; no write
+  references in `all.asm`); `0x004ADD90`, wrappers `0x004ADE40`–
+  `0x004ADE80`, sites `0x004B001B`, `0x004B0D81`, `0x004B03ED`,
+  `0x004B0475` (machine jump tables `0x004B0DF8` / `0x004B0DC0`
+  decoded), `0x004B1556` in `0x004B13A0`, `0x004CDB2B`; hooks
+  `0x004AD0C0`, `0x004AD1A0`, `0x004AD2F0` (`disasm.py at`; jump tables
+  `0x004AD444` / `0x004AD428` decoded), `0x004AD510`, `0x004AD5F0`,
+  `0x004AD890`, `0x004AD8E0`, `0x004AD920`, `0x004AD970`, `0x004ADB20`,
+  `0x004ADBC0`, `0x004ADCE0`, `0x004ADD80`; helpers `0x004AD6E0`,
+  `0x004C70D0`, `0x004CDB40`, `0x004CDBA0`, `0x004AC840`, `0x0046F170`;
+  list writers `0x004AC740` (callers `0x00466360` / 0xAC and
+  `0x0045E400` / 0x57), server 0x57 `0x00597C70` → `0x0053D880`. Names
+  from `patch_d2` `missiles.txt`, `monstats.txt`, `overlay.txt`.
 - Fire step 4 arithmetic: d = 1 uses `imul 0x55555555; sub; sar 1;
   add sign` = signed division by −3, checked numerically for −4 … 302.
 - Assign sites of `0x005A4850` (all 52 scanned for immediate umods):
@@ -845,12 +992,12 @@ Per callback, in order (U = the monster's seed unless named):
 
 ## Open questions
 
-1. No recording covers a callback: record a fire-enchanted unique dying
+1. ~~No recording covers a callback: record a fire-enchanted unique dying
    next to a player (rng and timer hooks) to confirm §2, §4, §6 and the
-   draw order.
-2. Edge case 5: whether the death start or the event handler drops the
+   draw order.~~ → PC 2 recording list.
+2. ~~Edge case 5: whether the death start or the event handler drops the
    second suicide-minion event 7; settle with a recording of a suicide
-   minion hit into GH.
+   minion hit into GH.~~ → PC 2 recording list.
 3. Answered (2026-10-07): §3.1 is the single owner of the unit find;
    `missiles/bodies-2.md` §44 and `monsters/ai-bodies-3.md` Open
    question 3 point to it. Merged from bodies-2 §44 and re-read on
@@ -876,7 +1023,22 @@ Per callback, in order (U = the monster's seed unless named):
    `Mod1`–`Mod3` use 1, 5–9, 17, 18, 23–28, 30 and monumod rows 40, 41
    have no `cpick` / `upick`. So 40 and 41 occur only through modded
    data or a saved list.
-6. A missile's `level(12)` (§3.4 step 2 for §18.2): `missiles.md`
+6. ~~A missile's `level(12)` (§3.4 step 2 for §18.2): `missiles.md`
    §R2.3 step 23 does not list stat 12 among a missile's stats; if it
    is 0 the monlvl row is 1. Settle with the missile stat list dump of
-   a spectral-hit unique's missile.
+   a spectral-hit unique's missile.~~ → PC 2 recording list.
+7. ~~Client §28: bodies of the client quest effects of umod 22
+   (`0x0046B3C0` … `0x0046BC90`), the maggot spawn `0x0046C320` and
+   class 45 (`corruptrogue3`) in the umod-22 table: owner is the client
+   quest / monster spec (Phase 6). Recording: a fire-enchanted unique's
+   death on the client (missiles and 2,458 at frame 4) confirms §28.2.~~ → PC 2 recording list. The client effect bodies
+   are owned by the client quest spec, not this file.
+8. Answered (2026-10-08, `docs/handoff/impl-umods-cs-handlers.md` U3):
+   the excluded unit is tested only in the player branch (the literal
+   reading is right), and negative r / F & 0x200 are §3.1 "Excluded
+   unit and negative radius". No caller in this spec passes r < 0.
+9. Answered (2026-10-08, `docs/handoff/impl-umods-cs-handlers.md` U6):
+   yes; the owner link is the AI control record's (GUID, type), resolved
+   per call (§1 r5), so owner data (−1, 1, 0, 0) in §9 leaves every
+   later "minion owner" query without a unit. The U4 question (§22.2 A1
+   damage) is answered in `init.md` Open question 14.

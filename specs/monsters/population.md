@@ -35,20 +35,20 @@
 |   4. Monster pick (`0x005BDE80(game, region, room, &record, chance, umon)`) | 310–336 |
 |   5. Boss or pack (`0x005BE020(region, room)`) | 337–354 |
 |   6. Random boss (champion or unique) | 355–427 |
-|   7. Packs (`0x0054DF80(game, room, cl, min, max)`, class in EBX) | 428–451 |
-|   8. Spawn point in a coordinate rectangle (`0x0054DC40`) | 452–487 |
-|   9. Placement search and creation call (`0x005B2A00`) | 488–602 |
-|   10. Party minions (monstats minion columns, `0x005B2830`) | 603–646 |
-|   11. Preset monsters (DS1 presets) | 647–778 |
-|   12. Ambient (wandering) spawns (`0x0054F060(game, room)`) | 779–803 |
-|   13. Region bookkeeping | 804–836 |
-|   14. Other table-driven and AI spawns | 837–861 |
-| Constants & data dependencies | 862–932 |
-| Randomness | 933–976 |
-| Edge cases & original bugs | 977–1017 |
-| Test vectors | 1018–1089 |
-| Provenance | 1090–1112 |
-| Open questions | 1113–1165 |
+|   7. Packs (`0x0054DF80(game, room, cl, min, max)`, class in EBX) | 428–454 |
+|   8. Spawn point in a coordinate rectangle (`0x0054DC40`) | 455–490 |
+|   9. Placement search and creation call (`0x005B2A00`) | 491–605 |
+|   10. Party minions (monstats minion columns, `0x005B2830`) | 606–649 |
+|   11. Preset monsters (DS1 presets) | 650–785 |
+|   12. Ambient (wandering) spawns (`0x0054F060(game, room)`) | 786–810 |
+|   13. Region bookkeeping | 811–843 |
+|   14. Other table-driven and AI spawns | 844–868 |
+| Constants & data dependencies | 869–939 |
+| Randomness | 940–983 |
+| Edge cases & original bugs | 984–1024 |
+| Test vectors | 1025–1096 |
+| Provenance | 1097–1119 |
+| Open questions | 1120–1173 |
 <!-- /index -->
 
 ## Summary
@@ -439,7 +439,10 @@ gets its party (§10).
    included, §10). Failure → no pack.
 6. If the class has the monstats2 `objCol` flag (`0x004638A0`, flag
    index 18) and it is 528 (evilhut): object 562 (0x232) is created at the
-   leader's position (`0x00555230`, objects spec).
+   leader's position (`0x00555230`, objects spec), allocated in mode 0
+   with flag 1 and GUID 0 (`world/objects-2.md` §22 rule 4; the same for
+   the barricade-door objects of classes 571 / 572, `0x0054E5AA` /
+   `0x0054E5EA`).
 7. Members: n = `roll(max − min + 1)` + (min − 1) on the **leader's unit
    seed** (+0x20). Each member: `0x005B2F70(game, cl, leader, class,
    mode 1, r 3, flags 0)`.
@@ -769,7 +772,11 @@ row:
 
 1. L = levels record of the room's level. If its `mon` count (+0x33) is
    0 → class unchanged.
-2. b = BaseId of class. If some `mon` entry has BaseId b → that entry.
+2. b = BaseId of class (monstats +2, i16); an invalid class (outside
+   0 … count − 1) is its own b. b invalid → class unchanged. If some
+   `mon` entry has BaseId b (an invalid entry compared as itself, so it
+   never matches) → that entry, in `mon` order (1.14d-confirmed,
+   `0x0063ECA9`–`0x0063ED34`).
 3. Otherwise walk the chain from b's `NextInClass`, for up to the class's
    chain length (`0x006510C0`). Each step takes the next class while its
    `Level` (+0xAA) ≤ L `MonLvl1Ex` (+0x16) + 1. Stop at the first invalid
@@ -1115,9 +1122,9 @@ unique with 3 minions), and placement points.
 1. Answered (§1 r2): `0x0052D0F0` runs from portal and arrival paths
    outside the tick room step. A recording that logs population calls
    with their step would confirm it on the running game.
-2. Draw-level check of §3–§10: record room-seed and game-seed draws
+2. ~~Draw-level check of §3–§10: record room-seed and game-seed draws
    (call site and `lo'`) during the first population of a Blood Moor room,
-   then replay.
+   then replay.~~ → PC 2 recording list.
 3. Answered (2026-10-07): class 432 (barricadedoor1; raw class test,
    only when the class is below the monstats count) creates object 571
    and class 433 (barricadedoor2; through the bounds helper
@@ -1152,6 +1159,7 @@ unique with 3 minions), and placement points.
    for evil monsters (`monsters/ai.md` §5.2 step 5.2), so §12's rogue2
    wanderers are attacked by the area's monsters. §12 step 6's
    "alignment change" wording is wrong; this answer supersedes it.
+   Slot 9 (bone wall): `missiles/bodies-2.md` Open question 2.
 8. Answered (2026-10-07): no. `0x005B1CF0` and `0x005B21B0` and their
    callees (2 call levels) contain no generator step (constant
    0x6AC690C5) and no `rng.md` helper call, on any seed; §Randomness

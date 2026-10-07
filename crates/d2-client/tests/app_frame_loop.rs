@@ -168,10 +168,13 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
         l.host_mut()
             .game
             .events
-            .hooks()
-            .x
+            .action
+            .sys
+            .units
+            .get_mut(player)
+            .expect("player record")
             .interact
-            .insert(player, (2, wp));
+            .set(2, wp);
     });
     let sent = app
         .world_mut()

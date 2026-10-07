@@ -135,6 +135,12 @@ pub struct ActionHooks<X> {
     pub hit_class: u8,
     /// The game seed of `rng.md` §5.3 (unit allocation).
     pub game_seed: Seed,
+    /// Game +0x1B24, the unique bits (`quality.md` §8.1): the game's one
+    /// store, read and set by every item creation (the chest drop of
+    /// [`Self::object_drops`], a monster drop, the economy of the host's
+    /// handlers and the lent quest parts). Zero in a new game (`cube.md`
+    /// Inputs).
+    pub uniques: crate::items::UniqueBits,
     /// The game's one item store (the item data of every item unit:
     /// drops, stores, inventories, the cube; `crate::wiring::economy`).
     /// Lent to an economy for a call (empty then).
@@ -254,6 +260,7 @@ impl<X> ActionHooks<X> {
             combat_lists: BTreeMap::new(),
             hit_class: 0,
             game_seed,
+            uniques: crate::items::UniqueBits::default(),
             items: crate::wiring::economy::ItemStore::new(),
             waypoints: BTreeMap::new(),
             objects: None,

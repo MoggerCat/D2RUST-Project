@@ -969,13 +969,21 @@ fn the_hireling_follows_a_waypoint_teleport() {
         guid: mg,
         ..PetNode::default()
     }];
-    // The waypoint menu open (its operate path is staged at the host's
-    // interaction owner, as `e2e_full_loop.rs`), then C→S 0x49 to GATE:
+    // The waypoint menu open (its operate path is staged on the player's
+    // interact info, as `e2e_full_loop.rs`), then C→S 0x49 to GATE:
     // the same-act warp places the player in GATE's spawn room
     // (`path-placement.md` §10, §11), which queues the pet follow (§10
     // rule 6); the host runs it after the handler.
     let wg = fx.guid(fx.wp);
-    fx.sim().world.rest.interact.insert(p, (2, wg));
+    fx.sim()
+        .events
+        .action
+        .sys
+        .units
+        .get_mut(p)
+        .unwrap()
+        .interact
+        .set(2, wg);
     let travel = bytes(&TakeOrCloseWp {
         wp: wg,
         level: GATE as u16,

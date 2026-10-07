@@ -35,18 +35,7 @@ impl CubeRest for Rest {
     fn send(&mut self, _: UnitId, msg: &[u8]) {
         self.log.push(format!("send {:02x}", msg[0]));
     }
-    fn interaction(&self, _: UnitId) -> Option<(u8, u32)> {
-        None
-    }
-    fn set_interaction(&mut self, _: UnitId, _: u8, _: u32) {}
-    fn reset_interaction(&mut self, _: UnitId) {}
     fn inventory_pass(&mut self, _: UnitId) {}
-    fn interacting_with_stash(&self, _: UnitId) -> bool {
-        false
-    }
-    fn trading(&self, _: UnitId) -> bool {
-        false
-    }
     fn inventory(&self, _: UnitId) -> Vec<UnitId> {
         self.inventory.clone()
     }

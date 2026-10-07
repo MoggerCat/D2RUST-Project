@@ -270,7 +270,10 @@ pub trait Pending {
     fn interacting(&self, unit: UnitId) -> bool {
         false
     }
-    /// `0x00535060`.
+    /// `0x00535060` without its interaction part (a cursor item, player
+    /// data +0x4C ≠ 0): the interact info is the unit record's
+    /// ([`crate::units::record::InteractInfo`]), which the callers test
+    /// first.
     fn busy(&self, unit: UnitId) -> bool {
         false
     }
@@ -664,7 +667,9 @@ pub trait Pending {
         level: i32,
     ) {
     }
-    /// A missile parameter record's init callback (skills spec).
+    /// A missile parameter record's init callback with an id no spec
+    /// names (the specified ones run in `missiles::init_cb`, §R2.3 step
+    /// 21).
     fn missile_init_callback(&mut self, game: &mut Game, missile: UnitId, callback: u32, arg: u32) {
     }
     /// Server-damage function `index` 1…14 (`0x0073C960`, skills spec):
@@ -872,14 +877,6 @@ pub trait Pending {
     /// `0x00624690` object mode change of an object without object data
     /// (with data: [`super::objects`], `objects.md` §4).
     fn set_object_mode(&mut self, game: &mut Game, object: UnitId, mode: u8) {}
-    /// `0x00554120`.
-    fn set_interact(&mut self, player: UnitId, unit_type: u8, guid: u32) {}
-    /// `0x00554190`.
-    fn reset_interact(&mut self, player: UnitId) {}
-    /// `0x00554D00`.
-    fn interact_guid(&self, player: UnitId) -> Option<u32> {
-        None
-    }
     /// waypoints.md §6.1 host clock (never true in single player).
     fn hostile_delay(&self, player: UnitId) -> bool {
         false

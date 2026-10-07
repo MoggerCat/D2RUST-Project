@@ -35,17 +35,17 @@
 |   6. Light records | 179–262 |
 |   7. Contribution of one record | 263–342 |
 |   8. Light sources | 343–407 |
-|   9. Environment (day and night) | 408–525 |
-|   10. Scripted ambient overrides (`0x0046BDD0`) | 526–579 |
-|   11. Light values handed to the draws | 580–610 |
-|   12. Captures (answers `capture.md` Open question 5) | 611–648 |
-|   13. d2rs answers | 649–659 |
-| Constants & data dependencies | 660–671 |
-| Randomness | 672–678 |
-| Edge cases & original bugs | 679–695 |
-| Test vectors | 696–729 |
-| Provenance | 730–773 |
-| Open questions | 774–861 |
+|   9. Environment (day and night) | 408–540 |
+|   10. Scripted ambient overrides (`0x0046BDD0`) | 541–594 |
+|   11. Light values handed to the draws | 595–625 |
+|   12. Captures (answers `capture.md` Open question 5) | 626–663 |
+|   13. d2rs answers | 664–674 |
+| Constants & data dependencies | 675–686 |
+| Randomness | 687–693 |
+| Edge cases & original bugs | 694–710 |
+| Test vectors | 711–744 |
+| Provenance | 745–788 |
+| Open questions | 789–886 |
 <!-- /index -->
 
 ## Summary
@@ -418,7 +418,7 @@ Measured: 100 `monstats2` rows have `Light` > 0 (e.g. `fallenshaman1`–`5`:
 | +0x10 | `GetTickCount()` at creation |
 | +0x18..+0x1A | R, G, B |
 | +0x1C, +0x20, +0x24 | floats: −cos θ, 0, the sine term `s` (§9.3) |
-| +0x28 | speed (ticks per degree) = `[0x007443E4 + 4 · (+0x2C)]` (128, 4, 8); +0x2C has no writer, so 128 |
+| +0x28 | speed (ticks per degree) = `[0x007443E4 + 4 · (+0x2C)]` (128, 4, 8); +0x2C: 0 (128) except during the Tainted Sun: its start `0x0061C450` writes 1 (speed `[0x007443E8]` = 4, `0x0061C465`), its end `0x0061C4D0` writes 0 (`world/quests-act2-2.md` §5.2) |
 | +0x30 | eclipse flag |
 | +0x34 | last reported hour (server, `0x0061C040`) |
 
@@ -473,7 +473,12 @@ from the normal entry 2, then §9.3 r4 and §9.4 with `A` = 0 and `L` = 0
       then is ignored. Recorded joins send 0x53 in frame 2, after 0x15
       (frame 1): `53 02000000 00000000 00` (`20261006-022633` seq 228)
       applies index 2, ticks 0; `53 02000000 80080000 00` (seq 146616,
-      frame 2177) index 2, ticks 0x880.
+      frame 2177) index 2, ticks 0x880. With no client act and a P
+      without act pointer (unplaced) both are null, so the check
+      **passes**; step 3 then calls the setter with act null, whose
+      first step (`0x0061C247` → `0x0061AA60`, the act's environment
+      record) is fatal 0x547 on a null act, before the index and ticks
+      checks and before any write. d2rs: fatal 0x547, no state change.
    3. The setter of r2 with (act, P's room (`0x004646A0` → `0x00620BB0`;
       none → null), index u32@1, ticks u32@5, eclipse u8@9).
    4. Day-period refresh `0x004646C0`: `p` := the act's day period
@@ -482,7 +487,17 @@ from the normal entry 2, then §9.3 r4 and §9.4 with `A` = 0 and `L` = 0
       of the client's sets S and C, bucket order, gets `0x004BC5E0(obj,
       0)` (object day/night refresh; owner: the client object spec,
       open question 11); a non-object found in those type-2 buckets →
-      fatal 0x88C.
+      fatal 0x88C. **The day period** `p` is the environment record's
+      +0x04 (period type); `0x0061C100` writes ticks / speed (0 when
+      speed is 0) to its optional out argument (null here) and returns
+      0 when the act has no record (a null act is fatal 0x547). Every
+      writer of +0x04 (creation §9.1, §9.3 r3, the setter of r2, the
+      period reset) takes the type column of the table chosen by the
+      eclipse flag (normal when 0, else eclipse; never the act-4 table)
+      at the current index, so `p` depends on (index, eclipse flag)
+      only, not on ticks or act: index 0..5 → normal 3, 3, 0, 1, 1, 2;
+      eclipse 3, 0, 1, 2, 2, 2 (`render/env-periods.tsv`; `0x0061C100`,
+      `0x0061BEE0`, `0x0061C240`).
    5. P still present → the requirement refresh of S→C 0x47 on P
       (`0x004C1BC0` with a built `47 <P type> <P GUID>`,
       `client/msg-stats-items.md` §3 rule 3).
@@ -833,6 +848,8 @@ data: `states` setfunc, `missiles` rows 191/288, `objects` row 17,
     the day period changes): which object classes change (lights,
     torches, mode) and how; owner: the client object spec. A recording
     across a day-period change with objects in sight settles it.
+    Also run every 500 ms for object class 39 through `ClientFn` 14
+    (`0x004BDCC0`, `world/objects-client.md` §26.14).
     *Answered* (static, 1.14d asm of `0x004BC5E0`; ECX object, EDX
     flag): only objects whose objects `EnvEffect` (+0x139) ≠ 0 change;
     others return 0. `p` := the act's period type (`0x0061C100(act,
@@ -858,3 +875,11 @@ data: `states` setfunc, `missiles` rows 191/288, `objects` row 17,
     of the 0x53 setter is the period reset `0x0061BDF0` (§9.2 r2): type
     and ticks from the eclipse table's entry of the index, discarding the
     received ticks; then intensity with the flag set and color.
+13. *Answered (2026-10-08)* (`impl-client-msgs-3` Q8): with no client
+    act and an unplaced P the act check of §9.2 r4.2 passes (null =
+    null) and the setter is fatal 0x547 on the null act before any
+    write (§9.2 r4.2; `0x0045E31C`, `0x0061C247`, `0x0061AA60`).
+14. *Answered (2026-10-08)* (`impl-client-msgs-3` Q7): open question 11
+    gives `p` = env +0x04 but not its value per state; that value is
+    the period type of (index, eclipse flag) only, never ticks or the
+    act-4 table (§9.2 r4.4, "The day period").

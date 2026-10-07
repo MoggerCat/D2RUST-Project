@@ -34,7 +34,6 @@ use crate::seams::PlayerGate;
 #[derive(Default)]
 pub struct TestPending {
     pub pos: BTreeMap<UnitId, (i32, i32)>,
-    pub interact: BTreeMap<UnitId, (u8, u32)>,
     pub sent: Vec<(UnitId, Vec<u8>)>,
     pub log: Vec<String>,
     /// Operators are in interact range of objects (`objects.md` §7.1
@@ -48,15 +47,6 @@ impl Pending for TestPending {
     }
     fn place(&mut self, unit: UnitId, x: i32, y: i32) {
         self.pos.insert(unit, (x, y));
-    }
-    fn set_interact(&mut self, player: UnitId, unit_type: u8, guid: u32) {
-        self.interact.entry(player).or_insert((unit_type, guid));
-    }
-    fn reset_interact(&mut self, player: UnitId) {
-        self.interact.remove(&player);
-    }
-    fn interact_guid(&self, player: UnitId) -> Option<u32> {
-        self.interact.get(&player).map(|i| i.1)
     }
     fn send(&mut self, player: UnitId, msg: &[u8]) {
         self.sent.push((player, msg.to_vec()));
@@ -385,10 +375,24 @@ impl Fx {
         &mut self.host.game.events.hooks().x
     }
 
+    /// The player's interact info (the unit record's), while active.
+    fn interact(&self) -> Option<(u8, u32)> {
+        let units = &self.host.game.events.sys.units;
+        units.get(self.player).unwrap().interact.get()
+    }
+
+    /// Stages the player's interact info as (type, GUID), active.
+    fn stage(&mut self, ty: u8, guid: u32) {
+        let units = &mut self.host.game.events.sys.units;
+        let r = units.get_mut(self.player).unwrap();
+        r.interact.reset();
+        r.interact.set(ty, guid);
+    }
+
     /// The player's interact info is the waypoint (the menu is open).
     fn open_menu(&mut self) {
-        let (p, wp) = (self.player, self.wp);
-        self.pending().interact.insert(p, (2, wp));
+        let wp = self.wp;
+        self.stage(2, wp);
     }
 
     fn msg(wp: u32, level: u16) -> Vec<u8> {
@@ -414,7 +418,7 @@ fn close_resets_the_interact_info_without_a_message() {
     let (code, got) = send(&mut fx.host, &Fx::msg(fx.wp, 0));
     assert_eq!(code, ResultCode::Done);
     assert_eq!(got, Vec::<Vec<u8>>::new());
-    assert!(fx.pending().interact.is_empty());
+    assert_eq!(fx.interact(), None);
     // Level 0 has no waypoint index: travel stops after the reset.
     assert!(fx.pending().log.is_empty());
     fx.assert_clean();
@@ -428,7 +432,7 @@ fn amazon_out_of_reach_is_refused_and_the_menu_closed() {
     let (code, got) = send(&mut fx.host, &Fx::msg(fx.wp, 0));
     assert_eq!(code, ResultCode::Refused);
     assert!(got.is_empty());
-    assert!(fx.pending().interact.is_empty());
+    assert_eq!(fx.interact(), None);
     fx.assert_clean();
 }
 
@@ -454,7 +458,7 @@ fn sorceress_at_22_travels_with_the_arrival_message() {
     want.extend_from_slice(&(20u16 + 3).to_le_bytes());
     want.extend_from_slice(&[0, 0]);
     assert_eq!(got, vec![want]);
-    assert!(fx.pending().interact.is_empty());
+    assert_eq!(fx.interact(), None);
     let room = fx.host.game.game.lists.unit(p).unwrap().room();
     assert_eq!(
         fx.host.game.world.arrivals.0,
@@ -480,11 +484,10 @@ fn levels_without_a_waypoint_or_past_the_table_are_malformed() {
 fn unknown_index_is_refused_and_closes_only_its_own_menu() {
     let mut fx = fixture(0, 0);
     // Interact info on another unit: kept.
-    let p = fx.player;
-    fx.pending().interact.insert(p, (1, 77));
+    fx.stage(1, 77);
     let (code, _) = send(&mut fx.host, &Fx::msg(fx.wp, LEVEL4 as u16));
     assert_eq!(code, ResultCode::Invalid);
-    assert_eq!(fx.pending().interact.get(&p), Some(&(1, 77)));
+    assert_eq!(fx.interact(), Some((1, 77)));
     fx.assert_clean();
     // Interact info on the waypoint: reset (a fresh client: the
     // transport filters a repeated message, §2.1).
@@ -493,7 +496,7 @@ fn unknown_index_is_refused_and_closes_only_its_own_menu() {
     let (code, got) = send(&mut fx.host, &Fx::msg(fx.wp, LEVEL4 as u16));
     assert_eq!(code, ResultCode::Invalid);
     assert!(got.is_empty());
-    assert!(fx.pending().interact.is_empty());
+    assert_eq!(fx.interact(), None);
     fx.assert_clean();
 }
 

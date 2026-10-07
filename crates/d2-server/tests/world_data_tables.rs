@@ -1,0 +1,161 @@
+// Spec: specs/items/treasure.md Inputs, §1; specs/formats/d2s.md Inputs, §2.5 r2, §8.1 r2, §8.4 r2; specs/world/hirelings.md §1.2 r2, §10 r1, §10 r2; specs/data/loading.md (the loaded set)
+//! The production loaders of `d2_server::world_data` a game is built
+//! from (`game::GameTables`, `tables::drop_tables`, `tables::SaveData`)
+//! on the synthetic install (`test_fixtures::install`, no game files),
+//! and the same loaders on the user's install (`#[ignore]`,
+//! `D2_GAME_DIR`).
+
+use std::path::PathBuf;
+
+use d2_formats::d2s::{Hireling, SaveTables};
+use d2_formats::mpq::ArchiveSet;
+use d2_server::world_data::game::GameTables;
+use d2_server::world_data::tables::{drop_tables, SaveData};
+use d2_sim::items::bitstream::{write_save, StreamItem};
+use test_fixtures::{content, install, synth};
+
+fn synthetic() -> (install::Install, GameTables) {
+    // One directory per test process (nextest runs each test in its own).
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
+        .join(format!("synthetic-world-data-{}", std::process::id()));
+    let i = install::build(&dir, &synth::synthetic()).unwrap_or_else(|e| panic!("{e}"));
+    let t = GameTables::load(&i.archives).expect("the synthetic install loads");
+    (i, t)
+}
+
+// Covers: specs/data/loading.md §6
+#[test]
+fn every_game_view_builds_from_the_synthetic_install() {
+    let (_, t) = synthetic();
+    t.action_tables().unwrap();
+    t.object_tables().unwrap();
+    t.world_tables().unwrap();
+    t.vitals().unwrap();
+    t.stat_data().unwrap();
+    assert!(t.unit_data(true).unwrap().expansion);
+    assert!(!t.unit_data(false).unwrap().expansion);
+    t.hire_rows().unwrap();
+    assert_eq!(t.item_tables().unwrap().items.len(), 6);
+    assert_eq!(t.vendor_tables().unwrap().items.len(), 6);
+}
+
+// Covers: specs/items/treasure.md §1
+#[test]
+fn drop_tables_hold_the_items_the_treasure_classes_and_the_superuniques() {
+    let (_, t) = synthetic();
+    let d = drop_tables(&t.fixed).unwrap();
+    assert_eq!(d.items.items.len(), 6, "2 weapons + 2 armor + 2 misc");
+    assert_eq!(d.treasure_items.len(), 6, "the item list in index order");
+    // TC 0, 32 automatic TCs for each of `weap` and `armo`, 3 rows
+    // (`test-fixtures` `server_tables::treasure_classes`).
+    assert_eq!(d.tcs.len(), 1 + 64 + 3);
+    assert_eq!(d.superuniques.len(), content::SUPERUNIQUES);
+}
+
+// Covers: specs/formats/d2s.md §8.1 r2
+#[test]
+fn save_data_reads_the_save_columns_and_measures_item_entries() {
+    let (_, t) = synthetic();
+    let s = SaveData::from_fixed(&t.fixed, true).unwrap();
+    assert_eq!(s.stats.len(), content::STATS.len());
+    // `CSvBits` of the synthetic rows: 32 for experience, else 10.
+    let exp = content::STATS
+        .iter()
+        .position(|n| *n == "experience")
+        .unwrap();
+    assert_eq!(s.stat_save(exp as u16).map(|c| c.bits), Some(32));
+    assert_eq!(s.stat_save(0).map(|c| c.bits), Some(10));
+    assert_eq!(s.stat_save(content::STATS.len() as u16), None);
+    // A compact record of the last misc code: its stream is the entry;
+    // the bytes after it are not read.
+    let code = s.items.items.last().unwrap().code;
+    let item = StreamItem {
+        flags: 0x10,
+        compact: true,
+        version: 101,
+        code,
+        page: 0xFF,
+        ..StreamItem::default()
+    };
+    let (bytes, _) = write_save(&item, &s.items.isc).unwrap();
+    let mut buf = bytes.clone();
+    buf.extend_from_slice(&[0xFF; 4]);
+    assert_eq!(s.item_entry_len(&buf), Ok(bytes.len()));
+    // M08: a code outside the items table does not decode.
+    let bad = StreamItem {
+        code: *b"zzz ",
+        ..item
+    };
+    let (bytes, _) = write_save(&bad, &s.items.isc).unwrap();
+    assert!(s.item_entry_len(&bytes).is_err());
+}
+
+// Covers: specs/formats/d2s.md §2.5 r2, §8.4 r2; specs/world/hirelings.md §10 r1, §10 r2
+#[test]
+fn a_saved_hireling_is_restored_when_present_and_its_row_is_found() {
+    let (_, t) = synthetic();
+    let s = SaveData::from_fixed(&t.fixed, true).unwrap();
+    let rows = &s.hirelings.rows;
+    assert!(!rows.is_empty(), "the synthetic install has hireling rows");
+    let id = rows
+        .iter()
+        .map(|r| r.id)
+        .find(|&id| s.hirelings.row_at(true, id, 1).is_some())
+        .expect("an expansion row at level 1");
+    let id = u16::try_from(id).unwrap();
+    let present = Hireling {
+        flags: 0,
+        seed: 7,
+        name_index: 0,
+        id,
+        experience: 0,
+        rest: [0; 16],
+    };
+    assert!(s.hireling_restored(&present));
+    // Rule 1: seed, name index and experience all 0 → none.
+    let absent = Hireling { seed: 0, ..present };
+    assert!(!s.hireling_restored(&absent));
+    // Rule 2: no row for the `Id` → not restored (M08: the same block
+    // with an id no row has).
+    let unknown = (0..=255u16)
+        .find(|&i| s.hirelings.row_at(true, u32::from(i), 1).is_none())
+        .expect("an id without rows");
+    let no_row = Hireling {
+        id: unknown,
+        ..present
+    };
+    assert!(!s.hireling_restored(&no_row));
+}
+
+/// The user's install (`$D2_GAME_DIR`).
+fn live() -> GameTables {
+    let dir = std::env::var_os("D2_GAME_DIR").expect("D2_GAME_DIR is set");
+    let archives = ArchiveSet::open_dir(PathBuf::from(dir)).expect("archives open");
+    GameTables::load(&archives).expect("the live set loads")
+}
+
+// Covers: specs/data/loading.md §6; specs/items/treasure.md §1
+#[test]
+#[ignore = "needs the game files (D2_GAME_DIR)"]
+fn every_loader_builds_from_the_users_install() {
+    let t = live();
+    t.action_tables().unwrap();
+    t.object_tables().unwrap();
+    t.world_tables().unwrap();
+    t.vitals().unwrap();
+    t.stat_data().unwrap();
+    t.unit_data(true).unwrap();
+    t.hire_rows().unwrap();
+    t.vendor_tables().unwrap();
+    let d = drop_tables(&t.fixed).unwrap();
+    assert!(d.tcs.notes.is_empty(), "{:?}", d.tcs.notes);
+    // 1.14d: 66 superuniques (`preset.md` §5.3).
+    assert_eq!(d.superuniques.len(), 66);
+    assert_eq!(
+        d.treasure_items.len(),
+        d.items.items.len(),
+        "one item list entry per items row"
+    );
+    let s = SaveData::from_fixed(&t.fixed, true).unwrap();
+    assert_eq!(s.stats.len(), t.table("itemstatcost").unwrap().count);
+}

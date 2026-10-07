@@ -29,22 +29,22 @@
 | Outputs / state changes | 80–93 |
 | Rules | 94–95 |
 |   R1. Data the server keeps per missile | 96–140 |
-|   R2. Creation | 141–281 |
-|   R3. Per-tick dispatch | 282–311 |
-|   R4. Default flight (server-do 1, `0x005B0BC0` → `0x005AE1F0`) | 312–432 |
-|   R5. Hit handler (`0x005ADF10`, D2MOO `MISSMODE_SrvDmgHitHandler`) | 433–482 |
-|   R6. Damage stage (missile-owned part) | 483–548 |
-|   R7. Lifetime and expiry | 549–572 |
-|   R8. Pierce | 573–598 |
-|   R9. Server-do and server-hit catalogues | 599–828 |
-|   R10. Behaviour of the recorded missiles | 829–862 |
-|   R11. `missiles.txt` columns and their server use | 863–897 |
-| Constants & data dependencies | 898–924 |
-| Randomness | 925–957 |
-| Edge cases & original bugs | 958–981 |
-| Test vectors | 982–1061 |
-| Provenance | 1062–1104 |
-| Open questions | 1105–1157 |
+|   R2. Creation | 141–284 |
+|   R3. Per-tick dispatch | 285–314 |
+|   R4. Default flight (server-do 1, `0x005B0BC0` → `0x005AE1F0`) | 315–445 |
+|   R5. Hit handler (`0x005ADF10`, D2MOO `MISSMODE_SrvDmgHitHandler`) | 446–498 |
+|   R6. Damage stage (missile-owned part) | 499–612 |
+|   R7. Lifetime and expiry | 613–636 |
+|   R8. Pierce | 637–663 |
+|   R9. Server-do and server-hit catalogues | 664–894 |
+|   R10. Behaviour of the recorded missiles | 895–928 |
+|   R11. `missiles.txt` columns and their server use | 929–969 |
+| Constants & data dependencies | 970–996 |
+| Randomness | 997–1029 |
+| Edge cases & original bugs | 1030–1056 |
+| Test vectors | 1057–1136 |
+| Provenance | 1137–1179 |
+| Open questions | 1180–1249 |
 <!-- /index -->
 
 ## Summary
@@ -200,8 +200,10 @@ Missile-owned helpers: `0x005A9720` (D2MOO
    flies at 75 % of its table speed.
 8. If v ≠ 0: if a target unit is given, is not the owner and stands on
    the owner's subtile → drop the target unit and add (1, 1) to the target
-   point (D2MOO order; the 1.14d comparison helpers are register-passed,
-   open question 6). With no target unit and target point = start → add
+   point (1.14d `0x0059FBBE`–`0x0059FC11`: the target unit's x
+   (`0x0045ADF0`, unit in ECX) against the owner's (record +0x04), then
+   the y (`0x0045AE20`); both equal → drop; open question 6). With no
+   target unit and target point = start → add
    (1, 1). Aim = target unit position or target point; `|aim.x − x| ≥ 100`
    or `|aim.y − y| ≥ 100` → fail. With v = 0 none of this runs.
 9. Allocate the unit `0x00555230(x, y, game, room, …, mode = CollideType)`
@@ -244,7 +246,8 @@ Missile-owned helpers: `0x005A9720` (D2MOO
 20. Allocate the missile's stat list (`0x00626D40`).
 21. Init callback, if any (record +0x54, argument +0x58). Four 1.14d
     callbacks re-seed the new missile (`rng.md` §5.3): `0x005C9290`,
-    `0x005CD110` (path first point x + a caller value), `0x005D40F0`,
+    `0x005CD110` (seed from path target x (+0x10) + a; `skills/bodies-3.md`
+    §5.28 owns it), `0x005D40F0`,
     `0x005D4680`; they belong to the skills spec.
 22. Skill (clamped ≥ 0), level.
 23. Damage setup `0x0059F900` (owner, origin, missile, level): the skills
@@ -368,7 +371,7 @@ The path code is `units.md`'s; what the missile fields mean there
 #### R4.2 Collide types (missile modes)
 
 Table `0x0073C720`, 9 entries of (unit callback, mask), dumped from
-`Game.exe`; callback semantics from D2MOO (open question 2):
+`Game.exe`; callbacks 1.14d-read (open question 2, answered 2026-10-08):
 
 | Mode | Callback | Mask | Units accepted | Rows |
 |---|---|---|---|---|
@@ -389,6 +392,16 @@ missile/unit footprint, 0x80 player, 0x100 monster. Shared unit filter
 the missile has an owner, the owner may attack the unit
 (`0x00554200`, D2MOO `sub_6FCBD900`, `units.md`) or `CollideFriend` ≠ 0.
 
+Callbacks (ECX unit, EDX the collide context, whose +0x0C must be
+non-null; result 1 = accept, else 0): `0x005A87B0` unit type 1 →
+filter; `0x005A87F0` type 0 → filter, type 1 with alignment
+`0x006259B0` = 2 → filter, no unit or other types → 0; `0x005A8850`
+type 0 or 1 → filter; `0x005A8890` (no context test, no filter) type 3
+whose class is valid and has `CanDestroy` (flags bit 4, mask table
+`0x006CE278` = 0x10) → 1. A null unit → 0 in all four. A `CollideType` ≥ 9
+would read past the table; no live row has one, and d2rs treats it as
+mode 0 (design choice).
+
 #### R4.3 Missile path compute (`0x00649760`, 1.14d-confirmed)
 
 `0x00649970` (`sim/pathing.md` §3 step 1) hands a path with flag
@@ -398,8 +411,8 @@ footprint removal, no room or town checks. By path type (+0x3C):
 | Type | Function | Result |
 |---|---|---|
 | 4 (every missile created by §R2.3) | `0x006492F0`, below | 0 → path flag 0x20 cleared, result 0; else flag 0x20 set, result = point count (+0x28) |
-| 10 | `0x0067A240` (charged-bolt zigzag, open question 12) | flag 0x20 set, result = point count |
-| 14 | `0x0067A140` (blessed-hammer spiral, open question 12) | flag 0x20 set, result = point count |
+| 10 | `0x0067A240` (charged-bolt zigzag, `sim/pathing.md` §11.2; open question 12) | flag 0x20 set, result = point count |
+| 14 | `0x0067A140` (blessed-hammer spiral, `sim/pathing.md` §11.3; open question 12) | flag 0x20 set, result = point count |
 | any other | fatal assert | — |
 
 Type 4, straight line to the target (`0x006492F0`):
@@ -437,7 +450,10 @@ barrier). Locals: result `c`, pierce word `p`. 1.14d-confirmed, in
 order:
 
 1. Owner = `SUNIT_GetOwner`. `c = 2` (deal direct damage), or 0 with
-   `Explosion`. `p = 3`.
+   `Explosion`. `p = 3`. A missile with no record (class out of range) reads
+   flags at address 4 (`0x005ADF61`, a null read in 1.14d); unreachable,
+   since creation fails without a record (§R2.3 step 1), so an
+   implementation asserts the record.
 2. With a unit:
    1. `NextHit` and the unit has state 86 → return 1.
    2. Unit is the last-collided unit (`LastCollide` only) → return 1.
@@ -488,8 +504,8 @@ stage, 4 = ignore this contact (keep flying, no exit test).
 2. `pSrvDmgFunc` in 1…30 (table `0x0073C960`, count 31 at
    `0x0073C95C`, entries 1–14 non-null, 15–30 null, no null check):
    adjusts the record (`srvdmg` functions: fire/magic/cold arrows, ice
-   arrow, fire wall, ice blast, blessed hammer, …; D2MOO names; skills
-   spec owns their formulas).
+   arrow, fire wall, ice blast, blessed hammer, …; D2MOO names; rules
+   in §R6.3).
 3. `0x005ADCD0`: result flags (`0x005AD730`, below), then damage
    application (skills spec), then, for a monster that is not a
    hireling, armor −= missile stat 120 (`item_damagetargetac`, clamped
@@ -519,7 +535,8 @@ order, as `min + roll(max − min)` after reading max then min:
 | 6 | poison | 57, 58 | 332 |
 | 7 | burning | 316, 317 | 329 |
 
-Per element (`0x005A8910`): max ≤ 0 → 0, no draw; min ≤ 0 → 0, no
+Per element (`0x005A8910`; every stat, the mastery included, is the
+missile's own total `0x00625480(missile, s, 0)`): max ≤ 0 → 0, no draw; min ≤ 0 → 0, no
 draw; if min > max swap; mastery m ≠ 0 → `min += pct(min, m)`, `max +=
 pct(max, m)`; result `min + roll(max − min)` — `roll(0)` does not step
 (`rng.md` §3), so equal bounds draw nothing. `pct(a, b) = a × b / 100`
@@ -531,7 +548,8 @@ rule; damages are 8.8 fixed point).
 After the rolls (no draws): cold length 56, poison length 59 divided by
 poison count 326 when > 1, drains 62/60/64, burn length 315, stun 66;
 with a unit: damage percent 25 (+121 demon, +122 undead, +180 by monster
-type), floored at −90, `phys += phys × pct / 100`; deadly strike 141 ≠ 0
+type), floored at −90, `phys += phys × pct / 100` (32-bit `imul`,
+wrapping, then signed ÷ 100 truncating, `0x005A8BE8`); deadly strike 141 ≠ 0
 → crit flag and phys × 2; 103/104/106 bypass flags.
 
 The record is the 0x70-byte damage record itself (`combat/damage.md`
@@ -545,6 +563,52 @@ flags (u16 +0x04) |= 0x2000 and +0x08 × 2. Bypass: stat 103 → hit flags
 (+0x00) |= 0x100, 104 → 0x200, 106 → 0x400 (`combat/damage.md` §1:
 undead / demons / beasts). Nothing else is set (freeze length +0x34
 stays 0).
+
+#### R6.3 Server-damage functions (`pSrvDmgFunc`, 1.14d-confirmed 2026-10-08)
+
+Table `0x0073C960` (§R6.1 step 2). Each is called as (ECX game, EDX
+missile M, stack unit U, record R) and returns nothing. "Row" = M's
+`missiles.txt` record; "row valid" = class in range and record found
+(§R1 rule 1); functions that test it do nothing without it. Shared
+helpers:
+
+- `add_elem(M, R, a)` = `0x005A9270`: adds a to R's field for the
+  row's `EType` (`0x0064B0C0`): 0 physical +0x08, 1 fire +0x10, 2
+  lightning +0x1C, 3 magic +0x20, 4 cold +0x24, 5 poison +0x28, 6 / 7 /
+  8 life / mana / stamina leech +0x38 / +0x3C / +0x40, 9 stun +0x44,
+  11 burn +0x14; 12 **sets** cold +0x24 := a; 10 and > 12 nothing.
+  M none → nothing.
+- `clear_elems(M, R)` = `0x005A91C0`: hit flags &= ~0x700 (bypass
+  bits); physical, fire, burn, lightning, magic, cold, poison, the three
+  leeches and stun := 0; then by `EType`: 4 or 12 → poison length +0x2C
+  and burn length +0x18 := 0 (cold / freeze lengths kept); 5 → cold
+  length +0x30, freeze +0x34, burn length := 0 (poison length kept); 11
+  → cold length, poison length, freeze := 0 (burn length kept); any
+  other → all four lengths and freeze := 0. M none → nothing.
+- `c` = missiles evaluator `0x0064B7C0(M, owner, DmgCalc1 (+0x90), −1,
+  −1)` (owner `0x00552FD0`); `pct` = `0x00483360` (`combat/damage.md`
+  §0). `elem_roll` = `0x005A8C70` (§R5 helpers).
+
+| # | Address | Rows (1.14d) | Rule |
+|---|---|---|---|
+| 1 | `0x005AD050` | firearrow, magicarrow, coldarrow | row valid; c > 0: c := min(c, 100); f := min(pct(R phys, c, 100), R phys); R phys −= f; `add_elem(M, R, f)` |
+| 2 | `0x005AD1B0` | icearrow, royalstrikechaosice | row valid: R freeze +0x34 := pct(M's total stat 56 `coldlength` (`0x00625480(M, 56, 0)`), max(`dParam1`, 0), 100); R cold length +0x30 := 0 |
+| 3 | `0x005AD220` | blaze, firewall, vampirefirewall, immolationfire, meteorfire, vampiremeteorfire | row valid: one step of M's unit seed (unit +0x20; seed := lo × 0x6AC690C5 + hi, inline, no `0x0045C390`); (new lo & 0x7F) < `dParam1` → R result flags |= 0x4000 (soft hit) |
+| 4 | `0x005AD290` | iceblast | no checks: R freeze +0x34 := R cold length +0x30; cold length := 0 |
+| 5 | `0x005AD2F0` | blessedhammer | row valid: e := `elem_roll(game, M, U, R)`; `dParam1` > 0 and U undead (`0x0063E990`) → `add_elem(M, R, pct(e, dParam1, 100))`; then `dParam2` > 0 and U demon (`0x0063E940`) → `add_elem(M, R, pct(e, dParam2, 100))` |
+| 6 | `0x005AD3A0` | none (no live row) | owner O of M; O, O flags +0xC4 bit 0x200 clear, U present → U flags +0xC4 |= 0x20000 |
+| 7 | `0x005AD3E0` | warcry, shockwave | row valid: R stun +0x44 := `dParam1` if > 0, else `0x004E6CA0(skill, level)` (M data +0x0A / +0x0C, `0x0064A280` / `0x0064A210`; `missiles/bodies-2.md` §38 step 4 formula); R hit class +0x60 := 0x60 |
+| 8 | `0x005AD450` | erruption crack 1, 2 | row valid, U present, `ProgOverlay` (+0x36, i16) > 0 → overlay on U (`0x00621E40(U, ProgOverlay, 0)`) |
+| 9 | `0x005AD4A0` | twister | row valid: k := M's skill; R stun := `dParam1` if > 0; else k's skills row (`0 ≤ k <` count) `Param2` (+0x14C); else 0. R hit class := 0x60 |
+| 10 | `0x005AD2B0` | bladesoficecubes | row valid: R freeze +0x34 := R cold length +0x30 (cold length kept) |
+| 11 | `0x005AD530` | rabiescontagion | O := owner; O or U none → R poison +0x28, poison length +0x2C := 0. Else t := M data +0x28 (`0x0064A730`) − game frame (game +0xA8); 10 ≤ t ≤ `elem_len(O, k, L, 1)` (`0x00644F20`, `skills/levels.md` §3.2; k, L = M's skill, level) → R poison length := t; else poison and its length := 0 |
+| 12 | `0x005AD0F0` | lightningjavelin | row valid; c > 0: c := min(c, 100); f := min(pct(R phys, c, 100), R phys); e := `elem_roll(game, M, U, R)`; `clear_elems(M, R)`; `add_elem(M, R, f + e)` |
+| 13 | `0x005AD5C0` | blessedhammerex | U present and a monster (type 1): O := owner; O → R phys += R phys × O's total stat 25 (`0x00625480(O, 25, 0)`) / 100 (signed, truncating); then function 5 (O or not). Other U: nothing |
+| 14 | `0x005AD630` | moltenboulder | M type 3 and row valid, U present. p by U: player → `dParam2` when `dParam1` ≥ 1, else none; monster (class flags `0x004638A0(class, 10)` small, `(class, 11)` large): `dParam1` < 1 → `dParam2` if small, else none; = 1 → small 2 × `dParam2`, large none, other `dParam2`; > 1 → small 3 × `dParam2`, large `dParam2`, other 2 × `dParam2`; other types none. p > 0: `roll(100)` on M's seed (`0x0045C390`) < p → R result flags |= 8 (knockback) |
+
+Draws: function 3 one inline seed step and function 14 one `roll(100)`,
+both on the missile's seed; 5, 12 and 13 make `elem_roll`'s draws.
+Entries 15–30 are null and never reached by live data (§R6.1).
 
 ### R7. Lifetime and expiry
 
@@ -584,7 +648,8 @@ and the row has `Pierce` (60 rows):
    owner's base pierce_idx is a counter incremented by attack/skill
    messages (D2MOO `PlrMsg.cpp`, `MonsterMsg.cpp`; skills spec).
 3. n = 0; up to 4 times: draw `lo' % 100` (inline step); if ≥ P stop;
-   else n += 1.
+   else n += 1. The compare is signed (`0x0059F9FB` `jge`): a negative P
+   stops at the first draw (one step, n = 0).
 4. Missile stat 328 (`pierce_idx`) = n: the number of units it may pass
    through.
 
@@ -608,10 +673,11 @@ piercing.
 
 The null pattern equals D2MOO 1.10f's tables entry for entry; 1.14d
 entries 23 and 24 of server-do share `0x005AF790`, as in D2MOO.
-`0x005AD9D0` (other caller of the server-hit table; no direct callers,
-reached through a pointer) runs the row's server-hit function with no
-unit when its flag argument is non-zero, then removes the missile
-(`0x00555600`). Its users are not identified (open question 10).
+`0x005AD9D0` (other caller of the server-hit table) runs the row's
+server-hit function with no unit when its flag argument is non-zero,
+then removes the missile (`0x00555600`). It is dead code in 1.14d: no
+call, jump or stored pointer reaches it (open question 10); d2rs does
+not implement it.
 
 #### R9.2 TSV columns (`srvdo.tsv`, `srvhit.tsv`)
 
@@ -895,6 +961,12 @@ functions that index the missile table: only client functions
 reader; `ExplosionMissile` none) and no D2MOO server read. A heuristic
 search; open question 7.
 
+`ProgSound` is read only by client missile functions (`pCltDoFunc`
+table `0x0072A398`) 9, 29, 47 and 51; their conditions are owned by
+`audio/triggers-2.md` §16. Function 29 (`0x004D5310` → `0x004CE850`)
+tests the elapsed-frame argument against 315 (`cmp` with 0x13B at
+`0x004CE8AE`), not the missile id 315.
+
 ## Constants & data dependencies
 
 | Constant | Value | Source |
@@ -966,7 +1038,10 @@ one `roll(SubStop − SubStart)` on the missile seed at frame SubStart − 1).
 4. Creation that fails at "no path" (R2.3 step 14) leaves an allocated
    missile with an active every-tick event; it then behaves per R3/R4.
 5. A missile with no room passes the town tests (R3.2, R3.6) and is
-   removed by R4 step 5 on its first collision-active run.
+   removed by R4 step 5 on its first run that reaches step 5, that is
+   the first run with `CollideType` ≠ 0 that survives steps 1–3.
+   `Activate` does not delay it: the activate-frame test is step 7,
+   after step 5.
 6. `MaxVel` below the creation speed is not a cap (R4.1.4).
 7. Pierce is all-or-nothing per owner counter value: the first draw
    decides whether any pierce happens; with counter 0 the draws are 66,
@@ -1108,12 +1183,15 @@ Reading:
    collision words? Settle: record per missile run the R4 exit path
    (hook `0x005AE1F0` returns and `0x005ADF10` arguments) in a combat
    recording.
-2. Collide-type callbacks `0x005A87B0`, `0x005A87F0`, `0x005A8850`,
-   `0x005A8890` are not in the disassembly export; their unit tests are
-   D2MOO's. Settle: disassemble them.
-3. Position and direction units of the path step (R4.1.3): is the
-   direction vector normalised to 4096 and the position 16.16 subtiles?
-   Owned by `units.md`; settle there.
+2. Answered (2026-10-08), §R4.2 "Callbacks": disassembled from
+   `Game.exe`; they match D2MOO (mode 7 tests `CanDestroy` without the
+   shared filter).
+3. Answered (2026-10-08), R4.1 rule 3: yes to both. The direction
+   vector comes from the 128-row `tan` table with x² + y² ≈ 4096²
+   (`sim/pathing.md` §8.3, `0x0064FC60`); the position is two u32 16.16
+   sub-tile values (`sim/path-placement.md` §1 rule 2), and the step
+   vector is 16.16 per tick (`sim/pathing.md` §9.4 rule 2.1,
+   `0x006502D0`). Owners: those two specs.
 4. Damage application, to-hit formula, block/dodge and the server-damage
    functions' formulas are the skills spec's; their draw counts complete
    the hit draw order here.
@@ -1121,32 +1199,46 @@ Reading:
    (e.g. through the room update queues "qin"/"qout" seen for missiles
    in the recording)? Settle: a packets recording during a firebolt cast
    compared with `0x73`/`0x4C`/`0x4D` counts.
-6. R2.3 step 8 compares the target with the owner's position (D2MOO);
-   the 1.14d helper calls take the units in registers. Settle: asm read
-   of `0x0059FBC0`–`0x0059FC09`.
+6. Answered (2026-10-08), R2.3 step 8: asm read of
+   `0x0059FBBE`–`0x0059FC11` confirms the owner (record +0x04): x
+   compared first, then y, via `0x0045ADF0` / `0x0045AE20` with the unit
+   in ECX; a target unit equal to the owner is skipped before the
+   compare. As D2MOO.
 7. Server reads of `InitSteps`, `Qty`, `SpecialSetup`,
    `ExplosionMissile` were searched heuristically only (functions that
    index the missile table). Settle: a full xref of record offsets
    +0x135, +0x18E, +0x190, +0x16 through every missile-record pointer.
-8. Server-do and server-hit functions marked D2MOO-only or summarized
-   need their 1.14d bodies read (done: server-do 2, 3, 5, 7, server-hit
-   1, 4, 12, 13, §R9.5–R9.6).
+8. Answered (2026-10-08), R9.2 `status`: none is left. Every row of
+   `srvdo.tsv` (53) and `srvhit.tsv` (71) is `spec'd-here`; the bodies
+   are §R9.5–R9.6 (server-do 2, 3, 5, 7, server-hit 1, 4, 12, 13) and
+   `missiles/bodies.md` §6 onward with `missiles/bodies-2.md` (the rest,
+   1.14d-read). No status change was needed.
 9. The level passed by monster attacks for spike1 (VelLev 8 makes its
    speed level-dependent) is the AI/skills spec's; a recording with
    positions would confirm the speed formula.
-10. Who calls `0x005AD9D0` (pointer only)? Settle: search `.rdata`/code
-    for the immediate `0x005AD9D0`.
+10. Answered (2026-10-08), R9.1: nobody. A search of `Game.exe` 1.14d
+    for the absolute value `0x005AD9D0` (all sections) and for E8 / E9
+    / 0F 8x rel32 branches to it in `.text` finds nothing; the export
+    lists 0 callers. Dead code; not implemented.
 11. Can a missile be created before the timer-queue run of a frame (e.g.
     while client messages are handled)? It would then run in its creation
     frame. Settle: a recording hooking `0x0059FA30` with the tick step
     in progress.
-12. Path types 10 and 14 (`0x0067A240`, `0x0067A140`, R4.3): who sets
-    them (a skill init callback, R2.3 step 21?), which seed
-    `0x0067A240` draws on (a seed pointer passed in a register; one
-    draw per point, 8-way turns over max distance / 2 points) and
-    `0x0067A140`'s x87 sine/cosine spiral (77 points). Settle: asm read
-    of both and of their callers; d2rs needs a bit-exact replacement of
-    the x87 part (hard rule 6).
+12. Answered (2026-10-08), R4.3 table: the computes are owned by
+    `sim/pathing.md` §11.2 (type 10) and §11.3 (type 14, the x87 part
+    as integer math; its precision-control question is pathing Open
+    question 9). Seed: `0x00649760` passes EDX = unit + 0x20 with the
+    unit asserted equal to the path's unit (`0x0064998A`), so the draws
+    are on the **missile's own seed**, which the setter re-seeded just
+    before. Server setters of type 10 (`0x00648CF0`): init callbacks
+    `0x005C9290` (`skills/bodies-2.md` §2.3), `0x005CD110`
+    (`skills/bodies-3.md`), `0x005D40F0`, `0x005D4680`
+    (`skills/bodies-4.md`) and `0x005AC040` (`bodies.md` §19); type 14:
+    srvdo 73 Blessed Hammer `0x005D0040` (`skills/bodies-2b.md` §6.9).
+    The other setters (`0x004C95E0`, `0x004D62B0`, `0x004E1C80`,
+    `0x004E2ED0`, `0x004F2AC0`, `0x004F2BE0`) are client-side mirrors
+    of these callbacks (e.g. `0x004E1C80` = `0x005CD110`'s shape);
+    owners: the client specs.
 13. *Answered* (`impl-missile-bodies-2` Q2): `elem_roll` returns the
     rolled amount of its element, not the `EType` (§R9.6 return list;
     `0x005A8C70`).

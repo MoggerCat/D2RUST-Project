@@ -33,14 +33,14 @@
 |   7. Vis and warp records | 225–248 |
 |   8. Coordinates to rooms | 249–262 |
 |   9. Level lifecycle: activity and freeing | 263–311 |
-|   10. Spawn room in a level (`0x0066B2B0`) | 312–356 |
-|   11. Logical rooms (coordinate lists) and population queries | 357–636 |
-| Constants & data dependencies | 637–657 |
-| Randomness | 658–676 |
-| Edge cases & original bugs | 677–701 |
-| Test vectors | 702–745 |
-| Provenance | 746–778 |
-| Open questions | 779–839 |
+|   10. Spawn room in a level (`0x0066B2B0`) | 312–374 |
+|   11. Logical rooms (coordinate lists) and population queries | 375–654 |
+| Constants & data dependencies | 655–675 |
+| Randomness | 676–694 |
+| Edge cases & original bugs | 695–719 |
+| Test vectors | 720–763 |
+| Provenance | 764–796 |
+| Open questions | 797–857 |
 <!-- /index -->
 
 ## Summary
@@ -353,6 +353,24 @@ DRLG (act +0x48): both are this one search, with the same draws.
    subclass has bit 0x40 (waypoint): (room x + px / 5, room y + py / 5).
 5. When no position was set, it is the room's centre (x + w/2, y + h/2).
    The chosen room is made active (`drlg/rooms.md` §4.5).
+6. The result is the chosen room's +0x30; (x, y) start at (−1, −1)
+   (`0x0066B2B0`). Rule 5's centre default runs only on the rule 3
+   path. On the `Position` ≠ 0 path (rule 2) there is no default and no
+   null test:
+   - Tile index 13 with no waypoint room: `0x0066AD80` returns null, and
+     the activation `0x0061B730` reads null +0x28. 1.14d crashes there
+     (access violation, no error code).
+   - A waypoint room without a waypoint object returns that room with
+     (x, y) left at (−1, −1).
+   - A spawn-tile record whose position is in no room (`0x00642C30`
+     null) crashes the same way.
+   d2rs reports each crash as a fatal error (`NoWaypointRoom` for the
+   first). It never substitutes a room.
+7. Rule 3 with every fallback failing (no waypoint room, no warp room,
+   no room at the centre point, and `0x0066AE70` returns null, e.g. a
+   level with no rooms): the function returns 0 with (x, y) = (−1,
+   −1). Nothing is activated, and there is no draw beyond those of rule
+   3.
 
 ### 11. Logical rooms (coordinate lists) and population queries
 

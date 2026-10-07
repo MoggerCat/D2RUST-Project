@@ -27,18 +27,18 @@
 | Rules | 69–70 |
 |   1. Configuration | 71–77 |
 |   2. Hooks | 78–92 |
-|   3. What is read | 93–266 |
-|   4. Tie to ticks | 267–279 |
-|   5. Raw format `frames-raw-2` | 280–303 |
-|   6. Hashes and the comparison | 304–325 |
-|   7. Stability first | 326–363 |
-|   8. Capture cases | 364–379 |
-| Constants & data dependencies | 380–384 |
-| Randomness | 385–391 |
-| Edge cases & original bugs | 392–403 |
-| Test vectors | 404–414 |
-| Provenance | 415–434 |
-| Open questions | 435–484 |
+|   3. What is read | 93–268 |
+|   4. Tie to ticks | 269–281 |
+|   5. Raw format `frames-raw-2` | 282–305 |
+|   6. Hashes and the comparison | 306–327 |
+|   7. Stability first | 328–365 |
+|   8. Capture cases | 366–381 |
+| Constants & data dependencies | 382–386 |
+| Randomness | 387–393 |
+| Edge cases & original bugs | 394–405 |
+| Test vectors | 406–416 |
+| Provenance | 417–436 |
+| Open questions | 437–486 |
 <!-- /index -->
 
 ## Summary
@@ -125,9 +125,11 @@ palette hash checks the first.
 
 The cursor is drawn into the framebuffer at the end of the UI pass
 (`0x004684C0`, order: `draw-order.md`) and animates on wall-clock time.
-Rule owner: this section until `ui/panels.md` (`client/ui.md` §B6) is
-written; that spec then takes the rule and this section keeps the
-recorded fields.
+Rule owner: `ui/panels-3.md` §23 (move / down / up transitions
+`0x00468840`, `0x00467F20`, `0x00467FA0`; item and shop cursors
+`0x00468070`, `0x00468010`, `0x00468040`; the dead copy `0x004685C0`;
+the idle cursor steps the client player seed on wall-clock time). This
+section keeps the recorded fields.
 
 | Global | Meaning |
 |---|---|

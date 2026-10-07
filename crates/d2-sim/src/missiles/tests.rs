@@ -910,6 +910,55 @@ fn creation_frames_activate_and_order() {
     assert_eq!(w.fake.stat(m, stat::DAMAGE_FRAMERATE), 0);
 }
 
+// Covers: specs/missiles/missiles.md §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r11
+#[test]
+fn creation_start_frame_shortens_the_frames() {
+    // Flag 0x200: frames −= start frame before the activate frame (step
+    // 13). The animation frame (unit +0x44) is not stored (TODO in
+    // `create.rs`).
+    let mut r = row();
+    r.range = 40;
+    r.activate = 3;
+    let mut w = World::new(r);
+    let mut p = w.params();
+    p.flags |= param_flags::START_FRAME;
+    p.start_frame = 6;
+    let m = w.create(&p).unwrap();
+    let d = w.store.get(m).unwrap();
+    assert_eq!((d.total, d.current, d.activate), (34, 34, 31));
+}
+
+// Covers: specs/missiles/missiles.md §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r21, §r9-4-missile-seed-re-initialisations-rng-md-5-3-list; specs/skills/bodies-2.md §2.3 r1, §2.3 r2, §2.3 r3
+#[test]
+fn creation_runs_the_skills_init_callbacks_after_the_stat_list() {
+    // Step 21 on the fake seams: the jitter (`0x005C9290`) caps 100
+    // frames at 77, re-seeds from the path target x 110 + a 4, sets type
+    // 10 and step counts 77, and builds, after the stat list (step 20)
+    // and before the damage setup (step 23).
+    use crate::skills::use_::bodies::init_cb;
+    let mut w = World::new(row());
+    let mut p = w.params();
+    p.flags |= param_flags::RANGE;
+    p.range = 100;
+    p.init = Some((init_cb::JITTER, 4));
+    let m = w.create(&p).unwrap();
+    let d = w.store.get(m).unwrap();
+    assert_eq!((d.total, d.current), (77, 77));
+    assert_eq!(*w.fake.seed(m), Seed::init_low(114));
+    let i = w.fake.calls.iter().position(|c| c == "statlist").unwrap();
+    assert_eq!(w.fake.calls[i + 1], "build");
+    assert!(w.fake.log.contains(&format!("ptype {} 10", m.0)));
+    assert!(w.fake.log.contains(&format!("pdist {} 77", m.0)));
+    assert!(!w.fake.calls.iter().any(|c| c.starts_with("init")));
+    // M08: an id no spec names still goes to the host hook, unchanged.
+    let mut w = World::new(row());
+    let mut p = w.params();
+    p.init = Some((0x0012_3456, 9));
+    let m = w.create(&p).unwrap();
+    assert_eq!(w.store.get(m).unwrap().total, 50);
+    assert!(w.fake.calls.contains(&format!("init {} 9", 0x0012_3456)));
+}
+
 // Covers: specs/missiles/missiles.md §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r19, §edge-cases-original-bugs r11
 #[test]
 fn creation_frames_from_distance() {

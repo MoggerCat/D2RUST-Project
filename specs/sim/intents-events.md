@@ -39,20 +39,20 @@
 | Outputs / state changes | 84–90 |
 | Rules | 91–92 |
 |   1. Loop order (single player) | 93–114 |
-|   2. Client → server | 115–287 |
-|   3. Server → client | 288–465 |
-|   4. d2rs mapping and scope | 466–497 |
-|   5. Machine-readable tables | 498–534 |
-|   6. Exact-match comparison | 535–638 |
-|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 639–1038 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1039–1183 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1184–1328 |
-| Constants & data dependencies | 1329–1347 |
-| Randomness | 1348–1353 |
-| Edge cases & original bugs | 1354–1390 |
-| Test vectors | 1391–1477 |
-| Provenance | 1478–1579 |
-| Open questions | 1580–1685 |
+|   2. Client → server | 115–315 |
+|   3. Server → client | 316–528 |
+|   4. d2rs mapping and scope | 529–560 |
+|   5. Machine-readable tables | 561–597 |
+|   6. Exact-match comparison | 598–701 |
+|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 702–1101 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1102–1246 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1247–1391 |
+| Constants & data dependencies | 1392–1410 |
+| Randomness | 1411–1416 |
+| Edge cases & original bugs | 1417–1462 |
+| Test vectors | 1463–1549 |
+| Provenance | 1550–1651 |
+| Open questions | 1652–1771 |
 <!-- /index -->
 
 ## Summary
@@ -175,6 +175,31 @@ The host schedule is `tick.md` §1 (owner). Message-relevant facts:
    (client id + message) into a stack buffer but returns the full size:
    a message longer than 0x1FC bytes is truncated in the copy while the
    handler sees the full size (only id 0x66 can be that long).
+8. **Client builders** (2026-10-08; answers open questions 7 and 8).
+   Every C→S game message (ids < 0x67) passes the sender of rule 1,
+   whose 13 call sites are all in the builders `0x00478590`–`0x00478830`
+   (by layout: `0x00478590` [id], `0x004785B0` [id][u16], `0x004785D0`
+   [id][u16][u16], `0x00478600`, `0x00478640` (no caller), `0x00478680`
+   [id][u32], `0x004786A0` [id][u32][u32], `0x004786D0`, `0x00478700`
+   take the id in CL; `0x00478740` writes 0x5D, `0x00478780` 0x5E,
+   `0x004787B0` chat, `0x00478830` 0x66). The system senders (rule 2)
+   use only ids 0x67–0x70. The ids at every builder call site are
+   constants, except:
+   - `0x00480B40` (the only caller passing a variable id to
+     `0x004785D0` / `0x004786A0`): its id comes from `0x00481030`,
+     whose switch (table `0x004812B4`) sends ids 1–0x11 and 0x13 to
+     their cases and takes 0x0B, 0x12 and every id outside 1–0x13 to a
+     fatal assert (0x352) before anything is sent; `0x00480B40` sends nothing for 0x13;
+   - `0x004B2650` → `0x00478700` with 0x32, 0x33 or 0x35;
+   - the chat builder `0x004787B0` with the record's id byte, written
+     as 0x14 or 0x15 by its two callers (`0x0047C1F0`, `0x0047C420`).
+   So the 1.14d client never sends 0x0B, 0x2E, 0x42 or 0x43.
+   **Chat third term** (rule 5): `0x004787B0` copies id, type and
+   language bytes, the text (at most 0x100 bytes with its NUL), then
+   the name (at most 0x10 with its NUL; the name pointer is never
+   null), then writes **one 0 byte** and sends L1 + L2 + 6 bytes. The
+   byte c of the size rule is therefore always 0 from the 1.14d
+   client; a non-zero c reaches the server only from another client.
 
 #### 2.2 Game message entry `0x0053F3D0`
 
@@ -244,8 +269,11 @@ of them has a consequence in 1.14d; d2rs keeps them as a diagnostic only.
    act than the player → 2; else the same 50-subtile test (→ 1).
 5. Skill messages (0x05–0x11 except 0x0B), after parsing: player stat
    `pierce_idx` (328, `0x148`) += 1, then the skill request.
-6. 0x14 (`0x0054A290`): msg = cstr at +3, 1 ≤ strlen < 256 else 2; name =
-   cstr after it (≤ 16). 0x15 (`0x0054A5D0`): msg strlen < 256 and
+6. 0x14 (`0x0054A290`): msg = cstr at +3; strlen ≥ 256 → 2; strlen 0
+   → 0 with no effect (`0x0054A2D5` jumps to the `xor eax, eax` exit at
+   `0x0054A3F0`; §9 rule 3; corrected 2026-10-08 for
+   `docs/handoff/impl-umods-cs-handlers.md`, which found "else 2" here);
+   name = cstr after it (≤ 16). 0x15 (`0x0054A5D0`): msg strlen < 256 and
    strlen + 4 < size, else rejected.
 7. 0x3C: u32 at +1, bit 31 = left hand, bits 0–30 = skill id, must be <
    the skills count (data +0xBA0); item u32 at +5. 0x51: u32 at +1: bits
@@ -273,7 +301,7 @@ ECX = buffer (client id, message), EDX = size. Switch on the id:
 | 0x6A | `0x0052DAF0` → `0x0052E9B0` |
 | 0x6B | `0x0052C550` → `0x00530190` |
 | 0x6C | total (u32 at +2) ≥ 0x2000 → fatal assert; `0x0052DB00` → `0x0052DB10` → `0x00538CE0(client, data @6, len u8@1, total, 0, 0, 0)` (save upload chunk) |
-| 0x6D | `0x0052C400` → `0x005389A0(client, tick u32@1, value u32@5)`: the client's game found → `GetTickCount` − tick − value goes into a 16-entry ring (client +0x4B4, count +0x500), the mean of the stored entries → client +0x4F8 (64-bit), S→C 0x8F (`0x0053E020`, with tick), client +0x3D8 := now (ping) |
+| 0x6D | `0x0052C400` → `0x005389A0(client, tick u32@1, value u32@5)`: the client's game found → `GetTickCount` − tick − value goes into a 16-entry ring (client +0x4B4, count +0x500), the mean of the stored entries → client +0x4F8 (64-bit), S→C 0x8F (`0x0053E020`: no arguments besides the client; 0x21 bytes, the id then 32 zero bytes, corrected 2026-10-08), client +0x3D8 := now (ping) |
 | 0x6E | `0x0052CBE0` → `0x00530270` |
 | 0x70 | client record +0x504 = 1, `0x005377A0` |
 | others | ignored |
@@ -417,7 +445,8 @@ Queue 2 (id 0xFF, 16 bytes, `0x0052CC20`) runs only when host callbacks
    |---|---|---|---|---|
    | 0x26 | `0x0053C750` | `0x0054A5D0` (`0x0054A895`, u8@1 := 6), `0x00571620` (`0x005716A4`, u8@1 := 5); `0x0054A470`, `0x0054A510` pass a built message | 0 | the builder copies u8@1–3, u32@4, u8@8–9, the name (≤ 15 chars + NUL, `0x004135D0`) at 10 and the text (length ≥ 256 → fatal 0x5BA) after the name's NUL. Form 5 (overhead, §7.9 r3): u8@2 = the overhead record's byte +8 (C→S 0x14 u8@2), u8@3 unit type, u32@4 GUID, empty name; bytes 8–9 never written. Form 6 (chat, open question 14): u8@2 0, u8@3 2, u32@4 = ESI, u8@8 0; byte 9 never written |
    | 0x27 | `0x0053C8D0` | §6 rule 6 | 7 | |
-   | 0x2C | `0x0053D780` | `0x00571740` (`0x00571775`) | 4 | unit type, GUID (+0x0C), event = unit u16 +0x6E; only when unit +0x70 is 0 or the client's player; callers `0x00580917`, `0x00581B07`, `0x00586000`, `0x00598369` |
+   | 0x2A | `0x0053D740` | callers pass DL 0x2A (e.g. `0x0057737A`) | 0 | 15 bytes from registers: kind u8@1 (4th stack arg), code u8@2 (1st), GUID u32@7 (3rd; −1 without a unit), gold u32@11 (2nd, e.g. stat 14 via `0x00625480`); bytes 3–6 never written (`tools/original-hooks.md` §6.2) |
+   | 0x2C | `0x0053D780` | `0x00571740` (`0x00571775`) | 4 | unit type, GUID (+0x0C), event = unit u16 +0x6E; only when unit +0x70 is 0 or the client's player; callers `0x00580917`, `0x00581B07`, `0x00586000`, `0x00598369`; the event setter `0x00553380` (78 call sites by event, last event before the flush wins: u16 +0x6E overwritten) is owned by `audio/triggers-2.md` §14 |
    | 0x4C, 0x99 | `0x0053D530` | itself | 2, 0 | rule 5 |
    | 0x4D, 0x9A | `0x0053D4D0`, `0x0053D530` | itself | 0 | rule 5 |
    | 0x4E | `0x0053D7B0` | `0x00576770` (BL 0x4E, `0x0057686C`) | 0 | `world/npc.md` §7.2 |
@@ -437,7 +466,30 @@ Queue 2 (id 0xFF, 16 bytes, `0x0052CC20`) runs only when host callbacks
    | 0xA5 | `0x0053C190` | itself | 0 | 8 bytes, zeroed first: unit type u8@1 (DL), GUID u32@2, skill u16@6 (stack); `skills/bodies-2.md` §2.13 |
    | 0xA8 | `0x0053E8D0` | `0x005711D0` (`0x00571359`) | 5 | rule 6 |
    | 0xAA | `0x0053E8D0` | `0x00570E30` | 269 | §7.9 rule 1 |
+   | 0xAC | `0x0053E2E0` | itself; one caller `0x005720D8` | 0 | header GUID u32@1, class u16@5, x u16@7, y u16@9, life u8@11, size u8@12, bit stream @13: `monsters/init.md` §24 |
 
+4.1. **Rows decided against PC 2** (2026-10-08; PC 2's
+   `spec-answers-tick-messages` on `claude/specs-staging-4` gave other
+   layouts; this table and the TSV are the owners). 0x2A and 0xAC: PC
+   2's layouts match the builders (table above). 0x50: `0x0053D7E0`
+   copies a 15-byte caller record; no caller writes bytes 13–14 (the
+   widest, `0x00593CB0`, loops five u16 @3–@11, `0x00593D10`), so the
+   TSV has code u16@1 and five u16 v0–v4 @3–@11 (PC 2's reading; the
+   former u16@13 field is dropped; masks §6 rule 6). 0x58: kept as
+   GUID u32@1, code u8@5, arg u8@6, because code 5 writes byte 6
+   (`0x005853CD`, `0x005853E4`); PC 2's 7-byte form without @6 loses
+   it. 0x63: kept as GUID u32@1, magic u16@5, bits u32@7, @11, @15,
+   u16@19: `0x006610B0` copies the 16-byte waypoint record (u16 0x0102,
+   then 14 bytes of bits) to @5; PC 2's single 16-byte field is the same
+   bytes unsplit. C→S 0x3A (`client-messages.tsv`): kept as
+   `repeat:u8@2`; `0x0054BD10` spends repeat + 1 points (stat < 16,
+   repeat < 100, else result 3), the same quantity PC 2 calls
+   `count_minus_one` (`combat/vitals.md` owns the spend).
+   Field names: C→S 0x32 / 0x33 keep PC 1's (`transaction`,
+   `client_price`, `item_mode`; the staging-5 code uses them; PC 2's
+   `mode` / `tab` / `cost` are the same bytes, vendor meaning
+   `world/vendors.md`); S→C 0x22 takes PC 2's `unit:u32@3
+   body_state:u8@11` (`items/inventory-moves.md` §11).
 5. **0x4C / 0x4D / 0x99 / 0x9A.** `0x0053D530` (ECX client, DL unit
    type; stack: GUID, target type u8, target GUID, skill u16, w u16, b
    u8, flag): id base 0x4C (16 bytes) or 0x4D (17 bytes), + 0x4D when
@@ -462,6 +514,17 @@ Queue 2 (id 0xFF, 16 bytes, `0x0052CC20`) runs only when host callbacks
    the entries exactly as §7.9 rule 1 step 3 after its list bit, then
    0x1FF; size u8@6 = 8 + the stream's bytes. Has s, no list or no
    entry → 0xA7 (`0x0053E260`). Not set → 0xA9 (`0x0053E290`).
+7. **0x1D / 0x1E / 0x1F choice** (2026-10-08; answers
+   `docs/handoff/impl-server-join-2.md` §3 "0x0053BE40's choice").
+   `0x0053BE40(client, stat s in DX, value v)`: s > 0xFE → fatal assert
+   0x3CB. Then by v as an unsigned u32: v < 0xFF → **0x1D** [s u8@1][v
+   u8@2] (3 bytes); else v < 0xFFFF → **0x1E** [s u8@1][v u16@2] (4
+   bytes); else **0x1F** [s u8@1][v u32@2] (6 bytes). So 0xFF goes to
+   0x1E, 0xFFFF to 0x1F, and a negative v (≥ 0x80000000 unsigned) to
+   0x1F. The gold sender `0x0053E9B0(client, new n, old o)` first
+   tests d = n − o: 1 ≤ d ≤ 0xFE (unsigned `d − 1 < 0xFE`) → **0x19**
+   [d u8@1] (2 bytes); else the same three-way choice with s = 14
+   (gold) and v = n.
 
 ### 4. d2rs mapping and scope
 
@@ -1387,6 +1450,15 @@ their systems (`rng.md` §7), in dispatch order, before the tick's draws
     the client handles both (`client/model.md` §9).
 12. `0x0053B5F0` (0x68 for a moving monster) dereferences the unit
     looked up by GUID without a null check (§7.7 rule 5).
+13. **0x3E padding** (2026-10-08). The builder `0x0053D130` writes the
+    item stream into a 0x20-byte area, sets size u8@1 = stream length L
+    + 2, but always queues 0x22 bytes (`push 0x22` at `0x0053D1F5`). The
+    0x20 − L bytes after the stream are 0, so the client's split (§3.4
+    rule 3, size rule u8@1, `server-messages.tsv`) reads them as that
+    many 1-byte S→C 0x00 messages, whose handler `0x0045C900` is empty
+    (`client/model.md` §7 rule 1). d2rs reproduces the padding bytes
+    exactly (they are flushed bytes, §6), and the client counts them as
+    0x00 messages with no effect.
 
 ## Test vectors
 
@@ -1418,8 +1490,8 @@ Synthetic (from the rules; CI-safe):
 | client sends `0C 10 00 20 00` twice 60 ms apart | both sent (50 ms window) | §2.1 rule 1 |
 | unit update: missile with unit flag 0x10 | nothing sent | §7.1 rule 2.1 |
 | unit update: new item (flag 0x10), mode 3, flag 0x1000 | 0x9C action 2 once; after the clean-up and no change: nothing | §7.1, §7.5 |
-| unit update: monster mode 0 (flag 0x1), no target, cell (4757, 5461), d 0x38, +0xB0 6, GUID 0x13 | `69 13000000 08 9512 5515 38 06` | §7.4; recorded `-015956` frame 2724 |
-| same monster later in mode 12 at (4756, 5461) | `69 13000000 09 9412 5515 38 00` | §7.4; recorded frame 2748 |
+| unit update: monster mode 0 (flag 0x1), no target, path target (4757, 5461) (the (a, b) of §7.4 rule 7, not the unit's cell; the next row's mode 12 sends the cell (4756, 5461)), d 0x38, +0xB0 6, GUID 0x13 | `69 13000000 08 9512 5515 38 06` | §7.4; recorded `-015956` frame 2724 |
+| same monster later in mode 12, its cell (4756, 5461) | `69 13000000 09 9412 5515 38 00` | §7.4; recorded frame 2748 |
 | monster mode 1 (flag 0x1) with GUID 6 at (4634, 4537), d 0x80 | `6d 06000000 1a12 b911 80`; stat 328 += 1 | §7.4 rule 5; recorded `-022633` seq 159 (after its 0xAC) |
 | monster mode 6 (block), no target, GUID 0x22 | `69 22000000 12 0000 ffff 00 00` | §7.4 rule 5; recorded `-015956` seq 264400 |
 | monster with a skill in use, target in the client's rooms | 0x4C, not a mode message | §7.4 rule 3 |
@@ -1624,9 +1696,13 @@ Handlers of §9: `0x0054A260`, `0x0054A290` (with `0x00661110`,
    rule 16), renamed `unread`; 0x44 u16@13 renamed `action` (§9 rule
    7); 0x4F (§9 rule 15); system ids 0x67 (adds `game_name`@1), 0x6C,
    0x6D (adds `tick`@1): §2.5.
-7. The odd third term of the C→S chat size rule (§2.1 rule 5): does the
-   1.14d client ever send a non-zero byte there?
-8. 0x0B, 0x2E, 0x42, 0x43: does the 1.14d client ever send them?
+7. *Answered (2026-10-08)*: §2.1 rule 8 (the chat builder `0x004787B0`
+   always writes c = 0). Original question: the odd third term of the
+   C→S chat size rule (§2.1 rule 5): does the 1.14d client ever send a
+   non-zero byte there?
+8. *Answered (2026-10-08)*: §2.1 rule 8 (no builder call site sends
+   them; 0x0B is a fatal assert in `0x00481030`). Original question:
+   0x0B, 0x2E, 0x42, 0x43: does the 1.14d client ever send them?
 9. Client receive handlers' behaviour (§3.4 rule 3) belongs to client
    specs (Phase 5–6); not covered here.
 10. The conditions inside `0x00571CD0`, `0x00571620`, `0x005715A0`,
@@ -1682,3 +1758,13 @@ Handlers of §9: `0x0054A260`, `0x0054A290` (with `0x00661110`,
     code 23 (C→S 0x69, `exit_requested`), 0x58 code 5 (`cursor_item`);
     the rest is UI or effect state. Display rules stay with `ui/*`
     (`docs/handoff/xpc-to-pc2.md`).
+19. *Answered (2026-10-08)* (`docs/handoff/impl-monster-death.md` §3
+    Finding 1): the first death test vector's (4757, 5461) is the path
+    target sent as (a, b), not the unit's cell; the row now says so.
+20. *Answered (2026-10-08)* (`docs/handoff/impl-server-join-2.md` §3):
+    the 0x1D / 0x1E / 0x1F choice of `0x0053BE40` and the 0x19 case of
+    `0x0053E9B0`: §3.5 rule 7.
+21. *Answered (2026-10-08)* (`docs/handoff/impl-umods-cs-handlers.md`,
+    subagent questions): C→S 0x14 with empty text returns 0 (§9 rule 3
+    is right; §2.4 rule 6 corrected). The 0x59 owner pointer already
+    names `monsters/ai-bodies.md` §9.9 (§9 table).

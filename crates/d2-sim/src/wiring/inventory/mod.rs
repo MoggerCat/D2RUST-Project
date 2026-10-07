@@ -52,7 +52,7 @@ use std::collections::BTreeMap;
 
 use super::economy::{Economy, EconomyError, ItemSpawn};
 use crate::items::bitstream::WriteBack;
-use crate::items::inventory::{InteractionTarget, InvItem, InvTables, Inventory, UnitKind};
+use crate::items::inventory::{InvItem, InvTables, Inventory, UnitKind};
 use crate::items::moves::{deferred, Guid, MovePending, Owner};
 use crate::items::ItemRequest;
 use crate::units::lifecycle::LifecycleHooks;
@@ -77,6 +77,13 @@ pub enum InvError {
     /// A step whose rule the spec does not write (named); the call stops
     /// there.
     Unwritten(&'static str),
+    /// The item copy (`0x0055A2A0`) was given a source on the ground
+    /// (`world/vendors-2.md` §7.3 step 1.1): a caller error; no copy.
+    GroundCopySource(UnitId),
+    /// Placement into a page (`0x00560200`) was given an item that is
+    /// still in a room (`items/inventory.md` §2.4 rule 2): a caller error;
+    /// not placed.
+    PlacedWithRoom(UnitId),
 }
 
 /// The inventory state of a game: one [`Inventory`] per unit that owns
@@ -195,12 +202,9 @@ pub trait InvRest: MovePending {
     /// Quiver-type item (`0x00628480`).
     fn quiver_kind(&self, item: Guid) -> bool;
 
-    // ---- player data and interaction (`world/npc.md` §2) -------------------
+    // ---- player data (`world/npc.md` §2; the interact info is the unit
+    // record's, `units::record::InteractInfo`) ---------------------------
 
-    /// The player's interaction (`0x00554100`).
-    fn interaction(&self, player: Owner) -> InteractionTarget;
-    /// `0x00554190`.
-    fn clear_interaction(&mut self, player: Owner);
     /// Player data +0x4C.
     fn player_data_4c(&self, player: Owner) -> u32;
     /// Player data +0x50.

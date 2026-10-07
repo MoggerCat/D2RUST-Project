@@ -174,8 +174,21 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
     fn has_used_skill(&self, player: Owner) -> bool {
         self.rest.has_used_skill(player)
     }
+    /// `0x0057FB70` on the unit hooks
+    /// ([`crate::units::hooks::UnitHooks::player_corpse_pickup`]: the
+    /// action wiring's `ActionHooks::corpse_pickup`).
     fn corpse_pickup(&mut self, player: Owner, corpse: Owner) {
-        self.rest.corpse_pickup(player, corpse)
+        let (Some(p), Some(c)) = (self.unit_of(player), self.unit_of(corpse)) else {
+            return;
+        };
+        let e = &mut *self.econ;
+        let mut sim = crate::units::hooks::Sim {
+            game: &mut *e.game,
+            units: &mut *e.units,
+            stats: &mut *e.stats,
+            data: e.data,
+        };
+        e.hooks.player_corpse_pickup(&mut sim, p, c);
     }
     fn player_interact(&mut self, player: Owner, other: Owner) {
         self.rest.player_interact(player, other)

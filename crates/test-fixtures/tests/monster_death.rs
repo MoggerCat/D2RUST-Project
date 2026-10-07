@@ -74,24 +74,14 @@ fn data() -> &'static GameData {
 
 // ---- the seams ------------------------------------------------------------------------
 
-/// The transport and the interaction owner (as `test_fixtures::game::Seams`),
-/// plus the fixture answers listed in the module doc.
+/// The transport (as `test_fixtures::game::Seams`), plus the fixture
+/// answers listed in the module doc.
 #[derive(Default)]
 struct Fx {
-    interact: std::collections::BTreeMap<UnitId, (u8, u32)>,
     sent: Vec<(UnitId, Vec<u8>)>,
 }
 
 impl Pending for Fx {
-    fn set_interact(&mut self, player: UnitId, unit_type: u8, guid: u32) {
-        self.interact.entry(player).or_insert((unit_type, guid));
-    }
-    fn reset_interact(&mut self, player: UnitId) {
-        self.interact.remove(&player);
-    }
-    fn interact_guid(&self, player: UnitId) -> Option<u32> {
-        self.interact.get(&player).map(|i| i.1)
-    }
     fn send(&mut self, player: UnitId, msg: &[u8]) {
         self.sent.push((player, msg.to_vec()));
     }

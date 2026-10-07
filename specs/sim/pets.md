@@ -27,13 +27,13 @@
 |   7. Dismiss `0x00574450` (GUID in EBX, game in EDI) | 161–169 |
 |   8. Broadcast and message 0x7A | 170–183 |
 |   9. Lookup `0x00574A20(player, GUID)` | 184–190 |
-|   10. Creation, free and maximum resync | 191–230 |
-| Constants & data dependencies | 231–240 |
-| Randomness | 241–244 |
-| Edge cases & original bugs | 245–261 |
-| Test vectors | 262–270 |
-| Provenance | 271–316 |
-| Open questions | 317–331 |
+|   10. Creation, free and maximum resync | 191–237 |
+| Constants & data dependencies | 238–247 |
+| Randomness | 248–251 |
+| Edge cases & original bugs | 252–268 |
+| Test vectors | 269–277 |
+| Provenance | 278–323 |
+| Open questions | 324–338 |
 <!-- /index -->
 
 ## Summary
@@ -118,8 +118,8 @@ The hireling list is never trimmed here.
 
 ### 5. Append `0x00575C70(pet, extra)` (E in ESI, game in EAX)
 
-1. E.max = 0: resync `0x00575900(game, player)` (`skills/bodies.md` Open
-   question 5); still 0 → dismiss (§7) the pet's GUID (−1 without one);
+1. E.max = 0: resync `0x00575900(game, player)` (§10;
+   `skills/bodies.md` §2.17); still 0 → dismiss (§7) the pet's GUID (−1 without one);
    return 0.
 2. E.count = E.max: head none → fatal assertion (line 0x312); unlink
    `0x00574850(head GUID, E, kill 1)` (call at `0x00575CE5`; §6: one
@@ -189,6 +189,13 @@ with this GUID → return t. Not found → 0. Used by Unsummon
 (`skills/bodies.md` §3.3) and Remove (§6).
 
 ### 10. Creation, free and maximum resync
+
+**Player death** (2026-10-08, PC 2 `world/hirelings-2.md` §15): the
+player mode-17 start `0x0057FCA0` calls `0x00575BC0` at `0x0057FD25` in
+every game type: every pet of a type other than 7 is killed
+(`0x00574450`) and its node freed with count and max decremented; then
+`0x00575900` recomputes the maxima. Hirelings (type 7):
+`world/hirelings-2.md` §15.
 
 **Create** `0x00575AF0(game, player)`, called once from the player
 type init `0x005348C0` (allocator, `sim/units.md` §3.1): player data
@@ -321,8 +328,8 @@ None.
 2. Answered (2026-10-07): §10 resync; it sends nothing of its own, and
    for type 7 (hireable) the maximum returns to `basemax` 1 and is never
    trimmed (`world/hirelings.md` §5 rule 3).
-3. Recording: summon pets past their maximum and across a group; compare
-   the 0x7A messages and which units die.
+3. ~~Recording: summon pets past their maximum and across a group; compare
+   the 0x7A messages and which units die.~~ → PC 2 recording list.
 4. Answered (2026-10-07): the only other append path is
    `0x00575E90(game, player, pet, 7, extra)` from the hireling init
    `0x00573270` (call `0x00573394`), extra = {seed, name, row `Id`}

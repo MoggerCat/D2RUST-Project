@@ -47,7 +47,6 @@ fn wild(flag: bool, w: &World) -> Answers {
         gold: false,
         number: 909,
         ammo: Some(910),
-        interaction: Some(InteractionTarget::Missing),
         trade_gate: Some(flag),
         open_ok: flag,
         code2: 912,
@@ -370,16 +369,14 @@ fn forward_inv_world(flag: bool) {
             flag,
             format!("quiver_kind {g}")
         );
-        fwd!(
-            InvWorld::interaction(d, pl),
-            InteractionTarget::Missing,
-            format!("interaction {p}")
-        );
-        fwd!(
-            InvWorld::clear_interaction(d, pl),
-            (),
-            format!("clear_interaction {p}")
-        );
+        // Answered by the desk: the interact info on the unit record
+        // (`units::record::InteractInfo`), not forwarded.
+        {
+            let before = d.rest.last();
+            let _ = InvWorld::interaction(d, pl);
+            InvWorld::clear_interaction(d, pl);
+            assert_eq!(d.rest.last(), before, "not forwarded");
+        }
         fwd!(
             InvWorld::player_data_4c(d, pl),
             905,
@@ -452,10 +449,6 @@ fn inv_rest_defaults() {
         fn quiver_kind(&self, _: u32) -> bool {
             false
         }
-        fn interaction(&self, _: Owner) -> InteractionTarget {
-            InteractionTarget::None
-        }
-        fn clear_interaction(&mut self, _: Owner) {}
         fn player_data_4c(&self, _: Owner) -> u32 {
             0
         }
@@ -923,11 +916,27 @@ fn trading_is_an_interaction_with_a_player() {
     let mut w = World::new();
     let me = w.me();
     assert!(!w.desk(|d| d.trading(me)));
-    let p = w.player;
-    w.rest.a.interaction = Some(InteractionTarget::Unit { ty: 0, unit: p });
+    let (p, pg) = (w.player, w.pguid());
+    // The interact info on the player's record: (type, GUID), active.
+    let stage = |w: &mut World, ty: u8| {
+        let r = w.units.get_mut(p).unwrap();
+        r.interact.reset();
+        r.interact.set(ty, pg);
+    };
+    stage(&mut w, 0);
     assert!(w.desk(|d| d.trading(me)));
-    w.rest.a.interaction = Some(InteractionTarget::Unit { ty: 1, unit: p });
-    assert!(!w.desk(|d| d.trading(me)));
+    assert_eq!(
+        w.desk(|d| InvWorld::interaction(d, p)),
+        InteractionTarget::Unit { ty: 0, unit: p }
+    );
+    stage(&mut w, 1);
+    assert!(!w.desk(|d| d.trading(me)), "no monster with that GUID");
+    assert_eq!(
+        w.desk(|d| InvWorld::interaction(d, p)),
+        InteractionTarget::Missing
+    );
+    w.desk(|d| InvWorld::clear_interaction(d, p));
+    assert_eq!(w.units.get(p).unwrap().interact.get(), None);
 }
 
 /// §5.4: no interaction and player data +0x4C ≠ 0 → refused.

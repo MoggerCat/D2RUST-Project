@@ -264,12 +264,10 @@ where
 
     // ---- player inventories (§7, §8) on the model ------------------------
 
-    /// `0x00557FF0` (§7.2 rule 3).
-    ///
-    /// TODO(spec: vendors.md §7.2 r3): the body of `0x00557FF0` is not
-    /// written; read as the owned-item test of `inventory.md` §5.1
-    /// (`0x00549220`: in the player's item list or its cursor item)
-    /// without the lookup the caller already did.
+    /// `0x00557FF0` (§7.2 rule 3): the player's cursor item or an item
+    /// of its item list (any page, body location or belt). A ground item
+    /// is in neither, so its sale is refused here (code 11, result 3)
+    /// before any copy.
     fn owns_item(&self, player: UnitId, item: UnitId) -> bool {
         self.state().is_some_and(|s| s.holds(player, item))
     }

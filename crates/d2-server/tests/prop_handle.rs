@@ -57,7 +57,7 @@ use d2_sim::drlg::{
 };
 use d2_sim::game::Game;
 use d2_sim::items::inventory::tables::{GridRec, InvItemRec, InvTypeRec};
-use d2_sim::items::inventory::{InteractionTarget, InvTables, UnitKind as InvKind};
+use d2_sim::items::inventory::{InvTables, UnitKind as InvKind};
 use d2_sim::items::moves::{Guid, MovePending, Owner};
 use d2_sim::items::tables::ItemRec;
 use d2_sim::items::{q, ty, ItemRequest, ItemTables};
@@ -260,7 +260,6 @@ struct Inner {
     right: Option<SkillEntry>,
     used: Option<SkillEntry>,
     pos: BTreeMap<UnitId, (i32, i32)>,
-    interact: BTreeMap<UnitId, (u8, u32)>,
     sent: Vec<(UnitId, Vec<u8>)>,
 }
 
@@ -279,18 +278,6 @@ impl Pending for Book {
     }
     fn place(&mut self, unit: UnitId, x: i32, y: i32) {
         self.get().pos.insert(unit, (x, y));
-    }
-    fn set_interact(&mut self, player: UnitId, unit_type: u8, guid: u32) {
-        self.get()
-            .interact
-            .entry(player)
-            .or_insert((unit_type, guid));
-    }
-    fn reset_interact(&mut self, player: UnitId) {
-        self.get().interact.remove(&player);
-    }
-    fn interact_guid(&self, player: UnitId) -> Option<u32> {
-        self.get().interact.get(&player).map(|i| i.1)
     }
     fn send(&mut self, player: UnitId, msg: &[u8]) {
         self.get().sent.push((player, msg.to_vec()));
@@ -886,10 +873,6 @@ impl InvRest for InvStandIn {
     fn quiver_kind(&self, _: Guid) -> bool {
         false
     }
-    fn interaction(&self, _: Owner) -> InteractionTarget {
-        InteractionTarget::None
-    }
-    fn clear_interaction(&mut self, _: Owner) {}
     fn player_data_4c(&self, _: Owner) -> u32 {
         0
     }
@@ -1752,8 +1735,8 @@ impl Digest for ActionGame {
         let h = &self.events.sys.hooks;
         let b = h.x.get();
         let book = format!(
-            "{:?}{:?}{:?}{:?}{:?}{:?}",
-            b.list, b.left, b.right, b.used, b.pos, b.interact
+            "{:?}{:?}{:?}{:?}{:?}",
+            b.list, b.left, b.right, b.used, b.pos
         );
         drop(b);
         format!(
@@ -1786,7 +1769,7 @@ impl Digest for ItemGame {
             w.state,
             w.npc,
             w.quests,
-            w.uniques,
+            self.events.sys.hooks.uniques,
             w.rest,
             cube,
             self.events.sys.hooks.game_seed,
@@ -1963,7 +1946,11 @@ fn cube_refusals_change_nothing() {
         "§2 step 1 cursor",
     );
     set_cursor(&mut sim, Some(ring_u));
-    sim.world.rest.interact.insert(player, (2, 77));
+    {
+        let r = sim.events.sys.units.get_mut(player).unwrap();
+        r.interact.reset();
+        r.interact.set(2, 77);
+    }
     for b in [0x17u8, 0x18] {
         refused(
             &mut sim,

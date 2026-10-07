@@ -28,14 +28,15 @@
 //! creation by
 //! [`super::ActionEvents::create_game`]); the economy's [`GameFields`]
 //! are built from them for each call and the seed is written back
-//! ([`WiredWorld::with_economy`]). The unique bits (+0x1B24) only the
-//! item code touches live here.
+//! ([`WiredWorld::with_economy`]). The unique bits (+0x1B24) live there
+//! too (`ActionHooks::uniques`): one store for the handlers' economy, the
+//! lent quest parts and the object and monster drops of the action
+//! wiring (`ActionHooks::object_drops`).
 //!
 //! One owner of the player's interaction (+0x64 GUID, +0x68 type, +0x6C
-//! active): the NPC wiring's player-data rest (`NpcRest::interact_unit`,
-//! `set_interact`, `reset_interact`). The NPC handlers ask it directly;
-//! the cube asks it through [`Interact`], the waypoints through
-//! [`HostWaypoints`] (instead of the action wiring's `Pending`).
+//! active): the player's unit record
+//! (`d2_sim::units::record::InteractInfo`), which the NPC, vendor,
+//! quest, cube, inventory, waypoint and object wirings read and set.
 //!
 //! What no written spec provides (player data, the item copy
 //! `0x0055A2A0`, the item routines of `vendors.md` without a written body,
@@ -43,7 +44,7 @@
 //! its messages leave through [`Outbox`].
 
 use d2_sim::game::Game;
-use d2_sim::items::{ItemTables, UniqueBits};
+use d2_sim::items::ItemTables;
 use d2_sim::units::{RoomId, UnitId};
 use d2_sim::wiring::action::Pending;
 use d2_sim::wiring::action::{ActionHooks, ObjectCase};
@@ -62,7 +63,7 @@ use d2_sim::world::waypoints::{
 };
 
 use super::super::items::moves::{InvParts, MoveCall};
-use super::super::items::{CubeCall, CubeParts, Interact, InvVendors};
+use super::super::items::{CubeCall, CubeParts, InvVendors};
 use super::super::player::{self, HostFacts, Outcome as PlayerOutcome, Run as PlayerRun};
 use super::super::skills::{Call as SkillCall, Handled as SkillHandled, NoSkills, SkillHost};
 use super::super::walk::{WalkCall, WalkResult};
@@ -85,16 +86,14 @@ impl<R: NpcRest + VendorRest + QuestRest + PlayerQuestsRef + Outbox> TradeRest f
 
 /// The wired host of a game on `ActionSim` (or `WorldSim`): the action
 /// systems ([`ActionWorld`], with the skill slot `S`), the economy's own
-/// parts (item tables, unique bits; the item store is the action
-/// wiring's `ActionHooks::items`), the cube's parts, the inventory
+/// parts (item tables; the item store and the unique bits are the action
+/// wiring's `ActionHooks::items`, `ActionHooks::uniques`), the cube's parts, the inventory
 /// model, the quests, the NPC control block, the vendor tables and the
 /// interaction state (one vendor record per NPC record, the NPCs'
 /// interaction lists), and the rest.
 pub struct WiredWorld<R, S = NoSkills> {
     /// Waypoints, arrivals, the skill slot and the handlers' faults.
     pub action: ActionWorld<S>,
-    /// Game +0x1B24 (`quality.md` §8.1).
-    pub uniques: UniqueBits,
     pub tables: ItemTables,
     /// The cube (`None`: 0x2A, 0x4F stay stubs).
     pub cube: Option<CubeParts>,
@@ -133,7 +132,6 @@ impl<R, S> WiredWorld<R, S> {
         let state = InteractionState::new(&npc, &GlobalLists::build(&vendor_tables));
         Self {
             action,
-            uniques: UniqueBits::default(),
             tables,
             cube: None,
             inventory: None,
@@ -166,7 +164,7 @@ impl<R, S> WiredWorld<R, S> {
             s.hooks.game_seed,
             &s.hooks.ai_info,
             s.data.expansion,
-            std::mem::take(&mut self.uniques),
+            std::mem::take(&mut s.hooks.uniques),
         );
         let mut items = std::mem::take(&mut s.hooks.items);
         let out = {
@@ -194,7 +192,7 @@ impl<R, S> WiredWorld<R, S> {
         };
         s.hooks.items = items;
         s.hooks.game_seed = fields.seed;
-        self.uniques = fields.uniques;
+        s.hooks.uniques = fields.uniques;
         out
     }
 
@@ -284,7 +282,7 @@ fn quest_objects<X: Pending, R: TradeRest>(
 
 impl<R: TradeRest + Default + 'static, S> WiredWorld<R, S> {
     /// Runs `f` with this world's quest parts (the quest control, the
-    /// rest, the item tables, the unique bits) lent to the action hooks
+    /// rest, the item tables) lent to the action hooks
     /// ([`QuestLoan`], `ActionHooks::quest_host`), so a quest init,
     /// operate or object event 7 the object module hands back during `f`
     /// runs at once, inside its allocation, dispatch or timer event
@@ -305,7 +303,6 @@ impl<R: TradeRest + Default + 'static, S> WiredWorld<R, S> {
             quests: std::mem::replace(&mut self.quests, empty),
             rest: std::mem::take(&mut self.rest),
             tables: std::mem::take(&mut self.tables),
-            uniques: std::mem::take(&mut self.uniques),
         };
         events.action().sys.hooks.quest_host = Some(Box::new(loan));
         let out = f(&mut self.action, events);
@@ -322,7 +319,6 @@ impl<R: TradeRest + Default + 'static, S> WiredWorld<R, S> {
                 self.quests = l.quests;
                 self.rest = l.rest;
                 self.tables = l.tables;
-                self.uniques = l.uniques;
             }
             // `f` took the loan out of the hooks or put another one in:
             // the game's quest state is gone (API misuse, fatal).
@@ -423,32 +419,15 @@ pub struct Parts<'p, R> {
     pub now: u32,
 }
 
-/// The rest's interaction calls as the cube's [`Interact`].
-struct RestInteract<'r, R>(&'r mut R);
-
-impl<R: NpcRest> Interact for RestInteract<'_, R> {
-    fn interact_unit(&self, player: UnitId) -> Option<(u8, u32)> {
-        self.0.interact_unit(player)
-    }
-    fn set_interact(&mut self, player: UnitId, unit_type: u8, guid: u32) {
-        self.0.set_interact(player, unit_type, guid);
-    }
-    fn reset_interact(&mut self, player: UnitId) {
-        self.0.reset_interact(player);
-    }
-}
-
-/// The action wiring's [`WaypointWorld`] with the player's interaction
-/// asked of the host's owner (the rest's `NpcRest` calls) and the
-/// difficulty of the game's home (`ActionHooks::ai_info`); every other
-/// call goes to the action wiring.
-pub struct HostWaypoints<'w, W, R> {
+/// The action wiring's [`WaypointWorld`] with the difficulty of the
+/// game's home (`ActionHooks::ai_info`); every other call goes to the
+/// action wiring.
+pub struct HostWaypoints<'w, W> {
     pub inner: &'w mut W,
-    pub rest: &'w mut R,
     pub difficulty: u8,
 }
 
-impl<W: WaypointWorld, R: NpcRest> WaypointWorld for HostWaypoints<'_, W, R> {
+impl<W: WaypointWorld> WaypointWorld for HostWaypoints<'_, W> {
     fn frame(&self) -> i32 {
         self.inner.frame()
     }
@@ -473,19 +452,17 @@ impl<W: WaypointWorld, R: NpcRest> WaypointWorld for HostWaypoints<'_, W, R> {
     fn schedule_endanim(&mut self, object: UnitId, frame: i32) {
         self.inner.schedule_endanim(object, frame);
     }
-    /// `0x00535060`: the interaction part from the owner, the cursor and
-    /// player data +0x4C parts from the action wiring.
     fn player_busy(&self, player: UnitId) -> bool {
-        self.rest.interact_unit(player).is_some() || self.inner.player_busy(player)
+        self.inner.player_busy(player)
     }
     fn set_interact(&mut self, player: UnitId, unit_type: u8, guid: u32) {
-        self.rest.set_interact(player, unit_type, guid);
+        self.inner.set_interact(player, unit_type, guid);
     }
     fn reset_interact(&mut self, player: UnitId) {
-        self.rest.reset_interact(player);
+        self.inner.reset_interact(player);
     }
     fn interact_guid(&self, player: UnitId) -> Option<u32> {
-        self.rest.interact_unit(player).map(|(_, guid)| guid)
+        self.inner.interact_guid(player)
     }
     fn hostile_delay(&self, player: UnitId) -> bool {
         self.inner.hostile_delay(player)
@@ -509,13 +486,12 @@ impl<W: WaypointWorld, R: NpcRest> WaypointWorld for HostWaypoints<'_, W, R> {
 
 /// A waypoint call on the action wiring's view, wrapped by
 /// [`HostWaypoints`].
-struct HostWaypointRun<'r, C, R> {
+struct HostWaypointRun<C> {
     call: C,
-    rest: &'r mut R,
     difficulty: u8,
 }
 
-impl<C: WaypointCall, R: NpcRest> WaypointCall for HostWaypointRun<'_, C, R> {
+impl<C: WaypointCall> WaypointCall for HostWaypointRun<C> {
     type Out = C::Out;
     fn call<W: WaypointWorld>(
         self,
@@ -525,7 +501,6 @@ impl<C: WaypointCall, R: NpcRest> WaypointCall for HostWaypointRun<'_, C, R> {
     ) -> C::Out {
         let mut hw = HostWaypoints {
             inner: w,
-            rest: self.rest,
             difficulty: self.difficulty,
         };
         self.call.call(data, arrivals, &mut hw)
@@ -567,8 +542,8 @@ where
         Some(out)
     }
 
-    /// The action wiring's waypoints, with the interaction of the host's
-    /// owner ([`HostWaypoints`]).
+    /// The action wiring's waypoints, with the game's difficulty
+    /// ([`HostWaypoints`]).
     fn waypoints<C: WaypointCall>(
         &mut self,
         game: &mut Game,
@@ -576,11 +551,7 @@ where
         call: C,
     ) -> Option<C::Out> {
         let difficulty = events.action().hooks().ai_info.difficulty;
-        let run = HostWaypointRun {
-            call,
-            rest: &mut self.rest,
-            difficulty,
-        };
+        let run = HostWaypointRun { call, difficulty };
         let out = WorldHost::<D>::waypoints(&mut self.action, game, events, run);
         self.pet_deaths(game, events);
         self.pet_follows(game, events);
@@ -648,14 +619,13 @@ where
         }))
     }
 
-    /// The cube on this world's economy and inventory model, with the
-    /// rest as the interaction owner.
+    /// The cube on this world's economy and inventory model.
     fn cube<C: CubeCall>(&mut self, game: &mut Game, events: &mut D, call: C) -> Option<C::Out> {
         self.cube.as_ref()?;
         Some(self.with_economy(game, events, |econ, p| {
             let parts = p.cube.as_deref_mut().expect("checked above");
             let inv = p.inventory.as_deref_mut();
-            call.call(econ, parts, inv, &mut RestInteract(&mut *p.rest))
+            call.call(econ, parts, inv)
         }))
     }
 
@@ -691,9 +661,8 @@ where
         out
     }
 
-    /// The action wiring's provider with this host's answers: the
-    /// interaction owner's part of `0x00535060` (the rest's
-    /// `NpcRest::interact_unit`) and, for 0x46 / 0x47, the hireling list
+    /// The action wiring's provider with this host's answer, for 0x46 /
+    /// 0x47, of the hireling list
     /// (`0x00574EC0(game, player, 7, 0)`, `NpcWorld::pet` on the desk);
     /// then the pet follows a warp queued ([`WiredWorld::pet_follows`]).
     fn player(
@@ -708,10 +677,7 @@ where
                 NpcWorld::pet(desk, p, d2_sim::world::hirelings::PET_HIRELING, 0)
             })
         });
-        let facts = HostFacts {
-            hireling,
-            interacting: self.rest.interact_unit(p).is_some(),
-        };
+        let facts = HostFacts { hireling };
         let out = player::action::run(game, events, &run, facts);
         self.pet_follows(game, events);
         Some(out)

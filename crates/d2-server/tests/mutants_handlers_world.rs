@@ -279,14 +279,17 @@ impl Fx {
         }
     }
 
-    /// The player's interaction, at the host's one owner.
+    /// The player's interaction, at its one owner (the unit record).
     fn interact(&mut self) -> Option<(u8, u32)> {
-        self.sim.world.rest.interact.get(&self.player).copied()
+        let units = &self.sim.events.sys.units;
+        units.get(self.player).unwrap().interact.get()
     }
 
     fn set_interact(&mut self, i: (u8, u32)) {
         let p = self.player;
-        self.sim.world.rest.interact.insert(p, i);
+        let r = self.sim.events.sys.units.get_mut(p).unwrap();
+        r.interact.reset();
+        r.interact.set(i.0, i.1);
     }
 
     fn log(&mut self) -> Vec<String> {

@@ -32,17 +32,17 @@
 |   2. Think dispatch `0x005B1740` | 243–372 |
 |   3. AI control and AI tables | 373–544 |
 |   4. AI parameters | 545–563 |
-|   5. Target selection | 564–689 |
-|   6. Distances and line tests | 690–704 |
-|   7. Tactics helpers | 705–822 |
-|   8. AI commands and minions | 823–847 |
-|   10. The catalogue `ai-functions.tsv` | 848–868 |
-| Constants & data dependencies | 869–892 |
-| Randomness | 893–914 |
-| Edge cases & original bugs | 915–956 |
-| Test vectors | 957–1045 |
-| Provenance | 1046–1102 |
-| Open questions | 1103–1206 |
+|   5. Target selection | 564–695 |
+|   6. Distances and line tests | 696–710 |
+|   7. Tactics helpers | 711–854 |
+|   8. AI commands and minions | 855–879 |
+|   10. The catalogue `ai-functions.tsv` | 880–900 |
+| Constants & data dependencies | 901–924 |
+| Randomness | 925–946 |
+| Edge cases & original bugs | 947–988 |
+| Test vectors | 989–1077 |
+| Provenance | 1078–1134 |
+| Open questions | 1135–1238 |
 <!-- /index -->
 
 ## Summary
@@ -632,6 +632,12 @@ D2MOO `sub_6FCF2110`. Returns target, distance, combat:
       chosen.
    3. Slot 9: the nearest same-act node passing the test becomes an
       alternative; `0x005DD510` decides whether it replaces the choice.
+      Its d is the no-size distance `0x005DC530`; no 55 or B limit
+      applies, a node replaces the alternative only when strictly
+      nearer (ties keep the earlier node), and the collision test runs
+      only when T ≠ 0. Accepted: target := the alternative and B := its
+      d, so step 7 reports the alternative's own distance
+      (1.14d-confirmed, `0x005DDA85`–`0x005DDB1D`).
 6. No target: combat := 0, distance := M (0x7FFFFFFF when no player
    qualified). Return 0.
 7. Target: if alignment ≠ good (2): set control flag 0x08 and vision
@@ -819,6 +825,32 @@ the unit (`0x00649180`), 0x3C01)` = 0; "line clear" =
 9. Any other skill → 1.
 
 1.14d-confirmed (`0x005FD470`, register use in the disassembly).
+
+#### 7.5 Path target and re-path budget on a mode request
+
+Every AI mode request of §7.1–§7.2 (and idle `0x005DE080`, when the unit
+is not already neutral) builds a mode-change record and calls the
+monster mode set `0x005A7C20(game, record, flag)` (`sim/units.md` §4.6);
+the path fields are set there, not in the AI functions:
+
+1. Unit not a monster (type 1) → nothing. Requested mode 3 (GH) → no
+   path change (the budget keeps its value).
+2. Any other mode, before the mode's start function runs (so also when
+   the start then fails and neutral runs instead): record target unit
+   (+0x08) set → path target := that unit (`0x00648B90`); else path
+   target := record (x +0x0C, y +0x10), target unit none (`0x00648AD0`)
+   (`sim/pathing.md` §1.2). Idle's record targets the monster itself.
+3. Then the re-path budget (path +0x94) := 20 (`0x006490E0(path, 20)`),
+   whatever the mode, moving or not.
+
+So each AI request refills the budget to 20, and a monster re-paths
+(`sim/pathing.md` §9.10) until it has advanced 20 points since its last
+request. `0x006490E0` has no other caller and no other code writes path
++0x94 except the drain `0x00649140`; the path allocation zeroes it
+(`sim/path-placement.md` §2.4), so a monster that has made no request
+yet does not re-path. 1.14d-confirmed (`0x005A7C20` at `0x005A7CC9`–
+`0x005A7CFF`; xref of `0x006490E0`; `byte [r + 0x94]` stores in
+`all.asm`).
 
 ### 8. AI commands and minions
 

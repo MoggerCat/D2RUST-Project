@@ -27,17 +27,17 @@
 | Inputs | 58–66 |
 | Outputs / state changes | 67–70 |
 | Rules | 71–72 |
-|   1. Creation values | 73–95 |
-|   2. Spending stat points (message 0x3A) | 96–146 |
-|   3. Level-up `0x00570880` (D2MOO `PLAYERSTATS_LevelUp`) | 147–168 |
-|   4. Experience | 169–357 |
-|   5. Client vitals sync (`0x00548760`) | 358–494 |
-| Constants & data dependencies | 495–511 |
-| Randomness | 512–515 |
-| Edge cases & original bugs | 516–527 |
-| Test vectors | 528–548 |
-| Provenance | 549–575 |
-| Open questions | 576–611 |
+|   1. Creation values | 73–103 |
+|   2. Spending stat points (message 0x3A) | 104–156 |
+|   3. Level-up `0x00570880` (D2MOO `PLAYERSTATS_LevelUp`) | 157–178 |
+|   4. Experience | 179–369 |
+|   5. Client vitals sync (`0x00548760`) | 370–506 |
+| Constants & data dependencies | 507–523 |
+| Randomness | 524–527 |
+| Edge cases & original bugs | 528–539 |
+| Test vectors | 540–560 |
+| Provenance | 561–587 |
+| Open questions | 588–624 |
 <!-- /index -->
 
 ## Summary
@@ -87,11 +87,19 @@ the class's charstats record (none → nothing), set base stats:
 | 30 nextexp | `threshold(class, 1)` (§4.1) |
 | 68 attackrate, 67 velocitypercent, 69 other_animrate | 100 |
 
+The base sets run in the table's row order, left column first (0, 1, 2,
+3, 19, 20, 6, 7, 8, 9, 10, 11, 12, 30, 68, 67, 69; `0x00570728`–
+`0x0057080E`, 1.14d-confirmed).
+
 Then, if `act > 0` (and `act <` the table count 5 at `0x007326B4`,
 else index 0): raise experience to the target level of table
 `0x006E1520` {1, 15, 20, 26, 32} by index `act` (`0x0057EB10`, D2MOO
 `SUNITDMG_SetExperienceForTargetLevel`: add `threshold(class, target) −
 experience` if positive, through the add §4.5, which levels up).
+For a player: only when target > base level (stat 12); the call is
+`0x00611800(class, target)`, row target + 1 of §4.1, so the player ends
+at level target + 1 (16, 21, 27, 33), not at target (1.14d-confirmed,
+`0x0057EB34`–`0x0057EB7E`).
 
 ### 2. Spending stat points (message 0x3A)
 
@@ -111,8 +119,10 @@ splits it, `0x0054BD29`.)
 - any other id (4…15): fail.
 
 `gain_energy(unit, n)`: `statpts −= n`; `energy += n`; if `n > 0`: `mana
-+= (ManaPerMagic × n) << 6`; `maxmana += (ManaPerMagic × n) << 6`; if
-the unit's mana (unit getter) > its max mana: set mana = max mana.
++= (ManaPerMagic × n) << 6`; then, whatever `n`, `maxmana +=
+(ManaPerMagic × n) << 6`; if the unit's mana (unit getter) > its max
+mana: set base mana := the max mana total. The `n > 0` test guards the
+current-mana add only (1.14d-confirmed, `0x00570AD7`–`0x00570B25`).
 
 `gain_vitality(unit, n)`: `statpts −= n`; `vitality += n`; `maxhp +=
 (LifePerVitality × n) << 6`; if `n > 0`: `hitpoints += (LifePerVitality
@@ -237,13 +247,14 @@ marked total.
    experience (13) ≤ 0 → nothing.
 2. Credited player P (`0x0057E7B0`): A a player → A. A a monster: P :=
    A's owner (`0x0058F0D0`); then a stat list with flag 0x800
-   (`0x00625760`) is looked up on A (when A has a stat holder) and then
-   on D (when D has one; D's result replaces A's, even when none); a
-   list found → P := the unit of that list's owner type and GUID
-   (`0x00552F60`). P must be a player, else nothing. PC 2 read: the
-   lookup on A (and on D) is gated by the unit being in the `exp` state
-   group (states flag bit 30, `0x0063A690`), not by having a stat
-   holder — to reconcile (staging-5 merge).
+   (`0x00625760`) is looked up on A when A has a state with the
+   `states` flag `exp` (bit 30, bitset at data tables +0x144; test
+   `0x0063A690` → `0x0063A130`), and then on D (D given and in an `exp`
+   state; D's result replaces A's, even when none); a list found → P :=
+   the unit of that list's owner type (`0x00625250`) and GUID
+   (`0x006252B0`) (`0x00552F60`). P must be a player, else nothing.
+   Read on 1.14d at `0x0057E7E4`–`0x0057E816` (2026-10-08); this
+   supersedes the earlier "A has a stat holder" gate.
 3. dl := D's level (12). Hireling H of P (`0x00574EC0(game, P, 7,
    0)`): g := gain(e, U = H, alvl = H's level, dlvl = dl); A ≠ H → g :=
    g · 86 / 256 (signed, toward zero); add to H (`0x0057E860`,
@@ -339,7 +350,8 @@ three `+0x508` references to the client record in `all.asm`).
    zero); then client +0x508 := 0. A death with no experience loss
    (pvp killer, level 1, `DeathExpPenalty` 0) leaves the field 0, so
    C holds 0.
-2. **Corpse pickup** `0x0057FB70(game, player P, corpse C)`
+2. **Corpse pickup** `0x0057FB70(game, player P, corpse C)` (the item
+   take-back `0x00562F30`: `items/inventory-moves.md` §12)
    (the 0x16 PickItem path on a dead player, `items/inventory.md`
    §7.1 rule 2): C must have state 7
    (`playerbody`) and P must be allowed to take it (`0x0057FAF0`: C's
@@ -575,18 +587,19 @@ stat points: three spends succeed, the fourth fails, result 2.
 
 ## Open questions
 
-1. No trace check. Recording request: hook `0x00570880` entry/exit and
+1. ~~No trace check. Recording request: hook `0x00570880` entry/exit and
    `0x00570D60` (log stats 4–13 before/after) during a level-up and
-   while spending points.
+   while spending points.~~ → PC 2 recording list.
 2. Answered: §4.3–§4.5 read from `0x0057E480`, `0x0057E390`,
    `0x0057E3F0`, `0x0057E990`, `0x0057E7B0`, `0x0057E6C0`, `0x0057E5A0`,
    `0x005405A0`, `0x0057E510`, `0x0057E860`. The hireling part (86/256
    share, 1/64-level cap, 1.14d adds 2·gain) is confirmed in
    `world/hirelings.md` §7. Open: the x87 party share's
    precision-control word in force (§4.4 rule 6, as
-   `sim/stat-lists.md` open question 1; settle with a party recording,
-   multiplayer, Phase 7) and the hireling level-up body (`0x00572840`,
-   mercenary spec).
+   `sim/stat-lists.md` open question 1); settle with a party recording
+   (multiplayer, Phase 7). Out of Phase 0–6 scope (a party needs two
+   players). The hireling level-up body (`0x00572840`) is the mercenary
+   spec's.
 3. Answered: `0x0057E2F0` takes ECX = experience, EDX = alvl, EAX =
    dlvl; for dlvl > alvl ≥ 25 it calls `pct(ECX exp, EDX alvl, stack
    dlvl)` (at `0x0057E31E`), i.e. exp × alvl / dlvl as §4.2 states.
@@ -605,6 +618,6 @@ stat points: three spends succeed, the fourth fails, result 2.
 7. Answered: §5.1 rule 4 (registry `PlayerPos`, off in a standard
    install; `0x00537FD0` and `0x0053E130` specified there; not run by
    `Ruleset::Original`).
-8. §5 has no trace check. Settle: R5 of `items/inventory.md` (gold) and
+8. ~~§5 has no trace check. Settle: R5 of `items/inventory.md` (gold) and
    any recording with damage, potions and running: every 0x18 / 0x95 /
-   0x96 / 0x1A–0x1C byte and its tick.
+   0x96 / 0x1A–0x1C byte and its tick.~~ → PC 2 recording list.

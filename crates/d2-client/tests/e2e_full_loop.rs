@@ -24,7 +24,8 @@
 //!    it (0x18): 0x9C / 0x47 / 0x48 bytes exact;
 //! 5. run to Akara (0x04, unit form), talk (0x13: 0x27, 0x29, 0x28),
 //!    trade (0x38), sell the cap (0x33: 0x2A kind 3), buy the store's
-//!    cap (0x32: **stops** at the unwritten item copy, 0x2A code 9);
+//!    cap (0x32: the copy `0x0055A2A0` into the backpack, 0x2A kind 4
+//!    and its 0x9C action 4);
 //! 6. walk to the waypoint (0x02, unit form) and travel to another level
 //!    of the act (0x49): placed by the path code in the destination's
 //!    spawn room, S→C 0x07 then 0x0D exact.
@@ -164,7 +165,7 @@ const STAMINA: i32 = 0x6400;
 /// and the timer paths alike), the drop state, and a log of the calls
 /// that change something. The answers are the narrowest ones
 /// (`Pending`'s defaults) except those the test stages (see each). The
-/// player's interaction is the server host's (the NPC rest, `Rest`).
+/// player's interaction is the unit record's interact info.
 #[derive(Default)]
 struct TestPending {
     sent: Vec<(UnitId, Vec<u8>)>,
@@ -2355,10 +2356,13 @@ fn run_with(game_seed: u32) -> Transcript {
     assert!(!fx.inventory().contains(&cap));
     assert!(fx.sim_ref().game.lists.unit(cap).is_none(), "freed");
 
-    // 13. Buy (C→S 0x32) the store's cap: rules 1–8 pass; STOP at the
-    // item copy `0x0055A2A0` (§7.1 rule 9.2, `VendorRest::copy_item`, no
-    // items spec writes it): S→C 0x2A code 9, GUID −1, result 1; nothing
-    // paid.
+    // 13. Buy (C→S 0x32) the store's cap: rules 1–8 pass; the purchase
+    // loop (§7.1 rule 9) copies the store cap (`0x0055A2A0`, §7.3, on the
+    // inventory model), pays (§9.2 by hand: 100·AC/5, sell mult 1024)
+    // and auto-places the copy in the backpack: S→C 0x2A code 0, kind 4,
+    // the copy's GUID, the new gold; its 0x9C action 4 in the update
+    // pass. The permanent cap stays in the store (rule 12).
+    let price = 100 * fx.stat(*store.last().unwrap(), ARMORCLASS) / 5;
     let store_cap = fx.guid(*store.last().unwrap());
     record(
         &mut fx,
@@ -2370,16 +2374,16 @@ fn run_with(game_seed: u32) -> Transcript {
             client_price: 0,
         })],
     );
-    assert_eq!(
-        frames.last().unwrap().1.codes,
-        [(0x32, Some(ResultCode::Refused))]
-    );
-    assert_eq!(
-        streams(&fx, &frames.last().unwrap().2),
-        [tx(0, 9, u32::MAX, gold_now)]
-    );
+    assert_eq!(frames.last().unwrap().1.codes, [(0x32, done)]);
+    let bought = *fx.inventory().last().unwrap();
+    assert!(!store.contains(&bought), "a new unit");
+    let bg = fx.guid(bought);
+    let gold_now = gold_now - price;
+    let mut want = vec![tx(4, 0, bg, gold_now)];
+    want.extend(pass(x9c(0x04, bg)));
+    assert_eq!(streams(&fx, &frames.last().unwrap().2), want);
     assert_eq!(fx.stat(player, GOLD), gold_now);
-    assert_eq!(fx.inventory(), [fx.buckler, fx.cap]);
+    assert_eq!(fx.inventory(), [fx.buckler, fx.cap, bought]);
 
     // 14. Walk to the waypoint object (C→S 0x02, type 2): objects have
     // no footprint here (`wiring::path::units` TODO: no objects.txt), so
@@ -2398,12 +2402,16 @@ fn run_with(game_seed: u32) -> Transcript {
 
     // 15. Waypoint travel to the GATE level (C→S 0x49, `waypoints.md`
     // §6–§7) with the menu open (the operate path is the object spec's:
-    // the interaction staged at the host's owner). With the path
+    // the interaction staged on the player's unit record). With the path
     // provider the same-act warp places the player in the destination's
     // spawn room (`path-placement.md` §10, §11), so rule 7 holds: in the
     // drain the client gets 0x07 MapReveal of the placement room, then
     // 0x0D at the player's position + 3 (§8 rule 3).
-    fx.sim().world.rest.interact.insert(player, (2, wp));
+    {
+        let rec = fx.sim().events.action.sys.units.get_mut(player).unwrap();
+        rec.interact.reset();
+        rec.interact.set(2, wp);
+    }
     let travel = bytes(&TakeOrCloseWp {
         wp,
         level: GATE as u16,
@@ -2506,7 +2514,8 @@ fn run_with(game_seed: u32) -> Transcript {
     want.extend(switch);
     want.extend(leave);
     assert_eq!(frames.last().unwrap().2, want);
-    assert!(!fx.sim_ref().world.rest.interact.contains_key(&player));
+    let rec = fx.sim_ref().events.action.sys.units.get(player).unwrap();
+    assert_eq!(rec.interact.get(), None);
     // The next tick: nothing (the 0x15 of `docs/handoff/wire-path-server.md`
     // §4 finding 1 came with the room switch's player update).
     record(&mut fx, &mut frames, vec![]);
@@ -2519,7 +2528,8 @@ fn run_with(game_seed: u32) -> Transcript {
     assert_eq!(client.0, frames.len() as u64 + 1);
     let log = fx.bridge.log();
     // The S→C stream drove the client model (`client/model.md`,
-    // `msg-units.md`, `msg-stats-items.md`): 0x9C ×2, 0x47 ×2, 0x48 ×2,
+    // `msg-units.md`, `msg-stats-items.md`): 0x9C ×3, 0x47 ×3, 0x48 ×3
+    // (the bought cap's too),
     // the waypoint's 0x51, the leave's three 0x0A and its 0x15 applied;
     // 0x0D dropped (the player was never announced: the server sends no
     // 0x59 / 0x0B in this staged game) and the monster's two 0x69 (codes
@@ -2529,9 +2539,9 @@ fn run_with(game_seed: u32) -> Transcript {
     // join's four 0x07, the warp's one and the six of its room switch,
     // the switch's four 0x08. The NPC / quest / trade ids are handled
     // now (`client/msg-ui.md` §5, §12, §16, §18: 0x27, 0x29, 0x28, 0x2A
-    // ×2), and Akara's harness add (0xAC) too: 11 + 6.
+    // ×2), and Akara's harness add (0xAC) too: 14 + 6.
     assert!(log.unowned.is_empty(), "{:?}", log.unowned);
-    assert_eq!(log.handled, 17);
+    assert_eq!(log.handled, 20);
     assert_eq!(log.dropped, BTreeMap::from([(0x0D, 1), (0x69, 2)]));
     assert_eq!((log.queued, log.drained), (0, 0));
     assert_eq!(fx.due, None, "the death end's 0x69 code 9 arrived");
@@ -2607,9 +2617,11 @@ fn full_single_player_loop() {
     assert_eq!(t.frames.len() as i32, t.game_frame);
     // The kill: 100 experience, one drop (the gold, picked up).
     assert_eq!((t.player_exp, t.drops.len()), (100, 1));
-    // The picked-up cap sold, the store's cap not bought.
-    assert_eq!(t.inventory.len(), 2);
-    assert!(t.player_stats[2] > PLAYER_GOLD);
+    // The picked-up cap sold, a copy of the store's cap bought.
+    assert_eq!(t.inventory.len(), 3);
+    // Gold moved by the pickup, the sale and the buy (each exact in the
+    // run's steps).
+    assert_ne!(t.player_stats[2], PLAYER_GOLD);
 }
 
 /// Same seeds → the same run: every C→S byte, result code, S→C chunk,

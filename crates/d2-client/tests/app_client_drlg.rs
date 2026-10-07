@@ -157,7 +157,12 @@ fn the_join_builds_the_client_drlg_in_the_app() {
     app.update();
     let (player, guid) = app_support::local_player(&server).expect("joined");
     let server_pos = app_support::with(&server, move |l| {
-        l.host_mut().game.events.hooks().path_position(player)
+        l.host_mut()
+            .game
+            .events
+            .action
+            .hooks()
+            .path_position(player)
     });
     let b = &app.world().resource::<BridgeResource>().0;
     let w = b.world();
@@ -285,7 +290,7 @@ fn the_session_join_on_the_install() {
         .with(|l| {
             let sim = &mut l.host_mut().game;
             let (player, _) = single_player::local_player(sim).expect("joined");
-            sim.events.hooks().path_position(player)
+            sim.events.action.hooks().path_position(player)
         })
         .unwrap();
     assert!(

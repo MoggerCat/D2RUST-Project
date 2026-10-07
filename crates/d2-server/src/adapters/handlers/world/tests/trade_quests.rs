@@ -86,7 +86,6 @@ impl Outbox for ActionRest {
 /// that would change state outside `d2-sim`.
 #[derive(Default)]
 pub struct Rest {
-    pub interact: BTreeMap<UnitId, (u8, u32)>,
     pub quests: BTreeMap<UnitId, PlayerQuests>,
     /// GUID of each NPC unit (for the staged 0x27).
     pub guids: BTreeMap<UnitId, u32>,
@@ -149,15 +148,6 @@ impl NpcRest for Rest {
     }
     fn tristram_cain_busy(&self, _: UnitId, _: UnitId) -> bool {
         false
-    }
-    fn interact_unit(&self, player: UnitId) -> Option<(u8, u32)> {
-        self.interact.get(&player).copied()
-    }
-    fn set_interact(&mut self, player: UnitId, t: u8, guid: u32) {
-        self.interact.insert(player, (t, guid));
-    }
-    fn reset_interact(&mut self, player: UnitId) {
-        self.interact.remove(&player);
     }
     /// No hireling: the quest mercenary is granted (`npc.md` §7.5).
     fn pet(&self, _: UnitId, _: u8, _: u8) -> Option<UnitId> {

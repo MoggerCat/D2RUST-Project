@@ -28,17 +28,17 @@
 |   1. Messages | 77–108 |
 |   2. `use_at_point(game, unit, skill, x, y)` = `0x00549AD0` | 109–150 |
 |   3. `use_on_unit(game, unit, skill, type, guid, run)` = `0x00549BA0` | 151–169 |
-|   4. Mode change gates | 170–203 |
-|   5. Start and do | 204–324 |
-|   6. Cooldown | 325–338 |
-|   7. Periodic skills and auras | 339–388 |
-|   8. Function tables | 389–408 |
-| Constants & data dependencies | 409–429 |
-| Randomness | 430–439 |
-| Edge cases & original bugs | 440–461 |
-| Test vectors | 462–475 |
-| Provenance | 476–492 |
-| Open questions | 493–533 |
+|   4. Mode change gates | 170–209 |
+|   5. Start and do | 210–340 |
+|   6. Cooldown | 341–354 |
+|   7. Periodic skills and auras | 355–404 |
+|   8. Function tables | 405–424 |
+| Constants & data dependencies | 425–445 |
+| Randomness | 446–455 |
+| Edge cases & original bugs | 456–477 |
+| Test vectors | 478–491 |
+| Provenance | 492–508 |
+| Open questions | 509–552 |
 <!-- /index -->
 
 ## Summary
@@ -177,7 +177,10 @@ yes. Else by current mode: NU, WL, RN, TN, TW, S2, S4, KB (19) → yes;
 DT, GH, BL, DD → no; A1, A2, SC, TH → yes if `frame ≤ E + 5` or the new
 mode is GH or BL; KK → `frame ≤ E + 5`; S1 → no for an Amazon (class 0),
 else yes; S3 → no for a Druid (5), else yes; SQ → yes if the used skill's
-`seqinput` > 0, else `frame ≤ E + 5`. `E` = smallest positive expire
+`seqinput` > 0, else `frame ≤ E + 5`; any current mode above 18 (KB 19 and beyond) → yes
+(the current-mode jump table covers 0–18 only, bound at `0x0057EE0B`).
+A new mode above 17 goes to the current-mode test, like 2–4 and 6–16.
+`E` = smallest positive expire
 frame of the unit's type-1 timers, 0 if none (`0x005415A0`).
 
 **`interrupt_gate` `0x0057EEC0`:**
@@ -191,7 +194,10 @@ frame of the unit's type-1 timers, 0 if none (`0x005415A0`).
    5`.
 4. Used skill with `interrupt`: if state 42 (concentration) is on, draw
    `roll(100)` (unit seed, `0x0045C390`); `r < stat 164` of state 42's
-   stat list → blocked. Not blocked and state 15 (concentrate) on →
+   stat list → blocked. The value is the list's base value
+   (`0x00625D00` → `0x00625350(list, 164, 0)`), read before the draw; a
+   missing list (`0x006256B0` → null) gives 0, so the draw is still made
+   and never blocks (1.14d-confirmed, `0x0057EF51`–`0x0057EF83`). Not blocked and state 15 (concentrate) on →
    blocked. Blocked: current mode NU → set NU, yes; else no.
 
 Then the used skill is set (`0x00620210`) and the mode's start runs
@@ -207,21 +213,31 @@ unit's type-0/1 timers (`0x00553990`), schedule frame events
 
 Fixed when the skill entry is created (entry +8): players `anim`; the
 Assassin's Left Hand Swing 16 (S4); monsters `monanim`; item-charge
-skills `anim` if A1/A2/SC/TH/SQ, else SC. 1.14d `anim`: SC 141, SQ 116,
+skills `anim` if A1/A2/SC/TH/SQ, else SC. The native-skill add
+`0x00647110` decides by unit type only: type 1 → `monanim` (record
++0x11, signed byte); type 0 with class 6 and skill 5 → 16; **every other
+unit** (players, objects, missiles, items, tiles) → `anim` (+0x10,
+signed byte) (1.14d-confirmed, `0x006471C0`–`0x006471EB`). 1.14d `anim`: SC 141, SQ 116,
 A1 48, none 23, S2 9, S1 6, TH 5, S3 4. `seqtrans`, `seqnum` and
 shapeshift mode conversion are animation (`sim/units.md`).
 
 #### 5.2 Frame events
 
 `0x005539B0` schedules a type-0 timer at each animation frame whose
-frame code `c` is 1–4 (args `c`, running index for 1, 2, 4; 0 for 3),
+frame code `c` is 1–4 (args `c`, running index for 1, 2, 4; 0 for 3;
+the index is **one** counter shared by codes 1, 2 and 4, from 0, +1
+after each such timer in frame order: jump table `0x00553AFC` sends 1,
+2, 4 to `0x00553A82` and 3 to `0x00553A9A`; 1.14d-confirmed),
 then the type-1 ENDANIM timer (`sim/units.md` owns frame data). The
 player type-0 handler `0x005811D0` dispatches by mode (table
 `0x00732C10`); attack-type modes (7, 8, 10–16, 18) use `0x00580460`:
 
 1. Store arg2 in unit +0x38 bits 8+ (`0x006212C0`).
 2. Skill flags bit 0 (moving skills): step the path (`0x00553490`,
-   `0x00554CA0`); finished (2) → flags |= 2 and run the do.
+   `0x00554CA0`); finished (2) → flags |= 2 and run the do. "Skill
+   flags" (E flags) are the skill entry's word +0x0C (get `0x006446A0`,
+   set `0x00644660`): value 1 = moving skill, mask 2 = the move ended
+   (`0x005804B3`). Bodies test mask 2 (`test al, 2`) and clear the word.
 3. Otherwise run the do only if unit flag 0x40 is clear and arg1 ∈ {1,
    2}.
 4. Return 1, or 2 when the unit died (ENDANIM runs at once).
@@ -391,7 +407,7 @@ Passives: learning (0x3B, `skills/levels.md` §6.4) and refreshes call
 `skills/functions.tsv`, columns: `kind` (srvst / srvdo), `index`,
 `address` (1.14d, `null` = empty slot), `d2moo_name`, `status`
 (`spec'd-here` = body specified in `skills/bodies.md`; `mapped` = 1.14d
-table entry identified, body not specified; `null`; `unreferenced` = no
+table entry identified, body in another spec (no row has it); `null`; `unreferenced` = no
 1.14d data uses it), `skills_using` (from `skills.txt` 1.14d), `notes`. Ranges `66-90` and `153-190` are one row
 each (all null).
 
@@ -503,7 +519,7 @@ their own (`combat/*`, `skills/levels.md`). The unit-seed reseeder
    `functions.tsv` (open question 10), so no re-export is needed.
 2. Answered: srvdo slot 121 holds `0x005C8AD0`, and Rabies (id 238) is
    the only 1.14d `skills.txt` row with `srvdofunc` 121; its body is
-   `skills/bodies-2.md` §6.14. The 1.14d body does not follow D2MOO's
+   `skills/bodies-2b.md` §6.14. The 1.14d body does not follow D2MOO's
    SrvDo121 (used-skill param check, `0x005C8980`, `apply_melee`
    `0x0057D4F0`, `elem_len` `0x00644F20`, `0x005C7DB0`, `0x005C7C20`).
 3. Recording: hook `0x0056FAF0` entry/return and `0x0056F7F0` entry; cast
@@ -530,3 +546,6 @@ their own (`combat/*`, `skills/levels.md`). The unit-seed reseeder
 10. Answered: every `functions.tsv` row is `spec'd-here` (bodies in
     `skills/bodies.md`, `bodies-2.md`, `bodies-3.md`, `bodies-4.md`),
     except the null slots and the 3 `unreferenced` rows.
+11. Answered (2026-10-08, `docs/handoff/impl-monster-skill-slots.md`): the
+    E flags "bit 2" of monster bodies is mask 2, the move-ended flag
+    (§5.2 rule 2).

@@ -685,10 +685,9 @@ impl<X: Pending> ObjectWorld for ObjectView<'_, X> {
     fn in_interact_range(&self, operator: UnitId, object: UnitId) -> bool {
         self.v.h.x.object_in_range(self.game, operator, object)
     }
-    /// `0x00554100`: the interact info ([`Pending::interact_guid`], the
-    /// waypoint seam's).
+    /// `0x00554100`: the interact info on the player's unit record.
     fn interact_active(&self, player: UnitId) -> bool {
-        self.v.h.x.interact_guid(player).is_some()
+        self.v.units.get(player).is_some_and(|r| r.interact.active)
     }
     fn player_busy(&self, player: UnitId) -> bool {
         self.v.h.x.object_player_busy(player)
@@ -738,22 +737,30 @@ impl<X: Pending> ObjectWorld for ObjectView<'_, X> {
 }
 
 /// The part-2 seams (`objects-2.md` §16–§18) on the unit lists, records,
-/// the act DRLG and the path provider: interact (the waypoint seam's
-/// [`Pending`] interact), messages ([`Pending::send`]), adjacency, free
+/// the act DRLG and the path provider: interact (the unit record's
+/// interact info), messages ([`Pending::send`]), adjacency, free
 /// point and placement (`sim/path-placement.md` §7, §10), the 0x07 room
 /// reveal, flags 2, the town test and the player lookup. Item drops (the
 /// §20 helpers), trap damage, the gem test, the tome recount, the warp
 /// tile, the day period keep their defaults.
 impl<X: Pending> objects::MechWorld for ObjectView<'_, X> {
+    /// `0x00554D00` on the unit record's interact info.
     fn interact_unit(&self, player: UnitId) -> Option<UnitId> {
-        let g = self.v.h.x.interact_guid(player)?;
-        self.game.lists.find_unit(UnitType::Object, g)
+        // Only the obelisk reads it, comparing with an object (§16.3).
+        let (ty, g) = self.v.units.get(player)?.interact.get()?;
+        (ty == UnitType::Object as u8)
+            .then(|| self.game.lists.find_unit(UnitType::Object, g))
+            .flatten()
     }
     fn set_interact(&mut self, player: UnitId, unit_type: u8, guid: u32) {
-        self.v.h.x.set_interact(player, unit_type, guid);
+        if let Some(r) = self.v.units.get_mut(player) {
+            r.interact.set(unit_type, guid);
+        }
     }
     fn clear_interact(&mut self, player: UnitId) {
-        self.v.h.x.reset_interact(player);
+        if let Some(r) = self.v.units.get_mut(player) {
+            r.interact.reset();
+        }
     }
     fn send(&mut self, player: UnitId, msg: &[u8]) {
         self.v.h.x.send(player, msg);
