@@ -11,6 +11,7 @@ Queue numbers are `docs/HANDOFF.md` §5 "Local run queue".
 
 | # | Item | Status | Raw file (local only) | Check | Key numbers |
 |---|---|---|---|---|---|
+| 69 | environment per tick, one day | **done: Python replay of §9.3–§9.4 equal on every update**; d2rs replay for the cloud | `env69-sound.jsonl` (41,892 env updates, 28 S→C 0x53 sets) | `check_env.py` (new) **OK**: 41,891 predicted, 0 mismatches; `--theta int` fails 22,132 (so ticks / speed is a double) | one day = 35,844 client updates (C 0 → 35,844 back to index 2, ticks 0); all 6 periods; I 64..255 |
 | 85 | game +0x80 in 0x03 | **done: all three equal** | `join1.jsonl`, `join1-packets.jsonl` (5,995 events) | `check_packets.py` **OK** (no 0x3E) | `0x00546C60` result = game +0x80 = 0x03 u32@8 = **0xF74A29B4** |
 | 83 | client room seeds | **recorded** (d2rs bridge replay is the cloud's) | same files | as 85 | 32 client monster creations, all at non-zero points; 32 / 32: the room's seed stepped exactly once and unit +0x28 = the new `lo'`; fresh client rooms hold `{x, 666}` |
 | 80 | hireling teleport follow | **done** (town portal, both ways) | `tp80-packets.jsonl` (16,358 events; side file of `tp80-spawn.jsonl`, no spawn made) | `check_packets.py` **OK** (no 0x3E) | per teleport: the merc's 0x0A in the input phase of the C→S 0x13, its 0xAC at the destination in the next tick before the player's 0x15; a merc 0x15 one frame later only on the first teleport |
@@ -181,3 +182,39 @@ Cain must have left Tristram (A1Q4 extra +0x50) before the town-Cain
 marker (class 385) is created; checked: no character has rescued Cain
 (every save is an Act I character that never reached Tristram; the
 rescue was blocked in pass 1, `local-buddy-recordings.md` item 3).
+
+## 69: environment per client update over one in-game day
+
+`record_sound.py --env-only` (hooks `0x0061BFC0` per client update and the
+S→C 0x53 setter `0x0061C240`, each read at return: index, type, ticks,
+intensity +0x0C, R G B +0x18..+0x1A, eclipse, and the room's level), `-w
+-ns -nosave -name bdAma -ama`, standing in the Rogue Encampment (L = 1 on
+every update, act index 0), 1,680 s.
+
+- 41,892 updates (C 0 … 41,891), starting from the creation state (index
+  2, ticks 0 → 1 after the first update, I 128, white). The day closed at
+  C 35,844 (index 1 → 2, ticks 0): one day = **35,844 updates**. Period
+  starts (C, ticks): 3 at 20,479 / 20,480; 4 at 23,040; 5 at 25,601 /
+  25,600 (from here +2 per update, type 2); 0 at 33,282 / 40,960; 1 at
+  35,843 / 43,520 (one update only, as §9.4 says). I from 64 (night,
+  ticks 34,816) to 255 (noon).
+- 28 S→C 0x53 sets (the server's cycle, each period change and every
+  2,176 ticks): every one carried the index and ticks the client already
+  had (stack args = state), e.g. C 23,041 `(4, 23040)`.
+- `check_env.py` (new, committed; `render/lighting.md` §9.3–§9.4 with
+  `env-periods.tsv`, each update predicted from the recorded state before
+  it): **OK, 0 mismatches in 41,891 updates** on index, ticks, intensity
+  and color. With θ from truncated ticks / speed (`--theta int`) 22,132
+  fail, so θ uses ticks / speed as a double. This answers `lighting.md`
+  OQ 7 for act 1 (A = 0, no eclipse): the CRT `sin` and `trunc` give the
+  spec's value on every θ of a day.
+- For the cloud: replay `rules::lighting::environment::Environment::update`
+  over `env69-sound.jsonl` (`env_update` records, field `env` after each,
+  `L`; `env_set` = 0x53 with stack [act, room?, index, ticks]) and expect
+  equality on every update; no d2rs harness for it exists yet
+  (`crates/d2-client/src/rules/lighting/env_tests.rs` is synthetic only).
+- Capture key (the entry's second part): `record_frames.py` 0.2.1 adds
+  `light_map_sha256` (18,432 bytes at `0x007B0E68`, frame end) and
+  `light_key` = [q, digest] to the state key. `--selftest` passes; **not
+  run live** in this task (`record_frames.py` needs the game started by
+  hand from the menu).
