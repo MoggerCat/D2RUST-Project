@@ -1,4 +1,4 @@
-// Spec: specs/client/model.md (§6)
+// Spec: specs/client/model.md (§6), specs/sim/unit-order.md (§5 rule 6)
 //! The position check `0x004804E0`: compares a point the server states
 //! with the unit's own position and, when they disagree beyond the
 //! tolerance (or the unit would be drawn off-screen), corrects it: the
@@ -7,7 +7,9 @@
 use crate::rules::camera::{moving_to_client, static_to_client};
 
 use super::dispatch::HandlerError;
-use super::world::{ClientUnit, ClientWorld, ModelInputs, UnitKey, ITEM, MONSTER, OBJECT, TILE};
+use super::world::{
+    ClientUnit, ClientWorld, ModelInputs, UnitKey, ITEM, MISSILE, MONSTER, OBJECT, PLAYER, TILE,
+};
 
 /// What the check did.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -140,11 +142,13 @@ pub fn check(
 /// (`model.md` §12 rule 2); none → nothing. Without a client DRLG (no
 /// DRLG source) the room is taken as found.
 fn correct(world: &mut ClientWorld, key: UnitKey, x: u16, y: u16) -> Checked {
+    let mut room = None;
     if world.active_rooms.is_some() {
         let start = world.unit_room(key).copied();
-        if world.room_from(start.as_ref(), x, y).is_none() {
+        let Some(found) = world.room_from(start.as_ref(), x, y) else {
             return Checked::NoRoom;
-        }
+        };
+        room = Some(found.room);
     }
     if world.local_player == Some(key) {
         // C→S 0x5F with the unit's own position.
@@ -160,6 +164,11 @@ fn correct(world: &mut ClientWorld, key: UnitKey, x: u16, y: u16) -> Checked {
     // model's position is (x, y) either way.
     if let Some(u) = world.units.get_mut(&key) {
         u.position = Some((x, y));
+    }
+    // A dynamic-path unit placed at (x, y) is recached into room'
+    // (`sim/unit-order.md` §5 rule 6, `0x0064FAD0`).
+    if room.is_some() && matches!(key.unit_type, PLAYER | MONSTER | MISSILE) {
+        world.room_units.place(key, room);
     }
     Checked::Moved
 }

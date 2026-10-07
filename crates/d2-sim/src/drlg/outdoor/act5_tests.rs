@@ -2,7 +2,7 @@
 //! Act V: the placement and level 110 vectors of `outdoor-act3-act5.md`
 //! and synthetic checks of each `outdoor.md` §11 step on small fakes.
 
-use super::{FATAL_PRISONS, FATAL_SPECIAL};
+use super::{CRASH_RAVINE_WALK, FATAL_PRISONS, FATAL_SPECIAL};
 use crate::drlg::outdoor::grid::{cell, file_of, Op};
 use crate::drlg::outdoor::tests::{data, od, one_cell_file, stepped, Env, Presets, Rec};
 use crate::drlg::outdoor::*;
@@ -278,6 +278,28 @@ fn ravine_walk_follows_the_table() {
     assert_eq!(g0(&e, 0, 4), 981);
 }
 
+// Covers: specs/drlg/outdoor.md §11 r3
+#[test]
+fn ravine_walk_off_the_pieces_is_reported() {
+    // (gw − 2, 0) holds no barricade piece: k = −881 has no D row; 1.14d
+    // stamps a non-row id (crash) and d2rs reports it, before any stamp.
+    let mut e = Env::new(112, 8, 6);
+    assert_eq!(
+        e.gen().ravine(),
+        Err(OutdoorError::Crash(CRASH_RAVINE_WALK))
+    );
+    assert!(e.info.grids[0].cells.iter().all(|&c| c == 0));
+    // A closed loop of pieces that never reaches (0, gh − 2): k 3 south
+    // then k 1 north, forever in 1.14d.
+    let mut e = Env::new(112, 8, 6);
+    e.gen().op(0, 6, 0, Op::Set, 881 + 3);
+    e.gen().op(0, 6, 2, Op::Set, 881 + 1);
+    assert_eq!(
+        e.gen().ravine(),
+        Err(OutdoorError::Crash(CRASH_RAVINE_WALK))
+    );
+}
+
 // Covers: specs/drlg/outdoor.md §11 r4
 #[test]
 fn entrances_take_the_first_link_cell() {
@@ -342,6 +364,10 @@ fn caves_tall_and_wide() {
     let mut e = Env::new(111, 20, 8);
     e.gen().caves().unwrap();
     assert!(e.info.grids[0].cells.iter().all(|&c| c == 0));
+    // w = h (level tile rect): the tall id (§11 step 5).
+    let mut e = Env::new(112, 10, 10);
+    e.gen().caves().unwrap();
+    assert_eq!(g0(&e, 2, 0), 913);
 }
 
 // Covers: specs/drlg/outdoor.md §11 r6
@@ -468,6 +494,12 @@ fn special_presets_rows_and_tall_wide() {
     let mut e = Env::new(111, 8, 20);
     e.gen().act5_specials().unwrap();
     assert_eq!([955, 944, 942, 943].map(|p| count(&e, p)), [1, 1, 4, 4]);
+    // w = h (level tile rect): the wide ids (§11 step 9, opposite tie to
+    // the caves).
+    let mut e = Env::new(111, 12, 12);
+    e.gen().act5_specials().unwrap();
+    assert_eq!([956, 947, 945, 946].map(|p| count(&e, p)), [1, 1, 4, 4]);
+    assert_eq!([955, 944, 942, 943].map(|p| count(&e, p)), [0; 4]);
     // 112: 956 F 0, 953, 941, 939, 940 ×5.
     let mut e = Env::new(112, 20, 8);
     e.gen().act5_specials().unwrap();

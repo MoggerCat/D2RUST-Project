@@ -7,18 +7,17 @@
 //! player's seed in the original's order.
 //!
 //! Only the GDI path (perspective 0) is modelled, as the spec describes it.
-//! The float parts of the particles are the spec's Open question 3: a
-//! spawn records its shape values as pending (`None`), and moving or
-//! drawing a falling particle returns [`WeatherError::Open`] instead of a
-//! guessed value. The snow spawn's draw list, its color (`0x00472FB0`) and
-//! the snow line table `0x006D6E78` are not in the spec yet and return
-//! [`WeatherError::Unspecified`]. The particle color tables are built at
-//! act load from ramps the spec does not list, so they are an input
-//! ([`ColorTables`]).
+//! The particle move `0x004732C0` is still the spec's Open question 3:
+//! moving live particles returns [`WeatherError::Open`] instead of a
+//! guessed value. The shape values, the snow spawn and color, the snow
+//! line table and the falling-drop vector are exact (§11.4 r5, §11.7 r3).
 
+use d2_formats::palette::Palette;
 use d2_sim::rng::Seed;
 
 use crate::rules::camera::{FrameSize, OpenMode};
+use crate::rules::lighting::overrides::sine_table;
+use crate::rules::shading::nearest;
 
 /// Particle pool slots (§11.1, `Environment Particles`, 256 × 0x28).
 pub const PARTICLE_SLOTS: usize = 256;
@@ -36,19 +35,36 @@ pub const SNOW_GOAL_START: (i32, i32) = (42, 170);
 pub const THUNDER_SOUND: u16 = 202;
 /// The play-area bottom margin of passes 4 and 9: `y < H − 47`.
 pub const BOTTOM_MARGIN: i32 = 47;
+/// Snow particle alpha by day period 0–3 (`0x006D6E41` + 2p, §11.4 r5).
+pub const SNOW_ALPHA: [u8; 4] = [200, 160, 80, 160];
+/// The snow line table `0x006D6E78` (§11.7 r3): 9 entries of (x0, y0,
+/// x1, y1) offsets; size `s` draws `T[s]` and `T[s + 1]`.
+pub const SNOW_LINES: [[i32; 4]; 9] = [
+    [0, 0, 0, 1],
+    [-1, -1, 0, 0],
+    [0, -1, 0, 1],
+    [1, 0, -1, 1],
+    [1, 0, 0, 1],
+    [2, -1, -1, 1],
+    [1, 1, -2, -1],
+    [2, 1, -2, -1],
+    [2, -1, -2, 2],
+];
 
 /// A fatal or unresolved condition of the weather code.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum WeatherError {
-    /// A fatal error of the original (`0x547`, `0x573`, `0x390`, `0x15B`).
+    /// A fatal error of the original (`0x547`, `0x573`, `0x390`, `0x356`,
+    /// `0x15B`, `0x12A`).
     #[error("weather fatal 0x{0:X} (render/draw-order-2.md §11)")]
     Fatal(u16),
     /// A rule waiting on an open question of `render/draw-order-2.md`.
     #[error("render/draw-order-2.md open question {question}: {what}")]
     Open { question: u8, what: &'static str },
-    /// A behavior the spec names but does not describe yet.
-    #[error("render/draw-order-2.md §11 does not specify {what}")]
-    Unspecified { what: &'static str },
+    /// A falling drop below its ground with `v` = 0 (§11.7 r3): the
+    /// original's C division `(g − y) × u / v` divides by zero (crash).
+    #[error("falling drop at ({x}, {y}) with v = 0 below its ground: the original divides by zero (render/draw-order-2.md §11.7 r3)")]
+    DropDivideByZero { x: i32, y: i32 },
     /// The act resources (§11.8) are not loaded.
     #[error("weather used before act load (render/draw-order-2.md §11.8)")]
     NotLoaded,
@@ -156,10 +172,10 @@ pub struct Particle {
     pub y: i32,
     /// Ground y (+0x0C).
     pub ground_y: i32,
-    /// Shape values +0x10 and +0x14: rain `4 − f₁`, `15 − f₂`; `None`
-    /// while the float parts are Open question 3.
-    pub shape_10: Option<i32>,
-    pub shape_14: Option<i32>,
+    /// Shape values +0x10 and +0x14 (§11.4 r5): rain drop length and
+    /// +0x14; snow size `s` (0–7) and +0x14.
+    pub shape_10: i32,
+    pub shape_14: i32,
     /// Phase 0–511 (+0x18).
     pub phase: u32,
     /// Landed flag (+0x1C).
@@ -197,17 +213,54 @@ impl EnvPool {
     }
 }
 
-/// The three 12-entry particle color tables (§11.4 r5), built at act load
-/// from `nearest` (`shading.md` §5) of ramps the spec does not list yet:
-/// supplied by the caller.
+/// The five 12-entry particle color tables (§11.4 r5), built at act load
+/// (`0x00472890`) by [`ColorTables::build`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ColorTables {
-    /// `[0x007A8980]`: day period 0 (alpha 0x7F).
+    /// `[0x007A8980]`: rain, day period 0 (alpha 0x7F).
     pub period0: [u8; 12],
-    /// `[0x007A894C]`: day periods 1 and 3.
+    /// `[0x007A894C]`: rain, day periods 1 and 3.
     pub period13: [u8; 12],
-    /// `[0x007A89A4]`: day period 2.
+    /// `[0x007A89A4]`: rain, day period 2.
     pub period2: [u8; 12],
+    /// `[0x007A898C]`: snow `S` (video modes 1–3, 6).
+    pub snow: [u8; 12],
+    /// `[0x007A89EC]`: snow `S'` (other video modes).
+    pub snow_alt: [u8; 12],
+}
+
+impl ColorTables {
+    /// The act-load ramps (§11.4 r5): entry `i` = `nearest` (`shading.md`
+    /// §5) over the current palette of, with `q` = ⌊80i / 12⌋: rain 0 (98
+    /// − q, 123 − q, 98 − q); rain 1/3 (v, v + 10, v), v = 45 − ⌊40i /
+    /// 12⌋; rain 2 (v, v + 5, v), v = 25 − 2i; snow (120 + q)³ and
+    /// (170 + q)³.
+    pub fn build(palette: &Palette) -> ColorTables {
+        let n = |r: i32, g: i32, b: i32| nearest(palette, r as u32, g as u32, b as u32);
+        let q = |i: i32| 80 * i / 12;
+        ColorTables {
+            period0: std::array::from_fn(|i| {
+                let v = 98 - q(i as i32);
+                n(v, v + 25, v)
+            }),
+            period13: std::array::from_fn(|i| {
+                let v = 45 - 40 * i as i32 / 12;
+                n(v, v + 10, v)
+            }),
+            period2: std::array::from_fn(|i| {
+                let v = 25 - 2 * i as i32;
+                n(v, v + 5, v)
+            }),
+            snow: std::array::from_fn(|i| {
+                let v = 120 + q(i as i32);
+                n(v, v, v)
+            }),
+            snow_alt: std::array::from_fn(|i| {
+                let v = 170 + q(i as i32);
+                n(v, v, v)
+            }),
+        }
+    }
 }
 
 /// What act load reads from files (§11.8): the eight cel files' frame
@@ -252,6 +305,9 @@ pub struct UpdateInput {
     pub camera_delta: (i32, i32),
     /// The act's day period 0–3 (`0x0061C100`).
     pub day_period: u8,
+    /// The video mode (`0x004F5140`, `ui/panels.md`): the snow color table
+    /// (§11.4 r5).
+    pub video_mode: u32,
 }
 
 /// Frame inputs of pass 9 (§11.7).
@@ -327,11 +383,14 @@ pub struct Pass9 {
     pub thunder: Option<Thunder>,
 }
 
-/// The floor pass's per-frame context (`0x004DE730`, §11.5).
+/// The floor pass's per-frame context (`0x004DE730`, context
+/// `0x007C8A28`, §11.5).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct FloorContext {
+    /// The splash threshold `k` (+0x10) of this frame.
+    pub k: i32,
     /// Update count of the last splash frame (+0x14) and bubble frame
-    /// (+0x18); persist between frames.
+    /// (+0x18); 0 at program start, never reset.
     pub last_s: u32,
     pub last_b: u32,
     /// This frame's flags; cleared at the start of each frame.
@@ -340,15 +399,17 @@ pub struct FloorContext {
 }
 
 impl FloorContext {
-    /// Start of a frame's floor pass: clears and sets the two flags.
-    /// `mud` is the local player's level's `Mud`.
+    /// Start of a frame's floor pass: `k` := [`Weather::splash_threshold`];
+    /// when `c` > `last_s` + 3, `last_s` := `c` (whatever `k` is) and the
+    /// splash flag when `k` ≠ 0; the bubble flag likewise with `Mud`.
     pub fn begin_frame(&mut self, update_count: u32, weather: &Weather, mud: bool) {
         let c = update_count;
         self.splash = false;
         self.bubble = false;
-        if c > self.last_s.wrapping_add(3) && weather.intensity_int() != 0 {
-            self.splash = true;
+        self.k = weather.splash_threshold();
+        if c > self.last_s.wrapping_add(3) {
             self.last_s = c;
+            self.splash = self.k != 0;
         }
         if mud && c > self.last_b.wrapping_add(25) {
             self.bubble = true;
@@ -380,9 +441,6 @@ pub struct Weather {
     pub snow_mode: bool,
     /// Snow lock `[0x007A8A1C]`.
     pub snow_lock: bool,
-    /// `[0x007A8A20]`: read by §11.3 with the lock; no writer is in the
-    /// spec (question W1).
-    pub snow_lock_hold: u32,
     /// Size bump `[0x007A8A18]`.
     pub size_bump: bool,
     /// Rain cycle phase `[0x007A8A24]`, length `[0x007A8A38]`, countdown
@@ -427,7 +485,9 @@ impl Default for Weather {
 
 impl Weather {
     /// The state at client start (`0x00472320`): empty pools, the thunder
-    /// flag set (`.data` 1), snow goal (42, 170); every other scalar 0.
+    /// flag set (`.data` 1), snow goal (42, 170); every other scalar 0
+    /// (`.bss`). Nothing resets the cycle later: phase, length, countdown
+    /// and the floor context carry over from game to game (§11.1).
     pub fn new() -> Self {
         Weather {
             particles: Pool::new(PARTICLE_SLOTS),
@@ -437,7 +497,6 @@ impl Weather {
             mud_flag: false,
             snow_mode: false,
             snow_lock: false,
-            snow_lock_hold: 0,
             size_bump: false,
             phase: 0,
             length: 0,
@@ -489,10 +548,12 @@ impl Weather {
         self.resources.as_ref()
     }
 
-    /// int(intensity) (`0x00682FD0`, truncation): `intensity_256` / 256,
-    /// exact for every target the rules produce (≤ 256).
-    pub fn intensity_int(&self) -> u32 {
-        self.intensity_256 / 256
+    /// The splash threshold `k` = trunc(intensity × 1000.0) (§11.5,
+    /// `0x00682FD0`, constant `0x006DB9D0`) = ⌊target × 1000 / 256⌋:
+    /// intensity is target × 1/256, exact in a float for every target the
+    /// rules produce (≤ 256), and the product is exact too.
+    pub fn splash_threshold(&self) -> i32 {
+        (u64::from(self.intensity_256) * 1_000 / 256) as i32
     }
 
     // ---------------------------------------------------------------- §11.8
@@ -617,13 +678,22 @@ impl Weather {
         self.target = self.peak;
     }
 
-    /// `0x00473D00(p)`: the rain phase entries.
+    /// `0x00473D00(p)`: the rain phase entries. p > 3: fatal 0x12A; snow
+    /// lock set and p ≠ 2: nothing (the stored phase stays); else phase :=
+    /// p and the entry.
     fn phase_entry(
         &mut self,
         p: u32,
         seed: &mut Seed,
         level: &LevelWeather,
     ) -> Result<(), WeatherError> {
+        if p > 3 {
+            return Err(WeatherError::Fatal(0x12A));
+        }
+        if self.snow_lock && p != 2 {
+            return Ok(());
+        }
+        self.phase = p;
         match p {
             0 => self.target = 0,
             1 => {
@@ -672,7 +742,8 @@ impl Weather {
         self.mark = c;
         let (seed, level) = (player.seed, player.level);
         if !r {
-            self.target = 0;
+            // §11.2 r3: intensity := 0.0, the target is kept.
+            self.intensity_256 = 0;
         } else {
             if self.particles.live() != 0 {
                 return Err(WeatherError::Open {
@@ -692,18 +763,19 @@ impl Weather {
         Ok(())
     }
 
-    /// The rain cycle (§11.3, `0x00473E50`).
+    /// The rain cycle (§11.3, `0x00473E50`). `[0x007A8A20]` has no writer
+    /// (always 0), so a locked cycle off phase 2 always becomes phase 2.
     fn rain_cycle(&mut self, seed: &mut Seed, level: &LevelWeather) -> Result<(), WeatherError> {
         if self.snow_lock && self.phase != 2 {
-            if self.snow_lock_hold == 0 {
-                self.phase = 2;
-                self.level_presets(seed, level);
-            }
+            self.phase = 2;
+            self.level_presets(seed, level);
             return Ok(());
         }
+        // r3 uses this call's p: a locked cycle keeps the stored phase 2
+        // while the p of r1 still picks the ramp.
+        let mut p = self.phase;
         if self.countdown == 0 {
-            let p = (self.phase + 1) % 4;
-            self.phase = p;
+            p = (self.phase + 1) % 4;
             let d = seed.roll_range(self.cycle_min[p as usize], self.cycle_n[p as usize]);
             self.length = d as u32;
             self.countdown = d as u32;
@@ -711,7 +783,7 @@ impl Weather {
         }
         self.countdown = self.countdown.wrapping_sub(1);
         let d = self.length;
-        match self.phase {
+        match p {
             1 => self.target = self.peak.wrapping_mul(d.wrapping_sub(self.countdown)) / d,
             3 => self.target = self.peak.wrapping_mul(self.countdown) / d,
             _ => {}
@@ -737,14 +809,11 @@ impl Weather {
         if self.wind_countdown == 0 {
             if self.snow_mode {
                 self.wind_countdown = 250 + (seed.step() % 875) as i32;
-                seed.roll_range(self.snow_goal_min, self.snow_goal_n);
-                return Err(WeatherError::Open {
-                    question: 3,
-                    what: "snow wind goal (§11.4 r3)",
-                });
+                self.wind_goal = seed.roll_range(self.snow_goal_min, self.snow_goal_n);
+            } else {
+                self.wind_countdown = 125 + (seed.step() % 375) as i32;
+                self.wind_goal = 92 + (seed.step() % 71) as i32;
             }
-            self.wind_countdown = 125 + (seed.step() % 375) as i32;
-            self.wind_goal = 92 + (seed.step() % 71) as i32;
         }
         if self.lightning_on {
             self.lightning_countdown = self.lightning_countdown.wrapping_sub(1);
@@ -762,11 +831,6 @@ impl Weather {
         seed: &mut Seed,
         input: &UpdateInput,
     ) -> Result<bool, WeatherError> {
-        if self.snow_mode {
-            return Err(WeatherError::Unspecified {
-                what: "the snow spawn's draw list and color 0x00472FB0 (§11.4 r5)",
-            });
-        }
         let colors = self.resources.ok_or(WeatherError::NotLoaded)?.colors;
         if self.particles.is_full() {
             return Ok(false);
@@ -776,24 +840,50 @@ impl Weather {
         let g = seed.roll_range(40, h - 87);
         let y = seed.roll_range(-20, g + 20);
         let phase = seed.step() & 511;
-        let i = (seed.step() % 12) as usize;
-        let (color, alpha) = match input.day_period {
-            0 => (colors.period0[i], 0x7F),
-            2 => (colors.period2[i], 0xFF),
-            _ => (colors.period13[i], 0xFF),
+        // t = (g − 40) / (H − 87) in [0, 1); the float forms of the spec
+        // equal these floors.
+        let (num, den) = (g - 40, h - 87);
+        let floor = |k: i32| (k * num).div_euclid(den);
+        let rec = if self.snow_mode {
+            seed.step();
+            let size = num * 7 / den + i32::from(self.size_bump);
+            if !(0..=7).contains(&size) {
+                return Err(WeatherError::Fatal(0x390));
+            }
+            let (color, alpha) = snow_color(&colors, size, input.day_period, input.video_mode)?;
+            Particle {
+                x,
+                y,
+                ground_y: g,
+                shape_10: size,
+                shape_14: 8 + floor(28),
+                phase,
+                landed: false,
+                bounces: 1,
+                color,
+                alpha,
+            }
+        } else {
+            let i = (seed.step() % 12) as usize;
+            let (color, alpha) = match input.day_period {
+                0 => (colors.period0[i], 0x7F),
+                2 => (colors.period2[i], 0xFF),
+                _ => (colors.period13[i], 0xFF),
+            };
+            Particle {
+                x,
+                y,
+                ground_y: g,
+                shape_10: 4 + floor(8),
+                shape_14: 15 + floor(15),
+                phase,
+                landed: false,
+                bounces: 3,
+                color,
+                alpha,
+            }
         };
-        self.particles.alloc(Particle {
-            x,
-            y,
-            ground_y: g,
-            shape_10: None,
-            shape_14: None,
-            phase,
-            landed: false,
-            bounces: 3,
-            color,
-            alpha,
-        });
+        self.particles.alloc(rec);
         Ok(true)
     }
 
@@ -804,7 +894,7 @@ impl Weather {
     /// then the gated splash and bubble spawns.
     pub fn water_floor(&mut self, ctx: &FloorContext, x: i32, y: i32, seed: &mut Seed) {
         let r = seed.roll_range(0, 1_000);
-        if ctx.splash && (r as i64) < i64::from(self.intensity_int()) {
+        if ctx.splash && r < ctx.k {
             self.spawn_splash(x, y, seed);
         }
         if ctx.bubble && r < 100 {
@@ -936,33 +1026,83 @@ impl Weather {
             return Ok(out);
         }
         let in_range = |x: i32, y: i32| x >= l && x < r && y >= 0 && y < bottom;
+        let line = |x0: i32, y0: i32, x1: i32, y1: i32, p: &Particle| SkyDraw::Line {
+            x0,
+            y0,
+            x1,
+            y1,
+            color: p.color,
+            alpha: p.alpha,
+        };
+        let (u_dir, v_dir) = drop_direction(self.wind);
         for (_, p) in self.particles.iter() {
             if self.snow_mode {
-                if p.shape_10.is_some_and(|s| (0..=7).contains(&s)) && in_range(p.x, p.y) {
-                    return Err(WeatherError::Unspecified {
-                        what: "the snow line table 0x006D6E78 (§11.7 r3)",
-                    });
+                let s = p.shape_10;
+                if (0..=7).contains(&s) && in_range(p.x, p.y) {
+                    for t in [SNOW_LINES[s as usize], SNOW_LINES[s as usize + 1]] {
+                        out.draws
+                            .push(line(p.x + t[0], p.y + t[1], p.x + t[2], p.y + t[3], p));
+                    }
                 }
             } else if p.landed {
                 if in_range(p.x, p.y) {
-                    out.draws.push(SkyDraw::Line {
-                        x0: p.x,
-                        y0: p.y,
-                        x1: p.x,
-                        y1: p.y,
-                        color: p.color,
-                        alpha: p.alpha,
-                    });
+                    out.draws.push(line(p.x, p.y, p.x, p.y, p));
                 }
             } else {
-                return Err(WeatherError::Open {
-                    question: 3,
-                    what: "falling drop vector (§11.7 r3)",
-                });
+                let len = f64::from(p.shape_10);
+                let mut u = (u_dir * len) as i32;
+                let mut v = (v_dir * len) as i32;
+                let rest = p.ground_y - p.y;
+                if v > rest {
+                    if v == 0 {
+                        return Err(WeatherError::DropDivideByZero { x: p.x, y: p.y });
+                    }
+                    u = rest.wrapping_mul(u) / v;
+                    v = rest;
+                }
+                let (x1, y1) = (p.x + u, p.y + v);
+                if in_range(p.x, p.y) || in_range(x1, y1) {
+                    out.draws.push(line(p.x, p.y, x1, y1, p));
+                }
             }
         }
         Ok(out)
     }
+}
+
+/// The falling-drop direction of wind `w` (§11.7 r3, `0x0040B330` /
+/// `0x0040B350`): (`Wt[(w + 128) & 511]`, `Wt[w & 511]`) of the sine table
+/// (`lighting.md` §10 r1), widened exactly.
+fn drop_direction(w: i32) -> (f64, f64) {
+    let t = sine_table();
+    (
+        f64::from(t[((w + 128) & 511) as usize]),
+        f64::from(t[(w & 511) as usize]),
+    )
+}
+
+/// `0x00472FB0` (§11.4 r5, no draws): the snow particle's color and alpha
+/// for size `s`, day period `p` and video mode.
+fn snow_color(
+    colors: &ColorTables,
+    s: i32,
+    p: u8,
+    video_mode: u32,
+) -> Result<(u8, u8), WeatherError> {
+    let alpha = *SNOW_ALPHA
+        .get(usize::from(p))
+        .ok_or(WeatherError::Fatal(0x356))?;
+    let i = (12 * s / 8) as usize;
+    let color = if matches!(video_mode, 1..=3 | 6) {
+        match p {
+            0 => colors.snow[i],
+            2 => colors.snow[i / 4],
+            _ => colors.snow[i / 2],
+        }
+    } else {
+        colors.snow_alt[i]
+    };
+    Ok((color, alpha))
 }
 
 /// The spawn offset of `0x00472DA0` / `0x00472EC0`: `a` := `roll_range(0,

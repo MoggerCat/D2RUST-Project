@@ -31,18 +31,18 @@
 |   2. Game unit hash lists | 100–138 |
 |   3. Unit placement and removal (list bookkeeping) | 139–150 |
 |   4. Act room lists (active rooms) | 151–161 |
-|   5. Room unit lists | 162–179 |
-|   6. Room update queues | 180–199 |
-|   7. Client list | 200–208 |
-|   8. Unit timer lists | 209–216 |
-|   9. Adjacent-room arrays (dependency) | 217–225 |
-|   10. Iteration and modification | 226–242 |
-| Constants & data dependencies | 243–253 |
-| Randomness | 254–260 |
-| Edge cases & original bugs | 261–271 |
-| Test vectors | 272–305 |
-| Provenance | 306–323 |
-| Open questions | 324–337 |
+|   5. Room unit lists | 162–217 |
+|   6. Room update queues | 218–237 |
+|   7. Client list | 238–246 |
+|   8. Unit timer lists | 247–254 |
+|   9. Adjacent-room arrays (dependency) | 255–263 |
+|   10. Iteration and modification | 264–280 |
+| Constants & data dependencies | 281–291 |
+| Randomness | 292–298 |
+| Edge cases & original bugs | 299–309 |
+| Test vectors | 310–343 |
+| Provenance | 344–361 |
+| Open questions | 362–380 |
 <!-- /index -->
 
 ## Summary
@@ -176,6 +176,44 @@ table `0x006E10E0`:
    re-sorts a room list: the sort by Y (`0x0064C0C0`) is called only from
    `0x00619EA0`, whose only caller is client code (`0x004DDA32`, draw
    order).
+6. **Client room lists.** The client's units live in the same lists of
+   its own active rooms (client DRLG, `client/model.md` §12 rule 1),
+   through the same insert (`0x0064C350`, prepend, rule 2) and remove
+   (`0x0064C370`, rule 3); the client has no other link from a unit to
+   a room. Client call sites (1.14d):
+
+   | When | Insert / remove |
+   |---|---|
+   | player, monster, missile creation with a room: dynamic path set-up `0x00649D00` (from `0x00460BF0`, `0x004AE8D0` at `0x004AEA63`, `0x004CD0A0`) | insert into the creation room (`0x00649EA4`), only when the room is not none |
+   | object creation `0x004BC720` | insert (`0x004BC7D4`) |
+   | tile creation (type 5 in `0x00465FD0`) | insert (`0x00466152`) |
+   | item mode set `0x004C1910` to mode 3 (ground) or 5 (dropping) | unit leaves its room first (`0x0064C450`), then insert (`0x004C19B4`, `0x004C197C`); other modes only leave |
+   | movement and placement of a dynamic-path unit (0x15 teleport, path steps, `sim/pathing.md` §9.6 rules 8–9) | room recache `0x0064FAD0`: remove from the old room, insert into the new one when it is not none (rule 4) |
+   | unit free `0x00465870` (`client/model.md` §2 rule 5) | remove, while the client act exists: per-kind frees `0x00460D50`, `0x004AED30`, `0x004BCA50`, `0x004CD170`; items `0x004C1A70` only when the unit is in the room's list (`0x0064C260`); tiles at `0x00465968` |
+   | client room free `0x0061A840` (`drlg/rooms.md` §8.2 rule 4) | each unit leaves the room (`0x0064C450`) |
+
+   A unit created at (0, 0) has no room and is in no list. 0x59 / 0xAC /
+   0x51 create in the room of their point (`client/model.md` §2 rule 7),
+   so a new unit is at the head of its room's list.
+7. **Y sort** (`0x0064C0C0`, through `0x00619EA0(room)`, which then
+   returns the head): in place, ascending by the unit's y
+   (`0x006206B0`: static path +0x08 for types 2, 4, 5, else the dynamic
+   path y, `client/model.md` §6 rule 6), signed compare; repeated
+   adjacent-swap passes swapping only when the earlier unit's y is
+   strictly greater, until a pass makes no swap. The result equals a
+   **stable** sort by y: units of equal y keep their list order. The
+   draw runs it on each room before walking its units
+   (`render/draw-order.md` §3 rule 4; skipped when "skip units" is set,
+   `0x004DDA27`), so the sorted order persists and later inserts
+   prepend into it.
+8. **Readers.** The only reader of a client room's list head besides
+   rules 2, 3 and the room free is `0x00619EA0` (the head is reached
+   only through `0x00619F60`, whose callers are `0x0064C0C0`,
+   `0x0064C260`, `0x0064C2C0`, `0x0064C370`); so the client's list order
+   is observable only through rule 7, where the pre-sort order decides
+   ties of equal y. d2rs: the bridge keeps per active room an ordered
+   list of `UnitKey`s with rules 2, 3, 6 and 7; units whose position is
+   (0, 0) or whose room is none are not in any list.
 
 ### 6. Room update queues
 
@@ -334,3 +372,8 @@ replay runs on the committed traces `traces/sim/tick/sim-0006`–`0008`
    there (OQ8).
 4. Which systems iterate hash lists rather than rooms (inventory of
    `0x005537D0` / `0x005538D0` callers by system), for the unit specs.
+5. *Answered:* client room unit lists (`impl-client-drlg` §3 Q6): §5
+   rules 6–8 (same list code on the client DRLG's rooms, the client
+   call sites, the draw's stable Y sort). Open inside it: a client
+   recording that dumps one room's list (active room +0x74, unit
+   +0xE8) before and after a drawn frame confirms rule 7's tie order.

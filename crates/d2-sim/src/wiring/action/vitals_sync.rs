@@ -145,5 +145,31 @@ pub fn run<X>(
     Some(r.messages)
 }
 
+/// The join's `0x00548760(P, client, force 1)` (`sim/intents-events.md`
+/// §8.2 rule 3.9, [`sync::join`]) for `client`'s player: 0x95, then the
+/// gold and experience messages against the client's cache. With the
+/// sync off the cache is a scratch one (all zero, the cache's value at
+/// creation, see [`SyncState::caches`]). Empty without a player unit.
+pub fn join_run<X>(
+    sim: &mut ActionSim<X>,
+    game: &Game,
+    client: ClientId,
+    staged: (u16, u16),
+) -> Vec<Vec<u8>> {
+    let Some(unit) = game.lists.client(client).and_then(|e| e.player) else {
+        return Vec::new();
+    };
+    if sim.sys.units.get(unit).map(|r| r.ty) != Some(UnitType::Player) {
+        return Vec::new();
+    }
+    let now = current(sim, game, unit, staged);
+    let mut scratch = SyncCache::default();
+    let cache = match sim.sys.hooks.sync.as_mut() {
+        Some(s) => s.caches.entry(client).or_default(),
+        None => &mut scratch,
+    };
+    sync::join(cache, &now).messages
+}
+
 #[cfg(test)]
 mod tests;

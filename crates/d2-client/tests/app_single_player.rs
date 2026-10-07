@@ -93,6 +93,31 @@ fn live_tables_give_a_waypoint_object() {
         .all(|o| !(o.operatefn == 23 && o.initfn == 17)));
 }
 
+/// The client skill rows (`client/msg-skills.md` Inputs) from the user's
+/// `skills` table: one per row, in row order, with `maxlvl`, `anim`,
+/// `monanim`, `passivestate` read as the typed record has them.
+/// `D2_GAME_DIR=<install> cargo test -p d2-client --test app_single_player -- --ignored client_skill_rows`
+// Covers: specs/client/msg-skills.md §2 r1, §2 r4
+#[test]
+#[ignore = "needs the game files in D2_GAME_DIR"]
+fn client_skill_rows_from_the_install() {
+    let dir = std::env::var("D2_GAME_DIR").expect("D2_GAME_DIR");
+    let archives = d2_formats::mpq::ArchiveSet::open_dir(&dir).unwrap();
+    let rows = single_player::client_skill_rows(&archives).unwrap();
+    let set = d2_data::bin::load(&archives, "eng").unwrap();
+    let skills: Vec<d2_data::tables::Skills> =
+        d2_data::tables::decode_all(set.table("skills").unwrap()).unwrap();
+    assert_eq!(rows.len(), skills.len());
+    for (r, s) in rows.iter().zip(&skills) {
+        assert_eq!(
+            (r.anim, r.monanim, r.passivestate, r.maxlvl),
+            (s.anim, s.monanim, s.passivestate, s.maxlvl)
+        );
+    }
+    let passive = rows.iter().filter(|r| r.passivestate as i16 > 0).count();
+    eprintln!("{} skills rows, {passive} with a passive state", rows.len());
+}
+
 /// The game on the user's files (`GameData::select`): levels generated
 /// through drlg-data's providers and the level-type dispatcher. Act 0
 /// holds the town (level 1, generated at act creation) and Cold Plains,

@@ -3,7 +3,7 @@
 
 use super::draws::{
     self, floor_light_grid, roof_light_grid, tile_origin_sub_tile, unit_light, wall_block_corners,
-    wall_light_words, DrawLightError, LightGrid, PointTable, WallPoints,
+    wall_light_words, DrawLightError, LightGrid, PointTable, WallPass, WallPoints,
 };
 use super::map::{LightCell, LightMap};
 use crate::rules::shading::{floor_block_light, BlockLight};
@@ -96,12 +96,26 @@ fn wall_points_parser_is_strict() {
 
 // Covers: specs/render/lighting.md §11 r2, §edge-cases-original-bugs r7
 #[test]
-fn wall_direction_0_is_pending_not_invented() {
+fn wall_direction_0_reuses_the_pass_words() {
     let m = ramp_map();
     assert_eq!(
         wall_light_words(&m, (100, 100), 0, 0),
         Err(DrawLightError::WallDirection0)
     );
+    // First record of a pass: undefined in the original → fatal.
+    let mut pass = WallPass::default();
+    assert_eq!(
+        pass.words(&m, (100, 100), 0, 0),
+        Err(DrawLightError::WallDirection0)
+    );
+    // After a direction-1 record, direction 0 keeps its words wherever it
+    // is.
+    let first = pass.words(&m, (100, 100), 1, 0).unwrap();
+    assert_eq!(first, wall_light_words(&m, (100, 100), 1, 0).unwrap());
+    assert_eq!(pass.words(&m, (120, 90), 0, 1), Ok(first));
+    let second = pass.words(&m, (120, 90), 2, 0).unwrap();
+    assert_ne!(second, first);
+    assert_eq!(pass.words(&m, (100, 100), 0, 0), Ok(second));
     assert_eq!(
         wall_light_words(&m, (100, 100), 10, 0),
         Err(DrawLightError::WallDirection(10))

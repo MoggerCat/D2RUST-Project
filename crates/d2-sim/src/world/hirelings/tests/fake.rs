@@ -34,10 +34,14 @@ pub struct Fake {
     pub difficulty: u8,
     pub players: Vec<UnitId>,
     pub sent: Vec<(UnitId, Vec<u8>)>,
+    /// §13 rule 4: the stat records queued per unit, in order.
+    pub queued: BTreeMap<UnitId, Vec<(u16, u32)>>,
     pub log: Vec<String>,
     /// `skills` reqlevel per skill id; `skill_count`.
     pub reqlevel: BTreeMap<u32, i16>,
     pub skill_count: u32,
+    /// `skill_pet_max` answer.
+    pub pet_max: Option<i32>,
 }
 
 impl Fake {
@@ -104,6 +108,13 @@ impl HirelingWorld for Fake {
     fn send(&mut self, player: UnitId, bytes: &[u8]) {
         self.sent.push((player, bytes.to_vec()));
     }
+    fn skill_pet_max(&self, _player: UnitId, pet_type: u8) -> Option<i32> {
+        assert_eq!(pet_type, 7);
+        self.pet_max
+    }
+    fn queue_stat(&mut self, unit: UnitId, stat: u16, value: u32) {
+        self.queued.entry(unit).or_default().push((stat, value));
+    }
     fn guid(&self, unit: UnitId) -> u32 {
         self.units.get(&unit).map_or(u32::MAX, |u| u.guid)
     }
@@ -111,6 +122,12 @@ impl HirelingWorld for Fake {
         self.units
             .iter()
             .find(|(_, u)| u.ty == 1 && u.guid == guid)
+            .map(|(k, _)| *k)
+    }
+    fn player_by_guid(&self, guid: u32) -> Option<UnitId> {
+        self.units
+            .iter()
+            .find(|(_, u)| u.ty == 0 && u.guid == guid)
             .map(|(k, _)| *k)
     }
     fn unit_type(&self, unit: UnitId) -> u8 {
@@ -258,6 +275,7 @@ pub fn act1_ice_rows() -> Vec<HirelingRow> {
 pub fn tables(rows: Vec<HirelingRow>) -> HirelingTables {
     HirelingTables {
         rows: HirelingRows::new(rows),
+        exp_ratios: Default::default(),
         max_level: 99,
         pet_flags: HirelingTables::WARP,
         pet_basemax: 1,

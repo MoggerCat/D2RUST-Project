@@ -398,12 +398,6 @@ fn server_setter() {
         e.set_from_server(&t, 3, -5, 0, 0, 1),
         Err(EnvError::NegativeTicks(-5))
     );
-    let before = e;
-    assert_eq!(
-        e.set_from_server(&t, 5, 0, 1, 0, 1),
-        Err(EnvError::EclipsePending)
-    );
-    assert_eq!(e, before);
 
     e.set_from_server(&t, 3, SPEED * 360 + 1, 0, 0, 1).unwrap();
     assert_eq!((e.index, e.kind, e.ticks, e.intensity), (3, 1, 0, 128));
@@ -414,6 +408,27 @@ fn server_setter() {
     assert_eq!((e.r, e.g, e.b), (255, 255, 255), "no color step");
     e.set_from_server(&t, 2, 90 * SPEED, 0, 0, 120).unwrap();
     assert_eq!((e.intensity, e.r, e.g, e.b), (200, 245, 240, 255));
+}
+
+// Covers: specs/render/lighting.md §9.2 r2
+#[test]
+fn server_setter_eclipse_resets_the_period() {
+    // The spec vector: index 5, ticks 0, eclipse 1, previous flag 0, act 2
+    // (`A` = 1, `L` = 40).
+    let t = tables();
+    let mut e = Environment::new(&t, 0);
+    e.set_from_server(&t, 2, 0, 0, 1, 40).unwrap();
+    assert_eq!(e.intensity, 128, "θ = 0 without the flag");
+    e.set_from_server(&t, 5, 0, 1, 1, 40).unwrap();
+    assert!(e.eclipse);
+    // Period reset: eclipse entry 5 → type 2, ticks 240 × speed, the
+    // received ticks discarded.
+    assert_eq!((e.index, e.kind, e.ticks), (5, 2, 240 * SPEED));
+    assert_eq!(240 * SPEED, 30_720);
+    // First intensity with the previous flag (θ = 0: 128), then with the
+    // eclipse: 128 − 8.
+    assert_eq!(e.intensity, 120);
+    assert_eq!((e.r, e.g, e.b), (0, 30, 243), "eclipse entry 5");
 }
 
 // Covers: specs/render/lighting.md §9.2 r3

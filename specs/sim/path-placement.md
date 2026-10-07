@@ -41,15 +41,15 @@
 |   8. Coarse free-box search (`0x0064E840`) | 478–510 |
 |   9. Floor drop placement (`0x00555DA0`) | 511–533 |
 |   10. Placing a unit at a point (`0x00554EA0`) | 534–583 |
-|   11. Level spawn point (`0x0061B060`) and game entry | 584–625 |
-|   12. Warp tiles and warp arrival | 626–686 |
-|   13. Where a joining character stands at tick 0 | 687–731 |
-| Constants & data dependencies | 732–750 |
-| Randomness | 751–760 |
-| Edge cases & original bugs | 761–796 |
-| Test vectors | 797–834 |
-| Provenance | 835–869 |
-| Open questions | 870–944 |
+|   11. Level spawn point (`0x0061B060`) and game entry | 584–631 |
+|   12. Warp tiles and warp arrival | 632–692 |
+|   13. Where a joining character stands at tick 0 | 693–737 |
+| Constants & data dependencies | 738–756 |
+| Randomness | 757–766 |
+| Edge cases & original bugs | 767–802 |
+| Test vectors | 803–840 |
+| Provenance | 841–875 |
+| Open questions | 876–957 |
 <!-- /index -->
 
 ## Summary
@@ -607,21 +607,27 @@ there.
 Game entry (`0x005394A0`, player not yet placed): spawn point as above
 with size = the unit's size (`0x00620510`, 2 for a player) and tile
 index 0; no spawn room → fatal assert; S→C 0x07 for the spawn room;
-`0x00554850(flag 0)` puts the player in the world (§2.5; the
-room-changed flag is set); S→C 0x15 (`0x0053BC10`: type, GUID, x, y,
-flag 1) at once. Level warp `0x0053AEC0` (same act) passes the unit's
+the client's room switch to the spawn room (`0x005381F0` →
+`0x00537B50`, `sim/intents-events.md` §7.8: S→C 0x07 and the add
+messages for every room of the spawn room's adjacency array, the spawn
+room included; client +0x1B4 := the spawn room); `0x00554850(flag 0)`
+puts the player in the world (§2.5; the room-changed flag is set);
+client +0x3D4 bit 0 cleared; S→C 0x15 (`0x0053BC10`: type, GUID, x, y,
+flag 1); S→C 0x7E (`0x0053DB70`, `sim/intents-events.md` edge case
+10); then followers (§13 rule 4). All of it runs in the join's message
+handling, before the next tick (`sim/intents-events.md` §8.2). Level warp `0x0053AEC0` (same act) passes the unit's
 size too; no spawn room → nothing (the player stays); else it places
 with `0x00554EA0(exact 0, alt 0)`, so the free search runs twice (the
 second finds the same point).
 
 Recipients: every message of §10–§12 goes to the moving player's own
-client. The other 0x07 seen at game entry come from the first
-per-client update's room switch (`sim/tick.md` §6 rule 5, `0x00537B50`):
-for each room of the new room's adjacency array that was not in the old
-one's (all of them at game entry) `0x0053A8E0` sends 0x07 for the room,
-adds the client to the room, and sends the add messages (`0x00571F90`)
-of every unit in it but the player (R2: one 0x07 from this section,
-nine from the switch).
+client. The other 0x07 seen at game entry come from the room switch
+that game entry itself runs (above; owner `sim/intents-events.md`
+§7.8), before the 0x15, not from a per-client update: R2 is 0x07
+(game entry), nine 0x07 (the switch, the spawn room's own again at
+position 6), then 0x15, 0x7E, all in the C→S 0x6B drain of frame 1.
+Later switches (walking, warps) run from the per-client update
+(`sim/tick.md` §6 rule 5).
 
 ### 12. Warp tiles and warp arrival
 
@@ -829,7 +835,7 @@ start level u16 @6, game +0x80 u32 @8): R1 `03 00 1fe86826 0100 …` =
 | Id | Recording | Event | Expected |
 |---|---|---|---|
 | R1 | `20261006-015956-packets.jsonl` frame 1 | game entry §11, S→C 0x15 | `15 00 01000000 ff12 1516 01`: player GUID 1 at (4863, 5653), Rogue Encampment |
-| R2 | `20261006-022633-packets.jsonl` frame 1 | same | `15 00 01000000 4112 c411 01`: (4673, 4548); preceded by ten 0x07 for the spawn room and its neighbours |
+| R2 | `20261006-022633-packets.jsonl` frame 1 | same | `15 00 01000000 4112 c411 01`: (4673, 4548); preceded by ten 0x07 (the spawn room from §11, then the nine rooms of its adjacency array from the room switch, the spawn room again 6th) and followed by `7e …` (§11) |
 | R3 | `20261006-022633-packets.jsonl` frames 132–133 | waypoint travel (`world/waypoints.md` §7) through §11 and §10 | 0x07 `07 d003 e003 03` (tile 976, 992, level 3), 0x0D at (4896, 4996), next tick 0x15 at (4893, 4993) flag 1 |
 
 ## Provenance
@@ -941,3 +947,10 @@ Answered handoff questions (`docs/HANDOFF.md` §7):
   dropper's room). DF2: `items/treasure.md` §7 step 4 (the allocation
   adds the dropped item to the world, path and footprint included).
   DF3: no spec question (provider-off wiring).
+- `docs/handoff/impl-server-join.md` §3 Q1 (0x15 against the switch's
+  0x07s): *Answered* in §11 — game entry runs the room switch itself
+  (`0x005381F0` at `0x00539577`), so the order is 0x07, 0x07 × array,
+  0x15, 0x7E, all before the first tick (code; R2 seq 144–155). The
+  per-client update finds client +0x1B4 already equal to the player's
+  room and switches nothing. Q2 (the spawn room's 0x07 twice):
+  *Answered*, yes (`sim/intents-events.md` §7.8 rule 5).

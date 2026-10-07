@@ -318,9 +318,13 @@ fn session_rows_go_to_the_session_code() {
 fn out_of_scope_rows() {
     // Multiplayer and Battle.net / realm C→S ids.
     assert_eq!(client_ids(Scope::Out), [0x5D, 0x5E, 0x66, 0x68, 0x6D]);
-    let mut out = vec![
-        0x75, 0x77, 0x78, 0x79, 0x7F, 0x8B, 0x8C, 0x8D, 0x8F, 0x90, 0xAE,
-    ];
+    // S→C 0x77 is a `sim` row (rule 4): its builder `0x0053CAB0` is
+    // `d2_sim::world::cube::trade_action`, sent by the cube paths
+    // (`world/cube.md` §1; `handlers::items` tests V24 and the open-cube
+    // pair).
+    assert_eq!(SERVER_MESSAGES[0x77].produced_by, ProducedBy::Sim);
+    assert_eq!(d2_sim::world::cube::trade_action(0x0C), [0x77, 0x0C]);
+    let mut out = vec![0x75, 0x78, 0x79, 0x7F, 0x8B, 0x8C, 0x8D, 0x8F, 0x90, 0xAE];
     // 0xAF..=0xB4 except 0xB1, whose size entry is 0: a `none` row
     // (rule 5), never receivable.
     out.extend([0xAF, 0xB0, 0xB2, 0xB3, 0xB4]);

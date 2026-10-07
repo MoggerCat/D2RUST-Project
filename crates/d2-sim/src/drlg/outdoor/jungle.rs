@@ -285,9 +285,13 @@ impl JungleGrid {
     }
 }
 
-/// Code → lvlprest id (§2.7, `0x00678670`). A chained lookup whose row
-/// is not 1..14 (a preset id from an earlier lookup, edge case 1, or 0)
-/// gives a value that is not a lvlprest id: fatal 0x78C (OQ 2).
+/// Code → lvlprest id (§2.7, `0x00678670`). A chained lookup indexes T
+/// with the previous result (edge case 1); rows outside 1..14 follow
+/// §2.7 "Lookups outside rows 1..14": row 0 reads 0 (fatal 0x78C at the
+/// end), rows 545..572 read 0 in slots 0 and 2 and a non-id value V in
+/// slots 1 and 3, which 1.14d stores and later crashes on (§3), and a
+/// lookup in row V reads outside the module. Both of those are
+/// [`OutdoorError::Crash`] here (no original error id).
 pub fn code_to_id(d: i32) -> Result<u32, OutdoorError> {
     if d == 0 {
         return Ok(0);
@@ -307,13 +311,16 @@ pub fn code_to_id(d: i32) -> Result<u32, OutdoorError> {
     let mut r = l as u32;
     for (slot, bit) in [0x10, 0x20, 0x40, 0x80].into_iter().enumerate() {
         if d & bit != 0 {
-            // TODO(spec edge case 1, OQ 2): rows outside 1..14 read memory
-            // past T (0 for slots 0 and 2, ~1.07e9 for 1 and 3; row 0 slot 3
-            // is S[16], not given); every such value is fatal 0x78C here.
-            let Some(row) = (1..=14).contains(&r).then(|| EXIT_IDS[r as usize - 1]) else {
-                return Err(OutdoorError::Fatal(fatal::EXIT_ID));
+            r = match r {
+                1..=14 => EXIT_IDS[r as usize - 1][slot],
+                // `0x006F13F0`..`0x006F13FC` (S[13..16]): all 0.
+                0 => 0,
+                545..=572 if slot % 2 == 0 => 0,
+                545..=572 => return Err(OutdoorError::Crash(CRASH_EXIT_ID)),
+                // TODO(spec §2.7): row 15 (L = 15 with an attach bit) is
+                // not in the table of reads outside rows 1..14.
+                _ => return Err(OutdoorError::Fatal(fatal::EXIT_ID)),
             };
-            r = row[slot];
         }
     }
     if r == 0 {
@@ -321,6 +328,11 @@ pub fn code_to_id(d: i32) -> Result<u32, OutdoorError> {
     }
     Ok(r)
 }
+
+/// The [`OutdoorError::Crash`] text of a block id from row 545..572,
+/// slot 1 or 3 of T (§2.7).
+pub const CRASH_EXIT_ID: &str =
+    "jungle block id V(r) from a T row past 14 (1.14d stores it and crashes in the stamp, outdoor-act3-act5.md §2.7)";
 
 /// The jungle placer's result: records in placement order and the level
 /// order of §2.8 step 2 (indices into the records, level 76 first).
@@ -543,12 +555,13 @@ pub fn river_and_attach(
             .flat_map(|row| (bx..bx + sxb).map(move |col| (col, row)))
             .filter(|&(col, row)| g.c_at(col, row) == 2)
             .nth(i);
-        // TODO(spec §2.4 step 4): fewer than i + 1 marks (n counts a mark a
-        // later step overwrote) is not described; nothing is dropped.
+        // §2.4 step 4 (`0x00677F8B`–`0x00677FB1`): n decrements only on
+        // a hit; a miss draws again. n always equals the C = 2 count, so
+        // a miss is not reached with 1.14d rules.
         if let Some((col, row)) = hit {
             g.set_c(col, row, 0);
+            n -= 1;
         }
-        n -= 1;
     }
 }
 

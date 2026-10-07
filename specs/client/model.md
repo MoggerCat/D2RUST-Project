@@ -36,18 +36,18 @@
 |   6. Position check (`0x004804E0`) | 270–309 |
 |   7. Session messages | 310–346 |
 |   8. Mode requests | 347–397 |
-|   9. Room-in-sight messages | 398–418 |
-|   10. Bit reader | 419–433 |
-|   11. Current act and level (join and later) | 434–475 |
-|   12. Client DRLG and the room of a point | 476–517 |
-|   13. Visibility predicate (`0x004DBF20`) | 518–545 |
-|   14. Pet list and the hireling GUID | 546–572 |
-| Constants & data dependencies | 573–585 |
-| Randomness | 586–597 |
-| Edge cases & original bugs | 598–606 |
-| Test vectors | 607–646 |
-| Provenance | 647–685 |
-| Open questions | 686–724 |
+|   9. Room-in-sight messages | 398–432 |
+|   10. Bit reader | 433–447 |
+|   11. Current act and level (join and later) | 448–493 |
+|   12. Client DRLG and the room of a point | 494–535 |
+|   13. Visibility predicate (`0x004DBF20`) | 536–563 |
+|   14. Pet list and the hireling GUID | 564–590 |
+| Constants & data dependencies | 591–603 |
+| Randomness | 604–615 |
+| Edge cases & original bugs | 616–624 |
+| Test vectors | 625–664 |
+| Provenance | 665–706 |
+| Open questions | 707–757 |
 <!-- /index -->
 
 ## Summary
@@ -415,6 +415,20 @@ position check of the local player.
 4. d2rs: the client DRLG is not in the model yet (open question 5);
    the handlers append `{show, level, x, y}` to `rooms_in_sight` in
    order, which is the input the map-tile feed (RW2) needs.
+5. **A point in no room of the level** (answers open question 11):
+   the level is got-or-allocated (and generated if it has no rooms,
+   `drlg/levels.md` §4 rule 2, §8 rule 1; a level that is still roomless
+   after generation is fatal assert 0x2FE in `0x00642630`); the room
+   lookup then returns none. **0x07**: `0x0061B640` has no null test
+   and reads the count (+0x0E) of the null room at `0x0061B672`, an
+   access violation that ends the 1.14d process (not an assert, no
+   message). **0x08**: `0x0061B690` tests the room (`0x0061B6C4`) and
+   does nothing. d2rs: 0x07 → handler error (the message is refused
+   and recorded, `client/bridge.md` §2.4, as for the fatal asserts of
+   §12 rule 3), after the rule 4 record; 0x08 → no effect beyond the
+   rule 4 record. A 1.14d server sends 0x07 / 0x08 only for its own
+   rooms (room origins, rule 3), so neither case arises from original
+   input when the client DRLG matches the server's.
 
 ### 10. Bit reader
 
@@ -462,10 +476,14 @@ player is in", the input of `render/composition.md` §3 step 2
    room, §7 rule 5). The level is the room's level id (`0x0061A1B0`:
    active room +0x10 → DRLG room → level, `0x0066BAB0`), read each frame
    by `0x0044C990` (`render/composition.md` §3 step 2); no room → no
-   level (BlankScreen treated as 0, nothing cleared).
+   level (BlankScreen treated as 0, nothing cleared). The full server
+   order (the "…" between 0x0B and 0x03, 0x53 after 0x03, the 0x7E after
+   0x15, and the units before 0x04) is `sim/intents-events.md` §8.
 4. **Room change** (`0x004654C0`, `msg-units.md` §3 rule 4.4): when the
-   local player moves to a room whose level's Levels `Act` byte differs
-   from the old room's, the act palette switches (`0x004FB480`); the
+   local player moves to a room whose level's Levels `Pal` byte (+0x02;
+   not `Act`, +0x03, which differs for levels 125–127 and 133–136)
+   differs from the old room's, the palette switches to `Pal`
+   (`0x004FB480`, `msg-units.md` §3 rule 4.4); the
    first placement (no old room) does not switch.
 5. d2rs: `ViewFeed` level := the level id of the local player's room
    (§12 rule 2 on the local player's `position`), none while the local
@@ -658,7 +676,10 @@ marked synthetic.
 mode request `0x00480C10` (jump table `0x00480C68`); session
 `0x0045C8B0`, `0x0045C8E0`, `0x0044E100`, `0x0045C910`, `0x00477DA0`,
 `0x0045C9A0`, `0x0045CA30`, `0x0045CA60`; rooms `0x0045CAB0`,
-`0x0045CB20`, `0x0061A070`, `0x0061A0C0`, `0x0061B640`, `0x0061B690`.
+`0x0045CB20`, `0x0061A070`, `0x0061A0C0`, `0x0061B640`, `0x0061B690`
+(§9 rule 5: the null read at `0x0061B672`, the null test at
+`0x0061B6C4`, `0x00642C30` → `0x00642630` returning none after its
+level walk, from the disassembly).
 D2MOO's `D2UnitStrc` (1.10f) names the record fields (+0xD8
 `pPacketList`, +0xE4 `pListNext`); every offset used here was read in
 1.14d code. Message bytes and order checked against both recordings
@@ -721,3 +742,15 @@ visibility `0x004DBF20`, `0x0045AFC0`, `0x0045AFD0`, `0x004709A0`,
 10. The pet record fields +0x24… written by 0x81 (§14 rule 3) and who
     reads +0x1C: UI (Phase 6); and a recording with a hireling (0x7A /
     0x81 seen) to confirm §14.
+11. *Answered:* 0x07 / 0x08 at a point in no DRLG room of the level
+    (`impl-client-drlg` §3 Q1): §9 rule 5 (0x07 reads through the null
+    room, an access violation at `0x0061B672`; 0x08 tests it and does
+    nothing).
+12. *Answered:* whether object creation steps the room seed
+    (`impl-client-drlg` §3 Q3): yes, §2 rule 6 stands. 0x51 creates
+    through `0x00466300` → `0x00465FD0` (call at `0x00466332`), which
+    for (x, y) ≠ (0, 0) steps the room's active-room seed (+0x6C/+0x70)
+    and sets the unit seed `init_low(lo')` (`0x0046606A`–`0x00466093`),
+    the same step as `0x00466200` (0x59) and `0x00466360` (0xAC).
+    `client/msg-units.md` Randomness, which named only 0x59 and 0xAC,
+    is corrected.

@@ -1440,7 +1440,7 @@ pub fn apply<W: CombatWorld>(
 }
 
 /// Frees the attacker's combat records for this defender (`0x0057C9F0`).
-fn free_records<W: CombatWorld>(w: &mut W, a: W::Unit, d: W::Unit) {
+pub fn free_records<W: CombatWorld>(w: &mut W, a: W::Unit, d: W::Unit) {
     let (ia, id) = (w.ident(a), w.ident(d));
     w.combat_list(a)
         .retain(|e| !(e.attacker == ia && e.defender == id));

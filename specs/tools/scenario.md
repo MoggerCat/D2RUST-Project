@@ -14,7 +14,7 @@
   records); `sim/intents-events.md` §1 (loop order), §6 (exact-match
   comparison); `sim/client-messages.tsv` (typed messages);
   `sim/rng.md` §5.3 (game seed); `world/waypoints.md` §5 (waypoint
-  objects); `tools/scenario-masks.tsv` (§6).
+  objects); `specs/tools/scenario-masks.tsv` (§6).
 
 <!-- index -->
 | Section | Lines |
@@ -321,7 +321,7 @@ so in its trace header's `gaps` (FORMAT.md) instead of approximating.
 
 ### 6. Masks
 
-1. `tools/scenario-masks.tsv` lists the S→C bytes the original does not
+1. `specs/tools/scenario-masks.tsv` lists the S→C bytes the original does not
    write or fills from the clock: `id`, `offset`, `length` (`*` = to the
    end of the message), `source` (the spec that states it). Masks apply
    to `s2c` records of that id on both sides; the message length is

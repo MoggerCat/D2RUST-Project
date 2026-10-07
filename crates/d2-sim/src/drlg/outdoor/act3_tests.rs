@@ -331,6 +331,24 @@ fn jungle_stamping_without_ids_is_fatal_after_the_roll() {
     assert_eq!(e.seed(), s);
 }
 
+// Covers: specs/drlg/outdoor-act3-act5.md §3 text
+#[test]
+fn jungle_stamping_rejects_a_short_id_array() {
+    // §3: creation and build read the same leveldefs 76 row, so the
+    // array always holds SXb·SYb = 12 ids; a shorter one is an error,
+    // reported after the step-1 roll and before any stamp.
+    let mut e = stamp_env(77, &[0; 11], 0);
+    let s0 = e.seed();
+    assert_eq!(
+        e.gen().jungle_stamping(),
+        Err(OutdoorError::JungleIdsShort(11, 12))
+    );
+    let mut s = s0;
+    s.roll(2);
+    assert_eq!(e.seed(), s);
+    assert!(stamps(&e).is_empty());
+}
+
 // Covers: specs/drlg/outdoor-act3-act5.md §3 r3
 #[test]
 fn jungle_stamping_fourth_clearing_is_fatal() {
@@ -393,9 +411,13 @@ fn code_to_id_table() {
     // A T entry 0: fatal 0x78C.
     assert_eq!(code_to_id(0x11), Err(OutdoorError::Fatal(0x78C)));
     // Edge case 1: the second bit indexes T with 548 (D2MOO: T[2][2] =
-    // 549); not an id, fatal 0x78C.
+    // 549). §2.7 "Lookups outside rows 1..14": rows 545..572 read 0 in
+    // slots 0 and 2 (fatal 0x78C), a non-id V in slots 1 and 3 (1.14d
+    // stores it and crashes in §3); row 0 reads 0 in every slot.
     assert_eq!(code_to_id(0x52), Err(OutdoorError::Fatal(0x78C)));
-    assert_eq!(code_to_id(0x32), Err(OutdoorError::Fatal(0x78C)));
+    assert_eq!(code_to_id(0x32), Err(OutdoorError::Crash(CRASH_EXIT_ID)));
+    assert_eq!(code_to_id(0x92), Err(OutdoorError::Crash(CRASH_EXIT_ID)));
+    assert_eq!(code_to_id(0xF1), Err(OutdoorError::Fatal(0x78C)));
     // Edge case 2: S[0] = 256 is never produced.
     for d in 1..256 {
         assert_ne!(code_to_id(d), Ok(256));

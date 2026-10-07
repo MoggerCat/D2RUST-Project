@@ -531,7 +531,7 @@ fn marker_init_registers_and_spawns() {
     // No town Cain due: the marker is registered only.
     let (mut ctl, _) = control();
     let mut f = marker_fake();
-    act1::q4::marker_init(&mut ctl, &mut f, MARKER, RoomIdT(1), 7, 8);
+    act1::q4::marker_init(&mut ctl, &mut f, MARKER, Some(RoomIdT(1)), 7, 8);
     assert!(f.log.is_empty());
     let x = q4(&ctl);
     assert!(x.marker_known && x.marker_guid == 0x30 && x.marker_pos == (7, 8));
@@ -542,7 +542,7 @@ fn marker_init_registers_and_spawns() {
     let mut f = marker_fake();
     f.spawns = vec![Some(CAIN5_U)];
     q4_mut(&mut ctl).town_cain_due = true;
-    act1::q4::marker_init(&mut ctl, &mut f, MARKER, RoomIdT(1), 10, 10);
+    act1::q4::marker_init(&mut ctl, &mut f, MARKER, Some(RoomIdT(1)), 10, 10);
     assert_eq!(
         f.log,
         [
@@ -562,13 +562,13 @@ fn marker_init_registers_and_spawns() {
         let x = q4_mut(&mut ctl);
         (x.town_cain_due, x.town_cain) = (true, true);
     }
-    act1::q4::marker_init(&mut ctl, &mut f, MARKER, RoomIdT(1), 10, 10);
+    act1::q4::marker_init(&mut ctl, &mut f, MARKER, Some(RoomIdT(1)), 10, 10);
     assert!(f.log.is_empty());
     // No chain 4 record: nothing.
     let (mut ctl, _) = control();
     drop_chain4(&mut ctl);
     let mut f = marker_fake();
-    act1::q4::marker_init(&mut ctl, &mut f, MARKER, RoomIdT(1), 10, 10);
+    act1::q4::marker_init(&mut ctl, &mut f, MARKER, Some(RoomIdT(1)), 10, 10);
     assert!(f.log.is_empty() && ctl.faults.is_empty());
 }
 

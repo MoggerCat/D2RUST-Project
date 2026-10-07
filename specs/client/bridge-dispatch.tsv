@@ -32,9 +32,9 @@ id	name	owner
 0x1E	SetStatWord	specs/client/msg-stats-items.md
 0x1F	SetStatDword	specs/client/msg-stats-items.md
 0x20	StatUpdate	specs/client/msg-stats-items.md
-0x21	UpdateItemOSkill	TBD
-0x22	UpdateItemSkill	TBD
-0x23	SetSkill	TBD
+0x21	UpdateItemOSkill	specs/client/msg-skills.md
+0x22	UpdateItemSkill	specs/client/msg-skills.md
+0x23	SetSkill	specs/client/msg-skills.md
 0x24	Unknown24	TBD
 0x25	Unknown25	TBD
 0x26	Chat	TBD
@@ -43,7 +43,7 @@ id	name	owner
 0x29	GameQuestInfo	TBD
 0x2A	NpcTransaction	TBD
 0x2B	-	TBD
-0x2C	PlaySound	TBD
+0x2C	PlaySound	specs/audio/triggers.md
 0x2D	-	TBD
 0x2E	-	TBD
 0x2F	-	TBD
@@ -82,7 +82,7 @@ id	name	owner
 0x50	QuestSpecial	TBD
 0x51	AssignObject	specs/client/msg-units.md
 0x52	QuestLogInfo	TBD
-0x53	Darkness	TBD
+0x53	Darkness	specs/render/lighting.md
 0x54	Unknown54	TBD
 0x55	-	TBD
 0x56	-	TBD
@@ -92,13 +92,13 @@ id	name	owner
 0x5A	EventMessage	TBD
 0x5B	PlayerJoined	TBD
 0x5C	PlayerLeft	TBD
-0x5D	QuestItemState	TBD
+0x5D	QuestItemState	specs/client/msg-ui.md
 0x5E	GameQuestAvailability	TBD
 0x5F	PortalFlags	TBD
 0x60	TownPortalState	TBD
 0x61	CanGoToAct	TBD
 0x62	MakeUnitTargetable	TBD
-0x63	WaypointMenu	TBD
+0x63	WaypointMenu	specs/client/msg-ui.md
 0x64	-	TBD
 0x65	PlayerKillCount	TBD
 0x66	Unknown66	TBD
@@ -118,7 +118,7 @@ id	name	owner
 0x74	PlayerCorpseAssign	TBD
 0x75	PlayerPartyInfo	TBD
 0x76	PlayerInProximity	TBD
-0x77	TradeAction	TBD
+0x77	TradeAction	specs/client/msg-ui.md
 0x78	TradeAccepted	TBD
 0x79	GoldInTrade	TBD
 0x7A	PetAction	specs/client/model.md
@@ -147,7 +147,7 @@ id	name	owner
 0x91	NpcGossipAct	TBD
 0x92	RemoveItemsDisplay	TBD
 0x93	Unknown93	TBD
-0x94	BaseSkillLevels	TBD
+0x94	BaseSkillLevels	specs/client/msg-skills.md
 0x95	LifeManaUpdate2	specs/client/msg-units.md
 0x96	WalkVerify	specs/client/msg-units.md
 0x97	WeaponSwitch	TBD

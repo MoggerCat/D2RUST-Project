@@ -187,6 +187,8 @@ pub fn tile_info(t: &Dt1Tile) -> TileInfo {
         rarity: t.rarity,
         material: t.material_flags,
         subtile_flags: t.subtile_flags,
+        roof_height: t.roof_height,
+        height: t.height,
     }
 }
 

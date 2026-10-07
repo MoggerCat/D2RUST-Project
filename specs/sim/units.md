@@ -30,14 +30,14 @@
 |   3. Lifecycle | 135–296 |
 |   4. Modes and mode schedules | 297–439 |
 |   5. Event dispatch | 440–454 |
-|   6. Events per kind | 455–535 |
-|   7. Scheduler inventory (`unit-events.tsv`) | 536–557 |
-| Constants & data dependencies | 558–574 |
-| Randomness | 575–582 |
-| Edge cases & original bugs | 583–601 |
-| Test vectors | 602–661 |
-| Provenance | 662–701 |
-| Open questions | 702–731 |
+|   6. Events per kind | 455–543 |
+|   7. Scheduler inventory (`unit-events.tsv`) | 544–565 |
+| Constants & data dependencies | 566–582 |
+| Randomness | 583–590 |
+| Edge cases & original bugs | 591–609 |
+| Test vectors | 610–669 |
+| Provenance | 670–709 |
+| Open questions | 710–739 |
 <!-- /index -->
 
 ## Summary
@@ -489,6 +489,14 @@ event 3 at f + 1, then event 11 at f + 250.
 
 Types 0, 1, 2, 6, 7, 9, 10, 11, 13, 14 are dropped for a frozen monster
 (`tick.md` §5.6).
+
+Type 7 (`0x005A4370`) runs every mode-2 umod callback of the monster,
+whoever scheduled the event; the bodies, the type-7 and type-2 sites of
+the umod callbacks, the think restart `0x00573780` (its two type-2
+sites) and where the umod dispatcher runs inside the monster mode set
+`0x005A7C20` (mode 0 before the start function, never for GH; mode 1
+after the animation prepare, before the cancel of events 0 / 1) are
+owned by `monsters/umod-callbacks.md` (§2, §3.5, §4–§27).
 
 #### 6.3 Missile
 

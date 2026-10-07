@@ -47,7 +47,7 @@ pub static CLIENT_MESSAGES: [ClientMessage; 113] = [
     ClientMessage { id: 0x23, name: "ItemToBelt", transport_size: SizeRule::Fixed(9), handler_size: HandlerSize::Exact(9), layout: &[Field { name: "item", ty: FieldType::U32, offset: Some(1) }, Field { name: "slot", ty: FieldType::U32, offset: Some(5) }], handler: Some(0x0054B3E0), kind: Kind::Handler, gate: Gate::Alive, request: "put the cursor item into the belt", scope: Scope::Sim, confirmed: Confirmed::Yes },
     ClientMessage { id: 0x24, name: "ItemFromBelt", transport_size: SizeRule::Fixed(5), handler_size: HandlerSize::Exact(5), layout: &[Field { name: "item", ty: FieldType::U32, offset: Some(1) }], handler: Some(0x0054B450), kind: Kind::Handler, gate: Gate::Alive, request: "take a belt item to the cursor", scope: Scope::Sim, confirmed: Confirmed::Yes },
     ClientMessage { id: 0x25, name: "SwitchBeltItem", transport_size: SizeRule::Fixed(9), handler_size: HandlerSize::Exact(9), layout: &[Field { name: "cursor", ty: FieldType::U32, offset: Some(1) }, Field { name: "belt", ty: FieldType::U32, offset: Some(5) }], handler: Some(0x0054B4E0), kind: Kind::Handler, gate: Gate::Alive, request: "swap cursor item with a belt item", scope: Scope::Sim, confirmed: Confirmed::Yes },
-    ClientMessage { id: 0x26, name: "UseBeltItem", transport_size: SizeRule::Fixed(13), handler_size: HandlerSize::Exact(13), layout: &[Field { name: "item", ty: FieldType::U32, offset: Some(1) }, Field { name: "on_merc", ty: FieldType::U32, offset: Some(5) }], handler: Some(0x0054B560), kind: Kind::Handler, gate: Gate::Alive, request: "use a belt item", scope: Scope::Sim, confirmed: Confirmed::Partial },
+    ClientMessage { id: 0x26, name: "UseBeltItem", transport_size: SizeRule::Fixed(13), handler_size: HandlerSize::Exact(13), layout: &[Field { name: "item", ty: FieldType::U32, offset: Some(1) }, Field { name: "on_merc", ty: FieldType::U32, offset: Some(5) }], handler: Some(0x0054B560), kind: Kind::Handler, gate: Gate::Alive, request: "use a belt item", scope: Scope::Sim, confirmed: Confirmed::Yes },
     ClientMessage { id: 0x27, name: "UseItemAction", transport_size: SizeRule::Fixed(9), handler_size: HandlerSize::Exact(9), layout: &[Field { name: "target", ty: FieldType::U32, offset: Some(1) }, Field { name: "used", ty: FieldType::U32, offset: Some(5) }], handler: Some(0x0054B280), kind: Kind::Handler, gate: Gate::Alive, request: "use an item on an item (identify, repair kit)", scope: Scope::Sim, confirmed: Confirmed::Yes },
     ClientMessage { id: 0x28, name: "SocketItem", transport_size: SizeRule::Fixed(9), handler_size: HandlerSize::Exact(9), layout: &[Field { name: "socketable", ty: FieldType::U32, offset: Some(1) }, Field { name: "target", ty: FieldType::U32, offset: Some(5) }], handler: Some(0x0054B650), kind: Kind::Handler, gate: Gate::Alive, request: "insert a socketable", scope: Scope::Sim, confirmed: Confirmed::Yes },
     ClientMessage { id: 0x29, name: "ScrollToBook", transport_size: SizeRule::Fixed(9), handler_size: HandlerSize::Exact(9), layout: &[Field { name: "scroll", ty: FieldType::U32, offset: Some(1) }, Field { name: "book", ty: FieldType::U32, offset: Some(5) }], handler: Some(0x0054B710), kind: Kind::Handler, gate: Gate::Alive, request: "put a scroll into a tome", scope: Scope::Sim, confirmed: Confirmed::Yes },
@@ -56,23 +56,23 @@ pub static CLIENT_MESSAGES: [ClientMessage; 113] = [
     ClientMessage { id: 0x2C, name: "Unused2C", transport_size: SizeRule::Fixed(0), handler_size: HandlerSize::None, layout: &[], handler: Some(0x0054B810), kind: Kind::Stub3, gate: Gate::Alive, request: "rejected (handler returns 3); never queued (size table 0)", scope: Scope::None, confirmed: Confirmed::Yes },
     ClientMessage { id: 0x2D, name: "Unused2D", transport_size: SizeRule::Fixed(1), handler_size: HandlerSize::None, layout: &[], handler: Some(0x0054B820), kind: Kind::Stub3, gate: Gate::Alive, request: "rejected (handler returns 3)", scope: Scope::None, confirmed: Confirmed::Yes },
     ClientMessage { id: 0x2E, name: "Unused2E", transport_size: SizeRule::Fixed(3), handler_size: HandlerSize::None, layout: &[], handler: Some(0x0054B920), kind: Kind::Stub0, gate: Gate::Alive, request: "nothing (handler returns 0)", scope: Scope::None, confirmed: Confirmed::Yes },
-    ClientMessage { id: 0x2F, name: "InitEntityChat", transport_size: SizeRule::Fixed(9), handler_size: HandlerSize::Exact(9), layout: &[Field { name: "id", ty: FieldType::U32, offset: Some(5) }], handler: Some(0x0054B930), kind: Kind::Handler, gate: Gate::Alive, request: "start talking to an NPC", scope: Scope::Sim, confirmed: Confirmed::Partial },
-    ClientMessage { id: 0x30, name: "TerminateEntityChat", transport_size: SizeRule::Fixed(9), handler_size: HandlerSize::Exact(9), layout: &[Field { name: "id", ty: FieldType::U32, offset: Some(5) }], handler: Some(0x0054B9F0), kind: Kind::Handler, gate: Gate::Alive, request: "stop talking to an NPC", scope: Scope::Sim, confirmed: Confirmed::Partial },
-    ClientMessage { id: 0x31, name: "QuestMessage", transport_size: SizeRule::Fixed(9), handler_size: HandlerSize::Exact(9), layout: &[Field { name: "npc", ty: FieldType::U32, offset: Some(1) }, Field { name: "msg", ty: FieldType::U16, offset: Some(5) }], handler: Some(0x0054BA90), kind: Kind::Handler, gate: Gate::Alive, request: "quest message shown by an NPC", scope: Scope::Sim, confirmed: Confirmed::Partial },
+    ClientMessage { id: 0x2F, name: "InitEntityChat", transport_size: SizeRule::Fixed(9), handler_size: HandlerSize::Exact(9), layout: &[Field { name: "id", ty: FieldType::U32, offset: Some(5) }], handler: Some(0x0054B930), kind: Kind::Handler, gate: Gate::Alive, request: "start talking to an NPC", scope: Scope::Sim, confirmed: Confirmed::Yes },
+    ClientMessage { id: 0x30, name: "TerminateEntityChat", transport_size: SizeRule::Fixed(9), handler_size: HandlerSize::Exact(9), layout: &[Field { name: "id", ty: FieldType::U32, offset: Some(5) }], handler: Some(0x0054B9F0), kind: Kind::Handler, gate: Gate::Alive, request: "stop talking to an NPC", scope: Scope::Sim, confirmed: Confirmed::Yes },
+    ClientMessage { id: 0x31, name: "QuestMessage", transport_size: SizeRule::Fixed(9), handler_size: HandlerSize::Exact(9), layout: &[Field { name: "npc", ty: FieldType::U32, offset: Some(1) }, Field { name: "msg", ty: FieldType::U16, offset: Some(5) }], handler: Some(0x0054BA90), kind: Kind::Handler, gate: Gate::Alive, request: "quest message shown by an NPC", scope: Scope::Sim, confirmed: Confirmed::Yes },
     ClientMessage { id: 0x32, name: "BuyItem", transport_size: SizeRule::Fixed(17), handler_size: HandlerSize::Exact(17), layout: &[Field { name: "npc", ty: FieldType::U32, offset: Some(1) }, Field { name: "item", ty: FieldType::U32, offset: Some(5) }, Field { name: "mode", ty: FieldType::U32, offset: Some(9) }, Field { name: "cost", ty: FieldType::U32, offset: Some(13) }], handler: Some(0x0054BAC0), kind: Kind::Handler, gate: Gate::Alive, request: "buy from an NPC", scope: Scope::Sim, confirmed: Confirmed::Partial },
     ClientMessage { id: 0x33, name: "SellItem", transport_size: SizeRule::Fixed(17), handler_size: HandlerSize::Exact(17), layout: &[Field { name: "npc", ty: FieldType::U32, offset: Some(1) }, Field { name: "item", ty: FieldType::U32, offset: Some(5) }, Field { name: "tab", ty: FieldType::U16, offset: Some(9) }, Field { name: "cost", ty: FieldType::U32, offset: Some(13) }], handler: Some(0x0054BB20), kind: Kind::Handler, gate: Gate::Alive, request: "sell to an NPC", scope: Scope::Sim, confirmed: Confirmed::Partial },
     ClientMessage { id: 0x34, name: "IdentifyWithNpc", transport_size: SizeRule::Fixed(5), handler_size: HandlerSize::Exact(5), layout: &[Field { name: "npc", ty: FieldType::U32, offset: Some(1) }], handler: Some(0x0054BBA0), kind: Kind::Handler, gate: Gate::Alive, request: "identify all items at an NPC (Cain)", scope: Scope::Sim, confirmed: Confirmed::Yes },
     ClientMessage { id: 0x35, name: "Repair", transport_size: SizeRule::Fixed(17), handler_size: HandlerSize::Exact(17), layout: &[Field { name: "npc", ty: FieldType::U32, offset: Some(1) }, Field { name: "item", ty: FieldType::U32, offset: Some(5) }, Field { name: "tab", ty: FieldType::U16, offset: Some(9) }, Field { name: "cost", ty: FieldType::U32, offset: Some(13) }], handler: Some(0x0054BB60), kind: Kind::Handler, gate: Gate::Alive, request: "repair at an NPC", scope: Scope::Sim, confirmed: Confirmed::Partial },
     ClientMessage { id: 0x36, name: "HireMerc", transport_size: SizeRule::Fixed(9), handler_size: HandlerSize::Exact(9), layout: &[Field { name: "npc", ty: FieldType::U32, offset: Some(1) }, Field { name: "merc", ty: FieldType::U16, offset: Some(5) }], handler: Some(0x0054BBD0), kind: Kind::Handler, gate: Gate::Alive, request: "hire a mercenary", scope: Scope::Sim, confirmed: Confirmed::Yes },
     ClientMessage { id: 0x37, name: "IdentifyGamble", transport_size: SizeRule::Fixed(5), handler_size: HandlerSize::Exact(5), layout: &[Field { name: "item", ty: FieldType::U32, offset: Some(1) }], handler: Some(0x0054BC30), kind: Kind::Handler, gate: Gate::Alive, request: "identify a gambled item", scope: Scope::Sim, confirmed: Confirmed::Yes },
-    ClientMessage { id: 0x38, name: "EntityAction", transport_size: SizeRule::Fixed(13), handler_size: HandlerSize::Exact(13), layout: &[Field { name: "action", ty: FieldType::U32, offset: Some(1) }, Field { name: "npc", ty: FieldType::U32, offset: Some(5) }, Field { name: "item", ty: FieldType::U32, offset: Some(9) }], handler: Some(0x0054BCA0), kind: Kind::Handler, gate: Gate::Alive, request: "NPC menu action (trade, gamble, ...)", scope: Scope::Sim, confirmed: Confirmed::Partial },
+    ClientMessage { id: 0x38, name: "EntityAction", transport_size: SizeRule::Fixed(13), handler_size: HandlerSize::Exact(13), layout: &[Field { name: "action", ty: FieldType::U32, offset: Some(1) }, Field { name: "npc", ty: FieldType::U32, offset: Some(5) }, Field { name: "item", ty: FieldType::U32, offset: Some(9) }], handler: Some(0x0054BCA0), kind: Kind::Handler, gate: Gate::Alive, request: "NPC menu action (trade, gamble, ...)", scope: Scope::Sim, confirmed: Confirmed::Yes },
     ClientMessage { id: 0x39, name: "PurchaseLife", transport_size: SizeRule::Fixed(5), handler_size: HandlerSize::None, layout: &[], handler: Some(0x0054BD00), kind: Kind::Stub3, gate: Gate::Alive, request: "rejected (handler returns 3)", scope: Scope::None, confirmed: Confirmed::Yes },
     ClientMessage { id: 0x3A, name: "AddStatPoint", transport_size: SizeRule::Fixed(3), handler_size: HandlerSize::Exact(3), layout: &[Field { name: "stat", ty: FieldType::U16, offset: Some(1) }], handler: Some(0x0054BD10), kind: Kind::Handler, gate: Gate::Alive, request: "spend a stat point", scope: Scope::Sim, confirmed: Confirmed::Yes },
     ClientMessage { id: 0x3B, name: "AddSkillPoint", transport_size: SizeRule::Fixed(3), handler_size: HandlerSize::Exact(3), layout: &[Field { name: "skill", ty: FieldType::U16, offset: Some(1) }], handler: Some(0x0054BD90), kind: Kind::Handler, gate: Gate::Alive, request: "spend a skill point", scope: Scope::Sim, confirmed: Confirmed::Yes },
     ClientMessage { id: 0x3C, name: "SelectSkill", transport_size: SizeRule::Fixed(9), handler_size: HandlerSize::Exact(9), layout: &[Field { name: "skill", ty: FieldType::Bits(31), offset: Some(1) }, Field { name: "left", ty: FieldType::Bit(31), offset: Some(1) }, Field { name: "item", ty: FieldType::U32, offset: Some(5) }], handler: Some(0x0054BE70), kind: Kind::Handler, gate: Gate::None, request: "choose the left or right skill", scope: Scope::Sim, confirmed: Confirmed::Yes },
-    ClientMessage { id: 0x3D, name: "HighlightDoor", transport_size: SizeRule::Fixed(5), handler_size: HandlerSize::Exact(5), layout: &[Field { name: "id", ty: FieldType::U32, offset: Some(1) }], handler: Some(0x0054BF10), kind: Kind::Handler, gate: Gate::Alive, request: "door highlight hint", scope: Scope::Sim, confirmed: Confirmed::Partial },
+    ClientMessage { id: 0x3D, name: "HighlightDoor", transport_size: SizeRule::Fixed(5), handler_size: HandlerSize::Exact(5), layout: &[Field { name: "id", ty: FieldType::U32, offset: Some(1) }], handler: Some(0x0054BF10), kind: Kind::Handler, gate: Gate::Alive, request: "door highlight hint", scope: Scope::Sim, confirmed: Confirmed::Yes },
     ClientMessage { id: 0x3E, name: "ActivateInifussScroll", transport_size: SizeRule::Fixed(5), handler_size: HandlerSize::Exact(5), layout: &[Field { name: "item", ty: FieldType::U32, offset: Some(1) }], handler: Some(0x0054BF60), kind: Kind::Handler, gate: Gate::Alive, request: "read the Inifuss scroll (quest)", scope: Scope::Sim, confirmed: Confirmed::Yes },
-    ClientMessage { id: 0x3F, name: "PlayAudio", transport_size: SizeRule::Fixed(3), handler_size: HandlerSize::Exact(3), layout: &[Field { name: "sound", ty: FieldType::U16, offset: Some(1) }], handler: Some(0x0054C070), kind: Kind::Handler, gate: Gate::Alive, request: "play a character speech line", scope: Scope::Sim, confirmed: Confirmed::Partial },
+    ClientMessage { id: 0x3F, name: "PlayAudio", transport_size: SizeRule::Fixed(3), handler_size: HandlerSize::Exact(3), layout: &[Field { name: "sound", ty: FieldType::U16, offset: Some(1) }], handler: Some(0x0054C070), kind: Kind::Handler, gate: Gate::Alive, request: "play a character speech line", scope: Scope::Sim, confirmed: Confirmed::Yes },
     ClientMessage { id: 0x40, name: "RequestQuestData", transport_size: SizeRule::Fixed(1), handler_size: HandlerSize::Exact(1), layout: &[], handler: Some(0x0054C0C0), kind: Kind::Handler, gate: Gate::Alive, request: "request quest log data", scope: Scope::Sim, confirmed: Confirmed::Yes },
     ClientMessage { id: 0x41, name: "Resurrect", transport_size: SizeRule::Fixed(1), handler_size: HandlerSize::Exact(1), layout: &[], handler: Some(0x0054C0E0), kind: Kind::Handler, gate: Gate::Dead, request: "respawn after death", scope: Scope::Sim, confirmed: Confirmed::Yes },
     ClientMessage { id: 0x42, name: "Unused42", transport_size: SizeRule::Fixed(1), handler_size: HandlerSize::None, layout: &[], handler: Some(0x0054C360), kind: Kind::Stub0, gate: Gate::Alive, request: "nothing (handler returns 0)", scope: Scope::None, confirmed: Confirmed::Yes },
@@ -85,8 +85,8 @@ pub static CLIENT_MESSAGES: [ClientMessage; 113] = [
     ClientMessage { id: 0x49, name: "TakeOrCloseWp", transport_size: SizeRule::Fixed(9), handler_size: HandlerSize::Exact(9), layout: &[Field { name: "wp", ty: FieldType::U32, offset: Some(1) }, Field { name: "level", ty: FieldType::U16, offset: Some(5) }], handler: Some(0x0054C5D0), kind: Kind::Handler, gate: Gate::Alive, request: "travel by waypoint or close it", scope: Scope::Sim, confirmed: Confirmed::Yes },
     ClientMessage { id: 0x4A, name: "-", transport_size: SizeRule::Fixed(0), handler_size: HandlerSize::None, layout: &[], handler: None, kind: Kind::None, gate: Gate::Unset, request: "no handler; never queued (size table 0)", scope: Scope::None, confirmed: Confirmed::Yes },
     ClientMessage { id: 0x4B, name: "RequestEntityUpdate", transport_size: SizeRule::Fixed(9), handler_size: HandlerSize::Exact(9), layout: &[Field { name: "type", ty: FieldType::U32, offset: Some(1) }, Field { name: "id", ty: FieldType::U32, offset: Some(5) }], handler: Some(0x0054C6D0), kind: Kind::Handler, gate: Gate::Alive, request: "request a unit refresh", scope: Scope::Sim, confirmed: Confirmed::Yes },
-    ClientMessage { id: 0x4C, name: "Transmogrify", transport_size: SizeRule::Fixed(5), handler_size: HandlerSize::Exact(5), layout: &[Field { name: "cube", ty: FieldType::U32, offset: Some(1) }], handler: Some(0x0054C760), kind: Kind::Handler, gate: Gate::Alive, request: "transmute the cube contents", scope: Scope::Sim, confirmed: Confirmed::Yes },
-    ClientMessage { id: 0x4D, name: "PlayNpcMessage", transport_size: SizeRule::Fixed(3), handler_size: HandlerSize::Exact(3), layout: &[Field { name: "msg", ty: FieldType::U16, offset: Some(1) }], handler: Some(0x0054C690), kind: Kind::Handler, gate: Gate::Alive, request: "NPC speech played", scope: Scope::Sim, confirmed: Confirmed::Partial },
+    ClientMessage { id: 0x4C, name: "Transmogrify", transport_size: SizeRule::Fixed(5), handler_size: HandlerSize::Exact(5), layout: &[Field { name: "item", ty: FieldType::U32, offset: Some(1) }], handler: Some(0x0054C760), kind: Kind::Handler, gate: Gate::Alive, request: "use a Transmogrify item (misc.txt); not the cube", scope: Scope::Sim, confirmed: Confirmed::Yes },
+    ClientMessage { id: 0x4D, name: "PlayNpcMessage", transport_size: SizeRule::Fixed(3), handler_size: HandlerSize::Exact(3), layout: &[Field { name: "npc_class", ty: FieldType::U16, offset: Some(1) }], handler: Some(0x0054C690), kind: Kind::Handler, gate: Gate::Alive, request: "clear an NPC's intro bit for the player", scope: Scope::Sim, confirmed: Confirmed::Yes },
     ClientMessage { id: 0x4E, name: "-", transport_size: SizeRule::Fixed(0), handler_size: HandlerSize::None, layout: &[], handler: None, kind: Kind::None, gate: Gate::Unset, request: "no handler; never queued (size table 0)", scope: Scope::None, confirmed: Confirmed::Yes },
     ClientMessage { id: 0x4F, name: "ClickButton", transport_size: SizeRule::Fixed(7), handler_size: HandlerSize::Exact(7), layout: &[Field { name: "button", ty: FieldType::U16, offset: Some(1) }, Field { name: "p1", ty: FieldType::U16, offset: Some(3) }, Field { name: "p2", ty: FieldType::U16, offset: Some(5) }], handler: Some(0x0054C7C0), kind: Kind::Handler, gate: Gate::Alive, request: "UI button (trade, stash gold, ...)", scope: Scope::Sim, confirmed: Confirmed::Partial },
     ClientMessage { id: 0x50, name: "DropGold", transport_size: SizeRule::Fixed(9), handler_size: HandlerSize::Exact(9), layout: &[Field { name: "unit", ty: FieldType::U32, offset: Some(1) }, Field { name: "amount", ty: FieldType::U32, offset: Some(5) }], handler: Some(0x0054C800), kind: Kind::Handler, gate: Gate::Alive, request: "drop gold", scope: Scope::Sim, confirmed: Confirmed::Yes },
@@ -97,8 +97,8 @@ pub static CLIENT_MESSAGES: [ClientMessage; 113] = [
     ClientMessage { id: 0x55, name: "-", transport_size: SizeRule::Fixed(0), handler_size: HandlerSize::None, layout: &[], handler: None, kind: Kind::None, gate: Gate::Unset, request: "no handler; never queued (size table 0)", scope: Scope::None, confirmed: Confirmed::Yes },
     ClientMessage { id: 0x56, name: "-", transport_size: SizeRule::Fixed(0), handler_size: HandlerSize::None, layout: &[], handler: None, kind: Kind::None, gate: Gate::Unset, request: "no handler; never queued (size table 0)", scope: Scope::None, confirmed: Confirmed::Yes },
     ClientMessage { id: 0x57, name: "-", transport_size: SizeRule::Fixed(0), handler_size: HandlerSize::None, layout: &[], handler: None, kind: Kind::None, gate: Gate::Unset, request: "no handler; never queued (size table 0)", scope: Scope::None, confirmed: Confirmed::Yes },
-    ClientMessage { id: 0x58, name: "QuestCompleted", transport_size: SizeRule::Fixed(3), handler_size: HandlerSize::Exact(3), layout: &[Field { name: "quest", ty: FieldType::U16, offset: Some(1) }], handler: Some(0x0054C9C0), kind: Kind::Handler, gate: Gate::Alive, request: "quest UI update request", scope: Scope::Sim, confirmed: Confirmed::Partial },
-    ClientMessage { id: 0x59, name: "MakeEntityMove", transport_size: SizeRule::Fixed(17), handler_size: HandlerSize::Exact(17), layout: &[Field { name: "type", ty: FieldType::U32, offset: Some(1) }, Field { name: "id", ty: FieldType::U32, offset: Some(5) }, Field { name: "x", ty: FieldType::U32, offset: Some(9) }, Field { name: "y", ty: FieldType::U32, offset: Some(13) }], handler: Some(0x0054CA10), kind: Kind::Handler, gate: Gate::Alive, request: "move a unit (NPC escort)", scope: Scope::Sim, confirmed: Confirmed::Partial },
+    ClientMessage { id: 0x58, name: "QuestCompleted", transport_size: SizeRule::Fixed(3), handler_size: HandlerSize::Exact(3), layout: &[Field { name: "quest", ty: FieldType::U16, offset: Some(1) }], handler: Some(0x0054C9C0), kind: Kind::Handler, gate: Gate::Alive, request: "quest UI update request", scope: Scope::Sim, confirmed: Confirmed::Yes },
+    ClientMessage { id: 0x59, name: "MakeEntityMove", transport_size: SizeRule::Fixed(17), handler_size: HandlerSize::Exact(17), layout: &[Field { name: "type", ty: FieldType::U32, offset: Some(1) }, Field { name: "id", ty: FieldType::U32, offset: Some(5) }, Field { name: "x", ty: FieldType::U32, offset: Some(9) }, Field { name: "y", ty: FieldType::U32, offset: Some(13) }], handler: Some(0x0054CA10), kind: Kind::Handler, gate: Gate::Alive, request: "move a unit (NPC escort)", scope: Scope::Sim, confirmed: Confirmed::Yes },
     ClientMessage { id: 0x5A, name: "-", transport_size: SizeRule::Fixed(0), handler_size: HandlerSize::None, layout: &[], handler: None, kind: Kind::None, gate: Gate::Unset, request: "no handler; never queued (size table 0)", scope: Scope::None, confirmed: Confirmed::Yes },
     ClientMessage { id: 0x5B, name: "-", transport_size: SizeRule::Fixed(0), handler_size: HandlerSize::None, layout: &[], handler: None, kind: Kind::None, gate: Gate::Unset, request: "no handler; never queued (size table 0)", scope: Scope::None, confirmed: Confirmed::Yes },
     ClientMessage { id: 0x5C, name: "-", transport_size: SizeRule::Fixed(0), handler_size: HandlerSize::None, layout: &[], handler: None, kind: Kind::None, gate: Gate::Unset, request: "no handler; never queued (size table 0)", scope: Scope::None, confirmed: Confirmed::Yes },
@@ -2405,11 +2405,11 @@ pub mod client {
         }
     }
 
-    /// 0x4C Transmogrify: transmute the cube contents (5 bytes).
+    /// 0x4C Transmogrify: use a Transmogrify item (misc.txt); not the cube (5 bytes).
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub struct Transmogrify {
         /// `u32` at 1.
-        pub cube: u32,
+        pub item: u32,
     }
 
     impl FixedMessage for Transmogrify {
@@ -2418,12 +2418,12 @@ pub mod client {
         fn decode(b: &[u8]) -> Result<Self, DecodeError> {
             check(b, Self::ID, Self::SIZE)?;
             Ok(Self {
-                cube: u32_at(b, 1),
+                item: u32_at(b, 1),
             })
         }
         fn write(&self, out: &mut [u8]) {
             start(out, Self::ID, Self::SIZE);
-            put_u32(out, 1, self.cube);
+            put_u32(out, 1, self.item);
         }
     }
 
@@ -2436,11 +2436,11 @@ pub mod client {
         }
     }
 
-    /// 0x4D PlayNpcMessage: NPC speech played (3 bytes).
+    /// 0x4D PlayNpcMessage: clear an NPC's intro bit for the player (3 bytes).
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub struct PlayNpcMessage {
         /// `u16` at 1.
-        pub msg: u16,
+        pub npc_class: u16,
     }
 
     impl FixedMessage for PlayNpcMessage {
@@ -2449,12 +2449,12 @@ pub mod client {
         fn decode(b: &[u8]) -> Result<Self, DecodeError> {
             check(b, Self::ID, Self::SIZE)?;
             Ok(Self {
-                msg: u16_at(b, 1),
+                npc_class: u16_at(b, 1),
             })
         }
         fn write(&self, out: &mut [u8]) {
             start(out, Self::ID, Self::SIZE);
-            put_u16(out, 1, self.msg);
+            put_u16(out, 1, self.npc_class);
         }
     }
 
@@ -3220,9 +3220,9 @@ pub static SERVER_MESSAGES: [ServerMessage; 181] = [
     ServerMessage { id: 0x05, name: "UnloadComplete", size: SizeRule::Fixed(1), layout: &[], senders: &[0x0053B320], client_handler: Some(0x0045CA30), client_unit_handler: None, produced_by: ProducedBy::Session, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x06, name: "GameExit", size: SizeRule::Fixed(1), layout: &[], senders: &[0x0053B320, 0x0053B240], client_handler: Some(0x0045CA60), client_unit_handler: None, produced_by: ProducedBy::Session, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x07, name: "MapReveal", size: SizeRule::Fixed(6), layout: &[Field { name: "x", ty: FieldType::U16, offset: Some(1) }, Field { name: "y", ty: FieldType::U16, offset: Some(3) }, Field { name: "level", ty: FieldType::U8, offset: Some(5) }], senders: &[0x0053BC50], client_handler: Some(0x0045CAB0), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
-    ServerMessage { id: 0x08, name: "MapHide", size: SizeRule::Fixed(6), layout: &[], senders: &[0x0053BC90], client_handler: Some(0x0045CB20), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
+    ServerMessage { id: 0x08, name: "MapHide", size: SizeRule::Fixed(6), layout: &[Field { name: "x", ty: FieldType::U16, offset: Some(1) }, Field { name: "y", ty: FieldType::U16, offset: Some(3) }, Field { name: "level", ty: FieldType::U8, offset: Some(5) }], senders: &[0x0053BC90], client_handler: Some(0x0045CB20), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x09, name: "AssignLevelWarp", size: SizeRule::Fixed(11), layout: &[], senders: &[0x0053BCD0], client_handler: Some(0x0045CB90), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
-    ServerMessage { id: 0x0A, name: "RemoveUnit", size: SizeRule::Fixed(6), layout: &[], senders: &[0x0053BDA0], client_handler: Some(0x0045CC10), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
+    ServerMessage { id: 0x0A, name: "RemoveUnit", size: SizeRule::Fixed(6), layout: &[Field { name: "type", ty: FieldType::U8, offset: Some(1) }, Field { name: "guid", ty: FieldType::U32, offset: Some(2) }], senders: &[0x0053BDA0], client_handler: Some(0x0045CC10), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x0B, name: "GameHandshake", size: SizeRule::Fixed(6), layout: &[], senders: &[0x0053B3D0], client_handler: Some(0x0045CC50), client_unit_handler: None, produced_by: ProducedBy::Session, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x0C, name: "MonsterHit", size: SizeRule::Fixed(9), layout: &[Field { name: "", ty: FieldType::U8, offset: Some(1) }, Field { name: "", ty: FieldType::U32, offset: Some(2) }, Field { name: "", ty: FieldType::U8, offset: Some(6) }, Field { name: "", ty: FieldType::U8, offset: Some(7) }, Field { name: "", ty: FieldType::U8, offset: Some(8) }], senders: &[0x0053B430], client_handler: Some(0x0045C900), client_unit_handler: Some(0x0045CC70), produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x0D, name: "PlayerStop", size: SizeRule::Fixed(13), layout: &[Field { name: "type", ty: FieldType::U8, offset: Some(1) }, Field { name: "guid", ty: FieldType::U32, offset: Some(2) }, Field { name: "a", ty: FieldType::U8, offset: Some(6) }, Field { name: "x", ty: FieldType::U16, offset: Some(7) }, Field { name: "y", ty: FieldType::U16, offset: Some(9) }, Field { name: "b", ty: FieldType::U8, offset: Some(11) }, Field { name: "life_pct", ty: FieldType::U8, offset: Some(12) }], senders: &[0x0053B4B0], client_handler: Some(0x0045C900), client_unit_handler: Some(0x0045CCC0), produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
@@ -3247,7 +3247,7 @@ pub static SERVER_MESSAGES: [ServerMessage; 181] = [
     ServerMessage { id: 0x20, name: "StatUpdate", size: SizeRule::Fixed(10), layout: &[], senders: &[0x0053C1D0], client_handler: Some(0x0045D880), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x21, name: "UpdateItemOSkill", size: SizeRule::Fixed(12), layout: &[], senders: &[0x0053C4A0], client_handler: Some(0x0045DCD0), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x22, name: "UpdateItemSkill", size: SizeRule::Fixed(12), layout: &[], senders: &[0x0053C520], client_handler: Some(0x0045DDB0), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
-    ServerMessage { id: 0x23, name: "SetSkill", size: SizeRule::Fixed(13), layout: &[], senders: &[0x0053C590], client_handler: Some(0x0045DE10), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
+    ServerMessage { id: 0x23, name: "SetSkill", size: SizeRule::Fixed(13), layout: &[Field { name: "type", ty: FieldType::U8, offset: Some(1) }, Field { name: "guid", ty: FieldType::U32, offset: Some(2) }, Field { name: "hand", ty: FieldType::U8, offset: Some(6) }, Field { name: "skill", ty: FieldType::U16, offset: Some(7) }, Field { name: "item", ty: FieldType::U32, offset: Some(9) }], senders: &[0x0053C590], client_handler: Some(0x0045DE10), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x24, name: "Unknown24", size: SizeRule::Fixed(90), layout: &[], senders: &[], client_handler: Some(0x0045C900), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Partial },
     ServerMessage { id: 0x25, name: "Unknown25", size: SizeRule::Fixed(90), layout: &[], senders: &[], client_handler: Some(0x0045C900), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Partial },
     ServerMessage { id: 0x26, name: "Chat", size: SizeRule::Chat26, layout: &[], senders: &[], client_handler: Some(0x0045DFC0), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Partial },
@@ -3313,15 +3313,15 @@ pub static SERVER_MESSAGES: [ServerMessage; 181] = [
     ServerMessage { id: 0x62, name: "MakeUnitTargetable", size: SizeRule::Fixed(7), layout: &[], senders: &[0x0053D6D0], client_handler: Some(0x0045D390), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x63, name: "WaypointMenu", size: SizeRule::Fixed(21), layout: &[], senders: &[], client_handler: Some(0x0045E670), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Partial },
     ServerMessage { id: 0x64, name: "-", size: SizeRule::Fixed(0), layout: &[], senders: &[], client_handler: Some(0x0045C900), client_unit_handler: None, produced_by: ProducedBy::None, confirmed: Confirmed::Yes },
-    ServerMessage { id: 0x65, name: "PlayerKillCount", size: SizeRule::Fixed(7), layout: &[], senders: &[0x0053D9C0], client_handler: Some(0x0045E6B0), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
+    ServerMessage { id: 0x65, name: "PlayerKillCount", size: SizeRule::Fixed(7), layout: &[Field { name: "guid", ty: FieldType::U32, offset: Some(1) }, Field { name: "count", ty: FieldType::U16, offset: Some(5) }], senders: &[0x0053D9C0], client_handler: Some(0x0045E6B0), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x66, name: "Unknown66", size: SizeRule::Fixed(7), layout: &[], senders: &[], client_handler: Some(0x0045E6C0), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Partial },
-    ServerMessage { id: 0x67, name: "MonsterMove", size: SizeRule::Fixed(16), layout: &[], senders: &[], client_handler: Some(0x0045C900), client_unit_handler: Some(0x0045CDE0), produced_by: ProducedBy::Sim, confirmed: Confirmed::Partial },
+    ServerMessage { id: 0x67, name: "MonsterMove", size: SizeRule::Fixed(16), layout: &[], senders: &[0x0053B710, 0x0053B910], client_handler: Some(0x0045C900), client_unit_handler: Some(0x0045CDE0), produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x68, name: "MonsterMoveToTarget", size: SizeRule::Fixed(21), layout: &[], senders: &[0x0053B5F0, 0x0053B7F0], client_handler: Some(0x0045C900), client_unit_handler: Some(0x0045CE30), produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
-    ServerMessage { id: 0x69, name: "MonsterState", size: SizeRule::Fixed(12), layout: &[], senders: &[0x0053BA40], client_handler: Some(0x0045C900), client_unit_handler: Some(0x0045CEA0), produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
-    ServerMessage { id: 0x6A, name: "Unknown6A", size: SizeRule::Fixed(12), layout: &[], senders: &[0x0053B9F0], client_handler: Some(0x0045C900), client_unit_handler: Some(0x0045CEF0), produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
-    ServerMessage { id: 0x6B, name: "MonsterAction", size: SizeRule::Fixed(16), layout: &[], senders: &[0x0053BB00], client_handler: Some(0x0045C900), client_unit_handler: Some(0x0045CF40), produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
-    ServerMessage { id: 0x6C, name: "MonsterAttack", size: SizeRule::Fixed(16), layout: &[], senders: &[0x0053BAA0], client_handler: Some(0x0045C900), client_unit_handler: Some(0x0045CFB0), produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
-    ServerMessage { id: 0x6D, name: "MonsterStop", size: SizeRule::Fixed(10), layout: &[], senders: &[0x0053BB70], client_handler: Some(0x0045C900), client_unit_handler: Some(0x0045D010), produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
+    ServerMessage { id: 0x69, name: "MonsterState", size: SizeRule::Fixed(12), layout: &[Field { name: "guid", ty: FieldType::U32, offset: Some(1) }, Field { name: "code", ty: FieldType::U8, offset: Some(5) }, Field { name: "a", ty: FieldType::U16, offset: Some(6) }, Field { name: "b", ty: FieldType::U16, offset: Some(8) }, Field { name: "d", ty: FieldType::U8, offset: Some(10) }, Field { name: "e", ty: FieldType::U8, offset: Some(11) }], senders: &[0x0053BA40], client_handler: Some(0x0045C900), client_unit_handler: Some(0x0045CEA0), produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
+    ServerMessage { id: 0x6A, name: "Unknown6A", size: SizeRule::Fixed(12), layout: &[Field { name: "guid", ty: FieldType::U32, offset: Some(1) }, Field { name: "code", ty: FieldType::U8, offset: Some(5) }, Field { name: "target_type", ty: FieldType::U8, offset: Some(6) }, Field { name: "target", ty: FieldType::U32, offset: Some(7) }, Field { name: "d", ty: FieldType::U8, offset: Some(11) }], senders: &[0x0053B9F0], client_handler: Some(0x0045C900), client_unit_handler: Some(0x0045CEF0), produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
+    ServerMessage { id: 0x6B, name: "MonsterAction", size: SizeRule::Fixed(16), layout: &[Field { name: "guid", ty: FieldType::U32, offset: Some(1) }, Field { name: "code", ty: FieldType::U8, offset: Some(5) }, Field { name: "a", ty: FieldType::U16, offset: Some(6) }, Field { name: "b", ty: FieldType::U16, offset: Some(8) }, Field { name: "d", ty: FieldType::U8, offset: Some(10) }, Field { name: "e", ty: FieldType::U8, offset: Some(11) }, Field { name: "x", ty: FieldType::U16, offset: Some(12) }, Field { name: "y", ty: FieldType::U16, offset: Some(14) }], senders: &[0x0053BB00], client_handler: Some(0x0045C900), client_unit_handler: Some(0x0045CF40), produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
+    ServerMessage { id: 0x6C, name: "MonsterAttack", size: SizeRule::Fixed(16), layout: &[Field { name: "guid", ty: FieldType::U32, offset: Some(1) }, Field { name: "code", ty: FieldType::U8, offset: Some(5) }, Field { name: "target_type", ty: FieldType::U8, offset: Some(6) }, Field { name: "target", ty: FieldType::U32, offset: Some(7) }, Field { name: "d", ty: FieldType::U8, offset: Some(11) }, Field { name: "x", ty: FieldType::U16, offset: Some(12) }, Field { name: "y", ty: FieldType::U16, offset: Some(14) }], senders: &[0x0053BAA0], client_handler: Some(0x0045C900), client_unit_handler: Some(0x0045CFB0), produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
+    ServerMessage { id: 0x6D, name: "MonsterStop", size: SizeRule::Fixed(10), layout: &[Field { name: "guid", ty: FieldType::U32, offset: Some(1) }, Field { name: "x", ty: FieldType::U16, offset: Some(5) }, Field { name: "y", ty: FieldType::U16, offset: Some(7) }, Field { name: "life", ty: FieldType::U8, offset: Some(9) }], senders: &[0x0053BB70], client_handler: Some(0x0045C900), client_unit_handler: Some(0x0045D010), produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x6E, name: "Unknown6E", size: SizeRule::Fixed(1), layout: &[], senders: &[], client_handler: Some(0x0045C900), client_unit_handler: Some(0x0045D0A0), produced_by: ProducedBy::Sim, confirmed: Confirmed::Partial },
     ServerMessage { id: 0x6F, name: "Unknown6F", size: SizeRule::Fixed(1), layout: &[], senders: &[], client_handler: Some(0x0045C900), client_unit_handler: Some(0x0045D0B0), produced_by: ProducedBy::Sim, confirmed: Confirmed::Partial },
     ServerMessage { id: 0x70, name: "Unknown70", size: SizeRule::Fixed(1), layout: &[], senders: &[], client_handler: Some(0x0045C900), client_unit_handler: Some(0x0045D0C0), produced_by: ProducedBy::Sim, confirmed: Confirmed::Partial },
@@ -3331,11 +3331,11 @@ pub static SERVER_MESSAGES: [ServerMessage; 181] = [
     ServerMessage { id: 0x74, name: "PlayerCorpseAssign", size: SizeRule::Fixed(10), layout: &[], senders: &[0x0053DA40], client_handler: Some(0x0045E7B0), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x75, name: "PlayerPartyInfo", size: SizeRule::Fixed(13), layout: &[], senders: &[0x0053DA90], client_handler: Some(0x0045E7E0), client_unit_handler: None, produced_by: ProducedBy::Out, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x76, name: "PlayerInProximity", size: SizeRule::Fixed(6), layout: &[], senders: &[0x0053B3D0], client_handler: Some(0x0045E050), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
-    ServerMessage { id: 0x77, name: "TradeAction", size: SizeRule::Fixed(2), layout: &[], senders: &[0x0053CAB0], client_handler: Some(0x0045E800), client_unit_handler: None, produced_by: ProducedBy::Out, confirmed: Confirmed::Yes },
+    ServerMessage { id: 0x77, name: "TradeAction", size: SizeRule::Fixed(2), layout: &[], senders: &[0x0053CAB0], client_handler: Some(0x0045E800), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x78, name: "TradeAccepted", size: SizeRule::Fixed(21), layout: &[], senders: &[], client_handler: Some(0x0045E810), client_unit_handler: None, produced_by: ProducedBy::Out, confirmed: Confirmed::Partial },
     ServerMessage { id: 0x79, name: "GoldInTrade", size: SizeRule::Fixed(6), layout: &[], senders: &[0x0053CBE0], client_handler: Some(0x0045E850), client_unit_handler: None, produced_by: ProducedBy::Out, confirmed: Confirmed::Yes },
-    ServerMessage { id: 0x7A, name: "PetAction", size: SizeRule::Fixed(13), layout: &[Field { name: "action", ty: FieldType::U8, offset: Some(1) }, Field { name: "pet_type", ty: FieldType::U8, offset: Some(2) }, Field { name: "class", ty: FieldType::U16, offset: Some(3) }, Field { name: "pet", ty: FieldType::U32, offset: Some(5) }, Field { name: "owner", ty: FieldType::U32, offset: Some(9) }], senders: &[0x0053CB30], client_handler: Some(0x0045E860), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
-    ServerMessage { id: 0x7B, name: "AssignHotkey", size: SizeRule::Fixed(8), layout: &[], senders: &[0x0053DB20], client_handler: Some(0x0045E8D0), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
+    ServerMessage { id: 0x7A, name: "PetAction", size: SizeRule::Fixed(13), layout: &[Field { name: "action", ty: FieldType::U8, offset: Some(1) }, Field { name: "pet_type", ty: FieldType::U8, offset: Some(2) }, Field { name: "class", ty: FieldType::U16, offset: Some(3) }, Field { name: "owner", ty: FieldType::U32, offset: Some(5) }, Field { name: "pet", ty: FieldType::U32, offset: Some(9) }], senders: &[0x0053CB30], client_handler: Some(0x0045E860), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
+    ServerMessage { id: 0x7B, name: "AssignHotkey", size: SizeRule::Fixed(8), layout: &[Field { name: "slot", ty: FieldType::U8, offset: Some(1) }, Field { name: "skill", ty: FieldType::U16, offset: Some(2) }, Field { name: "item", ty: FieldType::U32, offset: Some(4) }], senders: &[0x0053DB20], client_handler: Some(0x0045E8D0), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x7C, name: "UseScroll", size: SizeRule::Fixed(6), layout: &[], senders: &[0x0053B3D0], client_handler: Some(0x0045E910), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x7D, name: "SetItemState", size: SizeRule::Fixed(18), layout: &[Field { name: "type", ty: FieldType::U8, offset: Some(1) }, Field { name: "unit", ty: FieldType::U32, offset: Some(2) }, Field { name: "item", ty: FieldType::U32, offset: Some(6) }, Field { name: "flag", ty: FieldType::U32, offset: Some(10) }, Field { name: "state", ty: FieldType::U32, offset: Some(14) }], senders: &[0x0053D440], client_handler: Some(0x0045E930), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x7E, name: "Unknown7E", size: SizeRule::Fixed(5), layout: &[], senders: &[0x0053DB70], client_handler: Some(0x0045E970), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
@@ -3641,6 +3641,80 @@ pub mod server {
     }
 
     impl MapReveal {
+        /// The message bytes; unlisted bytes are 0.
+        pub fn encode(&self) -> [u8; 6] {
+            let mut b = [0; 6];
+            self.write(&mut b);
+            b
+        }
+    }
+
+    /// 0x08 MapHide (6 bytes).
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub struct MapHide {
+        /// `u16` at 1.
+        pub x: u16,
+        /// `u16` at 3.
+        pub y: u16,
+        /// `u8` at 5.
+        pub level: u8,
+    }
+
+    impl FixedMessage for MapHide {
+        const ID: u8 = 0x08;
+        const SIZE: usize = 6;
+        fn decode(b: &[u8]) -> Result<Self, DecodeError> {
+            check(b, Self::ID, Self::SIZE)?;
+            Ok(Self {
+                x: u16_at(b, 1),
+                y: u16_at(b, 3),
+                level: u8_at(b, 5),
+            })
+        }
+        fn write(&self, out: &mut [u8]) {
+            start(out, Self::ID, Self::SIZE);
+            put_u16(out, 1, self.x);
+            put_u16(out, 3, self.y);
+            put_u8(out, 5, self.level);
+        }
+    }
+
+    impl MapHide {
+        /// The message bytes; unlisted bytes are 0.
+        pub fn encode(&self) -> [u8; 6] {
+            let mut b = [0; 6];
+            self.write(&mut b);
+            b
+        }
+    }
+
+    /// 0x0A RemoveUnit (6 bytes).
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub struct RemoveUnit {
+        /// `u8` at 1.
+        pub type_: u8,
+        /// `u32` at 2.
+        pub guid: u32,
+    }
+
+    impl FixedMessage for RemoveUnit {
+        const ID: u8 = 0x0A;
+        const SIZE: usize = 6;
+        fn decode(b: &[u8]) -> Result<Self, DecodeError> {
+            check(b, Self::ID, Self::SIZE)?;
+            Ok(Self {
+                type_: u8_at(b, 1),
+                guid: u32_at(b, 2),
+            })
+        }
+        fn write(&self, out: &mut [u8]) {
+            start(out, Self::ID, Self::SIZE);
+            put_u8(out, 1, self.type_);
+            put_u32(out, 2, self.guid);
+        }
+    }
+
+    impl RemoveUnit {
         /// The message bytes; unlisted bytes are 0.
         pub fn encode(&self) -> [u8; 6] {
             let mut b = [0; 6];
@@ -4251,6 +4325,53 @@ pub mod server {
         }
     }
 
+    /// 0x23 SetSkill (13 bytes).
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub struct SetSkill {
+        /// `u8` at 1.
+        pub type_: u8,
+        /// `u32` at 2.
+        pub guid: u32,
+        /// `u8` at 6.
+        pub hand: u8,
+        /// `u16` at 7.
+        pub skill: u16,
+        /// `u32` at 9.
+        pub item: u32,
+    }
+
+    impl FixedMessage for SetSkill {
+        const ID: u8 = 0x23;
+        const SIZE: usize = 13;
+        fn decode(b: &[u8]) -> Result<Self, DecodeError> {
+            check(b, Self::ID, Self::SIZE)?;
+            Ok(Self {
+                type_: u8_at(b, 1),
+                guid: u32_at(b, 2),
+                hand: u8_at(b, 6),
+                skill: u16_at(b, 7),
+                item: u32_at(b, 9),
+            })
+        }
+        fn write(&self, out: &mut [u8]) {
+            start(out, Self::ID, Self::SIZE);
+            put_u8(out, 1, self.type_);
+            put_u32(out, 2, self.guid);
+            put_u8(out, 6, self.hand);
+            put_u16(out, 7, self.skill);
+            put_u32(out, 9, self.item);
+        }
+    }
+
+    impl SetSkill {
+        /// The message bytes; unlisted bytes are 0.
+        pub fn encode(&self) -> [u8; 13] {
+            let mut b = [0; 13];
+            self.write(&mut b);
+            b
+        }
+    }
+
     /// 0x3F UseStackableItem (8 bytes).
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub struct UseStackableItem {
@@ -4494,6 +4615,296 @@ pub mod server {
         }
     }
 
+    /// 0x65 PlayerKillCount (7 bytes).
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub struct PlayerKillCount {
+        /// `u32` at 1.
+        pub guid: u32,
+        /// `u16` at 5.
+        pub count: u16,
+    }
+
+    impl FixedMessage for PlayerKillCount {
+        const ID: u8 = 0x65;
+        const SIZE: usize = 7;
+        fn decode(b: &[u8]) -> Result<Self, DecodeError> {
+            check(b, Self::ID, Self::SIZE)?;
+            Ok(Self {
+                guid: u32_at(b, 1),
+                count: u16_at(b, 5),
+            })
+        }
+        fn write(&self, out: &mut [u8]) {
+            start(out, Self::ID, Self::SIZE);
+            put_u32(out, 1, self.guid);
+            put_u16(out, 5, self.count);
+        }
+    }
+
+    impl PlayerKillCount {
+        /// The message bytes; unlisted bytes are 0.
+        pub fn encode(&self) -> [u8; 7] {
+            let mut b = [0; 7];
+            self.write(&mut b);
+            b
+        }
+    }
+
+    /// 0x69 MonsterState (12 bytes).
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub struct MonsterState {
+        /// `u32` at 1.
+        pub guid: u32,
+        /// `u8` at 5.
+        pub code: u8,
+        /// `u16` at 6.
+        pub a: u16,
+        /// `u16` at 8.
+        pub b: u16,
+        /// `u8` at 10.
+        pub d: u8,
+        /// `u8` at 11.
+        pub e: u8,
+    }
+
+    impl FixedMessage for MonsterState {
+        const ID: u8 = 0x69;
+        const SIZE: usize = 12;
+        fn decode(b: &[u8]) -> Result<Self, DecodeError> {
+            check(b, Self::ID, Self::SIZE)?;
+            Ok(Self {
+                guid: u32_at(b, 1),
+                code: u8_at(b, 5),
+                a: u16_at(b, 6),
+                b: u16_at(b, 8),
+                d: u8_at(b, 10),
+                e: u8_at(b, 11),
+            })
+        }
+        fn write(&self, out: &mut [u8]) {
+            start(out, Self::ID, Self::SIZE);
+            put_u32(out, 1, self.guid);
+            put_u8(out, 5, self.code);
+            put_u16(out, 6, self.a);
+            put_u16(out, 8, self.b);
+            put_u8(out, 10, self.d);
+            put_u8(out, 11, self.e);
+        }
+    }
+
+    impl MonsterState {
+        /// The message bytes; unlisted bytes are 0.
+        pub fn encode(&self) -> [u8; 12] {
+            let mut b = [0; 12];
+            self.write(&mut b);
+            b
+        }
+    }
+
+    /// 0x6A Unknown6A (12 bytes).
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub struct Unknown6A {
+        /// `u32` at 1.
+        pub guid: u32,
+        /// `u8` at 5.
+        pub code: u8,
+        /// `u8` at 6.
+        pub target_type: u8,
+        /// `u32` at 7.
+        pub target: u32,
+        /// `u8` at 11.
+        pub d: u8,
+    }
+
+    impl FixedMessage for Unknown6A {
+        const ID: u8 = 0x6A;
+        const SIZE: usize = 12;
+        fn decode(b: &[u8]) -> Result<Self, DecodeError> {
+            check(b, Self::ID, Self::SIZE)?;
+            Ok(Self {
+                guid: u32_at(b, 1),
+                code: u8_at(b, 5),
+                target_type: u8_at(b, 6),
+                target: u32_at(b, 7),
+                d: u8_at(b, 11),
+            })
+        }
+        fn write(&self, out: &mut [u8]) {
+            start(out, Self::ID, Self::SIZE);
+            put_u32(out, 1, self.guid);
+            put_u8(out, 5, self.code);
+            put_u8(out, 6, self.target_type);
+            put_u32(out, 7, self.target);
+            put_u8(out, 11, self.d);
+        }
+    }
+
+    impl Unknown6A {
+        /// The message bytes; unlisted bytes are 0.
+        pub fn encode(&self) -> [u8; 12] {
+            let mut b = [0; 12];
+            self.write(&mut b);
+            b
+        }
+    }
+
+    /// 0x6B MonsterAction (16 bytes).
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub struct MonsterAction {
+        /// `u32` at 1.
+        pub guid: u32,
+        /// `u8` at 5.
+        pub code: u8,
+        /// `u16` at 6.
+        pub a: u16,
+        /// `u16` at 8.
+        pub b: u16,
+        /// `u8` at 10.
+        pub d: u8,
+        /// `u8` at 11.
+        pub e: u8,
+        /// `u16` at 12.
+        pub x: u16,
+        /// `u16` at 14.
+        pub y: u16,
+    }
+
+    impl FixedMessage for MonsterAction {
+        const ID: u8 = 0x6B;
+        const SIZE: usize = 16;
+        fn decode(b: &[u8]) -> Result<Self, DecodeError> {
+            check(b, Self::ID, Self::SIZE)?;
+            Ok(Self {
+                guid: u32_at(b, 1),
+                code: u8_at(b, 5),
+                a: u16_at(b, 6),
+                b: u16_at(b, 8),
+                d: u8_at(b, 10),
+                e: u8_at(b, 11),
+                x: u16_at(b, 12),
+                y: u16_at(b, 14),
+            })
+        }
+        fn write(&self, out: &mut [u8]) {
+            start(out, Self::ID, Self::SIZE);
+            put_u32(out, 1, self.guid);
+            put_u8(out, 5, self.code);
+            put_u16(out, 6, self.a);
+            put_u16(out, 8, self.b);
+            put_u8(out, 10, self.d);
+            put_u8(out, 11, self.e);
+            put_u16(out, 12, self.x);
+            put_u16(out, 14, self.y);
+        }
+    }
+
+    impl MonsterAction {
+        /// The message bytes; unlisted bytes are 0.
+        pub fn encode(&self) -> [u8; 16] {
+            let mut b = [0; 16];
+            self.write(&mut b);
+            b
+        }
+    }
+
+    /// 0x6C MonsterAttack (16 bytes).
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub struct MonsterAttack {
+        /// `u32` at 1.
+        pub guid: u32,
+        /// `u8` at 5.
+        pub code: u8,
+        /// `u8` at 6.
+        pub target_type: u8,
+        /// `u32` at 7.
+        pub target: u32,
+        /// `u8` at 11.
+        pub d: u8,
+        /// `u16` at 12.
+        pub x: u16,
+        /// `u16` at 14.
+        pub y: u16,
+    }
+
+    impl FixedMessage for MonsterAttack {
+        const ID: u8 = 0x6C;
+        const SIZE: usize = 16;
+        fn decode(b: &[u8]) -> Result<Self, DecodeError> {
+            check(b, Self::ID, Self::SIZE)?;
+            Ok(Self {
+                guid: u32_at(b, 1),
+                code: u8_at(b, 5),
+                target_type: u8_at(b, 6),
+                target: u32_at(b, 7),
+                d: u8_at(b, 11),
+                x: u16_at(b, 12),
+                y: u16_at(b, 14),
+            })
+        }
+        fn write(&self, out: &mut [u8]) {
+            start(out, Self::ID, Self::SIZE);
+            put_u32(out, 1, self.guid);
+            put_u8(out, 5, self.code);
+            put_u8(out, 6, self.target_type);
+            put_u32(out, 7, self.target);
+            put_u8(out, 11, self.d);
+            put_u16(out, 12, self.x);
+            put_u16(out, 14, self.y);
+        }
+    }
+
+    impl MonsterAttack {
+        /// The message bytes; unlisted bytes are 0.
+        pub fn encode(&self) -> [u8; 16] {
+            let mut b = [0; 16];
+            self.write(&mut b);
+            b
+        }
+    }
+
+    /// 0x6D MonsterStop (10 bytes).
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub struct MonsterStop {
+        /// `u32` at 1.
+        pub guid: u32,
+        /// `u16` at 5.
+        pub x: u16,
+        /// `u16` at 7.
+        pub y: u16,
+        /// `u8` at 9.
+        pub life: u8,
+    }
+
+    impl FixedMessage for MonsterStop {
+        const ID: u8 = 0x6D;
+        const SIZE: usize = 10;
+        fn decode(b: &[u8]) -> Result<Self, DecodeError> {
+            check(b, Self::ID, Self::SIZE)?;
+            Ok(Self {
+                guid: u32_at(b, 1),
+                x: u16_at(b, 5),
+                y: u16_at(b, 7),
+                life: u8_at(b, 9),
+            })
+        }
+        fn write(&self, out: &mut [u8]) {
+            start(out, Self::ID, Self::SIZE);
+            put_u32(out, 1, self.guid);
+            put_u16(out, 5, self.x);
+            put_u16(out, 7, self.y);
+            put_u8(out, 9, self.life);
+        }
+    }
+
+    impl MonsterStop {
+        /// The message bytes; unlisted bytes are 0.
+        pub fn encode(&self) -> [u8; 10] {
+            let mut b = [0; 10];
+            self.write(&mut b);
+            b
+        }
+    }
+
     /// 0x6E Unknown6E (1 byte).
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub struct Unknown6E;
@@ -4629,9 +5040,9 @@ pub mod server {
         /// `u16` at 3.
         pub class: u16,
         /// `u32` at 5.
-        pub pet: u32,
-        /// `u32` at 9.
         pub owner: u32,
+        /// `u32` at 9.
+        pub pet: u32,
     }
 
     impl FixedMessage for PetAction {
@@ -4643,8 +5054,8 @@ pub mod server {
                 action: u8_at(b, 1),
                 pet_type: u8_at(b, 2),
                 class: u16_at(b, 3),
-                pet: u32_at(b, 5),
-                owner: u32_at(b, 9),
+                owner: u32_at(b, 5),
+                pet: u32_at(b, 9),
             })
         }
         fn write(&self, out: &mut [u8]) {
@@ -4652,8 +5063,8 @@ pub mod server {
             put_u8(out, 1, self.action);
             put_u8(out, 2, self.pet_type);
             put_u16(out, 3, self.class);
-            put_u32(out, 5, self.pet);
-            put_u32(out, 9, self.owner);
+            put_u32(out, 5, self.owner);
+            put_u32(out, 9, self.pet);
         }
     }
 
@@ -4661,6 +5072,45 @@ pub mod server {
         /// The message bytes; unlisted bytes are 0.
         pub fn encode(&self) -> [u8; 13] {
             let mut b = [0; 13];
+            self.write(&mut b);
+            b
+        }
+    }
+
+    /// 0x7B AssignHotkey (8 bytes).
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub struct AssignHotkey {
+        /// `u8` at 1.
+        pub slot: u8,
+        /// `u16` at 2.
+        pub skill: u16,
+        /// `u32` at 4.
+        pub item: u32,
+    }
+
+    impl FixedMessage for AssignHotkey {
+        const ID: u8 = 0x7B;
+        const SIZE: usize = 8;
+        fn decode(b: &[u8]) -> Result<Self, DecodeError> {
+            check(b, Self::ID, Self::SIZE)?;
+            Ok(Self {
+                slot: u8_at(b, 1),
+                skill: u16_at(b, 2),
+                item: u32_at(b, 4),
+            })
+        }
+        fn write(&self, out: &mut [u8]) {
+            start(out, Self::ID, Self::SIZE);
+            put_u8(out, 1, self.slot);
+            put_u16(out, 2, self.skill);
+            put_u32(out, 4, self.item);
+        }
+    }
+
+    impl AssignHotkey {
+        /// The message bytes; unlisted bytes are 0.
+        pub fn encode(&self) -> [u8; 8] {
+            let mut b = [0; 8];
             self.write(&mut b);
             b
         }

@@ -10,7 +10,7 @@ site	function	api	type	classes	expire	a1	a2	callback	proof	owner
 0x0054cac5	0x0054ca10	timed	2	monster	f+1	0	0	0	file	NPC interaction: future AI spec
 0x0054cd31	0x0054cc40	timed	12	player	calc	0	0	0	file	player message handler: stat-lists.md
 0x0054d11f	0x0054ced0	timed	3	player,monster	f+1	0	0	0	file	inventory swap regen restart (units.md §6.1)
-0x0054ea84	0x0054e600	timed	7	object	calc	0	0	0	file	objects: future objects spec
+0x0054ea84	0x0054e600	timed	7	monster	calc	0	0	0	code	monsters/population.md §11.5 r4 (class 438: f+250+roll(50) on its own seed); event: monsters/umod-callbacks.md §23.2
 0x0054f886	0x0054f860	timed	8	object	f+60	0	0	0	file	objects: future objects spec
 0x0054f8ad	0x0054f860	timed	0	object	f+25	0	0	0	file	objects: future objects spec
 0x0054fb82	0x0054fb40	timed	0	object	f+25	0	0	0	file	objects: future objects spec
@@ -72,8 +72,8 @@ site	function	api	type	classes	expire	a1	a2	callback	proof	owner
 0x005704b1	0x00570420	timed	12	player,monster	calc	0	0	0	file	skills / states: sim/stat-lists.md, future skills spec
 0x0057051c	0x00570420	timed	12	player,monster	calc	0	0	0	file	skills / states: sim/stat-lists.md, future skills spec
 0x00570656	0x00570590	timed	12	player,monster	calc	0	0	0	file	skills / states: sim/stat-lists.md, future skills spec
-0x005737c0	0x00573780	timed	2	monster	f+2	0	0	0	file	monster: future monster spec
-0x00573825	0x00573780	timed	2	monster	f+2	0	0	0	file	monster: future monster spec
+0x005737c0	0x00573780	timed	2	monster	f+2	0	0	0	code	monsters/umod-callbacks.md §3.5 (think restart, mode NU)
+0x00573825	0x00573780	timed	2	monster	f+2	0	0	0	code	monsters/umod-callbacks.md §3.5 (think restart, base classes 110/118/136/247)
 0x0057abf3	0x0057aae0	timed	12	player,monster	calc	0	0	0	file	damage: future combat spec; regen restart units.md §6.1
 0x0057ac38	0x0057aae0	timed	12	player,monster	calc	0	0	0	file	damage: future combat spec; regen restart units.md §6.1
 0x0057aca8	0x0057ac50	timed	3	player,monster	f+1	0	0	0	file	damage: future combat spec; regen restart units.md §6.1
@@ -161,18 +161,18 @@ site	function	api	type	classes	expire	a1	a2	callback	proof	owner
 0x0059d8f5	0x0059d870	timed	1	object	f+fc1	0	0	0	file	objects: future objects spec
 0x0059f4a1	0x0059f440	timed	7	monster,object	f+1	0	0	0	file	future quests spec
 0x0059f8d3	0x0059f8a0	every	0	missile	-1	0	0	0	code	missile setup (units.md §6.3)
-0x005a1359	0x005a1330	timed	7	monster	f+75	0	0	0	file	monster unique mods: future monster spec
-0x005a2613	0x005a25f0	timed	7	monster	f+4	0	0	0	file	monster unique mods: future monster spec
-0x005a2ed0	0x005a2eb0	timed	7	monster	f+2	0	0	0	file	monster unique mods: future monster spec
-0x005a37f3	0x005a37d0	timed	7	monster	f+2	0	0	0	file	monster unique mods: future monster spec
-0x005a3829	0x005a3800	timed	7	monster	f+4	0	0	0	file	monster unique mods: future monster spec
-0x005a38ff	0x005a3840	timed	7	monster	calc	0	0	0	file	monster unique mods: future monster spec
-0x005a39dc	0x005a3910	timed	7	monster	calc	0	0	0	file	monster unique mods: future monster spec
-0x005a3a6c	0x005a3910	timed	2	monster	f+51	0	0	0	file	monster unique mods: future monster spec
-0x005a3adb	0x005a3aa0	timed	7	monster	f+3	0	0	0	file	monster unique mods: future monster spec
-0x005a3eb4	0x005a3e70	timed	7	monster	f+4	0	0	0	file	monster unique mods: future monster spec
-0x005a3eda	0x005a3e70	timed	7	monster	f+4	0	0	0	file	monster unique mods: future monster spec
-0x005a425e	0x005a4230	timed	7	monster	f+75	0	0	0	file	monster unique mods: future monster spec
+0x005a1359	0x005a1330	timed	7	monster	f+75	0	0	0	code	monsters/init.md §19.6 (umod 41 init); event: monsters/umod-callbacks.md §26
+0x005a2613	0x005a25f0	timed	7	monster	f+4	0	0	0	code	monsters/umod-callbacks.md §6.1 (fire, unique death)
+0x005a2ed0	0x005a2eb0	timed	7	monster	f+2	0	0	0	code	monsters/umod-callbacks.md §13.1 (scarab, GH or death)
+0x005a37f3	0x005a37d0	timed	7	monster	f+2	0	0	0	code	monsters/umod-callbacks.md §10.1 (lightning, unique GH)
+0x005a3829	0x005a3800	timed	7	monster	f+4	0	0	0	code	monsters/umod-callbacks.md §4 (death event, umods 10 18 31 32 42)
+0x005a38ff	0x005a3840	timed	7	monster	calc	0	0	0	code	monsters/umod-callbacks.md §23.1 (ai_after_death: f+1+10*aip1 on a roll)
+0x005a39dc	0x005a3910	timed	7	monster	calc	0	0	0	code	monsters/umod-callbacks.md §23.2 r3 (revive blocked: f+1+10*aip1)
+0x005a3a6c	0x005a3910	timed	2	monster	f+51	0	0	0	code	monsters/umod-callbacks.md §23.2 r6 (after revive)
+0x005a3adb	0x005a3aa0	timed	7	monster	f+3	0	0	0	code	monsters/umod-callbacks.md §14 (killself while uninterruptable)
+0x005a3eb4	0x005a3e70	timed	7	monster	f+4	0	0	0	code	monsters/umod-callbacks.md §22.1 r1 (suicide minion from GH)
+0x005a3eda	0x005a3e70	timed	7	monster	f+4	0	0	0	code	monsters/umod-callbacks.md §22.1 r2 (suicide minion dead)
+0x005a425e	0x005a4230	timed	7	monster	f+75	0	0	0	code	monsters/umod-callbacks.md §26 (umod 41 period)
 0x005a697a	0x005a6920	timed	3	monster	f+1	0	0	0	code	monster mode / event handler (units.md §6.2)
 0x005a7423	0x005a73e0	timed	2	monster	f+45	0	0	0	code	monster mode / event handler (units.md §6.2)
 0x005a747d	0x005a73e0	timed	2	monster	f+aidel	0	0	0	code	monster mode / event handler (units.md §6.2)

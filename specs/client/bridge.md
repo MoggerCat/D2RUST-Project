@@ -9,7 +9,10 @@
   `client/msg-stats-items.md`); their handlers are not registered yet
   (§6), so the world model holds no game facts. The
   in-process link to `d2-server` is a trait until the server's wiring
-  lands (§3, open question 1).
+  lands (§3, open question 1). 2026-10-07: 62 ids have an owner in
+  `bridge-dispatch.tsv` (new: `audio/triggers.md`, `render/lighting.md`,
+  `client/msg-ui.md`, `client/msg-skills.md`); the output channel (§10)
+  is specified, not implemented.
 - **Target version:** 1.14d (the message bytes it carries); the bridge
   itself has no 1.14d counterpart to match.
 - **Crate/module:** `d2-client::bridge` (`link`, `intent`, `receive`,
@@ -24,25 +27,26 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 48–62 |
-| Inputs | 63–71 |
-| Outputs / state changes | 72–81 |
-| Rules | 82–83 |
-|   1. Boundary | 84–99 |
-|   2. Receive path | 100–122 |
-|   3. Server link | 123–141 |
-|   4. Send path (intents) | 142–162 |
-|   5. Client world model | 163–182 |
-|   6. Dispatch table | 183–205 |
-|   7. Bevy mirror | 206–224 |
-|   8. Frame pacing | 225–245 |
-|   9. Versioning | 246–256 |
-| Constants & data dependencies | 257–271 |
-| Randomness | 272–275 |
-| Edge cases & original bugs | 276–284 |
-| Test vectors | 285–310 |
-| Provenance | 311–321 |
-| Open questions | 322–346 |
+| Summary | 52–66 |
+| Inputs | 67–75 |
+| Outputs / state changes | 76–87 |
+| Rules | 88–89 |
+|   1. Boundary | 90–105 |
+|   2. Receive path | 106–128 |
+|   3. Server link | 129–147 |
+|   4. Send path (intents) | 148–168 |
+|   5. Client world model | 169–188 |
+|   6. Dispatch table | 189–211 |
+|   7. Bevy mirror | 212–230 |
+|   8. Frame pacing | 231–251 |
+|   9. Versioning | 252–262 |
+|   10. Client outputs (bridge → UI and audio) | 263–322 |
+| Constants & data dependencies | 323–337 |
+| Randomness | 338–341 |
+| Edge cases & original bugs | 342–350 |
+| Test vectors | 351–379 |
+| Provenance | 380–390 |
+| Open questions | 391–421 |
 <!-- /index -->
 
 ## Summary
@@ -78,6 +82,8 @@ receive).
   split discarded, handler rejections.
 - Bevy mirror entities (§7), spawned, updated and despawned from the
   world model each frame.
+- Client outputs (§10): UI and sound requests that handlers emit, in
+  1.14d call order, delivered once per frame to the UI and audio layers.
 
 ## Rules
 
@@ -254,6 +260,66 @@ receive).
    version field from its first commit; recordings go in
    `traces/FORMAT.md`.
 
+### 10. Client outputs (bridge → UI and audio)
+
+Some S→C messages mean a UI or sound action rather than (or as well as)
+model state: 1.14d's handler calls a UI or sound function directly
+(0x2C `0x004CBDE0`, 0x5D `0x004A2CB0`, 0x63 `0x0049CF90`, 0x77
+`0x004B8CF0`). The bridge carries those calls out as **outputs**.
+
+1. A handler may append outputs to the bridge's output list (`outputs`,
+   a field of the bridge, not of `ClientWorld`; §5 rule 1 is
+   unchanged). An output is one 1.14d UI or sound entry point with the
+   arguments it was called with. The bridge defines only the transport;
+   each variant, its payload and what the consumer does is owned by the
+   spec that owns the producing message (table below). A spec adding a
+   variant adds a row here.
+2. **Order.** Outputs are appended in the order 1.14d makes the calls:
+   message order within the frame (§2), and within one message the
+   handler's own call order. Messages applied in the update pass
+   (`client/model.md` §4–§5) emit there, in update order. The list is
+   never reordered, merged or de-duplicated.
+3. **Captured values.** Each payload holds the values the 1.14d call
+   read when the handler ran: message fields, and model facts read by the
+   handler (e.g. a unit's key, type, class). A consumer never reads the
+   model to fill a payload field, because a later message in the same
+   frame may have changed it. A consumer may resolve a unit key for
+   something 1.14d tracks over time (a sound's position follows its unit,
+   `audio/triggers.md` §1); a key that no longer resolves is open
+   question 6.
+4. **Delivery.** At the end of `bridge_frame` (§8 rule 1, after every
+   chunk is dispatched and the counters are updated) the list is handed
+   over whole and cleared. One dispatcher applies it in list order,
+   calling the UI handler or the audio handler per item (§7 rule 1: before
+   the input and UI systems of the frame). One frame's outputs are all
+   applied before the next frame's receive.
+5. **Consumers.** Each variant has exactly one consumer. A 1.14d UI
+   function that itself plays sounds or changes UI states is one UI
+   output; the UI layer makes those sounds through its own request path
+   (`audio/triggers.md` §11). Likewise a 1.14d sound function that also
+   shows text is one audio output, and the audio layer makes the text
+   request (`audio/triggers.md` §2 r4). A 1.14d function whose result decides
+   whether the rest of the handler runs (`SetUIState` returning 1,
+   `ui/panels.md` §2) is inside the output, so the UI layer, not the
+   bridge, evaluates it.
+6. **No feedback into the model.** A consumer never writes `ClientWorld`.
+   A UI action that sends a C→S message (e.g. 0x77 → C→S 0x4F) uses the
+   send path (§4), so it reaches the server at the next pump (§8 rule 3),
+   as in 1.14d where these sends happen inside the receive.
+7. Outputs are not persisted and not part of a check by themselves; the
+   consumer's check (UI pixels, audio request log) covers them.
+8. Mechanical check (with §6 rule 5): every variant in code has exactly
+   one row in the table below with the same producer id, and every row
+   has a variant.
+
+<!-- rows -->
+| Variant | Payload | Producer | Consumer | Owner (what the consumer does) |
+|---|---|---|---|---|
+| `ServerSound` | unit key (type, GUID), unit class, event u16 | 0x2C | audio | `audio/triggers.md` §2 r4 |
+| `QuestUi` | chain u8, flags u8, status u8, extra i16 | 0x5D (every case except the eclipse) | UI | `client/msg-ui.md` §1 |
+| `WaypointMenu` | object GUID u32, record 16 bytes (as received) | 0x63 | UI | `client/msg-ui.md` §2 |
+| `TradeAction` | code u8 | 0x77 | UI | `client/msg-ui.md` §3 |
+
 ## Constants & data dependencies
 
 | Constant | Value | Owner |
@@ -307,6 +373,9 @@ Synthetic, run as unit tests in `crates/d2-client/src/bridge/tests.rs`.
 | link version ≠ `PROTOCOL_VERSION` | bridge refuses the link | §9 rule 1 |
 | test handlers add units (1, 7), (2, 9); Bevy `App` update | 2 `UnitView` entities in key order; after removing (1, 7) and one update, 1 entity | §7 rule 3 |
 | dispatch TSV with one owner changed | check reports exactly that id | §6 rule 5 |
+| chunk [0x2C for (1, 0x26) event 18; 0x77 code 0x10] | outputs = [`ServerSound` (1, 0x26) 18, `TradeAction` 0x10], in that order, delivered once after the frame | §10 rules 2, 4 |
+| frame with no outputs | dispatcher not called; list empty | §10 rule 4 |
+| 0x2C for (1, 0x26), then 0x0A removing (1, 0x26), same chunk | `ServerSound` still delivered with the class captured at receive | §10 rule 3 |
 
 ## Provenance
 
@@ -343,3 +412,9 @@ from `specs/`, `docs/` and `crates/` only.
    open questions 1, 2).
 5. Answered by `client/model.md` §4 rule 2: the pre-steps of 0x0D, 0x18,
    0x95, 0x96 write nothing any handler reads; they have no effect.
+6. A sound output whose unit is removed later in the same frame (§10
+   rule 3): 1.14d starts the sound inside the handler, while the unit
+   exists; whether the audio layer must then keep its last position or
+   drop the position tracking follows `audio/triggers.md` §1's rule for a
+   freed unit. Settle with the request log (`audio/triggers.md` Checks)
+   on a 0x2C followed by 0x0A in one chunk.

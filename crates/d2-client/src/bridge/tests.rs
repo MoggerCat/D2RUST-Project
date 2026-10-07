@@ -541,6 +541,12 @@ fn bridge_modules_except_mirror_have_no_bevy_type() {
         ("msg/session.rs", include_str!("msg/session.rs")),
         ("msg/units.rs", include_str!("msg/units.rs")),
         ("msg/stats_items.rs", include_str!("msg/stats_items.rs")),
+        ("msg/skills.rs", include_str!("msg/skills.rs")),
+        ("msg/ui.rs", include_str!("msg/ui.rs")),
+        ("msg/sound.rs", include_str!("msg/sound.rs")),
+        ("msg/lighting.rs", include_str!("msg/lighting.rs")),
+        ("output.rs", include_str!("output.rs")),
+        ("skills.rs", include_str!("skills.rs")),
     ];
     for (name, src) in sources {
         for line in code_lines(src) {
@@ -678,14 +684,31 @@ fn owned_rows_are_exactly_the_registered_handlers() {
         .collect();
     let registered: Vec<(u8, &str)> = dispatch::HANDLERS.iter().map(|h| (h.id, h.owner)).collect();
     assert_eq!(owned, registered);
-    // The three client model specs own 53 ids (0x7A, 0x81: model §14).
-    assert_eq!(owned.len(), 53);
+    // The three client model specs own 53 ids (0x7A, 0x81: model §14);
+    // `msg-skills.md` 4 (0x21–0x23, 0x94), `msg-ui.md` 3 (0x5D, 0x63,
+    // 0x77), `audio/triggers.md` 0x2C and `render/lighting.md` 0x53.
+    assert_eq!(owned.len(), 62);
+    let per = |spec: &str| owned.iter().filter(|(_, o)| *o == spec).count();
+    assert_eq!(
+        [
+            super::msg::SKILLS,
+            super::msg::UI,
+            super::msg::TRIGGERS,
+            super::msg::LIGHTING
+        ]
+        .map(per),
+        [4, 3, 1, 1]
+    );
     for (_, o) in &owned {
         assert!(
             [
                 super::msg::MODEL,
                 super::msg::UNITS,
-                super::msg::STATS_ITEMS
+                super::msg::STATS_ITEMS,
+                super::msg::SKILLS,
+                super::msg::UI,
+                super::msg::TRIGGERS,
+                super::msg::LIGHTING
             ]
             .contains(o),
             "{o}"
@@ -870,4 +893,64 @@ fn update_pass_runs_on_ticked_in_game_frames_and_answers_are_sent() {
     assert_eq!((r.queued, r.drained), (1, 0));
     assert_eq!(b.world().units[&key].queue.len(), 1);
     assert!(b.log().rejected.is_empty());
+}
+
+// Covers: specs/client/bridge.md §10 r2, §10 r4
+#[test]
+fn outputs_are_handed_over_once_after_the_frame() {
+    use super::output::Output;
+    let (mut b, link) = bridge();
+    // Object 13 (class 37), then 0x2C on it (event 18) and 0x77 0x10.
+    let chunk = [
+        hx("51 02 0d 00 00 00 25 00 14 12 c0 11 02 00"),
+        hx("2c 02 0d 00 00 00 12 00"),
+        hx("77 10"),
+    ]
+    .concat();
+    link.deliver(false, &[&chunk]);
+    let r = b.frame().unwrap();
+    assert_eq!(r.outputs, 2);
+    let want = [
+        Output::ServerSound {
+            unit: UnitKey::new(2, 13),
+            class: 37,
+            event: 18,
+        },
+        Output::TradeAction { code: 0x10 },
+    ];
+    assert_eq!(b.outputs(), want);
+    assert_eq!(b.take_outputs(), want);
+    assert!(b.take_outputs().is_empty(), "handed over once");
+    // A frame with no outputs: the list stays empty.
+    link.deliver(false, &[]);
+    assert_eq!(b.frame().unwrap().outputs, 0);
+    assert!(b.outputs().is_empty());
+}
+
+// Covers: specs/client/bridge.md §10 r4
+#[test]
+fn the_bevy_frame_hands_the_outputs_over() {
+    use super::mirror::FrameOutputs;
+    use super::output::Output;
+    let link = ScriptedLink::new();
+    link.deliver(false, &[&hx("77 15")]);
+    link.deliver(false, &[]);
+    let bridge = Bridge::new(Box::new(link) as _).unwrap();
+    let mut app = App::new();
+    app.add_plugins(BridgePlugin)
+        .insert_resource(BridgeResource(bridge));
+    app.update();
+    assert_eq!(
+        app.world().resource::<FrameOutputs>().0,
+        [Output::TradeAction { code: 0x15 }]
+    );
+    assert!(app
+        .world()
+        .resource::<BridgeResource>()
+        .0
+        .outputs()
+        .is_empty());
+    // The next frame replaces them (nothing new).
+    app.update();
+    assert!(app.world().resource::<FrameOutputs>().0.is_empty());
 }

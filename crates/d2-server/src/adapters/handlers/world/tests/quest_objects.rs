@@ -23,17 +23,20 @@ use crate::adapters::handlers::world::WorldHost;
 
 const STONE: u32 = 17;
 const GIBBET: u32 = 26;
+const LAM_ESEN_TOME: u32 = 29;
 const WIRT: u32 = 30;
 
 /// objects.txt rows 0–30: a Cairn stone (17: init 6, operate 9), the
 /// gibbet (26: operate 10, `FrameCnt1` 15 × 256), an object with quest
-/// operate 33 (no quest spec states it).
+/// operate 28 (Lam Esen's tome: no dispatcher entry states it), Wirt's
+/// body (operate 33, `quests-act1-rest.md` §9 item 11).
 fn tables() -> ObjectTables {
     let mut rows = vec![blank::<Objects>(); 31];
     rows[STONE as usize].initfn = 6;
     rows[STONE as usize].operatefn = 9;
     rows[GIBBET as usize].operatefn = 10;
     rows[GIBBET as usize].framecnt1 = 15 << 8;
+    rows[LAM_ESEN_TOME as usize].operatefn = 28;
     rows[WIRT as usize].operatefn = 33;
     ObjectTables {
         objects: rows,
@@ -139,20 +142,46 @@ fn the_gibbet_operate_and_its_event_7_run_on_the_quest_control() {
 // Covers: specs/world/objects.md §7.2 r4
 #[test]
 fn a_quest_operate_no_spec_states_is_handed_back() {
+    // Operate 28 has no entry in the wired dispatcher
+    // (`quest_objects::operate_fn`; Wirt's 33 has one since
+    // `quests-act1-rest.md` §9 item 11 stated it).
+    let mut fx = fixture();
+    let tome = fx.object(LAM_ESEN_TOME);
+    fx.frames(1);
+    let g = fx.guid(tome);
+    let (code, _) = send(&mut fx.h, &operate(g));
+    assert_eq!(code, ResultCode::Done);
+    let p = fx.player;
+    let want = ObjectRoute::Operate(Dispatch::Quest(Operate {
+        object: tome,
+        operator: Some(p),
+        class: LAM_ESEN_TOME as u16,
+        operate_fn: 28,
+    }));
+    assert_eq!(fx.h.game.events.hooks().x.routes, vec![want]);
+}
+
+// Covers: specs/world/quests-act1-rest.md §9 r11, §edge-cases-original-bugs r9
+#[test]
+fn wirts_body_operate_runs_on_the_quest_code() {
+    // Operate 33 runs `0x00583E70`: mode 0, drop code `leg ` and the drop
+    // `0x00559A30`, which this host does not provide (the rest reports
+    // it): no item, so the mode stays 0 and no event is scheduled; the
+    // route is not handed back.
     let mut fx = fixture();
     let wirt = fx.object(WIRT);
     fx.frames(1);
     let g = fx.guid(wirt);
     let (code, _) = send(&mut fx.h, &operate(g));
     assert_eq!(code, ResultCode::Done);
-    let p = fx.player;
-    let want = ObjectRoute::Operate(Dispatch::Quest(Operate {
-        object: wirt,
-        operator: Some(p),
-        class: WIRT as u16,
-        operate_fn: 33,
-    }));
-    assert_eq!(fx.h.game.events.hooks().x.routes, vec![want]);
+    assert!(fx.h.game.events.hooks().x.routes.is_empty());
+    assert_eq!(fx.mode(wirt), 0);
+    assert!(fx
+        .world()
+        .rest
+        .log
+        .iter()
+        .any(|l| l == "unhandled 255 0x559a30"));
 }
 
 /// A quest call reading back the calls `HostQuests` answers.
@@ -228,6 +257,7 @@ fn a_queued_pet_follow_warps_the_living_hireling_after_the_tick() {
     let w = fx.world();
     w.state.hireling_tables = Some(HirelingTables {
         rows: Default::default(),
+        exp_ratios: Default::default(),
         max_level: 99,
         pet_flags: HirelingTables::WARP,
         pet_basemax: 1,
@@ -257,4 +287,63 @@ fn a_queued_pet_follow_warps_the_living_hireling_after_the_tick() {
     assert_eq!(f2(&mut fx, merc) & flags::WARP2, flags::WARP2);
     assert_eq!(f2(&mut fx, dead) & flags::WARP2, 0);
     assert_eq!(fx.h.game.events.hooks().pet_follows, Some(vec![]));
+}
+
+// ---- the hireling's death -----------------------------------------------------------------
+
+// Covers: specs/world/hirelings.md §8 r1, §8 r2
+#[test]
+fn a_queued_kill_marks_the_player_owned_hireling_dead_after_the_tick() {
+    use d2_sim::world::hirelings::{HirelingTables, PetNode};
+    let mut fx = fixture();
+    let req = AllocRequest {
+        ty: UnitType::Monster,
+        class: 0,
+        room: None,
+        add: true,
+        fixed_guid: None,
+        mode: 1,
+        allied: false,
+    };
+    let s = &mut fx.h.game;
+    let merc = s
+        .events
+        .with(&mut s.game, |g, v| v.allocate(g, &req, 0, 0))
+        .unwrap();
+    let gm = fx.guid(merc);
+    let p = fx.player;
+    let pg = fx.guid(p);
+    let w = fx.world();
+    w.state.hireling_tables = Some(HirelingTables {
+        rows: Default::default(),
+        exp_ratios: Default::default(),
+        max_level: 99,
+        pet_flags: HirelingTables::WARP,
+        pet_basemax: 1,
+    });
+    w.state.hirelings.list_mut(p).nodes = vec![PetNode {
+        guid: gm,
+        name: 0x0D68,
+        ..PetNode::default()
+    }];
+    w.rest.owners.insert(merc, (pg, 0));
+    // The kill queues the defender (`ActionHooks::pet_deaths`, on from
+    // the first frame); here staged.
+    let q = fx.h.game.events.hooks().pet_deaths.as_mut().unwrap();
+    assert!(q.is_empty());
+    q.push(merc);
+    fx.h.connect(0);
+    fx.frames(1);
+    assert!(fx.world().state.hirelings.list(p).unwrap().nodes[0].dead);
+    // 0x9B (name 0x0D68, cost at level 0 = 0) to the owner, then the
+    // 0x7A remove with the pet GUID @9.
+    let mut remove = vec![0x7A, 0, 0, 0, 0, 0, 0, 0, 0];
+    remove.extend_from_slice(&gm.to_le_bytes());
+    let to_p: Vec<Vec<u8>> =
+        fx.h.receive(0)
+            .into_iter()
+            .filter(|m| m[0] == 0x9B || m[0] == 0x7A)
+            .collect();
+    assert_eq!(to_p, vec![vec![0x9B, 0x68, 0x0D, 0, 0, 0, 0], remove]);
+    assert_eq!(fx.h.game.events.hooks().pet_deaths, Some(vec![]));
 }

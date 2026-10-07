@@ -220,6 +220,13 @@ pub trait UnitHooks: StatHost {
     /// Event 2 `0x005B1740`: AI think. Provider: AI spec.
     fn ai_think(&mut self, sim: &mut Sim<'_>, unit: UnitId, a1: u32, a2: u32) {}
 
+    /// The umod dispatcher's mode-set sites inside `0x005A7C20`
+    /// (`monsters/umod-callbacks.md` §2 rules 1–2): `mode` 0
+    /// (`0x005A4350`, before the start function, never for GH) and 1
+    /// (`0x005A4360`, after the animation prepare, before the cancel of
+    /// events 0 / 1). Provider: monster spec (`monsters::init::dispatch`).
+    fn monster_umods(&mut self, sim: &mut Sim<'_>, unit: UnitId, mode: u8) {}
+
     /// Event 7 `0x005A4370`. Provider: monster spec.
     fn monster_umod(&mut self, sim: &mut Sim<'_>, unit: UnitId, a1: u32, a2: u32) {}
 

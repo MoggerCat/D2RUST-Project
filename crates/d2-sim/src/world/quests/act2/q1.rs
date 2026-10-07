@@ -1,4 +1,5 @@
 // Spec: specs/world/quests-act2.md §3 (A2Q1 Radament's Lair, chain 8, slot 9)
+// Spec: specs/world/quests-act2-2.md §1 items 1, 2, 19
 //! A2Q1 callback by callback: events 0, 2, 3, 8, 10, 11, 13, the status
 //! timer `0x00598F70`, the active function `0x00598910`, Radament's AI
 //! hook `0x00599420` ([`radament_ai`]) and the Book of Skill use
@@ -71,8 +72,8 @@ pub(super) fn callback<W: QuestWorld>(
         event::NPC_DEACTIVATE => chat_end(ctl, w, i, args),
         event::CHANGED_LEVEL => changed_level(ctl, w, i, args),
         event::MONSTER_KILLED => kill(ctl, w, i, args),
-        // `0x00598980`: §1.1, event 10 removes the player from the
-        // record's list (`0x00545530`).
+        // `0x00598980`: a jump to `0x00545530` (`quests-act2-2.md` §1
+        // item 2).
         event::PLAYER_LEAVES_GAME => remove_guid(ctl, w, i, args.player),
         event::SCROLL_MESSAGE => scroll(ctl, w, i, args),
         event::PLAYER_STARTED_GAME => start(ctl, w, i, args),
@@ -228,9 +229,9 @@ pub fn radament_ai<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, unit: UnitI
         }
         iterate_progress(ctl, w, i);
     } else if changed {
-        // TODO(quests-act2 §3.6): status ≥ 2 with a state below 3 is not
-        // specified (no 1.14d path reaches it); reported.
-        w.unhandled(CHAIN, 0x0059_9420);
+        // Status ≥ 2: the flag iterate only when the state was just
+        // raised, no 0x5D (`quests-act2-2.md` §1 item 19).
+        iterate_progress(ctl, w, i);
     }
 }
 

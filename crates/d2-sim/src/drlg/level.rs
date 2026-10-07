@@ -136,6 +136,11 @@ pub struct Drlg {
     pub rooms_built: u32,
     /// Builds since the last client update (+0x98, u8).
     pub builds_since_update: u8,
+    /// Client build timer T (+0x45C, u8; `rooms.md` §4.6 rule 2).
+    pub build_timer: u8,
+    /// Client build cursor C (+0x460; `rooms.md` §4.6 rule 2): a DRLG
+    /// room, or `None` for none and for the status-2 list's head node.
+    pub build_cursor: Option<DrlgRoomId>,
     /// Freed-room counter (+0x468).
     pub freed_rooms: u32,
     pub(super) levels: Vec<Level>,
@@ -167,6 +172,8 @@ impl Drlg {
             jungle_link: false,
             rooms_built: 0,
             builds_since_update: 0,
+            build_timer: 0,
+            build_cursor: None,
             freed_rooms: 0,
             levels: Vec::new(),
             level_head: None,

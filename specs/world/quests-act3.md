@@ -12,6 +12,7 @@
   act transitions, warps and the Durance warp §8, quest items and
   helpers §9; this spec uses its terms and never restates them);
   `world/quests-act2.md` (same layout and notation, Act II quests);
+  `world/quests-act3-2.md` (part 2: §11 implementation clarifications);
   `world/quests.tsv` (records and callbacks: rows 17–24 and 39),
   `world/quest-messages.tsv` (NPC message tables of chains 14–20 and
   39); `world/cube.md` §8 (the `qf2 ` transmute calls §4.8 here);
@@ -24,26 +25,27 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 49–64 |
-| Inputs | 65–75 |
-| Outputs / state changes | 76–86 |
-| Rules | 87–88 |
-|   1. Conventions | 89–158 |
-|   2. Act III records | 159–186 |
-|   3. A3Q1 Lam Esen's Tome (chain 15, slot 17) | 187–270 |
-|   4. A3Q2 Khalim's Will (chain 16, slot 18) | 271–386 |
-|   5. A3Q3 Blade of the Old Religion (chain 17, slot 19) | 387–493 |
-|   6. A3Q4 The Golden Bird (chain 18, slot 20) | 494–582 |
-|   7. A3Q5 The Blackened Temple (chain 19, slot 21) | 583–679 |
-|   8. A3Q6 The Guardian (chain 20, slot 22) | 680–777 |
-|   9. Act III gossip and intro records | 778–839 |
-|   10. Hooks called from other systems | 840–860 |
-| Constants & data dependencies | 861–877 |
-| Randomness | 878–891 |
-| Edge cases & original bugs | 892–930 |
-| Test vectors | 931–948 |
-| Provenance | 949–974 |
-| Open questions | 975–996 |
+| Summary | 51–66 |
+| Inputs | 67–77 |
+| Outputs / state changes | 78–88 |
+| Rules | 89–90 |
+|   1. Conventions | 91–160 |
+|   2. Act III records | 161–188 |
+|   3. A3Q1 Lam Esen's Tome (chain 15, slot 17) | 189–272 |
+|   4. A3Q2 Khalim's Will (chain 16, slot 18) | 273–388 |
+|   5. A3Q3 Blade of the Old Religion (chain 17, slot 19) | 389–495 |
+|   6. A3Q4 The Golden Bird (chain 18, slot 20) | 496–584 |
+|   7. A3Q5 The Blackened Temple (chain 19, slot 21) | 585–681 |
+|   8. A3Q6 The Guardian (chain 20, slot 22) | 682–779 |
+|   9. Act III gossip and intro records | 780–841 |
+|   10. Hooks called from other systems | 842–862 |
+|   11. Clarifications (QC-1 … QC-7) | 863–869 |
+| Constants & data dependencies | 870–886 |
+| Randomness | 887–900 |
+| Edge cases & original bugs | 901–948 |
+| Test vectors | 949–966 |
+| Provenance | 967–993 |
+| Open questions | 994–1016 |
 <!-- /index -->
 
 ## Summary
@@ -821,7 +823,7 @@ spawned, +0x0D minion timer exists, +0x10 wanderer GUID.
   +0x0D := 0. Wanderer exists: one quest-seed step; for i = (lo' & 1)
   … 7: spot = wanderer position + offset[i] (table `0x00741538`: (−3,
   −3), (−3, 0), (−3, 3), (0, −3), (0, 3), (3, −3), (3, 0), (−3, 3));
-  free spot (`0x00545340`, size 3, mask 0x3F11, radius 11, limit 100);
+  free spot (`0x00545340`, size 3, mask 0x3F11, radius 11 (unused: `0x00545340` never reads this sixth argument, `[ebp+0x14]`; the search runs to the limit), limit 100);
   found → object 131 there (`0x00555230`, flags 1, 0, 0). Returns 1.
   Object 131's event 7 spawns monster 301 `vilechild1` in level 76
   (`quests.md` §9.5).
@@ -857,6 +859,13 @@ the player's class matches, else 0. Event 11 (`0x005B6C60`): 458 from
 
 `0x005BBE20` (a status-like function for chain 19) is never stored or
 called.
+
+### 11. Clarifications (QC-1 … QC-7)
+
+Moved to `world/quests-act3-2.md` §11 (size split): bit 17.3 never set,
+Mephisto's progression step, the `&level` output of `0x00559A30`, the
+boss-choice and Gidbinn kill tests, the orb's weapon accessor, the dead
+map-AI hooks, and the positions and rooms of §5.6, §5.7, §9.1, §9.2.
 
 ## Constants & data dependencies
 
@@ -927,6 +936,15 @@ quest code draws.
 16. Khalim's status function never tests 18.0 (§4.9).
 17. `0x005B7230`, `0x005BD040`, `0x005BCF60` (status re-send) and
     `0x005BBE20` have no caller in 1.14d.
+18. Bit 17.3 is never set in 1.14d, so the §3.7 event-13 "17.3 → state
+    3" branch runs only for a save that already carries the bit (`quests-act3-2.md` §11.1).
+19. The Gidbinn boss is a random boss with champions allowed: it can be
+    a champion fetish11 instead of a unique one (`quests-act3-2.md` §11.4).
+20. `0x005B7120` (Hratli end position) has no caller; with `quests-act3-2.md` §11.6 the
+    Hratli and Natalya map-AI branches are dead code.
+21. A Dark Wanderer object whose point (x + 7, y) lies in no room near
+    the object spawns no wanderer and keeps trying at each later init
+    43 (`quests-act3-2.md` §11.7 rule 4).
 
 ## Test vectors
 
@@ -971,25 +989,27 @@ quest code draws.
   the room's level id (`0x0061A1B0`) against 104; the `levels.txt` Id
   column is that runtime id (row 0 Null, no offset), so 104 is Outer
   Steppes (Act 4 - Mesa 1), not Pandemonium Fortress (103).
+- §11 clarifications: provenance in `world/quests-act3-2.md`.
 
 ## Open questions
 
 1. Status meanings per Act III quest (client quest log): settle with
    `quests.md` open question 1.
-2. `0x00559A30`'s `&level` argument: Act III callers pass slots holding
-   an operate-context pointer (chests, Gidbinn) or uninitialised stack;
-   whether the item code reads the incoming value (item spec).
-3. Monstats flags byte +0x0D bit 6 tested by the boss choice (§6.2):
-   name the flag (monster spec).
-4. `0x005A0180` / `0x0063E9F0` (Gidbinn boss kill test) and the
-   `0x005A43E0` spawn arguments: monster spec.
-5. `0x00538680(client, 3, difficulty)` on Mephisto's credit: which save
-   progression field (save spec; with `quests-act2.md` open question 7).
-6. The orb's weapon accessor `0x0063BEF0`: which inventory slot (item /
-   inventory spec).
-7. `quests.tsv` column `spec` still says `catalogued` for Act III rows;
-   switch it to `specified` (with a link to this file) once `quests.md`
-   §2.4 documents owner files per act.
+2. Answered (`quests-act3-2.md` §11.3): `&level` is an output, written at `0x00559AF8`
+   before any read; the item level is the source monster's stat 12 or
+   the object's area level.
+3. Answered (`quests-act3-2.md` §11.4): mask 0x40 at `0x006CE280` on byte +0x0D = flag
+   word bit 14, the `flying` column.
+4. Answered (`quests-act3-2.md` §11.4): type flags & 0x0E (superunique, champion,
+   unique) or monstats `boss`; the spawn is the random boss of
+   `monsters/init.md` §16.1 with champion allowed = 1.
+5. Answered (`quests-act3-2.md` §11.2): `quests-act1-rest.md` §5, n = (4 or 5)·difficulty
+   + 3 into client +0x0A bits 8–12 (`0x005BC182`).
+6. Answered (`quests-act3-2.md` §11.5): the weapon in use (inventory +0x1C GUID) at body
+   location 5, else 4, of item type `weap`.
+7. Answered (cross-file request to PC 2 quests-core,
+   `docs/handoff/pc2-spec-quests-act3.md`): `quests.tsv` rows 17–24 and
+   39, column `spec` := `specified`; owner of those rows is this file.
 8. Record a full Act III run (packets + RNG, `docs/HANDOFF.md` §5):
    chest drops, the Alkor reward broadcast, council kills, the orb, the
    Hellgate and Natalya's spawn.

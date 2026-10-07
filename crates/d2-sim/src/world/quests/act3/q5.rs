@@ -1,4 +1,4 @@
-// Spec: specs/world/quests-act3.md §7 (A3Q5 The Blackened Temple, chain 19)
+// Spec: specs/world/quests-act3.md §7 (A3Q5 The Blackened Temple, chain 19); specs/world/quests-act3-2.md §11.3, §11.5
 //! A3Q5: events 0, 2, 3, 8, 10, 11, 13, the active function, the council
 //! registration, the Compelling Orb (init 60, operate 53), stairs R
 //! (init 53) and the Durance warp check.
@@ -398,7 +398,38 @@ pub fn orb_init<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: UnitId
     }
 }
 
-/// Orb operate 53 `0x005BB980` (returns 0).
+/// One hand item for [`weapon_in_use`]: its GUID, whether it is of item
+/// type 45 `weap` (`0x00629BB0`, equivalent types included) and its code.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HandItem {
+    pub guid: u32,
+    pub weap: bool,
+    pub code: [u8; 4],
+}
+
+/// `0x0063BEF0(inventory)` (`quests-act3-2.md` §11.5), what the host's
+/// [`QuestWorld::weapon_code`] reads the code of: the weapon in use.
+/// `weapon_guid` is inventory +0x1C (−1: none); `left` / `right` are the
+/// items at body locations 5 and 4. The left hand is tried first; each
+/// must be `weap` with the GUID +0x1C. The swap locations 11 / 12 are
+/// never consulted (edge case 2 of part 2).
+pub fn weapon_in_use(
+    weapon_guid: u32,
+    left: Option<HandItem>,
+    right: Option<HandItem>,
+) -> Option<HandItem> {
+    if weapon_guid == u32::MAX {
+        return None;
+    }
+    [left, right]
+        .into_iter()
+        .flatten()
+        .find(|h| h.weap && h.guid == weapon_guid)
+}
+
+/// Orb operate 53 `0x005BB980` (returns 0). The weapon test compares
+/// the code of the weapon in use ([`weapon_in_use`]) with `qf2 `
+/// (`0x005BB9B3`).
 pub fn orb_operate<W: QuestWorld>(
     ctl: &mut QuestControl,
     w: &mut W,

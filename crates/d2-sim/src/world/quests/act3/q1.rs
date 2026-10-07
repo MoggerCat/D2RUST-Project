@@ -1,4 +1,4 @@
-// Spec: specs/world/quests-act3.md §3 (A3Q1 Lam Esen's Tome, chain 15)
+// Spec: specs/world/quests-act3.md §3 (A3Q1 Lam Esen's Tome, chain 15); specs/world/quests-act3-2.md §11.1, §11.3
 //! A3Q1: events 0, 2, 3, 4, 5, 9, 10, 11, 13, 14, the status and active
 //! functions and the tome object (operate 28, init 23).
 
@@ -23,6 +23,10 @@ const MSG_STATE: [i8; 4] = [-1, 0, 1, 2];
 const LOWER_KURAST: u32 = 79;
 /// Stat 4 (`statpts`).
 const STATPTS: u16 = 4;
+/// 17.3, read by event 13 (§3.7). No 1.14d code sets it
+/// (`quests-act3-2.md` §11.1, edge case 18): only a save already carrying
+/// it reaches that branch, so nothing here writes it.
+const SAVED_LEFT_TOWN: u8 = 3;
 
 /// Chain 15's extra data (§3.1).
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -288,7 +292,7 @@ fn started<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, args: Eve
         x.tome_mode = 2;
         x.tome_active = true;
         x.holders.add(g);
-    } else if f.get(SLOT, 3) {
+    } else if f.get(SLOT, SAVED_LEFT_TOWN) {
         ctl.records[i].state = 3;
         status_silent(ctl, i, 1);
     } else if f.get(SLOT, bit::STARTED) {
@@ -392,6 +396,7 @@ pub fn tome_operate<W: QuestWorld>(
         w.attach_sound(player, sound::REFUSED);
         return;
     }
+    // Item level: the area level of the object's level (§11.3).
     if w.quest_drop(object, TOME, 2, None, false).is_none() {
         return;
     }

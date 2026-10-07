@@ -20,11 +20,14 @@
 
 use d2_sim::rng::Seed;
 
-use crate::bridge::world::{ClientWorld, LevelRow, ITEM, OBJECT, TILE};
+use crate::bridge::drlg::DrlgRoomId;
+use crate::bridge::world::{ClientWorld, LevelRow, UnitKey, ITEM, OBJECT, TILE};
 use crate::bridge::ClientUnit;
+use crate::rules::draw_order::{FadeClock, NearRooms, UnitFacts};
 use crate::rules::{MapTile, OpenMode, UnitPosition, ViewSource};
 
 use super::feed::{NoFeed, RunningShake, ViewFeed};
+use super::near_rooms::MapState;
 use super::{UnitPose, ViewAssets, ViewError};
 
 /// The 16.16 position of a dynamic path at the centre of cell `c`
@@ -60,33 +63,31 @@ pub fn unit_position(unit: &ClientUnit) -> Result<UnitPosition, String> {
 /// leaves them to `inner` ([`NoFeed`]: none).
 pub const PENDING: &[(&str, &str)] = &[
     (
-        "ViewFeed::near_rooms (room unit lists)",
-        "the near-room array (`draw-order.md` §3, §9) lists each room's units (room +0x74) in the \
-         client's list order; which client code links a client unit into a room, and the Y sort \
-         `0x0064C0C0` the draw path calls through `0x00619EA0` (`sim/unit-order.md` §5 r5), are \
-         not specified (`unit-order.md` §5 is the server's lists)",
-    ),
-    (
-        "ViewFeed::near_rooms, ViewSource::map_tiles (tile records)",
-        "the client DRLG builds the rooms in sight and their tile records (`model.md` §12 r1), \
-         but a record's DT1 roof height (+0x04) and height (+0x08) (`draw-order.md` §9) are not \
-         in `d2_sim::drlg::TileInfo`, and the record → DT1 file mapping is `draw-order.md` open \
-         question 12",
+        "ViewFeed::near_rooms (room unit facts)",
+        "the near rooms are built from the client DRLG (`ModelFeed::with_map`, `near_rooms.rs`: \
+         rooms, tile records with roof height and height, coordinate records, persisted fades, \
+         the room unit lists in the client's order with the fill's Y sort written back), but a \
+         listed unit's flags (+0xC4), flag-ex (+0xC8), monstats2 `unflatDead`, objects \
+         `DrawUnder`, states 7 / 143 / 146 and the sight test (`draw-order-2.md` §15) are not in \
+         the model (`ViewFeed::unit_facts` refuses)",
     ),
     (
         "ViewFeed::tile_art, ViewSource::tile_blocks",
-        "no ordered map tiles (above); walls also need the wall direction and fade state",
+        "each record's DT1 entry (path, index) is known (`rooms.md` §9.3, `MapState::entry`), \
+         but the art's shade and blend and the per-block shading need the frame's light \
+         (below); so the app runs the feed without the map (`ModelFeed::map` off)",
     ),
     (
         "ViewFeed::light",
         "the light map needs the act environment (S→C 0x53 has no client handler), light \
          records and the per-unit look inputs (fade, ghostly, hover, items, remaps); none is in \
-         the model",
+         the model (the record list `ClientWorld::lights` exists and the act room callback runs \
+         over it, but no unit code creates records)",
     ),
     (
         "ViewFeed::weather_frame",
         "the player's level is known now (`model.md` §11 r5), but no water floor is drawn \
-         without the near rooms (above) and passes 4 / 9 have no art path yet",
+         without tile art (above) and passes 4 / 9 have no art path yet",
     ),
     (
         "ViewFeed::player_seed, ViewFeed::shake",
@@ -105,6 +106,11 @@ pub struct ModelFeed<F = NoFeed> {
     /// The original UI's open mode (`ui/panels.md` §4.2), once the world
     /// view has handed one over; `None`: `open_mode` goes to `inner`.
     pub ui_open_mode: Option<OpenMode>,
+    /// The map from the client DRLG (`draw-order.md` §9). `None` (the
+    /// default): `near_rooms` goes to `inner`. Opt-in ([`Self::with_map`])
+    /// while tile art is pending: with near rooms every drawn tile needs
+    /// [`ViewFeed::tile_art`] (`PENDING`).
+    pub map: Option<MapState>,
 }
 
 impl<F> ModelFeed<F> {
@@ -113,7 +119,14 @@ impl<F> ModelFeed<F> {
             inner,
             levels: None,
             ui_open_mode: None,
+            map: None,
         }
+    }
+
+    /// The feed with the client DRLG's near rooms (`draw-order.md` §9).
+    pub fn with_map(mut self) -> Self {
+        self.map = Some(MapState::default());
+        self
     }
 }
 
@@ -199,6 +212,57 @@ impl<F: ViewFeed> ViewFeed for ModelFeed<F> {
     fn light(&self, world: &ClientWorld) -> Result<Option<super::feed::FeedLight<'_>>, ViewError> {
         self.inner.light(world)
     }
+
+    /// `draw-order.md` §9 from the client DRLG when the map is on
+    /// ([`MapState`]); the unit facts the model holds (type, mode, local
+    /// player) over the inner feed's for the rest.
+    fn near_rooms(&mut self, world: &ClientWorld) -> Result<Option<&mut NearRooms>, ViewError> {
+        let Self {
+            inner, levels, map, ..
+        } = self;
+        let Some(map) = map.as_mut() else {
+            return inner.near_rooms(world);
+        };
+        let inner = &*inner;
+        map.near_rooms(world, levels.as_deref(), |u| {
+            Ok(UnitFacts {
+                unit_type: u.key.unit_type,
+                mode: u.mode,
+                local: world.local_player == Some(u.key),
+                ..inner.unit_facts(world, u)?
+            })
+        })
+    }
+
+    fn unit_facts(&self, world: &ClientWorld, unit: &ClientUnit) -> Result<UnitFacts, ViewError> {
+        self.inner.unit_facts(world, unit)
+    }
+
+    fn take_unit_orders(&mut self) -> Vec<(DrlgRoomId, Vec<UnitKey>)> {
+        match self.map.as_mut() {
+            Some(m) => m.take_unit_orders(),
+            None => self.inner.take_unit_orders(),
+        }
+    }
+
+    fn weather_frame(
+        &mut self,
+        world: &ClientWorld,
+    ) -> Result<Option<crate::rules::draw_order::source::WeatherFrame<'_>>, ViewError> {
+        self.inner.weather_frame(world)
+    }
+
+    fn fade_clock(&self, world: &ClientWorld) -> Result<FadeClock, ViewError> {
+        self.inner.fade_clock(world)
+    }
+
+    fn tile_art(
+        &self,
+        tile: &crate::rules::draw_order::OrderedTile,
+        assets: &ViewAssets,
+    ) -> Result<crate::rules::draw_order::source::TileArt, ViewError> {
+        self.inner.tile_art(tile, assets)
+    }
 }
 
 #[cfg(test)]
@@ -280,7 +344,7 @@ mod tests {
             .unwrap()
             .is_empty());
         assert!(feed.player_seed(&w).is_err());
-        assert!(PENDING.len() >= 6);
+        assert_eq!(PENDING.len(), 5);
     }
 
     // Covers: specs/client/model.md §1 r2

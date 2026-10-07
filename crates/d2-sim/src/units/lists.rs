@@ -257,6 +257,12 @@ pub struct ActEntry {
 
 /// Client record states (client +0x04, `tick.md` §6.4).
 pub mod client_state {
+    /// Game created, S→C 0x00 sent (`0x005386D0`,
+    /// `sim/intents-events.md` §8.1 rule 4).
+    pub const LOADING: u32 = 1;
+    /// The join built the client's act and sent 0x03
+    /// (`sim/intents-events.md` §8.2 rule 4).
+    pub const ACT_LOADED: u32 = 2;
     /// Joining: waiting for its room.
     pub const JOINING: u32 = 3;
     /// In game.

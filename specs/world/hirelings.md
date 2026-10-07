@@ -2,8 +2,9 @@
 
 - **Status:** draft: every rule is read from the 1.14d `Game.exe`
   (addresses below) and the formulas are evaluated against the live
-  1.14d `hireling.txt` (Test vectors); no hire, level-up, death or
-  resurrect recording exists yet.
+  1.14d `hireling.txt` (Test vectors); a hire at Kashya and a
+  town-portal follow are recorded (Test vectors, §6 rule 6); no level-up,
+  death or resurrect recording exists yet.
 - **Target version:** 1.14d
 - **Crate/module:** `d2-sim::world::hirelings`
 - **Related specs:** `world/npc.md` §7 (owner of the hire list, its
@@ -25,29 +26,29 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 53–67 |
-| Inputs | 68–79 |
-| Outputs / state changes | 80–85 |
-| Rules | 86–87 |
-|   1. `hireling.txt` rows | 88–145 |
-|   2. Offer values and price (`0x006637F0(expansion, player, seed, act0, diff0, out)`) | 146–186 |
-|   3. Creating the hireling | 187–238 |
-|   4. Level stats (`0x00572840(game, player, merc, level)`) | 239–280 |
-|   5. Owner link and pet list | 281–320 |
-|   6. Following the player | 321–352 |
-|   7. Experience and level-up | 353–399 |
-|   8. Death (`0x0057CCB0` → `0x005751A0`) | 400–417 |
-|   9. Revive | 418–441 |
-|   10. Restoring from a save | 442–475 |
-|   11. Items (expansion) | 476–513 |
-|   12. Services (links) | 514–523 |
-|   13. Messages | 524–557 |
-| Constants & data dependencies | 558–581 |
-| Randomness | 582–592 |
-| Edge cases & original bugs | 593–627 |
-| Test vectors | 628–660 |
-| Provenance | 661–691 |
-| Open questions | 692–718 |
+| Summary | 54–68 |
+| Inputs | 69–80 |
+| Outputs / state changes | 81–86 |
+| Rules | 87–88 |
+|   1. `hireling.txt` rows | 89–156 |
+|   2. Offer values and price (`0x006637F0(expansion, player, seed, act0, diff0, out)`) | 157–197 |
+|   3. Creating the hireling | 198–252 |
+|   4. Level stats (`0x00572840(game, player, merc, level)`) | 253–294 |
+|   5. Owner link and pet list | 295–356 |
+|   6. Following the player | 357–400 |
+|   7. Experience and level-up | 401–466 |
+|   8. Death (`0x0057CCB0` → `0x005751A0`) | 467–499 |
+|   9. Revive | 500–537 |
+|   10. Restoring from a save | 538–571 |
+|   11. Items (expansion) | 572–625 |
+|   12. Services (links) | 626–635 |
+|   13. Messages | 636–697 |
+| Constants & data dependencies | 698–721 |
+| Randomness | 722–732 |
+| Edge cases & original bugs | 733–775 |
+| Test vectors | 776–826 |
+| Provenance | 827–877 |
+| Open questions | 878–917 |
 <!-- /index -->
 
 ## Summary
@@ -139,9 +140,19 @@ the player's pet list (node per hireling), unit removal, S→C 0x81, 0x7A,
    returned); a row of a higher id ends the walk. So: the last bracket
    with `Level` ≤ L, and the **first** bracket when L is below all of
    them.
-3. **Act of a name** (`0x00663750(name)`): `0x00656440` (row whose name
-   range holds the name), else `0x00656390`; result `Act − 1`; none → 0.
-   (`npc.md` §7.3 step 4 uses it.)
+3. **Act of a name** (`0x00663750(expansion, class, name)`; every 1.14d
+   caller passes class 0: `xor edx, edx` at `0x00573359`, `0x00577260`,
+   `0x00577504`, client `0x004B10C6`, `0x004B5E73`): first
+   `0x00656440(expansion, class, after 0)` = the first row (table order)
+   whose version is 100 if expansion else 0 and whose `Class` (+0x08)
+   equals `class`; no live row has class 0, so with 1.14d data this finds
+   nothing. Then the fallback `0x00656390(expansion, name, after 0)` = the
+   first row of that version with `NameFirst` ≤ name ≤ `NameLast` (u16
+   +0x114 / +0x116, unsigned compares at `0x006563F0`–`0x006563F9`).
+   Result: the found row's `Act` (+0x0C) − 1; neither found → 0. Both
+   scans start at row 0 when `after` is 0, else at the row after `after`.
+   (`npc.md` §7.3 step 4 uses it. Answered 2026-10-07, HL9: the earlier
+   text named `0x00656440` the name-range lookup; it matches the class.)
 
 ### 2. Offer values and price (`0x006637F0(expansion, player, seed, act0, diff0, out)`)
 
@@ -220,7 +231,10 @@ player, merc and slot exist and the player is unit type 0.
    expansion, player, slot seed, act0, game difficulty +0x6D). No offer
    → stop (the unit stays without owner or pet node).
 6. Add the pet node (§5 rule 3) with {seed, name, row `Id`}; this
-   broadcasts S→C 0x81 (§13).
+   broadcasts S→C 0x81 (§13). The add returns nothing (`0x00575E90` is
+   void; no test follows the call at `0x00573394`), so when it adds no
+   node (pet list missing, or max still 0 and the unit killed, §5 rule 3)
+   the init still runs rules 7–11 (answered 2026-10-07, HL5).
 7. Merc flags |= 0x80000000 (D2MOO ISREVIVE; the damage rules of
    `damage.md` read it).
 8. Owner link `0x0058F030(merc, player GUID, player type 0)` (§5 rule
@@ -299,11 +313,33 @@ Used by the new hire (§3.2 rule 9), level-up (§7.3) and restore (§10).
 
 3. Add (`0x00575E90` → `0x00575C70`): max = 0 → recompute it
    (`0x00575900`); still 0 → the new unit is killed (`0x00574450`) and
-   nothing is added. count = max → the oldest node is removed with kill
-   (rule 5) first (type 7: max = `basemax` 1, and §3.2 rule 4 already
+   nothing is added. count = max → the oldest node (list head) is
+   removed with kill (type 7: max = `basemax` 1, and §3.2 rule 4 already
    removed the old hireling). Append the node at the tail; count += 1.
    Then broadcast 0x81 / 0x7A (`0x005538D0` over players,
    `unit-order.md`; §13).
+   - The full-list eviction calls `0x00574850(head GUID, list, kill 1)`
+     directly (`push 1` at `0x00575CE0`), not `0x005750E0`: unlink, **one**
+     0x7A action 0 broadcast with only the GUID, then the kill
+     (`0x00574450`), free the node, count −= 1. `0x005750E0`'s second
+     broadcast (rule 5) does not happen on this path; any messages of the
+     kill itself are the kill's (`0x00574450`, `sim/pets.md`). After it
+     count = max again → fatal assert (line 0x316); count = max with an
+     empty list → fatal assert (0x312). (Answered 2026-10-07, HL3:
+     `sim/pets.md` §5 r2 is right.)
+   - Max recompute `0x00575900(player)` (player type 0 with pet list and
+     skill list, else nothing): a 257-entry table starts at 0; for each
+     of the player's skills (skill list order) whose `skills` record has
+     `pettype` (+0xBE, signed byte) in 1 … count − 1: v = `0x00646CA0`
+     (the skill's `petmax` calc +0xC0 at its level), v < 1 → 1; v above
+     the table entry → entry := v and set the type's max
+     (`0x00575850(type, v)`). Then every type whose entry is still < 1
+     and whose `pettype` row exists gets max := `basemax` (signed u16
+     +10). `0x00575850` sets the max (type 1 only when v = 1) and, for
+     types other than 7, removes the oldest node with kill
+     (`0x005750E0(…, 1)`) while count > max. Live 1.14d `skills.txt`
+     has no skill with `pettype` `hireable`, so type 7's max is always
+     `basemax` 1 (answered 2026-10-07, HL4).
 4. Find (`0x00574EC0(game, player, type, any)`): first node of the list
    with any ≠ 0 or bit 0 clear, mapped to its unit by GUID
    (`0x00552F60`; may be null). "Living hireling" = `(7, 0)`, "any
@@ -349,6 +385,18 @@ Used by the new hire (§3.2 rule 9), level-up (§7.3) and restore (§10).
    (`0x00650BE0`), act byte +0x18 and act pointer +0x1C := the new
    room's, queue for update, flags 2 (+0xC8) |= 0x10000, `0x00573780`,
    path reset (`0x00648C30(path, 0x100)`) when not moving.
+6. Recording evidence (town portal, both ways, living hireling;
+   `traces-raw-buddy/tp80-packets.jsonl`,
+   `docs/handoff/local-buddy-q-rec.md` entry 80): on the owner's client
+   the follow shows as S→C 0x0A removing the hireling (caller
+   `0x0053BDC2`) in the input phase of the C→S 0x13 that uses the
+   portal, then in the next tick the hireling's 0xAC (full unit send,
+   caller `0x0053E81E`, `0x00571F90`) at the player's destination point,
+   **before** the player's own 0x15 to that point. This matches rules 1
+   and 5 (the warp places the merc at the player's new room and point,
+   so the client gets it as a unit new to its rooms). Not settled: an
+   extra hireling 0x15 to the same point one frame later appeared on
+   the first teleport only.
 
 ### 7. Experience and level-up
 
@@ -363,6 +411,9 @@ read in 1.14d:
 2. If P has a living hireling H: g = gain(defender experience, alvl =
    H level (base), dlvl = defender level) (rule 7.2); if the attacker is
    not H: g = g·86/256 (signed, truncated toward 0); add g to H (§7.3).
+   Every value here is a **base** stat read (`0x006253B0`, layer 0):
+   defender experience 13 (`0x0057E9CA`), defender level 12
+   (`0x0057E9F2`), H level 12 (`0x0057EA12`); answered 2026-10-07, HL6.
 3. Then the player's own share (party or solo: `vitals.md` §4.3). The
    hireling's share does not reduce the player's.
 
@@ -374,6 +425,22 @@ read in 1.14d:
    (`0x0057E390`, shift from the `MaxLvl` row), then + pct(gain, stat
    85 of the hireling, 100) when stat 85 ≠ 0 (`item_addexperience` on
    hireling items counts).
+   **`ExpRatio` step** `0x0057E390(e, alvl)` (e in EAX, alvl pushed;
+   answered 2026-10-07, HL1). `ratio(L)` = `0x00613E60(L)`: L < 1 → the
+   `MaxLvl` row's `ExpRatio` (table word 7); 1 ≤ L ≤ table word 0 (class
+   0 `MaxLvl`, 99) → word `8·L + 15` (the `ExpRatio` of level L); above
+   → 0; no table → 0. Then:
+   - e ≤ 0 → e unchanged.
+   - r = ratio(alvl), s = ratio(0) (the `MaxLvl` row's `ExpRatio`, 10 in
+     1.14d). s − 1 ≥ 31 (unsigned; s = 0 or s > 31) → e unchanged.
+   - limit = 0x7FFFFFFF >> (((r >> s) + s) & 31) (arithmetic shifts, the
+     count masked to 5 bits by `sar`). e > limit (signed) → (e >> s)·r;
+     else (r·e) >> s. 32-bit signed `imul`, `sar`.
+   - Live 1.14d `experience.txt`: `ExpRatio` 1024 for levels 0–69, then
+     976, 928, … (−48 per level) to 256 at level 85, then 192, 144, 108,
+     81, 61, 46, 35, 26, 20, 15, 11, 8, 6, 5 (levels 86–99). With
+     r = 1024 the step changes nothing for e ≤ 1048575 (limit
+     0x7FFFFFFF >> 11); above it drops the low 10 bits.
 4. Cap (`0x0057E3F0`) for a non-player whose owner is a player with a
    pet node and row (§1.2 rule 2 at alvl): gain := min(gain,
    (threshold(alvl + 1) − threshold(alvl)) >> 6) (unsigned).
@@ -403,6 +470,21 @@ gain may carry it past the player's level.
    `0x00457490` test passes, with the death flag argument ≠ 0 and a
    player owner (`0x0058F0D0`, type 0): `0x005751A0(game, owner,
    merc)`.
+   - Answered 2026-10-07 (OQ8): `0x0057CCB0(game, unit, killer, flag)`
+     (ECX game, EDX unit, killer and flag on the stack). The test is
+     `0x00457490(class, 15)` (`mov edx, 0xf` at `0x0057CCF4`): bit 15
+     of the `monstats` flags (+0x0C; byte +0x0D & mask `0x006CE268`[7] =
+     0x80), the `killable` column; not killable → the whole kill stops
+     (no death mode either). Players: mode 0 or 17 → stop; other unit
+     types → stop.
+   - The flag is 1 at every caller (`0x00554548`, `0x0056D8B1`,
+     `0x0057D00F` (combat reaction), `0x005A6ADB`, `0x005A6FD8`,
+     `0x005CB0AC`, `0x005D1A6C`, `0x005ECCD2`, `0x005EF8FB`, `0x005F6601`,
+     `0x005F6BA9`, `0x005F8FBF`, `0x005F9020`, `0x005FD338`) except the
+     expired-pet kill `0x00574450` (`push 0` at `0x005744D3`), whose node
+     was already unlinked (§5 rule 5). So every ordinary death of an
+     owned hireling runs `0x005751A0`; it runs before the killer
+     bookkeeping and the death mode of the kill.
 2. `0x005751A0`: pet type of the unit (`0x00574A20`); type ≠ 7 → remove
    its node (§5 rule 5, no kill). Then in the type's list find the node
    with the unit's GUID: bit 0 := 1 (dead) and send S→C 0x9B (u16 name
@@ -427,6 +509,20 @@ gain may carry it past the player's level.
 3. `0x00579AA0`: if a **living** hireling node exists (`(7, 0)`), it is
    removed as in §3.2 rule 4 (owner cleared, node removed, room removal
    queued, unit freed).
+   - Answered 2026-10-07 (OQ6, edge case 5, `docs/handoff/gaps-night-specs.md`
+     GN1): nothing between C→S 0x62 and this rule tests the node's dead
+     bit, unit flag 0x10000 or the mode (`0x00579C00`: NPC and class
+     checks, `0x00574EC0(7, 1)`, cost, pay `0x00576D90`, then rule 2's
+     writes). With a living hireling L, `(7, 0)` here returns L itself
+     (one node: max 1), so rule 3 frees the unit being revived: owner
+     cleared (`0x0058F030(L, −1, 1)`), `0x005750E0(player, L GUID, 0)`
+     (node unlinked and freed, 0x7A broadcasts), room removal queued
+     (`0x0061A270`), `0x00555600(game, L)` frees L's path, monster data,
+     stats, skills and the unit record (`0x00620300`: type := 6, GUID :=
+     −1, pool free). From `0x00579B13` rules 4–9 and the 0x62 tail (0x9B,
+     0x2A with the GUID read from L +0x0C) run on the freed record: use
+     after free, outcome set by the allocator, not reproducible. d2rs
+     policy: edge case 5.
 4. Mode 1 again; life := max (stat 6 := `0x00625D10`); mark the node
    living (`0x00574AB0`: bit 0 := 0, broadcast 0x81 for it); join the
    team (`0x005B1900`, §3.2 rule 3).
@@ -504,6 +600,22 @@ allows C:
    - fail: old goes back to its slot (page 3, body location, mode 1,
      `0x00628280(old, 0xFF)`), merc refresh (`0x0055C460`,
      `0x0055F4F0(0)`). Result 0.
+   - Order and units (answered 2026-10-07, HL7; registers read at
+     `0x0054CF97`–`0x0054D11F`, ECX = game throughout): occupied target:
+     `0x0055C730(game, old, merc, 0)`, then `0x0055DF00(game, merc, 0,
+     0)`, then the requirement check `0x0062EAF0(C, merc, 0, 0, 0, 0)`.
+     Shared tail (rule 3): copy := `0x0055A2A0(game, C, merc, 1)`; mode 4;
+     `0x00540E60(game, merc, 9, C GUID)` then `0x00540E60(game, player,
+     9, C GUID)` (the first notice goes to the merc, the second to the
+     player); equip the copy (`0x005606B0(game, merc, copy GUID, slot,
+     1, out)`); consume C (`0x0055EEA0(game, player, C)`); player cursor
+     := none (`0x0063C180(player inventory, 0)`); **then**, only when
+     there was an old item: old copy := `0x0055A2A0(game, old, player,
+     1)`, cursor := old copy (`0x0063C180`), `0x0055FB10(game, player,
+     old copy)`; then `0x0055DF00(game, merc, 0, 0)`, `0x0055F4F0(game,
+     merc, 0)`, `0x00540E60(game, merc, 3, 0)`, `0x005417D0(game, merc,
+     3, game frame (+0xA8) + 1, 0, 0)`. All four refresh calls act on the
+     **merc**.
 5. Every give or take therefore creates new item units (new GUIDs);
    take (`inventory-moves.md` §7.23) duplicates as well.
 6. Potions given to the hireling are used on it (`inventory-moves.md`
@@ -530,8 +642,9 @@ allows C:
    broadcast record has a seed or a name; otherwise 0x7A action 1), on
    join (§5 rule 6) and on revive (§9 rule 4).
 2. **S→C 0x7A PetAction** (13 bytes, `0x0053CB30`, zeroed first): u8
-   action @1 (1 add, 0 remove), u8 pet type @2, u16 class @3, u32 pet
-   GUID @5, u32 owner GUID @9. Removal records built by §5 rule 5, §6
+   action @1 (1 add, 0 remove), u8 pet type @2, u16 class @3, u32 owner
+   GUID @5, u32 pet GUID @9 (owner of the layout: `sim/pets.md` §8;
+   corrected 2026-10-07, evidence there). Removal records built by §5 rule 5, §6
    rule 4 and §8 rule 2 carry only the GUID (other fields 0).
 3. **S→C 0x9B** (7 bytes, `0x0053E0E0`): u16 @1, u32 @3. Death /
    classic act change: name id and resurrect cost. Replace, resurrect:
@@ -545,6 +658,33 @@ allows C:
    `0x0053BEE0`: value < 0xFF → 0x9E (u8 stat @1, u32 GUID @2, u8 @6),
    < 0xFFFF → 0x9F (u16 @6), else 0xA0 (u32 @6). Stat id > 0xFE → fatal
    assert. No reader of `flag` was found in the body.
+   - The two damage sums are queued under stat ids **21** and **22**
+     (`mov edx, 0x15` at `0x005727A3`, `mov edx, 0x16` at `0x005727C8`):
+     21 := base 23 + base 21, 22 := base 24 + base 22.
+   - Who gets them, and when (answered 2026-10-07, HL8 / OQ7): the queue
+     is the merc's unit message list (+0xEC; `0x005718C0` queues the
+     unit for update `0x0064C040`). It is flushed by `0x00571CD0` inside
+     the per-client unit update `0x0053A500(unit, client)` of the client
+     pass (`sim/tick.md` §6 rule 5, `0x0053A620` → `0x0053A5D0`), i.e. to
+     **every client** whose adjacent rooms hold the merc in their update
+     queue, not only the owner: once in the full unit send
+     `0x00571F90` (when the unit has +0xC4 bit 4, new to clients:
+     `0x005721AB`) and once in the monster update `0x00598220`
+     (`0x005982DD`). The list is freed afterwards in the room update
+     step (`0x00553220` → `0x00571F40`, `sim/tick.md` §5 step 6). So the
+     stats are not sent at once: they leave in the next client pass, and
+     a hireling that is new to the client (a hire) sends them **twice**
+     in that pass. The experience delta of §7.3 rule 4 is different: it
+     goes at once to the owner's client only (`0x005531C0` then
+     `0x0053BFD0` at `0x0057E90B`–`0x0057E914`).
+   - Recording evidence (`traces-raw-buddy/merc1-spawn-packets.jsonl`,
+     `docs/handoff/local-buddy-recordings.md` Pass 2 B, hire of Diane at
+     Kashya): C→S 0x36 in the input phase of frame 1730; in the tick
+     phase of frame 1731 the merc's 0xAC / 0xAA, then the 15 stats in
+     rule 4 order (`9e0c…07`, `9e00…28`, `9e02…35`, `9f07…0051`,
+     `9f06…0051`, `9e1f…2f`, `9f0d…2099`, `9f1e…00e1`, `9e15…02`,
+     `9e16…04`, `9e27`/`29`/`2b`/`2d …08`), then 0x6D and the same 15
+     again. Values match §4 for Id 0, L 7 (Test vectors).
 5. **Experience delta** (`0x0053BFD0(client, merc, stat, old, new)`):
    δ = new − old (unsigned); δ < 0xFF → 0xA1 (u8 δ @6, 7 bytes); δ <
    0xFFFF → 0xA2 (u16 δ @6, 8 bytes); else 0xA0 with the **old** value
@@ -608,8 +748,16 @@ Reproduced by default.
    Inner Sight gets (10·−1 >> 5) + 1 = 0 → none).
 5. C→S 0x62 accepts a living hireling: §9 rule 2 charges the cost and
    §9 rule 3 then finds the same unit as "living" and frees it before
-   the rest of §9 runs on it. Not traced (open question 6); d2rs refuses
-   a living hireling with code 9 until it is.
+   the rest of §9 runs on it. Settled in the binary (2026-10-07, §9 rule
+   3): after the free 1.14d runs §9 rules 4–9 and the 0x62 tail on the
+   freed unit record (use after free), so its outcome is not defined and
+   cannot be matched. **d2rs policy** (the same in `npc.md` §7.4 and edge
+   case 11): when the node that `(7, 1)` returns is living (node bit 0
+   clear), answer S→C 0x2A code 9 exactly as for a missing hireling
+   (`npc.md` §7.4 step 2) and change nothing: no gold taken, no flag,
+   mode, life, node, unit or message change. Only a crafted 0x62 reaches
+   this (the client offers resurrection for a dead hireling); an
+   exact-match test of this case is excluded from the comparison.
 6. Experience gains stop at level 98, but a save reload recomputes the
    level from experience up to 99.
 7. 0xA0 for a large experience delta carries the old experience, not
@@ -657,6 +805,24 @@ Synthetic (CI-safe):
 | death, name id 0x0F21, level 30 | 0x9B `9b 21 0f 5e 1a 00 00` (6750) | §8, §9 rule 1 |
 | stat value 300 / 70000 / 5 | 0x9F / 0xA0 / 0x9E | §13 rule 4 |
 | merc level 97, exp jumps above threshold(99) | level 98 (§7.3); after reload 99 (§10) | edge case 6 |
+| `ExpRatio` (s = 10): e 229, alvl 6 (r 1024) / e 5000, alvl 80 (r 496) / e 3000000, alvl 97 (r 8) / e 2000000, alvl 6 | 229 / 2421 / 23432 (e > limit 2097151: (e >> 10)·8) / 1999872 (e > 1048575) | §7.2 rule 3 |
+| `0x00663750` with class 0, expansion, name 0x0D68 | no `Class` 0 row; name-range row of Act 1 → 0 | §1.2 rule 3 |
+| crafted 0x62, hireling node living | 0x2A code 9; gold, unit, node unchanged; no 0x9B (d2rs policy) | edge case 5 |
+
+Recorded (`traces-raw-buddy/merc1-spawn-packets.jsonl`, character
+`bdMercTwo` level 8, gold 296; `docs/handoff/local-buddy-recordings.md`
+Pass 2 B):
+
+| Step | Bytes / values | Rules |
+|---|---|---|
+| C→S 0x36, frame 1730 input | `36 03000000 680d` (Kashya GUID 3, name 0x0D68) | `npc.md` §7.3 |
+| S→C 0x81, same phase | `81 07 0f01 01000000 0d000000 f83287d1 680d0000`: type 7, class 271, owner GUID 1, merc GUID 13, slot seed, name 0x0D68 | §3.2 rule 6, §13 rule 1 |
+| S→C 0x27, same phase | `27 01 0d000000 01 ?? 03 ?? 7c0d …` (merc GUID, string 0xD7C; ?? not written) | §4 rule 3, §13 rule 6 |
+| S→C 0x4F + nine 0x4E, then 0x2A code 5 GUID 13 | list without 0x0D68 | `npc.md` §7.3 step 8 |
+| no S→C 0x7A for the hire | the add record has seed and name → 0x81 only | §5 rule 3, §13 rule 1 |
+| frame 1731 tick: stats twice (after 0xAC / 0xAA and after 0x6D) | 12 = 7, 0 = 40, 2 = 53, 7 = 6 = 0x5100 (81 life), 31 = 47, 13 = 39200, 30 = 57600, 21 = 2, 22 = 4, 39 / 41 / 43 / 45 = 8 | §4 (Id 0 row level 3, L 7, d 4), §13 rule 4 |
+| gold 296 → 136 (S→C 0x1D, frame 1731) | price 160 = 100·(100 + 15·4)/100 | §2 |
+| Save And Exit with the merc alive | S→C 0x7A `7a 00 00 0000 00000000 0d000000` (only the pet GUID @9) | §13 rule 2 |
 
 ## Provenance
 
@@ -679,6 +845,26 @@ Synthetic (CI-safe):
   `0x005774F0`, writer `0x005699A0`; item swap `0x0054CED0`; messages
   `0x0053CB80`, `0x0053CB30`, `0x0053E0E0`, `0x0053BFD0`, `0x005DE330`
   (byte stores read from the disassembly).
+- §13 r1–r2 GUID order (2026-10-07, spec-client-msgs-3): both senders
+  copy broadcast record +0x04 to the first GUID field (0x81 @4, 0x7A
+  @5) and record +0x00 to the second (0x81 @8, 0x7A @9); the add
+  `0x00575D90` builds the record with +0x00 = pet GUID (pet +0x0C) and
+  +0x04 = owner GUID (player +0x0C) (`0x00575E4F`–`0x00575E67`), so 0x7A
+  carries owner @5, pet @9 like 0x81 (owner @4, hireling @8).
+- 2026-10-07 (spec-hirelings, HL1–HL9, OQ6–OQ8, GN1): `ExpRatio`
+  `0x0057E390`, `0x00613E60`; kill share `0x0057E990` (base reads
+  `0x0057E9CA`, `0x0057E9F2`, `0x0057EA12`); act lookup `0x00663750`,
+  `0x00656440` (class), `0x00656390` (name range); pet add `0x00575C70`
+  (eviction `0x00575CE0`), max recompute `0x00575900`, `0x00575850`;
+  init `0x00573394`; item swap `0x0054CF97`–`0x0054D11F`; stats queue
+  `0x005718C0`, flush sites `0x005721AB` (`0x00571F90`), `0x005982DD`
+  (`0x00598220`), per-client update `0x0053A500`, free `0x00571F40`;
+  experience delta `0x0057E90B`; kill `0x0057CCB0` (`0x0057CCF4`), its
+  15 call sites, `0x00457490`; resurrect `0x00579C00`, revive
+  `0x00579AA0`, unit free `0x00555600`, `0x00620300`. Recordings:
+  `traces-raw-buddy/merc1-spawn-packets.jsonl` (hire),
+  `traces-raw-buddy/tp80-packets.jsonl` (follow); their facts were
+  checked against the rules above.
 - Live 1.14d data: `patch_d2` `hireling.txt` (120 rows), `pettype.txt`
   row 7, `skills.txt` `reqlevel`, `states.txt` 1/105/107/154,
   `itemstatcost.txt` stat names; test-vector table computed from them.
@@ -707,11 +893,24 @@ Synthetic (CI-safe):
 5. String 0xD7C (3452) of the level speech: key and text (decode
    `string.tbl`).
 6. Crafted 0x62 with a living hireling (edge case 5): debugger trace of
-   `0x00579AA0` on that path.
+   `0x00579AA0` on that path. **Answered** 2026-10-07 from the binary
+   (§9 rule 3): the unit is freed and then used (use after free); no
+   trace can make it reproducible; d2rs policy in edge case 5.
 7. Which clients `0x00571CD0` serves (only the owner, or every client
    that receives the merc's updates); settle with a two-player recording.
+   **Answered** 2026-10-07 from the binary (§13 rule 4): every client
+   whose per-client update reaches the merc (`0x0053A500`), in the next
+   client pass; twice for a unit new to the client (single-player hire
+   recording agrees). A two-player recording would still confirm it.
 8. The `0x00457490` test in the death path (§8 rule 1) and the meaning
    of the death flag argument; read the 14 callers of `0x0057CCB0`.
+   **Answered** 2026-10-07 (§8 rule 1): `monstats` `killable` (flag bit
+   15); the flag is 0 only from the expired-pet kill `0x00574450` (15
+   call sites, the other 14 pass 1).
 9. No recording: hire, level-up, death, resurrect, give / take item;
    record one of each (`packets-0002`, `docs/HANDOFF.md` §5) to confirm
-   message order and bytes.
+   message order and bytes. **Partly answered** 2026-10-07: the hire is
+   recorded (`merc1-spawn-packets.jsonl`, Test vectors: 0x81, 0x27,
+   0x4F / 0x4E, 0x2A in the input phase, stats twice in the next tick,
+   no 0x7A) and a town-portal follow (§6 rule 6). Still needed:
+   level-up, death, resurrect, give / take.

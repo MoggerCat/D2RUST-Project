@@ -571,11 +571,11 @@ seq fn `0x00593D70`; extra 0x1BC zeroed bytes, GUID lists at +0xB4 and
     point: for i = 0 through 20 (21 points) test (x + i, y + i) inside R0's tile rectangle
     (`0x00619730`, excluding the last row and column); found → that
     point; not found → (y, y + 21) (bug kept). Free spot
-    (`0x00545340`, args 2, 0x100, 1, 100); none → (x, y, R0). Spawn
+    (`0x00545340`, args 2, 0x100, 1, 100; the third, a radius, is never read by `0x00545340`); none → (x, y, R0). Spawn
     cain5 (`0x005B2F20(game, room, x, y, 265, mode 1, r 5, 0)`). On
     failure up to 20 retries, each moving the point by (+1, +1), taking
     its room (`0x00463740`; none → (x, y, R0)), a free spot (args 2,
-    0x100, 2, 100) and r 10; then one last try at (x, y, R0) with r 15.
+    0x100, 2 (unused), 100) and r 10; then one last try at (x, y, R0) with r 15.
     Spawned: unit +0xC4 |= 0x3000000; +0x51 := 1; +0x52 := 0; +0x68 :=
     its GUID.
 16. **Act change** `0x00597310(game, player)` (`quests.md` §8.1): if R lacks 4.0

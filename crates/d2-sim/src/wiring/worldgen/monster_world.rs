@@ -28,7 +28,7 @@ impl WorldState {
     /// A world state with the same tables, level types and game info and
     /// nothing else: what [`WorldSim::world`] holds while the real one is
     /// lent.
-    fn placeholder(&self) -> Self {
+    pub(super) fn placeholder(&self) -> Self {
         Self::new(self.types.clone(), self.tables.clone(), self.init_info)
     }
 }

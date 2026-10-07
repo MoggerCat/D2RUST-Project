@@ -24,16 +24,16 @@
 | Outputs / state changes | 67–75 |
 | Rules | 76–81 |
 |   1. Level map | 82–102 |
-|   2. Jungle placer (`0x00677880`, D2MOO `DRLG_GenerateJungles`) | 103–270 |
-|   3. Jungle stamping (`0x0067E910`, levels 76..78) | 271–296 |
-|   4. Act III rooms and links | 297–318 |
-|   5. Act V outdoor levels | 319–340 |
-| Constants & data dependencies | 341–362 |
-| Randomness | 363–397 |
-| Edge cases & original bugs | 398–421 |
-| Test vectors | 422–475 |
-| Provenance | 476–500 |
-| Open questions | 501–511 |
+|   2. Jungle placer (`0x00677880`, D2MOO `DRLG_GenerateJungles`) | 103–294 |
+|   3. Jungle stamping (`0x0067E910`, levels 76..78) | 295–324 |
+|   4. Act III rooms and links | 325–346 |
+|   5. Act V outdoor levels | 347–368 |
+| Constants & data dependencies | 369–390 |
+| Randomness | 391–425 |
+| Edge cases & original bugs | 426–449 |
+| Test vectors | 450–503 |
+| Provenance | 504–528 |
+| Open questions | 529–550 |
 <!-- /index -->
 
 ## Summary
@@ -191,7 +191,13 @@ k:
    for n a power of two, else `lo' mod n`). Scan the jungle's blocks
    row by row from row by, columns from bx; the i-th (0-based) block
    with C = 2 gets C := 0; n −= 1. The k > 0 mark of step 3.3 can be
-   dropped.
+   dropped. n decrements only on a hit (`0x00677F8B`–`0x00677F92`): if
+   fewer than i + 1 blocks have C = 2, nothing is dropped, n stays and
+   the loop draws `roll(n)` again (`0x00677FB1`). Not reachable: n always
+   equals the jungle's count of C = 2 blocks (the step 3.3 mark sits on
+   row `last`, which no branch mark of step 3.4 (rows by, by + 1, by + 3)
+   or later advance overwrites, and an advance marks only blocks with
+   C = 0).
 
 #### 2.5 River connections (whole grid, rows 0..H−1, columns 0..W−1; no draws)
 
@@ -253,6 +259,24 @@ S, 3 N; 0 = none): 1 (0, 545, 546, 547), 2 (548, 0, 549, 550), 3 (0, 0,
 indexes T with a preset id (edge case 1). D2MOO indexes every bit with
 the original L instead.
 
+Lookups outside rows 1..14 have no bound check: slot k of row r reads
+the dword at `0x006F13F0` + 4k + 16r (32-bit wrap; `.rdata`, so the file
+image is the run-time value):
+
+| r | Slots 0..3 read | Result |
+|---|---|---|
+| 0 (an earlier lookup gave 0) | 0, 0, 0, 0 (`0x006F13F0`–`0x006F13FC`, i.e. S[13..16]) | stays 0 → fatal 0x78C |
+| 545..572 (an earlier lookup hit) | slots 0 and 2: 0; slots 1 and 3: a value V(r) in 1,071,743,488 .. 1,072,087,552 (not an lvlprest id) | 0 → fatal 0x78C; V is stored as the block id |
+| V(r) (a third set bit after V) | the address `0x006F13F0` + 4k + 16V wraps into `0xFE8733F0`–`0xFEDB33FC`, outside the module image | reads memory outside the module (not reproducible) |
+
+A stored V reaches §3 as a clearing (V > 574): with c < 3, P := V + the
+family add and the stamp (`outdoor.md` §5.1) reads its size through the
+lvlprest row lookup (`0x00666FD0` → `0x0061F0B0`), which returns none
+for P ≥ the row count; 1.14d then reads +0x28 of a null row (access
+violation). So every outcome of a block with two or more attach bits is
+fatal 0x78C, a crash or an unreproducible read; d2rs reports all of them
+as a fatal error (the crash cases have no original error id). Not reached (edge case 1).
+
 #### 2.8 Hand-off to the levels
 
 1. For each record in placement order: block ids[i] := id of block (bx
@@ -271,7 +295,11 @@ the original L instead.
 ### 3. Jungle stamping (`0x0067E910`, levels 76..78)
 
 Runs at level generation after the link flags (`outdoor.md` §9.3).
-SXb, SYb from leveldefs 76 (by difficulty), as §2.
+SXb, SYb from leveldefs 76 (by difficulty), as §2. The array of §2.8 is
+never shorter than SXb·SYb: creation (`0x00677880`, `0x0067788C`–
+`0x0067789E`) and build (`0x0067E92D`–`0x0067E964`) both read leveldefs
+row 76 at the DRLG's difficulty byte (drlg +0x450), and the tables do not
+change after load.
 
 1. r := roll(2 + 4·(clearing count = 3)) on the level seed (helper
    `0x0045C390`). Drawn before the next check.
@@ -508,3 +536,14 @@ stamp list and draw sequence equal the recording.
    from 32-bit init seeds, or by a recording that hits fatal 0x78C.
 3. Record a build of 76..78 (stamps, room count: are id-0 blocks 16
    outdoor rooms each?) and of 111, 112, 117 (`outdoor.md` OQ 9).
+4. *Answered* (`impl-drlg-act3-5` Q1): lookups outside rows 1..14 of T
+   (row 0, rows 545..572, a third bit) are §2.7's table "Lookups outside
+   rows 1..14": 0 → fatal 0x78C, V(r) stored then a crash in §3, a third
+   bit an unreproducible read (`.rdata` read from the 1.14d file; `0x00678670`–
+   `0x006786F3`, `0x0061F0B0`, `0x00666FD0`).
+5. *Answered* (`impl-drlg-act3-5` Q2): a drop index past the C = 2
+   blocks drops nothing, keeps n and draws again (§2.4 step 4,
+   `0x00677F00`–`0x00677FB4`); unreachable since n equals the mark count.
+6. *Answered* (`impl-drlg-act3-5` Q3): the jungle id array is never
+   short at build (§3: same leveldefs row 76 and difficulty byte at
+   creation and build).

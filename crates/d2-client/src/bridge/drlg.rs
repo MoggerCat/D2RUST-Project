@@ -1,4 +1,4 @@
-// Spec: specs/client/model.md (§7 rule 4, §9 rules 1–2, §12 rules 1, 2, 5), specs/drlg/levels.md (§2 rule 3), specs/drlg/rooms.md (§4.2, §5 rule 5)
+// Spec: specs/client/model.md (§7 rule 4, §9 rules 1–2, §12 rules 1, 2, 5), specs/drlg/levels.md (§2 rule 3, §9 rule 2), specs/drlg/rooms.md (§4.2, §4.6, §5 rules 5, 9)
 //! The client DRLG copy (`model.md` §12 rule 1): the `d2-sim` DRLG act
 //! built from S→C 0x03's fields with the client flag, owned by the bridge
 //! and never shared with the server's. 0x07 / 0x08 set and unset its
@@ -6,6 +6,10 @@
 //! in sight is built and becomes an active room, prepended to the act's
 //! room list (`rooms.md` §5 rule 5). [`ClientDrlg::active_rooms`] is that
 //! list in list order, the input of the room of a point (§12 rule 2).
+//! Each new active room is recorded for the act room callback
+//! (`rooms.md` §5 rule 9: the light cache, [`ClientDrlg::take_created`]),
+//! and the client update runs the build timer and the level free
+//! ([`ClientDrlg::client_update`], `rooms.md` §4.6).
 //!
 //! The DRLG's table view, tile headers and level types are inputs
 //! ([`DrlgSource`]), as the server's are; each act build gets its own
@@ -17,7 +21,9 @@ use d2_sim::drlg::{ActRooms, Drlg, DrlgData, DrlgError, LevelTypes, Services, Ti
 use d2_sim::rng::Seed;
 use d2_sim::units::RoomId;
 
+use super::dispatch::HandlerError;
 use super::world::ActiveRoom;
+use crate::rules::lighting::records::LightError;
 
 /// A DRLG room of the client act, by slot (`d2_sim::drlg::DrlgRoomId`).
 pub use d2_sim::drlg::DrlgRoomId;
@@ -56,6 +62,9 @@ pub struct ActList {
     /// Head first.
     pub rooms: Vec<RoomId>,
     next: u32,
+    /// Records created since the last [`ClientDrlg::take_created`], in
+    /// creation order (the act callback's calls, `rooms.md` §5 rule 9).
+    created: Vec<RoomId>,
 }
 
 impl ActRooms for ActList {
@@ -63,6 +72,7 @@ impl ActRooms for ActList {
         let id = RoomId(self.next);
         self.next += 1;
         self.rooms.insert(0, id);
+        self.created.push(id);
         id
     }
 
@@ -86,6 +96,20 @@ pub enum ClientDrlgError {
     /// generate (see [`ClientDrlg`]'s `Clone`).
     #[error("client DRLG snapshot: no level-type state")]
     Snapshot,
+}
+
+/// The act room callback's fatal cases (`render/lighting.md` §6.4) as
+/// handler errors (`client/bridge.md` §2.4).
+impl From<LightError> for HandlerError {
+    fn from(e: LightError) -> Self {
+        match e {
+            LightError::Fatal0x591 => HandlerError::Fatal(0x591),
+            LightError::OwnerWithoutRoom => HandlerError::Unspecified(
+                "render/lighting.md §6.4: a cached light record's owner has no room",
+            ),
+            _ => HandlerError::Invalid("light record error outside the new-room rule"),
+        }
+    }
 }
 
 /// The client DRLG act of `[0x007A0634]` (`model.md` §1, §12 rule 1).
@@ -201,6 +225,31 @@ impl ClientDrlg {
     ) -> Result<Option<DrlgRoomId>, ClientDrlgError> {
         let (d, mut svc) = self.split()?;
         Ok(d.unset_in_sight_at(&mut svc, level.into(), x.into(), y.into(), hint)?)
+    }
+
+    /// The client update's DRLG part (`0x0044C790`, `rooms.md` §4.6 rule
+    /// 1): the build timer `0x0061B920` (rules 4–8), then, when
+    /// `free_levels` (every 13th call, §4.6 last paragraph), the level
+    /// free of `levels.md` §9 rule 2 (`0x0061AA20`). Returns the rooms the
+    /// timer built.
+    pub fn client_update(&mut self, free_levels: bool) -> Result<Vec<DrlgRoomId>, ClientDrlgError> {
+        let (d, mut svc) = self.split()?;
+        let built = d.client_build_timer(&mut svc)?;
+        if free_levels {
+            d.free_inactive_levels(svc.data, svc.types)?;
+        }
+        Ok(built)
+    }
+
+    /// The DRLG rooms whose active rooms were created since the last call,
+    /// in creation order (the act room callback `0x00475930` runs once
+    /// for each, `rooms.md` §5 rule 9). A record already removed again is
+    /// left out.
+    pub fn take_created(&mut self) -> Vec<DrlgRoomId> {
+        std::mem::take(&mut self.list.created)
+            .into_iter()
+            .filter_map(|id| self.drlg.drlg_room_of(id))
+            .collect()
     }
 
     /// The act's active rooms in list order (act +0x10, newest first):

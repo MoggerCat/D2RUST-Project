@@ -32,20 +32,20 @@
 |   3. Ambient fill (`0x00474610`) | 112–143 |
 |   4. Blocks-light flags (`0x004756D0`) | 144–152 |
 |   5. Light quality and the draw rate | 153–178 |
-|   6. Light records | 179–261 |
-|   7. Contribution of one record | 262–341 |
-|   8. Light sources | 342–406 |
-|   9. Environment (day and night) | 407–488 |
-|   10. Scripted ambient overrides (`0x0046BDD0`) | 489–542 |
-|   11. Light values handed to the draws | 543–573 |
-|   12. Captures (answers `capture.md` Open question 5) | 574–611 |
-|   13. d2rs answers | 612–622 |
-| Constants & data dependencies | 623–634 |
-| Randomness | 635–641 |
-| Edge cases & original bugs | 642–656 |
-| Test vectors | 657–689 |
-| Provenance | 690–732 |
-| Open questions | 733–764 |
+|   6. Light records | 179–262 |
+|   7. Contribution of one record | 263–342 |
+|   8. Light sources | 343–407 |
+|   9. Environment (day and night) | 408–525 |
+|   10. Scripted ambient overrides (`0x0046BDD0`) | 526–579 |
+|   11. Light values handed to the draws | 580–610 |
+|   12. Captures (answers `capture.md` Open question 5) | 611–648 |
+|   13. d2rs answers | 649–659 |
+| Constants & data dependencies | 660–671 |
+| Randomness | 672–678 |
+| Edge cases & original bugs | 679–695 |
+| Test vectors | 696–729 |
+| Provenance | 730–773 |
+| Open questions | 774–826 |
 <!-- /index -->
 
 ## Summary
@@ -246,17 +246,18 @@ order.
    cached contribution (§7.4, building the cache first when invalid);
    else the plain contribution with `q` (§7.2).
 
-A room leaving the client (`0x00475930`, ECX = the room, registered by
-`0x00475B40` through `0x0061AF60`) walks the list; for each kind-2
-record: owner type 6 or owner not found (§6.4 r1 lookup) is fatal
-0x591. With `R` = the owner's room (`0x00620BB0`): `R` = the leaving
-room → nothing. Else, with `(ux, uy)` the owner's sub-tile (objects,
+A new client active room (`0x00475930`, ECX = the room just created;
+registered by `0x00475B40` through `0x0061AF60` as the act callback and
+called only by the active-room creation, `drlg/rooms.md` §5 rules 8–9)
+walks the list; for each kind-2 record: owner type 6 or owner not found
+(§6.4 r1 lookup) is fatal 0x591. With `R` = the owner's room
+(`0x00620BB0`): `R` = the new room → nothing. Else, with `(ux, uy)` the owner's sub-tile (objects,
 items and tiles, types 2, 4, 5: static path `+0x0C`, `+0x10`; types 0,
 1, 3: dynamic path `0x006488C0` / `0x00648900`, 0 without a path) and
 `m` = radius (`+0x18`) `>> 3`, the cell lookup `0x00463740(R, x, y)`
 (`client/model.md` §2) is run on `(ux + m, uy)`, `(ux − m, uy)`,
 `(ux, uy + m)`, `(ux, uy − m)` in this order; the first that returns the
-leaving room sets cache valid (`+0x2C`) := 0 (the cache memory is kept)
+new room sets cache valid (`+0x2C`) := 0 (the cache memory is kept)
 and ends the record's tests.
 
 ### 7. Contribution of one record
@@ -437,11 +438,18 @@ from the normal entry 2, then §9.3 r4 and §9.4 with `A` = 0 and `L` = 0
    advance (§9.3 r1–r3), intensity (§9.3 r4), color (§9.4), then `L` =
    120 → R, G, B := 245, 240, 255.
 2. S→C 0x53 (10 bytes: u32 @1 period index, u32 @5 ticks, u8 @9 eclipse;
-   handler `0x0045E300`, only when the message act equals the player's
-   act) → `0x0061C240`: index > 5 or < 0, ticks < 0 → fatal; ticks >
+   handler `0x0045E300`, only when the client act is the local player's
+   act, r4) → `0x0061C240`: index > 5 or < 0, ticks < 0 → fatal; ticks >
    speed × 360 → 0; set index, ticks, type (normal or eclipse table by the
-   flag); intensity (§9.3 r4); set the eclipse flag; when it is set, also
-   `0x0061BDF0`, intensity again and color; `L` = 120 override. The server
+   flag); intensity (§9.3 r4, still with the **previous** eclipse flag);
+   set the eclipse flag; when it is set, also the period reset
+   `0x0061BDF0`, intensity again (now with the flag) and color (§9.4,
+   `A`); `L` = 120 override. Period reset (`0x0061BDF0`, record in EAX):
+   by the record's eclipse flag, normal or eclipse table entry of the
+   current index → type := its type, ticks := its start × speed. So with
+   the eclipse set the received ticks are discarded: index 5 (Tainted
+   Sun, r3) → type 2, ticks 240 × 128 = 30,720. Without the flag the
+   setter recomputes no color (the next per-update call of r1 does). The server
    sends it when its own cycle (same advance code, `sim/tick.md` §3 step
    1) changes period.
 3. `0x0044C83B` and `0x0044E16C` call the same setter with index 5, ticks
@@ -451,6 +459,35 @@ from the normal entry 2, then §9.3 r4 and §9.4 with `A` = 0 and `L` = 0
    pending flag `[0x007A060E]`, which the act load (S→C 0x03,
    `0x0044E142`) turns into the eclipse when the loaded act is act 2
    (byte 1).
+4. **Dispatch owner of 0x53** (`client/bridge-dispatch.tsv`). Client
+   model state: the environment record (§9.1) of the client DRLG act
+   (`[0x007A0634]` +0x04; d2rs: the act of `client/model.md` §1 `act`,
+   built by §12 there) and the day-period cache `[0x007A6A74]`. Handler
+   `0x0045E300`, in order:
+   1. P := the local player (`0x00463DD0`); no local player → 1.14d
+      reads P +0x1C through a null pointer (crash); bridge: handler error.
+   2. The client act `[0x007A0634]` ≠ P's act pointer (unit +0x1C: set
+      by creation at a point, `client/model.md` §2 rule 6, and by the
+      0x15 placement, `client/msg-units.md` §3 rule 2) → nothing more.
+      A player created at (0, 0) and not yet placed has none, so a 0x53
+      then is ignored. Recorded joins send 0x53 in frame 2, after 0x15
+      (frame 1): `53 02000000 00000000 00` (`20261006-022633` seq 228)
+      applies index 2, ticks 0; `53 02000000 80080000 00` (seq 146616,
+      frame 2177) index 2, ticks 0x880.
+   3. The setter of r2 with (act, P's room (`0x004646A0` → `0x00620BB0`;
+      none → null), index u32@1, ticks u32@5, eclipse u8@9).
+   4. Day-period refresh `0x004646C0`: `p` := the act's day period
+      (`0x0061C100(act, 0)`, 0–3, `sim/stats.md` §8); `p` = the
+      cache → nothing; else cache := `p` and every object unit (type 2)
+      of the client's sets S and C, bucket order, gets `0x004BC5E0(obj,
+      0)` (object day/night refresh; owner: the client object spec,
+      open question 11); a non-object found in those type-2 buckets →
+      fatal 0x88C.
+   5. P still present → the requirement refresh of S→C 0x47 on P
+      (`0x004C1BC0` with a built `47 <P type> <P GUID>`,
+      `client/msg-stats-items.md` §3 rule 3).
+   No output (`client/bridge.md` §10): lighting and objects read the
+   record each frame.
 
 #### 9.3 Advance and intensity (`0x0061BEE0`, `0x0061BB80`)
 
@@ -555,7 +592,7 @@ sub-tile) clamps the cell to 0…47 on each axis.
    `(X, Y)` = 8 × the tile's origin sub-tile (room sub-tile origin + 5 ×
    record tile position, `0x004DD180`); the DT1 direction (tile header
    `+0x00`) gives the point count (`0x006DB9D8`: 0 for direction 0, else
-   6) and the points of `render/wall-light-points.tsv` (`normal` =
+   6; 1.14d tiles use 1–9 only, Open question 8) and the points of `render/wall-light-points.tsv` (`normal` =
    `0x0072A9E8`; `faded` = `0x0072ABC8` when the record's fade state bit 0
    is set, `draw-order.md` §8); point `p` reads the cell at
    `(X + 8·dx_p, Y + 8·dy_p)` → dword as for units. Per 32-pixel block
@@ -650,7 +687,9 @@ seed the shake and cursor use), the `0x004ACC70` monster hook (unit seed).
 5. Missile lights exist only with the high-quality option (§8).
 6. Environment period 1 lasts one update (§9.4).
 7. Wall direction 0 has no light points: the wall draw's six light words
-   are uninitialized stack (§11 r2; Open question 8).
+   would be whatever its stack array last held (§11 r2). No 1.14d tile
+   has light direction 0 (Open question 8, answered), so this never
+   happens with the original data.
 8. Ring-0/1 shade is never written (§7.3 r4).
 9. The Den-light placement steps the local player's seed (§10 r1).
 
@@ -673,6 +712,7 @@ Synthetic (CI-safe; §7 with ambient 0, `I` = 255, light at x = y = 804
 | environment, normal, act 1, ticks = 128 × degree 0, 30, 45, 90, 135, 179, 180, 200, 270, 300, 339 | `I` = 128, 192, 219, 255, 219, 130, 128, 106, 64, 73, 105 | §9.3 r4 |
 | same in act 5 (`A` = 4) | 128, 170, 170, 170, 170, 130, 128, 106, 64, 73, 105 | §9.3 r4 |
 | color, normal, index 3, ticks 170 × 128; index 4, 190 × 128; index 0, 330 × 128 | (225, 204, 225), (160, 149, 218), (167, 164, 188) | §9.4 |
+| 0x53 setter, index 5, ticks 0, eclipse 1, previous flag 0, act 2 (`A` = 1, `L` = 40) | first intensity (flag 0, θ = 0) `I` 128; period reset → type 2, ticks 30,720; second intensity (eclipse) `I` 120; color = eclipse entry 5 (0, 30, 243) | §9.2 r2 |
 | Den counter 0, 15, 29 | `I` 80, 56, 4; past 29 the override is off (§3.1 r2 applies) | §10 r1 |
 | `W[7]` | 0.08579731732606888 (float) | §10 r1 |
 
@@ -702,7 +742,8 @@ contributions `0x004748D0`, `0x004740D0`, `0x00474080`, `0x004747C0`,
 `0x004609A0`, `0x004AE210`, `0x004ACC70`, `0x00470390`, `0x004CD540`,
 `0x004CD1C0`, `0x004D2C70`, `0x004C5680`, `0x004BC580`, `0x004D6D40`,
 `0x004F3530`; environment `0x0061BE40`, `0x0061BFC0`, `0x0061BEE0`,
-`0x0061BB80`, `0x0061BCE0`, `0x0061C240`, `0x0045E300`, `0x006427F0`, CRT
+`0x0061BB80`, `0x0061BCE0`, `0x0061C240`, `0x0061BDF0` (EAX record;
+call order in the `0x0061C240` disassembly), `0x0045E300`, `0x006427F0`, CRT
 `sin` `0x00688590` / `cos` `0x006886C0` (x87 `fsin` / `fcos` paths),
 `0x00682FD0` (truncating conversion); overrides `0x0046BEB0`,
 `0x0046AD10`, `0x0046AE50`, `0x0046B0C0`, `0x0046B0D0`, `0x0046AF70`,
@@ -719,7 +760,7 @@ reader, same-key pairs diffed and grouped into 8-connected blobs (gap 3),
 palette and light maps from act 1 `pal.pl2`. D2MOO not used; riiablo not
 needed.
 Ghidra backlog (2026-10-06): lookups `0x00463990`/`0x004639B0`/
-`0x00463940`; room unload `0x00475930`; monster light `0x004AE210`,
+`0x00463940`; new-room callback `0x00475930` (called at `0x00619954`); monster light `0x004AE210`,
 `0x0063EBD0`, umod hooks `0x004AD020`/`0x004ACC70` (tables `0x00724D78`,
 `0x006DA4C8` read from the file); cast light `0x004C5680` (caller
 `0x004C6140`), `cltdofunc` table `0x00727BA8` entry 30 = `0x004F3530`;
@@ -734,7 +775,8 @@ data: `states` setfunc, `missiles` rows 191/288, `objects` row 17,
 
 1. ~~Which unit tables `0x00463990` / `0x004639B0` search~~: answered in
    §6.4 r1 (sets S and C).
-2. ~~The room-unload test of `0x00475930`~~: answered in §6.4.
+2. ~~The room-unload test of `0x00475930`~~: answered in §6.4 (it runs
+   for a new active room, not an unloaded one: `drlg/rooms.md` §5 rule 9).
 3. ~~Monster light inputs~~: answered in §8 r1–r2 and the monster row
    (`Align`, client-only flag, umod 3 hook).
 4. ~~Radius-1 missile light paths, `+0x50`, flags 0x300~~: answered in
@@ -754,10 +796,30 @@ data: `states` setfunc, `missiles` rows 191/288, `objects` row 17,
    or x87 `fsin`) give the correctly rounded value for every θ of §9.3, so
    `trunc` matches: compare a recorded env `+0x0C` per tick over one day
    with §9.3.
-8. Whether any wall record has DT1 direction 0 (no light points, §11 r2),
-   and what direction 5 walls (points all (0, 0)) are.
+8. *Answered* (`impl-lighting-blend` "Not wired" 3), first half: no.
+   Every tile header of the 250 version-7 DT1 files in `d2data.mpq` /
+   `d2exp.mpq` (`mpq-tool extract "*.dt1"`; the 6 version-4 leftovers of
+   `formats/dt1.md` are never loaded) has light direction 1–9, fixed by
+   orientation: 0 → 3; 1, 5, 8, 10 → 1; 2, 6, 9, 11 → 2; 3, 4, 12, 13,
+   14 → 3; 7 → 4; 15 → 5; 16–19 → 6–9. So the point-count table
+   `0x006DB9D8` (10 entries: 0, then 6 × 9) is never indexed with 0 or
+   past 9. If d2rs meets direction 0 (modded tiles): the wall pass keeps
+   one eight-dword light array for the whole pass (`0x004DF1C0` loop),
+   so the record reuses the light words of the previous record drawn in
+   that pass; with none before it the values are undefined in the
+   original (treat as fatal). Still open: what direction 5 (roofs,
+   orientation 15; points all (0, 0)) reads, if a roof ever reaches a
+   wall pass.
 9. The light source behind run 1b f 13,496–13,599 (§12 r4): rerun with
    the light-map digest of §12 r3 in the key and the draw log, or read
    the light list (`[0x007B5668]`) at those frames.
 10. Where the lighting-quality option is loaded at start (registry or
     settings) and its default.
+11. `0x004BC5E0(object, 0)` (the object refresh of §9.2 r4 step 4 when
+    the day period changes): which object classes change (lights,
+    torches, mode) and how; owner: the client object spec. A recording
+    across a day-period change with objects in sight settles it.
+12. *Answered* (`impl-lighting-blend` "Not wired" 3): the eclipse branch
+    of the 0x53 setter is the period reset `0x0061BDF0` (§9.2 r2): type
+    and ticks from the eclipse table's entry of the index, discarding the
+    received ticks; then intensity with the flag set and color.

@@ -1053,9 +1053,13 @@ fn fire_head_heals_its_owner() {
     let (o, mon) = (w.owner, w.monster);
     w.fake.stats.insert((o, 6), 100);
     w.fake.mb.max_life.insert(o, 500);
+    // Fire 40..40 (equal bounds: no draw).
+    w.fake.stats.insert((m, 48), 40);
+    w.fake.stats.insert((m, 49), 40);
     assert_eq!(srv_hit(&mut w, 31, m, Some(mon)), 2);
-    // The value handed back by `elem_roll` (`EType`).
-    assert_eq!(w.fake.stats[&(o, 6)], 101);
+    // Healed by the rolled fire amount (`elem_roll`'s return), not by
+    // the `EType` 1 (`missiles.md` §R9.6 return value).
+    assert_eq!(w.fake.stats[&(o, 6)], 140);
     assert_eq!(srv_hit(&mut w, 31, m, None), 1);
 }
 
@@ -1092,14 +1096,12 @@ fn radament_redemption() {
     let (mut w, m) = world(row(), &[]);
     w.fake.mb.skills.insert(124, [0; 5]);
     w.fake.mb.fields.insert((124, 1), 16);
-    let mon = w.monster;
-    w.fake.mb.corpses = vec![mon];
+    let (room, mon) = (w.room(), w.monster);
+    w.game.lists.room_mut(room).unwrap().adjacent = vec![room];
+    // The monster at (110, 100) is a corpse (mode 12), within r = 16.
+    w.fake.mb.modes.insert(mon, 12);
     set_frames(&mut w, m, 400, 10);
     srv_do(&mut w, 19, m);
-    assert!(w
-        .fake
-        .log
-        .contains(&"corpses (100, 100) 16 0x3002".to_string()));
     assert!(w
         .fake
         .log
@@ -1110,6 +1112,101 @@ fn radament_redemption() {
     set_frames(&mut w, m, 400, 25);
     srv_do(&mut w, 19, m);
     assert_eq!(w.fake.logged("redeem"), 2);
+}
+
+fn find_world() -> (World, UnitId, RoomId) {
+    let (mut w, m) = world(row(), &[]);
+    let room = w.room();
+    w.game.lists.room_mut(room).unwrap().adjacent = vec![room];
+    (w, m, room)
+}
+
+fn find(w: &mut World, room: RoomId, flags: u32, r: i32) -> Vec<UnitId> {
+    let filter = crate::missiles::bodies_ext2::FindFilter {
+        flags,
+        source: Some(w.owner),
+        at: (100, 100),
+        r,
+    };
+    let mut cx = cx!(w);
+    crate::missiles::bodies_ext2::unit_find(&mut w.game, &mut cx, Some(room), &filter)
+}
+
+// Covers: specs/missiles/bodies-2.md §44 l3 r3, §44 l4 r1, §44 l4 r2, §44 l4 r3, §44 l4 r4, §44 l4 r5
+#[test]
+fn unit_find_default_filter_by_type_mode_and_distance() {
+    let (mut w, _, room) = find_world();
+    let mon = w.monster;
+    // Distance ≤ r passes: (110, 100) at r = 10, not at r = 9.
+    w.fake.mb.modes.insert(mon, 12);
+    assert_eq!(find(&mut w, room, 0x1002, 10), vec![mon]);
+    assert!(find(&mut w, room, 0x1002, 9).is_empty());
+    // Without 0x1000 a dead (12) or dying (0) monster is rejected.
+    assert!(find(&mut w, room, 0x2, 10).is_empty());
+    w.fake.mb.modes.insert(mon, 1);
+    assert_eq!(find(&mut w, room, 0x2, 10), vec![mon]);
+    assert!(find(&mut w, room, 0x1002, 10).is_empty());
+    // 0x4: undead only.
+    assert!(find(&mut w, room, 0x6, 10).is_empty());
+    w.fake.mb.undead.insert(mon);
+    assert_eq!(find(&mut w, room, 0x6, 10), vec![mon]);
+    // Players need 0x1 and are never the filter's own unit S.
+    assert_eq!(find(&mut w, room, 0x3, 10), vec![mon]);
+    // 0x80 / 0x400: unit flags 0x4 / 0x8.
+    w.fake.flags.insert(mon, 0);
+    assert!(find(&mut w, room, 0x82, 10).is_empty());
+    w.fake.flags.insert(mon, 0x4);
+    assert_eq!(find(&mut w, room, 0x82, 10), vec![mon]);
+    assert!(find(&mut w, room, 0x402, 10).is_empty());
+    // 0x40 with the record's limit 0: everything rejected.
+    assert!(find(&mut w, room, 0x42, 10).is_empty());
+    // 0x100: a unit in a town room rejects; 0x2000 skips town rooms.
+    w.fake.town.insert(room);
+    assert!(find(&mut w, room, 0x102, 10).is_empty());
+    assert!(find(&mut w, room, 0x2002, 10).is_empty());
+    assert_eq!(find(&mut w, room, 0x2, 10), vec![mon]);
+}
+
+// Covers: specs/missiles/bodies-2.md §44 l2 r4, §44 l3 r1, §44 l3 r2, §44 l3 r4
+#[test]
+fn unit_find_rooms_and_found_order() {
+    let (mut w, _, room) = find_world();
+    let filter = crate::missiles::bodies_ext2::FindFilter {
+        flags: 0x1002,
+        source: None,
+        at: (100, 100),
+        r: 10,
+    };
+    let mut cx = cx!(w);
+    assert!(
+        crate::missiles::bodies_ext2::unit_find(&mut w.game, &mut cx, None, &filter).is_empty()
+    );
+    let other = w.game.lists.create_room(0).unwrap();
+    w.game.lists.activate_room(other).unwrap();
+    w.game.lists.room_mut(room).unwrap().adjacent = vec![other, room];
+    let far = w
+        .game
+        .spawn_unit(UnitType::Monster, Some(other), false)
+        .unwrap();
+    let a = w
+        .game
+        .spawn_unit(UnitType::Monster, Some(room), false)
+        .unwrap();
+    w.fake.pos.insert(far, (101, 100));
+    w.fake.pos.insert(a, (100, 101));
+    let mon = w.monster;
+    for u in [far, a, mon] {
+        w.fake.mb.modes.insert(u, 12);
+    }
+    // Not strictly inside (no rectangle): the adjacency array in its
+    // order, then each room's unit list (newest first).
+    assert_eq!(find(&mut w, room, 0x1002, 10), vec![far, a, mon]);
+    // x ± r, y ± r strictly inside the room's rectangle: the room alone.
+    w.fake.mb.rects.insert(room, (89, 89, 22, 22));
+    assert_eq!(find(&mut w, room, 0x1002, 10), vec![a, mon]);
+    // Touching an edge is not strictly inside.
+    w.fake.mb.rects.insert(room, (90, 89, 22, 22));
+    assert_eq!(find(&mut w, room, 0x1002, 10), vec![far, a, mon]);
 }
 
 // Covers: specs/missiles/bodies-2.md §45 r1, §45 r2, §45 r3, §45 r4, §45 r5
@@ -1489,4 +1586,24 @@ fn unused_bodies() {
     assert_eq!(srv_hit(&mut w, 23, m, Some(mon)), 1);
     assert_eq!(w.fake.paths[&m].target_unit, Some(mon));
     assert!(w.fake.log.contains(&format!("skilldo {} 44 7 10", m.0)));
+}
+
+// Covers: specs/missiles/missiles.md §r6-2-damage-rolls-0x005a89a0-1-14d-confirmed
+#[test]
+fn full_record_carries_crit_and_bypass_flags() {
+    let (mut w, m) = world(row(), &[]);
+    let mon = w.monster;
+    for (s, v) in [(21, 10), (22, 10), (141, 1), (103, 1), (106, 5)] {
+        w.fake.stats.insert((m, s), v);
+    }
+    let mut cx = cx!(w);
+    let rec = crate::missiles::bodies_ext::full_record(&mut cx, m, Some(mon));
+    // Deadly strike: physical × 2 and result 0x2000; 103 → hit flags
+    // 0x100, 106 → 0x400, 104 (absent) leaves 0x200 clear.
+    assert_eq!(rec.physical, 20);
+    assert_eq!(rec.result & 0x2000, 0x2000);
+    assert_eq!(rec.hit_flags, 0x100 | 0x400);
+    // Without a unit no deadly strike or bypass applies.
+    let rec = crate::missiles::bodies_ext::full_record(&mut cx, m, None);
+    assert_eq!((rec.physical, rec.result, rec.hit_flags), (10, 0, 0));
 }

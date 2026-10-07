@@ -32,34 +32,34 @@
 |   38. Server-hit 28 Grim Ward scare `0x005ABA10` | 242–260 |
 |   39. Server-do 15 Frozen Orb `0x005AF030`, server-hit 29 `0x005ABB00` | 261–299 |
 |   40. Server-do 16 Frozen Orb nova `0x005AF170` | 300–316 |
-|   41. Server-hit 31 fire head `0x005ABD70` | 317–332 |
-|   42. Server-hit 32 Cairn Stones `0x005ABE50` | 333–343 |
-|   43. Server-do 18 tower chest spawner `0x005AF300`, server-hit 33 `0x005ABEB0` | 344–378 |
-|   44. Server-do 19 Radament death `0x005B0940` | 379–406 |
-|   45. Server-hit 35 orb mist `0x005ABEE0` | 407–421 |
-|   46. Server-do 20 blade creeper `0x005AF540`, server-do 21 Distraction `0x005AF590`, server-hit 37 `0x005AC020` | 422–449 |
-|   47. Server-hit 39 imp spawn monsters `0x005AC1D0` | 450–469 |
-|   48. Server-hit 40 catapult spike ball `0x005AC250` | 470–498 |
-|   49. Server-hit 43 Healing Vortex `0x005AC350` | 499–513 |
-|   50. Server-hit 47 Molten Boulder `0x005AC550` | 514–535 |
-|   51. Server-hit 48 Molten Boulder emerge `0x005AC6D0` | 536–544 |
-|   52. Server-hit 50 plague vines trail `0x005AC800` | 545–555 |
-|   53. Server-do 27 Tornado `0x005AFA30` | 556–574 |
-|   54. Server-hit 51 volcano debris `0x005AC870` | 575–585 |
-|   55. Server-do 29 recycler delay `0x005AFD70`, server-do 33 vine recycler delay `0x005AFEC0` | 586–602 |
-|   56. Server-do 30 rabies plague `0x005B0010`, server-hit 53 rabies contagion `0x005ACA50` | 603–638 |
-|   57. Server-do 32 Tiger Fury `0x005B03E0` | 639–651 |
-|   58. Server-hit 54 Baal spawn monsters `0x005ACAF0` | 652–663 |
-|   59. Server-hit 55 Baal inferno `0x005ACB60` | 664–674 |
-|   60. Server-do 36 `0x005B0A40`, server-hit 57 `0x005AD970` Baal FX control | 675–689 |
-|   61. Server-hit 59 Baal taunt poison control `0x005ACF20` | 690–701 |
-|   62. Unused bodies: server-do 37 `0x005B0AA0`, server-hit 5 `0x005ABC40`, 6 `0x005AA1C0`, 11 `0x005B0870`, 23 `0x005ACFC0` | 702–728 |
-| Constants & data dependencies | 729–754 |
-| Randomness | 755–774 |
-| Edge cases & original bugs | 775–801 |
-| Test vectors | 802–821 |
-| Provenance | 822–846 |
-| Open questions | 847–866 |
+|   41. Server-hit 31 fire head `0x005ABD70` | 317–333 |
+|   42. Server-hit 32 Cairn Stones `0x005ABE50` | 334–344 |
+|   43. Server-do 18 tower chest spawner `0x005AF300`, server-hit 33 `0x005ABEB0` | 345–381 |
+|   44. Server-do 19 Radament death `0x005B0940` | 382–455 |
+|   45. Server-hit 35 orb mist `0x005ABEE0` | 456–470 |
+|   46. Server-do 20 blade creeper `0x005AF540`, server-do 21 Distraction `0x005AF590`, server-hit 37 `0x005AC020` | 471–498 |
+|   47. Server-hit 39 imp spawn monsters `0x005AC1D0` | 499–525 |
+|   48. Server-hit 40 catapult spike ball `0x005AC250` | 526–554 |
+|   49. Server-hit 43 Healing Vortex `0x005AC350` | 555–569 |
+|   50. Server-hit 47 Molten Boulder `0x005AC550` | 570–591 |
+|   51. Server-hit 48 Molten Boulder emerge `0x005AC6D0` | 592–600 |
+|   52. Server-hit 50 plague vines trail `0x005AC800` | 601–611 |
+|   53. Server-do 27 Tornado `0x005AFA30` | 612–630 |
+|   54. Server-hit 51 volcano debris `0x005AC870` | 631–641 |
+|   55. Server-do 29 recycler delay `0x005AFD70`, server-do 33 vine recycler delay `0x005AFEC0` | 642–658 |
+|   56. Server-do 30 rabies plague `0x005B0010`, server-hit 53 rabies contagion `0x005ACA50` | 659–694 |
+|   57. Server-do 32 Tiger Fury `0x005B03E0` | 695–707 |
+|   58. Server-hit 54 Baal spawn monsters `0x005ACAF0` | 708–719 |
+|   59. Server-hit 55 Baal inferno `0x005ACB60` | 720–730 |
+|   60. Server-do 36 `0x005B0A40`, server-hit 57 `0x005AD970` Baal FX control | 731–746 |
+|   61. Server-hit 59 Baal taunt poison control `0x005ACF20` | 747–758 |
+|   62. Unused bodies: server-do 37 `0x005B0AA0`, server-hit 5 `0x005ABC40`, 6 `0x005AA1C0`, 11 `0x005B0870`, 23 `0x005ACFC0` | 759–785 |
+| Constants & data dependencies | 786–811 |
+| Randomness | 812–831 |
+| Edge cases & original bugs | 832–858 |
+| Test vectors | 859–878 |
+| Provenance | 879–910 |
+| Open questions | 911–944 |
 <!-- /index -->
 
 ## Summary
@@ -321,8 +321,9 @@ Row: firehead (277; `CollideKill` 1).
 1. Missile none or no record → return 1. O = owner; none, or no unit →
    return 1.
 2. Zeroed 0x70 record; v = `elem_roll(game, missile, unit, record)`
-   (`missiles.md` §R9.6; `EType` fire, missile seed); the record is not
-   used further.
+   (`missiles.md` §R9.6; `EType` fire, missile seed): v is the rolled
+   fire amount (8.8), not the element type; the record is not used
+   further.
 3. O life (stat 6) := min(life + max(v, 0), max life) (`0x00625480`,
    `0x00625D10`, `0x00627260`).
 4. Return 3 when `CollideKill` ≠ 0, else 2.
@@ -361,7 +362,9 @@ Server-do 18:
       px += `roll(2r + 1)` − r, then py += `roll(2r + 1)` − r
       (`0x0045C3E0`, missile seed).
    2. Floor drop spot `0x00555DA0(missile room, (px, py), &out, size 1,
-      fallback 1)` (`items/treasure.md` §7 step 2); none → skip.
+      fallback 1)` (`items/treasure.md` §7 step 2); none → skip. With
+      no room every cell lookup of the search (`0x00463740`) gives
+      none, so the spot is none: no gold.
    3. Gold: item request (0x84 bytes, zeroed) {unit the missile, game,
       item level = area level of out's level (`0x0061DCA0(0x0061A1B0(
       room), difficulty game +0x6D, expansion game +0x70)`), item index
@@ -395,14 +398,60 @@ unit, skill, x, y, radius 0, level, 0, cb} and runs `0x0056DCC0`:
 3. Room = the room containing (x, y), searched from the unit's room
    (`0x00463740`); none → nothing.
 4. Unit find around (x, y) with radius r and flags `flags` over that
-   room's neighbourhood (`0x0065A950` init, `0x0065AC70` collect,
-   `0x0065AA00` free; the finder no spec owns yet, Open question 3).
+   room's neighbourhood: the unit find below, with the default filter
+   (no callback) and filter record {flags, unit, x, y, r}.
 5. For each found unit U in found order: `cb(ECX game, EDX unit, U,
    level, 0)`.
 
 Both callbacks call `0x005D0C40(game, missile, U, 124, level, last)`
 (D2MOO `SKILLS_ApplyRedemptionEffect`; skills spec, not yet written,
 Open question 4) with last = 0 for `0x005AD8F0` and 1 for `0x005AD910`.
+
+**Unit find** (`0x0065A950` init, `0x0065AC70` collect, `0x0065AA40`
+default filter, `0x0065AA00` free; also used by `monsters/ai-bodies-3.md`
+with its own callback). Finder: room R, centre (x, y), radius r, flags F,
+callback cb (or none), filter argument A; a result array of capacity 15
+that grows by 15 whenever it fills (no limit).
+
+1. R none → 0 found.
+2. Rooms: if the square x ± r, y ± r lies strictly inside R's subtile
+   rectangle (active room +0x4C x, y, w, h: x − r > rx, y − r > ry,
+   x + r < rx + w, y + r < ry + h; `0x0065A6B0`) → R alone; else R's
+   adjacency array (active room +0x00, count +0x24; `drlg/rooms.md`
+   §1), in its order.
+3. Per room: F has 0x2000 and the room is in a town (its level is 1,
+   40, 75, 103 or 109; `0x0061AB00` → `0x006426A0`) → skip. Then the
+   overlap test `0x0065A710`, which rejects only when x + r < rx and
+   x − r > rx + w, or y + r < ry and y − r > ry + h: for r ≥ 0 it never
+   rejects (original bug; distance is left to the filter).
+4. Per unit of the room, from the room's first unit (+0x74) along the
+   next-in-room link (unit +0xE8): accepted by cb(ECX unit, EDX A) when
+   cb is set, else by the default filter → appended. **Found order** =
+   room order, then each room's unit-list order.
+
+Default filter (A = the filter record: +0x00 flags F, +0x08 unit S,
++0x0C x, +0x10 y, +0x14 r, +0x18 limit, +0x1C accepted count, +0x20
+coordinate list, +0x24 extra test):
+
+1. A none → reject. F has 0x40 and limit ≤ accepted → reject.
+2. Position of U (objects, items, tiles: static path; others: dynamic
+   path); (ux − x)² + (uy − y)² > r² → reject (distance ≤ r passes).
+3. By U's type: player (0) needs F & 1; without F & 0x1000 mode 17
+   (dead) or 0 (death) rejects, with it only mode 17 passes; U = S
+   rejects. Monster (1) needs F & 2; without 0x1000 mode 12 (dead) or 0
+   (death) rejects, with it only mode 12 passes; F & 4 → U must be
+   undead (`0x0063E990`). Object (2) needs F & 0x10. Missile (3) needs
+   F & 8, a missiles.txt record, and its `Explosion` flag (record +0x04
+   bit 1) clear. Item (4) needs F & 0x20. Tile (5) and others reject.
+4. F & 0x80 → unit flag 0x4 (+0xC4) required; F & 0x400 → unit flag
+   0x8 required. F & 0x100 → U's room in a town rejects. F & 0x200 and
+   U has a room → for each point of the coordinate list (`0x0066A5D0`)
+   the collision at it (`0x0064CB30(room, px, py, mask 4)`) equal to 4
+   rejects. F & 0x800 → the extra test (ECX U, EDX A) non-zero rejects.
+5. Accept: accepted count += 1.
+
+Corpse effect (flags 0x3002): monsters in mode 12 only, outside towns,
+within r of (x, y), in found order.
 
 ### 45. Server-hit 35 orb mist `0x005ABEE0`
 
@@ -457,12 +506,19 @@ Row: imp spawn monsters (409).
 `spawn_for_level` (ECX game, EDX room, stack x, y):
 
 1. L = levels record of the room's level (`0x0061DB70(0x0061A1B0(room))`).
-   n = `mon` count (+0x33); n = 0 → fatal assertion.
-2. i = `roll(n)` on the **room seed** (room +0x6C, `0x0045C3E0`).
+   n = `mon` count (+0x33); n = 0 → fatal assertion. No room: the level
+   id reads as 0, which has no levels record, so the +0x33 read goes
+   through null (fatal). Unreachable for a live missile: creation fails
+   without a room (`missiles.md` §R2.3 step 3) and the missile's room is
+   always set.
+2. i = `roll(n)` on the **room seed** (the active room's seed, room
+   +0x6C, `drlg/rooms.md` §1 active-room layout; `0x0045C3E0`).
 3. For up to n steps: i := i + 1, 0 when it reaches n; c = mon[i]
    (+0x36 + 2i, i16); c's monstats record (an invalid c reads through a
    null record: fatal) has `isSpawn` (flags +0x0C bit 0) → stop.
-4. c = −1 → return 0. All n entries without `isSpawn` → fatal assertion.
+4. c = −1 → return 0: a dead check, since c = −1 already failed in
+   step 3 (fatal); never reached. All n entries without `isSpawn` →
+   fatal assertion.
 5. Create request (`monsters/init.md` §2) {game, room, coord list 0,
    class c, mode 1, GUID 0, x, y, spread 5, flags 0} → `0x005B2A00`;
    return 1 when created, else 0.
@@ -680,7 +736,8 @@ Row: baalfx control (625); `Range` 650.
 quest test `0x005444B0(game, 36)` (the game's quest list, game +0x10F4:
 no entry with id 36 → true; else its byte +9 = 1) → `0x0058E920(game,
 R, missile)` (D2MOO `ACT5Q6_SpawnTyrael`; quests spec, Open question 7);
-then refresh R (`0x0061AED0(R, 1)`).
+then, whatever the test gave, refresh R (`0x0061AED0(R, 1)`): the
+refresh is outside the test branch in both callers.
 
 Server-do 36: data +0x28 = 0 and frames left ≤ 100 → `tyrael`. Return
 flight (tail jump).
@@ -839,6 +896,13 @@ Created missiles and monsters draw on their own seeds.
   `0x005B0AA0`, `0x005ABC40`, `0x005AA1C0`, `0x005B0870`, `0x005ACFC0`;
   table `0x006E2838`–`0x006E2A37` dumped.
   Table entries checked against `0x0073C768` / `0x0073C840`.
+- Unit find: `0x0056DCC0`, `0x0065A950`, `0x0065AC70`, `0x0065A6B0`,
+  `0x0065A710` (register arguments read in the disassembly),
+  `0x00619730`, `0x00619790`, `0x0065A900`, `0x0065AA40`, `0x0061AB00`,
+  `0x006426A0`, `0x00451F30`, `0x0046ACE0`; mask `0x006CE26C` = 2
+  (read from `Game.exe`). `spawn_for_level` null paths: `0x0061A1B0`,
+  `0x0066BAB0`, `0x0061DB70`; floor drop with no room: `0x00555DA0`,
+  `0x0064DEA0`, `0x00463740` (null room → none).
 - Live `patch_d2` missiles.txt rows per section; skills.txt Lightning
   Fury, Fist of the Heavens, Battle Cry, Bone Wall; monumod.txt row 15.
 - D2MOO 1.10f `MissMode.cpp` bodies of the same names: hints; 1.14d
@@ -851,9 +915,10 @@ Created missiles and monsters draw on their own seeds.
 2. `0x005B1990(game, P, 0, 9)` on a bone-wall piece: the meaning of
    mode 9 (`monsters/population.md` Open question 7 asks the same for
    mode 8).
-3. The unit finder `0x0065A950` / `0x0065AC70` used by `corpse_effect`
-   (§44) with flags 0x3002: which units and in which order
-   (`monsters/ai-bodies-3.md` Open question 3 asks the same).
+3. *Answered* (`impl-missile-bodies-2` Q6): the unit find is now
+   specified under §44 (rooms, found order, default filter); flags
+   0x3002 = dead monsters (mode 12) outside towns within r.
+   `monsters/ai-bodies-3.md` Open question 3 can link it.
 4. `0x005D0C40` (D2MOO `SKILLS_ApplyRedemptionEffect`) has no spec: the
    skills spec should own it (Redemption's per-corpse effect; called
    with last = 1 on the final frame).
@@ -863,3 +928,16 @@ Created missiles and monsters draw on their own seeds.
    recording that no tigerfurytrail missile is ever created.
 7. `0x0058E920` (Tyrael's spawn in the Worldstone Chamber) and the quest
    test `0x005444B0`: the quests spec should own both.
+8. *Answered* (`impl-missile-bodies-2` Q2): `elem_roll` returns the
+   rolled amount (`missiles.md` §R9.6 return list), so the fire head
+   heals by the fire roll (§41 step 2).
+9. *Answered* (`impl-missile-bodies-2` Q4): `tyrael` refreshes the room
+   after the quest-test branch, whatever the test gave (§60;
+   `0x005AD970`, `0x005B0A40`).
+10. *Answered* (`impl-missile-bodies-2` Q5): in `spawn_for_level` an
+    invalid class is a null read inside the search, so the −1 test is
+    dead; no room is fatal too but unreachable (§47 steps 1, 4). The
+    tower chest's floor drop with no room finds no spot (§43 step 4.2).
+11. *Answered* (`impl-missile-bodies-2` Q6): the room seed is the
+    active room's seed (+0x6C, `drlg/rooms.md` §1), which the DRLG
+    active-room code already provides; the unit find is §44.

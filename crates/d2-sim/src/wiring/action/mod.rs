@@ -29,6 +29,8 @@ pub mod objects;
 pub mod pending;
 pub mod reaction;
 pub mod rooms;
+pub mod switch;
+pub mod unit_update;
 pub mod units;
 pub mod vitals_sync;
 pub mod waypoints;
@@ -60,7 +62,9 @@ use crate::world::waypoints::WaypointRecords;
 
 pub use dispatch::ActionSim;
 pub use monsters::MonsterWorld;
-pub use objects::{ObjectCase, ObjectReach, ObjectRoute, ObjectState, ObjectView, QuestObjectCall};
+pub use objects::{
+    ObjectCase, ObjectReach, ObjectRoute, ObjectState, ObjectView, QuestObjectCall, QuestObjectHost,
+};
 pub use pending::{KillStep, NoPending, Pending, SkillEvent};
 
 /// The tables the action modules read (typed `d2_data` records).
@@ -105,6 +109,12 @@ pub enum WiringError {
     Place(crate::path::place_seams::PlaceError),
     /// An object fatal assert (`world/objects.md`).
     Object(crate::world::objects::ObjectError),
+    /// Room ready `0x0061A460` on a client without a room: fatal assert
+    /// 0x3EF in 1.14d (`sim/tick.md` §6 rule 6).
+    NoClientRoom(crate::units::ClientId),
+    /// The monster mode message (`sim/intents-events.md` §7.4): a fatal
+    /// assert or a message the spec gives no layout for.
+    ModeMessage(unit_update::ModeMessageError),
 }
 
 /// The [`crate::units::hooks::UnitHooks`] of [`ActionSim`]'s unit system
@@ -143,6 +153,11 @@ pub struct ActionHooks<X> {
     /// default): the call does nothing (no pet list in the action
     /// wiring).
     pub pet_follows: Option<Vec<UnitId>>,
+    /// Monsters killed by the kill `0x0057CCB0` with flag 1 (every
+    /// caller but the expired-pet kill), for the host that holds the
+    /// hireling lists: `hirelings.md` §8 rule 1 (`0x005751A0` when the
+    /// owner is a player). `None` (the default): nothing is recorded.
+    pub pet_deaths: Option<Vec<UnitId>>,
     /// The loaded `AnimData.d2` (`formats/animdata.md`, parsed by
     /// `d2-formats`): the records `UnitHooks::anim_record` looks up by
     /// COF name. `None`: no record for any unit (as before the table is
@@ -162,6 +177,20 @@ pub struct ActionHooks<X> {
     pub monster_world: Option<Box<dyn MonsterWorld<X>>>,
     /// The monster world is taken out for a call.
     monster_world_out: bool,
+    /// The quest control lent by the host that holds it
+    /// ([`objects::QuestObjectHost`]): a quest init, operate or object
+    /// event 7 the object module hands back runs on it at once, inside the
+    /// allocation, dispatch or event (`quests-act1-rest.md` §9 item 7).
+    /// `None`: queued for the host ([`ObjectState::route_quests`]) or
+    /// handed to [`Pending::object_route`], as before.
+    pub quest_host: Option<Box<dyn objects::QuestObjectHost<X>>>,
+    /// The quest host is running a route: routes it raises are queued and
+    /// run right after it.
+    quest_host_out: bool,
+    /// Objects allocated by [`View::allocate`] whose per-kind init waits
+    /// for the allocation's game-seed step to be written back (`None`
+    /// outside such an allocation).
+    deferred_inits: Option<Vec<UnitId>>,
     /// The unit path records and tables ([`crate::wiring::path`]).
     /// `None` (the default): the path seams keep their [`Pending`]
     /// answers; [`ActionHooks::enable_paths`] turns the provider on.
@@ -178,6 +207,10 @@ pub struct ActionHooks<X> {
     /// `None` (the default): the sync is off;
     /// [`ActionHooks::enable_vitals_sync`] turns it on.
     pub sync: Option<vitals_sync::SyncState>,
+    /// The session state of the clients and players
+    /// (`sim/intents-events.md` §8; [`switch`]): player names, hot keys,
+    /// skill hands, portal flags.
+    pub session: switch::SessionState,
     /// Seams with no provider yet.
     pub x: X,
     /// Scratch seed handed out for a unit without a record (an error is
@@ -202,15 +235,20 @@ impl<X> ActionHooks<X> {
             objects: None,
             objects_out: false,
             pet_follows: None,
+            pet_deaths: None,
             anim_data: None,
             vitals: None,
             mode_target: None,
             monster_world: None,
             monster_world_out: false,
+            quest_host: None,
+            quest_host_out: false,
+            deferred_inits: None,
             paths: None,
             bodies: None,
             handlers: BTreeMap::new(),
             sync: None,
+            session: switch::SessionState::default(),
             x,
             orphan_seed: Seed::init(),
             errors: Vec::new(),

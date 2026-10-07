@@ -309,6 +309,7 @@ pub fn hireling_tables(rows: &[HireRow]) -> HirelingTables {
         .collect();
     HirelingTables {
         rows: HirelingRows::new(rows),
+        exp_ratios: Default::default(),
         max_level: 99,
         pet_flags: HirelingTables::WARP,
         pet_basemax: 1,

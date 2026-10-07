@@ -16,7 +16,9 @@
 //! room list newest first. Their maze data (def, file, lock, links) lives
 //! here beside them: `drlg::room` has no orth links. The rooms the cells
 //! are built into (§9 step 4) get their links here too; they are dropped
-//! with the generation state.
+//! with the generation state. Nothing reads a built room's links after
+//! generation except the room free, so dropping them is not observable
+//! (`rooms.md` §1, open question 18).
 //!
 //! Seams: [`MazePresets`] reaches `drlg::preset` (DS1 map alloc and its
 //! file draw, building a map into rooms, a preset level's direction) and

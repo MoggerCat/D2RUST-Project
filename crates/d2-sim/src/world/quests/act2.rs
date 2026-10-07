@@ -1,4 +1,5 @@
 // Spec: specs/world/quests-act2.md §1 (conventions), §2 (records), §1.4 (sequence chain)
+// Spec: specs/world/quests-act2-2.md §1 (answers QB-2, QB-18)
 //! Act II quest callbacks: Radament ([`q1`]), the Horadric Staff
 //! ([`q2`]), Tainted Sun ([`q3`]), Arcane Sanctuary ([`q4`]), the
 //! Summoner ([`q5`]), the Seven Tombs ([`q6`]) and the gossip and intro
@@ -52,6 +53,10 @@ pub const SOUND_REFUSED: u16 = 19;
 pub struct Extra {
     /// A2Q0 (chain 7): the extra GUID list (§9).
     pub q0: GuidList,
+    /// A2Q7 (chain 26) extra +0x00: the chat-end byte `0x0059E0B0` tests
+    /// (init writes 0; no 1.14d code writes 1, `quests-act2-2.md` §1
+    /// item 3).
+    pub q7_chat: u8,
     pub q1: q1::Extra,
     pub q2: q2::Extra,
     pub q3: q3::Extra,
@@ -155,15 +160,25 @@ pub(crate) fn add_guid<W: QuestWorld>(ctl: &mut QuestControl, w: &W, i: usize, p
     ctl.records[i].guids.add(g);
 }
 
-/// Event 10 (`0x00545530`): remove the player from the record list.
+/// Event 10 (`0x00545530`, `quests-act2-2.md` §1 item 2): when the
+/// leaving player's record has both s.1 and s.0 (s = the record's filter
+/// slot) and the record list is not empty, remove the player's GUID (−1
+/// without a player) from it. Otherwise nothing.
 pub(crate) fn remove_guid<W: QuestWorld>(
     ctl: &mut QuestControl,
-    w: &W,
+    w: &mut W,
     i: usize,
     p: Option<UnitId>,
 ) {
-    let g = guid_of(w, p);
-    ctl.records[i].guids.remove(g);
+    let slot = ctl.records[i].filter;
+    let f = rec(w, p);
+    if f.get(slot, bit::REWARD_PENDING)
+        && f.get(slot, bit::REWARD_GRANTED)
+        && !ctl.records[i].guids.0.is_empty()
+    {
+        let g = guid_of(w, p);
+        ctl.records[i].guids.remove(g);
+    }
 }
 
 /// "quick remove" (`0x00545310`): remove the player when the list is not
@@ -175,7 +190,8 @@ pub(crate) fn quick_remove<W: QuestWorld>(
     p: Option<UnitId>,
 ) {
     if !ctl.records[i].guids.0.is_empty() {
-        remove_guid(ctl, w, i, p);
+        let g = guid_of(w, p);
+        ctl.records[i].guids.remove(g);
     }
 }
 
@@ -373,8 +389,10 @@ pub fn active_fn<W: QuestWorld>(
     }
 }
 
-/// Status functions (§2): chain 9 (§4.6), chain 13 (§8.5), chain 7
-/// (false). The others are reported.
+/// Status functions (§2): chain 9 (§4.6), chain 13 (§8.5); chains 7
+/// (`0x00598770`), 26 (`0x0059E2B0`) and 27 (`0x0059E4A0`) return false
+/// and write nothing (`quests-act2-2.md` §1 item 18). The others are
+/// reported.
 pub fn status_fn<W: QuestWorld>(
     ctl: &QuestControl,
     w: &mut W,
@@ -384,7 +402,7 @@ pub fn status_fn<W: QuestWorld>(
     f: u32,
 ) -> Option<u8> {
     match ctl.records[i].chain {
-        7 => None,
+        7 | 26 | 27 => None,
         9 => Some(q2::status(ctl, w, i, player, pf)),
         13 => Some(q6::status(ctl, w, i, player, pf)),
         c => {
