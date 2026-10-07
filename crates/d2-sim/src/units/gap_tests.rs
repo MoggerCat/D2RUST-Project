@@ -886,6 +886,7 @@ fn spec_monster_modes() -> Vec<(u32, MonsterModeRecord, Moves)> {
 /// §4.6: the mode table (from the spec text), the mode set's steps, the
 /// fallback, events 0/1 and the neutral start's pending-AI test.
 // Covers: specs/sim/units.md §4.6
+// Covers: specs/monsters/ai.md §1.3 text
 #[test]
 fn monster_mode_set() {
     let rows = spec_monster_modes();

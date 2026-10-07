@@ -113,3 +113,20 @@ fn raise_reinstall_without_an_alternate_runs_step_4_again() {
     let c = w.store.control(mon).unwrap();
     assert_eq!((c.params, c.function), ([0, 0, 0], AI_TABLE[3].think));
 }
+
+// Covers: specs/monsters/ai.md §1.3 text
+#[test]
+fn ai_functions_leave_the_next_think_to_the_mode_end() {
+    // A started attack: the AI function schedules no think itself (the
+    // mode's end does, §1.3).
+    let mut w = World::new(monstats(3, [0; 5], 15));
+    w.game.frame = 100;
+    w.run(true, 2);
+    assert_eq!(w.fake.modes().len(), 1, "an attack was requested");
+    assert!(w.thinks().is_empty(), "no think from the AI function");
+    // The mode ends and the unit returns to neutral: the neutral start
+    // adds the think `aidel` frames later.
+    let mon = w.mon;
+    w.with(|g, cx| neutral_mode_start(g, cx, mon));
+    assert_eq!(w.thinks(), [115]);
+}
