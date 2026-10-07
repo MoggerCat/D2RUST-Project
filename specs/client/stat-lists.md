@@ -25,14 +25,14 @@
 | Rules | 64–65 |
 |   1. The list of a client unit | 66–101 |
 |   2. Items | 102–188 |
-|   3. States (S→C 0xA7, 0xA8, 0xA9) | 189–279 |
-|   4. Skills | 280–311 |
-| Constants & data dependencies | 312–322 |
-| Randomness | 323–327 |
-| Edge cases & original bugs | 328–335 |
-| Test vectors | 336–347 |
-| Provenance | 348–360 |
-| Open questions | 361–400 |
+|   3. States (S→C 0xA7, 0xA8, 0xA9) | 189–419 |
+|   4. Skills | 420–451 |
+| Constants & data dependencies | 452–462 |
+| Randomness | 463–467 |
+| Edge cases & original bugs | 468–475 |
+| Test vectors | 476–487 |
+| Provenance | 488–500 |
+| Open questions | 501–540 |
 <!-- /index -->
 
 ## Summary
