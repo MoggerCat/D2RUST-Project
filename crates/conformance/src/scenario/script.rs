@@ -1559,4 +1559,79 @@ mod tests {
         assert!(text.contains("seed 0x00000001\n"), "{text}");
         assert!(text.contains("at 1 msg Walk x=@x+1 y=@y\n"), "{text}");
     }
+    // Covers: specs/tools/scenario.md §1 r1, §1 r3
+    #[test]
+    fn committed_scripts_parse_and_hold_only_inputs() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../traces/scenarios");
+        let mut n = 0;
+        for e in std::fs::read_dir(&dir).unwrap() {
+            let path = e.unwrap().path();
+            if path.extension().and_then(|x| x.to_str()) != Some("scenario") {
+                continue;
+            }
+            let text = std::fs::read_to_string(&path).unwrap();
+            assert!(!text.contains('\r'), "{path:?}: LF line ends");
+            let s = Scenario::parse(&text).unwrap_or_else(|e| panic!("{path:?}: {e}"));
+            assert_eq!(
+                Some(s.name.as_str()),
+                path.file_stem().and_then(|x| x.to_str()),
+                "{path:?}"
+            );
+            // The grammar admits numbers, names and 3-4 character item codes
+            // only: every item code is short and alphanumeric.
+            for it in s.character.iter().flat_map(|c| &c.items) {
+                assert!(it.code.len() <= 4 && it.code.chars().all(|c| c.is_ascii_alphanumeric()));
+            }
+            n += 1;
+        }
+        assert!(n >= 1);
+    }
+
+    // Covers: specs/tools/scenario.md §3 row1, §3 row2, §3 row3, §3 row4, §3 row5
+    #[test]
+    fn every_reference_form_resolves() {
+        let one = |r: &str| resolve(&parse_ref(r).unwrap(), &W);
+        assert_eq!(one("@player"), Ok(7));
+        assert_eq!(one("@x"), Ok(100));
+        assert_eq!(one("@y"), Ok(200));
+        assert_eq!(one("@x+7"), Ok(107));
+        assert_eq!(one("@x-7"), Ok(93));
+        assert_eq!(one("@y+7"), Ok(207));
+        assert_eq!(one("@y-7"), Ok(193));
+        // @<type>, @<type>#n: ascending GUID order over all units of the type.
+        assert_eq!(one("@1"), Ok(12));
+        assert_eq!(one("@1#1"), Ok(30));
+        assert!(one("@1#2").is_err());
+        assert_eq!(one("@0"), Ok(7));
+        // @<type>:<class>, with #n.
+        assert_eq!(one("@2:9"), Ok(4));
+        assert_eq!(one("@1:148#1"), Ok(30));
+        assert!(one("@2:9#1").is_err());
+        // @wp picks only waypoint objects.
+        assert_eq!(one("@wp"), Ok(5));
+        assert!(one("@wp#1").is_err());
+    }
+
+    // Covers: specs/tools/scenario.md §3.1 row1, §3.1 row2, §3.1 row3, §3.1 row4, §3.1 r4
+    #[test]
+    fn spawn_kinds_take_their_umod_counts_and_unresolved_refs_spawn_nothing() {
+        let ok = |kind: &str, umods: &str| steps(&format!("at 1 spawn 19 1 2 {kind}{umods}\n"));
+        assert!(ok("normal", "").is_ok());
+        assert!(ok("random-boss", "").is_ok());
+        assert!(ok("champion", " umod 16").is_ok());
+        assert!(ok("champion", " umod 16 17").is_err());
+        assert!(ok("champion", "").is_err());
+        assert!(ok("random-boss", " umod 1").is_err());
+        assert!(ok("unique", " umod 1").is_ok());
+        assert!(ok("unique", " umod 1 2 3 4 5 6 7 8 9").is_ok());
+        assert!(ok("unique", " umod 1 2 3 4 5 6 7 8 9 10").is_err());
+        assert!(ok("unique", "").is_err());
+        // Unresolved reference: no position, nothing is spawned (§3 rule 5).
+        let s = steps("at 1 spawn 19 @1:999 @y normal\n").unwrap();
+        let StepMsg::Spawn(sp) = &s.steps[0].msg else {
+            panic!()
+        };
+        let e = spawn_position(sp, &W).unwrap_err();
+        assert_eq!(e.reference, "@1:999");
+    }
 }

@@ -73,8 +73,7 @@ fn cmd_run(args: &[String]) -> Result<ExitCode> {
     for g in &r.trace.header.gaps {
         eprintln!("gap: {g}");
     }
-    let out =
-        out.unwrap_or_else(|| PathBuf::from(format!("traces/raw/{}.d2rs.trace.jsonl", s.name)));
+    let out = out.unwrap_or_else(|| default_trace_path(&s.name, "d2rs"));
     if let Some(dir) = out.parent().filter(|d| !d.as_os_str().is_empty()) {
         std::fs::create_dir_all(dir).with_context(|| format!("creating {}", dir.display()))?;
     }
@@ -87,6 +86,11 @@ fn cmd_run(args: &[String]) -> Result<ExitCode> {
         out.display()
     );
     Ok(ExitCode::SUCCESS)
+}
+
+/// `traces/raw/<name>.<side>.trace.jsonl` (spec §1 rule 2).
+fn default_trace_path(name: &str, side: &str) -> PathBuf {
+    PathBuf::from(format!("traces/raw/{name}.{side}.trace.jsonl"))
 }
 
 fn cmd_compare(args: &[String]) -> Result<ExitCode> {
@@ -127,4 +131,22 @@ fn main() -> ExitCode {
         eprintln!("error: {e:#}");
         ExitCode::from(3)
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Covers: specs/tools/scenario.md §1 r2
+    #[test]
+    fn default_trace_path_follows_the_convention() {
+        assert_eq!(
+            default_trace_path("walk-town", "d2rs"),
+            PathBuf::from("traces/raw/walk-town.d2rs.trace.jsonl")
+        );
+        assert_eq!(
+            default_trace_path("a-1", "original"),
+            PathBuf::from("traces/raw/a-1.original.trace.jsonl")
+        );
+    }
 }
