@@ -273,8 +273,9 @@ impl MoveCall for UpdateRun {
         // `0x00553220` → `0x00597B00`; §6.1 rule 4, `InvDesk::update_done`):
         // +0xC8 bit 0 cleared (bit 1, "save pending", stays: IS1), the
         // per-item resets, the update lists freed. The unit-flag part of
-        // `0x00553220` (`items::moves::room_cleanup`) belongs to the tick
-        // wiring, which does not run it yet (IS2).
+        // `0x00553220` runs in the tick wiring's step 6
+        // (`d2_sim::wiring::action::View::room_cleanup`, `intents-events.md`
+        // §7.5 step 3), before this pass.
         for &p in &self.players {
             let Some(o) = d.owner_of(p) else {
                 continue;
@@ -298,18 +299,20 @@ impl MoveCall for UpdateRun {
 ///
 /// Reading: in 1.14d this runs inside the client pass (`tick.md` §6,
 /// step 5) and the clean-up in step 6; here it runs after
-/// `d2_sim::tick::tick`, whose wiring implements neither the per-client
-/// unit update nor `0x00553220` (the hooks keep their defaults), so no
-/// step of the tick reads or changes what this pass does. Every player
+/// `d2_sim::tick::tick`. The tick wiring's per-client unit update sends
+/// no item message and its clean-up (`intents-events.md` §7.5, flags
+/// only) clears no bit this pass reads (+0xC8 bits 0 and 1, the item and
+/// command flags), so no step of the tick changes what this pass does. Every player
 /// is queued for update by its own per-client update (`tick.md` §6 step
 /// 5, last), so the queue membership test is the room test above. The
 /// client's room is read after the tick's room switch (`0x00537B50`, in
 /// the per-client update after the unit updates): in the tick of a
 /// switch 1.14d walks the old room's adjacent rooms. The ground items' unit update (§6.3,
 /// `d2_sim::items::moves::item_unit_update`) is not run: it belongs to the
-/// per-unit update `0x0053A500` over the client's rooms, and its flag 0x10
-/// is cleared by the room clean-up `0x00553220`, neither of which the
-/// tick wiring implements yet (IS2, IS3).
+/// per-unit update `0x0053A500` over the client's rooms, which the tick
+/// wiring does not run for items; run here, after the tick, it would find
+/// unit flags 0x1 and 0x10 already cleared by the room clean-up (IS2,
+/// IS3).
 pub fn update_pass<D: EventDispatch, W: WorldHost<D>>(
     sim: &mut SimGame<D, W>,
     out: &mut dyn MessageSink,

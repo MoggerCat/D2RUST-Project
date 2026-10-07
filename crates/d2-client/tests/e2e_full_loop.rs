@@ -1,4 +1,4 @@
-// Spec: specs/client/bridge.md §3; specs/sim/pathing.md §1.1, §9, §10; specs/sim/path-placement.md §2.4, §2.5, §10, §11; specs/sim/intents-events.md §2.4; specs/skills/use.md §1, §5.4; specs/missiles/missiles.md §R2.3, §R4; specs/combat/damage.md §5.2, §7.2; specs/combat/vitals.md §3, §4.2; specs/items/treasure.md §3; specs/items/inventory-moves.md §10.1; specs/items/inventory-moves.md §7.1, §7.3, §8.2; specs/world/npc.md §2; specs/world/vendors.md §3, §4, §7.1, §7.2, §9; specs/world/waypoints.md §6, §7, §8 (end to end)
+// Spec: specs/client/bridge.md §3; specs/sim/pathing.md §1.1, §9, §10; specs/sim/path-placement.md §2.4, §2.5, §10, §11; specs/sim/intents-events.md §2.4, §7.4, §7.7; specs/skills/use.md §1, §5.4; specs/missiles/missiles.md §R2.3, §R4; specs/combat/damage.md §5.2, §7.2; specs/combat/vitals.md §3, §4.2; specs/items/treasure.md §3; specs/items/inventory-moves.md §10.1; specs/items/inventory-moves.md §7.1, §7.3, §8.2; specs/world/npc.md §2; specs/world/vendors.md §3, §4, §7.1, §7.2, §9; specs/world/waypoints.md §6, §7, §8 (end to end)
 // Spec: specs/items/inventory.md (the sections other than §6–§11)
 //! The full single-player loop, end to end, on the wired host with the
 //! path provider on: the bridge (`d2_client::bridge`) on its local link
@@ -209,8 +209,12 @@ impl Pending for TestPending {
     fn skill_list(&self, _: UnitId) -> Vec<SkillEntry> {
         self.book.get().list.clone()
     }
-    fn used_skill(&self, _: UnitId) -> Option<SkillEntry> {
-        self.book.get().used
+    /// The book is the player's: other units (the monster's mode
+    /// message reads it, `intents-events.md` §7.4 rule 3) have no skill
+    /// in use.
+    fn used_skill(&self, u: UnitId) -> Option<SkillEntry> {
+        let b = self.book.get();
+        b.used.filter(|_| b.user == Some(u))
     }
     fn unit_event(
         &mut self,
@@ -363,8 +367,10 @@ impl UseRest for TestPending {
     fn owns_skill(&self, u: UnitId, skill: i32) -> bool {
         self.book.find_entry(u, skill).is_some()
     }
-    fn set_used_skill(&mut self, _: UnitId, e: Option<SkillEntry>) {
-        self.book.get().used = e;
+    fn set_used_skill(&mut self, u: UnitId, e: Option<SkillEntry>) {
+        let mut b = self.book.get();
+        b.used = e;
+        b.user = Some(u);
     }
     fn used_skill_flags(&self, _: UnitId) -> u32 {
         0
@@ -446,6 +452,8 @@ struct Inner {
     list: Vec<SkillEntry>,
     right: Option<SkillEntry>,
     used: Option<SkillEntry>,
+    /// The unit whose skill in use `used` is (the player).
+    user: Option<UnitId>,
     log: Vec<String>,
 }
 
@@ -1110,6 +1118,10 @@ struct Fx {
     cap: UnitId,
     /// The item-move seams' staged answers and log.
     inv: InvFx,
+    /// An S→C message due in the tick of a given frame (the monster's
+    /// death end, `intents-events.md` §7.7 rule 3), which [`walk`]'s
+    /// frames expect then and only then; taken when it arrived.
+    due: Option<(i32, Vec<u8>)>,
 }
 
 impl Fx {
@@ -1375,6 +1387,7 @@ impl Fx {
             buckler,
             cap,
             inv,
+            due: None,
         };
         fx.stage_facts();
         fx
@@ -1714,7 +1727,14 @@ fn walk(fx: &mut Fx, frames: &mut Vec<Frame>, msg: Vec<u8>, max: usize) -> Vec<(
         } else {
             assert!(f.1.codes.is_empty());
         }
-        assert!(f.2.is_empty(), "walk frame {i}: {:?}", f.2);
+        let now = fx.sim_ref().game.frame;
+        match fx.due.take() {
+            Some((at, m)) if at == now => assert_eq!(f.2, vec![m], "walk frame {i}"),
+            due => {
+                assert!(f.2.is_empty(), "walk frame {i}: {:?}", f.2);
+                fx.due = due;
+            }
+        }
         let d = fx
             .sim()
             .events
@@ -1934,13 +1954,40 @@ fn run_with(game_seed: u32) -> Transcript {
         let r = fx.sim_ref().events.action.sys.units.get(gold).unwrap();
         vec![(fx.guid(gold), r.seed, spot.x, spot.y, r.mode)]
     };
-    // No S→C so far but the join's 0x07s (frame 2): the unit-add /
-    // ground messages of the missile, the death and the drop belong to
-    // the per-unit update `0x0053A500`, which the tick wiring does not run
-    // yet (`inventory-moves.md` §6.3; IS2).
-    for f in &frames[1..] {
-        assert_eq!(f.2, none, "no S→C up to here");
+    // The kill's mode set (DT, unit flag 0x1) goes out in the client
+    // pass of the hit's tick (`intents-events.md` §7.3 rule 2 step 2,
+    // §7.4 rule 7): S→C 0x69 code 8 at the path target ((0, 0): the
+    // monster's path never had a target), d = the path direction, e =
+    // unit +0xB0 (`Pending::unit_b0`'s default 0). No other S→C so far
+    // but the join's 0x07s (frame 2): the unit-add / ground messages of
+    // the missile and the drop belong to the per-unit update
+    // `0x0053A500`, which the tick wiring does not run for them yet
+    // (`inventory-moves.md` §6.3; IS2).
+    let md = fx.path(monster);
+    let mguid = fx.guid(monster);
+    let mut code8 = vec![0x69];
+    code8.extend(mguid.to_le_bytes());
+    code8.push(8);
+    code8.extend(md.target_x.to_le_bytes());
+    code8.extend(md.target_y.to_le_bytes());
+    code8.extend([md.direction, 0]);
+    assert_eq!(&code8[5..], [8, 0, 0, 0, 0, md.direction, 0]);
+    let (hit, before) = frames[1..].split_last().unwrap();
+    for f in before {
+        assert_eq!(f.2, none, "no S→C up to the hit");
     }
+    assert_eq!(hit.2, vec![code8], "0x69 code 8 in the hit's frame");
+    // The death end: event 1 of the 4-frame DT animation (f_hit + 4)
+    // sets mode 12 (`0x005A72B0`, §7.7 rule 3), whose 0x69 code 9 at the
+    // monster's cell with e = 0 goes out in that tick (during the run of
+    // step 7).
+    let mut code9 = vec![0x69];
+    code9.extend(mguid.to_le_bytes());
+    code9.push(9);
+    code9.extend((md.x() as u16).to_le_bytes());
+    code9.extend((md.y() as u16).to_le_bytes());
+    code9.extend([md.direction, 0]);
+    fx.due = Some((f_hit + 4, code9));
     assert!(fx.errors().is_empty(), "{:?}", fx.errors());
 
     // 5b. Pick-up of the kill's gold (C→S 0x16 cursor 0, `inventory-moves.md`
@@ -2344,7 +2391,9 @@ fn run_with(game_seed: u32) -> Transcript {
     // The S→C stream drove the client model (`client/model.md`,
     // `msg-units.md`, `msg-stats-items.md`): 0x9C ×2, 0x47 ×2, 0x48 ×2
     // applied; 0x0D dropped (the player was never announced: the server
-    // sends no 0x59 / 0x0B in this staged game); every 0x07 rejected (no
+    // sends no 0x59 / 0x0B in this staged game) and the monster's two
+    // 0x69 (codes 8 and 9) dropped too (no 0xAC announced it:
+    // `msg-units.md` §4, the unit is not in the model); every 0x07 rejected (no
     // client act: this staged game sends no 0x03, fatal 0x58A): the join's
     // four, the warp's one and the six of its room switch; the NPC /
     // quest / trade ids have no owner spec yet.
@@ -2353,8 +2402,9 @@ fn run_with(game_seed: u32) -> Transcript {
         BTreeMap::from([(0x27, 1), (0x28, 1), (0x29, 1), (0x2A, 2)])
     );
     assert_eq!(log.handled, 6);
-    assert_eq!(log.dropped, BTreeMap::from([(0x0D, 1)]));
+    assert_eq!(log.dropped, BTreeMap::from([(0x0D, 1), (0x69, 2)]));
     assert_eq!((log.queued, log.drained), (0, 0));
+    assert_eq!(fx.due, None, "the death end's 0x69 code 9 arrived");
     let rejected: Vec<(u8, String)> = log
         .rejected
         .iter()

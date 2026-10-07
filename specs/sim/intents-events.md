@@ -14,7 +14,12 @@
   (branch `claude/phase3-server`), wired to `d2-proto` and `d2-sim`
   through adapters (`claude/phase3-wiring`; intent handlers are stubs
   until their system specs exist); the synthetic vectors pass as unit
-  tests; not yet run on a recording.
+  tests; not yet run on a recording. §7.4 / §7.7 (the monster mode
+  message, S→C 0x67–0x6D, and the death pair 0x69 codes 8 / 9) and the
+  flag part of §7.5 are implemented in `d2-sim`
+  (`monsters::mode_message`, `wiring::action::unit_update`; branch
+  `claude/impl-monster-death`): the §7.4 / §7.7 Test vectors pass as unit
+  tests; unverified against a recording of the wired host.
 - **Target version:** 1.14d
 - **Crate/module:** `d2-proto` (message ids, sizes, layouts: the two TSVs);
   `d2-server` (queues, drain, dispatch gate, per-client buffers, flush);
@@ -29,25 +34,25 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 53–69 |
-| Inputs | 70–78 |
-| Outputs / state changes | 79–85 |
-| Rules | 86–87 |
-|   1. Loop order (single player) | 88–109 |
-|   2. Client → server | 110–279 |
-|   3. Server → client | 280–379 |
-|   4. d2rs mapping and scope | 380–411 |
-|   5. Machine-readable tables | 412–448 |
-|   6. Exact-match comparison | 449–534 |
-|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 535–917 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 918–1062 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1063–1175 |
-| Constants & data dependencies | 1176–1194 |
-| Randomness | 1195–1200 |
-| Edge cases & original bugs | 1201–1234 |
-| Test vectors | 1235–1310 |
-| Provenance | 1311–1406 |
-| Open questions | 1407–1472 |
+| Summary | 58–74 |
+| Inputs | 75–83 |
+| Outputs / state changes | 84–90 |
+| Rules | 91–92 |
+|   1. Loop order (single player) | 93–114 |
+|   2. Client → server | 115–284 |
+|   3. Server → client | 285–384 |
+|   4. d2rs mapping and scope | 385–416 |
+|   5. Machine-readable tables | 417–453 |
+|   6. Exact-match comparison | 454–539 |
+|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 540–922 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 923–1067 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1068–1180 |
+| Constants & data dependencies | 1181–1199 |
+| Randomness | 1200–1205 |
+| Edge cases & original bugs | 1206–1239 |
+| Test vectors | 1240–1315 |
+| Provenance | 1316–1411 |
+| Open questions | 1412–1477 |
 <!-- /index -->
 
 ## Summary
