@@ -955,6 +955,14 @@ fn world(t: &mut TableSet) {
                 ("LevelType", ltype),
                 ("SizeX", size),
                 ("SizeY", size),
+                // The keep (a preset level) is placed away from the town's
+                // rooms at (0, 0): a preset level's position is its
+                // `OffsetX/Y` (`drlg/levels.md` §6 rule 1), and a room that
+                // still contains the cell keeps the unit on a teleport
+                // (`sim/pathing.md` §9.6 rule 9), so overlapping levels
+                // would leave a warped player in the town's room.
+                ("OffsetX", if i == 4 { "100" } else { "" }),
+                ("OffsetY", if i == 4 { "100" } else { "" }),
                 ("Vis0", if i == 1 { "2" } else { "0" }),
                 ("Warp0", if i == 1 { "0" } else { "-1" }),
                 ("Layer", &id),

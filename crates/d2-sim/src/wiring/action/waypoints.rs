@@ -28,8 +28,14 @@ pub struct WaypointView<'a, X> {
 }
 
 impl<X: Pending> WaypointView<'_, X> {
+    /// The room of a unit `0x00620BB0` (`sim/path-placement.md` §2.1:
+    /// the path's room) with the path provider, as the position; without
+    /// it, the unit list's room.
     fn room_and_level(&self, u: UnitId) -> (Option<RoomId>, Option<u32>) {
-        let room = self.game.lists.unit(u).and_then(|e| e.room());
+        let room = match &self.v.h.paths {
+            Some(p) => p.record(u).and_then(|r| r.room()),
+            None => self.game.lists.unit(u).and_then(|e| e.room()),
+        };
         let level = room.and_then(|r| self.v.h.drlg.level_id(self.game, r));
         (room, level)
     }
