@@ -156,7 +156,11 @@ pub fn shop_tabs(page: u8, counts: [u32; 5], max_page: u8) -> ([(bool, bool); 4]
         if counts.get(cur as usize).copied().unwrap_or(0) > 0 {
             break;
         }
-        cur = if cur == 0xFF || cur + 1 > max_page { 0 } else { cur + 1 };
+        cur = if cur == 0xFF || cur + 1 > max_page {
+            0
+        } else {
+            cur + 1
+        };
     }
     if let Some(t) = tabs.get_mut(cur as usize) {
         t.0 = true;
@@ -792,6 +796,7 @@ mod tests {
     }
 
     // Partial: §14 r4 (art quads and tabs; grid and buttons excluded).
+    // Covers: specs/ui/panels-2.md §14 r4
     #[test]
     fn shop_art_and_tabs_800() {
         let d = run(&panel(), Screen::R800);
@@ -1077,6 +1082,7 @@ mod tests {
 
     // Test vector "sell: NPC GUID 5, item GUID 9, mode 0, price 35".
     // Covers: specs/ui/menus.md §4 r3
+    // Covers: specs/ui/panels-2.md §14 r5
     #[test]
     fn send_messages() {
         let pf = |_t: u8| 35;

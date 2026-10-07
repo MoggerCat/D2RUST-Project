@@ -67,8 +67,14 @@ fn talk_end_flag_rules() {
 // Covers: specs/ui/panels-2.md §14 r9
 #[test]
 fn talk_messages() {
-    assert_eq!(msg_chat_start(1, 0x11223344), [0x2F, 1, 0, 0, 0, 0x44, 0x33, 0x22, 0x11]);
-    assert_eq!(msg_chat_not_found(0x1FF, 5), [0x30, 0xFF, 0, 0, 0, 5, 0, 0, 0]);
+    assert_eq!(
+        msg_chat_start(1, 0x11223344),
+        [0x2F, 1, 0, 0, 0, 0x44, 0x33, 0x22, 0x11]
+    );
+    assert_eq!(
+        msg_chat_not_found(0x1FF, 5),
+        [0x30, 0xFF, 0, 0, 0, 5, 0, 0, 0]
+    );
     assert_eq!(msg_chat_end(5), [0x30, 1, 0, 0, 0, 5, 0, 0, 0]);
     assert_eq!(msg_quest(5, 0x0102), [0x31, 5, 0, 0, 0, 2, 1, 0, 0]);
 }
@@ -87,7 +93,11 @@ fn cain_reset() {
     assert!(recs.iter().all(|r| r.count == 5));
     cain_count_reset(&mut recs, 245, 6);
     for r in &recs {
-        let want = if CAIN_RECORDS.contains(&r.record) { 2 } else { 5 };
+        let want = if CAIN_RECORDS.contains(&r.record) {
+            2
+        } else {
+            5
+        };
         assert_eq!(r.count, want);
     }
 }

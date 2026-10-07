@@ -259,7 +259,10 @@ pub fn talk_end(npc_present: bool, npc_class: u32, flag: u8) -> TalkEnd {
 /// of Cain's classes sets the counts of records 16, 17, 18, 19, 38 to 2.
 pub fn cain_count_reset(records: &mut [NpcMenuRecord], interaction_npc: u32, result: u8) {
     if (result == 3 || result == 6) && NPC_CAIN.contains(&interaction_npc) {
-        for r in records.iter_mut().filter(|r| CAIN_RECORDS.contains(&r.record)) {
+        for r in records
+            .iter_mut()
+            .filter(|r| CAIN_RECORDS.contains(&r.record))
+        {
             r.count = 2;
         }
     }

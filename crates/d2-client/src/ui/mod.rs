@@ -39,9 +39,9 @@ pub mod widget;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
-mod tests_fdesc;
-#[cfg(test)]
 mod tests_c2ui;
+#[cfg(test)]
+mod tests_fdesc;
 
 pub use draw::{ImageRef, ImageRequest, TextRequest, TextStyle, UiDraw, UiDrawSink};
 pub use frame::{FrameError, FramePos, Presentation};

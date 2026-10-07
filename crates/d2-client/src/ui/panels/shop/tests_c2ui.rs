@@ -7,7 +7,10 @@ use super::*;
 fn shop_buttons_by_npc() {
     let a = shop_button_records(148);
     assert_eq!(a.len(), 4);
-    assert_eq!((a[0].string, a[0].base_frame, a[0].enabled), (3335, 2, true));
+    assert_eq!(
+        (a[0].string, a[0].base_frame, a[0].enabled),
+        (3335, 2, true)
+    );
     assert_eq!((a[1].string, a[1].base_frame), (3336, 4));
     assert!(!a[2].enabled);
     assert_eq!((a[3].string, a[3].base_frame), (4144, 10));
