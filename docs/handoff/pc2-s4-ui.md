@@ -96,3 +96,38 @@ None.
 | `panels-3.md` §27 r8 (OQ 2 answered) | ui 0x1B–0x1D, 0x20 never opened: all 136 `SetUIState` sites resolved | `0x00455F20` call sites, `0x00456970` |
 | `panels-3.md` §23 r14 (OQ 4 answered) | cursor handlers: WM_MOUSEMOVE, WM_NCMOUSEMOVE (hide), WM_LBUTTONUP; the press transition only from the character-panel and control-panel button presses | table `0x00711FEC`, `0x00467EF0`, callers of `0x00467F20` / `0x00467FA0` |
 | `inventory.md` §8 r6 (OQ 7 answered) | gold picture: the amount class is the cel direction; `invgld` has 1 direction × 1 frame → frame 0 always | `0x0046EE80`, `0x004DBB50`, `0x00601840`, table `0x006E45A0` |
+| `control-panel.md` §10 r3 (OQ 5 answered) | `0x004B3470` = NPC menu up (interaction active, NPC present, menu state 1); `[0x007BEFD4]` has no reader | `0x004B3470`, `0x00499AC9` |
+
+### Pending
+
+- `controls.md` OQ 8 rest: the three target searches of the re-pick
+  (`0x00467490` `SearchEnemyNear`, `0x00467660` `SearchEnemyXY`,
+  `0x004677B0` `SearchOpenXY`) and the same-point nudge `0x004C51E0`
+  (§6 r10). A read of those four functions settles it.
+- `panels-3.md` §27 r7: "no writer" of the symbol slots rests on the
+  absolute-reference scan; a pointer-based write cannot be excluded
+  without a capture of reading the `bkd` scroll (expected: base only).
+- Skipped by the task: the trade panel (multiplayer), the held-button
+  send ticks (recording).
+
+### CODE-TABLE CHANGE commits
+
+None.
+
+### Cross-file requests
+
+- `client/model.md` (PC 1); §8 mode requests: the interact code 0x13
+  is requested by `ui/controls.md` §6 r9.2 / r9.4 / r9.5 with (type,
+  GUID); the C→S 0x13 itself leaves from the mode-0x13 arrival path
+  (`0x00461250` → `0x00480930`, per unit type: type 0 records the
+  player's position first, type 1 throttles to one send per 200 ms
+  per unit (+0xD4 tick), type 2 re-targets the path and checks objects
+  0x194 / 0x178 against the cube / Horadric-staff items, type 4
+  sends `0x004786D0` with the ui-9 flag); please state it as the sender
+  of C→S 0x13.
+- `sim/client-messages.tsv` (code-mirrored; owner of `sim/`): 0x59
+  `MakeEntityMove` is sent by the client when interacting with an
+  `npc` + `interact` monster (`ui/controls.md` §6 r9.2, `0x00461DC0`
+  tail at `0x004620F1`): [type u32][GUID u32][x u32][y u32] with the
+  NPC's current position; add the client sender to its note if the
+  TSV grammar has one.
