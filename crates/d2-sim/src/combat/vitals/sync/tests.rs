@@ -137,7 +137,7 @@ fn force_rule() {
     assert!(force(20, false));
 }
 
-// Covers: specs/combat/vitals.md §5.3 r1, §5.3 r2
+// Covers: specs/combat/vitals.md §5 text, §5.3 r1, §5.3 r2
 #[test]
 fn small_changes_wait_unless_forced() {
     let mut c = synced();

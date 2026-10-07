@@ -299,7 +299,7 @@ fn kill_guards() {
 /// experience, the rest of the kill runs; a player victim in mode 0 / 17
 /// stops at the guard, a live one runs steps 1–2 only (no death mode
 /// request, no quest parse).
-// Covers: specs/combat/damage.md §7.2 r1, §7.2 r2, §7.2 r3
+// Covers: specs/combat/damage.md §7.2 r1, §7.2 r2, §7.2 r3; specs/combat/vitals.md §4.4 text
 #[test]
 fn kill_without_experience_and_player_victims() {
     let mut fx = Fx::new();
