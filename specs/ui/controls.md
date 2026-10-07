@@ -18,22 +18,24 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 39–50 |
-| Inputs | 51–59 |
-| Outputs / state changes | 60–67 |
-| Rules | 68–69 |
-|   1. Binding table | 70–88 |
-|   2. Key files | 89–121 |
-|   3. Commands and default keys | 122–192 |
-|   4. Dispatch | 193–262 |
-|   5. Key-config screen assignment | 263–278 |
-|   B4. Original-defaults check (`client/ui.md` §B4) | 279–286 |
-| Constants & data dependencies | 287–293 |
-| Randomness | 294–297 |
-| Edge cases & original bugs | 298–310 |
-| Test vectors | 311–326 |
-| Provenance | 327–338 |
-| Open questions | 339–360 |
+| Summary | 41–52 |
+| Inputs | 53–61 |
+| Outputs / state changes | 62–69 |
+| Rules | 70–71 |
+|   1. Binding table | 72–90 |
+|   2. Key files | 91–123 |
+|   3. Commands and default keys | 124–194 |
+|   4. Dispatch | 195–264 |
+|   5. Key-config screen assignment | 265–280 |
+|   6. World clicks (left / right button; answers OQ 2 in part) | 281–394 |
+|   7. Gates and belt use (answers OQ 3, OQ 4, OQ 5) | 395–436 |
+|   B4. Original-defaults check (`client/ui.md` §B4) | 437–446 |
+| Constants & data dependencies | 447–453 |
+| Randomness | 454–457 |
+| Edge cases & original bugs | 458–470 |
+| Test vectors | 471–492 |
+| Provenance | 493–511 |
+| Open questions | 512–547 |
 <!-- /index -->
 
 ## Summary
@@ -258,7 +260,7 @@ otherwise significant except for the first-match rules of §4.1.
    `0x0070F234` ≠ 0x10 (the right one likewise from `0x0070F2BC`).
 4. What each button does on the world, its repeat while held (the
    right-button repeat `0x0044C2C0`, caller `0x0044F046`) and the C→S
-   messages: §Open questions 2.
+   messages: §6 (the remaining predicates: §Open questions 8).
 
 ### 5. Key-config screen assignment
 
@@ -276,13 +278,171 @@ otherwise significant except for the first-match rules of §4.1.
    the (c, s) entry (if no such entry exists, K is written back where it
    was).
 
+### 6. World clicks (left / right button; answers OQ 2 in part)
+
+1. **Events → action kind.** The fixed button handlers call the click
+   dispatcher `0x00462D00(kind ECX, x EDX, y, mods)` only while in game
+   (`[0x007A061C]` ≠ 0) and with a local player unit (type 0); `mods` =
+   §4.3 r1 flag word (8 run, 4 Stand Still) except where noted:
+
+   | Kind | Handler | Event | Position | Result kept in |
+   |---|---|---|---|---|
+   | 0 | `0x0044BF40` | left down (0x201) | event | `[0x007A0650]` (left held) |
+   | 1 | `0x0044C000` | left held (r6) | current mouse | — |
+   | 2 | `0x0044C060` | left up (0x202; also the focus-loss release, §4.3 r3) | current mouse | `[0x007A0650]` := 0 first |
+   | 3 | `0x0044C180` | right down (0x204) | event | `[0x007A0654]` (right held) |
+   | 4 | `0x0044C2C0` | right held (r6) | current mouse | — |
+   | 5 | `0x0044C370` | right up (0x205) | event; `mods` = the event's wParam (MK_SHIFT 4, MK_CONTROL 8) | `[0x007A0654]` := 0 first |
+
+   Down events are consumed (event +0x18 := 1). Right down is ignored in
+   open mode 3, and not dispatched (not consumed) when the click lies in
+   an open panel's half: open mode 2 with 0 < x < W / 2 and 0 < y < H −
+   47, or open mode 1 with W / 2 < x < W and 0 < y < `[0x007A521C]`
+   (`0x0044C180`). Left down / up reach the dispatcher only when no
+   panel consumed the event first (`ui/panels.md` §4.4).
+2. **Dispatcher** `0x00462D00`: returns 0 at once while ui 9 (game menu)
+   is open (`0x004538D0(9)`), and while the per-pass latch
+   `[0x007A5264]` is set unless x = y = 0; else latch := 1 (cleared once
+   per client loop pass at `0x0044F24C`, before the draw). It builds a
+   click record `C`: +0 flags, +4 P, +8 the hovered unit `U`
+   (`0x00467A10`, `client/model.md` hover), +0xC / +0x10 the click's
+   world position (`0x0045AFF0` maps the screen x, y in place,
+   `render/camera.md`), replaced by `U`'s position (`0x0045ADF0`,
+   `0x0045AE20`) when `U` is an object (type 2) or an item (type 4),
+   +0x14 / +0x18 the walk codes (r4), +0x1C the skill. Flags: kind 0, 1,
+   2 → 1 (left), kinds 3, 4, 5 → 2 (right); kind 0, 3 → 4 (press), 1, 4
+   → 8 (held), 2, 5 → 0x10 (release); `mods` & 4 → 0x20 (Stand Still);
+   `mods` & 8 and P's stamina (stat 10) ≠ 0 → 0x40 (run). Kinds 0, 3
+   first call `0x00467A70` with a hovered unit, else `0x00466FE0`; kinds
+   2, 5 call `0x00466FE0`. Kind > 5 → returns 1.
+3. **Press / held / release filter** `0x00462930(C)`: release → the
+   press latch `[0x007A526C]` := 0, no action; press → `[0x007A526C]` :=
+   1 + (`U` ≠ none), action; held → action only when `[0x007A526C]` ≠ 0
+   and (no `U`, or `U` is a player, monster or type-5 unit and P's mode
+   is not 2, 3 or 6 (walk, run, town walk)).
+4. **Per kind** (all start with r3):
+   - 0 left down (`0x004629A0`): skill := P's left skill (`0x00620190`).
+     If `0x00464600(P, skill)` = 0 (P holds a cursor item or is not a
+     player; or P's mode is 0, 4, 7–12, 17 or 19; or mode 13 with class
+     3, mode 14 with class 6, modes 15–16 with classes 4–6; mode 18 as
+     `0x004645B0(skill)` decides): cursor state 6 → `0x00453EC0` (C→S
+     **0x27** with the cursor unit's GUID in both fields); cursor state 8
+     → C→S **0x4C** [−1]; then, holding a cursor item → C→S **0x17**
+     [item GUID] (drop it, `DropItem`), returns 0. Else flags |= 0x80 and
+     the action (r5); returns 1.
+   - 1 left held (`0x00462A20`): skill := left skill; nothing unless
+     `0x00464600` ≠ 0. "Speed changed" = the path's speed
+     (`0x006486C0`) differs from P's walk speed × stat 67 / 100 while
+     not running, or equals it while running. With a unit (+8): when it
+     is not P's current target (`0x004648F0`) or the speed changed, P's
+     path is re-targeted (`0x00648B90`) and flags |= 0x80; the action
+     (r5) runs either way. Without a unit: Stand Still clear and P's
+     player data +0x154 ≠ 0 (an interaction in progress) → nothing; else
+     (Stand Still clear) flags |= 0x80; the action runs.
+   - 2 left up (`0x00462B40`): when P has a hireling (`0x00478F20(0)` ≠
+     −1), a cursor unit and that unit's mode record +8 = 2:
+     `0x00467410(0)`; then `0x00462370`: P not busy (`0x004648F0` = 0) in
+     mode 2 or 6 → `0x00461840(1)`, in mode 3 → `0x00461840(3)` (the
+     path end sent as walk / run code 1 / 3, `0x00481030`); returns 0.
+   - 3 right down / 4 right held (`0x00462BA0` / `0x00462C20`): skill :=
+     P's right skill (`0x006201D0`); when `0x00464600` ≠ 0: flags |=
+     0x80 if the skill's `range` (+0x14) is 1 (`h2h`) and run is not
+     set, then the action (r5).
+   - 5 right up (`0x00462CA0`): the hireling / cursor-unit step of kind 2
+     only; returns 0.
+5. **Action** `0x004625B0(C)` after the walk-code set-up `0x004621D0`:
+   walk codes := 1 / 2 (walk to a point / to a unit), or 3 / 4 with run
+   (flag 0x40); a right click with a skill that is not usable in town
+   (skills +5 & `[0x006CE268]` = 0) while P's room is in town
+   (`0x0061AB00`) plays the player event sound (`0x004CB9C0`) and stops;
+   a `passive` right skill (+4 & 0x10) stops; P's pending interaction
+   (player data +0x154) is cleared (0x13: `0x0045C470` with a cursor
+   item); no skill → stop; the target is re-picked (`0x00467880(&x, &y,
+   flags, …)`, Stand Still or a right click without a unit forces a
+   location target) into +8; then cursor state 6 / 8 → as kind 0. The
+   decision then picks one sender, each ending in the mode request and
+   message of r7: on a unit → interact (`0x00461DC0`, code 0x13 for NPCs,
+   objects, items, warps), attack / skill on the unit (`0x00461700(1)`),
+   walk to it (`0x00461C70`, `0x00461890`, `0x004619E0`); on a point →
+   skill at the point (`0x00461700(0)`) or walk / run there
+   (`0x00461840`). The exact predicate order of `0x004625B0` and of
+   those senders (melee range, `0x00645460`, `0x00643860`,
+   `0x00465C60`, `0x004610C0`, `0x00462560`, `0x004623C0`): §Open
+   questions 8.
+6. **Held repeat.** Every client loop pass (`0x0044EFA0`, before the
+   receive; `audio/sound-table-2.md` §14.2) runs kind 1 while
+   `[0x007A0650]` ≠ 0 and `[0x007A0658]` = 0 (`0x0044F039`), then kind 4
+   while `[0x007A0654]` ≠ 0 (`0x0044F046`), at the current mouse
+   position. `[0x007A0658]` := 1 when an interaction starts
+   (`0x0044BEF0`, from `0x00461DC0`) stops the left repeat until the next
+   left down / up. The per-pass latch (r2) allows one positioned dispatch
+   per pass. Repeats are therefore per loop pass, not per server tick;
+   the send ticks of a held button stay a recording case (OQ 2).
+7. **Skill codes** (`0x00461700(onUnit)`, only while mouse y ≤
+   `0x00454970()`): on a unit (target +8; none → type 6, GUID −1): left
+   → 0x06, or 0x09 held; with Stand Still 0x07 / 0x0A held; right →
+   0x0D / 0x10 held, Stand Still 0x0E / 0x11 held. At a point (+0xC,
+   +0x10): left 0x05 / 0x08 held; right 0x0C / 0x0F held. The code goes
+   to `0x00481030(code, P, a, b)`: the client mode request
+   (`0x00480C10`, `client/model.md` §8) and, through `0x00480B40`, the
+   C→S message whose id **is** the code (codes 1–0x11; layouts
+   `sim/client-messages.tsv`: point codes `[x u16][y u16]`
+   `0x004785D0`, unit codes `[type u32][GUID u32]` `0x004786A0`); code
+   0x13 sends nothing there (the interact message is sent by its own
+   path). So a left click on the ground without Stand Still is a walk
+   (code 1 / 3), never 0x05.
+
+### 7. Gates and belt use (answers OQ 3, OQ 4, OQ 5)
+
+1. **Gates** of §3: `0x0044DA30` = `[0x007A0620]`, the game-exit flag
+   (set to 1 by `0x0044D520` from the gate `0x00453910` (`0x004539D3`),
+   `0x004A2CB0`, `0x004B4380`, `0x004B9180`, `0x004B9210`, and by
+   `0x0044DD60`, `0x0044E380`; set at game start from `0x0044BBA0`;
+   never cleared in a game); `0x00463DF0` = no local player, or the
+   local player in mode 0x11 (dead). `0x0044DB30` = the game type
+   `[0x007A0610]` (0 single player, `ui/control-panel.md` Inputs): the
+   party command (cmd 2) works only in a multiplayer game.
+2. **Belt keys** (cmds 23–26, `0x00498C50` + 0x40·c): gate (r1); only
+   when the column-ready byte `[0x007BEFB0 + c]` = 1 (written by
+   `0x00498D50(c, v)`, c < 4, from the item handlers `0x004C4130`,
+   `0x004C42A0`, `0x004C4C70`: `client/msg-stats-items.md`); then
+   `0x00498A90(inventory, P, c, shift)` with shift =
+   `GetAsyncKeyState(VK_SHIFT) & 0x8000`.
+3. **Belt use** `0x00498A90`: shift := 0 in a classic game; nothing
+   with a cursor item or with ui 9 open. The item is belt slot `c`
+   (`0x0063C7F0(inventory, c)`: the bottom row, `items/inventory.md` §3);
+   none → nothing. Its `items` record (missing → fatal 0xA64) passes
+   `0x00498A20` when `quest` (+0x12A) and `unique` (+0x129) are not 1
+   (else `0x0049FF90` and stop) and `useable` (+0x11D) is 1 (else the
+   player event sound `0x004CB9C0` and stop); and `0x004C2240(item)` =
+   0 (`ui/inventory.md` §9 r2). Then C→S **0x26** [item GUID u32]
+   [shift u32: 0 or 0x8000][0 u32] (`0x004786D0`; `UseBeltItem`),
+   `0x004C21F0(item)`; with shift and a hireling (`0x00478F20(P, 7)` ≠
+   −1): hireling sound `0x004CBDE0(P, 1, 0x54)` when the item is of type
+   0x4C, 0x51 or 0x50, else `0x004CBDE0(P, 1, 0x55)`; without:
+   `0x004C1E20(inventory, 0, 0, 0)` and sound `0x004B9A00(0, 0, 0)`. The
+   belt hover `[0x007BEF94]` := 0 in each send path.
+4. **Key mode around the latch `[0x007A27B4]`** (§4.1 r5): the gold
+   dialog (`ui/panels-2.md` §21.6–§21.7): open → key mode 0 (key-up
+   kept), close → key mode 1.
+5. **Pointer button meanings** for the d2rs input (`client/ui.md` §B4;
+   code `PointerButton`, `UiFrame::unhandled`): Left and Right are the
+   fixed world buttons of §6 (never rebindable); Middle and the X
+   buttons run whatever command is bound to keys 0x100–0x102 (§4.2;
+   default middle = command 7, automap). Shift / Ctrl / Alt meaning
+   comes only from the bindings of commands 36 / 34 / 37 (§3, §4.3),
+   except right up, which reads the event's MK_SHIFT / MK_CONTROL (§6
+   r1). An event no panel consumed becomes a §6 dispatch.
+
 ### B4. Original-defaults check (`client/ui.md` §B4)
 
 The `original` preset of `d2-client::controls` must list the 57 commands
 of §3 with exactly the slot-1 / slot-0 keys of the §3 table (114
 bindings, compiled table `0x00712220`), mapping VK codes and 0x100–0x104
 to the portable `Key` names. The check compares the preset with a fresh
-read of `0x00712220` (§Test vectors).
+read of `0x00712220` (§Test vectors). The other §B4 items: pointer
+button meanings and modifiers §7 r5; events no panel takes → world
+intents §6; repeat while held §6 r6 (send ticks: §Open questions 2).
 
 ## Constants & data dependencies
 
@@ -323,6 +483,12 @@ None.
 | NPC shop open, press I | nothing (M2 = 0) | §4.1 r4 |
 | chat open, press I | nothing (key-down not registered) | §4.1 r5 |
 | `original` preset vs `0x00712220` | identical 114 bindings | §B4 |
+| left down on open ground, no modifier | a walk (code 1, C→S 0x01 `[x][y]`), not 0x05 (path through §6 r5: to confirm with OQ 8 / the OQ 2 trace) | §6 r7 |
+| right button held on open ground, P standing | press code 0x0C, then code 0x0F on each client loop pass that passes §6 r2–r3 (to confirm, OQ 2) | §6 r6, r7 |
+| right down at (100, 200), open mode 2 (character panel) | not dispatched, not consumed | §6 r1 |
+| left down with an item on the cursor over the ground | C→S 0x17 `[item GUID]` | §6 r4 |
+| key 1, column ready, Shift, hireling present, healing potion | C→S 0x26 `[GUID][0x8000][0]` | §7 r3 |
+| key 1, classic game, Shift | C→S 0x26 `[GUID][0][0]` | §7 r3 |
 
 ## Provenance
 
@@ -331,6 +497,13 @@ handler bodies `0x00468940`–`0x00469210` (disassembly,
 `tools/ghidra/disasm.py`), window handler tables `0x00712944` and
 `0x0070F2C4` read from the binary, command and binding tables dumped with a
 script (outside the repo). Mouse handlers `0x0044BEC0`–`0x0044CE90`.
+World clicks `0x00462D00` (jump table `0x00462EC0`), `0x00462930`,
+`0x004629A0`, `0x00462A20`, `0x00462B40`, `0x00462BA0`, `0x00462C20`,
+`0x00462CA0`, `0x004621D0`, `0x004625B0`, `0x00461700`, `0x00481030`,
+`0x00480B40`, `0x00464600`, `0x00453EC0`, `0x0044C000`, held repeats in
+`0x0044EFA0` (`0x0044F039`, `0x0044F046`), latch clear `0x00462920`;
+gates `0x0044DA30`, `0x00463DF0`, `0x0044DB30`; belt `0x00498C50`,
+`0x00498A90`, `0x00498A20`, `0x00498D50`, `0x004786D0`.
 UI hooks `0x00455720` / `0x00455AE0` (jump tables `0x00455A40` /
 `0x00455E80` read from the binary; `index/switches.tsv` renumbers their
 cases). Labels from the 1.14d `string.tbl` / `expansionstring.tbl`;
@@ -342,18 +515,32 @@ archive `default.key` headers measured. No D2MOO code used.
    not found): commands 9, 10, 11, 41, 43, 45, 56 are unnamed, and
    `CfgMiniMap` ("Micromap") vs `CfgToggleminimap` is unassigned. Read
    the config-screen draw `0x004A5270` / `0x004A47C0`.
-2. Left / right button semantics: `0x00462D00`'s first argument, what a
-   click on a unit / the ground / with Shift does, the held-button repeat
-   and its tick; which C→S messages go out. Needs a read of
-   `0x00462D00`, `0x0044C2C0`, `0x0044F046` plus a packet trace of a
-   scripted click (`client/ui.md` §B4 "send ticks"): Needs recording.
-3. The gates `0x0044DA30` and `0x00463DF0` (likely game-paused / player
-   not controllable) and `0x0044DB30` (party screen condition).
-4. Belt use `0x00498A90`: which slot of column c, the Shift branch
-   (give to hireling?), and the byte `0x007BEFB0`.
-5. Key-mode 0 from `0x00454150` and 1 from `0x00453EE0` around the
-   latch `0x007A27B4`: which UI state that is.
+2. *Partly answered* (2026-10-07, §6: action kinds, click record,
+   filters, held repeat per loop pass, codes → C→S ids; open: §Open
+   questions 8 and the send ticks). Was: Left / right button semantics:
+   `0x00462D00`'s first argument, what a click on a unit / the ground /
+   with Shift does, the held-button repeat and its tick; which C→S
+   messages go out. Needs a read of `0x00462D00`, `0x0044C2C0`,
+   `0x0044F046` plus a packet trace of a scripted click (`client/ui.md`
+   §B4 "send ticks"): Needs recording.
+3. **Answered** (2026-10-07, §7 r1). Was: The gates `0x0044DA30` and
+   `0x00463DF0` (likely game-paused / player not controllable) and
+   `0x0044DB30` (party screen condition).
+4. **Answered** (2026-10-07, §7 r2–r3; the writers of `[0x007BEFB0 +
+   c]`: `client/msg-stats-items.md`). Was: Belt use `0x00498A90`: which
+   slot of column c, the Shift branch (give to hireling?), and the byte
+   `0x007BEFB0`.
+5. **Answered** (2026-10-07, §7 r4: the gold dialog, `ui/panels-2.md`
+   §21). Was: Key-mode 0 from `0x00454150` and 1 from `0x00453EE0`
+   around the latch `0x007A27B4`: which UI state that is.
 6. When the key-config screen's Accept writes the files (no caller of
    `0x00469780` other than the load path was found).
 7. Which of slot 0 / slot 1 the config screen shows as "Key/Button One"
    (`CfgPrimaryKey`).
+8. World-click predicates (§6 r5): the exact condition order of
+   `0x004625B0` and of the senders `0x00461DC0`, `0x00461C70`,
+   `0x00461890`, `0x004619E0`, `0x00461840` (which target types
+   interact, melee range, the town and `0x00645460` / `0x00643860` /
+   `0x00465C60` / `0x004610C0` / `0x00462560` / `0x004623C0` tests), and
+   the target re-pick `0x00467880`. Disassembly read; then the packet
+   trace of OQ 2.
