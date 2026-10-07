@@ -14,6 +14,7 @@
 pub mod damage;
 pub mod events;
 pub mod hit;
+pub mod range;
 pub mod vitals;
 
 use crate::skills::SkillUnits;
