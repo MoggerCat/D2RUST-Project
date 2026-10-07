@@ -92,6 +92,16 @@ pub fn strictly_inside((x0, y0, w, h): (i32, i32, i32, i32), x: i32, y: i32, r: 
         && y.wrapping_add(r) < y0.wrapping_add(h)
 }
 
+/// `0x0065A710`: the room is rejected when `x + r < x0` and `x − r > x0 +
+/// w`, or `y + r < y0` and `y − r > y0 + h` (§3.1 collect step 3). For r ≥
+/// 0 and a box of non-negative size this never holds; for r < 0 it
+/// rejects a room whose box lies strictly inside (x − a, x + a) or
+/// (y − a, y + a) with a = |r| (§3.1 l3 r2).
+pub fn room_rejected((x0, y0, w, h): (i32, i32, i32, i32), x: i32, y: i32, r: i32) -> bool {
+    (x.wrapping_add(r) < x0 && x.wrapping_sub(r) > x0.wrapping_add(w))
+        || (y.wrapping_add(r) < y0 && y.wrapping_sub(r) > y0.wrapping_add(h))
+}
+
 /// The find from `start` (`None`: nothing found).
 pub fn find_units<W: FindWorld>(w: &mut W, start: Option<RoomId>, q: &FindQuery) -> Vec<UnitId> {
     let Some(start) = start else {
@@ -106,9 +116,12 @@ pub fn find_units<W: FindWorld>(w: &mut W, start: Option<RoomId>, q: &FindQuery)
         if q.flags & find_flag::SKIP_TOWN_ROOMS != 0 && w.room_in_town(room) {
             continue;
         }
-        // The room-box test `0x0065A710` passes for every r ≥ 0 and room
-        // of non-negative size (§3.1 rule 3); every caller of this spec
-        // passes r ≥ 1.
+        // The room-box test `0x0065A710` (§3.1 rule 3).
+        if w.room_box(room)
+            .is_some_and(|b| room_rejected(b, q.x, q.y, q.r))
+        {
+            continue;
+        }
         for u in w.room_units(room) {
             if accepts(w, u, room, q, found.len()) {
                 found.push(u);

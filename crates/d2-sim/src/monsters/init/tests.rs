@@ -2279,6 +2279,7 @@ fn real_level_stats() {
 }
 
 mod callbacks;
+mod find;
 mod umod_init_bodies;
 
 // Tests written against surviving mutants (METHODS M08); a child module so
