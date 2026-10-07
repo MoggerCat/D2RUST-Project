@@ -36,16 +36,16 @@
 |   6. Straight (type 7, `0x00679ED0`) | 423–432 |
 |   7. A* (type 1, `0x0067B850`) | 433–470 |
 |   8. Velocity, direction vector, facing | 471–557 |
-|   9. Per-tick movement | 558–738 |
-|   10. Messages | 739–761 |
-|   11. Missile paths (`0x00649760`) | 762–814 |
-|   12. Other path types (1.14d-read 2026-10-08) | 815–1017 |
-| Constants & data dependencies | 1018–1054 |
-| Randomness | 1055–1065 |
-| Edge cases & original bugs | 1066–1113 |
-| Test vectors | 1114–1151 |
-| Provenance | 1152–1189 |
-| Open questions | 1190–1263 |
+|   9. Per-tick movement | 558–739 |
+|   10. Messages | 740–762 |
+|   11. Missile paths (`0x00649760`) | 763–815 |
+|   12. Other path types (1.14d-read 2026-10-08) | 816–1018 |
+| Constants & data dependencies | 1019–1055 |
+| Randomness | 1056–1066 |
+| Edge cases & original bugs | 1067–1114 |
+| Test vectors | 1115–1152 |
+| Provenance | 1153–1190 |
+| Open questions | 1191–1264 |
 <!-- /index -->
 
 ## Summary
@@ -729,6 +729,7 @@ budget += −(current point index +0x24), clamped to 0..255
 called with 20 by the monster movement start `0x005A7C20` (after the
 target is set; that function belongs to `monsters/ai.md`), so a monster
 re-paths until it has advanced 20 points in total since that start.
+Which AI requests reach it, and when: `monsters/ai.md` §7.5.
 Types 2, 13, 15: finish → type 13; else
 type 2 and target := final target; compute (§3); non-zero → result;
 else type 15 and compute again. Other types: compute (§3).
