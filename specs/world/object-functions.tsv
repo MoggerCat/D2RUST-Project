@@ -46,7 +46,7 @@ operate	44	0x005B84E0	SewerStairs	1	world/quests.md
 operate	45	0x005B8530	SewerLever	1	world/quests.md
 operate	46	0x00584750	HellGatePortal	2	world/quests.md
 operate	47	0x00581F60	Stair	2	§16.11
-operate	48	0x005869F0	TrappedSoul	2	world/quests.md
+operate	48	0x005869F0	TrappedSoul	2	§18.4
 operate	49	0x005B5C10	HellForge	1	world/quests.md
 operate	50	0x00582180	Stair2	1	§16.11
 operate	51	0x00583F10	JungleStash	4	§16.12
@@ -84,7 +84,7 @@ init	9	0x00593FC0	InifussTree	1	world/quests.md
 init	10	0x0054F860	Unused10	0	§17
 init	11	0x00550140	Portal	1	§5.5
 init	12	0x0054FE70	PermanentPortal	1	§5.5
-init	13	0x00594020	InvisibleObject	1	world/quests.md
+init	13	0x00594020	InvisibleObject	1	§17
 init	14	0x005500D0	Brazier	1	§17
 init	15	0x00544950	MalusStand	1	world/quests.md
 init	16	0x00552B30	Well	17	§5.3
@@ -122,7 +122,7 @@ init	47	0x00595A50	CountessChest	1	world/quests.md
 init	48	0x005B5A20	HellForge	1	world/quests.md
 init	49	0x005B70B0	HratliStart	1	world/quests.md
 init	50	0x005B7160	HratliEnd	1	world/quests.md
-init	51	0x005501F0	TrappedSoul	2	world/quests.md
+init	51	0x005501F0	TrappedSoul	2	§18.4
 init	52	0x005BCE80	NatalyaStart	1	world/quests.md
 init	53	0x005BBB70	StairsR	1	world/quests.md
 init	54	0x005940E0	CainStartPosition	1	world/quests.md
