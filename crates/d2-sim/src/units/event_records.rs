@@ -71,15 +71,7 @@ impl UnitEvents {
     }
 
     /// Add `0x005C0AD0`: a zeroed record filled and **prepended**.
-    pub fn add(
-        &mut self,
-        event: u8,
-        v0: i32,
-        v1: i32,
-        func: i32,
-        kind: i32,
-        key: i32,
-    ) -> RecordId {
+    pub fn add(&mut self, event: u8, v0: i32, v1: i32, func: i32, kind: i32, key: i32) -> RecordId {
         let id = RecordId(self.next_id);
         self.next_id += 1;
         let rec = EventRecord {
@@ -252,7 +244,11 @@ mod tests {
         });
         assert_eq!(
             seen,
-            [(103, RUNNING, 0, 0), (102, RUNNING, 7, 8), (100, RUNNING, 0, 0)]
+            [
+                (103, RUNNING, 0, 0),
+                (102, RUNNING, 7, 8),
+                (100, RUNNING, 0, 0)
+            ]
         );
         // The result of the last function that ran.
         assert_eq!(r, 100);

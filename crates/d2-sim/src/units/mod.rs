@@ -17,6 +17,7 @@ pub mod modes;
 #[cfg(test)]
 mod mutant_tests;
 pub mod record;
+pub mod replenish;
 #[cfg(test)]
 mod tests;
 

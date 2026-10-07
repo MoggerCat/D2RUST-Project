@@ -1352,3 +1352,21 @@ fn cooldown_callback() {
     let _ = Arc::new(());
     let _ = event::MODE_CHANGE;
 }
+
+// Covers: specs/sim/units.md §5 r4
+#[test]
+fn expire_minus_one_becomes_every_tick_without_callback() {
+    use crate::tick::timer::CallbackId;
+    let mut game = Game::new();
+    let mut sys = system();
+    let m = spawn(&mut game, &mut sys, UnitType::Monster, 0);
+    let cb = Some(CallbackId(9));
+    let t = game
+        .schedule_event(m, 2, -1, cb, 11, 22)
+        .unwrap()
+        .expect("scheduled");
+    assert_eq!(game.timers.every_tick(TimerClass::Monster), [t]);
+    // The callback is lost: a cancel by it no longer finds the timer.
+    game.timers.cancel_unit_events_with_callback(m, 2, cb);
+    assert!(pending(&game, m).contains(&(2, -1, 11, 22)));
+}

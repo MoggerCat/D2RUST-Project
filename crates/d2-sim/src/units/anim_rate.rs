@@ -231,11 +231,7 @@ pub fn anim_rate(i: &RateInput) -> Result<Rate, RateError> {
         return set(s.clamp(0, SPEED_MAX), None, Velocity::Keep);
     }
     // Step 10.
-    set(
-        d(s, i.other_animrate.clamp(15, 175)),
-        None,
-        Velocity::Keep,
-    )
+    set(d(s, i.other_animrate.clamp(15, 175)), None, Velocity::Keep)
 }
 
 /// Frame bonus table `0x006E8E60` (12 type classes × 7 player classes):

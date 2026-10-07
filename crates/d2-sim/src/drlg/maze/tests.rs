@@ -388,7 +388,7 @@ fn pick_without_shape_leaves_cell() {
     );
 }
 
-// Covers: specs/drlg/maze.md §3 text, §edge-cases-original-bugs r1
+// Covers: specs/drlg/maze.md §3 text, §edge-cases-original-bugs r1; specs/sim/rng.md §7 row14
 #[test]
 fn rejected_place_still_draws() {
     let (mut d, l, _) = world(0, 9, 3, TileRect::new(0, 0, 100, 100));
