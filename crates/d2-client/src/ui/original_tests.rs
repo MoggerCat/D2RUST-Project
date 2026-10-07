@@ -116,7 +116,7 @@ fn panel_images(v: &[(String, u32, i32, i32)], prefix: &str) -> Vec<(u32, i32, i
 #[test]
 fn install_mirrors_the_flags_and_keeps_the_border_open() {
     let u = ui(Some(areas()), true);
-    assert_eq!(u.root.open_panels(), vec![BORDER_PANEL]);
+    assert_eq!(u.root.open_panels(), vec![BORDER_PANEL, hud::HUD_PANEL]);
     let w = world(AMAZON, 1, true);
     let img = u.images(&w);
     // Mode 0: no border; the 800 × 600 control panel base, six frames.
@@ -148,7 +148,7 @@ fn hotkeys_toggle_their_state_with_jump_0() {
     );
     assert_eq!(
         u.root.open_panels(),
-        vec![PanelId(1), BORDER_PANEL],
+        vec![PanelId(1), BORDER_PANEL, hud::HUD_PANEL],
         "the root mirrors the flag"
     );
     // The border shows on the right (mode 1): frames 5–9.
@@ -162,7 +162,7 @@ fn hotkeys_toggle_their_state_with_jump_0() {
     assert_eq!(u.ui.open_mode().get(), 0);
     // An action without a state does nothing.
     u.key(&w, Action::ToggleRun);
-    assert_eq!(u.root.open_panels(), vec![BORDER_PANEL]);
+    assert_eq!(u.root.open_panels(), vec![BORDER_PANEL, hud::HUD_PANEL]);
 }
 
 // Covers: specs/ui/panels.md §3 r3, §4 r2
@@ -410,4 +410,56 @@ fn hotkey_states_and_records() {
     assert!(PENDING
         .iter()
         .all(|(what, why)| !what.is_empty() && !why.is_empty()));
+}
+
+// Covers: specs/ui/panels-2.md §21 r1
+#[test]
+fn inventory_draws_the_gold_value_and_button_from_the_model() {
+    let mut u = ui(Some(areas()), true);
+    let mut w = world(AMAZON, 1, true);
+    let key = w.local_player.unwrap();
+    w.units.get_mut(&key).unwrap().stats.insert(14, 4321);
+    // A state list adds 9: the line shows the full value.
+    w.units
+        .get_mut(&key)
+        .unwrap()
+        .state_lists
+        .insert(1, [((14u16, 0u16), 9)].into_iter().collect());
+    u.key(&w, Action::ToggleInventory);
+    // The button needs no player: (W − sx − 236, H + sy − 71).
+    assert_eq!(
+        panel_images(&u.images(&w), "panel\\goldcoinbtn"),
+        vec![(0, 484, 469)]
+    );
+    let gold_texts = |u: &Ui| -> Vec<(String, i32, i32, u16, u16)> {
+        let ctx = UiCtx {
+            tick: 0,
+            world: &w,
+            strings: &NoStrings,
+        };
+        let mut out: Vec<UiDraw> = Vec::new();
+        u.root.draw(&ctx, &mut out);
+        out.iter()
+            .filter_map(|d| match d {
+                UiDraw::Text(t) => Some((
+                    String::from_utf16_lossy(&t.text),
+                    t.at.x,
+                    t.at.y,
+                    t.style.font,
+                    t.style.color,
+                )),
+                _ => None,
+            })
+            .collect()
+    };
+    // Without the fonts bound no text is drawn.
+    assert!(gold_texts(&u).is_empty());
+    let mut f = FontMeasure::default();
+    f.insert(
+        1,
+        FontTable::parse(&character_bind_tests::tbl(6)).expect("tbl"),
+    );
+    u.ui.set_fonts(f);
+    // `%d` of stat 14 total, Font16, color 0, at (W − sx − 212, H + sy − 72).
+    assert_eq!(gold_texts(&u), vec![("4330".to_string(), 508, 468, 1, 0)]);
 }

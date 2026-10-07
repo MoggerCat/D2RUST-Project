@@ -592,6 +592,13 @@ fn world_view_frame(
                             w.run.toggle_run();
                         }
                     }
+                    // The run button (control panel §10 r2) toggles it too.
+                    if let Some(o) = ui.original.as_mut() {
+                        for _ in 0..o.sync_run(w.run.run_lock) {
+                            w.run.toggle_run();
+                        }
+                        o.sync_run(w.run.run_lock);
+                    }
                     (w.run.word(), w.predict.position())
                 }
                 None => (0, None),
