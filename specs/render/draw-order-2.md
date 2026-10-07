@@ -21,18 +21,18 @@
 | Inputs | 49–59 |
 | Outputs / state changes | 60–65 |
 | Rules | 66–67 |
-|   11. Weather (passes 4 and 9; water floors) | 68–311 |
-|   12. Level backgrounds (pass 1) | 312–351 |
-|   13. Pass 8 (`0x00475B20`) | 352–360 |
-|   14. Edge floors (`0x004DE6C0`, `0x004DE630`) | 361–386 |
-|   15. Sight test (`draw-order.md` §5 r3) | 387–433 |
-|   16. Line test (`0x0064E260`) | 434–463 |
-| Constants & data dependencies | 464–474 |
-| Randomness | 475–486 |
-| Edge cases & original bugs | 487–503 |
-| Test vectors | 504–525 |
-| Provenance | 526–557 |
-| Open questions | 558–615 |
+|   11. Weather (passes 4 and 9; water floors) | 68–344 |
+|   12. Level backgrounds (pass 1) | 345–384 |
+|   13. Pass 8 (`0x00475B20`) | 385–393 |
+|   14. Edge floors (`0x004DE6C0`, `0x004DE630`) | 394–419 |
+|   15. Sight test (`draw-order.md` §5 r3) | 420–466 |
+|   16. Line test (`0x0064E260`) | 467–496 |
+| Constants & data dependencies | 497–507 |
+| Randomness | 508–519 |
+| Edge cases & original bugs | 520–536 |
+| Test vectors | 537–558 |
+| Provenance | 559–590 |
+| Open questions | 591–650 |
 <!-- /index -->
 
 ## Summary
@@ -121,7 +121,7 @@ it): always 0.
 3. `c` := client update count. No local player: fatal 0x547. If `c` >
    mark: mark := `c`; if `r` = 0: intensity := 0.0 (the target is
    kept); else, on the player's
-   seed: move the particles if any are live (`0x004732C0`), update the
+   seed: move the particles if any are live (`0x004732C0`, §11.9), update the
    splashes (§11.5), run the rain cycle (§11.3, `0x00473E50`), top up
    particles and wind (§11.4, `0x004737B0`). Then, if `m` ≠ 0, update the
    bubbles (§11.5).
@@ -308,6 +308,39 @@ on the player's seed:
 `roll_range(32, 56)`; 117 goal (170, 56), peak := `roll_range(40, 112)`;
 120, 121 goal (28, 28), wind and goal 28, peak := 256; other levels keep
 the peak, lightning off, and in rain mode one raw step. Target := peak.
+
+#### 11.9 Particle move (`0x004732C0`, §11.2 r3)
+
+`Wt` is the 512-float sine table of §11.7 r3 (`0x00707800`); `Wc(a)` =
+`Wt[(a + 128) & 511]` (`0x0040B330`), `Ws(a)` = `Wt[a & 511]`
+(`0x0040B350`); `w` = the wind (`[0x007A89C4]`); trunc = the CRT
+truncating conversion `0x00682FD0`; `dX`, `dY` = the camera delta of
+the last drawn frame (`[0x007A0678]`, `[0x007A067C]`, Inputs table).
+
+1. Speed factor `f` (float32): snow mode: max(|`Wc(w)`|, 0.25)
+   (`0x006D6E70`); rain mode: float32(intensity × 0.15 + 0.85)
+   (doubles `0x006D6E68`, `0x006D6E60`; intensity §11.1).
+2. For each slot 0 … pool `+0x110` (highest used index), in index
+   order, skipping free slots (tag 0):
+   1. `A` := trunc(+0x14 × `f`); `ux` := trunc(`Wc(w)` × `A`); `uy` :=
+      trunc(`Ws(w)` × `A`).
+   2. y += `uy` − `dY`. y > ground y (+0x0C) → landed (+0x1C) := 1.
+   3. Landed: bounce count (+0x20) = 0 → free the slot (`0x006BCCD0`)
+      and, if the live count (+0x114) < target (`[0x007A89E0]`),
+      spawn one particle (`0x00473090`, §11.4 r5; draws on the player
+      seed). Bounce count ≠ 0 → `ux` := 0, +0x14 := 0, bounce count −1.
+   4. Slot still live (tag ≠ 0): snow mode and not landed → `ux` +=
+      trunc(2 × `Ws`((`F` × 512) / 25 + phase (+0x18))), with `F` =
+      `[0x007A8A34]` and the product and quotient unsigned 32-bit (wraps).
+      Then x += `ux` − `dX`; x ≥ `W` (`[0x0071146C]`) → x −= `W`; x < 0 →
+      x += `W` (one correction each).
+3. `F` += 1 (every call, even with an empty pool). `F` is `.bss` (0 at
+   program start) and has no other writer: it never resets.
+
+Spawn reuse: the spawn takes the lowest free slot (§11.1), which can be
+the slot just freed; the loop then treats the new particle in step 2.4
+with the freed particle's `ux` and,
+in snow mode, the sway of its own phase. Reproduce.
 
 ### 12. Level backgrounds (pass 1)
 
@@ -577,6 +610,8 @@ Encampment): splash ripples on the river, drop lines.
    the drop vector of §11.7 r3 and the splash threshold of §11.5 are
    now exact. Open: the particle move `0x004732C0` (its FPU values from
    `0x0040B330` / `0x0040B350`); an asm read of it settles it.
+   *Answered* (static, asm of `0x004732C0`, `0x0040B330`, `0x0040B350`;
+   constants read from `Game.exe`): §11.9.
 4. Which event calls `0x004E3C50` (lightning start, sound flag 0) — a
    table-dispatched client handler; search the pointer tables for it.
    *Answered* (static): its only reference is entry 84 (`0x00727CF8`) of
