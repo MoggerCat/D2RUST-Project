@@ -1,0 +1,58 @@
+# local-buddy: queue recordings (task `q-rec`)
+
+Branch `claude/local-buddy-q-rec-2026-10-07` (from `origin/main` 674996d
++ `origin/claude/local-buddy-recordings-2026-10-07`). Local PC, the user's
+own 1.14d install (reference `Game.exe` hash checked by the tools on every
+run), one game at a time under `C:\d2slots\game.lock`. Raw files live only
+in `C:\Users\zffit\Desktop\D2test\traces-raw-buddy\` (never committed).
+Queue numbers are `docs/HANDOFF.md` §5 "Local run queue".
+
+## Summary
+
+| # | Item | Status | Raw file (local only) | Check | Key numbers |
+|---|---|---|---|---|---|
+| 85 | game +0x80 in 0x03 | **done: all three equal** | `join1.jsonl`, `join1-packets.jsonl` (5,995 events) | `check_packets.py` **OK** (no 0x3E) | `0x00546C60` result = game +0x80 = 0x03 u32@8 = **0xF74A29B4** |
+| 83 | client room seeds | **recorded** (d2rs bridge replay is the cloud's) | same files | as 85 | 32 client monster creations, all at non-zero points; 32 / 32: the room's seed stepped exactly once and unit +0x28 = the new `lo'`; fresh client rooms hold `{x, 666}` |
+
+## 85: game +0x80 in 0x03
+
+`record_join.py` (new, committed; subclass of `spawn.py` with no spawn),
+`-w -ns -nosave -name bdAma -ama`, 60 s. The object control was built
+from game creation (caller `0x00530DD1`, ECX = the game `0x467007C`)
+before the first tick and returned EAX = 0xF74A29B4 (4,148,832,692). Game
++0x80 read at the first tick (frame 1) and when S→C 0x03 was queued
+(frame 1, caller `0x0053B3BC`): 0xF74A29B4 both times. The 0x03 bytes
+`03 00 7389055a 0100 b4294af7`: act 0, u32@2 = 0x5A058973, u16@6 = 1 (town),
+u32@8 = **0xF74A29B4**. All three equal, as `client/model.md` §11 r1
+expects (d2rs: `ObjectState::obj_seed`; the app's game sends 0, the known
+wiring gap).
+
+## 83: client room seeds versus the server's
+
+Same run. `0x00466360` (client monster create, S→C 0xAC) was entered 32
+times in the first two server frames of the join (all creations of the run;
+standing in town): GUIDs 1–7 (classes 147, 150, 152 × 3, 154, 155: the
+town NPCs) then class 149 units (GUIDs 2–5, 47–52, 94–102, 129–134; GUID
+numbers 2–5 reused), every one at a non-zero point.
+
+- **One step per creation at a point (rule 6 / §12 r5): confirmed, 32 / 32.**
+  Of the 35 client active rooms exactly one changed its seed per creation,
+  the room of the unit's path; after = one D2 RNG step of before, and the
+  unit's init seed (+0x28) = the new `lo'`.
+- A client room's seed before its first creation is `{x, 666}` (an
+  `init_low` value), e.g. the first unit GUID 6 class 154 at (5434, 4697):
+  room `0x464D100` rect (5400, 4680, 40, 40), seed `[184151889, 666]` →
+  `[2878913519, 76808347]`, unit init seed 2878913519, unit seed (stepped
+  further after creation) `[1192825221, 1200772860]`.
+- The server unit of the same GUID: seed `[2775221797, 194707121]`, init
+  seed 1443133650; its room (same rect) seed `[3816720766, 1313571139]`.
+  For the five rects where both are known, the server room's seed is not
+  reached from the client room's first `{x, 666}` within 5,000 steps.
+  This is an observation for OQ 9 (the server room may be seeded or stepped
+  by other draws), not a conclusion: the d2rs bridge replay (live
+  `DrlgSource` + the recorded stream in `join1-packets.jsonl`) is what the
+  entry asks to compare.
+- To replay: `join1.jsonl` `cl_monster` records hold, per creation, the
+  unit (GUID, class, point, seed, init seed, room), all 35 rooms' rect and
+  seed before and after, and the server unit; the S→C stream (0x03 seed
+  0x5A058973, the 0x07s, the 0xACs) is in `join1-packets.jsonl`.
