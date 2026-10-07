@@ -686,7 +686,7 @@ fn the_armor_helper_picks_on_the_room_seed_with_the_superior_flag() {
         .is_empty());
 }
 
-// Covers: specs/world/objects-2.md §20.4, §20.6; specs/world/objects.md §8 (code drop)
+// Covers: specs/world/objects-2.md §20.4, §20.6; specs/world/objects.md §8
 #[test]
 fn source_and_code_drops_use_the_unit_seed_and_level() {
     use crate::treasure::class_pick::PickError;

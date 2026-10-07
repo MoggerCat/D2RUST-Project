@@ -3,7 +3,7 @@
 //! pickers `0x00555E70` (armor), `0x00555FB0` (weapons), `0x005560F0`
 //! (misc) with their filter `0x00555E00` (§20.5 / §9.1), the random
 //! class `0x00556240` (§20.6), the weapon rack's six tries (§20.2) and
-//! the class choice of `0x00559A30` (§20.4 rules 3–4). Pure: the seed is
+//! the class choice of `0x00559A30` (§20.4 r3, §20.4 r4). Pure: the seed is
 //! the caller's (a room seed or a unit seed), item creation and the floor
 //! search are the wiring's (`crate::wiring::economy::drop_helpers`).
 
@@ -252,7 +252,7 @@ pub fn weapon_rack_pick(
     id
 }
 
-/// The class of `0x00559A30` (§20.4 rules 3–4 / §9 rule 3): the drop
+/// The class of `0x00559A30` (§20.4 r3, §20.4 r4 / §9 rule 3): the drop
 /// code's index when `code` ≠ 0 (no draw), else the random class on the
 /// unit seed; quality 4 re-picks while the record is missing or lacks
 /// `bitfield1` bit 0 (11 random-class re-picks, then weapon picks; no
@@ -321,14 +321,14 @@ mod tests {
         }
     }
 
-    // Covers: specs/world/objects-2.md §20.5 (A(L) vector)
+    // Covers: specs/world/objects-2.md §20.5
     #[test]
     fn pick_act_uses_the_level_as_a_level_id() {
         let got: Vec<i32> = [39, 40, 108, 109, 1024].map(pick_act).to_vec();
         assert_eq!(got, vec![0, 1, 3, 4, 0]);
     }
 
-    // Covers: specs/world/objects-2.md §20.6 (random class vector)
+    // Covers: specs/world/objects-2.md §20.6
     #[test]
     fn random_class_bands_on_one_roll() {
         // S = {1, 666}: r = 51. L 10 → gold (51 < 55); L 20 → armor
@@ -348,7 +348,7 @@ mod tests {
         assert!((0..2).contains(&first(40)));
     }
 
-    // Covers: specs/world/objects-2.md §20.6 (fatal bounds)
+    // Covers: specs/world/objects-2.md §20.6
     #[test]
     fn random_class_fatals() {
         let p = picks();
@@ -365,7 +365,7 @@ mod tests {
         );
     }
 
-    // Covers: specs/world/objects-2.md §20.5 rule 1 (filter, rarity draws), edge case 3
+    // Covers: specs/world/objects-2.md §20.5 r1
     #[test]
     fn part_pick_filters_and_draws_per_row() {
         let mut p = picks();
@@ -407,7 +407,7 @@ mod tests {
         );
     }
 
-    // Covers: specs/world/objects-2.md §20.5 (misc body rows), §9.1 rule 1
+    // Covers: specs/world/objects-2.md §20.5 r1; specs/items/treasure.md §9.1 r1
     #[test]
     fn misc_skips_body_parts_unless_a_monster_drops() {
         let mut p = picks();
@@ -422,7 +422,7 @@ mod tests {
         assert!(id == 3 || id == 4);
     }
 
-    // Covers: specs/world/objects-2.md §20.2 (six tries, keep bit 1)
+    // Covers: specs/world/objects-2.md §20.2
     #[test]
     fn weapon_rack_keeps_bit_one_or_the_sixth_pick() {
         let p = picks();
@@ -441,7 +441,7 @@ mod tests {
         assert!(id == 0 || id == 1);
     }
 
-    // Covers: specs/world/objects-2.md §20.4 rules 3–4
+    // Covers: specs/world/objects-2.md §20.4 r3, §20.4 r4
     #[test]
     fn source_class_code_and_magic_loop() {
         let p = picks();
