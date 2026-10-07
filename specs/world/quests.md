@@ -44,13 +44,13 @@
 |   7. NPC dialog hooks | 581–613 |
 |   8. Act transitions, warps and portals | 614–695 |
 |   9. Quest items, rewards and helpers | 696–859 |
-|   11. Acts II–V | 860–871 |
-| Constants & data dependencies | 872–886 |
-| Randomness | 887–913 |
-| Edge cases & original bugs | 914–932 |
-| Test vectors | 933–964 |
-| Provenance | 965–993 |
-| Open questions | 994–1055 |
+|   11. Acts II–V | 860–875 |
+| Constants & data dependencies | 876–890 |
+| Randomness | 891–917 |
+| Edge cases & original bugs | 918–936 |
+| Test vectors | 937–968 |
+| Provenance | 969–997 |
+| Open questions | 998–1059 |
 <!-- /index -->
 
 ## Summary
@@ -868,6 +868,10 @@ Their state machines (Open question 8, answered) are in the per-act files
 The client's copy of the quest state (S→C 0x52 / 0x5D / 0x5E / 0x28 /
 0x29 / 0x50) and the client quest check `0x004A4180` that the
 level-entry lines use: `quests-status.md` §1 and §12.
+Shared helper functions the act files call (free-spot search
+`0x00545340`, critical spawn `0x005459A0`, superunique spawn
+`0x00545C30`, quest missiles, interaction end, game end):
+`quests-helpers.md`.
 
 ## Constants & data dependencies
 
