@@ -21,23 +21,24 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 43–52 |
-| Inputs | 53–60 |
-| Outputs / state changes | 61–65 |
-| Rules | 66–67 |
-|   1. Free-spot search (`0x00545340(room R0, &point, size s, mask m, &out room, unused, limit L)`) | 68–100 |
-|   2. Critical monster spawn (`0x005459A0(game, x, y, room R, flag, class)`) | 101–126 |
-|   3. Superunique spawn at a point (`0x00545C30(game, unit U, &point, kind, id)`) | 127–144 |
-|   4. Quest missiles | 145–197 |
-|   5. End a player's interaction (`0x005351C0(game, player)`) | 198–230 |
-|   6. End the game (`0x00530590(game, client c)`) — host | 231–248 |
-|   7. Close a player's town portal (`0x00535430(game, player)`) | 249–272 |
-| Constants & data dependencies | 273–286 |
-| Randomness | 287–291 |
-| Edge cases & original bugs | 292–300 |
-| Test vectors | 301–314 |
-| Provenance | 315–327 |
-| Open questions | 328–333 |
+| Summary | 44–53 |
+| Inputs | 54–61 |
+| Outputs / state changes | 62–66 |
+| Rules | 67–68 |
+|   1. Free-spot search (`0x00545340(room R0, &point, size s, mask m, &out room, unused, limit L)`) | 69–101 |
+|   2. Critical monster spawn (`0x005459A0(game, x, y, room R, flag, class)`) | 102–127 |
+|   3. Superunique spawn at a point (`0x00545C30(game, unit U, &point, kind, id)`) | 128–145 |
+|   4. Quest missiles | 146–198 |
+|   5. End a player's interaction (`0x005351C0(game, player)`) | 199–231 |
+|   6. End the game (`0x00530590(game, client c)`) — host | 232–249 |
+|   7. Close a player's town portal (`0x00535430(game, player)`) | 250–273 |
+|   8. Find a player's item by code (`0x00558110(game, player, code)`) | 274–296 |
+| Constants & data dependencies | 297–310 |
+| Randomness | 311–315 |
+| Edge cases & original bugs | 316–324 |
+| Test vectors | 325–338 |
+| Provenance | 339–351 |
+| Open questions | 352–357 |
 <!-- /index -->
 
 ## Summary
@@ -269,6 +270,29 @@ Player data +0x48 is not cleared here. Caller in the quests: the altar
 (`0x0058D2C0`: only when P's room's level is 120, `quests-act5-2.md`
 §7.8); the other callers (`monsters/population.md`, `sim/units.md`) use
 the same function.
+
+### 8. Find a player's item by code (`0x00558110(game, player, code)`)
+
+Used by the quest item deletion (`world/quests.md` §9.2) and every
+quest "holds item c" test that calls it.
+
+1. No inventory (player +0x60) → none.
+2. The cursor item (`0x0063C1E0`), when its code (`0x00628590`) is c:
+   returned when its `items.txt` record is missing, or `quest` (+0x12A)
+   = 0, or its stat 356 (`questitemdifficulty`, total value
+   `0x00625480`) ≥ the game difficulty (game +0x6D). (`questdiffcheck`
+   is not tested for the cursor item.) Otherwise the search goes on.
+3. Then every item of the inventory list in list order (first
+   `0x0063B2C0`, next `0x0063DFA0`, item `0x0063DFD0`; equipped, belt,
+   cube, stash and inventory items alike), skipping items on page 1
+   (`0x00628250` = 1, a trade page, `items/inventory.md` §1.2): code c →
+   returned when the record is missing, or `quest` = 0, or
+   `questdiffcheck` (+0x12B) = 0, or stat 356 ≥ difficulty.
+4. None → none.
+
+So a quest item with stat 356 < difficulty is skipped in the list when
+its record has `questdiffcheck`, and skipped on the cursor whenever its
+record has `quest` (rule 2 ignores `questdiffcheck`; reproduced).
 
 ## Constants & data dependencies
 
