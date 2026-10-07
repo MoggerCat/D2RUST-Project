@@ -44,7 +44,7 @@
 | Edge cases & original bugs | 673–707 |
 | Test vectors | 708–722 |
 | Provenance | 723–747 |
-| Open questions | 748–783 |
+| Open questions | 748–793 |
 <!-- /index -->
 
 ## Summary
@@ -760,7 +760,17 @@ other Act V part-1 quest code draws.
    helper as `items/generation.md` §10 and `items/treasure.md` §7.
 3. Does a second `0x0058A0A0` stat list (scroll used again in a later
    difficulty, or at load) stack with or replace the first? Settle with
-   the stat-list spec (owner ids of `0x006251F0`) and a recording.
+   the stat-list spec (owner ids of `0x006251F0`) and a recording. **Answered** (2026-10-07): it stacks. `0x0058A0A0` →
+   `0x00589FF0(game, player, v)` always allocates a new list
+   (`0x006251F0(memory, flags 0, state 0, owner = the player's type and
+   GUID)`), attaches it
+   (`0x00626E10(player, list, 1)`), writes the four stats with
+   `0x00627150(list, stat, v, 0)` and sends them (`0x00548520`); it
+   never looks for or frees an earlier list. Attached lists add into the
+   totals (`sim/stat-lists.md` §6). So in one game: load with k
+   difficulties done gives one list of 10·k; using the scroll then adds
+   a second list of 10·(k + 1) (totals 10·(2k + 1)) until the next load
+   rebuilds a single list. A recording would still confirm it.
 4. Prisoner AI and Anya AI callers (`0x005EE3DB`…`0x005EE562`,
    `0x005E7806`…`0x005E7A49`) and what they do with the returned values:
    AI spec (another owner). **Answered** (2026-10-07) for Anya: every
