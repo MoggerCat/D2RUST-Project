@@ -4968,6 +4968,11 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
   0x65 in a kill tick).
 - `sim/intents-events.md` OQ13: breakpoint at join: caller of the first
   0x48 in frame 2.
+- `client/bridge.md` OQ6: a 0x2C followed by a 0x0A in one chunk.
+- `render/lighting.md` OQ11: a day-period change with objects in sight.
+- `client/msg-skills.md` OQ1: equipping a charged item.
+- `client/stat-lists.md` OQ6: a buff (0xA8 bytes).
+- `client/model.md` OQ10: a game with a hireling (0x7A / 0x81).
 
 ## 8. Lessons (problems met, fixes)
 

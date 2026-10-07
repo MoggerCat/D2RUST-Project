@@ -41,13 +41,13 @@
 |   10. Restoring from a save | 442–475 |
 |   11. Items (expansion) | 476–513 |
 |   12. Services (links) | 514–523 |
-|   13. Messages | 524–557 |
-| Constants & data dependencies | 558–581 |
-| Randomness | 582–592 |
-| Edge cases & original bugs | 593–627 |
-| Test vectors | 628–660 |
-| Provenance | 661–691 |
-| Open questions | 692–718 |
+|   13. Messages | 524–558 |
+| Constants & data dependencies | 559–582 |
+| Randomness | 583–593 |
+| Edge cases & original bugs | 594–628 |
+| Test vectors | 629–661 |
+| Provenance | 662–698 |
+| Open questions | 699–725 |
 <!-- /index -->
 
 ## Summary
@@ -530,8 +530,9 @@ allows C:
    broadcast record has a seed or a name; otherwise 0x7A action 1), on
    join (§5 rule 6) and on revive (§9 rule 4).
 2. **S→C 0x7A PetAction** (13 bytes, `0x0053CB30`, zeroed first): u8
-   action @1 (1 add, 0 remove), u8 pet type @2, u16 class @3, u32 pet
-   GUID @5, u32 owner GUID @9. Removal records built by §5 rule 5, §6
+   action @1 (1 add, 0 remove), u8 pet type @2, u16 class @3, u32 owner
+   GUID @5, u32 pet GUID @9 (owner of the layout: `sim/pets.md` §8;
+   corrected 2026-10-07, evidence there). Removal records built by §5 rule 5, §6
    rule 4 and §8 rule 2 carry only the GUID (other fields 0).
 3. **S→C 0x9B** (7 bytes, `0x0053E0E0`): u16 @1, u32 @3. Death /
    classic act change: name id and resurrect cost. Replace, resurrect:
@@ -679,6 +680,12 @@ Synthetic (CI-safe):
   `0x005774F0`, writer `0x005699A0`; item swap `0x0054CED0`; messages
   `0x0053CB80`, `0x0053CB30`, `0x0053E0E0`, `0x0053BFD0`, `0x005DE330`
   (byte stores read from the disassembly).
+- §13 r1–r2 GUID order (2026-10-07, spec-client-msgs-3): both senders
+  copy broadcast record +0x04 to the first GUID field (0x81 @4, 0x7A
+  @5) and record +0x00 to the second (0x81 @8, 0x7A @9); the add
+  `0x00575D90` builds the record with +0x00 = pet GUID (pet +0x0C) and
+  +0x04 = owner GUID (player +0x0C) (`0x00575E4F`–`0x00575E67`), so 0x7A
+  carries owner @5, pet @9 like 0x81 (owner @4, hireling @8).
 - Live 1.14d data: `patch_d2` `hireling.txt` (120 rows), `pettype.txt`
   row 7, `skills.txt` `reqlevel`, `states.txt` 1/105/107/154,
   `itemstatcost.txt` stat names; test-vector table computed from them.
