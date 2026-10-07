@@ -187,11 +187,10 @@ what still blocks each panel / feed is named.
 
 ## 5. Gate (this branch)
 
-- `CARGO_INCREMENTAL=0 cargo test --workspace`: see §6 (filled in before
-  the push).
+- `CARGO_INCREMENTAL=0 cargo test --workspace`: see §6.
 - `cargo clippy --workspace --all-targets -- -D warnings`, `cargo fmt
   --all --check`: clean.
-- `python3 tools/coverage.py --check`: 8,391 claims, 0 errors.
+- `python3 tools/coverage.py --check`: 8,393 claims, 0 errors.
   `python3 tools/spec_index.py --check`: ok. `python3 tools/methods.py
   check`: 21 methods OK.
 
@@ -207,4 +206,10 @@ instead of a bare id. `Environment` (one `f32`, a sine, never NaN) is now
 
 ## 6. Gate result
 
-(filled in below at push time)
+- `CARGO_INCREMENTAL=0 cargo test --workspace --no-fail-fast` on `48c55fd`:
+  5,394 passed, 0 failed, 219 ignored (exit 0). `cargo clippy --workspace
+  --all-targets -- -D warnings`: clean (exit 0).
+- After the last commit (0x94 assigns every entry before reporting a
+  pending part): `cargo test -p d2-client` 999 passed, 0 failed (base:
+  85 failed); `cargo clippy -p d2-client --all-targets -- -D warnings`,
+  `cargo fmt --all --check`, coverage and spec index: clean.
