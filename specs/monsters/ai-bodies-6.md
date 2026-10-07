@@ -36,32 +36,32 @@
 |   4. MinionSpawner (121) `0x005E2BD0`, init `0x005F6630` | 290–309 |
 |   5. Towner (41) `0x005E7540` | 310–323 |
 |   6. EvilHole (76) `0x005FB410` | 324–351 |
-|   7. Hireable (61) `0x005E52D0`, alternate `0x005E5280` | 352–470 |
-|   8. QuillMother (75) `0x005FB2A0` | 471–485 |
-|   9. BaalTentacle (139) `0x005EF820` | 486–499 |
-|   10. ElementalBeast (46) `0x005F6B70` | 500–518 |
-|   11. NpcStationary (54) `0x005E73A0` | 519–546 |
-|   12. MosquitoNest (83) `0x005E0260` | 547–564 |
-|   13. DesertTurret (94) `0x005E0980` | 565–603 |
-|   14. AssassinSentry (101) `0x005EA3D0`, init `0x005EA290` | 604–638 |
-|   15. Catapult (123) `0x005E34C0` | 639–643 |
-|   16. CatapultSpotter (126) `0x005EE040` | 644–682 |
-|   17. Tentacle (56) `0x005F8F80` | 683–707 |
-|   18. TentacleHead (57) `0x005F9270` | 708–725 |
-|   19. Hydra (86) `0x005E9E60` | 726–736 |
-|   20. Totem (109) `0x005ED9E0` | 737–757 |
-|   21. Vendor (42) `0x005E9E00` | 758–763 |
-|   22. Trap-Missile (77) `0x005FB5B0` | 764–776 |
-|   23. TrappedSoul (99) `0x005E9F10` | 777–793 |
-|   24. DruidWolf (108) `0x005ED710` | 794–873 |
-|   25. CycleOfLife (111) `0x005EC8C0`, init `0x005EC6A0` | 874–902 |
-|   26. NpcBarb (127) `0x005EDC50`, init `0x005EDC40` | 903–923 |
-| Constants & data dependencies | 924–948 |
-| Randomness | 949–957 |
-| Edge cases & original bugs | 958–966 |
-| Test vectors | 967–991 |
-| Provenance | 992–1018 |
-| Open questions | 1019–1026 |
+|   7. Hireable (61) `0x005E52D0`, alternate `0x005E5280` | 352–472 |
+|   8. QuillMother (75) `0x005FB2A0` | 473–487 |
+|   9. BaalTentacle (139) `0x005EF820` | 488–501 |
+|   10. ElementalBeast (46) `0x005F6B70` | 502–520 |
+|   11. NpcStationary (54) `0x005E73A0` | 521–548 |
+|   12. MosquitoNest (83) `0x005E0260` | 549–566 |
+|   13. DesertTurret (94) `0x005E0980` | 567–605 |
+|   14. AssassinSentry (101) `0x005EA3D0`, init `0x005EA290` | 606–640 |
+|   15. Catapult (123) `0x005E34C0` | 641–645 |
+|   16. CatapultSpotter (126) `0x005EE040` | 646–684 |
+|   17. Tentacle (56) `0x005F8F80` | 685–709 |
+|   18. TentacleHead (57) `0x005F9270` | 710–727 |
+|   19. Hydra (86) `0x005E9E60` | 728–738 |
+|   20. Totem (109) `0x005ED9E0` | 739–759 |
+|   21. Vendor (42) `0x005E9E00` | 760–765 |
+|   22. Trap-Missile (77) `0x005FB5B0` | 766–778 |
+|   23. TrappedSoul (99) `0x005E9F10` | 779–795 |
+|   24. DruidWolf (108) `0x005ED710` | 796–875 |
+|   25. CycleOfLife (111) `0x005EC8C0`, init `0x005EC6A0` | 876–904 |
+|   26. NpcBarb (127) `0x005EDC50`, init `0x005EDC40` | 905–925 |
+| Constants & data dependencies | 926–950 |
+| Randomness | 951–959 |
+| Edge cases & original bugs | 960–977 |
+| Test vectors | 978–1002 |
+| Provenance | 1003–1029 |
+| Open questions | 1030–1038 |
 <!-- /index -->
 
 ## Summary
@@ -400,8 +400,8 @@ owner (`0x0058F0D0`). The alternate is Nihlathak's (`ai-bodies-5.md`
    (`level`, `0x00625480`), at most 95.
 2. d := full-size distance U→S.
 3. Node := U's node in O's pet lists by U's GUID (`0x00574BD0`,
-   `world/hirelings.md` §5 rule 4); none → idle 10. End. w := the node's
-   hireling `Id` (node +0x10).
+   `world/hirelings.md` §5 rule 4); none → idle 10. End. w := the
+   hireling `Id` at +8 of the record `0x00574BD0` returns (`0x005E50ED`).
 4. Draw r. r < a → ok := 1, p := 0; else ok := 0, p += 10.
 5. aip1 = 0 (ranged): d < 4 and a second draw < 50 → wander near O 4
    started → end; delete thinks; escape from S by 4 with delete started
@@ -429,7 +429,9 @@ owner (`0x0058F0D0`). The alternate is Nihlathak's (`ai-bodies-5.md`
       (+0xA8 + 4i) × Δ / 4 (signed, toward 0); c_i := acc.
    4. r := `roll(acc + 1)` (one step; none when acc + 1 < 1, r := 0).
    5. r ≥ H.`DefaultChance`: i := the first index 0..5 with c_i ≥ r
-      (signed); found and k := H.`Skill<i+1>` > 0: k's skills row has
+      (signed; c_i of the slots after the step-3 stop were not written
+      by this call, Edge case 4); found and k := H.`Skill<i+1>` > 0:
+      k's skills row has
       the `aura` flag (+4 bit 5) → make k the right skill
       (`0x005701B0(U, k, −1)`) and idle 10; else `0x005DEAD0(H.`Mode<i+1>`
       (+0xC0 + i), k, S, 0, 0)`. End.
@@ -963,6 +965,15 @@ quest seams have their own draws, owned by their specs.
    wander around the pet.
 3. Pet move k 1 runs (`0x005DEDE0`) on the first try but run-dels on the
    second when run ≠ 0.
+4. Hireling skill §7 step 7.5: the weights c_0..c_5 live on the stack
+   and only the slots up to the step-3 stop are written. With no
+   counting slot and r = `DefaultChance` > 0 (live rows have at most 3
+   skills), the search reads stack words this call never wrote, so
+   1.14d's pick is not defined by the inputs. d2rs: an unwritten c_i
+   counts as −1, so the search ends in the step-6 fallback
+   (`world/hirelings.md` edge case 12). After c_5 the search would read
+   the next stack word (the monstats row pointer) and always stop there
+   without a pick.
 
 ## Test vectors
 
@@ -1021,5 +1032,6 @@ Game-file vectors: Open question 1.
 1. No recording covers any AI of this file: record a game with a
    necromancer's summons, a hireling, a town walk and the spawners and
    traps of §4–§6 (tick recorder) and compare think schedules and draws.
-2. Pet move k 3 calls the free-spot search with class 363 for every
-   pet; its draws are `ai.md` open question 4.
+2. Answered (2026-10-07): the free-spot search `0x0054DC40` is
+   `monsters/population.md` §8 (room seed, x then y, up to 20 tries,
+   test-only probe with class 363).

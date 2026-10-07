@@ -38,16 +38,16 @@
 |   10. ClawViper (16) `0x005F1B60` | 294–316 |
 |   11. Vulture (23) `0x005F3170` | 317–382 |
 |   12. BatDemon (29) `0x005F5040`, alternate `0x005F4FD0` | 383–425 |
-|   13. SandMaggotQueen (66) `0x005F9CF0` | 426–447 |
-|   14. Duriel (44) `0x005F67B0` | 448–466 |
-|   15. Summoner (53) `0x005F85C0` | 467–499 |
-|   16. Special-state thinks 10/17, 11, 12 | 500–554 |
-| Constants & data dependencies | 555–572 |
-| Randomness | 573–582 |
-| Edge cases & original bugs | 583–597 |
-| Test vectors | 598–615 |
-| Provenance | 616–643 |
-| Open questions | 644–664 |
+|   13. SandMaggotQueen (66) `0x005F9CF0` | 426–494 |
+|   14. Duriel (44) `0x005F67B0` | 495–513 |
+|   15. Summoner (53) `0x005F85C0` | 514–546 |
+|   16. Special-state thinks 10/17, 11, 12 | 547–601 |
+| Constants & data dependencies | 602–619 |
+| Randomness | 620–629 |
+| Edge cases & original bugs | 630–644 |
+| Test vectors | 645–662 |
+| Provenance | 663–690 |
+| Open questions | 691–716 |
 <!-- /index -->
 
 ## Summary
@@ -435,7 +435,7 @@ count, 1 = "laying", 2 = "resting".
    schedules a think).
 3. Param 1 ≠ 0: spawn info `0x0063EFA0(unit, &class, &x, &y, &mode, 0,
    0x0058F710)`; for base class 284 it gives class
-   `0x0054DA60(68 sandmaggot1, …)` (Open question 4), (x, y) = (own x +
+   chain(68 sandmaggot1) (§13.1), (x, y) = (own x +
    8, own y), mode 8. Room at (x, y) from the unit's room
    (`0x00463740`); found → spawn `0x005B2F20(room, x, y, class, mode,
    spread 2, flags 0x42)` (`monsters/init.md` §1); spawned → its unit
@@ -444,6 +444,53 @@ count, 1 = "laying", 2 = "resting".
 
 No draws in the AI itself (the spawn's own draws: `monsters/
 population.md` §9). 1.14d-confirmed; same as D2MOO.
+
+#### 13.1 Spawn info `0x0063EFA0`
+
+`spawn_info(unit, &class, &x, &y, &mode, difficulty, pick)` (stdcall,
+`ret 0x1c`) gives a spawner's child class, spawn point and start mode.
+This section owns it for all four callers: the queen (§13, pick =
+`0x0058F710`), EvilHole (`ai-bodies-6.md` §6, pick 0), the Baal
+clone (`ai-bodies-5.md` §21.3, pick 0) and srvdo 140 Baal Tentacle
+(`skills/bodies-4.md` §3.22, pick 0).
+
+The key is the `BaseId` (monstats +2) of the unit's class; a null unit,
+a non-monster, a class outside monstats or a `BaseId` outside monstats
+is key −1. "Clamp(c)" = c when monstats has more than c rows, else −1
+(the same guard on every constant). "Chain(b)" = `0x0054DA60(clamp(b),
+p)`: `BaseId` b walked p steps along `NextInClass`
+(`monsters/population.md` §11.5 rule 3), with p := the chain position
+of the unit's class (monstats byte +0x4B, read through
+`0x006510C0(class, 0, &p)`; class −1 → 0). (ux, uy) = the unit's
+position (`0x0045ADF0` / `0x0045AE20`); (tx, ty) = its path's target
+point (path +0x10 / +0x12, `0x00648A00` / `0x00648A10`; the path is
+unit +0x2C, read without a null test).
+
+| Key (`BaseId`) | Class | Point | Mode |
+|---|---|---|---|
+| 206 crownest1 | chain(15 foulcrow1) | (ux, uy + 3) | 1 |
+| 228 sarcophagus | `0x0063EC70(room, clamp(96 mummy1))` (`population.md` §11.6; room = the unit's room `0x00620BB0`) | (ux, uy + 2) | 1 |
+| 267 bloodraven | clamp(6) (zombie2) | (tx, ty) | 8 |
+| 284 maggotqueen1 | chain(68 sandmaggot1) | (ux + 8, uy) | 8 |
+| 298 vilemother1 | chain(301 vilechild1) | (tx, ty) | 1 |
+| 321 evilhole1 | clamp(712 megademon6) when the unit's class is 711 (demonhole), else clamp(19 fallen1) | (ux, uy) | 1 |
+| 334 suckernest1 | chain(114 mosquito1) | (px − 2, py − 2) | 1 |
+| 484 minionspawner1 | chain(453 minion1) | (ux, uy + 3) | 1 |
+| 526 nihlathakboss, 528 evilhut | pick(unit) (ECX = unit) | (ux + 2, uy + 2) | 1 |
+| 537 ancientstatue1 | chain(540 ancientbarb1); then state 146 on the unit (`0x00639DB0(unit, 146, 1)`) | (ux, uy + 2) | 1 |
+| 544 baalcrab | `ai-bodies-5.md` §21.3 (incoming class compared with 570; draws) | same | 1 / 4 |
+| any other, −1 | clamp(0) | (0, 0) | 1 |
+
+(px, py) for 334: the unit's path position read by unit type: types 2,
+4, 5 (object, missile, item) the static path's +0x0C / +0x10; other
+types the dynamic path's x / y (`0x006488C0` / `0x00648900`), 0 when
+unit +0x2C is null. Keys 526 / 528 with pick = 0: class := clamp(0),
+then a fatal assertion (line 0x1FC); no caller passes a
+pick for them in live data (the queen's pick is reached only for key
+284, which ignores it), so the case is unreachable in 1.14d. `difficulty`
+is read only by key 544. No key other than 544 draws. 1.14d-confirmed
+(`0x0063EFA0`, jump tables `0x0063F5A0` / `0x0063F5BC` and `0x0063F630`
+/ `0x0063F644`).
 
 ### 14. Duriel (44) `0x005F67B0`
 
@@ -622,8 +669,8 @@ Game-file vectors: Open question 1.
   `0x005F6530`, `0x005F6340`, `0x005F1B60`, `0x0045ADF0`, `0x0045AE20`,
   `0x005F3170`, `0x005F2FC0`, `0x005F2EB0`, `0x005F30F0`, `0x005DE4E0`,
   `0x005DE440`, `0x005DE6D0`, `0x00649180`, `0x00648CE0`, `0x0064CBE0`,
-  `0x005F5040`, `0x005F4FD0`, `0x005F9CF0`, `0x0063EFA0` (case 284
-  only), `0x005F67B0`, `0x005F85C0`, `0x005E8020`, `0x005E80E0`,
+  `0x005F5040`, `0x005F4FD0`, `0x005F9CF0`, `0x0063EFA0` (all
+  cases), `0x005F67B0`, `0x005F85C0`, `0x005E8020`, `0x005E80E0`,
   `0x005E8140`, `0x005E8340`, `0x00457490`, `0x005DE890`, `0x005C34B0`,
   callers of `0x005B0E00` (33 sites, state pushes read in `all.asm`);
   `0x005A49B0` for the Countess-only state 13. Ghidra decompile read
@@ -649,14 +696,19 @@ Game-file vectors: Open question 1.
 2. Vulture §11 and BatDemon §12 flight: confirm modes 8 / 9 / 10 / 11
    and the land / take-off footprints with a recording that logs mode
    changes and collision.
-3. Installers of special states 2, 3, 9, 14, 16 (`0x0056D940`,
-   `0x005C07A0`, `0x005D18E0`, `0x005D19D0`, `0x005EF320`, …): confirm
-   none applies to the Act II rows; their thinks stay unread.
-4. `0x0054DA60` and `0x006510C0` in the spawn-info function
-   `0x0063EFA0` (which sandmaggot row the queen spawns): owner is
-   `monsters/population.md`; read them.
-5. Who calls the BatDemon alternate (`ai.md` §3.3 re-install while
-   running): the skill or event path that re-installs AI 29.
+3. Answered (2026-10-07): `ai.md` §3.3 "Installed special states":
+   no 1.14d site installs 2, 3, 9 or 14 (the summon spawn `0x0056D940`
+   always passes 0); 16 is installed only by the imp possess
+   `0x005D18E0` (Act V imps). None applies to an Act II row.
+4. Answered (2026-10-07): the spawn info `0x0063EFA0` is §13.1 (all
+   keys). The queen's class is chain(68): sandmaggot1 walked p steps
+   along `NextInClass`, p = the queen class's monstats +0x4B, so
+   maggotqueenK spawns sandmaggotK (`0x0054DA60` =
+   `monsters/population.md` §11.5 rule 3; `0x006510C0` reads +0x4B).
+5. Answered (2026-10-07): `ai.md` §3.3 "When an alternate runs": any
+   install over the running BatDemon think (curse AI `0x005C34B0`,
+   terror `0x005DDD00`, `0x005D6520`; BatDemon has `switchai`) makes
+   the alternate run for one think, which then installs the new state.
 6. Answered (`docs/handoff/impl-ai-acts2-5.md` reading 1): Vulture
    with T = 0 is unreachable (target mode 1, `ai.md` §2.3); the 1.14d
    null read in §11 step 1 is not a rule. An implementation asserts T
