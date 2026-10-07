@@ -4,9 +4,10 @@
   disassembly (addresses inline) and the live 1.14d tables
   (`patch_d2` `objects.txt` 573 rows, `shrines.txt` 23 rows); D2MOO 1.10f
   gave names only. No recording of an object interaction exists yet (open
-  questions 1–3). Object population (`0x00552610`, objects.txt
-  `PopulateFn`, objgroup) and the operate functions marked `todo` in
-  `object-functions.tsv` are not covered yet (§15). Implemented 2026-10-06,
+  questions 1–2). Object population (`0x00552610`, objects.txt
+  `PopulateFn`, objgroup) is owned by `world/object-population.md`; the
+  operate functions marked `todo` in `object-functions.tsv` are not
+  covered yet (§15). Implemented 2026-10-06,
   unverified (`d2_sim::world::objects`, `docs/handoff/impl-objects.md`).
 - **Target version:** 1.14d
 - **Crate/module:** `d2-sim::world::objects` (init and operate dispatch,
@@ -28,31 +29,31 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 58–69 |
-| Inputs | 70–81 |
-| Outputs / state changes | 82–88 |
-| Rules | 89–90 |
-|   1. Object data and unit fields | 91–119 |
-|   2. Object control (game +0x10F0) | 120–142 |
-|   3. Creation and init dispatch (`0x0054F5D0`) | 143–167 |
-|   4. Object animation at a mode change | 168–180 |
-|   5. Init functions | 181–248 |
-|   6. Preset object classes 574–582 (`0x0054F490`) | 249–268 |
-|   7. Operate dispatch | 269–298 |
-|   8. Chests and breakables | 299–390 |
-|   9. Shrines | 391–468 |
-|   10. Doors, operate 8 (`0x00581D40`) | 469–486 |
-|   11. Wells, operate 22 (`0x005858A0`) | 487–504 |
-|   12. Portals, operate 15 (`0x00584870`) | 505–521 |
-|   13. Torch, operate 11 (`0x005843D0`) | 522–526 |
-|   14. Client messages | 527–544 |
-|   15. Not covered yet | 545–553 |
-| Constants & data dependencies | 554–589 |
-| Randomness | 590–616 |
-| Edge cases & original bugs | 617–649 |
-| Test vectors | 650–670 |
-| Provenance | 671–701 |
-| Open questions | 702–723 |
+| Summary | 59–70 |
+| Inputs | 71–82 |
+| Outputs / state changes | 83–89 |
+| Rules | 90–91 |
+|   1. Object data and unit fields | 92–120 |
+|   2. Object control (game +0x10F0) | 121–143 |
+|   3. Creation and init dispatch (`0x0054F5D0`) | 144–168 |
+|   4. Object animation at a mode change | 169–181 |
+|   5. Init functions | 182–249 |
+|   6. Preset object classes 574–582 (`0x0054F490`) | 250–269 |
+|   7. Operate dispatch | 270–299 |
+|   8. Chests and breakables | 300–391 |
+|   9. Shrines | 392–469 |
+|   10. Doors, operate 8 (`0x00581D40`) | 470–487 |
+|   11. Wells, operate 22 (`0x005858A0`) | 488–505 |
+|   12. Portals, operate 15 (`0x00584870`) | 506–522 |
+|   13. Torch, operate 11 (`0x005843D0`) | 523–527 |
+|   14. Client messages | 528–545 |
+|   15. Not covered yet | 546–554 |
+| Constants & data dependencies | 555–590 |
+| Randomness | 591–617 |
+| Edge cases & original bugs | 618–650 |
+| Test vectors | 651–671 |
+| Provenance | 672–702 |
+| Open questions | 703–725 |
 <!-- /index -->
 
 ## Summary
@@ -60,8 +61,8 @@
 An object is a unit of type 2 (`sim/units.md` §1) whose behavior comes
 from its `objects.txt` row through three function numbers: `InitFn`
 (run once when the unit is allocated), `OperateFn` (run when a player,
-a monster or a skill operates it) and `PopulateFn` (room population, not
-covered here). Shared state lives in the game's object control (seed,
+a monster or a skill operates it) and `PopulateFn` (room population,
+`world/object-population.md`). Shared state lives in the game's object control (seed,
 per-level regions, shrine lists). This spec owns the dispatchers, the
 per-object data, the object animation rule, and the generic object
 classes: chests and other breakables with their traps, shrines, doors,
@@ -366,7 +367,7 @@ control seed. 61 rows use operate 14, 25 operate 3, 13 operate 1.
 
 **Arm** (`0x00582510(t)`): t ≥ 10 (`0x00732D14`) or handler null (t =
 0) → nothing. If the handler is the monster handler (t = 8, 9): m :=
-trap monster id (`0x005474C0`); m = 234 and the object's level is in act
+trap monster id (`0x005474C0`, `world/object-population.md` §6); m = 234 and the object's level is in act
 I → nothing. Otherwise schedule event 4 at frame + 35 and attach sound 13
 to the object (no target).
 
@@ -544,8 +545,8 @@ Sound ids used here: 8 (portal), 11 (unlock), 13 (trap armed), 19
 
 ### 15. Not covered yet
 
-Object population (`0x00552610`, `PopulateFn` 1–9, objgroup density,
-shrine and well limits in the per-level regions), the `todo` rows of
+Object population is owned by `world/object-population.md` (with the
+region fields and the trap monster choice). The `todo` rows of
 `object-functions.tsv` (trap door, obelisk, secret door, armor stand,
 weapon rack, bookshelf, teleport pad, slime door, exploding chest, bank,
 stairs, jungle stash, gate, torch tiki, small init functions), object
@@ -709,7 +710,8 @@ lists of §2 from the live `shrines.txt`.
    by a trace of an object allocation with `Sync` = 0.
 3. Trap monster choice `0x005474C0` (per-level cache; D2MOO
    `OBJRGN_GetTrapMonsterId`): not re-read in 1.14d; decides which
-   monsters casket/barrel/trap 8–9 spawn.
+   monsters casket/barrel/trap 8–9 spawn. **Answered** 2026-10-07 from
+   `0x005474C0`: `world/object-population.md` §6.
 4. Meaning of the constant 3 at 0x0E offset 6 and of 0x4D's zero fields
    (client handler `0x0045CD10` and the 0x4D client handler).
 5. Callback `0x00582750` and the eligibility test of the warping shrine
