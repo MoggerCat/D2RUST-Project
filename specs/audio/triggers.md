@@ -18,34 +18,35 @@
   `skills/use.md`, `skills/bodies.md` (skill functions; not restated),
   `missiles/missiles.md`, `monsters/ai.md` (who sends events 16–18),
   `world/quests.md` (who sends quest events), `world/npc.md`,
-  `items/inventory.md` (who sends item events), `client/ui.md` §B8.
+  `items/inventory.md` (who sends item events), `client/ui.md` §B8,
+  `audio/triggers-2.md` (part 2: §13–§17).
 
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 51–65 |
-| Inputs | 66–78 |
-| Outputs / state changes | 79–84 |
-| Rules | 85–86 |
-|   1. Conventions and shared state | 87–138 |
-|   2. Server sound events (S→C 0x2C) | 139–187 |
-|   3. Player event sounds (`0x004CB9C0(U, event e)`) | 188–248 |
-|   4. Mode sounds | 249–343 |
-|   5. Footsteps (`0x004CAF60(U)`) | 344–379 |
-|   6. Monster idle voices | 380–406 |
-|   7. Object mode sounds (`0x004CB460`, objects) | 407–434 |
-|   8. Skills, missiles, states | 435–471 |
-|   9. Items | 472–495 |
-|   10. NPC speech | 496–531 |
-|   11. UI sounds | 532–555 |
-|   12. Other fixed requests | 556–573 |
-| Constants & data dependencies | 574–590 |
-| Randomness | 591–610 |
-| Edge cases & original bugs | 611–627 |
-| Test vectors | 628–657 |
-|   Checks (hook addresses for `record_sound.py`, `client/audio.md` §B7) | 658–671 |
-| Provenance | 672–690 |
-| Open questions | 691–719 |
+| Summary | 52–66 |
+| Inputs | 67–79 |
+| Outputs / state changes | 80–85 |
+| Rules | 86–87 |
+|   1. Conventions and shared state | 88–164 |
+|   2. Server sound events (S→C 0x2C) | 165–213 |
+|   3. Player event sounds (`0x004CB9C0(U, event e)`) | 214–277 |
+|   4. Mode sounds | 278–383 |
+|   5. Footsteps (`0x004CAF60(U)`) | 384–435 |
+|   6. Monster idle voices | 436–462 |
+|   7. Object mode sounds (`0x004CB460`, objects) | 463–504 |
+|   8. Skills, missiles, states | 505–542 |
+|   9. Items | 543–566 |
+|   10. NPC speech | 567–636 |
+|   11. UI sounds | 637–663 |
+|   12. Other fixed requests | 664–727 |
+| Constants & data dependencies | 728–744 |
+| Randomness | 745–768 |
+| Edge cases & original bugs | 769–785 |
+| Test vectors | 786–817 |
+|   Checks (hook addresses for `record_sound.py`, `client/audio.md` §B7) | 818–831 |
+| Provenance | 832–868 |
+| Open questions | 869–980 |
 <!-- /index -->
 
 ## Summary
@@ -119,8 +120,11 @@ the sound fields of §1 r6. Each client RNG draw listed in Randomness.
    `sound-table.md` §10 r4); +0xB0 last hit class taken (u8, open
    question 3). Globals: `[0x007C88B8]` last idle voice of any monster
    (C), `[0x007C88BC]` last voice of any unit (C), `[0x007C88C0]` idle
-   gap (C, starts 0), `[0x007C88C4]`/`[0x007C88C8]` time (C) and id of
-   the last player speech line (§3 r6).
+   gap (C), `[0x007C88C4]`/`[0x007C88C8]` time (C) and id of
+   the last player speech line (§3 r6). All five are reset at every
+   game start by sound init (`0x004CA280` from `0x00482282`): 0, 0,
+   **90** (corrected: an earlier draft said the gap starts at 0), 0,
+   0.
 7. **Draw helpers** on the client RNG (`sound-table.md` §4 r5,
    `0x004E40A0`): `roll(n)`; `uniform(lo, hi)` = lo + roll(hi − lo +
    1) (`0x004E4100`); `jitter(r)` = roll(2r + 1) − r (`0x004E4120`).
@@ -135,6 +139,28 @@ the sound fields of §1 r6. Each client RNG draw listed in Randomness.
 10. **Type and class.** "player"/"monster"/"object" = unit type 0/1/2.
     Monster class = monstats row (`0x004CA2C0`); "base class" = its
     `BaseId` (`0x00463860`).
+11. **Id 0 and unguarded calls** (answers TR-6). Where a rule has no
+    "id 0 → nothing" guard, the request is still made with id 0: the
+    request entry returns 0 at once for `id < 1` (`0x004B9A21`), before
+    any record read, list change or RNG draw (`sound-table.md` §5 r1).
+    Recorded: the request log of `docs/handoff/local-buddy-q-rec.md`
+    entry 74 holds many id-0 requests from `0x004D9BC7` (state sounds
+    at unit creation, §8 r4) with return 0 and the seed unchanged. d2rs
+    may make or skip such calls; the logs compare equal only if the
+    request log keeps them (it records every entry call).
+12. **Time comparisons.** Every timer test in this spec is an unsigned
+    32-bit difference against C or T (`jb`/`jae`/`jbe` on the
+    difference, e.g. `0x004CB5C4`–`0x004CB6A0`, `0x004CB043`,
+    `0x004CC359`), so a stored time in the future reads as a huge
+    elapsed time.
+13. **Identity, lists, objects, inputs** (second pass): the type, class
+    and mode the rules of §4–§6 read are the unit's *sound identity*
+    (a transformed player sounds as its monster form) and its
+    `monsounds` record is chosen by superunique / unique / minion rules:
+    `audio/triggers-2.md` §18. The unit's request list (+0x78: order,
+    lifetime, the group walk `0x004CA900`, unit free): §19 there. When
+    object units make their §7 call: §20. Every client input the rules
+    read and its owner spec: §21.
 
 ### 2. Server sound events (S→C 0x2C)
 
@@ -205,7 +231,10 @@ the sound fields of §1 r6. Each client RNG draw listed in Randomness.
    `light_walk_dirt_1`, 2,768 `medium_walk_dirt_1`, 2,816
    `heavy_walk_dirt_1` (§5).
 2. If U is P and P is missing or in mode 17 (dead) (`0x00463DF0`):
-   nothing.
+   nothing. Exact (`0x004CB9C0`–`0x004CBA23`): U null or U's class ≥ 7
+   is fatal (`0xB22`) before this test, so "missing" never applies: the
+   rule is U = P (`[0x007A6A70]`) and P's mode (+0x10) = 17. Another
+   player's events play even when it is dead.
 3. **Chat, e = 25–32** (sent for C→S 0x3F PlayAudio,
    `client-messages.tsv`): unless `speaking(U)`, id = chat base + 2·(e
    − 25) (8 lines, 2 variants each), on U.
@@ -319,7 +348,18 @@ the sound fields of §1 r6. Each client RNG draw listed in Randomness.
       `Neutral` sounds (§6 r1 group, `0x004CB220(U, 1)`: force when the
       request still has units, else fade to 0 over 6), request(`AttackN`,
       U, d = `AttNDel`), U+0x7C := C, `[0x007C88BC]` := C. (Prb ≥ 100
-      still draws.)
+      still draws.) Exact (answers TR-4): `0x004CB220(U, f)` walks U's
+      request list (newest first, `sound-table.md` §5 r6) and takes
+      every handle whose request's current id has the group base of
+      `Neutral` (monsounds +0x68), playing or not. With f = 1: if that
+      request has **more than one** unit (`0x004B9BE0`; possible
+      through compound merges, `sound-table.md` §5 r2) → detach(h, U,
+      force) (§1 r3: U leaves, the others keep it); else → fade(h, 0,
+      delay 0, len 6) (`sound-table.md` §5 r7: len raised to `Fade
+      Out`, stop flag set; U stays in its list). With f = 0 every match
+      is detached with force. A handle whose request is gone reads id
+      0 (group base 0) and matches only when `Neutral` is 0; detaching
+      or fading a missing request does nothing.
    3. Always: request(`WeaponN`, U, d = (`WeaNDel` × 256 + 128) /
       max(U+0x4C, 1)); if a handle: volume `WeaNVol`.
 
@@ -376,6 +416,22 @@ id = `Skill1..4` for m = 8..11. id 0 → nothing. id 2,692
    (`formats/dt1.md` +0x06; `0x004CAD60`) give, first match: 0x20 → 1
    dirt, 0x08 → 2 istone, 0x10 → 3 ostone, 0x40 → 4 sand, 0x80 → 6
    wood, 0x400 → 5 snow; none → default.
+9. **Integer types** (answers TR-5; `0x004CAF60`, `0x004E4180`). s is
+   U+0x4C read as **signed 16-bit** (`movsx`); F = U+0x48 and f = U+0x44
+   are 32-bit. `n × s` is a 32-bit product used as an **unsigned**
+   divisor (period = F / (n·s), unsigned; a negative s gives a huge
+   divisor, period 0); step = F / n unsigned; `f + s`, `f − s` are
+   32-bit wrapping sums (signed values). dist(x): if step is a power of
+   two (or 0), x and o are masked with step − 1 (two's complement, so a
+   negative x reduces like a mathematical modulo; step 0 masks with
+   0xFFFFFFFF, i.e. no reduction); otherwise both are reduced by
+   **signed** division (`idiv`: the remainder has the sign of x, so f −
+   s < 0 gives a negative remainder). Then a = x mod, b = o mod: the
+   three candidates |b − a|, |b − a − step|, |a − b − step| are signed
+   32-bit with absolute value, and the minimum is taken with signed
+   compares; the step test of r4 compares signed (`jge`). The elapsed
+   tests of r3 and r6 are unsigned (`C − U+0x84`, ⌊2·period/3⌋,
+   ⌊3·period/2⌋ on u32).
 
 ### 6. Monster idle voices
 
@@ -427,6 +483,20 @@ id = `Skill1..4` for m = 8..11. id 0 → nothing. id 2,692
 6. U+0x74 := m, U+0x70 := 1. So the first call only sets the loop
    (and class 59's transition).
 
+7. **Classes without a record** (answers TR-1): 120 of the 573 classes
+   have a null pointer at `[0x007295F8 + 4·c]` (453 non-null, the TSV
+   rows). `0x004CB3E0` and `0x004CB380` then return 0 (`0x004CB3FC`,
+   `0x004CB39F`), so the class behaves as an all-zero row: no
+   transition; loop s = 0 → U is detached from its looping requests
+   (r4, normally none); U+0x74 and U+0x70 are still updated (r6). Class
+   ≥ 573 or mode ≥ 8 is fatal (`0xE72`, `0xE86`). The class-61 cairn
+   table is used only when the record is non-null (it is: `0x00728368`).
+8. **Cairn loop table** (answers TR-2; `0x00728338`, 8 dwords by mode):
+   mode 0 → 0, modes 1–5 → 413–417 (`cairn_stone_1` … `cairn_stone_5`),
+   modes 6, 7 → 0. Class 61's record gives only the mode-6 transition
+   418 (`object-sounds.tsv`). The table index is the current mode, so a
+   stone in mode 1–5 loops the matching `cairn_stone_<m>`.
+
 `object-sounds.tsv`: `class`; `mode0`–`mode7` transition ids;
 `loop_a`, `loop_a_mode`, `loop_b`, `loop_b_mode` (mode 8 = any);
 `ordered` (1 = the shared well record `0x00729328`). Ids are `sounds`
@@ -461,7 +531,8 @@ line indices, 0 = none. Dumped from `Game.exe`.
    sites); `HitSound` (+0x14) ≥ 0 on the missile when its client hit
    function returns non-zero (`0x004D2D70`); `ProgSound` (+0x34) on the
    missile from the client progressive functions `0x004CE850` (missile
-   315 only), `0x004D39C0`, `0x004D5950`, `0x004D5DD0` (conditions:
+   315 only; corrected: elapsed 315 of function 29, `triggers-2.md`
+   §16), `0x004D39C0`, `0x004D5950`, `0x004D5DD0` (conditions:
    open question 6).
 4. **States** (S→C 0xA7, 0xA8, 0xAA → `0x004D9B20`; 0xA9 →
    `0x004D9C30`): state on: if `notondead` and U is a dead monster
@@ -528,6 +599,40 @@ line indices, 0 = none. Dumped from `Game.exe`.
    `wussie_help_me` on class 534 (`0x004B3380`, by `0x004AE130`),
    3,983 `guard_halt`, 4,560 `nihlathak_hurryup` (`0x004B4380`);
    conditions open question 8.
+5. **Greeting records as data** (answers TR-3): `npc-greetings.tsv`,
+   one row per NPC class that `0x004E0370` maps to a record (35 rows,
+   28 distinct records). Columns: `class` (monstats row, decimal),
+   `monstats` (its `Id`, for reading only), `record` (the record's
+   address in `Game.exe`, hex `0x…`; classes with the same address
+   share the record's runtime `last` / `tick` dwords at +0x10 / +0x14,
+   so e.g. all six Cain classes avoid each other's last pick), then
+   `greet`, `inactive`, `time`, `return`: `sounds` line indices,
+   decimal, 0 = none. Every other class has no record (r1: 0). The
+   mapping is a switch on the class (`0x004E0386`–`0x004E0432`: 405
+   direct, 146–297 through the byte table `0x004E04C4`, 511–521
+   through `0x004E055C`). Five records repeat `greet` as `return`
+   (Cain, Elzix, Halbu, Jamella, Tyrael). Dumped from `Game.exe` with
+   `pefile` (our script). Parsing: header row as above; exactly 7
+   tab-separated cells per row; numbers decimal except `record`; rows
+   in ascending `class`, no duplicates.
+6. **Dialog table lookup** (`0x004E0650(key)`, used by r2; answers
+   TR-7's duplicate): when `[0x0072AE24]` is 0 → 0. Else the 8-byte
+   entries at `0x0072B0E0` (sound u32, key u16, 2 pad bytes) are
+   scanned from the first until an entry with sound 0; the first whose
+   key equals the 16-bit key wins. Key 506 is listed twice (rows
+   `order` 37 → 3,533 and 38 → 3,534): 3,533 is played, 3,534 never.
+   The initial value of `[0x0072AE24]` in the image is 1; its only
+   writer is the setter `0x004E0690`, called only from the options
+   menu `0x0047CEF0` (`0x0047CF17`, `0x0047CF28`, `0x0047CF3C`)
+   (answers open question 7: no start-up path applies the stored
+   `NPC Speech` setting).
+7. **Mode 2 and the record state** (`0x004E05AA`): mode 2 returns
+   `return` before the attempt loop and writes neither `last` (+0x10)
+   nor `tick` (+0x14); only modes 0 and 1 set them, after the last
+   attempt (`0x004E062E`, `tick` := C). The day phase of r1.2 is read
+   once per attempt that reaches it (`0x0061C220([0x007A0634])`).
+   "N's skill voices" of r1 and r2 (`0x004CB190`): `audio/triggers-2.md`
+   §19 r4.
 
 ### 11. UI sounds
 
@@ -551,7 +656,10 @@ S→C 0x5D (`0x004A2CB0`, flags byte f, code c, value v): f bit 0 and c
 = 33 → 237 `item_potion`; f bit 1: c = 4 → 241 `item_ring`; c ∈ {8,
 15, 18, 22, 35} → 7 `cursor_level_up`; c = 32 → 217 `item_gem`; c = 33
 → 243 `item_scroll`; f = 0x10: c = 10 → 2,456 then 2,474; c = 33 → id
-v. All none (open question 9).
+v. All none (full dispatch: `client/msg-ui.md` §1; open question 9). Only the first matching row of
+`client/msg-ui.md` §1 r2 runs: with f bit 0 set the bit-1 rows are not
+reached (f = 3, c = 33 plays 237 only), and f = 0x10 rows only when bits
+0 and 1 are clear.
 
 ### 12. Other fixed requests
 
@@ -563,13 +671,59 @@ v. All none (open question 9).
 | 2,231 | `player_townportal_enter` | `0x0049D010` | none |
 | 2,671 | `shrine_portal` | `0x0049FBA0` | none |
 | 4,640 | `monster_diablo_taunt_ex` | `0x0049EB10` (missing file: silent, `sound-table.md` §11) | none |
-| 4,638 | `monster_diablo_taunt_1` | `0x004D6540` | yes |
+| 4,638 | `monster_diablo_taunt_1` | `0x004D6540` | none (corrected: `0x004D6574` passes no unit) |
 | 2,458 | `necromancer_corpseexp_1` | `0x004AD0C0`, `0x004AD1A0`, `0x004ADCE0` | yes |
 | 1,308 / 1,311 / 1,314 / 1,317, 2,419, 790 | minion deaths, fireball impact, druid pod death | `0x004AFF60` (monster mode machine) | yes |
 | 2,517 | `barbarian_leap_land` (+ a running footstep) | `0x004C8970` | yes |
 | 1,830 | `spider_web_1` | `0x004E2D40` | yes |
 
-Their conditions are the owning features' (open question 10).
+Their conditions (open question 10, answered here and in
+`triggers-2.md` §13):
+
+1. 396 / 397: `0x00464E50(U, overlay o, n)` (from the monster mode
+   machine `0x004AFF60`, 5 sites) first creates overlay o on U (type 1
+   with n if n ≥ 1, else type 2; no seed draw), then o = 151 → 396
+   `impact_steal_life`, o = 152 → 397 `impact_steal_mana`, on U.
+2. 452: the shake level `l = trunc(a × 255 / 20)` clamped to 0–255 (a =
+   the shake amplitude of `render/camera.md` §8, `0x004769D0`, called
+   twice per drawn frame from `0x00476D40`). l > 0 with no loop request
+   (`[0x007B8D2C]` = 0) → request 452 with no unit, then volume := l
+   (`0x004B9B50`); with a request, its volume moves toward l by at most
+   6 per call (`0x004B9B20` read); when the new volume is 0 the request
+   is stopped (`0x004BA840`: stop flag, plus a `Fade Out` fade if it is
+   playing, as `sound-table.md` §6.2 r3's switch-off) and
+   `[0x007B8D2C]` := 0; otherwise volume := the new value. Wall-clock
+   driven (the shake envelope).
+3. 2,231 at `0x0049D010`: the waypoint panel row choice
+   (`ui/menus.md` mouse-up rule), no unit.
+4. 2,671 at `0x0049FBA0`: the deciphered Scroll of Inifuss panel (UI
+   state 16, item code `bkd `, from `0x0049FF10`): a step counter
+   advances when more than 50 ms of `GetTickCount` time passed; each of
+   the 5 symbols plays 2,671 (no unit) on the step where counter − its
+   start (`0x00722F08 + 4i`) = 1. Wall-clock driven.
+5. 4,640 at `0x0049EB10`: S→C 0x5A EventMessage type 18 (`0x0049F35B`;
+   handler `0x0045E070`, also `0x0048A630`), after the message, the
+   level effect `0x0061C240` and a shake: no unit (file missing, silent).
+6. 4,638 at `0x004D6540`: client missile function 37 (table
+   `0x0072A398`, missile 372 `diablo appears`): at frames left 150 a
+   screen shake (`0x00476A80`), at frames left 50 the request, no unit.
+
+The rest — 2,458 (`0x004AD0C0`, `0x004AD1A0`, `0x004ADCE0`, reached
+through tables `0x0072509C`, `0x00724EE4` and `0x004D93A0`), the
+`0x004AFF60` death sounds, 2,517 (`0x004C8970`) and 1,830
+(`0x004E2D40`, from `0x004807E9`) — is `audio/triggers-2.md` §13.
+
+**Thunder, draws** (`0x00473910`, weather; the timer and when it runs
+are the weather spec's): at a thunder step (`0x004739B4`) the code draws
+on the **local player's client seed** with `0x00472280(seed, lo, n)` =
+lo + roll(n) (the same generator as §1 r7; n ≤ 0 → lo, no step): first
+the next thunder timer = 500 + roll(1500); then, if the flag
+`[0x00712B4C]` is set (image value 1; when 0 it is set to 1 and no
+sound plays this time), delay = 25 + roll(50), h = request(202, none,
+d = delay); if h ≠ 0: y = −200 + roll(400), then x = −200 + roll(400)
+(y is drawn first), and the position of h := (x, y, 0 + 640.0)
+(`0x004B99A0`, `sound-table.md` §5 r8). These draws interleave with the
+sound draws of the same tick (`sound-table.md` open question 3).
 
 ## Constants & data dependencies
 
@@ -606,7 +760,11 @@ Within one client update the order follows the unit update order of
 `client/model.md` §5 r3 (monster: neutral, then footsteps). Variant
 draws of requests happen later, in the sound update's request order
 (`sound-table.md` §6.2). How these interleave with other users of the
-seed is `sound-table.md` open question 3.
+seed is `sound-table.md` open question 3 (answered statically in
+`sound-table-2.md` §14). Also on this seed, outside `0x004E40A0`:
+Nihlathak's hurry-up deadline (open question 8, `roll(30)` via
+`0x0045C3E0`, once per interaction, during a drawn frame) and the
+thunder draws (§12).
 
 ## Edge cases & original bugs
 
@@ -650,8 +808,10 @@ Synthetic (CI, d2rs rule functions):
 | well (ordered) m 2 → 1 | no transition | §7 r5 |
 | greeting class 148, mode 2 | `akara_greeting_return`, no draw | §10 r1 |
 
-Real (`#[ignore]`, `D2_GAME_DIR`): `object-sounds.tsv` has 453 rows
-and 115 distinct records; `npc-speech.tsv` 864 rows; every id in both
+Real (`#[ignore]`, `D2_GAME_DIR`): `object-sounds.tsv` has 453 rows,
+pointing at 115 distinct record addresses in `Game.exe` that hold 106
+distinct contents (the TSV has 106 distinct rows; corrected for TR-7:
+"115 distinct records" counted addresses); `npc-speech.tsv` 864 rows; every id in both
 is < 4,699; class record ids resolve to the names in §3 r1
 (`amazon_hit_1` … `light_walk_dirt_1`).
 
@@ -671,6 +831,15 @@ twice must give identical logs first (`client/audio.md` §B7).
 
 ## Provenance
 
+Both TSVs re-checked against the 1.14d file image (second pass,
+2026-10-07, scratch script): `npc-speech.tsv` equals the 864 8-byte
+entries at `0x0072B0E0` (sound u32 at +0, key u32 at +4; entry 864 has
+sound 0, the end); `object-sounds.tsv` equals, for each of the 453
+classes with a non-null pointer at `[0x007295F8 + 4·c]` (the same 453
+classes), the record's 12 dwords (`mode0`–`mode7`, `loop_a`,
+`loop_a_mode`, `loop_b`, `loop_b_mode`), with `ordered` = 1 exactly when
+the pointer is the well record `0x00729328`. 0 rows differ.
+
 1.14d `Game.exe` (sha256 631066c1…adaaf), Ghidra decompile export and
 `tools/ghidra/disasm.py` (register arguments: ECX = id, EDX = unit, three
 stack words for every `0x004B9A00` call; call sites listed by our script
@@ -687,32 +856,124 @@ offsets from `data/fields.tsv`. Sound ids cross-checked: every table
 id resolves to a sound whose name matches its role (e.g. class record
 +0x24 = `*_act1_complete_andariel` for all 7 classes). D2MOO and
 Riiablo not used (no client sound code there for these paths).
+Second pass (2026-10-07, TR-1–TR-7 of `docs/handoff/impl-audio.md`):
+`0x004CB220`, `0x004B9BE0`, `0x004BA790`, `0x004BA760` (TR-4);
+`0x004CAF60`, `0x004E4180` (TR-5); `0x004CB380`, `0x004CB3E0`,
+`0x004CB460` and the tables `0x007295F8`, `0x00728338` (TR-1, TR-2);
+`0x004E0370` switch and records `0x0072AE28`–`0x0072B0C8` dumped to
+`npc-greetings.tsv` (TR-3); `0x004E0650`, `0x004E0690` (TR-7, OQ 7);
+`0x00466360`, `0x0045F190` (OQ 11); thunder `0x00473910`,
+`0x00472280`. Recording facts: `docs/handoff/local-buddy-q-rec.md`
+entry 74 (id-0 requests).
 
 ## Open questions
 
 1. Every rule: confirm with the request log (Checks) on a recorded
    session (town walk, a fight, an NPC talk, item moves).
+   Needs recording: the Checks hooks (every `0x004B9A00` call with
+   caller, id, unit type/GUID, delay, flags, T, C) plus each S→C 0x2C,
+   0xA9 and code-8 mode request with T, over: town walk on two floor
+   materials, a fight with a melee and a caster monster (hits, a
+   death, a block), an NPC talk and greeting, item pickup / drop /
+   identify, a waypoint, a Leap, a fire-enchanted unique's death, the
+   options menu sliders; each logged request must match one rule's
+   site, id, unit and delay.
 2. Where the 0x2C events come from per id and tick (server senders);
    compare the request log's C against the 0x2C packet tick.
+   Answered (static, `triggers-2.md` §14): all 78 sites by event; the
+   unit keeps one pending event (last wins), flushed in the
+   per-client unit update; the client requests at receive.
 3. Who writes client unit +0xB0 (hit class of the last hit; read by
-   §4.2, §4.4); a write watch during a fight.
+   §4.2, §4.4); a write watch during a fight. Partly answered: +0xB0
+   is a dword, written only by the client mode machines: player
+   `0x00461250` (`0x0046140B`, `0x0046143F`, `0x00461498`, `0x004614EF`,
+   `0x0046155E`), monster `0x004AFF60` (`0x004B03BB`, `0x004B043E`,
+   `0x004B04A8`, `0x004B0549`, `0x004B05CD`, `0x004B0650`), plus
+   `0x00450A99` (`0x00450950`) and the player update `0x004635F4`; the
+   values come from the mode event records those machines consume
+   (e.g. record +0x08 at `0x00461494`, +0x18 at `0x004B0546`). Which
+   S→C message field fills them belongs to `client/msg-units.md`; the
+   write watch still settles it end to end. The writer list is
+   complete for client code: a scan of every store to `[reg + 0xB0]` in
+   `0x00440000`–`0x0050FFFF` finds only these sites plus `0x00447BB0`,
+   `0x00449050`, `0x004493E0`, which use +0xB0 as the next link of the
+   list at `[0x00798F34]` (not a unit).
 4. Event 12: which skill/record `0x006256B0(U, 0x44)` and
-   `0x00625D00(·, 350, 0)` select.
+   `0x00625D00(·, 350, 0)` select. Answered (`0x004CBE6B`–`0x004CBEB9`):
+   U's stat list of state 68 (`evade`); its stat 350
+   (`modifierlist_skill`) = the skill that set the state; if U has that
+   skill (`0x006439F0`) and its `skills.txt` record exists
+   (`0x0045C4B0`), its `stsound` (+0xFC) > 0 is requested on U, delay
+   0. Live: Dodge (13), Avoid (18) and Evade (29) all have `stsound`
+   2,236 `amazon_dodge_1`; no state 68 or no skill → nothing.
 5. `dosound a`/`dosound b` use in `0x004C9B40`, `0x004F4590`.
+   Answered: `0x004F4590` is `cltdofunc` 16 (table `0x00727BA8`; live:
+   Jab only): when the caster's action frame (unit byte +0x4E,
+   `sim/units.md`) is 3, a player caster requests `dosound a` (+0x102)
+   and a monster caster `dosound b` (+0x104), on the caster, delay 0,
+   when > 0 (Jab: 286 `weapon_1ht_1` / 292 `weapon_2ht_1`). It
+   returns 1 either way. `0x004C9B40` is `cltstfunc` 25 (table
+   `0x00727A90`; live: Charge 107, SerpentCharge 352): unless it hands
+   over to `0x004C7630` (player with a target in reach, `0x00622C40`),
+   a player requests `dosound a` (> 0) and a monster the sound of its
+   monstats skill slot holding this skill (`0x004F4F40`: slots 0–3 →
+   `monsounds` Skill1–Skill4, +0x44–+0x50; other slots or −1 → none),
+   on the caster, delay 0 (after its entry checks: skill record, path,
+   and not the local player re-casting its current skill with the
+   skill flag bit 0 set, `0x006446A0`). Both live skills have no
+   `dosound a`.
 6. ProgSound conditions per client progressive function (owner: the
-   client part of `missiles/missiles.md`).
-7. Whether any start-up path applies the stored `NPC Speech` value to
-   `[0x0072AE24]` (memory read after start with the option at 1).
+   client part of `missiles/missiles.md`). Answered (`triggers-2.md`
+   §16): functions 9, 29, 47, 51; 29 tests elapsed 315 (not missile
+   315).
+7. Answered (§10 r6): no; only the options menu calls the setter.
 8. Conditions of `0x004B3380`, `0x004B4380` (Act II guard, Act V
-   soldiers, Nihlathak).
+   soldiers, Nihlathak). Answered: `0x004B3380` is the S→C 0x8A
+   NpcWantsInteract handler (`0x0045EA40`; type u8@1, GUID u32@2). Unit
+   not found → nothing. Class 534 (`act5pow`): monster data +0x3C ≠ −1
+   (`0x004AE130`) → 4,603, else 4,607, on U; done. Any other U that is
+   not the NPC of the active interaction (`[0x007C0D29]`,
+   `[0x007C0D25]`): overlay 0x48 (type 3, no draw) on U; then if U is
+   class 331 (`act2guard2`), no interaction is active (`0x004B1620`), the
+   client quest record `[0x007C0D43]` exists, slot 12 (Arcane
+   Sanctuary) has neither bit 8 nor bit 1 (`0x0065C310`), and no object
+   of class 318 (`eunuch harem blocker`) in mode 2 is in the client
+   object set (`0x004649D0` with callback `0x004B3360`): 3,983
+   `guard_halt` on U. `0x004B4380` runs in the UI pass `0x00456EE0`
+   (once per drawn frame); in its branch with the NPC menu flag
+   `[0x007C0D67]` set (and `[0x007C0D6B]`, `[0x007C0D63]` clear,
+   `ui/menus.md`), when the interaction NPC is class 514 (`nihlathak`)
+   and `[0x007C0DBC]` = 0: the first time (`[0x007C0DC0]` = 0) it sets
+   `[0x007C0DC0]`, draws `roll(30)` on the sound seed and sets a
+   deadline = `GetTickCount` + (roll + 120) × 1,000; then if
+   `GetTickCount` < deadline (true at once) it sets `[0x007C0DBC]` and
+   requests 4,560 `nihlathak_hurryup` with no unit. So the line plays
+   on the first such frame, not after the delay (original bug, kept);
+   both flags are cleared by `0x004B23E0` (from `0x00456970`,
+   `0x004B32F0`).
 9. Answered by `client/msg-ui.md` §1 (full `0x004A2CB0` dispatch; the
    message is `world/quests.md` §6.3's one-quest status: code = chain,
    value = extra). §11's 0x5D paragraph is the sound subset of it.
-10. Conditions of the §12 call sites.
-11. Who calls `0x00466360` (monster Init voice, §6 r2): on assign
-    (S→C 0xAC) or on first sight.
+10. Conditions of the §12 call sites. Answered: §12 r1–r6 and
+    `triggers-2.md` §13 (2,458, the death sounds, 2,517, 1,830).
+11. Answered: on client creation. `0x004CC380` is called once, at the
+    end of the client monster create `0x00466360` (`0x00466716`), whose
+    callers are the S→C 0xAC AssignMonster handler `0x0045F190`
+    (`0x0045F40C`) and `0x00466730` (`0x00466796`; its callers are
+    `0x004667F0`, `0x00466820`, `0x0046C1A0`, `0x0046C320`,
+    `0x004A3150`, `0x004AFF60`, `0x004B13A0`, `0x004CD540`). No path
+    plays `Init` on first sight; which client creations reach
+    `0x00466730` belongs to `client/model.md`.
 12. UI control → site mapping for §11 (owner `client/ui.md` §B8).
+    Partly answered: the seven options-menu sites (`triggers-2.md`
+    §17, `sound-table-2.md` §15 r5). ~~The other 65 sites of §11~~
+    (more than two reads): moved to the recording list
+    (`docs/handoff/pc2-rec-pc2-render-audio.md` RA-T1); the result goes
+    to `client/ui.md` §B8 and the panel specs.
 13. COF/AnimData frame event 3 ("sound", `formats/cof.md`): none of
     the 222 request sites reads it; mode sounds use the fixed delays of
     §4. A request log of an attack whose animation has event 3 settles
-    whether any other path plays it.
+    whether any other path plays it. Answered (`triggers-2.md` §15):
+    event 3 is stored in U +0x4E by the frame advance; it runs the
+    skill do (with `dosound` / `tgtsound`) like events 1–2, and
+    `cltdofunc` 16 and 37 act on it alone; nothing else reads it.

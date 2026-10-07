@@ -35,6 +35,8 @@ const SOUND_BAAL: u16 = 83;
 const FX_BAAL: u8 = 19;
 /// Missile 625 at Baal's death.
 const MISSILE: u16 = 625;
+/// The last portal (object 565, §8.4, §8.8).
+const LAST_PORTAL: u16 = 565;
 /// The act argument of the character progression call.
 const PROGRESSION_ACT: u8 = 5;
 /// The zoo's draws.
@@ -278,18 +280,22 @@ fn chat_end<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, args: Ev
     if !tyrael || xr(ctl, i).last_portal_made {
         return;
     }
-    // `0x0058D7D0`: the first player in level 132 gets object 565 at a
-    // free spot near (x + 5, y) (size 5, mask 0x400, radius 18).
-    // TODO(quests-act5-2 §8.4): the free-spot call's limit argument is not
-    // in the spec; the function is reported for that player and the walk
-    // stops there.
-    if let Some(p) = w
-        .players()
-        .into_iter()
-        .find(|&p| w.unit_level(p) == Some(CHAMBER))
-    {
-        let _ = p;
-        w.unhandled(CHAIN, 0x0058_D7D0);
+    // `0x0058D7D0` per player: the first one in level 132 (its room's
+    // level) gets object 565 (type 2, flags 1, 1, 0) at a free spot from
+    // its position + (5, 0) in its room (`0x00545340` size 5, mask 0x400,
+    // radius 18 unused, limit 100, `0x0058D80A`); it returns 1 for that
+    // player whether or not a spot or object was made, so the walk stops
+    // and nothing retries.
+    for p in w.players() {
+        if w.unit_level(p) != Some(CHAMBER) {
+            continue;
+        }
+        if let Some((px, py, room)) = w.unit_position(p) {
+            if let Some((sx, sy, r)) = w.free_spot_at(room, px + 5, py, 5, 0x400, 18, 100) {
+                w.place_object(r, sx, sy, LAST_PORTAL, [1, 1, 0]);
+            }
+        }
+        break;
     }
     x(ctl, i).last_portal_made = true;
 }
@@ -298,8 +304,10 @@ fn chat_end<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, args: Ev
 fn killed<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, args: EventArgs) {
     let Some(victim) = args.target else { return };
     ctl.unique_event(w, FX_BAAL);
-    if ctl.records[i].not_intro {
-        baal_credits(ctl, w, i, victim, args.player);
+    // No victim room ends the whole callback, step 2 included
+    // (`0x0058DF5C` → `0x0058E110`).
+    if ctl.records[i].not_intro && !baal_credits(ctl, w, i, victim, args.player) {
+        return;
     }
     // Step 2 (always).
     if let Some(m) = w.create_missile_at(victim, MISSILE) {
@@ -307,19 +315,21 @@ fn killed<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, args: Even
     }
 }
 
-/// §8.5 step 1 (not-intro).
+/// §8.5 step 1 (not-intro); false: the victim has no room.
 fn baal_credits<W: QuestWorld>(
     ctl: &mut QuestControl,
     w: &mut W,
     i: usize,
     victim: UnitId,
     killer: Option<UnitId>,
-) {
+) -> bool {
     let Some((_, _, room)) = w.unit_position(victim) else {
-        return;
+        return false;
     };
     x(ctl, i).kill_room = Some(room);
-    late::status_to_all(ctl, w, i, 4);
+    // Status 4 to all, the flags byte kept (no flags write, `0x0058DF72`).
+    ctl.records[i].status = 4;
+    late::iterate_all(ctl, w, i);
     if let Some(k) = killer {
         let b = !flags(w, k).get(SLOT, bit::REWARD_GRANTED);
         x(ctl, i).credited = 0;
@@ -372,9 +382,11 @@ fn baal_credits<W: QuestWorld>(
             }
         }
     }
-    // "Then": read as after the killer block, inside not-intro.
-    w.save_pass();
+    // "Then": after the killer block, inside not-intro; a host request
+    // (`quests-helpers.md` §6).
+    ctl.save_pass();
     late::set_state(ctl, i, 5);
+    true
 }
 
 /// Baal's gold range [min, max) for difficulty `d` (§8.5): min = 6000·d
@@ -488,7 +500,11 @@ pub fn last_portal_init<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object
 }
 
 /// Operate 72 `0x0058E740`: the last portal. Returns 0.
-pub fn last_portal_operate<W: QuestWorld>(ctl: &QuestControl, w: &mut W, player: UnitId) -> i32 {
+pub fn last_portal_operate<W: QuestWorld>(
+    ctl: &mut QuestControl,
+    w: &mut W,
+    player: UnitId,
+) -> i32 {
     let Some(i) = ctl.find(CHAIN) else { return 0 };
     if xr(ctl, i).last_portal_mode != 2 {
         return 0;
@@ -498,7 +514,7 @@ pub fn last_portal_operate<W: QuestWorld>(ctl: &QuestControl, w: &mut W, player:
         return 0;
     }
     w.warp_to_level(player, HARROGATH, 0);
-    w.save_pass();
+    ctl.save_pass();
     if w.client_idle(player) {
         w.set_interact_unit(player, None);
         w.set_player_byte_4c(player, 1);
@@ -551,13 +567,16 @@ pub fn chamber_warp_open(ctl: &QuestControl) -> bool {
     ctl.find(CHAIN).is_some_and(|i| xr(ctl, i).chamber_open)
 }
 
-/// `0x0058E920` (from `0x005AD952`, `0x005AD9AB`, `0x005B0A7F`): tyrael3
-/// near the unit. TODO(quests-act5-2 §8.8, OQ5): the free-spot limit and
-/// the spawn's flags 0x42 (the `spawn_monster` seam fixes them at 0) are
-/// not specified for this call; reported.
-pub fn spawn_tyrael<W: QuestWorld>(w: &mut W, unit: UnitId) {
-    let _ = unit;
-    w.unhandled(CHAIN, 0x0058_E920);
+/// `0x0058E920(game, room, unit)` (from `0x005AD952`, `0x005AD9AB`,
+/// `0x005B0A7F`, §8.8): spot := the unit's position − (5, 5), searched
+/// from `room` (`0x00545340` size 5, mask 0x400, radius 19 unused, limit
+/// 100, `0x0058E940`); found → tyrael3 there (`0x005B2F20`: the found
+/// room, mode 1, spread 4, flags 0x42 = skip normal mods + skip party
+/// minions). No spot → nothing.
+pub fn spawn_tyrael<W: QuestWorld>(w: &mut W, room: RoomId, unit: UnitId) -> Option<UnitId> {
+    let (ux, uy) = w.unit_xy(unit)?;
+    let (sx, sy, r) = w.free_spot_at(room, ux - 5, uy - 5, 5, 0x400, 19, 100)?;
+    w.spawn_monster_flags(r, sx, sy, TYRAEL3, 1, 4, 0x42)
 }
 
 #[cfg(test)]

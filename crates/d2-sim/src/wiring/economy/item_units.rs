@@ -48,6 +48,10 @@ impl ItemStore {
     pub fn contains(&self, unit: UnitId) -> bool {
         self.items.contains_key(&unit)
     }
+    /// Stores the item data of a new item unit (`item_records`).
+    pub(super) fn insert(&mut self, unit: UnitId, item: Item<()>) {
+        self.items.insert(unit, item);
+    }
     pub fn len(&self) -> usize {
         self.items.len()
     }

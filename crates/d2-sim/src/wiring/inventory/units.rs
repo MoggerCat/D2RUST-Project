@@ -237,7 +237,8 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MoveUnits for InvDesk<'_, '_, H, R>
             .map(|i| i.items().iter().map(|&u| self.guid_of(u)).collect())
             .unwrap_or_default()
     }
+    /// `0x00627F80` ([`InvDesk::spell_of`]).
     fn spell(&self, item: Guid) -> i32 {
-        self.rest.spell(item)
+        self.item_unit(item).map_or(0, |u| self.spell_of(u))
     }
 }

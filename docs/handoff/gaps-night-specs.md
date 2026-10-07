@@ -1,5 +1,7 @@
 # Handoff: unit-test gaps of the specs implemented tonight — `claude/gaps-night-specs`
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the tenth fold (`claude/fold-handoff-10`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Tenth set" (PC 1 / PC 2).
+
 Cloud test session, 2026-10-07, task class: tests from specs, medium
 (M14). Base: `main` at `674996d`. Repo only, no game files. One subagent
 took `formats/d2s.md` (separate files: `crates/d2-formats/src/d2s/tests.rs`).

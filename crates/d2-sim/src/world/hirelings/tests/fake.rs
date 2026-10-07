@@ -25,6 +25,8 @@ pub struct FakeUnit {
     pub skills: BTreeMap<u32, i32>,
     pub owner: Option<(u32, u8)>,
     pub max_life: Option<i32>,
+    /// `hirelings-2.md` §18 rule 1 position.
+    pub pos: (i32, i32),
 }
 
 #[derive(Debug, Default)]
@@ -158,6 +160,9 @@ impl HirelingWorld for Fake {
     fn in_room(&self, unit: UnitId) -> bool {
         self.units.get(&unit).is_some_and(|u| u.in_room)
     }
+    fn position(&self, unit: UnitId) -> (i32, i32) {
+        self.units.get(&unit).map_or((0, 0), |u| u.pos)
+    }
     fn stat(&self, unit: UnitId, stat: u16) -> i32 {
         self.units.get(&unit).map_or(0, |u| {
             u.stats.get(&stat).copied().unwrap_or(0) + u.bonus.get(&stat).copied().unwrap_or(0)
@@ -223,6 +228,12 @@ impl HirelingWorld for Fake {
     }
     fn death_event(&mut self, unit: UnitId) {
         self.log.push(format!("death_event {}", unit.0));
+    }
+    fn cancel_timers(&mut self, unit: UnitId, ty: u8, a: u32) {
+        self.log.push(format!("cancel {} {ty} {a}", unit.0));
+    }
+    fn ensure_inventory(&mut self, unit: UnitId) {
+        self.log.push(format!("inventory {}", unit.0));
     }
     fn dismiss(&mut self, unit: UnitId) {
         self.log.push(format!("dismiss {}", unit.0));

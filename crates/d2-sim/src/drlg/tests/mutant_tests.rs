@@ -972,30 +972,166 @@ fn non_door_over_door_on_neighbours_edge_stops() {
     }
 }
 
-/// `rooms.md` §9.6 r3 corner handling: R of type 3 merged to another type
-/// hides its chained type-4 half (flag 0x8 added, other flags kept);
-/// merged to 3 it does not.
+/// Two 8×8 rooms N = (0, 0) and B = (8, 0) sharing column wx = 8. N
+/// fills the linked wall cells `n_cells` (y, type) of that column in
+/// order, then B fills (0, y) with type t for `b` = (y, t) (nothing for
+/// `None`); both use cell bits `WALL` (layer 0, no bits 7 / 26 / 31).
+/// Returns N, B and B's result.
+fn corner_vector(
+    n_cells: &[(usize, u32)],
+    b: Option<(usize, u32)>,
+) -> (Drlg, DrlgRoomId, DrlgRoomId, Result<(), DrlgError>) {
+    let mut dat = data();
+    gen_level(&mut dat, 2, 2);
+    let mut types = FakeTypes::default();
+    types
+        .rooms
+        .insert(2, vec![preset(0, 0, 8, 8), preset(8, 0, 8, 8)]);
+    let g = |x: usize, cells: &[(usize, u32)]| {
+        let mut c = CellGrid::new(9, 9);
+        let mut o = CellGrid::new(9, 9);
+        for &(y, t) in cells {
+            c.set(x, y, WALL | cell::LINKED);
+            o.set(x, y, t);
+        }
+        RoomGrids {
+            passes: vec![GridPass {
+                cells: c,
+                orientation: Some(o),
+                fill_blanks: false,
+            }],
+            ..RoomGrids::default()
+        }
+    };
+    types.grids.insert((2, 0), g(8, n_cells));
+    types.grids.insert((2, 1), g(0, b.as_slice()));
+    let mut w = World::new(dat, types);
+    let mut d = w.drlg(INIT);
+    let l = d.get_or_alloc_level(&w.data, &mut w.types, 2).unwrap();
+    d.generate_level(&w.data, &mut w.types, l).unwrap();
+    let r = d.level_rooms(l);
+    let mut svc = w.svc();
+    d.stream_room(&mut svc, r[0]).unwrap();
+    let out = d.stream_room(&mut svc, r[1]);
+    (d, r[0], r[1], out.map(|_| ()))
+}
+
+/// The kinds of a room's non-floor chain, head first (§9.6 C1).
+fn chain_head_first(d: &Drlg, r: DrlgRoomId) -> Vec<u32> {
+    let t = d.room(r).tiles().unwrap();
+    t.other_links
+        .iter()
+        .rev()
+        .map(|&(k, i)| t.records(k)[i].kind)
+        .collect()
+}
+
+/// `rooms.md` Test vectors "§9.6 C3": N's chain H → R → W; B fills R's
+/// cell with t = 12 (`keep`): W (the record after R, at another cell)
+/// is hidden, R becomes type 12 on N's seed, H is untouched, B draws
+/// nothing and adds no record.
+// Covers: specs/drlg/rooms.md §9.6 r3
 #[test]
-fn corner_merged_away_hides_its_half() {
-    // New type 1 (row 0) over R type 3 (column 2) → 1.
-    let mut table = [[3; 7]; 6];
-    table[0][2] = 1;
-    let (d, a, _) = link_pair(Shared::BLeft, (WALL, 3), (WALL, 1), table);
+fn corner_c3_hides_the_record_after_r_not_its_half() {
+    let (d, n, b, out) = corner_vector(&[(1, 1), (2, 3)], Some((2, 12)));
+    out.unwrap();
+    let t = d.room(n).tiles().unwrap();
+    assert_eq!(chain_head_first(&d, n), [4, 12, 1]);
+    let rec = |e: usize| {
+        let (k, i) = t.other_links[e];
+        t.records(k)[i]
+    };
+    let (w_, r, h) = (rec(0), rec(1), rec(2));
+    assert_eq!((w_.y, r.y, h.y), (1, 2, 2));
+    assert_ne!(w_.flags & rec_flags::HIDDEN, 0, "W hidden (C3)");
+    assert_eq!(r.kind, 12);
+    assert_eq!(r.flags & rec_flags::HIDDEN, 0, "R's 0x8 cleared (C7)");
+    assert_eq!(h.kind, 4);
+    assert_eq!(h.flags & rec_flags::HIDDEN, 0, "H never reached");
+    let tb = d.room(b).tiles().unwrap();
+    assert!(tb.walls.is_empty() && tb.other_links.is_empty());
+    // B's seed made no draw for the found cell: equal to a B with no
+    // cells at all.
+    let (d0, _, b0, _) = corner_vector(&[(1, 1), (2, 3)], None);
+    assert_eq!(d.room(b).seed, d0.room(b0).seed);
+}
+
+/// `rooms.md` Test vectors "§9.6 C5": N's chain W; B fills W's cell with
+/// t = 3 (`table` r1 = 3): W gets 0xC008, B gets S3 then S4 (chain S4 →
+/// S3, two draws on B's seed), W is re-chosen as type 3 on N's seed with
+/// no half; the closing re-run clears W's 0x8 and keeps 0xC000.
+// Covers: specs/drlg/rooms.md §9.6 r3
+#[test]
+fn corner_c5_adds_a_pair_to_this_room() {
+    let (d, n, b, out) = corner_vector(&[(2, 1)], Some((2, 3)));
+    out.unwrap();
+    let t = d.room(n).tiles().unwrap();
+    assert_eq!(chain_head_first(&d, n), [3]);
+    let (k, i) = t.other_links[0];
+    let w_ = t.records(k)[i];
+    assert_eq!((w_.kind, w_.half), (3, None));
+    assert_eq!(w_.flags & 0xC008, 0xC000);
+    assert_eq!(chain_head_first(&d, b), [4, 3]);
+    let tb = d.room(b).tiles().unwrap();
+    assert_eq!(tb.walls.iter().map(|r| r.kind).collect::<Vec<_>>(), [3, 4]);
+    // B's draws: the same as a B whose linked cell finds nothing (no N
+    // record), which chooses (3, v) and (4, v) on B's seed for its pair.
+    let (d1, _, b1, out) = corner_vector(&[], Some((2, 3)));
+    out.unwrap();
+    assert_eq!(chain_head_first(&d1, b1), [4, 3]);
+    assert_eq!(d.room(b).seed, d1.room(b1).seed);
+    // And N's seed made the type change's draw: one more than an N whose
+    // W is never revisited.
+    let (d0, n0, _, _) = corner_vector(&[(2, 1)], None);
+    let (mut s, want) = (d0.room(n0).seed, d.room(n).seed);
+    s.step();
+    assert_eq!(s, want);
+}
+
+/// `rooms.md` Test vectors "§9.6 C4": R first in its chain (R +0x20
+/// null) with m ≠ 3: 1.14d faults; d2rs fails the fill.
+// Covers: specs/drlg/rooms.md §9.6 r3
+#[test]
+fn corner_c4_without_a_next_record_is_fatal() {
+    let (_, _, _, out) = corner_vector(&[(2, 3)], Some((2, 12)));
+    assert_eq!(out, Err(DrlgError::LinkedCornerNoNext));
+}
+
+/// `rooms.md` §9.6 C3 over a column of corners: each R's next record is
+/// the previous corner's half, so merging R_k away hides H_(k−1); R_1 is
+/// first in its chain. Merged to 3 no record is hidden.
+// Covers: specs/drlg/rooms.md §9.6 r3
+#[test]
+fn corner_merged_away_hides_the_previous_half() {
+    // R_1 first in A's chain: fatal at B's first cell (C4).
+    let (_, _, _, out) = corner_vector(&[(1, 3), (2, 3)], Some((1, 12)));
+    assert_eq!(out, Err(DrlgError::LinkedCornerNoNext));
+    // With a wall ahead of the corners: B over R_2 (keep 12) hides H_1.
+    let (d, a, _, out) = corner_vector(&[(1, 1), (2, 3), (3, 3)], Some((3, 12)));
+    out.unwrap();
     let t = d.room(a).tiles().unwrap();
-    let halves: Vec<_> = t.walls.iter().filter(|r| r.kind == 4).collect();
-    assert_eq!(halves.len(), 7);
-    for h in halves {
-        assert_eq!(h.flags, 1 << 14 | 0x2000 | rec_flags::HIDDEN);
-    }
-    assert!(linked_kinds(&d, a).iter().all(|&(k, _)| k == 1));
-    // Merged to 3 again: the half stays visible.
+    let flags: Vec<(u32, i32, bool)> = t
+        .other_links
+        .iter()
+        .map(|&(k, i)| {
+            let r = t.records(k)[i];
+            (r.kind, r.y, r.flags & rec_flags::HIDDEN != 0)
+        })
+        .collect();
+    assert_eq!(
+        flags,
+        [
+            (1, 1, false),
+            (3, 2, false),
+            (4, 2, true),
+            (12, 3, false),
+            (4, 3, false)
+        ]
+    );
+    // Merged to 3 (C6): nothing hidden.
     let (d, a, _) = link_pair(Shared::BLeft, (WALL, 3), (WALL, 1), [[3; 7]; 6]);
     let t = d.room(a).tiles().unwrap();
-    assert!(t
-        .walls
-        .iter()
-        .filter(|r| r.kind == 4)
-        .all(|h| h.flags & rec_flags::HIDDEN == 0));
+    assert!(t.walls.iter().all(|h| h.flags & rec_flags::HIDDEN == 0));
 }
 
 /// `rooms.md` §9.7: only records whose tile has material 0x100 get an

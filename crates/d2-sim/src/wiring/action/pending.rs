@@ -148,6 +148,10 @@ pub trait Pending {
     }
     /// Stops the unit's path.
     fn stop_path(&mut self, unit: UnitId) {}
+    /// Monster run event 0 `0x005A84F0` (`units.md` §4.6) with the path
+    /// provider on: its body is not described (`pathing.md` §9.1 names
+    /// only walk's). Default: nothing (the monster does not move).
+    fn monster_run_event0(&mut self, unit: UnitId) {}
     /// `0x005DE6D0` → `0x005DE4E0` walk in radius; false = failed.
     fn walk_in_radius(
         &mut self,
@@ -266,7 +270,10 @@ pub trait Pending {
     fn interacting(&self, unit: UnitId) -> bool {
         false
     }
-    /// `0x00535060`.
+    /// `0x00535060` without its interaction part (a cursor item, player
+    /// data +0x4C ≠ 0): the interact info is the unit record's
+    /// ([`crate::units::record::InteractInfo`]), which the callers test
+    /// first.
     fn busy(&self, unit: UnitId) -> bool {
         false
     }
@@ -660,19 +667,10 @@ pub trait Pending {
         level: i32,
     ) {
     }
-    /// A missile parameter record's init callback (skills spec).
+    /// A missile parameter record's init callback with an id no spec
+    /// names (the specified ones run in `missiles::init_cb`, §R2.3 step
+    /// 21).
     fn missile_init_callback(&mut self, game: &mut Game, missile: UnitId, callback: u32, arg: u32) {
-    }
-    /// Server-damage function `index` 1…14 (`0x0073C960`, skills spec):
-    /// adjusts the missile's damage record.
-    fn srv_dmg(
-        &mut self,
-        game: &mut Game,
-        index: i16,
-        missile: UnitId,
-        unit: UnitId,
-        damage: &mut crate::missiles::Damage,
-    ) {
     }
     /// The curse helper `0x0056E970` (skills spec).
     #[allow(clippy::too_many_arguments)]
@@ -693,9 +691,13 @@ pub trait Pending {
 
     // ---- unit events, reaction, overlays (units.md, damage.md §7, §8) --
 
-    /// `0x005C0C30(game, event, unit, other, record)`: the unit's event
-    /// functions (registered by items; no registry yet). Event 0 (hit by
-    /// missile) comes with no record and possibly no unit.
+    /// `0x005C0C30(game, event, unit, other, record)` for a host without
+    /// the event registry: with [`ActionHooks::unit_events`] set
+    /// (`ActionHooks::enable_unit_events`, a host with
+    /// [`crate::wiring::interaction::UseRest`]) the iteration runs
+    /// [`crate::combat::events::run`] on [`ActionHooks::handlers`] and this
+    /// seam is not called. Event 0 (hit by missile) comes with no record
+    /// and possibly no unit.
     fn unit_event(
         &mut self,
         event: u8,
@@ -704,6 +706,82 @@ pub trait Pending {
         record: Option<&mut crate::combat::DamageRecord>,
     ) {
     }
+    /// The global layer split of the item event registrations (data
+    /// +0xC6C shift, +0xC70 mask; `items/properties.md` §5 rule 9).
+    ///
+    /// TODO(spec: sim/stats.md): the values are not written; default
+    /// (0, 0) (every item event reads skill = layer, level 0).
+    fn event_layer_split(&self) -> (u32, u32) {
+        (0, 0)
+    }
+    /// Terror install `0x005DDD00(game, source, unit, skill, a, b)`
+    /// (`monsters/ai.md`; `combat/events.md` §2.8).
+    fn event_terror(
+        &mut self,
+        game: &mut Game,
+        source: UnitId,
+        unit: UnitId,
+        skill: i32,
+        a: i32,
+        b: i32,
+    ) {
+    }
+    /// `0x0064D870(U's room, x, y, U's pattern, U's collision mask)` = 0
+    /// (`combat/events.md` §2.7; collision).
+    fn event_point_free(&self, unit: UnitId, at: (i32, i32)) -> bool {
+        false
+    }
+    /// The corpse find of item target 3 (`0x005FD9C0`,
+    /// `combat/events.md` §3): the first unit of the unit find around
+    /// `t0`, radius 10, flags 0x1002, callback `0x00645680`.
+    fn event_corpse_near(&mut self, game: &mut Game, t0: UnitId) -> Option<UnitId> {
+        None
+    }
+    /// S→C 0x99 / 0x9A on the unit's message list and the update queue
+    /// (`0x005717C0` / `0x00571840`, `0x0064C040`).
+    fn queue_item_cast(&mut self, unit: UnitId, msg: crate::combat::events::ItemCastMsg) {}
+    /// The raise test `0x00645510(V, 0)` (`combat/events.md` §2.21).
+    fn raise_test(&self, unit: UnitId) -> bool {
+        false
+    }
+    /// `0x0064EC10(V's room, V x, V y, V pattern, 0x8000)`.
+    fn clear_pattern(&mut self, unit: UnitId) {}
+    /// A step of the Reanimate raise on the new monster
+    /// (`combat/events.md` §2.21) with no body in d2-sim.
+    fn raise_step(
+        &mut self,
+        game: &mut Game,
+        unit: UnitId,
+        step: crate::combat::events::RaiseStep<UnitId>,
+    ) {
+    }
+    // ---- player death (`combat/vitals.md` §4.6–§4.7, [`super::death`]) --
+
+    /// The stash limit `0x00623460` (§4.6 rule 1; not written).
+    fn stash_cap(&self, unit: UnitId) -> i32 {
+        0
+    }
+    /// The death's gold drop `0x00535510(game, P, P's GUID, amount)`
+    /// (`items/inventory.md` §7.22).
+    fn death_drop_gold(&mut self, game: &mut Game, unit: UnitId, amount: i32) {}
+    /// Corpse creation `0x0057F700` without its experience (§4.7 rule
+    /// 1): a new player-type unit of P's class in mode 17 holding P's
+    /// items (`items/inventory.md`). Default: none.
+    fn create_corpse(&mut self, game: &mut Game, unit: UnitId) -> Option<UnitId> {
+        None
+    }
+    /// The corpse's owner GUID from its inventory (`0x0063D450`).
+    fn corpse_owner_guid(&self, corpse: UnitId) -> Option<u32> {
+        None
+    }
+    /// `0x0055B300(owner, P, 1)` for the corpse's player owner
+    /// (`0x0057FAF0`'s second test).
+    fn corpse_loot_allowed(&self, corpse: UnitId, unit: UnitId) -> bool {
+        false
+    }
+    /// The corpse's item take-back `0x00562F30` (§4.7 rule 2).
+    fn corpse_take_back(&mut self, game: &mut Game, unit: UnitId, corpse: UnitId) {}
+
     /// Reaction `0x0057CEE0` (`damage.md` §7.1, call level only; its mode
     /// changes and the kill `0x0057CCB0` are not specified in full).
     fn reaction(&mut self, a: UnitId, d: UnitId, record: &mut crate::combat::DamageRecord) {}
@@ -788,14 +866,6 @@ pub trait Pending {
     /// `0x00624690` object mode change of an object without object data
     /// (with data: [`super::objects`], `objects.md` §4).
     fn set_object_mode(&mut self, game: &mut Game, object: UnitId, mode: u8) {}
-    /// `0x00554120`.
-    fn set_interact(&mut self, player: UnitId, unit_type: u8, guid: u32) {}
-    /// `0x00554190`.
-    fn reset_interact(&mut self, player: UnitId) {}
-    /// `0x00554D00`.
-    fn interact_guid(&self, player: UnitId) -> Option<u32> {
-        None
-    }
     /// waypoints.md §6.1 host clock (never true in single player).
     fn hostile_delay(&self, player: UnitId) -> bool {
         false
@@ -844,14 +914,44 @@ pub trait Pending {
     fn object_staff_tomb(&self) -> u32 {
         u32::MAX
     }
+    /// The portal travel's host facts and steps (`objects.md` §12 rules
+    /// 4–13; [`crate::world::objects::MiscWorld`]): the party id
+    /// (`0x00554630`, default 0xFFFF none).
+    fn object_party_id(&self, unit: UnitId) -> u16 {
+        0xFFFF
+    }
+    /// `0x00553720`: the partner portal. Default: none.
+    fn object_portal_partner(&mut self, game: &mut Game, object: UnitId) -> Option<UnitId> {
+        None
+    }
+    /// The player's quest record for the difficulty exists. Default: no.
+    fn object_quest_record(&self, player: UnitId) -> bool {
+        false
+    }
+    /// `0x0065C310(Q, q, bit)`. Default: clear.
+    fn object_quest_bit(&self, player: UnitId, quest: u32, bit: u8) -> bool {
+        false
+    }
+    /// `0x005353F0`: player data +0x48. Default 0.
+    fn object_portal_guid(&self, player: UnitId) -> u32 {
+        0
+    }
+    /// `0x0061B060(act, level, 0, &x, &y, 3)`. Default: none.
+    fn object_level_spawn(&mut self, game: &mut Game, level: u32) -> Option<(RoomId, i32, i32)> {
+        None
+    }
+    /// `0x00543B90(game, from, to, P)`. Default: nothing.
+    fn object_quest_level_change(&mut self, player: UnitId, from: u32, to: u32) {}
+    /// A portal's removal (§12 rule 12). Default: nothing.
+    fn object_remove_portal(&mut self, game: &mut Game, object: UnitId) {}
+    /// `0x0058CF50(game, L)`. Default: nothing.
+    fn object_portal_act5(&mut self, partner: UnitId) {}
+    /// State 102 on P until `expire` (§12 rule 13). Default: nothing.
+    fn object_just_portaled(&mut self, game: &mut Game, player: UnitId, expire: i32) {}
     /// What the object module handed back without running it: quest,
     /// waypoint and `todo` inits, operates and events, uncovered presets
     /// ([`super::objects::ObjectRoute`]).
     fn object_route(&mut self, game: &mut Game, route: super::objects::ObjectRoute) {}
-    /// S→C 0x60 for the object `object` to `receiver`'s client
-    /// (`0x0053D900`, `objects.md` §14 rule 1; layout owned by
-    /// `intents-events.md`).
-    fn object_portal_message(&mut self, receiver: UnitId, object: UnitId) {}
     /// The C→S 0x13 object case's reach step (`waypoints.md` §5.2,
     /// `0x00548B00`: distance > 50 → refuse; in range and unobstructed →
     /// stop the player and operate; else walk and operate on arrival;

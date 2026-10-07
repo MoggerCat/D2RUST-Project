@@ -272,7 +272,7 @@ fn bits_of(w: BitWriter) -> String {
         .collect()
 }
 
-// Covers: specs/items/bitstream.md §1 r3, §3 r4, §4.5 r3
+// Covers: specs/items/bitstream.md §1 r3, §3 r4, §4.5 r3, §edge-cases-original-bugs r3
 #[test]
 fn synthetic_gold_and_clamp() {
     let mut w = BitWriter::new(BUFFER);
@@ -348,7 +348,7 @@ fn alt_code_ends_after_base_code() {
     assert_ne!(b, b2);
 }
 
-// Covers: specs/items/bitstream.md §4.3 r7, §4.1 r8
+// Covers: specs/items/bitstream.md §4.3 r7, §4.1 r8, §edge-cases-original-bugs r2
 #[test]
 fn quality_outside_range_is_rewritten_and_lists_skipped() {
     let t = isc_114d();
@@ -377,7 +377,7 @@ fn quality_outside_range_is_rewritten_and_lists_skipped() {
     assert_ne!(b2, write(&j, &t).unwrap().0);
 }
 
-// Covers: specs/items/bitstream.md §4.3 r5, §4.3 r4, §4.3 r6
+// Covers: specs/items/bitstream.md §4.3 r5, §4.3 r4, §4.3 r6, §edge-cases-original-bugs r4
 #[test]
 fn rare_slots_are_sent_unidentified() {
     let t = isc_114d();
@@ -403,7 +403,7 @@ fn rare_slots_are_sent_unidentified() {
     }
 }
 
-// Covers: specs/items/bitstream.md §4.6 r1, §4.6 r2, §4.6 r5
+// Covers: specs/items/bitstream.md §4.6 r1, §4.6 r2, §4.6 r5, §edge-cases-original-bugs r6
 #[test]
 fn set_mask_and_runeword_terminators() {
     let t = isc_114d();
@@ -456,7 +456,7 @@ fn ear_personalized_and_quest_difficulty() {
     assert_eq!(w.bit_len(), 32 + 10 + 3 + 15 + 32 + 2);
 }
 
-// Covers: specs/items/bitstream.md §4.5 r6
+// Covers: specs/items/bitstream.md §4.5 r6, §edge-cases-original-bugs r1
 #[test]
 fn unidentified_record_ends_after_type_values() {
     let t = isc_114d();
@@ -470,4 +470,80 @@ fn unidentified_record_ends_after_type_values() {
     write_into(&mut w, &i, &t);
     // Socketed cleared (not shown): no sockets, no lists.
     assert_eq!(w.bit_len(), 108 + 8 + 9);
+}
+
+/// Edge case 5: stat 326 writes only its 9-bit id (no param, no value),
+/// even with save bits and a param width set.
+// Covers: specs/items/bitstream.md §4.6 r4, §edge-cases-original-bugs r5
+#[test]
+fn stat_326_writes_only_its_id() {
+    let mut t = isc_114d();
+    t[326] = Isc {
+        valshift: 0,
+        save_bits: 8,
+        save_add: 0,
+        save_param_bits: 4,
+    };
+    let mut i = full(0x10, 0, (0, 0, 0, 0), b"lax ", 6);
+    i.main = Some(Vec::new());
+    let mut w = BitWriter::new(BUFFER);
+    write_into(&mut w, &i, &t);
+    let base = w.bit_len();
+    i.main = Some(vec![e(326, 3, 5)]);
+    let mut w = BitWriter::new(BUFFER);
+    write_into(&mut w, &i, &t);
+    assert_eq!(w.bit_len(), base + 9);
+}
+
+/// Edge case 8: a compact ear carries no item code: class, level and
+/// the name replace the 32 code bits.
+// Covers: specs/items/bitstream.md §3 r3, §3 r4, §edge-cases-original-bugs r8
+#[test]
+fn compact_ear_has_no_code() {
+    let t = isc_114d();
+    let mut i = StreamItem {
+        compact: true,
+        code: *b"ear ",
+        ..StreamItem::default()
+    };
+    let mut w = BitWriter::new(BUFFER);
+    write_into(&mut w, &i, &t);
+    let plain = w.bit_len();
+    i.flags = hflag::EAR;
+    i.ear_class = 2;
+    i.ear_level = 30;
+    i.name[..2].copy_from_slice(b"ab");
+    let mut w = BitWriter::new(BUFFER);
+    write_into(&mut w, &i, &t);
+    assert_eq!(w.bit_len(), plain - 32 + 3 + 7 + 3 * 7);
+}
+
+/// Edge case 7: names are written up to their first 0; the setter keeps
+/// at most 15 characters and rejects a longer name, so a stored name
+/// always has its terminator inside the 16 bytes.
+// Covers: specs/items/bitstream.md §edge-cases-original-bugs r7
+#[test]
+fn name_setter_bounds_the_name() {
+    use crate::items::{Item, NameTooLong};
+    let mut it = Item::new(0, 101, ());
+    assert_eq!(it.set_name(b"fifteen-chars-x"), Ok(()));
+    assert_eq!(&it.name[..15], b"fifteen-chars-x");
+    assert_eq!(it.name[15], 0);
+    assert_eq!(it.set_name(b"sixteen-chars-xy"), Err(NameTooLong(16)));
+    assert_eq!(&it.name[..15], b"fifteen-chars-x", "unchanged");
+    assert_eq!(it.set_name(b"ab\0cd"), Ok(()));
+    assert_eq!(&it.name[..4], b"ab\0\0");
+    let mut i = StreamItem {
+        flags: hflag::PERSONALIZED | 0x10,
+        name: it.name,
+        ..StreamItem::default()
+    };
+    let t = isc_114d();
+    let mut w = BitWriter::new(BUFFER);
+    write_into(&mut w, &i, &t);
+    let two = w.bit_len();
+    i.name = [0; 16];
+    let mut w = BitWriter::new(BUFFER);
+    write_into(&mut w, &i, &t);
+    assert_eq!(two, w.bit_len() + 2 * 7, "up to the first 0");
 }

@@ -239,6 +239,17 @@ pub enum LoadError {
     GolemSkill,
 }
 
+impl LoadError {
+    /// The load result of the error (§10 rule 1's table, `0x006E1208`):
+    /// the code §8.2 rule 2's join reports.
+    pub fn result(&self) -> u32 {
+        match self {
+            // Internal 23 → 10.
+            LoadError::GolemSkill => 10,
+        }
+    }
+}
+
 /// What the load did.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct LoadReport {
@@ -519,10 +530,13 @@ impl<X: Pending> CharacterWorld for ActionCharacter<'_, '_, X> {
             // `world/hirelings.md` §10 rule 1: no hireling.
             return Ok(());
         }
+        // `hirelings-2.md` §16: `d2_sim::world::hirelings::life`
+        // `restore_plan` / `restore` / `restore_tail` and
+        // `level::restore_experience` implement the restore.
         unapplied(
             "hireling",
-            "the unit creation of `hirelings.md` §10 rule 3 needs a place (not stated) and the \
-             hireling state is the host's",
+            "the roomless monster allocation of `hirelings-2.md` §16 rule 3 and the hireling \
+             state are the wired host's (WiredWorld), not this load world's",
         )
     }
     fn hireling_items_loaded(&mut self) -> Result<(), Unapplied> {

@@ -1263,16 +1263,16 @@ fn chain13_hooks() {
     ctl.records[i].not_intro = false;
     assert_eq!(hooks(&ctl), (true, false, true));
     ctl.records[i].not_intro = true;
-    // `0x0059DF50`: +0x3D → true; +0x0F → no living player within 12.
+    // `0x0059DF50`: +0x3D → true; +0x0F → no player (state 7 excluded
+    // by the walk) with `0x006416D0(player, Tyrael)` < 12.
     assert!(!tyrael_leave_hook(&ctl, &mut f, TYRAEL_U));
     exm(&mut ctl).portal_opened = true;
-    f.living_near = true;
+    f.a5_dist.insert((P1, TYRAEL_U), 11);
     assert!(!tyrael_leave_hook(&ctl, &mut f, TYRAEL_U));
-    f.living_near = false;
+    f.a5_dist.insert((P1, TYRAEL_U), 12);
     assert!(tyrael_leave_hook(&ctl, &mut f, TYRAEL_U));
-    assert_eq!(f.log, ["living within 12", "living within 12"]);
     exm(&mut ctl).completed_before = true;
-    f.living_near = true;
+    f.a5_dist.insert((P1, TYRAEL_U), 0);
     assert!(tyrael_leave_hook(&ctl, &mut f, TYRAEL_U));
     // `0x0059C750`: the flag iterate for all (state > 1 → 14.2 unless
     // 14.0).

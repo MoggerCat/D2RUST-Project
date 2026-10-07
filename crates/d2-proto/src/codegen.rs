@@ -79,6 +79,7 @@ fn field_type(t: FieldType) -> String {
         FieldType::U32 => "FieldType::U32".into(),
         FieldType::Cstr => "FieldType::Cstr".into(),
         FieldType::Cstr16 => "FieldType::Cstr16".into(),
+        FieldType::Bytes(n) => format!("FieldType::Bytes({n})"),
         FieldType::Bits(n) => format!("FieldType::Bits({n})"),
         FieldType::Bit(n) => format!("FieldType::Bit({n})"),
         FieldType::Tail => "FieldType::Tail".into(),
@@ -110,7 +111,14 @@ fn layout(fields: &[Field]) -> String {
 }
 
 /// Rust type of a fixed field in a typed struct.
-fn rust_type(t: FieldType) -> &'static str {
+fn rust_type(t: FieldType) -> String {
+    match t {
+        FieldType::Bytes(n) => format!("[u8; {n}]"),
+        _ => rust_word(t).into(),
+    }
+}
+
+fn rust_word(t: FieldType) -> &'static str {
     match t {
         FieldType::U8 => "u8",
         FieldType::U16 => "u16",
@@ -123,7 +131,9 @@ fn rust_type(t: FieldType) -> &'static str {
         FieldType::Packed { width, .. } if width <= 8 => "u8",
         FieldType::Packed { width, .. } if width <= 16 => "u16",
         FieldType::Packed { .. } => "u32",
-        FieldType::Cstr | FieldType::Tail => unreachable!("not a fixed field"),
+        FieldType::Cstr | FieldType::Tail | FieldType::Bytes(_) => {
+            unreachable!("not a fixed scalar field")
+        }
     }
 }
 
@@ -180,7 +190,15 @@ fn struct_code(out: &mut String, id: u8, name: &str, doc: &str, size: usize, fie
     let ids = idents(fields);
     let unit = if size == 1 { "byte" } else { "bytes" };
     let _ = writeln!(out, "\n    /// 0x{id:02X} {name}{doc} ({size} {unit}).");
-    out.push_str("    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]\n");
+    // `Default` is derived only for arrays up to 32 bytes.
+    let big = fields
+        .iter()
+        .any(|f| matches!(f.ty, FieldType::Bytes(n) if n > 32));
+    if big {
+        out.push_str("    #[derive(Clone, Copy, Debug, PartialEq, Eq)]\n");
+    } else {
+        out.push_str("    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]\n");
+    }
     if fields.is_empty() {
         let _ = writeln!(out, "    pub struct {name};");
     } else {
@@ -194,6 +212,18 @@ fn struct_code(out: &mut String, id: u8, name: &str, doc: &str, size: usize, fie
             let _ = writeln!(out, "        pub {ident}: {},", rust_type(f.ty));
         }
         out.push_str("    }\n");
+    }
+    if big {
+        let _ = writeln!(out, "\n    impl Default for {name} {{");
+        out.push_str("        fn default() -> Self {\n            Self {\n");
+        for (f, ident) in fields.iter().zip(&ids) {
+            let v = match f.ty {
+                FieldType::Bytes(n) => format!("[0; {n}]"),
+                _ => "Default::default()".into(),
+            };
+            let _ = writeln!(out, "                {ident}: {v},");
+        }
+        out.push_str("            }\n        }\n    }\n");
     }
     let _ = writeln!(out, "\n    impl FixedMessage for {name} {{");
     let _ = writeln!(out, "        const ID: u8 = 0x{id:02X};");
@@ -211,6 +241,7 @@ fn struct_code(out: &mut String, id: u8, name: &str, doc: &str, size: usize, fie
                 FieldType::U16 => format!("u16_at(b, {o})"),
                 FieldType::U32 => format!("u32_at(b, {o})"),
                 FieldType::Cstr16 => format!("bytes16_at(b, {o})"),
+                FieldType::Bytes(_) => format!("bytes_at(b, {o})"),
                 FieldType::Bits(n) if n <= 16 => {
                     format!("bits_at(b, {o}, {n}) as {}", rust_type(f.ty))
                 }
@@ -239,6 +270,7 @@ fn struct_code(out: &mut String, id: u8, name: &str, doc: &str, size: usize, fie
             FieldType::U16 => format!("put_u16(out, {o}, self.{ident})"),
             FieldType::U32 => format!("put_u32(out, {o}, self.{ident})"),
             FieldType::Cstr16 => format!("put_bytes16(out, {o}, &self.{ident})"),
+            FieldType::Bytes(_) => format!("put_bytes(out, {o}, &self.{ident})"),
             FieldType::Bits(n) if n <= 16 => {
                 format!("put_bits(out, {o}, {n}, u32::from(self.{ident}))")
             }
@@ -269,6 +301,7 @@ fn field_type_word(t: FieldType) -> String {
         FieldType::U32 => "u32".into(),
         FieldType::Cstr => "cstr".into(),
         FieldType::Cstr16 => "cstr16".into(),
+        FieldType::Bytes(n) => format!("bytes{n}"),
         FieldType::Bits(n) => format!("u{n}"),
         FieldType::Bit(n) => format!("bit{n}"),
         FieldType::Tail => "bytes".into(),

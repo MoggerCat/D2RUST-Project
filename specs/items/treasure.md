@@ -27,24 +27,25 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 50–60 |
-| Inputs | 61–77 |
-| Outputs / state changes | 78–84 |
-| Rules | 85–86 |
-|   1. TC runtime form (load step 46) | 87–216 |
+| Summary | 51–61 |
+| Inputs | 62–78 |
+| Outputs / state changes | 79–85 |
+| Rules | 86–87 |
+|   1. TC runtime form (load step 46) | 88–216 |
 |   2. TC by id and level (`0x00654E00`) | 217–223 |
-|   3. Monster drop | 224–276 |
-|   4. Chest drop (`0x00585B90`) | 277–303 |
-|   5. The TC walk (`0x0055A6D0`) | 304–410 |
-|   6. Drop quality (`0x00558640`) | 411–442 |
-|   7. Creation inputs and placement (`0x0055A550`) | 443–467 |
-|   8. Gold amount | 468–480 |
-| Constants & data dependencies | 481–510 |
-| Randomness | 511–527 |
-| Edge cases & original bugs | 528–551 |
-| Test vectors | 552–581 |
-| Provenance | 582–606 |
-| Open questions | 607–630 |
+|   3. Monster drop | 224–293 |
+|   4. Chest drop (`0x00585B90`) | 294–320 |
+|   5. The TC walk (`0x0055A6D0`) | 321–427 |
+|   6. Drop quality (`0x00558640`) | 428–459 |
+|   7. Creation inputs and placement (`0x0055A550`) | 460–490 |
+|   8. Gold amount | 491–506 |
+|   9. Quest drop helper (`0x00559A30`) | 507–592 |
+| Constants & data dependencies | 593–622 |
+| Randomness | 623–639 |
+| Edge cases & original bugs | 640–663 |
+| Test vectors | 664–693 |
+| Provenance | 694–718 |
+| Open questions | 719–881 |
 <!-- /index -->
 
 ## Summary
@@ -98,7 +99,7 @@ TC records (0x2C bytes, array `0x0096C5EC`, count `0x0096C5F0`; index =
 | count | 0x04 | i32 | entries |
 | total classic | 0x08 | i32 | sum of classic probs |
 | total expansion | 0x0C | i32 | sum of expansion probs |
-| picks | 0x10 | i32 | never 0 for TCs 1+ (§1.4); TC 0 is all zero (§1.2) |
+| picks | 0x10 | i32 | never 0 (§1.4) |
 | nodrop | 0x14 | i32 | |
 | mods | 0x1A | 6 × u16 | magic, rare, set, unique, slot 5, slot 6 |
 | entries | 0x28 | ptr | `count` entries |
@@ -122,8 +123,7 @@ does).
 
 #### 1.2 Order
 
-TC 0 (empty name, no entries, all fields 0 including picks: the 1.14d
-memory dump `traces/raw/20261006-201456-tables` has an all-zero record 0), the automatic TCs (§1.3), then
+TC 0 (empty name, no entries), the automatic TCs (§1.3), then
 `treasureclassex` rows (§1.4); list and name order: `loading.md` §10.6.
 Each TC's name is added to `@treasureclass` when its record is created,
 so a name lookup during §1.4 sees only TCs created before (`field-types.md`
@@ -230,6 +230,23 @@ collision at the monster's position (room, x, y, mask 0x801;
 `0x0064CB30`) is nonzero. A monster of class 344 (`bonewall`) without
 the flag is a fatal error (d2rs: error). Then §3.2 with `F` = 0 and the
 death mode change (target = `R`).
+
+Exact order in `0x005A6830` (handoff `impl-treasure` question 8): no unit
+→ fatal 0x1ED; flag bit 17 → no drop; class 344 → fatal 0x1F8, **before**
+the collision test (so a bone wall on a blocked spot is fatal too);
+collision ≠ 0 → no drop; the monster has no room → fatal 0x1FF; its
+monstats record missing (`0x00451F80`) → fatal 0x204; else §3.2.
+
+Collision word (`0x0064CB30`(room R, x, y, mask), R = the monster's room
+`0x00620BB0`; read 2026-10-07): the room containing (x, y) is looked up
+among R and R's adjacent rooms (`0x00463740`, `drlg/rooms.md` §6). No
+such room (also when R is none), the room has no collision record
+(`0x0061A010`), or the record has no grid (+0x20) → the value **0x27**
+(non-zero: no drop). Else the grid word at ((y − record y0) × record
+width − record x0 + x) (+0x04, +0x08, +0x00) AND mask. So a monster
+outside every room grid drops nothing, and the "no room → fatal 0x1FF"
+test after it is unreachable (a monster without a room already
+returned at the collision test).
 
 #### 3.2 Which TC (`0x005A6600`)
 
@@ -459,6 +476,12 @@ Inputs: item id, `L`, game, `U`, `R`, the slot mods. Draws are `roll`
    item level, room and position, spawn type 3, init flags 1, the game's
    item format (game +0x78), drop flags `d`, plus 0x01 when `U` is
    monster class 391 (`hellbovine`).
+   Exact request (`0x0055A550`, zeroed 0x84 bytes, `items/generation.md`
+   Inputs): +0x00 unit := `U` (none when `U` is none), +0x04 := 0, +0x08
+   game, +0x0C item level (step 3), +0x14 id, +0x18 spawn mode 3, +0x1C /
+   +0x20 the position and +0x24 the room the search of step 2 returned,
+   +0x28 init flags 1, +0x2A format, +0x30 quality, +0x40 index, +0x80
+   drop flags (`d` | 0x01 for `hellbovine`); every other field 0.
    Spawn type 3 with init flag 1 makes the allocation add the item to the
    world at the request's room and position (`sim/units.md` §3.1 step 8 →
    `sim/path-placement.md` §2.5: static path, footprint, room list) inside
@@ -470,6 +493,9 @@ Inputs: item id, `L`, game, `U`, `R`, the slot mods. Draws are `roll`
 1. Base (in item creation `0x00557AB0`, item type 4): `g` =
    `roll(5 × ilvl)` on the new item unit's seed (unit +0x20) + ilvl; `g`
    ≤ 0 → 1; a drop-request quantity > 0 replaces it.
+   "Quantity" here is the request's quantity override +0x54 (not +0x34;
+   `0x00557AF9`, handoff `impl-items` OQ-G1); with no request the gold is 1
+   and nothing is drawn.
 2. TC multiplier: §5.7 step 7.
 3. Gold find (`0x005589A0`), when `R` exists and the item's type is
    exactly 4 (`0x0062B400`): `G` =
@@ -477,6 +503,92 @@ Inputs: item id, `L`, game, `U`, `R`, the slot mods. Draws are `roll`
    gold × `G` / 100 (i32, toward zero).
 
 Setting gold (`0x00530EA0`): a negative value stores 0.
+
+### 9. Quest drop helper (`0x00559A30`)
+
+The drop of the quest and object code (`world/objects.md`,
+`world/quests-*.md`; 25 call sites). Fastcall: ECX game, EDX source unit
+`U`; stack: quality `q`, `&level` (output), `&request` (output, may be
+none), then two values `p6`, `p7` passed on to the class pick of step 3
+(the quest specs give −1 and 0, or −1 and a value they call
+"droppable", `world/quests-act2.md`); `ret 0x14`. Returns the
+created item, or none.
+
+1. Game none → fatal 0x9C7.
+2. Item level `L`: `U` none → 1; monster → total stat 12; player → base
+   stat 12; else the area level of `U`'s room level (`0x0061DCA0` with
+   game +0x6D, +0x70, as §7 rule 3); `L` < 2 → 1. Written to `*&level`
+   (`0x00559AF8`) before any read (`world/quests-act3-2.md` §11.3).
+3. Item class `c`:
+   - `U` +0xB8 (the unit's drop item code, `world/objects.md` Inputs)
+     ≠ 0 → `c` := the items index of that code (`0x00633680`); no such
+     code → fatal 0x9EA. No draw.
+   - Else `c` := the random class pick `0x00556240(L, U's unit seed +0x20,
+     p6, p7, U is a monster)`; when `q` = 4 (magic), while the record of
+     `c` is missing or its items `bitfield1` (+0xDC) bit 0 is clear: the
+     first 11 retries call `0x00556240` again, every later one calls
+     `0x00555FB0(L, unit seed, p6, p7)`; there is no retry limit.
+     `0x00556240`: `L` > 65 → fatal 0x180; else one `roll(100)` r on
+     `U`'s unit seed (`0x00472280`): r < 65 − `L` → gold (`gld `, its index
+     cached once, `0x008846EC`); r < (65 − `L`) + `L`/2 + 5 →
+     `0x00555E70`; r < that + `L`/2 + 10 (+ 1 when `L` is odd) →
+     `0x00555FB0`; r < 100 → `0x005560F0`; else fatal 0x1BA. The three
+     sub-pickers (Open question 10, answered) are §9.1.
+4. Position: `U`'s unit coordinates (`0x00620870`) and room
+   (`0x00620BB0`) into the floor drop `0x00555DA0`(room, position, size 1,
+   fallback 1), as §7 rule 2; no spot → return none (no request is
+   written out, nothing created).
+5. Request (0x84 bytes, zeroed; `items/generation.md` Inputs): unit `U`,
+   +0x04 0, game, ilvl `L`, item `c`, spawn mode 3, the found x, y and
+   room, init flags 1, format game +0x78, quality `q`; every other field
+   0 (not forced, no index, no flags). Create through `0x00558D90` with
+   "use seed" 0 (`items/generation.md` §3). When `&request` ≠ none the
+   whole request is copied there (after the pipeline, so with the
+   written-back ilvl). Return the pipeline's item.
+
+#### 9.1 Class sub-pickers (`0x00555E70`, `0x00555FB0`, `0x005560F0`)
+
+Fastcall ECX game, EDX the unit seed; stack `L`, `p6`, `p7` (and, for
+`0x005560F0` only, the "`U` is a monster" flag `m`). The combined items
+array header `0x0096CA58` (`0x00633590`) holds count +0x00, records
++0x04, then (start, count) per part: weapons +0x08/+0x0C, armor
++0x10/+0x14, misc +0x18/+0x1C (written at load, `0x006333E8`–
+`0x0063343B`). So `0x00555FB0` = weapons, `0x00555E70` = **armor**,
+`0x005560F0` = misc (the range from the misc start to the array end).
+In the quest drop, `0x00555E70` (armor) has the band (65 − `L`) …
+(65 − `L`) + `L`/2 + 5, `0x00555FB0` (weapons) the next one, misc the
+rest; the magic retries after the eleventh call weapons.
+
+Per record of the part, in index order:
+
+1. Misc only: type (+0x11E) = 40 and `m` = 0 → skip (body parts only
+   from monsters).
+2. Filter `0x00555E00` (EAX `L`, ESI record, EDI `p6`; stack seed, `p7`):
+   `L` < 1 counts as 1; `spawnable` (+0x133) ≠ 0, `quest` (+0x12A) = 0
+   and `level` (+0xFD) ≤ `L`, else skip. If `p7` = 0: a = `0x006427F0(L)`
+   (the act of **level id** `L`: the item level is passed where a level
+   id is expected, so `L` < 40 → 0, < 75 → 1, < 103 → 2, < 109 → 3, else
+   4); d = `rarity` (+0xFC, u8) − a; d > 0 → `roll(seed, d)`
+   (`0x0045C3E0`), result ≠ 0 → skip. Then `p6` = −1, or the record's
+   `type` (+0x11E, i16) = `p6`; else skip.
+3. Expansion game (game +0x70 ≠ 0) or `version` (+0xF6) < 100, and fewer
+   than 1,023 candidates held → append the record's combined index.
+
+Pick: count n > 0 → one step of the seed; n a power of two → `lo'` &
+(n − 1), else `lo'` mod n (unsigned); return that candidate. A part
+start of 0 returns −1 at once. n = 0 → the routine returns the
+**uninitialised** first slot of its candidate array (a stack value),
+reachable whenever every record is filtered out (for example all rarity
+rolls reject at a low `L`). d2rs (Ruleset choice, Open question 12):
+the n = 0 result is −1, as for a part start of 0; the caller then
+treats it as a missing record (§9 rule 3: the magic loop retries;
+otherwise the request item −1 fails `items/generation.md` §3 step 2,
+no item). `p6` = item type filter (−1 = any), `p7` = skip
+the rarity roll; the quest specs pass `p6` = −1. Draws: one `roll(d)`
+per record that reaches the rarity test with d > 0, in index order, then
+the pick step. `bitfield1` (+0xDC) bit 0, tested by the §9 magic retry
+loop, is the same "may be magic" bit the stores test
+(`world/vendors.md` §3 step 5).
 
 ## Constants & data dependencies
 
@@ -616,14 +728,153 @@ Real 1.14d (game-file tests, `#[ignore]`, from the live `.bin` set):
    `0x0055A9B9` for a game with `players` > 1.
 4. The runtime TC array (`0x0096C5EC`, 1,013 × 0x2C plus entries) and the
    chest table (`0x0096C5F4`) are not dumped; §1 is a model until a dump
-   matches (entry counts, starts, flags, rows).
+   matches (entry counts, starts, flags, rows). Recording list IT-9.
 5. x87 precision control on the server thread during §5.4 (irrelevant
    for 1.14d data, §5.4; matters for mods with other nodrop/total pairs).
+   Partly answered (2026-10-07, from the binary); the rest **Needs
+   recording**.
+   - CRT startup: `___tmainCRTStartup` calls `__cinit(1)` (`0x006828EA`,
+     ebx = 1), which calls `__fpmath(1)` through `0x006F2874`; with a
+     non-zero argument it runs `__setdefaultprecision` (`0x00682FC4` →
+     `0x0068E70A`): `_controlfp_s(NULL, 0x10000 = _PC_53, 0x30000 =
+     _MCW_PC)`, then `fnclex`. Rounding control and exception masks are
+     not touched, so the main thread starts with the Windows default
+     word plus PC = 53 bits: round to nearest even, 53-bit significand,
+     all exceptions masked. `__set_controlfp` has no callers;
+     `__controlfp_s` is called only from there and from
+     `__setdefaultprecision`.
+   - Game code: the only `fldcw` sites outside the CRT are 14 local
+     pairs in 8 functions (`0x0047CC90`, `0x0047CD00`, `0x00605080` ×4,
+     `0x00605F00`, `0x0061BCE0`, `0x00679190` ×2, `0x00679250` ×2,
+     `0x0067A140` ×2): each saves the word (`fnstcw`), sets RC = chop
+     (`or 0xC00`) for one `fistp`, and restores it. None is on the §5.4
+     path, and none changes the precision. The CRT's own math helpers
+     (`0x006879DD`–`0x00688718`, `__ctrlfp` `0x0069D097`) also save and
+     restore.
+   - §5.4 itself (`0x0055A935`–`0x0055A9B9`): `fild` of the i32 values,
+     `fdivp`, the `fmul` chain, `fld1` / `fsubrp`, the `fucomp` zero
+     test, `fsub`, `fimul` by `C`, `fdivrp`, all on the x87 stack with
+     no store between them, then `0x00682FD0` (SSE2: `fstp` to a double,
+     `cvttsd2si`, truncation regardless of RC). Under the startup word
+     (PC = 53, RC = nearest) every one of these operations rounds once
+     to a 53-bit significand; the exponent range is wider than
+     binary64's, which matters only outside its normal range (here, for
+     n0 ≥ 1 and n0 + C in 1..2³¹−1, x > 2⁻³¹ and p' = x^n with n ≤ 8,
+     so every intermediate stays above 2⁻²⁴⁸, far inside binary64's
+     normal range), and the `fstp`
+     to a double is exact. So with the startup word §5.4 equals the
+     IEEE binary64 evaluation d2rs uses, bit for bit.
+   - Not settled by the binary: single player runs the server inline
+     on the client frame thread (`sim/tick.md` §1 rule 4), the same
+     thread as the renderer. Game.exe passes neither `DDSCL_FPUSETUP`
+     (0x800) nor `DDSCL_FPUPRESERVE` (0x1000) at its SetCooperativeLevel
+     calls found by their error strings (`0x0051129F`, `0x005115E6`,
+     `0x006B40E2`, `0x006B4541`: 0x11; `0x006B505A`: 0x411), so whether
+     the DirectDraw / Direct3D runtime, a Glide wrapper or a driver
+     leaves the thread at another precision (24-bit) is decided outside
+     Game.exe. Recording: in a single-player game under each video mode
+     (DirectDraw, Direct3D, Glide), read the x87 control word (`fnstcw`)
+     at `0x0055A935` on a monster kill with a nodrop TC and `n` ≥ 2;
+     expect 0x027F (PC = 53, RC = nearest, all masked); any other PC
+     value means the evaluation is not binary64 there.
 6. Meaning of drop flags 0x04/0x10 (D2MOO: superior / normal) and their
    effect in creation: items spec.
-7. `0x005541B0` ("living") in the player and party counts is read as
-   D2MOO's living check, not confirmed.
+   Answered (2026-10-07, `0x0055A550` disassembled): §7 stores `d`
+   (its fourth stack argument) OR-ed into request flags2 (+0x80,
+   `0x0055A69B`–`0x0055A69E`; 0x01 first for `hellbovine`), so they
+   are `items/generation.md` §1.5 bits: 0x04 = always ethereal (§8.1
+   there: the ethereal roll is drawn, then applied regardless, on
+   eligible items), 0x10 = always sockets (§7.1 step 6: p := 0, so the
+   socket count is applied). Not superior / normal quality. In 1.14d
+   slot mods 5 and 6 come from record +0x30 / +0x32, which no column
+   fills (§1.4, OQ12 item 10: 0 in all 853 rows), so a TC drop never
+   sets either bit.
+7. Answered (handoff `impl-treasure` 13): "living" = not dead by
+   `0x005541B0` (`sim/units.md` §2: unit flag 0x10000, a player in mode
+   0 or 17, a monster in mode 0 or 12; any other unit type counts as
+   dead). The player count `0x00535790` counts every player the game's
+   player walk `0x005538D0` visits with that test (callback
+   `0x00535760`). The party count `0x005408E0` → `0x005405A0`: `O`
+   without a room or without a party (`0x00554630` = 0xFFFF) → `O` alone
+   (counted when living); else each member of the party list
+   (`0x00540290`; none → 0) found as a player by GUID whose room's level
+   equals `O`'s, counted when living (callback `0x005404F0`).
 8. Answered: `sim/path-placement.md` §7 (search, no RNG draw) and §9 (floor drop, §7 step 2 here).
 9. Answered (handoff `triage-game-findings` Q3): edge case 9; the d2rs
    sweep's "`magic` ⇒ q ≥ 4" holds after creation, not for the drop
    quality when `M` ≤ −100.
+10. Answered: §9.1 (disassembly of the three functions and of
+    `0x00555E00`, `0x00556240`). Original text: §9 rule 3 (quest drop
+    with no drop code): the sub-pickers
+    `0x00555E70`, `0x00555FB0` (a candidate list over the items records
+    between table +0x08 and +0x10, filtered by `0x00555E00`, expansion
+    or `version` < 100, then one unit-seed step: mask for a power-of-two
+    count, else mod) and `0x005560F0` were not written, nor the meaning
+    of items `bitfield1` bit 0 and of `p6` / `p7` inside them. The quest
+    specs set the drop code before their calls (e.g. Wirt's body `gld `,
+    `world/quests-act1.md`), so the path matters only for a caller that
+    leaves +0xB8 at 0; settle with `disasm.py fn` on the three
+    functions.
+11. Answered (handoff `impl-treasure` questions 2, 5, 6, 8): §6 step 2's
+    last test is one conjunction (itemtypes +0x14 `magic` and items +0x12A
+    `quest`, `0x00558640`); §5.7 step 7's gold test is `0x00629BB0(item,
+    4)` on the created item unit (`0x0055AEF5`: the `type` row or, when
+    `type2` > 0, the `type2` row equivalent to 4); the class-index test
+    `0x00629A90` differs only for a negative `type2` (taken as a row
+    there), which 1.14d data has not. §6 step 3 compares the itemratio
+    bytes for equality with the two 0 / 1 results (`0x00637910`: record
+    +0x43 `Class Specific` = `0x00629F70`, +0x42 `Uber` = `0x0062B4D0`), so
+    a stored 2 matches neither; the uber test's type 38 is the item's own
+    `type` field (items +0x11E), its weapon / armor test is the class-index
+    test with `type2`. §3.1's order is given there.
+12. Answered (handoff `impl-treasure` 1, 3, 4, 7, 9–12, 14), from the
+    1.14d code:
+    - 1 (`atol` beyond i32): `0x00681EBB` → `0x00681E95` is
+      `strtol(s, NULL, 10)` (`0x0068676E` → `strtoxl` `0x00686543`), which
+      saturates: an overflowing positive value gives 0x7FFFFFFF, a
+      negative one 0x80000000 (errno ERANGE), then §1.5 step 5 cuts to
+      u16 (0xFFFF, 0x0000). d2rs's strtol saturation is exact.
+    - 3 (NoDrop range): the conversion `0x00682FD0` takes the SSE2 path
+      when `0x00994C88` is set (`__get_sse2_info` `0x0069A8C0`, CPUID
+      SSE2 and OS support): `fstp` to a double, then `cvttsd2si`, so a
+      NaN, an infinity or a value outside i32 gives 0x80000000; the x87
+      fallback (`0x00683006`) is used only without SSE2. `n0` + `C` is an
+      i32 sum before `fild` (`0x0055A947`), and the q = 0 test
+      (`0x0055A9A1`–`0x0055A9A8`) treats an unordered (NaN) q as nonzero.
+      Default FPU exceptions are masked, so a division by zero gives an
+      infinity, not a fault. Then `T` + `N` (i32, wrapping) < 1 → `r` = 0
+      without a draw, and the NoDrop test `r` < `N` is signed
+      (`0x0055AA45`). The precision control (Open question 5) stays open.
+    - 4 (§5.6 with `get` = none): the new slot's TC pointer is stored and
+      its picks are read through it at once (`0x0055ABAE`), so none
+      faults; unreachable, as §1.5 step 4.2 builds TC entries only for an
+      index ≥ 1 below the count.
+    - 7 (itemratio divisor 0): the divisions of §6 are plain `idiv` by
+      the record fields (`0x00558733`, `0x005587AE`, `0x00558836`,
+      `0x005588CC`, `0x00558925`, `0x0055895A`), each only when its step
+      runs: a 0 divisor is an integer-divide fault (process crash). Every
+      divisor of the 6 live `itemratio` rows is ≥ 1.
+    - 9 (chest act): `act` = `0x006427F0(level id)` (`drlg/levels.md` §6
+      rule 3; table `0x006EB2F4` = 40, 75, 103, 109, 1024): always 0–4
+      (≥ 1024 → 0), never from `levels.txt`, and `0x00654E80` clamps
+      again.
+    - 10 (`treasureclassex` +0x30/+0x32): measured: the live
+      `treasureclassex.bin` (853 rows of 736 bytes) holds 0 at +0x30 and
+      +0x32 in every row.
+    - 11 (item string quotes): `0x00654440` drops one leading `"` and
+      then replaces **every** later `"` by a 0 byte, i.e. cuts at the next
+      quote whether or not a leading one was dropped.
+    - 12 (expansion search over zero entries): `lo` = `hi` = 0 → index
+      max(−1, 0) = 0, then the index-below-count test (`0x0055AB35`)
+      fails → no entry; unreachable (`T` = 0 ends the slot first).
+    - 14: the fatal paths (0xF3A, 0xF44, 0xFEA, no ratio row, bone wall,
+      > 65,534 TCs) are the original's asserts (process exit); how d2rs
+      reports them is a Ruleset choice, not a fidelity fact.
+    ~~Still open: §9.1's n = 0 result.~~ Struck (2026-10-07): the value
+    (an uninitialised stack value) is whatever earlier calls left in
+    that stack slot, so no reading of the binary fixes it; only a stack
+    capture at the pick of `0x00555E70` / `0x00555FB0` / `0x005560F0`
+    with every record filtered could show the 1.14d value. d2rs's choice
+    is recorded in §9.1 (−1, no item), so no code waits on it. Recording
+    list `docs/handoff/pc2-rec-pc2-items.md` IT-11 (what 1.14d does in
+    the one reproducible case).

@@ -1,8 +1,12 @@
 # Spec: Formats — Sound files (.wav)
 
-- **Status:** draft. Rules from the 1.14d `Game.exe` loaders (addresses
-  below) and a survey of all 4,992 RIFF blocks in the 1.14d archives; the
-  samples handed to DirectSound are not yet dumped (Open question 1).
+- **Status:** verified for parsing: `cargo test -p d2-formats --test
+  wav_game -- --ignored` (C72) passes on the 1.14d files (the 8 Test
+  vector files, and every `sounds.txt` file: 4,508 parse, 4,434 mono, 74
+  stereo; `docs/handoff/local-buddy-q-data.md` entry 72). Rules from the
+  1.14d `Game.exe` loaders (addresses below) and a survey of all 4,992
+  RIFF blocks; the samples handed to DirectSound are not yet dumped
+  (Open question 1).
 - **Target version:** 1.14d
 - **Crate/module:** `d2-formats::wav`
 - **Related specs:** `formats/mpq.md` §9–§12 (sector decompression, IMA
@@ -12,21 +16,22 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 32–43 |
-| Inputs | 44–49 |
-| Outputs / state changes | 50–55 |
-| Rules | 56–59 |
-|   1. Header | 60–66 |
-|   2. Chunk walk (no pad bytes) | 67–102 |
-|   3. Samples | 103–114 |
-|   4. Format checks by the game | 115–127 |
-| Constants & data dependencies | 128–135 |
-| Randomness | 136–139 |
-| Survey (1.14d data) | 140–188 |
-| Edge cases & original bugs | 189–202 |
-| Test vectors | 203–241 |
-| Provenance | 242–257 |
-| Open questions | 258–273 |
+| Summary | 37–48 |
+| Inputs | 49–54 |
+| Outputs / state changes | 55–60 |
+| Rules | 61–64 |
+|   1. Header | 65–71 |
+|   2. Chunk walk (no pad bytes) | 72–113 |
+|   3. Samples | 114–137 |
+|   4. Format checks by the game | 138–150 |
+|   5. Decoder hook (d2rs) | 151–164 |
+| Constants & data dependencies | 165–172 |
+| Randomness | 173–176 |
+| Survey (1.14d data) | 177–229 |
+| Edge cases & original bugs | 230–243 |
+| Test vectors | 244–282 |
+| Provenance | 283–299 |
+| Open questions | 300–329 |
 <!-- /index -->
 
 ## Summary
@@ -99,6 +104,12 @@ The Storm streaming loader (0x41B280, chunk search 0x41B210, used through
 0x515D70) performs the same walk by seeking in the archive file: same
 `fmt ` size ≥ 16 check, same pad-free skipping, `data` searched after
 `fmt `.
+Refined (third pass): the Storm walk keeps no `remaining` count. It
+reads 8-byte headers (`0x0041B050`) and seeks past each non-matching
+body (`0x004165A0`, relative) until the ID matches or a read fails at
+the end of the file; the RIFF/WAVE test reads only the first 12 bytes
+(no 32-byte minimum), and the `data` size is not checked against the
+file length. Every live stream file passes both walks (Survey).
 
 ### 3. Samples
 
@@ -109,14 +120,26 @@ for 8-bit, 0 otherwise). Every voice buffer is created with a fixed
 format built by 0x516720: PCM, 22,050 Hz, 16-bit, `channels` = 1 or 2
 (voices 0x5153C0, primary buffer 0x5140D0 is 22,050 Hz 16-bit stereo).
 So the samples the game outputs are the `data` bytes read as i16
-little-endian, interleaved by channel. d2rs: `samples[i]` = i16 at
+little-endian, interleaved by channel.
+Correction (third pass): stream voices are not 0x516720 buffers. Storm
+creates their DirectSound buffer itself (`0x0041B280`, through the
+device object `[0x00778F20]`) with the file's own first 16 `fmt ` bytes
+as its format (`cbSize` 0), no rate or bit check; buffer size = the
+requested size rounded up to the read unit `[0x00779038]` (0x4000 bytes
+by default), at least two units; start offset = the given offset mod
+the `data` size. Its reader (`0x00419C00`, from `0x0041A550`) reads
+the `data` through the archive (`0x00419790`) into a staging buffer and
+`memcpy`s it unchanged into the locked buffer (`0x004157C0`), padding
+the rest of a unit after the end with the silence byte (0x80 for
+8-bit, else 0). With the live files (every stream file stereo 16-bit
+22,050 Hz, Survey) the output equals the in-memory path's. d2rs: `samples[i]` = i16 at
 `data[2i..2i+2]` for `i < size / 2`.
 
 ### 4. Format checks by the game
 
 | Path | Address | Check | Channels from |
 |---|---|---|---|
-| sound start | 0x4DF630 (called from 0x481720, 0x482970) | bits == 16 and rate == 22,050, else the sound is marked failed (not played) | file: stereo iff channels == 2 |
+| sound start | 0x4DF630 (called from 0x481720, 0x482970) | bits == 16 and rate == 22,050, else the sound is marked failed (not played) | file: stereo iff channels == 2 (written into the row's `Stereo`, +0x50) |
 | UI preload ("D2SoundFast", 15 fixed names: `cursor\button.wav` and the 14 `cursor\intro\<class> select/deselect.wav`) | 0x514E10 (15 calls from 0x4359D0; one from 0x441B70) | rate == 22,050, else not cached | file: stereo iff channels == 2 |
 | voice data attach | 0x5155D0 | none on format; fatal error if the voice's loop start ≥ data size | voice |
 
@@ -124,6 +147,20 @@ The format tag, byte rate and block align are never checked. d2rs: the
 parser returns all fields; the audio layer accepts only tag 1, 16-bit,
 22,050 Hz (every file `sounds.txt` names passes; Survey) and treats any
 other file as failed to load, as 0x4DF630 does.
+
+### 5. Decoder hook (d2rs)
+
+The client's `WavDecoder` / `SoundBank` decode (`client/audio.md` §A1,
+§B1; the code's `TODO(spec: formats/wav.md §B1)`) is this spec with no
+further rule: archive lookup (`formats/mpq.md` §11), §1–§3 parse
+(`d2-formats::wav`, verified), then §4's check. Its outputs per sound
+id (`audio/sound-table.md` §1 r3): the interleaved i16 samples, the
+file's channel count (which overwrites the row's `Stereo` for
+non-stream rows, `audio/sound-table.md` §7 r7) and the byte size used by
+the cache (`audio/sound-table-2.md` §16 r2). A parse error or a failed
+§4 check is the original's "file failed" (+0x81 := 1, never retried,
+`audio/sound-table.md` §10 r2); a missing file likewise. `Stream` rows
+are decoded the same way (§3: the stream path copies the same bytes).
 
 ## Constants & data dependencies
 
@@ -174,7 +211,11 @@ Every block of every archive decoded (`mpq-tool check`: 0 errors) and each
   0x40/0x41 (4,897 files), stereo files 0x80/0x81 (all 78); the other
   sectors are PKWARE (0x08) or stored. 17 RIFF files have no ADPCM
   sector (lossless). For ADPCM files the samples are lossy and depend on
-  bit-exact `mpq.md` §12 decoding.
+  bit-exact `mpq.md` §12 decoding. Every 0x41 / 0x81 sector (350,543:
+  174,997 mono, 175,546 stereo) carries Huffman weight table 8 (count
+  byte 0) and no other table occurs; 313,273 of them (89.4 %) use the
+  escape path (`docs/handoff/local-buddy-q-data.md` entry 62, a counter
+  over a copy of our decoder, 0 decode errors).
 - Names: two `.wav` names in d2sfx are not RIFF: `cursor\wavindx.wav` and
   `cursor\curindx.wav` (72 bytes each, binary). No zero-length `.wav`.
 - `sounds.txt` (4,699 rows): 4,508 rows resolve (2,777 under
@@ -243,7 +284,8 @@ regressions; equality with the original's output is Open question 1.
 
 - 1.14d `Game.exe`: 0x516760 (RIFF/WAVE check, `fmt `/`data` lookup),
   0x5166D0 (in-memory chunk search), 0x41B280 / 0x41B210 (Storm streaming
-  begin and chunk search, via 0x515D70), 0x516720 (voice WAVEFORMATEX),
+  begin and chunk search, via 0x515D70), 0x41B050, 0x4165A0, 0x419C00,
+  0x41A550, 0x419790, 0x4157C0 (stream reads, third pass), 0x516720 (voice WAVEFORMATEX),
   0x5153C0 (voice buffer create), 0x5140D0 (DirectSound init, primary
   format), 0x515180 (buffer fill, `memcpy`), 0x5155D0 (attach data to a
   voice), 0x4DF630 and 0x514E10 (format checks), 0x4359D0 (UI preload
@@ -262,11 +304,25 @@ regressions; equality with the original's output is Open question 1.
    returned by 0x516760) for the Test vectors files and compare with our
    decoded `data`. This settles both this spec and the bit-exactness of
    `mpq.md` §12 ADPCM on real files (`client/audio.md` §B1).
+   Needs recording (not settleable statically: the bytes are Storm's
+   decompression output): for each Test vectors file and one ADPCM
+   sector file per channel count, hook `0x00516760` (returned `data`
+   pointer and size) or the buffer `Lock` after `0x00515180`, dump the
+   bytes with the path, and compare byte for byte with our decoded
+   `data`; plus one `Stream` song (`music\act1\crypt.wav`) dumped from
+   the refill copy `0x004157C0` over its first 256 KiB (C75, player
+   lane).
 2. The Storm stream path (0x41B280) is assumed to copy bytes unchanged
    like 0x515180; its refill thread was not traced. Settled by the same
    dump on a `Stream`=1 sound (e.g. `music\act1\crypt.wav`).
-3. 30 `sounds.txt` rows have `Stereo`=0 but a stereo file. Whether such a
-   file plays on a stereo voice (channel count from the file, as in
-   0x4DF630) or on a mono voice (bytes read as mono, double length) is
-   `client/audio.md` §B3; settle by a trace of `scene_cave` (voice flags
-   passed to 0x515530).
+   Answered (static, §3 correction): the refill thread `0x00419C00`
+   copies the archive's decoded bytes unchanged (`memcpy` in
+   `0x004157C0`) and pads with the silence byte; the buffer takes the
+   file's own format. Sample equality itself is open question 1.
+3. Answered: on a stereo voice. All 30 rows are non-`Stream`, so their
+   sample is loaded through `0x00482970` / `0x00481720`, both of which
+   run 0x4DF630; on success it overwrites the row's `Stereo` byte with
+   (channels = 2) (`0x004DF695`) before the start picks the channel kind
+   (`audio/sound-table.md` §7 r7). The stereo slots are 2-channel buffers
+   (`0x005153C0`). A `Stream` row would keep its cell (no load); none of
+   the 30 is one.

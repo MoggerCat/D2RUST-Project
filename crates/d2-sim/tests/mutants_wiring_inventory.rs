@@ -47,7 +47,6 @@ fn wild(flag: bool, w: &World) -> Answers {
         gold: false,
         number: 909,
         ammo: Some(910),
-        interaction: Some(InteractionTarget::Missing),
         trade_gate: Some(flag),
         open_ok: flag,
         code2: 912,
@@ -220,7 +219,13 @@ fn forward_pending(flag: bool) {
             (),
             "filler_linked 50 51".to_string()
         );
-        fwd!(d.runeword(m, 52), flag, "runeword 1:55 52".to_string());
+        // The runeword is the desk's (`queries::activate_runeword_on`):
+        // no item 52, no runeword, the rest not asked.
+        {
+            let before = d.rest.last();
+            assert!(!d.runeword(m, 52));
+            assert_eq!(d.rest.last(), before, "runeword is not forwarded");
+        }
         fwd!(d.hireling(m), a.owner, "hireling 1:55".to_string());
         fwd!(
             d.owns_hireling(me, m),
@@ -341,20 +346,19 @@ fn forward_inv_world(flag: bool) {
             format!("own_contribution {g} {p} 7")
         );
         fwd!(
-            InvWorld::level_requirement(d, item, pl),
-            913,
-            format!("level_requirement {g} {p}")
-        );
-        fwd!(
             InvWorld::one_or_two_handed(d, pl, item),
             flag,
             format!("one_or_two_handed {p} {g}")
         );
-        fwd!(
-            InvWorld::ammo_type(d, item),
-            Some(910),
-            format!("ammo_type {g}")
-        );
+        // Answered by the desk (`wiring::inventory::queries`): the
+        // level requirement of §4.8 and the primary type's `shoots`.
+        {
+            let before = d.rest.last();
+            let _ = InvWorld::level_requirement(d, item, pl);
+            let _ = InvWorld::ammo_type(d, item);
+            let _ = InvWorld::two_handed(d, item);
+            assert_eq!(d.rest.last(), before, "not forwarded");
+        }
         fwd!(
             InvWorld::has_allowed_location(d, item),
             flag,
@@ -365,16 +369,14 @@ fn forward_inv_world(flag: bool) {
             flag,
             format!("quiver_kind {g}")
         );
-        fwd!(
-            InvWorld::interaction(d, pl),
-            InteractionTarget::Missing,
-            format!("interaction {p}")
-        );
-        fwd!(
-            InvWorld::clear_interaction(d, pl),
-            (),
-            format!("clear_interaction {p}")
-        );
+        // Answered by the desk: the interact info on the unit record
+        // (`units::record::InteractInfo`), not forwarded.
+        {
+            let before = d.rest.last();
+            let _ = InvWorld::interaction(d, pl);
+            InvWorld::clear_interaction(d, pl);
+            assert_eq!(d.rest.last(), before, "not forwarded");
+        }
         fwd!(
             InvWorld::player_data_4c(d, pl),
             905,
@@ -447,10 +449,6 @@ fn inv_rest_defaults() {
         fn quiver_kind(&self, _: u32) -> bool {
             false
         }
-        fn interaction(&self, _: Owner) -> InteractionTarget {
-            InteractionTarget::None
-        }
-        fn clear_interaction(&mut self, _: Owner) {}
         fn player_data_4c(&self, _: Owner) -> u32 {
             0
         }
@@ -667,7 +665,7 @@ fn hand_result_7_needs_room_for_the_other_hand() {
             }
         }
         let n = w.cursor_item(TWO_HANDER);
-        w.rest.a.two_handed.insert(n);
+        w.inv.items[TWO_HANDER].twohanded = 1;
         let me = w.me();
         assert_eq!(
             w.desk(|d| d.equip_check(me, 4, Some(n), true)),
@@ -842,13 +840,13 @@ fn forward_inventory_ops() {
         let mut w = World::new();
         let g = w.ground_item(TWO_HANDER, 11, 11);
         w.rest.a.flag = flag;
-        if flag {
-            w.rest.a.two_handed.insert(g);
-        }
+        // Two-handed is the items column (`queries`), not the rest's.
+        w.inv.items[TWO_HANDER].twohanded = u8::from(flag);
         w.desk(|d| {
             assert_eq!(d.link_into_item(7, 8), flag);
             assert_eq!(d.rest.last(), "link_into_item 7 8");
             assert_eq!(InventoryOps::two_handed(d, g), flag);
+            assert_eq!(d.rest.last(), "link_into_item 7 8", "not forwarded");
         });
     }
 }
@@ -918,11 +916,27 @@ fn trading_is_an_interaction_with_a_player() {
     let mut w = World::new();
     let me = w.me();
     assert!(!w.desk(|d| d.trading(me)));
-    let p = w.player;
-    w.rest.a.interaction = Some(InteractionTarget::Unit { ty: 0, unit: p });
+    let (p, pg) = (w.player, w.pguid());
+    // The interact info on the player's record: (type, GUID), active.
+    let stage = |w: &mut World, ty: u8| {
+        let r = w.units.get_mut(p).unwrap();
+        r.interact.reset();
+        r.interact.set(ty, pg);
+    };
+    stage(&mut w, 0);
     assert!(w.desk(|d| d.trading(me)));
-    w.rest.a.interaction = Some(InteractionTarget::Unit { ty: 1, unit: p });
-    assert!(!w.desk(|d| d.trading(me)));
+    assert_eq!(
+        w.desk(|d| InvWorld::interaction(d, p)),
+        InteractionTarget::Unit { ty: 0, unit: p }
+    );
+    stage(&mut w, 1);
+    assert!(!w.desk(|d| d.trading(me)), "no monster with that GUID");
+    assert_eq!(
+        w.desk(|d| InvWorld::interaction(d, p)),
+        InteractionTarget::Missing
+    );
+    w.desk(|d| InvWorld::clear_interaction(d, p));
+    assert_eq!(w.units.get(p).unwrap().interact.get(), None);
 }
 
 /// §5.4: no interaction and player data +0x4C ≠ 0 → refused.
@@ -1072,7 +1086,8 @@ fn move_units_fields() {
 
 /// Socket getters: `sockets` = stat 194 (`0x006299B0`); `fillers` = the
 /// item's own inventory in link order (§1.4 rule 1); the filled /
-/// filler tests and the spell go to the rest.
+/// filler tests go to the rest; the spell is item data +0x3E (suffix
+/// slot 0).
 // Covers: specs/items/inventory.md §1.4 r1
 #[test]
 fn socket_getters() {
@@ -1102,8 +1117,9 @@ fn socket_getters() {
             assert_eq!(d.rest.last(), format!("socket_filled {s}"));
             assert_eq!(MoveUnits::socket_filler(d, a), flag);
             assert_eq!(d.rest.last(), format!("socket_filler {a}"));
-            assert_eq!(MoveUnits::spell(d, a), if flag { 33 } else { -7 });
-            assert_eq!(d.rest.last(), format!("spell {a}"));
+            let before = d.rest.last();
+            assert_eq!(MoveUnits::spell(d, a), 0);
+            assert_eq!(d.rest.last(), before, "spell is not forwarded");
         });
     }
 }

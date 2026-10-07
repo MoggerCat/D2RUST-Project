@@ -185,9 +185,6 @@ impl Fx {
             world,
             Seed::init_low(game_seed),
             TestPending {
-                // The action wiring keeps its own interact record here
-                // (as this file's fixture always did).
-                interact: Some(BTreeMap::new()),
                 book: book.clone(),
                 drops: Some(DeathDrops::new(
                     Arc::new(drop_tables()),

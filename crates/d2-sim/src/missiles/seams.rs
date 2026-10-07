@@ -130,15 +130,6 @@ pub trait MissileCombat {
     /// on the owner's seed. Only called with an owner (a missing owner
     /// misses without a draw, R5 step 5).
     fn hit_test(&mut self, game: &mut Game, owner: UnitId, defender: UnitId, tohit: i32) -> bool;
-    /// Server-damage function `index` (1…14; `0x0073C960`).
-    fn srv_dmg(
-        &mut self,
-        game: &mut Game,
-        index: i16,
-        missile: UnitId,
-        unit: UnitId,
-        damage: &mut Damage,
-    );
     /// The rest of `0x005ADCD0` after the missile's result flags: block /
     /// dodge, hit class, hit flags, pierce percent, events and damage
     /// execution (§R6.1).
@@ -365,6 +356,11 @@ pub trait MissileBodies {
     fn is_large_monster(&self, unit: UnitId) -> bool {
         false
     }
+    /// The monster's class has the monstats2 `small` flag
+    /// (`0x004638A0(class, 10)`; moltenboulder, §R6.3 function 14).
+    fn is_small_monster(&self, unit: UnitId) -> bool {
+        false
+    }
     /// Pet test `0x005542C0(game, owner, unit, skill)`.
     fn is_pet(&self, game: &Game, owner: UnitId, unit: UnitId, skill: i32) -> bool {
         false
@@ -397,6 +393,17 @@ pub trait MissileBodies {
     fn set_path_type(&mut self, unit: UnitId, ty: i32) {}
     /// `0x00648E70`: path distance.
     fn set_path_distance(&mut self, unit: UnitId, d: i32) {}
+    /// `0x00621DC0(unit, x, y)`: the 64-step direction from the unit's
+    /// position to (x, y) (`skills/bodies-3.md` §3.8, `sim/pathing.md`
+    /// §8.3). Default: 0.
+    fn dir64(&self, unit: UnitId, at: (i32, i32)) -> i32 {
+        0
+    }
+    /// Path point i := (x, y) (the point array of `0x006487D0`;
+    /// `skills/bodies-4.md` §2.4).
+    fn set_path_point(&mut self, unit: UnitId, i: i32, at: (u16, u16)) {}
+    /// The path's point count := n (`0x00648790`).
+    fn set_path_point_count(&mut self, unit: UnitId, n: i32) {}
     /// `0x00650BE0(path, unit, room, x, y)` (`sim/path-placement.md` §6).
     fn path_teleport(
         &mut self,

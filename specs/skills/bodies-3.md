@@ -27,15 +27,15 @@
 | Rules | 64–65 |
 |   1. Conventions | 66–93 |
 |   2. Implementation questions answered | 94–190 |
-|   3. Shared helpers, batch 4 | 191–342 |
-|   4. Bodies used by several monster skills | 343–531 |
-|   5. Bodies used by one monster skill | 532–968 |
-| Constants & data dependencies | 969–1004 |
-| Randomness | 1005–1021 |
-| Edge cases & original bugs | 1022–1061 |
-| Test vectors | 1062–1076 |
-| Provenance | 1077–1099 |
-| Open questions | 1100–1123 |
+|   3. Shared helpers, batch 4 | 191–355 |
+|   4. Bodies used by several monster skills | 356–544 |
+|   5. Bodies used by one monster skill | 545–983 |
+| Constants & data dependencies | 984–1019 |
+| Randomness | 1020–1036 |
+| Edge cases & original bugs | 1037–1076 |
+| Test vectors | 1077–1091 |
+| Provenance | 1092–1114 |
+| Open questions | 1115–1144 |
 <!-- /index -->
 
 ## Summary
@@ -253,6 +253,11 @@ Both bodies (srvdo 3, srvdo 5) differ only in step 2.2:
    to-hit `0x00645720(unit, I, 0, 0, 0)`; M `damagepercent(25)` += throw
    mastery damage `0x00645720(unit, I, 0, 1, 0)` (`levels.md` §3.5:
    stats 345 / 346 for a throwing item whose used skill has range 2).
+   `0x00645720` is gated on I's type: I not `throwable` (`0x0062BA80`;
+   step 2.2 also accepts such an item through `item_throwable(125)`), no
+   used skill, used skill's `itypea1` not `thro` (48), or its range ≠ 2
+   → returns 0 for both calls: `tohit(19)` is rewritten to its own value
+   and `damagepercent(25)` += 0.
 7. Return 1.
 
 #### 3.4 Monster swing `0x005CDDD0`
@@ -320,6 +325,14 @@ monstats2 record → 1. k = monstats2 `ResurrectSkill` (+0x10C, u16) in
 
 - `dir64(unit, x, y)` = `0x00621DC0`: the 64-step direction from the
   unit's position to (x, y) (`0x0064FDC0`, `sim/pathing.md` §8.3).
+  The unit position is its sub-tile: unit types 2, 4, 5 → static path
+  +0x0C / +0x10; else dynamic path sub-tile (`0x006488C0` /
+  `0x00648900`, path u16 +2 / +6); no path → 0. `0x0064FDC0(ux, uy, x,
+  y)` hands §8.3 start (ux·0x10000 + 0x8000, uy·0x10000 + 0x8000) and
+  point (x·0x10000 + 0x8000, y·0x10000 + 0x8000): sub-tile centres, no
+  path fraction. It returns §8.3 steps 1–3 only: rule 4 (flag 0x200,
+  `0x0064FED5`) lies in `0x0064FE40` (§8.4), not on this route.
+  Answered (2026-10-08, impl-missile-init MI1).
 - `dir8(d)` = table `0x00745600`: ((d + 4) >> 3) & 7 for d in 0…63.
 - Offset pair e (`0x0063E7E0(e, &dx, &dy)`): dx = table `0x006EA998`
   [e], dy = `0x006EA978`[e] (signed bytes; 32 entries, read from the
@@ -726,7 +739,8 @@ No Ghidra function at this entry. Skill and L are not read.
 #### 5.16 srvdo 90 Swarm Move `0x005CBC80`
 
 1. R invalid → 0. E none → 0.
-2. E flags bit 2 set (the move ended): E flags := 0; v = `eval(calc2)`.
+2. E flags & 2 (the move-ended flag, `use.md` §5.2 rule 2): E flags
+   := 0; v = `eval(calc2)`.
    Else v = `eval(calc1)`.
 3. Frame event index (unit +0x38 bits 8+) := v. Return 1.
 
@@ -780,8 +794,8 @@ Action frame (+0x4E) := 0; current frame (+0x44 >> 8) ≤ 0 → unit +0x3C
 3. r = R `Param4` (+0x154) + 2L (an invalid skill reads a null record:
    fatal).
 4. Unit find around (tx, ty) radius r with filter 0x583 (`0x0056C210`:
-   `0x0065A950` / `0x0065AC70`, the finder no spec owns; freed by
-   `0x0056C2A0`). For each found U in order: U must not be hostile
+   `0x0065A950` / `0x0065AC70`, `monsters/umod-callbacks.md` §3.1, room
+   R = the unit's own room `0x00620BB0(unit)`; freed by `0x0056C2A0`). For each found U in order: U must not be hostile
    (`0x00554200` = 0), must be of class 141…145 or 396…400, and must pass
    `0x005C3420` (`bodies.md` §4.4 step 3, which requires hostile) →
    `0x0056EBE0` apply_state {source the unit, target U, skill, L,
@@ -874,7 +888,8 @@ Skill columns used: `Param1`…`Param6` (1.14d DiabRun: 8, 14, 5, 13, 16,
 6), `calc1`.
 
 1. R invalid → 0. E none → 0.
-2. E flags bit 2 set (the run ended): E flags := 0; frame count
+2. E flags & 2 (the run ended, `use.md` §5.2 rule 2): E flags := 0;
+   frame count
    (+0x48) := `Param1` << 8; frame event index := `Param2`. Return 1.
 3. cur = current frame (+0x44 >> 8).
 4. cur = `Param3`: P none → 0. v = max(`eval(calc1)` << 8, 0x100); P
@@ -1120,3 +1135,9 @@ steps call them (`bodies.md` Randomness).
    `monsters/ai.md` §7 rule 5 placement test), the population caller
    is dead code (`monsters/population.md` §3.3), so no other owner is
    needed.
+8. Answered (2026-10-08, `docs/handoff/impl-monster-skill-slots.md`): throw mastery for a
+   non-throw item (§3.3 step 6) is 0: `0x00645720` tests the item's
+   `throwable` type first. FetishAura's finder room (§5.22 step 4) is
+   the casting unit's room. "E flags bit 2" in §5.16 / §5.30 is mask 2,
+   the move-ended flag owned by `use.md` §5.2 rule 2 (`test al, 2` at
+   `0x005CBCC8`, `0x005CD3D2`).

@@ -1,6 +1,7 @@
 # Handoff: mutation testing of `d2_sim::path` (`claude/mutants-path`)
 
-> Not yet folded into `docs/HANDOFF.md` / `docs/PLAN.md` (neither is edited here); the coordinator folds it.
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the tenth fold (`claude/fold-handoff-10`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Tenth set" (PC 1 / PC 2).
+
 
 Cloud test session, 2026-10-06, METHODS M08 (prove the check can fail).
 Base: `claude/tender-meitner-mphas3` at `729c76e`. Repo only, no game

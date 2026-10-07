@@ -13,6 +13,23 @@
   `formats/tbl.md`, `formats/palette.md` (PL2 text colors),
   `sim/intents-events.md` (intents the UI sends)
 
+<!-- index -->
+| Section | Lines |
+|---|---|
+| Summary | 33–41 |
+| Inputs | 42–51 |
+| Outputs / state changes | 52–56 |
+| Rules | 57–58 |
+|   A. d2rs design (ours) | 59–169 |
+|   B. Original behavior to reproduce (owned by the specs named) | 170–302 |
+| Constants & data dependencies | 303–306 |
+| Randomness | 307–310 |
+| Edge cases & original bugs | 311–314 |
+| Test vectors | 315–329 |
+| Provenance | 330–341 |
+| Open questions | 342–361 |
+<!-- /index -->
+
 ## Summary
 
 The UI is our own small immediate-layout framework in plain Rust: panels
@@ -93,9 +110,9 @@ fn layout_text(font: &Font, text: &[u16], origin: IVec2, color: TextColor,
 - Bevy keyboard/mouse events are mapped to `Action` values in
   `d2-client::input` (the only Bevy-facing part); everything after is
   plain Rust.
-- `Action` is a closed enum, ours: movement/attack clicks, skill slots,
-  belt slots, panel toggles, chat, map, run toggle, etc. Its list is
-  completed from §B4 (the original's configurable commands).
+- `Action` is a closed enum, ours: the 57 configurable commands of
+  `ui/controls.md` §3 plus the fixed inputs of its §4.3 (left / right
+  button, which are not configurable).
 - Mouse position is converted to the 800×600 frame by the inverse of the
   presentation scale (`render-pipeline.md` §A9) with integer division,
   then clamped; positions in the black bars are outside the frame.
@@ -144,22 +161,144 @@ Rules:
 5. Newer `version` than supported: error. Older: migrated in code
    (`controls::migrate`), file rewritten only on explicit user save.
 
-`preset = "original"` is the original's default key configuration (§B4);
-until that spec exists, only `preset = "dev"` (ours, marked unverified
-in code) is accepted.
+`preset = "original"` is the original's default key configuration:
+the 57 commands and 114 default bindings of `ui/controls.md` §3
+(machine form `ui/key-commands.tsv`; `Action` names = its `string_key`
+column, command 56 = `GameMenu`), checked by `ui/controls.md` §B4.
+`preset = "dev"` (ours) stays accepted for development.
 
-### B. Original behavior to reproduce (not specified here)
+### B. Original behavior to reproduce (owned by the specs named)
 
-| # | Behavior | Owner spec (to write) | Measure | Comparison |
+Owners as of 2026-10-07 (`claude/pc2-ui`): B1 `ui/panels.md`,
+`ui/panels-2.md`, `ui/control-panel.md`, `ui/menus.md`,
+`ui/messages.md`; B2 `ui/panels.md` §2–§4; B3 `ui/text.md`; B4
+`ui/controls.md` (world click messages and hold repeat: its OQ 2,
+recording `controls-0001`); B5 `ui/inventory.md` (cursor item draw and
+belt panel: its OQ 4, 5); B6 `render/capture.md` §3.3 (cursor type
+table, frames, draw position); B7 `ui/automap.md` **not written** (draw
+`0x0045AD60`, key commands 7–11 and 45 in `ui/controls.md` §3); B8
+`audio/triggers.md` (UI sound requests through `0x004B9A00`). All are
+draft: pixels unverified until their capture cases run.
+
+| # | Behavior | Owner spec | Measure | Comparison |
 |---|---|---|---|---|
-| B1 | Panel art and layout: which DC6 files and frames each panel draws, positions at 800×600, control panel, belt, orbs (fill rule), minipanel | `ui/panels.md` | client UI draw path; captures | identical pixels on `ui` captures per panel |
-| B2 | Panel open/close/stack rules, which panels exclude each other, world view shift when panels open | `ui/panels.md` | UI state code; captures | identical pixels and identical intents per input sequence |
+| B1 | Panel art and layout: which DC6 files and frames each panel draws, positions at 800×600, control panel, belt, orbs (fill rule), minipanel | `ui/panels.md`, `ui/panels-2.md` §22, `ui/panels-3.md` §23, `ui/control-panel.md` | client UI draw path; captures | identical pixels on `ui` captures per panel |
+| B2 | Panel open/close/stack rules, which panels exclude each other, world view shift when panels open | `ui/panels.md`, `ui/panels-2.md` §22, `ui/panels-3.md` §23 | UI state code; captures | identical pixels and identical intents per input sequence |
 | B3 | Text layout: advance (font `width` vs cell), line height, baseline, the font `.tbl` unknowns (`font-tbl.md` OQ 1), wrap, alignment, `ÿc` color codes, text-color PL2 maps, hover/item-name boxes | `ui/text.md` | text draw path; captures of known strings | identical pixels |
-| B4 | Default key configuration, configurable command list, mouse semantics (left/right/shift/alt), repeat behavior, at which tick held buttons send repeated intents | `ui/controls.md` | 1.14d key config and input path; packet trace with known inputs | identical action list; identical C→S messages and send ticks for a scripted input |
-| B5 | Inventory/stash/cube/belt grids: cell sizes, item graphic placement (`invfile`, sizes), hover highlight, cursor item drawing | `ui/inventory.md` | UI draw path; captures | identical pixels |
-| B6 | Cursor: images, hotspots, animation frames, when it changes | `ui/panels.md` | captures | identical pixels |
-| B7 | Automap: drawing, fade, cells revealed | `ui/automap.md` | captures | identical pixels |
-| B8 | UI sounds triggered by panels and clicks | `client/audio.md` §B owners | audio trace | identical file and trigger tick |
+| B4 | Default key configuration, configurable command list, mouse semantics (left/right/shift/alt), repeat behavior, at which tick held buttons send repeated intents | `ui/controls.md` (§3 command table `0x00712698`, defaults `0x00712220`; §6–§7) | 1.14d key config and input path; packet trace with known inputs | identical action list; identical C→S messages and send ticks for a scripted input |
+| B5 | Inventory/stash/cube/belt grids: cell sizes, item graphic placement (`invfile`, sizes), hover highlight, cursor item drawing | `ui/inventory.md` §8–§9 | UI draw path; captures | identical pixels |
+| B6 | Cursor: images, hotspots, animation frames, when it changes | `ui/panels-3.md` §23 (cursor), `ui/panels-2.md` §22, `render/capture.md` §3.3 | captures | identical pixels |
+| B7 | Automap: drawing, fade, cells revealed | `ui/automap.md` (not written) | captures | identical pixels |
+| B8 | UI sounds triggered by panels and clicks | `client/audio.md` §B owners, `audio/triggers.md`; site → control map below | audio trace | identical file and trigger tick |
+
+#### B8.1 UI sound request sites → controls
+
+Answers `audio/triggers.md` open question 12 (the control part; the
+request path, ids and sounds stay in `audio/triggers.md` §11). Every
+call of the UI request `0x004B9A00(id, no unit, 0, 0, 0)` whose id is a
+constant in the 1.14d disassembly and is one of 1–6, 15, 16. "Constant"
+includes an id built as `lea ecx, [r + k]` where r was set to a fixed
+value earlier in the same function (`xor r, r` or `mov r, 1`). "Down" /
+"up" = the mouse handler for button down / up of that UI's handler
+table; "pressed" = the press flag the handler sets before the request.
+
+1. **Count: 77 sites, not 72.** The scan of `re/exports/all.asm` finds
+   the 72 sites of `audio/triggers.md` §11 plus five whose base
+   register is set far from the call: `0x0045FE8B` (id 4), `0x004913F5`
+   (4), `0x004A5E9A` (2), `0x004A60F9` (1), `0x004A7896` (5). Ids: 1 ×
+   25, 2 × 8, 3 × 4, 4 × 28, 5 × 2, 6 × 8, 15 × 1, 16 × 1. Site
+   `0x004C05C1` requests 3 or 5 (`0x58` code 5, arg u8@6 = 0 → 3, else
+   5) and is counted once, under 3. `audio/triggers.md` §11 needs these
+   counts (cross-file request to PC 2).
+2. The options-menu sites (7) are owned by `audio/sound-table-2.md`
+   §15 r5 (`audio/triggers-2.md` §17); they are listed here only for
+   completeness.
+
+   | Site | Id | Function | Control / event |
+   |---|---|---|---|
+   | `0x0047D646` | 1 | `0x0047D5C0` | options menu: choice entry activated (Enter / click release), `sound-table-2.md` §15 r5 |
+   | `0x0047D667` | 2 | `0x0047D5C0` | options menu: action entry activated |
+   | `0x0047D7E1` | 1 | `0x0047D670` | options menu: slider dragged to a new stop |
+   | `0x0047D8F6` | 1 | `0x0047D8A0` | options menu: down arrow (next enabled entry) |
+   | `0x0047D971` | 1 | `0x0047D920` | options menu: up arrow (previous enabled entry) |
+   | `0x0047DA69` | 1 | `0x0047D9A0` | options menu: left arrow changed the value |
+   | `0x0047DB59` | 1 | `0x0047DA90` | options menu: right arrow changed the value |
+   | `0x0047AC66` | 1 | `0x0047AA60` | IME composition result into the 32-unit text field `[0x007BC850]` that does not fit (cut to 31 units, `[0x007BC88E]` := 0) |
+   | `0x0048A74E` | 1 | `0x0048A730` | inventory weapon swap button (`ui/panels.md` §9, swap 0x60) |
+   | `0x004A5A1B` | 1 | `0x004A59D0` | configure controls (UI_CONFIG 11): mouse wheel moved the key list |
+   | `0x004A5A8F` | 1 | `0x004A5A40` | configure controls: up arrow moved the selected row (separator rows, key code 0x39, skipped) |
+   | `0x004A5B09` | 1 | `0x004A5AB0` | configure controls: down arrow moved the selected row |
+   | `0x004A5B68` | 1 | `0x004A5B30` | configure controls: left arrow, column flag `[0x007246D4]` 0 → 1 |
+   | `0x004A5BC8` | 1 | `0x004A5B90` | configure controls: right arrow (the other column) |
+   | `0x004A5CCB` | 1 | `0x004A5C70` | configure controls: Esc or Space closes the screen (`SetUIState(11, off)`, `0x0047E090`) |
+   | `0x004A60F9` | 1 | `0x004A60B0` | configure controls, waiting for a key: Esc cancels the assignment |
+   | `0x004B3B0B` | 1 | `0x004B3870` | NPC shop item click (`ui/menus.md` §4: "every other case") |
+   | `0x004B713E` | 1 | `0x004B7100` | NPC menu box (`ui/menus.md` §2): keyboard moved the selection to another selectable item |
+   | `0x004B7251` | 1 | `0x004B7200` | NPC menu box: the pointer selected a different item |
+   | `0x004BE946` | 1 | `0x004BE910` | text list widget (`ui\menu\textslid`, vtable `0x006DAAF8`; the message log, UI_MSGLOG 24): line up |
+   | `0x004BE9EE` | 1 | `0x004BE990` | text list widget: line down |
+   | `0x004BF3F9` | 1 | `0x004BF2F0` | text list widget: position set by the slider |
+   | `0x004BFADF` | 1 | `0x004BFA70` | item-socket dialog (UI 0x0E, `ui/messages.md` §11 r5): the placed item taken back onto the cursor |
+   | `0x004C032A` | 1 | `0x004C02F0` | item-socket dialog: close button, Esc or Space (`ui/messages.md` §11 r6) |
+   | `0x004C049D` | 1 | `0x004C0450` | item-socket dialog: button released inside its armed rectangle |
+   | `0x004C2E61` | 1 | `0x004C2C80` | not a control: S→C 0x9D action 0x05 (RemoveFromContainer, `client/msg-stats-items.md` §2) removing an item of the local player, with the handler's flag byte = 1 |
+   | `0x004A5C46` | 2 | `0x004A5BF0` | configure controls: Delete or Backspace cleared the selected binding |
+   | `0x004A5E9A` | 2 | `0x004A5E60` | configure controls, button up on a key row: start the assignment |
+   | `0x004A5ED5` | 2 | `0x004A5E60` | configure controls, button up on a bottom button (function table `0x007246DA`, stride 0x1A) |
+   | `0x004A5FC4` | 2 | `0x004A5F70` | configure controls: Enter starts the assignment |
+   | `0x004A613E` | 2 | `0x004A60B0` | configure controls, waiting for a key: a key was bound |
+   | `0x004A620C` | 2 | `0x004A61A0` | configure controls, waiting for a key: a mouse button was bound |
+   | `0x004BFB09` | 2 | `0x004BFAF0` | item-socket dialog: button 0 (imbue / ok) with an item placed |
+   | `0x00489387` | 3 | `0x00489360` | trade screen (`client/msg-ui.md` §3, multiplayer) |
+   | `0x00489825` | 3 | `0x004897E0` | trade screen |
+   | `0x004BFD7F` | 3 | `0x004BFC50` | item-socket dialog: cursor item refused |
+   | `0x004C05C1` | 3 / 5 | `0x004C0550` | not a control: S→C 0x58 code 5 (`client/msg-ui.md` §8) |
+   | `0x0045FE8B` | 4 | `0x0045FE30` | one-button popup (`UI\Bigmenu\popupok`, loop `0x00460500` / `0x004605A0`): OK down |
+   | `0x0046024B` | 4 | `0x004601F0` | two-button popup (`UI\Menu\okcancelbtn`, loop `0x00460680`): OK or Cancel down |
+   | `0x0047F091` | 4 | `0x0047EF30` | mini panel button down (`ui/control-panel.md` §9 r7) |
+   | `0x0048B780` | 4 | `0x0048B680` | hireling inventory (UI_MERCINV 36): close button down (x `sx + 272`…`sx + 304`, y `H + sy − 95`…`H + sy − 63`, inclusive), `[0x007BCEA0]` := 1 |
+   | `0x0049134A` | 4 | `0x004912A0` | inventory grid handler: inventory gold button down (`[0x007BCE30]` := 1; modes 0, 0x0B, 0x0C, 0x0F) |
+   | `0x0049138B` | 4 | `0x004912A0` | inventory grid handler: inventory close button down (`[0x007BCE90]` := 1) |
+   | `0x004913F5` | 4 | `0x004912A0` | inventory grid handler: inventory close button down, second path (after `SetUIState`) |
+   | `0x00491D98` | 4 | `0x00491D20` | NPC shop down: inventory close button (`ui/panels-2.md` §16 r13) |
+   | `0x0049241E` | 4 | `0x00492310` | trade screen (inventory mode 0x0B, multiplayer): button down (`[0x007BCE18]` := 1) |
+   | `0x00492469` | 4 | `0x00492310` | trade screen: button down (`[0x007BCE24]`, `[0x007BCE1C]` := 1) |
+   | `0x004924B0` | 4 | `0x00492310` | trade screen: button down (`[0x007BCE30]` := 1) |
+   | `0x004925E4` | 4 | `0x00492510` | stash: stash close button down (`ui/panels-2.md` §20 r1) |
+   | `0x00492696` | 4 | `0x00492510` | stash: inventory gold button down (`[0x007BCE30]`) |
+   | `0x004926E1` | 4 | `0x00492510` | stash: stash gold button down (`[0x007BCE34]`) |
+   | `0x00492858` | 4 | `0x004927C0` | cube: cube close button down (`ui/panels-2.md` §20 r2) |
+   | `0x004928AB` | 4 | `0x004927C0` | cube: transmute button down |
+   | `0x00492946` | 4 | `0x004927C0` | cube: inventory gold button down (`[0x007BCE30]`) |
+   | `0x0049965D` | 4 | `0x00499500` | control panel: menu or run button down (`ui/control-panel.md` §10 r1) |
+   | `0x0049D225` | 4 | `0x0049D160` | waypoint menu: close button down (`ui/menus.md` §1 r2) |
+   | `0x0049D248` | 4 | `0x0049D160` | waypoint menu: row down |
+   | `0x004A2A4C` | 4 | `0x004A2A20` | quest-log alert button (UI_QUESTLOG 17) down (`[0x007BF2B0]` := 1) |
+   | `0x004A3F65` | 4 | `0x004A3E40` | quest panel (UI_QUESTSCREEN 15): a quest icon down (`[0x007BF2B5]` := index) |
+   | `0x004A3FB3` | 4 | `0x004A3E40` | quest panel: close button down (`[0x007BF2B4]` := 1) |
+   | `0x004A6749` | 4 | `0x004A66E0` | new-stats button down (`[0x007C02E4]`, `ui/control-panel.md` §8) |
+   | `0x004A67F9` | 4 | `0x004A6790` | new-skills button down (`[0x007C02E8]`) |
+   | `0x004A778B` | 4 | `0x004A7720` | character panel: close button down (`[0x007C02F4]`, `ui/panels.md` §8 r3) |
+   | `0x004ABAD8` | 4 | `0x004AB7E0` | skill tree: close button down (`ui/panels-2.md` §19) |
+   | `0x004BACB3` | 4 | `0x004BAC70` | `ButtonWrapper` widget (vtable `0x006DA6F4`; made by `0x004BB0F0`, e.g. at (250, 287) in `0x00454440`): down inside it |
+   | `0x004A7896` | 5 | `0x004A7720` | character panel: a stat add button down (`[0x00724A50 + …]` := 1) |
+   | `0x004ABBF1` | 5 | `0x004AB7E0` | skill tree: a learnable skill icon down (`[0x007C0838 + 4i]` := 3) |
+   | `0x00491F7B` | 6 | `0x00491D20` | NPC shop: tab 0 chosen (not the current page) |
+   | `0x00491FB6` | 6 | `0x00491D20` | NPC shop: tab 1 |
+   | `0x00491FE6` | 6 | `0x00491D20` | NPC shop: tab 2 |
+   | `0x0049201F` | 6 | `0x00491D20` | NPC shop: tab 3 |
+   | `0x0049D1CD` | 6 | `0x0049D160` | waypoint menu: another act tab |
+   | `0x0049E585` | 6 | `0x0049E3A0` | not a control: screen message added (`ui/messages.md` §2 r3) |
+   | `0x0049E7D0` | 6 | `0x0049E5C0` | not a control: event-text screen message added (from 0x5A, `client/msg-ui.md` §19) |
+   | `0x004ABA32` | 6 | `0x004AB7E0` | skill tree: another tab |
+   | `0x004B26A2` | 15 | `0x004B2650` | NPC repair sent (`ui/menus.md` §4) |
+   | `0x0049E9AC` | 16 | `0x0049E8F0` | not a control: event text "hostile" (string 0xFBA; from 0x5A, `client/msg-ui.md` §19) |
+
+3. Sites marked "not a control" are message effects; their owner is the
+   message's spec, and the UI layer requests them as part of that
+   message's output (`client/bridge.md` §10 r5).
+4. Not listed: requests whose id is computed (item, NPC and skill sound
+   tables), owned by `audio/triggers.md`.
 
 ## Constants & data dependencies
 
@@ -191,14 +330,21 @@ To be listed by the §B owners (reproduced by default).
 ## Provenance
 
 Design decided 2026-10-06 (architecture session). Font and string format
-facts come from `font-tbl.md` and `tbl.md`. No original behavior is
-stated here.
+facts come from `font-tbl.md` and `tbl.md`. §B8.1 (2026-10-08): a scan
+of every `0x004B9A00` call in `re/exports/all.asm` (ECX traced back in
+the function), handler tables read from the 1.14d image (`0x006D60C0`
+UI_CONFIG, `0x006D615C` UI_QUESTLOG, `0x0070F8D8` UI_QUESTSCREEN,
+`0x006D633C` UI_MERCINV, `0x00711D40` / `0x00711D70` popups; open hook
+`0x00455720` jump table `0x00455A40`), the functions read with
+`tools/ghidra/disasm.py` and the Ghidra export; control names from the
+PC 2 `ui/*` specs where they own the handler.
 
 ## Open questions
 
 1. Does the original's UI layout at 800×600 differ from 640×480 beyond
    centering, and must 640×480 be offered? (decision + `ui/panels.md`)
-2. §B1–§B8.
+2. §B1–§B8: owners named in §B (2026-10-07); still to write:
+   `ui/automap.md` (§B7).
 3. Text input (chat) IME/clipboard: ours to decide once chat exists;
    no fidelity impact beyond the characters sent.
 4. OQ 1 is answered for the panels by `ui/panels.md` §1: the 800 × 600
@@ -206,3 +352,9 @@ stated here.
    border and control panel (§6 there). §B1 (panel art) and §B2
    (open/close, exclusion, view shift) are written in `ui/panels.md`;
    its §Open questions 1 lists the §B1/§B6 parts still open.
+5. *Answered (2026-10-08).* §B8 UI control → sound site map
+   (`audio/triggers.md` OQ12): §B8.1 (77 constant-id sites of
+   `0x004B9A00`; the 7 options-menu sites stay owned by
+   `audio/sound-table-2.md` §15 r5). Open: the field `[0x007BC850]` of
+   `0x0047AC66` and the `ButtonWrapper` users of `0x004BACB3` are named
+   only by address; Phase 6 UI specs name them.

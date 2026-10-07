@@ -705,7 +705,15 @@ fn orb_operate_two_hits() {
     act3::orb_operate(&mut ctl, &mut f, ORB_U, P1);
     assert_eq!(x(&ctl).hits, 1);
     assert!(f.log().is_empty() && f.f.sent.is_empty());
-    // The second smashes it.
+    // The second smashes it. The orb kill (`quests-helpers.md` §4.3):
+    // mode 0 at (0, 0), then missile 368 from the orb to the first
+    // class-386 object of its room list, data +0x28 := its GUID, its
+    // room refreshed.
+    let stairs = UnitId(0x81);
+    f.f.objects.insert(stairs, (0x81, 386, 0));
+    f.f.pos.insert(ORB_MON_U, (10, 20, RoomId(4)));
+    f.f.pos.insert(stairs, (12, 25, RoomId(4)));
+    f.f.a5_adjacent.insert(RoomId(4), vec![ORB_MON_U, stairs]);
     ctl.records[i].state = 7;
     act3::orb_operate(&mut ctl, &mut f, ORB_U, P1);
     let fl = f.flags(P1);
@@ -713,9 +721,18 @@ fn orb_operate_two_hits() {
     assert!(f.p(P1).items.is_empty());
     let log = f.log();
     assert_eq!(
-        log[..4],
-        ["delete qf2 ", "kill 65", "mode 80 1", "event1 80 116"]
+        log[..7],
+        [
+            "delete qf2 ",
+            "mode request 65 0 0 0",
+            "spawn missile 368 owner 65 origin Some(65) flags 0x420 at 0 0 target 12 25 skill 0 level 1",
+            "missile guid 36865 0x81",
+            "refresh 129",
+            "mode 80 1",
+            "event1 80 116"
+        ]
     );
+    assert!(ctl.faults.is_empty());
     assert!(x(&ctl).orb_smashed);
     assert_eq!(ctl.fx, 10);
     assert!(f.f.sent.iter().any(|m| m.1 == [0x89, 10]));

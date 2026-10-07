@@ -46,7 +46,6 @@ fn odd(u: UnitId) -> bool {
 /// answered from its arguments (bools: an odd unit id).
 #[derive(Default)]
 pub struct Probe {
-    pub interact: BTreeMap<UnitId, (u8, u32)>,
     pub quests: BTreeMap<UnitId, PlayerQuests>,
     pub guids: BTreeMap<UnitId, u32>,
     pub sent: Vec<(UnitId, Vec<u8>)>,
@@ -82,15 +81,6 @@ impl NpcRest for Probe {
     }
     fn tristram_cain_busy(&self, _: UnitId, _: UnitId) -> bool {
         false
-    }
-    fn interact_unit(&self, player: UnitId) -> Option<(u8, u32)> {
-        self.interact.get(&player).copied()
-    }
-    fn set_interact(&mut self, player: UnitId, t: u8, guid: u32) {
-        self.interact.insert(player, (t, guid));
-    }
-    fn reset_interact(&mut self, player: UnitId) {
-        self.interact.remove(&player);
     }
     /// No hireling: the quest mercenary is granted (`npc.md` §7.5).
     fn pet(&self, _: UnitId, _: u8, _: u8) -> Option<UnitId> {
@@ -456,22 +446,6 @@ impl VendorRest for Probe {
 
 // ---- harnesses ------------------------------------------------------------------
 
-/// The interaction owner of a direct cube call.
-#[derive(Default)]
-struct Ia(BTreeMap<UnitId, (u8, u32)>);
-
-impl Interact for Ia {
-    fn interact_unit(&self, player: UnitId) -> Option<(u8, u32)> {
-        self.0.get(&player).copied()
-    }
-    fn set_interact(&mut self, player: UnitId, unit_type: u8, guid: u32) {
-        self.0.insert(player, (unit_type, guid));
-    }
-    fn reset_interact(&mut self, player: UnitId) {
-        self.0.remove(&player);
-    }
-}
-
 /// The wired host's vendor world on `probe`: the interaction desk over
 /// the host's economy (game fields edited by `fields` first), the NPC
 /// control block, and the inventory model, wrapped as the host wraps it.
@@ -504,7 +478,6 @@ fn with_vendors<O>(
 /// call sent and its errors (`ServerCube::finish`).
 fn with_cube<O>(
     t: &mut T,
-    ia: &mut Ia,
     fields: impl FnOnce(&mut GameFields),
     f: impl FnOnce(&mut ServerCube<'_, '_, '_, Hooks>) -> O,
 ) -> (O, Vec<Vec<u8>>, Vec<ItemError>) {
@@ -525,7 +498,6 @@ fn with_cube<O>(
             staged,
             pending.as_mut(),
             p.inventory.as_deref_mut(),
-            ia,
             player,
         );
         let out = f(&mut w);
@@ -715,7 +687,11 @@ fn inv_vendors_pass_other_calls_through() {
     }
     let (pg, ng) = (t.guid(player), t.guid(npc));
     let mut probe = Probe::default();
-    probe.interact.insert(player, (1, ng));
+    {
+        let r = t.units().get_mut(player).unwrap();
+        r.interact.reset();
+        r.interact.set(1, ng);
+    }
     let mut quests = PlayerQuests::default();
     quests.flags[1].0[4..6].copy_from_slice(&0x1234u16.to_le_bytes());
     quests.intro[2] = (0..1000).collect::<BTreeSet<u16>>();
@@ -774,10 +750,15 @@ fn inv_vendors_pass_other_calls_through() {
             // Items.
             let made = w.create_item(0, AMULET, q::NORMAL, 5).expect("created");
             assert_eq!(w.item_record(made), AMULET);
-            assert_eq!(w.copy_item(ring), Some(UnitId(ring.0 + 1000)));
+            // The copy is the inventory model's (`InvDesk::copy_of`,
+            // `vendors-2.md` §7.3), not the rest's.
+            let copy = w.copy_item(ring).expect("copied");
+            assert_ne!(copy, UnitId(ring.0 + 1000));
+            assert_eq!(w.item_record(copy), w.item_record(ring));
             assert_eq!(w.item_quality(ring), q::NORMAL);
             assert_eq!(w.item_file_index(ring), 5);
-            assert_eq!(w.item_flags(ring), flag::IDENTIFIED | 0x4);
+            // §7.3 step 6: the copied source carries 0x8000000.
+            assert_eq!(w.item_flags(ring), flag::IDENTIFIED | 0x4 | 0x800_0000);
             w.set_item_flags(ring, 0x30);
             assert_eq!(w.item_flags(ring), 0x30);
             w.or_unit_flags(ring, 0x40);
@@ -932,7 +913,6 @@ fn wired_vendors_run_on_the_model() {
 fn server_cube_answers_from_the_economy() {
     let mut t = setup(4);
     let (player, cube, ring) = (t.player, t.cube, t.ring);
-    let mut ia = Ia::default();
     {
         let tb = &mut t.world().tables;
         tb.items[CUBE].gemsockets = 4;
@@ -948,7 +928,6 @@ fn server_cube_answers_from_the_economy() {
     let guids = [t.guid(player), t.guid(cube), t.guid(ring)];
     let ((), _, errors) = with_cube(
         &mut t,
-        &mut ia,
         |f| {
             f.difficulty = 2;
             f.game_type = 3;
@@ -996,7 +975,7 @@ fn server_cube_answers_from_the_economy() {
     );
     assert!(errors.is_empty(), "{errors:?}");
     assert_eq!(t.host.game.events.sys.hooks.game_seed, Seed::init_low(77));
-    assert!(t.world().uniques.get(7));
+    assert!(t.host.game.events.sys.hooks.uniques.get(7));
     let rec = t.host.game.events.sys.units.get(ring).unwrap();
     assert_eq!((rec.mode, rec.class), (3, AMULET as u32));
     assert_eq!(rec.seed, Seed::init_low(9));
@@ -1013,7 +992,6 @@ fn server_cube_answers_from_the_economy() {
     // Expansion on, ladder off; the freed ring leaves the store.
     let ((), _, errors) = with_cube(
         &mut t,
-        &mut ia,
         |_| {},
         |w| {
             assert!(w.expansion());
@@ -1045,11 +1023,13 @@ fn server_cube_trading_and_stash() {
         ((3, sg), false, false),
     ];
     for (active, trading, stash) in cases {
-        let mut ia = Ia::default();
-        ia.0.insert(player, active);
+        {
+            let r = t.units().get_mut(player).unwrap();
+            r.interact.reset();
+            r.interact.set(active.0, active.1);
+        }
         let ((tr, st), _, _) = with_cube(
             &mut t,
-            &mut ia,
             |_| {},
             |w| (w.trading(player), w.interacting_with_stash(player)),
         );
@@ -1074,8 +1054,7 @@ fn server_cube_socketed_reads_the_model() {
         .state
         .inventories
         .insert(cube, inv);
-    let mut ia = Ia::default();
-    let (fillers, _, _) = with_cube(&mut t, &mut ia, |_| {}, |w| w.socketed(cube));
+    let (fillers, _, _) = with_cube(&mut t, |_| {}, |w| w.socketed(cube));
     assert_eq!(fillers, [ring]);
 }
 
@@ -1097,8 +1076,7 @@ fn server_cube_message_to_another_player_is_an_error() {
     let amu = item(&mut t.host.game, AMULET, 4);
     t.items().get_mut(amu).unwrap().inv_page = 0;
     store(&mut t.host.game, other, amu, 0);
-    let mut ia = Ia::default();
-    let ((), sent, errors) = with_cube(&mut t, &mut ia, |_| {}, |w| w.remove_cube_item(other, amu));
+    let ((), sent, errors) = with_cube(&mut t, |_| {}, |w| w.remove_cube_item(other, amu));
     assert!(sent.is_empty(), "{sent:?}");
     assert_eq!(errors, [ItemError::OtherPlayer(other)]);
     assert!(!t.items().contains(amu));
@@ -1122,11 +1100,9 @@ fn server_cube_item_routines_reach_the_economy() {
         val: 0,
     };
     t.world().tables.properties = vec![PropertyRec { slots }];
-    let mut ia = Ia::default();
     let mut format = 0;
     let ((fmt, init, value), _, errors) = with_cube(
         &mut t,
-        &mut ia,
         |f| format = ItemGame::item_format(&*f),
         |w| {
             let fmt = w.item_format();

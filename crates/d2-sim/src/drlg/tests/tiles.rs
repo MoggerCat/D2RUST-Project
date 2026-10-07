@@ -533,7 +533,8 @@ fn wall_merge_to_corner() {
     // B got a new type-3 record with its type-4 half for each cell.
     assert_eq!(tb.walls.iter().filter(|r| r.kind == 3).count(), 7);
     assert_eq!(tb.walls.iter().filter(|r| r.kind == 4).count(), 7);
-    assert_eq!(tb.other_links.len(), 7);
+    // Each pair is in the chain, the half after its record (§9.6 C1, C5).
+    assert_eq!(tb.other_links.len(), 14);
     assert!(tb.other_links.iter().all(|&(k, _)| k == RecordKind::Wall));
 }
 

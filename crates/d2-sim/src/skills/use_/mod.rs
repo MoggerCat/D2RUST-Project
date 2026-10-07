@@ -693,8 +693,8 @@ pub fn can_change_mode<W: UseWorld>(w: &W, t: &SkillTables, u: W::Unit, new: u32
                 .map_or(0, |r| r.seqinput);
             seq > 0 || early()
         }
-        // TODO(use.md §4): modes past KB are not listed.
-        _ => false,
+        // Any current mode above 18 (past the jump table) → yes (§4).
+        _ => true,
     }
 }
 
@@ -736,12 +736,12 @@ pub fn interrupt_gate<W: UseWorld>(
     }
     let mut blocked = false;
     if w.has_state(u, state::CONCENTRATION) {
-        let roll = w.seed(u).roll(100) as i32;
-        // TODO(use.md §4 step 4): state 42 on without a stat list: d2rs
-        // reads stat 164 as 0.
+        // The list's stat 164, read before the draw; a missing list gives
+        // 0, so the draw is still made and never blocks (§4 step 4).
         let limit = w
             .state_stat(u, state::CONCENTRATION, CONCENTRATION_STAT)
             .unwrap_or(0);
+        let roll = w.seed(u).roll(100) as i32;
         blocked = roll < limit;
     }
     if !blocked && w.has_state(u, state::CONCENTRATE) {
@@ -799,7 +799,7 @@ pub fn skill_mode(ty: UnitType, class: i32, r: &Skills, skill: i32, from_item: b
         UnitType::Player if class == 6 && skill == 5 => mode::S4,
         UnitType::Player => anim,
         UnitType::Monster => u32::from(r.monanim),
-        // TODO(use.md §5.1): other unit types are not listed.
+        // Every other unit type takes `anim` (§5.1).
         _ => anim,
     }
 }
@@ -810,8 +810,7 @@ pub fn skill_mode(ty: UnitType, class: i32, r: &Skills, skill: i32, from_item: b
 /// codes: `(frame, arg1, arg2)` for each frame with code 1–4; arg2 is a
 /// running index for codes 1, 2, 4 and 0 for 3. The ENDANIM timer
 /// follows (`sim/units.md`).
-// TODO(use.md OQ7): d2rs keeps one running index shared by codes 1, 2
-// and 4, starting at 0; the spec does not say whether it is per code.
+// The index is one counter shared by codes 1, 2 and 4, from 0 (§5.2).
 pub fn frame_events(codes: &[u8]) -> Vec<(usize, i32, i32)> {
     let mut n = 0;
     let mut out = Vec::new();
@@ -867,8 +866,7 @@ pub fn attack_frame_event<W: UseWorld>(
 /// Start `0x0056FAF0` (§5.3) for the used skill; its result.
 pub fn start<W: UseWorld>(w: &mut W, t: &SkillTables, u: W::Unit) -> i32 {
     let Some(e) = w.used_skill(u) else {
-        // TODO(use.md §5.3 step 1): "stop" taken as return 0 without the
-        // step-7 neutral reset.
+        // No used skill: 0, no neutral reset (§5.3 step 1).
         return 0;
     };
     let Some(r) = rec(t, e.skill) else {
@@ -1010,12 +1008,11 @@ fn start_core_with<W: UseWorld>(
     match r.lineofsight {
         0 => {}
         v @ 1..=5 => {
-            let Some(pos) = w.target_position(u) else {
-                // TODO(use.md §5.3 step 6.4): no target position: d2rs fails.
-                return 0;
-            };
-            if !w.line_clear(u, pos, LOS_MASKS[usize::from(v - 1)]) {
-                return 0;
+            // No target position: the test is skipped (§5.3 step 6.4).
+            if let Some(pos) = w.target_position(u) {
+                if !w.line_clear(u, pos, LOS_MASKS[usize::from(v - 1)]) {
+                    return 0;
+                }
             }
         }
         _ => return 0,
@@ -1080,9 +1077,11 @@ pub fn do_core<W: UseWorld>(
         }
         return 0;
     }
-    if !item && !used.is_some_and(|e| e.skill == skill && l > 0) {
-        // TODO(use.md §5.4 step 2): "level" of the highest entry read as
-        // its skill level with bonuses.
+    // The used entry's, else the highest entry's, `skill_level(…, 1)`
+    // (§5.4 step 2).
+    if !item
+        && !used.is_some_and(|e| e.skill == skill && skill_level(w, t, Some(u), Some(&e), true) > 0)
+    {
         let list = w.skill_list(u);
         let e = super::highest_entry(&list, skill);
         if skill_level(w, t, Some(u), e.as_ref(), true) <= 0 {

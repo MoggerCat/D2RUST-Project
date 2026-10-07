@@ -628,19 +628,17 @@ fn elem<W: SkillUnits>(
     let mut v = s32(base)
         .wrapping_add(bracket(lvl, levs.map(s32)))
         .wrapping_shl(u32::from(rec.hitshift));
-    if rec.edmgsympercalc != NO_CALC {
-        // TODO(levels.md §3.1 step 3): whether the gated minimum still
-        // evaluates the formula is not stated; d2rs evaluates, then gates
-        // the application (only a `rand` in the formula could tell).
+    // The min's gate is tested before the formula: a gated-out min does
+    // not evaluate it (no `rand` draw) (§3.1 step 3).
+    if rec.edmgsympercalc != NO_CALC && (max || v > 256 || rec.eminlev1 != 0) {
         let p = eval_skill(w, t, unit, rec.edmgsympercalc, skill, lvl);
-        if p != 0 && (max || v > 256 || rec.eminlev1 != 0) {
+        if p != 0 {
             v = v.wrapping_add(pct(v, p, 100));
         }
     }
     if mastery {
         if let (Some(u), Some(stat)) = (unit, elem_mastery_stat(rec.etype)) {
-            // TODO(levels.md §3.1): the getter is not named; the unit
-            // getter `0x00625480` is the narrowest reading.
+            // Unit getter `0x00625480(unit, stat, 0)` (§3.1 step 4).
             v = v.wrapping_add(pct(v, w.stat(u, stat, 0), 100));
         }
     }

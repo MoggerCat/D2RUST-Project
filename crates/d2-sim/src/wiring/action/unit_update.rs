@@ -1,4 +1,4 @@
-// Spec: specs/sim/intents-events.md §7.3, §7.4, §7.5, §7.7; specs/sim/units.md §4.1, §4.6
+// Spec: specs/sim/intents-events.md §7.3, §7.4, §7.5, §7.7, §7.9 rule 3; specs/sim/pathing.md §9.8; specs/sim/units.md §4.1, §4.6
 //! The monster part of the per-unit update (`0x00598220`, §7.3 rule 2
 //! step 2: the mode message `0x00597E20`, S→C 0x67–0x6D, built by
 //! [`crate::monsters::mode_message`]), the flag part of the room
@@ -30,6 +30,9 @@ const STAT_VELOCITY: u16 = 67;
 const STAT_POSITION: u16 = 328;
 /// Stat 6 `hitpoints`.
 const STAT_LIFE: u16 = 6;
+/// §7.3 rule 2 step 1: flag-ex (+0xC8) bit 0x10000, the reassign
+/// request (cleared by the room clean-up, §7.5 step 3).
+const REASSIGN_EX: u32 = 0x1_0000;
 
 /// Unit flags (+0xC4) and flag-ex bits (+0xC8) of the room clean-up.
 pub mod cleanup {
@@ -67,18 +70,28 @@ pub enum ModeMessageError {
 }
 
 impl<X: Pending> View<'_, X> {
-    /// §7.3 rule 2 step 2 for the client `client`: a monster with unit
-    /// flag 0x1 gets its mode message (§7.4), sent to the client's player
-    /// ([`Pending::send`]), then unit flag 0x80000 := 0. Needs the path
-    /// provider (the caller checks it); a client without a player gets
-    /// nothing.
+    /// The monster update `0x00598220` (§7.3 rule 2) for the client
+    /// `client`, its messages sent to the client's player
+    /// ([`Pending::send`]); a client without a player gets nothing. Needs
+    /// the path provider (the caller checks it). In order:
+    ///
+    /// 1. flag-ex (+0xC8) bit 0x10000: S→C 0x15 (type 1, GUID, the path's
+    ///    cell, flag 1), then the room-change messages `0x00554670(game,
+    ///    unit, 0)` (`pathing.md` §9.8);
+    /// 2. unit flag 0x1: the mode message (§7.4), then unit flag 0x80000
+    ///    := 0;
+    /// 4. unit flag 0x100: the overhead message `0x00571620` (§7.9 rule 3).
     ///
     /// TODO(spec: intents-events.md §7.1 rule 2.1, §7.2): a monster
     /// with unit flag 0x10 (not yet announced) first gets its add
     /// messages (0xAC, 0x98, 0x21, part B with a second mode message);
-    /// they are not sent here. Steps 1 and 3–10 of rule 2 (0x15, the
-    /// class / hireling messages, 0x0C, the stat messages) are not sent
-    /// either.
+    /// they are not sent here. Of rule 2, step 3 has nothing to send
+    /// (d2rs keeps no pending event records, §7.9 rule 2) and steps 5–10
+    /// are not sent: step 5 needs the item world, step 6's `0x00571740`
+    /// (unit +0x6E), step 7's 0x0C fields (`0x00597CF0`), step 8's test
+    /// `0x00639F20` and stat sender `0x005711D0`, step 9's `0x00625A20` /
+    /// `0x005715A0` conditions and step 10's 0x57 (`0x00597C70`) are not
+    /// specified.
     pub fn monster_update(&mut self, game: &mut Game, client: ClientId, unit: UnitId) {
         let Some(receiver) = game.lists.client(client).and_then(|c| c.player) else {
             return;
@@ -86,9 +99,36 @@ impl<X: Pending> View<'_, X> {
         let Some(r) = self.units.get(unit) else {
             return;
         };
-        if r.ty != UnitType::Monster || r.flags & flags::CHANGED == 0 {
+        if r.ty != UnitType::Monster {
             return;
         }
+        let (unit_flags, flags_ex, guid) = (r.flags, r.flags2, r.guid);
+        // Step 1.
+        if flags_ex & REASSIGN_EX != 0 {
+            let (x, y) = self.h.path_position(unit);
+            let m = crate::path::walk::messages::reassign_player(
+                UnitType::Monster as u8,
+                guid,
+                x as u16,
+                y as u16,
+                1,
+            );
+            self.h.x.send(receiver, &m);
+            crate::wiring::path::walk::PathCtx::of(self, game).room_change_messages(unit);
+        }
+        // Step 2.
+        if unit_flags & flags::CHANGED != 0 {
+            self.mode_update(game, client, receiver, unit);
+        }
+        // Step 4.
+        if unit_flags & flags::HOVER_FREED != 0 {
+            self.overhead_message(receiver, unit, UnitType::Monster as u8, guid);
+        }
+    }
+
+    /// §7.3 rule 2 step 2: the mode message (§7.4), then unit flag
+    /// 0x80000 := 0.
+    fn mode_update(&mut self, game: &Game, client: ClientId, receiver: UnitId, unit: UnitId) {
         if let Some(input) = self.mode_input(game, client, unit) {
             match mode_message::mode_message(&input) {
                 ModeMessage::Send(b) => self.h.x.send(receiver, &b),
@@ -265,12 +305,14 @@ impl<X: Pending> ActionHooks<X> {
 
     /// Mode DT's event-1 function `0x005A72B0` (§7.7 rule 3): mode 12,
     /// unit event 13 (`0x005C0C30(game, 13, unit, 0, 0)`,
-    /// [`Pending::unit_event`]), then the `monstats` `SplEndDeath` (row
+    /// [`super::combat::CombatView::fire_unit_event`]), then the `monstats` `SplEndDeath` (row
     /// +0x1A4) action 1 or 2 ([`Pending::death_end_action`] with
     /// `minion1`, row +0x26).
     pub fn death_event1(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
         self.death_mode(sim, unit);
-        self.x.unit_event(13, Some(unit), None, None);
+        View::of(sim.units, sim.stats, sim.data, self)
+            .combat(sim.game)
+            .fire_unit_event(13, Some(unit), None, None);
         let class = sim.units.get(unit).map(|r| r.class);
         let row = class.and_then(|c| self.tables.combat.monstats.get(c as usize));
         if let Some((action, minion)) = row.map(|m| (m.splenddeath, m.minion1)) {

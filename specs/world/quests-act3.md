@@ -32,20 +32,20 @@
 |   1. Conventions | 91–160 |
 |   2. Act III records | 161–188 |
 |   3. A3Q1 Lam Esen's Tome (chain 15, slot 17) | 189–272 |
-|   4. A3Q2 Khalim's Will (chain 16, slot 18) | 273–388 |
-|   5. A3Q3 Blade of the Old Religion (chain 17, slot 19) | 389–495 |
-|   6. A3Q4 The Golden Bird (chain 18, slot 20) | 496–584 |
-|   7. A3Q5 The Blackened Temple (chain 19, slot 21) | 585–681 |
-|   8. A3Q6 The Guardian (chain 20, slot 22) | 682–779 |
-|   9. Act III gossip and intro records | 780–841 |
-|   10. Hooks called from other systems | 842–862 |
-|   11. Clarifications (QC-1 … QC-7) | 863–869 |
-| Constants & data dependencies | 870–886 |
-| Randomness | 887–900 |
-| Edge cases & original bugs | 901–948 |
-| Test vectors | 949–966 |
-| Provenance | 967–993 |
-| Open questions | 994–1016 |
+|   4. A3Q2 Khalim's Will (chain 16, slot 18) | 273–390 |
+|   5. A3Q3 Blade of the Old Religion (chain 17, slot 19) | 391–497 |
+|   6. A3Q4 The Golden Bird (chain 18, slot 20) | 498–586 |
+|   7. A3Q5 The Blackened Temple (chain 19, slot 21) | 587–683 |
+|   8. A3Q6 The Guardian (chain 20, slot 22) | 684–781 |
+|   9. Act III gossip and intro records | 782–843 |
+|   10. Hooks called from other systems | 844–864 |
+|   11. Clarifications (QC-1 … QC-7) | 865–871 |
+| Constants & data dependencies | 872–888 |
+| Randomness | 889–902 |
+| Edge cases & original bugs | 903–950 |
+| Test vectors | 951–968 |
+| Provenance | 969–995 |
+| Open questions | 996–1023 |
 <!-- /index -->
 
 ## Summary
@@ -340,7 +340,7 @@ Chat end (`0x005B8020`): cain3 with +0x01 = 1: status 1 to all (chain
 | 406 brain | `0x005B8A20` | `qbr ` | +0x14, +0x25 |
 | 407 eye | `0x005B8940` | `qey ` | +0x10, +0x24 |
 
-Each: passes the quest-chest gate `0x00545850` or returns 0; one
+Each: passes the quest-chest gate `0x00545850` (`quests-act2.md` §1.3) or returns 0; one
 quest-seed step: n = (lo' mod 5) + 5 piles of gold (`0x00585970(game,
 object, 'gld ', 2)`) **before** the items; drop code := the part; with
 chain 16: +0x0C := 0, for each player (from the operating player) that
@@ -354,7 +354,8 @@ count and sets the flag; then the chest's own treasure `0x00585B90(op,
 
 - Stairs init 41 (`0x005B8660`): chain 16: +0x00 := 1, +0x04 := GUID;
   intro → mode 2, else mode := +0x08. Stairs operate 44 (`0x005B84E0`):
-  only in mode 2 → `0x0059D9D0` (the stairs' warp, object spec).
+  only in mode 2 → `0x0059D9D0` (the stairs' warp: every type-5 warp
+  tile of the stairs' room gets `0x005550B0`, `quests-act5-2.md` §7.8 summit door).
 - Lever init 42 (`0x005B86B0`): intro → mode 2.
 - Lever operate 45 (`0x005B8530`): lever mode 0, chain 16, +0x00 = 1
   and the stairs unit (+0x04) exists: lever mode := 1 with an
@@ -363,7 +364,8 @@ count and sets the flag; then the chest's own treasure `0x00585B90(op,
   Returns 0.
 - Lever event 7 (`0x005B85E0`, class 367): if +0x00 = 1: stairs gone →
   +0x08 := 2; else stairs mode := +0x08 and, when +0x08 ≠ 2, +0x08 := 2
-  and an end-animation event on the stairs.
+  and an end-animation event on the stairs at frame + (the stairs'
+  own `FrameCnt1` >> 8), no + 1 (`0x005B862A`–`0x005B864A`).
 
 #### 4.8 Cubing the Will (`0x005B86E0`, from `world/cube.md` §8)
 
@@ -670,7 +672,7 @@ Other victims:
   += 1; below 2 → return 0 (the first valid hit does nothing). Then:
   set 18.0, 18.13; delete `qf2 `; 21.4 set → set 21.0 (when clear); the
   orb monster (+0x2C) exists → kill it (`0x005DDFC0`, `0x005DFEE0`,
-  monster spec); object mode 1 with an end-animation event; +0x0C := 1;
+  `quests-helpers.md` §4.3); object mode 1 with an end-animation event; +0x0C := 1;
   FX 10; call chain 19's seq fn; party members (`0x005BB850`): with
   18.0 → delete the five Khalim items; else in Act III → set 18.0,
   18.13, delete the five items unless trading (`0x005678A0`), and 21.4
@@ -994,10 +996,14 @@ quest code draws.
 ## Open questions
 
 1. Status meanings per Act III quest (client quest log): settle with
-   `quests.md` open question 1.
+   `quests.md` open question 1. **Answered** (2026-10-07): `world/quests-status.md`: the client (0x52 `0x0045CC00` → `0x004A40D0` stores the list; row build `0x004A1950`, tables `0x00723F30` and the per-quest status tables) maps each status to a description string id, a replay speech id and an icon state (§4, §5); Act III tables §9; Blade (q 19) and Blackened Temple (q 21) exceptions §6.
 2. Answered (`quests-act3-2.md` §11.3): `&level` is an output, written at `0x00559AF8`
    before any read; the item level is the source monster's stat 12 or
-   the object's area level.
+   the object's area level. Confirmed again 2026-10-07 (QD-3, `quests-act4.md`
+   §4.7 and its open question 4): player → base stat 12, monster → total
+   stat 12, any other source → `levels.txt` `MonLvl` / `MonLvlEx` (by
+   difficulty) of its room's level (`0x0061DCA0`), ≤ 1 → 1, written at
+   `0x00559AF8` and read back as the item level (`0x00559C66`).
 3. Answered (`quests-act3-2.md` §11.4): mask 0x40 at `0x006CE280` on byte +0x0D = flag
    word bit 14, the `flying` column.
 4. Answered (`quests-act3-2.md` §11.4): type flags & 0x0E (superunique, champion,
@@ -1010,6 +1016,7 @@ quest code draws.
 7. Answered (cross-file request to PC 2 quests-core,
    `docs/handoff/pc2-spec-quests-act3.md`): `quests.tsv` rows 17–24 and
    39, column `spec` := `specified`; owner of those rows is this file.
-8. Record a full Act III run (packets + RNG, `docs/HANDOFF.md` §5):
+8. ~~Record a full Act III run (packets + RNG, `docs/HANDOFF.md` §5):
    chest drops, the Alkor reward broadcast, council kills, the orb, the
-   Hellgate and Natalya's spawn.
+   Hellgate and Natalya's spawn.~~ Needs recording: R-PQ-10
+   (`docs/handoff/pc2-rec-pc2-quests.md`, = HANDOFF §5 S9-A3 Act III).

@@ -309,7 +309,25 @@ pub struct Item<S> {
     pub stats: S,
 }
 
+/// A name longer than 15 characters (`items/bitstream.md` edge case 7).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+#[error("item name of {0} bytes does not fit 15 characters and a terminator")]
+pub struct NameTooLong(pub usize);
+
 impl<S> Item<S> {
+    /// The name setter (`0x00628370`, item data +0x4A): the original copies
+    /// without a bound; d2rs stores at most 15 characters and a 0, and
+    /// rejects a longer name (`items/bitstream.md` edge case 7, handoff
+    /// BV7). The name ends at its first 0 byte.
+    pub fn set_name(&mut self, name: &[u8]) -> Result<(), NameTooLong> {
+        let len = name.iter().position(|&c| c == 0).unwrap_or(name.len());
+        if len > 15 {
+            return Err(NameTooLong(len));
+        }
+        self.name = [0; 16];
+        self.name[..len].copy_from_slice(&name[..len]);
+        Ok(())
+    }
     /// A fresh item record with the given stats holder (before §3 step 3).
     pub fn new(record: usize, format: u16, stats: S) -> Self {
         Self {

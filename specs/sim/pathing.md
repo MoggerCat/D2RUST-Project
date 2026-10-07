@@ -24,27 +24,28 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 50–65 |
-| Inputs | 66–75 |
-| Outputs / state changes | 76–82 |
-| Rules | 83–84 |
-|   1. Walk and run requests | 85–229 |
-|   2. Path types | 230–269 |
-|   3. Path compute (`0x00649970(path, unit, town access)`) | 270–336 |
-|   4. Target preparation (flag 0x1000, `0x00648120`) | 337–353 |
-|   5. Toward (type 2, `0x00679C80`) | 354–413 |
-|   6. Straight (type 7, `0x00679ED0`) | 414–423 |
-|   7. A* (type 1, `0x0067B850`) | 424–461 |
-|   8. Velocity, direction vector, facing | 462–544 |
-|   9. Per-tick movement | 545–717 |
-|   10. Messages | 718–740 |
-|   11. Missile paths (`0x00649760`) | 741–790 |
-| Constants & data dependencies | 791–827 |
-| Randomness | 828–838 |
-| Edge cases & original bugs | 839–886 |
-| Test vectors | 887–924 |
-| Provenance | 925–962 |
-| Open questions | 963–1030 |
+| Summary | 51–66 |
+| Inputs | 67–76 |
+| Outputs / state changes | 77–83 |
+| Rules | 84–85 |
+|   1. Walk and run requests | 86–230 |
+|   2. Path types | 231–270 |
+|   3. Path compute (`0x00649970(path, unit, town access)`) | 271–337 |
+|   4. Target preparation (flag 0x1000, `0x00648120`) | 338–354 |
+|   5. Toward (type 2, `0x00679C80`) | 355–422 |
+|   6. Straight (type 7, `0x00679ED0`) | 423–432 |
+|   7. A* (type 1, `0x0067B850`) | 433–470 |
+|   8. Velocity, direction vector, facing | 471–557 |
+|   9. Per-tick movement | 558–739 |
+|   10. Messages | 740–762 |
+|   11. Missile paths (`0x00649760`) | 763–815 |
+|   12. Other path types (1.14d-read 2026-10-08) | 816–1018 |
+| Constants & data dependencies | 1019–1055 |
+| Randomness | 1056–1066 |
+| Edge cases & original bugs | 1067–1114 |
+| Test vectors | 1115–1152 |
+| Provenance | 1153–1190 |
+| Open questions | 1191–1264 |
 <!-- /index -->
 
 ## Summary
@@ -363,6 +364,14 @@ start, target, start room, target room, slack r (step 4), max distance
    - then dx := clamp to [−2, 2]; dy < −1 → o = 5·dx + 10; else o =
      5·dx + 12 + min(dy, 2).
    o is a row 0..24 of `testdir` and `altdir`.
+   "clamp(dy)" is the same [−2, 2] clamp as dx (`0x00678C79`–
+   `0x00678C94`: dy < −1 → −2, dy > 1 → 2), so every branch returns o =
+   5·dx' + dy' + 12 with dx', dy' ∈ [−2, 2]; the first branch has dx' =
+   −1 unclamped. In that branch ay ≥ 2·ax ≥ 2, so dy' is −2 or 2 and o
+   is 5 or 9. The middle case (ay < 2·ax and ax < 2·ay) changes neither
+   value before both clamps. Vectors (synthetic): (dx, dy) = (−1, −2) →
+   5; (−1, 5) → 9; (1, 2) → 1·5 + 2 + 12 = 19 (dx := 1 & 1); (3, 2) →
+   2·5 + 2 + 12 = 24 (middle case); (4, −1) → 2·5 − 1 + 12 = 21.
 2. Step of a direction d (`dir8_toward`, `0x006F1798`): 0 (1,0), 1 (1,1),
    2 (0,1), 3 (−1,1), 4 (−1,0), 5 (−1,−1), 6 (0,−1), 7 (1,−1).
 3. Path distance (`0x00679380`): ax = |Δx|, ay = |Δy|; both < 8 →
@@ -389,7 +398,7 @@ start, target, start room, target room, slack r (step 4), max distance
 #### 5.2 Algorithm
 
 Index := 0, count := 0. Direction offset ≠ 0 (types 5, 6, 12) →
-`0x00679B30` (monster circling, open question 3).
+`0x00679B30` (monster circling, §12.1) and its result is returned.
 
 1. points[0] := target; next-position check. Clear → points = [target].
 2. P = the returned point. dist(P, target) ≤ slack → points = [P].
@@ -475,7 +484,11 @@ animation-speed half of it belongs to the future animation-rate spec,
    `velmod_monster_x` (class ≥ 410): column b ≠ 0, or column a ≠ 0 and
    the used skill's flags (`0x006446A0`, skill +0x0C) have bit 0x1 and
    not 0x1000. Column b: player modes 2, 3, 6; monster modes 2, 15
-   (and 8–11 for classes < 410). Then p = f + stat 67 (unit total `0x00625480`; a player's
+   (and 8–11 for classes < 410). "Skill +0x0C" is not a `skills.txt`
+   column: `0x006446A0` returns word +0x0C of the used skill **entry**
+   (`0x00620250`), the runtime E-flags word written by the skill start
+   and bodies (`0x00644660`; `skills/use.md` §5.2 step 2: 1 = moving
+   skill, 2 = move ended); no used skill → 0. Then p = f + stat 67 (unit total `0x00625480`; a player's
    base is 100 from creation, `combat/vitals.md` §1), at least 25, where f = stat 96
    (item/skill getter `0x00625500`) scaled by `animstat` row 4: f ≠ 0 →
    150·f / (150 + f) (truncated). Velocity := base · p / 100
@@ -616,6 +629,14 @@ flag 0x2) → room-change messages (rule 9.8). Result 1 if m, else 2.
    whose refreshed point is more than 5 from the previous target (+0x14)
    on either axis → re-path (finish 1). Otherwise: index < count, or
    position = final target → passes; else re-path (finish 1).
+   Stop distance writers (1.14d, every server write of path +0x93):
+   the allocation `0x00649D00` sets 0; `0x00649070(path, n)` sets n − 1
+   for n in 1…19, else 0, and is called only by monster AI mode
+   requests and skill functions (`monsters/ai.md` §7.1; e.g.
+   `0x005DE490`, `0x005DEAD0`, `0x005CB940`, `0x005C07A0`,
+   `0x005DA020`). No player walk / run (C→S) path sets it, so a
+   player's walk or run to a unit keeps 0: it stops only at unit
+   distance 0 or by the other tests of this rule.
 4. Wherever a rule says "re-path", the check's result is the re-path's
    result (§9.10): non-zero passes, 0 fails. The movement then tests
    index < count against the new path.
@@ -708,6 +729,7 @@ budget += −(current point index +0x24), clamped to 0..255
 called with 20 by the monster movement start `0x005A7C20` (after the
 target is set; that function belongs to `monsters/ai.md`), so a monster
 re-paths until it has advanced 20 points in total since that start.
+Which AI requests reach it, and when: `monsters/ai.md` §7.5.
 Types 2, 13, 15: finish → type 13; else
 type 2 and target := final target; compute (§3); non-zero → result;
 else type 15 and compute again. Other types: compute (§3).
@@ -755,7 +777,10 @@ flag 0x20; type 4 with result 0 clears it. The result is the count.
    toward point 0 (§8.4; a target equal to the position sets velocity 0).
 4. Room-exit flag: the path room exists and the target lies outside its
    sub-tile rect (x in [room x, room x + w), y likewise, half-open) →
-   flag 0x1. Result count (1).
+   flag 0x1. Result count (1). Read again (2026-10-08, `0x006493BD`–
+   `0x006493EC`): no path room also sets 0x1 (the null test branches to
+   the `or`), and a target inside the room leaves +0x34 unchanged: the
+   flag is only ever set here, never cleared.
 
 #### 11.2 Type 10, charged bolt (`0x0067A240`)
 
@@ -787,6 +812,209 @@ The product of two float32 values is exact in 53-bit precision, so d2rs
 can compute it with integers (float32 = mantissa · 2^exponent); whether
 the x87 precision control is 53-bit (compiler default) or 24-bit while
 the game runs is open question 9.
+
+### 12. Other path types (1.14d-read 2026-10-08)
+
+Same calling form as §5 (path info I: start I+0x00, target I+0x04, max
+distance I+0x18, path I+0x30; points at path +0x9C, index +0x24, count
++0x28). Results are the count.
+
+#### 12.1 Circling walk (`0x00679B30`; types 5, 6, 12)
+
+Called by Toward (§5.2) when the direction offset (+0x98) k ≠ 0, after
+index and count := 0. It is §5.2 step 4 with these differences: n
+starts at the current count (+0x28); each of the `testdir` triple
+(`0x00678D70`) gets `(t + k) & 7` before the first-free pick
+(`0x006793E0`); the corner append of step 4.3 has no "unless cur =
+start" (the first step always appends the start); no clear-ray or slack
+shortcut (steps 1–3 of §5.2 are not run). End as §5.2 step 5; count :=
+n.
+
+#### 12.2 Type 3 (`0x00679E50`)
+
+Index := 0, then Toward (§5): the same as type 2.
+
+#### 12.3 Type 12, back-up turn (`0x00679E60`)
+
+Index := 0; k := −4; n := circling walk (§12.1, appending after the
+current count); n = 0 → result 0 (k left at −4). Else count := n; k :=
+−2, r := circling walk (appending after n); r = n (nothing added) → k :=
++2, r := circling walk. k := −4 again; result r.
+
+#### 12.4 Type 9, leap (`0x00679F70`)
+
+Index := 0; points[0] := target; next-position check (§5.1 rule 5) with
+P := target. P = start → result 0. Else points[0] := P, count := 1,
+result 1.
+
+#### 12.5 Type 8, knockback server (`0x0067A000`)
+
+k := (path +0x90 >> 1) + 1 (distance budget). With a target unit
+(+0x58; position: objects, items, tiles their static position, others
+their path cell, `0x006488C0` / `0x00648900`): dx := start x − its x,
+dy := start y − its y; m := max(|dx|, |dy|); m ≠ 0 → dx := k·dx / m,
+dy := k·dy / m (signed, truncating); P := start + (dx, dy) (16-bit
+adds). No target unit: P := target. Index is not reset. points[0] := P;
+ray test (§5.1 rule 4) from start to P (P := the last free cell);
+target := P (`0x00648AD0`, which also clears the target unit). P =
+start → result 0; else points[0] := P, count := 1, result 1.
+
+#### 12.6 Type 11, knockback client (`0x00679FD0`)
+
+Client only. Index := 0; points[0] := target; next-position check
+(§5.1 rule 5) on points[0]; result 1 (count not written).
+
+#### 12.7 Types 0 and 16, IDA* (`0x0067AD00` → `0x0067AAA0`)
+
+Info fields used: start I+0x00, target I+0x04, start room I+0x08,
+target room I+0x0C, slack byte I+0x14, score byte I+0x1C (path +0x92),
+type I+0x20, pattern I+0x28, move mask I+0x2C, path I+0x30. Distances
+are in cost units: orthogonal step 2, diagonal 3; heuristic h(p) = min
++ 2·max of (|target x − p.x|, |target y − p.y|) (`0x0067ABB2`,
+`0x0067A8AD`). Directions use the `dir8_toward` numbering (§5.1 rule 2;
+step table `0x006F1958`); pref(p) = the first entry of `testdir`[o(p →
+target)] (`0x00678D10`, table `0x006F1518`).
+
+1. **Wrapper** (`0x0067AD00`): I+0x14 := 2 × I+0x14 (u8, in place).
+   Bounds B (x, y, w, h) := the start room's sub-tile box (`0x00619730`).
+   With a target room ≠ the start room (box x2, y2, w2, h2), per axis:
+   x2 < x → left := x2, width := x + w − x2; else left := x, width := x2
+   + w2 − x (the target room's right edge); y likewise. An axis whose
+   width (height) equals the start room's after this gets left −= 10,
+   width += 20 (top −= 10, height += 20); with no target room, or the
+   same one, both axes get it. Then the search.
+2. **Setup** (`0x0067AAA0`): w·h > 50,000 → fatal assert. Grid: (w + 6)
+   × (h + 6) dwords, zeroed once (not per iteration); cell (x, y) is at
+   (y − B.y + 3)·(w + 6) + (x − B.x + 3); value 0 unvisited, 1 blocked,
+   else the best g seen. Search box: x in [B.x, B.x + w], y in [B.y, B.y
+   + h] (inclusive). Type 16: random mode, seed = the path owner's unit
+   seed (unit +0x20).
+3. **Node** (0x1C bytes; pool of at most 900, `0x384`): f (u16), h
+   (u16), g (u16), tries (i16), position, order pointer (into a row of
+   the order table `0x006F17D8`, 8 rows × 8 i32, one entry per try),
+   dir, parent, child (one slot, reused for every try). Root: f = h =
+   h(start), g = 0, tries = −3 (so the root tries 8 directions, every
+   other node 5), position = start, order = row 0 entry 0, dir =
+   pref(start), no parent or child; pool count := 1.
+4. **Thresholds**: type 0: T := h(start); type 16: T := h(start) +
+   h(start)/2 (signed, truncating). Tmax := max(T, I+0x1C). Repeat:
+   reset the root (rule 3, pool count 1), run the depth-first pass with
+   T; found → stop; not found and the pool count is 900 → fail; T += 5;
+   continue while T < Tmax, else fail (`0x0067AC90`–`0x0067ACD4`).
+5. **Depth-first pass** (`0x0067A740`, N := root, at most 10,000 turns):
+   1. N's position = target → found N.
+   2. Turn count + 1 > 10,000 → not found.
+   3. N's position outside the search box → found N (`0x0067A78F`–
+      `0x0067A7C0`: leaving the box counts as success).
+   4. c := position + step(N.dir). Grid cell of c = 0 → pattern query at
+      c (`0x0064D910`, start room I+0x08, I+0x28, I+0x2C); blocked → cell
+      := 1, next try (rule 6).
+   5. gc := N.g + (2 if c.x = x or c.y = y, else 3) (u16). Cell ≠ 0 and
+      cell < gc (unsigned; a blocked cell is always below) → next try.
+      Cell := gc. hc := h(c); fc := hc + gc (u16); fc > T (signed) →
+      next try.
+   6. Child: N has no child slot → pool count 900 → not found; else the
+      next pool node, zeroed, becomes N's child with parent N. Child :=
+      {f fc, h hc, g gc, tries 0, position c, order := row (pref(c) −
+      N.dir) & 7 entry 0, dir := (N.dir + that entry) & 7}, in random
+      mode + R[s]: one step of the seed (lo := lo × 0x6AC690C5 + hi,
+      64-bit), s = new lo & 0x1F, R = `0x006F18D8` (−2, −1, 0, 1, 2
+      six times, then −1, 1).
+   7. Child h < I+0x14 (the doubled slack) → found the child. Else N :=
+      the child.
+6. **Next try** (`0x0067A690`): tries < 4 → next order entry, dir :=
+   (dir + entry (+ R[s] in random mode)) & 7 (`0x0067A630`); tries += 1;
+   tries ≠ 5 → continue with N. tries = 5 → backtrack: N = root → not
+   found; else N := parent, next order entry, dir := (dir + entry (+
+   R[s])) & 7, tries += 1; repeat while that also reaches 5.
+7. **Output** (`0x0067A9F0`): walk from the found node up to (not
+   including) the root; a node is recorded when its step from its parent
+   differs from the step of the last recorded node (the found node
+   always is), at most 78. Points in root → found order go to path
+   +0x9C. Fewer than 2 or more than 77 → 0; the search returns the count
+   (≥ 78 → 0).
+
+Order table rows (increments, entry 0 first; `0x006F17D8`, dumped):
+0: 0 1 6 3 4 5 2 7; 1: 0 1 6 3 1 3 6 1; 2: 0 1 1 1 1 1 2 7; 3: 1 1 1 1
+1 3 6 1; 4: 6 4 3 6 1 3 2 7; 5: 7 7 7 7 7 5 2 7; 6: 0 7 7 7 7 5 2 7;
+7: 0 7 2 5 7 5 2 7.
+
+Test vector (synthetic, type 0, slack 0, score 70, every cell free,
+one room): start (10, 10), target (13, 11). h = 1 + 2·3 = 7 = T; root
+dir pref = 0. (11, 10): g 2, h 5, f 7 → child, dir 0. (12, 10): g 4, h
+3, f 7 → child (row 1, dir 0). (13, 10): g 6, h 2, f 8 > 7 → next try,
+dir 0 + 1 = 1. (13, 11): g 7, h 0, f 7 → child at the target → found.
+Output (12, 10), (13, 11); count 2. A straight run (target (13, 10))
+records only the found node, so the search returns 0.
+
+#### 12.8 Type 15, wall follow (`0x0067C2D0`)
+
+Uses I+0x00 start S, I+0x04 target, I+0x08 start room (every query is
+looked up from it), I+0x28 pattern, I+0x2C move mask, path I+0x30
+(whose owner must be a player or monster, else fatal assert). Cell
+buffer: 88 entries.
+
+1. L := path +0x91 (max distance); with a target unit (+0x58) and L <
+   40 → L := 40.
+2. **Line** (`0x0067B9F0`): the cells from S (excluded) to the target
+   (included); none when they are equal. Major axis x when |dx| ≥ |dy|,
+   else y; length = |major delta|; length > L − 1 → no cells. Each step
+   moves one on the major axis; err starts at 0; err += |minor delta|;
+   err ≥ |major delta| → err −= |major delta| and one step on the minor
+   axis. Line direction D: y-major → 0 for −y, 2 for +y; x-major → 1
+   for +x, 3 for −x. N := the cell count; N ≤ 2 → result 0.
+3. **Walk**: P := S, i := 0; while i < N: buf[i] blocked (pattern
+   query ≠ 0) → repair (rule 4) with P, i, N, L − i, D; failed → result
+   = compression (rule 6) of the first i cells. Else (free, or repaired)
+   P := buf[i] (after a repair: the cell at the new i, untested), i +=
+   1. Result = compression of the N cells; N = 0 → 0.
+4. **Repair** (`0x0067BDF0`): followers A and B start at P, each with
+   up to 201 points, a direction, a mark and a done flag. d0 := dir(P →
+   buf[i]) (table `0x006F1E18` on 3·dy + dx); directions here: 0 (0,
+   −1), 1 (1, −1), 2 (1, 0), 3 (1, 1), 4 (0, 1), 5 (−1, 1), 6 (−1, 0), 7
+   (−1, −1) (step table `0x006F1D98`). A.dir := d0 + 1, B.dir := d0 + 7
+   (indices up to 15; every table repeats after 8). Turn tables
+   (dumped): A after a free step T1 = `0x006F1F00` (0, 1 → 6; 2, 3 → 0;
+   4, 5 → 2; 6, 7 → 4), after a blocked try T2 = `0x006F1EC0` (0, 1 →
+   2; 2, 3 → 4; 4, 5 → 6; 6, 7 → 0); B: T1 = `0x006F1E80` (as A's T2),
+   T2 = `0x006F1E40` (0 → 6; 1, 2 → 0; 3, 4 → 2; 5, 6 → 4; 7 → 6).
+   Turns alternate, A first; a follower whose mark is non-zero after its
+   turn moves again instead of passing the turn. A turn of a not-done
+   follower F (other follower O):
+   1. Step (`0x0067BBF0`): up to four tries: candidate := F.pos +
+      step(F.dir); free → stop; else F.dir := T2[F.dir]. Four blocked →
+      F done, end of the turn.
+   2. F has points and D ≤ 3: progress k from P along D (0: P.y −
+      cand.y; 1: cand.x − P.x; 2: cand.y − P.y; 3: P.x − cand.x); k > 0,
+      j := i + k − 1 < N and buf[j] = the candidate → rejoin: F.count <
+      L − i (else fatal assert); append the candidate; buf[i..j] :=
+      F's points (`0x0067BD80`), N += F.count − (j − i + 1), i := i +
+      F.count; the repair succeeds.
+   3. O has more than 1 point: F.mark ≠ 0 → the candidate =
+      O.points[mark − 2] → the repair fails (buf cut at i, N := i); else
+      F.mark := 0. Then the candidate = O.pos → F.mark := O.count.
+   4. Append the candidate, F.pos := it, F.dir := T1[F.dir]; F.count ≥
+      (L − i) − N − 1 → F done.
+   The turns go on while neither follower is done.
+5. **No rejoin**: L − i > 80 → fail (buf cut at i, N := i). Else with
+   squared distances to the target dA, dB of A's and B's last points and
+   dS of S: dB > dA → A if dS ≥ dA, else fail; dB ≤ dA → B if dS ≥ dB,
+   else fail (this fail leaves buf and N unchanged). The chosen points
+   are copied to buf at i; i := N := i + their count; success.
+6. **Compression** (`0x0067C1E0`, n cells → path +0x9C): n = 1 → that
+   cell; n = 0 → 0. Else p := buf[0] − S, run := 0; for k = 0 … n − 2
+   with d := buf[k + 1] − buf[k]: d = p → run += 1; else run ≤ 0 and
+   both components differ from p → run := 1, d.x := −2 (a diagonal jog:
+   buf[k] dropped, the next change forced); else emit buf[k], run := 0;
+   p := d. Then emit buf[n − 1]. Result = emitted count.
+
+Test vector (synthetic, one-cell pattern, L 14, only (12, 10) blocked):
+S (10, 10), target (15, 10): line (11, 10) … (15, 10), D 1, N 5.
+(12, 10) blocked at i = 1, P (11, 10), d0 = 2. A (12, 11); B (12, 9);
+A: (12, 10) blocked → dir 2 → (13, 11); B (13, 9); A (13, 10) = buf[2]
+→ rejoin: buf = (11, 10), (12, 11), (13, 11), (13, 10), (14, 10), (15,
+10), i = 4; (14, 10) taken untested, (15, 10) free. Compression: (11,
+10), (12, 11), (13, 10), (15, 10); count 4.
 
 ## Constants & data dependencies
 
@@ -973,7 +1201,9 @@ Real (recordings; message side):
 3. Path types of monster AI and skills (0, 3, 5, 6, 8, 9, 11, 12, 13,
    15, 16) and `0x00679B30` (direction offset): specify with the AI and
    skill specs (Ghidra on `0x0067AD00`, `0x0067A000`, `0x0067C2D0`).
-   The missile types 4, 10, 14 are answered in §11.
+   The missile types 4, 10, 14 are answered in §11. Answered (2026-10-08)
+   in §12 for every type and `0x00679B30` (IDA* §12.7 and wall follow
+   §12.8 completed 2026-10-08).
 4. *Answered:* target lead (`0x00679190`, `0x00679250`): table sine,
    truncation, and +0x68 has no reachable writer, so the lead is 0
    (§3, after the steps).
@@ -1001,6 +1231,10 @@ Real (recordings; message side):
    leaving precision alone. So §11.3 runs in 53-bit unless code outside
    `Game.exe` (a display driver DLL) changes the control word; the
    debugger read at `0x0067A140` still confirms it for the GDI mode.
+10. *Answered (2026-10-08)* (`mutants-path` §3, spec reading): §5.1
+    rule 1's clamp(dy) is [−2, 2] (dy < −1 → −2, dy > 1 → 2;
+    `0x00678C79`–`0x00678C94`); the code's reading is right (§5.1 rule
+    1, text after the rule, with vectors).
 
 Answered handoff questions (`docs/HANDOFF.md` §7):
 

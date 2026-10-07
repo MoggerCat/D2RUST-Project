@@ -62,24 +62,14 @@ use d2_sim::world::waypoints::{WaypointData, NO_WAYPOINT};
 
 // ---- the action wiring's unprovided seams ------------------------------------------------
 
-/// Interaction info and the transport (handed to the host through
-/// [`Outbox`]); every path seam is the provider's.
+/// The transport (handed to the host through [`Outbox`]); every path
+/// seam is the provider's.
 #[derive(Default)]
 struct TestPending {
-    interact: BTreeMap<UnitId, (u8, u32)>,
     sent: Vec<(UnitId, Vec<u8>)>,
 }
 
 impl Pending for TestPending {
-    fn set_interact(&mut self, player: UnitId, unit_type: u8, guid: u32) {
-        self.interact.entry(player).or_insert((unit_type, guid));
-    }
-    fn reset_interact(&mut self, player: UnitId) {
-        self.interact.remove(&player);
-    }
-    fn interact_guid(&self, player: UnitId) -> Option<u32> {
-        self.interact.get(&player).map(|i| i.1)
-    }
     fn send(&mut self, player: UnitId, msg: &[u8]) {
         self.sent.push((player, msg.to_vec()));
     }
@@ -638,7 +628,14 @@ fn run() -> Transcript {
 
     // 4. The waypoint menu is open (interaction staged: the operate path
     // is the object-interaction spec's); travel to the town.
-    fx.sim().events.hooks().x.interact.insert(p, (2, og));
+    fx.sim()
+        .events
+        .sys
+        .units
+        .get_mut(p)
+        .unwrap()
+        .interact
+        .set(2, og);
     fx.stage_position();
     let take = TakeOrCloseWp {
         wp: og,

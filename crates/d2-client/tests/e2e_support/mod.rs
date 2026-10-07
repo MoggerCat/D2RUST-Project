@@ -20,8 +20,9 @@ use d2_data::tables::{Itemratio, Itemtypes, Monstats, Record};
 use d2_server::adapters::handlers::items::moves::{InvParts, MoveRest};
 use d2_server::adapters::handlers::world::{ActionEvents, Outbox, WiredWorld};
 use d2_sim::game::Game;
+use d2_sim::items::bitstream::Isc;
 use d2_sim::items::inventory::tables::{GridRec, InvItemRec, InvTypeRec};
-use d2_sim::items::inventory::{InteractionTarget, InvTables, UnitKind as InvKind};
+use d2_sim::items::inventory::{InvTables, UnitKind as InvKind};
 use d2_sim::items::moves::{Guid, MovePending, Owner, Spot};
 use d2_sim::items::tables::ItemRec;
 use d2_sim::items::{ty, ItemTables};
@@ -62,7 +63,6 @@ const MODEL: &str = "WiredWorld answers from the inventory model";
 /// is the host's inventory model, not this rest's.
 #[derive(Debug, Default)]
 pub struct Rest {
-    pub interact: BTreeMap<UnitId, (u8, u32)>,
     pub quests: BTreeMap<UnitId, PlayerQuests>,
     pub last_bought: BTreeMap<UnitId, u32>,
     pub sent: Vec<(UnitId, Vec<u8>)>,
@@ -110,15 +110,6 @@ impl NpcRest for Rest {
     }
     fn tristram_cain_busy(&self, _: UnitId, _: UnitId) -> bool {
         false
-    }
-    fn interact_unit(&self, player: UnitId) -> Option<(u8, u32)> {
-        self.interact.get(&player).copied()
-    }
-    fn set_interact(&mut self, player: UnitId, t: u8, guid: u32) {
-        self.interact.insert(player, (t, guid));
-    }
-    fn reset_interact(&mut self, player: UnitId) {
-        self.interact.remove(&player);
     }
     fn pet(&self, _: UnitId, _: u8, _: u8) -> Option<UnitId> {
         None
@@ -497,6 +488,9 @@ pub fn item_tables() -> ItemTables {
                 let mut t: Itemtypes = blank();
                 t.class = 0xFF;
                 t.staffmods = 0xFF;
+                // Empty `shoots`: the link miss (link16 −1), as the
+                // other inventory fixtures (`inventory.md` §4.4 rule 2).
+                t.shoots = 0xFFFF;
                 t.rare = 1;
                 t
             })
@@ -504,10 +498,28 @@ pub fn item_tables() -> ItemTables {
         equiv: equiv(),
         itemratio: vec![ratio],
         valshift: vec![0; N_STATS],
+        isc: save_columns(),
         stat_shift: 6,
         stat_mask: 0x3F,
         ..ItemTables::default()
     }
+}
+
+/// The itemstatcost save columns (`Save Bits`, `Save Add`) of the stats
+/// the items' save records carry (`items/bitstream.md` §4.4: defense,
+/// durability and its maximum), so the item copy (`world/vendors.md`
+/// §7.3, a save-format round trip) keeps them. Every other stat: none.
+fn save_columns() -> Vec<Isc> {
+    let mut t = vec![Isc::default(); N_STATS];
+    let bits = |save_bits: u8, save_add: u32| Isc {
+        save_bits,
+        save_add,
+        ..Isc::default()
+    };
+    t[usize::from(d2_sim::items::stat::ARMORCLASS)] = bits(11, 10);
+    t[usize::from(d2_sim::items::stat::DURABILITY)] = bits(9, 0);
+    t[usize::from(d2_sim::items::stat::MAXDURABILITY)] = bits(8, 0);
+    t
 }
 
 /// The vendor tables over the same items: Akara's column (0) holds the
@@ -687,10 +699,6 @@ impl InvRest for InvFx {
     fn quiver_kind(&self, _: Guid) -> bool {
         false
     }
-    fn interaction(&self, _: Owner) -> InteractionTarget {
-        InteractionTarget::None
-    }
-    fn clear_interaction(&mut self, _: Owner) {}
     fn player_data_4c(&self, _: Owner) -> u32 {
         0
     }

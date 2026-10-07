@@ -25,7 +25,7 @@ use d2_sim::drlg::data::DrlgData;
 use d2_sim::drlg::{Dungeon, NoLevelTypes, TileInfo, TileSource};
 use d2_sim::game::Game;
 use d2_sim::items::inventory::tables::{GridRec, InvItemRec, InvTypeRec};
-use d2_sim::items::inventory::{InteractionTarget, InvTables, UnitKind as InvKind};
+use d2_sim::items::inventory::{InvTables, UnitKind as InvKind};
 use d2_sim::items::moves::{Guid, MovePending, Owner};
 use d2_sim::items::tables::ItemRec;
 use d2_sim::items::{q, ty, ItemRequest, ItemTables};
@@ -192,11 +192,9 @@ impl Outbox for ActionRest {
 }
 
 /// The interaction seams no written spec provides (talk range, the
-/// staged inventory, room in the NPC grid, no item copy); the host's one
-/// owner of the player's interaction.
+/// staged inventory, room in the NPC grid, no item copy).
 #[derive(Default)]
 pub struct Rest {
-    pub interact: BTreeMap<UnitId, (u8, u32)>,
     pub quests: BTreeMap<UnitId, PlayerQuests>,
     pub inventory: BTreeSet<UnitId>,
     pub last_bought: BTreeMap<UnitId, u32>,
@@ -238,15 +236,6 @@ impl NpcRest for Rest {
     }
     fn tristram_cain_busy(&self, _: UnitId, _: UnitId) -> bool {
         false
-    }
-    fn interact_unit(&self, player: UnitId) -> Option<(u8, u32)> {
-        self.interact.get(&player).copied()
-    }
-    fn set_interact(&mut self, player: UnitId, t: u8, guid: u32) {
-        self.interact.insert(player, (t, guid));
-    }
-    fn reset_interact(&mut self, player: UnitId) {
-        self.interact.remove(&player);
     }
     fn pet(&self, _: UnitId, _: u8, _: u8) -> Option<UnitId> {
         None
@@ -804,10 +793,6 @@ impl InvRest for InvStandIn {
     fn quiver_kind(&self, _: Guid) -> bool {
         false
     }
-    fn interaction(&self, _: Owner) -> InteractionTarget {
-        InteractionTarget::None
-    }
-    fn clear_interaction(&mut self, _: Owner) {}
     fn player_data_4c(&self, _: Owner) -> u32 {
         0
     }
@@ -978,7 +963,13 @@ impl CubeFx {
             },
         );
         let cube_guid = sim.events.sys.units.get(cube).unwrap().guid;
-        sim.world.rest.interact.insert(player, (4, cube_guid));
+        sim.events
+            .sys
+            .units
+            .get_mut(player)
+            .unwrap()
+            .interact
+            .set(4, cube_guid);
         CubeFx {
             sim,
             player,

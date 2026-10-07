@@ -233,9 +233,11 @@ impl<X: Pending> PlayerWorld for ActionPlayer<'_, '_, X> {
     fn reselect_hand_skills(&mut self, player: UnitId) {
         self.v.h.x.reselect_hand_skills(self.game, player);
     }
-    /// The host's interaction part, then `Pending::inventory_busy`.
+    /// `0x00535060`: the interact info on the player's unit record
+    /// (active), then `Pending::inventory_busy`.
     fn busy(&self, player: UnitId) -> bool {
-        self.facts.interacting || self.v.h.x.inventory_busy(player)
+        self.v.units.get(player).is_some_and(|r| r.interact.active)
+            || self.v.h.x.inventory_busy(player)
     }
     fn trading(&self, player: UnitId) -> bool {
         self.v.h.x.player_trading(player)

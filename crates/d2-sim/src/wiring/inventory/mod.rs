@@ -35,19 +35,24 @@
 //! modules; an adapter maps a seam call to a provider call.
 
 pub mod bits;
+pub mod copy;
 pub mod host;
 pub mod inv_world;
 pub mod ops;
 pub mod pending;
+pub mod queries;
+pub mod save_index;
 pub mod units;
 
 #[cfg(test)]
 mod tests;
 
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 
 use super::economy::{Economy, EconomyError, ItemSpawn};
-use crate::items::inventory::{InteractionTarget, InvItem, InvTables, Inventory, UnitKind};
+use crate::items::bitstream::WriteBack;
+use crate::items::inventory::{InvItem, InvTables, Inventory, UnitKind};
 use crate::items::moves::{deferred, Guid, MovePending, Owner};
 use crate::items::ItemRequest;
 use crate::units::lifecycle::LifecycleHooks;
@@ -69,6 +74,16 @@ pub enum InvError {
     /// `0x0063BE30` found the body slot still holding an item after the
     /// unlink (the model clears cells only through §1.4 unlink).
     BodySlotHeld(UnitId, u8),
+    /// A step whose rule the spec does not write (named); the call stops
+    /// there.
+    Unwritten(&'static str),
+    /// The item copy (`0x0055A2A0`) was given a source on the ground
+    /// (`world/vendors-2.md` §7.3 step 1.1): a caller error; no copy.
+    GroundCopySource(UnitId),
+    /// Placement into a page (`0x00560200`) was given an item that is
+    /// still in a room (`items/inventory.md` §2.4 rule 2): a caller error;
+    /// not placed.
+    PlacedWithRoom(UnitId),
 }
 
 /// The inventory state of a game: one [`Inventory`] per unit that owns
@@ -86,6 +101,10 @@ pub struct InvState {
     /// Owner refreshes asked by the inventory functions during a call;
     /// run (`items::moves::owner_refresh`) when the call returns.
     refresh: Vec<UnitId>,
+    /// The bit-stream writer's changes to items (`items/bitstream.md`
+    /// §4.1 rule 8, §4.3 rule 7), queued by the read-only stream seam and
+    /// written by [`InvDesk::apply_write_backs`].
+    write_backs: RefCell<Vec<(UnitId, WriteBack)>>,
 }
 
 impl InvState {
@@ -147,7 +166,8 @@ pub trait InvRest: MovePending {
     fn socket_filler(&self, item: Guid) -> bool {
         false
     }
-    /// Book / scroll spell (`0x00627F80`). Default: 0.
+    /// Book / scroll spell (`0x00627F80`). Not asked by [`InvDesk`]
+    /// (`queries`: item data +0x3E). Default: 0.
     fn spell(&self, item: Guid) -> i32 {
         0
     }
@@ -160,26 +180,31 @@ pub trait InvRest: MovePending {
     fn item_active_on(&self, item: Guid, unit: Owner) -> bool;
     /// The item's own contribution to a unit stat (`0x0062B450`).
     fn own_contribution(&self, item: Guid, unit: Owner, stat: u16) -> i32;
-    /// Level requirement (`0x0062B5B0`, §4.8): the provider gathers the
-    /// values and runs `items::inventory::level_requirement`.
-    fn level_requirement(&self, item: Guid, unit: Owner) -> i32;
-    /// Two-handed (`0x006289C0`).
-    fn two_handed(&self, item: Guid) -> bool;
+    /// Level requirement (`0x0062B5B0`, §4.8). Not asked by [`InvDesk`]
+    /// (`queries` gathers the values). Default: 0.
+    fn level_requirement(&self, item: Guid, unit: Owner) -> i32 {
+        0
+    }
+    /// Two-handed (`0x006289C0`). Not asked by [`InvDesk`] (`queries`:
+    /// items `2handed`). Default: no.
+    fn two_handed(&self, item: Guid) -> bool {
+        false
+    }
     /// One-or-two-handed for the unit (`0x0062A1E0`).
     fn one_or_two_handed(&self, unit: Owner, item: Guid) -> bool;
-    /// Ammo type (`0x0062E6F0`): an itemtypes row.
-    fn ammo_type(&self, item: Guid) -> Option<i16>;
+    /// Ammo type (`0x0062E6F0`): an itemtypes row. Not asked by
+    /// [`InvDesk`] (`queries`: the primary type's `shoots`). Default: none.
+    fn ammo_type(&self, item: Guid) -> Option<i16> {
+        None
+    }
     /// Allowed location (`0x0062FDF0`).
     fn has_allowed_location(&self, item: Guid) -> bool;
     /// Quiver-type item (`0x00628480`).
     fn quiver_kind(&self, item: Guid) -> bool;
 
-    // ---- player data and interaction (`world/npc.md` §2) -------------------
+    // ---- player data (`world/npc.md` §2; the interact info is the unit
+    // record's, `units::record::InteractInfo`) ---------------------------
 
-    /// The player's interaction (`0x00554100`).
-    fn interaction(&self, player: Owner) -> InteractionTarget;
-    /// `0x00554190`.
-    fn clear_interaction(&mut self, player: Owner);
     /// Player data +0x4C.
     fn player_data_4c(&self, player: Owner) -> u32;
     /// Player data +0x50.
@@ -216,6 +241,7 @@ impl<'d, 'a, H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'d, 'a, H, R> {
             state,
             rest,
         };
+        d.apply_write_backs();
         d.sync_in();
         d
     }
@@ -271,8 +297,10 @@ impl<'d, 'a, H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'d, 'a, H, R> {
         self.state.items.retain(|u, _| live.contains(u));
     }
 
-    /// Writes the copied fields back to their owners.
+    /// Writes the copied fields back to their owners (and the queued
+    /// bit-stream write-backs).
     pub fn sync_out(&mut self) {
+        self.apply_write_backs();
         for (&u, d) in &self.state.items {
             if let Some(r) = self.econ.units.get_mut(u) {
                 r.mode = u32::from(d.mode);
@@ -310,6 +338,7 @@ impl<'d, 'a, H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'d, 'a, H, R> {
     /// room clean-up `0x00553220` ([`deferred::room_cleanup`]) are the
     /// tick wiring's (`tick.md` §3 step 6).
     pub fn update_done(&mut self, owner: Owner) {
+        self.apply_write_backs();
         deferred::update_list_reset(self, owner);
     }
 

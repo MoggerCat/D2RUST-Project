@@ -1,4 +1,4 @@
-// Spec: specs/world/cube.md §4–§7; specs/items/generation.md §3, §4, §7.2, §7.3; specs/items/properties.md §12; specs/sim/units.md §3.2
+// Spec: specs/world/cube.md §4–§7; specs/items/generation.md §3, §4, §7.2, §7.3; specs/items/properties.md §12; specs/sim/units.md §2 (the interact info), §3.2
 //! [`CubeWorld`] on the real providers: game fields ([`GameFields`]),
 //! unit records and stat lists, item creation and init, socket rules,
 //! craft property lists and the item data ([`super::ItemStore`]). What no
@@ -14,6 +14,8 @@ use crate::world::cube::{CraftProperty, CubeWorld, ItemRequest, StatRead};
 
 /// Stat 194 (`item_numsockets`).
 const STAT_SOCKETS: u16 = 194;
+/// The stash object class (`cube.md` §1: 0x10B).
+const STASH_CLASS: u32 = 0x10B;
 
 /// The cube's calls no written spec provides yet, each with its expected
 /// provider (`docs/handoff/impl-world.md` "Seams").
@@ -29,12 +31,7 @@ pub trait CubeRest {
     /// `d2-server` transport.
     fn send(&mut self, player: UnitId, msg: &[u8]);
     // Interaction (interaction / UI owner).
-    fn interaction(&self, player: UnitId) -> Option<(u8, u32)>;
-    fn set_interaction(&mut self, player: UnitId, unit_type: u8, guid: u32);
-    fn reset_interaction(&mut self, player: UnitId);
     fn inventory_pass(&mut self, player: UnitId);
-    fn interacting_with_stash(&self, player: UnitId) -> bool;
-    fn trading(&self, player: UnitId) -> bool;
     // Inventory (inventory spec).
     fn inventory(&self, player: UnitId) -> Vec<UnitId>;
     fn socketed(&self, item: UnitId) -> Vec<UnitId>;
@@ -149,23 +146,52 @@ impl<H: LifecycleHooks, R: CubeRest> CubeWorld for EconomyCube<'_, '_, H, R> {
         self.rest.send(player, msg)
     }
 
+    /// `0x00554100` on the player's unit record (+0x64 / +0x68 / +0x6C,
+    /// [`crate::units::record::InteractInfo`]); no record → none.
     fn interaction(&self, player: UnitId) -> Option<(u8, u32)> {
-        self.rest.interaction(player)
+        self.econ.units.get(player)?.interact.get()
     }
+    /// `0x00554120`: only while no interaction is active.
     fn set_interaction(&mut self, player: UnitId, unit_type: u8, guid: u32) {
-        self.rest.set_interaction(player, unit_type, guid)
+        if let Some(r) = self.econ.units.get_mut(player) {
+            r.interact.set(unit_type, guid);
+        }
     }
+    /// `0x00554190`: GUID −1, type 6, inactive.
     fn reset_interaction(&mut self, player: UnitId) {
-        self.rest.reset_interaction(player)
+        if let Some(r) = self.econ.units.get_mut(player) {
+            r.interact.reset();
+        }
     }
     fn inventory_pass(&mut self, player: UnitId) {
         self.rest.inventory_pass(player)
     }
+    /// The interaction is the stash object (`cube.md` §1: type 2, object
+    /// class 0x10B).
     fn interacting_with_stash(&self, player: UnitId) -> bool {
-        self.rest.interacting_with_stash(player)
+        self.interaction(player).is_some_and(|(ty, guid)| {
+            ty == UnitType::Object as u8
+                && self
+                    .econ
+                    .game
+                    .lists
+                    .find_unit(UnitType::Object, guid)
+                    .and_then(|u| self.econ.units.get(u))
+                    .is_some_and(|r| r.class == STASH_CLASS)
+        })
     }
+    /// `0x005678A0` (`inventory.md` §5.2): the interaction is with a
+    /// player unit that exists.
     fn trading(&self, player: UnitId) -> bool {
-        self.rest.trading(player)
+        self.interaction(player).is_some_and(|(ty, guid)| {
+            ty == UnitType::Player as u8
+                && self
+                    .econ
+                    .game
+                    .lists
+                    .find_unit(UnitType::Player, guid)
+                    .is_some()
+        })
     }
 
     fn inventory(&self, player: UnitId) -> Vec<UnitId> {

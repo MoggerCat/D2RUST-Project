@@ -22,7 +22,7 @@ use crate::path::coords::{to_fp16_center, Point};
 use crate::path::footprint::{teleport, PathMotion};
 use crate::path::history::PositionHistory;
 use crate::path::walk::request::{handle_message, request, Outcome, WalkTarget};
-use crate::path::walk::seams::{PathInfo, PathWorld, StartTarget, UsedSkill, WalkUnits};
+use crate::path::walk::seams::{PathWorld, StartTarget, UsedSkill, WalkUnits};
 use crate::path::walk::{Step, Walk, WalkError};
 use crate::path::{CollisionRooms, DynamicPath, PathTables, UnitPath};
 use crate::rng::Seed;
@@ -509,9 +509,6 @@ impl<X: Pending> WalkUnits for PathCtx<'_, X> {
     /// The player of a client record (`unit-order.md` §7).
     fn client_player(&self, client: ClientId) -> Option<UnitId> {
         self.game.lists.client(client)?.player
-    }
-    fn other_path_function(&mut self, _: &mut DynamicPath, _: &PathInfo) -> i32 {
-        0
     }
     /// [`crate::wiring::path::PathState::history`] (players only).
     fn position_history(&mut self, unit: UnitId) -> Option<&mut PositionHistory> {

@@ -131,7 +131,9 @@ pub fn prepare_animation<H: UnitHooks>(
         None
     };
     let rate = if sequence.is_none() && hooks.has_path(sim, unit) {
-        Some(hooks.anim_rate(sim, unit))
+        let r = hooks.anim_rate(sim, unit);
+        hooks.anim_velocity(sim, unit);
+        Some(r)
     } else {
         None
     };

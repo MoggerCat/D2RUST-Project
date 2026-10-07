@@ -1,5 +1,7 @@
 # Handoff: world rest (object providers, quest treasure, hireling loader) — `claude/impl-world-rest`
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the tenth fold (`claude/fold-handoff-10`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Tenth set" (PC 1 / PC 2).
+
 Cloud implementation session, 2026-10-07, implementation from specs
 (medium, METHODS M14). Base: `claude/specs-staging-5` at `666e2f2`. Repo
 only, synthetic tables, no game files (M09): every claim holds on this

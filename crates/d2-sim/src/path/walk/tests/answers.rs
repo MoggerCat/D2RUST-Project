@@ -297,6 +297,18 @@ fn straight_missile_path() {
     p.put_target(Point::new(110, 105));
     compute(&t, &mut c, &mut p, P, false).unwrap();
     assert_ne!(p.flags & flags::OUTSIDE_ROOM, 0);
+    // Rule 4 (read 2026-10-08): a target inside leaves the flag set; a
+    // path without a room sets it.
+    c.w.room0 = TileRect::new(0, 0, 200, 200);
+    compute(&t, &mut c, &mut p, P, false).unwrap();
+    assert_ne!(p.flags & flags::OUTSIDE_ROOM, 0);
+    p.flags &= !flags::OUTSIDE_ROOM;
+    let room = p.room.take();
+    assert!(room.is_some());
+    compute(&t, &mut c, &mut p, P, false).unwrap();
+    assert_ne!(p.flags & flags::OUTSIDE_ROOM, 0);
+    p.room = room;
+    p.flags &= !flags::OUTSIDE_ROOM;
     // A target unit: its position.
     let mut m = FakeUnit::player();
     m.ty = UnitType::Monster;
@@ -469,10 +481,12 @@ fn resync_ignore_and_walk_branches() {
 // Covers: specs/sim/pathing.md §1.6 r4
 #[test]
 fn resync_snap_branch() {
-    // Not reachable (the type-15 function finds nothing): S→C 0x15 with
+    // Not reachable (a wall on the target: the type-15 wall follow, §12.8,
+    // ends elsewhere): S→C 0x15 with
     // the player's position, flag 0; the path's mask, type and distances
     // restored, the computed points not.
     let (t, mut c) = setup(200, 200, 100, 100);
+    c.w.wall(120, 100);
     assert_eq!(
         handle_resync(&t, &mut c, P, &msg(120, 100)).unwrap(),
         (0, Resync::Reassigned)
@@ -491,7 +505,6 @@ fn resync_snap_branch() {
     // Reachable and placed: lock 125 frames, the frame recorded.
     let (t, mut c) = setup(200, 200, 100, 100);
     c.g.frame = 1000;
-    c.u.type15_reaches = true;
     c.u.place_ok = true;
     assert_eq!(
         handle_resync(&t, &mut c, P, &msg(120, 100)).unwrap(),

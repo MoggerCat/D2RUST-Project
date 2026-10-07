@@ -37,7 +37,7 @@
 | Edge cases & original bugs | 326–337 |
 | Test vectors | 338–361 |
 | Provenance | 362–382 |
-| Open questions | 383–392 |
+| Open questions | 383–396 |
 <!-- /index -->
 
 ## Summary
@@ -285,7 +285,7 @@ act's base time:
 t = environment(act) time / period length: the act's environment record
 (act +0x04), dword +0x08 divided by dword +0x28 (0 when +0x28 is 0),
 `0x0061C100`. That record is advanced in `tick.md` §3 step 1; its fields
-belong to the environment spec (Phase 3, not written). The period index
+and advance are `render/lighting.md` §9.1 and §9.3 (owner). The period index
 `0x0061C100` also returns is not used by ByTime.
 
 ### 9. Derived stats and clamps
@@ -382,10 +382,14 @@ defined and checked in `stat-lists.md` (Test vectors).
 
 ## Open questions
 
-1. Readers of `Direct`, `MaxStat`, `UpdateAnimRate`, `itemspecific`:
+1. ~~Readers of `Direct`, `MaxStat`, `UpdateAnimRate`, `itemspecific`:
    property application and animation code (items/animation specs);
-   confirm none of them writes stat arrays outside `stat-lists.md` §5.
-2. Op 3 is unused by 1.14d data; its formula is read from the code only.
-3. Environment record fields +0x08 / +0x28 (time, period length) and
-   their update: environment spec; until then op 6/7 inputs are recorded
-   (`senv`) rather than computed.
+   confirm none of them writes stat arrays outside `stat-lists.md` §5.~~ → PC 2 recording list.
+2. Answered (2026-10-08): nothing to settle. No 1.14d itemstatcost row
+   uses op 3 (`check_stats.py --files game`), so the §6 formula read
+   from the code is the rule and no recording can exercise it.
+3. Answered (2026-10-08): the environment record is specified in
+   `render/lighting.md` §9.1 (+0x08 ticks, +0x28 speed = 128 ticks per
+   degree, +0x2C has no writer) and its advance in §9.3 rules 1–3 (same
+   code `0x0061BEE0` on the server, `sim/tick.md` §3 step 1); so ByTime's
+   t (§8) is computed, not recorded.

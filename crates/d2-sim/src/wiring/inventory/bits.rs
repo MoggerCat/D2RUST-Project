@@ -8,12 +8,14 @@
 //! stat lists: base, total and the property lists) and
 //! [`InvDesk::item_stream`] writes it. Nothing here decides a rule.
 
+use super::inv_world::STAT_SOCKETS;
 use super::{InvDesk, InvRest};
 use crate::items::bitstream::{self, Kind, StatEntry, StreamItem};
 use crate::items::moves::Guid;
-use crate::items::{stat, ty, ListKey};
+use crate::items::{props, stat, ty, ListKey};
 use crate::stats::{key_layer, key_stat};
 use crate::units::lifecycle::LifecycleHooks;
+use crate::units::UnitId;
 use crate::wiring::economy::find_list;
 
 /// Set-list flags (§4.6 rule 1: 0x2040, else 0x40).
@@ -88,9 +90,7 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
             suffix: it.suffix,
             rare_prefix: it.rare_prefix,
             rare_suffix: it.rare_suffix,
-            // TODO(spec: bitstream.md §4.4 rule 1): the runeword record of
-            // an item (`0x0062BED0`) has no provider; read as "no record".
-            runeword: 0xFFFF,
+            runeword: self.runeword_name(u),
             kind: Kind {
                 armor: is(ty::ARMO),
                 weapon: is(ty::WEAP),
@@ -115,17 +115,63 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
         })
     }
 
+    /// The runeword record's name string id (`bitstream.md` §4.4 rule 1):
+    /// the match of `properties.md` §10.1 on the item's own inventory
+    /// (class ids in list order) and its socket count (stat 194 as u8);
+    /// no record → 0xFFFF.
+    pub fn runeword_name(&self, u: UnitId) -> u16 {
+        let Some(it) = self.econ.items.get(u) else {
+            return 0xFFFF;
+        };
+        let fillers: Vec<usize> = self
+            .state
+            .inventories
+            .get(&u)
+            .map(|inv| {
+                inv.items()
+                    .iter()
+                    .filter_map(|&f| self.econ.items.get(f).map(|x| x.record))
+                    .collect()
+            })
+            .unwrap_or_default();
+        let sockets = self.econ.stats.unit_total(u, STAT_SOCKETS, 0) as u8;
+        let t = self.econ.tables;
+        props::runeword_row(t, it.record, it.quality, sockets, &fillers)
+            .and_then(|row| t.runes.get(row))
+            .map_or(0xFFFF, |w| w.name_id)
+    }
+
     /// The stream bytes of `item` (`0x006313E0`, network case). Empty
     /// when the item has no stream view or the buffer overflows (§1 rule
-    /// 2: the message carries no stream).
-    // TODO(spec: bitstream.md §4.1 rule 8, §4.3 rule 6): the writer's
-    // changes to the item (item level < 1 → 1, quality outside 1–9 → 2)
-    // are not written back: the seam `MovePending::item_bits` reads the
-    // world only.
+    /// 2: the message carries no stream). The writer's changes to the
+    /// item (§4.1 rule 8: item level < 1 → 1; §4.3 rule 7: quality
+    /// outside 1–9 → 2) are queued in the state and written to the item
+    /// store by the next [`InvDesk::apply_write_backs`] (the seam
+    /// `MovePending::item_bits` reads the world only); the overflow of
+    /// rule 2 comes after them, so they are kept on overflow too.
     pub fn item_stream(&self, item: Guid, flags: u32, page: u8) -> Vec<u8> {
         let Some(view) = self.stream_item(item, flags, page) else {
             return Vec::new();
         };
-        bitstream::write(&view, &self.econ.tables.isc).map_or_else(|_| Vec::new(), |(b, _)| b)
+        let mut w = bitstream::BitWriter::new(bitstream::BUFFER);
+        let wb = bitstream::write_into(&mut w, &view, &self.econ.tables.isc);
+        if wb.ilvl != view.ilvl || wb.quality != view.quality {
+            if let Some(u) = self.item_unit(item) {
+                self.state.write_backs.borrow_mut().push((u, wb));
+            }
+        }
+        w.finish().unwrap_or_default()
+    }
+
+    /// Writes the queued writer changes (item level, quality) to the item
+    /// store, in queue order.
+    pub fn apply_write_backs(&mut self) {
+        let queued = std::mem::take(self.state.write_backs.get_mut());
+        for (u, wb) in queued {
+            if let Some(it) = self.econ.items.get_mut(u) {
+                it.ilvl = wb.ilvl;
+                it.quality = wb.quality;
+            }
+        }
     }
 }

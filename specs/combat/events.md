@@ -474,10 +474,10 @@ Draws happen only after the earlier guards pass, in the order above.
 
 ## Open questions
 
-1. No trace check. Recording: equip items with knockback, freeze,
+1. ~~No trace check. Recording: equip items with knockback, freeze,
    slow, skill-on-hit, damage-to-mana; cast Energy Shield, Bone Armor,
    Iron Maiden; log each event function's entry and return, the seed
-   before and after, and the record.
+   before and after, and the record.~~ → PC 2 recording list.
 2. Answered: `0x00541860(N)` is the AI-control getter (`monsters/ai.md`
    §3.1 end; the 0 was the state argument of `0x005B0E00`), and the
    second state-0 install on the freshly spawned N is `monsters/ai.md`

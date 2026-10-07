@@ -1,4 +1,5 @@
-// Spec: specs/world/quests.md §4.4, §4.5, §9; specs/world/quests-act1-rest.md §8; specs/sim/units.md §2; specs/sim/stat-lists.md §5
+// Spec: specs/world/quests.md §4.4, §4.5, §9; specs/world/quests-act1-rest.md §8; specs/sim/units.md §2; specs/world/npc.md §2 (the interact info); specs/sim/stat-lists.md §5
+// Spec: specs/world/quests-helpers.md §8 (item search); specs/world/quests-act2-2.md §5.2–§5.4
 //! [`QuestWorld`] on the real providers: game fields ([`GameFields`]),
 //! the frame and unit lookups ([`crate::game::Game`]), unit records
 //! (GUID, class, unit seed), stat lists (stat reads and adds) and the
@@ -45,12 +46,19 @@ pub trait QuestRest {
     /// The player's inventory items in list order (inventory spec;
     /// `cube.md` open question 5).
     fn inventory(&self, player: UnitId) -> Vec<UnitId>;
+    /// The player's cursor item (`0x0063C1E0`). Default: none.
+    fn quest_cursor_item(&self, player: UnitId) -> Option<UnitId> {
+        let _ = player;
+        None
+    }
     /// `0x00544160` (`quests.md` §9.2: removal by item mode, inventory).
     fn delete_item(&mut self, player: UnitId, code: [u8; 4]);
-    /// `0x005466B0` (`quests.md` §9.1). TODO(quests.md §9.1): its
-    /// creation call `0x00559CE0` and the level default `0x00558200` have
-    /// no request layout in the items specs; placement is the inventory
-    /// spec's. Not wired.
+    /// `0x005466B0` (`quests.md` §9.1). TODO(quests.md §9.1): the steps
+    /// are specified (creation `0x00559CE0` = `items/generation.md`
+    /// §10.2, level default `0x00558200`, placement `0x00560200`, the
+    /// free-spot drop); the creation and placement providers live with
+    /// the inventory host, which the quest world does not reach. Not
+    /// wired.
     fn reward_item(
         &mut self,
         player: UnitId,
@@ -274,11 +282,75 @@ impl<H: LifecycleHooks, R: QuestRest> EconomyQuests<'_, '_, H, R> {
     fn of_type(&self, unit: UnitId, ty: UnitType) -> Option<&crate::units::record::UnitRecord> {
         self.econ.units.get(unit).filter(|r| r.ty == ty)
     }
+
+    /// `0x00558110(game, player, code)` (`quests-helpers.md` §8): the
+    /// cursor item first (`questdiffcheck` not tested there), then the
+    /// inventory list in order, items on page 1 (trade) skipped. A quest
+    /// item passes when its record's `quest` is 0, or (list only)
+    /// `questdiffcheck` is 0, or its stat 356 (`questitemdifficulty`,
+    /// total value) ≥ the game difficulty.
+    pub fn find_item(&self, player: UnitId, code: [u8; 4]) -> Option<UnitId> {
+        const QUEST_ITEM_DIFFICULTY: u16 = 356;
+        let t = self.econ.tables;
+        let d = i32::from(self.econ.fields.difficulty);
+        let rec = |i: UnitId| t.item(self.econ.items.get(i)?.record);
+        let stat = |i: UnitId| self.econ.stats.unit_total(i, QUEST_ITEM_DIFFICULTY, 0);
+        if let Some(c) = self.rest.quest_cursor_item(player) {
+            if let Some(r) = rec(c).filter(|r| r.code == code) {
+                if r.quest == 0 || stat(c) >= d {
+                    return Some(c);
+                }
+            }
+        }
+        self.rest.inventory(player).into_iter().find(|&i| {
+            let Some(item) = self.econ.items.get(i) else {
+                return false;
+            };
+            if item.inv_page == 1 {
+                return false;
+            }
+            rec(i).is_some_and(|r| {
+                r.code == code && (r.quest == 0 || r.questdiffcheck == 0 || stat(i) >= d)
+            })
+        })
+    }
+}
+
+/// `quests-act2-2.md` §5.2 `0x0061C450`: the Tainted Sun start on the act
+/// environment record (the 0x53 fields: index 0, ticks 300 × 4 from the
+/// period reset `0x0061BDF0` of the eclipse table's entry 0, eclipse 1).
+pub fn tainted_sun_start(e: &mut crate::world::environment::Environment) {
+    e.period = 0;
+    e.ticks = 300 * 4;
+    e.eclipse = true;
+}
+
+/// `quests-act2-2.md` §5.2 `0x0061C4D0`: the Tainted Sun end (index 2,
+/// ticks 0, eclipse 0; no period reset).
+pub fn tainted_sun_end(e: &mut crate::world::environment::Environment) {
+    e.period = 2;
+    e.ticks = 0;
+    e.eclipse = false;
 }
 
 impl<H: LifecycleHooks, R: QuestRest> QuestWorld for EconomyQuests<'_, '_, H, R> {
     fn frame(&self) -> i32 {
         self.econ.game.frame
+    }
+    /// `0x00554100` on the player's unit record (+0x64 / +0x68 / +0x6C,
+    /// [`crate::units::record::InteractInfo`]); no record → none.
+    fn interact_unit(&mut self, player: UnitId) -> Option<(u8, u32)> {
+        self.econ.units.get(player)?.interact.get()
+    }
+    /// `0x00554120` (`Some`, ignored while active) / `0x00554190`
+    /// (`None`) on the player's unit record.
+    fn set_interact_unit(&mut self, player: UnitId, unit: Option<(u8, u32)>) {
+        if let Some(r) = self.econ.units.get_mut(player) {
+            match unit {
+                Some((t, guid)) => r.interact.set(t, guid),
+                None => r.interact.reset(),
+            }
+        }
     }
     fn difficulty(&self) -> u8 {
         self.econ.fields.difficulty
@@ -396,15 +468,10 @@ impl<H: LifecycleHooks, R: QuestRest> QuestWorld for EconomyQuests<'_, '_, H, R>
         }
     }
 
-    /// An inventory item whose items record `code` is `code`.
-    ///
-    /// TODO(quests.md §9.2 `0x00558110`): which of the player's items the
-    /// search covers (inventory only, or also equipped / cursor / belt)
-    /// is not written; the rest's inventory list is searched.
+    /// `0x00558110` (`quests-helpers.md` §8): the player holds an item of
+    /// `code` ([`EconomyQuests::find_item`]).
     fn has_item(&self, player: UnitId, code: [u8; 4]) -> bool {
-        self.inventory_records(player)
-            .iter()
-            .any(|(_, r)| r.code == code)
+        self.find_item(player, code).is_some()
     }
     /// The item's items record code (`0x00628590`).
     fn item_code(&self, item: UnitId) -> Option<[u8; 4]> {
@@ -539,8 +606,14 @@ impl<H: LifecycleHooks, R: QuestRest> QuestWorld for EconomyQuests<'_, '_, H, R>
     fn schedule_object_event(&mut self, object: UnitId, ev: u8, frame: i32) {
         self.rest.schedule_object_event(object, ev, frame)
     }
+    /// `0x005456A0` (`quests-act2-2.md` §5.4): S→C 0x27 type 2 with the
+    /// object's GUID and the string, to the player's client.
     fn open_quest_message(&mut self, player: UnitId, object: UnitId, msg: u16) {
-        self.rest.open_quest_message(player, object, msg)
+        let g = self.guid(object);
+        self.send(
+            player,
+            &crate::world::quests::helpers::msg_scroll_text(g, msg),
+        );
     }
     fn unhandled(&mut self, chain: u8, function: u32) {
         self.rest.unhandled(chain, function)
@@ -603,5 +676,83 @@ impl<H: LifecycleHooks, R: QuestRest> QuestWorld for EconomyQuests<'_, '_, H, R>
     }
     fn set_client_save_flags(&mut self, player: UnitId, flags: u16) {
         self.rest.set_client_save_flags(player, flags)
+    }
+
+    /// `0x0061C450(act)` (`quests-act2-2.md` §5.2) on the act's
+    /// environment record; a missing act (fatal 0x547) is reported.
+    fn start_tainted_sun(&mut self, act: u8) {
+        match self.econ.game.lists.act_mut(act) {
+            Some(a) => tainted_sun_start(&mut a.environment),
+            None => self.rest.unhandled(0xFF, 0x0061_C450),
+        }
+    }
+    /// `0x0061C4D0(act)` on Act II's environment record.
+    fn end_tainted_sun(&mut self) {
+        match self.econ.game.lists.act_mut(1) {
+            Some(a) => tainted_sun_end(&mut a.environment),
+            None => self.rest.unhandled(0xFF, 0x0061_C4D0),
+        }
+    }
+    /// `0x0052E050` (`quests-act2-2.md` §5.3): S→C 0x0A to every in-game
+    /// client whose room's adjacent-room list (the room included) holds
+    /// the unit's room (none for a missile), then the unit is freed
+    /// (`0x00555600`).
+    fn remove_unit(&mut self, unit: UnitId) {
+        let lists = &self.econ.game.lists;
+        let Some(entry) = lists.unit(unit) else {
+            return;
+        };
+        let (ty, guid, room) = (entry.ty, entry.guid, entry.room());
+        let mut to = Vec::new();
+        let mut missing_room = false;
+        for c in lists.clients() {
+            let Some(ce) = lists.client(c) else { continue };
+            if ce.state != crate::units::lists::client_state::IN_GAME {
+                continue;
+            }
+            let Some(cr) = ce.room else {
+                // Fatal 0x15BE in 1.14d.
+                missing_room = true;
+                continue;
+            };
+            // `0x00619790`: the client room's list, the room included.
+            let near = room.is_some_and(|u| {
+                lists
+                    .room(cr)
+                    .is_some_and(|r| u == cr || r.adjacent.contains(&u))
+            });
+            if near && ty != UnitType::Missile {
+                if let Some(p) = ce.player {
+                    to.push(p);
+                }
+            }
+        }
+        if missing_room {
+            self.rest.unhandled(0xFF, 0x0052_DFB0);
+        }
+        for p in to {
+            self.send(p, &crate::units::messages::remove_unit(ty as u8, guid));
+        }
+        let (mut sim, hooks) = self.econ.split();
+        if crate::units::lifecycle::remove(&mut sim, hooks, unit).is_err() {
+            self.rest.unhandled(0xFF, 0x0055_5600);
+        }
+    }
+}
+
+#[cfg(test)]
+mod sun_tests {
+    use super::{tainted_sun_end, tainted_sun_start};
+    use crate::world::environment::Environment;
+
+    // Covers: specs/world/quests-act2-2.md §5.2
+    #[test]
+    fn tainted_sun_start_and_end_on_the_record() {
+        let mut e = Environment::CREATED;
+        tainted_sun_start(&mut e);
+        // Index 0, ticks 300 × 4 from the period reset, eclipse 1.
+        assert_eq!(e.message(), [0x53, 0, 0, 0, 0, 0xB0, 0x04, 0, 0, 1]);
+        tainted_sun_end(&mut e);
+        assert_eq!(e, Environment::CREATED);
     }
 }

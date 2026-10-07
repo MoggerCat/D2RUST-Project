@@ -19,6 +19,9 @@ use d2_server::adapters::handlers::world::ActionWorld;
 use d2_server::adapters::session::{
     create_game, enter_game, Entry, GameSetup, HotKey, JoinError, PlayerRecord, SkillHand,
 };
+use d2_server::adapters::session_flow::{
+    CharacterLoader, CreateGame, CreateRefusal, Loaded, SessionFault, SessionFlow,
+};
 use d2_server::adapters::{PlayerData, PlayerFields, ProtoSizes, SimGame, UnitFacts};
 use d2_server::host::Host;
 use d2_server::seams::{ClientId, Clock, MessageSink, PlayerGate, Pos, SessionHandler};
@@ -29,6 +32,7 @@ use d2_sim::units::lifecycle::AllocRequest;
 use d2_sim::units::lists::client_state;
 use d2_sim::units::{UnitId, UnitType};
 use d2_sim::wiring::interaction::{VitalsRest, VitalsView};
+use d2_sim::wiring::worldgen::WorldSim;
 use test_fixtures::content::{FLOOR_DT1, PRESET_DS1, PRESET_SIZE, WALL_DT1};
 use test_fixtures::drlg::{archive_name, FIXED_LIBRARY, TOWN_WAYPOINT};
 use test_fixtures::game::{ActCreation, GameData, Seams, Sim};
@@ -405,9 +409,19 @@ fn join_run() -> Joined {
     })
 }
 
-/// [`join_run`] with the entry step `enter` (the client is joined, its
-/// player unplaced).
-fn join_with(enter: impl FnOnce(&mut Sim, UnitId)) -> Joined {
+/// The town of the join tests before any client: the game with its
+/// waypoint, and the facts the expected bytes are built from.
+struct Town {
+    s: Sim,
+    rect: (i32, i32, i32, i32),
+    wp: UnitId,
+    wp_class: u32,
+    wp_at: (i32, i32),
+    obj_seed: u32,
+}
+
+/// The town of [`run`] with its waypoint, as `SimGame` (no client).
+fn town() -> Town {
     let d = data();
     let (mut sim, _) = d
         .world_sim(
@@ -434,62 +448,96 @@ fn join_with(enter: impl FnOnce(&mut Sim, UnitId)) -> Joined {
     let room = room.expect("the town room is active");
     let (_, _, wx, wy) = TOWN_WAYPOINT;
     let wp_at = (rect.x * SUB + wx as i32, rect.y * SUB + wy as i32);
-    let mut alloc = |ty, class, room, (x, y): (i32, i32)| {
-        let req = AllocRequest {
-            ty,
-            class,
-            room,
-            add: true,
-            fixed_guid: None,
-            mode: 1,
-            allied: ty == UnitType::Player,
-        };
-        sim.action
-            .with(&mut game, |g, v| v.allocate(g, &req, x, y))
-            .expect("allocated")
-    };
     let objects: Vec<Objects> = d.rows().unwrap();
     let wp_class = objects
         .iter()
         .position(|o| o.operatefn == 23)
         .expect("the waypoint row") as u32;
-    let wp = alloc(UnitType::Object, wp_class, Some(room), wp_at);
-    // The player as the save loader leaves it: no room, at (0, 0).
-    let player = alloc(UnitType::Player, CLASS, None, (0, 0));
-    sim.action.sys.units.get_mut(player).unwrap().mode = 1;
-    let guid = game.lists.unit(player).unwrap().guid;
-    let wp_guid = game.lists.unit(wp).unwrap().guid;
+    let req = AllocRequest {
+        ty: UnitType::Object,
+        class: wp_class,
+        room: Some(room),
+        add: true,
+        fixed_guid: None,
+        mode: 1,
+        allied: false,
+    };
+    let wp = sim
+        .action
+        .with(&mut game, |g, v| v.allocate(g, &req, wp_at.0, wp_at.1))
+        .expect("allocated");
     let obj_seed = sim.action.hooks().objects.as_ref().unwrap().obj_seed;
     let world = ActionWorld {
         waypoints: Some(d.waypoints().unwrap()),
         ..ActionWorld::default()
     };
-    let mut s: Sim = SimGame::with_world(game, sim, world);
+    Town {
+        s: SimGame::with_world(game, sim, world),
+        rect: (rect.x, rect.y, rect.w, rect.h),
+        wp,
+        wp_class,
+        wp_at,
+        obj_seed,
+    }
+}
+
+/// The player as the save loader leaves it: no room, at (0, 0), mode 1.
+fn alloc_player(s: &mut Sim, class: u32) -> UnitId {
+    let req = AllocRequest {
+        ty: UnitType::Player,
+        class,
+        room: None,
+        add: true,
+        fixed_guid: None,
+        mode: 1,
+        allied: true,
+    };
+    let p = s
+        .events
+        .action
+        .with(&mut s.game, |g, v| v.allocate(g, &req, 0, 0))
+        .expect("allocated");
+    s.events.action.sys.units.get_mut(p).unwrap().mode = 1;
+    p
+}
+
+/// [`join_run`] with the entry step `enter` (the client is joined, its
+/// player unplaced).
+fn join_with(enter: impl FnOnce(&mut Sim, UnitId)) -> Joined {
+    let mut t = town();
+    let s = &mut t.s;
+    let player = alloc_player(s, CLASS);
     // The client record as its allocation leaves it (state 0); game
     // creation sets state 1, the join 2 then 3 (`intents-events.md` §8).
     s.join(CLIENT, Some(player), None, 0).expect("join");
-    create_game(&mut s, CLIENT, &SETUP).expect("game creation");
-    let skills = s.events.action.hooks().tables.skills.skills.len();
-    enter(&mut s, player);
+    create_game(s, CLIENT, &SETUP).expect("game creation");
+    enter(s, player);
     let id = s.sim_client(CLIENT).unwrap();
     assert_eq!(
         s.game.lists.client(id).unwrap().state,
         client_state::JOINING
     );
-    // The waypoint's 0x51 fields at the join.
-    let a = &mut s.events.action;
-    let wp_mode = a.sys.units.get(wp).unwrap().mode as u8;
-    let wp_interact = a
-        .hooks()
-        .objects
-        .as_ref()
-        .and_then(|o| o.control.data.get(&wp))
-        .map_or(0, |d| d.interact);
-    let waypoint = (wp_guid, wp_class as u16, wp_at, wp_mode, wp_interact);
-    let mut host: TestHost = Host::new(s, ProtoSizes, NoSession, Ms(1000));
+    let mut host: TestHost = Host::new(t.s, ProtoSizes, NoSession, Ms(1000));
     host.connect(CLIENT);
     host.frame().expect("first frame");
-    let mut received = host.receive(CLIENT);
+    let received = host.receive(CLIENT);
+    run_frames(
+        host, received, &t.rect, t.wp, t.wp_class, t.wp_at, t.obj_seed,
+    )
+}
+
+/// `FRAMES` frames of a joined host, then what the client received and
+/// the facts of the join (the waypoint's 0x51 fields read at the end:
+/// it does not change).
+fn run_frames(
+    mut host: TestHost,
+    mut received: Vec<Vec<u8>>,
+    rect: &(i32, i32, i32, i32),
+    wp: UnitId,
+    wp_class: u32,
+    wp_at: (i32, i32),
+    obj_seed: u32,
+) -> Joined {
     // The first flush (the host's first frame starts the tick driver's
     // clock and may not tick).
     let mut first = None;
@@ -505,14 +553,27 @@ fn join_with(enter: impl FnOnce(&mut Sim, UnitId)) -> Joined {
         assert_eq!(s.events.errors(), Vec::<String>::new(), "frame {f}");
     }
     let s = &mut host.game;
-    let pos = s.events.action.hooks().path_position(player);
+    let id = s.sim_client(CLIENT).unwrap();
+    let player = s.player_of(CLIENT).expect("the client's player");
+    let guid = s.game.lists.unit(player).unwrap().guid;
+    let wp_guid = s.game.lists.unit(wp).unwrap().guid;
+    let skills = s.events.action.hooks().tables.skills.skills.len();
+    let a = &mut s.events.action;
+    let wp_mode = a.sys.units.get(wp).unwrap().mode as u8;
+    let wp_interact = a
+        .hooks()
+        .objects
+        .as_ref()
+        .and_then(|o| o.control.data.get(&wp))
+        .map_or(0, |d| d.interact);
+    let pos = a.hooks().path_position(player);
     let state = s.game.lists.client(id).unwrap().state;
     Joined {
         guid,
         obj_seed,
-        room_rect: (rect.x, rect.y, rect.w, rect.h),
+        room_rect: *rect,
         pos,
-        waypoint,
+        waypoint: (wp_guid, wp_class as u16, wp_at, wp_mode, wp_interact),
         state,
         first: first.unwrap_or(0),
         skills,
@@ -520,7 +581,7 @@ fn join_with(enter: impl FnOnce(&mut Sim, UnitId)) -> Joined {
     }
 }
 
-// Covers: specs/sim/path-placement.md §11, §13 r1, §13 r3; specs/client/model.md §11 r1, §11 r3; specs/sim/intents-events.md §7.2, §7.8 r2, §7.8 r5, §8.1, §8.2 r3, §8.2 r4, §8.2 r5, §8.2 r6, §8.3; specs/sim/tick.md §6 r6
+// Covers: specs/sim/path-placement.md §11, §13 r1, §13 r3; specs/client/model.md §11 r1, §11 r3; specs/sim/intents-events.md §7.2, §7.8 r2, §7.8 r5, §8.1, §8.2 r3, §8.2 r4, §8.2 r5, §8.2 r6, §8.3; specs/sim/tick.md §6 r6; specs/render/lighting.md §9.2 r2
 #[test]
 fn town_entry_sends_the_join_sequence() {
     let j = join_run();
@@ -534,6 +595,184 @@ fn town_entry_sends_the_join_sequence() {
         j.room_rect
     );
     assert!(j.skills > 0, "the synthetic skills table has rows");
+    let want = join_messages(&j);
+    assert_eq!(
+        j.received[..want.len()].to_vec(),
+        want,
+        "join prefix of {:02x?}",
+        j.received
+    );
+    // The first tick populates the town room, so the client's room is
+    // ready: 0x04 once, the client in game (`tick.md` §6 rule 6).
+    let rest = &j.received[want.len()..];
+    assert_eq!(rest.iter().filter(|m| m[..] == [0x04]).count(), 1);
+    let at = j.received.iter().position(|m| m[..] == [0x04]).unwrap();
+    assert!(
+        at < j.first,
+        "0x04 at {at}, after the first flush's {}",
+        j.first
+    );
+    assert_eq!(j.state, client_state::IN_GAME);
+    // No further room comes into sight while the player stands still.
+    assert!(!rest.iter().any(|m| m[0] == 0x07 || m[0] == 0x08));
+    // Determinism on the synthetic data.
+    assert_eq!(join_run(), j);
+}
+
+/// The 0x67 of the session tests: the fixture's name, Normal, `flags`,
+/// locale 0 (`client-messages.tsv` row 0x67).
+fn create_request(class: u8, flags: u32) -> CreateGame {
+    let mut game_name = [0u8; 16];
+    game_name[..4].copy_from_slice(b"game");
+    CreateGame {
+        game_name,
+        class,
+        char_name: name(),
+        flags,
+        ..CreateGame::default()
+    }
+}
+
+/// Expansion (bit 20) and bit 2 (`intents-events.md` §2.5).
+const EXPANSION_FLAGS: u32 = (1 << 20) | 0x4;
+
+/// The town with a session flow whose loader allocates the player of the
+/// request's class with [`entry`]'s values, behind a host; the loader's
+/// calls are counted in `loads`.
+fn session_host(loads: std::rc::Rc<std::cell::Cell<u32>>) -> (TestHost, TownFacts) {
+    let mut t = town();
+    let loader: CharacterLoader<WorldSim<Seams>, ActionWorld> =
+        Box::new(move |s: &mut Sim, _: ClientId, r: &CreateGame| {
+            loads.set(loads.get() + 1);
+            let player = alloc_player(s, u32::from(r.class));
+            let skills = s.events.action.hooks().tables.skills.skills.len();
+            let mut entry = entry(skills);
+            entry.name = r.char_name;
+            Ok(Loaded { player, entry })
+        });
+    t.s.set_session(SessionFlow::new(SETUP.arena_flags, loader));
+    let Town {
+        s,
+        rect,
+        wp,
+        wp_class,
+        wp_at,
+        obj_seed,
+    } = t;
+    let mut host: TestHost = Host::new(s, ProtoSizes, NoSession, Ms(1000));
+    host.connect(CLIENT);
+    (host, (rect, wp, wp_class, wp_at, obj_seed))
+}
+
+/// [`Town`]'s facts without the game.
+type TownFacts = ((i32, i32, i32, i32), UnitId, u32, (i32, i32), u32);
+
+fn faults(host: &TestHost) -> &[(ClientId, SessionFault)] {
+    &host.game.session().expect("a session flow").faults
+}
+
+// Covers: specs/sim/intents-events.md §2.5, §8.1, §8.2 r1, §8.2 r3, §8.2 r4, §8.2 r5, §8.2 r6, §8.3; specs/sim/tick.md §6 r6
+#[test]
+fn session_messages_run_creation_then_the_join() {
+    let loads = std::rc::Rc::new(std::cell::Cell::new(0));
+    let (mut host, t) = session_host(loads.clone());
+    // C→S 0x67 in the first drain (`intents-events.md` OQ2): 0x01, 0x00,
+    // 0x02, with the first tick's flush.
+    let req = create_request(CLASS as u8, EXPANSION_FLAGS);
+    host.send_system(CLIENT, &req.encode()).expect("queued");
+    host.frame().expect("frame 1");
+    let mut received = host.receive(CLIENT);
+    host.clock.0 += 40;
+    let f = host.frame().expect("frame 2");
+    assert!(f.ticked);
+    received.extend(host.receive(CLIENT));
+    assert_eq!(received, join_messages_prefix());
+    let id = host.game.sim_client(CLIENT).expect("the client record");
+    assert_eq!(
+        host.game.game.lists.client(id).unwrap().state,
+        client_state::LOADING
+    );
+    assert_eq!(loads.get(), 0, "the character loads at the join");
+    // C→S 0x6B after tick 1: the join (§8.2), then the next tick's 0x04.
+    host.send_system(CLIENT, &[0x6B]).expect("queued");
+    let (rect, wp, wp_class, wp_at, obj_seed) = t;
+    let j = run_frames(host, received, &rect, wp, wp_class, wp_at, obj_seed);
+    assert_eq!(loads.get(), 1);
+    let want = join_messages(&j);
+    assert_eq!(
+        j.received[..want.len()].to_vec(),
+        want,
+        "session prefix of {:02x?}",
+        j.received
+    );
+    let rest = &j.received[want.len()..];
+    assert_eq!(rest.iter().filter(|m| m[..] == [0x04]).count(), 1);
+    assert_eq!(j.state, client_state::IN_GAME);
+}
+
+/// The three game-creation messages of [`SETUP`] (§8.1 rules 3–6).
+fn join_messages_prefix() -> Vec<Vec<u8>> {
+    vec![
+        vec![0x01, 0x00, 0x04, 0x00, 0x10, 0x00, 0x01, 0x00],
+        vec![0x00],
+        vec![0x02],
+    ]
+}
+
+// Covers: specs/sim/intents-events.md §2.5, §8.2 r1, §8.2 r2
+#[test]
+fn session_refusals_stop_the_sequence() {
+    let loads = std::rc::Rc::new(std::cell::Cell::new(0));
+    let (mut host, _t) = session_host(loads.clone());
+    // 0x6B with no client record: log, stop (§8.2 rule 1).
+    host.send_system(CLIENT, &[0x6B]).expect("queued");
+    // 0x67's checks (§2.5): locale > 14, neither flag bit 1 nor 2,
+    // class ≥ 7: nothing happens.
+    let mut bad = create_request(CLASS as u8, EXPANSION_FLAGS);
+    bad.locale = 15;
+    host.send_system(CLIENT, &bad.encode()).expect("queued");
+    host.send_system(CLIENT, &create_request(CLASS as u8, 1 << 20).encode())
+        .expect("queued");
+    host.send_system(CLIENT, &create_request(7, EXPANSION_FLAGS).encode())
+        .expect("queued");
+    // A classic game (no bit 20) with an expansion class: load result
+    // 0x18, the client removed (§8.2 rule 2), the loader not called.
+    host.send_system(CLIENT, &create_request(5, 0x4).encode())
+        .expect("queued");
+    host.send_system(CLIENT, &[0x6B]).expect("queued");
+    host.frame().expect("frame 1");
+    host.clock.0 += 40;
+    host.frame().expect("frame 2");
+    assert_eq!(
+        faults(&host),
+        [
+            (CLIENT, SessionFault::NoClientRecord),
+            (
+                CLIENT,
+                SessionFault::CreateRefused(CreateRefusal::Locale(15))
+            ),
+            (
+                CLIENT,
+                SessionFault::CreateRefused(CreateRefusal::Flags(1 << 20))
+            ),
+            (CLIENT, SessionFault::CreateRefused(CreateRefusal::Class(7))),
+            (CLIENT, SessionFault::LoadRefused(0x18)),
+        ]
+    );
+    assert_eq!(loads.get(), 0);
+    assert_eq!(host.game.sim_client(CLIENT), None);
+    // The accepted 0x67's creation messages were buffered, but the client
+    // left the game's list before the flush, which walks that list
+    // (`intents-events.md` §3.2 rule 3): nothing arrives (the refusal's
+    // 0xB4, a direct send, is a named gap).
+    assert_eq!(host.receive(CLIENT), Vec::<Vec<u8>>::new());
+}
+
+/// The messages of game creation and the join up to game entry's 0x7E,
+/// with `j`'s facts (`intents-events.md` §8.1, §8.2).
+fn join_messages(j: &Joined) -> Vec<Vec<u8>> {
+    let (rx, ry, _, _) = j.room_rect;
+    let (x, y) = j.pos;
     let g = j.guid.to_le_bytes();
     let mut assign = vec![0x59, g[0], g[1], g[2], g[3], CLASS as u8];
     assign.extend(name());
@@ -580,7 +819,7 @@ fn town_entry_sends_the_join_sequence() {
     // room switch (the town has one room: its 0x07 again, then the add
     // messages of its units, the waypoint), 0x15, 0x7E; all before the
     // first tick (`path-placement.md` §11 "Recipients").
-    let want = vec![
+    vec![
         vec![0x01, 0x00, 0x04, 0x00, 0x10, 0x00, 0x01, 0x00],
         vec![0x00],
         vec![0x02],
@@ -593,34 +832,19 @@ fn town_entry_sends_the_join_sequence() {
         hand(1, 0),
         hand(0, 36),
         load,
+        DARKNESS.to_vec(),
         reveal.clone(),
         reveal,
         object,
         place,
         vec![0x7E, 0, 0, 0, 0],
-    ];
-    assert_eq!(
-        j.received[..want.len()].to_vec(),
-        want,
-        "join prefix of {:02x?}",
-        j.received
-    );
-    // The first tick populates the town room, so the client's room is
-    // ready: 0x04 once, the client in game (`tick.md` §6 rule 6).
-    let rest = &j.received[want.len()..];
-    assert_eq!(rest.iter().filter(|m| m[..] == [0x04]).count(), 1);
-    let at = j.received.iter().position(|m| m[..] == [0x04]).unwrap();
-    assert!(
-        at < j.first,
-        "0x04 at {at}, after the first flush's {}",
-        j.first
-    );
-    assert_eq!(j.state, client_state::IN_GAME);
-    // No further room comes into sight while the player stands still.
-    assert!(!rest.iter().any(|m| m[0] == 0x07 || m[0] == 0x08));
-    // Determinism on the synthetic data.
-    assert_eq!(join_run(), j);
+    ]
 }
+
+/// S→C 0x53 of a new act's environment record (`intents-events.md` §8.2
+/// rule 4; recorded `53 02000000 00000000 00`, `render/lighting.md` §9.2
+/// rule 4.2).
+const DARKNESS: [u8; 10] = [0x53, 2, 0, 0, 0, 0, 0, 0, 0, 0];
 
 /// A save whose name is the fixture's player name, act 0 of Normal.
 fn save_named() -> d2_formats::d2s::D2s {

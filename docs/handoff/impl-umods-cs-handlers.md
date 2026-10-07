@@ -1,5 +1,7 @@
 # impl-umods-cs-handlers (2026-10-07, branch `claude/impl-umods-cs-handlers` on `claude/specs-staging-2` `b222388`)
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the tenth fold (`claude/fold-handoff-10`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Tenth set" (PC 1 / PC 2).
+
 ## Done
 1. **Umod callbacks** (`monsters/umod-callbacks.md`): all 32 callback bodies of `umods.tsv`
    in `d2-sim::monsters::init::callbacks` (dispatcher `run`), helpers §3.2 area damage,

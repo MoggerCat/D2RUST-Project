@@ -88,12 +88,24 @@ pub trait ChestWorld: ObjectWorld {
     /// `0x00559A30` (items spec): drop the object's drop item code (unit
     /// +0xB8) at the object (§8.1 rule 7).
     fn drop_item_code(&mut self, object: UnitId, code: u32) {}
-    /// `0x005474C0`: the trap monster id for the object (per-level cache,
-    /// D2MOO `OBJRGN_GetTrapMonsterId`; open question 3 of
-    /// `world/objects.md`, owner monsters spec). Draws, if any, are the
-    /// provider's.
-    fn trap_monster_id(&mut self, object: UnitId) -> Option<u32> {
+    /// The classes of the first `+0x10` entries of the level's monster
+    /// region (`0x00547BB0(game +0xF0, level)`, `monsters/population.md`
+    /// §2.2), in order; `None`: no region. Read by the trap monster id
+    /// [`trap_monster_id`] (§8.3).
+    fn monster_region_classes(&self, level: u32) -> Option<Vec<i32>> {
         None
+    }
+    /// The `monstats` row count (§8.3 trap monster id bound).
+    fn monstats_count(&self) -> u32 {
+        0
+    }
+    /// The unit's class id (unit +0x04): the assassin exemption of §8.1
+    /// rule 8 tests it with no type test.
+    fn unit_class(&self, unit: UnitId) -> Option<u32> {
+        match self.operator(unit) {
+            Operator::Player(c) => Some(u32::from(c)),
+            _ => None,
+        }
     }
     /// `0x00582280(…, monster, arg)`: spawn one trap monster for the
     /// object (§8.2 casket and barrel, §8.3 handlers 8 and 9 with arg 8;
@@ -131,12 +143,30 @@ pub trait ChestWorld: ObjectWorld {
     fn room_units(&self, room: RoomId) -> Vec<UnitId> {
         Vec::new()
     }
-    /// The range test of `0x00584240` (§8.2 fn 7): `unit` is within
-    /// `range` of `object` (range 3 for damage, distance 2 for chained
-    /// barrels). Metric and bound inclusiveness are the provider's (not
-    /// stated in the spec).
+    /// The range tests of `0x00584240` (§8.2 "Exploding barrel ranges"):
+    /// range 3 is the damage test `0x00641890(unit, B, 3)`, dx² + dy² ≤ 9
+    /// (inclusive) from the barrel's position; range 2 the chain test
+    /// `0x006416D0(barrel, other)` ≤ 2 (size-adjusted, signed).
     fn within(&self, object: UnitId, unit: UnitId, range: i32) -> bool {
-        false
+        let ((bx, by), (ux, uy)) = (self.position(object), self.position(unit));
+        if range == 2 {
+            return reach_distance(
+                (bx, by),
+                self.unit_size(object),
+                (ux, uy),
+                self.unit_size(unit),
+            ) <= 2;
+        }
+        let (dx, dy) = (
+            i64::from(bx.wrapping_sub(ux).wrapping_abs()),
+            i64::from(by.wrapping_sub(uy).wrapping_abs()),
+        );
+        dx * dx + dy * dy <= i64::from(range) * i64::from(range)
+    }
+    /// Unit size `0x00620510` (`sim/path-placement.md` §3; objects:
+    /// `SizeX`).
+    fn unit_size(&self, unit: UnitId) -> i32 {
+        0
     }
     /// `0x005DFA00` (combat spec): trap damage from `object` to `target`
     /// (§8.2 fn 7).
@@ -144,10 +174,16 @@ pub trait ChestWorld: ObjectWorld {
     /// `0x005A43E0` (monsters spec): spawn the first monster of the
     /// level's region list that can walk, at the object (§8.2 fn 68).
     fn spawn_region_monster(&mut self, object: UnitId) {}
-    /// The "inside the room" test of `0x00582380` (§8.3 handlers 5, 7):
-    /// (x, y) lies in `room` (DRLG).
+    /// The "inside the room" test of `0x00582380` (§8.3 fire objects):
+    /// x0 ≤ x < x0 + width of the room rectangle (`0x00619730`); y is not
+    /// tested.
     fn in_room(&self, room: RoomId, x: i32, y: i32) -> bool {
-        false
+        self.room_rect(room)
+            .is_some_and(|(x0, _, w, _)| x0 <= x && x < x0.wrapping_add(w))
+    }
+    /// `0x00619730`: the room's sub-tile rect {x0, y0, w, h}.
+    fn room_rect(&self, room: RoomId) -> Option<(i32, i32, i32, i32)> {
+        None
     }
 }
 
@@ -173,10 +209,11 @@ pub fn operate<W: ChestWorld>(
         3 => urn(ctl, t, w, op),
         5 => barrel(ctl, t, w, op),
         7 => {
-            if w.mode(op.object) == 0 {
-                exploding_barrel(ctl, t, w, op.object)?;
+            if w.mode(op.object) != 0 {
+                return Ok(1);
             }
-            Ok(1)
+            exploding_barrel(ctl, t, w, op.object)?;
+            Ok(0)
         }
         14 => corpse(ctl, t, w, op),
         68 => evil_urn(ctl, t, w, op),
@@ -202,12 +239,12 @@ fn chest<W: ChestWorld>(
     // Rule 2.
     let locked = d.interact & 0x80 != 0;
     let picks = if locked {
-        // TODO(objects.md §8.1 r2): a locked chest operated with no
-        // operator is not described; read as "no key" without a sound.
+        // Rule 8: the key test with no unit is fatal (`0x0055F173`); the
+        // exemption tests the class id only.
         let Some(p) = op.operator else {
-            return Ok(1);
+            return Err(ObjectError::KeyTestNoUnit);
         };
-        let pass = w.operator(p) == Operator::Player(ASSASSIN) || w.key_test(p);
+        let pass = w.unit_class(p) == Some(u32::from(ASSASSIN)) || w.key_test(p);
         if !pass {
             w.sound(p, sound::LOCKED, None, false);
             return Ok(1);
@@ -327,8 +364,7 @@ fn special_chest<W: ChestWorld>(ctl: &mut ObjectControl, w: &mut W, op: &Operate
         if is_magic(w, i) {
             break;
         }
-        // TODO(objects.md §8.1 r4 tail): a null drop is read as neither
-        // "magic" nor "non-magic": the loop goes on without counting.
+        // Rule 9: a null drop counts as neither item nor magic.
         if i.is_some() {
             k += 1;
         }
@@ -400,14 +436,68 @@ fn casket_footprint<W: ChestWorld>(
 /// (`0x005474C0`, spawn `0x00582280` arg 8).
 fn maybe_trap_monster<W: ChestWorld>(ctl: &mut ObjectControl, w: &mut W, obj: UnitId) {
     if ctl.seed.roll(10000) & 0xFFFF_E000 != 0 {
-        if let Some(m) = w.trap_monster_id(obj) {
+        if let Some(m) = spawnable(w, trap_monster_id(ctl, w, obj)) {
             w.spawn_trap_monster(obj, m, TRAP_SPAWN_ARG);
         }
     }
 }
 
-// TODO(objects.md §8.2): the breakables' return value on their main path
-// is not stated (only "else return 1"); 1 is returned on every path.
+/// The trap monster id `0x005474C0` (§8.3, no draws): the region's cached
+/// id (+0x1C) when it is a `monstats` row; else 234 is cached and the
+/// level's monster region entries are walked for the first family range
+/// holding one, whose base is cached. `None`: no object level or region.
+pub fn trap_monster_id<W: ChestWorld>(ctl: &mut ObjectControl, w: &W, obj: UnitId) -> Option<i32> {
+    let level = w.level(obj)?;
+    let count = w.monstats_count();
+    let g = ctl.regions.get_mut(level as usize)?.as_mut()?;
+    if g.w1c >= 0 && (g.w1c as u32) < count {
+        return Some(g.w1c);
+    }
+    g.w1c = ACT1_SKIPPED_TRAP_MONSTER as i32;
+    let act_range = if g.act == 1 { (96, 101) } else { (5, 10) };
+    let ranges = [
+        act_range,
+        (0, 4),
+        (170, 174),
+        (274, 278),
+        (379, 383),
+        (383, 387),
+        (387, 391),
+    ];
+    for c in w.monster_region_classes(level).unwrap_or_default() {
+        if let Some(&(base, _)) = ranges.iter().find(|&&(lo, hi)| (lo..hi).contains(&c)) {
+            g.w1c = base;
+            break;
+        }
+    }
+    Some(g.w1c)
+}
+
+/// `0x006416D0(a, b)` (`missiles/missiles.md` §R9.5): per axis |Δ| −
+/// (size(a) / 2 + size(b) / 2), clamped at 0; then (2·max + min) / 2.
+pub fn reach_distance(a: (i32, i32), sa: i32, b: (i32, i32), sb: i32) -> i32 {
+    let gap = sa / 2 + sb / 2;
+    let dx =
+        b.0.wrapping_sub(a.0)
+            .wrapping_abs()
+            .wrapping_sub(gap)
+            .max(0);
+    let dy =
+        b.1.wrapping_sub(a.1)
+            .wrapping_abs()
+            .wrapping_sub(gap)
+            .max(0);
+    (2 * dx.max(dy) + dx.min(dy)) / 2
+}
+
+/// An id outside 0 … `monstats` count − 1 spawns nothing (§8.3).
+fn spawnable<W: ChestWorld>(w: &W, m: Option<i32>) -> Option<u32> {
+    m.and_then(|m| u32::try_from(m).ok())
+        .filter(|&m| m < w.monstats_count())
+}
+
+// Return values (§8.2): casket, urn, corpse, evil urn 1; barrel (5) and
+// exploding barrel (7) 0.
 
 /// Operate 1 `0x00586410`: casket.
 fn casket<W: ChestWorld>(
@@ -467,8 +557,8 @@ fn barrel<W: ChestWorld>(
             w.start_player_skill_on(p, obj);
         }
     }
-    // TODO(objects.md §8.2 fn 5): "clear 0x2 (when the object exists)":
-    // the object is read as always existing here.
+    // `objects-2.md` §24 rule 2: the dispatch never passes a null object,
+    // so the flag is always cleared.
     set_mode(t, w, obj, op.class, 1, true)?;
     clear_selectable(w, obj);
     w.free_footprint(obj);
@@ -477,7 +567,7 @@ fn barrel<W: ChestWorld>(
         w.chest_drop(op, 0);
     }
     schedule_endanim(w, t.object(op.class)?, obj);
-    Ok(1)
+    Ok(0)
 }
 
 /// Operate 7 `0x00584330` (mode 0 checked by the caller): exploding
@@ -589,9 +679,9 @@ pub fn trap_arm<W: ChestWorld>(
         return Ok(());
     }
     if ty == 8 || ty == 9 {
-        let m = w.trap_monster_id(obj);
+        let m = trap_monster_id(ctl, w, obj);
         let level = w.level(obj).unwrap_or(0);
-        if m == Some(ACT1_SKIPPED_TRAP_MONSTER) && in_act1(t, level) {
+        if m == Some(ACT1_SKIPPED_TRAP_MONSTER as i32) && in_act1(t, level) {
             return Ok(());
         }
     }
@@ -632,11 +722,10 @@ pub fn trap_event<W: ChestWorld>(
         4 => trap_monster_at(w, obj, 369),
         5 | 7 => trap_fire(ctl, t, w, obj)?,
         8 | 9 => {
-            // TODO(objects.md §8.3, open question 3): whether the trap
-            // monster id is read before or after the control-seed step,
-            // and whether it draws, is not stated; read here after it.
+            // The control step comes before the id lookup, which draws
+            // nothing (§8.3 trap monster id).
             let n = 1 + (ctl.seed.step() & 1);
-            if let Some(m) = w.trap_monster_id(obj) {
+            if let Some(m) = spawnable(w, trap_monster_id(ctl, w, obj)) {
                 for _ in 0..n {
                     w.spawn_trap_monster(obj, m, TRAP_SPAWN_ARG);
                 }
@@ -674,18 +763,18 @@ fn trap_fire<W: ChestWorld>(
         return Ok(());
     };
     let (x, y) = w.position(obj);
-    // TODO(objects.md §8.3 handlers 5, 7): the allocation mode of objects
-    // 162 and 160 is not stated; mode 0 is used.
-    if let Some(o) = super::allocate(ctl, t, w, room, TRAP_FIRE_OBJECT, x, y, 0)? {
+    // §8.3 fire objects: allocated in mode 1; a failed 160 allocation is
+    // fatal (`0x005540A0`).
+    if let Some(o) = super::allocate(ctl, t, w, room, TRAP_FIRE_OBJECT, x, y, 1)? {
         if let Some(d) = ctl.data.get_mut(&o) {
             d.spark = SPARK_TRAP_FIRE;
         }
     }
     if w.in_room(room, x + 1, y) {
-        if let Some(o) = super::allocate(ctl, t, w, room, TRAP_FIRE_OBJECT_2, x + 1, y, 0)? {
-            if let Some(d) = ctl.data.get_mut(&o) {
-                d.spark = SPARK_TRAP_FIRE;
-            }
+        let o = super::allocate(ctl, t, w, room, TRAP_FIRE_OBJECT_2, x + 1, y, 1)?
+            .ok_or(ObjectError::AllocFailed(TRAP_FIRE_OBJECT_2))?;
+        if let Some(d) = ctl.data.get_mut(&o) {
+            d.spark = SPARK_TRAP_FIRE;
         }
     }
     Ok(())

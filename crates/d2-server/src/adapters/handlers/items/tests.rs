@@ -5,8 +5,8 @@
 //! `Economy::create_item` on the action sim's own unit records and stat
 //! lists (one unit world), and the player's inventory in the host's one
 //! inventory model ([`moves::InvParts`]: the same lists, checks and
-//! placement the item moves use). The player's interaction is the wired
-//! host's one owner (the quest tests' staged `Rest`). The fakes are
+//! placement the item moves use). The player's interaction is the unit
+//! record's interact info. The fakes are
 //! [`ItemPending`] (no owner spec: it logs) and the item-move rest
 //! (`moves::tests::MRest`: positions, sounds, the item bit stream).
 
@@ -141,6 +141,8 @@ fn tables() -> ItemTables {
             let mut t = Itemtypes::decode(&[0u8; Itemtypes::SIZE]);
             t.class = 0xFF;
             t.staffmods = 0xFF;
+            // Empty `shoots`: the link miss (link16 −1).
+            t.shoots = 0xFFFF;
             t.rare = 1;
             t
         })
@@ -480,10 +482,12 @@ impl T {
         let p = self.player;
         store(&mut self.host.game, p, item, page);
     }
-    /// The player's interaction, at its one owner.
+    /// The player's interaction, at its one owner (the unit record).
     fn interact(&mut self, unit_type: u8, guid: u32) {
         let p = self.player;
-        self.world().rest.interact.insert(p, (unit_type, guid));
+        let r = self.units().get_mut(p).unwrap();
+        r.interact.reset();
+        r.interact.set(unit_type, guid);
     }
     /// 0x2A with the ring and the cube.
     fn put_msg(&mut self) -> Vec<u8> {
@@ -732,7 +736,7 @@ fn click_button_closes_the_cube() {
     t.interact(4, g);
     assert_eq!(t.frame(&click(0x17)), (ResultCode::Done, NO_BYTES));
     // Reset (GUID −1, type 6, inactive) at the owner: no interaction.
-    assert_eq!(t.world().rest.interact.get(&player), None);
+    assert_eq!(t.units().get(player).unwrap().interact.get(), None);
     assert_eq!(t.pending.take(), ["inventory_pass"]);
     // Closed: the next click has no interaction.
     assert_eq!(

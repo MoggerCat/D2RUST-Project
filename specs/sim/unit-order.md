@@ -31,18 +31,18 @@
 |   2. Game unit hash lists | 100–138 |
 |   3. Unit placement and removal (list bookkeeping) | 139–150 |
 |   4. Act room lists (active rooms) | 151–161 |
-|   5. Room unit lists | 162–217 |
-|   6. Room update queues | 218–237 |
-|   7. Client list | 238–246 |
-|   8. Unit timer lists | 247–254 |
-|   9. Adjacent-room arrays (dependency) | 255–263 |
-|   10. Iteration and modification | 264–280 |
-| Constants & data dependencies | 281–291 |
-| Randomness | 292–298 |
-| Edge cases & original bugs | 299–309 |
-| Test vectors | 310–343 |
-| Provenance | 344–361 |
-| Open questions | 362–405 |
+|   5. Room unit lists | 162–219 |
+|   6. Room update queues | 220–239 |
+|   7. Client list | 240–248 |
+|   8. Unit timer lists | 249–256 |
+|   9. Adjacent-room arrays (dependency) | 257–265 |
+|   10. Iteration and modification | 266–282 |
+| Constants & data dependencies | 283–293 |
+| Randomness | 294–300 |
+| Edge cases & original bugs | 301–311 |
+| Test vectors | 312–345 |
+| Provenance | 346–363 |
+| Open questions | 364–408 |
 <!-- /index -->
 
 ## Summary
@@ -165,7 +165,9 @@ table `0x006E10E0`:
    `pRoomNext`).
 2. **Insert** (`0x0064C2C0`, also through `0x0064C350`): the unit is
    **prepended**. Then it is queued for update (§6). Players and good-
-   aligned monsters also raise the room's allied count (`0x00619EE0`).
+   aligned monsters also raise the room's allied count (`0x00619EE0`):
+   type 0, or type 1 with alignment `0x006259B0` = 2 (`0x0064C321`–
+   `0x0064C339`); missiles, objects, items and tiles never do.
 3. **Remove** (`0x0064C370`): unlink in place (linear search); remove from
    the update queue (`0x0064C1B0`, clears unit flag 0x2000 at +0xC4);
    allied count lowered for players and good-aligned monsters.
@@ -362,18 +364,19 @@ replay runs on the committed traces `traces/sim/tick/sim-0006`–`0008`
 ## Open questions
 
 1. Client list (§7) with more than one client: needs a hosted game.
+   Out of Phase 0–6 scope (multiplayer, Phase 7).
 2. Adjacent-room array order (§9): owned by the DRLG spec; record it in
    the same trace (room +0x00 / +0x24) to fix it (the snapshots already hold the arrays).
    *Answered* in the owner: `drlg/rooms.md` §6 (fill `0x0066BD00` =
    rooms-near order restricted to active rooms, refilled at each
    neighbouring activation; removal `0x0061A910` swaps the last entry
    into the hole). Its trace confirmation is `drlg/rooms.md` OQ 3.
-3. Inactive-unit storage (compress `0x005433F0`, restore `0x00542B40`):
+3. ~~Inactive-unit storage (compress `0x005433F0`, restore `0x00542B40`):
    order in which restored units re-enter the room list and whether they
    keep their GUIDs (observed: GUIDs are reused after removal, §1.4).
    Room-lifecycle spec. Which units are freed, stored or kept by the
    compress: answered in `sim/units.md` §3.3; the restore stays open
-   there (OQ8).
+   there (OQ8).~~ → PC 2 recording list.
 4. Which systems iterate hash lists rather than rooms (inventory of
    `0x005537D0` / `0x005538D0` callers by system), for the unit specs.
    *Answered* (static, 1.14d `disasm.py xref`, call sites mapped to

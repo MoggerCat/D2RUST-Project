@@ -1,7 +1,7 @@
 //! d2-client entry point.
 //!
 //! Usage:
-//!   d2-client [play]     [--seed N] [--frames N] [--synthetic]
+//!   d2-client [play]     [--seed N] [--frames N] [--synthetic] [--save FILE.d2s]
 //!   d2-client view       [--ds1 PATH] [--wall-base N] [--frames N]
 //!   d2-client verify     [--case NAME]... [--cases DIR] [--perturb N]
 //!   d2-client verify     [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out DIR] [--perturb N]
@@ -13,7 +13,9 @@
 //! compositor's render-graph node. With $D2_GAME_DIR set it reads the
 //! game's `levels` and `objects` tables and generates its levels from the
 //! user's DS1 / DT1 files (unless `--synthetic`); otherwise it uses
-//! synthetic tables and levels.
+//! synthetic tables and levels. `--save` joins with a character save
+//! (read with the user's tables: needs $D2_GAME_DIR) instead of a new
+//! sorceress.
 //! `view` opens a window (pan: arrows/WASD, zoom: mouse wheel). `verify`
 //! runs the render cases (`crates/d2-client/render-cases/*.toml`, spec
 //! `client/render-pipeline.md` §A10): per case, CPU reference vs GPU, byte
@@ -67,6 +69,8 @@ struct Options {
     seed: u32,
     /// `play`: synthetic tables even with $D2_GAME_DIR set.
     synthetic: bool,
+    /// `play --save`: the character save the join loads.
+    save: Option<PathBuf>,
 }
 
 fn parse_view(s: &str) -> Result<cpu::View> {
@@ -100,6 +104,7 @@ fn parse_options(args: &[String]) -> Result<Options> {
         frames: None,
         seed: d2_client::app::single_player::DEFAULT_SEED,
         synthetic: false,
+        save: None,
     };
     let mut it = args.iter();
     while let Some(flag) = it.next() {
@@ -118,6 +123,7 @@ fn parse_options(args: &[String]) -> Result<Options> {
             "--frames" => o.frames = Some(value()?.parse().context("--frames")?),
             "--seed" => o.seed = value()?.parse().context("--seed")?,
             "--synthetic" => o.synthetic = true,
+            "--save" => o.save = Some(PathBuf::from(value()?)),
             "--probe" => {
                 let v = value()?;
                 let (x, y) = v.split_once(',').context("--probe expects X,Y")?;
@@ -349,9 +355,18 @@ fn play(o: Options) -> Result<()> {
         ),
         single_player::GameData::Synthetic => println!("play: synthetic tables and levels"),
     }
+    let character = match &o.save {
+        Some(path) => {
+            let c = single_player::load_character(&data, path)?;
+            println!("play: character from {}", path.display());
+            c
+        }
+        None => single_player::Character::New,
+    };
     let result = play::run(play::PlayConfig {
         data,
         seed: o.seed,
+        character,
         exit_after: o.frames,
     })?;
     match result {
@@ -367,7 +382,7 @@ fn main() -> Result<()> {
         Some("verify") => verify(parse_options(&args[1..])?),
         Some("play") | None => play(parse_options(args.get(1..).unwrap_or(&[]))?),
         Some("view") => view(parse_options(&args[1..])?),
-        _ => bail!("usage: d2-client [view|verify|cpu-render|play] [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out PATH] [--case NAME] [--cases DIR] [--perturb N] [--seed N] [--frames N] [--synthetic]"),
+        _ => bail!("usage: d2-client [view|verify|cpu-render|play] [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out PATH] [--case NAME] [--cases DIR] [--perturb N] [--seed N] [--frames N] [--synthetic] [--save FILE.d2s]"),
     }
 }
 

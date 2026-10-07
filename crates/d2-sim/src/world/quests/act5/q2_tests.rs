@@ -677,3 +677,14 @@ fn barbarian_ai_hooks() {
     f.game_type = 3;
     assert!(door_open_near(&mut f, None, b));
 }
+
+// Covers: specs/world/quests-act5.md §4.7
+#[test]
+fn freed_bit_is_an_equality_test() {
+    // 15 → 36.5, 14 → 36.6, any other count (16 included) → 36.7
+    // (`0x00588B96`–`0x00588BA8`).
+    assert_eq!(super::freed_bit(15), 5);
+    assert_eq!(super::freed_bit(14), 6);
+    assert_eq!(super::freed_bit(16), 7);
+    assert_eq!(super::freed_bit(12), 7);
+}

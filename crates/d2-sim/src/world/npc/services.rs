@@ -253,8 +253,9 @@ pub(super) fn respec<W: NpcWorld>(w: &mut W, player: UnitId, difficulty: u8) {
         }
     }
     if w.quest_flags(player).get(41, 1) {
-        w.reset_stats(player);
+        // Skills (`0x00570360`) then stats (`0x00570C80`), in that order.
         w.reset_skills(player);
+        w.reset_stats(player);
         w.respec_sound(player);
         w.respec_done(player);
     }

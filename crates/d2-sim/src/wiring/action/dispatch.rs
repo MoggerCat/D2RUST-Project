@@ -143,11 +143,10 @@ impl<X: Pending> ActionSim<X> {
     /// step of the game seed ([`ActionHooks::game_seed`]), the control,
     /// the shrine lists and the level regions from `tables`.
     ///
-    /// TODO(rng.md §5.2): game creation derives, in order, the monster
-    /// regions (`WorldSim::create_regions`), this control, the NPC
-    /// control and the quest control, each from one game-seed step. d2rs
-    /// has no single game-creation sequence yet: the host calls this
-    /// right after the regions and before the NPC and quest controls.
+    /// Game creation derives, in order, the monster regions, this
+    /// control, the NPC control and the quest control, each from one
+    /// game-seed step (`rng.md` §5.2); `WorldSim::create_game` runs that
+    /// sequence.
     pub fn create_objects(&mut self, tables: Arc<ObjectTables>) {
         let h = &mut self.sys.hooks;
         h.objects = Some(ObjectState::new(&mut h.game_seed, tables));
@@ -295,8 +294,11 @@ impl<X: Pending> TickHooks for ActionSim<X> {
     /// the client's: the room switch `0x00537B50` to the player's room
     /// ([`View::room_switch`], `intents-events.md` §7.8).
     ///
-    /// TODO(tick.md §6.5): the level-change calls `0x00543B90`,
-    /// `0x00537340` are not specified.
+    /// TODO(wiring, tick.md §6 rule 5): when the two rooms' level ids
+    /// differ, quest event 3 `0x00543B90` (`QuestControl::changed_level`)
+    /// then the town-leave refresh `0x00537340` (`VendorDesk::level_changed`)
+    /// run before the room switch; this dispatcher holds neither the quest
+    /// control nor the vendor records, so neither is called yet.
     fn client_level_change(&mut self, game: &mut Game, client: ClientId) {
         let new = game
             .lists

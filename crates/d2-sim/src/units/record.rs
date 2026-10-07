@@ -1,4 +1,5 @@
 // Spec: specs/sim/units.md §2
+// Spec: specs/world/waypoints.md Inputs, specs/world/cube.md (interaction state), specs/world/npc.md §2–§3 (the interact info +0x64 / +0x68 / +0x6C)
 //! The unit record fields the simulation owns (§2), beside the list
 //! fields of [`super::lists`]: one [`UnitRecord`] per live unit in
 //! [`Units`], keyed by [`UnitId`]. Fields whose owner spec is not
@@ -87,6 +88,49 @@ pub struct Anim {
     pub record: Option<AnimRecord>,
 }
 
+/// The interact info of a player unit: +0x64 GUID, +0x68 unit type,
+/// +0x6C active (`world/waypoints.md` Inputs, `world/cube.md` state
+/// table). One home for every system that reads or sets it (NPCs, the
+/// cube, waypoints, objects, quests, the inventory's busy test; handoff
+/// HM3).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct InteractInfo {
+    /// +0x64.
+    pub guid: u32,
+    /// +0x68.
+    pub ty: u32,
+    /// +0x6C.
+    pub active: bool,
+}
+
+/// The type the reset writes (`0x00554190`: type 6).
+pub const INTERACT_RESET_TYPE: u32 = 6;
+
+impl InteractInfo {
+    /// `0x00554100`: (unit type, GUID) while active, else none.
+    pub fn get(&self) -> Option<(u8, u32)> {
+        self.active.then_some((self.ty as u8, self.guid))
+    }
+
+    /// `0x00554120`: (type, GUID) and active, ignored while already active
+    /// (`world/waypoints.md` §5.2 rule 3, `world/cube.md` §1).
+    pub fn set(&mut self, ty: u8, guid: u32) {
+        if !self.active {
+            self.guid = guid;
+            self.ty = u32::from(ty);
+            self.active = true;
+        }
+    }
+
+    /// `0x00554190`: GUID −1, type 6, active 0 (`world/npc.md` §3,
+    /// `world/cube.md` §1).
+    pub fn reset(&mut self) {
+        self.guid = u32::MAX;
+        self.ty = INTERACT_RESET_TYPE;
+        self.active = false;
+    }
+}
+
 /// The simulation's unit record (§2).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct UnitRecord {
@@ -117,6 +161,10 @@ pub struct UnitRecord {
     pub flags2: u32,
     /// +0xD0.
     pub node_index: u32,
+    /// +0x64 / +0x68 / +0x6C ([`InteractInfo`]).
+    // TODO(spec: sim/units.md §2): the allocation values of +0x64 / +0x68
+    // are not written; the record starts inactive (no getter reads them).
+    pub interact: InteractInfo,
 }
 
 impl UnitRecord {
@@ -137,6 +185,7 @@ impl UnitRecord {
             flags: 0,
             flags2: 0,
             node_index: INITIAL_NODE_INDEX,
+            interact: InteractInfo::default(),
         }
     }
 
@@ -184,5 +233,36 @@ impl Units {
     /// `0x005541B0`: a missing unit counts as dead.
     pub fn is_dead(&self, id: UnitId) -> bool {
         self.get(id).is_none_or(UnitRecord::is_dead)
+    }
+}
+
+#[cfg(test)]
+mod interact_tests {
+    use super::*;
+
+    /// The interact info: set while inactive, ignored while active; the
+    /// reset writes GUID −1, type 6, inactive; the getter answers only
+    /// while active.
+    // Covers: specs/world/npc.md §2 l2 r4; specs/world/waypoints.md §5.2 r3
+    #[test]
+    fn set_get_reset() {
+        let mut r = UnitRecord::new(UnitType::Player, 1, 7);
+        assert_eq!(r.interact.get(), None);
+        r.interact.set(1, 0x10);
+        assert_eq!(r.interact.get(), Some((1, 0x10)));
+        r.interact.set(2, 0x20);
+        assert_eq!(r.interact.get(), Some((1, 0x10)), "ignored while active");
+        r.interact.reset();
+        assert_eq!(
+            r.interact,
+            InteractInfo {
+                guid: u32::MAX,
+                ty: INTERACT_RESET_TYPE,
+                active: false
+            }
+        );
+        assert_eq!(r.interact.get(), None);
+        r.interact.set(4, 0x30);
+        assert_eq!(r.interact.get(), Some((4, 0x30)));
     }
 }

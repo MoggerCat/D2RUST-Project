@@ -17,9 +17,8 @@
 //! §2.4, removal §1.4, the §5.1 checks, the §5.3 targeting reset), the
 //! same one the item moves and the vendors ([`InvVendors`]) use. What the
 //! cube asks for that no written spec provides is either staged in the
-//! host's [`CubeParts`] ([`Staged`]: the local date, sound events),
-//! asked of the player's interaction owner ([`Interact`]: the host's
-//! player-data rest), or goes to [`ItemPending`], whose provider is the
+//! host's [`CubeParts`] ([`Staged`]: the local date, sound events) or
+//! goes to [`ItemPending`], whose provider is the
 //! unwritten owner spec (the inventory pass, the item routines no items
 //! spec writes, quest hooks).
 
@@ -101,19 +100,6 @@ pub enum ItemError {
     Move(d2_sim::items::moves::MoveFatal),
 }
 
-/// The player's interaction state (`cube.md` Inputs: player unit +0x64
-/// GUID, +0x68 unit type, +0x6C active byte) as its owner holds it:
-/// `Some((unit type, GUID))` while active. The reset `0x00554190`
-/// (`cube.md` §1 row 0x17: GUID −1, type 6, inactive) reads back as
-/// `None`. In a wired host the owner is the player-data rest of the NPC
-/// wiring (`d2_sim::wiring::interaction::NpcRest`), so the NPC, waypoint
-/// and cube paths share one value.
-pub trait Interact {
-    fn interact_unit(&self, player: UnitId) -> Option<(u8, u32)>;
-    fn set_interact(&mut self, player: UnitId, unit_type: u8, guid: u32);
-    fn reset_interact(&mut self, player: UnitId);
-}
-
 /// State no `d2-sim` module holds yet, staged by the caller until its
 /// owner spec moves it into `d2-sim`; and what the handlers record for
 /// it.
@@ -134,7 +120,8 @@ pub struct Staged {
 pub trait ItemPending {
     /// `0x0055FA40` (inventory / UI owner, `cube.md` OQ 8).
     fn inventory_pass(&mut self, player: UnitId, out: &mut Vec<Vec<u8>>);
-    /// `0x0055A2A0` (no items spec writes it).
+    /// `0x0055A2A0` for a host without inventory parts (with them the
+    /// cube copies on the model, `vendors.md` §7.3).
     fn duplicate(&mut self, item: UnitId, fillers: bool) -> Option<UnitId>;
     /// `0x005C1BC0(item, prefix)` (open question WE6 of the economy
     /// wiring).
@@ -185,8 +172,9 @@ pub trait CubeHooks: LifecycleHooks + StatHost {}
 impl<H: LifecycleHooks + StatHost> CubeHooks for H {}
 
 /// One call into the cube on the host's economy, its cube parts, the
-/// host's inventory model (`None`: every player's inventory is empty)
-/// and the player's interaction owner.
+/// host's inventory model (`None`: every player's inventory is empty).
+/// The player's interaction is the unit record's
+/// (`d2_sim::units::record::InteractInfo`).
 pub trait CubeCall {
     type Out;
     fn call<H: CubeHooks>(
@@ -194,7 +182,6 @@ pub trait CubeCall {
         econ: &mut Economy<'_, H>,
         parts: &mut CubeParts,
         inv: Option<&mut InvParts>,
-        interact: &mut dyn Interact,
     ) -> Self::Out;
 }
 
@@ -251,7 +238,6 @@ impl CubeCall for CubeRun<'_> {
         econ: &mut Economy<'_, H>,
         parts: &mut CubeParts,
         inv: Option<&mut InvParts>,
-        interact: &mut dyn Interact,
     ) -> Option<ResultCode> {
         let CubeParts {
             cube,
@@ -266,7 +252,6 @@ impl CubeCall for CubeRun<'_> {
             staged,
             pending.as_mut(),
             inv,
-            interact,
             self.player,
         );
         let code = if self.msg[0] == ITEM_TO_CUBE {

@@ -21,6 +21,7 @@
 //! for the skill list, which combat reads through
 //! [`Pending::skill_list`]).
 
+use crate::combat::events::{self, EventTables, EventWorld, ItemCastMsg, RaiseStep};
 use crate::combat::{CombatWorld, RoomKind};
 use crate::game::Game;
 use crate::missiles::{self, MissileParams};
@@ -1223,5 +1224,93 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
     /// [`Pending::ai_component`].
     fn component(&self, u: UnitId, k: usize) -> i32 {
         i32::from(self.x().ai_component(u, k))
+    }
+}
+
+// ---- unit events (`combat/events.md`) ------------------------------------
+
+/// The event functions' calls beyond [`BodyWorld`]: the handler lists of
+/// [`crate::wiring::action::ActionHooks::handlers`], GUIDs and list owners
+/// are real; the rest are [`Pending`]'s event seams.
+impl<X: Pending + UseRest> EventWorld for UseView<'_, X> {
+    fn layer_split(&self) -> (u32, u32) {
+        self.x().event_layer_split()
+    }
+    /// The list's owner type / GUID (+0x08 / +0x0C) resolved by
+    /// `0x00552F60` (the game's unit hash).
+    fn list_owner(&self, l: ListId) -> Option<UnitId> {
+        let stats = &self.cv.v.stats;
+        let ty = *UnitType::ALL.get(stats.owner_type(l) as usize)?;
+        self.cv.game.lists.find_unit(ty, stats.owner_guid(l))
+    }
+    fn guid(&self, u: UnitId) -> u32 {
+        self.cv.v.units.get(u).map_or(0, |r| r.guid)
+    }
+    fn terror(&mut self, source: UnitId, unit: UnitId, skill: i32, a: i32, b: i32) {
+        let game = &mut *self.cv.game;
+        self.cv.v.h.x.event_terror(game, source, unit, skill, a, b);
+    }
+    fn point_free(&self, u: UnitId, at: (i32, i32)) -> bool {
+        self.x().event_point_free(u, at)
+    }
+    fn corpse_near(&mut self, t0: UnitId) -> Option<UnitId> {
+        let game = &mut *self.cv.game;
+        self.cv.v.h.x.event_corpse_near(game, t0)
+    }
+    fn queue_item_cast(&mut self, u: UnitId, msg: ItemCastMsg) {
+        self.xm().queue_item_cast(u, msg);
+    }
+    fn raise_test(&self, v: UnitId) -> bool {
+        self.x().raise_test(v)
+    }
+    fn clear_pattern(&mut self, v: UnitId) {
+        self.xm().clear_pattern(v);
+    }
+    fn raise_step(&mut self, n: UnitId, step: RaiseStep<UnitId>) {
+        let game = &mut *self.cv.game;
+        self.cv.v.h.x.raise_step(game, n, step);
+    }
+    fn handlers_of(&self, u: UnitId) -> Vec<bodies::Handler> {
+        self.cv.v.h.handlers.get(&u).cloned().unwrap_or_default()
+    }
+    fn remove_handler(&mut self, u: UnitId, h: &bodies::Handler) {
+        if let Some(v) = self.cv.v.h.handlers.get_mut(&u) {
+            if let Some(i) = v.iter().position(|x| x == h) {
+                v.remove(i);
+            }
+        }
+    }
+}
+
+/// The unit event iteration `0x005C0C30` (`skills/bodies.md` §2.18) on
+/// the action wiring: [`events::run`] over [`UseView`] (a
+/// [`crate::wiring::action::combat::UnitEventFn`]).
+pub fn run_unit_event<X: Pending + UseRest>(
+    cv: &mut CombatView<'_, X>,
+    event: u8,
+    unit: Option<UnitId>,
+    other: Option<UnitId>,
+    record: Option<&mut crate::combat::DamageRecord>,
+) -> i32 {
+    let t = cv.v.h.tables.clone();
+    let mut w = UseView {
+        cv: CombatView {
+            game: &mut *cv.game,
+            v: View::of(&mut *cv.v.units, &mut *cv.v.stats, cv.v.data, &mut *cv.v.h),
+        },
+    };
+    let tb = EventTables {
+        skills: &t.skills,
+        combat: &t.combat,
+    };
+    events::run(&mut w, tb, event, unit, other, record)
+}
+
+impl<X: Pending + UseRest> crate::wiring::action::ActionHooks<X> {
+    /// Turns the unit event registry on: from now on `0x005C0C30` runs
+    /// [`events::run`] on [`Self::handlers`] ([`run_unit_event`]) instead
+    /// of [`Pending::unit_event`] / [`Pending::level_up_event`].
+    pub fn enable_unit_events(&mut self) {
+        self.unit_events = Some(run_unit_event::<X>);
     }
 }

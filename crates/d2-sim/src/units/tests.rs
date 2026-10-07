@@ -511,6 +511,9 @@ struct Fake {
     request_ok: bool,
     action_result: u32,
     fractions: Vec<i32>,
+    /// What each per-kind init saw: (found by hash lookup, in the update
+    /// queue), then "added" at step 8.
+    inits: Vec<String>,
 }
 
 impl StatHost for Fake {}
@@ -573,7 +576,20 @@ impl UnitHooks for Fake {
     }
 }
 
-impl LifecycleHooks for Fake {}
+impl LifecycleHooks for Fake {
+    fn init_kind(&mut self, sim: &mut Sim<'_>, unit: UnitId, req: &AllocRequest) {
+        let guid = sim.units.get(unit).map(|r| r.guid).unwrap_or(0);
+        let found = sim.game.lists.find_unit(req.ty, guid);
+        let room = sim.game.lists.unit(unit).and_then(|e| e.room());
+        self.inits
+            .push(format!("init found {found:?} room {room:?}"));
+    }
+    fn added(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
+        let guid = sim.units.get(unit).map(|r| r.guid).unwrap_or(0);
+        let found = sim.game.lists.find_unit(UnitType::Monster, guid) == Some(unit);
+        self.inits.push(format!("added found {found}"));
+    }
+}
 
 pub(super) fn data() -> UnitData {
     UnitData {
@@ -650,6 +666,45 @@ fn stats(sys: &UnitSystem<Fake>) -> &StatLists {
 }
 
 // ---- allocation ----------------------------------------------------------------------
+
+/// `units.md` §3.1 r7.1, r7.4: the per-kind init runs before
+/// `SUNIT_Add`, so a hash lookup of the unit's own GUID (CountessChest's
+/// chest list) misses it; step 8 links it.
+// Covers: specs/sim/units.md §3.1 r7, §3.1 r8
+#[test]
+fn per_kind_init_runs_before_the_unit_is_linked() {
+    let mut game = Game::new();
+    let mut sys = system();
+    let mut seed = Seed::init();
+    let req = AllocRequest {
+        ty: UnitType::Monster,
+        class: 0,
+        room: None,
+        add: true,
+        fixed_guid: Some(5),
+        mode: 1,
+        allied: false,
+    };
+    let m = sys
+        .with(&mut game, |sim, hooks| {
+            allocate(sim, hooks, &mut seed, &req)
+        })
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        sys.hooks.inits,
+        ["init found None room None", "added found true"]
+    );
+    assert_eq!(game.lists.find_unit(UnitType::Monster, 5), Some(m));
+    // A duplicate fixed GUID fails before any init, undoing the draw.
+    let before = seed;
+    let r = sys.with(&mut game, |sim, hooks| {
+        allocate(sim, hooks, &mut seed, &req)
+    });
+    assert!(r.is_err());
+    assert_eq!(seed, before);
+    assert_eq!(sys.hooks.inits.len(), 2);
+}
 
 // Covers: specs/sim/units.md §3.1 r1, §3.1 r4, §3.1 r6
 #[test]

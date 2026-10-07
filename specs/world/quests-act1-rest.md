@@ -27,17 +27,17 @@
 |   2. Cairn stones (object classes 17–21) | 148–195 |
 |   3. Town-Cain marker (object class 385, `InitFn` 54) | 196–222 |
 |   4. A1Q5 Countess chest trap (`0x005954F0(record, extra)`) | 223–261 |
-|   5. Character progression (`0x00538680(client, step, difficulty)`) | 262–285 |
-|   6. Party list as read by the quest code | 286–311 |
-|   7. Cairn stone-order 0x50: bytes 13–14 | 312–321 |
-|   8. Act I clarifications (implementation questions, 2026-10-06) | 322–392 |
-|   9. Implementation and wiring questions (2026-10-07) | 393–552 |
-| Constants & data dependencies | 553–568 |
-| Randomness | 569–575 |
-| Edge cases & original bugs | 576–599 |
-| Test vectors | 600–631 |
-| Provenance | 632–665 |
-| Open questions | 666–693 |
+|   5. Character progression (`0x00538680(client, step, difficulty)`) | 262–310 |
+|   6. Party list as read by the quest code | 311–336 |
+|   7. Cairn stone-order 0x50: bytes 13–14 | 337–346 |
+|   8. Act I clarifications (implementation questions, 2026-10-06) | 347–417 |
+|   9. Implementation and wiring questions (2026-10-07) | 418–577 |
+| Constants & data dependencies | 578–593 |
+| Randomness | 594–600 |
+| Edge cases & original bugs | 601–624 |
+| Test vectors | 625–656 |
+| Provenance | 657–690 |
+| Open questions | 691–727 |
 <!-- /index -->
 
 ## Summary
@@ -280,8 +280,33 @@ m = ((flags & 0x20) | 0x80) >> 5, and step 3 is a signed "n < p → skip"
 every caller keeps n below 32.
 
 The field is never lowered. Nothing is sent here; the save code writes
-the flags (future owner: the character save spec, header progression;
-not written).
+the flags (owner: `formats/d2s.md` §2.3, status word bits 8–12).
+
+Readers of p (1.14d):
+
+1. Difficulty unlock: the save loader's status checks,
+   `formats/d2s.md` §2.2 rule 5.4 (`0x00569D80`).
+2. Character title (client, `0x005068A0(class, p, hardcore, expansion)`,
+   callers `0x004380F0`, `0x00438560`, `0x0043DDD0` (character
+   select entry, status u16 at entry +0x1EF), `0x004403F0`,
+   `0x0044E5A0`). Tier t: classic p < 4 → 0, p < 8 → 1, p < 12 → 2,
+   else 3; expansion p < 5 → 0, p < 10 → 1, p < 15 → 2, else 3. If
+   hardcore and t ≠ 0: t += 3. The prefix text (`0x00505640(class, t,
+   expansion)`, literal strings in `Game.exe`, not the string tables;
+   t = 0 or > 6 → empty; trailing space included):
+
+   | t | classic, female (class 0, 1, 6, 9) | classic, male (others) | expansion, female | expansion, male |
+   |---|---|---|---|---|
+   | 1 | "Dame " | "Sir " | "Slayer " | "Slayer " |
+   | 2 | "Lady " | "Lord " | "Champion " | "Champion " |
+   | 3 | "Baroness " | "Baron " | "Matriarch " | "Patriarch " |
+   | 4 | "Countess " | "Count " | "Destroyer " | "Destroyer " |
+   | 5 | "Duchess " | "Duke " | "Conqueror " | "Conqueror " |
+   | 6 | "Queen " | "King " | "Guardian " | "Guardian " |
+
+   Class 9 is out of the 0–6 player range; it is listed because the
+   switch names it. Where each caller draws the title is the UI
+   specs' (`ui/menus.md`, `ui/panels.md`).
 
 ### 6. Party list as read by the quest code
 
@@ -668,15 +693,24 @@ object row 189 from live `objects.txt`.
 1. ~~`0x005944F0`~~: answered in §3 (caller: the `cain1`
    NpcOutOfTown AI, `monsters/ai-bodies.md` §9.32).
 2. Object modes set here (gibbet 1 / 3, stones 0 / 2, `quests-act1.md` §10.6)
-   and object events 1 / 7 belong to the objects spec (not written).
-3. A recording of a Cain rescue (gibbet operate → event 7 17 frames
+   and object events 1 / 7 belong to the objects spec (not written). **Answered**
+   (2026-10-07): the objects spec now exists: a mode set is
+   `world/objects.md` §4 (all Act I quest object rows have `Sync` = 1,
+   so no draw), event 1 (ENDANIM) is `world/objects-2.md` §18.6, event 7
+   (QUESTFN) dispatches through `quests.md` §9.5; the quest object
+   inits / operates are §9 items 8–11 here and `quests.md` §9.6.
+3. ~~A recording of a Cain rescue (gibbet operate → event 7 17 frames
    later: 0x28, 0x5D, Cain spawn) and of a Countess kill (trap monster,
-   chest missiles) would confirm §1 and §4.
-4. The progression's readers (difficulty unlock, character title) belong
-   to the save spec; confirm in 1.14d when it is written.
-5. A recording that enters Catacombs 1 after Andariel's kill (state 4)
+   chest missiles) would confirm §1 and §4.~~ Needs recording: R-PQ-6
+   (`docs/handoff/pc2-rec-pc2-quests.md`, = HANDOFF §5 S9-A1 (12)–(13)).
+4. ~~The progression's readers (difficulty unlock, character title) belong
+   to the save spec; confirm in 1.14d when it is written.~~ **Answered**
+   (2026-10-07): §5 "Readers of p" (`0x00569D80`, `0x005068A0`,
+   `0x00505640`).
+5. ~~A recording that enters Catacombs 1 after Andariel's kill (state 4)
    would confirm §8 item 6 (no 0x5D, state kept), and one Kashya reward
-   with a free hireling slot the §8 item 8 message order.
+   with a free hireling slot the §8 item 8 message order.~~ Needs
+   recording: R-PQ-7 (Catacombs part = HANDOFF §5 S9-A2).
 6. QA-1 (null room in the trap retry): Answered (§9 item 1).
 7. QA-2 (object or marker without a room): Answered (§9 item 2).
 8. QA-3 (L4 party step placement): Answered (§9 item 3).

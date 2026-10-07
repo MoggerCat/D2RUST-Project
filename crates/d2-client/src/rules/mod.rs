@@ -1,4 +1,4 @@
-// Spec: specs/render/camera.md, specs/render/sprite-placement.md, specs/render/draw-order.md, specs/render/unit-composite.md, specs/render/shading.md, specs/render/blend-modes.md, specs/render/lighting.md
+// Spec: specs/render/camera.md, specs/render/sprite-placement.md, specs/render/draw-order.md, specs/render/unit-composite.md, specs/render/shading.md, specs/render/blend-modes.md, specs/render/lighting.md, specs/monsters/umod-callbacks.md (§28.1)
 //! Original-behavior answers to the world-view hooks, one owner spec per
 //! module. Plain Rust, integer math, no Bevy types.
 //!
@@ -24,6 +24,8 @@
 //! - [`blend`]: draw mode → blend table and the pixel ops of a cel
 //!   (through `scene::PixelTables`), component, missile, item and overlay
 //!   draw modes, shadows, translucent walls (`render/blend-modes.md`).
+//! - [`umod_hooks`]: the client umod hook table and its dispatch order
+//!   (`monsters/umod-callbacks.md` §28.1).
 //! - [`lighting`]: the light map, light records and sources, the day /
 //!   night environment and the light value of each draw
 //!   (`render/lighting.md`).
@@ -34,6 +36,7 @@ pub mod draw_order;
 pub mod lighting;
 pub mod placement;
 pub mod shading;
+pub mod umod_hooks;
 pub mod unit_composite;
 pub mod view;
 

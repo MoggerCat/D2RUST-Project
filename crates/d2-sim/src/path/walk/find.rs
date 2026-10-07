@@ -1,8 +1,10 @@
-// Spec: specs/sim/pathing.md §2 (path types), §3 (path compute), §4 (target preparation), §5 (toward), §6 (straight), §7 (A*)
+// Spec: specs/sim/pathing.md §2 (path types), §3 (path compute), §4 (target preparation), §5 (toward), §6 (straight), §7 (A*), §12 (dispatch of the other types)
 //! Path finding: from a start cell and a target to a list of corner
-//! points. No randomness (pathing.md Randomness 1).
+//! points. No randomness (pathing.md Randomness 1) except IDA* type 16
+//! (§12.7, the owner's unit seed).
 
 use super::geom::{add, octant, path_distance, ray_test, step, Probe, Ray, NO_DIR};
+use super::other;
 use super::seams::{count, index, room_contains, PathInfo, PathWorld, Point, WalkError, WalkUnits};
 use super::velocity::aim;
 use crate::path::collision::find_room;
@@ -251,10 +253,21 @@ fn run_function<C: PathWorld + WalkUnits + ?Sized>(
         // 2, 5, 6, 13 share `0x00679C80`; 5 and 6 have a direction offset.
         path_types::TOWARD | 5 | 6 | path_types::TOWARD_FINISH => toward(&mut f, path, info),
         path_types::STRAIGHT => straight(&mut f, path, info),
+        // §12: IDA* (0, 16), type 3 (index 0, then Toward), knockbacks,
+        // leap, back-up turn, wall follow.
+        0 | 16 => other::ida_star(&mut f, path, info),
+        3 => {
+            path.cur_point = 0;
+            toward(&mut f, path, info)
+        }
+        8 => Ok(other::knockback_server(&mut f, path, info)),
+        9 => Ok(other::leap(&mut f, path, info)),
+        11 => Ok(other::knockback_client(&mut f, path, info)),
+        12 => other::back_up_turn(&mut f, path, info),
+        path_types::WALL_FOLLOW => other::wall_follow(&mut f, path, info),
         // 4, 10, 14 carry flag 0x40000 and are computed by §11; reaching
         // the function table without it is fatal (§2).
-        4 | 10 | 14 | 17 => Err(WalkError::Fatal("path type without a function")),
-        _ => Ok(f.c.other_path_function(path, info)),
+        _ => Err(WalkError::Fatal("path type without a function")),
     }
 }
 
@@ -328,7 +341,7 @@ fn push<W: PathWorld + ?Sized>(t: &PathTables, w: &W, path: &mut DynamicPath, in
     }
 }
 
-fn put(path: &mut DynamicPath, n: &mut usize, p: Point) -> Result<(), WalkError> {
+pub(super) fn put(path: &mut DynamicPath, n: &mut usize, p: Point) -> Result<(), WalkError> {
     if *n >= PATH_POINTS {
         return Err(WalkError::Fatal("path points overflow"));
     }
@@ -373,8 +386,8 @@ pub fn toward<C: PathWorld + WalkUnits + ?Sized>(
     path.cur_point = 0;
     path.point_count = 0;
     if path.dir_offset != 0 {
-        // Monster circling `0x00679B30`: pathing.md open question 3.
-        return Ok(f.c.other_path_function(path, info));
+        // Monster circling `0x00679B30` (§12.1).
+        return other::circling(f, path, info);
     }
     let t = f.t;
     let start = info.start;

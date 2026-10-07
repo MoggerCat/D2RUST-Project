@@ -354,14 +354,11 @@ pub struct Run<'m> {
 }
 
 /// What the host answers about the player that the action wiring cannot
-/// (the wired host's interaction owner and hireling list).
+/// (the wired host's hireling list).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct HostFacts {
     /// `Some`: the host's answer to [`PlayerWorld::hireling`].
     pub hireling: Option<Option<UnitId>>,
-    /// The player has an interact unit (the interaction part of
-    /// `0x00535060`).
-    pub interacting: bool,
 }
 
 /// What a handler did.

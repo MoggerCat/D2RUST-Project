@@ -16,6 +16,9 @@
 //! in the tests. The save format (§5) is tested on hand-computed
 //! synthetic vectors only.
 
+pub mod read;
+#[cfg(test)]
+mod read_tests;
 #[cfg(test)]
 mod save_tests;
 #[cfg(test)]
@@ -664,9 +667,8 @@ pub fn partners(s: u16) -> &'static [u16] {
 
 /// One list's stats (§4.6 rule 4).
 fn put_list(w: &mut BitWriter, list: &[StatEntry], t: &dyn IscTable) {
-    // TODO(spec: bitstream.md §4.6 rule 4.3): the recorded partner values
-    // are kept per list here; the spec does not say whether the record
-    // spans the lists of one item.
+    // §4.6 rule 4.3: the record is per list (all slots zeroed before each
+    // list, `0x00630E45`).
     let mut recorded: Vec<(u16, i32)> = Vec::new();
     // `0x00625D00`: a stat's value in the same list (layer 0).
     let value_of = |s: u16| {

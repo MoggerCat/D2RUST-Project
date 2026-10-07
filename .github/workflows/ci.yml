@@ -53,6 +53,7 @@ jobs:
           python3 tools/trace-recorder/convert_tick.py --check traces/sim/tick/*.json
           python3 tools/trace-recorder/check_rooms.py --selftest
           python3 tools/trace-recorder/check_rooms.py traces/sim/tick/*.json
+          python3 tools/trace-recorder/autostart.py --selftest
 
       # CLAUDE.md hard rule 1: the pre-commit hook's patterns, tested in a
       # scratch repo and applied to every tracked file.

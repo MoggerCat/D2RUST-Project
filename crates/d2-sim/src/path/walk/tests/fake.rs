@@ -13,7 +13,7 @@ use crate::path::history::PositionHistory;
 use crate::path::record::{alloc_dynamic_path, DynamicKind, DynamicPath};
 use crate::path::tables::PathTables;
 use crate::path::walk::resync::ResyncRing;
-use crate::path::walk::seams::{PathInfo, PathWorld, Point, StartTarget, UsedSkill, WalkUnits};
+use crate::path::walk::seams::{PathWorld, Point, StartTarget, UsedSkill, WalkUnits};
 use crate::rng::Seed;
 use crate::units::{ClientId, RoomId, UnitId, UnitType};
 
@@ -235,7 +235,6 @@ pub struct FakeUnits {
     pub place_ok: bool,
     pub ring: ResyncRing,
     pub game_type: u8,
-    pub type15_reaches: bool,
     /// Door orientation of every unit (`None`: not a door).
     pub door: Option<bool>,
     /// Monsters may not be in town (`0x0063E860` false).
@@ -387,16 +386,6 @@ impl WalkUnits for Ctx {
     }
     fn state13_step(&mut self, _unit: UnitId) {
         self.u.log.push("state13".into());
-    }
-    /// Type 15 (wall follow, pathing.md open question 3) when
-    /// [`FakeUnits::type15_reaches`]: straight to the target point.
-    fn other_path_function(&mut self, path: &mut DynamicPath, info: &PathInfo) -> i32 {
-        if self.u.type15_reaches && info.path_type == 15 {
-            path.points[0] = crate::path::record::PathPoint::from_point(info.target);
-            1
-        } else {
-            0
-        }
     }
     fn position_history(&mut self, unit: UnitId) -> Option<&mut PositionHistory> {
         self.u.history.get_mut(&unit)

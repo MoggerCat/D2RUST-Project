@@ -15,7 +15,7 @@
 
 use std::collections::BTreeMap;
 
-use d2_data::tables::{Levels, Objects, Shrines};
+use d2_data::tables::{Leveldefs, Levels, Objects, Objgroup, Shrines};
 
 use crate::rng::Seed;
 use crate::units::{RoomId, UnitId};
@@ -23,12 +23,15 @@ use crate::units::{RoomId, UnitId};
 pub mod chests;
 #[cfg(test)]
 pub(crate) mod fake;
+pub mod mech;
 pub mod misc;
+pub mod populate;
 pub mod shrines;
 #[cfg(test)]
 mod tests;
 
 pub use chests::ChestWorld;
+pub use mech::MechWorld;
 pub use misc::MiscWorld;
 pub use shrines::ShrineWorld;
 
@@ -104,6 +107,28 @@ pub enum ObjectError {
     NoData(UnitId),
     #[error("{table} has no row {row}")]
     NoRow { table: &'static str, row: u32 },
+    #[error("object {0} allocation failed (fatal)")]
+    AllocFailed(u16),
+    #[error("shrine effect with no operator (null read)")]
+    ShrineNoOperator,
+    #[error("portal operated with no player (0x0058494F)")]
+    PortalOperator,
+    #[error("portal {0:?}: no destination room")]
+    NoPortalDestination(UnitId),
+    #[error("portal travel: placing {0:?} failed (fatal)")]
+    PortalPlacement(UnitId),
+    #[error("object {0:?}: no warp tile in its room (fatal)")]
+    NoWarpTile(UnitId),
+    #[error("key test with no unit (0x0055F173)")]
+    KeyTestNoUnit,
+    #[error("room {0:?} has no active room seed")]
+    NoActiveRoom(RoomId),
+    #[error("populate function {0} ≥ 10")]
+    PopulateFn(u8),
+    #[error("populate density {0} out of range")]
+    Density(u8),
+    #[error("room theme {0}: body not specified (object-population.md open question 5)")]
+    Theme(u32),
 }
 
 // ------------------------------------------------------------------ tables
@@ -114,6 +139,12 @@ pub struct ObjectTables {
     pub objects: Vec<Objects>,
     pub shrines: Vec<Shrines>,
     pub levels: Vec<Levels>,
+    /// `objgroup.txt` (`d2exp`; object population, `object-population.md`
+    /// §5).
+    pub objgroup: Vec<Objgroup>,
+    /// `leveldefs` (0x9C-byte records, `0x0061E470`): the portal quest
+    /// gate (§12 rule 7).
+    pub leveldefs: Vec<Leveldefs>,
 }
 
 impl ObjectTables {
@@ -198,6 +229,8 @@ pub struct ObjectData {
     pub class: u16,
     /// +0x04 `InteractType`.
     pub interact: u8,
+    /// +0x05 portal flags (§1; portal creation ORs 0x3, travel 0x5).
+    pub portal_flags: u8,
     /// +0x08 the shrines.txt row.
     pub shrine: Option<u16>,
     /// +0x0C operator GUID + 1 (0 = none).
@@ -212,16 +245,45 @@ pub struct ObjectData {
     pub last_tick: u32,
 }
 
-/// A level's object region (§2 rule 4); the population fields are not
-/// covered yet (§15).
+/// A level's object region (§2 rule 4; the population fields:
+/// `object-population.md` §2).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Region {
     /// +0x00 `levels.Act`.
     pub act: u8,
-    /// +0x08.
+    /// +0x04: rooms counted so far.
+    pub counted: i32,
+    /// +0x08: populated-room total, 0x7FFFFFFF until set.
     pub w08: i32,
+    /// +0x10: health shrines.
+    pub health: i32,
+    /// +0x14: shrines (≤ 10).
+    pub shrines: i32,
+    /// +0x18: wells (≤ 4).
+    pub wells: i32,
     /// +0x1C.
     pub w1c: i32,
+    /// +0x20: well points.
+    pub well_points: [(i32, i32); 4],
+    /// +0x40: shrine points.
+    pub shrine_points: [(i32, i32); 10],
+}
+
+impl Region {
+    /// A region as the control build leaves it (§2 rule 4).
+    pub fn new(act: u8) -> Self {
+        Self {
+            act,
+            counted: 0,
+            w08: 0x7FFF_FFFF,
+            health: 0,
+            shrines: 0,
+            wells: 0,
+            w1c: -1,
+            well_points: [(0, 0); 4],
+            shrine_points: [(0, 0); 10],
+        }
+    }
 }
 
 /// The object control (game +0x10F0, §2) and the per-object data.
@@ -243,11 +305,7 @@ impl ObjectControl {
         let lo = game_seed.step();
         let mut regions = vec![None];
         for l in t.levels.iter().skip(1) {
-            regions.push(Some(Region {
-                act: l.act,
-                w08: 0x7FFF_FFFF,
-                w1c: -1,
-            }));
+            regions.push(Some(Region::new(l.act)));
         }
         let mut shrine_lists: [Vec<u16>; 8] = Default::default();
         for (i, s) in t.shrines.iter().enumerate() {
@@ -317,6 +375,11 @@ pub trait ObjectWorld {
     fn room(&self, unit: UnitId) -> Option<RoomId>;
     /// The level id of the unit's room (DRLG).
     fn level(&self, unit: UnitId) -> Option<u32>;
+    /// The level id of a room (DRLG). Default: none.
+    fn room_level(&self, room: RoomId) -> Option<u32> {
+        let _ = room;
+        None
+    }
     /// Sub-tile position (path).
     fn position(&self, unit: UnitId) -> (i32, i32);
     /// Schedule object event `ev` at `frame` (`tick.md` §5).
@@ -352,13 +415,45 @@ pub trait ObjectWorld {
         y: i32,
         mode: u8,
     ) -> Option<UnitId>;
+    /// `SUNIT_Add` (`sim/units.md` §3.1 step 8) of an
+    /// [`Self::allocate_object`] unit whose [`create`] [`allocate`] ran:
+    /// the init comes first (r7.1). A provider that links in
+    /// [`Self::allocate_object`] keeps the default (nothing).
+    fn add_object(&mut self, _obj: UnitId, _room: RoomId, _x: i32, _y: i32) {}
     /// `0x0061AEB0`: the act II staff-tomb level (quest spec).
     fn staff_tomb_level(&self) -> u32;
+    /// Unit +0x10 := `mode` written directly: no mode set, no animation
+    /// setup, no queue, no changed flag (`objects-2.md` §18.1, §18.6).
+    fn store_mode(&mut self, unit: UnitId, mode: u8);
+    /// Init 13 (`objects-2.md` §17): quest chain `chain`'s record exists
+    /// (`0x00543640`) → link the object to it (`0x005436B0`,
+    /// `world/quests.md` §4.6) and return `true`. Default: no record.
+    fn quest_link(&mut self, object: UnitId, chain: u8) -> bool {
+        let _ = (object, chain);
+        false
+    }
+    /// `0x00463740(room, x, y)`: the room holding the point among `room`
+    /// and its adjacency array.
+    fn room_at(&self, room: RoomId, x: i32, y: i32) -> Option<RoomId> {
+        let _ = (room, x, y);
+        None
+    }
+    /// `0x00559300` (`objects-2.md` §20.3): a gold drop at (x, y) in
+    /// `room`. Default: nothing.
+    fn gold_drop(&mut self, room: RoomId, x: i32, y: i32) {
+        let _ = (room, x, y);
+    }
+    /// `0x0064D800(room, x, y, 1, 1, mask)` = 0: the point is free of
+    /// `mask`. Default: not free.
+    fn point_free(&self, room: RoomId, x: i32, y: i32, mask: u32) -> bool {
+        let _ = (room, x, y, mask);
+        false
+    }
 }
 
 /// Every seam the dispatchers need.
-pub trait ObjectHost: ObjectWorld + ChestWorld + ShrineWorld + MiscWorld {}
-impl<T: ObjectWorld + ChestWorld + ShrineWorld + MiscWorld> ObjectHost for T {}
+pub trait ObjectHost: ObjectWorld + ChestWorld + ShrineWorld + MiscWorld + MechWorld {}
+impl<T: ObjectWorld + ChestWorld + ShrineWorld + MiscWorld + MechWorld> ObjectHost for T {}
 
 // ------------------------------------------------------------------ §4
 
@@ -377,7 +472,13 @@ pub fn set_mode<W: ObjectWorld>(
         return Err(ObjectError::Mode(mode));
     }
     let o = t.object(class)?;
+    // Rule 5 / `sim/units.md` §4.1: the same mode only queues the unit and
+    // sets flag 0x1 (no animation setup, no draw).
+    let same = w.mode(obj) == mode;
     w.write_mode(obj, mode, queue);
+    if same {
+        return Ok(());
+    }
     let frame_count = frame_cnt(o, mode) as i32;
     let frame = i32::from(start(o, mode)) * 256;
     let d = frame_delta(o, mode) as i16;
@@ -385,8 +486,8 @@ pub fn set_mode<W: ObjectWorld>(
         d
     } else {
         let r = w.unit_seed(obj).map_or(0, |s| s.roll(i32::from(d >> 3))) as i32;
-        // TODO(objects.md §4 rule 3): the sum is read in 32 bits; only the
-        // shift is stated as 16-bit. The clamps then bound it.
+        // Rule 4: a 32-bit sum of the sign-extended values, clamped, low
+        // 16 bits stored.
         let s = r + i32::from(d) - i32::from(d >> 4);
         s.clamp(0, 0x7FFF) as i16
     };
@@ -446,7 +547,7 @@ pub fn init_route(n: u8) -> Route {
         0 | 35 | 36 | 40 => Route::Null,
         1 | 2 | 3 | 5 | 11 | 12 | 16 | 57 => Route::Here,
         17 => Route::Waypoint,
-        8 | 10 | 13 | 14 | 22 | 24 | 26 | 27 | 28 | 34 | 37 | 58 => Route::NotCovered,
+        8 | 10 | 13 | 14 | 22 | 24 | 26 | 27 | 28 | 34 | 51 | 58 => Route::Here,
         n if n < INIT_FN_BOUND => Route::Quest,
         _ => Route::Null,
     }
@@ -457,10 +558,11 @@ pub fn operate_route(n: u8) -> Route {
     match n {
         0 | 35..=38 | 60 | 74..=100 => Route::Null,
         1 | 2 | 3 | 4 | 5 | 7 | 8 | 11 | 14 | 15 | 22 | 68 => Route::Here,
-        23 => Route::Waypoint,
-        13 | 16 | 17 | 18 | 19 | 20 | 26 | 27 | 29 | 30 | 32 | 47 | 50 | 51 | 61 => {
-            Route::NotCovered
+        // `objects-2.md` §16, §18.4.
+        13 | 16 | 17 | 18 | 19 | 20 | 26 | 27 | 29 | 30 | 32 | 47 | 48 | 50 | 51 | 61 => {
+            Route::Here
         }
+        23 => Route::Waypoint,
         n if n < OPERATE_FN_BOUND => Route::Quest,
         _ => Route::Null,
     }
@@ -583,9 +685,9 @@ fn run_init<W: ObjectWorld>(
     w: &mut W,
     obj: UnitId,
     n: u8,
-    _room: Option<RoomId>,
-    _x: i32,
-    _y: i32,
+    room: Option<RoomId>,
+    x: i32,
+    y: i32,
 ) -> Result<(), ObjectError> {
     let level = w.level(obj).unwrap_or(0);
     match n {
@@ -609,6 +711,9 @@ fn run_init<W: ObjectWorld>(
         5 => Ok(()),
         11 => init_town_portal(ctl, t, w, obj, level),
         12 => init_permanent_portal(ctl, t, w, obj, level),
+        8 | 10 | 13 | 14 | 22 | 24 | 26 | 27 | 28 | 34 | 51 | 58 => {
+            mech::init(ctl, t, w, obj, n, room, x, y)
+        }
         _ => Ok(()),
     }
 }
@@ -828,6 +933,7 @@ pub fn allocate<W: ObjectWorld>(
     if !ctl.data.contains_key(&obj) {
         let guid = w.guid(obj);
         create(ctl, t, w, obj, class, guid, Some(room), mode, x, y)?;
+        w.add_object(obj, room, x, y);
     }
     Ok(Some(obj))
 }
@@ -905,7 +1011,8 @@ pub fn create_preset<W: ObjectHost>(
                 d.interact = 3;
             }
             set_flag(w, obj, oflags::KEEP_MODE, true);
-            // TODO(objects.md §6): "mode 0" is read as the §4 mode set.
+            // `objects-2.md` §24 rule 1: the ordinary mode set (already in
+            // mode 0: no setup, no draw; queued, flag 0x1).
             set_mode(t, w, obj, 371, 0, true)?;
             Ok(Preset::Object(Some(obj)))
         }
@@ -1028,6 +1135,9 @@ fn run_operate<W: ObjectHost>(
         11 => misc::torch(ctl, t, w, op).map(Some),
         15 => misc::portal(ctl, t, w, op),
         22 => misc::well(ctl, t, w, op).map(Some),
+        13 | 16..=20 | 26 | 27 | 29 | 30 | 32 | 47 | 48 | 50 | 51 | 61 => {
+            mech::operate(ctl, t, w, op).map(Some)
+        }
         _ => Ok(Some(0)),
     }
 }
@@ -1040,7 +1150,7 @@ pub enum EventRun {
     Done,
     /// Event 7: the quest object event (`world/quests.md`).
     Quest,
-    /// Events 0, 3, 8, 9, 10 (§15): not specified yet.
+    /// An event type no spec gives a handler.
     NotCovered(u8),
 }
 
@@ -1060,17 +1170,17 @@ pub fn object_event<W: ObjectHost>(
         oevent::HOVER => shrines::hover_event(ctl, t, w, obj)?,
         oevent::QUEST => return Ok(EventRun::Quest),
         oevent::DELAYED_PORTAL => delayed_portal(ctl, t, w, obj)?,
+        // `objects-2.md` §18.
+        0 | 3 | 8 | 9 | 10 => mech::event(ctl, t, w, obj, ev)?,
         e => return Ok(EventRun::NotCovered(e)),
     }
     Ok(EventRun::Done)
 }
 
-/// Event 1 `0x00581490` (`sim/units.md` §6.4): mode 1 → 2 when `Mode2` ≠
-/// 0 (no update queued), then, if `HasCollision2` = 0, free the
+/// Event 1 `0x00581490` (`objects-2.md` §18.6): mode 1 and `Mode2` ≠ 0 →
+/// the mode field := 2 written directly (no setup, draw, queue or
+/// changed flag); inside that branch, `HasCollision2` = 0 → free the
 /// footprint.
-///
-/// TODO(units.md §6.4 type 1): the footprint step is read as part of the
-/// mode-1 branch.
 fn end_anim<W: ObjectWorld>(
     ctl: &mut ObjectControl,
     t: &ObjectTables,
@@ -1080,7 +1190,7 @@ fn end_anim<W: ObjectWorld>(
     let class = ctl.get(obj)?.class;
     let o = t.object(class)?;
     if w.mode(obj) == 1 && o.mode2 != 0 {
-        set_mode(t, w, obj, class, 2, false)?;
+        w.store_mode(obj, 2);
         if o.hascollision2 == 0 {
             w.free_footprint(obj);
         }
@@ -1134,14 +1244,20 @@ pub fn shrine_message(object: u32, operator: u32, code: u8) -> [u8; 17] {
     m
 }
 
+/// S→C 0x60 (`0x0053D900`, 7 bytes, §14 builder details): portal flags
+/// (+0x05), `InteractType` (destination level), object GUID.
+pub fn portal_message(d: &ObjectData) -> [u8; 7] {
+    let g = d.guid.to_le_bytes();
+    [0x60, d.portal_flags, d.interact, g[0], g[1], g[2], g[3]]
+}
+
 /// What the update pass sends for one queued object (§14 rule 1).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UpdateMessage {
     State([u8; 12]),
     Shrine([u8; 17]),
-    /// S→C 0x60 (`0x0053D900`): layout owned by `intents-events.md`; the
-    /// caller builds it.
-    Portal(UnitId),
+    /// S→C 0x60 ([`portal_message`]).
+    Portal([u8; 7]),
 }
 
 /// `0x00581AD0` rule 1 for one queued object: the messages it sends to
@@ -1167,14 +1283,14 @@ pub fn update_messages<W: ObjectWorld>(
     )));
     let o = t.object(d.class)?;
     if o.subclass & 4 != 0 {
-        out.push(UpdateMessage::Portal(obj));
+        out.push(UpdateMessage::Portal(portal_message(d)));
     } else if mode == 1 && o.subclass & 1 != 0 && d.operator != 0 {
         let code = match d.shrine {
             Some(id) => t.shrine(id)?.code,
             None => 0,
         };
-        // TODO(objects.md §14 rule 1, open question 4): "operator GUID" is
-        // read as the stored field − 1 (the field holds GUID + 1).
+        // §14 builder details: the operator field − 1 (the operator's
+        // GUID).
         out.push(UpdateMessage::Shrine(shrine_message(
             d.guid,
             d.operator.wrapping_sub(1),

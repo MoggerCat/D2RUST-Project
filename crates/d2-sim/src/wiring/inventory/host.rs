@@ -13,7 +13,7 @@
 //! reset, the §6.4 direct 0x9D) run on the desk, each the
 //! `items::inventory` / `items::moves` function of its rule.
 
-use super::{InvDesk, InvRest, InvState};
+use super::{InvDesk, InvError, InvRest, InvState};
 use crate::items::inventory::{
     grid_id, ground_or_owned_check, place_in_page, stored_item_check, targeting_reset, Inventory,
     BODY_GRID,
@@ -67,7 +67,9 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
     /// Item placement into a page (`0x00560200`, §2.4 steps 1–9: the
     /// targeting reset, then the cursor item `item` into the page its item
     /// data names, at (x, y) or a free position). False when the owner has
-    /// no inventory or the placement fails.
+    /// no inventory or the placement fails. A cursor-mode item still in a
+    /// room is a caller error (§2.4 rule 2: the mode test does not check
+    /// the room): recorded, not placed.
     pub fn place(
         &mut self,
         owner: UnitId,
@@ -76,6 +78,17 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
         find_free: bool,
         send: bool,
     ) -> bool {
+        let in_room = self
+            .econ
+            .game
+            .lists
+            .unit(item)
+            .and_then(|e| e.room())
+            .is_some();
+        if in_room && self.econ.units.get(item).is_some_and(|r| r.mode == 4) {
+            self.state.errors.push(InvError::PlacedWithRoom(item));
+            return false;
+        }
         let Some(o) = self.owner_of(owner) else {
             return false;
         };

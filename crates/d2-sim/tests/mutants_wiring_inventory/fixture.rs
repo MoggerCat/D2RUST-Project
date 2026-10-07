@@ -18,7 +18,7 @@ use d2_data::fixup::records::stat_ops;
 use d2_data::tables::{Itemratio, Itemstatcost, Itemtypes, Record, States};
 use d2_sim::game::Game;
 use d2_sim::items::inventory::tables::{GridRec, InvItemRec, InvTypeRec};
-use d2_sim::items::inventory::{InteractionTarget, InvItem, InvTables, Inventory, UnitKind};
+use d2_sim::items::inventory::{InvItem, InvTables, Inventory, UnitKind};
 use d2_sim::items::moves::{self, Guid, MovePending, Owner, Spot};
 use d2_sim::items::tables::ItemRec;
 use d2_sim::items::{q, ItemRequest, ItemTables};
@@ -153,6 +153,8 @@ pub fn item_tables() -> ItemTables {
             let mut t = Itemtypes::decode(&[0u8; Itemtypes::SIZE]);
             t.class = 0xFF;
             t.staffmods = 0xFF;
+            // Empty `shoots`: the link miss (link16 −1).
+            t.shoots = 0xFFFF;
             t.rare = 1;
             t
         })
@@ -262,7 +264,6 @@ pub struct Answers {
     pub gold: bool,
     pub number: i32,
     pub ammo: Option<i16>,
-    pub interaction: Option<InteractionTarget>,
     pub trade_gate: Option<bool>,
     /// `stack_quality_ok`, `has_allowed_location`, `auto_equip_allows`.
     pub open_ok: bool,
@@ -587,13 +588,6 @@ impl InvRest for Rest {
     fn quiver_kind(&self, item: Guid) -> bool {
         self.note(format!("quiver_kind {item}"));
         self.a.flag
-    }
-    fn interaction(&self, player: Owner) -> InteractionTarget {
-        self.note(format!("interaction {}", og(player)));
-        self.a.interaction.unwrap_or(InteractionTarget::None)
-    }
-    fn clear_interaction(&mut self, player: Owner) {
-        self.note(format!("clear_interaction {}", og(player)));
     }
     fn player_data_4c(&self, player: Owner) -> u32 {
         self.note(format!("player_data_4c {}", og(player)));

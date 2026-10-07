@@ -174,8 +174,21 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
     fn has_used_skill(&self, player: Owner) -> bool {
         self.rest.has_used_skill(player)
     }
+    /// `0x0057FB70` on the unit hooks
+    /// ([`crate::units::hooks::UnitHooks::player_corpse_pickup`]: the
+    /// action wiring's `ActionHooks::corpse_pickup`).
     fn corpse_pickup(&mut self, player: Owner, corpse: Owner) {
-        self.rest.corpse_pickup(player, corpse)
+        let (Some(p), Some(c)) = (self.unit_of(player), self.unit_of(corpse)) else {
+            return;
+        };
+        let e = &mut *self.econ;
+        let mut sim = crate::units::hooks::Sim {
+            game: &mut *e.game,
+            units: &mut *e.units,
+            stats: &mut *e.stats,
+            data: e.data,
+        };
+        e.hooks.player_corpse_pickup(&mut sim, p, c);
     }
     fn player_interact(&mut self, player: Owner, other: Owner) {
         self.rest.player_interact(player, other)
@@ -319,11 +332,20 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
     fn equip_picked(&mut self, player: Owner, item: Guid) -> bool {
         self.rest.equip_picked(player, item)
     }
+    /// The filler's properties (`properties.md` §9,
+    /// [`InvDesk::apply_filler_properties`]), then the owner link
+    /// `0x006276C0` on the rest.
     fn filler_linked(&mut self, filler: Guid, target: Guid) {
+        if let (Some(f), Some(t)) = (self.item_unit(filler), self.item_unit(target)) {
+            self.apply_filler_properties(f, t);
+        }
         self.rest.filler_linked(filler, target)
     }
-    fn runeword(&mut self, player: Owner, target: Guid) -> bool {
-        self.rest.runeword(player, target)
+    /// §7.19 step 3's runeword ([`InvDesk::activate_runeword_on`]); the
+    /// rest's default is not asked.
+    fn runeword(&mut self, _player: Owner, target: Guid) -> bool {
+        self.item_unit(target)
+            .is_some_and(|t| self.activate_runeword_on(t))
     }
     fn hireling(&self, player: Owner) -> Option<Owner> {
         self.rest.hireling(player)

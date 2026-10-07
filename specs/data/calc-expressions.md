@@ -29,21 +29,21 @@
 | Rules | 82–85 |
 |   1. Where formulas live | 86–176 |
 |   2. Bytecode | 177–222 |
-|   3. Evaluator | 223–330 |
-|   4. Compiler | 331–527 |
-|   5. Code tables (compile-time links, 1.14d) | 528–562 |
-| Constants & data dependencies | 563–580 |
-| Randomness | 581–599 |
-| Edge cases & original bugs | 600–609 |
-| d2rs policy (proposed, not yet logged in `docs/PLAN.md`; 1, 2, 4, 6 implemented) | 610–640 |
-| Test vectors | 641–642 |
-|   Real 1.14d formulas (`#[ignore]`, need `D2_GAME_DIR`) | 643–682 |
-|   Compiler, synthetic (skills family, 1.14d links) | 683–731 |
-|   Compiler, other families | 732–746 |
-|   Evaluator | 747–778 |
-|   Validation | 779–790 |
-| Provenance | 791–848 |
-| Open questions | 849–883 |
+|   3. Evaluator | 223–339 |
+|   4. Compiler | 340–536 |
+|   5. Code tables (compile-time links, 1.14d) | 537–571 |
+| Constants & data dependencies | 572–589 |
+| Randomness | 590–608 |
+| Edge cases & original bugs | 609–618 |
+| d2rs policy (proposed, not yet logged in `docs/PLAN.md`; 1, 2, 4, 6 implemented) | 619–649 |
+| Test vectors | 650–651 |
+|   Real 1.14d formulas (`#[ignore]`, need `D2_GAME_DIR`) | 652–691 |
+|   Compiler, synthetic (skills family, 1.14d links) | 692–740 |
+|   Compiler, other families | 741–755 |
+|   Evaluator | 756–787 |
+|   Validation | 788–799 |
+| Provenance | 800–857 |
+| Open questions | 858–892 |
 <!-- /index -->
 
 ## Summary
@@ -310,7 +310,11 @@ Functions:
 - `rand(a, b)`: no context → 0. `a ≥ b` → `a`, no RNG draw. Otherwise
   `a + R(b − a + 1)` (§Randomness) on the unit's own seed
   (skills, skilldesc: the caster; items: the unit). Missiles: Open
-  question 1.
+  question 1. A context without a unit (skills `0x00643700`
+  takes the seed at unit + 0x20 with no null test): `a ≥ b` → `a`;
+  otherwise a null read in 1.14d. Unreachable with 1.14d data (the one
+  `rand`, Imp Inferno `calc1`, is evaluated with its caster); d2rs
+  returns `a` when `a ≥ b`, else 0, with no draw (design choice).
 - skills `skill(s, c)`: `L` = the context unit's level in skill `s`,
   bonuses included (`skills/levels.md` §1); 0 if there is no unit or the
   unit lacks the skill. Result: special value `c` of skill `s` at level
@@ -322,7 +326,12 @@ Functions:
   count → 0. Otherwise the unit's stat `s`, read through one of four
   getters: `s` = 19 (`tohit`) its own getter whatever the mode; else
   mode 1 (`base`), mode 2 (`mod`), any other mode (`accr`, 0) one each
-  (stats spec; Open question 5).
+  (stats spec; Open question 5). The getters (skills `0x00643770`,
+  items `0x00627BB0`, 1.14d-read 2026-10-08): 19 → attack rating
+  `0x00622560` (`combat/hit.md` §1); mode 1 → unit base `0x006253B0(unit,
+  s, 0)`; mode 2 → unit total `0x00625500(unit, s, 0)`; others → unit
+  total `0x00625480(unit, s, 0)` (`sim/stats.md` §4.2: both totals read
+  the same value).
 - skills `sklvl(s, c1, c2)`: `L` = special value `c1` of the context skill
   at the context level; result = special value `c2` of skill `s` at level
   `L`.
@@ -865,8 +874,8 @@ sign-extended (D2MOO: zero-extended).
    the size defined) on a missing file was not traced. d2rs treats a
    missing code file as a load error (`loading.md` §4.3).
 5. Answered by `skills/levels.md` §2 (special values `0x00646460`,
-   `0x0064B340`); the stat getters behind `stat` belong to the stats
-   specs.
+   `0x0064B340`); the stat getters behind `stat`: Answered
+   (2026-10-08), §3.5 `stat`.
 6. Items context: no items function reads the second word (the item, in
    the one caller checked); which unit each of the 5 callers passes as
    the first word (the one `stat` and `rand` use) was not traced.

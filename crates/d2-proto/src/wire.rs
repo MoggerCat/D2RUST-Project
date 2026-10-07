@@ -66,6 +66,12 @@ pub(crate) fn bytes16_at(b: &[u8], off: usize) -> [u8; 16] {
     a
 }
 
+pub(crate) fn bytes_at<const N: usize>(b: &[u8], off: usize) -> [u8; N] {
+    let mut a = [0; N];
+    a.copy_from_slice(&b[off..off + N]);
+    a
+}
+
 /// ORs `v`'s little-endian bytes in at `off` (fields share no bit, so
 /// ORing builds the message in any order).
 fn or_bytes(out: &mut [u8], off: usize, v: &[u8]) {
@@ -87,6 +93,10 @@ pub(crate) fn put_u32(out: &mut [u8], off: usize, v: u32) {
 }
 
 pub(crate) fn put_bytes16(out: &mut [u8], off: usize, v: &[u8; 16]) {
+    or_bytes(out, off, v);
+}
+
+pub(crate) fn put_bytes<const N: usize>(out: &mut [u8], off: usize, v: &[u8; N]) {
     or_bytes(out, off, v);
 }
 

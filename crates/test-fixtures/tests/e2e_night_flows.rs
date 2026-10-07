@@ -26,7 +26,6 @@
 //! reaches such a seam is named in the test and in
 //! `docs/handoff/e2e-night-flows.md`.
 
-use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
 
@@ -135,33 +134,25 @@ fn object_tables() -> ObjectTables {
         objects,
         shrines,
         levels: d.rows::<Levels>().unwrap(),
+        objgroup: Vec::new(),
+        leveldefs: Vec::new(),
     }
 }
 
 // ---- the action wiring's seams ----------------------------------------------------------
 
 /// The action wiring's `Pending` (no spec provides these): the
-/// interaction owner kept as set, the interact range `0x00623660`
+/// interact range `0x00623660`
 /// answered "in range" (`objects.md` §7.1 rule 3; the path spec does not
 /// write it), the routes the object module hands back logged
 /// (`Pending::object_route`), and every send collected for the host.
 #[derive(Default)]
 struct Night {
-    interact: BTreeMap<UnitId, (u8, u32)>,
     sent: Vec<(UnitId, Vec<u8>)>,
     routes: Vec<ObjectRoute>,
 }
 
 impl Pending for Night {
-    fn set_interact(&mut self, player: UnitId, unit_type: u8, guid: u32) {
-        self.interact.entry(player).or_insert((unit_type, guid));
-    }
-    fn reset_interact(&mut self, player: UnitId) {
-        self.interact.remove(&player);
-    }
-    fn interact_guid(&self, player: UnitId) -> Option<u32> {
-        self.interact.get(&player).map(|i| i.1)
-    }
     fn send(&mut self, player: UnitId, msg: &[u8]) {
         self.sent.push((player, msg.to_vec()));
     }
@@ -526,7 +517,7 @@ fn quest_info(rec: &PlayerQuests) -> Vec<u8> {
 
 // ---- 1. game creation and the join -----------------------------------------------------
 
-// Covers: specs/sim/rng.md §5.2 text; specs/world/objects.md §2 r2; specs/sim/path-placement.md §11 text, §13 r1, §13 r3; specs/client/model.md §11 r1, §11 r3; specs/sim/intents-events.md §8.2 r3, §8.3
+// Covers: specs/sim/rng.md §5.2 text; specs/world/objects.md §2 r2; specs/sim/path-placement.md §11 text, §13 r1, §13 r3; specs/client/model.md §11 r1, §11 r3; specs/sim/intents-events.md §8.2 r3, §8.2 r4, §8.3
 #[test]
 fn game_creation_then_the_real_join() {
     let mut fx = Fx::new();
@@ -553,7 +544,7 @@ fn game_creation_then_the_real_join() {
     // The join (`intents-events.md` §8.2, `path-placement.md` §11, §13):
     // 0x59 with the player's own part B (0xAA without states, 0x76), 0x0B,
     // 0x03 (act 0, the act DRLG's init seed, the town level, game +0x80 =
-    // `dwObjSeed`), game entry: 0x07 of the spawn room, the room switch's
+    // `dwObjSeed`), 0x53, game entry: 0x07 of the spawn room, the room switch's
     // 0x07 per room of its adjacency array (the town has one room, no
     // unit in it), 0x15 at the spawn search's point (flag 1), 0x7E; then
     // the first tick: the room is ready, 0x04 (`tick.md` §6 rule 6).
@@ -591,6 +582,8 @@ fn game_creation_then_the_real_join() {
             proximity,
             handshake,
             load,
+            // 0x53: the new act's environment record (§8.2 rule 4).
+            vec![0x53, 2, 0, 0, 0, 0, 0, 0, 0, 0],
             reveal.clone(),
             reveal,
             place,
@@ -844,10 +837,15 @@ fn reading_horazons_journal() {
     let done = vec![0x5D, A2Q4, 0x00, 0x0C, 0x00, 0x00];
     assert!(got.contains(&done), "{got:02x?}");
     assert!(got.contains(&object_state(g, true, 1)), "{got:02x?}");
-    // The scroll text 396 (`0x005456A0`, S→C 0x27 type 2) has no byte
-    // layout in the spec (`quests-act2.md` OQ4): the rest's
-    // `open_quest_message` seam, nothing sent.
-    assert!(!got.iter().any(|m| m[0] == 0x27), "{got:02x?}");
+    // The scroll text 396 (`0x005456A0`, `quests-act2-2.md` §5.4): S→C
+    // 0x27 type 2, the journal's GUID, count 1, entry 0 kind 0 with the
+    // string; bytes 7, 9, 12–39 are 0 here (unwritten in 1.14d, masked).
+    let mut scroll = vec![0x27, 2];
+    scroll.extend_from_slice(&g.to_le_bytes());
+    scroll.extend_from_slice(&[1, 0, 0, 0]);
+    scroll.extend_from_slice(&396u16.to_le_bytes());
+    scroll.resize(40, 0);
+    assert!(got.contains(&scroll), "{got:02x?}");
     // +0x08 := the tome's room (`unit_position` on the wired host,
     // finding N-2 fixed).
     let room = fx

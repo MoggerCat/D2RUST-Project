@@ -22,6 +22,7 @@
 
 pub mod ai;
 pub mod combat;
+pub mod death;
 pub mod dispatch;
 pub mod missiles;
 pub mod monsters;
@@ -134,6 +135,12 @@ pub struct ActionHooks<X> {
     pub hit_class: u8,
     /// The game seed of `rng.md` §5.3 (unit allocation).
     pub game_seed: Seed,
+    /// Game +0x1B24, the unique bits (`quality.md` §8.1): the game's one
+    /// store, read and set by every item creation (the chest drop of
+    /// [`Self::object_drops`], a monster drop, the economy of the host's
+    /// handlers and the lent quest parts). Zero in a new game (`cube.md`
+    /// Inputs).
+    pub uniques: crate::items::UniqueBits,
     /// The game's one item store (the item data of every item unit:
     /// drops, stores, inventories, the cube; `crate::wiring::economy`).
     /// Lent to an economy for a call (empty then).
@@ -164,6 +171,12 @@ pub struct ActionHooks<X> {
     /// hireling lists: `hirelings.md` §8 rule 1 (`0x005751A0` when the
     /// owner is a player). `None` (the default): nothing is recorded.
     pub pet_deaths: Option<Vec<UnitId>>,
+    /// Players whose mode-17 start `0x0057FCA0` ran (after the corpse
+    /// creation), for the host that holds the hireling lists:
+    /// `hirelings-2.md` §15 (`0x00575BC0`, the hireling dies with its
+    /// owner, every game type). `None` (the default): nothing is
+    /// recorded.
+    pub owner_deaths: Option<Vec<UnitId>>,
     /// The loaded `AnimData.d2` (`formats/animdata.md`, parsed by
     /// `d2-formats`): the records `UnitHooks::anim_record` looks up by
     /// COF name. `None`: no record for any unit (as before the table is
@@ -174,7 +187,9 @@ pub struct ActionHooks<X> {
     pub vitals: Option<Arc<VitalsTables>>,
     /// The target of the monster mode change running now (the record
     /// argument of `0x005A7C20`, `units.md` §4.6); set by the kill's
-    /// death mode change only (`damage.md` §7.2).
+    /// death mode change (`damage.md` §7.2). Also the killer of a
+    /// player's DT start (`0x00580A70`'s unit target, [`death`]): the
+    /// host that starts it sets it.
     pub mode_target: Option<UnitId>,
     /// The monster state (monster data, umods, monster init) lent by the
     /// host that owns it ([`monsters`]: `WorldSim` lends its world state
@@ -197,6 +212,9 @@ pub struct ActionHooks<X> {
     /// for the allocation's game-seed step to be written back (`None`
     /// outside such an allocation).
     deferred_inits: Option<Vec<UnitId>>,
+    /// Units between allocation steps 7 and 8 (`units.md` §3.1 r7.1),
+    /// with the allocation's room argument (r7.2), innermost last.
+    alloc_rooms: Vec<(UnitId, Option<crate::units::RoomId>)>,
     /// The unit path records and tables ([`crate::wiring::path`]).
     /// `None` (the default): the path seams keep their [`Pending`]
     /// answers; [`ActionHooks::enable_paths`] turns the provider on.
@@ -209,10 +227,19 @@ pub struct ActionHooks<X> {
     /// Unit event handler lists (unit +0x90, `bodies.md` §2.13), first =
     /// head.
     pub handlers: BTreeMap<UnitId, Vec<crate::skills::use_::bodies::Handler>>,
+    /// The unit event iteration `0x005C0C30` on [`Self::handlers`]
+    /// ([`combat::UnitEventFn`]). `None` (the default): every unit event
+    /// goes to [`Pending::unit_event`];
+    /// `ActionHooks::enable_unit_events` (a host with
+    /// [`crate::wiring::interaction::UseRest`]) turns the registry on.
+    pub unit_events: Option<combat::UnitEventFn<X>>,
     /// The client vitals sync's caches ([`vitals_sync`], `vitals.md` §5).
     /// `None` (the default): the sync is off;
     /// [`ActionHooks::enable_vitals_sync`] turns it on.
     pub sync: Option<vitals_sync::SyncState>,
+    /// Client +0x508 of the players' clients ([`death`], `vitals.md`
+    /// §4.6–§4.7).
+    pub death: death::DeathState,
     /// The session state of the clients and players
     /// (`sim/intents-events.md` §8; [`switch`]): player names, hot keys,
     /// skill hands, portal flags.
@@ -236,6 +263,7 @@ impl<X> ActionHooks<X> {
             combat_lists: BTreeMap::new(),
             hit_class: 0,
             game_seed,
+            uniques: crate::items::UniqueBits::default(),
             items: crate::wiring::economy::ItemStore::new(),
             waypoints: BTreeMap::new(),
             objects: None,
@@ -243,6 +271,7 @@ impl<X> ActionHooks<X> {
             object_drops: None,
             pet_follows: None,
             pet_deaths: None,
+            owner_deaths: None,
             anim_data: None,
             vitals: None,
             mode_target: None,
@@ -251,10 +280,13 @@ impl<X> ActionHooks<X> {
             quest_host: None,
             quest_host_out: false,
             deferred_inits: None,
+            alloc_rooms: Vec::new(),
             paths: None,
             bodies: None,
             handlers: BTreeMap::new(),
+            unit_events: None,
             sync: None,
+            death: death::DeathState::default(),
             session: switch::SessionState::default(),
             x,
             orphan_seed: Seed::init(),

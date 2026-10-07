@@ -22,17 +22,18 @@ fn layout_mask(layout: &[Field], size: usize) -> Vec<u8> {
             continue;
         }
         let off = usize::from(f.offset.expect("fixed message field has an offset"));
-        let bits: &[u8] = match f.ty {
-            FieldType::U8 => &[0xFF],
-            FieldType::U16 => &[0xFF; 2],
-            FieldType::U32 => &[0xFF; 4],
-            FieldType::Cstr16 => &[0xFF; 16],
-            FieldType::Bits(n) => &((1u32 << n) - 1).to_le_bytes(),
-            FieldType::Bit(n) => &(1u32 << n).to_le_bytes(),
+        let bits: Vec<u8> = match f.ty {
+            FieldType::U8 => vec![0xFF],
+            FieldType::U16 => vec![0xFF; 2],
+            FieldType::U32 => vec![0xFF; 4],
+            FieldType::Cstr16 => vec![0xFF; 16],
+            FieldType::Bytes(n) => vec![0xFF; usize::from(n)],
+            FieldType::Bits(n) => ((1u32 << n) - 1).to_le_bytes().to_vec(),
+            FieldType::Bit(n) => (1u32 << n).to_le_bytes().to_vec(),
             FieldType::Packed { .. } => unreachable!("handled above"),
             FieldType::Cstr | FieldType::Tail => panic!("not a fixed field: {f:?}"),
         };
-        for (m, b) in mask[off..off + bits.len()].iter_mut().zip(bits) {
+        for (m, b) in mask[off..off + bits.len()].iter_mut().zip(&bits) {
             *m |= b;
         }
     }

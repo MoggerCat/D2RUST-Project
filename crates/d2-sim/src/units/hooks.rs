@@ -104,6 +104,10 @@ pub trait UnitHooks: StatHost {
         0
     }
 
+    /// The path-velocity half of `0x00623F50` (`sim/pathing.md` §8.1),
+    /// run right after [`UnitHooks::anim_rate`]. Provider: path spec.
+    fn anim_velocity(&mut self, sim: &mut Sim<'_>, unit: UnitId) {}
+
     /// `0x00623B10`: the frame bonus (start index of §4.2).
     fn frame_bonus(&mut self, sim: &Sim<'_>, unit: UnitId) -> i32 {
         0
@@ -151,6 +155,11 @@ pub trait UnitHooks: StatHost {
     /// `0x0057FCA0` corpse mode: corpse and character save. Provider:
     /// player spec.
     fn player_corpse(&mut self, sim: &mut Sim<'_>, unit: UnitId) {}
+
+    /// `0x0057FB70(game, player, corpse)`: the corpse pickup of C→S 0x16
+    /// type 0 (`items/inventory-moves.md` §7.1, `combat/vitals.md` §4.7
+    /// rule 2). Provider: player/combat spec.
+    fn player_corpse_pickup(&mut self, sim: &mut Sim<'_>, player: UnitId, corpse: UnitId) {}
 
     /// Knockback start: path values 8 and 5. Provider: path spec.
     fn player_knockback_path(&mut self, sim: &mut Sim<'_>, unit: UnitId) {}

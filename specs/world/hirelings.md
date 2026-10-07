@@ -21,34 +21,37 @@
   rule 6 (teleport calls §6 here); `sim/stats.md`, `sim/stat-lists.md`;
   `sim/server-messages.tsv`, `sim/client-messages.tsv`; `data/fields.tsv`
   (`hireling`, `pettype`), `data/runtime-maps.md` §8 (hireling id
-  tables), `data/fixups.md` §7 (name ids).
+  tables), `data/fixups.md` §7 (name ids); `world/hirelings-2.md`
+  (part 2: §15 player death, §16 restore details, §17 swap timers, §18
+  follow details, §19 entry points and tables).
 
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 54–68 |
-| Inputs | 69–80 |
-| Outputs / state changes | 81–86 |
-| Rules | 87–88 |
-|   1. `hireling.txt` rows | 89–156 |
-|   2. Offer values and price (`0x006637F0(expansion, player, seed, act0, diff0, out)`) | 157–197 |
-|   3. Creating the hireling | 198–252 |
-|   4. Level stats (`0x00572840(game, player, merc, level)`) | 253–294 |
-|   5. Owner link and pet list | 295–356 |
-|   6. Following the player | 357–400 |
-|   7. Experience and level-up | 401–466 |
-|   8. Death (`0x0057CCB0` → `0x005751A0`) | 467–499 |
-|   9. Revive | 500–537 |
-|   10. Restoring from a save | 538–571 |
-|   11. Items (expansion) | 572–625 |
-|   12. Services (links) | 626–635 |
-|   13. Messages | 636–697 |
-| Constants & data dependencies | 698–721 |
-| Randomness | 722–732 |
-| Edge cases & original bugs | 733–775 |
-| Test vectors | 776–826 |
-| Provenance | 827–877 |
-| Open questions | 878–917 |
+| Summary | 57–73 |
+| Inputs | 74–85 |
+| Outputs / state changes | 86–91 |
+| Rules | 92–93 |
+|   1. `hireling.txt` rows | 94–176 |
+|   2. Offer values and price (`0x006637F0(expansion, player, seed, act0, diff0, out)`) | 177–217 |
+|   3. Creating the hireling | 218–272 |
+|   4. Level stats (`0x00572840(game, player, merc, level)`) | 273–314 |
+|   5. Owner link and pet list | 315–376 |
+|   6. Following the player | 377–454 |
+|   7. Experience and level-up | 455–520 |
+|   8. Death (`0x0057CCB0` → `0x005751A0`) | 521–583 |
+|   9. Revive | 584–621 |
+|   10. Restoring from a save | 622–659 |
+|   11. Items (expansion) | 660–717 |
+|   12. Services (links) | 718–721 |
+|   13. Messages | 722–788 |
+|   14. Skill pick of the Hireable AI (`0x005E4D30`) | 789–795 |
+| Constants & data dependencies | 796–819 |
+| Randomness | 820–830 |
+| Edge cases & original bugs | 831–882 |
+| Test vectors | 883–933 |
+| Provenance | 934–990 |
+| Open questions | 991–1081 |
 <!-- /index -->
 
 ## Summary
@@ -62,7 +65,9 @@ initialising the hireling unit (§3), its level-dependent stats and
 skills (§4), the owner link and pet node (§5), following the player
 across levels and acts (§6), experience and level-up (§7), death (§8),
 revive (§9), restoring from a save (§10), the item swap (§11) and the
-messages (§13). Classic games keep the hireling inside its act;
+messages (§13). Part 2 (`world/hirelings-2.md`, numbers continue)
+adds the owner's death (§15) and the callers a game wires (§19).
+Classic games keep the hireling inside its act;
 expansion games keep it across acts, let it die and be resurrected, and
 let it wear items.
 
@@ -121,6 +126,21 @@ the player's pet list (node per hireling), unit removal, S→C 0x81, 0x7A,
    item types a hireling may use are code constants (§11). The columns
    `Head`/`Torso`/`Weapon`/`Shield` (+0x68–+0x74) have no reader on the
    paths of this spec (open question 4).
+6. Readers of the row (answered 2026-10-07, open question 4). The
+   table (base `[0x0096BDD0]`, count `[0x0096BDD4]`, rows of 0x118
+   bytes) is referenced only by seven functions (`0x00655720` load,
+   `0x0065A190` free, `0x006562B0`, and the lookups `0x006562F0`,
+   `0x00656390`, `0x00656440`, `0x006564D0`, `0x00656580`); their 21
+   callers (server, client `0x004B1090`, loaders, AI) hold the row
+   pointers. Among them only the Hireable AI's skill pick `0x005E4D30`
+   (called by `0x005E5050` ← AI think `0x005E52D0`) reads `DefaultChance`
+   (+0x64, `0x005E4D9F`, `0x005E4F06`), next to `Skill1`–`6` (+0x78),
+   `Chance1`–`6` (+0x90), `ChancePerLvl1`–`6` (+0xA8) and `Mode1`–`6`
+   (+0xC0); behaviour in §14. No instruction of these functions reads
+   +0x68, +0x6C, +0x70 or +0x74 of a row (the +0x70 reads there are of
+   the game record, its expansion flag), and the row pointer is not
+   stored in a unit: `Head`, `Torso`, `Weapon`, `Shield` are loaded and
+   never read in 1.14d.
 
 #### 1.2 Lookups
 
@@ -397,6 +417,40 @@ Used by the new hire (§3.2 rule 9), level-up (§7.3) and restore (§10).
    so the client gets it as a unit new to its rooms). Not settled: an
    extra hireling 0x15 to the same point one frame later appeared on
    the first teleport only.
+7. The extra hireling 0x15 of rule 6 (answered 2026-10-07 from the
+   binary and the same recording) is not part of the follow: it is the
+   server's answer to a client request. In the input phase of frame
+   2919 (after the tick-2919 messages reached the client) the client
+   sent C→S 0x4B `4b 01000000 01000000` (type 1, GUID 1 = the
+   hireling); no 0x4B occurs near the second teleport (the only 0x4B of
+   the 16,358-event file). Server path:
+   1. 0x4B handler `0x0054C6D0` (`sim/intents-events.md` §9 rule 10):
+      unit found, the player's room in the unit's room's near list
+      (`0x0065A590`) → queue the unit for update (`0x0064C040`) and
+      flags 2 (+0xC8) |= 0x10000.
+   2. Next tick (2920), client pass `0x005380D0` → `0x0053A620` (rooms
+      near the client's room) → `0x0053A5D0` → `0x0053A500` → monster
+      update `0x00598220`: flags 2 bit 0x10000 → S→C 0x15 (`0x0053BC10`
+      at `0x005982A8`: type 1, GUID, path x, y, flag 1), then
+      `0x00554670(unit, 0)`. Same bytes as the recording
+      `15 01 01000000 ed10 6f16 01`.
+   3. End of the tick `0x0053B000` → `0x00553220` clears flags 2
+      0x10000 for every unit in a room update list (`0x00553326`).
+   The warp's own 0x10000 (§6 rule 5) sends no 0x15: the next tick's
+   client pass walks the rooms near the client's stored (old) room
+   (+0x1B4, `0x005380ED`), the room switch after it (`0x00537B50` →
+   `0x0053A8E0` → `0x00571F90`) sends the 0xAC, and `0x0053B000` clears
+   the flag in that tick. A warp shows as 0x0A + 0xAC only. Why the client asked on the first teleport only
+   is client behaviour (`client/model.md` §5 rule 5: C→S 0x4B for a unit
+   left in a freed client room); in that teleport the hireling was
+   walking (0x67 after its 0xAC, last 0x67 at frame 2888 to (4489, 5729)
+   in the Blood Moor room freed by the tick-2919 0x08), in the second it
+   stood (0x6D after its 0xAC). d2rs: the server needs nothing beyond
+   the 0x4B handler; the client side is PC 1's (handoff cross-file
+   request).
+8. The range branch of rule 1 (squared distance 1600 to the player
+   unit's position, not the follow's (x, y)) and the list-head step of
+   rule 4: `world/hirelings-2.md` §18.
 
 ### 7. Experience and level-up
 
@@ -496,6 +550,36 @@ gain may carry it past the player's level.
    experience. Nothing is dropped.
 4. Unit flags get 0x10000 (dead) through the monster death mode
    (`sim/units.md`); the restore path sets it explicitly (§10).
+5. The corpse when its room is deactivated (answered 2026-10-07, open
+   question 2): a dead hireling does not warp (§6 rule 2), so after the
+   player leaves, its room can pass the removal test (`drlg/rooms.md`
+   §8). Tick step 9 hands each unit of the room to `0x005433F0`;
+   monsters go to `0x005431F0`. There, for a unit with flags +0xC4 bit
+   31 (set on every hireling, §3.2 rule 7) whose owner (`0x0058F0D0`)
+   is a player, `0x005752B0(owner, unit)` looks the unit's GUID up in
+   its pet list (type ≠ 7: the node is removed and the result is 0;
+   type 7: 1 when a node holds the GUID, dead or alive). Result 1 →
+   flags 2 (+0xC8) |= 0x100, the unit is **not** put in inactive storage
+   (the store flag was cleared in that branch, and the hireling classes'
+   `monstats2` `restore` = 1 does not set it again) and **not** freed;
+   it leaves the room (`0x0064C450`) and lives on without a room, found
+   by GUID. The node keeps it (bit 0 set), the save keeps writing it
+   (`formats/d2s.md` §2.5), and a revive (§9) warps it to the player
+   (§9 rule 8 → `0x00574CC0` with no old room: placed, then
+   `0x00554670` sends it to the clients of the new room). The only
+   instruction that clears flags 2 0x100 is `0x00554A86` in the
+   inactive-storage restore `0x00554A30`, which a hireling never goes
+   through, so a revived hireling keeps the bit. The bit has no effect
+   on it: its only readers are the pet dismiss `0x00574450` (bit set →
+   fatal assert 0x5A, `sim/pets.md` §7) and the summon finish
+   `0x0056D840` (the owner's skill-linked unit: bit set → freed instead
+   of killed, `skills/bodies.md` §6.2), and no 1.14d path dismisses a
+   hireling with a kill (replace removes without kill, §3.2 rule 4; set
+   maximum skips type 7; `hireable` has no `group`; its `warp` bit sends
+   the follow to the warp, not the range kill `0x00575380`) or links it
+   as a summon (open question 10).
+6. The owner's death kills the hireling too (player mode 17,
+   `world/hirelings-2.md` §15).
 
 ### 9. Revive
 
@@ -568,6 +652,10 @@ version ≥ 0x5C, `0x00533C70` for older):
    section `jf`, expansion only, written when any hireling node
    exists); after they load: refresh, life := max (also when dead),
    send the stats (flag 1).
+9. Details (the class argument, the `Id` 0xFFFF path of version-0x47
+   saves, the roomless allocation and the join follow, `0x005738D0`,
+   the row checks, each loader's order of rule 7):
+   `world/hirelings-2.md` §16.
 
 ### 11. Items (expansion)
 
@@ -582,8 +670,9 @@ allows C:
    there. Act 3 hireling (359) with a shield (type 2) → location 2
    instead (left hand).
 3. Target empty: **duplicate** C into the merc (`0x0055A2A0`), set the
-   copy's mode 4, two item-removal notices for C's GUID
-   (`0x00540E60(9, GUID)`), equip the copy at the target from the
+   copy's mode 4, two timer cancels for C's GUID
+   (`0x00540E60(9, GUID)`: type-9 events with that argument, on the
+   merc and on the player; `world/hirelings-2.md` §17), equip the copy at the target from the
    cursor path (`inventory.md` §4.6, skip requirements 1), consume C
    (`0x0055EEA0`), the player's cursor := none. Refresh
    (`0x0055DF00`, `0x0055F4F0(0)`), `0x00540E60(3, 0)`, event 3 at
@@ -606,7 +695,7 @@ allows C:
      0)`, then the requirement check `0x0062EAF0(C, merc, 0, 0, 0, 0)`.
      Shared tail (rule 3): copy := `0x0055A2A0(game, C, merc, 1)`; mode 4;
      `0x00540E60(game, merc, 9, C GUID)` then `0x00540E60(game, player,
-     9, C GUID)` (the first notice goes to the merc, the second to the
+     9, C GUID)` (the first cancel acts on the merc, the second on the
      player); equip the copy (`0x005606B0(game, merc, copy GUID, slot,
      1, out)`); consume C (`0x0055EEA0(game, player, C)`); player cursor
      := none (`0x0063C180(player inventory, 0)`); **then**, only when
@@ -622,16 +711,13 @@ allows C:
    §7.23, item-use spec); C→S 0x26 `on_merc` (belt) likewise.
 7. Death keeps the items (§8 rule 3); a replaced hireling's items are
    freed with it (§3.2 rule 4).
+8. A duplicate that fails (`0x0055A2A0` returns none) and the
+   socket and replenish details of the copies: `world/hirelings-2.md`
+   §17.
 
 ### 12. Services (links)
 
-| Service | Owner | Hireling-side rule here |
-|---|---|---|
-| hire (C→S 0x36) | `npc.md` §7.3 | offer §2, init §3, replace §3.2 rule 4 |
-| resurrect (C→S 0x62) | `npc.md` §7.4 | cost §9 rule 1, revive §9 |
-| heal on chat open | `npc.md` §5 step 5 | life to max, curable states; mana not touched |
-| quest-granted hireling | `npc.md` §7.5, `quests.md` | init §3 |
-| command (C→S 0x46, 0x47) | AI spec | — |
+Moved to `world/hirelings-2.md` §12 (number kept).
 
 ### 13. Messages
 
@@ -694,6 +780,18 @@ allows C:
    string id @10 (0xD7C); the other bytes of the stack buffer are not
    written (as in `npc.md` §9 bytes 3–6). Sent on every §4 call.
 7. Hire list 0x4F / 0x4E and 0x2A results: `npc.md` §7.2, §9.
+8. String 0xD7C (3452, `string.tbl`, below 10,000; answered 2026-10-07,
+   open question 5): key `merclevelup`, English text "I feel much
+   stronger now" (decoded from `d2data.mpq`
+   `data\local\lng\eng\string.tbl` slot 3452; slot 3451 is `merc41`,
+   the last Act I name).
+
+### 14. Skill pick of the Hireable AI (`0x005E4D30`)
+
+Moved to `monsters/ai-bodies-6.md` §7 step 7 "Hireling skill" (PC 1's
+AI spec, 2026-10-07; first split to `world/hirelings-ai.md` §1, now a
+pointer): the one reader of `DefaultChance` and the `Chance` columns
+(§1.1 rule 6).
 
 ## Constants & data dependencies
 
@@ -772,6 +870,15 @@ Reproduced by default.
     rule 8).
 11. Classic: changing acts turns the hireling into a dead node with no
     way to revive it; only a new hire clears it.
+12. Skill pick with no counting slot (§14 → `monsters/ai-bodies-6.md`
+    §7 step 7.5, its edge case 4): 1.14d reads stack words that this
+    call did not write, so the chosen slot is not defined by the
+    inputs. d2rs: an unwritten w counts as −1 (never ≥ r), so the
+    search ends in the fallback (step 7.6). Not
+    reproducible in 1.14d; recorded so the deviation is explicit.
+13. A dead hireling whose room is deactivated is kept without a room
+    (§8 rule 5) and keeps flags 2 bit 0x100 after a revive (no reader
+    reaches it, open question 10).
 
 ## Test vectors
 
@@ -874,6 +981,12 @@ Pass 2 B):
   (1.14d twice, §7.3 rule 2); the 86/256 share and the 1/64-level cap
   match D2MOO. This confirms the hireling part of `vitals.md` open
   question 2.
+- Third pass (2026-10-07, open questions 1–5, §6 rule 7, §8 rule 5):
+  `tp80-packets.jsonl` frames 2918–2934 and 3359–3376 (every record of
+  GUID 1, every C→S 0x4B of the file); the functions named inline;
+  D2MOO `MonsterMsg.cpp` (`UNITFLAGEX_TELEPORTED`) as a map only; field
+  offsets `data/fields.tsv`; live `hireling.txt`, `monstats2` `restore`;
+  `string.tbl` from `d2data.mpq` decoded per `formats/tbl.md`.
 
 ## Open questions
 
@@ -882,16 +995,38 @@ Pass 2 B):
    from header offset 0xAF (u32 flags with dead bit 0x10000, u32 seed
    @0xB3, u16 name index @0xB7, u16 `Id` @0xB9, u32 experience @0xBB);
    settle in the save spec with a saved character.
+   **Answered** 2026-10-07: `formats/d2s.md` §2.5 (block +0xAF, 32
+   bytes, writer `0x00568E60`, reader `0x0056AA50`, measured on
+   `bdMercTwo`) and §8.4 (`jf`, writer `0x005699A0`, reader
+   `0x0056AC10`); §10 here is the behaviour.
 2. Where a dead expansion hireling's unit lives after the player leaves
    its level (it does not warp, §6 rule 2) and how it survives room
    freeing; settle with a recording (die, change level, resurrect).
+   **Answered** 2026-10-07 from the binary (§8 rule 5): at room
+   deactivation `0x005431F0` keeps an owned hireling found in its
+   owner's type-7 list (`0x005752B0`): flags 2 |= 0x100, not stored, not
+   freed, removed from the room (`0x0064C450`); the revive's warp places
+   it at the player. The recording would only confirm it (Recording
+   list).
 3. `0x005394A0` (player placement) restores a hireling from inventory
    corpse-list nodes (`0x0063D570` …, `0x005774F0` with Id 0xFFFF): when
    such nodes exist; read the corpse-list writers.
+   **Answered** 2026-10-07: never in 1.14d. The list (inventory +0x34,
+   nodes {flag, id, value, next}) is written only by `0x0063D470`, whose
+   three callers (`0x00533945` old-save corpse load, `0x0056A9BB` save
+   corpse load, `0x0057F894` player death) all pass flag 1, value 0 and
+   a corpse unit GUID. The restore branch of `0x005394A0` runs for flag-0
+   nodes only, so its `0x005774F0(…, 0xFFFF, …)` call is unreachable;
+   flag-1 nodes are corpses placed near the player (`0x005352C0`).
 4. Readers of `hireling` `Head`/`Torso`/`Weapon`/`Shield` (+0x68–+0x74)
    and `DefaultChance` +0x64: likely AI or appearance (grep the image).
+   **Answered** 2026-10-07 (§1.1 rule 6, §14): `DefaultChance` is read
+   only by the Hireable AI skill pick `0x005E4D30`; `Head`, `Torso`,
+   `Weapon`, `Shield` have no reader (all 21 row holders checked).
 5. String 0xD7C (3452) of the level speech: key and text (decode
    `string.tbl`).
+   **Answered** 2026-10-07 (§13 rule 8): `merclevelup`, "I feel much
+   stronger now".
 6. Crafted 0x62 with a living hireling (edge case 5): debugger trace of
    `0x00579AA0` on that path. **Answered** 2026-10-07 from the binary
    (§9 rule 3): the unit is freed and then used (use after free); no
@@ -914,3 +1049,32 @@ Pass 2 B):
    0x4F / 0x4E, 0x2A in the input phase, stats twice in the next tick,
    no 0x7A) and a town-portal follow (§6 rule 6). Still needed:
    level-up, death, resurrect, give / take.
+   **Needs recording** (2026-10-07; the binary fixes the order, only
+   a recording confirms it; same character `bdMercTwo`, packets
+   recorder): (a) level-up from a kill: in the kill's tick the owner
+   gets 0xA1 / 0xA2 stat 13 for the merc (§13 rule 5) at once, the
+   0x27 `merclevelup` (§13 rule 6, string 0xD7C) and, in the next
+   client pass, the §13 rule 4 stats batch (0x9E / 0x9F) with the new
+   level, life and the §4 values for the new level; (b) death: S→C 0x9B
+   (u16 name id, u32 cost (L·L/2)·15) to the owner and one 0x7A action
+   0 with only the GUID (§8 rule 2), no item drop; (c) resurrect at the
+   seller: in the input phase of the C→S 0x62, 0x81 (node living), the
+   §9 rule 8 follow (when the corpse is out of the client's rooms: its
+   0xAC at the player's point), `9b ffff 00000000`,
+   0x2A code 5 with the merc GUID, then the stats batch next tick;
+   (d) give / take an item: two 0x540E60 item notices (§11 rule 4, merc
+   first, then player) and new item GUIDs. Each check: message ids,
+   phase, order and the bytes named here.
+10. Flags 2 (+0xC8) bit 0x100 stays set on a hireling revived after its
+    room was deactivated (§8 rule 5, edge case 13): which code reads the
+    bit and whether it changes the revived unit's behaviour (D2MOO
+    names it "deleted, not yet freed"); read the readers of +0xC8 &
+    0x100 in the image.
+    **Answered** 2026-10-07 from the binary: the bit changes nothing
+    for a hireling (`world/hirelings-2.md` §18 rule 4).
+    **Answered** 2026-10-07 (§8 rule 5): a scan of `all.asm` for every
+    +0xC8 bit-0x100 access finds the setters `0x005433AD`,
+    `0x005434E3`, the clear `0x00554A86` and two readers, `0x0057446E`
+    (dismiss: fatal assert) and `0x0056D881` (summon link: free); no
+    1.14d path takes a hireling to either, so the kept bit changes
+    nothing.

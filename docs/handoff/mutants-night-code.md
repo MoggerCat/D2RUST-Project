@@ -1,5 +1,7 @@
 # Handoff: mutation testing of last night's code — `claude/mutants-night-code`
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of the tenth fold (`claude/fold-handoff-10`); this file stays as the detailed record. Its open questions are in HANDOFF §7 "Tenth set" (PC 1 / PC 2).
+
 Cloud test session, 2026-10-07 (METHODS M08). Base: `claude/specs-staging`
 at `913d3b0`. Repo only, synthetic data, no game files (M09). **Stopped
 early on a budget cut from the coordinator**: only part of the first module

@@ -53,6 +53,8 @@ fn tables() -> Arc<ObjectTables> {
         ],
         shrines: Vec::new(),
         levels,
+        objgroup: Vec::new(),
+        leveldefs: Vec::new(),
     })
 }
 
@@ -315,6 +317,9 @@ fn the_chest_drop_walks_on_the_object_seed_and_drops_into_its_room() {
     let mut want_game = fx.sim.hooks().game_seed;
     want_game.step();
     want_game.step();
+    // The game's one unique-bit store (`ActionHooks::uniques`) is the
+    // drop's: lent to it and back, not a copy kept in the drop state.
+    fx.sim.hooks().uniques.0[0] = 1 << 5;
     let op = Operate {
         object: o,
         operator: Some(p),
@@ -330,6 +335,8 @@ fn the_chest_drop_walks_on_the_object_seed_and_drops_into_its_room() {
         .expect("an item");
     let d = fx.sim.hooks().object_drops.take().unwrap();
     assert!(d.failures.is_empty() && d.errors.is_empty());
+    assert!(fx.sim.hooks().uniques.get(5));
+    assert_eq!(d.fields.uniques, crate::items::UniqueBits::default());
     assert_eq!(d.placed.len(), 1);
     assert_eq!(d.placed[0].0, item);
     let spot = d.placed[0].1;

@@ -22,15 +22,15 @@
 | Outputs / state changes | 51–56 |
 | Rules | 57–58 |
 |   1. Conventions | 59–67 |
-|   2. Shared helpers, batch 4 (continued) | 68–192 |
-|   3. Bodies used by one monster skill (continued) | 193–506 |
-|   4. Bodies used by no monster skill row | 507–635 |
-| Constants & data dependencies | 636–647 |
-| Randomness | 648–663 |
-| Edge cases & original bugs | 664–688 |
-| Test vectors | 689–699 |
-| Provenance | 700–710 |
-| Open questions | 711–727 |
+|   2. Shared helpers, batch 4 (continued) | 68–198 |
+|   3. Bodies used by one monster skill (continued) | 199–515 |
+|   4. Bodies used by no monster skill row | 516–644 |
+| Constants & data dependencies | 645–656 |
+| Randomness | 657–672 |
+| Edge cases & original bugs | 673–697 |
+| Test vectors | 698–708 |
+| Provenance | 709–719 |
+| Open questions | 720–741 |
 <!-- /index -->
 
 ## Summary
@@ -139,7 +139,13 @@ Callback `0x005D4680` (ECX M, EDX argument a; M none → nothing):
    Y = (0, 2, 2, 2, 0, −2, −2, −2) (`0x006E328C`); point i := (px, py)
    (u16 each). i mod 15 (`0x00741B0C`) = 0 → s := −s and k := (`lo'` of
    one more step of M's seed mod 3) + 2.
-6. P's point count := n (`0x00648790`).
+6. P's point count := n (`0x00648790`, path +0x28, capped 77).
+
+Nothing else of P is written: no compute-path call (unlike
+`bodies-2.md` §2.3 step 3), the current point index (path +0x24) keeps
+its creation value, and the flags (+0x34) change only through the
+path-type setter of step 2 (`0x00648CF0`, `sim/pathing.md` §2). Answered
+(2026-10-08, impl-missile-init MI4).
 
 The path is written point by point: each missile zigzags from its ring
 direction.
@@ -482,7 +488,10 @@ Each eaten corpse adds one more list of the state (Edge case 6).
 
 1. R invalid or `aurastate` invalid → 0.
 2. O = the source of the unit (§1). T = target.
-3. O exists (riding): target position (result not tested);
+3. O exists (riding): target position (x, y) (`0x0056D2C0`,
+   `bodies.md` §2.4; result not tested: it always writes both
+   coordinates, from the target unit or else the path's target point,
+   and "fails" only when one of them is 0, which is then used as is);
    `0x00554EA0(game, unit, room none, x, y, 0, 0)` (result not read);
    release (§2.3) with (unit, O, skill, L). Return 1.
 4. No O, no T → return srvdo 98 (`bodies-3.md` §4.3).
@@ -630,7 +639,7 @@ The riding imp (§2.3) follows its tower or siege beast every tick.
 3. (dx, dy) = T's position − the unit's, or (0, 0) without T.
 4. M = straight `skill_missile(game, m, unit, skill, L, dx, dy, 0, 0,
    quant 0)` (starts on T, aims at the target position); none → 0.
-5. M data +0x28 := n (jump count, as srvdo 26 `bodies-2.md` §6.4).
+5. M data +0x28 := n (jump count, as srvdo 26 `bodies-2b.md` §6.4).
    Return 1.
 
 ## Constants & data dependencies
@@ -724,3 +733,8 @@ The riding imp (§2.3) follows its tower or siege beast every tick.
    `missiles/missiles.md` (`area_damage` callback) and `0x0064CB30`
    (point collision) in `sim/path-placement.md` §4 (query table, rule
    5, masked value rule 2).
+6. Answered (2026-10-08, `docs/handoff/impl-monster-skill-slots.md`): Imp Teleport's point
+   when the target position "fails" (§3.24 step 3) is the pair that
+   `0x0056D2C0` wrote anyway (target unit's position, else the path
+   target), one or both coordinates 0; never a separate (0, 0) default.
+   Read at `0x005D1B1A`–`0x005D1B3D`.

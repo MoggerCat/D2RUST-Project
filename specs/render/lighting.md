@@ -31,21 +31,21 @@
 |   2. Build order (`0x00475800`) | 103–111 |
 |   3. Ambient fill (`0x00474610`) | 112–143 |
 |   4. Blocks-light flags (`0x004756D0`) | 144–152 |
-|   5. Light quality and the draw rate | 153–178 |
-|   6. Light records | 179–262 |
-|   7. Contribution of one record | 263–342 |
-|   8. Light sources | 343–407 |
-|   9. Environment (day and night) | 408–525 |
-|   10. Scripted ambient overrides (`0x0046BDD0`) | 526–579 |
-|   11. Light values handed to the draws | 580–610 |
-|   12. Captures (answers `capture.md` Open question 5) | 611–648 |
-|   13. d2rs answers | 649–659 |
-| Constants & data dependencies | 660–671 |
-| Randomness | 672–678 |
-| Edge cases & original bugs | 679–695 |
-| Test vectors | 696–729 |
-| Provenance | 730–773 |
-| Open questions | 774–861 |
+|   5. Light quality and the draw rate | 153–184 |
+|   6. Light records | 185–268 |
+|   7. Contribution of one record | 269–348 |
+|   8. Light sources | 349–413 |
+|   9. Environment (day and night) | 414–546 |
+|   10. Scripted ambient overrides (`0x0046BDD0`) | 547–600 |
+|   11. Light values handed to the draws | 601–631 |
+|   12. Captures (answers `capture.md` Open question 5) | 632–669 |
+|   13. d2rs answers | 670–680 |
+| Constants & data dependencies | 681–692 |
+| Randomness | 693–699 |
+| Edge cases & original bugs | 700–716 |
+| Test vectors | 717–750 |
+| Provenance | 751–794 |
+| Open questions | 795–903 |
 <!-- /index -->
 
 ## Summary
@@ -157,7 +157,13 @@ the cell's flag := 1 when the collision point test (`0x0064CB30`,
 `[0x0072DA50]` (static 0; the settings `+0x08` of `render/shading.md` §4)
 and missile-lights flag `[0x0072A348]` (static 1). The options-menu
 "lighting quality" item (`0x0047CFE0`) sets them: low → 1, 0; medium →
-0, 0; high → 0, 1.
+0, 0; high → 0, 1. At every game join the item reads the stored value
+(registry "Light Quality", Open question 10) and applies it before the
+first world draw: S→C 0x01 GameFlags (`client/model.md` §7 r2) runs the
+in-game UI set-up `0x00456970`, which calls the options set-up
+`0x0047DD70`; that walks each options item table through `0x0047DBB0`
+and calls every item's callback once (item stride 0x550 bytes, callback
+at item +0x118).
 
 1. Candidate: `[0x0072DA50]` ≠ 0 and `[0x0072A348]` = 0 → 0 (no rate test).
    Otherwise start from 2 (1 when both flags are set) and apply the
@@ -418,7 +424,7 @@ Measured: 100 `monstats2` rows have `Light` > 0 (e.g. `fallenshaman1`–`5`:
 | +0x10 | `GetTickCount()` at creation |
 | +0x18..+0x1A | R, G, B |
 | +0x1C, +0x20, +0x24 | floats: −cos θ, 0, the sine term `s` (§9.3) |
-| +0x28 | speed (ticks per degree) = `[0x007443E4 + 4 · (+0x2C)]` (128, 4, 8); +0x2C has no writer, so 128 |
+| +0x28 | speed (ticks per degree) = `[0x007443E4 + 4 · (+0x2C)]` (128, 4, 8); +0x2C: 0 (128) except during the Tainted Sun: its start `0x0061C450` writes 1 (speed `[0x007443E8]` = 4, `0x0061C465`), its end `0x0061C4D0` writes 0 (`world/quests-act2-2.md` §5.2) |
 | +0x30 | eclipse flag |
 | +0x34 | last reported hour (server, `0x0061C040`) |
 
@@ -473,7 +479,12 @@ from the normal entry 2, then §9.3 r4 and §9.4 with `A` = 0 and `L` = 0
       then is ignored. Recorded joins send 0x53 in frame 2, after 0x15
       (frame 1): `53 02000000 00000000 00` (`20261006-022633` seq 228)
       applies index 2, ticks 0; `53 02000000 80080000 00` (seq 146616,
-      frame 2177) index 2, ticks 0x880.
+      frame 2177) index 2, ticks 0x880. With no client act and a P
+      without act pointer (unplaced) both are null, so the check
+      **passes**; step 3 then calls the setter with act null, whose
+      first step (`0x0061C247` → `0x0061AA60`, the act's environment
+      record) is fatal 0x547 on a null act, before the index and ticks
+      checks and before any write. d2rs: fatal 0x547, no state change.
    3. The setter of r2 with (act, P's room (`0x004646A0` → `0x00620BB0`;
       none → null), index u32@1, ticks u32@5, eclipse u8@9).
    4. Day-period refresh `0x004646C0`: `p` := the act's day period
@@ -482,7 +493,17 @@ from the normal entry 2, then §9.3 r4 and §9.4 with `A` = 0 and `L` = 0
       of the client's sets S and C, bucket order, gets `0x004BC5E0(obj,
       0)` (object day/night refresh; owner: the client object spec,
       open question 11); a non-object found in those type-2 buckets →
-      fatal 0x88C.
+      fatal 0x88C. **The day period** `p` is the environment record's
+      +0x04 (period type); `0x0061C100` writes ticks / speed (0 when
+      speed is 0) to its optional out argument (null here) and returns
+      0 when the act has no record (a null act is fatal 0x547). Every
+      writer of +0x04 (creation §9.1, §9.3 r3, the setter of r2, the
+      period reset) takes the type column of the table chosen by the
+      eclipse flag (normal when 0, else eclipse; never the act-4 table)
+      at the current index, so `p` depends on (index, eclipse flag)
+      only, not on ticks or act: index 0..5 → normal 3, 3, 0, 1, 1, 2;
+      eclipse 3, 0, 1, 2, 2, 2 (`render/env-periods.tsv`; `0x0061C100`,
+      `0x0061BEE0`, `0x0061C240`).
    5. P still present → the requirement refresh of S→C 0x47 on P
       (`0x004C1BC0` with a built `47 <P type> <P GUID>`,
       `client/msg-stats-items.md` §3 rule 3).
@@ -785,17 +806,19 @@ data: `states` setfunc, `missiles` rows 191/288, `objects` row 17,
    §10 r4 (S→C 0x89 ids, Cloak of Shadows); client quest byte 1 is byte
    1 of the last S→C 0x5E (`0x0045E570` → `0x004B92B0` copies 37 bytes
    to `0x007C0EA4`: the not-intro byte of the Den of Evil quest,
-   `world/quests.md` step 5). Open: the server conditions of 0x89 ids 12
-   and 13 (`0x005B5230`, `0x005B52E0`) belong to `world/quests.md`; a
-   trace of the Den of Evil clear confirms id 0.
+   `world/quests.md` step 5). The server conditions of 0x89 ids 12 and
+   13 (`0x005B5230`, `0x005B52E0`) are specified in
+   `world/quests-act4.md` §5.5 and §5.7. A trace of the Den of Evil
+   clear confirms id 0 (recording list `pc2-rec-pc2-render-audio.md`
+   RA-L1).
 6. Environment state before the first S→C 0x53: the creation values are
-   answered in §9.1 (`A` = 0, `L` = 0: `I` 128, white). Open: whether
-   0x53 always arrives before the first world draw (trace of a game
-   join).
-7. Whether `sin` / `cos` of the CRT (SSE2 path `0x00699E30` / `0x0069A000`
+   answered in §9.1 (`A` = 0, `L` = 0: `I` 128, white). ~~Whether
+   0x53 always arrives before the first world draw~~: moved to the
+   recording list (RA-L2).
+7. ~~Whether `sin` / `cos` of the CRT (SSE2 path `0x00699E30` / `0x0069A000`
    or x87 `fsin`) give the correctly rounded value for every θ of §9.3, so
    `trunc` matches: compare a recorded env `+0x0C` per tick over one day
-   with §9.3.
+   with §9.3.~~ Moved to the recording list (RA-L3).
 8. *Answered* (`impl-lighting-blend` "Not wired" 3), first half: no.
    Every tile header of the 250 version-7 DT1 files in `d2data.mpq` /
    `d2exp.mpq` (`mpq-tool extract "*.dt1"`; the 6 version-4 leftovers of
@@ -807,12 +830,17 @@ data: `states` setfunc, `missiles` rows 191/288, `objects` row 17,
    one eight-dword light array for the whole pass (`0x004DF1C0` loop),
    so the record reuses the light words of the previous record drawn in
    that pass; with none before it the values are undefined in the
-   original (treat as fatal). Still open: what direction 5 (roofs,
-   orientation 15; points all (0, 0)) reads, if a roof ever reaches a
-   wall pass.
-9. The light source behind run 1b f 13,496–13,599 (§12 r4): rerun with
+   original (treat as fatal). Second half, *answered* (static,
+   `draw-order.md` §3 r2, §6 r4–r5): direction 5 (roofs, orientation 15)
+   is never read. Type-15 records are filed only in the roof list; the
+   wall and lower-wall lists that the light-reading passes walk
+   (`0x004DF1C0`, `0x004DEDF0`, `0x004DEF80`) never hold one (a type-15
+   record in the wall pass is fatal 0xF9), and the roof pass
+   `0x004DEA70` uses the floor drawer, which takes no wall light points.
+9. ~~The light source behind run 1b f 13,496–13,599 (§12 r4): rerun with
    the light-map digest of §12 r3 in the key and the draw log, or read
-   the light list (`[0x007B5668]`) at those frames.
+   the light list (`[0x007B5668]`) at those frames.~~ Moved to the
+   recording list (RA-L4).
 10. Where the lighting-quality option is loaded at start (registry or
     settings) and its default.
     *Partly answered* (static): the registry. `0x0047CFE0`, the
@@ -829,10 +857,16 @@ data: `states` setfunc, `missiles` rows 191/288, `objects` row 17,
     the item callback runs before the first in-game draw (it may run
     only when the options menu is built); a memory read of the two flags
     at the first draw settles it.
+    *Answered* (static, `0x0047DD70`, `0x0047DBB0`): it runs at every
+    game join, before the first world draw: S→C 0x01 → `0x00456970` →
+    `0x0047DD70` → `0x0047DBB0` per options table, which calls each
+    item's callback (item +0x118) once (§5).
 11. `0x004BC5E0(object, 0)` (the object refresh of §9.2 r4 step 4 when
     the day period changes): which object classes change (lights,
     torches, mode) and how; owner: the client object spec. A recording
     across a day-period change with objects in sight settles it.
+    Also run every 500 ms for object class 39 through `ClientFn` 14
+    (`0x004BDCC0`, `world/objects-client.md` §26.14).
     *Answered* (static, 1.14d asm of `0x004BC5E0`; ECX object, EDX
     flag): only objects whose objects `EnvEffect` (+0x139) ≠ 0 change;
     others return 0. `p` := the act's period type (`0x0061C100(act,
@@ -858,3 +892,11 @@ data: `states` setfunc, `missiles` rows 191/288, `objects` row 17,
     of the 0x53 setter is the period reset `0x0061BDF0` (§9.2 r2): type
     and ticks from the eclipse table's entry of the index, discarding the
     received ticks; then intensity with the flag set and color.
+13. *Answered (2026-10-08)* (`impl-client-msgs-3` Q8): with no client
+    act and an unplaced P the act check of §9.2 r4.2 passes (null =
+    null) and the setter is fatal 0x547 on the null act before any
+    write (§9.2 r4.2; `0x0045E31C`, `0x0061C247`, `0x0061AA60`).
+14. *Answered (2026-10-08)* (`impl-client-msgs-3` Q7): open question 11
+    gives `p` = env +0x04 but not its value per state; that value is
+    the period type of (index, eclipse flag) only, never ticks or the
+    act-4 table (§9.2 r4.4, "The day period").

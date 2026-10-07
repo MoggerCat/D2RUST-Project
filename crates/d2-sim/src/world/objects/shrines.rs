@@ -45,6 +45,8 @@ pub const PORTAL_SPOT_SIZE: i32 = 3;
 pub const TOWN_PORTAL_CLASS: u16 = 59;
 /// Missile flags of the exploding and poison shrines (§9.3).
 pub const POTION_MISSILE_FLAGS: u32 = 0x520;
+/// Storm missiles: flags 3, position given and target relative (§9.3).
+pub const STORM_MISSILE_FLAGS: u32 = 3;
 /// The gem shrine's fallback chipped gems by `roll(6)` (§9.3).
 pub const CHIPPED_GEMS: [[u8; 4]; 6] = [*b"gcw ", *b"gcr ", *b"gcg ", *b"gcb ", *b"gcy ", *b"gcv "];
 /// The "no better gem" code (§9.3).
@@ -194,6 +196,9 @@ pub trait ShrineWorld: ObjectWorld {
     fn free_spot(&mut self, unit: UnitId, size: i32, mask: u32) -> Option<(i32, i32)> {
         None
     }
+    /// `0x00582A00` (§9.2 code 16): reverse P's name (player data +0x00)
+    /// in place (`_strrev`, then `strncpy` of 16 bytes; no message).
+    fn reverse_player_name(&mut self, player: UnitId) {}
     /// `0x0056D130`: a portal object of `class` at (x, y) in P's room to
     /// level `dest`, owner P (`world/waypoints.md`, quest specs).
     fn create_portal(&mut self, player: UnitId, x: i32, y: i32, class: u16, dest: u32) {}
@@ -225,9 +230,9 @@ pub fn operate<W: ObjectHost>(
     if d.operator != 0 || w.mode(obj) != 0 {
         return Ok(0);
     }
-    // TODO(objects.md §9.1 rule 4): an object without a shrine record has
-    // no `Code`; the original reads a null record. Refused here before any
-    // change.
+    // §9.1 "No guards in 1.14d": the record is read unchecked at rule 4
+    // (a null read, fatal); every live operate-2 row sets it in init 1.
+    // Reported before any change.
     let id = d.shrine.ok_or(ObjectError::NoRow {
         table: "shrines",
         row: u32::from(d.interact),
@@ -246,11 +251,10 @@ pub fn operate<W: ObjectHost>(
         w.schedule(obj, oevent::HOVER, at);
     }
     // Rule 4.
-    // TODO(objects.md §9.1 rule 4): the effect with no operator (P null)
-    // is not stated; nothing runs.
-    if let Some(p) = op.operator {
-        effect(t, w, obj, p, &s)?;
-    }
+    // §9.1 "No guards": the effect gets a missing operator unchecked (a
+    // null read, fatal); unreachable with live data.
+    let p = op.operator.ok_or(ObjectError::ShrineNoOperator)?;
+    effect(t, w, obj, p, &s)?;
     // Rule 5.
     let m = i32::from(s.reset_time_in_minutes);
     if m != 0 {
@@ -324,6 +328,13 @@ pub fn missile_level(player_level: i32) -> i32 {
     (player_level / 5).clamp(1, 8)
 }
 
+/// The base-stat add `0x006272B0`: a 0 add writes nothing (§9.2).
+fn base_add<W: ShrineWorld>(w: &mut W, unit: UnitId, id: u16, delta: i32) {
+    if delta != 0 {
+        w.add_base_stat(unit, id, delta);
+    }
+}
+
 /// The effect of `code` (§9.1 rule 4, table `0x006E1850`, §9.2, §9.3).
 pub fn effect<W: ObjectHost>(
     t: &ObjectTables,
@@ -345,34 +356,33 @@ pub fn effect<W: ObjectHost>(
             let max = w.max_mana(p);
             w.add_base_stat(p, stat::MANA, max.wrapping_sub(mana));
         }
-        // `0x00582860`: life to max (edge case 5).
+        // `0x00582860`: life to max (edge case 5), a base-stat add.
         2 => {
             let max = w.max_life(p);
-            w.set_stat(p, stat::LIFE, max);
+            let life = w.stat(p, stat::LIFE);
+            base_add(w, p, stat::LIFE, max.wrapping_sub(life));
         }
-        // `0x005828A0`: mana to max (edge case 5).
+        // `0x005828A0`: mana to max (edge case 5), a base-stat add.
         3 => {
             let max = w.max_mana(p);
-            w.set_stat(p, stat::MANA, max);
+            let mana = w.stat(p, stat::MANA);
+            base_add(w, p, stat::MANA, max.wrapping_sub(mana));
         }
-        // `0x00582940`.
-        // TODO(objects.md §9.2 code 4/5): "−=" / "+=" are read as stat
-        // sets of the new value (the writer is not named).
+        // `0x00582940`: base-stat adds (`0x006272B0`, §9.2).
         4 => {
             let life = w.stat(p, stat::LIFE);
             let d = a0.wrapping_mul(life >> 8) / 100;
-            w.set_stat(p, stat::LIFE, life.wrapping_sub(d.wrapping_mul(256)));
             let add = (a1 as u32).wrapping_mul(d as u32).wrapping_mul(256) / 100;
-            let mana = w.stat(p, stat::MANA);
-            w.set_stat(p, stat::MANA, mana.wrapping_add(add as i32));
+            base_add(w, p, stat::LIFE, d.wrapping_mul(256).wrapping_neg());
+            base_add(w, p, stat::MANA, add as i32);
         }
-        // `0x005829A0`.
+        // `0x005829A0`: base-stat adds (§9.2).
         5 => {
             let mana = w.stat(p, stat::MANA);
             let d = a0.wrapping_mul(mana) / 100;
-            w.set_stat(p, stat::MANA, mana.wrapping_sub(d));
-            let life = w.stat(p, stat::LIFE);
-            w.set_stat(p, stat::LIFE, life.wrapping_add(a1.wrapping_mul(d) / 100));
+            let add = (a1 as u32).wrapping_mul(d as u32) / 100;
+            base_add(w, p, stat::MANA, d.wrapping_neg());
+            base_add(w, p, stat::LIFE, add as i32);
         }
         // `0x00583B30`.
         6 | 8..=11 | 13 | 15 => {
@@ -430,9 +440,9 @@ pub fn effect<W: ObjectHost>(
                 w.set_list_stat(l, stat::STAMINA_RECOVERY, 1000);
             }
         }
-        // TODO(objects.md §9.2 code 16): `0x00582A00`'s effect is not
-        // stated (unreachable through init); nothing runs.
-        16 => {}
+        // `0x00582A00`: P's name reversed in place (unreachable through
+        // init).
+        16 => w.reverse_player_name(p),
         // `0x00582A30`.
         17 => portal_shrine(t, w, p),
         18 => gem(w, p),
@@ -447,8 +457,8 @@ pub fn effect<W: ObjectHost>(
 
 /// Code 17 `0x00582A30`.
 fn portal_shrine<W: ObjectHost>(t: &ObjectTables, w: &mut W, p: UnitId) {
-    // TODO(objects.md §9.2 code 17): no free spot is not stated; nothing
-    // is created. P's act town by P's level (`levels.Act`, §5.5).
+    // §9.2 code 17: no free spot → nothing; the portal is created in P's
+    // room. P's act town by P's level (`levels.Act`, §5.5).
     let Some((x, y)) = w.free_spot(p, PORTAL_SPOT_SIZE, PORTAL_SPOT_MASK) else {
         return;
     };
@@ -476,16 +486,15 @@ fn gem<W: ShrineWorld>(w: &mut W, p: UnitId) {
 
 /// Code 19 `0x00582DA0` (§9.3).
 fn storm<W: ShrineWorld>(w: &mut W, obj: UnitId, p: UnitId, a0: i32, a1: i32) {
-    // TODO(objects.md §9.3 storm): the life writer (and death handling) is
-    // not named; read as a stat set of life − loss.
+    // §9.3 "Storm, read in 1.14d": a base-stat add on stat 6, nothing
+    // tests the result or kills (`objects-2.md` §24 rule 3).
     for u in w.units_in_range(obj, a1) {
         let life = w.stat(u, stat::LIFE);
         let loss = ((life >> 8).wrapping_mul(a0) / 100).wrapping_mul(256);
-        w.set_stat(u, stat::LIFE, life.wrapping_sub(loss));
+        base_add(w, u, stat::LIFE, loss.wrapping_neg());
     }
     let lvl = missile_level(w.player_level(p));
-    // TODO(objects.md §9.3 storm): the loop nesting (i outer) and the
-    // missile flags are not stated; flags 0.
+    // i outer, j inner; flags 3 (position given, target relative).
     for i in 1..=4 {
         for j in 1..=4 {
             let sx = if i % 2 == 1 { 5 * i } else { -5 * i };
@@ -496,7 +505,7 @@ fn storm<W: ShrineWorld>(w: &mut W, obj: UnitId, p: UnitId, a0: i32, a1: i32) {
                 from: obj,
                 offset: (sx, sy),
                 skill_level: lvl,
-                flags: 0,
+                flags: STORM_MISSILE_FLAGS,
             });
         }
     }
@@ -552,8 +561,8 @@ pub fn hover_event<W: ObjectHost>(
     obj: UnitId,
 ) -> Result<(), ObjectError> {
     let _ = (ctl, t);
-    // TODO(objects.md §9.1 event 6): an object without a hover is not
-    // stated; nothing happens.
+    // `objects-2.md` §24 rule 4: no object or no hover → nothing, no
+    // reschedule.
     let Some(e) = w.hover_expiry(obj) else {
         return Ok(());
     };

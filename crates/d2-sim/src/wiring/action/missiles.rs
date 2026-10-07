@@ -313,34 +313,12 @@ pub fn result_bits(missile: u32) -> u16 {
 }
 
 /// A missile damage record (`missiles.md` §R6.2) as the combat damage
-/// record (`damage.md` §1).
-///
-/// TODO(missiles.md §R6.2): where the 103/104/106 bypass flags go in the
-/// record is not stated (the 0x70-byte layout has no field for them);
-/// they are not carried.
+/// record (`damage.md` §1): [`Damage::to_record`] (deadly strike, bypass
+/// hit flags, the §R6.3 fields) with the missile's result flags.
 pub fn damage_record(d: &Damage) -> DamageRecord {
-    let mut result = result_bits(d.result);
-    if d.crit {
-        result |= result::CRITICAL;
-    }
-    DamageRecord {
-        result,
-        physical: d.phys,
-        fire: d.fire,
-        burn: d.burn,
-        burn_len: d.burn_length,
-        lightning: d.light,
-        magic: d.magic,
-        cold: d.cold,
-        poison: d.poison,
-        poison_len: d.poison_length,
-        cold_len: d.cold_length,
-        life_leech: d.life_drain,
-        mana_leech: d.mana_drain,
-        stamina_leech: d.stamina_drain,
-        stun_len: d.stun_length,
-        ..DamageRecord::default()
-    }
+    let mut rec = d.to_record();
+    rec.result |= result_bits(d.result);
+    rec
 }
 
 impl<X: Pending> MissileCombat for View<'_, X> {
@@ -370,16 +348,6 @@ impl<X: Pending> MissileCombat for View<'_, X> {
             true,
         )
     }
-    fn srv_dmg(
-        &mut self,
-        game: &mut Game,
-        index: i16,
-        missile: UnitId,
-        unit: UnitId,
-        damage: &mut Damage,
-    ) {
-        self.h.x.srv_dmg(game, index, missile, unit, damage);
-    }
     /// The rest of `0x005ADCD0` (`missiles.md` §R6.1): the record with the
     /// missile's hit class (`HitClass`) and pierce percent (stat 327),
     /// then `apply(game, owner, unit, missile = 1, record)` (`damage.md`
@@ -404,8 +372,9 @@ impl<X: Pending> MissileCombat for View<'_, X> {
         damage.result = rec.result.into();
     }
     /// Unit event 0 (`0x005C0C30`), also with no unit.
-    fn hit_by_missile_event(&mut self, _: &mut Game, missile: UnitId, unit: Option<UnitId>) {
-        self.h.x.unit_event(0, unit, Some(missile), None);
+    fn hit_by_missile_event(&mut self, game: &mut Game, missile: UnitId, unit: Option<UnitId>) {
+        self.combat(game)
+            .fire_unit_event(0, unit, Some(missile), None);
     }
     /// `missiles.md` §R6.2: stat 121 for demons, 122 for undead, 180 by
     /// monster type (entries whose layer matches the unit's montype), on
@@ -673,6 +642,46 @@ impl<X: Pending> crate::missiles::MissileBodies for View<'_, X> {
     /// step 2).
     fn room_seed(&mut self, _: &mut Game, room: RoomId) -> Option<&mut crate::rng::Seed> {
         self.h.drlg.active_seed_mut(room)
+    }
+    /// Path target point (`0x00648A00` / `0x00648A10`) with the path
+    /// provider ([`crate::wiring::path::missiles`]); (0, 0) without it.
+    fn path_target_point(&self, unit: UnitId) -> (i32, i32) {
+        self.path_target_xy(unit).unwrap_or((0, 0))
+    }
+    /// `0x0056D2C0` with the path provider; none without it.
+    fn target_position(&mut self, game: &Game, unit: UnitId) -> Option<(i32, i32)> {
+        self.path_target_position(game, unit).flatten()
+    }
+    /// Set type `0x00648CF0` with the path provider.
+    fn set_path_type(&mut self, unit: UnitId, ty: i32) {
+        let _ = View::path_set_type(self, unit, ty);
+    }
+    /// Step counts `0x00648E70` with the path provider.
+    fn set_path_distance(&mut self, unit: UnitId, d: i32) {
+        let _ = self.path_set_step_counts(unit, d);
+    }
+    /// `0x00621DC0` with the path provider; 0 without it.
+    fn dir64(&self, unit: UnitId, at: (i32, i32)) -> i32 {
+        self.path_dir64(unit, at).unwrap_or(0)
+    }
+    /// Path point i with the path provider.
+    fn set_path_point(&mut self, unit: UnitId, i: i32, at: (u16, u16)) {
+        let _ = self.path_set_point(unit, i, at);
+    }
+    /// `0x00648790` with the path provider.
+    fn set_path_point_count(&mut self, unit: UnitId, n: i32) {
+        let _ = self.path_set_point_count(unit, n);
+    }
+    /// Teleport `0x00650BE0` with the path provider.
+    fn path_teleport(
+        &mut self,
+        game: &mut Game,
+        unit: UnitId,
+        room: Option<RoomId>,
+        x: i32,
+        y: i32,
+    ) {
+        let _ = self.path_teleport_to(game, unit, room, x, y);
     }
     /// The active room's sub-tile rectangle on the DRLG (`bodies-2.md`
     /// §44 unit find step 2).

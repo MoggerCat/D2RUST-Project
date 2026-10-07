@@ -18,6 +18,8 @@ mod missiles;
 #[cfg(test)]
 mod objects;
 #[cfg(test)]
+mod player_death;
+#[cfg(test)]
 mod rooms;
 #[cfg(test)]
 mod waypoints;
@@ -64,6 +66,8 @@ pub struct TestPending {
     pub sent: Vec<(UnitId, Vec<u8>)>,
     /// (operator, object) of every interact-range test, in order.
     pub ranged: std::cell::RefCell<Vec<(UnitId, UnitId)>>,
+    /// The corpse `create_corpse` answers and its owner GUID.
+    pub corpse: Option<(UnitId, u32)>,
 }
 
 impl Pending for TestPending {
@@ -78,6 +82,18 @@ impl Pending for TestPending {
     }
     fn level_up_event(&mut self, unit: UnitId) {
         self.log.push(format!("level up {}", unit.0));
+    }
+    fn death_drop_gold(&mut self, _: &mut Game, unit: UnitId, amount: i32) {
+        self.log.push(format!("drop gold {} {amount}", unit.0));
+    }
+    fn create_corpse(&mut self, _: &mut Game, _: UnitId) -> Option<UnitId> {
+        self.corpse.map(|c| c.0)
+    }
+    fn corpse_owner_guid(&self, corpse: UnitId) -> Option<u32> {
+        self.corpse.filter(|c| c.0 == corpse).map(|c| c.1)
+    }
+    fn corpse_take_back(&mut self, _: &mut Game, unit: UnitId, corpse: UnitId) {
+        self.log.push(format!("take back {} {}", unit.0, corpse.0));
     }
     /// The death start's body is not written: the fake sets mode DT, as
     /// a start function sets its mode (monster spec).

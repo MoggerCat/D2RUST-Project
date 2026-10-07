@@ -41,23 +41,13 @@ use crate::seams::{ClientId, Intents, MessageSink, PlayerGate, ResultCode, Tick}
 
 // ---- fixture -----------------------------------------------------------------------------
 
-/// The seams with no provider: interaction info and the transport.
+/// The seams with no provider: the transport.
 #[derive(Default)]
 struct TestPending {
-    interact: BTreeMap<UnitId, (u8, u32)>,
     sent: Vec<(UnitId, Vec<u8>)>,
 }
 
 impl Pending for TestPending {
-    fn set_interact(&mut self, player: UnitId, unit_type: u8, guid: u32) {
-        self.interact.entry(player).or_insert((unit_type, guid));
-    }
-    fn reset_interact(&mut self, player: UnitId) {
-        self.interact.remove(&player);
-    }
-    fn interact_guid(&self, player: UnitId) -> Option<u32> {
-        self.interact.get(&player).map(|i| i.1)
-    }
     fn send(&mut self, player: UnitId, msg: &[u8]) {
         self.sent.push((player, msg.to_vec()));
     }
@@ -681,7 +671,8 @@ fn travel(fx: &mut Fx, level: u32) -> (UnitId, (ResultCode, Queued)) {
     let rec = h.waypoints.entry(p).or_default().get_mut(0);
     rec.set(0).unwrap();
     rec.set(1).unwrap();
-    h.x.interact.insert(p, (2, wp));
+    let r = fx.sim.events.sys.units.get_mut(p).unwrap();
+    r.interact.set(2, wp);
     let mut m = vec![0x49];
     m.extend_from_slice(&wp.to_le_bytes());
     m.extend_from_slice(&(level as u16).to_le_bytes());
@@ -1142,17 +1133,16 @@ fn vitals_sync_on_the_host_tick() {
 
 impl Fx {
     /// Everything a walk request could touch, as text: the game, units,
-    /// stats, the path state, the interactions, the player fields, the
-    /// stubs and the errors.
+    /// stats (the interactions on the unit records), the path state, the
+    /// player fields, the stubs and the errors.
     fn digest(&self, p: UnitId) -> String {
         let s = &self.sim.events.sys;
         format!(
-            "{:?}|{:?}|{:?}|{:?}|{:?}|{:?}{:?}|{:?}{:?}",
+            "{:?}|{:?}|{:?}|{:?}|{:?}{:?}|{:?}{:?}",
             self.sim.game,
             s.units,
             s.stats,
             s.hooks.paths,
-            s.hooks.x.interact,
             self.sim.player_fields(p),
             self.sim.unhandled,
             s.hooks.errors,

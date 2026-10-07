@@ -171,4 +171,9 @@ pub enum DrlgError {
     /// failed on this level id; the provider keeps its own error.
     #[error("level type generator failed on level {0} (error kept by the provider)")]
     LevelType(u32),
+    /// `rooms.md` §9.6 C4: a corner record R first in its link chain
+    /// (R +0x20 null) met with m ≠ 3; 1.14d writes through a null
+    /// pointer at `0x0066E8A7`.
+    #[error("linked corner record has no record after it in its chain (fault at 0x0066E8A7)")]
+    LinkedCornerNoNext,
 }

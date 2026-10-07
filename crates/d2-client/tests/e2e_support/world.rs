@@ -102,15 +102,9 @@ pub const ATTACK: i32 = 0;
 /// and the timer paths alike), the drop state, and a log of the calls
 /// that change something. The answers are the narrowest ones
 /// (`Pending`'s defaults) except those the test stages (see each). The
-/// player's interaction is the server host's (the NPC rest, `Rest`)
-/// unless [`TestPending::interact`] is set.
+/// player's interaction is the unit record's interact info.
 #[derive(Default)]
 pub struct TestPending {
-    /// The action wiring's own record of the player's interact unit
-    /// (`set_interact` / `reset_interact` / `interact_guid`): `None`
-    /// answers `Pending`'s defaults (`e2e_single_player.rs`); `Some`
-    /// keeps the first unit set until a reset (`prop_worldsim.rs`).
-    pub interact: Option<BTreeMap<UnitId, (u8, u32)>>,
     pub pos: BTreeMap<UnitId, (i32, i32)>,
     pub sent: Vec<(UnitId, Vec<u8>)>,
     pub log: Vec<String>,
@@ -204,19 +198,6 @@ impl Pending for TestPending {
     }
     fn kill_step(&mut self, _: &mut Game, step: KillStep, d: UnitId, a: UnitId) {
         self.log.push(format!("kill {step:?} {} {}", d.0, a.0));
-    }
-    fn set_interact(&mut self, player: UnitId, unit_type: u8, guid: u32) {
-        if let Some(m) = &mut self.interact {
-            m.entry(player).or_insert((unit_type, guid));
-        }
-    }
-    fn reset_interact(&mut self, player: UnitId) {
-        if let Some(m) = &mut self.interact {
-            m.remove(&player);
-        }
-    }
-    fn interact_guid(&self, player: UnitId) -> Option<u32> {
-        self.interact.as_ref()?.get(&player).map(|i| i.1)
     }
     fn send(&mut self, player: UnitId, msg: &[u8]) {
         self.sent.push((player, msg.to_vec()));
@@ -848,6 +829,8 @@ pub fn gold_item_tables() -> ItemTables {
         .map(|_| {
             let mut t: Itemtypes = blank();
             (t.class, t.staffmods, t.rare) = (0xFF, 0xFF, 1);
+            // Empty `shoots`: the link miss (link16 −1).
+            t.shoots = 0xFFFF;
             t
         })
         .collect();
