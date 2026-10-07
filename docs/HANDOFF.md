@@ -4973,6 +4973,15 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
 - `client/msg-skills.md` OQ1: equipping a charged item.
 - `client/stat-lists.md` OQ6: a buff (0xA8 bytes).
 - `client/model.md` OQ10: a game with a hireling (0x7A / 0x81).
+- `render/draw-order-2.md` OQ1 / OQ9 (W5): Rogue Encampment in rain:
+  per frame the player seed, rain target `[0x007A89E0]`, `k` (context
+  `0x007C8A38`), `last_s` and the splash pool count; check splashes
+  spawn only when `r` < ⌊target × 1000 / 256⌋.
+- `render/blend-modes.md` OQ6: a weather or Arcane-star capture with the
+  line endpoints logged (45° lines x-major, end one short on the minor
+  axis).
+- `missiles/bodies.md` OQ1 / OQ3: Plague Javelin hit, cloud positions
+  per tick (velocity 192 / 384, no extra << 8).
 
 ## 8. Lessons (problems met, fixes)
 
