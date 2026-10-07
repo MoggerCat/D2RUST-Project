@@ -84,7 +84,11 @@ none), as `quests-act1-rest.md` §8 rule 1.
   monstats flag word at +0x0C: the `flying` column (`data/fields.tsv`
   monstats seq 46). Flying monsters never carry the Golden Bird. The
   test runs only when the monstats row exists (class 0 … count − 1) and
-  chain 18 is present with not-intro = 1.
+  chain 18 is present with not-intro = 1. Order (`0x00544E80`): the unit's room's
+  level must be in Act III (act 2), the unit present, class ≥ 0 and <
+  the monstats row count (`0x00544ED3`), chain 18 present with not-intro
+  = 1, class ≠ 407 (fetish11), not flying → `0x005BAC70`. A class with no
+  row fails the whole test: nothing is chosen or linked.
 - §5.6 kill test: `0x005A0180(victim, 0x0E)` = monster data type flags
   (+0x16) & 0x0E ≠ 0, i.e. superunique (2), champion (4) or unique (8)
   (`monsters/init.md` §2 type flags); else `0x0063E9F0(0, victim)` = the

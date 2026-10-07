@@ -727,7 +727,7 @@ reward-pending bit). Single player has no party (party id 0xFFFF).
 | monster creation, base-id switch `0x005B1CF0` | `0x005436B0` | base 243 → chain 23 unless class 705; 256 → chain 22 unless 706; 409 → chain 24; bases 340–343 (`boneprison1`–`4`): unit flags \|= 0x20000, no link. Bases 243 / 256 also get `0x005A4850(…, 22, 1)` (monster spec) |
 | superunique creation `0x005A4440`, `0x005A49B0` | `0x005436B0` | hcIdx 36, 37, 38 → chain 23 (`0x005A49B0` then `0x005A4850(…, 22, 1)`) |
 | item creation `0x00555D20` | `0x005436B0` | `hfh ` → chain 24, `mss ` → chain 22 (`quests-act3.md` §10) |
-| room population `0x0054EBC0`; inactive-unit restore `0x005424F0` | `0x005B5210` | +0x13 of chain 23 (§5.5) |
+| room population `0x0054EBC0`; inactive-unit restore `0x005424F0` | `0x005B5210` | +0x13 of chain 23 (§5.5); chain 23 absent → 0 (`0x005B5226`) |
 | NpcStationary AI `0x005E73A0` | `0x005B43F0`, `0x005B4440` | §3.6 |
 | Izual AI `0x005F89B0` | `0x005B4390` | §3.6 |
 | object event 7 `0x005449E0` | `0x005B5750`, `0x005B6710` | §5.4, §4.7 |

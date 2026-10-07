@@ -32,20 +32,20 @@
 |   1. Conventions | 91–160 |
 |   2. Act III records | 161–188 |
 |   3. A3Q1 Lam Esen's Tome (chain 15, slot 17) | 189–272 |
-|   4. A3Q2 Khalim's Will (chain 16, slot 18) | 273–389 |
-|   5. A3Q3 Blade of the Old Religion (chain 17, slot 19) | 390–496 |
-|   6. A3Q4 The Golden Bird (chain 18, slot 20) | 497–585 |
-|   7. A3Q5 The Blackened Temple (chain 19, slot 21) | 586–682 |
-|   8. A3Q6 The Guardian (chain 20, slot 22) | 683–780 |
-|   9. Act III gossip and intro records | 781–842 |
-|   10. Hooks called from other systems | 843–863 |
-|   11. Clarifications (QC-1 … QC-7) | 864–870 |
-| Constants & data dependencies | 871–887 |
-| Randomness | 888–901 |
-| Edge cases & original bugs | 902–949 |
-| Test vectors | 950–967 |
-| Provenance | 968–994 |
-| Open questions | 995–1021 |
+|   4. A3Q2 Khalim's Will (chain 16, slot 18) | 273–390 |
+|   5. A3Q3 Blade of the Old Religion (chain 17, slot 19) | 391–497 |
+|   6. A3Q4 The Golden Bird (chain 18, slot 20) | 498–586 |
+|   7. A3Q5 The Blackened Temple (chain 19, slot 21) | 587–683 |
+|   8. A3Q6 The Guardian (chain 20, slot 22) | 684–781 |
+|   9. Act III gossip and intro records | 782–843 |
+|   10. Hooks called from other systems | 844–864 |
+|   11. Clarifications (QC-1 … QC-7) | 865–871 |
+| Constants & data dependencies | 872–888 |
+| Randomness | 889–902 |
+| Edge cases & original bugs | 903–950 |
+| Test vectors | 951–968 |
+| Provenance | 969–995 |
+| Open questions | 996–1022 |
 <!-- /index -->
 
 ## Summary
@@ -364,7 +364,8 @@ count and sets the flag; then the chest's own treasure `0x00585B90(op,
   Returns 0.
 - Lever event 7 (`0x005B85E0`, class 367): if +0x00 = 1: stairs gone →
   +0x08 := 2; else stairs mode := +0x08 and, when +0x08 ≠ 2, +0x08 := 2
-  and an end-animation event on the stairs.
+  and an end-animation event on the stairs at frame + (the stairs'
+  own `FrameCnt1` >> 8), no + 1 (`0x005B862A`–`0x005B864A`).
 
 #### 4.8 Cubing the Will (`0x005B86E0`, from `world/cube.md` §8)
 
