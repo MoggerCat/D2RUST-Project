@@ -10,6 +10,10 @@ with `pefile`; local recordings of `docs/handoff/local-buddy-q-rec.md`
 read from the raw `snd74*-sound.jsonl` (not committed) where cited;
 `docs/handoff/local-buddy-q-data.md` entries 62, 72, 73. Scratch scripts
 in `C:\Users\zffit\Desktop\D2test\scratch-audio\` (outside the repo).
+Fourth pass (2026-10-07): the remaining "Still open" items: sound-table
+OQ 1, 9, 10; triggers OQ 1, 2, 6, 10, 12, 13; environment OQ 1, 5; wav
+OQ 1. New file `specs/audio/triggers-2.md` (§13–§17); `sound-table-2.md`
+§15; `environment.md` §9.
 
 ## Answered
 
@@ -61,6 +65,16 @@ in `C:\Users\zffit\Desktop\D2test\scratch-audio\` (outside the repo).
 | triggers OQ 10 | `triggers.md` §12 | Partly: 396/397, 452, 2,231, 2,671, 4,640, 4,638 conditions; correction: 4,638 has no unit. |
 | env OQ 4 | `environment.md` OQ 4 | Active = snow-mode flag 0 and the level's `Rain` byte; intensity owned by `render/draw-order-2.md` §11. |
 | wav OQ 2 | `formats/wav.md` OQ 2, §2, §3 | Storm stream path copies bytes unchanged (`0x004157C0` memcpy); correction: stream buffers take the file's own format, and the Storm chunk walk has no length bound. |
+| sound-table OQ 9 (fourth pass) | `sound-table-2.md` §15 | 21 slider stops; value = 5 × position (`0x0047CD00`), position = ⌊(v + 1) / 5⌋ at menu open (`0x0047CC90`); setters only on a change; arrows / drag (13.25 px stops) / enter mapped with their cursor sounds; `3DBias` only in mixer modes 1–2. |
+| sound-table OQ 1, 10 | `sound-table.md` OQ | Needs recording (what to record written there). |
+| triggers OQ 10 (rest) | `triggers-2.md` §13 | 2,458: client umod phase-2 hooks (fire 9 / goboom 31: unique, mode 0, frame 4; worms 40: unconditional) and state 110 `pregnant` remove hook on 0xA9; death sounds of the code-8 request by `BaseId` 453 / 461 / 425–427 (minion sound by direction d8 & 3); 2,517 on Leap / Leap Attack landing (players only, after the run footstep); 1,830 per update of a `spiderlay` unit whose path flag 0x08 is set, outside town. |
+| triggers OQ 2 | `triggers-2.md` §14 | All 78 `0x00553380` sites by event; one pending event per unit (last wins), flushed in the per-client unit update; no 0x2C sender for 3, 5, 14, 21, 84, 90 and most quest events. |
+| triggers OQ 13 | `triggers-2.md` §15 | Event 3 → U +0x4E; runs the generic skill do (`dosound` / `tgtsound`) like 1–2; `cltdofunc` 16 / 37 act on it alone; nothing else reads it. |
+| triggers OQ 6 | `triggers-2.md` §16 | `ProgSound` of missile functions 9, 29, 47, 51; correction: 29 tests elapsed = 315, not missile 315 (`triggers.md` §8 r3 fixed). |
+| triggers OQ 12 (part) | `triggers-2.md` §17 | The seven options-menu sites mapped; rest is `client/ui.md` §B8 (cross-file request). |
+| triggers OQ 1 | `triggers.md` OQ 1 | Needs recording (session and hooks listed there). |
+| env OQ 5 | `environment.md` §9 | Front-end jukebox: two 8-track lists, entry 0 first, then CRT `rand()` mod 8 forward to an unplayed track, volume 110, toggle `0x004FA160`, 200 ms stop fade, 180 ms device fade on game entry. |
+| env OQ 1, wav OQ 1 | `environment.md` OQ 1, `formats/wav.md` OQ 1 | Needs recording (details there). |
 
 ## Still open
 
@@ -68,12 +82,12 @@ in `C:\Users\zffit\Desktop\D2test\scratch-audio\` (outside the repo).
 |---|---|
 | ST4 / sound-table OQ 12 | natural-end tick depends on real audio time (device side settled, §6.6 r4); recording below |
 | ST7 / sound-table OQ 13 | async read completion time; Storm branch for sound files not settled statically; recording below |
-| sound-table OQ 1, 9, 10 | voice-log conformance; slider mapping (`client/ui.md`); async effect in practice (with OQ 13) |
-| triggers OQ 1, 2, 6, 12, 13 | request log replay or the owning features' specs |
+| sound-table OQ 1, 10 | Needs recording: voice log per tick; `Async Only` request/attempt/start ticks (with OQ 13) |
+| triggers OQ 1 | Needs recording: request log over the listed session |
 | triggers OQ 3 | message field that fills +0xB0 (`client/msg-units.md`; write watch below) |
-| triggers OQ 10 | 2,458, the `0x004AFF60` death sounds, 2,517, 1,830 not traced this pass |
-| environment OQ 1, 5 | recording replay (entry 74 is partial: no cave, no Blood Raven); front end |
-| wav OQ 1 | DirectSound buffer dump (C75, player lane) |
+| triggers OQ 12 (rest) | UI control names per site: `client/ui.md` §B8 (cross-file request) |
+| environment OQ 1 | Needs recording (entry 74 is partial: no cave, no Blood Raven, no rain toggle) |
+| wav OQ 1 | Needs recording: DirectSound buffer dump (C75, player lane) |
 | — (size rule) | `sound-table.md` §1–§13 are all claimed by code `Covers:` lines (`crates/d2-client/src/audio/sound_table/tests.rs`), so moving a § would break `coverage.py`; the new material went into a new file `sound-table-2.md` §14 instead and `sound-table.md` stays at 59.5 KB. |
 
 ## CODE-TABLE CHANGE commits
@@ -84,23 +98,23 @@ in `C:\Users\zffit\Desktop\D2test\scratch-audio\` (outside the repo).
 
 ## Cross-file requests
 
-- to PC 1: `specs/formats/mpq.md` Observations; new observation; every
+- ~~to PC 1: `specs/formats/mpq.md` Observations; new observation; every
   ADPCM-masked `.wav` sector (mask 0x41 / 0x81, 350,543 sectors) uses
   Huffman weight table 8 and no other, 89.4 % with an escape
   (`docs/handoff/local-buddy-q-data.md` entry 62); add it (the q-data
   note says it was not yet recorded there). Mirrored in `formats/wav.md`
-  Survey.
-- to PC 1: `specs/client/audio.md` §A3; the original detects a one-shot's
+  Survey.~~ Done by PC 1 (commit 4ebe8d2, `xpc-to-pc2.md`).
+- ~~to PC 1: `specs/client/audio.md` §A3; the original detects a one-shot's
   end with a 50 ms wall-clock service thread (`0x00516250`) seen by the
   next sound-tick upkeep (`0x004DF890`), so end ticks are not
   tick-exact in 1.14d (`audio/sound-table.md` §6.6); state the d2rs
   end-tick model there (elapsed ticks × 40 ms ≥ duration) and that its
-  conformance waits for `sound-table.md` OQ 12.
-- to PC 1: `specs/client/audio.md` §A4; device gain = trunc((1 − occ) ×
+  conformance waits for `sound-table.md` OQ 12.~~ Done by PC 1 (commit 4ebe8d2, `xpc-to-pc2.md`).
+- ~~to PC 1: `specs/client/audio.md` §A4; device gain = trunc((1 − occ) ×
   trunc(v × G / 255)) / 255 with G = 255 in game (`0x005157B0`,
   `audio/sound-table.md` §8.3 r3); the `GainCurve` must take the
   occlusion (0 or 0.5 targets, 0.05 steps) as an input, not only v and
-  pan.
+  pan.~~ Done by PC 1 (commit 4ebe8d2, `xpc-to-pc2.md`).
 - to PC 1: `specs/sim/rng.md` §7, row "sound variants, NPC greetings,
   …"; the same seed is also stepped by the overlay create `0x00470390`
   for any unit's overlay (type 6: `roll(frames)`; arg a ≠ 0:
@@ -118,6 +132,26 @@ in `C:\Users\zffit\Desktop\D2test\scratch-audio\` (outside the repo).
   spec yet; `0x00470390`"); when the overlay spec is written it must
   own the three draws of `0x00470390` on the local player's seed listed
   above (`audio/sound-table-2.md` §14.3 states them meanwhile).
+- to PC 1: `specs/client/ui.md` §B8; `audio/triggers.md` open question
+  12; the seven options-menu UI sound sites are mapped in
+  `audio/sound-table-2.md` §15 r5 / `audio/triggers-2.md` §17 (handler
+  table `0x006D6034`–`0x006D6090`); the control names of the other 65
+  sites of `triggers.md` §11 (ids 1–6, 15, 16) are §B8's: add a site →
+  control table there and a link back.
+- to PC 1: `specs/monsters/umod-callbacks.md` (client side, new note);
+  the client has its own umod hook table `0x00724E28` (5 phases per
+  umod, `0x004ADD90`); phase 2 runs every client update and the umod 40
+  entry `0x004ADD80` has no mode or frame test (corpse-explode missiles
+  117 / 545 and sound 2,458 each update, `audio/triggers-2.md` §13.1
+  r4); state whether any client monster can carry umod 40 (0xAC list).
+- to PC 1: `specs/missiles/missiles.md` (client part, `ProgSound`);
+  conditions of missile functions 9, 29, 47, 51 are in
+  `audio/triggers-2.md` §16 (function 29 `0x004CE850`: elapsed = 315,
+  not missile 315); link it from the client-function rules.
+- to PC 1: `specs/sim/intents-events.md` §4 table row 0x2C; the 78
+  `0x00553380` sites by event and the last-wins rule (u16 +0x6E
+  overwritten before the flush) are in `audio/triggers-2.md` §14; add
+  a pointer there.
 
 ## Recording list
 
@@ -131,3 +165,22 @@ in `C:\Users\zffit\Desktop\D2test\scratch-audio\` (outside the repo).
 - Existing recordings used: entry 74 (`snd74*-sound.jsonl`) and entry 69
   (`env69-sound.jsonl`); still missing from entry 74: a cave walk and
   Blood Raven's death (stinger 34), needed for `environment.md` OQ 1.
+- sound-table OQ 1: voice log per sound tick (each `0x004E01B0` start
+  with id, variant, unit, offset, loop; each `0x005157B0` / `0x00515890`
+  argument; listener and unit points; settings) over a town walk, a
+  fight, a song change and the ESC menu.
+- sound-table OQ 10 (with 13): fresh start; per `Async Only` request,
+  T of the request, of the first start attempt and of the start (or the
+  §6.3 r4 drop).
+- triggers OQ 1: request log (`0x004B9A00` caller, id, unit, delay,
+  flags, T, C) with each S→C 0x2C / 0xA9 and code-8 request: two floor
+  materials, a melee and a caster fight with a death and a block, an
+  NPC greeting and talk, item pickup / drop / identify, a waypoint, a
+  Leap, a fire-enchanted unique's death, the options sliders.
+- environment OQ 1: town → Blood Moor → Den of Evil → town, a day
+  change, Blood Raven's death (stinger 34), rain on and off; the
+  `0x004DCAA0` / `0x004DCD40` / `0x004E42E0` hooks.
+- wav OQ 1 (C75): dump at `0x00516760` (pointer, size) for the wav.md
+  Test vectors files and one ADPCM file per channel count, and the
+  first 256 KiB of `music\act1\crypt.wav` from the refill copy
+  `0x004157C0`; compare byte for byte with our decode.

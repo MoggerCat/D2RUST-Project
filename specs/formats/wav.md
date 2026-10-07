@@ -30,7 +30,7 @@
 | Edge cases & original bugs | 215–228 |
 | Test vectors | 229–267 |
 | Provenance | 268–284 |
-| Open questions | 285–306 |
+| Open questions | 285–314 |
 <!-- /index -->
 
 ## Summary
@@ -289,6 +289,14 @@ regressions; equality with the original's output is Open question 1.
    returned by 0x516760) for the Test vectors files and compare with our
    decoded `data`. This settles both this spec and the bit-exactness of
    `mpq.md` §12 ADPCM on real files (`client/audio.md` §B1).
+   Needs recording (not settleable statically: the bytes are Storm's
+   decompression output): for each Test vectors file and one ADPCM
+   sector file per channel count, hook `0x00516760` (returned `data`
+   pointer and size) or the buffer `Lock` after `0x00515180`, dump the
+   bytes with the path, and compare byte for byte with our decoded
+   `data`; plus one `Stream` song (`music\act1\crypt.wav`) dumped from
+   the refill copy `0x004157C0` over its first 256 KiB (C75, player
+   lane).
 2. The Storm stream path (0x41B280) is assumed to copy bytes unchanged
    like 0x515180; its refill thread was not traced. Settled by the same
    dump on a `Stream`=1 sound (e.g. `music\act1\crypt.wav`).

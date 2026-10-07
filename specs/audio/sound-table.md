@@ -50,7 +50,7 @@
 | Edge cases & original bugs | 869–873 |
 | Test vectors | 874–918 |
 | Provenance | 919–963 |
-| Open questions | 964–1037 |
+| Open questions | 964–1044 |
 <!-- /index -->
 
 ## Summary
@@ -966,6 +966,9 @@ sites, fade `0x00515F50`, front-end stream `0x00514780`, `0x00514840`,
 1. Voice-log conformance: record 0x004E01B0 starts and the values passed
    to `0x005157B0`/`0x00515890` with the sound tick (`client/audio.md`
    §B7) in a scene with known unit positions; settles §6–§8 as a whole.
+   Needs recording: per T, each start (id, variant, unit, offset,
+   loop), each (voice, v) and (voice, pan) sent, listener and unit
+   points, settings; town walk, a fight, a song change, ESC menu.
 2. Answered (§8.1 r1): the client pixel point (dynamic path +0x08 /
    +0x0C for types 0, 1, 3; static path +0x04 / +0x08 for 2, 4, 5).
 3. Whether variant draws interleave with other users of the player's
@@ -1000,9 +1003,13 @@ sites, fade `0x00515F50`, front-end stream `0x00514780`, `0x00514840`,
    (`audio/environment.md` §2 r8, §3 r1), and `Block 1` of a non-stream
    row only as its loop start (§7 r4).
 8. Answered (§8.1 r1, "River").
-9. Options-menu slider → 0–100 mapping (owner `client/ui.md`).
+9. Answered (`audio/sound-table-2.md` §15): 21 positions; value =
+   5 × position (`0x0047CD00`), position = ⌊(value + 1) / 5⌋ at open
+   (`0x0047CC90`); setters run only on a change.
 10. Whether async-load latency changes which one-shots play in practice
     (d2rs has no load latency); compare voice logs for a fresh start.
+    Needs recording (with 13): fresh start; per `Async Only`
+    request, T of request, first attempt and start (or §6.3 r4 drop).
 11. Answered (§12 r2): −2³¹ from `cvttsd2si`, then wrapping integer
     steps; silent at the device.
 12. Needs recording (ST-4, §6.6 r3): the sound tick at which one-shots
