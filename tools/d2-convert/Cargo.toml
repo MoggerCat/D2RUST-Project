@@ -1,0 +1,22 @@
+[package]
+name = "d2-convert"
+description = "Converts the player's own D2 LoD install into the d2rs native asset folder (specs/formats/native-assets.md)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+d2-formats.workspace = true
+d2-native.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+toml = "0.9"
+
+[dev-dependencies]
+d2-formats = { workspace = true, features = ["test-support"] }
+
+[lints]
+workspace = true

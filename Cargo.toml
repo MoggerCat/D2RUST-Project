@@ -19,6 +19,7 @@ members = [
     "tools/scenario-run",
     "tools/seed-finder",
     "tools/d2s-tool",
+    "tools/d2-convert",
 ]
 
 [workspace.package]
