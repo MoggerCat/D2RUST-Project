@@ -22,16 +22,16 @@
 |   1. Renderers in 1.14d and the reference | 65–104 |
 |   2. Framebuffer | 105–113 |
 |   3. Frame cycle | 114–151 |
-|   4. Palette (one per presented frame) | 152–198 |
-|   5. One pixel write (index domain) | 199–237 |
-|   6. d2rs answers | 238–256 |
-|   7. DirectDraw (display type 3) differences | 257–268 |
-| Constants & data dependencies | 269–274 |
-| Randomness | 275–278 |
-| Edge cases & original bugs | 279–288 |
-| Test vectors | 289–300 |
-| Provenance | 301–327 |
-| Open questions | 328–361 |
+|   4. Palette (one per presented frame) | 152–199 |
+|   5. One pixel write (index domain) | 200–238 |
+|   6. d2rs answers | 239–257 |
+|   7. DirectDraw (display type 3) differences | 258–269 |
+| Constants & data dependencies | 270–275 |
+| Randomness | 276–279 |
+| Edge cases & original bugs | 280–289 |
+| Test vectors | 290–301 |
+| Provenance | 302–328 |
+| Open questions | 329–362 |
 <!-- /index -->
 
 ## Summary
@@ -172,9 +172,10 @@ it is the palette used).
 `n` outside 1…5 → 1, then `SetPalette`. In game it is called by the
 client loop at game start with `a = 0` (`0x0044F2DC`: act 1) and by the
 client unit room change `0x004654C0` when the moved unit is the local
-player (`[0x007A6A70]`) and the Levels `Act` byte (`+0x02`) of the new
-room's level differs from the old room's (`0x00465603`–`0x0046562A`),
-with `a` = the new level's act; the first placement (no old room) does
+player (`[0x007A6A70]`) and the Levels `Pal` byte (`+0x02`; not `Act`,
++0x03, which differs for levels 125–127 and 133–136) of the new room's
+level differs from the old room's (`0x00465603`–`0x0046562A`), with `a`
+= the new level's `Pal` (`client/msg-units.md` §3 rule 4.4); the first placement (no old room) does
 not switch. So while playing, the presented palette is that of the act of
 the local player's current room's level, switched on the room change that
 crosses acts. A game that starts in another act gets its act palette

@@ -204,10 +204,15 @@ fn client_world_holds_only_stated_fields() {
         room_units,
         lights,
         drlg_updates,
+        // `render/lighting.md` §9.2 r3–r4; `client/msg-skills.md` §4 r2.
+        environment,
+        eclipse_pending,
+        skill_tree_flag,
     } = ClientWorld::default();
     assert!(pets.is_empty() && palette_act.is_none() && active_rooms.is_none());
     assert!(room_units == Default::default() && lights.is_empty() && drlg_updates == 0);
     assert!(drlg.is_none());
+    assert!(environment.is_none() && !eclipse_pending && skill_tree_flag.is_none());
     assert_eq!((frames, server_ticks, units.len()), (0, 0, 0));
     assert_eq!((local_player, act, use_cursor), (None, None, None));
     assert_eq!((difficulty, expansion, ladder, game_flags), (0, 0, 0, 0));
@@ -229,7 +234,11 @@ fn client_world_holds_only_stated_fields() {
         queue,
         last_mode_request,
         kind,
+        // `client/msg-skills.md` §1 r1; `client/msg-ui.md` §1 r4.
+        skills,
+        quest_untargetable,
     } = ClientUnit::new(key);
+    assert!(skills.is_none() && !quest_untargetable);
     assert_eq!(k, key);
     assert_eq!((class, mode, position, server_point), (0, 0, None, (0, 0)));
     assert_eq!(seed, Some((1, 666)));

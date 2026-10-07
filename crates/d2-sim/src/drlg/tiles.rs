@@ -502,12 +502,17 @@ impl Drlg {
         tile: TileRef,
     ) -> Result<usize, DrlgError> {
         let rect = self.room(id).rect;
-        if is_door(t) {
-            // New record: flag 0x20 is clear.
-            svc.types
+        // The flag rules (`0x0066DB20`) call the door unit first for a
+        // type 8 / 9 record (a new record: flag 0x20 clear), which sets
+        // flag 0x20 on its outcome (`rooms.md` §9.5.1, `preset.md` §11).
+        let door_flag = is_door(t)
+            && svc
+                .types
                 .door_unit(self, svc.data, id, rect.x + x, rect.y + y, v, t);
+        let mut flags = record_flags(0, t, v, self.material(tile), false);
+        if door_flag {
+            flags |= rec_flags::DOOR_UNIT;
         }
-        let flags = record_flags(0, t, v, self.material(tile), false);
         let tl = self.tiles_mut(id);
         tl.walls.push(TileRecord {
             x,
@@ -836,6 +841,12 @@ impl Drlg {
         let shadow = k == RecordKind::Shadow;
         if r.flags & rec_flags::LAYER_ABOVE != 0 {
             if is_door(r.kind) {
+                // The re-run's door unit call (`0x0066DB20` → `0x0066D9E0`)
+                // is skipped for a record with flag 0x20 (§9.5.1).
+                // TODO(spec: rooms.md §9.6 step 3): for a door record
+                // without flag 0x20 the re-run calls the door unit again;
+                // which room (this one or N) and position it passes is not
+                // stated, so no call is made here.
                 let f = record_flags(r.flags, r.kind, v, self.material(r.tile), shadow);
                 self.tiles_mut(n).records_mut(k)[i].flags = f;
             }

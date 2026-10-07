@@ -336,6 +336,7 @@ fn every_queued_row_reads_its_layout() {
         bytes: &b,
         unit: k,
         inputs: &m.inputs,
+        out: &Default::default(),
     };
     let mut w = m.w.clone();
     queued(&mut w, &msg).unwrap();

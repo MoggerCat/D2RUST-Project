@@ -1,4 +1,4 @@
-// Spec: specs/sim/path-placement.md §11, §13; specs/client/model.md §11 rules 1, 3; specs/sim/intents-events.md §4 rule 3, §7.2
+// Spec: specs/sim/path-placement.md §11, §13; specs/client/model.md §11 rules 1, 3; specs/sim/intents-events.md §4 rule 3, §7.2; specs/formats/d2s-load.md
 //! The single-player join of a client whose player is not yet placed: the
 //! game part of the C→S 0x6B path (`0x0052C550` → `0x00530190`,
 //! `path-placement.md` §13 rule 1), as far as the specs state it.
@@ -37,6 +37,7 @@
 //!   `tick.md` §6 rule 4; `0x0061A460` is not specified):
 //!   `intents-events.md` open question 2.
 
+use d2_formats::d2s::D2s;
 use d2_proto::s2c::{AssignPlayer, GameHandshake};
 use d2_proto::server::LoadAct;
 use d2_sim::drlg::TOWN_LEVELS;
@@ -45,6 +46,7 @@ use d2_sim::wiring::action::Pending;
 use d2_sim::wiring::path::place::game_entry;
 use d2_sim::wiring::path::walk::PathCtx;
 
+use super::character::{self, ActionCharacter, CharacterWorld, LoadContext, LoadError, LoadReport};
 use super::handlers::world::ActionEvents;
 use super::SimGame;
 use crate::seams::ClientId;
@@ -76,6 +78,9 @@ pub enum JoinError {
     /// room, no free point), as the wiring logged it.
     #[error("game entry failed: {0}")]
     Entry(String),
+    /// The save's load failed (`formats/d2s.md` §10).
+    #[error("character load: {0}")]
+    Load(#[from] LoadError),
 }
 
 /// The S→C 0x03 of act `act` (`client/model.md` §11 rule 1).
@@ -161,4 +166,43 @@ pub fn enter_game<D: ActionEvents, W>(
         return Err(JoinError::Entry(why));
     }
     Ok(player)
+}
+
+/// The join of `client` with its character save (`formats/d2s-load.md`):
+/// the load of `save` (parsed and checked by `d2_formats::d2s`) onto the
+/// client's player unit on the action wiring ([`ActionCharacter`]), then,
+/// for a full save, the caller's quest entry with mode 0 (load §2), then
+/// the game entry ([`enter_game`]) in the act the save holds (§2.2 rule
+/// 8; a new character enters act 0). Steps without a provider are listed
+/// in the report.
+///
+/// TODO(formats/d2s-load.md §1): whether the caller's game entry also
+/// runs the quest entry with mode 0 after a new-character start is not
+/// stated; it is not run here.
+pub fn enter_game_from_save<D: ActionEvents, W>(
+    s: &mut SimGame<D, W>,
+    client: ClientId,
+    save: &D2s,
+    ctx: &LoadContext,
+) -> Result<(UnitId, LoadReport), JoinError> {
+    if s.sim_client(client).is_none() {
+        return Err(JoinError::NotJoined(client));
+    }
+    let player = s.player_of(client).ok_or(JoinError::NoPlayer(client))?;
+    let report = s.events.action().with(&mut s.game, |_, v| {
+        let mut cw = ActionCharacter { v, player };
+        let mut r = character::load(save, ctx, &mut cw)?;
+        if !r.new_character {
+            if let Err(u) = cw.quest_entry(0) {
+                r.unapplied.push(u);
+            }
+        }
+        Ok::<_, LoadError>(r)
+    })?;
+    let entry = Entry {
+        act: report.act,
+        name: save.header.name,
+    };
+    let placed = enter_game(s, client, &entry)?;
+    Ok((placed, report))
 }

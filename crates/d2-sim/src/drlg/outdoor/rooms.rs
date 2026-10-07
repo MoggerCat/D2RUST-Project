@@ -86,6 +86,7 @@ impl Outdoor {
         info.path_ends.clear();
         info.paths.clear();
         info.build_list.clear();
+        info.sub_hits.clear();
         let mut g = Gen {
             drlg,
             data,

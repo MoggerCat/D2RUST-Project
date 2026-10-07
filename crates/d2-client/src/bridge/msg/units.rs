@@ -16,6 +16,7 @@ use super::super::bits::BitReader;
 use super::super::check::check;
 use super::super::dispatch::{HandlerError, Message, UnitMessage};
 use super::super::drlg::DrlgRoomId;
+use super::super::skills::SkillList;
 use super::super::world::{
     ClientUnit, ClientWorld, KindData, ModeRequest, MonsterData, ObjectData, PlayerData, UnitKey,
     INIT_SEED, MISSILE, MONSTER, OBJECT, PLAYER,
@@ -87,6 +88,8 @@ pub fn assign_player(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handl
     for s in [68, 67, 69] {
         u.stats.insert(s, 100);
     }
+    // A skill list (`0x006438B0`, +0xA8; `msg-skills.md` §1 rule 1).
+    u.skills = Some(SkillList::default());
     u.mode = 5;
     // Randomness rule 2: unless the new record is already the local
     // player (never: the local player pointer is the old record while the
@@ -191,6 +194,10 @@ pub fn assign_monster(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Hand
     u.stats.insert(7, 0x8000);
     u.stats.insert(6, i32::from(life) << 8);
     u.stats.insert(328, i32::from(x.wrapping_add(y)));
+    // Rule 7: `+0xA8` := a skill list (`0x006438B0(0)`). TODO(spec:
+    // msg-units.md §1.2 rule 8): the `monstats` Skill / level / mode
+    // columns are not in the client tables, so no skill is added.
+    u.skills = Some(SkillList::default());
     // Rule 4.
     if r.read(1) == 1 {
         // TODO(spec: msg-units.md open question 3): what `0x00621CC0`

@@ -22,7 +22,7 @@ use crate::units::{RoomId, UnitId, UnitType};
 use super::combat::CombatView;
 use super::monsters::umod_mode;
 use super::units::STATE_JUSTHIT;
-use super::{Pending, View};
+use super::{Pending, View, WiringError};
 
 /// Pierce percent stat of the damage record (`missiles.md` §R6.1:
 /// "pierce percent = stat 327").
@@ -400,20 +400,7 @@ impl<X: Pending> MissileCombat for View<'_, X> {
             return;
         };
         let mut rec = damage_record(damage);
-        let class = self
-            .h
-            .missiles
-            .as_ref()
-            .and_then(|s| s.get(missile))
-            .map(|d| d.class);
-        let t = self.h.tables.clone();
-        if let Some(row) = class.and_then(|c| t.missiles.get(usize::from(c))) {
-            rec.hit_class = u32::from(row.hitclass);
-        }
-        rec.pierce_pct = View::stat(self, missile, PIERCE_PERCENT_STAT);
-        let mut w = self.combat(game);
-        combat::apply(&mut w, &t.combat, owner, unit, true, &mut rec);
-        crate::combat::CombatWorld::reaction(&mut w, owner, unit, &mut rec);
+        self.apply_missile_record(game, owner, missile, unit, &mut rec);
         damage.result = rec.result.into();
     }
     /// Unit event 0 (`0x005C0C30`), also with no unit.
@@ -452,6 +439,72 @@ impl<X: Pending> MissileCombat for View<'_, X> {
             .wrapping_add(delta)
             .max(0);
         self.set_base(unit, ARMORCLASS, ac);
+    }
+}
+
+impl<X: Pending> View<'_, X> {
+    /// The damage part of `0x005ADCD0` (`missiles.md` §R6.1) on a
+    /// record: the missile's hit class (`HitClass`) and pierce percent
+    /// (stat 327), then `apply(game, owner, unit, missile = 1, record)`
+    /// (`damage.md` §5.2) and the reaction (§7.1).
+    fn apply_missile_record(
+        &mut self,
+        game: &mut Game,
+        owner: UnitId,
+        missile: UnitId,
+        unit: UnitId,
+        rec: &mut DamageRecord,
+    ) {
+        let class = self
+            .h
+            .missiles
+            .as_ref()
+            .and_then(|s| s.get(missile))
+            .map(|d| d.class);
+        let t = self.h.tables.clone();
+        if let Some(row) = class.and_then(|c| t.missiles.get(usize::from(c))) {
+            rec.hit_class = u32::from(row.hitclass);
+        }
+        rec.pierce_pct = View::stat(self, missile, PIERCE_PERCENT_STAT);
+        let mut w = self.combat(game);
+        combat::apply(&mut w, &t.combat, owner, unit, true, rec);
+        crate::combat::CombatWorld::reaction(&mut w, owner, unit, rec);
+    }
+
+    /// `0x005AD730(game, missile, unit, rec)` with a caller's record
+    /// (`umod-callbacks.md` §3.2; `missiles.md` §R6.1): the missile's
+    /// result flags ([`crate::missiles::result_flags`]: hit, get-hit /
+    /// soft-hit, the knockback roll on the missile's seed) or-ed into a
+    /// copy of the record, then the damage part of `0x005ADCD0`. The
+    /// caller has checked the owner.
+    ///
+    /// TODO(missiles.md §R6.1): as in `apply_damage`
+    /// here, the block/dodge arguments and the hit flags from missile
+    /// data flags 1, 2 are not stated and not applied.
+    pub fn missile_record_hit(
+        &mut self,
+        game: &mut Game,
+        owner: UnitId,
+        missile: UnitId,
+        unit: UnitId,
+        mut rec: DamageRecord,
+    ) {
+        let Some(mut store) = self.h.missiles.take() else {
+            self.h.errors.push(WiringError::Reentrant("missiles"));
+            return;
+        };
+        let t = self.h.tables.clone();
+        let flags = {
+            let mut cx = crate::missiles::Ctx {
+                tables: &t.missiles,
+                store: &mut store,
+                world: &mut *self,
+            };
+            crate::missiles::result_flags(game, &mut cx, missile, unit)
+        };
+        self.h.missiles = Some(store);
+        rec.result |= result_bits(flags);
+        self.apply_missile_record(game, owner, missile, unit, &mut rec);
     }
 }
 

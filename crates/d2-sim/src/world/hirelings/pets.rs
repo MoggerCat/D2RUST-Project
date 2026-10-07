@@ -40,9 +40,10 @@ pub fn assign_merc(class: u16, owner: u32, merc: u32, seed: u32, name: u32) -> [
 }
 
 /// S→C 0x7A (`0x0053CB30`, 13 bytes, zeroed first): u8 action @1, u8 pet
-/// type @2, u16 class @3, u32 owner GUID @5, u32 pet GUID @9 (§13 rule 2,
-/// layout owned by `pets.md` §8).
-pub fn pet_action(action: u8, pet_type: u8, class: u16, owner: u32, pet: u32) -> [u8; 13] {
+/// type @2, u16 class @3, u32 owner GUID @5, u32 pet GUID @9 (§13 rule
+/// 2; layout owner `sim/pets.md` §8, corrected 2026-10-07; recorded
+/// remove `7a 00 00 0000 00000000 0d000000`).
+pub fn pet_action(action: u8, pet_type: u8, class: u16, pet: u32, owner: u32) -> [u8; 13] {
     let mut b = [0u8; 13];
     b[0] = MSG_PET_ACTION;
     b[1] = action;
@@ -74,7 +75,7 @@ pub fn broadcast<W: HirelingWorld>(w: &mut W, bytes: &[u8]) {
 /// The "remove" broadcast (`0x00574410`): 0x7A action 0 with only the
 /// GUID set (§13 rule 2, `pets.md` §8).
 pub fn broadcast_remove<W: HirelingWorld>(w: &mut W, guid: u32) {
-    broadcast(w, &pet_action(ACTION_REMOVE, 0, 0, 0, guid));
+    broadcast(w, &pet_action(ACTION_REMOVE, 0, 0, guid, 0));
 }
 
 /// The "add" broadcast (`0x00574930`, `pets.md` §8): record {pet GUID,
@@ -93,7 +94,7 @@ fn broadcast_add<W: HirelingWorld>(w: &mut W, owner: UnitId, unit: Option<UnitId
         )
         .to_vec()
     } else {
-        pet_action(ACTION_ADD, PET_HIRELING, class, owner_guid, node.guid).to_vec()
+        pet_action(ACTION_ADD, PET_HIRELING, class, node.guid, owner_guid).to_vec()
     };
     broadcast(w, &bytes);
 }
@@ -127,19 +128,19 @@ pub fn add<W: HirelingWorld>(
     id: u32,
 ) -> Result<bool, HirelingError> {
     let guid = w.guid(merc);
-    let list = st.list_mut(player);
-    if list.max == 0 {
-        // TODO(sim/pets.md open question 2): the resync `0x00575900` is
-        // not specified; the hireling entry's max is taken from
-        // `pettype` `basemax` (row 7: 1).
-        list.max = t.pet_basemax;
-        if list.max == 0 {
+    if st.list_mut(player).max == 0 {
+        let max = recompute_max(w, t, player);
+        st.list_mut(player).max = max;
+        if max == 0 {
             dismiss(w, guid);
             return Ok(false);
         }
     }
+    let list = st.list_mut(player);
     if list.nodes.len() as i32 >= list.max {
-        // `pets.md` §5 rule 2: unlink the head with kill.
+        // The full-list eviction: `0x00574850(head GUID, list, kill 1)`
+        // directly (one 0x7A remove from the unlink, then the kill
+        // `0x00574450` with its own messages); not `0x005750E0`.
         if let Some(head) = list.nodes.first().map(|n| n.guid) {
             unlink(w, st, player, head, true)?;
         }
@@ -167,6 +168,21 @@ pub fn find<W: HirelingWorld>(
 ) -> Option<UnitId> {
     let node = st.first_node(player, any)?;
     w.monster_by_guid(node.guid)
+}
+
+/// §5 rule 3 max recompute `0x00575900(player)`, type 7 part: the largest
+/// `petmax` (each below 1 counted as 1) over the player's skills whose
+/// `pettype` is 7; none → `pettype` `basemax`. `0x00575850` evicts only
+/// for types other than 7. (Live 1.14d `skills.txt` has no skill of
+/// `pettype` `hireable`, so this is `basemax` 1 there.)
+pub fn recompute_max<W: HirelingWorld>(w: &W, t: &HirelingTables, player: UnitId) -> i32 {
+    if w.unit_type(player) != UNIT_PLAYER {
+        return 0;
+    }
+    match w.skill_pet_max(player, PET_HIRELING) {
+        Some(v) => v.max(1),
+        None => t.pet_basemax,
+    }
 }
 
 /// "Living hireling" `(7, 0)`.

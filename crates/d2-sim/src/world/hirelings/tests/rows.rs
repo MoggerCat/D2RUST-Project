@@ -57,10 +57,38 @@ fn act_of_name() {
     (a.name_first, a.name_last) = (10, 50);
     let mut b = row(100, 6, 2, 1, 9);
     (b.name_first, b.name_last) = (51, 71);
+    let mut c = row(0, 7, 3, 1, 9);
+    (c.name_first, c.name_last) = (72, 80);
+    let t = HirelingRows::new(vec![a, b, c]);
+    assert_eq!(t.act_of_name(true, 10), 0);
+    assert_eq!(t.act_of_name(true, 60), 1);
+    assert_eq!(t.act_of_name(true, 5), 0);
+    // Only rows of the game's version: the classic row's range is not
+    // seen by an expansion game, and the other way round.
+    assert_eq!(t.act_of_name(true, 75), 0);
+    assert_eq!(t.act_of_name(false, 75), 2);
+    assert_eq!(t.act_of_name(false, 60), 0);
+}
+
+// Covers: specs/world/hirelings.md §1.2 r3
+#[test]
+fn act_lookup_matches_class_before_the_name_range() {
+    // `0x00656440` matches `Class` first; the name range is the fallback.
+    let mut a = row(100, 0, 1, 1, 3);
+    (a.name_first, a.name_last, a.class) = (10, 50, 271);
+    let mut b = row(100, 6, 2, 1, 9);
+    (b.name_first, b.name_last, b.class) = (51, 71, 338);
     let t = HirelingRows::new(vec![a, b]);
-    assert_eq!(t.act_of_name(10), 0);
-    assert_eq!(t.act_of_name(60), 1);
-    assert_eq!(t.act_of_name(5), 0);
+    assert_eq!(t.act_of(true, 338, 10), 1);
+    assert_eq!(t.act_of(true, 999, 10), 0);
+    assert_eq!(t.act_of(true, 999, 60), 1);
+    // Test vector: class 0, expansion, name 0x0D68 → no `Class` 0 row;
+    // the name-range row of Act 1 → 0.
+    let mut k = row(100, 0, 1, 1, 3);
+    (k.name_first, k.name_last, k.class) = (0x0D56, 0x0D76, 271);
+    let t = HirelingRows::new(vec![k]);
+    assert_eq!(t.act_of(true, 0, 0x0D68), 0);
+    assert_eq!(t.act_of_name(true, 0x0D68), 0);
 }
 
 // Covers: specs/world/hirelings.md §2 r1, §2 r2, §2 r3, §2 r4, §2 r6, §2 r7, §2 text

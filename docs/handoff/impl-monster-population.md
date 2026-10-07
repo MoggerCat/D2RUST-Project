@@ -89,7 +89,11 @@ units and the Den of Evil quest (§13).
    not stated; boss unit seed, mode 1, `place_near` r 4 flags 0x40 for
    the skeletons and the four mages.
 5. §11.5 r4: the seed of the event-7 `roll(50)` is not stated; the whole
-   schedule is the seam `schedule_monumod`.
+   schedule is the seam `schedule_monumod`. **Answered 2026-10-07**
+   (asm `0x0054EA5F`): `roll(50)` on the created monster's own unit seed,
+   right after its creation; the event's body is umod 34's revive
+   (`monsters/umod-callbacks.md` §23.2; `unit-events.tsv` row
+   `0x0054ea84`).
 6. §11.5: ids absent from the TSV (0, 1, 6, 7, 9, 12–16, 19–21, ≥ 33)
    spawn nothing.
 7. §10.3 r1: "owner data and minion list as in 10.2.3" read as the same

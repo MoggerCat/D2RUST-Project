@@ -1,7 +1,8 @@
-// Spec: specs/sim/pathing.md §1.1, §10; specs/sim/intents-events.md §2.4 rules 3–4
+// Spec: specs/sim/pathing.md §1.1, §1.6, §10; specs/sim/intents-events.md §2.4 rules 3–4
 //! The walk and run intent handlers: C→S 0x01 walk to a point, 0x02 walk
 //! to a unit, 0x03 run to a point, 0x04 run to a unit (`pathing.md`
-//! §1.1).
+//! §1.1); and C→S 0x5F, the client position resync (`pathing.md` §1.6,
+//! [`RESYNC_ID`]).
 //!
 //! The dispatcher (`crate::dispatch`) has applied the gate, the exact
 //! size and the point / unit parse (`intents-events.md` §2.3, §2.4 rules
@@ -54,6 +55,12 @@ pub const WALK_IDS: &[(u8, &str, &str, Form, u32)] = &[
     (0x04, "RunToUnit", "sim/pathing.md §1.1", Form::Unit, 3),
 ];
 
+/// C→S 0x5F UpdatePlayerPos (`x:u16@1 y:u16@3`): the client position
+/// resync of `pathing.md` §1.6 (`0x0054CD50`), on the same path provider
+/// (`d2_sim::wiring::path::walk::resync_message`). Not a point message:
+/// the dispatcher parses nothing (§2.4 rule 3 lists the point ids).
+pub const RESYNC_ID: u8 = 0x5F;
+
 /// The target form of `id`, if it is a walk / run id.
 pub fn form(id: u8) -> Option<Form> {
     WALK_IDS
@@ -87,6 +94,19 @@ pub fn enable_paths<D: ActionEvents>(events: &mut D) -> Result<(), PathError> {
 pub fn run<D: ActionEvents>(game: &mut Game, events: &mut D, call: WalkCall) -> Option<WalkResult> {
     let action = events.action();
     action.hooks().paths.as_ref()?;
+    if call.id == RESYNC_ID {
+        let mut m = [RESYNC_ID, 0, 0, 0, 0];
+        m[1..3].copy_from_slice(&(call.a as u16).to_le_bytes());
+        m[3..5].copy_from_slice(&(call.b as u16).to_le_bytes());
+        return Some(action.with(game, |g, v| {
+            let (r, what) = d2_sim::wiring::path::walk::resync_message(v, g, call.player, &m);
+            let o = match what {
+                Some(d2_sim::path::walk::resync::Resync::Walk(o)) => Some(o),
+                _ => None,
+            };
+            (r, o)
+        }));
+    }
     Some(action.with(game, |g, v| {
         d2_sim::wiring::path::walk::walk_message(v, g, call.player, call.id, call.a, call.b)
     }))
@@ -102,9 +122,9 @@ fn u32_at(m: &[u8], at: usize) -> Option<u32> {
     Some(u32::from_le_bytes(m.get(at..at + 4)?.try_into().ok()?))
 }
 
-/// The walk / run handler for one dispatched message. `None`: not a walk
-/// id, no player, or the host has no path provider: the caller keeps its
-/// stub.
+/// The walk / run handler (and 0x5F, [`RESYNC_ID`]) for one dispatched
+/// message. `None`: not a walk id, no player, or the host has no path
+/// provider: the caller keeps its stub.
 pub fn handle<D: EventDispatch, W: WorldHost<D>>(
     sim: &mut SimGame<D, W>,
     client: ClientId,
@@ -112,9 +132,10 @@ pub fn handle<D: EventDispatch, W: WorldHost<D>>(
     out: &mut dyn MessageSink,
 ) -> Option<ResultCode> {
     let id = *msg.first()?;
-    let (a, b) = match form(id)? {
-        Form::Point => (u16_at(msg, 1)?, u16_at(msg, 3)?),
-        Form::Unit => (u32_at(msg, 1)?, u32_at(msg, 5)?),
+    let (a, b) = match (id, form(id)) {
+        (RESYNC_ID, _) | (_, Some(Form::Point)) => (u16_at(msg, 1)?, u16_at(msg, 3)?),
+        (_, Some(Form::Unit)) => (u32_at(msg, 1)?, u32_at(msg, 5)?),
+        (_, None) => return None,
     };
     let player = sim.player_of(client)?;
     let call = WalkCall { player, id, a, b };

@@ -65,6 +65,8 @@ pub struct FakeTypes {
     /// (wx, wy) of door and warp unit hooks.
     pub door_units: Vec<(i32, i32)>,
     pub warp_units: Vec<(i32, i32)>,
+    /// What the door unit hook answers (record flag 0x20).
+    pub door_flag: bool,
 }
 
 impl LevelTypes for FakeTypes {
@@ -146,8 +148,9 @@ impl LevelTypes for FakeTypes {
         wy: i32,
         _: u32,
         _: u32,
-    ) {
+    ) -> bool {
         self.door_units.push((wx, wy));
+        self.door_flag
     }
 
     fn warp_unit(&mut self, _: &mut Drlg, _: DrlgRoomId, wx: i32, wy: i32, _: u32) {

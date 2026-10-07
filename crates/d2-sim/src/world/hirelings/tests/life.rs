@@ -62,7 +62,7 @@ fn with_nodes(player: UnitId, nodes: Vec<PetNode>) -> HirelingState {
 }
 
 fn remove_msg(guid: u32) -> Vec<u8> {
-    pet_action(0, 0, 0, 0, guid).to_vec()
+    pet_action(0, 0, 0, guid, 0).to_vec()
 }
 
 /// Asserts that `want` appears in `log` in this order (other entries may
@@ -97,6 +97,36 @@ fn death_sends_name_and_cost() {
     // A unit in no hireling node.
     let other = w.add(11, 1, 271, OLD_GUID);
     assert!(!life::death(&mut w, &mut st, p, other));
+}
+
+// Covers: specs/world/hirelings.md §8 r1
+#[test]
+fn kill_marks_the_node_of_a_player_owned_hireling() {
+    let (mut w, p, _, m) = world();
+    w.set(m, stat::LEVEL, 30);
+    // Flag 0 (the expired-pet kill `0x00574450`): nothing.
+    w.unit_mut(m).owner = Some((P_GUID, UNIT_PLAYER));
+    let mut st = with_nodes(p, vec![node(M_GUID, false)]);
+    assert!(!life::on_kill(&mut w, &mut st, m, false));
+    assert!(!st.list(p).unwrap().nodes[0].dead);
+    assert!(w.sent.is_empty());
+    // No owner, or an owner that is not a player: nothing.
+    w.unit_mut(m).owner = None;
+    assert!(!life::on_kill(&mut w, &mut st, m, true));
+    w.unit_mut(m).owner = Some((P_GUID, 1));
+    assert!(!life::on_kill(&mut w, &mut st, m, true));
+    assert!(w.sent.is_empty());
+    // Flag 1 and a player owner: `0x005751A0` (§8 rule 2).
+    w.unit_mut(m).owner = Some((P_GUID, UNIT_PLAYER));
+    assert!(life::on_kill(&mut w, &mut st, m, true));
+    assert!(st.list(p).unwrap().nodes[0].dead);
+    assert_eq!(
+        w.sent_to(p),
+        vec![
+            vec![0x9b, 0x21, 0x0f, 0x5e, 0x1a, 0x00, 0x00],
+            remove_msg(M_GUID)
+        ]
+    );
 }
 
 // Covers: specs/world/hirelings.md §3.2 r1, §3.2 r2, §3.2 r3, §3.2 r4, §3.2 r6, §3.2 r7, §3.2 r8, §3.2 r10, §3.2 r11, §5 r1, §11 r7, §13 r3
@@ -252,11 +282,10 @@ fn revive_order() {
         w.sent_to(q),
         vec![remove_msg(OLD_GUID), remove_msg(OLD_GUID), add.clone()]
     );
-    // The owner then gets the stats (§13 rule 4: 14 messages).
+    // The stats are queued on the merc (§13 rule 4: 14 records), not sent.
     let to_p = w.sent_to(p);
-    assert_eq!(to_p[..3], [remove_msg(OLD_GUID), remove_msg(OLD_GUID), add]);
-    assert_eq!(to_p.len(), 3 + 14);
-    assert!(to_p[3..].iter().all(|b| matches!(b[0], 0x9E..=0xA0)));
+    assert_eq!(to_p, [remove_msg(OLD_GUID), remove_msg(OLD_GUID), add]);
+    assert_eq!(w.queued[&m].len(), 14);
 }
 
 // Covers: specs/world/hirelings.md §6 r1, §6 r2, §6 r5

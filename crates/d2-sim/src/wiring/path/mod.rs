@@ -34,6 +34,9 @@ pub mod walk;
 #[cfg(test)]
 mod tests;
 
+#[cfg(test)]
+mod mutant_tests;
+
 use std::collections::BTreeMap;
 use std::sync::Arc;
 

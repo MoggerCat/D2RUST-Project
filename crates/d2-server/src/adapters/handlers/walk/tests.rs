@@ -745,7 +745,7 @@ fn waypoint_to_the_town_places_the_player_and_sends_0x0d() {
     fx.assert_clean();
 }
 
-// Covers: specs/sim/pathing.md §10 r3; specs/sim/path-placement.md §10 r6
+// Covers: specs/sim/pathing.md §10 r3; specs/sim/path-placement.md §10 r6; specs/sim/intents-events.md §7.5 r3
 #[test]
 fn a_warp_within_the_level_sends_0x15_in_the_next_update_pass() {
     // Travel to Cold Plains itself: placed in room A (the client's room),
@@ -773,16 +773,19 @@ fn a_warp_within_the_level_sends_0x15_in_the_next_update_pass() {
     }
     .encode()
     .to_vec();
-    assert_eq!(fx.tick(), vec![(0, reassign.clone())]);
+    assert_eq!(fx.tick(), vec![(0, reassign)]);
     assert!(fx.tick().is_empty());
-    // TODO(spec: `0x00553220` clean-up flags): flags 2 bit 0x10000 is
-    // never cleared, so the next queueing (the walk's mode set) sends
-    // 0x15 again. A spec answer changes this line.
+    // The room clean-up `0x00553220` clears flags 2 bit 0x10000 after
+    // that pass (`intents-events.md` §7.5 step 3), so the next queueing
+    // (the walk's mode set) sends no 0x15; the own client gets no walk
+    // message either (§10 rule 2).
     assert_eq!(
         fx.handle(0, &point(0x01, 26, 22)),
         (ResultCode::Done, vec![])
     );
-    assert_eq!(fx.tick(), vec![(0, reassign)]);
+    assert_ne!(fx.sim.events.sys.units.get(p).unwrap().flags & 0x1, 0);
+    assert_eq!(fx.tick(), vec![]);
+    assert_eq!(fx.sim.events.sys.units.get(p).unwrap().flags2 & 0x10000, 0);
     fx.assert_clean();
 }
 
@@ -1142,4 +1145,30 @@ fn early_refusals_change_nothing() {
         assert_eq!(fx.digest(p), before, "§1.3 mode DT: {m:02X?}");
     }
     assert!(fx.sim.events.sys.hooks.x.sent.is_empty());
+}
+
+/// C→S 0x5F runs `pathing.md` §1.6 on the path provider (`RESYNC_ID`):
+/// a point less than 5 away is ignored (0, nothing moves); without the
+/// provider the id stays a stub (recorded, 0).
+// Covers: specs/sim/pathing.md §1.6 r2
+#[test]
+fn update_player_pos_routes_to_the_resync() {
+    let mut fx = Fx::new();
+    let a = fx.a;
+    let p = fx.player(0, a, 26, 10);
+    let before = fx.path(p);
+    assert_eq!(
+        fx.handle(0, &point(super::RESYNC_ID, 27, 11)),
+        (ResultCode::Done, vec![])
+    );
+    assert_eq!(fx.mode(p), 1);
+    assert_eq!(fx.path(p).precise_x, before.precise_x);
+    fx.assert_clean();
+    fx.sim.events.hooks().paths = None;
+    assert_eq!(
+        fx.handle(0, &point(super::RESYNC_ID, 27, 11)),
+        (ResultCode::Done, vec![])
+    );
+    let ids: Vec<u8> = fx.sim.unhandled.iter().map(|u| u.1).collect();
+    assert_eq!(ids, [super::RESYNC_ID]);
 }

@@ -351,10 +351,10 @@ impl Presets {
             if def.populate == 0 {
                 room.flags |= room_flags::NO_POPULATION;
             }
-            // TODO(preset.md §6 step 10): a non-zero link also sets bit 0
-            // of the link record's +0x0C (`link +0x0C |= 1`); the link
-            // grid holds plain values here (no record to flag), and the
-            // record is outdoor code's (`drlg/outdoor.md`).
+            // §6 step 10: a non-zero link would also set bit 0 of the link
+            // record's +0x0C; 1.14d never fills the map's link grid (map
+            // +0x20 is never set), so the link is always 0 and no link
+            // record type is needed.
             presets.rooms.insert(
                 id,
                 PresetRoom {

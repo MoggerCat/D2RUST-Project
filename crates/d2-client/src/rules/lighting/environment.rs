@@ -167,6 +167,10 @@ pub struct Environment {
     pub eclipse: bool,
 }
 
+// The one float, `s`, is a sine of a finite angle or 0: never NaN, so
+// equality is reflexive and the model holding the record stays `Eq`.
+impl Eq for Environment {}
+
 impl Environment {
     /// Creation (`0x0061BE40`, §9.1): index 2, type and ticks from the
     /// normal entry 2, then intensity and color with `A` = 0, `L` = 0,

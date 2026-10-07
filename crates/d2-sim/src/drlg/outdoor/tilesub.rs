@@ -135,6 +135,23 @@ pub fn style_map(style: u32, v: u32, snow: bool) -> Result<i32, OutdoorError> {
         .ok_or(OutdoorError::StyleMap(style, v))
 }
 
+/// One replacement of a border substitution (§2.2 step 3): lvlsub type,
+/// row index within the type's rows, group index, the snapped cell, the
+/// variant roll and the level seed's low word after it. Not original
+/// state: a record of what the generator did, read by the checks that
+/// compare a build with the recorded draws (`outdoor.md` Test vectors,
+/// "Cold Plains grid").
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SubHit {
+    pub t: i32,
+    pub row: usize,
+    pub group: usize,
+    pub x: i32,
+    pub y: i32,
+    pub variant: i32,
+    pub lo: u32,
+}
+
 /// Outcome of one group (`0x0066F690`).
 enum GroupEnd {
     NextGroup,
@@ -146,7 +163,7 @@ impl Gen<'_> {
     pub fn border_sub(&mut self, mut ctx: BorderCtx) -> Result<(), OutdoorError> {
         let od = self.od;
         let subs = self.subs;
-        for row in od.sub_rows(ctx.t)? {
+        for (r, row) in od.sub_rows(ctx.t)?.iter().enumerate() {
             let file = load(subs, row)?;
             if ctx.skip == -1 {
                 ctx.skip = SKIP_STYLE;
@@ -159,8 +176,8 @@ impl Gen<'_> {
                 0
             };
             for j in 0..count {
-                let g = file.groups[((g0 + j) % count) as usize];
-                if let GroupEnd::StopRow = self.border_group(&ctx, row, file, g)? {
+                let gi = ((g0 + j) % count) as usize;
+                if let GroupEnd::StopRow = self.border_group(&ctx, (r, row), file, gi)? {
                     break;
                 }
             }
@@ -172,10 +189,11 @@ impl Gen<'_> {
     fn border_group(
         &mut self,
         ctx: &BorderCtx,
-        row: &SubRow,
+        (r, row): (usize, &SubRow),
         file: &SubFile,
-        g: SubGroup,
+        gi: usize,
     ) -> Result<GroupEnd, OutdoorError> {
+        let g = file.groups[gi];
         let off = if ctx.t == 1 && self.info.flags & 0xC != 0 {
             -1
         } else {
@@ -196,6 +214,17 @@ impl Gen<'_> {
             if self.sub_test(ctx, row, file, g, x, y)? {
                 // Sites 0x0066F8DB / 0x0066F905.
                 let v = self.seed().roll(g.variants) as i32;
+                let (sx, sy) = Self::snap(row, x, y);
+                let lo = self.seed().lo;
+                self.info.sub_hits.push(SubHit {
+                    t: ctx.t,
+                    row: r,
+                    group: gi,
+                    x: sx,
+                    y: sy,
+                    variant: v,
+                    lo,
+                });
                 self.sub_replace(ctx, row, file, g, x, y, (v + 1) * (g.w + 1))?;
                 match row.bord_type {
                     0 => return Ok(GroupEnd::StopRow),

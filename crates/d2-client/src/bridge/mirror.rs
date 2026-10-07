@@ -8,6 +8,7 @@ use std::collections::BTreeMap;
 use bevy::prelude::*;
 
 use super::link::ServerLink;
+use super::output::Output;
 use super::world::{ClientUnit, UnitKey};
 use super::Bridge;
 
@@ -31,6 +32,13 @@ impl UnitView {
     }
 }
 
+/// The outputs of the last bridge frame (§10 rule 4), handed over whole
+/// at the end of [`bridge_frame`]; the output dispatcher takes them
+/// before the input and UI systems. A frame replaces what an earlier
+/// frame left, so one frame's outputs never mix with the next frame's.
+#[derive(Resource, Default, Debug)]
+pub struct FrameOutputs(pub Vec<Output>);
+
 /// Mirror entity of each unit key.
 #[derive(Resource, Default, Debug)]
 pub struct MirrorIndex(pub BTreeMap<UnitKey, Entity>);
@@ -40,18 +48,25 @@ pub struct BridgePlugin;
 
 impl Plugin for BridgePlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<MirrorIndex>().add_systems(
-            PreUpdate,
-            (bridge_frame, mirror_units)
-                .chain()
-                .run_if(resource_exists::<BridgeResource>),
-        );
+        app.init_resource::<MirrorIndex>()
+            .init_resource::<FrameOutputs>()
+            .add_systems(
+                PreUpdate,
+                (bridge_frame, mirror_units)
+                    .chain()
+                    .run_if(resource_exists::<BridgeResource>),
+            );
     }
 }
 
-/// One bridge frame (§8 rule 1). Errors go to Bevy's error handler.
-pub fn bridge_frame(mut bridge: ResMut<BridgeResource>) -> Result {
+/// One bridge frame (§8 rule 1), then its outputs are handed over (§10
+/// rule 4). Errors go to Bevy's error handler.
+pub fn bridge_frame(
+    mut bridge: ResMut<BridgeResource>,
+    mut outputs: ResMut<FrameOutputs>,
+) -> Result {
     bridge.0.frame()?;
+    outputs.0 = bridge.0.take_outputs();
     Ok(())
 }
 

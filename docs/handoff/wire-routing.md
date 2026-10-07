@@ -98,7 +98,7 @@ know:
 
 - **Umod mode 4** (`0x005A43A0` in the reaction `0x0057CEE0`): not
   placed by `damage.md` §7.1 (call level only, OQ3); stays inside
-  `Pending::reaction`.
+  `Pending::reaction`. **Answered 2026-10-07** (`monsters/umod-callbacks.md` §2 r5): mode 4 runs on the monster defender, after the GH mode set (get-hit, stunned or `0x0057CB00` allows it) or after the soft-hit path (get-hit refused, or soft hit 0x4000); never on knockback, block or death.
 - **AI state** (`dwAiState`, `ai.md` OQ5): no writer specified.
 - **`is_boss` `0x0063E9F0`, superunique `0x005A03A0`, minion owner
   `0x0058F0D0`**: not routed. `0x0063E9F0`'s test is not specified;
@@ -138,6 +138,7 @@ know:
   schedule), mode 0 first: a type-7 event they schedule follows the
   mode's animation events in the timer queue, which decides the run
   order of events on the same frame.
+  **Answered 2026-10-07** (`monsters/umod-callbacks.md` §2, read from the asm): mode 0 runs before the start function (after the mode damage rewrite `0x005A4F50`) and not at all when the requested mode is 3 (GH); mode 1 runs after the start function and the animation prepare but **before** the cancel of events 0 / 1 and the animation schedule, so a type-7 event it schedules sits **before** the mode's animation events in the timer queue. The reading above (both after the whole mode set) is wrong; RT-R1 now only confirms it.
 - **R2** (`action/ai.rs` `monster_level`; `ai.md` §2.4 step 2): "level"
   of the teleport heal: the getter is not named; stat 12 unit total.
 

@@ -1,4 +1,4 @@
-// Spec: specs/monsters/population.md §6, §9.6, §10, §11.4 (the MonsterInit seam); specs/monsters/init.md §4, §5, §14, §16–§20; specs/sim/units.md §3.1
+// Spec: specs/monsters/population.md §6, §9.6, §10, §11.4, §11.5 r4 (the MonsterInit seam); specs/sim/unit-events.tsv (0x0054ea84); specs/monsters/init.md §4, §5, §14, §16–§20; specs/sim/units.md §3.1
 //! Population → monster init and unit allocation: [`MonsterInit`] on
 //! [`WorldHost`]. The creation call of `population.md` §9.6 is the one
 //! creation path: allocation `0x00555230` (`units.md` §3.1, one game-seed
@@ -206,8 +206,20 @@ impl<X: WorldPending> MonsterInit for WorldHost<'_, X> {
         self.v.h.x.preset_created(unit, preset);
     }
 
+    /// `population.md` §11.5 rule 4, class 438: event 7 (MONUMOD) at
+    /// frame + 250 + `roll(50)` on the created monster's own seed
+    /// (`unit-events.tsv` site `0x0054ea84`).
     fn schedule_monumod(&mut self, unit: UnitId) {
-        self.v.h.x.schedule_monumod(unit);
+        let r = self
+            .v
+            .units
+            .get_mut(unit)
+            .map_or(0, |rec| rec.seed.roll(50)) as i32;
+        let at = self.game.frame.wrapping_add(250).wrapping_add(r);
+        // A unit outside the lists schedules nothing.
+        let _ = self
+            .game
+            .schedule_event(unit, init::EVENT_UMOD, at, None, 0, 0);
     }
 
     fn change_alignment(&mut self, unit: UnitId, a: i32, b: i32) {

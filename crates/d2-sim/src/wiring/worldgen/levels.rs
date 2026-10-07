@@ -402,12 +402,9 @@ impl LevelTypes for WorldTypes {
     }
 
     /// A door cell's preset unit `0x0066D9E0` (`preset.md` §11) in a
-    /// preset room.
-    // TODO(preset.md §11, rooms.md §9.5.1): the door record's flag 0x20
-    // (`DoorOutcome::sets_record_flag`: a unit placed or `roll(3)` = 0)
-    // is the tile code's; the seam returns
-    // nothing, so it is not set. The call sites create new records (flag
-    // clear) or no record, so no call is skipped by it today.
+    /// preset room; true when the door record gets flag 0x20
+    /// ([`crate::drlg::preset::DoorOutcome::sets_record_flag`], set by the
+    /// tile code, `rooms.md` §9.5.1).
     fn door_unit(
         &mut self,
         drlg: &mut Drlg,
@@ -417,10 +414,10 @@ impl LevelTypes for WorldTypes {
         wy: i32,
         cell: u32,
         orientation: u32,
-    ) {
+    ) -> bool {
         let p = self.parts(drlg.act);
         if p.presets.room(room).is_err() {
-            return;
+            return false;
         }
         let ctx = PresetCtx {
             drlg: data,
@@ -428,11 +425,15 @@ impl LevelTypes for WorldTypes {
             source: p.src,
             cache: p.cache,
         };
-        if let Err(e) = p
+        match p
             .presets
             .door_unit(drlg, &ctx, room, wx, wy, cell, orientation)
         {
-            p.errors.push(WorldgenError::Preset(e));
+            Ok(outcome) => outcome.sets_record_flag(),
+            Err(e) => {
+                p.errors.push(WorldgenError::Preset(e));
+                false
+            }
         }
     }
 }
@@ -510,7 +511,7 @@ impl LevelTypes for SharedTypes {
         wy: i32,
         cell: u32,
         orientation: u32,
-    ) {
+    ) -> bool {
         self.0
             .borrow_mut()
             .door_unit(drlg, data, room, wx, wy, cell, orientation)

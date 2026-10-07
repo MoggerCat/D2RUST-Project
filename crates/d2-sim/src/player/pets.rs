@@ -28,8 +28,9 @@ pub const FLAG_PET: u32 = 0x8000_0000;
 pub const FLAG_NO_EXPERIENCE: u32 = 0x0400_0000;
 /// The player state that skips the broadcast (§8).
 pub const STATE_NO_BROADCAST: u16 = 7;
-/// Message id of S→C PetAction (§8).
-pub const MSG_PET_ACTION: u8 = 0x7A;
+/// Message id of S→C PetAction (§8); the one encoder is
+/// `world::hirelings::pets::pet_action`.
+pub const MSG_PET_ACTION: u8 = crate::world::hirelings::pets::MSG_PET_ACTION;
 /// Message id of S→C AssignMerc (§8).
 pub const MSG_ASSIGN_MERC: u8 = 0x81;
 /// Node flags bit 0: skipped by [`first_pet`] with `any` = false (§1 rule 3).
@@ -153,16 +154,9 @@ impl PetMsg {
                 class,
                 owner,
                 pet,
-            } => {
-                let mut b = [0u8; 13];
-                b[0] = MSG_PET_ACTION;
-                b[1] = action;
-                b[2] = pet_type;
-                b[3..5].copy_from_slice(&class.to_le_bytes());
-                b[5..9].copy_from_slice(&owner.to_le_bytes());
-                b[9..13].copy_from_slice(&pet.to_le_bytes());
-                Some(b)
-            }
+            } => Some(crate::world::hirelings::pets::pet_action(
+                action, pet_type, class, pet, owner,
+            )),
             PetMsg::AssignMerc { .. } => None,
         }
     }

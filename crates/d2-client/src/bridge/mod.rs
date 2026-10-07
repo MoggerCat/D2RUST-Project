@@ -22,7 +22,9 @@ pub mod link;
 pub mod local;
 pub mod mirror;
 pub mod msg;
+pub mod output;
 pub mod receive;
+pub mod skills;
 pub mod update;
 pub mod world;
 
@@ -39,12 +41,13 @@ use d2_proto::{FixedMessage, PROTOCOL_VERSION};
 use dispatch::{Dispatch, TableError};
 use intent::IntentError;
 use link::{LinkError, Sent, ServerLink};
+use output::Output;
 use receive::{receive_chunk, ReceiveLog};
 use world::{ClientTables, ClientWorld, ModelInputs, VisibleFn};
 
 pub use link::{Pumped, SendQueue, LOCAL_CLIENT};
 pub use local::{LocalLink, SinglePlayer};
-pub use mirror::{BridgePlugin, BridgeResource, UnitView};
+pub use mirror::{BridgePlugin, BridgeResource, FrameOutputs, UnitView};
 pub use world::{ClientUnit, UnitKey};
 
 /// A bridge failure. All of them stop the frame (spec §8 rule 4).
@@ -81,6 +84,8 @@ pub struct FrameReport {
     pub discarded_bytes: usize,
     /// C→S messages the model sent on its own (0x6B, 0x5F).
     pub answered: usize,
+    /// UI and sound outputs the frame's handlers made (spec §10).
+    pub outputs: usize,
 }
 
 /// The bridge: a server link, the client world model and the dispatch
@@ -91,6 +96,8 @@ pub struct Bridge<L> {
     world: ClientWorld,
     inputs: ModelInputs,
     log: ReceiveLog,
+    /// The frame's UI and sound outputs, in order (spec §10 rule 1).
+    outputs: Vec<Output>,
 }
 
 impl<L: ServerLink> Bridge<L> {
@@ -115,6 +122,7 @@ impl<L: ServerLink> Bridge<L> {
             world: ClientWorld::default(),
             inputs: ModelInputs::default(),
             log: ReceiveLog::default(),
+            outputs: Vec::new(),
         })
     }
 
@@ -134,7 +142,8 @@ impl<L: ServerLink> Bridge<L> {
     /// the model is in game, the update pass (`model.md` §5 rule 1), and
     /// the C→S messages the model answered with. A refused chunk ends the
     /// frame with an error; chunks after it in the same receive are not
-    /// processed (a fatal assert in 1.14d).
+    /// processed (a fatal assert in 1.14d). The frame's outputs wait in
+    /// the bridge for [`Self::take_outputs`] (spec §10 rule 4).
     pub fn frame(&mut self) -> Result<FrameReport, BridgeError> {
         let pumped = self.link.pump()?;
         let mut report = FrameReport {
@@ -145,12 +154,14 @@ impl<L: ServerLink> Bridge<L> {
         if pumped.ticked {
             self.world.server_ticks += 1;
         }
+        let before = self.outputs.len();
         for chunk in self.link.receive() {
             let c = receive_chunk(
                 &mut self.world,
                 &self.inputs,
                 &self.dispatch,
                 &mut self.log,
+                &mut self.outputs,
                 &chunk,
             )?;
             report.chunks += 1;
@@ -168,6 +179,7 @@ impl<L: ServerLink> Bridge<L> {
             report.rejected += self.log.rejected.len() - before;
         }
         report.answered = self.send_outgoing()?;
+        report.outputs = self.outputs.len() - before;
         Ok(report)
     }
 
@@ -178,13 +190,32 @@ impl<L: ServerLink> Bridge<L> {
             &self.inputs,
             &self.dispatch,
             &mut self.log,
+            &mut self.outputs,
             chunk,
         )?)
     }
 
     /// The update pass alone (`model.md` §5): drains every unit's queue.
     pub fn update_pass(&mut self) -> usize {
-        update::update_pass(&mut self.world, &self.inputs, &self.dispatch, &mut self.log)
+        update::update_pass(
+            &mut self.world,
+            &self.inputs,
+            &self.dispatch,
+            &mut self.log,
+            &mut self.outputs,
+        )
+    }
+
+    /// Hands the outputs made since the last call over, in order, and
+    /// clears the list (spec §10 rule 4: once per frame, after the
+    /// frame).
+    pub fn take_outputs(&mut self) -> Vec<Output> {
+        std::mem::take(&mut self.outputs)
+    }
+
+    /// The outputs not yet handed over.
+    pub fn outputs(&self) -> &[Output] {
+        &self.outputs
     }
 
     /// Sends the model's own C→S messages (`model.md` §6 rule 8, §7 rule
@@ -207,6 +238,12 @@ impl<L: ServerLink> Bridge<L> {
     /// The tables the message rules read (`msg-units.md` Inputs).
     pub fn set_tables(&mut self, tables: ClientTables) {
         self.inputs.tables = tables;
+    }
+
+    /// The `skills` rows of the client skill list (`msg-skills.md`
+    /// Inputs); the other tables stay.
+    pub fn set_skill_rows(&mut self, rows: Vec<world::SkillRow>) {
+        self.inputs.tables.skills = rows;
     }
 
     /// What the client DRLG of 0x03 is built from (`model.md` §12 rule

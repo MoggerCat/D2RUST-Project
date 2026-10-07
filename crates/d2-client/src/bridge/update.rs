@@ -9,17 +9,20 @@
 //! (`drlg/rooms.md` §4.6).
 
 use super::dispatch::{Dispatch, Handle, HandlerError, UnitMessage};
+use super::output::{Output, Outputs};
 use super::receive::{ReceiveLog, Rejected};
 use super::world::{update_order, ClientWorld, ModelInputs};
 
 /// Drains every unit's queue (§5 rules 2–4). Returns the number of
 /// messages applied. A handler error is recorded as a rejection; the
-/// drain goes on with the next message.
+/// drain goes on with the next message. Handler outputs are appended to
+/// `outputs` in update order (`bridge.md` §10 rule 2).
 pub fn update_pass(
     world: &mut ClientWorld,
     inputs: &ModelInputs,
     dispatch: &Dispatch,
     log: &mut ReceiveLog,
+    outputs: &mut Vec<Output>,
 ) -> usize {
     let mut applied = 0;
     // TODO(spec: model.md open question 4): unit flag 0x800000 skips a
@@ -33,6 +36,7 @@ pub fn update_pass(
         let queue = std::mem::take(&mut unit.queue);
         for bytes in &queue {
             let id = bytes[0];
+            let sink = Outputs::default();
             let result = match dispatch.get(id).map(|e| e.handle) {
                 Some(Handle::Unit(handle)) => handle(
                     world,
@@ -41,6 +45,7 @@ pub fn update_pass(
                         bytes,
                         unit: key,
                         inputs,
+                        out: &sink,
                     },
                 ),
                 // Only unit-handler ids are queued (§4 rule 1); 1.14d
@@ -53,6 +58,7 @@ pub fn update_pass(
                 Ok(()) => {
                     applied += 1;
                     log.drained += 1;
+                    outputs.extend(sink.take());
                 }
                 Err(error) => log.rejected.push(Rejected { id, error }),
             }
@@ -73,7 +79,7 @@ pub fn update_pass(
 /// without a client DRLG.
 pub fn drlg_update(world: &mut ClientWorld) -> Result<(), HandlerError> {
     world.drlg_updates = world.drlg_updates.wrapping_add(1);
-    let free = world.drlg_updates % 13 == 0;
+    let free = world.drlg_updates.is_multiple_of(13);
     let Some(drlg) = world.drlg.as_mut() else {
         return Ok(());
     };

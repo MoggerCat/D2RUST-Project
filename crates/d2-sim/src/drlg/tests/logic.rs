@@ -106,7 +106,7 @@ fn grid_build_open_room() {
     );
 }
 
-// Covers: specs/drlg/levels.md §11.3 r4, §11.3 r5, §11.3 r6, §11.3 r7, §11.3 r8
+// Covers: specs/drlg/levels.md §11.3 r4, §11.3 r5, §11.3 r6, §11.3 r7, §11.3 r8, §11.4
 #[test]
 fn grid_build_blockers_orientation_1() {
     let (mut d, l, _) = world();
@@ -138,9 +138,15 @@ fn grid_build_blockers_orientation_1() {
     assert_eq!(d.coord_at(id, 50, 100).map(|r| r.index), Some(4));
     assert_eq!(d.coord_at(id, 55, 105).map(|r| r.index), Some(5));
     assert_eq!(d.coord_at(id, 64, 109).map(|r| r.index), Some(5));
-    // Outside the (W+1) × (H+1) cells: no record (the original reads
-    // outside the grid).
-    assert_eq!(d.coord_at(id, 65, 100), None);
+    // §11.4 table, outside the (W+1) × (H+1) cells: with 0 ≤ cy ≤ H a
+    // cell index inside the block reads that cell, so a column past W or
+    // before 0 wraps into the next / previous row (cell (3, 0) is cell
+    // (0, 1), cell (−1, 1) is cell (2, 0)); a negative index or a row
+    // outside 0..H is not reproducible: no record.
+    assert_eq!(d.coord_at(id, 65, 100).map(|r| r.index), Some(4));
+    assert_eq!(d.coord_at(id, 45, 105).map(|r| r.index), Some(5));
+    assert_eq!(d.coord_at(id, 45, 100), None);
+    assert_eq!(d.coord_at(id, 65, 105), None);
     assert_eq!(d.coord_at(id, 50, 110), None);
 }
 
