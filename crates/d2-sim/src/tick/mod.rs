@@ -55,8 +55,10 @@ pub trait EventDispatch {
 /// and flags around them.
 #[allow(unused_variables)]
 pub trait TickHooks: EventDispatch {
-    /// Step 1 (`0x0061C040`): advance act `act`'s day/night cycle; true
-    /// when the cycle index changed.
+    /// Step 1 (`0x0061C040(act, a)`, `render/lighting.md` §9.3 rule 5):
+    /// advance act `act`'s day/night cycle with `A` = `act`; true when the
+    /// index or type changed or the hour moved more than 16 degrees since
+    /// the last report.
     fn advance_environment(&mut self, game: &mut Game, act: u8) -> bool {
         false
     }

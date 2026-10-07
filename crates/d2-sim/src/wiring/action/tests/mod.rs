@@ -98,9 +98,6 @@ impl Pending for TestPending {
     fn corpse_owner_guid(&self, corpse: UnitId) -> Option<u32> {
         self.corpse.filter(|c| c.0 == corpse).map(|c| c.1)
     }
-    fn corpse_take_back(&mut self, _: &mut Game, unit: UnitId, corpse: UnitId) {
-        self.log.push(format!("take back {} {}", unit.0, corpse.0));
-    }
     /// The death start's body is not written: the fake sets mode DT, as
     /// a start function sets its mode (monster spec).
     fn monster_death_start(

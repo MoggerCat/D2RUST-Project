@@ -16,6 +16,7 @@ use crate::tick::timer::TimerRun;
 use crate::tick::{EventDispatch, TickHooks};
 use crate::units::dispatch::UnitSystem;
 use crate::units::hooks::UnitData;
+use crate::units::lists::client_state;
 use crate::units::{ClientId, RoomId, UnitId, UnitType};
 use crate::world::objects::{ObjectControl, ObjectTables};
 
@@ -210,6 +211,42 @@ impl<X: Pending> EventDispatch for ActionSim<X> {
 }
 
 impl<X: Pending> TickHooks for ActionSim<X> {
+    /// Step 1 `0x0061C040(act, a)` (`render/lighting.md` §9.3 rule 5):
+    /// the act's environment record advanced with `A` = the act index.
+    /// An act no join has built yet ([`crate::units::lists::ActEntry::built`])
+    /// does not exist in 1.14d and is skipped.
+    fn advance_environment(&mut self, game: &mut Game, act: u8) -> bool {
+        game.lists
+            .act_mut(act)
+            .filter(|a| a.built)
+            .is_some_and(|a| a.environment.server_advance(act))
+    }
+
+    /// Step 1 per client (`tick.md` §3): the player's items refreshed
+    /// (`0x0055FDE0`, [`Pending::environment_refresh_items`]), then the
+    /// 0x53 with the record's values (`0x0061C330(act)`) when the client
+    /// is in game (state 4) in that act (its room's act).
+    fn environment_changed(&mut self, game: &mut Game, act: u8, client: ClientId) {
+        let Some(c) = game.lists.client(client) else {
+            return;
+        };
+        let (state, room) = (c.state, c.room);
+        let Some(player) = c.player else {
+            return;
+        };
+        self.sys.hooks.x.environment_refresh_items(player);
+        let in_act = room
+            .and_then(|r| game.lists.room(r))
+            .is_some_and(|r| r.act == act);
+        if state != client_state::IN_GAME || !in_act {
+            return;
+        }
+        if let Some(a) = game.lists.act(act) {
+            let m = a.environment.message();
+            self.sys.hooks.x.send(player, &m);
+        }
+    }
+
     /// Step 9 `0x0061A790` (`rooms.md` §7.2).
     fn room_inactivity(&mut self, game: &mut Game, room: RoomId) -> u32 {
         match self.sys.hooks.drlg.room_inactivity(game, room) {

@@ -141,6 +141,8 @@ pub enum NpcError {
     Table(String),
     #[error("vendors.tsv: {0}")]
     Tsv(#[from] TsvError),
+    #[error("vendor: {0}")]
+    Vendor(#[from] crate::world::vendors::price::PriceFatal),
 }
 
 // ------------------------------------------------------------ §1.2

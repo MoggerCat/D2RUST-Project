@@ -254,6 +254,11 @@ pub struct ActEntry {
     /// Act +0x04: the environment record (`render/lighting.md` §9.1),
     /// created with the act.
     pub environment: crate::world::environment::Environment,
+    /// The act is built for a client (game +0xBC + 4a non-null in
+    /// 1.14d: the join builds it when its slot is empty,
+    /// `intents-events.md` §8.2 rule 4). d2rs keeps the act entry from
+    /// creation; tick step 1 advances only built acts (`tick.md` §3).
+    pub built: bool,
     /// Room list head (+0x10).
     rooms_head: Option<RoomId>,
 }

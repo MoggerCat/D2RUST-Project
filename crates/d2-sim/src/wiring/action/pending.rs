@@ -776,8 +776,6 @@ pub trait Pending {
     fn corpse_loot_allowed(&self, corpse: UnitId, unit: UnitId) -> bool {
         false
     }
-    /// The corpse's item take-back `0x00562F30` (§4.7 rule 2).
-    fn corpse_take_back(&mut self, game: &mut Game, unit: UnitId, corpse: UnitId) {}
 
     /// Reaction `0x0057CEE0` (`damage.md` §7.1, call level only; its mode
     /// changes and the kill `0x0057CCB0` are not specified in full).
@@ -1504,6 +1502,9 @@ pub trait Pending {
     /// contents (hover/chat spec, S→C 0x26 §7.9) live here. Default:
     /// nothing kept.
     fn replace_overhead(&mut self, player: UnitId, text: &[u8], byte8: u8, end: i32) {}
+    /// The items refresh `0x0055FDE0` of tick step 1 (`sim/tick.md` §3:
+    /// an act's environment report, before its 0x53). Default: nothing.
+    fn environment_refresh_items(&mut self, player: UnitId) {}
     /// The room clean-up's client part for a player (`intents-events.md`
     /// §7.5 step 7, `0x0053FA90`: the client record's +0x34 → +4 := 0).
     /// Default: nothing (no client record model).

@@ -137,9 +137,9 @@ pub struct Entry {
     pub name: [u8; 16],
     /// The client's hot-key slots.
     pub hotkeys: [HotKey; 16],
-    /// The player record's values. `None`: not given (a full save's
-    /// record is not derived yet, `formats/d2s-load.md` §8 rule 2), so
-    /// 0x5F and the two 0x23 are not sent.
+    /// The player record's values (`d2s-load.md` §8; a new character's:
+    /// [`PlayerRecord::new_character`]). `None`: not given, so 0x5F and
+    /// the two 0x23 are not sent.
     pub record: Option<PlayerRecord>,
     /// The new-character load's own right-skill selection
     /// (`0x005701B0(P, hand 0, StartSkill, −1)` at `0x0056A05A`,
@@ -356,11 +356,19 @@ pub fn enter_game<D: ActionEvents, W>(
         .hooks
         .x
         .send(player, &load_act(entry.act, map_seed, obj_seed).encode());
+    // The act is built here when its slot is empty: a fresh environment
+    // record (`render/lighting.md` §9.1 creation).
     let env = s
         .game
         .lists
-        .act(entry.act)
-        .map(|r| r.environment)
+        .act_mut(entry.act)
+        .map(|r| {
+            if !r.built {
+                r.built = true;
+                r.environment = d2_sim::world::environment::Environment::CREATED;
+            }
+            r.environment
+        })
         .ok_or(JoinError::NoAct(entry.act))?;
     a.sys.hooks.x.send(player, &env.message());
     if let Some(e) = s.game.lists.client_mut(id) {

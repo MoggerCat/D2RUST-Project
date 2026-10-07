@@ -665,26 +665,17 @@ pub fn frozen<W: AiHost + ?Sized>(cx: &Ctx<'_, W>, unit: UnitId) -> bool {
     cx.world.has_state(unit, state::FREEZE) && !cx.world.is_dead(unit)
 }
 
-/// `0x005A8030`, the end of modes 3–9 and 14 (§1.4): walk/run ends and
-/// the `SplEndGeneric` cases run the think inline; every other case
+/// `0x005A8030`, the end of modes 3–9 and 14 (§1.4): the `SplEndGeneric`
+/// cases and the walk/run ends run the think inline; every other case
 /// requests a mode change to neutral.
-///
-// PROVISIONAL (monsters/ai.md §1.4): the `SplEndGeneric` cases run the
-// think inline without setting the anim mode to neutral first (the spec
-// lists neutral only for the table-1 modes); settled by a bin read of
-// 0x005A8030 / a think schedule recording.
 pub fn mode_end<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, unit: UnitId, ended: u8) {
     const INLINE: [u8; 16] = [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
-    if INLINE.get(ended as usize) == Some(&1) {
-        cx.world.set_anim_mode(unit, mode::NEUTRAL);
-        if !frozen(cx, unit) {
-            think(game, cx, unit);
-        }
-        return;
-    }
     let class = cx.world.class(unit);
     let generic = cx.monstats(class).is_some_and(|r| r.splendgeneric != 0);
     let base = cx.base_class(unit);
+    // §1.4: the `SplEndGeneric` branch is tested first and does not set
+    // the anim mode; a matching class whose mode does not match falls to
+    // the table test.
     let special = generic
         && match base {
             110 => ended == 8,
@@ -695,6 +686,13 @@ pub fn mode_end<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, unit: 
             _ => false,
         };
     if special {
+        if !frozen(cx, unit) {
+            think(game, cx, unit);
+        }
+        return;
+    }
+    if INLINE.get(ended as usize) == Some(&1) {
+        cx.world.set_anim_mode(unit, mode::NEUTRAL);
         if !frozen(cx, unit) {
             think(game, cx, unit);
         }

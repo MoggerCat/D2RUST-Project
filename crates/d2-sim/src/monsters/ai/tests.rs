@@ -41,6 +41,8 @@ struct Fake {
     busy: BTreeSet<UnitId>,
     /// Modes whose start fails.
     fail_modes: BTreeSet<u8>,
+    /// Point targets whose mode start fails.
+    fail_points: BTreeSet<(i32, i32)>,
     /// A failed mode start falls into the neutral start (§1.3), which
     /// adds a think at frame + this when none is pending later.
     fail_think: Option<i32>,
@@ -109,6 +111,10 @@ struct Summ {
     last_placed: (i32, i32),
     pets: Vec<UnitId>,
     pet_count: i32,
+    /// `0x00574A20` result (consulted only when `pettype_count` makes the
+    /// skill's pettype valid).
+    pet_type: i32,
+    pettype_count: i32,
     hire_id: Option<i32>,
     hire_row: Option<HireRow>,
     calc: i32,
@@ -277,7 +283,11 @@ impl AiUnits for Fake {
 impl AiModes for Fake {
     fn change_mode(&mut self, game: &mut Game, unit: UnitId, m: u8, target: ModeTarget) -> bool {
         self.log.push(format!("mode {m} {target:?}"));
-        if (self.walk_fails && matches!(m, mode::WALK | mode::RUN)) || self.fail_modes.contains(&m)
+        let point_fails =
+            matches!(target, ModeTarget::Point(x, y) if self.fail_points.contains(&(x, y)));
+        if (self.walk_fails && matches!(m, mode::WALK | mode::RUN))
+            || self.fail_modes.contains(&m)
+            || point_fails
         {
             if let Some(n) = self.fail_think {
                 if pending_think(game, unit) <= game.frame {
@@ -811,6 +821,12 @@ impl AiSummons for Fake {
     }
     fn pet_count(&self, _: UnitId) -> i32 {
         self.y.pet_count
+    }
+    fn pet_type_of(&self, _: &Game, _: UnitId, _: UnitId) -> i32 {
+        self.y.pet_type
+    }
+    fn pettype_count(&self) -> i32 {
+        self.y.pettype_count
     }
     fn hireling_id(&self, _: &Game, _: UnitId, _: UnitId) -> Option<i32> {
         self.y.hire_id

@@ -470,11 +470,13 @@ pub struct VendorTables {
     pub gamble_index: Option<Vec<u32>>,
     pub gamble_thresholds: Vec<u32>,
     /// Mask of `0x006CE270` tested against a unique's flag byte +0x2C
-    /// (§7.2 rule 7).
-    // TODO(specs/world/vendors.md §7.2 rule 7): the mask's value is not
-    // written; 0 (no unique is refused) until the spec gives it.
+    /// (§7.2 rule 7: entry 2 of the bit table `0x006CE268`, value 4, the
+    /// `carry1` bit; V1).
     pub unique_nosell_mask: u8,
 }
+
+/// `0x006CE270` (§7.2 rule 7): 4, the `carry1` bit of uniqueitems +0x2C.
+pub const UNIQUE_NOSELL_MASK: u8 = 0x04;
 
 /// A table the projection needs is missing or has the wrong layout.
 #[derive(Debug, thiserror::Error)]
@@ -588,7 +590,7 @@ impl VendorTables {
                 .collect(),
             gamble_index: f.gamble.index.clone(),
             gamble_thresholds: f.gamble.thresholds.to_vec(),
-            unique_nosell_mask: 0,
+            unique_nosell_mask: UNIQUE_NOSELL_MASK,
         })
     }
 

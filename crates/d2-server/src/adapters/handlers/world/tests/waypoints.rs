@@ -523,3 +523,29 @@ fn without_waypoint_tables_0x49_stays_a_stub() {
     assert!(got.is_empty());
     assert_eq!(fx.host.game.unhandled, vec![(0, 0x49, 9)]);
 }
+
+/// `monsters/ai.md` open question 12: the Npc command counter G is
+/// process-wide. `ProcessState` hands it to a new game and reads back
+/// what the game left; a fresh process starts at 0.
+// Covers: specs/monsters/ai-bodies.md §9.9
+#[test]
+fn process_state_carries_the_npc_walk_counter_across_games() {
+    use super::super::ProcessState;
+    let mut process = ProcessState::new();
+    let mut first = fixture(0, 0);
+    let d = &mut first.host.game.events;
+    process.start_game(d);
+    assert_eq!(d.sys.hooks.ai.as_ref().unwrap().npc_walk_counter, 0);
+    d.sys.hooks.ai.as_mut().unwrap().npc_walk_counter = 7;
+    process.end_game(d);
+    assert_eq!(process.npc_walk_counter, 7);
+    // The next game of the process continues from 7, also without a store.
+    let mut second = fixture(0, 0);
+    let d = &mut second.host.game.events;
+    d.sys.hooks.ai = None;
+    process.start_game(d);
+    assert_eq!(d.sys.hooks.ai.as_ref().unwrap().npc_walk_counter, 7);
+    d.sys.hooks.ai.as_mut().unwrap().npc_walk_counter = u32::MAX;
+    process.end_game(d);
+    assert_eq!(process.npc_walk_counter, u32::MAX);
+}

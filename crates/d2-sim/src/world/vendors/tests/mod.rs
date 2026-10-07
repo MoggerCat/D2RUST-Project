@@ -291,7 +291,7 @@ pub fn tables() -> VendorTables {
         lowquality: vec![b"Cracked".to_vec(), b"Crude".to_vec()],
         gamble_index: Some(vec![]),
         gamble_thresholds: vec![0; 100],
-        unique_nosell_mask: 0,
+        unique_nosell_mask: crate::world::vendors::UNIQUE_NOSELL_MASK,
     }
 }
 

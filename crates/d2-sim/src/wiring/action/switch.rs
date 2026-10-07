@@ -43,6 +43,11 @@ use super::{Pending, View, WiringError};
 pub struct SessionState {
     /// Player data names (0x59 bytes 6..22), zero-padded.
     pub names: BTreeMap<UnitId, [u8; 16]>,
+    /// The overhead records (unit +0xA4; `intents-events.md` §9 rule 3,
+    /// written by the C→S 0x14 handler through
+    /// [`View::replace_overhead`]): text (`0x006611E0`) and byte +8. The
+    /// record is live while the unit's `hover` frame is set.
+    pub overheads: BTreeMap<UnitId, (Vec<u8>, u8)>,
 }
 
 /// S→C 0x59 AssignPlayer (`0x0053E8F0`, 26 bytes, §7.2 part A): GUID
@@ -215,7 +220,8 @@ impl<X: Pending> View<'_, X> {
     /// unless the unit is a player the receiver relates to
     /// (`0x0055B300(P, unit, 4)` or `0x0055B300(unit, P, 2)`), the
     /// overhead chat 0x26 form 5 with the +0xA4 record's text
-    /// ([`Pending::overhead_record`]; none kept → nothing).
+    /// (the record [`View::replace_overhead`] kept, else
+    /// [`Pending::overhead_record`]; none → nothing).
     pub(super) fn overhead_message(&mut self, receiver: UnitId, unit: UnitId, ty: u8, guid: u32) {
         let Some(r) = self.units.get(unit) else {
             return;
@@ -230,11 +236,29 @@ impl<X: Pending> View<'_, X> {
         {
             return;
         }
-        if let Some((text, byte8)) = self.h.x.overhead_record(unit) {
+        let record = self.h.session.overheads.get(&unit).cloned();
+        if let Some((text, byte8)) = record.or_else(|| self.h.x.overhead_record(unit)) {
             self.h
                 .x
                 .send(receiver, &messages::overhead_chat(byte8, ty, guid, &text));
         }
+    }
+
+    /// The overhead record replaced (`intents-events.md` §9 rule 3:
+    /// `0x006611A0` free, `0x00661110(game +0x1C, text, frame)` new, byte
+    /// +8 := `byte8`, `0x00661230`): unit +0xA4's timeout frame
+    /// (`UnitRecord::hover`, read by event 6, `units.md` §6.1) := `end`
+    /// and the record kept for the overhead 0x26 (§7.9 rule 3); then
+    /// [`Pending::replace_overhead`].
+    pub fn replace_overhead(&mut self, unit: UnitId, text: &[u8], byte8: u8, end: i32) {
+        if let Some(r) = self.units.get_mut(unit) {
+            r.hover = Some(end);
+        }
+        self.h
+            .session
+            .overheads
+            .insert(unit, (text.to_vec(), byte8));
+        self.h.x.replace_overhead(unit, text, byte8, end);
     }
 
     /// S→C 0xAA of `unit` (§7.9 rule 1): its states in ascending order,
