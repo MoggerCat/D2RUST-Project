@@ -2434,6 +2434,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "d2-convert"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "d2-formats",
+ "d2-native",
+ "sha2",
+ "thiserror 2.0.21",
+ "toml",
+]
+
+[[package]]
 name = "d2-data"
 version = "0.0.0"
 dependencies = [
