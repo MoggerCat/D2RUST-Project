@@ -1,7 +1,7 @@
 //! d2-client entry point.
 //!
 //! Usage:
-//!   d2-client [play]     [--seed N] [--frames N] [--synthetic] [--save FILE.d2s]
+//!   d2-client [play]     [--seed N] [--frames N] [--synthetic] [--save FILE.d2s | --new CLASS NAME]
 //!   d2-client view       [--ds1 PATH] [--wall-base N] [--frames N]
 //!   d2-client verify     [--case NAME]... [--cases DIR] [--perturb N]
 //!   d2-client verify     [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out DIR] [--perturb N]
@@ -15,7 +15,11 @@
 //! user's DS1 / DT1 files (unless `--synthetic`); otherwise it uses
 //! synthetic tables and levels. `--save` joins with a character save
 //! (read with the user's tables: needs $D2_GAME_DIR) instead of a new
-//! sorceress.
+//! sorceress. `--new CLASS NAME` joins with a new character of that class
+//! (a name or 0–6: amazon, sorceress, necromancer, paladin, barbarian,
+//! druid, assassin) and name (1–15 of A–Z, a–z, 0–9, `-`, `_`), held in
+//! memory only: nothing is written to disk (decision D3, a stand-in for
+//! the unspecified select / create screens).
 //! `view` opens a window (pan: arrows/WASD, zoom: mouse wheel). `verify`
 //! runs the render cases (`crates/d2-client/render-cases/*.toml`, spec
 //! `client/render-pipeline.md` §A10): per case, CPU reference vs GPU, byte
@@ -71,6 +75,8 @@ struct Options {
     synthetic: bool,
     /// `play --save`: the character save the join loads.
     save: Option<PathBuf>,
+    /// `play --new CLASS NAME`: a new character (decision D3).
+    new: Option<(String, String)>,
 }
 
 fn parse_view(s: &str) -> Result<cpu::View> {
@@ -105,6 +111,7 @@ fn parse_options(args: &[String]) -> Result<Options> {
         seed: d2_client::app::single_player::DEFAULT_SEED,
         synthetic: false,
         save: None,
+        new: None,
     };
     let mut it = args.iter();
     while let Some(flag) = it.next() {
@@ -124,6 +131,14 @@ fn parse_options(args: &[String]) -> Result<Options> {
             "--seed" => o.seed = value()?.parse().context("--seed")?,
             "--synthetic" => o.synthetic = true,
             "--save" => o.save = Some(PathBuf::from(value()?)),
+            "--new" => {
+                let class = value()?.clone();
+                let name = it
+                    .next()
+                    .context("--new needs a class and a name: --new CLASS NAME")?
+                    .clone();
+                o.new = Some((class, name));
+            }
             "--probe" => {
                 let v = value()?;
                 let (x, y) = v.split_once(',').context("--probe expects X,Y")?;
@@ -131,6 +146,9 @@ fn parse_options(args: &[String]) -> Result<Options> {
             }
             other => bail!("unknown option {other}"),
         }
+    }
+    if o.save.is_some() && o.new.is_some() {
+        bail!("--save and --new cannot be combined");
     }
     Ok(o)
 }
@@ -355,13 +373,18 @@ fn play(o: Options) -> Result<()> {
         ),
         single_player::GameData::Synthetic => println!("play: synthetic tables and levels"),
     }
-    let character = match &o.save {
-        Some(path) => {
+    let character = match (&o.save, &o.new) {
+        (Some(path), _) => {
             let c = single_player::load_character(&data, path)?;
             println!("play: character from {}", path.display());
             c
         }
-        None => single_player::Character::New,
+        (None, Some((class, name))) => {
+            let c = single_player::new_character(class, name)?;
+            println!("play: new character {name} ({class}), not saved");
+            c
+        }
+        (None, None) => single_player::Character::New,
     };
     let result = play::run(play::PlayConfig {
         data,
@@ -382,7 +405,7 @@ fn main() -> Result<()> {
         Some("verify") => verify(parse_options(&args[1..])?),
         Some("play") | None => play(parse_options(args.get(1..).unwrap_or(&[]))?),
         Some("view") => view(parse_options(&args[1..])?),
-        _ => bail!("usage: d2-client [view|verify|cpu-render|play] [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out PATH] [--case NAME] [--cases DIR] [--perturb N] [--seed N] [--frames N] [--synthetic] [--save FILE.d2s]"),
+        _ => bail!("usage: d2-client [view|verify|cpu-render|play] [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out PATH] [--case NAME] [--cases DIR] [--perturb N] [--seed N] [--frames N] [--synthetic] [--save FILE.d2s | --new CLASS NAME]"),
     }
 }
 
@@ -401,6 +424,17 @@ mod tests {
     #[test]
     fn stems() {
         assert_eq!(file_stem(DEFAULT_DS1), "townN1");
+    }
+
+    #[test]
+    fn new_takes_a_class_and_a_name() {
+        let args = |a: &[&str]| a.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let o = parse_options(&args(&["--new", "amazon", "Test", "--frames", "3"])).unwrap();
+        assert_eq!(o.new, Some(("amazon".to_owned(), "Test".to_owned())));
+        assert_eq!(o.frames, Some(3));
+        assert!(parse_options(&args(&["--new", "amazon"])).is_err());
+        assert!(parse_options(&args(&["--new"])).is_err());
+        assert!(parse_options(&args(&["--new", "0", "A", "--save", "x.d2s"])).is_err());
     }
 
     #[test]

@@ -157,10 +157,68 @@ impl TextColors {
             })?;
         let mut maps = [MapId(0); TEXT_COLORS - 1];
         for (k, map) in maps.iter_mut().enumerate() {
-            let row = &bytes[256 * (k + 1)..256 * (k + 2)];
-            *map = table.push(row.try_into().expect("256-byte row"));
+            let row: [u8; 256] = bytes
+                .get(256 * (k + 1)..256 * (k + 2))
+                .and_then(|r| r.try_into().ok())
+                .ok_or_else(|| ViewError::Unresolved {
+                    what: "UI text color maps",
+                    spec: "ui/text.md",
+                    message: format!("text-color map {} is not 256 bytes", k + 1),
+                })?;
+            *map = table.push(row);
         }
         Ok(TextColors { maps })
+    }
+}
+
+/// Makes the fonts of a frame's UI text resident (`ui/text.md` §1.3): for
+/// each text draw, its style's glyph table (`.tbl`) into
+/// [`ViewAssets::fonts`] and its glyph DC6 (direction 0) into
+/// [`ViewAssets::frames`], read from `source` once. The image half is
+/// [`super::panel_art::PanelArtLoader`]. A file in no archive, or one
+/// that does not parse, is an error.
+pub struct TextAssetLoader {
+    pub source: std::sync::Arc<dyn crate::assets::path::FileSource>,
+}
+
+impl TextAssetLoader {
+    pub fn ensure(&self, draws: &[UiDraw], assets: &mut ViewAssets) -> Result<(), ViewError> {
+        for d in draws {
+            let UiDraw::Text(req) = d else { continue };
+            let font = original_text_font(req.style)?;
+            if !assets.fonts.contains_key(&font.table) {
+                let bytes = self.read(font.table.as_str())?;
+                let table = d2_formats::font::FontTable::parse(&bytes)
+                    .map_err(|e| fail(font.table.as_str(), e.to_string()))?;
+                assets.fonts.insert(font.table.clone(), table);
+            }
+            if !assets.frames.contains(&font.glyphs) {
+                let path = font.glyphs.path().to_owned();
+                let bytes = self.read(&path)?;
+                let dc6 =
+                    d2_formats::dc6::Dc6::parse(&bytes).map_err(|e| fail(&path, e.to_string()))?;
+                let frames = crate::frames::FrameSet::from_dc6(&dc6, 0)
+                    .map_err(|e| fail(&path, e.to_string()))?;
+                assets.frames.insert(font.glyphs.clone(), frames)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn read(&self, path: &str) -> Result<Vec<u8>, ViewError> {
+        let archive = path.replace('/', "\\");
+        self.source
+            .read_file(&archive)
+            .ok_or_else(|| fail(path, "in no archive".into()))?
+            .map_err(|e| fail(path, e))
+    }
+}
+
+fn fail(path: &str, message: String) -> ViewError {
+    ViewError::Unresolved {
+        what: "UI font file",
+        spec: "ui/text.md",
+        message: format!("{path}: {message}"),
     }
 }
 
@@ -524,6 +582,92 @@ mod text_tests {
         // The file must hold all 13 maps.
         let short = &pl2()[..TEXT_COLOR_MAP_OFFSET + 256 * 12];
         assert!(TextColors::push(&mut MapTable::new(), short).is_err());
+    }
+
+    /// A one-direction DC6 of `frames` frames, each `w` × `h` literal
+    /// pixels (`formats/dc6.md`).
+    fn dc6(frames: u32, w: u32, h: u32) -> Vec<u8> {
+        let mut rows = Vec::new();
+        for _ in 0..h {
+            rows.push(w as u8);
+            rows.extend((0..w).map(|i| 1 + i as u8));
+            rows.push(0x80);
+        }
+        let mut d = Vec::new();
+        for v in [6i32, 1, 0] {
+            d.extend_from_slice(&v.to_le_bytes());
+        }
+        d.extend_from_slice(&[0xEE; 4]);
+        d.extend_from_slice(&1u32.to_le_bytes());
+        d.extend_from_slice(&frames.to_le_bytes());
+        let mut at = d.len() + 4 * frames as usize;
+        let mut body = Vec::new();
+        for _ in 0..frames {
+            d.extend_from_slice(&(at as u32).to_le_bytes());
+            for v in [0u32, w, h, 0, 0, 0, 0, rows.len() as u32] {
+                body.extend_from_slice(&v.to_le_bytes());
+            }
+            body.extend_from_slice(&rows);
+            body.extend_from_slice(&[0xEE; 3]);
+            at += 32 + rows.len() + 3;
+        }
+        d.extend(body);
+        d
+    }
+
+    /// A synthetic `.tbl` of 256 records, each 6 wide.
+    fn tbl() -> Vec<u8> {
+        let mut d = b"Woo!".to_vec();
+        d.extend_from_slice(&[1, 0, 0, 0, 0, 1, 10, 0]);
+        for i in 0..256u16 {
+            d.extend_from_slice(&i.to_le_bytes());
+            d.extend_from_slice(&[0, 6, 10, 0, 0, 0]);
+            d.extend_from_slice(&i.to_le_bytes());
+            d.extend_from_slice(&[0; 4]);
+        }
+        d
+    }
+
+    // Covers: specs/ui/text.md §1 r3
+    #[test]
+    fn text_assets_load_once_per_font() {
+        use crate::assets::path::MemorySource;
+        let mut src = MemorySource::default();
+        let style = TextStyle { font: 1, color: 0 };
+        let font = original_text_font(style).unwrap();
+        src.insert(font.table.as_str(), tbl());
+        src.insert(font.glyphs.path(), dc6(256, 4, 4));
+        let loader = TextAssetLoader {
+            source: std::sync::Arc::new(src),
+        };
+        let mut a = ViewAssets::new(Palette {
+            colors: [Rgb::default(); 256],
+        });
+        let req = |style| {
+            UiDraw::Text(TextRequest {
+                text: vec![u16::from(b'A')],
+                at: Point::new(10, 20),
+                style,
+                opts: TextOpts::default(),
+                clip: FRAME,
+            })
+        };
+        loader.ensure(&[req(style), req(style)], &mut a).unwrap();
+        assert_eq!(a.fonts.len(), 1);
+        assert!(a.frames.contains(&font.glyphs));
+        // The text then draws through `text_sprites`.
+        let UiDraw::Text(r) = req(style) else {
+            unreachable!()
+        };
+        assert_eq!(
+            text_sprites(&OriginalTextHooks::default(), &r, &a)
+                .unwrap()
+                .len(),
+            1
+        );
+        // A font in no archive is an error.
+        let other = req(TextStyle { font: 6, color: 0 });
+        assert!(loader.ensure(&[other], &mut a).is_err());
     }
 
     // Covers: specs/ui/text.md §4 r1, §4 r2

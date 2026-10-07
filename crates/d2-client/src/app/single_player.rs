@@ -196,6 +196,7 @@ pub const CREATE_FLAGS_CLASSIC: u32 = 0x4;
 pub fn create_request_for(character: &Character) -> CreateGame {
     let (class, name, expansion) = match character {
         Character::New => (PLAYER_CLASS as u8, PLAYER_NAME, GAME_SETUP.expansion),
+        Character::Named(c) => (c.class, c.name(), GAME_SETUP.expansion),
         Character::Save(save, _) => (
             save.header.class,
             save.header.name_bytes(),
@@ -235,10 +236,97 @@ pub enum Character {
     /// sends 0x5F and the two 0x23.
     #[default]
     New,
+    /// [`Character::New`] with the class and name of `d2-client play
+    /// --new <class> <name>` (decision D3, `docs/PLAN.md`: a CLI stand-in
+    /// for the select / create screens, which are not specified). Held in
+    /// memory only: nothing is written to disk.
+    Named(NewCharacter),
     /// A parsed `.d2s` loaded onto the new player
     /// (`d2_server::adapters::session::load_save`); `d2-client play
     /// --save` reads one with [`LiveData::read_save`].
     Save(Box<D2s>, LoadContext),
+}
+
+/// The class names of `play --new` in class-id order (`charstats` rows
+/// 0–6; `items/inventory.md` §1.3 uses the same ids).
+pub const CLASS_NAMES: [&str; 7] = [
+    "amazon",
+    "sorceress",
+    "necromancer",
+    "paladin",
+    "barbarian",
+    "druid",
+    "assassin",
+];
+
+/// Longest character name: the 0x67 name must have a NUL within its 16
+/// bytes (`intents-events.md` §2.5 rule 1, `0x0053EFC0(name, 16)`).
+pub const MAX_NAME_LEN: usize = 15;
+
+/// The class and name of a new character (`play --new`, decision D3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NewCharacter {
+    /// Class id 0–6 (the 0x67 class u8@0x12; ≥ 7 is refused, §2.5 r1).
+    pub class: u8,
+    /// The name, NUL-padded (bytes after the name are 0).
+    pub name: [u8; 16],
+}
+
+impl NewCharacter {
+    /// The name bytes up to the first NUL.
+    pub fn name(&self) -> &[u8] {
+        let n = self.name.iter().position(|&b| b == 0).unwrap_or(16);
+        &self.name[..n]
+    }
+}
+
+/// Why `play --new <class> <name>` was refused.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum NewCharacterError {
+    #[error("unknown class {0:?}: use 0-6 or one of {names}", names = CLASS_NAMES.join(", "))]
+    Class(String),
+    #[error("character name {0:?}: {1}")]
+    Name(String, &'static str),
+}
+
+/// The class id of `s`: a number 0–6 or a [`CLASS_NAMES`] entry (any
+/// case).
+pub fn parse_class(s: &str) -> Result<u8, NewCharacterError> {
+    if let Ok(n) = s.parse::<u8>() {
+        return if n < 7 {
+            Ok(n)
+        } else {
+            Err(NewCharacterError::Class(s.to_owned()))
+        };
+    }
+    CLASS_NAMES
+        .iter()
+        .position(|c| c.eq_ignore_ascii_case(s))
+        .map(|i| i as u8)
+        .ok_or_else(|| NewCharacterError::Class(s.to_owned()))
+}
+
+/// The character of `play --new <class> <name>` (decision D3): class by
+/// name or 0–6; the name 1–[`MAX_NAME_LEN`] bytes so the 0x67 check
+/// passes (§2.5 r1).
+pub fn new_character(class: &str, name: &str) -> Result<Character, NewCharacterError> {
+    let class = parse_class(class)?;
+    let bad = |why| NewCharacterError::Name(name.to_owned(), why);
+    if name.is_empty() || name.len() > MAX_NAME_LEN {
+        return Err(bad("must be 1 to 15 bytes"));
+    }
+    // d2rs-own, unverified: the create screen's name rules are not
+    // specified (no menu spec); ASCII letters, digits, `-` and `_` keep
+    // the name printable in every font and safe in a file name.
+    if !name
+        .bytes()
+        .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+    {
+        return Err(bad("only ASCII letters, digits, '-' and '_'"));
+    }
+    let mut bytes = [0u8; 16];
+    bytes[..name.len()].copy_from_slice(name.as_bytes());
+    Ok(Character::Named(NewCharacter { class, name: bytes }))
 }
 
 /// The load result the loader gives when the player unit cannot be
@@ -755,6 +843,21 @@ pub fn client_level_rows(data: &GameData) -> Vec<LevelRow> {
         .collect()
 }
 
+/// `difficultylevels` `ResistPenalty` per row (difficulty), from the
+/// user's `.bin` set: the expansion resist penalty of the character
+/// panel (`ui/panels.md` §8.9, `0x00611D30`; `panels-2.md` §24 r2), for
+/// [`crate::ui::original::OriginalUi::set_resist_penalties`]. The field
+/// is read as a signed value.
+pub fn client_resist_penalties(archives: &ArchiveSet) -> Result<Vec<i32>, BuildError> {
+    let set = d2_data::bin::load(archives, "eng").map_err(|e| BuildError::Tables(e.to_string()))?;
+    let table = set
+        .table("difficultylevels")
+        .ok_or_else(|| BuildError::Tables("difficultylevels not loaded".into()))?;
+    let rows: Vec<Difficultylevels> =
+        decode_all(table).map_err(|e| BuildError::Tables(e.to_string()))?;
+    Ok(rows.iter().map(|r| r.resistpenalty as i32).collect())
+}
+
 /// The `skills` fields the client skill list reads (`client/msg-skills.md`
 /// Inputs: `anim`, `monanim`, `passivestate`; §9–§10: `enhanceable`,
 /// `EType`, `skilldesc`, `srvdofunc`; `skills/levels.md` §1, §6:
@@ -1269,7 +1372,7 @@ fn loader(
             u.mode = 1;
         }
         let (entry, quests) = match &character {
-            Character::New => {
+            Character::New | Character::Named(_) => {
                 if let Some(index) = cold_plains_wp {
                     let set = s
                         .events
@@ -1405,4 +1508,58 @@ pub fn start_with<C: Clock + Send + 'static>(
         .recv()
         .map_err(|_| BuildError::Setup("game not started".into()))?;
     Ok((link, started))
+}
+
+#[cfg(test)]
+mod new_character_tests {
+    use super::*;
+
+    // Covers: specs/sim/intents-events.md §2.5 r1
+    #[test]
+    fn class_by_name_or_number() {
+        for (i, name) in CLASS_NAMES.iter().enumerate() {
+            assert_eq!(parse_class(name), Ok(i as u8));
+            assert_eq!(parse_class(&name.to_uppercase()), Ok(i as u8));
+            assert_eq!(parse_class(&i.to_string()), Ok(i as u8));
+        }
+        for bad in ["7", "255", "-1", "", "paladins", "ama"] {
+            assert!(parse_class(bad).is_err(), "{bad:?}");
+        }
+    }
+
+    // Covers: specs/sim/intents-events.md §2.5 r1
+    #[test]
+    fn names_fit_the_create_request() {
+        let Ok(Character::Named(c)) = new_character("amazon", "Test") else {
+            panic!("refused");
+        };
+        assert_eq!((c.class, c.name()), (0, &b"Test"[..]));
+        assert_eq!(c.name[4..], [0; 12]);
+        assert!(new_character("druid", &"A".repeat(15)).is_ok());
+        for bad in ["", &"A".repeat(16), "two words", "Näme", "a\0b"] {
+            assert!(
+                matches!(
+                    new_character("druid", bad),
+                    Err(NewCharacterError::Name(..))
+                ),
+                "{bad:?}"
+            );
+        }
+        assert!(matches!(
+            new_character("monk", "Test"),
+            Err(NewCharacterError::Class(_))
+        ));
+    }
+
+    // Covers: specs/client/model.md §7 r9
+    #[test]
+    fn the_create_request_carries_the_new_class_and_name() {
+        let c = new_character("6", "Shadow_1").unwrap();
+        let r = create_request_for(&c);
+        assert_eq!(r.class, 6);
+        assert_eq!(&r.char_name[..9], b"Shadow_1\0");
+        assert_eq!(r.char_name[9..], [0; 7]);
+        assert_eq!(r.flags, CREATE_FLAGS_EXPANSION);
+        assert_eq!(r.game_type, GAME_TYPE);
+    }
 }
