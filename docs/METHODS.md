@@ -160,3 +160,10 @@ evidence; a trial that fails is removed or rewritten, not kept.
 - Check: each escape has a log line and a new or changed check.
 - Here: the "Lessons" table in `docs/HANDOFF.md` §8.
 - Status: trial — adopted 2026-10-05.
+
+## M22 Provisional over blocked
+- Rule: When a behavior can only be settled by a capture or recording, do not leave the code blocked: implement the most plausible reading of the evidence already in the spec, mark it provisional in spec and code, and name the capture that settles it. Captures of choices that spread silently (RNG draw order, persisted or wire byte layouts) go to the top of the recording list.
+- Why: a blocked seam leaves holes that stop the build from being played and tested; the capture comparison runs the same whether the code guessed or not, and in this project the misses found by testing have been small, local edits.
+- Check: every provisional point is greppable and names its settling capture; it counts as unverified (M02), never done.
+- Here: spec line `PROVISIONAL: <chosen behavior> (because …); settled by <capture / recording id>`; code comment `// PROVISIONAL (<spec ref>)` on a plain implementation (no blocking seam); the cloud implementation session makes the choice while coding, no PC research; `grep -rn PROVISIONAL specs crates` is the testing-phase checklist; the settling captures are in the HANDOFF §7 recording list.
+- Status: trial — adopted 2026-10-07 by the user's decision; proven when the testing phase settles the provisional points with only local edits.
