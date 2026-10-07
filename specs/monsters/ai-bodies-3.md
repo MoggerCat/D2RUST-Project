@@ -621,9 +621,9 @@ Game-file vectors: Open question 1.
    schedules and draws with §2–§11.
 2. FrogDemon §6: confirm the submerged footprint (Vulture helpers) and
    the emerge timing with a recording that logs modes and collision.
-3. The unit-find `0x0065A950` / `0x0065AC70` (flags 0x583, size 32):
-   which rooms and which order it returns units in (it sets the wisps'
-   slots). No spec owns it yet.
+3. Answered (2026-10-07): the unit find `0x0065A950` / `0x0065AC70`
+   (rooms, found order, filter) is owned by `monsters/umod-callbacks.md`
+   §3.1.
 4. Who calls the FrogDemon and FetishShaman alternates (`ai.md` §3.3
    re-install while running): the skill or event paths that re-install
    AIs 52 and 65.

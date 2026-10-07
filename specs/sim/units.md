@@ -37,7 +37,7 @@
 | Edge cases & original bugs | 591–609 |
 | Test vectors | 610–669 |
 | Provenance | 670–709 |
-| Open questions | 710–739 |
+| Open questions | 710–751 |
 <!-- /index -->
 
 ## Summary
@@ -721,18 +721,30 @@ Ghidra backlog (2026-10-06): store `0x00542E10` (falls through to
    `d2-sim` use instead?
 4. Object delays rolled from the object-control seed (events 0, 8):
    confirm the draw with an RNG + tick recording.
-5. Item event 4 has a no-op handler and no scheduler: confirm no 1.14d
-   path schedules it (none among the 269 sites).
-6. `proof = file` rows of `unit-events.tsv` (kind assigned from the
-   source-file family): each is settled by a `site` observation or by
-   reading its function.
+5. Answered (2026-10-07): the only type-4 site of the 269
+   (`0x00582595`, trap arm `0x00582510`) schedules on objects (unit +4
+   of the operate record; `unit-events.tsv`, proof code); no 1.14d path
+   schedules item event 4.
+6. Partly answered (2026-10-07): 130 of the 208 `file` rows were read
+   and are now `code`. Corrections: restore `0x00542B40` schedules types
+   5 and 2 on objects only (saved type-2 records; §6.2's "restore" entry
+   for monster type 2 is wrong, and object type 2 also comes from it);
+   the quest event-7 sites schedule on objects except `0x0059584E`
+   (the Countess, a monster); `0x0054D11F` on the hireling (monster);
+   freeze `0x0057B216`, `0x0057B3E9` on monsters only; the wisp buff
+   `0x005F4268` on a player. Site `0x00586800` is in `0x005867A0`. The
+   78 rows left `file` (state timers, damage, missile hits, item use,
+   most trade sites) need their callers traced; each names its owner.
 7. Game +0x6A and +0x74 (§4.6, edge case 6): which game types set them;
    a Nightmare single-player recording settles which `aidel` column
    single player uses.
 8. Inactive storage: records and restore answered in §3.4 (monster
    GUIDs are kept; other units come back with new GUIDs; restore order
-   monsters, items, others, each newest first). Open: the meaning of
-   node index (`+0xD0`) 11 and of the fields from `0x005B0D60`,
+   monsters, items, others, each newest first). Answered 2026-10-07:
+   node index (`+0xD0`) is the unit's target-node list (game +0x10F8,
+   lists 0–7 per player, 8 and 9 special; inserts `0x005B1900`
+   (`skills/bodies.md` §6.3) and `0x005B1990` (`population.md` OQ7));
+   11 = in no list. Open: the meaning of the fields from `0x005B0D60`,
    `0x00573520`, `0x005A0140`, `0x00625D10`; whether a restored item
    keeps its GUID (`0x00541990`); a recording leaving and re-entering a
    wilderness area confirms the order (`unit-order.md` OQ3).

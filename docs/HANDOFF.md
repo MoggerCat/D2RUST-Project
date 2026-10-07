@@ -5026,6 +5026,19 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
   Diablo and Baal log the AI control's function (+0x04) and special
   state (+0x00) after creation and at each think, and every type-2
   schedule (their table thinks are empty in 1.14d).
+- `monsters/umod-init-bodies.md` OQ1: 0xAC assign + stat messages of a
+  lightning, cold or mana-burn unique with minions (expect the §2
+  values; minions on Normal get no damage stats, cold minions still get
+  coldlength).
+- `monsters/init.md` OQ1 / OQ4 / OQ10: client message 0x67 game type in
+  classic SP and TCP/IP; one population pass with rng hook + callers; a
+  unique's client name draws.
+- `sim/stat-lists.md` OQ1: read the x87 control word (precision bits) at
+  the §7.2 max-rescale call during a max-life change (a D3D device may
+  set 24-bit).
+- `sim/units.md` OQ6 (78 rows left `proof = file`): a `site` recording
+  over combat with skills, a trade and an item use, to confirm the
+  scheduled unit kinds of the state-timer, damage and trade sites.
 
 ## 8. Lessons (problems met, fixes)
 

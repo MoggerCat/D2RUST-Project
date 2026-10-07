@@ -38,7 +38,7 @@
 | Edge cases & original bugs | 537–555 |
 | Test vectors | 556–592 |
 | Provenance | 593–616 |
-| Open questions | 617–632 |
+| Open questions | 617–634 |
 <!-- /index -->
 
 ## Summary
@@ -621,8 +621,10 @@ replaces it under the same comparison.
    settle with a recording of max-life changes (`check_stats.py`
    compares the nested set) or by reading the FPU control word at the
    call.
-2. `0x0061AB00`(room) in monster regeneration (§10.1 step 4): what it
-   tests (room/level spec).
+2. Answered (2026-10-07): `0x0061AB00(room)` is "room in a town": the
+   room's level id (`0x0066BAB0`) is 1, 40, 75, 103 or 109 (`0x006426A0`,
+   byte table `0x006426C8`); null room → 0. Also used by the unit find
+   (`monsters/umod-callbacks.md` §3.1).
 3. Who sets list flags 0x08, 0x20, 0x40, 0x80, 0x100 and 0x1 (skills,
    curses, items); this spec only needs their tests.
 4. Recording: the whole spec is unverified until `record_stats.py`
