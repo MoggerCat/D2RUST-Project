@@ -34,6 +34,9 @@ pub fn archive_name(name: &str) -> String {
     if let Some(item) = name.strip_prefix(crate::ui::panels::inv_items::ITEMS_PREFIX) {
         return crate::ui::inv_grid::inventory_path(item); // ui/inventory.md §8 r2
     }
+    if let Some(label) = name.strip_prefix(crate::ui::original::esc_art::LOCAL_PREFIX) {
+        return format!("data\\local\\ui\\eng\\{label}.dc6"); // frontend-options.md §O2 r3
+    }
     format!("data\\global\\ui\\{name}.dc6")
 }
 

@@ -11,11 +11,10 @@
 //!
 //! The tree, rows, input and settings are `options_menu` (spec
 //! `ui/frontend-options.md` §O2–§O8); this panel draws it and routes
-//! events. d2rs-own, unverified: the DC6 labels, value images, bar,
-//! skull and pentspin are not available here, so labels and values are
-//! Font16 English text, the slider is a thin bar with a gold knob and the
-//! pentagrams are gold squares (REC-187); Esc closes the whole menu
-//! (`OriginalUi::game_menu_key`, §O1 r4).
+//! events. The DC6 art is `esc_art` (REC-257); a row without art (Window
+//! Mode) is Font16 English text with a thin bar and gold knob stand-in
+//! (REC-187). Esc closes the whole menu (`OriginalUi::game_menu_key`,
+//! §O1 r4).
 
 use super::hud::{FILL_FILE, FILL_H, FILL_W};
 use super::options_menu::{Kind, MenuEvent, OptionsMenu, HALF};
@@ -144,6 +143,9 @@ impl Panel for EscMenuUi {
         let m = &sh.esc.menu;
         let file = sh.tables.files.id(FILL_FILE);
         for (i, def) in m.rows().iter().enumerate() {
+            if super::esc_art::draw_row(&sh.tables.files, m, i, out) {
+                continue;
+            }
             let yb = m.baseline(i);
             let color = if !m.enabled(i) && def.kind != Kind::Title {
                 COLOR_DISABLED
@@ -184,12 +186,7 @@ impl Panel for EscMenuUi {
                 }
             }
         }
-        if let Some(file) = file {
-            // Pentagram stand-ins (no pentspin art here), both sides.
-            let y = m.pentagram_y();
-            push_fill(out, file, GOLD, Rect::new(HALF - 301, y - 6, 12, 12));
-            push_fill(out, file, GOLD, Rect::new(HALF + 249, y - 6, 12, 12));
-        }
+        super::esc_art::draw_pents(&sh.tables.files, m, ctx.tick, out);
     }
 
     fn hit(&self, _p: Point) -> Option<WidgetId> {
