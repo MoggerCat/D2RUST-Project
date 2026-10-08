@@ -487,6 +487,16 @@ impl<X: Pending> ActionHooks<X> {
             }
         }
         self.plain_mode(sim, unit, m);
+        // PROVISIONAL (units.md §4.6 rule 7 gives no flag step; REC-143):
+        // unit flag 0x40 off before the skill start, as the player's mode
+        // starts (rule table row 7..18) and the SQ start (rule 10) do. The
+        // attack's do sets it (`skills/bodies.md` melee), the per-frame
+        // event runs the do only while it is clear (`skills/use.md` §5.2
+        // rule 3), so without this a monster whose first attack did not
+        // kill never attacked again.
+        if let Some(r) = sim.units.get_mut(unit) {
+            r.flags &= !unit_flags::ATTACK_PENDING;
+        }
         if self.used_skill_of(unit).is_some() {
             let _ = X::monster_skill_start(self, sim, unit);
         }

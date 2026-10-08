@@ -178,6 +178,19 @@ fn local_mode(app: &App) -> u32 {
 // Covers: specs/combat/vitals.md §4.8
 #[test]
 fn a_monster_next_to_the_player_attacks_until_the_player_dies() {
+    attacks_until_the_player_dies(single_player::DEFAULT_SEED);
+}
+
+// Covers: specs/monsters/ai.md §5.2; specs/skills/use.md §5.2
+/// On game seed 9 the monster's first attack misses (hit chance 95, roll
+/// 96): the next attacks must still run their do (unit flag 0x40, set by the
+/// first do, is cleared by the Attack start; REC-143).
+#[test]
+fn a_missed_first_attack_is_followed_by_more_attacks() {
+    attacks_until_the_player_dies(9);
+}
+
+fn attacks_until_the_player_dies(seed: u32) {
     let character = single_player::new_character("sorceress", "Test").unwrap();
     let ms = Arc::new(AtomicU32::new(1000));
     let clock = StepClock(ms.clone());
@@ -185,10 +198,7 @@ fn a_monster_next_to_the_player_attacks_until_the_player_dies() {
     let link = ThreadLink::spawn(move || {
         let mut g = single_player::build_with(
             &GameData::Synthetic,
-            // Seed 99, not the default: on the default seed's stream (shifted
-            // by q-a4's Act IV NPC allocations) the zombie stays in NU for 600
-            // frames (docs/handoff/q-a4.md, REC-143). Assertions unchanged.
-            99,
+            seed,
             spawn_character,
         )?;
         install_fixtures(&mut g.sim);
