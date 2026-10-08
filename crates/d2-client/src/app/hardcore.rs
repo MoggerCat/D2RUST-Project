@@ -66,7 +66,7 @@ fn save_on_death(screen: Res<DeathScreen>, saver: Option<Res<SaveHandle>>, mut w
 /// closes the game; the dead save is already written.
 fn leave_dead(
     run: Res<HardcoreRun>,
-    mut bridge: ResMut<BridgeResource>,
+    bridge: ResMut<BridgeResource>,
     keys: Option<Res<ButtonInput<KeyCode>>>,
     mut exit: MessageWriter<AppExit>,
 ) {

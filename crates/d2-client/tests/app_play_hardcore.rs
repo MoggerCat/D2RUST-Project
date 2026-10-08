@@ -151,7 +151,7 @@ fn run(hardcore: bool) -> (Option<Vec<(d2_sim::units::UnitId, u32)>>, bool, bool
     (Some(dropped), left, live.hardcore_dead, written)
 }
 
-// Covers: specs/sim/intents-events.md §9 r6, specs/formats/d2s.md §2.2 r5
+// Covers: specs/sim/intents-events.md §9 r6, specs/formats/d2s.md §2.2
 #[test]
 fn a_hardcore_death_drops_the_client_and_marks_the_save_dead() {
     let (dropped, left, dead, status) = run(true);
