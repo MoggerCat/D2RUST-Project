@@ -14,6 +14,7 @@
 //! changes) and [`Pending::kill_step`] (pet credit, attacker
 //! bookkeeping, facing, quest kill, barricade doors).
 
+use crate::combat::result;
 use crate::combat::vitals::experience::{distribute, ExpShare};
 use crate::combat::vitals::VitalsUnits;
 use crate::combat::DamageRecord;
@@ -61,8 +62,93 @@ pub fn reaction<X: Pending>(
         .is_some_and(|e| e.ty == UnitType::Monster);
     if monster && will_die {
         kill(cv, d, a);
+        return;
+    }
+    if monster {
+        monster_hit(cv, a, d, rec);
+    } else if cv
+        .game
+        .lists
+        .unit(d)
+        .is_some_and(|e| e.ty == UnitType::Player)
+    {
+        player_hit(cv, d, rec);
     }
 }
+
+/// Unit flag 0x8000 (+0xC4), the "soft" hit: the client is told with
+/// S→C 0x0C (`units.md` §7.3 rule 2 step 7).
+pub const UNIT_FLAG_SOFT_HIT: u32 = 0x8000;
+
+/// "Soft" (`damage.md` §7.1): queue the unit for update and set unit
+/// flag 0x8000.
+fn soft<X: Pending>(cv: &mut CombatView<'_, X>, d: UnitId) {
+    if cv.game.lists.queue_update(d).is_err() {
+        return;
+    }
+    if let Some(r) = cv.v.units.get_mut(d) {
+        r.flags |= UNIT_FLAG_SOFT_HIT;
+    }
+}
+
+/// The get-hit test `0x0057CB00` (§6.2) is false: the unit enters get-hit.
+fn enters_get_hit<X: Pending>(cv: &mut CombatView<'_, X>, d: UnitId, rec: &DamageRecord) -> bool {
+    let t = cv.v.h.tables.clone();
+    !crate::combat::damage::no_get_hit(cv, &t.combat.hitclass, d, rec, rec.hit_class)
+}
+
+/// `damage.md` §7.1 step 4 for a monster the hit does not kill: the
+/// get-hit mode (4.6) and the soft hits (4.7, 4.8's flag part).
+///
+/// d2rs-own, unverified (PROVISIONAL, REC in `docs/HANDOFF.md` §7): the
+/// mode request `0x005A7E60` / `0x005A7C20` is the direct mode change
+/// toward the attacker; the knockback / block steps (4.1, 4.2, 4.4,
+/// 4.5), the umod mode 4 call and the life-percent soft test (4.8) are
+/// not done.
+fn monster_hit<X: Pending>(cv: &mut CombatView<'_, X>, a: UnitId, d: UnitId, rec: &DamageRecord) {
+    let Some(mode) = cv.v.units.get(d).map(|r| r.mode) else {
+        return;
+    };
+    if mode == monster_mode::DT || mode == monster_mode::DD {
+        return;
+    }
+    let f = rec.result;
+    if f & result::GET_HIT != 0 {
+        if cv.v.stats.has_state(d, STATE_STUNNED) || enters_get_hit(cv, d, rec) {
+            let game = &mut *cv.game;
+            cv.v.h.mode_target = Some(a);
+            cv.v.monster_set_mode(game, d, monster_mode::GH);
+            cv.v.h.mode_target = None;
+        } else {
+            soft(cv, d);
+        }
+    } else if f & result::SOFT_HIT != 0 {
+        soft(cv, d);
+    }
+}
+
+/// `damage.md` §7.1 step 5 for a player: the soft hits (5.6 test true,
+/// 5.7). d2rs-own, unverified: the player's get-hit / block / death mode
+/// requests (`pathing.md` §1.2) are not made here.
+fn player_hit<X: Pending>(cv: &mut CombatView<'_, X>, d: UnitId, rec: &DamageRecord) {
+    let f = rec.result;
+    if f & (result::DODGE | result::AVOID | result::EVADE | result::BLOCK | result::WEAPON_BLOCK)
+        != 0
+        || f & result::WILL_DIE != 0
+    {
+        return;
+    }
+    if f & result::GET_HIT != 0 {
+        if !cv.v.stats.has_state(d, STATE_STUNNED) && !enters_get_hit(cv, d, rec) {
+            soft(cv, d);
+        }
+    } else if f & result::SOFT_HIT != 0 {
+        soft(cv, d);
+    }
+}
+
+/// State 21 `stunned`.
+const STATE_STUNNED: u32 = 21;
 
 /// Unit flag 0x04000000: no experience for this victim (`damage.md`
 /// §7.2 step 2, `0x005A4EF0`).

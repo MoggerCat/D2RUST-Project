@@ -109,6 +109,11 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
         .init_resource::<ButtonInput<MouseButton>>();
     add_game(&mut app, Box::new(SharedLink(server.clone())), true).unwrap();
     app_support::synthetic_skill_rows(&mut app);
+    // Akara's monster row, so her 0xAC creates the unit.
+    app.world_mut()
+        .resource_mut::<BridgeResource>()
+        .0
+        .set_unit_rows(single_player::synthetic_unit_rows());
     // No original UI here: the open mode it would hand over with every
     // panel closed (`ui/panels.md` §4.2), so the world view can place.
     app.world_mut()
@@ -199,8 +204,23 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     // five of the travel; the 0x0D waits on its unit's queue for the
     // update pass (`client/model.md` §4, §5); nothing is unowned
     // (`client/bridge.md` §6 rule 3).
-    assert_eq!(joined, 18);
-    assert_eq!((b.log().handled, b.log().queued), (23, 1));
+    // (Plus the room switch's 0x07 for the Blood Moor room bordering
+    // the synthetic town: 19; plus its cave entrance's 0x09, a level
+    // warp tile unit, `path-placement.md` §12.1: 20.)
+    // Plus Akara, the synthetic town NPC (`q-quests`): two handled
+    // messages of her add (her 0xAC and a stat/state message), her 0x6D
+    // waits on her unit's queue: 22. Plus the Blood Moor's second warp
+    // tile, to the Black Marsh (`q-a1-tower`, d2rs-own): its 0x09: 23. Kashya
+    // (`q-a1-bloodraven`) adds the same three as Akara: 26.
+    assert_eq!(joined, 26);
+    // Plus two for the Blood Moor room bordering the synthetic town: its
+    // 0x07 at the join and its 0x08 when the travel leaves the town.
+    // Plus two for that room's cave entrance (a tile unit): its 0x09 at
+    // the join and its removal when the travel leaves the town.
+    // Plus two for the Black Marsh tile (`q-a1-tower`): 32. Kashya's
+    // three joined (two handled, her 0x6D queued) and the Burial Grounds
+    // tile's two (`q-a1-bloodraven`): 37, 3.
+    assert_eq!((b.log().handled, b.log().queued), (37, 3));
     assert!(b.log().unowned.is_empty(), "{:?}", b.log().unowned);
     assert!(b.log().dropped.is_empty(), "{:?}", b.log().dropped);
     let sight: Vec<_> = b
@@ -214,9 +234,11 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
         [
             (true, 1, 16, 0),
             (true, 1, 16, 0),
+            (true, 2, 24, 0),
             (true, 3, 0, 0),
             (true, 3, 0, 0),
-            (false, 1, 16, 0)
+            (false, 1, 16, 0),
+            (false, 2, 24, 0)
         ]
     );
     assert!(b.log().rejected.is_empty() && b.log().discarded.is_empty());
@@ -264,9 +286,10 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     );
     // Nothing dropped. The client update pass runs only while in game
     // (`client/model.md` §5 rule 1); tick 2's 0x04 put the client in
-    // game, so the queued 0x0D was drained by the update pass.
+    // game, so the queued 0x0D (one more with Kashya) were drained by the
+    // update pass.
     let log = bridge(&app).0.log();
-    assert_eq!((log.queued, log.drained), (1, 1));
+    assert_eq!((log.queued, log.drained), (3, 3));
     assert!(log.dropped.is_empty());
     let w = bridge(&app).0.world();
     assert!(w.in_game);

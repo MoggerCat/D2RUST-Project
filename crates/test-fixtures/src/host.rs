@@ -108,6 +108,7 @@ pub struct Setup {
 /// `Ds1File::from_input` without touching the game). All three are
 /// searched, in that order.
 pub fn town_waypoint(
+    act: u8,
     gd: &GameData,
     d: &Drlg,
     types: &SharedTypes,
@@ -116,7 +117,7 @@ pub fn town_waypoint(
 ) -> (DrlgRoomId, (i32, i32), u32) {
     let lv = d.find_level(town).expect("town allocated");
     let t = types.borrow();
-    let presets = t.act_presets(0).expect("act 0 presets");
+    let presets = t.act_presets(act).expect("act presets");
     let is_wp = |unit_type: u32, class: i32| {
         unit_type == 2
             && usize::try_from(class)
@@ -173,6 +174,7 @@ pub fn town_waypoint(
 /// After the room's tile build: the waypoint unit is on the room's
 /// preset-unit list at the room-relative position (`preset.md` §9).
 fn assert_transferred(
+    act: u8,
     types: &SharedTypes,
     room: DrlgRoomId,
     rect: d2_sim::drlg::TileRect,
@@ -180,7 +182,7 @@ fn assert_transferred(
     class: u32,
 ) {
     let t = types.borrow();
-    let presets = t.act_presets(0).expect("act 0 presets");
+    let presets = t.act_presets(act).expect("act presets");
     let units: Vec<(u32, i32, i32, i32)> = presets
         .room_units(room)
         .iter()
@@ -205,16 +207,25 @@ pub struct Session {
     pub transcript: Vec<Vec<u8>>,
     /// Steps skipped or stopped, for the report.
     pub notes: Vec<String>,
+    /// The act the game was created in (0 for [`Self::new`]).
+    pub act: u8,
 }
 
 impl Session {
     /// Game creation, the town waypoint and the player, the client
     /// joined (the first frame, no tick, has run).
     pub fn new(d: &GameData, setup: &Setup) -> Self {
+        Self::new_in_act(d, setup, 0)
+    }
+
+    /// [`Self::new`] in act `act` (0..=4): `setup.town` is that act's
+    /// town level.
+    pub fn new_in_act(d: &GameData, setup: &Setup, act: u8) -> Self {
         let (mut sim, types) = d
-            .world_sim(
+            .world_sim_act(
                 setup.creation,
                 setup.init_seed,
+                act,
                 setup.town,
                 setup.game_seed,
                 Seams::default(),
@@ -228,24 +239,24 @@ impl Session {
         // The town generated (`levels.md` §3 step 8), its waypoint room
         // streamed.
         let mut game = Game::new();
-        game.lists.ensure_act(0).unwrap();
+        game.lists.ensure_act(act).unwrap();
         let (room_id, room, rect, wp_at, wp_class) = sim
             .action
             .hooks()
             .drlg
-            .with_act(0, &mut game.lists, |dr, svc| {
+            .with_act(act, &mut game.lists, |dr, svc| {
                 let lv = dr.get_or_alloc_level(svc.data, svc.types, town)?;
                 if dr.level_rooms(lv).is_empty() {
                     dr.generate_level(svc.data, svc.types, lv)?;
                 }
-                let (r, at, c) = town_waypoint(d, dr, &types, &objects, town);
+                let (r, at, c) = town_waypoint(act, d, dr, &types, &objects, town);
                 let rect = dr.room(r).rect;
                 Ok::<_, d2_sim::drlg::DrlgError>((r, dr.stream_room(svc, r)?, rect, at, c))
             })
-            .expect("act 0 has a DRLG")
+            .expect("the act has a DRLG")
             .expect("town generated and streamed");
         let room = room.expect("the waypoint room is active");
-        assert_transferred(&types, room_id, rect, wp_at, wp_class);
+        assert_transferred(act, &types, room_id, rect, wp_at, wp_class);
         assert_eq!(sim.errors(), Vec::<String>::new(), "game creation");
 
         let inside = |(x, y): (i32, i32)| {
@@ -334,7 +345,7 @@ impl Session {
         s.set_unit(
             object,
             UnitFacts {
-                act: 0,
+                act,
                 pos: Pos {
                     x: wp_at.0,
                     y: wp_at.1,
@@ -354,6 +365,7 @@ impl Session {
             start,
             transcript: Vec::new(),
             notes: Vec::new(),
+            act,
         };
         // The position the allocation gave (the path placement may move
         // it off the requested point).
@@ -384,7 +396,8 @@ impl Session {
     }
 
     pub fn room_level(&mut self, room: RoomId) -> Option<u32> {
-        let d = self.sim().events.action.hooks().drlg.dungeon.acts[0].as_ref()?;
+        let act = usize::from(self.act);
+        let d = self.sim().events.action.hooks().drlg.dungeon.acts[act].as_ref()?;
         let r = d.drlg_room_of(room)?;
         Some(d.level(d.room(r).level).id)
     }
@@ -393,11 +406,11 @@ impl Session {
     /// (`UnitFacts`, staged by the caller) follow the player's path.
     pub fn sync_facts(&mut self) {
         let (x, y) = self.pos();
-        let p = self.player;
+        let (p, act) = (self.player, self.act);
         self.sim().set_unit(
             p,
             UnitFacts {
-                act: 0,
+                act,
                 pos: Pos { x, y },
                 owner: None,
             },
@@ -523,7 +536,8 @@ impl Session {
 
     /// The tile rect of an allocated level.
     pub fn level_rect(&mut self, id: u32) -> TileRect {
-        let d = self.sim().events.action.hooks().drlg.dungeon.acts[0]
+        let act = usize::from(self.act);
+        let d = self.sim().events.action.hooks().drlg.dungeon.acts[act]
             .as_ref()
             .unwrap();
         let l = d.find_level(id).expect("level allocated at act creation");

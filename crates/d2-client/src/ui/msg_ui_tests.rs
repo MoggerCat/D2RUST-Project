@@ -96,13 +96,7 @@ fn quest_parts_without_a_spec_are_skipped() {
     }
     assert_eq!(
         u.take_outcome().skipped,
-        [
-            skip::SCREEN_MESSAGE,
-            skip::MONSTER_EFFECT,
-            skip::SCREEN_MESSAGE,
-            skip::VIDEO_7,
-            skip::DEN_COUNTER
-        ]
+        [skip::MONSTER_EFFECT, skip::VIDEO_7, skip::DEN_COUNTER]
     );
     // f bit 1, c 23: expansion → `[0x007BC9D8]`; classic → the video
     // path (skipped) and `[0x007BC9D4]`.

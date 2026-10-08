@@ -13,7 +13,9 @@
 //!
 //! Everything except [`mirror`] is plain Rust without Bevy types.
 
+pub mod belt;
 pub mod bits;
+pub mod chat_end;
 pub mod check;
 pub mod click;
 pub mod combat;
@@ -21,6 +23,7 @@ pub mod dispatch;
 pub mod drlg;
 pub mod hover;
 pub mod intent;
+pub mod items;
 pub mod link;
 pub mod local;
 pub mod mirror;
@@ -448,6 +451,13 @@ impl<L: ServerLink> Bridge<L> {
     #[cfg(test)]
     pub(crate) fn world_mut(&mut self) -> &mut ClientWorld {
         &mut self.world
+    }
+
+    /// The play preview's own-walk room recache of the local player at
+    /// the predicted sub-tile ([`ClientWorld::recache_local_room`]).
+    /// d2rs-own, unverified. PROVISIONAL (`client/model.md` OQ2; REC-51).
+    pub fn recache_local_room(&mut self, x: u16, y: u16) -> bool {
+        self.world.recache_local_room(x, y)
     }
 
     pub fn world(&self) -> &ClientWorld {

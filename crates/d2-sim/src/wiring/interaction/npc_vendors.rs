@@ -99,6 +99,8 @@ where
         let tables = self.vendor_tables;
         let now = self.now;
         let mut seed = ctl.seed;
+        self.state.shown_player = Some(player);
+        self.state.shown_class = class;
         let r = self.with_record(class, |rec, desk| {
             let mut c = StoreCtx {
                 tables,

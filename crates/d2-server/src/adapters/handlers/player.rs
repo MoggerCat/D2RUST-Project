@@ -758,6 +758,31 @@ fn target_code<D: EventDispatch, W: WorldHost<D>>(
     }
 }
 
+/// The 0x15 resync of a client whose point target was out of range
+/// (`intents-events.md` §2.4 rule 3): the player is queued for update
+/// with flag-ex bit 0x10000, which makes its next update send S→C 0x15
+/// (`pathing.md` §10 rule 2), exactly as C→S 0x4B for the player's own
+/// unit does (§9 rule 10). A host without the player provider does
+/// nothing.
+pub fn resync<D: EventDispatch, W: WorldHost<D>>(sim: &mut SimGame<D, W>, client: ClientId) {
+    let Some(player) = sim.player_of(client) else {
+        return;
+    };
+    let Some(guid) = sim.game.lists.unit(player).map(|e| e.guid) else {
+        return;
+    };
+    let mut msg = [0u8; 9];
+    msg[0] = 0x4B;
+    msg[5..9].copy_from_slice(&guid.to_le_bytes());
+    let run = Run {
+        player,
+        msg: &msg,
+        target: 0,
+    };
+    let (game, events) = (&mut sim.game, &mut sim.events);
+    let _ = sim.world.player(game, events, run);
+}
+
 /// The §9 handler for one dispatched message. `None`: not an id routed
 /// here, no player, the host has no [`PlayerWorld`] provider, or the
 /// handler reached a call with no provider: the caller keeps its stub.

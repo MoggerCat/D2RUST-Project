@@ -177,6 +177,25 @@ pub fn set_skill(unit_type: u8, guid: u32, hand: u8, skill: u16, item: u32) -> [
     b
 }
 
+/// S→C 0x94 BaseSkillLevels (`0x0053C5D0`, `client/msg-skills.md` §3
+/// rule 1, `sim/server-messages.tsv` `u8@1*3+6;min=9`): count n u8@1,
+/// player GUID u32@2, then n entries from @6 of skill u16, level u8.
+/// `None` for no entry (below the table's minimum of 9 bytes) or more
+/// than 255 (n is a byte). Which entries and levels the sender takes is
+/// the caller's (`crate::skills::list::SkillList::base_levels`).
+pub fn base_skill_levels(guid: u32, entries: &[(u16, u8)]) -> Option<Vec<u8>> {
+    let n = u8::try_from(entries.len()).ok().filter(|&n| n > 0)?;
+    let mut m = Vec::with_capacity(6 + 3 * entries.len());
+    m.push(0x94);
+    m.push(n);
+    m.extend_from_slice(&guid.to_le_bytes());
+    for &(skill, level) in entries {
+        m.extend_from_slice(&skill.to_le_bytes());
+        m.push(level);
+    }
+    Some(m)
+}
+
 /// S→C 0x7E (`0x0053DB70`, 5 bytes, `path-placement.md` §11): 1.14d
 /// writes only the id byte; bytes 1–4 are uninitialised stack memory
 /// there. d2rs sends zeros (edge case 10; the scenario comparison masks
@@ -228,6 +247,60 @@ pub fn clamp_send(value: i32, n: u8, signed: bool) -> i32 {
     }
 }
 
+/// A state's list entries then the 0x1FF end (§7.9 rule 1.3).
+fn write_entries(
+    w: &mut BitWriter,
+    entries: &[(u16, u16, i32)],
+    stat: &impl Fn(u16) -> Option<SendStat>,
+) {
+    for &(param, id, value) in entries.iter().take(STATE_LIST_ENTRIES) {
+        let Some(row) = stat(id).filter(|r| r.bits != 0) else {
+            continue;
+        };
+        w.write(u32::from(id), 9);
+        if row.param_bits != 0 {
+            w.write(u32::from(param), u32::from(row.param_bits));
+        }
+        let v = clamp_send(value, row.bits, row.signed);
+        w.write(v as u32, u32::from(row.bits).min(32));
+    }
+    w.write(0x1FF, 9);
+}
+
+/// S→C 0xA7 DelayedState / 0xA9 EndState (`0x0053E260` / `0x0053E290`,
+/// §3.5 rule 6): `id`, unit type, GUID u32@2, state u8@6 (7 bytes).
+pub fn state_ref(id: u8, unit_type: u8, guid: u32, state: u8) -> [u8; 7] {
+    let g = guid.to_le_bytes();
+    [id, unit_type, g[0], g[1], g[2], g[3], state]
+}
+
+/// S→C 0xA8 SetState (`0x0053E8D0`, §3.5 rule 6): type, GUID, size u8@6
+/// = 8 + the stream's bytes, state u8@7, the entries stream from @8
+/// (the §7.9 rule 1.3 form after the list bit, then 0x1FF).
+pub fn set_state(
+    unit_type: u8,
+    guid: u32,
+    state: u8,
+    entries: &[(u16, u16, i32)],
+    stat: impl Fn(u16) -> Option<SendStat>,
+) -> Vec<u8> {
+    let mut w = BitWriter::new();
+    write_entries(&mut w, entries, &stat);
+    let g = guid.to_le_bytes();
+    let mut b = vec![
+        0xA8,
+        unit_type,
+        g[0],
+        g[1],
+        g[2],
+        g[3],
+        (8 + w.bytes.len()) as u8,
+        state,
+    ];
+    b.extend(w.bytes);
+    b
+}
+
 /// S→C 0xAA, unit states (`0x00570E30`, §7.9 rule 1): byte 0 0xAA, unit
 /// type u8@1, GUID u32@2, size u8@6 = 7 + the stream's byte length, the
 /// bit stream from byte 7 (LSB first). `states`: the unit's states in
@@ -252,18 +325,7 @@ pub fn unit_states(
             None | Some([]) => w.write(0, 1),
             Some(entries) => {
                 w.write(1, 1);
-                for &(param, id, value) in entries.iter().take(STATE_LIST_ENTRIES) {
-                    let Some(row) = stat(id).filter(|r| r.bits != 0) else {
-                        continue;
-                    };
-                    w.write(u32::from(id), 9);
-                    if row.param_bits != 0 {
-                        w.write(u32::from(param), u32::from(row.param_bits));
-                    }
-                    let v = clamp_send(value, row.bits, row.signed);
-                    w.write(v as u32, u32::from(row.bits).min(32));
-                }
-                w.write(0x1FF, 9);
+                write_entries(&mut w, entries, &stat);
             }
         }
     }

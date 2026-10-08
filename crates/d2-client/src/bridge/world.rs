@@ -99,6 +99,11 @@ pub struct ItemRecord {
     /// The owner of 0x9D.
     pub owner: Option<UnitKey>,
     pub stream: Vec<u8>,
+    /// d2rs-own, unverified: [`ClientWorld::store_serial`] when this
+    /// store-shown record (action 0x0B) arrived; 0 for every other
+    /// action. Lets the shop panel tell the items of the current trade
+    /// from those of an earlier one.
+    pub seq: u32,
 }
 
 /// Item data (`msg-stats-items.md` §2 rule 4, §3 rule 2, §5).
@@ -507,6 +512,9 @@ impl RoomUnits {
 pub struct ClientWorld {
     /// Bridge frames run (`bridge.md` §5 rule 3).
     pub frames: u64,
+    /// d2rs-own, unverified: S→C 0x9C action 0x0B records received (the
+    /// store items a trade open shows, `world/vendors.md` §4 step 3).
+    pub store_serial: u32,
     /// Bridge frames whose pump ran a server tick (`bridge.md` §5 rule 3).
     pub server_ticks: u64,
     /// Set S: the units the server announced, in key order (§2 rule 8).
@@ -528,6 +536,10 @@ pub struct ClientWorld {
     /// Palette level of pet monsters set by the 0x75 pet pass (render
     /// state, `msg-units.md` §8 r10; PROVISIONAL).
     pub pet_palette: BTreeMap<UnitKey, u8>,
+    /// The belt column-ready bytes `[0x007BEFB0 + c]`
+    /// (`msg-stats-items.md` §2 r6), written only by 0x9C 0x0E, 0x0F and
+    /// 0x15 mode 2.
+    pub belt_ready: [bool; 4],
     pub rooms_in_sight: Vec<RoomSight>,
     /// C→S messages the client sends on its own (§6 rule 8, §7 rule 3),
     /// until the bridge hands them to its send path. An empty entry is a
@@ -665,6 +677,34 @@ impl ClientWorld {
             return Some(found);
         }
         room_of_point(rooms, x, y).copied()
+    }
+
+    /// The play preview's own-walk room recache (decision D2): the local
+    /// player moved by the client's walk prediction to sub-tile `(x, y)`
+    /// is linked to the room of that point (§12 rule 2 from its current
+    /// room, or the act lookup when it has none) through the room recache
+    /// of `sim/unit-order.md` §5 rule 6 (`0x0064FAD0`), as the 1.14d
+    /// client's own path step does (§3 rule 3). The model's `position`
+    /// is not written (the prediction keeps it). No room at the point
+    /// (not in sight yet) or the same room: unchanged, `false`.
+    ///
+    /// d2rs-own, unverified. PROVISIONAL (open question 2; REC-51).
+    pub fn recache_local_room(&mut self, x: u16, y: u16) -> bool {
+        let Some(key) = self.local_player else {
+            return false;
+        };
+        if !self.units.contains_key(&key) {
+            return false;
+        }
+        let current = self.local_room().copied();
+        let Some(found) = self.room_from(current.as_ref(), x, y) else {
+            return false;
+        };
+        if current.is_some_and(|c| c.room == found.room) {
+            return false;
+        }
+        self.room_units.place(key, Some(found.room));
+        true
     }
 
     /// The room of a unit: the active room whose unit list holds it

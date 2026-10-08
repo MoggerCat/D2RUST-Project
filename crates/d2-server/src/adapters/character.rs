@@ -1,4 +1,4 @@
-// Spec: specs/formats/d2s-load.md; specs/items/generation.md §10.3; specs/world/hirelings-2.md §19; specs/formats/d2s.md §2.2 r7, §2.2 r8, §2.2 r9, §2.4 r4, §2.4 r5, §2.4 r6, §8.2 r7, §8.5 r2, §9; specs/world/quests.md §1.6
+// Spec: specs/formats/d2s-load.md; specs/client/msg-skills.md §2 r8; specs/formats/d2s.md §7.2 r2; specs/items/generation.md §10.3; specs/world/hirelings-2.md §19; specs/formats/d2s.md §2.2 r7, §2.2 r8, §2.2 r9, §2.4 r4, §2.4 r5, §2.4 r6, §8.2 r7, §8.5 r2, §9; specs/world/quests.md §1.6
 //! Character storage: what loading a parsed `.d2s` does to the game
 //! (`formats/d2s-load.md`). `d2_formats::d2s` parses and checks the bytes
 //! (`formats/d2s.md` §1–§8, §10); [`load`] then runs either the
@@ -23,9 +23,11 @@
 
 use d2_formats::d2s::{self, Corpse, D2s, Header, Hireling, ItemEntry, Slot, StatEntry};
 use d2_sim::combat::vitals::{init_player_stats, VitalsUnits};
+use d2_sim::skills::list::{class_skills, ListOwner};
 use d2_sim::units::UnitId;
 use d2_sim::wiring::action::{HirelingCall, Pending, View};
 use d2_sim::world::hirelings::life::{Loader, SavedHireling};
+use d2_sim::world::waypoints::{WaypointRecord, WaypointRecords};
 
 /// Stat ids the load reads or writes (`formats/d2s.md` §9).
 pub mod stat {
@@ -175,6 +177,14 @@ pub struct Unapplied {
 /// provider does not exist yet (named, never guessed); [`load`] records
 /// that and goes on, in the master's order.
 pub trait CharacterWorld {
+    /// The player init's native skills (`0x005348C0` → `0x00647EE0`,
+    /// `client/msg-skills.md` §2 rule 8): the player's skill list gets
+    /// skill 0 and its class's `charstats` `Skill 1`…`Skill 10` (base 1,
+    /// owner −1), with Attack in both hands. Both load paths allocate the
+    /// player through that init (load §1 rule 1, the header step of load
+    /// §2), so it runs first in both.
+    fn player_skills(&mut self) -> Result<(), Unapplied>;
+
     // ---- load §1: new-character start (`0x00569F80`)
 
     /// Client +0x3D4 |= 1, the unit's set-up (`0x00569F20`: mode 1,
@@ -283,6 +293,8 @@ pub fn load(
         // header step runs), so `StartSkill` applies (edge case 1).
         return Ok(load_new_character(w));
     };
+    // The header step allocates the player (`0x005348C0`, rule 8).
+    note(&mut r, w.player_skills());
     let h = header_load(&save.header, ctx);
     r.act = h.act;
     note(&mut r, w.apply_header(&h));
@@ -346,6 +358,8 @@ pub fn load_new_character(w: &mut dyn CharacterWorld) -> LoadReport {
 
 /// Load §1 rule 1 after the unit exists; the right skill selected.
 fn new_character(w: &mut dyn CharacterWorld, act: u8, r: &mut LoadReport) -> Option<u16> {
+    // The allocation of `0x00569F80` runs the player init (rule 8).
+    note(r, w.player_skills());
     note(r, w.new_character_setup());
     note(r, w.start_stats(act));
     note(r, w.start_items());
@@ -357,9 +371,11 @@ fn new_character(w: &mut dyn CharacterWorld, act: u8, r: &mut LoadReport) -> Opt
                 Ok(false) => None,
                 Err(u) => {
                     // PROVISIONAL (formats/d2s-load.md §1 rule 1, §8 rule 3;
-                    // REC-02): with no skill-list provider the start skill
-                    // is taken as present, as in the fresh 1.14d saves
-                    // (Sorceress 36, Necromancer 70 = `StartSkill`).
+                    // REC-02): with no provider for the entries the start
+                    // items grant (stat 107 on slot 0, `items/generation.md`
+                    // §10.3 step 2.3) the start skill is taken as present,
+                    // as in the fresh 1.14d saves (Sorceress 36,
+                    // Necromancer 70 = `StartSkill`).
                     r.unapplied.push(u);
                     Some(s)
                 }
@@ -449,6 +465,31 @@ impl<X: Pending> ActionCharacter<'_, '_, X> {
 }
 
 impl<X: Pending> CharacterWorld for ActionCharacter<'_, '_, X> {
+    /// Rule 8 on the player's list in `ActionHooks::skill_lists`
+    /// (created here when missing: `0x006438B0` at the player init).
+    fn player_skills(&mut self) -> Result<(), Unapplied> {
+        let Some(t) = self.v.h.vitals.clone() else {
+            return unapplied(
+                "player skills",
+                "no vitals tables (charstats `Skill 1`–`Skill 10`) on the action wiring",
+            );
+        };
+        let class = self.class();
+        let cs = t.charstats(class).map(|c| {
+            [
+                c.skill_1, c.skill_2, c.skill_3, c.skill_4, c.skill_5, c.skill_6, c.skill_7,
+                c.skill_8, c.skill_9, c.skill_10,
+            ]
+        });
+        let h = &mut *self.v.h;
+        let rows = &h.tables.skills.skills;
+        let list = h.skill_lists.entry(self.player).or_default();
+        list.init_player(rows, ListOwner::player(class), cs.as_ref())
+            .map_err(|_| Unapplied {
+                step: "player skills",
+                reason: "select of skill 0 outside the skills table (fatal 0x668)",
+            })
+    }
     fn new_character_setup(&mut self) -> Result<(), Unapplied> {
         unapplied(
             "new character set-up",
@@ -475,10 +516,23 @@ impl<X: Pending> CharacterWorld for ActionCharacter<'_, '_, X> {
         };
         Ok(t.charstats(self.class()).map_or(0, |c| c.startskill))
     }
-    fn has_skill(&self, _: u16) -> Result<bool, Unapplied> {
+    /// `0x006439F0` on the player's list: an entry → true. No entry is
+    /// not an answer: the entries items grant (the start items' stat 107,
+    /// `items/generation.md` §10.3 step 2.3; a loaded item's skills) are
+    /// not in the list.
+    fn has_skill(&self, skill: u16) -> Result<bool, Unapplied> {
+        if self
+            .v
+            .h
+            .skill_lists
+            .get(&self.player)
+            .is_some_and(|l| l.has(i32::from(skill)))
+        {
+            return Ok(true);
+        }
         unapplied(
             "has skill",
-            "the player's skill list (`0x006439F0`) has no provider here",
+            "item-granted skill entries (`0x006439F0` beyond the native list) have no provider here",
         )
     }
     fn set_mouse_skills(&mut self, _: Option<u16>) -> Result<(), Unapplied> {
@@ -505,8 +559,18 @@ impl<X: Pending> CharacterWorld for ActionCharacter<'_, '_, X> {
             "the player's quest records live in the host rest (QuestRest::quests)",
         )
     }
-    fn set_waypoints(&mut self, _: &[[u8; 16]; 3]) -> Result<(), Unapplied> {
-        unapplied("waypoints", "player data +0x1C is not in d2-sim")
+    /// `0x0056A3E0` (`world/waypoints.md` §3): the records, magic
+    /// normalised, in `ActionHooks::waypoints` (player data +0x1C).
+    fn set_waypoints(&mut self, records: &[[u8; 16]; 3]) -> Result<(), Unapplied> {
+        let mut out = WaypointRecords::default();
+        for (slot, src) in out.0.iter_mut().zip(records) {
+            *slot = WaypointRecord::load_copy(src).map_err(|_| Unapplied {
+                step: "waypoints",
+                reason: "a record's magic is not 0x0102 / 0x0101 / 0 (waypoints.md §2)",
+            })?;
+        }
+        self.v.h.waypoints.insert(self.player, out);
+        Ok(())
     }
     fn set_npc_fields(&mut self, _: &[[u8; 8]; 3], _: &[[u8; 8]; 3]) -> Result<(), Unapplied> {
         unapplied("npc fields", "player data +0x60 is not in d2-sim")
@@ -522,11 +586,24 @@ impl<X: Pending> CharacterWorld for ActionCharacter<'_, '_, X> {
         }
         Ok(self.v.stats.unit_total(self.player, id, 0))
     }
-    fn add_skill_level(&mut self, _: usize, _: u8) -> Result<(), Unapplied> {
-        unapplied(
-            "skills",
-            "`0x0056DEB0` on a player unit (skills/levels.md) has no provider here",
-        )
+    /// `formats/d2s.md` §7.2 rule 2: skill = the class list's entry
+    /// `index` (`data/runtime-maps.md` §5; −1 past its end, which the set
+    /// ignores), base level := `level` (`0x0056DEB0(unit, skill, level,
+    /// 1)`, [`SkillList::set_base`](d2_sim::skills::list::SkillList::set_base)).
+    fn add_skill_level(&mut self, index: usize, level: u8) -> Result<(), Unapplied> {
+        let class = self.class();
+        let h = &mut *self.v.h;
+        let rows = &h.tables.skills.skills;
+        let Some(&skill) = class_skills(rows, class).get(index) else {
+            return Ok(());
+        };
+        h.skill_lists.entry(self.player).or_default().set_base(
+            rows,
+            ListOwner::player(class),
+            skill,
+            level,
+        );
+        Ok(())
     }
     fn create_items(&mut self, _: ItemList, entries: &[ItemEntry]) -> Result<(), Unapplied> {
         if entries.is_empty() {

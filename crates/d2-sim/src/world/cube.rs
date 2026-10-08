@@ -422,6 +422,28 @@ impl CubeData {
         }
     }
 
+    /// From the fixed-up table set (`d2_data::fixup::apply`): the
+    /// `cubemain` records in record order and the item, stat and
+    /// experience columns the cube reads.
+    pub fn from_fixed(
+        f: &d2_data::fixup::FixedSet,
+    ) -> Result<Self, crate::items::tables::TableError> {
+        use crate::items::tables::TableError;
+        fn typed<T: Record>(f: &d2_data::fixup::FixedSet) -> Result<Vec<T>, TableError> {
+            let t = f.table(T::TABLE).ok_or(TableError::Missing(T::TABLE))?;
+            Ok(decode_all::<T>(t)?)
+        }
+        let cube = f.table("cubemain").ok_or(TableError::Missing("cubemain"))?;
+        Ok(Self::new(
+            recipes(cube)?,
+            &typed::<Weapons>(f)?,
+            &typed::<Armor>(f)?,
+            &typed::<Misc>(f)?,
+            &typed::<Itemstatcost>(f)?,
+            &typed::<Experience>(f)?,
+        ))
+    }
+
     fn item(&self, class: u32) -> Option<&ItemRecord> {
         self.items.get(class as usize)
     }

@@ -24,6 +24,7 @@ pub mod ai;
 pub mod combat;
 pub mod death;
 pub mod dispatch;
+pub mod dying;
 pub mod hirelings;
 pub mod inactive;
 pub mod missiles;
@@ -33,10 +34,13 @@ pub mod objects;
 pub mod pending;
 pub mod reaction;
 pub mod rooms;
+pub mod state_update;
 pub mod switch;
+pub mod town_portal;
 pub mod unit_update;
 pub mod units;
 pub mod vitals_sync;
+pub mod warp_tile;
 pub mod waypoints;
 
 #[cfg(any(test, feature = "bench-fixtures"))]
@@ -70,7 +74,7 @@ pub use monsters::MonsterWorld;
 pub use objects::{
     ObjectCase, ObjectReach, ObjectRoute, ObjectState, ObjectView, QuestObjectCall, QuestObjectHost,
 };
-pub use pending::{KillStep, NoPending, Pending, SkillEvent};
+pub use pending::{KillStep, NoPending, Pending, QuestEvent, SkillEvent};
 
 /// The tables the action modules read (typed `d2_data` records).
 #[derive(Debug, Clone)]
@@ -101,6 +105,8 @@ pub enum WiringError {
     /// A store was needed while it was lent out (a missile or AI call
     /// re-entered its own module).
     Reentrant(&'static str),
+    /// A pet list fatal assert (`sim/pets.md`).
+    Pet(crate::player::pets::PetError),
     Drlg(DrlgError),
     Unit(UnitError),
     /// The AnimData name lookup failed (`animdata.md` §4: a name longer
@@ -166,6 +172,8 @@ pub struct ActionHooks<X> {
     pub objects: Option<ObjectState>,
     /// The object state is lent out for a call.
     objects_out: bool,
+    /// The town portal pairs ([`town_portal`], REC-117).
+    pub portals: town_portal::PortalLinks,
     /// The drop state of the object code's chest drop `D(Q)`
     /// (`treasure.md` §4, [`crate::wiring::economy::object_chest_drop`];
     /// the `levels` rows are the object tables'). `None` (the default):
@@ -194,6 +202,10 @@ pub struct ActionHooks<X> {
     /// lists (`hirelings-2.md` §19). `None` (the default): nothing is
     /// recorded.
     pub hireling_calls: Option<Vec<HirelingCall>>,
+    /// The quest/NPC act changes asked (`LifecycleHooks::request_act_change`:
+    /// player, destination level, argument), for the host that runs them
+    /// (`wiring::path::act_change`) after the call.
+    pub act_changes: Vec<(UnitId, u32, u32)>,
     /// The loaded `AnimData.d2` (`formats/animdata.md`, parsed by
     /// `d2-formats`): the records `UnitHooks::anim_record` looks up by
     /// COF name. `None`: no record for any unit (as before the table is
@@ -265,6 +277,16 @@ pub struct ActionHooks<X> {
     /// (`sim/intents-events.md` §8; [`switch`]): player names, hot keys,
     /// skill hands, portal flags.
     pub session: switch::SessionState,
+    /// The players' server skill lists (unit +0xA8,
+    /// [`crate::skills::list`]): created by the player init
+    /// (`client/msg-skills.md` §2 rule 8) and filled by the character
+    /// load (`formats/d2s.md` §7.2); the join's S→C 0x94 reads them.
+    /// TODO(skills/levels.md): the combat and skill seams
+    /// ([`Pending::skill_list`]) do not read them yet.
+    pub skill_lists: BTreeMap<UnitId, crate::skills::list::SkillList>,
+    /// The players' pet lists (player data +0x44, `sim/pets.md` §1),
+    /// created on a player's first summon ([`crate::wiring::interaction::summon`]).
+    pub pet_lists: BTreeMap<UnitId, crate::player::pets::PetLists>,
     /// The inactive-unit store (game +0xD8, `units.md` §3.4;
     /// [`inactive`]). `None` (the default): tick step 9 compresses
     /// nothing and the restore is the host's, as before.
@@ -275,6 +297,28 @@ pub struct ActionHooks<X> {
     /// logged with it).
     pub orphan_seed: Seed,
     pub errors: Vec<WiringError>,
+}
+
+impl<X: Pending> ActionHooks<X> {
+    /// The unit's skill list: its list in [`ActionHooks::skill_lists`]
+    /// when it has one (`client/msg-skills.md` §1), else
+    /// [`Pending::skill_list`].
+    pub fn skill_list_of(&self, unit: UnitId) -> Vec<crate::skills::SkillEntry> {
+        match self.skill_lists.get(&unit) {
+            Some(l) => l.view(),
+            None => self.x.skill_list(unit),
+        }
+    }
+
+    /// The unit's current skill entry (`use.md` §1 rule 2, +0x10): its
+    /// list's current entry when it has a list, else
+    /// [`Pending::used_skill`].
+    pub fn used_skill_of(&self, unit: UnitId) -> Option<crate::skills::SkillEntry> {
+        match self.skill_lists.get(&unit) {
+            Some(l) => l.current.and_then(|i| l.view().get(i).copied()),
+            None => self.x.used_skill(unit),
+        }
+    }
 }
 
 impl<X> ActionHooks<X> {
@@ -293,11 +337,13 @@ impl<X> ActionHooks<X> {
             waypoints: BTreeMap::new(),
             objects: None,
             objects_out: false,
+            portals: Default::default(),
             object_drops: None,
             pet_follows: None,
             pet_deaths: None,
             owner_deaths: None,
             hireling_calls: None,
+            act_changes: Vec::new(),
             anim_data: None,
             vitals: None,
             mode_target: None,
@@ -315,6 +361,8 @@ impl<X> ActionHooks<X> {
             sync: None,
             death: death::DeathState::default(),
             session: switch::SessionState::default(),
+            skill_lists: BTreeMap::new(),
+            pet_lists: BTreeMap::new(),
             inactive: None,
             x,
             orphan_seed: Seed::init(),

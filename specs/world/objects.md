@@ -44,22 +44,22 @@
 |   4. Object animation at a mode change | 180–211 |
 |   5. Init functions | 212–286 |
 |   6. Preset object classes 574–582 (`0x0054F490`) | 287–323 |
-|   7. Operate dispatch | 324–374 |
-|   8. Chests and breakables | 375–508 |
-|   9. Shrines | 509–617 |
-|   10. Doors, operate 8 (`0x00581D40`) | 618–641 |
-|   11. Wells, operate 22 (`0x005858A0`) | 642–673 |
-|   12. Portals, operate 15 (`0x00584870`) | 674–740 |
-|   13. Torch, operate 11 (`0x005843D0`) | 741–745 |
-|   14. Client messages | 746–773 |
-|   15. Not covered yet | 774–788 |
-|   16.–18. Moved | 789–795 |
-| Constants & data dependencies | 796–842 |
-| Randomness | 843–888 |
-| Edge cases & original bugs | 889–955 |
-| Test vectors | 956–994 |
-| Provenance | 995–1052 |
-| Open questions | 1053–1101 |
+|   7. Operate dispatch | 324–382 |
+|   8. Chests and breakables | 383–516 |
+|   9. Shrines | 517–625 |
+|   10. Doors, operate 8 (`0x00581D40`) | 626–649 |
+|   11. Wells, operate 22 (`0x005858A0`) | 650–681 |
+|   12. Portals, operate 15 (`0x00584870`) | 682–748 |
+|   13. Torch, operate 11 (`0x005843D0`) | 749–753 |
+|   14. Client messages | 754–781 |
+|   15. Not covered yet | 782–796 |
+|   16.–18. Moved | 797–803 |
+| Constants & data dependencies | 804–850 |
+| Randomness | 851–896 |
+| Edge cases & original bugs | 897–963 |
+| Test vectors | 964–1002 |
+| Provenance | 1003–1060 |
+| Open questions | 1061–1109 |
 <!-- /index -->
 
 ## Summary
@@ -333,6 +333,14 @@ case `0x00548B00` (player; range and walk rules in `world/waypoints.md`
 2. Operator is a monster and `MonsterOK` (+0x16D) = 0 → return 1.
 3. Operator present and not in interact range (`0x00623660`) → return 1.
 4. Else run §7.2 and return 1.
+
+PROVISIONAL: the interact range test `0x00623660` of rule 3 is read as
+always in range for a player operator (because no written spec gives
+its test, and the client sends C→S 0x13 only after its walk to the
+object ended; the play host's seam, `LocalSeams::object_in_range`);
+settled by REC-94. The player's interact info needs no staging before
+the operate: §7.2 rule 2 refuses an active one, and the waypoint's
+operate sets it itself (`waypoints.md` §5.2 step 3).
 
 Skills call §7.2 directly (`0x005C9B13`, skills spec).
 

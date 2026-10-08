@@ -92,6 +92,8 @@ pub struct WorldViewState {
     /// The game's automap (`ui/automap.md`), when the app supplied its
     /// tables; `None`: no automap.
     pub automap: Option<crate::ui::automap::session::AutomapSession>,
+    /// The automap's draw sink (`super::automap_view`); `None`: not drawn.
+    pub automap_view: Option<super::automap_view::AutomapView>,
     /// The play preview (decision D1, [`super::preview`]): a frame whose
     /// build fails is logged (each message once) and not presented,
     /// instead of failing the app. `false`: strict (M07).
@@ -104,6 +106,13 @@ pub struct WorldViewState {
     pub last_ui: Vec<crate::ui::UiDraw>,
     /// The preview's pending interaction (`super::interact`).
     pub interact: super::interact::PreviewInteract,
+    /// Ground items (`super::ground_items`): the app hands in the item art
+    /// rows and the archives; the default draws nothing.
+    pub ground_items: super::ground_items::GroundItems,
+    /// The click on a corpse (`super::corpse_click`).
+    pub corpse_clicks: super::corpse_click::CorpseClicks,
+    /// Client missiles and cast / state overlays (`super::missiles`).
+    pub missiles: super::missiles::Missiles,
 }
 
 impl WorldViewState {
@@ -121,11 +130,15 @@ impl WorldViewState {
             last: None,
             click: Default::default(),
             automap: None,
+            automap_view: None,
             preview: false,
             preview_error: None,
             last_tags: Vec::new(),
             last_ui: Vec::new(),
             interact: Default::default(),
+            ground_items: Default::default(),
+            corpse_clicks: Default::default(),
+            missiles: Default::default(),
         }
     }
 }
@@ -284,6 +297,7 @@ pub fn deliver_outputs(
     outputs: Option<ResMut<FrameOutputs>>,
     ui: Option<NonSendMut<WorldViewUi>>,
     sounds: Option<ResMut<UiSounds>>,
+    state: Option<Res<WorldViewState>>,
 ) -> Result {
     let Some(mut outputs) = outputs else {
         return Ok(());
@@ -293,7 +307,8 @@ pub fn deliver_outputs(
         return Ok(());
     }
     let original = ui.map(|u| u.into_inner()).and_then(|u| u.original.as_mut());
-    let requests = deliver(&mut bridge.0, &list, original)?;
+    let preview = state.is_some_and(|s| s.preview);
+    let requests = deliver_with(&mut bridge.0, &list, original, preview)?;
     if let Some(mut s) = sounds {
         s.0.extend(requests);
     }
@@ -315,7 +330,19 @@ pub fn deliver_outputs(
 pub fn deliver<L: ServerLink>(
     bridge: &mut Bridge<L>,
     list: &[Output],
+    original: Option<&mut OriginalUi>,
+) -> Result<Vec<SoundRequest>, DeliverError> {
+    deliver_with(bridge, list, original, false)
+}
+
+/// [`deliver`], with the play preview's chat close after the dialog
+/// branch when `preview_chat_end` (`bridge::chat_end`; d2rs-own,
+/// unverified).
+pub fn deliver_with<L: ServerLink>(
+    bridge: &mut Bridge<L>,
+    list: &[Output],
     mut original: Option<&mut OriginalUi>,
+    preview_chat_end: bool,
 ) -> Result<Vec<SoundRequest>, DeliverError> {
     let requests = std::cell::RefCell::new(Vec::new());
     let bridge = std::cell::RefCell::new(bridge);
@@ -331,6 +358,11 @@ pub fn deliver<L: ServerLink>(
                     }
                     if let Some((d, case)) = ui.take_dialog_answer() {
                         bridge.borrow_mut().npc_dialog_branch(&d, case)?;
+                        // Preview: no speech or menu, so the chat closes
+                        // at once (`bridge::chat_end`; d2rs-own).
+                        if preview_chat_end && !ui.npc_menu_up() {
+                            bridge.borrow_mut().preview_chat_end(d.guid)?;
+                        }
                     }
                 }
                 None => debug!("ui output {o:?}: no original UI"),
@@ -454,6 +486,10 @@ fn ui_input(
             walk.run.stand_still = held;
         }
     }
+    // d2rs-own, unverified: Shift held, for the shift-click to the belt.
+    if let (Some(o), Some(keys)) = (ui.original.as_mut(), keys.as_deref()) {
+        o.set_shift(keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight));
+    }
     // Keys in `KEY_CODES` order, so one frame's actions are ordered the
     // same on every run.
     if let (Some(bindings), Some(keys)) = (&ui.bindings, keys.as_deref()) {
@@ -464,6 +500,7 @@ fn ui_input(
             .collect();
         let actions = edge::key_actions(bindings, &pressed);
         ui.queue.0.extend(actions);
+        ui.queue.0.extend(edge::key_chars(&pressed));
     }
     // A window below 800×600 has no frame mapping (`ui.md` open question
     // 1 of the C8 notes): pointer input is dropped as outside the frame.
@@ -526,6 +563,7 @@ fn world_view_frame(
     mut images: ResMut<Assets<Image>>,
     mut sounds: Option<ResMut<UiSounds>>,
     mut walk: Option<ResMut<PreviewWalk>>,
+    mut exit: MessageWriter<AppExit>,
 ) -> Result {
     let tick = bridge.0.world().server_ticks;
     if tick == 0 || state.last.is_some_and(|l| l.server_tick == tick) {
@@ -562,6 +600,10 @@ fn world_view_frame(
                     s.0.extend(outcome.sounds);
                 }
                 state.feed.set_ui_open_mode(original.open_mode());
+                // The Esc menu's "Save and Exit Game" (d2rs-own, unverified).
+                if original.take_exit_request() {
+                    crate::app::save::request_save_and_exit(&mut exit);
+                }
             }
             if let Some(art) = &ui.art {
                 art.ensure(&frame.draws, &mut state.assets)?;
@@ -582,7 +624,7 @@ fn world_view_frame(
                 // `0x00454970()` is not specified: the play area H − 40.
                 skill_y_limit: crate::rules::camera::FrameSize::D2RS.play_height(),
                 mouse,
-                game_menu_open: false,
+                game_menu_open: ui.original.as_ref().is_some_and(|o| o.is_open(9)),
                 // d2rs-own, unverified (D1): the preview's hover pick.
                 pick: state.preview,
             };
@@ -597,15 +639,29 @@ fn world_view_frame(
                             w.run.toggle_run();
                         }
                     }
+                    // The run button (control panel §10 r2) toggles it too.
+                    if let Some(o) = ui.original.as_mut() {
+                        for _ in 0..o.sync_run(w.run.run_lock) {
+                            w.run.toggle_run();
+                        }
+                        o.sync_run(w.run.run_lock);
+                    }
                     (w.run.word(), w.predict.position())
                 }
                 None => (0, None),
             };
+            let cam = super::corpse_click::camera_for(bridge.0.world(), view.open_mode);
+            let unhandled =
+                state
+                    .corpse_clicks
+                    .take_clicks(&mut bridge.0, cam.as_ref(), &frame.unhandled)?;
+            let unhandled = state.ground_items.take_clicks(&mut bridge.0, &unhandled)?;
+            crate::bridge::belt::send_keys(&mut bridge.0, &frame.unhandled)?;
             let outs = world_clicks(
                 &mut bridge.0,
                 &mut state.click,
                 view,
-                &frame.unhandled,
+                &unhandled,
                 mods,
                 local_at,
             )?;
@@ -623,6 +679,8 @@ fn world_view_frame(
                 for o in state.interact.frame(&mut bridge.0, walking)? {
                     debug!("interact: {o:?}");
                 }
+                state.ground_items.frame(&mut bridge.0, walking)?;
+                state.corpse_clicks.frame(&mut bridge.0, walking)?;
             }
             // `ui/automap.md` §8 r2: the toggle command no panel took.
             let toggle = crate::controls::Action::ToggleAutomap.index() as u16;
@@ -646,7 +704,7 @@ fn world_view_frame(
         state.feed.as_mut(),
         &state.assets,
     );
-    let frame = match built {
+    let mut frame = match built {
         Ok(f) => f,
         // d2rs-own, unverified (D1): the preview keeps running; the
         // frame is not presented.
@@ -660,6 +718,31 @@ fn world_view_frame(
         }
         Err(e) => return Err(e.into()),
     };
+    for m in state.ground_items.add_to_frame(
+        bridge.0.world(),
+        state.feed.as_ref(),
+        &mut state.assets,
+        &mut frame,
+    ) {
+        warn!("preview (d2rs-own, unverified): {m}");
+    }
+    for m in state.missiles.add_to_frame(
+        bridge.0.world(),
+        state.feed.as_ref(),
+        &mut state.assets,
+        &mut frame,
+    ) {
+        warn!("preview (d2rs-own, unverified): {m}");
+    }
+    // `ui/automap.md` §10: the open automap's draw pass.
+    if let (Some(a), Some(v)) = (state.automap.as_mut(), state.automap_view.as_mut()) {
+        let world = bridge.0.world();
+        if let Ok(mode) = state.feed.open_mode(world) {
+            for m in v.add_to_frame(a, world, mode, &mut state.assets, &mut frame) {
+                warn!("preview (d2rs-own, unverified): {m}");
+            }
+        }
+    }
     // `ui/automap.md` §5 r1: the reveal of this frame, after the draw
     // marked its records (from the frame `0x0044C7EB`).
     if let Some(a) = state.automap.as_mut() {

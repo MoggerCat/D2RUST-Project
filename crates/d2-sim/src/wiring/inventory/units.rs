@@ -223,8 +223,16 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MoveUnits for InvDesk<'_, '_, H, R>
     fn socket_filled(&self, item: Guid) -> bool {
         self.rest.socket_filled(item)
     }
+    /// `0x0062BEB0`: PROVISIONAL (REC-121): the test is not
+    /// written in the specs; a gem (20), rune (74) or jewel (58) is a
+    /// filler (`items/properties.md` §9 names gem and rune; the jewel
+    /// is the third filler of the game).
     fn socket_filler(&self, item: Guid) -> bool {
-        self.rest.socket_filler(item)
+        use crate::items::ty;
+        [ty::GEM, ty::RUNE, ty::JEWL]
+            .into_iter()
+            .any(|t| self.is_type(item, t))
+            || self.rest.socket_filler(item)
     }
     /// `0x006299B0`: stat 194.
     fn sockets(&self, item: Guid) -> i32 {

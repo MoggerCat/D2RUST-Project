@@ -16,6 +16,8 @@
 
 use d2_sim::combat::RoomKind;
 use d2_sim::rng::Seed;
+use d2_sim::skills::list::ListOwner;
+use d2_sim::skills::use_::bodies::BodyWorld;
 use d2_sim::skills::use_::{
     MissileAim, ModeTarget, ServerMsg, SkillFunctions, UseMissiles, UseState, UseWorld,
 };
@@ -365,9 +367,9 @@ impl<X: SkillRest> UseWorld for World<'_, '_, X> {
     /// change, `docs/handoff/host-merge.md`), it runs here on the same
     /// providers.
     fn start_mode(&mut self, u: UnitId, mode: u32, target: ModeTarget<UnitId>) {
-        // TODO(use.md §4): where `0x0057FE90` / `0x0057FEF0` store the
-        // point or unit target is not stated; the target is not kept.
-        let _ = target;
+        // PROVISIONAL (use.md §4): where `0x0057FE90` / `0x0057FEF0` store
+        // the point or unit target is not stated; the seam value keeps it
+        // (`UseRest::keep_target`) for the skill's missile and checks.
         if self
             .with_sim(|sim, h| modes::set_mode(sim, h, u, mode))
             .is_none()
@@ -375,6 +377,7 @@ impl<X: SkillRest> UseWorld for World<'_, '_, X> {
             return;
         }
         UseRest::clear_target(self.x_mut(), u);
+        UseRest::keep_target(self.x_mut(), u, target);
         self.with_sim(|sim, h| modes::animate(sim, h, u));
         if let Some(r) = self.u.cv.v.units.get_mut(u) {
             r.flags &= !flags::ATTACK_PENDING;
@@ -453,10 +456,57 @@ impl<X: SkillRest> UseWorld for World<'_, '_, X> {
 }
 
 impl<X: SkillRest> LearnUnits for World<'_, '_, X> {
+    /// `0x0056C700`: the skill's `charclass` is the player's class.
     fn is_class_skill(&self, u: UnitId, skill: i32) -> bool {
+        let h = &*self.u.cv.v.h;
+        let class = SkillUnits::class_id(&*self.u, u);
         LearnRest::is_class_skill(self.x(), u, skill)
+            || h.tables
+                .skills
+                .skill(skill)
+                .is_some_and(|r| i32::from(r.charclass as i8) == class)
     }
+    /// `0x00570080` after the cost check (`levels.md` §6.4 step 4): the
+    /// cost comes off `newskills(5)`, the native entry of the player's
+    /// list gains a level (`SkillList::add`, `0x00647110`), and the
+    /// client is told (S→C 0x21: type 0, remove 0, GUID, skill, base
+    /// level, bonus; PROVISIONAL, REC-96).
     fn add_skill_level(&mut self, u: UnitId, skill: i32, cost: i32) {
+        d2_sim::combat::vitals::VitalsUnits::add_base_stat(
+            &mut self.u.cv.v,
+            u,
+            5,
+            cost.wrapping_neg(),
+        );
+        let class = SkillUnits::class_id(&*self.u, u);
+        let guid = self.u.cv.v.units.get(u).map_or(0, |r| r.guid);
+        let h = &mut *self.u.cv.v.h;
+        let rows = &h.tables.skills.skills;
+        let list = h.skill_lists.entry(u).or_default();
+        let Some(i) = list.add(rows, ListOwner::player(class), skill) else {
+            return;
+        };
+        let level = list.entries[i].base;
+        let entry = d2_sim::skills::levels::highest_entry(&list.view(), skill);
+        // `0x00647110`: the skill's passive state on, then the refresh
+        // `0x00646D60` (Critical Strike, Dodge ...; q-amazon, REC-150).
+        let passive = h
+            .tables
+            .skills
+            .skill(skill)
+            .map_or(-1, |r| i32::from(r.passivestate as i16));
+        if passive > 0 {
+            self.u.cv.v.set_state(u, passive as u16, true);
+            if let Some(entry) = entry {
+                BodyWorld::passive_state_apply(&mut *self.u, u, &entry);
+            }
+        }
+        let h = &mut *self.u.cv.v.h;
+        let mut m = vec![0x21, 0, 0];
+        m.extend_from_slice(&guid.to_le_bytes());
+        m.extend_from_slice(&(skill as u16).to_le_bytes());
+        m.extend_from_slice(&[level as u8, 0, 0]);
+        d2_sim::wiring::action::Pending::send(&mut h.x, u, &m);
         LearnRest::add_skill_level(self.x_mut(), u, skill, cost);
     }
 }

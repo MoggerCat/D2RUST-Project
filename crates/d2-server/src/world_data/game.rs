@@ -144,6 +144,12 @@ impl GameTables {
         VitalsTables::from_bin(&self.bins).map_err(|e| err("vitals", e))
     }
 
+    /// The skill bodies' table data (itemstatcost flags, state groups,
+    /// overlays, monlvl, pettype).
+    pub fn body_tables(&self) -> Result<d2_sim::skills::use_::bodies::BodyTables, WorldDataError> {
+        d2_sim::skills::use_::bodies::BodyTables::from_bin(&self.bins).map_err(|e| err("bodies", e))
+    }
+
     pub fn stat_data(&self) -> Result<StatData, WorldDataError> {
         let states = StateTable::new(self.table("states")?, &self.fixed.states)
             .map_err(|e| err("states", e))?;

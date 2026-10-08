@@ -216,3 +216,31 @@ fn monster_mode_is_the_mode_its_code_was_sent_for() {
     req(&mut w, &i, k, 2, R0).unwrap();
     assert_eq!(w.units[&k].mode, 12);
 }
+
+/// PROVISIONAL (client/model.md OQ 1; REC-51): codes 0x15 / 0x16 (S→C
+/// 0x4D / 0x4C) set the skill's `anim` (player) or `monanim` (monster)
+/// mode; a skill without a row leaves the mode.
+// Covers: specs/client/msg-units.md §4 r1; specs/client/model.md §8 r1
+#[test]
+fn skill_codes_set_the_skill_animation_mode() {
+    use super::world::SkillRow;
+    let mut i = ModelInputs::default();
+    i.tables.skills = vec![
+        SkillRow::default(),
+        SkillRow {
+            anim: 10,
+            monanim: 4,
+            ..SkillRow::default()
+        },
+    ];
+    let m = UnitKey::new(MONSTER, 2);
+    for (key, code, want) in [(P, 0x16, 10), (P, 0x15, 10), (m, 0x16, 4), (m, 0x15, 4)] {
+        let mut w = world_with(key, 1);
+        req(&mut w, &i, key, code, [1, -1, 0, 0, 0, 0, 0]).unwrap();
+        assert_eq!(w.units[&key].mode, want, "{key:?} {code:#x}");
+        // No row: unchanged.
+        let mut w = world_with(key, 1);
+        req(&mut w, &i, key, code, [9, -1, 0, 0, 0, 0, 0]).unwrap();
+        assert_eq!(w.units[&key].mode, 1);
+    }
+}

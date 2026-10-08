@@ -87,13 +87,9 @@ use d2_sim::treasure::{ItemData, TcEntry, TreasureClass, TreasureClasses};
 use d2_sim::units::hooks::{MonsterInfo, Sim as USim, UnitData};
 use d2_sim::units::lifecycle::AllocRequest;
 use d2_sim::units::lists::client_state;
-use d2_sim::units::modes;
 use d2_sim::units::{RoomId, UnitId, UnitType};
 use d2_sim::wiring::action::{ActionHooks, ActionTables, DrlgWorld, KillStep, Pending, SkillEvent};
-use d2_sim::wiring::economy::{
-    monster_death_drop, DeathDrops, DropSpot, DropTables, FreeSpot, GameFields, ItemSpawn,
-    ItemStore,
-};
+use d2_sim::wiring::economy::{DeathDrops, DropSpot, DropTables, GameFields, ItemSpawn, ItemStore};
 use d2_sim::wiring::interaction::{skill_events, UseRest};
 use d2_sim::wiring::worldgen::{
     SharedTypes, WorldPending, WorldSim, WorldState, WorldTables, WorldTypes,
@@ -175,8 +171,6 @@ struct TestPending {
     /// helpers' record fill, `use.md` §5.4 step 7, is not specified).
     aim_at: (i32, i32),
     book: Book,
-    /// The game's drop state (`treasure.md` §3), lent out during a drop.
-    drops: Option<DeathDrops>,
 }
 
 /// The fixture's COF names (the composer `0x0064F5B0` for units with a
@@ -276,34 +270,10 @@ impl Pending for TestPending {
             unit.0,
             target.map(|t| t.0)
         ));
-        modes::set_mode(sim, h, unit, 0).expect("mode DT");
-        if let Some(mut d) = h.x.drops.take() {
-            monster_death_drop(h, sim, &mut d, &mut Spot, unit, target);
-            h.x.drops = Some(d);
-        }
-        true
+        d2_client::app::monster_drop::death_start(h, sim, unit, target)
     }
     fn set_entry_param_of(&mut self, _: UnitId, e: &SkillEntry, i: u8, v: i32) {
         self.book.param(e, i, v);
-    }
-}
-
-/// The free-spot search `0x0064E810` (collision spec, not written): the
-/// start spot as is.
-struct Spot;
-
-impl FreeSpot for Spot {
-    fn free_spot(
-        &mut self,
-        room: Option<RoomId>,
-        start: (i32, i32),
-        _: (i32, i32),
-    ) -> Option<DropSpot> {
-        Some(DropSpot {
-            room,
-            x: start.0,
-            y: start.1,
-        })
     }
 }
 
@@ -1201,13 +1171,13 @@ impl Fx {
             Seed::init_low(game_seed),
             TestPending {
                 book: book.clone(),
-                drops: Some(DeathDrops::new(
-                    Arc::new(drop_tables()),
-                    GameFields::new(Seed::init_low(game_seed), false),
-                )),
                 ..TestPending::default()
             },
         );
+        hooks.object_drops = Some(Box::new(DeathDrops::new(
+            Arc::new(drop_tables()),
+            GameFields::new(Seed::init_low(game_seed), false),
+        )));
         hooks.anim_data = Some(Arc::new(anim_data()));
         hooks.vitals = Some(Arc::new(vitals()));
         let wt = WorldTables {
@@ -1524,8 +1494,7 @@ impl Fx {
             .action
             .sys
             .hooks
-            .x
-            .drops
+            .object_drops
             .as_ref()
             .unwrap()
             .placed
@@ -2058,8 +2027,12 @@ fn run_with(game_seed: u32) -> Transcript {
     code8.extend([md.direction, 0]);
     assert_eq!(&code8[5..], [8, 0, 0, 0, 0, md.direction, 0]);
     let (hit, before) = frames[1..].split_last().unwrap();
+    // The player's own skill message (S→C 0x4D while in its attack
+    // mode) is the d2rs-own echo of `pathing.md` §10 r2 (PROVISIONAL,
+    // REC-95); nothing else up to the hit.
     for f in before {
-        assert_eq!(f.2, none, "no S→C up to the hit");
+        let rest: Vec<_> = f.2.iter().filter(|m| m[0] != 0x4D).cloned().collect();
+        assert_eq!(rest, none, "no S→C up to the hit but the 0x4D echo");
     }
     assert_eq!(hit.2, vec![code8], "0x69 code 8 in the hit's frame");
     // The death end: event 1 of the 4-frame DT animation (f_hit + 4)
@@ -2244,6 +2217,7 @@ fn run_with(game_seed: u32) -> Transcript {
                     action: 4,
                     category: 0,
                     owner: None,
+                    seq: 0,
                     stream: frames
                         .last()
                         .unwrap()
@@ -2321,7 +2295,8 @@ fn run_with(game_seed: u32) -> Transcript {
     );
 
     // 11. Trade (C→S 0x38 action 1, `vendors.md` §4 → §3): the store
-    // generated (1–3 bucklers, then the permanent cap). No message.
+    // generated (1–3 bucklers, then the permanent cap). One 0x9C action 11
+    // per store item.
     record(
         &mut fx,
         &mut frames,
@@ -2332,7 +2307,7 @@ fn run_with(game_seed: u32) -> Transcript {
         })],
     );
     assert_eq!(frames.last().unwrap().1.codes, [(0x2F, done), (0x38, done)]);
-    assert_eq!(streams(&fx, &frames.last().unwrap().2), none);
+    let trade_frame = frames.len() - 1;
     let store = {
         let w = &fx.sim_ref().world;
         let rec = &w.state.vendors[w.state.vendor_index(class::AKARA).unwrap()];
@@ -2348,6 +2323,14 @@ fn run_with(game_seed: u32) -> Transcript {
         store_rows.push((guid, it.record, it.item_seed, ac));
     }
     assert_eq!(store_rows.last().unwrap().1, CAP, "permanent codes last");
+    // One 0x9C action 11 per store item, in store order (§4 step 3).
+    let shown: Vec<(u8, u8, u32)> = frames[trade_frame]
+        .2
+        .iter()
+        .map(|m| (m[0], m[1], u32::from_le_bytes(m[4..8].try_into().unwrap())))
+        .collect();
+    let want: Vec<(u8, u8, u32)> = store_rows.iter().map(|r| (0x9C, 11, r.0)).collect();
+    assert_eq!(shown, want);
 
     // 12. Sell (C→S 0x33) the picked-up cap (`vendors.md` §7.2): a
     // permanent code, so no copy; S→C 0x9D action 5, removed from the
@@ -2570,10 +2553,12 @@ fn run_with(game_seed: u32) -> Transcript {
     // is dropped like its 0x69s (not in the model); Akara's is queued on
     // its unit (`model.md` §4) and never drained in this staged game.
     assert!(log.unowned.is_empty(), "{:?}", log.unowned);
-    assert_eq!(log.handled, 25);
+    // + the trade open's 0x9C action 11, one per store item.
+    assert_eq!(log.handled, 25 + store.len() as u64);
     assert_eq!(
         log.dropped,
-        BTreeMap::from([(0x0D, 1), (0x69, 2), (0x6D, 1)])
+        // + the player's own 0x4D echo (REC-95), dropped like 0x0D.
+        BTreeMap::from([(0x0D, 1), (0x4D, 1), (0x69, 2), (0x6D, 1)])
     );
     assert_eq!((log.queued, log.drained), (1, 0));
     assert_eq!(fx.due, None, "the death end's 0x69 code 9 arrived");

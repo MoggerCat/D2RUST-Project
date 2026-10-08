@@ -135,6 +135,65 @@ pub trait FileSource: Send + Sync + 'static {
     }
 }
 
+/// The decoded asset at `archive` (`\` or `/` separators, any case) from
+/// `source`, picked by `pick` (`native-assets.md` §5 r1): on a native
+/// folder the typed file, on the archives the decoded original bytes.
+/// `None`: no such file (or a wrong kind).
+fn read_typed<S: FileSource + ?Sized, T>(
+    source: &S,
+    archive: &str,
+    pick: fn(NativeAsset) -> Option<T>,
+) -> Option<Result<T, String>> {
+    let path = match CanonicalPath::new(archive) {
+        Ok(p) => p,
+        Err(e) => return Some(Err(e.to_string())),
+    };
+    match source.read_native(&path)? {
+        Ok(a) => pick(a).map(Ok),
+        Err(e) => Some(Err(e)),
+    }
+}
+
+macro_rules! typed_reader {
+    ($(#[$m:meta])* $name:ident, $variant:ident, $ty:ty) => {
+        $(#[$m])*
+        pub fn $name<S: FileSource + ?Sized>(
+            source: &S,
+            archive: &str,
+        ) -> Option<Result<$ty, String>> {
+            read_typed(source, archive, |a| match a {
+                NativeAsset::$variant(x) => Some(x),
+                _ => None,
+            })
+        }
+    };
+}
+
+typed_reader!(
+    /// The DC6 at `archive`, from archives or native alike.
+    read_dc6, Dc6, d2_formats::dc6::Dc6
+);
+typed_reader!(
+    /// The DCC at `archive`.
+    read_dcc, Dcc, d2_formats::dcc::Dcc
+);
+typed_reader!(
+    /// The DT1 at `archive`.
+    read_dt1_file, Dt1, d2_formats::dt1::Dt1
+);
+typed_reader!(
+    /// The font `.tbl` at `archive`.
+    read_font_table, Font, d2_formats::font::FontTable
+);
+typed_reader!(
+    /// The palette (`pal.dat`) at `archive`.
+    read_palette, Pal, d2_formats::palette::Palette
+);
+typed_reader!(
+    /// The PL2 at `archive`.
+    read_pl2, Pl2, d2_formats::palette::Pl2
+);
+
 /// The converted native folder (`native-assets.md` §5). Raw bytes exist
 /// only for the kinds whose native file is the original format: excel
 /// `.txt` (verbatim). Audio is deferred: `.wav` reads are `None`, so the

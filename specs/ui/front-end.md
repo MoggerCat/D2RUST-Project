@@ -168,7 +168,7 @@ function or in `0x004326F0` (character-create art, per class).
 | character create | OK or **Enter** (descriptor 176, 5102) | `0x004369F0` | game load (new character) |
 | difficulty popup | Normal / Nightmare / Hell | `0x00439B80` / `0x00439BA0` / `0x00439BC0` → `0x00439AF0` | game load |
 | difficulty popup | **Esc** (descriptor 173: invisible 10×10 button at (900,900), hotkey 27) | `0x00432EE0` → `0x0042F3F0` (pops list A) | character select |
-| in game | exit (0x50 code 23 path) | `0x0044B8A0` returns 4 for single player (`client/msg-ui.md` OQ8) | PROVISIONAL: character select (because 1.14d returns to it after Save and Exit); settled by REC-110 |
+| in game | exit (0x50 code 23 path) | `0x0044B8A0` returns 4 for single player (`client/msg-ui.md` OQ8) | PROVISIONAL: character select (because 1.14d returns to it after Save and Exit); settled by REC-158 |
 
 Every screen builder starts with `0x0043C4F0` (descriptors 8 background,
 6, 7 logo halves) except the character screens, which draw their own
@@ -227,7 +227,7 @@ backgrounds. Re-entering the main menu rebuilds all its controls.
 4. Draw order on the main menu: background 8, logo left 6, logo right 7,
    buttons, version text, in creation order. PROVISIONAL: D2Win draws a
    list in creation order (because the builders add the background
-   first); settled by REC-111.
+   first); settled by REC-159.
 5. `Diablo2.dc6` (descriptor 5, (240,120) 320×151) is preloaded but no
    builder found here adds it.
 
@@ -236,7 +236,7 @@ backgrounds. Re-entering the main menu rebuilds all its controls.
 1. Palette: PROVISIONAL: the front end draws with
    `data\global\palette\ACT1\pal.dat` (because no front-end palette switch
    was found and the menus share the in-game DC6 pipeline); settled by
-   REC-112. Other palettes present (`Menu0`–`menu4`, `Trademark`,
+   REC-160. Other palettes present (`Menu0`–`menu4`, `Trademark`,
    `loading`, `fechar`) are not referenced by the code traced here.
 2. Menu sound files (behaviour deferred to `client/audio.md`): button
    click `cursor\button.wav` (Sounds.txt row 4 `cursor_button_click`),
@@ -261,7 +261,7 @@ the pop-up layer; record layout in §F2.9).
    if it names an existing directory, the default path is computed (rule 3) and `0x00406DE0` decides between
    them: result 1 → keep the legacy path, else → the default path with a trailing `\`. The choice is written
    back as `NewSavePath` (`0x00415070`). PROVISIONAL: `0x00406DE0` returns 1 when the legacy folder holds
-   entries other than `.` / `..` (because the function compares those two names); settled by REC-122.
+   entries other than `.` / `..` (because the function compares those two names); settled by REC-164.
 3. The path read does not exist (`GetFileAttributesA` = −1) or is empty → default path
    (`0x00406D30`): `SHGetKnownFolderPath(FOLDERID_SavedGames {4C5C32FF-BB9D-43B0-B5B4-2D72E54EAAA4})` +
    `Diablo II` (`0x004067D0`); if that API is missing or fails, `SHGetFolderPathA(CSIDL_PERSONAL)` +
@@ -296,7 +296,7 @@ The scan runs when the screen is built (`0x0043AE30` → `0x0043ADB0` → `0x004
    A failed build retries with class 7 / mode 5, all components 0 except +1 = 1, colours 0xFF; a second
    failure is fatal. Appearance bytes: `formats/d2s-appearance.md`. PROVISIONAL: class' 8 / 9 draws the dead
    (grey) figure of the female / male body (because 8 and 9 are outside the 7 class tokens and only used
-   for dead hardcore); settled by REC-121.
+   for dead hardcore); settled by REC-163.
 
 ### F2.3 Sort order (`0x00438AD0`)
 
@@ -319,7 +319,7 @@ Positions are 800 × 600 frame pixels; control `y` in the table is the **bottom*
      expansion)`, p = status bits 8–12) followed by the name (and ` {tag}` when a guild tag exists: never in
      single player); colour 1 (red) when hardcore, else 4 (gold) (`ui/text.md` colours);
    - level line: `" %d "` with the level and the class name (`0x00437F60`); PROVISIONAL text "Level N
-     ClassName" (because the string id is passed in a register lost by the export); settled by REC-123;
+     ClassName" (because the string id is passed in a register lost by the export); settled by REC-165;
    - when status & 0x20: string 22731 `EXPANSION CHARACTER` in colour 2 (green).
    Dead hardcore has no extra text: it shows only through the dead figure (§F2.2 rule 6) and draw flags
    from `0x006CE278` / `0x006CE27C` (hardcore, dead) versus `0x006CE2F8` / `0x006CE2FC`.
@@ -353,7 +353,7 @@ State: `sel` = `[0x0070CC00]` (index into the list), `first` = `[0x00779DC8]`, `
    → `first` += 2d, clamped to [0, n − 1]; `sel` is not changed. The arrows and thumb are the D2Win scroll
    bar widget's.
 5. Mouse wheel: PROVISIONAL: none (because no wheel handler was found in the character select code);
-   settled by REC-120.
+   settled by REC-162.
 6. Buttons enabled (`0x004390A0`): no entry at `sel` → OK, Delete, Convert off; else OK and Delete on,
    Convert on unless status & 0x20; Create New on (`[0x00779DB8]` = 0; its only write is 0 at
    `0x0043AD21`).
@@ -563,7 +563,7 @@ Class ids (`[0x0070CB80]`, save +0x28): 0 Amazon, 1 Sorceress, 2 Necromancer, 3 
 
 PROVISIONAL: 10097 shows "Druid" and 10098 "Assassin" (because the d2exp base `patchstring.tbl` maps
 10097 "Assassin" / 10098 "Druid", the reverse of the code's use, so the 1.14d `Patch_D2.mpq` table must
-differ); settled by REC-130.
+differ); settled by REC-166.
 
 ### F3.4 Name entry (edit box, descriptor 204)
 
@@ -573,7 +573,7 @@ differ); settled by REC-130.
    the filter's second argument ≠ 0 and the current text holds no `-` and no `_`; reject everything else
    (digits, space, accented letters, other punctuation). PROVISIONAL: the second argument is the caret
    position, so a separator cannot be typed as the first character (because only that reading fits the
-   later first-char rule); settled by REC-131.
+   later first-char rule); settled by REC-167.
 3. Change callback `0x00433BD0` (set by `0x004FDB00`) → `0x00430620` after every edit.
 4. OK enable (`0x00430620`): OK (176) enabled iff `2 ≤ len ≤ 15`, first char ∉ {`-`,`_`}, last char ∉
    {`-`,`_`}, and count(`-`) + count(`_`) < 2; else disabled. A disabled OK ignores clicks and Enter.
@@ -600,7 +600,7 @@ unchecked / checked). Each click toggles one bit of the creation flags `[+0x1EF]
 2. The hardcore pair exists only when `[0x00779DA4]` ≠ 0 (else created disabled and never shown).
    `[0x00779DA4]` is set to 1 unconditionally by character select (`0x0043B080`) and the other entry
    paths (`0x00438AD0`, `0x0043AE30`, `0x0043B9A0`, `0x0043BF60`). PROVISIONAL: hardcore is always offered
-   in 1.14d single player (because no path stores 0 there before the create screen); settled by REC-133.
+   in 1.14d single player (because no path stores 0 there before the create screen); settled by REC-169.
 
 ### F3.6 OK / Cancel behaviour and the new save
 
@@ -805,45 +805,45 @@ D2Win anim control `0x00500850` / `0x005005B0` / `0x00500480` / `0x005003A0` / `
 
 ## Open questions
 
-- **REC-110** Game exit target. Capture: in single player, Save and Exit
+- **REC-158** Game exit target. Capture: in single player, Save and Exit
   from a game. Steps: hook `0x0044B8A0` return and the next screen builder
   called (`0x0043B080` vs `0x004336C0`). Settles: which screen return
   value 4 maps to (expected character select).
-- **REC-111** Control draw order. Capture: break in the D2Win list draw
+- **REC-159** Control draw order. Capture: break in the D2Win list draw
   while the main menu shows; log the control order (types 2, 3, 3, 6…).
   Settles: creation order = draw order (logo over background, buttons
   over logo).
-- **REC-112** Front-end palette. Capture: hook the D2GFX palette load
+- **REC-160** Front-end palette. Capture: hook the D2GFX palette load
   during start-up and on reaching the main menu; log the `pal.dat` path.
   Settles: ACT1 vs another palette for all front-end art.
-- **REC-113** Character-select OK condition. Capture: press OK with a new
+- **REC-161** Character-select OK condition. Capture: press OK with a new
   character and with one that finished Normal; log whether `0x00439780`
   or `0x00434A00` runs and the session values compared at
   `0x00439A79`–`0x00439A97`. Settles: when the difficulty popup appears
   (owned by part 2 if it covers character select).
 
-- **REC-120** Mouse wheel on character select. Capture: 1.14d, ≥ 11 characters, wheel up / down over the list
+- **REC-162** Mouse wheel on character select. Capture: 1.14d, ≥ 11 characters, wheel up / down over the list
   and over the scroll bar; log `[0x00779DC8]` and `[0x0070CC00]` per event (hook `0x00439DF0`, `0x00439E90`).
   Settles: whether the wheel scrolls (`first` changes) and by how much, or nothing.
-- **REC-121** Dead hardcore figure. Capture: a hardcore save with status 0x0C (male and female class);
+- **REC-163** Dead hardcore figure. Capture: a hardcore save with status 0x0C (male and female class);
   screenshot the slot; hook `0x005066C0` args. Settles: what class' 8 / 9 draws (token, mode, palette) and
   the draw flags from `0x006CE278`.
-- **REC-122** Legacy `Save Path` migration. Capture: registry with `Save Path` → a folder with saves, no
+- **REC-164** Legacy `Save Path` migration. Capture: registry with `Save Path` → a folder with saves, no
   `NewSavePath`; start the game; read `NewSavePath` after; repeat with an empty folder. Hook `0x00406DE0`
   return. Settles: which folder is kept.
-- **REC-123** Slot level line text. Capture: screenshot one slot per class; or read the string id pushed
+- **REC-165** Slot level line text. Capture: screenshot one slot per class; or read the string id pushed
   to the `D2Lang_GetStringByIndex` call after `" %d "` in `0x004380F0` (`disasm.py fn 0x004380F0`). Settles: the
   exact level / class line text and colour.
 
-- **REC-130** — class names 10097 / 10098. Capture: extract `data\local\lng\eng\patchstring.tbl` from
+- **REC-166** — class names 10097 / 10098. Capture: extract `data\local\lng\eng\patchstring.tbl` from
   `Patch_D2.mpq` (by name; the archive has no listfile) or, in the 1.14d game with expansion, hover the
   Druid and the Assassin on the create screen and screenshot text 197. Settles which id shows which name.
-- **REC-131** — filter argument 2. Capture: on the create screen, select a class, type `-` into the empty
+- **REC-167** — filter argument 2. Capture: on the create screen, select a class, type `-` into the empty
   box, then `a-`; hook `0x00430590` and log its 3 arguments. Settles whether a leading separator is
   rejected (arg = caret position) or the argument means something else.
-- **REC-132** — animation timing. Capture: record the create screen at ≥ 50 fps; click the Paladin;
+- **REC-168** — animation timing. Capture: record the create screen at ≥ 50 fps; click the Paladin;
   count frames from click to `panu3` start (expect 79 × 40 ms ≈ 3.2 s) and check that loops skip the
   last frame. Settles §F3.3 rule 2/4 as implemented.
-- **REC-133** — hardcore availability. Capture: fresh install, empty save folder, Single Player → create
+- **REC-169** — hardcore availability. Capture: fresh install, empty save folder, Single Player → create
   screen, select any class; check the Hardcore box is shown (and log `[0x00779DA4]` at `0x00435580`).
   Settles §F3.5 rule 2.

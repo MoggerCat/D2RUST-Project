@@ -44,15 +44,15 @@
 |   4. d2rs mapping and scope | 603–634 |
 |   5. Machine-readable tables | 635–671 |
 |   6. Exact-match comparison | 672–779 |
-|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 780–1202 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1203–1417 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1418–1574 |
-| Constants & data dependencies | 1575–1593 |
-| Randomness | 1594–1599 |
-| Edge cases & original bugs | 1600–1645 |
-| Test vectors | 1646–1732 |
-| Provenance | 1733–1849 |
-| Open questions | 1850–1969 |
+|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 780–1205 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1206–1420 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1421–1577 |
+| Constants & data dependencies | 1578–1596 |
+| Randomness | 1597–1602 |
+| Edge cases & original bugs | 1603–1648 |
+| Test vectors | 1649–1735 |
+| Provenance | 1736–1852 |
+| Open questions | 1853–1972 |
 <!-- /index -->
 
 ## Summary
@@ -913,6 +913,9 @@ class is 291, 417 or 418; item → `0x0055BED0` (§7.3 rule 4); others nothing.
    GUID); else 0x4D (`0x0053D4D0`: path target x, y). Both builders
    send 0x99 / 0x9A instead when their last argument is non-zero; this
    caller passes 0. No skill → nothing. Stop.
+   PROVISIONAL: the level byte b is the used skill entry's base + bonus
+   level (+0x28 + +0x2C), as a byte (because the rule names only
+   "level"); settled by REC-95.
 4. The unit must have a path (fatal 0xE6). With T: id 0x68, code := E
    code to unit, (a, b) := (T type, T GUID); modes 2 and 15 with path
    type 5 or 6 (`0x00648E30`) instead id 0x67, code to point, (a, b) :=

@@ -45,7 +45,7 @@
 
 use d2_sim::game::Game;
 use d2_sim::items::ItemTables;
-use d2_sim::units::{RoomId, UnitId};
+use d2_sim::units::{RoomId, UnitId, UnitType};
 use d2_sim::wiring::action::Pending;
 use d2_sim::wiring::action::{ActionHooks, ObjectCase};
 use d2_sim::wiring::economy::{
@@ -53,12 +53,13 @@ use d2_sim::wiring::economy::{
     QuestLoan, QuestRest,
 };
 use d2_sim::wiring::interaction::{
-    Desk, InteractionError, InteractionState, NpcRest, PlayerQuestsRef, VendorDesk, VendorRest,
+    Desk, InteractionError, InteractionState, NpcInv, NpcInventory, NpcRest, PlayerQuestsRef,
+    VendorDesk, VendorRest,
 };
 use d2_sim::world::hirelings::life;
 use d2_sim::world::npc::NpcControl;
 use d2_sim::world::quests::{HostRequest, QuestControl};
-use d2_sim::world::vendors::{GlobalLists, VendorTables};
+use d2_sim::world::vendors::{price, trade, tx, GlobalLists, VendorTables, VendorWorld};
 use d2_sim::world::waypoints::{
     ObjectFacts, PlayerFacts, RoomRect, WaypointRecords, WaypointWorld,
 };
@@ -107,6 +108,12 @@ pub struct WiredWorld<R, S = NoSkills> {
     pub vendor_tables: VendorTables,
     pub state: InteractionState,
     pub rest: R,
+    /// Monster classes whose units get an interaction list
+    /// (`npc.md` §1.1: monster init embeds one for an `interact` NPC;
+    /// d2rs-own, unverified: monster init does not call
+    /// `InteractionState::add_npc` yet, so a host names the classes and
+    /// each desk call registers their units, idempotently).
+    pub interact_classes: Vec<u16>,
     /// Host milliseconds (`GetTickCount`), an input of store generation
     /// and refresh (`vendors.md` edge case 10); the caller keeps it
     /// current.
@@ -114,9 +121,45 @@ pub struct WiredWorld<R, S = NoSkills> {
     /// What the inventory rules queued during vendor calls (receiving
     /// unit, bytes), sent after the rest's messages ([`WorldHost::take_sent`]).
     inv_sent: Vec<(UnitId, Vec<u8>)>,
+    /// The levels the quest events last saw the players in.
+    quest_levels: quest_events::QuestLevels,
 }
 
 impl<R, S> WiredWorld<R, S> {
+    /// The unit facts of an item (`intents-events.md` §2.4 rule 4): the
+    /// owner from the inventory model (`InvItem::owner_guid`, the owning
+    /// player's GUID), the act from the item's room, or from its owner
+    /// when it is in an inventory, and the position of an item on the
+    /// ground from its static path. `None`: not an item, or no act.
+    fn item_facts<D: ActionEvents>(
+        &mut self,
+        game: &Game,
+        events: &mut D,
+        unit: UnitId,
+    ) -> Option<crate::adapters::UnitFacts> {
+        use d2_sim::units::UnitType;
+        let e = game.lists.unit(unit)?;
+        if e.ty != UnitType::Item {
+            return None;
+        }
+        let owner = self
+            .inventory
+            .as_ref()
+            .and_then(|i| i.state.items.get(&unit))
+            .map(|i| i.owner_guid)
+            .filter(|&g| g != d2_sim::items::inventory::NO_GUID)
+            .and_then(|g| game.lists.find_unit(UnitType::Player, g));
+        let (x, y) = events.action().hooks().path_position(unit);
+        let act = match e.room() {
+            Some(r) => game.lists.room(r)?.act,
+            None => game.lists.room(game.lists.unit(owner?)?.room()?)?.act,
+        };
+        Some(crate::adapters::UnitFacts {
+            act,
+            pos: crate::seams::Pos { x, y },
+            owner,
+        })
+    }
     /// The vendor records at game creation (`npc.md` §1.1 step 5,
     /// `vendors.md` §1 rules 3–5) from the NPC records and the global
     /// column lists (`GlobalLists::build`). The creation fields are the
@@ -141,8 +184,10 @@ impl<R, S> WiredWorld<R, S> {
             vendor_tables,
             state,
             rest,
+            interact_classes: Vec::new(),
             now,
             inv_sent: Vec::new(),
+            quest_levels: Default::default(),
         }
     }
 
@@ -209,7 +254,43 @@ impl<R, S> WiredWorld<R, S> {
             Option<&mut InvParts>,
         ) -> T,
     ) -> T {
+        self.desk_with(game, events, false, f)
+    }
+
+    /// [`Self::desk`]; with `lend` the inventory model is lent to the
+    /// desk for the NPC item services ([`NpcInv`], `Desk::inv`) and `f`
+    /// gets none.
+    pub(super) fn desk_with<D: ActionEvents, T>(
+        &mut self,
+        game: &mut Game,
+        events: &mut D,
+        lend: bool,
+        f: impl FnOnce(
+            &mut Desk<'_, '_, ActionHooks<D::X>, R>,
+            &mut NpcControl,
+            Option<&mut InvParts>,
+        ) -> T,
+    ) -> T {
+        let classes = self.interact_classes.clone();
         self.with_economy(game, events, |econ, p| {
+            for u in econ.game.lists.units_of_type(UnitType::Monster) {
+                let class = econ.units.get(u).map(|r| r.class);
+                if class.is_some_and(|c| classes.iter().any(|&k| u32::from(k) == c)) {
+                    p.state.add_npc(u);
+                }
+            }
+            let mut lent = if lend { p.inventory.take() } else { None }.map(|v| {
+                let InvParts {
+                    tables,
+                    state,
+                    rest,
+                } = v;
+                NpcInv {
+                    tables: &*tables,
+                    state,
+                    rest: rest.as_mut(),
+                }
+            });
             let mut desk = Desk {
                 econ,
                 quests: &mut *p.quests,
@@ -217,10 +298,57 @@ impl<R, S> WiredWorld<R, S> {
                 state: &mut *p.state,
                 rest: &mut *p.rest,
                 now: p.now,
+                inv: lent.as_mut().map(|v| v as &mut dyn NpcInventory<_>),
             };
             f(&mut desk, &mut *p.npc, p.inventory.as_deref_mut())
         })
     }
+}
+
+mod quest_events;
+
+/// 0x9C action of a store item shown to the client (`vendors.md` §3.1).
+const STORE_ITEM_ACTION: u8 = 11;
+
+/// The store items a trade open added to the NPC's trade inventory, as
+/// S→C 0x9C action 11 to the opening player, one per item in add order
+/// (`vendors.md` §4 step 3, recorded frame 899). Needs the inventory
+/// model (the item bit stream); without it the items stay unsent.
+fn flush_shown<X: Pending, R: TradeRest>(
+    desk: &mut Desk<'_, '_, ActionHooks<X>, R>,
+    inv: Option<&mut InvParts>,
+) -> Vec<(UnitId, Vec<u8>)> {
+    let (Some(parts), Some(player)) = (inv, desk.state.shown_player) else {
+        return Vec::new();
+    };
+    let items = std::mem::take(&mut desk.state.shown);
+    // d2rs-own, unverified: the buy price of each shown item, for the
+    // preview client (`VendorRest::store_price`).
+    let (tables, class) = (desk.vendor_tables, desk.state.shown_class);
+    let prices: Vec<(u32, u32)> = {
+        let v = desk.vendors(None);
+        let ctx = trade::price_ctx(tables, &v, player, class);
+        items
+            .iter()
+            .filter_map(|&i| {
+                let it = v.price_item(i)?;
+                let c = price::cost(tables, &ctx, Some(&it), tx::BUY).ok()?;
+                Some((v.guid(i), u32::try_from(c).ok()?))
+            })
+            .collect()
+    };
+    for (guid, price) in prices {
+        desk.rest.store_price(player, guid, price);
+    }
+    let mut d = parts.desk(&mut *desk.econ);
+    for item in items {
+        // PROVISIONAL: a failed encode skips the item.
+        let _ = d.send_item_world(player, item, STORE_ITEM_ACTION, 0);
+    }
+    inv_take_sent(&mut d)
+        .into_iter()
+        .filter_map(|(u, b)| Some((u?, b)))
+        .collect()
 }
 
 /// A quest call on the desk's economy and rest ([`HostQuests`]: the
@@ -405,6 +533,56 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
         });
     }
 
+    /// The items of the corpses the deaths created
+    /// (`ActionHooks::death.loot`, `vitals.md` §4.7 rule 1.7): the cursor
+    /// and body items move from the player to the corpse. A host without
+    /// the inventory model drops the queue.
+    pub fn corpse_fill<D: ActionEvents>(&mut self, game: &mut Game, events: &mut D)
+    where
+        Self: WorldHost<D>,
+    {
+        let hooks = &mut events.action().sys;
+        let q = std::mem::take(&mut hooks.hooks.death.loot);
+        let gold = std::mem::take(&mut hooks.hooks.death.gold_drops);
+        if (q.is_empty() && gold.is_empty()) || self.inventory.is_none() {
+            return;
+        }
+        let gold: Vec<_> = gold
+            .into_iter()
+            .filter(|&(_, a)| a > 0)
+            .filter_map(|(p, a)| {
+                Some((
+                    d2_sim::items::moves::Owner::player(hooks.units.get(p)?.guid),
+                    a,
+                ))
+            })
+            .collect();
+        let pairs: Vec<_> = q
+            .into_iter()
+            .filter_map(|(p, c)| {
+                let (pr, cr) = (hooks.units.get(p)?, hooks.units.get(c)?);
+                Some((
+                    d2_sim::items::moves::Owner::player(pr.guid),
+                    d2_sim::items::moves::Owner::player(cr.guid),
+                    cr.class,
+                ))
+            })
+            .collect();
+        let Some((faults, sent)) = self.moves(
+            game,
+            events,
+            super::super::items::moves::CorpseFillRun { pairs, gold },
+        ) else {
+            return;
+        };
+        debug_assert!(faults.is_empty(), "corpse fill: {faults:?}");
+        for (unit, bytes) in sent {
+            if let Some(u) = unit {
+                self.inv_sent.push((u, bytes));
+            }
+        }
+    }
+
     /// The hireling deaths the kill queued (`ActionHooks::pet_deaths`, on
     /// from the first frame): `hirelings.md` §8 rule 1 → `0x005751A0`
     /// ([`life::on_kill`] with flag 1) for each killed monster with a
@@ -558,7 +736,36 @@ where
     D::X: Outbox,
 {
     fn npc<C: NpcCall>(&mut self, game: &mut Game, events: &mut D, call: C) -> Option<C::Out> {
-        Some(self.desk(game, events, |desk, ctl, _| call.call(ctl, desk)))
+        // The player inventories are staged on the rest for the NPC
+        // entries (Cain's identify, `inventory_entries`).
+        self.desk(game, events, |desk, _, inv| {
+            let players = desk.econ.game.lists.units_of_type(UnitType::Player);
+            if let Some(p) = inv {
+                let d = p.desk(&mut *desk.econ);
+                for &pl in &players {
+                    desk.rest.stage_inventory(pl, d.npc_entries(pl));
+                }
+            }
+        });
+        // The call runs with the inventory lent to the desk (the item
+        // services: imbue, `Desk::inv`).
+        let out = self.desk_with(game, events, true, |desk, ctl, _| call.call(ctl, desk));
+        let (_, sent) = self.desk(game, events, |desk, _, mut inv| {
+            let players = desk.econ.game.lists.units_of_type(UnitType::Player);
+            // Cain's identify (C→S 0x34) on the inventory model.
+            let done = desk.rest.take_identified();
+            if let (false, Some(p)) = (done.is_empty(), inv.as_deref_mut()) {
+                let mut d = p.desk(&mut *desk.econ);
+                for item in done {
+                    if let Some(&pl) = players.iter().find(|&&pl| d.state.holds(pl, item)) {
+                        d.identify_unit(pl, item);
+                    }
+                }
+            }
+            ((), flush_shown(desk, inv))
+        });
+        self.inv_sent.extend(sent);
+        Some(out)
     }
 
     /// The vendor records are lent out of the interaction state for the
@@ -623,6 +830,22 @@ where
         out
     }
 
+    /// The 0x13 tile case on the action wiring (REC-99).
+    fn warp_tile(
+        &mut self,
+        game: &mut Game,
+        events: &mut D,
+        player: UnitId,
+        guid: u32,
+    ) -> Option<u32> {
+        WorldHost::<D>::warp_tile(&mut self.action, game, events, player, guid)
+    }
+
+    /// The Town Portal pair on the action wiring (REC-117).
+    fn town_portal(&mut self, game: &mut Game, events: &mut D, player: UnitId) -> bool {
+        WorldHost::<D>::town_portal(&mut self.action, game, events, player)
+    }
+
     /// The tick with this world's quest parts lent to the action hooks
     /// ([`WiredWorld::lend_quests`]): quest object inits run inside their
     /// allocation and object event 7 inside its timer event, in the tick
@@ -631,6 +854,7 @@ where
     where
         D: d2_sim::tick::EventDispatch + d2_sim::tick::TickHooks,
     {
+        self.arrivals(game, events);
         self.lend_quests(events, |_, ev| d2_sim::tick::tick(game, ev));
     }
 
@@ -639,9 +863,15 @@ where
     fn after_tick(&mut self, game: &mut Game, events: &mut D) {
         let sent = self.desk(game, events, quest_objects);
         self.inv_sent.extend(sent);
+        self.run_quest_events(game, events);
+        // A player with no life starts dying (`vitals.md` §4.8).
+        events.action().player_deaths(game);
+        self.corpse_fill(game, events);
         self.pet_deaths(game, events);
+        self.approaches(game, events);
         self.hireling_calls(game, events);
         self.pet_follows(game, events);
+        self.drive_hirelings(game, events);
     }
 
     /// The quest control on the desk's economy and rest
@@ -692,7 +922,33 @@ where
             .hireling_tables
             .is_some()
             .then(|| self.state.hirelings.clone());
-        let out = self.with_economy(game, events, |econ, _| call.call(econ, &mut inv));
+        let out = self.with_economy(game, events, |econ, _| {
+            // d2rs-own, unverified (D1): the preview rest reads the
+            // places staged here (`MoveRest::stage`).
+            let mut places = Vec::new();
+            for u in econ
+                .game
+                .lists
+                .units_of_type(d2_sim::units::UnitType::Player)
+            {
+                let Some(r) = econ.units.get(u) else { continue };
+                places.push(super::super::items::moves::StagedPlace {
+                    owner: d2_sim::items::moves::Owner::player(r.guid),
+                    pos: econ.hooks.path_position(u),
+                    room: econ.game.lists.unit(u).and_then(|e| e.room()),
+                });
+            }
+            for (&u, it) in &inv.state.items {
+                places.push(super::super::items::moves::StagedPlace {
+                    owner: d2_sim::items::moves::Owner::item(it.guid),
+                    pos: (it.x, it.y),
+                    room: econ.game.lists.unit(u).and_then(|e| e.room()),
+                });
+            }
+            let format = d2_sim::items::ItemGame::item_format(&*econ.fields);
+            inv.rest.stage(&places, format);
+            call.call(econ, &mut inv)
+        });
         inv.state.hirelings = None;
         self.inventory = Some(inv);
         Some(out)
@@ -745,12 +1001,38 @@ where
         Some(out)
     }
 
+    fn unit_positions(&mut self, events: &mut D, units: &[UnitId]) -> Vec<(UnitId, (i32, i32))> {
+        WorldHost::<D>::unit_positions(&mut self.action, events, units)
+    }
+
     fn walk(&mut self, game: &mut Game, events: &mut D, call: WalkCall) -> Option<WalkResult> {
+        self.drop_queued(call.player);
         let out = self.lend_quests(events, |a, ev| WorldHost::<D>::walk(a, game, ev, call));
         self.pet_deaths(game, events);
         self.hireling_calls(game, events);
         self.pet_follows(game, events);
         out
+    }
+
+    fn player_gate(
+        &mut self,
+        game: &Game,
+        events: &mut D,
+        unit: UnitId,
+    ) -> Option<crate::seams::PlayerGate> {
+        WorldHost::<D>::player_gate(&mut self.action, game, events, unit)
+    }
+
+    fn live_facts(
+        &mut self,
+        game: &Game,
+        events: &mut D,
+        unit: UnitId,
+    ) -> Option<crate::adapters::UnitFacts> {
+        if let Some(f) = WorldHost::<D>::live_facts(&mut self.action, game, events, unit) {
+            return Some(f);
+        }
+        self.item_facts(game, events, unit)
     }
 
     fn vitals_sync(

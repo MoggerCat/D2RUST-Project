@@ -232,21 +232,47 @@ impl WorldFiles {
         drlg: &DrlgData,
         pd: &PresetData,
         od: &OutdoorData,
-        mut read: impl FnMut(&str) -> Result<Vec<u8>, String>,
+        read: impl FnMut(&str) -> Result<Vec<u8>, String>,
+    ) -> Result<Self, WorldDataError> {
+        let read = std::cell::RefCell::new(read);
+        Self::load_typed(
+            drlg,
+            pd,
+            od,
+            |path| parse_ds1(path, &mut *read.borrow_mut()),
+            |path| {
+                let bytes = read_file(path, &mut *read.borrow_mut())?;
+                Dt1::parse(&bytes).map_err(|source| WorldDataError::Parse {
+                    path: lossy(path),
+                    source,
+                })
+            },
+        )
+    }
+
+    /// [`WorldFiles::load`] over typed readers (`native-assets.md` §5 r1):
+    /// `ds1` / `dt1` get the file's path as the table names it and return
+    /// the decoded file, from the archives or from a native folder.
+    pub fn load_typed(
+        drlg: &DrlgData,
+        pd: &PresetData,
+        od: &OutdoorData,
+        mut ds1: impl FnMut(&[u8]) -> Result<Ds1, WorldDataError>,
+        mut dt1: impl FnMut(&[u8]) -> Result<Dt1, WorldDataError>,
     ) -> Result<Self, WorldDataError> {
         let mut out = Self::default();
         for path in pd.defs.iter().flat_map(|d| d.file.iter()) {
             if !names_file(path) || out.ds1.0.contains_key(path) {
                 continue;
             }
-            let d = parse_ds1(path, &mut read)?;
+            let d = ds1(path)?;
             out.ds1.0.insert(path.clone(), ds1_input(path, &d)?);
         }
         for path in od.subs.iter().map(|r| &r.file) {
             if !names_file(path) || out.subs.0.contains_key(path) {
                 continue;
             }
-            let d = parse_ds1(path, &mut read)?;
+            let d = ds1(path)?;
             out.subs.0.insert(path.clone(), sub_file(path, &d, pd)?);
         }
         let library = drlg
@@ -259,11 +285,7 @@ impl WorldFiles {
             if !names_file(path) || out.dt1.0.contains_key(path) {
                 continue;
             }
-            let bytes = read_file(path, &mut read)?;
-            let dt1 = Dt1::parse(&bytes).map_err(|source| WorldDataError::Parse {
-                path: lossy(path),
-                source,
-            })?;
+            let dt1 = dt1(path)?;
             out.dt1
                 .0
                 .insert(path.to_vec(), dt1.tiles.iter().map(tile_info).collect());
@@ -282,15 +304,20 @@ fn lossy(path: &[u8]) -> String {
     String::from_utf8_lossy(path).into_owned()
 }
 
-fn read_file(
-    path: &[u8],
-    read: &mut impl FnMut(&str) -> Result<Vec<u8>, String>,
-) -> Result<Vec<u8>, WorldDataError> {
+/// The archive name (`\` separators, ASCII) of a table's file path.
+pub fn file_name(path: &[u8]) -> Result<String, WorldDataError> {
     let name = archive_name(path);
     if !name.is_ascii() {
         return Err(WorldDataError::BadPath(path.to_vec()));
     }
-    let name = String::from_utf8(name).map_err(|e| WorldDataError::BadPath(e.into_bytes()))?;
+    String::from_utf8(name).map_err(|e| WorldDataError::BadPath(e.into_bytes()))
+}
+
+fn read_file(
+    path: &[u8],
+    read: &mut impl FnMut(&str) -> Result<Vec<u8>, String>,
+) -> Result<Vec<u8>, WorldDataError> {
+    let name = file_name(path)?;
     read(&name).map_err(|detail| WorldDataError::Read { path: name, detail })
 }
 

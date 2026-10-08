@@ -66,6 +66,16 @@ pub trait NpcRest: super::HirelingRest {
     // items specs)
     /// The player's items in inventory order with their places.
     fn inventory_entries(&self, player: UnitId) -> Vec<InvEntry>;
+    /// A host whose inventory model is not the rest's hands the rest the
+    /// player's entries before an NPC call (default: ignored).
+    fn stage_inventory(&mut self, player: UnitId, entries: Vec<InvEntry>) {
+        let _ = (player, entries);
+    }
+    /// The items the NPC call identified since the last take, for the
+    /// host to apply on its inventory model (default: none).
+    fn take_identified(&mut self) -> Vec<UnitId> {
+        Vec::new()
+    }
     fn identify(&mut self, item: UnitId);
     fn cursor_item(&self, player: UnitId) -> Option<UnitId>;
     fn item_facts(&self, item: UnitId) -> ItemFacts;
@@ -197,6 +207,7 @@ impl<'a, H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> NpcWorld
         }
     }
     fn approach(&mut self, player: UnitId, npc: UnitId) {
+        self.state.approaches.push((player, npc));
         self.rest.approach(player, npc);
     }
     fn interaction(&mut self, npc: UnitId) -> Option<&mut InteractionList> {
@@ -374,6 +385,7 @@ impl<'a, H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> NpcWorld
     }
     fn act_change(&mut self, player: UnitId, level: u32, arg: u32) {
         self.rest.act_change(player, level, arg);
+        self.econ.hooks.request_act_change(player, level, arg);
     }
     fn activate_waypoint(&mut self, player: UnitId, level: u32) {
         self.rest.activate_waypoint(player, level);
@@ -388,22 +400,40 @@ impl<'a, H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> NpcWorld
         self.rest.identify(item);
     }
     fn cursor_item(&self, player: UnitId) -> Option<UnitId> {
-        self.rest.cursor_item(player)
+        match &self.inv {
+            Some(v) => v.cursor_item(player),
+            None => self.rest.cursor_item(player),
+        }
     }
     fn item_facts(&self, item: UnitId) -> ItemFacts {
-        self.rest.item_facts(item)
+        match self.inv {
+            Some(_) => self.facts_of(item).unwrap_or_default(),
+            None => self.rest.item_facts(item),
+        }
     }
     fn put_back(&mut self, player: UnitId, item: UnitId) {
         self.rest.put_back(player, item);
     }
     fn remove_cursor_item(&mut self, player: UnitId, item: UnitId) -> bool {
-        self.rest.remove_cursor_item(player, item)
+        match self.inv.as_deref_mut() {
+            Some(v) => v.remove_cursor_item(&mut *self.econ, player, item),
+            None => self.rest.remove_cursor_item(player, item),
+        }
     }
     fn duplicate(&mut self, player: UnitId, item: UnitId) -> Option<UnitId> {
         self.rest.duplicate(player, item)
     }
     fn create_imbued(&mut self, player: UnitId, input: UnitId, mods: &ImbueMods) -> Option<UnitId> {
-        self.rest.create_imbued(player, input, mods)
+        if self.inv.is_none() {
+            return self.rest.create_imbued(player, input, mods);
+        }
+        // The input has left the cursor; its record is still in the item
+        // store until the new item is made. It is freed after.
+        let new = self.imbue_from(input, mods);
+        if let Err(e) = self.econ.free_item(input) {
+            self.state.errors.push(super::InteractionError::Economy(e));
+        }
+        new
     }
     fn item_refresh(&mut self, item: UnitId) {
         self.rest.item_refresh(item);
@@ -427,7 +457,16 @@ impl<'a, H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> NpcWorld
         self.rest.set_personal_name(item, name);
     }
     fn place_or_drop(&mut self, player: UnitId, item: UnitId) {
-        self.rest.place_or_drop(player, item);
+        match self.inv.as_deref_mut() {
+            // d2rs-own, unverified: with no free spot the item stays on
+            // the cursor (the ground drop near the player is unwired).
+            Some(v) => {
+                if !v.place(&mut *self.econ, player, item) {
+                    self.rest.place_or_drop(player, item);
+                }
+            }
+            None => self.rest.place_or_drop(player, item),
+        }
     }
     /// `generation.md` §7.2 on the item's record and level.
     fn max_sockets(&self, item: UnitId) -> u32 {
@@ -463,6 +502,15 @@ impl<'a, H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> NpcWorld
     // ---- mercenaries
 
     fn spawn_mercenary(&mut self, near: UnitId, class: u32, mode: u8) -> Option<UnitId> {
+        let mut sim = crate::units::hooks::Sim {
+            game: &mut *self.econ.game,
+            units: &mut *self.econ.units,
+            stats: &mut *self.econ.stats,
+            data: self.econ.data,
+        };
+        if let Some(u) = self.econ.hooks.spawn_near(&mut sim, near, class, mode) {
+            return Some(u);
+        }
         self.rest.spawn_mercenary(near, class, mode)
     }
     /// `hirelings.md` §3.2.

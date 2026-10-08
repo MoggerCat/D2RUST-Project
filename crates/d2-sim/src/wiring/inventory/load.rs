@@ -1,0 +1,83 @@
+// Spec: specs/formats/d2s.md §8.2 rules 2–4, 7 (item list reading)
+//! A save item entry made an item unit of an owner's inventory:
+//! [`InvDesk::load_entry`]. The record is decoded into a unit
+//! (`Economy::item_from_record`, `0x00558CB0`), its socketed children are
+//! inserted ([`InvDesk::insert_filler`], rule 4), then the item is placed
+//! by the mode and position it was saved with.
+//!
+//! PROVISIONAL (REC-115): the placement routine `0x00531210` has no spec
+//! (`d2s.md` §8.2 rule 3 is blocked). d2rs-own, unverified: the unit is
+//! set to cursor mode and goes through the same inventory calls the start
+//! items use (`equip_from_cursor` at its body location; the belt at slot x;
+//! the page its record names at (x, y)); a stored item that does not fit
+//! at its saved cell takes a free position; an item that cannot be
+//! placed at all is freed (rule 3).
+
+use super::{InvDesk, InvError, InvRest};
+use crate::items::bitstream::read::ReadEntry;
+use crate::items::inventory::UnitKind;
+use crate::items::moves::{mode, InventoryOps, Owner};
+use crate::units::lifecycle::LifecycleHooks;
+use crate::units::UnitId;
+
+/// Why a loaded item was not placed.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum LoadFault {
+    /// The unit could not be made from the record.
+    NotCreated,
+    /// The owner has no inventory in the model.
+    NoInventory,
+    /// Neither the saved place nor a free position took it; the unit is freed.
+    NoRoom,
+}
+
+impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
+    /// Makes the item of `entry` (and its socketed children) and places it
+    /// in `owner`'s inventory. Placements queue the owner's item messages
+    /// (take them with the host's sent queue).
+    pub fn load_entry(&mut self, owner: UnitId, entry: &ReadEntry) -> Result<UnitId, LoadFault> {
+        if !self.state.inventories.contains_key(&owner) {
+            return Err(LoadFault::NoInventory);
+        }
+        let rec = &entry.item;
+        let unit = match self.econ.item_from_record(rec, None) {
+            Ok(u) => u,
+            Err(e) => {
+                self.state.errors.push(InvError::Economy(e));
+                return Err(LoadFault::NotCreated);
+            }
+        };
+        self.sync_in();
+        let it = &rec.item;
+        if !entry.children.is_empty() {
+            let g = self.guid_of(unit);
+            self.state.add_inventory(unit, UnitKind::Item, g);
+            for child in &entry.children {
+                let _ = self.insert_filler(unit, &child.item);
+            }
+        }
+        let page = if it.page == 0xFF { 0 } else { it.page };
+        if let Some(d) = self.state.items.get_mut(&unit) {
+            d.x = it.x;
+            d.y = it.y;
+            d.body_loc = it.body_loc;
+            d.page = page;
+            d.mode = mode::CURSOR;
+        }
+        self.sync_out();
+        let (o, g) = (
+            self.owner_of(owner).unwrap_or(Owner::player(0)),
+            self.guid_of(unit),
+        );
+        let at_saved_place = match it.mode as u8 {
+            mode::EQUIPPED => self.equip_from_cursor(o, g, it.body_loc, true).0,
+            mode::BELT => self.belt_place(o, g, it.x as u32),
+            _ => self.place(owner, unit, (it.x, it.y), false, true),
+        };
+        if at_saved_place || self.place(owner, unit, (0, 0), true, true) {
+            return Ok(unit);
+        }
+        self.free(unit);
+        Err(LoadFault::NoRoom)
+    }
+}

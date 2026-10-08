@@ -61,9 +61,14 @@ pub struct ActionRest {
     pub sent: Vec<(UnitId, Vec<u8>)>,
     pub in_range: bool,
     pub routes: Vec<ObjectRoute>,
+    /// Quest events the tests queue for the host's `after_tick`.
+    pub quest_events: Vec<d2_sim::wiring::action::QuestEvent>,
 }
 
 impl Pending for ActionRest {
+    fn take_quest_events(&mut self) -> Vec<d2_sim::wiring::action::QuestEvent> {
+        std::mem::take(&mut self.quest_events)
+    }
     fn send(&mut self, player: UnitId, msg: &[u8]) {
         self.sent.push((player, msg.to_vec()));
     }
@@ -364,6 +369,13 @@ impl QuestRest for Rest {
     fn unit_kind(&self, u: UnitId) -> UnitKind {
         if self.quests.contains_key(&u) {
             UnitKind::Player
+        } else if self.chains.get(&u).is_some_and(|c| c.0.contains(&31)) {
+            // Shenk: monster init links superunique 42 to chain 31.
+            UnitKind::Monster {
+                class: 0,
+                superunique: Some(42),
+                owner: None,
+            }
         } else {
             UnitKind::Other
         }

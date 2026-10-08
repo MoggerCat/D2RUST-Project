@@ -121,7 +121,10 @@ fn fixture(objects: bool) -> Fx {
             mode: if ty == UnitType::Player { 1 } else { 0 },
             allied: ty == UnitType::Player,
         };
-        sim.with(game, |g, v| v.allocate(g, &req, x, 20)).unwrap()
+        let u = sim.with(game, |g, v| v.allocate(g, &req, x, 20)).unwrap();
+        // Staged as already announced (`intents-events.md` §7.1 r2.1).
+        sim.sys.units.get_mut(u).unwrap().flags &= !d2_sim::units::record::flags::SEED_SET;
+        u
     };
     let objs = [
         alloc(&mut game, UnitType::Object, WAYPOINT, 20),

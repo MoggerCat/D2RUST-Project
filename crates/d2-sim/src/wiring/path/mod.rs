@@ -30,12 +30,14 @@
 //! and tests that fake positions). Nothing here decides game behaviour:
 //! each adapter maps one seam call to one call of the path code.
 
+pub mod act_change;
 pub mod missiles;
 pub mod monsters;
 pub mod place;
 pub mod rooms;
 pub mod units;
 pub mod walk;
+mod warp_dest;
 
 #[cfg(test)]
 mod tests;

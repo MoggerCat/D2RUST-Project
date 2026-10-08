@@ -113,7 +113,7 @@ pub fn can_act(is_player: bool, cursor_item: bool, mode: u32, class: u32) -> boo
 }
 
 impl ModelClick<'_> {
-    fn camera(&self) -> Option<Camera> {
+    pub(super) fn camera(&self) -> Option<Camera> {
         let p = self.world.local()?;
         let (x, y) = p.cell();
         let (px, py) = self
@@ -644,6 +644,52 @@ mod tests {
         want.extend_from_slice(&1u32.to_le_bytes());
         want.extend_from_slice(&9u32.to_le_bytes());
         assert_eq!(w.outgoing, vec![want], "C→S 0x06 [type 1][guid 9]");
+    }
+
+    // Covers: specs/ui/controls.md §6 r8
+    #[test]
+    fn right_click_on_the_ground_casts_the_right_skill_at_the_point() {
+        use crate::bridge::world::SkillRow;
+        let mut w = world();
+        // The right skill: id 3, cast mode SC (10), range rng (synthetic rows).
+        if let Some(list) = w
+            .units
+            .get_mut(&UnitKey::new(PLAYER, 1))
+            .and_then(|e| e.skills.as_mut())
+        {
+            list.entries.push(SkillEntry {
+                skill: 3,
+                mode: 10,
+                ..SkillEntry::default()
+            });
+            list.right = Some(1);
+        }
+        let mut inputs = ModelInputs::default();
+        inputs.tables.skills = vec![
+            SkillRow::default(),
+            SkillRow::default(),
+            SkillRow::default(),
+            SkillRow {
+                anim: 10,
+                range: 2,
+                ..SkillRow::default()
+            },
+        ];
+        let at = (500, 200);
+        let mut st = ClickState::default();
+        world_click(
+            &mut w,
+            &inputs,
+            &mut st,
+            view(at),
+            Kind::RightDown,
+            Some(at),
+            0,
+        )
+        .unwrap();
+        assert_eq!(w.outgoing.len(), 1, "{:?}", w.outgoing);
+        assert_eq!(w.outgoing[0][0], 0x0C, "C→S 0x0C RightSkill at a point");
+        assert_eq!(w.outgoing[0].len(), 5);
     }
 
     #[test]

@@ -15,6 +15,8 @@ mod objects;
 mod quest_objects;
 mod quests;
 mod quests_act1;
+mod quests_act2;
+mod quests_act5;
 pub(crate) mod trade_quests;
 mod vendors;
 pub(crate) mod waypoints;

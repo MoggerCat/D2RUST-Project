@@ -13,7 +13,7 @@ use super::{InvDesk, InvError, InvRest};
 use crate::items::inventory::{
     active_inventory_item, belt_removal_allowed, corpse_slot_fit, InvWorld, UnitKind,
 };
-use crate::items::moves::{Guid, MovePending, Owner, Spot};
+use crate::items::moves::{Guid, MovePending, MoveUnits, Owner, Spot};
 use crate::units::lifecycle::LifecycleHooks;
 use crate::units::UnitId;
 
@@ -148,9 +148,24 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
         self.rest.tile_warp(player, tile)
     }
     fn use_item_at(&mut self, player: Owner, item: Guid, x: i32, y: i32) -> bool {
+        // PROVISIONAL (REC-117): Town Portal scroll and tome.
+        if self.use_portal_item(player, item) {
+            return true;
+        }
         self.rest.use_item_at(player, item, x, y)
     }
+    fn open_cube(&mut self, player: Owner, cube: Guid) -> bool {
+        self.open_cube_desk(player, cube)
+    }
     fn consume_item(&mut self, player: Owner, item: Guid) {
+        // PROVISIONAL (REC-113, REC-117): a used identify or Town Portal
+        // scroll leaves the grid.
+        if (self.item_unit(item).is_some()
+            && super::identify::IDENTIFY_CODES.contains(&self.code(item)))
+            || self.is_portal_scroll(item)
+        {
+            return self.remove_used_item(player, item);
+        }
         self.rest.consume_item(player, item)
     }
     fn item_skill(&self, item: Guid) -> i32 {
@@ -209,9 +224,35 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
         let a = a.and_then(|g| self.item_unit(g));
         corpse_slot_fit(self, self.tables, u, xu, d, a, l)
     }
-    /// The corpse list, room and unit removal are not modelled by the
-    /// desk: the rest's.
+    /// The corpse list is not modelled by the desk (the rest's
+    /// `corpse_taken` runs after).
+    ///
+    /// d2rs-own, unverified (PROVISIONAL REC-141): §12.1 step 4 on the
+    /// wired side. The corpse unit leaves its room and is freed with its
+    /// inventory (`0x0061A270`, `0x00555600`); the player is sent S→C 0x8E
+    /// `CorpseAssign` [1] 0, the player's and the corpse's GUID, and 0x0A
+    /// for the unit, so the client drops it. Other players' clients are
+    /// not told (single-player preview); the rest's `corpse_taken` still
+    /// runs.
     fn corpse_taken(&mut self, player: Owner, corpse: Owner) {
+        if let Some(c) = self.unit_of(corpse) {
+            let mut assign = vec![0x8E, 0];
+            assign.extend_from_slice(&player.guid.to_le_bytes());
+            assign.extend_from_slice(&corpse.guid.to_le_bytes());
+            self.rest.send(player, assign);
+            self.rest.send(
+                player,
+                crate::units::messages::remove_unit(0, corpse.guid).to_vec(),
+            );
+            let r = self.econ.game.lists.room_remove(c);
+            self.note_list(r);
+            self.state.inventories.remove(&c);
+            let (mut sim, hooks) = self.econ.split();
+            if let Err(e) = crate::units::lifecycle::remove(&mut sim, hooks, c) {
+                self.state.errors.push(InvError::Economy(e.into()));
+            }
+            self.sync_in();
+        }
         self.rest.corpse_taken(player, corpse)
     }
     fn replenish_timers(&mut self, item: Guid) {
@@ -376,12 +417,23 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
         self.rest.book_count_changed(player, n)
     }
     fn use_item(&mut self, player: Owner, target: Owner, item: Guid) -> bool {
+        // PROVISIONAL (REC-102): potions on the player.
+        if target == player && self.use_potion(player, item) {
+            return true;
+        }
+        // PROVISIONAL (REC-113): identify scrolls and tomes on an item.
+        if self.use_identify(player, target, item) {
+            return true;
+        }
         self.rest.use_item(player, target, item)
     }
     fn charge_update(&mut self, player: Owner, item: Guid) {
         self.rest.charge_update(player, item)
     }
     fn remove_used(&mut self, player: Owner, item: Guid) {
+        if self.item_unit(item).is_some() {
+            return self.remove_used_item(player, item);
+        }
         self.rest.remove_used(player, item)
     }
     fn equip_picked(&mut self, player: Owner, item: Guid) -> bool {

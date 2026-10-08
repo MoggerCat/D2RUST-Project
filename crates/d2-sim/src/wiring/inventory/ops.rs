@@ -11,7 +11,7 @@ use crate::items::inventory::{
     cursor_item_check, equip, equip_check, equip_from_cursor, find_free_position, free_belt_slot,
     grid_id, ground_or_owned_check, item_move_gate, owned_item_check, place_at_body, place_at_page,
     place_in_belt_slot, place_in_page_from_cursor, requirements_met, stack_test, stored_item_check,
-    stored_or_equipped_check, targeting_reset, trading, InvWorld, NO_GUID,
+    stored_or_equipped_check, targeting_reset, trading, InvWorld, UnitKind, NO_GUID,
 };
 use crate::items::moves::{Guid, InventoryOps, Owner};
 use crate::units::lifecycle::LifecycleHooks;
@@ -131,8 +131,15 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InventoryOps for InvDesk<'_, '_, H,
             _ => false,
         }
     }
+    /// §7.19 step 3: the target's inventory is created if needed
+    /// (`0x0063ABD0`), the filler is linked into it (no grid).
     fn link_into_item(&mut self, target: Guid, filler: Guid) -> bool {
-        self.rest.link_into_item(target, filler)
+        let (Some(t), Some(f)) = (self.iu(target), self.iu(filler)) else {
+            return self.rest.link_into_item(target, filler);
+        };
+        self.state.add_inventory(t, UnitKind::Item, target);
+        self.with_inv(Owner::item(target), |inv, d| inv.link(d, f, None))
+            .is_some()
     }
 
     // ---- §3 ------------------------------------------------------------

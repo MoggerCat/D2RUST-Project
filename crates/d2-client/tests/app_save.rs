@@ -239,6 +239,7 @@ fn live_values_overlay_the_base() {
     let live = save::Live {
         stats: vec![(0, 30), (12, 6), (13, 5000), (14, 0), (15, 40)],
         quests: Some(rec),
+        ..Default::default()
     };
     let out = save::apply_live(&base, &live, 777);
     let got = entries(&out);
@@ -253,4 +254,90 @@ fn live_values_overlay_the_base() {
     // No live stats (a game with no stat table): the base stays as it is.
     let kept = save::apply_live(&base, &save::Live::default(), 1);
     assert_eq!(entries(&kept), entries(&base));
+}
+
+/// The waypoints of the loaded save are the played character's, and the
+/// written file holds them again (q-save-full; fails when the load leaves
+/// them unapplied and a new record is saved instead).
+// Covers: specs/world/waypoints.md §3 r1, §3 r2
+// d2rs-own, unverified
+#[test]
+fn waypoints_round_trip_through_the_save() {
+    let mut base = synthetic_save();
+    // Waypoints 0 (default), 5 and 20 in Normal; 3 in Nightmare.
+    let body = base.body.as_mut().unwrap();
+    body.waypoints.records[0][2] |= 0x20;
+    body.waypoints.records[0][4] |= 0x10;
+    body.waypoints.records[1][2] |= 0x08;
+    let want = body.waypoints.records;
+    let character = Character::Save(
+        Box::new(base),
+        LoadContext {
+            difficulty: 0,
+            map_seed_applies: false,
+        },
+    );
+    let dir = temp("waypoints");
+    let file = dir.join("Rolf.d2s");
+    // The base the live values lay over has the default waypoints, so
+    // only the running game can supply the saved ones.
+    let (_shared, h) = save::share(
+        joined(character),
+        synthetic_save(),
+        Arc::new(Tables),
+        file.clone(),
+    );
+    h.save().unwrap();
+    let opts = ReadOptions {
+        expansion: true,
+        game: None,
+    };
+    let back = d2s::read(&std::fs::read(&file).unwrap(), &opts, &Tables).unwrap();
+    assert_eq!(back.body.unwrap().waypoints.records, want);
+}
+
+/// The live items, skill levels and waypoints replace the base's;
+/// `None` (no inventory model, no skill rows) keeps the base's.
+// d2rs-own, unverified
+#[test]
+fn extra_values_overlay_the_body() {
+    use d2_client::app::save_full::{apply_extra, Extra};
+    let mut body = synthetic_save().body.unwrap();
+    body.items = vec![d2s::ItemEntry { bytes: vec![1, 2] }];
+    let mut wp = [[0u8; 16]; 3];
+    wp[2][5] = 7;
+    apply_extra(
+        &mut body,
+        &Extra {
+            items: Some(vec![d2s::ItemEntry { bytes: vec![9] }]),
+            skills: Some(vec![0, 3, 20]),
+            waypoints: Some(wp),
+            corpses: None,
+        },
+    );
+    assert_eq!(body.items, [d2s::ItemEntry { bytes: vec![9] }]);
+    assert_eq!(&body.skills[..4], [0, 3, 20, 0]);
+    assert_eq!(body.skills.len(), 30);
+    assert_eq!(body.waypoints.records, wp);
+    // The corpse section follows the live corpse (`d2s.md` §8.3).
+    let corpse = d2s::Corpse {
+        items: vec![d2s::ItemEntry { bytes: vec![7] }],
+        ..d2s::Corpse::default()
+    };
+    apply_extra(
+        &mut body,
+        &Extra {
+            corpses: Some(vec![corpse.clone()]),
+            ..Extra::default()
+        },
+    );
+    assert_eq!(body.corpses, [corpse]);
+    apply_extra(&mut body, &Extra::default());
+    assert_eq!(
+        body.corpses.len(),
+        1,
+        "no model: the section passes through"
+    );
+    assert_eq!(body.items.len(), 1);
+    assert_eq!(body.skills[2], 20);
 }

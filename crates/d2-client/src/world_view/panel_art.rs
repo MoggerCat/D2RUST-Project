@@ -31,6 +31,9 @@ const SPEC: &str = "ui/panels.md";
 /// The archive name of a [`UiFiles`] name (§7.1: relative to
 /// `DATA\GLOBAL\UI\`, `.dc6`).
 pub fn archive_name(name: &str) -> String {
+    if let Some(item) = name.strip_prefix(crate::ui::panels::inv_items::ITEMS_PREFIX) {
+        return crate::ui::inv_grid::inventory_path(item); // ui/inventory.md §8 r2
+    }
     format!("data\\global\\ui\\{name}.dc6")
 }
 
@@ -202,12 +205,19 @@ impl PanelArtLoader {
                 spec: SPEC,
                 message: format!("{archive}: {message}"),
             };
-            let bytes = self
-                .source
-                .read_file(&archive)
+            // d2rs-own, unverified (D1): the HUD's fill cels are made
+            // here; a HUD file no archive holds draws nothing (logged).
+            if let Some(frames) = crate::ui::original::hud::preview_set(
+                name,
+                || self.source.read_file(&archive).is_none(),
+                &assets.palette,
+            ) {
+                assets.frames.insert(set, frames)?;
+                continue;
+            }
+            let dc6 = crate::assets::path::read_dc6(self.source.as_ref(), &archive)
                 .ok_or_else(|| fail("in no archive".into()))?
                 .map_err(fail)?;
-            let dc6 = d2_formats::dc6::Dc6::parse(&bytes).map_err(|e| fail(e.to_string()))?;
             let frames = FrameSet::from_dc6(&dc6, 0).map_err(|e| fail(e.to_string()))?;
             assets.frames.insert(set, frames)?;
         }

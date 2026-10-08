@@ -66,3 +66,35 @@ pub fn load(set: &ArchiveSet) -> Result<(LevelTables, WorldFiles), WorldDataErro
     let files = WorldFiles::load(&tables.drlg, &tables.preset, &tables.outdoor, reader(set))?;
     Ok((tables, files))
 }
+
+/// The level-type table views and every DRLG file, from a native folder
+/// (`native-assets.md` §5 r1: the typed DS1 / DT1 files).
+pub fn load_native(src: &NativeSource) -> Result<(LevelTables, WorldFiles), WorldDataError> {
+    let fixed = fixed_tables_native(src)?;
+    let tables = LevelTables::from_fixed(&fixed)?;
+    let read = |path: &[u8]| -> Result<NativeAsset, WorldDataError> {
+        let name = super::file_name(path)?;
+        match src.read_native(&d2_native::source::fold(&name)) {
+            Some(Ok(a)) => Ok(a),
+            Some(Err(detail)) => Err(WorldDataError::Read { path: name, detail }),
+            None => Err(WorldDataError::Read {
+                path: name,
+                detail: "no native file".into(),
+            }),
+        }
+    };
+    let files = WorldFiles::load_typed(
+        &tables.drlg,
+        &tables.preset,
+        &tables.outdoor,
+        |p| match read(p)? {
+            NativeAsset::Ds1(d) => Ok(d),
+            _ => Err(WorldDataError::BadPath(p.to_vec())),
+        },
+        |p| match read(p)? {
+            NativeAsset::Dt1(d) => Ok(d),
+            _ => Err(WorldDataError::BadPath(p.to_vec())),
+        },
+    )?;
+    Ok((tables, files))
+}

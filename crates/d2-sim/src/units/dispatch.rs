@@ -224,7 +224,15 @@ fn monster<H: UnitHooks>(
     a2: u32,
 ) -> Result<(), UnitError> {
     match ev {
-        event::MODE_CHANGE => modes::monster_event(sim, hooks, unit, false)?,
+        event::MODE_CHANGE => {
+            // PROVISIONAL (skills/use.md OQ6; REC-111): the frame code of
+            // the type-0 timer is unit +0x4E, which the monster per-frame
+            // `0x005A7670` reads; the store itself is not specified.
+            if let Some(r) = sim.units.get_mut(unit) {
+                r.anim.action_frame = a1 as u8;
+            }
+            modes::monster_event(sim, hooks, unit, false)?
+        }
         event::END_ANIM => modes::monster_event(sim, hooks, unit, true)?,
         event::AI_THINK => hooks.ai_think(sim, unit, a1, a2),
         event::STAT_REGEN => monster_regen(sim, hooks, unit)?,

@@ -182,10 +182,9 @@ impl TileAssets {
 
 fn read_dt1(source: Option<&dyn FileSource>, archive: &str) -> Result<Arc<Dt1>, String> {
     let source = source.ok_or("no game archives (synthetic data)")?;
-    let bytes = source
-        .read_file(archive)
-        .ok_or_else(|| "in no archive".to_string())??;
-    Dt1::parse(&bytes).map(Arc::new).map_err(|e| e.to_string())
+    crate::assets::path::read_dt1_file(source, archive)
+        .ok_or_else(|| "in no archive".to_string())?
+        .map(Arc::new)
 }
 
 #[cfg(test)]

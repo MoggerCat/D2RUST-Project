@@ -345,10 +345,17 @@ impl Fx {
             mode: 1,
             allied: ty == UnitType::Player,
         };
-        self.sim
+        let u = self
+            .sim
             .events
             .with(&mut self.sim.game, |g, v| v.allocate(g, &req, x, y))
-            .expect("allocated")
+            .expect("allocated");
+        // Staged as already known to the clients: the room clean-up has
+        // cleared unit flag 0x10, so the client pass announces nothing
+        // (`intents-events.md` §7.1 rule 2.1).
+        self.sim.events.sys.units.get_mut(u).unwrap().flags &=
+            !d2_sim::units::record::flags::SEED_SET;
+        u
     }
 
     /// A player (neutral, velocity percent 100, stamina 0x6400) for
@@ -1097,8 +1104,14 @@ fn vitals_sync_on_the_host_tick() {
         dx: (d.x() as u16).wrapping_sub(d.target_x) as u8,
         dy: (d.y() as u16).wrapping_sub(d.target_y) as u8,
     };
-    assert_eq!(sent.last().unwrap(), &(0, want.encode().to_vec()));
-    assert_eq!(sync_msgs(&sent, 0).len(), 1);
+    // The sync's own message, then the stat messages of what is nonzero
+    // (the maxima: `vitals_sync::stat_changes`).
+    assert_eq!(sync_msgs(&sent, 0), [want.encode().to_vec()]);
+    assert!(sent
+        .iter()
+        .skip_while(|m| m.1[0] != 0x95)
+        .skip(1)
+        .all(|m| matches!(m.1[0], 0x1D..=0x1F)));
     assert!(sync_msgs(&sent, 1).is_empty());
     assert_eq!(
         fx.sim

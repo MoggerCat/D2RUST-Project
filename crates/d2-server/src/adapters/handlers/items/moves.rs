@@ -113,6 +113,21 @@ pub trait MoveRest: InvRest {
     /// The messages `MovePending::send` queued since the last take, in
     /// send order: (receiving unit, bytes).
     fn take_sent(&mut self) -> Vec<(Owner, Vec<u8>)>;
+
+    /// The places of the game's players and items at the start of a
+    /// move call, and the game's item format, for a rest that holds no
+    /// positions of its own (the play preview's, [`StagedPlace`]).
+    /// Default: ignored.
+    fn stage(&mut self, _places: &[StagedPlace], _item_format: u16) {}
+}
+
+/// Where a player or an item is when an item-move call starts: its
+/// owner key, position in sub-tiles and room.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct StagedPlace {
+    pub owner: Owner,
+    pub pos: (i32, i32),
+    pub room: Option<d2_sim::units::RoomId>,
 }
 
 /// The item-move part of a game's world host: the inventory tables
@@ -177,6 +192,7 @@ struct MoveRun<'m> {
 type MoveOut = (
     Option<Result<u32, MoveFatal>>,
     Vec<(Option<UnitId>, Vec<u8>)>,
+    Vec<UnitId>,
 );
 
 impl MoveCall for MoveRun<'_> {
@@ -185,7 +201,46 @@ impl MoveCall for MoveRun<'_> {
         let mut d = parts.desk(econ);
         let guid = d.guid_of(self.player);
         let r = sim_moves::handle(&mut d, guid, self.msg);
-        (r, take_sent(&mut d))
+        let portals = d.take_portal_requests();
+        (r, take_sent(&mut d), portals)
+    }
+}
+
+/// The item part of the corpse creations the death queued
+/// (`ActionHooks::death.loot`, `vitals.md` §4.7 rule 1.7): each corpse
+/// gets an inventory, then the player's cursor and body items move onto
+/// it ([`sim_moves::ground::corpse_fill`]). The result carries what the
+/// rest sent.
+pub struct CorpseFillRun {
+    /// (player, corpse) with their GUIDs and the corpse's class.
+    pub pairs: Vec<(Owner, Owner, u32)>,
+    /// (player, amount) gold drops of the death penalty.
+    pub gold: Vec<(Owner, i32)>,
+}
+
+impl MoveCall for CorpseFillRun {
+    type Out = (Vec<MoveFatal>, Vec<(Option<UnitId>, Vec<u8>)>);
+    fn call<H: LifecycleHooks>(self, econ: &mut Economy<'_, H>, parts: &mut InvParts) -> Self::Out {
+        let mut faults = Vec::new();
+        let mut d = parts.desk(econ);
+        // `0x00535510`: piles near the player's death spot, the amount
+        // already off the player's stat (the penalty set it).
+        for (p, amount) in self.gold {
+            sim_moves::ground::gold_piles(&mut d, p, amount, sim_moves::MAX_PILES);
+        }
+        for (p, c, class) in self.pairs {
+            if let Some(cu) = d.unit_of(c) {
+                d.state.add_inventory(
+                    cu,
+                    d2_sim::items::inventory::UnitKind::Player { class: class as u8 },
+                    c.guid,
+                );
+            }
+            if let Err(e) = sim_moves::ground::corpse_fill(&mut d, p, c) {
+                faults.push(e);
+            }
+        }
+        (faults, take_sent(&mut d))
     }
 }
 
@@ -211,7 +266,11 @@ pub fn handle<D: EventDispatch, W: WorldHost<D>>(
     // Every item-move id has a fixed size ≤ 17 (`client-messages.tsv`).
     let msg = &msg[..size.min(msg.len())];
     let (game, events) = (&mut sim.game, &mut sim.events);
-    let (run, sent) = sim.world.moves(game, events, MoveRun { player, msg })?;
+    let (run, sent, portals) = sim.world.moves(game, events, MoveRun { player, msg })?;
+    // REC-117: a used Town Portal scroll / tome opens its pair.
+    for p in portals {
+        sim.world.town_portal(game, events, p);
+    }
     let mut faults = Vec::new();
     for (unit, bytes) in sent {
         // §3.2 rule 1: a unit without a client receives nothing.

@@ -154,6 +154,13 @@ impl UiRoot {
             let id = s.panel.id().0;
             if usize::from(id) < super::layout::UI_STATE_COUNT {
                 s.open = states.is_open(id as u8);
+                // d2rs-own, unverified (q-stash, PROVISIONAL): the right
+                // half shows the inventory beside the stash; the gate
+                // refuses opening ui 1 while the stash is open
+                // (`panels.md` §Test vectors), so it is drawn with it.
+                if id == 1 && (states.is_open(0x19) || states.is_open(0x1A)) {
+                    s.open = true;
+                }
             }
         }
     }

@@ -116,15 +116,16 @@ pub fn save_path(
 pub fn base_save(character: &Character) -> D2s {
     match character {
         Character::Save(save, _) => (**save).clone(),
-        Character::Named(c) => fresh(c.class, c.name()),
+        Character::Named(c) => fresh(c.class, c.name(), c.difficulty),
         Character::New => fresh(
             single_player::PLAYER_CLASS as u8,
             single_player::PLAYER_NAME,
+            single_player::GAME_SETUP.difficulty,
         ),
     }
 }
 
-fn fresh(class: u8, name: &[u8]) -> D2s {
+fn fresh(class: u8, name: &[u8], difficulty: u8) -> D2s {
     let mut header = Header {
         class,
         ..Header::default()
@@ -138,7 +139,7 @@ fn fresh(class: u8, name: &[u8]) -> D2s {
         0
     };
     // Town per difficulty: act 0 of the current one (§2.5).
-    header.towns[usize::from(single_player::GAME_SETUP.difficulty).min(2)] = 0x80;
+    header.towns[usize::from(difficulty).min(2)] = 0x80;
     D2s {
         header,
         body: Some(Body {
@@ -165,6 +166,13 @@ pub struct Live {
     pub stats: Vec<(u16, i32)>,
     /// The quest flag records per difficulty (`QuestFlags::copy_out`).
     pub quests: Option<[[u8; 96]; 3]>,
+    /// Items, skill levels and waypoints (q-save-full).
+    pub extra: super::save_full::Extra,
+    /// The character is hardcore and the player is dying or dead
+    /// ([`super::hardcore`]): the save gets the dead bit.
+    pub hardcore_dead: bool,
+    /// The character is hardcore.
+    pub hardcore: bool,
 }
 
 /// Reads [`Live`] from the game's local player.
@@ -189,7 +197,23 @@ pub fn read_live(sim: &mut Sim) -> Result<Live, SaveError> {
         }
         out
     });
-    Ok(Live { stats, quests })
+    let extra = super::save_full::read_extra(sim, player);
+    let hardcore = sim.events.action.hooks().x.hardcore;
+    // Player modes 0 (DT) and 17 (DD).
+    let down = sim
+        .events
+        .action
+        .sys
+        .units
+        .get(player)
+        .is_some_and(|u| u.mode == 0 || u.mode == 17);
+    Ok(Live {
+        stats,
+        quests,
+        extra,
+        hardcore,
+        hardcore_dead: hardcore && down,
+    })
 }
 
 /// `base` with the live values laid over it (the module docs list what).
@@ -224,11 +248,16 @@ pub fn apply_live(base: &D2s, live: &Live, now: u32) -> D2s {
     if let Some(records) = &live.quests {
         body.quests.records = *records;
     }
+    super::save_full::apply_extra(body, &live.extra);
     if let Some(&(_, level)) = live.stats.iter().find(|s| s.0 == LEVEL_STAT) {
         if level > 0 {
             save.header.level = level.min(99) as u8;
         }
     }
+    if live.hardcore {
+        save.header.status |= d2s::status::HARDCORE;
+    }
+    super::hardcore::mark_dead(&mut save, live.hardcore, live.hardcore_dead);
     if save.header.create_time == 0 {
         save.header.create_time = now;
     }

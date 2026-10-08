@@ -38,6 +38,7 @@ use d2_formats::font::FontTable;
 
 use super::draw::UiDrawSink;
 use super::geom::{Point, Rect};
+use super::item_tip;
 use super::layout::{LayoutError, PanelKey, RowKind, Screen};
 use super::panel::{ActionId, Panel, PanelId, UiCtx, UiEvent, UiResponse, WidgetId};
 use super::panels::border::draw_border_and_ctrlpnl;
@@ -46,6 +47,8 @@ use super::panels::char_inputs;
 use super::panels::character::{
     self, CharacterPanel, CharacterView, ResistEffect, STAT_STATPTS, UI_CHARACTER,
 };
+use super::panels::inv_gold;
+use super::panels::inv_items::{InvLayout, ItemsUi};
 use super::panels::inventory::{InventoryPanel, UI_INVENTORY};
 use super::panels::skilltree::{SkillEntry, SkillTreePanel, SkillTreeView, UI_SKILLTREE};
 use super::panels::{
@@ -57,6 +60,7 @@ use super::states::{GateEnv, PlayerLife, UiEffect, UiStateError, UiStates};
 use super::PointerButton;
 use crate::assets::path::FileSource;
 use crate::audio::driver::SoundRequest;
+use crate::bridge::items::ItemArtRows;
 use crate::bridge::msg::ui_npc::DialogCase;
 use crate::bridge::output::NpcDialog;
 use crate::bridge::world::{ClientWorld, KindData, UnitKey, PLAYER};
@@ -77,11 +81,20 @@ pub const PENDING: &[(&str, &str)] = &[
     (
         "character labels, class line, resist effects, shift-spend (§8.6, §8.9; \
          `panels-2.md` §17 r3, r5–r9)",
-        "the values and the name line are bound ([`ModelCharacter`]); the labels and the \
-         class line need the string table by id (`StringLookup::get_id`, `NoStrings` in \
-         play), the resist effects (`0x0063A570` family) need the state tests, the damage \
-         block and popups need the skill list and `monstats`; Shift is not in the UI events \
-         (a spend is 1 point); the language is English (0, `ui/text.md` §1.2)",
+        "the values and the name line are bound ([`ModelCharacter`]); the labels need the \
+         string table by id (`StringLookup::get_id`, `NoStrings` in play); the class line \
+         needs the `charstats` class name (record +0, not in `ClientTables`); next level \
+         (§8.11) needs `experience.txt` (not in the model: the panel shows stat 30); the \
+         resist and defense effects (`panels-3.md` §24 r1, r3) need the `states.txt` flag \
+         masks (not in `StateRow`); the damage block and popups need the skill list and \
+         `monstats`; Shift is not in the UI events (a spend is 1 point); the language is \
+         English (0, `ui/text.md` §1.2)",
+    ),
+    (
+        "inventory gold button press / release and the gold dialog (`panels-2.md` §21 r3–r9)",
+        "the gold value and button art are drawn ([`InventoryUi`]); the press / release and \
+         the drop dialog (kind 1) are wired in [`gold_dialog`] (d2rs-own box, REC-103); the \
+         press does not play sound 4 (deferred); the stash kinds 3 / 4 are not wired",
     ),
     (
         "inventory equipment backgrounds (§9.4)",
@@ -96,9 +109,9 @@ pub const PENDING: &[(&str, &str)] = &[
     ),
     (
         "waypoint menu panel (ui 0x14, §13 r2–r7)",
-        "S→C 0x63 opens it (flag, GUID, record: `msg_ui`), but the row rebuild, the tab \
-         gates (client quest flags, `msg-ui.md` open question 4) and the tab / row click \
-         rectangles (spec OQ 7) are not specified",
+        "installed (`waypoint_ui`: art, rows from the record, row click → C→S 0x49); the \
+         tab gates read the client quest flags (`msg-ui.md` open question 4, tab 0 only) \
+         and the row text needs the string table by id",
     ),
     (
         "stash and cube panels (ui 0x19, 0x1A; §11 r2–r6, §12 r2–r6)",
@@ -208,6 +221,22 @@ struct Shared {
     /// `difficultylevels` `ResistPenalty` by difficulty (§8.9, `0x00611D30`);
     /// an expansion game draws no values without it.
     resist_penalties: Option<Vec<i32>>,
+    /// The control panel overlays' state ([`hud`]).
+    hud: hud::HudState,
+    /// The inventory panel's item facts (`inv_items`).
+    items: ItemsUi,
+    /// The levels' waypoint indexes (`waypoint_ui`).
+    waypoint_map: Option<d2_sim::world::waypoints::WaypointMap>,
+    /// The waypoint menu S→C 0x63 opened last (`waypoint_ui`).
+    waypoint_open: Option<WaypointOpen>,
+    /// The Esc game menu's state ([`esc_menu`]).
+    esc: esc_menu::EscState,
+    /// The quest log's inputs ([`quest_log_ui`]).
+    quest: quest_log_ui::QuestInputs,
+    /// The inventory gold button and the drop-gold dialog ([`gold_dialog`]).
+    gold: gold_dialog::GoldState,
+    /// The screen message list ([`game_messages`]).
+    messages: game_messages::GameMessages,
 }
 
 impl Shared {
@@ -273,6 +302,12 @@ pub struct OriginalUi {
     /// `NpcDialog`, for the bridge (`client/msg-ui.md` §16 r4.3, open
     /// question 10 decided as A).
     dialog_answer: Option<(Box<NpcDialog>, DialogCase)>,
+    /// The hire list (`ui/hire_list.rs`, `menus.md` §3).
+    pub(super) hire: super::hire_list::SharedHire,
+    /// The NPC shop (`shop_ui`, `panels-2.md` §14 r4).
+    shop: shop_ui::SharedShop,
+    /// The NPC menu (`ui/npc_menu_ui.rs`, `menus.md` §2).
+    pub(super) npcm: super::npc_menu_ui::SharedNpcMenu,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -303,8 +338,11 @@ impl OriginalUi {
     /// by record (§9.2), `None` when the table is not loaded (the right
     /// panels then take no pointer event).
     pub fn new(config: UiConfig, inv_areas: Option<Vec<InvArea>>) -> Result<Self, LayoutError> {
+        let mut tables = PanelTables::load()?;
+        tables.files.extend(hud::hud_files());
+        tables.files.extend(quest_log_ui::quest_files());
         let shared = Shared {
-            tables: PanelTables::load()?,
+            tables,
             states: UiStates::new()?,
             config,
             inv_areas,
@@ -317,6 +355,14 @@ impl OriginalUi {
             outputs: Vec::new(),
             fonts: None,
             resist_penalties: None,
+            hud: hud::HudState::default(),
+            items: ItemsUi::default(),
+            waypoint_map: None,
+            waypoint_open: None,
+            esc: esc_menu::EscState::default(),
+            quest: quest_log_ui::QuestInputs::default(),
+            gold: gold_dialog::GoldState::default(),
+            messages: Default::default(),
         };
         Ok(Self {
             shared: Rc::new(RefCell::new(shared)),
@@ -325,6 +371,9 @@ impl OriginalUi {
             more: MsgUiMore::default(),
             npc_text: None,
             dialog_answer: None,
+            hire: super::hire_list::SharedHire::default(),
+            shop: shop_ui::SharedShop::default(),
+            npcm: Default::default(),
         })
     }
 
@@ -345,10 +394,50 @@ impl OriginalUi {
             sh: sh.clone(),
             panel: CharacterPanel::default(),
         }))?;
+        root.add(Box::new(waypoint_ui::WaypointUi {
+            sh: sh.clone(),
+            panel: Default::default(),
+            seq: 0,
+        }))?;
+        root.add(Box::new(quest_log_ui::QuestLogUi {
+            sh: sh.clone(),
+            log: Default::default(),
+        }))?;
+        root.add(Box::new(stash_ui::StashUi {
+            sh: sh.clone(),
+            input: Default::default(),
+        }))?;
+        root.add(Box::new(shop_ui::ShopUi {
+            sh: sh.clone(),
+            st: self.shop.clone(),
+        }))?;
+        root.add(Box::new(cube_ui::CubeUi {
+            sh: sh.clone(),
+            input: Default::default(),
+        }))?;
         root.add(Box::new(BorderUi { sh: sh.clone() }))?;
+        root.add(Box::new(super::hire_list::HireListUi {
+            st: self.hire.clone(),
+        }))?;
+        root.open(super::hire_list::HIRE_PANEL)?;
+        root.add(Box::new(super::npc_menu_ui::NpcMenuUi {
+            st: self.npcm.clone(),
+            hire: self.hire.clone(),
+        }))?;
+        root.open(super::npc_menu_ui::NPC_MENU_PANEL)?;
+        root.add(Box::new(hud::HudUi { sh: sh.clone() }))?;
+        root.add(Box::new(gold_dialog::GoldDialogUi { sh: sh.clone() }))?;
+        root.add(Box::new(game_messages::MessagesUi { sh: sh.clone() }))?;
+        root.open(game_messages::MESSAGES_PANEL)?;
+        root.add(Box::new(esc_menu::EscMenuUi { sh: sh.clone() }))?;
         // Not a UI state: open for good.
         root.open(BORDER_PANEL)?;
+        root.open(hud::HUD_PANEL)?;
+        root.open(gold_dialog::GOLD_PANEL)?;
         root.sync_states(&sh.borrow().states);
+        let sc = sh.borrow().config.screen;
+        self.hire.borrow_mut().screen = (sc.w, sc.h);
+        self.npcm.borrow_mut().screen = (sc.w, sc.h);
         Ok(())
     }
 
@@ -370,6 +459,56 @@ impl OriginalUi {
     /// (§8.9 expansion penalty, `0x00611D30`; `panels-2.md` §24 r2).
     pub fn set_resist_penalties(&mut self, penalties: Vec<i32>) {
         self.shared.borrow_mut().resist_penalties = Some(penalties);
+    }
+
+    /// The HUD's skill icon and experience tables ([`hud::HudTables`]).
+    pub fn set_hud_tables(&mut self, tables: hud::HudTables) {
+        self.shared.borrow_mut().hud.tables = tables;
+    }
+
+    /// The walk's run toggle for the run button (§6 r1); returns the
+    /// toggles the run button asked for since the last call (§10 r2).
+    pub fn sync_run(&mut self, running: bool) -> u32 {
+        let mut sh = self.shared.borrow_mut();
+        sh.hud.running = running;
+        std::mem::take(&mut sh.hud.run_toggles)
+    }
+
+    /// Item-table art rows (`inv_items`): the inventory panel draws the
+    /// local player's items and the cursor item with them; empty draws
+    /// nothing. Registers their graphics in [`Self::files`], so call it
+    /// before handing the files to the art loader.
+    pub fn set_item_art(&mut self, art: ItemArtRows) {
+        let mut sh = self.shared.borrow_mut();
+        sh.items.art = art;
+        let Shared { items, tables, .. } = &mut *sh;
+        items.register_files(&mut tables.files);
+    }
+
+    /// `inventory.bin` layouts by record (`inv_items::inv_layout` of each
+    /// row); without them the grid is the spec's measured record.
+    pub fn set_inv_layouts(&mut self, layouts: Vec<InvLayout>) {
+        self.shared.borrow_mut().items.layouts = Some(layouts);
+    }
+
+    /// The `belts.bin` records and the belts' types (`hud_belt`).
+    pub fn set_belt_parts(&mut self, parts: hud_belt::BeltParts) {
+        self.shared.borrow_mut().hud.belt.parts = parts;
+    }
+
+    /// The item tool tips' tables and strings (`item_tip`).
+    pub fn set_item_tips(&mut self, tips: item_tip::ItemTips) {
+        self.shared.borrow_mut().items.tips = Some(tips);
+    }
+
+    /// Shift is held (set by the host each frame, `inv_items`).
+    pub fn set_shift(&mut self, shift: bool) {
+        self.shared.borrow_mut().items.shift = shift;
+    }
+
+    /// Measured item graphic frame sizes by `invfile` (lower case).
+    pub fn set_item_frame_sizes(&mut self, sizes: BTreeMap<String, (u32, u32)>) {
+        self.shared.borrow_mut().items.frame_sizes = sizes;
     }
 
     /// The flags.
@@ -418,13 +557,66 @@ impl OriginalUi {
             }
         }
         if let (Routed::Unhandled, UiEvent::Action(a)) = (routed, e) {
-            if let Some(ui) = hotkey_state(a) {
+            if a == ActionId(Action::GameMenu.index() as u16) {
+                self.game_menu_key()?;
+            } else if let Some(ui) = hotkey_state(a) {
                 // §4.3: hot keys pass jump 0; mode 2 toggle.
                 self.set_ui(u32::from(ui), 2, false)?;
+                // The quest log asks the server for the quest data when
+                // it opens (`quest_log_ui`; d2rs-own, unverified).
+                if ui == quest_log_ui::UI_QUEST_SCREEN && self.is_open(ui) {
+                    root.queue_intent(quest_log_ui::request_quest_data());
+                }
             }
         }
         root.sync_states(&self.shared.borrow().states);
         Ok(())
+    }
+
+    /// Esc (command 56, `controls.md` §3): the open menu closes; else the
+    /// open panels close; else the menu opens. Which panels Esc closes is
+    /// d2rs-own, unverified (`0x00456300` is not specified).
+    fn game_menu_key(&mut self) -> Result<(), OriginalUiError> {
+        use super::states::id;
+        const CLOSEABLE: [u8; 17] = [
+            id::INVENTORY,
+            id::CHARACTER,
+            3,
+            id::SKILL_TREE,
+            id::NEW_STATS,
+            id::NEW_SKILLS,
+            id::NPC_MENU,
+            id::NPC_SHOP,
+            id::QUEST_SCREEN,
+            id::INI_SCROLL,
+            id::QUEST_LOG,
+            id::WAYPOINT,
+            id::PARTY,
+            id::STASH,
+            id::CUBE,
+            id::MERC_INV,
+            id::RECIPE_SCROLL,
+        ];
+        if self.is_open(id::ESC_MENU) {
+            self.set_ui(u32::from(id::ESC_MENU), 1, false)?;
+            return Ok(());
+        }
+        let mut closed = false;
+        for ui in CLOSEABLE {
+            if self.is_open(ui) {
+                self.set_ui(u32::from(ui), 1, true)?;
+                closed = true;
+            }
+        }
+        if !closed {
+            self.set_ui(u32::from(id::ESC_MENU), 0, false)?;
+        }
+        Ok(())
+    }
+
+    /// Whether "Save and Exit Game" was chosen since the last call.
+    pub fn take_exit_request(&mut self) -> bool {
+        std::mem::take(&mut self.shared.borrow_mut().esc.exit_requested)
     }
 
     /// `SetUIState(ui, mode, jump)` with the model's gate facts; effects
@@ -462,6 +654,7 @@ pub fn hotkey_state(a: ActionId) -> Option<u8> {
         (Action::ToggleInventory, UI_INVENTORY),
         (Action::ToggleCharacter, UI_CHARACTER),
         (Action::ToggleSkillTree, UI_SKILLTREE),
+        (Action::ToggleQuests, quest_log_ui::UI_QUEST_SCREEN),
     ]
     .into_iter()
     .find(|(action, _)| action.index() == i)
@@ -491,7 +684,9 @@ fn is_click(e: UiEvent) -> bool {
 
 const EMPTY: Rect = Rect::new(0, 0, 0, 0);
 
-/// Inventory (ui 1, §9.3): art and close button.
+/// Inventory (ui 1, §9.3): art, the gold line and gold button (§9.6,
+/// `panels-2.md` §21 r1: the local player's full stat 14, drawn with the
+/// fonts bound as the character values are) and the close button.
 struct InventoryUi {
     sh: SharedRef,
     panel: InventoryPanel,
@@ -506,28 +701,76 @@ impl Panel for InventoryUi {
         self.sh.borrow().right_area().unwrap_or(EMPTY)
     }
 
-    fn draw(&self, _ctx: &UiCtx, out: &mut dyn UiDrawSink) {
+    fn draw(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
         let sh = self.sh.borrow();
-        self.panel.draw(&sh.tables, &sh.env(), out);
+        // `0x00625480(P, 14, 0)`: the total, layer 0 (`stat-lists.md`
+        // §1 r3). Font16 is drawn only with the fonts bound (their DC6
+        // are then in the frame's assets).
+        let gold = match (&sh.fonts, local_player(ctx.world)) {
+            (Some(_), Some((key, _))) => Some(ctx.world.total(key, inv_gold::STAT_GOLD, 0)),
+            _ => None,
+        };
+        // The gold button's pressed flag is the gold dialog module's.
+        let panel = InventoryPanel {
+            gold_pressed: sh.gold.buttons.inv_pressed,
+            ..self.panel
+        };
+        panel.draw(&sh.tables, &sh.env(), gold, out);
+        let class = Facts::of(ctx.world).class;
+        if let Some(l) = sh.items.layout(class, &sh.config.screen) {
+            sh.items.draw_panel(ctx.world, &sh.tables.files, &l, out);
+        }
     }
 
     fn hit(&self, _p: Point) -> Option<WidgetId> {
         None
     }
 
-    fn event(&mut self, e: UiEvent, _ctx: &UiCtx) -> UiResponse {
+    fn event(&mut self, e: UiEvent, ctx: &UiCtx) -> UiResponse {
         if !is_click(e) {
             return UiResponse::Ignored;
         }
         let mut sh = self.sh.borrow_mut();
         let s = sh.config.screen;
+        if let UiEvent::Press {
+            button: PointerButton::Right,
+            at,
+        } = e
+        {
+            let class = Facts::of(ctx.world).class;
+            if let Some(l) = sh.items.layout(class, &s) {
+                let out = sh.items.right_press(ctx.world, &sh.tables.files, &l, at);
+                sh.outputs.extend(out);
+            }
+            return UiResponse::Consumed;
+        }
         match left(e) {
-            Some((true, at)) => self.panel.press(&sh.tables, &s, at),
+            Some((true, at)) => {
+                self.panel.press(&sh.tables, &s, at);
+                let class = Facts::of(ctx.world).class;
+                if let Some(l) = sh.items.layout(class, &s) {
+                    let out = sh.items.press(ctx.world, &sh.tables.files, &l, at);
+                    sh.outputs.extend(out);
+                }
+            }
             Some((false, at)) => {
                 let out = self.panel.release(&sh.tables, &s, at);
                 sh.outputs.extend(out);
             }
-            None => {}
+            None => {
+                // Right press: use the item under the mouse (REC-117).
+                if let UiEvent::Press {
+                    button: PointerButton::Right,
+                    at,
+                } = e
+                {
+                    let class = Facts::of(ctx.world).class;
+                    if let Some(l) = sh.items.layout(class, &s) {
+                        let out = sh.items.use_press(ctx.world, &l, at);
+                        sh.outputs.extend(out);
+                    }
+                }
+            }
         }
         UiResponse::Consumed
     }
@@ -653,13 +896,31 @@ impl FontMeasure {
         for &id in ids {
             let info = super::font_info(id).ok_or(format!("font id {id} is not 0–13"))?;
             let archive = info.tbl_path.replace('/', "\\");
-            let bytes = source
-                .read_file(&archive)
-                .ok_or(format!("{archive}: in no archive"))??;
-            let table = FontTable::parse(&bytes).map_err(|e| format!("{archive}: {e}"))?;
+            let table = crate::assets::path::read_font_table(source, &archive)
+                .ok_or(format!("{archive}: in no archive"))?
+                .map_err(|e| format!("{archive}: {e}"))?;
             m.insert(id, table);
         }
         Ok(m)
+    }
+
+    /// `Wrap(text, max)` (`ui/text.md` §10): the lines; `None` without
+    /// the font.
+    pub fn wrap(&self, font: u16, text: &[u16], max: i32) -> Option<Vec<Vec<u16>>> {
+        let g = super::text::GlyphLookup::new(self.tables.get(&font)?);
+        let lines = super::text::wrap(&g, text, max).ok()?;
+        Some(lines.into_iter().map(<[u16]>::to_vec).collect())
+    }
+
+    /// Width A of `text` (`ui/text.md` §6); `None` without the font.
+    pub fn width_a(&self, font: u16, text: &[u16]) -> Option<i32> {
+        TextMeasure::width(self, font, text)
+    }
+
+    /// Width C (`0x00501730`) of the whole `text`.
+    pub fn width_c(&self, font: u16, text: &[u16]) -> Option<i32> {
+        let g = super::text::GlyphLookup::new(self.tables.get(&font)?);
+        super::text::width_c(&g, text, 0, text.len()).ok()
     }
 
     /// `0x00501840` max width of `text` in font `font` (§6); `None`
@@ -737,7 +998,7 @@ impl CharacterView for ModelCharacter<'_> {
 
 /// The local player's key and 0x59 name (up to its NUL), when the model
 /// has a local player unit.
-fn local_player(world: &ClientWorld) -> Option<(UnitKey, &[u8])> {
+pub(super) fn local_player(world: &ClientWorld) -> Option<(UnitKey, &[u8])> {
     let u = world.local().filter(|u| u.key.unit_type == PLAYER)?;
     let name: &[u8] = match &u.kind {
         KindData::Player(p) => {
@@ -876,9 +1137,32 @@ impl Panel for BorderUi {
         EMPTY
     }
 
-    fn draw(&self, _ctx: &UiCtx, out: &mut dyn UiDrawSink) {
+    fn draw(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
         let sh = self.sh.borrow();
         draw_border_and_ctrlpnl(&sh.tables, &sh.env(), out);
+        // The cursor item last (`panels-3.md` §23 r9).
+        sh.items
+            .draw_cursor(ctx.world, &sh.tables.files, (29, 29), sh.mouse, out);
+        // The item tool tip over everything (`item_tip`).
+        if sh.states.is_open(UI_INVENTORY) {
+            let class = Facts::of(ctx.world).class;
+            let lines = sh.items.hover_lines(
+                ctx.world,
+                &sh.tables.files,
+                &sh.config.screen,
+                class,
+                sh.mouse,
+            );
+            let (w, h) = (sh.config.screen.w, sh.config.screen.h);
+            item_tip::draw_tip(
+                &lines,
+                sh.mouse,
+                (w, h),
+                sh.fonts.as_ref(),
+                &sh.tables.files,
+                out,
+            );
+        }
     }
 
     fn hit(&self, _p: Point) -> Option<WidgetId> {
@@ -890,11 +1174,38 @@ impl Panel for BorderUi {
     }
 }
 
+#[path = "esc_menu.rs"]
+pub mod esc_menu;
+#[path = "game_messages.rs"]
+pub mod game_messages;
+#[path = "gold_dialog.rs"]
+pub mod gold_dialog;
+#[path = "hud.rs"]
+pub mod hud;
+
+#[path = "hud_belt.rs"]
+pub mod hud_belt;
+
+#[path = "cube_ui.rs"]
+pub(super) mod cube_ui;
 #[path = "msg_ui.rs"]
 pub mod msg_ui;
+#[path = "quest_log_ui.rs"]
+pub mod quest_log_ui;
+#[cfg(test)]
+#[path = "quest_log_ui_tests.rs"]
+mod quest_log_ui_tests;
+#[path = "shop_ui.rs"]
+pub mod shop_ui;
+#[path = "stash_ui.rs"]
+pub(super) mod stash_ui;
+#[path = "waypoint_ui.rs"]
+pub mod waypoint_ui;
 pub use msg_ui::{
     ChatAction, IntroEntry, MsgUiMore, MsgUiState, NpcTextList, OverheadText, WaypointMenuState,
 };
+pub use shop_ui::ShopPrices;
+pub use waypoint_ui::WaypointOpen;
 
 #[cfg(test)]
 #[path = "original_tests.rs"]

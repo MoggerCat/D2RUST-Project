@@ -409,6 +409,13 @@ pub trait MovePending {
     fn use_item_at(&mut self, player: Owner, item: Guid, x: i32, y: i32) -> bool {
         false
     }
+    /// Opening the Horadric Cube (item-use table entry 7, `0x005BF0C0`,
+    /// `world/cube.md` §1): the interaction (type 4, the cube) and the
+    /// S→C 0x77 messages; true = opened (the cube is not consumed).
+    /// Default: not opened.
+    fn open_cube(&mut self, player: Owner, cube: Guid) -> bool {
+        false
+    }
     /// Use `0x005BF240` on a target; true = used.
     fn use_item(&mut self, player: Owner, target: Owner, item: Guid) -> bool {
         false

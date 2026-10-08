@@ -396,3 +396,206 @@ fn environment_report_sends_0x53_to_the_act_s_clients() {
     );
     assert_eq!(fx.game.lists.act(act).unwrap().environment.last_hour, 17);
 }
+
+// ---- skill messages 0x4C / 0x4D and the hit message 0x0C ---------------------------
+
+fn use_skill(fx: &mut Fx, u: UnitId, skill: i32, base: i32) {
+    fx.sim.hooks().x.used.insert(
+        u,
+        crate::skills::SkillEntry {
+            skill,
+            base,
+            level_bonus: 1,
+            owner_guid: -1,
+            charges: 0,
+            has_charges: false,
+        },
+    );
+}
+
+fn target(fx: &mut Fx, u: UnitId, t: UnitId, ty: UnitType) {
+    let guid = guid(fx, t);
+    let d = fx
+        .sim
+        .hooks()
+        .paths
+        .as_mut()
+        .unwrap()
+        .dynamic_mut(u)
+        .unwrap();
+    d.target_unit = Some(crate::path::TargetUnit { unit: t, ty, guid });
+    d.target_x = 0x1234;
+    d.target_y = 0x0567;
+}
+
+fn changed(fx: &mut Fx, u: UnitId, mode: u32) {
+    let r = fx.sim.sys.units.get_mut(u).unwrap();
+    r.mode = mode;
+    r.flags |= flags::CHANGED;
+    fx.game.lists.queue_update(u).unwrap();
+}
+
+/// The builders of §3.5 rule 5 (flag 0): 0x4C's 16 bytes and 0x4D's 17,
+/// at the TSV offsets.
+// Covers: specs/sim/intents-events.md §3.5 r5
+#[test]
+fn skill_message_builders_write_the_tsv_offsets() {
+    use skill_message::{skill_on_point, skill_on_unit};
+    assert_eq!(
+        skill_on_unit(1, 0x0403_0201, 0x0A0B, 3, 0, 0x0D0C_0B0A, 0),
+        [0x4C, 1, 1, 2, 3, 4, 0x0B, 0x0A, 3, 0, 0x0A, 0x0B, 0x0C, 0x0D, 0, 0]
+    );
+    assert_eq!(
+        skill_on_point(0, 7, 0x1_0002, 5, 0x1234, 0x0567, 0),
+        [0x4D, 0, 7, 0, 0, 0, 2, 0, 1, 0, 5, 0x34, 0x12, 0x67, 0x05, 0, 0]
+    );
+}
+
+/// §7.4 rule 3: a monster with a skill in use and its target in the
+/// client's rooms sends 0x4C (type 1, GUID, skill, level, target type
+/// and GUID) instead of a mode message; nothing is logged.
+// Covers: specs/sim/intents-events.md §7.4 r3, §3.5 r5
+#[test]
+fn a_monster_using_a_skill_on_its_target_sends_0x4c() {
+    let (mut fx, p, m) = setup();
+    use_skill(&mut fx, m, 0x2F, 2);
+    target(&mut fx, m, p, UnitType::Player);
+    changed(&mut fx, m, 4);
+    fx.tick();
+    let want = skill_message::skill_on_unit(1, guid(&fx, m), 0x2F, 3, 0, guid(&fx, p), 0);
+    assert_eq!(sent(&mut fx), vec![(p, want.to_vec())]);
+    assert_eq!(fx.sim.hooks().errors, vec![]);
+}
+
+/// §7.4 rule 3, no target (mode 14 SQ drops none, but the path has no
+/// target unit): 0x4D at the path target.
+// Covers: specs/sim/intents-events.md §7.4 r3, §3.5 r5
+#[test]
+fn a_monster_using_a_skill_without_a_target_sends_0x4d() {
+    let (mut fx, p, m) = setup();
+    use_skill(&mut fx, m, 0x2F, 0);
+    target(&mut fx, m, p, UnitType::Player);
+    fx.sim
+        .hooks()
+        .paths
+        .as_mut()
+        .unwrap()
+        .dynamic_mut(m)
+        .unwrap()
+        .target_unit = None;
+    changed(&mut fx, m, 14);
+    fx.tick();
+    let want = skill_message::skill_on_point(1, guid(&fx, m), 0x2F, 1, 0x1234, 0x0567, 0);
+    assert_eq!(sent(&mut fx), vec![(p, want.to_vec())]);
+    assert_eq!(fx.sim.hooks().errors, vec![]);
+}
+
+/// §7.3 rule 2 step 7: unit flag 0x8000 sends 0x0C (type 1, GUID, 0x13,
+/// +0xB0, the life fraction minus 1) and stores the fraction as stat
+/// 352; the clean-up clears the flag, so it is sent once.
+// Covers: specs/sim/intents-events.md §7.3 r2, §7.5 r3
+#[test]
+fn a_hit_monster_sends_0x0c_once() {
+    let (mut fx, p, m) = setup();
+    // Stat 7 `maxhp` 100, stat 6 `hitpoints` 50 (both << 8).
+    let max = 100 << 8;
+    fx.stats(m, &[(7, max), (6, max / 2)]);
+    let p128 = crate::stats::life_fraction(max / 2, max);
+    assert!(p128 < 0x80, "max life {max}");
+    fx.sim.sys.units.get_mut(m).unwrap().flags |= HIT;
+    fx.game.lists.queue_update(m).unwrap();
+    fx.tick();
+    let want = skill_message::monster_hit(guid(&fx, m), 0, p128 as u8, false);
+    assert_eq!(want[6], 0x13);
+    assert_eq!(sent(&mut fx), vec![(p, want.to_vec())]);
+    assert_eq!(fx.sim.sys.stats.unit_base(m, 352, 0), p128);
+    fx.game.lists.queue_update(m).unwrap();
+    fx.tick();
+    assert_eq!(sent(&mut fx), vec![]);
+}
+
+/// The 0x0C life byte: p − 1 above 1, else p; | 0x80 with the 0x100 flag.
+// Covers: specs/sim/intents-events.md §7.3 r2
+#[test]
+fn monster_hit_life_byte() {
+    assert_eq!(skill_message::monster_hit(9, 4, 0x80, false)[8], 0x7F);
+    assert_eq!(skill_message::monster_hit(9, 4, 1, false)[8], 1);
+    assert_eq!(skill_message::monster_hit(9, 4, 0, true)[8], 0x80);
+    assert_eq!(skill_message::monster_hit(9, 4, 0x40, true)[7..], [4, 0xBF]);
+}
+
+/// PROVISIONAL (pathing.md §10 r2; REC-95): a player entering a skill
+/// mode (A1) with a used skill sends 0x4C on its path's target unit, to
+/// its own client too; a walk mode still sends nothing to it.
+// Covers: specs/sim/pathing.md §10 r2; specs/sim/intents-events.md §3.5 r5
+#[test]
+fn a_player_attacking_a_monster_sends_0x4c() {
+    let (mut fx, p, m) = setup();
+    use_skill(&mut fx, p, 0, 1);
+    target(&mut fx, p, m, UnitType::Monster);
+    changed(&mut fx, p, 7);
+    fx.tick();
+    let want = skill_message::skill_on_unit(0, guid(&fx, p), 0, 2, 1, guid(&fx, m), 0);
+    assert_eq!(sent(&mut fx), vec![(p, want.to_vec())]);
+    // Without a target unit: 0x4D at the path target.
+    fx.sim
+        .hooks()
+        .paths
+        .as_mut()
+        .unwrap()
+        .dynamic_mut(p)
+        .unwrap()
+        .target_unit = None;
+    changed(&mut fx, p, 10);
+    fx.tick();
+    let want = skill_message::skill_on_point(0, guid(&fx, p), 0, 2, 0x1234, 0x0567, 0);
+    assert_eq!(sent(&mut fx), vec![(p, want.to_vec())]);
+    // Neutral, block: nothing.
+    for mode in [1, 9] {
+        changed(&mut fx, p, mode);
+        fx.tick();
+        assert_eq!(sent(&mut fx), vec![], "mode {mode}");
+    }
+}
+
+/// §3.5 rule 6: a state toggled on a unit reaches the client as 0xA7
+/// (no list entries) in the next client pass, once; toggled off, 0xA9.
+// Covers: specs/sim/intents-events.md §3.5 r6, §7.3 r2
+#[test]
+fn state_changes_are_sent_once_as_a_7_then_a_9() {
+    let (mut fx, p, m) = setup();
+    let g = guid(&fx, m).to_le_bytes();
+    let state_msgs = |v: Vec<(UnitId, Vec<u8>)>| -> Vec<Vec<u8>> {
+        v.into_iter()
+            .map(|(_, b)| b)
+            .filter(|b| matches!(b[0], 0xA7..=0xA9))
+            .collect()
+    };
+    let s = &mut fx.sim.sys;
+    let mut v = View::of(&mut s.units, &mut s.stats, &s.data, &mut s.hooks);
+    v.set_state(m, 1, true);
+    fx.game.lists.queue_update(m).unwrap();
+    fx.tick();
+    let on = state_msgs(sent(&mut fx));
+    assert_eq!(on, vec![vec![0xA7, 1, g[0], g[1], g[2], g[3], 1]]);
+    fx.tick();
+    assert_eq!(state_msgs(sent(&mut fx)), Vec::<Vec<u8>>::new());
+    let s = &mut fx.sim.sys;
+    let mut v = View::of(&mut s.units, &mut s.stats, &s.data, &mut s.hooks);
+    v.set_state(m, 1, false);
+    fx.game.lists.queue_update(m).unwrap();
+    fx.tick();
+    let off = state_msgs(sent(&mut fx));
+    assert_eq!(off, vec![vec![0xA9, 1, g[0], g[1], g[2], g[3], 1]]);
+    let _ = p;
+}
+
+/// 0xA8 carries the state list's entries (§3.5 rule 6).
+// Covers: specs/sim/intents-events.md §3.5 r6
+#[test]
+fn set_state_message_layout() {
+    let m = crate::units::messages::set_state(1, 0x0102_0304, 9, &[], |_| None);
+    // size = 8 + stream (the 0x1FF end: 9 bits = 2 bytes).
+    assert_eq!(m[..8], [0xA8, 1, 4, 3, 2, 1, 10, 9]);
+    assert_eq!(m.len(), 10);
+}

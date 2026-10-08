@@ -87,11 +87,28 @@ pub trait UseRest {
     fn equippable(&self, item: UnitId) -> bool;
     fn bow_equipped(&self, u: UnitId) -> bool;
     fn state_mask(&self, u: UnitId, mask: u32) -> bool;
+    /// The weapon in use and the item on a body location as the skill
+    /// bodies see them (ammo check, bow missile, `bodies.md` §2.3–§2.5),
+    /// ahead of combat's [`Pending::current_weapon`] / [`Pending::item_at`]:
+    /// a host whose equipped items do not yet feed the stat lists lets the
+    /// skills see its weapon without changing the melee damage rules.
+    /// Default: not answered (combat's).
+    fn skill_weapon(&self, _u: UnitId) -> Option<UnitId> {
+        None
+    }
+    fn skill_item_at(&self, _u: UnitId, _loc: u8) -> Option<UnitId> {
+        None
+    }
     // ---- modes and paths (units.md player modes, path spec)
     fn start_mode(&mut self, game: &mut Game, u: UnitId, mode: u32, target: ModeTarget<UnitId>);
     fn run_to(&mut self, u: UnitId, target: UnitId, e: SkillEntry);
     fn target(&self, u: UnitId) -> Option<UnitId>;
     fn clear_target(&mut self, u: UnitId);
+    /// The target of a mode start: the point or unit the skill's missile
+    /// and checks read back through [`UseRest::target`] and
+    /// [`UseRest::target_position`] (`use.md` §4: where `0x0057FE90` /
+    /// `0x0057FEF0` store it is not stated). Default: not kept.
+    fn keep_target(&mut self, _u: UnitId, _target: ModeTarget<UnitId>) {}
     fn event_arg(&self, u: UnitId) -> i32;
     fn set_event_arg(&mut self, u: UnitId, a: i32);
     fn step_path(&mut self, u: UnitId) -> i32;
@@ -136,10 +153,19 @@ impl<X: Pending + UseRest> ActionSim<X> {
 }
 
 impl<X: Pending + UseRest> UseView<'_, X> {
-    fn x(&self) -> &X {
+    /// The unit's list in `ActionHooks::skill_lists` (`client/msg-skills.md`
+    /// §1), when it has one: the list calls answer from it, the seam
+    /// otherwise.
+    fn list(&self, u: UnitId) -> Option<&crate::skills::list::SkillList> {
+        self.cv.v.h.skill_lists.get(&u)
+    }
+    fn list_mut(&mut self, u: UnitId) -> Option<&mut crate::skills::list::SkillList> {
+        self.cv.v.h.skill_lists.get_mut(&u)
+    }
+    pub(super) fn x(&self) -> &X {
         &self.cv.v.h.x
     }
-    fn xm(&mut self) -> &mut X {
+    pub(super) fn xm(&mut self) -> &mut X {
         &mut self.cv.v.h.x
     }
     fn error(&mut self, e: WiringError) {
@@ -190,13 +216,17 @@ impl<X: Pending + UseRest> SkillUnits for UseView<'_, X> {
         self.cv.used_skill(u)
     }
     fn current_weapon(&self, u: UnitId) -> Option<UnitId> {
-        self.cv.current_weapon(u)
+        self.x()
+            .skill_weapon(u)
+            .or_else(|| self.cv.current_weapon(u))
     }
     fn weapon(&self, u: UnitId) -> Option<UnitId> {
-        self.cv.weapon(u)
+        self.x().skill_weapon(u).or_else(|| self.cv.weapon(u))
     }
     fn item_at(&self, u: UnitId, loc: u8) -> Option<UnitId> {
-        self.cv.item_at(u, loc)
+        self.x()
+            .skill_item_at(u, loc)
+            .or_else(|| self.cv.item_at(u, loc))
     }
     fn item_is(&self, item: UnitId, itype: i32) -> bool {
         self.cv.item_is(item, itype)
@@ -329,28 +359,52 @@ impl<X: Pending + UseRest> UseWorld for UseView<'_, X> {
     }
 
     fn left_skill(&self, u: UnitId) -> Option<SkillEntry> {
-        self.x().left_skill(u)
+        match self.list(u) {
+            Some(l) => l.left.and_then(|i| l.view().get(i).copied()),
+            None => self.x().left_skill(u),
+        }
     }
     fn right_skill(&self, u: UnitId) -> Option<SkillEntry> {
-        self.x().right_skill(u)
+        match self.list(u) {
+            Some(l) => l.right.and_then(|i| l.view().get(i).copied()),
+            None => self.x().right_skill(u),
+        }
     }
     fn set_left_skill(&mut self, u: UnitId, e: SkillEntry) {
-        self.xm().set_left_skill(u, e);
+        match self.list_mut(u) {
+            Some(l) => l.left = l.find(e.skill, e.owner_guid),
+            None => self.xm().set_left_skill(u, e),
+        }
     }
     fn set_right_skill(&mut self, u: UnitId, e: SkillEntry) {
-        self.xm().set_right_skill(u, e);
+        match self.list_mut(u) {
+            Some(l) => l.right = l.find(e.skill, e.owner_guid),
+            None => self.xm().set_right_skill(u, e),
+        }
     }
     fn find_entry(&self, u: UnitId, skill: i32) -> Option<SkillEntry> {
-        self.x().find_entry(u, skill)
+        match self.list(u) {
+            Some(l) => l.view().into_iter().find(|e| e.skill == skill),
+            None => self.x().find_entry(u, skill),
+        }
     }
     fn find_entry_owned(&self, u: UnitId, skill: i32, owner: i32) -> Option<SkillEntry> {
-        self.x().find_entry_owned(u, skill, owner)
+        match self.list(u) {
+            Some(l) => l.find(skill, owner).and_then(|i| l.view().get(i).copied()),
+            None => self.x().find_entry_owned(u, skill, owner),
+        }
     }
     fn owns_skill(&self, u: UnitId, skill: i32) -> bool {
-        self.x().owns_skill(u, skill)
+        match self.list(u) {
+            Some(l) => l.has(skill),
+            None => self.x().owns_skill(u, skill),
+        }
     }
     fn set_used_skill(&mut self, u: UnitId, e: Option<SkillEntry>) {
-        self.xm().set_used_skill(u, e);
+        match self.list_mut(u) {
+            Some(l) => l.current = e.and_then(|e| l.find(e.skill, e.owner_guid)),
+            None => self.xm().set_used_skill(u, e),
+        }
     }
     fn used_skill_flags(&self, u: UnitId) -> u32 {
         self.x().used_skill_flags(u)
@@ -359,7 +413,12 @@ impl<X: Pending + UseRest> UseWorld for UseView<'_, X> {
         self.xm().set_used_skill_flags(u, f);
     }
     fn entry_mode(&self, u: UnitId, e: &SkillEntry) -> u32 {
-        self.x().entry_mode(u, e)
+        match self.list(u) {
+            Some(l) => l
+                .find(e.skill, e.owner_guid)
+                .map_or(0, |i| l.entries[i].mode),
+            None => self.x().entry_mode(u, e),
+        }
     }
     fn attack_param4(&self, u: UnitId) -> i32 {
         self.x().attack_param4(u)
@@ -431,9 +490,17 @@ impl<X: Pending + UseRest> UseWorld for UseView<'_, X> {
     fn start_mode(&mut self, u: UnitId, mode: u32, target: ModeTarget<UnitId>) {
         let game = &mut *self.cv.game;
         self.cv.v.h.x.start_mode(game, u, mode, target);
+        self.cv.v.h.x.keep_target(u, target);
     }
+    /// The unit-form run request on the path provider; without one the
+    /// host's seam.
     fn run_to(&mut self, u: UnitId, target: UnitId, e: SkillEntry) {
-        self.xm().run_to(u, target, e);
+        if self.cv.v.h.paths.is_some() {
+            let mut p = crate::wiring::path::walk::PathCtx::of(&mut self.cv.v, &mut *self.cv.game);
+            p.run_to_unit(u, target, e.skill as u16);
+        } else {
+            self.xm().run_to(u, target, e);
+        }
     }
     fn target(&self, u: UnitId) -> Option<UnitId> {
         UseRest::target(self.x(), u)
@@ -858,7 +925,19 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         self.cv.v.h.missiles = Some(store);
         made
     }
+    /// `0x00646F20`: every passive skill of the unit whose state is on
+    /// ([`bodies::passive`]), then the host's own hook.
     fn passive_refresh(&mut self, u: UnitId) {
+        let t = self.cv.v.h.tables.clone();
+        for e in self.skill_list(u) {
+            let p = t
+                .skills
+                .skill(e.skill)
+                .map_or(-1, |r| i32::from(r.passivestate as i16));
+            if p > 0 && SkillUnits::has_state(self, u, p as u16) {
+                bodies::passive::refresh(self, &t.skills, u, e.skill);
+            }
+        }
         self.xm().passive_refresh(u);
     }
     fn buff_refresh(&mut self, u: UnitId) {
@@ -867,7 +946,11 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
     fn skill_resync(&mut self, u: UnitId) {
         self.xm().skill_resync(u);
     }
+    /// `0x00646D60`: the passive state's stat list ([`bodies::passive`]),
+    /// then the host's own hook.
     fn passive_state_apply(&mut self, u: UnitId, e: &SkillEntry) {
+        let t = self.cv.v.h.tables.clone();
+        bodies::passive::refresh(self, &t.skills, u, e.skill);
         self.xm().passive_state_apply(u, e);
     }
     fn set_ai_state(&mut self, u: UnitId, k: i32) {
@@ -889,7 +972,9 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
             self.error(WiringError::EndlessProgressive { unit, skill, step });
             return;
         }
-        self.xm().body_effect(e);
+        if let Some(e) = self.pet_effect(e) {
+            self.xm().body_effect(e);
+        }
     }
     fn path_op(&mut self, u: UnitId, op: bodies::PathOp<UnitId>) -> i32 {
         self.xm().body_path_op(u, op)
@@ -1028,7 +1113,7 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         self.x().room_act(r)
     }
     fn room_teleport(&self, r: RoomId) -> Option<i32> {
-        self.x().room_teleport(r)
+        self.level_teleport(r).or_else(|| self.x().room_teleport(r))
     }
     fn free_point(
         &mut self,
@@ -1038,13 +1123,17 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         mask: u32,
         fallback: bool,
     ) -> Option<(RoomId, (i32, i32))> {
-        self.xm().free_point(r, at, size, mask, fallback)
+        match self.rooms_free_point(r, at, size, mask, fallback) {
+            Some(found) => found,
+            None => self.xm().free_point(r, at, size, mask, fallback),
+        }
     }
     fn pattern_collides(&self, r: RoomId, at: (i32, i32), u: UnitId, mask: u32) -> bool {
         self.x().pattern_collides(r, at, u, mask)
     }
     fn box_collides(&self, r: RoomId, at: (i32, i32), size: i32, mask: u32) -> bool {
-        self.x().box_collides(r, at, size, mask)
+        self.rooms_box_collides(r, at, size, mask)
+            .unwrap_or_else(|| self.x().box_collides(r, at, size, mask))
     }
     /// `0x0064E260` (`pathing.md` §13.3, [`crate::path::line::line_test`])
     /// on the DRLG rooms with the path provider; else [`Pending`].
@@ -1063,7 +1152,10 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         self.x().body_line_blocked(r, from, to, mask)
     }
     fn place_unit(&mut self, u: UnitId, r: Option<RoomId>, at: (i32, i32)) -> bool {
-        self.xm().place_unit(u, r, at)
+        match self.rooms_place_unit(u, r, at) {
+            Some(placed) => placed,
+            None => self.xm().place_unit(u, r, at),
+        }
     }
     fn has_path(&self, u: UnitId) -> bool {
         self.x().has_path(u)
@@ -1075,7 +1167,7 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         self.x().path_last_point(u)
     }
     fn path_target_point(&self, u: UnitId) -> (i32, i32) {
-        self.x().path_target_point(u)
+        self.cast_target_point(u)
     }
     fn create_monster(
         &mut self,
@@ -1085,7 +1177,10 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         mode: i32,
         spread: i32,
     ) -> Option<UnitId> {
-        self.xm().create_monster(r, at, class, mode, spread)
+        match self.xm().create_monster(r, at, class, mode, spread) {
+            Some(m) => Some(m),
+            None => self.alloc_monster(r, at, class, mode),
+        }
     }
     fn mode_request(&mut self, m: UnitId, mode: i32, target: Option<UnitId>) -> i32 {
         Pending::mode_request(self.xm(), m, mode, target)
@@ -1240,7 +1335,7 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
     /// a = 0: [`BodyWorld::place_unit`]'s provider.
     fn place_unit_flag(&mut self, u: UnitId, r: Option<RoomId>, at: (i32, i32), a: i32) -> bool {
         if a == 0 {
-            self.xm().place_unit(u, r, at)
+            BodyWorld::place_unit(self, u, r, at)
         } else {
             self.xm().body_place_unit_flag(u, r, at, a)
         }

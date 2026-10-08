@@ -364,7 +364,11 @@ fn other_hand(loc: u8) -> u8 {
 /// Removal from the body (§7.6): `0x0062A360`, `0x0063D2B0`, unlink, slot
 /// cleared; a belt (primary type 19) then the belt change with no new
 /// belt (§3 rule 9).
-fn remove_from_body<W: MoveWorld>(w: &mut W, owner: Owner, item: Guid) -> Result<(), MoveFatal> {
+pub(super) fn remove_from_body<W: MoveWorld>(
+    w: &mut W,
+    owner: Owner,
+    item: Guid,
+) -> Result<(), MoveFatal> {
     let loc = w.body_loc(item);
     w.body_leave_effects(owner, item);
     if !w.unlink(owner, item) {
@@ -839,6 +843,15 @@ pub fn use_grid_body<W: MoveWorld>(w: &mut W, p: Owner, i: Guid, x: i32, y: i32)
     }
     if w.trading(p) {
         return Outcome::NOTHING;
+    }
+    // The cube is opened, not used up (`cube.md` §1; PROVISIONAL, the
+    // item-use spec `0x005BF240` is unwritten).
+    if &w.code(i) == b"box " {
+        return if w.open_cube(p, i) {
+            Outcome::DONE
+        } else {
+            Outcome::NOTHING
+        };
     }
     // Step 3.
     if w.use_item_at(p, i, x, y) {

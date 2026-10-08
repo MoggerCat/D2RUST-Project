@@ -17,9 +17,10 @@
 
 use std::sync::Arc;
 
+use crate::assets::game_files::GameFiles;
 use bevy::prelude::*;
+use d2_data::bin::TableFiles;
 use d2_data::tables::{decode_all, Inventory};
-use d2_formats::mpq::ArchiveSet;
 
 use crate::assets::path::FileSource;
 use crate::bridge::mirror::{bridge_frame, mirror_units};
@@ -60,16 +61,16 @@ pub struct UiParts {
 impl UiParts {
     /// The parts of a live install: the `inventory` table of the user's
     /// `.bin` set (a load error is an error, not a fallback).
-    pub fn live(archives: Arc<ArchiveSet>) -> Result<Self, String> {
-        let set = d2_data::bin::load(&archives, "eng").map_err(|e| e.to_string())?;
+    pub fn live(archives: Arc<GameFiles>) -> Result<Self, String> {
+        let set = d2_data::bin::load_from(archives.as_ref(), "eng").map_err(|e| e.to_string())?;
         let table = set.table("inventory").ok_or("inventory not loaded")?;
         let rows: Vec<Inventory> = decode_all(table).map_err(|e| e.to_string())?;
-        let expansion_installed = archives.has_archive("d2exp.mpq");
+        let expansion_installed = archives.lod();
         let fonts = FontMeasure::load(archives.as_ref(), &CHARACTER_FONTS)?;
-        let resist_penalties =
-            super::single_player::client_resist_penalties(&archives).map_err(|e| e.to_string())?;
+        let resist_penalties = super::single_player::client_resist_penalties(archives.as_ref())
+            .map_err(|e| e.to_string())?;
         Ok(UiParts {
-            source: archives,
+            source: archives.source(),
             inv_areas: Some(rows.iter().map(inv_area).collect()),
             expansion_installed,
             fonts: Some(fonts),
@@ -98,6 +99,26 @@ pub fn add_original_ui(app: &mut App, parts: UiParts) -> Result<(), OriginalUiEr
     add_original_ui_with(app, parts, looks)
 }
 
+/// The levels' waypoint indexes for the installed waypoint menu
+/// ([`OriginalUi::set_waypoint_map`]); nothing without the original UI.
+pub fn set_waypoint_map(app: &mut App, map: d2_sim::world::waypoints::WaypointMap) {
+    if let Some(mut ui) = app.world_mut().get_non_send_mut::<WorldViewUi>() {
+        if let Some(o) = ui.original.as_mut() {
+            o.set_waypoint_map(map);
+        }
+    }
+}
+
+/// The store prices the server host publishes for the shop panel
+/// ([`OriginalUi::set_shop_prices`]); nothing without the original UI.
+pub fn set_shop_prices(app: &mut App, prices: crate::ui::original::ShopPrices) {
+    if let Some(mut ui) = app.world_mut().get_non_send_mut::<WorldViewUi>() {
+        if let Some(o) = ui.original.as_mut() {
+            o.set_shop_prices(prices);
+        }
+    }
+}
+
 /// [`add_original_ui`] with the unit tables `looks` (instead of the ones
 /// read from `parts.source`).
 pub fn add_original_ui_with(
@@ -120,6 +141,7 @@ pub fn add_original_ui_with(
     // root's own rules are never asked.
     let mut root = UiRoot::new(Box::new(NoPanelRules));
     original.install(&mut root)?;
+    super::items::prepare_ui(app, &mut original);
     let files = original.files();
     let mut ui = WorldViewUi::new(root, Box::new(NoStrings));
     ui.original = Some(original);

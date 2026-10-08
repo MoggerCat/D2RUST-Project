@@ -116,7 +116,17 @@ fn panel_images(v: &[(String, u32, i32, i32)], prefix: &str) -> Vec<(u32, i32, i
 #[test]
 fn install_mirrors_the_flags_and_keeps_the_border_open() {
     let u = ui(Some(areas()), true);
-    assert_eq!(u.root.open_panels(), vec![BORDER_PANEL]);
+    assert_eq!(
+        u.root.open_panels(),
+        vec![
+            BORDER_PANEL,
+            crate::ui::hire_list::HIRE_PANEL,
+            crate::ui::npc_menu_ui::NPC_MENU_PANEL,
+            hud::HUD_PANEL,
+            crate::ui::original::gold_dialog::GOLD_PANEL,
+            crate::ui::original::game_messages::MESSAGES_PANEL
+        ]
+    );
     let w = world(AMAZON, 1, true);
     let img = u.images(&w);
     // Mode 0: no border; the 800 × 600 control panel base, six frames.
@@ -148,7 +158,15 @@ fn hotkeys_toggle_their_state_with_jump_0() {
     );
     assert_eq!(
         u.root.open_panels(),
-        vec![PanelId(1), BORDER_PANEL],
+        vec![
+            PanelId(1),
+            BORDER_PANEL,
+            crate::ui::hire_list::HIRE_PANEL,
+            crate::ui::npc_menu_ui::NPC_MENU_PANEL,
+            hud::HUD_PANEL,
+            crate::ui::original::gold_dialog::GOLD_PANEL,
+            crate::ui::original::game_messages::MESSAGES_PANEL
+        ],
         "the root mirrors the flag"
     );
     // The border shows on the right (mode 1): frames 5–9.
@@ -162,7 +180,17 @@ fn hotkeys_toggle_their_state_with_jump_0() {
     assert_eq!(u.ui.open_mode().get(), 0);
     // An action without a state does nothing.
     u.key(&w, Action::ToggleRun);
-    assert_eq!(u.root.open_panels(), vec![BORDER_PANEL]);
+    assert_eq!(
+        u.root.open_panels(),
+        vec![
+            BORDER_PANEL,
+            crate::ui::hire_list::HIRE_PANEL,
+            crate::ui::npc_menu_ui::NPC_MENU_PANEL,
+            hud::HUD_PANEL,
+            crate::ui::original::gold_dialog::GOLD_PANEL,
+            crate::ui::original::game_messages::MESSAGES_PANEL
+        ]
+    );
 }
 
 // Covers: specs/ui/panels.md §3 r3, §4 r2
@@ -329,7 +357,11 @@ fn character_art_and_close_button() {
     );
     // No stat-point box or add buttons (`PENDING`).
     assert!(panel_images(&img, "panel\\skillpoints").is_empty());
-    assert!(panel_images(&img, "panel\\level").is_empty());
+    // Only the control panel's two closed level buttons (frame 2, §8).
+    assert_eq!(
+        panel_images(&img, "panel\\level"),
+        vec![(2, 206, 592), (2, 563, 592)]
+    );
     // A classic install draws `InvChar`.
     let mut c = ui(Some(areas()), false);
     c.key(&w, Action::ToggleCharacter);
@@ -410,4 +442,267 @@ fn hotkey_states_and_records() {
     assert!(PENDING
         .iter()
         .all(|(what, why)| !what.is_empty() && !why.is_empty()));
+}
+
+// Covers: specs/ui/panels-2.md §21 r1
+#[test]
+fn inventory_draws_the_gold_value_and_button_from_the_model() {
+    let mut u = ui(Some(areas()), true);
+    let mut w = world(AMAZON, 1, true);
+    let key = w.local_player.unwrap();
+    w.units.get_mut(&key).unwrap().stats.insert(14, 4321);
+    // A state list adds 9: the line shows the full value.
+    w.units
+        .get_mut(&key)
+        .unwrap()
+        .state_lists
+        .insert(1, [((14u16, 0u16), 9)].into_iter().collect());
+    u.key(&w, Action::ToggleInventory);
+    // The button needs no player: (W − sx − 236, H + sy − 71).
+    assert_eq!(
+        panel_images(&u.images(&w), "panel\\goldcoinbtn"),
+        vec![(0, 484, 469)]
+    );
+    let gold_texts = |u: &Ui| -> Vec<(String, i32, i32, u16, u16)> {
+        let ctx = UiCtx {
+            tick: 0,
+            world: &w,
+            strings: &NoStrings,
+        };
+        let mut out: Vec<UiDraw> = Vec::new();
+        u.root.draw(&ctx, &mut out);
+        out.iter()
+            .filter_map(|d| match d {
+                UiDraw::Text(t) => Some((
+                    String::from_utf16_lossy(&t.text),
+                    t.at.x,
+                    t.at.y,
+                    t.style.font,
+                    t.style.color,
+                )),
+                _ => None,
+            })
+            .collect()
+    };
+    // Without the fonts bound no text is drawn.
+    assert!(gold_texts(&u).is_empty());
+    let mut f = FontMeasure::default();
+    f.insert(
+        1,
+        FontTable::parse(&character_bind_tests::tbl(6)).expect("tbl"),
+    );
+    u.ui.set_fonts(f);
+    // `%d` of stat 14 total, Font16, color 0, at (W − sx − 212, H + sy − 72).
+    assert_eq!(gold_texts(&u), vec![("4330".to_string(), 508, 468, 1, 0)]);
+}
+
+// d2rs-own, unverified: Esc order (controls.md §3 row 56)
+#[test]
+fn esc_opens_the_game_menu_closes_panels_first_and_closes_it_again() {
+    let mut u = ui(Some(areas()), true);
+    let w = world(AMAZON, 1, true);
+    assert!(!u.ui.is_open(9));
+    // Nothing open: Esc opens the menu.
+    u.key(&w, Action::GameMenu);
+    assert!(u.ui.is_open(9));
+    assert!(u.root.open_panels().contains(&esc_menu::ESC_PANEL));
+    // Esc again closes it.
+    u.key(&w, Action::GameMenu);
+    assert!(!u.ui.is_open(9));
+    // A panel open: Esc closes the panel only; the next Esc opens the menu.
+    u.key(&w, Action::ToggleInventory);
+    assert!(u.ui.is_open(1));
+    u.key(&w, Action::GameMenu);
+    assert!(!u.ui.is_open(1) && !u.ui.is_open(9));
+    u.key(&w, Action::GameMenu);
+    assert!(u.ui.is_open(9));
+}
+
+// Covers: specs/ui/panels.md §3
+#[test]
+fn esc_without_a_player_opens_nothing() {
+    let mut u = ui(Some(areas()), true);
+    u.key(&ClientWorld::default(), Action::GameMenu);
+    assert!(!u.ui.is_open(9));
+}
+
+// d2rs-own, unverified: the menu entries (REC-QESC-1)
+#[test]
+fn the_menu_entries_return_save_and_exit_and_swallow_clicks() {
+    let mut u = ui(Some(areas()), true);
+    let w = world(AMAZON, 1, true);
+    let texts = |u: &Ui| -> Vec<String> {
+        let ctx = UiCtx {
+            tick: 0,
+            world: &w,
+            strings: &NoStrings,
+        };
+        let mut out: Vec<UiDraw> = Vec::new();
+        u.root.draw(&ctx, &mut out);
+        out.iter()
+            .filter_map(|d| match d {
+                UiDraw::Text(t) => Some(String::from_utf16_lossy(&t.text)),
+                _ => None,
+            })
+            .collect()
+    };
+    assert!(texts(&u).is_empty());
+    u.key(&w, Action::GameMenu);
+    assert_eq!(
+        texts(&u),
+        vec!["Options", "Save and Exit Game", "Return to Game"]
+    );
+    let entry = |i: i32| Point::new(400, 215 + 45 * i);
+    // Options does nothing and the click is swallowed (not Unhandled).
+    let (_, r) = u.click(&w, entry(0));
+    assert_ne!(r, Routed::Unhandled);
+    assert!(u.ui.is_open(9) && !u.ui.take_exit_request());
+    // A click outside the box does not reach the world either.
+    let (_, r) = u.click(&w, Point::new(10, 10));
+    assert_ne!(r, Routed::Unhandled);
+    // Save and Exit asks the host once.
+    u.click(&w, entry(1));
+    assert!(u.ui.take_exit_request());
+    assert!(!u.ui.take_exit_request());
+    // Return closes.
+    u.click(&w, entry(2));
+    assert!(!u.ui.is_open(9));
+}
+
+// Covers: specs/ui/control-panel.md §9
+#[test]
+fn the_mini_panel_game_menu_button_opens_it() {
+    let mut u = ui(Some(areas()), true);
+    let w = world(AMAZON, 1, true);
+    u.ui.set_ui(0x15, 0, false).unwrap();
+    u.root.sync_states(&u.ui.shared.borrow().states);
+    // Row 7 of the mini panel; the exact rectangle is the spec's, so
+    // find it by scanning the panel strip for a click that opens ui 9.
+    let mut opened = false;
+    'scan: for y in 440..600 {
+        for x in (250..560).step_by(2) {
+            u.click(&w, Point::new(x, y));
+            if u.ui.is_open(9) {
+                opened = true;
+                break 'scan;
+            }
+            if !u.ui.is_open(0x15) {
+                u.ui.set_ui(0x15, 0, false).unwrap();
+                u.root.sync_states(&u.ui.shared.borrow().states);
+            }
+        }
+    }
+    assert!(opened);
+}
+
+// d2rs-own, unverified: the drop-gold dialog (REC-103); the button
+// and the OK request are panels-2.md §21 r3–r8
+#[test]
+fn the_gold_button_opens_the_dialog_and_ok_sends_drop_gold() {
+    let mut u = ui(Some(areas()), true);
+    let mut w = world(AMAZON, 1, true);
+    let key = w.local_player.unwrap();
+    w.units.get_mut(&key).unwrap().stats.insert(14, 5000);
+    u.key(&w, Action::ToggleInventory);
+    let texts = |u: &Ui| -> Vec<String> {
+        let ctx = UiCtx {
+            tick: 0,
+            world: &w,
+            strings: &NoStrings,
+        };
+        let mut out: Vec<UiDraw> = Vec::new();
+        u.root.draw(&ctx, &mut out);
+        out.iter()
+            .filter_map(|d| match d {
+                UiDraw::Text(t) => Some(String::from_utf16_lossy(&t.text)),
+                _ => None,
+            })
+            .collect()
+    };
+    assert!(texts(&u).is_empty());
+    // §21 r3: x in [W − sx − 237, W − sx − 217], y in [H + sy − 87, H + sy − 69].
+    let button = Point::new(493, 462);
+    let b = PointerButton::Left;
+    // A press sets the flag (the button's frame 1, one row lower).
+    u.send(
+        &w,
+        UiEvent::Press {
+            button: b,
+            at: button,
+        },
+    );
+    assert_eq!(
+        panel_images(&u.images(&w), "panel\\goldcoinbtn"),
+        vec![(1, 484, 470)]
+    );
+    // The release in the rectangle opens the dialog.
+    u.send(
+        &w,
+        UiEvent::Release {
+            button: b,
+            at: button,
+        },
+    );
+    assert_eq!(
+        panel_images(&u.images(&w), "panel\\goldcoinbtn"),
+        vec![(0, 484, 469)]
+    );
+    assert!(texts(&u).contains(&"do you want to drop?".to_string()));
+    // Digits fill the edit box, letters are ignored; past the maximum
+    // (stat 14) the box takes the maximum.
+    for c in "15x00".chars() {
+        let r = u.send(&w, UiEvent::Char(c as u16));
+        assert_ne!(r, Routed::Unhandled);
+    }
+    assert!(texts(&u).contains(&"1500_".to_string()));
+    // The belt keys and the menu key do not reach the game while open.
+    assert_ne!(u.key(&w, Action::BeltSlot1), Routed::Unhandled);
+    // Enter is OK: C→S 0x50 [player GUID][1500]; the dialog closes.
+    u.send(&w, UiEvent::Char(0x0D));
+    let guid = key.guid.to_le_bytes();
+    let mut want = vec![0x50];
+    want.extend_from_slice(&guid);
+    want.extend_from_slice(&1500u32.to_le_bytes());
+    assert_eq!(u.root.intents(), &[ClientIntent(want)]);
+    assert!(!texts(&u).contains(&"do you want to drop?".to_string()));
+    // Cancel (Esc) sends nothing and the Esc menu stays shut.
+    u.send(
+        &w,
+        UiEvent::Press {
+            button: b,
+            at: button,
+        },
+    );
+    u.send(
+        &w,
+        UiEvent::Release {
+            button: b,
+            at: button,
+        },
+    );
+    for c in "99999".chars() {
+        u.send(&w, UiEvent::Char(c as u16));
+    }
+    assert!(texts(&u).contains(&"5000_".to_string()));
+    assert_ne!(u.key(&w, Action::GameMenu), Routed::Unhandled);
+    assert!(!u.ui.is_open(9));
+    assert_eq!(u.root.intents().len(), 1);
+    assert!(!texts(&u).contains(&"do you want to drop?".to_string()));
+    // Zero is not sent (§21 r8).
+    u.send(
+        &w,
+        UiEvent::Press {
+            button: b,
+            at: button,
+        },
+    );
+    u.send(
+        &w,
+        UiEvent::Release {
+            button: b,
+            at: button,
+        },
+    );
+    u.send(&w, UiEvent::Char(0x0D));
+    assert_eq!(u.root.intents().len(), 1);
 }

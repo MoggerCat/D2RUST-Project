@@ -1,7 +1,7 @@
 //! d2-client entry point.
 //!
 //! Usage:
-//!   d2-client [play]     [--seed N] [--frames N] [--synthetic] [--save FILE.d2s | --new CLASS NAME [--save-dir DIR]] [--native DIR] [--source native|mpq]
+//!   d2-client [play]     [--seed N] [--frames N] [--synthetic] [--difficulty normal|nightmare|hell] [--save FILE.d2s | --new CLASS NAME [--save-dir DIR]] [--native DIR] [--source native|mpq]
 //!   d2-client view       [--ds1 PATH] [--wall-base N] [--frames N]
 //!   d2-client verify     [--case NAME]... [--cases DIR] [--perturb N]
 //!   d2-client verify     [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out DIR] [--perturb N]
@@ -75,6 +75,8 @@ struct Options {
     synthetic: bool,
     /// `play --save`: the character save the join loads.
     save: Option<PathBuf>,
+    /// `play --difficulty normal|nightmare|hell|0-2`.
+    difficulty: u8,
     /// `play --new CLASS NAME`: a new character (decision D3).
     new: Option<(String, String)>,
     /// `play --native DIR`: a converted native folder (`native-assets.md` §3.4).
@@ -83,6 +85,7 @@ struct Options {
     source: Option<String>,
     /// `play --new`: the folder the new character's `<name>.d2s` goes in.
     save_dir: Option<PathBuf>,
+    hardcore: bool,
 }
 
 fn parse_view(s: &str) -> Result<cpu::View> {
@@ -116,11 +119,13 @@ fn parse_options(args: &[String]) -> Result<Options> {
         frames: None,
         seed: d2_client::app::single_player::DEFAULT_SEED,
         synthetic: false,
+        difficulty: 0,
         save: None,
         new: None,
         native: None,
         source: None,
         save_dir: None,
+        hardcore: false,
     };
     let mut it = args.iter();
     while let Some(flag) = it.next() {
@@ -139,9 +144,17 @@ fn parse_options(args: &[String]) -> Result<Options> {
             "--frames" => o.frames = Some(value()?.parse().context("--frames")?),
             "--seed" => o.seed = value()?.parse().context("--seed")?,
             "--synthetic" => o.synthetic = true,
+            "--hardcore" => o.hardcore = true,
             "--save" => o.save = Some(PathBuf::from(value()?)),
             "--native" => o.native = Some(PathBuf::from(value()?)),
             "--source" => o.source = Some(value()?.clone()),
+            "--difficulty" => {
+                let v = value()?;
+                o.difficulty =
+                    d2_client::app::single_player::parse_difficulty(v).with_context(|| {
+                        format!("--difficulty {v}: use normal, nightmare, hell or 0-2")
+                    })?;
+            }
             "--save-dir" => o.save_dir = Some(PathBuf::from(value()?)),
             "--new" => {
                 let class = value()?.clone();
@@ -369,29 +382,6 @@ fn view(o: Options) -> Result<()> {
     }
 }
 
-/// `play` on a native folder (`native-assets.md` §3.4, §5): opens and
-/// checks the root and loads the table set from it. The play app still
-/// reads levels, UI art and sound through the archive set, so it stops
-/// there with the seams named (`docs/handoff/native-n4.md`).
-fn play_native(dir: &std::path::Path) -> Result<()> {
-    let src = d2_native::source::NativeSource::open(dir)?;
-    println!(
-        "play: native folder {} (converter {}, {} mod layer(s))",
-        dir.display(),
-        src.manifest.converter_version,
-        src.layers.layers.len() - 1
-    );
-    let tables = src.tables(d2_data::bin::DEFAULT_LANGUAGE)?;
-    let bins = d2_data::bin::load_from(&tables, d2_data::bin::DEFAULT_LANGUAGE)?;
-    println!(
-        "play: native tables loaded ({} runtime tables)",
-        bins.tables.len()
-    );
-    bail!(
-        "play on a native folder: the source and tables load, but the play app still reads its levels, UI and sound through the archive set (seams in docs/handoff/native-n4.md); run with D2_GAME_DIR for now"
-    )
-}
-
 fn play(o: Options) -> Result<()> {
     use d2_client::app::{play, single_player};
     let choice = d2_client::assets::choose_source(
@@ -401,16 +391,22 @@ fn play(o: Options) -> Result<()> {
         d2_client::assets::default_native_dir(),
     )
     .map_err(anyhow::Error::msg)?;
-    if let d2_client::assets::SourceChoice::Native(dir) = &choice {
-        if !o.synthetic {
-            return play_native(dir);
-        }
-    }
+    let native = match &choice {
+        d2_client::assets::SourceChoice::Native(dir) if !o.synthetic => Some(dir.clone()),
+        _ => None,
+    };
     let dir = std::env::var_os("D2_GAME_DIR").map(PathBuf::from);
-    let data = single_player::GameData::select(dir.as_deref(), o.synthetic)?;
+    let data = match &native {
+        Some(dir) => single_player::GameData::select_native(dir)?,
+        None => single_player::GameData::select(dir.as_deref(), o.synthetic)?,
+    };
+    let origin = match &native {
+        Some(dir) => format!("native folder {}", dir.display()),
+        None => "D2_GAME_DIR".to_owned(),
+    };
     match &data {
         single_player::GameData::Live(d) => println!(
-            "play: game data from D2_GAME_DIR ({} levels, {} objects, waypoint object class {}; level files: {} DS1, {} lvlsub DS1, {} DT1)",
+            "play: game data from {origin} ({} levels, {} objects, waypoint object class {}; level files: {} DS1, {} lvlsub DS1, {} DT1)",
             d.waypoints.levels.len(),
             d.waypoints.objects.len(),
             d.waypoints.object_class,
@@ -429,7 +425,7 @@ fn play(o: Options) -> Result<()> {
     )?;
     let character = match (&o.save, &o.new) {
         (Some(path), _) => {
-            let c = single_player::load_character(&data, path)?;
+            let c = single_player::load_character(&data, path, o.difficulty)?;
             println!("play: character from {}", path.display());
             c
         }
@@ -439,13 +435,16 @@ fn play(o: Options) -> Result<()> {
             c
         }
         (None, None) => single_player::Character::New,
-    };
+    }
+    .with_difficulty(o.difficulty);
+    println!("play: difficulty {}", o.difficulty);
     let result = play::run(play::PlayConfig {
         data,
         seed: o.seed,
         character,
         exit_after: o.frames,
         save_path: save_path.clone(),
+        hardcore: o.hardcore,
     })?;
     match result {
         bevy::app::AppExit::Success => Ok(()),
@@ -460,7 +459,7 @@ fn main() -> Result<()> {
         Some("verify") => verify(parse_options(&args[1..])?),
         Some("play") | None => play(parse_options(args.get(1..).unwrap_or(&[]))?),
         Some("view") => view(parse_options(&args[1..])?),
-        _ => bail!("usage: d2-client [view|verify|cpu-render|play] [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out PATH] [--case NAME] [--cases DIR] [--perturb N] [--seed N] [--frames N] [--synthetic] [--save FILE.d2s | --new CLASS NAME [--save-dir DIR]] [--native DIR] [--source native|mpq]"),
+        _ => bail!("usage: d2-client [view|verify|cpu-render|play] [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out PATH] [--case NAME] [--cases DIR] [--perturb N] [--seed N] [--frames N] [--synthetic] [--difficulty normal|nightmare|hell] [--save FILE.d2s | --new CLASS NAME [--save-dir DIR]] [--native DIR] [--source native|mpq]"),
     }
 }
 

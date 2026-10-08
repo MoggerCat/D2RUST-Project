@@ -68,7 +68,7 @@ use d2_sim::world::quests::{PlayerQuests, QuestControl, QuestTables};
 mod e2e_support;
 #[path = "../../d2-client/tests/e2e_support/world.rs"]
 mod e2e_world;
-use e2e_support::{blank, item_tables, tx, vendor_tables, Rest, N_MONSTATS};
+use e2e_support::{blank, item_tables, vendor_tables, Rest, N_MONSTATS};
 use e2e_world::*;
 
 // ---- constants ------------------------------------------------------------------------
@@ -204,6 +204,7 @@ impl Pending for TestPending {
         match (ty, mode) {
             (UnitType::Player, 10) => Some(*PLAYER_SC),
             (UnitType::Monster, 0) => Some(*MONSTER_DT),
+            (UnitType::Monster, 2) => Some(*b"M0WLHTH\0"),
             _ => None,
         }
     }
@@ -590,7 +591,20 @@ impl Fx {
                 ..TestPending::default()
             },
         );
-        hooks.anim_data = Some(Arc::new(anim_data()));
+        hooks.anim_data = Some(Arc::new({
+            // The fixture's two names plus a monster walk (6 frames), for
+            // the hireling stand-in think (`hireling_drive`).
+            use d2_formats::animdata::{self, AnimRecord};
+            let mut a = anim_data();
+            let name = *b"M0WLHTH\0";
+            a.buckets[animdata::hash(&name[..7])].push(AnimRecord {
+                name,
+                frames: 6,
+                speed: 256,
+                events: [0; animdata::EVENTS],
+            });
+            a
+        }));
         hooks.vitals = Some(Arc::new(vitals()));
         let wt = WorldTables {
             pop: PopTables::from_records(&levels(), &[monster_class()], &monstats2(), &[]),
@@ -854,7 +868,7 @@ fn interact(unit_type: u8, guid: u32) -> Vec<u8> {
 
 // Covers: specs/world/npc.md §7.1 r1, §7.1 r2, §7.1 r3, §7.1 r4, §7.2, §7.3 r5, §7.3 r6, §7.3 r7, §9
 #[test]
-fn hiring_at_greiz_stops_at_the_unit_spawn() {
+fn hiring_at_greiz_spawns_the_mercenary() {
     let mut fx = Fx::new();
     let (p, ng) = (fx.player, fx.guid(fx.npc));
     // §7.1 by hand on a copy of the NPC-control seed: one step per slot
@@ -907,11 +921,18 @@ fn hiring_at_greiz_stops_at_the_unit_spawn() {
     assert_eq!(codes, [ResultCode::Done]);
     let gold = PLAYER_GOLD - want.price as i32;
     assert_eq!(fx.stat(p, GOLD), gold);
-    assert_eq!(got, [tx(0, code::NOT_PLACED, u32::MAX, gold)]);
-    // No unit, no pet node; the slot is not marked hired.
-    let w = &fx.sim().world;
-    assert!(w.state.hirelings.list(p).is_none_or(|l| l.nodes.is_empty()));
-    let slots = &w
+    // The unit spawn is `LifecycleHooks::spawn_near` (stitch-hireling): the
+    // client is told of the new monster (S→C 0xAC) and of the hire
+    // (0x2A code 5 with the mercenary's GUID).
+    assert!(got.iter().any(|m| m[0] == 0xAC), "{got:02x?}");
+    assert!(
+        got.iter().any(|m| m[0] == 0x2A && m[2] == code::MERC),
+        "{got:02x?}"
+    );
+    assert!(!got.iter().any(|m| m[0] == 0x2A && m[2] == code::NOT_PLACED));
+    let slots = &fx
+        .sim()
+        .world
         .npc
         .record(class::GREIZ)
         .unwrap()
@@ -919,8 +940,9 @@ fn hiring_at_greiz_stops_at_the_unit_spawn() {
         .as_ref()
         .unwrap()
         .slots;
-    assert!(!slots[k].hired);
-    fx.assert_clean();
+    assert!(slots[k].hired);
+    // The fixture holds no hireling tables, so the merc init reports
+    // `NoHirelingTables` (the live host loads them): not `assert_clean`.
 }
 
 // ---- 2. the hireling follows a waypoint teleport ---------------------------------------
@@ -1019,6 +1041,120 @@ fn the_hireling_follows_a_waypoint_teleport() {
     assert_eq!(fx.pos(merc), merc_at, "warp_to is Pending");
     assert_eq!(fx.sim().events.action.hooks().pet_follows, Some(vec![]));
     fx.assert_clean();
+}
+
+// ---- 2b. the hireling fights (preview stand-in think) ----------------------------------
+
+// d2rs-own, unverified: `hireling_drive` (no spec rule checked)
+#[test]
+fn the_hireling_attacks_a_hostile_monster_beside_it() {
+    let mut fx = Fx::new();
+    let p = fx.player;
+    let spawn = |fx: &mut Fx, class: u32, dy: i32| {
+        let room = fx.room(p);
+        let req = AllocRequest {
+            ty: UnitType::Monster,
+            class,
+            room,
+            add: true,
+            fixed_guid: None,
+            mode: 1,
+            allied: false,
+        };
+        let s = fx.sim();
+        s.events
+            .action
+            .with(&mut s.game, |g, v| {
+                v.allocate(g, &req, PLAYER_AT.0, PLAYER_AT.1 + dy)
+            })
+            .unwrap()
+    };
+    let merc = spawn(&mut fx, MERC_CLASS, 12);
+    let foe = spawn(&mut fx, 0, 14);
+    let mg = fx.guid(merc);
+    {
+        let s = fx.sim();
+        s.events.action.with(&mut s.game, |_, v| {
+            v.set_base(merc, 21, 10);
+            v.set_base(merc, 22, 10);
+            v.set_base(foe, 7, 50 << 8);
+            v.set_base(foe, 6, 50 << 8);
+        });
+    }
+    let w = &mut fx.sim().world;
+    w.state.hireling_tables = Some(HirelingTables {
+        rows: d2_sim::world::hirelings::HirelingRows::default(),
+        exp_ratios: Default::default(),
+        max_level: 99,
+        pet_flags: HirelingTables::WARP,
+        pet_basemax: 1,
+    });
+    w.state.hirelings.list_mut(p).nodes = vec![PetNode {
+        guid: mg,
+        ..PetNode::default()
+    }];
+    let before = fx.stat(foe, 6);
+    assert!(before > 0);
+    for _ in 0..40 {
+        fx.step(&[]);
+    }
+    assert!(fx.stat(foe, 6) < before, "the hireling hurt its neighbour");
+    assert_eq!(fx.sim().events.action.sys.units.get(merc).unwrap().mode, 4);
+}
+
+// d2rs-own, unverified: `hireling_drive` (no spec rule checked)
+#[test]
+fn a_summoned_pet_attacks_a_hostile_monster_beside_it() {
+    use d2_sim::player::pets::{PetLists, PetNode};
+    let mut fx = Fx::new();
+    let p = fx.player;
+    let spawn = |fx: &mut Fx, class: u32, dy: i32| {
+        let room = fx.room(p);
+        let req = AllocRequest {
+            ty: UnitType::Monster,
+            class,
+            room,
+            add: true,
+            fixed_guid: None,
+            mode: 1,
+            allied: false,
+        };
+        let s = fx.sim();
+        s.events
+            .action
+            .with(&mut s.game, |g, v| {
+                v.allocate(g, &req, PLAYER_AT.0, PLAYER_AT.1 + dy)
+            })
+            .unwrap()
+    };
+    let pet = spawn(&mut fx, MERC_CLASS, 12);
+    let foe = spawn(&mut fx, 0, 14);
+    let pg = fx.guid(pet);
+    {
+        let s = fx.sim();
+        s.events.action.with(&mut s.game, |_, v| {
+            v.set_base(pet, 21, 10);
+            v.set_base(pet, 22, 10);
+            v.set_base(foe, 7, 50 << 8);
+            v.set_base(foe, 6, 50 << 8);
+            let mut lists = PetLists::new(3);
+            lists.entries[2].count = 1;
+            lists.entries[2].max = 1;
+            lists.entries[2].nodes = vec![PetNode {
+                flags: 0,
+                guid: pg as i32,
+                extra: [0; 3],
+            }];
+            v.h.pet_lists.insert(p, lists);
+        });
+    }
+    let before = fx.stat(foe, 6);
+    assert!(before > 0);
+    for _ in 0..40 {
+        fx.step(&[]);
+    }
+    assert!(fx.stat(foe, 6) < before, "the pet hurt its neighbour");
+    assert_eq!(fx.sim().events.action.sys.units.get(pet).unwrap().mode, 4);
 }
 
 // ---- 3. a room-population monster killed with a missile --------------------------------
@@ -1168,15 +1304,14 @@ fn a_population_monster_killed_with_a_missile() {
     // `intents-events.md` §7.4 rule 7 states the death messages (0x69
     // code 8 at the kill, code 9 when the death animation ends) and §7.6
     // the drop's 0x9C. Both come from the client pass's per-unit update
-    // (`0x0053A500`), which the tick wiring does not run (HANDOFF IS2):
-    // nothing is sent for the cast, the missile, the kill or the drop.
-    // When it is wired this transcript must hold the §7.4 / §7.6 bytes.
-    assert_eq!(transcript, Vec::<Vec<u8>>::new());
-    // The cast's S→C 0x4C / 0x4D skill message has no written layout
-    // (`docs/handoff/impl-monster-death.md` §3): the host logs it as a
-    // gap, once per cast message; nothing else may be logged.
-    assert_eq!(
-        fx.errors(),
-        vec!["ModeMessage(SkillMessage { unit: UnitId(4), to_unit: false })".to_string(); 2]
-    );
+    // (`0x0053A500`), which the tick wiring does not run here (HANDOFF
+    // IS2) for the kill or the drop. The monster's two mode changes while
+    // its skill is in use send the skill message instead of a mode
+    // message (§7.4 rule 3, `0x00597D70` → `0x0053D4D0`, §3.5 rule 5):
+    // 0x4D type 1, GUID 3, skill 1 (u32), level 10 (PROVISIONAL, REC-95:
+    // base + bonus), the path target (0, 0: no target point), w 0.
+    let skill_4d = vec![0x4D, 1, 3, 0, 0, 0, 1, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0];
+    assert_eq!(transcript, vec![skill_4d; 2]);
+    // Nothing is logged.
+    assert_eq!(fx.errors(), Vec::<String>::new());
 }

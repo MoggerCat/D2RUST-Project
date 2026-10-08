@@ -180,6 +180,8 @@ fn client_world_holds_only_stated_fields() {
     // The fields of `client/model.md` §1 rule 1 and `bridge.md` §5 rule 3.
     let ClientWorld {
         frames,
+        // d2rs-own, unverified: the shop panel's trade epoch.
+        store_serial,
         server_ticks,
         units,
         local_player,
@@ -222,11 +224,14 @@ fn client_world_holds_only_stated_fields() {
         connected,
         ping,
         pet_palette,
+        // `client/msg-stats-items.md` §2 r6.
+        belt_ready,
         // `client/model.md` §2 rule 1 (set C); `world/objects-client.md`
         // §27 r2 (the latches).
         objclient,
     } = ClientWorld::default();
     assert!(!connected && ping == Default::default() && pet_palette.is_empty());
+    assert_eq!(belt_ready, [false; 4]);
     assert_eq!(objclient, Default::default());
     assert!(overrides == Default::default() && roster.is_empty() && roster_inactive.is_empty());
     assert!(weapon_set == 0 && item_table_ext.is_empty());
@@ -237,6 +242,7 @@ fn client_world_holds_only_stated_fields() {
     assert_eq!(env_period_cache, 0);
     assert!(room_allied.is_empty());
     assert_eq!((frames, server_ticks, units.len()), (0, 0, 0));
+    assert_eq!(store_serial, 0);
     assert_eq!((local_player, act, use_cursor), (None, None, None));
     assert_eq!((difficulty, expansion, ladder, game_flags), (0, 0, 0, 0));
     assert!(!in_game && !unloaded && !exit_requested);

@@ -1,4 +1,4 @@
-// Spec: specs/client/assets.md (§A1–§A5), specs/render/unit-composite.md (§2, §2.1, §5.1, §6)
+// Spec: specs/client/assets.md (§A1–§A5), specs/render/unit-composite.md (§2, §2.1, §3 r1, r3, §5.1, §6), specs/client/model.md (§8 r4), specs/sim/pathing.md (§8.3, §10 r2)
 //! Unit art for the play preview: the table facts a unit composite reads
 //! ([`UnitLooks`]: unit tokens, mode tokens, component tokens, monster
 //! base weapon class), the COF and component file names of a model unit
@@ -12,7 +12,21 @@
 //! decisions, "First playable preview"), each marked
 //! `d2rs-own, unverified`: a player has no items (every armor class
 //! `lit`, weapon class `hth`), a monster's component choices are all 0.
-//! A file that fails to load is skipped with a log line, never retried.
+//! A COF that fails to load is skipped with a log line, never retried; a
+//! component file that is in no archive is the normal empty slot of
+//! `unit-composite.md` §6 r4 (e.g. a player's SH `lit` with no shield,
+//! §5.1 r3): remembered, no log line. A component file that is there but
+//! does not parse is logged.
+//!
+//! Direction (§3 r1): the model holds no client path record, so the
+//! facing [`UnitArt::dir64`] reads is a preview fill (`// d2rs-own,
+//! unverified`, PROVISIONAL until REC-51 records the client's turns):
+//! the local player's predicted facing ([`UnitArt::pose_dir`], from
+//! `bridge::predict`); for other units the `sim/pathing.md` §8.3
+//! direction toward the target of a player's walk / run mode request
+//! (`client/model.md` §8 r4 codes 0x01 / 0x17 to a point, 0x00 / 0x18 to
+//! a unit; `sim/pathing.md` §10 r2), else toward the unit's last position
+//! change ([`UnitArt::observe_facing`]); 0 when none is known.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, RwLock};
@@ -20,16 +34,19 @@ use std::sync::{Arc, RwLock};
 use d2_data::bin::{excel_path, BinTable};
 use d2_data::tables::{
     decode_all, Composit, Monmode, Monstats, Monstats2, Objects, Objmode, Plrmode, Plrtype, Record,
+    States,
 };
 use d2_formats::cof::{Cof, CofLayer};
 
 use crate::assets::path::{CanonicalPath, FileSource};
-use crate::bridge::world::{ClientWorld, UnitKey};
+use crate::bridge::predict::{cell_centre, facing};
+use crate::bridge::world::{ClientWorld, UnitKey, PLAYER};
 use crate::bridge::ClientUnit;
 use crate::frames::{FramePart, FrameSet, FrameSetKey};
 use crate::rules::unit_composite::{
-    armor_class, code, file_format, mode_overrides, mode_token, monster_weapon_class, ArmorSource,
-    Code, CofName, ComponentCodes, CompositeKind, FileFormat, MonsterLook, PlayerLook, EMPTY, HTH,
+    armor_class, code, expected_directions, file_format, mode_overrides, mode_token,
+    monster_weapon_class, ArmorSource, Code, CofName, ComponentCodes, CompositeKind,
+    DirectionSource, FileFormat, MonsterLook, PlayerLook, EMPTY, HTH,
 };
 
 use super::ViewAssets;
@@ -60,6 +77,8 @@ pub struct UnitLooks {
     pub monsters: BTreeMap<u32, MonsterRow>,
     /// `objects` `Token` by row.
     pub objects: BTreeMap<u32, Code>,
+    /// The shape states' draw identity (`unit-composite.md` §1.1).
+    pub shapes: super::disguise::Disguise,
 }
 
 fn read_table<T: Record>(source: &dyn FileSource) -> Result<Vec<T>, String> {
@@ -70,6 +89,25 @@ fn read_table<T: Record>(source: &dyn FileSource) -> Result<Vec<T>, String> {
     let table =
         BinTable::parse(T::TABLE, "archive", &file, &bytes, T::SIZE).map_err(|e| e.to_string())?;
     decode_all(&table).map_err(|e| e.to_string())
+}
+
+/// The `monstats2` mode bits (mDT = bit 0 … mRN = bit 15) by monster row.
+fn monstats2_modes(monstats: &[Monstats], monstats2: &[Monstats2]) -> BTreeMap<u32, u16> {
+    monstats
+        .iter()
+        .enumerate()
+        .filter_map(|(i, m)| {
+            let r = monstats2.get(usize::from(m.monstatsex))?;
+            let bits = [
+                r.mdt, r.mnu, r.mwl, r.mgh, r.ma1, r.ma2, r.mbl, r.msc, r.ms1, r.ms2, r.ms3, r.ms4,
+                r.mdd, r.mkb, r.msq, r.mrn,
+            ]
+            .iter()
+            .enumerate()
+            .fold(0u16, |a, (b, &on)| a | (u16::from(on) << b));
+            Some((i as u32, bits))
+        })
+        .collect()
 }
 
 fn code4(c: [u8; 4]) -> Code {
@@ -99,6 +137,15 @@ impl UnitLooks {
                 )
             })
             .collect();
+        let shapes = super::disguise::Disguise {
+            states: read_table::<States>(source)?
+                .iter()
+                .enumerate()
+                .filter(|(_, r)| matches!(r.gfxtype, 1 | 2))
+                .map(|(i, r)| (i as u8, r.gfxtype, r.gfxclass))
+                .collect(),
+            mode_bits: monstats2_modes(&read_table::<Monstats>(source)?, &monstats2),
+        };
         let objects = read_table::<Objects>(source)?
             .iter()
             .enumerate()
@@ -127,6 +174,7 @@ impl UnitLooks {
                 .collect(),
             monsters,
             objects,
+            shapes,
         })
     }
 
@@ -184,6 +232,7 @@ fn base_mode_token(looks: &UnitLooks, kind: CompositeKind, mode: u8) -> Code {
 /// The COF name of a model unit (§2), `None` for a unit without a
 /// composite (types 3–5, unknown class or mode).
 pub fn unit_cof(looks: &UnitLooks, unit: &ClientUnit) -> Option<CofName> {
+    let unit = &*looks.shapes.identity(unit);
     let (kind, mode) = kind_mode(unit)?;
     let token = unit_token(looks, unit, kind)?;
     let m = mode_token(
@@ -216,6 +265,7 @@ pub fn component_codes(
     name: &CofName,
     layer: &CofLayer,
 ) -> Option<ComponentCodes> {
+    let unit = &*looks.shapes.identity(unit);
     let (kind, mode) = kind_mode(unit)?;
     let c = layer.component;
     let component_token = *looks.components.get(usize::from(c))?;
@@ -276,6 +326,44 @@ pub struct UnitArt {
     /// walk prediction moves it (decision D2, `bridge::predict`: 2 walk,
     /// 3 run). d2rs-own, unverified.
     pub pose_mode: Option<(UnitKey, u32)>,
+    /// The local player's predicted facing `dir64` (`Predict::facing`),
+    /// set with [`Self::pose_mode`]. d2rs-own, unverified.
+    pub pose_dir: Option<(UnitKey, u8)>,
+    /// The model facing of every unit (module doc), by
+    /// [`Self::observe_facing`].
+    pub facing: BTreeMap<UnitKey, Facing>,
+    /// The model's local player at the last [`Self::observe_facing`].
+    pub local: Option<UnitKey>,
+}
+
+/// A unit's facing as the view last saw it (module doc).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Facing {
+    /// The model position at the last observation.
+    pub at: (u16, u16),
+    /// `dir64` (0–63).
+    pub dir64: u8,
+}
+
+/// The cell a player's walk / run mode request goes to (`client/model.md`
+/// §8 r4: codes 0x01 / 0x17 to the point (r0, r1), 0x00 / 0x18 to the
+/// unit (type r0, GUID r1); `sim/pathing.md` §10 r2).
+fn request_target(world: &ClientWorld, unit: &ClientUnit) -> Option<(u16, u16)> {
+    if unit.key.unit_type != PLAYER {
+        return None;
+    }
+    let r = unit.last_mode_request.as_ref()?;
+    match r.code {
+        0x01 | 0x17 => Some((
+            u16::try_from(r.record[0]).ok()?,
+            u16::try_from(r.record[1]).ok()?,
+        )),
+        0x00 | 0x18 => {
+            let key = UnitKey::new(u8::try_from(r.record[0]).ok()?, r.record[1] as u32);
+            world.units.get(&key)?.position
+        }
+        _ => None,
+    }
 }
 
 impl UnitArt {
@@ -289,6 +377,62 @@ impl UnitArt {
                 std::borrow::Cow::Owned(u)
             }
             _ => std::borrow::Cow::Borrowed(unit),
+        }
+    }
+}
+
+impl UnitArt {
+    /// Updates [`Self::facing`] from the model (module doc; d2rs-own,
+    /// unverified): toward a player's walk target when it has one and is
+    /// not on it, else toward the last position change; otherwise the
+    /// facing stays. Units no longer in the model are dropped.
+    pub fn observe_facing(&mut self, world: &ClientWorld) {
+        self.local = world.local_player;
+        self.facing.retain(|k, _| world.units.contains_key(k));
+        for unit in world.units.values() {
+            let Some(pos) = unit.position else { continue };
+            let old = self.facing.get(&unit.key).copied();
+            let toward = |to: (u16, u16)| facing(cell_centre(pos), cell_centre(to));
+            let dir = request_target(world, unit)
+                .and_then(toward)
+                .or_else(|| old.and_then(|f| facing(cell_centre(f.at), cell_centre(pos))))
+                .or(old.map(|f| f.dir64))
+                .unwrap_or(0);
+            self.facing.insert(
+                unit.key,
+                Facing {
+                    at: pos,
+                    dir64: dir,
+                },
+            );
+        }
+    }
+
+    /// The `dir64` the view draws `unit` with (module doc): the predicted
+    /// facing of the local player, else the observed facing, else 0.
+    pub fn dir64(&self, unit: &ClientUnit) -> u8 {
+        match self.pose_dir {
+            Some((key, d)) if key == unit.key => d,
+            _ => self.facing.get(&unit.key).map_or(0, |f| f.dir64),
+        }
+    }
+
+    /// §3 r3 expected direction count `n` of `unit` drawn with a COF of
+    /// `d` directions: players 8, the local player 16 (`[0x007A8928]` = 0
+    /// on a full install, open question 8); objects 1. Monsters: `d`
+    /// (d2rs-own, unverified: `monstats2` `d<mode>` is not in
+    /// [`UnitLooks`]).
+    pub fn expected_directions(&self, unit: &ClientUnit, kind: CompositeKind, d: u8) -> u8 {
+        let mode = i32::try_from(unit.mode).unwrap_or(-1);
+        match kind {
+            CompositeKind::Player => expected_directions(
+                DirectionSource::Player {
+                    sixteen: self.local == Some(unit.key),
+                },
+                mode,
+            ),
+            CompositeKind::Monster => d,
+            CompositeKind::Object => expected_directions(DirectionSource::Other, mode),
         }
     }
 }
@@ -309,9 +453,10 @@ impl UnitArtLoader {
     pub fn ensure(&self, world: &ClientWorld, assets: &mut ViewAssets) -> Vec<String> {
         let mut log = Vec::new();
         let mut art = self.art.write().unwrap_or_else(|e| e.into_inner());
+        art.observe_facing(world);
         for unit in world.units.values() {
             let posed = art.posed(unit).into_owned();
-            let unit = &posed;
+            let unit = &*self.looks.shapes.identity(&posed);
             let Some(name) = unit_cof(&self.looks, unit) else {
                 continue;
             };
@@ -346,7 +491,8 @@ impl UnitArtLoader {
                 }
                 let format = file_format(&codes, unit.class, unit.mode as u8);
                 let loaded = self.load_file(&codes, format, assets);
-                if let Err(e) = &loaded {
+                // §6 r4: a file in no archive is the normal empty slot.
+                if let Err(Some(e)) = &loaded {
                     log.push(format!("unit art: {}: {e}", codes.file(format)));
                 }
                 art.files.insert(key, loaded.ok());
@@ -362,18 +508,44 @@ impl UnitArtLoader {
     }
 
     /// Every direction of the file into the frame store, all or nothing.
+    /// `Err(None)`: the file is in no archive (§6 r4, not an error).
     fn load_file(
         &self,
         codes: &ComponentCodes,
         format: FileFormat,
         assets: &mut ViewAssets,
+    ) -> Result<(CanonicalPath, FileFacts), Option<String>> {
+        let file = codes.file(format);
+        let src = self.source.as_ref();
+        let loaded = match format {
+            FileFormat::Dcc => {
+                crate::assets::path::read_dcc(src, &file).map(|r| r.map(Loaded::Dcc))
+            }
+            FileFormat::Dc6 => {
+                crate::assets::path::read_dc6(src, &file).map(|r| r.map(Loaded::Dc6))
+            }
+        };
+        let loaded = match loaded {
+            None => return Err(None),
+            Some(r) => r.map_err(Some)?,
+        };
+        self.store_file(codes, format, loaded, assets).map_err(Some)
+    }
+
+    fn store_file(
+        &self,
+        codes: &ComponentCodes,
+        format: FileFormat,
+        loaded: Loaded,
+        assets: &mut ViewAssets,
     ) -> Result<(CanonicalPath, FileFacts), String> {
         let path = codes.path(format).map_err(|e| e.to_string())?;
-        let bytes = self.read(&codes.file(format))?;
         let mut sets = Vec::new();
         let (directions, frames) = match format {
             FileFormat::Dcc => {
-                let dcc = d2_formats::dcc::Dcc::parse(&bytes).map_err(|e| e.to_string())?;
+                let Loaded::Dcc(dcc) = loaded else {
+                    return Err("format mismatch".into());
+                };
                 let d = u8::try_from(dcc.directions.len()).map_err(|_| "too many directions")?;
                 for dir in 0..d {
                     sets.push(FrameSet::from_dcc(&dcc, dir).map_err(|e| e.to_string())?);
@@ -381,7 +553,9 @@ impl UnitArtLoader {
                 (d, dcc.frames_per_direction as usize)
             }
             FileFormat::Dc6 => {
-                let dc6 = d2_formats::dc6::Dc6::parse(&bytes).map_err(|e| e.to_string())?;
+                let Loaded::Dc6(dc6) = loaded else {
+                    return Err("format mismatch".into());
+                };
                 let d = u8::try_from(dc6.header.directions).map_err(|_| "too many directions")?;
                 for dir in 0..d {
                     sets.push(FrameSet::from_dc6(&dc6, dir).map_err(|e| e.to_string())?);
@@ -405,4 +579,10 @@ impl UnitArtLoader {
             },
         ))
     }
+}
+
+/// A unit art file read through [`FileSource::read_native`].
+enum Loaded {
+    Dcc(d2_formats::dcc::Dcc),
+    Dc6(d2_formats::dc6::Dc6),
 }
