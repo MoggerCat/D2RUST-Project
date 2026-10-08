@@ -131,5 +131,15 @@ fn front_end_screens_on_the_install() {
     // Character select's "Create New Character" (33..200, 470..528).
     click(&mut a, Point::new(117, 500));
     shot(&mut a, &out, "ours_create");
+    // Select the Barbarian (400, 330), type a name, wait for the walk.
+    host(&mut a)
+        .front
+        .input(FrontInput::Move(Point::new(400, 250)));
+    click(&mut a, Point::new(400, 250));
+    for c in "Werwer".encode_utf16() {
+        host(&mut a).front.input(FrontInput::Char(c));
+    }
+    ticks(&mut a, 80);
+    shot(&mut a, &out, "ours_create_selected");
     let _ = std::fs::remove_dir_all(&saves);
 }

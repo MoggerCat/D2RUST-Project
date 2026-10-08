@@ -12,6 +12,8 @@ pub const BACKGROUND: &str = r"FrontEnd\gameselectscreenEXP";
 pub const BACKGROUND_CLASSIC: &str = r"FrontEnd\gameselectscreen";
 /// Button cels (§F1.4 r3 art column). // d2rs-own, unverified: file names.
 pub const WIDE: &str = r"FrontEnd\WideButtonBlank";
+/// Battle.net button art (descriptor 17, global `0x00779754`, d2exp).
+pub const WIDE02: &str = r"FrontEnd\WideButtonBlank02";
 pub const NARROW: &str = r"FrontEnd\NarrowButtonBlank";
 pub const SHORT: &str = r"CharSelect\ShortButtonBlank";
 /// Logo halves (§F1.5 r1): the black base cel (the fire overlay is drawn
@@ -82,7 +84,7 @@ impl Screen for MainMenu {
                 STR_SINGLE_PLAYER,
                 Action::Trigger(Trigger::SinglePlayer),
             ),
-            button(WIDE, 264, 366 - up, 272, 35, STR_BATTLE_NET, Action::None),
+            button(WIDE02, 264, 366 - up, 272, 35, STR_BATTLE_NET, Action::None),
             // The gateway label is set at run time (0x00431AF0): none here.
             button(NARROW, 264, 391 - up, 272, 25, 0, Action::None),
             button(

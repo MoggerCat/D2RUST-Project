@@ -453,10 +453,13 @@ impl FrontEnd {
                     }
                 }
             }
+            // The topmost (last created) control holding the key: a pop-up
+            // (list A) is asked before the screen under it (list B).
             FrontInput::Key(k) => {
                 let hit = self
                     .controls
                     .iter()
+                    .rev()
                     .find(|c| c.enabled && c.action != Action::None && c.takes_key(k))
                     .map(|c| c.action);
                 if let Some(a) = hit {

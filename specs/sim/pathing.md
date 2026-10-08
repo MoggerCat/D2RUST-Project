@@ -35,18 +35,18 @@
 |   5. Toward (type 2, `0x00679C80`) | 359–426 |
 |   6. Straight (type 7, `0x00679ED0`) | 427–436 |
 |   7. A* (type 1, `0x0067B850`) | 437–474 |
-|   8. Velocity, direction vector, facing | 475–561 |
-|   9. Per-tick movement | 562–745 |
-|   10. Messages | 746–808 |
-|   11. Missile paths (`0x00649760`) | 809–861 |
-|   12. Other path types (1.14d-read 2026-10-08) | 862–1075 |
-|   13. Path accessors and the cell line test (1.14d-read 2026-10-08) | 1076–1225 |
-| Constants & data dependencies | 1226–1262 |
-| Randomness | 1263–1273 |
-| Edge cases & original bugs | 1274–1321 |
-| Test vectors | 1322–1359 |
-| Provenance | 1360–1415 |
-| Open questions | 1416–1489 |
+|   8. Velocity, direction vector, facing | 475–568 |
+|   9. Per-tick movement | 569–752 |
+|   10. Messages | 753–815 |
+|   11. Missile paths (`0x00649760`) | 816–868 |
+|   12. Other path types (1.14d-read 2026-10-08) | 869–1082 |
+|   13. Path accessors and the cell line test (1.14d-read 2026-10-08) | 1083–1232 |
+| Constants & data dependencies | 1233–1269 |
+| Randomness | 1270–1280 |
+| Edge cases & original bugs | 1281–1328 |
+| Test vectors | 1329–1366 |
+| Provenance | 1367–1422 |
+| Open questions | 1423–1496 |
 <!-- /index -->
 
 ## Summary

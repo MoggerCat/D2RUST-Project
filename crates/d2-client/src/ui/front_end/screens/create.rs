@@ -40,6 +40,8 @@ pub mod act {
     pub const BACKSPACE: u32 = 23;
     pub const WARN_OK: u32 = 24;
     pub const WARN_CANCEL: u32 = 25;
+    /// The message pop-up's CANCEL (`0x00432060`).
+    pub const MESSAGE_CLOSE: u32 = 26;
 }
 
 /// Class ids (save +0x28, §F3.2).
@@ -578,6 +580,7 @@ struct Idx {
     grey: Vec<usize>,
     ok: Option<usize>,
     warn: Vec<usize>,
+    taken: Vec<usize>,
 }
 
 impl CreateScreen {
@@ -601,10 +604,31 @@ const BG: &str = "FrontEnd\\CharacterCreate";
 /// Font16 (`0x007089C4`).
 const FONT30: u16 = 2;
 const FONT16: u16 = 1;
+/// Font24 (`0x007089BC`): the message pop-up text 249.
+const FONT24: u16 = 7;
 /// Positions of texts 197 and 198 in the built list.
 const TEXT_NAME: usize = 2;
 const TEXT_DESC: usize = 3;
 const BG_EXP: &str = "FrontEnd\\charactercreationscreenEXP";
+/// Pop-up art (§F3.8): hardcore warning `PopUpOKCancel` (`0x00779780`),
+/// message `PopUpOK2` (`0x007797AC`), buttons `OkCancelButtonBlank`
+/// (`0x007797B0`).
+const POPUP_OK_CANCEL: &str = "FrontEnd\\PopUpOKCancel";
+const POPUP_OK: &str = "FrontEnd\\PopUpOk2";
+const POPUP_BUTTON: &str = "FrontEnd\\OkCancelButtonBlank";
+/// 5103 CANCEL, 5102 OK (§F3.6 r2).
+const STR_CANCEL: u32 = 5103;
+const STR_OK: u32 = 5102;
+
+/// A pop-up text (208 / 249, §F3.6 r2.1 / r2.4): (268, 320) 264 × 120,
+/// margins 10 / 8, flag 2 (centred, wrapped), colour 0.
+fn popup_text(string_id: u32, font: u16) -> Control {
+    let mut c = Control::new(ControlKind::Text, 268, 320, 264, 120)
+        .with_string(string_id)
+        .with_font(font, 2);
+    c.margin = (10, 8);
+    c
+}
 
 impl Screen for CreateScreen {
     fn build(&mut self, ctx: &mut FrontCtx) -> Vec<Control> {
@@ -663,8 +687,12 @@ impl Screen for CreateScreen {
                     .with_art("FrontEnd\\clickbox")
                     .with_action(Action::Custom(act::EXPANSION)),
             );
+            // 211: PROVISIONAL size (§F3.5 gives the position only): 200 ×
+            // 32 as label 201, so "EXPANSION CHARACTER" stays on one row
+            // (100 px would wrap it onto the Hardcore label); settled by a
+            // capture of the create screen with a class selected.
             v.push(
-                Control::new(ControlKind::Text, 339, 561, 100, 32)
+                Control::new(ControlKind::Text, 339, 561, 200, 32)
                     .with_string(22731)
                     .with_font(FONT16, 0),
             );
@@ -700,20 +728,35 @@ impl Screen for CreateScreen {
             vk::BACKSPACE,
             Action::Custom(act::BACKSPACE),
         ));
-        // Hardcore warning (5303): YES / NO, shown while it is up.
-        self.idx.warn = vec![v.len(), v.len() + 1];
+        // Hardcore warning `0x00430520` (§F3.6 r2.4): 205 image, 206
+        // CANCEL, 207 OK, 208 text 5303; shown while it is up.
+        self.idx.warn = (v.len()..v.len() + 4).collect();
+        v.push(Control::new(ControlKind::Image, 268, 350, 264, 176).with_art(POPUP_OK_CANCEL));
         v.push(
-            Control::new(ControlKind::Button, 270, 400, 128, 35)
-                .with_art("FrontEnd\\MediumSelButtonBlank")
-                .with_string(5166)
-                .with_action(Action::Custom(act::WARN_OK)),
-        );
-        v.push(
-            Control::new(ControlKind::Button, 410, 400, 128, 35)
-                .with_art("FrontEnd\\MediumSelButtonBlank")
-                .with_string(5167)
+            Control::new(ControlKind::Button, 281, 337, 96, 32)
+                .with_art(POPUP_BUTTON)
+                .with_string(STR_CANCEL)
                 .with_action(Action::Custom(act::WARN_CANCEL)),
         );
+        v.push(
+            Control::new(ControlKind::Button, 421, 337, 96, 32)
+                .with_art(POPUP_BUTTON)
+                .with_string(STR_OK)
+                .with_action(Action::Custom(act::WARN_OK)),
+        );
+        v.push(popup_text(STR_HARDCORE_WARNING, FONT16));
+        // Message pop-up `0x00433460` (§F3.6 r2.1) with 5165: 247 image,
+        // 250 CANCEL (Esc), 249 text (Font24).
+        self.idx.taken = (v.len()..v.len() + 3).collect();
+        v.push(Control::new(ControlKind::Image, 268, 350, 264, 176).with_art(POPUP_OK));
+        v.push(
+            Control::new(ControlKind::Button, 351, 337, 96, 32)
+                .with_art(POPUP_BUTTON)
+                .with_string(STR_CANCEL)
+                .with_hotkey(vk::ESC)
+                .with_action(Action::Custom(act::MESSAGE_CLOSE)),
+        );
+        v.push(popup_text(STR_NAME_TAKEN, FONT24));
         self.state = Some(st);
         v
     }
@@ -744,6 +787,10 @@ impl Screen for CreateScreen {
             act::WARN_OK => st.warning_ok(),
             act::WARN_CANCEL => {
                 st.warning_cancel(ctx.now_ms);
+                None
+            }
+            act::MESSAGE_CLOSE => {
+                st.name_taken = false;
                 None
             }
             n if n >= act::CLASS => {
@@ -863,24 +910,6 @@ impl Screen for CreateScreen {
                 boxed: None,
             });
         }
-        let popup = if st.warning {
-            Some(STR_HARDCORE_WARNING)
-        } else if st.name_taken {
-            Some(STR_NAME_TAKEN)
-        } else {
-            None
-        };
-        if let Some(id) = popup {
-            out.push(DrawItem::Text {
-                label: None,
-                string_id: id,
-                text: String::new(),
-                font: 1,
-                at: Point::new(270, 360),
-                color: 0,
-                boxed: None,
-            });
-        }
         out
     }
 
@@ -899,7 +928,18 @@ impl Screen for CreateScreen {
         show(controls, &self.idx.hardcore, st.hardcore_visible());
         show(controls, &self.idx.expansion, st.expansion_box_visible());
         show(controls, &self.idx.grey, st.expansion_grey_visible());
-        show(controls, &self.idx.warn, st.warning);
+        // The pop-ups (list A): shown and live only while up.
+        for (ix, on) in [
+            (&self.idx.warn, st.warning),
+            (&self.idx.taken, st.name_taken),
+        ] {
+            for &i in ix {
+                if let Some(c) = controls.get_mut(i) {
+                    c.visible = on;
+                    c.enabled = on;
+                }
+            }
+        }
         // Texts 197 / 198: the hovered or selected class (§F3.3 r7).
         let (name, desc) = st.texts().map_or((0, 0), |(ids, _)| ids);
         for (i, id) in [(TEXT_NAME, name), (TEXT_DESC, desc)] {

@@ -78,7 +78,7 @@ fn disabled_button_never_draws_pressed() {
         .draw()
         .iter()
         .filter_map(|d| match d {
-            DrawItem::Art { file, frame, at } if *file == WIDE && at.y == 366 => Some(*frame),
+            DrawItem::Art { file, frame, at } if *file == WIDE02 && at.y == 366 => Some(*frame),
             _ => None,
         })
         .collect();
