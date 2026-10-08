@@ -443,7 +443,7 @@ mod belt {
         assert_eq!(b.state.hover_item, Some(7));
     }
 
-    // Covers: specs/ui/control-panel.md §5 r4 (the hover rectangle)
+    // Covers: specs/ui/control-panel.md §5 r4
     #[test]
     fn a_hovered_belt_slot_paints_its_highlight_rect() {
         use crate::ui::original::hud::{BELT_FILL_BASE, FILL_FILE};
@@ -491,7 +491,7 @@ mod belt {
         assert_eq!(tiles(&out), vec![(461, 562, 29, 18), (461, 580, 29, 11)]);
     }
 
-    // Covers: specs/ui/control-panel.md §5 r4 (the key label)
+    // Covers: specs/ui/control-panel.md §5 r4
     #[test]
     fn rebinding_a_belt_key_changes_its_label() {
         use crate::controls::{Action, Key, Preset};
