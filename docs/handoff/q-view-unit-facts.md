@@ -7,6 +7,8 @@ Links connected (draw order's unit facts, `draw-order.md` §3 r4 / §5, `draw-or
 
 PROVISIONAL: REC-273 (see `docs/HANDOFF.md` §7).
 
-Left: the sight test's line test (client DRLG collision grid as `CollisionRooms`); flag bits no model rule writes.
+Follow-up: the sight test runs over `world.drlg` (`ClientRooms`, `sight_with`; test: a collision-bit-2 cell between player and unit hides it in a LOSDraw level).
+
+Left: flag bits no model rule writes; sight uses model cells, not the walk prediction.
 
 Local check: `cargo run -p d2-client -- play ...` (as in `docs/local/2026-10-07/PLAYABLE.md`), kill a monster whose corpse lies flat (it draws under standing units) and stand next to a DrawUnder object (e.g. a floor decoration); both draw below units. Unit tests: `cargo nextest run -p d2-client unit_facts`.
