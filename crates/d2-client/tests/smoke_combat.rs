@@ -33,6 +33,7 @@ use d2_client::app::play::{add_client_data, add_game, add_preview, send_create_g
 use d2_client::app::server_thread::ThreadLink;
 use d2_client::app::single_player::{self, BuildError, GameData};
 use d2_client::app::synthetic_client;
+use d2_client::bridge::link::{LinkError, Pumped, SendQueue, Sent, ServerLink};
 use d2_client::bridge::local::{LocalLink, PendingSession};
 use d2_client::bridge::mirror::DynLink;
 use d2_client::bridge::modes::player_mode;
@@ -54,11 +55,11 @@ use d2_sim::items::inventory::InvItem;
 use d2_sim::items::moves::ty;
 use d2_sim::items::tables::ItemRec;
 use d2_sim::items::{q, ItemRequest};
-use d2_sim::missiles::unit_flag as flags;
-use d2_sim::monsters::ai::{install, AiControl};
+use d2_sim::missiles::seams::MissileBodies;
+use d2_sim::monsters::ai::install;
 use d2_sim::stats::{stat, StatLists};
 use d2_sim::tick::events::event;
-use d2_sim::units::hooks::{MonsterInfo, UnitData};
+use d2_sim::units::hooks::MonsterInfo;
 use d2_sim::units::lifecycle::AllocRequest;
 use d2_sim::units::{UnitId, UnitType};
 use d2_sim::wiring::action::ActionTables;
@@ -83,6 +84,11 @@ fn level2_skill(class: u8) -> u16 {
 }
 
 /// Player classes' two-letter tokens (`app/anim_names.rs`).
+/// Stat 14, gold on the person.
+const GOLD: u16 = 14;
+/// The synthetic act 1 hire row's mercenary class (`single_player`).
+const MERC_CLASS: u32 = 271;
+
 const TOKENS: [&[u8; 2]; 7] = [b"AM", b"SO", b"NE", b"PA", b"BA", b"DZ", b"AI"];
 
 struct StepClock(Arc<AtomicU32>);
@@ -182,6 +188,8 @@ fn anim_data() -> AnimData {
     };
     put(*b"ZOA1HTH\0", true);
     put(*b"ZODTHTH\0", false);
+    put(*b"RGA1HTH\0", true);
+    put(*b"RGDTHTH\0", false);
     for t in TOKENS {
         put([t[0], t[1], b'A', b'1', b'H', b'T', b'H', 0], true);
         put([t[0], t[1], b'D', b'T', b'H', b'T', b'H', 0], false);
@@ -194,7 +202,24 @@ fn anim_data() -> AnimData {
 fn install_fixtures(sim: &mut single_player::Sim) {
     let s = &mut sim.events.action.sys;
     s.stats = StatLists::new(d2_sim::bench_fixtures::stat_data());
-    let (monstats, monstats2) = monster();
+    // Row 0 of the synthetic game's monster rows becomes the test's
+    // monster; the other rows stay (the mercenary's class 271 is one).
+    let (zombie, zombie2) = monster();
+    let mut monstats = s.hooks.tables.combat.monstats.clone();
+    let mut monstats2 = s.hooks.tables.combat.monstats2.clone();
+    monstats.resize_with(monstats.len().max(1), blank);
+    monstats2.resize_with(monstats.len(), blank);
+    monstats[0] = zombie[0].clone();
+    monstats2[0] = zombie2[0].clone();
+    // The mercenary's row: the Hireable AI (61) and the zombie's modes.
+    let m = MERC_CLASS as usize;
+    monstats.resize_with(monstats.len().max(m + 1), blank);
+    monstats2.resize_with(monstats.len(), blank);
+    let mut merc = zombie[0].clone();
+    merc.ai = 61;
+    merc.code = *b"rg\0\0";
+    monstats[m] = merc;
+    monstats2[m] = zombie2[0].clone();
     let mut skills = fx::skills();
     skills.skills = skill_rows();
     let mut combat = fx::combat_tables();
@@ -226,25 +251,39 @@ fn install_fixtures(sim: &mut single_player::Sim) {
         player_tokens: TOKENS.iter().map(|t| code(&t[..])).collect(),
         player_modes,
         monster_modes: modes.iter().map(|m| code(m.as_bytes())).collect(),
-        monsters: [(
-            0,
-            MonsterRow {
-                token: code(b"zo"),
-                base_w: None,
-                composite_death: false,
-            },
-        )]
+        monsters: [
+            (
+                0,
+                MonsterRow {
+                    token: code(b"zo"),
+                    base_w: None,
+                    composite_death: false,
+                },
+            ),
+            (
+                MERC_CLASS,
+                MonsterRow {
+                    token: code(b"rg"),
+                    base_w: None,
+                    composite_death: false,
+                },
+            ),
+        ]
         .into(),
         ..UnitLooks::default()
     }));
-    s.data = UnitData {
-        monsters: vec![MonsterInfo {
-            enabled: true,
-            aidel: [15, 15, 15],
-            moves: 0,
-        }],
-        ..UnitData::default()
+    let zombie_info = MonsterInfo {
+        enabled: true,
+        aidel: [15, 15, 15],
+        moves: 0,
     };
+    s.data
+        .monsters
+        .resize_with(s.data.monsters.len().max(MERC_CLASS as usize + 1), || {
+            zombie_info.clone()
+        });
+    s.data.monsters[0] = zombie_info.clone();
+    s.data.monsters[MERC_CLASS as usize] = zombie_info;
     add_potion_rows(sim);
 }
 
@@ -296,12 +335,38 @@ fn client_skill_rows() -> Vec<SkillRow> {
         .collect()
 }
 
+/// Wraps the shared link and keeps every S→C message (as
+/// `app_mercs_acts.rs`).
+struct Tap {
+    inner: SharedLink<ThreadLink<single_player::Link<StepClock>>>,
+    seen: Arc<Mutex<Vec<Vec<u8>>>>,
+}
+
+impl ServerLink for Tap {
+    fn protocol_version(&self) -> u32 {
+        self.inner.protocol_version()
+    }
+    fn send(&mut self, queue: SendQueue, msg: &[u8]) -> Result<Sent, LinkError> {
+        self.inner.send(queue, msg)
+    }
+    fn pump(&mut self) -> Result<Pumped, LinkError> {
+        self.inner.pump()
+    }
+    fn receive(&mut self) -> Vec<Vec<u8>> {
+        let v = self.inner.receive();
+        self.seen.lock().unwrap().extend(v.iter().cloned());
+        v
+    }
+}
+
 /// The play app, headless, over the synthetic game with the fills above.
 struct Rig {
     app: App,
     server: Server<StepClock>,
     ms: Arc<AtomicU32>,
     class: u8,
+    /// Every S→C message the client received, in order.
+    seen: Arc<Mutex<Vec<Vec<u8>>>>,
 }
 
 impl Rig {
@@ -326,7 +391,11 @@ impl Rig {
         })
         .unwrap();
         let server: Server<StepClock> = Arc::new(Mutex::new(link));
-        let dyn_link: DynLink = Box::new(SharedLink(server.clone()));
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let dyn_link: DynLink = Box::new(Tap {
+            inner: SharedLink(server.clone()),
+            seen: seen.clone(),
+        });
         let mut app = App::new();
         app.add_plugins((MinimalPlugins, AssetPlugin::default()))
             .init_asset::<Image>()
@@ -375,6 +444,7 @@ impl Rig {
             server,
             ms,
             class,
+            seen,
         }
     }
 
@@ -498,8 +568,7 @@ impl Rig {
         app_support::with(&self.server, move |l| {
             let sim = &mut l.host_mut().game;
             let (p, _) = single_player::local_player(sim).expect("joined");
-            let a = &mut sim.events.action;
-            let (px, py) = a.sys.hooks.path_position(p);
+            let (px, py) = sim.events.action.sys.hooks.path_position(p);
             let room = sim.game.lists.unit(p).and_then(|e| e.room()).expect("room");
             let mut guids = Vec::new();
             for i in 0..n {
@@ -512,9 +581,13 @@ impl Rig {
                     mode: 1,
                     allied: false,
                 };
-                let m = a
+                // Through the world's allocation: the monster type init
+                // runs (`monsters/init.md` §5: unit flags, AI control).
+                let m = sim
+                    .events
                     .with(&mut sim.game, |g, v| v.allocate(g, &req, px + 1, py + i))
                     .expect("monster");
+                let a = &mut sim.events.action;
                 a.with(&mut sim.game, |_, v| {
                     v.set_base(m, stat::LEVEL, 1);
                     // The kill's experience, as monster init sets it.
@@ -525,17 +598,11 @@ impl Rig {
                     v.set_base(m, MINDAMAGE, 3 << 8);
                     v.set_base(m, MAXDAMAGE, 3 << 8);
                 });
-                // Monster init's unit flags (`monsters/init.md`: |= 0x0A,
-                // 0x04 for `isAtt`); without 0x02 the skill start's
-                // target check clears the target (`use.md` §5.3 step 2).
-                a.sys.units.get_mut(m).unwrap().flags |=
-                    flags::BIT1 | flags::IS_VALID_TARGET | flags::CAN_BE_ATTACKED;
                 if ai {
-                    a.ai(&mut sim.game, |g, cx| {
-                        cx.store.entry(m).control = Some(AiControl::default());
-                        install(g, cx, m, 0);
-                    })
-                    .expect("ai");
+                    // The spawner's first think (as `start_host_ai`,
+                    // REC-254): install state 0, a think next frame.
+                    a.ai(&mut sim.game, |g, cx| install(g, cx, m, 0))
+                        .expect("ai");
                     let at = sim.game.frame + 1;
                     sim.game
                         .schedule_event(m, u32::from(event::AI_THINK), at, None, 0, 0)
@@ -606,6 +673,50 @@ impl Rig {
         })
     }
 
+    /// The client model's unit of `ty` and `class`.
+    fn unit_of_class(&self, ty: u8, class: u32) -> UnitKey {
+        let w = self.bridge().world();
+        *w.units
+            .iter()
+            .find(|(k, u)| k.unit_type == ty && u.class == class)
+            .unwrap_or_else(|| panic!("class {class} in the model"))
+            .0
+    }
+
+    /// Teleports the player (server side) three sub-tiles south of `key`.
+    fn stand_beside(&mut self, key: UnitKey) {
+        let (x, y) = self.bridge().world().units[&key]
+            .position
+            .expect("the unit's position");
+        let (p, _) = self.player();
+        app_support::with(&self.server, move |l| {
+            let g = &mut l.host_mut().game;
+            let room = g.game.lists.unit(p).and_then(|u| u.room());
+            g.events.action.with(&mut g.game, |g, v| {
+                v.path_teleport(g, p, room, i32::from(x), i32::from(y) + 3)
+            });
+        });
+        self.step(3, "stand beside");
+    }
+
+    /// C→S 0x36 hire from `seller`: its GUID and the row's first name id.
+    fn hire(&mut self, seller: UnitKey) {
+        let mut m = vec![0x36];
+        m.extend_from_slice(&seller.guid.to_le_bytes());
+        m.extend_from_slice(&100u32.to_le_bytes());
+        self.send(&m);
+        self.step(20, "hire");
+    }
+
+    /// The hired mercenary (class 271) in the client model.
+    fn merc(&self) -> Option<UnitKey> {
+        let w = self.bridge().world();
+        w.units
+            .iter()
+            .find(|(k, u)| k.unit_type == MONSTER && u.class == MERC_CLASS)
+            .map(|(k, _)| *k)
+    }
+
     fn monster_alive(&self, guid: u32) -> bool {
         let w = self.bridge().world();
         w.units
@@ -654,8 +765,74 @@ fn scenario(class: u8) {
         "class {class}: life {life0}, mana {mana0}"
     );
 
-    // Out of town.
+    // A mercenary from Kashya (C→S 0x36, `npc.md` §7.3; the synthetic
+    // hire row is made up, REC-157). Below level 8 she refuses until
+    // the Sisters' Burial Grounds (quest 2) is done.
+    let kashya = r.unit_of_class(MONSTER, u32::from(d2_sim::world::npc::class::KASHYA));
+    r.stand_beside(kashya);
+    r.app
+        .world_mut()
+        .resource_mut::<BridgeResource>()
+        .0
+        .interact(kashya)
+        .unwrap();
+    r.step(20, "talk to Kashya");
+    let gold0 = 100_000;
+    let (p, _) = r.player();
+    app_support::with(&r.server, move |l| {
+        let g = &mut l.host_mut().game;
+        g.events
+            .action
+            .with(&mut g.game, |_, v| v.set_base(p, GOLD, gold0));
+    });
+    r.step(2, "gold");
+    let n = r.seen.lock().unwrap().len();
+    r.hire(kashya);
+    assert_eq!(r.merc(), None, "class {class}: the hire is gated");
+    let answer: Vec<u8> = r.seen.lock().unwrap()[n..]
+        .iter()
+        .filter(|m| m[0] == 0x2A)
+        .map(|m| m[2])
+        .collect();
+    assert_eq!(answer, [11], "class {class}: the gate's 0x2A code");
+    app_support::with(&r.server, move |l| {
+        let g = &mut l.host_mut().game;
+        g.world.rest.quests.get_mut(&p).unwrap().flags[0].set(2, 0);
+    });
+    r.hire(kashya);
+    let merc = r.merc().expect("the mercenary reached the client's model");
+    // The hire's creation ran the monster type init (`monsters/init.md`
+    // §5 step 1: unit flags |= 0x0A; the hire handler lends the world).
+    let merc_flags = app_support::with(&r.server, move |l| {
+        let g = &l.host().game;
+        let u = g.game.lists.find_unit(UnitType::Monster, merc.guid);
+        u.and_then(|u| g.events.action.sys.units.get(u))
+            .map(|r| r.flags)
+    });
+    assert_eq!(
+        merc_flags.map(|f| f & d2_sim::monsters::init::unit_flag::AT_INIT),
+        Some(d2_sim::monsters::init::unit_flag::AT_INIT),
+        "class {class}: the mercenary's type init"
+    );
+    // Closing the dialog ends the chat (C→S 0x30, `npc.md`): until then
+    // the player is busy and picks nothing up (`inventory-moves.md` §8.1).
+    let mut m = vec![0x30];
+    m.extend_from_slice(&1u32.to_le_bytes());
+    m.extend_from_slice(&kashya.guid.to_le_bytes());
+    r.send(&m);
+    r.step(2, "end the chat");
+    assert!(
+        r.server_stat(GOLD) < gold0,
+        "class {class}: the hire cost gold"
+    );
+
+    // Out of town; the mercenary follows (`hirelings.md` §6).
     r.leave_town();
+    r.step(10, "the mercenary follows");
+    assert!(
+        r.bridge().world().units.contains_key(&merc),
+        "class {class}: the mercenary followed into the Den"
+    );
 
     // A pack of three: one killed with the left skill (Attack), two with
     // the right skill (the class's start skill, which costs mana).
@@ -744,6 +921,10 @@ fn scenario(class: u8) {
     // (`inventory-moves.md` §7.1, §12): S→C 0x8E, the corpse leaves.
     r.leave_town();
     r.step(10, "the corpse comes into view");
+    assert!(
+        r.bridge().world().units.contains_key(&merc),
+        "class {class}: the mercenary followed into the Den again"
+    );
     let corpse = r.corpse().expect("the corpse lies where the player died");
     let mut taken = false;
     for _ in 0..40 {
@@ -777,21 +958,28 @@ fn scenario(class: u8) {
     // A healing potion: picked up into the belt (C→S 0x16 type 4,
     // `inventory-moves.md` §7.1, §8.1), then drunk from it (0x26, §7.17;
     // the effect is PROVISIONAL REC-102: life over time).
+    // A unit next to it (the mercenary) turns the click into a walk to
+    // it (§7.1 type 4 step 2): click again until it is in the belt.
     let potion = r.drop_potion();
-    let mut m = vec![0x16];
-    m.extend_from_slice(&4u32.to_le_bytes());
-    m.extend_from_slice(&potion.to_le_bytes());
-    m.extend_from_slice(&0u32.to_le_bytes());
-    r.send(&m);
-    r.step(4, "pick up the potion");
-    let in_belt = {
+    let in_belt = |r: &Rig| {
         let w = r.bridge().world();
         d2_client::bridge::items::belt(w)
             .values()
             .any(|i| i.key.guid == potion)
     };
+    for _ in 0..10 {
+        let mut m = vec![0x16];
+        m.extend_from_slice(&4u32.to_le_bytes());
+        m.extend_from_slice(&potion.to_le_bytes());
+        m.extend_from_slice(&0u32.to_le_bytes());
+        r.send(&m);
+        r.step(8, "pick up the potion");
+        if in_belt(&r) {
+            break;
+        }
+    }
     assert!(
-        in_belt,
+        in_belt(&r),
         "class {class}: the potion reached the client's belt"
     );
     let (p, _) = r.player();
