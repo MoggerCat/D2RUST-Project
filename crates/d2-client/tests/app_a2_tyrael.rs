@@ -458,7 +458,7 @@ fn duriel_fights_tyrael_opens_the_portal_and_meshif_travels_east() {
     }
     // The arrival spot follows the portal check: the type-12 spawn, then
     // the free spot of size 3, mask 0xBE11, step 7 (REC-254).
-    let (spawn, at) = app_support::with(&server, |l| {
+    let (spawn_xy, at) = app_support::with(&server, |l| {
         let sim = &mut l.host_mut().game;
         let (p, _) = single_player::local_player(sim).unwrap();
         let a = &mut sim.events.action;
@@ -474,8 +474,11 @@ fn duriel_fights_tyrael_opens_the_portal_and_meshif_travels_east() {
             .unwrap();
         ((s.x * 5 + 2, s.y * 5 + 2), at)
     });
-    let d = (at.0 - spawn.0).abs().max((at.1 - spawn.1).abs());
-    assert!(d <= 20, "arrival {at:?} near the type-12 spawn {spawn:?}");
+    let d = (at.0 - spawn_xy.0).abs().max((at.1 - spawn_xy.1).abs());
+    assert!(
+        d <= 20,
+        "arrival {at:?} near the type-12 spawn {spawn_xy:?}"
+    );
 
     // Jerhyn (442) and Meshif (450): the quest moves on, Meshif travels.
     let (_, jerhyn) = spawn(&server, JERHYN);
