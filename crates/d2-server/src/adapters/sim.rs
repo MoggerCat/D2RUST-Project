@@ -62,6 +62,11 @@ pub struct UnitFacts {
     pub owner: Option<UnitId>,
 }
 
+/// Lets the host's seams read the game before the sim runs on it
+/// ([`SimGame::set_host_sync`]): called before each handled intent and at
+/// the start of each tick.
+pub type HostSync<D> = fn(&Game, &mut D);
+
 /// Misuse of the adapter's client bookkeeping.
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum AdapterError {
@@ -101,6 +106,8 @@ pub struct SimGame<D = Unspecified, W = NoWorld> {
     /// ([`WorldHost::live_facts`]) rather than the caller: refreshed
     /// before each point / unit parse.
     live: std::collections::BTreeSet<UnitId>,
+    /// The host's seam refresh, if set.
+    host_sync: Option<HostSync<D>>,
     /// Clients the point parser asked to resync with S→C 0x15, in order.
     /// Not queued: the 11-byte layout of 0x15 is not in
     /// `server-messages.tsv` (`docs/HANDOFF.md` §7).
@@ -163,6 +170,7 @@ impl<D: EventDispatch, W> SimGame<D, W> {
             players: BTreeMap::new(),
             units: BTreeMap::new(),
             live: Default::default(),
+            host_sync: None,
             resyncs: Vec::new(),
             unhandled: Vec::new(),
             world,
@@ -252,6 +260,18 @@ impl<D: EventDispatch, W> SimGame<D, W> {
     /// Stages a unit's act, position and owner.
     pub fn set_unit(&mut self, unit: UnitId, facts: UnitFacts) {
         self.units.insert(unit, facts);
+    }
+
+    /// Runs `sync` before each handled intent and at the start of each
+    /// tick (a host whose seams answer from a copy of the game's units).
+    pub fn set_host_sync(&mut self, sync: HostSync<D>) {
+        self.host_sync = Some(sync);
+    }
+
+    fn run_host_sync(&mut self) {
+        if let Some(f) = self.host_sync {
+            f(&self.game, &mut self.events);
+        }
     }
 
     /// The client's player unit, if it is a player (unit type 0).
@@ -442,6 +462,7 @@ impl<D: EventDispatch, W: WorldHost<D>> Intents for SimGame<D, W> {
         size: usize,
         out: &mut dyn MessageSink,
     ) -> ResultCode {
+        self.run_host_sync();
         if let Some(r) = handlers::items::handle(self, client, msg, out) {
             return r;
         }
@@ -507,6 +528,7 @@ impl<D: EventDispatch + TickHooks, W: WorldHost<D>> Tick for SimGame<D, W> {
     /// (`handlers::items::moves::update_pass`, `inventory-moves.md` §6.1), then
     /// the client vitals sync ([`SimGame::vitals_sync`]).
     fn tick(&mut self, out: &mut dyn MessageSink) {
+        self.run_host_sync();
         self.world.run_tick(&mut self.game, &mut self.events);
         self.world.after_tick(&mut self.game, &mut self.events);
         let requests = self.world.take_host_requests();

@@ -1209,6 +1209,12 @@ its only caller `0x0044F360` (`0x0044F43E`–`0x0044F45E`),
    and no client seed draws beyond those the message rules name
    (because the server stream carries every mode change the recordings
    show); settled by REC-51 (HIGH-PRIORITY CAPTURE: client seed draws).
+   PROVISIONAL: the client skill start of codes 0x15 / 0x16 (S→C 0x4D /
+   0x4C, `0x004C6F40` / `0x004C6EB0`) sets the unit's mode to the
+   skill's `anim` (player) or `monanim` (monster) mode, record[0] being
+   the skill id; a skill without a row leaves the mode (because the
+   attack art follows `unit.mode` and the start is not read); settled by
+   REC-51.
 2. Local walk prediction and per-update path stepping of the local
    player (input → path, `0x00463390`): needed for a smooth
    `ViewFeed::player`; Phase 6 movement spec; check against

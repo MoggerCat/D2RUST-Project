@@ -61,8 +61,11 @@
 //!
 //! Seams without a provider are [`LocalSeams`] (the action and world
 //! wiring's): the narrowest answers (`Pending`'s and `WorldPending`'s
-//! defaults) plus a store of what the sim itself sets (positions) and
-//! the transport outbox; and [`super::rest::AppRest`] (the wired
+//! defaults) plus a store of what the sim itself sets (positions), the
+//! transport outbox, the combat seams' copy of the units
+//! ([`sync_seams`]) and the skill pipeline's preview fills
+//! ([`super::skill_rest`]: the world's skill slot is `WiredSkills`, on
+//! d2-sim's skill lists); and [`super::rest::AppRest`] (the wired
 //! host's). Nothing
 //! here decides an outcome: it stages the game the way the server tests
 //! do (a sorceress who knows her act's first waypoint, `bridge.md` §3).
@@ -78,6 +81,7 @@ use d2_formats::animdata::AnimData;
 use d2_formats::d2s::{self, D2s, ReadOptions};
 use d2_formats::mpq::ArchiveSet;
 use d2_server::adapters::character::LoadContext;
+use d2_server::adapters::handlers::skills::wired::WiredSkills;
 use d2_server::adapters::handlers::world::{
     preview_inv_parts, ActionEvents, ActionWorld, Outbox, WiredWorld,
 };
@@ -126,6 +130,7 @@ use d2_sim::drlg::preset::{Ds1Input, Ds1Source, PresetData};
 
 use super::rest::AppRest;
 use super::server_thread::{ThreadLink, ThreadStopped};
+use super::skill_rest::SkillStore;
 use crate::bridge::drlg::DrlgSource;
 use crate::bridge::local::{LocalLink, PendingSession};
 use crate::bridge::world::{
@@ -137,7 +142,7 @@ use crate::bridge::LOCAL_CLIENT;
 pub type Sim = SimGame<WorldSim<LocalSeams>, World>;
 
 /// The wired host of the app's game.
-pub type World = WiredWorld<AppRest>;
+pub type World = WiredWorld<AppRest, WiredSkills>;
 
 /// The local link over [`Sim`] with clock `C`.
 pub type Link<C = SystemClock> = LocalLink<Sim, ProtoSizes, PendingSession, C>;
@@ -380,6 +385,43 @@ pub struct LocalSeams {
     pub pos: BTreeMap<UnitId, (i32, i32)>,
     pub sent: Vec<(UnitId, Vec<u8>)>,
     pub log: Vec<String>,
+    /// The game's players and monsters (type, allied, path position),
+    /// copied by [`sync_seams`] before each intent and tick: the
+    /// hostility, alignment and melee-range seams have no game to read.
+    pub sides: BTreeMap<UnitId, (UnitType, bool, (i32, i32))>,
+    /// The skill pipeline's per-unit fields and preview fills (`UseRest`,
+    /// `LearnRest`: [`super::skill_rest`]).
+    pub skills: SkillStore,
+}
+
+impl LocalSeams {
+    /// Player side: a player or an allied (good-aligned) monster.
+    fn player_side(&self, unit: UnitId) -> Option<bool> {
+        self.sides
+            .get(&unit)
+            .map(|&(ty, allied, _)| ty == UnitType::Player || allied)
+    }
+}
+
+/// d2rs-own, unverified (preview, D1): the melee reach of every unit in
+/// sub-tiles (`0x00622870` reads the unit's size and weapon; not
+/// answered here).
+const PREVIEW_MELEE_RANGE: i32 = 2;
+
+/// The play host's seam refresh (`SimGame::set_host_sync`): the players
+/// and monsters with their allied flag (`UnitLists`), for
+/// [`LocalSeams::sides`].
+pub fn sync_seams(game: &Game, sim: &mut WorldSim<LocalSeams>) {
+    let hooks = &mut sim.action.sys.hooks;
+    let mut sides = BTreeMap::new();
+    for ty in [UnitType::Player, UnitType::Monster] {
+        for u in game.lists.units_of_type(ty) {
+            if let Some(e) = game.lists.unit(u) {
+                sides.insert(u, (ty, e.allied, hooks.path_position(u)));
+            }
+        }
+    }
+    hooks.x.sides = sides;
 }
 
 impl Pending for LocalSeams {
@@ -398,6 +440,54 @@ impl Pending for LocalSeams {
     }
     fn set_player_mode_arrival(&mut self, _: &mut Game, player: UnitId) {
         self.log.push(format!("arrival mode {}", player.0));
+    }
+    /// d2rs-own, unverified (preview, decision D1; `0x00554200` is not
+    /// specified): the player side (players, allied monsters) and the
+    /// other monsters may attack each other; nothing else, never itself.
+    fn may_attack(&self, attacker: UnitId, defender: UnitId) -> bool {
+        attacker != defender
+            && matches!(
+                (self.player_side(attacker), self.player_side(defender)),
+                (Some(a), Some(d)) if a != d
+            )
+    }
+    /// d2rs-own, unverified (preview, D1; `0x00622870`).
+    fn melee_range(&self, _: UnitId) -> i32 {
+        PREVIEW_MELEE_RANGE
+    }
+    /// d2rs-own, unverified (preview, D1; `combat/range.md` §7.2 step 3
+    /// with the preview reach and no line test): the larger axis
+    /// distance of the synced positions within reach + `extra` + 1.
+    fn in_melee_range(&self, a: UnitId, d: UnitId, extra: i32) -> bool {
+        let (Some(&(_, _, pa)), Some(&(_, _, pd))) = (self.sides.get(&a), self.sides.get(&d))
+        else {
+            return false;
+        };
+        let dist = (pa.0 - pd.0).abs().max((pa.1 - pd.1).abs());
+        dist <= PREVIEW_MELEE_RANGE + extra + 1
+    }
+    /// d2rs-own, unverified (preview, D1; `0x006259B0`): allied monsters
+    /// and players good (2), every other unit evil (0, the default).
+    fn alignment(&self, unit: UnitId) -> u8 {
+        if self.player_side(unit) == Some(true) {
+            2
+        } else {
+            0
+        }
+    }
+    /// d2rs-own, unverified (preview, D1; game +0x10F8, `ai.md` OQ6):
+    /// one target-node slot per player (the player alone, no pets), in
+    /// unit-list order, at most 8 (`ai.md` §5.2 step 5 reads 8).
+    fn target_nodes(&self, game: &Game) -> [Vec<UnitId>; 10] {
+        let mut nodes: [Vec<UnitId>; 10] = Default::default();
+        for (slot, p) in nodes
+            .iter_mut()
+            .zip(game.lists.units_of_type(UnitType::Player))
+            .take(8)
+        {
+            slot.push(p);
+        }
+        nodes
     }
     /// `0x00623660`, the operate entry's interact range (`objects.md`
     /// §7.1 rule 3): no written spec gives its test.
@@ -928,22 +1018,7 @@ pub fn client_skill_rows(archives: &ArchiveSet) -> Result<Vec<SkillRow>, BuildEr
         .table("skills")
         .ok_or_else(|| BuildError::Tables("skills not loaded".to_owned()))?;
     let rows: Vec<Skills> = decode_all(table).map_err(|e| BuildError::Tables(e.to_string()))?;
-    Ok(rows
-        .iter()
-        .map(|s| SkillRow {
-            anim: s.anim,
-            monanim: s.monanim,
-            passivestate: s.passivestate,
-            maxlvl: s.maxlvl,
-            charclass: s.charclass as i8,
-            srvdofunc: s.srvdofunc as i16,
-            enhanceable: s.enhanceable,
-            skilldesc: s.skilldesc,
-            etype: s.etype,
-            range: s.range,
-            flags: crate::bridge::combat::skill_flags(s),
-        })
-        .collect())
+    Ok(rows.iter().map(super::skill_rest::skill_row).collect())
 }
 
 /// Each class's `charstats` `Skill 1`…`Skill 10` (`client/msg-skills.md`
@@ -954,15 +1029,7 @@ pub fn client_class_skills(archives: &ArchiveSet) -> Result<Vec<[u16; 10]>, Buil
         .table("charstats")
         .ok_or_else(|| BuildError::Tables("charstats not loaded".to_owned()))?;
     let rows: Vec<Charstats> = decode_all(table).map_err(|e| BuildError::Tables(e.to_string()))?;
-    Ok(rows
-        .iter()
-        .map(|c| {
-            [
-                c.skill_1, c.skill_2, c.skill_3, c.skill_4, c.skill_5, c.skill_6, c.skill_7,
-                c.skill_8, c.skill_9, c.skill_10,
-            ]
-        })
-        .collect())
+    Ok(rows.iter().map(super::skill_rest::class_skills).collect())
 }
 
 /// The `monstats` / `monstats2` columns of the client monster set-up
@@ -1295,6 +1362,9 @@ pub fn build_with(
     );
     hooks.anim_data = parts.anim;
     hooks.vitals = parts.vitals;
+    // The client vitals sync (`combat/vitals.md` §5.1): life, mana,
+    // stamina and position sent to the client at the end of each tick.
+    hooks.enable_vitals_sync();
     // Game entry places through the path provider; on before any unit is
     // allocated.
     hooks
@@ -1390,6 +1460,9 @@ pub fn build_with(
     // The wired host on the created controls.
     let action = ActionWorld {
         waypoints: Some(WaypointData::new(&wp_tables.levels, &wp_tables.objects)),
+        // The skill handlers (C→S 0x05–0x11, 0x3A–0x3C) on the action
+        // wiring, their open seams on `LocalSeams` (`super::skill_rest`).
+        skills: WiredSkills::default(),
         ..ActionWorld::default()
     };
     let rest = AppRest {
@@ -1413,6 +1486,7 @@ pub fn build_with(
     // fills in `PreviewMoveRest`): the new character's start items.
     world.inventory = parts.inventory.map(preview_inv_parts);
     let mut s: Sim = SimGame::with_world(game, sim, world);
+    s.set_host_sync(sync_seams);
     // The session sequence (`intents-events.md` §8) runs on the client's
     // C→S 0x67 / 0x6B: game creation (the client record, 0x01, 0x00,
     // 0x02; state 1), then the join (this loader, the player's add

@@ -284,6 +284,28 @@ pub struct ActionHooks<X> {
     pub errors: Vec<WiringError>,
 }
 
+impl<X: Pending> ActionHooks<X> {
+    /// The unit's skill list: its list in [`ActionHooks::skill_lists`]
+    /// when it has one (`client/msg-skills.md` §1), else
+    /// [`Pending::skill_list`].
+    pub fn skill_list_of(&self, unit: UnitId) -> Vec<crate::skills::SkillEntry> {
+        match self.skill_lists.get(&unit) {
+            Some(l) => l.view(),
+            None => self.x.skill_list(unit),
+        }
+    }
+
+    /// The unit's current skill entry (`use.md` §1 rule 2, +0x10): its
+    /// list's current entry when it has a list, else
+    /// [`Pending::used_skill`].
+    pub fn used_skill_of(&self, unit: UnitId) -> Option<crate::skills::SkillEntry> {
+        match self.skill_lists.get(&unit) {
+            Some(l) => l.current.and_then(|i| l.view().get(i).copied()),
+            None => self.x.used_skill(unit),
+        }
+    }
+}
+
 impl<X> ActionHooks<X> {
     pub fn new(tables: Arc<ActionTables>, drlg: DrlgWorld, game_seed: Seed, x: X) -> Self {
         Self {
