@@ -36,15 +36,15 @@
 |   5. A2Q3 Tainted Sun (chain 10, slot 11) | 406–534 |
 |   6. A2Q4 Arcane Sanctuary (chain 11, slot 12) | 535–657 |
 |   7. A2Q5 The Summoner (chain 12, slot 13) | 658–693 |
-|   8. A2Q6 The Seven Tombs (chain 13, slot 14) | 694–868 |
-|   9. Act II gossip and intro records | 869–877 |
-|   10. Hooks called from other systems | 878–894 |
-| Constants & data dependencies | 895–908 |
-| Randomness | 909–923 |
-| Edge cases & original bugs | 924–957 |
-| Test vectors | 958–978 |
-| Provenance | 979–1001 |
-| Open questions | 1002–1089 |
+|   8. A2Q6 The Seven Tombs (chain 13, slot 14) | 694–883 |
+|   9. Act II gossip and intro records | 884–892 |
+|   10. Hooks called from other systems | 893–909 |
+| Constants & data dependencies | 910–923 |
+| Randomness | 924–938 |
+| Edge cases & original bugs | 939–972 |
+| Test vectors | 973–993 |
+| Provenance | 994–1016 |
+| Open questions | 1017–1104 |
 <!-- /index -->
 
 ## Summary
@@ -825,7 +825,10 @@ Its trigger code `trs ` is not an item code in the 1.14d tables
 - Event 11 (`0x0059CB20`):
   - tyrael1 251 msg **302**, not-intro, +0x0F = 0: +0x3C := 1; a portal
     object (class 59) to level 40 at the player's position in the
-    player's room (`0x0056D130`); created → state := 4; for each player
+    player's room (`0x0056D130`, owner the player, exact 0: the pair of
+    `world/objects-2.md` §25, the Lut Gholein half placed by the portal
+    check below because +0x3C is 1 during the call; owner GUID stays
+    −1); created → state := 4; for each player
     from Tyrael: in level 73 without 14.13, 14.3, 14.4 → set 14.13,
     14.3 and character progression for Act II (`0x00538680(client, 2,
     difficulty)`; save spec) (`0x0059C860`); players with 14.13 → their
@@ -864,7 +867,19 @@ Its trigger code `trs ` is not an item code in the 1.14d tables
 - Portal check `quests.md` §8.3 (`0x0059DFD0`): while +0x3C = 1 the
   destination is the Act II spawn location of type 12 in level 40
   (`0x0061B060(act, 40, 12, …, 3)`, `0x0052D0F0`), then a free spot
-  (`0x0064E7E0`, size 3, mask 0xBE11, radius 7).
+  (`0x0064E7E0`, size 3, mask 0xBE11, step 7) whose point is dropped:
+  the partner portal goes to the free point (step 5) nearest the raw
+  tile-12 point (`world/objects-2.md` §25 rules 11–13).
+- Placement in Duriel's Lair (level 73, lvlprest 481 `Act2/Tomb/
+  Duriel.ds1`, one file): no quest rule; the DS1 presets
+  (`drlg/preset.md` §5.3, §7–§9) give tyrael1 (monpreset act II row 57)
+  at DS1 sub-tile (78, 88), duriel (row 19) at (135, 218) and Tyrael's
+  door 153 (object preset act II id 15) at (110, 207), all unfiltered
+  (§7 draws for none of them). Door 153 has `OperateFn` 0 and no
+  `Selectable` mode: only Duriel's death opens it (above; init 38,
+  §8.8). Measured 2026-10-08 on the DS1 of `d2exp.mpq` (46 records;
+  the `d2data.mpq` copy, 40 records, has the same three); whether
+  `Patch_D2.mpq` (no listfile) overrides the file was not checked.
 
 ### 9. Act II gossip and intro records
 

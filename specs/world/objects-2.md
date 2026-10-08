@@ -17,25 +17,26 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 41–50 |
-| Inputs | 51–54 |
-| Outputs / state changes | 55–59 |
-| Rules | 60–61 |
-|   16. Operate functions, part 2 | 62–189 |
-|   17. Small init functions | 190–216 |
-|   18. Object events 0, 3, 8, 9, 10 | 217–284 |
-|   19. Obelisk completion (C→S 0x44, `0x00585240`) | 285–331 |
-|   20. Item drop helpers (open question 13) | 332–427 |
-|   21. Curable-state removal (`0x00578C20`, open question 15) | 428–440 |
-|   22. Object allocation modes (open question 8) | 441–489 |
-|   23. Client side of S→C 0x0E and 0x4D (open question 4) | 490–507 |
-|   24. Guards and corner cases of part 1 (read 2026-10-07) | 508–549 |
-| Constants & data dependencies | 550–553 |
-| Randomness | 554–568 |
-| Edge cases & original bugs | 569–593 |
-| Test vectors | 594–610 |
-| Provenance | 611–637 |
-| Open questions | 638–641 |
+| Summary | 42–51 |
+| Inputs | 52–55 |
+| Outputs / state changes | 56–60 |
+| Rules | 61–62 |
+|   16. Operate functions, part 2 | 63–190 |
+|   17. Small init functions | 191–217 |
+|   18. Object events 0, 3, 8, 9, 10 | 218–285 |
+|   19. Obelisk completion (C→S 0x44, `0x00585240`) | 286–332 |
+|   20. Item drop helpers (open question 13) | 333–428 |
+|   21. Curable-state removal (`0x00578C20`, open question 15) | 429–441 |
+|   22. Object allocation modes (open question 8) | 442–490 |
+|   23. Client side of S→C 0x0E and 0x4D (open question 4) | 491–508 |
+|   24. Guards and corner cases of part 1 (read 2026-10-07) | 509–550 |
+|   25. Portal pair creation (`0x0056D130`, `0x0056CF40`) | 551–642 |
+| Constants & data dependencies | 643–646 |
+| Randomness | 647–661 |
+| Edge cases & original bugs | 662–686 |
+| Test vectors | 687–709 |
+| Provenance | 710–744 |
+| Open questions | 745–748 |
 <!-- /index -->
 
 ## Summary
@@ -547,6 +548,98 @@ each is settled from the 1.14d function named.
    refill that adds a charge, also when the mode rule sets no mode;
    after a mode set they repeat it (no second effect).
 
+### 25. Portal pair creation (`0x0056D130`, `0x0056CF40`)
+
+`0x0056D130(ECX game, EDX owner unit or null, room, x, y, level, out,
+class, exact)` (`ret 0x1C`) creates a pair of portal objects: object 1
+at (x, y) in the caller's act, object 2 in `level`, linked to each
+other. Returns 1 when both exist, else 0. Callers (12): NPC travel in
+the same act `0x0054B8F3` (class 59, owner the player, `world/npc.md`
+§8.3), the portal shrine effect 17 `0x00582AA8` (`world/objects.md` §9.2), quest
+code `0x0058B01D`, `0x0058BD33`, `0x00592DE8`, `0x005933EB`,
+`0x00594228` (cow portal), `0x005964D3`, `0x0059B0E7`, `0x0059CBA8`
+(Tyrael, `world/quests-act2.md` §8.11), `0x005A99BD`, and the town portal
+cast `0x005BE290` at `0x005BE32A` (its use path: `skills/bodies-3.md` §4.4).
+
+1. Room null → fatal 0xE42 (`0x0056D147`).
+2. `out` ≠ null → *out := null.
+3. Town refusal: owner ≠ null and the room is in a town (`0x0061AB00`)
+   and not (level ∈ {39, 133, 134, 135, 136} and class = 60) → sound
+   event 24 on the owner (`0x00553380(owner, 24, owner)`, `notintown`,
+   `audio/triggers-2.md`), return 0.
+4. Act of `level` ≠ act of the room's level → fatal 0xE5C (`0x0056D1E1`):
+   a portal never leads to another act.
+5. Spot: (x, y) as given when `exact` ≠ 0; else the field search
+   `0x0064E810(room, &(x, y), origin (x, y), size 3, mask 0x3E01, field
+   mask 0xC01, no fallback)` (`sim/path-placement.md` §7.1, §7.2), none
+   → return 0. Then the cell lookup `0x00463740` of (x, y) **from the
+   argument room** (the room the search found is only tested); none →
+   return 0. Call that room R1.
+6. Object 1 := `0x00555230` (type 2, `class`, x, y, R1, flags 1, mode 1,
+   GUID 0; `0x0056D249`). *out := object 1. Mode set `0x00624690(object
+   1, 1)` (already mode 1: update mark only). Its init (§3) runs inside
+   the allocation: class 59 init 11 sets its destination (data +0x04) to
+   the town of R1's act; class 60 init 12 to its level map
+   (`world/objects.md` §5.5).
+7. Object 2 := `0x0056CF40(game, object 1, level, R1's level)` (rules
+   9–15); none → return 0 (object 1 is already freed then).
+8. Object 2's portal flags (data +0x05) |= 3 (again, after rule 14);
+   the "has portal" flag of R1's DRLG room and of object 2's room
+   (`0x0061AED0(room, 0)`, `drlg/rooms.md` §8 rule 1: the rooms are not
+   freed while it is set). Return 1.
+
+`0x0056CF40(ECX game, object 1, level, source level)` (`ret 0xC`):
+
+9. S := `0x0061B060(act of level's record, level, tile index 11, &sx,
+   &sy, size 3)` (`sim/path-placement.md` §11); populate S
+   (`0x0052D0F0`) **before** the null test (`monsters/population.md`
+   §1 rule 2).
+10. S null → remove object 1 (`0x0061A270(object 1's room, 2, its
+    GUID)`, free `0x00555600`), return 0.
+11. Point p := (sx, sy). Arrival hook `0x00545830(game, &p, source
+    level, &R)` (`world/quests.md` §8.3): only source level 73 runs
+    `0x0059DFD0`: when chain 13's record has +0x3C = 1 (Tyrael's flag,
+    `world/quests-act2.md` §8.11), T := `0x0061B060(act II record (game
+    +0xC0), 40, tile index 12, &tx, &ty, 3)`; T found → populate T, then
+    free point `0x0064E7E0(T, &p, 3, mask 0xBE11, step 7)` from p (the
+    tile-11 point); found room F → p := (tx, ty) (the raw tile-12 spawn
+    point; the free point found is dropped), R := F, hook result 1.
+    Otherwise result 0 and p, R unchanged.
+12. Hook result 1 → R := cell lookup of p from R (`0x00463740`); else R
+    := S. R null → R := S, p := (sx, sy).
+13. Free point `0x0064E7E0(R, &p, 3, mask 0xBE11, step 5)`; found → R :=
+    its room. Not found → R := a second `0x0061B060(level, 11, size 3)`
+    (it may draw again), or S when that returns null; p stays as given
+    to the failed search (§7.2 rule 4). (The fatal 0xE08 after it is
+    unreachable: S ≠ null.)
+14. Object 2 := `0x00555230` (type 2, class = object 1's class, p, R,
+    flags 1, mode 2, GUID 0; `0x0056D092`); null → remove and free
+    object 1 as rule 10, return 0. Object 2's destination (data +0x04)
+    := the level of object 1's room (> 255 → fatal 0xE2B); portal flags
+    |= 3; mode set `0x00624690(object 2, 2)` (update mark only).
+15. Link (`0x00553590(object 1, object 2)`): each object's data +0x20 /
+    +0x24 := the other's position x / y, and +0x18 / +0x1C := the tile
+    x / y of the other's room (`0x00619730` words 4 and 5; skipped when
+    the other has no room). Partner (`0x00621CE0`, both ways): unit
+    +0x94 := the other's type, +0x98 := the other's GUID, flag-ex
+    (+0xC8) |= 0x400; a unit with a stat list (+0x5C ≠ 0) also gets
+    state 98 and stats 353 / 354 holding the type and GUID. Return
+    object 2.
+
+Neither function sets the owner GUID (timer argument, `world/objects.md`
+§1, read by §12 rule 4): it stays −1 unless the caller writes it (the
+town portal cast `0x005BE290` does after the call). Draws: `world/cube.md`
+open question 4 (one game-seed step per object, plus the level build
+and population of rules 9, 11 and 13).
+
+Tyrael's portal (`0x0059CBA8`): owner the player, the player's room
+and position, level 40, class 59, exact 0, out null. Object 1 stands at
+the free spot nearest the player in Duriel's Lair (73), destination 40
+(init 11: town of act II); object 2 stands in Lut Gholein at the free
+point (mask 0xBE11, step 5) nearest its tile-12 spawn point (rule 11,
+because +0x3C is 1 during the call), destination 73. Travel through it
+is §12 of `world/objects.md` with partner L = object 2.
+
 ## Constants & data dependencies
 
 Listed in `world/objects.md` (Constants & data dependencies).
@@ -607,6 +700,12 @@ Listed in `world/objects.md` (Constants & data dependencies).
 | well, `Parm1` 0, `Parm3` 3, P life 10 of max 20 (8.8), mana and stamina full | life written 10 (unchanged), used: charges 2 → 1, mode 1 | §24 rule 5 |
 | preset 580, init leaves mode 0 | no draw, O queued, flag 0x1 (0x0E sent) | §24 rule 1 |
 | population / evilhut / barricade object | allocated in mode 0 | §22 rule 4 |
+| `0x0056D130`, owner P in a town room, level 1, class 59 | sound 24 on P, result 0, no object | §25 rule 3 |
+| same, level 39, class 60 (cow portal from Rogue Encampment) | town test passed; pair created | §25 rule 3 |
+| destination level in another act | fatal 0xE5C | §25 rule 4 |
+| pair created | object 1 mode 1, object 2 mode 2, both class `class`; object 2 +0x04 = object 1's level; each +0x94/+0x98 = the other's type/GUID; each +0x20/+0x24 = the other's position; object 2 portal flags & 3 = 3; owner GUID −1 on both | §25 rules 6, 14, 15 |
+| Tyrael (msg 302) from level 73, chain 13 +0x3C = 1 | object 2 in level 40 at the free point (mask 0xBE11, step 5) nearest the tile-12 spawn point | §25 rule 11 |
+| spawn search of rule 9 returns none | object 1 removed and freed; result 0 | §25 rule 10 |
 
 ## Provenance
 
@@ -634,6 +733,14 @@ The §16–§18 bullet of `world/objects.md` Provenance; §18.6 from
   `0x00551BA7`, `0x0056D092`, `0x00588A3B`, `0x0059D969`).
 - §24: `0x0054F370`, `0x005868A0`, `0x00582DA0`, `0x00581620`,
   `0x00585720`, `0x00581510`, `0x00624690`.
+- §25 (read 2026-10-08): `0x0056D130` (`0x0056D130`–`0x0056D2BC`),
+  `0x0056CF40` (`0x0056CF40`–`0x0056D12B`), `0x00545830`, `0x0059DFD0`,
+  `0x00553590`, `0x00619730`, `0x00621CE0`/`0x00621C30`, `0x0061AED0`/
+  `0x0061BAC0`, `0x00552AF0`/`0x00552B10` (owner set / get); the 12 call
+  sites of `0x0056D130` from `all.asm`; Tyrael's pushes at
+  `0x0059CB7A`–`0x0059CBA8`; the town portal cast's owner writes at
+  `0x005BE366`, `0x005BE380`. D2MOO 1.10f `D2GAME_CreatePortalObject_6FD13DF0`
+  gave the name only.
 
 ## Open questions
 

@@ -506,9 +506,9 @@ addresses.)
 |---|---|---|---|
 | warriv1 155 | any ∉ 1–3 | slot 6 bit 0 | act change to level 40 (`0x0054B830(40, 0)`), `0x005467E0(npc, 40, 1)` (`quests.md` §8.1), activate level 40's waypoint (`0x00660E00`, `0x00660EC0`; `waypoints.md`) |
 | warriv2 175 | any ∉ 1–3 | none | `0x0054B830(1, 5)` |
-| meshif1 210 | 0 | slot 14 bit 0 | level 75, `0x005467E0(npc, 75, 40)`, waypoint 75 |
+| meshif1 210 | 0 | slot 14 bit 0 | level 75 (`0x0054B830(75, 0)`), `0x005467E0(npc, 75, 40)`, waypoint 75 |
 | meshif2 264 | 0 | none | `0x0054B830(40, 5)` |
-| tyrael2 367 | 0 | expansion and slot 26 bit 0 | level 109, `0x005467E0(npc, 109, 103)`, waypoint 109 |
+| tyrael2 367 | 0 | expansion and slot 26 bit 0 | level 109 (`0x0054B830(109, 0)`), `0x005467E0(npc, 109, 103)`, waypoint 109 |
 | cain6 520 | 0 | none | `0x0054B830(103, 5)` |
 
 The three calls of a row run in the order listed (`0x0057A67A`,
@@ -519,7 +519,7 @@ player, level, arg)`: level 0 → warp to the town of the player's act
 (`0x0061AB70`) with arg; level in the player's act → a town-portal
 object (class 59) at the player's (x − 5, y) leading to it
 (`0x0056D130`); else the warp `0x0053AEC0(level, arg)`
-(`waypoints.md` §7 rule 5). Every §8.3 destination is in another act,
+(`waypoints.md` §7 rule 5, the act change §11; the argument is the spawn tile index). Every §8.3 destination is in another act,
 so only the warp runs.
 
 ### 9. S→C 0x2A NPC transaction (15 bytes)
