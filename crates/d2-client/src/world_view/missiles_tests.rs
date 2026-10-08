@@ -143,7 +143,7 @@ impl Run {
     }
 }
 
-// Covers: specs/missiles/missiles.md §R4.1; specs/sim/intents-events.md §7.6 r1
+// Covers: specs/missiles/missiles.md §r4-1-movement-in-fixed-point
 #[test]
 fn a_fire_bolt_cast_shows_a_missile_that_moves_each_tick() {
     let mut w = world();
@@ -164,7 +164,7 @@ fn a_fire_bolt_cast_shows_a_missile_that_moves_each_tick() {
     assert_eq!((x2 - x1, y2 - y1), (16, 8), "{t1:?} {t2:?}");
 }
 
-// Covers: specs/missiles/missiles.md §R4.1
+// Covers: specs/missiles/missiles.md §r4-1-movement-in-fixed-point
 #[test]
 fn the_missile_explodes_at_the_end_of_its_range_and_leaves() {
     let mut w = world();
@@ -179,7 +179,7 @@ fn the_missile_explodes_at_the_end_of_its_range_and_leaves() {
     assert_eq!(r.m.live(), 0, "all effects have ended");
 }
 
-// Covers: specs/missiles/missiles.md §R4.1
+// Covers: specs/missiles/missiles.md §r4-1-movement-in-fixed-point
 #[test]
 fn the_missile_stops_at_a_monster_on_its_way() {
     let mut w = world();
