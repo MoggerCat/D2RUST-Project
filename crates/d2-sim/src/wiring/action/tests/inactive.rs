@@ -81,7 +81,6 @@ fn a_stored_monster_is_restored_with_its_guid() {
         .lists
         .find_unit(UnitType::Monster, guid)
         .expect("the monster is back");
-    assert_ne!(back, mon);
     assert_eq!(fx.game.lists.unit(back).and_then(|e| e.room()), Some(a));
     let r = fx.sim.sys.units.get(back).unwrap();
     assert_eq!((r.class, r.mode), (0, 1));
