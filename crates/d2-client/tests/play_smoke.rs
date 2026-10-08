@@ -239,6 +239,7 @@ struct Run {
     ms: Arc<AtomicU32>,
     wire: Arc<Mutex<Wire>>,
     frames: usize,
+    character: single_player::Character,
 }
 
 impl Run {
@@ -259,6 +260,15 @@ impl Run {
     /// built game before the join.
     fn start_on(data: GameData, install: fn(&mut single_player::Sim)) -> Self {
         let character = single_player::new_character("sorceress", "Smoke").unwrap();
+        Self::start_as(data, character, install)
+    }
+
+    /// [`Self::start_on`] with `character` (a new one, or a save).
+    fn start_as(
+        data: GameData,
+        character: single_player::Character,
+        install: fn(&mut single_player::Sim),
+    ) -> Self {
         let ms = Arc::new(AtomicU32::new(1000));
         let clock = StepClock(ms.clone());
         let built = character.clone();
@@ -354,6 +364,7 @@ impl Run {
             ms,
             wire,
             frames: 0,
+            character,
         };
         while app_support::local_player(&run.server).is_none() {
             run.step(1);
@@ -865,6 +876,74 @@ fn five_act_set() -> test_fixtures::synth::Synthetic {
             }
         }
     }
+    // A Town Portal scroll: type `scro` (1.14d row 22, `items::ty::SCRO`),
+    // code `tsc` (the item-use stand-in of REC-117), one in the
+    // sorceress' start items.
+    s.tables.row(
+        "itemtypes",
+        &[
+            ("code", "scro"),
+            ("equiv1", "misc"),
+            ("storepage", "misc"),
+            ("body", "0"),
+            ("normal", "1"),
+            ("rarity", "3"),
+        ],
+    );
+    s.tables.row(
+        "misc",
+        &[
+            ("code", "tsc"),
+            ("namestr", "tsc"),
+            ("type", "scro"),
+            ("level", "0"),
+            ("invwidth", "1"),
+            ("invheight", "1"),
+            ("stackable", "0"),
+            ("cost", "25"),
+            ("spawnable", "1"),
+            ("useable", "1"),
+        ],
+    );
+    for (c, v) in [("item3", "tsc"), ("item3count", "1")] {
+        s.tables.set("charstats", 1, c, v);
+    }
+    // `objects` row 59, the town portal (1.14d's TownPortal; operate 15,
+    // init 11 as the synthetic game's, `object-functions.tsv`), the rows
+    // before it padded.
+    {
+        let f = s.tables.files.get_mut("objects.txt").unwrap();
+        let col = |f: &test_fixtures::synth::TxtFile, n: &str| {
+            f.columns
+                .iter()
+                .position(|c| c.eq_ignore_ascii_case(n))
+                .unwrap()
+        };
+        let name = col(f, "Name");
+        let blank = vec![String::new(); f.columns.len()];
+        while f.rows.len() < 59 {
+            let mut r = blank.clone();
+            r[name] = format!("pad{}", f.rows.len());
+            f.rows.push(r);
+        }
+        let mut r = blank.clone();
+        for (c, v) in [
+            ("Name", "TownPortal"),
+            ("Token", "TP"),
+            ("SizeX", "1"),
+            ("SizeY", "1"),
+            ("FrameCnt1", "15"),
+            ("Selectable0", "1"),
+            ("Selectable1", "1"),
+            ("OperateRange", "4"),
+            ("OperateFn", "15"),
+            ("InitFn", "11"),
+        ] {
+            r[col(f, c)] = v.into();
+        }
+        f.rows.truncate(59);
+        f.rows.push(r);
+    }
     // `itemtypes` on 1.14d's row numbers: the game reads some types by
     // row (`items::ty`: gold 4, play 7, weap 45, armo 50, misc 52); the
     // base set's rows are in its own order (gold on row 7, the ear type),
@@ -888,6 +967,7 @@ fn five_act_set() -> test_fixtures::synth::Synthetic {
             "weap" => Some(45),
             "armo" => Some(50),
             "misc" => Some(52),
+            "scro" => Some(22),
             _ => None,
         };
         let mut rows: Vec<Vec<String>> = (0..75)
@@ -1097,7 +1177,7 @@ impl Run {
 fn the_live_run() {
     let dir = five_act_install("live");
     let data = GameData::select(Some(&dir), false).unwrap();
-    let mut run = Run::start_on(data, |_| {});
+    let mut run = Run::start_on(data.clone(), |_| {});
     run.walk_into(1, 2);
     run.step(20);
     run.check("Blood Moor");
@@ -1208,6 +1288,134 @@ fn the_live_run() {
         .find(|i| i.mode == 1 && i.body == 4)
         .map(|i| i.key.guid);
     assert_eq!(worn, Some(weapon), "the weapon is worn again");
+
+    // Level up: more beasts until level 2 (100 experience, 63 a beast),
+    // searching deeper into the Blood Moor when none is near.
+    let rect = run.level_rect(2);
+    let centre = (
+        (rect.x + rect.w / 2) * test_fixtures::host::SUB,
+        (rect.y + rect.h / 2) * test_fixtures::host::SUB,
+    );
+    for _ in 0..30 {
+        if run.player_stat(12) >= 2 {
+            break;
+        }
+        match run.monsters_near().first().copied() {
+            Some(m) => {
+                assert!(run.kill(m), "a beast died");
+                run.step(20);
+                run.check("kill");
+            }
+            None => {
+                // Toward the level's centre first, then the other
+                // directions, until a leg moves (a blocked path stays).
+                let p = run.pos();
+                let toward = (
+                    (centre.0 - p.0).signum() * 15,
+                    (centre.1 - p.1).signum() * 15,
+                );
+                let dirs = [
+                    toward,
+                    (15, 0),
+                    (0, 15),
+                    (-15, 0),
+                    (0, -15),
+                    (15, 15),
+                    (-15, 15),
+                    (15, -15),
+                    (-15, -15),
+                ];
+                for d in dirs {
+                    run.leg((p.0 + d.0, p.1 + d.1));
+                    if test_fixtures::host::cheb(run.pos(), p) > 3 {
+                        break;
+                    }
+                }
+                run.settle();
+            }
+        }
+    }
+    assert_eq!(run.player_stat(12), 2, "level 2");
+    let (points, skills) = (run.player_stat(4), run.player_stat(5));
+    assert!(
+        points >= 5 && skills >= 1,
+        "points {points}, skill points {skills}"
+    );
+    // Spend: strength + 1 (C→S 0x3A stat 0, count − 1 = 0), Firebolt
+    // (skill 2, the sorceress' class skill) + 1 (0x3B).
+    let str0 = run.player_stat(0);
+    run.bridge().send_bytes(&[0x3A, 0, 0]).unwrap();
+    run.bridge().send_bytes(&[0x3B, 2, 0]).unwrap();
+    run.step(6);
+    run.check("spend points");
+    assert_eq!(run.player_stat(0), str0 + 1, "strength");
+    assert_eq!(run.player_stat(4), points - 1, "a stat point spent");
+    assert_eq!(run.player_stat(5), skills - 1, "a skill point spent");
+    let firebolt = {
+        let w = run.app.world().resource::<BridgeResource>().0.world();
+        w.local()
+            .and_then(|p| p.skills.as_ref())
+            .map(|l| format!("{l:?}"))
+    };
+    assert!(
+        firebolt.is_some_and(|l| l.contains("skill: 2,")),
+        "the client learned Firebolt (S→C 0x21)"
+    );
+
+    // Town Portal: the start scroll used (C→S 0x20 at the player's
+    // position), the field portal reaches the client (S→C 0x51), a click
+    // on it (0x13) takes the player to the Rogue Encampment.
+    let scroll = run
+        .local_items()
+        .into_iter()
+        .find(|i| i.code == Some(*b"tsc "))
+        .expect("the start scroll")
+        .key
+        .guid;
+    let p = run.pos();
+    run.bridge()
+        .send(&d2_client::bridge::items::use_grid(
+            scroll, p.0 as u32, p.1 as u32,
+        ))
+        .unwrap();
+    run.step(10);
+    run.check("read the scroll");
+    let portal = {
+        let w = run.app.world().resource::<BridgeResource>().0.world();
+        w.units
+            .iter()
+            .find(|(k, u)| k.unit_type == 2 && u.class == 59 && u.position.is_some())
+            .map(|(k, _)| *k)
+    };
+    let portal = portal.expect("the field portal in the client model");
+    // The portal's hostile delay (`objects.md` §12 rule 2) has passed.
+    run.ms.fetch_add(10_000, Ordering::SeqCst);
+    run.bridge().interact(portal).unwrap();
+    run.until("the town", 400, |r| r.server_level() == Some(1));
+    run.step(20);
+    run.check("through the portal");
+
+    // Save and exit, as `play::run` does on every way out (`save::share`'s
+    // save: the running game read, applied over the base, written with
+    // the install's `.d2s` tables), then load the file and join again.
+    let GameData::Live(live) = &data else {
+        unreachable!("a live run")
+    };
+    let path = dir.join("Smoke.d2s");
+    let before = run.snapshot();
+    {
+        use d2_client::app::save;
+        let base = save::base_save(&run.character);
+        let got = app_support::with(&run.server, |l| save::read_live(&mut l.host_mut().game));
+        let d2s = save::apply_live(&base, &got.expect("the live read"), 0);
+        save::write_file(&path, &d2s, &live.save).expect("the save written");
+    }
+    drop(run);
+    let character = single_player::load_character(&data, &path, 0).expect("the save loads");
+    let mut run = Run::start_as(data.clone(), character, |_| {});
+    run.check("join the saved character");
+    let after = run.snapshot();
+    assert_eq!(after, before, "the loaded character is the saved one");
 }
 
 impl Run {
@@ -1241,6 +1449,35 @@ impl Run {
     fn ground_items(&self) -> Vec<d2_client::bridge::items::ItemView> {
         let w = self.app.world().resource::<BridgeResource>().0.world();
         d2_client::bridge::items::ground_items(w)
+    }
+
+    /// What a save keeps of the server player: level, experience, the
+    /// stats, gold, its class skills' levels and its items (code, mode,
+    /// body location), sorted.
+    fn snapshot(&self) -> (Vec<(u16, i32)>, Vec<(u16, i32)>, Vec<([u8; 4], u8, u8)>) {
+        let stats = [0u16, 1, 2, 3, 4, 5, 12, 13, 14]
+            .iter()
+            .map(|&s| (s, self.player_stat(s)))
+            .collect();
+        let skills = app_support::with(&self.server, |l| {
+            let g = &mut l.host_mut().game;
+            let (p, _) = single_player::local_player(g).unwrap();
+            let h = g.events.action.hooks();
+            let mut v: Vec<(u16, i32)> = h
+                .skill_lists
+                .get(&p)
+                .map(|l| l.entries.iter().map(|e| (e.skill, e.base)).collect())
+                .unwrap_or_default();
+            v.sort();
+            v
+        });
+        let mut items: Vec<([u8; 4], u8, u8)> = self
+            .local_items()
+            .into_iter()
+            .filter_map(|i| Some((i.code?, i.mode, i.body)))
+            .collect();
+        items.sort();
+        (stats, skills, items)
     }
 
     /// The local player's items (`bridge::items::local_items`).
