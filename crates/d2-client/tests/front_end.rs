@@ -230,3 +230,81 @@ fn logo_frames() {
     assert_eq!(logo_frame(1000, 0), 25);
     assert_eq!(logo_frame(1160, 0), 0);
 }
+
+mod loading {
+    use d2_client::ui::front_end::screens::loading::*;
+
+    fn run(evs: &[LoadEvent]) -> LoadingScreen {
+        let mut s = LoadingScreen::new();
+        for e in evs {
+            s.event(*e);
+        }
+        s
+    }
+
+    #[test]
+    fn game_start_frames() {
+        let mut s = run(&[
+            LoadEvent::GameStart,
+            LoadEvent::S01,
+            LoadEvent::S03 { act: 0 },
+        ]);
+        assert!(!s.wants_input());
+        assert_eq!(s.frame(true), None); // no 0x04 yet
+        s.event(LoadEvent::S04);
+        assert_eq!(s.frame(false), None); // no placed player
+        s.frame(true);
+        s.frame(true);
+        assert_eq!(
+            s.presented,
+            [
+                Presented::Loading { frame: 0 },
+                Presented::Loading { frame: 1 },
+                Presented::Black,
+                Presented::World { act: 0 },
+            ]
+        );
+        assert!(s.wants_input());
+    }
+
+    #[test]
+    fn act_change_frames_and_video() {
+        let mut s = run(&[
+            LoadEvent::GameStart,
+            LoadEvent::S03 { act: 0 },
+            LoadEvent::S04,
+        ]);
+        s.frame(true);
+        s.frame(true);
+        s.presented.clear();
+        s.event(LoadEvent::S05);
+        assert_eq!(s.frame(true), None); // game draws stop
+        s.event(LoadEvent::S03 { act: 1 });
+        s.event(LoadEvent::S61 { id: 2 });
+        s.event(LoadEvent::S04);
+        s.frame(true);
+        s.frame(true);
+        assert_eq!(s.videos, [2]);
+        assert_eq!(
+            s.presented,
+            [
+                Presented::Loading { frame: 0 },
+                Presented::Black,
+                Presented::World { act: 1 },
+            ]
+        );
+    }
+
+    #[test]
+    fn clamp_placement_path() {
+        let mut s = LoadingScreen::new();
+        for _ in 0..12 {
+            s.event(LoadEvent::S03 { act: 0 });
+        }
+        assert_eq!(s.presented[11], Presented::Loading { frame: 9 });
+        assert_eq!(placement(800, 600), (272, 428));
+        assert_eq!(placement(640, 480), (192, 368));
+        assert_eq!(art_path(3), r"DATA\LOCAL\UI\LoadingScreen");
+        assert_eq!(video_name(5), Some("ACT04END"));
+    }
+}
