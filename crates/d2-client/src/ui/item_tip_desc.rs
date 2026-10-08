@@ -58,6 +58,8 @@ pub struct StatDesc {
     pub op_param: u8,
     pub op_base: u16,
     pub valshift: u8,
+    /// `op stat1` … `op stat3` (the op targets).
+    pub op_stats: [u16; 3],
 }
 
 /// The `charstats` strings of a class (§7.2 f 13, 14, 27).

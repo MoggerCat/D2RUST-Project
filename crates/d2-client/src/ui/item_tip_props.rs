@@ -80,6 +80,41 @@ impl StatList {
     }
 }
 
+/// The list values of one stream list (`items/bitstream.md` §4.6 r4):
+/// (stat, param, value). A stat's own entry is sent as value >>
+/// `ValShift` (`valshift`); the partners written after 17, 48, 50, 52,
+/// 54, 57 (r4.3) are sent unshifted.
+pub fn stream_values(
+    stats: &[d2_proto::item_bits::Stat],
+    valshift: impl Fn(u16) -> u8,
+) -> Vec<(u16, u32, i32)> {
+    let mut out = Vec::with_capacity(stats.len());
+    let mut partners: &[u16] = &[];
+    for s in stats {
+        let partner = partners.first() == Some(&s.stat);
+        partners = if partner {
+            &partners[1..]
+        } else {
+            match s.stat {
+                17 => &[18],
+                48 => &[49],
+                50 => &[51],
+                52 => &[53],
+                54 => &[55, 56],
+                57 => &[58, 59],
+                _ => &[],
+            }
+        };
+        let v = s.value() as i32;
+        out.push((
+            s.stat,
+            s.param,
+            if partner { v } else { v << valshift(s.stat) },
+        ));
+    }
+    out
+}
+
 /// What §6 reads of the item beyond its lists.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct PropItem {

@@ -284,3 +284,22 @@ fn elixir_text_by_file_index() {
     };
     assert_eq!(multi(&n, &none, &StatList::default()), "");
 }
+
+// Own entries are shifted back by `ValShift`; the partners after a
+// grouped stat are not.
+// Covers: specs/items/bitstream.md §4.6 r4
+#[test]
+fn stream_values_shift_own_entries_not_partners() {
+    let st = |stat, raw| d2_proto::item_bits::Stat {
+        stat,
+        param: 0,
+        raw,
+        save_add: 0,
+    };
+    let shift = |s: u16| if s == 7 || s == 49 { 8 } else { 0 };
+    let got = stream_values(&[st(48, 10), st(49, 16), st(7, 3), st(49, 2)], shift);
+    assert_eq!(
+        got,
+        vec![(48, 0, 10), (49, 0, 16), (7, 0, 3 << 8), (49, 0, 2 << 8)]
+    );
+}

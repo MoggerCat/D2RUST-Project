@@ -163,17 +163,18 @@ impl crate::bridge::item_lists::StreamProps for TableDecoder {
         // with the property lists. PROVISIONAL (REC-281, stat-lists.md
         // open question 2): durability, quantity and sockets are left
         // out (no total reads them).
+        // `bitstream.md` §4.6 r4.3: grouped partners are sent unshifted.
+        let shift = |s: u16| t.valshift.get(usize::from(s)).copied().unwrap_or(0);
         let props = b
             .defense
             .iter()
-            .chain(b.lists.iter().flatten().flatten())
-            .map(|s| {
-                let shift = t.valshift.get(usize::from(s.stat)).copied().unwrap_or(0);
-                crate::bridge::item_lists::ItemProp {
-                    stat: s.stat,
-                    layer: s.param as u16,
-                    value: (s.value() as i32) << shift,
-                }
+            .map(|d| vec![*d])
+            .chain(b.lists.iter().flatten().cloned())
+            .flat_map(|list| crate::ui::item_tip_props::stream_values(&list, shift))
+            .map(|(stat, layer, value)| crate::bridge::item_lists::ItemProp {
+                stat,
+                layer: layer as u16,
+                value,
             })
             .collect();
         (props, charm)
