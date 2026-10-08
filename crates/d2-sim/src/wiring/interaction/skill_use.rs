@@ -138,6 +138,36 @@ pub struct UseView<'a, X> {
     pub cv: CombatView<'a, X>,
 }
 
+impl<X: Pending + UseRest> UseView<'_, X> {
+    /// The weapon-type test `0x00643F80` of `use_state` rule 5
+    /// (`client/stat-lists.md` §2 r8): the skill's `itypea1` against the
+    /// items at body locations 4 and 5, `etypea1` excluded.
+    // PROVISIONAL (REC-176): the spec names `itypea1` / `etypea1`; the
+    // columns `itypea2`, `itypea3` and `etypea2` are read the same way
+    // (a crossbow satisfies Magic Arrow's `itypea2`), and the hands
+    // combine as "some hand holds a wanted item that is not excluded".
+    // No wanted type (0xFFFF, or 0 of a blank test row) asks nothing.
+    fn weapon_type_ok(&self, u: UnitId, skill: i32) -> bool {
+        let Some(r) = self.cv.v.h.tables.skills.skill(skill) else {
+            return true;
+        };
+        let set = |v: u16| (v != 0 && v != 0xFFFF).then_some(i32::from(v));
+        let want: Vec<i32> = [r.itypea1, r.itypea2, r.itypea3]
+            .into_iter()
+            .filter_map(set)
+            .collect();
+        let not: Vec<i32> = [r.etypea1, r.etypea2].into_iter().filter_map(set).collect();
+        if want.is_empty() {
+            return true;
+        }
+        [4u8, 5].into_iter().any(|loc| {
+            self.item_at(u, loc).is_some_and(|i| {
+                want.iter().any(|&t| self.item_is(i, t)) && !not.iter().any(|&t| self.item_is(i, t))
+            })
+        })
+    }
+}
+
 impl<X: Pending + UseRest> ActionSim<X> {
     /// Runs `f` with the skill use pipeline's view (message handlers,
     /// the do / periodic event handlers, tests).
@@ -452,7 +482,11 @@ impl<X: Pending + UseRest> UseWorld for UseView<'_, X> {
         self.xm().set_attack_param4(u, v);
     }
     fn use_state(&mut self, u: UnitId, e: &SkillEntry) -> UseState {
-        self.xm().use_state(u, e)
+        let st = self.xm().use_state(u, e);
+        if st == UseState::Usable && !self.weapon_type_ok(u, e.skill) {
+            return UseState::NoQuantity;
+        }
+        st
     }
     /// `0x0056C3F0` (`bodies.md` §2.5).
     fn dec_quantity(&mut self, u: UnitId, _skill: i32) {
@@ -1257,7 +1291,27 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         }
     }
     fn mode_request(&mut self, m: UnitId, mode: i32, target: Option<UnitId>) -> i32 {
-        Pending::mode_request(self.xm(), m, mode, target)
+        let r = Pending::mode_request(self.xm(), m, mode, target);
+        // d2rs-own, unverified (q-skill-gaps, REC-176): without a host
+        // answer the request is the monster mode set `0x005A7E60` +
+        // `0x005A7C20` (`units.md` §4.6) itself, so a revived corpse
+        // stands up.
+        let monster = self
+            .cv
+            .v
+            .units
+            .get(m)
+            .is_some_and(|r| r.ty == UnitType::Monster);
+        match u32::try_from(mode) {
+            Ok(mode) if r == 0 && monster => {
+                if let Some(t) = target {
+                    let t = crate::monsters::ai::ModeTarget::Unit(t);
+                    self.cv.v.h.x.set_mode_target(m, t);
+                }
+                i32::from(self.cv.v.monster_set_mode(&mut *self.cv.game, m, mode))
+            }
+            _ => r,
+        }
     }
     /// An item unit is its own item handle here.
     fn as_item(&self, u: UnitId) -> Option<UnitId> {

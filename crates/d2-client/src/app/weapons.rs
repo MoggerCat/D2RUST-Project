@@ -59,6 +59,10 @@ pub struct ItemFacts {
     pub max_stack: i32,
     /// The grip (`0x0063D340`): 2 for a two-handed base item, else 1.
     pub grip: i32,
+    /// A shield (type `shld`), with its armor `mindam` / `maxdam`
+    /// (d2rs-own, unverified: q-skill-gaps, REC-176).
+    pub shield: bool,
+    pub dam: (i32, i32),
 }
 
 /// A player's hands.
@@ -99,6 +103,12 @@ impl Weapons {
             .map_or(class::HAND_TO_HAND, |f| f.class)
     }
 
+    /// The shield in the left hand (`0x0063C8F0`).
+    pub fn shield(&self, u: UnitId) -> Option<UnitId> {
+        let l = self.hands.get(&u)?.left?;
+        self.items.get(&l)?.shield.then_some(l)
+    }
+
     pub fn facts(&self, item: UnitId) -> ItemFacts {
         self.items.get(&item).cloned().unwrap_or_default()
     }
@@ -136,6 +146,7 @@ fn facts_of(t: &InvTables, record: usize) -> ItemFacts {
     let xbow = type_rows(t, &[b"xbow"]);
     let jave = type_rows(t, &[b"jave", b"ajav"]);
     let weap = type_rows(t, &[b"weap"]);
+    let shld = type_rows(t, &[b"shld"]);
     let (class, shoots) = if is_any(t, record, &bow) {
         (class::BOW, true)
     } else if is_any(t, record, &xbow) {
@@ -165,6 +176,10 @@ fn facts_of(t: &InvTables, record: usize) -> ItemFacts {
         stackable,
         max_stack,
         grip,
+        shield: is_any(t, record, &shld),
+        dam: t
+            .item(record)
+            .map_or((0, 0), |r| (i32::from(r.mindam), i32::from(r.maxdam))),
     }
 }
 
