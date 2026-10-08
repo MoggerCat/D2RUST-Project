@@ -6,7 +6,7 @@
 //! quest control after the tick (`after_tick`), as `0x005436B0`,
 //! `0x00543A30` and `0x00543B90` do.
 //!
-//! PROVISIONAL (REC-124): the original calls these from inside monster
+//! PROVISIONAL (REC-129): the original calls these from inside monster
 //! init, the kill and the warp; here they run once per tick after the
 //! tick's steps, in the order links, level changes, kills. `// d2rs-own,
 //! unverified`.
