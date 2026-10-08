@@ -689,8 +689,10 @@ fn a_new_client_drlg_drops_the_tile_draw_state() {
     m.w.frames += 1;
     let near = feed.near_rooms(&m.w).unwrap().unwrap();
     assert_ne!(near.rooms[0].floors[0].flags & REC_DRAWN, 0);
-    // A new act's DRLG whose room slots are the same: nothing carried.
-    m.w.drlg.as_mut().unwrap().drlg.act = 1;
+    // A new client DRLG (another 0x03; here the same act with a new init
+    // seed, so the act's tile libraries stay) whose room slots are the
+    // same: nothing carried.
+    m.w.drlg.as_mut().unwrap().drlg.init_seed ^= 1;
     m.w.frames += 1;
     let near = feed.near_rooms(&m.w).unwrap().unwrap();
     assert_eq!(near.rooms[0].floors[0].flags & REC_DRAWN, 0);
