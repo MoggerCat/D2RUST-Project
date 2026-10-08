@@ -71,7 +71,8 @@ the click dispatcher's walk-to-unit.
   host and implement the §3.4 restores (`sim/units.md`), or make the
   synthetic towns' units presets of their rooms. The smoke tests use a
   fresh game per act because of it.
-- **B3: the arrival walk-outs are not drawn (open question).** A warp
+- **B3: the arrival walk-outs are not drawn (open question).** Fixed
+  provisionally by q-fix-travel-arrivals (REC-288). A warp
   (`path-placement.md` §12.2 r5–6) and a Town Portal (`objects.md` §12
   r11) put the player at the arrival point and walk it out (S→C 0x0D
   code 1 to the walk target, then 0x15 at the arrival point); the server
@@ -83,9 +84,12 @@ the click dispatcher's walk-to-unit.
   `client/model.md` open question 2, settled by REC-51. The smoke checks
   the model position (placement) only.
 - **B4: the Kurast Docks town portal does not take the player back**
+  (q-fix-travel-arrivals: the smoke picked the field portal, in sight
+  across the Spider Forest border; fixed in the test)
   to Spider Forest (the server player stays in town after the click;
   Act I and Act V do the same flow and pass). Not diagnosed.
-- **B5: Meshif is not in the client model** at a Kurast Docks arrival
+- **B5: Meshif is not in the client model** (fixed by q-smoke-town's
+  REC-278; un-ignored by q-fix-travel-arrivals) at a Kurast Docks arrival
   by the act-change queue (the waypoint and the room's tiles are; the
   Act III NPCs are placed by `town_npcs::ACT3` offsets that may lie
   outside the rooms the client gets). Not diagnosed; may be B2.
