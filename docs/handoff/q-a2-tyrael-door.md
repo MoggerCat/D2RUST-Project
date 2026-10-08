@@ -1,6 +1,6 @@
 # q-a2-tyrael-door: the Lair's population, Tyrael's door and the portal walk
 
-Branch `claude/q-a2-tyrael-door`. Nothing verified against 1.14d (rule 10). Open point: REC-238 (`docs/HANDOFF.md` §7).
+Branch `claude/q-a2-tyrael-door`. Nothing verified against 1.14d (rule 10). Open point: REC-241 (`docs/HANDOFF.md` §7).
 
 ## Links connected
 | Link | Before | Now |
@@ -11,7 +11,7 @@ Branch `claude/q-a2-tyrael-door`. Nothing verified against 1.14d (rule 10). Open
 
 Test: `crates/d2-client/tests/app_a2_tyrael.rs` (placed units, door shut then open, portal walk ends in Lut Gholein).
 
-## PROVISIONAL (REC-238)
+## PROVISIONAL (REC-241)
 Positions, the free-spot rule, Duriel's AI started by the test. All `d2rs-own, unverified`.
 
 ## What's left

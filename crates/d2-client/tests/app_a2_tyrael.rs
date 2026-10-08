@@ -380,7 +380,7 @@ fn duriel_fights_tyrael_opens_the_portal_and_meshif_travels_east() {
     take(&mut app, into(a2::DURIELS_LAIR), a2::DURIELS_LAIR);
 
     // The Lair's population: Duriel, Tyrael and his door are there with
-    // no test spawn (REC-238).
+    // no test spawn (REC-241).
     for _ in 0..30 {
         step(&mut app);
     }

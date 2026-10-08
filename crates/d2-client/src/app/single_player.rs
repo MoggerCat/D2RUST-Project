@@ -1215,7 +1215,7 @@ impl WaypointTables {
         for (class, operate, init) in [
             (synthetic_act2::LAIR_ENTRANCE_CLASS, 0, 0),
             (synthetic_act2::ORIFICE_CLASS, 25, 21),
-            // Tyrael's door: init 38 (`quests-act2.md` §8.8), REC-238.
+            // Tyrael's door: init 38 (`quests-act2.md` §8.8), REC-241.
             (synthetic_act2::TYRAEL_DOOR_CLASS, 0, 38),
         ] {
             let c = class as usize;

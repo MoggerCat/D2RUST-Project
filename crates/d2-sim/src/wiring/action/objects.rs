@@ -1312,7 +1312,7 @@ impl<X: Pending> MiscWorld for ObjectView<'_, X> {
         if let Some(p) = self.v.h.x.object_level_spawn(self.game, level) {
             return Some(p);
         }
-        // PROVISIONAL (REC-238): a portal without a partner (Tyrael's,
+        // PROVISIONAL (REC-241): a portal without a partner (Tyrael's,
         // `quests-act2.md` §8.3) arrives at the level's spawn location
         // of type 12 (the first step of `q6::portal_destination`); the
         // free spot is rule 10's, not that function's (3, 0xBE11, 7).

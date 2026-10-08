@@ -153,7 +153,12 @@ impl FrontHost {
         art: Option<FrontArt>,
         first_entry: bool,
     ) -> Self {
-        let mut front = FrontEnd::with_screens(expansion, saves);
+        Self::with_front(FrontEnd::with_screens(expansion, saves), art, first_entry)
+    }
+
+    /// [`FrontHost::new`] over a front end the caller built (a registry
+    /// with the select / create screens wired, `app::front_start`).
+    pub fn with_front(mut front: FrontEnd, art: Option<FrontArt>, first_entry: bool) -> Self {
         front.start(first_entry, &mut MemProgress::default(), &mut StubVideo);
         Self {
             front,

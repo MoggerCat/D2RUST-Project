@@ -275,7 +275,7 @@ impl<F: LevelTypes> LevelTypes for SyntheticTypes<F> {
                 }
             }
             // The Lair's population: Duriel, Tyrael and Tyrael's door
-            // (q-a2-tyrael-door, d2rs-own, unverified, REC-238).
+            // (q-a2-tyrael-door, d2rs-own, unverified, REC-241).
             if drlg.level(level).id == super::synthetic_act2::DURIELS_LAIR {
                 use super::synthetic_act2 as a;
                 for (class, (x, y)) in [

@@ -730,3 +730,114 @@ fn the_gold_button_opens_the_dialog_and_ok_sends_drop_gold() {
     u.send(&w, UiEvent::Char(0x0D));
     assert_eq!(u.root.intents().len(), 1);
 }
+
+// Covers: specs/ui/inventory.md §11 r1, §11 r2, §11 r4
+// d2rs-own, unverified: the stash gold dialogs (REC-240).
+#[test]
+fn stash_gold_withdraw_and_deposit_send_0x4f() {
+    let mut u = ui(Some(areas()), true);
+    let mut w = world(AMAZON, 1, true);
+    let key = w.local_player.unwrap();
+    w.units.get_mut(&key).unwrap().stats.insert(14, 5000);
+    w.units.get_mut(&key).unwrap().stats.insert(15, 70000);
+    u.ui.set_ui(0x19, 0, false).unwrap();
+    u.root.sync_states(&u.ui.shared.borrow().states);
+    assert!(u.ui.is_open(0x19));
+    let texts = |u: &Ui| -> Vec<String> {
+        let ctx = UiCtx {
+            tick: 0,
+            world: &w,
+            strings: &NoStrings,
+        };
+        let mut out: Vec<UiDraw> = Vec::new();
+        u.root.draw(&ctx, &mut out);
+        out.iter()
+            .filter_map(|d| match d {
+                UiDraw::Text(t) => Some(String::from_utf16_lossy(&t.text)),
+                _ => None,
+            })
+            .collect()
+    };
+    // The stash gold button (kind 4, withdraw): typed 1234 -> 0x4F 0x13.
+    let s = Screen::R800;
+    let btn = Point::new(s.sx() + 80, s.h + s.sy() - 455 + 5);
+    u.click(&w, btn);
+    assert!(texts(&u).contains(&"_".to_string()));
+    for c in "1234".chars() {
+        u.send(&w, UiEvent::Char(c as u16));
+    }
+    u.send(&w, UiEvent::Char(0x0D));
+    assert_eq!(
+        u.root.intents(),
+        &[ClientIntent(vec![0x4F, 0x13, 0, 0, 0, 0xD2, 0x04])]
+    );
+    // Over the stash maximum nothing grows: the field takes the stat 15.
+    u.click(&w, btn);
+    for c in "9999999".chars() {
+        u.send(&w, UiEvent::Char(c as u16));
+    }
+    assert!(texts(&u).contains(&"70000_".to_string()));
+    u.send(&w, UiEvent::Char(0x1B));
+    assert_eq!(u.root.intents().len(), 1);
+    // The inventory gold button with the stash open (kind 3, deposit):
+    // the field is pre-filled with the carried gold -> 0x4F 0x14.
+    let inv_btn = Point::new(493, 462);
+    u.click(&w, inv_btn);
+    assert!(texts(&u).contains(&"5000_".to_string()));
+    u.send(&w, UiEvent::Char(0x0D));
+    assert_eq!(
+        u.root.intents().last(),
+        Some(&ClientIntent(vec![0x4F, 0x14, 0, 0, 0, 0x88, 0x13]))
+    );
+}
+
+// d2rs-own, unverified: the stash GoldMax line reads string 4051 through
+// `ctx.strings` (REC-241); cap = the fixed stash limit.
+#[test]
+fn stash_gold_max_line_resolves_its_string_id() {
+    struct Strs(Vec<u16>);
+    impl crate::ui::StringLookup for Strs {
+        fn get(&self, _: &str) -> Option<&[u16]> {
+            None
+        }
+        fn get_id(&self, id: u16) -> Option<&[u16]> {
+            (id == 4051).then_some(self.0.as_slice())
+        }
+    }
+    let mut u = ui(Some(areas()), true);
+    let w = world(AMAZON, 1, true);
+    u.ui.apply_output(
+        &crate::bridge::output::Output::TradeAction {
+            code: 0x10,
+            dead_or_absent: false,
+        },
+        &w,
+    )
+    .unwrap();
+    // Mirror the state flags into the root (no action: no hotkey runs).
+    let e = UiEvent::Press {
+        button: PointerButton::Right,
+        at: Point::new(0, 0),
+    };
+    u.ui.after_event(&mut u.root, e, Routed::Unhandled).unwrap();
+    let texts = |s: &dyn crate::ui::StringLookup| -> Vec<String> {
+        let ctx = UiCtx {
+            tick: 0,
+            world: &w,
+            strings: s,
+        };
+        let mut out: Vec<UiDraw> = Vec::new();
+        u.root.draw(&ctx, &mut out);
+        out.iter()
+            .filter_map(|d| match d {
+                UiDraw::Text(t) => Some(String::from_utf16_lossy(&t.text)),
+                _ => None,
+            })
+            .collect()
+    };
+    assert!(texts(&NoStrings).is_empty());
+    assert_eq!(
+        texts(&Strs("Gold Max: %d".encode_utf16().collect())),
+        vec!["Gold Max: 2500000"]
+    );
+}
