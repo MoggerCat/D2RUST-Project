@@ -127,6 +127,8 @@ pub struct ModelFeed<F = NoFeed> {
     /// The table columns of the unit facts (`unit_facts`); `None`: the
     /// facts the model needs them for refuse.
     pub unit_tables: Option<UnitFactTables>,
+    /// The skill-move draw offsets of the preview (`skill_motion`).
+    pub motion_offsets: std::collections::BTreeMap<UnitKey, (i32, i32)>,
 }
 
 impl<F> ModelFeed<F> {
@@ -139,6 +141,7 @@ impl<F> ModelFeed<F> {
             preview: None,
             local_at: None,
             unit_tables: None,
+            motion_offsets: Default::default(),
         }
     }
 
@@ -180,7 +183,13 @@ impl<F: ViewSource> ViewSource for ModelFeed<F> {
     /// feed's.
     fn unit_offset(&self, unit: &ClientUnit, pose: &UnitPose) -> Result<(i32, i32), String> {
         if self.preview.is_some() {
-            return Ok(preview::unit_offset());
+            let (x, y) = preview::unit_offset();
+            let (mx, my) = self
+                .motion_offsets
+                .get(&unit.key)
+                .copied()
+                .unwrap_or((0, 0));
+            return Ok((x + mx, y + my));
         }
         self.inner.unit_offset(unit, pose)
     }
@@ -239,6 +248,10 @@ impl<F: ViewFeed> ViewFeed for ModelFeed<F> {
 
     fn set_unit_fact_tables(&mut self, tables: UnitFactTables) {
         self.unit_tables = Some(tables);
+    }
+
+    fn set_motion_offsets(&mut self, offsets: std::collections::BTreeMap<UnitKey, (i32, i32)>) {
+        self.motion_offsets = offsets;
     }
 
     fn set_hover(&mut self, unit: Option<UnitKey>) {

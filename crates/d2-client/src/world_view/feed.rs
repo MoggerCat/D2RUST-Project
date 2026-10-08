@@ -79,6 +79,11 @@ pub trait ViewFeed: ViewSource {
     /// cell).
     fn set_local_prediction(&mut self, _at: Option<(UnitKey, (u32, u32))>) {}
 
+    /// The play preview's skill-move draw offsets `(dx, dy)` per unit
+    /// (`world_view::skill_motion`, Leap's arc; d2rs-own, unverified),
+    /// handed over before each build. The default ignores them.
+    fn set_motion_offsets(&mut self, _offsets: std::collections::BTreeMap<UnitKey, (i32, i32)>) {}
+
     /// The unit under the cursor, handed over before each build by the
     /// play preview (`bridge::hover::pick`; d2rs-own, unverified): drawn
     /// highlighted (`blend-modes.md` §3 `h`). The default ignores it.
