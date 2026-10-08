@@ -1,8 +1,10 @@
-// Spec: specs/drlg/outdoor.md §2 (Act III placement), §9; specs/drlg/outdoor-act3-act5.md §1–§4; specs/drlg/levels.md §3–§6; specs/drlg/preset.md §2–§3
+// Spec: specs/drlg/maze.md §3.3, §6 (the dungeons, q-a3-dungeons); specs/drlg/outdoor.md §2 (Act III placement), §9; specs/drlg/outdoor-act3-act5.md §1–§4; specs/drlg/levels.md §3–§6; specs/drlg/preset.md §2–§3
 //! An Act III-shaped variant of the synthetic set (task `q-a3-fields`), so
 //! `Drlg::create(2, ..)` runs the real jungle placer and Kurast chain and
 //! the Act III generator (jungle stamping, Kurast border rows, Travincal)
-//! on made-up data.
+//! on made-up data. Task `q-a3-dungeons` adds levels 84..=102: the maze
+//! dungeons (Spider, Swampy Pit, Flayer Dungeon, sewers, Durance 1 / 2)
+//! and the one-cell preset temples and Durance 3.
 //!
 //! Same method as [`crate::act2`]. Fixed by the spec: the level ids and
 //! DrlgTypes (75 preset, 76..83 outdoor), LevelTypes 20 / 21 / 22, the
@@ -31,12 +33,51 @@ pub const KURAST_BAZAAR: u32 = 80;
 pub const UPPER_KURAST: u32 = 81;
 pub const KURAST_CAUSEWAY: u32 = 82;
 pub const TRAVINCAL: u32 = 83;
-/// Rows of `levels`: ids 0 ..= 83.
-pub const LEVEL_COUNT: u32 = 84;
+/// Rows of `levels`: ids 0 ..= 102 (83 is Travincal, 84.. the dungeons).
+pub const LEVEL_COUNT: u32 = 103;
 /// LevelTypes (`outdoor-act3-act5.md` §1).
 pub const DOCKS_TYPE: u32 = 20;
 pub const JUNGLE_TYPE: u32 = 21;
 pub const KURAST_TYPE: u32 = 22;
+/// The dungeons (task `q-a3-dungeons`, REC-139).
+pub const SPIDER_CAVE: u32 = 84;
+pub const SPIDER_CAVERN: u32 = 85;
+pub const SEWERS_1: u32 = 92;
+pub const SEWERS_2: u32 = 93;
+pub const DURANCE_1: u32 = 100;
+pub const DURANCE_2: u32 = 101;
+pub const DURANCE_3: u32 = 102;
+/// The maze levels with their lvltypes `Id` (`maze.md` §3.3): Spider 23,
+/// Dungeon 24 (Swampy Pit 86 / 87 / 89, Flayer Dungeon 88 / 90 / 91),
+/// Act 3 Sewer 25, Kurast 22.
+pub const MAZE_LEVELS: [(u32, u32); 12] = [
+    (84, 23),
+    (85, 23),
+    (86, 24),
+    (87, 24),
+    (88, 24),
+    (89, 24),
+    (90, 24),
+    (91, 24),
+    (92, 25),
+    (93, 25),
+    (100, 22),
+    (101, 22),
+];
+/// The temples and Fanes (94..=99) and Durance of Hate 3, one-cell preset
+/// levels (their layouts are fixed DS1s in the original).
+pub const PRESET_LEVELS: [u32; 7] = [94, 95, 96, 97, 98, 99, 102];
+/// The vis chains of the dungeons (made up: the original's entrances are
+/// DS1 warp units of the outdoor levels).
+const DUNGEON_CHAINS: [&[u32]; 4] = [&[86, 87, 89], &[88, 90, 91], &[92, 93], &[100, 101, 102]];
+/// The 24-tile maze cell and the level rect side of a maze level (made
+/// up; the shipped rows are about 200).
+pub const MAZE_CELL: u32 = 24;
+const MAZE_SIZE: u32 = 200;
+/// lvlprest: maze defs (659..=1100) and the preset-level rows after them.
+pub const LAST_MAZE_DEF: u32 = 1100;
+pub const MAZE_DS1: &str = "Synth\\Act3\\Maze.ds1";
+
 /// The outdoor levels of Act III.
 pub const OUTDOOR: [u32; 8] = [
     SPIDER_FOREST,
@@ -109,8 +150,30 @@ fn levels(s: &mut Synthetic) {
         let row = PLACER_LEVELS.iter().find(|r| r.0 == id);
         let name = level_name(id);
         s.strings.base.push((name.clone(), name.clone()));
+        let maze = MAZE_LEVELS.iter().find(|m| m.0 == id);
+        let dungeon_vis: Vec<u32> = DUNGEON_CHAINS
+            .iter()
+            .find_map(|c| {
+                let i = c.iter().position(|&l| l == id)?;
+                Some(c.get(i + 1).copied().into_iter().collect())
+            })
+            .unwrap_or_default();
         let (drlg, ltype, size, offset, vis) = match row {
             Some(&(_, d, l, s, o, v)) => (d, l, s, o, v),
+            None if maze.is_some() => (
+                1,
+                maze.map_or(0, |m| m.1),
+                (MAZE_SIZE as i32, MAZE_SIZE as i32),
+                (0, 0),
+                &dungeon_vis[..],
+            ),
+            None if PRESET_LEVELS.contains(&id) => (
+                2,
+                1,
+                (MAZE_CELL as i32, MAZE_CELL as i32),
+                (0, 0),
+                &dungeon_vis[..],
+            ),
             None => (0, 0, (0, 0), (0, 0), &[][..]),
         };
         let wp = WAYPOINTS.iter().find(|w| w.0 == id).map_or(255, |w| w.1);
@@ -126,7 +189,7 @@ fn levels(s: &mut Synthetic) {
             ("LevelWarp".into(), name.clone()),
             ("EntryFile".into(), name),
             ("Waypoint".into(), n(wp)),
-            ("IsInside".into(), "0".into()),
+            ("IsInside".into(), n(u32::from(maze.is_some()))),
             ("DrlgType".into(), n(drlg)),
             ("LevelType".into(), n(ltype)),
             ("OffsetX".into(), n(offset.0)),
@@ -144,7 +207,7 @@ fn levels(s: &mut Synthetic) {
             cells.push((format!("Vis{k}"), n(vis.get(k).copied().unwrap_or(0))));
             cells.push((format!("Warp{k}"), "-1".into()));
         }
-        if drlg == 3 {
+        if drlg == 3 || maze.is_some() {
             for (c, v) in [
                 ("MonLvl1", "2"),
                 ("MonDen", "500"),
@@ -178,9 +241,9 @@ fn piece(def: u32) -> (u32, u32, &'static str) {
 }
 
 fn tables(t: &mut TableSet) {
-    // lvltypes: 0 none, 1 town and preset levels, 2..=22 the rest.
+    // lvltypes: 0 none, 1 town and preset levels, 2..=25 the rest.
     t.row("lvltypes", &[("Act", "0")]);
-    for _ in 1..=KURAST_TYPE {
+    for _ in 1..=25 {
         t.row(
             "lvltypes",
             &[
@@ -188,6 +251,22 @@ fn tables(t: &mut TableSet) {
                 ("File 2", WALL_DT1),
                 ("File 3", FLOOR_DT1[1]),
                 ("Act", "2"),
+            ],
+        );
+    }
+    // lvlmaze: one row per maze level, 24-tile cells; `Merge` 500 so the
+    // Spider Cavern vector's draw (367) links.
+    for &(id, _) in &MAZE_LEVELS {
+        t.row(
+            "lvlmaze",
+            &[
+                ("Level", &n(id)),
+                ("Rooms", "6"),
+                ("Rooms(N)", "8"),
+                ("Rooms(H)", "10"),
+                ("SizeX", &n(MAZE_CELL)),
+                ("SizeY", &n(MAZE_CELL)),
+                ("Merge", "500"),
             ],
         );
     }
@@ -222,6 +301,14 @@ fn tables(t: &mut TableSet) {
             _ => CELL_FILES,
         };
         preset(t, def, 0, (sx, sy), files, &[ds1; 6]);
+    }
+    // The maze defs, then one row per preset dungeon level (`LevelId`).
+    for def in LAST_DEF + 1..=LAST_MAZE_DEF {
+        preset(t, def, 0, (MAZE_CELL, MAZE_CELL), 6, &[MAZE_DS1; 6]);
+    }
+    for (i, &level) in PRESET_LEVELS.iter().enumerate() {
+        let def = LAST_MAZE_DEF + 1 + i as u32;
+        preset(t, def, level, (MAZE_CELL, MAZE_CELL), 1, &[MAZE_DS1]);
     }
     for ty in ["0", "1", "2", "3"] {
         t.row(
@@ -264,6 +351,7 @@ pub fn files() -> Vec<(String, Vec<u8>)> {
         (CAUSEWAY_DS1, floor_preset(48, 16)),
         (TRAV_NARROW_DS1, floor_preset(16, 32)),
         (TRAV_WIDE_DS1, floor_preset(32, 32)),
+        (MAZE_DS1, floor_preset(MAZE_CELL, MAZE_CELL)),
     ];
     let mut out: Vec<(String, Vec<u8>)> = presets
         .iter()

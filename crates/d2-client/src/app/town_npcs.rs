@@ -30,6 +30,17 @@ pub const ACT3: [(u16, i32); 7] = [
     (class::CAIN4, 84),
 ];
 
+/// Act V (Harrogath, REC-144; its own room, q-a5-town): Larzuk, Anya,
+/// Malah, Nihlathak, Qual-Kehk and Cain.
+pub const ACT5: [(u16, i32); 6] = [
+    (class::LARZUK, 3),
+    (class::DREHYA, 7),
+    (class::MALAH, 11),
+    (class::NIHLATHAK, 15),
+    (class::QUAL_KEHK, 19),
+    (class::CAIN6, 23),
+];
+
 /// d2rs-own, unverified (REC-137): the synthetic game's `hireling` rows,
 /// one per difficulty for Asheara (act 3, seller 252) so her hire list
 /// can be made (`npc.md` §7.1 needs a row, `NoHirelingRow` otherwise).
@@ -52,5 +63,18 @@ pub fn synthetic_hire_rows() -> Vec<d2_sim::world::npc::hire::HireRow> {
             name_first: 3000,
             name_last: 3004,
         })
+        .chain((1..=3).map(|difficulty| d2_sim::world::npc::hire::HireRow {
+            // Qual-Kehk (act 5, seller 515; REC-144): made-up barbarian
+            // mercenary, price, level and names.
+            version,
+            class: 560,
+            act: 5,
+            difficulty,
+            seller: u32::from(class::QUAL_KEHK),
+            gold: 300,
+            level: 1,
+            name_first: 3100,
+            name_last: 3102,
+        }))
         .collect()
 }

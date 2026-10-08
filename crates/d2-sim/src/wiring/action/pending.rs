@@ -80,6 +80,16 @@ pub enum QuestEvent {
     SummonerActivated,
     /// The cube placed a Horadric Staff for `player` (`0x0059E5C0`).
     StaffAssembled { player: UnitId },
+    /// Shenk's AI ran (`0x00587900`, `ai-bodies-5.md` §7).
+    ShenkActivated { unit: UnitId },
+    /// Nihlathak's AI ran (`0x0058BC40`, `ai-bodies-5.md` §23).
+    NihlathakActivated,
+    /// An Ancient's AI armed-off call (`0x0058CF90`, `quests-act5-2.md` §7.9).
+    AncientsDisarm,
+    /// The Baal crab reached the Worldstone portal (`0x0058E600`).
+    BaalToStairs,
+    /// Anya's AI asks for the temple portal (`0x0058BC80`, §6.7).
+    AnyaOpenPortal { unit: UnitId },
 }
 
 /// Seams without a provider (see the module doc). Grouped by the spec

@@ -17,8 +17,6 @@ thiserror.workspace = true
 toml = "0.9"
 
 [dev-dependencies]
-# The play-on-native test runs the client's data loading on both sources.
-d2-client = { path = "../../crates/d2-client" }
 d2-formats = { workspace = true, features = ["test-support"] }
 test-fixtures.workspace = true
 

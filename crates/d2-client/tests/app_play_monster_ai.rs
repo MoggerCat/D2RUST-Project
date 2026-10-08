@@ -196,11 +196,7 @@ fn attacks_until_the_player_dies(seed: u32) {
     let clock = StepClock(ms.clone());
     let spawn_character = character.clone();
     let link = ThreadLink::spawn(move || {
-        let mut g = single_player::build_with(
-            &GameData::Synthetic,
-            seed,
-            spawn_character,
-        )?;
+        let mut g = single_player::build_with(&GameData::Synthetic, seed, spawn_character)?;
         install_fixtures(&mut g.sim);
         Ok::<_, BuildError>(LocalLink::new(Host::new(
             g.sim,

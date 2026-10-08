@@ -176,6 +176,8 @@ pub const DEN_TO_BLOOD_MOOR: u32 = 12;
 /// middle) and the synthetic walk-out.
 pub const WARP_TILE_XY: i32 = 20;
 pub const ACT2_TOWN: u32 = 40;
+/// Harrogath (act 4, the fifth act; `levels` row 109).
+pub const ACT5_TOWN: u32 = 109;
 /// Catacombs Level 4, Andariel's lair (act 0; a flat level in the
 /// synthetic world, reached by a level warp: d2rs-own, unverified).
 pub const CATACOMBS_4: u32 = 37;
@@ -223,8 +225,13 @@ pub const ACT2_NPC_Y: i32 = 12;
 /// The Act II town waypoint (sub-tiles from its room's origin).
 pub const ACT2_WAYPOINT_XY: (i32, i32) = (20, 30);
 
+/// The Harrogath waypoint (sub-tiles from its room's origin).
+pub const ACT5_WAYPOINT_XY: (i32, i32) = (20, 30);
+/// The Harrogath waypoint's index (`levels` `Waypoint`).
+const ACT5_WAYPOINT: u8 = 35;
+
 /// Every NPC class of the synthetic game: the Rogue Encampment's Akara,
-/// Kashya and Warriv, and Lut Gholein's.
+/// Kashya and Warriv, Lut Gholein's and Harrogath's.
 fn synthetic_npc_classes() -> impl Iterator<Item = u16> {
     [
         d2_sim::world::npc::class::AKARA,
@@ -236,6 +243,7 @@ fn synthetic_npc_classes() -> impl Iterator<Item = u16> {
     .into_iter()
     .chain(ACT2_NPCS)
     .chain(synthetic_act4::NPCS)
+    .chain(super::town_npcs::ACT5.iter().map(|&(c, _)| c))
     .chain(super::town_npcs::ACT3.iter().map(|&(c, _)| c))
 }
 /// The player's character class (1, sorceress, as in the server tests).
@@ -639,9 +647,22 @@ impl Pending for LocalSeams {
                 .quest_events
                 .push(QuestEvent::RadamentActivated { unit }),
             QuestCall::SummonerActivated => self.quest_events.push(QuestEvent::SummonerActivated),
+            // d2rs-own, unverified (REC-148): the Act V AI calls.
+            QuestCall::Shenk => self.quest_events.push(QuestEvent::ShenkActivated { unit }),
+            QuestCall::Nihlathak => self.quest_events.push(QuestEvent::NihlathakActivated),
+            QuestCall::BaalToStairs => self.quest_events.push(QuestEvent::BaalToStairs),
+            QuestCall::AncientsNotActivatable => {
+                self.quest_events.push(QuestEvent::AncientsDisarm);
+                return false;
+            }
             _ => return false,
         }
         true
+    }
+    /// d2rs-own, unverified (REC-148): Anya's AI asks for the temple portal.
+    fn anya_open_portal(&mut self, _: &mut Game, unit: UnitId) {
+        self.quest_events
+            .push(d2_sim::wiring::action::QuestEvent::AnyaOpenPortal { unit });
     }
     /// `0x0061AEB0`: the Act II staff tomb, the orifice's level.
     fn object_staff_tomb(&self) -> u32 {
@@ -1017,10 +1038,14 @@ impl WaypointTables {
         let mut levels = vec![blank::<Levels>(); 150];
         for (i, l) in levels.iter_mut().enumerate() {
             l.waypoint = NO_WAYPOINT;
-            l.act = match i {
-                103.. => 3,
-                40.. => 1,
-                _ => 0,
+            l.act = if i >= ACT5_TOWN as usize {
+                4
+            } else if i >= synthetic_act4::FORTRESS as usize {
+                3
+            } else if i >= 40 {
+                1
+            } else {
+                0
             };
         }
         levels[1].waypoint = 0;
@@ -1028,6 +1053,7 @@ impl WaypointTables {
         levels[STONY_FIELD as usize].waypoint = 2;
         levels[ACT2_TOWN as usize].waypoint = 9;
         levels[synthetic_act4::FORTRESS as usize].waypoint = 27;
+        levels[ACT5_TOWN as usize].waypoint = ACT5_WAYPOINT;
         let mut o: Objects = blank();
         o.operatefn = 23;
         o.initfn = 17;
@@ -1313,7 +1339,7 @@ impl LevelSource {
             data: Arc::new(synthetic_drlg_data()),
             tiles: Box::new(tiles()),
             types: Box::new(synthetic_level_types()),
-            acts: vec![(0, 1, 0), (1, 2, 0), (synthetic_act4::ACT, 3, 0)],
+            acts: vec![(0, 1, 0), (1, 2, 0), (4, 3, 0), (synthetic_act4::ACT, 4, 0)],
         }
     }
 
@@ -1340,6 +1366,7 @@ impl LevelSource {
             acts: vec![
                 (0, init_seed, 1),
                 (1, init_seed, ACT2_TOWN),
+                (4, init_seed, ACT5_TOWN),
                 (synthetic_act4::ACT, init_seed, synthetic_act4::FORTRESS),
             ],
         }
@@ -1375,6 +1402,7 @@ fn synthetic_drlg_data() -> DrlgData {
         DEN_OF_EVIL,
         CATACOMBS_4,
         ACT2_TOWN,
+        ACT5_TOWN,
     ]
     .into_iter()
     .chain(synthetic_act4::LEVELS)
@@ -1515,6 +1543,7 @@ fn synthetic_types() -> Types {
         ),
         (synthetic_act4::RIVER_OF_FLAME, TileRect::new(32, 0, 8, 8)),
         (synthetic_act4::CHAOS_SANCTUARY, TileRect::new(40, 0, 8, 8)),
+        (ACT5_TOWN, TileRect::new(0, 0, 8, 8)),
     ]))
 }
 
@@ -1848,7 +1877,7 @@ struct GameParts {
 
 /// Rows of the synthetic `monstats` (classes 0 … 399; Akara is the only
 /// NPC).
-const SYNTHETIC_MONSTATS: usize = synthetic_act4::MONSTATS_ROWS;
+const SYNTHETIC_MONSTATS: usize = 600;
 
 /// d2rs-own, unverified (preview): the synthetic game's `monstats`, all
 /// zero rows with Akara `npc` and `interact` (the town NPC of
@@ -2235,6 +2264,9 @@ pub fn build_with_town(
     // q-a1-tower, d2rs-own, unverified).
     if matches!(data, GameData::Synthetic) {
         start_levels.push((0, synthetic_tower::BLACK_MARSH));
+        // Harrogath's room (rooms[4]; q-a5-town).
+        start_levels.push((4, ACT5_TOWN));
+        // The Pandemonium Fortress's room (rooms[5]; q-a4).
         start_levels.push((synthetic_act4::ACT, synthetic_act4::FORTRESS));
     }
     for (act, level) in start_levels {
@@ -2385,32 +2417,68 @@ pub fn build_with_town(
             })
             .ok_or_else(|| BuildError::Setup("allocating the Act II waypoint failed".into()))?;
     }
-    // Pandemonium Fortress: its NPCs and its waypoint (rooms[4], d2rs-own,
-    // unverified, q-a4).
+    // Harrogath: its NPCs and its waypoint (act 4's room, d2rs-own,
+    // unverified, q-a5-town, REC-144).
     if matches!(data, GameData::Synthetic) {
-        let (room4, rect4) = rooms[4];
-        let (ox4, oy4) = (rect4.x * 5, rect4.y * 5);
-        for (i, &class) in synthetic_act4::NPCS.iter().enumerate() {
+        let (room5, rect5) = rooms[4];
+        let (ox5, oy5) = (rect5.x * 5, rect5.y * 5);
+        for &(class, dx) in &super::town_npcs::ACT5 {
             let req = AllocRequest {
                 ty: UnitType::Monster,
                 class: u32::from(class),
-                room: Some(room4),
+                room: Some(room5),
                 add: true,
                 fixed_guid: None,
                 mode: 1,
                 allied: true,
             };
-            let x = ox4 + synthetic_act4::NPC_X0 + synthetic_act4::NPC_STEP * i as i32;
             sim.action
                 .with(&mut game, |g, v| {
-                    v.allocate(g, &req, x, oy4 + synthetic_act4::NPC_Y)
+                    v.allocate(g, &req, ox5 + dx, oy5 + UNIT_Y)
                 })
                 .ok_or_else(|| BuildError::Setup(format!("allocating NPC {class} failed")))?;
         }
         let req = AllocRequest {
             ty: UnitType::Object,
             class: wp_tables.object_class,
-            room: Some(room4),
+            room: Some(room5),
+            add: true,
+            fixed_guid: None,
+            mode: 1,
+            allied: false,
+        };
+        sim.action
+            .with(&mut game, |g, v| {
+                v.allocate(g, &req, ox5 + ACT5_WAYPOINT_XY.0, oy5 + ACT5_WAYPOINT_XY.1)
+            })
+            .ok_or_else(|| BuildError::Setup("allocating the Act V waypoint failed".into()))?;
+    }
+    // Pandemonium Fortress: its NPCs and its waypoint (rooms[5], d2rs-own,
+    // unverified, q-a4, REC-143).
+    if matches!(data, GameData::Synthetic) {
+        let (room6, rect6) = rooms[5];
+        let (ox6, oy6) = (rect6.x * 5, rect6.y * 5);
+        for (i, &class) in synthetic_act4::NPCS.iter().enumerate() {
+            let req = AllocRequest {
+                ty: UnitType::Monster,
+                class: u32::from(class),
+                room: Some(room6),
+                add: true,
+                fixed_guid: None,
+                mode: 1,
+                allied: true,
+            };
+            let x = ox6 + synthetic_act4::NPC_X0 + synthetic_act4::NPC_STEP * i as i32;
+            sim.action
+                .with(&mut game, |g, v| {
+                    v.allocate(g, &req, x, oy6 + synthetic_act4::NPC_Y)
+                })
+                .ok_or_else(|| BuildError::Setup(format!("allocating NPC {class} failed")))?;
+        }
+        let req = AllocRequest {
+            ty: UnitType::Object,
+            class: wp_tables.object_class,
+            room: Some(room6),
             add: true,
             fixed_guid: None,
             mode: 1,
@@ -2418,7 +2486,7 @@ pub fn build_with_town(
         };
         let (wx, wy) = synthetic_act4::WAYPOINT_XY;
         sim.action
-            .with(&mut game, |g, v| v.allocate(g, &req, ox4 + wx, oy4 + wy))
+            .with(&mut game, |g, v| v.allocate(g, &req, ox6 + wx, oy6 + wy))
             .ok_or_else(|| BuildError::Setup("allocating the Act IV waypoint failed".into()))?;
     }
     let interact_classes: Vec<u16> = parts

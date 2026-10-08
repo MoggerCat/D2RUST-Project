@@ -37,3 +37,7 @@ With an Act IV save: click Tyrael, Jamella, Halbu and Cain in the Fortress (expe
 
 - `app_single_player` (`game_creation_derives_the_four_controls...`): four more NPC allocations and one waypoint allocation, one RNG step each (`rng.md` §5.3), as q-a2-town did for Act II. The spec value, not a weakened assertion.
 - `app_play_monster_ai`: kept on the default seed; added `a_missed_first_attack_is_followed_by_more_attacks` (seed 9). The failure was a real gap, not a lucky seed: the Zombie's first attack missed (a legitimate 5% roll, hit chance 95) and it never attacked again, because the attack do sets unit flag 0x40, the per-frame event runs the do only while it is clear (`use.md` §5.2 rule 3), and the monster Attack start never cleared it. Fixed in `monster_attack_start` (PROVISIONAL, REC-143; the player starts and the SQ start clear it). Open: a trace of a monster's second attack to confirm where the original clears it.
+
+## Merge note
+
+Staging's Harrogath (q-a5-town) kept `rooms[4]` and act 4; the Fortress room is `rooms[5]` (act 3). Both towns had claimed waypoint index 27: the Fortress keeps 27 (the real index), Harrogath's synthetic one is now 35 (its real index).

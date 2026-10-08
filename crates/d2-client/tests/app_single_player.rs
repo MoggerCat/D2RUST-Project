@@ -352,6 +352,9 @@ fn game_creation_derives_the_four_controls_in_order_before_the_first_unit() {
     for _ in 0..=single_player::ACT2_NPCS.len() {
         want.step(); // Lut Gholein's NPCs and its waypoint (d2rs-own, q-a2-town)
     }
+    for _ in 0..=d2_client::app::town_npcs::ACT5.len() {
+        want.step(); // Harrogath's NPCs and its waypoint (d2rs-own, q-a5-town)
+    }
     for _ in 0..=d2_client::app::synthetic_act4::NPCS.len() {
         want.step(); // the Fortress's NPCs and its waypoint (d2rs-own, q-a4)
     }
