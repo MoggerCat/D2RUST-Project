@@ -108,6 +108,9 @@ pub struct ShopState {
     /// The repair button is down: the next click on one of the player's
     /// items repairs it (d2rs-own, unverified; REC-177).
     repair_mode: bool,
+    /// A shop closed since the last Trade / Gamble choice: a late store
+    /// record (a sold item's copy) opens nothing until the next choice.
+    closed: bool,
 }
 
 impl ShopState {
@@ -578,6 +581,7 @@ impl OriginalUi {
             st.tx = ShopTx::default();
             st.pressed = None;
             st.repair_mode = false;
+            st.closed = false;
             // The start page of the class (`panels-2.md` §14 r12).
             st.page = shop_start_page(npc_class).0;
         }
@@ -608,20 +612,41 @@ impl OriginalUi {
         if world.store_serial != serial {
             self.shop.borrow_mut().serial = world.store_serial;
             if open.is_none() {
-                if let Some((guid, class)) = nearest_trader(world) {
+                // The trader the menu chose, else the nearest one (the
+                // model's local position is the last placement, not the
+                // predicted walk: d2rs-own, unverified).
+                let chosen = self.npcm.borrow_mut().shop_for.take();
+                if let Some((guid, class, floor)) = chosen {
                     self.open_shop(guid, class);
+                    // The records of an earlier trade (a closed shop's late
+                    // copy) are not this store's.
+                    self.shop.borrow_mut().floor = floor;
+                } else if !self.shop.borrow().closed {
+                    // A closed shop's late records (the copy of an item sold
+                    // just before the close) are not a new trade.
+                    if let Some((guid, class)) = nearest_trader(world) {
+                        self.open_shop(guid, class);
+                    }
                 }
             }
         }
         let open = self.shop.borrow().open;
         if let Some(o) = open.filter(|_| !self.is_open(id::NPC_SHOP)) {
-            let mut st = self.shop.borrow_mut();
-            st.open = None;
-            st.repair_mode = false;
-            st.floor = world.store_serial;
+            {
+                let mut st = self.shop.borrow_mut();
+                st.open = None;
+                st.repair_mode = false;
+                st.floor = world.store_serial;
+                st.closed = true;
+            }
             root.queue_intent(ClientIntent::from_message(&TerminateEntityChat {
                 id: o.npc_guid,
             }));
+            // PROVISIONAL (ui/panels-2.md §14; REC-278): the inventory the
+            // shop opened beside it closes with it; an inventory left open
+            // refuses the next shop (`ui-states.tsv` C[1][0x0C] = 3).
+            // Settled by a capture of the states after the shop's close.
+            let _ = self.set_ui(u32::from(id::INVENTORY), 1, false);
         }
         self.sync_root(root);
     }

@@ -24,6 +24,7 @@ use d2_client::app::play::{
 };
 use d2_client::app::server_thread::ThreadLink;
 use d2_client::app::single_player::{self, GameData};
+use d2_client::app::synthetic_items::BUCKLER;
 use d2_client::app::town_npcs;
 use d2_client::app::ui::{add_original_ui_with, UiParts};
 use d2_client::assets::path::MemorySource;
@@ -244,6 +245,8 @@ struct Rig {
     /// A test teleport moved the server player (the client's view of its
     /// position is stale from then on).
     teleported: bool,
+    /// The newest store record before the current trade opened.
+    store_floor: u32,
 }
 
 impl Rig {
@@ -304,7 +307,19 @@ impl Rig {
             &mut app,
             UiParts {
                 source: source.clone(),
-                inv_areas: None,
+                // The right panel's click area of every `inventory.bin`
+                // record (the user's file gives them; d2rs-own fixture:
+                // the right half above the control panel, 800 × 600).
+                inv_areas: Some(
+                    (0..32)
+                        .map(|_| d2_client::ui::original::InvArea {
+                            left: 400,
+                            right: 800,
+                            top: 0,
+                            bottom: 553,
+                        })
+                        .collect(),
+                ),
                 expansion_installed: false,
                 fonts: Some(fonts),
                 resist_penalties: Some(vec![0, 20, 50]),
@@ -321,6 +336,7 @@ impl Rig {
             wire,
             steps: 0,
             teleported: false,
+            store_floor: 0,
         };
         while app_support::local_player(&rig.server).is_none() {
             rig.step(1);
@@ -344,17 +360,6 @@ impl Rig {
             .receive_chunk(&msgs)
             .unwrap();
         rig.step(2);
-        // Nor creation stats (no vitals tables): stage what 1.14d gives a
-        // new character (stat 67 `velocitypercent` 100, `combat/vitals.md`
-        // §1), else the server walks at the 25 % floor (`pathing.md` §8.1
-        // r2) behind the client's prediction, as `app_level_border.rs`.
-        app_support::with(&rig.server, |l| {
-            let (p, _) = single_player::local_player(&l.host().game).unwrap();
-            let g = &mut l.host_mut().game;
-            g.events
-                .action
-                .with(&mut g.game, |_, v| v.set_base(p, 67, 100));
-        });
         rig.check("join");
         rig
     }
@@ -792,4 +797,316 @@ fn act1_trade_and_gamble_rows_open_the_shop() {
         rig.step(10);
         rig.check(&format!("{class} chat end"));
     }
+}
+
+// ---- the shop ---------------------------------------------------------------------------
+
+/// The store grid's cell (x, y) on screen (`ui/shop_ui.rs`: 29 px cells
+/// at (`sx` + 15, `H` + `sy` − 400), R800).
+fn store_cell(x: i32, y: i32) -> Point {
+    let s = Screen::R800;
+    Point::new(s.sx() + 15 + 29 * x + 10, s.h + s.sy() - 400 + 29 * y + 10)
+}
+
+/// The backpack cell (x, y) on screen (the inventory panel's grid beside
+/// the shop, as `e2e_vendor.rs` reads it).
+fn backpack_cell(x: u16, y: u16) -> Point {
+    Point::new(
+        339 + 80 + 29 * i32::from(x) + 10,
+        255 + 60 + 29 * i32::from(y) + 10,
+    )
+}
+
+/// Shop button `i` of a four-button bar (`panels::shop::BUTTON_X`).
+fn shop_button(i: usize) -> Point {
+    let s = Screen::R800;
+    Point::new(
+        s.sx() + d2_client::ui::panels::shop::BUTTON_X[3][i] + 10,
+        s.h + s.sy() - 87,
+    )
+}
+
+impl Rig {
+    /// Steps until the client's gold differs from `from` (the vitals
+    /// sync's forced run, at most 20 client updates) and returns it.
+    fn gold_after(&mut self, from: i32) -> i32 {
+        for _ in 0..40 {
+            if self.gold() != from {
+                break;
+            }
+            self.step(1);
+        }
+        self.gold()
+    }
+
+    fn gold(&self) -> i32 {
+        let w = self.bridge().world();
+        w.local_player.map_or(0, |me| w.total(me, 14, 0))
+    }
+
+    /// Server: the local player's gold := `n` (a new character has none).
+    fn stage_gold(&mut self, n: i32) {
+        app_support::with(&self.server, move |l| {
+            let (p, _) = single_player::local_player(&l.host().game).unwrap();
+            let g = &mut l.host_mut().game;
+            g.events
+                .action
+                .with(&mut g.game, |_, v| v.set_base(p, 14, n));
+        });
+        // The vitals sync sends gold on its forced run (every 20 client
+        // updates, `combat/vitals.md` §5.1 rule 2).
+        for _ in 0..60 {
+            self.step(1);
+            if self.gold() == n {
+                break;
+            }
+        }
+    }
+
+    /// Server: the durability (stat 72) of the item `guid` := `n`.
+    fn stage_durability(&mut self, guid: u32, n: i32) {
+        app_support::with(&self.server, move |l| {
+            let g = &mut l.host_mut().game;
+            let item = g
+                .game
+                .lists
+                .find_unit(d2_sim::units::UnitType::Item, guid)
+                .expect("the item is on the server");
+            g.events
+                .action
+                .with(&mut g.game, |_, v| v.set_base(item, 72, n));
+        });
+        self.step(4);
+    }
+
+    /// The local player's backpack items (stored, page 0) of `code`.
+    fn backpack(&self, code: &[u8; 4]) -> Vec<d2_client::bridge::items::ItemView> {
+        d2_client::bridge::items::local_items(self.bridge().world())
+            .into_iter()
+            .filter(|i| i.code == Some(*code) && i.mode == 0 && i.page == 0 && !i.store)
+            .collect()
+    }
+
+    /// The open store's page-0 items in the panel's packing order (every
+    /// synthetic item is 1 × 1 without item art: cell k = (k mod 10, k / 10)).
+    fn store_page0(&self) -> Vec<d2_client::bridge::items::ItemView> {
+        let mut v: Vec<_> = d2_client::bridge::items::store_items(self.bridge().world())
+            .into_iter()
+            .filter(|i| i.page == 0 && i.store_seq > self.store_floor)
+            .collect();
+        v.sort_by_key(|i| i.store_seq);
+        v
+    }
+
+    /// S→C 0x2A of the step: (kind, code).
+    fn transactions(&self) -> Vec<(u8, u8)> {
+        self.wire
+            .lock()
+            .unwrap()
+            .received
+            .iter()
+            .filter(|m| m[0] == 0x2A)
+            .map(|m| (m[1], m[2]))
+            .collect()
+    }
+
+    /// Closes the shop's UI state (as Escape does); the close ends the
+    /// chat (C→S 0x30).
+    fn close_shop(&mut self) {
+        self.app
+            .world_mut()
+            .non_send_mut::<WorldViewUi>()
+            .original
+            .as_mut()
+            .unwrap()
+            .set_ui(0x0C, 1, false)
+            .unwrap();
+        self.step(10);
+        assert!(self.sent_ids().contains(&0x30), "{:02X?}", self.sent_ids());
+        self.check("shop close");
+    }
+
+    /// Opens the shop of `class` through its menu row `kind`.
+    fn open_shop(&mut self, class: u16, kind: OptionKind) {
+        // The store records of an earlier trade stay in the model; the
+        // shop shows only the newer ones (`ShopState` floor).
+        self.store_floor = d2_client::bridge::items::store_items(self.bridge().world())
+            .iter()
+            .map(|i| i.store_seq)
+            .max()
+            .unwrap_or(0);
+        self.choose(class, kind);
+        self.step(10);
+        assert!(
+            self.with_ui(|u| u.is_open(0x0C)),
+            "{class}: the shop is open"
+        );
+        assert!(
+            !self.store_page0().is_empty(),
+            "{class}: the store has items"
+        );
+    }
+
+    /// Right-clicks the store item of `code` (quick buy, C→S 0x32): the
+    /// bought copy's GUID.
+    fn buy(&mut self, code: &[u8; 4]) -> u32 {
+        let list = self.store_page0();
+        let k = list
+            .iter()
+            .position(|i| i.code == Some(*code))
+            .unwrap_or_else(|| panic!("{code:?} is in the store"));
+        let before: Vec<u32> = self.backpack(code).iter().map(|i| i.key.guid).collect();
+        let gold = self.gold();
+        self.click_with(
+            PointerButton::Right,
+            store_cell(k as i32 % 10, k as i32 / 10),
+        );
+        self.step(10);
+        assert!(self.sent_ids().contains(&0x32), "{:02X?}", self.sent_ids());
+        let tx = self.transactions();
+        assert!(
+            tx.iter()
+                .any(|&(kind, c)| c == 0 && (kind == 4 || kind == 5)),
+            "bought: {tx:?}"
+        );
+        let after = self.backpack(code);
+        let new = after
+            .iter()
+            .find(|i| !before.contains(&i.key.guid))
+            .unwrap_or_else(|| panic!("the copy is in the backpack: {after:?}"));
+        let now = self.gold_after(gold);
+        assert!(now < gold, "paid: {gold} → {now}");
+        let guid = new.key.guid;
+        self.check("buy");
+        guid
+    }
+}
+
+// Covers: specs/world/vendors.md §7.1, §7.2, §8.1, §5.3; specs/ui/menus.md §4
+#[test]
+fn act1_traders_buy_sell_repair_and_gamble() {
+    let mut rig = Rig::new();
+    // A level-1 character carries at most 10 000 (`0x00622E70`).
+    rig.stage_gold(5_000);
+    rig.check("gold");
+    assert_eq!(rig.gold(), 5_000, "the client model has the gold");
+
+    // Akara: buy a buckler, then sell it back (lift it from the backpack,
+    // drop it on the store grid: C→S 0x19, then 0x33).
+    rig.open_shop(class::AKARA, OptionKind::Trade);
+    let bought = rig.buy(&BUCKLER);
+    let it = rig
+        .backpack(&BUCKLER)
+        .into_iter()
+        .find(|i| i.key.guid == bought)
+        .unwrap();
+    rig.queue(UiEvent::Press {
+        button: PointerButton::Left,
+        at: backpack_cell(it.x, it.y),
+    });
+    rig.step(3);
+    rig.queue(UiEvent::Release {
+        button: PointerButton::Left,
+        at: backpack_cell(it.x, it.y),
+    });
+    rig.step(6);
+    assert_eq!(
+        d2_client::bridge::items::cursor_item(rig.bridge().world()).map(|i| i.key.guid),
+        Some(bought),
+        "the buckler is on the cursor: {:02X?}",
+        rig.wire.lock().unwrap().sent
+    );
+    rig.check("lift");
+    let gold = rig.gold();
+    rig.click(store_cell(9, 9));
+    rig.step(10);
+    assert!(rig.sent_ids().contains(&0x33), "{:02X?}", rig.sent_ids());
+    assert!(
+        rig.transactions().contains(&(3, 1)),
+        "sold: {:?}",
+        rig.transactions()
+    );
+    assert!(rig.gold_after(gold) > gold, "received the price");
+    assert!(
+        d2_client::bridge::items::local_items(rig.bridge().world())
+            .iter()
+            .all(|i| i.key.guid != bought || i.store),
+        "the sold buckler left the player"
+    );
+    rig.check("sell");
+    rig.close_shop();
+
+    // Charsi: buy a buckler, wear it down, repair it (button 2, then the
+    // item), wear it down again, repair all (button 3: worn items only).
+    rig.open_shop(class::CHARSI, OptionKind::Trade);
+    let bought = rig.buy(&BUCKLER);
+    rig.stage_durability(bought, 3);
+    rig.check("worn");
+    let it = rig
+        .backpack(&BUCKLER)
+        .into_iter()
+        .find(|i| i.key.guid == bought)
+        .unwrap();
+    rig.click(shop_button(2));
+    assert!(
+        rig.with_ui(|u| u.shop_state().repair_mode()),
+        "repair armed"
+    );
+    let gold = rig.gold();
+    rig.click(backpack_cell(it.x, it.y));
+    rig.step(10);
+    assert!(rig.sent_ids().contains(&0x35), "{:02X?}", rig.sent_ids());
+    assert!(
+        rig.transactions().contains(&(1, 2)),
+        "repaired: {:?}",
+        rig.transactions()
+    );
+    assert!(rig.gold_after(gold) < gold, "the repair was paid");
+    rig.check("repair one");
+    rig.stage_durability(bought, 2);
+    rig.check("worn again");
+    let gold = rig.gold();
+    rig.click(shop_button(3));
+    rig.step(10);
+    assert!(rig.sent_ids().contains(&0x35), "{:02X?}", rig.sent_ids());
+    assert!(
+        rig.transactions().contains(&(1, 2)),
+        "repaired all: {:?}",
+        rig.transactions()
+    );
+    // Repair all covers the equipped items only (`vendors.md` §8.1 rule
+    // 3): the worn buckler is in the backpack, so the total is 0 (code 2,
+    // nothing paid) and the buckler stays worn.
+    rig.step(30);
+    assert_eq!(rig.gold(), gold, "nothing equipped needs repair");
+    let dur = app_support::with(&rig.server, move |l| {
+        let g = &mut l.host_mut().game;
+        let item = g
+            .game
+            .lists
+            .find_unit(d2_sim::units::UnitType::Item, bought)
+            .unwrap();
+        g.events.action.with(&mut g.game, |_, v| v.stat(item, 72))
+    });
+    assert_eq!(dur, 2, "the backpack buckler was not repaired");
+    rig.check("repair all");
+    rig.close_shop();
+
+    // Gheed: the gamble window; a right click buys at the gamble price.
+    rig.store_floor = d2_client::bridge::items::store_items(rig.bridge().world())
+        .iter()
+        .map(|i| i.store_seq)
+        .max()
+        .unwrap_or(0);
+    rig.choose(class::GHEED, OptionKind::Gamble);
+    rig.step(10);
+    assert!(
+        rig.with_ui(|u| u.is_open(0x0C) && u.shop_state().gamble()),
+        "gamble window"
+    );
+    let list = rig.store_page0();
+    assert!(!list.is_empty(), "the gamble list");
+    let code = list[0].code.unwrap();
+    rig.buy(&code);
+    rig.close_shop();
 }

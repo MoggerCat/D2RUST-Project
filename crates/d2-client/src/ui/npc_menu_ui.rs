@@ -88,6 +88,12 @@ pub struct NpcMenuState {
     /// The last Trade / Gamble choice was Gamble: the shop that opens next
     /// is a gamble window (`panels-2.md` §14: the gamble shop flag).
     pub gamble: bool,
+    /// The NPC (GUID, class) the last Trade / Gamble was chosen for and
+    /// the model's store serial at the choice: the shop its store items
+    /// open, showing the records newer than that serial
+    /// (`OriginalUi::shop_poll`; d2rs-own, the menu's choice names the
+    /// trader, `menus.md` §3.1).
+    pub shop_for: Option<(u32, u32, u32)>,
     pub screen: (i32, i32),
 }
 
@@ -315,7 +321,13 @@ impl Panel for NpcMenuUi {
         let Some(k) = self.st.borrow().row_at(at) else {
             return UiResponse::Consumed;
         };
-        let row = self.st.borrow().up.as_ref().map(|o| o.rows[k]).unwrap();
+        let (row, row_class) = self
+            .st
+            .borrow()
+            .up
+            .as_ref()
+            .map(|o| (o.rows[k], o.class))
+            .unwrap();
         match row.kind {
             // Talk: the speech is shown; the 0x2F went out with the 0x28.
             Some(OptionKind::Talk) => {
@@ -341,6 +353,7 @@ impl Panel for NpcMenuUi {
                     st.up = None;
                     if matches!(kind, OptionKind::Trade | OptionKind::Gamble) {
                         st.gamble = kind == OptionKind::Gamble;
+                        st.shop_for = Some((guid, row_class, ctx.world.store_serial));
                     }
                 }
                 match option_intent(kind, guid).and_then(|v| v.into_iter().next()) {
