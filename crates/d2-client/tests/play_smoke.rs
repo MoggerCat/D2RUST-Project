@@ -1149,6 +1149,7 @@ impl Run {
         for g in goals {
             for _ in 0..30 {
                 if self.server_level() == Some(to) {
+                    self.settle();
                     return;
                 }
                 let p = self.pos();
@@ -1163,6 +1164,33 @@ impl Run {
             }
         }
         assert_eq!(self.server_level(), Some(to), "walked into level {to}");
+        self.settle();
+    }
+
+    /// A one-sub-tile leg, so the walk prediction and the server stand on
+    /// the same cell: the preview's straight-line prediction ends apart
+    /// from the server's path when that stops short (REC-51), and the
+    /// next position check then walks the server player back to the
+    /// predicted cell (C→S 0x5F, `pathing.md` §1.6). See the handoff.
+    fn settle(&mut self) {
+        let p = self.pos();
+        self.leg((p.0 + 1, p.1));
+        self.step(60);
+        let walk = self
+            .app
+            .world()
+            .resource::<d2_client::world_view::walk::PreviewWalk>();
+        let pc = walk
+            .predict
+            .cell()
+            .map(|(x, y)| (i32::from(x), i32::from(y)))
+            .expect("a prediction");
+        // Within the check's tolerance (`model.md` §6 r4–r5).
+        let p = self.pos();
+        assert!(
+            test_fixtures::host::cheb(pc, p) <= 2,
+            "the prediction met the server: {pc:?} / {p:?}"
+        );
     }
 }
 
@@ -1424,9 +1452,10 @@ impl Run {
     /// character kills them in a few dozen swings.
     fn monsters_near(&self) -> Vec<UnitKey> {
         let w = self.app.world().resource::<BridgeResource>().0.world();
-        let Some((px, py)) = w.local().and_then(|p| p.position) else {
-            return Vec::new();
-        };
+        // The server player's position (the harness's choice of target;
+        // the client's own reading can lag, see the handoff).
+        let (px, py) = self.pos();
+        let (px, py) = (px as u16, py as u16);
         let mut v: Vec<(i32, UnitKey)> = w
             .units
             .iter()
@@ -1518,6 +1547,27 @@ impl Run {
             match self.monster_life(key.guid) {
                 Some(l) if l > 0 => {}
                 _ => return true,
+            }
+            // A far monster: run toward it first (the unit target is
+            // refused past its range, `intents-events.md` §2.4 r4).
+            let mp = app_support::with(&self.server, move |l| {
+                let g = &mut l.host_mut().game;
+                let u = g
+                    .game
+                    .lists
+                    .find_unit(d2_sim::units::UnitType::Monster, key.guid)?;
+                Some(g.events.action.hooks().path_position(u))
+            });
+            if let Some(mp) = mp {
+                let p = self.pos();
+                if test_fixtures::host::cheb(p, mp) > 30 {
+                    self.leg((
+                        p.0 + (mp.0 - p.0).clamp(-25, 25),
+                        p.1 + (mp.1 - p.1).clamp(-25, 25),
+                    ));
+                    self.settle();
+                    continue;
+                }
             }
             let mut m = vec![0x06, 1, 0, 0, 0];
             m.extend_from_slice(&key.guid.to_le_bytes());
