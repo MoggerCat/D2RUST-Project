@@ -15,16 +15,16 @@ use d2_client::bridge::LOCAL_CLIENT;
 use d2_client::rules::unit_composite::code;
 use d2_client::world_view::unit_assets::UnitLooks;
 use d2_data::bin::BinTable;
-use d2_data::fixup::records::stat_ops;
 use d2_data::fixup::maps;
+use d2_data::fixup::records::stat_ops;
 use d2_data::tables::{
     Charstats, Itemstatcost, Missiles, Monstats, Monstats2, Record, Skills, States,
 };
-use d2_sim::skills::use_::bodies::BodyTables;
-use d2_sim::stats::StateTable;
 use d2_formats::animdata::{self, AnimData, AnimRecord};
 use d2_server::seams::{Clock, Pos};
 use d2_sim::skills::list::ListOwner;
+use d2_sim::skills::use_::bodies::{BodyStat, BodyTables};
+use d2_sim::stats::StateTable;
 use d2_sim::stats::{StatData, StatLists, StatTable};
 use d2_sim::units::lifecycle::AllocRequest;
 use d2_sim::units::{UnitId, UnitType};
@@ -45,7 +45,7 @@ fn anim_data() -> AnimData {
     };
     let mut events = [0u8; animdata::EVENTS];
     events[4] = 2;
-    let name = *b"SOA1HTH\0";
+    let name = *b"SOSCHTH\0";
     a.buckets[animdata::hash(&name[..7])].push(AnimRecord {
         name,
         frames: 8,
@@ -59,7 +59,7 @@ fn anim_data() -> AnimData {
 /// token `A1`.
 fn looks() -> UnitLooks {
     let mut modes = vec![code(b"NU"); 20];
-    modes[7] = code(b"A1");
+    modes[10] = code(b"SC");
     UnitLooks {
         player_tokens: vec![code(b"SO"); 7],
         player_modes: modes,
@@ -94,7 +94,6 @@ fn stat_data() -> Arc<StatData> {
 
 const MANA: i32 = 100 << 8;
 
-
 /// Progressive (`pgsv`, flag bit 4) states of the synthetic table.
 const STATES: usize = 12;
 const PGSV: [usize; 2] = [8, 9];
@@ -102,12 +101,19 @@ const PGSV: [usize; 2] = [8, 9];
 /// A skill row that starts at once, costs nothing and works in the camp.
 fn row(srvst: u16, srvdo: u16) -> Skills {
     let mut s = Skills::decode(&[0u8; Skills::SIZE]);
-    s.anim = 7;
+    s.anim = 10;
     s.range = 1;
     s.intown = true;
     s.srvstfunc = srvst;
     s.srvdofunc = srvdo;
     s.srvmissile = 0xFFFF;
+    s.aurastate = 0xFFFF;
+    s.auratargetstate = 0xFFFF;
+    s.srvoverlay = 0xFFFF;
+    s.tgtoverlay = 0xFFFF;
+    s.passivestate = 0xFFFF;
+    s.delay = 0xFFFF_FFFF;
+    s.perdelay = 0xFFFF_FFFF;
     s.hitshift = 8;
     s.srcdam = 128;
     s
@@ -161,6 +167,7 @@ impl Game {
                     t.skills.skills[i] = r;
                 }
                 t.skills.level_cap = d2_sim::skills::LEVEL_CAP_114D;
+                t.skills.stat_count = 359;
                 let mut m = Missiles::decode(&[0u8; Missiles::SIZE]);
                 m.range = 20;
                 m.vel = 16;
@@ -173,8 +180,11 @@ impl Game {
                 h.anim_data = Some(Arc::new(anim_data()));
                 h.x.looks = Some(Arc::new(looks()));
                 h.bodies = Some(Arc::new(BodyTables {
-                    pettype_count: 2,
-                    pettype_group: vec![0, 0],
+                    stats: vec![BodyStat::default(); 359],
+                    state_group: vec![0; 256],
+                    state_aura: vec![false; 256],
+                    pettype_count: 3,
+                    pettype_group: vec![0; 3],
                     ..BodyTables::default()
                 }));
                 l.host_mut().game.events.action.sys.stats = StatLists::new(stat_data_with_states());
@@ -299,7 +309,6 @@ impl Game {
             .unwrap()
     }
 
-
     /// Has the local player the state (a charge or a buff)?
     fn has_state(&mut self, state: u16) -> bool {
         self.link
@@ -324,7 +333,14 @@ impl Game {
         msg.extend((at.y as u16).to_le_bytes());
         self.link.send(SendQueue::Game, &msg).unwrap();
         self.link.pump().unwrap();
-        self.ticks(14)
+        let mut got = Vec::new();
+        let mut modes = vec![self.player_mode()];
+        for _ in 0..14 {
+            got.extend(self.ticks(1));
+            modes.push(self.player_mode());
+        }
+        eprintln!("modes {modes:?}");
+        got
     }
 
     fn cast_on(&mut self, guid: u32) -> Vec<Vec<u8>> {
@@ -343,10 +359,14 @@ fn a_sentry_trap_is_laid_and_listed_as_a_pet() {
     let mut s = row(0, 45);
     s.summon = 0;
     s.summode = 1;
+    s.pettype = 2;
     let mut g = Game::joined(vec![(3, s)]);
     let got = g.cast_at(5);
     let errors = g.errors();
-    assert!(got.iter().any(|m| m.contains(&0x7A)), "pet add; errors: {errors}");
+    assert!(
+        got.iter().any(|m| m.contains(&0x7A)),
+        "pet add; errors: {errors}"
+    );
 }
 
 // Covers: specs/skills/bodies.md §8.21
@@ -355,10 +375,14 @@ fn shadow_warrior_summons_the_shadow() {
     let mut s = row(0, 49);
     s.summon = 0;
     s.summode = 1;
+    s.pettype = 2;
     let mut g = Game::joined(vec![(3, s)]);
     let got = g.cast_at(5);
     let errors = g.errors();
-    assert!(got.iter().any(|m| m.contains(&0x7A)), "pet add; errors: {errors}");
+    assert!(
+        got.iter().any(|m| m.contains(&0x7A)),
+        "pet add; errors: {errors}"
+    );
 }
 
 // Covers: specs/skills/bodies.md §8.8, §2.14
@@ -372,5 +396,46 @@ fn tiger_strike_adds_a_charge_on_a_hit() {
     let (_, guid) = g.monster(500);
     g.cast_on(guid);
     let errors = g.errors();
-    assert!(g.has_state(PGSV[0] as u16), "a charge; errors: {errors}; mode {}", g.player_mode());
+    assert!(
+        g.has_state(PGSV[0] as u16),
+        "a charge; errors: {errors}; mode {}",
+        g.player_mode()
+    );
+}
+
+// Covers: specs/skills/bodies.md §4.3
+#[test]
+fn burst_of_speed_turns_its_state_on() {
+    let mut s = row(0, 18);
+    s.aurastate = PGSV[1] as u16;
+    s.auralencalc = 0;
+    let mut g = Game::joined(vec![(3, s)]);
+    g.cast_at(0);
+    let errors = g.errors();
+    assert!(g.has_state(PGSV[1] as u16), "state on; errors: {errors}");
+}
+
+// Covers: specs/skills/bodies.md §2.14, §8.10
+// (asserts the charge and no fault, not the finisher damage)
+#[test]
+fn a_finisher_after_a_charge_runs_without_faults() {
+    let charge = row(23, 34);
+    let mut charge = charge;
+    charge.aurastate = PGSV[0] as u16;
+    charge.aurastat1 = 10;
+    let finisher = row(23, 35);
+    let mut g = Game::joined(vec![(3, charge), (4, finisher)]);
+    let (_, guid) = g.monster(500);
+    g.cast_on(guid);
+    assert!(g.has_state(PGSV[0] as u16), "charged; {}", g.errors());
+    g.link
+        .with(|l| {
+            let sim = &mut l.host_mut().game;
+            let p = sim.player_of(LOCAL_CLIENT).unwrap();
+            let list = sim.events.action.hooks().skill_lists.get_mut(&p).unwrap();
+            list.right = list.view().iter().position(|e| e.skill == 4);
+        })
+        .unwrap();
+    g.cast_on(guid);
+    assert!(g.errors() == "[]", "no faults: {}", g.errors());
 }

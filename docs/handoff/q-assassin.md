@@ -1,36 +1,22 @@
-# q-assassin: Assassin skills in `play` (`claude/q-assassin`) — UNFINISHED
+# q-assassin: Assassin skills in `play` (`claude/q-assassin`)
 
-Stopped early by the coordinator. Nothing here is verified against 1.14d (rule 10). No REC id was taken (REC-156 was reserved for any provisional note; none written yet). Synthetic fixtures only.
+Nothing here is verified against 1.14d (rule 10). Provisional note: REC-156. Synthetic fixtures only; sound not wired.
 
-## State
+## Diagnosis of the 3 failing tests
+All three were test-fixture faults; no production code changed:
+1. Sentry / Shadow Warrior rows had `pettype` 0 (no pet type), so `pets::add` refused silently (no 0x7A, no error). Fixed with `pettype = 2` and `BodyTables { pettype_count: 3, .. }` as in `app_necro.rs`.
+2. Tiger Strike: `skills.stat_count` was 0 in the synthetic table, so `stat_ok(aurastat1)` failed and `charge_hit` returned 0. Fixed with `stat_count = 359`.
+3. The rows also lacked the `0xFFFF` sentinels (`aurastate`, `auratargetstate`, `srvoverlay`, `tgtoverlay`, `passivestate`, `delay`, `perdelay`), the `BodyTables` stat/state vectors, and used attack mode 7; they now follow `app_necro.rs` (cast mode 10, `SOSC`).
 
-- **Tests written, compile, all 3 FAIL (not yet diagnosed; `hooks().errors` is empty, the player ends in mode 5 = town neutral)**: `crates/d2-client/tests/app_assassin.rs` (3 tests, harness copied from `app_amazon.rs`, with a synthetic states table whose rows 8 and 9 are progressive):
-  - `a_sentry_trap_is_laid_and_listed_as_a_pet` (srvdo 45, expects S→C 0x7A)
-  - `shadow_warrior_summons_the_shadow` (srvdo 49, expects 0x7A)
-  - `tiger_strike_adds_a_charge_on_a_hit` (srvst 23 / srvdo 34, expects the pgsv state on the player)
-- Run result: sentry and Shadow Warrior: no 0x7A seen; Tiger Strike: no charge state. Candidates: the skill never starts (the test rows lack fields the start core needs, e.g. `srvstfunc`/`anim` mode handling, `intown` vs `town` rule, skill not on the right button), or the do step runs but `create_monster`/pettype/states are refused silently. Add debug output from `sim.events.action.hooks()` first.
-- The first `cargo build` failed because the system libs (wayland etc.) were missing; they are now installed, but the test build had not finished. Expect compile fixes in the test file (field names/types of `Skills`, `StatLists::has_state`, `BodyTables` pub fields) before any result.
-- No source change in `crates/` yet; no missing link has been confirmed.
+## Tests (`crates/d2-client/tests/app_assassin.rs`, 5, all pass)
+Sentry pet (0x7A), Shadow Warrior pet (0x7A), Tiger Strike charge state, Burst of Speed generic state buff (srvdo 18), a finisher after a charge (asserts the charge and no faults only).
 
-## Findings from reading (unverified)
-
-- The sim already has bodies for: charge-ups `srvst 23` / `srvdo 34, 35` and the progressive functions 36–39, 40, 41, 143 (`bodies.md` §2.14, §8.8, §8.10, `bodies-4.md` §4); sentries `srvdo 45` (§8.3, `helpers2::sentry`); Shadow Warrior `srvdo 49` (§8.21); Dragon Talon `srvst 24` / `srvdo 42`; Dragon Claw 25/46; Blade Sentinel 44; Cloak of Shadows 47; Blade Fury 48; Dragon Tail 50; Mind Blast 51; Dragon Flight 52.
-- Charge-ups need `states` rows (`state_count`), `aurastate` below the count, and `hooks.bodies` (pet types) for sentries/shadows; the synthetic game has none, the new test installs them.
-- Likely gaps to check first: `Pending::body_effect` for `Alignment`, `OwnerData`, `NodeInsert` (pets' real AI, see q-summons "Left"); `path_op` (Dragon Talon kick / Dragon Flight move) is the default no-op; `line_clear` still blocked (skills with `lineofsight` > 0).
-- Burst of Speed and Fire Blast were not traced (no special srvdo found in `functions.tsv`; probably the generic state buff / missile paths).
-
-## What's left
-
-1. Compile and run `app_assassin.rs`; fix links that fail (each test must fail before the fix).
-2. Dragon Talon (kick, `path_op`), Burst of Speed (state + speed stat), Fire Blast.
-3. Tests for the finisher (second skill after charges) and the shadow's stats.
-4. REC id: take the highest REC-N in `origin/claude/specs-staging-7` docs/HANDOFF.md §7 plus one; add PROVISIONAL notes.
-5. `cargo fmt`, clippy, `cargo nextest run -p d2-sim -p d2-server -p d2-client -p test-fixtures`, `tools/coverage.py --check`, `tools/spec_index.py --check`.
+## Left
+Dragon Talon / Dragon Flight (`path_op` no-op), Fire Blast / Lightning Sentry missiles, finisher damage and charge consumption, shadow stats, sentry AI, claw weapon check (`itypea1`). Reuse of q-amazon weapon facts / passive refresh and q-summons pets is by the existing wiring; no new copy added.
 
 ## The user's local check
-
 ```powershell
 git fetch origin claude/q-assassin; git checkout claude/q-assassin
 cargo test -p d2-client --test app_assassin
 ```
-Report compile errors or failing test names.
+Expect 5 passed.
