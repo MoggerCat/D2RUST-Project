@@ -28,6 +28,7 @@ use crate::wiring::interaction::NpcRest;
 
 use super::{Economy, EconomyQuests, GameFields, HostQuests, QuestRest};
 use crate::world::objects::{Dispatch, EventRun, Operate, Route};
+use crate::world::quests::act3::{self, InitPoint, KhalimChest};
 use crate::world::quests::{self, act1, act2, QuestControl, QuestWorld};
 
 /// What running one queued route did.
@@ -171,6 +172,20 @@ pub fn init_fn(n: u8) -> Option<u32> {
         33 => 0x0059_9EF0,
         // TyraelsDoor (§8.8).
         38 => 0x0059_DAD0,
+        // Act III (`quests-act3.md` §1.4, q-a3-quests).
+        23 => 0x0054_4E30,
+        25 => 0x005B_9AE0,
+        39 => 0x005B_9D40,
+        41 => 0x005B_8660,
+        42 => 0x005B_86B0,
+        43 => 0x005B_D1F0,
+        44 => 0x005B_CBF0,
+        45 => 0x005B_CB90,
+        49 => 0x005B_70B0,
+        50 => 0x005B_7160,
+        52 => 0x005B_CE80,
+        53 => 0x005B_BB70,
+        60 => 0x005B_BBA0,
         // CountessChest (`quests-act1-rest.md` §4).
         47 => 0x0059_5A50,
         // CainStartPosition (`quests-act1-rest.md` §3).
@@ -187,6 +202,15 @@ pub fn operate_fn(n: u8) -> Option<u32> {
     Some(match n {
         // TowerTome (`quests-act1.md` §10.7).
         6 => 0x0059_4E70,
+        // Act III (`quests-act3.md` §1.4, q-a3-quests).
+        28 => 0x005B_7A60,
+        31 => 0x005B_9B40,
+        44 => 0x005B_84E0,
+        45 => 0x005B_8530,
+        53 => 0x005B_B980,
+        57 => 0x005B_8860,
+        58 => 0x005B_8940,
+        59 => 0x005B_8A20,
         // Monolith (Cairn stone, `quests-act1.md` §10.6).
         9 => 0x0059_3710,
         // CainGibbet (`quests-act1-rest.md` §1.1).
@@ -224,8 +248,47 @@ fn init<W: QuestWorld>(
     if init_fn(n).is_none() {
         return QuestObjectRun::HandBack(c.route);
     }
+    // The init point of the object (room, x, y); a null room has none.
+    let at = c.room.map(|room| InitPoint {
+        room,
+        x: c.x,
+        y: c.y,
+    });
     match n {
         4 => act1::q5::object_init(ctl, w, object),
+        23 => act3::tome_init(ctl, w, object),
+        25 => {
+            if let Some(at) = at {
+                act3::decoy_init(ctl, w, object, at);
+            }
+        }
+        39 => {
+            if let Some(at) = at {
+                act3::altar_init(ctl, w, object, at);
+            }
+        }
+        41 => act3::stairs_init(ctl, w, object),
+        42 => act3::lever_init(ctl, w, object),
+        43 => {
+            if let Some(at) = at {
+                act3::wanderer_init(ctl, w, at);
+            }
+        }
+        44 => act3::hellgate_init(ctl, w, object),
+        45 => act3::bridge_init(ctl, w, object),
+        49 => {
+            if let Some(at) = at {
+                act3::hratli_start_init(ctl, w, at);
+            }
+        }
+        50 => {
+            if let Some(at) = at {
+                act3::hratli_end_init(ctl, w, at);
+            }
+        }
+        52 => act3::natalya_init(ctl, w, object),
+        53 => act3::stairs_r_init(ctl, w, object),
+        60 => act3::orb_init(ctl, w, object),
         // The stone's class is its value (`quests-act1-rest.md` §2.1).
         6 => act1::q4::stone_init(ctl, w, object, c.class),
         7 => act1::q4::gibbet_init(ctl, w, object),
@@ -264,6 +327,14 @@ fn operate<W: QuestWorld>(
     let o = op.object;
     match op.operate_fn {
         6 => act1::q5::tome_operate(ctl, w, o, player),
+        28 => act3::tome_operate(ctl, w, o, player),
+        31 => act3::decoy_operate(ctl, w, o, player),
+        44 => act3::stairs_operate(ctl, w, o, player),
+        45 => act3::lever_operate(ctl, w, o, player),
+        53 => act3::orb_operate(ctl, w, o, player),
+        57 => act3::chest_operate(ctl, w, o, player, KhalimChest::Heart),
+        58 => act3::chest_operate(ctl, w, o, player, KhalimChest::Eye),
+        59 => act3::chest_operate(ctl, w, o, player, KhalimChest::Brain),
         // The stone's value is its class (`quests-act1-rest.md` §2.1).
         9 => act1::q4::stone_operate(ctl, w, o, player, op.class),
         10 => act1::q4::gibbet_operate(ctl, w, o, player),
