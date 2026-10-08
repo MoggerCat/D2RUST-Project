@@ -74,6 +74,20 @@ fn tile(o: u32, main: u32, sub: u32, rarity: u32) -> TileInfo {
         subtile_flags: [0; 25],
         roof_height: 0,
         height: 0,
+        light_direction: light_direction(o),
+    }
+}
+
+/// `render/lighting.md` Open question 8: the light direction every 1.14d
+/// DT1 header carries for an orientation.
+fn light_direction(orientation: u32) -> u32 {
+    match orientation {
+        1 | 5 | 8 | 10 => 1,
+        2 | 6 | 9 | 11 => 2,
+        0 | 3 | 4 | 12..=14 => 3,
+        7 => 4,
+        15 => 5,
+        o => o - 10,
     }
 }
 
@@ -605,6 +619,10 @@ fn near_rooms_come_from_the_client_drlg() {
         (room.floors[0].dt1.roof_height, room.floors[0].dt1.height),
         (0, 0)
     );
+    // The DT1 light direction crosses the sim seam (`lighting.md` §11 r2):
+    // a floor's orientation 0 carries direction 3.
+    assert_eq!(room.floors[0].dt1.orientation, 0);
+    assert_eq!(room.floors[0].dt1.light_direction, 3);
     // The unit list in the client's order (newest first), the model's
     // facts over the inner feed's.
     let keys: Vec<UnitKey> = room.units.iter().map(|u| u.key).collect();
