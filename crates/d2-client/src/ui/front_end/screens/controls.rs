@@ -17,6 +17,7 @@ use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
+use crate::controls::keymap::{action_of_cmd, key_to_vk, vk_to_key};
 use crate::controls::original::{
     assign_key, menu_table, AssignError, BindingTable, MenuRow, SEPARATOR, UNBOUND,
 };
@@ -516,186 +517,11 @@ pub fn vk_name(vk: u16) -> String {
 
 // ---- controls.toml bridge (d2rs-own) ----------------------------------
 
-/// Original command → d2rs action, for the commands that have one.
-pub(crate) fn action_of_cmd(cmd: i32) -> Option<Act> {
-    use Act::*;
-    const SKILLS: [Act; 16] = [
-        SkillSlot1,
-        SkillSlot2,
-        SkillSlot3,
-        SkillSlot4,
-        SkillSlot5,
-        SkillSlot6,
-        SkillSlot7,
-        SkillSlot8,
-        SkillSlot9,
-        SkillSlot10,
-        SkillSlot11,
-        SkillSlot12,
-        SkillSlot13,
-        SkillSlot14,
-        SkillSlot15,
-        SkillSlot16,
-    ];
-    Some(match cmd {
-        0 => ToggleCharacter,
-        1 => ToggleInventory,
-        2 => ToggleParty,
-        4 => ToggleQuests,
-        5 => OpenChat,
-        6 => ToggleHelp,
-        7 => ToggleAutomap,
-        8 => CenterAutomap,
-        9 => ToggleAutomapFade,
-        12 => ToggleSkillTree,
-        13 => ToggleSkillMenuRight,
-        14..=21 => SKILLS[(cmd - 14) as usize],
-        22 => ToggleBelt,
-        23 => BeltSlot1,
-        24 => BeltSlot2,
-        25 => BeltSlot3,
-        26 => BeltSlot4,
-        35 => ToggleRun,
-        36 => StandStill,
-        37 => ShowItems,
-        38 => ClearScreen,
-        42 => Screenshot,
-        43 => ShowPortraits,
-        44 => SwapWeapons,
-        46..=53 => SKILLS[(cmd - 46 + 8) as usize],
-        56 => GameMenu,
-        _ => return None,
-    })
-}
-
-/// Windows virtual key (or 0x100…0x104 mouse) → portable [`Key`].
-pub fn vk_to_key(vk: u16) -> Option<Key> {
-    const LETTERS: [Key; 26] = [
-        Key::A,
-        Key::B,
-        Key::C,
-        Key::D,
-        Key::E,
-        Key::F,
-        Key::G,
-        Key::H,
-        Key::I,
-        Key::J,
-        Key::K,
-        Key::L,
-        Key::M,
-        Key::N,
-        Key::O,
-        Key::P,
-        Key::Q,
-        Key::R,
-        Key::S,
-        Key::T,
-        Key::U,
-        Key::V,
-        Key::W,
-        Key::X,
-        Key::Y,
-        Key::Z,
-    ];
-    const DIGITS: [Key; 10] = [
-        Key::Digit0,
-        Key::Digit1,
-        Key::Digit2,
-        Key::Digit3,
-        Key::Digit4,
-        Key::Digit5,
-        Key::Digit6,
-        Key::Digit7,
-        Key::Digit8,
-        Key::Digit9,
-    ];
-    const F: [Key; 12] = [
-        Key::F1,
-        Key::F2,
-        Key::F3,
-        Key::F4,
-        Key::F5,
-        Key::F6,
-        Key::F7,
-        Key::F8,
-        Key::F9,
-        Key::F10,
-        Key::F11,
-        Key::F12,
-    ];
-    const PAD: [Key; 10] = [
-        Key::Numpad0,
-        Key::Numpad1,
-        Key::Numpad2,
-        Key::Numpad3,
-        Key::Numpad4,
-        Key::Numpad5,
-        Key::Numpad6,
-        Key::Numpad7,
-        Key::Numpad8,
-        Key::Numpad9,
-    ];
-    Some(match vk {
-        0x41..=0x5A => LETTERS[usize::from(vk - 0x41)],
-        0x30..=0x39 => DIGITS[usize::from(vk - 0x30)],
-        0x70..=0x7B => F[usize::from(vk - 0x70)],
-        0x60..=0x69 => PAD[usize::from(vk - 0x60)],
-        0x10 => Key::LeftShift,
-        0x11 => Key::LeftCtrl,
-        0x12 => Key::LeftAlt,
-        0x20 => Key::Space,
-        0x0D => Key::Enter,
-        // Command 56's fixed key (`controls.md` §3, not reassignable).
-        0x1B => Key::Escape,
-        0x09 => Key::Tab,
-        0x08 => Key::Backspace,
-        0x13 => Key::Pause,
-        0x21 => Key::PageUp,
-        0x22 => Key::PageDown,
-        0x23 => Key::End,
-        0x24 => Key::Home,
-        0x25 => Key::Left,
-        0x26 => Key::Up,
-        0x27 => Key::Right,
-        0x28 => Key::Down,
-        0x2C => Key::PrintScreen,
-        0x2D => Key::Insert,
-        0x2E => Key::Delete,
-        0x6A => Key::NumpadMultiply,
-        0x6B => Key::NumpadAdd,
-        0x6D => Key::NumpadSubtract,
-        0x6F => Key::NumpadDivide,
-        0xBA => Key::Semicolon,
-        0xBB => Key::Equals,
-        0xBC => Key::Comma,
-        0xBD => Key::Minus,
-        0xBE => Key::Period,
-        0xBF => Key::Slash,
-        0xC0 => Key::Grave,
-        0xDB => Key::LeftBracket,
-        0xDC => Key::Backslash,
-        0xDD => Key::RightBracket,
-        0xDE => Key::Quote,
-        0x100 => Key::MouseMiddle,
-        0x101 => Key::Mouse4,
-        0x102 => Key::Mouse5,
-        0x103 => Key::MouseWheelUp,
-        0x104 => Key::MouseWheelDown,
-        _ => return None,
-    })
-}
-
-/// The inverse of [`vk_to_key`]; keys the table cannot hold give `None`.
-pub fn key_to_vk(k: Key) -> Option<u16> {
-    (0u16..=0x104).find(|&vk| vk_to_key(vk) == Some(k))
-}
-
-/// The table → effective play bindings: the `dev` preset with every mapped
-/// command replaced by its (slot 1, slot 0) keys; unmapped dev actions
-/// lose an input a mapped action in the same context now holds.
+/// The table → effective play bindings: the `original` preset with every
+/// command replaced by its (slot 1, slot 0) keys; the actions that are
+/// not commands lose an input a command in the same context now holds.
 pub fn table_to_bindings(t: &BindingTable) -> Bindings {
-    let mut b = Preset::Dev.bindings().expect("dev preset");
+    let mut b = Preset::Original.bindings().expect("original preset");
     let mut mapped = Vec::new();
     let mut held: Vec<(Context, Key)> = Vec::new();
     for cmd in 0..57 {
@@ -780,11 +606,11 @@ pub fn load_table(path: Option<&Path>) -> BindingTable {
     t
 }
 
-/// Write `t` to `path` as `controls.toml` over the `dev` preset.
+/// Write `t` to `path` as `controls.toml` over the `original` preset.
 pub fn save_table(t: &BindingTable, path: &Path) -> anyhow::Result<()> {
     let eff = table_to_bindings(t);
-    let file = ControlsFile::from_effective(Preset::Dev, &eff)
-        .ok_or_else(|| anyhow::anyhow!("dev preset unavailable"))?;
+    let file = ControlsFile::from_effective(Preset::Original, &eff)
+        .ok_or_else(|| anyhow::anyhow!("original preset unavailable"))?;
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir)?;
     }

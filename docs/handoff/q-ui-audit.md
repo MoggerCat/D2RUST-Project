@@ -51,6 +51,22 @@ and system seams (q-seam-audit) are out of scope.
 
 Gate on the branch: `cargo fmt --check`, `cargo clippy -p d2-client --all-targets -- -D warnings`, `cargo nextest run -p d2-client` (2205 run, all pass), `py tools/coverage.py --check`, `py tools/spec_index.py --check`. None of these ran on the real install (cloud, no game files fetched): M23 real-data checks are queued below.
 
+## Fixed on `claude/q-fix-ui-input` (follow-up session)
+
+| Build-queue row | What changed | Play-path test |
+|---|---|---|
+| q-fix-ui-grid-hover | `ItemsUi.hover` keeps the §5 hover state on every mouse event over an open inventory / stash / cube grid; an overhanging footprint keeps the last cell; the grid click places at it (`cursor_cell_for` gone). Placement tint (§4) not drawn: draw-sink work | `original_tests::grid_hover` (spec vector; stash last column) |
+| q-fix-ui-input-pass | input and `world_clicks` every loop pass (draw stays per tick); input reset `0x0044DA40` applied (`take_input_reset`, `ClickState::input_reset`); release outside the frame; focus-loss release | `tests/app_input_pass.rs` (3 tests, each red on the old code) |
+| q-fix-ui-close-hooks | `OriginalUi::set_ui` runs the close hook of every state it closes (stash 0x4F 0x12 in mode 0x0C / 0x0D, cube 0x4F 0x17, waypoint 0x49 level 0); a panel's own close keeps sending its own | `original_tests::close_hooks` (Esc) |
+| q-fix-ui-keys | `Preset::Original` from `COMMANDS` (§B4 r1 checked against `key-commands.tsv`), play default; 17 new actions; handlers M, O, Space, F9–F12, V, NumPad 0–7, Run / Stand Still / Show Items held, middle / X buttons, wheel | `controls::tests`, `edge` tests, `original_tests::key_commands`, `app_input_pass::the_play_keys_are_the_original_preset` |
+
+Still open from these rows: skill up / down (`0x004AA740`), clear text
+(`0x004A01E0`) and the F1–F8 skill hot keys (`0x004AA030`) have no spec'd
+callee in the client; the Run down handler's walk → run switch (C→S
+0x53 / 0x54); the key modes of §4.1 r4–r5; the short / long key names
+(`control-panel.md` §5 r4, r13); the `client/ui.md` §A6 naming conflict
+(spec task). None of this ran on the real install (cloud, no game files).
+
 ## Findings, most visible first
 
 Size: S = few lines, value in the spec; M = one module; L = needs a spec,

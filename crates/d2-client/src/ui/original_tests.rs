@@ -1253,3 +1253,204 @@ fn a_cursor_jump_effect_becomes_a_cursor_warp_to_the_new_x_at_the_same_y() {
     u.key(&w, Action::ToggleInventory);
     assert_eq!(u.ui.take_cursor_warp(), Some(Point::new(300, 77)));
 }
+
+/// The kept cursor cell (`inventory.md` §5 r3) on the play path: a world
+/// with a 2 × 3 (`qui `, graphic 56 × 84) or 2 × 2 (`gem2`, 56 × 56)
+/// item on the cursor, the panels' art rows and frame sizes set.
+mod grid_hover {
+    use super::*;
+    use crate::bridge::items::{mode, ItemArtRow};
+    use crate::ui::panels::inv_items::tests::world as item_world;
+
+    fn grid_ui(open: &[u8]) -> Ui {
+        let mut u = ui(Some(areas()), true);
+        let mut art = ItemArtRows::default();
+        let row = |w, h, f: &str| ItemArtRow {
+            inv_w: w,
+            inv_h: h,
+            inv_file: f.into(),
+            flippy_file: String::new(),
+        };
+        art.0.insert(*b"qui ", row(2, 3, "invqlt"));
+        art.0.insert(*b"gem2", row(2, 2, "invgem2"));
+        u.ui.set_item_art(art);
+        u.ui.set_item_frame_sizes(BTreeMap::from([
+            ("invqlt".to_string(), (56, 84)),
+            ("invgem2".to_string(), (56, 56)),
+        ]));
+        for &s in open {
+            u.ui.set_ui(u32::from(s), 0, false).unwrap();
+        }
+        u.ui.sync_root(&mut u.root);
+        u
+    }
+
+    fn cursor_world(code: &[u8; 4]) -> ClientWorld {
+        let mut w = item_world(&[(9, mode::CURSOR, (0, 0, 0, 0), code)], Some(9));
+        let p = w.local_player.unwrap();
+        w.units.get_mut(&p).unwrap().mode = 1;
+        w
+    }
+
+    // The spec vector: record 16, 2 × 3 item, graphic 56 × 84. A move to
+    // (500, 340) sets cell (2, 0); at (700, 340) the footprint overhangs
+    // the last column, the cell stays (2, 0), and the press there places
+    // the item at (2, 0) (0x18) instead of sending nothing.
+    // Covers: specs/ui/inventory.md §5 r3, §10 r4
+    #[test]
+    fn an_inventory_press_over_the_last_column_keeps_the_last_cell() {
+        let mut u = grid_ui(&[crate::ui::states::id::INVENTORY]);
+        let w = cursor_world(b"qui ");
+        u.send(&w, UiEvent::CursorMoved(Point::new(500, 340)));
+        u.send(&w, UiEvent::CursorMoved(Point::new(700, 340)));
+        u.click(&w, Point::new(700, 340));
+        let want = ClientIntent::from_message(&crate::bridge::items::insert(9, 2, 0, 0));
+        assert_eq!(u.root.take_intents(), vec![want]);
+    }
+
+    // The stash misclick (q-ui-audit.md §3): a 2 × 2 item moved over
+    // stash cell (4, 2), then pressed over the right half of the last
+    // column (c = (14 − 154 + 319) / 29 − 1 = 5, 2 + 5 > 6) is placed at
+    // the kept cell (4, 2) on page 4.
+    // Covers: specs/ui/inventory.md §5 r3, §10 r4
+    #[test]
+    fn a_stash_press_over_the_last_column_places_at_the_kept_cell() {
+        use crate::ui::states::id;
+        let mut u = grid_ui(&[id::STASH]);
+        let w = cursor_world(b"gem2");
+        u.send(&w, UiEvent::CursorMoved(Point::new(290, 239)));
+        u.click(&w, Point::new(319, 239));
+        let want = ClientIntent::from_message(&crate::bridge::items::insert(9, 4, 2, 4));
+        assert_eq!(u.root.take_intents(), vec![want]);
+    }
+}
+
+/// The close hooks `0x00455AE0` (`panels.md` §2 r6) of a close that is
+/// not the panel's own button: Esc's close-all here.
+mod close_hooks {
+    use super::*;
+    use crate::ui::states::id;
+
+    fn alive() -> ClientWorld {
+        let mut w = world(AMAZON, 1, true);
+        let p = w.local_player.unwrap();
+        w.units.get_mut(&p).unwrap().position = Some((100, 100));
+        w
+    }
+
+    fn esc(u: &mut Ui, w: &ClientWorld) -> Vec<ClientIntent> {
+        u.key(w, Action::GameMenu);
+        u.root.take_intents()
+    }
+
+    // Stash open in inventory mode 0x0C (S→C 0x77 0x10), Esc: the hook
+    // sends one 0x4F 0x12 and resets the mode; opened without the mode
+    // (not by the server) it sends nothing (§11 r7).
+    // Covers: specs/ui/panels.md §2 r6, §2 r9, §11 r5, §11 r7
+    #[test]
+    fn esc_closing_the_stash_sends_one_0x4f_0x12() {
+        let w = alive();
+        let mut u = ui(Some(areas()), true);
+        u.ui.set_ui(u32::from(id::STASH), 0, false).unwrap();
+        u.ui.msg.inventory_mode = msg_ui::MODE_STASH;
+        u.ui.sync_root(&mut u.root);
+        assert_eq!(
+            esc(&mut u, &w),
+            vec![ClientIntent(vec![0x4F, 0x12, 0, 0, 0, 0, 0])]
+        );
+        assert!(!u.ui.is_open(id::STASH));
+        assert_eq!(u.ui.msg.inventory_mode, 0);
+        // Mode 0: the hook sends nothing.
+        u.ui.set_ui(u32::from(id::STASH), 0, false).unwrap();
+        u.ui.sync_root(&mut u.root);
+        assert!(esc(&mut u, &w).is_empty());
+    }
+
+    // Covers: specs/ui/panels.md §2 r6, §12 r7; specs/ui/panels-2.md §20 r4
+    #[test]
+    fn esc_closing_the_cube_sends_one_0x4f_0x17() {
+        let w = alive();
+        let mut u = ui(Some(areas()), true);
+        u.ui.set_ui(u32::from(id::CUBE), 0, false).unwrap();
+        u.ui.msg.inventory_mode = msg_ui::MODE_CUBE;
+        u.ui.sync_root(&mut u.root);
+        assert_eq!(
+            esc(&mut u, &w),
+            vec![ClientIntent(vec![0x4F, 0x17, 0, 0, 0, 0, 0])]
+        );
+        assert_eq!(u.ui.msg.inventory_mode, 0);
+    }
+
+    // The waypoint menu open (S→C 0x63 stored), Esc: the latched 0x49
+    // with level 0; without a room for the player nothing is sent.
+    // Covers: specs/ui/panels.md §2 r6, §13 r1; specs/ui/menus.md §1 r5
+    #[test]
+    fn esc_closing_the_waypoint_menu_sends_0x49_level_0() {
+        let open = WaypointOpen {
+            guid: 0x0A,
+            record: Default::default(),
+            current: 1,
+            seq: 1,
+        };
+        let w = alive();
+        let mut u = ui(Some(areas()), true);
+        u.ui.shared.borrow_mut().waypoint_open = Some(open);
+        u.ui.set_ui(u32::from(id::WAYPOINT), 0, false).unwrap();
+        u.ui.sync_root(&mut u.root);
+        let want =
+            ClientIntent::from_message(&d2_proto::client::TakeOrCloseWp { wp: 0x0A, level: 0 });
+        assert_eq!(esc(&mut u, &w), vec![want]);
+        // No position (no room): the hook sends nothing.
+        let mut nowhere = alive();
+        let p = nowhere.local_player.unwrap();
+        nowhere.units.get_mut(&p).unwrap().position = None;
+        u.ui.set_ui(u32::from(id::WAYPOINT), 0, false).unwrap();
+        u.ui.sync_root(&mut u.root);
+        assert!(esc(&mut u, &nowhere).is_empty());
+    }
+}
+
+/// Key commands with an `OriginalUi` handler (`ui/controls.md` §3).
+mod key_commands {
+    use super::*;
+
+    // Space (command 38): the close-all; with nothing to close, the
+    // automap part is handed to the host once.
+    // Covers: specs/ui/controls.md §3 row23; specs/ui/panels.md §2 r9
+    #[test]
+    fn clear_screen_closes_all_then_asks_for_the_automap() {
+        let w = world(AMAZON, 1, true);
+        let mut u = ui(Some(areas()), true);
+        u.key(&w, Action::ToggleInventory);
+        assert!(u.ui.is_open(1));
+        u.key(&w, Action::ClearScreen);
+        assert!(!u.ui.is_open(1));
+        assert!(!u.ui.take_clear_automap(), "it closed something");
+        u.key(&w, Action::ClearScreen);
+        assert!(u.ui.take_clear_automap());
+        assert!(!u.ui.take_clear_automap());
+        assert!(!u.ui.is_open(9), "Space never opens the game menu");
+    }
+
+    // O (command 54) without a hireling: nothing opens.
+    // Covers: specs/ui/controls.md §3 row32
+    #[test]
+    fn the_hireling_key_needs_a_hireling() {
+        let w = world(AMAZON, 1, true);
+        let mut u = ui(Some(areas()), true);
+        u.key(&w, Action::ToggleHireling);
+        assert!(!u.ui.is_open(0x24));
+    }
+
+    // M (command 3): SetUIState(0x18, toggle, 0).
+    // Covers: specs/ui/controls.md §3 row4
+    #[test]
+    fn m_toggles_the_message_log_state() {
+        let w = world(AMAZON, 1, true);
+        let mut u = ui(Some(areas()), true);
+        u.key(&w, Action::ToggleMessageLog);
+        assert!(u.ui.is_open(0x18));
+        u.key(&w, Action::ToggleMessageLog);
+        assert!(!u.ui.is_open(0x18));
+    }
+}

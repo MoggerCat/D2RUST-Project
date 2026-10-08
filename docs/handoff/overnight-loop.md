@@ -12,7 +12,9 @@ session report or the hourly check-in).
    (q-cloud-game).
 3. Open `q-fix-*` rows in `docs/handoff/build-queue.tsv` from the audits
    (ui, render, seam, flow, audio, items, proto, save, prov).
-Rows that need the binary or a spec decision are not cloud work: list
+Cloud REC ids for new provisional points: REC-400..499 (below 300 is
+used up; 300..399 belong to PC 1). Rows that need the binary or a spec
+decision are not cloud work: list
 them for PC 1 in `docs/handoff/pc1-data.md` §Step 4 and skip.
 
 ## Token rules
