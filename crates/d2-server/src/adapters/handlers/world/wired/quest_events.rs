@@ -22,6 +22,8 @@ use super::{quest_call, ActionEvents, TradeRest, WiredWorld};
 
 /// Andariel's monster class (`monstats.txt` row 156).
 const ANDARIEL: u16 = 156;
+/// Mephisto's monster class (`monstats.txt` row 242, `quests-act3.md` §8).
+const MEPHISTO: u16 = d2_sim::world::quests::act3::npc::MEPHISTO;
 
 /// The level each player was last seen in.
 #[derive(Debug, Default)]
@@ -78,6 +80,12 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                         // spec links Andariel to chain 6.
                         if w.monster_class(victim) == Some(ANDARIEL) {
                             q.add_link(w, victim, 6, None);
+                        }
+                        // PROVISIONAL (REC-142, d2rs-own, unverified): the
+                        // Guardian's link to Mephisto is by class, as
+                        // Andariel's; no spec names where chain 20 is added.
+                        if w.monster_class(victim) == Some(MEPHISTO) {
+                            q.add_link(w, victim, 20, None);
                         }
                         q.monster_killed(w, victim, killer);
                     }
