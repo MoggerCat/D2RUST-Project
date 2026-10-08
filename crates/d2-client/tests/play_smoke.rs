@@ -766,3 +766,53 @@ fn the_field_leg_kills_levels_up_and_spends_a_point() {
     run.check("spend a stat point");
     assert_eq!(level(&mut run, 4), 4);
 }
+
+/// The five-act fixture set (`test_fixtures::acts::all_acts`) with the
+/// patches `play_native.rs` makes, so the play app's live build
+/// (`GameData::Live`, every act created) runs on it.
+fn five_act_set() -> test_fixtures::synth::Synthetic {
+    let mut s = test_fixtures::acts::all_acts();
+    let pad = |s: &mut test_fixtures::synth::Synthetic, txt: &str, col: &str, n: usize| {
+        let m = s.tables.files.get_mut(txt).unwrap();
+        let id = m.columns.iter().position(|c| c == col).unwrap();
+        let mut row = m.rows[0].clone();
+        while m.rows.len() < n {
+            row[id] = format!("pad{}", m.rows.len());
+            m.rows.push(row.clone());
+        }
+    };
+    // The fix-up of monstats record 707 reads monmode 15; the hireling
+    // table reads pettype row 7.
+    pad(&mut s, "monmode.txt", "name", 16);
+    pad(&mut s, "pettype.txt", "pet type", 8);
+    // `WaypointTables::live` needs a waypoint object (operatefn 23,
+    // initfn 17).
+    let o = s.tables.files.get_mut("objects.txt").unwrap();
+    for (col, v) in [("OperateFn", "23"), ("InitFn", "17")] {
+        let c = o.columns.iter().position(|x| x == col).unwrap();
+        o.rows[0][c] = v.into();
+    }
+    s
+}
+
+/// The five-act install on disk (in the test's own temp folder).
+fn five_act_install(name: &str) -> std::path::PathBuf {
+    let dir = std::path::PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
+        .join(format!("smoke-{}-{name}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    test_fixtures::install::build(&dir, &five_act_set()).unwrap();
+    dir
+}
+
+/// The play app's live build (`GameData::select` on an install, every
+/// act created, `LevelSource::live`) runs on the five-act fixture install
+/// (it stopped at `Drlg(UnknownLevel(40))` on the Act I install, F2).
+#[test]
+fn the_live_play_game_builds_on_the_five_act_install() {
+    let dir = five_act_install("build");
+    let data = GameData::select(Some(&dir), false).unwrap();
+    assert!(matches!(data, GameData::Live(_)));
+    let g = single_player::build(&data, single_player::DEFAULT_SEED);
+    assert!(g.is_ok(), "{:?}", g.err());
+}
