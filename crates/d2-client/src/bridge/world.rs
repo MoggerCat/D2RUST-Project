@@ -1252,6 +1252,9 @@ pub struct LevelRow {
     pub rain: bool,
     /// `Mud` (+0x06, `render/draw-order-2.md` §11.5).
     pub mud: bool,
+    /// The level's `leveldefs` `Intensity`, `Red`, `Green`, `Blue`
+    /// (`render/lighting.md` §3.1 r2; the darkness base of §10 r3).
+    pub ambient: crate::rules::lighting::environment::Ambient,
 }
 
 /// Inputs of the message rules that are not model state.
