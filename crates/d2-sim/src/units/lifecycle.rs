@@ -47,6 +47,12 @@ pub trait LifecycleHooks: UnitHooks {
     /// over. Provider: whoever tracks units between steps 7 and 8.
     fn added(&mut self, sim: &mut Sim<'_>, unit: UnitId) {}
 
+    /// The quest/NPC act change `0x0054B830(game, player, level, arg)`
+    /// (`npc.md` §8.3), asked from a call that holds no view of the
+    /// unit side. Provider: the host that owns the path code, which runs
+    /// it right after the call; the default drops it.
+    fn request_act_change(&mut self, player: UnitId, level: u32, arg: u32) {}
+
     /// The free routine's other calls (§1 table) and `0x005C0A90`,
     /// `0x00571F40` at removal. Provider: the kind's spec.
     fn free_kind(&mut self, sim: &mut Sim<'_>, unit: UnitId) {}
