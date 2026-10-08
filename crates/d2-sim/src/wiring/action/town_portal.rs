@@ -126,7 +126,7 @@ impl<X: Pending> View<'_, X> {
     /// `0x0056D130` for a quest portal (Tyrael's, `quests-act2.md` §8.11):
     /// one portal object of `class` in mode 1 at the free spot nearest
     /// (x, y) in `player`'s room, to `level`, owned by the player.
-    /// PROVISIONAL (REC-174): no partner object at the destination; the
+    /// PROVISIONAL (REC-231): no partner object at the destination; the
     /// spot rules are the town portal's. `// d2rs-own, unverified`.
     pub fn create_quest_portal(
         &mut self,

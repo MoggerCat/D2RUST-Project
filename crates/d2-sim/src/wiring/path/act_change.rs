@@ -90,7 +90,7 @@ pub fn run<X: Pending>(mut c: PathCtx<'_, X>, player: UnitId, level: u32, tile_i
     }
     // The unit record's act (+0x18) follows the player: the monster AI's
     // "same act" target test (`ai.md` §5.2 step 5.1) reads it. d2rs-own,
-    // unverified (REC-174).
+    // unverified (REC-231).
     if let Some(r) = c.v.units.get_mut(player) {
         r.act = act;
     }

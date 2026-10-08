@@ -5,14 +5,16 @@
 //! state 3), Tyrael's message 302 opens the portal and gives the credit,
 //! Jerhyn's 442 and Meshif's 450 move the quest on, and Meshif's travel
 //! row leads to Act III.
-//! PROVISIONAL (REC-174): d2rs-own, unverified.
+//! PROVISIONAL (REC-231): d2rs-own, unverified.
 
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
 use bevy::prelude::*;
 use d2_client::app::monster_ai::MonsterAi;
-use d2_client::app::play::{add_client_data, add_game, add_walk, predict_link, send_create_game_for};
+use d2_client::app::play::{
+    add_client_data, add_game, add_walk, predict_link, send_create_game_for,
+};
 use d2_client::app::server_thread::ThreadLink;
 use d2_client::app::single_player::{self, BuildError, GameData, ACT2_TOWN};
 use d2_client::app::synthetic_act2 as a2;
@@ -223,12 +225,11 @@ fn start_ai(server: &Server, m: UnitId) {
 }
 
 fn send(app: &mut App, m: &[u8]) {
-    let r = app
-        .world_mut()
+    app.world_mut()
         .resource_mut::<BridgeResource>()
         .0
-        .send_bytes(m);
-    eprintln!("SENT {r:?} {m:?}");
+        .send_bytes(m)
+        .unwrap();
 }
 
 /// C→S 0x31: the message `msg` to the NPC `guid`.
@@ -369,19 +370,12 @@ fn duriel_fights_tyrael_opens_the_portal_and_meshif_travels_east() {
             v.set_base(duriel, MAXDAMAGE, 64);
         });
     });
-    let mode_of = |server: &Server| app_support::with(server, |l| {
-        let sim = &l.host().game;
-        let (p, _) = single_player::local_player(sim).unwrap();
-        sim.events.action.sys.units.get(p).map(|u| u.mode)
-    });
-    eprintln!("MODE before fight {:?}", mode_of(&server));
     let before = life(&server);
     start_ai(&server, duriel);
     for _ in 0..120 {
         step(&mut app);
     }
     let after = life(&server);
-    eprintln!("MODE after fight {:?}", mode_of(&server));
     assert!(after < before, "Duriel hit the player: {before} -> {after}");
 
     // The player lives to see it: Duriel dies by his hand (the kill
@@ -409,11 +403,6 @@ fn duriel_fights_tyrael_opens_the_portal_and_meshif_travels_east() {
     // Tyrael: message 302 opens the portal to Lut Gholein.
     let (_, tyrael) = spawn(&server, TYRAEL);
     assert_eq!(objects_of(&app, PORTAL), 0);
-    eprintln!("LIFE before talk {} mode {:?}", life(&server), app_support::with(&server, |l| {
-        let sim = &l.host().game;
-        let (p, _) = single_player::local_player(sim).unwrap();
-        sim.events.action.sys.units.get(p).map(|u| u.mode)
-    }));
     say(&mut app, tyrael, 302);
     for _ in 0..60 {
         step(&mut app);
