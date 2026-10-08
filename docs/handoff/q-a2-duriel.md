@@ -1,6 +1,6 @@
 # q-a2-duriel: the Horadric Staff, Duriel's Lair and the Duriel kill in the play preview
 
-Branch `claude/q-a2-duriel`. Nothing is verified against 1.14d (rule 10). Open point: REC-159 (`docs/HANDOFF.md` §7).
+Branch `claude/q-a2-duriel`. Nothing is verified against 1.14d (rule 10). Open point: REC-163 (`docs/HANDOFF.md` §7).
 
 ## Links connected
 
@@ -16,7 +16,7 @@ The quest rules (`act2/q6.rs`: orifice operate, `item_to_object`, `hand_in`, the
 
 Tests: `d2-server` `quests_act2::the_staff_put_in_the_orifice_is_handed_in` (0x44 event: a wrong item refused, the staff handed in); `d2-client` `tests/app_a2_duriel.rs` (staff tomb has the orifice, the Lair tile is refused while closed, opens, Lair reached, Duriel's death: chain 13 state 3 and killed). `app_act2_dungeons` stops its chain walk at the Lair (new world, not a weaker assertion).
 
-## PROVISIONAL (REC-159)
+## PROVISIONAL (REC-163)
 
 See HANDOFF §7. All `// d2rs-own, unverified`.
 

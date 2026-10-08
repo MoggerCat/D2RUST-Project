@@ -106,22 +106,24 @@ fn object(f: &mut Fx, class: u32) -> UnitId {
         .unwrap()
 }
 
-/// A real item of the one-row table (`hst `, a quest item), in the
-/// cursor mode.
-fn staff(f: &mut Fx, code: &[u8; 4]) -> UnitId {
+/// A real item of the two-row table (0 `hst `, 1 `msf `), in the cursor
+/// mode.
+fn staff(f: &mut Fx, index: i32) -> UnitId {
     use d2_sim::items::tables::ItemRec;
     use d2_sim::items::{q, ItemRequest, ItemTables};
     use d2_sim::wiring::economy::ItemSpawn;
     f.world().tables = ItemTables {
-        items: vec![ItemRec {
-            code: *code,
-            level: 1,
-            ..ItemRec::default()
-        }],
+        items: [b"hst ", b"msf "]
+            .map(|code| ItemRec {
+                code: *code,
+                level: 1,
+                ..ItemRec::default()
+            })
+            .to_vec(),
         ..ItemTables::default()
     };
     let mut rq = ItemRequest {
-        item: 0,
+        item: index,
         format: 101,
         quality: q::NORMAL,
         ..ItemRequest::default()
@@ -147,7 +149,7 @@ fn the_staff_put_in_the_orifice_is_handed_in() {
     f.world().quests.record_mut(13).unwrap().not_intro = true;
     let orifice = object(&mut f, 152);
     let og = f.guid(orifice);
-    let (hst, msf) = (staff(&mut f, b"hst "), staff(&mut f, b"msf "));
+    let (hst, msf) = (staff(&mut f, 0), staff(&mut f, 1));
     let (hg, mg) = (f.guid(hst), f.guid(msf));
     // Another item is refused (0x58 result 4); the staff is not handed in.
     queue(
@@ -182,7 +184,8 @@ fn the_staff_put_in_the_orifice_is_handed_in() {
     );
     frame(&mut f);
     let x = &f.world().quests.record(13).unwrap().extra.a2.q6;
-    assert!(x.staff_removed && x.objects_update && x.timer_active);
+    let got = (x.staff_removed, x.objects_update, x.timer_active);
+    assert_eq!(got, (true, true, true), "{:?}", f.world().quests.faults);
     assert!(f.world().quests.faults.is_empty());
     assert_eq!(f.world().rest.object_modes[&orifice], 1);
 }

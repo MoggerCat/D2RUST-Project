@@ -26,7 +26,7 @@ pub const MAGGOT_LAIR_1: u32 = 62;
 pub const FIRST_TOMB: u32 = 66;
 pub const ARCANE_SANCTUARY: u32 = 74;
 /// Duriel's Lair: entered from the tomb holding the orifice, behind the
-/// quest gate (q-a2-duriel, d2rs-own, unverified, REC-159).
+/// quest gate (q-a2-duriel, d2rs-own, unverified, REC-163).
 pub const DURIELS_LAIR: u32 = 73;
 /// The orifice's and the lair entrance's `objects` rows (`objects.txt`).
 pub const ORIFICE_CLASS: u32 = 152;

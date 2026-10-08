@@ -81,7 +81,7 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                         QuestEvent::AncientsDisarm => act5::q5::disarm(q),
                         QuestEvent::BaalToStairs => act5::q6::chamber_open(q, w),
                         QuestEvent::AnyaOpenPortal { unit } => act5::q4::anya_ai_portal(q, w, unit),
-                        // C→S 0x44 (REC-159): the staff in the orifice.
+                        // C→S 0x44 (REC-163): the staff in the orifice.
                         QuestEvent::InsertItem {
                             player,
                             object,
@@ -107,7 +107,7 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                         if w.monster_class(victim) == Some(MEPHISTO) {
                             q.add_link(w, victim, 20, None);
                         }
-                        // PROVISIONAL (REC-159, d2rs-own, unverified): Duriel's
+                        // PROVISIONAL (REC-163, d2rs-own, unverified): Duriel's
                         // link to chain 13 is by class, as Andariel's.
                         if w.monster_class(victim) == Some(DURIEL) {
                             q.add_link(w, victim, 13, None);

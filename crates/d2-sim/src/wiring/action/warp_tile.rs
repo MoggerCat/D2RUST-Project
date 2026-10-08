@@ -28,7 +28,7 @@ use super::{Pending, View};
 /// read (it takes type 1). PROVISIONAL (REC-124); d2rs-own, unverified.
 pub const HOST_MONSTER_PRESET: u32 = 6;
 /// Preset unit type for an object the host's level types provider lists
-/// (q-a2-duriel, REC-159; d2rs-own, unverified): created through the
+/// (q-a2-duriel, REC-163; d2rs-own, unverified): created through the
 /// object state's `create_object` (allocation and the §3 init).
 pub const HOST_OBJECT_PRESET: u32 = 7;
 

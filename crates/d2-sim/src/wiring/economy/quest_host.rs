@@ -840,7 +840,7 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
             self.inner.drop_gold(object)
         }
     }
-    /// d2rs-own, unverified (REC-159): the has-portal room flag
+    /// d2rs-own, unverified (REC-163): the has-portal room flag
     /// (`0x0061AED0`) is not modelled; nothing reads it here.
     fn set_room_portal(&mut self, _room: RoomId, _on: bool) {}
     /// `0x00555230` (mode 0 form) on the object state when there is one
@@ -851,7 +851,7 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
         }
         self.inner.spawn_quest_object(room, x, y, class)
     }
-    /// d2rs-own, unverified (REC-159): `0x00535060` is not read; never
+    /// d2rs-own, unverified (REC-163): `0x00535060` is not read; never
     /// busy.
     fn player_busy(&mut self, _player: UnitId) -> bool {
         false
@@ -860,7 +860,7 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
         self.inner.open_insert_dialog(player, object)
     }
     /// `missiles.txt` `Range` (u16 +0x96) of the action tables' row
-    /// (`quests-act2.md` §8.7). d2rs-own, unverified (REC-159): a table
+    /// (`quests-act2.md` §8.7). d2rs-own, unverified (REC-163): a table
     /// without row 338 (the synthetic game) answers the live value 440
     /// (spec test vector, lair timer period 18).
     fn missile_range(&mut self, row: u32) -> Option<i32> {

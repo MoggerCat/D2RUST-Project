@@ -6,7 +6,7 @@
 //! then the warp leads into level 73, and Duriel's death moves chain 13
 //! (state 3, killed). The staff hand-in itself is the `d2-server`
 //! `quests_act2` test (the synthetic game has no item tables for `hst `).
-//! PROVISIONAL (REC-159): d2rs-own, unverified.
+//! PROVISIONAL (REC-163): d2rs-own, unverified.
 
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};

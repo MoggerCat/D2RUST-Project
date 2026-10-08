@@ -681,7 +681,7 @@ impl Pending for LocalSeams {
     }
     /// `0x00545B80` for level 73 (`quests.md` §8.2, `quests-act2.md`
     /// §8.8): closed until the lair is open, and then only from the tomb
-    /// holding the orifice (d2rs-own, unverified, REC-159: the synthetic
+    /// holding the orifice (d2rs-own, unverified, REC-163: the synthetic
     /// Lair has a way in from every tomb).
     fn warp_quest_gate(&self, source: u32, level: u32) -> u32 {
         u32::from(
@@ -692,7 +692,7 @@ impl Pending for LocalSeams {
         self.lair_open = open;
     }
     /// C→S 0x44 (`quests-act2-2.md` §3.2): queued for the quest control
-    /// (REC-159, d2rs-own, unverified: it runs after the tick, not inside
+    /// (REC-163, d2rs-own, unverified: it runs after the tick, not inside
     /// the handler); the handler's own result is 0.
     fn staff_in_orifice(
         &mut self,
@@ -1145,7 +1145,7 @@ impl WaypointTables {
         // Class 100: Duriel's Lair entrance (a quest object, `quests-act2.md`
         // §8.8; no operate here, the way in is the warp tile), and class
         // 152: the orifice (operate 25, init 21). d2rs-own, unverified
-        // (REC-159).
+        // (REC-163).
         objects.resize(synthetic_act2::LAIR_ENTRANCE_CLASS as usize, blank());
         let mut entrance: Objects = blank();
         entrance.framecnt1 = 15 << 8;
