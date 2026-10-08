@@ -155,13 +155,17 @@ fn monster() -> (Vec<Monstats>, Vec<Monstats2>) {
     (vec![m], vec![m2])
 }
 
-/// The A1 records (attack event 1 on frame 2) of the monster and of
-/// every player class, and the fixture's death records.
+/// The A1 records (attack event 1 on frame 2) and the DT records (6
+/// frames, no event) of the monster and of every player class. A name
+/// the file lacks gets the default record (`animdata.md` §3, 2048
+/// frames), so without a DT record the player's death would not end.
 fn anim_data() -> AnimData {
     let mut a = fx::anim_data();
-    let mut put = |name: [u8; 8]| {
+    let mut put = |name: [u8; 8], event: bool| {
         let mut events = [0u8; animdata::EVENTS];
-        events[2] = 1;
+        if event {
+            events[2] = 1;
+        }
         let len = name.iter().position(|&b| b == 0).unwrap();
         a.buckets[animdata::hash(&name[..len])].push(AnimRecord {
             name,
@@ -170,9 +174,11 @@ fn anim_data() -> AnimData {
             events,
         });
     };
-    put(*b"ZOA1HTH\0");
+    put(*b"ZOA1HTH\0", true);
+    put(*b"ZODTHTH\0", false);
     for t in TOKENS {
-        put([t[0], t[1], b'A', b'1', b'H', b'T', b'H', 0]);
+        put([t[0], t[1], b'A', b'1', b'H', b'T', b'H', 0], true);
+        put([t[0], t[1], b'D', b'T', b'H', b'T', b'H', 0], false);
     }
     a
 }
@@ -203,8 +209,13 @@ fn install_fixtures(sim: &mut single_player::Sim) {
         "dt", "nu", "wl", "gh", "a1", "a2", "bl", "sc", "s1", "s2", "s3", "s4", "dd", "kb", "sq",
         "rn",
     ];
-    let mut player_modes = vec![code(b"NU"); 20];
-    player_modes[7] = code(b"A1");
+    let player_modes = [
+        "DT", "NU", "WL", "RN", "GH", "TN", "TW", "A1", "A2", "BL", "SC", "TH", "KK", "S1", "S2",
+        "S3", "S4", "DD", "SQ",
+    ]
+    .iter()
+    .map(|m| code(m.as_bytes()))
+    .collect();
     s.hooks.x.looks = Some(Arc::new(UnitLooks {
         player_tokens: TOKENS.iter().map(|t| code(&t[..])).collect(),
         player_modes,
@@ -465,14 +476,19 @@ impl Rig {
                     .expect("monster");
                 a.with(&mut sim.game, |_, v| {
                     v.set_base(m, stat::LEVEL, 1);
+                    // The kill's experience, as monster init sets it.
+                    v.set_base(m, EXPERIENCE, 100);
                     v.set_base(m, stat::MAXHP, life << 8);
                     v.set_base(m, stat::HITPOINTS, life << 8);
                     v.set_base(m, TOHIT, 1000);
                     v.set_base(m, MINDAMAGE, 3 << 8);
                     v.set_base(m, MAXDAMAGE, 3 << 8);
                 });
+                // Monster init's unit flags (`monsters/init.md`: |= 0x0A,
+                // 0x04 for `isAtt`); without 0x02 the skill start's
+                // target check clears the target (`use.md` §5.3 step 2).
                 a.sys.units.get_mut(m).unwrap().flags |=
-                    flags::IS_VALID_TARGET | flags::CAN_BE_ATTACKED;
+                    flags::BIT1 | flags::IS_VALID_TARGET | flags::CAN_BE_ATTACKED;
                 if ai {
                     a.ai(&mut sim.game, |g, cx| {
                         cx.store.entry(m).control = Some(AiControl::default());
@@ -668,43 +684,36 @@ fn the_synthetic_play_join_is_clean() {
 
 // Covers: specs/skills/use.md §5; specs/combat/vitals.md §4
 #[test]
-#[ignore = "q-smoke-combat: stops at the left-skill kill (open break 3, docs/handoff/q-smoke-combat.md)"]
 fn amazon_fights_levels_dies_and_respawns() {
     scenario(0);
 }
 
 #[test]
-#[ignore = "q-smoke-combat: stops at the left-skill kill (open break 3, docs/handoff/q-smoke-combat.md)"]
 fn sorceress_fights_levels_dies_and_respawns() {
     scenario(1);
 }
 
 #[test]
-#[ignore = "q-smoke-combat: stops at the left-skill kill (open break 3, docs/handoff/q-smoke-combat.md)"]
 fn necromancer_fights_levels_dies_and_respawns() {
     scenario(2);
 }
 
 #[test]
-#[ignore = "q-smoke-combat: stops at the left-skill kill (open break 3, docs/handoff/q-smoke-combat.md)"]
 fn paladin_fights_levels_dies_and_respawns() {
     scenario(3);
 }
 
 #[test]
-#[ignore = "q-smoke-combat: stops at the left-skill kill (open break 3, docs/handoff/q-smoke-combat.md)"]
 fn barbarian_fights_levels_dies_and_respawns() {
     scenario(4);
 }
 
 #[test]
-#[ignore = "q-smoke-combat: stops at the left-skill kill (open break 3, docs/handoff/q-smoke-combat.md)"]
 fn druid_fights_levels_dies_and_respawns() {
     scenario(5);
 }
 
 #[test]
-#[ignore = "q-smoke-combat: stops at the left-skill kill (open break 3, docs/handoff/q-smoke-combat.md)"]
 fn assassin_fights_levels_dies_and_respawns() {
     scenario(6);
 }
