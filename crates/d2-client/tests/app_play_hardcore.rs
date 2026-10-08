@@ -69,7 +69,14 @@ fn local_mode(app: &App) -> u32 {
         .mode
 }
 
-fn run(hardcore: bool) -> (Option<Vec<(d2_sim::units::UnitId, u32)>>, bool, bool, u16) {
+struct Outcome {
+    dropped: Vec<(d2_sim::units::UnitId, u32)>,
+    left: bool,
+    dead: bool,
+    status: u16,
+}
+
+fn run(hardcore: bool) -> Outcome {
     let data = GameData::Synthetic;
     let character = single_player::new_character("sorceress", "Test").unwrap();
     let ms = Arc::new(AtomicU32::new(1000));
@@ -148,14 +155,24 @@ fn run(hardcore: bool) -> (Option<Vec<(d2_sim::units::UnitId, u32)>>, bool, bool
         .unwrap();
     let base = save::base_save(&character);
     let written = save::apply_live(&base, &live, 1).header.status;
-    (Some(dropped), left, live.hardcore_dead, written)
+    Outcome {
+        dropped,
+        left,
+        dead: live.hardcore_dead,
+        status: written,
+    }
 }
 
-// Covers: specs/sim/intents-events.md §9 r6, specs/formats/d2s.md §2.2
+// Covers: specs/sim/intents-events.md §9 r6
+// Covers: specs/formats/d2s.md §2.2 r5
 #[test]
 fn a_hardcore_death_drops_the_client_and_marks_the_save_dead() {
-    let (dropped, left, dead, status) = run(true);
-    let dropped = dropped.unwrap();
+    let Outcome {
+        dropped,
+        left,
+        dead,
+        status,
+    } = run(true);
     assert_eq!(dropped.len(), 1, "the client was dropped");
     assert_eq!(dropped[0].1, 3, "reason 3, the hardcore resurrect");
     assert!(left, "the game closes");
@@ -169,8 +186,13 @@ fn a_hardcore_death_drops_the_client_and_marks_the_save_dead() {
 // Covers: specs/sim/intents-events.md §9 r6
 #[test]
 fn a_softcore_death_respawns_and_the_save_stays_alive() {
-    let (dropped, left, dead, status) = run(false);
-    assert!(dropped.unwrap().is_empty());
+    let Outcome {
+        dropped,
+        left,
+        dead,
+        status,
+    } = run(false);
+    assert!(dropped.is_empty());
     assert!(!left);
     assert!(!dead);
     assert_eq!(status & d2_formats::d2s::status::DEAD, 0);
