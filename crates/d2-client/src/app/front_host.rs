@@ -102,6 +102,14 @@ impl FrontArt {
             .as_ref()
     }
 
+    /// Width of `text` in font `id`, from the font table's advances (0 when
+    /// the font is missing).
+    pub fn text_width(&mut self, id: u16, text: &[u16]) -> i32 {
+        self.font(id).map_or(0, |(t, _)| {
+            crate::ui::front_end::glyphs::text_width(t, text)
+        })
+    }
+
     fn dc6(&mut self, file: &'static str) -> Option<&Dc6> {
         let source = &self.source;
         self.cache
@@ -269,12 +277,6 @@ pub struct FrontHost {
     stub: Option<(NewCharacterSink, PathBuf)>,
     /// The stub `.d2s` written for the last created character, or why not.
     pub created: Option<Result<PathBuf, String>>,
-}
-
-/// `// d2rs-own, unverified` (REC-231): until the glyph path (q-fe-draw)
-/// lands, a fixed advance of 8 per unit stands for the font's.
-pub fn provisional_adv(_font: u16, text: &[u16]) -> i32 {
-    8 * text.len() as i32
 }
 
 /// Registers the credits screen with the text read from the archives when no
@@ -504,7 +506,14 @@ fn draw(
     let host = &mut *host;
     host.frames += 1;
     host.drawn = host.front.draw();
-    let over = host.front.overlay(&provisional_adv);
+    let over = match host.art.as_mut() {
+        Some(art) => {
+            let art = std::cell::RefCell::new(art);
+            host.front
+                .overlay(&|font, text| art.borrow_mut().text_width(font, text))
+        }
+        None => host.front.overlay(&|_, _| 0),
+    };
     host.drawn.extend(over);
     if let Some(img) = img {
         if let Some(mut i) = images.get_mut(&img.0) {
