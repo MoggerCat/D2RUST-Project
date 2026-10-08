@@ -651,6 +651,14 @@ fn world_view_frame(
                 None => (0, None),
             };
             let cam = super::corpse_click::camera_for(bridge.0.world(), view.open_mode);
+            // d2rs-own, unverified (D1): the hover target (the preview's pick
+            // under the cursor) is drawn highlighted (`blend-modes.md` §3 `h`).
+            let over = matches!(ui.cursor, Some(FramePos::Inside(_)));
+            let hover = cam
+                .as_ref()
+                .filter(|_| over && state.preview)
+                .and_then(|c| crate::bridge::hover::pick(bridge.0.world(), c, mouse));
+            state.feed.set_hover(hover);
             let unhandled =
                 state
                     .corpse_clicks
