@@ -188,6 +188,9 @@ pub struct Dt1Facts {
     pub height: i32,
     /// Material flags (§6 r2: bit 0x2 starts water effects).
     pub material: u16,
+    /// Light direction (+0x00): the wall light points of
+    /// `render/lighting.md` §11 r2.
+    pub light_direction: u32,
 }
 
 /// A record's fade bytes (§8, §9: +0x24, +0x28, +0x29, +0x2A, +0x2C).
@@ -852,6 +855,10 @@ pub struct OrderedTile {
     pub dt1: Dt1Facts,
     /// The record's alpha byte at its draw (0xFF opaque).
     pub alpha: u8,
+    /// The record's fade state (+0x24) as this frame's §8 filing left it
+    /// (the §6 r1 advance changes only bit 1); bit 0 picks the faded wall
+    /// light points (`lighting.md` §11 r2).
+    pub fade_state: u8,
     pub key: OrderKey,
 }
 
@@ -933,6 +940,7 @@ impl Passes<'_> {
             cell: absolute(r, rec),
             dt1: rec.dt1,
             alpha: rec.fade.alpha,
+            fade_state: rec.fade.state,
             key: at,
         }));
     }
@@ -1102,6 +1110,7 @@ fn edge_floors(
             cell: f.tile(),
             dt1: rec.dt1,
             alpha: rec.fade.alpha,
+            fade_state: rec.fade.state,
             key: edges::edge_key(rooms, n),
         })
     });
