@@ -276,6 +276,81 @@ fn expected(a: &Answers, msg: &[u8], size: usize) -> Option<ResultCode> {
     None
 }
 
+/// The sender's filter state from spec §2.1 rule 1, independent of
+/// `d2_server::transport`: the 0x200-byte store at `0x007BB3B8` (zeroed,
+/// overwritten only over each sent message's size) and the time at
+/// `0x007BB5B8`.
+struct FilterModel {
+    store: Vec<u8>,
+    at: u32,
+}
+
+impl Default for FilterModel {
+    fn default() -> Self {
+        Self {
+            store: vec![0; 0x200],
+            at: 0,
+        }
+    }
+}
+
+impl FilterModel {
+    /// True when `m` (shorter than 0x200 bytes) is sent at `now`.
+    fn pass(&mut self, m: &[u8], now: u32) -> bool {
+        let window = match m.first() {
+            Some(0x05..=0x0A | 0x0C..=0x11) => Some(50),
+            Some(0x3A) | None => None,
+            Some(_) => Some(200),
+        };
+        if let Some(w) = window {
+            if self.store[..m.len()] == *m && now.wrapping_sub(self.at) < w {
+                return false;
+            }
+        }
+        self.store[..m.len()].copy_from_slice(m);
+        self.at = now;
+        true
+    }
+}
+
+/// Regression (`duplicate_filter_any`, seen once under nextest): the
+/// store keeps bytes past a shorter message, so a longer message whose
+/// tail matches them is a repeat although no sent message starts with
+/// it. The old oracle (`last.starts_with(m)`) called this drop wrong.
+#[test]
+fn duplicate_filter_store_tail() {
+    let mut f = DuplicateFilter::default();
+    assert_eq!(f.pass(&[0x20, 1, 2, 3], 0), Ok(true));
+    assert_eq!(f.pass(&[0x21], 300), Ok(true));
+    // Store is now 21 01 02 03: within 200 ms, 21 01 02 repeats it.
+    assert_eq!(f.pass(&[0x21, 1, 2], 350), Ok(false));
+    // The store and time stay as they were after a drop.
+    assert_eq!(f.pass(&[0x21, 1, 2, 3], 499), Ok(false));
+    assert_eq!(f.pass(&[0x21, 1, 2, 3], 500), Ok(true));
+}
+
+/// Regression: the store and time start zeroed, so an all-zero message
+/// inside the first 200 ms is dropped before anything was sent, and a
+/// short message followed by itself plus zero bytes repeats the zeroed
+/// tail. The first assert is the shrunk failing input of the old oracle
+/// (`sends = [([0x00], 0)]`; PROPTEST_RNG_SEED 1, 2 and 3 all reach it,
+/// after about 23k–60k cases).
+#[test]
+fn duplicate_filter_zeroed_store() {
+    let mut f = DuplicateFilter::default();
+    assert_eq!(f.pass(&[0x00], 0), Ok(false));
+    assert_eq!(f.pass(&[0x00, 0x00], 199), Ok(false));
+    assert_eq!(f.pass(&[0x00, 0x00], 200), Ok(true));
+    let mut f = DuplicateFilter::default();
+    assert_eq!(f.pass(&[0x20], 1000), Ok(true));
+    assert_eq!(f.pass(&[0x20, 0x00], 1100), Ok(false));
+    // A 50 ms id outside its window passes; 0x3A never filters.
+    assert_eq!(f.pass(&[0x05], 2000), Ok(true));
+    assert_eq!(f.pass(&[0x05], 2050), Ok(true));
+    assert_eq!(f.pass(&[0x3A], 2051), Ok(true));
+    assert_eq!(f.pass(&[0x3A], 2051), Ok(true));
+}
+
 proptest! {
     #![proptest_config(config(256))]
 
@@ -341,11 +416,14 @@ proptest! {
 
     /// The client's duplicate filter (§2.1 rule 1) on any message and
     /// time: 0x200 bytes or more is the sender's assert; a message is
-    /// dropped only when it repeats the last sent one inside its window.
+    /// dropped exactly when its window applies, it equals the store over
+    /// its own size and less than the window has passed. The store is the
+    /// model's own 0x200 bytes (zeroed at start, each send overwrites its
+    /// length only), not just the last message: see `filter_model`.
     #[test]
     fn duplicate_filter_any(sends in prop::collection::vec((message(0x220), 0u32..400), 0..24)) {
         let mut f = DuplicateFilter::default();
-        let mut last: Option<(Vec<u8>, u32)> = None;
+        let mut model = FilterModel::default();
         let mut now = 0u32;
         for (m, dt) in sends {
             now = now.wrapping_add(dt);
@@ -354,12 +432,10 @@ proptest! {
                     prop_assert!(m.len() >= MAX_GAME_SEND);
                     prop_assert_eq!(e, SendError::GameTooLarge(m.len()));
                 }
-                Ok(false) => {
-                    let (l, at) = last.as_ref().expect("a filtered message repeats one");
-                    prop_assert!(l.starts_with(&m), "{:02X?}", m);
-                    prop_assert!(now.wrapping_sub(*at) < 200);
+                Ok(sent) => {
+                    prop_assert!(m.len() < MAX_GAME_SEND);
+                    prop_assert_eq!(sent, model.pass(&m, now), "{:02X?} at {}", m, now);
                 }
-                Ok(true) => last = Some((m.clone(), now)),
             }
         }
     }
