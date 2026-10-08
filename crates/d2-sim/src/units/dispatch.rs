@@ -225,7 +225,7 @@ fn monster<H: UnitHooks>(
 ) -> Result<(), UnitError> {
     match ev {
         event::MODE_CHANGE => {
-            // PROVISIONAL (skills/use.md OQ6; REC-109): the frame code of
+            // PROVISIONAL (skills/use.md OQ6; REC-110): the frame code of
             // the type-0 timer is unit +0x4E, which the monster per-frame
             // `0x005A7670` reads; the store itself is not specified.
             if let Some(r) = sim.units.get_mut(unit) {

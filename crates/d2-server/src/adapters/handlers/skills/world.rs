@@ -366,9 +366,9 @@ impl<X: SkillRest> UseWorld for World<'_, '_, X> {
     /// change, `docs/handoff/host-merge.md`), it runs here on the same
     /// providers.
     fn start_mode(&mut self, u: UnitId, mode: u32, target: ModeTarget<UnitId>) {
-        // TODO(use.md §4): where `0x0057FE90` / `0x0057FEF0` store the
-        // point or unit target is not stated; the target is not kept.
-        let _ = target;
+        // PROVISIONAL (use.md §4): where `0x0057FE90` / `0x0057FEF0` store
+        // the point or unit target is not stated; the seam value keeps it
+        // (`UseRest::keep_target`) for the skill's missile and checks.
         if self
             .with_sim(|sim, h| modes::set_mode(sim, h, u, mode))
             .is_none()
@@ -376,6 +376,7 @@ impl<X: SkillRest> UseWorld for World<'_, '_, X> {
             return;
         }
         UseRest::clear_target(self.x_mut(), u);
+        UseRest::keep_target(self.x_mut(), u, target);
         self.with_sim(|sim, h| modes::animate(sim, h, u));
         if let Some(r) = self.u.cv.v.units.get_mut(u) {
             r.flags &= !flags::ATTACK_PENDING;

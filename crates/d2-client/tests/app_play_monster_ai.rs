@@ -6,7 +6,7 @@
 //!
 //! Synthetic fills: the stat table, a `monstats` class with the Zombie AI,
 //! the Attack skill (`srvdofunc` 1), and the AnimData record of the
-//! monster's A1 (no game files). Provisional parts: REC-109 in
+//! monster's A1 (no game files). Provisional parts: REC-110 in
 //! `docs/HANDOFF.md` §7.
 
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -24,7 +24,9 @@ use d2_client::bridge::mirror::DynLink;
 use d2_client::bridge::modes::player_mode;
 use d2_client::bridge::world::TILE;
 use d2_client::bridge::BridgeResource;
+use d2_client::rules::unit_composite::code;
 use d2_client::world_view::tile_assets::TileAssets;
+use d2_client::world_view::unit_assets::{MonsterRow, UnitLooks};
 use d2_data::tables::{Monstats, Monstats2, Record, Skills};
 use d2_formats::animdata::{self, AnimData, AnimRecord};
 use d2_server::adapters::ProtoSizes;
@@ -125,6 +127,25 @@ fn install_fixtures(sim: &mut single_player::Sim) {
         skill_modes: vec![[0; 8]],
     });
     s.hooks.anim_data = Some(Arc::new(anim_data()));
+    // The server's animation names follow the client art's name rules
+    // (`app/anim_names.rs`): class 0 is token `zo`, bare hands.
+    let modes = [
+        "dt", "nu", "wl", "gh", "a1", "a2", "bl", "sc", "s1", "s2", "s3", "s4", "dd", "kb", "sq",
+        "rn",
+    ];
+    s.hooks.x.looks = Some(Arc::new(UnitLooks {
+        monster_modes: modes.iter().map(|m| code(m.as_bytes())).collect(),
+        monsters: [(
+            0,
+            MonsterRow {
+                token: code(b"zo"),
+                base_w: None,
+                composite_death: false,
+            },
+        )]
+        .into(),
+        ..UnitLooks::default()
+    }));
     s.data = UnitData {
         monsters: vec![MonsterInfo {
             enabled: true,

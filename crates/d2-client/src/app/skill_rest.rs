@@ -41,6 +41,8 @@ pub struct UnitSkills {
     /// Player data +0x168 (the handlers use the staged value; kept for
     /// the timer path).
     pub last_point_frame: i32,
+    /// The target of the last mode start (`UseRest::keep_target`).
+    pub target: Option<ModeTarget<UnitId>>,
 }
 
 /// The use pipeline's per-unit fields of the game (module docs).
@@ -225,15 +227,23 @@ impl UseRest for LocalSeams {
     fn run_to(&mut self, u: UnitId, target: UnitId, e: SkillEntry) {
         self.note(format!("run to {} {} skill {}", u.0, target.0, e.skill));
     }
-    // d2rs-own, unverified (q-monster-ai): the mode request's unit target
-    // (a monster's attack); the player's handlers keep their own.
     fn target(&self, u: UnitId) -> Option<UnitId> {
-        self.monsters.target(u)
+        // The monster side: the AI's request target, kept past the skill
+        // start's clear (q-monster-ai; the next request replaces it).
+        let kept = self.skills.unit(u).and_then(|s| match s.target? {
+            ModeTarget::Unit(t) => Some(t),
+            ModeTarget::Point(..) => None,
+        });
+        kept.or_else(|| self.monsters.target(u))
     }
-    // The skill start clears the target after it set the mode
-    // (`use.md` §5.3), but a monster's per-frame do reads it later; the
-    // next mode request replaces it, so the clear is not kept.
-    fn clear_target(&mut self, _: UnitId) {}
+    fn clear_target(&mut self, u: UnitId) {
+        self.skills.unit_mut(u).target = None;
+    }
+    // d2rs-own, unverified (use.md §4): the mode start's target kept per
+    // unit.
+    fn keep_target(&mut self, u: UnitId, target: ModeTarget<UnitId>) {
+        self.skills.unit_mut(u).target = Some(target);
+    }
     fn event_arg(&self, u: UnitId) -> i32 {
         self.skills.unit(u).map_or(0, |s| s.event_arg)
     }
@@ -244,8 +254,16 @@ impl UseRest for LocalSeams {
     fn step_path(&mut self, _: UnitId) -> i32 {
         0
     }
-    fn target_position(&self, _: UnitId) -> Option<(i32, i32)> {
-        None
+    // d2rs-own, unverified: the kept point, or the kept unit's position.
+    fn target_position(&self, u: UnitId) -> Option<(i32, i32)> {
+        match self.skills.unit(u)?.target? {
+            ModeTarget::Point(x, y) => Some((x, y)),
+            ModeTarget::Unit(t) => self
+                .sides
+                .get(&t)
+                .map(|s| s.2)
+                .or_else(|| self.pos.get(&t).copied()),
+        }
     }
     // d2rs-own, unverified (collision not reachable): blocked.
     fn line_clear(&self, _: UnitId, _: (i32, i32), _: u32) -> bool {

@@ -612,7 +612,7 @@ impl<X: Pending> ActionHooks<X> {
 
     /// Attack-family event 0 `0x005A7670` (`skills/use.md` §5.2: "monsters
     /// branch", Open question 6).
-    // PROVISIONAL (skills/use.md OQ6; REC-109): the sequence frame's skill
+    // PROVISIONAL (skills/use.md OQ6; REC-110): the sequence frame's skill
     // part (the do by frame code, unit +0x4E = 1 or 2 or 4), then the
     // animation refresh. The spec says the test reads +0x4E = 1.
     fn monster_attack_event0(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
