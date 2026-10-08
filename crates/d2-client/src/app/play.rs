@@ -380,6 +380,9 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
         add_preview(&mut app, level_rows, tiles);
         let item_parts = super::items::item_parts(archives.as_ref()).map_err(anyhow::Error::msg)?;
         super::items::add_items(&mut app, archives.source(), item_parts);
+        let effects =
+            super::missile_art::effect_rows(archives.as_ref()).map_err(anyhow::Error::msg)?;
+        super::missile_art::add_missiles(&mut app, archives.source(), effects);
         palette::add_act_palettes(&mut app, palettes);
         if let Some(source) = automap_source {
             super::automap::add_automap(&mut app, source, automap_files, archives.source(), true);

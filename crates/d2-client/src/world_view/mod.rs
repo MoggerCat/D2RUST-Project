@@ -32,6 +32,7 @@ pub mod automap_view;
 pub mod feed;
 pub mod ground_items;
 pub mod interact;
+pub mod missiles;
 pub mod model_feed;
 pub mod monster_walk;
 pub mod near_rooms;
