@@ -412,6 +412,33 @@ impl Game {
             }
         }))
     }
+
+    /// One key press, then its release on the next frame.
+    fn press(&mut self, key: KeyCode) {
+        self.app
+            .world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(key);
+        self.frame();
+        let mut k = self.app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
+        k.release(key);
+        k.clear();
+        self.frame();
+    }
+
+    fn ui(&mut self) -> Mut<'_, d2_client::world_view::WorldViewUi> {
+        self.app
+            .world_mut()
+            .non_send_mut::<d2_client::world_view::WorldViewUi>()
+    }
+
+    fn menu_open(&mut self) -> bool {
+        self.ui().original.as_ref().unwrap().is_open(9)
+    }
+
+    fn exited(&mut self) -> bool {
+        self.app.should_exit().is_some()
+    }
 }
 
 /// A save header with progression `status` (expansion bit, difficulties
@@ -465,6 +492,130 @@ fn each_class_is_created_and_starts_the_game() {
             "{class:?}"
         );
     }
+}
+
+/// In game: Esc → Options → every sub-menu (a value changed in each) →
+/// Configure Controls (Inventory rebound to C, Accept) → Save and Exit;
+/// the front end comes back at character select with the character
+/// listed; select, OK → the same character in game.
+// Covers: specs/ui/frontend-options.md §o3-save-and-exit-game-0x0047f2d0 r1, §o9-configure-controls-ui-11-ui-config r1
+#[test]
+fn esc_options_save_and_exit_then_reload_the_character() {
+    let dir = temp_dir("esc");
+    let cfg = dir.join("cfg");
+    std::env::set_var("D2RS_CONFIG_DIR", &cfg);
+    let mut f = Front::open(&dir, Entry::First);
+    to_main_menu(&mut f);
+    f.click_trigger(Trigger::SinglePlayer);
+    create(&mut f, Class::Sorceress, "Tester");
+    let (g, c) = f.choice();
+    let mut game = Game::start(resolve(&dir, g, &c).unwrap());
+
+    // Esc opens the game menu (Return to Game selected).
+    game.press(KeyCode::Escape);
+    assert!(game.menu_open());
+    // Down wraps to Options; Enter opens it (Previous selected).
+    game.press(KeyCode::ArrowDown);
+    game.press(KeyCode::Enter);
+    // Sound (row 0), Video (1), Automap (2): open, Down to the first row,
+    // Left changes it (a slider or a choice), Up wraps to Previous, Enter.
+    for row in 0..3 {
+        for _ in 0..=row {
+            game.press(KeyCode::ArrowDown);
+        }
+        game.press(KeyCode::Enter);
+        game.press(KeyCode::ArrowDown);
+        game.press(KeyCode::ArrowLeft);
+        let changed = game.ui().original.as_mut().unwrap().take_settings_change();
+        assert!(changed.is_some(), "sub-menu {row}: no value changed");
+        game.press(KeyCode::ArrowUp);
+        game.press(KeyCode::Enter);
+        assert!(game.menu_open());
+    }
+    // Configure Controls (row 3).
+    for _ in 0..4 {
+        game.press(KeyCode::ArrowDown);
+    }
+    game.press(KeyCode::Enter);
+    let screen = game
+        .ui()
+        .original
+        .as_ref()
+        .unwrap()
+        .controls_screen()
+        .expect("Configure Controls open");
+    // An expansion install shows the expansion table (§O9, `controls.md` §3.3).
+    assert_eq!(screen.rows().len(), 62);
+    // Down to Inventory (command 1), Enter, C.
+    for _ in 0..80 {
+        let s = game
+            .ui()
+            .original
+            .as_ref()
+            .unwrap()
+            .controls_screen()
+            .unwrap();
+        if s.rows()[s.selected()].cmd == 1 {
+            break;
+        }
+        game.press(KeyCode::ArrowDown);
+    }
+    game.press(KeyCode::Enter);
+    game.press(KeyCode::KeyC);
+    // Accept (button 2, §O9 r2).
+    let at = Point::new(90 + 206 * 2 + 103, 70 + 350);
+    for e in [
+        d2_client::ui::UiEvent::Press {
+            button: d2_client::ui::PointerButton::Left,
+            at,
+        },
+        d2_client::ui::UiEvent::Release {
+            button: d2_client::ui::PointerButton::Left,
+            at,
+        },
+    ] {
+        game.ui().queue.0.push(e);
+    }
+    game.frame();
+    assert!(!game.ui().original.as_ref().unwrap().controls_open());
+    assert!(game.menu_open());
+    {
+        use d2_client::controls::{Action as Act, Key};
+        let ui = game.ui();
+        let b = ui.bindings.as_ref().expect("bindings");
+        assert!(b.inputs(Act::ToggleInventory).contains(&Key::C));
+        // Esc (command 56, not reassignable) still opens the game menu.
+        assert_eq!(b.inputs(Act::GameMenu), &[Key::Escape]);
+    }
+    assert!(cfg.join("d2rs").join("controls.toml").is_file());
+
+    // Esc closes the whole menu; Esc opens it; Up to Save and Exit; Enter.
+    game.press(KeyCode::Escape);
+    assert!(!game.menu_open());
+    game.press(KeyCode::Escape);
+    assert!(game.menu_open());
+    game.press(KeyCode::ArrowUp);
+    game.press(KeyCode::Enter);
+    assert!(game.exited(), "Save and Exit did not end the game");
+
+    // Back in the front end: character select, the character listed.
+    let mut f = Front::open(&dir, Entry::AfterGame);
+    assert_eq!(f.current(), CHAR_SELECT);
+    assert!(f.texts().iter().any(|t| t == "Tester"), "{:?}", f.texts());
+    f.click_custom(d2_client::ui::front_end::screens::char_select::ids::SLOT_TEXT);
+    f.click_custom(d2_client::ui::front_end::screens::char_select::ids::OK);
+    let (g, c) = f.choice();
+    assert!(!g.new_character);
+    assert_eq!(c.save, Some(dir.join("Tester.d2s")));
+    let game = Game::start(resolve(&dir, g, &c).unwrap());
+    assert_eq!(
+        game.joined(),
+        Some(Joined {
+            class: 1,
+            name: b"Tester".to_vec(),
+            difficulty: 0,
+        })
+    );
 }
 
 /// A character with Nightmare open: OK → the difficulty popup →
