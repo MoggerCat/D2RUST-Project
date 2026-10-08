@@ -97,9 +97,11 @@ pub const PENDING: &[(&str, &str)] = &[
          press does not play sound 4 (deferred); the stash kinds 3 / 4 are not wired",
     ),
     (
-        "inventory equipment backgrounds (§9.4)",
-        "equipped items per body location: the item stream is not decoded \
-         (`msg-stats-items.md` open question 3)",
+        "inventory equipment tints and empty-slot pictures (§9.4, `inventory.md` §6 r4)",
+        "the equipped-item tint (refused when the requirements fail, unidentified) is pushed \
+         as `UiDraw::Tint` by `ItemsUi::draw_panel` (REC-271); the scene has no fill \
+         primitive to paint it, the hover tint and the grid-item tints are not pushed, and \
+         the empty-slot pictures (§9.4 table) are not drawn",
     ),
     (
         "skill tree icons and level numbers (§10.3–§10.5)",
