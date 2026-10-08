@@ -40,6 +40,46 @@ Under Wine the game also logs ALSA "cannot find card" lines (no sound
 device; `-ns`) and wined3d "no GL" errors (unused: `-w` is GDI). Both
 harmless.
 
+### Step 2 — REC-290 (Wine fidelity): RNG equal to PC 1; ticks repeatable
+
+**RNG against PC 1.** The committed RNG traces `traces/sim/rng/sim-0001`–`0005` come
+from one hand-played PC 1 run (`20261005-232125-rng.jsonl`). Three of their
+seeds do not depend on the clock: the automap seed `{0, 666}` (sim-0001),
+the DRLG seed from the character's map seed 644409375 (sim-0003), and the
+level-2 seed derived from it (sim-0005). A new expansion character
+`RecMap` (`d2s-tool new --name RecMap --class ama --expansion --map-seed
+644409375`) under Wine:
+
+```
+tools/cloud-game/run.sh --python --seconds 1500 -- tools/trace-recorder/record_rng.py \
+    --game "$D2_GAME_DIR/Game.exe" --seconds 1400 --auto RecMap --input "wait 3; end" --out rng.jsonl
+python3 tools/cloud-game/rec290_rng.py rng.jsonl
+```
+
+| Trace | Result |
+|---|---|
+| sim-0001 automap seed | **EQUAL** 64 of 64 events (every field, `site` too); the Wine chain has 737 draws, as PC 1's note says |
+| sim-0003 DRLG seed | **EQUAL** 7 of 7 |
+| sim-0005 level 2 rooms | **EQUAL** 64 of 64; the Wine chain has 3,899 draws, as PC 1's |
+| sim-0002 game seed, sim-0004 monster-region seed | no chain: both start from the time-based game seed (expected; a fixed `-seed` run on both sides would compare them) |
+
+27,065 records (24,207 inline steps). With every inline hook the arrival
+took 192.8 s (PC 1: about 23 s), so Wine is about 8× slower in this mode.
+
+**Ticks.** No PC 1 tick trace exists for a scripted start (sim-0006–0008
+are hand-played), so there is nothing to compare yet. Under Wine,
+`record_tick.py --auto ScnAma --seed 1234 --ticks 600` gives 601 ticks
+(arrival at 7.0 s, near full speed), and `check_tick.py` passes: 1,017
+timer runs, 25 snapshots, 0 errors. A **second identical run is byte-equal**
+in every record except `ms` (14,436 records; heap addresses included).
+Wine runs therefore repeat each other.
+Still open for REC-290: the same command on PC 1, compared record by
+record (the script above, with `ms` and the header dropped).
+
+`tools/cloud-game/rec290_rng.py RAW [TRACE...]` splits the raw file with
+`convert_rng.py`'s own chain rule, converts with its `draw_data`, and
+compares each trace's `expected` in order. Exit 1 on any difference.
+
 ## What the recorders need from Windows, and the Wine plan
 
 Read: `tools/trace-recorder/README.md`, `record_rng.py` (the Win32 base),
