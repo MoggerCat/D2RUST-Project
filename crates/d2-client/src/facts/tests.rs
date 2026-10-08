@@ -1,0 +1,337 @@
+//! Format tests on hand-made fact sets: no game values, only the shape
+//! of §1–§6 (every number below is made up for the test).
+
+use std::path::Path;
+
+use super::compare::{compare, compare_dirs, FactSet, Outcome, Stage};
+use super::export::{draw_rows, frame_rows, ExportContext, FrameState};
+use super::*;
+use crate::frames::{FrameAnchor, FramePart, FrameSet, FrameSetKey, FrameStore, IndexFrame};
+use crate::scene::{DrawItem, DrawKey, ItemTag};
+
+const HEAD: &str = "# facts v1; tool: test 0; command: hand-made; game: 1.14d\n";
+
+fn draws_text(rows: &[&str]) -> String {
+    let mut s = format!("{HEAD}{}\n", DRAW_COLUMNS.join("\t"));
+    for r in rows {
+        s.push_str(&r.replace(' ', "\t"));
+        s.push('\n');
+    }
+    s
+}
+
+fn frame_text(edit: &[(&str, &str)]) -> String {
+    let mut s = format!("{HEAD}key\tvalue\n");
+    for (k, _) in FRAME_KEYS {
+        let v = edit.iter().find(|(e, _)| *e == k).map_or("1", |(_, v)| *v);
+        s.push_str(&format!("{k}\t{v}\n"));
+    }
+    s
+}
+
+fn sprites_text(rows: &[&str]) -> String {
+    let mut s = format!("{HEAD}{}\n", SPRITE_COLUMNS.join("\t"));
+    for r in rows {
+        s.push_str(&r.replace(' ', "\t"));
+        s.push('\n');
+    }
+    s
+}
+
+const ROW0: &str = "0 unit - - - - 10 20 - - - - - 0xff - 1:7 0x401000";
+const ROW1: &str = "1 CelDraw a/b.dc6 0 2 - 30 40 8 9 -1 8 5 0xff 0 - 0x401010";
+const SPRITE: &str = "a/b.dc6 0 2 8 9 -1 8";
+
+fn set(draws: &[&str], frame: &[(&str, &str)], sprites: Option<&[&str]>) -> FactSet {
+    FactSet {
+        draws: parse("draws", &draws_text(draws), &DRAW_COLUMNS).unwrap(),
+        frame: parse("frame", &frame_text(frame), &FRAME_COLUMNS).unwrap(),
+        sprites: sprites.map(|s| parse("sprites", &sprites_text(s), &SPRITE_COLUMNS).unwrap()),
+    }
+}
+
+// Covers: specs/tools/facts-render.md §1 r1, §6 r4
+#[test]
+fn identical_sets_match() {
+    let a = set(&[ROW0, ROW1], &[], Some(&[SPRITE]));
+    assert_eq!(compare(&a, &a.clone(), &[]), Outcome::Match);
+    assert_eq!(Outcome::Match.exit_code(), 0);
+}
+
+// Covers: specs/tools/facts-render.md §6 r2, §6 r4
+#[test]
+fn every_changed_draw_cell_is_reported_at_its_row_and_column() {
+    let a = set(&[ROW0, ROW1], &[], Some(&[SPRITE]));
+    let base: Vec<&str> = ROW1.split(' ').collect();
+    // M08: change each compared cell of row 1 in turn.
+    for (c, name) in DRAW_COLUMNS.iter().enumerate() {
+        if matches!(*name, "i" | "at") {
+            continue;
+        }
+        let mut cells = base.clone();
+        cells[c] = "77";
+        let changed = cells.join(" ");
+        let b = set(&[ROW0, &changed], &[], Some(&[SPRITE]));
+        match compare(&a, &b, &[]) {
+            Outcome::Diverged(d) => {
+                assert_eq!(
+                    (d.stage, d.row, d.column.as_str()),
+                    (Stage::Draws, 1, *name)
+                );
+                assert_eq!(d.d2rs.unwrap()[c], "77");
+            }
+            other => panic!("column {name}: {other:?}"),
+        }
+    }
+}
+
+// Covers: specs/tools/facts-render.md §2 r7, §6 r3
+#[test]
+fn info_and_ignored_columns_are_not_compared() {
+    let a = set(&[ROW0, ROW1], &[("seq", "5")], Some(&[SPRITE]));
+    let b = set(
+        &[ROW0, &ROW1.replace("0x401010", "-").replace(" 5 ", " 6 ")],
+        &[("seq", "9")],
+        Some(&[SPRITE]),
+    );
+    assert!(matches!(compare(&a, &b, &[]), Outcome::Diverged(d) if d.column == "mode"));
+    assert_eq!(compare(&a, &b, &["mode".to_owned()]), Outcome::Match);
+}
+
+// Covers: specs/tools/facts-render.md §6 r2
+#[test]
+fn a_shorter_list_diverges_at_the_first_missing_row() {
+    let a = set(&[ROW0, ROW1], &[], Some(&[SPRITE]));
+    let b = set(&[ROW0], &[], Some(&[SPRITE]));
+    match compare(&a, &b, &[]) {
+        Outcome::Diverged(d) => {
+            assert_eq!((d.stage, d.row), (Stage::Draws, 1));
+            assert!(d.original.is_some() && d.d2rs.is_none());
+        }
+        other => panic!("{other:?}"),
+    }
+}
+
+// Covers: specs/tools/facts-render.md §1 r2, §6 r3, §6 r4
+#[test]
+fn unknown_cells_and_missing_sprites_are_partial() {
+    let a = set(&[ROW0, ROW1], &[], Some(&[SPRITE]));
+    let b = set(&[ROW0, &ROW1.replace(" 5 ", " ? ")], &[], Some(&[SPRITE]));
+    let out = compare(&a, &b, &[]);
+    assert_eq!(out.exit_code(), 2);
+    assert!(matches!(&out, Outcome::Partial(u) if u.get("mode") == Some(&1)));
+    let c = set(&[ROW0, ROW1], &[], None);
+    assert!(matches!(compare(&a, &c, &[]), Outcome::Partial(u) if u.contains_key("sprites.tsv")));
+    // A `?` never hides a later measured difference.
+    let d = set(
+        &[&ROW0.replace(" 10 ", " ? "), &ROW1.replace(" 30 ", " 31 ")],
+        &[],
+        Some(&[SPRITE]),
+    );
+    assert!(matches!(compare(&a, &d, &[]), Outcome::Diverged(x) if x.row == 1 && x.column == "x"));
+}
+
+// Covers: specs/tools/facts-render.md §6 r1
+#[test]
+fn causes_are_reported_before_effects() {
+    let a = set(&[ROW0, ROW1], &[], Some(&[SPRITE]));
+    // Input key, sprite, draw and output all differ: the input wins.
+    let b = set(
+        &[ROW0, &ROW1.replace(" 30 ", " 31 ")],
+        &[("level", "2"), ("index_sha256", "ab")],
+        Some(&["a/b.dc6 0 2 8 9 -2 8"]),
+    );
+    let first = |b: &FactSet| match compare(&a, b, &[]) {
+        Outcome::Diverged(d) => (d.stage, d.column),
+        other => panic!("{other:?}"),
+    };
+    assert_eq!(first(&b), (Stage::FrameInput, "level".into()));
+    let b = set(
+        &b_rows(),
+        &[("index_sha256", "ab")],
+        Some(&["a/b.dc6 0 2 8 9 -2 8"]),
+    );
+    assert_eq!(first(&b), (Stage::Sprites, "xoff".into()));
+    let b = set(&b_rows(), &[("index_sha256", "ab")], Some(&[SPRITE]));
+    assert_eq!(first(&b), (Stage::Draws, "x".into()));
+    let b = set(&[ROW0, ROW1], &[("index_sha256", "ab")], Some(&[SPRITE]));
+    assert_eq!(first(&b), (Stage::FrameOutput, "index_sha256".into()));
+}
+
+fn b_rows() -> Vec<&'static str> {
+    vec![
+        ROW0,
+        "1 CelDraw a/b.dc6 0 2 - 31 40 8 9 -1 8 5 0xff 0 - 0x401010",
+    ]
+}
+
+// Covers: specs/tools/facts-render.md §1 r1, §3 r1
+#[test]
+fn malformed_files_are_errors() {
+    let bad_header = draws_text(&[ROW0]).replacen("v1", "v2", 1);
+    assert!(parse("d", &bad_header, &DRAW_COLUMNS).is_err());
+    let mut swapped = DRAW_COLUMNS;
+    swapped.swap(6, 7);
+    let text = format!(
+        "{HEAD}{}\n{}\n",
+        swapped.join("\t"),
+        ROW0.replace(' ', "\t")
+    );
+    assert!(parse("d", &text, &DRAW_COLUMNS).is_err());
+    let short = draws_text(&["0 unit -"]);
+    assert!(parse("d", &short, &DRAW_COLUMNS).is_err());
+    assert!(parse("d", draws_text(&[ROW0]).trim_end(), &DRAW_COLUMNS).is_err());
+    let frame = frame_text(&[]).replace("rain\t", "snowy\t");
+    let t = parse("f", &frame, &FRAME_COLUMNS).unwrap();
+    assert!(check_frame_keys("f", &t).is_err());
+    let ok = parse("f", &frame_text(&[]), &FRAME_COLUMNS).unwrap();
+    assert!(check_frame_keys("f", &ok).is_ok());
+}
+
+// Covers: specs/tools/facts-render.md §1 r1
+#[test]
+fn header_round_trips() {
+    let h = Header {
+        tool: "t 1".into(),
+        command: "py x.py --a 1; b".into(),
+        game: "1.14d".into(),
+    };
+    let text = write(&h, &SPRITE_COLUMNS, &[]);
+    assert_eq!(parse("s", &text, &SPRITE_COLUMNS).unwrap().header, h);
+}
+
+// Covers: specs/tools/facts-render.md §6
+#[test]
+fn directories_compare_with_the_shared_sprites_file() {
+    let root = std::env::temp_dir().join(format!("facts-compare-{}", std::process::id()));
+    let scene = root.join("render/scenes/s1");
+    let ours = root.join("d2rs");
+    let write = |dir: &Path, name: &str, text: String| {
+        std::fs::create_dir_all(dir).unwrap();
+        std::fs::write(dir.join(name), text).unwrap();
+    };
+    write(&scene, DRAWS_FILE, draws_text(&[ROW0, ROW1]));
+    write(&scene, FRAME_FILE, frame_text(&[]));
+    write(&root.join("render"), SPRITES_FILE, sprites_text(&[SPRITE]));
+    write(&ours, DRAWS_FILE, draws_text(&[ROW0, ROW1]));
+    write(&ours, FRAME_FILE, frame_text(&[]));
+    write(&ours, SPRITES_FILE, sprites_text(&[SPRITE]));
+    assert_eq!(compare_dirs(&scene, &ours, &[]).unwrap(), Outcome::Match);
+    assert!(compare_dirs(&scene, &root.join("missing"), &[]).is_err());
+    std::fs::remove_dir_all(&root).unwrap();
+}
+
+fn store() -> FrameStore {
+    let mut s = FrameStore::new();
+    let dc6 = IndexFrame::new(4, 3, -2, 10, vec![1; 12])
+        .unwrap()
+        .with_anchor(FrameAnchor::Bottom);
+    let dcc = IndexFrame::new(2, 5, 3, -6, vec![1; 10]).unwrap();
+    let key = |p: &str, part| FrameSetKey::new(p, part).unwrap();
+    s.insert(
+        key("x/ui.dc6", FramePart::Dir(0)),
+        FrameSet { frames: vec![dc6] },
+    )
+    .unwrap();
+    s.insert(
+        key("x/unit.dcc", FramePart::Dir(3)),
+        FrameSet { frames: vec![dcc] },
+    )
+    .unwrap();
+    let tile = IndexFrame::new(160, 80, 0, -16, vec![1; 160 * 80]).unwrap();
+    s.insert(
+        key("x/floor.dt1", FramePart::Tile(7)),
+        FrameSet { frames: vec![tile] },
+    )
+    .unwrap();
+    s
+}
+
+// Covers: specs/tools/facts-render.md §5 r1, §5 r2, §5 r4, §5 r6
+#[test]
+fn export_rows_invert_placement_and_merge_tile_blocks() {
+    use crate::rules::placement::place;
+    use crate::scene::order::pass;
+    use crate::scene::{FrameId, Rect};
+    let s = store();
+    let at = |id: u32, x: i32, y: i32| {
+        // Items placed by the forward rule (sprite-placement §8).
+        let f = s.frame(FrameId(id)).unwrap();
+        let p = place(f, x, y, Rect::FRAME);
+        DrawItem::new(FrameId(id), p.x, p.y)
+    };
+    let mut floor = at(2, 100, 200);
+    floor.key = DrawKey::new(pass::FLOORS, 0, 0, 0).unwrap();
+    floor.tag = ItemTag::Tile { x: 1, y: 2 };
+    let mut floor_block = floor;
+    floor_block.clip = Rect::new(0, 0, 32, 15);
+    let mut unit = at(1, 50, 60);
+    unit.key = DrawKey::new(pass::WALLS_UNITS, 0, 0, 0).unwrap();
+    unit.tag = ItemTag::Unit(9);
+    let mut ui = at(0, 300, 400);
+    ui.key = DrawKey::new(pass::UI, 0, 0, 0).unwrap();
+    let unit_type = |g: u32| (g == 9).then_some(1u8);
+    let cx = ExportContext {
+        frames: &s,
+        view_left: Some(5),
+        unit_type: &unit_type,
+    };
+    let rows = draw_rows(&[floor, floor_block, unit, ui], &cx).unwrap();
+    let cols: Vec<String> = rows.draws.iter().map(|r| r[..8].join(" ")).collect();
+    assert_eq!(
+        cols,
+        [
+            "0 FloorTileDraw x/floor.dt1 - 7 ? 175 200",
+            "1 unit - - - - ? ?",
+            "2 CelDraw x/unit.dcc 3 0 - 50 60",
+            "3 CelDraw x/ui.dc6 0 0 - 300 400",
+        ]
+    );
+    // §4 r1: a DCC box's yoff names its bottom row; a DC6 keeps its own.
+    assert_eq!(rows.draws[2][8..12], ["2", "5", "3", "-2"]);
+    assert_eq!(rows.draws[1][15], "1:9");
+    assert_eq!(
+        rows.sprites,
+        [
+            vec!["x/ui.dc6", "0", "0", "4", "3", "-2", "10"],
+            vec!["x/unit.dcc", "3", "0", "2", "5", "3", "-2"],
+        ]
+    );
+    for r in &rows.draws {
+        assert_eq!(r.len(), DRAW_COLUMNS.len());
+    }
+}
+
+// Covers: specs/tools/facts-render.md §3 r1, §5 r7
+#[test]
+fn exported_frame_rows_have_every_key_in_order() {
+    let rows = frame_rows(&FrameState {
+        seq: 1,
+        tick: 2,
+        width: 800,
+        height: 600,
+        act: Some(0),
+        level: None,
+        camera: None,
+        open_mode: Some(0),
+        draws: 3,
+        index_sha256: None,
+        palette_sha256: sha256_hex(&[]),
+    });
+    let h = Header {
+        tool: "t".into(),
+        command: "c".into(),
+        game: "d2rs".into(),
+    };
+    let t = parse("f", &write(&h, &FRAME_COLUMNS, &rows), &FRAME_COLUMNS).unwrap();
+    check_frame_keys("f", &t).unwrap();
+    let get = |k: &str| t.rows.iter().find(|r| r[0] == k).unwrap()[1].clone();
+    assert_eq!(
+        (get("tick"), get("level"), get("draws")),
+        ("2".into(), "?".into(), "3".into())
+    );
+    assert_eq!(
+        get("palette_sha256"),
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    );
+}
