@@ -5802,6 +5802,13 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 - Output: `traces/raw/pc2rec-r94-packets.jsonl` + hook log.
 - Compare: the distance at which the hook first returns 1 and whether S→C 0x63 follows the C→S 0x13. Fold: write the range test into §7.1 r3 and drop its PROVISIONAL line.
 
+##### REC-117 [MANUAL] drlg/maze.md, drlg/rooms.md §9.5.1 (exit warps of maze levels, q-act1-dungeons)
+- Priority P2.
+- Settles: which maze/preset room carries each exit warp of Den of Evil, Cave, Tower, Crypt, Mausoleum, Barracks, Jail, Cathedral and Catacombs levels, and the tile position (PROVISIONAL in the synthetic world: `crates/d2-client/src/app/synthetic_maze.rs` puts the way back in the first room at sub-tile (20, 20); live levels depend on the DS1 `warp_unit` tables, which are untranscribed).
+- Steps: record S→C 0x09 tile units and 0x07/0x15 on entering each level from the town and back.
+- Output: `traces/raw/` packet logs.
+- Compare: room and position of every warp tile per level.
+
 ##### REC-99 [MANUAL] sim/path-placement.md §12.2 (C→S 0x13 on a warp tile, tile unit creation)
 - Priority P1.
 - Settles: sim/path-placement.md §12.2 callers (`0x00548C32`: what the 0x13 tile case checks before `0x005550B0`), `client/model.md` §8 rule 7 (the interact sender lists no tile case; `ui/controls.md` §6 r9.2 sends 0x13 (T, g) for a tile), and where 1.14d allocates the tile units from the type-5 presets (PROVISIONAL: every active room's type-5 presets become tile units once, `View::spawn_warp_tiles` in `crates/d2-sim/src/wiring/action/warp_tile.rs`; the 0x13 tile case is `View::warp_tile_message`, no range test).
