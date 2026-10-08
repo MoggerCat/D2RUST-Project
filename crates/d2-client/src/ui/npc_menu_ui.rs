@@ -88,6 +88,10 @@ pub struct NpcMenuState {
     /// The last Trade / Gamble choice was Gamble: the shop that opens next
     /// is a gamble window (`panels-2.md` §14: the gamble shop flag).
     pub gamble: bool,
+    /// The Trade / Gamble choice's NPC (GUID, class): the shop opens for
+    /// it on the next shop poll (`OriginalUi::shop_poll`). d2rs-own,
+    /// unverified (REC-277).
+    pub shop_request: Option<(u32, u32)>,
     pub screen: (i32, i32),
 }
 
@@ -290,7 +294,7 @@ impl Panel for NpcMenuUi {
         if self.st.borrow().imbue.is_some() {
             return self.imbue_event(e, ctx);
         }
-        let Some(guid) = self.st.borrow().up.as_ref().map(|o| o.guid) else {
+        let Some((guid, class)) = self.st.borrow().up.as_ref().map(|o| (o.guid, o.class)) else {
             return UiResponse::Ignored;
         };
         let at = match e {
@@ -341,6 +345,7 @@ impl Panel for NpcMenuUi {
                     st.up = None;
                     if matches!(kind, OptionKind::Trade | OptionKind::Gamble) {
                         st.gamble = kind == OptionKind::Gamble;
+                        st.shop_request = Some((guid, class));
                     }
                 }
                 match option_intent(kind, guid).and_then(|v| v.into_iter().next()) {

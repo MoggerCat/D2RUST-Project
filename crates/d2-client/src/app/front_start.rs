@@ -55,6 +55,46 @@ pub fn registry(save_dir: &Path, handles: &StartHandles) -> Registry {
     reg
 }
 
+/// Where the front end opens.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Entry {
+    /// The first entry of the process: start-up chain and trademark (C1).
+    First,
+    /// A later entry: the main menu.
+    MainMenu,
+    /// Back from a game (Save and Exit, or its window closed): character
+    /// select (§F1.3 "in game" row, PROVISIONAL REC-200).
+    AfterGame,
+}
+
+/// The front-end host `play` runs: every screen wired to `save_dir`
+/// ([`registry`]), the credits text from `art`, the stub writer of a new
+/// character; the handles the game start reads ([`StartChoice::resolve`]).
+pub fn front_host(
+    save_dir: &Path,
+    art: Option<crate::app::front_host::FrontArt>,
+    expansion: bool,
+    entry: Entry,
+) -> (crate::app::front_host::FrontHost, StartHandles) {
+    use crate::app::front_host::{register_credits, DirSaves, FrontHost};
+    let handles = StartHandles::default();
+    let mut reg = registry(save_dir, &handles);
+    if let Some(a) = &art {
+        register_credits(&mut reg, a);
+    }
+    let front = crate::ui::front_end::FrontEnd::new(
+        expansion,
+        Box::new(DirSaves(save_dir.to_path_buf())),
+        reg,
+    );
+    let mut host = FrontHost::with_front(front, art, entry == Entry::First)
+        .with_stub_writer(handles.created.clone(), save_dir.to_path_buf());
+    if entry == Entry::AfterGame {
+        host.front.trigger(crate::ui::front_end::Trigger::GameExit);
+    }
+    (host, handles)
+}
+
 /// The character the front end chose, and how to start it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct StartChoice {
@@ -66,6 +106,10 @@ pub struct StartChoice {
     pub difficulty: u8,
     /// The save to load (`None`: a new character).
     pub save: Option<PathBuf>,
+    /// The character's file in the Save folder, where the game writes it:
+    /// the loaded save, or the stub `.d2s` the front end wrote for a new
+    /// character (`FrontHost::with_stub_writer`).
+    pub file: PathBuf,
 }
 
 impl StartChoice {
@@ -82,6 +126,7 @@ impl StartChoice {
                 status |= difficulty::STATUS_EXPANSION;
             }
             return Some(StartChoice {
+                file: save_dir.join(format!("{}.d2s", n.name)),
                 name: n.name,
                 class: n.class.id(),
                 status,
@@ -90,8 +135,10 @@ impl StartChoice {
             });
         }
         let Selection { entry, .. } = handles.selection.lock().ok()?.take()?;
+        let file = save_dir.join(format!("{}.d2s", entry.name));
         Some(StartChoice {
-            save: Some(save_dir.join(format!("{}.d2s", entry.name))),
+            save: Some(file.clone()),
+            file,
             name: entry.name,
             class: entry.class,
             status: entry.status,

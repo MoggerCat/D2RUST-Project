@@ -24,6 +24,13 @@ pub fn window_pixel(physical: Vec2) -> (i64, i64) {
     (physical.x.floor() as i64, physical.y.floor() as i64)
 }
 
+/// The physical window position of a frame pixel, for warping the cursor
+/// (the cursor jump of `ui/panels.md` §4.3). `Err` below the minimum window.
+pub fn frame_to_window(window: &Window, at: super::geom::Point) -> Result<Vec2, FrameError> {
+    let (x, y) = presentation(window)?.from_frame(at.x, at.y);
+    Ok(Vec2::new(x as f32, y as f32))
+}
+
 /// Where the window's cursor is in the frame; `Outside` when the cursor
 /// is not in the window.
 pub fn cursor_frame_pos(window: &Window) -> Result<FramePos, FrameError> {

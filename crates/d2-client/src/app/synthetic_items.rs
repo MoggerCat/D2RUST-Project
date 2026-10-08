@@ -35,12 +35,22 @@ fn rune_codes() -> impl Iterator<Item = [u8; 4]> {
     (1..=25u8).map(|n| [b'r', b'0' + n / 10, b'0' + n % 10, b' '])
 }
 
+/// The store armor (q-smoke-town, REC-278): a cap (helm) and a buckler
+/// (shield), the vendors' stock (`super::synthetic_vendors`), with their
+/// defense range.
+pub const CAP: [u8; 4] = *b"cap ";
+pub const BUCKLER: [u8; 4] = *b"buc ";
+/// Rows of the armor part of the combined array.
+pub const ARMOR_ROWS: std::ops::Range<usize> = 1..3;
+
 /// The combined array's codes, with each row's type and invwidth ×
-/// invheight: the hammer (weapons), then misc (the soulstone, gems,
-/// skulls, runes).
+/// invheight: the hammer (weapons), the cap and buckler (armor), then misc
+/// (the soulstone, gems, skulls, runes).
 fn rows() -> Vec<([u8; 4], u16, (u8, u8))> {
     let mut v = vec![
         (q3::HAMMER, ty::WEAP, (2, 3)),
+        (CAP, ty::HELM, (2, 2)),
+        (BUCKLER, ty::SHIE, (2, 2)),
         (q3::SOULSTONE, ty::MISC, (1, 1)),
     ];
     for code in q3::PERFECT_GEMS
@@ -54,8 +64,9 @@ fn rows() -> Vec<([u8; 4], u16, (u8, u8))> {
     v
 }
 
-/// Every type is its own and type 0's (as the fixtures' `equiv`).
-fn equiv() -> EquivMatrix {
+/// Every type is its own and type 0's (as the fixtures' `equiv`); helm
+/// and shield are armor.
+pub fn equiv() -> EquivMatrix {
     let n = N_TYPES;
     let words = n.div_ceil(32);
     let mut m = EquivMatrix {
@@ -66,6 +77,10 @@ fn equiv() -> EquivMatrix {
     for i in 1..n {
         m.bits[i * words] |= 1;
         m.bits[i * words + i / 32] |= 1 << (i % 32);
+    }
+    let armo = usize::from(ty::ARMO);
+    for t in [ty::HELM, ty::SHIE] {
+        m.bits[usize::from(t) * words + armo / 32] |= 1 << (armo % 32);
     }
     m
 }
@@ -92,14 +107,32 @@ pub fn item_tables() -> ItemTables {
     let rows = rows();
     let items: Vec<ItemRec> = rows
         .iter()
-        .map(|&(code, t, (w, h))| ItemRec {
-            code,
-            type_: t as i16,
-            level: 1,
-            invwidth: w,
-            invheight: h,
-            spawnable: 1,
-            ..ItemRec::default()
+        .map(|&(code, t, (w, h))| {
+            let armor = t == ty::HELM || t == ty::SHIE;
+            ItemRec {
+                code,
+                type_: t as i16,
+                level: 1,
+                invwidth: w,
+                invheight: h,
+                spawnable: 1,
+                durability: if armor { 12 } else { 0 },
+                minac: if t == ty::HELM {
+                    3
+                } else if armor {
+                    4
+                } else {
+                    0
+                },
+                maxac: if t == ty::HELM {
+                    5
+                } else if armor {
+                    6
+                } else {
+                    0
+                },
+                ..ItemRec::default()
+            }
         })
         .collect();
     let n = items.len();
@@ -123,7 +156,11 @@ pub fn item_tables() -> ItemTables {
         isc: save_columns(),
         stat_shift: 6,
         stat_mask: 0x3F,
-        parts: [Some((0, 1)), None, Some((1, n - 1))],
+        parts: [
+            Some((0, ARMOR_ROWS.start)),
+            Some((ARMOR_ROWS.start, ARMOR_ROWS.len())),
+            Some((ARMOR_ROWS.end, n - ARMOR_ROWS.end)),
+        ],
         ..ItemTables::default()
     }
 }
@@ -153,6 +190,15 @@ pub fn inv_tables(t: &ItemTables) -> InvTables {
     weap.body = 1;
     weap.bodyloc1 = 4;
     weap.bodyloc2 = 5;
+    // The cap on the head (1), the buckler in either hand.
+    let helm = &mut itemtypes[usize::from(ty::HELM)];
+    helm.body = 1;
+    helm.bodyloc1 = 1;
+    helm.bodyloc2 = 1;
+    let shie = &mut itemtypes[usize::from(ty::SHIE)];
+    shie.body = 1;
+    shie.bodyloc1 = 4;
+    shie.bodyloc2 = 5;
     InvTables {
         grids,
         belts: vec![12, 8, 4, 16, 8, 12, 16, 12, 8, 4, 16, 8, 12, 16],

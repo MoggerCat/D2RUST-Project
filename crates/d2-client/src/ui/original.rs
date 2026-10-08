@@ -85,21 +85,22 @@ pub const PENDING: &[(&str, &str)] = &[
         "labels (string ids), the class line, next level, the resist / defense colours and a \
          weapon-only damage / attack-rating block are bound ([`char_feed`], PROVISIONAL \
          REC-269); the skill-specific `descdam` / `descatt` entries, the to-hit popups (need \
-         `monstats`) and Shift (not in the UI events: a spend is 1 point) are not; the language \
+         `monstats`) are not (Shift spends in chunks of 32, `panels.md` §8 r5, REC-268); the language \
          is English (0, `ui/text.md` §1.2)",
     ),
     (
         "inventory gold button press / release and the gold dialog (`panels-2.md` §21 r3–r9)",
         "the gold value and button art are drawn ([`InventoryUi`]); the press / release and \
          the drop dialog (kind 1) are wired in [`gold_dialog`] (d2rs-own box, REC-103); the \
-         press does not play sound 4 (deferred); the stash kinds 3 / 4 are not wired",
+         press does not play sound 4 (deferred); the stash kinds 3 / 4 are wired (\
+         `original_tests.rs::stash_gold_withdraw_and_deposit_send_0x4f`)",
     ),
     (
-        "inventory equipment tints and empty-slot pictures (§9.4, `inventory.md` §6 r4)",
-        "the equipped-item tint (refused when the requirements fail, unidentified) is pushed \
-         as `UiDraw::Tint` by `ItemsUi::draw_panel` (REC-271); the scene has no fill \
-         primitive to paint it, the hover tint and the grid-item tints are not pushed, and \
-         the empty-slot pictures (§9.4 table) are not drawn",
+        "inventory tints (translucency) and empty-slot pictures (§9.4, `inventory.md` §2–§6)",
+        "the equipped and grid item tints and the hover tint are painted by \
+         `ItemsUi::draw_tints` as opaque `hudfill` tiles (REC-271: the UI sprite path has no \
+         A2 blend); the shooter / quiver and cursor-item tints are not read and the \
+         empty-slot pictures (§9.4 table) are not drawn",
     ),
     (
         "skill tree hover description and the no-points message (§10.5, §10.7)",
@@ -109,27 +110,15 @@ pub const PENDING: &[(&str, &str)] = &[
          not wired",
     ),
     (
-        "waypoint menu panel (ui 0x14, §13 r2–r7)",
-        "installed (`waypoint_ui`: art, rows from the record, row click → C→S 0x49); the \
-         tab gates read the client quest flags (`msg-ui.md` open question 4, tab 0 only) \
-         and the row text needs the string table by id",
+        "waypoint menu panel (ui 0x14, §13 r2–r7): tab gates",
+        "the panel is installed and covered (`waypoint_ui`; \
+         `app_play_npc.rs::clicking_the_waypoint_walks_there_and_interacts`; the row and tab \
+         text come from the string table by id); the tab gates read the client quest flags \
+         (`msg-ui.md` open question 4, tab 0 only): every act tab is shown (d2rs-own)",
     ),
     (
-        "stash and cube panels (ui 0x19, 0x1A; §11 r2–r6, §12 r2–r6)",
-        "S→C 0x77 opens and closes them (flag and inventory mode: `msg_ui`); their art, \
-         grids and buttons are not wired",
-    ),
-    (
-        "NPC menu, NPC shop (ui 8, 0x0C; §14)",
-        "their openers (NPC interaction messages) have no client handler",
-    ),
-    (
-        "cursor jump (§4.3, `UiEffect::CursorX`)",
-        "the waypoint menu passes jump 1 (S→C 0x63); the effect is reported but there is \
-         no cursor-warp edge",
-    ),
-    (
-        "hotkeys for other states (escape menu, chat, automap, quests, party)",
+        "hotkeys for other states (escape menu, chat, automap, party; the quest log, ToggleQuests, is \
+         bound: `quest_log_ui_tests.rs`)",
         "their panels are not specified (§Open questions 1); the original key table is \
          `ui/controls.md` (§Open questions 2)",
     ),
@@ -599,8 +588,11 @@ impl OriginalUi {
             if a == ActionId(Action::GameMenu.index() as u16) {
                 self.game_menu_key()?;
             } else if let Some(ui) = hotkey_state(a) {
-                // §4.3: hot keys pass jump 0; mode 2 toggle.
-                self.set_ui(u32::from(ui), 2, false)?;
+                // §4.3: the Character, Inventory, Party, Skill Tree and
+                // Hireling keys pass jump 1, every other hot key 0; mode 2
+                // toggle.
+                let jump = matches!(ui, 1 | 2 | 4 | 0x16 | 0x24);
+                self.set_ui(u32::from(ui), 2, jump)?;
                 // The quest log asks the server for the quest data when
                 // it opens (`quest_log_ui`; d2rs-own, unverified).
                 if ui == quest_log_ui::UI_QUEST_SCREEN && self.is_open(ui) {
@@ -680,6 +672,20 @@ impl OriginalUi {
         self.shared.borrow().esc.controls.is_some()
     }
 
+    /// Whether the expansion is installed (`0x00408F20`: the Options and
+    /// Configure Controls tables, `ui/frontend-options.md` §O2, §O9).
+    pub fn expansion_installed(&self) -> bool {
+        self.shared.borrow().config.expansion_installed
+    }
+
+    /// The open Controls screen's state (hosts and tests read it).
+    pub fn controls_screen(
+        &self,
+    ) -> Option<crate::ui::front_end::screens::controls::ConfigureControls> {
+        let sh = self.shared.borrow();
+        sh.esc.controls.as_ref().map(|c| c.model().clone())
+    }
+
     /// A raw key (Windows virtual key) for the open Controls screen;
     /// false when it is not open (the key is for the game).
     pub fn controls_key(&mut self, vk: u16, now_ms: u64) -> bool {
@@ -723,6 +729,19 @@ impl OriginalUi {
             sh.esc.controls = None;
         }
         r
+    }
+
+    /// The cursor jump the pending effects ask for (§4.3,
+    /// [`UiEffect::CursorX`]): the frame position `(x, mouse y)` of the last
+    /// one, which also becomes the UI's mouse. Leaves the effects in place.
+    pub fn take_cursor_warp(&mut self) -> Option<Point> {
+        let x = self.outcome.effects.iter().rev().find_map(|e| match e {
+            UiEffect::CursorX(x) => Some(*x),
+            _ => None,
+        })?;
+        let mut sh = self.shared.borrow_mut();
+        sh.mouse.x = x;
+        Some(sh.mouse)
     }
 
     /// The effects and sounds since the last call.
@@ -816,6 +835,8 @@ impl Panel for InventoryUi {
         panel.draw(&sh.tables, &sh.env(), gold, out);
         let class = Facts::of(ctx.world).class;
         if let Some(l) = sh.items.layout(class, &sh.config.screen) {
+            sh.items
+                .draw_tints(ctx.world, &sh.tables.files, &l, sh.mouse, out);
             sh.items.draw_panel(ctx.world, &sh.tables.files, &l, out);
         }
     }
@@ -1274,8 +1295,9 @@ impl Panel for CharacterUi {
         match left(e) {
             Some((true, at)) => self.panel.press(&sh.tables, &s, at, statpts),
             Some((false, at)) => {
-                // Shift is not in the UI events (`PENDING`): one point.
-                let out = self.panel.release(&sh.tables, &s, at, false, statpts);
+                // Shift is the host's per-frame flag (`set_shift`): all points.
+                let shift = sh.items.shift;
+                let out = self.panel.release(&sh.tables, &s, at, shift, statpts);
                 sh.outputs.extend(out);
             }
             None => {}
