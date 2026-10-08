@@ -206,6 +206,14 @@ impl Predict {
         self.seen = Some(now);
     }
 
+    /// The model's local position was set to `cell` by the prediction
+    /// itself (`Bridge::set_local_cell`): not a placement to snap to.
+    pub fn own_cell(&mut self, cell: (u16, u16)) {
+        if let Some((pos, _)) = self.seen.as_mut() {
+            *pos = cell;
+        }
+    }
+
     /// A walk intent the client sent: the new target.
     pub fn walk(&mut self, walk: Walk) {
         self.exhausted = false;

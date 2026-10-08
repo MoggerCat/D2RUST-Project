@@ -395,7 +395,9 @@ where
     R: ViewRules + UiRules + ?Sized,
     F: ViewFeed + ?Sized,
 {
-    match camera_and_mode(world, feed)? {
+    let cm = camera_and_mode(world, feed)?;
+    let at = cm.map(|c| c.0);
+    let mut frame = (match cm {
         Some((camera, mode)) if mode.get() == NO_WORLD_MODE => build(
             world,
             ui,
@@ -417,7 +419,10 @@ where
             },
             assets,
         ),
-    }
+    })?;
+    // `client/model.md` §13: the visibility predicate reads it.
+    frame.camera = at;
+    Ok(frame)
 }
 
 /// [`build`] through [`OriginalView`], with unit `shade` / `blend` from

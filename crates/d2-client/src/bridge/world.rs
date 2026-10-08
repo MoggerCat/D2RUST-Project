@@ -728,6 +728,22 @@ impl ClientWorld {
     /// (not in sight yet) or the same room: unchanged, `false`.
     ///
     /// d2rs-own, unverified. PROVISIONAL (open question 2; REC-51).
+    /// The play preview's own walk moves the local player's model
+    /// position to its predicted sub-tile, as the 1.14d client's own path
+    /// step does (`client/model.md` §3 r3), so the position checks (§6)
+    /// and their C→S 0x5F read where the player is. False: no local player
+    /// or no position. d2rs-own, unverified (OQ2; REC-51, REC-277).
+    pub fn set_local_cell(&mut self, x: u16, y: u16) -> bool {
+        let Some(u) = self.local_player.and_then(|k| self.units.get_mut(&k)) else {
+            return false;
+        };
+        if u.position.is_none() {
+            return false;
+        }
+        u.position = Some((x, y));
+        true
+    }
+
     pub fn recache_local_room(&mut self, x: u16, y: u16) -> bool {
         let Some(key) = self.local_player else {
             return false;
@@ -969,9 +985,31 @@ pub fn addressed_unit(msg: &[u8]) -> Option<UnitKey> {
 }
 
 /// Visibility of a unit's sprite at a client pixel point
-/// (`0x004DBF20`, model §6 rule 6, open question 7): a Phase 6 render
-/// seam, taken as an input.
-pub type VisibleFn = fn(&ClientUnit, i32, i32) -> bool;
+/// (`0x004DBF20`, model §6 rule 6, §13): render state, taken as an input
+/// (§13 r6). The play app's world view answers it from the last built
+/// frame (`world_view::visibility`).
+#[derive(Clone)]
+pub struct VisibleFn(pub std::sync::Arc<VisibleDyn>);
+
+/// The predicate's call: `visible(U, a, b)`.
+pub type VisibleDyn = dyn Fn(&ClientUnit, i32, i32) -> bool + Send + Sync;
+
+impl VisibleFn {
+    pub fn new(f: impl Fn(&ClientUnit, i32, i32) -> bool + Send + Sync + 'static) -> Self {
+        VisibleFn(std::sync::Arc::new(f))
+    }
+
+    /// `visible(U, a, b)`.
+    pub fn visible(&self, unit: &ClientUnit, a: i32, b: i32) -> bool {
+        (self.0)(unit, a, b)
+    }
+}
+
+impl std::fmt::Debug for VisibleFn {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("VisibleFn")
+    }
+}
 
 /// One `monstats` row as 0xAC reads it (`msg-units.md` §1.2), with the
 /// flags 0x28 reads (`msg-ui.md` §16 r4).

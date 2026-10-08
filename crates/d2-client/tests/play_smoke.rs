@@ -238,17 +238,20 @@ impl Run {
     /// [`Self::start`] with `install` run on the built game before the
     /// join (fixture tables the synthetic game lacks).
     fn start_with(install: fn(&mut single_player::Sim)) -> Self {
-        let data = GameData::Synthetic;
+        Self::start_on(GameData::Synthetic, install)
+    }
+
+    /// The play app on `data` (synthetic, or an install loaded as
+    /// `d2-client play` loads the user's files), `install` run on the
+    /// built game before the join.
+    fn start_on(data: GameData, install: fn(&mut single_player::Sim)) -> Self {
         let character = single_player::new_character("sorceress", "Smoke").unwrap();
         let ms = Arc::new(AtomicU32::new(1000));
         let clock = StepClock(ms.clone());
         let built = character.clone();
+        let game_data = data.clone();
         let link = ThreadLink::spawn(move || {
-            let mut g = single_player::build_with(
-                &GameData::Synthetic,
-                single_player::DEFAULT_SEED,
-                built,
-            )?;
+            let mut g = single_player::build_with(&game_data, single_player::DEFAULT_SEED, built)?;
             install(&mut g.sim);
             Ok::<_, single_player::BuildError>(LocalLink::new(Host::new(
                 g.sim,
@@ -283,11 +286,33 @@ impl Run {
             levels,
             TileAssets::new(Some(source.clone()), None),
         );
-        app_support::synthetic_skill_rows(&mut app);
-        app.world_mut()
-            .resource_mut::<BridgeResource>()
-            .0
-            .set_unit_rows(single_player::synthetic_unit_rows());
+        let speeds = match &data {
+            GameData::Synthetic => {
+                app_support::synthetic_skill_rows(&mut app);
+                app.world_mut()
+                    .resource_mut::<BridgeResource>()
+                    .0
+                    .set_unit_rows(single_player::synthetic_unit_rows());
+                Speeds { walk: 6, run: 9 }
+            }
+            GameData::Live(d) => {
+                // The client tables `play::run` gives the bridge on the
+                // user's files.
+                let a = d.archives.as_ref();
+                let mut b = app.world_mut().resource_mut::<BridgeResource>();
+                b.0.set_skill_rows(single_player::client_skill_rows(a).unwrap());
+                b.0.set_class_skills(single_player::client_class_skills(a).unwrap());
+                b.0.set_skill_tables(Arc::new(single_player::client_skill_tables(a).unwrap()));
+                b.0.set_unit_rows(single_player::client_unit_rows(a).unwrap());
+                b.0.set_item_tables(Arc::new(d2_client::app::items::TableDecoder(Arc::new(
+                    d.tables.item_tables().unwrap(),
+                ))));
+                b.0.set_object_rows(single_player::client_object_rows(&data));
+                single_player::walk_speeds(&data, &character)
+                    .unwrap()
+                    .expect("walk speeds from charstats")
+            }
+        };
         add_act_palettes(
             &mut app,
             ActPalettes {
@@ -309,7 +334,7 @@ impl Run {
         )
         .unwrap();
         d2_client::app::ui::set_waypoint_map(&mut app, single_player::client_waypoint_map(&data));
-        add_walk(&mut app, tap, Some(Speeds { walk: 6, run: 9 }));
+        add_walk(&mut app, tap, Some(speeds));
         let mut run = Run {
             app,
             server,
@@ -815,4 +840,96 @@ fn the_live_play_game_builds_on_the_five_act_install() {
     assert!(matches!(data, GameData::Live(_)));
     let g = single_player::build(&data, single_player::DEFAULT_SEED);
     assert!(g.is_ok(), "{:?}", g.err());
+}
+
+impl Run {
+    /// The server player's path position (sub-tiles).
+    fn pos(&self) -> (i32, i32) {
+        app_support::with(&self.server, |l| {
+            let g = &mut l.host_mut().game;
+            let (p, _) = single_player::local_player(g).unwrap();
+            g.events.action.hooks().path_position(p)
+        })
+    }
+
+    fn mode(&self) -> u32 {
+        app_support::with(&self.server, |l| {
+            let g = &l.host().game;
+            let (p, _) = single_player::local_player(g).unwrap();
+            g.events.action.sys.units.get(p).map_or(0, |u| u.mode)
+        })
+    }
+
+    /// The tile rect of level `id` in the act of the player.
+    fn level_rect(&self, id: u32) -> d2_sim::drlg::TileRect {
+        app_support::with(&self.server, move |l| {
+            let h = l.host_mut().game.events.action.hooks();
+            h.drlg
+                .dungeon
+                .acts
+                .iter()
+                .flatten()
+                .find_map(|d| d.find_level(id).map(|lv| d.level(lv).rect))
+                .expect("level allocated")
+        })
+    }
+
+    /// A run leg (C→S 0x03 through the bridge), then frames until the
+    /// player stops.
+    fn leg(&mut self, (x, y): (i32, i32)) {
+        let mut m = vec![0x03];
+        m.extend_from_slice(&(x as u16).to_le_bytes());
+        m.extend_from_slice(&(y as u16).to_le_bytes());
+        self.bridge().send_bytes(&m).unwrap();
+        self.step(2);
+        for _ in 0..400 {
+            if !test_fixtures::host::MOVING.contains(&self.mode()) {
+                break;
+            }
+            self.step(1);
+        }
+        self.check("run leg");
+    }
+
+    /// Run legs into level `to` (from `from`) until the server player is
+    /// there.
+    fn walk_into(&mut self, from: u32, to: u32) {
+        use test_fixtures::host::{border_goals, cheb, LEG};
+        let goals = border_goals(self.level_rect(from), self.level_rect(to), self.pos());
+        for g in goals {
+            for _ in 0..30 {
+                if self.server_level() == Some(to) {
+                    return;
+                }
+                let p = self.pos();
+                let before = cheb(p, g);
+                self.leg((
+                    p.0 + (g.0 - p.0).clamp(-LEG, LEG),
+                    p.1 + (g.1 - p.1).clamp(-LEG, LEG),
+                ));
+                if cheb(self.pos(), g) >= before {
+                    break;
+                }
+            }
+        }
+        assert_eq!(self.server_level(), Some(to), "walked into level {to}");
+    }
+}
+
+/// The scripted run on the five-act install, loaded as `d2-client play`
+/// loads the user's files: join, then out of the Rogue Encampment into
+/// the Blood Moor on foot (run legs, C→S 0x03). It failed twice on the way:
+/// the position checks of S→C 0x96 had no visibility predicate
+/// (`model.md` §13 r6: now the world view's), and a check correction sent
+/// the model's stale local position in C→S 0x5F, so the server put the
+/// player back at the join point (the model now follows the prediction).
+#[test]
+fn the_live_run() {
+    let dir = five_act_install("live");
+    let data = GameData::select(Some(&dir), false).unwrap();
+    let mut run = Run::start_on(data, |_| {});
+    run.walk_into(1, 2);
+    run.step(20);
+    run.check("Blood Moor");
+    assert_eq!(run.server_level(), Some(2), "out of town on foot");
 }

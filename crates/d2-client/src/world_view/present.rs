@@ -762,6 +762,23 @@ fn world_view_frame(
         state.feed.as_mut(),
         &state.assets,
     );
+    // `client/model.md` §13 r6: the visibility predicate from this frame
+    // (a frame the preview could not build: its camera, no unit drawn).
+    let visible = match &built {
+        Ok(f) => super::visibility::predicate(f.camera, &f.drawn, &state.assets),
+        Err(_) => super::visibility::predicate(
+            super::corpse_click::camera_for(
+                bridge.0.world(),
+                state
+                    .feed
+                    .open_mode(bridge.0.world())
+                    .map_or(0, |m| m.get()),
+            ),
+            &[],
+            &state.assets,
+        ),
+    };
+    bridge.0.set_visibility(visible);
     let mut frame = match built {
         Ok(f) => f,
         // d2rs-own, unverified (D1): the preview keeps running; the
