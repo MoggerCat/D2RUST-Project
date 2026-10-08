@@ -69,6 +69,10 @@ impl ShopPrices {
     }
 }
 
+/// The key the repair-all total is published under: item GUID 0, the
+/// repair-all message's item (d2rs-own, unverified).
+pub const REPAIR_ALL_KEY: u32 = 0;
+
 impl PartialEq for ShopPrices {
     fn eq(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.0, &other.0)
@@ -98,6 +102,20 @@ pub struct ShopState {
     /// The pressed action button (state 1), by index.
     pressed: Option<usize>,
     prices: ShopPrices,
+    /// The window is a gamble window (the menu chose Gamble).
+    gamble: bool,
+}
+
+impl ShopState {
+    /// The window is a gamble window.
+    pub fn gamble(&self) -> bool {
+        self.gamble
+    }
+
+    /// The price the host published for an item.
+    pub fn price(&self, guid: u32) -> Option<u32> {
+        self.prices.get(guid)
+    }
 }
 
 pub type SharedShop = Rc<RefCell<ShopState>>;
@@ -142,12 +160,42 @@ fn footprint(sh: &super::Shared, it: &ItemView) -> (i32, i32) {
         })
 }
 
-/// The store items of the open trade on `page`, in key order.
-fn page_items(world: &ClientWorld, st: &ShopState, page: u8) -> Vec<ItemView> {
-    items::store_items(world)
+/// The store items of the open trade on `page`, packed row by row into
+/// the grid in arrival order (d2rs-own, unverified, REC-162: the preview
+/// has no NPC grid model, so the server's positions are not used).
+fn page_items(sh: &super::Shared, world: &ClientWorld, st: &ShopState, page: u8) -> Vec<ItemView> {
+    let mut list: Vec<ItemView> = items::store_items(world)
         .into_iter()
         .filter(|i| i.store_seq > st.floor && i.page == page)
-        .collect()
+        .collect();
+    list.sort_by_key(|i| i.store_seq);
+    let (cols, rows) = (i32::from(GRID.0), i32::from(GRID.1));
+    let mut used = [[false; GRID.0 as usize]; GRID.1 as usize];
+    for it in &mut list {
+        let (w, h) = footprint(sh, it);
+        let spot = (0..rows)
+            .flat_map(|y| (0..cols).map(move |x| (x, y)))
+            .find(|&(x, y)| {
+                x + w <= cols
+                    && y + h <= rows
+                    && (y..y + h).all(|r| (x..x + w).all(|c| !used[r as usize][c as usize]))
+            });
+        let Some((x, y)) = spot else {
+            // No room: parked off the grid, not drawn or hit.
+            it.x = u16::MAX;
+            it.y = u16::MAX;
+            continue;
+        };
+        for r in y..y + h {
+            for c in x..x + w {
+                used[r as usize][c as usize] = true;
+            }
+        }
+        it.x = x as u16;
+        it.y = y as u16;
+    }
+    list.retain(|i| i.x < u16::from(GRID.0));
+    list
 }
 
 /// The store item whose footprint holds `at`.
@@ -282,10 +330,10 @@ impl ShopUi {
         let price = move |_t: u8| prices.get(guid).unwrap_or(0);
         let env = ClickEnv {
             cursor_item: items::cursor_item(world).is_some(),
-            gamble_shop: false,
+            gamble_shop: st.gamble,
             repair_all_button_on: true,
             repair_button_on: false,
-            repair_all_price: 0,
+            repair_all_price: st.prices.get(REPAIR_ALL_KEY).unwrap_or(0),
             price: &price,
         };
         if let ClickOutcome::Effects(e) = st.tx.click(&args, &env) {
@@ -325,10 +373,22 @@ impl Panel for ShopUi {
             }
         }
         let g = grid_record(&sh);
-        let list = page_items(ctx.world, &st, page);
+        let list = page_items(&sh, ctx.world, &st, page);
         for it in &list {
             let (x, y, _, _) = g.cell(i32::from(it.x), i32::from(it.y));
             sh.items.draw_at(&sh.tables.files, it, (x, y), out);
+        }
+        // The repair-all total above the button bar (d2rs-own).
+        if let (true, Some(_)) = (REPAIR_CLASSES.contains(&open.npc_class), &sh.fonts) {
+            if let Some(total) = st.prices.get(REPAIR_ALL_KEY).filter(|&t| t > 0) {
+                out.push(text(
+                    utf16(&total.to_string()),
+                    s.sx() + 20,
+                    s.h + s.sy() - 120,
+                    crate::ui::panels::shop::FONT16,
+                    4,
+                ));
+            }
         }
         // The hovered item's price.
         if let (Some(it), Some(_)) = (item_at(&sh, &g, &list, sh.mouse), &sh.fonts) {
@@ -416,7 +476,7 @@ impl Panel for ShopUi {
         if !g.contains_mouse(at) {
             return UiResponse::Consumed;
         }
-        let list = page_items(ctx.world, &st, page);
+        let list = page_items(&sh, ctx.world, &st, page);
         let under = item_at(&sh, &g, &list, at);
         let cursor = items::cursor_item(ctx.world);
         match (button, cursor.as_ref(), under.as_ref()) {
@@ -439,8 +499,10 @@ impl OriginalUi {
     /// Trade option, `menus.md` §3.1): the shop and inventory panels come
     /// up; the store items arrive as S→C 0x9C action 0x0B.
     pub fn open_shop(&mut self, npc_guid: u32, npc_class: u32) {
+        let gamble = self.npcm.borrow().gamble;
         {
             let mut st = self.shop.borrow_mut();
+            st.gamble = gamble;
             st.open = Some(ShopOpen {
                 npc_guid,
                 npc_class,

@@ -117,6 +117,8 @@ pub struct InteractionState {
     pub shown_player: Option<UnitId>,
     /// The class of the NPC the shown items belong to.
     pub shown_class: u16,
+    /// The trade open that added them was a gamble (`vendors.md` §4).
+    pub shown_gamble: bool,
     /// Approach requests (`npc.md` §2 rule 3: C→S 0x13 at distance 7–8)
     /// the host has not started yet: (player, NPC).
     pub approaches: Vec<(UnitId, UnitId)>,
@@ -144,6 +146,7 @@ impl InteractionState {
             shown: Vec::new(),
             shown_player: None,
             shown_class: 0,
+            shown_gamble: false,
             approaches: Vec::new(),
             queued: Vec::new(),
         }
