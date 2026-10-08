@@ -503,6 +503,7 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
             .map_err(anyhow::Error::msg)?;
         super::strings::install_strings(&mut app, strings);
         super::hud::install_hud_tables(&mut app, archives.as_ref()).map_err(anyhow::Error::msg)?;
+        super::hud::install_char_tables(&mut app, archives.as_ref()).map_err(anyhow::Error::msg)?;
         ui::set_waypoint_map(&mut app, waypoint_map);
         ui::set_shop_prices(&mut app, started.prices.clone());
         super::hire_stats::install_hire_stats(&mut app, hire_rows, true);
