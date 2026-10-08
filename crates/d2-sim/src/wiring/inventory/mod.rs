@@ -49,6 +49,7 @@ pub mod pending;
 pub mod potion;
 pub mod queries;
 pub mod save_index;
+pub mod swap;
 pub mod town_portal;
 pub mod units;
 

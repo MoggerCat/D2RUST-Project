@@ -384,6 +384,7 @@ impl OriginalUi {
         let sh = &self.shared;
         root.add(Box::new(InventoryUi {
             sh: sh.clone(),
+            shop: self.shop.clone(),
             panel: InventoryPanel::default(),
         }))?;
         root.add(Box::new(SkillTreeUi {
@@ -689,6 +690,7 @@ const EMPTY: Rect = Rect::new(0, 0, 0, 0);
 /// fonts bound as the character values are) and the close button.
 struct InventoryUi {
     sh: SharedRef,
+    shop: shop_ui::SharedShop,
     panel: InventoryPanel,
 }
 
@@ -749,6 +751,17 @@ impl Panel for InventoryUi {
                 self.panel.press(&sh.tables, &s, at);
                 let class = Facts::of(ctx.world).class;
                 if let Some(l) = sh.items.layout(class, &s) {
+                    // The shop's repair button is down: repair, not pick up.
+                    let under = sh.items.item_under(ctx.world, &l.grid, &l, at);
+                    let taken = shop_ui::ShopUi::repair_click(
+                        &mut sh,
+                        &mut self.shop.borrow_mut(),
+                        ctx.world,
+                        under.as_ref(),
+                    );
+                    if taken {
+                        return UiResponse::Consumed;
+                    }
                     let out = sh.items.press(ctx.world, &sh.tables.files, &l, at);
                     sh.outputs.extend(out);
                 }

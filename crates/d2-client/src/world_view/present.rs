@@ -699,6 +699,7 @@ fn world_view_frame(
                     }
                 }
             }
+            super::swap_key::send_swaps(&frame.unhandled, &mut bridge.0)?;
             Some(frame)
         }
         None => None,
