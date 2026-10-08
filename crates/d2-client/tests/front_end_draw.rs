@@ -92,14 +92,20 @@ fn fire_overlay_follows_the_logo_frame_each_tick() {
     for _ in 0..60 {
         f.tick();
         let d = f.draw();
-        let DrawItem::Art { frame: base, .. } = d[1] else {
+        // The background is 12 tiles; the left logo half follows it.
+        let i = d
+            .iter()
+            .position(|it| matches!(it, DrawItem::Art { file, .. } if *file == LOGO_LEFT))
+            .expect("left logo half");
+        let DrawItem::Art { frame: base, .. } = d[i] else {
             panic!()
         };
-        match d[2] {
+        match d[i + 1] {
             DrawItem::Blend {
                 file, frame, mode, ..
             } => {
-                assert_eq!((file, mode), (r"FrontEnd\FireLeft", 3));
+                // §F1.5 r1: `D2logoFireLeft` (`0x006D4054`).
+                assert_eq!((file, mode), (r"FrontEnd\D2logoFireLeft", 3));
                 assert_eq!(frame, base, "same frame index as the base");
                 seen.push(frame);
             }
@@ -117,6 +123,8 @@ fn text(s: &str, font: u16, label: Option<Label>) -> DrawItem {
         font,
         at: Point::new(100, 200),
         label,
+        color: 0,
+        boxed: None,
     }
 }
 
@@ -142,6 +150,8 @@ fn string_id_text_resolves_through_the_table_lookup() {
         font: 1,
         at: Point::new(0, 0),
         label: None,
+        color: 0,
+        boxed: None,
     };
     let q = text_quads(
         &item,
@@ -156,17 +166,20 @@ fn string_id_text_resolves_through_the_table_lookup() {
 
 #[test]
 fn button_label_is_centered_with_the_pressed_offset() {
-    // 272×35 button (font 9, k = 4): text height 10·16/10 = 16.
+    // 272×35 button (font 9, k = 4): §F1.1 r5 uses the font height (the
+    // header byte, 10 here; `0x00501A40`), not the text height 16.
     let label = |pressed| Label {
         w: 272,
         h: 35,
         pressed,
+        second: 0,
     };
     let item = |p| text("ab", 9, Some(label(p)));
     let up = text_quads(&item(false), &|_| Vec::new(), &|_| Some(font(10)));
-    // width 7 + 12 = 19 → x = 100 + (272 − 19)/2; y = 200 − (35 − 16)/2 + 4.
-    assert_eq!(up[0].at, Point::new(100 + (272 - 19) / 2, 200 - 9 + 4));
+    // width 7 + 12 = 19 → x = 100 + (272 − 19)/2; y = 200 − (35 − 10)/2 + 4.
+    assert_eq!(up[0].at, Point::new(100 + (272 - 19) / 2, 200 - 12 + 4));
     assert_eq!(up[1].at.x, up[0].at.x + 7);
+    // Pressed: x − 2, y + 2.
     let down = text_quads(&item(true), &|_| Vec::new(), &|_| Some(font(10)));
-    assert_eq!(down[0].at.y, up[0].at.y + 2);
+    assert_eq!(down[0].at, Point::new(up[0].at.x - 2, up[0].at.y + 2));
 }

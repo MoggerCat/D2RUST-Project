@@ -942,13 +942,15 @@ impl Screen for ControlsScreen {
                     text,
                     x,
                     y,
-                    ..
+                    color,
                 } => DrawItem::Text {
                     label: None,
                     string_id,
                     text,
                     font: FONT,
                     at: Point::new(x, y),
+                    color: i32::from(color),
+                    boxed: None,
                 },
             })
             .collect()

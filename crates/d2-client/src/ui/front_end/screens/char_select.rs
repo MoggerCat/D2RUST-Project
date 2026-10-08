@@ -20,7 +20,7 @@ use std::time::SystemTime;
 
 use d2_formats::d2s::{checksum, status, HEADER_SIZE, MAGIC, MAX_FILE, VERSION, VERSION_MIN};
 
-use crate::ui::front_end::control::{vk, Action, Control, ControlKind};
+use crate::ui::front_end::control::{vk, Action, Control, ControlKind, TextRow};
 use crate::ui::front_end::flow::Trigger;
 use crate::ui::front_end::screen::{FrontCtx, Screen};
 use crate::ui::front_end::{Registry, SaveFolder, CHAR_SELECT};
@@ -696,12 +696,19 @@ fn slot_y(i: usize) -> i32 {
     178 + 93 * (i / 2) as i32
 }
 
-fn text_at(x: i32, y: i32, w: u16, h: u16, string_id: u32, text: &str) -> Control {
-    let mut c = Control::new(ControlKind::Text, x, y, w, h);
-    c.string_id = string_id;
-    if !text.is_empty() {
-        c.text = Some(text.to_string());
-    }
+/// Fonts of the text descriptors (§F1.1 r6): Font42 (`0x007089AC`),
+/// Font16 (`0x007089C4`).
+const FONT42: u16 = 3;
+const FONT16: u16 = 1;
+
+/// A pop-up text (0xD9 / 0xDD, 268, 320, 264 × 120). PROVISIONAL (§F2.7
+/// gives no font for these descriptors): as the create pop-up 208 (§F3.6
+/// r2.4): Font16, margins 10 / 8, flag 2 (centred, wrapped).
+fn popup_text(string_id: u32) -> Control {
+    let mut c = Control::new(ControlKind::Text, 268, 320, 264, 120)
+        .with_string(string_id)
+        .with_font(FONT16, 2);
+    c.margin = (10, 8);
     c
 }
 
@@ -728,12 +735,36 @@ impl Screen for CharSelect {
         // Slot labels (0x84+i) and click controls (0x84+i / 0x8C+i).
         for i in 0..SLOTS {
             if let Some(l) = m.slot_lines(i) {
-                let (x, y) = (slot_x(i), slot_y(i));
-                v.push(text_at(x, y - 76, 200, 16, 0, &l.name));
-                v.push(text_at(x, y - 56, 200, 16, 0, &l.level));
+                // 0x84 + i: 200 × 92, a = 76, b = 3, Font16 (§F2.9); rows
+                // name (gold / red), level (colour 0), expansion (green).
+                // PROVISIONAL (§F2.9 gives no flags): no wrap (flag 0x20),
+                // as the 1.14d screenshot shows EXPANSION CHARACTER on one
+                // row although it is wider than w − 2·mx = 48.
+                // PROVISIONAL (§F2.4 r4 lists three rows): an empty first
+                // row (the realm, +0x100, empty in single player) precedes
+                // the name, as the 1.14d screenshot puts the name one row
+                // pitch (14 px) below the r8 first baseline.
+                let mut c = Control::new(ControlKind::Text, slot_x(i), slot_y(i), 200, 92)
+                    .with_font(FONT16, 0x20);
+                c.margin = (76, 3);
+                c.more_rows.push(TextRow {
+                    string_id: 0,
+                    text: l.name.clone(),
+                    color: i32::from(l.name_colour),
+                });
+                c.more_rows.push(TextRow {
+                    string_id: 0,
+                    text: l.level.clone(),
+                    color: 0,
+                });
                 if let Some(id) = l.expansion {
-                    v.push(text_at(x, y - 36, 200, 16, id, ""));
+                    c.more_rows.push(TextRow {
+                        string_id: id,
+                        text: String::new(),
+                        color: 2,
+                    });
                 }
+                v.push(c);
             }
         }
         for i in 0..SLOTS {
@@ -751,15 +782,24 @@ impl Screen for CharSelect {
         if let Ok(s) = usize::try_from(m.sel) {
             if s >= m.first && s < m.first + SLOTS && s < m.entries.len() + 1 {
                 let i = s - m.first;
+                // `charselectbox` is two frames, 256 + 16 px wide: both are
+                // drawn side by side. PROVISIONAL (§F2.4 r5 gives 256 × 93):
+                // the 1.14d screenshot shows the box 272 px wide (37–308).
                 v.push(
-                    Control::new(ControlKind::Image, slot_x(i), slot_y(i), 256, 93)
+                    Control::new(ControlKind::Image, slot_x(i), slot_y(i), 272, 93)
                         .with_art(SEL_BOX),
                 );
             }
         }
         // Top label (0x9C): the selected name.
+        // PROVISIONAL (§F2.4 r6, §F2.9 give no flags): centred (flags 2),
+        // as the 1.14d screenshot shows the name centred in 85–550.
         if let Some(e) = m.selected() {
-            v.push(text_at(85, 78, 466, 42, 0, &e.name));
+            v.push(
+                Control::new(ControlKind::Text, 85, 78, 466, 42)
+                    .with_font(FONT42, 2)
+                    .with_text(e.name.clone(), 0),
+            );
         }
         // Scroll bar (0xA7), n > 8.
         if m.scroll_range().is_some() {
@@ -776,17 +816,20 @@ impl Screen for CharSelect {
                 .with_hotkey(vk::ESC)
                 .with_action(Action::Trigger(Trigger::Exit)),
         );
-        v.push(
-            button(33, 528, 168, 60, TALL, strings::CREATE_NEW)
-                .with_action(Action::Trigger(Trigger::CreateNew)),
-        );
+        // Second label lines (§F2.7, `0x00500BF0`): CHARACTER, EXPANSION.
+        let mut create = button(33, 528, 168, 60, TALL, strings::CREATE_NEW)
+            .with_action(Action::Trigger(Trigger::CreateNew));
+        create.second_label = strings::CHARACTER;
+        v.push(create);
         let mut conv = button(233, 528, 168, 60, TALL, strings::CONVERT_TO)
             .with_action(Action::Custom(ids::CONVERT));
+        conv.second_label = strings::EXPANSION_LABEL;
         conv.enabled = b.convert;
         conv.visible = ctx.expansion;
         v.push(conv);
         let mut del = button(433, 528, 168, 60, TALL, strings::DELETE)
             .with_action(Action::Custom(ids::DELETE));
+        del.second_label = strings::CHARACTER;
         del.enabled = b.delete;
         v.push(del);
         // Keys (the selection box's handler).
@@ -804,13 +847,13 @@ impl Screen for CharSelect {
         match m.popup {
             Popup::None => {}
             Popup::Delete | Popup::Convert => {
-                let (q, ql) = if m.popup == Popup::Delete {
-                    (strings::DELETE_QUESTION, 120)
+                let q = if m.popup == Popup::Delete {
+                    strings::DELETE_QUESTION
                 } else {
-                    (strings::CONVERT_WARNING, 120)
+                    strings::CONVERT_WARNING
                 };
                 v.push(Control::new(ControlKind::Image, 268, 350, 264, 176).with_art(POPUP));
-                v.push(text_at(268, 320, 264, ql, q, ""));
+                v.push(popup_text(q));
                 v.push(
                     button(281, 337, 96, 32, CANCEL, strings::NO)
                         .with_hotkey(vk::ESC)
@@ -823,7 +866,7 @@ impl Screen for CharSelect {
             }
             Popup::Message(id) => {
                 v.push(Control::new(ControlKind::Image, 268, 350, 264, 176).with_art(POPUP));
-                v.push(text_at(268, 320, 264, 120, id, ""));
+                v.push(popup_text(id));
                 v.push(
                     button(351, 337, 96, 32, CANCEL, strings::OK)
                         .with_hotkey(vk::ENTER)

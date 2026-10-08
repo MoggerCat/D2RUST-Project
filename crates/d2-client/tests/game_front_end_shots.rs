@@ -61,6 +61,10 @@ fn shot(a: &mut App, out: &std::path::Path, name: &str) {
         None => h.front.overlay(&|_, _| 0),
     };
     items.extend(over);
+    let palette = h.front.palette();
+    if let Some(art) = h.art.as_mut() {
+        art.use_palette(palette);
+    }
     let rgba = compose(&items, h.art.as_mut());
     let path = out.join(format!("{name}.png"));
     let file = std::fs::File::create(&path).unwrap();
@@ -106,6 +110,10 @@ fn front_end_screens_on_the_install() {
     use d2_data::bin::TableFiles;
     let (h, _handles) = front_host(&saves, Some(art), d.archives.lod(), Entry::First);
     let mut a = app(h);
+    // The trademark screen at its first frame (the start-up chain's videos
+    // are not played: C5 stub).
+    ticks(&mut a, 1);
+    shot(&mut a, &out, "ours_trademark");
     // Past the trademark screen to the main menu.
     for _ in 0..400 {
         ticks(&mut a, 1);

@@ -23,9 +23,9 @@ use bevy::input::mouse::MouseWheel;
 use bevy::input::ButtonState;
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
-use d2_formats::dc6::Dc6;
+use d2_formats::dc6::{Dc6, Dc6Frame};
 use d2_formats::font::FontTable;
-use d2_formats::palette::Palette;
+use d2_formats::palette::{Palette, Pl2};
 
 use crate::assets::path::FileSource;
 use crate::ui::front_end::glyphs::text_quads;
@@ -58,28 +58,50 @@ impl SaveFolder for DirSaves {
     }
 }
 
-/// DC6 art from the archives and the sky palette.
+/// DC6 art from the archives and the screen's palette.
 pub struct FrontArt {
     source: Arc<dyn FileSource>,
+    /// The palette files in use and their tables (`pal.dat`, `pal.pl2`).
+    palette_files: [&'static str; 2],
     palette: Option<Palette>,
+    pl2: Option<Pl2>,
     cache: HashMap<&'static str, Option<Dc6>>,
     fonts: HashMap<u16, Option<(FontTable, Dc6)>>,
     /// UTF-16 text of a string id (button labels); `None`: labels blank.
     strings: Option<Box<dyn Fn(u32) -> Vec<u16>>>,
 }
 
+fn read_palette(source: &dyn FileSource, files: [&str; 2]) -> (Option<Palette>, Option<Pl2>) {
+    let read = |f: &str| source.read_file(f).and_then(Result::ok);
+    (
+        read(files[0]).and_then(|b| Palette::parse(&b).ok()),
+        read(files[1]).and_then(|b| Pl2::parse(&b).ok()),
+    )
+}
+
 impl FrontArt {
     pub fn new(source: Arc<dyn FileSource>) -> Self {
-        let palette = source
-            .read_file(SKY_PALETTE[0])
-            .and_then(Result::ok)
-            .and_then(|b| Palette::parse(&b).ok());
+        let (palette, pl2) = read_palette(&*source, SKY_PALETTE);
         Self {
             source,
+            palette_files: SKY_PALETTE,
             palette,
+            pl2,
             cache: HashMap::new(),
             fonts: HashMap::new(),
             strings: None,
+        }
+    }
+
+    /// Switches to the palette `files` the current screen loaded
+    /// (`FrontEnd::palette`, §F1.6 r1); `None` keeps the current one.
+    pub fn use_palette(&mut self, files: Option<[&'static str; 2]>) {
+        let Some(files) = files else { return };
+        if files != self.palette_files {
+            let (palette, pl2) = read_palette(&*self.source, files);
+            self.palette_files = files;
+            self.palette = palette;
+            self.pl2 = pl2;
         }
     }
 
@@ -123,146 +145,181 @@ impl FrontArt {
     }
 }
 
-/// Composes the draw items into 800×600 RGBA (opaque black background).
-pub fn compose(items: &[DrawItem], art: Option<&mut FrontArt>) -> Vec<u8> {
-    let mut px = vec![0u8; (WIDTH * HEIGHT * 4) as usize];
-    for p in px.as_chunks_mut::<4>().0 {
-        p[3] = 255;
+/// The 8-bit frame the front end draws into (`render/blend-modes.md` §1:
+/// every write is a palette index; blends read the PL2 tables).
+struct IndexFrame {
+    px: Vec<u8>,
+}
+
+impl IndexFrame {
+    /// Writes source index `s` at (x, y) with draw mode `mode` (§1): 5 (and
+    /// every mode without a table, or no PL2) writes `s`; 0–2 alpha, 3
+    /// additive, 4 multiplicative, 6 max-component read `T[256·d + s]`
+    /// (row = destination, §2).
+    fn put(&mut self, x: i32, y: i32, s: u8, mode: u8, pl2: Option<&Pl2>) {
+        if !(0..WIDTH as i32).contains(&x) || !(0..HEIGHT as i32).contains(&y) {
+            return;
+        }
+        let i = (y as u32 * WIDTH + x as u32) as usize;
+        let d = usize::from(self.px[i]);
+        let s = usize::from(s);
+        self.px[i] = match (mode, pl2) {
+            // Mode 0 is alpha level 2, mode 2 level 0 (§1 table).
+            (0..=2, Some(t)) => t.alpha_blend[usize::from(2 - mode)][d][s],
+            (3, Some(t)) => t.additive_blend[d][s],
+            (4, Some(t)) => t.multiplicative_blend[d][s],
+            (6, Some(t)) => t.max_component_blend[d][s],
+            _ => s as u8,
+        };
     }
-    let mut plot = |x: i32, y: i32, rgb: [u8; 3], additive: bool| {
-        if (0..WIDTH as i32).contains(&x) && (0..HEIGHT as i32).contains(&y) {
-            let i = ((y as u32 * WIDTH + x as u32) * 4) as usize;
-            for (d, s) in px[i..i + 3].iter_mut().zip(rgb) {
-                *d = if additive { d.saturating_add(s) } else { s };
+
+    /// Draws DC6 frame `f` at (x, bottom y) (`sprite-placement.md` §2:
+    /// columns `x + xoff …`, rows `y + yoff − h + 1 … y + yoff`; no offsets
+    /// when `offsets` is false), each source index through `map` first
+    /// (DC6 index 0 is transparent: the encoding's skips).
+    fn cel(
+        &mut self,
+        f: &Dc6Frame,
+        at: Point,
+        offsets: bool,
+        mode: u8,
+        map: Option<&[u8; 256]>,
+        pl2: Option<&Pl2>,
+    ) {
+        let (ox, oy) = if offsets {
+            (f.offset_x, f.offset_y)
+        } else {
+            (0, 0)
+        };
+        let top = at.y + oy - f.height as i32 + 1;
+        for row in 0..f.height {
+            for col in 0..f.width {
+                let idx = f.pixels[(row * f.width + col) as usize];
+                if idx != 0 {
+                    let s = map.map_or(idx, |m| m[usize::from(idx)]);
+                    self.put(at.x + ox + col as i32, top + row as i32, s, mode, pl2);
+                }
             }
         }
+    }
+}
+
+/// The palette index nearest to `rgb` (the d2rs-own boxes).
+fn nearest(pal: &Palette, rgb: [u8; 3]) -> u8 {
+    let dist = |i: u8| {
+        let c = pal.colors[usize::from(i)];
+        let e = |a: u8, b: u8| (i32::from(a) - i32::from(b)).pow(2);
+        e(c.r, rgb[0]) + e(c.g, rgb[1]) + e(c.b, rgb[2])
+    };
+    (0..=255u8).min_by_key(|&i| dist(i)).unwrap_or(0)
+}
+
+/// Composes the draw items into 800×600 RGBA (opaque black background):
+/// every item writes palette indices into one 8-bit frame (draw modes and
+/// text colours through the PL2 tables, `render/blend-modes.md` §1,
+/// `ui/text.md` §4), shown with the screen's palette.
+pub fn compose(items: &[DrawItem], art: Option<&mut FrontArt>) -> Vec<u8> {
+    let mut frame = IndexFrame {
+        px: vec![0u8; (WIDTH * HEIGHT) as usize],
     };
     let mut art = art;
-    for it in items {
-        match it {
-            DrawItem::Art { file, frame, at } => {
-                let Some(a) = art.as_deref_mut() else {
-                    continue;
-                };
-                let Some(pal) = a.palette.clone() else {
-                    continue;
-                };
-                let Some(dc6) = a.dc6(file) else { continue };
-                let Some(f) = dc6.frames.get(*frame as usize) else {
-                    continue;
-                };
-                // The frame's offsets add to the position (`sprite-placement.md`
-                // §2), as for the blended cels; y is the bottom edge.
-                let top = at.y + f.offset_y - f.height as i32 + 1;
-                for row in 0..f.height {
-                    for col in 0..f.width {
-                        let idx = f.pixels[(row * f.width + col) as usize];
-                        if idx != 0 {
-                            let c = pal.colors[usize::from(idx)];
-                            let x = at.x + f.offset_x + col as i32;
-                            plot(x, top + row as i32, [c.r, c.g, c.b], false);
-                        }
-                    }
-                }
+    if let Some(a) = art.as_deref_mut() {
+        let pl2 = a.pl2.take();
+        for it in items {
+            draw_item(&mut frame, a, pl2.as_ref(), it);
+        }
+        a.pl2 = pl2;
+    }
+    // The palette shown: the PL2's (`render/composition.md` §4), else
+    // `pal.dat`.
+    let shown = art.as_deref().and_then(|a| {
+        a.pl2
+            .as_ref()
+            .map(|t| t.base_palette.clone())
+            .or_else(|| a.palette.clone())
+    });
+    let mut px = vec![0u8; (WIDTH * HEIGHT * 4) as usize];
+    for (o, &i) in px.as_chunks_mut::<4>().0.iter_mut().zip(&frame.px) {
+        let c = shown
+            .as_ref()
+            .map_or(Default::default(), |p| p.colors[usize::from(i)]);
+        *o = [c.r, c.g, c.b, 255];
+    }
+    px
+}
+
+fn draw_item(frame: &mut IndexFrame, a: &mut FrontArt, pl2: Option<&Pl2>, it: &DrawItem) {
+    let Some(pal) = a.palette.clone() else {
+        return;
+    };
+    match it {
+        DrawItem::Art { file, frame: n, at } => {
+            if let Some(f) = a.dc6(file).and_then(|d| d.frames.get(*n as usize)) {
+                frame.cel(f, *at, true, 5, None, pl2);
             }
-            // d2rs-own, unverified (REC-231): a dark box and a 1 px outline.
-            DrawItem::Rect { at, w, h } => {
-                for y in at.y..at.y + h {
-                    for x in at.x..at.x + w {
-                        plot(x, y, [8, 8, 12], false);
-                    }
-                }
-            }
-            DrawItem::Border { at, w, h } => {
+        }
+        // d2rs-own, unverified (REC-231): a dark box and a 1 px outline.
+        DrawItem::Rect { at, w, h } => {
+            let c = nearest(&pal, [8, 8, 12]);
+            for y in at.y..at.y + h {
                 for x in at.x..at.x + w {
-                    plot(x, at.y, [120, 100, 60], false);
-                    plot(x, at.y + h - 1, [120, 100, 60], false);
-                }
-                for y in at.y..at.y + h {
-                    plot(at.x, y, [120, 100, 60], false);
-                    plot(at.x + w - 1, y, [120, 100, 60], false);
+                    frame.put(x, y, c, 5, None);
                 }
             }
-            // PROVISIONAL (REC-189): draw mode 3 is the additive blend of
-            // §F1.5 r2 (per-channel `min(255, d + s)`, the spec's fit of the
-            // PL2 table); the frame's offsets add to the position
-            // (`sprite-placement.md` §2). Other modes draw opaque.
-            DrawItem::Blend {
-                file,
-                frame,
-                at,
-                mode,
-            } => {
-                let Some(a) = art.as_deref_mut() else {
-                    continue;
-                };
-                let Some(pal) = a.palette.clone() else {
-                    continue;
-                };
-                let Some(dc6) = a.dc6(file) else { continue };
-                let Some(f) = dc6.frames.get(*frame as usize) else {
-                    continue;
-                };
-                let top = at.y + f.offset_y - f.height as i32 + 1;
-                for row in 0..f.height {
-                    for col in 0..f.width {
-                        let idx = f.pixels[(row * f.width + col) as usize];
-                        if idx != 0 {
-                            let c = pal.colors[usize::from(idx)];
-                            let (x, y) = (at.x + f.offset_x + col as i32, top + row as i32);
-                            plot(x, y, [c.r, c.g, c.b], *mode == 3);
-                        }
-                    }
-                }
+        }
+        DrawItem::Border { at, w, h } => {
+            let c = nearest(&pal, [120, 100, 60]);
+            for x in at.x..at.x + w {
+                frame.put(x, at.y, c, 5, None);
+                frame.put(x, at.y + h - 1, c, 5, None);
             }
-            DrawItem::Text { .. } => {
-                let Some(a) = art.as_deref_mut() else {
-                    continue;
+            for y in at.y..at.y + h {
+                frame.put(at.x, y, c, 5, None);
+                frame.put(at.x + w - 1, y, c, 5, None);
+            }
+        }
+        // Draw mode `mode` through the PL2 table (3 = additive, §F1.5 r2);
+        // the frame's offsets add to the position unless `boxed`.
+        DrawItem::Blend {
+            file,
+            frame: n,
+            at,
+            mode,
+            boxed,
+        } => {
+            if let Some(f) = a.dc6(file).and_then(|d| d.frames.get(*n as usize)) {
+                frame.cel(f, *at, !*boxed, *mode, None, pl2);
+            }
+        }
+        DrawItem::Text { font, label, .. } => {
+            let none = |_| Vec::new();
+            let strings = a.strings.take();
+            let resolve: &dyn Fn(u32) -> Vec<u16> = match &strings {
+                Some(f) => f,
+                None => &none,
+            };
+            let table = a.font(*font).map(|(t, _)| t.clone());
+            let quads = text_quads(it, resolve, &|_| table.clone());
+            a.strings = strings;
+            // A button label draws every glyph with mode 4 (§F1.1 r5),
+            // other text with mode 5 (`ui/text.md` §4.1, §7).
+            let mode = if label.is_some() { 4 } else { 5 };
+            for q in quads {
+                // Colour k ≠ 0: the PL2 text-colour map k (`ui/text.md`
+                // §4.3–4.4); 0 draws the glyph's own indices.
+                let map = match (q.color, pl2) {
+                    (1..=12, Some(t)) => t.text_color_shifts.get(q.color as usize),
+                    _ => None,
                 };
-                let Some(pal) = a.palette.clone() else {
-                    continue;
-                };
-                let none = |_| Vec::new();
-                let strings = a.strings.take();
-                let resolve: &dyn Fn(u32) -> Vec<u16> = match &strings {
-                    Some(f) => f,
-                    None => &none,
-                };
-                let mut tables = HashMap::new();
-                if let DrawItem::Text { font, .. } = it {
-                    if let Some((t, _)) = a.font(*font) {
-                        tables.insert(*font, t.clone());
-                    }
-                }
-                let quads = text_quads(it, resolve, &|id| tables.get(&id).cloned());
-                a.strings = strings;
-                for q in quads {
-                    let Some((_, dc6)) = a.font(q.font) else {
-                        continue;
-                    };
-                    let Some(f) = dc6.frames.get(usize::from(q.frame)) else {
-                        continue;
-                    };
-                    let top = q.at.y - f.height as i32 + 1;
-                    for row in 0..f.height {
-                        for col in 0..f.width {
-                            let idx = f.pixels[(row * f.width + col) as usize];
-                            if idx != 0 {
-                                let c = pal.colors[usize::from(idx)];
-                                plot(
-                                    q.at.x + col as i32,
-                                    top + row as i32,
-                                    [c.r, c.g, c.b],
-                                    false,
-                                );
-                            }
-                        }
-                    }
+                if let Some(f) = a
+                    .font(q.font)
+                    .and_then(|(_, d)| d.frames.get(usize::from(q.frame)))
+                {
+                    frame.cel(f, q.at, true, mode, map, pl2);
                 }
             }
         }
     }
-    px
 }
 
 /// The front end in the app (a non-send resource: screens are not `Send`).
@@ -516,6 +573,9 @@ fn draw(
     let host = &mut *host;
     host.frames += 1;
     host.drawn = host.front.draw();
+    if let Some(art) = host.art.as_mut() {
+        art.use_palette(host.front.palette());
+    }
     let over = match host.art.as_mut() {
         Some(art) => {
             let art = std::cell::RefCell::new(art);
