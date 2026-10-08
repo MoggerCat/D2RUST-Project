@@ -6,7 +6,7 @@ use super::price::PriceFatal;
 use super::trade::repair_item;
 use super::{
     flag, gamble, stat, store_level, unit_flag, EventNode, VendorRecord, VendorTables, VendorWorld,
-    AQV, CQV, CRACKED, FAIL_LIMIT, HIRE_CLASSES, NO_STORE_REFRESH, REFRESH_MS, TOWNS, XXX,
+    AQV, CQV, CRACKED, FAIL_LIMIT, HIRE_CLASSES, NO_CODE, NO_STORE_REFRESH, REFRESH_MS, TOWNS, XXX,
 };
 use crate::items::q;
 use crate::rng::Seed;
@@ -63,7 +63,10 @@ pub struct StoreCtx<'a> {
 }
 
 /// Upgrade code choice (§3.1 rule 1): one roll(100000) in Nightmare or
-/// Hell when L_p > 25.
+/// Hell when L_p > 25. Returns the chosen record and whether the chosen
+/// code is in the code map: a code the map lacks is class index 0 (`hax`:
+/// `0x00633640` writes 0), whose creation never matches the chosen code
+/// (§3.1 rule 2: null item).
 fn upgrade<W: VendorWorld>(
     t: &VendorTables,
     seed: &mut Seed,
@@ -71,36 +74,34 @@ fn upgrade<W: VendorWorld>(
     record: usize,
     ilvl: i32,
     player_level: i32,
-) -> usize {
+) -> (usize, bool) {
     let d = w.difficulty();
     let Some(rec) = t.item(record) else {
-        return record;
+        return (record, true);
     };
     if d == 0 || player_level <= 25 {
-        return record;
+        return (record, true);
     }
+    // Rule 1 tests `ubercode` / `ultracode` only for ≠ 0 and ≠ spaces;
+    // the lookup comes after the choice.
+    let set = |c: [u8; 4]| c != [0; 4] && c != NO_CODE;
+    let find = |c: [u8; 4]| t.find_code(c).map_or((0, false), |i| (i, true));
     let r = seed.roll(100_000) as i32;
-    let mut code = record;
+    let mut code = (record, true);
     if d == 1 {
-        if let (true, Some(u)) = (r < ilvl * 64 + 4000, t.valid_code(rec.ubercode)) {
-            code = u;
+        if r < ilvl * 64 + 4000 && set(rec.ubercode) {
+            code = find(rec.ubercode);
         } else if rec.nightmare_upgrade != XXX {
-            // A code the map lacks is class index 0 (`hax`: `0x00633640`
-            // writes 0), §3.1 rule 2.
-            code = t.find_code(rec.nightmare_upgrade).unwrap_or(0);
+            code = find(rec.nightmare_upgrade);
         }
     } else {
-        if let (true, true, Some(x)) = (
-            w.expansion(),
-            r < ilvl * 16 + 1000,
-            t.valid_code(rec.ultracode),
-        ) {
-            code = x;
-        } else if let (true, Some(u)) = (r < ilvl * 128 + 5000, t.valid_code(rec.ubercode)) {
-            code = u;
+        if w.expansion() && r < ilvl * 16 + 1000 && set(rec.ultracode) {
+            code = find(rec.ultracode);
+        } else if r < ilvl * 128 + 5000 && set(rec.ubercode) {
+            code = find(rec.ubercode);
         }
         if rec.hell_upgrade != XXX {
-            code = t.find_code(rec.hell_upgrade).unwrap_or(0);
+            code = find(rec.hell_upgrade);
         }
     }
     code
@@ -156,7 +157,7 @@ pub fn make_store_item<W: VendorWorld>(
     player_level: i32,
 ) -> Result<Option<UnitId>, PriceFatal> {
     let t = c.tables;
-    let chosen = upgrade(t, c.seed, w, record, ilvl, player_level);
+    let (chosen, found) = upgrade(t, c.seed, w, record, ilvl, player_level);
     let mut q = quality;
     let mut made = None;
     'rounds: for _ in 0..2 {
@@ -177,8 +178,9 @@ pub fn make_store_item<W: VendorWorld>(
             return Ok(None);
         };
         // A code mismatch destroys the item; in round 2 the result is
-        // null (rule 2, V7).
-        if w.item_record(i) != chosen {
+        // null (rule 2, V7). An unfound code made class 0, which never
+        // equals the chosen code.
+        if !found || w.item_record(i) != chosen {
             w.destroy_item(i);
             q = q::NORMAL;
             continue 'rounds;
