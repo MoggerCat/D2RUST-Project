@@ -53,10 +53,12 @@ fn first_sync_sends_0x95_and_resets_the_counter() {
     f.game.lists.client_mut(c).unwrap().update_count = 7;
     // Cache all zero: Δlife 40 of 50 ≥ 10 %: 0x95 at the staged position.
     let got = run_fx(&mut f, c, false).unwrap();
+    // Then the stat messages of what is nonzero (the maxima), once.
     assert_eq!(
-        got,
-        [life_mana_update2(40, 20, 30, 700, 800, 0, 0).to_vec()]
+        got[0],
+        life_mana_update2(40, 20, 30, 700, 800, 0, 0).to_vec()
     );
+    assert!(got[1..].iter().all(|m| matches!(m[0], 0x1D..=0x1F)));
     assert_eq!(f.game.lists.client(c).unwrap().update_count, 0);
     let cache = f.sim.sys.hooks.sync.as_ref().unwrap().caches[&c];
     assert_eq!(
@@ -112,4 +114,26 @@ fn life_prediction_reads_the_healthpot_list() {
     assert_eq!(now.lp, 100);
     let got = run_fx(&mut f, c, false).unwrap();
     assert_eq!(got[0][0], 0x18);
+}
+
+// Covers: specs/combat/vitals.md §3
+#[test]
+fn changed_mod_stats_follow_as_stat_messages_once() {
+    let (mut f, p, c) = fx();
+    f.sim.sys.hooks.enable_vitals_sync();
+    // The first run sends whatever is nonzero; settle it.
+    run_fx(&mut f, c, false).unwrap();
+    assert_eq!(run_fx(&mut f, c, false).unwrap(), Vec::<Vec<u8>>::new());
+    // Level 1 -> 2, 5 stat points, 300 strength: byte, byte, word messages.
+    f.stats(p, &[(12, 2), (4, 5), (stat::STRENGTH, 300)]);
+    let got = run_fx(&mut f, c, false).unwrap();
+    for m in [
+        vec![0x1D, 12, 2],
+        vec![0x1D, 4, 5],
+        vec![0x1E, 0, 0x2C, 0x01],
+    ] {
+        assert!(got.contains(&m), "{m:02X?} in {got:02X?}");
+    }
+    // Sent once: unchanged values are not repeated.
+    assert_eq!(run_fx(&mut f, c, false).unwrap(), Vec::<Vec<u8>>::new());
 }

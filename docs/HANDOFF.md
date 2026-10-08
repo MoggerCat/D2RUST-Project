@@ -5577,7 +5577,7 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 - Priority P0 (wire byte layout).
 - Settles: `intents-events.md` §7.4 r3 (the 0x4C / 0x4D level byte: base + bonus clamped to a byte, PROVISIONAL); `pathing.md` §10 r2 (which player modes send 0x4C / 0x4D, and whether the attacker's own client receives them; d2rs-own today: every skill mode A1, A2, SC, TH, KK, S1–S4, SQ, own client included).
 - Steps: `record_packets.py --seconds 120` on two clients in one game (TCP/IP) in the Blood Moor: client A attacks a Fallen (left click, Attack), casts a point skill on the ground and a unit skill on a monster; a Fallen Shaman casts at A. Log every S→C 0x4C / 0x4D / 0x0C on both clients with the server tick and the caster's skill level.
-- Output: `rec94-packets.jsonl`.
+- Output: `rec96-packets.jsonl`.
 - Compare: the level byte against the skill level; the player modes that send a skill message and which clients get it; fold into the cited rules and drop their PROVISIONAL lines. Also note, for `stitch-server-core.md` §2, the hostility (`0x00554200`) and melee-range (`0x00622870`) answers seen (who can attack whom, the reach in sub-tiles).
 
 #### Priority 1
@@ -5945,6 +5945,13 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 
 #### Deferred (not recorded; outside Phases 0–6)
 - IT-1 `formats/d2s.md` OQ1 (legacy loader `0x00534020`, pre-1.09 saves), IT-2 OQ2 (item records of save versions 0x5C–0x5F), `formats/d2s-legacy.md` and `items/bitstream-legacy.md` Pending lines (1.07 / 1.08 / 1.00–1.06 saves): need sample files and are only needed if old saves must load. Record only if the user opens that scope.
+##### REC-96 [ASSISTED] Level-up stat messages (S→C 0x1D-0x1F, 0x21) around a level-up
+- Priority 2 (the play preview sends them by a diff at the tick's sync).
+- Settles: PROVISIONAL `combat/vitals.md` §3 step 7 / `wiring::action::vitals_sync::stat_changes` (the original sends a changed stat from the unit's client update from the changed-stat array, `sim/stat-lists.md` §11; the preview sends level, stat points, skill points, attributes, the maxima and next-level experience against a per-client cache at the end of each tick), and PROVISIONAL `skills/levels.md` §6.4 (the message after a spent skill point: 0x21 skill, base level; what 0x3B sends on the validator's codes 2 / 3, OQ5).
+- Steps: a new character at level 1; `record_packets.py --seconds 120` through one kill that levels up (stat points and a skill point appear), then spend one stat point (C→S 0x3A) and one skill point (C→S 0x3B).
+- Output: `rec96-packets.jsonl`.
+- Compare: which S→C stat ids, in which order and in which tick follow the level-up; the stat ids and values after 0x3A; the 0x21 (and any 0x22 / 0x23) after 0x3B against `d2-server` `skills/world.rs` `add_skill_level`. Fold: replace the two PROVISIONAL points.
+
 - **REC-44** legacy saves, cited by the specs as the capture: `formats/d2s-legacy.md` OQ2 (load one 1.07 / 1.08 save, version 0x57 / 0x59, in 1.14d and compare the unit (stats, skills, items, hireling) with the rules), `items/bitstream-legacy.md` OQ1 (the same 1.07 / 1.08 save: every item against §2–§4, affix ids after the offset of §2 rule 3) and OQ2 (a 1.00–1.06 save, version 0x47, holding a stored, equipped, belt, cursor and socketed item, an ear and a corpse with an equipped item: compare with §6–§8 and edge cases 7–9). No such save exists on this PC; record only if the user opens that scope (steps: place the save in `%USERPROFILE%\Saved Games\Diablo II`, `record_packets.py --seconds 60` plain, then `tools/d2s_check.py`).
 
 #### [NO] Not reachable with the current setup (and why)

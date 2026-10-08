@@ -7,9 +7,16 @@
 //! with state 0x15 open (§9); the mouse input of §10 (run toggle, menu
 //! button, skill buttons → state 3, mini panel functions).
 //!
-//! The belt is `hud_belt`. Not drawn: the new-stats / new-skills
-//! buttons (§8), the tool tips and the globe numbers (they need the
-//! string table by id, `NoStrings` in play).
+//! The new-stats / new-skills buttons (§8, 800 × 600) draw `Panel\Level`:
+//! the glowing button while stat (skill) points are unspent, frame 2
+//! otherwise; a click opens the character panel (state 2) / skill tree
+//! (state 4). d2rs-own, unverified: states 6 and 7 are not driven by the
+//! level-up; the unspent points (stats 4 and 5 of the model) stand for
+//! them.
+//!
+//! The belt is `hud_belt`. Not drawn: the 640 × 480 variant of §8, the
+//! tool tips and the globe numbers (they need the string table by id,
+//! `NoStrings` in play).
 //!
 //! Preview fills (decision D1), each `// d2rs-own, unverified`:
 //! - the bars' lines and rectangle are cels of a synthetic one-colour file
@@ -30,7 +37,8 @@ use crate::ui::draw::{ImageRef, ImageRequest, UiDraw, UiDrawSink};
 use crate::ui::geom::{Point, Rect};
 use crate::ui::panel::{ClientIntent, Panel, PanelId, UiCtx, UiEvent, UiResponse, WidgetId};
 use crate::ui::panels::control::buttons::{
-    menu_button, run_button, skill_icon_file, skill_icon_pos, ButtonCel, SkillSide,
+    draw_800, menu_button, run_button, skill_icon_file, skill_icon_pos, BtnEffect, BtnEnv,
+    ButtonCel, NewBtn, NewButtons, SkillSide,
 };
 use crate::ui::panels::control::globes::{
     exp_bar, life_globe, mana_globe, stamina_bar, ExpIn, GlobeDraw, GlobeFile, GlobeSmoothing,
@@ -62,6 +70,7 @@ pub fn hud_files() -> Vec<String> {
         "panel\\overlap",
         "panel\\runbutton",
         "panel\\menubutton",
+        "panel\\level",
         "panel\\minipanel",
         "panel\\minipanel_s",
         "panel\\minipanelbtn",
@@ -156,6 +165,8 @@ pub struct HudState {
     pub select_left: bool,
     /// The belt (`hud_belt`).
     pub belt: super::hud_belt::HudBelt,
+    /// The new-stats / new-skills pressed flags (§8).
+    pub new_btns: NewButtons,
 }
 
 impl Default for HudState {
@@ -170,6 +181,7 @@ impl Default for HudState {
             run_toggles: 0,
             select_left: true,
             belt: Default::default(),
+            new_btns: NewButtons::default(),
         }
     }
 }
@@ -384,6 +396,20 @@ impl Panel for HudUi {
         let (res2, items_ui) = (sh.config.screen.res2(), &sh.items);
         hud.belt
             .draw(world, items_ui, files, (w, h), res2, mouse, living, out);
+        // §8 r1 new-stats / new-skills buttons.
+        let benv = BtnEnv {
+            w,
+            h,
+            res2: true,
+            open_mode: 0,
+        };
+        for (which, points, pressed) in [
+            (NewBtn::Stats, stat(4), hud.new_btns.stats_pressed),
+            (NewBtn::Skills, stat(5), hud.new_btns.skills_pressed),
+        ] {
+            let c = draw_800(&benv, which, points > 0, pressed, mouse);
+            out.extend_one(cel(files, "panel\\level", c));
+        }
         // §7 r2 skill buttons.
         let list = unit.and_then(|u| u.skills.as_ref());
         for (side, entry) in [
@@ -521,6 +547,39 @@ impl Panel for HudUi {
                 }
             }
             return UiResponse::Consumed;
+        }
+        // §8 r4, r5 the new-stats / new-skills buttons, while points are unspent.
+        let benv = BtnEnv {
+            w,
+            h,
+            res2: true,
+            open_mode: 0,
+        };
+        let unspent = local(world).map(|k| (world.total(k, 4, 0), world.total(k, 5, 0)));
+        for (which, points) in [
+            (NewBtn::Stats, unspent.map_or(0, |u| u.0)),
+            (NewBtn::Skills, unspent.map_or(0, |u| u.1)),
+        ] {
+            let mouse = (at.x, at.y);
+            let (effects, consumed) = if down && points > 0 {
+                sh.hud
+                    .new_btns
+                    .press(&benv, which, at.x, at.y, mouse, false, false)
+            } else if !down {
+                sh.hud
+                    .new_btns
+                    .release(&benv, which, at.x, at.y, mouse, false)
+            } else {
+                continue;
+            };
+            for eff in effects {
+                if let BtnEffect::Out(o) = eff {
+                    sh.outputs.push(o);
+                }
+            }
+            if consumed {
+                return UiResponse::Consumed;
+            }
         }
         // §10 the control panel strip.
         let env = InputEnv {
