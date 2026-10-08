@@ -108,6 +108,7 @@ fn anim_data() -> AnimData {
 pub fn skill_row(skill: usize) -> Skills {
     let mut s: Skills = fx::skill_rec();
     s.charclass = 4;
+    s.skilldesc = 0;
     s.intown = true;
     s.range = 1;
     s.mana = 2;
@@ -171,7 +172,7 @@ impl Rig {
         let mut r = Rig { app, ms, link };
         r.step(10);
         let learned: Vec<usize> = skills.to_vec();
-        r.with(|sim, p| {
+        r.with(move |sim, p| {
             let h = &mut sim.events.action.sys.hooks;
             let rows = h.tables.skills.skills.clone();
             let list = h.skill_lists.entry(p).or_default();
@@ -193,7 +194,10 @@ impl Rig {
     }
 
     /// Runs `f` on the server's sim with the local player.
-    pub fn with<R>(&mut self, f: impl FnOnce(&mut single_player::Sim, UnitId) -> R) -> R {
+    pub fn with<R: Send + 'static>(
+        &mut self,
+        f: impl FnOnce(&mut single_player::Sim, UnitId) -> R + Send + 'static,
+    ) -> R {
         self.link
             .lock()
             .unwrap()
@@ -294,7 +298,7 @@ impl Rig {
             .interact(entrance)
             .unwrap();
         for _ in 0..200 {
-            let level = self.with(|sim, p| {
+            let level = self.with(move |sim, p| {
                 let room = sim.game.lists.unit(p)?.room()?;
                 sim.events.action.hooks().drlg.level_id(&sim.game, room)
             });
@@ -305,7 +309,7 @@ impl Rig {
         }
         self.step(20);
         // A strong player: hits land, mana and life are plentiful.
-        self.with(|sim, p| {
+        self.with(move |sim, p| {
             sim.events.action.with(&mut sim.game, |_, v| {
                 for st in [stat::MANA, stat::MAXMANA] {
                     v.set_base(p, st, 100 << 8);
@@ -323,7 +327,7 @@ impl Rig {
     /// A still monster of class 0, `dx` sub-tiles east of the player, with
     /// 100 life.
     pub fn spawn_monster(&mut self, dx: i32) -> UnitId {
-        self.with(|sim, p| {
+        self.with(move |sim, p| {
             let a = &mut sim.events.action;
             let (px, py) = a.sys.hooks.path_position(p);
             let room = sim.game.lists.unit(p).and_then(|e| e.room()).expect("room");
@@ -352,7 +356,7 @@ impl Rig {
 
     /// Makes `skill` the player's right skill.
     pub fn select_right(&mut self, skill: usize) {
-        self.with(|sim, p| {
+        self.with(move |sim, p| {
             let h = &mut sim.events.action.sys.hooks;
             let list = h.skill_lists.get_mut(&p).expect("list");
             let i = list
@@ -365,12 +369,16 @@ impl Rig {
     }
 
     fn send(&mut self, msg: &[u8]) {
-        self.link.lock().unwrap().send(SendQueue::Game, msg).unwrap();
+        self.link
+            .lock()
+            .unwrap()
+            .send(SendQueue::Game, msg)
+            .unwrap();
     }
 
     /// C→S 0x0D: the right skill on a monster.
     pub fn right_click_unit(&mut self, m: UnitId) {
-        let guid = self.with(|sim, _| sim.game.lists.unit(m).expect("unit").guid);
+        let guid = self.with(move |sim, _| sim.game.lists.unit(m).expect("unit").guid);
         let mut msg = vec![0x0D];
         msg.extend(1u32.to_le_bytes());
         msg.extend(guid.to_le_bytes());
@@ -380,7 +388,7 @@ impl Rig {
     /// C→S 0x0C: the right skill at a point `dx`, `dy` sub-tiles from the
     /// player.
     pub fn right_click_point(&mut self, dx: i32, dy: i32) {
-        let (px, py) = self.with(|sim, p| sim.events.action.sys.hooks.path_position(p));
+        let (px, py) = self.with(move |sim, p| sim.events.action.sys.hooks.path_position(p));
         let mut msg = vec![0x0C];
         msg.extend(((px + dx) as u16).to_le_bytes());
         msg.extend(((py + dy) as u16).to_le_bytes());
@@ -388,11 +396,15 @@ impl Rig {
     }
 
     pub fn stat_of(&mut self, u: UnitId, st: u16) -> i32 {
-        self.with(|sim, _| sim.events.action.with(&mut sim.game, |_, v| v.stat(u, st)))
+        self.with(move |sim, _| sim.events.action.with(&mut sim.game, |_, v| v.stat(u, st)))
     }
 
     pub fn mana(&mut self) -> i32 {
-        self.with(|sim, p| sim.events.action.with(&mut sim.game, |_, v| v.stat(p, stat::MANA)))
+        self.with(move |sim, p| {
+            sim.events
+                .action
+                .with(&mut sim.game, |_, v| v.stat(p, stat::MANA))
+        })
     }
 
     pub fn life(&mut self, u: UnitId) -> i32 {
@@ -400,6 +412,6 @@ impl Rig {
     }
 
     pub fn errors(&mut self) -> String {
-        self.with(|sim, _| format!("{:?}", sim.events.action.sys.hooks.errors))
+        self.with(move |sim, _| format!("{:?}", sim.events.action.sys.hooks.errors))
     }
 }

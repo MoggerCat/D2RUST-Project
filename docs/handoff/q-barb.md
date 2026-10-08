@@ -13,8 +13,12 @@
   Orders 149, Whirlwind 151; AnimData for BAA1HTH; leave town through
   the Den cave warp; spawn a still monster; C→S 0x0C / 0x0D helpers) and
   one test, `bash_on_a_monster_costs_mana_and_hurts_it`.
-  **State: written, never compiled or run.** Expect compile fixes and
-  then the first failing link.
+  **State: compiles and runs; fails at the first assertion**
+  (`Bash spent mana`: mana unchanged, server `errors` empty, no panic).
+  Fixed on the way: `Send`/`move` closures, `skilldesc` 0 on the rows
+  (levels.md Edge case 4 panic). Next: check the 0x0D handler reached
+  the skill use (is the right skill Bash? is a player in the Den
+  reaching melee range? `LocalSeams::use_state` / `in_melee_range`).
 - Merged staging (q-amazon: `app/weapons.rs`, `bodies/passive.rs`).
 
 ## Findings (read from code, not run)
