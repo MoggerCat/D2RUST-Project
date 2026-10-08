@@ -772,8 +772,8 @@ fn world_view_frame(
     // between ticks keep the drawn tick's. An error here is the frame
     // build's own, reported there.
     if draw {
-        state.anchor = super::feed::frame_anchor(bridge.0.world(), state.feed.as_mut())
-            .unwrap_or_default();
+        state.anchor =
+            super::feed::frame_anchor(bridge.0.world(), state.feed.as_mut()).unwrap_or_default();
     }
     let anchor = state.anchor;
     // The frame's one camera, once the UI has set this frame's open mode.
