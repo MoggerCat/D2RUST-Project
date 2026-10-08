@@ -323,6 +323,9 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
         palette::add_act_palettes(&mut app, palettes);
         let parts = ui::UiParts::live(archives.clone()).map_err(anyhow::Error::msg)?;
         ui::add_original_ui(&mut app, parts)?;
+        let strings = super::strings::TableStrings::load(archives.as_ref(), super::strings::LANG)
+            .map_err(anyhow::Error::msg)?;
+        super::strings::install_strings(&mut app, strings);
         super::hud::install_hud_tables(&mut app, &archives).map_err(anyhow::Error::msg)?;
         let table = sound::sound_table_live(&archives).map_err(anyhow::Error::msg)?;
         app.insert_resource(GameAudio::new(AudioParts::original(archives, table)));
