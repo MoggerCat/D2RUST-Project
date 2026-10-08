@@ -1247,3 +1247,74 @@ fn a_cursor_jump_effect_becomes_a_cursor_warp_to_the_new_x_at_the_same_y() {
     u.key(&w, Action::ToggleInventory);
     assert_eq!(u.ui.take_cursor_warp(), Some(Point::new(300, 77)));
 }
+
+/// The kept cursor cell (`inventory.md` §5 r3) on the play path: a world
+/// with a 2 × 3 (`qui `, graphic 56 × 84) or 2 × 2 (`gem2`, 56 × 56)
+/// item on the cursor, the panels' art rows and frame sizes set.
+mod grid_hover {
+    use super::*;
+    use crate::bridge::items::{mode, ItemArtRow};
+    use crate::ui::panels::inv_items::tests::world as item_world;
+
+    fn grid_ui(open: &[u8]) -> Ui {
+        let mut u = ui(Some(areas()), true);
+        let mut art = ItemArtRows::default();
+        let row = |w, h, f: &str| ItemArtRow {
+            inv_w: w,
+            inv_h: h,
+            inv_file: f.into(),
+            flippy_file: String::new(),
+        };
+        art.0.insert(*b"qui ", row(2, 3, "invqlt"));
+        art.0.insert(*b"gem2", row(2, 2, "invgem2"));
+        u.ui.set_item_art(art);
+        u.ui.set_item_frame_sizes(BTreeMap::from([
+            ("invqlt".to_string(), (56, 84)),
+            ("invgem2".to_string(), (56, 56)),
+        ]));
+        for &s in open {
+            u.ui.set_ui(u32::from(s), 0, false).unwrap();
+        }
+        u.ui.sync_root(&mut u.root);
+        u
+    }
+
+    fn cursor_world(code: &[u8; 4]) -> ClientWorld {
+        let mut w = item_world(&[(9, mode::CURSOR, (0, 0, 0, 0), code)], Some(9));
+        let p = w.local_player.unwrap();
+        w.units.get_mut(&p).unwrap().mode = 1;
+        w
+    }
+
+    // The spec vector: record 16, 2 × 3 item, graphic 56 × 84. A move to
+    // (500, 340) sets cell (2, 0); at (700, 340) the footprint overhangs
+    // the last column, the cell stays (2, 0), and the press there places
+    // the item at (2, 0) (0x18) instead of sending nothing.
+    // Covers: specs/ui/inventory.md §5 r3, §10 r4
+    #[test]
+    fn an_inventory_press_over_the_last_column_keeps_the_last_cell() {
+        let mut u = grid_ui(&[crate::ui::states::id::INVENTORY]);
+        let w = cursor_world(b"qui ");
+        u.send(&w, UiEvent::CursorMoved(Point::new(500, 340)));
+        u.send(&w, UiEvent::CursorMoved(Point::new(700, 340)));
+        u.click(&w, Point::new(700, 340));
+        let want = ClientIntent::from_message(&crate::bridge::items::insert(9, 2, 0, 0));
+        assert_eq!(u.root.take_intents(), vec![want]);
+    }
+
+    // The stash misclick (q-ui-audit.md §3): a 2 × 2 item moved over
+    // stash cell (4, 2), then pressed over the right half of the last
+    // column (c = (14 − 154 + 319) / 29 − 1 = 5, 2 + 5 > 6) is placed at
+    // the kept cell (4, 2) on page 4.
+    // Covers: specs/ui/inventory.md §5 r3, §10 r4
+    #[test]
+    fn a_stash_press_over_the_last_column_places_at_the_kept_cell() {
+        use crate::ui::states::id;
+        let mut u = grid_ui(&[id::STASH]);
+        let w = cursor_world(b"gem2");
+        u.send(&w, UiEvent::CursorMoved(Point::new(290, 239)));
+        u.click(&w, Point::new(319, 239));
+        let want = ClientIntent::from_message(&crate::bridge::items::insert(9, 4, 2, 4));
+        assert_eq!(u.root.take_intents(), vec![want]);
+    }
+}

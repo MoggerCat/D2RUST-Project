@@ -569,6 +569,33 @@ impl OriginalUi {
         self.refresh_facts(world);
         if let Some(p) = e.at() {
             self.shared.borrow_mut().mouse = p;
+            self.track_grid_hover(world, p);
+        }
+    }
+
+    /// The hover handler `0x00487000` (`inventory.md` §5) of every open
+    /// item grid under `p`: the inventory (page 0), stash (page 4) and
+    /// cube (page 3) grids, so the grid click reads the kept cursor cell
+    /// (§5 r3, §10 r4).
+    fn track_grid_hover(&self, world: &ClientWorld, p: Point) {
+        use super::states::id;
+        let sh = self.shared.borrow();
+        let s = sh.config.screen;
+        let files = &sh.tables.files;
+        if sh.states.is_open(id::STASH) {
+            let g = sh.items.stash_grid(sh.env().exp, &s);
+            sh.items
+                .track_hover(world, files, &g, super::panels::stash_items::STASH_PAGE, p);
+        }
+        if sh.states.is_open(id::CUBE) {
+            let g = sh.items.cube_grid(&s);
+            sh.items
+                .track_hover(world, files, &g, super::panels::cube_items::CUBE_PAGE, p);
+        }
+        if sh.states.is_open(id::INVENTORY) {
+            if let Some(l) = sh.items.layout(Facts::of(world).class, &s) {
+                sh.items.track_hover(world, files, &l.grid, 0, p);
+            }
         }
     }
 
