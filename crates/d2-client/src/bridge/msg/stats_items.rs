@@ -1,4 +1,4 @@
-// Spec: specs/client/msg-stats-items.md
+// Spec: specs/client/msg-stats-items.md, specs/sim/unit-order.md (§5 r6)
 //! Stat messages (0x19–0x20) and item messages (0x9C, 0x9D, 0x3F, 0x42,
 //! 0x47, 0x48). An item unit records its last message; the stream
 //! header the actions read (open question 3) is the provisional
@@ -319,11 +319,16 @@ pub fn item_action(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handler
             _ => {}
         }
     }
+    // `sim/unit-order.md` §5 r6 (item mode set `0x004C1910`): the item
+    // leaves its room, then a ground or dropping item is linked at the
+    // head of the room of its point (none: in no list).
+    let ground = header.filter(|h| matches!(h.mode, 3 | 5));
+    let room = ground.and_then(|h| w.room_at(h.x, h.y)).map(|r| r.room);
     let u = w.units.entry(key).or_insert_with(|| ClientUnit::new(key));
     // A ground item (header mode 3 or 5) stands at its sub-tile; any
     // other mode leaves the world (no cell).
-    if let Some(h) = header {
-        u.position = matches!(h.mode, 3 | 5).then_some((h.x, h.y));
+    if header.is_some() {
+        u.position = ground.map(|h| (h.x, h.y));
     }
     match &mut u.kind {
         KindData::Item(d) => d.last = Some(record),
@@ -333,6 +338,9 @@ pub fn item_action(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handler
                 ..ItemData::default()
             })
         }
+    }
+    if header.is_some() {
+        w.room_units.place(key, room);
     }
     super::super::item_lists::refresh(w, key);
     // Rule 5: the cursor of the inventory's unit (a player's
