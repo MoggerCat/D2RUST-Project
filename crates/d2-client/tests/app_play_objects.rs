@@ -194,7 +194,9 @@ fn clicking_an_object_walks_to_it_and_operates_it() {
     // local check covers it, docs/handoff/stitch-objects.md.)
     let (link, _started) = single_player::start_with_chests(
         data.clone(),
-        single_player::DEFAULT_SEED,
+        // A seed whose chest roll drops (`objects.md` §8.1 rule 5: 25% of
+        // plain chests are empty).
+        single_player::DEFAULT_SEED + 1,
         character.clone(),
         StepClock(ms.clone()),
         vec![(single_player::WAYPOINT_X + 8, single_player::UNIT_Y + 3)],
@@ -326,4 +328,9 @@ fn clicking_an_object_walks_to_it_and_operates_it() {
         mode, mode0,
         "the server operated the chest (S→C 0x0E: opening)"
     );
+    // The chest's drop (`treasure.md` §4, §7; REC-260): the opened chest's
+    // item lies on the floor and the client heard it (0x9C ground item).
+    let ground = d2_client::bridge::items::ground_items(w);
+    assert_eq!(ground.len(), 1, "the chest dropped its item on the floor");
+    assert_eq!(ground[0].code, Some(*b"hfh "));
 }

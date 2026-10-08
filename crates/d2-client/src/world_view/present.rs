@@ -639,6 +639,9 @@ fn world_view_frame(
                 if let Some(b) = original.take_accepted_bindings() {
                     ui.bindings = Some(b);
                 }
+                if let Some(b) = &ui.bindings {
+                    original.set_belt_keys(b);
+                }
             }
             if let Some(art) = &ui.art {
                 art.ensure(&frame.draws, &mut state.assets)?;

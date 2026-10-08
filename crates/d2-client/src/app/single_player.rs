@@ -139,8 +139,8 @@ use super::rest::AppRest;
 use super::server_thread::{ThreadLink, ThreadStopped};
 use super::skill_rest::SkillStore;
 use super::{
-    synthetic_act2, synthetic_act4, synthetic_act5, synthetic_burial, synthetic_chains,
-    synthetic_maze, synthetic_tower,
+    synthetic_a1_maze, synthetic_act2, synthetic_act4, synthetic_act5, synthetic_burial,
+    synthetic_chains, synthetic_maze, synthetic_tower,
 };
 use crate::bridge::drlg::DrlgSource;
 use crate::bridge::local::{LocalLink, PendingSession};
@@ -1673,6 +1673,9 @@ fn synthetic_drlg_data() -> DrlgData {
         c.vis[0] = DEN_OF_EVIL;
         c.warp[0] = synthetic_maze::CAVE_TO_DEN as i32;
     }
+    // The tree dungeons built by the maze generator (q-dungeon-builds);
+    // their vis / warp slots come from the tree below.
+    synthetic_a1_maze::add_levels(&mut drlg);
     drlg.levels[DEN_OF_EVIL as usize].vis[1] = synthetic_maze::CAVE_LEVEL_1;
     drlg.levels[DEN_OF_EVIL as usize].warp[1] = synthetic_maze::DEN_TO_CAVE as i32;
     // The town and the Blood Moor see each other through vis slot 0, a
@@ -2889,6 +2892,7 @@ pub fn build_with_town(
     // reward path yet.
     world.start_extra = vec![*b"box "];
     let mut s: Sim = SimGame::with_world(game, sim, world);
+    s.announce_ground = true;
     s.set_host_sync(sync_seams);
     s.set_world_sync(super::weapons::sync);
     // The session sequence (`intents-events.md` §8) runs on the client's
