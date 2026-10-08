@@ -425,8 +425,23 @@ impl MoveCall for UpdateRun {
         // The sound of each (receiver, player), read before the pass: the
         // item messages do not touch the sound slots.
         let sounds = self.sounds(econ.game);
+        let item_updates = econ.hooks.take_item_updates();
         let mut d = parts.desk(econ);
         let (mut sent, mut fatal) = (Vec::new(), Vec::new());
+        // The ground items' 0x9C of the per-unit update (§6.3), decided
+        // by the tick wiring and built here, to the receiver's client.
+        // PROVISIONAL (REC-281, d2rs-own, unverified): they leave after
+        // the tick's other unit messages, before the players' updates
+        // (1.14d interleaves them in unit order).
+        for (receiver, item, action) in item_updates {
+            let Some(r) = self.receivers.iter().find(|r| r.own == receiver) else {
+                continue;
+            };
+            match sim_moves::item_world_action(&d, d.guid_of(item), action) {
+                Ok(m) => sent.push((r.client, m)),
+                Err(e) => fatal.push((r.client, e)),
+            }
+        }
         let mut sounds = sounds.into_iter();
         for r in &self.receivers {
             let own = d.guid_of(r.own);

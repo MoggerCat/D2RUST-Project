@@ -945,7 +945,8 @@ fn pick_item_auto_and_refusals() {
     let mut t = setup();
     let k = t.ground_item(KEY, 12, 11);
     t.rest.with(|r| r.distance = 51);
-    assert_eq!(t.frame(&pick(k, 0)), (Refused, NO_BYTES));
+    // The new ground item is announced in its first tick (§6.3 part 1).
+    assert_eq!(t.frame(&pick(k, 0)), (Refused, vec![x9c(0x00, k)]));
     t.rest.with(|r| r.distance = 5);
     assert_eq!(t.frame(&pick(k, 0)), (Done, NO_BYTES));
     let me = t.pguid();
@@ -963,9 +964,8 @@ fn pick_item_auto_and_refusals() {
 
 /// 0x17 (§7.2, §9.1): the cursor item dropped at the free spot: mode 3,
 /// in the room, at the spot, expiry frame + 15000. §9.1 runs no owner
-/// refresh and no update list, so the tick sends nothing to the owner;
-/// the ground message (§6.3) is not sent: the per-unit update that would
-/// send it is not wired (see `update_pass`). An item
+/// refresh and no update list; the per-unit update sends the ground
+/// message (§6.3 part 2: unit flag 0x1000, action 2). An item
 /// that is not the cursor item → 1.
 // Covers: specs/items/inventory-moves.md §7.2 r1, §9.1
 #[test]
@@ -989,7 +989,7 @@ fn drop_item_to_the_ground() {
     let u = t.unit(k).unwrap();
     let frame = t.sim().game.frame;
     assert_eq!(t.inv().state.expiry[&u], frame - 1 + 15000);
-    assert_eq!(bytes, NO_BYTES);
+    assert_eq!(bytes, vec![x9c(0x02, k)]);
     assert_eq!(t.rest.take_log(), [format!("quest_item_dropped {k}")]);
 }
 
@@ -1168,7 +1168,11 @@ fn use_grid_item() {
     let mut t = setup();
     let k = t.picked(KEY);
     let g = t.ground_item(KEY, 12, 12);
-    assert_eq!(t.frame(&msg(0x20, &[g, 10, 10])), (Refused, NO_BYTES));
+    // The new ground item is announced in its first tick (§6.3 part 1).
+    assert_eq!(
+        t.frame(&msg(0x20, &[g, 10, 10])),
+        (Refused, vec![x9c(0x00, g)])
+    );
     assert_eq!(t.frame(&msg(0x20, &[k, 11, 10])), (Malformed, NO_BYTES));
 }
 
@@ -1302,7 +1306,8 @@ fn use_item_action() {
     let k = t.picked(KEY);
     let u = t.cursor_item(KEY);
     let g = t.ground_item(KEY, 12, 12);
-    assert_eq!(t.frame(&msg(0x27, &[g, u])), (Refused, NO_BYTES));
+    // The new ground item is announced in its first tick (§6.3 part 1).
+    assert_eq!(t.frame(&msg(0x27, &[g, u])), (Refused, vec![x9c(0x00, g)]));
     assert_eq!(t.frame(&msg(0x27, &[k, u])), (Done, NO_BYTES));
 }
 
@@ -1315,7 +1320,11 @@ fn socket_item() {
     let mut t = setup();
     let target = t.picked(KEY);
     let g = t.ground_item(KEY, 12, 12);
-    assert_eq!(t.frame(&msg(0x28, &[g, target])), (Refused, NO_BYTES));
+    // The new ground item is announced in its first tick (§6.3 part 1).
+    assert_eq!(
+        t.frame(&msg(0x28, &[g, target])),
+        (Refused, vec![x9c(0x00, g)])
+    );
     let f = t.cursor_item(KEY);
     assert_eq!(t.frame(&msg(0x28, &[f, target])), (Done, NO_BYTES));
     assert_eq!((t.mode(f), t.mode(target)), (4, 0));
@@ -1382,7 +1391,8 @@ fn drop_gold_makes_a_pile() {
     assert_eq!(t.frame(&msg(0x50, &[me + 1, 10])), (Malformed, NO_BYTES));
     let before = t.sim().game.lists.units_of_type(UnitType::Item);
     t.rest.take_log();
-    assert_eq!(t.frame(&msg(0x50, &[me, 1500])), (Done, NO_BYTES));
+    let (code, bytes) = t.frame(&msg(0x50, &[me, 1500]));
+    assert_eq!(code, Done);
     let piles: Vec<UnitId> = t
         .sim()
         .game
@@ -1399,6 +1409,9 @@ fn drop_gold_makes_a_pile() {
         GOLD as u32
     );
     assert_eq!(t.stat(pile, stat::GOLD), 1500);
+    // The new pile on the ground, announced by the per-unit update
+    // (§6.3 part 1: dropped, action 2).
+    assert_eq!(bytes, vec![x9c(0x02, g)]);
     assert_eq!(t.mode(g), 3);
     assert!(t.in_room(g));
     assert_eq!(t.stat(p, stat::GOLD), 3500);

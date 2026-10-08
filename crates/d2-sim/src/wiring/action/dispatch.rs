@@ -240,6 +240,40 @@ impl<X: Pending> EventDispatch for ActionSim<X> {
 }
 
 impl<X: Pending> TickHooks for ActionSim<X> {
+    /// Per-client update removals (`0x0053A770`, `tick.md` §6 rule 5):
+    /// S→C 0x0A (`messages::remove_unit`) to the client's player for each
+    /// removal record in the client room's adjacent rooms. PROVISIONAL
+    /// (REC-281): the records are the freed ground items'
+    /// (`ActionHooks::removed_items`).
+    fn send_removed_units(&mut self, game: &mut Game, client: ClientId) {
+        let h = &mut self.sys.hooks;
+        if h.removed_items.is_empty() {
+            return;
+        }
+        let Some(c) = game.lists.client(client) else {
+            return;
+        };
+        let Some(player) = c.player else {
+            return;
+        };
+        let adjacent = c
+            .room
+            .and_then(|r| game.lists.room(r))
+            .map(|r| r.adjacent.clone())
+            .unwrap_or_default();
+        for &(guid, room) in &h.removed_items {
+            if adjacent.contains(&room) {
+                let m = crate::units::messages::remove_unit(UnitType::Item as u8, guid);
+                h.x.send(player, &m);
+            }
+        }
+    }
+
+    /// Step 7 (`0x0061A2C0`): the room's removal records are freed.
+    fn free_removal_records(&mut self, _: &mut Game, room: RoomId) {
+        self.sys.hooks.removed_items.retain(|&(_, r)| r != room);
+    }
+
     /// Step 1 `0x0061C040(act, a)` (`render/lighting.md` §9.3 rule 5):
     /// the act's environment record advanced with `A` = the act index.
     /// An act no join has built yet ([`crate::units::lists::ActEntry::built`])
@@ -349,6 +383,21 @@ impl<X: Pending> TickHooks for ActionSim<X> {
                     UnitType::Monster => {}
                     _ => v.add_messages(game, p, unit),
                 }
+            }
+        }
+        // `inventory-moves.md` §6.3 part 2 (`0x0055BF30` / `0x0055BED0`):
+        // an announced item with unit flag 0x1 in mode 3 sends 0x9C
+        // action 2 (unit flag 0x1000) or 3, built by the host
+        // (`ActionHooks::item_updates`).
+        if let (Some(p), None) = (receiver, new) {
+            if let Some(r) = v.units.get(unit).filter(|r| {
+                r.ty == UnitType::Item
+                    && r.flags & crate::units::record::flags::CHANGED != 0
+                    && r.mode == u32::from(crate::items::moves::mode::GROUND)
+            }) {
+                let dropped = r.flags & crate::items::moves::uflag::DROPPED != 0;
+                v.h.item_updates
+                    .push((p, unit, if dropped { 2 } else { 3 }));
             }
         }
         // §3.5 rule 6 / §7.3 rule 2 step 8: the changed-state messages of

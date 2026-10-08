@@ -1205,6 +1205,10 @@ fn host(game_seed: u32) -> Host {
     );
     h.sim.set_unit(player, facts());
     h.sim.set_unit(npc, facts());
+    // One tick: the start's ground items are announced to the client
+    // (`inventory-moves.md` §6.3 part 1), so every test starts after it.
+    h.sim.tick(&mut h.out);
+    h.drain();
     h
 }
 
@@ -1955,7 +1959,10 @@ fn check_stream(
     // §6.1 rule 2: a pass that sent item messages ends with 0x47, 0x48,
     // then at most the player's S→C 0x2C (`world/cube.md` §8 rule 3: the
     // sound slot after the item messages).
-    if ticked.iter().any(|m| m[0] == 0x9C || m[0] == 0x9D) {
+    // The ground items' 0x9C of the per-unit update (§6.3: actions 0, 2,
+    // 3; no dispatcher row sends them) are not the pass's.
+    let pass_item = |m: &Vec<u8>| (m[0] == 0x9C && !matches!(m[1], 0 | 2 | 3)) || m[0] == 0x9D;
+    if ticked.iter().any(pass_item) {
         let n = ticked.len() - usize::from(ticked.last().is_some_and(|m| m[0] == 0x2C));
         let tail: Vec<u8> = ticked[n.saturating_sub(2)..n]
             .iter()

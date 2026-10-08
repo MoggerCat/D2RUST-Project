@@ -329,6 +329,12 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
     fn request_act_change(&mut self, player: UnitId, level: u32, arg: u32) {
         self.act_changes.push((player, level, arg));
     }
+    fn take_item_updates(&mut self) -> Vec<(UnitId, UnitId, u8)> {
+        std::mem::take(&mut self.item_updates)
+    }
+    fn path_xy(&self, unit: UnitId) -> Option<(i32, i32)> {
+        self.path_has(unit).then(|| self.path_position(unit))
+    }
     /// The monster type init `0x00574250` (`init.md` §5, `units.md` §3.1
     /// table: the allocator's per-kind init of a monster) on the lent
     /// monster world ([`super::monsters`]); the object data and init
@@ -392,6 +398,25 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
             .units
             .get(unit)
             .map_or((None, 0), |r| (Some(r.ty), r.mode));
+        // A ground item leaves the clients' rooms: its removal record
+        // (REC-281, `ActionHooks::removed_items`), in the room its path
+        // was in.
+        if ty == Some(UnitType::Item) && mode == u32::from(crate::items::moves::mode::GROUND) {
+            let room = self
+                .paths
+                .as_ref()
+                .and_then(|p| p.record(unit))
+                .and_then(|r| r.room())
+                .or_else(|| sim.game.lists.unit(unit).and_then(|e| e.room()));
+            let guid = sim.units.get(unit).map(|r| r.guid);
+            if let (Some(room), Some(guid)) = (room, guid) {
+                self.removed_items.push((guid, room));
+                let act = sim.game.lists.room(room).map(|r| r.act);
+                if let Some(a) = act.and_then(|a| sim.game.lists.act_mut(a)) {
+                    a.pending_removals = true;
+                }
+            }
+        }
         self.path_free(unit, ty, mode);
         if let Some(ai) = self.ai.as_mut() {
             ai.remove(unit);

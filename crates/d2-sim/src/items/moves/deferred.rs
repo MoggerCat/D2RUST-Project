@@ -618,6 +618,19 @@ pub fn announce_item<W: MoveWorld>(w: &W, item: Guid) -> Result<Vec<u8>, MoveFat
     let dropped =
         w.mode(item) == mode::GROUND && w.unit_flags(Owner::item(item)) & uflag::DROPPED != 0;
     let action = if dropped { 2 } else { 0 };
+    item_world_action(w, item, action)
+}
+
+/// The 0x9C of §6.3 with an action decided by the caller (part 1: 0 / 2;
+/// part 2: 2 / 3): the item's bits with flags 0 at its page. A host whose
+/// per-unit update runs where the item world is not reachable decides
+/// the action there (the unit flags are cleared by the room clean-up
+/// before it builds the message) and builds the message here.
+pub fn item_world_action<W: MoveWorld>(
+    w: &W,
+    item: Guid,
+    action: u8,
+) -> Result<Vec<u8>, MoveFatal> {
     let bits = w.item_bits(item, 0, w.page(item));
     layouts::item_world(action, category(w, item), item, &bits)
 }

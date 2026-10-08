@@ -19,8 +19,10 @@
 //! Every message goes to the client's player ([`Pending::send`]).
 //!
 //! Not sent, because no spec gives them (named, not guessed):
-//! - missile 0x73 (`0x0059FEE0`), item 0x9C (the item world is not
-//!   reachable from the action wiring, as for §7.1);
+//! - missile 0x73 (`0x0059FEE0`);
+//! - item 0x9C is not built here (the item world is not reachable from
+//!   the action wiring, as for §7.1): the action is queued on
+//!   `ActionHooks::item_updates` for the host's item pass.
 //! - player part B for another player (`0x005489F0`, `0x005484B0`,
 //!   multiplayer only, §7.9 rule 5), the corpse 0x74 and the inventory
 //!   messages `0x00534F80`;
@@ -36,6 +38,11 @@ use crate::units::{ClientId, RoomId, UnitId, UnitType};
 
 use super::rooms::RoomSwitch;
 use super::{Pending, View, WiringError};
+
+/// Item mode 3 (on the ground) and unit flag 0x1000 (dropped), as
+/// `items::moves` names them (`inventory-moves.md` §6.3).
+const ITEM_GROUND: u32 = crate::items::moves::mode::GROUND as u32;
+const ITEM_DROPPED: u32 = crate::items::moves::uflag::DROPPED;
 
 /// The session facts of the players a client join brings in (the save,
 /// `path-placement.md` §13 rule 2): read by the add messages.
@@ -203,8 +210,16 @@ impl<X: Pending> View<'_, X> {
                 self.h.x.send(receiver, &m);
             }
             UnitType::Monster => self.monster_add(game, receiver, unit),
+            // `inventory-moves.md` §6.3 part 1: mode 3 with unit flag
+            // 0x1000 → 0x9C action 2, otherwise action 0; built by the
+            // host (module docs).
+            UnitType::Item => {
+                let dropped = mode == ITEM_GROUND && r.flags & ITEM_DROPPED != 0;
+                let action = if dropped { 2 } else { 0 };
+                self.h.item_updates.push((receiver, unit, action));
+            }
             // Module docs: not specified far enough.
-            UnitType::Missile | UnitType::Item => {}
+            UnitType::Missile => {}
         }
     }
 

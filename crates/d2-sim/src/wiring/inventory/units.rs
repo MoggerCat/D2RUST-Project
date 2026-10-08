@@ -10,7 +10,7 @@
 
 use super::inv_world::STAT_SOCKETS;
 use super::{InvDesk, InvRest};
-use crate::items::moves::{Guid, MoveUnits, Owner};
+use crate::items::moves::{Guid, MovePending, MoveUnits, Owner};
 use crate::units::lifecycle::LifecycleHooks;
 use crate::units::UnitId;
 
@@ -127,7 +127,19 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MoveUnits for InvDesk<'_, '_, H, R>
     fn mode(&self, item: Guid) -> u8 {
         self.data(item).map_or(0, |d| d.mode)
     }
+    /// The item data's mode; a change also sets unit flag 0x1 (changed
+    /// this tick, [`crate::items::moves::uflag::CHANGED`]: "set by every
+    /// mode set") and queues the unit for update (`unit-order.md` §6
+    /// rule 2: only a unit in a room is queued), so a ground item's
+    /// change reaches the per-unit update (`inventory-moves.md` §6.3
+    /// part 2). PROVISIONAL (REC-281): the item mode setter's body is not
+    /// written; d2rs-own, unverified.
     fn set_mode(&mut self, item: Guid, m: u8) {
+        if self.data(item).is_some_and(|d| d.mode != m) {
+            let u = Owner::item(item);
+            self.set_rec(u, |r| r.flags |= crate::items::moves::uflag::CHANGED);
+            self.queue_update(u);
+        }
         self.edit(item, |d| d.mode = m);
     }
     fn page(&self, item: Guid) -> u8 {

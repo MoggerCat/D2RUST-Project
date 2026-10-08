@@ -1067,7 +1067,13 @@ fn run_with(game_seed: u32) -> Transcript {
     for (i, m) in monster_adds.into_iter().enumerate() {
         want.insert(1 + i, m);
     }
-    assert_eq!(frames[0].2, want);
+    // The ring on the ground of a joined room: its add message, 0x9C
+    // action 0 (`inventory-moves.md` §6.3 part 1), built by the host's
+    // item pass after the tick's unit messages (REC-281).
+    let mut ring_add = vec![0x9C, 0, 8, 0];
+    ring_add.extend_from_slice(&fx.guid(fx.ring).to_le_bytes());
+    want.push(ring_add);
+    assert_eq!(streams(&fx, &frames[0].2), want);
     assert_eq!(fx.sim_ref().game.lists.active_rooms(0).len(), 4);
     let monsters = fx.monsters();
     assert_eq!(monsters.len(), 1, "the DS1 preset monster");
@@ -1204,9 +1210,15 @@ fn run_with(game_seed: u32) -> Transcript {
     );
     let amount = fx.stat(gold, 14);
     assert!((1..=6).contains(&amount), "roll(5 · 1) + 1: {amount}");
-    for f in &frames[2..] {
-        assert_eq!(f.2, none);
-    }
+    // The only S→C since: the pile's add message, 0x9C action 0 (a new
+    // ground item, `inventory-moves.md` §6.3 part 1; REC-281).
+    let mut pile_add = vec![0x9C, 0, 8, 0];
+    pile_add.extend_from_slice(&fx.guid(gold).to_le_bytes());
+    let sent: Vec<Vec<u8>> = frames[2..]
+        .iter()
+        .flat_map(|f| streams(&fx, &f.2))
+        .collect();
+    assert_eq!(sent, vec![pile_add]);
     assert!(fx.errors().is_empty(), "{:?}", fx.errors());
 
     // Level-up (`vitals.md` §4.3 → §3): 100 experience reaches level 2
@@ -1452,11 +1464,12 @@ fn run_with(game_seed: u32) -> Transcript {
     // free-spot search answers that spot: the cap on the ground (mode 3,
     // in the player's room, at the player's position), the ITEMDROPPED
     // hook. No owner refresh, so no update pass; the ground message
-    // (§6.3) is not built on real units (`wire-inventory-sim.md` WV1).
+    // (§6.3 part 2: the mode set's unit flag 0x1 with the drop's 0x1000
+    // → 0x9C action 2; REC-281).
     let drop_msg = bytes(&DropItem { item: cg });
     record(&mut fx, &mut frames, vec![drop_msg]);
     assert_eq!(frames[25].1.codes, [(0x17, done)]);
-    assert_eq!(frames[25].2, none);
+    assert_eq!(streams(&fx, &frames[25].2), vec![x9c(0x02, cg)]);
     assert_eq!(fx.mode(cap), 3);
     let room = fx.sim_ref().game.lists.unit(player).unwrap().room();
     assert_eq!(fx.sim_ref().game.lists.unit(cap).unwrap().room(), room);
@@ -1749,7 +1762,9 @@ fn run_with(game_seed: u32) -> Transcript {
         .flat_map(|f| f.2.iter())
         .filter(|m| m[0] == 0x9C && m[1] == 11)
         .collect();
-    assert_eq!(client, (37, 36, 6 + shown.len()));
+    // + the ring, made by its add message in the join's frame (0x9C
+    // action 0, `inventory-moves.md` §6.3 part 1; REC-281).
+    assert_eq!(client, (37, 36, 7 + shown.len()));
     assert_eq!(w.local_player, None);
     let object = d2_client::bridge::world::UnitKey::new(d2_client::bridge::world::OBJECT, wp);
     assert!(w.units.contains_key(&object));
@@ -1774,7 +1789,10 @@ fn run_with(game_seed: u32) -> Transcript {
     // (`intents-events.md` §7.2: 0xAC ×2, 0xAA ×2), + the transmute's
     // sound 0x2C (step 25, `cube.md` §8 "Exact" item 3).
     // + the 0x9C action 11 of the store items (trade open, sold copy).
-    assert_eq!(log.handled, 54 + shown.len() as u64);
+    // + the ground items' 0x9C of the per-unit update
+    // (`inventory-moves.md` §6.3, REC-281): the ring's and the gold
+    // pile's adds (action 0), the dropped cap's (action 2).
+    assert_eq!(log.handled, 57 + shown.len() as u64);
     let rejected: Vec<(u8, String)> = log
         .rejected
         .iter()

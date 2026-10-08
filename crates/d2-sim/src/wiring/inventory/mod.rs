@@ -386,11 +386,19 @@ impl<'d, 'a, H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'d, 'a, H, R> {
             let (Some(r), Some(it)) = (self.econ.units.get(u), self.econ.items.get(u)) else {
                 continue;
             };
-            let d = self
-                .state
-                .items
-                .entry(u)
-                .or_insert_with(|| InvItem::new(r.guid, it.record));
+            let d = self.state.items.entry(u).or_insert_with(|| {
+                let mut d = InvItem::new(r.guid, it.record);
+                // An item new to the model that lies on the ground (a
+                // treasure drop, placed by the path code): its position
+                // is the path's (`bitstream.md` §4.1 rule 2, static path
+                // +0x0C / +0x10).
+                if r.mode == u32::from(crate::items::moves::mode::GROUND) {
+                    if let Some((x, y)) = self.econ.hooks.path_xy(u) {
+                        (d.x, d.y) = (x, y);
+                    }
+                }
+                d
+            });
             d.guid = r.guid;
             d.record = it.record;
             d.mode = r.mode as u8;
