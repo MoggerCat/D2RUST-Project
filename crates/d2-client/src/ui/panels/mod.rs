@@ -178,6 +178,7 @@ pub fn cel(file: u32, frame: u32, x: i32, y: i32) -> UiDraw {
         image: ImageRef { file, frame },
         at: Point::new(x, y),
         clip: FRAME,
+        look: crate::ui::CelLook::PLAIN,
     })
 }
 

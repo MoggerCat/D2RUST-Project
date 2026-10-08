@@ -216,7 +216,7 @@ fn cof_and_component_names_from_the_looks() {
     assert!(unit_cof(&l, &unit(4, 5, 0, 0)).is_none());
 }
 
-// Covers: specs/render/unit-composite.md §6 r2
+// Covers: specs/render/unit-composite.md §6 r2, §3 r2
 #[test]
 fn an_object_loads_draws_and_animates() {
     let mut src = MemorySource::default();
@@ -245,14 +245,12 @@ fn an_object_loads_draws_and_animates() {
     assert!(loader.ensure(&world, &mut a).is_empty());
     assert_eq!(a.frames.len(), 6);
 
-    // The model animates the object (`client/model.md` §18 r1): its 8.8
-    // frame is the COF frame, frame 0 included (`seams/bridge-app.md`
-    // §2.1), whatever the server tick.
-    for (tick, model, frame) in [(1, 0x100, 1), (2, 0x200, 2), (3, 0, 0), (4, 0x80, 0)] {
+    // §3 r2: the frame is the model's +0x44 >> 8 (the client object
+    // update animates it), whatever the tick; frame 0 is a frame.
+    let mut o = o;
+    for (tick, counter, frame) in [(1, 0, 0), (2, 0, 0), (3, 0x100, 1), (4, 0x2FF, 2)] {
         world.server_ticks = tick;
-        let mut o = o.clone();
-        o.frame = model;
-        world.units.insert(o.key, o.clone());
+        o.frame = counter;
         let pose = rules.unit_pose(&world, &o).unwrap().unwrap();
         assert_eq!((pose.dir, pose.frame), (0, frame), "tick {tick}");
         let built = build(&world, &[], &rules, &a).unwrap();
@@ -265,6 +263,9 @@ fn an_object_loads_draws_and_animates() {
             (ShadeChain::EMPTY, BlendOp::Opaque)
         );
     }
+    // No `% F`: a frame past the COF's 3 frames is used as is (§3 r6).
+    o.frame = 0x300;
+    assert_eq!(rules.unit_pose(&world, &o).unwrap().unwrap().frame, 3);
 }
 
 // Covers: specs/render/unit-composite.md §2 r4, §5 r2, §5.1 r3, §6 r4

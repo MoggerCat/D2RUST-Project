@@ -592,6 +592,7 @@ pub fn draw_tip(
                     image: ImageRef { file, frame: DARK },
                     at: Point::new(tx, ty),
                     clip: Rect::new(tx, ty, cw as u16, ch as u16),
+                    look: crate::ui::CelLook::PLAIN,
                 }));
                 tx += tw;
             }

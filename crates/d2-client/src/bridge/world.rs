@@ -620,6 +620,10 @@ pub struct ClientWorld {
     pub use_cursor: Option<UseCursor>,
     /// The pet list, newest first (§14 rule 5).
     pub pets: Vec<PetRecord>,
+    /// S→C 0x03 act loads handled (count, never reset): each one replaces
+    /// the client act through `0x0044E100`, which sets the post-draw clear
+    /// counter (`render/composition.md` §3 step 4).
+    pub act_loads: u64,
     /// The act whose palette is loaded (§11 rules 2, 4): the act of 0x03,
     /// replaced by the Levels `Pal` of the new level on a room change.
     pub palette_act: Option<u8>,

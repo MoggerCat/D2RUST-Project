@@ -1,4 +1,4 @@
-// Spec: specs/render/unit-composite.md (§9), specs/render/camera.md (§2, §3, §4), specs/render/sprite-placement.md (§2, §8), specs/render/draw-order.md (§3, §10), specs/items/inventory-moves.md (§7.1, §7.2), specs/ui/controls.md (§6 r4)
+// Spec: specs/render/unit-composite.md (§9), specs/render/camera.md (§2, §3, §4), specs/render/sprite-placement.md (§2, §8), specs/render/draw-order.md (§3, §5, §10), specs/items/inventory-moves.md (§7.1, §7.2), specs/ui/controls.md (§6 r4)
 //! Ground items in the play preview's world view: each item of the model
 //! in mode 3 / 5 drawn at its sub-tile with its flippy DC6, and the world
 //! clicks that pick one up (C→S 0x16) or drop the cursor item (C→S 0x17).
@@ -9,8 +9,10 @@
 //! - the position: a static unit at its sub-tile (`camera.md` §2), drawn at
 //!   the camera's unit draw position with no extra offset (§4), the DC6
 //!   cel placed bottom-anchored (`sprite-placement.md` §2, §8);
-//! - the pass: a ground item is a flat unit in the shadow list, drawn in
-//!   pass 5 (`draw-order.md` §3, §10);
+//! - the draw key: the item's slot in the frame's draw order (a room unit,
+//!   `draw-order.md` §3 r4: flat in mode 3, so in the shadow list of its
+//!   cell, pass 5; a dropping item (mode 5) in the unit list, pass 6;
+//!   sight-tested, §5 r3); an item the order does not draw is hidden;
 //! - draw mode 5 (not highlighted): the opaque copy (`unit-composite.md`
 //!   §9, `render/blend-modes.md`);
 //! - a left press in the world while the local player holds a cursor item
@@ -27,9 +29,8 @@
 //!   (§9: < 100, < 500, < 5,000, else);
 //! - no colormap and no light (`0x0062C100`, `render/lighting.md`): the
 //!   cel is unshaded;
-//! - the draw key: pass 5 with major `DrawKey::MAJOR_MAX` (after the
-//!   shadow tiles of every cell) and minor by (sx + sy, GUID), not the
-//!   draw-cell grid index of `draw-order.md` §2;
+//! - without a draw order (no map feed): pass 5 with major
+//!   `DrawKey::MAJOR_MAX` and minor by (sx + sy, GUID);
 //! - no shake in the camera (no effect spec starts one, `model_feed.rs`
 //!   `PENDING`);
 //! - the click on an item: the original hovers the unit
@@ -55,10 +56,11 @@ use std::sync::Arc;
 use crate::assets::path::{CanonicalPath, FileSource};
 use crate::bridge::items::{self, ItemArtRows};
 use crate::bridge::link::ServerLink;
-use crate::bridge::world::ClientWorld;
+use crate::bridge::world::{ClientWorld, UnitKey};
 use crate::bridge::{Bridge, BridgeError};
 use crate::frames::{FramePart, FrameSet, FrameSetKey};
 use crate::rules::camera::{static_to_client, Camera, FrameSize};
+use crate::rules::draw_order::UnitSlot;
 use crate::rules::placement::place;
 use crate::scene::order::pass;
 use crate::scene::{BlendOp, DrawItem, DrawKey, ItemTag, Rect, ShadeChain};
@@ -202,9 +204,16 @@ impl GroundItems {
         world: &ClientWorld,
         camera: &Camera,
         assets: &ViewAssets,
+        slots: Option<&BTreeMap<UnitKey, UnitSlot>>,
     ) -> Vec<GroundDraw> {
         let mut found = Vec::new();
         for item in items::ground_items(world) {
+            // `draw-order.md` §3 r4, §5: the order's slot; not drawn → hidden.
+            let slot = match slots.map(|s| s.get(&item.key).copied()) {
+                None => None,
+                Some(Some(UnitSlot::Drawn(k))) => Some(k),
+                Some(_) => continue,
+            };
             let Some(name) = self.flippy(item.code) else {
                 continue;
             };
@@ -232,18 +241,27 @@ impl GroundItems {
             d.shade = ShadeChain::EMPTY;
             d.blend = BlendOp::Opaque;
             d.tag = ItemTag::Unit(item.key.guid);
-            found.push((sx + sy, item.key.guid, d, hit));
+            found.push((slot, sx + sy, item.key.guid, d, hit));
         }
-        found.sort_by_key(|&(depth, guid, ..)| (depth, guid));
-        found
+        // Unordered: by (sx + sy, GUID) after every pass-5 entry.
+        found.sort_by_key(|&(slot, depth, guid, ..)| (slot.is_some(), depth, guid));
+        let mut out = found
             .into_iter()
             .enumerate()
-            .filter_map(|(minor, (_, guid, mut item, hit))| {
-                let minor = u32::try_from(minor).ok()?;
-                item.key = DrawKey::new(pass::SHADOWS, DrawKey::MAJOR_MAX, minor, 0).ok()?;
+            .filter_map(|(minor, (slot, _, guid, mut item, hit))| {
+                item.key = match slot {
+                    Some(k) => DrawKey::new(k.pass, k.major, k.minor, 0).ok()?,
+                    None => {
+                        let minor = u32::try_from(minor).ok()?;
+                        DrawKey::new(pass::SHADOWS, DrawKey::MAJOR_MAX, minor, 0).ok()?
+                    }
+                };
                 Some(GroundDraw { guid, item, hit })
             })
-            .collect()
+            .collect::<Vec<_>>();
+        // In draw order (the hit test takes the last).
+        out.sort_by_key(|d| d.item.key);
+        out
     }
 
     /// Loads the art ([`Self::ensure`]) and adds the ground items to a
@@ -268,14 +286,14 @@ impl GroundItems {
             // the player's, unshaken.
             (Ok(Some(p)), Ok(mode)) if mode.get() != NO_WORLD_MODE => frame
                 .camera
-                .unwrap_or_else(|| Camera::new(FrameSize::D2RS, mode, p.client(), (0, 0))),
+                .unwrap_or_else(|| Camera::new(FrameSize::play(), mode, p.client(), (0, 0))),
             (Err(e), _) | (_, Err(e)) => {
                 log.push(format!("ground items: no camera: {e}"));
                 return log;
             }
             _ => return log,
         };
-        self.last = self.draws(world, &camera, assets);
+        self.last = self.draws(world, &camera, assets, frame.slots.as_ref());
         if !self.last.is_empty() {
             frame.items.extend(self.last.iter().map(|d| d.item));
             crate::scene::order(&mut frame.items);

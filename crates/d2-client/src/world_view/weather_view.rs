@@ -163,7 +163,7 @@ impl WeatherView {
             update_count: self.update_count,
             mud: level.mud,
             sky: Some(SkyFrame {
-                frame: FrameSize::D2RS,
+                frame: FrameSize::play(),
                 mode: OpenMode::NONE,
                 shift_x: 0,
                 level,
@@ -220,7 +220,7 @@ impl WeatherView {
         let delta = self.camera_delta(local_at, mode);
         let input = UpdateInput {
             update_count: self.update_count,
-            frame: FrameSize::D2RS,
+            frame: FrameSize::play(),
             camera_delta: delta,
             day_period: DAY_PERIOD,
             video_mode: VIDEO_MODE,
@@ -336,11 +336,11 @@ impl WeatherView {
     }
 
     fn ensure_flash(&self, mode: OpenMode, assets: &mut ViewAssets) -> Result<(), String> {
-        let key = flash_key(FrameSize::D2RS, mode);
+        let key = flash_key(FrameSize::play(), mode);
         if assets.frames.contains(&key) {
             return Ok(());
         }
-        let (w, h) = flash_size(FrameSize::D2RS, mode);
+        let (w, h) = flash_size(FrameSize::play(), mode);
         let frame = IndexFrame::new(w, h, 0, 0, vec![1; w as usize * h as usize])
             .map_err(|e| e.to_string())?;
         assets
@@ -362,7 +362,7 @@ impl WeatherView {
             return (0, 0);
         };
         let player = UnitPosition::Moving { x16, y16 }.client();
-        let cam = Camera::new(FrameSize::D2RS, mode, player, (0, 0)).unit;
+        let cam = Camera::new(FrameSize::play(), mode, player, (0, 0)).unit;
         let now = (cam.x, cam.y);
         let delta = self.origin.map_or((0, 0), |o| (now.0 - o.0, now.1 - o.1));
         self.origin = Some(now);
@@ -406,7 +406,7 @@ impl WeatherView {
                         })?;
                         let g = gdi_rectangle(
                             tables,
-                            FrameSize::D2RS,
+                            FrameSize::play(),
                             maps[usize::from(SkyDraw::FLASH_COLOR)],
                             x0,
                             y0,
@@ -416,7 +416,7 @@ impl WeatherView {
                         )
                         .map_err(|e| unresolved("lightning flash", e.to_string()))?;
                         if let Some(g) = g {
-                            let id = assets.id(&flash_key(FrameSize::D2RS, mode), 0)?;
+                            let id = assets.id(&flash_key(FrameSize::play(), mode), 0)?;
                             let mut item = g.item(id);
                             item.key = sky_key(minor)?;
                             minor += 1;
@@ -438,8 +438,8 @@ impl WeatherView {
                         for (x, y) in pixels {
                             if x < 0
                                 || y < 0
-                                || x >= FrameSize::D2RS.width
-                                || y >= FrameSize::D2RS.height
+                                || x >= FrameSize::play().width
+                                || y >= FrameSize::play().height
                             {
                                 continue;
                             }
