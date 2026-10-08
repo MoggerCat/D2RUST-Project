@@ -1005,13 +1005,8 @@ impl LevelTypes for Types {
                 }
             }
             // The remaining chains (q-levels-warps-all): slot 0 back, 1 on.
-            if let Some((back, on)) = synthetic_chains::links(id) {
-                if back.is_some() {
-                    drlg.room_mut(r).flags |= d2_sim::drlg::room_flags::WARP_0;
-                }
-                if on.is_some() {
-                    drlg.room_mut(r).flags |= d2_sim::drlg::room_flags::WARP_0 << 1;
-                }
+            for (slot, _, _) in synthetic_chains::slots(id) {
+                drlg.room_mut(r).flags |= d2_sim::drlg::room_flags::WARP_0 << slot;
             }
             if id == DEN_OF_EVIL {
                 drlg.room_mut(r).flags |= d2_sim::drlg::room_flags::WARP_0;
@@ -1034,7 +1029,8 @@ impl LevelTypes for Types {
             x: xy,
             y: xy,
         };
-        match drlg.level(drlg.room(room).level).id {
+        let id = drlg.level(drlg.room(room).level).id;
+        let mut v = match id {
             t::BLACK_MARSH => vec![
                 tile(t::MARSH_TO_BLOOD_MOOR, t::MARSH_BACK_XY),
                 tile(t::MARSH_TO_TOWER, t::MARSH_TOWER_XY),
@@ -1071,19 +1067,28 @@ impl LevelTypes for Types {
                 v.extend(on.map(|c| tile(c, a::ON_XY)));
                 v
             }
-            id if synthetic_chains::links(id).is_some() => {
-                let (back, on) = synthetic_chains::links(id).unwrap_or((None, None));
-                let mut v = Vec::new();
-                v.extend(back.map(|c| tile(c, synthetic_chains::BACK_XY)));
-                v.extend(on.map(|c| tile(c, synthetic_chains::ON_XY)));
-                v
-            }
             DEN_OF_EVIL => vec![
                 tile(DEN_TO_BLOOD_MOOR, WARP_TILE_XY),
                 tile(synthetic_maze::DEN_TO_CAVE, synthetic_maze::DEN_STAIRS_XY),
             ],
             _ => Vec::new(),
-        }
+        };
+        // The tree's tiles (q-levels-warps-all, q-a1-dungeons), also on
+        // levels that have their own tiles above.
+        v.extend(
+            synthetic_chains::slots(id)
+                .into_iter()
+                .map(|(slot, _, class)| {
+                    let (x, y) = synthetic_chains::tile_xy(slot);
+                    PresetUnit {
+                        unit_type: 5,
+                        class,
+                        x,
+                        y,
+                    }
+                }),
+        );
+        v
     }
     fn room_grids(
         &mut self,
@@ -1651,16 +1656,11 @@ fn synthetic_drlg_data() -> DrlgData {
     }
     synthetic_act2::add_levels(&mut drlg);
     // The remaining chains (q-levels-warps-all): slot 0 back, slot 1 on.
-    for l in synthetic_chains::levels() {
-        let [back, on] = synthetic_chains::slots(l);
-        if let Some((other, class)) = back {
-            drlg.levels[l as usize].vis[0] = other;
-            drlg.levels[l as usize].warp[0] = class as i32;
-        }
-        if let Some((other, class)) = on {
-            drlg.levels[l as usize].vis[1] = other;
-            drlg.levels[l as usize].warp[1] = class as i32;
-        }
+    for e in synthetic_chains::edges() {
+        drlg.levels[e.from as usize].vis[e.slot] = e.to;
+        drlg.levels[e.from as usize].warp[e.slot] = e.on as i32;
+        drlg.levels[e.to as usize].vis[0] = e.from;
+        drlg.levels[e.to as usize].warp[0] = e.back as i32;
     }
     let mut ids = vec![
         BLOOD_MOOR_TO_DEN,
@@ -1720,7 +1720,6 @@ fn synthetic_types() -> Types {
         (COLD_PLAINS, TileRect::new(0, 0, 8, 8)),
         (STONY_FIELD, TileRect::new(0, 16, 8, 8)),
         (DEN_OF_EVIL, TileRect::new(0, 8, 8, 8)),
-        (CATACOMBS_4, TileRect::new(0, 24, 8, 8)),
         (synthetic_tower::BLACK_MARSH, TileRect::new(8, 16, 8, 8)),
         (synthetic_burial::BURIAL_GROUNDS, TileRect::new(0, 24, 8, 8)),
         (ACT2_TOWN, TileRect::new(0, 0, 8, 8)),

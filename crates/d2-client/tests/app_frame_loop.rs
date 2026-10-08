@@ -233,8 +233,9 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
         .iter()
         .map(|r| (r.show, r.level, r.x, r.y))
         .collect();
-    // Cold Plains's warp tile leads to level 5 (`q-levels-warps-all`,
-    // d2rs-own): its room joins the sight list like the Blood Moor's.
+    // Cold Plains's warp tile leads to level 13, Cave Level 2
+    // (`q-a1-dungeons`, d2rs-own; it led to level 5 before the tree
+    // moved the Dark Wood under the Black Marsh): its room joins the sight list like the Blood Moor's.
     assert_eq!(
         sight,
         [
@@ -243,7 +244,7 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
             (true, 2, 24, 0),
             (true, 3, 0, 0),
             (true, 3, 0, 0),
-            (true, 5, 8, 40),
+            (true, 13, 24, 40),
             (false, 1, 16, 0),
             (false, 2, 24, 0)
         ]
