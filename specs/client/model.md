@@ -40,18 +40,18 @@
 |   10. Bit reader | 627–641 |
 |   11. Current act and level (join and later) | 642–687 |
 |   12. Client DRLG and the room of a point | 688–729 |
-|   13. Visibility predicate (`0x004DBF20`) | 730–757 |
-|   14. Pet list and the hireling GUID | 758–811 |
-|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 812–878 |
-|   16. C→S 0x4B after a teleport (the hireling case) | 879–913 |
-|   17. Model writes made by 1.14d UI code | 914–1060 |
-|   18. Audio driver inputs and the client object functions | 1061–1091 |
-| Constants & data dependencies | 1092–1104 |
-| Randomness | 1105–1116 |
-| Edge cases & original bugs | 1117–1128 |
-| Test vectors | 1129–1176 |
-| Provenance | 1177–1255 |
-| Open questions | 1256–1361 |
+|   13. Visibility predicate (`0x004DBF20`) | 730–781 |
+|   14. Pet list and the hireling GUID | 782–835 |
+|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 836–925 |
+|   16. C→S 0x4B after a teleport (the hireling case) | 926–960 |
+|   17. Model writes made by 1.14d UI code | 961–1107 |
+|   18. Audio driver inputs and the client object functions | 1108–1138 |
+| Constants & data dependencies | 1139–1151 |
+| Randomness | 1152–1163 |
+| Edge cases & original bugs | 1164–1175 |
+| Test vectors | 1176–1223 |
+| Provenance | 1224–1302 |
+| Open questions | 1303–1414 |
 <!-- /index -->
 
 ## Summary
@@ -754,6 +754,30 @@ player is in", the input of `render/composition.md` §3 step 2
    render side implements rules 1–5 from its camera, COF and cel state.
    With no render state (headless) the predicate is absent and §6 rule 6
    is a handler error (unchanged).
+7. Cel context fields (0x48 bytes, zeroed by the caller; writers
+   `0x004DBB50`, `0x004DB7B0`, cache `0x006001F0`):
+
+   | Offset | Field | Written by / read by |
+   |---|---|---|
+   | +0x00 | frame | `0x004DBB50`; frame ≥ the block's frames per direction → no cel (`0x005FEB80`) |
+   | +0x04 | flags byte: 0x02 overlay context, 0x08 the unit is the local player (`0x004DB985`), 0x04 picks the second direction table of `0x00600CB0` (writer not traced) | `0x004DB7B0`; 0x02/0x08 pick the cache key and the direction prefetch (`0x0060ACE0`, `0x006000B0`) |
+   | +0x05 | component | `0x004DBB50` (`render/unit-composite.md` §5) |
+   | +0x08 | unit type 0–5; 6 = overlay (no unit) | `0x004DB7B0` from the unit, 6 when none |
+   | +0x0C | class id (unit +0x04) | `0x004DB7B0`; cache key for types 3, 4 |
+   | +0x10 | mode (argument, −1 → the unit's draw-identity mode) | `0x004DB7B0` |
+   | +0x14 | overlay index (type 6) | caller; `0x004DB7B0` sets +0x2C := overlay row + 2 (its file name; rows 0x84 bytes) |
+   | +0x18 … +0x28 | unit, component, armor class, mode, weapon class tokens | `0x004DB7B0` (`render/unit-composite.md` §5.1); cache key (`0x0060ACE0`) |
+   | +0x30 | frames per direction of the loaded block | `0x005FEC50` |
+   | +0x34 | cel file pointer (0 = DCC through the sprite cache) | caller (`render/sprite-placement.md` §3) |
+   | +0x3C | the cel (0 = none) | `0x006001F0`, cleared on entry |
+   | +0x40 | direction (64 steps) | `0x004DBB50`; requantised to the file's directions by `0x006001F0` (`render/unit-composite.md` §3, §6) |
+   | +0x44 | bit 0: file header read through `0x0060BF20` instead of the direct read | read by `0x005FE990`; 0 for unit draws |
+
+   `0x006001F0(context, probe, async)`: `probe` ≠ 0 only tests whether
+   the block is resident (`0x0040A7F0`), fetching no cel; `async`
+   (1 from the driver `0x00511FB8` and §13 rule 4) makes the
+   neighbour-direction prefetch `0x006000B0` load through `0x005FFFA0`
+   instead of `0x005FFE90`. +0x38 is read by none of these paths.
 
 ### 14. Pet list and the hireling GUID
 
@@ -849,8 +873,8 @@ record r (`msg-units.md` §4 rows 0x0E, 0x4D).
    +0x00 function, if any, runs with (U, shrine data). `0x004BD4A0`
    (codes 6–15), for each of +0x08 and +0x0C that is not −1:
    `0x0046F0C0(U, 0, id)`, then, when U is null or U's mode (+0x10) is
-   0, `0x00470390(U, id, 3, 0, 0, 0, 0, 0)` (overlay calls; Phase 6
-   effects).
+   0, `0x00470390(U, id, 3, 0, 0, 0, 0, 0)` (overlay remove and create:
+   `render/overlay.md` §3 r9, §2).
 4. **Code 0x15** (`0x004BD5C0`, S→C 0x4D for an object): reads only
    r0 (= u32@6, the operator's GUID in the shrine form). r1 = −1 and
    r2..r4 (u16@11, u16@13, u8@10) are never read; u16@15 is not copied
@@ -861,7 +885,7 @@ record r (`msg-units.md` §4 rows 0x0E, 0x4D).
    2. P := the player unit with GUID r0 (`0x00463990(r0, 0)`). None →
       the request ends; nothing else runs.
    3. 0 < code < 23 and the entry's +0x04 function set → call it with
-      (U, P, D) (codes 16, 19, 21, 22; Phase 6 effects).
+      (U, P, D) (codes 16, 19, 21, 22; rule 6).
    4. `0x004BD550(U, P)`: shrine data of U null → fatal 0x34D; its code
       ≥ 23 → fatal 0x34E; entry +0x10 ≠ 0 → sound request
       `0x004B9A00(id, P, 0, 0, 0)` (request rule: `audio/triggers.md`
@@ -875,6 +899,29 @@ record r (`msg-units.md` §4 rows 0x0E, 0x4D).
    order above, with the captured code, object key, player key and
    overlay or sound ids. The fatal asserts are handler errors
    (`client/bridge.md` §6 rule 4).
+6. **On-use functions** (rule 4 step 3; static read 2026-10-08). The
+   missile ones fill a zeroed 0x5C-byte create record
+   (`missiles/missiles.md` §R2.1 layout) and call the client missile
+   create `0x004CD540` once per missile, in the order given. Common
+   fields: +0x04 owner := P, +0x14/+0x18 := U's position (static path
+   +0x0C/+0x10 for unit types 2, 4, 5, else `0x006488C0` /
+   `0x00648900`), +0x30 level := P's stat 12 (`level`,
+   `0x00625480(P, 12, 0)`) / 5 (integer), clamped to 1…8.
+   - 16 Enirhs (`0x004BD090`): reverses P's name in place in its
+     player data (`0x006221A0(P)` +0x00, `strrev`; the following
+     16-byte `strncpy` onto itself changes nothing). No missile.
+   - 19 Storm (`0x004BD0C0`): 16 missiles, class 62 (`fireball`),
+     flags 3 (position given, target relative), +0x08 origin := none,
+     target offset (+0x1C, +0x20) := (dx, dy) for dx in +5, −10, +15,
+     −20 (outer) and dy in +5, −10, +15, −20 (inner).
+   - 21 Exploding (`0x004BD220`) and 22 Poison (`0x004BD360`): 6
+     missiles, class 45 (`explosivepotion`) / 48 (`chokinggaspoition`),
+     flags 0x520, +0x08 origin := U, +0x24 := 1, absolute target
+     (+0x1C, +0x20) := U's position + (dx, dy) for (−6, +6), (−6, −6),
+     (0, +6), (0, −6), (+6, +6), (+6, −6).
+   No function draws on a seed itself (the missile create's own draws
+   belong to the client missile spec). d2rs: these are the `ShrineFx`
+   effects of rule 5.
 
 ### 16. C→S 0x4B after a teleport (the hireling case)
 
@@ -1294,6 +1341,8 @@ its only caller `0x0044F360` (`0x0044F43E`–`0x0044F45E`),
    direction, and the `0x006001F0` load arguments (`render/capture.md`
    cel context); a replay of recording A's 0x68 / 0x6B / 0x6C checks
    with a live camera confirms (no C→S 0x5F recorded).
+   *Answered* (static, 2026-10-08): fields and load arguments in §13
+   rule 7. The replay check stays with the recording list.
 8. Which 0x03 fields the act change path (`0x0053ACC0`) sends for a
    game whose client changes act (a waypoint to another act): settle
    from a recording with an act change (expected: same builder, new act
@@ -1338,6 +1387,10 @@ its only caller `0x0044F360` (`0x0044F43E`–`0x0044F45E`),
 15. The on-mode / on-use shrine functions (`0x004BD4A0`, `0x004BD090`,
     `0x004BD0C0`, `0x004BD220`, `0x004BD360`) and the overlay calls
     `0x0046F0C0` / `0x00470390` (§15): Phase 6 effects spec.
+    *Answered* (static, 2026-10-08): on-use functions in §15 rule 6;
+    the on-mode function's overlay calls are `render/overlay.md` §2 and
+    §3 r9 (§15 rule 3). Open: the client missile create `0x004CD540`
+    itself (Phase 6 client missiles).
 16. *Answered (2026-10-08)*: §17 rule 6 (the room-change step that
     reaches the town exit, emitted as `TownExit`, `client/bridge.md` §10
     r11 and table). Original question: §17 rule 5: the town exit runs UI code (greeting re-arm, interaction

@@ -29,13 +29,13 @@
 |   5. Local player vitals: 0x18, 0x95, 0x96 | 402–423 |
 |   6. Unit states: 0xA7, 0xA8, 0xA9, 0xAA | 424–454 |
 |   7. Other unit messages (general handlers, act at receive) | 455–590 |
-|   8. Player roster (0x5B, 0x5C, 0x65, 0x75, 0x82, 0x8E; life from 0x0D, 0xAB) | 591–726 |
-| Constants & data dependencies | 727–738 |
-| Randomness | 739–746 |
-| Edge cases & original bugs | 747–769 |
-| Test vectors | 770–820 |
-| Provenance | 821–872 |
-| Open questions | 873–915 |
+|   8. Player roster (0x5B, 0x5C, 0x65, 0x75, 0x82, 0x8E; life from 0x0D, 0xAB) | 591–741 |
+| Constants & data dependencies | 742–753 |
+| Randomness | 754–761 |
+| Edge cases & original bugs | 762–784 |
+| Test vectors | 785–835 |
+| Provenance | 836–887 |
+| Open questions | 888–933 |
 <!-- /index -->
 
 Owned ids: 0x0A, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x15, 0x18, 0x4C, 0x4D,
@@ -632,6 +632,16 @@ The player roster (§8). Outputs (`client/bridge.md` §10): `UnitOverlay`
    Recorded `5b 2400 01000000 04 "charactertest" 0100 ffff 0000 0000
    0000 00 00` (`-015956` seq 267): GUID 1, class 4, +0x20 = 1, +0x22 =
    0xFFFF.
+   What the 1.14d sender `0x0053C940` puts in the words and strings
+   (static read 2026-10-08): u16@0x18 = the player's level (stat 12,
+   `0x00625480(P, 12, 0)`), u16@0x1A = its party id (`0x00554630`;
+   0xFFFF = no party), u16@0x1C = u16@0x1E = 0 always, u16@0x20 = the
+   server client's u16 +0x45E, string 1 = the client's 4 bytes at +0x460
+   (so at most 3 characters), string 2 = the client's text at +0x464.
+   Only the legacy save header loader `0x00532690` writes those client
+   fields (`formats/d2s-legacy.md` §2 r5); for any other character they
+   are 0 and empty, as recorded. So the roster's +0x20 is the level and
+   +0x22 the party id (the same slots 0x75 writes, rule 10).
 4. **0x5C** PlayerLeft (`0x0045E530` → `0x0047A8B0`, 5 bytes;
    `sim/server-messages.tsv` `guid:u32@1`, sender `0x0053CA90`): GUID
    u32@1 (−1 → fatal 0x121). Its own walk of the active list (not rule
@@ -671,7 +681,12 @@ The player roster (§8). Outputs (`client/bridge.md` §10): `UnitOverlay`
    0x75 (rule 10) also writes the roster.
 10. **0x75** PlayerPartyInfo (`0x0045E7E0` → `0x0047A850`, 13 bytes;
     2026-10-08 read): GUID u32@1, party u16@5, level u16@7, u16@9,
-    u16@11. Record r found (rule 2), else nothing. If the GUID is in
+    u16@11 (sender `0x0053DA90`: party `0x00554630`, level stat 12;
+    u16@9 = the flags +0x04 and u16@11 = the word +0x0C of the
+    receiving player's relation entry for that GUID (`0x0055B350`,
+    `0x0055B3F0`; list `combat/hit.md` §7 r4), 0 without an entry;
+    for the receiver itself u16@9 = 0 and u16@11 = 1). Record r found
+    (rule 2), else nothing. If the GUID is in
     r's corpse list (r was found as a corpse holder), nothing. Else r
     +0x22 := party, +0x20 := level, +0x30 := u16@11 (zero-extended);
     u16@9 is not stored (the same slots as 0x5B's u16@0x1A, u16@0x18,
@@ -883,6 +898,9 @@ r12–r13 from `0x0045D2E0`, `0x0045D260`, `0x0045C900`
    rule 6). Open: the meaning of the 0x5B words u16@0x18 … u16@0x20 and
    the two strings (D2MOO: level, party id, account names; nothing
    reads them in the single-player recordings).
+   *Answered* (static, 2026-10-08): §8 rule 3 (sender `0x0053C940`:
+   level, party id, 0, 0, then legacy-save client fields; 0x75's
+   words §8 rule 10).
 5. *Answered (2026-10-08)*: §3 rule 2 (`0x0063EA40`: dying or dead
    monster) and §1.3 rule 3 (`0x004BD6B0`: shrine record set and the
    shrine function called). Original question: `0x0063EA40` (0x15 rule 2) and `0x004BD6B0` (0x51 rule 3): what

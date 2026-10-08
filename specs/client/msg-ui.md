@@ -27,34 +27,34 @@
 | Inputs | 80–87 |
 | Outputs / state changes | 88–105 |
 | Rules | 106–107 |
-|   1. 0x5D quest status (`0x0045E540` → `0x004A2CB0`) | 108–196 |
-|   2. 0x63 waypoint menu (`0x0045E670` → `0x0049CF90`) | 197–227 |
-|   3. 0x77 UI action (`0x0045E800` → `0x004B8CF0`) | 228–272 |
-|   4. 0x26 chat and overhead text (`0x0045DFC0` → `0x0049F490`) | 273–354 |
-|   5. 0x27 NPC text (`0x0045E0A0` → `0x004A1600`) | 355–384 |
-|   6. 0x4E hire offer and 0x4F hire list reset | 385–397 |
-|   7. 0x50 quest special (`0x0045E370` → `0x004B9210`) | 398–438 |
-|   8. 0x58 UI open (`0x0045E490` → `0x004C0550`) | 439–472 |
-|   9. 0x8A NPC wants to interact (`0x0045EA40` → `0x004B3380`) | 473–501 |
-|   10. 0x91 NPC intros (`0x0045E580` → `0x004B3510`) | 502–512 |
-|   11. 0x78 trade partner (`0x0045E810` → `0x004B9010`) | 513–525 |
-|   12. 0x29 game quest flags (`0x0045D3A0` → `0x004B2620`) | 526–535 |
-|   13. 0x52 quest log status (`0x0045CC00` → `0x004A40D0`) | 536–548 |
-|   14. 0x5E game quest availability (`0x0045E570` → `0x004B92B0`) | 549–557 |
-|   15. 0x9B hireling revive state (`0x0045EAC0` → `0x004B6980`) | 558–568 |
-|   16. 0x28 NPC dialog start and quest flags (`0x0045D370` → `0x004B6DD0`) | 569–671 |
-|   17. 0x62 NPC dialog end (`0x0045D390` → `0x004B5320`) | 672–684 |
-|   18. 0x2A NPC transaction (`0x0045E0D0` → `0x004B6390`) | 685–695 |
-|   19. 0x5A event text (`0x0045E070` → `0x0049EB10`) | 696–715 |
-|   20. 0x61 act video (`0x0045E660`) | 716–723 |
-|   21. 0x76 overhead clear (`0x0045E050` → `0x0049F8C0`) | 724–731 |
-|   22. 0x7B skill hotkey (`0x0045E8D0` → `0x004AA0C0`) | 732–741 |
-| Constants & data dependencies | 742–753 |
-| Randomness | 754–758 |
-| Edge cases & original bugs | 759–775 |
-| Test vectors | 776–823 |
-| Provenance | 824–891 |
-| Open questions | 892–1021 |
+|   1. 0x5D quest status (`0x0045E540` → `0x004A2CB0`) | 108–218 |
+|   2. 0x63 waypoint menu (`0x0045E670` → `0x0049CF90`) | 219–249 |
+|   3. 0x77 UI action (`0x0045E800` → `0x004B8CF0`) | 250–294 |
+|   4. 0x26 chat and overhead text (`0x0045DFC0` → `0x0049F490`) | 295–376 |
+|   5. 0x27 NPC text (`0x0045E0A0` → `0x004A1600`) | 377–406 |
+|   6. 0x4E hire offer and 0x4F hire list reset | 407–419 |
+|   7. 0x50 quest special (`0x0045E370` → `0x004B9210`) | 420–460 |
+|   8. 0x58 UI open (`0x0045E490` → `0x004C0550`) | 461–494 |
+|   9. 0x8A NPC wants to interact (`0x0045EA40` → `0x004B3380`) | 495–523 |
+|   10. 0x91 NPC intros (`0x0045E580` → `0x004B3510`) | 524–534 |
+|   11. 0x78 trade partner (`0x0045E810` → `0x004B9010`) | 535–547 |
+|   12. 0x29 game quest flags (`0x0045D3A0` → `0x004B2620`) | 548–557 |
+|   13. 0x52 quest log status (`0x0045CC00` → `0x004A40D0`) | 558–570 |
+|   14. 0x5E game quest availability (`0x0045E570` → `0x004B92B0`) | 571–579 |
+|   15. 0x9B hireling revive state (`0x0045EAC0` → `0x004B6980`) | 580–590 |
+|   16. 0x28 NPC dialog start and quest flags (`0x0045D370` → `0x004B6DD0`) | 591–693 |
+|   17. 0x62 NPC dialog end (`0x0045D390` → `0x004B5320`) | 694–706 |
+|   18. 0x2A NPC transaction (`0x0045E0D0` → `0x004B6390`) | 707–717 |
+|   19. 0x5A event text (`0x0045E070` → `0x0049EB10`) | 718–737 |
+|   20. 0x61 act video (`0x0045E660`) | 738–745 |
+|   21. 0x76 overhead clear (`0x0045E050` → `0x0049F8C0`) | 746–753 |
+|   22. 0x7B skill hotkey (`0x0045E8D0` → `0x004AA0C0`) | 754–763 |
+| Constants & data dependencies | 764–775 |
+| Randomness | 776–780 |
+| Edge cases & original bugs | 781–797 |
+| Test vectors | 798–845 |
+| Provenance | 846–913 |
+| Open questions | 914–1047 |
 <!-- /index -->
 
 Owned ids: 0x26, 0x27, 0x29, 0x4E, 0x4F, 0x50, 0x52, 0x58, 0x5D, 0x5E,
@@ -179,6 +179,28 @@ layer.
       of c exists → its status byte (`[0x007BF356 + index]`) := s; and
       when `[0x007BF2B3]` = 0 and the entry's act = `[0x007C0255]`
       (the act tab shown): `[0x007BF2B9]` := the entry's slot.
+   3. **Latch values** (static read 2026-10-08): 0 = no alert and
+      the quest screen closed, 1 = the quest-log alert (ui 17) raised
+      by r6.1, 2 = the quest screen (ui 15) open with its cels loaded.
+      Writers: r6.1 (0 → 1); the quest-log toggle `0x004A3FE0` (Q key
+      `0x00468990`, the alert button `0x004A4110`, the control-panel
+      button `0x0047EC50`): from 0 (only when ≥ 250 ms of
+      `GetTickCount` since the last close `[0x007C0259]`, the local
+      player present and alive (`0x00463DF0` = 0) and `0x00483350` =
+      0) or from 1 (latch := 0 first, no time test) it opens ui 15 and
+      on success sets 2; from 2 it closes (`0x004A26B0`, latch := 0)
+      and stamps `[0x007C0259]`. Resets to 0: the ui 15 close hook
+      `0x004A28D0` (unconditional; `ui/panels.md` §2 r6), the ui 17
+      close hook `0x004A3000` (1 → 0), the alert draw `0x004A2A80`
+      (1 → 0 when the local player is absent or dead, closing ui 17),
+      the quest screen draw `0x004A34F0` (2 → 0 when the local player
+      is absent or dead), and the in-game UI set-up `0x004A3410` (from
+      `0x00456970`, with the other quest-log globals). Every 2 → 0
+      reset also clears `[0x007BF2B0]` and `[0x007BF2B3]`. The
+      counters `[0x007BF2A4]`, `[0x007BF2AC]` and the selected slot
+      `[0x007BF2B9]` are read by the quest-log rows and tab
+      (`world/quests-status.md` §1 r3, §4, §5). UI state: not in the
+      model.
 7. **f bit 5, other c** (the Den of Evil counter path): when the client
    quest flags (`0x004B32D0` → record `[0x007C0D43]`, `world/quests.md`
    §1) have quest 1 bit 0 or quest 1 bit 1 set (`0x0065C310`) →
@@ -929,6 +951,10 @@ Gap pass (2026-10-08, PC 1 lane D): §4 r3.2.1–r3.2.4 from
 3. Who resets the quest-log latch `[0x007BF298]` and the meaning of
    `[0x007BF2A4]`, `[0x007BF2AC]`, `[0x007BF2B9]` in the quest-log draw
    (Phase 6 quest-log spec).
+   *Answered* (static, 2026-10-08): §1 r6.3 (latch values and every
+   writer); the three values are read as `world/quests-status.md` §1
+   r3, §4 and §5 state. Open: the entry fields +0, +1, +4, +0xC of
+   `client/quest-log-table.tsv`.
 4. ~~The client quest flags record `[0x007C0D43]`~~: answered in §16
    r7 (all writers: create / destroy / reset on a local-player change,
    0x28 copies). Original text: which messages write it
