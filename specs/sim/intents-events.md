@@ -44,15 +44,15 @@
 |   4. d2rs mapping and scope | 603–634 |
 |   5. Machine-readable tables | 635–671 |
 |   6. Exact-match comparison | 672–779 |
-|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 780–1202 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1203–1417 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1418–1574 |
-| Constants & data dependencies | 1575–1593 |
-| Randomness | 1594–1599 |
-| Edge cases & original bugs | 1600–1645 |
-| Test vectors | 1646–1732 |
-| Provenance | 1733–1849 |
-| Open questions | 1850–1969 |
+|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 780–1205 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1206–1420 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1421–1577 |
+| Constants & data dependencies | 1578–1596 |
+| Randomness | 1597–1602 |
+| Edge cases & original bugs | 1603–1648 |
+| Test vectors | 1649–1735 |
+| Provenance | 1736–1852 |
+| Open questions | 1853–1972 |
 <!-- /index -->
 
 ## Summary
