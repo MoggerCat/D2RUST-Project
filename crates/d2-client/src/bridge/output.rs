@@ -17,11 +17,13 @@ use super::world::{RosterRecord, UnitKey};
 /// owned by the spec of its producer ([`ROWS`]).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Output {
-    /// S→C 0x2C (`audio/triggers.md` §2 r4): the event unit's key and
-    /// class at receive, and the event.
+    /// S→C 0x2C (`audio/triggers.md` §2 r4): the event unit's key,
+    /// class and position x, y at receive (§10 r3.1 (b); `None`: the
+    /// unit has no position), and the event.
     ServerSound {
         unit: UnitKey,
         class: u32,
+        at: Option<(u16, u16)>,
         event: u16,
     },
     /// S→C 0x5D (`client/msg-ui.md` §1): chain, flags, status, extra.
@@ -216,6 +218,11 @@ pub enum Output {
         hook: u8,
         values: [i32; 2],
     },
+    /// A model unit free (S→C 0x0A and every free path of
+    /// `client/model.md` §2 r5; §10 r3.1 (a)), in free order: the audio
+    /// layer detaches the unit's requests without force
+    /// (`audio/triggers-2.md` §19 r5).
+    UnitFreed { unit: UnitKey },
     /// The client object update's audio calls (`world/objects-client.md`
     /// §28 r3; mode sound calls, requests, the player event sound), in
     /// update order.
@@ -332,7 +339,7 @@ use Consumer::{Audio, Effects, Ui};
 
 /// The variants in code, in the §10 table's order (checked against the
 /// table, §10 rule 8).
-pub const ROWS: [Row; 42] = [
+pub const ROWS: [Row; 43] = [
     row("ServerSound", 0x2C, Audio),
     row("QuestUi", 0x5D, Ui),
     row("WaypointMenu", 0x63, Ui),
@@ -373,6 +380,7 @@ pub const ROWS: [Row; 42] = [
     row("JoinRefused", 0xB4, Ui),
     update_row("TownExit", Ui),
     row("StateFx", 0xA8, Effects),
+    row("UnitFreed", 0x0A, Audio),
     update_row("ObjectSound", Audio),
     update_row("ObjectFx", Effects),
 ];
@@ -421,8 +429,9 @@ impl Output {
             Output::JoinRefused { .. } => 37,
             Output::TownExit { .. } => 38,
             Output::StateFx { .. } => 39,
-            Output::ObjectSound(_) => 40,
-            Output::ObjectFx(_) => 41,
+            Output::UnitFreed { .. } => 40,
+            Output::ObjectSound(_) => 41,
+            Output::ObjectFx(_) => 42,
         };
         &ROWS[i]
     }
@@ -430,6 +439,15 @@ impl Output {
     pub fn consumer(&self) -> Consumer {
         self.row().consumer
     }
+}
+
+/// Moves the model's unit frees made since the last call to `outputs`
+/// as `UnitFreed` outputs, in free order (§10 r3.1 (a)). The receive
+/// path and the update pass call it after each handler (every free path
+/// frees after the handler's own outputs), the bridge once more before
+/// it hands the list over.
+pub fn move_freed(world: &mut super::world::ClientWorld, outputs: &mut Vec<Output>) {
+    outputs.extend(world.freed.drain(..).map(|unit| Output::UnitFreed { unit }));
 }
 
 /// The sink of one handler call: outputs in the handler's call order
@@ -614,6 +632,7 @@ mod tests {
             Output::ServerSound {
                 unit: UnitKey::new(1, 0x26),
                 class: 3,
+                at: None,
                 event: 18,
             },
             Output::TradeAction {
@@ -623,6 +642,7 @@ mod tests {
             Output::ServerSound {
                 unit: UnitKey::new(0, 1),
                 class: 0,
+                at: None,
                 event: 2,
             },
             Output::MonsterPreload { class: 7 },
@@ -662,6 +682,7 @@ mod tests {
             Output::ServerSound {
                 unit: k,
                 class: 1,
+                at: None,
                 event: 2,
             },
             Output::QuestUi {
@@ -823,18 +844,19 @@ mod tests {
                 hook: 0,
                 values: [0; 2],
             },
+            Output::UnitFreed { unit: k },
             Output::ObjectSound(ObjSound::Request { id: 0, unit: obj }),
             Output::ObjectFx(ObjFx::GfxLoad { class: 0, flag: 0 }),
         ]
     }
 
-    // Covers: specs/client/bridge.md §10 r1, §10 row1, §10 row2, §10 row3, §10 row4, §10 row5, §10 row6, §10 row7, §10 row8, §10 row9, §10 row10, §10 row11, §10 row12, §10 row13, §10 row14, §10 row15, §10 row16, §10 row17, §10 row18, §10 row19, §10 row20, §10 row21, §10 row22, §10 row23, §10 row24, §10 row25, §10 row26, §10 row27, §10 row28, §10 row29, §10 row30, §10 row31, §10 row32, §10 row33, §10 row34, §10 row35, §10 row36, §10 row37, §10 row38, §10 row39, §10 row40, §10 row41, §10 row42
+    // Covers: specs/client/bridge.md §10 r1, §10 row1, §10 row2, §10 row3, §10 row4, §10 row5, §10 row6, §10 row7, §10 row8, §10 row9, §10 row10, §10 row11, §10 row12, §10 row13, §10 row14, §10 row15, §10 row16, §10 row17, §10 row18, §10 row19, §10 row20, §10 row21, §10 row22, §10 row23, §10 row24, §10 row25, §10 row26, §10 row27, §10 row28, §10 row29, §10 row30, §10 row31, §10 row32, §10 row33, §10 row34, §10 row35, §10 row36, §10 row37, §10 row38, §10 row39, §10 row40, §10 row41, §10 row42, §10 row43
     #[test]
     fn each_table_row_is_one_variant_with_its_producer_and_consumer() {
         let table = parse_table(SPEC).unwrap();
         let all = every_variant();
-        assert_eq!(all.len(), 42);
-        assert_eq!(table.len(), 42);
+        assert_eq!(all.len(), 43);
+        assert_eq!(table.len(), 43);
         for (i, (o, t)) in all.iter().zip(&table).enumerate() {
             // The variant's Debug name is the table's variant name.
             let dbg = format!("{o:?}");

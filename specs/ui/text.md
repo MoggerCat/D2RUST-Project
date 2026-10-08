@@ -30,21 +30,21 @@
 |   4. Glyph pixels | 153–190 |
 |   5. Color codes | 191–226 |
 |   6. Measuring | 227–246 |
-|   7. The draw call | 247–272 |
-|   8. Framed text (hover boxes) | 273–293 |
-|   9. Variants of the draw call | 294–333 |
-|   10. Word wrap | 334–371 |
-|   11. Alignment | 372–379 |
-|   12. Clipping (decision CG2) | 380–390 |
-|   13. d2rs answers (hooks in `d2-client`) | 391–405 |
-|   14. Wide formatter `0x005269D0` (added 2026-10-07) | 406–453 |
-|   15. Edit box caret and selection (`0x004FF620`, added 2026-10-08) | 454–534 |
-| Constants & data dependencies | 535–550 |
-| Randomness | 551–554 |
-| Edge cases & original bugs | 555–584 |
-| Test vectors | 585–620 |
-| Provenance | 621–654 |
-| Open questions | 655–721 |
+|   7. The draw call | 247–310 |
+|   8. Framed text (hover boxes) | 311–331 |
+|   9. Variants of the draw call | 332–371 |
+|   10. Word wrap | 372–409 |
+|   11. Alignment | 410–417 |
+|   12. Clipping (decision CG2) | 418–428 |
+|   13. d2rs answers (hooks in `d2-client`) | 429–445 |
+|   14. Wide formatter `0x005269D0` (added 2026-10-07) | 446–493 |
+|   15. Edit box caret and selection (`0x004FF620`, added 2026-10-08) | 494–587 |
+| Constants & data dependencies | 588–603 |
+| Randomness | 604–607 |
+| Edge cases & original bugs | 608–637 |
+| Test vectors | 638–673 |
+| Provenance | 674–716 |
+| Open questions | 717–820 |
 <!-- /index -->
 
 ## Summary
@@ -270,6 +270,44 @@ text, k): span = `x2 − x1 + 1`; if width A < span, x = `x1 + ((span −
 width A) >> 1)`, else x = `x1`; then `DrawText(text, x, y, k, 0)`.
 Width A counts color-code units, so colored strings sit left of center.
 
+**The callers' `k`** (static, 1.14d, added 2026-10-08). The six entries
+that take a caller's `k` have 253 call sites: `0x00502320` 202,
+`0x004A7080` 45, `0x00502360` 2, `0x005023B0` 2, `0x00502480` 1,
+`0x005025C0` 1. By where the pushed `k` comes from:
+
+| Pattern | Sites | `k` values | Rule |
+|---|---|---|---|
+| A. immediate push | 181 | 0 (149), 4 (23), 1 (5), 2, 3, 6, 9 (1 each) | in 0 … 12 |
+| B. register holding one constant (`xor` / `mov` imm; 3 where the push sits before a branch: `0x0045FD06`, `0x0048A94D`, `0x004ED8FA`) | 21 | 0, 1, 3, 4, 8 | in 0 … 12 |
+| C. the caller's own argument, every caller passing a constant (`0x0047B450` ← 4 / 0; `0x00492FA0` ← 0; `0x0049A2C0`, `0x0049A3D0`, `0x0049A830`, `0x0049C170` ← 1; `0x0049AF60` ← 0; `0x004A8DF0` ← 4 from 32 sites; `0x004A7080` = its 45 callers, rows A–F) | 11 | 0, 1, 4 | in 0 … 12 |
+| D. a local set only to constants, or a constant-valued helper: `0x0048A990` (0–4, 9; element triples 1 / 9 / 3 / 3), `0x0049B030` (0, 1, 4, 8, 9), `0x004A7D00` (0, 1, 3, 4), `0x00505810` (0, 1, 3), `0x00505A80` (0, 3), `0x005087A0` (`0x0050887D`: 0 or 3), `0x004A4FA0` result (1, 3, 4, 5) | 11 | 0 … 9 | in 0 … 12 |
+| E. character-screen stat colours (`0x004E96E0`, `0x004E9870`, `0x004E9940` ← the `descdam` / `desc*` draw functions of `skills/descriptions.md`): a local zeroed, then written only by `0x004E6FB0` (mode 1 → 1, 2 → 9, 3 → 3, 4 → 2, else 0), `0x004E72D0` (1, 9, 3, 2), `0x004E86F0` (1, 3), `0x004E89A0` (1, 2, 3), `0x004EA4A0` (0 … 4), `0x004E93A0` (0) or constants 0 / 3 | 4 | 0 … 4, 9 | in 0 … 12 |
+| F. clamped by the caller: automap name `0x0045A760` (`k` ≥ 13 → 0, `0x0045A77D`); automap object-267 label `0x0045A97D` (the marker colour byte, index 0 for object 267, `ui/automap.md` §11 r3) | 2 | 0 … 12 | in 0 … 12 |
+| G. a byte from the server: recipe scroll `0x0048BC10` draws with `[0x007BCEA4]` = the 0x26 type-7 byte at +8 (`ui/messages.md` §4) | 1 | 0 … 255, unchecked | §4 r5 |
+| H. a colour stored in a UI record by its creator (below) | 22 | not settled | §4 r5 |
+
+Pattern H sites: edit box E +0x274 (`0x004FF7F0`, `0x004FFA94`,
+`0x004FFAEA`, `0x004FFB62`, `0x004FFBAD`, `0x005000E9`, `0x00500106`,
+`0x0050011D`, `0x0050013C`, `0x005001B1`; set by the create call
+`0x005001D0` from the second dword of its colour pair, else 0) and E
++0x264 (`0x00500D7E`, `0x00500D94`; create argument 6 from the
+descriptor +0x24 of `0x004F93C0`, setters `0x005009D0` (its 6 callers in
+`0x004313D0` pass 0) and `0x00500A20` (no direct caller)); text-box row
++0x14 (`0x004FC207`: row colour 4 → 0, `0x004FC269`); scrolled panel
+line +0x1A (`0x0049DD6D`, `0x0049DEA6`, `0x0049DFA7`; writers
+`0x0049D5E9`, `0x0049D63C`, `0x0049DBAE`, `0x0049E47A`, `0x0049E701`,
+`0x004A0654`); hover list `0x007C55C0` entry +4 (`0x004C0C8E`). Four
+more sites mix a constant with a record field: `0x004B82B6` (3 or list
+record +4), `0x004BE472` / `0x004BE4EA` (3 or entry −4 of the
+0x300E-byte records at +0x3012), `0x00454A5B` (3, `[0x007A2C78]` = 4,
+or `[0x007A2F30]` from `0x00452520`'s caller). They are counted in H
+(22 = 18 + 4).
+
+So patterns A–F (230 sites) never pass a `k` outside 0 … 12 in 1.14d;
+the only static way to a `k ≥ 13` or a negative `k` is G (a server byte)
+or H. **d2rs:** `DrawText` takes any `k` and applies §4 r5 (no clamp),
+so every pattern behaves as 1.14d without knowing the values.
+
 ### 8. Framed text (hover boxes)
 
 `DrawFramedText(text, x, y, rect_color, rect_mode, k)` (`0x005023B0`,
@@ -402,6 +440,8 @@ arguments (§13), not a rectangle.
 | `TextInput` caret | OQ 3 |
 | `client/assets.md` §B2 (locale font directory) | §1: `latin` for English |
 | `formats/tbl.md` OQ2 (`DEFAULT.TBL`, `FONTER.TBL`) | not opened by the font path (§1.4) |
+| a caller's text width | the measure that caller's address calls, never a shared "text width": the front-end controls use width A (`0x00501820`: button label `0x00500C70`, `0x00500CC1`, `0x00500D04`; text control draw `0x004FC04D`–`0x004FC180`; credits columns `ui/frontend-credits.md` C3 r2) and width B for the row clip (`0x004FBEFD`) and wrap (`0x004FCE84`); width A ≠ max width when the row holds `ÿ` codes or `LF` |
+| no font table (no game files, or a font that failed to load) | d2rs-own: every measure is 0 and nothing is drawn; the original has no such state to compare |
 
 ### 14. Wide formatter `0x005269D0` (added 2026-10-07)
 
@@ -522,15 +562,28 @@ function table; control record E). Per drawn line, after the line's text
    2·(E +0x40); with E +0x260 bit 0 (password) widths are measured on n
    `*` (0x2A) instead of the text. wt = width of the text, wc = width
    of `_`. When (wt + wc if caret = n, else wt) ≤ W: first := 0, last :=
-   n − 1. Otherwise W′ = W − wc when caret = n, else W, and: caret >
-   last → last := caret, first walks down from caret − 1 while the span
-   fits (< W′), then first + 1; caret ≤ first + 1 → first := max(caret −
-   1, 0), last walks up from first + 1 while the span fits, then − 1.
-   PROVISIONAL: the remaining case (caret inside the window) refits
-   from the end of the text when the text from the window start fits,
-   else keeps `first` and walks `last` up as above (because the two
-   width calls take their spans in registers not traced here); settled
-   by REC-60.
+   n − 1 (`0x004FE89D` → `0x004FE9D1`). Otherwise W′ = W − wc when
+   caret = n, else W. span(a, b) = width B (`0x005017D0`, pointer ECX =
+   unit a, count EDX = b − a + 1) of units a … b; tail(a) = width A
+   (`0x00501820`) of units a … n − 1. "Fits" is always **strictly
+   less** than W′ (`jge` exits). Comparisons are signed. Three cases,
+   tested in this order:
+   1. caret > last (`0x004FE8A9`): last := caret, first := caret − 1.
+      While first ≠ 0 and span(first, last) fits: first −= 1. Then
+      first += 1. So first is never 0 here: caret 1 gives first = 1
+      even when unit 0 would fit (original behavior, reproduced).
+   2. caret ≤ first + 1 (`0x004FE8F4`): first := max(caret − 1, 0),
+      last := first + 1; while last < n and span(first, last) fits:
+      last += 1. Then last −= 1.
+   3. Otherwise (caret inside the window, `0x004FE942`): if tail(first)
+      fits, the window is refit from the end (`0x004FE952`): last :=
+      n − 1, first := n − 2; while first ≠ 0 and tail(first) fits:
+      first −= 1; then first += 1 (first ≥ 1, as in case 1). If
+      tail(first) does not fit (`0x004FE996`): first is kept and last
+      walks up exactly as in case 2 (last := first + 1, …, then − 1).
+   (Answered statically 2026-10-08 from the register arguments of the
+   width calls at `0x004FE8CB`–`0x004FE9B5`; replaces the PROVISIONAL
+   reading, REC-60 no longer needed.)
 
 ## Constants & data dependencies
 
@@ -650,7 +703,16 @@ Ghidra backlog (2026-10-06): `0x00501DF0`, `0x004F64E0`, GDI slot
 `0x0049D5A0` / `0x004A0770`; block builder `0x004FB010`, GDI copy
 `0x006C8000`; `0x005023A0` reference search over the whole image
 (rel32, absolute, RVA, export table); `DrawText` call-site scan of the
-pushed `k` (214 sites).
+pushed `k` (214 sites). Callers' `k` (§7, 2026-10-08): all calls to
+`0x00502320`, `0x00502360`, `0x004A7080`, `0x005023B0`, `0x00502480`,
+`0x005025C0` in `all.asm`; argument found by a backward scan counting
+pushes (skipping the stack arguments of intervening calls by their
+`ret n`, `add esp`, `pop`), register sources by the last write in the
+function, parameters followed to every direct caller; the three
+pushes before a branch checked by hand; helpers `0x004E6FB0`,
+`0x004E72D0`, `0x004E86F0`, `0x004E89A0`, `0x004EA4A0`, `0x004E93A0`,
+`0x004A4FA0`, `0x00459BC0` (colour bytes `0x007A51B0`–`0x007A51B8`
+from `0x0045A620`), `0x0048BBE0`.
 
 ## Open questions
 
@@ -662,9 +724,16 @@ pushed `k` (214 sites).
    sites) all pass 0, 1, 3, 4, 6 or 9; the 148 sites passing a register
    or memory value need a per-site read (or a runtime trace) to exclude
    `k ≥ 13` or a negative `k`.
+   *Answered by pattern* (static, 2026-10-08): §7 "The callers' `k`"
+   (253 sites of six entries, 8 patterns): 230 sites are settled in
+   0 … 12; the recipe scroll passes a server byte unchecked; 22 sites
+   take a colour stored in a UI record (pattern H). d2rs needs no
+   answer for H (§4 r5 applies to any `k`); which values H carries in
+   play is a recording item (hook `0x00501A80`, log `k` per caller).
 3. Answered (2026-10-08), §15: caret `_` blinking on the second, the
    selection rectangle; key handling and the scroll window answered
-   in §15 r5 / r6 (2026-10-08; one case PROVISIONAL, REC-60).
+   in §15 r5 / r6 (2026-10-08; the caret-inside case of r6 answered
+   statically the same day, REC-60 withdrawn).
 4. Text-box control `0x004FBF30` (alignment flags, marquee scroll −2 px
    per draw, selected row `0x005025C0`): belongs to the controls owner;
    listed so it is not lost.
@@ -700,6 +769,17 @@ pushed `k` (214 sites).
    `0x004EA170`, `0x004EA240`, `0x004EA310`, `0x004EB240`, `0x004EC040`
    via `0x004E99F0` / `0x004EA010`, and `0x004EDA20`). Still open: those
    18 return chains.
+   *Answered* (static, 2026-10-08): no record pointer reaches a reader,
+   so only `width` and `frame` are read outside the font loader. The
+   callbacks are the `descdam` entries (`skills/descriptions.md` §3),
+   called through `[0x0072D768 + 4i]` at `0x004ED767`; `0x004ED570`
+   tests a local, not EAX, and on its other path EAX is replaced
+   (`0x004ED786` call) or returned to `0x004EDA20`, whose callers
+   overwrite it (`0x004EDA6B` call `0x006201D0`; `0x004EDA76` returns
+   to `0x004A8197`, which calls `SetFont` `0x00502EF0`). `0x004A9260`
+   returns to `0x004A9690` / `0x004A9870`, which return it to
+   `0x00496CAA` and `0x004AA5A6`; both load EAX before reading it
+   (`0x00496CB4` / `0x00496CD2`, `0x004AA5B1`).
 8. CRT `isspace` assumes the "C" locale: confirm no `setlocale` call
    changes it (Ghidra xref of `setlocale`).
    *Answered* (static): nothing can change it. The statically linked
@@ -718,3 +798,22 @@ pushed `k` (214 sites).
     elements 103–105 to confirm it is shifted by one and that every
     format string in the 1.14d English tables uses only `%d`, `%u`,
     `%s`, `%%` (§14 rule 2).
+    *Answered* (game-file read, 2026-10-08, `Patch_D2.mpq`
+    `data\local\lng\eng\patchstring.tbl`, 1,179 elements): element 103
+    is `charmonsterX`, 104 `charmontohit1X` ("Average chance %s will hit
+    you: %d%%"), 105 `charmontohit2X` (the block + chance text of §14
+    rule 3). Patch_D2 is searched before d2exp (`client/assets.md` §B1),
+    so 0x2778 / 0x2779 load exactly the two texts §14 rule 3 names; the
+    d2exp copy (same path) is one element behind but is never read.
+    Format units in the three English tables the game loads (Patch_D2
+    `patchstring`, d2exp `expansionstring`, d2data `string`; the
+    shadowed d2exp `patchstring` agrees): every `%` is followed by `d`,
+    `u`, `s` or `%` except (a) 17 name templates with positional
+    `%0`–`%2` (`string` 1709–1722 `ScrollFormat` … `Monster2Format`,
+    `expansionstring` 1768 `ChampionFormatX`, Patch_D2 `patchstring`
+    89 `SetItemFormatX` and 1072 (key `x`)): these would hit the §14
+    rule 2 fatal row if given to `0x005269D0` (their filler is the item
+    / monster naming owner's, not checked here); (b) `string` 3471 /
+    3472 `ItemStatsrejuv1` / `2` ("Heals 35% Life and Mana", `%` +
+    space) and 4001 `percent` (a lone `%`): plain display text, likewise
+    not valid `0x005269D0` formats.

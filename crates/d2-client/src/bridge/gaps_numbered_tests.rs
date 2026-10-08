@@ -238,7 +238,11 @@ fn client_world_holds_only_stated_fields() {
         // `client/model.md` §2 rule 1 (set C); `world/objects-client.md`
         // §27 r2 (the latches).
         objclient,
+        // `client/bridge.md` §10 r3.1 (a): frees not yet moved out as
+        // `UnitFreed` outputs.
+        freed,
     } = ClientWorld::default();
+    assert!(freed.is_empty());
     assert!(!connected && ping == Default::default() && pet_palette.is_empty());
     assert_eq!(belt_ready, [false; 4]);
     assert!(local_walk.is_none());

@@ -41,7 +41,7 @@
 | Edge cases & original bugs | 572–589 |
 | Test vectors | 590–615 |
 | Provenance | 616–657 |
-| Open questions | 658–702 |
+| Open questions | 658–747 |
 <!-- /index -->
 
 ## Summary
@@ -320,7 +320,7 @@ generation (§3.2: F = 0, multi-room), `drlg/maze.md` (`0x00673A60`),
    1), `0x0067CBF0`), written through `0x0067C4F0` with **no bound
    check**: cx past the row width writes into the next row's cells, a
    row outside 0..h/8 reads past the row-offset array (open question
-   7).
+   7: no 1.14d DS1 does either, measured).
 10. **Rooms:**
     - Multi-room: for tile row Y = map y, map y + 8, … < map y + h (outer)
       and column X = map x, map x + 8, … < map x + w (inner): a room of
@@ -512,7 +512,7 @@ the simulation. Exact fade values: render spec.
 | `Expansion` | load filter (§2.3) |
 
 Files beyond `Files` are only reachable through outdoor code setting the
-picked file (82 rows name such files, e.g. Defs 4–7 `File4`/`File5`).
+picked file (80 rows in the live d2exp table name such files: any of `File`(`Files`+1)..`File6` holding a string of more than one character, the 0/1-character strings being the `0` placeholders, `data/fixups.md` §12; 76 of them are in the 863 base rows, 4 in the expansion rows; e.g. Defs 4–7 `File4`/`File5`). Measured 2026-10-08 on d2exp `LvlPrest.txt` (1,091 rows) and `crates/d2-sim/tests/game_drlg_tables.rs` `lvlprest_measurements`; an earlier figure of 82 was not reproducible under any slot or placeholder rule tried.
 
 ## Constants & data dependencies
 
@@ -675,10 +675,37 @@ the disassembly). Function map (D2MOO 1.10f names as hints):
    14): the bytes come from the uninitialized 0x320 slack after the file
    buffer (`0x00517079`, Fog allocator, no clear). d2rs uses 0; settle by
    checking whether lvlsub ever picks that group (`drlg/outdoor.md`).
+   *Reachability answered (2026-10-08, data + static)*: yes. patch_d2
+   `lvlsub.txt` row "Trees" (type 6, `CheckAll` 0, `Max0..4` = 2, 2, 2,
+   12, 2, `Prob0..4` = 50, 30, 50, 100, 50) is a scattered row
+   (`drlg/outdoor-tilesub.md` §4.2): each repetition draws G :=
+   group[roll(14)] (`0x006701DB`), so index 13 (the truncated group) is
+   taken with probability 1/14 per repetition in every Act I outdoor
+   room whose Trees bit is set. Its x is in the file; y, w, h come from
+   the slack. With w, h ≥ 8 the repetition ends after the group roll
+   (aw or ah ≤ 0); smaller values lead to `Trials` draws, so the draw
+   count depends on the slack bytes. Not derivable statically: the
+   value stays a memory read (REC-35, `formats/ds1.md` OQ 3).
 3. Order of §8 (hardcoded units added to the map list at activation)
    versus §9 (unit transfer at tile build) for rooms built before the
    first activation of their map: confirm with a recording that the
    river/navi units reach their rooms.
+   *Answered (2026-10-08, static)*: §8 always comes first, for every
+   room of the map. The only callers of §8 (`0x00667890`) are set
+   handler 3 (`0x0061B343`) and the stream `0x0061B730` (`0x0061B752`,
+   before its own build at `0x0061B77F`); the only other tile build,
+   `0x0061B190` (no §8 call; callers set handler 1 `0x0061B2F3` and the
+   client timer `0x0061B9DF`), runs only on rooms that already had set
+   handler 3: a room's rooms-near array contains the room itself
+   (`drlg/rooms.md` §3 rule 1), so Propagate(N, 2) reaches Propagate(N,
+   3) and runs set handler 3 on N before set handler 2 and 1 on N
+   (`drlg/rooms.md` §4), and set handler 2 refuses a type-2 room
+   without flag 0x2000000 (client builds take rooms of status ≤ 2). So
+   each room's own §8 call precedes its §9 transfer, and the first §8
+   call of the map (hardcoded-units-pending 1 → 0) puts the units on
+   the map list before any room of the map transfers. A hardcoded unit
+   reaches its room whenever it lies inside one (§9, "Units outside
+   every room ... stay on the map list").
 4. *Answered* in the owner: `world/objects.md` §6 (`0x0054F490`, the
    handler table `0x00731D28` for classes 574–582: 580 special chest,
    581 random chest by act, 582 quest-chosen class).
@@ -687,6 +714,17 @@ the disassembly). Function map (D2MOO 1.10f names as hints):
 5. The ~94 DS1s that `Patch_D2.mpq` overrides were not re-surveyed
    (no listfile): re-run the size/pops/unit counts with `mpq-tool
    formats`-style name lists to confirm the measurements.
+   *Answered (2026-10-08, measured)*: every lvlprest `File1..6` name
+   was read by name with archive priority `Patch_D2.mpq`, `d2exp.mpq`,
+   `d2data.mpq` (no listfile needed): 2,058 references, 2,043 distinct
+   files, all present; only 10 resolve to `Patch_D2.mpq` (Act IV
+   `Diab/Entry1`, `WingE1/E2`, `WingN1/N2`, `WingS1/S2`, `WingW1/W2`,
+   and `Expansion/Town/townWest`). With the patch files the §5.3 / §6
+   measurements are unchanged: versions 12–18 (12: 7, 13: 16, 15: 10,
+   16: 210, 17: 126, 18: 1,674), unit types 1: 2,267 and 2: 14,105,
+   one record with flags ≠ 0, every DS1 size equal to its row's
+   `SizeX`/`SizeY` when set, and no DS1 with more distinct pop styles
+   (8–29 on orientation 10/11 cells) than its row's `Pops`.
 6. *Answered* (static): never in 1.14d. `0x0061EBB0`'s only caller is
    the load-all routine `0x00619300` (call `0x0061941D`), which passes
    its input 2 in EDX; the preload loop calls `0x00665F40` only when
@@ -696,6 +734,13 @@ the disassembly). Function map (D2MOO 1.10f names as hints):
 7. Does any lvlprest DS1 with `Scan` ≠ 0 have a waypoint object outside
    its map (§6 step 9 writes without a bound check)? Scan the waypoint
    objects (objects `SubClass` bit 0x40) of those DS1s against w, h.
+   *Answered (2026-10-08, measured)*: no. 292 lvlprest rows have
+   `Scan` ≠ 0 (495 distinct DS1s, patch priority as OQ 5); their files
+   hold 91 type-2 records whose §5.3 class is < 573 with `SubClass` bit
+   0x40, and every one lands in the grid: 0 ≤ x/5/8 ≤ w/8 and 0 ≤
+   y/5/8 ≤ h/8 (largest: `tempNEWay.ds1` 40×40, cell (3, 4)). So §6
+   step 9's missing bound check is never exercised by 1.14d data; an
+   implementation may assert the bound.
 8. *Answered* (`impl-drlg-act3-5` Q12, link bit 0): the §6 step 10 link
    is always 0 in 1.14d (map +0x20 is never set), so the bit is never
    written and needs no record type (§6 step 10).

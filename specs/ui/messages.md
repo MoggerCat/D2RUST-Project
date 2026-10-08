@@ -27,24 +27,24 @@
 | Rules | 86–87 |
 |   1. Entry points | 88–101 |
 |   2. Screen message list (`0x0049E3A0(text, color)`) | 102–140 |
-|   3. Chat line formats (0x26, `client/msg-ui.md` §4 r3) | 141–177 |
-|   4. Recipe scroll text (0x26 type 7) | 178–193 |
-|   5. Overhead text | 194–253 |
-|   6. NPC text list `[0x007BF250]` (0x27 type 1) | 254–312 |
-|   7. Dialog panel (`0x004A1320`, `0x004A10E0`) | 313–427 |
-|   8. Timed text box (`0x004A1510(id)`, 0x27 type 2 kind 3) | 428–440 |
-|   9. Hire offers and the hire popup (0x4E, 0x4F, 0x50 code 2) | 441–457 |
-|   10. Other 0x50 codes (UI effects) | 458–492 |
-|   11. Item-socket dialog (UI state 0x0E, 0x58 codes) | 493–562 |
-|   12. NPC alert (0x8A, `client/msg-ui.md` §9 r3) | 563–569 |
-|   13. NPC intro table `0x00726850` (0x91) | 570–598 |
-|   14. Interact NPC `[0x007C0D25]` / `[0x007C0D29]` (answers `client/msg-ui.md` OQ7, writer part) | 599–615 |
-| Constants & data dependencies | 616–633 |
-| Randomness | 634–638 |
-| Edge cases & original bugs | 639–659 |
-| Test vectors | 660–682 |
-| Provenance | 683–709 |
-| Open questions | 710–735 |
+|   3. Chat line formats (0x26, `client/msg-ui.md` §4 r3) | 141–196 |
+|   4. Recipe scroll text (0x26 type 7) | 197–212 |
+|   5. Overhead text | 213–277 |
+|   6. NPC text list `[0x007BF250]` (0x27 type 1) | 278–336 |
+|   7. Dialog panel (`0x004A1320`, `0x004A10E0`) | 337–451 |
+|   8. Timed text box (`0x004A1510(id)`, 0x27 type 2 kind 3) | 452–464 |
+|   9. Hire offers and the hire popup (0x4E, 0x4F, 0x50 code 2) | 465–481 |
+|   10. Other 0x50 codes (UI effects) | 482–516 |
+|   11. Item-socket dialog (UI state 0x0E, 0x58 codes) | 517–586 |
+|   12. NPC alert (0x8A, `client/msg-ui.md` §9 r3) | 587–593 |
+|   13. NPC intro table `0x00726850` (0x91) | 594–622 |
+|   14. Interact NPC `[0x007C0D25]` / `[0x007C0D29]` (answers `client/msg-ui.md` OQ7, writer part) | 623–639 |
+| Constants & data dependencies | 640–657 |
+| Randomness | 658–662 |
+| Edge cases & original bugs | 663–683 |
+| Test vectors | 684–706 |
+| Provenance | 707–737 |
+| Open questions | 738–763 |
 <!-- /index -->
 
 ## Summary
@@ -174,6 +174,25 @@ stops at a `ÿc` that ends the string.
    `ÿc` the player typed, so the echo is one color (2).
 3. Types 1 and 2 do not strip: a player's `ÿc` codes in T recolor the
    rest of the line (`ui/text.md` §5).
+4. **Server senders** (2026-10-08, static; every function that stores
+   0x26 as a message id in the server range and every caller of the
+   builder `0x0053C750`):
+   - type 1, 2: the chat relay and type 6 the whisper echo
+     (`sim/intents-events.md` §9 r16); type 5: overhead
+     (`0x00571620`);
+   - type 1 with an empty name (shown as T, color u8@8): `0x0054A930`
+     (u8@3 = 2, to every client), reached only from the quest debug
+     logs `0x00544070`, `0x00544350`, `0x00545CD0`, all gated by
+     `[0x008846DC]` ≠ 0 (`world/quests-act1.md` §10.1: no effect in
+     1.14d); `0x00546FF0` (from `0x00547080`, which has no caller);
+   - **type 4**: only `0x0054A9B0` (u8@2 = 0, u8@3 = 0, u32@4 = 0, u8@8
+     = the color argument, to every client of the game). Its callers
+     `0x0052F4C0` (from `0x0052F720`, a thread started by `0x0052F740`)
+     and `0x0052F630` are host entry points with no caller and no
+     address reference in the image. So a 1.14d game never sends a
+     type 4 line, and no server refusal (`You cannot …`) arrives as one. The
+     d2rs server sends none either; the client rule above stays for
+     completeness.
 
 ### 4. Recipe scroll text (0x26 type 7)
 
@@ -193,8 +212,9 @@ stops at a `ÿc` that ends the string.
 
 ### 5. Overhead text
 
-1. **Text pass** `0x004A0E70` (UI pass step 10, `ui/panels.md` §5), in
-   order: the overhead counter `[0x007BF20E]` += 1; the view rectangle
+1. **Text pass** `0x004A0E70` (UI pass step 10, `ui/panels.md` §5: once
+   per drawn frame, not per client tick), in order: the overhead counter
+   `[0x007BF20E]` += 1 (so a record's life `d` counts drawn frames); the view rectangle
    is read (`0x00476070`, `0x004760C0`) into `[0x007BF214]` (left, top);
    placed-bubble count `[0x007BF224]` := 1 with slot 0 = the dialog
    panel rectangle (`[0x007BF278]`, `[0x007225FC]`, +325, +112) while
@@ -210,7 +230,11 @@ stops at a `ÿc` that ends the string.
    of 0x26 type 5 holds the player's text.
 3. **Per unit** (`0x004A0B30` players, `0x004A0D20` monsters and
    objects; units without a record are skipped). (px, py) = the unit's
-   client pixel point (`0x00620900`) − (`[0x007BF214]`, `[0x007BF218]`);
+   client pixel point (`0x00620900`: the static path +4 / +8 for unit
+   types 2, 4, 5, else the dynamic path `0x006489C0` / `0x006489D0`;
+   for the local player that is its client-side walk, the same point
+   its sprite is drawn from) − (`[0x007BF214]`, `[0x007BF218]`), the
+   frame's view origin (`render/camera.md`);
    py −= 30 (players) or 10 (others); open mode 1 → px −= W / 4, mode 2
    → px += W / 4 (W / 4 rounded toward 0), mode 3 → nothing drawn.
    Drawn only when 0 < py < H and −100 < px < W + 100. Text:
@@ -686,7 +710,11 @@ Synthetic (rules as cited).
 `0x004521C0`, `0x00452300`, `0x0049E3A0`, `0x0049DBC0`, `0x0049DC40`,
 `0x0049E280`; recipe scroll `0x0048BBE0`, `0x0048BC10`; text pass
 `0x004A0E70`, bubbles `0x004A0B30`, `0x004A0D20`, `0x004A0A00`,
-`0x0049E070`, `0x0049D3C0`, `0x0049D9A0`, `0x0049D8E0`; NPC text list
+`0x0049E070`, `0x0049D3C0`, `0x0049D9A0`, `0x0049D8E0`; 0x26 senders
+(§3 r4, REC-245, 2026-10-08): builder `0x0053C750` and its callers,
+`0x0054A9B0`, `0x0054A930`, `0x00546FF0`, `0x0052F4C0`, `0x0052F630`,
+`0x0052F720`, `0x0052F740` (`functions.tsv` callers 0; no 4-byte
+address match in `Game.exe`); NPC text list
 `0x004A1600`, `0x00661240`, `0x00661510`, `0x006616E0`, `0x006615F0`
 (comparator `0x006615D0`), `0x006612A0`, `0x00661390`, `0x006613C0`,
 `0x0049F910`, `0x004B5890`, `0x004B5BC0`, `0x004B40D0`, `0x004B1680`,

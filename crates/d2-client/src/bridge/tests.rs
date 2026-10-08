@@ -992,6 +992,7 @@ fn outputs_are_handed_over_once_after_the_frame() {
         Output::ServerSound {
             unit: UnitKey::new(2, 13),
             class: 37,
+            at: Some((0x1214, 0x11C0)),
             event: 18,
         },
         Output::TradeAction {

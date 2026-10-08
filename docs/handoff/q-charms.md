@@ -39,3 +39,5 @@ cargo run -p d2-client --release -- play --new sorceress Test
 ```
 
 Pick up a charm (a drop, or one from a vendor) and put it in the inventory grid; open the character panel (C): defense/resists/attributes the charm adds appear. Pick the charm up again: they go. Headless: `cargo nextest run -p d2-sim wiring::inventory::tests::equip vitals_sync`.
+
+Local check done 2026-10-08 (PC 1 round 2, branch claude/local-pc1-s8): headless part passes (d2-sim `wiring::inventory::tests::equip`, `vitals_sync`); the charm pick-up play check needs a player.

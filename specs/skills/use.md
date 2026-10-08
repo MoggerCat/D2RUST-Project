@@ -26,19 +26,19 @@
 | Outputs / state changes | 68–74 |
 | Rules | 75–76 |
 |   1. Messages | 77–108 |
-|   2. `use_at_point(game, unit, skill, x, y)` = `0x00549AD0` | 109–150 |
-|   3. `use_on_unit(game, unit, skill, type, guid, run)` = `0x00549BA0` | 151–169 |
-|   4. Mode change gates | 170–209 |
-|   5. Start and do | 210–340 |
-|   6. Cooldown | 341–354 |
-|   7. Periodic skills and auras | 355–404 |
-|   8. Function tables | 405–424 |
-| Constants & data dependencies | 425–445 |
-| Randomness | 446–455 |
-| Edge cases & original bugs | 456–477 |
-| Test vectors | 478–491 |
-| Provenance | 492–508 |
-| Open questions | 509–552 |
+|   2. `use_at_point(game, unit, skill, x, y)` = `0x00549AD0` | 109–191 |
+|   3. `use_on_unit(game, unit, skill, type, guid, run)` = `0x00549BA0` | 192–210 |
+|   4. Mode change gates | 211–250 |
+|   5. Start and do | 251–409 |
+|   6. Cooldown | 410–423 |
+|   7. Periodic skills and auras | 424–473 |
+|   8. Function tables | 474–493 |
+| Constants & data dependencies | 494–514 |
+| Randomness | 515–524 |
+| Edge cases & original bugs | 525–546 |
+| Test vectors | 547–567 |
+| Provenance | 568–587 |
+| Open questions | 588–639 |
 <!-- /index -->
 
 ## Summary
@@ -134,7 +134,7 @@ at the first failure (entry null → fatal assert):
 | 2 | `skill_level(unit, entry, 1)` = 0 (`0x006442A0`) | 7 |
 | 3 | `aura` | 6 |
 | 4 | `passive` | 5 |
-| 5 | quantity and throw `0x00647640`, then item type `0x00643F80` | 2 |
+| 5 | skill item test `0x00647640` (`client/stat-lists.md` §3 rule 6.11, the same function on the server: scroll / book skills need quantity +0x30 > 0; Throw and Left Hand Throw a throwable item in the hand the weapon in use picks, and Throw without dual wield fails while inventory +0x1C names no item (writers `world/quests-act3-2.md` §11.5); Left Hand Swing a second weapon; other skills pass), then item type `0x00643F80` | 2 |
 | 6 | mana `can_afford` `0x00647540` (`skills/levels.md` §4) | 1 |
 | 7 | shape `0x00644060` | 4 |
 | 8 | start stat `0x006440F0` | 1 |
@@ -147,6 +147,47 @@ message handler reads it). The step 4 fallback looks Attack up with
 unit's skill list (+0xA8, list +4, next +4) whose record id equals the
 id and whose owner item GUID (+0x34) equals the argument; none → null,
 and `use_state(null)` is fatal.
+
+**Item type test** `0x00643F80` (entry in EAX, stack unit; test 5,
+fail → 2). Skill record columns (i16, ≤ 0 = none): `itypea1..3` +0x18,
+`itypeb1..3` +0x1E, `etypea1..2` +0x24, `etypeb1..2` +0x28 (set a / b).
+Type tests are `0x00629BB0` (with equivalence).
+
+1. Entry or record none → fail. `etypea1` ≤ 0 and `itypea1` ≤ 0 →
+   pass (no inventory needed).
+2. No inventory (+0x60) → fail. A = item at body location 4, B = at 5
+   (`0x0063BDE0`).
+3. Skill id 4 (Left Hand Throw) or 5 (Left Hand Swing): the weapon in
+   use (`0x0063BEF0`) is dropped from the test (A := none when it is A,
+   else B := none when it is B).
+4. `hand(a, A, B)` passes → the result is `hand(b, B, A)` (no second
+   try). It fails → pass when `hand(b, A, B)` and then `hand(a, B, A)`
+   pass (`0x00644009`–`0x0064403E`). So the hands may meet the two sets
+   either way round, but the swapped order is tried only when A fails
+   set a.
+
+`hand(s, X, Y)` = `0x00643D90` (set s in EAX: 0 = a, 1 = b):
+
+- X none: pass when set s's `etype` 1 and `itype` 1 are both ≤ 0. Else
+  pass when `itypea1` (always set a) is 45 `weap`, 46 `mele` or 67
+  `h2h`, `itypeb1` ≤ 0 and Y is not of type 45 (an empty hand meets a
+  weapon-type set when the other hand holds no weapon: bare-handed use).
+  Else fail.
+- X present: X of either `etype` of set s (stop at the first ≤ 0) →
+  fail. Then the `itype`s of set s in order (stop at the first ≤ 0):
+  none listed → pass; listed and X of none of them → fail.
+- X matched: X has item flag 0x4000 or 0x100 (`0x006280A0`, item data
+  +0x18) → pass only for skill 0 (Attack). Else s = the `shoots` type of
+  X's type (`0x0062E6F0`, itemtypes +0x0C); s ≠ 0 and the skill lacks
+  `noammo` (flags bit 16): Attack and X with stat 157
+  (`item_magicarrow`) → pass; Y none or not of type s → fail; Attack
+  and Y with stat 157 → pass; Y stackable (`0x006295B0` > 0) and Y's
+  `quantity(70)` < 1 → fail. Pass.
+
+Item type indices are binary row indices (the `Expansion` row of
+`itemtypes.txt` takes none: 45 `weap`, 46 `mele`, 51 `shld`, 67 `h2h`).
+1.14d-confirmed (asm `0x00643F80`–`0x00644050`, `0x00643D90`–`0x00643F7B`;
+offsets from `data/fields.tsv`).
 
 ### 3. `use_on_unit(game, unit, skill, type, guid, run)` = `0x00549BA0`
 
@@ -232,15 +273,40 @@ then the type-1 ENDANIM timer (`sim/units.md` owns frame data). The
 player type-0 handler `0x005811D0` dispatches by mode (table
 `0x00732C10`); attack-type modes (7, 8, 10–16, 18) use `0x00580460`:
 
-1. Store arg2 in unit +0x38 bits 8+ (`0x006212C0`).
-2. Skill flags bit 0 (moving skills): step the path (`0x00553490`,
-   `0x00554CA0`); finished (2) → flags |= 2 and run the do. "Skill
-   flags" (E flags) are the skill entry's word +0x0C (get `0x006446A0`,
-   set `0x00644660`): value 1 = moving skill, mask 2 = the move ended
-   (`0x005804B3`). Bodies test mask 2 (`test al, 2`) and clear the word.
-3. Otherwise run the do only if unit flag 0x40 is clear and arg1 ∈ {1,
-   2}.
-4. Return 1, or 2 when the unit died (ENDANIM runs at once).
+1. No used skill (`0x00620250`) → return 2. Store arg2 in unit +0x38
+   bits 8+ (`0x006212C0`).
+2. Skill flags bit 0 (moving skills): target check `0x00553490`, then
+   step the path `0x00554CA0` (`sim/pathing.md` §9.3), on **every**
+   type-0 event (codes 1–4). Result 2 (finished) → flags |= 2 and run
+   the do at once (no flag 0x40 or arg1 test); skip rule 3. Any other
+   result → rule 3. "Skill flags" (E flags) are the skill entry's word
+   +0x0C (get `0x006446A0`, set `0x00644660`): value 1 = moving skill,
+   mask 2 = the move ended (`0x005804B3`). Bodies test mask 2 (`test
+   al, 2`) and clear the word.
+3. Run the do if unit flag 0x40 is clear and arg1 ∈ {1, 2} (also for a
+   moving skill whose step did not finish: `0x005804B1` jumps to the
+   rule-3 test `0x005804BE`, 1.14d-confirmed).
+4. Return 1, or 2 when the unit died (`0x005541B0`; ENDANIM runs at
+   once).
+
+So a moving skill steps its path once per type-0 event and runs its do
+at each code-1/2 event on the way, then once more on arrival with mask
+2 set. The bodies keep the movement going by rewinding their own
+animation (`sim/units.md` §4.2 variant `0x00553DC0`), which re-arms the
+code-1 event:
+
+| Skill (`seqnum`, frames, code-1 frames) | Do on the way | Next event |
+|---|---|---|
+| Whirlwind (10; 8 frames; 3, 7) | `bodies-2b.md` §8.11 step 4: player → animation from frame 3, then `Pacing` strikes (0, 1 or 2) | frame 3's code 1 at F + 1 for every speed s < 1280 (first loop pass reaches index 3): one path step and one do per tick |
+| Leap (13; 15 frames; 5, 11, 14) | the frame-5 do launches (`bodies-2.md` §4.7, flags 0x1101); later dos run Land, not there → player animation from frame 10 | frame 11's code 1 at F + 1 for s ≥ 256, else F + 2 or later |
+| Leap Attack (14; 22–28 frames by class; 5, 11, strike 16–18) | as Leap (`bodies-2b.md` §6.12: start flags 0x1080, launch → 0x1101, Land not there → frame 10) | as Leap; after landing the strike event (`bodies-2b.md` §6.12) |
+
+On arrival the Whirlwind do ends the move (`bodies-2b.md` §8.11 step
+3) and strikes nothing on that tick; the Leap do lands (`bodies-2.md`
+§4.7); the Leap Attack do lands and rewinds to frame 16 for its strike
+(`bodies-2b.md` §6.12). Frames, code-1 indices and classes of these
+sequences: `skills/sequences.md` §4 (`seqnum` 10 and 13 have one record
+for every class that has one; 14 has four).
 
 Monsters: start `0x005A75C0`, per-frame `0x005A7670` (monsters branch;
 Open question 6).
@@ -274,6 +340,9 @@ Open question 6).
       line test `0x00645950` with collision mask 4 / 0x1C09 / 0x180 /
       0x804 / 0x805; failure → 0; value > 5 → 0. (1.14d: only value 4,
       48 skills.)
+      The walk runs from the target point to the caster's position
+      (`0x00645950`, `sim/pathing.md` §13.4: owner of its direction,
+      rooms and end cells).
    5. `srvstfunc` ∉ 0…90 → 0. Null entry → result 1, nothing charged
       (step 7 still runs).
    6. Else `r = srvst[srvstfunc](game, unit, skill, L)` (table
@@ -487,10 +556,20 @@ their own (`combat/*`, `skills/levels.md`). The unit-seed reseeder
 | Meteor (delay 30), do at frame F | state 121 until F + 30, type-12 timer at F + 30; any delay skill → state 8 meanwhile |
 | Might (perdelay 50, immediate) assigned at 1234 | do now; type 8 at 1251, then 1301, … ; assigned at 1250 → 1251 |
 | Dual wield, three Attack requests | Left Hand Swing, Attack, Left Hand Swing |
+| §5.2, moving skill, step result 1, flag 0x40 clear, arg1 1 / 3 | do runs / no do |
+| §5.2, moving skill, step result 2, arg1 3, flag 0x40 set | flags \|= 2, do runs |
+| Item type test, Tiger Strike (`itypea1` `mele`), no hand item | pass (bare-handed: set a has a weapon type, set b empty, no weapon in the other hand) |
+| Item type test, Tiger Strike, bow at location 4, nothing at 5 | fail (bow not `mele`; swapped order: the empty hand fails set a because the other hand holds a weapon) |
+| Item type test, Smite (`shld`), sword at 4, shield at 5 | pass (sword fails set a; swapped: sword passes the empty set b, shield passes set a) |
+| Item type test, Smite, sword at 4, nothing at 5 | fail → `use_state` 2 |
+| Item type test, Double Swing (`mele` / `mele`), one sword at 4 | fail (set a passes; the empty hand fails set b: `itypeb1` is set) |
 | Recording 021854: request at frame 886 | type 0 (1, 0) expiring 892, type 1 expiring 900; do at 892; ENDANIM cancelled at 899 by the next request |
 
 ## Provenance
 
+- §2 test 5 re-read 2026-10-08 (REC-266): `0x00647640` (skill ids 2, 4,
+  5 by `0x0063C9B0` / `0x00643D60`; other ids return 1 before the
+  inventory test).
 - 1.14d disassembly; tables read from the image: srvst `0x00732140`,
   srvdo `0x007322B0`, mode starts `0x006E1740`, player per-mode handlers
   `0x00732C10`. Function identification: same null pattern as D2MOO's
@@ -549,3 +628,11 @@ their own (`combat/*`, `skills/levels.md`). The unit-seed reseeder
 11. Answered (2026-10-08, `docs/handoff/impl-monster-skill-slots.md`): the
     E flags "bit 2" of monster bodies is mask 2, the move-ended flag
     (§5.2 rule 2).
+12. Answered (2026-10-08, REC-232, asm `0x00580460`–`0x005804F9`): a
+    moving skill whose path step did not finish falls through to the
+    rule-3 test, so Whirlwind strikes on the way (§5.2 rules 2–3 and the
+    moving-skill table). The hit ticks still want the Whirlwind
+    recording of `bodies-2.md` Open question 12.
+13. Answered (2026-10-08, REC-176): the item type test `0x00643F80`
+    reads both column sets a and b and both hands (§2, "Item type
+    test").

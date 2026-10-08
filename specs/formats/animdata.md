@@ -34,7 +34,7 @@
 | Test vectors | 209–241 |
 | expfield.d2 | 242–277 |
 | Provenance | 278–303 |
-| Open questions | 304–319 |
+| Open questions | 304–346 |
 <!-- /index -->
 
 ## Summary
@@ -307,6 +307,13 @@ raw disassembly where Ghidra lost register arguments):
    with it) and of event values 1–3 (`cof.md` names 1 attack, 2 missile,
    3 sound, 4 skill): owned by a future animation spec; check in the
    1.14d animation code.
+   *Answered* in the owners: `speed` is the base of the unit's
+   animation speed +0x4C, in 1/256 frame per tick (`0x00623F50` scales
+   it by the rate stats and states, `sim/units.md` §4.3 / §4.7), and
+   the frame count is `frames` · 256 (`0x005533D0`); the event bytes
+   drive the schedule of `sim/units.md` §4.2 (1, 2, 4: numbered action
+   events; 3: an action event with argument 0; others ignored) and the
+   client's +0x4E (`audio/triggers-2.md` §15).
 2. The full COF-name composer `0x0064F5B0` / weapon-class resolver
    `0x0064F060` for players, objects and units with an inventory (which
    weapon class, the `gh` mode override table at `0x00745900`–
@@ -314,5 +321,25 @@ raw disassembly where Ghidra lost register arguments):
    contents: its OQ1).
 3. Whether any 1.14d code path looks up a name of 8 characters (would
    overflow the 8-byte buffers into the stack cookie).
+   *Partly answered* (static + data, 2026-10-08): the short form is
+   `sprintf("%s%s%s", T, M, W)` (format `0x006D5514`, call `0x0064F9E9`)
+   of three parts that are each the first 3 bytes of a 4-byte code with
+   spaces → 0 and a forced 0 4th byte (`0x0064F900`–`0x0064F9A0`), so a
+   composed name is at most 9 characters. In `0x0066A9B0` the buffer is
+   `[ebp−0xC]`–`[ebp−5]` and the stack cookie is at `[ebp−4]`: a name of
+   8 characters writes its NUL into the cookie's low byte (the check
+   `0x00681A48` then fails unless that byte was already 0); 9 writes two
+   bytes. 1.14d data: every `monstats` Code (734), `PlrType` token (7),
+   mode token (`PlrMode` 20, `MonMode` 16, `ObjMode` 8) is 2 characters
+   and every `WeaponClass` code 3, so player and monster names are 7
+   characters. The one exception is `objects` row 0 (`Dummy`, "test
+   data", Token `NU0`), whose names would be 8 characters. Still open:
+   whether an object of class 0 ever reaches `0x0066A9B0` (callers
+   `0x00620F3B`, `0x00650F48`, `0x00650FAE`).
 4. Whether `expfield.d2`'s unread u16 (266) is a version, and what the
    path callers use the step field for.
+   *Answered* for the u16 (static): it has no meaning in 1.14d; the
+   parser `0x0066A2B0` starts reading at +2 (`0x0066A2BC`) and nothing
+   else reads the file buffer, which is freed after the copy. What the
+   path callers (`0x0064DEA0`, `0x0065AA40`) use the step field for
+   belongs to the pathing owner.

@@ -25,26 +25,27 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 50–66 |
-| Inputs | 67–81 |
-| Outputs / state changes | 82–92 |
-| Rules | 93–94 |
-|   1. Waypoint index ↔ level | 95–114 |
-|   2. Waypoint record ("history") | 115–146 |
-|   3. Save field layout (owner of the save format: the character-save spec) | 147–169 |
-|   4. Which waypoints are known without operating one | 170–189 |
-|   5. Waypoint objects | 190–279 |
-|   6. C→S 0x49 TakeOrCloseWp (`0x0054C5D0`) | 280–329 |
-|   7. Travel (`0x00584F60`) | 330–385 |
-|   8. Timing and message order | 386–407 |
-|   9. Town portals | 408–413 |
-|   10. Object mode change (consequence used above) | 414–421 |
-| Constants & data dependencies | 422–449 |
-| Randomness | 450–473 |
-| Edge cases & original bugs | 474–517 |
-| Test vectors | 518–557 |
-| Provenance | 558–596 |
-| Open questions | 597–675 |
+| Summary | 51–67 |
+| Inputs | 68–82 |
+| Outputs / state changes | 83–93 |
+| Rules | 94–95 |
+|   1. Waypoint index ↔ level | 96–115 |
+|   2. Waypoint record ("history") | 116–147 |
+|   3. Save field layout (owner of the save format: the character-save spec) | 148–170 |
+|   4. Which waypoints are known without operating one | 171–190 |
+|   5. Waypoint objects | 191–280 |
+|   6. C→S 0x49 TakeOrCloseWp (`0x0054C5D0`) | 281–330 |
+|   7. Travel (`0x00584F60`) | 331–386 |
+|   8. Timing and message order | 387–408 |
+|   9. Town portals | 409–414 |
+|   10. Object mode change (consequence used above) | 415–422 |
+|   11. Act change (`0x0053ACC0`) | 423–511 |
+| Constants & data dependencies | 512–539 |
+| Randomness | 540–563 |
+| Edge cases & original bugs | 564–615 |
+| Test vectors | 616–660 |
+| Provenance | 661–706 |
+| Open questions | 707–792 |
 <!-- /index -->
 
 ## Summary
@@ -342,8 +343,8 @@ roomless unit passes step 2 against any Act I unit.
 5. Warp `0x0053AEC0(game, player, level, tile code)` (D2MOO
    `LEVEL_WarpUnit`):
    - destination act ≠ the client's act (`0x005382B0`): act change,
-     `0x00537340` then `0x0053ACC0` (D2MOO `LEVEL_ChangeAct`; owner: the
-     act/level-change spec; unrecorded, open question 1);
+     `0x00537340` then `0x0053ACC0(level, tile code)` (D2MOO
+     `LEVEL_ChangeAct`; §11; message order recorded, open question 1);
    - same act: spawn search `0x0061B060(act, level, tile code, &x, &y,
      player size)` and, if it found a room, place the player
      `0x00554EA0(game, player, room, x, y, 0, 0)`.
@@ -418,6 +419,95 @@ null → nothing; same mode → only marks the unit for update; else mark
 for update (unit +0xC4 |= 1), store the mode, run the anim setup
 `0x00624390`, which for an object reads `FrameCnt[mode]`, `Start[mode]`
 and `FrameDelta[mode]`, and for `Sync` = 0 draws once (Randomness).
+
+### 11. Act change (`0x0053ACC0`)
+
+`0x0053ACC0(ECX game, EDX client, level, tile index)` (`ret 8`). Its
+only caller is the level warp `0x0053AEC0` (§7 rule 5), after the
+town-leave refresh `0x00537340`, when the level's act differs from the
+client's act. Every travel to another act ends here: waypoint travel
+(§7), NPC travel `0x0054B830` (`world/npc.md` §8.3), the Hellgate portal
+(operate 46, `0x00584750`) and the Harrogath portal (operate 73,
+`0x005B5880`, `world/quests-act4.md` §5.9). Steps, in order:
+
+1. Arena flags bit 1 set (`0x0053FCE0`: game +0x1D28 record +0x08, bit
+   value 2; no record → fatal 0x27) → return; nothing changes.
+2. A := act of `level` (`0x006427F0`). A = the client's act (client
+   +0x1AC) → fatal 0x19F.
+3. Act A not built (game +0xBC + 4·A null) → build it (`0x0053AC70`,
+   `drlg/levels.md` §2).
+4. Client state := 5 (`0x005386D0`, client +0x04).
+5. P := the client's player (`0x00537860(client, 0)`); none → fatal
+   0x1AF.
+6. Classic game (game +0x70 = 0) and P of type 0 → the classic pet drop
+   `0x00575BC0` (`world/hirelings.md` §6 rule 4).
+7. Disguise check `0x00646020(P)` (`combat/vitals.md` §4.8 item 1.1: a
+   shapeshifted P loses its disguise states); the result is ignored.
+8. Spawn: R := `0x0061B060(act A's record, level, tile index, &x, &y,
+   P's size (0x00620510))` (`sim/path-placement.md` §11; the tile index
+   classes and draws: `drlg/levels.md` §10 rule 2). None → return.
+9. Free point from R: `0x0064E7E0(R, &(x, y), P's size, mask 0x1C89,
+   step 5)` (`sim/path-placement.md` §7.1, §7.2). None → return.
+   Steps 8–9 failing leave steps 3, 4, 6 and 7 done and send nothing.
+10. Leave the old room: O := P's room (`0x00620BB0`); teleport P's path
+    to (room none, 0, 0) (`0x00650BE0`, `sim/path-placement.md` §6 rule
+    4: the footprint is cleared in O; the room recache with no hint
+    finds no room at cell (0, 0), so P leaves O's unit list, the
+    previous room := O, the path room := none; `sim/pathing.md` §9.6
+    rule 9). Failure → fatal 0x1D1. Then the room-change messages with O
+    as the old room (`0x00554670(game, P, O)`, `sim/pathing.md` §9.8):
+    every client of O except P's own gets P's removal.
+11. Enter: teleport P's path to (R, x, y) (`0x00650BE0`, the step 9
+    point); failure → fatal 0x1D6. P joins R's unit list and is queued
+    for update (`sim/pathing.md` §9.6 rule 9).
+12. Client room switch to none (`0x005381F0(client, 0)`,
+    `sim/intents-events.md` §7.8): the old act's removals (S→C 0x0A,
+    0x08). P is no longer in a room of the old act (step 10).
+13. Queue S→C 0x05 (`0x0053B320(client, 5)`).
+14. Client act (+0x1AC) := A (`0x005382E0`).
+15. P's unit record: act (+0x18) := A, act record (+0x1C) := game
+    +0xBC + 4·A (`0x0053AE4E`, `0x0053AE56`; `sim/units.md` §2). The
+    monster AI's "same act" target test (`monsters/ai.md` §5.2) reads
+    +0x18.
+16. S→C 0x03 then 0x53 (`0x0053ABE0`; `client/model.md` open question
+    13).
+17. Client room switch to R (`0x005381F0(client, R)`): the new act's
+    room adds (0x07) and their units.
+18. Queue P for update (`0x0064C040`); P flag-ex (+0xC8) |= 0x10000
+    (S→C 0x15 at the update, `sim/intents-events.md` §7 rule 1);
+    room-change messages `0x00554670(game, P, 0)`; queue P for update
+    again.
+19. P of type 0: pets follow `0x005754B0(game, P, P's x, P's y)`
+    (`world/hirelings.md` §6 rule 1).
+
+The act change does **not** call the placement `0x00554EA0`: no 0x07
+MapReveal of its own, no player data +0x148 / +0x14C, no position
+history write, no timer event 14 (`sim/path-placement.md` §10 rule 6).
+The caller's own steps follow it: waypoint travel's arrival 0x0D (§7
+rule 7, recorded after an act change: open question 1), NPC travel's act
+completion and waypoint (`world/npc.md` §8.3).
+
+Tile index per caller (`0x0054B830` passes its argument to the warp
+unchanged, `0x0054B878`, `0x0054B90B`):
+
+| Caller | Call site | Level, tile index |
+|---|---|---|
+| waypoint travel (§7 rule 4) | `0x00585060` | the waypoint level, tile code 13 or 0 |
+| warriv1 155 | `0x0057A67A` | 40, 0 |
+| meshif1 210 | `0x0057A6FF` | 75, 0 |
+| tyrael2 367 | `0x0057A786` | 109, 0 |
+| cain6 520 | `0x0057A7D6` | 103, 5 |
+| Hellgate portal, operate 46 | `0x0058480A` | 103, 0 |
+| Harrogath portal, operate 73 | `0x005B598F` | 109, 5 |
+
+Levels 40, 75, 103 and 109 have `Position` ≠ 0, so index 0 picks among
+spawn records 0–4 and index 5 among records 5–9, with one `roll(n)` on
+the level seed when n > 0 (`drlg/levels.md` §10 rule 2).
+
+No portal object crosses acts: the portal pair creation `0x0056D130`
+asserts that the destination act equals the act of the room it is
+created in (fatal 0xE5C, `world/objects-2.md` §25 rule 4), and
+`0x0054B830` creates a portal only for a level of the player's own act.
 
 ## Constants & data dependencies
 
@@ -514,6 +604,14 @@ Reproduced by default.
     tests hostile time + 5000 ms (`0x005848C1`), not 10000 ms as §9 and
     the constants row say for it; the 10000 ms applies to the 0x49
     handler only. Owner of the portal rule: `world/objects.md` §12.
+12. **Act change without a spawn point** (§11 steps 8–9): the client is
+    left in state 5 with the player in the old act's room; the new act
+    stays built; no message is sent.
+13. **Act change leaves the old room before the room switch** (§11
+    steps 10–12): acts share tile coordinates, so a placement that kept
+    the old room as the recache hint could keep a room of the old act
+    whose rectangle holds the new point; the original never does this,
+    because the unit has no room when it is placed in the new act.
 
 ## Test vectors
 
@@ -521,6 +619,11 @@ Synthetic (CI). Record bytes are the 16 bytes at 0x63 offset 5.
 
 | Input | Expected | Source |
 |---|---|---|
+| act change (§11), client act 3, level 109, tile index 5, spawn found | P's unit +0x18 = 4, +0x1C = act 4's record, client +0x1AC = 4; P in the new room only (old room's unit list without P); 0x05 queued before 0x03; P flag-ex has 0x10000 | §11 |
+| act change, level in the client's own act | fatal 0x19F | §11 rule 2 |
+| act change, arena flags 0x2 | nothing changes, no message | §11 rule 1 |
+| act change, spawn search returns none | client state 5, P unchanged, no message | §11 rule 8 |
+| Harrogath portal `0x0054B830(109, 5)` / Tyrael `0x0054B830(109, 0)` | spawn search with tile index 5 / 0 (records 5–9 / 0–4 of level 109) | §11 table |
 | allocate | `0201 0100 0000 0000 0000 0000 0000 0000` | §2 rule 4 |
 | set index 2 on allocate | `0201 0500 0000 …` | §2 |
 | towns 0, 9, 18, 27, 30 | `0201 0102 0448 0000 0000 0000 0000 0000` | byte 2 + n/8 |
@@ -573,6 +676,13 @@ Save: the test character with Cold Plains has the section `5753
   `0x0045E670`, activation callers `0x00579D60`, `0x00584750`,
   `0x005B4FF0`/`0x005B5880`, object event table `0x006E19B0` entry 1 =
   `0x00581490`, mode change `0x00624690`/`0x00624390`.
+- §11 (read 2026-10-08): act change `0x0053ACC0` (`0x0053ACC0`–
+  `0x0053AEB1`), its call in the warp `0x0053AF4F` (ECX game, EDX the
+  client from `0x005531C0`), `0x0053FCE0`, `0x005386D0`, `0x00620BB0`,
+  `0x00650910`/`0x0064FB90`, `0x00554670`; the tile index
+  pushes at `0x0057A672`, `0x0057A6F7`, `0x0057A77E`, `0x0057A7CE`,
+  `0x00584806`, `0x005B598B`, `0x0058505A`; `0x0054B830`'s warp calls
+  `0x0054B878`, `0x0054B90B`. D2MOO `LEVEL_ChangeAct` gave the name only.
 - Live tables: `patch_d2` `levels.txt` (39 waypoint rows, `Position`,
   `Act`) and `objects.txt` (16 waypoint classes; operate fns 15, 46, 73
   rows), measured with a script; `waypoints.tsv` is that measurement.
@@ -672,3 +782,10 @@ Save: the test character with Cold Plains has the section `5753
    entry travels (Lut Gholein, Kurast Docks, Pandemonium Fortress,
    back to the Rogue Encampment). Which client state decides the icon
    (the 0x63 record, a client copy of it, or another flag) is not known.
+9. Act change by NPC travel or a portal (§11 table, tile index 0 or 5):
+   no recording yet. Settle: record Tyrael's travel and the Harrogath
+   portal (operate 73) to level 109, and Meshif to 75: the level-seed
+   `roll(n)` of the spawn search (`0x0066ACB3`), the S→C order (0x05,
+   0x03, 0x53, 0x07 …, 0x15) and the player's arrival point; also
+   whether the old act's removals contain a 0x0A for the player's own
+   GUID (§11 step 10 says no).

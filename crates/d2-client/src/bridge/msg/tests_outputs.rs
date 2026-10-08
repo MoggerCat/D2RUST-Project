@@ -320,6 +320,7 @@ fn play_sound_captures_key_and_class() {
         [Output::ServerSound {
             unit: npc,
             class: 0x93,
+            at: None,
             event: 18
         }]
     );
@@ -331,9 +332,12 @@ fn play_sound_captures_key_and_class() {
 fn outputs_keep_message_order_and_capture_at_receive() {
     let mut m = Model::default();
     let npc = UnitKey::new(MONSTER, 0x26);
-    m.put(npc).class = 0x93;
+    let u = m.put(npc);
+    u.class = 0x93;
+    u.position = Some((5000, 4100));
     // One chunk: 0x2C on (1, 0x26), 0x77 0x10, then 0x0A removing the
-    // unit: the sound keeps the class read at receive.
+    // unit: the sound keeps the class and position read at receive, and
+    // the free appends its `UnitFreed` (§10 r3.1) after them.
     let chunk = [
         hex("2c 01 26 00 00 00 12 00"),
         hex("77 10"),
@@ -348,14 +352,40 @@ fn outputs_keep_message_order_and_capture_at_receive() {
             Output::ServerSound {
                 unit: npc,
                 class: 0x93,
+                at: Some((5000, 4100)),
                 event: 18
             },
             Output::TradeAction {
                 code: 0x10,
                 dead_or_absent: true
-            }
+            },
+            Output::UnitFreed { unit: npc }
         ]
     );
+}
+
+// Covers: specs/client/bridge.md §10 r3
+#[test]
+fn every_model_unit_free_appends_one_unit_freed() {
+    let mut m = Model::default();
+    let a = UnitKey::new(MONSTER, 0x26);
+    let b = UnitKey::new(MONSTER, 0x27);
+    m.put(a);
+    m.put(b);
+    // A key not in S frees nothing; two frees keep their order.
+    m.recv(
+        &[
+            hex("0a 01 30 00 00 00"),
+            hex("0a 01 27 00 00 00"),
+            hex("0a 01 26 00 00 00"),
+        ]
+        .concat(),
+    );
+    assert_eq!(
+        outs(&m),
+        [Output::UnitFreed { unit: b }, Output::UnitFreed { unit: a }]
+    );
+    assert!(m.w.freed.is_empty());
 }
 
 // --------------------------------------------------------------- 0x53

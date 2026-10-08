@@ -10,7 +10,7 @@ use std::collections::BTreeMap;
 use d2_proto::transport::{split_server_buffer, SplitError};
 
 use super::dispatch::{Dispatch, Handle, HandlerError, Message};
-use super::output::{Output, Outputs};
+use super::output::{move_freed, Output, Outputs};
 use super::world::{addressed_unit, ClientWorld, ModelInputs};
 
 /// Bytes a split discarded (§2 rule 3).
@@ -106,10 +106,14 @@ pub fn receive_chunk(
                     log.handled += 1;
                     report.handled += 1;
                     outputs.extend(sink.take());
+                    move_freed(world, outputs);
                 }
                 Err(error) => {
                     log.rejected.push(Rejected { id: msg.id, error });
                     report.rejected += 1;
+                    // A unit the handler freed before failing is gone
+                    // from the model: its free is still applied.
+                    move_freed(world, outputs);
                 }
             },
         }

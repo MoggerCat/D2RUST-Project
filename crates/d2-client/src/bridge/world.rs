@@ -662,6 +662,10 @@ pub struct ClientWorld {
     /// Set C and the client latches of the object functions
     /// (`world/objects-client.md` §27, `model.md` §2 rule 1).
     pub objclient: ClientObjects,
+    /// Units freed since the receive path last moved them out, in free
+    /// order: each becomes one `UnitFreed` output (`client/bridge.md` §10
+    /// r3.1 (a)).
+    pub freed: Vec<UnitKey>,
 }
 
 impl ClientWorld {
@@ -704,10 +708,12 @@ impl ClientWorld {
     }
 
     /// Removes the unit `key` (§2 rule 5): its queue is dropped
-    /// unapplied; the local player is cleared if it was that unit. A key
-    /// not in the set: nothing.
+    /// unapplied; the local player is cleared if it was that unit; the
+    /// free is recorded for its `UnitFreed` output (`client/bridge.md`
+    /// §10 r3.1). A key not in the set: nothing.
     pub fn remove(&mut self, key: UnitKey) -> Option<ClientUnit> {
         let unit = self.units.remove(&key)?;
+        self.freed.push(key);
         // The unit free leaves the room list (`unit-order.md` §5 rule 6).
         self.room_units.leave(key);
         if self.local_player == Some(key) {

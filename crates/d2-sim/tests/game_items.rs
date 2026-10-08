@@ -150,7 +150,7 @@ fn types_fit(t: &ItemTables, item: usize, row: &AffixRec) -> bool {
 
 /// `affixes.md` §1 rule 1: magic suffixes 0–746, prefixes 747–1,415,
 /// automagic 1,416–1,451 in 1.14d.
-// Claim once the first local run passes (note §1): specs/items/affixes.md §1 r1
+// Covers: specs/items/affixes.md §1 r1
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn live_affix_parts() {
@@ -175,7 +175,7 @@ fn live_qualityitems_count() {
 /// `quality.md` edge case 4: the unique rarity is read as 32 bits at
 /// +0x30; the two bytes above the u16 `rarity` are 0 in 1.14d, so the
 /// value read equals the column.
-// Claim once the first local run passes (note §1): specs/items/quality.md §edge-cases-original-bugs r4
+// Covers: specs/items/quality.md §edge-cases-original-bugs r4
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn live_unique_rarity_32_bits() {

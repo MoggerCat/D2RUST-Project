@@ -17,3 +17,5 @@
 
 ## Local check
 `D2_GAME_DIR=<game> cargo run -p d2-client -- play`: hover the run button, the menu button, the experience bar: the tip text appears over the strip. Open a stash: "Gold Max: 2500000" shows top-left. Tests: `cargo test -p d2-client --lib hud_tips stash_gold_max`.
+
+Local check done 2026-10-08 (PC 1 round 2, branch claude/local-pc1-s8): headless part passes (`hud_tips`, `stash_gold_max`); hover tips need a player.

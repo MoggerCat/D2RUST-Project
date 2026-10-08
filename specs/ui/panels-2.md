@@ -30,15 +30,15 @@
 |   17. Character panel details (`panels.md` §8; answers UP-6) | 246–360 |
 |   18. Inventory close button and click area (`panels.md` §9; answers UP-7, UP-8) | 361–385 |
 |   19. Skill tree input and draw order (`panels.md` §10; answers UP-21, UP-22, UP-23) | 386–456 |
-|   20. Stash and cube buttons (`panels.md` §11, §12; answers UP-10, `panels.md` OQ 13) | 457–524 |
-|   21. Gold amounts, gold buttons and the gold dialog (`panels.md` §9 r6, §11 r6; answers `panels.md` OQ 5) | 525–619 |
-|   22. d2rs widget answers (`client/ui.md` §B1, §B2; code `TODO(spec: ui/panels.md …)`) | 620–677 |
-| Constants & data dependencies | 678–692 |
-| Randomness | 693–697 |
-| Edge cases & original bugs | 698–718 |
-| Test vectors | 719–744 |
-| Provenance | 745–773 |
-| Open questions | 774–800 |
+|   20. Stash and cube buttons (`panels.md` §11, §12; answers UP-10, `panels.md` OQ 13) | 457–586 |
+|   21. Gold amounts, gold buttons and the gold dialog (`panels.md` §9 r6, §11 r6; answers `panels.md` OQ 5) | 587–681 |
+|   22. d2rs widget answers (`client/ui.md` §B1, §B2; code `TODO(spec: ui/panels.md …)`) | 682–739 |
+| Constants & data dependencies | 740–754 |
+| Randomness | 755–759 |
+| Edge cases & original bugs | 760–780 |
+| Test vectors | 781–810 |
+| Provenance | 811–841 |
+| Open questions | 842–868 |
 <!-- /index -->
 
 ## Summary
@@ -489,9 +489,15 @@ flag `[0x007C0A38 + 4i]` (−1 = not learnable, 0, 1 pressed), remap
    transmute rectangle with pressed → pressed := 0, C→S 0x4F 0x18. The
    draw's hover tool tips use the same strict rectangles (`0x0048F0D7`,
    `0x0048F11F`): `strClose` at (`sx + 289 − w / 2`, `H + sy − 100`),
-   `strUiMenu2` at (`sx + 158 − w / 2`, `H + sy − 223`).
-4. **Cube-gone close** (`0x0048EEB0`–`0x0048F183`): when `0x0044DA30()`
-   or `0x00463DF0()` is set in inventory mode 0x0E, the draw calls
+   `strUiMenu2` at (`sx + 158 − w / 2`, `H + sy − 223`). Both tips are
+   pop-up text (`0x00502280` `D2Win_SetPopUpUnicodeText`, colour 0, centre
+   0) in font 1 (set at `0x0048F0CA`), drawn later by `0x00503000` with the
+   box of `ui/control-panel.md` §5 r14; string ids 4144 (`strClose`,
+   `0x0048F0E0`) and 3341 (`strUiMenu2`, `0x0048F12C`).
+4. **Exit / dead close** (`0x0048EEB0`–`0x0048F183`): when `0x0044DA30()`
+   (exit flag) or `0x00463DF0()` (no local player, or its mode is 0x11
+   dead) is set in inventory mode 0x0E (the only tests at `0x0048EEB0`–
+   `0x0048EEC4`; a missing cube does not close, `world/cube.md` §11 r3), the draw calls
    `SetUIState(0x1A, off, 0)` with the mode still 0x0E and the latch
    `[0x007BCC54]` untouched. If ui 0x1A was open, its close hook (case
    0x1A of `0x00455AE0`, jump table `0x00455E80`: `0x00455DDD` →
@@ -521,6 +527,62 @@ flag `[0x007C0A38 + 4i]` (−1 = not learnable, 0, 1 pressed), remap
    (`ui/messages.md` §5 r4), and a frame in which a UI state changes
    runs the open / close hooks (`0x00455720`, `0x00455AE0`) whose menu
    builders are not covered here.
+7. **Transmute animation start** (answers REC-267 point 1; the draw and
+   step are `panels.md` §12.4). The start `0x0048A540` has one caller,
+   the item placement `0x004C2970` (`0x004C2AB7`), which S→C 0x9C runs
+   for actions 0x04 (`0x004C2AD0`), 0x0B / 0x0C (`0x004C3C00`) and 0x15
+   header mode 0 (`0x004C4C70`) (`client/msg-stats-items.md` §2 rule
+   5.3). After the item is placed in the owner's grid (`0x0063B210`,
+   `0x0063BCC0` both succeed), the start is reached only when the owner
+   is the local player (`0x00463DD0`, `0x004C2A89`), the stream
+   header's page byte (+0x10) is 3 (the cube page, `0x004C2A92`) and
+   the item's `items` record (`0x006335F0` on the unit's class) has
+   code `hst ` (0x20747368) or `qf2 ` (0x20326671)
+   (`0x004C2AA7`–`0x004C2AB5`). `0x0048A540(code)`:
+   1. R := the client quest record (`0x004B32D0`, `[0x007C0D43]`,
+      `client/msg-ui.md` §16 rule 7). R none → return, no animation.
+   2. `hst `: quest 10 bit 11 set in R (`0x0065C310(R, 10, 11)`) →
+      return; else set it (`0x0065C360(R, 10, 11)`). `qf2 `: the same
+      with quest 18 bit 11. This is a write to `[0x007C0D43]`'s record
+      that `client/msg-ui.md` §16 rule 7's writer list lacks; the next
+      0x28 copy overwrites it with the server's record.
+   3. Flag `[0x007BCC10]` := 1, n `[0x007BCC14]` := 0, stamp
+      `[0x007BCC18]` := `GetTickCount` (`[0x006CC260]`); cel
+      `[0x007BCC1C]` loaded (`0x004788B0`, path format `0x006D9D5C`
+      with the root `0x006D4118`) only when not loaded yet.
+   Consequences: the transmute button (r3, C→S 0x4F 0x18) starts
+   nothing; a transmute whose outputs are anything else (every other
+   `cubemain` record) shows no animation. The Horadric Staff shows it
+   once per difficulty while the client copy lacks 10.11 (the server
+   sets 10.11 after the transmute, `world/quests-act2.md` §4.9, and a
+   later 0x28 brings it). The server's Will hook sets no bit
+   (`world/quests-act3.md` §4.8), so after a 0x28 the copy lacks 18.11
+   again and a later Khalim's Will arriving in page 3 plays it again.
+   The animation has no sound of its own: `0x0048A540` and the step
+   (`0x0048F03E`–`0x0048F0C0`) call no sound function; the transmute's
+   sounds are the button click (sound 4, r2) and the server's sound
+   event 4 (S→C 0x2C, `world/cube.md` §8 Exact rule 3). Item arrival
+   order: the outputs' 0x9C action 4 come in the unit update after the
+   0x4F 0x18 (`world/cube.md` §8 Exact rule 2), so the first frame is
+   at that message's handling, not at the button release.
+   The step is wall-clock (`GetTickCount` at each cube draw, at most
+   one step per drawn frame) and the 1.14d in-game draw rate is itself
+   wall-clock (`render/capture.md` §3, `[0x007A04A8]`): with draws 40
+   ms apart each frame is held two draws (80 ms), at other rates it
+   differs; a capture records the per-draw `GetTickCount`.
+8. **Open latch** (answers REC-267 point 4). S→C 0x77 0x15 →
+   `0x0048A460` (no direct caller; the 0x77 table, `client/msg-ui.md` §3
+   0x15 row): `SetUIState(0x1A, on, 0)` (`0x00455F20`); only when that
+   returns non-zero: the close latch `[0x007BCC54]` := 0 at once,
+   inventory mode `[0x007BCBF0]` := 0x0E, `0x0044DA40()`, and the
+   button words `[0x007BCE30]`, `[0x007BCE40]`, `[0x007BCE44]`,
+   `[0x007BCE48]`, `[0x007BCE4C]` := 0. The open does not touch the
+   animation (`[0x007BCC10]`–`[0x007BCC1C]`). The close `0x0048A050`
+   (`panels.md` §12 r7) clears only the flag `[0x007BCC10]`; n, stamp
+   and the cel are cleared and the cel freed only by `0x0048A600`,
+   whose one caller is the game-UI teardown `0x00453D90`
+   (`0x00453DB3`). So a close stops the animation; reopening does not
+   restart it; the cel stays loaded for the rest of the game.
 
 ### 21. Gold amounts, gold buttons and the gold dialog (`panels.md` §9 r6, §11 r6; answers `panels.md` OQ 5)
 
@@ -734,7 +796,11 @@ Reproduced by default.
 | 640 × 480 shop, mouse down (100, 10) | tab 1 (if visible and not current) | §14.13 |
 | 640 × 480 shop (mode 3), mouse down (140, 400) | button 0 (116 < 140 < 161, 371 < 400 < 415) | §14.13 |
 | stash close (expansion, 640 × 480) press at (272, 416) / (273, 416) | none / pressed | §20.1 |
-| cube vanishes while ui 0x1A open | 0x4F 0x17 twice | §20.4 |
+| exit flag or dead local player while ui 0x1A open | 0x4F 0x17 twice | §20.4 |
+| cube item leaves the inventory while ui 0x1A open | panel stays open, no 0x4F 0x17 | §20.4; `world/cube.md` §11 r3 |
+| 0x9C action 4, owner the local player, page byte 3, code `hst `, client record 10.11 clear | 10.11 set in the client record; animation flag 1, n 0 | §20.7 |
+| same, 10.11 already set; or page byte 0; or code `gfv ` | no animation | §20.7 |
+| 0x77 0x15 while an animation runs | latch 0, mode 0x0E; animation untouched | §20.8 |
 | 800 × 600, inventory open, 1,234 gold | `1234` at (508, 468) Font16; button frame 0 at (484, 469) | §21.1 |
 | 640 × 480 expansion stash, 50,000 in stash | `50000` at (165, 40); button at (75, 40) | §21.1 |
 | deposit dialog OK with 70,000 | `4F 14 00 01 00 70 11` | §21.8 |
@@ -759,6 +825,8 @@ skill tree `0x004AB7E0`, `0x004ABC30`, `0x004AB5F0`, `0x004AB630`,
 `0x004AB310`, `0x004AC690`, `0x004AC200`, `0x004ABF60`; stash / cube
 `0x00492510`, `0x00489920`, `0x00489980`, `0x004927C0`, `0x00489FB0`,
 `0x0048A000`, `0x0048A190`, `0x0048EDF0`, close hook `0x00455AE0`;
+cube animation and latch (2026-10-08, REC-267) `0x004C2970` (`0x004C2A89`–`0x004C2AB7`),
+`0x0048A540`, `0x0048A460`, `0x0048A600` (caller `0x00453D90`), `0x0048A050`;
 gold `0x00488100` (call sites `0x0048EE72`, `0x0048F350`, `0x0048FF31`
 with ECX 2, 0, 1), `0x00486820`, `0x00486DA0`, `0x00492310`,
 `0x00489AC0`, dialog `0x00454150` (table `0x00454558`), `0x00453EE0`,

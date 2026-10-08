@@ -17,3 +17,5 @@ Hook into the host: feed `LoadEvent`s from the bridge (0x03/0x04/0x05/0x61 and g
 
 ## Local check
 `cargo test -p d2-client --test front_end loading` — 3 pass. No visible change in `play` yet.
+
+Local check done 2026-10-08 (PC 1 round 2, branch claude/local-pc1-s8): headless part passes (the whole `front_end` binary, 12 pass).

@@ -38,7 +38,7 @@
 | Edge cases & original bugs | 394–405 |
 | Test vectors | 406–416 |
 | Provenance | 417–436 |
-| Open questions | 437–486 |
+| Open questions | 437–495 |
 <!-- /index -->
 
 ## Summary
@@ -483,3 +483,12 @@ re-hashing and diffing the PNG indices. Recorder design follows
    while not paused contradict `camera.md` §9 ("passes without a tick do
    not draw"); the `frames-raw-2` `client_update` counter shows whether a
    client update ran.
+   *Answered* (static, 2026-10-08, asm `0x0044EFA0`; `camera.md` §9
+   cases 1–2): paused passes draw through `0x0044F017` without advancing
+   `[0x007A0494]` (a source of the frames where the draw counter did not
+   advance), and in the catch-up hold (`[0x007A04BC]`: 10 s after an act
+   load, 2 s after the act set-up, 3 s after a local S→C 0x15 room
+   move) every pass with ≥ 40 ms on the client clock draws, tick or not.
+   Each frame carries its own tick and state (§4), so these frames lose
+   no comparison. The recording check that run 1's 0-tick frames fall in
+   such windows (or are paused) is on the PC 2 list.

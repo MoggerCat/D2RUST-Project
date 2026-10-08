@@ -9,6 +9,31 @@
 - **Crate/module:** `d2-formats::dcc`
 - **Related specs:** `specs/formats/cof.md`, `specs/formats/palette.md`
 
+<!-- index -->
+| Section | Lines |
+|---|---|
+| Summary | 37–44 |
+| Inputs | 45–50 |
+| Outputs / state changes | 51–56 |
+| Rules | 57–58 |
+|   Bit reading | 59–67 |
+|   File header (little-endian bytes) | 68–82 |
+|   Direction header (bits) | 83–129 |
+|   Boxes | 130–142 |
+|   Coded bytes | 143–155 |
+|   Frame size limit | 156–175 |
+|   Cells | 176–193 |
+|   Stage 1: cell colors (all frames, in order) | 194–218 |
+|   Stage 2: building frames (all frames, in order, after stage 1) | 219–241 |
+|   End checks | 242–247 |
+| Constants & data dependencies | 248–251 |
+| Randomness | 252–255 |
+| Edge cases & original bugs | 256–264 |
+| Test vectors | 265–276 |
+| Provenance | 277–287 |
+| Open questions | 288–305 |
+<!-- /index -->
+
 ## Summary
 
 DCC stores the animations of units, missiles and many objects: `D`
@@ -114,6 +139,39 @@ direction box larger than 16M pixels, is an error. So is a frame box corner
 outside the i32 range, and direction boxes adding up to more than 0x400_0000
 (64M) pixels over the whole file (implementation limits: a few header bits
 can make a box, and the work to decode it, large; see Open questions).
+
+### Coded bytes
+
+A frame's `coded bytes` field is the length of the frame re-encoded as a
+DC6 row stream (`dc6.md` §Pixel decoding): rows bottom first, per row a
+skip byte `0x80 | n` (n ≤ 127) for each run of 0s before a non-0 pixel,
+a copy byte `n` (n ≤ 127) plus n pixels for each run of non-0s,
+trailing 0s not coded, `0x80` ending the row. 1.14d builds each cel
+this way (`0x0060BDB0`) with `coded bytes` as the DC6 `length`, and ends
+the process ("Sprite Decompression Error", fatal `0x660`, `0x0060BFF0`)
+when the encoding's length differs. Every live frame matches (game-file
+read 2026-10-08: all 3,305,132 frames of the 21,717 DCCs of `d2data`,
+`d2exp`, `d2char`).
+
+### Frame size limit
+
+1.14d's sprite cache never draws a frame with width or height > 256
+(owner of the draw rule: `render/sprite-placement.md` §3). The live
+frames over the limit (same read; repo parser, no override in `d2exp`
+or by name in `Patch_D2.mpq`):
+
+| File | Frames over 256 | Loaded by 1.14d? |
+|---|---|---|
+| `monsters\GT\TR\GTTRLITA1HTH.dcc` | all 20 (4 dirs × 5), 345 × 324, offset (−319, 240) | yes: monster `gargoyletrap` (`GT`, `TR` layer in `GTA1HTH.COF`), placed by 17 `monpreset` presets in 11 Act 1 `.ds1` files (`ACT1\BARRACKS\jail*`, `ACT1\CATACOMB\cat*`) |
+| `monsters\GT\TR\GTTRLITNUHTH.dcc` | all 4, 345 × 324 | yes, as above (`GTNUHTH.COF`) |
+| `monsters\TH\S1\THS1LITDTHTH.dcc` | 12 (dirs 1, 2, 5, 6, 7; frames 8–10), heights 257–274 | no: `THDTHTH.COF` has layers TR, HD, LA, RA only, no S1 |
+| `overlays\RedemptionGhost Big.dcc` | frame 15, 257 × 214 | no: named by no table (`overlay.txt`, `missiles.txt` name only `missiles\RedemptionGhost`) and not by `Game.exe` |
+
+Each gargoyle-trap frame has 3,629 non-0 pixels spread over the whole
+345 × 324 box. Open (capture "gargoyle trap on screen"): whether 1.14d
+draws these frames, draws nothing, or aborts with `0x58C` when a
+gargoyle trap is on screen (walk the room of `catNEtheme1.ds1`, which
+holds 3 presets, or any listed Jail room).
 
 ### Cells
 
@@ -222,7 +280,10 @@ Paul Siramy's DCC decoding documentation (community), cross-checked
 against Riiablo (Apache-2.0) `codec/DCC.java` (frame-cell sizes,
 persistent frame buffer, cell copy rule) and `file/Dcc.java` (header and
 stream layout, `ENCODED_BITS`). No Blizzard code or decompiler output was
-consulted.
+consulted for the decoding rules. §Coded bytes and §Frame size limit:
+1.14d `Game.exe` `0x0060BFF0` (frame header → cel), `0x0060BDB0`
+(re-encoding, length check), `0x005FEC90`/`0x005FEB80` (256 limit);
+counts by a scratch program over the repo parser (2026-10-08).
 
 ## Open questions
 

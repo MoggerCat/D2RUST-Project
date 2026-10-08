@@ -117,7 +117,7 @@ fn probs(tc: &TreasureClass) -> Vec<i32> {
 // ------------------------------------------------------------ §1 vectors
 
 /// Test vector "TC count, kinds" and the measurements of §1.3 and §1.5.
-// Claim once the first local run passes (note §1): specs/items/treasure.md §1.3 text, §1.5 text
+// Covers: specs/items/treasure.md §1.3 text, §1.5 text
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn live_tc_counts_and_kinds() {
@@ -165,7 +165,7 @@ fn live_tc_counts_and_kinds() {
 
 /// §1.3: the itemtypes records with `treasureclass` ≠ 0, the group
 /// offset `A` and the automatic TC names and levels; record 38 is `tpot`.
-// Claim once the first local run passes (note §1): specs/items/treasure.md §1.3 text
+// Covers: specs/items/treasure.md §1.3 text
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn live_automatic_tcs() {
@@ -205,7 +205,7 @@ fn live_automatic_tcs() {
 }
 
 /// Test vector `Act 1 H2H A` (§1.4).
-// Claim once the first local run passes (note §1): specs/items/treasure.md §1.4
+// Covers: specs/items/treasure.md §1.4
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn live_act1_h2h_a() {
@@ -243,7 +243,7 @@ fn live_act1_h2h_a() {
 
 /// Test vector `ROP (N)` (§1.5): a TC entry and the `Annihilus` unique
 /// entry (expansion only).
-// Claim once the first local run passes (note §1): specs/items/treasure.md §1.5 r4
+// Covers: specs/items/treasure.md §1.5 r4
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn live_rop_n() {
@@ -266,7 +266,7 @@ fn live_rop_n() {
 }
 
 /// Test vector `Act 1 Champ A` (§1.4): negative picks and two TC entries.
-// Claim once the first local run passes (note §1): specs/items/treasure.md §1.4
+// Covers: specs/items/treasure.md §1.4
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn live_act1_champ_a() {
@@ -298,7 +298,7 @@ fn live_tcx_slots_5_6_zero() {
 
 /// Test vector "chest table": all 45 chest TCs found, `Act 1 Chest A` =
 /// TC 385 (§1.6).
-// Claim once the first local run passes (note §1): specs/items/treasure.md §1.6
+// Covers: specs/items/treasure.md §1.6
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn live_chest_table() {
@@ -320,7 +320,7 @@ fn live_chest_table() {
 
 /// Test vectors `get(430, 40)`, `get(430, 0)`, `get(430, 85)`,
 /// `get(0, 40)` (§2).
-// Claim once the first local run passes (note §1): specs/items/treasure.md §2
+// Covers: specs/items/treasure.md §2
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn live_get_by_level() {
@@ -344,7 +344,7 @@ fn live_get_by_level() {
 
 /// Test vectors "chest tier" (§4 steps 2–5): expansion Normal act 0 and
 /// expansion Hell act 4.
-// Claim once the first local run passes (note §1): specs/items/treasure.md §4 r2, §4 r4
+// Covers: specs/items/treasure.md §4 r2, §4 r4
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn live_chest_tiers() {
@@ -372,7 +372,7 @@ fn live_chest_tiers() {
 /// `n` = 2…8 the binary64 result equals the exact rational form
 /// floor(C·n0^n / ((n0 + C)^n − n0^n)), which the spec states is a valid
 /// check on the live data.
-// Claim once the first local run passes (note §1): specs/items/treasure.md §5.4 r5
+// Covers: specs/items/treasure.md §5.4 r5
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn live_nodrop_pairs() {
@@ -416,7 +416,7 @@ fn live_ratio_rows_are_version_1() {
 /// §6 on every item: no fatal error, a quality 1–7, step 2's direct
 /// results exact, and the gates of `treasure-quality.tsv` kept; for
 /// every live slot-mod set, item level and magic find tried.
-// Claim once the first local run passes (note §1): specs/items/treasure.md §6 r2
+// Covers: specs/items/treasure.md §6 r2
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn sweep_drop_quality_every_item() {

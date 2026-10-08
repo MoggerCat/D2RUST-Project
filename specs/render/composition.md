@@ -31,7 +31,7 @@
 | Edge cases & original bugs | 306–315 |
 | Test vectors | 316–327 |
 | Provenance | 328–356 |
-| Open questions | 357–412 |
+| Open questions | 357–438 |
 <!-- /index -->
 
 ## Summary
@@ -399,6 +399,32 @@ Ghidra backlog (2026-10-06): act palette at game start from
    screen each of `0x0044CB60`, `0x004565E0`, `0x0045FDE0`,
    `0x00460190`, `0x00460490` draws (Ghidra read of their state-table
    owners, owner `client/ui.md`), for `ui/` capture cases.
+   *Answered* (static, 2026-10-08; image pointer scan and asm, including
+   code the export's function list misses, `0x00460490`–`0x0046072D`):
+   - `0x0044CB60`: the join-refused error screen (string of error m,
+     `client/model.md` §6 r2, `formats/d2s-load.md` rule 1).
+   - `0x004565E0`: one loading-screen draw (`ui/frontend-loading.md` L4).
+   - `0x0045FDE0`, `0x00460190`: draw slots 1 and 2 of the frame-draw
+     table `0x0070EF0C` (slot 0 = `0x0044C990`); `0x0044C930(n)` sets
+     `[0x007A0480]` := n and `[0x007A0484]` := slot n. Both serve the
+     popup screens of the act-video player `0x00482EF0` (`client/msg-ui.md`
+     §20, S→C 0x61): its callbacks `0x00460500` / `0x004605A0` (popup 1)
+     and `0x00460680` (popup 2) load `Data\Global\UI\Bigmenu\popupok`
+     (twice) and `Data\Global\UI\Menu\okcancelbtn` (`0x004788B0`;
+     strings `0x006D6A14`, `0x006D69F4`), set slot 1 (popup 1) or 2
+     (popup 2), run the modal loop `0x00451BB0` with the per-pass draw
+     `0x00460490` (popup 1: `StartDraw(1, 0, 0, 0)` at `0x004604A3`,
+     fill, palette, `0x0045FBC0(1)`, `0x0045FC60`, `0x0045FD20`,
+     `0x0045FD80`, cursor `0x004684C0`, `EndDraw`) or `0x00460640` (→
+     `0x00460190`: the same with `0x0045FBC0(0)`, `0x0045FFC0`,
+     `0x00460060`, `0x004600F0`), then set slot 0 again. `0x00482EF0`
+     picks popup 1 or 2 by a flag (`0x00483081`–`0x0048308F`; 1 when a
+     result is 6, `0x0048307A`) and also hands `0x00460500` /
+     `0x004605A0` to `0x004FAEC0` at its exit (`0x004832E6`). The
+     popups' layout and text belong to `client/ui.md`.
+   - `0x0044D100` (beta screens) and `0x0044E770` (end-game screen):
+     callbacks of the game-loop wait `0x0044F360` (`0x0044F61E`,
+     `0x0044F66E`, `0x0044F72B`).
 4. ~~What sets the post-draw clear counter~~: the act load (S→C 0x03,
    §3 step 4).
 5. ~~Act palette at game start outside act 1~~: answered in §4 (the act

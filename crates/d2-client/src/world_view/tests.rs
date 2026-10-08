@@ -1104,6 +1104,7 @@ fn outputs_reach_the_ui_and_the_sound_requests_in_order() {
             SoundRequest::Server {
                 unit: UnitKey::new(2, 13),
                 class: 37,
+                at: Some((0x1214, 0x11C0)),
                 event: 13
             }
         ]

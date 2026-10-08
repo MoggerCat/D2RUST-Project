@@ -13,3 +13,5 @@ Branch `claude/q-menu-credits`. File `crates/d2-client/src/ui/front_end/screens/
 
 ## Local check
 `cargo nextest run -p d2-client --lib credits; cargo nextest run -p d2-client --test front_end_credits` — all pass.
+
+Local check done 2026-10-08 (PC 1 round 2, branch claude/local-pc1-s8): headless part passes (`front_end_credits` 2; `--lib credits` in a 21-test lib run all pass).

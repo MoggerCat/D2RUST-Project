@@ -26,23 +26,23 @@
 | Outputs / state changes | 70–77 |
 | Rules | 78–83 |
 |   1. Paths | 84–96 |
-|   2. Archive search order | 97–136 |
-|   3. Choosing `.bin` or `.txt` | 137–200 |
-|   4. The `.bin` container | 201–252 |
-|   5. `.txt` record counting | 253–264 |
-|   6. Load order and record sizes (runtime tables) | 265–352 |
-|   7. Links and dependencies | 353–489 |
-|   8. Post-load checks (fatal in 1.14d) | 490–538 |
-|   9. Combined index spaces | 539–553 |
-|   10. Special cases | 554–612 |
-|   11. Txt vs bin cross-check | 613–653 |
-| Constants & data dependencies | 654–674 |
-| Randomness | 675–678 |
-| Edge cases & original bugs | 679–695 |
-| d2-data policy | 696–722 |
-| Test vectors | 723–756 |
-| Provenance | 757–845 |
-| Open questions | 846–915 |
+|   2. Archive search order | 97–153 |
+|   3. Choosing `.bin` or `.txt` | 154–217 |
+|   4. The `.bin` container | 218–275 |
+|   5. `.txt` record counting | 276–287 |
+|   6. Load order and record sizes (runtime tables) | 288–375 |
+|   7. Links and dependencies | 376–512 |
+|   8. Post-load checks (fatal in 1.14d) | 513–561 |
+|   9. Combined index spaces | 562–576 |
+|   10. Special cases | 577–646 |
+|   11. Txt vs bin cross-check | 647–687 |
+| Constants & data dependencies | 688–708 |
+| Randomness | 709–712 |
+| Edge cases & original bugs | 713–729 |
+| d2-data policy | 730–756 |
+| Test vectors | 757–793 |
+| Provenance | 794–882 |
+| Open questions | 883–974 |
 <!-- /index -->
 
 ## Summary
@@ -130,6 +130,23 @@ second group opens after the startup group and the video path last (Open
 question 1): `patch_d2`, `d2xvideo`, `d2xtalk`, `d2xmusic`, `d2exp`,
 `d2video`, `d2music`, `d2char`, `d2speech`, `d2sfx`, `d2data`. Excel
 lookups need only P → X → D, so they do not depend on that assumption.
+
+**Loose files.** The archive layer's open (`0x004068E0` → `0x00419980`
+→ `0x004192F0`) consults the disk only through its direct-access flags
+`0x00779058` (read by `0x00418B50`). Those are set once at startup from
+the launcher config byte +0x204, the `-direct` switch
+(`tools/original-hooks.md` §5.1; `0x00405C55` → `0x00406870` →
+`0x00415F70`, the only writer). Bit 0 or 1 set: before the first archive
+is searched, the lookup `0x00417F10` tests the name on disk
+(`0x00415B00`; bit 1: a path derived from the name by `0x00415A80`;
+bit 0: the name itself, used as-is when it starts with `\` or contains
+`:\` or `\\` (a UNC path); a hit is an existing non-directory per
+`GetFileAttributesA`, `0x00415940`) and opens that file with
+`CreateFileA` instead (result kind 2). With the flags 0 and at least one
+archive open, no disk file is ever read. Normal play passes no
+`-direct`, so 1.14d reads every data file from the archives. (With no
+archive open and flags 0, `0x00418B50` returns bit 0: disk only; not a
+case d2rs meets.)
 With this order every live `.bin` resolves to the archive §6 names (56 P,
 17 X; confirmed by bin cross-check). d2rs does not open `d2delta` or
 `d2kfixup`.
@@ -246,9 +263,15 @@ size. There is no count header and no record size.
 
 They exist only in P. In `-txt` mode each is rewritten from the formula
 columns of its "Compiled from" tables (`calc-expressions.md` §1.1). A
-missing code file does not abort loading; evaluating a formula with an
-absent buffer gives 0 (`calc-expressions.md` §3.1 and its open question
-4). d2rs treats a missing code file as a load error.
+missing code file does not abort loading: the code-file loader
+`0x00613E90` reads through `0x00612280` → `0x00517079`, whose open step
+`0x00516E46` on failure only writes the log line `Error opening file: %s`
+(`0x00410610`, a non-fatal log) and returns 0. The loader then stores a
+null buffer pointer and copies its never-written local size variable
+into the size field (an uninitialized stack value). The evaluator
+entries test the pointer before the size (e.g. `0x0064B812`), so every
+formula of that family evaluates to 0 (`calc-expressions.md` §3.1).
+d2rs treats a missing code file as a load error.
 
 ### 5. `.txt` record counting
 
@@ -606,9 +629,20 @@ Suffixes come before prefixes in both affix arrays.
 8. **Counts not kept.** `arena`, `composit`, `armtype`, `experience` and
    `leveldefs` discard their count; the code relies on fixed sizes or on
    another table (levels). d2rs checks, besides the file size: `leveldefs`
-   count = `levels` count; `arena` 1, `composit` 16, `armtype` 3,
-   `experience` 101, exactly (the 1.14d counts, until the limits the code
-   relies on are known: Open question 12).
+   count = `levels` count, and the lowest counts the code relies on
+   (Open question 12): `arena` ≥ 1 (only row 0 is read: the accessor
+   `0x00664AB0` is fatal for a type ≥ 1, error 0x41, and the game's arena
+   type +4 is zeroed at creation `0x0053F4D3` and never written);
+   `composit` ≥ 16 (the client composite init reads rows 0–15,
+   `0x004DA7A4`–`0x004DA7C2`, no bound in the accessor `0x0065B5E0`);
+   `armtype` ≥ 3 and > the largest `rArm`, `lArm`, `torso`, `legs`,
+   `rspad`, `lspad` byte of any weapons / armor / misc row (items
+   +0x116–+0x11B; rows 0–2 read at `0x004DA891`–`0x004DA8AB`, and the
+   item-graphics path `0x0063E5BC` indexes it with that byte through
+   `0x0064F500`, no bound in the accessor `0x0065B620`; 1.14d: largest
+   byte 2); `experience` ≥ max(MaxLvl) + 2 (MaxLvl = row 0's 7 class
+   values; Open question 12). Rows past these limits are loaded and never read. 1.14d
+   counts: 1, 16, 3, 101.
 
 ### 11. Txt vs bin cross-check
 
@@ -712,8 +746,8 @@ Decided 2026-10-05 and logged in the `docs/PLAN.md` decisions log.
 4. Mod patch layers: `patch-layers.md` (they patch `.txt` cells only;
    under `Ruleset::Mod` every table is compiled from text). Never by
    editing or shipping `.bin` files.
-5. Not reproduced: `-txt` mode, loose files on disk, the dead `.txt`
-   runtime branch, classic installs (`d2exp.mpq` is required, so every
+5. Not reproduced: `-txt` mode, loose files on disk (`-direct`, §2), the
+   dead `.txt` runtime branch, classic installs (`d2exp.mpq` is required, so every
    "d2exp exists" branch takes the expansion path; Open question 6).
    Presence of `runessrv.*` or `cubeserver.*` is reported as an error,
    like 1.14d.
@@ -750,6 +784,9 @@ Decided 2026-10-05 and logged in the `docs/PLAN.md` decisions log.
 | `automap` row with LevelName `6 Town` | load error | §8 |
 | `chartemplate` rows with Level 9, then 3 | load error | §8 |
 | `experience` count 100, or `leveldefs` count ≠ `levels` count | load error | §10.8 |
+| `arena` 0 / 2, `composit` 15 / 17, `armtype` 2 / 4 records (size valid) | load error / valid | §10.8 |
+| `armtype` 3 records and an armor row with `torso` 3 | load error | §10.8 |
+| `experience` 102 records (row 0 MaxLvl 99 for all classes) / 101 with one class MaxLvl 100 | valid / load error | §10.8 |
 | P `monstats.bin` record 0 `TreasureClass1` (u16 +0x86) | 430 = 161 + 269 (`treasureclassex` row 269 `Act 1 H2H A`) | §10.6 |
 | P `uniqueitems.bin` record 5, after fix-up | u16 +0x00 = 5 (file: 0) | `fixups.md` §6 |
 | an archive set (or test lookup stub) in which `runessrv.txt` resolves | load error before `runes` | §3.3 |
@@ -851,11 +888,15 @@ the 1.14d data files. Addresses are virtual addresses in `Game.exe`.
    other files §2 contradicts `mpq.md`'s provisional order (e.g. `d2data`
    last here, 6th there); `mpq.md` open question 1 should take §2 as
    input.
-2. Whether the archive layer also reads loose files from disk (a disk
-   branch exists in the file-open routine; a `direct` option exists in the
-   command table). Not traced; d2rs ignores loose files.
-3. In `-txt` mode, whether the freshly written `.bin` (disk) or the MPQ copy
-   is read back depends on question 2.
+2. Answered (static, 1.14d `0x004192F0`, `0x00417F10`, `0x00418B50`,
+   `0x00415F70`): loose files are read only with `-direct` (§2 "Loose
+   files"); d2rs ignores loose files, as 1.14d without `-direct`.
+3. Answered (follows from 2): the table loader `0x006122F0` and the
+   code-file loader `0x00613E90` read the `.bin` through `0x00612280` →
+   `0x00517079`, the archive open. In `-txt` mode without `-direct` the
+   MPQ copy is read back (the `.bin` just written to
+   `DATA\GLOBAL\EXCEL` on disk is ignored); with `-direct` the disk
+   `.bin` wins.
 4. Answered: the field compiler rules are `txt-format.md` §6–§8 and
    `field-types.md`.
 5. Answered: byte-exact equality of every live `.bin` with its `.txt`
@@ -864,9 +905,8 @@ the 1.14d data files. Addresses are virtual addresses in `Game.exe`.
    by bin cross-check (§11, d2rs cross-check).
 6. How a 1.14d install without `d2exp.mpq` would load the 18 `.bin` files
    that exist only in X. Out of scope (d2rs requires LoD).
-7. Answered: evaluation with an absent code buffer gives 0
-   (`calc-expressions.md` §3.1); whether a missing file leaves the buffer
-   absent is its open question 4. d2rs requires the files.
+7. Answered: a missing code file leaves the buffer null and evaluation
+   gives 0 (§4.3, `calc-expressions.md` §3.1). d2rs requires the files.
 8. When the client composite loader (§3.5) and the sound loader (§3.4)
    first run relative to game start (both after the excel load).
 9. The DS1 handling inside the `lvlprest`/`lvlsub` loaders (which rows,
@@ -898,6 +938,25 @@ the 1.14d data files. Addresses are virtual addresses in `Game.exe`.
 12. The index limits the code relies on for `arena`, `composit`,
     `armtype` and `experience` (e.g. the highest level read from
     `experience`); until known, d2rs requires the 1.14d counts (§10.8).
+    *Partly answered* (static, 1.14d) for `experience`: no reader checks
+    the row count (table `[0x0096C8A8]`; readers `0x00611800`,
+    `0x00611830`, `0x00611860`, `combat/vitals.md` §4.1).
+    `level_from_exp` reads row i + 1 before its `i < MaxLvl` test
+    (`0x0061189F` then `0x00611895`), so it reads up to row MaxLvl + 1:
+    at least max(MaxLvl) + 2 rows (101 in 1.14d, MaxLvl 99). `threshold`
+    reads row L + 1 with no bound; its 13 callers pass the unit's level,
+    level − 1 (`0x00535A24`), level + 1 (`0x0058C62D`), MaxLvl − 1
+    (`0x0057E53B`) or constants. Whether the level + 1 caller can run at
+    level MaxLvl (row MaxLvl + 2, past 1.14d's 101 rows) is not traced;
+    `arena`, `composit`, `armtype` still open.
+    *Answered* (static, 2026-10-08): the level + 1 caller (`0x0058C5C0`)
+    first compares the unit's level (stat 12, `0x00625480`) with its
+    class's MaxLvl (`0x00611830`) and skips the call when level ≥ MaxLvl
+    (signed, `0x0058C61E` / `0x0058C624`), so it reads at most row
+    MaxLvl + 1 (`threshold` row index L + 1, `0x00611814`). The highest
+    row is MaxLvl + 1 for both readers: `experience` needs
+    max(MaxLvl) + 2 rows. Limits of `arena`, `composit`, `armtype`:
+    §10.8.
 13. Answered: the §7.4 algorithms are `fixups.md` and `runtime-maps.md`,
     which also cover the further maps found in the loaders (states,
     montype, monseq, monpreset, hireling, leveldefs, lvlsub, items; a

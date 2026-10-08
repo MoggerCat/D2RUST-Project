@@ -1,8 +1,10 @@
 # Spec: Formats — DS1 (map presets)
 
-- **Status:** implemented. All 2,456 `.ds1` files in 1.14d parse
-  (`mpq-tool formats`). Versions seen: 3, 8, 12, 13, 15, 16, 17, 18 (1,997
-  at v18).
+- **Status:** implemented. All 2,372 `.ds1` files in 1.14d parse
+  (`mpq-tool formats`, names compared case-insensitively, measured
+  2026-10-08; the earlier 2,456 counted names case-sensitively, so a file
+  under two spellings counted twice). Versions seen: 3, 8, 12, 13,
+  15, 16, 17, 18 (1,926 at v18).
 - **Target version:** 1.14d
 - **Crate/module:** `d2-formats::ds1`
 - **Related specs:** `specs/formats/dt1.md`
