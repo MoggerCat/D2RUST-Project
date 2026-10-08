@@ -29,6 +29,9 @@ refusal code (7, 9–15, `npc.md` §9).
    NPC could be met (the Act III rigs placed them in the Act I room).
    Fix: `town_npcs::act3_docks` and the allocation next to the Kurast
    Docks waypoint in `single_player::build_with_town` (REC-278).
+   Changed expectation: `app_single_player`'s game-seed count adds one
+   step per new NPC allocation (`rng.md` §5.3), as the earlier town fills
+   did.
 2. **The synthetic new character has no creation stats** (not fixed,
    staged in the rig). `GameParts::synthetic` has `vitals: None`, so
    `start_stats` (`init_player_stats`, `combat/vitals.md` §1) never runs:
