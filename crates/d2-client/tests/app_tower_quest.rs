@@ -123,8 +123,24 @@ fn the_tome_the_cellars_and_the_countess_run_chain_5() {
         }
     };
     assert_eq!(chain5(&server).0, 0);
-    // Blood Moor -> Black Marsh.
-    take(&mut app, tower::BLOOD_MOOR_TO_MARSH, tower::BLACK_MARSH);
+    // The Black Marsh hangs off the Dark Wood (q-a1-vis-links): put the
+    // player there.
+    app_support::with(&server, |l| {
+        let (p, _) = single_player::local_player(&l.host().game).unwrap();
+        l.host_mut()
+            .game
+            .events
+            .action
+            .hooks()
+            .act_changes
+            .push((p, tower::BLACK_MARSH, 0));
+    });
+    while server_level(&server) != Some(tower::BLACK_MARSH) {
+        step(&mut app);
+    }
+    for _ in 0..30 {
+        step(&mut app);
+    }
     // The tome (a quest object, operate function 6) opens the quest.
     let tome = find(&app, OBJECT, tower::TOME_CLASS).expect("the Moldy Tome in the model");
     interact(&mut app, tome);

@@ -564,7 +564,28 @@ fn blood_raven_dies_and_kashya_pays() {
     let kashya = talk(&mut app, &ms, &wire, 150);
     talk(&mut app, &ms, &wire, 150);
     assert_eq!(quest(&h, 2).0, 2, "started");
-    // Through the Blood Moor's second entrance to the Burial Grounds.
+    // The Burial Grounds hang off Cold Plains (q-a1-vis-links): cross the
+    // border there, then take its tile.
+    on_server(&h, |s| {
+        let (p, _) = single_player::local_player(s).unwrap();
+        s.events
+            .action
+            .hooks()
+            .act_changes
+            .push((p, single_player::COLD_PLAINS, 0));
+    });
+    for _ in 0..300 {
+        if level(&h) == Some(single_player::COLD_PLAINS) {
+            break;
+        }
+        step(&mut app, &ms, 1);
+    }
+    step(&mut app, &ms, 30);
+    let class = d2_client::app::synthetic_chains::slots(single_player::COLD_PLAINS)
+        .into_iter()
+        .find(|s| s.1 == d2_client::app::synthetic_burial::BURIAL_GROUNDS)
+        .expect("Cold Plains has a way to the Burial Grounds")
+        .2;
     let entrance = app
         .world()
         .resource::<BridgeResource>()
@@ -572,10 +593,7 @@ fn blood_raven_dies_and_kashya_pays() {
         .world()
         .units
         .iter()
-        .find(|(k, u)| {
-            k.unit_type == d2_client::bridge::world::TILE
-                && u.class == d2_client::app::synthetic_burial::BLOOD_MOOR_TO_BURIAL
-        })
+        .find(|(k, u)| k.unit_type == d2_client::bridge::world::TILE && u.class == class)
         .map(|(k, _)| *k)
         .expect("the Burial Grounds entrance reached the client");
     app.world_mut()
