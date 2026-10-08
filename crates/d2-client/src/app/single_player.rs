@@ -1820,6 +1820,20 @@ pub fn client_object_rows(data: &GameData) -> Vec<crate::bridge::objects::ObjCli
     }
 }
 
+/// The `objects.txt` `Name` of each class, for the mouse-over label
+/// (`world_view::object_label`; d2rs-own, unverified, REC-239).
+pub fn client_object_names(data: &GameData) -> Vec<String> {
+    data.tables()
+        .objects
+        .iter()
+        .map(|o| {
+            let n = &o.name;
+            let end = n.iter().position(|&b| b == 0).unwrap_or(n.len());
+            String::from_utf8_lossy(&n[..end]).into_owned()
+        })
+        .collect()
+}
+
 /// The `Levels.txt` fields the client reads (`client/model.md` §11
 /// rules 3–4: `Pal`, `Act`, `BlankScreen`; `audio/environment.md` §1 r2:
 /// `SoundEnv`), one row per level id, from the game's `levels` table.
@@ -2770,6 +2784,10 @@ pub fn build_with_town(
     world.inventory = parts.inventory.map(preview_inv_parts);
     // The cube (d2rs-own, unverified, REC-119): the user's `cubemain`.
     world.cube = parts.cube.map(preview_cube_parts);
+    // A new character carries the Horadric Cube (d2rs-own, unverified,
+    // REC-244): charstats gives none, and the preview has no Act II quest
+    // reward path yet.
+    world.start_extra = vec![*b"box "];
     let mut s: Sim = SimGame::with_world(game, sim, world);
     s.set_host_sync(sync_seams);
     s.set_world_sync(super::weapons::sync);
@@ -2890,6 +2908,7 @@ fn loader(
                 Ok((entry, report)) => {
                     // q-save-full: the save's items, made on the wired host.
                     let items_ok = super::save_full::join_items(s, player, save);
+                    super::save_gaps::join_gaps(s, player, save);
                     let log = &mut s.events.action.hooks().x.log;
                     log.extend(
                         report

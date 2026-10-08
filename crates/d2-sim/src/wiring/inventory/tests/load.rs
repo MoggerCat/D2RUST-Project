@@ -134,3 +134,39 @@ fn an_equipped_item_returns_to_its_body_location() {
     assert_eq!(w.state.body_items(p), [n]);
     assert_eq!(w.data(g).body_loc, 1);
 }
+
+/// Rule 5 (`d2s-load.md` §6): a stored item with the runeword flag whose
+/// sockets match no runeword row is freed on load.
+// Covers: specs/formats/d2s.md §8.2 r5
+#[test]
+fn a_stale_runeword_item_is_freed() {
+    let mut w = world();
+    let p = w.player;
+    let k = w.cursor_item(CAP);
+    let u = w.unit(k).unwrap();
+    w.items.get_mut(u).unwrap().inv_page = 0;
+    w.items.get_mut(u).unwrap().flags |= bitstream::hflag::RUNEWORD;
+    assert!(w.desk(|d| d.place(p, u, (4, 2), false, true)));
+    w.drain();
+    let e = entry_of(&mut w, u);
+    assert!(w.desk(|d| d.remove(p, u)));
+    w.desk(|d| d.free(u));
+    assert_eq!(
+        w.desk(|d| d.load_entry(p, &e)),
+        Err(LoadFault::StaleRuneword)
+    );
+    assert!(w.state.items_of(p).is_empty());
+}
+
+/// Without the runeword flag the same entry loads.
+#[test]
+fn an_item_without_the_runeword_flag_is_not_refreshed() {
+    let mut w = world();
+    let p = w.player;
+    let k = w.cursor_item(CAP);
+    let u = w.unit(k).unwrap();
+    w.items.get_mut(u).unwrap().inv_page = 0;
+    assert!(w.desk(|d| d.place(p, u, (4, 2), false, true)));
+    let e = entry_of(&mut w, u);
+    assert!(w.desk(|d| d.load_entry(p, &e)).is_ok());
+}

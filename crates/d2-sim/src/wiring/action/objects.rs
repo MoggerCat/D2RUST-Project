@@ -35,7 +35,8 @@ use crate::units::record::flags;
 use crate::units::{RoomId, UnitId, UnitType};
 use crate::world::objects::{
     self, ChestWorld, Created, Dispatch, EventRun, MiscWorld, ObjectControl, ObjectError,
-    ObjectTables, ObjectWorld, Operate, Operator, Preset, ShrineWorld, UpdateMessage,
+    ObjectTables, ObjectWorld, Operate, Operator, Preset, ShrineWorld, StateList, StateRequest,
+    UpdateMessage,
 };
 
 use super::{Pending, View, WiringError};
@@ -1227,6 +1228,45 @@ impl<X: Pending> ShrineWorld for ObjectView<'_, X> {
             r.hover = None;
         }
         self.v.h.session.overheads.remove(&obj);
+    }
+    /// The timed-state helper `0x0056E970` (`skills/bodies.md` §2.7) for a
+    /// shrine: a plain state list on the target ending `duration` frames
+    /// from now, the state on, and the type-12 timer that expires it
+    /// (`stat-lists.md` §10.4); a list of the same state is replaced.
+    // PROVISIONAL (d2rs-own, unverified; REC-239): the helper's refusals
+    // (state table check, curse and monster rules, higher-level keep) and
+    // the shrine remove callbacks `0x00583BD0` / `0x00583A40` (skill
+    // refresh, stamina restore) are not wired here: the expiry runs the
+    // stat list's own free and the state goes off with it.
+    fn apply_state(&mut self, req: StateRequest) -> Option<StateList> {
+        let (p, state) = (req.target, req.state);
+        let end = self.game.frame.wrapping_add(req.duration);
+        let owner = self.game.lists.unit(req.source).map(|e| (e.ty, e.guid));
+        if self.v.state_list(p, state).is_some() {
+            let st = u32::from(state);
+            self.v.stats.free_state_list(&mut *self.v.h, p, st);
+        }
+        let expire = if req.duration != 0 { end } else { 0 };
+        let l = self.v.create_state_list(p, state, owner, expire)?;
+        if req.stat != 0 || req.value != 0 {
+            self.v.set_list_stat(l, req.stat, req.value);
+        }
+        self.v.set_state(p, state, true);
+        let _ = self.game.lists.queue_update(p);
+        if req.duration != 0 {
+            if let Err(e) = self.game.schedule_event(p, 12, end, None, 0, 0) {
+                self.v.unit_error(e.into());
+            }
+        }
+        Some(StateList((p.0 << 8) | u32::from(state)))
+    }
+    /// A stat on a list [`Self::apply_state`] returned (the handle packs
+    /// the unit slot and the state).
+    fn set_list_stat(&mut self, list: StateList, id: u16, value: i32) {
+        let (unit, state) = (UnitId(list.0 >> 8), (list.0 & 0xFF) as u16);
+        if let Some(l) = self.v.state_list(unit, state) {
+            self.v.set_list_stat(l, id, value);
+        }
     }
     fn stat(&self, unit: UnitId, id: u16) -> i32 {
         self.v.stat(unit, id)

@@ -578,4 +578,4 @@ pub use tip::is_identify;
 
 #[cfg(test)]
 #[path = "inv_items_tests.rs"]
-mod tests;
+pub(crate) mod tests;

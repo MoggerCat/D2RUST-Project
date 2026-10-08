@@ -186,15 +186,10 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
         self.socket_runeword(target).0
     }
 
-    /// [`InvDesk::activate_runeword_on`], then the recharge `0x0055FE80`
-    /// (`generation.md` §12.2) that §7.19 step 3 runs after the timers
-    /// whenever a runeword row matched. Returns (runeword ran, the
-    /// recharged charged skills for the S→C 0x3E of step 4).
-    pub fn socket_runeword(&mut self, target: UnitId) -> (bool, Vec<Recharged>) {
-        let Some(it) = self.econ.items.get(target) else {
-            return (false, Vec::new());
-        };
-        let fillers: Vec<usize> = self
+    /// The socket count (stat 194) and the filler class ids of `target`'s
+    /// inventory in insertion order: the inputs of `properties.md` §10.1.
+    fn runeword_inputs(&self, target: UnitId) -> (u8, Vec<usize>) {
+        let fillers = self
             .state
             .inventories
             .get(&target)
@@ -206,6 +201,28 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
             })
             .unwrap_or_default();
         let sockets = self.econ.stats.unit_total(target, stat::NUMSOCKETS, 0) as u8;
+        (sockets, fillers)
+    }
+
+    /// Whether `target` still matches a runeword row (`properties.md`
+    /// §10.1, `0x0062BED0`).
+    pub fn runeword_matches(&self, target: UnitId) -> bool {
+        let Some(it) = self.econ.items.get(target) else {
+            return false;
+        };
+        let (sockets, fillers) = self.runeword_inputs(target);
+        props::runeword_row(self.econ.tables, it.record, it.quality, sockets, &fillers).is_some()
+    }
+
+    /// [`InvDesk::activate_runeword_on`], then the recharge `0x0055FE80`
+    /// (`generation.md` §12.2) that §7.19 step 3 runs after the timers
+    /// whenever a runeword row matched. Returns (runeword ran, the
+    /// recharged charged skills for the S→C 0x3E of step 4).
+    pub fn socket_runeword(&mut self, target: UnitId) -> (bool, Vec<Recharged>) {
+        let Some(it) = self.econ.items.get(target) else {
+            return (false, Vec::new());
+        };
+        let (sockets, fillers) = self.runeword_inputs(target);
         let Some(row) =
             props::runeword_row(self.econ.tables, it.record, it.quality, sockets, &fillers)
         else {

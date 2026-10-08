@@ -64,7 +64,10 @@ fn version_text_and_draw_order() {
     let d = f.draw();
     assert!(matches!(&d[0], DrawItem::Art { file, .. } if *file == BACKGROUND));
     assert!(matches!(&d[1], DrawItem::Art { file, .. } if *file == LOGO_LEFT));
-    assert!(matches!(&d[2], DrawItem::Art { file, .. } if *file == LOGO_RIGHT));
+    // §F1.5 r2: per logo half, the black base and then its fire overlay.
+    assert!(matches!(&d[2], DrawItem::Blend { mode: 3, .. }));
+    assert!(matches!(&d[3], DrawItem::Art { file, .. } if *file == LOGO_RIGHT));
+    assert!(matches!(&d[4], DrawItem::Blend { mode: 3, .. }));
     match d.last().unwrap() {
         DrawItem::Text { text, .. } => assert_eq!(text, "v 1.14d"),
         other => panic!("{other:?}"),

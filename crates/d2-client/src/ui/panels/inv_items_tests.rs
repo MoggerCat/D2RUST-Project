@@ -6,7 +6,7 @@ use crate::bridge::items::ItemArtRow;
 use crate::bridge::world::{ClientUnit, ItemData, ItemRecord, KindData, PlayerData, UnitKey};
 use crate::ui::draw::UiDraw;
 
-const PLAYER: UnitKey = UnitKey::new(0, 1);
+pub(crate) const PLAYER: UnitKey = UnitKey::new(0, 1);
 
 /// An item stream head (`items/bitstream.md` §2): flags, version, mode,
 /// location (body, x, y, page + 1), code.
@@ -40,9 +40,9 @@ fn stream(m: u8, loc: (u8, u16, u16, u8), code: &[u8; 4]) -> Vec<u8> {
 /// A world with the local player (class 0) and items (guid, mode,
 /// location, code); `cursor` names the cursor item.
 /// guid, mode, location (body, x, y, page + 1), code.
-type Fixture<'a> = (u32, u8, (u8, u16, u16, u8), &'a [u8; 4]);
+pub(crate) type Fixture<'a> = (u32, u8, (u8, u16, u16, u8), &'a [u8; 4]);
 
-fn world(items: &[Fixture], cursor: Option<u32>) -> ClientWorld {
+pub(crate) fn world(items: &[Fixture], cursor: Option<u32>) -> ClientWorld {
     let mut w = ClientWorld::default();
     let mut p = ClientUnit::new(PLAYER);
     p.kind = KindData::Player(PlayerData {
