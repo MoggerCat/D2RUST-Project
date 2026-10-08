@@ -135,6 +135,9 @@ fn equiv() -> EquivMatrix {
         m.bits[i * words] |= 1;
         m.bits[i * words + i / 32] |= 1 << (i % 32);
     }
+    // The cap's `helm` is `armo` (REC-281): armor base stats and stream.
+    let (h, a) = (usize::from(ty::HELM), usize::from(ty::ARMO));
+    m.bits[h * words + a / 32] |= 1 << (a % 32);
     m
 }
 

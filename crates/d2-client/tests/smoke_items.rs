@@ -156,6 +156,14 @@ impl Rig {
             .resource_mut::<BridgeResource>()
             .0
             .set_unit_rows(single_player::synthetic_unit_rows());
+        // The item tables the play app installs from the user's files
+        // (`app/play.rs`, `TableDecoder`): here the synthetic ones.
+        app.world_mut()
+            .resource_mut::<BridgeResource>()
+            .0
+            .set_item_tables(Arc::new(d2_client::app::items::TableDecoder(Arc::new(
+                d2_client::app::synthetic_items::item_tables(),
+            ))));
         app.update();
         let mut rig = Rig {
             app,
@@ -226,6 +234,35 @@ impl Rig {
         self.check(what);
     }
 
+    /// The smoke monster dies beside the player: the sword, the cap and
+    /// gold on the ground, announced.
+    fn monster_drop(&mut self) {
+        let (px, py) = self.player_at();
+        let m = self.place_monster(smoke::MONSTER, (px + 1, py));
+        self.step(5);
+        self.kill(m);
+        self.step(20);
+        self.check("monster drop");
+    }
+
+    /// The item's own value of `stat` on the server (its stat list total).
+    fn server_item_stat(&self, guid: u32, stat: u16) -> i32 {
+        app_support::with(&self.server, move |l| {
+            let g = &mut l.host_mut().game;
+            let u = g.game.lists.find_unit(UnitType::Item, guid).unwrap();
+            g.events
+                .action
+                .with(&mut g.game, |_, v| v.stats.unit_total(u, stat, 0))
+        })
+    }
+
+    /// The local player's (base, total) of `stat` in the client model.
+    fn client_stat(&self, stat: u16) -> (i32, i32) {
+        let w = self.bridge().world();
+        let me = w.local_player.unwrap();
+        (w.base(me, stat, 0), w.total(me, stat, 0))
+    }
+
     fn act_bytes(&mut self, what: &str, m: &[u8]) {
         self.send_bytes(m);
         self.step(8);
@@ -274,7 +311,8 @@ impl Rig {
                     out.insert(guid, (code, (mode::GROUND, 0, 0, x, y)));
                 } else if ours {
                     let d = data.unwrap();
-                    out.insert(guid, (code, (d.mode, d.body_loc, d.page, d.x, d.y)));
+                    let body = if d.mode == mode::BODY { d.body_loc } else { 0 };
+                    out.insert(guid, (code, (d.mode, body, d.page, d.x, d.y)));
                 }
             }
             out
@@ -288,9 +326,14 @@ impl Rig {
             .into_iter()
             .map(|i| {
                 // A ground item's page and body location mean nothing
-                // (compared as 0 on both sides).
+                // (compared as 0 on both sides); the body location only
+                // in mode 1 (the stream carries item data +0x44 as is,
+                // `bitstream.md` §4.1 rule 3; nothing clears it when the
+                // item leaves the body, `inventory-moves.md` §7.7).
                 let (body, page) = if i.mode == mode::GROUND {
                     (0, 0)
+                } else if i.mode != mode::BODY {
+                    (0, i.page)
                 } else {
                     (i.body, i.page)
                 };
@@ -434,29 +477,7 @@ fn drops_pick_up_grid_belt_cursor_and_ground() {
 
     // The chests: operated, one drops its treasure class (§8.1 rule 5:
     // a quarter of the plain chests drop nothing; three are placed).
-    let chests: Vec<UnitKey> = rig
-        .bridge()
-        .world()
-        .units
-        .iter()
-        .filter(|(k, u)| k.unit_type == OBJECT && u.class == single_player::SYNTHETIC_CHEST_CLASS)
-        .map(|(k, _)| *k)
-        .collect();
-    assert_eq!(chests.len(), CHESTS.len(), "the chests in the model");
-    for chest in chests {
-        let has_axe = |rig: &Rig| rig.server_items().values().any(|(c, _)| *c == smoke::AXE);
-        if has_axe(&rig) {
-            break;
-        }
-        rig.interact(chest);
-        rig.step(60);
-        rig.check("chest");
-        assert_ne!(
-            rig.bridge().world().units[&chest].mode,
-            0,
-            "the chest opened"
-        );
-    }
+    open_chests(&mut rig);
     for c in [
         smoke::AXE,
         smoke::POTION,
@@ -481,10 +502,16 @@ fn drops_pick_up_grid_belt_cursor_and_ground() {
         "the gold stat rose"
     );
 
-    // Pick-up to the inventory (auto placement) and to the cursor.
+    // Auto pick-up: the identified sword goes to the empty right hand
+    // (`inventory-moves.md` §8.1 step 5, `inventory.md` §4.7, §4.9); the
+    // axe (strength 32 > 10) fails §4.2 and goes to the grid (step 7).
     let sword = rig.guid(smoke::SWORD);
     rig.act("pick sword", &items::pick(sword, false));
-    assert_eq!(rig.place_of(sword).0, mode::STORED);
+    assert_eq!(rig.place_of(sword).0, mode::BODY);
+    assert_eq!(rig.place_of(sword).1, 4);
+    let axe = rig.guid(smoke::AXE);
+    rig.act("pick axe", &items::pick(axe, false));
+    assert_eq!(rig.place_of(axe).0, mode::STORED);
     let cap = rig.guid(smoke::CAP);
     rig.act("pick cap to cursor", &items::pick(cap, true));
     assert_eq!(rig.place_of(cap).0, mode::CURSOR);
@@ -539,16 +566,93 @@ fn a_far_pick_up_runs_to_the_item_and_picks_it() {
     rig.send(&items::pick(sword, false));
     for _ in 0..200 {
         rig.step(1);
-        if rig.place_of(sword).0 == mode::STORED {
+        if rig.place_of(sword).0 == mode::BODY {
             break;
         }
     }
     rig.step(10);
     rig.check("far pick-up");
-    assert_eq!(rig.place_of(sword).0, mode::STORED, "picked on arrival");
+    assert_eq!(rig.place_of(sword).0, mode::BODY, "picked on arrival");
     let (ax, ay) = rig.player_at();
     assert!(
         (ax - sx).abs().max((ay - sy).abs()) < 5,
         "the player ran to the item: ({ax}, {ay}) for ({sx}, {sy})"
     );
+}
+
+// Covers: specs/items/inventory-moves.md §7.5, §7.7; specs/items/inventory.md §4.2
+#[test]
+fn equip_unequip_requirements_and_weapon_swap() {
+    let mut rig = Rig::new();
+    rig.monster_drop();
+    let (cap, sword) = (rig.guid(smoke::CAP), rig.guid(smoke::SWORD));
+    // The cap to the head (body location 1) from the cursor.
+    rig.act("pick cap", &items::pick(cap, true));
+    let defense = rig.client_stat(31);
+    rig.act("equip cap", &items::equip(cap, 1));
+    assert_eq!(rig.place_of(cap).0, mode::BODY);
+    // The character panel's defense: base unchanged, total + the cap's
+    // (`client/stat-lists.md` §2: the equipped item's list adds).
+    let cap_def = rig.server_item_stat(cap, 31);
+    assert!(cap_def >= 3, "the cap's defense {cap_def}");
+    assert_eq!(rig.client_stat(31), (defense.0, defense.1 + cap_def));
+    // Unequip to the cursor (0x1C), back on.
+    rig.act_bytes("unequip cap", &[0x1C, 1, 0]);
+    assert_eq!(rig.place_of(cap).0, mode::CURSOR);
+    rig.act("equip cap again", &items::equip(cap, 1));
+    assert_eq!(rig.place_of(cap).0, mode::BODY);
+    // The sword to the right hand (4).
+    rig.act("pick sword", &items::pick(sword, true));
+    rig.act("equip sword", &items::equip(sword, 4));
+    assert_eq!(rig.place_of(sword).1, 4);
+    // W: the weapon switch (C→S 0x60): the sword goes to the switch
+    // slot (11), the empty second set comes to the hands.
+    rig.act_bytes("weapon swap", &[0x60]);
+    assert_eq!(rig.place_of(sword).1, 11);
+    // The axe needs strength 32: at 10, §4.6 step 2 (§4.3 with §4.2)
+    // fails, result 0, it stays on the cursor.
+    open_chests(&mut rig);
+    let axe = rig.guid(smoke::AXE);
+    rig.act("pick axe", &items::pick(axe, true));
+    rig.act("equip axe at strength 10", &items::equip(axe, 4));
+    assert_eq!(rig.place_of(axe).0, mode::CURSOR);
+    rig.set_base(0, 40);
+    rig.step(5);
+    rig.act("equip axe at strength 40", &items::equip(axe, 4));
+    assert_eq!((rig.place_of(axe).0, rig.place_of(axe).1), (mode::BODY, 4));
+    // W again: the sets trade places.
+    rig.act_bytes("weapon swap back", &[0x60]);
+    let hands = |rig: &Rig| [rig.place_of(sword).1, rig.place_of(axe).1];
+    assert_eq!(hands(&rig), [4, 11]);
+}
+
+/// The chests in the client model.
+fn chests(rig: &Rig) -> Vec<UnitKey> {
+    rig.bridge()
+        .world()
+        .units
+        .iter()
+        .filter(|(k, u)| k.unit_type == OBJECT && u.class == single_player::SYNTHETIC_CHEST_CLASS)
+        .map(|(k, _)| *k)
+        .collect()
+}
+
+/// Opens the chests until one dropped its class (§8.1 rule 5: a quarter
+/// of the plain chests drop nothing; three are placed).
+fn open_chests(rig: &mut Rig) {
+    let chests = chests(rig);
+    assert_eq!(chests.len(), CHESTS.len(), "the chests in the model");
+    for chest in chests {
+        if rig.server_items().values().any(|(c, _)| *c == smoke::AXE) {
+            break;
+        }
+        rig.interact(chest);
+        rig.step(60);
+        rig.check("chest");
+        assert_ne!(
+            rig.bridge().world().units[&chest].mode,
+            0,
+            "the chest opened"
+        );
+    }
 }
