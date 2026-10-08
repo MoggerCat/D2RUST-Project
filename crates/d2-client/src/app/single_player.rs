@@ -549,6 +549,9 @@ pub struct LocalSeams {
     /// The Act II DRLG's staff-tomb level (0 = not yet known), set when
     /// the acts are created (`q-a2-dungeons`).
     pub staff_tomb: u32,
+    /// The lair warp check's answer, published once per tick by the quest
+    /// control (`Pending::set_lair_open`, q-a2-duriel).
+    pub lair_open: bool,
     /// The players' hands and the facts of the items in them
     /// ([`super::weapons`], q-amazon).
     pub weapons: super::weapons::Weapons,
@@ -622,6 +625,23 @@ pub fn sync_seams(game: &Game, sim: &mut WorldSim<LocalSeams>) {
 }
 
 impl Pending for LocalSeams {
+    fn frame_event_index(&self, unit: UnitId) -> i32 {
+        LocalSeams::frame_event_index(self, unit)
+    }
+
+    fn set_frame_event_index(&mut self, unit: UnitId, i: i32) {
+        LocalSeams::set_frame_event_index(self, unit, i);
+    }
+
+    fn body_path_op(
+        &mut self,
+        unit: UnitId,
+        op: d2_sim::skills::use_::bodies::PathOp<UnitId>,
+    ) -> i32 {
+        LocalSeams::path_op(self, unit, op);
+        0
+    }
+
     /// Client flag 4 (`0x00538670`): the local character is hardcore.
     fn client_hardcore(&self, _player: UnitId) -> bool {
         self.hardcore
@@ -678,6 +698,38 @@ impl Pending for LocalSeams {
         } else {
             self.staff_tomb
         }
+    }
+    /// `0x00545B80` for level 73 (`quests.md` §8.2, `quests-act2.md`
+    /// §8.8): closed until the lair is open, and then only from the tomb
+    /// holding the orifice (d2rs-own, unverified, REC-167: the synthetic
+    /// Lair has a way in from every tomb).
+    fn warp_quest_gate(&self, source: u32, level: u32) -> u32 {
+        u32::from(
+            level == synthetic_act2::DURIELS_LAIR && !(self.lair_open && source == self.staff_tomb),
+        )
+    }
+    fn set_lair_open(&mut self, open: bool) {
+        self.lair_open = open;
+    }
+    /// C→S 0x44 (`quests-act2-2.md` §3.2): queued for the quest control
+    /// (REC-167, d2rs-own, unverified: it runs after the tick, not inside
+    /// the handler); the handler's own result is 0.
+    fn staff_in_orifice(
+        &mut self,
+        _: &mut Game,
+        player: UnitId,
+        object: u32,
+        item: u32,
+        action: u16,
+    ) -> Option<u32> {
+        self.quest_events
+            .push(d2_sim::wiring::action::QuestEvent::InsertItem {
+                player,
+                object,
+                item,
+                action,
+            });
+        Some(0)
     }
     fn take_quest_events(&mut self) -> Vec<d2_sim::wiring::action::QuestEvent> {
         std::mem::take(&mut self.quest_events)
@@ -738,6 +790,21 @@ impl Pending for LocalSeams {
     }
     fn item_is(&self, item: UnitId, itype: i32) -> bool {
         self.weapons.item_is(item, itype)
+    }
+    // d2rs-own, unverified (q-weapon-combat, REC-158): combat's weapon is
+    // the weapon in use; its damage reaches the wearer through the
+    // linked stat list.
+    fn current_weapon(&self, unit: UnitId) -> Option<UnitId> {
+        self.weapons.weapon(unit)
+    }
+    fn weapon(&self, unit: UnitId) -> Option<UnitId> {
+        self.weapons.weapon(unit)
+    }
+    fn item_at(&self, unit: UnitId, loc: u8) -> Option<UnitId> {
+        self.weapons.item_at(unit, loc)
+    }
+    fn wield_type(&self, item: UnitId) -> i32 {
+        self.weapons.facts(item).grip
     }
     fn item_shoots(&self, item: UnitId) -> bool {
         self.weapons.facts(item).shoots
@@ -1128,6 +1195,36 @@ impl WaypointTables {
         objects.push(portal);
         debug_assert_eq!(objects.len(), synthetic_tower::TOME_CLASS as usize);
         objects.push(tome);
+        // Class 100: Duriel's Lair entrance (a quest object, `quests-act2.md`
+        // §8.8; no operate here, the way in is the warp tile), and class
+        // 152: the orifice (operate 25, init 21). d2rs-own, unverified
+        // (REC-167).
+        for (class, operate, init) in [
+            (synthetic_act2::LAIR_ENTRANCE_CLASS, 0, 0),
+            (synthetic_act2::ORIFICE_CLASS, 25, 21),
+        ] {
+            let c = class as usize;
+            if objects.len() <= c {
+                objects.resize(c + 1, blank());
+            }
+            let mut row: Objects = blank();
+            row.operatefn = operate;
+            row.initfn = init;
+            row.framecnt1 = 15 << 8;
+            objects[c] = row;
+        }
+        // The Act IV endgame objects (q-a4-endgame), by class.
+        let last = synthetic_act4::OBJECT_ROWS.iter().map(|r| r.0).max();
+        objects.resize(
+            last.map_or(0, |c| c as usize + 1).max(objects.len()),
+            blank(),
+        );
+        for &(class, operate, init) in &synthetic_act4::OBJECT_ROWS {
+            let row = &mut objects[class as usize];
+            row.operatefn = operate;
+            row.initfn = init;
+            row.framecnt1 = 20 << 8;
+        }
         WaypointTables {
             levels,
             objects,
@@ -1625,7 +1722,12 @@ fn synthetic_types() -> Types {
             TileRect::new(24, 0, 8, 8),
         ),
         (synthetic_act4::RIVER_OF_FLAME, TileRect::new(32, 0, 8, 8)),
-        (synthetic_act4::CHAOS_SANCTUARY, TileRect::new(40, 0, 8, 8)),
+        // 40 × 40 tiles: the seal bosses stand up to 52 sub-tiles from
+        // their seals (`quests-act4.md` §5.4; q-a4-endgame).
+        (
+            synthetic_act4::CHAOS_SANCTUARY,
+            TileRect::new(40, 0, 40, 40),
+        ),
         (ACT5_TOWN, TileRect::new(0, 0, 8, 8)),
     ]);
     // The remaining chains' levels (q-levels-warps-all) that have no
@@ -1985,6 +2087,10 @@ fn synthetic_monstats() -> Vec<Monstats> {
     // Blood Raven (REC-130): a killable class, so the kill parse runs.
     v[synthetic_burial::BLOOD_RAVEN as usize].killable = true;
     v[synthetic_act4::IZUAL as usize].killable = true;
+    // The Act IV endgame bosses (q-a4-endgame).
+    for c in synthetic_act4::BOSSES {
+        v[c as usize].killable = true;
+    }
     v
 }
 

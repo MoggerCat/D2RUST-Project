@@ -148,6 +148,7 @@ impl<X: WorldPending> TickHooks for WorldSim<X> {
         self.host(game, |h| {
             let WorldHost { game, v, .. } = h;
             v.spawn_warp_tiles(game, r);
+            v.spawn_host_objects(game, r);
             // PROVISIONAL (REC-130): the monsters a level types provider
             // lists for the host (`HOST_MONSTER_PRESET`).
             for (u, class) in v.spawn_host_monsters(game, r) {

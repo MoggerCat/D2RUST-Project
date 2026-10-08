@@ -90,6 +90,15 @@ pub enum QuestEvent {
     BaalToStairs,
     /// Anya's AI asks for the temple portal (`0x0058BC80`, §6.7).
     AnyaOpenPortal { unit: UnitId },
+    /// C→S 0x44 reached `0x005852E0` (`quests-act2-2.md` §3.2): `player`
+    /// puts `item` (GUID, 0: none) into the object with GUID `object`
+    /// (`action` 2 cancel, 3 insert).
+    InsertItem {
+        player: UnitId,
+        object: u32,
+        item: u32,
+        action: u16,
+    },
 }
 
 /// Seams without a provider (see the module doc). Grouped by the spec
@@ -1687,6 +1696,16 @@ pub trait Pending {
     ) -> Option<u32> {
         None
     }
+    /// Quest warp gate `0x00545B80(source level, destination level)`
+    /// (`quests.md` §8.2; `path-placement.md` §12.2 rule 3): non-zero
+    /// blocks. Default: open.
+    fn warp_quest_gate(&self, source: u32, level: u32) -> u32 {
+        0
+    }
+    /// The Act II lair warp check's answer (`0x0059DB20`,
+    /// `quests.md` §8.2), published by the quest control once per tick.
+    /// Default: nothing.
+    fn set_lair_open(&mut self, open: bool) {}
     /// `0x00574EC0(game, player, 7, 0)`: the player's hireling (§9 rule
     /// 8; `hirelings.md` §5 rule 4; the wired host answers it from the
     /// hireling list). Default: none.

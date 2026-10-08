@@ -192,7 +192,12 @@ fn every_act2_dungeon_is_entered_built_and_left() {
         let mut here = *e;
         loop {
             visited.push(here.to);
-            let Some(next) = edges.iter().find(|n| n.from == here.to) else {
+            // The Lair behind the tombs is gated by the quest
+            // (`app_a2_duriel`).
+            let Some(next) = edges
+                .iter()
+                .find(|n| n.from == here.to && n.to != a2::DURIELS_LAIR)
+            else {
                 break;
             };
             take(&mut app, next.to_class, next.to);
@@ -208,7 +213,7 @@ fn every_act2_dungeon_is_entered_built_and_left() {
             up = *edges.iter().find(|n| n.to == up.from).unwrap();
         }
     }
-    for id in a2::dungeon_levels() {
+    for id in a2::dungeon_levels().filter(|&l| l != a2::DURIELS_LAIR) {
         assert!(visited.contains(&id), "level {id} was visited");
     }
     // The special generation: the staff tomb is the largest, the boss tomb

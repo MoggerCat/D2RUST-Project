@@ -325,18 +325,33 @@ fn flush_shown<X: Pending, R: TradeRest>(
     // d2rs-own, unverified: the buy price of each shown item, for the
     // preview client (`VendorRest::store_price`).
     let (tables, class) = (desk.vendor_tables, desk.state.shown_class);
-    let prices: Vec<(u32, u32)> = {
+    // A gamble window shows the gamble price (`vendors.md` §9.4).
+    let kind = if desk.state.shown_gamble {
+        tx::GAMBLE
+    } else {
+        tx::BUY
+    };
+    let mut prices: Vec<(u32, u32)> = {
         let v = desk.vendors(None);
         let ctx = trade::price_ctx(tables, &v, player, class);
         items
             .iter()
             .filter_map(|&i| {
                 let it = v.price_item(i)?;
-                let c = price::cost(tables, &ctx, Some(&it), tx::BUY).ok()?;
+                let c = price::cost(tables, &ctx, Some(&it), kind).ok()?;
                 Some((v.guid(i), u32::try_from(c).ok()?))
             })
             .collect()
     };
+    // d2rs-own, unverified (REC-162): the repair-all total of a repairer,
+    // under item GUID 0 (the repair-all message's item).
+    if d2_sim::world::vendors::REPAIRERS.contains(&class) {
+        let w = InvVendors::new(desk.vendors(None), Some(&mut *parts));
+        let ctx = trade::price_ctx(tables, &w, player, class);
+        if let Ok((total, _)) = trade::repair_all_quote(tables, &ctx, &w, player) {
+            prices.push((0, u32::try_from(total).unwrap_or(0)));
+        }
+    }
     for (guid, price) in prices {
         desk.rest.store_price(player, guid, price);
     }
