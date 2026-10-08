@@ -800,6 +800,17 @@ impl Pending for LocalSeams {
     fn item_at(&self, unit: UnitId, loc: u8) -> Option<UnitId> {
         self.weapons.item_at(unit, loc)
     }
+    // d2rs-own, unverified (q-skill-gaps, REC-176): the shield and its
+    // smite damage from the weapon copy.
+    fn shield(&self, unit: UnitId) -> Option<UnitId> {
+        self.weapons.shield(unit)
+    }
+    fn has_shield(&self, unit: UnitId) -> bool {
+        self.weapons.shield(unit).is_some()
+    }
+    fn shield_damage(&self, item: UnitId) -> Option<(i32, i32)> {
+        Some(self.weapons.facts(item).dam)
+    }
     fn wield_type(&self, item: UnitId) -> i32 {
         self.weapons.facts(item).grip
     }
