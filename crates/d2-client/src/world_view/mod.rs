@@ -45,6 +45,7 @@ pub mod overlay;
 pub mod panel_art;
 pub mod present;
 pub mod preview;
+pub mod preview_blocks;
 pub mod preview_light;
 pub mod swap_key;
 pub mod tile_assets;

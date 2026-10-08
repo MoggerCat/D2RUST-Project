@@ -54,6 +54,9 @@ pub struct TileAssets {
     files: BTreeMap<String, Result<Arc<Dt1>, String>>,
     /// Resident entries and their blocks.
     blocks: BTreeMap<FrameSetKey, Vec<BlockRect>>,
+    /// The grid coordinates (block record bytes 6, 7) of each resident
+    /// entry's blocks, for the floor light grid (`lighting.md` §11 r3).
+    grids: BTreeMap<FrameSetKey, Vec<(u8, u8)>>,
     /// Entries that cannot be made resident, and why.
     failed: BTreeMap<FrameSetKey, String>,
     /// The `pal.pl2` of acts 0…4 (`composition.md` §4), when known.
@@ -104,15 +107,16 @@ impl TileAssets {
             if self.blocks.contains_key(&key) || self.failed.contains_key(&key) {
                 continue;
             }
-            let loaded = self.load(path, *index).and_then(|(set, blocks)| {
+            let loaded = self.load(path, *index).and_then(|(set, blocks, grids)| {
                 assets
                     .frames
                     .insert(key.clone(), set)
-                    .map(|_| blocks)
+                    .map(|_| (blocks, grids))
                     .map_err(|e| e.to_string())
             });
             match loaded {
-                Ok(blocks) => {
+                Ok((blocks, grids)) => {
+                    self.grids.insert(key.clone(), grids);
                     self.blocks.insert(key, blocks);
                 }
                 Err(m) => {
@@ -123,6 +127,11 @@ impl TileAssets {
             }
         }
         found
+    }
+
+    /// The grid coordinates of a resident entry's blocks, in block order.
+    pub fn grids(&self, key: &FrameSetKey) -> Option<&[(u8, u8)]> {
+        self.grids.get(key).map(Vec::as_slice)
     }
 
     /// The blocks of a resident entry; `None` when it is not resident.
@@ -158,7 +167,7 @@ impl TileAssets {
     }
 
     /// The frame set and blocks of tile `index` of `path`.
-    fn load(&mut self, path: &[u8], index: u32) -> Result<(FrameSet, Vec<BlockRect>), String> {
+    fn load(&mut self, path: &[u8], index: u32) -> LoadedTile {
         let archive = archive_name(path);
         let file = match self.files.get(&archive) {
             Some(f) => f.clone(),
@@ -176,9 +185,13 @@ impl TileAssets {
         if set.frames.is_empty() {
             return Err("the tile has no blocks".into());
         }
-        Ok((set, BlockRect::of_tile(tile)))
+        let grids = tile.blocks.iter().map(|b| (b.grid_x, b.grid_y)).collect();
+        Ok((set, BlockRect::of_tile(tile), grids))
     }
 }
+
+/// A loaded tile: its frame set, blocks and block grid coordinates.
+type LoadedTile = Result<(FrameSet, Vec<BlockRect>, Vec<(u8, u8)>), String>;
 
 fn read_dt1(source: Option<&dyn FileSource>, archive: &str) -> Result<Arc<Dt1>, String> {
     let source = source.ok_or("no game archives (synthetic data)")?;

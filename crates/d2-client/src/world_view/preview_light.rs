@@ -11,10 +11,11 @@
 //! tables.
 //!
 //! `d2rs-own, unverified`:
-//! - a tile gets one flat light value (the cell at its centre sub-tile),
-//!   not the per-block wall / floor gradients of §11 r2–r3;
-//! - the ambient is the environment's alone (no `Levels.txt` ambient, no
-//!   near-room fills, no scripted override);
+//! - a tile's whole-tile shade is one flat value (the cell at its centre
+//!   sub-tile); its blocks take the gradients of [`super::preview_blocks`];
+//! - the ambient is the player level's `Levels.txt` ambient when it has a
+//!   colour, else the environment's (no near-room fills, no scripted
+//!   override);
 //! - the other lights are those of [`super::light_sources`];
 //! - no blocks-light flags, so every light is unshadowed (kind 0 / 2
 //!   records draw plain);
@@ -100,13 +101,21 @@ pub struct PreviewLight {
     pub fullbright: bool,
     env: Option<Environment>,
     periods: Option<PeriodTables>,
-    /// The ambient intensity of the frame (roof tiles, §11 r4).
-    ambient_i: u8,
+    /// The act environment's ambient of the frame (roof tiles, §11 r4).
+    env_cell: crate::rules::lighting::map::LightCell,
     frame: Option<FrameLight>,
     look: PreviewLook,
     /// The monster / missile light columns ([`super::light_sources`]);
     /// objects from the `objects` rows. `None`: only the player's light.
     pub sources: Option<std::sync::Arc<super::light_sources::LightRows>>,
+}
+
+/// The ambient of a level (§3.1 r2): its `Levels.txt` `Intensity`, `Red`,
+/// `Green`, `Blue` when any colour byte is non-zero, else `None` (the act
+/// environment applies, r3).
+pub fn level_ambient(rows: &[(u8, u8, u8, u8)], level: u32) -> Option<Ambient> {
+    let &(i, r, g, b) = rows.get(level as usize)?;
+    (r != 0 || g != 0 || b != 0).then_some(Ambient { i, r, g, b })
 }
 
 /// A light: sub-tile, radius, rgb.
@@ -238,7 +247,19 @@ impl PreviewLight {
             g: a.g,
             b: a.b,
         };
-        self.ambient_i = a.i;
+        self.env_cell = crate::rules::lighting::map::LightCell {
+            blocks: 0,
+            i: a.i,
+            r: a.r,
+            g: a.g,
+            b: a.b,
+        };
+        // §3.1 r2 before r3: the level's own ambient wins over the act's.
+        let ambient = self
+            .sources
+            .as_ref()
+            .and_then(|s| level_ambient(&s.levels, level))
+            .unwrap_or(ambient);
         let radius = player_light_radius(player.stat(STAT_LIGHT_RADIUS)).max(1);
         let rgb = player_light_color(player.stat(STAT_LIGHT_COLOR) as u32);
         let mut lights = vec![(at, radius, rgb)];
@@ -252,6 +273,35 @@ impl PreviewLight {
         });
     }
 
+    /// The per-block shades of a tile (§11 r2–r4, `shading.md` §4); empty
+    /// in full bright or when the tile keeps its flat shade.
+    #[allow(clippy::too_many_arguments)]
+    pub fn block_shades(
+        &self,
+        kind: TileKind,
+        dt1: &Dt1Facts,
+        cell: (i32, i32),
+        alpha: u8,
+        blend: crate::scene::BlendOp,
+        blocks: &[crate::rules::BlockRect],
+        grids: &[(u8, u8)],
+    ) -> Vec<crate::rules::BlockShade> {
+        let Some(f) = self.frame() else {
+            return Vec::new();
+        };
+        super::preview_blocks::block_shades(
+            f,
+            self.env_cell,
+            kind,
+            dt1,
+            cell,
+            alpha,
+            blend,
+            blocks,
+            grids,
+        )
+    }
+
     /// The flat shade of a tile, `None` in full bright.
     pub fn tile_chain(
         &self,
@@ -260,7 +310,7 @@ impl PreviewLight {
         cell: (i32, i32),
     ) -> Option<ShadeChain> {
         let f = self.frame()?;
-        let v = tile_light_byte(&f.map, self.ambient_i, kind, dt1, cell);
+        let v = tile_light_byte(&f.map, self.env_cell.i, kind, dt1, cell);
         Some(chain_of(&f.tables, v))
     }
 }
@@ -368,6 +418,33 @@ mod tests {
         );
     }
 
+    // Covers: specs/render/lighting.md §3.1 r2
+    #[test]
+    fn the_levels_ambient_replaces_the_environments_when_it_has_a_colour() {
+        let mut w = ClientWorld::default();
+        let key = UnitKey::new(PLAYER, 1);
+        let mut u = ClientUnit::new(key);
+        u.position = Some((4000, 4000));
+        w.units.insert(key, u);
+        w.local_player = Some(key);
+        let t = tables();
+        let far = (8 * 4000 + 8 * 40, 8 * 4000);
+        let mut plain = PreviewLight::default();
+        plain.refresh(&w, None, Some(&t));
+        // Level 0 (no room): the row's own ambient needs a colour.
+        let rows = super::super::light_sources::LightRows {
+            levels: vec![(99, 255, 255, 255)],
+            ..Default::default()
+        };
+        let mut lit = PreviewLight {
+            sources: Some(std::sync::Arc::new(rows)),
+            ..PreviewLight::default()
+        };
+        lit.refresh(&w, None, Some(&t));
+        assert_eq!(lit.frame().unwrap().map.read(far.0, far.1).i, 99);
+        assert_ne!(plain.frame().unwrap().map.read(far.0, far.1).i, 99);
+    }
+
     // Covers: specs/render/lighting.md §8
     #[test]
     fn a_monster_light_lights_its_surroundings() {
@@ -449,5 +526,48 @@ mod tests {
             .light
             .refresh(&w, None, Some(&t));
         assert!(feed.light(&w).unwrap().is_none());
+    }
+}
+
+#[cfg(test)]
+mod block_feed_tests {
+    use crate::rules::{BlockRect, BlockShade, MapTile, ViewSource};
+    use crate::scene::{BlendOp, DrawKey, ShadeChain};
+    use crate::world_view::feed::NoFeed;
+    use crate::world_view::model_feed::ModelFeed;
+    use crate::world_view::preview::Preview;
+
+    // Covers: specs/render/lighting.md §11 r2
+    #[test]
+    fn the_model_feed_answers_the_previews_block_shades() {
+        let preview = Preview::default();
+        let key = DrawKey::new(1, 2, 3, 0).unwrap();
+        let block = BlockShade {
+            block: BlockRect {
+                x: 0,
+                y: 0,
+                width: 32,
+                height: 32,
+            },
+            shade: ShadeChain::EMPTY,
+            blend: BlendOp::Opaque,
+        };
+        preview.put_block_shades(key, vec![block]);
+        let feed = ModelFeed::<NoFeed>::default().with_preview(preview);
+        let tile = |key| MapTile {
+            cell: (1, 1),
+            list: crate::rules::camera::TileList::Floor,
+            frame: crate::composite::ComponentFrame {
+                set: crate::world_view::preview::skip_key(),
+                index: 0,
+            },
+            blocks: Vec::new(),
+            shade: ShadeChain::EMPTY,
+            blend: BlendOp::Opaque,
+            key,
+        };
+        assert_eq!(feed.tile_blocks(&tile(key)).unwrap(), vec![block]);
+        let other = DrawKey::new(1, 2, 4, 0).unwrap();
+        assert!(feed.tile_blocks(&tile(other)).unwrap().is_empty());
     }
 }
