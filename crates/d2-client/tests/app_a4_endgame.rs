@@ -4,7 +4,7 @@
 //! seal bosses spawn from the dummy objects and die, the Sanctum clears
 //! and Diablo spawns at the start point and dies (chain 23); the
 //! Hellforge answers (chain 24) and Hephasto's death reaches it; the
-//! portal to Harrogath changes the act. PROVISIONAL (REC-160): every
+//! portal to Harrogath changes the act. PROVISIONAL (REC-162): every
 //! place, the plain-monster superunique spawn and the hand-spawned
 //! bosses are `d2rs-own, unverified`.
 
@@ -71,6 +71,7 @@ struct Rig {
     app: App,
     server: Server,
     ms: Arc<AtomicU32>,
+    #[allow(dead_code)]
     seen: Arc<Mutex<Vec<u8>>>,
     steps: u32,
 }
