@@ -22,6 +22,7 @@ use d2_client::bridge::world::{UnitKey, TILE};
 use d2_client::bridge::BridgeResource;
 use d2_client::ui::panels::npc::msg_chat_end;
 use d2_server::seams::Clock;
+use d2_sim::missiles::seams::MissileBodies;
 use d2_sim::units::{UnitId, UnitType};
 use d2_sim::wiring::action::{KillStep, Pending};
 
