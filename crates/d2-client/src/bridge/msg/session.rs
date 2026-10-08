@@ -10,7 +10,7 @@ use d2_proto::s2c::{parse, Message as S2c};
 use super::super::dispatch::{HandlerError, Message};
 use super::super::drlg::{ClientDrlg, ClientDrlgError};
 use super::super::output::Output;
-use super::super::world::{ActLoad, ClientWorld, RoomSight, UnitKey};
+use super::super::world::{ActLoad, ClientWorld, RoomSight, SessionMark, UnitKey};
 use super::lighting::{act_load_eclipse, create_environment};
 use super::Bytes;
 
@@ -51,6 +51,7 @@ pub fn load_act(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerErr
     let S2c::LoadAct(m) = parsed(msg)? else {
         return Err(HandlerError::Invalid("not 0x03"));
     };
+    w.mark_session(SessionMark::LoadAct(m.act));
     w.act = Some(ActLoad {
         act: m.act,
         init_seed: m.f2,
@@ -89,6 +90,7 @@ pub fn load_complete(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handl
     if w.local().and_then(|u| u.position).is_none() {
         return Err(HandlerError::Fatal(0x527));
     }
+    w.mark_session(SessionMark::LoadComplete);
     w.in_game = true;
     w.unloaded = false;
     Ok(())
@@ -97,6 +99,7 @@ pub fn load_complete(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handl
 /// 0x05 UnloadComplete (§7 rule 6).
 pub fn unload_complete(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerError> {
     parsed(msg)?;
+    w.mark_session(SessionMark::Unload);
     w.in_game = false;
     w.unloaded = true;
     Ok(())

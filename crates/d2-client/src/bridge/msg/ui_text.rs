@@ -113,11 +113,11 @@ pub fn event_text(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerE
 }
 
 /// 0x61 CanGoToAct (§20): video u8@1.
-pub fn act_video(_: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerError> {
+pub fn act_video(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerError> {
     len(msg, 2, "0x61 is 2 bytes")?;
-    msg.out.push(Output::ActVideo {
-        video: Bytes(msg.bytes).u8(1)?,
-    });
+    let video = Bytes(msg.bytes).u8(1)?;
+    w.mark_session(crate::bridge::world::SessionMark::Video(video));
+    msg.out.push(Output::ActVideo { video });
     Ok(())
 }
 
