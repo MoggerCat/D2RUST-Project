@@ -27,6 +27,7 @@ pub mod inv_grid;
 pub mod item_tip;
 pub mod layout;
 pub mod messages;
+pub mod npc_menu_ui;
 pub mod original;
 pub mod panel;
 pub mod panels;

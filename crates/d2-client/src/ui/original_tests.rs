@@ -121,6 +121,7 @@ fn install_mirrors_the_flags_and_keeps_the_border_open() {
         vec![
             BORDER_PANEL,
             crate::ui::hire_list::HIRE_PANEL,
+            crate::ui::npc_menu_ui::NPC_MENU_PANEL,
             hud::HUD_PANEL,
             crate::ui::original::gold_dialog::GOLD_PANEL
         ]
@@ -160,6 +161,7 @@ fn hotkeys_toggle_their_state_with_jump_0() {
             PanelId(1),
             BORDER_PANEL,
             crate::ui::hire_list::HIRE_PANEL,
+            crate::ui::npc_menu_ui::NPC_MENU_PANEL,
             hud::HUD_PANEL,
             crate::ui::original::gold_dialog::GOLD_PANEL
         ],
@@ -181,6 +183,7 @@ fn hotkeys_toggle_their_state_with_jump_0() {
         vec![
             BORDER_PANEL,
             crate::ui::hire_list::HIRE_PANEL,
+            crate::ui::npc_menu_ui::NPC_MENU_PANEL,
             hud::HUD_PANEL,
             crate::ui::original::gold_dialog::GOLD_PANEL
         ]
