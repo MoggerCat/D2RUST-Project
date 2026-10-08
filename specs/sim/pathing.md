@@ -37,16 +37,16 @@
 |   7. A* (type 1, `0x0067B850`) | 437–474 |
 |   8. Velocity, direction vector, facing | 475–561 |
 |   9. Per-tick movement | 562–745 |
-|   10. Messages | 746–776 |
-|   11. Missile paths (`0x00649760`) | 777–829 |
-|   12. Other path types (1.14d-read 2026-10-08) | 830–1043 |
-|   13. Path accessors and the cell line test (1.14d-read 2026-10-08) | 1044–1123 |
-| Constants & data dependencies | 1124–1160 |
-| Randomness | 1161–1171 |
-| Edge cases & original bugs | 1172–1219 |
-| Test vectors | 1220–1257 |
-| Provenance | 1258–1300 |
-| Open questions | 1301–1374 |
+|   10. Messages | 746–808 |
+|   11. Missile paths (`0x00649760`) | 809–861 |
+|   12. Other path types (1.14d-read 2026-10-08) | 862–1075 |
+|   13. Path accessors and the cell line test (1.14d-read 2026-10-08) | 1076–1155 |
+| Constants & data dependencies | 1156–1192 |
+| Randomness | 1193–1203 |
+| Edge cases & original bugs | 1204–1251 |
+| Test vectors | 1252–1289 |
+| Provenance | 1290–1338 |
+| Open questions | 1339–1412 |
 <!-- /index -->
 
 ## Summary
@@ -749,20 +749,52 @@ town access 0.
    unit for update (mode set, `sim/units.md` §4.1).
 2. Update pass (`sim/tick.md` §6 step 5, per unit `0x0053A500`): for a
    player whose mode changed (flag 0x1), the mode's update function
-   (table `0x007319E8`, 3 dwords per mode: function, code to point, code
-   to unit) runs per client: modes 2, 3, 6 → `0x00548180`: nothing for
-   the client whose player it is; other clients get S→C 0x10 (target
-   unit set: code, target type, target GUID, x, y) or 0x0F (code, target
-   x, y, 0, x, y). Codes: walk 1 / unit 0, run 0x17 / 0x18 (walk and
-   town walk share the row).
-   PROVISIONAL: the skill modes A1 7, A2 8, SC 10, TH 11, KK 12, S1–S4
-   13–16, SQ 18 with a used skill run `0x00548090`: the skill message of
-   `sim/intents-events.md` §3.5 rule 5 (flag 0, w 0; the path's target
-   unit → `0x0053D530`, else `0x0053D4D0` at the path target), sent to
-   every client including the player's own (d2rs-own: the client applies
-   no mode request for its click, `ui/controls.md` §6 r7) (because the
-   table's other rows are not read and `0x00548090` is the other named
-   caller of the builders); settled by REC-95.
+   (table `0x007319E8`, 20 rows of 3 dwords: function, code c1, code
+   c2; read by `0x005484B0`, row 0 for a null unit; a null function
+   does nothing) runs per client (ECX game, EDX unit; stack client,
+   mode). Every row of 1.14d (dump of `0x007319E8`–`0x00731AD7`):
+
+   | Modes | Function | c1, c2 | Own client | Message to each receiver |
+   |---|---|---|---|---|
+   | WL 2, TW 6 | `0x00548180` | 1, 0 | nothing | 0x10 or 0x0F, below |
+   | RN 3 | `0x00548180` | 0x17, 0x18 | nothing | same |
+   | NU 1, TN 5 | `0x00548400` | 7, 7 | nothing | 0x0D: a = c1, b = 0 |
+   | GH 4 (c 6), BL 9 (c 0x12), DD 17 (c 9) | `0x00548350` | c, c | sent | 0x0D: a = c1, b = unit byte +0xB0 |
+   | DT 0 | `0x0054DA10` | 8, 8 | sent, then the stat message | 0x0D as `0x00548350` (a = 8) |
+   | KB 19 | `0x005482A0` | 0x14, 0x14 | sent | 0x0F: code c1, byte @11 = unit byte +0xB0 |
+   | A1 7, A2 8, SC 10, TH 11, KK 12, S1–S4 13–16, SQ 18 | `0x00548090` | 0x15, 0x16 | only with E-flags bit 0x4 | skill message, below |
+
+   "Nothing" = the row returns for the client whose player
+   (`0x00537860(client, 0)`) the unit is. x, y = the unit's position
+   (`0x006488C0` / `0x00648900`; players have a dynamic path,
+   `sim/path-placement.md` §2); target x, y = the path target
+   (`0x00648A00` / `0x00648A10`, path +0x10 / +0x12); life % =
+   `0x00621F20(unit)`. Each builder takes DL = message id, then type 0
+   and the unit GUID (+0x0C).
+   - `0x00548180`: T := the path's target unit (`0x00553540`). T
+     non-null and `0x005387F0(T, client)` ≠ 0 (client in T's room's
+     client array, `drlg/rooms.md`) → S→C 0x10
+     (`0x0053B520`: code c2, T type, T GUID, x, y). Else → S→C 0x0F
+     (`0x0053B570`: code c1, target x, target y, 0, x, y).
+   - `0x00548400`, `0x00548350` → S→C 0x0D (`0x0053B4B0`: a, x, y, b,
+     life %).
+   - `0x0054DA10`: `0x00548350`; then, only when the unit is the
+     client's player, the stat message of stat 175 `goldlost` (value =
+     unit total `0x00625480(unit, 175, 0)`, sender `0x00548520` with the
+     argument order of `sim/stat-lists.md` §11 rule 4).
+   - `0x005482A0` → S→C 0x0F (c1, target x, target y, unit byte +0xB0,
+     x, y).
+   - `0x00548090`: E := the used skill (`0x00620250`); none → nothing.
+     E-flags (`0x006446A0`, E +0x0C) without bit 0x4 and the unit is
+     the client's player → nothing. Bit 0x4 has one setter, the dodge /
+     avoid reaction (`combat/damage.md` §7.1 rule 5.1, `0x0057D1CF`), so
+     in 1.14d the own client gets this message only for a dodge / avoid
+     (mode S1). Skill id := `0x00643CE0(E)`; b := the level with bonuses
+     `0x006442A0(unit, E, 1)` (byte). T := the path's target unit
+     (`0x00553540`); T non-null and `0x005387F0(T, client)` ≠ 0 →
+     `0x0053D530` (T type, T GUID, skill, w 0, b, flag 0); else
+     `0x0053D4D0` (target x, target y, skill, w 0, b, flag 0). Builders:
+     `sim/intents-events.md` §3.5 rule 5.
 3. Same pass, before it: a player with flags 2 bit 0x10000, or bit 0x800
    when the client's player is not this unit → S→C 0x15 (`0x00548010`:
    type, GUID, x, y, flag 1 for 0x10000 else 0). Waypoint arrival and
@@ -1297,6 +1329,12 @@ Real (recordings; message side):
   with the same rules.
 - Live tables: charstats rows (patch_d2), `sim/path-tables.tsv` from the
   executable.
+- §10 rule 2 table (2026-10-08): dump of `0x007319E8` (20 × 12 bytes)
+  from `Game.exe`; reader `0x005484B0`; row functions `0x00548090`,
+  `0x00548180`, `0x005482A0`, `0x00548350`, `0x00548400`, `0x0054DA10`
+  read in `all.asm`; builders `0x0053B4B0`, `0x0053B520`, `0x0053B570`
+  (DL = id); the only E-flags bit-0x4 writer in the server range is
+  `0x0057D1CF` (every push / or before `0x00644660` scanned).
 
 ## Open questions
 
