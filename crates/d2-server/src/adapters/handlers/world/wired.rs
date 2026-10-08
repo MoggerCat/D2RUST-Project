@@ -328,8 +328,6 @@ impl<R, S> WiredWorld<R, S> {
 
 mod quest_events;
 
-/// 0x9C action of a store item shown to the client (`vendors.md` §3.1).
-const STORE_ITEM_ACTION: u8 = 11;
 /// 0x9C action of a store item a purchase took from the NPC's grid
 /// (`vendors.md` §7.1 rule 10: "next frame 0x9C action 12 for GUID 0x12").
 const STORE_TAKEN_ACTION: u8 = 12;
@@ -382,7 +380,9 @@ fn flush_shown<X: Pending, R: TradeRest>(
     let mut d = parts.desk(&mut *desk.econ);
     for item in items {
         // PROVISIONAL: a failed encode skips the item.
-        let _ = d.send_item_world(player, item, STORE_ITEM_ACTION, 0);
+        // `inventory-moves.md` §6.2 store check: the store stream
+        // (alt-code for an unidentified quality 4–9 gamble item).
+        let _ = d.send_store_item(player, item);
     }
     inv_take_sent(&mut d)
         .into_iter()

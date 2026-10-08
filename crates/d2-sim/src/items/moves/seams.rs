@@ -542,6 +542,13 @@ pub trait MovePending {
     fn item_bits(&self, item: Guid, flags: u32, page: u8) -> Vec<u8> {
         Vec::new()
     }
+    /// The bit stream of a store item shown to its trading client
+    /// (`0x0053EF30` with 0x38): the alt-code record (`bitstream.md`
+    /// §4.1 r4) exactly when the item's quality is 4–9 and it lacks item
+    /// flag 0x10. Default: the plain stream.
+    fn store_item_bits(&self, item: Guid, page: u8) -> Vec<u8> {
+        self.item_bits(item, 0, page)
+    }
     /// Store messages 0x38 / 0x39 of the dispatcher's first step
     /// (`world/vendors.md`). Default: none.
     fn store_messages(&mut self, client: Owner, item: Guid) -> Vec<Vec<u8>> {
