@@ -156,8 +156,14 @@ impl Panel for WaypointUi {
         let view = View {
             rows: rows_of(sh.waypoint_map.as_ref(), &open, self.panel.tab),
         };
+        // The title is centred on its width (§13 r6): drawn with the
+        // fonts bound, else not at all.
+        let measure: &dyn TextMeasure = match sh.fonts.as_ref() {
+            Some(f) => f,
+            None => &NoMeasure,
+        };
         self.panel
-            .draw(&sh.tables, &sh.env(), &view, ctx.strings, &NoMeasure, out);
+            .draw(&sh.tables, &sh.env(), &view, ctx.strings, measure, out);
     }
 
     fn hit(&self, _p: Point) -> Option<WidgetId> {
@@ -181,7 +187,8 @@ impl Panel for WaypointUi {
         };
         let hit = hit_rows(&rows);
         let mut sh = self.sh.borrow_mut();
-        let env = WpEnv::new(&sh.config.screen, false);
+        // The tab hit steps by the game's tab count (`menus.md` §1.3).
+        let env = WpEnv::new(&sh.config.screen, sh.env().exp);
         // d2rs-own, unverified: no client quest flags, every act tab
         // opens (the server checks the destination's bit on C→S 0x49).
         let (effects, consumed) = if press {

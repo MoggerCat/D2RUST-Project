@@ -197,7 +197,9 @@ pub const DEVICE_GAIN: i32 = 255;
 /// no voice is an EAX voice).
 pub fn device_occluded(v: i32, occlusion: f32) -> i32 {
     let v1 = v.wrapping_mul(DEVICE_GAIN) / 255;
-    ftol((1.0 - occlusion) * v1 as f32)
+    // Exact: both factors and the product are exact in f64 for |v1| <= 255
+    // (`client/audio.md` §A4); an f32 product is off by one in places.
+    (f64::from(1.0 - occlusion) * f64::from(v1)).trunc() as i32
 }
 
 /// The §8.3 ratios as the mixer's Q8 gains (`client/audio.md` §A4):

@@ -1,5 +1,5 @@
 // Spec: specs/ui/panels.md (§12 r2), specs/ui/panels-2.md (§20 r4)
-//! The cube-gone close of [`OriginalUi::cube_poll`] on a synthetic model.
+//! The dead / no-player close of [`OriginalUi::cube_poll`] on a synthetic model.
 
 use super::*;
 use crate::bridge::items::mode;
@@ -22,27 +22,38 @@ fn ui() -> (OriginalUi, UiRoot) {
     (ui, root)
 }
 
+// A missing cube does not close the panel; a dead local player (mode
+// 0x11) does, with 0x4F 0x17 twice. (Before this audit the code closed on
+// the cube's absence; the spec says the only tests are the exit flag and
+// `0x00463DF0`.)
 // Covers: specs/ui/panels.md §12 r2; specs/ui/panels-2.md §20 r4
 #[test]
-fn the_cube_panel_closes_when_the_cube_leaves_the_inventory() {
+fn the_cube_panel_closes_on_death_not_when_the_cube_leaves() {
     let (mut u, mut root) = ui();
     let with_cube = world(&[(7, mode::STORED, (0, 0, 0, 1), b"box ")], None);
     u.set_ui(u32::from(id::CUBE), 0, false).unwrap();
     u.sync_root(&mut root);
-    // The cube is still there: the panel stays, nothing is sent.
     u.cube_poll(&with_cube, &mut root).unwrap();
     assert!(u.is_open(id::CUBE));
     assert!(root.intents().is_empty());
-    // The cube moved out (here: gone from the model): the panel closes
-    // and 0x4F 0x17 leaves twice.
+    // The cube moved out: the panel stays, nothing is sent.
     let without = world(&[(8, mode::STORED, (0, 2, 0, 1), b"hp1 ")], None);
     u.cube_poll(&without, &mut root).unwrap();
+    assert!(u.is_open(id::CUBE));
+    assert!(root.intents().is_empty());
+    // The player died: the panel closes and 0x4F 0x17 leaves twice.
+    let mut dead = without.clone();
+    dead.units
+        .get_mut(&dead.local_player.unwrap())
+        .unwrap()
+        .mode = 0x11;
+    u.cube_poll(&dead, &mut root).unwrap();
     assert!(!u.is_open(id::CUBE));
     let sent: Vec<Vec<u8>> = root.take_intents().into_iter().map(|i| i.0).collect();
     assert_eq!(sent.len(), 2);
     assert!(sent.iter().all(|b| b[..2] == [0x4F, 0x17]), "{sent:?}");
     // Closed: nothing more on the next pass.
-    u.cube_poll(&without, &mut root).unwrap();
+    u.cube_poll(&dead, &mut root).unwrap();
     assert!(root.intents().is_empty());
 }
 

@@ -856,7 +856,8 @@ mod tests {
         assert!(p.button_cels(&Screen::R800).is_empty());
     }
 
-    // Partial: §14 r5 (close of the shop only).
+    // Partial: §14 r5 (close of the shop only); the bytes are
+    // `0x004B3C20`'s 30 [1 u32][GUID u32] (§14.9).
     #[test]
     fn shop_close_sends_0x30() {
         let o = panel().close_intent();

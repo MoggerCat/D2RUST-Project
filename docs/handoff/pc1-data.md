@@ -50,11 +50,18 @@ and is plain text (TSV / JSON). Rule 1: measurements and digests only;
 frame PNGs and raw captures stay local or go to the private repo
 (`captures/`), never to the public repo.
 
+**Format: `specs/tools/facts-render.md` §1–§4 (exact columns, units,
+`-` / `?` markers, row order, header line). Write exactly that format:
+the cloud's `d2-client facts-compare` reads it and refuses anything else
+(exit 3).** Check a converted scene with
+`cargo run -p d2-client -- facts-compare facts/render/scenes/<scene> facts/render/scenes/<scene>`
+(must print MATCH or PARTIAL, never an error).
+
 Tool: `tools/trace-recorder/record_frames.py` (it already reads the 8-bit
 framebuffer, the palette and, with `--draws-every N`, every draw call),
 under `autostart.py --auto CHAR --seed N [--input SCRIPT]`. Add a small
 converter `tools/trace-recorder/facts_render.py` (a tool, not `crates/`)
-that turns one capture into:
+that turns one capture into (summary; the spec is the format):
 
 - `facts/render/scenes/<scene>/draws.tsv`: every draw call of the chosen
   frame in order (kind, cell file / frame / direction, screen x, y, size,
@@ -81,10 +88,10 @@ fixed camera; one frame each after the scene is stable):
    Harrogath), the Den of Evil (dungeon lighting), Blood Moor at night,
    rain in Act I.
 
-After each scene: push. Then process `facts/requests.tsv` (cloud sessions
-add rows there for cases the existing facts do not answer: scene, what to
-capture, who asked); run only those, newest-first, and mark each row done
-with the commit.
+After each scene: push. Then process `facts/requests.tsv` (format:
+`facts-render.md` §7; cloud sessions add rows there for cases the existing
+facts do not answer: scene, what to capture, who asked); run only those,
+newest-first, and set each row's status to `done <commit>`.
 
 ## Hand-back
 
