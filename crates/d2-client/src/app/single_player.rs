@@ -235,6 +235,7 @@ fn synthetic_npc_classes() -> impl Iterator<Item = u16> {
     ]
     .into_iter()
     .chain(ACT2_NPCS)
+    .chain(super::town_npcs::ACT3.iter().map(|&(c, _)| c))
 }
 /// The player's character class (1, sorceress, as in the server tests).
 pub const PLAYER_CLASS: u32 = 1;
@@ -1904,7 +1905,10 @@ impl GameParts {
                 ..ObjectTables::default()
             },
             monstats: synthetic_monstats(),
-            hire_rows: synthetic_hire_rows(),
+            hire_rows: synthetic_hire_rows()
+                .into_iter()
+                .chain(super::town_npcs::synthetic_hire_rows())
+                .collect(),
             items: ItemTables::default(),
             vendors: VendorTables::default(),
             anim: None,
@@ -2034,6 +2038,27 @@ pub fn build_with_objects(
     character: Character,
     chests: &[(i32, i32)],
     stash: Option<(i32, i32)>,
+) -> Result<LocalGame, BuildError> {
+    build_with_town(
+        data,
+        seed,
+        character,
+        chests,
+        stash,
+        &super::town_npcs::ACT1,
+    )
+}
+
+/// [`build_with_objects`] with the synthetic town's NPCs given as (class,
+/// sub-tile offset from the room origin) pairs (`super::town_npcs`;
+/// synthetic data only, the live town's NPCs come from its presets).
+pub fn build_with_town(
+    data: &GameData,
+    seed: u32,
+    character: Character,
+    chests: &[(i32, i32)],
+    stash: Option<(i32, i32)>,
+    npcs: &[(u16, i32)],
 ) -> Result<LocalGame, BuildError> {
     let mut wp_tables = data.tables();
     if stash.is_some() && matches!(data, GameData::Synthetic) {
@@ -2235,14 +2260,10 @@ pub fn build_with_objects(
         .unit(waypoint)
         .ok_or_else(|| BuildError::Setup("waypoint unit missing".into()))?
         .guid;
-    // The synthetic game's town NPC: Akara, a few sub-tiles from the
-    // waypoint (d2rs-own, unverified; the live game's NPCs come from the
-    // town presets).
+    // The synthetic game's town NPCs (d2rs-own, unverified; the live
+    // game's NPCs come from the town presets).
     if matches!(data, GameData::Synthetic) {
-        for (class, x) in [
-            (d2_sim::world::npc::class::AKARA, AKARA_X),
-            (d2_sim::world::npc::class::KASHYA, KASHYA_X),
-        ] {
+        for &(class, dx) in npcs {
             let req = AllocRequest {
                 ty: UnitType::Monster,
                 class: u32::from(class),
@@ -2253,7 +2274,7 @@ pub fn build_with_objects(
                 allied: true,
             };
             sim.action
-                .with(&mut game, |g, v| v.allocate(g, &req, ox + x, oy + UNIT_Y))
+                .with(&mut game, |g, v| v.allocate(g, &req, ox + dx, oy + UNIT_Y))
                 .ok_or_else(|| BuildError::Setup(format!("allocating NPC {class} failed")))?;
         }
     }
@@ -2573,9 +2594,31 @@ pub fn start_with_objects<C: Clock + Send + 'static>(
     chests: Vec<(i32, i32)>,
     stash: Option<(i32, i32)>,
 ) -> Result<(ThreadLink<Link<C>>, Started), BuildError> {
+    start_with_town(
+        data,
+        seed,
+        character,
+        clock,
+        chests,
+        stash,
+        super::town_npcs::ACT1.to_vec(),
+    )
+}
+
+/// [`start_with_objects`] with the synthetic town's NPCs given
+/// ([`build_with_town`]).
+pub fn start_with_town<C: Clock + Send + 'static>(
+    data: GameData,
+    seed: u32,
+    character: Character,
+    clock: C,
+    chests: Vec<(i32, i32)>,
+    stash: Option<(i32, i32)>,
+    npcs: Vec<(u16, i32)>,
+) -> Result<(ThreadLink<Link<C>>, Started), BuildError> {
     let (tx, rx) = std::sync::mpsc::channel();
     let link = ThreadLink::spawn(move || {
-        let g = build_with_objects(&data, seed, character, &chests, stash)?;
+        let g = build_with_town(&data, seed, character, &chests, stash, &npcs)?;
         let _ = tx.send(Started {
             waypoint: g.waypoint,
             waypoint_guid: g.waypoint_guid,
