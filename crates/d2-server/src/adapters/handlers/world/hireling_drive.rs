@@ -84,11 +84,16 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                 })
                 .collect()
         });
-        mercs.extend(pets);
+        // The laid traps do not follow: their own think shoots.
+        let traps: BTreeSet<UnitId> = events
+            .action()
+            .with(game, |_, v| v.h.sentries.keys().copied().collect());
+        mercs.extend(pets.into_iter().filter(|(m, _)| !traps.contains(m)));
+        let frame = game.frame;
+        self.drive_sentries(game, events, &mercs);
         if mercs.is_empty() {
             return;
         }
-        let frame = game.frame;
         let friends: BTreeSet<UnitId> = mercs.iter().map(|&(m, _)| m).collect();
         events.action().with(game, |g, v| {
             for (merc, owner) in mercs {
@@ -114,26 +119,7 @@ pub(super) fn think<X: Pending>(
     let me = AiUnits::position(v, merc);
     let boss = AiUnits::position(v, owner);
     let slot = frame.wrapping_add(merc.0 as i32);
-    let target = g
-        .lists
-        .units_of_type(UnitType::Monster)
-        .into_iter()
-        .filter(|&m| m != merc && !AiUnits::is_dead(v, m))
-        .filter(|&m| {
-            let class = AiUnits::class(v, m);
-            !friends.contains(&m)
-                && !HIRELING_CLASSES.iter().any(|&c| c as i32 == class)
-                && !d2_sim::world::npc::SELLERS
-                    .iter()
-                    .any(|&c| i32::from(c) == class)
-                && g.lists
-                    .unit(m)
-                    .and_then(|e| e.room())
-                    .is_some_and(|r| !v.h.drlg.in_town(g, r))
-        })
-        .map(|m| (d2(me, AiUnits::position(v, m)), m))
-        .filter(|&(d, _)| d <= SIGHT)
-        .min();
+    let target = nearest_hostile(v, g, merc, friends, SIGHT);
     if let Some((dist, t)) = target {
         let tp = AiUnits::position(v, t);
         if dist <= MELEE {
@@ -171,4 +157,37 @@ pub(super) fn think<X: Pending>(
     {
         AiModes::change_mode(v, g, merc, mode::NEUTRAL, ModeTarget::Point(me.0, me.1));
     }
+}
+
+/// The nearest living hostile monster within squared distance `sight` of
+/// `from` (never a friend, a hireling, a seller, or in a town room), as
+/// (squared distance, unit). Shared by the followers' think and the
+/// traps' ([`super::sentry_drive`]).
+pub(super) fn nearest_hostile<X: Pending>(
+    v: &mut View<'_, X>,
+    g: &Game,
+    from: UnitId,
+    friends: &BTreeSet<UnitId>,
+    sight: i64,
+) -> Option<(i64, UnitId)> {
+    let me = AiUnits::position(v, from);
+    g.lists
+        .units_of_type(UnitType::Monster)
+        .into_iter()
+        .filter(|&m| m != from && !AiUnits::is_dead(v, m))
+        .filter(|&m| {
+            let class = AiUnits::class(v, m);
+            !friends.contains(&m)
+                && !HIRELING_CLASSES.iter().any(|&c| c as i32 == class)
+                && !d2_sim::world::npc::SELLERS
+                    .iter()
+                    .any(|&c| i32::from(c) == class)
+                && g.lists
+                    .unit(m)
+                    .and_then(|e| e.room())
+                    .is_some_and(|r| !v.h.drlg.in_town(g, r))
+        })
+        .map(|m| (d2(me, AiUnits::position(v, m)), m))
+        .filter(|&(d, _)| d <= sight)
+        .min()
 }

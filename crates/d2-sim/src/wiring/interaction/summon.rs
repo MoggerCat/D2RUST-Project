@@ -182,6 +182,27 @@ impl<X: Pending + UseRest> UseView<'_, X> {
         &mut self,
         e: BodyEffect<UnitId, UnitId, RoomId>,
     ) -> Option<BodyEffect<UnitId, UnitId, RoomId>> {
+        if let BodyEffect::SentryLaid {
+            m,
+            owner,
+            skill,
+            level,
+            shots,
+        } = e
+        {
+            // d2rs-own, unverified (REC-241).
+            self.cv.v.h.sentries.insert(
+                m,
+                crate::wiring::action::Sentry {
+                    owner,
+                    skill,
+                    level,
+                    shots,
+                    next: 0,
+                },
+            );
+            return None;
+        }
         let BodyEffect::PetAdd { owner, pet, t, max } = e else {
             return Some(e);
         };

@@ -76,6 +76,18 @@ pub use objects::{
 };
 pub use pending::{KillStep, NoPending, Pending, QuestEvent, SkillEvent};
 
+/// A laid trap (d2rs-own, unverified; REC-241): the skill that laid it, its
+/// level and the shots left.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Sentry {
+    pub owner: UnitId,
+    pub skill: i32,
+    pub level: i32,
+    pub shots: i32,
+    /// The frame of the next possible shot.
+    pub next: i32,
+}
+
 /// The tables the action modules read (typed `d2_data` records).
 #[derive(Debug, Clone)]
 pub struct ActionTables {
@@ -287,6 +299,9 @@ pub struct ActionHooks<X> {
     /// The players' pet lists (player data +0x44, `sim/pets.md` §1),
     /// created on a player's first summon ([`crate::wiring::interaction::summon`]).
     pub pet_lists: BTreeMap<UnitId, crate::player::pets::PetLists>,
+    /// The laid traps (d2rs-own, unverified; q-assassin-gaps, REC-241):
+    /// the host's sentry think shoots and spends their shots.
+    pub sentries: BTreeMap<UnitId, Sentry>,
     /// The inactive-unit store (game +0xD8, `units.md` §3.4;
     /// [`inactive`]). `None` (the default): tick step 9 compresses
     /// nothing and the restore is the host's, as before.
@@ -363,6 +378,7 @@ impl<X> ActionHooks<X> {
             session: switch::SessionState::default(),
             skill_lists: BTreeMap::new(),
             pet_lists: BTreeMap::new(),
+            sentries: BTreeMap::new(),
             inactive: None,
             x,
             orphan_seed: Seed::init(),
