@@ -225,9 +225,14 @@ impl UseRest for LocalSeams {
     fn run_to(&mut self, u: UnitId, target: UnitId, e: SkillEntry) {
         self.note(format!("run to {} {} skill {}", u.0, target.0, e.skill));
     }
-    fn target(&self, _: UnitId) -> Option<UnitId> {
-        None
+    // d2rs-own, unverified (q-monster-ai): the mode request's unit target
+    // (a monster's attack); the player's handlers keep their own.
+    fn target(&self, u: UnitId) -> Option<UnitId> {
+        self.monsters.target(u)
     }
+    // The skill start clears the target after it set the mode
+    // (`use.md` §5.3), but a monster's per-frame do reads it later; the
+    // next mode request replaces it, so the clear is not kept.
     fn clear_target(&mut self, _: UnitId) {}
     fn event_arg(&self, u: UnitId) -> i32 {
         self.skills.unit(u).map_or(0, |s| s.event_arg)

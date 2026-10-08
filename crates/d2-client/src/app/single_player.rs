@@ -407,6 +407,9 @@ pub struct LocalSeams {
     /// The skill pipeline's per-unit fields and preview fills (`UseRest`,
     /// `LearnRest`: [`super::skill_rest`]).
     pub skills: SkillStore,
+    /// The monsters' mode targets and current skills
+    /// ([`super::monster_ai`]).
+    pub monsters: super::monster_ai::MonsterAi,
 }
 
 impl LocalSeams {
@@ -465,6 +468,47 @@ impl Pending for LocalSeams {
                 (self.player_side(attacker), self.player_side(defender)),
                 (Some(a), Some(d)) if a != d
             )
+    }
+    // d2rs-own, unverified (preview, q-monster-ai; `monster_ai`): a mode
+    // request's target, the monster's current skill and the skill pipeline's
+    // monster start and per-frame (`use.md` §5.3, OQ6).
+    fn set_mode_target(&mut self, unit: UnitId, target: d2_sim::monsters::ai::ModeTarget) {
+        self.monsters.set_target(unit, target);
+    }
+    fn set_current_skill(&mut self, unit: UnitId, skill: i32) -> bool {
+        self.monsters.set_current(unit, skill)
+    }
+    fn class_has_mode(&self, class: i32, mode: u8) -> bool {
+        self.monsters.class_has_mode(class, mode)
+    }
+    fn anim_name(&self, _: UnitId, ty: UnitType, class: u32, mode: u32) -> Option<[u8; 8]> {
+        self.monsters.anim_name(ty, class, mode)
+    }
+    // d2rs-own, unverified (q-monster-ai; the animation-rate spec is not
+    // written): the AnimData speed as it is, no rate stats.
+    fn anim_rate(&self, _: UnitId, speed: Option<u32>) -> i16 {
+        speed.map_or(0, |s| s as i16)
+    }
+    fn used_skill(&self, unit: UnitId) -> Option<d2_sim::skills::SkillEntry> {
+        let monster = self
+            .sides
+            .get(&unit)
+            .is_some_and(|s| s.0 == UnitType::Monster);
+        self.monsters.used_skill(unit, monster)
+    }
+    fn monster_skill_start(
+        h: &mut ActionHooks<Self>,
+        sim: &mut d2_sim::units::hooks::Sim<'_>,
+        unit: UnitId,
+    ) -> i32 {
+        d2_sim::wiring::interaction::skill_events::monster_skill_start(h, sim, unit)
+    }
+    fn monster_sequence_frame(
+        h: &mut ActionHooks<Self>,
+        sim: &mut d2_sim::units::hooks::Sim<'_>,
+        unit: UnitId,
+    ) {
+        d2_sim::wiring::interaction::skill_events::monster_sequence_frame(h, sim, unit);
     }
     /// d2rs-own, unverified (preview, D1; `0x00622870`).
     fn melee_range(&self, _: UnitId) -> i32 {
@@ -1431,12 +1475,14 @@ pub fn build_with_chests(
     };
     // `rng.md` §5.2, the fixed-seed branch (`--seed N`): the game seed
     // is `{N, 666}`, unstepped.
-    let mut hooks = ActionHooks::new(
-        Arc::new(parts.action),
-        world,
-        Seed::init_low(seed),
-        LocalSeams::default(),
-    );
+    let seams = LocalSeams {
+        monsters: super::monster_ai::MonsterAi::from_tables(
+            &parts.action.combat.monstats,
+            &parts.action.combat.monstats2,
+        ),
+        ..LocalSeams::default()
+    };
+    let mut hooks = ActionHooks::new(Arc::new(parts.action), world, Seed::init_low(seed), seams);
     hooks.anim_data = parts.anim;
     hooks.vitals = parts.vitals;
     // The client vitals sync (`combat/vitals.md` §5.1): life, mana,
