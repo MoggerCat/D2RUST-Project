@@ -537,6 +537,9 @@ pub struct LocalSeams {
     /// The Act II DRLG's staff-tomb level (0 = not yet known), set when
     /// the acts are created (`q-a2-dungeons`).
     pub staff_tomb: u32,
+    /// The players' hands and the facts of the items in them
+    /// ([`super::weapons`], q-amazon).
+    pub weapons: super::weapons::Weapons,
 }
 
 impl LocalSeams {
@@ -698,6 +701,26 @@ impl Pending for LocalSeams {
     }
     fn monster_sequence_frame(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, unit: UnitId) {
         skill_events::monster_sequence_frame(h, sim, unit);
+    }
+    // d2rs-own, unverified (q-amazon, REC-150): the hand class, the item
+    // shoots / stack facts of the skill bodies ([`super::weapons`]).
+    fn composit_weapon_class(&self, unit: UnitId) -> i32 {
+        self.weapons.hand_class(unit)
+    }
+    fn hand_class(&self, unit: UnitId) -> i32 {
+        self.weapons.hand_class(unit)
+    }
+    fn item_is(&self, item: UnitId, itype: i32) -> bool {
+        self.weapons.item_is(item, itype)
+    }
+    fn item_shoots(&self, item: UnitId) -> bool {
+        self.weapons.facts(item).shoots
+    }
+    fn item_stackable(&self, item: UnitId) -> bool {
+        self.weapons.facts(item).stackable
+    }
+    fn item_max_stack(&self, item: UnitId) -> i32 {
+        self.weapons.facts(item).max_stack
     }
     fn anim_name(&self, _: UnitId, ty: UnitType, class: u32, mode: u32) -> Option<[u8; 8]> {
         super::anim_names::anim_key(self.looks.as_deref()?, ty, class, mode)
@@ -2357,6 +2380,7 @@ pub fn build_with_town(
     world.cube = parts.cube.map(preview_cube_parts);
     let mut s: Sim = SimGame::with_world(game, sim, world);
     s.set_host_sync(sync_seams);
+    s.set_world_sync(super::weapons::sync);
     // The session sequence (`intents-events.md` §8) runs on the client's
     // C→S 0x67 / 0x6B: game creation (the client record, 0x01, 0x00,
     // 0x02; state 1), then the join (this loader, the player's add

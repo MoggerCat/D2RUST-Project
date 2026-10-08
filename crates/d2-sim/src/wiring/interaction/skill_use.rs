@@ -87,6 +87,18 @@ pub trait UseRest {
     fn equippable(&self, item: UnitId) -> bool;
     fn bow_equipped(&self, u: UnitId) -> bool;
     fn state_mask(&self, u: UnitId, mask: u32) -> bool;
+    /// The weapon in use and the item on a body location as the skill
+    /// bodies see them (ammo check, bow missile, `bodies.md` §2.3–§2.5),
+    /// ahead of combat's [`Pending::current_weapon`] / [`Pending::item_at`]:
+    /// a host whose equipped items do not yet feed the stat lists lets the
+    /// skills see its weapon without changing the melee damage rules.
+    /// Default: not answered (combat's).
+    fn skill_weapon(&self, _u: UnitId) -> Option<UnitId> {
+        None
+    }
+    fn skill_item_at(&self, _u: UnitId, _loc: u8) -> Option<UnitId> {
+        None
+    }
     // ---- modes and paths (units.md player modes, path spec)
     fn start_mode(&mut self, game: &mut Game, u: UnitId, mode: u32, target: ModeTarget<UnitId>);
     fn run_to(&mut self, u: UnitId, target: UnitId, e: SkillEntry);
@@ -204,13 +216,15 @@ impl<X: Pending + UseRest> SkillUnits for UseView<'_, X> {
         self.cv.used_skill(u)
     }
     fn current_weapon(&self, u: UnitId) -> Option<UnitId> {
-        self.cv.current_weapon(u)
+        self.x().skill_weapon(u).or_else(|| self.cv.current_weapon(u))
     }
     fn weapon(&self, u: UnitId) -> Option<UnitId> {
-        self.cv.weapon(u)
+        self.x().skill_weapon(u).or_else(|| self.cv.weapon(u))
     }
     fn item_at(&self, u: UnitId, loc: u8) -> Option<UnitId> {
-        self.cv.item_at(u, loc)
+        self.x()
+            .skill_item_at(u, loc)
+            .or_else(|| self.cv.item_at(u, loc))
     }
     fn item_is(&self, item: UnitId, itype: i32) -> bool {
         self.cv.item_is(item, itype)
@@ -909,7 +923,16 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         self.cv.v.h.missiles = Some(store);
         made
     }
+    /// `0x00646F20`: every passive skill of the unit whose state is on
+    /// ([`bodies::passive`]), then the host's own hook.
     fn passive_refresh(&mut self, u: UnitId) {
+        let t = self.cv.v.h.tables.clone();
+        for e in self.skill_list(u) {
+            let p = t.skills.skill(e.skill).map_or(-1, |r| i32::from(r.passivestate as i16));
+            if p > 0 && SkillUnits::has_state(self, u, p as u16) {
+                bodies::passive::refresh(self, &t.skills, u, e.skill);
+            }
+        }
         self.xm().passive_refresh(u);
     }
     fn buff_refresh(&mut self, u: UnitId) {
@@ -918,7 +941,11 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
     fn skill_resync(&mut self, u: UnitId) {
         self.xm().skill_resync(u);
     }
+    /// `0x00646D60`: the passive state's stat list ([`bodies::passive`]),
+    /// then the host's own hook.
     fn passive_state_apply(&mut self, u: UnitId, e: &SkillEntry) {
+        let t = self.cv.v.h.tables.clone();
+        bodies::passive::refresh(self, &t.skills, u, e.skill);
         self.xm().passive_state_apply(u, e);
     }
     fn set_ai_state(&mut self, u: UnitId, k: i32) {
