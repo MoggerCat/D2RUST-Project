@@ -62,6 +62,9 @@ pub enum Entry {
     First,
     /// A later entry: the main menu.
     MainMenu,
+    /// Back from a game (Save and Exit, or its window closed): character
+    /// select (§F1.3 "in game" row, PROVISIONAL REC-200).
+    AfterGame,
 }
 
 /// The front-end host `play` runs: every screen wired to `save_dir`
@@ -84,8 +87,11 @@ pub fn front_host(
         Box::new(DirSaves(save_dir.to_path_buf())),
         reg,
     );
-    let host = FrontHost::with_front(front, art, entry == Entry::First)
+    let mut host = FrontHost::with_front(front, art, entry == Entry::First)
         .with_stub_writer(handles.created.clone(), save_dir.to_path_buf());
+    if entry == Entry::AfterGame {
+        host.front.trigger(crate::ui::front_end::Trigger::GameExit);
+    }
     (host, handles)
 }
 

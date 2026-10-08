@@ -614,3 +614,21 @@ fn play_cli_new_and_save_paths() {
         play_start::resolve(&CliStart::default(), &GameData::Synthetic, None, None, None).unwrap();
     assert_eq!(start.save_path, None);
 }
+
+/// `play` after a game (Save and Exit, or the window closed): the front
+/// end opens at character select with the saved character listed (§F1.3
+/// "in game" row, REC-200), not at the main menu.
+#[test]
+fn after_a_game_the_front_end_opens_at_character_select() {
+    let dir = temp_dir("after");
+    let c = NewCharacter {
+        name: "Back".into(),
+        class: Class::Assassin,
+        hardcore: false,
+        expansion: true,
+    };
+    write_stub(&dir, &c, 1).unwrap();
+    let f = Front::open(&dir, Entry::AfterGame);
+    assert_eq!(f.current(), CHAR_SELECT);
+    assert!(f.texts().iter().any(|t| t == "Back"), "{:?}", f.texts());
+}
