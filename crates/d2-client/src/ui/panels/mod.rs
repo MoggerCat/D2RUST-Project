@@ -270,6 +270,9 @@ pub enum PanelOutput {
     SetUi { ui: u8, mode: u8, jump: bool },
     /// The UI click sound (`0x004B9A00(0, 0, 0)`, §10.2).
     ClickSound,
+    /// A player event (speech) on the local player (`audio/triggers.md`
+    /// §3; `items/inventory.md` §5.6: 19 `impossible`, 20 `cantuseyet`).
+    PlayerEvent(u16),
 }
 
 /// A string as UTF-16 code units.

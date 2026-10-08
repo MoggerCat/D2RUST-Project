@@ -172,6 +172,17 @@ pub fn item_skill_link<W: EquipWorld + ?Sized>(
         }
         q = 1;
     }
+    skill_quantity_steps(w, u, s, q, add)
+}
+
+/// §5.5 steps 3–5 for skill `s` and count `q`.
+fn skill_quantity_steps<W: EquipWorld + ?Sized>(
+    w: &mut W,
+    u: UnitId,
+    s: i32,
+    q: i32,
+    add: bool,
+) -> Result<bool, EquipFatal> {
     // Step 3.
     let new = match (add, w.skill_quantity(u, s)) {
         (true, Some(cur)) => cur.wrapping_add(q),
@@ -198,6 +209,25 @@ pub fn item_skill_link<W: EquipWorld + ?Sized>(
         }
     }
     Ok(true)
+}
+
+/// Book count change `0x0055C070(n)` (`inventory-moves.md` §7.12, §7.20,
+/// §8.1 step 4: "`inventory.md` §5.5 skill quantity += n, S→C 0x22"):
+/// §5.5 with the tome `i`'s skill and q := n, add = 1. Only a player
+/// owner acts; an item without a skill does nothing.
+pub fn item_skill_add<W: EquipWorld + ?Sized>(
+    w: &mut W,
+    u: UnitId,
+    i: UnitId,
+    n: i32,
+) -> Result<bool, EquipFatal> {
+    if w.unit_type(u) != Some(TYPE_PLAYER) {
+        return Ok(false);
+    }
+    let Some((s, _)) = item_skill(w, i) else {
+        return Ok(false);
+    };
+    skill_quantity_steps(w, u, s, n, true)
 }
 
 /// Recount on cube open / close (`0x0055FA40`, §5.5).

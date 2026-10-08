@@ -399,8 +399,9 @@ pub trait MovePending {
     fn merge_allowed(&self, src: Guid) -> bool {
         false
     }
-    /// Book count change `0x0055C070(n)`.
-    fn book_count_changed(&mut self, player: Owner, n: i32) {}
+    /// Book count change `0x0055C070(n)` of the tome `book` (§8.1 step 4:
+    /// `inventory.md` §5.5 skill quantity += n, S→C 0x22).
+    fn book_count_changed(&mut self, player: Owner, book: Guid, n: i32) {}
 
     // ---- item use (`0x005BF240`: item-use spec, unwritten) ----------------
 
@@ -442,8 +443,9 @@ pub trait MovePending {
     /// Set or clear a quest flag of the player's record for the current
     /// difficulty (`0x0065C360` / `0x0065C3A0`; §7.11 step 4).
     fn set_quest_flag(&mut self, player: Owner, quest: u8, flag: u8, on: bool) {}
-    /// `0x005458E0` after a quest item use (§7.11 step 4).
-    fn quest_item_used(&mut self, player: Owner) {}
+    /// `0x005458E0(player, chain)` after a quest item use (§7.11 step 4:
+    /// S→C 0x5D `5D chain 02 00 0000` to the player's client).
+    fn quest_item_used(&mut self, player: Owner, chain: u8) {}
     /// `0x0058A0A0` (§7.11 step 4, `tr2`).
     fn quest_tr2_used(&mut self, player: Owner) {}
     /// Skills and stats reset `0x00570360`, `0x00570C80` (§7.11 step 4,

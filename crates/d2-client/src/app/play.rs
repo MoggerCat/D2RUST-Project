@@ -343,6 +343,13 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
         GameData::Live(d) => Some(d.tables.item_tables().map_err(|e| e.to_string())),
         GameData::Synthetic => None,
     };
+    let inv_lookup = match &config.data {
+        GameData::Live(d) => Some(
+            d2_sim::items::inventory::InvTables::from_fixed(&d.tables.fixed)
+                .map_err(|e| e.to_string()),
+        ),
+        GameData::Synthetic => None,
+    };
     let drlg_source = single_player::client_drlg_source(&config.data);
     let level_rows = single_player::client_level_rows(&config.data);
     let waypoint_map = single_player::client_waypoint_map(&config.data);
@@ -499,6 +506,11 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
                 }
                 Err(e) => warn!("item tips (d2rs-own, unverified): {e}; no tool tips"),
             }
+        }
+        match inv_lookup {
+            Some(Ok(t)) => item_parts.inv_tables = Some(std::sync::Arc::new(t)),
+            Some(Err(e)) => warn!("inventory tables: {e}; equipment boxes take no clicks"),
+            None => {}
         }
         super::items::add_items(&mut app, archives.source(), item_parts);
         let effects =

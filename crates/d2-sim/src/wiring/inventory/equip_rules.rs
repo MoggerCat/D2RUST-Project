@@ -79,6 +79,13 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
         self.note_equip(r);
     }
 
+    /// Book count change `0x0055C070(n)` on the rules
+    /// ([`bk::item_skill_add`]).
+    pub fn run_item_skill_add(&mut self, owner: UnitId, book: UnitId, n: i32) {
+        let r = bk::item_skill_add(self, owner, book, n);
+        self.note_equip(r);
+    }
+
     /// §5.5 cube recount `0x0055FA40` on the rules.
     pub fn run_cube_recount(&mut self, owner: UnitId) {
         let r = bk::cube_recount(self, owner);

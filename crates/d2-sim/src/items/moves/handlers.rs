@@ -924,7 +924,13 @@ pub fn use_grid_body<W: MoveWorld>(w: &mut W, p: Owner, i: Guid, x: i32, y: i32)
         _ => return Outcome::NOTHING,
     };
     if used {
-        w.quest_item_used(p);
+        // `0x005458E0(player, chain)`: the chain is fixed per code.
+        let chain = match &w.code(i) {
+            b"ass " => 8,
+            b"xyz " => 18,
+            _ => 33,
+        };
+        w.quest_item_used(p, chain);
         w.consume_item(p, i);
     } else {
         // The sound event on the player `0x00553380` (as §8.1 step 3).
@@ -970,7 +976,7 @@ pub fn stack_items<W: MoveWorld>(w: &mut W, p: Owner, src: Guid, dst: Guid) -> u
         w.set_stat(s, stat::QUANTITY, qs.wrapping_add(qd).wrapping_sub(m));
         w.send_item_stat(p, src, stat::QUANTITY);
         if books {
-            w.book_count_changed(p, m.wrapping_sub(qd));
+            w.book_count_changed(p, dst, m.wrapping_sub(qd));
         }
         add_iflags(w, dst, iflag::STACK_FULL);
     } else if w.merge_allowed(src) {
@@ -983,7 +989,7 @@ pub fn stack_items<W: MoveWorld>(w: &mut W, p: Owner, src: Guid, dst: Guid) -> u
         w.set_stat(d, stat::QUANTITY, qs.wrapping_add(qd));
         w.send_item_stat(p, dst, stat::QUANTITY);
         if books {
-            w.book_count_changed(p, qs);
+            w.book_count_changed(p, dst, qs);
         }
         w.set_cursor(p, None);
         w.send(p, layouts::clear_cursor(Owner::ITEM, src));
@@ -1392,7 +1398,7 @@ pub fn scroll_into_book<W: MoveWorld>(
     }
     w.set_stat(b, stat::QUANTITY, q.wrapping_add(1));
     w.send_item_stat(p, book, stat::QUANTITY);
-    w.book_count_changed(p, 1);
+    w.book_count_changed(p, book, 1);
     Ok(Outcome::DONE)
 }
 

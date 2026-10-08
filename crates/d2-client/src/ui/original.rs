@@ -186,6 +186,8 @@ struct Facts {
     player: Option<PlayerLife>,
     /// An expansion game (`[0x007A04F4]`).
     expansion_game: bool,
+    /// The local player (`0x00463DD0`), for player events.
+    local: Option<UnitKey>,
 }
 
 impl Facts {
@@ -200,6 +202,7 @@ impl Facts {
                 dead: u.mode == 0x11,
             }),
             expansion_game: world.expansion != 0,
+            local: local.map(|u| u.key),
         }
     }
 }
@@ -368,6 +371,7 @@ impl OriginalUi {
                 class: None,
                 player: None,
                 expansion_game: false,
+                local: None,
             },
             mouse: Point::new(0, 0),
             outputs: Vec::new(),
@@ -544,6 +548,11 @@ impl OriginalUi {
         self.shared.borrow_mut().items.tips = Some(tips);
     }
 
+    /// The inventory tables of the equip-box click (`inv_items` `equip`).
+    pub fn set_inv_tables(&mut self, t: std::sync::Arc<d2_sim::items::inventory::InvTables>) {
+        self.shared.borrow_mut().items.inv_tables = Some(t);
+    }
+
     /// Shift is held (set by the host each frame, `inv_items`).
     pub fn set_shift(&mut self, shift: bool) {
         self.shared.borrow_mut().items.shift = shift;
@@ -609,6 +618,14 @@ impl OriginalUi {
                 }
                 PanelOutput::ClickSound => {
                     self.outcome.sounds.push(SoundRequest::Ui(CLICK_SOUND_ID))
+                }
+                PanelOutput::PlayerEvent(event) => {
+                    let local = self.shared.borrow().facts.local;
+                    if let Some(unit) = local {
+                        self.outcome
+                            .sounds
+                            .push(SoundRequest::PlayerEvent { unit, event });
+                    }
                 }
             }
         }

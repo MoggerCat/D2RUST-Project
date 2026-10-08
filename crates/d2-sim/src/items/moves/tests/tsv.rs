@@ -318,3 +318,19 @@ fn handled_check_catches_perturbations() {
         vec!["0x17 size: tsv 5 / ==6".to_string()]
     );
 }
+
+/// The 0x3E vector of `client/msg-stats-items.md` (§5 r1.2): GUID 7 in 8
+/// bits, set flag 1, stat 70, value 3 in 8 bits, param 0 in 8 bits: 37
+/// bits, size 7, padded with zeros to 0x22 bytes
+/// (`sim/intents-events.md` edge case 13).
+// Covers: specs/client/msg-stats-items.md §5 r1
+#[test]
+fn update_item_stat_writes_the_readers_vector() {
+    let m = layouts::update_item_stat(7, 70, 3, 0);
+    assert_eq!(m.len(), 0x22);
+    assert_eq!(m[..7], [0x3E, 7, 0x0E, 0x1A, 0x31, 0, 0]);
+    assert!(m[7..].iter().all(|&b| b == 0));
+    // A 16-bit GUID: a = 1, b = 0.
+    let m = layouts::update_item_stat(0x1234, 70, 3, 0);
+    assert_eq!(m[2] & 0b11, 0b01);
+}

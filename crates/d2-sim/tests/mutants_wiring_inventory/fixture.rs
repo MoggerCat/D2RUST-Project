@@ -450,7 +450,7 @@ impl MovePending for Rest {
     fn rest_pile(&mut self, player: Owner, rest: i32) {
         self.note(format!("rest_pile {} {rest}", og(player)));
     }
-    fn book_count_changed(&mut self, player: Owner, n: i32) {
+    fn book_count_changed(&mut self, player: Owner, _book: Guid, n: i32) {
         self.note(format!("book_count_changed {} {n}", og(player)));
     }
     fn use_item(&mut self, player: Owner, target: Owner, item: Guid) -> bool {

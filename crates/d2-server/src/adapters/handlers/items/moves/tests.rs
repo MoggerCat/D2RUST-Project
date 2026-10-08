@@ -1695,6 +1695,69 @@ fn preview_rest_picks_up_a_gold_pile() {
     assert_eq!(t.unit(g), None, "the pile is freed");
 }
 
+/// Vector G2 on the play host's rest: level 1 (limit 10000), gold 9500,
+/// a pile of 1000 picked up → gold 10000 and a new pile of the rest, 500,
+/// on the ground (`inventory-moves.md` §10.1 `0x0055B030`, §10.2).
+// Covers: specs/items/inventory-moves.md §10.1, §10.2
+#[test]
+fn preview_rest_leaves_the_gold_above_the_cap_as_a_pile() {
+    let mut t = setup_preview();
+    // As `preview_inv_parts`.
+    t.inv().state.move_effects = true;
+    let p = t.player;
+    t.set_stat(p, stat::LEVEL, 1);
+    t.set_stat(p, stat::GOLD, 9500);
+    let g = gold_pile(&mut t, 1000);
+    let (code, _) = t.frame(&pick(g, 0));
+    assert_eq!(code, Done);
+    assert_eq!(t.stat(p, stat::GOLD), 10000);
+    assert_eq!(t.unit(g), None, "the picked pile is freed");
+    let piles: Vec<_> = t
+        .sim()
+        .game
+        .lists
+        .units_of_type(UnitType::Item)
+        .into_iter()
+        .collect();
+    assert_eq!(piles.len(), 1, "the rest stays as one new pile");
+    assert_eq!(t.stat(piles[0], stat::GOLD), 500);
+    assert!(t.sim().game.lists.unit(piles[0]).unwrap().room().is_some());
+}
+
+/// 0x21 over the max stack with the play host's move effects on: each
+/// quantity change leaves as S→C 0x3E (`inventory-moves.md` §7.12; layout
+/// `client/msg-stats-items.md` §5 r1), dst first, none through the rest.
+// Covers: specs/items/inventory-moves.md §7.12
+#[test]
+fn move_effects_announce_stack_quantities_with_0x3e() {
+    use d2_sim::items::moves::layouts::update_item_stat;
+    let mut t = setup();
+    t.inv().state.move_effects = true;
+    let dst = t.picked(KEY);
+    let src = t.cursor_item(KEY);
+    let (du, su) = (t.unit(dst).unwrap(), t.unit(src).unwrap());
+    t.set_stat(du, stat::QUANTITY, 8);
+    t.set_stat(su, stat::QUANTITY, 7);
+    let (code, bytes) = t.frame(&msg(0x21, &[src, dst]));
+    assert_eq!(code, Done);
+    assert!(t
+        .rest
+        .take_log()
+        .iter()
+        .all(|l| !l.starts_with("send_item_stat")));
+    let x3e: Vec<_> = bytes.into_iter().filter(|m| m[0] == 0x3E).collect();
+    // The client's split reads size u8@1; the zero padding after it
+    // arrives as 0x00 messages (`sim/intents-events.md` edge case 13).
+    let sized = |m: Vec<u8>| m[..usize::from(m[1])].to_vec();
+    assert_eq!(
+        x3e,
+        [
+            sized(update_item_stat(dst, stat::QUANTITY, 12, 0)),
+            sized(update_item_stat(src, stat::QUANTITY, 3, 0))
+        ]
+    );
+}
+
 /// 0x50 on the play host's rest: a pile is made (gold request, free
 /// spot, staged room), the amount leaves stat 14 (`§7.22`, `§10.2`).
 // Covers: specs/items/inventory-moves.md §7.22, §10.2

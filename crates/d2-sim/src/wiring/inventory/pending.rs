@@ -6,13 +6,17 @@
 //! durability" (`0x00629930`, `generation.md` §1.3), item
 //! freeing (`units.md` §3.2 through the economy) and the creation of gold
 //! piles (`generation.md` §3 through the economy, request from the rest),
-//! the item bit stream (`items/bitstream.md`, [`super::bits`]).
+//! the item bit stream (`items/bitstream.md`, [`super::bits`]), the gold
+//! rest pile (§10.1), the quest-chain notice 0x5D (§7.11 step 4) and the
+//! book count change (`0x0055C070`, on the equipment rules).
 //! Every other call goes to [`InvRest`] unchanged.
 
 use super::{InvDesk, InvError, InvRest};
 use crate::items::inventory::{
     active_inventory_item, belt_removal_allowed, corpse_slot_fit, InvWorld, UnitKind,
 };
+use crate::items::moves::ground::gold_piles;
+use crate::items::moves::layouts;
 use crate::items::moves::{Guid, MovePending, MoveUnits, Owner, Spot};
 use crate::units::lifecycle::LifecycleHooks;
 use crate::units::UnitId;
@@ -192,8 +196,15 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
     fn set_quest_flag(&mut self, player: Owner, quest: u8, flag: u8, on: bool) {
         self.rest.set_quest_flag(player, quest, flag, on)
     }
-    fn quest_item_used(&mut self, player: Owner) {
-        self.rest.quest_item_used(player)
+    /// `0x005458E0(player, chain)` (`inventory-moves.md` §7.11 step 4):
+    /// S→C 0x5D `5D chain 02 00 0000` to the player's client, with
+    /// [`InvState::move_effects`](super::InvState::move_effects).
+    fn quest_item_used(&mut self, player: Owner, chain: u8) {
+        if self.state.move_effects {
+            self.send(player, vec![0x5D, chain, 0x02, 0, 0, 0]);
+        } else {
+            self.rest.quest_item_used(player, chain)
+        }
     }
     fn quest_tr2_used(&mut self, player: Owner) {
         self.rest.quest_tr2_used(player)
@@ -442,11 +453,29 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
     fn owned_gold_pickup(&mut self, player: Owner, pile: Guid, take: i32) {
         self.rest.owned_gold_pickup(player, pile, take)
     }
+    /// `0x0055B030` "a gold pile of `rest` at the player"
+    /// (`inventory-moves.md` §10.1) as one pile of §10.2
+    /// ([`gold_piles`], max 1; the same creation and placement as the
+    /// 0x50 drop), with [`InvState::move_effects`](super::InvState::move_effects).
     fn rest_pile(&mut self, player: Owner, rest: i32) {
-        self.rest.rest_pile(player, rest)
+        if self.state.move_effects {
+            gold_piles(self, player, rest, 1);
+        } else {
+            self.rest.rest_pile(player, rest)
+        }
     }
-    fn book_count_changed(&mut self, player: Owner, n: i32) {
-        self.rest.book_count_changed(player, n)
+    /// `0x0055C070(n)` on the rules when [`InvState::equip_rules`] is on.
+    ///
+    /// [`InvState::equip_rules`]: super::InvState::equip_rules
+    fn book_count_changed(&mut self, player: Owner, book: Guid, n: i32) {
+        match (
+            self.state.equip_rules,
+            self.unit_of(player),
+            self.item_unit(book),
+        ) {
+            (true, Some(o), Some(i)) => self.run_item_skill_add(o, i, n),
+            _ => self.rest.book_count_changed(player, book, n),
+        }
     }
     fn use_item(&mut self, player: Owner, target: Owner, item: Guid) -> bool {
         // PROVISIONAL (REC-102): potions on the player.
@@ -552,8 +581,16 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
     fn send(&mut self, player: Owner, bytes: Vec<u8>) {
         self.rest.send(player, bytes)
     }
+    /// S→C 0x3E of the item's current stat value
+    /// ([`layouts::update_item_stat`], param 0), queued like every other
+    /// item message of the desk, with [`InvState::move_effects`](super::InvState::move_effects).
     fn send_item_stat(&mut self, player: Owner, item: Guid, stat: u16) {
-        self.rest.send_item_stat(player, item, stat)
+        if self.state.move_effects {
+            let v = self.stat(Owner::item(item), stat);
+            self.send(player, layouts::update_item_stat(item, stat, v, 0));
+        } else {
+            self.rest.send_item_stat(player, item, stat)
+        }
     }
     /// The item bit stream (`items/bitstream.md`) of the real item
     /// ([`InvDesk::item_stream`]); the rest's default is not asked.

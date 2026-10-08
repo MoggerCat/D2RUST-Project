@@ -147,6 +147,17 @@ fn is_type<W: InvWorld + ?Sized>(w: &W, t: &InvTables, item: UnitId, ty: i16) ->
     w.item(item).is_some_and(|d| t.is_type(d.record, ty))
 }
 
+/// One-or-two-handed for a unit (`0x0062A1E0`, §4.4 step 4) of an item
+/// of class `record`, for a unit of kind `unit`.
+///
+/// PROVISIONAL (`inventory.md` §4.4 r4, REC-289): no spec gives the body
+/// of `0x0062A1E0`; read as items `1or2handed` ≠ 0 held by a player of
+/// class 4 (barbarian). Settled by a capture of `0x0062A1E0`.
+pub fn one_or_two_handed_for(t: &InvTables, record: usize, unit: Option<UnitKind>) -> bool {
+    matches!(unit, Some(UnitKind::Player { class: BARBARIAN }))
+        && t.item(record).is_some_and(|r| r.onetwohanded != 0)
+}
+
 /// Hands compatible (`0x0063DBC0`, §4.4) of `a` and `b` for `unit`.
 pub fn hands_compatible<W: InvWorld + ?Sized>(
     w: &W,

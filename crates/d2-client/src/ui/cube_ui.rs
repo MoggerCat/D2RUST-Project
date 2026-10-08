@@ -204,7 +204,7 @@ impl OriginalUi {
                 PanelOutput::SetUi { ui, mode, jump } => {
                     self.set_ui(u32::from(ui), u32::from(mode), jump)?;
                 }
-                PanelOutput::ClickSound => {}
+                PanelOutput::ClickSound | PanelOutput::PlayerEvent(_) => {}
             }
         }
         self.sync_root(root);
