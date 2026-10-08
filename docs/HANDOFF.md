@@ -5938,6 +5938,11 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 - Output: screenshots / `--draws-every 1` trace.
 - Compare: cel draws (order, X, Y, mode) and marker lines vs §10 and §11.
 
+##### REC-102 [MANUAL] items/inventory-moves.md §7.17 (potion use from the belt: item-use spec `0x005BF240` unwritten)
+- Priority 3 (manual play). PROVISIONAL, `claude/q-belt-ui`: a belt healing potion attaches a `healthpot` (state 100) list with stat 74 for 100 frames; a mana potion a `manapot` (106) list with stat 26; `rvs` / `rvl` restore 35 % / 70 % of both at once. Amounts (hp 45/90/150/270/480, mp 30/60/120/225/450) and the duration are d2rs-own, unverified (`d2-sim/src/wiring/inventory/potion.rs`).
+- Steps: new Amazon in town, take damage, press belt key 1–4; `record_packets.py --seconds 60` plain.
+- Compare: the S→C 0x95 life/mana bytes per tick (and 0x9D removal) against the PROVISIONAL list; fold the real amounts, duration and message order into a new item-use spec.
+
 #### Deferred (not recorded; outside Phases 0–6)
 - IT-1 `formats/d2s.md` OQ1 (legacy loader `0x00534020`, pre-1.09 saves), IT-2 OQ2 (item records of save versions 0x5C–0x5F), `formats/d2s-legacy.md` and `items/bitstream-legacy.md` Pending lines (1.07 / 1.08 / 1.00–1.06 saves): need sample files and are only needed if old saves must load. Record only if the user opens that scope.
 - **REC-44** legacy saves, cited by the specs as the capture: `formats/d2s-legacy.md` OQ2 (load one 1.07 / 1.08 save, version 0x57 / 0x59, in 1.14d and compare the unit (stats, skills, items, hireling) with the rules), `items/bitstream-legacy.md` OQ1 (the same 1.07 / 1.08 save: every item against §2–§4, affix ids after the offset of §2 rule 3) and OQ2 (a 1.00–1.06 save, version 0x47, holding a stored, equipped, belt, cursor and socketed item, an ear and a corpse with an equipped item: compare with §6–§8 and edge cases 7–9). No such save exists on this PC; record only if the user opens that scope (steps: place the save in `%USERPROFILE%\Saved Games\Diablo II`, `record_packets.py --seconds 60` plain, then `tools/d2s_check.py`).
