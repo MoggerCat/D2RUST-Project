@@ -199,15 +199,43 @@ impl<R: UiRules> UiRules for PanelArtRules<R> {
 pub struct PanelArtLoader {
     pub source: Arc<dyn FileSource>,
     pub files: UiFiles,
+    /// File id → (name, frame set key) of the draws already resolved: the
+    /// key is built once, not per draw per frame (q-perf). An entry is
+    /// valid while `files` names the id the same.
+    keys: std::sync::Mutex<std::collections::HashMap<u32, (String, FrameSetKey)>>,
 }
 
 impl PanelArtLoader {
+    pub fn new(source: Arc<dyn FileSource>, files: UiFiles) -> Self {
+        Self {
+            source,
+            files,
+            keys: Default::default(),
+        }
+    }
+
+    /// [`image_set`], memoized by file id.
+    fn set_of(&self, image: ImageRef) -> Result<FrameSetKey, ViewError> {
+        let mut keys = self.keys.lock().unwrap_or_else(|e| e.into_inner());
+        if let (Some((name, key)), Some(now)) = (keys.get(&image.file), self.files.name(image.file))
+        {
+            if name == now {
+                return Ok(key.clone());
+            }
+        }
+        let key = image_set(&self.files, image)?;
+        if let Some(name) = self.files.name(image.file) {
+            keys.insert(image.file, (name.to_owned(), key.clone()));
+        }
+        Ok(key)
+    }
+
     /// Makes every image's frame set resident. A file no archive holds, or
     /// one that does not parse, is an error (M07): never skipped.
     pub fn ensure(&self, draws: &[UiDraw], assets: &mut ViewAssets) -> Result<(), ViewError> {
         for d in draws {
             let UiDraw::Image(req) = d else { continue };
-            let set = image_set(&self.files, req.image)?;
+            let set = self.set_of(req.image)?;
             if assets.frames.contains(&set) {
                 continue;
             }
@@ -298,10 +326,7 @@ mod tests {
         let id = files.id("panel\\buysellbtn").unwrap();
         let mut src = MemorySource::default();
         src.insert("data\\global\\ui\\panel\\buysellbtn.dc6", dc6(12, 4, 3));
-        let loader = PanelArtLoader {
-            source: Arc::new(src),
-            files: files.clone(),
-        };
+        let loader = PanelArtLoader::new(Arc::new(src), files.clone());
         let mut a = assets();
         let draws = [
             UiDraw::Image(image(id, 10, 418, 476)),
@@ -325,15 +350,30 @@ mod tests {
     fn missing_or_unknown_files_are_errors() {
         let files = PanelTables::load().unwrap().files;
         let id = files.id("panel\\invchar6").unwrap();
-        let loader = PanelArtLoader {
-            source: Arc::new(MemorySource::default()),
-            files: files.clone(),
-        };
+        let loader = PanelArtLoader::new(Arc::new(MemorySource::default()), files.clone());
         let mut a = assets();
         let missing = [UiDraw::Image(image(id, 0, 0, 0))];
         assert!(loader.ensure(&missing, &mut a).is_err());
         let unknown = [UiDraw::Image(image(u32::MAX, 0, 0, 0))];
         assert!(loader.ensure(&unknown, &mut a).is_err());
         assert!(a.frames.is_empty());
+    }
+
+    // q-perf: the memoized key is the key `image_set` builds, every time.
+    #[test]
+    fn the_memoized_set_key_equals_image_set() {
+        let files = PanelTables::load().unwrap().files;
+        let id = files.id("panel\\invchar6").unwrap();
+        let loader = PanelArtLoader::new(Arc::new(MemorySource::default()), files.clone());
+        let r = ImageRef { file: id, frame: 0 };
+        let want = image_set(&files, r).unwrap();
+        assert_eq!(loader.set_of(r).unwrap(), want);
+        assert_eq!(loader.set_of(r).unwrap(), want);
+        assert!(loader
+            .set_of(ImageRef {
+                file: u32::MAX,
+                frame: 0
+            })
+            .is_err());
     }
 }

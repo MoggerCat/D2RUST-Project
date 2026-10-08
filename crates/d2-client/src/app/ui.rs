@@ -146,10 +146,7 @@ pub fn add_original_ui_with(
     let mut ui = WorldViewUi::new(root, Box::new(NoStrings));
     ui.original = Some(original);
     ui.bindings = Preset::Dev.bindings();
-    ui.art = Some(PanelArtLoader {
-        source: parts.source.clone(),
-        files: files.clone(),
-    });
+    ui.art = Some(PanelArtLoader::new(parts.source.clone(), files.clone()));
     ui.text = Some(TextAssetLoader {
         source: parts.source.clone(),
     });

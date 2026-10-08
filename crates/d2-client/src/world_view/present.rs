@@ -766,8 +766,10 @@ fn world_view_frame(
     let blank_screen = state.feed.blank_screen(bridge.0.world())?;
     let use_gpu = gpu.is_some();
     let bridge_frame = bridge.0.world().frames;
-    state.last_tags = frame.items.iter().map(|i| i.tag).collect();
-    state.last_ui = draws.to_vec();
+    state.last_tags.clear();
+    state.last_tags.extend(frame.items.iter().map(|i| i.tag));
+    state.last_ui.clear();
+    state.last_ui.extend_from_slice(draws);
     state.last = Some(FrameStats {
         bridge_frame,
         server_tick: tick,

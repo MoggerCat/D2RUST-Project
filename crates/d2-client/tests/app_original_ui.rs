@@ -215,10 +215,7 @@ fn wired_panels_load_from_the_install() {
         w.units.insert(key, u);
         w.local_player = Some(key);
         w.expansion = 1;
-        let loader = PanelArtLoader {
-            source: archives.clone(),
-            files: ui.files(),
-        };
+        let loader = PanelArtLoader::new(archives.clone(), ui.files());
         for state in [1, 4] {
             ui.before_event(UiEvent::CursorLeft, &w);
             ui.set_ui(2, 0, false).unwrap();
