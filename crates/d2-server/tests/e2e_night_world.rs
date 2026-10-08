@@ -204,6 +204,7 @@ impl Pending for TestPending {
         match (ty, mode) {
             (UnitType::Player, 10) => Some(*PLAYER_SC),
             (UnitType::Monster, 0) => Some(*MONSTER_DT),
+            (UnitType::Monster, 2) => Some(*b"M0WLHTH\0"),
             _ => None,
         }
     }
@@ -590,7 +591,20 @@ impl Fx {
                 ..TestPending::default()
             },
         );
-        hooks.anim_data = Some(Arc::new(anim_data()));
+        hooks.anim_data = Some(Arc::new({
+            // The fixture's two names plus a monster walk (6 frames), for
+            // the hireling stand-in think (`hireling_drive`).
+            use d2_formats::animdata::{self, AnimRecord};
+            let mut a = anim_data();
+            let name = *b"M0WLHTH\0";
+            a.buckets[animdata::hash(&name[..7])].push(AnimRecord {
+                name,
+                frames: 6,
+                speed: 256,
+                events: [0; animdata::EVENTS],
+            });
+            a
+        }));
         hooks.vitals = Some(Arc::new(vitals()));
         let wt = WorldTables {
             pop: PopTables::from_records(&levels(), &[monster_class()], &monstats2(), &[]),
@@ -1027,6 +1041,65 @@ fn the_hireling_follows_a_waypoint_teleport() {
     assert_eq!(fx.pos(merc), merc_at, "warp_to is Pending");
     assert_eq!(fx.sim().events.action.hooks().pet_follows, Some(vec![]));
     fx.assert_clean();
+}
+
+// ---- 2b. the hireling fights (preview stand-in think) ----------------------------------
+
+// Covers: specs/world/hirelings-ai.md; specs/monsters/ai-bodies-6.md §7 (d2rs-own, unverified: `hireling_drive`)
+#[test]
+fn the_hireling_attacks_a_hostile_monster_beside_it() {
+    let mut fx = Fx::new();
+    let p = fx.player;
+    let spawn = |fx: &mut Fx, class: u32, dy: i32| {
+        let room = fx.room(p);
+        let req = AllocRequest {
+            ty: UnitType::Monster,
+            class,
+            room,
+            add: true,
+            fixed_guid: None,
+            mode: 1,
+            allied: false,
+        };
+        let s = fx.sim();
+        s.events
+            .action
+            .with(&mut s.game, |g, v| {
+                v.allocate(g, &req, PLAYER_AT.0, PLAYER_AT.1 + dy)
+            })
+            .unwrap()
+    };
+    let merc = spawn(&mut fx, MERC_CLASS, 12);
+    let foe = spawn(&mut fx, 0, 14);
+    let mg = fx.guid(merc);
+    {
+        let s = fx.sim();
+        s.events.action.with(&mut s.game, |_, v| {
+            v.set_base(merc, 21, 10);
+            v.set_base(merc, 22, 10);
+            v.set_base(foe, 7, 50 << 8);
+            v.set_base(foe, 6, 50 << 8);
+        });
+    }
+    let w = &mut fx.sim().world;
+    w.state.hireling_tables = Some(HirelingTables {
+        rows: d2_sim::world::hirelings::HirelingRows::default(),
+        exp_ratios: Default::default(),
+        max_level: 99,
+        pet_flags: HirelingTables::WARP,
+        pet_basemax: 1,
+    });
+    w.state.hirelings.list_mut(p).nodes = vec![PetNode {
+        guid: mg,
+        ..PetNode::default()
+    }];
+    let before = fx.stat(foe, 6);
+    assert!(before > 0);
+    for _ in 0..40 {
+        fx.step(&[]);
+    }
+    assert!(fx.stat(foe, 6) < before, "the hireling hurt its neighbour");
+    assert_eq!(fx.sim().events.action.sys.units.get(merc).unwrap().mode, 4);
 }
 
 // ---- 3. a room-population monster killed with a missile --------------------------------

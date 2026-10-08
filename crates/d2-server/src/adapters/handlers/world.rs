@@ -26,6 +26,7 @@
 //! and the cube on the same unit world).
 
 mod action;
+mod hireling_drive;
 mod hireling_host;
 mod wired;
 

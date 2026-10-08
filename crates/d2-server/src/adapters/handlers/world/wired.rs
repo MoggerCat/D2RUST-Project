@@ -642,6 +642,7 @@ where
         self.pet_deaths(game, events);
         self.hireling_calls(game, events);
         self.pet_follows(game, events);
+        self.drive_hirelings(game, events);
     }
 
     /// The quest control on the desk's economy and rest
