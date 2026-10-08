@@ -127,7 +127,8 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvWorld for InvDesk<'_, '_, H, R> 
             return self.queue_equip(EquipCall::Pass(owner));
         }
         let o = self.o(owner);
-        self.rest.inventory_pass(o)
+        self.rest.inventory_pass(o);
+        self.link_charms(owner)
     }
     fn trade_hook(&mut self, owner: UnitId, item: UnitId) {
         let (o, i) = (self.o(owner), self.g(item));
@@ -138,6 +139,7 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvWorld for InvDesk<'_, '_, H, R> 
         self.rest.weapon_in_use_update(o)
     }
     fn stat_link(&mut self, unit: UnitId, item: UnitId) {
+        self.link_item_stats(unit, item);
         let (o, i) = (self.o(unit), self.g(item));
         self.rest.stat_link(o, i)
     }

@@ -553,6 +553,28 @@ fn needs_repair(t: &VendorTables, it: &PriceItem) -> bool {
         || charges_not_full(it)
 }
 
+/// The repair-all quote of rule 3: the summed repair cost of the equipped
+/// items that need repair, and those items.
+pub fn repair_all_quote<W: VendorWorld>(
+    t: &VendorTables,
+    ctx: &PriceCtx,
+    w: &W,
+    player: UnitId,
+) -> Result<(i32, Vec<UnitId>), PriceFatal> {
+    let mut total = 0i32;
+    let mut todo = Vec::new();
+    for item in w.equipped_items(player) {
+        let Some(it) = w.price_item(item) else {
+            continue;
+        };
+        if needs_repair(t, &it) {
+            total = total.wrapping_add(cost(t, ctx, Some(&it), tx::REPAIR)?);
+            todo.push(item);
+        }
+    }
+    Ok((total, todo))
+}
+
 /// Repair `0x00578050` (§8.1). Returns the routine's own result (rule 7,
 /// V12): 1 for rules 1, 2, rule 4's "not repairable" and "nothing to
 /// repair" and repair-all's failed payment; 3 for rule 4's "missing or
@@ -578,17 +600,7 @@ pub fn repair<W: VendorWorld>(
     let ctx = price_ctx(t, w, player, class);
     // Rule 3.
     if m.all {
-        let mut total = 0i32;
-        let mut todo = Vec::new();
-        for item in w.equipped_items(player) {
-            let Some(it) = w.price_item(item) else {
-                continue;
-            };
-            if needs_repair(t, &it) {
-                total = total.wrapping_add(cost(t, &ctx, Some(&it), tx::REPAIR)?);
-                todo.push(item);
-            }
-        }
+        let (total, todo) = repair_all_quote(t, &ctx, w, player)?;
         if total == 0 {
             send(w, player, 1, 2, NO_GUID);
             return Ok(0);

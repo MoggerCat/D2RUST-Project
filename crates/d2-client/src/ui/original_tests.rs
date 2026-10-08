@@ -553,10 +553,34 @@ fn the_menu_entries_return_save_and_exit_and_swallow_clicks() {
         vec!["Options", "Save and Exit Game", "Return to Game"]
     );
     let entry = |i: i32| Point::new(400, 215 + 45 * i);
-    // Options does nothing and the click is swallowed (not Unhandled).
+    // Options opens its page (d2rs config, REC-172); the click is
+    // swallowed and nothing is requested.
     let (_, r) = u.click(&w, entry(0));
     assert_ne!(r, Routed::Unhandled);
     assert!(u.ui.is_open(9) && !u.ui.take_exit_request());
+    assert_eq!(
+        texts(&u),
+        vec![
+            "Resolution: 800x600",
+            "Window Mode: windowed",
+            "Controls: controls.toml",
+            "Previous"
+        ]
+    );
+    // Window Mode cycles and reports the change once.
+    assert!(u.ui.take_settings_change().is_none());
+    u.click(&w, entry(1));
+    let s = u.ui.take_settings_change().unwrap();
+    assert_eq!(s.window_mode, crate::app::config::WindowMode::Borderless);
+    assert!(u.ui.take_settings_change().is_none());
+    u.click(&w, entry(0));
+    assert_eq!(u.ui.take_settings_change().unwrap().resolution, 0);
+    // Previous goes back to the first page.
+    u.click(&w, entry(3));
+    assert_eq!(
+        texts(&u),
+        vec!["Options", "Save and Exit Game", "Return to Game"]
+    );
     // A click outside the box does not reach the world either.
     let (_, r) = u.click(&w, Point::new(10, 10));
     assert_ne!(r, Routed::Unhandled);

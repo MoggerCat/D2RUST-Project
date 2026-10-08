@@ -26,10 +26,13 @@ use std::sync::Arc;
 
 use crate::bridge::world::ClientWorld;
 use crate::bridge::ClientUnit;
-use crate::composite::{ComponentFrame, ComponentRequest, CompositeError, UnitParams};
+use crate::composite::{
+    ComponentDraw, ComponentFrame, ComponentRequest, CompositeError, UnitParams,
+};
 use crate::frames::IndexFrame;
+use crate::rules::draw_order::OrderKey;
 use crate::rules::unit_composite::{component_cel, frame_index, unit_direction, CompositeKind};
-use crate::scene::{order::pass, BlendOp, ItemTag, Rect, ShadeChain};
+use crate::scene::{order::pass, BlendOp, DrawItem, ItemTag, Rect, ShadeChain};
 use crate::ui::{ImageRequest, TextRequest};
 
 use super::unit_assets::{component_codes, unit_cof, SharedUnitArt, UnitLooks};
@@ -113,6 +116,22 @@ impl<R: ViewRules> ViewRules for UnitRules<R> {
             clip: Rect::FRAME,
             tag: ItemTag::Unit(unit.key.guid),
         })
+    }
+
+    /// The shadows of the composite just built (`unit_shadow`).
+    fn unit_shadows(
+        &self,
+        _world: &ClientWorld,
+        unit: &ClientUnit,
+        pose: &UnitPose,
+        at: Option<OrderKey>,
+        draws: &[ComponentDraw],
+        assets: &ViewAssets,
+    ) -> Result<Vec<DrawItem>, ViewError> {
+        let (Some(at), Some(cof)) = (at, assets.cofs.get(&pose.cof)) else {
+            return Ok(Vec::new());
+        };
+        super::unit_shadow::draws(cof, unit.key.guid, at, draws, assets)
     }
 
     fn component_frame(

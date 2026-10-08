@@ -89,3 +89,103 @@ fn the_preview_cube_records_quest_item_hooks_for_the_host() {
     assert_eq!(c.take_quest_items(), vec![(UnitId(1), *b"hst ")]);
     assert!(c.take_quest_items().is_empty());
 }
+
+fn object(f: &mut Fx, class: u32) -> UnitId {
+    let req = AllocRequest {
+        ty: UnitType::Object,
+        class,
+        room: None,
+        add: true,
+        fixed_guid: None,
+        mode: 0,
+        allied: false,
+    };
+    let s = &mut f.h.game;
+    s.events
+        .with(&mut s.game, |g, v| v.allocate(g, &req, 0, 0))
+        .unwrap()
+}
+
+/// A real item of the two-row table (0 `hst `, 1 `msf `), in the cursor
+/// mode.
+fn staff(f: &mut Fx, index: i32) -> UnitId {
+    use d2_sim::items::tables::ItemRec;
+    use d2_sim::items::{q, ItemRequest, ItemTables};
+    use d2_sim::wiring::economy::ItemSpawn;
+    f.world().tables = ItemTables {
+        items: [b"hst ", b"msf "]
+            .map(|code| ItemRec {
+                code: *code,
+                level: 1,
+                ..ItemRec::default()
+            })
+            .to_vec(),
+        ..ItemTables::default()
+    };
+    let mut rq = ItemRequest {
+        item: index,
+        format: 101,
+        quality: q::NORMAL,
+        ..ItemRequest::default()
+    };
+    let spawn = ItemSpawn {
+        room: None,
+        mode: 4,
+        init_flags: 1,
+    };
+    let s = &mut f.h.game;
+    s.world
+        .with_economy(&mut s.game, &mut s.events, |econ, _| {
+            econ.create_item(&mut rq, false, spawn)
+        })
+        .unwrap()
+}
+
+// Covers: specs/world/quests-act2-2.md §3.2; specs/world/quests-act2.md §8.7
+#[test]
+fn the_staff_put_in_the_orifice_is_handed_in() {
+    let mut f = Fx::new(|_| {});
+    let p = f.player;
+    f.world().quests.record_mut(13).unwrap().not_intro = true;
+    let orifice = object(&mut f, 152);
+    let og = f.guid(orifice);
+    let (hst, msf) = (staff(&mut f, 0), staff(&mut f, 1));
+    let (hg, mg) = (f.guid(hst), f.guid(msf));
+    // Another item is refused (0x58 result 4); the staff is not handed in.
+    queue(
+        &mut f,
+        QuestEvent::InsertItem {
+            player: p,
+            object: og,
+            item: mg,
+            action: 3,
+        },
+    );
+    frame(&mut f);
+    assert!(
+        !f.world()
+            .quests
+            .record(13)
+            .unwrap()
+            .extra
+            .a2
+            .q6
+            .staff_removed
+    );
+    // The staff: accepted, handed in, the lair objects are due.
+    queue(
+        &mut f,
+        QuestEvent::InsertItem {
+            player: p,
+            object: og,
+            item: hg,
+            action: 3,
+        },
+    );
+    frame(&mut f);
+    let x = &f.world().quests.record(13).unwrap().extra.a2.q6;
+    let got = (x.staff_removed, x.objects_update, x.timer_active);
+    assert_eq!(got, (true, true, true), "{:?}", f.world().quests.faults);
+    assert!(f.world().quests.faults.is_empty());
+    assert_eq!(f.world().rest.object_modes[&orifice], 1);
+}

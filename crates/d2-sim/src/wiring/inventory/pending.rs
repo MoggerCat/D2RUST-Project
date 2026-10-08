@@ -296,6 +296,9 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
         self.rest.stat_refresh_unlink(u, b)
     }
     fn stat_link(&mut self, owner: Owner, item: Guid) {
+        if let (Some(o), Some(i)) = (self.unit_of(owner), self.item_unit(item)) {
+            self.link_item_stats(o, i);
+        }
         self.rest.stat_link(owner, item)
     }
     /// §5.5 `0x0055C270` on the rules when [`InvState::equip_rules`] is on.
@@ -321,6 +324,9 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
             (true, Some(o), Some(i)) => self.run_item_skill_link(o, i, false),
             _ => self.rest.charm_unlink(owner, item),
         }
+        if let (Some(o), Some(i)) = (self.unit_of(owner), self.item_unit(item)) {
+            self.unlink_item_stats(o, i);
+        }
     }
     /// §5.6 (`0x0062FF70`).
     fn is_active(&self, owner: Owner, item: Guid) -> bool {
@@ -335,6 +341,9 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
             (true, Some(o)) => self.run_inventory_pass(o, false),
             _ => self.rest.inventory_pass(owner),
         }
+        if let Some(o) = self.unit_of(owner) {
+            self.link_charms(o);
+        }
     }
     fn weapon_in_use_update(&mut self, owner: Owner) {
         self.rest.weapon_in_use_update(owner)
@@ -347,6 +356,9 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
         }
     }
     fn body_leave_effects(&mut self, owner: Owner, item: Guid) {
+        if let (Some(o), Some(i)) = (self.unit_of(owner), self.item_unit(item)) {
+            self.unlink_item_stats(o, i);
+        }
         self.rest.body_leave_effects(owner, item)
     }
     fn hireling_owner_pass(&mut self, owner: Owner) {

@@ -232,6 +232,26 @@ pub struct OriginalTextHooks {
 
 /// The font of id `style.font` (`text-fonts.tsv`).
 pub fn original_text_font(style: TextStyle) -> Result<TextFont, ViewError> {
+    // Memoized per font id (q-perf): the 14 fonts' paths are validated
+    // once per thread, not per text draw per frame.
+    thread_local! {
+        static FONTS: std::cell::RefCell<[Option<TextFont>; 14]> =
+            const { std::cell::RefCell::new([const { None }; 14]) };
+    }
+    let id = usize::from(style.font);
+    if id < 14 {
+        if let Some(f) = FONTS.with(|c| c.borrow()[id].clone()) {
+            return Ok(f);
+        }
+    }
+    let font = build_text_font(style)?;
+    if id < 14 {
+        FONTS.with(|c| c.borrow_mut()[id] = Some(font.clone()));
+    }
+    Ok(font)
+}
+
+fn build_text_font(style: TextStyle) -> Result<TextFont, ViewError> {
     let info = font_info(style.font).ok_or_else(|| ViewError::Unresolved {
         what: "UI text font",
         spec: "ui/text.md",
@@ -744,5 +764,17 @@ mod text_tests {
         // Font16 `A` at pen (104, 200): columns 104–117, rows 185–200.
         assert_eq!(s.len(), 1);
         assert_eq!((s[0].x, s[0].y, s[0].frame.index), (104, 185, 65));
+    }
+
+    // q-perf: the memoized font is the font built fresh, every call.
+    #[test]
+    fn the_memoized_font_equals_the_built_one() {
+        for font in 0..14u16 {
+            let style = TextStyle { font, color: 0 };
+            let built = build_text_font(style).unwrap();
+            assert_eq!(original_text_font(style).unwrap(), built);
+            assert_eq!(original_text_font(style).unwrap(), built);
+        }
+        assert!(original_text_font(TextStyle { font: 14, color: 0 }).is_err());
     }
 }

@@ -149,13 +149,26 @@ pub fn add_client_data(app: &mut App, drlg: DrlgSource, levels: Vec<LevelRow>) {
 /// for the inputs the model lacks; a frame that still fails is logged,
 /// not fatal. Nothing it draws is verified against 1.14d (rule 10).
 pub fn add_preview(app: &mut App, levels: Vec<LevelRow>, tiles: TileAssets) {
+    add_preview_lit(app, levels, tiles, None);
+}
+
+/// [`add_preview`] with the monster / missile light columns of the tables
+/// (`world_view::light_sources`, d2rs-own, unverified).
+pub fn add_preview_lit(
+    app: &mut App,
+    levels: Vec<LevelRow>,
+    tiles: TileAssets,
+    lights: Option<crate::world_view::light_sources::LightRows>,
+) {
+    let mut preview = Preview::new(tiles);
+    preview.light.sources = lights.map(std::sync::Arc::new);
     let mut state = app.world_mut().resource_mut::<WorldViewState>();
     state.feed = Box::new(
         ModelFeed {
             levels: Some(levels),
             ..ModelFeed::<NoFeed>::default()
         }
-        .with_preview(Preview::new(tiles)),
+        .with_preview(preview),
     );
     state.preview = true;
 }
@@ -341,13 +354,27 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
         config.seed, started.waypoint, started.waypoint_guid
     );
     let mut app = App::new();
+    // d2rs-own, unverified: the config folder is next to the saves; a bad
+    // settings.toml or controls.toml stops here (no silent default).
+    let cfg_dir = super::config::config_dir(
+        &config
+            .save_path
+            .as_deref()
+            .and_then(|p| p.parent().map(std::path::Path::to_path_buf))
+            .unwrap_or_else(super::save::default_save_dir),
+    );
+    let settings = super::config::load_settings(&cfg_dir)?;
+    let bindings = super::config::load_controls(&cfg_dir)?;
     app.add_plugins(DefaultPlugins.set(WindowPlugin {
-        primary_window: Some(Window {
-            title: "d2rs".into(),
-            ..default()
-        }),
+        primary_window: Some(super::config::window_for(&settings)),
         ..default()
     }));
+    app.insert_resource(super::config::ConfigRes {
+        dir: cfg_dir,
+        settings,
+        bindings,
+    })
+    .add_systems(Update, super::config::apply_settings);
     let (link, saver): (DynLink, Option<save::SaveHandle>) = match (config.save_path, save_tables) {
         (Some(path), Some(tables)) => {
             let (link, handle) = save::share(link, save_base, tables, path);
@@ -392,7 +419,10 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
             .set_wall_seconds(wall_seconds);
         let palettes = ActPalettes::live(archives.as_ref()).map_err(anyhow::Error::msg)?;
         let tiles = TileAssets::new(Some(archives.source()), Some(palettes.pl2.clone()));
-        add_preview(&mut app, level_rows, tiles);
+        let lights = crate::world_view::light_sources::load(archives.as_ref())
+            .map_err(|e| warn!("light rows (d2rs-own, unverified): {e}; player light only"))
+            .ok();
+        add_preview_lit(&mut app, level_rows, tiles, lights);
         let mut item_parts =
             super::items::item_parts(archives.as_ref()).map_err(anyhow::Error::msg)?;
         if let Some(lookup) = item_lookup {

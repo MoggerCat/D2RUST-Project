@@ -152,16 +152,52 @@ pub fn run<X>(
 }
 
 /// The stats whose changes follow as stat messages: the attributes (0-3),
-/// stat and skill points (4, 5), the maxima (7, 9, 11), level (12) and
-/// next-level experience (30). Life, mana, stamina, gold and experience
-/// have their own messages above.
-const WATCHED: [u16; 11] = [0, 1, 2, 3, 4, 5, 7, 9, 11, 12, 30];
+/// stat and skill points (4, 5), the maxima (7, 9, 11), level (12),
+/// next-level experience (30), defense (31) and the resists (39-46).
+/// Life, mana, stamina, gold and experience have their own messages above.
+const WATCHED: [u16; 20] = [
+    0, 1, 2, 3, 4, 5, 7, 9, 11, 12, 30, 31, 39, 40, 41, 42, 43, 44, 45, 46,
+];
 
-/// The watched base values of `unit`, by stat.
+/// The watched stats an item's properties add to (attributes, defense,
+/// resists).
+fn item_affected(stat: u16) -> bool {
+    matches!(stat, 0..=3 | 31 | 39..=46)
+}
+
+/// The sum of `stat` over the item lists linked to `unit` (charms and
+/// worn items, `inventory.md` §5.7). The client builds no item stat lists
+/// yet, so these ride in the value sent.
+fn item_bonus<X>(sim: &ActionSim<X>, unit: UnitId, stat: u16) -> i32 {
+    let s = &sim.sys.stats;
+    let Some(root) = s.unit_list(unit) else {
+        return 0;
+    };
+    s.active_chain(root)
+        .into_iter()
+        .filter(|&l| {
+            s.owner(l)
+                .and_then(|o| sim.sys.units.get(o))
+                .is_some_and(|r| r.ty == UnitType::Item)
+        })
+        .fold(0i32, |a, l| a.wrapping_add(s.total(l, stat, 0)))
+}
+
+/// The watched base values of `unit`, by stat. PROVISIONAL (REC-163): the
+/// value of an item-affected stat includes the unit's linked item lists
+/// (the client's total reads it as a base).
 fn watched<X>(sim: &ActionSim<X>, unit: UnitId) -> BTreeMap<i32, i32> {
     WATCHED
         .iter()
-        .map(|&s| (i32::from(s), sim.sys.stats.unit_base(unit, s, 0)))
+        .map(|&s| {
+            let base = sim.sys.stats.unit_base(unit, s, 0);
+            let extra = if item_affected(s) {
+                item_bonus(sim, unit, s)
+            } else {
+                0
+            };
+            (i32::from(s), base.wrapping_add(extra))
+        })
         .collect()
 }
 

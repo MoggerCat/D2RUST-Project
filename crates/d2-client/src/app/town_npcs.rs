@@ -44,7 +44,8 @@ pub const ACT5: [(u16, i32); 6] = [
 /// d2rs-own, unverified (REC-137): the synthetic game's `hireling` rows,
 /// one per difficulty for Asheara (act 3, seller 252) so her hire list
 /// can be made (`npc.md` §7.1 needs a row, `NoHirelingRow` otherwise).
-/// The mercenary class, price, level and name ids are made up.
+/// The mercenary class, level and name ids are made up; the price is 0
+/// because the synthetic game has no gold stat row to pay from (REC-157).
 pub fn synthetic_hire_rows() -> Vec<d2_sim::world::npc::hire::HireRow> {
     let version = if super::single_player::GAME_SETUP.expansion {
         100
@@ -58,7 +59,7 @@ pub fn synthetic_hire_rows() -> Vec<d2_sim::world::npc::hire::HireRow> {
             act: 3,
             difficulty,
             seller: u32::from(class::ASHEARA),
-            gold: 1000,
+            gold: 0,
             level: 1,
             name_first: 3000,
             name_last: 3004,
@@ -71,7 +72,7 @@ pub fn synthetic_hire_rows() -> Vec<d2_sim::world::npc::hire::HireRow> {
             act: 5,
             difficulty,
             seller: u32::from(class::QUAL_KEHK),
-            gold: 300,
+            gold: 0,
             level: 1,
             name_first: 3100,
             name_last: 3102,

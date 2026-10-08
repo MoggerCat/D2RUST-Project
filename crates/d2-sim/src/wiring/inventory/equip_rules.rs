@@ -30,6 +30,13 @@ pub enum EquipCall {
     Pass(UnitId),
     /// §5.8 weapon bookkeeping.
     Weapons(UnitId),
+    /// The set-item update after an item was linked (owner, item;
+    /// [`item_link`](super::item_link)).
+    SetLink(UnitId, UnitId),
+    /// The set-item update after an item left the body.
+    SetUnlink(UnitId, UnitId),
+    /// The charm links of the inventory pass (§5.7 step 2).
+    Charms(UnitId),
 }
 
 /// Unit type 4 (item), the owner type of a new set list (§13 step 6).
@@ -59,6 +66,9 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
                 EquipCall::SkillLink(o, i) => self.run_item_skill_link(o, i, true),
                 EquipCall::Pass(o) => self.run_inventory_pass(o, false),
                 EquipCall::Weapons(o) => self.run_weapon_bookkeeping(o),
+                EquipCall::SetLink(o, i) => self.run_set_link(o, i),
+                EquipCall::SetUnlink(o, i) => self.run_set_unlink(o, i),
+                EquipCall::Charms(o) => self.run_link_charms(o),
             }
         }
     }
@@ -376,6 +386,9 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> SetWorld for InvDesk<'_, '_, H, R> 
     }
     /// `0x00660120` (`properties.md` §11): the rest's.
     fn set_bonuses(&mut self, o: UnitId, i: UnitId, state: u32) {
+        if self.state.link_item_stats {
+            return self.apply_set_bonuses(o, i, state);
+        }
         let (ow, g) = (self.owner_or_none(o), self.guid_of(i));
         self.rest.set_bonuses(ow, g, state)
     }

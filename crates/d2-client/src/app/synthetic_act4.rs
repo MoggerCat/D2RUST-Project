@@ -37,6 +37,32 @@ pub const WAYPOINT_XY: (i32, i32) = (20, 30);
 pub const IZUAL: u32 = 256;
 pub const IZUAL_CHAIN: u32 = 22;
 pub const IZUAL_XY: i32 = 8;
+/// Object classes of the endgame (`quests-act4.md` §1.4, task
+/// `q-a4-endgame`): the seal-boss dummy, the Diablo start point, the
+/// Hellforge, the five seals and the portal to Harrogath, each with
+/// its (operate, init) function indices. d2rs-own, unverified.
+pub const DUMMY: u32 = 131;
+pub const START_POINT: u32 = 255;
+pub const HELLFORGE: u32 = 376;
+pub const SEALS: [u32; 5] = [392, 393, 394, 395, 396];
+pub const HARROGATH_PORTAL: u32 = 566;
+/// (class, operate fn, init fn) rows past the Moldy Tome's.
+pub const OBJECT_ROWS: [(u32, u8, u8); 9] = [
+    (DUMMY, 0, 59),
+    (START_POINT, 0, 55),
+    (HELLFORGE, 49, 48),
+    (392, 54, 56),
+    (393, 52, 56),
+    (394, 55, 56),
+    (395, 52, 56),
+    (396, 56, 56),
+    (HARROGATH_PORTAL, 73, 78),
+];
+/// Diablo, Hephasto, and the seal bosses' classes (the superunique ids
+/// 36–38 stand in as classes when the game has no `superuniques` rows).
+pub const DIABLO: u32 = 243;
+pub const HEPHASTO: u32 = 409;
+pub const BOSSES: [u32; 5] = [DIABLO, HEPHASTO, 36, 37, 38];
 /// `monstats` rows the synthetic table needs for this act (Hephasto's
 /// class 409 is the highest Act IV class listed in the spec).
 pub const MONSTATS_ROWS: usize = 410;

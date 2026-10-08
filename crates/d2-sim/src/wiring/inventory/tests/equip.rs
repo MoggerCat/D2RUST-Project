@@ -142,3 +142,101 @@ fn swap_cursor_with_body() {
     assert_eq!((w.data(e).cmd_flags, w.data(n).cmd_flags), (0x20, 0x20));
     assert_eq!(item_msgs(&w.drain()), [(0x9D, 0x09, e), (0x9D, 0x09, n)]);
 }
+
+/// REC-161 (d2rs-own, unverified): a worn item's stat list is attached to
+/// the wearer, so its base damage reaches the wearer's stats (21 / 22),
+/// and goes with the item when it comes off.
+#[test]
+fn a_worn_weapon_gives_its_damage_to_the_wearer() {
+    const MIN: u16 = 21;
+    const MAX: u16 = 22;
+    let mut w = World::new();
+    w.state.link_item_stats = true;
+    let p = w.player;
+    let c = w.cursor_item(SWORD);
+    let u = w.unit(c).unwrap();
+    w.set_stat(u, MIN, 3);
+    w.set_stat(u, MAX, 9);
+    assert_eq!(w.stats.unit_total(p, MAX, 0), 0);
+    assert_eq!(w.handle(&body(0x1A, c, 4)), Ok(0));
+    assert_eq!(w.mode(c), 1);
+    assert_eq!(w.stats.unit_total(p, MIN, 0), 3);
+    assert_eq!(w.stats.unit_total(p, MAX, 0), 9);
+    assert_eq!(w.handle(&unequip(4)), Ok(0));
+    assert_eq!(w.stats.unit_total(p, MIN, 0), 0);
+    assert_eq!(w.stats.unit_total(p, MAX, 0), 0);
+}
+
+/// A gem socketed into a worn item reaches the wearer (the filler's list
+/// hangs on the item's list, which hangs on the wearer's).
+#[test]
+fn a_socketed_gem_reaches_the_wearer() {
+    use crate::items::tables::{GemRec, PropRec, PropSlot, PropertyRec};
+    const STAT: u16 = 31;
+    let mut w = World::new();
+    w.state.link_item_stats = true;
+    let p = w.player;
+    let sword = equipped(&mut w, SWORD, 4);
+    let su = w.unit(sword).unwrap();
+    w.items.get_mut(su).unwrap().flags |= 0x800;
+    w.set_stat(su, super::super::inv_world::STAT_SOCKETS, 1);
+    let mut pr = PropertyRec::default();
+    pr.slots[0] = PropSlot {
+        func: 1,
+        stat: STAT,
+        set: 0,
+        val: 0,
+    };
+    w.tables.properties = vec![pr];
+    let block = [
+        PropRec {
+            code: 0,
+            param: 0,
+            min: 5,
+            max: 5,
+        },
+        PropRec::NONE,
+        PropRec::NONE,
+    ];
+    w.tables.gems = vec![GemRec { mods: [block; 3] }];
+    let gem = w.cursor_item(GEM);
+    let before = w.stats.unit_total(p, STAT, 0);
+    assert_eq!(w.handle(&msg(0x28, &[gem, sword])), Ok(0));
+    assert_eq!(w.mode(gem), 6);
+    assert_eq!(w.stats.unit_total(p, STAT, 0), before + 5);
+    assert_eq!(w.handle(&unequip(4)), Ok(0));
+    assert_eq!(w.stats.unit_total(p, STAT, 0), before);
+}
+
+/// Defense (stat 31) of the player's totals.
+fn defense(w: &World) -> i32 {
+    w.stats.unit_total(w.player, 31, 0)
+}
+
+// Covers: specs/items/inventory.md §5.7 r2
+// d2rs: a charm that left page 0 is unlinked (PROVISIONAL, REC-163).
+#[test]
+fn a_charm_in_the_inventory_counts_and_stops_when_picked_up() {
+    let mut w = World::new();
+    w.state.link_item_stats = true;
+    // Created as a box (a magic charm needs the affix tables), then
+    // turned into the charm record.
+    let c = w.ground_item(BOX, 11, 11);
+    let cu = w.unit(c).unwrap();
+    w.items.get_mut(cu).unwrap().record = CHARM;
+    assert_eq!(w.handle(&pick(c, 1)), Ok(0));
+    w.drain();
+    w.stats.unit_add(&mut w.hooks, cu, 31, 5, 0);
+    let before = defense(&w);
+    assert_eq!(w.handle(&insert(c, 0, 0, 0)), Ok(0));
+    w.drain();
+    assert_eq!(w.mode(c), 0);
+    assert_eq!(defense(&w), before + 5, "the charm's stats count");
+    assert_eq!(w.handle(&lift(c)), Ok(0));
+    w.drain();
+    assert_eq!(defense(&w), before, "off again on the cursor");
+    assert_eq!(w.handle(&insert(c, 1, 0, 0)), Ok(0));
+    w.drain();
+    assert_eq!(defense(&w), before + 5);
+    assert!(w.state.errors.is_empty(), "{:?}", w.state.errors);
+}

@@ -15,6 +15,7 @@
 //!   not the per-block wall / floor gradients of §11 r2–r3;
 //! - the ambient is the environment's alone (no `Levels.txt` ambient, no
 //!   near-room fills, no scripted override);
+//! - the other lights are those of [`super::light_sources`];
 //! - no blocks-light flags, so every light is unshadowed (kind 0 / 2
 //!   records draw plain);
 //! - the environment advances one update per drawn frame, from the
@@ -56,10 +57,19 @@ pub fn subtile_of(x16: u32, y16: u32) -> (i32, i32) {
 
 /// The `LookFeed` of the preview: a unit's light is the cell at its
 /// sub-tile; the local player is at its predicted one; no ghostly, no
-/// override, no hover, no remap (`d2rs-own, unverified`).
+/// override, hover only from the cursor pick, no remap (`d2rs-own, unverified`).
 #[derive(Debug, Clone, Copy, Default)]
 pub struct PreviewLook {
     pub local: Option<(UnitKey, (i32, i32))>,
+    /// The unit under the cursor (drawn highlighted, `blend-modes.md` §3).
+    pub hover: Option<UnitKey>,
+}
+
+impl PreviewLook {
+    /// Whether `unit` is the hover target (drawn highlighted).
+    pub fn is_hovered(&self, unit: &ClientUnit) -> bool {
+        self.hover == Some(unit.key)
+    }
 }
 
 impl LookFeed for PreviewLook {
@@ -73,11 +83,11 @@ impl LookFeed for PreviewLook {
         Ok((i32::from(x), i32::from(y)))
     }
 
-    fn look(&self, _: &ClientUnit, _: &ComponentRequest<'_>) -> Result<ComponentLook, String> {
+    fn look(&self, unit: &ClientUnit, _: &ComponentRequest<'_>) -> Result<ComponentLook, String> {
         Ok(ComponentLook {
             ghostly: false,
             override_input: None,
-            hovered: false,
+            hovered: self.is_hovered(unit),
             remap: None,
         })
     }
@@ -94,6 +104,9 @@ pub struct PreviewLight {
     ambient_i: u8,
     frame: Option<FrameLight>,
     look: PreviewLook,
+    /// The monster / missile light columns ([`super::light_sources`]);
+    /// objects from the `objects` rows. `None`: only the player's light.
+    pub sources: Option<std::sync::Arc<super::light_sources::LightRows>>,
 }
 
 /// A light: sub-tile, radius, rgb.
@@ -173,6 +186,11 @@ impl PreviewLight {
         self.frame.as_ref()
     }
 
+    /// The unit under the cursor this frame.
+    pub fn set_hover(&mut self, unit: Option<UnitKey>) {
+        self.look.hover = unit;
+    }
+
     pub fn look(&self) -> &PreviewLook {
         &self.look
     }
@@ -223,7 +241,11 @@ impl PreviewLight {
         self.ambient_i = a.i;
         let radius = player_light_radius(player.stat(STAT_LIGHT_RADIUS)).max(1);
         let rgb = player_light_color(player.stat(STAT_LIGHT_COLOR) as u32);
-        let map = build_map(at, ambient, &[(at, radius, rgb)]);
+        let mut lights = vec![(at, radius, rgb)];
+        if let Some(rows) = &self.sources {
+            lights.extend(rows.lights(world));
+        }
+        let map = build_map(at, ambient, &lights);
         self.frame = Some(FrameLight {
             tables: *tables,
             map,
@@ -281,6 +303,18 @@ mod tests {
         assert_eq!(chain_of(&t, 0xFF), ShadeChain::EMPTY);
     }
 
+    // Covers: specs/render/blend-modes.md §3
+    #[test]
+    fn only_the_hover_target_is_highlighted() {
+        let (a, b) = (UnitKey::new(PLAYER, 1), UnitKey::new(PLAYER, 2));
+        let mut light = PreviewLight::default();
+        light.set_hover(Some(b));
+        assert!(!light.look().is_hovered(&ClientUnit::new(a)));
+        assert!(light.look().is_hovered(&ClientUnit::new(b)));
+        light.set_hover(None);
+        assert!(!light.look().is_hovered(&ClientUnit::new(b)));
+    }
+
     // Covers: specs/render/lighting.md §11 r4
     #[test]
     fn unlit_floor_and_high_roof_are_special() {
@@ -332,6 +366,39 @@ mod tests {
             wide.frame().unwrap().map.read(8 * edge.0, 8 * edge.1).i
                 > f.map.read(8 * edge.0, 8 * edge.1).i
         );
+    }
+
+    // Covers: specs/render/lighting.md §8
+    #[test]
+    fn a_monster_light_lights_its_surroundings() {
+        use crate::bridge::world::MONSTER;
+        let mut w = ClientWorld::default();
+        let key = UnitKey::new(PLAYER, 1);
+        let mut u = ClientUnit::new(key);
+        u.position = Some((4000, 4000));
+        w.units.insert(key, u);
+        w.local_player = Some(key);
+        let mk = UnitKey::new(MONSTER, 9);
+        let mut m = ClientUnit::new(mk);
+        m.class = 0;
+        m.mode = 1;
+        m.position = Some((4000, 4018));
+        w.units.insert(mk, m);
+        let t = tables();
+        let probe = (8 * 4000, 8 * 4018);
+        let mut plain = PreviewLight::default();
+        plain.refresh(&w, None, Some(&t));
+        let dark = plain.frame().unwrap().map.read(probe.0, probe.1).i;
+        let rows = super::super::light_sources::LightRows {
+            monsters: vec![(6, (255, 255, 255))],
+            ..Default::default()
+        };
+        let mut lit = PreviewLight {
+            sources: Some(std::sync::Arc::new(rows)),
+            ..PreviewLight::default()
+        };
+        lit.refresh(&w, None, Some(&t));
+        assert!(lit.frame().unwrap().map.read(probe.0, probe.1).i > dark);
     }
 
     // Covers: specs/render/lighting.md §3

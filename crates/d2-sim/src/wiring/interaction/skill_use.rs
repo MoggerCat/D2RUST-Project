@@ -36,6 +36,7 @@ use crate::tick::events::event;
 use crate::units::{RoomId, UnitId, UnitType};
 use crate::wiring::action::combat::CombatView;
 use crate::wiring::action::{ActionSim, Pending, View, WiringError};
+use crate::wiring::interaction::body_path;
 
 /// `skilldelay` (state 121, `use.md` §6).
 const STATE_SKILL_DELAY: u16 = 121;
@@ -977,7 +978,19 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         }
     }
     fn path_op(&mut self, u: UnitId, op: bodies::PathOp<UnitId>) -> i32 {
-        self.xm().body_path_op(u, op)
+        let cv = &mut self.cv;
+        match body_path::path_op(&mut cv.v, &mut *cv.game, u, op) {
+            Some(r) => {
+                // The host also hears of a retarget, so the unit's kept
+                // target follows its path target (Double Swing's second
+                // swing, q-barb).
+                if matches!(op, bodies::PathOp::TargetUnit(_)) {
+                    self.xm().body_path_op(u, op);
+                }
+                r
+            }
+            None => self.xm().body_path_op(u, op),
+        }
     }
     fn monlvl(&self) -> &[d2_data::tables::Monlvl] {
         self.body_tables().map_or(&[], |b| &b.monlvl)
@@ -1158,7 +1171,7 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         }
     }
     fn has_path(&self, u: UnitId) -> bool {
-        self.x().has_path(u)
+        self.cv.v.h.path_has(u)
     }
     fn path_point_count(&self, u: UnitId) -> i32 {
         self.x().path_point_count(u)

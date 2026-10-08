@@ -40,6 +40,9 @@ pub struct AppRest {
     /// The players' quest records (player data, `quests.md` §1.7), set at
     /// the join.
     pub quests: BTreeMap<UnitId, PlayerQuests>,
+    /// The units' owners (guid, type), set by `set_owner` (a hired
+    /// mercenary's player; `hirelings.md` §8 reads it on a kill).
+    pub owners: BTreeMap<UnitId, (u32, u8)>,
     /// The players' names (client record +0x0D), set at the join.
     pub names: BTreeMap<UnitId, Vec<u8>>,
     pub last_bought: BTreeMap<UnitId, u32>,
@@ -228,10 +231,10 @@ impl HirelingRest for AppRest {
         self.note(format!("skill level {} {skill} {level}", u.0));
     }
     fn set_owner(&mut self, u: UnitId, guid: u32, t: u8) {
-        self.note(format!("owner {} {guid} {t}", u.0));
+        self.owners.insert(u, (guid, t));
     }
-    fn owner(&self, _: UnitId) -> Option<(u32, u8)> {
-        None
+    fn owner(&self, u: UnitId) -> Option<(u32, u8)> {
+        self.owners.get(&u).copied()
     }
     fn join_team(&mut self, m: UnitId, p: UnitId) {
         self.note(format!("join team {} {}", m.0, p.0));
@@ -321,9 +324,11 @@ impl VendorRest for AppRest {
     fn new_store_inventory(&mut self, class: u16, _: Option<UnitId>) {
         self.note(format!("new store {class}"));
     }
-    /// The NPC grid (`0x00560200`, inventory spec): no room.
+    /// The NPC grid (`0x00560200`, inventory spec): always room.
+    // d2rs-own, unverified (REC-162): the preview has no NPC grid model;
+    // the shop panel packs the shown items itself.
     fn place_in_store(&mut self, _: u16, _: UnitId) -> bool {
-        false
+        true
     }
     fn remove_store_item(&mut self, class: u16, item: UnitId) {
         self.note(format!("unstore {class} {}", item.0));
@@ -331,8 +336,9 @@ impl VendorRest for AppRest {
     fn take_from_store(&mut self, class: u16, item: UnitId) {
         self.note(format!("take {class} {}", item.0));
     }
+    // d2rs-own, unverified (REC-162): always room, as the store's.
     fn place_in_gamble(&mut self, _: u16, _: u32, _: UnitId) -> bool {
-        false
+        true
     }
     fn remove_gamble_item(&mut self, class: u16, _: u32, item: UnitId) {
         self.note(format!("ungamble {class} {}", item.0));

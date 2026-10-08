@@ -333,7 +333,8 @@ fn data_selection_falls_back_only_without_game_files() {
 /// the NPC control and the quest control each take one step, before any
 /// unit; then the waypoint object's allocation takes one (§5.3). The
 /// controls are the wired host's. The synthetic game has no drop state
-/// and no hireling tables, and one unique-bit store (the hooks').
+/// and one unique-bit store (the hooks'); its hireling tables are the
+/// preview's made-up rows (q-mercs-acts, REC-157).
 // Covers: specs/sim/rng.md §5.2, §5.3; specs/world/objects.md §2
 #[test]
 fn game_creation_derives_the_four_controls_in_order_before_the_first_unit() {
@@ -365,7 +366,7 @@ fn game_creation_derives_the_four_controls_in_order_before_the_first_unit() {
     assert_eq!(h.uniques, Default::default());
     let w = &g.sim.world;
     assert!(w.quests.record(1).is_some(), "the quest control's records");
-    assert!(w.state.hireling_tables.is_none());
+    assert!(w.state.hireling_tables.is_some());
     // M08: another seed gives another object seed.
     let mut other = single_player::build(&GameData::Synthetic, DEFAULT_SEED + 1).unwrap();
     let o = other

@@ -20,8 +20,8 @@ use super::weather::{FloorContext, Weather};
 use super::super::camera::{Camera, ClientPos, OpenMode, TileList, UnitPosition};
 use super::super::view::{BlockRect, MapTile, ViewSource};
 use super::{
-    mark_drawn, order_frame, sets_drawn_flag, FrameOrder, Ordered, OrderedTile, TileArray,
-    TileKind, UnitSlot, SPEC,
+    mark_drawn, order_frame, sets_drawn_flag, FrameOrder, OrderKey, Ordered, OrderedTile,
+    TileArray, TileKind, UnitSlot, SPEC,
 };
 
 /// The art of one ordered tile, answered by its owner specs: the DT1
@@ -125,6 +125,9 @@ impl WeatherFrame<'_> {
 pub struct DrawEffects {
     pub drawn: Vec<(usize, TileArray, usize)>,
     pub water: Vec<(i32, i32)>,
+    /// The shadow pass entries of units (kind 2, `blend-modes.md` §5): the
+    /// draw key position of each unit's shadow.
+    pub shadows: BTreeMap<UnitKey, OrderKey>,
 }
 
 /// A [`ViewSource`] over a feed with the frame's draw order.
@@ -133,6 +136,8 @@ pub struct OrderedSource<'a, S: ?Sized> {
     pub source: &'a S,
     pub tiles: Vec<MapTile>,
     pub units: BTreeMap<UnitKey, UnitSlot>,
+    /// Unit shadows ([`DrawEffects::shadows`]).
+    pub shadows: BTreeMap<UnitKey, OrderKey>,
 }
 
 impl<S: ViewSource + ?Sized> ViewSource for OrderedSource<'_, S> {
@@ -154,6 +159,10 @@ impl<S: ViewSource + ?Sized> ViewSource for OrderedSource<'_, S> {
         tile: &MapTile,
     ) -> Result<Vec<super::super::view::BlockShade>, ViewError> {
         self.source.tile_blocks(tile)
+    }
+
+    fn unit_shadow_slot(&self, unit: &ClientUnit) -> Option<OrderKey> {
+        self.shadows.get(&unit.key).copied()
     }
 
     /// Drawn units with their key; every other unit is not drawn.
@@ -242,11 +251,11 @@ pub fn ordered_source<'a, F: ViewFeed + ?Sized>(
         source: feed,
         tiles,
         units,
+        shadows: effects.shadows,
     }))
 }
 
-/// The map tiles and unit slots of an order. Fails on the items whose
-/// draw is not wired yet: unit shadows (`render/blend-modes.md` §5).
+/// The map tiles and unit slots of an order.
 pub fn resolve(
     camera: &Camera,
     order: &FrameOrder,
@@ -294,14 +303,8 @@ pub fn resolve_drawn(
             Ordered::Unit { key, at } => {
                 units.insert(*key, UnitSlot::Drawn(*at));
             }
-            Ordered::UnitShadow { key, .. } => {
-                return Err(open(
-                    "unit shadow",
-                    format!(
-                        "open question 3: unit ({}, {}) has a shadow entry (0x00471620)",
-                        key.unit_type, key.guid
-                    ),
-                ));
+            Ordered::UnitShadow { key, at } => {
+                fx.shadows.insert(*key, *at);
             }
         }
     }
