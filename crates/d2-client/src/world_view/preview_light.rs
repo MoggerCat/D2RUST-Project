@@ -15,6 +15,7 @@
 //!   not the per-block wall / floor gradients of §11 r2–r3;
 //! - the ambient is the environment's alone (no `Levels.txt` ambient, no
 //!   near-room fills, no scripted override);
+//! - the other lights are those of [`super::light_sources`];
 //! - no blocks-light flags, so every light is unshadowed (kind 0 / 2
 //!   records draw plain);
 //! - the environment advances one update per drawn frame, from the
@@ -94,6 +95,9 @@ pub struct PreviewLight {
     ambient_i: u8,
     frame: Option<FrameLight>,
     look: PreviewLook,
+    /// The monster / missile light columns ([`super::light_sources`]);
+    /// objects read the model's tables. `None`: only the player's light.
+    pub sources: Option<std::sync::Arc<super::light_sources::LightRows>>,
 }
 
 /// A light: sub-tile, radius, rgb.
@@ -223,7 +227,11 @@ impl PreviewLight {
         self.ambient_i = a.i;
         let radius = player_light_radius(player.stat(STAT_LIGHT_RADIUS)).max(1);
         let rgb = player_light_color(player.stat(STAT_LIGHT_COLOR) as u32);
-        let map = build_map(at, ambient, &[(at, radius, rgb)]);
+        let mut lights = vec![(at, radius, rgb)];
+        if let Some(rows) = &self.sources {
+            lights.extend(rows.lights(world));
+        }
+        let map = build_map(at, ambient, &lights);
         self.frame = Some(FrameLight {
             tables: *tables,
             map,
@@ -332,6 +340,38 @@ mod tests {
             wide.frame().unwrap().map.read(8 * edge.0, 8 * edge.1).i
                 > f.map.read(8 * edge.0, 8 * edge.1).i
         );
+    }
+
+    // Covers: specs/render/lighting.md §8
+    #[test]
+    fn a_monster_light_lights_its_surroundings() {
+        use crate::bridge::world::MONSTER;
+        let mut w = ClientWorld::default();
+        let key = UnitKey::new(PLAYER, 1);
+        let mut u = ClientUnit::new(key);
+        u.position = Some((4000, 4000));
+        w.units.insert(key, u);
+        w.local_player = Some(key);
+        let mk = UnitKey::new(MONSTER, 9);
+        let mut m = ClientUnit::new(mk);
+        m.class = 0;
+        m.mode = 1;
+        m.position = Some((4000, 4030));
+        w.units.insert(mk, m);
+        let t = tables();
+        let probe = (8 * 4000, 8 * 4030);
+        let mut plain = PreviewLight::default();
+        plain.refresh(&w, None, Some(&t));
+        let dark = plain.frame().unwrap().map.read(probe.0, probe.1).i;
+        let mut lit = PreviewLight::default();
+        lit.sources = Some(std::sync::Arc::new(
+            super::super::light_sources::LightRows {
+                monsters: vec![(6, (255, 255, 255))],
+                missiles: Vec::new(),
+            },
+        ));
+        lit.refresh(&w, None, Some(&t));
+        assert!(lit.frame().unwrap().map.read(probe.0, probe.1).i > dark);
     }
 
     // Covers: specs/render/lighting.md §3

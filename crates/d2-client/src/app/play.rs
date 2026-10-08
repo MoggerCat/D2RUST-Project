@@ -149,13 +149,26 @@ pub fn add_client_data(app: &mut App, drlg: DrlgSource, levels: Vec<LevelRow>) {
 /// for the inputs the model lacks; a frame that still fails is logged,
 /// not fatal. Nothing it draws is verified against 1.14d (rule 10).
 pub fn add_preview(app: &mut App, levels: Vec<LevelRow>, tiles: TileAssets) {
+    add_preview_lit(app, levels, tiles, None);
+}
+
+/// [`add_preview`] with the monster / missile light columns of the tables
+/// (`world_view::light_sources`, d2rs-own, unverified).
+pub fn add_preview_lit(
+    app: &mut App,
+    levels: Vec<LevelRow>,
+    tiles: TileAssets,
+    lights: Option<crate::world_view::light_sources::LightRows>,
+) {
+    let mut preview = Preview::new(tiles);
+    preview.light.sources = lights.map(std::sync::Arc::new);
     let mut state = app.world_mut().resource_mut::<WorldViewState>();
     state.feed = Box::new(
         ModelFeed {
             levels: Some(levels),
             ..ModelFeed::<NoFeed>::default()
         }
-        .with_preview(Preview::new(tiles)),
+        .with_preview(preview),
     );
     state.preview = true;
 }
@@ -392,7 +405,10 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
             .set_wall_seconds(wall_seconds);
         let palettes = ActPalettes::live(archives.as_ref()).map_err(anyhow::Error::msg)?;
         let tiles = TileAssets::new(Some(archives.source()), Some(palettes.pl2.clone()));
-        add_preview(&mut app, level_rows, tiles);
+        let lights = crate::world_view::light_sources::load(archives.as_ref())
+            .map_err(|e| warn!("light rows (d2rs-own, unverified): {e}; player light only"))
+            .ok();
+        add_preview_lit(&mut app, level_rows, tiles, lights);
         let mut item_parts =
             super::items::item_parts(archives.as_ref()).map_err(anyhow::Error::msg)?;
         if let Some(lookup) = item_lookup {

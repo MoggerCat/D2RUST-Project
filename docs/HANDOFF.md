@@ -6092,6 +6092,12 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 - Steps and compare: delete `Aux Battle.net`, start 1.14d hooking `0x004F5D90` (log video paths) and `0x0042F430` (log descriptor ids); repeat with the value present. Settles if no descriptor 0/1 is ever built and the videos are the two Bliz logos plus `d2intro` on the first run only.
 - Fold: write the result into the cited `ui/frontend-credits.md` rule and drop its PROVISIONAL line.
 
+##### REC-170 [MANUAL] Lighting detail: other light sources in the play preview
+- Priority 3 (preview only; `world_view/light_sources.rs`, d2rs-own, unverified).
+- Settles: the PROVISIONAL points of `docs/handoff/q-light-radius-detail.md`: monster / object / missile lights rebuilt each frame as plain records (no §6.4 radius walk, flicker, umod 3, `L_c`, cast, overlay or Den of Evil lights).
+- Steps and compare: capture a light map (`render/capture.md`) in a town and a cave with a lit monster, an object with `Lit` and a missile; compare cell values with the computed map.
+- Fold: replace the preview fills with the client light list of `lighting.md` §6, §8.
+
 #### Deferred (not recorded; outside Phases 0–6)
 - IT-1 `formats/d2s.md` OQ1 (legacy loader `0x00534020`, pre-1.09 saves), IT-2 OQ2 (item records of save versions 0x5C–0x5F), `formats/d2s-legacy.md` and `items/bitstream-legacy.md` Pending lines (1.07 / 1.08 / 1.00–1.06 saves): need sample files and are only needed if old saves must load. Record only if the user opens that scope.
 ##### REC-96 [ASSISTED] Level-up stat messages (S→C 0x1D-0x1F, 0x21) around a level-up
