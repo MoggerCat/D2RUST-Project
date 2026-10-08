@@ -2230,6 +2230,7 @@ fn synthetic_monstats() -> Vec<Monstats> {
     for c in synthetic_act4::BOSSES {
         v[c as usize].killable = true;
     }
+    super::synthetic_items::smoke::monster(&mut v);
     v
 }
 
@@ -2304,6 +2305,8 @@ pub fn synthetic_unit_rows() -> UnitRows {
     for c in MERC_CLASSES {
         monsters[c] = Some(class_row(false));
     }
+    // The item smoke test's monster (q-smoke-items, REC-281).
+    monsters[super::synthetic_items::smoke::MONSTER as usize] = Some(class_row(false));
     UnitRows {
         monsters,
         ..UnitRows::default()
@@ -2376,7 +2379,8 @@ impl GameParts {
             inventory: Some(super::synthetic_items::inv_tables(
                 &super::synthetic_items::item_tables(),
             )),
-            cube: None,
+            // No recipe; the stash and cube buttons need the parts (REC-281).
+            cube: Some(super::synthetic_items::cube_data()),
         })
     }
 

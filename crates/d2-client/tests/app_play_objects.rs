@@ -330,7 +330,12 @@ fn clicking_an_object_walks_to_it_and_operates_it() {
     );
     // The chest's drop (`treasure.md` §4, §7; REC-260): the opened chest's
     // item lies on the floor and the client heard it (0x9C ground item).
+    // The synthetic chest's class is the item smoke test's (REC-281):
+    // one pick of each entry, in order.
     let ground = d2_client::bridge::items::ground_items(w);
-    assert_eq!(ground.len(), 1, "the chest dropped its item on the floor");
-    assert_eq!(ground[0].code, Some(*b"hfh "));
+    let mut codes: Vec<[u8; 4]> = ground.iter().filter_map(|i| i.code).collect();
+    codes.sort();
+    let mut want = [*b"axe ", *b"hp1 ", *b"isc ", *b"tsc ", *b"cm1 ", *b"gsv "];
+    want.sort();
+    assert_eq!(codes, want, "the chest dropped its items on the floor");
 }

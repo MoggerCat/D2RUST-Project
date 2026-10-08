@@ -213,15 +213,16 @@ pub(crate) fn take_sent<H: LifecycleHooks>(
 }
 
 /// One item-move message.
-struct MoveRun<'m> {
-    player: UnitId,
-    msg: &'m [u8],
+pub(crate) struct MoveRun<'m> {
+    pub(crate) player: UnitId,
+    pub(crate) msg: &'m [u8],
 }
 
-type MoveOut = (
+pub(crate) type MoveOut = (
     Option<Result<u32, MoveFatal>>,
     Vec<(Option<UnitId>, Vec<u8>)>,
     Vec<UnitId>,
+    Vec<(UnitId, UnitId, bool)>,
 );
 
 impl MoveCall for MoveRun<'_> {
@@ -232,7 +233,8 @@ impl MoveCall for MoveRun<'_> {
         let r = sim_moves::handle(&mut d, guid, self.msg);
         d.flush_equip();
         let portals = d.take_portal_requests();
-        (r, take_sent(&mut d), portals)
+        let walks = d.take_item_walks();
+        (r, take_sent(&mut d), portals, walks)
     }
 }
 
@@ -343,10 +345,14 @@ pub fn handle<D: EventDispatch, W: WorldHost<D>>(
     // Every item-move id has a fixed size ≤ 17 (`client-messages.tsv`).
     let msg = &msg[..size.min(msg.len())];
     let (game, events) = (&mut sim.game, &mut sim.events);
-    let (run, sent, portals) = sim.world.moves(game, events, MoveRun { player, msg })?;
+    let (run, sent, portals, walks) = sim.world.moves(game, events, MoveRun { player, msg })?;
     // REC-117: a used Town Portal scroll / tome opens its pair.
     for p in portals {
         sim.world.town_portal(game, events, p);
+    }
+    // §7.1 step 2: a pick-up out of reach runs the player to the item.
+    for w in walks {
+        sim.world.item_walk(game, events, w);
     }
     let mut faults = Vec::new();
     for (unit, bytes) in sent {
@@ -513,6 +519,13 @@ pub fn update_pass<D: EventDispatch, W: WorldHost<D>>(
     sim: &mut SimGame<D, W>,
     out: &mut dyn MessageSink,
 ) {
+    // An announced item that left the ground (picked up, freed: no room)
+    // is forgotten, so its next landing is announced again (a drop from
+    // the cursor, §6.3; PROVISIONAL REC-281, d2rs-own, unverified). The
+    // freed pile's removal is the tick's S→C 0x0A.
+    let lists = &sim.game.lists;
+    sim.announced_ground
+        .retain(|&(_, u)| lists.unit(u).is_some_and(|e| e.room().is_some()));
     let clients = sim.clients();
     let players: Vec<(UnitId, Option<d2_sim::units::RoomId>)> = clients
         .iter()

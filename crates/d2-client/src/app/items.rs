@@ -157,11 +157,16 @@ impl crate::bridge::item_lists::StreamProps for TableDecoder {
             return (Vec::new(), false);
         };
         let charm = lookup.code(b.code).is_some_and(|c| c.charm);
+        // The armor's defense (stat 31, `bitstream.md` §4.4) is one of
+        // the item's own values the reader stores in its list
+        // (`client/stat-lists.md` §2 r1); it reaches the wearer's total
+        // with the property lists. PROVISIONAL (REC-281, stat-lists.md
+        // open question 2): durability, quantity and sockets are left
+        // out (no total reads them).
         let props = b
-            .lists
+            .defense
             .iter()
-            .flatten()
-            .flatten()
+            .chain(b.lists.iter().flatten().flatten())
             .map(|s| {
                 let shift = t.valshift.get(usize::from(s.stat)).copied().unwrap_or(0);
                 crate::bridge::item_lists::ItemProp {
