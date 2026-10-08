@@ -21,11 +21,15 @@ use crate::bridge::BridgeResource;
 
 use super::walk::{preview_walk_frame, PreviewWalk};
 
-/// Recaches the local player's room at the predicted sub-tile.
+/// Recaches the local player's room at the predicted sub-tile, and
+/// records the prediction for the position check's rule 8
+/// (`Bridge::set_local_walk`, REC-277).
 pub fn preview_walk_room(mut bridge: ResMut<BridgeResource>, walk: Res<PreviewWalk>) {
-    if let Some((x, y)) = walk.predict.cell() {
+    let cell = walk.predict.cell();
+    if let Some((x, y)) = cell {
         bridge.0.recache_local_room(x, y);
     }
+    bridge.0.set_local_walk(cell);
 }
 
 /// Adds [`preview_walk_room`] after the walk prediction's frame, before

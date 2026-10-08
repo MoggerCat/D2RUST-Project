@@ -2630,12 +2630,12 @@ fn run_with(game_seed: u32) -> Transcript {
 #[test]
 fn full_single_player_loop() {
     let t = run();
-    // Frames per walk / run: 20, 50 (the run list is not wired, so the
-    // run moves at walk velocity, `wire-path-server.md` §4 finding 4),
-    // 24, 8; 123 recorded frames, one tick each.
+    // Frames per walk / run: 20, 33 and 16 (the runs move at the run
+    // velocity: the run list's stat 67 +50, `pathing.md` §8.2), 8; 98
+    // recorded frames, one tick each.
     let lens: Vec<usize> = t.walks.iter().map(Vec::len).collect();
-    assert_eq!(lens, [20, 50, 24, 8]);
-    assert_eq!(t.frames.len(), 123);
+    assert_eq!(lens, [20, 33, 16, 8]);
+    assert_eq!(t.frames.len(), 98);
     assert_eq!(t.frames.len() as i32, t.game_frame);
     // The kill: 100 experience, one drop (the gold, picked up).
     assert_eq!((t.player_exp, t.drops.len()), (100, 1));

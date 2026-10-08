@@ -186,7 +186,7 @@ the sound fields of §1 r6. Each client RNG draw listed in Randomness.
 | 18 | NPC greeting of U (§10 r1, mode 1) on **P**, flags 1 | |
 | 84 | 4,615 `hireable_female_thank_you` if U's class is 271, else 4,625 `hireable_male_thanks_1`, on U | + text, + r3 |
 | 85 | 4,612 / 4,616 (`…cant_use_that_ever…`) | same |
-| 86 | 4,613 / 4,619 (`…cant_use_that_yet…`) | same |
+| 86 | 4,613 / 4,619 (`…cant_use_that_yet…`) | same; 84–86 also come from the client hireling checks `0x0048B7C0` and `0x004934D0` (`ui/panels-3.md` §30) |
 | 87 | 4,614 / 4,622 (`…i_will_use_that…`) | same |
 | 90 | 4,379 `ancient_act5_reward_spiel` on U | |
 | 91 | 8 `cursor_level_up_hireling` on P | |

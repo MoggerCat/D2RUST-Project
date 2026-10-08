@@ -25,16 +25,16 @@
 | Outputs / state changes | 55–60 |
 | Rules | 61–62 |
 |   1. Conventions | 63–74 |
-|   2. Shared helpers, batch 3 | 75–658 |
-|   3. Bodies, required level 1 | 659–834 |
-|   4. Bodies, required level 6 | 835–1044 |
-|   5. Bodies, required level 12 | 1045–1220 |
-| Constants & data dependencies | 1221–1255 |
-| Randomness | 1256–1294 |
-| Edge cases & original bugs | 1295–1364 |
-| Test vectors | 1365–1402 |
-| Provenance | 1403–1422 |
-| Open questions | 1423–1457 |
+|   2. Shared helpers, batch 3 | 75–733 |
+|   3. Bodies, required level 1 | 734–918 |
+|   4. Bodies, required level 6 | 919–1130 |
+|   5. Bodies, required level 12 | 1131–1306 |
+| Constants & data dependencies | 1307–1341 |
+| Randomness | 1342–1380 |
+| Edge cases & original bugs | 1381–1450 |
+| Test vectors | 1451–1488 |
+| Provenance | 1489–1508 |
+| Open questions | 1509–1547 |
 <!-- /index -->
 
 ## Summary
@@ -355,7 +355,9 @@ set, `0x006446A0` get) carry the phase: 0x80 launch, 0x1101 in flight
   `0x0064E7B0(room at (cx, cy), &(cx, cy), unit size (0x00620510), mask
   0x1C09, fallback 1)` (`sim/path-placement.md` §7) gives room R'; R'
   found, `0x0064D910(R', cx, cy, the unit's path pattern (0x00649180),
-  0x1C09)` = 0 (no cell collides), the line from (ux, uy) to (cx, cy) is
+  0x1C09)` = 0 (no cell collides; the pattern is the unit's own path
+  record's field +0x48, `0x00649180(unit)` reads unit +0x2C → +0x48,
+  1.14d-confirmed; REC-173), the line from (ux, uy) to (cx, cy) is
   clear (`0x00645910` → `0x0064E260(R', from, to, 0x804)` = 0), and the
   distance to (cx, cy) ≤ r → x, y := cx, cy; return 1. After three
   failures → 0.
@@ -625,7 +627,11 @@ Remove callbacks (ECX T, EDX state):
   1. n = E param 4 (+0x24); n = 0 → E param 4 := F + 4, return 1. F < n
   → 0. d = 10 without a weapon; else by f = attack frames: f < 12 → 4, <
   15 → 6, < 18 → 8, < 20 → 10, < 23 → 12, ≤ 25 → 14, else 16. next = n +
-  d; next < F → next = F + d. E param 4 := next. Return 2 with two melee
+  d; next < F → next = F + d. E param 4 := next. (Hand of a round:
+  Whirlwind's `weapsel` is 2, so each strike's damage weapon (§2.27) is
+  the right-hand weapon while E flags bit 0x2000 is clear, the
+  left-hand one while it is set; srvdo 76 toggles the bit after every
+  round.) Return 2 with two melee
   weapons, else 1.
 - **End** `0x005D9460(game, unit, E, skill, x, y)`: E flags := 0;
   `set_uninterruptable(unit, 0)` (§2.8); landing message `0x00571B70(unit,
@@ -655,6 +661,75 @@ bit 1 → `ResultFlags`; else `melee_result(game, unit, U, h, range 1)`,
 on a hit | `ResultFlags`). Hit: hit flags |= `HitFlags`; `SrcDam` ≠ 0 →
 `fill(game, unit, U, copy, 0, SrcDam)`; `start_combat(game, unit, U,
 copy, 128)`; `apply_melee(game, unit, U)`. Return 1.
+
+#### 2.27 Damage weapon and the dual-weapon stat switch
+
+Which hand's item a melee hit uses, and whose item stats count. Owner of
+`0x00535BC0`, `0x00535D10`, `0x00535E20` (REC-233; `combat/damage.md`
+§3.1 step 1 calls the switch). q(5), q(6) and the type tests as
+`sim/units.md` §4.7 "Attack weapon"; "active" = `0x00625820(item, 0)`,
+"on / off" = `0x00627910(unit, item, 1 / 0)` (`sim/stat-lists.md`
+§8.4).
+
+- **Damage weapon** `0x00535BC0(unit)` (ECX unit): unit or inventory
+  (+0x60) none → none. D = the weapon pick `0x0063C9B0`
+  (`bodies-3.md` §3.3). Not dual-capable (`0x006235A0`: player class 4
+  or 6, monster class 417 or 418), no used skill (`0x00620250`) or no
+  skills row → D. By the used skill's `weapsel` (+0x168):
+
+  | weapsel | X |
+  |---|---|
+  | 1 | q(6) |
+  | 2 | A = q(5), B = q(6): A none or not `weap`, or B `weap` and the used entry's E flags bit 0x2000 → B; else A |
+  | 3 | i = unit +0x38 >> 8 (the frame event index, `use.md` §5.2 rule 1, arithmetic shift): i odd (signed i mod 2 ≠ 0) → q(6), else q(5) |
+  | 4 | none; D := none |
+  | other | q(5) when it is `weap`, else q(6) |
+
+  Result: X when of type 45 `weap` and usable (`0x0062A4E0`), else D.
+  This differs from the attack weapon `0x00623990` (`sim/units.md`
+  §4.7): that one reads the entry `0x006439A0`, and its `weapsel` 3 has
+  the i = 0 and flag rules; this one reads the used entry and only the
+  parity.
+- **Switch** `0x00535D10(unit, off)` (ECX unit, EDX off), run at the
+  start of every `fill` (`combat/damage.md` §3.1 step 1; `off` is that
+  call's `offhand` argument):
+  1. off ≠ 0: W = the weapon in use (`0x0063BEF0`), O = the other
+     weapon (`0x0063BF90`); W active → W off; O ≠ W and active → O off.
+  2. The unit is dual-capable: X = damage weapon, W = weapon in use. X
+     none: W active → W on. X = W: W active → W on; O active → O off. X
+     ≠ W: X active → X on; W active → W off.
+- **Restore** `0x00535E20(unit, off)`, at the end of `fill` (step 14):
+  off ≠ 0: W active → W on; O ≠ W and active → O off. off = 0: nothing
+  (the hand chosen by the switch stays on until the next switch or the
+  mode-start toggle `sim/units.md` §4.7).
+
+So in a `fill` with `offhand` 0 only the damage weapon's stat lists
+(its `mindamage` 21 / `maxdamage` 22 / two-handed 23 / 24 and every
+other item stat) count; the other hand's are off. A kick (`fill` with
+1, §2.5) runs step 1, then step 2 with the kick skill's `weapsel` 4
+(Dragon Talon, Dragon Tail): X none (asm `0x00535D10`–`0x00535E0F`).
+
+Dual claws (Fists of Fire, Claws of Thunder, Blades of Ice: srvdo 35,
+`bodies.md` §8.10; Dragon Claw: srvdo 46, §4.13; all `weapsel` 3, `anim`
+SQ, `seqnum` 16). Sequence 16 has a weapon-class record per COF weapon
+class (`0x006632C0` maps the class code to the record; table
+`0x00748418`, 14 pairs): `hth` and `ht1` (record 0, 12): 12 frames, one
+code-1 frame (index 6, A2 frame 6); `ht2` (two claws, record 13): 16
+frames, code 1 at index 6 (A2 frame 6) and 10 (S4 frame 6); other
+classes have no record. So only a unit drawn with two claws gets two
+frame events: index 0 runs the do with the right claw q(5) and clears
+flag 0x40, index 1 runs it again with the left claw q(6) and sets it.
+Each run is a full hit with its own `melee_result` draws: srvdo 35
+through the srvdo 34 body (`bodies.md` §8.8: `start_combat` → `fill`
+with `offhand` 0) and srvdo 46 through `claw_hit` (§2.12, `fill` with
+`offhand` 0, plus the skill's `calc1` ED and elements). So the second
+hit rolls the left claw's damage with only its stat lists on. Tiger
+Strike, Cobra Strike, Royal Strike (srvdo 34 alone, `weapsel` empty,
+`anim` A1) hit once with q(5). An ordinary Attack with two claws alternates
+Attack (`weapsel` empty → q(5)) and Left Hand Swing (`weapsel` 1 →
+q(6)) per request (`use.md` §2 step 2). Sequence records read from the
+image (`0x007483B8`[16] = `0x00747B58`; frame lists `0x00747AB0`,
+`0x00747AF8`).
 
 ### 3. Bodies, required level 1
 
@@ -719,7 +794,12 @@ T's current life; calc2 = `par3` (8 %) in 1.14d.
 3. **Player** (unit type 0):
    1. Shield: `0x0063C8F0(inventory, &S)` = 0 → 0 (`combat/hit.md`);
       item record of S's class (`0x006335F0(S +0x04)`, −1 without S)
-      none → 0.
+      none → 0. `0x0063C8F0`: S := none; the item at body location 4
+      (right hand), then the one at 5 (left hand) (inventory body
+      slots +0x10 / +0x14): the first that is usable (`0x0062A4E0`)
+      and of type 51 `shld` (`0x00629BB0`, with equivalence) → S := it,
+      return 1; neither → 0 (1.14d-confirmed; REC-176). A shield in
+      the right hand counts, and wins over one in the left.
    2. mn = armor `mindam` (+0xFE, u8) << 8; mx = `maxdam` (+0xFF) << 8.
    3. The unit has state 101 (`holyshield`) with a list H: k = H's skill
       (`0x006260E0`), l = H's level (`0x00626100`); mn += `phys_min(unit,
@@ -831,6 +911,10 @@ The start makes the first kick itself.
 
 With n kicks the start makes kick 1 and each do one more; every do also
 applies the previous kick's stored record first (step 2).
+Dragon Talon's `anim` is KK (mode 12): it plays the plain KK AnimData
+animation, never sequence 19 (`sequences.md` §5), and each rewind re-arms
+that animation's code-1 frame. It has no `InTown`, so the start refuses
+in town (`use.md` §5.3 step 5).
 
 ### 4. Bodies, required level 6
 
@@ -958,7 +1042,9 @@ part. The scan skips the caster (`bodies.md` §2.12) but not T.
 3. By E flags:
    - Bit 0x100 (in flight): landed = Land (§2.13). Landed and the unit
      is a player: zeroed record, result := 9 (hit, knockback);
-     `area_damage(game, unit, 0, 0, eval(calc1), record, 0)`
+     `area_damage(game, unit, 0, 0, eval(calc1), record, 0)` (the
+     record carries no damage: the landing knocks back, it does not
+     hurt; Leap `calc1` = `ln34` radius)
      (`missiles.md`; filter 0x8583, around the unit). Return 1.
    - Bit 0x80 (launch): return Launch (§2.13).
    - Otherwise: a player gets E flags := 0. Return 1.
@@ -1451,6 +1537,10 @@ steps call them (`bodies.md` Randomness). Draws named here:
     other components match the item's `component`.
 11. Answered in `skills/bodies-3.md` §2 answer 13.
 12. Recording: Whirlwind with one and two weapons: E param 4 and hits per
-    do (§2.25 pacing).
+    do (§2.25 pacing). When the do runs on the way is answered
+    (`use.md` §5.2, REC-232); this recording checks the hit ticks.
+13. Answered (2026-10-08, REC-233): the second claw's hit and whose
+    stats count (§2.27); the Smite shield lookup (§3.4 step 3.1,
+    REC-176); the Leap clamp's pattern (§2.13, REC-173).
 
 Implementation questions on §2.1, §2.12, §2.16, §2.19, §2.26, `bodies-2b.md` §6.8, `bodies-2b.md` §7.2 and §7.10, and Open question 11, are answered in `skills/bodies-3.md` §2.

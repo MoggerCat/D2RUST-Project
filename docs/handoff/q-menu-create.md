@@ -33,3 +33,5 @@ Test: `cargo nextest run -p d2-client --test front_end_create`.
 ## Local check
 
 `cargo nextest run -p d2-client --test front_end_create` — all pass; no visible change in `play` yet.
+
+Local check done 2026-10-08 (PC 1 round 2, branch claude/local-pc1-s8): headless part passes (`front_end_create` 10).

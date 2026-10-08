@@ -169,7 +169,7 @@ in 0 … count − 1 (`monsters/init.md` §17.3). Both matrices are built by
   `descfunc` (u8 +0x36) ≠ 0, in record order; sort with §1, comparator:
   priority compared as **signed 16-bit**, −1 / 0 / +1. The list is the u16
   stat indices in sorted order; its count is the number collected. Read
-  by the client item-description code (`0x004E60A0`).
+  by the client item-description code (`0x004E60A0`, `ui/item-tips.md` §6).
 
 1.14d: 207 stats. Starts 91 (priority 0), 252, 204 (1), 253 (2), 75, 254,
 125, 89, 240, 87, 80 (8), 239. Tie groups in output order: 1: 252, 204;

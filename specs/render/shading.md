@@ -22,19 +22,19 @@
 |   1. The palette-table block | 70–100 |
 |   2. Map semantics | 101–109 |
 |   3. Light map of a cel draw | 110–123 |
-|   4. Light maps of DT1 tile blocks | 124–183 |
-|   5. Selected-unit highlight | 184–199 |
-|   6. Remap tables (`P`) | 200–291 |
-|   7. Mapped index 0 | 292–301 |
-|   8. Tables loaded but not drawn by GDI | 302–313 |
-|   9. Palettes per screen region | 314–319 |
-|   10. d2rs answers | 320–331 |
-| Constants & data dependencies | 332–339 |
-| Randomness | 340–344 |
-| Edge cases & original bugs | 345–352 |
-| Test vectors | 353–379 |
-| Provenance | 380–405 |
-| Open questions | 406–458 |
+|   4. Light maps of DT1 tile blocks | 124–186 |
+|   5. Selected-unit highlight | 187–202 |
+|   6. Remap tables (`P`) | 203–316 |
+|   7. Mapped index 0 | 317–326 |
+|   8. Tables loaded but not drawn by GDI | 327–338 |
+|   9. Palettes per screen region | 339–344 |
+|   10. d2rs answers | 345–356 |
+| Constants & data dependencies | 357–364 |
+| Randomness | 365–369 |
+| Edge cases & original bugs | 370–381 |
+| Test vectors | 382–413 |
+| Provenance | 414–442 |
+| Open questions | 443–495 |
 <!-- /index -->
 
 ## Summary
@@ -56,8 +56,8 @@ the unit and item colormap tables, and the rule for a mapped index 0. How
 |---|---|---|
 | act `pal.pl2` | 439,808 + 259·T bytes | `formats/palette.md`; act by `composition.md` §4 |
 | light value of a cel draw | byte `v` (0xFF = unlit) | caller; for units `lighting.md` |
-| light values of a wall/roof block | 4 ints `c0…c3` | `lighting.md` §11 r2 |
-| floor light grid | 12-byte cells, 8 per row | `lighting.md` §11 r3 (`0x004DDEF0`) |
+| light values of a wall block | 4 ints `c0…c3` | `lighting.md` §11 r2 |
+| floor light grid (floors and roofs) | 12-byte cells, 8 per row | `lighting.md` §11 r3–r4 (`0x004DDEF0`) |
 | remap request | unit palette index, monster shift, item, text color | `unit-composite.md` §7, `ui/text.md` §5 |
 | `items\Palette\*.dat`, monster `palshift.dat`, `RandTransforms.dat`, `GreenBlood.dat` | index maps | archives (§6) |
 
@@ -131,8 +131,10 @@ built by `0x004F7CC0`) is
 
 (the value walks from `a` at `x = 0` toward `b`; floor division).
 
-**Walls and roofs** (lit wall slot `+0x9C` GDI `0x006C94B0`, translucent
+**Walls** (lit wall slot `+0x9C` GDI `0x006C94B0`, translucent
 wall `+0xA0` `0x006C93A0`; per block helper `0x004F8120` / `0x004F84F0`).
+Roofs do not take this path: the roof pass uses the floor drawer
+(`lighting.md` §11 r4, `blend-modes.md` §6 roofs r1).
 The caller passes `c0, c1, c2, c3` (ints, 0…255, from `lighting.md`).
 
 1. `[0x007D2340]` selects a flat-only path; it has no writer in
@@ -149,7 +151,8 @@ The caller passes `c0, c1, c2, c3` (ints, 0…255, from `lighting.md`).
    top-left, `c1` the top-right, `c2` the bottom-right, `c3` the
    bottom-left corner.
 
-**Floors** (slot `+0x7C` GDI `0x006C95D0` → helper `0x004F8B80`). The
+**Floors and roofs** (slot `+0x7C` GDI `0x006C95D0` → helper `0x004F8B80`;
+the roof pass `0x004DEA70` calls the same drawer `0x004F68E0`). The
 caller passes the floor light grid: cells of 12 bytes, 8 cells per row,
 the cell's byte 0 is its light value; let `e[n]` be the byte of cell `n`.
 A block with grid coordinates `(gx, gy)` (block record bytes 6 and 7) has
@@ -206,6 +209,28 @@ of each component's `P` is `unit-composite.md` §7; the tables are:
    of §1 (`0x004FB0C0(p − 1)`; callers `0x00471000`, `0x0047200F`). So
    `p` = 1…111 are the hue variations, 112–114 the red, green, blue tones,
    115–128 the unknown variations.
+   1. **From states** (`0x004D97F0(unit)`, the "color" call of
+      `client/stat-lists.md` §3 r6.1 / r6.3, run after the state bit is
+      set or cleared, only for a state whose `colorshift` ≠ 0). Over
+      every state id `s` = 0 … count − 1 (sgpt `+0xC4`, records of 0x3C
+      bytes at `+0xBC`) that is on (`0x00639DF0(unit, s)`): `s` becomes
+      the best when its `colorpri` (+0x20) is **greater** than the best
+      so far, which starts at 0. So a state with `colorpri` 0 never wins,
+      equal priorities keep the lowest id, and `colorshift` plays no part
+      in the choice. Best found with id > 0 (`0x004D9865`): `p` :=
+      `colorshift` (+0x21, may be 0), except `p` := 0 when `colorshift`
+      = 104 (`'h'`), the unit is the local player and the render kind
+      `[0x007C8CB0]` ≥ 4 (`0x004F51C0`; never under the GDI reference,
+      display type 1). None: `p` := 0. Then, for the local player with a
+      light (unit `+0x64`), the light colour (`lighting.md` §6.2 r4) :=
+      the best state's `light-r`, `light-g`, `light-b` (+0x22…+0x24), or
+      255, 255, 255 with none. A state with `colorshift` 0 turning on or
+      off does not run this call.
+      Live `states.txt` (185 rows, `patch_d2`): seven rows have a
+      `colorpri` and all seven a `colorshift`: 1 `freeze`, 11 `cold`,
+      44 `holywindcold`, 90 `blue` (pri 100, shift 108, light 150, 215,
+      255); 2 `poison` (95, 104, 128/255/128); 96 `revive` (85, 73,
+      white); 91 `red` (70, 100, white).
 2. **Monster palette shift** (`0x00477530`, monsters only; when the unit
    has no palette index): the class's `palshift.dat` (2,048 bytes = 8
    maps, loaded per monster class into the table `[0x007B9578]`, 8 bytes
@@ -349,6 +374,10 @@ Open question 2.)
    `0x00600C20` never returns their maps.
 3. The highlight ignores the light byte in GDI (§5).
 4. Unit palette index `p` selects map `p − 1`: `p = 0` means "none".
+5. Every run of §6 r1.1 for the local player overwrites its light
+   colour (a state's colour, or 255, 255, 255 when none wins), dropping
+   an `item_lightcolor` colour (`lighting.md` §8) until that stat
+   changes again; reproduce.
 
 ## Test vectors
 
@@ -366,6 +395,11 @@ R, G, B: `composition.md` §4).
 | act 1 `R` | `R[255] = 98`, `R[100] = 10`, `R[0] = 0` | §8, live |
 | act 1, unit palette index `p = 2`, `s = 100` | hue map 1: `106` (PL2 byte `0x53500 + 256 + 100`) | §6 r1, live |
 | act 1, `p = 112` (red tone), `s = 100` | map 111: `33` | §6 r1, live |
+| states on: 2 `poison` (pri 95) and 11 `cold` (pri 100) | `p` = 108 (map 107); local player light 150, 215, 255 | §6 r1.1, live |
+| states on: 1 `freeze` and 11 `cold` (both pri 100) | best = state 1, `p` = 108 | §6 r1.1 |
+| synthetic: state 5 pri 0 shift 9; state 7 pri 3 shift 0 | `p` = 0 (state 7 wins with shift 0; state 5 can never win) | §6 r1.1 |
+| state 2 `poison` on the local player, render kind 1 (GDI) / 4 | `p` = 104 / `p` = 0 | §6 r1.1 |
+| no state with `colorpri` > 0 on | `p` = 0; local player light 255, 255, 255 | §6 r1.1 |
 | `G[31][0][1]`, `G[31][0][31]`, `G[0][31][31]`, `G[10][20][16]`, `G[20][10][1]` | 30, 0, 30, 15, 19 | §4 |
 | wall corners `c0…c3` = 200, 200, 200, 200 | flat, map 25 | §4 r3 |
 | wall corners 0xFF, 0xFF, 0xFF, 0xF8 | flat (`Δ` = 7), unlit copy | §4 r3 |
@@ -388,7 +422,10 @@ mode 7); tile helpers `0x004F8120`, `0x004F8050`, `0x004F71A0`,
 `0x004F7CC0`; settings `0x0072DA48` (driver init slot `+0x04`,
 `0x004F52E0`); colormaps `0x00477530`, `0x00476EA0`, `0x00477680`,
 `0x0062C100`, `0x00600C20`, `0x006009C0`, `0x00600B60`; unit palette index
-use `0x00470EC0` (`0x00471000`) and `0x00471EC0` (`0x0047200F`).
+use `0x00470EC0` (`0x00471000`) and `0x00471EC0` (`0x0047200F`); state
+colour call `0x004D97F0` (loop `0x004D9820`–`0x004D9863`, `'h'` test
+`0x004D9889`, light colour `0x004D98C7`–`0x004D98D4` → `0x00474390`),
+render-kind test `0x004F51C0` (2026-10-08, REC-245, static).
 Measurements: scratch scripts over the five act PL2 files and
 `items\Palette\*.dat` (5,376 bytes each) extracted with `mpq-tool
 extract`; field offsets from `specs/data/fields.tsv` (items `Transform`

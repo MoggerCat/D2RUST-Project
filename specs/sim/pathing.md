@@ -35,18 +35,18 @@
 |   5. Toward (type 2, `0x00679C80`) | 359–426 |
 |   6. Straight (type 7, `0x00679ED0`) | 427–436 |
 |   7. A* (type 1, `0x0067B850`) | 437–474 |
-|   8. Velocity, direction vector, facing | 475–561 |
-|   9. Per-tick movement | 562–745 |
-|   10. Messages | 746–776 |
-|   11. Missile paths (`0x00649760`) | 777–829 |
-|   12. Other path types (1.14d-read 2026-10-08) | 830–1043 |
-|   13. Path accessors and the cell line test (1.14d-read 2026-10-08) | 1044–1123 |
-| Constants & data dependencies | 1124–1160 |
-| Randomness | 1161–1171 |
-| Edge cases & original bugs | 1172–1219 |
-| Test vectors | 1220–1257 |
-| Provenance | 1258–1300 |
-| Open questions | 1301–1374 |
+|   8. Velocity, direction vector, facing | 475–568 |
+|   9. Per-tick movement | 569–752 |
+|   10. Messages | 753–815 |
+|   11. Missile paths (`0x00649760`) | 816–868 |
+|   12. Other path types (1.14d-read 2026-10-08) | 869–1082 |
+|   13. Path accessors and the cell line test (1.14d-read 2026-10-08) | 1083–1232 |
+| Constants & data dependencies | 1233–1269 |
+| Randomness | 1270–1280 |
+| Edge cases & original bugs | 1281–1328 |
+| Test vectors | 1329–1366 |
+| Provenance | 1367–1422 |
+| Open questions | 1423–1496 |
 <!-- /index -->
 
 ## Summary
@@ -512,6 +512,13 @@ flag 4, freed at the next mode set) with stat 67 = 100 · `RunVelocity`
 / `WalkVelocity` − 100 (truncated; 1.14d live: 100·9/6 − 100 = 50); the
 list is skipped when `WalkVelocity` is 0. Rule 8.1.2 then reads it.
 
+PROVISIONAL: a run start without a mode change (a new 0x03 while in
+mode 3: the mode set frees no TEMPONLY list, `sim/units.md` §4.1) keeps
+one run list and rewrites its stat 67, rather than attaching a second
+(because §1.5 rule 6 places the attach in the animation setup, which
+only a new mode runs); settled by a recording of two 0x03 in a row
+(velocity after the second).
+
 #### 8.3 Direction vector (`0x0064FC60`)
 
 From precise start (sx, sy) to precise point (tx, ty) (`tan` table:
@@ -749,20 +756,52 @@ town access 0.
    unit for update (mode set, `sim/units.md` §4.1).
 2. Update pass (`sim/tick.md` §6 step 5, per unit `0x0053A500`): for a
    player whose mode changed (flag 0x1), the mode's update function
-   (table `0x007319E8`, 3 dwords per mode: function, code to point, code
-   to unit) runs per client: modes 2, 3, 6 → `0x00548180`: nothing for
-   the client whose player it is; other clients get S→C 0x10 (target
-   unit set: code, target type, target GUID, x, y) or 0x0F (code, target
-   x, y, 0, x, y). Codes: walk 1 / unit 0, run 0x17 / 0x18 (walk and
-   town walk share the row).
-   PROVISIONAL: the skill modes A1 7, A2 8, SC 10, TH 11, KK 12, S1–S4
-   13–16, SQ 18 with a used skill run `0x00548090`: the skill message of
-   `sim/intents-events.md` §3.5 rule 5 (flag 0, w 0; the path's target
-   unit → `0x0053D530`, else `0x0053D4D0` at the path target), sent to
-   every client including the player's own (d2rs-own: the client applies
-   no mode request for its click, `ui/controls.md` §6 r7) (because the
-   table's other rows are not read and `0x00548090` is the other named
-   caller of the builders); settled by REC-95.
+   (table `0x007319E8`, 20 rows of 3 dwords: function, code c1, code
+   c2; read by `0x005484B0`, row 0 for a null unit; a null function
+   does nothing) runs per client (ECX game, EDX unit; stack client,
+   mode). Every row of 1.14d (dump of `0x007319E8`–`0x00731AD7`):
+
+   | Modes | Function | c1, c2 | Own client | Message to each receiver |
+   |---|---|---|---|---|
+   | WL 2, TW 6 | `0x00548180` | 1, 0 | nothing | 0x10 or 0x0F, below |
+   | RN 3 | `0x00548180` | 0x17, 0x18 | nothing | same |
+   | NU 1, TN 5 | `0x00548400` | 7, 7 | nothing | 0x0D: a = c1, b = 0 |
+   | GH 4 (c 6), BL 9 (c 0x12), DD 17 (c 9) | `0x00548350` | c, c | sent | 0x0D: a = c1, b = unit byte +0xB0 |
+   | DT 0 | `0x0054DA10` | 8, 8 | sent, then the stat message | 0x0D as `0x00548350` (a = 8) |
+   | KB 19 | `0x005482A0` | 0x14, 0x14 | sent | 0x0F: code c1, byte @11 = unit byte +0xB0 |
+   | A1 7, A2 8, SC 10, TH 11, KK 12, S1–S4 13–16, SQ 18 | `0x00548090` | 0x15, 0x16 | only with E-flags bit 0x4 | skill message, below |
+
+   "Nothing" = the row returns for the client whose player
+   (`0x00537860(client, 0)`) the unit is. x, y = the unit's position
+   (`0x006488C0` / `0x00648900`; players have a dynamic path,
+   `sim/path-placement.md` §2); target x, y = the path target
+   (`0x00648A00` / `0x00648A10`, path +0x10 / +0x12); life % =
+   `0x00621F20(unit)`. Each builder takes DL = message id, then type 0
+   and the unit GUID (+0x0C).
+   - `0x00548180`: T := the path's target unit (`0x00553540`). T
+     non-null and `0x005387F0(T, client)` ≠ 0 (client in T's room's
+     client array, `drlg/rooms.md`) → S→C 0x10
+     (`0x0053B520`: code c2, T type, T GUID, x, y). Else → S→C 0x0F
+     (`0x0053B570`: code c1, target x, target y, 0, x, y).
+   - `0x00548400`, `0x00548350` → S→C 0x0D (`0x0053B4B0`: a, x, y, b,
+     life %).
+   - `0x0054DA10`: `0x00548350`; then, only when the unit is the
+     client's player, the stat message of stat 175 `goldlost` (value =
+     unit total `0x00625480(unit, 175, 0)`, sender `0x00548520` with the
+     argument order of `sim/stat-lists.md` §11 rule 4).
+   - `0x005482A0` → S→C 0x0F (c1, target x, target y, unit byte +0xB0,
+     x, y).
+   - `0x00548090`: E := the used skill (`0x00620250`); none → nothing.
+     E-flags (`0x006446A0`, E +0x0C) without bit 0x4 and the unit is
+     the client's player → nothing. Bit 0x4 has one setter, the dodge /
+     avoid reaction (`combat/damage.md` §7.1 rule 5.1, `0x0057D1CF`), so
+     in 1.14d the own client gets this message only for a dodge / avoid
+     (mode S1). Skill id := `0x00643CE0(E)`; b := the level with bonuses
+     `0x006442A0(unit, E, 1)` (byte). T := the path's target unit
+     (`0x00553540`); T non-null and `0x005387F0(T, client)` ≠ 0 →
+     `0x0053D530` (T type, T GUID, skill, w 0, b, flag 0); else
+     `0x0053D4D0` (target x, target y, skill, w 0, b, flag 0). Builders:
+     `sim/intents-events.md` §3.5 rule 5.
 3. Same pass, before it: a player with flags 2 bit 0x10000, or bit 0x800
    when the client's player is not this unit → S→C 0x15 (`0x00548010`:
    type, GUID, x, y, flag 1 for 0x10000 else 0). Waypoint arrival and
@@ -1107,7 +1146,8 @@ and `to` := the blocking cell (the first cell that fails).
    that cell (it is not tested). Then the walk goes on in the new room
    with the same error term.
 
-Callers named in other specs: the line test `0x00645910`
+Callers named in other specs: the point-to-unit line `0x00645950`
+(§13.4, the skill `lineofsight` test), the line test `0x00645910`
 (`skills/bodies-2.md`, `monsters/ai.md` §7.4), the missile line test
 (`skills/bodies.md` §2.11), event flag 0x200 (`skills/bodies.md`). No
 draws.
@@ -1120,6 +1160,75 @@ Test vectors (synthetic; one room rect (0, 0, 20, 20), mask 1, cell
 | (0, 0) → (6, 2) | (0,0) (1,0) (2,0) (3,1) | 1, (3, 1) |
 | (0, 0) → (2, 6) | (0,0) (0,1) (0,2) (1,3) (1,4) (1,5) (2,6) | 0 |
 | (3, 1) → (3, 1) | (3,1) | 1, (3, 1) |
+
+The walk is not symmetric: from → to and to → from round ⌊k·minor /
+major⌋ from opposite ends, so they can visit different cells (vector
+L4 below). No null-grid guard: every room the walk enters was found by
+the cell lookup, and every active room has a grid (`drlg/rooms.md`
+§10.2).
+
+#### 13.4 Point-to-unit line `0x00645950` and the coordinate wrapper `0x00645910` (1.14d-read 2026-10-08)
+
+1. **`0x00645950(x, y, unit U, mask)`** → 1 clear, 0 blocked (cdecl,
+   4 args). It calls §13.3 as `0x0064E260(R, &from, &to, mask)` with
+   R := U's room (`0x00620BB0`: types 2, 4, 5 the static path's room,
+   else the dynamic path's room `0x00648A80`, none without a path),
+   **from := (x, y), the point**, and **to := U's position** (types 2,
+   4, 5 static path +0x0C / +0x10, else `0x006488C0` / `0x00648900`,
+   (0, 0) without a path). So:
+   - the walk runs from the point **toward the unit**; both end cells
+     are tested (the point's cell first, U's own cell last);
+   - the point's room is looked up from U's room (§13.3 rule 1: U's room
+     itself, else U's room's adjacency array, `sim/path-placement.md`
+     §4 rule 1). A point outside every room of that array is blocked
+     at once, even when a chain of rooms would reach it; U without a
+     room → blocked (rule 1);
+   - cells in no loaded room met during the walk block (rule 4); no
+     unit size, footprint or stop cell is applied (unlike the unit
+     line `0x00622AA0`, `render/draw-order-2.md` §15.1); U's own
+     footprint bits are in the last cell and count when the mask has
+     them (of item 3's masks only 0x180, PLAYER | MONSTER, holds a bit a
+     player or monster stamps for itself, so `lineofsight` 3 blocks on
+     the caster's own cell when the caster is stamped there; 4, 0x1C09,
+     0x804, 0x805 do not).
+2. **`0x00645910(x1, y1, x2, y2, room, mask)`** → 1 clear: §13.3 with
+   from := (x1, y1), to := (x2, y2) and the given room. Callers:
+   `0x004C82A7`, `0x005D9BE7`, `0x005FD5E9`–`0x005FD798` (four),
+   `0x00645EC2`; bodies in the specs named in §13.3.
+3. **Callers of `0x00645950`** (all four in `Game.exe`):
+
+   | Call site | Who | Point (x, y) | U | Mask |
+   |---|---|---|---|---|
+   | `0x0056F74B` in `0x0056F640` | server skill start, `skills/use.md` §5.3 step 6.4 | target position `0x0056D2C0` (§13.2; none → test skipped) | caster | `lineofsight` 1–5 → 4, 0x1C09, 0x180, 0x804, 0x805 (jump table `0x0056F7DC` = `0x0056F720`, `…727`, `…72E`, `…735`, `…73C` in that order) |
+   | `0x004C61DB` in `0x004C6140` | client skill start (`client/msg-skills.md` §2 rule 7) | client target position `0x004C52E0` (below) | caster | same values (table `0x004C664C` = `0x004C61B0` … `0x004C61CC` in order); failure → the client start returns 0 |
+   | `0x0057E1B1` in `0x0057E090` | area damage (`monsters/umod-callbacks.md` §3.2) | the area centre | victim | 0x805 |
+   | `0x005C86F4` in `0x005C8520` | Armageddon state function (`skills/bodies-4.md` §4.9) | the random point | the unit | 0x805 |
+
+   Value 0 skips the test; a value > 5 fails the start on both sides.
+4. **Client target position `0x004C52E0(unit, &x, &y)`**: the path's
+   target unit (`0x00648BF0`) when set → its position; else the path's
+   target point (`0x00648A00` / `0x00648A10`). Either coordinate 0 →
+   (x, y) := the unit's position plus an offset by facing octant
+   (`0x004C51E0`: octant = facing (`0x00620100`) >> 3; dx = [0, −1, −2,
+   −1, 0, 1, 2, 1], dy = [2, 1, 0, −1, −2, −1, 0, 1], as read). It
+   always returns 1, so the client never skips the test, unlike the
+   server (§13.2 rule 2 returns 0 for a zero coordinate).
+5. **Which grid.** Each side tests its own DRLG's active-room grids:
+   the server's, and on the client the client DRLG copy's, built by the
+   same code at each client active-room creation (`drlg/rooms.md`
+   §10.2). Tile bits are equal on both when the rooms are; unit bits
+   (DOOR 0x800 in mask 0x804, MONSTER, PLAYER) are those each side's
+   units stamped (`sim/path-placement.md` §5), and a cell in a room the
+   client has not built blocks there and not on the server.
+
+Test vector L4 (synthetic; one room rect (0, 0, 20, 20), U in it at
+(0, 0), cell (5, 2) = 4, all others 0, mask 4 (`lineofsight` 1)):
+
+| Call | Cells | Result |
+|---|---|---|
+| `0x00645950(6, 2, U, 4)` | (6,2) (5,2) | 0 (blocked at (5, 2)) |
+| §13.3 from (0, 0) to (6, 2), mask 4 | (0,0) (1,0) (2,0) (3,1) (4,1) (5,1) (6,2) | clear |
+| `0x00645950(30, 2, U, 4)`, no room holds (30, 2) | — | 0 (rule 1, no cell tested) |
 
 ## Constants & data dependencies
 
@@ -1285,6 +1394,13 @@ Real (recordings; message side):
   `0x00648AD0`; decompile of `0x0056D2C0` and `0x0064E260` (branch
   structure checked against its error-term updates); test vectors hand
   computed from §13.3.
+- §13.4 (2026-10-08, REC-248): decompile of `0x00645950`, `0x00645910`,
+  `0x00620BB0`, `0x004C52E0`, `0x004C51E0`, `0x00620100`; `all.asm` call
+  sites `0x0056F6EB`–`0x0056F74B` and `0x004C617D`–`0x004C61DB` (push
+  order: x, y, unit, mask); jump tables `0x0056F7DC` and `0x004C664C`
+  read from `Game.exe` (`re/scripts/rd.py`); every caller of
+  `0x00645950` / `0x00645910` / `0x0064E260` listed from `all.asm`.
+  Vector L4 hand computed from §13.3.
 - D2MOO 1.10f as a map (`D2Common_10142`, `PATH_Toward_6FDAA9F0`,
   `PATH_RayTrace`, `PATH_Straight_Compute`, `PATH_AStar_*`,
   `PATH_PreparePathTargetForPathUpdate`,
@@ -1297,6 +1413,12 @@ Real (recordings; message side):
   with the same rules.
 - Live tables: charstats rows (patch_d2), `sim/path-tables.tsv` from the
   executable.
+- §10 rule 2 table (2026-10-08): dump of `0x007319E8` (20 × 12 bytes)
+  from `Game.exe`; reader `0x005484B0`; row functions `0x00548090`,
+  `0x00548180`, `0x005482A0`, `0x00548350`, `0x00548400`, `0x0054DA10`
+  read in `all.asm`; builders `0x0053B4B0`, `0x0053B520`, `0x0053B570`
+  (DL = id); the only E-flags bit-0x4 writer in the server range is
+  `0x0057D1CF` (every push / or before `0x00644660` scanned).
 
 ## Open questions
 

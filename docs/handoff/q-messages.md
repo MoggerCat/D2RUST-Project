@@ -17,3 +17,5 @@ Expiry clock 40 ms per client frame; Latin-1 text; HUD fill tiles as the backing
 
 ## Local check
 `cargo run -p d2-client -- play --new amazon Test` (as in PLAYABLE.md). Nothing in the game sends a chat line yet, so there is nothing to see in play beyond the unit tests: `cargo test -p d2-client --lib game_messages`.
+
+Local check done 2026-10-08 (PC 1 round 2, branch claude/local-pc1-s8): `--lib game_messages` passes (in a 21-test lib run with credits, hud_tips, stash_gold_max, inv_items_socket, weapons); the play check has nothing to see.

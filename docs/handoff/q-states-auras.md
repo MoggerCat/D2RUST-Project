@@ -15,3 +15,5 @@ Unit tints for colour states; client-side state hooks; a recorded aura trace.
 
 ## Local check
 `cargo nextest run -p d2-sim unit_update` then `play`: cast Might / a curse / Frost Nova; the state overlay should appear on the unit and vanish when it expires.
+
+Local check done 2026-10-08 (PC 1 round 2, branch claude/local-pc1-s8): `cargo test -p d2-sim --lib unit_update` passes (40 tests in one filtered run with equip, vitals_sync, socket); the in-game overlay check needs a player.

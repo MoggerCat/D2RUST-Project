@@ -26,15 +26,15 @@
 |   3. Join after the load: Iron Golem re-summon (`0x005394A0`) | 119–144 |
 |   4. Hotkey and mouse-skill item indices after a reload | 145–162 |
 |   5. Load failure: result codes and the message shown | 163–200 |
-|   6. Runeword items that no longer match (`0x00563470`) | 201–226 |
-|   7. Map seed restore in single player | 227–238 |
-|   8. Player-record values sent at the join (`sim/intents-events.md` §8.2 rule 3) | 239–280 |
-| Constants & data dependencies | 281–285 |
-| Randomness | 286–290 |
-| Edge cases & original bugs | 291–299 |
-| Test vectors | 300–307 |
-| Provenance | 308–348 |
-| Open questions | 349–366 |
+|   6. Runeword items that no longer match (`0x00563470`) | 201–246 |
+|   7. Map seed restore in single player | 247–258 |
+|   8. Player-record values sent at the join (`sim/intents-events.md` §8.2 rule 3) | 259–300 |
+| Constants & data dependencies | 301–305 |
+| Randomness | 306–310 |
+| Edge cases & original bugs | 311–319 |
+| Test vectors | 320–327 |
+| Provenance | 328–368 |
+| Open questions | 369–388 |
 <!-- /index -->
 
 ## Summary
@@ -218,8 +218,28 @@ own sections are written "load §1", "load §2".
       becoming the cursor item), mode 4 (`0x00624690`),
       `0x00628170`(item, 0x10, 1), its
       update entry (`0x0063CC70`) and the player's stats are refreshed
-      (`0x00621000`). Where the item ends up after that is not traced
-      (`formats/d2s.md` Open question 13).
+      (`0x00621000`). Then weapon bookkeeping `0x0055C5C0` and the
+      inventory pass `0x0055DBC0(…, 0)` run (`items/inventory.md` §5.7,
+      §5.8); neither links, places nor frees the item. **End state**:
+      the item is a detached unit: mode 4, no body location, not in the
+      player's item list (unlinked `0x0063AD90`), **not** the cursor
+      (the 4th argument 1 skips `0x0063C180` and sets item flag 0x20
+      instead), its stat list off the player (`0x0062A360`), not in a
+      room and not freed. Its GUID is on the player's update list with
+      command flag 0x10, so the player's next unit update dispatches it
+      like a 0x1C body removal (`items/inventory-moves.md` §6.1–§6.2,
+      0x9D action 8) and the clean-up clears flag 0x20; command flag 0x1
+      is not set, so it is not removed then either. The save writer
+      walks only the item list and the cursor (`formats/d2s.md` §8.1
+      rule 3), so the next save drops the item: on disk it is deleted
+      one save later than a stored one. Whether the client shows the
+      0x9D for an item it never received is not traced (no effect on
+      the server).
+      When `0x0063DE60` gives neither 3 nor 4, `0x00560CD0` changes
+      nothing and the item stays equipped with its stale runeword flag
+      (a held cursor item would do the same, but the cursor entry is
+      the last of the list, `formats/d2s.md` §8.1 rule 3, so the cursor
+      is empty here).
    3. 4 (cursor): `0x0055EEA0`: when it is the cursor item, a message,
       the cursor is cleared (`0x0063C180`) and the unit is freed.
    4. Any other mode: nothing.
@@ -351,11 +371,13 @@ the owner specs' (`items/generation.md` §10.3).
 1. None of its own; see `formats/d2s.md` Open questions 15 (golem item)
    and 17 (appearance bytes).
 2. ~~Load §6 rule 1.2: where an equipped non-matching runeword item
-   ends up after `0x00560CD0` (flag 0x20 set, not the cursor).~~ Struck
-   (2026-10-07): needs `0x0055C730`, `0x0055C5C0` and `0x0055DBC0`
-   (three bodies). A game-written save holds a stale runeword only
-   after a data change (modded runes), so Phases 0–6 do not reach it.
-   Recording list `docs/handoff/pc2-rec-pc2-items.md` IT-8.
+   ends up after `0x00560CD0` (flag 0x20 set, not the cursor).~~
+   **Answered** (2026-10-08, REC-241; `0x00560CD0`, `0x0055C730`,
+   `0x0055C5C0`, `0x0055DBC0`, `0x0063CC70` read): detached, not
+   freed, dropped by the next save (§6 rule 1.2 "End state"). A
+   game-written save holds a stale runeword only after a data change
+   (modded runes); the confirming load is recording list
+   `docs/handoff/pc2-rec-pc2-items.md` IT-8.
 3. ~~Load §4 measured confirmation.~~ Struck (2026-10-07): the rule is
    derived from the binary; the confirming save is recording list
    IT-3.

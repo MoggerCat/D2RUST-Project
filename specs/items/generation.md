@@ -42,13 +42,13 @@
 |   9. Forced requests, ears, names, timers | 431–464 |
 |   10. Items from a code: the create wrapper and start items | 465–535 |
 |   11. Format-0 branches (legacy items) | 536–581 |
-|   12. Repair, recharge and runeword removal | 582–651 |
-| Constants & data dependencies | 652–674 |
-| Randomness | 675–693 |
-| Edge cases & original bugs | 694–708 |
-| Test vectors | 709–724 |
-| Provenance | 725–751 |
-| Open questions | 752–842 |
+|   12. Repair, recharge and runeword removal | 582–668 |
+| Constants & data dependencies | 669–691 |
+| Randomness | 692–710 |
+| Edge cases & original bugs | 711–725 |
+| Test vectors | 726–741 |
+| Provenance | 742–768 |
+| Open questions | 769–859 |
 <!-- /index -->
 
 ## Summary
@@ -634,11 +634,28 @@ X's own inventory (+0x60, node order) until one returns 1; else 0.
 (The client's copy of this rule: `client/msg-stats-items.md` §5, 0x3E
 stat 204.)
 
-PROVISIONAL: "X's stat lists with flag 0x40 in list order" is read as
-the item list (state 0), then the runeword list (state 171) (because
-d2rs has no list-order walk here; a charged skill's key is in one list
-only, so the order shows only when both hold it); settled by: recharge
-capture of a runeword item whose base has the same charged skill.
+**List order of the walk** (2026-10-08, static; replaces a
+PROVISIONAL reading "main list, then runeword list"): `0x00625760(X,
+0x40)` → `0x006256E0` starts at the head of X's active child chain
+(extended list +0x3C) and `0x00625730` follows the link +0x2C, taking
+every child with flag 0x40 whatever its state; the parked chain (+0x40)
+is not walked. The attach `0x00626E10` prepends a non-parked list at
+the head (`0x00626E10`: list +0x2C := old head, head := list), so the
+walk visits the most recently attached list first. An item's main
+list (state 0, flags 0x40), when missing, is created and attached by
+the first property write (`0x0065CBF0` → `0x00625790(X, 0, 0x40)`,
+missing → `0x006251F0` + `0x00626E10`), at generation or, on load, by
+the bit-stream reader's list c = −1; the runeword list (state 171) is
+attached later, at activation (`items/properties.md` §10.2) or by the
+reader's last list (`items/bitstream.md` §4.6 rule 3). So for a
+runeword item the walk is: **the runeword list, then the main list**
+(then any other flag-0x40 child attached before them). Since a
+state-0 lookup returns the first active flag-0x40 child
+(`0x006256E0`, state ignored), a runeword base that had no main list
+before activation has only the runeword list, and later state-0
+property writes land in it. The order shows only when both lists hold
+the same charged-skill key (the first one found is the one written,
+and a found entry with mx out of 1 … 255 ends the search with 0).
 
 #### 12.3 Remove a runeword (`0x00558C50`, EDX item X)
 

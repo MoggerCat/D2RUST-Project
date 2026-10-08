@@ -309,6 +309,7 @@ fn trade_codes() {
     let s = Output::ServerSound {
         unit: UnitKey::new(PLAYER, 1),
         class: 0,
+        at: None,
         event: 2,
     };
     u.apply_output(&s, &w).unwrap();

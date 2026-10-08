@@ -1,9 +1,11 @@
 # Spec: Formats — DT1 (map tiles)
 
-- **Status:** implemented. All 254 live `.dt1` files in 1.14d parse and
-  decode (6 unused version-4 leftovers excepted, see Edge cases). Block
-  formats seen: 0x0001 iso (226,996), 0x1001 (110,259) and 0x2005 (15,712),
-  both RLE.
+- **Status:** implemented. All 256 live `.dt1` files in 1.14d (names
+  case-insensitive, `mpq-tool formats` 2026-10-08) are read: 250 decode
+  and 6 unused version-4 leftovers are refused (see Edge cases). Block
+  formats seen: 0x0001 iso (226,996), 0x1001 (108,905) and 0x2005 (15,712),
+  both RLE. (The earlier 254 files / 110,259 0x1001 blocks counted names
+  case-sensitively.)
 - **Target version:** 1.14d
 - **Crate/module:** `d2-formats::dt1`
 - **Related specs:** `specs/formats/ds1.md` (maps that reference tiles)
@@ -62,7 +64,7 @@ All integers are little-endian.
 | 0x50 | u32 | block count |
 | 0x54 | 4 bytes | unused |
 | 0x58 | u16 | unknown |
-| 0x5A | u16 | cache index |
+| 0x5A | u16 | unknown (D2MOO: cache index; replaced at load, §Unknown and runtime fields) |
 | 0x5C | u32 | unknown |
 
 ### Block header (20 bytes each, at the tile's block headers offset)
@@ -107,6 +109,23 @@ pixel is written there. Truncated pairs or pixel runs are errors.
 Unwritten pixels are 0 (transparent). Assembling blocks into a tile image
 (using block x, y) and the meaning of orientation values are rendering /
 map rules.
+
+### Unknown and runtime fields
+
+Game-file read 2026-10-08 (the 245 version-7 DT1s of `d2exp.mpq` then
+`d2data.mpq` by name, 15,637 tiles, 345,923 blocks; scratch program):
+
+| Field | Live values | 1.14d use |
+|---|---|---|
+| tile 0x10 | 0 in every tile | none needed |
+| tile 0x24 | 50 distinct values, 0 in 296 tiles; read as 3 bytes they look like RGB colours (e.g. `0x131C07`) | reader not found (open question 1) |
+| tile 0x54 | 0 in every tile | overwritten at load with the block headers' address (tile 0x48 + file base, `0x0060A290`) |
+| tile 0x58, 0x5A | both 0 in 14,284 tiles; 13 / 17 distinct values in the rest | the u32 at 0x58 is overwritten at load with a pointer to the library's path (`0x0060A290`, `0x0060A390`): the file values are never read |
+| tile 0x5C | 0 in every tile | the header-only load `0x0060A390` ends the process (fatal) when 0x54 or 0x5C ≠ 0 |
+| block 0x04, 0x0E | 0 in every block | none needed |
+| block 0x0C (upper half of the data length) | 0 in every block | 1.14d reads the data length as u16 at 0x0A (`0x0060A290`, `0x0060A650`) |
+
+A d2rs reader keeps decoding these as stored; no rule depends on them.
 
 ## Constants & data dependencies
 
@@ -154,6 +173,11 @@ consulted.
 ## Open questions
 
 1. Meaning of the unknown fields and of each orientation value: map spec.
+   *Partly answered* (game-file read and static, 2026-10-08):
+   §Unknown and runtime fields (0x10, 0x54, 0x5C and the block's 0x04,
+   0x0C, 0x0E are 0 in all live data; 0x58/0x5A are replaced at load).
+   Open: a reader of tile 0x24 (the RGB-looking value); orientation
+   values stay with the map specs.
 2. Sub-tile flag row order relative to screen and world coordinates: map
    spec (Riiablo reverses rows).
    *Answered* in the owner: `drlg/rooms.md` §10.4 rule 3 (1.14d's
@@ -162,7 +186,10 @@ consulted.
 3. Whole-file block limit (`file length / 20`, §Block header) assumes
    tiles never share block headers: confirm on every 1.14d `.dt1`
    (`mpq-tool formats`).
-   *Answered* (game-file read, 2026-10-07, the 251 used DT1s of
-   d2data + d2exp, 15,928 tiles, 397,668 blocks; `Patch_D2.mpq`
+   *Answered* (game-file read, 2026-10-07, the 251 DT1s of
+   d2data + d2exp by name = 245 version-7 files plus the 6 unused
+   version-4 leftovers; the totals quoted then, 15,928 tiles and 397,668
+   blocks, are for those 251 files. Version-7 only, re-read 2026-10-08:
+   15,637 tiles, 345,923 blocks, see Unknown and runtime fields; `Patch_D2.mpq`
    unlisted): no two tiles' block-header ranges overlap and every file's
    block total is within `length / 20`.

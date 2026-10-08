@@ -17,3 +17,5 @@
 ## Local check
 `D2_GAME_DIR=<game> cargo run -p d2-client -- play --new <class> <name>` with a save or drop that has a socketed (white/blue) item and a gem or rune: pick the gem up, click the socketed item. The gem leaves the cursor, the item's tip lists the gem's name and bonus, and a runeword shows once the last rune goes in (name from the runes table).
 Tests: `cargo nextest run -p d2-sim wiring::inventory::tests::socket`, `cargo nextest run -p d2-client inv_items_socket` (4 + 3 synthetic).
+
+Local check done 2026-10-08 (PC 1 round 2, branch claude/local-pc1-s8): headless part passes: `wiring::inventory::tests::socket` (d2-sim) and `inv_items_socket` (d2-client lib); the gem-in-socket play check needs a player.

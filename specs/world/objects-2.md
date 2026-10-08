@@ -17,25 +17,29 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 41–50 |
-| Inputs | 51–54 |
-| Outputs / state changes | 55–59 |
-| Rules | 60–61 |
-|   16. Operate functions, part 2 | 62–189 |
-|   17. Small init functions | 190–216 |
-|   18. Object events 0, 3, 8, 9, 10 | 217–284 |
-|   19. Obelisk completion (C→S 0x44, `0x00585240`) | 285–331 |
-|   20. Item drop helpers (open question 13) | 332–427 |
-|   21. Curable-state removal (`0x00578C20`, open question 15) | 428–440 |
-|   22. Object allocation modes (open question 8) | 441–489 |
-|   23. Client side of S→C 0x0E and 0x4D (open question 4) | 490–507 |
-|   24. Guards and corner cases of part 1 (read 2026-10-07) | 508–549 |
-| Constants & data dependencies | 550–553 |
-| Randomness | 554–568 |
-| Edge cases & original bugs | 569–593 |
-| Test vectors | 594–610 |
-| Provenance | 611–637 |
-| Open questions | 638–641 |
+| Summary | 45–54 |
+| Inputs | 55–58 |
+| Outputs / state changes | 59–63 |
+| Rules | 64–65 |
+|   16. Operate functions, part 2 | 66–193 |
+|   17. Small init functions | 194–220 |
+|   18. Object events 0, 3, 8, 9, 10 | 221–288 |
+|   19. Obelisk completion (C→S 0x44, `0x00585240`) | 289–335 |
+|   20. Item drop helpers (open question 13) | 336–455 |
+|   21. Curable-state removal (`0x00578C20`, open question 15) | 456–468 |
+|   22. Object allocation modes (open question 8) | 469–517 |
+|   23. Client side of S→C 0x0E and 0x4D (open question 4) | 518–535 |
+|   24. Guards and corner cases of part 1 (read 2026-10-07) | 536–577 |
+|   25. Portal pair creation (`0x0056D130`, `0x0056CF40`) | 578–674 |
+|   26. Shrine state lists and shrine texts (REC-239, read 2026-10-08) | 675–768 |
+|   27. Town Portal cast and the life of the pair (`0x005BE290`; REC-117, REC-243, read 2026-10-08) | 769–902 |
+|   28. A chest opened in play (REC-260, read 2026-10-08) | 903–980 |
+| Constants & data dependencies | 981–984 |
+| Randomness | 985–1007 |
+| Edge cases & original bugs | 1008–1045 |
+| Test vectors | 1046–1092 |
+| Provenance | 1093–1151 |
+| Open questions | 1152–1155 |
 <!-- /index -->
 
 ## Summary
@@ -425,6 +429,30 @@ g + ⌊L/2⌋ + 5 → armor pick; r < 80 → weapon pick; else misc pick (with
 m). So gold (65 − L) %, armor (⌊L/2⌋ + 5) %, weapon (⌈L/2⌉ + 10) %,
 misc 20 %.
 
+#### 20.7 Code drop, `0x00585970(ECX game, EDX U; code, quality)` (`ret 8`; REC-260, read 2026-10-08)
+
+The chest's `C(code)` (`world/objects.md` §8) and the quest gold
+piles. No draw of its own.
+
+1. id := `0x00633680(code)`; −1 → return none (no fatal, unlike
+   §20.4 rule 3).
+2. Floor search from U's position (`0x00620870`) in U's room
+   (`0x00620BB0`): `0x00555DA0(room, &pos, &out, 1, 1)`; none → return
+   none.
+3. Request (zeroed 0x84 bytes): +0x00 U, +0x04 0, +0x08 game, +0x0C
+   ilvl := `0x00558200(U, 0)` (the §20.4 rule 2 level: for an object
+   the area level of its room's level, at least 1), +0x14 id, +0x18
+   spawn mode 3, +0x1C / +0x20 the search's position, +0x24 its room,
+   +0x28 init flags 1, +0x2A format (game +0x78), +0x30 `quality`;
+   every other field 0. `0x00558D90(game, request, 0)`; return its
+   item.
+
+So the item level is read after the search (neither draws). The chest
+calls pass quality 0 (`items/quality.md` OQ2). No gold find: its only
+caller is the TC walk (`0x005589A0` from `0x0055A6D0`), so a chest's
+`gld ` code piles keep the pipeline amount (`items/treasure.md` §8
+step 1).
+
 ### 21. Curable-state removal (`0x00578C20`, open question 15)
 
 For each state s = 0 … count − 1 (data +0xC4; 185 live), in order: P
@@ -547,6 +575,409 @@ each is settled from the 1.14d function named.
    refill that adds a charge, also when the mode rule sets no mode;
    after a mode set they repeat it (no second effect).
 
+### 25. Portal pair creation (`0x0056D130`, `0x0056CF40`)
+
+`0x0056D130(ECX game, EDX owner unit or null, room, x, y, level, out,
+class, exact)` (`ret 0x1C`) creates a pair of portal objects: object 1
+at (x, y) in the caller's act, object 2 in `level`, linked to each
+other. Returns 1 when both exist, else 0. Callers (12): NPC travel in
+the same act `0x0054B8F3` (class 59, owner the player, `world/npc.md`
+§8.3), the portal shrine effect 17 `0x00582AA8` (`world/objects.md` §9.2), quest
+code `0x0058B01D`, `0x0058BD33`, `0x00592DE8`, `0x005933EB`,
+`0x00594228` (cow portal), `0x005964D3`, `0x0059B0E7`, `0x0059CBA8`
+(Tyrael, `world/quests-act2.md` §8.11), `0x005A99BD`, and the town portal
+cast `0x005BE290` at `0x005BE32A` (its body: §27; its use path:
+`items/use.md` §4, `skills/bodies-3.md` §4.4).
+
+1. Room null → fatal 0xE42 (`0x0056D147`).
+2. `out` ≠ null → *out := null.
+3. Town refusal: owner ≠ null and the room is in a town (`0x0061AB00`)
+   and not (level ∈ {39, 133, 134, 135, 136} and class = 60) → sound
+   event 24 on the owner (`0x00553380(owner, 24, owner)`, `notintown`,
+   `audio/triggers-2.md`), return 0.
+4. Act of `level` ≠ act of the room's level → fatal 0xE5C (`0x0056D1E1`):
+   a portal never leads to another act.
+5. Spot: (x, y) as given when `exact` ≠ 0; else the field search
+   `0x0064E810(room, &(x, y), origin (x, y), size 3, mask 0x3E01, field
+   mask 0xC01, no fallback)` (`sim/path-placement.md` §7.1, §7.2), none
+   → return 0. Then the cell lookup `0x00463740` of (x, y) **from the
+   argument room** (the room the search found is only tested); none →
+   return 0. Call that room R1.
+6. Object 1 := `0x00555230` (type 2, `class`, x, y, R1, flags 1, mode 1,
+   GUID 0; `0x0056D249`). *out := object 1. Mode set `0x00624690(object
+   1, 1)` (already mode 1: update mark only). Its init (§3) runs inside
+   the allocation: class 59 init 11 sets its destination (data +0x04) to
+   the town of R1's act; class 60 init 12 to its level map
+   (`world/objects.md` §5.5).
+7. Object 2 := `0x0056CF40(game, object 1, level, R1's level)` (rules
+   9–15); none → return 0 (object 1 is already freed then).
+8. Object 2's portal flags (data +0x05) |= 3 (again, after rule 14);
+   the "has portal" flag of R1's DRLG room and of object 2's room
+   (`0x0061AED0(room, 0)`, `drlg/rooms.md` §8 rule 1: the rooms are not
+   freed while it is set). Return 1.
+
+`0x0056CF40(ECX game, object 1, level, source level)` (`ret 0xC`):
+
+9. S := `0x0061B060(act of level's record, level, tile index 11, &sx,
+   &sy, size 3)` (`sim/path-placement.md` §11); populate S
+   (`0x0052D0F0`) **before** the null test (`monsters/population.md`
+   §1 rule 2).
+10. S null → remove object 1 (`0x0061A270(object 1's room, 2, its
+    GUID)`, free `0x00555600`), return 0.
+11. Point p := (sx, sy). Arrival hook `0x00545830(game, &p, source
+    level, &R)` (`world/quests.md` §8.3): only source level 73 runs
+    `0x0059DFD0`: when chain 13's record has +0x3C = 1 (Tyrael's flag,
+    `world/quests-act2.md` §8.11), T := `0x0061B060(act II record (game
+    +0xC0), 40, tile index 12, &tx, &ty, 3)`; T found → populate T, then
+    free point `0x0064E7E0(T, &p, 3, mask 0xBE11, step 7)` from p (the
+    tile-11 point); found room F → p := (tx, ty) (the raw tile-12 spawn
+    point; the free point found is dropped), R := F, hook result 1.
+    Otherwise result 0 and p, R unchanged.
+12. Hook result 1 → R := cell lookup of p from R (`0x00463740`); else R
+    := S. R null → R := S, p := (sx, sy).
+13. Free point `0x0064E7E0(R, &p, 3, mask 0xBE11, step 5)`; found → R :=
+    its room. Not found → R := a second `0x0061B060(level, 11, size 3)`
+    (it may draw again), or S when that returns null; p stays as given
+    to the failed search (§7.2 rule 4). (The fatal 0xE08 after it is
+    unreachable: S ≠ null.)
+14. Object 2 := `0x00555230` (type 2, class = object 1's class, p, R,
+    flags 1, mode 2, GUID 0; `0x0056D092`); null → remove and free
+    object 1 as rule 10, return 0. Object 2's destination (data +0x04)
+    := the level of object 1's room (> 255 → fatal 0xE2B); portal flags
+    |= 3; mode set `0x00624690(object 2, 2)` (update mark only).
+15. Link (`0x00553590(object 1, object 2)`): each object's data +0x20 /
+    +0x24 := the other's position x / y, and +0x18 / +0x1C := the tile
+    x / y of the other's room (`0x00619730` words 4 and 5; skipped when
+    the other has no room). Partner (`0x00621CE0`, both ways): unit
+    +0x94 := the other's type, +0x98 := the other's GUID, flag-ex
+    (+0xC8) |= 0x400; a unit with a stat list (+0x5C ≠ 0) also gets
+    state 98 and stats 353 / 354 holding the type and GUID. Return
+    object 2.
+
+Neither function sets the owner GUID (timer argument, `world/objects.md`
+§1, read by §12 rule 4): it stays −1 unless the caller writes it (the
+town portal cast `0x005BE290` does after the call). Draws: `world/cube.md`
+open question 4 (one game-seed step per object, plus the level build
+and population of rules 9, 11 and 13).
+
+Tyrael's portal (`0x0059CBA8`): owner the player, the player's room
+and position, level 40, class 59, exact 0, out null. Object 1 stands at
+the free spot nearest the player in Duriel's Lair (73), destination 40
+(init 11: town of act II); object 2 stands in Lut Gholein at the free
+point (mask 0xBE11, step 5) nearest its tile-12 spawn point (rule 11,
+because +0x3C is 1 during the call), destination 73. Travel through it
+is §12 of `world/objects.md` with partner L = object 2. Lut Gholein has
+no tile-12 record, so the "tile-12 point" is spawn-tile record 0, DS1
+tile (33, 9), with no draw (`world/quests-act2.md` §8.12 rule 6). The
+pair is complete from creation: 1.14d has no partner-less Tyrael
+portal and no free-spot rule for one.
+
+### 26. Shrine state lists and shrine texts (REC-239, read 2026-10-08)
+
+The timed-state shrines (`world/objects.md` §9.2 codes 6–15) go through
+the state helper `apply_state` `0x0056E970` (`skills/bodies.md` §2.7,
+owner of its rules). This section gives the request the shrines pass and
+what the helper's rules then mean for them.
+
+#### 26.1 The request
+
+`0x00582800(ECX source, EDX target, duration, value, stat, state,
+callback)` fills the helper's request: source := the shrine object,
+target := P, **skill := 0, level := 0**, duration := the shrine's
+`Duration in frames` (+0x0C), stat, value, state, and callback (0 → the
+default `0x0056E900`).
+
+| Code | Caller | stat, value | state | callback | after the call |
+|---|---|---|---|---|---|
+| 6, 8–11, 13, 15 | `0x00583B30` | table stat, V(stat, `Arg0`) (table stat −1 → value 0; not live) | table | 0 | – |
+| 7 | `0x005839B0` | 25, `Arg1` (+0x08) | table (129) | 0 | stat 19 := V(19, `Arg0`) on the returned list |
+| 12 | `0x00583BF0` (builds the request itself) | 11, 0 | table (134) | `0x00583BD0` | `0x0056DE40(P)`, whether or not a list was made |
+| 14 | `0x00583A70` | 162, v = V(162, `Arg0`) | table (136) | `0x00583A40` | stamina was set to its maximum **before** the call; on the returned list stat 10 := 2v, stat 28 := 1000 |
+
+Table = `0x006E1850` (`world/objects.md` §9.2). A code ≥ `[0x00732EAC]`
+is fatal in `0x00583B30` / `0x005839B0` / `0x00583A70` (0x9F9 / 0x9C1 /
+0x9E7). §9.1 rule 4 already rules that out. A set on a returned none
+does nothing (`0x006270B0` returns 0 on a null list). A 0 value on a
+missing stat writes nothing, so code 12's list holds no stat.
+
+#### 26.2 The helper's rules applied to a shrine (live 1.14d data)
+
+1. **State check:** 128–137 are valid; never refuses.
+2. **Monster rules:** the target is the operating player; never apply.
+3. **Curse path.** All ten shrine states (128 `shrine_armor` … 137
+   `shrine_experience`) have `states.txt` `curse` = 1, so:
+   1. r := P's `curse_resistance` (stat 109). Its only live source is
+      the Assassin's Fade (skill 267, `aurastat5`, calc `dm34`). r ≥ 100
+      → no list; 0 < r < 100 → duration −= pct(duration, r, 100)
+      (`combat/damage.md`).
+   2. P has state 57 (`attract`) → no list.
+   3. Old := P's **first stat list with flag 0x20**: any curse list, so
+      another shrine's state or a monster's curse (e.g. Amplify Damage).
+      The new list's flags start at 0x20.
+4. **Old list.**
+   1. Same state (skill 0 and level 0 always match a shrine's own list):
+      **refresh only**. Expiry := F + duration (after rule 3.1), timer 12
+      re-armed, the old list returned. Its stats are **not** rewritten:
+      the V just computed is dropped. Only the caller's sets after the
+      call (code 7 stat 19; code 14 stats 10 and 28) write the old list.
+   2. Another state: the "request level < old level → none" refusal
+      needs the same state and skill, so it never fires for a shrine.
+      The old list is detached and freed, and its remove callback runs
+      (§26.3 for 134 / 136; curses: `skills/bodies.md` §2.8).
+   So a player holds at most one shrine state or curse at a time. A
+   shrine replaces the current curse or shrine state. A later curse
+   replaces the shrine state by the same rule (on the curse's request).
+5. **New list:** P is queued for update; state on. Every state shrine
+   has duration ≠ 0 (2,400–4,800), so e = F + duration, timer 12 at e,
+   flags 0x22 (none of 128–137 has `exp` or `aura`). Source := (type 2,
+   the shrine's GUID), state, skill 0, level 0; stat ≠ −1 → list stat :=
+   value; attached; remove callback := the request's, else `0x0056E900`.
+   Expiry and the type-12 timer: `sim/stat-lists.md` §10.4.
+
+#### 26.3 Remove callbacks
+
+Detach calls them (ECX unit, EDX state, stack list; `sim/stat-lists.md`
+§8.2 step 6) on expiry, on replacement (§26.2 r4.2) and on any other
+removal.
+
+- **`0x00583BD0`** (state 134, skill shrine): the default callback
+  `0x0056E900` (`skills/bodies.md` §2.8) with the same arguments, then
+  the skill refresh `0x0056DE40(unit)` (`skills/use.md` §7), which drops
+  the +2 of state 134 (`skills/levels.md`).
+- **`0x00583A40`** (state 136, stamina shrine): the default callback with
+  the same arguments, then stamina (stat 10) := the unit's maximum
+  stamina (`0x00625DB0`) through the unit set `0x00627260(unit, 10, max,
+  layer 0)`. This runs whether the unit is alive or not.
+
+#### 26.4 Shrine texts on the client
+
+- **Overhead message** (server: `world/objects.md` §9.1 rule 3 and event
+  6). The text is the decimal string of 3683 + shrine id: 4 characters
+  for every id 0–22 ("3683" … "3705"), so the record lives 8 · 4 + 125
+  = 157 frames. It is sent as S→C 0x26 type 5 (unit type 2, the object's
+  GUID, empty name; `sim/intents-events.md` §7.9 r3). Event 6 at +300
+  frees the server record and sends S→C 0x76.
+- **Client.** `client/msg-ui.md` §4 r4 stores an overhead record (d =
+  8 · 4 + 125 = 157 overhead draws). `ui/messages.md` §5 draws it as an
+  object: `atol` of the text → string 3683 + id (`ShrMsg0`–`ShrMsg22`,
+  e.g. 3684 "You feel refreshed.", 3689 "Your skin hardens."), in a
+  font-13 bubble above the object (py − 10). S→C 0x76 frees the record
+  if it is still there (`client/msg-ui.md` §21).
+- **Mouse-over label:** the shrine's name, string 10809 + shrine id
+  (`world/objects-client.md` §29 r4.3).
+
+### 27. Town Portal cast and the life of the pair (`0x005BE290`; REC-117, REC-243, read 2026-10-08)
+
+#### 27.1 The cast `0x005BE290(ECX game, EDX P; I, T, x, y, e)` (`ret 0x14`)
+
+Word 1 of item-use entry 2 (`items/use.md` §3, §4): a `tsc` / `tbk`
+use from C→S 0x20, 0x26, 0x27 or the scroll / book skill (srvdo 113,
+`skills/bodies-3.md` §4.4) gets here with item flag 0x4 already set on
+I. Of the stack arguments only I is read.
+
+1. P null or not a player (type ≠ 0) → return 0, nothing else.
+2. P's unit flags (+0xC4) |= 0x40.
+3. R := P's room (`0x00620BB0`). Town := the town level of the act of
+   R's level (`0x006427F0`, then `0x0061AB70`: table `0x006E7D1C` =
+   1, 40, 75, 103, 109).
+4. **Town refusal**: R is in a town (`0x0061AB00`) or R's level is 136
+   (Pandemonium Finale) → sound 24 (`notintown`, `audio/triggers-2.md`)
+   on P with target P (`0x00553380(P, 24, P)`), return 0. Nothing else
+   happens: the old pair stays, no 0x7C from the cast. Levels 133–135
+   are not towns: the cast works there.
+5. **One pair per player**: P's current pair is closed
+   (`0x00535430(game, P)`, `world/quests-helpers.md` §7: the class-59
+   object whose GUID is player data +0x48, and its partner).
+6. Creation: `0x0056D130(game, P, R, P's x (0x0045ADF0), P's y
+   (0x0045AE20), Town, &O1, class 59, exact 0)` (§25): O1 in mode 1 at
+   the free spot nearest P (field search, size 3, mask 0x3E01, field
+   mask 0xC01), destination Town (init 11); O2 in mode 2 in Town at the
+   free point (mask 0xBE11, step 5) nearest its tile-11 spawn point,
+   destination R's level. Step 4 has already excluded §25 rule 3's
+   refusal.
+7. Sound 7 (`player_townportal_cast`) on P, no target (`0x00553380(P,
+   7, 0)`), whether or not step 6 made the pair.
+8. Step 6 returned 1: player data +0x48 := O1's GUID (`0x005353B0`; −1
+   if O1 were null). With O1: O1's owner GUID := P's GUID (`0x00552AF0`,
+   the timer argument of `world/objects.md` §1); O2 := O1's partner
+   (`0x00553720`, which streams O2's room when it is not loaded); O2
+   found → O2's owner := P's GUID, then the Act V hook `0x0058CF00(game,
+   O2)`; then `0x0058CF00(game, O1)` (`world/quests-act5-2.md` §7.6
+   "opened": only a portal standing in level 120 counts).
+9. I ≠ null → S→C 0x7C (I's type, I's GUID; `0x0053B3D0`) to P's client
+   (`0x005531C0`), made or not.
+10. Return step 6's result (1 made, 0 not).
+
+A 0 (step 4, or step 6 failing) means "not used" for the dispatcher
+(`items/use.md` §1 rule 5: failure reset and a second 0x7C) and for its
+caller: the scroll is not consumed, the tome keeps its charge. Step 6
+failing has still closed the old pair (step 5) and leaves player data
++0x48 at the old, freed GUID (§27.4).
+
+#### 27.2 The pair
+
+| | O1 | O2 |
+|---|---|---|
+| where | P's level, next to P | Town, at the tile-11 spawn point (Lut Gholein: DS1 tile (35, 10); with `LutN.ds1` also (32, 13), one `roll(2)` on the level seed picks, `drlg/levels.md` §10 rule 2) |
+| mode at creation | 1 | 2 |
+| class | 59 | 59 |
+| destination (data +0x04) | Town (init 11) | P's level at the cast |
+| owner GUID | P | P |
+| player data +0x48 of P | O1's GUID | |
+
+Partner links: §25 rule 15. The pair has no timer: nothing expires it
+(the ENDANIM of `world/objects.md` §12 rule 12 is only for class 60 or
+a portal without a partner).
+
+#### 27.3 Entering
+
+`world/objects.md` §12 (operate 15). For the pair:
+
+1. Who may enter: anyone not refused by rule 1 (busy; while a hostile
+   player exists only the owner), rule 2 (5 s after declaring
+   hostility), rule 4 (a player other than the owner must share the
+   owner's party when the owner is in the game) and rule 7 (class 59,
+   a user whose +0x48 is neither O's nor L's GUID: the destination
+   level's quest flag; `QuestFlagEx` in an expansion game).
+2. Entering O1 (field → town): P is placed at the free spot (mask
+   0x1C09, P's size) nearest O2 (rules 6, 8, 10, 11): a level change
+   through the placement `0x00554EA0`, sound 8, S→C 0x0D at (x + 5,
+   y + 5), state 102 for 75 frames (rule 13). Nothing is removed (u =
+   O1's GUID, not L's).
+3. Entering O2 (town → field): the same, next to O1; then, when the
+   user is the owner (u = player data +0x48 = L's GUID, L = O1), rule 12
+   removes both: O2 first, the Act V hook on O1, then O1. Anyone else
+   leaves the pair standing.
+4. State 102's list: allocated with (pool, flags 2, f + 75, owner type
+   0, owner GUID = P's unit type) (pushes at `0x00584C99`–`0x00584CA3`;
+   P's GUID is never passed); event 12 at f + 75 (the expiry walk,
+   `sim/stat-lists.md` §10.4); state 102 on; list state 102; remove
+   callback the default `0x0056E900` (`skills/bodies.md` §2.8: state off
+   unless it stays on death, anim refresh, passive refresh, pet
+   resync); attached. No existing list of state 102 is looked for: two
+   uses within 75 frames give two lists, and the first one's expiry
+   turns the state off while the second list remains.
+
+#### 27.4 Closing
+
+Every path that removes a town portal pair in 1.14d (the three callers
+of `0x00535430`, §12 rule 12 and the altar):
+
+| Closer | Site | Note |
+|---|---|---|
+| the owner casts again | `0x005BE2FD` (§27.1 step 5) | outside a town and level 136 only |
+| the owner enters O2 | `0x00584C1B` (`world/objects.md` §12 rule 12) | |
+| the owner's unit is freed (leaves the game) | `0x00555674` in `0x00555600` (player case, `sim/units.md` §3.2) | |
+| the owner declares hostility | `0x005A5F65` in `0x005A5E50` | that handler acts only in a town |
+| Arreat Summit altar | `world/quests-act5-2.md` §7.8 | only a portal in level 120 |
+
+Death, a level or act change and time do not close it. Player data
++0x48 is never cleared; a closer that finds no class-59 object with
+that GUID does nothing.
+
+Each portal leaves its room through `0x0061A270(room, 2, GUID)`: a
+{type, GUID} record is prepended to the room's delete list (room
++0x18) and the room's flag +0x58 := 1. In the frame's per-client
+update (`sim/tick.md` §6 rule 5) every client whose room's adjacency
+array (`0x00619790`) holds that room gets S→C 0x0A (type 2, GUID;
+`0x0053A770` → `0x0053BDA0`), except for a record of its own player.
+The object is then freed (`0x00555600`) and the room refreshed
+(`0x0061AED0(room, 1)`).
+
+#### 27.5 Messages of a portal
+
+1. Add (`sim/intents-events.md` §7.2, for a client that gets the room):
+   S→C 0x51, then 0x60 (`SubClass` bit 2: flags, destination, GUID),
+   then for class 59 S→C 0x82 (`0x0053DB90`, call site `0x005720B1`).
+2. 0x82 for portal O: o := O's owner GUID (`0x00552B10`); the player
+   with GUID o (`0x00552F60(game, 0, o)`); none (o = −1, or the player
+   is gone) → no 0x82. Else u32@1 = o, bytes 5–20 = the owner's name
+   (player data +0x00, at most 15 characters + NUL, `0x004135D0`),
+   u32@21 = O's GUID, u32@25 = O's partner's GUID (`0x00553720` at
+   `0x00572099`; −1 without a partner). The partner lookup can stream
+   the partner's room (`0x0061A140`, `0x0052D0F0`), so adding a portal
+   to a client can load a room.
+3. Object update pass (`world/objects.md` §14 rule 1): 0x0E then 0x60.
+4. Removal: 0x0A (§27.4). Arrival of the user: 0x0D (§12 rule 11).
+
+### 28. A chest opened in play (REC-260, read 2026-10-08)
+
+The chain from a chest operate (`world/objects.md` §8.1, `0x00585F60`)
+to what each client receives. Every step has its owner (linked); this
+section owns the links, the order and the unit flags the created items
+carry.
+
+#### 28.1 Server side, in order
+
+1. Lock (`InteractType` bit 0x80): no key → sound 22 queued on the
+   operator P with target P (`0x00553380` at `0x00585FCB`), return; no
+   draw. Key used (or class 6) → sound 11 queued on P (`0x00585FE4`)
+   and sent at once to P's client (`0x005531C0` →`0x00571740` at
+   `0x00586000`; the second send of the same event is
+   `audio/triggers-2.md` §14 rule 2, REC-93).
+2. Control-seed draws (operate record +0x0C, `world/objects.md` §2):
+   sparkle `roll(100)` (`0x00586032`) only for a sparkling chest; then
+   class 397 `roll(10000)` (`0x00586098`), any other chest `roll(100)`
+   (`0x005862F8`).
+3. Drops, in call order (§8.1 rules 4–5): each `D(Q)` is one TC walk
+   (`items/treasure.md` §4–§5, draws on the chest's unit seed, at most
+   6 items); each `C(code)` is §20.7. Every item is placed by the floor
+   search (`items/treasure.md` §7 step 2, `sim/path-placement.md` §9)
+   and added to the world before the next search, so later items avoid
+   earlier ones (item footprint 0x200 inside the search mask 0x3E01).
+4. Open (§8.1 rule 7, `0x00586380`–`0x00586406`): mode set 1 with
+   ENDANIM (`Mode1` ≠ 0) or mode set 2 (`0x00624690`, which queues the
+   chest and sets unit flag 0x1); selectable flag 0x2 cleared; drop
+   code (U +0xB8 ≠ 0) → `0x00559A30(game, U, quality 2, &level, request
+   out none, type −1, act flag 1)` (§20.4; pushes `0x005863E3`–
+   `0x005863F1`); trap arm (§8.3: sound 13 on the chest, target none,
+   event 4 at frame + 35).
+
+#### 28.2 Unit flags of a created item
+
+The allocation sets unit flag 0x10 "not yet announced" (`0x0055532F`);
+the item is added in mode 3 at the search's room and position and
+queued in that room (`sim/path-placement.md` §2.5, `sim/unit-order.md`
+§6 rule 2). Unit flag 0x1000 ("dropped") is **not** set: its only
+setters are `0x00558AA0` (`or 0x1002` at `0x00558ADF`, the put-down of
+an item a unit held) and `0x0055C9A0` (refused pickup), and no chest
+path reaches them (`0x00585B90` → `0x0055A6D0` → `0x0055A550`,
+`0x00585970` and `0x00559A30` each create through `0x00558D90` only;
+`0x00558D90` and `0x00555230` set no 0x1000; the `0x1000` pushes at
+`0x00558EE9` / `0x00558EF5` are item-data flags).
+
+#### 28.3 Messages
+
+In the client pass of the next tick (`sim/tick.md` §6 rule 5; an
+operate from C→S 0x13 runs before it), for each client whose room's
+adjacent-room array holds the item's room (`sim/intents-events.md`
+§7.1):
+
+1. Each created item: S→C 0x9C **action 0** (new) with its stream
+   (`items/inventory-moves.md` §6.3 part 1, `items/bitstream.md`), once:
+   part B and the item update find flag 0x10 still set and send
+   nothing; tick step 6 clears 0x10 and 0x1.
+2. The chest: 0x0E (type 2, GUID, 3, byte @7 = 0 since 0x2 is clear,
+   mode 1 or 2; `world/objects.md` §14 rule 1), then 0x2C event 13 when
+   the trap armed (flag 0x400).
+3. Order within one room: most recently queued first
+   (`sim/unit-order.md` §6 rule 5): in the chest's room the drop-code
+   item (queued after the mode set) first, then the chest, then the
+   walk and code items, last created first; a unit queued earlier in
+   the same tick keeps its earlier place (§6 rule 3). Items the search
+   put in another room follow that room's place in the client room's
+   adjacency array.
+4. A client whose rooms do not hold the item's room in that pass never
+   gets action 0: it gets the item from the add messages of its room
+   switch (`sim/intents-events.md` §7.2 part B: 0x9C action 3, or 2 in
+   a tick where 0x1000 is set), each time the room enters its view.
+
+Recorded for TC drops (monster deaths; same creation path from
+`0x0055A550`): `traces/raw/20261006-015956-packets.jsonl` frames 3090,
+3317, 3532, 3574, 3200 send `9c 00 …` in the kill's client pass; the
+recording has no 0x9C action 2 and one action 3 (frame 3187, an item
+entering view). No chest is recorded (REC-260).
+
 ## Constants & data dependencies
 
 Listed in `world/objects.md` (Constants & data dependencies).
@@ -565,6 +996,14 @@ Listed in `world/objects.md` (Constants & data dependencies).
    quality-4 loop; with a drop code it draws nothing itself. The
    pipeline's own draws follow (`items/generation.md`).
 3. Curable-state removal (§21): none.
+4. Code drop (§20.7): none of its own; the pipeline's draws only (the
+   new item's seeds, a gold pile's amount on the new item's seed,
+   `items/treasure.md` §8).
+5. Chest opened in play (§28.1): [sparkle `roll(100)` C], `roll(10000)`
+   or `roll(100)` C, then each drop's draws in call order, then the
+   open mode change (U, `world/objects.md` §4), then the drop-code
+   item's pipeline draws. The key test, the floor search, the trap arm
+   and the messages draw nothing.
 
 ## Edge cases & original bugs
 
@@ -590,6 +1029,19 @@ Listed in `world/objects.md` (Constants & data dependencies).
 6. **The weapon rack keeps a 6th failing pick** (§20.2).
 7. **Locked doors never occur** (§22): §10's mode-6 branch and sound 22
    are dead with live data.
+8. **A failed Town Portal still closes the old pair** (§27.1 steps 5,
+   6): no free spot near P, or no town spawn → the old pair is gone,
+   no new one, the scroll stays; sound 7 plays anyway.
+9. **State 102's list owner is (0, P's unit type)** (§27.3 rule 4):
+   the GUID slot gets the type, not P's GUID.
+10. **Stale +0x48** (§27.4): never cleared; harmless because GUIDs
+    are not reused within a game.
+11. **Chest and monster drops are "new", never "dropped"** (§28.2):
+    0x9C action 0, and only to clients in range in the next pass; a
+    client that walks up later sees the item as action 3 (no drop
+    animation).
+12. **Unknown code in a code drop gives nothing** (§20.7 rule 1),
+    where `0x00559A30` is fatal (0x9EA) for the same code.
 
 ## Test vectors
 
@@ -607,6 +1059,36 @@ Listed in `world/objects.md` (Constants & data dependencies).
 | well, `Parm1` 0, `Parm3` 3, P life 10 of max 20 (8.8), mana and stamina full | life written 10 (unchanged), used: charges 2 → 1, mode 1 | §24 rule 5 |
 | preset 580, init leaves mode 0 | no draw, O queued, flag 0x1 (0x0E sent) | §24 rule 1 |
 | population / evilhut / barricade object | allocated in mode 0 | §22 rule 4 |
+| `0x0056D130`, owner P in a town room, level 1, class 59 | sound 24 on P, result 0, no object | §25 rule 3 |
+| same, level 39, class 60 (cow portal from Rogue Encampment) | town test passed; pair created | §25 rule 3 |
+| destination level in another act | fatal 0xE5C | §25 rule 4 |
+| pair created | object 1 mode 1, object 2 mode 2, both class `class`; object 2 +0x04 = object 1's level; each +0x94/+0x98 = the other's type/GUID; each +0x20/+0x24 = the other's position; object 2 portal flags & 3 = 3; owner GUID −1 on both | §25 rules 6, 14, 15 |
+| Tyrael (msg 302) from level 73, chain 13 +0x3C = 1 | object 2 in level 40 at the free point (mask 0xBE11, step 5) nearest the tile-12 spawn point | §25 rule 11 |
+| spawn search of rule 9 returns none | object 1 removed and freed; result 0 | §25 rule 10 |
+| armor shrine (code 6, `Arg0` 100, duration 2,400) at frame F, P without a curse list | one list: state 128, flags 0x22, source (2, shrine GUID), skill 0, level 0, stat 171 = 100, expiry and timer 12 at F + 2,400 | §26.1, §26.2 r5 |
+| the same armor shrine type again at F + 100 | no new list; expiry and timer F + 2,500; stat 171 still the first value | §26.2 r4.1 |
+| resist fire shrine (code 8) at F + 200 while the armor list is on | armor list freed (state 128 off, default callback); new list state 131, stat 39 = 75, expiry F + 3,800 | §26.2 r4.2 |
+| armor shrine while P has a monster curse list (flag 0x20) | the curse list is freed (its callback runs); shrine list made | §26.2 r3.3, r4.2 |
+| resist cold shrine (3,600), P's `curse_resistance` 50 | expiry F + 3,600 − pct(3,600, 50, 100) = F + 1,800 | §26.2 r3.1 |
+| any shrine state, P's `curse_resistance` 100 | no list; code 14 still refilled stamina, code 12 still refreshed skills | §26.1, §26.2 r3.1 |
+| stamina shrine list expires | default callback, then stamina := max stamina | §26.3 |
+| skill shrine list replaced by a resist shrine | default callback, then skill refresh `0x0056DE40` | §26.3 |
+| shrine id 1 operated | S→C 0x26 type 5 text "3684"; client bubble "You feel refreshed." for 157 overhead draws; S→C 0x76 at server frame + 300 | §26.4 |
+| Town Portal scroll used (C→S 0x20) by P in the Rogue Encampment (level 1) | sound 24 on P (target P); no object; 0x3F for the scroll (flag 0x4 cleared), one 0x7C; scroll kept, skill count unchanged; old pair kept | §27.1 r4, `items/use.md` §1 r5 |
+| the same in level 136 | the same refusal | §27.1 r4 |
+| scroll used by P in level 2 (Blood Moor), P's old pair in level 3 | old pair removed (0x0A to clients with those rooms); O1 class 59 mode 1 near P, O2 mode 2 in level 1; both owner P; +0x48 = O1; sound 7; 0x7C; then the caller's 0x22, 0x3F, consumption | §27.1 r5–r9, `inventory-moves.md` §7.11 r3 |
+| scroll in level 2, no free spot near P | old pair removed; result 0; sound 7; two 0x7C; scroll kept | §27.1 r6, r9, edge case 8 |
+| P (owner) enters O1, then O2 | O1: P in level 1 next to O2, pair kept; O2: P next to O1, then O2 and O1 removed | §27.3 r2–r3 |
+| party member Q enters P's O2 | Q next to O1; pair kept | §27.3 r3 |
+| portal O1 added to a client, owner P in the game, O2 GUID g | 0x51, 0x60, 0x82 with u32@1 = P's GUID, P's name, u32@21 = O1, u32@25 = g | §27.5 r2 |
+| the same, O's owner GUID −1 (Tyrael's portal) | 0x51, 0x60, no 0x82 | §27.5 r2 |
+| code drop, code not an items code | none; no fatal, no draw | §20.7 r1 |
+| code drop `gld `, U a chest in level 2 (area level 1, normal), search finds a spot | request ilvl 1, quality 0, spawn mode 3, unit U; gold amount `roll(5)` + 1 on the new item's seed; no gold find (`0x005589A0` is called only by the TC walk) | §20.7 r3, `items/treasure.md` §8 |
+| chest: unlocked, not sparkling, class ≠ 397, C `roll(100)` ≥ 25, `Mode1` 0, no trap, no drop code; the walk creates i1 then i2 in the chest's room; one client in range | C: one `roll(100)`; next client pass to that client: 0x0E (2, chest GUID, 3, 0, mode 2), 0x9C action 0 i2, 0x9C action 0 i1 | §28.1, §28.3 r1–r3 |
+| same, C `roll(100)` < 25 | no item, chest opens: 0x0E only | §28.1, `world/objects.md` §8.1 r5 |
+| same as row 3 with trap 1 | 0x0E, 0x2C event 13 (target none), 0x9C i2, 0x9C i1 | §28.3 r2 |
+| locked, P without a key | no draw, chest stays mode 0; 0x2C event 22 to P's client in P's update | §28.1 r1 |
+| a second client enters the room after that pass | 0x9C action 3 for each item (room switch, part B) | §28.3 r4 |
 
 ## Provenance
 
@@ -621,6 +1103,14 @@ The §16–§18 bullet of `world/objects.md` Provenance; §18.6 from
 - §20: `0x005594C0`, `0x00559630`, `0x00559300`, `0x00559A30`,
   `0x00555E00`, `0x00555E70`, `0x00555FB0`, `0x005560F0`, `0x00556240`,
   `0x00629CC0`, `0x006427F0` (thresholds `0x006EB2F0`).
+- §20.7, §28 (read 2026-10-08, `all.asm`): `0x00585970`–`0x00585A79`,
+  `0x00558200`, the chest operate `0x00585F60` (draws at `0x00586032`,
+  `0x00586098`, `0x005862F8`; sounds `0x00585FCB`, `0x00585FE4`,
+  `0x00586000`; open tail `0x00586380`–`0x00586406`), the setters of
+  unit flag 0x1000 (all `or …+0xC4` sites: `0x00558ADF`, `0x0055C9D1`),
+  the callers of `0x00558AA0`, the call lists of `0x0055A550` and
+  `0x00558D90`, the 0x10 set at `0x0055532F`. Recording
+  `20261006-015956` (0x9C action counts: 8 × 0, 1 × 3, 0 × 2).
 - §21: `0x00578C20`, `0x0063A460` (bitset 12 = `curable`, cross-checked
   with bitset 2 `hide` at +0xD4 and 33 `udead` at +0x150); live
   `states.txt` `curable` column.
@@ -634,6 +1124,30 @@ The §16–§18 bullet of `world/objects.md` Provenance; §18.6 from
   `0x00551BA7`, `0x0056D092`, `0x00588A3B`, `0x0059D969`).
 - §24: `0x0054F370`, `0x005868A0`, `0x00582DA0`, `0x00581620`,
   `0x00585720`, `0x00581510`, `0x00624690`.
+- §25 (read 2026-10-08): `0x0056D130` (`0x0056D130`–`0x0056D2BC`),
+  `0x0056CF40` (`0x0056CF40`–`0x0056D12B`), `0x00545830`, `0x0059DFD0`,
+  `0x00553590`, `0x00619730`, `0x00621CE0`/`0x00621C30`, `0x0061AED0`/
+  `0x0061BAC0`, `0x00552AF0`/`0x00552B10` (owner set / get); the 12 call
+  sites of `0x0056D130` from `all.asm`; Tyrael's pushes at
+  `0x0059CB7A`–`0x0059CBA8`; the town portal cast's owner writes at
+  `0x005BE366`, `0x005BE380`. D2MOO 1.10f `D2GAME_CreatePortalObject_6FD13DF0`
+  gave the name only.
+- §27 (read 2026-10-08, `all.asm`): `0x005BE290`–`0x005BE3E3`,
+  `0x00535430`, `0x005353B0`, `0x00552AF0`, `0x00553720`, `0x0058CF00`,
+  `0x0058CF50`, `0x0061AB70` (table `0x006E7D1C` read from the image),
+  `0x0061A270`, `0x0053A770`, `0x0053DB90` and its call site
+  `0x00572087`–`0x005720B1`, the state-102 pushes `0x00584C7E`–
+  `0x00584CE6`, `0x0056E900`; the callers of `0x00535430`
+  (`0x00555674`, `0x005A5F65`, `0x005BE2FD`). Live `levels.txt` ids 1,
+  40, 75, 103, 109, 120, 136.
+- §26 (read 2026-10-08, `all.asm`): `0x00582800` (request offsets),
+  `0x00583B30`, `0x005839B0`, `0x00583A70`, `0x00583BF0`, `0x00583BD0`,
+  `0x00583A40`, `0x006270B0` (null list → 0); the helper's rules from
+  `skills/bodies.md` §2.7 (`0x0056E970`). Live `patch_d2` `states.txt`
+  rows 128–137 (`curse` 1; `exp`, `aura` empty), `shrines.txt` (`Arg0`,
+  `Arg1`, durations), `skills.txt` row 267 (`aurastat5`
+  `curse_resistance`; no other row or property sets stat 109). Strings:
+  English `string.tbl` 3683–3705 (`ShrMsg0`–`ShrMsg22`).
 
 ## Open questions
 

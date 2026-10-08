@@ -1,4 +1,4 @@
-// Spec: specs/client/model.md (§3 r3, open question 2), specs/sim/pathing.md (§8.1–8.5, §9.4, cases M1, D1–D4), specs/ui/controls.md (§6 r7)
+// Spec: specs/client/model.md (§3 r3, open question 2), specs/sim/pathing.md (§1.2–§1.5, §3–§9, cases M1, D1–D4), specs/ui/controls.md (§6 r7)
 //! Provisional own-walk motion of the local player (first playable
 //! preview, decision D2 in `docs/PLAN.md`).
 //!
@@ -20,8 +20,12 @@
 //!   walk is held until the player's client room holds its target (so it
 //!   starts from the arrival point, after the level change) and a walk
 //!   the player sends replaces it ([`Predict::server_walk`]);
-//! - each server tick the predicted position steps toward the target in a
-//!   straight line at the charstats walk / run speed ([`Speeds`]);
+//! - each server tick the predicted position steps along the player's own
+//!   path over the client DRLG ([`ClientPath`]: the server's path code,
+//!   `sim/pathing.md` §1.2–§9, so it stops at the same wall and goes
+//!   round the same obstacle); without a client DRLG (or no active room
+//!   at the predicted cell) it steps toward the target in a straight line
+//!   at the charstats walk / run speed ([`Speeds`]);
 //! - every change of the model's local position or server point (0x15
 //!   placement, 0x0F / position-check correction) snaps it back to the
 //!   model ([`Predict::observe`]);
@@ -34,8 +38,9 @@
 //! written to the model; the prediction only feeds the view and the
 //! click's screen → world conversion ([`Predict::position`]).
 //!
-//! d2rs-own, unverified. PROVISIONAL (client/model.md OQ2; REC-51): the
-//! straight line (the server walks the path of `sim/pathing.md` §4), the
+//! d2rs-own, unverified. PROVISIONAL (client/model.md OQ2; REC-51,
+//! REC-277 (d)): the client path step (`ClientPath`'s module doc), the
+//! straight-line fallback, the
 //! snap rule, the tick step and the facing (the client turns, §8.5) are
 //! not 1.14d facts. PROVISIONAL (REC-288): that the 0x0D walk outlives
 //! the 0x15 placement after it (the placement's teleport sets the path's
@@ -49,6 +54,7 @@ use std::sync::OnceLock;
 use d2_sim::path::tables::PathTables;
 use d2_sim::path::walk::geom::direction_vector;
 
+use super::client_path::{ClientPath, PathTo};
 use super::link::{LinkError, Pumped, SendQueue, Sent, ServerLink};
 use super::world::{ClientWorld, UnitKey, PLAYER};
 
@@ -58,11 +64,10 @@ use super::world::{ClientWorld, UnitKey, PLAYER};
 /// no direction toward the point the unit is on) or the tables do not
 /// parse.
 pub fn facing(from: (u32, u32), to: (u32, u32)) -> Option<u8> {
-    static TABLES: OnceLock<Option<PathTables>> = OnceLock::new();
     if from == to {
         return None;
     }
-    let tables = TABLES.get_or_init(|| PathTables::spec().ok()).as_ref()?;
+    let tables = tables()?;
     // d2rs-own, unverified: `0x0064FC60` takes the 32-bit `127 × l`, which
     // wraps past about 258 sub-tiles and then indexes the `tan` table out
     // of range; the original only aims at near path points, but the model
@@ -83,6 +88,13 @@ pub fn facing(from: (u32, u32), to: (u32, u32)) -> Option<u8> {
         return None;
     }
     Some(direction_vector(tables, from, near).1)
+}
+
+/// The spec path tables (`path-tables.tsv`); `None` when they do not
+/// parse.
+fn tables() -> Option<&'static PathTables> {
+    static TABLES: OnceLock<Option<PathTables>> = OnceLock::new();
+    TABLES.get_or_init(|| PathTables::spec().ok()).as_ref()
 }
 
 /// The precise distance (16.16) below which `127 × l` stays in `i32`.
@@ -205,6 +217,12 @@ pub struct Predict {
     /// A server walk (S→C 0x0D code 1) whose target is not yet in the
     /// player's client room ([`Self::server_walk`]).
     held: Option<(u16, u16)>,
+    /// The player's own path over the client DRLG ([`ClientPath`]): the
+    /// step of a walk when the client has a DRLG.
+    path: ClientPath,
+    /// The walk and the predicted position the path was last stepped
+    /// for: a new walk or a snap ([`Self::observe`]) re-places it.
+    path_for: Option<(Walk, (i64, i64))>,
 }
 
 /// The player mode request code "walk to (r0, r1)" (`client/model.md`
@@ -270,6 +288,8 @@ impl Predict {
                 act: world.act.as_ref().map(|a| a.act),
                 requests: p.mode_requests,
                 held: None,
+                path: ClientPath::default(),
+                path_for: None,
             };
             return;
         }
@@ -363,6 +383,9 @@ impl Predict {
         self.exhausted = world
             .local()
             .is_some_and(|p| p.stats.get(&10).is_some_and(|s| *s == 0));
+        if self.path_step(world, speeds, walk, target) {
+            return;
+        }
         let step = speeds.step(walk.run && !self.exhausted);
         let dist = isqrt(dx.unsigned_abs().pow(2) + dy.unsigned_abs().pow(2)) as i64;
         if dist <= step || step <= 0 {
@@ -373,6 +396,68 @@ impl Predict {
             return;
         }
         self.at = Some((x + dx * step / dist, y + dy * step / dist));
+    }
+
+    /// The tick on the player's own path (module doc): with a client DRLG
+    /// whose active rooms hold the predicted cell, the path is placed
+    /// there and requested for a new walk (or after a snap), then stepped
+    /// one tick (`sim/pathing.md` §9.2); its position is the prediction
+    /// and its stop ends the walk. `false`: no client path (no DRLG, no
+    /// room, no tables), so the straight step runs.
+    fn path_step(
+        &mut self,
+        world: &ClientWorld,
+        speeds: Speeds,
+        walk: Walk,
+        target: (u16, u16),
+    ) -> bool {
+        let (Some(at), Some(cell), Some(t)) = (self.at, self.cell(), tables()) else {
+            return false;
+        };
+        let Some(drlg) = world.drlg.as_ref().map(|d| &d.drlg) else {
+            return false;
+        };
+        let to = match walk.to {
+            WalkTo::Point(x, y) => PathTo::Point(x, y),
+            WalkTo::Unit(k) => {
+                let Some(&ty) = d2_sim::units::UnitType::ALL.get(usize::from(k.unit_type)) else {
+                    return false;
+                };
+                PathTo::Unit(ty, k.guid, target)
+            }
+        };
+        // The model's stamina; only zero is read (a run starts as a walk).
+        let stamina = world
+            .local()
+            .and_then(|p| p.stats.get(&10).copied())
+            .unwrap_or(1);
+        if self.path_for != Some((walk, at)) {
+            if !self.path.place(t, drlg, cell.0, cell.1) {
+                self.path_for = None;
+                return false;
+            }
+            if !self.path.request(t, drlg, speeds, stamina, to, walk.run) {
+                // No path: the server's request stands still too.
+                self.walk = None;
+                self.path_for = None;
+                return true;
+            }
+        }
+        let moving = self.path.tick(t, drlg, speeds, stamina, Some(to));
+        if let Some((x, y)) = self.path.position() {
+            let now = (i64::from(x), i64::from(y));
+            if let Some(d) = facing((at.0 as u32, at.1 as u32), (x, y)) {
+                self.dir = Some(d);
+            }
+            self.at = Some(now);
+        }
+        if moving {
+            self.path_for = self.at.map(|a| (walk, a));
+        } else {
+            self.walk = None;
+            self.path_for = None;
+        }
+        true
     }
 
     /// Faces the walk's target from the predicted position (module doc);

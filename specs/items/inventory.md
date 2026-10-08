@@ -5,7 +5,10 @@
   read from the 1.14d `Game.exe` (addresses below); grid sizes measured
   on the 1.14d `inventory.bin` / `belts.bin`; no recording replayed yet
   (test vectors T1–T9 are synthetic or table facts; R1–R6 need
-  recordings).
+  recordings). 2026-10-08 (REC-253): §4.2 out flags, the dexterity
+  branch without the link test and the socket contribution
+  `0x0062B450`; §5.6 the effects of item flag 0x4000, the refusing
+  callers and the client body-click pre-check; §5.7 r4 termination.
 - **Target version:** 1.14d
 - **Crate/module:** `d2-sim::items::inventory` (grids, placement, belt,
   equip checks), `d2-sim::items::moves` (intent handlers, deferred item
@@ -28,21 +31,21 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 48–67 |
-| Inputs | 68–78 |
-| Outputs / state changes | 79–86 |
-| Rules | 87–88 |
-|   1. Inventory model | 89–181 |
-|   2. Grid placement | 182–282 |
-|   3. Belt | 283–340 |
-|   4. Equipping | 341–526 |
-|   5. Shared checks | 527–720 |
-| Constants & data dependencies | 721–743 |
-| Randomness | 744–757 |
-| Edge cases & original bugs | 758–806 |
-| Test vectors | 807–855 |
-| Provenance | 856–915 |
-| Open questions | 916–1019 |
+| Summary | 51–70 |
+| Inputs | 71–81 |
+| Outputs / state changes | 82–89 |
+| Rules | 90–91 |
+|   1. Inventory model | 92–184 |
+|   2. Grid placement | 185–285 |
+|   3. Belt | 286–343 |
+|   4. Equipping | 344–553 |
+|   5. Shared checks | 554–796 |
+| Constants & data dependencies | 797–819 |
+| Randomness | 820–833 |
+| Edge cases & original bugs | 834–882 |
+| Test vectors | 883–937 |
+| Provenance | 938–1002 |
+| Open questions | 1003–1108 |
 <!-- /index -->
 
 ## Summary
@@ -346,26 +349,50 @@ The item's allowed locations are itemtypes `bodyloc1`/`bodyloc2`
 (`0x0062EA80`). Location L is allowed when it equals either, or when L is
 11 or 12 and either allowed location is 4 or 5.
 
-#### 4.2 Requirements (`0x0062EAF0`, item, unit, equipping)
+#### 4.2 Requirements (`0x0062EAF0`, item, unit, equipping, &str_ok, &dex_ok, &lvl_ok)
 
-1. Item missing or no items record → fail.
+The last three arguments are optional out flags (null → not written);
+every caller of the server rules passes null, the client's item
+description `0x0048D1D0` passes all three (REC-253, read 2026-10-08).
+
+1. Each given out flag := 0. Item missing, not an item (unit type ≠ 4)
+   or no items record → fail; the flags stay 0.
 2. p = item stat 91 (`item_req_percent`, item or skill stat
    `0x00625500`). p ≠ 0 → bonus_str = reqstr × p / 100, bonus_dex =
    reqdex × p / 100, each `pct(req, p, 100)` (`0x00483360`, signed and
    truncating, `combat/damage.md` §0; ECX = req, EDX = p at `0x0062EB86`).
-   Ethereal (item flag 0x400000) → both bonuses −10.
-3. Strength: unit stat 0 < 1 → fail; < reqstr + bonus_str → fail;
-   "equipping" and the item is active on the unit (`0x00625820`) →
-   subtract the item's own strength contribution (`0x0062B450(0)`) and
-   test again (< 1 or < requirement → fail).
-4. Dexterity: the same with stat 2, reqdex, `0x0062B450(2)`.
+   Ethereal (item flag 0x400000) → both bonuses −10. reqstr / reqdex are
+   items record u16 +0x10A / +0x10C.
+3. Strength (stat 0, `0x00625480(unit, 0, 0)`): < 1 → fail; < reqstr +
+   bonus_str → fail; else when "equipping" ≠ 0 **and** the item's stat
+   list is linked to a unit (`0x00625820(item, 0)` ≠ 0,
+   `0x0062EBF1`): s = the socket contribution `0x0062B450(0)` (below);
+   strength − s < 1 or < the requirement → fail.
+4. Dexterity (stat 2): < 1 → fail; < reqdex + bonus_dex → fail; else
+   when "equipping" ≠ 0 — **no** link test (`0x0062EC4A`–`0x0062EC75`
+   go straight to `0x0062B450(2)`; the strength branch's
+   `0x00625820` call has no counterpart) — dexterity − `0x0062B450(2)`
+   < 1 or < the requirement → fail. Reproduce the asymmetry.
 5. Level: requirement R from §4.8 (never negative, so the caller's "R =
    −1 → skip" test at `0x0062EC8A` never fires); unit stat 12 < R → fail.
-6. Pass needs 3–5 and **identified** (item flag 0x10). Then: type 18
-   (book) needs item stat 70 > 0. Class: itemtypes `class` 7 (none) →
-   pass; a player whose class equals it → pass; a monster of class 0x230
-   or 0x231 (act 5 hirelings) with item class 4 (barbarian) → pass; else
-   fail.
+6. The out flags := the results of 3, 4, 5 (1 pass, 0 fail), written
+   before step 7, so they are set even when 7 fails.
+7. Pass needs 3–5 and **identified** (item flag 0x10). Then: primary
+   type (`0x0062B400`) 18 (book) needs item stat 70 > 0. Class
+   (`0x0062C0B0`, itemtypes `class`): 7 (none) → pass; unit type 0 whose
+   class (unit +4) equals it → pass; unit type 1 of class 0x230 or 0x231
+   (act 5 hirelings, `0x00463900`) with item class 4 (barbarian) → pass;
+   no unit or anything else → fail.
+
+**Socket contribution** (`0x0062B450(stat k, &out)`, EBX = item; one
+caller, this check): out := 0. Only when the item's record has `hasinv`
+(+0x137) ≠ 0: for every item F of the item's own inventory (its socket
+fillers; `0x0063B2C0` first, `0x0063DFA0` next, `0x0063DFD0` the item),
+when the **socketed** item is in mode 1 (equipped, `0x00451F70` = item
++0x10), out += F's stat k (`0x00625480(F, k, 0)`). So an item on the
+cursor (mode 4), in a grid or on the ground counts 0, and the item's
+own affixes never count: it is the fillers' strength / dexterity that
+step 3 / 4 take back from a worn item.
 
 #### 4.3 Equip check (`0x0063DE60`, unit, location L, item N, skip requirements)
 
@@ -422,7 +449,7 @@ neither has sockets (`0x006299B0` = 0). Used by 0x21 and hand result 6.
    update).
 5. Put at L (`0x0063BDB0` = §2.2 on grid 0), link (`0x0063B210`, kind 3,
    or 4 for 11/12; failure → out := 1, 0). Body location := L. L ∉
-   {11, 12} → stat link `0x0063D1D0` and stat refresh. Cursor := none,
+   {11, 12} → weapon-in-use link `0x0063D1D0` (world/quests-act3-2.md §11.5; writes only inventory +0x1C) and stat refresh. Cursor := none,
    unit flag 0x2 cleared, mode 1, page 0xFF, command flag 0x8, item flag
    0x1, item flag 0x4000 cleared, update list += item, refresh, weapon
    bookkeeping `0x0055C5C0` (§5.8), inventory pass (§5.7) `0x0055DBC0(0)`. Result 1.
@@ -504,7 +531,7 @@ vendor buy §7.1 rule 9.7 of `world/vendors.md` (`0x00577D90`), and
    (`ItemMode.cpp` line 0x1674). L = 11 or 12 → fatal assert (0x1656;
    §4.7 never returns them). Link check `0x0063B210(kind 3)` fails →
    location L emptied again (`0x0063BE30`), then fatal assert (0x1671).
-3. Body location := L (`0x00627D70`); stat link `0x0063D1D0`; cursor :=
+3. Body location := L (`0x00627D70`); weapon-in-use link `0x0063D1D0` (world/quests-act3-2.md §11.5; writes only inventory +0x1C); cursor :=
    none (§1.4 rule 3); stat refresh `0x0055C2C0(U, 0)`; unit flag 0x2
    cleared; mode 1; command flag 0x200 (`item-actions.tsv` row 5: 0x9D
    action 6 to every client); unit flag 0x2000000 cleared; update list +=
@@ -612,7 +639,47 @@ scrolls and tomes therefore stop counting after the first cube use.
   is set also needs the other hand's item (location 4, or 5 when the
   item itself is at 4) to be of that type.
 - **Item flag 0x4000** marks an equipped item or charm whose stats are
-  switched off because it is not usable.
+  switched off because it is not usable. Set only by §5.7 step 3 (so
+  also after the weapon switch, `inventory-moves.md` §7.25 r7); while set: no stat
+  link, not an active inventory item (above), skipped by §4.7 r1
+  (`0x0062A4E0`), by §5.7 step 5 (set bonuses) and by the set / runeword
+  counts of `properties.md` §10; the client tints it 0 (red,
+  `ui/inventory.md` §3 r3, §6 r4, §9 r1). Cleared by §5.7 step 2 / 4
+  and by every move that takes the item off the body or cursor
+  (§4.6 r5, `inventory-moves.md` §7). The item stays where it is: no
+  rule drops or unequips an unusable item.
+- **Where the requirements refuse** (REC-253; callers of `0x0062EAF0`
+  in the 1.14d image, each rule owned where cited): equip from the
+  cursor §4.6 r2–r3 (via §4.3 and directly), auto-equip on pickup /
+  buy / corpse §4.7 r1, the two-handed and body swaps
+  `inventory-moves.md` §7.6–§7.9 (`0x00563D20`, `0x00560F00`,
+  `0x00561220`), the hireling give / swap `inventory-moves.md` §7.23
+  (`0x0054D230`, `0x0054CED0`), the skill-body re-equip
+  `0x00562A30` (`skills/bodies.md`), the corpse take-back
+  `inventory-moves.md` §12.2 (`0x00562F30`); "usable" and "active
+  inventory item" above. Grid placement, the belt, the cube, the stash
+  and trade never test requirements: an unusable item is carried, only
+  its stats stay off.
+- **Client pre-check of a body click** (the requirement branch of the
+  three body-location click handlers `0x00490780`, `0x00490BA0`,
+  `0x00490FC0`; the rest of those handlers is `ui/panels-3.md` §29).
+  The handler runs §4.3 for (the local player, the clicked location,
+  the cursor item, skip 0) (`0x00490831`, `0x00490C57`, `0x004910B6`).
+  Result 0:
+  1. no cursor item → consumed (return 1), nothing sent;
+  2. §4.3 again with skip 1 ≠ 0 (only §4.2 failed) and the item's class
+     (`0x0062C0B0`) is 7 (none) or the player's class → player event
+     20 (`cantuseyet` speech, `audio/triggers.md` §3) on the player;
+  3. else (the location refuses the item even without requirements, or
+     a class item of another class) → player event 19 (`impossible`);
+  4. either way consumed, and **no C→S message** is sent: in 1.14d a
+     requirement failure never reaches the server from a body click.
+     The server checks of §4.6 r2–r3 still apply to any 0x1A / 0x1D /
+     0x1E that arrives.
+  Other client readers (display only): the tints of `ui/inventory.md`
+  §3 r3 / §6 r4–r5, the hireling slots `0x0048B290`, `0x0048B3F0`,
+  `0x004934D0` (`ui/panels-3.md` §30) and the item description's three out
+  flags (§4.2; `0x0048D1D0`, no spec yet).
 
 #### 5.7 Inventory pass (`0x0055DBC0`, ECX = game, EDX = unit U, send)
 
@@ -625,7 +692,7 @@ hirelings). U without an inventory → nothing (after step 1).
 2. Charms: each item of the item list with node kind 1 (+0x69,
    `0x0063E020`) that is an active inventory item (§5.6), whose stat list
    is not linked to U (`0x00625820` = 0) and is usable → item flag 0x4000
-   cleared, then `0x0055D970`: stat link (`0x0063D1D0`, skipped for
+   cleared, then `0x0055D970`: weapon-in-use link (`0x0063D1D0`, skipped for
    body locations 11 / 12), and when the item is in mode 1, or in mode 0
    and an active inventory item, stat refresh `0x0055C2C0(item, U, 1)`.
 3. Switch off: body locations 1–10 in order, each item X that is (not
@@ -636,7 +703,16 @@ hirelings). U without an inventory → nothing (after step 1).
    each X not broken with (flag 0x4000 set or not linked) and usable →
    flag 0x4000 cleared, stat link (not for 11 / 12), and when X is in
    mode 1, or in mode 0 and an active inventory item, stat refresh
-   `0x0055C2C0(X, U, 1)`.
+   `0x0055C2C0(X, U, 1)`. "Linked" is `0x00625820(X, 0)` ≠ 0 (X's stat
+   list has a parent), the state the stat linking in `0x0055D970` leaves (one of its callees `0x00627D40` / `0x0062FF70` / `0x00621190`, not pinned; not `0x0063D1D0`, which only writes +0x1C); the
+   sweep's change flag is set by every switch-on (REC-253, re-read
+   2026-10-08, `0x0055DBC0` sweep loop). The repeat exists because a
+   switched-on item's stats can make another item usable (its strength
+   or dexterity). It ends because a switched-on X is then flag-clear and
+   linked and is skipped by the next sweep: at most 11 sweeps (10
+   switch-ons + one empty sweep). A link that leaves `0x00625820` = 0
+   would loop forever in the original too; an implementation may cap
+   the sweeps (d2rs-own guard, never reached with a correct link).
 5. Set items: locations 1–10, each X of quality 5, not broken, flag
    0x4000 clear → `0x0055C730(X, U, 1, 1)` then `0x0055C2C0(X, U, 1)`
    (set bonuses re-applied).
@@ -704,8 +780,8 @@ Callers (all pass U in EAX after the item move is done): repair
 `0x0055F900` (`generation.md` §12.1 step 5), equip from the cursor
 `0x005606B0` (§4.6), 0x1C `0x00560CD0`, 0x1D `0x00560F00`, 0x1E
 `0x00561220`, 0x1B `0x00563D20` (`inventory-moves.md` §7.6–§7.9), the
-weapon switch `0x005616A0` (0x60, `sim/intents-events.md` open
-question 16), the skill-body re-equip `0x00562A30` (`skills/bodies.md`),
+weapon switch `0x005616A0` (0x60, `inventory-moves.md` §7.25; runs
+while both hands are empty, so it does nothing), the skill-body re-equip `0x00562A30` (`skills/bodies.md`),
 equip without the cursor `0x00562E00` (§4.9), corpse take-back
 `0x00562F30` (`inventory-moves.md` §12.2).
 
@@ -751,7 +827,7 @@ happen only inside the systems these paths call, in handler order:
 2. 0x61 take from hireling: the duplicate `0x0055A2A0`
    (`world/cube.md` OQ4): two game-seed steps per item unit it allocates,
    2 · (1 + k) with k fillers (`world/vendors.md` §7.3).
-3. Item use (0x20, 0x26, potions on the hireling): item-use spec.
+3. Item use (0x20, 0x26, potions on the hireling): `items/use.md`.
 4. Free-spot searches (`inventory-moves.md` §9.1, §10.2): `sim/path-placement.md` (whether
    `0x0064E810` draws is that spec's to state).
 
@@ -828,6 +904,12 @@ Synthetic (CI): grid cells as (x, y, w, h) occupied rectangles.
 | E2 | §4.3 location 4, N = two-handed sword (not 1-or-2 for a sorceress), left hand holds a shield | 2 | §4.3, §4.4 |
 | E3 | §4.3 location 4, barbarian, N = one-handed sword, left holds an axe, right empty | 1 | §4.4 |
 | E4 | §4.3 location 4 without N, right empty, left holds a bow (two-handed) | 4 | §4.3 |
+| Q1 | §4.2 equipping, reqdex 50, unit dex 55, item worn (mode 1), **not** linked, `hasinv` ≠ 0, one socketed jewel with dex 10 | dexterity fails (55 − 10 < 50; no link test); the same with strength (reqstr 50, str 55, jewel str 10) passes (unlinked → no subtraction) | §4.2 r3–r4 |
+| Q2 | §4.2 equipping, item on the cursor (mode 4) with a +10 dex jewel, reqdex 50, dex 55 | passes (contribution 0 outside mode 1) | §4.2 socket contribution |
+| Q3 | §4.2 with out flags, identified-clear item, str / dex / level met | fail; flags 1, 1, 1 | §4.2 r6–r7 |
+| Q4 | client body click, cursor item fails only reqstr, item class 7 | player event 20 (`cantuseyet`), no C→S | §5.6 client pre-check |
+| Q5 | client body click, sorceress, cursor item of class 4 (barbarian) | player event 19 (`impossible`), no C→S | §5.6 client pre-check |
+| Q6 | §5.7, three worn items flagged 0x4000 whose usability chains (A usable; A's +str makes B usable; B's +dex makes C usable), C at location 1, B at 3, A at 5 | sweep 1 switches on A, sweep 2 B, sweep 3 C, sweep 4 changes nothing and ends step 4; with A at 1, B at 3, C at 5 all three in sweep 1, sweep 2 ends | §5.7 r4 |
 | G1 | 0x50 amount 0 | result 0, no pile, no draw | `inventory-moves.md` §7.22 |
 | G2 | level 1 (limit 10000), gold 9500, pile 1000 | gold 10000, new pile 500 | `inventory-moves.md` §10.1 |
 | G3 | 0x19 new 120, old 100 / new 400, old 100 / new 70000 | `19 14` / `1E 0E 90 01` / `1F 0E 70 11 01 00` | `inventory-moves.md` §10.3 |
@@ -850,13 +932,18 @@ Recordings (conformance; none recorded yet):
 | R3 | Equip, swap and unequip: helm (0x1A/0x1C), weapon over a shield (0x1D), a two-handed weapon over sword + shield (0x1B), weapon swap key | 0x9D actions 6/7/8/9/0x17, 0x47/0x48 placement |
 | R4 | Belt: pick up three `hp1` with an empty belt column and a sash equipped; shift-click a potion from the inventory (0x63); take one from the belt (0x24); swap (0x25); drink one from slot 4 (0x26) | slots, compaction, direct 0x9D 5 + 0x9C 0xE |
 | R5 | Gold: drop 1, 255, 70000 gold (0x50); pick each up | piles, 0x19/0x1E/0x1F bytes, RNG trace of pile creation |
-| R6 | Pick up an item with a full inventory; equip an item whose strength requirement is not met | refused-pickup bytes (sound 0x17), result codes |
+| R6 | Pick up an item with a full inventory; equip an item whose strength requirement is not met (click its body slot; then a class item of another class) | refused-pickup bytes (sound 0x17), result codes; the equip clicks send no C→S and play `cantuseyet` / `impossible` (§5.6 client pre-check) |
 | R7 | Cube open with a valid recipe (e.g. 3 `gcv` chipped gems): hold another item on the cursor and press Transmute; then swap (0x1F) a 2 × 2 item onto a 1 × 1 item at the inventory's last column | whether the client sends 0x4F 0x18 / the 0x1F at all; the held item's later 0x9C messages (edge cases 10, 12) |
 
 ## Provenance
 
 Read from the 1.14d `Game.exe` (Ghidra exports and `tools/ghidra/disasm.py`
-for register arguments): weapon bookkeeping `0x0055C5C0`, `0x0055C470`,
+for register arguments): REC-253 (2026-10-08, disassembled):
+`0x0062EAF0` (`0x0062EBC2`–`0x0062EC83`), `0x0062B450`, `0x00451F70`,
+`0x0055DBC0` sweep loop, client body clicks `0x00490780`
+(`0x00490826`–`0x0049089A`), `0x00490BA0` (`0x00490C52`–`0x00490CC0`),
+`0x00490FC0` (`0x004910B1`–`0x00491119`), callers of `0x0062EAF0`
+listed in §5.6; weapon bookkeeping `0x0055C5C0`, `0x0055C470`,
 `0x0055C4D0`, `0x0055C4F0`, `0x0055C560`, `0x00622EA0`, `0x00622F10`,
 `0x00623060`, `0x006230C0` (disassembled: EAX/EBX/ESI/EDI operands, push
 order of `0x005701B0`); handlers `0x0054AAD0`–`0x0054B710`, `0x0054C800`,
@@ -916,7 +1003,9 @@ size and fallback pushes at `0x00563B9C` / `0x00563C83`), `0x005628C0`.
 ## Open questions
 
 1. Answered: `items/bitstream.md` (owner; checked on all 144 recorded
-   0x9C / 0x9D streams).
+   0x9C / 0x9D streams). Which client stat lists the stream's stat
+   section fills (base array, list c = −1, runeword list, parked set
+   lists; all on the item): `client/stat-lists.md` §2 rule 1.1.
 2. Order of 0x9C/0x9D relative to other per-player update messages in
    one client pass (life, stats, 0x47/0x48). Settle: R1–R3 packet order.
    PROVISIONAL: 0x9C/0x9D are sent in the order the server produces them within the pass, with no reordering against the life/stats/0x47/0x48 messages (because the spec's rules (§4–§5) emit each message where its owner runs and state no sorting); settled by REC-08.
@@ -934,7 +1023,7 @@ size and fallback pushes at `0x00563B9C` / `0x00563C83`), `0x005628C0`.
     restriction there; R2 (stash and cube use while the panels are
     open) confirms on live data.
 13. Answered: §3 rules 9–10 (from the binary; a recording removing a belt with potions in rows 2–4 would confirm the 0x9C order: R3).
-14. Answered: `inventory-moves.md` §7.9 (0x1E), `inventory-moves.md` §7.11 (0x20), `inventory-moves.md` §7.18 (0x27), `inventory-moves.md` §8.1 step 4 (pickup specials). The use effects behind `0x005BF240` stay with the item-use spec (`world/cube.md` OQ7).
+14. Answered: `inventory-moves.md` §7.9 (0x1E), `inventory-moves.md` §7.11 (0x20), `inventory-moves.md` §7.18 (0x27), `inventory-moves.md` §8.1 step 4 (pickup specials). The use effects behind `0x005BF240` are `items/use.md`.
 15. Answered: `inventory-moves.md` §7.12 (stat 72 = `durability`).
 16. Answered: `inventory-moves.md` §7.23 step 2 (used skill).
 17. Answered: `inventory-moves.md` §9.2 (reader `0x00558B90`).

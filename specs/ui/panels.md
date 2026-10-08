@@ -32,27 +32,27 @@
 | Outputs / state changes | 91–95 |
 | Rules | 96–97 |
 |   1. Screen layout model | 98–134 |
-|   2. UI states and the open/close call | 135–174 |
-|   3. The conflict gate (`0x00453910`) | 175–203 |
-|   4. Slots, open mode and the view shift | 204–261 |
-|   5. UI pass order (`0x00456EE0`) | 262–301 |
-|   6. 800 × 600 border and control panel art (`0x00499450`) | 302–322 |
-|   7. Shared panel parts | 323–340 |
-|   8. Character panel (ui 2, left; `0x004A7D00`) | 341–443 |
-|   9. Inventory panel family (`0x0048EDF0`) | 444–504 |
-|   10. Skill tree (ui 4, right; `0x004AC690`) | 505–568 |
-|   11. Stash (ui 0x19, full; inventory modes 0x0C / 0x0D) | 569–604 |
-|   12. Horadric Cube (ui 0x1A, full; inventory mode 0x0E) | 605–655 |
-|   13. Waypoint menu (ui 0x14, left; `0x0049C9C0`) | 656–708 |
-|   14. NPC menu (ui 8) and NPC shop (ui 0x0C) | 709–714 |
-|   15. Event → intent summary | 715–742 |
-|   16. Machine tables | 743–777 |
-| Constants & data dependencies | 778–798 |
-| Randomness | 799–803 |
-| Edge cases & original bugs | 804–824 |
-| Test vectors | 825–865 |
-| Provenance | 866–906 |
-| Open questions | 907–998 |
+|   2. UI states and the open/close call | 135–200 |
+|   3. The conflict gate (`0x00453910`) | 201–234 |
+|   4. Slots, open mode and the view shift | 235–292 |
+|   5. UI pass order (`0x00456EE0`) | 293–332 |
+|   6. 800 × 600 border and control panel art (`0x00499450`) | 333–353 |
+|   7. Shared panel parts | 354–371 |
+|   8. Character panel (ui 2, left; `0x004A7D00`) | 372–474 |
+|   9. Inventory panel family (`0x0048EDF0`) | 475–535 |
+|   10. Skill tree (ui 4, right; `0x004AC690`) | 536–599 |
+|   11. Stash (ui 0x19, full; inventory modes 0x0C / 0x0D) | 600–635 |
+|   12. Horadric Cube (ui 0x1A, full; inventory mode 0x0E) | 636–688 |
+|   13. Waypoint menu (ui 0x14, left; `0x0049C9C0`) | 689–741 |
+|   14. NPC menu (ui 8) and NPC shop (ui 0x0C) | 742–747 |
+|   15. Event → intent summary | 748–775 |
+|   16. Machine tables | 776–810 |
+| Constants & data dependencies | 811–831 |
+| Randomness | 832–836 |
+| Edge cases & original bugs | 837–857 |
+| Test vectors | 858–898 |
+| Provenance | 899–943 |
+| Open questions | 944–1035 |
 <!-- /index -->
 
 ## Summary
@@ -171,6 +171,32 @@ cursor position (cursor jump, §4.3), UI `DrawItem`s, C→S messages (§15).
 8. Mode "on" for a state that is already open still runs the gate, and
    most states refuse themselves (`ui-states.tsv` diagonal = 2), so
    "on" twice returns 0 the second time.
+9. **Close-all** `0x00456300(automap, jump)` (ECX, EDX; disassembled
+   2026-10-08). For i = 0 … 37 in order, state i is closed when it is open
+   and its Esc-closable flag (u32 table `0x006D6378`, read from the
+   image) is 1, or when `automap` ≠ 0 and i = 0x0A. Flag 1: ui 1, 2, 3, 4,
+   5, 9, 0x0B, 0x0C, 0x0D, 0x0F, 0x10, 0x12, 0x14, 0x16–0x21, 0x24, 0x25.
+   Flag 0: ui 0, 6, 7, 8, 0x0A, 0x0E, 0x11, 0x13, 0x15, 0x22, 0x23. Per
+   state closed:
+   - ui 0x23–0x25 unless the game is an expansion game with the
+     expansion installed (r3): skipped, flag left set;
+   - else the gate in mode off (§3: passes), flag := 0, close hook
+     `0x00455AE0(i)` (r6), then the open mode by slot kind as in §4 r2
+     (right / left / full / anvil; ui 0x0B calls `0x004A5DE0` instead;
+     kind none: no change), with the cursor jump of §4 r3 for the
+     "closed, other side not open" cases when `jump` ≠ 0;
+   - ui 1 and 0x19 also call `0x00487990` (ui 1 before and after the mode
+     step).
+   Returns 1 when at least one state passed the open-and-flag test (even
+   one skipped by the expansion rule), else 0. Callers (xref scan, 17
+   sites): Esc (0, 1) (`0x004690DF`, `ui/frontend-options.md` §O1 r2);
+   Clear Screen, command 38 (`0x0044C6B0`, in game only): (0, 1), and
+   when that returns 0, `0x00457640(0)` then (1, 0); (1, 0) also at
+   `0x0044E3BB`, `0x0044F2E6`, `0x00461553`, `0x00498C00`, `0x004B53C1`;
+   (0, 0) at the UI pass `0x00457133`, the mini-panel Game Menu button
+   `0x0047ED4C`, the NPC menu paths `0x004B5057`, `0x004B6712`,
+   `0x004B6F84`, `0x004B701C`, `0x004B70A4` and the message box
+   `0x004C038A` (`ui/messages.md`).
 
 ### 3. The conflict gate (`0x00453910`)
 
@@ -183,6 +209,11 @@ skips it and passes).
    - ui 9 with no player is refused; ui 9 while the player is dead (mode
      0x11) does not open the menu: it runs the respawn path
      (`0x004647D0`, C→S 0x41 via `0x00478590`) and returns 0.
+     Ui 9 is the Esc game menu: its opening (`0x0047E090`, which first
+     closes and remembers the other states), the Esc logic, art, layout,
+     input and the single-player pause are `ui/frontend-options.md`
+     §O1–§O5; which panels one Esc closes before the menu can open is the
+     close-all of §2 r9.
 2. While `[0x007BF0A4]` ≠ 0 (a modal text screen, `0x004A0000`) only
    ui 0x0A, 0x13, 0x11, 6 and 7 may open; any other request is refused.
 3. Then, for every open state `i` (0 … 37 in order), the action
@@ -606,9 +637,11 @@ after both.
 
 1. Open: `0x0048A460` → `SetUIState(0x1A, on)`, mode 0x0E; the open
    hook loads `%s\ui\panel\supertransmogrifier` (`0x0048A4B0`).
-2. If the cube item is gone (`0x0044DA30` or `0x00463DF0`) while drawn:
-   `SetUIState(0x1A, off)`, then C→S 0x4F button 0x17 (`0x0048F183`)
-   and nothing more is drawn that frame.
+2. Exit flag (`0x0044DA30`) or missing / dead local player (`0x00463DF0`:
+   no player, or mode 0x11) while drawn (`0x0048EEB0`–`0x0048EEC4`, the
+   only tests): `SetUIState(0x1A, off)`, then C→S 0x4F button 0x17
+   (`0x0048F183`) and nothing more is drawn that frame. A missing cube does
+   not close the panel (`world/cube.md` §11 r3).
 3. Art: frames 0–3 as left quads; cube grid (page 3) via `0x00483FF0`.
    Close button at (`sx + 275`, `H + sy − 65`) frame 10 + `[0x007BCE40]`;
    transmute button `Panel\miniconvert` frame `[0x007BCE48]` (0/1) at
@@ -650,7 +683,7 @@ after both.
    close reaches the hook, the nested `0x0048A050`'s `SetUIState` finds
    the state closed (no hook again) and the latch lets only the first of
    the two calls send: **one** 0x4F 0x17 per open, whichever path closes.
-8. Button rectangles and the cube-gone close (two 0x4F 0x17):
+8. Button rectangles and the exit / dead close (two 0x4F 0x17):
    `ui/panels-2.md` §20.2–§20.4.
 
 ### 13. Waypoint menu (ui 0x14, left; `0x0049C9C0`)
@@ -722,11 +755,11 @@ call):
 |---|---|---|
 | character | release on an add button | 0x3A × ⌈n / 32⌉ (`combat/vitals.md` §2) |
 | skill tree | release on a pressed icon, points left | 0x3B (`skills/levels.md` §6.4) |
-| inventory, stash, cube, trade pages | grid click (`0x0048FFE0`) | 0x19 lift, 0x18 place, 0x1F swap, 0x20 use, 0x21 stack, 0x27 use on item, 0x28 socket, 0x29 scroll to tome, 0x2A to cube, 0x33 sell, 0x63 to belt, 0x4C (`items/inventory-moves.md` §7) |
-| inventory | body location click (`0x00490780`, `0x00490BA0`, `0x00490FC0`) | 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x21, 0x27, 0x4C (`items/inventory-moves.md` §7) |
-| inventory | socket fill (`0x004912A0`) | 0x28 |
+| inventory, stash, cube, trade pages | grid click (`0x0048FFE0`) | 0x19 lift, 0x18 place, 0x1F swap, 0x20 use (`0x00487740` → sender `0x004786D0`, call `0x004878F4`; with ui 0x19 open and the item a `box `, `[0x007BCC50]` := 1 first), 0x21 stack, 0x27 use on item, 0x28 socket, 0x29 scroll to tome, 0x2A to cube, 0x33 sell, 0x63 to belt, 0x4C (`items/inventory-moves.md` §7) |
+| inventory | body location click (`0x00490780`, `0x00490BA0`, `0x00490FC0`) | 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x21, 0x27, 0x4C (`items/inventory-moves.md` §7); client rules: `ui/panels-3.md` §29 |
+| inventory | socket fill (`0x004912A0`) | 0x28; client rules: `ui/panels-3.md` §29 |
 | inventory | weapon swap (`0x0048A730`) | 0x60 |
-| mercenary | item on merc (`0x0048B7C0`, `0x004936E0`) | 0x61 |
+| mercenary | item on merc (`0x0048B7C0`, `0x004936E0`) | 0x61; `ui/panels-3.md` §30 (`0x0048B7C0` is WM_LBUTTONUP) |
 | belt | `0x00498870` / `0x00498A90` | 0x23 / 0x24, 0x26 |
 | stash | close | 0x4F 0x12 |
 | cube | transmute / close | 0x4F 0x18 / 0x4F 0x17 (`world/cube.md`) |
@@ -903,6 +936,10 @@ Horadric animation `0x0048F03E`–`0x0048F0C0`, start `0x0048A540`, frame
 headers of d2data `menu\horadric.dc6` (all 31 frames, Python, outside the
 repo; HANDOFF §5 C71 found frame 1 at (−205, 17)); cube close
 `0x0048A050`, `0x0048A190`, `0x0048A500`; Resurrect insert `0x004B6440`.
+2026-10-08 additions (REC-237): close-all `0x00456300` (disassembly,
+jump table `0x00456508` / index bytes `0x00456520`, Esc-closable flags
+`0x006D6378` read from the image, 17 call sites by `tools/ghidra/disasm.py
+xref`), Clear Screen `0x0044C6B0`, Esc `0x004690B0`.
 
 ## Open questions
 

@@ -1,8 +1,9 @@
 // Spec: specs/audio/triggers.md (§2 r1, r4)
 //! S→C 0x2C PlaySound: no model state; the event unit is looked up in
 //! set S and one `ServerSound` output (`client/bridge.md` §10) carries
-//! its key and class as read now, with the event. The audio layer
-//! applies the event table (`audio/triggers.md` §2 r2–r3) at delivery.
+//! its key, class and position as read now (§10 r3.1 (b)), with the
+//! event. The audio layer applies the event table (`audio/triggers.md`
+//! §2 r2–r3) at delivery.
 
 use super::super::dispatch::{HandlerError, Message};
 use super::super::output::Output;
@@ -22,6 +23,7 @@ pub fn play_sound(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerE
         msg.out.push(Output::ServerSound {
             unit: key,
             class: u.class,
+            at: u.position,
             event,
         });
     }

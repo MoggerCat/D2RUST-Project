@@ -417,12 +417,24 @@ fn automap_facts(
 /// The sound request of an audio output (`client/bridge.md` §10 rule 5),
 /// in list order: S→C 0x2C events, the client object code's calls
 /// (`world/objects-client.md` §28 r3: mode sounds, requests, player
-/// event sounds) and the 0x4D shrine sound (`client/model.md` §15 rule
-/// 4 step 4: request(id, P)). `None`: no sound consumer for it.
+/// event sounds), the 0x4D shrine sound (`client/model.md` §15 rule
+/// 4 step 4: request(id, P)) and the unit frees (`client/bridge.md` §10
+/// r3.1). `None`: no sound consumer for it.
 pub fn audio_request(o: &Output) -> Option<SoundRequest> {
     use crate::bridge::objects::ObjSound;
     Some(match o {
-        &Output::ServerSound { unit, class, event } => SoundRequest::Server { unit, class, event },
+        &Output::ServerSound {
+            unit,
+            class,
+            at,
+            event,
+        } => SoundRequest::Server {
+            unit,
+            class,
+            at,
+            event,
+        },
+        &Output::UnitFreed { unit } => SoundRequest::UnitFreed { unit },
         Output::ObjectSound(ObjSound::Mode {
             unit,
             class,

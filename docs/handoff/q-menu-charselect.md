@@ -14,3 +14,5 @@ Branch `claude/q-menu-charselect`. Files: `ui/front_end/screens/char_select.rs`,
 
 ## Local check
 `cargo test -p d2-client --test front_end_char_select --test front_end` (no game files): all pass. With real saves: scan the user's Save folder with `DirSaves` and compare the list order with the original's.
+
+Local check done 2026-10-08 (PC 1 round 2, branch claude/local-pc1-s8): the headless part passes (`front_end` 12, `front_end_char_select` 14, release). The DirSaves order compare against the original's list needs the in-game character list (not run).

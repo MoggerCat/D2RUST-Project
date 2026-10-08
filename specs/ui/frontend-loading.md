@@ -29,15 +29,15 @@
 |   L6 Between draws | 179–188 |
 |   L7 End: the first game frame (`0x0044C990` → `0x004547B0`) | 189–207 |
 |   L8 Input during loading | 208–227 |
-|   L9 Act change (S→C 0x05, 0x03, …, 0x04) | 228–245 |
-|   L10 Act-start cinematics (hooks only) | 246–270 |
-|   L11 Sounds (deferred) | 271–277 |
-| Constants & data dependencies | 278–294 |
-| Randomness | 295–298 |
-| Edge cases & original bugs | 299–314 |
-| Test vectors | 315–334 |
-| Provenance | 335–356 |
-| Open questions | 357–371 |
+|   L9 Act change (S→C 0x05, 0x03, …, 0x04) | 228–251 |
+|   L10 Act-start cinematics (hooks only) | 252–278 |
+|   L11 Sounds (deferred) | 279–285 |
+| Constants & data dependencies | 286–302 |
+| Randomness | 303–306 |
+| Edge cases & original bugs | 307–322 |
+| Test vectors | 323–342 |
+| Provenance | 343–366 |
+| Open questions | 367–381 |
 <!-- /index -->
 
 ## Summary
@@ -237,6 +237,12 @@ The third caller, the room-graphics preload `0x00470070`, draws only when `[0x00
 2. Client: 0x05 clears `in_game` (game draws stop, the last world frame stays presented); 0x03 rebuilds the
    client act and draws the loading screen (L5 row 3: frame 0, Loading palette). **Same art for every
    act**: the path in L3 takes no act argument; the act byte only chooses the palette at L7.
+   **Every 0x03 does this, same act or not**: the handler (`0x0045C8E0` → `0x0044E100`) has no act
+   comparison; it frees the current client act when one exists (`[0x007A0634]` → `0x0061AFD0`), builds
+   the new one (`0x006194A0`) and runs the loading draw (`0x004565E0(1)`, L4), so a repeated 0x03 of
+   the same act shows the next loading frame by the L5 table (art held: frame = counter; released:
+   frame 0). Messages are handled one at a time in arrival order (`client/model.md` §7), so 0x05,
+   0x03, 0x61 and 0x04 act in the order sent.
 3. End: the server sends 0x04 and client state 4 when the new room is ready (`sim/tick.md` §6 rule 4,
    state 5); the first game frame follows (L7: art freed, new act palette, black frame). PROVISIONAL:
    0x04 comes in the tick after the warp, as at the join (because the warp activates the arrival rooms in
@@ -264,7 +270,9 @@ The third caller, the room-graphics preload `0x00470070`, draws only when `[0x00
    `0x00482EF0` ends by loading Act V's palette (`render/composition.md` §4); L7 then loads the arrival
    act's palette anyway. PROVISIONAL: after the video the loading frame is not redrawn and the screen
    shows black until L7 (because no caller of `0x004565E0` follows the video and the player cannot see a
-   redraw); settled by REC-223.
+   redraw); settled by REC-223. After the video the handler calls `0x0047F1D0`, which re-reads the
+   registry `Resolution` (missing → 1) and re-applies the resolution mode (`0x0044BA20(2 or 0)`,
+   `ui/frontend-options.md` §O6 r7); d2rs: no effect (one logical size).
 3. End-of-game videos (`[0x007A0604]` → entry 5, `[0x007A0628]` → entry 7, after the game loop in
    `0x0044F360`) are not act transitions: named only.
 
@@ -353,6 +361,8 @@ progress-bar branch `0x004566A9`–`0x0045676A`), release `0x004547B0`, flag rea
 `0x006D64B0`, `0x006D64CC`. DC6 headers: `loadingscreen.dc6` from d2data (both copies) extracted with
 `tools/mpq-tool` into the scratchpad; d2exp has neither; `Patch_D2` not probed (no listfile). D2MOO not
 used.
+2026-10-08 (REC-251): 0x03 handler `0x0045C8E0` → `0x0044E100` (no act compare; `0x0061AFD0`, `0x006194A0`,
+`0x004565E0`), post-video `0x0047F1D0` → `0x0044BA20`.
 
 ## Open questions
 

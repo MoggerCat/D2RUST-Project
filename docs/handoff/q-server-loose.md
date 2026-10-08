@@ -37,3 +37,5 @@ cargo run -p d2-client --release -- play --new barbarian Test
 Click a far Fallen: the Barbarian now runs to it and attacks. Hit Fallens
 play a get-hit animation. Headless:
 `cargo nextest run -p d2-client --test app_server_core`.
+
+Local check done 2026-10-08 (PC 1 round 2, branch claude/local-pc1-s8): headless part passes: `app_server_core` 5 pass; the far-Fallen play check needs a player.
