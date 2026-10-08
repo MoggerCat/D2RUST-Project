@@ -42,12 +42,13 @@ use d2_sim::wiring::action::ActionTables;
 mod app_support;
 use app_support::SharedLink;
 
-const DURIEL: u32 = 211;
+const DURIEL: u32 = a2::DURIEL_CLASS;
 const JERHYN: u32 = 201;
 const MESHIF: u32 = 210;
-const TYRAEL: u32 = 251;
+const TYRAEL: u32 = a2::TYRAEL_CLASS;
 const ACT3_TOWN: u32 = 75;
 const PORTAL: u32 = 59;
+const DOOR: u32 = a2::TYRAEL_DOOR_CLASS;
 const DURIEL_ANIMS: [&[u8; 8]; 2] = [b"DUA1HTH\0", b"DUA2HTH\0"];
 const MINDAMAGE: u16 = 21;
 const MAXDAMAGE: u16 = 22;
@@ -206,6 +207,28 @@ fn spawn(server: &Server, class: u32) -> (UnitId, u32) {
     })
 }
 
+/// The world-placed unit of `ty`/`class` (the Lair's population): (unit,
+/// GUID, mode).
+fn placed(server: &Server, ty: UnitType, class: u32) -> Option<(UnitId, u32, u32)> {
+    app_support::with(server, move |l| {
+        let sim = &mut l.host_mut().game;
+        let (p, _) = single_player::local_player(sim)?;
+        let room = sim.game.lists.unit(p)?.room()?;
+        let found = sim.game.lists.room_units(room).into_iter().find(|&u| {
+            sim.game.lists.unit(u).is_some_and(|e| e.ty == ty)
+                && sim
+                    .events
+                    .action
+                    .sys
+                    .units
+                    .get(u)
+                    .is_some_and(|r| r.class == class)
+        })?;
+        let r = sim.events.action.sys.units.get(found)?;
+        Some((found, r.guid, r.mode))
+    })
+}
+
 /// Gives the monster its AI (`ai.md` §3.3) and schedules its first think.
 fn start_ai(server: &Server, m: UnitId) {
     app_support::with(server, move |l| {
@@ -356,8 +379,22 @@ fn duriel_fights_tyrael_opens_the_portal_and_meshif_travels_east() {
     }
     take(&mut app, into(a2::DURIELS_LAIR), a2::DURIELS_LAIR);
 
+    // The Lair's population: Duriel, Tyrael and his door are there with
+    // no test spawn (REC-234).
+    for _ in 0..30 {
+        step(&mut app);
+    }
+    let (duriel, _, _) = placed(&server, UnitType::Monster, DURIEL).expect("Duriel in the Lair");
+    let (_, tyrael, _) = placed(&server, UnitType::Monster, TYRAEL).expect("Tyrael in the Lair");
+    let (_, _, door_mode) = placed(&server, UnitType::Object, DOOR).expect("Tyrael's door");
+    assert_eq!(door_mode, 0, "the door is shut while Duriel lives");
+    assert_eq!(
+        objects_of(&app, DOOR),
+        1,
+        "the door is in the client's model"
+    );
+
     // Duriel's AI: he attacks the player.
-    let (duriel, _) = spawn(&server, DURIEL);
     app_support::with(&server, move |l| {
         let sim = &mut l.host_mut().game;
         let (p, _) = single_player::local_player(sim).unwrap();
@@ -401,7 +438,8 @@ fn duriel_fights_tyrael_opens_the_portal_and_meshif_travels_east() {
     assert_eq!(chain13(&server), (3, true), "Duriel's death: state 3");
 
     // Tyrael: message 302 opens the portal to Lut Gholein.
-    let (_, tyrael) = spawn(&server, TYRAEL);
+    let (_, _, door_mode) = placed(&server, UnitType::Object, DOOR).unwrap();
+    assert_ne!(door_mode, 0, "Duriel's death opens Tyrael's door");
     assert_eq!(objects_of(&app, PORTAL), 0);
     say(&mut app, tyrael, 302);
     for _ in 0..60 {
@@ -409,6 +447,33 @@ fn duriel_fights_tyrael_opens_the_portal_and_meshif_travels_east() {
     }
     assert_eq!(chain13(&server).0, 4, "Tyrael's talk: state 4");
     assert!(objects_of(&app, PORTAL) > 0, "Tyrael's portal is there");
+
+    // Walking through the portal: Lut Gholein, at its arrival spot.
+    let portal = app
+        .world()
+        .resource::<BridgeResource>()
+        .0
+        .world()
+        .units
+        .iter()
+        .find(|(k, u)| k.unit_type == OBJECT && u.class == PORTAL)
+        .map(|(k, _)| *k)
+        .expect("the portal unit");
+    app.world_mut()
+        .resource_mut::<BridgeResource>()
+        .0
+        .interact(portal)
+        .unwrap();
+    for _ in 0..300 {
+        if server_level(&server) == Some(ACT2_TOWN) {
+            break;
+        }
+        step(&mut app);
+    }
+    assert_eq!(server_level(&server), Some(ACT2_TOWN), "Tyrael's portal");
+    for _ in 0..30 {
+        step(&mut app);
+    }
 
     // Jerhyn (442) and Meshif (450): the quest moves on, Meshif travels.
     let (_, jerhyn) = spawn(&server, JERHYN);

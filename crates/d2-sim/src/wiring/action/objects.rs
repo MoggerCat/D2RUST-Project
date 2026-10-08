@@ -1309,7 +1309,25 @@ impl<X: Pending> MiscWorld for ObjectView<'_, X> {
         own.unwrap_or_else(|| self.v.h.x.object_portal_guid(player))
     }
     fn level_spawn_point(&mut self, level: u32) -> Option<(RoomId, i32, i32)> {
-        self.v.h.x.object_level_spawn(self.game, level)
+        if let Some(p) = self.v.h.x.object_level_spawn(self.game, level) {
+            return Some(p);
+        }
+        // PROVISIONAL (REC-234): a portal without a partner (Tyrael's,
+        // `quests-act2.md` §8.3) arrives at the level's spawn location
+        // of type 12 (the first step of `q6::portal_destination`); the
+        // free spot is rule 10's, not that function's (3, 0xBE11, 7).
+        // d2rs-own, unverified.
+        let act = crate::drlg::act_of_level(level);
+        let p = self
+            .v
+            .h
+            .drlg
+            .with_act(act, &mut self.game.lists, |d, svc| {
+                d.spawn_room(svc, level, 12)
+            })?
+            .ok()?;
+        let sub = crate::path::place::SPAWN_OFFSET;
+        Some((p.active?, p.x * 5 + sub, p.y * 5 + sub))
     }
     fn quest_level_change(&mut self, player: UnitId, from: u32, to: u32) {
         self.v.h.x.object_quest_level_change(player, from, to);
