@@ -95,7 +95,8 @@ fn a_learned_mastery_puts_its_passive_stats_in_its_state() {
     );
 }
 
-// Covers: specs/skills/bodies-3.md Leap (srvst 40)
+// Covers: specs/skills/bodies-2.md §4.6
+// Covers: specs/skills/bodies-2.md §4.7
 #[test]
 fn leap_spends_mana_and_moves_the_barbarian() {
     let mut r = Rig::new(&[LEAP]);
@@ -116,7 +117,7 @@ fn leap_spends_mana_and_moves_the_barbarian() {
     );
 }
 
-// Covers: specs/skills/bodies-3.md Whirlwind (srvst 38)
+// Covers: specs/skills/bodies-2b.md §8.10
 #[test]
 fn whirlwind_spends_mana_and_moves_the_barbarian() {
     let mut r = Rig::new(&[WHIRLWIND]);
