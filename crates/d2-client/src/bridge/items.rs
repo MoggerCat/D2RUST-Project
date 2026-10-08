@@ -56,10 +56,20 @@ pub struct ItemView {
     pub y: u16,
     /// The inventory's unit: the 0x9D owner, else the local player.
     pub owner: Option<UnitKey>,
+    /// Shown in an NPC's store: the last record is 0x9C action 11
+    /// (`world/vendors.md` §4 step 3), not the player's.
+    pub store: bool,
+    /// The store record's epoch (`ItemRecord::seq`); 0 when not a store item.
+    pub store_seq: u32,
     /// The amount of a compact gold pile (`gld`, `bitstream.md` §3 r1:
     /// after the code a flag bit, then 32 or 12 bits); `None` otherwise.
     pub gold: Option<u32>,
 }
+
+/// 0x9C action of an item shown in a store (`vendors.md` §3.1, §4).
+pub const ACTION_STORE_SHOWN: u8 = 0x0B;
+/// 0x9C action of an item taken out of a store (`vendors.md` §2).
+pub const ACTION_STORE_TAKEN: u8 = 0x0C;
 
 impl ItemView {
     pub fn on_ground(&self) -> bool {
@@ -121,7 +131,7 @@ fn gold_of(stream: &[u8]) -> Option<u32> {
 /// Unequip or RemoveFromBelt with header flag 0x20 (§2 r5.3: "the item is
 /// removed, no write").
 fn removed(action: u8, flags: u32) -> bool {
-    matches!(action, 0x05 | 0x08 | 0x0F) && flags & 0x20 != 0
+    action == ACTION_STORE_TAKEN || matches!(action, 0x05 | 0x08 | 0x0F) && flags & 0x20 != 0
 }
 
 /// The view of item unit `key`, `None` when it is not an item with a
@@ -146,6 +156,8 @@ pub fn item(w: &ClientWorld, key: UnitKey) -> Option<ItemView> {
         x,
         y,
         owner: r.owner.or(w.local_player),
+        store: r.action == ACTION_STORE_SHOWN,
+        store_seq: r.seq,
         gold: gold_of(&r.stream),
     })
 }
@@ -175,8 +187,14 @@ pub fn local_items(w: &ClientWorld) -> Vec<ItemView> {
     };
     items(w)
         .into_iter()
-        .filter(|i| !i.on_ground() && i.owner == Some(p))
+        .filter(|i| !i.on_ground() && !i.store && i.owner == Some(p))
         .collect()
+}
+
+/// The items shown in the NPC's store, in key order (their GUIDs rise in
+/// store order).
+pub fn store_items(w: &ClientWorld) -> Vec<ItemView> {
+    items(w).into_iter().filter(|i| i.store).collect()
 }
 
 /// The ground items.
@@ -319,6 +337,7 @@ mod tests {
                     action: *action,
                     category: 0,
                     owner: None,
+                    seq: 0,
                     stream: s.clone(),
                 }),
                 ..ItemData::default()

@@ -50,6 +50,11 @@ pub trait VendorRest {
     // ---- messages (transport)
     fn send_item_stat(&mut self, player: UnitId, item: UnitId, stat: u16);
     fn send_transaction(&mut self, player: UnitId, t: Transaction);
+    /// The buy price of a store item the player was just shown (S→C 0x9C
+    /// action 11). The original client computes it from its own tables;
+    /// d2rs's preview client has no price tables, so the host publishes it
+    /// here (d2rs-own, unverified). Default: not published.
+    fn store_price(&mut self, _player: UnitId, _item_guid: u32, _price: u32) {}
     // ---- NPC inventories (inventory spec)
     fn new_store_inventory(&mut self, npc_class: u16, npc: Option<UnitId>);
     fn place_in_store(&mut self, npc_class: u16, item: UnitId) -> bool;
@@ -386,6 +391,9 @@ where
         self.desk.rest.refresh_npc_inventory(npc);
     }
     fn add_trade_inventory(&mut self, npc_class: u16, item: UnitId) {
+        if !self.desk.state.shown.contains(&item) {
+            self.desk.state.shown.push(item);
+        }
         self.desk.rest.add_trade_inventory(npc_class, item);
     }
 

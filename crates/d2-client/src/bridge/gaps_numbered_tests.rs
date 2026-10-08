@@ -180,6 +180,8 @@ fn client_world_holds_only_stated_fields() {
     // The fields of `client/model.md` §1 rule 1 and `bridge.md` §5 rule 3.
     let ClientWorld {
         frames,
+        // d2rs-own, unverified: the shop panel's trade epoch.
+        store_serial,
         server_ticks,
         units,
         local_player,
@@ -240,6 +242,7 @@ fn client_world_holds_only_stated_fields() {
     assert_eq!(env_period_cache, 0);
     assert!(room_allied.is_empty());
     assert_eq!((frames, server_ticks, units.len()), (0, 0, 0));
+    assert_eq!(store_serial, 0);
     assert_eq!((local_player, act, use_cursor), (None, None, None));
     assert_eq!((difficulty, expansion, ladder, game_flags), (0, 0, 0, 0));
     assert!(!in_game && !unloaded && !exit_requested);

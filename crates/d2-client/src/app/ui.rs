@@ -109,6 +109,16 @@ pub fn set_waypoint_map(app: &mut App, map: d2_sim::world::waypoints::WaypointMa
     }
 }
 
+/// The store prices the server host publishes for the shop panel
+/// ([`OriginalUi::set_shop_prices`]); nothing without the original UI.
+pub fn set_shop_prices(app: &mut App, prices: crate::ui::original::ShopPrices) {
+    if let Some(mut ui) = app.world_mut().get_non_send_mut::<WorldViewUi>() {
+        if let Some(o) = ui.original.as_mut() {
+            o.set_shop_prices(prices);
+        }
+    }
+}
+
 /// [`add_original_ui`] with the unit tables `looks` (instead of the ones
 /// read from `parts.source`).
 pub fn add_original_ui_with(

@@ -77,6 +77,7 @@ fn item_actions() {
                 action: 0x0E,
                 category: 0x10,
                 owner: None,
+                seq: 0,
                 stream: hex("10 00 a2 00 65 08 00 80 06 17 03 02"),
             }),
             flags4: false,

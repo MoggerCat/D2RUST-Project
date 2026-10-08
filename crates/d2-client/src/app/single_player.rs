@@ -2030,10 +2030,12 @@ pub fn local_player(s: &Sim) -> Option<(UnitId, u32)> {
 
 /// The units of a started game, for the caller (the player exists after
 /// the join: [`local_player`]).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Started {
     pub waypoint: UnitId,
     pub waypoint_guid: u32,
+    /// The store prices the host publishes for the shop panel.
+    pub prices: crate::ui::original::ShopPrices,
 }
 
 /// Builds the game on a new server thread behind a local host with
@@ -2082,6 +2084,7 @@ pub fn start_with_objects<C: Clock + Send + 'static>(
         let _ = tx.send(Started {
             waypoint: g.waypoint,
             waypoint_guid: g.waypoint_guid,
+            prices: g.sim.world.rest.prices.clone(),
         });
         Ok::<_, BuildError>(LocalLink::new(Host::new(
             g.sim,

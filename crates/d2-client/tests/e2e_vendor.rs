@@ -602,7 +602,13 @@ fn run_with(game_seed: u32, gold: i32) -> Transcript {
     assert_eq!(trade.len(), 13);
     let f = fx.step(&[trade]);
     assert_eq!(f.codes, [(0x38, done)]);
-    assert!(f.received.is_empty());
+    // One S→C 0x9C action 11 per store item (`vendors.md` §4 step 3),
+    // in store order; each names the item's GUID.
+    let shown: Vec<(u8, u8, u32)> = f
+        .received
+        .iter()
+        .map(|m| (m[0], m[1], u32::from_le_bytes(m[4..8].try_into().unwrap())))
+        .collect();
     frames.push(f);
     let (store, rec_store) = {
         let w = &fx.sim_ref().world;
@@ -634,6 +640,8 @@ fn run_with(game_seed: u32, gold: i32) -> Transcript {
     assert!((1..=3).contains(&bucs.len()), "Min 1, Max 3");
     assert_eq!(caps.len(), 1);
     assert_eq!(caps[0].2, 2, "the permanent item is normal (§3)");
+    let want_shown: Vec<(u8, u8, u32)> = store_rows.iter().map(|r| (0x9C, 11, r.0)).collect();
+    assert_eq!(shown, want_shown, "0x9C action 11 per store item");
     let cap = *store.last().unwrap();
     assert_eq!(store_rows.last().unwrap().1, CAP, "permanent codes last");
     assert_eq!(fx.stat(cap, MAXDURABILITY), 12);
@@ -842,4 +850,106 @@ fn other_seed_other_store() {
     assert_ne!(a.game_seed, b.game_seed);
     assert_ne!(a.npc_seed, b.npc_seed);
     assert_ne!(a.store, b.store);
+}
+
+// ---- the shop panel (docs/handoff/q-vendor-items.md) -----------------------------------
+
+/// The client half of the trade: the store items the server shows
+/// (S→C 0x9C action 11) open the shop panel; a right click on the
+/// permanent cap leaves as C→S 0x32 and the server pays and places the
+/// copy; closing the shop ends the interaction (C→S 0x30).
+#[test]
+fn shop_panel_buys_and_closes() {
+    use d2_client::bridge::items::store_items;
+    use d2_client::ui::layout::Screen;
+    use d2_client::ui::original::{OriginalUi, UiConfig};
+    use d2_client::ui::panel::PointerButton;
+    use d2_client::ui::panel::{NoStrings, UiCtx, UiEvent};
+    use d2_client::ui::{NoPanelRules, Point, UiRoot};
+    use d2_proto::client::TerminateEntityChat;
+
+    let mut fx = Fx::new(GAME_SEED, PLAYER_GOLD);
+    let (player, npc) = (fx.player, fx.npc);
+    let ng = fx.guid(npc);
+    assert!(!fx.bridge.frame().unwrap().ticked);
+    fx.step(&[bytes(&InteractWithEntity { type_: 1, id: ng })]);
+    fx.step(&[bytes(&InitEntityChat { id: ng })]);
+
+    let mut ui = OriginalUi::new(
+        UiConfig {
+            screen: Screen::R800,
+            expansion_installed: true,
+        },
+        None,
+    )
+    .unwrap();
+    let mut root = UiRoot::new(Box::new(NoPanelRules));
+    ui.install(&mut root).unwrap();
+    ui.shop_poll(fx.bridge.world(), &mut root);
+    assert!(!ui.is_open(0x0C), "no store items shown yet");
+
+    // C→S 0x38 action 1: the server shows every store item.
+    let trade = bytes(&EntityAction {
+        action: 1,
+        npc: ng,
+        item: 0,
+    });
+    let f = fx.step(&[trade]);
+    assert!(f.received.iter().all(|m| m[0] == 0x9C && m[1] == 11));
+    ui.shop_poll(fx.bridge.world(), &mut root);
+    assert!(ui.is_open(0x0C), "the store items opened the shop");
+    assert_eq!(ui.shop_state().open.map(|o| o.npc_guid), Some(ng));
+
+    // The permanent cap is the last store item; right-click its cell
+    // (the grid is at (sx + 15, H + sy - 400) of 29-px cells).
+    let shown = store_items(fx.bridge.world());
+    assert_eq!(shown.len(), f.received.len());
+    let cap = shown.last().unwrap().clone();
+    let at = Point::new(
+        80 + 15 + 29 * i32::from(cap.x) + 5,
+        600 - 60 - 400 + 29 * i32::from(cap.y) + 5,
+    );
+    let tab_page = cap.page;
+    assert!(tab_page < 4);
+    let strings = NoStrings;
+    let click = |fx: &mut Fx, ui: &mut OriginalUi, root: &mut UiRoot, button, at| {
+        let w = fx.bridge.world();
+        let ctx = UiCtx {
+            tick: w.frames,
+            world: w,
+            strings: &strings,
+        };
+        for e in [
+            UiEvent::Press { button, at },
+            UiEvent::Release { button, at },
+        ] {
+            ui.before_event(e, w);
+            let routed = root.dispatch(e, &ctx);
+            ui.after_event(root, e, routed).unwrap();
+        }
+        root.forward(&mut fx.bridge).unwrap()
+    };
+    // The cap sits on a page that is not the current one until its tab
+    // is chosen (the start page of Akara is 3: the first page with items
+    // is current).
+    let sent = click(&mut fx, &mut ui, &mut root, PointerButton::Right, at);
+    assert_eq!(sent, 1, "one C→S 0x32");
+    let f = fx.step(&[]);
+    assert_eq!(f.codes, [(0x32, Some(ResultCode::Done))]);
+    assert!(f
+        .received
+        .iter()
+        .any(|m| m[0] == 0x2A && m[1] == 4 && m[2] == 0));
+    assert!(fx.stat(player, GOLD) < PLAYER_GOLD, "the price was paid");
+    assert_eq!(fx.inventory().len(), 3, "the copy joined the backpack");
+
+    // Closing the shop's UI state ends the interaction.
+    ui.set_ui(0x0C, 1, false).unwrap();
+    ui.shop_poll(fx.bridge.world(), &mut root);
+    assert!(ui.shop_state().open.is_none());
+    assert_eq!(root.forward(&mut fx.bridge).unwrap(), 1);
+    let end = bytes(&TerminateEntityChat { id: ng });
+    let f = fx.step(&[]);
+    assert_eq!(f.codes[0].0, end[0]);
+    assert!(fx.errors().is_empty(), "{:?}", fx.errors());
 }
