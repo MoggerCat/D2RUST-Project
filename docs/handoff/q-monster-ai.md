@@ -2,7 +2,7 @@
 
 > Stitching session, 2026-10-08. Read only `specs/`, `docs/`, `crates/`,
 > `tools/`. Synthetic fixtures only. Nothing here is verified against
-> 1.14d (rule 10); the open points are REC-110 in `docs/HANDOFF.md` §7.
+> 1.14d (rule 10); the open points are REC-111 in `docs/HANDOFF.md` §7.
 > Sound not wired.
 
 ## 1. The path, and the links that were missing
@@ -30,7 +30,7 @@ to DEATH and the death screen comes up. It failed before each link above
 `d2-sim` `attack_event0_runs_the_skill_frame_and_keeps_the_frame_code`
 covers link 6.
 
-## 3. PROVISIONAL (REC-110)
+## 3. PROVISIONAL (REC-111)
 
 - Which skill an attack mode uses (`monsters/ai.md` §7.1: the AI's plain
   attack request sets none): Attack, level 1 (`MonsterAi::used_skill`).
@@ -63,5 +63,5 @@ The test passes. In `play`, leave the Rogue Encampment (east, the Blood
 Moor) and let a monster reach you: it should swing (attack animation),
 your life should drop, and at 0 life the death screen appears (Esc
 respawns in town). If a monster just stands next to you, copy the console
-lines into `docs/HANDOFF.md` §7 REC-110 (the usual suspect: the monster's
+lines into `docs/HANDOFF.md` §7 REC-111 (the usual suspect: the monster's
 class lacks the mode in monstats2, or AnimData has no `<code>A1HTH` row).

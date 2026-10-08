@@ -221,7 +221,7 @@ fn good_npc_ranged_takes_ai_turns() {
 // Covers: specs/skills/use.md §5.2
 #[test]
 fn attack_event0_runs_the_skill_frame_and_keeps_the_frame_code() {
-    // PROVISIONAL (REC-110): the attack-family event 0 `0x005A7670` runs the
+    // PROVISIONAL (REC-111): the attack-family event 0 `0x005A7670` runs the
     // skill part of the sequence frame with unit +0x4E := the timer's code.
     let mut fx = Fx::new();
     let m = monster(&mut fx);

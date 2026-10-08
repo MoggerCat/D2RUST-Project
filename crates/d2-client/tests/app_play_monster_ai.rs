@@ -6,7 +6,7 @@
 //!
 //! Synthetic fills: the stat table, a `monstats` class with the Zombie AI,
 //! the Attack skill (`srvdofunc` 1), and the AnimData record of the
-//! monster's A1 (no game files). Provisional parts: REC-110 in
+//! monster's A1 (no game files). Provisional parts: REC-111 in
 //! `docs/HANDOFF.md` §7.
 
 use std::sync::atomic::{AtomicU32, Ordering};

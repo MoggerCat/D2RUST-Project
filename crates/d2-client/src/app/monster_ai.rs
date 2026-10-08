@@ -8,7 +8,7 @@
 //! damage path.
 //!
 //! Everything here is a preview fill (decision D1), marked
-//! `// d2rs-own, unverified`; the open points are PROVISIONAL (REC-110 in
+//! `// d2rs-own, unverified`; the open points are PROVISIONAL (REC-111 in
 //! `docs/HANDOFF.md` §7).
 
 use std::collections::BTreeMap;
@@ -19,7 +19,7 @@ use d2_sim::skills::SkillEntry;
 use d2_sim::units::UnitId;
 
 /// The skill id of a monster's melee attack (skills.txt row 0, "Attack").
-// PROVISIONAL (skills/use.md OQ6; REC-110): the monster's attack modes use
+// PROVISIONAL (skills/use.md OQ6; REC-111): the monster's attack modes use
 // skill 0 at level 1; monstats `Skill1`…`Skill8` / `Sk1mode`… (which skill
 // an attack mode picks) are not specified for the preview. d2rs-own,
 // unverified.
@@ -94,14 +94,14 @@ impl MonsterAi {
 
     /// The used skill (`0x00620250`) of a monster: the one the request set
     /// ([`Self::set_current`]), else Attack.
-    // PROVISIONAL (monsters/ai.md §7.1, skills/use.md OQ6; REC-110): the AI's
+    // PROVISIONAL (monsters/ai.md §7.1, skills/use.md OQ6; REC-111): the AI's
     // plain attack request (`0x005DDF90`) sets no skill, and the spec does
     // not say which entry the unit then uses; the preview takes Attack
     // (skill 0, level 1). d2rs-own, unverified.
     pub fn used_skill(&self, unit: UnitId, monster: bool) -> Option<SkillEntry> {
         let skill = match self.current.get(&unit) {
             Some(&skill) => skill,
-            None if monster => ATTACK_SKILL,
+            None if monster && self.targets.contains_key(&unit) => ATTACK_SKILL,
             None => return None,
         };
         Some(SkillEntry {
