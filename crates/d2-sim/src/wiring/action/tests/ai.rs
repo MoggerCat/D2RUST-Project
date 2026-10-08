@@ -217,3 +217,27 @@ fn good_npc_ranged_takes_ai_turns() {
     assert!(fx.sim.hooks().ai_store().unhandled.is_empty());
     fx.assert_clean();
 }
+
+// Covers: specs/skills/use.md §5.2
+#[test]
+fn attack_event0_runs_the_skill_frame_and_keeps_the_frame_code() {
+    // PROVISIONAL (REC-111): the attack-family event 0 `0x005A7670` runs the
+    // skill part of the sequence frame with unit +0x4E := the timer's code.
+    let mut fx = Fx::new();
+    let m = monster(&mut fx);
+    fx.sim.sys.units.get_mut(m).unwrap().mode = u32::from(mode::ATTACK1);
+    fx.game
+        .schedule_event(m, u32::from(event::MODE_CHANGE), 1, None, 1, 0)
+        .unwrap();
+    fx.frame();
+    assert!(
+        fx.sim
+            .hooks()
+            .x
+            .log
+            .contains(&format!("sequence frame {}", m.0)),
+        "{:?}",
+        fx.sim.hooks().x.log
+    );
+    assert_eq!(fx.sim.sys.units.get(m).unwrap().anim.action_frame, 1);
+}

@@ -417,6 +417,9 @@ pub struct LocalSeams {
     /// The skill pipeline's per-unit fields and preview fills (`UseRest`,
     /// `LearnRest`: [`super::skill_rest`]).
     pub skills: SkillStore,
+    /// The monsters' mode targets and current skills
+    /// ([`super::monster_ai`]).
+    pub monsters: super::monster_ai::MonsterAi,
     /// The unit tables of the client art's name rules ([`super::anim_names`]);
     /// none on synthetic data.
     pub looks: Option<Arc<crate::world_view::unit_assets::UnitLooks>>,
@@ -542,6 +545,25 @@ impl Pending for LocalSeams {
                 (self.player_side(attacker), self.player_side(defender)),
                 (Some(a), Some(d)) if a != d
             )
+    }
+    // d2rs-own, unverified (preview, q-monster-ai; `monster_ai`): a mode
+    // request's target, the monster's current skill and the skill pipeline's
+    // monster start and per-frame (`use.md` §5.3, OQ6).
+    fn set_mode_target(&mut self, unit: UnitId, target: d2_sim::monsters::ai::ModeTarget) {
+        self.monsters.set_target(unit, target);
+    }
+    fn set_current_skill(&mut self, unit: UnitId, skill: i32) -> bool {
+        self.monsters.set_current(unit, skill)
+    }
+    fn class_has_mode(&self, class: i32, mode: u8) -> bool {
+        self.monsters.class_has_mode(class, mode)
+    }
+    fn used_skill(&self, unit: UnitId) -> Option<d2_sim::skills::SkillEntry> {
+        let monster = self
+            .sides
+            .get(&unit)
+            .is_some_and(|s| s.0 == UnitType::Monster);
+        self.monsters.used_skill(unit, monster)
     }
     /// d2rs-own, unverified (preview, D1; `0x00622870`).
     fn melee_range(&self, _: UnitId) -> i32 {
@@ -1649,12 +1671,14 @@ pub fn build_with_objects(
     };
     // `rng.md` §5.2, the fixed-seed branch (`--seed N`): the game seed
     // is `{N, 666}`, unstepped.
-    let mut hooks = ActionHooks::new(
-        Arc::new(parts.action),
-        world,
-        Seed::init_low(seed),
-        LocalSeams::default(),
-    );
+    let seams = LocalSeams {
+        monsters: super::monster_ai::MonsterAi::from_tables(
+            &parts.action.combat.monstats,
+            &parts.action.combat.monstats2,
+        ),
+        ..LocalSeams::default()
+    };
+    let mut hooks = ActionHooks::new(Arc::new(parts.action), world, Seed::init_low(seed), seams);
     hooks.anim_data = parts.anim;
     if let GameData::Live(d) = data {
         // The server's animation names follow the client art's name rules.

@@ -15,6 +15,7 @@ pub mod death;
 pub mod hire_stats;
 pub mod hud;
 pub mod items;
+pub mod monster_ai;
 pub mod monster_drop;
 pub mod npc_seams;
 pub mod palette;
