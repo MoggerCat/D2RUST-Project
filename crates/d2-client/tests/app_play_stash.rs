@@ -299,7 +299,7 @@ fn clicking_the_stash_opens_the_panel_and_its_close_button_closes_it() {
     let cell = app.world().resource::<BridgeResource>().0.world().units[&key]
         .position
         .expect("object cell");
-    let (x, y) = hover::feet(&cam, cell);
+    let (x, y) = hover::feet(&cam, key.unit_type, cell);
     let at = Point::new(x, y - 20);
     queue(
         &mut app,

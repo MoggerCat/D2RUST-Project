@@ -11,9 +11,9 @@
 //! The strict path never calls this ([`super::click::ClickView::pick`]
 //! is `false`).
 
-use crate::rules::camera::{moving_to_client, Camera};
+use crate::rules::camera::{moving_to_client, static_to_client, Camera};
 
-use super::world::{ClientWorld, UnitKey};
+use super::world::{ClientWorld, UnitKey, ITEM, OBJECT, TILE};
 
 /// Half the box width, in screen pixels. d2rs-own, unverified.
 pub const HIT_HALF_WIDTH: i32 = 24;
@@ -22,14 +22,20 @@ pub const HIT_ABOVE: i32 = 96;
 /// How far the box reaches below the feet. d2rs-own, unverified.
 pub const HIT_BELOW: i32 = 16;
 
-/// The screen point of a unit's feet: its cell centre drawn by the unit
-/// rule (`render/camera.md` §4) with no extra offset.
-pub fn feet(cam: &Camera, cell: (u16, u16)) -> (i32, i32) {
-    let (x, y) = (u32::from(cell.0), u32::from(cell.1));
-    cam.unit_draw(
-        moving_to_client((x << 16) | 0x8000, (y << 16) | 0x8000),
-        (0, 0),
-    )
+/// The screen point of a unit's feet: its draw anchor
+/// (`seams/world-screen.md` §2.5) drawn by the unit rule
+/// (`render/camera.md` §4) with no extra offset. Static-path units
+/// (objects, items, tiles) from the cell's static vertex
+/// (`static_to_client`), moving ones from the cell centre
+/// (`moving_to_client`, `camera.md` §2).
+pub fn feet(cam: &Camera, unit_type: u8, cell: (u16, u16)) -> (i32, i32) {
+    let at = if matches!(unit_type, OBJECT | ITEM | TILE) {
+        static_to_client(i32::from(cell.0), i32::from(cell.1))
+    } else {
+        let (x, y) = (u32::from(cell.0), u32::from(cell.1));
+        moving_to_client((x << 16) | 0x8000, (y << 16) | 0x8000)
+    };
+    cam.unit_draw(at, (0, 0))
 }
 
 /// The hover target at screen point `mouse` (module doc).
@@ -43,7 +49,7 @@ pub fn pick(world: &ClientWorld, cam: &Camera, mouse: (i32, i32)) -> Option<Unit
             continue;
         }
         let Some(cell) = u.position else { continue };
-        let (fx, fy) = feet(cam, cell);
+        let (fx, fy) = feet(cam, key.unit_type, cell);
         let (dx, dy) = (mouse.0 - fx, mouse.1 - fy);
         if dx.abs() > HIT_HALF_WIDTH || !(-HIT_ABOVE..=HIT_BELOW).contains(&dy) {
             continue;

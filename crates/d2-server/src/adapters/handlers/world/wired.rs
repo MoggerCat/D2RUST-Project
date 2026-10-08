@@ -121,6 +121,10 @@ pub struct WiredWorld<R, S = NoSkills> {
     /// What the inventory rules queued during vendor calls (receiving
     /// unit, bytes), sent after the rest's messages ([`WorldHost::take_sent`]).
     pub(super) inv_sent: Vec<(UnitId, Vec<u8>)>,
+    /// The messages the systems sent so far, in production order
+    /// ([`Self::collect_sent`]; `seams/sim-server.md` §2.2,
+    /// `sim/intents-events.md` §1 r3).
+    pub(super) outbox: Vec<(UnitId, Vec<u8>)>,
     /// Pick-ups waiting for the player's run to the item to end
     /// (player, item GUID, cursor flag; [`Self::item_arrivals`], REC-281).
     pub(super) item_queued: Vec<(UnitId, u32, bool)>,
@@ -195,6 +199,7 @@ impl<R, S> WiredWorld<R, S> {
             interact_classes: Vec::new(),
             now,
             inv_sent: Vec::new(),
+            outbox: Vec::new(),
             item_queued: Vec::new(),
             start_extra: Vec::new(),
             quest_levels: Default::default(),
@@ -585,6 +590,23 @@ impl<R: TradeRest + Default + 'static, S> WiredWorld<R, S> {
 }
 
 impl<R: TradeRest, S> WiredWorld<R, S> {
+    /// Moves what the systems sent since the last call into the one
+    /// outbox: the action wiring's sends, then what the inventory rules
+    /// queued, then the rest's (NPC, vendor and quest messages). Called
+    /// after each step that sends, so the outbox holds a tick's messages
+    /// in production order (`seams/sim-server.md` §2.2); one system
+    /// runs per step, and within a vendor call the inventory messages
+    /// precede its 0x2A (`vendors.md` §7 "Message order").
+    pub(super) fn collect_sent<D: ActionEvents>(&mut self, events: &mut D)
+    where
+        D::X: Outbox,
+    {
+        let mut sent = events.action().hooks().x.take_sent();
+        self.outbox.append(&mut sent);
+        self.outbox.append(&mut self.inv_sent);
+        self.outbox.extend(self.rest.take_sent());
+    }
+
     /// The pet follows `0x005754B0` the placements queued
     /// (`path-placement.md` §10 rule 6, `ActionHooks::pet_follows`, on
     /// from the first frame): `hirelings.md` §6 rule 1 on the hireling
@@ -951,22 +973,34 @@ where
         self.lend_quests(events, |_, ev| d2_sim::tick::tick(game, ev));
         let sent = self.take_inventory_sent(game, events);
         self.inv_sent.extend(sent);
+        self.collect_sent(events);
     }
 
     /// The quest routes queued outside a lent call (a quest call's own
     /// allocations, [`quest_objects`]), before the tick's sends are taken.
     fn after_tick(&mut self, game: &mut Game, events: &mut D) {
+        // Each step's sends join the outbox before the next step runs
+        // (production order, `seams/sim-server.md` §2.2).
         let sent = self.desk(game, events, quest_objects);
         self.inv_sent.extend(sent);
+        self.collect_sent(events);
         self.run_quest_events(game, events);
+        self.collect_sent(events);
         // A player with no life starts dying (`vitals.md` §4.8).
         events.action().player_deaths(game);
+        self.collect_sent(events);
         self.corpse_fill(game, events);
+        self.collect_sent(events);
         self.pet_deaths(game, events);
+        self.collect_sent(events);
         self.approaches(game, events);
+        self.collect_sent(events);
         self.hireling_calls(game, events);
+        self.collect_sent(events);
         self.pet_follows(game, events);
+        self.collect_sent(events);
         self.drive_hirelings(game, events);
+        self.collect_sent(events);
     }
 
     /// The quest control on the desk's economy and rest
@@ -1236,18 +1270,18 @@ where
         WorldHost::<D>::vitals_sync(&mut self.action, game, events, client, staged, queued)
     }
 
-    /// The action wiring's sends (waypoints, tick paths), then what the
-    /// inventory rules queued in vendor calls, then the rest's (NPC,
-    /// vendor and quest messages); one system runs per message, so the
-    /// systems never interleave. A vendor call's inventory messages (a
-    /// targeting reset's 0x3F, placement and 0x9D sends) come before its
-    /// 0x2A, the last call of each buy pass, sell or repair (`vendors.md`
-    /// §7 "Message order").
+    /// The outbox in production order ([`WiredWorld::collect_sent`]):
+    /// the tick's steps in turn; for a handled message, the action
+    /// wiring's sends (waypoints, tick paths), then what the inventory
+    /// rules queued in vendor calls, then the rest's (NPC, vendor and
+    /// quest messages); one system runs per message, so the systems never
+    /// interleave. A vendor call's inventory messages (a targeting
+    /// reset's 0x3F, placement and 0x9D sends) come before its 0x2A, the
+    /// last call of each buy pass, sell or repair (`vendors.md` §7
+    /// "Message order").
     fn take_sent(&mut self, events: &mut D) -> Vec<(UnitId, Vec<u8>)> {
-        let mut sent = events.action().hooks().x.take_sent();
-        sent.append(&mut self.inv_sent);
-        sent.extend(self.rest.take_sent());
-        sent
+        self.collect_sent(events);
+        std::mem::take(&mut self.outbox)
     }
 
     /// The action wiring's object host tick, and [`WiredWorld::now`] (the

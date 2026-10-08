@@ -59,7 +59,7 @@ impl ObjectLabels {
         let u = world.units.get(&key)?;
         let text = self.text(u.class, strings)?;
         let cell = u.position?;
-        let (x, y) = feet(cam, cell);
+        let (x, y) = feet(cam, OBJECT, cell);
         Some(UiDraw::Text(TextRequest {
             text,
             at: Point::new(x, y - HIT_ABOVE),
@@ -124,7 +124,7 @@ mod tests {
     fn hovering_an_object_yields_its_name_over_its_feet() {
         let w = world();
         let cam = crate::world_view::corpse_click::camera_for(&w, 0).unwrap();
-        let at = feet(&cam, (103, 100));
+        let at = feet(&cam, OBJECT, (103, 100));
         let hover = crate::bridge::hover::pick(&w, &cam, at);
         assert_eq!(hover, Some(CHEST));
         let Some(UiDraw::Text(t)) = labels().draw(&w, &cam, hover, &Strings) else {

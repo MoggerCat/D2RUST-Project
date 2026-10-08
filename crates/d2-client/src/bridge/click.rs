@@ -113,12 +113,16 @@ pub fn can_act(is_player: bool, cursor_item: bool, mode: u32, class: u32) -> boo
 }
 
 impl ModelClick<'_> {
+    /// The local player's own position (`seams/movement-prediction.md`
+    /// §2.9 r1): the one the caller read for the frame ([`Self::local_at`]),
+    /// else the model's ([`ClientWorld::local_position`]).
+    fn own_position(&self) -> Option<(u32, u32)> {
+        self.world.local()?;
+        self.local_at.or_else(|| self.world.local_position())
+    }
+
     pub(super) fn camera(&self) -> Option<Camera> {
-        let p = self.world.local()?;
-        let (x, y) = p.cell();
-        let (px, py) = self
-            .local_at
-            .unwrap_or(((u32::from(x) << 16) | 0x8000, (u32::from(y) << 16) | 0x8000));
+        let (px, py) = self.own_position()?;
         let at = crate::rules::camera::moving_to_client(px, py);
         let mode = OpenMode::new(self.view.open_mode).unwrap_or(OpenMode::NONE);
         Some(Camera::new(self.view.size, mode, at, (0, 0)))
@@ -195,9 +199,8 @@ impl ClickWorld for ModelClick<'_> {
         self.camera().map_or((0, 0), |c| screen_to_world(&c, x, y))
     }
     fn position(&self, u: UnitKey) -> Option<(i32, i32)> {
-        if let (Some((x, y)), Some(_)) =
-            (self.local_at, self.world.local_player.filter(|k| *k == u))
-        {
+        if self.world.local_player == Some(u) {
+            let (x, y) = self.own_position()?;
             return Some(((x >> 16) as i32, (y >> 16) as i32));
         }
         let u = self.world.units.get(&u)?;
@@ -306,11 +309,17 @@ impl ClickWorld for ModelClick<'_> {
     }
     fn path_distance(&self, u: UnitKey) -> i32 {
         let rows = &self.inputs.objclient.rows;
-        match (self.world.units.get(&u), self.world.local()) {
-            (Some(u), Some(p)) => super::objects::distance(
-                u,
+        // From the local player's own cell, as its position
+        // (`seams/movement-prediction.md` §2.9 r2).
+        match (
+            self.world.units.get(&u),
+            self.world.local(),
+            self.own_position(),
+        ) {
+            (Some(u), Some(p), Some((x, y))) => super::objects::distance_at(
+                u.cell(),
                 super::objects::unit_size(u, rows),
-                p,
+                ((x >> 16) as u16, (y >> 16) as u16),
                 super::objects::unit_size(p, rows),
             ),
             _ => i32::MAX,
@@ -708,5 +717,54 @@ mod tests {
         // The model's cell read as the prediction: the same as none.
         let same = ((100 << 16) | 0x8000, (100 << 16) | 0x8000);
         assert_eq!(press(0, at, Some(same)).unwrap().to, WalkTo::Point(x, y));
+    }
+    // Covers: specs/seams/movement-prediction.md §2.9 r2
+    #[test]
+    fn an_npc_click_measures_from_the_predicted_position() {
+        use crate::bridge::world::{MonsterClass, MONSTER};
+        // Model (100, 100), the walk prediction at (121, 100), a town NPC
+        // at (122, 100): next to the player's own position, so the click
+        // interacts at once (C→S 0x13) instead of walking there.
+        let mut w = world();
+        w.set_local_walk(Some(((121 << 16) | 0x8000, (100 << 16) | 0x8000)), None);
+        let npc = UnitKey::new(MONSTER, 9);
+        let mut u = ClientUnit::new(npc);
+        u.position = Some((122, 100));
+        u.flag_4 = true;
+        u.mode = 1;
+        w.units.insert(npc, u);
+        let mut inputs = ModelInputs::default();
+        inputs.tables.monsters = vec![Some(MonsterClass {
+            npc: true,
+            interact: true,
+            ..MonsterClass::default()
+        })];
+        let c = ModelClick {
+            world: &w,
+            inputs: &inputs,
+            view: view((0, 0)),
+            local_at: None,
+        };
+        assert!(c.path_distance(npc) <= 2, "{}", c.path_distance(npc));
+        let cam = c.camera().unwrap();
+        let at = (0..800)
+            .flat_map(|x| (0..550).map(move |y| (x, y)))
+            .find(|&(x, y)| screen_to_world(&cam, x, y) == (122, 100))
+            .expect("the NPC is on screen");
+        let mut st = ClickState::default();
+        world_click(
+            &mut w,
+            &inputs,
+            &mut st,
+            view(at),
+            Kind::LeftDown,
+            Some(at),
+            0,
+        )
+        .unwrap();
+        let mut want = vec![0x13];
+        want.extend_from_slice(&1u32.to_le_bytes());
+        want.extend_from_slice(&9u32.to_le_bytes());
+        assert_eq!(w.outgoing, vec![want], "C→S 0x13 [type 1][guid 9]");
     }
 }

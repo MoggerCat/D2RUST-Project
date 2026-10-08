@@ -466,12 +466,13 @@ impl<L: ServerLink> Bridge<L> {
         self.world.recache_local_room(x, y)
     }
 
-    /// The play preview's predicted sub-tile of the local player, for the
-    /// position check ([`ClientWorld::set_local_walk`],
-    /// [`ClientWorld::predicted`]). d2rs-own, unverified. PROVISIONAL
-    /// (`client/model.md` OQ2; REC-51, REC-277).
-    pub fn set_local_walk(&mut self, cell: Option<(u16, u16)>) {
-        self.world.set_local_walk(cell);
+    /// The play preview's predicted precise position of the local player
+    /// and its walk / run mode, for the position check
+    /// ([`ClientWorld::set_local_walk`], [`ClientWorld::predicted`]).
+    /// d2rs-own, unverified. PROVISIONAL (`client/model.md` OQ2; REC-51,
+    /// REC-277).
+    pub fn set_local_walk(&mut self, pos: Option<(u32, u32)>, mode: Option<u32>) {
+        self.world.set_local_walk(pos, mode);
     }
 
     /// Installs the item tables the model decodes item streams with.
@@ -499,7 +500,7 @@ impl<L: ServerLink> Bridge<L> {
     /// The play preview's monster motion on the model (d2rs-own,
     /// unverified; [`motion`]).
     pub fn preview_motion(&mut self, m: &mut motion::MonsterMotion) {
-        m.frame(&mut self.world);
+        m.frame(&mut self.world, &self.inputs.tables.monsters);
     }
 
     pub fn log(&self) -> &ReceiveLog {

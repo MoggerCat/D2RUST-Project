@@ -165,6 +165,32 @@ fn a_ground_item_draws_its_flippy_at_its_subtile() {
     assert_eq!(g.hit(433, 301), None);
 }
 
+// Covers: specs/seams/world-screen.md §2.6
+#[test]
+fn a_ground_item_moves_with_the_frames_shaken_camera() {
+    use crate::rules::camera::{ClientPos, FrameSize, OpenMode};
+    let mut w = ClientWorld::default();
+    populate(&mut w, &[(5, 3, (102, 100), b"cap ")]);
+    let mut g = GroundItems::new(source(), rows());
+    let mut a = assets();
+    let feed = ModelFeed::<NoFeed>::default();
+    // The player at client (0, 1608) (as above), a running shake (3, −2).
+    let player = ClientPos { x: 0, y: 1608 };
+    let plain = Camera::new(FrameSize::D2RS, OpenMode::NONE, player, (0, 0));
+    let shaken = Camera::new(FrameSize::D2RS, OpenMode::NONE, player, (3, -2));
+    let mut frame = WorldFrame {
+        camera: Some(shaken),
+        ..WorldFrame::default()
+    };
+    let log = g.add_to_frame(&w, &feed, &mut a, &mut frame);
+    assert!(log.is_empty(), "{log:?}");
+    let d = frame.items[0];
+    // The tiles move by the unit origin's change; so does the item.
+    let (dx, dy) = (shaken.unit.x - plain.unit.x, shaken.unit.y - plain.unit.y);
+    assert_ne!((dx, dy), (0, 0));
+    assert_eq!((d.x, d.y), (432 - dx, 298 - dy));
+}
+
 // Covers: specs/render/unit-composite.md §9
 #[test]
 fn no_rows_or_missing_art_draw_nothing_and_never_fail() {

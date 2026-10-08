@@ -10,9 +10,11 @@
 //!   the local player, else the facing toward the walk target or the last
 //!   position change, else 0), mapped to the COF row with §3 r3's
 //!   expected count (`UnitArt::expected_directions`);
-//! - frame: the model's +0x44 frame when set, else the COF's animation
-//!   rate advanced by the server tick count (the client model runs no
-//!   animation yet);
+//! - frame: an object's is the model's +0x44 frame always (the model
+//!   animates objects, `client/model.md` §18 r1; frame 0 is COF frame 0,
+//!   `seams/bridge-app.md` §2.1); another unit's is the model's when set,
+//!   else the COF's animation rate advanced by the server tick count (the
+//!   client model runs no animation for them yet);
 //! - no COF box pre-test (§4: the screen position is the placement
 //!   hook's; the view clips at the frame edge);
 //! - draw key: pass 6 at major / minor 0 when the source states no draw
@@ -24,7 +26,7 @@
 
 use std::sync::Arc;
 
-use crate::bridge::world::ClientWorld;
+use crate::bridge::world::{ClientWorld, OBJECT};
 use crate::bridge::ClientUnit;
 use crate::composite::{
     ComponentDraw, ComponentFrame, ComponentRequest, CompositeError, UnitParams,
@@ -50,8 +52,8 @@ impl<R> UnitRules<R> {
     /// unverified).
     fn frame(world: &ClientWorld, unit: &ClientUnit, frames: u8, rate: u32) -> usize {
         let frames = usize::from(frames.max(1));
-        if unit.frame > 0 {
-            return frame_index(unit.frame as u32) % frames;
+        if unit.frame > 0 || unit.key.unit_type == OBJECT {
+            return frame_index(unit.frame.max(0) as u32) % frames;
         }
         // d2rs-own, unverified (D1): 8.8 animation rate per tick.
         ((world.server_ticks.wrapping_mul(u64::from(rate)) >> 8) % frames as u64) as usize

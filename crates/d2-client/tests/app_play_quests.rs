@@ -328,7 +328,7 @@ fn akara_on_screen(app: &App) -> (u32, Point) {
         moving_to_client(at.0, at.1),
         (0, 0),
     );
-    let (x, y) = hover::feet(&cam, u.position.unwrap());
+    let (x, y) = hover::feet(&cam, u.key.unit_type, u.position.unwrap());
     (key.guid, Point::new(x, y - 20))
 }
 
