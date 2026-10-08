@@ -102,6 +102,7 @@ fn populate(w: &mut ClientWorld, items: &[Fixture<'_>]) {
                 action: 0,
                 category: 0,
                 owner: None,
+                seq: 0,
                 stream: stream(m, loc, code),
             }),
             ..ItemData::default()

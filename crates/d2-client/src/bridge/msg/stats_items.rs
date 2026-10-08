@@ -255,12 +255,17 @@ pub fn item_action(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handler
     } else {
         None
     };
+    // d2rs-own, unverified: the shop panel's trade epoch (`ItemRecord::seq`).
+    if action == 0x0B {
+        w.store_serial += 1;
+    }
     let record = ItemRecord {
         id: msg.id,
         action,
         category: b.u8(3)?,
         owner,
         stream: msg.bytes[head..].to_vec(),
+        seq: if action == 0x0B { w.store_serial } else { 0 },
     };
     // Rule 4: the stream header (provisional [`ItemHeader`]) decides
     // placement and the cursor writes of rule 5.

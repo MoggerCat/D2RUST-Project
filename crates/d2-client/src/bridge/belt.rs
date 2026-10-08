@@ -106,6 +106,7 @@ mod tests {
                 action: 0x0E,
                 category: 0x10,
                 owner: None,
+                seq: 0,
                 stream: s,
             }),
             ..ItemData::default()

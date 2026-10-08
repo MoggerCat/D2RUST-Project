@@ -25,6 +25,8 @@ use d2_sim::world::quests::{PlayerQuests, QuestChain, TextList, UnitKind};
 use d2_sim::world::vendors::price::Bonus;
 use d2_sim::world::vendors::Transaction;
 
+use crate::ui::original::ShopPrices;
+
 /// The rest of the app's wired host (module docs).
 #[derive(Debug, Default)]
 pub struct AppRest {
@@ -40,6 +42,9 @@ pub struct AppRest {
     pub sent: Vec<(UnitId, Vec<u8>)>,
     /// Calls that did nothing (no provider), in call order.
     pub log: Vec<String>,
+    /// The store item buy prices the shop panel shows (d2rs-own,
+    /// unverified: `VendorRest::store_price`).
+    pub prices: ShopPrices,
 }
 
 impl AppRest {
@@ -250,6 +255,9 @@ impl VendorRest for AppRest {
     }
     fn set_last_bought(&mut self, p: UnitId, guid: u32) {
         self.last_bought.insert(p, guid);
+    }
+    fn store_price(&mut self, _: UnitId, item_guid: u32, price: u32) {
+        self.prices.set(item_guid, price);
     }
     fn has_cursor_item(&self, _: UnitId) -> bool {
         false

@@ -2248,6 +2248,7 @@ fn run_with(game_seed: u32) -> Transcript {
                     action: 4,
                     category: 0,
                     owner: None,
+                    seq: 0,
                     stream: frames
                         .last()
                         .unwrap()

@@ -445,7 +445,8 @@ pub fn run_ui_with<L: ServerLink>(
         input.drain(&mut events);
         // The flags the delivered S→C outputs set since the last event
         // (S→C 0x63 opens ui 0x14), mirrored before routing.
-        if let Some(o) = original.as_deref() {
+        if let Some(o) = original.as_deref_mut() {
+            o.shop_poll(world, root);
             o.sync_root(root);
         }
         for e in events {

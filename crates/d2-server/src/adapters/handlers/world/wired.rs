@@ -58,7 +58,7 @@ use d2_sim::wiring::interaction::{
 use d2_sim::world::hirelings::life;
 use d2_sim::world::npc::NpcControl;
 use d2_sim::world::quests::{HostRequest, QuestControl};
-use d2_sim::world::vendors::{GlobalLists, VendorTables};
+use d2_sim::world::vendors::{price, trade, tx, GlobalLists, VendorTables, VendorWorld};
 use d2_sim::world::waypoints::{
     ObjectFacts, PlayerFacts, RoomRect, WaypointRecords, WaypointWorld,
 };
@@ -221,6 +221,50 @@ impl<R, S> WiredWorld<R, S> {
             f(&mut desk, &mut *p.npc, p.inventory.as_deref_mut())
         })
     }
+}
+
+/// 0x9C action of a store item shown to the client (`vendors.md` §3.1).
+const STORE_ITEM_ACTION: u8 = 11;
+
+/// The store items a trade open added to the NPC's trade inventory, as
+/// S→C 0x9C action 11 to the opening player, one per item in add order
+/// (`vendors.md` §4 step 3, recorded frame 899). Needs the inventory
+/// model (the item bit stream); without it the items stay unsent.
+fn flush_shown<X: Pending, R: TradeRest>(
+    desk: &mut Desk<'_, '_, ActionHooks<X>, R>,
+    inv: Option<&mut InvParts>,
+) -> Vec<(UnitId, Vec<u8>)> {
+    let (Some(parts), Some(player)) = (inv, desk.state.shown_player) else {
+        return Vec::new();
+    };
+    let items = std::mem::take(&mut desk.state.shown);
+    // d2rs-own, unverified: the buy price of each shown item, for the
+    // preview client (`VendorRest::store_price`).
+    let (tables, class) = (desk.vendor_tables, desk.state.shown_class);
+    let prices: Vec<(u32, u32)> = {
+        let v = desk.vendors(None);
+        let ctx = trade::price_ctx(tables, &v, player, class);
+        items
+            .iter()
+            .filter_map(|&i| {
+                let it = v.price_item(i)?;
+                let c = price::cost(tables, &ctx, Some(&it), tx::BUY).ok()?;
+                Some((v.guid(i), u32::try_from(c).ok()?))
+            })
+            .collect()
+    };
+    for (guid, price) in prices {
+        desk.rest.store_price(player, guid, price);
+    }
+    let mut d = parts.desk(&mut *desk.econ);
+    for item in items {
+        // PROVISIONAL: a failed encode skips the item.
+        let _ = d.send_item_world(player, item, STORE_ITEM_ACTION, 0);
+    }
+    inv_take_sent(&mut d)
+        .into_iter()
+        .filter_map(|(u, b)| Some((u?, b)))
+        .collect()
 }
 
 /// A quest call on the desk's economy and rest ([`HostQuests`]: the
@@ -558,7 +602,12 @@ where
     D::X: Outbox,
 {
     fn npc<C: NpcCall>(&mut self, game: &mut Game, events: &mut D, call: C) -> Option<C::Out> {
-        Some(self.desk(game, events, |desk, ctl, _| call.call(ctl, desk)))
+        let (out, sent) = self.desk(game, events, |desk, ctl, inv| {
+            let out = call.call(ctl, desk);
+            (out, flush_shown(desk, inv))
+        });
+        self.inv_sent.extend(sent);
+        Some(out)
     }
 
     /// The vendor records are lent out of the interaction state for the

@@ -104,6 +104,14 @@ pub struct InteractionState {
     /// (`hirelings.md` §13 rule 4, `0x005718C0`), in queue order, for the
     /// client pass's flush ([`InteractionState::unit_stat_messages`]).
     pub unit_stats: BTreeMap<UnitId, Vec<(u16, u32)>>,
+    /// The store or gamble items added to an NPC's trade inventory since
+    /// the host last took them (`vendors.md` §4 step 3: the client gets
+    /// one 0x9C action 11 per item), in add order, and the player whose
+    /// trade open added them.
+    pub shown: Vec<UnitId>,
+    pub shown_player: Option<UnitId>,
+    /// The class of the NPC the shown items belong to.
+    pub shown_class: u16,
 }
 
 impl InteractionState {
@@ -122,6 +130,9 @@ impl InteractionState {
             hirelings: HirelingState::default(),
             hireling_tables: None,
             unit_stats: BTreeMap::new(),
+            shown: Vec::new(),
+            shown_player: None,
+            shown_class: 0,
         }
     }
 

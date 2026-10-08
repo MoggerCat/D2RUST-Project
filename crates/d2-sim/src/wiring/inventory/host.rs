@@ -143,6 +143,22 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
         }
     }
 
+    /// Direct S→C 0x9C with `action` for `item`, queued to the owner now
+    /// (`deferred::send_item_world`; the store item's action 11,
+    /// `vendors.md` §4 step 3).
+    pub fn send_item_world(
+        &mut self,
+        owner: UnitId,
+        item: UnitId,
+        action: u8,
+        flags: u32,
+    ) -> Result<(), MoveFatal> {
+        let (Some(o), g) = (self.owner_of(owner), self.guid_of(item)) else {
+            return Ok(());
+        };
+        deferred::send_item_world(self, o, g, action, flags)
+    }
+
     /// Direct S→C 0x9D action 5 (`0x0053D010`, §6.4) for an item of the
     /// owner, queued now through `MovePending::send`: the stored page set
     /// to `shown` first (`0x00628320`), item flags OR-ed with `flags` in
