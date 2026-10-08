@@ -253,6 +253,12 @@ impl Rig {
     /// A new sorceress in the Act I town of the synthetic game, joined,
     /// with the play UI over it.
     fn new() -> Rig {
+        Rig::with_stash(STASH_XY)
+    }
+
+    /// [`Rig::new`] with the stash at `stash` (sub-tiles from the town
+    /// room's origin).
+    fn with_stash(stash: (i32, i32)) -> Rig {
         let data = GameData::Synthetic;
         let ms = Arc::new(AtomicU32::new(1000));
         let character = single_player::new_character("sorceress", "Test").unwrap();
@@ -262,7 +268,7 @@ impl Rig {
             character.clone(),
             StepClock(ms.clone()),
             Vec::new(),
-            Some(STASH_XY),
+            Some(stash),
             town_npcs::ACT1.to_vec(),
         )
         .unwrap();
@@ -1229,4 +1235,145 @@ fn asheara_hires_and_resurrects_a_mercenary_through_her_menu() {
     rig.step(10);
     assert_eq!(rig.monsters_of(ACT3_MERC).len(), 1, "the mercenary is back");
     rig.check("resurrect");
+}
+
+/// The walk to Akara ends on the stash's cell in the client's straight
+/// line prediction (REC-51: no client path, no object footprint); the
+/// server's position then snaps the view three cells and the click aimed
+/// at Kashya before the snap lands on the stash. Settled with the client
+/// path of REC-51.
+// Covers: specs/ui/controls.md §6 r9
+#[test]
+#[ignore = "q-smoke-town break 5: the straight-line walk prediction ends inside the stash (REC-51)"]
+fn a_click_on_an_npc_while_standing_on_the_stash_talks_to_the_npc() {
+    // The stash right below Akara (the walk to her ends on its cell).
+    let mut rig = Rig::with_stash((single_player::AKARA_X, single_player::UNIT_Y + 3));
+    rig.open_menu(class::AKARA);
+    rig.cancel(class::AKARA);
+    let kinds = rig.open_menu(class::KASHYA);
+    assert!(!rig.with_ui(|u| u.is_open(0x19)), "the stash stayed closed");
+    assert!(kinds.contains(&Some(OptionKind::Talk)), "{kinds:?}");
+    rig.cancel(class::KASHYA);
+}
+
+// ---- heal and identify -----------------------------------------------------------------
+
+impl Rig {
+    /// The local player's (life, max life) in the client model (stats 6,
+    /// 7, 8.8 fixed point).
+    fn life(&self) -> (i32, i32) {
+        let w = self.bridge().world();
+        w.local_player
+            .map_or((0, 0), |me| (w.total(me, 6, 0), w.total(me, 7, 0)))
+    }
+
+    /// Server: the local player's life := `n` (8.8).
+    fn stage_life(&mut self, n: i32) {
+        app_support::with(&self.server, move |l| {
+            let (p, _) = single_player::local_player(&l.host().game).unwrap();
+            let g = &mut l.host_mut().game;
+            g.events
+                .action
+                .with(&mut g.game, |_, v| v.set_base(p, 6, n));
+        });
+        for _ in 0..40 {
+            self.step(1);
+            if self.life().0 == n {
+                break;
+            }
+        }
+    }
+
+    /// Opens a trade or gamble window at `class` (the store floor of this
+    /// trade first).
+    fn open_window(&mut self, class: u16, kind: OptionKind) {
+        self.store_floor = d2_client::bridge::items::store_items(self.bridge().world())
+            .iter()
+            .map(|i| i.store_seq)
+            .max()
+            .unwrap_or(0);
+        self.choose(class, kind);
+        self.step(10);
+        assert!(
+            self.with_ui(|u| u.is_open(0x0C)),
+            "{class}: the window is open"
+        );
+    }
+}
+
+// Covers: specs/world/npc.md §5, §6; specs/world/vendors.md §5.3; specs/ui/menus.md §2
+#[test]
+fn kurast_docks_heals_gambles_and_identifies() {
+    let mut rig = Rig::new();
+    rig.go_to_town(d2_client::app::synthetic_chains::KURAST_DOCKS);
+    rig.stage_gold(5_000);
+    rig.check("gold");
+
+    // Ormus heals on the chat's start (`npc.md` §5): a wounded player's
+    // life is full again in the client model.
+    let (_, max) = rig.life();
+    assert!(max > 0, "the player has life");
+    rig.stage_life(max / 3);
+    rig.check("wounded");
+    assert!(rig.life().0 < max, "wounded in the model: {:?}", rig.life());
+    rig.open_menu(class::ORMUS);
+    for _ in 0..40 {
+        if rig.life().0 == max {
+            break;
+        }
+        rig.step(1);
+    }
+    assert_eq!(rig.life(), (max, max), "Ormus healed the player");
+    rig.cancel(class::ORMUS);
+
+    // Alkor's gamble window: the bought item is unidentified (flag 0x10).
+    rig.open_window(class::ALKOR, OptionKind::Gamble);
+    assert!(rig.with_ui(|u| u.shop_state().gamble()), "a gamble window");
+    let list = rig.store_page0();
+    let code = list[0].code.unwrap();
+    let item = rig.buy(&code);
+    rig.close_shop();
+    let flags = |rig: &Rig| {
+        d2_client::bridge::items::local_items(rig.bridge().world())
+            .iter()
+            .find(|i| i.key.guid == item)
+            .map(|i| i.flags)
+    };
+    assert_eq!(flags(&rig).map(|f| f & 0x10), Some(0), "unidentified");
+
+    // Cain: the Identify row costs 100 × 1; the row sends C→S 0x34, the
+    // server identifies the item (S→C 0x2A code 3, the item's update) and
+    // takes the price.
+    let kinds = rig.open_menu(class::CAIN4);
+    let i = kinds
+        .iter()
+        .position(|k| *k == Some(OptionKind::Identify))
+        .unwrap_or_else(|| panic!("Cain offers Identify: {kinds:?}"));
+    let cost = rig.with_ui(|u| u.npc_menu().unwrap().rows[i].cost);
+    assert_eq!(cost, Some(100), "one item to identify");
+    let gold = rig.gold();
+    rig.click(Rig::row_at(i));
+    for _ in 0..40 {
+        rig.step(1);
+        if flags(&rig).is_some_and(|f| f & 0x10 != 0) {
+            break;
+        }
+    }
+    assert!(
+        rig.sent_ids().contains(&0x34),
+        "C→S 0x34: {:02X?}",
+        rig.sent_ids()
+    );
+    assert!(
+        rig.transactions().contains(&(0, 3)),
+        "identified: {:?}",
+        rig.transactions()
+    );
+    assert_eq!(
+        flags(&rig).map(|f| f & 0x10),
+        Some(0x10),
+        "identified in the model"
+    );
+    assert_eq!(rig.gold_after(gold), gold - 100, "Cain took 100");
+    rig.check("identify");
 }
