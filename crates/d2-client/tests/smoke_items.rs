@@ -116,8 +116,8 @@ const CHESTS: [(i32, i32); 3] = [
     (single_player::WAYPOINT_X + 4, single_player::UNIT_Y),
     (single_player::WAYPOINT_X + 5, single_player::UNIT_Y + 1),
 ];
-/// The stash's sub-tile.
-const STASH: (i32, i32) = (single_player::WAYPOINT_X - 6, single_player::UNIT_Y + 3);
+/// The stash's sub-tile: beside the player's start, in reach.
+const STASH: (i32, i32) = (single_player::WAYPOINT_X + 1, single_player::UNIT_Y + 5);
 
 impl Rig {
     fn new() -> Rig {
@@ -288,12 +288,12 @@ impl Rig {
                 let guid = e.guid;
                 let inv = g.world.inventory.as_ref().map(|i| &i.state);
                 let data = inv.and_then(|s| s.items.get(&u)).cloned();
+                // The player's items and the fillers socketed into them.
                 let ours = inv.is_some_and(|s| {
                     s.holds(p, u)
-                        || data
-                            .as_ref()
-                            .and_then(|d| d.inv)
-                            .is_some_and(|owner| s.holds(p, owner))
+                        || s.items_of(p)
+                            .into_iter()
+                            .any(|it| s.fillers(it).contains(&u))
                 });
                 let unit_mode = g
                     .events
@@ -655,4 +655,194 @@ fn open_chests(rig: &mut Rig) {
             "the chest opened"
         );
     }
+}
+
+impl Rig {
+    /// Item flags of `guid` on the server (item store).
+    fn server_flags(&self, guid: u32) -> u32 {
+        app_support::with(&self.server, move |l| {
+            let g = &mut l.host_mut().game;
+            let u = g.game.lists.find_unit(UnitType::Item, guid).unwrap();
+            g.events.action.hooks().items.get(u).map_or(0, |i| i.flags)
+        })
+    }
+
+    /// The client's header flags of `guid` (its last record).
+    fn client_flags(&self, guid: u32) -> u32 {
+        items::items(self.bridge().world())
+            .into_iter()
+            .find(|i| i.key.guid == guid)
+            .map_or(0, |i| i.flags)
+    }
+
+    fn exists(&self, guid: u32) -> bool {
+        self.server_items().contains_key(&guid)
+    }
+}
+
+/// Item flag 0x10 (identified).
+const IDENTIFIED: u32 = 0x10;
+
+// Covers: specs/items/inventory-moves.md §7.11, §7.17, §7.18, §7.19
+#[test]
+fn sockets_charm_identify_potion_and_scrolls() {
+    let mut rig = Rig::new();
+    // The sword drops with its two sockets (`generation.md` §7: the
+    // socket roll is random; the test sets the outcome before the drop
+    // is announced: item flag 0x800, stat 194 = 2).
+    let (px, py) = rig.player_at();
+    let m = rig.place_monster(smoke::MONSTER, (px + 1, py));
+    rig.step(5);
+    rig.kill(m);
+    app_support::with(&rig.server, |l| {
+        let g = &mut l.host_mut().game;
+        let row = d2_client::app::synthetic_items::item_tables()
+            .items
+            .iter()
+            .position(|r| r.code == smoke::SWORD);
+        let sword = g
+            .game
+            .lists
+            .units_of_type(UnitType::Item)
+            .into_iter()
+            .find(|&u| g.events.action.hooks().items.get(u).map(|i| i.record) == row)
+            .expect("the sword dropped");
+        if let Some(i) = g.events.action.hooks().items.get_mut(sword) {
+            i.flags |= 0x800;
+        }
+        g.events
+            .action
+            .with(&mut g.game, |_, v| v.set_base(sword, 194, 2));
+    });
+    rig.step(20);
+    rig.check("monster drop");
+    open_chests(&mut rig);
+    // Socketing: the gem from the cursor into the worn sword.
+    let (sword, gem) = (rig.guid(smoke::SWORD), rig.guid(*b"gsv "));
+    rig.act("pick sword", &items::pick(sword, false));
+    assert_eq!(rig.place_of(sword).0, mode::BODY);
+    rig.act("pick gem", &items::pick(gem, true));
+    let mut m = vec![0x28];
+    m.extend_from_slice(&gem.to_le_bytes());
+    m.extend_from_slice(&sword.to_le_bytes());
+    rig.act_bytes("socket gem", &m);
+    assert_eq!(rig.place_of(gem).0, mode::SOCKETED, "the gem in the sword");
+    // The charm, carried in the inventory (page 0).
+    let charm = rig.guid(smoke::CHARM);
+    rig.act("pick charm", &items::pick(charm, false));
+    assert_eq!(rig.place_of(charm).0, mode::STORED);
+    assert_eq!(rig.server_flags(charm) & IDENTIFIED, 0, "a magic charm");
+    assert_eq!(rig.client_flags(charm) & IDENTIFIED, 0);
+    // Identify with the scroll: use it (0x20), then on the charm (0x27).
+    let isc = rig.guid(smoke::IDENTIFY);
+    rig.act("pick identify scroll", &items::pick(isc, false));
+    let (px, py) = rig.player_at();
+    rig.act(
+        "use identify scroll",
+        &items::use_grid(isc, px as u32, py as u32),
+    );
+    let mut m = vec![0x27];
+    m.extend_from_slice(&charm.to_le_bytes());
+    m.extend_from_slice(&isc.to_le_bytes());
+    rig.act_bytes("identify the charm", &m);
+    assert_ne!(rig.server_flags(charm) & IDENTIFIED, 0, "identified");
+    assert_ne!(rig.client_flags(charm) & IDENTIFIED, 0, "the client knows");
+    assert!(!rig.exists(isc), "the scroll was used up");
+    // The potion: to the belt, drink it at half life.
+    let hp = rig.guid(smoke::POTION);
+    rig.act("pick potion", &items::pick(hp, false));
+    assert_eq!(rig.place_of(hp).0, mode::BELT);
+    rig.set_base(6, 20 << 8);
+    rig.step(10);
+    let life = rig.client_stat(6).1;
+    rig.act("drink potion", &items::use_belt(hp));
+    assert!(!rig.exists(hp), "the potion was drunk");
+    rig.step(60);
+    assert!(rig.client_stat(6).1 > life, "life rose from {life}");
+}
+
+// Covers: specs/items/inventory-moves.md §7.3, §7.4; specs/world/npc.md §6
+#[test]
+fn stash_cube_and_cain_identify() {
+    let mut rig = Rig::new();
+    rig.monster_drop();
+    open_chests(&mut rig);
+    let cap = rig.guid(smoke::CAP);
+    // The stash (page 4, a town level), opened: cursor → stash → cursor.
+    let stash = rig
+        .bridge()
+        .world()
+        .units
+        .iter()
+        .find(|(k, u)| k.unit_type == OBJECT && u.class == single_player::STASH_CLASS)
+        .map(|(k, _)| *k)
+        .expect("the stash in the model");
+    // (A busy player picks nothing up, §8.2: the cap first.)
+    rig.act("pick cap", &items::pick(cap, true));
+    rig.interact(stash);
+    rig.step(20);
+    rig.check("open the stash");
+    rig.act("cap to the stash", &items::insert(cap, 0, 0, 4));
+    assert_eq!(
+        (rig.place_of(cap).0, rig.place_of(cap).2),
+        (mode::STORED, 4)
+    );
+    rig.act("cap out of the stash", &items::remove(cap));
+    assert_eq!(rig.place_of(cap).0, mode::CURSOR);
+    rig.act("cap to the grid", &items::insert(cap, 2, 0, 0));
+    // The interaction ends (C→S 0x4F button 0x12, the stash closed).
+    rig.act_bytes("close the stash", &[0x4F, 0x12, 0, 0, 0, 0, 0]);
+    // The cube page (3) needs no open cube to put in (§7.3 step 3); to
+    // take out, the cube is opened by its use (0x20, `cube.md` §2).
+    let cube = rig.guid(smoke::CUBE);
+    rig.act("pick cube", &items::pick(cube, false));
+    assert_eq!(rig.place_of(cube).0, mode::STORED);
+    rig.act("cap to cursor", &items::remove(cap));
+    rig.act("cap to the cube", &items::insert(cap, 0, 0, 3));
+    assert_eq!(
+        (rig.place_of(cap).0, rig.place_of(cap).2),
+        (mode::STORED, 3)
+    );
+    let (px, py) = rig.player_at();
+    rig.act(
+        "open the cube",
+        &items::use_grid(cube, px as u32, py as u32),
+    );
+    rig.act("cap out of the cube", &items::remove(cap));
+    rig.act_bytes("close the cube", &[0x4F, 0x17, 0, 0, 0, 0, 0]);
+    rig.act("cap to the grid again", &items::insert(cap, 2, 0, 0));
+    assert_eq!(
+        (rig.place_of(cap).0, rig.place_of(cap).2),
+        (mode::STORED, 0)
+    );
+
+    // Cain identifies the unidentified charm for 100 gold (`npc.md` §6).
+    let charm = rig.guid(smoke::CHARM);
+    rig.act("pick charm", &items::pick(charm, false));
+    assert_eq!(rig.server_flags(charm) & IDENTIFIED, 0);
+    rig.set_base(14, 1000);
+    rig.step(10);
+    let (px, py) = rig.player_at();
+    let cain = rig.place_monster(
+        u32::from(d2_sim::world::quests::act4::q3::CAIN4),
+        (px + 2, py),
+    );
+    rig.step(10);
+    let cain_guid = app_support::with(&rig.server, move |l| {
+        l.host().game.game.lists.unit(cain).unwrap().guid
+    });
+    let key = UnitKey {
+        unit_type: d2_client::bridge::world::MONSTER,
+        guid: cain_guid,
+    };
+    rig.interact(key);
+    rig.step(20);
+    rig.check("talk to Cain");
+    let mut m = vec![0x34];
+    m.extend_from_slice(&cain_guid.to_le_bytes());
+    rig.act_bytes("Cain identifies", &m);
+    assert_ne!(rig.server_flags(charm) & IDENTIFIED, 0, "identified");
+    assert_ne!(rig.client_flags(charm) & IDENTIFIED, 0, "the client knows");
+    rig.step(30);
+    assert_eq!(rig.client_stat(14).1, 900, "100 gold for one item");
 }
