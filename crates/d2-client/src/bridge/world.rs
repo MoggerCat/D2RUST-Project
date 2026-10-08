@@ -1231,11 +1231,4 @@ pub struct ModelInputs {
     /// evaluates (`client/msg-skills.md` §2 r4); `None`: a passive skill
     /// is a handler error.
     pub skill_tables: Option<std::sync::Arc<super::passive::Tables>>,
-    /// d2rs-own, unverified (decision D2): the `play` preview's predicted
-    /// cell of the local player. 1.14d's client moves its own player
-    /// along its path each frame; the preview's model keeps the last
-    /// placement and the walk prediction holds the moving position, so
-    /// the position check (§6 rules 3–5, 8) reads this as the local
-    /// player's cell. `None`: the model's.
-    pub local_cell: Option<(u16, u16)>,
 }

@@ -79,14 +79,11 @@ impl PreviewWalk {
 /// Runs [`PreviewWalk::frame`] after the bridge frame and hands the
 /// prediction to the feed and the unit art.
 pub fn preview_walk_frame(
-    mut bridge: ResMut<BridgeResource>,
+    bridge: Res<BridgeResource>,
     mut walk: ResMut<PreviewWalk>,
     mut state: ResMut<WorldViewState>,
 ) {
     walk.frame(bridge.0.world());
-    // The position check reads the predicted cell as the local player's
-    // own (`ModelInputs::local_cell`, decision D2).
-    bridge.0.set_local_cell(walk.predict.cell());
     state.feed.set_local_prediction(walk.local_at());
     if let Some(art) = &walk.art {
         let mut art = art.write().unwrap_or_else(|e| e.into_inner());

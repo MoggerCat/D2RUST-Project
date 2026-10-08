@@ -426,12 +426,6 @@ impl<L: ServerLink> Bridge<L> {
         self.inputs.now = now;
     }
 
-    /// The predicted cell of the local player the position check reads
-    /// ([`ModelInputs::local_cell`]).
-    pub fn set_local_cell(&mut self, cell: Option<(u16, u16)>) {
-        self.inputs.local_cell = cell;
-    }
-
     /// The `objects.txt` rows the client object update reads
     /// (`world/objects-client.md` §28 r1); empty: no object update.
     pub fn set_object_rows(&mut self, rows: Vec<objects::ObjClientRow>) {
