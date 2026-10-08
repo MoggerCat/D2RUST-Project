@@ -739,6 +739,7 @@ impl<R, S> WiredWorld<R, S> {
                 .push("no inventory model (WiredWorld::inventory is None)".into());
             return r;
         };
+        let extra = self.start_extra.clone();
         self.with_economy(game, events, |econ, _| {
             let Some((class, guid)) = econ.units.get(player).map(|u| (u.class, u.guid)) else {
                 r.faults.push(format!("no player unit {player:?}"));
@@ -753,7 +754,14 @@ impl<R, S> WiredWorld<R, S> {
                 // §10.3: no row → nothing.
                 return;
             };
-            let slots = character::start_slots(cs);
+            let mut slots = character::start_slots(cs).to_vec();
+            // d2rs-own, unverified (REC-244): after the charstats slots,
+            // one inventory copy of each extra code (loc 0, count 1).
+            slots.extend(extra.iter().map(|&code| character::StartSlot {
+                code,
+                loc: 0,
+                count: 1,
+            }));
             let skills = econ.hooks.tables.skills.skills.len();
             let start_skill = Some(cs.startskill).filter(|&k| usize::from(k) < skills);
             // d2rs-own, unverified: the play host never adds the player's

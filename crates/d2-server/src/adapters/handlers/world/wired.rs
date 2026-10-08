@@ -121,6 +121,11 @@ pub struct WiredWorld<R, S = NoSkills> {
     /// What the inventory rules queued during vendor calls (receiving
     /// unit, bytes), sent after the rest's messages ([`WorldHost::take_sent`]).
     inv_sent: Vec<(UnitId, Vec<u8>)>,
+    /// d2rs-own, unverified (REC-244): item codes a new character gets
+    /// after its charstats start items, one each, to the inventory (the
+    /// play preview names the Horadric Cube, `box `, which charstats
+    /// does not give). Empty: the original's start items only.
+    pub start_extra: Vec<[u8; 4]>,
     /// The levels the quest events last saw the players in.
     quest_levels: quest_events::QuestLevels,
 }
@@ -187,6 +192,7 @@ impl<R, S> WiredWorld<R, S> {
             interact_classes: Vec::new(),
             now,
             inv_sent: Vec::new(),
+            start_extra: Vec::new(),
             quest_levels: Default::default(),
         }
     }

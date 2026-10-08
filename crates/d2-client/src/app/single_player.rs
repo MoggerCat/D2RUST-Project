@@ -2770,6 +2770,10 @@ pub fn build_with_town(
     world.inventory = parts.inventory.map(preview_inv_parts);
     // The cube (d2rs-own, unverified, REC-119): the user's `cubemain`.
     world.cube = parts.cube.map(preview_cube_parts);
+    // A new character carries the Horadric Cube (d2rs-own, unverified,
+    // REC-244): charstats gives none, and the preview has no Act II quest
+    // reward path yet.
+    world.start_extra = vec![*b"box "];
     let mut s: Sim = SimGame::with_world(game, sim, world);
     s.set_host_sync(sync_seams);
     s.set_world_sync(super::weapons::sync);
