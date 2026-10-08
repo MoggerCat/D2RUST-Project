@@ -46,7 +46,6 @@ pub const TRADE_REFUSED: u8 = 7;
 
 /// Named parts the UI skipped (their input or callee is not specified).
 pub mod skip {
-    pub const SCREEN_MESSAGE: &str = "0x5D: screen message 0x0049E3A0 (msg-ui §1 r2)";
     pub const MONSTER_EFFECT: &str = "0x5D: 0x0046F870(211, 1) (msg-ui open question 1)";
     pub const ACT_END_VIDEO: &str =
         "0x5D: 0x0044EC80, the video-5 flag and the character record word +0x1EF (msg-ui §1 r2)";
@@ -236,6 +235,12 @@ impl OriginalUi {
     ) -> Result<(), OriginalUiError> {
         self.refresh_facts(world);
         self.hire_auto_open(o, world);
+        if matches!(o, Output::ChatLine { .. }) {
+            // `messages.md` §3: the screen message; the overhead record
+            // of type 5 is `chat_line`'s.
+            self.game_message(o, world.frames);
+            return Ok(());
+        }
         if self.apply_more(o)? {
             return Ok(());
         }
@@ -355,7 +360,7 @@ impl OriginalUi {
         world: &ClientWorld,
     ) -> Result<(), OriginalUiError> {
         match quest_row(c, f) {
-            QuestRow::ScreenMessage(_) => self.skip(skip::SCREEN_MESSAGE),
+            QuestRow::ScreenMessage(id) => self.game_message_id(id),
             QuestRow::MonsterEffect211 => self.skip(skip::MONSTER_EFFECT),
             QuestRow::Sounds(ids) => {
                 for &id in ids {
