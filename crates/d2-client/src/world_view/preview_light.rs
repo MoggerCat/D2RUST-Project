@@ -216,7 +216,12 @@ impl PreviewLight {
         // read as 0 (the Den of Evil glow stays off).
         let o = world.overrides.ambient(level, 0);
         if o.r != 0 || o.g != 0 || o.b != 0 {
-            return o;
+            return Ambient {
+                i: o.i,
+                r: o.r,
+                g: o.g,
+                b: o.b,
+            };
         }
         self.sources
             .as_ref()
