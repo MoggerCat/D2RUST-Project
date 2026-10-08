@@ -29,6 +29,7 @@ pub mod modes;
 mod modes_tests;
 pub mod motion;
 pub mod msg;
+pub mod object_hover;
 pub mod objects;
 pub mod output;
 pub mod passive;

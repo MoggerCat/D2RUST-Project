@@ -156,6 +156,11 @@ pub const GAME_TYPE: u8 = 3;
 /// Sub-tile x and y of the waypoint object from the origin of the town's
 /// first room (inside the synthetic 8 × 8-tile room, 40 sub-tiles square).
 pub const WAYPOINT_X: i32 = 20;
+/// The synthetic chest row's class, operate function and init function
+/// (`object-functions.tsv`).
+pub const SYNTHETIC_CHEST_CLASS: u32 = 1;
+const SYNTHETIC_CHEST_OPERATE: u8 = 4;
+const SYNTHETIC_CHEST_INIT: u8 = 3;
 pub const UNIT_Y: i32 = 20;
 /// The player's character class (1, sorceress, as in the server tests).
 pub const PLAYER_CLASS: u32 = 1;
@@ -397,6 +402,10 @@ impl Pending for LocalSeams {
     fn set_player_mode_arrival(&mut self, _: &mut Game, player: UnitId) {
         self.log.push(format!("arrival mode {}", player.0));
     }
+    /// d2rs-own, unverified (stitch-objects): the preview's interact reach.
+    fn object_preview_range(&self) -> Option<i32> {
+        Some(crate::world_view::object_click::INTERACT_RANGE)
+    }
 }
 
 impl WorldPending for LocalSeams {}
@@ -510,9 +519,15 @@ impl WaypointTables {
         o.operatefn = 23;
         o.initfn = 17;
         o.framecnt1 = 15 << 8;
+        // Class 1: a chest (`objects.md` §5.2, §8.1), placed only on
+        // request ([`build_with_chests`]). d2rs-own, unverified.
+        let mut chest: Objects = blank();
+        chest.operatefn = SYNTHETIC_CHEST_OPERATE;
+        chest.initfn = SYNTHETIC_CHEST_INIT;
+        chest.framecnt1 = 15 << 8;
         WaypointTables {
             levels,
-            objects: vec![o],
+            objects: vec![o, chest],
             object_class: 0,
         }
     }
@@ -1232,6 +1247,18 @@ pub fn build_with(
     seed: u32,
     character: Character,
 ) -> Result<LocalGame, BuildError> {
+    build_with_chests(data, seed, character, &[])
+}
+
+/// [`build_with`] plus a synthetic chest (`SYNTHETIC_CHEST_CLASS`) in the
+/// town's first room at each sub-tile offset from the room origin
+/// (synthetic data only; the end-to-end tests of world objects).
+pub fn build_with_chests(
+    data: &GameData,
+    seed: u32,
+    character: Character,
+    chests: &[(i32, i32)],
+) -> Result<LocalGame, BuildError> {
     let wp_tables = data.tables();
     let (mut levels, parts) = match data {
         GameData::Synthetic => (LevelSource::synthetic(), GameParts::synthetic(&wp_tables)?),
@@ -1355,6 +1382,16 @@ pub fn build_with(
             v.allocate(g, &req, ox + WAYPOINT_X, oy + UNIT_Y)
         })
         .ok_or_else(|| BuildError::Setup("allocating the waypoint object failed".into()))?;
+    for &(dx, dy) in chests {
+        let chest = AllocRequest {
+            class: SYNTHETIC_CHEST_CLASS,
+            mode: 0,
+            ..req
+        };
+        sim.action
+            .with(&mut game, |g, v| v.allocate(g, &chest, ox + dx, oy + dy))
+            .ok_or_else(|| BuildError::Setup("allocating a chest failed".into()))?;
+    }
     let waypoint_guid = game
         .lists
         .unit(waypoint)
@@ -1524,6 +1561,16 @@ fn loader(
         let rest = &mut s.world.rest;
         rest.quests.insert(player, quests);
         rest.names.insert(player, name[..n].to_vec());
+        // The point parser reads the staged position (`point_state`); the
+        // tick moves it to the path's ([`WorldHost::unit_positions`]).
+        s.set_unit(
+            player,
+            d2_server::adapters::UnitFacts {
+                act: 0,
+                pos: d2_server::seams::Pos { x: 0, y: 0 },
+                owner: None,
+            },
+        );
         s.set_player(
             player,
             PlayerFields {
@@ -1570,9 +1617,20 @@ pub fn start_with<C: Clock + Send + 'static>(
     character: Character,
     clock: C,
 ) -> Result<(ThreadLink<Link<C>>, Started), BuildError> {
+    start_with_chests(data, seed, character, clock, Vec::new())
+}
+
+/// [`start_with`] with synthetic chests ([`build_with_chests`]).
+pub fn start_with_chests<C: Clock + Send + 'static>(
+    data: GameData,
+    seed: u32,
+    character: Character,
+    clock: C,
+    chests: Vec<(i32, i32)>,
+) -> Result<(ThreadLink<Link<C>>, Started), BuildError> {
     let (tx, rx) = std::sync::mpsc::channel();
     let link = ThreadLink::spawn(move || {
-        let g = build_with(&data, seed, character)?;
+        let g = build_with_chests(&data, seed, character, &chests)?;
         let _ = tx.send(Started {
             waypoint: g.waypoint,
             waypoint_guid: g.waypoint_guid,
