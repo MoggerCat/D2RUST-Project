@@ -111,9 +111,12 @@ mod tests {
     }
 
     #[test]
-    fn distance_is_euclidean_and_unknown_is_far() {
+    fn distance_is_the_unit_distance_and_unknown_is_far() {
         let s = snap();
-        assert_eq!(s.distance(UnitId(1), UnitId(2)), 5);
+        // Both axes under 8: the `dist8_unit` table (`pathing.md` §9.5).
+        assert_eq!(s.distance(UnitId(1), UnitId(2)), 4);
+        // Past 8 on an axis: 2·max + min of Δ minus the sizes.
+        assert_eq!(s.distance(UnitId(1), UnitId(3)), 2 * 49);
         assert_eq!(s.distance(UnitId(1), UnitId(9)), i32::MAX);
     }
 

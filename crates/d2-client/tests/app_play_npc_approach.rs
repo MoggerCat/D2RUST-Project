@@ -383,7 +383,7 @@ fn talks_after_one_click(x: i32) -> (bool, usize) {
     (open, presses_on(&wire, guid))
 }
 
-// Covers: specs/world/npc.md §2 rule 3
+// Covers: specs/world/npc.md §2 r3
 #[test]
 fn a_click_from_far_walks_up_and_talks_without_a_second_click() {
     for x in [24, 28, 30, 32] {
