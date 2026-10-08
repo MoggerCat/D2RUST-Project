@@ -27,22 +27,22 @@
 | Inputs | 63–71 |
 | Outputs / state changes | 72–77 |
 | Rules | 78–79 |
-|   1. Structures (1.14d layout, for recorders and checks) | 80–128 |
-|   2. DRLG room creation and seeds (`0x0066B3E0`) | 129–161 |
-|   3. Rooms-near arrays (`0x0066C370`) | 162–205 |
-|   4. Status and activation | 206–395 |
-|   5. Active room creation (`0x006422A0`, `0x00619890`) | 396–429 |
-|   6. Adjacency array order (owner of `unit-order.md` §9) | 430–445 |
-|   7. Room clients and the inactivity counter | 446–466 |
-|   8. Deactivation (tick step 9) | 467–530 |
-|   9. Room tile grid | 531–1174 |
-|   10. Collision map from tiles | 1175–1253 |
-| Constants & data dependencies | 1254–1268 |
-| Randomness | 1269–1286 |
-| Edge cases & original bugs | 1287–1304 |
-| Test vectors | 1305–1355 |
-| Provenance | 1356–1399 |
-| Open questions | 1400–1507 |
+|   1. Structures (1.14d layout, for recorders and checks) | 80–129 |
+|   2. DRLG room creation and seeds (`0x0066B3E0`) | 130–162 |
+|   3. Rooms-near arrays (`0x0066C370`) | 163–206 |
+|   4. Status and activation | 207–396 |
+|   5. Active room creation (`0x006422A0`, `0x00619890`) | 397–430 |
+|   6. Adjacency array order (owner of `unit-order.md` §9) | 431–446 |
+|   7. Room clients and the inactivity counter | 447–467 |
+|   8. Deactivation (tick step 9) | 468–585 |
+|   9. Room tile grid | 586–1229 |
+|   10. Collision map from tiles | 1230–1308 |
+| Constants & data dependencies | 1309–1323 |
+| Randomness | 1324–1341 |
+| Edge cases & original bugs | 1342–1359 |
+| Test vectors | 1360–1410 |
+| Provenance | 1411–1462 |
+| Open questions | 1463–1585 |
 <!-- /index -->
 
 ## Summary
@@ -117,7 +117,8 @@ Room flags (+0x28; D2MOO names): 0x10 << i warp toward vis slot i (i =
 waypoint; 0x40000 automap reveal (client copy); 0x80000 no LOS draw;
 0x100000 has tiles/active room built (`HAS_ROOM`); 0x400000 portal
 (blocks removal); 0x800000 no population (next to a town); 0x1000000 tile
-library loaded; 0x2000000 preset units added.
+library loaded; 0x2000000 preset units added; 0x4000000 preset list
+already handed to population (server, never cleared; §8 rule 6).
 
 Active room (0x80 bytes): +0x00 adjacency array, +0x24 its count; +0x04
 client array capacity, +0x48 client array, +0x78 client count; +0x08 tile
@@ -522,11 +523,65 @@ A populated room that is removed and built again starts with flag bit 0:
    | 1 monster | `0x005431F0`: saved and leaves the room (kept), or saved and freed |
    | 2 object | class 59 or 60: as the kept player exit; else compressed, saved when the keep flag holds, freed |
    | 3 missile | freed |
-   | 4 item | saved (`0x00542E10`) only: neither freed nor removed from the room |
+   | 4 item | saved (`0x00542E10` → `0x00542E30` → `0x00541B10`); `0x005433F0` itself skips the free, but the item store frees the socketed items and the item (`0x00555600` at `0x00541BF6`, `0x00541C09`, unconditional), which unlinks it from the room |
    | 5 tile | saved, freed |
 
-   So on the server rule 4 runs for the room's items (and nothing
-   else): each gets 0x800000 and flags-2 0x20 and leaves the room.
+   So on the server every unit has left the room's list before rule 4:
+   kept units are detached, all others freed (items by their store).
+   Rule 4 finds an empty list on the server; it acts on client rooms
+   only. (Earlier text said items stay; corrected 2026-10-08 from
+   `0x00541B10`, consistent with `sim/units.md` §3.4 rule 2.)
+6. **Warp tile units across deactivation** (owner; REC-230 follow-up,
+   static). Warp tiles (type 5) come from the DRLG room's preset list
+   (`sim/path-placement.md` §12.1) and are spawned once:
+   - **Preset list is handed out once.** The population preset pass
+     `0x005559A0` (`monsters/population.md` §11.1) gets the list through
+     `0x00619FD0` (active room +0x10) → `0x0066BFA0(DRLG room)`: if room
+     flag 0x40000 (client copy) is set, return +0x5C; else if flag
+     0x4000000 is set, return null; else set 0x4000000 and return +0x5C
+     (`0x0066BFAA`–`0x0066BFB9`). No code clears 0x4000000: the
+     room is zeroed at allocation (`0x0066B3E0`), the other writes of
+     DRLG room +0x28 in `all.asm` are `or`s of other bits, the 0x400000
+     `and` of `0x0061BAC0` (§8 rule 1) and the tile free `0x0066F1A0`,
+     which clears only 0x100000 (`0x0066F1E3`); the remaining
+     `mov [reg + 0x28]` sites in `0x00663000`–`0x00680000` write tile
+     records, grids and coordinate lists, not rooms. So on the server a DRLG room's preset units (warp
+     tiles included) are spawned at its first population only; every
+     later activation's preset pass sees an empty list.
+   - **First spawn** (`0x005559A0`, settles REC-99's "where"): the
+     first of its two list walks takes every preset whose type (+0x14)
+     ≠ 1 and whose done bit (+0x1C bit 0) is clear, in list order (head
+     first; §12.1 prepends, so the last-added warp first), and calls
+     `0x00555910`: `0x005557D0(type, class +0x04, x +0x08 + room
+     sub-tile x, y +0x18 + room sub-tile y, mode +0x00, flags 0)`; for
+     type 5 that is `0x00555230` (new unit, flags |= 0x3000000). Level
+     specials in that walk touch only type-2 presets (level 0x85 / 0x87
+     class 0x18D, 0x86 class 0x192 and its counter, 0x88 classes 0x10C,
+     0x1A, 0x10D), so warp tiles are never skipped. The monster walk
+     (type 1) comes second (`monsters/population.md` §11.1). So the
+     warp tiles exist before any preset monster of the room.
+   - **Deactivation:** each type-5 unit of the room is stored (other
+     record, `0x00542E30`: x, y = static path +0x0C, +0x10, type 5,
+     class, mode, game frame, unit flags +0xC4, flag-ex +0xC8) and freed
+     (`0x005433F0`: jump table `0x00543504` sends types 4 and 5 to the store call at `0x005434AF`; type
+     5 then reaches the free at `0x005434BE`, type 4 skips it). The store is unconditional (no `SaveMonsters`
+     test).
+   - **Reactivation:** the restore `0x00542B40` (first population of the
+     new active room, after the empty preset pass) re-creates each tile
+     from its record as a **new unit, new GUID**:
+     `0x005557D0(type 5, class, x, y, mode, stored flags)` →
+     `0x00555230`, then unit flags |= 0x3000000. Order: after the
+     restored monsters and items, within the "other" records from the
+     list head (reverse of store order, i.e. reverse of the room unit
+     list order at deactivation), interleaved with stored objects.
+   - So a reactivated room has exactly the warp tiles it had (same type,
+     class, position, mode), with new GUIDs; the restore is the only
+     source. A tile freed by other code before deactivation is not
+     re-created (its record never exists).
+   Test vector (static): Blood Moor room with the Den of Evil entrance
+   tile (class = lvlwarp `Id` of the vis slot), deactivate and
+   reactivate → one type-5 unit of that class at the same sub-tile, GUID
+   ≠ the old one, created in the restore step (not the preset step).
 
 ### 9. Room tile grid
 
@@ -1391,6 +1446,14 @@ counter (+0x0C), and per level all DRLG rooms in list order; then §3 and
   `0x005433F0` disassembly with its table `0x00543504` read from the file
   image.
 - **Flag 0x400000 setter (§8 rule 1)**: asm of `0x0061AED0` (null test, active room +0x10, `ret 8`) and `0x0061BAC0` (`edx` = clear; `and 0xFFBFFFFF` / `or 0x400000` on +0x28); `disasm.py xref`: `0x0061BAC0` has the single caller `0x0061AEE0`, `0x0061AED0` has 31 call sites. Requested by PC 2 (`world/quests-act1-rest.md` §9 item 12 links here).
+- **Warp tiles across deactivation (§8 rule 6), item store (§8 rule
+  5)** (2026-10-08): asm of `0x0066BFA0` (callers `0x00619FD0`,
+  `0x0066B030` only), `0x00619FD0`, `0x005559A0` (both walks, tests at
+  `0x005559E3`, `0x005559EC`, `0x00555AB0`, `0x00555AB6`), `0x00555910`,
+  `0x005557D0`, `0x005433F0` (store `0x005434AF`, free `0x005434BE`),
+  `0x00542E10`/`0x00542E30` (record layout), `0x00541B10` (frees at
+  `0x00541BF6`, `0x00541C09`), `0x00542B40` (other-record restore);
+  `all.asm` scan of writes to +0x28 for the 0x4000000 clear.
 - **Room free, units left (§8.2 rule 4)**: asm of `0x0061A840`
   (`0x0061A851`–`0x0061A87F` loop), `0x0064C450` (unit leaves room),
   `0x0064FC20` (dynamic path reset), `0x0064C370` (room-list remove);
@@ -1454,6 +1517,12 @@ counter (+0x0C), and per level all DRLG rooms in list order; then §3 and
     leaves in the room). Open inside it: whether `0x005421A0` (the item
     save) unlinks the item some other way; a server memory read of a
     freed room's +0x74 after an item was dropped there settles it.
+    *Answered (2026-10-08, static)*: `0x005421A0` is the monster save;
+    items go `0x00542E10` → `0x00542E30` (type 4) → `0x00541B10`,
+    which frees the item unconditionally (`0x00541C09`, after its
+    socketed children at `0x00541BF6`). So no item stays in the room:
+    §8 rule 5 corrected (rule 4 runs on no server unit). No memory
+    read needed.
 13. Merge corner case (§9.6 step 3): can R be a type-3 record with no
     successor in its chain (R +0x20 null) when the merged type is not 3?
     1.14d then writes through a null pointer. A dump of every link chain
@@ -1462,6 +1531,15 @@ counter (+0x0C), and per level all DRLG rooms in list order; then §3 and
     (floor layer 1). Does any 1.14d DS1 with lvlprest `Animate` have a
     shadow cell whose tile has material 0x100? Scan the Animate rows'
     DS1 files with their DT1s.
+    *Answered (2026-10-08, measured)*: no, and it cannot happen. Over
+    all 238 DT1 files named by patch_d2 `lvltypes.txt` (read with
+    `Patch_D2.mpq` > `d2exp.mpq` > `d2data.mpq` priority) the only tiles
+    with material bit 0x100 are the 80 floor tiles (type 0, main 20,
+    sub 0–7, 10 frames each) of `Act4/Lava/Floor.dt1`; none of the 806
+    type-13 (shadow) tiles has it. The 33 Animate rows' DS1s (Act IV
+    lava and Diablo areas, Act V `Act4/Expansion` lava) also have empty
+    shadow layers. So the shadow branch of §9.7 never runs in 1.14d and
+    its read of the slot before the shadow grid is unreachable.
 15. *Answered:* the client build timer (`impl-client-drlg` §3 Q2):
     §4.6 rules 1–8. Open inside it: a client recording that logs B, T,
     C and each timed build per client update (memory read of the client

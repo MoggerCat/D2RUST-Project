@@ -24,24 +24,24 @@
 | Inputs | 63–72 |
 | Outputs / state changes | 73–78 |
 | Rules | 79–80 |
-|   1. Structures (1.14d layout, for recorders and checks) | 81–106 |
-|   2. Act creation (server) | 107–123 |
-|   3. DRLG creation (`0x00642DA0`) | 124–158 |
-|   4. Level list, get-or-allocate | 159–176 |
-|   5. Level generation (`0x006424A0`, D2MOO `DRLG_InitLevel`) | 177–208 |
-|   6. Level position, size, act number | 209–225 |
-|   7. Vis and warp records | 226–249 |
-|   8. Coordinates to rooms | 250–263 |
-|   9. Level lifecycle: activity and freeing | 264–312 |
-|   10. Spawn room in a level (`0x0066B2B0`) | 313–375 |
-|   11. Logical rooms (coordinate lists) and population queries | 376–655 |
-|   12. Level connections: Act I fields, Act III, Act V | 656–850 |
-| Constants & data dependencies | 851–871 |
-| Randomness | 872–890 |
-| Edge cases & original bugs | 891–915 |
-| Test vectors | 916–976 |
-| Provenance | 977–1024 |
-| Open questions | 1025–1104 |
+|   1. Structures (1.14d layout, for recorders and checks) | 81–107 |
+|   2. Act creation (server) | 108–124 |
+|   3. DRLG creation (`0x00642DA0`) | 125–159 |
+|   4. Level list, get-or-allocate | 160–177 |
+|   5. Level generation (`0x006424A0`, D2MOO `DRLG_InitLevel`) | 178–209 |
+|   6. Level position, size, act number | 210–226 |
+|   7. Vis and warp records | 227–250 |
+|   8. Coordinates to rooms | 251–264 |
+|   9. Level lifecycle: activity and freeing | 265–313 |
+|   10. Spawn room in a level (`0x0066B2B0`) | 314–376 |
+|   11. Logical rooms (coordinate lists) and population queries | 377–656 |
+|   12. Level connections: Act I fields, Act III, Act V | 657–851 |
+| Constants & data dependencies | 852–872 |
+| Randomness | 873–891 |
+| Edge cases & original bugs | 892–916 |
+| Test vectors | 917–977 |
+| Provenance | 978–1025 |
+| Open questions | 1026–1105 |
 <!-- /index -->
 
 ## Summary
@@ -95,6 +95,7 @@ data; the drlg seed and level seeds advance as listed under Randomness.
 | level | 0x230 | DRLG type (1 maze, 2 preset, 3 outdoor); flags (0x10 = automap reveal) | +0x00; +0x04 |
 | level | | room count (+1 per room linked at the list head, `0x0066B970`; −1 per room freed, `0x0066C100`; 0 when the rooms are freed, `0x00642010`, which also sizes +0x22C by it); first room; activity count; inactive frames | +0x08; +0x10; +0x0C; +0x1D4 |
 | level | | position x, y; width, height (tiles) | +0x1C, +0x20; +0x24, +0x28 |
+| level | | type info (DrlgType 2: preset info, whose +0x04 is the preset direction, u32, written by the act link driver at `0x00677490` for levels 1 and 40 and `0x006774F9` for 27, `drlg/outdoor.md` §2.3 step 4) | +0x14 |
 | level | | spawn-tile records (x, y, tile index; stride 12); count | +0x2C; +0x1D8 |
 | level | | next level; drlg; level type; level seed (lo, hi); level id | +0x1AC; +0x1B4; +0x1C0; +0x1C4, +0x1C8; +0x1D0 |
 | level | | warp-room centres x[9], y[9]; count; populated-room memory | +0x1E0, +0x204; +0x228; +0x22C |
