@@ -940,6 +940,22 @@ impl Pending for LocalSeams {
             .is_some_and(|s| s.0 == UnitType::Monster);
         self.monsters.used_skill(unit, monster)
     }
+    // d2rs-own, unverified (preview, q-a2-charge-jab; REC-274): a monster
+    // has no skill list, so its used entry's flags and params (Charge's
+    // moving flag, target and hit mode, `skills/bodies-2.md` §5.3) are
+    // kept per unit in the skill store.
+    fn entry_param(&self, unit: UnitId, _: &d2_sim::skills::SkillEntry, i: u8) -> i32 {
+        self.unit_entry_param(unit, i)
+    }
+    fn set_entry_param_of(&mut self, unit: UnitId, _: &d2_sim::skills::SkillEntry, i: u8, v: i32) {
+        self.set_unit_entry_param(unit, i, v);
+    }
+    fn entry_flags(&self, unit: UnitId, _: &d2_sim::skills::SkillEntry) -> u32 {
+        d2_sim::wiring::interaction::UseRest::used_skill_flags(self, unit)
+    }
+    fn set_entry_flags(&mut self, unit: UnitId, _: &d2_sim::skills::SkillEntry, f: u32) {
+        d2_sim::wiring::interaction::UseRest::set_used_skill_flags(self, unit, f);
+    }
     /// d2rs-own, unverified (preview, D1; `0x00622870`).
     fn melee_range(&self, _: UnitId) -> i32 {
         PREVIEW_MELEE_RANGE
