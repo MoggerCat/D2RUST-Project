@@ -363,6 +363,16 @@ fn client_record(app: &App) -> [u8; 96] {
 /// Talks to Akara: click, walk, C→S 0x13, then the server's reply and the
 /// client's 0x2F / 0x31.
 fn talk_to_akara(app: &mut App, ms: &AtomicU32, wire: &Arc<Mutex<Wire>>) -> u32 {
+    let guid = open_akara_menu(app, ms, wire);
+    // Cancel (the last row of the NPC menu box, R800: box x 300, y 150,
+    // rows from y 170, 20 high) ends the chat: C→S 0x30.
+    click(app, ms, Point::new(400, 170 + 20 * 2 + 5));
+    step(app, ms, 3);
+    guid
+}
+
+/// Clicks Akara and waits for her menu (S→C 0x28).
+fn open_akara_menu(app: &mut App, ms: &AtomicU32, wire: &Arc<Mutex<Wire>>) -> u32 {
     let (guid, at) = akara_on_screen(app);
     assert!(
         (0..800).contains(&at.x) && (0..560).contains(&at.y),
@@ -483,4 +493,62 @@ fn the_quest_log_shows_the_started_den_of_evil() {
     let den = rows.iter().find(|r| r.0 == 1).expect("the Den of Evil row");
     assert_eq!(den.2, 1, "status 1 (started): {rows:?}");
     assert_eq!(den.1, IconState::InProgress);
+}
+
+// Covers: specs/ui/menus.md §2; specs/world/npc.md §3
+#[test]
+fn akaras_menu_offers_talk_trade_and_cancel() {
+    let ms = Arc::new(AtomicU32::new(1000));
+    let wire = Arc::new(Mutex::new(Wire::default()));
+    let mut app = play_app(&ms, &wire);
+    let guid = open_akara_menu(&mut app, &ms, &wire);
+    let menu = {
+        let ui = app.world().non_send::<WorldViewUi>();
+        ui.original.as_ref().unwrap().npc_menu()
+    };
+    let menu = menu.expect("the NPC menu is open after the 0x28");
+    assert_eq!(menu.guid, guid);
+    let kinds: Vec<_> = menu.rows.iter().map(|r| r.kind).collect();
+    use d2_client::ui::layout::OptionKind::{Talk, Trade};
+    assert_eq!(kinds, [Some(Talk), Some(Trade), None]);
+    // The automatic chat close is gone: the chat stays open.
+    assert!(
+        !ids(&wire).contains(&0x30),
+        "no C→S 0x30 yet: {:?}",
+        ids(&wire)
+    );
+    // Talk shows the speech.
+    click(&mut app, &ms, Point::new(400, 170 + 5));
+    step(&mut app, &ms, 2);
+    let ui = app.world().non_send::<WorldViewUi>();
+    assert!(ui.original.as_ref().unwrap().npc_menu().unwrap().talking);
+    // Trade: C→S 0x38 action 1 [GUID] and the menu closes.
+    click(&mut app, &ms, Point::new(400, 170 + 20 + 5));
+    step(&mut app, &ms, 3);
+    let mut want = vec![0x38, 1, 0, 0, 0];
+    want.extend_from_slice(&guid.to_le_bytes());
+    want.extend_from_slice(&0u32.to_le_bytes());
+    assert!(
+        wire.lock().unwrap().sent.contains(&want),
+        "C→S 0x38 trade: {:?}",
+        ids(&wire)
+    );
+    let ui = app.world().non_send::<WorldViewUi>();
+    assert!(ui.original.as_ref().unwrap().npc_menu().is_none());
+}
+
+// Covers: specs/world/npc.md §3
+#[test]
+fn leaving_the_menu_sends_the_chat_end() {
+    let ms = Arc::new(AtomicU32::new(1000));
+    let wire = Arc::new(Mutex::new(Wire::default()));
+    let mut app = play_app(&ms, &wire);
+    let guid = talk_to_akara(&mut app, &ms, &wire);
+    let mut want = vec![0x30, 1, 0, 0, 0];
+    want.extend_from_slice(&guid.to_le_bytes());
+    assert!(
+        wire.lock().unwrap().sent.contains(&want),
+        "C→S 0x30: {:?}",
+        ids(&wire)
+    );
 }
