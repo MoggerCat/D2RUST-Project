@@ -649,7 +649,8 @@ fn a_dropped_item_blocks_the_next_drop() {
 }
 
 /// The provider on without the walk-back field: the drop keeps the
-/// [`FreeSpot`] seam (here: the start as is), at the path position.
+/// [`FreeSpot`] seam (here: the start as is), and the item is put there
+/// (`treasure.md` §7 step 4: its static path at the spot).
 #[test]
 fn without_the_field_the_drop_keeps_the_free_spot_seam() {
     let mut fx = Fx::new();
@@ -660,14 +661,7 @@ fn without_the_field_the_drop_keeps_the_free_spot_seam() {
     let spot = spot_of(&mut fx, &mut d, mon, p);
     assert_eq!((spot.x, spot.y), (15, 13));
     let item = d.placed[0].0;
-    assert!(fx
-        .sim
-        .hooks()
-        .paths
-        .as_ref()
-        .unwrap()
-        .record(item)
-        .is_none());
+    assert_eq!(fx.sim.hooks().path_position(item), (15, 13));
     fx.assert_clean();
 }
 

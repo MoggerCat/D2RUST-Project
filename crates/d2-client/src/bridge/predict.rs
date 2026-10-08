@@ -10,6 +10,16 @@
 //!
 //! - every walk / run C→S message the client sends (0x01–0x04, `ui/controls.md`
 //!   §6 r7) sets the target ([`walk_of`], recorded by [`PredictLink`]);
+//! - so does the server's walk request for the local player: an S→C
+//!   0x0D with code 1 (`client/msg-units.md` §4 r1) is the player mode
+//!   request code 0x01, "walk to (r0, r1)" (`client/model.md` §8 r4).
+//!   The server sends it for the arrival walk-outs of a warp
+//!   (`sim/path-placement.md` §12.2 r5–6), a portal (`world/objects.md`
+//!   §12 r11) and a waypoint (`world/waypoints.md` §7 r7), each right
+//!   before the 0x15 that places the player at the arrival point; the
+//!   walk is held until the player's client room holds its target (so it
+//!   starts from the arrival point, after the level change) and a walk
+//!   the player sends replaces it ([`Predict::server_walk`]);
 //! - each server tick the predicted position steps toward the target in a
 //!   straight line at the charstats walk / run speed ([`Speeds`]);
 //! - every change of the model's local position or server point (0x15
@@ -27,8 +37,12 @@
 //! d2rs-own, unverified. PROVISIONAL (client/model.md OQ2; REC-51): the
 //! straight line (the server walks the path of `sim/pathing.md` §4), the
 //! snap rule, the tick step and the facing (the client turns, §8.5) are
-//! not 1.14d facts. Used only by the
-//! `play` preview; the strict path never builds one.
+//! not 1.14d facts. PROVISIONAL (REC-288): that the 0x0D walk outlives
+//! the 0x15 placement after it (the placement's teleport sets the path's
+//! point count to 0, `sim/path-placement.md` §6 r4; whether the client
+//! then walks on to the request's target is OQ2), and the hold until the
+//! target is in the player's room. Used only by the `play` preview; the
+//! strict path never builds one.
 
 use std::sync::OnceLock;
 
@@ -49,8 +63,30 @@ pub fn facing(from: (u32, u32), to: (u32, u32)) -> Option<u8> {
         return None;
     }
     let tables = TABLES.get_or_init(|| PathTables::spec().ok()).as_ref()?;
-    Some(direction_vector(tables, from, to).1)
+    // d2rs-own, unverified: `0x0064FC60` takes the 32-bit `127 × l`, which
+    // wraps past about 258 sub-tiles and then indexes the `tan` table out
+    // of range; the original only aims at near path points, but the model
+    // can hold a position from before a level change. Far points are
+    // brought near by halving both deltas (the direction keeps its ratio).
+    let mut d = (
+        i64::from(to.0) - i64::from(from.0),
+        i64::from(to.1) - i64::from(from.1),
+    );
+    while d.0.abs().max(d.1.abs()) >= FACING_REACH {
+        d = (d.0 / 2, d.1 / 2);
+    }
+    let near = (
+        (i64::from(from.0) + d.0) as u32,
+        (i64::from(from.1) + d.1) as u32,
+    );
+    if near == from {
+        return None;
+    }
+    Some(direction_vector(tables, from, near).1)
 }
+
+/// The precise distance (16.16) below which `127 × l` stays in `i32`.
+const FACING_REACH: i64 = 1 << 23;
 
 /// The precise (16.16) centre of a sub-tile, as `u32`.
 pub fn cell_centre((x, y): (u16, u16)) -> (u32, u32) {
@@ -159,7 +195,21 @@ pub struct Predict {
     /// instead of running (`pathing.md` §9.9, `units.md` §4.5), so the
     /// prediction does too. d2rs-own, unverified (client prediction).
     exhausted: bool,
+    /// The local player's level at the last observation.
+    level: Option<u16>,
+    /// The client's act at the last level change.
+    act: Option<u8>,
+    /// The local player's mode request count (`ClientUnit::mode_requests`)
+    /// at the last look.
+    requests: u32,
+    /// A server walk (S→C 0x0D code 1) whose target is not yet in the
+    /// player's client room ([`Self::server_walk`]).
+    held: Option<(u16, u16)>,
 }
+
+/// The player mode request code "walk to (r0, r1)" (`client/model.md`
+/// §8 r4, code 0x01).
+const CODE_WALK_TO_POINT: u8 = 0x01;
 
 impl Predict {
     pub fn new() -> Self {
@@ -170,8 +220,13 @@ impl Predict {
     /// position; a change of the model's position (0x15, a check
     /// correction) or server point (0x0F and the other checked unit
     /// messages, `client/model.md` §6 r3) moves the prediction to it,
-    /// server point first. The walk target is kept. No local player, or
-    /// one with no position: no prediction.
+    /// server point first. The walk target is kept, unless the player's
+    /// level changed (a warp, portal or act change: the target is a point
+    /// of the old level). A level change the prediction did not walk into
+    /// is a placement (0x15 / 0x59): the prediction moves to the model's
+    /// position even when that is the cell the model held before (an act
+    /// change that lands on the old act's arrival cell). No local player,
+    /// or one with no position: no prediction.
     pub fn observe(&mut self, world: &ClientWorld) {
         let Some(p) = world.local().filter(|p| p.key.unit_type == PLAYER) else {
             *self = Self::default();
@@ -182,6 +237,27 @@ impl Predict {
             return;
         };
         let now = (pos, p.server_point);
+        let level = world.player_level();
+        let act = world.act.as_ref().map(|a| a.act);
+        if level != self.level {
+            // The prediction's own walk across a level border (the room
+            // recache of `world_view::walk_room`) is no placement: same
+            // act, the predicted cell in the player's room.
+            let walked_in = act == self.act
+                && self.cell().is_some_and(|(x, y)| {
+                    world
+                        .local_room()
+                        .is_some_and(|r| r.contains(i32::from(x), i32::from(y)))
+                });
+            self.level = level;
+            self.act = act;
+            self.walk = None;
+            if self.player == Some(p.key) && !walked_in {
+                self.at = Some(centre(pos));
+                self.seen = Some(now);
+                return;
+            }
+        }
         if self.player != Some(p.key) {
             *self = Self {
                 player: Some(p.key),
@@ -190,6 +266,10 @@ impl Predict {
                 walk: None,
                 dir: None,
                 exhausted: false,
+                level: world.player_level(),
+                act: world.act.as_ref().map(|a| a.act),
+                requests: p.mode_requests,
+                held: None,
             };
             return;
         }
@@ -206,8 +286,49 @@ impl Predict {
         self.seen = Some(now);
     }
 
-    /// A walk intent the client sent: the new target.
+    /// The server's walk request for the local player (module doc): a
+    /// new mode request with code 0x01 (S→C 0x0D code 1) is held; any
+    /// other new request drops a held one. A held walk starts once the
+    /// player's client room holds its target: after the 0x15 of an
+    /// arrival, from the arrival point (a target in another level is
+    /// never stepped toward from the old position).
+    pub fn server_walk(&mut self, world: &ClientWorld) {
+        let Some(p) = world.local().filter(|p| Some(p.key) == self.player) else {
+            return;
+        };
+        if p.mode_requests != self.requests {
+            self.requests = p.mode_requests;
+            self.held = p
+                .last_mode_request
+                .filter(|r| r.code == CODE_WALK_TO_POINT)
+                .and_then(|r| {
+                    Some((
+                        u16::try_from(r.record[0]).ok()?,
+                        u16::try_from(r.record[1]).ok()?,
+                    ))
+                });
+        }
+        let Some((x, y)) = self.held else {
+            return;
+        };
+        if self.at.is_none()
+            || !world
+                .local_room()
+                .is_some_and(|room| room.contains(i32::from(x), i32::from(y)))
+        {
+            return;
+        }
+        self.held = None;
+        self.walk = Some(Walk {
+            to: WalkTo::Point(x, y),
+            run: false,
+        });
+    }
+
+    /// A walk intent the client sent: the new target (a held server walk
+    /// is dropped).
     pub fn walk(&mut self, walk: Walk) {
+        self.held = None;
         self.exhausted = false;
         if self.at.is_some() {
             self.walk = Some(walk);
@@ -269,9 +390,9 @@ impl Predict {
         }
     }
 
-    /// One bridge frame: [`Self::observe`], the walks sent since the last
-    /// frame (last one wins), the facing toward the target, then
-    /// [`Self::tick`] if the server ticked.
+    /// One bridge frame: [`Self::observe`], [`Self::server_walk`], the
+    /// walks sent since the last frame (last one wins), the facing toward
+    /// the target, then [`Self::tick`] if the server ticked.
     pub fn frame(
         &mut self,
         world: &ClientWorld,
@@ -280,6 +401,7 @@ impl Predict {
         speeds: Speeds,
     ) {
         self.observe(world);
+        self.server_walk(world);
         for w in walks {
             self.walk(w);
         }
@@ -528,6 +650,184 @@ mod tests {
         assert_ne!(p.position(), Some((0x32_8000, 0x3C_8000)));
     }
 
+    /// A walk under way when the player changes level (a warp or portal
+    /// placement) ends: its target is a point of the old level, which may
+    /// lie hundreds of sub-tiles away in the new level's coordinates.
+    #[test]
+    fn a_level_change_ends_the_walk() {
+        use super::super::world::ActiveRoom;
+        use crate::bridge::drlg::DrlgRoomId;
+        let (mut w, key) = world_at(20, 20);
+        let room = |level: u16, id: u32, x0: i32| ActiveRoom {
+            x0,
+            y0: 0,
+            w: 40,
+            h: 40,
+            level,
+            room: DrlgRoomId(id),
+        };
+        w.active_rooms = Some(vec![room(3, 1, 0), room(1, 2, 1000)]);
+        w.room_units.place(key, Some(DrlgRoomId(1)));
+        let mut p = Predict::new();
+        p.frame(&w, [walk_point(30, 20, false)], true, SPEEDS);
+        assert!(p.walking().is_some());
+        // The placement in level 1, far east.
+        w.units.get_mut(&key).unwrap().position = Some((1010, 20));
+        w.room_units.place(key, Some(DrlgRoomId(2)));
+        p.frame(&w, [], true, SPEEDS);
+        assert!(p.walking().is_none());
+        assert_eq!(p.cell(), Some((1010, 20)));
+    }
+
+    /// Two 40 × 40 rooms: level 3 at x 0, level 1 at x 1000; the player
+    /// in the first.
+    fn two_levels(x: u16, y: u16) -> (ClientWorld, UnitKey) {
+        use super::super::world::ActiveRoom;
+        use crate::bridge::drlg::DrlgRoomId;
+        let (mut w, key) = world_at(x, y);
+        let room = |level: u16, id: u32, x0: i32| ActiveRoom {
+            x0,
+            y0: 0,
+            w: 40,
+            h: 40,
+            level,
+            room: DrlgRoomId(id),
+        };
+        w.active_rooms = Some(vec![room(3, 1, 0), room(1, 2, 1000)]);
+        w.room_units.place(key, Some(DrlgRoomId(1)));
+        (w, key)
+    }
+
+    /// The player's mode request `(code, x, y)` as the bridge stores it.
+    fn request(w: &mut ClientWorld, key: UnitKey, code: u8, x: i32, y: i32) {
+        let u = w.units.get_mut(&key).unwrap();
+        u.last_mode_request = Some(super::super::world::ModeRequest {
+            code,
+            record: [x, y, 0, 0, 0, 0, 0],
+        });
+        u.mode_requests += 1;
+    }
+
+    // Covers: specs/client/model.md §8 r4; specs/sim/path-placement.md §12.2 r5; specs/world/objects.md §12 r11
+    #[test]
+    fn an_arrival_walk_out_starts_at_the_arrival_point() {
+        use crate::bridge::drlg::DrlgRoomId;
+        let (mut w, key) = two_levels(20, 20);
+        let mut p = Predict::new();
+        p.frame(&w, [], true, SPEEDS);
+        // One receive: the warp's 0x0D code 1 to (1013, 23), then the 0x15
+        // at the arrival point (1010, 20) in level 1.
+        request(&mut w, key, 1, 1013, 23);
+        w.units.get_mut(&key).unwrap().position = Some((1010, 20));
+        w.room_units.place(key, Some(DrlgRoomId(2)));
+        p.frame(&w, [], false, SPEEDS);
+        assert_eq!(p.walking().map(|w| w.to), Some(WalkTo::Point(1013, 23)));
+        assert_eq!(p.cell(), Some((1010, 20)));
+        for _ in 0..40 {
+            p.frame(&w, [], true, SPEEDS);
+        }
+        assert_eq!(p.cell(), Some((1013, 23)));
+        assert!(p.walking().is_none());
+    }
+
+    // Covers: specs/client/model.md §3 r3; specs/client/model.md §11 r3
+    #[test]
+    fn a_level_change_to_the_same_cell_moves_the_prediction() {
+        use crate::bridge::drlg::DrlgRoomId;
+        let (mut w, key) = two_levels(20, 20);
+        let mut p = Predict::new();
+        p.frame(&w, [walk_point(30, 20, false)], true, SPEEDS);
+        for _ in 0..40 {
+            p.frame(&w, [], true, SPEEDS);
+        }
+        assert_eq!(p.cell(), Some((30, 20)));
+        // An act change places the player at (20, 20) again, now in the
+        // other act's room at the same coordinates: the model position
+        // does not change.
+        w.act = Some(super::super::world::ActLoad {
+            act: 4,
+            init_seed: 0,
+            town_level: 109,
+            f8: 0,
+        });
+        w.room_units.place(key, Some(DrlgRoomId(2)));
+        w.active_rooms.as_mut().unwrap()[1].x0 = 0;
+        w.active_rooms.as_mut().unwrap()[0].x0 = 1000;
+        p.frame(&w, [], false, SPEEDS);
+        assert_eq!(p.cell(), Some((20, 20)));
+    }
+
+    // Covers: specs/client/model.md §3 r3
+    #[test]
+    fn walking_across_a_level_border_is_no_placement() {
+        use super::super::world::ActiveRoom;
+        use crate::bridge::drlg::DrlgRoomId;
+        let (mut w, key) = world_at(35, 20);
+        let room = |level: u16, id: u32, x0: i32| ActiveRoom {
+            x0,
+            y0: 0,
+            w: 40,
+            h: 40,
+            level,
+            room: DrlgRoomId(id),
+        };
+        w.active_rooms = Some(vec![room(1, 1, 0), room(2, 2, 40)]);
+        w.room_units.place(key, Some(DrlgRoomId(1)));
+        let mut p = Predict::new();
+        p.frame(&w, [walk_point(50, 20, false)], true, SPEEDS);
+        while p.cell().is_some_and(|c| c.0 < 41) {
+            p.frame(&w, [], true, SPEEDS);
+        }
+        // The view's room recache links the player to the next level's
+        // room; the model position stays (35, 20).
+        w.room_units.place(key, Some(DrlgRoomId(2)));
+        let at = p.cell();
+        p.frame(&w, [], false, SPEEDS);
+        assert_eq!(p.cell(), at);
+    }
+
+    // Covers: specs/client/model.md §8 r4
+    #[test]
+    fn a_walk_out_ahead_of_its_placement_is_held() {
+        use crate::bridge::drlg::DrlgRoomId;
+        let (mut w, key) = two_levels(20, 20);
+        let mut p = Predict::new();
+        p.frame(&w, [], true, SPEEDS);
+        // The 0x0D arrives one frame before the 0x15: its target is in
+        // the other level; nothing steps toward it from (20, 20).
+        request(&mut w, key, 1, 1013, 23);
+        p.frame(&w, [], true, SPEEDS);
+        assert!(p.walking().is_none());
+        assert_eq!(p.cell(), Some((20, 20)));
+        w.units.get_mut(&key).unwrap().position = Some((1010, 20));
+        w.room_units.place(key, Some(DrlgRoomId(2)));
+        p.frame(&w, [], false, SPEEDS);
+        assert_eq!(p.walking().map(|w| w.to), Some(WalkTo::Point(1013, 23)));
+    }
+
+    // Covers: specs/client/model.md §8 r4
+    #[test]
+    fn a_player_walk_or_another_request_drops_a_held_walk_out() {
+        let (mut w, key) = two_levels(20, 20);
+        let mut p = Predict::new();
+        p.frame(&w, [], true, SPEEDS);
+        request(&mut w, key, 1, 1013, 23);
+        p.frame(&w, [walk_point(30, 20, false)], false, SPEEDS);
+        assert_eq!(p.walking().map(|w| w.to), Some(WalkTo::Point(30, 20)));
+        // Not a walk request: no server walk.
+        request(&mut w, key, 1, 25, 25);
+        request(&mut w, key, 0x19, 25, 25);
+        p.frame(&w, [], false, SPEEDS);
+        assert_eq!(p.walking().map(|w| w.to), Some(WalkTo::Point(30, 20)));
+        // The same request again is still a new one.
+        request(&mut w, key, 1, 25, 25);
+        p.frame(&w, [], false, SPEEDS);
+        assert_eq!(p.walking().map(|w| w.to), Some(WalkTo::Point(25, 25)));
+        request(&mut w, key, 1, 25, 25);
+        p.frame(&w, [], false, SPEEDS);
+        assert_eq!(p.walking().map(|w| w.to), Some(WalkTo::Point(25, 25)));
+    }
+
     #[test]
     fn no_local_player_no_prediction() {
         let mut p = Predict::new();
@@ -576,6 +876,23 @@ mod tests {
         assert_eq!(facing(o, c(5, 5)), Some(0));
         assert_eq!(facing(o, c(3, 1)), Some(59));
         assert_eq!(facing(o, o), None);
+    }
+
+    // Covers: specs/sim/pathing.md §8.3
+    #[test]
+    fn facing_a_far_point_keeps_the_direction() {
+        // A position from before a level change: thousands of sub-tiles.
+        let c = |x: u16, y: u16| cell_centre((x, y));
+        assert_eq!(facing(c(100, 100), c(5100, 100)), Some(56));
+        assert_eq!(
+            facing(c(5100, 5100), c(100, 5100)),
+            facing(c(110, 100), c(100, 100))
+        );
+        assert_eq!(facing(c(100, 100), c(3100, 1100)), Some(59));
+        assert_eq!(
+            facing(c(9000, 9000), c(20, 20)),
+            facing(c(110, 110), c(100, 100))
+        );
     }
 
     // Covers: specs/sim/pathing.md §8.3, §8.4

@@ -134,12 +134,12 @@ pub fn check(
     let visible = if x == cx || y == cy {
         true
     } else {
-        let pred = inputs.visible.ok_or(HandlerError::Unspecified(
+        let pred = inputs.visible.as_ref().ok_or(HandlerError::Unspecified(
             "model.md open question 7: the visibility predicate 0x004DBF20",
         ))?;
         let (a, b) = client_point(unit);
         let p = static_to_client(xi, yi);
-        pred(unit, a, b) || pred(unit, p.x, p.y)
+        pred.visible(unit, a, b) || pred.visible(unit, p.x, p.y)
     };
     // Rule 7.
     if visible && !far {

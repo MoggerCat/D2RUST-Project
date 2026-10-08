@@ -11,8 +11,8 @@
 
 use crate::game::Game;
 use crate::monsters::ai::{
-    AiActs, AiModes, AiQuests, AiSkills, AiSummons, AiTargets, AiUnits, AiWorld, ModeTarget,
-    PortalNpc, QuestCall,
+    AiActs, AiModes, AiQuests, AiSkills, AiSummons, AiTargets, AiUnits, AiWorld, HireRow,
+    ModeTarget, PortalNpc, QuestCall,
 };
 use crate::rng::Seed;
 use crate::stats::stat;
@@ -730,5 +730,20 @@ impl<X: Pending> AiSummons for View<'_, X> {
     }
     fn target_slot(&self, unit: UnitId) -> i32 {
         self.units.get(unit).map_or(11, |r| r.node_index as i32)
+    }
+    /// `0x00574BD0` from the published hireling facts: the `Id` of the
+    /// unit's node when `owner` holds it.
+    fn hireling_id(&self, _game: &Game, owner: UnitId, unit: UnitId) -> Option<i32> {
+        match self.h.hireling_ai.ids.get(&unit) {
+            Some(&(o, id)) if o == owner => i32::try_from(id).ok(),
+            _ => None,
+        }
+    }
+    /// `0x006562F0(expansion, id, level)` (`hirelings.md` §1.2 rule 2)
+    /// on the published rows.
+    fn hireling_row(&self, _game: &Game, id: i32, level: i32) -> Option<HireRow> {
+        let rows = self.h.hireling_ai.rows.as_ref()?;
+        let i = rows.row_at(self.data.expansion, u32::try_from(id).ok()?, level)?;
+        rows.rows.get(i).map(|r| r.ai_row())
     }
 }

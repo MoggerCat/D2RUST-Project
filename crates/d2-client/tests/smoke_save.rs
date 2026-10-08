@@ -1,0 +1,797 @@
+// Spec: specs/formats/d2s.md (§1, §2, §7, §8), specs/formats/d2s-load.md, specs/ui/frontend-options.md (§O3)
+//! Save smoke tests (q-smoke-save): the real play path end to end, no
+//! window. A character joins the synthetic single-player game through the
+//! bridge and the in-process server, is played (levels, stat and skill
+//! points, items in the inventory, stash and cube, waypoints, quests,
+//! gold), leaves through the Esc menu's "Save and Exit Game" (the app
+//! exits, then the save runs as `play::run` does it), and the written
+//! `.d2s` is read and joined again: every live value the save holds must
+//! come back exactly, and saving the reloaded character must give the
+//! same file. Then the same at Nightmare, a hardcore death and the
+//! dead-hardcore load refusal, and the `.bak` of a second save.
+//!
+//! Everything here is d2rs-own, unverified (rule 10): the synthetic
+//! tables are fixtures, the 1.14d byte layout is not compared.
+
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::Arc;
+
+use bevy::prelude::*;
+use d2_client::app::play::{add_client_data, add_game, add_preview, send_create_game_for};
+use d2_client::app::save::{self, Live, SaveHandle, SharedLink};
+use d2_client::app::single_player::{self, Character, GameData, Sim, DEFAULT_SEED};
+use d2_client::app::ui::{add_original_ui, UiParts};
+use d2_client::assets::path::MemorySource;
+use d2_client::controls::Action;
+use d2_client::ui::{ActionId, Point, PointerButton, UiEvent};
+use d2_client::world_view::tile_assets::TileAssets;
+use d2_client::world_view::WorldViewUi;
+use d2_data::tables::{Record, Skills};
+use d2_formats::d2s::{self, D2s, ReadOptions, StatSave};
+use d2_server::adapters::character::LoadContext;
+use d2_server::seams::Clock;
+use d2_sim::items::inventory::{page, UnitKind};
+use d2_sim::items::moves::InventoryOps;
+use d2_sim::items::ItemRequest;
+use d2_sim::skills::list::ListOwner;
+use d2_sim::units::UnitId;
+use d2_sim::wiring::economy::ItemSpawn;
+
+struct StepClock(Arc<AtomicU32>);
+
+impl Clock for StepClock {
+    fn now_ms(&mut self) -> u32 {
+        self.0.load(Ordering::SeqCst)
+    }
+}
+
+type Server = SharedLink<StepClock>;
+
+/// The save tables of the synthetic game: 32-bit stats (the synthetic
+/// `itemstatcost` has no save columns), the synthetic item tables for the
+/// item stream, every present hireling restorable.
+struct Tables {
+    items: d2_sim::items::ItemTables,
+}
+
+impl Tables {
+    fn new() -> Self {
+        Self {
+            items: d2_client::app::synthetic_items::item_tables(),
+        }
+    }
+}
+
+impl d2s::SaveTables for Tables {
+    fn stat_save(&self, id: u16) -> Option<StatSave> {
+        (id < 400).then_some(StatSave {
+            bits: 32,
+            param: 0,
+            signed: true,
+        })
+    }
+    fn item_entry_len(&self, buf: &[u8]) -> Result<usize, String> {
+        d2_sim::items::bitstream::read::read_save_entry(buf, &self.items)
+            .map(|e| e.len)
+            .map_err(|e| e.to_string())
+    }
+    fn hireling_restored(&self, h: &d2s::Hireling) -> bool {
+        h.is_present()
+    }
+}
+
+fn blank<T: Record>() -> T {
+    T::decode(&vec![0u8; T::SIZE])
+}
+
+/// Skill rows 0..=`SKILLS` with ten class skills per class (ids
+/// 1 + 10·class ..), so the save's class-list order exists.
+const SKILLS: usize = 71;
+
+fn skill_rows() -> Vec<Skills> {
+    (0..SKILLS)
+        .map(|i| {
+            let mut s: Skills = blank();
+            s.charclass = if i == 0 { 0xFF } else { ((i - 1) / 10) as _ };
+            s.ingame = true;
+            s.skpoints = d2_sim::skills::levels::NO_CALC;
+            (s.reqskill1, s.reqskill2, s.reqskill3) = (0xFFFF, 0xFFFF, 0xFFFF);
+            s.maxlvl = 20;
+            s
+        })
+        .collect()
+}
+
+/// A DC6 of one direction with `frames` frames of 2 × 2 pixels
+/// (`app_original_ui.rs`' fixture).
+fn dc6(frames: u32) -> Vec<u8> {
+    let rows = [2u8, 1, 2, 0x80, 2, 3, 4, 0x80];
+    let mut d = Vec::new();
+    for v in [6i32, 1, 0] {
+        d.extend_from_slice(&v.to_le_bytes());
+    }
+    d.extend_from_slice(&[0xEE; 4]);
+    d.extend_from_slice(&1u32.to_le_bytes());
+    d.extend_from_slice(&frames.to_le_bytes());
+    let mut at = d.len() + 4 * frames as usize;
+    let mut body = Vec::new();
+    for _ in 0..frames {
+        d.extend_from_slice(&(at as u32).to_le_bytes());
+        for v in [0u32, 2, 2, 0, 0, 0, 0, rows.len() as u32] {
+            body.extend_from_slice(&v.to_le_bytes());
+        }
+        body.extend_from_slice(&rows);
+        body.extend_from_slice(&[0xEE; 3]);
+        at += 32 + rows.len() + 3;
+    }
+    d.extend(body);
+    d
+}
+
+fn panel_files() -> MemorySource {
+    let mut s = MemorySource::default();
+    for (name, frames) in [
+        ("panel\\invchar", 8),
+        ("panel\\buysellbtn", 12),
+        ("panel\\800borderframe", 10),
+        ("panel\\800ctrlpnl7", 6),
+        ("panel\\goldcoinbtn", 2),
+    ] {
+        s.insert(&format!("data\\global\\ui\\{name}.dc6"), dc6(frames));
+    }
+    s
+}
+
+/// One running game: the app (bridge, world view, original UI with the
+/// Esc menu, hardcore wiring), its server, the save handle.
+struct Run {
+    app: App,
+    server: Server,
+    saver: SaveHandle,
+    ms: Arc<AtomicU32>,
+}
+
+impl Run {
+    /// `play::run`'s wiring without the window: the save handle shares
+    /// the link, the app joins `character` (`hardcore`: `play --new
+    /// --hardcore`; a save's own status bit makes it hardcore too).
+    fn start(character: &Character, path: &std::path::Path) -> Run {
+        Run::start_hc(character, path, false)
+    }
+
+    fn start_hc(character: &Character, path: &std::path::Path, hardcore: bool) -> Run {
+        let data = GameData::Synthetic;
+        let ms = Arc::new(AtomicU32::new(1000));
+        let mut base = save::base_save(character);
+        let hardcore = hardcore || base.header.status & d2s::status::HARDCORE != 0;
+        if hardcore {
+            base.header.status |= d2s::status::HARDCORE;
+        }
+        let (mut link, _) = single_player::start_with(
+            data.clone(),
+            DEFAULT_SEED,
+            character.clone(),
+            StepClock(ms.clone()),
+        )
+        .unwrap();
+        link.with(move |l| {
+            let a = &mut l.host_mut().game.events.action;
+            Arc::make_mut(&mut a.hooks().tables).skills.skills = skill_rows();
+            a.hooks().x.hardcore = hardcore;
+        })
+        .unwrap();
+        let (server, saver) = save::share(link, base, Arc::new(Tables::new()), path.into());
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, AssetPlugin::default()))
+            .init_asset::<Image>()
+            .init_resource::<ButtonInput<MouseButton>>()
+            .init_resource::<ButtonInput<KeyCode>>();
+        app.insert_resource(saver.clone());
+        add_game(&mut app, Box::new(server.clone()), false).unwrap();
+        send_create_game_for(&mut app, character).unwrap();
+        let levels = single_player::client_level_rows(&data);
+        add_client_data(
+            &mut app,
+            single_player::client_drlg_source(&data),
+            levels.clone(),
+        );
+        add_preview(&mut app, levels, TileAssets::default());
+        add_original_ui(
+            &mut app,
+            UiParts {
+                source: Arc::new(panel_files()),
+                inv_areas: None,
+                expansion_installed: false,
+                fonts: None,
+                resist_penalties: None,
+            },
+        )
+        .unwrap();
+        d2_client::app::death::add_death(&mut app);
+        d2_client::app::hardcore::add_hardcore(&mut app, hardcore);
+        let mut run = Run {
+            app,
+            server,
+            saver,
+            ms,
+        };
+        run.step(10);
+        assert!(run.player().is_some(), "the character joined");
+        run
+    }
+
+    fn step(&mut self, n: usize) {
+        for _ in 0..n {
+            self.app.update();
+            self.ms.fetch_add(40, Ordering::SeqCst);
+        }
+    }
+
+    fn with<R: Send + 'static>(&self, f: impl FnOnce(&mut Sim) -> R + Send + 'static) -> R {
+        self.server.with(|l| f(&mut l.host_mut().game)).unwrap()
+    }
+
+    fn player(&self) -> Option<(UnitId, u32)> {
+        self.with(|s| single_player::local_player(s))
+    }
+
+    fn live(&self) -> Live {
+        self.with(|s| save::read_live(s).unwrap())
+    }
+
+    fn log(&self) -> Vec<String> {
+        self.with(|s| s.events.action.hooks().x.log.clone())
+    }
+
+    fn ui_event(&mut self, e: UiEvent) {
+        self.app
+            .world_mut()
+            .non_send_mut::<WorldViewUi>()
+            .queue
+            .0
+            .push(e);
+        self.step(1);
+    }
+
+    /// Esc, then a click on "Save and Exit Game" (the game menu's second
+    /// row, `ui/frontend-options.md` §O3); the app must stop. Then the save
+    /// `play::run` makes after `app.run()` returns.
+    fn save_and_exit(mut self) {
+        self.ui_event(UiEvent::Action(ActionId(Action::GameMenu.index() as u16)));
+        let at = Point::new(400, 185 + 50 + 20);
+        let b = PointerButton::Left;
+        self.ui_event(UiEvent::Press { button: b, at });
+        self.ui_event(UiEvent::Release { button: b, at });
+        self.step(1);
+        assert!(
+            self.app.should_exit().is_some(),
+            "Save and Exit Game stops the app"
+        );
+        self.saver.save().unwrap();
+    }
+}
+
+/// What a session of play changes on the server.
+struct Played {
+    level: i32,
+    gold: i32,
+    bank: i32,
+}
+
+/// Plays a while on the server: levels, stats, unspent and spent points,
+/// skill levels, a waypoint and a quest flag per difficulty, gold, items
+/// in the inventory, the cube page and the stash.
+fn play(run: &mut Run, seed: i32) -> Played {
+    let played = Played {
+        level: 7 + seed,
+        gold: 1234 + seed,
+        bank: 56789 + seed,
+    };
+    let (level, gold, bank) = (played.level, played.gold, played.bank);
+    run.with(move |s| {
+        let (p, _) = single_player::local_player(s).unwrap();
+        let class = s.events.action.sys.units.get(p).unwrap().class as i32;
+        let a = &mut s.events.action;
+        {
+            let sys = &mut a.sys;
+            for (id, v) in [
+                (0u16, 30 + seed),
+                (1, 20 + seed),
+                (2, 25),
+                (3, 40),
+                (4, 5),
+                (5, 2),
+                // Life, mana and stamina at their maxima: the regeneration
+                // of the ticks between two reads changes nothing.
+                (6, 150 << 8),
+                (7, 150 << 8),
+                (8, 60 << 8),
+                (9, 60 << 8),
+                (10, 90 << 8),
+                (11, 90 << 8),
+                (12, level),
+                (13, 20_000 + seed),
+                (14, gold),
+                (15, bank),
+            ] {
+                sys.stats.unit_set(&mut sys.hooks, p, id, v, 0);
+            }
+        }
+        let rows = a.hooks().tables.skills.skills.clone();
+        let list = a.hooks().skill_lists.entry(p).or_default();
+        for k in 0..3 {
+            list.set_base(
+                &rows,
+                ListOwner {
+                    monster: false,
+                    class,
+                },
+                1 + 10 * class + k,
+                (k + 1 + seed) as u8,
+            );
+        }
+        for d in 0..3usize {
+            let w = a.hooks().waypoints.entry(p).or_default();
+            w.get_mut(d as u8).set(3 + d as u32).unwrap();
+        }
+        let q = s.world.rest.quests.get_mut(&p).unwrap();
+        for d in 0..3 {
+            q.flags[d].set(1 + d as u8, 0);
+            q.flags[d].set(2, 12);
+        }
+        give(s, p, 2, page::INVENTORY, (0, 0));
+        give(s, p, 30, page::INVENTORY, (3, 1));
+        give(s, p, 0, page::STASH, (0, 0));
+        give(s, p, 31, page::STASH, (4, 2));
+        give(s, p, 1, page::CUBE, (1, 1));
+        // The hammer in the right hand (body location 4).
+        equip(s, p, 0, 4);
+    });
+    run.step(4);
+    played
+}
+
+/// Makes the synthetic item of `record` on the cursor of `owner` (an
+/// inventory made for it when it has none, as the load does) and runs
+/// `put` on the inventory desk with the item (a macro: the desk's hook
+/// type is the host's own).
+macro_rules! make_then {
+    ($s:expr, $owner:expr, $record:expr, |$d:ident, $item:ident| $put:expr) => {{
+        let (s, owner, record): (&mut Sim, UnitId, i32) = ($s, $owner, $record);
+        s.world
+            .with_economy(&mut s.game, &mut s.events, |econ, parts| {
+                let mut rq = ItemRequest {
+                    item: record,
+                    ilvl: 1,
+                    quality: 2,
+                    format: 1,
+                    ..ItemRequest::default()
+                };
+                let held = ItemSpawn {
+                    room: None,
+                    mode: 4,
+                    init_flags: 1,
+                };
+                let $item = econ.create_item(&mut rq, false, held).expect("item");
+                let inv = parts.inventory.as_deref_mut().expect("inventory model");
+                let (ty, class, guid) = {
+                    let u = econ.units.get(owner).unwrap();
+                    (u.ty, u.class, u.guid)
+                };
+                if !inv.state.inventories.contains_key(&owner) {
+                    let kind = if ty == d2_sim::units::UnitType::Monster {
+                        UnitKind::Monster { class }
+                    } else {
+                        UnitKind::Player { class: class as u8 }
+                    };
+                    inv.state.add_inventory(owner, kind, guid);
+                }
+                let mut desk = inv.desk(econ);
+                let $d = &mut desk;
+                $d.sync_in();
+                if let Some(i) = $d.state.items.get_mut(&$item) {
+                    i.mode = d2_sim::items::inventory::mode::CURSOR;
+                }
+                $d.sync_out();
+                $put
+            })
+    }};
+}
+
+/// Makes the synthetic item of `record` and stores it at `at` on `pg` of
+/// `p`'s inventory (as the item moves leave a stored item).
+fn give(s: &mut Sim, p: UnitId, record: i32, pg: u8, at: (i32, i32)) {
+    let placed = make_then!(s, p, record, |d, item| {
+        if let Some(i) = d.state.items.get_mut(&item) {
+            i.page = pg;
+        }
+        d.sync_out();
+        d.place(p, item, at, false, true)
+    });
+    assert!(placed, "item {record} stored on page {pg} at {at:?}");
+}
+
+/// Makes the synthetic item of `record` and equips it on `owner` at body
+/// location `loc` from the cursor (the item moves' equip, `inventory.md`).
+fn equip(s: &mut Sim, owner: UnitId, record: i32, loc: u8) {
+    let worn = make_then!(s, owner, record, |d, item| {
+        match (d.owner_of(owner), d.guid_of(item)) {
+            (Some(o), g) => d.equip_from_cursor(o, g, loc, true).0,
+            _ => false,
+        }
+    });
+    assert!(worn, "item {record} worn at body location {loc}");
+}
+
+fn temp(name: &str) -> std::path::PathBuf {
+    let dir = std::path::Path::new(env!("CARGO_TARGET_TMPDIR"))
+        .join(format!("smoke-save-{}-{name}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    dir
+}
+
+fn read(path: &std::path::Path, difficulty: u8) -> Result<D2s, d2s::D2sError> {
+    let bytes = std::fs::read(path).unwrap();
+    let opts = ReadOptions {
+        expansion: true,
+        game: Some(d2s::GameContext {
+            client_name: single_player::save_name(&bytes).to_vec(),
+            expansion: true,
+            hardcore: d2_client::app::hardcore::save_is_hardcore(&bytes),
+            difficulty,
+        }),
+    };
+    d2s::read(&bytes, &opts, &Tables::new())
+}
+
+fn loaded(save: D2s, difficulty: u8) -> Character {
+    Character::Save(
+        Box::new(save),
+        LoadContext {
+            difficulty,
+            map_seed_applies: false,
+        },
+    )
+}
+
+/// `live` as a load leaves it: every item's 0x2000 (instore) cleared, in
+/// the player, hireling and corpse lists alike
+/// (`d2s.md` §8.2 rule 7: "a file's 0x2000 never survives a load"). The
+/// flags are the 32 bits after `JM`; 0x2000 is bit 5 of byte 3.
+fn loaded_live(mut live: Live) -> Live {
+    let clear = |items: &mut Vec<d2s::ItemEntry>| {
+        for e in items {
+            e.bytes[3] &= !0x20;
+        }
+    };
+    if let Some(items) = &mut live.extra.items {
+        clear(items);
+    }
+    if let Some(items) = &mut live.gaps.hireling_items {
+        clear(items);
+    }
+    for c in live.extra.corpses.iter_mut().flatten() {
+        clear(&mut c.items);
+    }
+    live
+}
+
+/// The save without its time stamp and the checksum over it (the second
+/// save is a later one).
+fn timeless(mut s: D2s) -> D2s {
+    s.header.save_time = 0;
+    s.header.checksum = 0;
+    s
+}
+
+/// Plays `class`, saves through the Esc menu, loads the file, and checks
+/// the round trip: the live state after the load is the state before, and
+/// a save of the reloaded character is the same file.
+fn round_trip(class: &str, name: &str, difficulty: u8, seed: i32) {
+    let dir = temp(name);
+    let file = dir.join(format!("{name}.d2s"));
+    let character = single_player::new_character(class, name)
+        .unwrap()
+        .with_difficulty(difficulty);
+    let mut run = Run::start(&character, &file);
+    let played = play(&mut run, seed);
+    let before = run.live();
+    assert!(
+        before.extra.items.as_ref().is_some_and(|i| i.len() == 6),
+        "{name}: six items before the save: {:?}",
+        before.extra.items
+    );
+    run.save_and_exit();
+
+    let first = read(&file, difficulty).unwrap();
+    let h = &first.header;
+    assert_eq!(h.name_bytes(), name.as_bytes());
+    assert_eq!(i32::from(h.level), played.level);
+    let stat = |s: &D2s, id: u16| {
+        s.body
+            .as_ref()
+            .unwrap()
+            .stats
+            .entries()
+            .iter()
+            .find(|e| e.id == id)
+            .map(|e| e.value)
+    };
+    assert_eq!(stat(&first, 14), Some(played.gold));
+    assert_eq!(stat(&first, 15), Some(played.bank));
+
+    let file2 = dir.join(format!("{name}-again.d2s"));
+    let again = Run::start(&loaded(first.clone(), difficulty), &file2);
+    let log = again.log();
+    // The loader's known unapplied steps (`ActionCharacter`) are listed
+    // in the log; a failed load or a dropped item is a break.
+    let broken: Vec<_> = log
+        .iter()
+        .filter(|l| l.contains("load failed") || l.contains("items:") || l.contains("quests "))
+        .collect();
+    assert!(broken.is_empty(), "{name}: the load reported: {broken:?}");
+    let after = again.live();
+    assert_eq!(
+        after,
+        loaded_live(before),
+        "{name}: the live state after the load"
+    );
+    again.save_and_exit();
+    let second = read(&file2, difficulty).unwrap();
+    let mut first = timeless(first);
+    if let Some(b) = &mut first.body {
+        for e in &mut b.items {
+            e.bytes[3] &= !0x20;
+        }
+    }
+    assert_eq!(timeless(second), first, "{name}: the saved file");
+}
+
+// Covers: specs/formats/d2s.md §1 r4; specs/formats/d2s-load.md §2
+#[test]
+fn every_class_round_trips_through_save_and_exit() {
+    for (i, (class, name)) in [
+        ("amazon", "Ama"),
+        ("sorceress", "Sorc"),
+        ("necromancer", "Necro"),
+        ("paladin", "Pala"),
+        ("barbarian", "Barb"),
+        ("druid", "Dru"),
+        ("assassin", "Sin"),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        round_trip(class, name, 0, i as i32);
+    }
+}
+
+// Covers: specs/formats/d2s.md §2.5
+#[test]
+fn a_nightmare_character_round_trips() {
+    round_trip("barbarian", "NmBarb", 1, 3);
+    round_trip("sorceress", "NmSorc", 1, 5);
+}
+
+/// The mercenary and its gear: a character whose save holds a hireling
+/// (the restore at the join makes it), the hammer put in its hand, saved
+/// through the Esc menu; the reload restores the same hireling block and
+/// the same item on it.
+// Covers: specs/formats/d2s.md §2.5 r1, §8.4 r2
+#[test]
+fn a_mercenary_with_gear_round_trips() {
+    let dir = temp("merc");
+    let file = dir.join("Merc.d2s");
+    let mut base = save::base_save(&single_player::new_character("paladin", "Merc").unwrap());
+    base.header.hireling = d2s::Hireling {
+        flags: 0,
+        seed: 0x1234,
+        name_index: 2,
+        id: 1,
+        experience: 5000,
+        rest: [0; 16],
+    };
+    let mut run = Run::start(&loaded(base, 0), &file);
+    run.step(10);
+    let merc = run.with(|s| {
+        let (p, _) = single_player::local_player(s).unwrap();
+        s.world.hireling_unit(&s.game, p)
+    });
+    let merc = merc.expect("the save's hireling was restored at the join");
+    play(&mut run, 1);
+    run.with(move |s| equip(s, merc, 0, 4));
+    run.step(2);
+    let before = run.live();
+    assert_eq!(
+        before.gaps.hireling_items.as_ref().map(Vec::len),
+        Some(1),
+        "the hammer on the mercenary"
+    );
+    run.save_and_exit();
+    let first = read(&file, 0).unwrap();
+    assert_eq!(first.header.hireling.seed, 0x1234);
+    let again = Run::start(&loaded(first, 0), &dir.join("Merc-again.d2s"));
+    let broken: Vec<_> = again
+        .log()
+        .into_iter()
+        // "hireling rule 8" (refresh, life := max after the items) is a
+        // known unapplied step (docs/handoff/q-smoke-save.md).
+        .filter(|l| l.contains("hireling items") || l.contains("items:") || l.contains("failed"))
+        .collect();
+    assert!(broken.is_empty(), "the load reported: {broken:?}");
+    assert_eq!(again.live(), loaded_live(before));
+}
+
+/// Hardcore: played, then killed; the death saves the character with the
+/// dead bit (and the corpse), Esc leaves, the save on the way out keeps
+/// it dead, and the load refuses the file (`d2s.md` §2.2 r5).
+// Covers: specs/formats/d2s.md §2.2 r5; specs/combat/vitals.md §4.8
+#[test]
+fn a_dead_hardcore_character_is_saved_dead_and_refused() {
+    let dir = temp("hc");
+    let file = dir.join("Hc.d2s");
+    let character = single_player::new_character("necromancer", "Hc").unwrap();
+    let mut run = Run::start_hc(&character, &file, true);
+    play(&mut run, 2);
+    // A first save while alive (the Esc menu would close the game: the
+    // handle saves as the death screen does).
+    run.saver.save().unwrap();
+    let alive = std::fs::read(&file).unwrap();
+    assert!(read(&file, 0).is_ok(), "a living hardcore character loads");
+    run.with(|s| {
+        let (p, _) = single_player::local_player(s).unwrap();
+        s.events.action.start_death(&mut s.game, p);
+    });
+    run.step(4);
+    run.with(|s| {
+        let (p, _) = single_player::local_player(s).unwrap();
+        let sys = &mut s.events.action.sys;
+        let mut u = d2_sim::units::hooks::Sim {
+            game: &mut s.game,
+            units: &mut sys.units,
+            stats: &mut sys.stats,
+            data: &sys.data,
+        };
+        d2_sim::units::modes::player_event1(&mut u, &mut sys.hooks, p).unwrap();
+    });
+    run.step(3);
+    let dead = read(&file, 0);
+    assert!(
+        matches!(&dead, Err(d2s::D2sError::Load { code: 10, .. })),
+        "the death's save is refused: {dead:?}"
+    );
+    // The previous save is the `.bak`.
+    let mut bak = file.clone().into_os_string();
+    bak.push(".bak");
+    assert!(std::path::Path::new(&bak).exists());
+    // Esc on the dead hardcore player leaves; the exit save keeps it dead.
+    run.app
+        .world_mut()
+        .resource_mut::<ButtonInput<KeyCode>>()
+        .press(KeyCode::Escape);
+    run.step(4);
+    assert!(run.app.should_exit().is_some(), "the game closes");
+    run.saver.save().unwrap();
+    let opts = ReadOptions {
+        expansion: true,
+        game: None,
+    };
+    let bytes = std::fs::read(&file).unwrap();
+    let raw = d2s::read(&bytes, &opts, &Tables::new()).unwrap();
+    let both = d2s::status::HARDCORE | d2s::status::DEAD;
+    assert_eq!(raw.header.status & both, both);
+    assert_eq!(raw.header.name_bytes(), b"Hc");
+    assert!(matches!(
+        read(&file, 0),
+        Err(d2s::D2sError::Load { code: 10, .. })
+    ));
+    assert_ne!(bytes, alive);
+}
+
+/// `stitch-save`'s `.bak`: every save first copies the file it replaces;
+/// no temporary file is left; the `.bak` loads as the earlier character.
+// Covers: specs/formats/d2s.md §1 r4
+#[test]
+fn each_save_keeps_the_previous_file_as_bak() {
+    let dir = temp("bak");
+    let file = dir.join("Bak.d2s");
+    let character = single_player::new_character("druid", "Bak").unwrap();
+    let mut run = Run::start(&character, &file);
+    run.saver.save().unwrap();
+    let first = std::fs::read(&file).unwrap();
+    let mut bak = file.clone().into_os_string();
+    bak.push(".bak");
+    let bak = std::path::PathBuf::from(bak);
+    assert!(!bak.exists(), "no .bak before a second save");
+    play(&mut run, 4);
+    run.save_and_exit();
+    assert_eq!(std::fs::read(&bak).unwrap(), first);
+    let second = std::fs::read(&file).unwrap();
+    assert_ne!(second, first);
+    let names: Vec<_> = std::fs::read_dir(&dir)
+        .unwrap()
+        .map(|e| e.unwrap().file_name().into_string().unwrap())
+        .collect();
+    assert!(
+        !names.iter().any(|n| n.ends_with(".tmp")),
+        "no temporary file left: {names:?}"
+    );
+    let earlier = read(&bak, 0).unwrap();
+    assert_eq!(earlier.header.level, 1);
+    // A third save rotates: the .bak is now the second file.
+    let again = Run::start(&loaded(read(&file, 0).unwrap(), 0), &file);
+    again.save_and_exit();
+    assert_eq!(std::fs::read(&bak).unwrap(), second);
+}
+
+/// Softcore death: the corpse takes the worn hammer, Esc respawns the
+/// player, Save and Exit writes the corpse section; the reload makes the
+/// corpse again with the hammer in it (`d2s.md` §8.3 rule 4), so the
+/// next save keeps it.
+// Covers: specs/formats/d2s.md §8.3 r4
+#[test]
+fn a_corpse_with_its_items_survives_save_and_reload() {
+    let dir = temp("corpse");
+    let file = dir.join("Corpse.d2s");
+    let character = single_player::new_character("sorceress", "Corpse").unwrap();
+    let mut run = Run::start(&character, &file);
+    play(&mut run, 0);
+    run.with(|s| {
+        let (p, _) = single_player::local_player(s).unwrap();
+        s.events.action.start_death(&mut s.game, p);
+    });
+    run.step(4);
+    run.with(|s| {
+        let (p, _) = single_player::local_player(s).unwrap();
+        let sys = &mut s.events.action.sys;
+        let mut u = d2_sim::units::hooks::Sim {
+            game: &mut s.game,
+            units: &mut sys.units,
+            stats: &mut sys.stats,
+            data: &sys.data,
+        };
+        d2_sim::units::modes::player_event1(&mut u, &mut sys.hooks, p).unwrap();
+    });
+    run.step(3);
+    run.app
+        .world_mut()
+        .resource_mut::<ButtonInput<KeyCode>>()
+        .press(KeyCode::Escape);
+    run.step(6);
+    run.app
+        .world_mut()
+        .resource_mut::<ButtonInput<KeyCode>>()
+        .release(KeyCode::Escape);
+    run.step(2);
+    let before = run.live();
+    let corpses = before.extra.corpses.clone().unwrap();
+    assert_eq!(corpses.len(), 1, "one corpse with items");
+    assert_eq!(corpses[0].items.len(), 1, "the hammer is on the corpse");
+    run.save_and_exit();
+    let first = read(&file, 0).unwrap();
+    assert_eq!(first.body.as_ref().unwrap().corpses.len(), 1);
+    let file2 = dir.join("Corpse-again.d2s");
+    let again = Run::start(&loaded(first.clone(), 0), &file2);
+    let broken: Vec<_> = again
+        .log()
+        .into_iter()
+        .filter(|l| l.contains("corpse") || l.contains("items:"))
+        .collect();
+    assert!(broken.is_empty(), "the load reported: {broken:?}");
+    let after = again.live();
+    assert_eq!(after.extra.corpses, loaded_live(before).extra.corpses);
+    again.save_and_exit();
+    let second = read(&file2, 0).unwrap();
+    let mut want = first.body.unwrap().corpses;
+    for c in &mut want {
+        for e in &mut c.items {
+            e.bytes[3] &= !0x20;
+        }
+    }
+    assert_eq!(
+        second.body.unwrap().corpses,
+        want,
+        "the corpse section of the next save"
+    );
+}

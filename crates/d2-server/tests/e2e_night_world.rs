@@ -1029,16 +1029,16 @@ fn the_hireling_follows_a_waypoint_teleport() {
     assert_eq!(got[0][0], 0x07, "{got:02x?}");
     assert_eq!(got[1][0], 0x0D, "{got:02x?}");
     // §6 rule 1: warp → the living node's unit moves to the player
-    // (`0x00574CC0`); rule 5 sets flags 2 bit 0x10000 on it. The move
-    // itself (leave the old room list, place at the target,
-    // `0x00650BE0`) is the rest's `warp_to`, which has no provider: the
-    // unit keeps its old position.
+    // (`0x00574CC0`, rule 5: placed at the player's room and point by the
+    // path teleport `0x00650BE0`, flags 2 bit 0x10000 set).
     // The bit is set by rule 5 and cleared again by the end-of-tick room
     // clean-up (`intents-events.md` §7.5 rule 3: flag-ex 0x10000 := 0),
     // which the tick now runs; after the step it reads 0.
     let f2 = fx.sim().events.action.sys.units.get(merc).unwrap().flags2;
     assert_eq!(f2 & hflags::WARP2, 0);
-    assert_eq!(fx.pos(merc), merc_at, "warp_to is Pending");
+    assert_ne!(fx.pos(merc), merc_at, "the hireling moved");
+    assert_eq!(fx.pos(merc), at, "at the player's point");
+    assert_eq!(fx.room(merc), Some(room), "in the player's room");
     assert_eq!(fx.sim().events.action.hooks().pet_follows, Some(vec![]));
     fx.assert_clean();
 }

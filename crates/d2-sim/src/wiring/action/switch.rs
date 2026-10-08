@@ -22,8 +22,9 @@
 //! - missile 0x73 (`0x0059FEE0`), item 0x9C (the item world is not
 //!   reachable from the action wiring, as for §7.1);
 //! - player part B for another player (`0x005489F0`, `0x005484B0`,
-//!   multiplayer only, §7.9 rule 5), the corpse 0x74 and the inventory
-//!   messages `0x00534F80`;
+//!   multiplayer only, §7.9 rule 5) and the inventory messages
+//!   `0x00534F80`; the corpse 0x74 is sent with PROVISIONAL fields
+//!   ([`corpse_assign`], REC-279);
 //! - the leave side's `0x005738D0` (monsters of a room without clients)
 //!   and rule 4's portal-flag record update (`0x0061AE30`).
 
@@ -64,6 +65,25 @@ pub fn assign_player(guid: u32, class: u8, name: &[u8; 16], x: u16, y: u16) -> [
     b[6..22].copy_from_slice(name);
     b[22..24].copy_from_slice(&x.to_le_bytes());
     b[24..26].copy_from_slice(&y.to_le_bytes());
+    b
+}
+
+/// S→C 0x74 PlayerCorpseAssign (10 bytes: flag u8@1, player u32@2,
+/// corpse u32@6) of §7.2 part B for the corpse `guid`.
+// PROVISIONAL (REC-279; d2rs-own, unverified): the fields of the part-B
+// call `0x0053DA40` are not in any spec. Read as flag 1 with the corpse
+// in both GUID fields: the client's 0x74 (`client/msg-units.md` §7 r7)
+// then sets the corpse unit (P, not dead after its 0x59) to mode 0 and
+// does not touch the local player; with the owner as P it would kill
+// a living local player on its client. Settled by a 1.14d capture of a
+// player's own corpse coming back into view (the 0x59 … 0x74 of the
+// room join).
+pub fn corpse_assign(guid: u32) -> [u8; 10] {
+    let mut b = [0u8; 10];
+    b[0] = 0x74;
+    b[1] = 1;
+    b[2..6].copy_from_slice(&guid.to_le_bytes());
+    b[6..10].copy_from_slice(&guid.to_le_bytes());
     b
 }
 
@@ -217,9 +237,22 @@ impl<X: Pending> View<'_, X> {
             return;
         };
         let (ty, guid) = (e.ty as u8, e.guid);
+        if self.is_player_corpse(unit) {
+            self.h.x.send(receiver, &corpse_assign(guid));
+        }
         let states = self.unit_states_message(ty, guid, unit);
         self.h.x.send(receiver, &states);
         self.overhead_message(receiver, unit, ty, guid);
+    }
+
+    /// §7.2 part B's corpse test: `0x005541B0(unit)` (dead) and
+    /// `0x00639DF0(unit, 7)` (`playerbody`); a corpse this wiring
+    /// allocated counts as having state 7 (as the take-back,
+    /// [`super::death`]).
+    fn is_player_corpse(&self, unit: UnitId) -> bool {
+        self.units.get(unit).is_some_and(|r| r.is_dead())
+            && (self.stats.has_state(unit, super::death::STATE_PLAYERBODY)
+                || self.h.death.owners.contains_key(&unit))
     }
 
     /// §7.9 rule 3 (`0x00571620`): unit +0xA4 = 0 → S→C 0x76. Else,
@@ -393,5 +426,19 @@ impl<X: Pending> View<'_, X> {
             return false;
         };
         self.h.drlg.room_ready(game, room).unwrap_or(false)
+    }
+}
+
+#[cfg(test)]
+mod corpse_tests {
+    /// The part-B corpse 0x74: 10 bytes, flag 1, the corpse's GUID in
+    /// both fields (PROVISIONAL REC-279).
+    // Covers: specs/sim/intents-events.md §7.2
+    #[test]
+    fn corpse_assign_bytes() {
+        assert_eq!(
+            super::corpse_assign(0x0102_0304),
+            [0x74, 1, 4, 3, 2, 1, 4, 3, 2, 1]
+        );
     }
 }

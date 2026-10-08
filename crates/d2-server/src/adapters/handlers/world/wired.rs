@@ -47,7 +47,7 @@ use d2_sim::game::Game;
 use d2_sim::items::ItemTables;
 use d2_sim::units::{RoomId, UnitId, UnitType};
 use d2_sim::wiring::action::Pending;
-use d2_sim::wiring::action::{ActionHooks, ObjectCase};
+use d2_sim::wiring::action::{ActionHooks, ActionSim, ObjectCase};
 use d2_sim::wiring::economy::{
     quest_objects, Economy, EconomyQuests, GameFields, HostQuests, LoanedInventory, QuestInv,
     QuestInventory, QuestLoan, QuestRest,
@@ -120,7 +120,10 @@ pub struct WiredWorld<R, S = NoSkills> {
     pub now: u32,
     /// What the inventory rules queued during vendor calls (receiving
     /// unit, bytes), sent after the rest's messages ([`WorldHost::take_sent`]).
-    inv_sent: Vec<(UnitId, Vec<u8>)>,
+    pub(super) inv_sent: Vec<(UnitId, Vec<u8>)>,
+    /// Pick-ups waiting for the player's run to the item to end
+    /// (player, item GUID, cursor flag; [`Self::item_arrivals`], REC-281).
+    pub(super) item_queued: Vec<(UnitId, u32, bool)>,
     /// d2rs-own, unverified (REC-244): item codes a new character gets
     /// after its charstats start items, one each, to the inventory (the
     /// play preview names the Horadric Cube, `box `, which charstats
@@ -192,6 +195,7 @@ impl<R, S> WiredWorld<R, S> {
             interact_classes: Vec::new(),
             now,
             inv_sent: Vec::new(),
+            item_queued: Vec::new(),
             start_extra: Vec::new(),
             quest_levels: Default::default(),
         }
@@ -211,7 +215,18 @@ impl<R, S> WiredWorld<R, S> {
         events: &mut D,
         f: impl FnOnce(&mut Economy<'_, ActionHooks<D::X>>, &mut Parts<'_, R>) -> T,
     ) -> T {
-        let s = &mut events.action().sys;
+        // With the monster state lent: a monster the call creates (the
+        // hired mercenary, `npc.md` §7.3 step 7) gets its type init.
+        events.lend_world(|a| self.with_economy_on(game, a, f))
+    }
+
+    fn with_economy_on<X: Pending, T>(
+        &mut self,
+        game: &mut Game,
+        a: &mut ActionSim<X>,
+        f: impl FnOnce(&mut Economy<'_, ActionHooks<X>>, &mut Parts<'_, R>) -> T,
+    ) -> T {
+        let s = &mut a.sys;
         let mut fields = GameFields::from_action(
             s.hooks.game_seed,
             &s.hooks.ai_info,
@@ -913,6 +928,11 @@ where
         WorldHost::<D>::warp_tile(&mut self.action, game, events, player, guid)
     }
 
+    /// The run to a ground item (§7.1 step 2, REC-281).
+    fn item_walk(&mut self, game: &mut Game, events: &mut D, walk: (UnitId, UnitId, bool)) {
+        self.start_item_walk(game, events, walk);
+    }
+
     /// The Town Portal pair on the action wiring (REC-117).
     fn town_portal(&mut self, game: &mut Game, events: &mut D, player: UnitId) -> bool {
         WorldHost::<D>::town_portal(&mut self.action, game, events, player)
@@ -927,6 +947,7 @@ where
         D: d2_sim::tick::EventDispatch + d2_sim::tick::TickHooks,
     {
         self.arrivals(game, events);
+        self.item_arrivals(game, events);
         self.lend_quests(events, |_, ev| d2_sim::tick::tick(game, ev));
         let sent = self.take_inventory_sent(game, events);
         self.inv_sent.extend(sent);
@@ -1175,6 +1196,7 @@ where
 
     fn walk(&mut self, game: &mut Game, events: &mut D, call: WalkCall) -> Option<WalkResult> {
         self.drop_queued(call.player);
+        self.item_queued.retain(|q| q.0 != call.player);
         let out = self.lend_quests(events, |a, ev| WorldHost::<D>::walk(a, game, ev, call));
         self.pet_deaths(game, events);
         self.hireling_calls(game, events);

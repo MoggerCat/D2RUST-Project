@@ -521,9 +521,11 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
             table,
         )));
     } else {
+        super::synthetic_client::install(&mut app);
         add_preview(&mut app, level_rows, TileAssets::default());
     }
     add_walk(&mut app, tap, speeds);
+    super::visibility::add_visibility(&mut app);
     super::loading_overlay::add_loading(&mut app, loading_files);
     super::death::add_death(&mut app);
     super::hardcore::add_hardcore(&mut app, hardcore);

@@ -198,6 +198,26 @@ fn update_queue_ignores_flag_bit_2() {
     assert!(!l.act(0).unwrap().pending_updates);
 }
 
+/// A later alignment change (`set_allied`) keeps the room's allied
+/// count in step, so the removal of §5.3 lowers what was raised.
+// Covers: specs/sim/unit-order.md §5 r3
+#[test]
+fn set_allied_keeps_the_room_count() {
+    let (mut l, r) = one_room();
+    let a = l.add_unit(UnitType::Monster, 1, Some(r), false).unwrap();
+    assert_eq!(l.room(r).unwrap().allied_count(), 0);
+    l.set_allied(a, true);
+    l.set_allied(a, true);
+    assert!(l.unit(a).unwrap().allied);
+    assert_eq!(l.room(r).unwrap().allied_count(), 1);
+    l.room_remove(a).unwrap();
+    assert_eq!(l.room(r).unwrap().allied_count(), 0);
+    // Out of a room only the flag changes.
+    l.set_allied(a, false);
+    assert!(!l.unit(a).unwrap().allied);
+    assert_eq!(l.room(r).unwrap().allied_count(), 0);
+}
+
 // Covers: specs/sim/unit-order.md §5 r3
 #[test]
 fn room_remove_unqueues_and_clear_resets_flags() {

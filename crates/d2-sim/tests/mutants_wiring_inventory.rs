@@ -210,11 +210,6 @@ fn forward_pending(flag: bool) {
         );
         fwd!(d.remove_used(m, 43), (), "remove_used 1:55 43".to_string());
         fwd!(
-            d.equip_picked(m, 49),
-            flag,
-            "equip_picked 1:55 49".to_string()
-        );
-        fwd!(
             d.filler_linked(50, 51),
             (),
             "filler_linked 50 51".to_string()

@@ -133,6 +133,10 @@ pub struct InvState {
     /// Town Portal scroll / tome uses of the call, taken by the host
     /// ([`InvDesk::take_portal_requests`], REC-117).
     pub portal_requests: Vec<UnitId>,
+    /// The walks to a ground item the pick-ups of the call asked for
+    /// (§7.1 step 2, `0x00548A50`: player, item, cursor flag), taken by
+    /// the host that runs them ([`InvDesk::take_item_walks`], REC-281).
+    pub item_walks: Vec<(UnitId, UnitId, bool)>,
     /// Equipment-rule calls the inventory functions asked for while the
     /// owner's inventory was lent to them ([`InvDesk::with_inv`]); run
     /// when the call returns, before the owner refreshes.
@@ -386,11 +390,19 @@ impl<'d, 'a, H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'d, 'a, H, R> {
             let (Some(r), Some(it)) = (self.econ.units.get(u), self.econ.items.get(u)) else {
                 continue;
             };
-            let d = self
-                .state
-                .items
-                .entry(u)
-                .or_insert_with(|| InvItem::new(r.guid, it.record));
+            let d = self.state.items.entry(u).or_insert_with(|| {
+                let mut d = InvItem::new(r.guid, it.record);
+                // An item new to the model that lies on the ground (a
+                // treasure drop, placed by the path code): its position
+                // is the path's (`bitstream.md` §4.1 rule 2, static path
+                // +0x0C / +0x10).
+                if r.mode == u32::from(crate::items::moves::mode::GROUND) {
+                    if let Some((x, y)) = self.econ.hooks.path_xy(u) {
+                        (d.x, d.y) = (x, y);
+                    }
+                }
+                d
+            });
             d.guid = r.guid;
             d.record = it.record;
             d.mode = r.mode as u8;

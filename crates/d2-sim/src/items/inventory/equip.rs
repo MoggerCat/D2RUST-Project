@@ -495,6 +495,54 @@ pub fn equip_from_cursor<W: InvWorld + ?Sized>(
     EquipOutcome::OK
 }
 
+/// Equip without the cursor (`0x00562E00`, §4.9, skip `skip`): §4.7
+/// gives the location L (none → false, nothing changed); put at L on the
+/// body grid and link (kind 3); body location := L, stat link, cursor :=
+/// none, stat refresh, unit flag 0x2 cleared, mode 1, page 0xFF, command
+/// flag 0x200, update list, owner refresh, weapon bookkeeping. No item
+/// flag 0x1, item flag 0x4000 kept, no inventory pass (the differences
+/// from §4.6). The fatal asserts of step 2 return false. Unit flag
+/// 0x2000000 is the caller's (it holds the unit flags).
+pub fn equip_without_cursor<W: InvWorld + ?Sized>(
+    inv: &mut Inventory,
+    w: &mut W,
+    t: &InvTables,
+    item: UnitId,
+    skip: bool,
+) -> bool {
+    let unit = inv.owner;
+    // Step 1.
+    let Some(loc) = auto_equip_location(inv, w, t, item, skip) else {
+        return false;
+    };
+    // Step 2.
+    if matches!(loc, body::SWAP_RIGHT | body::SWAP_LEFT) || !place_at_body(inv, w, item, loc) {
+        return false;
+    }
+    if !w.link_check(unit, item, 3) {
+        return false;
+    }
+    // Step 3.
+    if let Some(d) = w.item_mut(item) {
+        d.body_loc = loc;
+    }
+    w.stat_link(unit, item);
+    inv.put_cursor(w, None);
+    w.stat_refresh(unit);
+    w.clear_targetable(item);
+    let mut guid = NO_GUID;
+    if let Some(d) = w.item_mut(item) {
+        d.mode = mode::EQUIPPED;
+        d.cmd_flags |= cmd::EQUIP2;
+        d.page = page::NONE;
+        guid = d.guid;
+    }
+    inv.push_update(guid);
+    w.owner_refresh(unit);
+    w.weapon_bookkeeping(unit, item);
+    true
+}
+
 /// Auto-equip on pickup (`0x0055D710`, §4.7): the body location `item`
 /// goes to on the inventory owner's body, none = no.
 pub fn auto_equip_location<W: InvWorld + ?Sized>(

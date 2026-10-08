@@ -269,6 +269,8 @@ fn client_world_holds_only_stated_fields() {
         seed,
         queue,
         last_mode_request,
+        // d2rs bookkeeping of §8 rule 1 (no 1.14d field).
+        mode_requests,
         kind,
         // `client/msg-skills.md` §1 r1; `client/msg-ui.md` §1 r4.
         skills,
@@ -303,6 +305,7 @@ fn client_world_holds_only_stated_fields() {
     assert_eq!((class, mode, position, server_point), (0, 0, None, (0, 0)));
     assert_eq!(seed, Some((1, 666)));
     assert!(stats.is_empty() && queue.is_empty() && last_mode_request.is_none());
+    assert_eq!(mode_requests, 0);
     assert_eq!(kind, super::world::KindData::None);
     // Not game state: the model's module does not use the simulation.
     let world = std::fs::read_to_string(src_dir().join("bridge/world.rs")).unwrap();

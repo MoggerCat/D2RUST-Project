@@ -9,6 +9,7 @@
 //! message rules read are inputs ([`ModelInputs`]), not model fields.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 
 pub use super::objects::{ClientObjects, ObjClientInputs};
 
@@ -184,6 +185,10 @@ pub struct ClientUnit {
     /// Queued unit-handler messages (§4).
     pub queue: Vec<Vec<u8>>,
     pub last_mode_request: Option<ModeRequest>,
+    /// How many mode requests (§8 rule 1) the unit has had: d2rs
+    /// bookkeeping (no 1.14d field), so a reader can tell a new request
+    /// from a repeat of the same one.
+    pub mode_requests: u32,
     pub kind: KindData,
     /// The skill list (+0xA8, `msg-skills.md` §1 rule 1); `None` = no
     /// list.
@@ -262,6 +267,7 @@ impl ClientUnit {
             seed: Some(INIT_SEED),
             queue: Vec::new(),
             last_mode_request: None,
+            mode_requests: 0,
             kind: KindData::None,
             skills: None,
             quest_untargetable: false,
@@ -969,9 +975,32 @@ pub fn addressed_unit(msg: &[u8]) -> Option<UnitKey> {
 }
 
 /// Visibility of a unit's sprite at a client pixel point
-/// (`0x004DBF20`, model §6 rule 6, open question 7): a Phase 6 render
-/// seam, taken as an input.
-pub type VisibleFn = fn(&ClientUnit, i32, i32) -> bool;
+/// (`0x004DBF20`, model §6 rule 6, §13): a render seam, taken as an
+/// input (§13 r6). A closure so the render side can answer from its own
+/// state (camera, COF and cel stores: `world_view::visibility`); the
+/// bridge only calls it.
+#[derive(Clone)]
+pub struct VisibleFn(Arc<Visible>);
+
+/// The closure behind a [`VisibleFn`].
+type Visible = dyn Fn(&ClientUnit, i32, i32) -> bool + Send + Sync;
+
+impl VisibleFn {
+    pub fn new(f: impl Fn(&ClientUnit, i32, i32) -> bool + Send + Sync + 'static) -> Self {
+        VisibleFn(Arc::new(f))
+    }
+
+    /// `visible(U, a, b)` (§13), (a, b) in client pixel space.
+    pub fn visible(&self, unit: &ClientUnit, a: i32, b: i32) -> bool {
+        (self.0)(unit, a, b)
+    }
+}
+
+impl std::fmt::Debug for VisibleFn {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("VisibleFn(..)")
+    }
+}
 
 /// One `monstats` row as 0xAC reads it (`msg-units.md` §1.2), with the
 /// flags 0x28 reads (`msg-ui.md` §16 r4).

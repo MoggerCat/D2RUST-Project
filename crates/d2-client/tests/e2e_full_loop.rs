@@ -2051,9 +2051,11 @@ fn run_with(game_seed: u32) -> Transcript {
     // 5b. Pick-up of the kill's gold (C→S 0x16 cursor 0, `inventory-moves.md`
     // §7.1 → §8.1 → §10.1): the staged distance 3 (< 5, `InvRest::
     // distance`); gold → §10.1: limit = level 2 × 10000, take = p: stat
-    // 14 += take; the pile leaves its room and is freed. Result 0. No
-    // message: inventory gold reaches the client through the vitals sync
-    // (§10.3, `combat/vitals.md` §5, not wired here).
+    // 14 += take; the pile leaves its room and is freed. Result 0. The
+    // freed pile's removal S→C 0x0A (type 4) leaves in the per-client
+    // update (`tick.md` §6 rule 5; PROVISIONAL REC-281); inventory gold
+    // reaches the client through the vitals sync (§10.3, `combat/vitals.md`
+    // §5, not wired here).
     let gold_guid = fx.guid(gold);
     record(
         &mut fx,
@@ -2065,7 +2067,9 @@ fn run_with(game_seed: u32) -> Transcript {
         })],
     );
     assert_eq!(frames.last().unwrap().1.codes, [(0x16, done)]);
-    assert_eq!(streams(&fx, &frames.last().unwrap().2), none);
+    let mut removal = vec![0x0A, 4];
+    removal.extend_from_slice(&gold_guid.to_le_bytes());
+    assert_eq!(streams(&fx, &frames.last().unwrap().2), vec![removal]);
     assert!(fx.sim_ref().game.lists.unit(gold).is_none(), "freed");
     let gold_picked = PLAYER_GOLD + amount;
     assert_eq!(fx.stat(player, GOLD), gold_picked);
@@ -2554,7 +2558,8 @@ fn run_with(game_seed: u32) -> Transcript {
     // its unit (`model.md` §4) and never drained in this staged game.
     assert!(log.unowned.is_empty(), "{:?}", log.unowned);
     // + the trade open's 0x9C action 11, one per store item.
-    assert_eq!(log.handled, 25 + store.len() as u64);
+    // + the picked gold pile's removal 0x0A (REC-281).
+    assert_eq!(log.handled, 26 + store.len() as u64);
     assert_eq!(
         log.dropped,
         // + the player's own 0x4D echo (REC-95), dropped like 0x0D.

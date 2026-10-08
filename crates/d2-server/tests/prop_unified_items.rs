@@ -2460,12 +2460,12 @@ fn checks_catch_perturbations() {
 /// Counterexample kept (seed 0; `docs/handoff/prop-unified-items.md` Q3):
 /// an auto pick-up (0x16 cursor flag 0, §8.1) of the ground cap, which
 /// §4.7 auto-equips on the empty head: step 5 takes the cap out of its
-/// room, then calls `0x00562E00`, which no spec writes (the seam's
-/// default fails, `ground.rs` TODO). The cap is left in mode 3, in no
-/// room, no grid and not the cursor item; nothing is sent. Pinned as
-/// wired until the spec writes `0x00562E00`.
+/// room, then `0x00562E00` (`inventory.md` §4.9, now on the inventory
+/// model, REC-281) puts it on the head: mode 1, body location 1, S→C
+/// 0x9D action 6 (command flag 0x200) then 0x47 / 0x48. It used to be
+/// left nowhere while the seam failed.
 #[test]
-fn auto_pickup_with_auto_equip_leaves_the_item_nowhere() {
+fn auto_pickup_with_auto_equip_equips_the_item() {
     let mut h = host(0);
     let start = check_state(&mut h, None).unwrap();
     let cap = *start
@@ -2483,11 +2483,17 @@ fn auto_pickup_with_auto_equip_leaves_the_item_nowhere() {
         x: 0,
         y: 0,
     });
-    assert!(d.is_empty() && t.is_empty(), "{d:02X?} {t:02X?}");
-    let places = check_state(&mut h, Some(mode::GROUND)).unwrap();
-    assert_eq!(places[&cap], Place::Limbo(mode::GROUND));
+    assert!(d.is_empty(), "{d:02X?}");
+    let ids: Vec<(u8, u8)> = t.iter().map(|m| (m[0], m[1])).collect();
+    assert_eq!(ids[0], (0x9D, 0x06), "{t:02X?}");
+    assert_eq!(
+        ids[1..].iter().map(|m| m.0).collect::<Vec<_>>(),
+        [0x47, 0x48]
+    );
+    let places = check_state(&mut h, None).unwrap();
+    assert_eq!(places[&cap], Place::Body(h.player));
     assert_eq!(h.sim.game.lists.unit(cap).unwrap().room(), None);
-    assert!(h.inv().state.body_items(h.player).is_empty());
+    assert_eq!(h.inv().state.body_items(h.player), vec![cap]);
     assert!(faults(&h).is_empty(), "{:?}", faults(&h));
 }
 

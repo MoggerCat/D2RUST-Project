@@ -341,6 +341,27 @@ impl UnitLists {
         self.units.get_mut(id.0)
     }
 
+    /// Sets the unit's allied flag after creation (a later alignment
+    /// change, e.g. `hirelings.md` §3.2 rule 2), keeping its room's
+    /// allied count (§5.2) in step. An unknown unit: nothing.
+    pub fn set_allied(&mut self, id: UnitId, allied: bool) {
+        let Some(e) = self.units.get_mut(id.0) else {
+            return;
+        };
+        if e.allied == allied {
+            return;
+        }
+        e.allied = allied;
+        if let Some(room) = e.room {
+            let r = self.r(room);
+            if allied {
+                r.allied_count += 1;
+            } else {
+                r.allied_count = r.allied_count.wrapping_sub(1);
+            }
+        }
+    }
+
     fn unit_ok(&self, id: UnitId) -> Result<&UnitEntry, ListError> {
         self.unit(id).ok_or(ListError::UnknownUnit(id))
     }

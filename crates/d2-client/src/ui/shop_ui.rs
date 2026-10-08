@@ -10,7 +10,8 @@
 //! The shop opens by itself when a trade's store items arrive
 //! ([`OriginalUi::shop_poll`], the same way as the hire list opens on
 //! S→C 0x4F) for the trader nearest to the local player, or when the NPC
-//! menu calls [`OriginalUi::open_shop`]. It closes with the UI state; the
+//! menu's Trade / Gamble choice is made (REC-277: the next poll calls
+//! [`OriginalUi::open_shop`]). It closes with the UI state; the
 //! close sends C→S 0x30 (`panels-2.md` §14 r5).
 //!
 //! d2rs-own, unverified (preview fills):
@@ -605,6 +606,20 @@ impl OriginalUi {
     /// the trader nearest to the local player, d2rs-own) and ends the
     /// interaction (C→S 0x30) when the shop's UI state went off.
     pub fn shop_poll(&mut self, world: &ClientWorld, root: &mut UiRoot) {
+        // d2rs-own, unverified (REC-277): the Trade / Gamble choice opens
+        // the shop at once, so its close ends the interaction (C→S 0x30)
+        // even when no store item arrives.
+        let request = self.npcm.borrow_mut().shop_request.take();
+        if let Some((guid, class)) = request {
+            if self.shop.borrow().open.is_none() {
+                self.open_shop(guid, class);
+                // The store records newer than the choice are this trade's
+                // (a closed shop's late copy is not; q-smoke-town).
+                if let Some((_, _, floor)) = self.npcm.borrow_mut().shop_for.take() {
+                    self.shop.borrow_mut().floor = floor;
+                }
+            }
+        }
         let (open, serial) = {
             let st = self.shop.borrow();
             (st.open, st.serial)

@@ -57,6 +57,7 @@ pub mod unit_assets;
 pub mod unit_facts;
 pub mod unit_rules;
 pub mod unit_shadow;
+pub mod visibility;
 pub mod walk;
 pub mod walk_room;
 pub mod weather_view;
@@ -414,6 +415,10 @@ pub struct WorldFrame {
     /// Units drawn, and units the rules left undrawn (`unit_pose` = None).
     pub units_drawn: usize,
     pub units_hidden: usize,
+    /// The camera the frame was placed with (`render/camera.md` §3);
+    /// `None` without one. Read back by [`visibility`] (the origin
+    /// getters of `client/model.md` §13 r1 return the last drawn frame's).
+    pub camera: Option<crate::rules::camera::Camera>,
 }
 
 /// The C7 resolver of one unit: the hooks. Frame ids are not a hook: they
@@ -540,6 +545,7 @@ pub fn build<R: ViewRules + UiRules + ?Sized>(
         items,
         units_drawn,
         units_hidden,
+        camera: None,
     })
 }
 

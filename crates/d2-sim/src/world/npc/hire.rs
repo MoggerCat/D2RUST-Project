@@ -11,6 +11,9 @@ use crate::units::UnitId;
 use crate::world::npc::class::{KASHYA, QUAL_KEHK};
 
 /// §7.1 step 1: slots of a hire list (0x450 bytes / 16).
+/// The hired mercenary's creation mode (`npc.md` §7.3 step 7).
+const HIRE_MODE: u8 = 1;
+
 pub const HIRE_SLOTS: usize = 69;
 /// §7.1 step 4: offers drawn per list.
 pub const OFFERS: usize = 10;
@@ -350,9 +353,12 @@ impl NpcControl {
             return refuse(w, code::NO_GOLD);
         }
         let merc_class = self.hirelings[offer.row].class;
-        let merc = match w.spawn_mercenary(npc, merc_class, 4) {
+        // `0x005B23C0(class, 1, 4, 0)`: mode 1 (neutral), spread 4, flags
+        // 0 (`init.md` creation table: game, unit, class, mode, spread,
+        // flags).
+        let merc = match w.spawn_mercenary(npc, merc_class, HIRE_MODE) {
             Some(m) => Some(m),
-            None => w.spawn_mercenary(player, merc_class, 4),
+            None => w.spawn_mercenary(player, merc_class, HIRE_MODE),
         };
         let Some(merc) = merc else {
             return refuse(w, code::NOT_PLACED);
