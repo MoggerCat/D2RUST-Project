@@ -43,15 +43,15 @@
 |   C9. End `0x004D2D70(m, U, forced)` | 319–361 |
 |   C10. Removal and lifetime | 362–374 |
 |   C11. `InitSteps` and `ExplosionMissile` | 375–385 |
-|   C12. Client function table `0x0072A398` | 386–470 |
-|   C13. Function bodies specified here | 471–524 |
-|   C14. Seeds (capture-only) | 525–561 |
-| Constants & data dependencies | 562–583 |
-| Randomness | 584–587 |
-| Edge cases & original bugs | 588–607 |
-| Test vectors | 608–623 |
-| Provenance | 624–640 |
-| Open questions | 641–668 |
+|   C12. Client function table `0x0072A398` | 386–472 |
+|   C13. Function bodies specified here | 473–528 |
+|   C14. Seeds (capture-only) | 529–575 |
+| Constants & data dependencies | 576–597 |
+| Randomness | 598–601 |
+| Edge cases & original bugs | 602–621 |
+| Test vectors | 622–637 |
+| Provenance | 638–654 |
+| Open questions | 655–687 |
 <!-- /index -->
 
 ## Summary
@@ -404,17 +404,17 @@ spec'd: § of this spec, or "open" (Open question 1).
 | 7 | `0x004D37F0` | 3 (86 `guidedarrow`, 193 `bonespirit`, 329) | y | — | — | y | `client-bodies.md` §B5 r2 |
 | 8 | `0x004D38D0` | 16 (93 `chainlightning`, 98 `lightningbolt` …) | y | y | — | y | §C13 |
 | 9 | `0x004D39C0` | 3 (101 `meteorcenter` …) | y | y | — | y | `client-bodies.md` §B5 r5 |
-| 10 | `0x004D3C40` | 1 (106) | y | — | 1 | y | open |
+| 10 | `0x004D3C40` | 1 (106) | y | shard `0x004CE320` | 1; reseed, 2 | y | `client-bodies-2.md` §B11 |
 | 11 | `0x004D3D00` | 16 (115 `corpseexplosion` …) | y | — | — | — | §C13 |
 | 12 | `0x004D3D30` | none | y | — | — | y | §C13 |
-| 13 | `0x004D3F10` | 1 (158 `blizzardcenter`) | y | — | 1 | y | open |
+| 13 | `0x004D3F10` | 1 (158 `blizzardcenter`) | y | shard `0x004CE320` | 1; reseed, 2 | y | `client-bodies-2.md` §B11 |
 | 14 | `0x004D4040` | none | y | — | — | y | open |
-| 15 | `0x004D4180` | 1 (177) | y | y | — | y | open |
+| 15 | `0x004D4180` | 1 (177) | y | y | — | y | `client-bodies-2.md` §B11 |
 | 16 | `0x004D43A0` | 1 (179 `diabwallmaker`) | y | y | 1 | y | open |
 | 17 | `0x004D44B0` | 2 (191 `cursecenter`, 576) | y | `0x004CEF50` | per point | y | `client-bodies.md` §B4 |
 | 18 | `0x004D4590` | 2 (192 `bonespear`, 652) | y | y | — | — | §C13 |
-| 19 | `0x004D46D0` | 1 (260 `frozenorb`) | y | y | — | y | open |
-| 20 | `0x004D47F0` | 1 (262) | y | — | — | y | open |
+| 19 | `0x004D46D0` | 1 (260 `frozenorb`) | y | y | — | y | `client-bodies-2.md` §B11 |
+| 20 | `0x004D47F0` | 1 (262) | y | — | — | y | `client-bodies-2.md` §B11 |
 | 21 | `0x004D48B0` | 1 (284) | y | y | 3 | y | open |
 | 22 | `0x004D49F0` | 1 (285) | y | y | — | y | open |
 | 23 | `0x004D4B80` | 1 (287 `denofevillight`) | y | — | — | — | §C13 |
@@ -438,21 +438,21 @@ spec'd: § of this spec, or "open" (Open question 1).
 | 41 | `0x004D6590` | 1 (377) | y | — | — | — | open |
 | 42 | `0x004D66E0` | 1 (379) | y | y | 3 | — | open |
 | 43 | `0x004D3070` | 6 (392 `blade creeper`, 406, 410, 415, …) | — | — | — | y | §C13 |
-| 44 | `0x004D55C0` | 1 (393) | y | `0x004CDBA0` | — | — | open |
-| 45 | `0x004D56B0` | 1 (394) | y | — | — | y | open |
+| 44 | `0x004D55C0` | 1 (393) | y | `0x004CDBA0` | — | direct | `client-bodies-2.md` §B11 |
+| 45 | `0x004D56B0` | 1 (394) | y | `0x004CE140` | 1 + 2 per puff | y | `client-bodies-2.md` §B11 |
 | 46 | `0x004D5710` | 2 (431, 438) | y | 2 | — | direct | `client-bodies.md` §B4 |
-| 47 | `0x004D5950` | 1 (452 `moltenboulder`) | — | — | — | y | open |
-| 48 | `0x004D59E0` | 1 (461) | y | 2 | 2 + local seed | y | open |
+| 47 | `0x004D5950` | 1 (452 `moltenboulder`) | via 6 | via 6 | via 6 | y | `client-bodies-2.md` §B11 |
+| 48 | `0x004D59E0` | 1 (461) | y | 2 | reseed, 2 | y | `client-bodies-2.md` §B11 |
 | 49 | `0x004D5BA0` | 2 (471, 474) | y | `0x004CDBA0` | — | y | `client-bodies.md` §B4 |
-| 50 | `0x004D5C10` | 1 (479) | y | — | 2 + local seed | y | open |
-| 51 | `0x004D5DD0` | 2 (498, 540) | y | 3 | 2 | y | open (sound: `audio/triggers-2.md` §16) |
+| 50 | `0x004D5C10` | 1 (479) | y | lob `0x004CDC30` | reseed, 2 | y | `client-bodies-2.md` §B11 |
+| 51 | `0x004D5DD0` | 2 (498, 540) | y | 2 + P3 | 2 per extra | y | `client-bodies-2.md` §B11 (sound: `audio/triggers-2.md` §16) |
 | 52 | `0x004D5F80` | 2 (517, 589) | y | 2 | — | y | `client-bodies.md` §B4 |
-| 53 | `0x004D6080` | 1 (520 `tigerfury`) | — | y | — | y | open |
+| 53 | `0x004D6080` | 1 (520 `tigerfury`) | via 7 | y | — | y | `client-bodies-2.md` §B11 |
 | 54 | `0x004D8000` | 1 (528 `anya center`) | y | 2 | — | — | shake: `render/camera.md` §8; rest open |
 | 55 | `0x004D8260` | 1 (541) | y | y | — | — | open |
 | 56 | `0x004D6130` | 1 (546) | y | y | local seed | y | open |
-| 57 | `0x004D62B0` | 1 (553) | y | y | — | y | open |
-| 58 | `0x004D63E0` | 1 (569) | y | — | local seed | y | open |
+| 57 | `0x004D62B0` | 1 (553) | y | y | — | y | `client-bodies-2.md` §B11 |
+| 58 | `0x004D63E0` | 1 (569) | y | — | reseed, 1 step | y | `client-bodies-2.md` §B11 |
 | 59 | `0x004D7FC0` | 4 (570–573) | y | — | — | y | `client-bodies.md` §B5 r6 |
 | 60 | `0x004D8400` | 6 (581–586) | y | — | — | — | `client-bodies.md` §B5 r3 |
 | 61 | `0x004D7690` | 1 (602) | y | — | — | — | open |
@@ -462,16 +462,20 @@ spec'd: § of this spec, or "open" (Open question 1).
 | 65 | `0x004D7E00` | 5 (626–630) | y | — | rnd(25), 1 step, rnd(2) | — | `client-bodies.md` §B5 r4 |
 | 66 | `0x004D2610` | 1 (639 `worldstone shake`) | — | — | inline | y | `render/camera.md` §8 rule W |
 | 67 | `0x004D3E00` | none | y | 3 | — | y | open |
-| 68 | `0x004D5880` | 1 (441 `sucfireball`) | y | y | — | y | open |
+| 68 | `0x004D5880` | 1 (441 `sucfireball`) | y | y | — | y | `client-bodies-2.md` §B11 |
 
 Each function calls the default step at most once per run
 (`render/camera.md` §9). The columns of the rows that point to
-`client-bodies.md` were corrected from the body reads there.
+`client-bodies.md` or `client-bodies-2.md` were corrected from the body
+reads there ("via n": through function n's body; "reseed": m's seed
+re-initialised before the draws).
 
 ### C13. Function bodies specified here
 
 More bodies, the shared create helpers and the hit functions:
-`missiles/client-bodies.md` (conventions §B1).
+`missiles/client-bodies.md` (conventions §B1) and
+`missiles/client-bodies-2.md` (more bodies, the client unit search
+§B9, helpers §B10).
 
 "P1", "P2" = `CltParam1`, `CltParam2` (+0x58, +0x5C); "S1", "S2", "S3" =
 `CltSubMissile1`–`3` (+0x1E, +0x20, +0x22, i16); "step" = §C7; "remove" =
@@ -555,6 +559,16 @@ All client-only; none touches server RNG.
    | hit 3 | H3 > H2 ≥ 0: rnd(H3 − H2 + 1) |
    | hit 14 | H2 ≥ 0: 2 steps (lo' mod 3, lo' & 7) |
    | hit 19 | H2 > H1 ≥ 0: rnd(H2 − H1 + 1) |
+   | functions 13, 10 | S2 > S1: rnd(S2 − S1 + 1); then on a shard frame (elapsed mod k = 0, owner and room present): reseed {x + elapsed, 666}, rnd(2(r − 1)) twice (x, y) (`client-bodies-2.md` §B10 r3) |
+   | function 19 (frozen orb), 20, 15, 57, 68, 53, 44 | none of their own (53 then runs function 7: none; 44 spawns) |
+   | function 45 | as function 4 (scatter): frames left ≠ 0: rnd(P1); per puff rnd(2·P3) twice |
+   | function 48 | on emission: reseed {x + elapsed, 666}; rnd(2(r − 1)) twice |
+   | function 50 | on emission: reseed {d28, 666}; rnd(2r + 1) twice; d28 := seed lo |
+   | function 51 | at elapsed = P1, per extra (P3): rnd(2P4 + 1) twice |
+   | function 58 | on emission: reseed {d28, 666}; 1 step (lo' bit 0); d28 := seed lo |
+   | hit 12 (fire patch) | per kept point: v ≠ 0 → 1 step (lo' mod 25); 1 step for the class (`roll(n)`, n = 1 included); 1 step (lo' mod 100) |
+   | hit 52 (rocks) | H2 ≥ 0: per rock rnd(4c1 + 1) twice |
+   | hits 9, 13, 16, 18, 25, 26, 28, 30, 53, 54, 56 | none |
 
    Every create among them also steps the room seed (r1), after the
    body's draws for that create.
@@ -640,14 +654,12 @@ the owners named there. §C14 r9: the body reads listed in
 
 ## Open questions
 
-1. Bodies marked "open" in §C12 (live: 10, 13, 15, 16, 19–22, 24, 26,
-   28, 30, 31 rest, 32–36, 40–42, 44, 45, 47, 48, 50, 51, 53–58, 61,
-   62, 64, 68; unused: 14, 67) and the helpers `0x004CE530`,
+1. Bodies marked "open" in §C12 (live: 16, 21, 22, 24, 26, 28, 30, 31
+   rest, 32–36, 40–42, 54–56, 61, 62, 64; unused: 14, 67) and the helpers `0x004CE530`,
    `0x004CE850`, `0x004CECC0`, `0x004D19D0`: static read per function,
    one session per ~10 functions.
-2. Client hit functions still open (`client-bodies.md` §B6): live 9,
-   12, 13, 16, 18, 25, 26, 28, 30, 32–34, 36–43, 46–48, 50–54, 56, 57,
-   60–63; unused 4, 64.
+2. Client hit functions still open (`client-bodies.md` §B6): live
+   32–34, 36–43, 46–48, 50, 51, 57, 60–63; unused 4, 64.
 3. Capture: a fireball (Storm shrine) and an Exploding shrine — the
    missile pixels per frame, GUID order and `[0x00711F30]` advance,
    confirming §C3 r20 frames and the not-drawn first frame (§C7 r2).
@@ -665,3 +677,10 @@ the owners named there. §C14 r9: the body reads listed in
    frame offsets), a Plague Javelin hit (hit 2: 23 clouds) and a
    Freezing Arrow hit (hit 14 shard facings); compare the client room
    seed and the missile seeds before and after.
+8. Capture (`client-bodies-2.md`): a Fist of the Heavens cast on a
+   group (count of client `fistoftheheavensbolt` per hit: settles the
+   unset cap of hit 26, Edge case 2 there); a Chain Lightning cast on
+   three monsters (hop order = cyclic GUID order, hit 16); a Blizzard
+   and a Fissure cast (shard / crack positions from the re-seeded
+   missile seed, §B10 r3, function 48); a Frozen Orb (bolt directions
+   d28 += 19 mod 64 per frame, 16 novas at the end).

@@ -5,7 +5,7 @@
   and the shared create helpers, read from the 1.14d `Game.exe` asm
   (addresses per rule; tables dumped from the image). No capture has
   checked them; their seed draws are capture-only (`missiles/client.md`
-  §C14).
+  §C14). More bodies: `missiles/client-bodies-2.md`.
 - **Target version:** 1.14d
 - **Crate/module:** `d2-client::effects::missiles` (with
   `missiles/client.md`)
@@ -246,27 +246,27 @@ with that `pCltHitFunc`.
 | 2 | `0x004CF2B0` | 43, 47–49, 419, 436 | B7 |
 | 3 | `0x004CF300` | 44–46, 238 | B7 |
 | 4 | `0x004D05E0` | none | open |
-| 9 | `0x004CF3C0` | 55 `holybolt`, 234 | open |
+| 9 | `0x004CF3C0` | 55 `holybolt`, 234 | `client-bodies-2.md` §B12 |
 | 10 | `0x004CC9A0` | 23 (56 `chargedbolt`, 90 `nova`, …) | B7 |
 | 11 | null | 283 `desertfireball` | not called |
-| 12 | `0x004CF500` | 85 | open |
-| 13 | `0x004CCBE0` | 86, 193, 329 | open |
+| 12 | `0x004CF500` | 85 | `client-bodies-2.md` §B12 |
+| 13 | `0x004CCBE0` | 86, 193, 329 | `client-bodies-2.md` §B12 |
 | 14 | `0x004CF640` | 87, 96, 271 | B7 |
-| 16 | `0x004CF800` | 93, 232, 267 (568 `*16`: compiled value per `data/field-types.md`) | open |
-| 18 | `0x004CF9B0` | 101, 133, 564 | open |
+| 16 | `0x004CF800` | 93, 232, 267 (568 `*16`: compiled value per `data/field-types.md`) | `client-bodies-2.md` §B12 |
+| 18 | `0x004CF9B0` | 101, 133, 564 | `client-bodies-2.md` §B12 |
 | 19 | `0x004CFC80` | 11 (107–110, 159–162, 312–314) | B7 |
 | 24 | `0x004CFD00` | 192 `bonespear`, 652 | B7 |
-| 25, 26, 28 | `0x004CFE30`, `0x004D0060`, `0x004D02E0` | 206, 233, 239 | open |
+| 25, 26, 28 | `0x004CFE30`, `0x004D0060`, `0x004D02E0` | 206, 233, 239 | `client-bodies-2.md` §B12 |
 | 29 | `0x004D0380` | 249–256 (6 `grimward…`) | B7 |
-| 30 | `0x004D04D0` | 260 `frozenorb` | open |
+| 30 | `0x004D04D0` | 260 `frozenorb` | `client-bodies-2.md` §B12 |
 | 31 | `0x004D14A0` | 272–274, 417 | B7 |
 | 32–34 | `0x004D06F0`, `0x004D07E0`, `0x004CCCA0` | 277, 302, 306 | open |
 | 36–43 | `0x004D0920`, `0x004D1BD0`, `0x004D1D70`, `0x004D1EC0`, `0x004CD240`, `0x004D1F50`, `0x004D1820`, `0x004D1890` | 336, 348, 351, 354, 357, 364, 374, 375 | open |
 | 44 | `0x004D09E0` | 385, 388, 412, 496, 503, 588 | B7 |
 | 46–48 | `0x004CCD20`, `0x004D0A80`, `0x004D2760` | 407, 411, 416 | open |
-| 50–54 | `0x004D0DB0`, `0x004CCE40`, `0x004D0E00`, `0x004D0EB0`, `0x004D0FF0` | 422, 431/438, 452, 453, 472/475 | open |
+| 50–54 | `0x004D0DB0`, `0x004CCE40`, `0x004D0E00`, `0x004D0EB0`, `0x004D0FF0` | 422, 431/438, 452, 453, 472/475 | 50, 51 open; 52–54 `client-bodies-2.md` §B12 |
 | 55 | `0x004D1040` | 481, 578, 671 | B7 |
-| 56, 57 | `0x004D1110`, `0x004D11D0` | 499, 550 | open |
+| 56, 57 | `0x004D1110`, `0x004D11D0` | 499, 550 | 56 `client-bodies-2.md` §B12; 57 open |
 | 60–63 | `0x004D1240`, `0x004CCF00`, `0x004D2AF0`, `0x004D2C10` | 603, 639, 654, 655 | open |
 | 64 | `0x004CF150` | none | open |
 
@@ -386,4 +386,4 @@ dumped from the image (`re/scripts/rd.py`). Live rows and values from
    client: the client skill functions that create these missiles
    (`client/msg-skills.md` §7) — not traced per row.
 2. Remaining live bodies: `missiles/client.md` Open question 1 (do)
-   and 2 (hit).
+   and 2 (hit); part 2 of these bodies: `missiles/client-bodies-2.md`.
