@@ -49,8 +49,8 @@ use d2_sim::units::{RoomId, UnitId, UnitType};
 use d2_sim::wiring::action::Pending;
 use d2_sim::wiring::action::{ActionHooks, ObjectCase};
 use d2_sim::wiring::economy::{
-    quest_objects, Economy, EconomyQuests, GameFields, HostQuests, QuestInv, QuestInventory,
-    QuestLoan, QuestRest,
+    quest_objects, Economy, EconomyQuests, GameFields, HostQuests, LoanedInventory, QuestInv,
+    QuestInventory, QuestLoan, QuestRest,
 };
 use d2_sim::wiring::interaction::{
     Desk, InteractionError, InteractionState, NpcInv, NpcInventory, NpcRest, PlayerQuestsRef,
@@ -396,6 +396,24 @@ fn flush_taken<X: Pending, R: TradeRest>(
         .collect()
 }
 
+/// The wired host's inventory model as a quest loan's ([`QuestLoan`]).
+impl LoanedInventory for InvParts {
+    fn lend<X: Pending, T>(
+        &mut self,
+        f: impl FnOnce(&mut dyn QuestInventory<ActionHooks<X>>) -> T,
+    ) -> T {
+        let mut q = QuestInv::new(&self.tables, &mut self.state, self.rest.as_mut());
+        let out = f(&mut q);
+        let errors = q.errors;
+        self.state.errors.extend(
+            errors
+                .into_iter()
+                .map(d2_sim::wiring::inventory::InvError::Economy),
+        );
+        out
+    }
+}
+
 /// A quest call on the desk's economy and rest ([`HostQuests`]: the
 /// [`EconomyQuests`] calls with the object, level, interaction and
 /// identify calls answered by the action wiring and the NPC rest, the
@@ -521,6 +539,10 @@ impl<R: TradeRest + Default + 'static, S> WiredWorld<R, S> {
             quests: std::mem::replace(&mut self.quests, empty),
             rest: std::mem::take(&mut self.rest),
             tables: std::mem::take(&mut self.tables),
+            // The inventory model goes with the loan: a quest object's
+            // operate reads and removes the player's items
+            // (q-a4-quest-items).
+            inv: self.inventory.take(),
         };
         events.action().sys.hooks.quest_host = Some(Box::new(loan));
         let out = f(&mut self.action, events);
@@ -530,13 +552,14 @@ impl<R: TradeRest + Default + 'static, S> WiredWorld<R, S> {
             .hooks
             .quest_host
             .take()
-            .map(|h| h.into_any().downcast::<QuestLoan<R>>());
+            .map(|h| h.into_any().downcast::<QuestLoan<R, InvParts>>());
         match back {
             Some(Ok(l)) => {
                 let l = *l;
                 self.quests = l.quests;
                 self.rest = l.rest;
                 self.tables = l.tables;
+                self.inventory = l.inv;
             }
             // `f` took the loan out of the hooks or put another one in:
             // the game's quest state is gone (API misuse, fatal).
@@ -874,6 +897,8 @@ where
         });
         let sent = self.desk(game, events, quest_objects);
         self.inv_sent.extend(sent);
+        let sent = self.take_inventory_sent(game, events);
+        self.inv_sent.extend(sent);
         out
     }
 
@@ -903,6 +928,8 @@ where
     {
         self.arrivals(game, events);
         self.lend_quests(events, |_, ev| d2_sim::tick::tick(game, ev));
+        let sent = self.take_inventory_sent(game, events);
+        self.inv_sent.extend(sent);
     }
 
     /// The quest routes queued outside a lent call (a quest call's own
@@ -969,10 +996,32 @@ where
             .hireling_tables
             .is_some()
             .then(|| self.state.hirelings.clone());
-        let out = self.with_economy(game, events, |econ, _| {
+        let out = self.with_economy(game, events, |econ, parts| {
             // d2rs-own, unverified (D1): the preview rest reads the
             // places staged here (`MoveRest::stage`).
             let mut places = Vec::new();
+            // The players' quest flags of the game's difficulty, staged
+            // for the quest-item uses of 0x20 (`inventory-moves.md` §7.11
+            // step 4: `ass`, `xyz`, `tr2`) and written back after the call
+            // (PROVISIONAL, REC-246; d2rs-own, unverified).
+            let difficulty = usize::from(econ.fields.difficulty).min(2);
+            let mut flags = Vec::new();
+            let mut by_owner = Vec::new();
+            for u in econ
+                .game
+                .lists
+                .units_of_type(d2_sim::units::UnitType::Player)
+            {
+                let Some(guid) = econ.units.get(u).map(|r| r.guid) else {
+                    continue;
+                };
+                let owner = d2_sim::items::moves::Owner::player(guid);
+                if let Some(q) = parts.rest.quests(u) {
+                    flags.push((owner, q.flags[difficulty]));
+                    by_owner.push((owner, u));
+                }
+            }
+            inv.rest.stage_quest_flags(&flags);
             for u in econ
                 .game
                 .lists
@@ -988,13 +1037,33 @@ where
             for (&u, it) in &inv.state.items {
                 places.push(super::super::items::moves::StagedPlace {
                     owner: d2_sim::items::moves::Owner::item(it.guid),
-                    pos: (it.x, it.y),
+                    // A drop made by the treasure walk keeps its spot in the
+                    // static path, not in the item data (q-a4-quest-items).
+                    pos: if (it.x, it.y) == (0, 0) {
+                        econ.hooks.path_position(u)
+                    } else {
+                        (it.x, it.y)
+                    },
                     room: econ.game.lists.unit(u).and_then(|e| e.room()),
                 });
             }
             let format = d2_sim::items::ItemGame::item_format(&*econ.fields);
             inv.rest.stage(&places, format);
-            call.call(econ, &mut inv)
+            let out = call.call(econ, &mut inv);
+            for (owner, quest, flag, on) in inv.rest.take_quest_flag_writes() {
+                let Some(&(_, u)) = by_owner.iter().find(|(o, _)| *o == owner) else {
+                    continue;
+                };
+                if let Some(q) = parts.rest.quests(u) {
+                    let f = &mut q.flags[difficulty];
+                    if on {
+                        f.set(quest, flag);
+                    } else {
+                        f.clear(quest, flag);
+                    }
+                }
+            }
+            out
         });
         inv.state.hirelings = None;
         self.inventory = Some(inv);

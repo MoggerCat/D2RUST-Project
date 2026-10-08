@@ -287,19 +287,34 @@ impl<H: LifecycleHooks, R: QuestRest> EconomyQuests<'_, '_, H, R> {
     /// `questdiffcheck` is 0, or its stat 356 (`questitemdifficulty`,
     /// total value) ≥ the game difficulty.
     pub fn find_item(&self, player: UnitId, code: [u8; 4]) -> Option<UnitId> {
+        self.find_item_in(
+            self.rest.quest_cursor_item(player),
+            self.rest.inventory(player),
+            code,
+        )
+    }
+
+    /// [`Self::find_item`] over a given cursor item and item list (a host
+    /// with an inventory model lends its own).
+    pub fn find_item_in(
+        &self,
+        cursor: Option<UnitId>,
+        list: Vec<UnitId>,
+        code: [u8; 4],
+    ) -> Option<UnitId> {
         const QUEST_ITEM_DIFFICULTY: u16 = 356;
         let t = self.econ.tables;
         let d = i32::from(self.econ.fields.difficulty);
         let rec = |i: UnitId| t.item(self.econ.items.get(i)?.record);
         let stat = |i: UnitId| self.econ.stats.unit_total(i, QUEST_ITEM_DIFFICULTY, 0);
-        if let Some(c) = self.rest.quest_cursor_item(player) {
+        if let Some(c) = cursor {
             if let Some(r) = rec(c).filter(|r| r.code == code) {
                 if r.quest == 0 || stat(c) >= d {
                     return Some(c);
                 }
             }
         }
-        self.rest.inventory(player).into_iter().find(|&i| {
+        list.into_iter().find(|&i| {
             let Some(item) = self.econ.items.get(i) else {
                 return false;
             };

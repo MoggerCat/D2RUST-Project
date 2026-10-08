@@ -361,10 +361,12 @@ fn game_creation_derives_the_four_controls_in_order_before_the_first_unit() {
     for _ in 0..=d2_client::app::synthetic_act4::NPCS.len() {
         want.step(); // the Fortress's NPCs and its waypoint (d2rs-own, q-a4)
     }
+    want.step(); // Kurast Docks's waypoint (q-act3-act5-gaps, d2rs-own)
     let h = g.sim.events.action.hooks();
     assert_eq!(h.game_seed, want);
     assert_eq!(h.objects.as_ref().map(|o| o.obj_seed), Some(obj_seed));
-    assert!(h.object_drops.is_none());
+    // The synthetic game has the Hellforge's drop tables (q-a4-quest-items).
+    assert!(h.object_drops.is_some());
     assert_eq!(h.uniques, Default::default());
     let w = &g.sim.world;
     assert!(w.quests.record(1).is_some(), "the quest control's records");

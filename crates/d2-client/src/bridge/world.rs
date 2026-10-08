@@ -115,6 +115,10 @@ pub struct ItemData {
     /// The other bits of the item flag word (item data +0x18) as the
     /// model rules write them (0x3E, 0x40, 0x7D); bit 4 is `flags4`.
     pub flags: u32,
+    /// The properties of the last record's lists (`bridge::item_lists`).
+    pub props: Vec<super::item_lists::ItemProp>,
+    /// The item is a charm (type `char`).
+    pub charm: bool,
 }
 
 impl ItemData {
@@ -512,6 +516,9 @@ impl RoomUnits {
 pub struct ClientWorld {
     /// Bridge frames run (`bridge.md` §5 rule 3).
     pub frames: u64,
+    /// The item tables the streams are decoded with
+    /// (`bridge::item_lists`).
+    pub item_tables: super::item_lists::ItemTablesRef,
     /// d2rs-own, unverified: S→C 0x9C action 0x0B records received (the
     /// store items a trade open shows, `world/vendors.md` §4 step 3).
     pub store_serial: u32,
@@ -809,8 +816,8 @@ impl ClientWorld {
     /// lists attached to the unit (§1 rule 2: the state lists of 0xA7–0xAA
     /// and the passive-state lists, `ClientUnit::state_lists`, each
     /// propagating its stats into the owner's full array,
-    /// `sim/stat-lists.md` §8.1). Item lists wait for the item stream
-    /// (`stat-lists.md` open question 2).
+    /// `sim/stat-lists.md` §8.1) and the lists of the attached items
+    /// (§2, `bridge::item_lists`).
     pub fn total(&self, key: UnitKey, stat: u16, layer: u16) -> i32 {
         let Some(u) = self.units.get(&key) else {
             return 0;
@@ -819,6 +826,7 @@ impl ClientWorld {
             .values()
             .filter_map(|l| l.get(&(stat, layer)))
             .fold(self.base(key, stat, layer), |a, &v| a.wrapping_add(v))
+            .wrapping_add(self.item_lists_total(key, stat, layer))
     }
 
     /// The roster lookup `0x004792E0(GUID)` (`msg-units.md` §8 r2):

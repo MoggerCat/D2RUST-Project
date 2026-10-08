@@ -26,7 +26,9 @@ use crate::items::ItemTables;
 use crate::wiring::action::{ObjectRoute, Pending, QuestObjectCall, QuestObjectHost, View};
 use crate::wiring::interaction::NpcRest;
 
+use super::quest_reward::QuestInventory;
 use super::{Economy, EconomyQuests, GameFields, HostQuests, QuestRest};
+use crate::wiring::action::ActionHooks;
 use crate::world::objects::{Dispatch, EventRun, Operate, Route};
 use crate::world::quests::act3::{self, InitPoint, KhalimChest};
 use crate::world::quests::{self, act1, act2, act4, act5, QuestControl, QuestWorld};
@@ -51,13 +53,39 @@ pub enum QuestObjectRun {
 /// `with_economy` does),
 /// without the deferred mercenary rewards (no object quest function
 /// grants one).
-pub struct QuestLoan<R> {
+pub struct QuestLoan<R, I = NoInventory> {
     pub quests: QuestControl,
     pub rest: R,
     pub tables: ItemTables,
+    /// The host's inventory model, lent with the rest (the quest items:
+    /// `has_item`, `delete_item`, the reward); none: the rest's answers.
+    pub inv: Option<I>,
 }
 
-impl<X: Pending, R: QuestRest + NpcRest + 'static> QuestObjectHost<X> for QuestLoan<R> {
+/// An inventory model a host lends to [`QuestLoan`]: `lend` runs `f` on
+/// it as the quest calls' inventory ([`QuestInventory`]).
+pub trait LoanedInventory {
+    fn lend<X: Pending, T>(
+        &mut self,
+        f: impl FnOnce(&mut dyn QuestInventory<ActionHooks<X>>) -> T,
+    ) -> T;
+}
+
+/// The loan with no inventory model (no value of this type exists).
+pub enum NoInventory {}
+
+impl LoanedInventory for NoInventory {
+    fn lend<X: Pending, T>(
+        &mut self,
+        _: impl FnOnce(&mut dyn QuestInventory<ActionHooks<X>>) -> T,
+    ) -> T {
+        match *self {}
+    }
+}
+
+impl<X: Pending, R: QuestRest + NpcRest + 'static, I: LoanedInventory + 'static> QuestObjectHost<X>
+    for QuestLoan<R, I>
+{
     fn run(
         &mut self,
         game: &mut Game,
@@ -83,9 +111,11 @@ impl<X: Pending, R: QuestRest + NpcRest + 'static> QuestObjectHost<X> for QuestL
                 tables: &self.tables,
                 items: &mut items,
             };
-            let inner = EconomyQuests::new(&mut econ, &mut self.rest);
-            let mut w = HostQuests::new(inner);
-            run(&mut self.quests, &mut w, &call)
+            let (quests, rest) = (&mut self.quests, &mut self.rest);
+            match self.inv.as_mut() {
+                Some(inv) => inv.lend::<X, _>(|q| run_on(&mut econ, rest, quests, Some(q), &call)),
+                None => run_on(&mut econ, rest, quests, None, &call),
+            }
         };
         v.h.items = items;
         v.h.game_seed = fields.seed;
@@ -99,6 +129,21 @@ impl<X: Pending, R: QuestRest + NpcRest + 'static> QuestObjectHost<X> for QuestL
     fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
         self
     }
+}
+
+/// One route on [`HostQuests`] over `econ` and `rest`, with the host's
+/// inventory model when one is lent.
+fn run_on<'e, X: Pending, R: QuestRest>(
+    econ: &'e mut Economy<'_, ActionHooks<X>>,
+    rest: &'e mut R,
+    quests: &mut QuestControl,
+    inv: Option<&'e mut dyn QuestInventory<ActionHooks<X>>>,
+    call: &QuestObjectCall,
+) -> QuestObjectRun {
+    let inner = EconomyQuests::new(econ, rest);
+    let mut w = HostQuests::new(inner);
+    w.inventory = inv;
+    run(quests, &mut w, call)
 }
 
 /// Runs the queued routes in order; returns those handed back.

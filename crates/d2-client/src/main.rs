@@ -449,12 +449,13 @@ fn play(o: Options) -> Result<()> {
             .clone()
             .unwrap_or_else(d2_client::app::save::default_save_dir);
         let handles = StartHandles::default();
-        let front = FrontEnd::new(
-            expansion,
-            Box::new(DirSaves(saves.clone())),
-            registry(&saves, &handles),
-        );
-        let host = FrontHost::with_front(front, art, first);
+        let mut reg = registry(&saves, &handles);
+        if let Some(a) = &art {
+            d2_client::app::front_host::register_credits(&mut reg, a);
+        }
+        let front = FrontEnd::new(expansion, Box::new(DirSaves(saves.clone())), reg);
+        let host = FrontHost::with_front(front, art, first)
+            .with_stub_writer(handles.created.clone(), saves.clone());
         first = false;
         match run_front_end(host) {
             Outcome::Exit => return Ok(()),

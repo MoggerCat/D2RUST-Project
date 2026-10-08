@@ -14,10 +14,12 @@
 //! screens do not yet report a choice).
 
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use bevy::asset::RenderAssetUsages;
 use bevy::input::keyboard::KeyboardInput;
+use bevy::input::mouse::MouseWheel;
 use bevy::input::ButtonState;
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
@@ -27,9 +29,11 @@ use d2_formats::palette::Palette;
 
 use crate::assets::path::FileSource;
 use crate::ui::front_end::glyphs::text_quads;
+use crate::ui::front_end::screens::create::{NewCharacter, NewCharacterSink};
+use crate::ui::front_end::screens::credits;
 use crate::ui::front_end::startup::{MemProgress, StubVideo};
 use crate::ui::front_end::{
-    DrawItem, FrontEnd, FrontInput, Outcome, SaveFolder, SKY_PALETTE, TICK_MS,
+    DrawItem, FrontEnd, FrontInput, Outcome, Registry, SaveFolder, SKY_PALETTE, TICK_MS,
 };
 use crate::ui::geom::Point;
 use crate::ui::text::font_info;
@@ -150,6 +154,24 @@ pub fn compose(items: &[DrawItem], art: Option<&mut FrontArt>) -> Vec<u8> {
                     }
                 }
             }
+            // d2rs-own, unverified (REC-231): a dark box and a 1 px outline.
+            DrawItem::Rect { at, w, h } => {
+                for y in at.y..at.y + h {
+                    for x in at.x..at.x + w {
+                        plot(x, y, [8, 8, 12], false);
+                    }
+                }
+            }
+            DrawItem::Border { at, w, h } => {
+                for x in at.x..at.x + w {
+                    plot(x, at.y, [120, 100, 60], false);
+                    plot(x, at.y + h - 1, [120, 100, 60], false);
+                }
+                for y in at.y..at.y + h {
+                    plot(at.x, y, [120, 100, 60], false);
+                    plot(at.x + w - 1, y, [120, 100, 60], false);
+                }
+            }
             // PROVISIONAL (REC-189): draw mode 3 is the additive blend of
             // §F1.5 r2 (per-channel `min(255, d + s)`, the spec's fit of the
             // PL2 table); the frame's offsets add to the position
@@ -242,6 +264,66 @@ pub struct FrontHost {
     /// Set when the flow ended.
     pub outcome: Option<Outcome>,
     pub frames: u32,
+    /// Where the create screen leaves its choice, and the Save folder the
+    /// stub is written to ([`FrontHost::with_stub_writer`]).
+    stub: Option<(NewCharacterSink, PathBuf)>,
+    /// The stub `.d2s` written for the last created character, or why not.
+    pub created: Option<Result<PathBuf, String>>,
+}
+
+/// `// d2rs-own, unverified` (REC-231): until the glyph path (q-fe-draw)
+/// lands, a fixed advance of 8 per unit stands for the font's.
+pub fn provisional_adv(_font: u16, text: &[u16]) -> i32 {
+    8 * text.len() as i32
+}
+
+/// Registers the credits screen with the text read from the archives when no
+/// loose file is under `D2_GAME_DIR`.
+pub fn register_credits(reg: &mut Registry, art: &FrontArt) {
+    let src = art.source.clone();
+    credits::register_with(
+        reg,
+        Box::new(move |expansion| {
+            let name = if expansion {
+                "ExpansionCredits.txt"
+            } else {
+                "Credits.txt"
+            };
+            // d2rs-own, unverified: loose file first, then the archives.
+            credits::loose_file(expansion)
+                .or_else(|| src.read_file(&format!(r"data\local\ui\eng\{name}"))?.ok())
+        }),
+    );
+}
+
+/// The 335-byte stub `.d2s` of a new character (`formats/d2s.md` §2.6),
+/// written to `<dir>/<name>.d2s`.
+pub fn write_stub(dir: &Path, c: &NewCharacter, time: u32) -> Result<PathBuf, String> {
+    use d2_formats::d2s::{self, D2s, SaveTables, StatSave};
+    // The stub has no body: no table is consulted.
+    struct NoTables;
+    impl SaveTables for NoTables {
+        fn stat_save(&self, _: u16) -> Option<StatSave> {
+            None
+        }
+        fn item_entry_len(&self, _: &[u8]) -> Result<usize, String> {
+            Err("stub has no items".into())
+        }
+    }
+    let mut flags = 0u16;
+    if c.hardcore {
+        flags |= d2s::status::HARDCORE;
+    }
+    if c.expansion {
+        flags |= d2s::status::EXPANSION;
+    }
+    let stub = D2s::new_stub(c.name.as_bytes(), c.class.id(), flags, time)
+        .ok_or_else(|| format!("name {:?} does not fit", c.name))?;
+    let bytes = d2s::write(&stub, &NoTables).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    let path = dir.join(format!("{}.d2s", c.name));
+    std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
+    Ok(path)
 }
 
 impl FrontHost {
@@ -261,6 +343,8 @@ impl FrontHost {
     pub fn with_front(mut front: FrontEnd, art: Option<FrontArt>, first_entry: bool) -> Self {
         front.start(first_entry, &mut MemProgress::default(), &mut StubVideo);
         Self {
+            stub: None,
+            created: None,
             front,
             art,
             acc_ms: 0,
@@ -268,6 +352,27 @@ impl FrontHost {
             outcome: None,
             frames: 0,
         }
+    }
+
+    /// Writes the stub `.d2s` of a character the create screen finishes
+    /// into `save_dir`. The choice stays in the sink for the game start.
+    pub fn with_stub_writer(mut self, sink: NewCharacterSink, save_dir: PathBuf) -> Self {
+        self.stub = Some((sink, save_dir));
+        self
+    }
+
+    /// The flow ended in a game load from character create: write the stub.
+    fn write_created(&mut self) {
+        let Some((sink, dir)) = &self.stub else {
+            return;
+        };
+        let Some(c) = sink.borrow().clone() else {
+            return;
+        };
+        let time = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| d.as_secs() as u32);
+        self.created = Some(write_stub(dir, &c, time));
     }
 }
 
@@ -334,6 +439,7 @@ fn feed_input(
     windows: Query<&Window>,
     buttons: Option<Res<ButtonInput<MouseButton>>>,
     mut keys: MessageReader<KeyboardInput>,
+    mut wheel: MessageReader<MouseWheel>,
 ) {
     let at = windows.single().ok().and_then(|w| {
         Some(frame_point(
@@ -350,9 +456,20 @@ fn feed_input(
             if b.just_released(MouseButton::Left) {
                 host.front.input(FrontInput::Up(p));
             }
+            if b.just_pressed(MouseButton::Middle) {
+                host.front.input(FrontInput::Middle);
+            }
         }
     }
+    for w in wheel.read() {
+        host.front.input(FrontInput::Wheel((w.y * 120.0) as i32));
+    }
     for k in keys.read() {
+        if k.state == ButtonState::Released {
+            if let Some(code) = vk(k.key_code) {
+                host.front.input(FrontInput::KeyUp(code));
+            }
+        }
         if k.state == ButtonState::Pressed {
             if let Some(code) = vk(k.key_code) {
                 host.front.input(FrontInput::Key(code));
@@ -373,6 +490,9 @@ fn drive(mut host: NonSendMut<FrontHost>, time: Res<Time>) {
         host.acc_ms -= TICK_MS;
         host.front.tick();
         host.outcome = host.front.outcome();
+        if matches!(host.outcome, Some(Outcome::GameLoad(g)) if g.new_character) {
+            host.write_created();
+        }
     }
 }
 
@@ -384,6 +504,8 @@ fn draw(
     let host = &mut *host;
     host.frames += 1;
     host.drawn = host.front.draw();
+    let over = host.front.overlay(&provisional_adv);
+    host.drawn.extend(over);
     if let Some(img) = img {
         if let Some(mut i) = images.get_mut(&img.0) {
             i.data = Some(compose(&host.drawn, host.art.as_mut()));

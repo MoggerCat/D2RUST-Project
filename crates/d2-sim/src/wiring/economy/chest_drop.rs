@@ -150,3 +150,24 @@ impl FreeSpot for NoSpot {
         None
     }
 }
+
+/// The free-spot seam of a host with no collision search over the floor:
+/// the start spot as is (`treasure.md` §7 step 2 without the search).
+///
+/// PROVISIONAL (M22; REC-235, REC-108): `// d2rs-own, unverified`.
+pub struct StartSpot;
+
+impl FreeSpot for StartSpot {
+    fn free_spot(
+        &mut self,
+        room: Option<crate::units::RoomId>,
+        start: (i32, i32),
+        _: (i32, i32),
+    ) -> Option<super::DropSpot> {
+        Some(super::DropSpot {
+            room,
+            x: start.0,
+            y: start.1,
+        })
+    }
+}

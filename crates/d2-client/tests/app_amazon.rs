@@ -148,6 +148,10 @@ impl Game {
                 h.anim_data = Some(Arc::new(anim_data()));
                 h.x.looks = Some(Arc::new(looks()));
                 l.host_mut().game.events.action.sys.stats = StatLists::new(stat_data());
+                // The test sets the weapon copy by hand (`equip`); the
+                // synthetic game now has an inventory model, whose sync
+                // would replace it (q-a4-quest-items).
+                l.host_mut().game.world.inventory = None;
             })
             .unwrap();
         let req = single_player::create_request();

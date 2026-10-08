@@ -107,7 +107,7 @@ impl<'e, 'a, X: Pending, R: QuestRest> HostQuests<'e, 'a, X, R> {
             &mut crate::units::hooks::Sim<'_>,
             &mut super::DeathDrops,
             &[d2_data::tables::Levels],
-            &mut super::NoSpot,
+            &mut super::StartSpot,
         ) -> T,
     ) -> Option<T> {
         let e = &mut *self.inner.econ;
@@ -128,7 +128,7 @@ impl<'e, 'a, X: Pending, R: QuestRest> HostQuests<'e, 'a, X, R> {
                 &mut sim,
                 &mut d,
                 &at.levels,
-                &mut super::NoSpot,
+                &mut super::StartSpot,
             )
         };
         std::mem::swap(&mut e.hooks.items, &mut *e.items);
@@ -235,6 +235,17 @@ impl<X: Pending, R: QuestRest> HostQuests<'_, '_, X, R> {
         };
         let inv = self.inventory.as_deref_mut()?;
         quest_reward::drop_or_free(&mut *self.inner.econ, inv, item, spot)
+    }
+
+    /// `0x00558110` over the lent inventory model's lists; none lent: the
+    /// rest's.
+    fn find_on_host(&self, player: UnitId, code: [u8; 4]) -> Option<UnitId> {
+        match self.inventory.as_deref() {
+            Some(inv) => self
+                .inner
+                .find_item_in(inv.cursor_of(player), inv.items_of(player), code),
+            None => self.inner.find_item(player, code),
+        }
     }
 
     /// §9.1's drop spot: `0x00545340` ([`helpers::free_spot`]) from the
@@ -441,13 +452,29 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
         self.inner.send_text_list(player, npc, list)
     }
     fn has_item(&self, player: UnitId, code: [u8; 4]) -> bool {
-        self.inner.has_item(player, code)
+        self.find_on_host(player, code).is_some()
+    }
+    /// `0x0063BEF0` and the items record code (+0x80); none without an
+    /// inventory model.
+    fn wielded_weapon_code(&mut self, player: UnitId) -> Option<[u8; 4]> {
+        let inv = self.inventory.as_deref()?;
+        let w = inv.weapon_in_use(&*self.inner.econ, player)?;
+        self.inner.item_code(w)
     }
     fn item_code(&self, item: UnitId) -> Option<[u8; 4]> {
         self.inner.item_code(item)
     }
+    /// `0x00544160` (`quests.md` §9.2): the found item, removed through
+    /// the lent inventory model; none lent: the rest's.
     fn delete_item(&mut self, player: UnitId, code: [u8; 4]) {
-        self.inner.delete_item(player, code)
+        if self.inventory.is_none() {
+            return self.inner.delete_item(player, code);
+        }
+        if let Some(item) = self.find_on_host(player, code) {
+            if let Some(inv) = self.inventory.as_deref_mut() {
+                inv.delete(&mut *self.inner.econ, player, item);
+            }
+        }
     }
     fn reward_item(
         &mut self,
@@ -469,7 +496,31 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
     /// the rest's answer.
     fn drop_item_at(&mut self, unit: UnitId, code: [u8; 4], quality: u8) -> bool {
         match self.econ_quest_drop(unit, code, quality, 0) {
-            Some(item) => item.is_some(),
+            Some(item) => {
+                // PROVISIONAL (REC-235; quests-act4.md §4.8 names no
+                // identify): a quest drop is identified, as the reward
+                // `0x005466B0` (§9.1) makes its item, so the Hellforge
+                // hammer can be wielded without Cain's identify.
+                if let Some(i) = item.and_then(|u| self.inner.econ.items.get_mut(u)) {
+                    i.flags |= crate::items::flag::IDENTIFIED;
+                }
+                // PROVISIONAL (REC-235): the item takes its spot in the
+                // static path (the treasure walk's `placed` does that only
+                // with the walk-back field), so a pick-up reads where it is.
+                let spot = self
+                    .inner
+                    .econ
+                    .hooks
+                    .object_drops
+                    .as_ref()
+                    .and_then(|d| d.placed.last().copied());
+                if let (Some(u), Some((placed, at))) = (item, spot) {
+                    if placed == u {
+                        self.view(|g, v| v.path_place(g, u, at.x, at.y));
+                    }
+                }
+                item.is_some()
+            }
             None => self.inner.drop_item_at(unit, code, quality),
         }
     }

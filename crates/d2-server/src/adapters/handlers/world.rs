@@ -724,6 +724,29 @@ pub struct StartItems {
 }
 
 impl<R, S> WiredWorld<R, S> {
+    /// What the inventory model queued outside a vendor or quest call
+    /// (the quest objects' item removals, run on the loan): receiving
+    /// unit, bytes.
+    pub fn take_inventory_sent<D: ActionEvents>(
+        &mut self,
+        game: &mut Game,
+        events: &mut D,
+    ) -> Vec<(UnitId, Vec<u8>)> {
+        let Some(mut inv) = self.inventory.take() else {
+            return Vec::new();
+        };
+        let mut out = Vec::new();
+        self.with_economy(game, events, |econ, _| {
+            let mut d = inv.desk(econ);
+            out = inv_take_sent(&mut d)
+                .into_iter()
+                .filter_map(|(u, b)| Some((u?, b)))
+                .collect();
+        });
+        self.inventory = Some(inv);
+        out
+    }
+
     /// The start items `0x00534F10` (`items/generation.md` §10.3) of
     /// `player` on this host's economy and inventory model
     /// ([`character::start_items`] over [`WiredStart`]). The player's
@@ -747,6 +770,14 @@ impl<R, S> WiredWorld<R, S> {
                 r.faults.push(format!("no player unit {player:?}"));
                 return;
             };
+            // d2rs-own, unverified: the play host never adds the player's
+            // inventory (unit allocation `0x0063ABD0` has no caller there);
+            // the quest items (a reward, a delete) need it without start
+            // items (q-a4-quest-items, REC-235).
+            if !inv.state.inventories.contains_key(&player) {
+                inv.state
+                    .add_inventory(player, UnitKind::Player { class: class as u8 }, guid);
+            }
             let Some(vitals) = econ.hooks.vitals.clone() else {
                 r.faults
                     .push("no vitals tables (charstats) on the action wiring".into());
@@ -766,12 +797,6 @@ impl<R, S> WiredWorld<R, S> {
             }));
             let skills = econ.hooks.tables.skills.skills.len();
             let start_skill = Some(cs.startskill).filter(|&k| usize::from(k) < skills);
-            // d2rs-own, unverified: the play host never adds the player's
-            // inventory (unit allocation `0x0063ABD0` has no caller there).
-            if !inv.state.inventories.contains_key(&player) {
-                inv.state
-                    .add_inventory(player, UnitKind::Player { class: class as u8 }, guid);
-            }
             let mut w = WiredStart {
                 econ,
                 inv: &mut inv,
@@ -928,11 +953,33 @@ pub struct PreviewMoveRest {
     /// The places staged at the start of the call ([`MoveRest::stage`]).
     places: BTreeMap<Owner, StagedPlace>,
     item_format: u16,
+    /// The players' quest flags staged at the start of the call, and the
+    /// writes made since ([`MoveRest::stage_quest_flags`]).
+    quest_flags: BTreeMap<Owner, d2_sim::world::quests::QuestFlags>,
+    quest_writes: Vec<(Owner, u8, u8, bool)>,
 }
 
 impl MovePending for PreviewMoveRest {
     fn send(&mut self, player: Owner, bytes: Vec<u8>) {
         self.sent.push((player, bytes));
+    }
+    /// The staged quest record (`0x0065C310`).
+    fn quest_flag(&self, player: Owner, quest: u8, flag: u8) -> bool {
+        self.quest_flags
+            .get(&player)
+            .is_some_and(|f| f.get(quest, flag))
+    }
+    /// `0x0065C360` / `0x0065C3A0`: applied to the staged copy at once,
+    /// and recorded for the host to write back.
+    fn set_quest_flag(&mut self, player: Owner, quest: u8, flag: u8, on: bool) {
+        if let Some(f) = self.quest_flags.get_mut(&player) {
+            if on {
+                f.set(quest, flag);
+            } else {
+                f.clear(quest, flag);
+            }
+        }
+        self.quest_writes.push((player, quest, flag, on));
     }
     /// d2rs-own, unverified (D1): `0x00641530` is not specified; the
     /// larger of the two sub-tile axis distances of the staged places,
@@ -1043,6 +1090,13 @@ impl MoveRest for PreviewMoveRest {
     fn stage(&mut self, places: &[StagedPlace], item_format: u16) {
         self.places = places.iter().map(|p| (p.owner, *p)).collect();
         self.item_format = item_format;
+    }
+    fn stage_quest_flags(&mut self, flags: &[(Owner, d2_sim::world::quests::QuestFlags)]) {
+        self.quest_flags = flags.iter().copied().collect();
+        self.quest_writes.clear();
+    }
+    fn take_quest_flag_writes(&mut self) -> Vec<(Owner, u8, u8, bool)> {
+        std::mem::take(&mut self.quest_writes)
     }
 }
 

@@ -1706,6 +1706,10 @@ pub trait Pending {
     /// `quests.md` §8.2), published by the quest control once per tick.
     /// Default: nothing.
     fn set_lair_open(&mut self, open: bool) {}
+    /// The Arreat Summit warp check's answer (`0x0058D090`,
+    /// `quests.md` §8.2: leaving the summit for 118 or 128), published by
+    /// the quest control once per tick. Default: nothing.
+    fn set_summit_open(&mut self, open: bool) {}
     /// `0x00574EC0(game, player, 7, 0)`: the player's hireling (§9 rule
     /// 8; `hirelings.md` §5 rule 4; the wired host answers it from the
     /// hireling list). Default: none.

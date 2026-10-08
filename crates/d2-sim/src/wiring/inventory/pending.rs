@@ -163,6 +163,9 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
         if (self.item_unit(item).is_some()
             && super::identify::IDENTIFY_CODES.contains(&self.code(item)))
             || self.is_portal_scroll(item)
+            // A used quest item (`inventory-moves.md` §7.11 step 4; REC-246).
+            || (self.item_unit(item).is_some()
+                && matches!(&self.code(item), b"ass " | b"xyz " | b"tr2 "))
         {
             return self.remove_used_item(player, item);
         }

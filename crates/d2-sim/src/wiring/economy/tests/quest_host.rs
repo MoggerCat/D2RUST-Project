@@ -39,6 +39,18 @@ impl<H> QuestInventory<H> for Inv {
     fn fault(&mut self, error: EconomyError) {
         panic!("{error:?}");
     }
+    fn items_of(&self, _: UnitId) -> Vec<UnitId> {
+        Vec::new()
+    }
+    fn cursor_of(&self, _: UnitId) -> Option<UnitId> {
+        None
+    }
+    fn weapon_in_use(&self, _: &Economy<'_, H>, _: UnitId) -> Option<UnitId> {
+        None
+    }
+    fn delete(&mut self, _: &mut Economy<'_, H>, player: UnitId, item: UnitId) {
+        self.log.push(format!("delete {} {}", player.0, item.0));
+    }
 }
 
 type Host<'e, 'a> = HostQuests<'e, 'a, TestPending, Rest>;
