@@ -8,8 +8,7 @@
 //! nothing: the server validates and warps, `world/waypoints.md` §6–§7).
 //!
 //! Preview fills (d2rs-own, unverified): the client quest flags are not
-//! in the model, so the tab setter keeps tab 0 (`msg_ui` skips the gate
-//! for the other acts); the row and tab text needs the string table by
+//! in the model, so every act tab opens (the quest gate is skipped); the row and tab text needs the string table by
 //! id (`NoStrings` in play), so only the art is drawn.
 
 use d2_sim::world::waypoints::{WaypointMap, WaypointRecord};
@@ -97,8 +96,11 @@ impl WaypointView for View {
     fn rows(&self, _tab: u8) -> &[WpRow] {
         &self.rows
     }
-    fn tab_reachable(&self, tab: u8) -> bool {
-        tab == 0
+    /// d2rs-own, unverified (q-act-travel): every act tab is shown; the
+    /// original's gate reads the client quest flags (`msg-ui.md` OQ 4).
+    /// The rows of an act with no known waypoint have nothing to click.
+    fn tab_reachable(&self, _tab: u8) -> bool {
+        true
     }
     fn any_other_known(&self) -> bool {
         self.rows.iter().any(|r| r.known && !r.current)
@@ -180,10 +182,11 @@ impl Panel for WaypointUi {
         let hit = hit_rows(&rows);
         let mut sh = self.sh.borrow_mut();
         let env = WpEnv::new(&sh.config.screen, false);
-        // d2rs-own, unverified: no client quest flags, tab 0 only.
+        // d2rs-own, unverified: no client quest flags, every act tab
+        // opens (the server checks the destination's bit on C→S 0x49).
         let (effects, consumed) = if press {
             self.panel
-                .mouse_down(&env, at.x, at.y, &hit, false, &|_| false)
+                .mouse_down(&env, at.x, at.y, &hit, false, &|_| true)
         } else {
             self.panel.mouse_up(&env, at.x, at.y, &hit, false)
         };

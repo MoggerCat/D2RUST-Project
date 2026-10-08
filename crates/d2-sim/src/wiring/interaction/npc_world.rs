@@ -374,6 +374,7 @@ impl<'a, H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> NpcWorld
     }
     fn act_change(&mut self, player: UnitId, level: u32, arg: u32) {
         self.rest.act_change(player, level, arg);
+        self.econ.hooks.request_act_change(player, level, arg);
     }
     fn activate_waypoint(&mut self, player: UnitId, level: u32) {
         self.rest.activate_waypoint(player, level);

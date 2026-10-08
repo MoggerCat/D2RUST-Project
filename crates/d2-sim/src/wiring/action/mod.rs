@@ -199,6 +199,10 @@ pub struct ActionHooks<X> {
     /// lists (`hirelings-2.md` §19). `None` (the default): nothing is
     /// recorded.
     pub hireling_calls: Option<Vec<HirelingCall>>,
+    /// The quest/NPC act changes asked (`LifecycleHooks::request_act_change`:
+    /// player, destination level, argument), for the host that runs them
+    /// (`wiring::path::act_change`) after the call.
+    pub act_changes: Vec<(UnitId, u32, u32)>,
     /// The loaded `AnimData.d2` (`formats/animdata.md`, parsed by
     /// `d2-formats`): the records `UnitHooks::anim_record` looks up by
     /// COF name. `None`: no record for any unit (as before the table is
@@ -333,6 +337,7 @@ impl<X> ActionHooks<X> {
             pet_deaths: None,
             owner_deaths: None,
             hireling_calls: None,
+            act_changes: Vec::new(),
             anim_data: None,
             vitals: None,
             mode_target: None,
