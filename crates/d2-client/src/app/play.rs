@@ -92,9 +92,7 @@ pub fn unspecified_palette() -> Palette {
 /// render world; without one the CPU reference is presented). Inserting
 /// a [`WorldViewState`] or [`GameAudio`] afterwards replaces the defaults.
 pub fn add_game(app: &mut App, link: DynLink, gpu: bool) -> Result<(), BridgeError> {
-    let mut bridge = Bridge::new(link)?;
-    // The position check's visibility predicate (PROVISIONAL, REC-278).
-    bridge.set_visibility(Some(super::preview_visible::visible));
+    let bridge = Bridge::new(link)?;
     app.add_plugins((BridgePlugin, WorldViewPlugin { gpu }))
         .insert_resource(BridgeResource(bridge))
         .insert_resource(WorldViewState::new(
