@@ -13,7 +13,7 @@
 //! - a missile's radius is `Light` with the `missiles` colour; none when
 //!   `Light` is 0 (the high-quality gate of §8 is taken as on).
 
-use d2_data::tables::{Missiles, Monstats, Monstats2};
+use d2_data::tables::{Missiles, Monstats, Monstats2, Objects};
 
 use crate::bridge::world::{ClientWorld, MISSILE, MONSTER, OBJECT};
 use crate::world_view::preview_light::PointLight;
@@ -28,6 +28,8 @@ pub struct LightRows {
     pub monsters: Vec<Row>,
     /// By `missiles` row (the missile id).
     pub missiles: Vec<Row>,
+    /// By `objects` row: `Lit0`…`Lit7` and the colour.
+    pub objects: Vec<([u8; 8], (u8, u8, u8))>,
 }
 
 impl LightRows {
@@ -35,6 +37,7 @@ impl LightRows {
         monstats: &[Monstats],
         monstats2: &[Monstats2],
         missiles: &[Missiles],
+        objects: &[Objects],
     ) -> Self {
         LightRows {
             monsters: monstats
@@ -51,11 +54,22 @@ impl LightRows {
                 .iter()
                 .map(|m| (m.light, (m.red, m.green, m.blue)))
                 .collect(),
+            objects: objects
+                .iter()
+                .map(|o| {
+                    (
+                        [
+                            o.lit0, o.lit1, o.lit2, o.lit3, o.lit4, o.lit5, o.lit6, o.lit7,
+                        ],
+                        (o.red, o.green, o.blue),
+                    )
+                })
+                .collect(),
         }
     }
 
     /// The lights of the world's non-player units, as sub-tile lights
-    /// (`radius` in sub-tiles, §8). Objects come from the model's tables.
+    /// (`radius` in sub-tiles, §8). Objects come from the `objects` rows.
     pub fn lights(&self, world: &ClientWorld) -> Vec<PointLight> {
         let mut out = Vec::new();
         for unit in world.units.values() {
@@ -65,8 +79,8 @@ impl LightRows {
             let (radius, rgb) = match unit.key.unit_type {
                 MONSTER if !unit.is_dead() => self.monsters.get(class).copied().unwrap_or_default(),
                 MISSILE => self.missiles.get(class).copied().unwrap_or_default(),
-                OBJECT => match world.tables.objects.get(class) {
-                    Some(o) => (o.lit.get(unit.mode as usize).map_or(0, |l| l / 2), o.rgb),
+                OBJECT => match self.objects.get(class) {
+                    Some((lit, rgb)) => (lit.get(unit.mode as usize).map_or(0, |l| l / 2), *rgb),
                     None => continue,
                 },
                 _ => continue,
@@ -93,13 +107,14 @@ pub fn load(archives: &dyn d2_data::bin::TableFiles) -> Result<LightRows, String
         &all::<Monstats>(&set, "monstats")?,
         &all::<Monstats2>(&set, "monstats2")?,
         &all::<Missiles>(&set, "missiles")?,
+        &all::<Objects>(&set, "objects")?,
     ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bridge::world::{ClientUnit, ObjectRow, PLAYER};
+    use crate::bridge::world::{ClientUnit, PLAYER};
     use crate::bridge::UnitKey;
 
     fn unit(world: &mut ClientWorld, ty: u8, guid: u32, class: u32, mode: u32, at: (u16, u16)) {
@@ -115,15 +130,11 @@ mod tests {
     #[test]
     fn monsters_objects_and_missiles_give_lights() {
         let rows = LightRows {
+            objects: vec![([0, 0, 12, 0, 0, 0, 0, 0], (9, 8, 7))],
             monsters: vec![(0, (0, 0, 0)), (5, (230, 168, 255))],
             missiles: vec![(8, (1, 2, 3))],
         };
         let mut w = ClientWorld::default();
-        w.tables.objects = vec![ObjectRow {
-            lit: [0, 0, 12, 0, 0, 0, 0, 0],
-            rgb: (9, 8, 7),
-            ..ObjectRow::default()
-        }];
         unit(&mut w, MONSTER, 1, 1, 1, (100, 100));
         unit(&mut w, MONSTER, 2, 0, 1, (101, 100));
         unit(&mut w, MONSTER, 3, 1, 0xC, (102, 100));

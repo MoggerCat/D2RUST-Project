@@ -9,7 +9,7 @@ in `docs/HANDOFF.md`.
 | Link | Before | Now |
 |---|---|---|
 | Monster / missile light columns | not read | `world_view/light_sources.rs` `load` reads `monstats`, `monstats2` (`light`, `light-r/g/b`) and `missiles` (`Light`, `Red/Green/Blue`); `app/play.rs` `add_preview_lit` hands them to `PreviewLight::sources` |
-| Object light | none | radius `Lit<mode>` / 2, colour from the model's `objects` rows (`ClientWorld::tables.objects`) |
+| Object light | none | radius `Lit<mode>` / 2, colour from the `objects` rows (`LightRows::objects`) |
 | Light list | only the player's record | `PreviewLight::refresh` adds one plain record per live monster, object and missile with a radius (§8 rows) |
 
 `add_preview` keeps its signature (player light only); `add_preview_lit` is

@@ -96,7 +96,7 @@ pub struct PreviewLight {
     frame: Option<FrameLight>,
     look: PreviewLook,
     /// The monster / missile light columns ([`super::light_sources`]);
-    /// objects read the model's tables. `None`: only the player's light.
+    /// objects from the `objects` rows. `None`: only the player's light.
     pub sources: Option<std::sync::Arc<super::light_sources::LightRows>>,
 }
 
@@ -356,20 +356,21 @@ mod tests {
         let mut m = ClientUnit::new(mk);
         m.class = 0;
         m.mode = 1;
-        m.position = Some((4000, 4030));
+        m.position = Some((4000, 4018));
         w.units.insert(mk, m);
         let t = tables();
-        let probe = (8 * 4000, 8 * 4030);
+        let probe = (8 * 4000, 8 * 4018);
         let mut plain = PreviewLight::default();
         plain.refresh(&w, None, Some(&t));
         let dark = plain.frame().unwrap().map.read(probe.0, probe.1).i;
-        let mut lit = PreviewLight::default();
-        lit.sources = Some(std::sync::Arc::new(
-            super::super::light_sources::LightRows {
-                monsters: vec![(6, (255, 255, 255))],
-                missiles: Vec::new(),
-            },
-        ));
+        let rows = super::super::light_sources::LightRows {
+            monsters: vec![(6, (255, 255, 255))],
+            ..Default::default()
+        };
+        let mut lit = PreviewLight {
+            sources: Some(std::sync::Arc::new(rows)),
+            ..PreviewLight::default()
+        };
         lit.refresh(&w, None, Some(&t));
         assert!(lit.frame().unwrap().map.read(probe.0, probe.1).i > dark);
     }
