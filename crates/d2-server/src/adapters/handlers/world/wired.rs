@@ -1049,7 +1049,51 @@ where
             }
             let format = d2_sim::items::ItemGame::item_format(&*econ.fields);
             inv.rest.stage(&places, format);
+            // The players' skill lists are lent to the rest for the call
+            // and the item-granted entries synced after it (REC-266).
+            let mut staged = std::collections::BTreeMap::new();
+            for u in econ
+                .game
+                .lists
+                .units_of_type(d2_sim::units::UnitType::Player)
+            {
+                let Some(r) = econ.units.get(u) else { continue };
+                let (guid, class) = (r.guid, r.class as i32);
+                if let Some(list) = econ.hooks.skill_lists.remove(&u) {
+                    staged.insert(
+                        d2_sim::items::moves::Owner::player(guid),
+                        super::super::items::moves::preview_skills::StagedList {
+                            list,
+                            unit: u,
+                            class,
+                        },
+                    );
+                }
+            }
+            inv.rest.stage_skills(
+                super::super::items::moves::preview_skills::SkillStage {
+                    tables: econ.hooks.tables.clone(),
+                    lists: staged,
+                },
+                &inv.tables,
+            );
             let out = call.call(econ, &mut inv);
+            if let Some(mut st) = inv.rest.take_skills() {
+                let mut sent = Vec::new();
+                let owners: Vec<_> = st.lists.keys().copied().collect();
+                for o in owners {
+                    super::super::items::moves::preview_skills::sync_oskills(
+                        &mut st,
+                        o,
+                        |sl, stat, skill| econ.stats.unit_total(sl.unit, stat, skill as u16),
+                        &mut sent,
+                    );
+                }
+                inv.rest.queue_sent(sent);
+                for (_, sl) in st.lists {
+                    econ.hooks.skill_lists.insert(sl.unit, sl.list);
+                }
+            }
             for (owner, quest, flag, on) in inv.rest.take_quest_flag_writes() {
                 let Some(&(_, u)) = by_owner.iter().find(|(o, _)| *o == owner) else {
                     continue;
