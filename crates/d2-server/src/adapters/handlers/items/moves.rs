@@ -119,6 +119,17 @@ pub trait MoveRest: InvRest {
     /// positions of its own (the play preview's, [`StagedPlace`]).
     /// Default: ignored.
     fn stage(&mut self, _places: &[StagedPlace], _item_format: u16) {}
+
+    /// The players' quest flag records (current difficulty) at the start
+    /// of a move call, for a rest that holds no quest record of its own
+    /// (`inventory-moves.md` §7.11 step 4). Default: ignored.
+    fn stage_quest_flags(&mut self, _flags: &[(Owner, d2_sim::world::quests::QuestFlags)]) {}
+
+    /// The quest flag writes the call made (`MovePending::set_quest_flag`)
+    /// since the last take: (player, quest, flag, on). Default: none.
+    fn take_quest_flag_writes(&mut self) -> Vec<(Owner, u8, u8, bool)> {
+        Vec::new()
+    }
 }
 
 /// Where a player or an item is when an item-move call starts: its
