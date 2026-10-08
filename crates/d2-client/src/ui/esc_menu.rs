@@ -82,7 +82,7 @@ const VALUE_BLOCK: i32 = 130;
 
 /// The menu draws over the world with no backdrop (§O4, PROVISIONAL REC-212),
 /// so a dark strip behind the rows keeps the English stand-in text readable.
-pub(super) fn push_fill(out: &mut dyn UiDrawSink, file: u32, frame: u32, r: Rect) {
+pub(crate) fn push_fill(out: &mut dyn UiDrawSink, file: u32, frame: u32, r: Rect) {
     let (w, h) = (FILL_W as i32, FILL_H as i32);
     let mut y = r.y;
     while y < r.y + i32::from(r.h) {
