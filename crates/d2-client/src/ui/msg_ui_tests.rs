@@ -127,7 +127,10 @@ fn waypoint_menu_b7852() {
     // No room in the model: tab 0.
     assert_eq!(st.tab, Some(0));
     let out = u.take_outcome();
-    assert_eq!(out.skipped, [skip::INPUT_RESET, skip::WAYPOINT_ROWS]);
+    // r2.2: the input reset is asked of the host, not skipped.
+    assert_eq!(out.skipped, [skip::WAYPOINT_ROWS]);
+    assert!(u.take_input_reset());
+    assert!(!u.take_input_reset());
     // Jump 1 (§4.3) with the left slot: the cursor effect is reported.
     assert!(out
         .effects
