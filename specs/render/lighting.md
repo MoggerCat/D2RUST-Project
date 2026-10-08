@@ -29,23 +29,23 @@
 | Rules | 87–88 |
 |   1. The light map | 89–102 |
 |   2. Build order (`0x00475800`) | 103–111 |
-|   3. Ambient fill (`0x00474610`) | 112–143 |
-|   4. Blocks-light flags (`0x004756D0`) | 144–168 |
-|   5. Light quality and the draw rate | 169–200 |
-|   6. Light records | 201–284 |
-|   7. Contribution of one record | 285–364 |
-|   8. Light sources | 365–429 |
-|   9. Environment (day and night) | 430–587 |
-|   10. Scripted ambient overrides (`0x0046BDD0`) | 588–645 |
-|   11. Light values handed to the draws | 646–685 |
-|   12. Captures (answers `capture.md` Open question 5) | 686–723 |
-|   13. d2rs answers | 724–736 |
-| Constants & data dependencies | 737–748 |
-| Randomness | 749–755 |
-| Edge cases & original bugs | 756–772 |
-| Test vectors | 773–806 |
-| Provenance | 807–863 |
-| Open questions | 864–972 |
+|   3. Ambient fill (`0x00474610`) | 112–147 |
+|   4. Blocks-light flags (`0x004756D0`) | 148–172 |
+|   5. Light quality and the draw rate | 173–204 |
+|   6. Light records | 205–288 |
+|   7. Contribution of one record | 289–368 |
+|   8. Light sources | 369–433 |
+|   9. Environment (day and night) | 434–591 |
+|   10. Scripted ambient overrides (`0x0046BDD0`) | 592–667 |
+|   11. Light values handed to the draws | 668–707 |
+|   12. Captures (answers `capture.md` Open question 5) | 708–745 |
+|   13. d2rs answers | 746–761 |
+| Constants & data dependencies | 762–773 |
+| Randomness | 774–780 |
+| Edge cases & original bugs | 781–797 |
+| Test vectors | 798–831 |
+| Provenance | 832–891 |
+| Open questions | 892–1000 |
 <!-- /index -->
 
 ## Summary
@@ -115,7 +115,11 @@ reaches the server.
    0 and flag 0.
 2. Every cell := the ambient of the player's room (§3.1), flag 0.
 3. Then each room of the player's room near list, in list order, except
-   the player's room itself (pointer compare): its ambient (§3.1) fills a
+   the player's room itself (pointer compare): the list is the active
+   room's adjacency array (`0x00619790` at `0x0047464D`, `drlg/rooms.md`
+   §6: the rooms-near list filtered to active rooms; it holds the room
+   itself, which the compare at `0x004746B3` skips), so only active rooms
+   fill. Each one's ambient (§3.1) fills a
    rectangle. With the room's sub-tile rectangle `(x, y, w, h)` (room
    `+0x4C..+0x58`, `0x00619730`) and `x' = x − ox`, `y' = y − oy`: skip
    the room when `x' > 48`, `x' + w < 0`, `y' > 48` or `y' + h < 0`;
@@ -590,7 +594,11 @@ one normal day is 43,520 ticks plus the doubled night periods.
 By the room's level id:
 
 1. **Level 8** (Den of Evil, `0x0046BD50`): when `[0x007A745C]` = 0 and
-   client quest byte 1 (`[0x007C0EA5]`, `0x004B92E0`) ≠ 0: R, G, B = 255,
+   client quest byte 1 ≠ 0 (`[0x007C0EA5]`: `0x004B92E0(0, 1)` at
+   `0x0046BD60`, byte `A[1]` of the last S→C 0x5E, `world/quests-status.md`
+   §12, `client/msg-ui.md` §14; fatal, error string 0x60, while no 0x5E
+   has arrived, `[0x007C0ECC]` = 0 at `0x004B92E3`; not read when
+   `[0x007A745C]` ≠ 0): R, G, B = 255,
    64, 48 and `I` = 80 while the Den counter `[0x007129CC]` = −1, else
    `trunc(W[(a + 128) & 511] · 80.0)` with `a = trunc(counter · 128 / 30)`;
    else 0, 0, 0 (falls through, §3.1). `W[i]` = float(`sin(i · π_f /
@@ -608,8 +616,9 @@ By the room's level id:
 2. **Levels 107, 108**: when `[0x007A7460]` ≠ 0 and `[0x007129D0]` = −1:
    R, G, B = 255, 64, 48, `I` = 160; else 0, 0, 0. `0x0046B290` (event
    table `0x00712A08`) sets the flag; `0x0046B3A0` sets the counter 0;
-   the counter then rises per update and at > 29 resets flag and counter
-   (`0x0046BEB0`). Triggers: r4.
+   the counter then rises per update **only while the flag is set** and
+   at 30 resets flag := 0 and counter := −1 (`0x0046BEB0`, r5). So id 13
+   without id 12 leaves the counter at 0. Triggers: r4.
 3. **Other levels** — darkness event: `I` = `[0x007A7430]`, R, G, B =
    `[0x007A7434..36]`, all 0 when no event runs. An event
    (`0x0046AE50(in, hold, out, level)`, callers `0x004D8893`,
@@ -642,6 +651,19 @@ By the room's level id:
    owner `world/quests.md`). The second darkness caller `0x004D8893` is state
    setfunc 2 (table `0x0072A690`, `states` `setfunc` +0x1A):
    state 153 `cloak_of_shadows`.
+5. **Per client update** (`0x0046BEB0`, called once by the client update
+   `0x0044C790` at `0x0044C7B0`, after `0x0061AEF0` and
+   before `0x00470350`; one client update per pass in which the server
+   ticked, `client/model.md` §5; never per drawn frame), in this order:
+   1. darkness event step `0x0046AD10` (r3) when `[0x007A742C]` ≠ 0 (set
+      to 1 by `0x0046AE50` at `0x0046AE7B`);
+   2. Den: when `[0x007A745C]` = 0 and `[0x007129CC]` ≠ −1: counter += 1;
+      at 30 flag `[0x007A745C]` := 1 and the Den lights of r1
+      (`0x0046B0D0` at `0x0046BEE8`);
+   3. levels 107/108: when `[0x007A7460]` ≠ 0 and `[0x007129D0]` ≠ −1:
+      counter += 1; at 30 flag := 0 and counter := −1.
+   The map build (§3.1 r1) only reads these values; a drawn frame without
+   a client update shows the same override as the previous one.
 
 ### 11. Light values handed to the draws
 
@@ -733,6 +755,9 @@ sub-tile) clamps the cell to 0…47 on each axis.
 | floating point | §9.3, §9.4, §10 use doubles and `sin`; client-only (not `d2-sim`) |
 | blocks-light source | the client's active-room collision grids (§4 r3); a cell in no room or a room without a grid → flag 1 (§4 r2) |
 | near-room fills, overrides | §3 r3 and §10 run every frame in the map build; no d2rs-own shortcut (the level ambient alone is not §3) |
+| near-room source | the player's active room's adjacency array in its order (§3 r3), each entry's level from its own room (§3.1 r2) |
+| override state | §10 r5 per client update (the bridge's tick pass), not per drawn frame; quest byte 1 = `A[1]` of the client's last S→C 0x5E (§10 r1), held by the client, never a constant |
+| record kinds | each source's kind from §8's Kind column: kind 0 (the local player, monsters, umod 3) shadowed at `q` = 2 (§7.3), kind 2 (objects, `horadric_light`) cached (§7.4) at every `q`, kind 1 plain (§7.2); "only the player is shadowed" is not §6.4 r5 |
 
 ## Constants & data dependencies
 
@@ -824,6 +849,9 @@ call order in the `0x0061C240` disassembly), `0x0045E300`, `0x006427F0`, CRT
 `sin` `0x00688590` / `cos` `0x006886C0` (x87 `fsin` / `fcos` paths),
 `0x00682FD0` (truncating conversion); overrides `0x0046BEB0`,
 `0x0046AD10`, `0x0046AE50`, `0x0046B0C0`, `0x0046B0D0`, `0x0046AF70`,
+call site `0x0044C7B0` (client update `0x0044C790`), quest byte
+`0x004B92E0` (from `0x0046BD60`), near list `0x00619790` (from
+`0x0047464D`),
 `0x0046BE60`, `0x0046BF90`, `0x0046B290`, `0x0046B3A0`, sine table
 `0x00707800` (`0x0040B330`); draws `0x00475AA0`, `0x004DF1C0`,
 `0x004DD180`, `0x004DD600`, `0x004DE410`, `0x004DDEF0`, `0x004DEA70`,

@@ -36,15 +36,15 @@
 |   10. Word wrap | 334–371 |
 |   11. Alignment | 372–379 |
 |   12. Clipping (decision CG2) | 380–390 |
-|   13. d2rs answers (hooks in `d2-client`) | 391–405 |
-|   14. Wide formatter `0x005269D0` (added 2026-10-07) | 406–453 |
-|   15. Edit box caret and selection (`0x004FF620`, added 2026-10-08) | 454–547 |
-| Constants & data dependencies | 548–563 |
-| Randomness | 564–567 |
-| Edge cases & original bugs | 568–597 |
-| Test vectors | 598–633 |
-| Provenance | 634–667 |
-| Open questions | 668–754 |
+|   13. d2rs answers (hooks in `d2-client`) | 391–407 |
+|   14. Wide formatter `0x005269D0` (added 2026-10-07) | 408–455 |
+|   15. Edit box caret and selection (`0x004FF620`, added 2026-10-08) | 456–549 |
+| Constants & data dependencies | 550–565 |
+| Randomness | 566–569 |
+| Edge cases & original bugs | 570–599 |
+| Test vectors | 600–635 |
+| Provenance | 636–669 |
+| Open questions | 670–756 |
 <!-- /index -->
 
 ## Summary
@@ -402,6 +402,8 @@ arguments (§13), not a rectangle.
 | `TextInput` caret | OQ 3 |
 | `client/assets.md` §B2 (locale font directory) | §1: `latin` for English |
 | `formats/tbl.md` OQ2 (`DEFAULT.TBL`, `FONTER.TBL`) | not opened by the font path (§1.4) |
+| a caller's text width | the measure that caller's address calls, never a shared "text width": the front-end controls use width A (`0x00501820`: button label `0x00500C70`, `0x00500CC1`, `0x00500D04`; text control draw `0x004FC04D`–`0x004FC180`; credits columns `ui/frontend-credits.md` C3 r2) and width B for the row clip (`0x004FBEFD`) and wrap (`0x004FCE84`); width A ≠ max width when the row holds `ÿ` codes or `LF` |
+| no font table (no game files, or a font that failed to load) | d2rs-own: every measure is 0 and nothing is drawn; the original has no such state to compare |
 
 ### 14. Wide formatter `0x005269D0` (added 2026-10-07)
 

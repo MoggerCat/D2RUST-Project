@@ -38,6 +38,7 @@ Branch `claude/local-pc1-s8` from `origin/claude/specs-staging-7`
 | REC-252, REC-253 | globe numbers Font16 always (set at `0x00499053`), stamina tip pop-up `0x00502280(W/2-76, H-52)`, `stambarblue` flag; requirement check out flags, dex/str asymmetry, socket contribution `0x0062B450`, 0x4000 effects and refusing callers, client body-click pre-check events 19/20 | `items/inventory.md` §4.2, §5.6, §5.7 r4, Q1-Q6; `ui/control-panel.md` §3 r6, §4 r2 | globe font, sweep cap, item_active_on match | `q-fix-equip-reqs`; `q-fix-hud-popup` extended |
 | REC-249, REC-246 (a)-(c) | Act I dungeon kinds (maze vs preset), connection slots and lvlwarp Ids, exit cells and tile places for every stamp; old maze "unconditional stamps" never apply (DrlgType 2); quest item use sends 5D chain 8/18/33; Docks waypoint place; Arreat Summit exits and units. Live data spawns no warp tiles (warp_unit not implemented) | `drlg/levels.md` §12 intro, §12.3, §12.4, §12.5 new, OQ12; `drlg/maze.md` §6 | waypoint indexes match; tree, Docks, summit, warp_unit, 5D, summit gate do not | `q-fix-warp-tile-unit`, `q-fix-quest-item-msg`, `q-fix-summit-gate`; `q-fix-level-connections` extended |
 | REC-232 (re-filed): Leap Attack (Barbarian 143, not a monster skill), kicks, Dragon Flight, Whirlwind, sequences | Leap Attack: Land / Launch / Strike order, no landing hit, restart at frame 16 on a target, strike index 16/17/18 by weapon class, re-pick, knockback + ED; Dragon Talon plays KK, refused in town; Dragon Flight seq 21 teleport at 9, kick at 14, no range test, failed teleport still kicks; player sequence table `0x007483B8` (23 × 14) dumped with lookup / loader | `skills/sequences.md` + `sequences.tsv` new; `skills/use.md` §5.2; `skills/bodies-2b.md` §6.12, §7.20; `skills/bodies-2.md` §3.11 | Leap Attack, kicks, Dragon Flight sim match; sequences missing in play | `q-skill-sequences`; `q-fix-moving-skill-do` extended |
+| REC-250 (1)-(4), REC-255, REC-258 | lighting: quest byte = A[1] of the last 0x5E (fatal 0x60 if none), override counters once per client update `0x0046BEB0` (order darkness, Den, 107/108 gated on its flag), near list = room adjacency array; Cain caption from the client quest record `[0x007C0D43]` (the REC premise was wrong); front-end controls measure width A, clip/wrap width B | `render/lighting.md` §3 r3, §10 r1, r2, r5, §13; `world/npc.md` §6; `ui/text.md` §13 | none match | `q-fix-cain-caption`; `q-fix-preview-light`, `q-fe-text-widths` extended |
 
 Follow-ups for a later worker (other owners: `sim/units.md` §4.2 "sequence spec" → `skills/sequences.md`, §4.1 prepare → `sequences.md` §2; `items/inventory-moves.md` §7.11 step 4 add the 5D chains 8/18/33 (`0x0055E40C`/`0x0055E48D`/`0x0055E506`); `world/quests-act5-2.md` §7.6, §7.8 link `drlg/levels.md` §12.4; `ui/control-panel.md` §5 r8 can link `ui/item-tips.md` §6 for `0x004E6410` line breaks; unowned specs needed: hireling slot checks `0x0048B290`/`0x0048B3F0`/`0x004934D0`, the rest of the body-click handlers (`ui/panels.md` §15); the items/use.md links, 0x82 pointer and hirelings save pointer are done; `ui/panels.md` cite `0x00487740`/`0x004786D0` for 0x20; msg-stats-items labels, properties §13 callers and the OQ pointers are done): `client/stat-lists.md` §2 r8 should link the `skills/use.md` §2 item type test.
 
@@ -259,3 +260,13 @@ Recordability (tools/original-hooks.md §7): R-MIS-1/2, R-PAUSE-1, R-NOTICK-1, R
   Leap Attack with hth and one with a 2ht weapon, monster at range: per tick
   position, type-0 event ticks and args, the monster's life.
 - R-WW-1 and bodies-2 OQ2 (Dragon Talon kicks at L 6 and 12) stay as listed.
+- **R-LIGHT-2** [MANUAL] Confirms lighting §3 r3, §4, §7.3. Light map
+  `0x007B0E68` (48x48x8) and q `[0x007B567C]` beside a dungeon wall, and at a
+  border between rooms with different level ambients (Act IV town / outdoor).
+- **R-LIGHT-3** [MANUAL] (extends RA-L1) Confirms lighting §10 r1, r5. After
+  clearing the Den: `[0x007129CC]`, `[0x007A745C]`, `[0x007C0EA5]` per client
+  update over 31 updates.
+- **R-CAIN-1** [MANUAL] (extends R-NV-2) Confirms npc §6 caption. Cain's menu
+  with Search for Cain done (4020, no cost) and not done (4021 + 100 x n).
+- **R-FE-4** [AUTO] Confirms frontend-credits C3 r2, text §13. Credits pixel
+  capture at a fixed draw count.
