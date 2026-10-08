@@ -12,6 +12,22 @@
   (type flags, random boss); `items/inventory.md` §1.1 (weapon GUID);
   `data/fields.tsv` (monstats flag bits); `formats/d2s.md` (progression).
 
+<!-- index -->
+| Section | Lines |
+|---|---|
+| Summary | 31–36 |
+| Inputs | 37–40 |
+| Outputs / state changes | 41–44 |
+| Rules | 45–46 |
+|   11. Clarifications (implementation questions QC-1 … QC-7, 2026-10-07) | 47–207 |
+| Constants & data dependencies | 208–216 |
+| Randomness | 217–222 |
+| Edge cases & original bugs | 223–229 |
+| Test vectors | 230–241 |
+| Provenance | 242–256 |
+| Open questions | 257–261 |
+<!-- /index -->
+
 ## Summary
 
 Answers to the questions the Act III implementation raised
@@ -109,6 +125,31 @@ body location 5 (left hand) is returned when it is of item type 45
 body location 4 (right hand); else none. Locations 11 / 12 (swap) are
 not consulted. The orb operate then compares that item's code with
 `qf2 ` (`0x00628590`, `0x005BB9B3`).
+
+Who writes +0x1C (read 2026-10-08 for REC-235; the Hellforge's `hfh `
+test, `quests-act4.md` §4.6, reads the same field):
+
+1. Body link `0x0063D1D0(inventory, item)` (`ret 8`, 19 call sites):
+   only for an item unit of type 45 `weap` at body location 4 or 5. Item not
+   usable (`0x0062A4E0`: identified, not broken, no flag 0x4000) →
+   +0x1C := −1 when it held this item's GUID. Usable → W := the weapon
+   in use (`0x0063BEF0`); W none, W not `weap`, or W of type 38 `tpot`
+   → +0x1C := the item's GUID; else unchanged (the first wielded
+   weapon stays the weapon in use).
+2. Body unlink `0x0063D2B0(inventory, item)` (`ret 8`, 22 call sites):
+   only for a `weap` item: +0x1C = its GUID → −1; then, when it was at
+   location 4 the item at 5 (and the reverse), when present and usable,
+   becomes +0x1C (`0x0063D331`; its type is not tested, so a shield can
+   be stored there, and `0x0063BEF0` then returns none).
+3. Inventory unlink clears +0x1C when it holds the item
+   (`items/inventory.md` §1.4 rule 1, `0x0063ABB4`); the inventory
+   clear `0x0063E0B0` (cursor 0, every item unlinked) sets −1
+   (`0x0063E0D5`). `0x0063D190` (direct set / clear) has no caller.
+   These are the only stores to +0x1C in the inventory code
+   (`0x00630000`–`0x0063FFFF`, `all.asm`).
+So equipping a usable weapon in either hand (body link, e.g.
+`items/inventory-moves.md` §7.25 step 6) makes it the weapon in use
+when none is.
 
 #### 11.6 Natalya's and Hratli's map AI (QC-4)
 

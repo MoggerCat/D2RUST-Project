@@ -43,16 +43,16 @@
 |   3. Server → client | 387–623 |
 |   4. d2rs mapping and scope | 624–655 |
 |   5. Machine-readable tables | 656–692 |
-|   6. Exact-match comparison | 693–800 |
-|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 801–1232 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1233–1448 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1449–1621 |
-| Constants & data dependencies | 1622–1640 |
-| Randomness | 1641–1646 |
-| Edge cases & original bugs | 1647–1692 |
-| Test vectors | 1693–1779 |
-| Provenance | 1780–1906 |
-| Open questions | 1907–2059 |
+|   6. Exact-match comparison | 693–801 |
+|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 802–1233 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1234–1449 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1450–1622 |
+| Constants & data dependencies | 1623–1641 |
+| Randomness | 1642–1647 |
+| Edge cases & original bugs | 1648–1693 |
+| Test vectors | 1694–1780 |
+| Provenance | 1781–1907 |
+| Open questions | 1908–2060 |
 <!-- /index -->
 
 ## Summary
@@ -765,7 +765,8 @@ as in §2.1 rule 5 and §3.1 rule 1.
      non-zero padding byte would pass.
    - **0x50**: the six call sites of the copier `0x0053D7E0` (15 bytes)
      are the five rows above; each writes a constant u16@1.
-   - **0x82** (29 bytes, `0x0053DB90`, call site `0x005720B1`): owner
+   - **0x82** (29 bytes, `0x0053DB90`, call site `0x005720B1`; field
+     meanings and when it is sent: `world/objects-2.md` §27.5): owner
      GUID u32@1, byte 5 := 0, then the owner's name is copied to
      bytes 5–20 by `0x004135D0` (at most 15 characters + NUL; it writes
      exactly through the NUL, also in its dword path, never past it);
@@ -836,7 +837,7 @@ room-change merge (`sim/pathing.md` §9.8). Part A by type:
 |---|---|---|
 | player | 0x59 (`0x0053E8F0`) | GUID, class u8 (+0x04), name (player data), x, y (`0x00620870` position) |
 | monster | 0xAC (`0x0053E2E0`, `monsters/init.md` §24) | skipped when `0x005541B0(unit)` and `0x0063A320(unit)` both hold; then stat 328 := (x + y) & 0xFFFF; class 528 → 0x98 (`0x0053E0A0`); for each `monstats` skill slot i = 0..7 whose bit i of row +0x16C is set and skill id (row +0x170 + 2i) is valid and the unit has that skill: 0x21 (`0x0053C4A0`); then `0x00570E30`, `0x00571CD0` (§7.3 rule 2 steps 3 and 8) |
-| object | 0x51 (`0x0053BD10`, type 2: GUID, class u16, x, y, mode u8 +0x10, interact u8) | then `objects` row +0x167 bit 2 → 0x60 (`0x0053D900`); class 59 → 0x82 (`0x0053DB90`) |
+| object | 0x51 (`0x0053BD10`, type 2: GUID, class u16, x, y, mode u8 +0x10, interact u8) | then `objects` row +0x167 bit 2 → 0x60 (`0x0053D900`); class 59 → 0x82 (`0x0053DB90`; fields `world/objects-2.md` §27.5) |
 | missile | 0x73 (`0x0059FEE0`, `missiles/missiles.md` R2.4) | with `0x006486C0(path)` |
 | item | only with unit flag 0x10: mode 3 and unit flag 0x1000 → 0x9C action 2 (`0x0053EC90`), else 0x9C action 0 (`0x0053EC00`) (`items/inventory-moves.md` §6.3) | |
 | other (5) | 0x09 (`0x0053BCD0`: type, GUID, class u8, x, y) | |

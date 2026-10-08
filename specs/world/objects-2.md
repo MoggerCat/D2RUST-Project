@@ -30,15 +30,15 @@
 |   22. Object allocation modes (open question 8) | 444–492 |
 |   23. Client side of S→C 0x0E and 0x4D (open question 4) | 493–510 |
 |   24. Guards and corner cases of part 1 (read 2026-10-07) | 511–552 |
-|   25. Portal pair creation (`0x0056D130`, `0x0056CF40`) | 553–645 |
-|   26. Shrine state lists and shrine texts (REC-239, read 2026-10-08) | 646–739 |
-|   27. Town Portal cast and the life of the pair (`0x005BE290`; REC-117, REC-243, read 2026-10-08) | 740–873 |
-| Constants & data dependencies | 874–877 |
-| Randomness | 878–892 |
-| Edge cases & original bugs | 893–924 |
-| Test vectors | 925–964 |
-| Provenance | 965–1015 |
-| Open questions | 1016–1019 |
+|   25. Portal pair creation (`0x0056D130`, `0x0056CF40`) | 553–649 |
+|   26. Shrine state lists and shrine texts (REC-239, read 2026-10-08) | 650–743 |
+|   27. Town Portal cast and the life of the pair (`0x005BE290`; REC-117, REC-243, read 2026-10-08) | 744–877 |
+| Constants & data dependencies | 878–881 |
+| Randomness | 882–896 |
+| Edge cases & original bugs | 897–928 |
+| Test vectors | 929–968 |
+| Provenance | 969–1019 |
+| Open questions | 1020–1023 |
 <!-- /index -->
 
 ## Summary
@@ -641,7 +641,11 @@ the free spot nearest the player in Duriel's Lair (73), destination 40
 (init 11: town of act II); object 2 stands in Lut Gholein at the free
 point (mask 0xBE11, step 5) nearest its tile-12 spawn point (rule 11,
 because +0x3C is 1 during the call), destination 73. Travel through it
-is §12 of `world/objects.md` with partner L = object 2.
+is §12 of `world/objects.md` with partner L = object 2. Lut Gholein has
+no tile-12 record, so the "tile-12 point" is spawn-tile record 0, DS1
+tile (33, 9), with no draw (`world/quests-act2.md` §8.12 rule 6). The
+pair is complete from creation: 1.14d has no partner-less Tyrael
+portal and no free-spot rule for one.
 
 ### 26. Shrine state lists and shrine texts (REC-239, read 2026-10-08)
 
@@ -789,7 +793,7 @@ failing has still closed the old pair (step 5) and leaves player data
 
 | | O1 | O2 |
 |---|---|---|
-| where | P's level, next to P | Town, at the tile-11 spawn point |
+| where | P's level, next to P | Town, at the tile-11 spawn point (Lut Gholein: DS1 tile (35, 10); with `LutN.ds1` also (32, 13), one `roll(2)` on the level seed picks, `drlg/levels.md` §10 rule 2) |
 | mode at creation | 1 | 2 |
 | class | 59 | 59 |
 | destination (data +0x04) | Town (init 11) | P's level at the cast |

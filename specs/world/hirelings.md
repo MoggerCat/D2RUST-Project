@@ -41,17 +41,17 @@
 |   7. Experience and level-up | 455–520 |
 |   8. Death (`0x0057CCB0` → `0x005751A0`) | 521–583 |
 |   9. Revive | 584–621 |
-|   10. Restoring from a save | 622–659 |
-|   11. Items (expansion) | 660–717 |
-|   12. Services (links) | 718–721 |
-|   13. Messages | 722–788 |
-|   14. Skill pick of the Hireable AI (`0x005E4D30`) | 789–795 |
-| Constants & data dependencies | 796–819 |
-| Randomness | 820–830 |
-| Edge cases & original bugs | 831–882 |
-| Test vectors | 883–933 |
-| Provenance | 934–990 |
-| Open questions | 991–1081 |
+|   10. Restoring from a save | 622–660 |
+|   11. Items (expansion) | 661–718 |
+|   12. Services (links) | 719–722 |
+|   13. Messages | 723–789 |
+|   14. Skill pick of the Hireable AI (`0x005E4D30`) | 790–796 |
+| Constants & data dependencies | 797–820 |
+| Randomness | 821–831 |
+| Edge cases & original bugs | 832–883 |
+| Test vectors | 884–934 |
+| Provenance | 935–991 |
+| Open questions | 992–1084 |
 <!-- /index -->
 
 ## Summary
@@ -621,8 +621,9 @@ gain may carry it past the player's level.
 
 ### 10. Restoring from a save
 
-Save layout is owned by a save spec that does not exist yet (open
-question 1). Behavior of the 1.14d loaders (`0x0056AA50` for save
+Save layout: `formats/d2s.md` §2.5 (hireling block +0xAF, rebuilt from
+the live hireling on every save by `0x00568E60`, rule 3) and §8.4 (`jf`
+items). Behavior of the 1.14d loaders (`0x0056AA50` for save
 version ≥ 0x5C, `0x00533C70` for older):
 
 1. No hireling when seed, name and experience are all 0.
@@ -990,15 +991,17 @@ Pass 2 B):
 
 ## Open questions
 
-1. Save layout of the hireling fields and the `jf` item section: no
-   save spec yet. Evidence for it: the ≥ 0x5C loader copies 32 bytes
+1. ~~Save layout of the hireling fields and the `jf` item section: no
+   save spec yet.~~ Evidence for it: the ≥ 0x5C loader copies 32 bytes
    from header offset 0xAF (u32 flags with dead bit 0x10000, u32 seed
    @0xB3, u16 name index @0xB7, u16 `Id` @0xB9, u32 experience @0xBB);
    settle in the save spec with a saved character.
    **Answered** 2026-10-07: `formats/d2s.md` §2.5 (block +0xAF, 32
    bytes, writer `0x00568E60`, reader `0x0056AA50`, measured on
    `bdMercTwo`) and §8.4 (`jf`, writer `0x005699A0`, reader
-   `0x0056AC10`); §10 here is the behaviour.
+   `0x0056AC10`); §10 here is the behaviour. The block is rebuilt from
+   the live hireling on every save, never copied through from the file
+   (`formats/d2s.md` §2.5 rule 3, 2026-10-08).
 2. Where a dead expansion hireling's unit lives after the player leaves
    its level (it does not warp, §6 rule 2) and how it survives room
    freeing; settle with a recording (die, change level, resurrect).

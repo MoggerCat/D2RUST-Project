@@ -328,8 +328,8 @@ Fields: cursor u32 @1, target u32 @5, x u32 @9, y u32 @13.
 
 Stored item check; (x u32 @5, y u32 @9) within 50 subtiles of the player
 per axis (`0x00548EF0`), else 1; `0x0055E170(game, player, I, x, y,
-&out)` (item use; the effects behind `0x005BF240` are owned by the
-unwritten item-use spec, `world/cube.md` OQ7); refused with out → 3:
+&out)` (item use; the effects behind `0x005BF240` are owned by
+`items/use.md`); refused with out → 3:
 
 1. out := 0; targeting reset. I missing → out 1, 0. I not an item or a
    cursor item exists → 0. I not in mode 0 or items `useable` = 0 (`0x00628C20`)
@@ -417,7 +417,7 @@ out 1; a cursor item → 0; mode ≠ 2 or items `useable` = 0 → out 1;
 trading → 0. on_merc ≠ 0 with a player in an expansion game: the item
 must be of type 76, 80 or 81 (`hpot`, `apot`, `wpot`, with itemtypes
 equivalence `0x00629BB0`), else 0; the target becomes the hireling
-(`0x00574EC0(7, 0)`). Use: `0x005BF240` (item-use spec). Used → tome /
+(`0x00574EC0(7, 0)`). Use: `0x005BF240` (`items/use.md`). Used → tome /
 skill charge update (`0x0055E050`, `0x006439B0`, S→C 0x22 via
 `0x0053C520`), targeting reset, removal `0x00561E70`, compaction `inventory.md` §3.8.
 No hireling (`0x00574EC0` returns none): the target stays the player,
@@ -429,7 +429,7 @@ failing (`0x005BF240` = 0) → 0 with out 0, nothing removed.
 Owned item check on target (u32 @1) and used item (u32 @5);
 `0x00561ED0(game, player, T, U, &out)` (U = scroll or tome used on item
 T; the effect itself is the item-use dispatcher `0x005BF240`, owned by
-the item-use spec):
+`items/use.md`):
 
 1. out := 0. U missing → out 1, 0. T missing or T = U → targeting reset
    (`inventory.md` §5.3), 0.

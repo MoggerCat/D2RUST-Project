@@ -305,7 +305,7 @@ specs, stat values to the stats spec, the seed to the RNG spec.
 no context at all. Items functions read only the unit. The items entry
 `0x00627C20(unit, item, offset)` has 11 call sites in 5 routines; the
 unit is always the one the item acts on, the item is the second word:
-- server item use: the dispatcher `0x005BF240` calls the misc `pSpell`
+- server item use (`items/use.md`): the dispatcher `0x005BF240` calls the misc `pSpell`
   handler from its 8-byte table at `0x00741790` with the target unit;
   the handlers `0x005BE3F0`, `0x005BE7B0`, `0x005BEAC0`, `0x005BEDA0`
   (`pSpell` 3, 4, 5, 9; the entry's second slot, +4) pass it as the
