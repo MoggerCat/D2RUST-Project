@@ -1,0 +1,39 @@
+﻿cargo :    Compiling d2-sim v0.0.0 (C:\Users\pc\Documents\Claude code folder\w-integ\crates\d2-sim)
+At line:1 char:850
++ ...  "sccache"; cargo run -p d2-client --release -- play --new sorceress  ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (   Compiling d2...\crates\d2-sim):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+   Compiling d2-server v0.0.0 (C:\Users\pc\Documents\Claude code folder\w-integ\crates\d2-server)
+   Compiling d2-client v0.0.0 (C:\Users\pc\Documents\Claude code folder\w-integ\crates\d2-client)
+    Finished `release` profile [optimized] target(s) in 3m 53s
+     Running `C:\Users\pc\Documents\Claude code folder\d2rs\target\release\d2-client.exe play --new sorceress Test`
+play: game data from D2_GAME_DIR (137 levels, 573 objects, waypoint object class 119; level files: 2043 DS1, 34 lvlsub DS1, 241 DT1)
+play: new character Test (sorceress), not saved
+single player: seed 1234, waypoint unit UnitId(0) (GUID 1)
+2026-10-07T23:43:55.311075Z  INFO bevy_diagnostic::system_information_diagnostics_plugin::internal: SystemInfo { os: 
+"Windows 10 Enterprise", kernel: "19045", cpu: "Intel(R) Core(TM) i7-7700HQ CPU @ 2.80GHz", core_count: "4", memory: 
+"15.9 GiB" }
+2026-10-07T23:43:55.579588Z  INFO bevy_render::renderer: AdapterInfo { name: "Intel(R) HD Graphics 630", vendor: 
+32902, device: 22811, device_type: IntegratedGpu, device_pci_bus_id: "", driver: "?", driver_info: "?", backend: 
+Vulkan, subgroup_min_size: 4, subgroup_max_size: 128, transient_saves_memory: false }
+2026-10-07T23:43:56.463431Z  INFO bevy_pbr::cluster: GPU clustering is supported on this device.
+2026-10-07T23:43:56.463527Z  INFO bevy_render::batching::gpu_preprocessing: GPU preprocessing is fully supported on 
+this device.
+2026-10-07T23:43:56.464967Z  INFO bevy_winit::system: Creating new window d2rs (65v0)
+2026-10-07T23:43:56.825562Z  WARN d2_client::app::ui: unit art: DATA\GLOBAL\CHARS\SO\SH\SOSHlitTNhth.dcc: in no archive
+2026-10-07T23:43:56.825594Z  WARN d2_client::app::ui: unit art: DATA\GLOBAL\MONSTERS\RG\LH\RGLHlitNUhth.dcc: in no 
+archive
+2026-10-07T23:43:56.825604Z  WARN d2_client::app::ui: unit art: DATA\GLOBAL\OBJECTS\TA\COF\TANUhth.COF: in no archive
+Encountered an error in system `<Enable the debug feature to see the name>`: sound world: line test 0x00622AA0 (§6.4 r2): no client collision rooms (pending: not in the client model)
+   4: <bevy_ecs::error::bevy_error::BevyError as core::convert::From<d2_client::app::sound::AudioFrameError>>::from
+   5: RNvXs1_NtNtNtCs9rw95XCWuke_4core3ops8function5implsQNvNtNtCs31xj8mDR1Wl_9d2_client3app5sound11audio_frameINtB7_5FnMutTINtNtNtCslz1oGxipbbw_8bevy_ecs16change_detection6params3ResNtNtNtBU_6bridge6mirror14BridgeResourceEINtB1V_6ResMutNtBQ_9GameAudioEINtNtBb_6
+   6: RNvXsa_NtNtCslz1oGxipbbw_8bevy_ecs6system15function_systemINtB5_14FunctionSystemFINtNtNtB9_16change_detection6params3ResNtNtNtCs31xj8mDR1Wl_9d2_client6bridge6mirror14BridgeResourceEINtB1k_6ResMutNtNtNtB20_3app5sound9GameAudioEINtNtCs9rw95XCWuke_4core6optio
+note: Some "noisy" backtrace lines have been filtered out. Run with `BEVY_BACKTRACE=full` for a verbose backtrace.
+
+Encountered a panic in system `<Enable the debug feature to see the name>`!
+Encountered a panic in system `<Enable the debug feature to see the name>`!
+error: process didn't exit successfully: `C:\Users\pc\Documents\Claude code folder\d2rs\target\release\d2-client.exe 
+play --new sorceress Test` (exit code: 101)
+EXIT=101

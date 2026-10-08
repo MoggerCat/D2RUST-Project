@@ -198,6 +198,12 @@ pub struct GameAudio {
     pub driver: Option<Mutex<SoundDriver>>,
     errors: Arc<Mutex<Vec<SoundPoolError>>>,
     pub stats: AudioStats,
+    /// The play preview (decision D1): a pending sound-world question is
+    /// logged once and the frame goes on, as the preview's other fills;
+    /// the strict path keeps failing the frame (rule 10).
+    pub preview: bool,
+    /// The pending questions already logged in preview mode.
+    logged_pending: std::collections::BTreeSet<&'static str>,
 }
 
 impl GameAudio {
@@ -233,6 +239,8 @@ impl GameAudio {
             driver,
             errors,
             stats: AudioStats::default(),
+            preview: false,
+            logged_pending: std::collections::BTreeSet::new(),
         }
     }
 }
@@ -312,12 +320,18 @@ fn audio_frame(
         None => None,
     };
     if let Some(d) = driver.as_deref_mut() {
-        d.frame(
+        match d.frame(
             world,
             &bridge.0.inputs().tables.levels,
             requests.as_deref().unwrap_or_default(),
-        )
-        .map_err(AudioFrameError::from)?;
+        ) {
+            Err(crate::audio::driver::DriverError::Pending(q)) if audio.preview => {
+                if audio.logged_pending.insert(q) {
+                    warn!("preview (d2rs-own, unverified): sound question not answered, frame goes on: {q}");
+                }
+            }
+            r => r.map_err(AudioFrameError::from)?,
+        }
         for s in d.take_skipped() {
             debug!("sound layer skipped: {s}");
         }

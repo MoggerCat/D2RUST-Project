@@ -1,0 +1,46 @@
+﻿cargo :    Compiling d2-client v0.0.0 (C:\Users\pc\Documents\Claude code folder\w-integ\crates\d2-client)
+At line:1 char:687
++ ...  "sccache"; cargo run -p d2-client --release -- play --new sorceress  ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (   Compiling d2...ates\d2-client):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+    Finished `release` profile [optimized] target(s) in 4m 57s
+     Running `C:\Users\pc\Documents\Claude code folder\d2rs\target\release\d2-client.exe play --new sorceress Test`
+play: game data from D2_GAME_DIR (137 levels, 573 objects, waypoint object class 119; level files: 2043 DS1, 34 lvlsub DS1, 241 DT1)
+play: new character Test (sorceress), not saved
+single player: seed 1234, waypoint unit UnitId(0) (GUID 1)
+2026-10-07T23:50:58.507170Z  INFO bevy_diagnostic::system_information_diagnostics_plugin::internal: SystemInfo { os: 
+"Windows 10 Enterprise", kernel: "19045", cpu: "Intel(R) Core(TM) i7-7700HQ CPU @ 2.80GHz", core_count: "4", memory: 
+"15.9 GiB" }
+2026-10-07T23:50:58.641202Z  INFO bevy_render::renderer: AdapterInfo { name: "Intel(R) HD Graphics 630", vendor: 
+32902, device: 22811, device_type: IntegratedGpu, device_pci_bus_id: "", driver: "?", driver_info: "?", backend: 
+Vulkan, subgroup_min_size: 4, subgroup_max_size: 128, transient_saves_memory: false }
+2026-10-07T23:50:59.533128Z  INFO bevy_pbr::cluster: GPU clustering is supported on this device.
+2026-10-07T23:50:59.533215Z  INFO bevy_render::batching::gpu_preprocessing: GPU preprocessing is fully supported on 
+this device.
+2026-10-07T23:50:59.534906Z  INFO bevy_winit::system: Creating new window d2rs (65v0)
+2026-10-07T23:50:59.913160Z  WARN d2_client::app::ui: unit art: DATA\GLOBAL\CHARS\SO\SH\SOSHlitTNhth.dcc: in no archive
+2026-10-07T23:50:59.913201Z  WARN d2_client::app::ui: unit art: DATA\GLOBAL\MONSTERS\RG\LH\RGLHlitNUhth.dcc: in no 
+archive
+2026-10-07T23:50:59.913210Z  WARN d2_client::app::ui: unit art: DATA\GLOBAL\OBJECTS\TA\COF\TANUhth.COF: in no archive
+2026-10-07T23:50:59.922397Z  WARN d2_client::app::sound: preview (d2rs-own, unverified): sound question not answered, 
+frame goes on: line test 0x00622AA0 (§6.4 r2): no client collision rooms
+2026-10-07T23:50:59.922432Z  WARN d2_client::app::sound: audio: cue at tick 1 queued after tick 1 was presented
+2026-10-07T23:50:59.922468Z  WARN d2_client::app::sound: audio: cue at tick 1 queued after tick 1 was presented
+2026-10-07T23:51:03.234470Z  WARN d2_client::app::ui: unit art: DATA\GLOBAL\CHARS\SO\SH\SOSHlitWLhth.dcc: in no archive
+2026-10-07T23:51:07.074258Z  INFO d2_client::app::play: frame 250: 117 server ticks, 28 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 248, server_tick: 116, items: 140, units_drawn: 17, 
+units_hidden: 11, ui_sent: 0, ui_unhandled: 4, gpu: true }); node frames 80; audio Some(AudioStats { frame: 250, 
+presented: 117, decodes: 10, load_errors: 0, engine_errors: 2 })
+2026-10-07T23:51:16.702659Z  INFO d2_client::app::play: frame 500: 272 server ticks, 28 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 499, server_tick: 271, items: 156, units_drawn: 17, 
+units_hidden: 11, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 160; audio Some(AudioStats { frame: 500, 
+presented: 272, decodes: 10, load_errors: 0, engine_errors: 2 })
+2026-10-07T23:51:25.098313Z  INFO d2_client::app::play: frame 750: 441 server ticks, 28 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 749, server_tick: 440, items: 164, units_drawn: 18, 
+units_hidden: 10, ui_sent: 0, ui_unhandled: 3, gpu: true }); node frames 244; audio Some(AudioStats { frame: 750, 
+presented: 441, decodes: 10, load_errors: 0, engine_errors: 2 })
+2026-10-07T23:51:31.804292Z  INFO bevy_window::system: No windows are open, exiting
+2026-10-07T23:51:31.804375Z  INFO bevy_winit::system: Closing window 65v0
+EXIT=0

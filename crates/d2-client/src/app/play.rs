@@ -296,7 +296,9 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
         let parts = ui::UiParts::live(archives.clone()).map_err(anyhow::Error::msg)?;
         ui::add_original_ui(&mut app, parts)?;
         let table = sound::sound_table_live(&archives).map_err(anyhow::Error::msg)?;
-        app.insert_resource(GameAudio::new(AudioParts::original(archives, table)));
+        let mut audio = GameAudio::new(AudioParts::original(archives, table));
+        audio.preview = true;
+        app.insert_resource(audio);
     } else {
         add_preview(&mut app, level_rows, TileAssets::default());
     }
