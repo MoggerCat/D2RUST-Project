@@ -2,7 +2,7 @@
 //! The Act II quest hooks the play host feeds once per tick
 //! (`wired/quest_events.rs`, task `q-a2-quests`): Radament's and the
 //! Summoner's AI calls and the cube's Horadric Staff hook, raised as the
-//! pending seams queue them. PROVISIONAL (REC-141): the frame they run in.
+//! pending seams queue them. PROVISIONAL (REC-136): the frame they run in.
 
 use d2_sim::units::lifecycle::AllocRequest;
 use d2_sim::units::{UnitId, UnitType};

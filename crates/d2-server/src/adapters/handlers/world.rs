@@ -1042,7 +1042,7 @@ impl MoveRest for PreviewMoveRest {
 /// and the quest hooks do nothing, and the Cow portal is refused.
 #[derive(Debug, Default)]
 pub struct PreviewCubePending {
-    /// `hst ` hooks recorded for the quest control (REC-141).
+    /// `hst ` hooks recorded for the quest control (REC-136).
     quest_items: Vec<(UnitId, [u8; 4])>,
 }
 

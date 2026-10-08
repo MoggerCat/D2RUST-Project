@@ -502,6 +502,56 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
         });
     }
 
+    /// The items of the corpses the deaths created
+    /// (`ActionHooks::death.loot`, `vitals.md` §4.7 rule 1.7): the cursor
+    /// and body items move from the player to the corpse. A host without
+    /// the inventory model drops the queue.
+    pub fn corpse_fill<D: ActionEvents>(&mut self, game: &mut Game, events: &mut D)
+    where
+        Self: WorldHost<D>,
+    {
+        let hooks = &mut events.action().sys;
+        let q = std::mem::take(&mut hooks.hooks.death.loot);
+        let gold = std::mem::take(&mut hooks.hooks.death.gold_drops);
+        if (q.is_empty() && gold.is_empty()) || self.inventory.is_none() {
+            return;
+        }
+        let gold: Vec<_> = gold
+            .into_iter()
+            .filter(|&(_, a)| a > 0)
+            .filter_map(|(p, a)| {
+                Some((
+                    d2_sim::items::moves::Owner::player(hooks.units.get(p)?.guid),
+                    a,
+                ))
+            })
+            .collect();
+        let pairs: Vec<_> = q
+            .into_iter()
+            .filter_map(|(p, c)| {
+                let (pr, cr) = (hooks.units.get(p)?, hooks.units.get(c)?);
+                Some((
+                    d2_sim::items::moves::Owner::player(pr.guid),
+                    d2_sim::items::moves::Owner::player(cr.guid),
+                    cr.class,
+                ))
+            })
+            .collect();
+        let Some((faults, sent)) = self.moves(
+            game,
+            events,
+            super::super::items::moves::CorpseFillRun { pairs, gold },
+        ) else {
+            return;
+        };
+        debug_assert!(faults.is_empty(), "corpse fill: {faults:?}");
+        for (unit, bytes) in sent {
+            if let Some(u) = unit {
+                self.inv_sent.push((u, bytes));
+            }
+        }
+    }
+
     /// The hireling deaths the kill queued (`ActionHooks::pet_deaths`, on
     /// from the first frame): `hirelings.md` §8 rule 1 → `0x005751A0`
     /// ([`life::on_kill`] with flag 1) for each killed monster with a
@@ -777,6 +827,7 @@ where
         self.run_quest_events(game, events);
         // A player with no life starts dying (`vitals.md` §4.8).
         events.action().player_deaths(game);
+        self.corpse_fill(game, events);
         self.pet_deaths(game, events);
         self.hireling_calls(game, events);
         self.pet_follows(game, events);

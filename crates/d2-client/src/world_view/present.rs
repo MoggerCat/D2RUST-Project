@@ -109,6 +109,8 @@ pub struct WorldViewState {
     /// Ground items (`super::ground_items`): the app hands in the item art
     /// rows and the archives; the default draws nothing.
     pub ground_items: super::ground_items::GroundItems,
+    /// The click on a corpse (`super::corpse_click`).
+    pub corpse_clicks: super::corpse_click::CorpseClicks,
     /// Client missiles and cast / state overlays (`super::missiles`).
     pub missiles: super::missiles::Missiles,
 }
@@ -135,6 +137,7 @@ impl WorldViewState {
             last_ui: Vec::new(),
             interact: Default::default(),
             ground_items: Default::default(),
+            corpse_clicks: Default::default(),
             missiles: Default::default(),
         }
     }
@@ -647,9 +650,12 @@ fn world_view_frame(
                 }
                 None => (0, None),
             };
-            let unhandled = state
-                .ground_items
-                .take_clicks(&mut bridge.0, &frame.unhandled)?;
+            let cam = super::corpse_click::camera_for(bridge.0.world(), view.open_mode);
+            let unhandled =
+                state
+                    .corpse_clicks
+                    .take_clicks(&mut bridge.0, cam.as_ref(), &frame.unhandled)?;
+            let unhandled = state.ground_items.take_clicks(&mut bridge.0, &unhandled)?;
             crate::bridge::belt::send_keys(&mut bridge.0, &frame.unhandled)?;
             let outs = world_clicks(
                 &mut bridge.0,
@@ -674,6 +680,7 @@ fn world_view_frame(
                     debug!("interact: {o:?}");
                 }
                 state.ground_items.frame(&mut bridge.0, walking)?;
+                state.corpse_clicks.frame(&mut bridge.0, walking)?;
             }
             // `ui/automap.md` §8 r2: the toggle command no panel took.
             let toggle = crate::controls::Action::ToggleAutomap.index() as u16;

@@ -345,9 +345,13 @@ fn game_creation_derives_the_four_controls_in_order_before_the_first_unit() {
     want.step();
     want.step(); // the waypoint object's allocation
     want.step(); // Akara (the synthetic town NPC, d2rs-own)
+    want.step(); // Kashya (the second synthetic town NPC, q-a1-bloodraven)
                  // The Moldy Tome in the Black Marsh (q-a1-tower, d2rs-own): one
                  // more object allocation, one more step (`rng.md` §5.3).
     want.step();
+    for _ in 0..=single_player::ACT2_NPCS.len() {
+        want.step(); // Lut Gholein's NPCs and its waypoint (d2rs-own, q-a2-town)
+    }
     let h = g.sim.events.action.hooks();
     assert_eq!(h.game_seed, want);
     assert_eq!(h.objects.as_ref().map(|o| o.obj_seed), Some(obj_seed));

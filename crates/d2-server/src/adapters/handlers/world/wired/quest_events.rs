@@ -6,7 +6,7 @@
 //! quest control after the tick (`after_tick`), as `0x005436B0`,
 //! `0x00543A30` and `0x00543B90` do.
 //!
-//! PROVISIONAL (REC-129; Act II hooks REC-141): the original calls these from inside monster
+//! PROVISIONAL (REC-129; Act II hooks REC-136): the original calls these from inside monster
 //! init, the kill and the warp; here they run once per tick after the
 //! tick's steps, in the order links, level changes, kills. `// d2rs-own,
 //! unverified`.
@@ -19,6 +19,9 @@ use d2_sim::wiring::action::{Pending, QuestEvent};
 use d2_sim::world::quests::{act2, QuestWorld};
 
 use super::{quest_call, ActionEvents, TradeRest, WiredWorld};
+
+/// Andariel's monster class (`monstats.txt` row 156).
+const ANDARIEL: u16 = 156;
 
 /// The level each player was last seen in.
 #[derive(Debug, Default)]
@@ -37,6 +40,7 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                 }
             }
         }
+        let frame = game.frame;
         let mut seen = std::mem::take(&mut self.quest_levels.0);
         seen = self.desk(game, events, |desk, ctl, inv| {
             let ((), _) = quest_call(desk, ctl, inv, |q, w| {
@@ -70,8 +74,19 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                 }
                 for e in &queued {
                     if let QuestEvent::Kill { victim, killer } = *e {
+                        // PROVISIONAL (REC-132, d2rs-own, unverified): no
+                        // spec links Andariel to chain 6.
+                        if w.monster_class(victim) == Some(ANDARIEL) {
+                            q.add_link(w, victim, 6, None);
+                        }
                         q.monster_killed(w, victim, killer);
                     }
+                }
+                // Tick step 8 `0x00543E10`: the quest updater (timers such
+                // as A1Q2's 15, `quests-act1.md` §10.5 r5) runs on every
+                // 20th frame (`quests.md` §5; REC-130).
+                if frame % 20 == 0 {
+                    q.update(w);
                 }
             });
             seen

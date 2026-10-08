@@ -1,6 +1,6 @@
 # q-a2-quests: Act II quest hooks in the play host
 
-Branch `claude/q-a2-quests`. Nothing is verified against 1.14d (rule 10). Open point: REC-141 (`docs/HANDOFF.md` §7).
+Branch `claude/q-a2-quests`. Nothing is verified against 1.14d (rule 10). Open point: REC-136 (`docs/HANDOFF.md` §7).
 
 ## Finding
 
@@ -14,7 +14,7 @@ The Act II quest rules (`world/quests/act2/q1..q6`), the object routes (altar, t
 
 Tests: `d2-server` `world::tests::quests_act2` (Radament outside / inside Sewers 3, Summoner seen, staff assembled, the cube pending's record).
 
-## PROVISIONAL (REC-141)
+## PROVISIONAL (REC-136)
 
 The hooks run once per tick after the steps, not inside the AI / cube call. `// d2rs-own, unverified`.
 

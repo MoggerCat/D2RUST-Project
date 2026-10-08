@@ -66,6 +66,7 @@ impl<X: Pending> super::ActionHooks<X> {
         }
         self.death.owners.insert(c, guid);
         self.death.fresh.push(c);
+        self.death.loot.push((p, c));
         Some(c)
     }
 }
@@ -117,6 +118,13 @@ impl<X: Pending> ActionSim<X> {
     /// is told).
     pub fn deaths_of(&mut self, game: &mut Game, players: &[UnitId]) -> Vec<UnitId> {
         let mut changed = Vec::new();
+        // A corpse the pickup freed is no longer one.
+        let units = &self.sys.units;
+        self.sys
+            .hooks
+            .death
+            .owners
+            .retain(|c, _| units.get(*c).is_some_and(|r| r.mode == DD));
         for &p in players {
             let Some(mode) = self.sys.units.get(p).map(|r| r.mode) else {
                 continue;
