@@ -53,6 +53,7 @@ pub mod swap_key;
 pub mod tile_assets;
 pub mod ui_bind;
 pub mod unit_assets;
+pub mod unit_facts;
 pub mod unit_rules;
 pub mod unit_shadow;
 pub mod walk;
