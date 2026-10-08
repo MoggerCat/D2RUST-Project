@@ -55,7 +55,7 @@ Failing (findings, no expectation changed): 2.4 one test, 2.5 one test,
 `population.md` says 528. Not run: Batch 4, 2.17, 3.15. Stale LOCAL-RUN
 expectations updated (1.4, 2.4, 3.1, 5.2).
 
-## Lane C — recordings PC 2 needs (to move into HANDOFF §7)
+## Lane C — recordings PC 2 needs (moved into HANDOFF §7 "PC 1 s8 additions": R-SWAP=REC-300, R-SET=REC-301, R-WW=REC-302, R-CLAW=REC-303, R-SENTRY=REC-304, R-PAUSE=REC-305, R-ACT=REC-306, R-TYRPORT=REC-307, R-HCFLAG=REC-308, R-MSG=REC-309, R-EXIT=REC-310, R-MUPD=REC-311, R-DOOR=REC-312, R-BELT=REC-313, R-HUD=REC-314, R-GOLD=REC-315, R-LOAD=REC-316, R-LVL=REC-317, R-MODE=REC-318, R-ACTBYTE=REC-319, R-MIS=REC-320, R-SHAKE=REC-321, R-NOTICK=REC-322, R-SHRINE=REC-323, R-DRLG-DIR=REC-324, R-WARP-RESTORE=REC-325, R-TINT=REC-326, R-WALL=REC-327, R-LIGHTEDGE=REC-328, R-BUBBLE=REC-329, R-SYS4=REC-330, R-GARG=REC-331, R-TP=REC-332, R-CUBE=REC-333, R-SAVE=REC-334, R-LOS=REC-335)
 
 Recordability (tools/original-hooks.md §7): R-MIS-1/2, R-PAUSE-1, R-NOTICK-1, R-LVL-1/2, R-EXIT-1, R-MSG-1 need `q-rec-hooks` first. R-HCFLAG-1 from the menu by hand (no `--auto`) until `q-rec-joinflags`. R-MODE-1 needs a second client. R-LVL-2, R-ACT-1, R-TYRPORT-1 need saves at those quest stages. The rest is covered by the existing recorders.
 

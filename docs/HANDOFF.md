@@ -5557,6 +5557,7 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 - Compare: boss unit seed, mode 1. Fold: write the result into the cited rule and drop its PROVISIONAL line.
 
 ##### REC-82 [AUTO] ai-bodies-7.md §27 step 12 (aitype 1 / 12)
+- SETTLED 2026-10-08 from the binary (pc1-s8): no recording needed; drop this entry.
 - Priority P0 (RNG draw order).
 - Settles: ai-bodies-7.md §27 step 12 (aitype 1 / 12).
 - Steps: `d2s-tool` Assassin with Shadow Master and a few aitype-1 / aitype-12 skills; `record_rng.py --seconds 240` + `record_tick.py --seconds 240` while the Shadow Master fights in the Blood Moor; log unit-seed steps with caller inside `0x005EB970` per think.
@@ -5758,6 +5759,7 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 - Output: the export named there; one line in the xpc report.
 
 ##### REC-60 [AUTO] ui/text.md §15 r6 (scroll window, caret-inside-window case)
+- SETTLED 2026-10-08 from the binary (pc1-s8): no recording needed; drop this entry.
 - Priority P2.
 - Settles: ui/text.md §15 r6 (scroll window, caret-inside-window case).
 - Steps: `record_frames.py --seconds 40 --auto ScnSor --seed 1234 --draws-every 1 --input "wait 3; key ENTER; text <60 chars longer than the chat box>; key HOME; key RIGHT x5; key END; key LEFT x10; key SHIFT+LEFT x5; key BACKSPACE; key DELETE; key RIGHT x20; key ESC; end"` + NEW HOOK at `0x004FE7C0` exit logging E +0x25C, +0x4C, +0x50.
@@ -5779,6 +5781,7 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 - Compare: no entry with unit type 2, 4 or 5 expected; if one shows up, write the 1.14d effect into §10 r1 and drop the d2rs static-set choice. Fold: write the result into the cited rule and drop its PROVISIONAL line.
 
 ##### REC-91 [NO RUN] formats/d2s-appearance.md §1 r2, §1 r3, Open question 3 (reference table `0x00744CA8`)
+- SETTLED 2026-10-08 from the binary (pc1-s8): no recording needed; drop this entry.
 - Priority P2.
 - Settles: formats/d2s-appearance.md §1 r2 / Open question 3 (PROVISIONAL: slots 57–124 are `weap` slots, no other slot reserved; `ReferenceSlots::provisional_1_14d`).
 - Steps: (no game run) read the 256 × 8 bytes at `0x00744CA8` of the 1.14d image; also local run queue item 99 (`D2_GAME_DIR=<install> cargo test -p d2-server --test character_save -- --ignored`, `token_positions_on_the_users_install`).
@@ -5786,6 +5789,7 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 - Compare: the reconstruction (weapons 4–56, `cap` 57, `buc` 79, potions 125–134); a miss → write the table into §1 r2. Fold: write the result into the cited rule and drop its PROVISIONAL line.
 
 ##### REC-92 [MANUAL] formats/d2s-appearance.md §2 r1, Open question 4 (empty `alternategfx`)
+- SETTLED 2026-10-08 from the binary (pc1-s8): no recording needed; drop this entry.
 - Priority P2.
 - Settles: formats/d2s-appearance.md §2 r1 / Open question 4 (PROVISIONAL: an empty `alternategfx` is compared like any code, matching the first unfilled entry).
 - Steps: IT-6 save (`docs/handoff/pc2-rec-pc2-items.md`): a character holding an item whose `code` sits above the first hole (a throwing potion) in a hand; save; read the appearance bytes of the d2s header.
@@ -6113,6 +6117,137 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 - REC-98 (PROVISIONAL, M22): no spec gives the screen or text shown while the player is dead. Preview: a Bevy text node "You have died / Press Esc to return to town" while the local player's mode is 0 or 0x11; Esc in mode 0x11 sends C→S 0x41 (`ui/panels.md` §3 r1). Needs the original's wording and layout (RE of the dead-state draw).
 - REC-111 (PROVISIONAL, M22; monsters attack the player, `q-monster-ai`): (1) the skill an attack mode uses is not specified (`monsters/ai.md` §7.1's plain attack request sets none): preview, Attack (skill 0) level 1; (2) the attack-family per-frame `0x005A7670` (`skills/use.md` §5.2 OQ6 gives only "tests +0x4E = 1"): preview, the sequence frame's skill part with unit +0x4E := the type-0 timer's code; (3) the start's target clear is not kept for monsters. Needs the monster half of `use.md` OQ6 and the monster composer (RE).
 - **REC-177** Town and panel gaps (PROVISIONAL, d2rs-own; M22; q-town-gaps): (1) the shop's single-item repair button (frame 6, third of a repairer's row) toggles a mode; the next left click on one of the player's items (grid page 0 or worn) sends C→S 0x35 for it with no confirm dialog (`ui/shop_ui.rs`, `ui/panels/inv_items_repair.rs`); (2) Gheed and Charsi stand in the synthetic Rogue Encampment at x 36 / 8 (`app/town_npcs.rs`; Elzix and Jamella were already placed by q-a2-town / q-a4); (3) the weapon switch C→S 0x60 has no written body (`0x005616A0`, intents-events.md OQ16): d2-sim `wiring/inventory/swap.rs` trades body locations 4/5 with 11/12 (hand items unlink their stat lists, the swap set's link; requirements are not rechecked; every moved item joins the update list; S→C 0x97 flips the client's set); the W key sends it (`world_view/swap_key.rs`); (4) SUPERSEDED by REC-188 (q-item-bonus-wire; the pseudo states are removed, the client sums the item lists): item bonuses to the panel ride as the stat lists of pseudo states 0xFE / 0xFD (S→C 0xA8 SetState, ≤ 16 stats each, `vitals_sync.rs` `item_state_changes`) instead of base + bonus, so the client's total is base + lists and the existing value-above-base colour is blue; the stats are 0-3, 7, 9, 11, 19, 21-25, 31, 39-46. Supersedes the transport of REC-163 (2). Not done: the damage / attack-rating block of the character panel is not drawn in the preview at all (`char_details` is not fed); swap requirements and durability; the weapon-set tabs; a saved character's linked items. Needed: a trace of the W key with two weapon sets (0x60 answer, 0x9D moves, 0x97).
+
+#### PC 1 s8 additions (2026-10-08, `docs/handoff/pc1-s8.md`; REC-300+)
+Spec rules these confirm or settle were written from the 1.14d binary on `claude/local-pc1-s8`; most are confirmations. Recordability: `docs/handoff/pc1-s8.md` Lane C header (some need `q-rec-hooks` first).
+
+##### REC-300 [MANUAL] (R-SWAP-1)
+- R-SWAP-1 [MANUAL]: Settles: REC-177 (3) message order and fields. Expansion character, set 1 sword + shield, set 2 a two-hander that fails a requirement, a different left/right skill chosen in each set. Press W twice, then once more with both sets empty. Capture S→C in order: 0x97, the direct 0x23s, 0x9D action 0x17 ×n, 0x47, 0x48, the two queued 0x23; the 0x23 fields and the 0x9D bit streams (body location, flag 0x4000 on the unusable two-hander).
+
+##### REC-301 [MANUAL] (R-SET-1, R-SET-2)
+- R-SET-1 [MANUAL]: Settles: REC-188 (stat-lists OQ8). Equip a two-hander (action 0x07) over a worn set shield while a partial set bonus shows; record 0x9C/0x9D and what follows, then read the character panel: does anything refresh the taken-off item's set list?
+- R-SET-2 [MANUAL]: Settles: REC-188 (stat-lists §2 r6, set test vectors). Equip 2 then 3 pieces of one set, unequip one; record the 0x9C/0x9D streams (set mask, lists), confirm no 0xA8 for states 165–170 and base-only 0x1D–0x1F; compare panel totals with base + item lists + client-computed set bonuses.
+
+##### REC-302 [MANUAL] (R-WW-1)
+- R-WW-1 [MANUAL]: Settles: REC-173, REC-232 (tick timing). Whirlwind with one and with two weapons, and one Leap: per tick the unit position, 0x4C/0x4D, type-0 timer args, E param 4, hit ticks.
+
+##### REC-303 [MANUAL] (R-CLAW-1)
+- R-CLAW-1 [MANUAL]: Settles: REC-233. Fists of Fire or Dragon Claw with two claws vs one claw on one monster: type-0 events per attack, unit flag 0x40, damage per hit with different claws.
+
+##### REC-304 [MANUAL] (R-SENTRY-1)
+- R-SENTRY-1 [MANUAL]: Settles: REC-233 / REC-176 sentry part. One Lightning Sentry laid near a monster: shots fired (expect 10), think ticks, death tick.
+
+##### REC-305 [AUTO] (R-PAUSE-1)
+- R-PAUSE-1 [AUTO]: Verifies `ui/frontend-options.md` §O1 r6 (REC-237). 1.14d single player: log the server frame counter and the client update-clock global `0x007A0490` each loop pass; open the Esc menu 10 s, close it. Expect no server tick while open and no catch-up after.
+
+##### REC-306 [MANUAL] (R-ACT-1)
+- R-ACT-1 [MANUAL]: Settles: REC-175, REC-174 (Meshif part), waypoints OQ9. Tyrael's travel and the Harrogath portal (operate 73) to level 109, Meshif to level 75: packets and RNG (level-seed `roll(n)` at `0x0066ACB3`), order 0x05 / 0x03 / 0x53 / 0x07… / 0x15, arrival point, whether a 0x0A for the player's own GUID is sent. Needs saves at those quest stages.
+
+##### REC-307 [MANUAL] (R-TYRPORT-1)
+- R-TYRPORT-1 [MANUAL]: Settles: REC-174. Talk to Tyrael (msg 302), walk through the portal: its 0x51, position, the two game-seed steps, arrival point in Lut Gholein (expect near the tile-12 spawn), removal / ENDANIM on use.
+
+##### REC-308 [AUTO] (R-HCFLAG-1)
+- R-HCFLAG-1 [AUTO]: Confirms `client/model.md` §7 r9 (REC-46). 0x67 bytes of a classic-hardcore and an expansion-hardcore character joining single player; expect u32@0x27 = 0x804 and 0x100804.
+
+##### REC-309 [AUTO] [MANUAL] (R-MSG-1, R-MSG-2, R-MSG-3, R-MSG-4, R-MSG-5)
+- R-MSG-1 [AUTO]: Settles: msg-stats-items OQ1. Recorder dumps the local player's stat list after frame 2 of a join.
+- R-MSG-2 [MANUAL]: Settles: msg-units OQ7. Hire a hireling: 0x7A, 0x81, 0xAC.
+- R-MSG-3 [MANUAL]: Checks msg-skills §1 r6 (REC-09). Equip / unequip a charged item, use the charges.
+- R-MSG-4 [AUTO]: Settles: msg-skills OQ4. Scan existing recordings for a frame where a later message changes the unit, target or state 118 after a 0x99 / 0x9A event.
+- R-MSG-5 [MANUAL]: Checks msg-units §8 r10.1. Necromancer skeleton render capture (expect palette map 1).
+
+##### REC-310 [AUTO] (R-EXIT-1)
+- R-EXIT-1 [AUTO]: Settles: intents-events OQ2 remainder. Single-player exit: S→C receive order on the client (system 0xB0 vs game 0x05 / 0x06 in the same drain).
+
+##### REC-311 [AUTO] (R-MUPD-1)
+- R-MUPD-1 [AUTO]: Settles: intents-events OQ10 remainder. One plain Act I fight: which monster-update senders fire (0x11, 0x57, 0xA7–0xA9).
+
+##### REC-312 [MANUAL] (R-DOOR-1)
+- R-DOOR-1 [MANUAL]: Confirms intents-events §9 r4. Hover an open door with a monster in the doorway: C→S 0x3D and the door's next mode (2 → 5).
+
+##### REC-313 [MANUAL] (R-BELT-1, R-BELT-2, R-BELT-3)
+- R-BELT-1 [MANUAL]: Settles: control-panel §5 r4, r13. Set `CfgBelt1` to F1, bind `CfgBelt3` in its secondary slot only; screenshot the belt (expect "F1" and "None").
+- R-BELT-2 [MANUAL]: Settles: control-panel §5 r8. Hovered belt potion with and without an NPC shop open, screenshot.
+- R-BELT-3 [MANUAL]: Settles: control-panel §5 r4–r5. Highlight pixels: hovered usable potion; cursor item over empty, swappable, invalid box.
+
+##### REC-314 [MANUAL] (R-HUD-1)
+- R-HUD-1 [MANUAL]: Settles: control-panel §5 r14, REC-238. Hovered run button and experience bar at 800×600, screenshots.
+
+##### REC-315 [AUTO trace + MANUAL screenshot] (R-GOLD-1)
+- R-GOLD-1 [AUTO trace + MANUAL screenshot]: Settles: panels-2 §21 r6, r8. Stash gold withdraw and deposit dialogs, C→S 0x4F trace.
+
+##### REC-316 [MANUAL] (R-LOAD-1)
+- R-LOAD-1 [MANUAL]: Settles: REC-236 (and `frontend-loading.md` L5–L7 checks). Draw calls of the loading screen across a waypoint change and a game start at 800×600 (repeated 0x03 for the same act, 0x61 videos).
+
+##### REC-317 [AUTO] [MANUAL] (R-LVL-1, R-LVL-2)
+- R-LVL-1 [AUTO]: Confirms `drlg/levels.md` §12.3 (REC-230). Enter Act III with `-seed 644409375` (TestSor), dump drlg +0x90 vis/warp of levels 75–83.
+- R-LVL-2 [MANUAL]: Confirms §12.4 (REC-230). Act V save: dump vis/warp of 109–112, walk into 112 and 117, list warp tile units (class 71/72).
+
+##### REC-318 [ASSISTED] (R-MODE-1)
+- R-MODE-1 [ASSISTED]: Confirms `sim/pathing.md` §10 r2 (REC-95). A dodge/avoid trigger and a normal A1 attack with a second client: S→C 0x4C/0x4D received by the own and the other client.
+
+##### REC-319 [AUTO] (R-ACTBYTE-1)
+- R-ACTBYTE-1 [AUTO]: Confirms path-placement §13 r2. Load a character saved in Act III, log the S→C 0x03 act byte (expect 2, town 75).
+
+##### REC-320 [AUTO] (R-MIS-1, R-MIS-2)
+- R-MIS-1 [AUTO]: Confirms missiles OQ9. Quill rat A2 on Normal and Hell, missile positions per tick (expect v = 2112 / 3456).
+- R-MIS-2 [AUTO]: Confirms missiles OQ11. Hook `0x0059FA30` in a combat recording, log the tick step in progress (expect step 4 or between ticks).
+
+##### REC-321 [MANUAL] (R-SHAKE-1)
+- R-SHAKE-1 [MANUAL]: Optional confirmation of camera §8 rows 36, 38 (REC-62). Next to the Hellforge or at Duriel's death: shake start time, `seed_start` / `seed_end`, (dx, dy) per frame.
+
+##### REC-322 [AUTO] (R-NOTICK-1)
+- R-NOTICK-1 [AUTO]: Settles camera OQ8 / capture OQ8 against recordings. For runs 1–2 list frames after 0 ticks; each must be paused or inside the `[0x007A04BC]` hold (record it and GetTickCount per frame).
+
+##### REC-323 [AUTO] [MANUAL] (R-SHRINE-1, R-SHRINE-2, R-SHRINE-3, R-SHRINE-4)
+- R-SHRINE-1 [AUTO]: Settles objects-2 §26.1–§26.3 (REC-239). Stat-list trace (state, flags, expiry, source, stats) after each state shrine (codes 6–15); same shrine twice, a second shrine, a shrine while cursed (Amplify Damage), expiry of the stamina and skill shrines.
+- R-SHRINE-2 [MANUAL]: Settles objects-client §29 r2–r5, OQ4. 800×600 hover screenshots: chest, locked chest, shrine before/after, a door per mode, a waypoint, a town portal.
+- R-SHRINE-3 [MANUAL]: Settles objects-2 §26.4. Frame-stepped capture from shrine operation until the bubble disappears.
+- R-SHRINE-4 [MANUAL]: Confirms client/model §15 r6. Storm, Exploding and Poison shrines: client missile creates (class, position, target, level, order).
+
+##### REC-324 [AUTO] (R-DRLG-DIR)
+- R-DRLG-DIR [AUTO]: Settles outdoor OQ1. After Act I creation read the u32 at `[level+0x14]+0x04` for levels 1 and 27, and 40 after Act II (expect 3 and 1 for the recorded seed).
+
+##### REC-325 [AUTO] (R-WARP-RESTORE)
+- R-WARP-RESTORE [AUTO]: Confirms rooms §8 r6. Blood Moor: log the room's type-5 units (GUID, class, x, y) before deactivation and after reactivation, plus the tick step they appear in (expect new GUIDs).
+
+##### REC-326 [MANUAL] (R-TINT-1)
+- R-TINT-1 [MANUAL]: Confirms shading §6 r1.1, lighting §8. Monster under Poison then Cold, local player under Poison, GDI `-w`: cel draws' palette argument and the player's light colour (record +0x25..+0x27).
+
+##### REC-327 [MANUAL] (R-WALL-1)
+- R-WALL-1 [MANUAL]: Confirms lighting §11 r2, r4 / blend-modes §6. A wall in a preset with Logicals (Jail or Cathedral) next to a light, plus a Lut Gholein roof: per-pixel tile output and the light-map words.
+
+##### REC-328 [AUTO] (R-LIGHTEDGE-1)
+- R-LIGHTEDGE-1 [AUTO]: Confirms lighting §4 r2. Light-map flag words at `0x007B0E68` at the edge of the loaded rooms.
+
+##### REC-329 [MANUAL] (R-BUBBLE-1)
+- R-BUBBLE-1 [MANUAL]: Confirms messages §5 r1. An NPC overhead bubble at two draw rates; when it disappears, in drawn frames.
+
+##### REC-330 [AUTO, optional] (R-SYS4-1)
+- R-SYS4-1 [AUTO, optional]: Scan packet recordings for S→C 0x26 with u8@1 = 4 (none expected).
+
+##### REC-331 [MANUAL] (R-GARG-1)
+- R-GARG-1 [MANUAL]: Settles sprite-placement §3 PROVISIONAL, dcc §Frame size limit. Walk a room with a `gargoyletrap` preset (`ACT1\CATACOMB\catNEtheme1.ds1` has 3): record unit and cel draws, or note an abort with 0x58C.
+
+##### REC-332 [MANUAL, second client] [MANUAL] (R-TP-1, R-TP-2, R-TP-3, R-TP-4)
+- R-TP-1 [MANUAL]: Confirms objects-2 §27.1, §27.4, §27.5. TP scroll in Blood Moor with an older pair elsewhere; enter O1, return through O2. Expect old pair 0x0A; O1's 0x51/0x60/0x82 + sound 7; 0x7C, 0x22, 0x3F, scroll removal; 0x0D on arrival; 0x0A for both after the return.
+- R-TP-2 [MANUAL]: Confirms §27.1 r4, use §1 r5. Scroll in the Rogue Encampment: sound 24, one 0x3F, one 0x7C, scroll kept, no 0x22.
+- R-TP-3 [MANUAL]: Confirms use edge 1. Tome in the field: 0x7C, 0x3E (stat 70), 0x7C, 0x22; tome keeps flag 0x4.
+- R-TP-4 [MANUAL, second client]: Confirms §27.5 r2. Second player enters the room with the owner's portal: 0x82 fields.
+
+##### REC-333 [MANUAL] (R-CUBE-1, R-CUBE-2)
+- R-CUBE-1 [MANUAL]: Confirms cube §11 r2–r3 (REC-244). Items in the cube, panel open, lift the cube, place it elsewhere, Transmute a valid recipe; then drop the cube on the ground. Expect the panel stays open, the transmute works, page-3 items go to the inventory, no 0x4F 0x17 / 0x77.
+- R-CUBE-2 [MANUAL]: Confirms panels-2 §20 r3. Hover close and Transmute at 800×600, screenshots.
+
+##### REC-334 [AUTO] [MANUAL] (R-SAVE-1, R-SAVE-2, R-SAVE-3, R-SAVE-4, R-SAVE-5)
+- R-SAVE-1 [AUTO]: Confirms d2s §2.1. Waypoint to Act II, save: header +0xA8..+0xAA = `81 00 00`.
+- R-SAVE-2 [MANUAL]: Confirms d2s §2.3. Andariel killed in Normal, saved: status bits 8–12 = 1 (5 on Nightmare after Andariel, expansion).
+- R-SAVE-3 [MANUAL]: Confirms d2s §2.4 r6. Oskill / charged item skill as right skill, save and reload; variant with the item stashed first.
+- R-SAVE-4 [MANUAL]: Confirms d2s §2.5 r3, §8.4, OQ4. Hire after the last load, give items, save; gain experience, save again.
+- R-SAVE-5 [MANUAL]: Confirms d2s-load §3, d2s OQ15. Necromancer with an item Iron Golem, saved, rejoin with a packet log: recast at the join.
+
+##### REC-335 [AUTO hook, MANUAL placement] (R-LOS-1)
+- R-LOS-1 [AUTO hook, MANUAL placement]: Confirms pathing §13.4. Hook `0x00645950` entry/exit (x, y, GUID, mask, result, unit position) casting a lineofsight-4 skill across a dungeon wall and in the open; also client `0x004C6140`.
 
 ## 8. Lessons (problems met, fixes)
 
