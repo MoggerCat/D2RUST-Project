@@ -92,9 +92,13 @@ fn file_ending_after_kf_marker_is_rejected_with_23() {
 #[test]
 fn short_skills_section_is_rejected_with_19() {
     let mut s = empty_body();
-    s.header.skill_count = 30;
+    // The writer refuses a section the header does not frame; the file is
+    // made by patching +0x2A (the hand-made case of edge case 4).
+    s.header.skill_count = 5;
     s.body.as_mut().unwrap().skills = vec![0; 5];
-    let f = write(&s, &NoItems).unwrap();
+    let mut f = write(&s, &NoItems).unwrap();
+    f[0x2A] = 30;
+    finish(&mut f);
     let o = ReadOptions {
         expansion: false,
         game: None,

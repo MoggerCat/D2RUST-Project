@@ -66,6 +66,55 @@ fn func18_by_time_vectors() {
     assert_eq!(it.stats.item_list(268, 0), 4_190_211);
 }
 
+/// Open question 5: functions 18 and 19 write with the plain list set:
+/// no `valshift` (the vectors of §Test vectors stay unshifted).
+// Covers: specs/items/properties.md §5 r8, §5 r9
+#[test]
+fn func18_func19_set_without_valshift() {
+    let mut t = tables();
+    let i = push_item(&mut t, item_rec(RING, b"rin "));
+    t.properties = vec![prop1(18, 268), prop1(19, CHARGED)];
+    t.skills = vec![SkillRec::default(); 4];
+    t.valshift[268] = 8;
+    t.valshift[usize::from(CHARGED)] = 8;
+    let mut it = item(i, 1);
+    run(&t, &mut it, rec(0, 1, -50, 50));
+    assert_eq!(it.stats.item_list(268, 0), 1_254_201);
+    let mut it = item(i, 4242);
+    run(&t, &mut it, rec(1, 3, 0, 1));
+    assert_eq!(it.stats.item_list(CHARGED, (3 << 6) + 1), 1283);
+}
+
+/// §5 rule 3 with a foreign owner (§11: owner = the player, I = the set
+/// item): I is still an item, so the small-bonus rule applies and the
+/// base is reset.
+// Covers: specs/items/properties.md §5 r3, §11
+#[test]
+fn func7_set_bonus_on_item() {
+    let mut t = tables();
+    let i = weapon(&mut t, 1, 2);
+    t.properties = vec![prop1(7, stat::MAXDAMAGE_PERCENT)];
+    let mut partial = [PropRec::NONE; 8];
+    partial[0] = rec(0, 0, 10, 10);
+    t.sets = vec![SetRec {
+        count: 3,
+        partial,
+        full: [PropRec::NONE; 8],
+    }];
+    t.setitems = vec![SetItemRec::default()];
+    let mut it = item(i, 1);
+    it.file_index = 0;
+    let key = ListKey {
+        state: 165,
+        flags: 0,
+    };
+    let mut owner = FakeStats::default();
+    set_bonuses(&t, &mut it, 0b11, &mut owner, key);
+    assert_eq!(owner.lists[&key].get(&(stat::MAXDAMAGE, 0)), Some(&1));
+    assert_eq!(owner.lists[&key].get(&(stat::MAXDAMAGE_PERCENT, 0)), None);
+    assert_eq!(it.stats.base(stat::MAXDAMAGE, 0), 2, "base reset");
+}
+
 // Covers: specs/items/properties.md §5 text
 #[test]
 fn func10_layer() {
