@@ -13,12 +13,13 @@
 //! `d2rs-own, unverified`:
 //! - a tile's whole-tile shade is one flat value (the cell at its centre
 //!   sub-tile); its blocks take the gradients of [`super::preview_blocks`];
-//! - the ambient is the player level's `Levels.txt` ambient when it has a
-//!   colour, else the environment's (no near-room fills, no scripted
-//!   override);
+//! - the ambient of a room is the scripted override (§10, quest byte 1 read
+//!   as 0), else the level's `Levels.txt` ambient when it has a colour,
+//!   else the environment's; the near rooms fill their rectangles (§3 r3);
 //! - the other lights are those of [`super::light_sources`];
-//! - no blocks-light flags, so every light is unshadowed (kind 0 / 2
-//!   records draw plain);
+//! - the blocks-light flags (§4) come from the client DRLG collision
+//!   (`collision_at`, mask 0x22); only the player's light (kind 0) is
+//!   shadowed, the other sources draw plain (REC-250);
 //! - the environment advances one update per drawn frame, from the
 //!   model's record (or a fresh one).
 
@@ -29,7 +30,7 @@ use crate::rules::draw_order::{Dt1Facts, TileKind};
 use crate::rules::lighting::contribute;
 use crate::rules::lighting::draws::MATERIAL_UNLIT;
 use crate::rules::lighting::environment::{Ambient as EnvAmbient, Environment, PeriodTables};
-use crate::rules::lighting::map::{Ambient, AmbientScene, LightMap};
+use crate::rules::lighting::map::{Ambient, AmbientScene, LightMap, NearRoom};
 use crate::rules::lighting::records::{LightKind, LightList};
 use crate::rules::lighting::sources::{player_light_color, player_light_radius};
 use crate::rules::lighting::view::{ComponentLook, FrameLight, LookFeed};
@@ -42,6 +43,9 @@ pub const STAT_LIGHT_COLOR: u16 = 90;
 
 /// Light quality used by the preview: not 0, so no radius caps (§7.2).
 const QUALITY: u8 = 2;
+
+/// The collision mask of the blocks-light test (§4: bits 0x02 and 0x20).
+pub const BLOCKS_LIGHT_MASK: u16 = 0x22;
 
 /// Environment variable that turns the lighting off (full bright, D1).
 pub const FULLBRIGHT_VAR: &str = "D2RS_FULLBRIGHT";
@@ -132,18 +136,40 @@ pub type PointLight = ((i32, i32), i32, (u8, u8, u8));
 /// The light map of a frame: ambient fill, then each `(sub-tile, radius,
 /// rgb)` light plain (§2 r2, r4; §7.2).
 pub fn build_map(player: (i32, i32), ambient: Ambient, lights: &[PointLight]) -> LightMap {
-    let mut map = LightMap::new(player);
-    map.fill_ambient(Some(&AmbientScene {
+    let scene = AmbientScene {
         player_ambient: ambient,
         near: Vec::new(),
-    }));
+    };
+    build_map_blocked(player, &scene, |_, _| false, lights, false)
+}
+
+/// The light map of a frame with the ambient scene (§3 r3 near-room
+/// fills) and the blocks-light flags (§4, `blocks` = the collision point
+/// test with mask 0x22 at a sub-tile). With `shadow_first` the first light
+/// (the local player's, kind 0, §8) takes the shadowed contribution (§7.3,
+/// quality 2); the others draw plain.
+pub fn build_map_blocked(
+    player: (i32, i32),
+    scene: &AmbientScene,
+    blocks: impl FnMut(i32, i32) -> bool,
+    lights: &[PointLight],
+    shadow_first: bool,
+) -> LightMap {
+    let mut map = LightMap::new(player);
+    map.fill_ambient(Some(scene));
+    map.fill_blocks(blocks);
     let mut list = LightList::new();
-    for &((sx, sy), r, (red, green, blue)) in lights {
+    for (n, &((sx, sy), r, (red, green, blue))) in lights.iter().enumerate() {
         // The light's position is the sub-tile centre in 1/8 sub-tile.
+        let kind = if shadow_first && n == 0 {
+            LightKind::Shadowed
+        } else {
+            LightKind::Plain
+        };
         list.create(
             None,
             (8 * sx + 4, 8 * sy + 4),
-            LightKind::Plain,
+            kind,
             r,
             255,
             red,
@@ -153,7 +179,10 @@ pub fn build_map(player: (i32, i32), ambient: Ambient, lights: &[PointLight]) ->
     }
     let colored = list.colored;
     for (_, rec) in list.iter() {
-        contribute::plain(&mut map, rec, QUALITY, false, colored);
+        match rec.kind {
+            LightKind::Shadowed => contribute::shadowed(&mut map, rec, colored),
+            _ => contribute::plain(&mut map, rec, QUALITY, false, colored),
+        }
     }
     map
 }
@@ -187,6 +216,54 @@ pub fn chain_of(tables: &ShadeTables, v: u8) -> ShadeChain {
 }
 
 impl PreviewLight {
+    /// The ambient of a room of `level` (§3.1): the scripted override
+    /// (§10) when it has a colour, else the level's own, else the act's
+    /// `env`.
+    fn room_ambient(&self, world: &ClientWorld, level: u32, env: Ambient) -> Ambient {
+        // d2rs-own, unverified (REC-250): client quest byte 1 is not held,
+        // read as 0 (the Den of Evil glow stays off).
+        let o = world.overrides.ambient(level, 0);
+        if o.r != 0 || o.g != 0 || o.b != 0 {
+            return Ambient {
+                i: o.i,
+                r: o.r,
+                g: o.g,
+                b: o.b,
+            };
+        }
+        self.sources
+            .as_ref()
+            .and_then(|s| level_ambient(&s.levels, level))
+            .unwrap_or(env)
+    }
+
+    /// The ambient input of §3: the player room's ambient and the near
+    /// list (its adjacency array, `rooms.md` §6), each with its own level
+    /// ambient and sub-tile rectangle.
+    fn scene(&self, world: &ClientWorld, env: Ambient, level: u32) -> AmbientScene {
+        let mut near = Vec::new();
+        if let (Some(own), Some(drlg), Some(active)) = (
+            world.local_room(),
+            world.drlg.as_ref(),
+            world.active_rooms.as_ref(),
+        ) {
+            for id in drlg.adjacency(own.room) {
+                let Some(r) = active.iter().find(|a| a.room == id) else {
+                    continue;
+                };
+                near.push(NearRoom {
+                    rect: (r.x0, r.y0, r.w, r.h),
+                    ambient: self.room_ambient(world, u32::from(r.level), env),
+                    is_player_room: id == own.room,
+                });
+            }
+        }
+        AmbientScene {
+            player_ambient: self.room_ambient(world, level, env),
+            near,
+        }
+    }
+
     pub fn new() -> Self {
         PreviewLight {
             fullbright: fullbright_requested(),
@@ -268,19 +345,27 @@ impl PreviewLight {
             g: a.g,
             b: a.b,
         };
-        // §3.1 r2 before r3: the level's own ambient wins over the act's.
-        let ambient = self
-            .sources
-            .as_ref()
-            .and_then(|s| level_ambient(&s.levels, level))
-            .unwrap_or(ambient);
+        let scene = self.scene(world, ambient, level);
         let radius = player_light_radius(player.stat(STAT_LIGHT_RADIUS)).max(1);
         let rgb = player_light_color(player.stat(STAT_LIGHT_COLOR) as u32);
         let mut lights = vec![(at, radius, rgb)];
         if let Some(rows) = &self.sources {
             lights.extend(rows.lights(world));
         }
-        let map = build_map(at, ambient, &lights);
+        let drlg = world.drlg.as_ref().filter(|_| world.local_room().is_some());
+        let map = build_map_blocked(
+            at,
+            &scene,
+            |x, y| {
+                drlg.is_some_and(|d| {
+                    d.drlg
+                        .collision_at(x, y)
+                        .is_some_and(|m| m & BLOCKS_LIGHT_MASK != 0)
+                })
+            },
+            &lights,
+            true,
+        );
         self.frame = Some(FrameLight {
             tables: *tables,
             map,
