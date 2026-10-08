@@ -5,6 +5,18 @@ repo `MoggerCat/D2RUST-private-repo` (`main`).
 
 ## 2026-10-09
 
+- **Step 2 done:** core extract (5 parts, branch `extracted`, merged into
+  `main` as `aed059e1`), then the media folders (8 parts) and the
+  `extracted: complete` marker on the private `main` (00:21–00:39):
+  11 archives, 35095 files, 3066588211 bytes. Patch_D2 and d2sfx are
+  partial (see 2026-10-08); both archives are whole in `install/`.
+- **Step 1 done:** `install: complete` pushed 00:16 (private `main`
+  `6a5b2aa7`): 23 files, 2014663095 bytes. After two more 408s on the
+  first ≤250 MB part, every later push took 1–2 min (upload rose from
+  ≈0.55 to ≈3–4 MB/s; the cause of the earlier limit is unknown).
+- Next (PC 1, later): Step 3 (rendering facts); the seven `Fact*`
+  characters are ready.
+
 - **Failure (00:03):** install batch 3 (d2exp + d2music, ≈595 MB) and
   the core extract (≈680 MB) pushed side by side each failed 3 times:
   `error: RPC failed; HTTP 408 curl 22 The requested URL returned error:
