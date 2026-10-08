@@ -28,7 +28,8 @@ use crate::wiring::interaction::NpcRest;
 
 use super::{Economy, EconomyQuests, GameFields, HostQuests, QuestRest};
 use crate::world::objects::{Dispatch, EventRun, Operate, Route};
-use crate::world::quests::{self, act1, act2, QuestControl, QuestWorld};
+use crate::world::quests::act3::{self, InitPoint, KhalimChest};
+use crate::world::quests::{self, act1, act2, act5, QuestControl, QuestWorld};
 
 /// What running one queued route did.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -171,12 +172,44 @@ pub fn init_fn(n: u8) -> Option<u32> {
         33 => 0x0059_9EF0,
         // TyraelsDoor (§8.8).
         38 => 0x0059_DAD0,
+        // Act III (`quests-act3.md` §1.4, q-a3-quests).
+        23 => 0x0054_4E30,
+        25 => 0x005B_9AE0,
+        39 => 0x005B_9D40,
+        41 => 0x005B_8660,
+        42 => 0x005B_86B0,
+        43 => 0x005B_D1F0,
+        44 => 0x005B_CBF0,
+        45 => 0x005B_CB90,
+        49 => 0x005B_70B0,
+        50 => 0x005B_7160,
+        52 => 0x005B_CE80,
+        53 => 0x005B_BB70,
+        60 => 0x005B_BBA0,
         // CountessChest (`quests-act1-rest.md` §4).
         47 => 0x0059_5A50,
         // CainStartPosition (`quests-act1-rest.md` §3).
         54 => 0x0059_40E0,
         // CainPortal (`quests-act1-rest.md` §9 item 10).
         61 => 0x0059_4290,
+        // Act V objects (`quests-act5.md` §1.4).
+        62 => 0x0058_86A0,
+        63 => 0x0058_D150,
+        64 => 0x0058_D190,
+        65 => 0x0058_D110,
+        66 => 0x0058_EAC0,
+        67 => 0x0058_A5B0,
+        68 => 0x0058_A610,
+        69 => 0x0058_A6C0,
+        70 => 0x0058_7830,
+        71 => 0x0058_7840,
+        72 => 0x0058_D240,
+        73 => 0x0058_D280,
+        74 => 0x0058_AA50,
+        75 => 0x0058_E670,
+        76 => 0x0058_D640,
+        77 => 0x0058_E710,
+        79 => 0x0058_E830,
         _ => return None,
     })
 }
@@ -187,6 +220,15 @@ pub fn operate_fn(n: u8) -> Option<u32> {
     Some(match n {
         // TowerTome (`quests-act1.md` §10.7).
         6 => 0x0059_4E70,
+        // Act III (`quests-act3.md` §1.4, q-a3-quests).
+        28 => 0x005B_7A60,
+        31 => 0x005B_9B40,
+        44 => 0x005B_84E0,
+        45 => 0x005B_8530,
+        53 => 0x005B_B980,
+        57 => 0x005B_8860,
+        58 => 0x005B_8940,
+        59 => 0x005B_8A20,
         // Monolith (Cairn stone, `quests-act1.md` §10.6).
         9 => 0x0059_3710,
         // CainGibbet (`quests-act1-rest.md` §1.1).
@@ -209,6 +251,17 @@ pub fn operate_fn(n: u8) -> Option<u32> {
         41 => 0x0059_9CF0,
         // SanctuaryTome (§6.7).
         42 => 0x0059_B970,
+        // Act V objects (`quests-act5.md` §1.4).
+        62 => 0x0058_D1E0,
+        63 => 0x0058_D200,
+        64 => 0x0058_D220,
+        65 => 0x0058_D310,
+        66 => 0x0058_D400,
+        67 => 0x0058_ABC0,
+        69 => 0x0058_D5E0,
+        70 => 0x0058_E6A0,
+        71 => 0x0058_D6A0,
+        72 => 0x0058_E740,
         _ => return None,
     })
 }
@@ -224,8 +277,47 @@ fn init<W: QuestWorld>(
     if init_fn(n).is_none() {
         return QuestObjectRun::HandBack(c.route);
     }
+    // The init point of the object (room, x, y); a null room has none.
+    let at = c.room.map(|room| InitPoint {
+        room,
+        x: c.x,
+        y: c.y,
+    });
     match n {
         4 => act1::q5::object_init(ctl, w, object),
+        23 => act3::tome_init(ctl, w, object),
+        25 => {
+            if let Some(at) = at {
+                act3::decoy_init(ctl, w, object, at);
+            }
+        }
+        39 => {
+            if let Some(at) = at {
+                act3::altar_init(ctl, w, object, at);
+            }
+        }
+        41 => act3::stairs_init(ctl, w, object),
+        42 => act3::lever_init(ctl, w, object),
+        43 => {
+            if let Some(at) = at {
+                act3::wanderer_init(ctl, w, at);
+            }
+        }
+        44 => act3::hellgate_init(ctl, w, object),
+        45 => act3::bridge_init(ctl, w, object),
+        49 => {
+            if let Some(at) = at {
+                act3::hratli_start_init(ctl, w, at);
+            }
+        }
+        50 => {
+            if let Some(at) = at {
+                act3::hratli_end_init(ctl, w, at);
+            }
+        }
+        52 => act3::natalya_init(ctl, w, object),
+        53 => act3::stairs_r_init(ctl, w, object),
+        60 => act3::orb_init(ctl, w, object),
         // The stone's class is its value (`quests-act1-rest.md` §2.1).
         6 => act1::q4::stone_init(ctl, w, object, c.class),
         7 => act1::q4::gibbet_init(ctl, w, object),
@@ -243,7 +335,22 @@ fn init<W: QuestWorld>(
         // (`quests-act1-rest.md` §9 item 2).
         54 => act1::q4::marker_init(ctl, w, object, c.room, c.x, c.y),
         61 => act1::q4::cain_portal_init(w, object),
-        // 31–33: `ret`.
+        62 => act5::q2::cage_init(ctl, w, object),
+        // The statue's class (474–476) picks its slot (part 2 §7.8).
+        63..=65 => act5::q5::statue_init(ctl, w, object, c.class),
+        66 => act5::q3::anya_town_dummy_init(ctl, w, object),
+        67 => act5::q3::anya_dummy_init(ctl, w, object),
+        68 => act5::q3::nihlathak_town_dummy_init(ctl, w, object),
+        69 => act5::q3::nihlathak_temple_dummy_init(ctl, w, object),
+        71 => act5::q1::larzuk_dummy_init(ctl, w, object),
+        72 => act5::q5::altar_init(ctl, w, object),
+        73 => act5::q5::keep_door_init(ctl, w, object),
+        74 => act5::q3::frozen_anya_init(ctl, w, object),
+        75 => act5::q6::portal_init(ctl, w, object),
+        76 => act5::q5::summit_door_init(ctl, w, object),
+        77 => act5::q6::last_portal_init(ctl, w, object),
+        79 => act5::q6::zoo_init(ctl, w),
+        // 31–33 and 70: `ret`.
         _ => {}
     }
     QuestObjectRun::Ran
@@ -264,6 +371,14 @@ fn operate<W: QuestWorld>(
     let o = op.object;
     match op.operate_fn {
         6 => act1::q5::tome_operate(ctl, w, o, player),
+        28 => act3::tome_operate(ctl, w, o, player),
+        31 => act3::decoy_operate(ctl, w, o, player),
+        44 => act3::stairs_operate(ctl, w, o, player),
+        45 => act3::lever_operate(ctl, w, o, player),
+        53 => act3::orb_operate(ctl, w, o, player),
+        57 => act3::chest_operate(ctl, w, o, player, KhalimChest::Heart),
+        58 => act3::chest_operate(ctl, w, o, player, KhalimChest::Eye),
+        59 => act3::chest_operate(ctl, w, o, player, KhalimChest::Brain),
         // The stone's value is its class (`quests-act1-rest.md` §2.1).
         9 => act1::q4::stone_operate(ctl, w, o, player, op.class),
         10 => act1::q4::gibbet_operate(ctl, w, o, player),
@@ -295,6 +410,30 @@ fn operate<W: QuestWorld>(
             act2::q2::staff_chest(ctl, w, o, player);
         }
         42 => act2::q4::tome_operate(ctl, w, o, player),
+        62..=64 => {
+            act5::q5::statue_operate(w, player);
+        }
+        65 => {
+            act5::q5::altar_operate(ctl, w, o, player);
+        }
+        66 => {
+            act5::q5::keep_door_operate(ctl, w, o, player);
+        }
+        67 => {
+            act5::q3::frozen_anya_operate(ctl, w, o, player);
+        }
+        69 => {
+            act5::q5::invisible_ancient_operate(w, o, player);
+        }
+        70 => {
+            act5::q6::portal_operate(ctl, w, player);
+        }
+        71 => {
+            act5::q5::summit_door_operate(ctl, w, o, player);
+        }
+        72 => {
+            act5::q6::last_portal_operate(ctl, w, player);
+        }
         _ => return QuestObjectRun::HandBack(c.route),
     }
     QuestObjectRun::Ran
@@ -356,6 +495,18 @@ mod tests {
         }
     }
 
+    #[test]
+    fn act_v_functions_are_stated() {
+        for n in [
+            62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 79,
+        ] {
+            assert!(init_fn(n).is_some(), "init {n}");
+        }
+        for n in [62, 63, 64, 65, 66, 67, 69, 70, 71, 72] {
+            assert!(operate_fn(n).is_some(), "operate {n}");
+        }
+    }
+
     // Covers: specs/world/quests-act1-rest.md §9 r8, §9 r9, §9 r10, §9 r11
     #[test]
     fn act1_answered_functions_are_stated() {
@@ -366,6 +517,17 @@ mod tests {
         }
         assert!(operate_fn(33).is_some());
         assert!(init_fn(37).is_none());
+    }
+
+    // Covers: specs/world/quests-act3.md §1.4
+    #[test]
+    fn act3_functions_are_stated() {
+        for n in [23, 25, 39, 41, 42, 43, 44, 45, 49, 50, 52, 53, 60] {
+            assert!(init_fn(n).is_some(), "init {n}");
+        }
+        for n in [28, 31, 44, 45, 53, 57, 58, 59] {
+            assert!(operate_fn(n).is_some(), "operate {n}");
+        }
     }
 
     // M08: a wrong address and a non-quest index are reported.

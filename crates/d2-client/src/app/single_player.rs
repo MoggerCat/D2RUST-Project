@@ -176,6 +176,8 @@ pub const DEN_TO_BLOOD_MOOR: u32 = 12;
 /// middle) and the synthetic walk-out.
 pub const WARP_TILE_XY: i32 = 20;
 pub const ACT2_TOWN: u32 = 40;
+/// Harrogath (act 4, the fifth act; `levels` row 109).
+pub const ACT5_TOWN: u32 = 109;
 /// Catacombs Level 4, Andariel's lair (act 0; a flat level in the
 /// synthetic world, reached by a level warp: d2rs-own, unverified).
 pub const CATACOMBS_4: u32 = 37;
@@ -223,8 +225,13 @@ pub const ACT2_NPC_Y: i32 = 12;
 /// The Act II town waypoint (sub-tiles from its room's origin).
 pub const ACT2_WAYPOINT_XY: (i32, i32) = (20, 30);
 
+/// The Harrogath waypoint (sub-tiles from its room's origin).
+pub const ACT5_WAYPOINT_XY: (i32, i32) = (20, 30);
+/// The Harrogath waypoint's index (`levels` `Waypoint`).
+const ACT5_WAYPOINT: u8 = 27;
+
 /// Every NPC class of the synthetic game: the Rogue Encampment's Akara,
-/// Kashya and Warriv, and Lut Gholein's.
+/// Kashya and Warriv, Lut Gholein's and Harrogath's.
 fn synthetic_npc_classes() -> impl Iterator<Item = u16> {
     [
         d2_sim::world::npc::class::AKARA,
@@ -235,6 +242,7 @@ fn synthetic_npc_classes() -> impl Iterator<Item = u16> {
     ]
     .into_iter()
     .chain(ACT2_NPCS)
+    .chain(super::town_npcs::ACT5.iter().map(|&(c, _)| c))
     .chain(super::town_npcs::ACT3.iter().map(|&(c, _)| c))
 }
 /// The player's character class (1, sorceress, as in the server tests).
@@ -537,6 +545,9 @@ pub struct LocalSeams {
     /// The Act II DRLG's staff-tomb level (0 = not yet known), set when
     /// the acts are created (`q-a2-dungeons`).
     pub staff_tomb: u32,
+    /// The players' hands and the facts of the items in them
+    /// ([`super::weapons`], q-amazon).
+    pub weapons: super::weapons::Weapons,
 }
 
 impl LocalSeams {
@@ -638,9 +649,22 @@ impl Pending for LocalSeams {
                 .quest_events
                 .push(QuestEvent::RadamentActivated { unit }),
             QuestCall::SummonerActivated => self.quest_events.push(QuestEvent::SummonerActivated),
+            // d2rs-own, unverified (REC-148): the Act V AI calls.
+            QuestCall::Shenk => self.quest_events.push(QuestEvent::ShenkActivated { unit }),
+            QuestCall::Nihlathak => self.quest_events.push(QuestEvent::NihlathakActivated),
+            QuestCall::BaalToStairs => self.quest_events.push(QuestEvent::BaalToStairs),
+            QuestCall::AncientsNotActivatable => {
+                self.quest_events.push(QuestEvent::AncientsDisarm);
+                return false;
+            }
             _ => return false,
         }
         true
+    }
+    /// d2rs-own, unverified (REC-148): Anya's AI asks for the temple portal.
+    fn anya_open_portal(&mut self, _: &mut Game, unit: UnitId) {
+        self.quest_events
+            .push(d2_sim::wiring::action::QuestEvent::AnyaOpenPortal { unit });
     }
     /// `0x0061AEB0`: the Act II staff tomb, the orifice's level.
     fn object_staff_tomb(&self) -> u32 {
@@ -698,6 +722,26 @@ impl Pending for LocalSeams {
     }
     fn monster_sequence_frame(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, unit: UnitId) {
         skill_events::monster_sequence_frame(h, sim, unit);
+    }
+    // d2rs-own, unverified (q-amazon, REC-150): the hand class, the item
+    // shoots / stack facts of the skill bodies ([`super::weapons`]).
+    fn composit_weapon_class(&self, unit: UnitId) -> i32 {
+        self.weapons.hand_class(unit)
+    }
+    fn hand_class(&self, unit: UnitId) -> i32 {
+        self.weapons.hand_class(unit)
+    }
+    fn item_is(&self, item: UnitId, itype: i32) -> bool {
+        self.weapons.item_is(item, itype)
+    }
+    fn item_shoots(&self, item: UnitId) -> bool {
+        self.weapons.facts(item).shoots
+    }
+    fn item_stackable(&self, item: UnitId) -> bool {
+        self.weapons.facts(item).stackable
+    }
+    fn item_max_stack(&self, item: UnitId) -> i32 {
+        self.weapons.facts(item).max_stack
     }
     fn anim_name(&self, _: UnitId, ty: UnitType, class: u32, mode: u32) -> Option<[u8; 8]> {
         super::anim_names::anim_key(self.looks.as_deref()?, ty, class, mode)
@@ -987,12 +1031,19 @@ impl WaypointTables {
         let mut levels = vec![blank::<Levels>(); 150];
         for (i, l) in levels.iter_mut().enumerate() {
             l.waypoint = NO_WAYPOINT;
-            l.act = if i >= 40 { 1 } else { 0 };
+            l.act = if i >= ACT5_TOWN as usize {
+                4
+            } else if i >= 40 {
+                1
+            } else {
+                0
+            };
         }
         levels[1].waypoint = 0;
         levels[COLD_PLAINS as usize].waypoint = 1;
         levels[STONY_FIELD as usize].waypoint = 2;
         levels[ACT2_TOWN as usize].waypoint = 9;
+        levels[ACT5_TOWN as usize].waypoint = ACT5_WAYPOINT;
         let mut o: Objects = blank();
         o.operatefn = 23;
         o.initfn = 17;
@@ -1267,7 +1318,7 @@ struct LevelSource {
     tiles: Box<dyn TileSource>,
     types: Box<dyn LevelTypes>,
     /// (act, init seed, town level id) of each created act.
-    acts: [(u8, u32, u32); 2],
+    acts: [(u8, u32, u32); 3],
 }
 
 impl LevelSource {
@@ -1278,7 +1329,7 @@ impl LevelSource {
             data: Arc::new(synthetic_drlg_data()),
             tiles: Box::new(tiles()),
             types: Box::new(synthetic_level_types()),
-            acts: [(0, 1, 0), (1, 2, 0)],
+            acts: [(0, 1, 0), (1, 2, 0), (4, 3, 0)],
         }
     }
 
@@ -1302,7 +1353,11 @@ impl LevelSource {
             data,
             tiles: Box::new(d.files.dt1.clone()),
             types: Box::new(types),
-            acts: [(0, init_seed, 1), (1, init_seed, ACT2_TOWN)],
+            acts: [
+                (0, init_seed, 1),
+                (1, init_seed, ACT2_TOWN),
+                (4, init_seed, ACT5_TOWN),
+            ],
         }
     }
 }
@@ -1336,6 +1391,7 @@ fn synthetic_drlg_data() -> DrlgData {
         DEN_OF_EVIL,
         CATACOMBS_4,
         ACT2_TOWN,
+        ACT5_TOWN,
     ] {
         drlg.levels[id as usize].drlg_type = 2;
         drlg.levels[id as usize].level_type = 1;
@@ -1449,6 +1505,7 @@ fn synthetic_types() -> Types {
         (synthetic_tower::BLACK_MARSH, TileRect::new(8, 16, 8, 8)),
         (synthetic_burial::BURIAL_GROUNDS, TileRect::new(0, 24, 8, 8)),
         (ACT2_TOWN, TileRect::new(0, 0, 8, 8)),
+        (ACT5_TOWN, TileRect::new(0, 0, 8, 8)),
     ]))
 }
 
@@ -1782,7 +1839,7 @@ struct GameParts {
 
 /// Rows of the synthetic `monstats` (classes 0 … 399; Akara is the only
 /// NPC).
-const SYNTHETIC_MONSTATS: usize = 400;
+const SYNTHETIC_MONSTATS: usize = 600;
 
 /// d2rs-own, unverified (preview): the synthetic game's `monstats`, all
 /// zero rows with Akara `npc` and `interact` (the town NPC of
@@ -2165,6 +2222,8 @@ pub fn build_with_town(
     // q-a1-tower, d2rs-own, unverified).
     if matches!(data, GameData::Synthetic) {
         start_levels.push((0, synthetic_tower::BLACK_MARSH));
+        // Harrogath's room (rooms[4]; q-a5-town).
+        start_levels.push((4, ACT5_TOWN));
     }
     for (act, level) in start_levels {
         game.lists
@@ -2314,6 +2373,42 @@ pub fn build_with_town(
             })
             .ok_or_else(|| BuildError::Setup("allocating the Act II waypoint failed".into()))?;
     }
+    // Harrogath: its NPCs and its waypoint (act 4's room, d2rs-own,
+    // unverified, q-a5-town, REC-144).
+    if matches!(data, GameData::Synthetic) {
+        let (room5, rect5) = rooms[4];
+        let (ox5, oy5) = (rect5.x * 5, rect5.y * 5);
+        for &(class, dx) in &super::town_npcs::ACT5 {
+            let req = AllocRequest {
+                ty: UnitType::Monster,
+                class: u32::from(class),
+                room: Some(room5),
+                add: true,
+                fixed_guid: None,
+                mode: 1,
+                allied: true,
+            };
+            sim.action
+                .with(&mut game, |g, v| {
+                    v.allocate(g, &req, ox5 + dx, oy5 + UNIT_Y)
+                })
+                .ok_or_else(|| BuildError::Setup(format!("allocating NPC {class} failed")))?;
+        }
+        let req = AllocRequest {
+            ty: UnitType::Object,
+            class: wp_tables.object_class,
+            room: Some(room5),
+            add: true,
+            fixed_guid: None,
+            mode: 1,
+            allied: false,
+        };
+        sim.action
+            .with(&mut game, |g, v| {
+                v.allocate(g, &req, ox5 + ACT5_WAYPOINT_XY.0, oy5 + ACT5_WAYPOINT_XY.1)
+            })
+            .ok_or_else(|| BuildError::Setup("allocating the Act V waypoint failed".into()))?;
+    }
     let interact_classes: Vec<u16> = parts
         .monstats
         .iter()
@@ -2357,6 +2452,7 @@ pub fn build_with_town(
     world.cube = parts.cube.map(preview_cube_parts);
     let mut s: Sim = SimGame::with_world(game, sim, world);
     s.set_host_sync(sync_seams);
+    s.set_world_sync(super::weapons::sync);
     // The session sequence (`intents-events.md` §8) runs on the client's
     // C→S 0x67 / 0x6B: game creation (the client record, 0x01, 0x00,
     // 0x02; state 1), then the join (this loader, the player's add

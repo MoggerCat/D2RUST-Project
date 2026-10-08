@@ -564,3 +564,117 @@ fn charsi_refuses_without_the_quest_reward() {
                 == Some(buckler)
     );
 }
+
+/// The client half (`docs/handoff/q-imbue-ui.md`): Charsi's menu offers
+/// Imbue; its row opens the dialog; with the buckler on the cursor a
+/// click in the item area places it and the imbue button leaves as C→S
+/// 0x38 action 0, which the server answers with S→C 0x58 `[npc][6]`; the
+/// 0x58 closes the dialog.
+#[test]
+fn menu_click_to_imbue_done() {
+    use d2_client::ui::layout::Screen;
+    use d2_client::ui::original::{OriginalUi, UiConfig};
+    use d2_client::ui::panel::{NoStrings, PointerButton, UiCtx, UiEvent};
+    use d2_client::ui::{NoPanelRules, Point, UiRoot};
+
+    let mut fx = Fx::new(GAME_SEED, 0);
+    let (player, buckler) = (fx.player, fx.buckler);
+    assert!(!fx.bridge.frame().unwrap().ticked);
+    {
+        let w = &mut fx.sim().world;
+        w.tables.items[BUC].bitfield1 |= 1;
+        w.rest.quests.get_mut(&player).unwrap().flags[0].set(GATE.0, GATE.1);
+    }
+    {
+        let sim = fx.sim();
+        sim.events
+            .with(&mut sim.game, |_, v| v.set_base(player, LEVEL, 10));
+    }
+    let ng = fx.guid(fx.npc);
+    let mut ui = OriginalUi::new(
+        UiConfig {
+            screen: Screen::R800,
+            expansion_installed: true,
+        },
+        None,
+    )
+    .unwrap();
+    let mut root = UiRoot::new(Box::new(NoPanelRules));
+    ui.install(&mut root).unwrap();
+    ui.open_npc_menu(ng, 154, 10);
+    let menu = ui.npc_menu().expect("the menu is up");
+    assert!(
+        menu.rows
+            .iter()
+            .any(|r| r.kind == Some(d2_client::ui::layout::OptionKind::Imbue)),
+        "Charsi's menu has an Imbue row"
+    );
+
+    let strings = NoStrings;
+    let click = |fx: &mut Fx, ui: &mut OriginalUi, root: &mut UiRoot, at: Point| {
+        let w = fx.bridge.world();
+        let ctx = UiCtx {
+            tick: w.frames,
+            world: w,
+            strings: &strings,
+        };
+        let button = PointerButton::Left;
+        for e in [
+            UiEvent::Press { button, at },
+            UiEvent::Release { button, at },
+        ] {
+            ui.before_event(e, w);
+            let routed = root.dispatch(e, &ctx);
+            ui.after_event(root, e, routed).unwrap();
+        }
+        root.forward(&mut fx.bridge).unwrap()
+    };
+    // The third row (Talk, Trade, Imbue) of the box at (300, 150).
+    let k = menu
+        .rows
+        .iter()
+        .position(|r| r.kind == Some(d2_client::ui::layout::OptionKind::Imbue))
+        .unwrap() as i32;
+    assert_eq!(
+        click(
+            &mut fx,
+            &mut ui,
+            &mut root,
+            Point::new(310, 150 + 20 + 20 * k + 5)
+        ),
+        0
+    );
+    assert!(
+        ui.npc_menu().is_none() && ui.npc_menu_up(),
+        "the dialog replaced the menu"
+    );
+
+    pickup(&mut fx, buckler);
+    // The fixture's client model has no item stream, so the placing click
+    // (covered by the unit test of `imbue_ui`) goes through its seam.
+    ui.imbue_place(fx.guid(buckler));
+    assert_eq!(
+        click(&mut fx, &mut ui, &mut root, Point::new(130, 230)),
+        1,
+        "one C→S 0x38"
+    );
+    let f = fx.step(&[]);
+    assert_eq!(f.codes[0], (0x38, Some(ResultCode::Done)), "{f:?}");
+    let done: Vec<&Vec<u8>> = f.received.iter().filter(|m| m[0] == 0x58).collect();
+    assert_eq!(done.len(), 1, "{:?} {:?}", f.received, fx.errors());
+    assert_eq!(done[0][5], 6, "done; errors: {:?}", fx.errors());
+    assert!(!fx.inventory().contains(&buckler), "the buckler was imbued");
+    assert!(fx.errors().is_empty(), "{:?}", fx.errors());
+    // Delivering the 0x58 to the UI closes the dialog.
+    let w = fx.bridge.world();
+    ui.apply_output(
+        &d2_client::bridge::output::Output::OpenUi {
+            guid: ng,
+            code: 6,
+            arg: 0,
+        },
+        w,
+    )
+    .unwrap();
+    assert!(!ui.npc_menu_up());
+}

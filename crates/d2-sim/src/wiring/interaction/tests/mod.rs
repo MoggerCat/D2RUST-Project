@@ -5,6 +5,7 @@
 //! [`super::VendorRest`], the economy's `QuestRest`, [`super::UseRest`],
 //! [`super::VitalsRest`], the action wiring's `Pending`) are fakes.
 
+mod amazon;
 mod npc;
 mod quest_npc;
 mod regen;

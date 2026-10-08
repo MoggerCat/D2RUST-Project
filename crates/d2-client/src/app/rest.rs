@@ -428,7 +428,14 @@ impl QuestRest for AppRest {
         match self.snap.lock().ok().and_then(|s| s.units.get(&u).copied()) {
             Some(s) if s.ty == UnitType::Monster => UnitKind::Monster {
                 class: s.class,
-                superunique: None,
+                // d2rs-own, unverified (REC-148): the live monster record's
+                // superunique index is not read here; Shenk is the unit
+                // linked to chain 31 by monster init (superunique 42).
+                superunique: self
+                    .chains
+                    .get(&u)
+                    .filter(|c| c.0.contains(&31))
+                    .map(|_| 42),
                 owner: None,
             },
             _ => UnitKind::Other,

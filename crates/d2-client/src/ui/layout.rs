@@ -626,6 +626,8 @@ pub enum OptionKind {
     SailWest,
     Identify,
     Resurrect,
+    /// d2rs-own, unverified (REC-145): Charsi's runtime insert, never parsed.
+    Imbue,
 }
 
 impl OptionKind {

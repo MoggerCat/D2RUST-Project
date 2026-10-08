@@ -36,6 +36,7 @@ pub mod synthetic_maze;
 pub mod synthetic_tower;
 pub mod town_npcs;
 pub mod ui;
+pub mod weapons;
 
 use std::path::PathBuf;
 use std::sync::Arc;
