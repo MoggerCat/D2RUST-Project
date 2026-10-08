@@ -170,6 +170,9 @@ pub struct TileInfo {
     pub roof_height: u16,
     /// Height (+0x08, i32). Read only by the client draw (as above).
     pub height: i32,
+    /// Light direction (+0x00). Read only by the client draw: it picks the
+    /// wall light points (`render/lighting.md` §11 r2, Open question 8).
+    pub light_direction: u32,
 }
 
 /// Parsed DT1 files by path (no I/O in the sim). Paths are the
