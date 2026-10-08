@@ -2635,3 +2635,23 @@ fn unit_free_detaches_loops_and_leaves_one_shots() {
     detach_all(&mut sys.with(&mut w), MONSTER, true);
     assert!(!sys.request_by_handle(one).unwrap().stop);
 }
+
+// Covers: specs/audio/sound-table.md §4 r3
+#[test]
+fn variant_pick_ends_when_the_roll_is_stuck_at_zero() {
+    let mut r = rows(110);
+    r[100].group_size = 4;
+    let mut t = table(r);
+    t.record_history(100, 100);
+    t.record_history(100, 100);
+    // A roll that always gives 0 (no client seed): the pick must end.
+    assert_eq!(t.pick_variant(100, &mut |_| 0), 100);
+}
+
+// Covers: specs/audio/sound-table.md §8.3 r3
+#[test]
+fn device_occlusion_product_is_exact() {
+    // (1 - 0.05f) × 200 truncates to 189, not the 190 an f32 product gives.
+    assert_eq!(device_occluded(200, 0.05), 189);
+    assert_eq!(device_occluded(255, 0.0), 255);
+}

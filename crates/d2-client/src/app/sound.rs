@@ -311,12 +311,18 @@ fn audio_frame(
         None => None,
     };
     if let Some(d) = driver.as_deref_mut() {
-        d.frame(
+        // A pending model question (audio-audit q-fix-audio-pending) must not
+        // skip the pump and present below: the frame's cues still reach the
+        // mixer.
+        match d.frame(
             world,
             &bridge.0.inputs().tables.levels,
             requests.as_deref().unwrap_or_default(),
-        )
-        .map_err(AudioFrameError::from)?;
+        ) {
+            Ok(()) => {}
+            Err(DriverError::Pending(q)) => debug!("sound layer pending: {q}"),
+            Err(e) => return Err(AudioFrameError::from(e)),
+        }
         for s in d.take_skipped() {
             debug!("sound layer skipped: {s}");
         }
