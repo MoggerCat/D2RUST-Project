@@ -3008,7 +3008,12 @@ fn loader(
                 // are the join's item messages (rule 3.5), sent after the
                 // stat messages.
                 let (entry, report, items) = load_new_character_with_items(s, player, r.char_name);
-                super::save_gaps::seed_new_flags(s, player, GAME_SETUP.expansion);
+                super::save_gaps::seed_new_flags(
+                    s,
+                    player,
+                    GAME_SETUP.expansion,
+                    character.difficulty(),
+                );
                 let own: Vec<Vec<u8>> = items
                     .sent
                     .iter()
@@ -3051,6 +3056,7 @@ fn loader(
                 Ok((entry, report)) => {
                     // q-save-full: the save's items, made on the wired host.
                     let items_ok = super::save_full::join_items(s, player, save);
+                    let corpses_ok = super::save_full::join_corpses(s, player, save);
                     super::save_gaps::join_gaps(s, player, save);
                     let log = &mut s.events.action.hooks().x.log;
                     log.extend(
@@ -3058,6 +3064,7 @@ fn loader(
                             .unapplied
                             .iter()
                             .filter(|u| !(items_ok && u.step == "items"))
+                            .filter(|u| !(corpses_ok && u.step == "corpse"))
                             .map(|u| format!("join: save load: {u:?}")),
                     );
                     // Load §2 quests row (`0x0056A370` → `0x0065C4D0`,
