@@ -60,7 +60,7 @@ pub(crate) fn pl2() -> Pl2 {
 
 /// A frame light with the player at sub-tile (100, 100) and cell (101,
 /// 100) at intensity `i`; every other cell 0.
-fn frame_light(i: u8) -> FrameLight {
+pub(crate) fn frame_light(i: u8) -> FrameLight {
     let mut maps = MapTable::new();
     let tables = ShadeTables::push(&mut maps, &pl2());
     let mut m = LightMap::new((100, 100));
@@ -70,7 +70,7 @@ fn frame_light(i: u8) -> FrameLight {
     FrameLight { tables, map: m }
 }
 
-fn layer(override_translucency: u8, new_translucency: u8) -> CofLayer {
+pub(crate) fn layer(override_translucency: u8, new_translucency: u8) -> CofLayer {
     CofLayer {
         component: 0,
         shadow: 0,
@@ -81,7 +81,7 @@ fn layer(override_translucency: u8, new_translucency: u8) -> CofLayer {
     }
 }
 
-fn cof(l: CofLayer) -> Cof {
+pub(crate) fn cof(l: CofLayer) -> Cof {
     Cof {
         layers_count: 1,
         frames: 1,
@@ -100,7 +100,7 @@ fn cof(l: CofLayer) -> Cof {
     }
 }
 
-fn request<'a>(cof: &'a Cof) -> ComponentRequest<'a> {
+pub(crate) fn request<'a>(cof: &'a Cof) -> ComponentRequest<'a> {
     ComponentRequest {
         cof,
         dir: 0,

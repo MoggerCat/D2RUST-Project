@@ -175,8 +175,21 @@ pub fn add_preview_lit(
     tiles: TileAssets,
     lights: Option<crate::world_view::light_sources::LightRows>,
 ) {
+    add_preview_tinted(app, levels, tiles, lights, None);
+}
+
+/// [`add_preview_lit`] with the `colorpri` / `colorshift` of the `states`
+/// table (`world_view::state_tint`, PROVISIONAL REC-245).
+pub fn add_preview_tinted(
+    app: &mut App,
+    levels: Vec<LevelRow>,
+    tiles: TileAssets,
+    lights: Option<crate::world_view::light_sources::LightRows>,
+    tints: Option<crate::world_view::state_tint::StateTints>,
+) {
     let mut preview = Preview::new(tiles);
     preview.light.sources = lights.map(std::sync::Arc::new);
+    preview.light.set_tints(tints.map(std::sync::Arc::new));
     let mut state = app.world_mut().resource_mut::<WorldViewState>();
     state.feed = Box::new(
         ModelFeed {
@@ -448,12 +461,23 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
         let lights = crate::world_view::light_sources::load(archives.as_ref())
             .map_err(|e| warn!("light rows (d2rs-own, unverified): {e}; player light only"))
             .ok();
-        add_preview_lit(&mut app, level_rows, tiles, lights);
+        let tints = super::missile_art::state_tints(archives.as_ref())
+            .map_err(|e| warn!("state tints (d2rs-own, unverified): {e}; no unit tinted"))
+            .ok();
+        add_preview_tinted(&mut app, level_rows, tiles, lights, tints);
         let mut item_parts =
             super::items::item_parts(archives.as_ref()).map_err(anyhow::Error::msg)?;
         if let Some(lookup) = item_lookup {
             match lookup.and_then(|t| super::items::item_tips(archives.as_ref(), t)) {
-                Ok(t) => item_parts.tips = Some(t),
+                Ok(t) => {
+                    app.world_mut()
+                        .resource_mut::<BridgeResource>()
+                        .0
+                        .set_item_tables(std::sync::Arc::new(super::items::TableDecoder(
+                            t.tables(),
+                        )));
+                    item_parts.tips = Some(t);
+                }
                 Err(e) => warn!("item tips (d2rs-own, unverified): {e}; no tool tips"),
             }
         }

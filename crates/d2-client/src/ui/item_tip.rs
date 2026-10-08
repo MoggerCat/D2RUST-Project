@@ -158,6 +158,12 @@ fn rows<T: Record>(set: &BinSet) -> Result<Vec<T>, String> {
 }
 
 impl ItemTips {
+    /// The item tables the tips decode with (shared with the model's
+    /// item lists, `bridge::item_lists`).
+    pub fn tables(&self) -> Arc<ItemTables> {
+        self.lookup.clone()
+    }
+
     /// The tips over `lookup` (the game's item tables, for the stream
     /// reader), the loaded tables `set` and `strings`.
     pub fn new(

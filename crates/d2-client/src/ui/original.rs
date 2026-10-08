@@ -237,6 +237,8 @@ struct Shared {
     gold: gold_dialog::GoldState,
     /// The screen message list ([`game_messages`]).
     messages: game_messages::GameMessages,
+    /// The overhead text bubbles ([`overhead_ui`]).
+    bubbles: overhead_ui::Bubbles,
 }
 
 impl Shared {
@@ -363,6 +365,7 @@ impl OriginalUi {
             quest: quest_log_ui::QuestInputs::default(),
             gold: gold_dialog::GoldState::default(),
             messages: Default::default(),
+            bubbles: Default::default(),
         };
         Ok(Self {
             shared: Rc::new(RefCell::new(shared)),
@@ -430,6 +433,8 @@ impl OriginalUi {
         root.add(Box::new(gold_dialog::GoldDialogUi { sh: sh.clone() }))?;
         root.add(Box::new(game_messages::MessagesUi { sh: sh.clone() }))?;
         root.open(game_messages::MESSAGES_PANEL)?;
+        root.add(Box::new(overhead_ui::OverheadUi { sh: sh.clone() }))?;
+        root.open(overhead_ui::OVERHEAD_PANEL)?;
         root.add(Box::new(esc_menu::EscMenuUi { sh: sh.clone() }))?;
         // Not a UI state: open for good.
         root.open(BORDER_PANEL)?;
@@ -1228,6 +1233,8 @@ pub mod gold_dialog;
 pub mod hud;
 #[path = "options_menu.rs"]
 pub mod options_menu;
+#[path = "overhead_ui.rs"]
+pub mod overhead_ui;
 
 #[path = "hud_belt.rs"]
 pub mod hud_belt;

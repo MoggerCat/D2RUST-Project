@@ -19,7 +19,6 @@ use crate::combat::vitals::sync::{self, Current, ManaInputs, SyncCache};
 use crate::game::Game;
 use crate::stats::stat;
 use crate::units::lists::client_state;
-use crate::units::messages::{self, SendStat};
 use crate::units::{ClientId, UnitId, UnitType};
 
 /// `healthpot` / `manapot` list states (§5.2).
@@ -41,9 +40,6 @@ pub struct SyncState {
     /// Per client: the watched stats last sent as stat messages
     /// ([`stat_changes`]), by stat.
     pub stats: BTreeMap<ClientId, BTreeMap<i32, i32>>,
-    /// Per client: the item bonuses last sent as the pseudo states'
-    /// lists ([`item_state_changes`]), by stat.
-    pub items: BTreeMap<ClientId, BTreeMap<u16, i32>>,
 }
 
 impl<X> ActionHooks<X> {
@@ -163,96 +159,9 @@ const WATCHED: [u16; 20] = [
     0, 1, 2, 3, 4, 5, 7, 9, 11, 12, 30, 31, 39, 40, 41, 42, 43, 44, 45, 46,
 ];
 
-/// The stats the worn items and charms add that the client panels show
-/// (attributes, the maxima, attack rating, damage, defense, resists).
-const ITEM_SHOWN: [u16; 22] = [
-    0, 1, 2, 3, 7, 9, 11, 19, 21, 22, 31, 39, 40, 41, 42, 43, 44, 45, 46, 23, 24, 25,
-];
-
-/// The pseudo states that carry the item bonuses to the client, at most
-/// [`messages::STATE_LIST_ENTRIES`] stats each. d2rs-own, unverified
-/// (REC-177): the client builds no item stat lists, so the sum of the
-/// unit's linked item lists rides as the stat lists of these states (the
-/// client's total is the base plus its attached lists, so the panel's
-/// "value above base" colour follows). The ids are past the `states`
-/// table.
-const ITEM_STATES: [u8; 2] = [0xFE, 0xFD];
-
-/// The sum of `stat` over the item lists linked to `unit` (charms and
-/// worn items, `inventory.md` §5.7).
-fn item_bonus<X>(sim: &ActionSim<X>, unit: UnitId, stat: u16) -> i32 {
-    let s = &sim.sys.stats;
-    let Some(root) = s.unit_list(unit) else {
-        return 0;
-    };
-    s.active_chain(root)
-        .into_iter()
-        .filter(|&l| {
-            s.owner(l)
-                .and_then(|o| sim.sys.units.get(o))
-                .is_some_and(|r| r.ty == UnitType::Item)
-        })
-        .fold(0i32, |a, l| a.wrapping_add(s.total(l, stat, 0)))
-}
-
-/// The nonzero item bonuses of `unit`, by stat.
-fn item_bonuses<X>(sim: &ActionSim<X>, unit: UnitId) -> BTreeMap<u16, i32> {
-    ITEM_SHOWN
-        .iter()
-        .map(|&s| (s, item_bonus(sim, unit, s)))
-        .filter(|&(_, v)| v != 0)
-        .collect()
-}
-
-/// The changed item bonuses of `unit` for `client`: per pseudo state,
-/// 0xA9 EndState for a list that was sent and 0xA8 SetState for the new
-/// one (the client's `state_on` frees an old list itself, the end keeps
-/// its state bit honest). Empty when nothing changed.
-fn item_state_changes<X>(sim: &mut ActionSim<X>, client: ClientId, unit: UnitId) -> Vec<Vec<u8>> {
-    let now = item_bonuses(sim, unit);
-    let Some(r) = sim.sys.units.get(unit) else {
-        return Vec::new();
-    };
-    let (ty, guid) = (r.ty as u8, r.guid);
-    let Some(state) = sim.sys.hooks.sync.as_mut() else {
-        return Vec::new();
-    };
-    let sent = state.items.entry(client).or_default();
-    if *sent == now {
-        return Vec::new();
-    }
-    let had = !sent.is_empty();
-    *sent = now.clone();
-    let bodies = sim.sys.hooks.bodies.as_deref();
-    let all: Vec<(u16, u16, i32)> = now.iter().map(|(&k, &v)| (0, k, v)).collect();
-    let mut out = Vec::new();
-    for (i, &st) in ITEM_STATES.iter().enumerate() {
-        if had {
-            out.push(messages::state_ref(0xA9, ty, guid, st).to_vec());
-        }
-        let chunk: Vec<(u16, u16, i32)> = all
-            .iter()
-            .skip(i * messages::STATE_LIST_ENTRIES)
-            .take(messages::STATE_LIST_ENTRIES)
-            .copied()
-            .collect();
-        if !chunk.is_empty() {
-            out.push(messages::set_state(ty, guid, st, &chunk, |id| {
-                bodies
-                    .and_then(|b| b.stat(i32::from(id)))
-                    .map(|r| SendStat {
-                        bits: r.send_bits,
-                        param_bits: r.send_param_bits,
-                        signed: r.signed,
-                    })
-            }));
-        }
-    }
-    out
-}
-
-/// The watched base values of `unit`, by stat (the item bonuses ride
-/// apart, [`item_state_changes`]).
+/// The watched base values of `unit`, by stat. The item bonuses are not
+/// sent: the client sums the lists of its equipped items itself
+/// (`client/stat-lists.md` §2; `d2-client` `bridge::item_lists`).
 fn watched<X>(sim: &ActionSim<X>, unit: UnitId) -> BTreeMap<i32, i32> {
     WATCHED
         .iter()
@@ -285,7 +194,6 @@ pub fn stat_changes<X>(sim: &mut ActionSim<X>, client: ClientId, unit: UnitId) -
         sent.insert(k, v);
         out.extend(stat_message(k as u16, v));
     }
-    out.extend(item_state_changes(sim, client, unit));
     out
 }
 

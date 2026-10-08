@@ -24,7 +24,8 @@ use crate::controls::{self, Action as Act, Bindings, Context, ControlsFile, Key,
 use crate::ui::front_end::control::{Action, Control, ControlKind};
 use crate::ui::front_end::flow::Trigger;
 use crate::ui::front_end::screen::{FrontCtx, Screen};
-use crate::ui::front_end::Registry;
+use crate::ui::front_end::{DrawItem, Registry};
+use crate::ui::geom::Point;
 
 use super::ids::CONTROLS;
 
@@ -802,6 +803,10 @@ const ARROW_DOWN: u32 = 0x4001;
 pub struct ControlsScreen {
     model: Rc<RefCell<ConfigureControls>>,
     path: Option<PathBuf>,
+    pointer: Option<(i32, i32)>,
+    /// Key whose release was already counted by the `action` swallow; the
+    /// host's real key-up for it is then ignored once.
+    swallowed: Option<u16>,
 }
 
 impl ControlsScreen {
@@ -812,6 +817,8 @@ impl ControlsScreen {
                 BindingTable::defaults(),
             ))),
             path,
+            pointer: None,
+            swallowed: None,
         }
     }
 
@@ -883,6 +890,68 @@ impl Screen for ControlsScreen {
         v
     }
 
+    fn pointer(&mut self, _ctx: &mut FrontCtx, p: Point) {
+        self.pointer = Some((p.x, p.y));
+    }
+
+    fn wheel(&mut self, _ctx: &mut FrontCtx, delta: i32) {
+        self.model.borrow_mut().wheel(delta);
+    }
+
+    fn key_up(&mut self, ctx: &mut FrontCtx, vk: u16) {
+        if self.swallowed == Some(vk) {
+            self.swallowed = None;
+            return;
+        }
+        self.model.borrow_mut().key_up(vk, ctx.now_ms);
+    }
+
+    fn middle_down(&mut self, ctx: &mut FrontCtx) {
+        // The middle button is the pseudo key 0x100 (`vk_to_key`); its
+        // release assigns it, as for a keyboard key (r5).
+        let mut m = self.model.borrow_mut();
+        m.key_down(0x100, false, ctx.now_ms);
+        m.key_up(0x100, ctx.now_ms);
+    }
+
+    fn overlay(&mut self, now_ms: u64, _adv: &dyn Fn(u16, &[u16]) -> i32) -> Vec<DrawItem> {
+        // d2rs-own, unverified: text colour and the `boxpieces` border art
+        // are not carried by `DrawItem` (REC-231).
+        let list = self.model.borrow_mut().draw_list(now_ms, self.pointer);
+        list.into_iter()
+            .map(|d| match d {
+                CfgDraw::Rect { x, y, w, h } => DrawItem::Rect {
+                    at: Point::new(x, y),
+                    w,
+                    h,
+                },
+                CfgDraw::Border { x, y, w, h } => DrawItem::Border {
+                    at: Point::new(x, y),
+                    w,
+                    h,
+                },
+                CfgDraw::Slider { frame, x, y } => DrawItem::Art {
+                    file: r"MENU\textslid",
+                    frame,
+                    at: Point::new(x, y),
+                },
+                CfgDraw::Text {
+                    string_id,
+                    text,
+                    x,
+                    y,
+                    ..
+                } => DrawItem::Text {
+                    label: None,
+                    string_id,
+                    text,
+                    font: FONT,
+                    at: Point::new(x, y),
+                },
+            })
+            .collect()
+    }
+
     fn action(&mut self, ctx: &mut FrontCtx, id: u32) -> Option<Trigger> {
         let done = {
             let mut m = self.model.borrow_mut();
@@ -895,6 +964,7 @@ impl Screen for ControlsScreen {
                     // Enter that began editing is swallowed here (r5).
                     if !was && m.editing() {
                         m.key_up(vk, ctx.now_ms);
+                        self.swallowed = Some(vk);
                     }
                     d
                 }

@@ -48,7 +48,7 @@ rules are `docs/handoff/build-loop.md`, the task rows are
 
 ## Merge log (third coordinator)
 
-Merged into staging: q-belt-stash, q-strings-bind, q-fe-start-flow, q-cube-gaps, q-shrines-labels, q-lighting-detail, q-client-collision, q-save-gaps, q-fe-draw, q-tp-gaps, q-assassin-gaps, q-a2-tyrael-door, q-item-tips, q-menu-options (7,007 tests). Sent back: q-fe-host-screens (keep front_start's registry and q-fe-draw's glyph text; drop its duplicates). New follow-ups from these: lighting blocks-light flags / near-room fills (q-lighting-detail), shrine overhead text 0x26 type 5 (q-shrines-labels; maybe q-unit-fx), 0x61 act videos (q-fe-start-flow), HUD globe numbers (q-strings-bind).
+Merged into staging: q-belt-stash, q-strings-bind, q-fe-start-flow, q-cube-gaps, q-shrines-labels, q-lighting-detail, q-client-collision, q-save-gaps, q-fe-draw, q-tp-gaps, q-assassin-gaps, q-a2-tyrael-door, q-item-tips, q-menu-options (7,007 tests; shipped to main as PR #51, merged 2026-10-08 11:21 UTC), then q-item-bonus-wire, q-unit-fx, q-fe-host-screens (7,020 tests; in the next snapshot, release-8f). q-fe-text-widths REC-258 launched (session_01BWwKswhrWVQFvRWAoFJejM). Next free: REC-259. q-fe-host-screens was sent back once (duplicate registry), then merged. New follow-ups from these: lighting blocks-light flags / near-room fills (q-lighting-detail), shrine overhead text 0x26 type 5 (q-shrines-labels; maybe q-unit-fx), 0x61 act videos (q-fe-start-flow), HUD globe numbers (q-strings-bind).
 
 ## REC ids
 

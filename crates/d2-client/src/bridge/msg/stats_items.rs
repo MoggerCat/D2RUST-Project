@@ -334,6 +334,7 @@ pub fn item_action(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handler
             })
         }
     }
+    super::super::item_lists::refresh(w, key);
     // Rule 5: the cursor of the inventory's unit (a player's
     // `cursor_item`), then the UI cursor refresh (UI state).
     if let Some((c, item)) = write {

@@ -48,6 +48,7 @@ pub mod present;
 pub mod preview;
 pub mod preview_blocks;
 pub mod preview_light;
+pub mod state_tint;
 pub mod swap_key;
 pub mod tile_assets;
 pub mod ui_bind;
