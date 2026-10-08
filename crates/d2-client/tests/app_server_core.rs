@@ -154,7 +154,7 @@ fn monster_at(g: &mut Game, dx: i32) -> u32 {
     use d2_sim::units::lifecycle::AllocRequest;
     use d2_sim::units::UnitType;
     g.link
-        .with(|l| {
+        .with(move |l| {
             let s = &mut l.host_mut().game;
             let (p, _) = single_player::local_player(s).expect("joined");
             let room = s.game.lists.unit(p).and_then(|e| e.room());
@@ -273,7 +273,7 @@ fn item_at(g: &mut Game, dx: i32, owned: bool) -> u32 {
     use d2_sim::units::lifecycle::AllocRequest;
     use d2_sim::units::UnitType;
     g.link
-        .with(|l| {
+        .with(move |l| {
             let s = &mut l.host_mut().game;
             let (p, pguid) = single_player::local_player(s).expect("joined");
             let room = s.game.lists.unit(p).and_then(|e| e.room());
