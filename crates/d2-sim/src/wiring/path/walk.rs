@@ -557,6 +557,44 @@ impl<X: Pending> WalkUnits for PathCtx<'_, X> {
             self.v.unit_error(e);
         }
     }
+    /// The run stat list `0x00620E80` (`pathing.md` §8.2): a TEMPONLY
+    /// list (`stat-lists.md` §2 flag 4) owned by the unit, stat 67 :=
+    /// `value`, attached to the unit; the next real mode change frees it
+    /// (`units.md` §4.1, `stat-lists.md` §8.9).
+    // PROVISIONAL (sim/pathing.md §1.5 r6, §8.2): a run start without a
+    // mode change (a new 0x03 while running: the mode set frees nothing)
+    // keeps the one run list and rewrites its stat 67 instead of
+    // attaching a second (which would add +50 % per request); the spec
+    // places the attach in the animation setup that only a new mode runs
+    // (`units.md` §4.1). Settled by a recording of two 0x03 in a row
+    // (velocity / stat 67 after the second request).
+    fn attach_run_stats(&mut self, unit: UnitId, value: i32) {
+        use crate::path::walk::velocity::STAT_VELOCITYPERCENT as VELOCITYPERCENT;
+        use crate::stats::lists::flag;
+        let Some((ty, guid)) = self
+            .v
+            .units
+            .get(unit)
+            .map(|r| (r.ty.index() as u32, r.guid))
+        else {
+            return;
+        };
+        let stats = &*self.v.stats;
+        let existing = stats.unit_list(unit).and_then(|root| {
+            stats.active_chain(root).into_iter().find(|&l| {
+                stats.flags(l) & flag::TEMPONLY != 0 && stats.base(l, VELOCITYPERCENT, 0) != 0
+            })
+        });
+        match existing {
+            Some(l) => self.v.set_list_stat(l, VELOCITYPERCENT, value),
+            None => {
+                let l = self.v.stats.alloc(flag::TEMPONLY, 0, ty, guid);
+                self.v.set_list_stat(l, VELOCITYPERCENT, value);
+                let v = &mut self.v;
+                v.stats.attach(&mut *v.h, unit, l, true);
+            }
+        }
+    }
     fn charstats_velocity(&self, unit: UnitId) -> (i32, i32, i32) {
         self.v.charstats_velocity(unit)
     }

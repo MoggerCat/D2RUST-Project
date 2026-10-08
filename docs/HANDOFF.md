@@ -738,8 +738,8 @@ Cloud (repo only):
    steps / blocked (flag 0x800 vs `0x00648EB0`) / stop / walk in radius,
    `units.md` §3.1 step 8 corpse settings, objects (no `objects.txt` in
    `ActionTables`: static path, no footprint), the removal's footprint
-   clear conditions (`0x00649F50`, cleared unconditionally), the run stat
-   list (`attach_run_stats`, `0x00620E80`), torso speed, door orientation,
+   clear conditions (`0x00649F50`, cleared unconditionally),
+   torso speed, door orientation,
    target lead (OQ4), re-path budget (OQ8), unit add / removal messages,
    AI room memo, life percent of 0x0D (`0x00621F20`), player data
    +0x148 / +0x14C, pets. Also: monster mode functions own §9.1 and call

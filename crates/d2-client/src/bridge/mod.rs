@@ -461,6 +461,14 @@ impl<L: ServerLink> Bridge<L> {
         self.world.recache_local_room(x, y)
     }
 
+    /// The play preview's own-walk cell of the local player
+    /// ([`ClientWorld::set_local_walk`]; the position check reads it,
+    /// [`ClientWorld::own_cell`]). d2rs-own, unverified. PROVISIONAL
+    /// (`client/model.md` OQ2; REC-51).
+    pub fn set_local_walk(&mut self, cell: Option<(u16, u16)>) {
+        self.world.set_local_walk(cell);
+    }
+
     /// Installs the item tables the model decodes item streams with.
     pub fn set_item_tables(&mut self, t: std::sync::Arc<dyn item_lists::StreamProps>) {
         self.world.set_item_tables(t);

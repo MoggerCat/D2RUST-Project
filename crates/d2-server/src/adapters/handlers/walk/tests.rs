@@ -486,6 +486,22 @@ fn assert_m1(ticks: &[Frame], mode: u32) {
     );
 }
 
+/// The same leg run (`pathing.md` §8.2: the run stat list's stat 67 =
+/// 100·9/6 − 100 = 50, velocity 0x600 · 150 / 100 = 0x900; vector M2
+/// translated): +0x9000 per tick for 8 ticks, the 9th lands on the
+/// target centre and stops (mode 1).
+fn assert_m2(ticks: &[Frame], mode: u32) {
+    assert_eq!(ticks.len(), 9);
+    for (k, t) in ticks.iter().take(8).enumerate() {
+        assert_eq!(t.0, 0x1B1000 + k as u32 * 0x9000, "tick {}", k + 1);
+        assert_eq!((t.1, t.2), (centre(10), mode), "tick {}", k + 1);
+    }
+    assert_eq!(
+        (ticks[8].0, ticks[8].1, ticks[8].2),
+        (centre(31), centre(10), 1)
+    );
+}
+
 /// Two players in room A: `p` at (26, 10) for client 0, `q` at (26, 14)
 /// for client 1, and an object at (31, 10).
 fn two_players() -> (Fx, UnitId, UnitId, UnitId) {
@@ -547,10 +563,10 @@ fn run_to_point_drains_stamina_and_sends_the_run_code() {
         (ResultCode::Done, vec![])
     );
     assert_eq!(fx.mode(p), 3);
-    // The run stat list (`pathing.md` §8.2, `0x00620E80`) is not wired
-    // (`docs/handoff/wire-path-sim.md` §5): velocity stays 0x600.
+    // The run stat list (`pathing.md` §8.2, `0x00620E80`): velocity 0x900.
+    assert_eq!(fx.path(p).velocity, 0x900);
     let ticks = fx.run(p, 3, 20);
-    assert_m1(&ticks, 3);
+    assert_m2(&ticks, 3);
     let want = PlayerMove {
         type_: 0,
         guid,
@@ -558,12 +574,19 @@ fn run_to_point_drains_stamina_and_sends_the_run_code() {
         target_x: 31,
         target_y: 10,
         zero: 0,
-        x: 26,
+        // The cell after tick 1 (0x1B1000: 27), when the update pass runs.
+        x: 27,
         y: 10,
     };
     assert_eq!(ticks[0].3, vec![(1, want.encode().to_vec())]);
-    // §9.9: 2 · RunDrain = 40 per running tick, 14 ticks.
-    assert_eq!(fx.stamina(p), 0x6400 - 14 * 2 * i32::from(RUN_DRAIN));
+    // §9.9: 2 · RunDrain = 40 per running tick, 9 ticks.
+    assert_eq!(fx.stamina(p), 0x6400 - 9 * 2 * i32::from(RUN_DRAIN));
+    // The stop's mode set freed the run list (`stat-lists.md` §8.9).
+    let v = fx
+        .sim
+        .events
+        .with(&mut fx.sim.game, |_, v| v.stat(p, STAT_VELOCITY));
+    assert_eq!(v, 100);
     fx.assert_clean();
 }
 
@@ -581,14 +604,19 @@ fn walk_and_run_to_a_unit_send_0x10() {
         let t = fx.path(p).target_unit.expect("target unit");
         assert_eq!((t.unit, t.ty, t.guid), (o, UnitType::Object, og));
         let ticks = fx.run(p, mode, 20);
-        assert_m1(&ticks, mode);
+        if mode == 3 {
+            assert_m2(&ticks, mode);
+        } else {
+            assert_m1(&ticks, mode);
+        }
         let want = PlayerToTarget {
             type_: 0,
             guid,
             code,
             target_type: 2,
             target_guid: og,
-            x: 26,
+            // The cell after tick 1 (§10 r2 runs in its update pass).
+            x: if mode == 3 { 27 } else { 26 },
             y: 10,
         };
         assert_eq!(ticks[0].3, vec![(1, want.encode().to_vec())], "{id:#04x}");
@@ -1219,4 +1247,42 @@ fn update_player_pos_routes_to_the_resync() {
     );
     let ids: Vec<u8> = fx.sim.unhandled.iter().map(|u| u.1).collect();
     assert_eq!(ids, [super::RESYNC_ID]);
+}
+
+/// The play client sends a new C→S 0x03 every frame while the run is
+/// held, each a point a little ahead (`ui/controls.md` §6 r7). In the
+/// town (no drain, §9.9 rule 1) every request finds the player already
+/// in mode 3: the mode set frees nothing, so the run list must not be
+/// attached a second time (PROVISIONAL, `wiring::path::walk`
+/// `attach_run_stats`): the velocity stays 0x900 (§8.2) and the player
+/// advances +0x9000 a tick. Before the run list was wired the run moved
+/// at the walk's 0x600, a third slower than the client's run prediction.
+// Covers: specs/sim/pathing.md §1.5 r2, §1.5 r6, §8.1 r2, §8.2, §9.9 r1
+#[test]
+fn a_run_requested_every_tick_in_the_town_keeps_the_run_velocity() {
+    let mut fx = Fx::new();
+    let c = fx.c;
+    let rect = fx.sim.events.hooks().drlg.subtile_rect(c).unwrap();
+    let (x, y) = (rect.x + 2, rect.y + 4);
+    let p = fx.player(0, c, x, y);
+    let start = fx.path(p).precise_x;
+    for k in 1..=4u32 {
+        let cell = fx.path(p).cell();
+        assert_eq!(
+            fx.handle(0, &point(0x03, (cell.x + 3) as u16, y as u16)),
+            (ResultCode::Done, vec![])
+        );
+        assert_eq!(fx.mode(p), 3, "tick {k}");
+        assert_eq!(fx.path(p).velocity, 0x900, "tick {k}");
+        fx.tick();
+        assert_eq!(fx.path(p).precise_x, start + k * 0x9000, "tick {k}");
+    }
+    let v = fx
+        .sim
+        .events
+        .with(&mut fx.sim.game, |_, v| v.stat(p, STAT_VELOCITY));
+    assert_eq!(v, 150, "one run list (+50)");
+    // Stamina untouched in the town.
+    assert_eq!(fx.stamina(p), 0x6400);
+    fx.assert_clean();
 }

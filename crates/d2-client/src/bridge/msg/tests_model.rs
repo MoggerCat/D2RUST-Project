@@ -383,6 +383,47 @@ fn position_check_vectors() {
     assert_eq!(w.units[&k].position, Some((100, 100)));
 }
 
+/// The play preview's own walk (PROVISIONAL, client/model.md OQ2): the
+/// local player placed at (100, 100) has walked to the predicted
+/// (112, 100). The server's 0x96 point near the walk is within the
+/// tolerance of the walked cell, not of the placement (no 0x5F); a far
+/// point asks with the walked cell, not the placement (the server's
+/// resync would otherwise run the player back to it). After a new
+/// placement the stale walk cell is not used.
+// Covers: specs/client/model.md §6 r5, §6 r8
+#[test]
+fn position_check_uses_the_local_walk_cell() {
+    let none = ModelInputs::default();
+    let mut w = ClientWorld::default();
+    let mut u = ClientUnit::new(P1);
+    u.mode = 1;
+    u.position = Some((100, 100));
+    w.units.insert(P1, u);
+    w.local_player = Some(P1);
+    w.set_local_walk(Some((112, 100)));
+    assert_eq!(
+        check(&mut w, &none, P1, 111, 100, 0, 0, 0).unwrap(),
+        Checked::Kept
+    );
+    assert!(w.outgoing.is_empty());
+    assert_eq!(
+        check(&mut w, &none, P1, 104, 100, 0, 0, 0).unwrap(),
+        Checked::Asked
+    );
+    assert_eq!(w.outgoing, vec![hex("5f 70 00 64 00")]);
+    // A placement since the walk cell was recorded: the model wins.
+    w.outgoing.clear();
+    w.units.get_mut(&P1).unwrap().position = Some((50, 50));
+    assert_eq!(
+        check(&mut w, &none, P1, 54, 50, 0, 0, 0).unwrap(),
+        Checked::Asked
+    );
+    assert_eq!(w.outgoing, vec![hex("5f 32 00 32 00")]);
+    // No walk: the model position.
+    w.set_local_walk(None);
+    assert_eq!(w.local_walk, None);
+}
+
 // Covers: specs/client/model.md §2 r6, §1 r2
 #[test]
 fn creation_common_fields() {

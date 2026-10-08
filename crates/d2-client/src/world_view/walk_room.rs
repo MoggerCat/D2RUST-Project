@@ -22,10 +22,17 @@ use crate::bridge::BridgeResource;
 use super::walk::{preview_walk_frame, PreviewWalk};
 
 /// Recaches the local player's room at the predicted sub-tile.
+/// The predicted sub-tile is also recorded as the local player's own
+/// position for the position check (`Bridge::set_local_walk`): the
+/// check's C→S 0x5F then carries where the client walks, not the last
+/// placement (which the server's resync, `sim/pathing.md` §1.6, would walk
+/// or snap the running player back to).
 pub fn preview_walk_room(mut bridge: ResMut<BridgeResource>, walk: Res<PreviewWalk>) {
-    if let Some((x, y)) = walk.predict.cell() {
+    let cell = walk.predict.cell();
+    if let Some((x, y)) = cell {
         bridge.0.recache_local_room(x, y);
     }
+    bridge.0.set_local_walk(cell);
 }
 
 /// Adds [`preview_walk_room`] after the walk prediction's frame, before

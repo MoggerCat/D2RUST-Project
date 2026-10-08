@@ -201,6 +201,9 @@ fn client_world_holds_only_stated_fields() {
         exit_requested,
         rooms_in_sight,
         outgoing,
+        // d2rs-own, unverified (client/model.md OQ2; REC-51): the play
+        // preview's own-walk cell of the local player.
+        local_walk,
         use_cursor,
         // `client/model.md` §14 rule 5, §11 rules 2 and 4, §12 rules 1–2.
         pets,
@@ -254,6 +257,7 @@ fn client_world_holds_only_stated_fields() {
     assert_eq!((difficulty, expansion, ladder, game_flags), (0, 0, 0, 0));
     assert!(!in_game && !unloaded && !exit_requested);
     assert!(rooms_in_sight.is_empty() && outgoing.is_empty());
+    assert_eq!(local_walk, None);
     let key = UnitKey {
         unit_type: 1,
         guid: 2,

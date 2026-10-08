@@ -512,6 +512,13 @@ flag 4, freed at the next mode set) with stat 67 = 100 · `RunVelocity`
 / `WalkVelocity` − 100 (truncated; 1.14d live: 100·9/6 − 100 = 50); the
 list is skipped when `WalkVelocity` is 0. Rule 8.1.2 then reads it.
 
+PROVISIONAL: a run start without a mode change (a new 0x03 while in
+mode 3: the mode set frees no TEMPONLY list, `sim/units.md` §4.1) keeps
+one run list and rewrites its stat 67, rather than attaching a second
+(because §1.5 rule 6 places the attach in the animation setup, which
+only a new mode runs); settled by a recording of two 0x03 in a row
+(velocity after the second).
+
 #### 8.3 Direction vector (`0x0064FC60`)
 
 From precise start (sx, sy) to precise point (tx, ty) (`tan` table:
