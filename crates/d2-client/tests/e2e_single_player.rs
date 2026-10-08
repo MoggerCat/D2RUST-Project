@@ -1308,8 +1308,7 @@ fn run_with(game_seed: u32) -> Transcript {
     // generated on the NPC-control seed, its items made by the economy
     // wiring on the game seed (two steps per item, `rng.md` §5.3): 1–3
     // bucklers (Min 1, Max 3), then the permanent cap, each identified.
-    // S→C 0x9C action 11 belongs to the unwritten item spec
-    // (`add_trade_inventory` stub): no message.
+    // S→C 0x9C action 11: one per store item (§4 step 3).
     let seed_before = fx.sim_ref().events.action.sys.hooks.game_seed;
     let trade = bytes(&EntityAction {
         action: 1,
@@ -1318,7 +1317,8 @@ fn run_with(game_seed: u32) -> Transcript {
     });
     record(&mut fx, &mut frames, vec![trade]);
     assert_eq!(frames[19].1.codes, [(0x38, done)]);
-    assert_eq!(frames[19].2, none);
+    assert!(!frames[19].2.is_empty());
+    assert!(frames[19].2.iter().all(|m| m[0] == 0x9C && m[1] == 11));
     let store = {
         let w = &fx.sim_ref().world;
         let rec = &w.state.vendors[w.state.vendor_index(class::AKARA).unwrap()];
@@ -1596,7 +1596,11 @@ fn run_with(game_seed: u32) -> Transcript {
         ],
     );
     assert_eq!(frames[32].1.codes, [(0x30, done), (0x16, done)]);
-    assert_eq!(streams(&fx, &frames[32].2), pass(vec![x9c(0x01, rg)]));
+    // The buckler sold in step 21 joined the store (`vendors.md` §7.2
+    // rule 8); its 0x9C action 11 leaves with the next NPC call, this one.
+    let got = streams(&fx, &frames[32].2);
+    assert_eq!((got[0][0], got[0][1]), (0x9C, 11));
+    assert_eq!(got[1..], pass(vec![x9c(0x01, rg)])[..]);
     assert_eq!(fx.mode(ring), 4);
     // §8.2: the quest hook ITEMPICKEDUP, then the pickup sound.
     assert_eq!(
@@ -1724,7 +1728,14 @@ fn run_with(game_seed: u32) -> Transcript {
     // nothing discarded.
     let w = fx.bridge.world();
     let client = (w.frames, w.server_ticks, w.units.len());
-    assert_eq!(client, (37, 36, 6));
+    // + the store items the trade open and the sold buckler showed
+    // (each 0x9C action 11 makes a unit; the seed sets how many).
+    let shown: Vec<&Vec<u8>> = frames
+        .iter()
+        .flat_map(|f| f.2.iter())
+        .filter(|m| m[0] == 0x9C && m[1] == 11)
+        .collect();
+    assert_eq!(client, (37, 36, 6 + shown.len()));
     assert_eq!(w.local_player, None);
     let object = d2_client::bridge::world::UnitKey::new(d2_client::bridge::world::OBJECT, wp);
     assert!(w.units.contains_key(&object));
@@ -1748,7 +1759,8 @@ fn run_with(game_seed: u32) -> Transcript {
     // action 5 (`vendors.md` §7.2 rule 9), + the join's monster adds
     // (`intents-events.md` §7.2: 0xAC ×2, 0xAA ×2), + the transmute's
     // sound 0x2C (step 25, `cube.md` §8 "Exact" item 3).
-    assert_eq!(log.handled, 54);
+    // + the 0x9C action 11 of the store items (trade open, sold copy).
+    assert_eq!(log.handled, 54 + shown.len() as u64);
     let rejected: Vec<(u8, String)> = log
         .rejected
         .iter()

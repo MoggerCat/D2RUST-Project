@@ -2326,7 +2326,8 @@ fn run_with(game_seed: u32) -> Transcript {
     );
 
     // 11. Trade (C→S 0x38 action 1, `vendors.md` §4 → §3): the store
-    // generated (1–3 bucklers, then the permanent cap). No message.
+    // generated (1–3 bucklers, then the permanent cap). One 0x9C action 11
+    // per store item.
     record(
         &mut fx,
         &mut frames,
@@ -2337,7 +2338,9 @@ fn run_with(game_seed: u32) -> Transcript {
         })],
     );
     assert_eq!(frames.last().unwrap().1.codes, [(0x2F, done), (0x38, done)]);
-    assert_eq!(streams(&fx, &frames.last().unwrap().2), none);
+    let shown = &frames.last().unwrap().2;
+    assert!(!shown.is_empty());
+    assert!(shown.iter().all(|m| m[0] == 0x9C && m[1] == 11));
     let store = {
         let w = &fx.sim_ref().world;
         let rec = &w.state.vendors[w.state.vendor_index(class::AKARA).unwrap()];
@@ -2575,7 +2578,8 @@ fn run_with(game_seed: u32) -> Transcript {
     // is dropped like its 0x69s (not in the model); Akara's is queued on
     // its unit (`model.md` §4) and never drained in this staged game.
     assert!(log.unowned.is_empty(), "{:?}", log.unowned);
-    assert_eq!(log.handled, 25);
+    // + the trade open's 0x9C action 11, one per store item.
+    assert_eq!(log.handled, 25 + store.len() as u64);
     assert_eq!(
         log.dropped,
         // + the player's own 0x4D echo (REC-95), dropped like 0x0D.
