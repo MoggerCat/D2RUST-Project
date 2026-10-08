@@ -439,6 +439,42 @@ impl Smoke {
             .map(|(k, _)| *k)
     }
 
+    /// Walks next to `key` the way a ground click does (C→S 0x01 to the
+    /// unit's sub-tile, `ui/controls.md` §6 r7) and waits until the server
+    /// player stands (a bare 0x13 from beyond the approach distance is
+    /// answered with nothing, `npc.md` §2).
+    fn walk_to(&mut self, key: UnitKey) {
+        let (x, y) = self
+            .app
+            .world()
+            .resource::<BridgeResource>()
+            .0
+            .world()
+            .units[&key]
+            .position
+            .expect("the unit's position");
+        let mut m = vec![0x01];
+        m.extend_from_slice(&x.to_le_bytes());
+        m.extend_from_slice(&y.to_le_bytes());
+        self.app
+            .world_mut()
+            .resource_mut::<BridgeResource>()
+            .0
+            .send_bytes(&m)
+            .unwrap();
+        for n in 0.. {
+            self.step(1);
+            let mode = self.server(|sim| {
+                let (p, _) = single_player::local_player(sim)?;
+                sim.events.action.sys.units.get(p).map(|r| r.mode)
+            });
+            if n >= 5 && matches!(mode, Some(1 | 5)) {
+                break;
+            }
+            assert!(n < 1500, "walking to {key:?}");
+        }
+    }
+
     /// The client interacts with `key` (the click's C→S 0x13).
     fn interact(&mut self, key: UnitKey) {
         self.app
@@ -852,10 +888,15 @@ fn act1_tower_andariel_and_the_way_east() {
     );
     s.check("Andariel dead");
     s.put_in(single_player::ACT1_TOWN);
-    // The synthetic Rogue Encampment has no Warriv (a class only; follow-up
-    // for the town set): he is placed by the player, as `app_andariel`.
-    if s.unit(1, u32::from(class::WARRIV1)).is_none() {
-        s.spawn(u32::from(class::WARRIV1));
+    // Warriv stands in the synthetic Rogue Encampment (REC-280) and comes
+    // back with the town's rooms (the inactive store, REC-287): walk up to
+    // him. Placed by the player only if a town set has none, as
+    // `app_andariel`.
+    match s.unit(1, u32::from(class::WARRIV1)) {
+        Some(k) => s.walk_to(k),
+        None => {
+            s.spawn(u32::from(class::WARRIV1));
+        }
     }
     let warriv = s.talk(u32::from(class::WARRIV1));
     for _ in 0..3 {
