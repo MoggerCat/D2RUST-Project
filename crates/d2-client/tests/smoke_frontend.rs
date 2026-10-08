@@ -632,3 +632,15 @@ fn after_a_game_the_front_end_opens_at_character_select() {
     assert_eq!(f.current(), CHAR_SELECT);
     assert!(f.texts().iter().any(|t| t == "Back"), "{:?}", f.texts());
 }
+
+/// The Configure Controls table as play bindings keeps command 56 (Esc →
+/// Game Menu, not reassignable, `controls.md` §3): Accept or a saved
+/// `controls.toml` must not leave the game without its Esc key.
+#[test]
+fn controls_table_bindings_keep_esc_on_the_game_menu() {
+    use d2_client::controls::original::BindingTable;
+    use d2_client::controls::{Action as Act, Key};
+    use d2_client::ui::front_end::screens::controls::table_to_bindings;
+    let b = table_to_bindings(&BindingTable::defaults());
+    assert_eq!(b.inputs(Act::GameMenu), &[Key::Escape]);
+}
