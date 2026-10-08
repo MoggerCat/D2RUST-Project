@@ -49,8 +49,30 @@ pub fn facing(from: (u32, u32), to: (u32, u32)) -> Option<u8> {
         return None;
     }
     let tables = TABLES.get_or_init(|| PathTables::spec().ok()).as_ref()?;
-    Some(direction_vector(tables, from, to).1)
+    // d2rs-own, unverified: `0x0064FC60` takes the 32-bit `127 × l`, which
+    // wraps past about 258 sub-tiles and then indexes the `tan` table out
+    // of range; the original only aims at near path points, but the model
+    // can hold a position from before a level change. Far points are
+    // brought near by halving both deltas (the direction keeps its ratio).
+    let mut d = (
+        i64::from(to.0) - i64::from(from.0),
+        i64::from(to.1) - i64::from(from.1),
+    );
+    while d.0.abs().max(d.1.abs()) >= FACING_REACH {
+        d = (d.0 / 2, d.1 / 2);
+    }
+    let near = (
+        (i64::from(from.0) + d.0) as u32,
+        (i64::from(from.1) + d.1) as u32,
+    );
+    if near == from {
+        return None;
+    }
+    Some(direction_vector(tables, from, near).1)
 }
+
+/// The precise distance (16.16) below which `127 × l` stays in `i32`.
+const FACING_REACH: i64 = 1 << 23;
 
 /// The precise (16.16) centre of a sub-tile, as `u32`.
 pub fn cell_centre((x, y): (u16, u16)) -> (u32, u32) {
@@ -576,6 +598,23 @@ mod tests {
         assert_eq!(facing(o, c(5, 5)), Some(0));
         assert_eq!(facing(o, c(3, 1)), Some(59));
         assert_eq!(facing(o, o), None);
+    }
+
+    // Covers: specs/sim/pathing.md §8.3
+    #[test]
+    fn facing_a_far_point_keeps_the_direction() {
+        // A position from before a level change: thousands of sub-tiles.
+        let c = |x: u16, y: u16| cell_centre((x, y));
+        assert_eq!(facing(c(100, 100), c(5100, 100)), Some(56));
+        assert_eq!(
+            facing(c(5100, 5100), c(100, 5100)),
+            facing(c(110, 100), c(100, 100))
+        );
+        assert_eq!(facing(c(100, 100), c(3100, 1100)), Some(59));
+        assert_eq!(
+            facing(c(9000, 9000), c(20, 20)),
+            facing(c(110, 110), c(100, 100))
+        );
     }
 
     // Covers: specs/sim/pathing.md §8.3, §8.4
