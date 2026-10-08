@@ -742,8 +742,11 @@ fn inv_vendors_pass_other_calls_through() {
             assert_eq!(w.quest_slot(player, 1, 2), 0x1234);
             assert_eq!(w.players_in_level(5), 105);
             assert_eq!(w.player_level_id(player), 7);
-            assert_eq!(w.gold_cap(player), 1234);
-            assert_eq!(w.stash_cap(player), 4321);
+            // The caps are the spec's (`0x00622E70` level × 10000,
+            // `0x00623460` the 1.14d constant), not the rest's.
+            let level = w.stat(player, 12, 0);
+            assert_eq!(w.gold_cap(player), level * 10_000);
+            assert_eq!(w.stash_cap(player), 2_500_000);
             assert_eq!(w.last_bought(player), 0xBEEF);
             w.drop_gold(player, 9);
             w.set_last_bought(player, 77);
