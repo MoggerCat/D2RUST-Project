@@ -139,7 +139,9 @@ impl InteractionState {
             hirelings: HirelingState::default(),
             hireling_tables: None,
             unit_stats: BTreeMap::new(),
-            shown: Vec::new(),
+            shown_class: 0,
+            approaches: Vec::new(),
+            queued: Vec::new(),
             shown_player: None,
             shown_class: 0,
         }
