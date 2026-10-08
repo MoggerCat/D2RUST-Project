@@ -767,7 +767,6 @@ fn meshif_sails_east_after_the_seven_tombs() {
 
 // Covers: specs/world/npc.md §8.3
 #[test]
-#[ignore = "open break B5 (docs/handoff/q-smoke-travel.md): Meshif is not in the client model at the Kurast Docks arrival"]
 fn meshif_sails_back_west() {
     npc_hop(
         75,
