@@ -980,7 +980,15 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
     fn path_op(&mut self, u: UnitId, op: bodies::PathOp<UnitId>) -> i32 {
         let cv = &mut self.cv;
         match body_path::path_op(&mut cv.v, &mut *cv.game, u, op) {
-            Some(r) => r,
+            Some(r) => {
+                // The host also hears of a retarget, so the unit's kept
+                // target follows its path target (Double Swing's second
+                // swing, q-barb).
+                if matches!(op, bodies::PathOp::TargetUnit(_)) {
+                    self.xm().body_path_op(u, op);
+                }
+                r
+            }
             None => self.xm().body_path_op(u, op),
         }
     }

@@ -324,9 +324,11 @@ impl VendorRest for AppRest {
     fn new_store_inventory(&mut self, class: u16, _: Option<UnitId>) {
         self.note(format!("new store {class}"));
     }
-    /// The NPC grid (`0x00560200`, inventory spec): no room.
+    /// The NPC grid (`0x00560200`, inventory spec): always room.
+    // d2rs-own, unverified (REC-162): the preview has no NPC grid model;
+    // the shop panel packs the shown items itself.
     fn place_in_store(&mut self, _: u16, _: UnitId) -> bool {
-        false
+        true
     }
     fn remove_store_item(&mut self, class: u16, item: UnitId) {
         self.note(format!("unstore {class} {}", item.0));
@@ -334,8 +336,9 @@ impl VendorRest for AppRest {
     fn take_from_store(&mut self, class: u16, item: UnitId) {
         self.note(format!("take {class} {}", item.0));
     }
+    // d2rs-own, unverified (REC-162): always room, as the store's.
     fn place_in_gamble(&mut self, _: u16, _: u32, _: UnitId) -> bool {
-        false
+        true
     }
     fn remove_gamble_item(&mut self, class: u16, _: u32, item: UnitId) {
         self.note(format!("ungamble {class} {}", item.0));
