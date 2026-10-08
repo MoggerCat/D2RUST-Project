@@ -55,3 +55,46 @@ fn the_join_creates_the_named_character() {
     assert_eq!(class, Some(4));
     assert_eq!(name.as_deref(), Some(&b"Conan"[..]));
 }
+
+/// `play --difficulty hell`: the 0x67 asks for Hell, the game runs on it
+/// (S→C 0x01 byte 1, the sim's difficulty copy), and the new
+/// character's save town is Hell's.
+// Covers: specs/sim/intents-events.md §8.1 r3
+#[test]
+fn the_join_runs_the_game_on_the_chosen_difficulty() {
+    let ms = Arc::new(AtomicU32::new(1000));
+    let character = single_player::new_character("amazon", "Hel")
+        .unwrap()
+        .with_difficulty(2);
+    assert_eq!(character.difficulty(), 2);
+    let (mut link, _) = single_player::start_with(
+        GameData::Synthetic,
+        DEFAULT_SEED,
+        character.clone(),
+        StepClock(ms.clone()),
+    )
+    .unwrap();
+    let req = single_player::create_request_for(&character);
+    assert_eq!(req.difficulty, 2);
+    link.send(SendQueue::System, &req.encode()).unwrap();
+    link.pump().unwrap();
+    ms.fetch_add(40, Ordering::SeqCst);
+    link.pump().unwrap();
+    let got = link.receive();
+    let game = got.iter().find(|c| c[0] == 0x01).expect("S→C 0x01");
+    assert_eq!(game[1], 2);
+    let d = link
+        .with(|l| l.host_mut().game.events.action.hooks().ai_info.difficulty)
+        .unwrap();
+    assert_eq!(d, 2);
+    let save = d2_client::app::save::base_save(&character);
+    assert_eq!(save.header.towns, [0, 0, 0x80]);
+}
+
+#[test]
+fn difficulty_names_parse() {
+    assert_eq!(single_player::parse_difficulty("Nightmare"), Some(1));
+    assert_eq!(single_player::parse_difficulty("hell"), Some(2));
+    assert_eq!(single_player::parse_difficulty("3"), None);
+    assert_eq!(single_player::Character::New.difficulty(), 0);
+}
