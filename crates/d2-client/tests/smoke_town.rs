@@ -1377,3 +1377,140 @@ fn kurast_docks_heals_gambles_and_identifies() {
     assert_eq!(rig.gold_after(gold), gold - 100, "Cain took 100");
     rig.check("identify");
 }
+
+// ---- the stash ----------------------------------------------------------------------------
+
+/// The stash grid's cell (x, y) on screen (`panels/stash_items.rs`
+/// fallback: (74, 82) + the 800 × 600 offset, 29 px cells).
+fn stash_cell(x: u16, y: u16) -> Point {
+    Point::new(154 + 29 * i32::from(x) + 10, 142 + 29 * i32::from(y) + 10)
+}
+
+/// The inventory gold button (`ui/gold.rs` `inventory_gold_hit`, 800 ×
+/// 600) and the stash gold button (`stash_gold_rect_hit`, expansion).
+const INV_GOLD_BUTTON: Point = Point::new(493, 462);
+const STASH_GOLD_BUTTON: Point = Point::new(190, 93);
+
+impl Rig {
+    /// The local player's stash gold (stat 15) in the client model.
+    fn stash_gold(&self) -> i32 {
+        let w = self.bridge().world();
+        w.local_player.map_or(0, |me| w.total(me, 15, 0))
+    }
+
+    /// Types `amount` into the open gold dialog and confirms it (Enter).
+    fn gold_dialog(&mut self, amount: u32) {
+        // The deposit box opens pre-filled with the maximum (§21 r3):
+        // backspaces clear it first (the edit box rules of §28 r4).
+        for _ in 0..10 {
+            self.queue(UiEvent::Char(8));
+        }
+        for c in amount.to_string().bytes() {
+            self.queue(UiEvent::Char(u16::from(c)));
+        }
+        self.queue(UiEvent::Char(0x0D));
+        self.step(10);
+    }
+
+    /// The local player's item `guid` (page, mode).
+    fn item_place(&self, guid: u32) -> Option<(u8, u8)> {
+        d2_client::bridge::items::local_items(self.bridge().world())
+            .iter()
+            .find(|i| i.key.guid == guid)
+            .map(|i| (i.page, i.mode))
+    }
+}
+
+// Covers: specs/ui/panels.md §11; specs/world/stash.md §10; specs/items/inventory-moves.md §7
+#[test]
+fn act1_stash_keeps_an_item_and_gold() {
+    let mut rig = Rig::new();
+    rig.stage_gold(5_000);
+    rig.check("gold");
+    rig.open_shop(class::AKARA, OptionKind::Trade);
+    let item = rig.buy(&BUCKLER);
+    rig.close_shop();
+    let gold = rig.gold();
+
+    // Walk to the stash and click it: C→S 0x13, S→C 0x77 0x10, ui 0x19.
+    let stash = *rig
+        .bridge()
+        .world()
+        .units
+        .iter()
+        .find(|(k, u)| k.unit_type == 2 && u.class == single_player::STASH_CLASS)
+        .expect("the stash is listed")
+        .0;
+    assert!(rig.walk_near(stash), "the stash is reachable");
+    let at = rig.pick_point(stash);
+    rig.click(at);
+    for _ in 0..200 {
+        rig.step(1);
+        if rig.with_ui(|u| u.is_open(0x19)) {
+            break;
+        }
+    }
+    assert!(rig.with_ui(|u| u.is_open(0x19)), "the stash opened");
+    rig.check("stash open");
+
+    // The buckler: backpack → cursor → stash grid (C→S 0x19, 0x18 page 4).
+    let (x, y) = d2_client::bridge::items::local_items(rig.bridge().world())
+        .iter()
+        .find(|i| i.key.guid == item)
+        .map(|i| (i.x, i.y))
+        .unwrap();
+    rig.click(backpack_cell(x, y));
+    rig.step(6);
+    rig.click(stash_cell(0, 0));
+    rig.step(10);
+    assert_eq!(
+        rig.item_place(item),
+        Some((4, 0)),
+        "the buckler is stored on the stash page"
+    );
+    rig.check("item to the stash");
+
+    // Gold: the inventory gold button deposits (kind 3), the stash gold
+    // button withdraws (kind 4); each moves stats 14 / 15.
+    rig.click(INV_GOLD_BUTTON);
+    rig.gold_dialog(1_000);
+    let now = rig.gold_after(gold);
+    assert_eq!(now, gold - 1_000, "deposited from the carried gold");
+    for _ in 0..40 {
+        if rig.stash_gold() == 1_000 {
+            break;
+        }
+        rig.step(1);
+    }
+    assert_eq!(rig.stash_gold(), 1_000, "the stash holds the deposit");
+    rig.check("deposit");
+    rig.click(STASH_GOLD_BUTTON);
+    rig.gold_dialog(400);
+    assert_eq!(
+        rig.gold_after(now),
+        now + 400,
+        "withdrawn to the carried gold"
+    );
+    assert_eq!(rig.stash_gold(), 600, "the stash keeps the rest");
+    rig.check("withdraw");
+
+    // The buckler back to its backpack cell (the start cube, REC-244,
+    // holds (0, 0)), then the stash closes.
+    rig.click(stash_cell(0, 0));
+    rig.step(6);
+    rig.click(backpack_cell(x, y));
+    rig.step(10);
+    assert_eq!(rig.item_place(item), Some((0, 0)), "back in the backpack");
+    rig.check("item back");
+    rig.app
+        .world_mut()
+        .non_send_mut::<WorldViewUi>()
+        .original
+        .as_mut()
+        .unwrap()
+        .set_ui(0x19, 1, false)
+        .unwrap();
+    rig.step(10);
+    assert!(!rig.with_ui(|u| u.is_open(0x19)), "the stash closed");
+    rig.check("stash close");
+}
