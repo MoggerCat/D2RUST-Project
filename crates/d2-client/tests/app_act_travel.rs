@@ -40,7 +40,7 @@ fn server_level(server: &app_support::Server<StepClock>) -> Option<u32> {
     })
 }
 
-// Covers: specs/world/waypoints.md §7 r5, OQ1; specs/client/model.md §11
+// Covers: specs/world/waypoints.md §7 r5; specs/client/model.md §11
 #[test]
 fn taking_a_waypoint_to_another_act_changes_the_act() {
     travel(false);
@@ -48,7 +48,7 @@ fn taking_a_waypoint_to_another_act_changes_the_act() {
 
 /// Warriv's "Go East" asks the act change through the hooks queue
 /// (`NpcWorld::act_change`); the host runs it after the call.
-// Covers: specs/world/npc.md §8.3; specs/world/waypoints.md OQ1
+// Covers: specs/world/npc.md §8.3; specs/world/waypoints.md §7 r5
 #[test]
 fn an_npc_act_change_moves_the_player_to_the_next_act() {
     travel(true);
