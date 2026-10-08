@@ -61,6 +61,9 @@ pub struct ItemView {
     pub store: bool,
     /// The store record's epoch (`ItemRecord::seq`); 0 when not a store item.
     pub store_seq: u32,
+    /// The amount of a compact gold pile (`gld`, `bitstream.md` §3 r1:
+    /// after the code a flag bit, then 32 or 12 bits); `None` otherwise.
+    pub gold: Option<u32>,
 }
 
 /// 0x9C action of an item shown in a store (`vendors.md` §3.1, §4).
@@ -100,6 +103,30 @@ pub fn peek(stream: &[u8]) -> Option<Head> {
     Some((flags, m, body, page, x, y, code))
 }
 
+/// The gold amount of a compact `gld` record (`bitstream.md` §3 r1).
+fn gold_of(stream: &[u8]) -> Option<u32> {
+    let mut r = BitReader::new(stream);
+    let flags = r.read(32).ok()?;
+    if flags & hflag::COMPACT == 0 || flags & hflag::EAR != 0 {
+        return None;
+    }
+    let _version = r.read(10).ok()?;
+    let skip = if matches!(r.read(3).ok()? as u8, mode::GROUND | mode::DROPPING) {
+        32
+    } else {
+        15
+    };
+    r.read(skip).ok()?;
+    if r.read(32).ok()?.to_le_bytes() != *b"gld " {
+        return None;
+    }
+    if r.read(1).ok()? == 1 {
+        r.read(32).ok()
+    } else {
+        r.read(12).ok()
+    }
+}
+
 /// The last record took the item out of the world: RemoveFromContainer,
 /// Unequip or RemoveFromBelt with header flag 0x20 (§2 r5.3: "the item is
 /// removed, no write").
@@ -131,6 +158,7 @@ pub fn item(w: &ClientWorld, key: UnitKey) -> Option<ItemView> {
         owner: r.owner.or(w.local_player),
         store: r.action == ACTION_STORE_SHOWN,
         store_seq: r.seq,
+        gold: gold_of(&r.stream),
     })
 }
 

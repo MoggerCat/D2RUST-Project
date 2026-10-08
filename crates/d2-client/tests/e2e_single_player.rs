@@ -1317,8 +1317,6 @@ fn run_with(game_seed: u32) -> Transcript {
     });
     record(&mut fx, &mut frames, vec![trade]);
     assert_eq!(frames[19].1.codes, [(0x38, done)]);
-    assert!(!frames[19].2.is_empty());
-    assert!(frames[19].2.iter().all(|m| m[0] == 0x9C && m[1] == 11));
     let store = {
         let w = &fx.sim_ref().world;
         let rec = &w.state.vendors[w.state.vendor_index(class::AKARA).unwrap()];
@@ -1341,6 +1339,14 @@ fn run_with(game_seed: u32) -> Transcript {
     }
     assert_eq!(store_rows.last().unwrap().1, CAP, "permanent codes last");
     assert!(store_rows[..store.len() - 1].iter().all(|r| r.1 == BUC));
+    // One 0x9C action 11 per store item, in store order (§4 step 3).
+    let shown: Vec<(u8, u8, u32)> = frames[19]
+        .2
+        .iter()
+        .map(|m| (m[0], m[1], u32::from_le_bytes(m[4..8].try_into().unwrap())))
+        .collect();
+    let want: Vec<(u8, u8, u32)> = store_rows.iter().map(|r| (0x9C, 11, r.0)).collect();
+    assert_eq!(shown, want);
 
     // 11–16. Item moves (`inventory-moves.md` §7) on the game's inventory
     // model, after the player leaves Akara (C→S 0x30 in step 11's frame,
@@ -1599,7 +1605,15 @@ fn run_with(game_seed: u32) -> Transcript {
     // The buckler sold in step 21 joined the store (`vendors.md` §7.2
     // rule 8); its 0x9C action 11 leaves with the next NPC call, this one.
     let got = streams(&fx, &frames[32].2);
-    assert_eq!((got[0][0], got[0][1]), (0x9C, 11));
+    let copy = {
+        let w = &fx.sim_ref().world;
+        *w.state.vendors[w.state.vendor_index(class::AKARA).unwrap()]
+            .store
+            .last()
+            .unwrap()
+    };
+    assert_eq!(got[0][..2], [0x9C, 11]);
+    assert_eq!(got[0][4..8], fx.guid(copy).to_le_bytes());
     assert_eq!(got[1..], pass(vec![x9c(0x01, rg)])[..]);
     assert_eq!(fx.mode(ring), 4);
     // §8.2: the quest hook ITEMPICKEDUP, then the pickup sound.

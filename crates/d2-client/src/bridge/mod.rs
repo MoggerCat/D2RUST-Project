@@ -15,6 +15,7 @@
 
 pub mod belt;
 pub mod bits;
+pub mod chat_end;
 pub mod check;
 pub mod click;
 pub mod combat;

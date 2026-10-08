@@ -224,6 +224,16 @@ impl OriginalUi {
     /// `world` now. A `ServerSound` is the audio layer's (rule 5): no
     /// effect here.
     pub fn apply_output(&mut self, o: &Output, world: &ClientWorld) -> Result<(), OriginalUiError> {
+        let r = self.apply_output_inner(o, world);
+        self.sync_quest_inputs(o);
+        r
+    }
+
+    fn apply_output_inner(
+        &mut self,
+        o: &Output,
+        world: &ClientWorld,
+    ) -> Result<(), OriginalUiError> {
         self.refresh_facts(world);
         self.hire_auto_open(o, world);
         if self.apply_more(o)? {

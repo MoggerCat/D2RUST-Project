@@ -30,11 +30,11 @@ Tests (synthetic): `crates/d2-client/tests/e2e_vendor.rs`
   click on the permanent cap leaves as C→S 0x32 → the server pays and
   places the copy (S→C 0x2A kind 4) → closing the shop sends C→S 0x30.
 
-## PROVISIONAL (REC-109 in `docs/HANDOFF.md` §7)
+## PROVISIONAL (REC-110 in `docs/HANDOFF.md` §7)
 
 - Grid geometry, left-click buy without the confirm dialog, button hit
   areas, the epoch counter and the host-published price are
-  `d2rs-own, unverified` (see REC-109).
+  `d2rs-own, unverified` (see REC-110).
 - The NPC menu (`q-npc-menu`) is not merged: nothing in `play` opens a
   trade yet, because there is no NPC in the play world and no Trade menu
   option. The panel reacts to the store items, so it works as soon as
@@ -71,4 +71,4 @@ the left (art, tabs Armor / Weapons / Misc, the item grid) beside the
 inventory; hover an item for its price; right-click it to buy (gold drops,
 the item appears in the backpack); drop a cursor item on the grid to sell;
 Esc or the Close button closes the panel. Copy any `ui:` or `shop` log line
-and a screenshot of the grid into `docs/HANDOFF.md` (REC-109).
+and a screenshot of the grid into `docs/HANDOFF.md` (REC-110).

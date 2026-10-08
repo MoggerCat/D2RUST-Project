@@ -115,11 +115,12 @@ use d2_sim::monsters::init::GameInfo;
 use d2_sim::rng::Seed;
 use d2_sim::skills::SkillTables;
 use d2_sim::stats::StatData;
-use d2_sim::units::hooks::UnitData;
+use d2_sim::units::hooks::{MonsterInfo, Sim as USim, UnitData};
 use d2_sim::units::lifecycle::AllocRequest;
 use d2_sim::units::{UnitId, UnitType};
-use d2_sim::wiring::action::{ActionHooks, ActionTables, DrlgWorld, Pending};
+use d2_sim::wiring::action::{ActionHooks, ActionTables, DrlgWorld, Pending, SkillEvent};
 use d2_sim::wiring::economy::{DeathDrops, DropTables, GameFields};
+use d2_sim::wiring::interaction::skill_events;
 use d2_sim::wiring::worldgen::levels::{SharedTypes, WorldTypes};
 use d2_sim::wiring::worldgen::{CreationTables, WorldPending, WorldSim, WorldState, WorldTables};
 use d2_sim::world::hirelings::HirelingTables;
@@ -183,6 +184,8 @@ pub const SYNTHETIC_CHEST_CLASS: u32 = 1;
 const SYNTHETIC_CHEST_OPERATE: u8 = 4;
 const SYNTHETIC_CHEST_INIT: u8 = 3;
 pub const UNIT_Y: i32 = 20;
+/// Akara's x in the synthetic town room (sub-tiles from its origin).
+pub const AKARA_X: i32 = 28;
 /// The player's character class (1, sorceress, as in the server tests).
 pub const PLAYER_CLASS: u32 = 1;
 /// The character's name (0x59 bytes 6..22, zero-padded).
@@ -411,6 +414,12 @@ pub struct LocalSeams {
     /// The skill pipeline's per-unit fields and preview fills (`UseRest`,
     /// `LearnRest`: [`super::skill_rest`]).
     pub skills: SkillStore,
+    /// The unit tables of the client art's name rules ([`super::anim_names`]);
+    /// none on synthetic data.
+    pub looks: Option<Arc<crate::world_view::unit_assets::UnitLooks>>,
+    /// The players and monsters for the host rest's NPC and quest seams
+    /// (`npc_seams`), written by [`sync_seams`].
+    pub snap: super::npc_seams::SnapRef,
 }
 
 impl LocalSeams {
@@ -441,9 +450,70 @@ pub fn sync_seams(game: &Game, sim: &mut WorldSim<LocalSeams>) {
         }
     }
     hooks.x.sides = sides;
+    let mut units = BTreeMap::new();
+    for ty in [UnitType::Player, UnitType::Monster] {
+        for u in game.lists.units_of_type(ty) {
+            let Some(e) = game.lists.unit(u) else {
+                continue;
+            };
+            let act = e
+                .room()
+                .and_then(|r| game.lists.room(r))
+                .map_or(0, |r| r.act);
+            units.insert(
+                u,
+                super::npc_seams::SnapUnit {
+                    ty,
+                    pos: hooks.path_position(u),
+                    act,
+                    guid: e.guid,
+                },
+            );
+        }
+    }
+    if let Ok(mut snap) = hooks.x.snap.lock() {
+        snap.units = units;
+    }
 }
 
 impl Pending for LocalSeams {
+    /// d2rs-own, unverified (REC-108): mode DT and the treasure drop
+    /// ([`super::monster_drop::death_start`]).
+    fn monster_death_start(
+        h: &mut ActionHooks<Self>,
+        sim: &mut d2_sim::units::hooks::Sim<'_>,
+        unit: UnitId,
+        target: Option<UnitId>,
+    ) -> bool {
+        super::monster_drop::death_start(h, sim, unit, target)
+    }
+    // The skill timer events and the action frame reach the skill use
+    // pipeline (`use.md` §5.2, §7); without them a cast's do step never
+    // runs: no mana spent, no missile.
+    fn skill_event(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, ev: SkillEvent) {
+        skill_events::route(h, sim, ev);
+    }
+    fn action_frame(
+        h: &mut ActionHooks<Self>,
+        sim: &mut USim<'_>,
+        unit: UnitId,
+        a1: u32,
+        a2: u32,
+    ) -> u32 {
+        skill_events::action_frame(h, sim, unit, a1, a2)
+    }
+    fn monster_skill_start(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, unit: UnitId) -> i32 {
+        skill_events::monster_skill_start(h, sim, unit)
+    }
+    fn monster_sequence_frame(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, unit: UnitId) {
+        skill_events::monster_sequence_frame(h, sim, unit);
+    }
+    fn anim_name(&self, _: UnitId, ty: UnitType, class: u32, mode: u32) -> Option<[u8; 8]> {
+        super::anim_names::anim_key(self.looks.as_deref()?, ty, class, mode)
+    }
+    fn anim_rate(&self, _: UnitId, speed: Option<u32>) -> i16 {
+        super::anim_names::anim_rate(speed)
+    }
     fn position(&self, unit: UnitId) -> (i32, i32) {
         self.pos.get(&unit).copied().unwrap_or_default()
     }
@@ -1315,6 +1385,45 @@ struct GameParts {
     inventory: Option<InvTables>,
 }
 
+/// Rows of the synthetic `monstats` (classes 0 … 399; Akara is the only
+/// NPC).
+const SYNTHETIC_MONSTATS: usize = 400;
+
+/// d2rs-own, unverified (preview): the synthetic game's `monstats`, all
+/// zero rows with Akara `npc` and `interact` (the town NPC of
+/// `docs/handoff/q-quests.md`).
+fn synthetic_monstats() -> Vec<Monstats> {
+    let mut v: Vec<Monstats> = (0..SYNTHETIC_MONSTATS)
+        .map(|_| Monstats::decode(&vec![0u8; Monstats::SIZE]))
+        .collect();
+    let a = &mut v[usize::from(d2_sim::world::npc::class::AKARA)];
+    a.npc = true;
+    a.interact = true;
+    v
+}
+
+/// d2rs-own, unverified (preview): the client's monster rows for the
+/// synthetic game, so Akara's S→C 0xAC creates her unit (a class without
+/// a row is ignored, `client/msg-units.md` §1.2 r2).
+pub fn synthetic_unit_rows() -> UnitRows {
+    let akara = usize::from(d2_sim::world::npc::class::AKARA);
+    let mut monsters = vec![None; akara + 1];
+    monsters[akara] = Some(MonsterClass {
+        components: [0; 16],
+        npc: true,
+        interact: true,
+        setup: Some(crate::bridge::world::MonsterSetup {
+            is_att: true,
+            is_sel: true,
+            ..Default::default()
+        }),
+    });
+    UnitRows {
+        monsters,
+        ..UnitRows::default()
+    }
+}
+
 impl GameParts {
     /// No game files: the waypoint rows, everything else empty; the world
     /// state's level types over the synthetic DRLG view with no preset,
@@ -1338,11 +1447,22 @@ impl GameParts {
             Box::new(d2_server::world_data::Ds1Files::default()),
             Box::new(d2_sim::drlg::outdoor::SubFileMap::default()),
         ));
+        let mut action = empty_action_tables();
+        // The unit path needs the monster's `monstats` row (the shape).
+        action.combat.monstats = synthetic_monstats();
         Ok(GameParts {
-            action: empty_action_tables(),
+            action,
             stats: StatData::default(),
             units: UnitData {
                 expansion: GAME_SETUP.expansion,
+                monsters: vec![
+                    MonsterInfo {
+                        enabled: true,
+                        aidel: [15; 3],
+                        moves: 0,
+                    };
+                    SYNTHETIC_MONSTATS
+                ],
                 ..UnitData::default()
             },
             world: WorldTables {
@@ -1356,7 +1476,7 @@ impl GameParts {
                 levels: wp.levels.clone(),
                 ..ObjectTables::default()
             },
-            monstats: Vec::new(),
+            monstats: synthetic_monstats(),
             hire_rows: Vec::new(),
             items: ItemTables::default(),
             vendors: VendorTables::default(),
@@ -1462,7 +1582,34 @@ pub fn build_with_chests(
     character: Character,
     chests: &[(i32, i32)],
 ) -> Result<LocalGame, BuildError> {
-    let wp_tables = data.tables();
+    build_with_objects(data, seed, character, chests, None)
+}
+
+/// The stash object's class (`objects.txt` row 267, `world/objects.md`
+/// §16.10 `BANK_CLASS`) and its operate function (32, the bank).
+pub const STASH_CLASS: u32 = 267;
+const STASH_OPERATE: u8 = 32;
+
+/// [`build_with_chests`] plus, for synthetic data, a stash object
+/// ([`STASH_CLASS`]) in the town's first room at the sub-tile offset
+/// `stash` (the synthetic `objects` table is padded to the stash row).
+/// d2rs-own, unverified: the end-to-end tests of the stash.
+pub fn build_with_objects(
+    data: &GameData,
+    seed: u32,
+    character: Character,
+    chests: &[(i32, i32)],
+    stash: Option<(i32, i32)>,
+) -> Result<LocalGame, BuildError> {
+    let mut wp_tables = data.tables();
+    if stash.is_some() && matches!(data, GameData::Synthetic) {
+        wp_tables
+            .objects
+            .resize(STASH_CLASS as usize + 1, blank::<Objects>());
+        let row = &mut wp_tables.objects[STASH_CLASS as usize];
+        row.operatefn = STASH_OPERATE;
+        row.framecnt1 = 15 << 8;
+    }
     let (mut levels, parts) = match data {
         GameData::Synthetic => (LevelSource::synthetic(), GameParts::synthetic(&wp_tables)?),
         GameData::Live(d) => (LevelSource::live(d, seed), GameParts::live(d)?),
@@ -1497,6 +1644,12 @@ pub fn build_with_chests(
         LocalSeams::default(),
     );
     hooks.anim_data = parts.anim;
+    if let GameData::Live(d) = data {
+        // The server's animation names follow the client art's name rules.
+        hooks.x.looks = crate::world_view::unit_assets::UnitLooks::live(d.archives.as_ref())
+            .ok()
+            .map(Arc::new);
+    }
     hooks.vitals = parts.vitals;
     // The client vitals sync (`combat/vitals.md` §5.1): life, mana,
     // stamina and position sent to the client at the end of each tick.
@@ -1601,11 +1754,47 @@ pub fn build_with_chests(
             .with(&mut game, |g, v| v.allocate(g, &chest, ox + dx, oy + dy))
             .ok_or_else(|| BuildError::Setup("allocating a chest failed".into()))?;
     }
+    if let Some((dx, dy)) = stash {
+        let req = AllocRequest {
+            class: STASH_CLASS,
+            mode: 0,
+            ..req
+        };
+        sim.action
+            .with(&mut game, |g, v| v.allocate(g, &req, ox + dx, oy + dy))
+            .ok_or_else(|| BuildError::Setup("allocating the stash failed".into()))?;
+    }
     let waypoint_guid = game
         .lists
         .unit(waypoint)
         .ok_or_else(|| BuildError::Setup("waypoint unit missing".into()))?
         .guid;
+    // The synthetic game's town NPC: Akara, a few sub-tiles from the
+    // waypoint (d2rs-own, unverified; the live game's NPCs come from the
+    // town presets).
+    if matches!(data, GameData::Synthetic) {
+        let req = AllocRequest {
+            ty: UnitType::Monster,
+            class: u32::from(d2_sim::world::npc::class::AKARA),
+            room: Some(room0),
+            add: true,
+            fixed_guid: None,
+            mode: 1,
+            allied: true,
+        };
+        sim.action
+            .with(&mut game, |g, v| {
+                v.allocate(g, &req, ox + AKARA_X, oy + UNIT_Y)
+            })
+            .ok_or_else(|| BuildError::Setup("allocating Akara failed".into()))?;
+    }
+    let interact_classes: Vec<u16> = parts
+        .monstats
+        .iter()
+        .enumerate()
+        .filter(|(_, m)| m.npc && m.interact)
+        .map(|(i, _)| i as u16)
+        .collect();
     // The wired host on the created controls.
     let action = ActionWorld {
         waypoints: Some(WaypointData::new(&wp_tables.levels, &wp_tables.objects)),
@@ -1616,6 +1805,7 @@ pub fn build_with_chests(
     };
     let rest = AppRest {
         expansion: GAME_SETUP.expansion,
+        snap: sim.action.sys.hooks.x.snap.clone(),
         ..AppRest::default()
     };
     // `WiredWorld::now` (store generation and refresh, `vendors.md` edge
@@ -1631,6 +1821,9 @@ pub fn build_with_chests(
         0,
     );
     world.state.hireling_tables = parts.hirelings;
+    // Monster init does not embed the interaction lists yet: the host
+    // registers the `interact` NPC units (d2rs-own, unverified).
+    world.interact_classes = interact_classes;
     // The play host's inventory model (`play-server` seam, D1 preview
     // fills in `PreviewMoveRest`): the new character's start items.
     world.inventory = parts.inventory.map(preview_inv_parts);
@@ -1858,9 +2051,21 @@ pub fn start_with_chests<C: Clock + Send + 'static>(
     clock: C,
     chests: Vec<(i32, i32)>,
 ) -> Result<(ThreadLink<Link<C>>, Started), BuildError> {
+    start_with_objects(data, seed, character, clock, chests, None)
+}
+
+/// [`start_with_chests`] plus a stash ([`build_with_objects`]).
+pub fn start_with_objects<C: Clock + Send + 'static>(
+    data: GameData,
+    seed: u32,
+    character: Character,
+    clock: C,
+    chests: Vec<(i32, i32)>,
+    stash: Option<(i32, i32)>,
+) -> Result<(ThreadLink<Link<C>>, Started), BuildError> {
     let (tx, rx) = std::sync::mpsc::channel();
     let link = ThreadLink::spawn(move || {
-        let g = build_with_chests(&data, seed, character, &chests)?;
+        let g = build_with_objects(&data, seed, character, &chests, stash)?;
         let _ = tx.send(Started {
             waypoint: g.waypoint,
             waypoint_guid: g.waypoint_guid,

@@ -291,6 +291,7 @@ pub fn deliver_outputs(
     outputs: Option<ResMut<FrameOutputs>>,
     ui: Option<NonSendMut<WorldViewUi>>,
     sounds: Option<ResMut<UiSounds>>,
+    state: Option<Res<WorldViewState>>,
 ) -> Result {
     let Some(mut outputs) = outputs else {
         return Ok(());
@@ -300,7 +301,8 @@ pub fn deliver_outputs(
         return Ok(());
     }
     let original = ui.map(|u| u.into_inner()).and_then(|u| u.original.as_mut());
-    let requests = deliver(&mut bridge.0, &list, original)?;
+    let preview = state.is_some_and(|s| s.preview);
+    let requests = deliver_with(&mut bridge.0, &list, original, preview)?;
     if let Some(mut s) = sounds {
         s.0.extend(requests);
     }
@@ -322,7 +324,19 @@ pub fn deliver_outputs(
 pub fn deliver<L: ServerLink>(
     bridge: &mut Bridge<L>,
     list: &[Output],
+    original: Option<&mut OriginalUi>,
+) -> Result<Vec<SoundRequest>, DeliverError> {
+    deliver_with(bridge, list, original, false)
+}
+
+/// [`deliver`], with the play preview's chat close after the dialog
+/// branch when `preview_chat_end` (`bridge::chat_end`; d2rs-own,
+/// unverified).
+pub fn deliver_with<L: ServerLink>(
+    bridge: &mut Bridge<L>,
+    list: &[Output],
     mut original: Option<&mut OriginalUi>,
+    preview_chat_end: bool,
 ) -> Result<Vec<SoundRequest>, DeliverError> {
     let requests = std::cell::RefCell::new(Vec::new());
     let bridge = std::cell::RefCell::new(bridge);
@@ -338,6 +352,11 @@ pub fn deliver<L: ServerLink>(
                     }
                     if let Some((d, case)) = ui.take_dialog_answer() {
                         bridge.borrow_mut().npc_dialog_branch(&d, case)?;
+                        // Preview: no speech or menu, so the chat closes
+                        // at once (`bridge::chat_end`; d2rs-own).
+                        if preview_chat_end {
+                            bridge.borrow_mut().preview_chat_end(d.guid)?;
+                        }
                     }
                 }
                 None => debug!("ui output {o:?}: no original UI"),
@@ -475,6 +494,7 @@ fn ui_input(
             .collect();
         let actions = edge::key_actions(bindings, &pressed);
         ui.queue.0.extend(actions);
+        ui.queue.0.extend(edge::key_chars(&pressed));
     }
     // A window below 800×600 has no frame mapping (`ui.md` open question
     // 1 of the C8 notes): pointer input is dropped as outside the frame.
@@ -650,6 +670,7 @@ fn world_view_frame(
                 for o in state.interact.frame(&mut bridge.0, walking)? {
                     debug!("interact: {o:?}");
                 }
+                state.ground_items.frame(&mut bridge.0, walking)?;
             }
             // `ui/automap.md` §8 r2: the toggle command no panel took.
             let toggle = crate::controls::Action::ToggleAutomap.index() as u16;

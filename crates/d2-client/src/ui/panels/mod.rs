@@ -25,6 +25,7 @@ pub mod skill_inputs;
 pub mod skilltree;
 pub mod stash_cube;
 pub mod stash_input;
+pub mod stash_items;
 pub mod waypoint;
 pub mod waypoint_rows;
 

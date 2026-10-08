@@ -17,6 +17,9 @@
 use std::collections::BTreeMap;
 
 use d2_server::adapters::handlers::world::Outbox;
+use d2_sim::units::UnitType;
+
+use super::npc_seams::{encode_text_list, SnapRef};
 use d2_sim::units::{RoomId, UnitId};
 use d2_sim::wiring::economy::QuestRest;
 use d2_sim::wiring::interaction::{HirelingRest, NpcRest, PlayerQuestsRef, VendorRest};
@@ -42,6 +45,8 @@ pub struct AppRest {
     pub sent: Vec<(UnitId, Vec<u8>)>,
     /// Calls that did nothing (no provider), in call order.
     pub log: Vec<String>,
+    /// The players and monsters at the last sync (`npc_seams`).
+    pub snap: SnapRef,
     /// The store item buy prices the shop panel shows (d2rs-own,
     /// unverified: `VendorRest::store_price`).
     pub prices: ShopPrices,
@@ -74,16 +79,21 @@ impl NpcRest for AppRest {
             2
         }
     }
-    /// No unit distance provider: out of every range.
-    fn distance(&self, _: UnitId, _: UnitId) -> i32 {
-        i32::MAX
+    /// d2rs-own, unverified (`npc_seams`): the snapshot's distance.
+    fn distance(&self, a: UnitId, b: UnitId) -> i32 {
+        self.snap.lock().map_or(i32::MAX, |s| s.distance(a, b))
     }
-    /// Nonzero: the check fails.
-    fn axis_check(&self, _: UnitId, _: UnitId) -> u32 {
-        1
+    /// `npc.md` §3: both axes within 50 sub-tiles (the snapshot).
+    fn axis_check(&self, p: UnitId, n: UnitId) -> u32 {
+        self.snap.lock().map_or(1, |s| s.axis_check(p, n))
     }
-    fn unit_check(&self, _: UnitId, _: u32) -> u32 {
-        1
+    /// d2rs-own, unverified (REC-106): `0x00548F80` accepts a known unit.
+    fn unit_check(&self, _: UnitId, guid: u32) -> u32 {
+        let known = self
+            .snap
+            .lock()
+            .is_ok_and(|s| s.units.values().any(|u| u.guid == guid));
+        u32::from(!known)
     }
     fn clear_path(&mut self, u: UnitId) {
         self.note(format!("clear path {}", u.0));
@@ -91,15 +101,17 @@ impl NpcRest for AppRest {
     fn approach(&mut self, p: UnitId, n: UnitId) {
         self.note(format!("approach {} {}", p.0, n.0));
     }
-    /// Nonzero: busy.
+    /// d2rs-own, unverified (REC-106, `0x00535060`): free; the interact
+    /// unit is checked by the module and the cursor item is not read.
     fn player_busy(&self, _: UnitId) -> u32 {
-        1
+        0
     }
+    /// d2rs-own, unverified (REC-106, `0x00457490` unspecified).
     fn start_allowed(&self, _: UnitId, _: UnitId) -> bool {
-        false
+        true
     }
     fn tristram_cain_busy(&self, _: UnitId, _: UnitId) -> bool {
-        true
+        false
     }
     fn pet(&self, _: UnitId, _: u8, _: u8) -> Option<UnitId> {
         None
@@ -131,9 +143,10 @@ impl NpcRest for AppRest {
     fn respec_sound(&mut self, p: UnitId) {
         self.note(format!("respec sound {}", p.0));
     }
-    /// `0x00661480` is not specified: 34 zero bytes.
-    fn encode_text_list(&self, _: &TextList) -> [u8; 34] {
-        [0; 34]
+    /// `0x00661480` is not specified: the inverse of the client's read
+    /// ([`encode_text_list`], d2rs-own, unverified).
+    fn encode_text_list(&self, list: &TextList) -> [u8; 34] {
+        encode_text_list(list)
     }
     fn socket_granted(&mut self, p: UnitId) {
         self.note(format!("socket granted {}", p.0));
@@ -383,17 +396,22 @@ impl QuestRest for AppRest {
     fn quest_chain(&mut self, _: UnitId) -> Option<&mut QuestChain> {
         None
     }
-    fn unit_act(&self, _: UnitId) -> Option<u8> {
-        None
+    fn unit_act(&self, u: UnitId) -> Option<u8> {
+        self.snap.lock().ok()?.units.get(&u).map(|u| u.act)
     }
     fn unit_level(&self, _: UnitId) -> Option<u32> {
         None
     }
-    fn unit_kind(&self, _: UnitId) -> UnitKind {
-        UnitKind::Other
+    fn unit_kind(&self, u: UnitId) -> UnitKind {
+        if self.quests.contains_key(&u) {
+            UnitKind::Player
+        } else {
+            UnitKind::Other
+        }
     }
+    /// d2rs-own, unverified (REC-106): every player (single player).
     fn players_near(&self, _: UnitId) -> Vec<UnitId> {
-        Vec::new()
+        self.quests.keys().copied().collect()
     }
     fn party_members(&self, _: UnitId) -> Option<Vec<UnitId>> {
         None
@@ -404,8 +422,22 @@ impl QuestRest for AppRest {
     fn send(&mut self, player: UnitId, msg: &[u8]) {
         self.sent.push((player, msg.to_vec()));
     }
+    /// S→C 0x27 (`npc.md` §2 step 5): type 1, the NPC's GUID, the
+    /// encoded list.
     fn send_text_list(&mut self, p: UnitId, n: UnitId, list: &[(u16, u32)]) {
-        self.note(format!("text list {} {} {}", p.0, n.0, list.len()));
+        let guid = self
+            .snap
+            .lock()
+            .ok()
+            .and_then(|s| s.units.get(&n).map(|u| u.guid));
+        let Some(guid) = guid else {
+            self.note(format!("text list {} {} {}: no guid", p.0, n.0, list.len()));
+            return;
+        };
+        let mut m = vec![0x27, 1];
+        m.extend_from_slice(&guid.to_le_bytes());
+        m.extend_from_slice(&encode_text_list(list));
+        self.sent.push((p, m));
     }
     fn inventory(&self, _: UnitId) -> Vec<UnitId> {
         Vec::new()
@@ -483,7 +515,10 @@ impl QuestRest for AppRest {
         self.note(format!("unit flags {} {flags:#x}", u.0));
     }
     fn monsters(&self) -> Vec<UnitId> {
-        Vec::new()
+        self.snap
+            .lock()
+            .map(|s| s.of_type(UnitType::Monster))
+            .unwrap_or_default()
     }
     fn npc_chat_clients(&self, _: UnitId) -> Option<Vec<UnitId>> {
         None

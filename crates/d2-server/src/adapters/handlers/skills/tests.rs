@@ -855,6 +855,9 @@ fn add_skill_point_vectors() {
     assert_eq!((codes, recv), (vec![Malformed, Invalid, Done], NONE));
     assert_eq!(fx.book().log, ["addskill 3 1", "after"]);
     fx.book().log.clear();
+    // The spend added the skill to the player's own list (`skill_lists`,
+    // the one player list); this fixture's seam list stands in again.
+    fx.host.game.events.hooks().skill_lists.clear();
     fx.book().list = vec![entry(LEARN, 3)];
     fx.set_stats(&[(5, 0), (12, 5)]);
     // (Not 0x3B LEARN first: the client's duplicate filter, §2.1 rule

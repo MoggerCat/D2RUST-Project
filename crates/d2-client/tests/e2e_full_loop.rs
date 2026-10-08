@@ -87,13 +87,9 @@ use d2_sim::treasure::{ItemData, TcEntry, TreasureClass, TreasureClasses};
 use d2_sim::units::hooks::{MonsterInfo, Sim as USim, UnitData};
 use d2_sim::units::lifecycle::AllocRequest;
 use d2_sim::units::lists::client_state;
-use d2_sim::units::modes;
 use d2_sim::units::{RoomId, UnitId, UnitType};
 use d2_sim::wiring::action::{ActionHooks, ActionTables, DrlgWorld, KillStep, Pending, SkillEvent};
-use d2_sim::wiring::economy::{
-    monster_death_drop, DeathDrops, DropSpot, DropTables, FreeSpot, GameFields, ItemSpawn,
-    ItemStore,
-};
+use d2_sim::wiring::economy::{DeathDrops, DropSpot, DropTables, GameFields, ItemSpawn, ItemStore};
 use d2_sim::wiring::interaction::{skill_events, UseRest};
 use d2_sim::wiring::worldgen::{
     SharedTypes, WorldPending, WorldSim, WorldState, WorldTables, WorldTypes,
@@ -175,8 +171,6 @@ struct TestPending {
     /// helpers' record fill, `use.md` §5.4 step 7, is not specified).
     aim_at: (i32, i32),
     book: Book,
-    /// The game's drop state (`treasure.md` §3), lent out during a drop.
-    drops: Option<DeathDrops>,
 }
 
 /// The fixture's COF names (the composer `0x0064F5B0` for units with a
@@ -276,34 +270,10 @@ impl Pending for TestPending {
             unit.0,
             target.map(|t| t.0)
         ));
-        modes::set_mode(sim, h, unit, 0).expect("mode DT");
-        if let Some(mut d) = h.x.drops.take() {
-            monster_death_drop(h, sim, &mut d, &mut Spot, unit, target);
-            h.x.drops = Some(d);
-        }
-        true
+        d2_client::app::monster_drop::death_start(h, sim, unit, target)
     }
     fn set_entry_param_of(&mut self, _: UnitId, e: &SkillEntry, i: u8, v: i32) {
         self.book.param(e, i, v);
-    }
-}
-
-/// The free-spot search `0x0064E810` (collision spec, not written): the
-/// start spot as is.
-struct Spot;
-
-impl FreeSpot for Spot {
-    fn free_spot(
-        &mut self,
-        room: Option<RoomId>,
-        start: (i32, i32),
-        _: (i32, i32),
-    ) -> Option<DropSpot> {
-        Some(DropSpot {
-            room,
-            x: start.0,
-            y: start.1,
-        })
     }
 }
 
@@ -1201,13 +1171,13 @@ impl Fx {
             Seed::init_low(game_seed),
             TestPending {
                 book: book.clone(),
-                drops: Some(DeathDrops::new(
-                    Arc::new(drop_tables()),
-                    GameFields::new(Seed::init_low(game_seed), false),
-                )),
                 ..TestPending::default()
             },
         );
+        hooks.object_drops = Some(Box::new(DeathDrops::new(
+            Arc::new(drop_tables()),
+            GameFields::new(Seed::init_low(game_seed), false),
+        )));
         hooks.anim_data = Some(Arc::new(anim_data()));
         hooks.vitals = Some(Arc::new(vitals()));
         let wt = WorldTables {
@@ -1524,8 +1494,7 @@ impl Fx {
             .action
             .sys
             .hooks
-            .x
-            .drops
+            .object_drops
             .as_ref()
             .unwrap()
             .placed
@@ -2338,9 +2307,7 @@ fn run_with(game_seed: u32) -> Transcript {
         })],
     );
     assert_eq!(frames.last().unwrap().1.codes, [(0x2F, done), (0x38, done)]);
-    let shown = &frames.last().unwrap().2;
-    assert!(!shown.is_empty());
-    assert!(shown.iter().all(|m| m[0] == 0x9C && m[1] == 11));
+    let trade_frame = frames.len() - 1;
     let store = {
         let w = &fx.sim_ref().world;
         let rec = &w.state.vendors[w.state.vendor_index(class::AKARA).unwrap()];
@@ -2356,6 +2323,14 @@ fn run_with(game_seed: u32) -> Transcript {
         store_rows.push((guid, it.record, it.item_seed, ac));
     }
     assert_eq!(store_rows.last().unwrap().1, CAP, "permanent codes last");
+    // One 0x9C action 11 per store item, in store order (§4 step 3).
+    let shown: Vec<(u8, u8, u32)> = frames[trade_frame]
+        .2
+        .iter()
+        .map(|m| (m[0], m[1], u32::from_le_bytes(m[4..8].try_into().unwrap())))
+        .collect();
+    let want: Vec<(u8, u8, u32)> = store_rows.iter().map(|r| (0x9C, 11, r.0)).collect();
+    assert_eq!(shown, want);
 
     // 12. Sell (C→S 0x33) the picked-up cap (`vendors.md` §7.2): a
     // permanent code, so no copy; S→C 0x9D action 5, removed from the
