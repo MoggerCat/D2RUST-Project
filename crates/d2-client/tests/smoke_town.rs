@@ -24,7 +24,7 @@ use d2_client::app::play::{
 };
 use d2_client::app::server_thread::ThreadLink;
 use d2_client::app::single_player::{self, GameData};
-use d2_client::app::synthetic_items::BUCKLER;
+use d2_client::app::synthetic_items::CAP;
 use d2_client::app::town_npcs;
 use d2_client::app::ui::{add_original_ui_with, UiParts};
 use d2_client::assets::path::MemorySource;
@@ -955,15 +955,38 @@ impl Rig {
         );
     }
 
+    /// [`Rig::buy`] until the copy lands in the backpack: with its slot
+    /// empty the first copy of an equippable item is worn (the equip try
+    /// of `vendors.md` §7.1.1, `inventory.md` §4.9); the next cap finds
+    /// the head taken and is placed in the backpack (§7.1 rule 9.7; the
+    /// cap is a permanent store item, rule 12). The backpack copy's GUID.
+    fn buy_to_backpack(&mut self, code: &[u8; 4]) -> u32 {
+        for _ in 0..3 {
+            let g = self.buy(code);
+            // Past the shop's 500 ms send throttle (`menus.md` §4).
+            self.step(15);
+            if self.backpack(code).iter().any(|i| i.key.guid == g) {
+                return g;
+            }
+        }
+        panic!("{code:?}: no copy reached the backpack");
+    }
+
     /// Right-clicks the store item of `code` (quick buy, C→S 0x32): the
-    /// bought copy's GUID.
+    /// bought copy's GUID (worn or in the backpack).
     fn buy(&mut self, code: &[u8; 4]) -> u32 {
         let list = self.store_page0();
         let k = list
             .iter()
             .position(|i| i.code == Some(*code))
             .unwrap_or_else(|| panic!("{code:?} is in the store"));
-        let before: Vec<u32> = self.backpack(code).iter().map(|i| i.key.guid).collect();
+        let held = |r: &Self| -> Vec<d2_client::bridge::items::ItemView> {
+            d2_client::bridge::items::local_items(r.bridge().world())
+                .into_iter()
+                .filter(|i| i.code == Some(*code) && !i.store && matches!(i.mode, 0 | 1))
+                .collect()
+        };
+        let before: Vec<u32> = held(self).iter().map(|i| i.key.guid).collect();
         let gold = self.gold();
         self.click_with(
             PointerButton::Right,
@@ -977,11 +1000,11 @@ impl Rig {
                 .any(|&(kind, c)| c == 0 && (kind == 4 || kind == 5)),
             "bought: {tx:?}"
         );
-        let after = self.backpack(code);
+        let after = held(self);
         let new = after
             .iter()
             .find(|i| !before.contains(&i.key.guid))
-            .unwrap_or_else(|| panic!("the copy is in the backpack: {after:?}"));
+            .unwrap_or_else(|| panic!("the copy is worn or in the backpack: {after:?}"));
         let now = self.gold_after(gold);
         assert!(now < gold, "paid: {gold} → {now}");
         let guid = new.key.guid;
@@ -999,12 +1022,12 @@ fn act1_traders_buy_sell_repair_and_gamble() {
     rig.check("gold");
     assert_eq!(rig.gold(), 5_000, "the client model has the gold");
 
-    // Akara: buy a buckler, then sell it back (lift it from the backpack,
+    // Akara: buy a cap, then sell it back (lift it from the backpack,
     // drop it on the store grid: C→S 0x19, then 0x33).
     rig.open_shop(class::AKARA, OptionKind::Trade);
-    let bought = rig.buy(&BUCKLER);
+    let bought = rig.buy_to_backpack(&CAP);
     let it = rig
-        .backpack(&BUCKLER)
+        .backpack(&CAP)
         .into_iter()
         .find(|i| i.key.guid == bought)
         .unwrap();
@@ -1021,7 +1044,7 @@ fn act1_traders_buy_sell_repair_and_gamble() {
     assert_eq!(
         d2_client::bridge::items::cursor_item(rig.bridge().world()).map(|i| i.key.guid),
         Some(bought),
-        "the buckler is on the cursor: {:02X?}",
+        "the cap is on the cursor: {:02X?}",
         rig.wire.lock().unwrap().sent
     );
     rig.check("lift");
@@ -1039,19 +1062,19 @@ fn act1_traders_buy_sell_repair_and_gamble() {
         d2_client::bridge::items::local_items(rig.bridge().world())
             .iter()
             .all(|i| i.key.guid != bought || i.store),
-        "the sold buckler left the player"
+        "the sold cap left the player"
     );
     rig.check("sell");
     rig.close_shop();
 
-    // Charsi: buy a buckler, wear it down, repair it (button 2, then the
+    // Charsi: buy a cap, wear it down, repair it (button 2, then the
     // item), wear it down again, repair all (button 3: worn items only).
     rig.open_shop(class::CHARSI, OptionKind::Trade);
-    let bought = rig.buy(&BUCKLER);
+    let bought = rig.buy_to_backpack(&CAP);
     rig.stage_durability(bought, 3);
     rig.check("worn");
     let it = rig
-        .backpack(&BUCKLER)
+        .backpack(&CAP)
         .into_iter()
         .find(|i| i.key.guid == bought)
         .unwrap();
@@ -1083,8 +1106,8 @@ fn act1_traders_buy_sell_repair_and_gamble() {
         rig.transactions()
     );
     // Repair all covers the equipped items only (`vendors.md` §8.1 rule
-    // 3): the worn buckler is in the backpack, so the total is 0 (code 2,
-    // nothing paid) and the buckler stays worn.
+    // 3): the worn cap is in the backpack, so the total is 0 (code 2,
+    // nothing paid) and the cap stays worn.
     rig.step(30);
     assert_eq!(rig.gold(), gold, "nothing equipped needs repair");
     let dur = app_support::with(&rig.server, move |l| {
@@ -1096,7 +1119,7 @@ fn act1_traders_buy_sell_repair_and_gamble() {
             .unwrap();
         g.events.action.with(&mut g.game, |_, v| v.stat(item, 72))
     });
-    assert_eq!(dur, 2, "the backpack buckler was not repaired");
+    assert_eq!(dur, 2, "the backpack cap was not repaired");
     rig.check("repair all");
     rig.close_shop();
 
@@ -1428,7 +1451,7 @@ fn act1_stash_keeps_an_item_and_gold() {
     rig.stage_gold(5_000);
     rig.check("gold");
     rig.open_shop(class::AKARA, OptionKind::Trade);
-    let item = rig.buy(&BUCKLER);
+    let item = rig.buy_to_backpack(&CAP);
     rig.close_shop();
     let gold = rig.gold();
 
@@ -1453,7 +1476,7 @@ fn act1_stash_keeps_an_item_and_gold() {
     assert!(rig.with_ui(|u| u.is_open(0x19)), "the stash opened");
     rig.check("stash open");
 
-    // The buckler: backpack → cursor → stash grid (C→S 0x19, 0x18 page 4).
+    // The cap: backpack → cursor → stash grid (C→S 0x19, 0x18 page 4).
     let (x, y) = d2_client::bridge::items::local_items(rig.bridge().world())
         .iter()
         .find(|i| i.key.guid == item)
@@ -1466,7 +1489,7 @@ fn act1_stash_keeps_an_item_and_gold() {
     assert_eq!(
         rig.item_place(item),
         Some((4, 0)),
-        "the buckler is stored on the stash page"
+        "the cap is stored on the stash page"
     );
     rig.check("item to the stash");
 
@@ -1494,7 +1517,7 @@ fn act1_stash_keeps_an_item_and_gold() {
     assert_eq!(rig.stash_gold(), 600, "the stash keeps the rest");
     rig.check("withdraw");
 
-    // The buckler back to its backpack cell (the start cube, REC-244,
+    // The cap back to its backpack cell (the start cube, REC-244,
     // holds (0, 0)), then the stash closes.
     rig.click(stash_cell(0, 0));
     rig.step(6);
@@ -1570,9 +1593,14 @@ fn act1_cube_holds_an_item_and_transmutes() {
     rig.stage_gold(5_000);
     rig.check("gold");
     rig.open_shop(class::AKARA, OptionKind::Trade);
-    let item = rig.buy(&BUCKLER);
+    let item = rig.buy_to_backpack(&CAP);
     rig.close_shop();
-    let (_, x, y) = rig.own_item(&BUCKLER);
+    let (x, y) = rig
+        .backpack(&CAP)
+        .into_iter()
+        .find(|i| i.key.guid == item)
+        .map(|i| (i.x, i.y))
+        .expect("the bought cap is in the backpack");
 
     // The inventory (its toggle), then the start cube (REC-244) opened by
     // its use: a right click on it, C→S 0x20, ui 0x1A.
@@ -1595,27 +1623,23 @@ fn act1_cube_holds_an_item_and_transmutes() {
     assert!(rig.with_ui(|u| u.is_open(UI_CUBE)), "the cube opened");
     rig.check("cube open");
 
-    // The buckler: backpack → cursor → cube grid (page 3).
+    // The cap: backpack → cursor → cube grid (page 3).
     rig.click(backpack_cell(x, y));
     rig.step(6);
     rig.click(cube_cell(0, 0));
     rig.step(10);
-    assert_eq!(
-        rig.item_place(item),
-        Some((3, 0)),
-        "the buckler is in the cube"
-    );
+    assert_eq!(rig.item_place(item), Some((3, 0)), "the cap is in the cube");
     rig.check("item to the cube");
 
-    // Transmute (C→S 0x4F 0x18): no recipe takes a lone buckler, so it
+    // Transmute (C→S 0x4F 0x18): no recipe takes a lone cap, so it
     // stays as it is (`cube.md` §2).
     rig.click(transmute_button());
     rig.step(10);
     assert_eq!(rig.buttons_sent(), [0x18], "the transmute is sent");
-    assert_eq!(rig.item_place(item), Some((3, 0)), "the buckler stays");
+    assert_eq!(rig.item_place(item), Some((3, 0)), "the cap stays");
     rig.check("transmute");
 
-    // The buckler back to its backpack cell.
+    // The cap back to its backpack cell.
     rig.click(cube_cell(0, 0));
     rig.step(6);
     rig.click(backpack_cell(x, y));

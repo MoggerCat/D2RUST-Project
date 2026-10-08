@@ -970,14 +970,14 @@ pub trait VendorWorld: NpcLink {
     /// Equipped items over the 13 body locations (`0x0062FE60`).
     fn equipped_items(&self, player: UnitId) -> Vec<UnitId>;
     /// A backpack tome matching the scroll with free space (`0x0055F640`).
-    fn find_tome(&self, player: UnitId, scroll: UnitId) -> Option<(UnitId, i32)>;
+    fn find_tome(&mut self, player: UnitId, scroll: UnitId) -> Option<(UnitId, i32)>;
     /// Tome quantity += k (`0x0055F6E0`).
     fn add_to_tome(&mut self, tome: UnitId, k: i32);
     /// A partial stack of the same item (`0x00577700`: equipped first,
     /// then backpack) with its free space.
-    fn find_partial_stack(&self, player: UnitId, item: UnitId) -> Option<(UnitId, i32)>;
+    fn find_partial_stack(&mut self, player: UnitId, item: UnitId) -> Option<(UnitId, i32)>;
     /// Can go to the belt (`0x00628BA0`); put it there (`0x0055E9B0`).
-    fn can_belt(&self, player: UnitId, item: UnitId) -> bool;
+    fn can_belt(&mut self, player: UnitId, item: UnitId) -> bool;
     fn put_in_belt(&mut self, player: UnitId, item: UnitId) -> bool;
     /// Arrow / bolt auto-equip at buy (`0x00562E00`, Open question 3).
     fn equip_ammo(&mut self, player: UnitId, item: UnitId) -> bool;

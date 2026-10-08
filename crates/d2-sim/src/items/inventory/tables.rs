@@ -42,6 +42,9 @@ pub struct InvItemRec {
     pub twohanded: u8,
     /// `1or2handed` (read by `0x0062A1E0`, §4.4 step 4).
     pub onetwohanded: u8,
+    /// `wclass` (the hand class `0x00623C60`: `bow `, `xbw `, …;
+    /// `world/vendors.md` §7.1.1).
+    pub wclass: [u8; 4],
     /// `levelreq` (`0x006335F0`, §4.8).
     pub levelreq: u8,
     /// `mindam` / `maxdam` (+0xFE / +0xFF): a shield's smite damage
@@ -71,6 +74,7 @@ macro_rules! inv_item_rec {
                     maxstack: r.maxstack,
                     twohanded: r.f_2handed,
                     onetwohanded: r.f_1or2handed,
+                    wclass: r.wclass,
                     levelreq: r.levelreq,
                     mindam: r.mindam,
                     maxdam: r.maxdam,

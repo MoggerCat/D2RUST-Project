@@ -86,6 +86,11 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
         self.note_equip(r);
     }
 
+    /// `0x00576E40` on the rules ([`bk::item_skill_remove`]).
+    pub fn run_item_skill_remove(&mut self, owner: UnitId, item: UnitId, n: i32) {
+        bk::item_skill_remove(self, owner, item, n);
+    }
+
     /// §5.5 cube recount `0x0055FA40` on the rules.
     pub fn run_cube_recount(&mut self, owner: UnitId) {
         let r = bk::cube_recount(self, owner);

@@ -230,6 +230,28 @@ pub fn item_skill_add<W: EquipWorld + ?Sized>(
     skill_quantity_steps(w, u, s, n, true)
 }
 
+/// `0x00576E40` (`world/vendors.md` §7.2 rule 9, a sold scroll or
+/// tome): the item's skill quantity −= n, floor 0, S→C 0x22, and the
+/// right skill cleared (skill 0) when it was that skill. A non-player,
+/// an item without a skill or a skill the player lacks: nothing.
+pub fn item_skill_remove<W: EquipWorld + ?Sized>(w: &mut W, u: UnitId, i: UnitId, n: i32) {
+    if w.unit_type(u) != Some(TYPE_PLAYER) {
+        return;
+    }
+    let Some((s, _)) = item_skill(w, i) else {
+        return;
+    };
+    let Some(cur) = w.skill_quantity(u, s) else {
+        return;
+    };
+    let new = cur.wrapping_sub(n).max(0);
+    w.set_skill_quantity(u, s, new);
+    w.send_skill_quantity(u, s, new);
+    if w.mouse_skill(u, false).is_some_and(|m| m.0 == s) {
+        w.select_skill(u, false, (0, -1));
+    }
+}
+
 /// Recount on cube open / close (`0x0055FA40`, §5.5).
 pub fn cube_recount<W: EquipWorld + ?Sized>(w: &mut W, u: UnitId) -> Result<(), EquipFatal> {
     let mut count = 0usize;
