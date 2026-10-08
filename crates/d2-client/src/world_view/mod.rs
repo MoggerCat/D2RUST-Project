@@ -276,6 +276,18 @@ pub trait ViewRules {
         req: &ComponentRequest<'_>,
     ) -> Result<ComponentFrame, CompositeError>;
 
+    /// `render/unit-composite.md` §4: whether the composite of `unit` with
+    /// `pose` passes the COF box pre-test at its final screen position.
+    /// The default (no camera) passes every unit.
+    fn unit_box_visible(
+        &self,
+        _unit: &ClientUnit,
+        _pose: &UnitPose,
+        _cof: &Cof,
+    ) -> Result<bool, ViewError> {
+        Ok(true)
+    }
+
     /// The unit's shadow draws (`render/blend-modes.md` §5 r1–r3), keyed
     /// at the shadow pass slot `at` (`draw-order.md` §6 r3; `None` until
     /// `OriginalView` fills it from the frame's draw order), from the
@@ -419,6 +431,11 @@ pub struct WorldFrame {
     /// `None` without one. Read back by [`visibility`] (the origin
     /// getters of `client/model.md` §13 r1 return the last drawn frame's).
     pub camera: Option<crate::rules::camera::Camera>,
+    /// The units' draw slots of the frame's draw order (`draw-order.md`
+    /// §3 r4, §5, §10); `None` when no order was computed (no map feed).
+    /// The layers drawn after the build (ground items) take their keys
+    /// from it.
+    pub slots: Option<BTreeMap<crate::bridge::world::UnitKey, crate::rules::draw_order::UnitSlot>>,
 }
 
 /// The C7 resolver of one unit: the hooks. Frame ids are not a hook: they
@@ -512,6 +529,10 @@ pub fn build<R: ViewRules + UiRules + ?Sized>(
             .cofs
             .get(&pose.cof)
             .ok_or_else(|| ViewError::CofMissing(pose.cof.clone()))?;
+        if !rules.unit_box_visible(unit, &pose, cof)? {
+            units_hidden += 1;
+            continue;
+        }
         let params = rules.unit_params(world, unit, &pose)?;
         let resolver = UnitResolver {
             rules,
@@ -546,6 +567,7 @@ pub fn build<R: ViewRules + UiRules + ?Sized>(
         units_drawn,
         units_hidden,
         camera: None,
+        slots: None,
     })
 }
 

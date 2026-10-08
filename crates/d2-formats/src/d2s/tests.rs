@@ -624,6 +624,8 @@ fn item_section_bytes() {
         b.hireling_items = Some(None);
         b.golem = Some(Golem::default());
     }
+    // No hireling in the header (`6A 66` without a list, §8.4 rule 4).
+    s.header.hireling = Hireling::default();
     let f = write(&s, &Tables::v114d()).unwrap();
     // Empty player list, no corpse, no hireling list, no golem.
     assert!(f.ends_with(&[0x4A, 0x4D, 0, 0, 0x4A, 0x4D, 0, 0, 0x6A, 0x66, 0x6B, 0x66, 0x00]));
@@ -1322,4 +1324,71 @@ fn hireling_items_written_by_the_writer_round_trip_through_the_loader() {
     assert_eq!(s.body.as_ref().unwrap().hireling_items, None);
     let f = write(&s, &t).unwrap();
     assert!(!f.windows(2).any(|w| w == [0x6A, 0x66]));
+}
+
+// q-save-audit: a save d2rs writes must load in 1.14d, so a model the
+// loader could not frame is refused instead of written.
+// Covers: specs/formats/d2s.md §7.2 r2, §8.3 r4, §8.4 r2, §8.5 r2
+#[test]
+fn writer_refuses_models_the_loader_cannot_frame() {
+    let t = Tables::v114d();
+    let refused = |s: &D2s| matches!(write(s, &t), Err(WriteError::Model(_)));
+    assert!(!refused(&sample(true)));
+    // Skills: the loader reads header +0x2A bytes.
+    let mut s = sample(true);
+    s.body.as_mut().unwrap().skills.pop();
+    assert!(refused(&s));
+    // Corpse: n >= 2 is error 21.
+    let mut s = sample(true);
+    let c = s.body.as_ref().unwrap().corpses[0].clone();
+    s.body.as_mut().unwrap().corpses.push(c);
+    assert!(refused(&s));
+    // Golem: g and the item go together (g = 1 without an item reads the
+    // next section as the item; an item with g = 0 is read as a marker).
+    let mut s = sample(true);
+    s.body.as_mut().unwrap().golem = Some(Golem {
+        flag: 1,
+        item: None,
+    });
+    assert!(refused(&s));
+    let mut s = sample(true);
+    s.body.as_mut().unwrap().golem = Some(Golem {
+        flag: 0,
+        item: Some(item(7, 0)),
+    });
+    assert!(refused(&s));
+    // jf: a hireling in the header needs the list, none in the header
+    // must not have one (the loader reads the list iff it restores it).
+    let mut s = sample(true);
+    s.body.as_mut().unwrap().hireling_items = Some(None);
+    assert!(refused(&s));
+    let mut s = sample(true);
+    s.header.hireling = Hireling::default();
+    assert!(refused(&s));
+    // Absent jf is fine for either header (the loader tolerates it).
+    let mut s = sample(true);
+    s.body.as_mut().unwrap().hireling_items = None;
+    assert!(!refused(&s));
+}
+
+// Covers: specs/formats/d2s.md §2.1, §2.4 r3
+#[test]
+fn swap_pairs_and_switch_byte_sit_at_their_offsets() {
+    let mut h = Header {
+        weapon_switch: 1,
+        ..Header::default()
+    };
+    h.mouse[0] = Slot {
+        code: 0x0024,
+        item: 0,
+    };
+    h.mouse[2] = Slot {
+        code: 0x0024,
+        item: 0,
+    };
+    let b = h.to_bytes();
+    assert_eq!(&b[0x10..0x14], &[1, 0, 0, 0]);
+    assert_eq!(&b[0x78..0x7C], &[0x24, 0, 0, 0]);
+    assert_eq!(&b[0x80..0x84], &[0x24, 0, 0, 0]);
+    assert_eq!(&b[0x84..0x88], &[0, 0, 0, 0]);
 }

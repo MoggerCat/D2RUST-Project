@@ -76,6 +76,9 @@ pub fn load_act(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerErr
             Some(ClientDrlg::build(src, m.act, m.f2, w.difficulty).map_err(ClientDrlgError::from)?);
         w.refresh_active_rooms()?;
     }
+    // `0x0044E100` replaced the client act (`render/composition.md` §3
+    // step 4: the next drawn frame is cleared after drawing).
+    w.act_loads = w.act_loads.wrapping_add(1);
     // The act's environment record (`render/lighting.md` §9.1), then the
     // pending eclipse (§9.2 r3).
     w.environment = Some(create_environment()?);

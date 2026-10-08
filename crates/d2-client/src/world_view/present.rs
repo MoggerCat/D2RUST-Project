@@ -117,6 +117,19 @@ pub struct WorldViewState {
     pub object_labels: super::object_label::ObjectLabels,
     /// The last drawn frame's camera (`super::visibility`).
     pub camera: super::visibility::SharedCamera,
+    /// The model's act loads already handed to the cycle
+    /// ([`note_act_loads`]).
+    act_loads: u64,
+}
+
+/// `composition.md` §3 step 4: each S→C 0x03 the model handled since the
+/// last call sets the post-draw clear counter to 1 (`0x0044E100`), so the
+/// next presented frame is all index 0.
+pub fn note_act_loads(cycle: &mut FrameCycle, seen: &mut u64, loads: u64) {
+    if loads != *seen {
+        *seen = loads;
+        cycle.set_post_clear(1);
+    }
 }
 
 impl WorldViewState {
@@ -145,6 +158,28 @@ impl WorldViewState {
             missiles: Default::default(),
             object_labels: Default::default(),
             camera: Default::default(),
+            act_loads: 0,
+        }
+    }
+}
+
+/// `play --dump-draws` (`specs/tools/facts-render.md` §5): the facts of
+/// the first drawn frame at or after the requested server tick, then the
+/// app exits. Reads the built frame only.
+#[derive(Resource)]
+pub struct DrawDump {
+    pub request: crate::facts::export::DumpRequest,
+    /// Frames drawn so far (the dump's `seq`).
+    seen: u64,
+    done: bool,
+}
+
+impl DrawDump {
+    pub fn new(request: crate::facts::export::DumpRequest) -> Self {
+        DrawDump {
+            request,
+            seen: 0,
+            done: false,
         }
     }
 }
@@ -607,6 +642,7 @@ fn world_view_frame(
     mut walk: Option<ResMut<PreviewWalk>>,
     mut exit: MessageWriter<AppExit>,
     mut windows: Query<&mut Window, With<PrimaryWindow>>,
+    mut dump: Option<ResMut<DrawDump>>,
 ) -> Result {
     let tick = bridge.0.world().server_ticks;
     if tick == 0 || state.last.is_some_and(|l| l.server_tick == tick) {
@@ -848,6 +884,39 @@ fn world_view_frame(
         bridge.0.set_room_order(room, &order);
     }
     let blank_screen = state.feed.blank_screen(bridge.0.world())?;
+    let loads = bridge.0.world().act_loads;
+    note_act_loads(&mut state.cycle, &mut state.act_loads, loads);
+    if let Some(d) = dump.as_deref_mut().filter(|d| !d.done) {
+        d.seen += 1;
+        if tick >= d.request.at_tick {
+            d.done = true;
+            let world = bridge.0.world();
+            let open_mode = state.feed.open_mode(world).ok().map(|m| m.get());
+            let frame_in = crate::facts::export::DumpFrame {
+                world,
+                frame: &frame,
+                assets: &state.assets,
+                cycle: &state.cycle,
+                blank_screen,
+                open_mode,
+                seq: d.seen,
+            };
+            match crate::facts::export::dump(&d.request, &frame_in) {
+                Ok(()) => {
+                    println!(
+                        "play: rendering facts of tick {tick} ({} items) written to {}",
+                        frame.items.len(),
+                        d.request.dir.display()
+                    );
+                    exit.write(AppExit::Success);
+                }
+                Err(e) => {
+                    eprintln!("play: --dump-draws failed: {e}");
+                    exit.write(AppExit::error());
+                }
+            }
+        }
+    }
     let use_gpu = gpu.is_some();
     let bridge_frame = bridge.0.world().frames;
     state.last_tags.clear();
@@ -957,5 +1026,35 @@ fn present_scale(
     let s = p.scale as f32 / window.scale_factor();
     for mut t in &mut sprites {
         t.scale = Vec3::new(s, s, 1.0);
+    }
+}
+
+#[cfg(test)]
+mod act_load_tests {
+    use super::*;
+    use crate::scene::{FrameImage, MapTable};
+
+    // Covers: specs/render/composition.md §3
+    #[test]
+    fn the_frame_after_an_act_load_presents_all_index_0() {
+        // The spec's vector: framebuffer all 5, BlankScreen 1, nothing
+        // drawn, 800 × 600, counter 1 → all 0, counter back to 0.
+        let mut c = FrameCycle::with_pixels(800, 600, vec![5; 800 * 600]).unwrap();
+        let mut seen = 0;
+        note_act_loads(&mut c, &mut seen, 0);
+        assert_eq!(c.post_clear(), 0, "no 0x03 yet");
+        note_act_loads(&mut c, &mut seen, 1);
+        assert_eq!(c.post_clear(), 1);
+        let none: Vec<FrameImage> = Vec::new();
+        let out = c.compose(true, &[], &none, &MapTable::default()).unwrap();
+        assert!(out.iter().all(|&p| p == 0));
+        assert_eq!(c.post_clear(), 0);
+        // The same count again: no clear; the next frame keeps rows
+        // 553–599 (BlankScreen clears rows 0–552 only).
+        note_act_loads(&mut c, &mut seen, 1);
+        assert_eq!(c.post_clear(), 0);
+        // Two loads before one frame: one cleared frame.
+        note_act_loads(&mut c, &mut seen, 3);
+        assert_eq!(c.post_clear(), 1);
     }
 }

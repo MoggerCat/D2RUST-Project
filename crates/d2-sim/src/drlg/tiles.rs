@@ -20,6 +20,31 @@ pub const FIXED_LIBRARY: [&[u8]; 3] = [
     b"DATA\\GLOBAL\\Tiles\\Act1\\Barracks\\Warp.dt1",
 ];
 
+/// A base library path and a tile key (orientation, main, sub).
+pub type EdgeTileKey = (&'static [u8], (u32, u32, u32));
+
+/// The act's base tile library (`levels.md` §3 step 5, `0x00641F60`) and
+/// the key (orientation, main, sub) of the act's edge floor record looked
+/// up in it (`levels.md` §2 rule 3, `0x00642A30`;
+/// `render/draw-order-2.md` open question 2), by act number. Acts IV and
+/// V load no base library: their record stays zero.
+pub const ACT_EDGE_TILE: [Option<EdgeTileKey>; 5] = [
+    Some((b"DATA\\GLOBAL\\Tiles\\Act1\\Town\\Floor.dt1", (0, 0, 0))),
+    Some((b"DATA\\GLOBAL\\Tiles\\Act2\\Town\\Ground.dt1", (0, 0, 1))),
+    Some((b"DATA\\GLOBAL\\Tiles\\ACT3\\Kurast\\sets.dt1", (0, 29, 12))),
+    None,
+    None,
+];
+
+/// The first entry of the lookup `0x00604AE0` of `key` in one DT1 file's
+/// tiles (§9.3: reverse file order), its index in file order.
+pub fn first_entry(tiles: &[TileInfo], key: (u32, u32, u32)) -> Option<u32> {
+    tiles
+        .iter()
+        .rposition(|t| (t.orientation, t.main, t.sub) == key)
+        .map(|i| i as u32)
+}
+
 /// Library slots per room (+0x68).
 pub const LIBRARY_SLOTS: usize = 32;
 
