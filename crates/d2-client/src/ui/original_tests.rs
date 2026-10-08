@@ -552,11 +552,35 @@ fn the_menu_tree_returns_saves_exits_and_swallows_clicks() {
             })
             .collect()
     };
+    let art_names = |u: &Ui, w: &ClientWorld| -> Vec<String> {
+        let ctx = UiCtx {
+            tick: 0,
+            world: w,
+            strings: &NoStrings,
+        };
+        let mut out: Vec<UiDraw> = Vec::new();
+        u.root.draw(&ctx, &mut out);
+        let sh = u.ui.shared.borrow();
+        out.iter()
+            .filter_map(|d| match d {
+                UiDraw::Image(i) => sh.tables.files.name(i.image.file).map(str::to_string),
+                _ => None,
+            })
+            .collect()
+    };
     assert!(texts(&u).is_empty());
     u.key(&w, Action::GameMenu);
+    // The labels are DC6 images now (spec §O2 r4: no font): no text.
+    assert!(texts(&u).is_empty());
     assert_eq!(
-        texts(&u),
-        vec!["Options", "Save and Exit Game", "Return to Game"]
+        art_names(&u, &w),
+        vec![
+            "*local\\options",
+            "*local\\exit",
+            "*local\\returntogame",
+            "cursor\\pentspin",
+            "cursor\\pentspin"
+        ]
     );
     // Rows: Game menu tops 185 / 235 / 285 (click inside the 50 px row).
     let row = |i: i32| Point::new(400, 185 + 50 * i + 20);
@@ -564,20 +588,20 @@ fn the_menu_tree_returns_saves_exits_and_swallows_clicks() {
     assert_ne!(r, Routed::Unhandled);
     assert!(u.ui.is_open(9) && !u.ui.take_exit_request());
     assert_eq!(
-        texts(&u),
-        vec![
-            "Sound Options",
-            "Video Options",
-            "Automap Options",
-            "Configure Controls",
-            "Previous Menu"
+        art_names(&u, &w)[..5],
+        [
+            "*local\\soundoptions",
+            "*local\\videooptions",
+            "*local\\automapoptions",
+            "*local\\cfgoptions",
+            "*local\\previous"
         ]
     );
     // Options rows (tops 135, 185, ...): Video Options.
     let orow = |i: i32| Point::new(400, 135 + 50 * i + 20);
     u.click(&w, orow(1));
     let t = texts(&u);
-    assert_eq!(t[0], "Video Options");
+    assert_eq!(art_names(&u, &w)[0], "*local\\videooptions");
     assert!(t.contains(&"Window Mode".to_string()));
     // Video rows (tops 70 + 45 k for 9 rows): Window Mode is row 2.
     let m = u.ui.shared.borrow().esc.menu.clone();

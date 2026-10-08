@@ -340,6 +340,7 @@ impl OriginalUi {
     pub fn new(config: UiConfig, inv_areas: Option<Vec<InvArea>>) -> Result<Self, LayoutError> {
         let mut tables = PanelTables::load()?;
         tables.files.extend(hud::hud_files());
+        tables.files.extend(esc_art::esc_files());
         tables.files.extend(quest_log_ui::quest_files());
         let shared = Shared {
             tables,
@@ -1218,6 +1219,8 @@ impl Panel for BorderUi {
     }
 }
 
+#[path = "esc_art.rs"]
+pub mod esc_art;
 #[path = "esc_menu.rs"]
 pub mod esc_menu;
 #[path = "game_messages.rs"]

@@ -114,11 +114,14 @@ impl Panel for EscMenuUi {
         FRAME
     }
 
-    fn draw(&self, _ctx: &UiCtx, out: &mut dyn UiDrawSink) {
+    fn draw(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
         let sh = self.sh.borrow();
         let m = &sh.esc.menu;
         let file = sh.tables.files.id(FILL_FILE);
         for (i, def) in m.rows().iter().enumerate() {
+            if super::esc_art::draw_row(&sh.tables.files, m, i, out) {
+                continue;
+            }
             let yb = m.baseline(i);
             let color = if !m.enabled(i) && def.kind != Kind::Title {
                 COLOR_DISABLED
@@ -159,12 +162,7 @@ impl Panel for EscMenuUi {
                 }
             }
         }
-        if let Some(file) = file {
-            // Pentagram stand-ins (no pentspin art here), both sides.
-            let y = m.pentagram_y();
-            push_fill(out, file, GOLD, Rect::new(HALF - 301, y - 6, 12, 12));
-            push_fill(out, file, GOLD, Rect::new(HALF + 249, y - 6, 12, 12));
-        }
+        super::esc_art::draw_pents(&sh.tables.files, m, ctx.tick, out);
     }
 
     fn hit(&self, _p: Point) -> Option<WidgetId> {

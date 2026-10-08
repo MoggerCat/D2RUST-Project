@@ -88,7 +88,7 @@ pub fn hud_files() -> Vec<String> {
 /// Whether a missing archive file of `name` may draw nothing instead of
 /// failing the frame (D1: HUD art only).
 pub fn optional_file(name: &str) -> bool {
-    hud_files().iter().any(|f| f == name)
+    hud_files().iter().any(|f| f == name) || super::esc_art::is_esc_file(name)
 }
 
 /// The fill frames for `palette` (module doc). d2rs-own, unverified.
