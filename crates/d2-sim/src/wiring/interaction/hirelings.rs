@@ -26,6 +26,11 @@ use super::NpcRest;
 const STATE_BROADCAST_SKIP: u32 = 7;
 
 /// The hireling calls no written spec provides yet, each with its owner.
+/// Umod 19 `hireable` (`umod-callbacks.md` §12).
+const UMOD_HIREABLE: u8 = 19;
+/// Stat 172 `alignment`: good (`ai.md` §5.2 step 7).
+const ALIGNMENT_GOOD: i32 = 2;
+
 pub trait HirelingRest {
     /// `0x00624690` / `0x00553570`: a mode change (monster modes spec).
     fn set_mode(&mut self, unit: UnitId, mode: u8);
@@ -193,7 +198,18 @@ impl<H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> HirelingWorld
     fn max_life(&self, unit: UnitId) -> i32 {
         self.desk.econ.stats.max_life(unit)
     }
+    /// The rest's state list; an `alignment` (172) of 2 also marks the
+    /// unit allied in the game's unit lists (`UnitEntry::allied`, the
+    /// good alignment the wiring's hostility reads; `hirelings.md` §3.2
+    /// rule 2).
     fn set_state_stat(&mut self, unit: UnitId, state: u16, stat: u16, value: i32) {
+        if stat == crate::world::hirelings::stat::ALIGNMENT {
+            self.desk
+                .econ
+                .game
+                .lists
+                .set_allied(unit, value == ALIGNMENT_GOOD);
+        }
         self.desk.rest.set_state_stat(unit, state, stat, value);
     }
     /// The state's stat list freed (`stat-lists.md` §9).
@@ -214,7 +230,10 @@ impl<H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> HirelingWorld
     fn skill_pet_max(&self, player: UnitId, pet_type: u8) -> Option<i32> {
         self.desk.rest.skill_pet_max(player, pet_type)
     }
+    /// `0x0058F030`: the AI control's minion owner (the Hireable AI
+    /// reads it, `ai-bodies-6.md` §7 step 1), and the rest's copy.
     fn set_owner(&mut self, merc: UnitId, guid: u32, unit_type: u8) {
+        self.desk.econ.hooks.set_ai_owner(merc, unit_type, guid);
         self.desk.rest.set_owner(merc, guid, unit_type);
     }
     fn owner(&self, merc: UnitId) -> Option<(u32, u8)> {
@@ -223,7 +242,18 @@ impl<H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> HirelingWorld
     fn join_team(&mut self, merc: UnitId, player: UnitId) {
         self.desk.rest.join_team(merc, player);
     }
+    /// `0x005A4850(game, merc, 19, 0)` (`hirelings.md` §3.2 rule 10:
+    /// umod 19 `hireable`, `umod-callbacks.md` §12), then the rest's
+    /// part (monster data bytes, rule 11).
     fn hireling_ai(&mut self, merc: UnitId) {
+        let e = &mut *self.desk.econ;
+        let mut sim = crate::units::hooks::Sim {
+            game: &mut *e.game,
+            units: &mut *e.units,
+            stats: &mut *e.stats,
+            data: e.data,
+        };
+        e.hooks.assign_umod(&mut sim, merc, UMOD_HIREABLE);
         self.desk.rest.hireling_ai(merc);
     }
     fn free_unit(&mut self, unit: UnitId) {
@@ -247,7 +277,17 @@ impl<H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> HirelingWorld
     fn dismiss(&mut self, unit: UnitId) {
         self.desk.rest.dismiss(unit);
     }
+    /// `0x00574D90` → `0x00574CC0` on the hooks' path code
+    /// ([`LifecycleHooks::warp_pet`]), then the rest's part.
     fn warp_to(&mut self, pet: UnitId, player: UnitId) {
+        let e = &mut *self.desk.econ;
+        let mut sim = crate::units::hooks::Sim {
+            game: &mut *e.game,
+            units: &mut *e.units,
+            stats: &mut *e.stats,
+            data: e.data,
+        };
+        e.hooks.warp_pet(&mut sim, pet, player);
         self.desk.rest.warp_to(pet, player);
     }
     fn level_events(&mut self, player: UnitId, merc: UnitId) {

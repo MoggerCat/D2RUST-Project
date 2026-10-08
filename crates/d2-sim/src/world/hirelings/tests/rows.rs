@@ -167,7 +167,7 @@ fn threshold_vectors() {
     assert_eq!(threshold(i32::MAX, 2), i32::MAX.wrapping_mul(12));
 }
 
-// Covers: specs/world/hirelings.md §1.1 r1, §1.1 r3
+// Covers: specs/world/hirelings.md §1.1 r1, §1.1 r3, §1.1 r6
 #[test]
 fn from_table_reads_the_row_columns() {
     use d2_data::bin::BinTable;
@@ -194,6 +194,14 @@ fn from_table_reads_the_row_columns() {
         put(r, 0x1C, &36u32.to_le_bytes());
         put(r, 0x114, &(1000 + i as u16).to_le_bytes());
         put(r, 0x116, &1040u16.to_le_bytes());
+        // The skill pick's columns (§1.1 r6): DefaultChance +0x64,
+        // Skill1 +0x78, Chance1 +0x90, ChancePerLvl1 +0xA8, Mode1 +0xC0.
+        put(r, 0x64, &40u32.to_le_bytes());
+        put(r, 0x78, &12u32.to_le_bytes());
+        put(r, 0x90, &30u32.to_le_bytes());
+        put(r, 0x94, &5u32.to_le_bytes());
+        put(r, 0xA8, &4u32.to_le_bytes());
+        put(r, 0xC0, &[14]);
     }
     let t = BinTable {
         name: Hireling::TABLE.into(),
@@ -217,6 +225,10 @@ fn from_table_reads_the_row_columns() {
         (100, 4, 271, 1, 2, 150, 36)
     );
     assert_eq!((r.name_first, r.name_last), (1001, 1040));
+    let ai = r.ai_row();
+    assert_eq!((ai.level, ai.default_chance), (36, 40));
+    assert_eq!((ai.skill[0], ai.chance[..2].to_vec()), (12, vec![30, 5]));
+    assert_eq!((ai.chance_per_lvl[0], ai.mode[0]), (4, 14));
     // Each Id is its own row set: Id 4 at L 36 is row 1, Id 3 row 0.
     assert_eq!(rows.row_at(true, 4, 50), Some(1));
     assert_eq!(rows.row_at(true, 3, 50), Some(0));
