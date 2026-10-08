@@ -6,31 +6,51 @@ rules are `docs/handoff/build-loop.md`, the task rows are
 `docs/handoff/build-queue.tsv`, and each finished task left
 `docs/handoff/q-<task>.md` (done / left / local check).
 
-## State at hand-over (06:30 UTC)
+## State at hand-over (2026-10-08 ~09:20 UTC, second account switch)
 
-- `main`: includes PR #47 (everything merged up to ~05:30 UTC).
-- `claude/specs-staging-7`: green, about 70 tasks merged (6,779 tests
-  sim/server/client/test-fixtures). Everything after #47 is here only:
-  open a PR from a snapshot branch (see "Ship" below) to land it.
-- Merged after PR #47 (in `claude/release-8b`): q-necro, q-npc-approach,
-  q-a4 (with a real monster-AI fix), q-druid, q-sorc, plus everything listed
-  in that PR.
-- Branches pushed but **not merged** (sessions stopped at 06:25 UTC; each
-  is partial — read its `docs/handoff/q-<task>.md` first):
-  `claude/q-barb` (test rig only, never compiled), `claude/q-assassin`
-  (3 tests compile, all fail, undiagnosed), `claude/q-paladin` and
-  `claude/q-mercs-acts` (state unknown at hand-over; check the branch).
-- Queue rows not started: `q-item-uniques`, `q-gamble`, `q-charms`,
-  `q-levels-warps-all`, `q-light-radius-detail`, `q-render-polish`,
-  `q-perf`, `q-config`.
+- `main`: includes PR #48 (through q-sorc).
+- `claude/specs-staging-7`: green (6,855 tests sim/server/client/
+  test-fixtures). Merged after #48: q-mercs-acts, q-paladin,
+  q-item-uniques, q-weapon-combat, q-assassin, q-gamble, q-barb,
+  q-charms, q-a4-endgame, q-a2-duriel, pc1-frontend (menu specs + 10
+  q-menu rows), q-render-polish, q-wp-warp, q-levels-warps-all,
+  q-menu-shell, q-config, q-perf, q-light-radius-detail. If a snapshot
+  PR (`claude/release-8c`) is open, it carries these; merge it on green.
+- Sessions launched by the previous coordinator, each on its own
+  `claude/<task>` branch and reporting to that (now gone) coordinator.
+  Check each branch's head and its `docs/handoff/q-<task>.md`; merge the
+  finished ones with the recipe below, relaunch the unfinished ones:
+
+  | task | REC | note |
+  |---|---|---|
+  | q-skill-moves | 173 | Leap / Whirlwind / Dragon Flight on body_path.rs |
+  | q-a2-tyrael | 174 | Duriel AI, Tyrael, travel east |
+  | q-a4-harrogath | 175 | Fortress -> Harrogath move |
+  | q-skill-gaps | 176 | Sacrifice/Smite/Zeal, curses, summons |
+  | q-town-gaps | 177 | single repair, vendors, weapon swap, panel totals |
+  | q-menu-host | 178 | Bevy host for `ui::front_end` |
+  | q-menu-main | 179 | screens/main_menu.rs |
+  | q-menu-charselect | 180 | screens/char_select.rs |
+  | q-menu-create | 181 | screens/create.rs |
+  | q-menu-difficulty | 182 | screens/difficulty.rs |
+  | q-menu-loading | 183 | screens/loading.rs |
+  | q-menu-controls | 184 | screens/controls.rs |
+  | q-menu-credits | 185 | screens/credits.rs |
+  | q-menu-cinematics | 186 | screens/cinematics.rs |
+
+  Menu screen sessions were told to edit only their own screen file.
+- Queue row not started: `q-menu-options` (needs q-config, merged; it
+  replaces q-config's simple Esc Options page with the full menu tree).
+  Use REC-187.
 
 ## REC ids
 
-Highest used in staging: REC-155. Reserved for the unmerged branches:
-152 q-barb, 153 q-paladin, 156 q-assassin, 157 q-mercs-acts. Next free:
-REC-158. Sessions often pick a taken id; on merge, renumber only the
-branch's new lines with `python3 tools/coord/renum.py REC-OLD REC-NEW`
-(run during an uncommitted merge, from the repo root).
+Staging uses up to REC-177 plus REC-230 (q-levels-warps-all); the front-
+end specs use REC-200..213 and REC-220..229. 164, 169 and 171 were
+reserved and never used. Next free: REC-187 (then 188, 189, 231+).
+Sessions often pick a taken id; on merge, renumber only the branch's new
+lines with `python3 tools/coord/renum.py REC-OLD REC-NEW` (run during an
+uncommitted merge, from the repo root).
 
 ## Merge recipe (per branch)
 
@@ -63,7 +83,10 @@ create a Sonnet session on it with this prompt:
 > docs/handoff/build-queue.tsv. Push only to claude/<task>. Use REC-<N> for
 > any provisional note.
 
-Keep at most 8 running; each reports back with `send_message`.
+Up to ~17 at once has worked; each reports back with `send_message`.
+Two sessions touching the same system (e.g. q-item-uniques and
+q-weapon-combat both built the worn-item stat link) is the usual merge
+cost: keep one implementation, never both.
 
 ## Ship
 
@@ -77,23 +100,22 @@ and `cargo run -p depcheck` (CI builds the workspace without Bevy:
 
 ## Follow-ups reported by sessions (not yet queued)
 
+Items now covered by a merged task or a running row above are removed.
+
 - strings: bind `TableStrings::by_id` in NPC menu / HUD / item-name panels
 - REC-QESC-1 is a nonstandard id; renumber
 - shrine timed-state effects; client object mouse-over label
-- warp-tile picking by click; hireling follow live check (local)
-- belt key labels / hover text / highlight rects
-- stash gold kinds 3/4
+- belt key labels / hover text / highlight rects; stash gold kinds 3/4
 - save: mouse skills, act byte, merc/golem/corpse items, runeword refresh
 - identify: Tome of Town Portal, descfunc > 4, belt/shop tips
 - town portal: in-town cast, 0x82 owner name, state 102; vendor buy 0x9C action 12
 - cube in start items, cube tool tips, close when cube gone
-- unit state tints
-- socketed gem stats reach the wearer (equip wiring); combat uses the equipped weapon
-- server emits 0x26 system lines (pickup, can't use); overhead bubbles
-- Book of Skill, Jerhyn/Meshif travel east; Act III waypoints
-- Duriel's lair, boss-tomb entrance, Horadric Staff/orifice flow, Act II dungeon population
-- Act V: Ancients statues, warp gates; Act IV: Hellforge, seals, Diablo
-- Necromancer curses / Corpse Explosion / Raise Skeleton / Revive (need a target in the harness)
+- unit state tints; server 0x26 system lines; overhead bubbles
+- Book of Skill; Act III waypoints; Act V Ancients statues and warp gates
+- set bonus lines in item tips; equip_rules switch still off
+- lighting: per-block floor/wall gradients, blocks-light flags, Levels ambient
+- line_clear answers "clear" until the client has collision (REC-152)
+- Act I dungeons beyond the existing ones are not in the synthetic world
 
 ## Local checks (the user's PC, with game files)
 
