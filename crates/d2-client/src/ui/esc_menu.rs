@@ -9,20 +9,16 @@
 //! it is open (`controls.md` §7 r2). The menu's art, layout and strings
 //! have no spec yet (REC-QESC-1 in `docs/HANDOFF.md` §7, M22).
 //!
-//! Preview fills, each `// d2rs-own, unverified`:
-//! - the box is tiles of the synthetic fill file ([`FILL_FILE`] frame
-//!   [`DARK`]), the three entries are Font16 text in English;
-//! - "Options" opens a second page (Resolution, Window Mode, Controls,
-//!   Previous) over the d2rs config (`app::config`): the two rows cycle
-//!   their value and set `settings_changed` for the host to write
-//!   `settings.toml` (REC-172); "Controls" only names `controls.toml`
-//!   (no Configure Controls screen yet); "Save and Exit Game" asks the host to save
-//!   and close (`app::save::request_save_and_exit`, read through
-//!   [`super::OriginalUi::take_exit_request`]); "Return to Game" closes.
-
-use crate::app::config::Settings;
+//! The tree, rows, input and settings are `options_menu` (spec
+//! `ui/frontend-options.md` §O2–§O8); this panel draws it and routes
+//! events. d2rs-own, unverified: the DC6 labels, value images, bar,
+//! skull and pentspin are not available here, so labels and values are
+//! Font16 English text, the slider is a thin bar with a gold knob and the
+//! pentagrams are gold squares (REC-187); Esc closes the whole menu
+//! (`OriginalUi::game_menu_key`, §O1 r4).
 
 use super::hud::{FILL_FILE, FILL_H, FILL_W};
+use super::options_menu::{Kind, MenuEvent, OptionsMenu, HALF};
 use super::{left, SharedRef};
 use crate::ui::draw::{ImageRef, ImageRequest, TextRequest, TextStyle, UiDraw, UiDrawSink};
 use crate::ui::geom::{Point, Rect};
@@ -34,106 +30,73 @@ use crate::ui::FRAME;
 /// The panel's id: the UI state number (§3.1).
 pub const ESC_PANEL: PanelId = PanelId(9);
 
-/// The fill file's dark frame (made by `hud::fill_frames`).
+/// The fill file's frames (made by `hud::fill_frames`): gold, white, dark.
+const GOLD: u32 = 1;
+const WHITE: u32 = 3;
 pub const DARK: u32 = 4;
 
-/// The frame is 800 × 600 (resolution mode 2).
-const FRAME_W: i32 = 800;
-const BOX_W: i32 = 260;
-const BOX_TOP: i32 = 190;
-const BOX_H: i32 = 215;
-const ITEM_TOP: i32 = 210;
-const ITEM_H: i32 = 45;
-/// Font16, and the colors of an entry at rest and under the mouse.
+/// Menu keys as UI `Char` events (the original's handler table, §O5 r1,
+/// keyed by VK code): private-use code units, d2rs-own.
+pub const CHAR_ENTER: u16 = 0x0D;
+pub const CHAR_LEFT: u16 = 0xF025;
+pub const CHAR_UP: u16 = 0xF026;
+pub const CHAR_RIGHT: u16 = 0xF027;
+pub const CHAR_DOWN: u16 = 0xF028;
+
+/// Font16, and the colors of a row at rest, selected and disabled.
 const FONT: u16 = 1;
 const COLOR_REST: u16 = 0;
-const COLOR_HOVER: u16 = 3;
-
-/// The entries, top to bottom.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Entry {
-    Options,
-    SaveAndExit,
-    Return,
-    Resolution,
-    WindowMode,
-    Controls,
-    Previous,
-}
-
-/// Which page is shown.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum View {
-    #[default]
-    Main,
-    Options,
-}
-
-const MAIN: [Entry; 3] = [Entry::Options, Entry::SaveAndExit, Entry::Return];
-const OPTIONS: [Entry; 4] = [
-    Entry::Resolution,
-    Entry::WindowMode,
-    Entry::Controls,
-    Entry::Previous,
-];
+const COLOR_SELECTED: u16 = 3;
+const COLOR_DISABLED: u16 = 5;
 
 /// The menu's own state.
 #[derive(Clone, Debug, Default)]
 pub struct EscState {
     /// "Save and Exit Game" was chosen and the host has not read it yet.
     pub exit_requested: bool,
-    pub view: View,
-    /// The settings the Options page shows and edits.
-    pub settings: Settings,
-    /// A setting changed and the host has not written it yet.
-    pub settings_changed: bool,
+    /// "Configure Controls" was chosen and the host has not read it yet.
+    pub controls_requested: bool,
+    /// The menu tree and the settings it edits (`options_menu`).
+    pub menu: OptionsMenu,
 }
 
-impl EscState {
-    fn entries(&self) -> &'static [Entry] {
-        match self.view {
-            View::Main => &MAIN,
-            View::Options => &OPTIONS,
+/// A row's label x and the value / slider geometry, §O4 r1.
+const LABEL_X: i32 = HALF - 230;
+const VALUE_BLOCK: i32 = 130;
+
+/// The menu draws over the world with no backdrop (§O4, PROVISIONAL REC-212),
+/// so a dark strip behind the rows keeps the English stand-in text readable.
+fn push_fill(out: &mut dyn UiDrawSink, file: u32, frame: u32, r: Rect) {
+    let (w, h) = (FILL_W as i32, FILL_H as i32);
+    let mut y = r.y;
+    while y < r.y + i32::from(r.h) {
+        let mut x = r.x;
+        while x < r.x + i32::from(r.w) {
+            let cw = (r.x + i32::from(r.w) - x).min(w);
+            let ch = (r.y + i32::from(r.h) - y).min(h);
+            out.push(UiDraw::Image(ImageRequest {
+                image: ImageRef { file, frame },
+                at: Point::new(x, y),
+                clip: Rect::new(x, y, cw as u16, ch as u16),
+            }));
+            x += w;
         }
-    }
-
-    fn label(&self, e: Entry) -> String {
-        match e {
-            Entry::Options => "Options".into(),
-            Entry::SaveAndExit => "Save and Exit Game".into(),
-            Entry::Return => "Return to Game".into(),
-            Entry::Resolution => {
-                let (w, h) = self.settings.window_size();
-                format!("Resolution: {w}x{h}")
-            }
-            Entry::WindowMode => format!("Window Mode: {}", self.settings.window_mode.name()),
-            Entry::Controls => "Controls: controls.toml".into(),
-            Entry::Previous => "Previous".into(),
-        }
+        y += h;
     }
 }
 
-fn box_left() -> i32 {
-    (FRAME_W - BOX_W) / 2
-}
-
-fn entry_rect(i: usize) -> Rect {
-    Rect::new(
-        box_left(),
-        ITEM_TOP + ITEM_H * i as i32,
-        BOX_W as u16,
-        ITEM_H as u16,
-    )
-}
-
-/// The entry under `p`.
-pub fn entry_at(state: &EscState, p: Point) -> Option<Entry> {
-    state
-        .entries()
-        .iter()
-        .enumerate()
-        .find(|(i, _)| entry_rect(*i).contains(p))
-        .map(|(_, e)| *e)
+fn text(out: &mut dyn UiDrawSink, s: &str, at: Point, color: u16, centered_in: Option<i32>) {
+    out.push(UiDraw::Text(TextRequest {
+        text: utf16(s),
+        at,
+        style: TextStyle { font: FONT, color },
+        opts: TextOpts::Draw {
+            centered: centered_in.is_some(),
+            block_w: centered_in,
+            mode: 5,
+        },
+        clip: FRAME,
+    }));
 }
 
 /// The adapter (installed last: top-most, so it takes every click).
@@ -153,43 +116,54 @@ impl Panel for EscMenuUi {
 
     fn draw(&self, _ctx: &UiCtx, out: &mut dyn UiDrawSink) {
         let sh = self.sh.borrow();
-        if let Some(file) = sh.tables.files.id(FILL_FILE) {
-            let (w, h) = (FILL_W as i32, FILL_H as i32);
-            let mut y = BOX_TOP;
-            while y < BOX_TOP + BOX_H {
-                let mut x = box_left();
-                while x < box_left() + BOX_W {
-                    let cw = (box_left() + BOX_W - x).min(w);
-                    let ch = (BOX_TOP + BOX_H - y).min(h);
-                    out.push(UiDraw::Image(ImageRequest {
-                        image: ImageRef { file, frame: DARK },
-                        at: Point::new(x, y),
-                        clip: Rect::new(x, y, cw as u16, ch as u16),
-                    }));
-                    x += w;
-                }
-                y += h;
-            }
-        }
-        for (i, entry) in sh.esc.entries().iter().enumerate() {
-            let r = entry_rect(i);
-            let label = sh.esc.label(*entry);
-            let color = if entry_at(&sh.esc, sh.mouse) == Some(*entry) {
-                COLOR_HOVER
+        let m = &sh.esc.menu;
+        let file = sh.tables.files.id(FILL_FILE);
+        for (i, def) in m.rows().iter().enumerate() {
+            let yb = m.baseline(i);
+            let color = if !m.enabled(i) && def.kind != Kind::Title {
+                COLOR_DISABLED
+            } else if i == m.selected {
+                COLOR_SELECTED
             } else {
                 COLOR_REST
             };
-            out.push(UiDraw::Text(TextRequest {
-                text: utf16(&label),
-                at: Point::new(r.x, r.y + 30),
-                style: TextStyle { font: FONT, color },
-                opts: TextOpts::Draw {
-                    centered: true,
-                    block_w: Some(BOX_W),
-                    mode: 5,
-                },
-                clip: FRAME,
-            }));
+            match def.kind {
+                Kind::Title | Kind::Action => {
+                    text(
+                        out,
+                        def.label,
+                        Point::new(0, yb - 12),
+                        color,
+                        Some(super::options_menu::W),
+                    );
+                }
+                Kind::Choice(_) => {
+                    text(out, def.label, Point::new(LABEL_X, yb - 12), color, None);
+                    let v = def.values[m.value(i) as usize];
+                    let x = HALF + 230 - VALUE_BLOCK;
+                    text(out, v, Point::new(x, yb - 12), color, Some(VALUE_BLOCK));
+                }
+                Kind::Slider { .. } => {
+                    text(out, def.label, Point::new(LABEL_X, yb - 12), color, None);
+                    if let Some(file) = file {
+                        let y = m.slider_y(i);
+                        // Track from h − 60 to h + 230, skull at h − 60 + t.
+                        push_fill(out, file, WHITE, Rect::new(HALF - 60, y - 14, 290, 2));
+                        push_fill(
+                            out,
+                            file,
+                            GOLD,
+                            Rect::new(HALF - 60 + m.slider_t(i), y - 20, 12, 14),
+                        );
+                    }
+                }
+            }
+        }
+        if let Some(file) = file {
+            // Pentagram stand-ins (no pentspin art here), both sides.
+            let y = m.pentagram_y();
+            push_fill(out, file, GOLD, Rect::new(HALF - 301, y - 6, 12, 12));
+            push_fill(out, file, GOLD, Rect::new(HALF + 249, y - 6, 12, 12));
         }
     }
 
@@ -199,45 +173,47 @@ impl Panel for EscMenuUi {
 
     fn event(&mut self, e: UiEvent, _ctx: &UiCtx) -> UiResponse {
         let mut sh = self.sh.borrow_mut();
-        // Release on an entry chooses it; everything else is swallowed.
-        if let Some((false, at)) = left(e) {
-            match entry_at(&sh.esc, at) {
-                Some(Entry::Options) => {
-                    sh.outputs.push(PanelOutput::ClickSound);
-                    sh.esc.view = View::Options;
+        let m = &mut sh.esc.menu;
+        let mut consumed = false;
+        match e {
+            UiEvent::CursorMoved(p) => m.moved(p),
+            UiEvent::Char(c) => {
+                consumed = true;
+                match c {
+                    CHAR_ENTER => m.key_enter(),
+                    CHAR_LEFT => m.key_left(),
+                    CHAR_UP => m.key_up(),
+                    CHAR_RIGHT => m.key_right(),
+                    CHAR_DOWN => m.key_down(),
+                    _ => consumed = false,
                 }
-                Some(Entry::Previous) => {
-                    sh.outputs.push(PanelOutput::ClickSound);
-                    sh.esc.view = View::Main;
+            }
+            _ => {
+                if let Some((down, at)) = left(e) {
+                    if down {
+                        m.press(at);
+                    } else {
+                        m.release(at);
+                    }
                 }
-                Some(Entry::Resolution) => {
-                    sh.outputs.push(PanelOutput::ClickSound);
-                    sh.esc.settings.resolution ^= 1;
-                    sh.esc.settings_changed = true;
-                }
-                Some(Entry::WindowMode) => {
-                    sh.outputs.push(PanelOutput::ClickSound);
-                    sh.esc.settings.window_mode = sh.esc.settings.window_mode.next();
-                    sh.esc.settings_changed = true;
-                }
-                Some(Entry::Controls) => {}
-                Some(Entry::SaveAndExit) => {
-                    sh.outputs.push(PanelOutput::ClickSound);
-                    sh.esc.exit_requested = true;
-                }
-                Some(Entry::Return) => {
-                    sh.outputs.push(PanelOutput::ClickSound);
-                    sh.outputs.push(PanelOutput::SetUi {
-                        ui: 9,
-                        mode: 1,
-                        jump: false,
-                    });
-                }
-                None => {}
+            }
+        }
+        for ev in m.take_events() {
+            match ev {
+                MenuEvent::CursorPass => {}
+                MenuEvent::CursorSelect => sh.outputs.push(PanelOutput::ClickSound),
+                MenuEvent::SaveAndExit => sh.esc.exit_requested = true,
+                MenuEvent::Close => sh.outputs.push(PanelOutput::SetUi {
+                    ui: 9,
+                    mode: 1,
+                    jump: false,
+                }),
+                MenuEvent::ConfigureControls => sh.esc.controls_requested = true,
             }
         }
         match e {
             UiEvent::Press { .. } | UiEvent::Release { .. } => UiResponse::Consumed,
+            _ if consumed => UiResponse::Consumed,
             _ => UiResponse::Ignored,
         }
     }

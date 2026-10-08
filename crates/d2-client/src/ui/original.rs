@@ -620,15 +620,20 @@ impl OriginalUi {
         std::mem::take(&mut self.shared.borrow_mut().esc.exit_requested)
     }
 
+    /// Whether Configure Controls was chosen since the last call.
+    pub fn take_controls_request(&mut self) -> bool {
+        std::mem::take(&mut self.shared.borrow_mut().esc.controls_requested)
+    }
+
     /// The settings the Esc menu's Options page shows (`app::config`).
     pub fn set_settings(&mut self, s: crate::app::config::Settings) {
-        self.shared.borrow_mut().esc.settings = s;
+        self.shared.borrow_mut().esc.menu.set_settings(s);
     }
 
     /// The settings after a change on the Options page, once per change.
     pub fn take_settings_change(&mut self) -> Option<crate::app::config::Settings> {
         let mut sh = self.shared.borrow_mut();
-        std::mem::take(&mut sh.esc.settings_changed).then_some(sh.esc.settings)
+        sh.esc.menu.take_changed()
     }
 
     /// `SetUIState(ui, mode, jump)` with the model's gate facts; effects
@@ -641,7 +646,7 @@ impl OriginalUi {
             .set(ui, mode, jump, &mut env, &mut self.outcome.effects);
         // The Esc menu always reopens on its first page.
         if ui == u32::from(esc_menu::ESC_PANEL.0) {
-            sh.esc.view = esc_menu::View::Main;
+            sh.esc.menu.open();
         }
         r
     }
@@ -1212,6 +1217,8 @@ pub mod game_messages;
 pub mod gold_dialog;
 #[path = "hud.rs"]
 pub mod hud;
+#[path = "options_menu.rs"]
+pub mod options_menu;
 
 #[path = "hud_belt.rs"]
 pub mod hud_belt;

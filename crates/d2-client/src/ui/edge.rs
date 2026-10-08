@@ -197,6 +197,11 @@ pub fn key_chars(pressed: &[KeyCode]) -> Vec<UiEvent> {
             C::Backspace => Some(8),
             C::Enter | C::NumpadEnter => Some(0x0D),
             C::Escape => Some(0x1B),
+            // The Esc menu's arrows (private-use units, d2rs-own).
+            C::ArrowLeft => Some(0xF025),
+            C::ArrowUp => Some(0xF026),
+            C::ArrowRight => Some(0xF027),
+            C::ArrowDown => Some(0xF028),
             c => DIGITS.iter().find(|(d, _)| d == c).map(|&(_, u)| u),
         })
         .map(UiEvent::Char)
