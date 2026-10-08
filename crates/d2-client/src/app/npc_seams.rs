@@ -10,6 +10,9 @@
 //! integer Euclidean distance in sub-tiles. REC-106 in `docs/HANDOFF.md`
 //! §7 (the NPC rest answers).
 
+use d2_sim::path::coords::Point;
+use d2_sim::path::tables::PathTables;
+use d2_sim::path::walk::geom::unit_distance;
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
@@ -38,20 +41,34 @@ pub struct Snap {
     pub units: BTreeMap<UnitId, SnapUnit>,
 }
 
+/// Unit size used by [`Snap::distance`] (d2rs-own, unverified).
+const UNIT_SIZE: i32 = 2;
+
 /// The snapshot shared by the sim's seams (writer) and the host rest
 /// (reader).
 pub type SnapRef = Arc<Mutex<Snap>>;
 
 impl Snap {
-    /// Integer Euclidean distance in sub-tiles; `i32::MAX` when either
-    /// unit is unknown.
+    /// Unit distance `0x00641530` (`pathing.md` §9.5) in sub-tiles, the
+    /// distance the walk's arrival check and `npc.md` §2 read;
+    /// `i32::MAX` when either unit is unknown. d2rs-own, unverified:
+    /// every unit has size 2 (the player's, and Akara's monstats2
+    /// `SizeX`).
     pub fn distance(&self, a: UnitId, b: UnitId) -> i32 {
         let (Some(a), Some(b)) = (self.units.get(&a), self.units.get(&b)) else {
             return i32::MAX;
         };
-        let dx = i64::from(a.pos.0 - b.pos.0);
-        let dy = i64::from(a.pos.1 - b.pos.1);
-        ((dx * dx + dy * dy) as f64).sqrt() as i32
+        static TABLES: std::sync::OnceLock<Option<PathTables>> = std::sync::OnceLock::new();
+        match TABLES.get_or_init(|| PathTables::spec().ok()) {
+            Some(t) => unit_distance(
+                t,
+                Point::new(a.pos.0, a.pos.1),
+                UNIT_SIZE,
+                Point::new(b.pos.0, b.pos.1),
+                UNIT_SIZE,
+            ),
+            None => i32::MAX,
+        }
     }
 
     /// 0 when both axes are within [`AXIS_LIMIT`], else 1.

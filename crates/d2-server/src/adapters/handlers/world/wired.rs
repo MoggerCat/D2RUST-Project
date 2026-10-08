@@ -854,6 +854,7 @@ where
     where
         D: d2_sim::tick::EventDispatch + d2_sim::tick::TickHooks,
     {
+        self.arrivals(game, events);
         self.lend_quests(events, |_, ev| d2_sim::tick::tick(game, ev));
     }
 

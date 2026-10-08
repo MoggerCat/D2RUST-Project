@@ -101,7 +101,15 @@ impl<'a, X: Pending> PathCtx<'a, X> {
             let r = self.v.units.get(target)?;
             (r.ty, r.guid)
         };
-        match request(&t, self, unit, None, 3, WalkTarget::Unit { ty, guid }, false) {
+        match request(
+            &t,
+            self,
+            unit,
+            None,
+            3,
+            WalkTarget::Unit { ty, guid },
+            false,
+        ) {
             Ok(o) => Some(o),
             Err(e) => {
                 self.walk_error(e);

@@ -6,8 +6,9 @@
 //! client sends no second 0x13.
 //!
 //! d2rs-own, unverified: the arrival is read from the player's mode
-//! leaving walk / run / town walk at the host's after-tick pass, not from
-//! the step result of `0x00580C20`; the queue is dropped by the player's
+//! leaving walk / run / town walk at the start of the next tick (after
+//! the host's seam refresh, so the distance is current), not from the
+//! step result of `0x00580C20`; the queue is dropped by the player's
 //! next walk request (`clear_queued_action`, `pathing.md` §1.2 step 4).
 
 use d2_sim::game::Game;
@@ -27,9 +28,8 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
     }
 
     /// The queued interactions whose run has ended run the 0x13 handling
-    /// again; then the approach requests of the last calls start their
-    /// run and queue the interaction.
-    pub(super) fn approaches<D: ActionEvents>(&mut self, game: &mut Game, events: &mut D)
+    /// again (start of a tick).
+    pub(super) fn arrivals<D: ActionEvents>(&mut self, game: &mut Game, events: &mut D)
     where
         Self: WorldHost<D>,
     {
@@ -44,14 +44,16 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
             }
             let mut msg = vec![0x13, 1, 0, 0, 0];
             msg.extend_from_slice(&guid.to_le_bytes());
-            let call = NpcRun {
-                player,
-                msg: &msg,
-            };
+            let call = NpcRun { player, msg: &msg };
             WorldHost::<D>::npc(self, game, events, call);
             // The arrival does not queue another approach.
             self.state.approaches.clear();
         }
+    }
+
+    /// The approach requests of the last calls start their run and queue
+    /// the interaction (end of a tick).
+    pub(super) fn approaches<D: ActionEvents>(&mut self, game: &mut Game, events: &mut D) {
         let asked = std::mem::take(&mut self.state.approaches);
         for (player, npc) in asked {
             let guid = self.desk(game, events, |desk, _, _| NpcWorld::guid(desk, npc));

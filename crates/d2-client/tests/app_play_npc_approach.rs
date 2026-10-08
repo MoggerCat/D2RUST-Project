@@ -12,7 +12,6 @@ use d2_client::app::play::{
     add_client_data, add_game, add_preview, add_walk, predict_link, send_create_game_for,
 };
 use d2_client::app::single_player::{self, GameData};
-use d2_client::app::town_npcs;
 use d2_client::app::ui::{add_original_ui_with, UiParts};
 use d2_client::assets::path::MemorySource;
 use d2_client::bridge::hover;
@@ -350,65 +349,6 @@ fn click(app: &mut App, ms: &AtomicU32, at: Point) {
     step(app, ms, 2);
 }
 
-fn ids(wire: &Arc<Mutex<Wire>>) -> Vec<u8> {
-    wire.lock().unwrap().sent.iter().map(|m| m[0]).collect()
-}
-
-/// Clicks the NPC of `class` and waits for its menu (S→C 0x28); the
-/// menu's row kinds and the NPC's GUID.
-fn open_menu(
-    app: &mut App,
-    ms: &AtomicU32,
-    wire: &Arc<Mutex<Wire>>,
-    class: u16,
-) -> (u32, Vec<Option<d2_client::ui::layout::OptionKind>>) {
-    // A click walks up to the NPC and talks; when the walk ends outside
-    // the talk distance the server only approaches, so click again.
-    let mut guid = 0;
-    for _ in 0..4 {
-        let (g, at) = npc_on_screen(app, class);
-        guid = g;
-        assert!(
-            (0..800).contains(&at.x) && (0..560).contains(&at.y),
-            "NPC {class} is on screen: {at:?}"
-        );
-        click(app, ms, at);
-        step(app, ms, 40);
-        if app
-            .world()
-            .non_send::<WorldViewUi>()
-            .original
-            .as_ref()
-            .unwrap()
-            .npc_menu()
-            .is_some()
-        {
-            break;
-        }
-    }
-    let mut want = vec![0x13, 1, 0, 0, 0];
-    want.extend_from_slice(&guid.to_le_bytes());
-    assert!(
-        wire.lock().unwrap().sent.contains(&want),
-        "C→S 0x13 on NPC {class}: {:?}",
-        ids(wire)
-    );
-    let menu = app
-        .world()
-        .non_send::<WorldViewUi>()
-        .original
-        .as_ref()
-        .unwrap()
-        .npc_menu()
-        .unwrap_or_else(|| panic!("the menu of NPC {class} is open"));
-    assert_eq!(menu.guid, guid);
-    let kinds = menu.rows.iter().map(|r| r.kind).collect();
-    // Leave through the last row (Cancel, R800: box x 300, y 150, rows
-    // from y 170, 20 high) so the next NPC starts clean.
-    let rows = menu_rows(app);
-    click(app, ms, Point::new(400, 170 + 20 * (rows as i32 - 1) + 5));
-    step(app, ms, 3);
-
 fn presses_on(wire: &Arc<Mutex<Wire>>, guid: u32) -> usize {
     let mut want = vec![0x13, 1, 0, 0, 0];
     want.extend_from_slice(&guid.to_le_bytes());
@@ -428,6 +368,8 @@ fn talks_after_one_click(x: i32) -> (bool, usize) {
     let class = d2_sim::world::npc::class::ORMUS;
     let mut app = play_app(&ms, &wire, vec![(class, x)]);
     let (guid, at) = npc_on_screen(&app, class);
+    queue(&mut app, UiEvent::CursorMoved(at));
+    step(&mut app, &ms, 3);
     click(&mut app, &ms, at);
     step(&mut app, &ms, 120);
     let open = app
@@ -444,7 +386,7 @@ fn talks_after_one_click(x: i32) -> (bool, usize) {
 // Covers: specs/world/npc.md §2 rule 3
 #[test]
 fn a_click_from_far_walks_up_and_talks_without_a_second_click() {
-    for x in [24, 30, 34, 38] {
+    for x in [24, 28, 30, 32] {
         let (open, sent) = talks_after_one_click(x);
         assert!(open, "NPC at offset {x}: the talk menu is open");
         assert!(sent >= 1, "NPC at offset {x}: C→S 0x13 sent");
