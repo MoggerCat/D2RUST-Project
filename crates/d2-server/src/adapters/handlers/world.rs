@@ -26,6 +26,7 @@
 //! and the cube on the same unit world).
 
 mod action;
+mod gap_items;
 mod hireling_drive;
 mod hireling_host;
 mod item_save;

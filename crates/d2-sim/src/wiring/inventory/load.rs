@@ -14,6 +14,7 @@
 //! placed at all is freed (rule 3).
 
 use super::{InvDesk, InvError, InvRest};
+use crate::items::bitstream::hflag;
 use crate::items::bitstream::read::ReadEntry;
 use crate::items::inventory::UnitKind;
 use crate::items::moves::{mode, InventoryOps, Owner};
@@ -29,6 +30,9 @@ pub enum LoadFault {
     NoInventory,
     /// Neither the saved place nor a free position took it; the unit is freed.
     NoRoom,
+    /// Rule 5: the item carries the runeword flag but matches no runeword
+    /// row any more; stored and cursor items are freed.
+    StaleRuneword,
 }
 
 impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
@@ -56,6 +60,25 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
                 let _ = self.insert_filler(unit, &child.item);
             }
         }
+        // Rule 5 (`0x00563470`, `d2s-load.md` §6): a runeword flag the
+        // sockets no longer back. Stored / cursor: the unit is freed. An
+        // equipped one is taken off and placed like a stored item (where
+        // the original leaves it is untraced, Open question 13;
+        // PROVISIONAL, REC-241).
+        let stale = self
+            .econ
+            .items
+            .get(unit)
+            .is_some_and(|i| i.flags & hflag::RUNEWORD != 0)
+            && !self.runeword_matches(unit);
+        let mut saved_mode = it.mode as u8;
+        if stale {
+            if saved_mode != mode::EQUIPPED {
+                self.free(unit);
+                return Err(LoadFault::StaleRuneword);
+            }
+            saved_mode = mode::STORED;
+        }
         let page = if it.page == 0xFF { 0 } else { it.page };
         if let Some(d) = self.state.items.get_mut(&unit) {
             d.x = it.x;
@@ -69,9 +92,10 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
             self.owner_of(owner).unwrap_or(Owner::player(0)),
             self.guid_of(unit),
         );
-        let at_saved_place = match it.mode as u8 {
+        let at_saved_place = match saved_mode {
             mode::EQUIPPED => self.equip_from_cursor(o, g, it.body_loc, true).0,
             mode::BELT => self.belt_place(o, g, it.x as u32),
+            _ if stale => false,
             _ => self.place(owner, unit, (it.x, it.y), false, true),
         };
         if at_saved_place || self.place(owner, unit, (0, 0), true, true) {
