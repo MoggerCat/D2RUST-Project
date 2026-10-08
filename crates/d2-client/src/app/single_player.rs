@@ -1329,6 +1329,14 @@ impl WaypointTables {
             row.initfn = init;
             row.framecnt1 = 20 << 8;
         }
+        // The Hellforge's animation: mode 1 ends in mode 2 (`objects-2.md`
+        // §18.6 needs `Mode2`), frame counts 22 (`quests-act4.md` §1.4).
+        // d2rs-own, unverified (q-a4-quest-items, REC-235).
+        let forge = &mut objects[synthetic_act4::HELLFORGE as usize];
+        forge.mode2 = 1;
+        forge.hascollision2 = 1;
+        forge.framecnt1 = 22 << 8;
+        forge.framecnt3 = 22 << 8;
         WaypointTables {
             levels,
             objects,
@@ -2305,7 +2313,7 @@ impl GameParts {
         action.levels = wp.levels.clone();
         Ok(GameParts {
             action,
-            stats: StatData::default(),
+            stats: super::synthetic_items::stat_data(),
             units: UnitData {
                 expansion: GAME_SETUP.expansion,
                 monsters: vec![
@@ -2334,14 +2342,17 @@ impl GameParts {
             },
             monstats: synthetic_monstats(),
             hire_rows: hire_rows.clone(),
-            items: ItemTables::default(),
+            items: super::synthetic_items::item_tables(),
             vendors: VendorTables::default(),
             anim: None,
             vitals: None,
             bodies: None,
-            drops: None,
+            // The Hellforge's code drops (q-a4-quest-items, REC-235).
+            drops: Some(Arc::new(super::synthetic_items::drop_tables())),
             hirelings: Some(super::merc_rows::synthetic_hireling_tables(&hire_rows)),
-            inventory: None,
+            inventory: Some(super::synthetic_items::inv_tables(
+                &super::synthetic_items::item_tables(),
+            )),
             cube: None,
         })
     }
@@ -2995,7 +3006,10 @@ fn loader(
                         .join_items
                         .insert(player, own);
                 }
-                let has_inventory = s.world.inventory.is_some();
+                // The synthetic game has an inventory model but no vitals
+                // tables: its start items are not made (q-a4-quest-items).
+                let has_inventory =
+                    s.world.inventory.is_some() && s.events.action.hooks().vitals.is_some();
                 let log = &mut s.events.action.hooks().x.log;
                 log.extend(
                     report

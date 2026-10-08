@@ -69,6 +69,9 @@ fn hold(r: &mut Rig, right: bool, facts: ItemFacts) -> UnitId {
             .action
             .with(&mut sim.game, |g, v| v.allocate(g, &req, 0, 0))
             .expect("an item unit");
+        // The weapon copy is set by hand; the synthetic game's inventory
+        // model would replace it at the next sync (q-a4-quest-items).
+        sim.world.inventory = None;
         let w = &mut sim.events.action.sys.hooks.x.weapons;
         let h = w.hands.entry(p).or_default();
         if right {

@@ -724,6 +724,29 @@ pub struct StartItems {
 }
 
 impl<R, S> WiredWorld<R, S> {
+    /// What the inventory model queued outside a vendor or quest call
+    /// (the quest objects' item removals, run on the loan): receiving
+    /// unit, bytes.
+    pub fn take_inventory_sent<D: ActionEvents>(
+        &mut self,
+        game: &mut Game,
+        events: &mut D,
+    ) -> Vec<(UnitId, Vec<u8>)> {
+        let Some(mut inv) = self.inventory.take() else {
+            return Vec::new();
+        };
+        let mut out = Vec::new();
+        self.with_economy(game, events, |econ, _| {
+            let mut d = inv.desk(econ);
+            out = inv_take_sent(&mut d)
+                .into_iter()
+                .filter_map(|(u, b)| Some((u?, b)))
+                .collect();
+        });
+        self.inventory = Some(inv);
+        out
+    }
+
     /// The start items `0x00534F10` (`items/generation.md` §10.3) of
     /// `player` on this host's economy and inventory model
     /// ([`character::start_items`] over [`WiredStart`]). The player's
@@ -747,6 +770,14 @@ impl<R, S> WiredWorld<R, S> {
                 r.faults.push(format!("no player unit {player:?}"));
                 return;
             };
+            // d2rs-own, unverified: the play host never adds the player's
+            // inventory (unit allocation `0x0063ABD0` has no caller there);
+            // the quest items (a reward, a delete) need it without start
+            // items (q-a4-quest-items, REC-235).
+            if !inv.state.inventories.contains_key(&player) {
+                inv.state
+                    .add_inventory(player, UnitKind::Player { class: class as u8 }, guid);
+            }
             let Some(vitals) = econ.hooks.vitals.clone() else {
                 r.faults
                     .push("no vitals tables (charstats) on the action wiring".into());
@@ -766,12 +797,6 @@ impl<R, S> WiredWorld<R, S> {
             }));
             let skills = econ.hooks.tables.skills.skills.len();
             let start_skill = Some(cs.startskill).filter(|&k| usize::from(k) < skills);
-            // d2rs-own, unverified: the play host never adds the player's
-            // inventory (unit allocation `0x0063ABD0` has no caller there).
-            if !inv.state.inventories.contains_key(&player) {
-                inv.state
-                    .add_inventory(player, UnitKind::Player { class: class as u8 }, guid);
-            }
             let mut w = WiredStart {
                 econ,
                 inv: &mut inv,

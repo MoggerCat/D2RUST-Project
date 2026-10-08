@@ -49,8 +49,8 @@ use d2_sim::units::{RoomId, UnitId, UnitType};
 use d2_sim::wiring::action::Pending;
 use d2_sim::wiring::action::{ActionHooks, ObjectCase};
 use d2_sim::wiring::economy::{
-    quest_objects, Economy, EconomyQuests, GameFields, HostQuests, QuestInv, QuestInventory,
-    QuestLoan, QuestRest,
+    quest_objects, Economy, EconomyQuests, GameFields, HostQuests, LoanedInventory, QuestInv,
+    QuestInventory, QuestLoan, QuestRest,
 };
 use d2_sim::wiring::interaction::{
     Desk, InteractionError, InteractionState, NpcInv, NpcInventory, NpcRest, PlayerQuestsRef,
@@ -396,6 +396,24 @@ fn flush_taken<X: Pending, R: TradeRest>(
         .collect()
 }
 
+/// The wired host's inventory model as a quest loan's ([`QuestLoan`]).
+impl LoanedInventory for InvParts {
+    fn lend<X: Pending, T>(
+        &mut self,
+        f: impl FnOnce(&mut dyn QuestInventory<ActionHooks<X>>) -> T,
+    ) -> T {
+        let mut q = QuestInv::new(&self.tables, &mut self.state, self.rest.as_mut());
+        let out = f(&mut q);
+        let errors = q.errors;
+        self.state.errors.extend(
+            errors
+                .into_iter()
+                .map(d2_sim::wiring::inventory::InvError::Economy),
+        );
+        out
+    }
+}
+
 /// A quest call on the desk's economy and rest ([`HostQuests`]: the
 /// [`EconomyQuests`] calls with the object, level, interaction and
 /// identify calls answered by the action wiring and the NPC rest, the
@@ -521,6 +539,10 @@ impl<R: TradeRest + Default + 'static, S> WiredWorld<R, S> {
             quests: std::mem::replace(&mut self.quests, empty),
             rest: std::mem::take(&mut self.rest),
             tables: std::mem::take(&mut self.tables),
+            // The inventory model goes with the loan: a quest object's
+            // operate reads and removes the player's items
+            // (q-a4-quest-items).
+            inv: self.inventory.take(),
         };
         events.action().sys.hooks.quest_host = Some(Box::new(loan));
         let out = f(&mut self.action, events);
@@ -530,13 +552,14 @@ impl<R: TradeRest + Default + 'static, S> WiredWorld<R, S> {
             .hooks
             .quest_host
             .take()
-            .map(|h| h.into_any().downcast::<QuestLoan<R>>());
+            .map(|h| h.into_any().downcast::<QuestLoan<R, InvParts>>());
         match back {
             Some(Ok(l)) => {
                 let l = *l;
                 self.quests = l.quests;
                 self.rest = l.rest;
                 self.tables = l.tables;
+                self.inventory = l.inv;
             }
             // `f` took the loan out of the hooks or put another one in:
             // the game's quest state is gone (API misuse, fatal).
@@ -874,6 +897,8 @@ where
         });
         let sent = self.desk(game, events, quest_objects);
         self.inv_sent.extend(sent);
+        let sent = self.take_inventory_sent(game, events);
+        self.inv_sent.extend(sent);
         out
     }
 
@@ -903,6 +928,8 @@ where
     {
         self.arrivals(game, events);
         self.lend_quests(events, |_, ev| d2_sim::tick::tick(game, ev));
+        let sent = self.take_inventory_sent(game, events);
+        self.inv_sent.extend(sent);
     }
 
     /// The quest routes queued outside a lent call (a quest call's own
@@ -1010,7 +1037,13 @@ where
             for (&u, it) in &inv.state.items {
                 places.push(super::super::items::moves::StagedPlace {
                     owner: d2_sim::items::moves::Owner::item(it.guid),
-                    pos: (it.x, it.y),
+                    // A drop made by the treasure walk keeps its spot in the
+                    // static path, not in the item data (q-a4-quest-items).
+                    pos: if (it.x, it.y) == (0, 0) {
+                        econ.hooks.path_position(u)
+                    } else {
+                        (it.x, it.y)
+                    },
                     room: econ.game.lists.unit(u).and_then(|e| e.room()),
                 });
             }
