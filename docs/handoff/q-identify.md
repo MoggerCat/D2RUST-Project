@@ -22,8 +22,8 @@ Tests (synthetic):
 
 ## PROVISIONAL points
 
-- **REC-109** (identify effect): see `docs/HANDOFF.md` §7.
-- **REC-110** (item tip text and the right-press identify cursor): see `docs/HANDOFF.md` §7.
+- **REC-110** (identify effect): see `docs/HANDOFF.md` §7.
+- **REC-111** (item tip text and the right-press identify cursor): see `docs/HANDOFF.md` §7.
 
 ## What is left
 

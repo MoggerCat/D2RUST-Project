@@ -9,7 +9,7 @@
 //!   the next left press on a grid item sends C→S 0x27 (target, used)
 //!   and ends the state. A right press while the state is set cancels it.
 //!
-//! d2rs-own, unverified (REC-110): the right press is not specified
+//! d2rs-own, unverified (REC-111): the right press is not specified
 //! (`0x00468830` is set by the use handler `0x005BF240`, unwritten), the
 //! state is client-local, and the belt is not hit-tested for the tip.
 

@@ -1,5 +1,5 @@
 //! 0x27 UseItemAction with an identify scroll (§7.18; provisional effect,
-//! REC-109).
+//! REC-110).
 
 use super::*;
 use crate::items::moves::iflag;

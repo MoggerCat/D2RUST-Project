@@ -8,7 +8,7 @@
 //! `inventory.md` §5 r1 is the cursor point here; the box is a preview
 //! box over the synthetic fill file.
 //!
-//! d2rs-own, unverified (REC-110): no spec gives the text of an item
+//! d2rs-own, unverified (REC-111): no spec gives the text of an item
 //! description (the builder behind `0x0048DD90` is unwritten), so
 //! - the name line is the base name (`namestr`) with the magic prefix and
 //!   suffix names around it, the rare / unique / set name above it, all

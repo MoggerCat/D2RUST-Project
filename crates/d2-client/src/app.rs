@@ -9,12 +9,14 @@
 //! single-player game ([`single_player`], on a server thread,
 //! [`server_thread`]) through the bridge and the world view.
 
+pub mod anim_names;
 pub mod automap;
 pub mod death;
 pub mod hire_stats;
 pub mod hud;
 pub mod items;
 pub mod monster_drop;
+pub mod npc_seams;
 pub mod palette;
 pub mod play;
 pub mod rest;
