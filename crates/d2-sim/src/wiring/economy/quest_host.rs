@@ -505,6 +505,11 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
         self.inner.free_spot(player, size, mask, radius, limit)
     }
     fn create_portal(&mut self, player: UnitId, x: i32, y: i32, class: u16, level: u32) -> bool {
+        if self.inner.econ.hooks.objects.is_some() {
+            return self
+                .view(|g, v| v.create_quest_portal(g, player, (x, y), u32::from(class), level))
+                .is_some();
+        }
         self.inner.create_portal(player, x, y, class, level)
     }
     fn object_by_guid(&self, guid: u32) -> Option<(UnitId, u16)> {

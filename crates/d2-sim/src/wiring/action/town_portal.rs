@@ -123,6 +123,33 @@ impl<X: Pending> View<'_, X> {
         Some((field, dest))
     }
 
+    /// `0x0056D130` for a quest portal (Tyrael's, `quests-act2.md` §8.11):
+    /// one portal object of `class` in mode 1 at the free spot nearest
+    /// (x, y) in `player`'s room, to `level`, owned by the player.
+    /// PROVISIONAL (REC-174): no partner object at the destination; the
+    /// spot rules are the town portal's. `// d2rs-own, unverified`.
+    pub fn create_quest_portal(
+        &mut self,
+        game: &mut Game,
+        player: UnitId,
+        (x, y): (i32, i32),
+        class: u32,
+        level: u32,
+    ) -> Option<UnitId> {
+        self.h.objects.as_ref()?;
+        let room = game.lists.unit(player)?.room()?;
+        let guid = game.lists.unit(player)?.guid;
+        let (froom, fx, fy) = self.portal_spot(room, x, y)?;
+        let portal = self.create_object(game, froom, class, fx, fy, 1)?;
+        let st = self.h.objects.as_mut()?;
+        if let Some(d) = st.control.data.get_mut(&portal) {
+            d.interact = u8::try_from(level).unwrap_or(u8::MAX);
+            d.owner = Some(guid as i32);
+        }
+        self.add_messages(game, player, portal);
+        Some(portal)
+    }
+
     /// `objects.md` §12 rule 12's removal of `object` and its partner:
     /// `0x00555600` on each, the links forgotten.
     pub fn remove_portal_pair(&mut self, game: &mut Game, object: UnitId, notify: Option<UnitId>) {
