@@ -9,8 +9,9 @@ Branch `claude/local-pc1-s8` from `origin/claude/specs-staging-7`
 |---|---|---|---|---|
 | REC-177 (3) | settled statically (`0x005616A0`–`0x00561AF9`): no requirement recheck or refusal; durability untouched; moves 4→11, 5→12, 11→4, 12→5 (all four leave first); mouse-skill swap sets trade; S→C 0x97, direct 0x23s, then next update 0x9D action 0x17 per item, 0x47, 0x48, two queued 0x23 | `items/inventory-moves.md` §7.25 (new owner), `sim/intents-events.md` §9 r14 + owner table + OQ16 answered, `items/inventory.md` §5.8 pointer | `swap_key.rs` matches (1-byte 0x60); `wiring/inventory/swap.rs` + `handlers/items/moves.rs` do not (gates bypassed at `adapters/sim.rs:485`, no 0x9D 0x17, no skill trade / 0x23, fail result 1 not 3) | `q-fix-weapon-switch` |
 | REC-188 | settled: 0x1D–0x1F base only; client sums item lists itself; 0xFE/0xFD pseudo states d2rs-own; set lists are parked state 165+i children, the client runs the set update `0x00663CC0` at 8 sites; no 0xA8 from set lists | `client/stat-lists.md` §2 r1.1, r5, r6, OQ2 answered, new OQ8; `items/bitstream.md` §4.6 r6 | `vitals_sync.rs:172-260` d2rs-own transport (q-item-bonus-wire removes it); `item_bits` decode fine | `q-fix-client-set-lists` |
+| REC-232, REC-233, REC-173 (bin part), REC-176 (2 parts) | Whirlwind strikes on the way (`0x00580460` falls through unless step returns 2; restart at frame 3, seq 10 events 3/7; 0–2 strikes per do, radius 5 round robin); Leap landing = knockback only; Talon complete; dual claws: seq 16 `ht2` events 6/10, even → right, odd → left, only that hand's stats (`0x00535BC0`, `0x00535D10`/`0x00535E20`); Lightning Sentry 10 shots, no lifetime; Leap pattern = path +0x48; Smite shield = first usable shld at loc 4 then 5; item-type test `0x00643F80` | `skills/use.md` §2, §5.2, OQ12–13; `skills/bodies-2.md` §2.13, §2.25, §2.27 new, §3.4, §4.7; `skills/bodies.md` §8.3, §8.10 | Leap pattern matches (drop note at `skill_rooms.rs:67`); others do not | `q-fix-moving-skill-do`, `q-fix-item-type-test`, `q-fix-smite-shield`, `q-fix-dual-weapon-damage`, `q-fix-sentry-ai` |
 
-Follow-ups for a later worker (other owners): `client/msg-stats-items.md` §5 r4 (0x7D) and the 0x92 rule have the (1,1)/(0,0) labels swapped ((1,1) = removed / owner set list freed); `items/properties.md` §13 caller list should name the 7 other client sites (stat-lists §2 r5); `items/inventory.md` OQ1 and `client/msg-stats-items.md` OQ3 can point to stat-lists §2 r1.1.
+Follow-ups for a later worker (other owners): `client/msg-stats-items.md` §5 r4 (0x7D) and the 0x92 rule have the (1,1)/(0,0) labels swapped ((1,1) = removed / owner set list freed); `items/properties.md` §13 caller list should name the 7 other client sites (stat-lists §2 r5); `items/inventory.md` OQ1 and `client/msg-stats-items.md` OQ3 can point to stat-lists §2 r1.1. `combat/damage.md` §3.1 step 1 should link `skills/bodies-2.md` §2.27; `client/stat-lists.md` §2 r8 should link the `skills/use.md` §2 item type test.
 
 ## Lane C — recordings PC 2 needs (to move into HANDOFF §7)
 
@@ -30,3 +31,12 @@ Follow-ups for a later worker (other owners): `client/msg-stats-items.md` §5 r4
   0x9C/0x9D streams (set mask, lists), confirm no 0xA8 for states 165–170
   and base-only 0x1D–0x1F; compare panel totals with base + item lists +
   client-computed set bonuses.
+- **R-WW-1** [MANUAL] Settles: REC-173, REC-232 (tick timing). Whirlwind
+  with one and with two weapons, and one Leap: per tick the unit position,
+  0x4C/0x4D, type-0 timer args, E param 4, hit ticks.
+- **R-CLAW-1** [MANUAL] Settles: REC-233. Fists of Fire or Dragon Claw with
+  two claws vs one claw on one monster: type-0 events per attack, unit flag
+  0x40, damage per hit with different claws.
+- **R-SENTRY-1** [MANUAL] Settles: REC-233 / REC-176 sentry part. One
+  Lightning Sentry laid near a monster: shots fired (expect 10), think
+  ticks, death tick.
