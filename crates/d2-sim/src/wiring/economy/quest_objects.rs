@@ -424,7 +424,6 @@ mod tests {
         }
     }
 
-    // Covers: specs/world/quests-act5.md §1.4
     #[test]
     fn act_v_functions_are_stated() {
         for n in [
