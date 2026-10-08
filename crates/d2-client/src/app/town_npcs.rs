@@ -8,16 +8,18 @@
 
 use d2_sim::world::npc::class;
 
-/// Act I: Akara and Kashya (the default synthetic town; Warriv is a
-/// class only), plus Gheed (gambles) and Charsi (repairs) east of Akara
-/// (d2rs-own, unverified, REC-177: the real positions come from the
-/// town presets). Act II's Elzix and Act IV's Jamella are in
+/// Act I: Akara and Kashya (the default synthetic town), plus Gheed
+/// (gambles) and Charsi (repairs) east of Akara (d2rs-own, unverified,
+/// REC-177: the real positions come from the town presets), and Warriv,
+/// whose travel row is the way to Act II (`npc.md` §8.3; d2rs-own,
+/// unverified, REC-280: his place). Act II's Elzix and Act IV's Jamella are in
 /// `single_player::ACT2_NPCS` and `synthetic_act4::NPCS`.
-pub const ACT1: [(u16, i32); 4] = [
+pub const ACT1: [(u16, i32); 5] = [
     (class::AKARA, super::single_player::AKARA_X),
     (class::KASHYA, super::single_player::KASHYA_X),
     (class::GHEED, 36),
     (class::CHARSI, 8),
+    (class::WARRIV1, 3),
 ];
 
 /// Natalya's `monstats` row (`npc-menus.tsv` record 20, Talk only).
@@ -34,6 +36,17 @@ pub const ACT3: [(u16, i32); 7] = [
     (class::MESHIF2, 74),
     (class::CAIN4, 84),
 ];
+
+/// The Act III NPCs in the synthetic Kurast Docks room (d2rs-own,
+/// unverified, REC-278: the real positions come from the town presets):
+/// the [`ACT3`] classes in a row (x 3, 7, … at y 12, as Lut Gholein's),
+/// inside the 40 × 40 sub-tile room; [`ACT3`]'s own offsets place them
+/// beside the Act I start for the single-NPC rigs.
+pub fn act3_docks() -> impl Iterator<Item = (u16, (i32, i32))> {
+    ACT3.into_iter()
+        .enumerate()
+        .map(|(i, (class, _))| (class, (3 + 4 * i as i32, 12)))
+}
 
 /// Act V (Harrogath, REC-144; its own room, q-a5-town): Larzuk, Anya,
 /// Malah, Nihlathak, Qual-Kehk and Cain.

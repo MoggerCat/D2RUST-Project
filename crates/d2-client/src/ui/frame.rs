@@ -57,6 +57,16 @@ impl Presentation {
         })
     }
 
+    /// The window pixel (physical) at the top-left of a frame pixel: the
+    /// inverse of [`Self::to_frame`] (`to_frame(from_frame(p)) == p`).
+    pub fn from_frame(&self, fx: i32, fy: i32) -> (i64, i64) {
+        let s = i64::from(self.scale);
+        (
+            i64::from(self.left) + i64::from(fx) * s,
+            i64::from(self.top) + i64::from(fy) * s,
+        )
+    }
+
     /// Maps a window pixel (physical, top-left origin) to the frame.
     pub fn to_frame(&self, x: i64, y: i64) -> FramePos {
         let s = i64::from(self.scale);

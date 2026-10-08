@@ -128,9 +128,8 @@ pub fn check(
     let visible = if x == cx || y == cy {
         true
     } else {
-        // §13 r6: no render state (headless), no predicate.
         let pred = inputs.visible.as_ref().ok_or(HandlerError::Unspecified(
-            "model.md §13 r6: no visibility predicate (no render state)",
+            "model.md open question 7: the visibility predicate 0x004DBF20",
         ))?;
         let (a, b) = client_point(unit);
         let p = static_to_client(xi, yi);

@@ -31,13 +31,14 @@ use crate::bridge::ClientUnit;
 use crate::composite::{ComponentFrame, ComponentRequest, CompositeError, UnitParams};
 use crate::frames::IndexFrame;
 use crate::rules::camera::shake_offsets;
+use crate::rules::draw_order::sky::SkyPasses;
 use crate::rules::draw_order::source::{ordered_source, TileArt, WeatherFrame};
 use crate::rules::draw_order::{FadeClock, NearRooms, OrderedTile, UnitFacts};
 use crate::rules::lighting::view::{FrameLight, LitRules, LookFeed};
 use crate::rules::{
     Camera, FrameSize, MapTile, OpenMode, OriginalView, Shake, UnitPosition, ViewSource,
 };
-use crate::scene::{BlendOp, ShadeChain};
+use crate::scene::{BlendOp, DrawItem, ShadeChain};
 use crate::ui::{ImageRequest, TextRequest, UiDraw};
 
 use super::WorldFrame;
@@ -78,6 +79,11 @@ pub trait ViewFeed: ViewSource {
     /// before each build. The default ignores it (strict path: the model's
     /// cell).
     fn set_local_prediction(&mut self, _at: Option<(UnitKey, (u32, u32))>) {}
+
+    /// The play preview's skill-move draw offsets `(dx, dy)` per unit
+    /// (`world_view::skill_motion`, Leap's arc; d2rs-own, unverified),
+    /// handed over before each build. The default ignores them.
+    fn set_motion_offsets(&mut self, _offsets: std::collections::BTreeMap<UnitKey, (i32, i32)>) {}
 
     /// The unit under the cursor, handed over before each build by the
     /// play preview (`bridge::hover::pick`; d2rs-own, unverified): drawn
@@ -157,6 +163,24 @@ pub trait ViewFeed: ViewSource {
         _world: &ClientWorld,
     ) -> Result<Option<WeatherFrame<'_>>, ViewError> {
         Ok(None)
+    }
+
+    /// The draw items of the frame's passes 4 and 9 (`draw-order-2.md`
+    /// §11.6, §11.7), keyed at their passes. The default draws none and
+    /// refuses a frame that has draws (M07: nothing is dropped).
+    fn sky_items(&self, sky: &SkyPasses, _assets: &ViewAssets) -> Result<Vec<DrawItem>, ViewError> {
+        if sky.is_empty() {
+            return Ok(Vec::new());
+        }
+        Err(ViewError::Unresolved {
+            what: "weather draws",
+            spec: "render/draw-order-2.md",
+            message: format!(
+                "{} pool cel(s) and {} sky draw(s) and the feed has no art for them",
+                sky.pools.len(),
+                sky.sky.len()
+            ),
+        })
     }
 
     /// The fade clock of the frame (`draw-order.md` §8 clock arithmetic):
@@ -395,9 +419,26 @@ where
     R: ViewRules + UiRules + ?Sized,
     F: ViewFeed + ?Sized,
 {
-    let cm = camera_and_mode(world, feed)?;
-    let at = cm.map(|c| c.0);
-    let mut frame = (match cm {
+    let placed = camera_and_mode(world, feed)?;
+    let mut frame = build_placed(world, ui, rules, feed, assets, placed)?;
+    frame.camera = placed.map(|(camera, _)| camera);
+    Ok(frame)
+}
+
+/// [`build_frame`] with the frame's camera and open mode.
+fn build_placed<R, F>(
+    world: &ClientWorld,
+    ui: &[UiDraw],
+    rules: &R,
+    feed: &mut F,
+    assets: &ViewAssets,
+    placed: Option<(Camera, OpenMode)>,
+) -> Result<WorldFrame, ViewError>
+where
+    R: ViewRules + UiRules + ?Sized,
+    F: ViewFeed + ?Sized,
+{
+    match placed {
         Some((camera, mode)) if mode.get() == NO_WORLD_MODE => build(
             world,
             ui,
@@ -407,7 +448,18 @@ where
             assets,
         ),
         Some((camera, mode)) => match ordered_source(world, &camera, mode, feed, assets)? {
-            Some(source) => build_lit(world, ui, rules, camera, &source, source.source, assets),
+            Some(source) => {
+                let mut frame =
+                    build_lit(world, ui, rules, camera, &source, source.source, assets)?;
+                // Passes 4 and 9 (`draw-order-2.md` §11.6, §11.7) join the
+                // sorted list by their keys.
+                let sky = source.source.sky_items(&source.sky, assets)?;
+                if !sky.is_empty() {
+                    frame.items.extend(sky);
+                    crate::scene::order(&mut frame.items);
+                }
+                Ok(frame)
+            }
             None => build_lit(world, ui, rules, camera, &*feed, &*feed, assets),
         },
         None => build(
@@ -419,10 +471,7 @@ where
             },
             assets,
         ),
-    })?;
-    // `client/model.md` §13: the visibility predicate reads it.
-    frame.camera = at;
-    Ok(frame)
+    }
 }
 
 /// [`build`] through [`OriginalView`], with unit `shade` / `blend` from

@@ -115,6 +115,8 @@ pub struct WorldViewState {
     pub missiles: super::missiles::Missiles,
     /// The object mouse-over label (`super::object_label`).
     pub object_labels: super::object_label::ObjectLabels,
+    /// The last drawn frame's camera (`super::visibility`).
+    pub camera: super::visibility::SharedCamera,
 }
 
 impl WorldViewState {
@@ -142,6 +144,7 @@ impl WorldViewState {
             corpse_clicks: Default::default(),
             missiles: Default::default(),
             object_labels: Default::default(),
+            camera: Default::default(),
         }
     }
 }
@@ -591,6 +594,7 @@ fn world_view_frame(
     mut sounds: Option<ResMut<UiSounds>>,
     mut walk: Option<ResMut<PreviewWalk>>,
     mut exit: MessageWriter<AppExit>,
+    mut windows: Query<&mut Window, With<PrimaryWindow>>,
 ) -> Result {
     let tick = bridge.0.world().server_ticks;
     if tick == 0 || state.last.is_some_and(|l| l.server_tick == tick) {
@@ -619,6 +623,14 @@ fn world_view_frame(
                 ui.original.as_mut(),
             )?;
             if let Some(original) = ui.original.as_mut() {
+                // The cursor jump of §4.3: warp the window cursor.
+                if let (Some(at), Ok(mut window)) =
+                    (original.take_cursor_warp(), windows.single_mut())
+                {
+                    if let Ok(pos) = edge::frame_to_window(&window, at) {
+                        window.set_physical_cursor_position(Some(pos.as_dvec2()));
+                    }
+                }
                 let outcome = original.take_outcome();
                 for e in &outcome.effects {
                     debug!("ui: {e:?}");
@@ -632,8 +644,9 @@ fn world_view_frame(
                     crate::app::save::request_save_and_exit(&mut exit);
                 }
                 // Configure Controls over the game (`ui::controls_host`).
+                let expansion = original.expansion_installed();
                 original.service_controls(
-                    false,
+                    expansion,
                     crate::ui::front_end::screens::controls::config_path(),
                 );
                 if let Some(b) = original.take_accepted_bindings() {
@@ -762,23 +775,6 @@ fn world_view_frame(
         state.feed.as_mut(),
         &state.assets,
     );
-    // `client/model.md` §13 r6: the visibility predicate from this frame
-    // (a frame the preview could not build: its camera, no unit drawn).
-    let visible = match &built {
-        Ok(f) => super::visibility::predicate(f.camera, &f.drawn, &state.assets),
-        Err(_) => super::visibility::predicate(
-            super::corpse_click::camera_for(
-                bridge.0.world(),
-                state
-                    .feed
-                    .open_mode(bridge.0.world())
-                    .map_or(0, |m| m.get()),
-            ),
-            &[],
-            &state.assets,
-        ),
-    };
-    bridge.0.set_visibility(visible);
     let mut frame = match built {
         Ok(f) => f,
         // d2rs-own, unverified (D1): the preview keeps running; the
@@ -793,6 +789,7 @@ fn world_view_frame(
         }
         Err(e) => return Err(e.into()),
     };
+    *state.camera.write().unwrap_or_else(|e| e.into_inner()) = frame.camera;
     for m in state.ground_items.add_to_frame(
         bridge.0.world(),
         state.feed.as_ref(),

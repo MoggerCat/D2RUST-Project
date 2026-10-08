@@ -49,8 +49,30 @@ pub fn facing(from: (u32, u32), to: (u32, u32)) -> Option<u8> {
         return None;
     }
     let tables = TABLES.get_or_init(|| PathTables::spec().ok()).as_ref()?;
-    Some(direction_vector(tables, from, to).1)
+    // d2rs-own, unverified: `0x0064FC60` takes the 32-bit `127 × l`, which
+    // wraps past about 258 sub-tiles and then indexes the `tan` table out
+    // of range; the original only aims at near path points, but the model
+    // can hold a position from before a level change. Far points are
+    // brought near by halving both deltas (the direction keeps its ratio).
+    let mut d = (
+        i64::from(to.0) - i64::from(from.0),
+        i64::from(to.1) - i64::from(from.1),
+    );
+    while d.0.abs().max(d.1.abs()) >= FACING_REACH {
+        d = (d.0 / 2, d.1 / 2);
+    }
+    let near = (
+        (i64::from(from.0) + d.0) as u32,
+        (i64::from(from.1) + d.1) as u32,
+    );
+    if near == from {
+        return None;
+    }
+    Some(direction_vector(tables, from, near).1)
 }
+
+/// The precise distance (16.16) below which `127 × l` stays in `i32`.
+const FACING_REACH: i64 = 1 << 23;
 
 /// The precise (16.16) centre of a sub-tile, as `u32`.
 pub fn cell_centre((x, y): (u16, u16)) -> (u32, u32) {
@@ -159,6 +181,8 @@ pub struct Predict {
     /// instead of running (`pathing.md` §9.9, `units.md` §4.5), so the
     /// prediction does too. d2rs-own, unverified (client prediction).
     exhausted: bool,
+    /// The local player's level at the last observation.
+    level: Option<u16>,
 }
 
 impl Predict {
@@ -170,8 +194,10 @@ impl Predict {
     /// position; a change of the model's position (0x15, a check
     /// correction) or server point (0x0F and the other checked unit
     /// messages, `client/model.md` §6 r3) moves the prediction to it,
-    /// server point first. The walk target is kept. No local player, or
-    /// one with no position: no prediction.
+    /// server point first. The walk target is kept, unless the player's
+    /// level changed (a warp, portal or act change: the target is a point
+    /// of the old level). No local player, or one with no position: no
+    /// prediction.
     pub fn observe(&mut self, world: &ClientWorld) {
         let Some(p) = world.local().filter(|p| p.key.unit_type == PLAYER) else {
             *self = Self::default();
@@ -182,6 +208,11 @@ impl Predict {
             return;
         };
         let now = (pos, p.server_point);
+        let level = world.player_level();
+        if level != self.level {
+            self.level = level;
+            self.walk = None;
+        }
         if self.player != Some(p.key) {
             *self = Self {
                 player: Some(p.key),
@@ -190,6 +221,7 @@ impl Predict {
                 walk: None,
                 dir: None,
                 exhausted: false,
+                level: world.player_level(),
             };
             return;
         }
@@ -204,14 +236,6 @@ impl Predict {
             self.at = Some(centre(pos));
         }
         self.seen = Some(now);
-    }
-
-    /// The model's local position was set to `cell` by the prediction
-    /// itself (`Bridge::set_local_cell`): not a placement to snap to.
-    pub fn own_cell(&mut self, cell: (u16, u16)) {
-        if let Some((pos, _)) = self.seen.as_mut() {
-            *pos = cell;
-        }
     }
 
     /// A walk intent the client sent: the new target.
@@ -536,6 +560,35 @@ mod tests {
         assert_ne!(p.position(), Some((0x32_8000, 0x3C_8000)));
     }
 
+    /// A walk under way when the player changes level (a warp or portal
+    /// placement) ends: its target is a point of the old level, which may
+    /// lie hundreds of sub-tiles away in the new level's coordinates.
+    #[test]
+    fn a_level_change_ends_the_walk() {
+        use super::super::world::ActiveRoom;
+        use crate::bridge::drlg::DrlgRoomId;
+        let (mut w, key) = world_at(20, 20);
+        let room = |level: u16, id: u32, x0: i32| ActiveRoom {
+            x0,
+            y0: 0,
+            w: 40,
+            h: 40,
+            level,
+            room: DrlgRoomId(id),
+        };
+        w.active_rooms = Some(vec![room(3, 1, 0), room(1, 2, 1000)]);
+        w.room_units.place(key, Some(DrlgRoomId(1)));
+        let mut p = Predict::new();
+        p.frame(&w, [walk_point(30, 20, false)], true, SPEEDS);
+        assert!(p.walking().is_some());
+        // The placement in level 1, far east.
+        w.units.get_mut(&key).unwrap().position = Some((1010, 20));
+        w.room_units.place(key, Some(DrlgRoomId(2)));
+        p.frame(&w, [], true, SPEEDS);
+        assert!(p.walking().is_none());
+        assert_eq!(p.cell(), Some((1010, 20)));
+    }
+
     #[test]
     fn no_local_player_no_prediction() {
         let mut p = Predict::new();
@@ -584,6 +637,23 @@ mod tests {
         assert_eq!(facing(o, c(5, 5)), Some(0));
         assert_eq!(facing(o, c(3, 1)), Some(59));
         assert_eq!(facing(o, o), None);
+    }
+
+    // Covers: specs/sim/pathing.md §8.3
+    #[test]
+    fn facing_a_far_point_keeps_the_direction() {
+        // A position from before a level change: thousands of sub-tiles.
+        let c = |x: u16, y: u16| cell_centre((x, y));
+        assert_eq!(facing(c(100, 100), c(5100, 100)), Some(56));
+        assert_eq!(
+            facing(c(5100, 5100), c(100, 5100)),
+            facing(c(110, 100), c(100, 100))
+        );
+        assert_eq!(facing(c(100, 100), c(3100, 1100)), Some(59));
+        assert_eq!(
+            facing(c(9000, 9000), c(20, 20)),
+            facing(c(110, 110), c(100, 100))
+        );
     }
 
     // Covers: specs/sim/pathing.md §8.3, §8.4

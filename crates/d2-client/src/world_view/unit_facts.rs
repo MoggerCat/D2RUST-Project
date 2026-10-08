@@ -6,15 +6,23 @@
 //! `DrawUnder`) and the level gate of the sight test (`LOSDraw`).
 //!
 //! PROVISIONAL (REC-273): the unit flag bits no model rule writes (flat
-//! 0x100000, the dead bit 0x10000 of a missile) read 0, and the line test
-//! of the sight test needs the client DRLG's collision grid, which the
-//! feed does not hold: in a `LOSDraw` level `sight_hidden` stays `None`
-//! (the draw order then refuses the frame, as the spec's gate requires),
-//! elsewhere every unit passes (§15 r1).
+//! 0x100000, the dead bit 0x10000 of a missile) read 0. The sight test
+//! (§15) runs over the client DRLG's collision grids ([`ClientRooms`]);
+//! a unit it cannot place (no client DRLG, no local player or room, no
+//! grid cell, a class without a size row) leaves `sight_hidden` `None`,
+//! which the draw order refuses in a `LOSDraw` level. d2rs-own,
+//! unverified: the positions are the model's cells (no walk
+//! prediction), an unplaced unit is at (0, 0).
 
-use d2_data::tables::{decode_all, Leveldefs, Monstats, Monstats2, Objects, Record};
+use d2_data::tables::{decode_all, Leveldefs, Missiles, Monstats, Monstats2, Objects, Record};
+use d2_sim::drlg::{CollisionGrid, Drlg, TileRect};
+use d2_sim::path::CollisionRooms;
+use d2_sim::units::RoomId;
 
-use crate::bridge::world::{ClientUnit, ClientWorld, LevelRow, MONSTER, OBJECT};
+use crate::bridge::world::{
+    ClientUnit, ClientWorld, LevelRow, ITEM, MISSILE, MONSTER, OBJECT, PLAYER,
+};
+use crate::rules::draw_order::sight::{sight_hidden, SightUnit};
 use crate::rules::draw_order::UnitFacts;
 
 use super::ViewError;
@@ -41,6 +49,41 @@ pub struct UnitFactTables {
     pub draw_under: Vec<u8>,
     /// leveldefs `LOSDraw` by level id.
     pub los_draw: Vec<bool>,
+    /// monstats2 `SizeX` (signed) by `monstats` row.
+    pub monster_size: Vec<Option<i8>>,
+    /// objects `SizeX` by class.
+    pub object_size: Vec<i32>,
+    /// missiles `Size` by missile id.
+    pub missile_size: Vec<u8>,
+}
+
+/// The client act's active rooms as [`CollisionRooms`] (read only:
+/// `grid_mut` answers none; the sight test never writes).
+pub struct ClientRooms<'a>(pub &'a Drlg);
+
+impl CollisionRooms for ClientRooms<'_> {
+    fn subtile_rect(&self, room: RoomId) -> Option<TileRect> {
+        let r = self.0.drlg_room_of(room)?;
+        self.0.active_room(r).map(|a| a.subtiles)
+    }
+    fn adjacent_count(&self, room: RoomId) -> usize {
+        self.0
+            .drlg_room_of(room)
+            .and_then(|r| self.0.active_room(r))
+            .map_or(0, |a| a.adjacency.len())
+    }
+    fn adjacent(&self, room: RoomId, i: usize) -> Option<RoomId> {
+        let r = self.0.drlg_room_of(room)?;
+        let n = *self.0.active_room(r)?.adjacency.get(i)?;
+        self.0.active_room(n).map(|a| a.id)
+    }
+    fn grid(&self, room: RoomId) -> Option<&CollisionGrid> {
+        let r = self.0.drlg_room_of(room)?;
+        self.0.active_room(r).map(|a| &a.collision)
+    }
+    fn grid_mut(&mut self, _room: RoomId) -> Option<&mut CollisionGrid> {
+        None
+    }
 }
 
 impl UnitFactTables {
@@ -50,6 +93,7 @@ impl UnitFactTables {
         monstats2: &[Monstats2],
         objects: &[Objects],
         defs: &[Leveldefs],
+        missiles: &[Missiles],
     ) -> Self {
         Self {
             unflat_dead: monstats
@@ -62,6 +106,16 @@ impl UnitFactTables {
                 .collect(),
             draw_under: objects.iter().map(|o| o.drawunder).collect(),
             los_draw: defs.iter().map(|d| d.losdraw != 0).collect(),
+            monster_size: monstats
+                .iter()
+                .map(|m| {
+                    monstats2
+                        .get(usize::from(m.monstatsex))
+                        .map(|r| r.sizex as i8)
+                })
+                .collect(),
+            object_size: objects.iter().map(|o| o.sizex as i32).collect(),
+            missile_size: missiles.iter().map(|m| m.size).collect(),
         }
     }
 }
@@ -80,6 +134,7 @@ pub fn load(archives: &dyn d2_data::bin::TableFiles) -> Result<UnitFactTables, S
         &all::<Monstats2>(&set, "monstats2")?,
         &all::<Objects>(&set, "objects")?,
         &all::<Leveldefs>(&set, "leveldefs")?,
+        &all::<Missiles>(&set, "missiles")?,
     ))
 }
 
@@ -145,15 +200,56 @@ pub fn fill_model(
     Ok(())
 }
 
-/// The sight test's answer (`draw-order-2.md` §15 r1): `Some(false)` when
-/// the local player's level has `LOSDraw` 0, else `None` (the line test
-/// needs the collision grid; PROVISIONAL REC-273).
-pub fn sight_gate(world: &ClientWorld, t: &UnitFactTables) -> Option<bool> {
-    let level = world.player_level()?;
-    match t.los_draw.get(usize::from(level)) {
-        Some(false) | None => Some(false),
-        Some(true) => None,
+/// The size of `unit` for the sight line (`path-placement.md` §3).
+fn sight_size(unit: &ClientUnit, t: &UnitFactTables) -> Option<i32> {
+    let class = unit.class as usize;
+    match unit.key.unit_type {
+        PLAYER => Some(2),
+        MONSTER => t.monster_size.get(class).copied().flatten().map(i32::from),
+        OBJECT => t.object_size.get(class).copied(),
+        MISSILE => t.missile_size.get(class).map(|&s| i32::from(s)),
+        ITEM => Some(1),
+        _ => Some(0),
     }
+}
+
+/// §15 over any collision rooms: whether `unit` is hidden from `local`
+/// (`local_room` its room); `None` when the test cannot be answered.
+pub fn sight_with<R: CollisionRooms + ?Sized>(
+    rooms: &R,
+    los_draw: bool,
+    local_room: Option<RoomId>,
+    local: &ClientUnit,
+    unit: &ClientUnit,
+    t: &UnitFactTables,
+) -> Option<bool> {
+    let end = |u: &ClientUnit, room| {
+        let (x, y) = u.cell();
+        Some(SightUnit {
+            room,
+            x: i32::from(x),
+            y: i32::from(y),
+            size: sight_size(u, t)?,
+        })
+    };
+    let a = end(local, local_room)?;
+    let b = end(unit, None)?;
+    sight_hidden(los_draw, &a, &b, rooms).ok()
+}
+
+/// The sight test's answer (`draw-order-2.md` §15) for `unit` in the
+/// local player's level: `Some(false)` when its `LOSDraw` is 0, else the
+/// line test over the client DRLG ([`sight_with`]); `None` when it cannot
+/// be run (see the module doc).
+pub fn sight_gate(world: &ClientWorld, unit: &ClientUnit, t: &UnitFactTables) -> Option<bool> {
+    let level = world.player_level()?;
+    if !t.los_draw.get(usize::from(level)).copied().unwrap_or(false) {
+        return Some(false);
+    }
+    let drlg = &world.drlg.as_ref()?.drlg;
+    let local = world.units.get(&world.local_player?)?;
+    let room = drlg.active_room(world.local_room()?.room)?.id;
+    sight_with(&ClientRooms(drlg), true, Some(room), local, unit, t)
 }
 
 /// The facts of a room unit from the model alone.
@@ -167,7 +263,7 @@ pub fn model_facts(
         unit_type: unit.key.unit_type,
         mode: unit.mode,
         local: world.local_player == Some(unit.key),
-        sight_hidden: sight_gate(world, t),
+        sight_hidden: sight_gate(world, unit, t),
         ..UnitFacts::default()
     };
     fill_model(&mut f, unit, t)?;
@@ -179,12 +275,16 @@ mod tests {
     use super::*;
     use crate::bridge::world::{UnitKey, PLAYER};
     use crate::rules::draw_order::{is_flat, UNIT_EX_VISIBLE};
+    use d2_sim::drlg::collision::bits;
 
     fn tables() -> UnitFactTables {
         UnitFactTables {
             unflat_dead: vec![Some(false), Some(true), None],
             draw_under: vec![0, 2, 1],
             los_draw: vec![false, true],
+            monster_size: vec![Some(1), Some(1), None],
+            object_size: vec![1, 1, 1],
+            missile_size: Vec::new(),
         }
     }
 
@@ -245,5 +345,71 @@ mod tests {
         assert_eq!(f.flag_ex & UNIT_EX_VISIBLE, 0);
         u.quest_untargetable = true;
         assert_eq!(flags_of(&u), FLAG_200);
+    }
+
+    /// One room over (0, 0)–(19, 19).
+    struct One(TileRect, CollisionGrid);
+
+    impl One {
+        fn new() -> Self {
+            let r = TileRect {
+                x: 0,
+                y: 0,
+                w: 20,
+                h: 20,
+            };
+            Self(r, CollisionGrid::new(r))
+        }
+    }
+
+    impl CollisionRooms for One {
+        fn subtile_rect(&self, _: RoomId) -> Option<TileRect> {
+            Some(self.0)
+        }
+        fn adjacent_count(&self, _: RoomId) -> usize {
+            0
+        }
+        fn adjacent(&self, _: RoomId, _: usize) -> Option<RoomId> {
+            None
+        }
+        fn grid(&self, _: RoomId) -> Option<&CollisionGrid> {
+            Some(&self.1)
+        }
+        fn grid_mut(&mut self, _: RoomId) -> Option<&mut CollisionGrid> {
+            Some(&mut self.1)
+        }
+    }
+
+    fn placed(ty: u8, guid: u32, at: (u16, u16)) -> ClientUnit {
+        let mut u = ClientUnit::new(UnitKey::new(ty, guid));
+        u.position = Some(at);
+        u
+    }
+
+    // Covers: specs/render/draw-order-2.md §15 r2
+    #[test]
+    fn a_wall_between_player_and_unit_hides_it_in_a_los_draw_level() {
+        let t = tables();
+        let mut rooms = One::new();
+        let player = placed(PLAYER, 1, (2, 5));
+        let monster = placed(MONSTER, 2, (12, 5));
+        let r = Some(RoomId(0));
+        let run = |rooms: &One| sight_with(rooms, true, r, &player, &monster, &t);
+        assert_eq!(run(&rooms), Some(false));
+        // Collision bit 0x2 on the line hides it; bit 0x1 (wall) does not.
+        *rooms.1.get_mut(7, 5).unwrap() = 1;
+        assert_eq!(run(&rooms), Some(false));
+        *rooms.1.get_mut(7, 5).unwrap() = bits::VISIBLE;
+        assert_eq!(run(&rooms), Some(true));
+        // LOSDraw 0: every unit passes.
+        assert_eq!(
+            sight_with(&rooms, false, r, &player, &monster, &t),
+            Some(false)
+        );
+        // A class without a size row cannot be answered.
+        let unknown = placed(MONSTER, 3, (12, 5));
+        let mut unknown = unknown;
+        unknown.class = 2;
+        assert_eq!(sight_with(&rooms, true, r, &player, &unknown, &t), None);
     }
 }

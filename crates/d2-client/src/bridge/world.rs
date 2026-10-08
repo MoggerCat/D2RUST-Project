@@ -9,6 +9,7 @@
 //! message rules read are inputs ([`ModelInputs`]), not model fields.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 
 pub use super::objects::{ClientObjects, ObjClientInputs};
 
@@ -728,22 +729,6 @@ impl ClientWorld {
     /// (not in sight yet) or the same room: unchanged, `false`.
     ///
     /// d2rs-own, unverified. PROVISIONAL (open question 2; REC-51).
-    /// The play preview's own walk moves the local player's model
-    /// position to its predicted sub-tile, as the 1.14d client's own path
-    /// step does (`client/model.md` §3 r3), so the position checks (§6)
-    /// and their C→S 0x5F read where the player is. False: no local player
-    /// or no position. d2rs-own, unverified (OQ2; REC-51, REC-277).
-    pub fn set_local_cell(&mut self, x: u16, y: u16) -> bool {
-        let Some(u) = self.local_player.and_then(|k| self.units.get_mut(&k)) else {
-            return false;
-        };
-        if u.position.is_none() {
-            return false;
-        }
-        u.position = Some((x, y));
-        true
-    }
-
     pub fn recache_local_room(&mut self, x: u16, y: u16) -> bool {
         let Some(key) = self.local_player else {
             return false;
@@ -985,21 +970,22 @@ pub fn addressed_unit(msg: &[u8]) -> Option<UnitKey> {
 }
 
 /// Visibility of a unit's sprite at a client pixel point
-/// (`0x004DBF20`, model §6 rule 6, §13): render state, taken as an input
-/// (§13 r6). The play app's world view answers it from the last built
-/// frame (`world_view::visibility`).
+/// (`0x004DBF20`, model §6 rule 6, §13): a render seam, taken as an
+/// input (§13 r6). A closure so the render side can answer from its own
+/// state (camera, COF and cel stores: `world_view::visibility`); the
+/// bridge only calls it.
 #[derive(Clone)]
-pub struct VisibleFn(pub std::sync::Arc<VisibleDyn>);
+pub struct VisibleFn(Arc<Visible>);
 
-/// The predicate's call: `visible(U, a, b)`.
-pub type VisibleDyn = dyn Fn(&ClientUnit, i32, i32) -> bool + Send + Sync;
+/// The closure behind a [`VisibleFn`].
+type Visible = dyn Fn(&ClientUnit, i32, i32) -> bool + Send + Sync;
 
 impl VisibleFn {
     pub fn new(f: impl Fn(&ClientUnit, i32, i32) -> bool + Send + Sync + 'static) -> Self {
-        VisibleFn(std::sync::Arc::new(f))
+        VisibleFn(Arc::new(f))
     }
 
-    /// `visible(U, a, b)`.
+    /// `visible(U, a, b)` (§13), (a, b) in client pixel space.
     pub fn visible(&self, unit: &ClientUnit, a: i32, b: i32) -> bool {
         (self.0)(unit, a, b)
     }
@@ -1007,7 +993,7 @@ impl VisibleFn {
 
 impl std::fmt::Debug for VisibleFn {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("VisibleFn")
+        f.write_str("VisibleFn(..)")
     }
 }
 
@@ -1208,6 +1194,10 @@ pub struct LevelRow {
     pub sound_env: u8,
     /// `DrawEdges` (+9, `render/draw-order.md` §6 r2).
     pub draw_edges: bool,
+    /// `Rain` (+0x05, `render/draw-order-2.md` §11.8).
+    pub rain: bool,
+    /// `Mud` (+0x06, `render/draw-order-2.md` §11.5).
+    pub mud: bool,
 }
 
 /// Inputs of the message rules that are not model state.

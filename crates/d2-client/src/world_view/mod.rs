@@ -48,6 +48,7 @@ pub mod present;
 pub mod preview;
 pub mod preview_blocks;
 pub mod preview_light;
+pub mod skill_motion;
 pub mod state_tint;
 pub mod swap_key;
 pub mod tile_assets;
@@ -59,6 +60,7 @@ pub mod unit_shadow;
 pub mod visibility;
 pub mod walk;
 pub mod walk_room;
+pub mod weather_view;
 
 #[cfg(test)]
 mod tests;
@@ -413,11 +415,10 @@ pub struct WorldFrame {
     /// Units drawn, and units the rules left undrawn (`unit_pose` = None).
     pub units_drawn: usize,
     pub units_hidden: usize,
-    /// The frame's camera (`render/camera.md` §3), when it has one.
+    /// The camera the frame was placed with (`render/camera.md` §3);
+    /// `None` without one. Read back by [`visibility`] (the origin
+    /// getters of `client/model.md` §13 r1 return the last drawn frame's).
     pub camera: Option<crate::rules::camera::Camera>,
-    /// Each drawn unit's COF and TR frame (`client/model.md` §13 r2–r5,
-    /// [`visibility`]).
-    pub drawn: Vec<visibility::Drawn>,
 }
 
 /// The C7 resolver of one unit: the hooks. Frame ids are not a hook: they
@@ -502,7 +503,6 @@ pub fn build<R: ViewRules + UiRules + ?Sized>(
     }
 
     let (mut units_drawn, mut units_hidden) = (0, 0);
-    let mut drawn = Vec::new();
     for unit in world.units.values() {
         let Some(pose) = rules.unit_pose(world, unit)? else {
             units_hidden += 1;
@@ -532,7 +532,6 @@ pub fn build<R: ViewRules + UiRules + ?Sized>(
             guid: unit.key.guid,
             error,
         })?;
-        drawn.push(visibility::Drawn::of(unit.key, &pose, &draws));
         let shadows = rules.unit_shadows(world, unit, &pose, None, &draws, assets)?;
         items.extend(draws.into_iter().map(|d| d.item));
         items.extend(shadows);
@@ -547,7 +546,6 @@ pub fn build<R: ViewRules + UiRules + ?Sized>(
         units_drawn,
         units_hidden,
         camera: None,
-        drawn,
     })
 }
 

@@ -65,6 +65,7 @@ use crate::world_view::object_label::ObjectLabels;
 use crate::world_view::preview::Preview;
 use crate::world_view::tile_assets::TileAssets;
 use crate::world_view::walk::{add_preview_walk, PreviewWalk};
+use crate::world_view::weather_view::WeatherView;
 use crate::world_view::{
     ModelFeed, NoFeed, Unspecified, ViewAssets, WorldViewPlugin, WorldViewState,
 };
@@ -187,6 +188,7 @@ pub fn add_preview_tinted(
     lights: Option<crate::world_view::light_sources::LightRows>,
     tints: Option<crate::world_view::state_tint::StateTints>,
 ) {
+    let weather = WeatherView::new(tiles.source());
     let mut preview = Preview::new(tiles);
     preview.light.sources = lights.map(std::sync::Arc::new);
     preview.light.set_tints(tints.map(std::sync::Arc::new));
@@ -196,7 +198,8 @@ pub fn add_preview_tinted(
             levels: Some(levels),
             ..ModelFeed::<NoFeed>::default()
         }
-        .with_preview(preview),
+        .with_preview(preview)
+        .with_weather(weather),
     );
     state.preview = true;
 }
@@ -221,6 +224,7 @@ pub fn add_walk(app: &mut App, tap: WalkTap, speeds: Option<crate::bridge::predi
         .map(|a| a.0.art.clone());
     add_preview_walk(app, walk);
     crate::world_view::monster_walk::add_monster_walk(app);
+    crate::world_view::skill_motion::add_skill_motion(app);
     crate::world_view::walk_room::add_preview_walk_room(app);
 }
 
@@ -503,6 +507,9 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
             .map_err(anyhow::Error::msg)?;
         super::strings::install_strings(&mut app, strings);
         super::hud::install_hud_tables(&mut app, archives.as_ref()).map_err(anyhow::Error::msg)?;
+        super::hud::install_char_tables(&mut app, archives.as_ref()).map_err(anyhow::Error::msg)?;
+        super::hud::install_skill_tree_tables(&mut app, archives.as_ref())
+            .map_err(anyhow::Error::msg)?;
         ui::set_waypoint_map(&mut app, waypoint_map);
         ui::set_shop_prices(&mut app, started.prices.clone());
         super::hire_stats::install_hire_stats(&mut app, hire_rows, true);
@@ -512,9 +519,11 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
             table,
         )));
     } else {
+        super::synthetic_client::install(&mut app);
         add_preview(&mut app, level_rows, TileAssets::default());
     }
     add_walk(&mut app, tap, speeds);
+    super::visibility::add_visibility(&mut app);
     super::loading_overlay::add_loading(&mut app, loading_files);
     super::death::add_death(&mut app);
     super::hardcore::add_hardcore(&mut app, hardcore);

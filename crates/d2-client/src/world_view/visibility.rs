@@ -1,129 +1,118 @@
-// Spec: specs/client/model.md (§13 visibility predicate, §6 rule 6)
-//! The visibility predicate `0x004DBF20` (`client/model.md` §13) from the
-//! last built frame: §13 r6 has the bridge take it as an input and the
-//! render side answer it from its camera, COF and cel state. Each frame
-//! records the drawn units' COF and TR frame ([`Drawn`]); [`predicate`]
-//! turns them, the frame's camera and the frame store into the bridge's
-//! [`VisibleFn`] (rules 1–5, `rules::unit_visibility`).
+// Spec: specs/client/model.md (§13), specs/render/camera.md (§3, §4), specs/render/unit-composite.md (§2, §3 r1, §4, §5.1, §6), specs/render/sprite-placement.md (§3)
+//! The visibility predicate `0x004DBF20` (`client/model.md` §13) answered
+//! from the world view's state, for the bridge's position check (§6 rule
+//! 6, §13 r6: the render side gives the bridge the predicate,
+//! [`crate::bridge::Bridge::set_visibility`]).
 //!
-//! A unit the frame did not draw has no cel: its request fails, so it is
-//! not visible (§13 r3–r4). The predicate answers for the frame before the
-//! message (the bridge frame runs before the world view's).
+//! What it reads, all shared with the view (no Bevy types here):
+//! - rule 1: the unit origin and `shiftX` of the last drawn frame's camera
+//!   ([`SharedCamera`], written from [`super::WorldFrame::camera`]: the
+//!   origin getters return the globals the last draw set);
+//! - rule 2: the unit's COF (the unit art's resident COFs, the unit's
+//!   draw identity and drawn mode as [`super::unit_rules::UnitRules`]
+//!   resolves them);
+//! - rules 3–4: the TR component file of that COF at the unit's
+//!   direction and frame `+0x44 >> 8` (the unit art's loaded files);
+//! - rule 5: that cel's w, h, xoff, yoff ([`UnitArt::cels`]).
+//!
+//! The rule arithmetic is `rules::unit_visibility`.
+//!
+//! PROVISIONAL (REC-286): before the first drawn frame (no camera yet) the
+//! origin and `shiftX` are read as 0, the zero-initialised globals
+//! `0x007A520C` / `0x007A5208` / `0x007A5214`; and the direction is the
+//! preview facing the view draws with (`UnitArt::dir64`, itself
+//! PROVISIONAL REC-51), as the model holds no client path record.
+//!
+//! [`UnitArt::cels`]: super::unit_assets::UnitArt::cels
 
-use std::collections::BTreeMap;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
-use d2_formats::cof::Cof;
-
-use super::{UnitPose, ViewAssets};
-use crate::assets::path::CanonicalPath;
-use crate::bridge::world::{ClientUnit, UnitKey, VisibleFn};
-use crate::composite::ComponentDraw;
-use crate::rules::camera::Camera;
+use crate::bridge::world::VisibleFn;
+use crate::bridge::ClientUnit;
+use crate::rules::camera::{Camera, FrameSize};
+use crate::rules::unit_composite::{component_cel, frame_index, unit_direction};
 use crate::rules::unit_visibility::{unit_visible, CelBox};
-use crate::scene::FrameId;
 
-/// Component 1, TR (`render/unit-composite.md`), the cel of §13 r3.
+use super::unit_assets::{component_codes, unit_cof, SharedUnitArt, UnitArt, UnitLooks};
+
+/// The last drawn frame's camera, shared by the view (writer) and the
+/// predicate (reader).
+pub type SharedCamera = Arc<RwLock<Option<Camera>>>;
+
+/// Component id of the torso (`composit` row 1, the cel request's
+/// component byte, §13 r3).
 const TR: u8 = 1;
 
-/// One drawn unit: its COF and the frame of its TR layer, if drawn.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Drawn {
-    pub key: UnitKey,
-    pub cof: CanonicalPath,
-    pub tr: Option<FrameId>,
+/// The predicate's inputs: the unit tables, the unit art and the camera.
+#[derive(Clone)]
+pub struct ViewVisibility {
+    pub looks: Arc<UnitLooks>,
+    pub art: SharedUnitArt,
+    pub camera: SharedCamera,
 }
 
-impl Drawn {
-    /// The record of a unit drawn with `pose` as `draws`.
-    pub fn of(key: UnitKey, pose: &UnitPose, draws: &[ComponentDraw]) -> Self {
-        Drawn {
-            key,
-            cof: pose.cof.clone(),
-            tr: draws
-                .iter()
-                .find(|d| d.slot.component == TR)
-                .map(|d| d.item.frame),
-        }
-    }
-}
-
-/// The frame's answer: the camera's unit origin and shift, the frame
-/// size, and each drawn unit's COF and TR cel box.
-struct Snapshot {
-    origin: (i32, i32),
-    shift_x: i32,
-    size: (u32, u32),
-    units: BTreeMap<UnitKey, (Cof, Option<CelBox>)>,
-}
-
-impl Snapshot {
-    fn visible(&self, unit: &ClientUnit, a: i32, b: i32) -> bool {
-        let Some((cof, cel)) = self.units.get(&unit.key) else {
+impl ViewVisibility {
+    /// `visible(U, a, b)` (§13 rules 1–5); W × H is the d2rs frame.
+    pub fn visible(&self, unit: &ClientUnit, a: i32, b: i32) -> bool {
+        let camera = *self.camera.read().unwrap_or_else(|e| e.into_inner());
+        // PROVISIONAL (REC-286): no frame drawn yet → zeroed globals.
+        let (origin, shift_x) =
+            camera.map_or(((0, 0), 0), |c| ((c.unit.x, c.unit.y), c.view.shift_x));
+        let art = self.art.read().unwrap_or_else(|e| e.into_inner());
+        let posed = art.posed(unit);
+        let unit = &*self.looks.shapes.identity(&posed);
+        let Some(name) = unit_cof(&self.looks, unit) else {
             return false;
         };
+        let Some(cof) = name.path().ok().and_then(|p| art.cofs.get(&p)) else {
+            return false;
+        };
+        let cel = tr_cel(&self.looks, &art, unit, &name, cof);
+        let size = FrameSize::D2RS;
         unit_visible(
             cof,
-            *cel,
+            cel,
             a,
             b,
-            self.origin,
-            self.shift_x,
-            self.size.0,
-            self.size.1,
+            origin,
+            shift_x,
+            size.width as u32,
+            size.height as u32,
         )
+    }
+
+    /// The predicate as the bridge takes it.
+    pub fn into_fn(self) -> VisibleFn {
+        VisibleFn::new(move |unit, a, b| self.visible(unit, a, b))
     }
 }
 
-/// The predicate of a frame with `camera` that drew `drawn`; `None`
-/// without a camera (no local player: nothing is placed, §13 r1 has no
-/// origin).
-pub fn predicate(
-    camera: Option<Camera>,
-    drawn: &[Drawn],
-    assets: &ViewAssets,
-) -> Option<VisibleFn> {
-    let camera = camera?;
-    let units = drawn
-        .iter()
-        .filter_map(|d| {
-            let cof = assets.cofs.get(&d.cof)?.clone();
-            let cel = d.tr.and_then(|id| assets.frames.frame(id)).map(|f| CelBox {
-                w: f.width as i32,
-                h: f.height as i32,
-                ox: f.x_off,
-                oy: f.y_off,
-            });
-            Some((d.key, (cof, cel)))
-        })
-        .collect();
-    let s = Arc::new(Snapshot {
-        origin: (camera.unit.x, camera.unit.y),
-        shift_x: camera.view.shift_x,
-        size: (camera.size.width as u32, camera.size.height as u32),
-        units,
-    });
-    Some(VisibleFn::new(move |u, a, b| s.visible(u, a, b)))
+/// Rules 3–4: the TR cel of `unit` at its direction and frame `+0x44 >>
+/// 8`; `None` when the COF has no TR layer, the component request fails,
+/// or the file or cel did not load.
+fn tr_cel(
+    looks: &UnitLooks,
+    art: &UnitArt,
+    unit: &ClientUnit,
+    name: &crate::rules::unit_composite::CofName,
+    cof: &d2_formats::cof::Cof,
+) -> Option<CelBox> {
+    let layer = cof.layers.iter().find(|l| l.component == TR)?;
+    let codes = component_codes(looks, unit, name, layer)?;
+    let (path, facts) = art.files.get(&codes.name())?.as_ref()?;
+    let n = art.expected_directions(unit, name.kind, cof.directions);
+    let dir = unit_direction(cof.directions, n, art.dir64(unit), false).ok()?;
+    let frame = frame_index(unit.frame as u32);
+    let cel = component_cel(path, facts.directions, facts.frames, dir.dir64, frame).ok()?;
+    let crate::frames::FramePart::Dir(d) = cel.set.part() else {
+        return None;
+    };
+    art.cels
+        .get(path)?
+        .get(usize::from(d))?
+        .get(cel.index)
+        .copied()
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::rules::camera::{ClientPos, FrameSize, OpenMode};
-
-    // Covers: specs/client/model.md §13 r3
-    #[test]
-    fn an_undrawn_unit_is_not_visible() {
-        let cam = Camera::new(
-            FrameSize::D2RS,
-            OpenMode::NONE,
-            ClientPos::default(),
-            (0, 0),
-        );
-        let assets = ViewAssets::new(crate::app::play::unspecified_palette());
-        let p = predicate(Some(cam), &[], &assets).expect("a camera gives a predicate");
-        let u = ClientUnit::new(UnitKey::new(1, 7));
-        assert!(!p.visible(&u, 0, 0));
-        assert!(predicate(None, &[], &assets).is_none());
-    }
-}
+mod tests;

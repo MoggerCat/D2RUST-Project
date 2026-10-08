@@ -144,11 +144,11 @@ fn install_mirrors_the_flags_and_keeps_the_border_open() {
 
 // Covers: specs/ui/panels.md §2 r2, §2 r5, §2 r6, §4 r2, §4 r3
 #[test]
-fn hotkeys_toggle_their_state_with_jump_0() {
+fn hotkeys_toggle_their_state_with_the_specs_jump() {
     let mut u = ui(Some(areas()), true);
     let w = world(AMAZON, 1, true);
-    // The mouse at x 500 would jump with jump 1 (§4.3 vector); hot keys
-    // pass 0.
+    // §4.3 (corrected 2026-10-07, vector "key I at 800 × 600, mouse x 500"):
+    // the Inventory key passes jump 1, so the cursor goes to x 300.
     u.send(&w, UiEvent::CursorMoved(Point::new(500, 300)));
     assert_eq!(u.key(&w, Action::ToggleInventory), Routed::Unhandled);
     assert!(u.ui.is_open(UI_INVENTORY));
@@ -158,7 +158,8 @@ fn hotkeys_toggle_their_state_with_jump_0() {
         vec![
             UiEffect::Opened(1),
             UiEffect::InventoryHook,
-            UiEffect::OpenMode(OpenMode::new(1).unwrap())
+            UiEffect::OpenMode(OpenMode::new(1).unwrap()),
+            UiEffect::CursorX(300)
         ]
     );
     assert_eq!(
@@ -979,4 +980,131 @@ fn stash_gold_max_line_resolves_its_string_id() {
         texts(&Strs("Gold Max: %d".encode_utf16().collect())),
         vec!["Gold Max: 2500000"]
     );
+}
+
+fn tree_tables() -> skill_tree_ui::SkillTreeTables {
+    use skill_tree_ui::SkillTreeRow;
+    let row = |skill, page, r, c, cel, req: u16| SkillTreeRow {
+        skill,
+        class: 0,
+        page,
+        row: r,
+        column: c,
+        icon_cel: cel,
+        maxlvl: 20,
+        ingame: true,
+        reqlevel: req,
+        reqskill: [u16::MAX; 3],
+        ..Default::default()
+    };
+    skill_tree_ui::SkillTreeTables {
+        rows: vec![
+            row(6, 1, 1, 1, 2, 1),
+            row(7, 1, 2, 3, 4, 6),
+            row(8, 2, 3, 2, 6, 1),
+        ],
+    }
+}
+
+// Covers: specs/ui/panels.md §10 r3, §10 r4, §10 r5
+#[test]
+fn skill_tree_draws_icons_and_levels_and_spends_a_point() {
+    use crate::bridge::skills::{SkillEntry as Entry, SkillList, NATIVE};
+    let mut w = world(AMAZON, 1, true);
+    let key = w.local_player.unwrap();
+    {
+        let u = w.units.get_mut(&key).unwrap();
+        u.stats.insert(12, 5); // level
+        u.stats.insert(5, 2); // free points
+        u.skills = Some(SkillList {
+            entries: vec![Entry {
+                skill: 6,
+                base: 3,
+                owner: NATIVE,
+                ..Default::default()
+            }],
+            ..Default::default()
+        });
+    }
+    let mut u = ui(Some(areas()), true);
+    u.ui.set_skill_tree_tables(tree_tables());
+    u.key(&w, Action::ToggleSkillTree);
+    let img = u.images(&w);
+    // Tab 1: skills 6 (column 1, row 1) and 7 (column 3, row 2).
+    let icons = panel_images(&img, "spells\\amskillicon");
+    assert_eq!(icons, vec![(2, 415, 122), (4, 553, 190)]);
+    // The level number of skill 6 (hard points 3), none for skill 7.
+    let ctx = UiCtx {
+        tick: 0,
+        world: &w,
+        strings: &NoStrings,
+    };
+    let mut out: Vec<UiDraw> = Vec::new();
+    u.root.draw(&ctx, &mut out);
+    let numbers: Vec<_> = out
+        .iter()
+        .filter_map(|d| match d {
+            UiDraw::Text(t) => Some((String::from_utf16_lossy(&t.text), t.at.x, t.at.y)),
+            _ => None,
+        })
+        .filter(|(s, ..)| s == "3")
+        .collect();
+    assert_eq!(numbers.len(), 1);
+    // A click on skill 6's icon with a free point sends 0x3B.
+    u.click(&w, Point::new(430, 100));
+    let want = ClientIntent::from_message(&d2_proto::client::AddSkillPoint { skill: 6 });
+    assert_eq!(u.root.intents(), &[want]);
+    // Skill 7 needs level 6: its click sends nothing.
+    u.root.take_intents();
+    u.click(&w, Point::new(570, 170));
+    assert!(u.root.intents().is_empty());
+}
+
+fn ui_with_fonts(w: &ClientWorld) -> Ui {
+    let mut u = ui(Some(areas()), true);
+    let mut f = FontMeasure::default();
+    f.insert(
+        1,
+        FontTable::parse(&character_bind_tests::tbl(6)).expect("tbl"),
+    );
+    u.ui.set_fonts(f);
+    u.key(w, Action::ToggleCharacter);
+    u
+}
+
+// Covers: specs/ui/panels-2.md §17 r2; specs/ui/panels.md §8 r5
+#[test]
+fn a_stat_button_spends_one_point_and_shift_spends_all_in_chunks_of_32() {
+    let mut w = world(AMAZON, 1, true);
+    let key = w.local_player.unwrap();
+    w.units.get_mut(&key).unwrap().stats.insert(4, 70);
+    let strength = Point::new(198, 164);
+    let mut u = ui_with_fonts(&w);
+    u.click(&w, strength);
+    assert_eq!(u.root.intents(), &[ClientIntent(vec![0x3A, 0x00, 0x00])]);
+    let mut u = ui_with_fonts(&w);
+    u.ui.set_shift(true);
+    u.click(&w, strength);
+    assert_eq!(
+        u.root.intents(),
+        &[
+            ClientIntent(vec![0x3A, 0x00, 0x1F]),
+            ClientIntent(vec![0x3A, 0x00, 0x1F]),
+            ClientIntent(vec![0x3A, 0x00, 0x05]),
+        ]
+    );
+}
+
+// Covers: specs/ui/panels.md §4 r3
+#[test]
+fn a_cursor_jump_effect_becomes_a_cursor_warp_to_the_new_x_at_the_same_y() {
+    let w = world(AMAZON, 1, true);
+    let mut u = ui(Some(areas()), true);
+    // Nothing pending: no warp.
+    assert_eq!(u.ui.take_cursor_warp(), None);
+    // Key I at 800 × 600 with the mouse at x 500: the cursor jumps to 300.
+    let e = UiEvent::CursorMoved(Point::new(500, 77));
+    u.send(&w, e);
+    u.key(&w, Action::ToggleInventory);
+    assert_eq!(u.ui.take_cursor_warp(), Some(Point::new(300, 77)));
 }

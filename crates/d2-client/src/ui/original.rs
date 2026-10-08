@@ -56,6 +56,7 @@ use super::panels::{
     TextMeasure, UiFiles,
 };
 use super::root::{Routed, UiError, UiRoot};
+use super::skill_tree_ui;
 use super::states::{GateEnv, PlayerLife, UiEffect, UiStateError, UiStates};
 use super::PointerButton;
 use crate::assets::path::FileSource;
@@ -79,56 +80,45 @@ pub const CLICK_SOUND_ID: i32 = 0;
 /// the app does not hold yet (M02: named, not guessed).
 pub const PENDING: &[(&str, &str)] = &[
     (
-        "character labels, class line, resist effects, shift-spend (§8.6, §8.9; \
-         `panels-2.md` §17 r3, r5–r9)",
-        "the values and the name line are bound ([`ModelCharacter`]); the labels need the \
-         string table by id (`StringLookup::get_id`, `NoStrings` in play); the class line \
-         needs the `charstats` class name (record +0, not in `ClientTables`); next level \
-         (§8.11) needs `experience.txt` (not in the model: the panel shows stat 30); the \
-         resist and defense effects (`panels-3.md` §24 r1, r3) need the `states.txt` flag \
-         masks (not in `StateRow`); the damage block and popups need the skill list and \
-         `monstats`; Shift is not in the UI events (a spend is 1 point); the language is \
-         English (0, `ui/text.md` §1.2)",
+        "character shift-spend, popups and the skill-modified damage block (§8.6, §8.9; \
+         `panels-2.md` §17 r5–r9)",
+        "labels (string ids), the class line, next level, the resist / defense colours and a \
+         weapon-only damage / attack-rating block are bound ([`char_feed`], PROVISIONAL \
+         REC-269); the skill-specific `descdam` / `descatt` entries, the to-hit popups (need \
+         `monstats`) are not (Shift spends in chunks of 32, `panels.md` §8 r5, REC-268); the language \
+         is English (0, `ui/text.md` §1.2)",
     ),
     (
         "inventory gold button press / release and the gold dialog (`panels-2.md` §21 r3–r9)",
         "the gold value and button art are drawn ([`InventoryUi`]); the press / release and \
          the drop dialog (kind 1) are wired in [`gold_dialog`] (d2rs-own box, REC-103); the \
-         press does not play sound 4 (deferred); the stash kinds 3 / 4 are not wired",
+         press does not play sound 4 (deferred); the stash kinds 3 / 4 are wired (\
+         `original_tests.rs::stash_gold_withdraw_and_deposit_send_0x4f`)",
     ),
     (
-        "inventory equipment backgrounds (§9.4)",
-        "equipped items per body location: the item stream is not decoded \
-         (`msg-stats-items.md` open question 3)",
+        "inventory tints (translucency) and empty-slot pictures (§9.4, `inventory.md` §2–§6)",
+        "the equipped and grid item tints and the hover tint are painted by \
+         `ItemsUi::draw_tints` as opaque `hudfill` tiles (REC-271: the UI sprite path has no \
+         A2 blend); the shooter / quiver and cursor-item tints are not read and the \
+         empty-slot pictures (§9.4 table) are not drawn",
     ),
     (
-        "skill tree icons and level numbers (§10.3–§10.5)",
-        "the skill list is in the model (`client/msg-skills.md`), but the icon file prefix \
-         `CC` (spec open), the flag mask `[0x006CE270]` and the fields the tree shows \
-         (`msg-skills.md` open question 3) are not",
+        "skill tree hover description and the no-points message (§10.5, §10.7)",
+        "icons, level numbers, the flag mask and the point spend (C→S 0x3B) are wired \
+         ([`skill_tree_ui`]); the point cost is 1 (`skpoints` formula not evaluated, \
+         REC-270); the tab tool tips, the free-points box and the no-points message are \
+         not wired",
     ),
     (
-        "waypoint menu panel (ui 0x14, §13 r2–r7)",
-        "installed (`waypoint_ui`: art, rows from the record, row click → C→S 0x49); the \
-         tab gates read the client quest flags (`msg-ui.md` open question 4, tab 0 only) \
-         and the row text needs the string table by id",
+        "waypoint menu panel (ui 0x14, §13 r2–r7): tab gates",
+        "the panel is installed and covered (`waypoint_ui`; \
+         `app_play_npc.rs::clicking_the_waypoint_walks_there_and_interacts`; the row and tab \
+         text come from the string table by id); the tab gates read the client quest flags \
+         (`msg-ui.md` open question 4, tab 0 only): every act tab is shown (d2rs-own)",
     ),
     (
-        "stash and cube panels (ui 0x19, 0x1A; §11 r2–r6, §12 r2–r6)",
-        "S→C 0x77 opens and closes them (flag and inventory mode: `msg_ui`); their art, \
-         grids and buttons are not wired",
-    ),
-    (
-        "NPC menu, NPC shop (ui 8, 0x0C; §14)",
-        "their openers (NPC interaction messages) have no client handler",
-    ),
-    (
-        "cursor jump (§4.3, `UiEffect::CursorX`)",
-        "the waypoint menu passes jump 1 (S→C 0x63); the effect is reported but there is \
-         no cursor-warp edge",
-    ),
-    (
-        "hotkeys for other states (escape menu, chat, automap, quests, party)",
+        "hotkeys for other states (escape menu, chat, automap, party; the quest log, ToggleQuests, is \
+         bound: `quest_log_ui_tests.rs`)",
         "their panels are not specified (§Open questions 1); the original key table is \
          `ui/controls.md` (§Open questions 2)",
     ),
@@ -221,8 +211,12 @@ struct Shared {
     /// `difficultylevels` `ResistPenalty` by difficulty (§8.9, `0x00611D30`);
     /// an expansion game draws no values without it.
     resist_penalties: Option<Vec<i32>>,
+    /// The character panel's extra tables ([`char_feed`]).
+    char_tables: super::char_feed::CharTables,
     /// The control panel overlays' state ([`hud`]).
     hud: hud::HudState,
+    /// The skill tree's class skill rows ([`skill_tree_ui`]).
+    skill_tree: skill_tree_ui::SkillTreeTables,
     /// The inventory panel's item facts (`inv_items`).
     items: ItemsUi,
     /// The levels' waypoint indexes (`waypoint_ui`).
@@ -350,6 +344,7 @@ impl OriginalUi {
         tables.files.extend(esc_art::esc_files());
         tables.files.extend(quest_log_ui::quest_files());
         tables.files.extend(cube_ui::cube_files());
+        tables.files.extend(skill_tree_ui::icon_files());
         let shared = Shared {
             tables,
             states: UiStates::new()?,
@@ -364,7 +359,9 @@ impl OriginalUi {
             outputs: Vec::new(),
             fonts: None,
             resist_penalties: None,
+            char_tables: Default::default(),
             hud: hud::HudState::default(),
+            skill_tree: Default::default(),
             items: ItemsUi::default(),
             waypoint_map: None,
             waypoint_open: None,
@@ -476,9 +473,20 @@ impl OriginalUi {
         self.shared.borrow_mut().resist_penalties = Some(penalties);
     }
 
+    /// The character panel's class keys, state flags and skilldesc rows.
+    pub fn set_char_tables(&mut self, tables: super::char_feed::CharTables) {
+        self.shared.borrow_mut().char_tables = tables;
+    }
+
     /// The HUD's skill icon and experience tables ([`hud::HudTables`]).
     pub fn set_hud_tables(&mut self, tables: hud::HudTables) {
         self.shared.borrow_mut().hud.tables = tables;
+    }
+
+    /// The skill tree's class skill rows (`skill_tree_ui`); without them
+    /// the tree shows no icons.
+    pub fn set_skill_tree_tables(&mut self, tables: skill_tree_ui::SkillTreeTables) {
+        self.shared.borrow_mut().skill_tree = tables;
     }
 
     /// The walk's run toggle for the run button (§6 r1); returns the
@@ -580,8 +588,11 @@ impl OriginalUi {
             if a == ActionId(Action::GameMenu.index() as u16) {
                 self.game_menu_key()?;
             } else if let Some(ui) = hotkey_state(a) {
-                // §4.3: hot keys pass jump 0; mode 2 toggle.
-                self.set_ui(u32::from(ui), 2, false)?;
+                // §4.3: the Character, Inventory, Party, Skill Tree and
+                // Hireling keys pass jump 1, every other hot key 0; mode 2
+                // toggle.
+                let jump = matches!(ui, 1 | 2 | 4 | 0x16 | 0x24);
+                self.set_ui(u32::from(ui), 2, jump)?;
                 // The quest log asks the server for the quest data when
                 // it opens (`quest_log_ui`; d2rs-own, unverified).
                 if ui == quest_log_ui::UI_QUEST_SCREEN && self.is_open(ui) {
@@ -661,6 +672,20 @@ impl OriginalUi {
         self.shared.borrow().esc.controls.is_some()
     }
 
+    /// Whether the expansion is installed (`0x00408F20`: the Options and
+    /// Configure Controls tables, `ui/frontend-options.md` §O2, §O9).
+    pub fn expansion_installed(&self) -> bool {
+        self.shared.borrow().config.expansion_installed
+    }
+
+    /// The open Controls screen's state (hosts and tests read it).
+    pub fn controls_screen(
+        &self,
+    ) -> Option<crate::ui::front_end::screens::controls::ConfigureControls> {
+        let sh = self.shared.borrow();
+        sh.esc.controls.as_ref().map(|c| c.model().clone())
+    }
+
     /// A raw key (Windows virtual key) for the open Controls screen;
     /// false when it is not open (the key is for the game).
     pub fn controls_key(&mut self, vk: u16, now_ms: u64) -> bool {
@@ -704,6 +729,19 @@ impl OriginalUi {
             sh.esc.controls = None;
         }
         r
+    }
+
+    /// The cursor jump the pending effects ask for (§4.3,
+    /// [`UiEffect::CursorX`]): the frame position `(x, mouse y)` of the last
+    /// one, which also becomes the UI's mouse. Leaves the effects in place.
+    pub fn take_cursor_warp(&mut self) -> Option<Point> {
+        let x = self.outcome.effects.iter().rev().find_map(|e| match e {
+            UiEffect::CursorX(x) => Some(*x),
+            _ => None,
+        })?;
+        let mut sh = self.shared.borrow_mut();
+        sh.mouse.x = x;
+        Some(sh.mouse)
     }
 
     /// The effects and sounds since the last call.
@@ -797,6 +835,8 @@ impl Panel for InventoryUi {
         panel.draw(&sh.tables, &sh.env(), gold, out);
         let class = Facts::of(ctx.world).class;
         if let Some(l) = sh.items.layout(class, &sh.config.screen) {
+            sh.items
+                .draw_tints(ctx.world, &sh.tables.files, &l, sh.mouse, out);
             sh.items.draw_panel(ctx.world, &sh.tables.files, &l, out);
         }
     }
@@ -866,11 +906,30 @@ impl Panel for InventoryUi {
     }
 }
 
-/// The skill tree's view of the model: the class only. The model holds
-/// no skill list, so there are no icons; free points and the flag mask
-/// are read only for icons (inert, `PENDING`).
+/// The skill tree's view of the model: the class, the icon file, the free
+/// points and the entries joined from the skill rows and the local
+/// player's list ([`skill_tree_ui::entries`]).
 struct ModelSkillTree {
     class: Option<u8>,
+    icon_file: Option<u32>,
+    free_points: i32,
+    entries: Vec<SkillEntry>,
+}
+
+impl ModelSkillTree {
+    fn of(sh: &Shared, world: &ClientWorld) -> Self {
+        let class = class_u8(sh.facts.class);
+        ModelSkillTree {
+            class,
+            icon_file: class
+                .and_then(skill_tree_ui::icon_file_name)
+                .and_then(|n| sh.tables.files.id(&n)),
+            free_points: world.local().map_or(0, |u| u.stat(5)),
+            entries: class
+                .map(|c| skill_tree_ui::entries(&sh.skill_tree, world, c))
+                .unwrap_or_default(),
+        }
+    }
 }
 
 impl SkillTreeView for ModelSkillTree {
@@ -878,16 +937,16 @@ impl SkillTreeView for ModelSkillTree {
         self.class
     }
     fn icon_file(&self) -> Option<u32> {
-        None
+        self.icon_file
     }
     fn free_points(&self) -> i32 {
-        0
+        self.free_points
     }
     fn flag_mask(&self) -> u8 {
-        0
+        skill_tree_ui::FLAG_INGAME
     }
     fn skills(&self) -> &[SkillEntry] {
-        &[]
+        &self.entries
     }
 }
 
@@ -910,11 +969,9 @@ impl Panel for SkillTreeUi {
         self.sh.borrow().right_area().unwrap_or(EMPTY)
     }
 
-    fn draw(&self, _ctx: &UiCtx, out: &mut dyn UiDrawSink) {
+    fn draw(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
         let sh = self.sh.borrow();
-        let view = ModelSkillTree {
-            class: class_u8(sh.facts.class),
-        };
+        let view = ModelSkillTree::of(&sh, ctx.world);
         self.panel.draw(&sh.tables, &sh.env(), &view, sh.mouse, out);
     }
 
@@ -922,15 +979,13 @@ impl Panel for SkillTreeUi {
         None
     }
 
-    fn event(&mut self, e: UiEvent, _ctx: &UiCtx) -> UiResponse {
+    fn event(&mut self, e: UiEvent, ctx: &UiCtx) -> UiResponse {
         if !is_click(e) {
             return UiResponse::Ignored;
         }
         let mut sh = self.sh.borrow_mut();
         let env = sh.env();
-        let view = ModelSkillTree {
-            class: class_u8(sh.facts.class),
-        };
+        let view = ModelSkillTree::of(&sh, ctx.world);
         match left(e) {
             Some((true, at)) => {
                 let out = self.panel.mouse_down(&env, &view, at);
@@ -1039,6 +1094,9 @@ pub struct ModelCharacter<'a> {
     pub fonts: &'a FontMeasure,
     /// `difficultylevels` `ResistPenalty` by difficulty (expansion game).
     pub penalties: &'a [i32],
+    /// The extra tables and the `experience` rows ([`char_feed`]).
+    pub chars: &'a super::char_feed::CharTables,
+    pub experience: &'a [[u32; 7]],
 }
 
 impl CharacterView for ModelCharacter<'_> {
@@ -1074,10 +1132,24 @@ impl CharacterView for ModelCharacter<'_> {
         )
     }
 
-    /// The state tests (`0x0063A570` family) are not in the model
-    /// (`PENDING`): none active.
-    fn resist_effect(&self, _id: u16) -> ResistEffect {
-        ResistEffect::None
+    /// The state tests (`0x0063A570` family) by the `states` flags.
+    fn resist_effect(&self, id: u16) -> ResistEffect {
+        match self.world.units.get(&self.key) {
+            Some(u) => self.chars.resist_effect(&u.states, id),
+            None => ResistEffect::None,
+        }
+    }
+
+    fn defense_color(&self) -> Option<u16> {
+        self.chars
+            .defense_color(&self.world.units.get(&self.key)?.states)
+    }
+
+    fn next_level(&self) -> Option<u32> {
+        let u = self.world.units.get(&self.key)?;
+        let level = u32::try_from(self.base(12)).unwrap_or(0);
+        let stat30 = u32::try_from(self.stat(30)).unwrap_or(0);
+        super::char_feed::next_level(self.experience, u.class, level, stat30)
     }
 
     /// §8.8: the max width of the value in Font16.
@@ -1176,10 +1248,31 @@ impl Panel for CharacterUi {
             key,
             fonts,
             penalties,
+            chars: &sh.char_tables,
+            experience: &sh.hud.tables.experience,
         };
         let env = sh.env();
         self.panel
             .draw(&sh.tables, &env, &view, fonts, ctx.strings, out);
+        super::char_feed::damage_block(
+            ctx.world,
+            key,
+            &sh.char_tables,
+            ctx.strings,
+            &env.screen,
+            fonts,
+            out,
+        );
+        if let Some(u) = ctx.world.units.get(&key) {
+            super::char_feed::class_line(
+                u.class,
+                &sh.char_tables,
+                ctx.strings,
+                &env.screen,
+                fonts,
+                out,
+            );
+        }
         name_line(name, &env.screen, fonts, out);
     }
 
@@ -1202,8 +1295,9 @@ impl Panel for CharacterUi {
         match left(e) {
             Some((true, at)) => self.panel.press(&sh.tables, &s, at, statpts),
             Some((false, at)) => {
-                // Shift is not in the UI events (`PENDING`): one point.
-                let out = self.panel.release(&sh.tables, &s, at, false, statpts);
+                // Shift is the host's per-frame flag (`set_shift`): all points.
+                let shift = sh.items.shift;
+                let out = self.panel.release(&sh.tables, &s, at, shift, statpts);
                 sh.outputs.extend(out);
             }
             None => {}
@@ -1319,6 +1413,10 @@ pub use waypoint_ui::WaypointOpen;
 #[cfg(test)]
 #[path = "original_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "char_feed_tests.rs"]
+mod char_feed_tests;
 
 #[cfg(test)]
 mod character_bind_tests {

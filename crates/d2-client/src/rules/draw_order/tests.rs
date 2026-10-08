@@ -3,10 +3,11 @@
 
 use std::collections::BTreeMap;
 
+use super::sky::SkyFrame;
 use super::source::{
     ordered_source, placement_list, resolve, resolve_drawn, TileArt, WeatherFrame,
 };
-use super::weather::{FloorContext, Weather};
+use super::weather::{EnvPool, FloorContext, LevelWeather, PoolRecord, SkyDraw, Weather};
 use super::*;
 use crate::bridge::world::ClientWorld;
 use crate::bridge::ClientUnit;
@@ -956,6 +957,7 @@ struct MapFeed {
     near: NearRooms,
     seed: Seed,
     weather: Option<(Weather, FloorContext)>,
+    sky: Option<SkyFrame>,
 }
 
 impl ViewSource for MapFeed {
@@ -1017,6 +1019,7 @@ impl ViewFeed for MapFeed {
             seed: &mut self.seed,
             update_count: 100,
             mud: false,
+            sky: self.sky,
         }))
     }
 }
@@ -1056,6 +1059,7 @@ fn ordered_source_wraps_the_feed() {
         near: near(vec![r]),
         seed: Seed::new(1, 0),
         weather: None,
+        sky: None,
     };
     let cam = Camera::new(FrameSize::D2RS, OpenMode::NONE, at, (0, 0));
     let assets = ViewAssets::new(palette());
@@ -1362,6 +1366,7 @@ fn water_floor_draws_the_player_seed_through_the_feed() {
         near: near(vec![r.clone()]),
         seed: Seed::new(1, 0),
         weather: None,
+        sky: None,
     };
     let e = ordered_source(&world, &cam, OpenMode::NONE, &mut feed, &assets)
         .err()
@@ -1372,6 +1377,7 @@ fn water_floor_draws_the_player_seed_through_the_feed() {
         near: near(vec![r]),
         seed: Seed::new(1, 0),
         weather: Some((Weather::new(), FloorContext::default())),
+        sky: None,
     };
     assert!(
         ordered_source(&world, &cam, OpenMode::NONE, &mut feed, &assets)
@@ -1385,4 +1391,68 @@ fn water_floor_draws_the_player_seed_through_the_feed() {
     assert_eq!((w.splashes().live(), w.bubbles().live()), (0, 0));
     // The drawn floor got flag 0x20000 after its draw.
     assert_eq!(feed.near.rooms[0].floors[0].flags & REC_DRAWN, REC_DRAWN);
+}
+
+// Covers: specs/render/draw-order-2.md §11.6; specs/render/draw-order-2.md §11.7
+#[test]
+fn ordered_source_runs_passes_4_and_9() {
+    let world = ClientWorld::default();
+    let at = UnitPosition::Static { sx: 187, sy: 62 }.client();
+    let cam = Camera::new(FrameSize::D2RS, OpenMode::NONE, at, (0, 0));
+    let assets = ViewAssets::new(palette());
+    let level = LevelWeather {
+        level_id: 2,
+        act: 0,
+        rain: true,
+        mud: false,
+    };
+    let sky = SkyFrame {
+        frame: FrameSize::LOW,
+        mode: OpenMode::new(1).unwrap(),
+        shift_x: 0,
+        level,
+        frame_rate: 25,
+        low_quality: false,
+    };
+    let mut weather = Weather::new();
+    // A splash at (100, 200) frame 1 kind 2, and a lightning strike.
+    weather.pools_mut().1.alloc(PoolRecord {
+        x: 100,
+        y: 200,
+        kind: 2,
+        frame: 1,
+        countdown: 2,
+    });
+    weather.start_lightning(false);
+    let mut feed = MapFeed {
+        near: near(vec![room()]),
+        seed: Seed::new(1, 0),
+        weather: Some((weather, FloorContext::default())),
+        sky: Some(sky),
+    };
+    let source = ordered_source(&world, &cam, OpenMode::NONE, &mut feed, &assets)
+        .unwrap()
+        .unwrap();
+    // The camera's frame and mode replace the feed's: pass 4 keeps the
+    // record, pass 9 flashes over the camera's span (mode 0: 0 … 800).
+    assert_eq!(source.sky.pools.len(), 1);
+    let d = source.sky.pools[0];
+    assert_eq!(
+        (d.pool, d.kind, d.frame, d.x, d.y),
+        (EnvPool::Splashes, 2, 1, 100, 200)
+    );
+    assert_eq!(
+        source.sky.sky,
+        [SkyDraw::Flash {
+            x0: 0,
+            y0: 0,
+            x1: 800,
+            y1: 553
+        }]
+    );
+    // Without a sky frame the live pools fail the frame, never dropped.
+    let (w, _) = feed.weather.as_mut().unwrap();
+    w.start_lightning(true);
+    feed.sky = None;
+    assert!(ordered_source(&world, &cam, OpenMode::NONE, &mut feed, &assets).is_err());
 }
