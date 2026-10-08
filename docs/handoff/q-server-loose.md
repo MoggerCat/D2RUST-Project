@@ -13,7 +13,7 @@
 | 0x15 resync: an out-of-range point target queues the player with flag-ex 0x10000 (as C→S 0x4B on itself); the next update sends 0x15, flag 1. | `d2-server/src/adapters/handlers/player.rs` `resync`, `sim.rs` `queue_resync` | `an_out_of_range_walk_resyncs_the_client_with_0x15` |
 | Item target owner: `live_facts` answers items (owner from `InvItem::owner_guid`, act from the room or the owner, static position). | `handlers/world/wired.rs` `item_facts` | `an_item_target_is_staged_with_its_owner` |
 
-## PROVISIONAL (REC-123, HANDOFF §7)
+## PROVISIONAL (REC-124, HANDOFF §7)
 
 - Monster get-hit is a direct mode change, not the AI mode-request record
   (`0x005A7E60` / `0x005A7C20`); steps 4.1, 4.2, 4.4, 4.5 (knockback, sand
