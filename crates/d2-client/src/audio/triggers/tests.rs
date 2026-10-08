@@ -2636,3 +2636,12 @@ fn object_client_function_calls() {
     });
     assert!(f.log.is_empty() && next == 5);
 }
+
+// Covers: specs/audio/triggers.md §1 r6
+#[test]
+fn sound_init_sets_the_idle_gap_to_90() {
+    let g = Globals::sound_init();
+    assert_eq!(g.idle_gap, 90);
+    assert_eq!(g.last_idle_any, 0);
+    assert_eq!(g.speech_id, 0);
+}

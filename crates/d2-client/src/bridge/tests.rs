@@ -1151,3 +1151,43 @@ fn ui_answers_npc_dialog_with_0x31_in_order() {
     assert!(next.is_empty());
     assert_eq!(mode, 1);
 }
+
+/// The skill fallback is the last step of a tick frame while `in_game`
+/// (`client/bridge.md` §8 rule 5, `flows/client-frame.md` §1 rule 6);
+/// a frame without a tick does not run it.
+// Covers: specs/client/bridge.md §8 r5
+#[test]
+fn skill_fallback_runs_only_in_a_tick_frame() {
+    use super::skills::{SkillEntry, SkillList, NATIVE};
+    use super::world::{SkillRow, PLAYER};
+    let p = UnitKey::new(PLAYER, 1);
+    let native = |skill, base| SkillEntry {
+        skill,
+        base,
+        owner: NATIVE,
+        ..SkillEntry::default()
+    };
+    let (mut b, link) = bridge();
+    b.inputs.tables.skills = vec![SkillRow::default(); 37];
+    let mut u = ClientUnit::new(p);
+    u.skills = Some(SkillList {
+        entries: vec![native(0, 1), native(36, 0)],
+        left: Some(1),
+        right: Some(0),
+        ..SkillList::default()
+    });
+    b.world.units.insert(p, u);
+    b.world.local_player = Some(p);
+    b.world.in_game = true;
+    let left = |b: &Bridge<ScriptedLink>| {
+        let l = b.world.units[&p].skills.as_ref().unwrap();
+        l.left_entry().map(|e| e.skill)
+    };
+    link.deliver(false, &[]);
+    b.frame().unwrap();
+    assert_eq!(left(&b), Some(36), "no tick: no fallback");
+    link.deliver(true, &[]);
+    let r = b.frame().unwrap();
+    assert_eq!(r.rejected, 0);
+    assert_eq!(left(&b), Some(0), "tick frame: the level-0 hand fell back");
+}
