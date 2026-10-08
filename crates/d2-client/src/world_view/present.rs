@@ -92,6 +92,8 @@ pub struct WorldViewState {
     /// The game's automap (`ui/automap.md`), when the app supplied its
     /// tables; `None`: no automap.
     pub automap: Option<crate::ui::automap::session::AutomapSession>,
+    /// The automap's draw sink (`super::automap_view`); `None`: not drawn.
+    pub automap_view: Option<super::automap_view::AutomapView>,
     /// The play preview (decision D1, [`super::preview`]): a frame whose
     /// build fails is logged (each message once) and not presented,
     /// instead of failing the app. `false`: strict (M07).
@@ -124,6 +126,7 @@ impl WorldViewState {
             last: None,
             click: Default::default(),
             automap: None,
+            automap_view: None,
             preview: false,
             preview_error: None,
             last_tags: Vec::new(),
@@ -682,6 +685,15 @@ fn world_view_frame(
         &mut frame,
     ) {
         warn!("preview (d2rs-own, unverified): {m}");
+    }
+    // `ui/automap.md` §10: the open automap's draw pass.
+    if let (Some(a), Some(v)) = (state.automap.as_mut(), state.automap_view.as_mut()) {
+        let world = bridge.0.world();
+        if let Ok(mode) = state.feed.open_mode(world) {
+            for m in v.add_to_frame(a, world, mode, &mut state.assets, &mut frame) {
+                warn!("preview (d2rs-own, unverified): {m}");
+            }
+        }
     }
     // `ui/automap.md` §5 r1: the reveal of this frame, after the draw
     // marked its records (from the frame `0x0044C7EB`).

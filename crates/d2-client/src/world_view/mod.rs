@@ -28,6 +28,7 @@
 //! The client decides no outcome here (CLAUDE.md rule 7): this module only
 //! reads the model.
 
+pub mod automap_view;
 pub mod feed;
 pub mod ground_items;
 pub mod interact;

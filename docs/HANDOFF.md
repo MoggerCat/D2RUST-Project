@@ -5910,6 +5910,13 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 - Output: `pc2rec-r46-packets.jsonl`.
 - Compare: the client_out 0x67 (seq 1) bytes @0x11–@0x14, @0x25, @0x27, @0x2B–@0x2D against §7 r9's table; S→C 0x01 u32@2 = u32@0x27 & 0x3179C7 and u8@6 = 0 (`intents-events.md` §8.1). Fold: replace the PROVISIONAL in `client/model.md` §7 r9.
 
+##### REC-47 [MANUAL] Automap in the play preview (draw modes, header, markers)
+- Priority 3 (manual play; the preview's automap is d2rs-own, unverified).
+- Settles: `ui/automap.md` automap-0001 / automap-0002 (the cel draw modes of §10 r4, the clip rectangle and origin of §9) against the preview, which draws every cel opaque, no header or name text, and only the local player's marker (`docs/handoff/q-automap.md`).
+- Steps: New character, Blood Moor, walk 30 s, Tab (full), screenshots; fade options 0–3; options → mini.
+- Output: screenshots / `--draws-every 1` trace.
+- Compare: cel draws (order, X, Y, mode) and marker lines vs §10 and §11.
+
 #### Deferred (not recorded; outside Phases 0–6)
 - IT-1 `formats/d2s.md` OQ1 (legacy loader `0x00534020`, pre-1.09 saves), IT-2 OQ2 (item records of save versions 0x5C–0x5F), `formats/d2s-legacy.md` and `items/bitstream-legacy.md` Pending lines (1.07 / 1.08 / 1.00–1.06 saves): need sample files and are only needed if old saves must load. Record only if the user opens that scope.
 - **REC-44** legacy saves, cited by the specs as the capture: `formats/d2s-legacy.md` OQ2 (load one 1.07 / 1.08 save, version 0x57 / 0x59, in 1.14d and compare the unit (stats, skills, items, hireling) with the rules), `items/bitstream-legacy.md` OQ1 (the same 1.07 / 1.08 save: every item against §2–§4, affix ids after the offset of §2 rule 3) and OQ2 (a 1.00–1.06 save, version 0x47, holding a stored, equipped, belt, cursor and socketed item, an ear and a corpse with an equipped item: compare with §6–§8 and edge cases 7–9). No such save exists on this PC; record only if the user opens that scope (steps: place the save in `%USERPROFILE%\Saved Games\Diablo II`, `record_packets.py --seconds 60` plain, then `tools/d2s_check.py`).
