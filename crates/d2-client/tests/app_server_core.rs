@@ -244,7 +244,7 @@ fn an_out_of_range_walk_resyncs_the_client_with_0x15() {
     assert_eq!(r[10], 1);
 }
 
-// Covers: specs/skills/use.md §3 (run to the target), specs/sim/pathing.md §1.2
+// Covers: specs/skills/use.md §3, specs/sim/pathing.md §1.2
 #[test]
 fn a_left_skill_on_a_far_monster_runs_the_server_player_to_it() {
     let mut g = Game::joined();
@@ -294,7 +294,10 @@ fn item_at(g: &mut Game, dx: i32, owned: bool) -> u32 {
                 .expect("item allocated");
             let guid = s.game.lists.unit(it).unwrap().guid;
             if owned {
-                let inv = s.world.inventory.as_mut().expect("inventory model");
+                // The synthetic game has no inventory model: an empty one.
+                let inv = s.world.inventory.get_or_insert_with(|| {
+                    d2_server::adapters::handlers::world::preview_inv_parts(Default::default())
+                });
                 let mut rec = d2_sim::items::inventory::InvItem::new(guid, 0);
                 rec.owner_guid = pguid;
                 inv.state.items.insert(it, rec);
@@ -316,7 +319,7 @@ fn run_to_item(g: &mut Game, guid: u32) -> String {
         .unwrap()
 }
 
-// Covers: specs/sim/intents-events.md §2.4 r4 (an item the player owns → accept)
+// Covers: specs/sim/intents-events.md §2.4 r4
 #[test]
 fn an_item_target_is_staged_with_its_owner() {
     let mut g = Game::joined();
