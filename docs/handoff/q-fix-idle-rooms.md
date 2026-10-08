@@ -58,6 +58,20 @@ waypoint.
   new unit with flags 0x3000000; a kept portal is placed again with
   flag 0x10.
 
+Other tests touched (no assertion weakened):
+- `smoke_combat::the_synthetic_play_join_is_clean`: staging's count (5,
+  Warriv) kept.
+- `app_assassin_gaps::a_lightning_sentry_fires_its_missile`: the stand-in
+  bolt row (the arrow row) had `ToHit` 1, so the hit hung on a 95 %-capped
+  roll of the trap's seed; one more town unit (Warriv) moved the seed into
+  the miss band. The stand-in row now has `ToHit` 0 (d2rs-own row).
+- `smoke_quests::act1_tower_andariel_and_the_way_east`: it spawned a
+  Warriv beside the player because the idle town had lost him (B2); he is
+  now restored at his place, beyond the NPC approach distance, so the test
+  walks up to him first (C→S 0x01). Its comment that the Moldy Tome is lost
+  when the Black Marsh's room is freed no longer holds (the tome row has
+  `Restore` 1 and the build's flags): the tower-first order can stay.
+
 ## PROVISIONAL (REC-287)
 
 Restored monster's allied flag from the record's alignment bit (the
