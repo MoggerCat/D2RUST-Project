@@ -29,21 +29,21 @@
 | Rules | 82–85 |
 |   1. Where formulas live | 86–176 |
 |   2. Bytecode | 177–222 |
-|   3. Evaluator | 223–339 |
-|   4. Compiler | 340–536 |
-|   5. Code tables (compile-time links, 1.14d) | 537–571 |
-| Constants & data dependencies | 572–589 |
-| Randomness | 590–608 |
-| Edge cases & original bugs | 609–618 |
-| d2rs policy (proposed, not yet logged in `docs/PLAN.md`; 1, 2, 4, 6 implemented) | 619–649 |
-| Test vectors | 650–651 |
-|   Real 1.14d formulas (`#[ignore]`, need `D2_GAME_DIR`) | 652–691 |
-|   Compiler, synthetic (skills family, 1.14d links) | 692–740 |
-|   Compiler, other families | 741–755 |
-|   Evaluator | 756–787 |
-|   Validation | 788–799 |
-| Provenance | 800–857 |
-| Open questions | 858–892 |
+|   3. Evaluator | 223–365 |
+|   4. Compiler | 366–574 |
+|   5. Code tables (compile-time links, 1.14d) | 575–609 |
+| Constants & data dependencies | 610–627 |
+| Randomness | 628–646 |
+| Edge cases & original bugs | 647–655 |
+| d2rs policy (proposed, not yet logged in `docs/PLAN.md`; 1, 2, 4, 6 implemented) | 656–689 |
+| Test vectors | 690–691 |
+|   Real 1.14d formulas (`#[ignore]`, need `D2_GAME_DIR`) | 692–731 |
+|   Compiler, synthetic (skills family, 1.14d links) | 732–780 |
+|   Compiler, other families | 781–795 |
+|   Evaluator | 796–827 |
+|   Validation | 828–839 |
+| Provenance | 840–897 |
+| Open questions | 898–931 |
 <!-- /index -->
 
 ## Summary
@@ -166,7 +166,7 @@ has formula columns.
    compiler can emit: 0x00, 0x01, 0x02, 0x04–0x16. Operands must fit inside
    the buffer.
 2. Every formula field must be 0xFFFFFFFF or an expression start.
-3. `misscode` must not contain CALL 2 (`rand`; policy 6, Open question 1).
+3. (Removed: `misscode` CALL 2 is legal, §3.5 `rand`.)
 4. Diagnostics, not errors: an expression start referenced by no field or
    by more than one; opcode 0x02 (§4.7); a CALL index without an evaluator
    entry (§3.4).
@@ -298,19 +298,45 @@ specs, stat values to the stats spec, the seed to the RNG spec.
 | Family | Context | Parameter callback `param(c)` |
 |---|---|---|
 | skills, skilldesc | caster unit, skill id, skill level | special value `c` (skillcalc index, low 8 bits) of the context skill at the context level |
-| missiles | missile unit, owner unit, missile id, missile level | missile special value `c` (misscalc index) of the context missile |
+| missiles | missile unit, owner unit, missile id, missile level | missile special value `c` (misscalc index, low 8 bits) of the context missile |
 | items | unit, item unit | always 0 |
 
 "No unit" = the context's unit is absent; "no context" = the caller passed
-no context at all. Items functions read only the unit; which unit each
-caller passes belongs to the items spec (Open question 6).
+no context at all. Items functions read only the unit. The items entry
+`0x00627C20(unit, item, offset)` has 11 call sites in 5 routines; the
+unit is always the one the item acts on, the item is the second word:
+- server item use: the dispatcher `0x005BF240` calls the misc `pSpell`
+  handler from its 8-byte table at `0x00741790` with the target unit;
+  the handlers `0x005BE3F0`, `0x005BE7B0`, `0x005BEAC0`, `0x005BEDA0`
+  (`pSpell` 3, 4, 5, 9; the entry's second slot, +4) pass it as the
+  unit. The target is the player
+  for UseGridItem / UseItemAction / UseBeltItem (`0x0055E170`,
+  `0x00561ED0`, `0x00562390`), the hireling for UseBeltItem onto the
+  hireling (`items/inventory-moves.md` §7.17) and for the hireling's own
+  item use `0x0054D230`.
+- client tooltip `0x00486370` (`spelldesc` text, field `spelldesccalc`
+  +0xA4): the local player unit (`0x00463DD0` → `[0x007A6A70]`).
 
 Functions:
 - `min(a, b)`, `max(a, b)`: signed minimum / maximum.
 - `rand(a, b)`: no context → 0. `a ≥ b` → `a`, no RNG draw. Otherwise
   `a + R(b − a + 1)` (§Randomness) on the unit's own seed
-  (skills, skilldesc: the caster; items: the unit). Missiles: Open
-  question 1. A context without a unit (skills `0x00643700`
+  (skills, skilldesc: the caster; items: the unit). Missiles
+  (`0x0064B720`): the seed is not the missile's. The context is a
+  16-byte block (missile unit, owner, missile id, level) in the frame of
+  the entry `0x0064B7C0`, and the function reads its seed at block +
+  0x20, which is the entry's own 3rd and 4th stack arguments: `lo` =
+  the formula offset, `hi` = the missile-id argument as passed (−1 =
+  0xFFFFFFFF when the caller lets it default to the unit's class; the
+  default goes to a register, the slot keeps −1). The draw steps those
+  two slots, so a second `rand` in the same evaluation continues from
+  the stepped pair, and the pair is dropped when the entry returns: each
+  evaluation starts again from (offset, id argument). No unit seed is
+  read or changed; the result is a pure function of the formula offset
+  and the id argument (`0x0064B823`–`0x0064B850` build the block and
+  pass its address as the context; `0x0064B742` takes block + 0x20).
+  The missiles context is never null, so there is no "no context" case.
+  A context without a unit (skills `0x00643700`
   takes the seed at unit + 0x20 with no null test): `a ≥ b` → `a`;
   otherwise a null read in 1.14d. Unreachable with 1.14d data (the one
   `rand`, Imp Inferno `calc1`, is evaluated with its caster); d2rs
@@ -352,11 +378,19 @@ For each calc column of each record, in the order of §1.4:
 
 - space: 0x09–0x0D, 0x20. digit: `0`–`9`. letter: `A`–`Z`, `a`–`z`.
   alnum: digit or letter. `_` is not alnum.
-- Bytes ≥ 0x80: the original passes them to the C library's class tests as
-  negative values (undefined; Open question 2). d2rs: a byte ≥ 0x80
-  anywhere in the text (the first 256 cell bytes, even after a stop) is an
-  error and the table does not compile (Open question 10). 1.14d formula
-  cells are ASCII.
+- Bytes ≥ 0x80 (original): in none of the four classes. The tokenizer
+  passes them sign-extended to `isspace` / `isdigit` / `isalpha` /
+  `isalnum`, which in the C locale index a class table whose
+  128 entries below 0 are all 0 (table pointer `[0x0074AB98]` =
+  `0x006F9280`; locale flag `0x0096DFE4` is set only by `setlocale`
+  `0x0069263E`, which nothing calls). The token dispatch compares the
+  sign-extended byte unsigned against 0x5E (`0x006C14C5`), so a byte
+  ≥ 0x80 at a token start is a stop (`0x006C173D`). Hence: it ends a
+  number, word or suffix, stops at a token start, and is kept as-is
+  inside a quoted name (no class test there). d2rs: a byte ≥ 0x80
+  anywhere in the text (the first 256 cell bytes, even after a stop) is
+  an error and the table does not compile (policy 4, Open question 10).
+  1.14d formula cells are ASCII.
 
 #### 4.3 Tokens
 
@@ -400,7 +434,11 @@ Lookups:
   `par34` finds `par3`, `ln123` finds `ln12`; `LVL` misses.
 - **Stat mode**: the whole name, ASCII case-insensitive: `base` →
   (1, parameter), `mod` → (2, parameter), any other name (`accr`
-  included) → (0, parameter). Whole-name compare: Open question 9.
+  included) → (0, parameter). The test is `_strnicmp(name, literal, 32)`
+  (wrapper `0x00413590`; calls `0x00611AAC`/`0x00611ACC` skills,
+  `0x006314DF`/`0x006314FD` items); the literal's NUL ends the compare,
+  so it is a whole-name compare: `basex` → 0, `BASE` → 1. The third
+  compare (`accr`) has its result discarded.
 
 | Family | Context | Resolution |
 |---|---|---|
@@ -613,8 +651,7 @@ continues after COND (§3.3; D2MOO returns), missile `miss()` (§3.4),
 stops, open parens and argument counts (§4.7), name contexts (§4.4),
 4-byte codes (§5). Differences (d2rs policy): −2³¹ / −1 gives −2³¹ (the
 original crashes, when folding or at run time; unreachable from 1.14d
-data); a byte ≥ 0x80 is an error (§4.2); a missile formula with CALL 2 is
-rejected (its seed source, Open question 1).
+data); a byte ≥ 0x80 is an error (§4.2).
 
 ## d2rs policy (proposed, not yet logged in `docs/PLAN.md`; 1, 2, 4, 6 implemented)
 
@@ -643,9 +680,12 @@ rejected (its seed source, Open question 1).
 5. Evaluator: §3 exactly (it accepts any bytes; d2-data hands it
    validated buffers); −2³¹ / −1 gives −2³¹ (wrapping) instead of
    crashing; `^` uses wrapping exponentiation by squaring.
-6. Missile `rand()`: a missile formula whose compiled bytes contain CALL 2
-   is an error until the seed source is settled (Open question 1); no
-   1.14d data uses it. The validator rejects it too (§1.5).
+6. Missile `rand()`: evaluated per §3.5 (seed = formula offset and
+   missile-id argument, discarded after the evaluation); no 1.14d data
+   uses it. Under `Ruleset::Mod` offsets move with the rebuild
+   (policy 3), so the same mod formula can roll differently from a
+   1.14d build that placed it elsewhere; this is the original rule
+   applied to the rebuilt buffer.
 
 ## Test vectors
 
@@ -857,35 +897,34 @@ sign-extended (D2MOO: zero-extended).
 
 ## Open questions
 
-1. Missile `rand()` (0x64B720) takes its seed address as context + 0x20,
-   while the missile context block is 16 bytes on the stack of the entry
-   routine 0x64B7C0, so the 8 seed bytes lie elsewhere in that routine's
-   frame (possibly its own argument slots). What they hold, and whether the
-   draw is deterministic, was not traced. Unused in 1.14d.
-2. Bytes ≥ 0x80 in a formula: behavior of the 1.14d CRT class tests
-   (`isspace`, `isdigit`, `isalpha`, `isalnum`) for negative `char`
-   values was not examined. No 1.14d formula has one.
+1. Answered (static, 1.14d `0x0064B720`, `0x0064B7C0`, evaluator CALL
+   path `0x006C0D8D`–`0x006C0D9B` pushing the context): the seed is the
+   entry's (offset, missile-id argument) slots; deterministic and
+   stateless (§3.5 `rand`).
+2. Answered (static, 1.14d class table `0x006F9280`, dispatch
+   `0x006C14C5`): a byte ≥ 0x80 is in no class (§4.2).
 3. Compile failures other than "nothing produced" (operand count, `)`
    without `(`, 64 pending entries, buffer limits) are taken from the code;
    no 1.14d cell triggers them. Same for every POW/LE/GE/EQ/NE/PARAM16/
    PARAM32/INT32 path.
-4. A missing code file at run time: the entries return 0 when the buffer
-   pointer is null; whether the archive read leaves the pointer null (and
-   the size defined) on a missing file was not traced. d2rs treats a
-   missing code file as a load error (`loading.md` §4.3).
+4. Answered (static, 1.14d): a missing code file leaves the buffer
+   pointer null and loading continues (`loading.md` §4.3), so every
+   formula of that family evaluates to 0 (§3.1). d2rs treats a missing
+   code file as a load error.
 5. Answered by `skills/levels.md` §2 (special values `0x00646460`,
    `0x0064B340`); the stat getters behind `stat`: Answered
    (2026-10-08), §3.5 `stat`.
-6. Items context: no items function reads the second word (the item, in
-   the one caller checked); which unit each of the 5 callers passes as
-   the first word (the one `stat` and `rand` use) was not traced.
-7. Behavior when a skills special-value code is ≥ 256 (the callee takes
-   the low 8 bits): only reachable with hand-made PARAM16 operands.
+6. Answered (static, 1.14d; all 11 calls of `0x00627C20`): first word =
+   the unit the item is used on (player or hireling), or the client's
+   local player for tooltips; second word = the item (§3.5).
+7. Answered (static, 1.14d): the parameter callbacks `0x00646BE0`
+   (skills) and `0x0064B6E0` (missiles) pass the operand's full 32 bits;
+   `0x00646460` reads only its low byte (`movzx` at `0x00646495`), as
+   does `0x0064B340` (`0x0064B387`). A PARAM16/PARAM32 operand `c` acts as
+   `c & 0xFF`, then `skills/levels.md` §2 applies (> 72, resp. > 42 → 0).
 8. Answered by `skills/levels.md` §1: flag 1 of the level getter means
    "with bonuses" in 1.14d; `skill(s, c)` passes 1.
-9. Stat mode (§4.4): d2rs compares the whole name case-insensitively
-   (`basex` → 0); a prefix compare would give 1. 1.14d formulas use only
-   `.accr`, so the data cannot decide.
-10. The refusals of d2rs policy 4 and 6 (byte ≥ 0x80, missile `rand`)
-    have no `txt-format.md` §9 code; d2rs reports both as E11 with a
-    detail text.
+9. Answered (static, 1.14d `0x006119F0`, `0x006314A0`): `_strnicmp`
+   with n = 32 against `base` / `mod`, a whole-name compare (§4.4).
+10. The refusal of d2rs policy 4 (byte ≥ 0x80) has no `txt-format.md`
+    §9 code; d2rs reports it as E11 with a detail text.

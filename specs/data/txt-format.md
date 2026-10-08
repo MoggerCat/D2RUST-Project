@@ -941,8 +941,8 @@ rule above comes from the 1.14d binary and data.
 
 ## Open questions
 
-1. In compile mode, whether the `.bin` read after writing is the loose file
-   just written or the archive copy: `loading.md` open questions 2–3.
+1. Answered by `loading.md` open questions 2–3: the archive copy, unless
+   `-direct` is also given.
 2. Table-specific field callbacks (types 23–25): what each 1.14d callback
    does with a bound cell and with no text. Per-table specs
    (`field-types.md` §8).

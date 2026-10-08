@@ -32,15 +32,15 @@
 |   5. Text, codes and names | 230–256 |
 |   6. Linkers (key → index) | 257–365 |
 |   7. String keys (`strkey`) | 366–397 |
-|   8. Callback fields (`cb`) | 398–449 |
-|   9. Records | 450–470 |
-|   10. Comparing a compiled `.txt` with a shipped `.bin` | 471–504 |
-| Constants & data dependencies | 505–519 |
-| Randomness | 520–523 |
-| Edge cases & original bugs | 524–531 |
-| Test vectors | 532–657 |
-| Provenance | 658–736 |
-| Open questions | 737–772 |
+|   8. Callback fields (`cb`) | 398–454 |
+|   9. Records | 455–475 |
+|   10. Comparing a compiled `.txt` with a shipped `.bin` | 476–509 |
+| Constants & data dependencies | 510–524 |
+| Randomness | 525–528 |
+| Edge cases & original bugs | 529–536 |
+| Test vectors | 537–662 |
+| Provenance | 663–741 |
+| Open questions | 742–777 |
 <!-- /index -->
 
 ## Summary
@@ -431,6 +431,11 @@ store u16 (id if id ≠ 0 else 5,382)
 - No text, or empty text → u32 0.
 - First byte `-` or `0`–`9` → C `atol(text)`: optional sign, decimal digits,
   stop at the first non-digit (`41` → 41, `-5` → −5, `12abc` → 12).
+  1.14d `atol` (`0x00681E95`) is `strtol(text, NULL, 10)` (`0x0068676E`
+  → `0x00686543`, C locale): a `-` followed by a non-digit gives 0
+  (`-x`, `--5`, `- 5` → 0); out of range saturates (`0x006866E4`–
+  `0x0068670F`): `4294967296` → 2147483647, `-3000000000` →
+  −2147483648, `-2147483648` → −2147483648 (errno is set and unread).
 - Otherwise look up the name (§5.3, E11 included) in the skills linker (`skills.skill`),
   then `montype.type`, then `states.state`. The first hit gives the index.
   No hit → 0. A linker that does not exist yet is skipped.
@@ -745,8 +750,8 @@ functions) agrees with every rule here.
    from the code only.
 5. The duplicate-code bump (§6.1) comes from the code only. No 1.14d lookup
    uses a bumped key.
-6. `atol` edge cases in `param` (overflow, MSVC CRT behavior) were not
-   checked; all 1.14d `param` numbers are small.
+6. Answered (static, 1.14d `0x00681E95` → `strtol` `0x00686543`):
+   saturating, sign then digits only (§8.2).
 7. Policy for monstats record 707 `NameStr`: keep the shipped 5382 or the
    compiled 11154 when d2rs compiles that table (§10).
 8. Whether string-table element numbering is the same in every language.
