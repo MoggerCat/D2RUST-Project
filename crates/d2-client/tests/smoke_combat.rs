@@ -49,6 +49,11 @@ use d2_server::host::{Handled, Host};
 use d2_server::seams::{Clock, ResultCode};
 use d2_sim::bench_fixtures::combat as fx;
 use d2_sim::combat::vitals::VitalsTables;
+use d2_sim::items::inventory::tables::InvItemRec;
+use d2_sim::items::inventory::InvItem;
+use d2_sim::items::moves::ty;
+use d2_sim::items::tables::ItemRec;
+use d2_sim::items::{q, ItemRequest};
 use d2_sim::missiles::unit_flag as flags;
 use d2_sim::monsters::ai::{install, AiControl};
 use d2_sim::stats::{stat, StatLists};
@@ -57,6 +62,7 @@ use d2_sim::units::hooks::{MonsterInfo, UnitData};
 use d2_sim::units::lifecycle::AllocRequest;
 use d2_sim::units::{UnitId, UnitType};
 use d2_sim::wiring::action::ActionTables;
+use d2_sim::wiring::economy::ItemSpawn;
 
 const STATPTS: u16 = 4;
 const NEWSKILLS: u16 = 5;
@@ -239,6 +245,41 @@ fn install_fixtures(sim: &mut single_player::Sim) {
         }],
         ..UnitData::default()
     };
+    add_potion_rows(sim);
+}
+
+/// The `hp1` row appended to the synthetic item tables (which hold gems
+/// and runes only): a healing potion, auto-belted, usable, of a beltable
+/// type (as `d2-server`'s item-move tests). Returns nothing; the record
+/// is the last of the combined array.
+fn add_potion_rows(sim: &mut single_player::Sim) {
+    let w = &mut sim.world;
+    w.tables.items.push(ItemRec {
+        code: *b"hp1 ",
+        type_: ty::HPOT as i16,
+        level: 1,
+        invwidth: 1,
+        invheight: 1,
+        spawnable: 1,
+        ..ItemRec::default()
+    });
+    if let Some((start, n)) = w.tables.parts[2] {
+        w.tables.parts[2] = Some((start, n + 1));
+    }
+    let inv = w
+        .inventory
+        .as_mut()
+        .expect("the synthetic inventory tables");
+    inv.tables.items.push(InvItemRec {
+        code: *b"hp1 ",
+        type_: ty::HPOT as i16,
+        invwidth: 1,
+        invheight: 1,
+        autobelt: 1,
+        useable: 1,
+        ..InvItemRec::default()
+    });
+    inv.tables.itemtypes[usize::from(ty::HPOT)].beltable = 1;
 }
 
 /// The client's skill rows (`msg-skills.md` Inputs) for the same table.
@@ -519,6 +560,52 @@ impl Rig {
             .map(|u| u.key.guid)
     }
 
+    /// A healing potion (`hp1`) on the ground one sub-tile east of the
+    /// player, as a drop leaves it (mode 3, unit flag 0x10); its GUID.
+    fn drop_potion(&mut self) -> u32 {
+        app_support::with(&self.server, |l| {
+            let sim = &mut l.host_mut().game;
+            let (p, _) = single_player::local_player(sim).expect("joined");
+            let (px, py) = sim.events.action.sys.hooks.path_position(p);
+            let room = sim.game.lists.unit(p).and_then(|e| e.room());
+            let record = sim.world.tables.items.len() - 1;
+            let mut rq = ItemRequest {
+                item: record as i32,
+                format: 101,
+                ilvl: 1,
+                quality: q::NORMAL,
+                flags2: 0x2,
+                ..ItemRequest::default()
+            };
+            let (game, events, world) = (&mut sim.game, &mut sim.events, &mut sim.world);
+            let u = world
+                .with_economy(game, events, |econ, _| {
+                    econ.create_item(
+                        &mut rq,
+                        false,
+                        ItemSpawn {
+                            room,
+                            mode: 3,
+                            init_flags: 1,
+                        },
+                    )
+                })
+                .expect("the potion");
+            let a = &mut events.action.sys;
+            a.hooks.items.get_mut(u).unwrap().flags |= 0x10;
+            let guid = a.units.get(u).unwrap().guid;
+            world.inventory.as_mut().unwrap().state.items.insert(
+                u,
+                InvItem {
+                    x: px + 1,
+                    y: py,
+                    ..InvItem::new(guid, record)
+                },
+            );
+            guid
+        })
+    }
+
     fn monster_alive(&self, guid: u32) -> bool {
         let w = self.bridge().world();
         w.units
@@ -686,6 +773,66 @@ fn scenario(class: u8) {
             .count()
     });
     assert_eq!(left, 0, "class {class}: the server freed the corpse");
+
+    // A healing potion: picked up into the belt (C→S 0x16 type 4,
+    // `inventory-moves.md` §7.1, §8.1), then drunk from it (0x26, §7.17;
+    // the effect is PROVISIONAL REC-102: life over time).
+    let potion = r.drop_potion();
+    let mut m = vec![0x16];
+    m.extend_from_slice(&4u32.to_le_bytes());
+    m.extend_from_slice(&potion.to_le_bytes());
+    m.extend_from_slice(&0u32.to_le_bytes());
+    r.send(&m);
+    r.step(4, "pick up the potion");
+    let in_belt = {
+        let w = r.bridge().world();
+        d2_client::bridge::items::belt(w)
+            .values()
+            .any(|i| i.key.guid == potion)
+    };
+    assert!(
+        in_belt,
+        "class {class}: the potion reached the client's belt"
+    );
+    let (p, _) = r.player();
+    let max = r.server_stat(stat::MAXHP);
+    app_support::with(&r.server, move |l| {
+        let sim = &mut l.host_mut().game;
+        sim.events.action.with(&mut sim.game, |_, v| {
+            v.set_base(p, stat::HITPOINTS, max / 4)
+        });
+    });
+    r.step(2, "wounded");
+    let low = r.client_stat(stat::HITPOINTS);
+    assert_eq!(
+        r.server_stat(74),
+        0,
+        "class {class}: no life regeneration yet"
+    );
+    let mut m = vec![0x26];
+    m.extend_from_slice(&potion.to_le_bytes());
+    m.extend_from_slice(&[0; 8]);
+    r.send(&m);
+    r.step(2, "drink");
+    // Stat 74 (life regeneration per tick) is the potion list's.
+    let regen = r.server_stat(74);
+    assert!(
+        regen > 0,
+        "class {class}: the potion's life list is on ({regen})"
+    );
+    r.step(58, "the potion works");
+    let healed = r.client_stat(stat::HITPOINTS);
+    assert!(
+        healed > low,
+        "class {class}: the potion healed ({low} → {healed})"
+    );
+    let gone = {
+        let w = r.bridge().world();
+        !d2_client::bridge::items::belt(w)
+            .values()
+            .any(|i| i.key.guid == potion)
+    };
+    assert!(gone, "class {class}: the potion left the belt");
 }
 
 /// `play --synthetic`'s client rows: the join and the town's NPCs reach
