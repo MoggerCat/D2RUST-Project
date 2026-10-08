@@ -72,6 +72,17 @@ use crate::rules::camera::OpenMode;
 /// are), so [`UiRoot::sync_states`] leaves it open.
 pub const BORDER_PANEL: PanelId = PanelId(0x100);
 
+/// The Esc-closable states (`panels.md` §2 r9, flag table `0x006D6378`
+/// = 1), in the close-all's order i = 0 … 37.
+pub const ESC_CLOSABLE: [u8; 27] = [
+    1, 2, 3, 4, 5, 9, 0x0B, 0x0C, 0x0D, 0x0F, 0x10, 0x12, 0x14, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B,
+    0x1C, 0x1D, 0x1E, 0x1F, 0x20, 0x21, 0x24, 0x25,
+];
+
+/// The states the game menu's open remembers and its close reopens
+/// (`frontend-options.md` §O1 r2: keep = 1).
+pub const GAME_MENU_KEEP: [u8; 6] = [6, 7, 10, 17, 21, 35];
+
 /// The click sound of §10.2: `0x004B9A00(0, 0, 0)` = request id 0, no
 /// unit, delay 0 (`audio/triggers.md` §1 r1).
 pub const CLICK_SOUND_ID: i32 = 0;
@@ -134,7 +145,7 @@ pub struct UiConfig {
 }
 
 /// One `inventory.bin` `inv` rectangle (§4.4, §9.2): left, right
-/// (exclusive), top, bottom.
+/// (exclusive), top, bottom (inclusive).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct InvArea {
     pub left: i32,
@@ -144,11 +155,11 @@ pub struct InvArea {
 }
 
 impl InvArea {
-    /// The right panel's click area (§4.4). Bottom is read exclusive like
-    /// right: the spec does not say (handoff `impl-ui-panels` §3).
+    /// The right panel's click area (§4.4): left ≤ x < right, top ≤ y ≤
+    /// bottom (`panels-2.md` §18 r2: bottom inclusive).
     pub fn rect(&self) -> Rect {
         let w = u16::try_from(self.right - self.left).unwrap_or(0);
-        let h = u16::try_from(self.bottom - self.top).unwrap_or(0);
+        let h = u16::try_from(self.bottom - self.top + 1).unwrap_or(0);
         Rect::new(self.left, self.top, w, h)
     }
 }
@@ -225,6 +236,9 @@ struct Shared {
     waypoint_open: Option<WaypointOpen>,
     /// The Esc game menu's state ([`esc_menu`]).
     esc: esc_menu::EscState,
+    /// The ui states the game menu's open closed and reopens at its close
+    /// (`frontend-options.md` §O1 r2–r3, `0x00713060`).
+    esc_kept: Vec<u8>,
     /// The quest log's inputs ([`quest_log_ui`]).
     quest: quest_log_ui::QuestInputs,
     /// The inventory gold button and the drop-gold dialog ([`gold_dialog`]).
@@ -366,6 +380,7 @@ impl OriginalUi {
             waypoint_map: None,
             waypoint_open: None,
             esc: esc_menu::EscState::default(),
+            esc_kept: Vec::new(),
             quest: quest_log_ui::QuestInputs::default(),
             gold: gold_dialog::GoldState::default(),
             messages: Default::default(),
@@ -576,8 +591,21 @@ impl OriginalUi {
             match o {
                 PanelOutput::Intent(i) => root.queue_intent(i),
                 // A refused call (returns 0) changes nothing (§2.4).
+                // The mini panel's menu button opens the game menu through
+                // `0x0047E090(1, 0)` (`frontend-options.md` §O1 r2).
+                PanelOutput::SetUi { ui, mode: 0, .. }
+                    if ui == super::states::id::ESC_MENU && !self.is_open(ui) =>
+                {
+                    self.open_game_menu()?;
+                }
                 PanelOutput::SetUi { ui, mode, jump } => {
+                    let was_menu = ui == super::states::id::ESC_MENU && self.is_open(ui);
                     self.set_ui(u32::from(ui), u32::from(mode), jump)?;
+                    // Return to Game closes the menu through
+                    // `0x0047E200(1)` (`frontend-options.md` §O1 r3).
+                    if was_menu && !self.is_open(ui) {
+                        self.restore_game_menu_states()?;
+                    }
                 }
                 PanelOutput::ClickSound => {
                     self.outcome.sounds.push(SoundRequest::Ui(CLICK_SOUND_ID))
@@ -604,43 +632,58 @@ impl OriginalUi {
         Ok(())
     }
 
-    /// Esc (command 56, `controls.md` §3): the open menu closes; else the
-    /// open panels close; else the menu opens. Which panels Esc closes is
-    /// d2rs-own, unverified (`0x00456300` is not specified).
+    /// Esc (command 56, `frontend-options.md` §O1 r2–r4): with ui 9 open
+    /// the menu closes and the remembered states reopen (§O1 r3); else
+    /// the close-all `0x00456300(0, 1)` (`panels.md` §2 r9) runs and the
+    /// menu opens only when it closed nothing (§O1 r2). The command's
+    /// no-op while an NPC interaction or a modal text screen is active is
+    /// not modelled (the NPC menu is not ui 8 in play).
     fn game_menu_key(&mut self) -> Result<(), OriginalUiError> {
         use super::states::id;
-        const CLOSEABLE: [u8; 17] = [
-            id::INVENTORY,
-            id::CHARACTER,
-            3,
-            id::SKILL_TREE,
-            id::NEW_STATS,
-            id::NEW_SKILLS,
-            id::NPC_MENU,
-            id::NPC_SHOP,
-            id::QUEST_SCREEN,
-            id::INI_SCROLL,
-            id::QUEST_LOG,
-            id::WAYPOINT,
-            id::PARTY,
-            id::STASH,
-            id::CUBE,
-            id::MERC_INV,
-            id::RECIPE_SCROLL,
-        ];
         if self.is_open(id::ESC_MENU) {
             self.set_ui(u32::from(id::ESC_MENU), 1, false)?;
+            self.restore_game_menu_states()?;
             return Ok(());
         }
         let mut closed = false;
-        for ui in CLOSEABLE {
+        for ui in ESC_CLOSABLE {
             if self.is_open(ui) {
                 self.set_ui(u32::from(ui), 1, true)?;
                 closed = true;
             }
         }
         if !closed {
-            self.set_ui(u32::from(id::ESC_MENU), 0, false)?;
+            self.open_game_menu()?;
+        }
+        Ok(())
+    }
+
+    /// `0x0047E090(save 1, menu 0)` (`frontend-options.md` §O1 r2): every
+    /// ui but 0 and 9 closes, the open ones of [`GAME_MENU_KEEP`] are
+    /// remembered, then ui 9 opens.
+    fn open_game_menu(&mut self) -> Result<(), OriginalUiError> {
+        use super::states::id;
+        let mut kept = Vec::new();
+        for ui in 0..=37u8 {
+            if ui == id::GAME || ui == id::ESC_MENU || !self.is_open(ui) {
+                continue;
+            }
+            if GAME_MENU_KEEP.contains(&ui) {
+                kept.push(ui);
+            }
+            self.set_ui(u32::from(ui), 1, false)?;
+        }
+        self.shared.borrow_mut().esc_kept = kept;
+        self.set_ui(u32::from(id::ESC_MENU), 0, false)?;
+        Ok(())
+    }
+
+    /// `0x0047E200(1)` after ui 9 closed (`frontend-options.md` §O1 r3):
+    /// the states remembered at the open reopen with jump 0.
+    fn restore_game_menu_states(&mut self) -> Result<(), OriginalUiError> {
+        let kept = std::mem::take(&mut self.shared.borrow_mut().esc_kept);
+        for ui in kept {
+            self.set_ui(u32::from(ui), 0, false)?;
         }
         Ok(())
     }

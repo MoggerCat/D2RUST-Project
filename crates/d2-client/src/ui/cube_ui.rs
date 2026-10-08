@@ -24,7 +24,7 @@ use crate::ui::draw::{ImageRef, ImageRequest, UiDraw, UiDrawSink};
 use crate::ui::geom::{Point, Rect};
 use crate::ui::panel::{Panel, PanelId, UiCtx, UiEvent, UiResponse, WidgetId};
 use crate::ui::panels;
-use crate::ui::panels::cube_items::cube_present;
+use crate::ui::panels::cube_items::cube_player_ok;
 use crate::ui::panels::stash_cube::{horadric_pos, CubePanel, STR_TRANSMUTE, UI_CUBE};
 use crate::ui::panels::stash_input::{
     cube_close_hit, cube_tooltips, transmute_hit, Pointer, StashCubeInput,
@@ -70,12 +70,12 @@ impl Panel for CubeUi {
             close_pressed: self.input.cube_close_pressed,
             transmute_pressed: self.input.transmute_pressed,
         };
-        // The cube-gone close (§12.2, two 0x4F 0x17) is not sent from a
-        // draw: outputs leave only after an event, so
+        // The dead / no-player close (§12.2, two 0x4F 0x17) is not sent
+        // from a draw: outputs leave only after an event, so
         // [`OriginalUi::cube_poll`] sends it. The panel draws nothing
-        // while the cube item is absent.
+        // that frame.
         if !panel
-            .draw(&sh.tables, &env, cube_present(ctx.world), out)
+            .draw(&sh.tables, &env, cube_player_ok(ctx.world), out)
             .is_empty()
         {
             return;
@@ -184,9 +184,9 @@ impl Panel for CubeUi {
 }
 
 impl OriginalUi {
-    /// Once per pass: when ui 0x1A is open and the cube item is no longer
-    /// in the model (moved out of the inventory, sold, dropped), the
-    /// cube-gone close of `panels.md` §12 r2 / `panels-2.md` §20 r4:
+    /// Once per pass: when ui 0x1A is open and the local player is missing
+    /// or dead (mode 0x11), the close of `panels.md` §12 r2 /
+    /// `panels-2.md` §20 r4 (a missing cube does not close it):
     /// `SetUIState(0x1A, off)`, then C→S 0x4F 0x17 twice (the latched
     /// close, then the unconditional one). The state was just open, so
     /// the close latch is the open's (clear). Nothing otherwise.
@@ -195,7 +195,7 @@ impl OriginalUi {
         world: &ClientWorld,
         root: &mut UiRoot,
     ) -> Result<(), OriginalUiError> {
-        if !self.is_open(id::CUBE) || cube_present(world) {
+        if !self.is_open(id::CUBE) || cube_player_ok(world) {
             return Ok(());
         }
         for o in StashCubeInput::default().cube_gone(true) {

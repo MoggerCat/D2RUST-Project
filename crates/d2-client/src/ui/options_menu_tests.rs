@@ -197,3 +197,20 @@ fn click_activates_on_release_and_hover_selects() {
     o.release(pt(400, 340));
     assert_eq!(o.menu, MenuId::Options);
 }
+
+// Party Names is enabled only while Show Party is on (`0x004577B0`).
+// Covers: specs/ui/frontend-options.md §o2-menu-records-and-the-tree r3
+#[test]
+fn party_names_is_enabled_only_while_the_party_is_shown() {
+    let mut o = menu_at(MenuId::Automap);
+    let names = row_of(&o, Row::MapNames);
+    let mut s = Settings {
+        automap_party: 1,
+        ..Settings::default()
+    };
+    o.set_settings(s);
+    assert!(o.enabled(names));
+    s.automap_party = 0;
+    o.set_settings(s);
+    assert!(!o.enabled(names));
+}
