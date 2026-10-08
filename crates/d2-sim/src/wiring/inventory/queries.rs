@@ -175,6 +175,28 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
         self.sync_in();
     }
 
+    /// The stat link of a worn item (`stat-lists.md` §8.4, equip
+    /// `0x00627910`): the item's own list (its base damage, armor and
+    /// properties, and the lists of its socketed fillers attached to it)
+    /// is attached to the wearer.
+    // d2rs-own, unverified (REC-158): called from the equip paths of the
+    // move handlers; the original's stat-link function is not specified.
+    pub(super) fn link_item_stats(&mut self, unit: UnitId, item: UnitId) {
+        let l = self.econ.stats.unit_list(item);
+        self.econ
+            .stats
+            .equip(&mut *self.econ.hooks, unit, l, false, true);
+    }
+
+    /// The reverse of [`Self::link_item_stats`]: the item's list leaves
+    /// the wearer (the list stays the item's).
+    // d2rs-own, unverified (REC-158).
+    pub(super) fn unlink_item_stats(&mut self, item: UnitId) {
+        if let Some(l) = self.econ.stats.unit_list(item) {
+            self.econ.stats.detach(&mut *self.econ.hooks, l);
+        }
+    }
+
     /// The runeword step of `inventory-moves.md` §7.19 step 3 on `target`:
     /// the record of `properties.md` §10.1 on the target's inventory, then
     /// §10.2 (`0x006600A0`: a `server` row needs game +0x74; a target that

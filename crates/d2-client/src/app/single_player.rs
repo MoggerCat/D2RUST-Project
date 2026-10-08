@@ -736,6 +736,21 @@ impl Pending for LocalSeams {
     fn item_is(&self, item: UnitId, itype: i32) -> bool {
         self.weapons.item_is(item, itype)
     }
+    // d2rs-own, unverified (q-weapon-combat, REC-158): combat's weapon is
+    // the weapon in use; its damage reaches the wearer through the
+    // linked stat list.
+    fn current_weapon(&self, unit: UnitId) -> Option<UnitId> {
+        self.weapons.weapon(unit)
+    }
+    fn weapon(&self, unit: UnitId) -> Option<UnitId> {
+        self.weapons.weapon(unit)
+    }
+    fn item_at(&self, unit: UnitId, loc: u8) -> Option<UnitId> {
+        self.weapons.item_at(unit, loc)
+    }
+    fn wield_type(&self, item: UnitId) -> i32 {
+        self.weapons.facts(item).grip
+    }
     fn item_shoots(&self, item: UnitId) -> bool {
         self.weapons.facts(item).shoots
     }
