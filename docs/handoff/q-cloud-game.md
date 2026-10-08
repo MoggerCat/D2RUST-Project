@@ -21,6 +21,25 @@ committed. Tools: `tools/cloud-game/` (README there).
 | 8 | The recorders' self-tests under Windows Python in Wine: `autostart.py --selftest`, `record_frames.py --selftest`. | Both exit 0 |
 | 9 | `fetch.sh`: sparse blob-less clone of the private repo, piece check against `install/manifest.json`, rebuild with its `assemble.py`. | `--partial` at private-repo `6b18585`: 20 files rebuilt, 0 sha256 mismatches, 3 skipped (pieces not uploaded) |
 
+## Round 2 (2026-10-08/09): the full install under Wine
+
+Private repo `5174f0c` (`install: complete` `6a5b2aa7` + `extracted:
+complete`); merged `origin/claude/specs-staging-7` (`40e9e1ec`).
+
+### Step 1 — menu and a game: works
+
+| Check | Result |
+|---|---|
+| `fetch.sh` | 23 files → `$HOME/game`, 0 mismatches |
+| `run.sh --seconds 20 --shot-at 15` | the LoD title screen at 15 s (800×600 window). The very first run after the install showed no window in 30 s (first-run set-up; not seen again) |
+| `prepare_saves.sh` | `ScnAma`, `ScnSor`, `TestSor` written and `check` OK in the prefix's `Saved Games\Diablo II` |
+| `autostart.py --try ScnAma --seed 1234` | menu left at 6.0 s, player in level 1 (Rogue Encampment) at 6.5 s, position [4873, 4228], act init seed 1234 (PC 1: arrival ≈ 6.3 s) |
+| `record_frames.py --auto ScnAma --seed 1234 --every 25 --draws-every 200 --input "wait 8; end"` | 11 frames, 154 ticks in 17 s; every frame video type 1 (GDI), 800×600, not refused, level 1 act 0; draw logs of 214 (seq 1) and 297 (seq 9) calls; the PNGs (`game/captures/<time>/`, gitignored) show the town with Warriv and the player: the framebuffer path replaces PrintWindow |
+
+Under Wine the game also logs ALSA "cannot find card" lines (no sound
+device; `-ns`) and wined3d "no GL" errors (unused: `-w` is GDI). Both
+harmless.
+
 ## What the recorders need from Windows, and the Wine plan
 
 Read: `tools/trace-recorder/README.md`, `record_rng.py` (the Win32 base),
