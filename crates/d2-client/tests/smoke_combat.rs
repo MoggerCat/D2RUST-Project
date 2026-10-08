@@ -506,6 +506,19 @@ impl Rig {
         })
     }
 
+    /// The GUID of the player unit that is not the local one: the
+    /// corpse (single player). Not matched on mode 17: a corpse that
+    /// comes back into view stays in 0x59's mode 5, because the add's
+    /// corpse 0x74 is not sent (open break 4 in
+    /// `docs/handoff/q-smoke-combat.md`).
+    fn corpse(&self) -> Option<u32> {
+        let w = self.bridge().world();
+        w.units
+            .values()
+            .find(|u| u.key.unit_type == 0 && Some(u.key) != w.local_player)
+            .map(|u| u.key.guid)
+    }
+
     fn monster_alive(&self, guid: u32) -> bool {
         let w = self.bridge().world();
         w.units
@@ -639,6 +652,40 @@ fn scenario(class: u8) {
     );
     assert!(!r.app.world().resource::<DeathScreen>().active);
     assert!(r.client_stat(stat::HITPOINTS) > 0);
+
+    // Back to the corpse: C→S 0x16 type 0 on it takes it back
+    // (`inventory-moves.md` §7.1, §12): S→C 0x8E, the corpse leaves.
+    r.leave_town();
+    r.step(10, "the corpse comes into view");
+    let corpse = r.corpse().expect("the corpse lies where the player died");
+    let mut taken = false;
+    for _ in 0..40 {
+        let mut m = vec![0x16];
+        m.extend_from_slice(&0u32.to_le_bytes());
+        m.extend_from_slice(&corpse.to_le_bytes());
+        m.extend_from_slice(&0u32.to_le_bytes());
+        r.send(&m);
+        r.step(8, "take the corpse back");
+        if r.corpse().is_none() {
+            taken = true;
+            break;
+        }
+    }
+    assert!(
+        taken,
+        "class {class}: the corpse {corpse} was not taken back"
+    );
+    let left = app_support::with(&r.server, move |l| {
+        let a = &l.host().game.events.action;
+        a.sys
+            .hooks
+            .death
+            .owners
+            .keys()
+            .filter(|&&c| a.sys.units.get(c).is_some_and(|u| u.guid == corpse))
+            .count()
+    });
+    assert_eq!(left, 0, "class {class}: the server freed the corpse");
 }
 
 /// `play --synthetic`'s client rows: the join and the town's NPCs reach
