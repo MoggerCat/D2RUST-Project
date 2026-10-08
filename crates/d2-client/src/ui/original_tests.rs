@@ -628,7 +628,7 @@ fn the_menu_tree_returns_saves_exits_and_swallows_clicks() {
     assert!(!u.ui.is_open(9));
 }
 
-// Covers: specs/ui/frontend-options.md §O9
+// Covers: specs/ui/frontend-options.md §o9-configure-controls-ui-11-ui-config r1
 #[test]
 fn configure_controls_opens_over_the_game_and_applies_the_bindings() {
     use crate::controls::{Action as Act, Key};
