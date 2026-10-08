@@ -14,8 +14,9 @@
 //! `triggers.md` §2 r2–r4) and the player event sounds the UI asks for
 //! (§3). Every other cause class needs input the client model does not
 //! hold; each is in [`PENDING`]. The [`SoundWorld`] questions the model
-//! cannot answer are not guessed: a request that asks one makes the frame
-//! fail ([`DriverError::Pending`]). A rule part whose input is not held
+//! cannot answer are not guessed: each is answered neutrally and named in
+//! [`SoundDriver::take_pending`] (never a frame error: a pending input
+//! must not stop play, `seams/bridge-app.md` §2.9). A rule part whose input is not held
 //! (an event's record, a follow-up's owner not wired) is skipped and
 //! named in [`SoundDriver::take_skipped`].
 
@@ -29,7 +30,9 @@ use crate::audio::triggers::objects::object_mode;
 use crate::audio::triggers::tables::ObjectSounds;
 use crate::audio::triggers::{detach_all, ui, Ctx, Globals, TriggerError, Unit, UnitSound};
 use crate::audio::{CueSource, TriggerQueue};
-use crate::bridge::world::{ClientWorld, LevelRow, UnitKey, MONSTER};
+use crate::bridge::world::{ClientUnit, ClientWorld, LevelRow, UnitKey, MONSTER};
+use crate::rules::UnitPosition;
+use crate::world_view::model_feed::unit_position;
 use d2_sim::rng::Seed;
 
 /// Trigger feeds not wired, each with the input it lacks (M02).
@@ -65,12 +68,10 @@ pub const PENDING: &[(&str, &str)] = &[
     ),
 ];
 
-/// A [`SoundWorld`] question the model cannot answer yet, or a fatal
-/// path of the original.
+/// A fatal path of the original (a [`SoundWorld`] question the model
+/// cannot answer is not an error: [`SoundDriver::take_pending`]).
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum DriverError {
-    #[error("sound world: {0} (pending: not in the client model)")]
-    Pending(&'static str),
     #[error(transparent)]
     Trigger(#[from] TriggerError),
 }
@@ -129,7 +130,7 @@ pub const SKIP_NO_UNIT: &str = "player event sound: the unit is not in the model
 
 /// The sound layer's view of the client model (`sound-table.md` §8.1,
 /// §6.4 r2, §6.5 r2, §4 r5). Questions it cannot answer are recorded in
-/// `asked` and answered neutrally; [`SoundDriver::frame`] then fails.
+/// `asked` and answered neutrally ([`SoundDriver::take_pending`]).
 pub struct ModelSoundWorld<'a> {
     pub world: &'a ClientWorld,
     /// The `Levels.txt` rows by level id (`SoundEnv`).
@@ -138,10 +139,16 @@ pub struct ModelSoundWorld<'a> {
     pub env_indoors: &'a [u8],
     /// Pending questions asked, in order.
     pub asked: RefCell<Vec<&'static str>>,
-    /// The positions `ServerSound` outputs captured, by unit, for a unit
-    /// no longer in the model at delivery (`client/bridge.md` §10 r3.1
-    /// (b)); the latest capture of a unit wins.
+    /// The client pixel points `ServerSound` outputs captured, by unit,
+    /// for a unit no longer in the model at delivery (`client/bridge.md`
+    /// §10 r3.1 (b)); the latest capture of a unit wins.
     pub captured: Option<&'a RefCell<BTreeMap<UnitKey, (i32, i32)>>>,
+    /// The frame's local-player position (16.16 subtiles) when the play
+    /// preview predicts its walk: the point the player is drawn at
+    /// (`world_view::walk::PreviewWalk::local_at`), so the listener is
+    /// where the view and the clicks put the player
+    /// (`seams/bridge-app.md` §2.7).
+    pub local_at: Option<(UnitKey, (u32, u32))>,
 }
 
 impl<'a> ModelSoundWorld<'a> {
@@ -157,6 +164,7 @@ impl<'a> ModelSoundWorld<'a> {
             env_indoors,
             asked: RefCell::new(Vec::new()),
             captured: None,
+            local_at: None,
         }
     }
 
@@ -170,15 +178,26 @@ impl SoundWorld for ModelSoundWorld<'_> {
         self.world.local_player
     }
 
-    /// The model's cell of the unit (`client/model.md` §1 r2); a unit no
-    /// longer in the model: the position its `ServerSound` captured
-    /// (`client/bridge.md` §10 r3.1 (b)). The units per type are
-    /// `sound-table.md` open question 2.
+    /// The unit's client pixel point (`sound-table.md` §8.1 r1: dynamic
+    /// path +0x08 / +0x0C for types 0, 1, 3, static path +0x04 / +0x08
+    /// for types 2, 4, 5), as the view projects it (`render/camera.md`
+    /// §2, [`unit_position`]); the local player at its predicted point
+    /// while the preview walks ([`Self::local_at`]). A unit no longer in
+    /// the model: the point its `ServerSound` captured
+    /// (`client/bridge.md` §10 r3.1 (b)). A unit with no cell (an item
+    /// off the ground): no position.
     fn position(&self, unit: UnitKey) -> Option<(i32, i32)> {
+        if let Some((key, (x16, y16))) = self.local_at {
+            if key == unit && self.world.units.contains_key(&unit) {
+                let p = UnitPosition::Moving { x16, y16 }.client();
+                return Some((p.x, p.y));
+            }
+        }
         match self.world.units.get(&unit) {
             Some(u) => {
-                let (x, y) = u.position?;
-                Some((i32::from(x), i32::from(y)))
+                u.position?;
+                let p = unit_position(u).ok()?.client();
+                Some((p.x, p.y))
             }
             None => self.captured?.borrow().get(&unit).copied(),
         }
@@ -238,6 +257,12 @@ pub struct SoundDriver {
     last_server_tick: Option<u64>,
     /// Rule parts skipped since the last [`SoundDriver::take_skipped`].
     skipped: Vec<&'static str>,
+    /// [`SoundWorld`] questions asked since the last
+    /// [`SoundDriver::take_pending`].
+    pending: Vec<&'static str>,
+    /// The frame's predicted local-player position
+    /// ([`ModelSoundWorld::local_at`]).
+    local_at: Option<(UnitKey, (u32, u32))>,
     /// The per-unit sound fields +0x70 … +0x88 (`client/model.md` §18
     /// rule 1: zero at creation, written only by the audio rules), by
     /// (unit, in set C); a unit gone from the model drops its fields
@@ -254,12 +279,20 @@ impl SoundDriver {
             cues: TriggerQueue::new(),
             last_server_tick: None,
             skipped: Vec::new(),
+            pending: Vec::new(),
+            local_at: None,
             unit_sounds: BTreeMap::new(),
         }
     }
 
     pub fn system(&self) -> &SoundSystem {
         &self.system
+    }
+
+    /// The local player's drawn position for the next frames (the play
+    /// preview's prediction, 16.16 subtiles); `None`: the model's cell.
+    pub fn set_local_prediction(&mut self, at: Option<(UnitKey, (u32, u32))>) {
+        self.local_at = at;
     }
 
     /// The sound tick T (ticks run so far): what the core presents.
@@ -270,8 +303,8 @@ impl SoundDriver {
     /// One audio frame: the frame's sound requests in order (UI sounds,
     /// server sound events, player event sounds), then one sound tick per
     /// server tick since the last frame (none before the first server
-    /// tick). A pending [`SoundWorld`] question fails the frame after the
-    /// tick that asked it. `levels` are the `Levels.txt` rows by level id
+    /// tick). A pending [`SoundWorld`] question is answered neutrally and
+    /// kept for [`SoundDriver::take_pending`]. `levels` are the `Levels.txt` rows by level id
     /// (`SoundEnv`). P is the local player now (§2 r4: at delivery).
     pub fn frame(
         &mut self,
@@ -295,6 +328,7 @@ impl SoundDriver {
         let captured = RefCell::new(BTreeMap::new());
         let mut sw = ModelSoundWorld::with_env(world, levels, &self.env_indoors);
         sw.captured = Some(&captured);
+        sw.local_at = self.local_at;
         if !requests.is_empty() {
             // C: one client update per server tick (§1 r5).
             let c = now as u32;
@@ -305,8 +339,7 @@ impl SoundDriver {
                     unit, at: Some(at), ..
                 } = *r
                 {
-                    let at = (i32::from(at.0), i32::from(at.1));
-                    captured.borrow_mut().insert(unit, at);
+                    captured.borrow_mut().insert(unit, capture_point(unit, at));
                 }
                 request(&mut cx, world, r, &mut self.unit_sounds, &mut self.skipped)?;
             }
@@ -317,10 +350,14 @@ impl SoundDriver {
         if ticks > 0 {
             self.last_server_tick = Some(now);
         }
-        if let Some(&q) = sw.asked.borrow().first() {
-            return Err(DriverError::Pending(q));
-        }
+        self.pending.extend(sw.asked.borrow().iter().copied());
         Ok(())
+    }
+
+    /// The [`SoundWorld`] questions the model could not answer since the
+    /// last call, in order (each answered neutrally).
+    pub fn take_pending(&mut self) -> Vec<&'static str> {
+        std::mem::take(&mut self.pending)
     }
 
     /// The rule parts skipped since the last call, in order.
@@ -332,6 +369,15 @@ impl SoundDriver {
     pub fn take_errors(&mut self) -> Vec<crate::audio::sound_table::SoundError> {
         self.system.take_errors()
     }
+}
+
+/// The client pixel point of a `ServerSound` capture: the event unit's
+/// cell at receive, projected as [`ModelSoundWorld::position`] does.
+fn capture_point(unit: UnitKey, at: (u16, u16)) -> (i32, i32) {
+    let mut u = ClientUnit::new(unit);
+    u.position = Some(at);
+    let p = unit_position(&u).map(|p| p.client()).unwrap_or_default();
+    (p.x, p.y)
 }
 
 /// The unit as the event rules read it: key and class (captured at
@@ -438,6 +484,7 @@ mod tests {
     use crate::audio::sound_table::SoundTableData;
     use crate::audio::{Sound, SoundBank, SoundId};
     use crate::bridge::world::{ClientUnit, MONSTER, PLAYER};
+    use crate::rules::camera::moving_to_client;
 
     struct Bank;
 
@@ -590,10 +637,9 @@ mod tests {
         w.units.insert(m, u);
         // The request is made; its tick's line test needs the client
         // collision rooms (pending, not part of this rule).
-        assert!(matches!(
-            d.frame(&w, &[], &[SoundRequest::UnitRequest { id: 1, unit: m }]),
-            Err(DriverError::Pending(_))
-        ));
+        d.frame(&w, &[], &[SoundRequest::UnitRequest { id: 1, unit: m }])
+            .unwrap();
+        assert!(!d.take_pending().is_empty());
         assert_eq!(d.system().unit_requests(m).len(), 1);
         w.units.remove(&m);
         w.server_ticks = 2;
@@ -607,29 +653,86 @@ mod tests {
     fn a_freed_units_position_is_the_one_its_sound_captured() {
         let w = ClientWorld::default();
         let gone = UnitKey::new(MONSTER, 4);
-        let captured = RefCell::new(BTreeMap::from([(gone, (100, 200))]));
+        let captured = RefCell::new(BTreeMap::from([(gone, capture_point(gone, (100, 200)))]));
         let mut sw = ModelSoundWorld::new(&w);
         assert_eq!(sw.position(gone), None);
         sw.captured = Some(&captured);
-        assert_eq!(sw.position(gone), Some((100, 200)));
+        // The moving unit's cell centre, projected (camera §2).
+        assert_eq!(sw.position(gone), Some((-1600, 2408)));
         assert_eq!(sw.position(UnitKey::new(MONSTER, 5)), None);
     }
 
     // Covers: specs/audio/sound-table.md §4 r5
     #[test]
-    fn a_question_the_model_cannot_answer_fails_the_frame() {
+    fn a_question_the_model_cannot_answer_is_reported_not_fatal() {
         let mut d = driver();
         // Id 2 heads a group: the variant roll needs the client seed (a
         // local player exists: a draw without one is an internal error,
         // `sound-table.md` §4 r6).
         let mut w = at_tick(1);
         w.local_player = Some(UnitKey::new(PLAYER, 1));
-        assert_eq!(
-            d.frame(&w, &[], &[SoundRequest::Ui(2)]),
-            Err(DriverError::Pending(
-                "local player client seed (§4 r5): read-only model seed"
-            ))
-        );
+        assert_eq!(d.frame(&w, &[], &[SoundRequest::Ui(2)]), Ok(()));
+        let asked = d.take_pending();
+        assert!(!asked.is_empty());
+        assert!(asked
+            .iter()
+            .all(|&q| q == "local player client seed (§4 r5): read-only model seed"));
+        assert!(d.take_pending().is_empty(), "handed over once");
+    }
+
+    fn walker(w: &mut ClientWorld, key: UnitKey, at: (u16, u16)) {
+        let mut u = ClientUnit::new(key);
+        u.position = Some(at);
+        w.units.insert(key, u);
+    }
+
+    // Covers: specs/audio/sound-table.md §8.1 r1, §8.1 r2, §6.3 r4
+    #[test]
+    fn positions_are_client_pixel_points() {
+        let mut d = driver();
+        // Before the first server tick: the request is made, no tick runs.
+        let mut w = at_tick(0);
+        let p = UnitKey::new(PLAYER, 1);
+        let m = UnitKey::new(MONSTER, 2);
+        walker(&mut w, p, (100, 100));
+        walker(&mut w, m, (140, 100));
+        w.local_player = Some(p);
+        d.frame(&w, &[], &[SoundRequest::UnitRequest { id: 1, unit: m }])
+            .unwrap();
+        // 40 subtiles along x: 640 px right, 320 px down; y doubled
+        // (§8.1 r1), z 640.0. In subtile cells this was (40, 0).
+        let (h, _) = d.system().unit_requests(m)[0];
+        let r = d.system().request_by_handle(h).unwrap();
+        assert_eq!(r.pos, [640.0, 640.0, 640.0]);
+        assert_eq!(r.dist2, 640.0 * 640.0 * 2.0);
+        // Falloff 0 reaches 400: the one-shot is out of range and dropped
+        // at its first tick (§6.3 r4).
+        w.server_ticks = 1;
+        d.frame(&w, &[], &[]).unwrap();
+        assert!(d.system().unit_requests(m).is_empty());
+    }
+
+    // Covers: specs/audio/sound-table.md §8.1 r1
+    #[test]
+    fn the_listener_is_the_drawn_local_player() {
+        let mut w = at_tick(1);
+        let p = UnitKey::new(PLAYER, 1);
+        walker(&mut w, p, (100, 100));
+        w.local_player = Some(p);
+        let mut sw = ModelSoundWorld::new(&w);
+        assert_eq!(sw.position(p), Some((0, 1608)));
+        // The preview draws the player at (103.0, 100.0): the listener is
+        // there, not at the model's cell.
+        sw.local_at = Some((p, (103 << 16, 100 << 16)));
+        let drawn = moving_to_client(103 << 16, 100 << 16);
+        assert_eq!(sw.position(p), Some((drawn.x, drawn.y)));
+        assert_ne!(sw.position(p), Some((0, 1608)));
+        // Another unit keeps its own point.
+        let m = UnitKey::new(MONSTER, 2);
+        walker(&mut w, m, (100, 100));
+        let mut sw = ModelSoundWorld::new(&w);
+        sw.local_at = Some((p, (103 << 16, 100 << 16)));
+        assert_eq!(sw.position(m), Some((0, 1608)));
     }
 
     // Covers: specs/audio/sound-table.md §8.1 r1, §6.4 r2, §6.5 r2
@@ -643,7 +746,15 @@ mod tests {
         w.local_player = Some(key);
         let mut sw = ModelSoundWorld::new(&w);
         assert_eq!(sw.local_player(), Some(key));
-        assert_eq!(sw.position(key), Some((0x1241, 0x11C4)));
+        // The client pixel point of the cell's centre (§8.1 r1, camera
+        // §2): a = x16 >> 11, b = y16 >> 11, ((a − b) >> 1, (a + b) >> 2).
+        let p = UnitPosition::Moving {
+            x16: (0x1241 << 16) | 0x8000,
+            y16: (0x11C4 << 16) | 0x8000,
+        }
+        .client();
+        assert_eq!(sw.position(key), Some((p.x, p.y)));
+        assert_eq!(p.x, (0x1241 - 0x11C4) * 16);
         assert_eq!(sw.position(UnitKey::new(PLAYER, 8)), None);
         assert!(!sw.state_duck());
         assert!(sw.asked.borrow().is_empty());

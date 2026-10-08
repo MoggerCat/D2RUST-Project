@@ -39,6 +39,7 @@ use crate::audio::{
     SoundPoolError, TriggerQueue, UnityGain, Unlimited, VoicePolicy, WavDecoder,
 };
 use crate::bridge::BridgeResource;
+use crate::world_view::walk::PreviewWalk;
 use crate::world_view::UiSounds;
 
 /// Sound ids to archive paths: the `sounds.txt` mapping of
@@ -184,6 +185,9 @@ pub struct AudioStats {
     /// Sound loads that failed, and engine errors, so far.
     pub load_errors: usize,
     pub engine_errors: usize,
+    /// The sound layer's pending model questions seen so far, each once,
+    /// in first-seen order (`SoundDriver::take_pending`).
+    pub pending: Vec<&'static str>,
 }
 
 /// The play mode's audio state.
@@ -287,6 +291,7 @@ fn audio_frame(
     bridge: Res<BridgeResource>,
     mut audio: ResMut<GameAudio>,
     ui_sounds: Option<ResMut<UiSounds>>,
+    walk: Option<Res<PreviewWalk>>,
 ) -> std::result::Result<(), BevyError> {
     let audio = &mut *audio;
     let world = bridge.0.world();
@@ -311,17 +316,23 @@ fn audio_frame(
         None => None,
     };
     if let Some(d) = driver.as_deref_mut() {
-        // A pending model question (audio-audit q-fix-audio-pending) must not
-        // skip the pump and present below: the frame's cues still reach the
-        // mixer.
-        match d.frame(
+        // The listener is where the player is drawn (`seams/bridge-app.md`
+        // §2.7).
+        d.set_local_prediction(walk.as_deref().and_then(PreviewWalk::local_at));
+        d.frame(
             world,
             &bridge.0.inputs().tables.levels,
             requests.as_deref().unwrap_or_default(),
-        ) {
-            Ok(()) => {}
-            Err(DriverError::Pending(q)) => debug!("sound layer pending: {q}"),
-            Err(e) => return Err(AudioFrameError::from(e).into()),
+        )
+        .map_err(AudioFrameError::from)?;
+        // A model question the sound layer could not answer is not an
+        // error (`seams/bridge-app.md` §2.9): answered neutrally, logged
+        // once per question.
+        for q in d.take_pending() {
+            if !audio.stats.pending.contains(&q) {
+                warn!("sound layer pending: {q}");
+                audio.stats.pending.push(q);
+            }
         }
         for s in d.take_skipped() {
             debug!("sound layer skipped: {s}");
