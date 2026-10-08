@@ -27,15 +27,15 @@
 |   5. Panel shift for floors | 153–158 |
 |   6. Tiles | 159–198 |
 |   7. View culling | 199–249 |
-|   8. Screen shake | 250–301 |
-|   9. Time base: no interpolation | 302–355 |
-|   10. What d2rs hooks get | 356–364 |
-| Constants & data dependencies | 365–371 |
-| Randomness | 372–377 |
-| Edge cases & original bugs | 378–387 |
-| Test vectors | 388–409 |
-| Provenance | 410–433 |
-| Open questions | 434–528 |
+|   8. Screen shake | 250–327 |
+|   9. Time base: no interpolation | 328–402 |
+|   10. What d2rs hooks get | 403–411 |
+| Constants & data dependencies | 412–418 |
+| Randomness | 419–426 |
+| Edge cases & original bugs | 427–436 |
+| Test vectors | 437–461 |
+| Provenance | 462–491 |
+| Open questions | 492–594 |
 <!-- /index -->
 
 ## Summary
@@ -275,26 +275,52 @@ seeded RNG helper `0x00472280` on the local player unit's seed,
 `0x007B8D20`, added to the tile origin and, through `0x00476AC0`, to the
 unit origin. `0x004769D0(a)` also drives a rumble sound (audio specs).
 Callers of `0x00476A80` (2026-10-08, static: every `call 0x476A80`
-in 1.14d; (A, t1, t2, t3)):
+in 1.14d, and every pointer to the calling functions in the image;
+(A, t1, t2, t3), times in ms). Missile functions run once per client
+update of a client missile, through table `0x0072A398` indexed by
+`missiles` `pCltDoFunc`; "elapsed" = `0x0064A3B0`, "frames left" =
+`0x0064A380`, P1/P2 = `CltParam1`/`CltParam2` (missile record
++0x58/+0x5C, record = `missiles` row of the missile class, unit +0x04;
+no record → the default function `0x004CD390`, no shake). Live users
+from `patch_d2` `missiles.txt` / `skills.txt` (`pCltDoFunc` and the
+`clt*func` columns; each function address occurs once in the image):
 
-| Site (function) | Parameters | Condition at the site |
-|---|---|---|
-| `0x0049F34E` (`0x0049EB10`, S→C 0x5A type 18, `client/msg-ui.md` §9) | (6, 4000, 10000, 4000) | always |
-| `0x004D2695` (`0x004D2610`) | (6, 2000, 3000, 2000) | the counter stored at record +0x20 has its low 6 bits 0 |
-| `0x004D3DD3` (`0x004D3D30`) | (record +0x58, t, v, t) | computed t, v |
-| `0x004D5433` (`0x004D5310`, client missile function 29) | (8, t, v, t) | computed t, v |
-| `0x004D655C` (`0x004D6540`, client missile function 37, missile 372 `diablo appears`) | (25, 0, 4000, 0) | frames left = 150 |
-| `0x004D66C7` (`0x004D6680`) | (4, 80, 80, 400) | value = 10 |
-| `0x004D6854` (`0x004D6820`) | (25, 0, 4000, 0) | value = 150 |
-| `0x004D742A` (`0x004D7400`) | (20, 0, 6000, 0) | `0x0064A380` = 325 |
-| `0x004D8207` (`0x004D8000`) | (3, 600, 4000, 3000) | value = 5 |
-| `0x004F0811` (`0x004F0710`) | (local, t, v, w) | computed |
+| Site (function) | Started by (live users) | Parameters | Condition at the site |
+|---|---|---|---|
+| `0x0049F34E` (`0x0049EB10`) | S→C 0x5A type 18 (`client/msg-ui.md` §19 r3) | (6, 4000, 10000, 4000) | always |
+| `0x004D3DD3` (`0x004D3D30`, missile function 12, entry `0x0072A3C8`) | none: no live missile has `pCltDoFunc` 12 | (P1, 1000q, 1000(P2 − 2q), 1000q), q = ⌊P2 / 3⌋ | P1 > 0, P2 > 0, elapsed = 0 |
+| `0x004D5433` (`0x004D5310`, function 29, `0x0072A40C`) | 307 `andycontrol0` (P2 = 7) | (8, 1000q, 1000(P2 − 2q), 1000q), q = ⌊P2 / 3⌋; live (8, 2000, 3000, 2000) | the owner exists (`0x004639D0`), P2 > 0, elapsed = 90 |
+| `0x004D6854` (`0x004D6820`, function 31, `0x0072A414`) | 338 `horadricstaff` | (25, 0, 4000, 0) | frames left = 150 |
+| `0x004D742A` (`0x004D7400`, function 36, `0x0072A428`) | 363 `durieldeathcontrol` | (20, 0, 6000, 0) | frames left = 325 |
+| `0x004D655C` (`0x004D6540`, function 37, `0x0072A42C`) | 372 `diablo appears` | (25, 0, 4000, 0) | frames left = 150 |
+| `0x004D66C7` (`0x004D6680`, function 38, `0x0072A430`) | 373 `hfcontrol` | (4, 80, 80, 400) | the client object (type 2, `0x00463990(g, 2)`) whose GUID g is missile data +0x28 (`0x0064A730`) exists, and elapsed = 10 |
+| `0x004D8207` (`0x004D8000`, function 54, `0x0072A470`) | 528 `anya center` | (3, 600, 4000, 3000) | elapsed = 5 |
+| `0x004D2695` (`0x004D2610`, function 66, `0x0072A4A0`) | 639 `worldstone shake` | (6, 2000, 3000, 2000) | see rule W below |
+| `0x004F0811` (`0x004F0710`, skill client function 75, entry `0x00727CD4` of `0x00727BA8`) | skill 301 `Siege Beast Stomp` (`cltdofunc` 75; no other `clt*func` column holds 75) | (`Param1`, 40·`Param2`, 40·`Param3`, 40·`Param4`) of the skill (skills +0x148 … +0x154; ⌊v × 1000 / 25⌋, signed); live (8, 200, 800, 600) | every client skill do of skill 301 (`client/msg-skills.md` §7 step 4, `0x004C6680`) |
 
-PROVISIONAL: d2rs starts a shake only at the two sites whose trigger
-is known: S→C 0x5A type 18 (first row) and client missile function 37
-at frames left 150 (fifth row); every other row starts none (because
-the missiles / skills reaching those functions and the computed
-parameter formulas were not read); settled by REC-62. Each started shake draws 2 values per frame
+All divisions truncate toward 0 (signed `imul`/`sar` sequences at
+`0x004D3D85`…, `0x004D53E7`…, `0x004F0773`…). A t2 of 0 starts nothing
+(`0x00476A80` returns), so function 12 with P2 < 3 and skill 301 with
+`Param3` = 0 start none.
+
+Rule W (worldstone shake, `0x004D2610`): with owner O
+(`0x004639D0(missile)`) present and the level id of O's room
+(`0x00620BB0` → `0x0061A1B0`) 131 or 132 (Throne of Destruction,
+Worldstone Chamber): `0x006505E0(missile, O)` and
+`0x00621310(missile)` run; then if missile data +0x28 (`0x0064A730`) = 0, the
+shake starts; otherwise the missile's own seed (unit +0x20, `sim/rng.md`
+step) steps once and the shake starts when the new low dword & 0x3F =
+0. After a start, data +0x28 := 1 (`0x0064A710`). Either way the
+missile seed then steps once more; when that low dword mod 10 = 0 it
+steps twice more and `0x004D2520` runs (not a shake; owner: the client
+missile spec). No owner, or another level → the default function
+`0x004CD390`. So the first update in those levels always shakes; later
+updates shake with chance 1/64 each, on the missile seed (not the
+player seed).
+
+The rows above are the whole set (answered 2026-10-08 from the 1.14d
+binary; supersedes the provisional "two sites only" rule).
+Each started shake draws 2 values per frame
 on the client player seed, so this is RNG draw order. The same seed is stepped by the mouse cursor in its
 idle state and by the weather in the same frame (`capture.md` §3.3,
 Randomness).
@@ -306,7 +332,28 @@ most once per client tick of 40 ms (`0x0070EF1C = 40`): in single player
 the draw follows the server tick and the client update of the same loop
 pass, and later passes without a tick do not draw (`0x007A0704`); when the
 loop falls behind, draws are skipped, never interpolated. While a single
-player game is paused the draw runs every pass with no tick. Every
+player game is paused the draw runs every pass with no tick. The full
+schedule is `client/model.md` §17 r4 ("Runs per loop pass"); two of its
+cases draw with no server tick (answers open question 8, static, asm
+`0x0044EFA0`):
+
+1. Paused passes (UI state 9 or 11): the draw at `0x0044F017` runs
+   through `[0x007A0484]` without incrementing the draw counter
+   `[0x007A0494]` (only the draw at `0x0044F28B` increments it).
+2. The catch-up hold: in a pass whose client clock moved by e ≥ 40 ms
+   (`0x0044F0C6`) while `GetTickCount` < `[0x007A04BC]` (`0x0044F0CA`),
+   the skip counter is set to 0 and e to 40 (`0x0044F0F3`,
+   `0x0044F0F9`), so that pass draws whether or not the server tick
+   driver `0x0052FC20` ran a tick; the draw counter increments. The
+   hold end is raised to now + 10,000 ms at every act load
+   (`0x0044E100`, `0x0044E1E3`), now + 2,000 ms in the act set-up
+   `0x004547B0` (`0x0045481B`) and now + 3,000 ms when S→C 0x15 moves
+   the local player into a room for which `0x0061AB30` is 0
+   (`0x0045D23F`); `0x0044DB40` only raises it, never lowers it.
+   In the hold, draws follow the client's 40 ms wall clock, not the
+   server's ticks.
+
+Every
 position above is the integer state at draw time; no sub-tick time enters
 any formula except the shake envelope (§8, wall clock).
 
@@ -373,7 +420,9 @@ view clip margins 80 and 47; block cull margin 32; tick 40 ms
 
 Screen shake only: two draws of the local player unit's seed per drawn
 frame while `a ≠ 0` (§8). This is a client-side copy of the unit; it does
-not touch server RNG.
+not touch server RNG. Missile function 66 (`worldstone shake`, §8 rule
+W) decides its later starts on the client missile's own seed (one step,
+low 6 bits), not on the player seed.
 
 ## Edge cases & original bugs
 
@@ -403,6 +452,9 @@ not touch server RNG.
 | shake A = 10, t1 = 100, t2 = 200, t3 = 0, t = 300 | a = 0: no draw, origins unchanged, shake not ended | §8 |
 | shake A = 10, t1 = 100, t2 = 200, t3 = 0, t = 301 | ended: `0x007B9534 = 0`, offsets 0 | §8 |
 | shake A = 0x10000, t1 = 0x20000, t2 = 1, t3 = 1, t = 0x10000 (attack) | product 2^32 keeps 0 → a = 0 | §8 |
+| missile 307 `andycontrol0` (P1 25, P2 7), owner present, elapsed 90 | shake (8, 2000, 3000, 2000); elapsed 89 or 91: none | §8 |
+| skill 301 `Siege Beast Stomp` client do (`Param1`–`4` = 8, 5, 20, 15) | shake (8, 200, 800, 600) | §8 |
+| missile 639 in level 131, data +0x28 = 0 | shake (6, 2000, 3000, 2000), data +0x28 := 1, no missile-seed step before the start test; same in level 130: default function, no shake | §8 rule W |
 | mode 1, W = 800: wall blocks at screen x 399 and 400 | 399 drawn (pixels 399–430), 400 skipped | §7 |
 | 1.14d captures (`capture.md`): recorded path client `(px, py)` vs §2 from the fixed position; tile / unit origin, view rect and `shiftX` vs §1, §3 | equal on 15,934 of 15,934 frames | `frames-raw-1` runs 1, 2 |
 | capture case `camera-0001`: walk 5 s in a cleared area, every frame captured with state (`capture.md`) | per frame, CPU reference from the recorded positions equals the capture; recorded origins equal §3 | capture, queued |
@@ -429,7 +481,13 @@ by the `frames-raw-1` capture runs (`capture.md` Test vectors). Roof
 block y's, roof heights and wall block grid counted 2026-10-06 over the
 DT1 files `mpq-tool extract` wrote from `d2data.mpq` / `d2exp.mpq`
 (`patch_d2.mpq` holds no listed DT1; the 6 known-unused files of
-`formats/dt1.md` excluded); roof height read `0x004DEBA6`.
+`formats/dt1.md` excluded); roof height read `0x004DEBA6`. Shake
+starts (§8, 2026-10-08): asm of the ten callers of `0x00476A80`; their
+table slots found by scanning the image for each function address
+(`0x0072A398` missile client functions, `0x00727BA8` skill client
+functions); live users from `patch_d2` `missiles.txt` (`pCltDoFunc`,
+`CltParam1`/`2`) and `skills.txt` (`clt*func`, `Param1`–`4`); level ids
+from `levels.txt`.
 
 ## Open questions
 
@@ -524,4 +582,12 @@ DT1 files `mpq-tool extract` wrote from `d2data.mpq` / `d2exp.mpq`
    (mod 32). §7's count follows the result.
 8. Draws with no server tick between them (118 frames of run 1 while not
    paused, `capture.md` §4, OQ8) against §9's "passes without a tick do
-   not draw"; the `frames-raw-2` client-update counter settles it.
+   not draw".
+   *Answered* (static, 2026-10-08, asm `0x0044EFA0`): §9 cases 1–2. A
+   non-paused draw with no server tick happens only in the catch-up hold
+   (10 s after an act load, 2 s after the act set-up, 3 s after a local
+   S→C 0x15 room move). d2rs steps by tick and does not reproduce the
+   hold (`client/model.md` §17 r4); captures key each frame by its own
+   tick and state (`capture.md` §4), so no check depends on it. The
+   recording check (the 0-tick frames of a run fall inside a hold
+   window) is on the PC 2 list.
