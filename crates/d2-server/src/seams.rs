@@ -175,6 +175,15 @@ pub trait Intents {
     /// with a unit type already checked < 6.
     fn unit_target(&self, client: ClientId, unit_type: u32, unit_id: u32) -> UnitTarget;
 
+    /// Before the point / unit parse of `msg` (spec §2.4 rules 3–4):
+    /// brings the positions those parsers read up to date (the player's,
+    /// and for a unit message the target's: the dynamic path, or the
+    /// static path for unit types 2, 4, 5). Default: the game's
+    /// positions are always current.
+    fn refresh_positions(&mut self, client: ClientId, msg: &[u8]) {
+        let _ = (client, msg);
+    }
+
     /// The intent handler for an id with kind `handler` (the
     /// `client-messages.tsv` `kind` column), called after the gate, the
     /// size check and the server-side parse (spec §2.4, §4 rule 1).

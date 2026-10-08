@@ -630,6 +630,64 @@ fn near_rooms_come_from_the_client_drlg() {
     assert!(bare.near_rooms(&m.w).is_err());
 }
 
+/// The play preview's near rooms follow the predicted position
+/// (PROVISIONAL, client/model.md OQ2): the server sends the walking
+/// player nothing, so the model's player stays in the room the walk
+/// started from; the map is built around the room holding the predicted
+/// point, with the local player filed there. The strict path ignores the
+/// prediction.
+// Covers: specs/render/draw-order.md §9; specs/client/model.md §12 r2
+#[test]
+fn preview_near_rooms_follow_the_predicted_position() {
+    use crate::world_view::model_feed::ModelFeed;
+    use crate::world_view::near_rooms::MapState;
+    use crate::world_view::ViewFeed;
+    let mut m = model();
+    m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
+    m.recv(&sight(true, 8, 0)).recv(&sight(true, 16, 0));
+    m.recv(&assign_player(46, 6)).hex("0b 00 01 00 00 00");
+    let me = UnitKey::new(PLAYER, 1);
+    let rows = vec![LevelRow::default(); 4];
+    let model_room = m.w.local_room().copied().unwrap();
+    let ahead = m.w.room_at(85, 6).expect("the second room holds (85, 6)");
+    assert_ne!(ahead.room, model_room.room);
+    let at = (85 << 16 | 0x8000, 6 << 16 | 0x8000);
+    let facts = |_: &crate::bridge::ClientUnit| Ok(Default::default());
+
+    let mut map = MapState::default();
+    map.local_at = Some((me, at));
+    let near = map.near_rooms(&m.w, Some(&rows), facts).unwrap().unwrap();
+    assert_eq!(near.player_tile, (17, 1));
+    let filed: Vec<_> = (0..near.rooms.len())
+        .filter(|&i| near.rooms[i].units.iter().any(|u| u.key == me))
+        .collect();
+    assert_eq!(filed.len(), 1, "filed once");
+    assert_eq!(map.room(filed[0]), Some(ahead.room));
+
+    // The model's room freed (0x08 of the room switch): the map stays.
+    m.w.free_active_room(model_room.room);
+    assert!(m.w.local_room().is_none());
+    m.w.frames += 1;
+    assert!(map.near_rooms(&m.w, Some(&rows), facts).unwrap().is_some());
+    m.w.frames += 1;
+    map.local_at = None;
+    assert!(
+        map.near_rooms(&m.w, Some(&rows), facts).unwrap().is_none(),
+        "without the prediction: no room, no map (the black screen)"
+    );
+
+    // The strict feed never reads the prediction.
+    let mut m = model();
+    m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
+    m.recv(&sight(true, 8, 0)).recv(&sight(true, 16, 0));
+    m.recv(&assign_player(46, 6)).hex("0b 00 01 00 00 00");
+    let mut feed = ModelFeed::new(ZeroFacts).with_map();
+    feed.levels = Some(rows);
+    feed.set_local_prediction(Some((me, at)));
+    let near = feed.near_rooms(&m.w).unwrap().unwrap();
+    assert_eq!(near.player_tile, (9, 1));
+}
+
 fn room_mut(
     near: &mut crate::rules::draw_order::NearRooms,
     k: usize,

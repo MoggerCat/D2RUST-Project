@@ -49,6 +49,9 @@ pub struct MapState {
     /// DT1 entry.
     entries: Vec<[Vec<Dt1Entry>; 3]>,
     draw: BTreeMap<(DrlgRoomId, u8, usize), DrawState>,
+    /// Play preview only (decision D2): the local player's predicted
+    /// 16.16 position. `None` (the strict path): the model's.
+    pub local_at: Option<(UnitKey, (u32, u32))>,
 }
 
 fn array_slot(a: TileArray) -> u8 {
@@ -147,7 +150,28 @@ impl MapState {
         // A room no longer active has freed its records.
         self.draw
             .retain(|(id, _, _), _| active.iter().any(|a| a.room == *id));
-        let (Some(cd), Some(own)) = (world.drlg.as_ref(), world.local_room().copied()) else {
+        // The local player's cell: the model's, or in the preview its
+        // predicted one.
+        let predicted = self
+            .local_at
+            .filter(|(k, _)| world.local_player == Some(*k))
+            .map(|(_, (x16, y16))| ((x16 >> 16) as u16, (y16 >> 16) as u16));
+        // PROVISIONAL (client/model.md OQ2; REC-51): in the preview the
+        // near rooms are those of the room holding the predicted position
+        // (the cell lookup from the model's room, then the act lookup,
+        // `model.md` §12 r2), as the original's own-path walk moves its
+        // player's room; the model's room only when no active room holds
+        // that point. The server sends the walking player nothing
+        // (`pathing.md` §10 r2), so the model's room stays where the walk
+        // started (and is freed by the room switch's 0x08 once the server
+        // player leaves it): without this the map outside it is black.
+        let own = match predicted {
+            Some((x, y)) => world
+                .room_from(world.local_room(), x, y)
+                .or_else(|| world.local_room().copied()),
+            None => world.local_room().copied(),
+        };
+        let (Some(cd), Some(own)) = (world.drlg.as_ref(), own) else {
             return Ok(());
         };
         let d = &cd.drlg;
@@ -235,10 +259,27 @@ impl MapState {
             self.rooms.push(id);
             self.entries.push(entries);
         }
+        // PROVISIONAL (client/model.md OQ2; REC-51): in the preview the
+        // local player is filed in the room of its predicted position, not
+        // in its model room's list (left behind, or freed by 0x08), so the
+        // draw order (§5) files it where it is drawn.
+        if let (Some(_), Some(key), Some(unit)) = (predicted, world.local_player, world.local()) {
+            let at = self.rooms.iter().position(|&id| id == own.room);
+            let filed = at.is_some_and(|i| rooms[i].units.iter().any(|u| u.key == key));
+            if let (false, Some(at)) = (filed, at) {
+                for r in &mut rooms {
+                    r.units.retain(|u| u.key != key);
+                }
+                rooms[at].units.push(RoomUnit {
+                    key,
+                    facts: facts(unit)?,
+                });
+            }
+        }
         // `[0x007C8A08]` / `[0x007C8A10]`: the player's path sub-tile / 5;
         // `[0x007C8A0C]`: `0x0061B130` (`levels.md` §11.4) from the
         // player's room: none → 0, else the record index at the point.
-        let (sx, sy) = world.local().map_or((0, 0), ClientUnit::cell);
+        let (sx, sy) = predicted.unwrap_or_else(|| world.local().map_or((0, 0), ClientUnit::cell));
         let (sx, sy) = (i32::from(sx), i32::from(sy));
         let player_logical = match world.cell_lookup(&own, sx, sy) {
             None => 0,

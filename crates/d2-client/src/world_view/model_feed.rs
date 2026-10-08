@@ -276,11 +276,15 @@ impl<F: ViewFeed> ViewFeed for ModelFeed<F> {
             levels,
             map,
             preview,
+            local_at,
             ..
         } = self;
         let Some(map) = map.as_mut() else {
             return inner.near_rooms(world);
         };
+        // The preview's near rooms follow the predicted position
+        // (PROVISIONAL, `MapState::local_at`); the strict path never has one.
+        map.local_at = preview.as_ref().and(*local_at);
         let Some(preview) = preview.as_ref() else {
             let inner = &*inner;
             return map.near_rooms(world, levels.as_deref(), |u| {

@@ -126,6 +126,26 @@ impl<X: WorldPending> ActionEvents for WorldSim<X> {
     }
 }
 
+/// The live position of `unit` on the action wiring
+/// (`WorldHost::unit_position`, `intents-events.md` §2.4 rules 3–4): its
+/// path position (`path-placement.md` §2.1) and the act of its room.
+/// `None` with the path provider off (the staged facts stand), for a unit
+/// without a path record, or one in no room.
+pub fn live_position<D: ActionEvents>(
+    game: &Game,
+    events: &mut D,
+    unit: UnitId,
+) -> Option<(u8, (i32, i32))> {
+    let h = events.action().hooks();
+    h.paths.as_ref()?;
+    if !h.path_has(unit) {
+        return None;
+    }
+    let room = game.lists.unit(unit)?.room()?;
+    let act = game.lists.room(room)?.act;
+    Some((act, h.path_position(unit)))
+}
+
 /// The systems of a game wired on [`ActionSim`]: the waypoints and the
 /// skill handlers' slot `S` ([`NoSkills`]: skill ids stay stubs).
 #[derive(Default)]
@@ -196,6 +216,15 @@ where
     /// `handlers::walk::run` (the path provider of the action wiring).
     fn walk(&mut self, game: &mut Game, events: &mut D, call: WalkCall) -> Option<WalkResult> {
         super::super::walk::run(game, events, call)
+    }
+
+    fn unit_position(
+        &mut self,
+        game: &Game,
+        events: &mut D,
+        unit: UnitId,
+    ) -> Option<(u8, (i32, i32))> {
+        live_position(game, events, unit)
     }
 
     /// `d2_sim::wiring::action::vitals_sync::run` on the action wiring

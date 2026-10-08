@@ -753,6 +753,15 @@ where
         out
     }
 
+    fn unit_position(
+        &mut self,
+        game: &Game,
+        events: &mut D,
+        unit: UnitId,
+    ) -> Option<(u8, (i32, i32))> {
+        super::action::live_position(game, events, unit)
+    }
+
     fn vitals_sync(
         &mut self,
         game: &mut Game,

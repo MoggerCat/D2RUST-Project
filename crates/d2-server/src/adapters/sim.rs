@@ -394,6 +394,44 @@ impl<D: EventDispatch, W: WorldHost<D>> Intents for SimGame<D, W> {
         }
     }
 
+    /// The host's live position facts (`WorldHost::unit_position`: the
+    /// path provider's position and the act of the unit's room) replace
+    /// the staged [`UnitFacts`] of the client's player and, for a unit
+    /// message, of the target, so the range tests of §2.4 rules 3–4 read
+    /// the position the walk moved (the staged facts were never updated
+    /// in the app's game, so every walk was refused, `docs/handoff`
+    /// `wire-path-server.md` finding 3 = WS3). A host without the
+    /// provider answers `None` and the staged facts stay. An item keeps
+    /// its staged owner.
+    fn refresh_positions(&mut self, client: ClientId, msg: &[u8]) {
+        let mut units = Vec::new();
+        if let Some(p) = self.player_unit(client) {
+            units.push(p);
+        }
+        if msg.len() >= 9 && crate::dispatch::is_unit(msg[0]) {
+            let ty = u32::from_le_bytes([msg[1], msg[2], msg[3], msg[4]]);
+            let guid = u32::from_le_bytes([msg[5], msg[6], msg[7], msg[8]]);
+            if let Some(&ty) = UnitType::ALL.get(ty as usize) {
+                units.extend(self.game.lists.find_unit(ty, guid));
+            }
+        }
+        for unit in units {
+            let Some((act, (x, y))) = self.world.unit_position(&self.game, &mut self.events, unit)
+            else {
+                continue;
+            };
+            let owner = self.units.get(&unit).and_then(|f| f.owner);
+            self.units.insert(
+                unit,
+                UnitFacts {
+                    act,
+                    pos: Pos { x, y },
+                    owner,
+                },
+            );
+        }
+    }
+
     /// Per-intent behaviour belongs to the system specs (movement,
     /// skills, items, NPCs, quests; §4 rule 1). Ids a [`handlers`]
     /// module owns run there when the host provides their system (the

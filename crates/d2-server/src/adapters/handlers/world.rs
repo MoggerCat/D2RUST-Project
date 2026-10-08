@@ -368,6 +368,19 @@ pub trait WorldHost<D> {
     ) -> Option<Vec<Vec<u8>>> {
         None
     }
+    /// The live position of `unit` for the dispatcher's range tests
+    /// (`intents-events.md` §2.4 rules 3–4: the dynamic path, or the
+    /// static path for unit types 2, 4, 5) and the act of its room.
+    /// `None`: the host has no path provider (or the unit no path or no
+    /// room), and the staged facts stand.
+    fn unit_position(
+        &mut self,
+        game: &Game,
+        events: &mut D,
+        unit: UnitId,
+    ) -> Option<(u8, (i32, i32))> {
+        None
+    }
     /// The messages the seams sent since the last take, in send order:
     /// (receiving player unit, bytes).
     fn take_sent(&mut self, events: &mut D) -> Vec<(UnitId, Vec<u8>)> {

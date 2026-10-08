@@ -278,6 +278,9 @@ fn parse(
     id: u8,
     msg: &[u8],
 ) -> Result<(), ResultCode> {
+    if is_point(id) || is_unit(id) {
+        game.refresh_positions(client, msg);
+    }
     if is_point(id) {
         let Some(PointState {
             player,

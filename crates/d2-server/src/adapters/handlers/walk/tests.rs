@@ -616,6 +616,51 @@ fn walking_into_room_b_changes_the_players_room() {
     fx.assert_clean();
 }
 
+/// One message through the whole dispatcher (gate, size, the point /
+/// unit parse of `intents-events.md` §2.4 rules 3–4, then the handler).
+fn dispatch(fx: &mut Fx, msg: &[u8]) -> ResultCode {
+    crate::dispatch::dispatch(
+        &mut fx.sim,
+        &crate::adapters::ProtoSizes,
+        &mut fx.out,
+        0,
+        ALIVE,
+        msg,
+        msg.len(),
+    )
+}
+
+/// The app's game stages no `UnitFacts`: the range tests read the live
+/// path positions (`intents-events.md` §2.4 r3: "position from the
+/// dynamic path, or the static path for unit types 2, 4, 5"). Before the
+/// fix every point and unit message of such a game was refused (point:
+/// no staged position → 2; unit: target missing → 1), so the server's
+/// player never walked out of the town.
+// Covers: specs/sim/intents-events.md §2.4 r3, §2.4 r4
+#[test]
+fn the_dispatcher_ranges_read_the_live_path_positions() {
+    let (mut fx, p, _, o) = two_players();
+    let og = fx.guid(o);
+    // Nothing staged: SimGame::set_unit is never called.
+    assert_eq!(dispatch(&mut fx, &point(0x01, 31, 10)), ResultCode::Done);
+    assert_eq!(fx.mode(p), 2, "the walk started");
+    fx.run(p, 2, 20);
+    assert_eq!(fx.path(p).cell(), d2_sim::path::Point::new(31, 10));
+    // The test reads where the walk ended: 31 + 50 is in range (79), 26 + 51
+    // (in range of the start, not of the end) and 31 + 51 are not.
+    assert_eq!(dispatch(&mut fx, &point(0x01, 79, 10)), ResultCode::Done);
+    fx.tick();
+    let x = fx.path(p).cell().x;
+    assert!(x > 31, "walked on toward x 79: {x}");
+    assert_eq!(
+        dispatch(&mut fx, &point(0x01, (x + 51) as u16, 10)),
+        ResultCode::Refused
+    );
+    // A unit target (the object, static path) passes the parse too.
+    assert_eq!(dispatch(&mut fx, &unit_msg(0x02, 2, og)), ResultCode::Done);
+    assert_eq!(fx.path(p).target_unit.map(|t| t.unit), Some(o));
+}
+
 // Covers: specs/sim/pathing.md §1.1, §1.2 r1, §1.3 r3
 #[test]
 fn refused_requests_still_return_0() {
