@@ -632,7 +632,7 @@ fn the_menu_tree_returns_saves_exits_and_swallows_clicks() {
     // Arrow keys and Enter: Down wraps to Options; Right on a choice row.
     u.root_char(&w, 0xF028);
     u.root_char(&w, 0x0D);
-    assert_eq!(texts(&u)[0], "Sound Options");
+    assert_eq!(art_names(&u, &w)[0], "*local\\soundoptions");
     // Configure Controls is requested once.
     for _ in 0..4 {
         u.root_char(&w, 0xF028);
