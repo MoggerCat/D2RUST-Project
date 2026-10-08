@@ -1406,7 +1406,7 @@ fn cell_grid_inventory_geometry() {
     );
 }
 
-// Covers: specs/ui/panels.md §4 r3 (the cursor warp edge)
+// Covers: specs/ui/panels.md §4 r3
 #[test]
 fn from_frame_is_the_inverse_of_to_frame() {
     // 1700 × 1300: scale 2, left bar 50, top bar 50.
