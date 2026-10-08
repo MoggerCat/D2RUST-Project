@@ -278,6 +278,12 @@ impl OptionsMenu {
         }
     }
 
+    /// Back from Configure Controls: the Options menu with Previous Menu
+    /// selected (the same entry rule as `go`).
+    pub fn return_from_controls(&mut self) {
+        self.go(MenuId::Options);
+    }
+
     fn go(&mut self, m: MenuId) {
         self.menu = m;
         self.selected = m.rows().len() - 1;

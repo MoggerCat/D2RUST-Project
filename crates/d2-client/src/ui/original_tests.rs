@@ -628,6 +628,82 @@ fn the_menu_tree_returns_saves_exits_and_swallows_clicks() {
     assert!(!u.ui.is_open(9));
 }
 
+// Covers: specs/ui/frontend-options.md §O9
+#[test]
+fn configure_controls_opens_over_the_game_and_applies_the_bindings() {
+    use crate::controls::{Action as Act, Key};
+    let mut u = ui(Some(areas()), true);
+    let w = world(AMAZON, 1, true);
+    let dir = std::env::temp_dir().join(format!("d2rs-ctl-ingame-{}", std::process::id()));
+    let path = dir.join("controls.toml");
+    let open = |u: &mut Ui| {
+        u.key(&w, Action::GameMenu);
+        u.root_char(&w, 0xF028);
+        u.root_char(&w, 0x0D);
+        for _ in 0..4 {
+            u.root_char(&w, 0xF028);
+        }
+        u.root_char(&w, 0x0D);
+        assert!(u.ui.service_controls(false, Some(path.clone())));
+        assert!(u.ui.controls_open() && u.ui.is_open(9));
+    };
+    let rebind_inventory = |u: &mut Ui| {
+        // Down to Inventory (command 1), Enter, then C.
+        loop {
+            let sh = u.ui.shared.borrow();
+            let m = sh.esc.controls.as_ref().unwrap().model();
+            if m.rows()[m.selected()].cmd == 1 {
+                break;
+            }
+            drop(sh);
+            assert!(u.ui.controls_key(0x28, 0));
+        }
+        u.ui.controls_key(0x0D, 0);
+        u.ui.controls_key(0x43, 0);
+    };
+    let button = |i: i32| Point::new(90 + 206 * i + 103, 70 + 350);
+    // Cancel restores: nothing accepted, back on Options with Previous.
+    open(&mut u);
+    let drawn: Vec<String> = {
+        let ctx = UiCtx {
+            tick: 0,
+            world: &w,
+            strings: &NoStrings,
+        };
+        let mut out: Vec<UiDraw> = Vec::new();
+        u.root.draw(&ctx, &mut out);
+        out.iter()
+            .filter_map(|d| match d {
+                UiDraw::Text(t) if t.style.font == 13 => Some(String::from_utf16_lossy(&t.text)),
+                _ => None,
+            })
+            .collect()
+    };
+    for want in ["Cancel", "Default", "Accept", "Key / Button One"] {
+        assert!(drawn.iter().any(|t| t == want), "{want}: {drawn:?}");
+    }
+    rebind_inventory(&mut u);
+    u.click(&w, button(0));
+    assert!(!u.ui.controls_open() && u.ui.take_accepted_bindings().is_none());
+    {
+        let sh = u.ui.shared.borrow();
+        let m = &sh.esc.menu;
+        assert_eq!(m.menu, crate::ui::original::options_menu::MenuId::Options);
+        assert_eq!(m.selected, m.rows().len() - 1);
+    }
+    assert!(!path.exists());
+    // Accept applies the new key and writes it.
+    u.key(&w, Action::GameMenu);
+    open(&mut u);
+    rebind_inventory(&mut u);
+    u.click(&w, button(2));
+    assert!(!u.ui.controls_open() && u.ui.is_open(9));
+    let b = u.ui.take_accepted_bindings().expect("accepted");
+    assert!(b.inputs(Act::ToggleInventory).contains(&Key::C));
+    assert!(path.is_file());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 // Covers: specs/ui/control-panel.md §9
 #[test]
 fn the_mini_panel_game_menu_button_opens_it() {

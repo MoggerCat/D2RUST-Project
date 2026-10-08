@@ -30,12 +30,12 @@ use super::ids::CONTROLS;
 
 // ---- layout constants (§O9 r2), 800 × 600 frame -----------------------
 
-const W: i32 = 800;
-const H: i32 = 600;
-const M: i32 = (W - 620) / 2;
-const T: i32 = (H - 40 - 420) / 2;
-const C: i32 = (620 - 49) / 3;
-const VISIBLE: usize = 15;
+pub(crate) const W: i32 = 800;
+pub(crate) const H: i32 = 600;
+pub(crate) const M: i32 = (W - 620) / 2;
+pub(crate) const T: i32 = (H - 40 - 420) / 2;
+pub(crate) const C: i32 = (620 - 49) / 3;
+pub(crate) const VISIBLE: usize = 15;
 /// FontInGameChat.
 pub const FONT: u16 = 13;
 /// The error message stays for 2,000 ms (r2).
@@ -503,7 +503,7 @@ impl ConfigureControls {
 const TRACK_FRAMES: i32 = 20;
 /// Half width of a button hit box: spec is w/2 + 10 from the text width,
 /// which needs the font measure; PROVISIONAL (REC-184): w = 100.
-const BTN_HALF: i32 = 60;
+pub(crate) const BTN_HALF: i32 = 60;
 
 /// Display name of a key (d2rs-own: the original's names are localised).
 pub fn vk_name(vk: u16) -> String {
@@ -516,7 +516,7 @@ pub fn vk_name(vk: u16) -> String {
 // ---- controls.toml bridge (d2rs-own) ----------------------------------
 
 /// Original command → d2rs action, for the commands that have one.
-fn action_of_cmd(cmd: i32) -> Option<Act> {
+pub(crate) fn action_of_cmd(cmd: i32) -> Option<Act> {
     use Act::*;
     const SKILLS: [Act; 16] = [
         SkillSlot1,
