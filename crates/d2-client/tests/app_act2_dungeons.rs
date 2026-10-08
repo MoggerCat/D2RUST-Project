@@ -57,7 +57,7 @@ fn tombs(server: &Server) -> (u32, u32, u32, Vec<usize>) {
     })
 }
 
-// Covers: specs/drlg/maze.md §9 r1; specs/drlg/maze.md §6.3; specs/drlg/maze.md §5.2; specs/drlg/levels.md §3; specs/world/quests-act2.md §8.1
+// Covers: specs/drlg/maze.md §9 r1; specs/drlg/levels.md §5; specs/world/quests-act2.md §8.1
 #[test]
 fn every_act2_dungeon_is_entered_built_and_left() {
     let data = GameData::Synthetic;

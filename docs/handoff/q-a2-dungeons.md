@@ -1,6 +1,6 @@
 # q-a2-dungeons: the Act 2 dungeons in the play preview
 
-Branch `claude/q-a2-dungeons`. Nothing is verified against 1.14d (rule 10). Open point: REC-136 (`docs/HANDOFF.md` §7).
+Branch `claude/q-a2-dungeons`. Nothing is verified against 1.14d (rule 10). Open point: REC-142 (`docs/HANDOFF.md` §7).
 
 ## Links connected
 
@@ -16,7 +16,7 @@ The maze generator, the Act II tomb choice and the special builders (sewers, tom
 
 Test: `tests/app_act2_dungeons.rs`: to Act II, in and out of every line (all 31 dungeon levels built and visited, the client follows each time), the staff tomb is a tomb ≠ the boss tomb, the objects seam has it, and the staff tomb has the most rooms, the boss tomb next.
 
-## PROVISIONAL (REC-136)
+## PROVISIONAL (REC-142)
 
 Where each line starts (the fields are other tasks'), tile places, which maze room holds the exits, the Canyon stand-in. All `// d2rs-own, unverified`.
 
