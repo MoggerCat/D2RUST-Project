@@ -373,7 +373,7 @@ fn game_creation_derives_the_four_controls_in_order_before_the_first_unit() {
 // Covers: specs/formats/d2s.md §2.1, §2.2 r4
 #[test]
 fn a_save_needs_the_users_tables_and_names_its_character() {
-    let e = single_player::load_character(&GameData::Synthetic, "x.d2s".as_ref()).unwrap_err();
+    let e = single_player::load_character(&GameData::Synthetic, "x.d2s".as_ref(), 0).unwrap_err();
     assert!(e.to_string().contains("D2_GAME_DIR"), "{e}");
     let mut b = vec![0u8; 0x14F];
     b[0x14..0x18].copy_from_slice(b"Kara");
@@ -416,7 +416,7 @@ fn a_save_from_the_command_line_joins() {
     let dir = std::env::var("D2_GAME_DIR").expect("D2_GAME_DIR");
     let save = std::env::var("D2_SAVE").expect("D2_SAVE");
     let data = GameData::select(Some(dir.as_ref()), false).unwrap();
-    let character = single_player::load_character(&data, save.as_ref()).unwrap();
+    let character = single_player::load_character(&data, save.as_ref(), 0).unwrap();
     let req = single_player::create_request_for(&character);
     let ms = std::sync::Arc::new(AtomicU32::new(1000));
     let (mut link, _) =

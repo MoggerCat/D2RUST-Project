@@ -251,7 +251,7 @@ pub fn create_request_for(character: &Character) -> CreateGame {
         game_type: GAME_TYPE,
         class,
         template: 0,
-        difficulty: GAME_SETUP.difficulty,
+        difficulty: character.difficulty(),
         char_name,
         arena: 0,
         flags: if expansion {
@@ -289,6 +289,50 @@ pub enum Character {
     Save(Box<D2s>, LoadContext),
 }
 
+impl Character {
+    /// The difficulty the game runs on: a save's load context, else a
+    /// named character's own (Normal for [`Character::New`]).
+    pub fn difficulty(&self) -> u8 {
+        match self {
+            Character::New => GAME_SETUP.difficulty,
+            Character::Named(c) => c.difficulty,
+            Character::Save(_, ctx) => ctx.difficulty,
+        }
+    }
+
+    /// This character on difficulty `d` (`play --difficulty`). A save's
+    /// difficulty is set at load ([`load_character`]); a default new
+    /// character becomes the stand-in sorceress as a named one.
+    pub fn with_difficulty(self, d: u8) -> Character {
+        match self {
+            Character::New => {
+                let mut name = [0u8; 16];
+                name[..PLAYER_NAME.len()].copy_from_slice(PLAYER_NAME);
+                Character::Named(NewCharacter {
+                    class: PLAYER_CLASS as u8,
+                    name,
+                    difficulty: d,
+                })
+            }
+            Character::Named(c) => Character::Named(NewCharacter { difficulty: d, ..c }),
+            Character::Save(s, mut ctx) => {
+                ctx.difficulty = d;
+                Character::Save(s, ctx)
+            }
+        }
+    }
+}
+
+/// Parses `--difficulty`: `normal`, `nightmare`, `hell` (any case) or 0–2.
+pub fn parse_difficulty(s: &str) -> Option<u8> {
+    match s.to_ascii_lowercase().as_str() {
+        "normal" | "0" => Some(0),
+        "nightmare" | "1" => Some(1),
+        "hell" | "2" => Some(2),
+        _ => None,
+    }
+}
+
 /// The class names of `play --new` in class-id order (`charstats` rows
 /// 0–6; `items/inventory.md` §1.3 uses the same ids).
 pub const CLASS_NAMES: [&str; 7] = [
@@ -312,6 +356,8 @@ pub struct NewCharacter {
     pub class: u8,
     /// The name, NUL-padded (bytes after the name are 0).
     pub name: [u8; 16],
+    /// The game's difficulty 0–2 (`play --difficulty`; Normal by default).
+    pub difficulty: u8,
 }
 
 impl NewCharacter {
@@ -368,7 +414,11 @@ pub fn new_character(class: &str, name: &str) -> Result<Character, NewCharacterE
     }
     let mut bytes = [0u8; 16];
     bytes[..name.len()].copy_from_slice(name.as_bytes());
-    Ok(Character::Named(NewCharacter { class, name: bytes }))
+    Ok(Character::Named(NewCharacter {
+        class,
+        name: bytes,
+        difficulty: 0,
+    }))
 }
 
 /// The load result the loader gives when the player unit cannot be
@@ -933,14 +983,14 @@ impl LiveData {
     /// hardcore). The client's name is the save's own: the client sends
     /// the selected character's name in its C→S 0x67
     /// ([`create_request_for`]).
-    pub fn read_save(&self, bytes: &[u8]) -> Result<D2s, d2s::D2sError> {
+    pub fn read_save(&self, bytes: &[u8], difficulty: u8) -> Result<D2s, d2s::D2sError> {
         let opts = ReadOptions {
             expansion: GAME_SETUP.expansion,
             game: Some(d2s::GameContext {
                 client_name: save_name(bytes).to_vec(),
                 expansion: GAME_SETUP.expansion,
                 hardcore: false,
-                difficulty: GAME_SETUP.difficulty,
+                difficulty,
             }),
         };
         d2s::read(bytes, &opts, &self.save)
@@ -964,7 +1014,11 @@ pub fn save_name(bytes: &[u8]) -> &[u8] {
 /// map seed does not apply: the app's game runs on a fixed seed, game
 /// +0x84 = 1, `formats/d2s.md` §2.2 rule 8, `rng.md` §5.2). Synthetic
 /// data has no save tables: an error.
-pub fn load_character(data: &GameData, path: &std::path::Path) -> Result<Character, BuildError> {
+pub fn load_character(
+    data: &GameData,
+    path: &std::path::Path,
+    difficulty: u8,
+) -> Result<Character, BuildError> {
     let err = |message: String| BuildError::Save {
         path: path.display().to_string(),
         message,
@@ -975,11 +1029,13 @@ pub fn load_character(data: &GameData, path: &std::path::Path) -> Result<Charact
         ));
     };
     let bytes = std::fs::read(path).map_err(|e| err(e.to_string()))?;
-    let save = d.read_save(&bytes).map_err(|e| err(e.to_string()))?;
+    let save = d
+        .read_save(&bytes, difficulty)
+        .map_err(|e| err(e.to_string()))?;
     Ok(Character::Save(
         Box::new(save),
         LoadContext {
-            difficulty: GAME_SETUP.difficulty,
+            difficulty,
             map_seed_applies: false,
         },
     ))
@@ -1757,7 +1813,7 @@ pub fn build_with_objects(
         .map_err(|e| BuildError::Setup(format!("path tables: {e:?}")))?;
     let info = GameInfo {
         expansion: GAME_SETUP.expansion,
-        difficulty: GAME_SETUP.difficulty,
+        difficulty: character.difficulty(),
         game_type: GAME_TYPE,
         ladder: GAME_SETUP.ladder,
         ..GameInfo::default()
@@ -1767,7 +1823,7 @@ pub fn build_with_objects(
     // Game creation (`rng.md` §5.2): the creation fields to their home,
     // then the four seeded controls in order, before any unit.
     let fields = GameFields {
-        difficulty: GAME_SETUP.difficulty,
+        difficulty: character.difficulty(),
         game_type: GAME_TYPE,
         ladder: GAME_SETUP.ladder,
         ..GameFields::new(Seed::init_low(seed), GAME_SETUP.expansion)
@@ -1982,7 +2038,7 @@ fn loader(
                         .waypoints
                         .entry(player)
                         .or_default()
-                        .get_mut(0)
+                        .get_mut(character.difficulty())
                         .set(u32::from(index));
                     if let Err(e) = set {
                         s.events
