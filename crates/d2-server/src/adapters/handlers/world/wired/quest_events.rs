@@ -98,7 +98,7 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                         if w.monster_class(victim) == Some(MEPHISTO) {
                             q.add_link(w, victim, 20, None);
                         }
-                        // PROVISIONAL (REC-162, d2rs-own, unverified): the
+                        // PROVISIONAL (REC-163, d2rs-own, unverified): the
                         // Act IV links of monster creation (`quests-act4.md`
                         // §8: 243 → chain 23, 409 → chain 24) by class, as
                         // Mephisto's; a refused duplicate is harmless.

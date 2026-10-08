@@ -1,6 +1,6 @@
 # q-a4-endgame: Act IV endgame in the play preview
 
-Branch `claude/q-a4-endgame`. Nothing is verified against 1.14d (rule 10). Open point: REC-162 (`docs/HANDOFF.md` §7).
+Branch `claude/q-a4-endgame`. Nothing is verified against 1.14d (rule 10). Open point: REC-163 (`docs/HANDOFF.md` §7).
 
 ## Links connected
 
@@ -17,7 +17,7 @@ Tests: `crates/d2-client/tests/app_a4_endgame.rs` (three, all fail before the ch
 - `the_hellforge_answers_and_hephastos_death_reaches_chain_24`: operate 49 without a soulstone moves chain 24 to state 1; Hephasto's kill reaches `hephasto_killed` (the hammer drop is asked for).
 - `the_portal_to_harrogath_refuses_then_asks_for_the_act_change`: sound 19 without 26.13; with it the accepted branch runs and the act change is queued and run.
 
-## PROVISIONAL (REC-162)
+## PROVISIONAL (REC-163)
 
 All places and the plain-monster superunique spawn are `// d2rs-own, unverified`. Bosses and Diablo are killed by hand through the quest-parse kill step (as the Mephisto test), not fought.
 

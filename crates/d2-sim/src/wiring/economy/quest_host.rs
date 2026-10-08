@@ -860,7 +860,7 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
     }
     // -- Act IV, Terror's End (`quests-act4.md` §5; q-a4-endgame). The
     // object's mode flags and the spawn spread are not modelled
-    // (PROVISIONAL, REC-162, `// d2rs-own, unverified`).
+    // (PROVISIONAL, REC-163, `// d2rs-own, unverified`).
     /// `FrameCnt1` of the object's `objects.txt` row (the raw column is
     /// × 256).
     fn object_frame_count1(&mut self, object: UnitId) -> i32 {
