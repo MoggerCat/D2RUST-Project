@@ -3,6 +3,36 @@
 Branch `claude/local-pc1-s8` from `origin/claude/specs-staging-7`
 (`docs/handoff/pc1-loop.md`). REC block REC-300..349; none used yet.
 
+## Round summary (session end, 2026-10-08)
+
+Lanes A and B are empty for the staging head merged in this branch's last
+commit; the session hands over to the PC 1 autotest role
+(`docs/handoff/pc1-autotest.md`, branch `claude/local-pc1-test`).
+
+- Lane A: every REC point listed in `pc1-loop.md` and every new staging REC
+  through REC-267 (plus REC-260) was read against the binary; results per
+  row below. Most turned out settled from the binary; the code differs on
+  most, so each has a `q-fix-*` row in `build-queue.tsv`.
+- Lane B: rounds 1 and 2 recorded in HANDOFF §5 (Done blocks 2026-10-08 and
+  round 2). Open after round 2: the wired-host walk (C59/C97), the DS1/DT1
+  sweep test numbers (C46 (1)), Cold Plains rooms (C92), the live-data play
+  panic (C40/C53 and every play run after it), and the player-only entries.
+- Lane C: 36 recording entries moved into HANDOFF §7 as REC-300..335; later
+  entries (from "Lane C round 2" on) are still only in this file.
+- Lane D: new specs `items/use.md`, `ui/item-tips.md`, `skills/sequences.md`
+  (+ `.tsv`), `missiles/client.md`, `client-bodies.md`, `client-bodies-2.md`;
+  `ui/panels-3.md` §29–§30, `client/model.md` §19 and many sections settled.
+- Rows superseded: `q-options-art` (into `q-fix-esc-menu`),
+  `q-controls-ingame` (into `q-fix-controls-ingame`). Rows to run together:
+  `q-fix-skill-msg-level` + `q-fix-player-mode-msgs`; `q-fix-body-clicks` +
+  `q-fix-equip-reqs` (2); the pop-up slot rows `q-fix-hud-popup`,
+  `q-fix-object-label`, `q-fix-cube-panel` (2) share one primitive.
+
+Lane B round 2 findings: `q-fix-play-gradient-block`,
+`q-fix-play-exit-resource`, `q-fix-set-skill-fatal`,
+`q-fix-panel-horadric-offsets`, and `q-fix-d2s-token-ref` (ktr at 51 vs 45:
+spec table to re-read).
+
 ## Lane A — provisional points from the binary
 
 | REC | Result | Specs changed | Code | Queue row |

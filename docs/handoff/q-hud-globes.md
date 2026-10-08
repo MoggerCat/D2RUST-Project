@@ -16,3 +16,5 @@
 
 ## Local check
 `D2_GAME_DIR=<game> cargo run -p d2-client -- play`: hover the life or mana globe: "Life: x / y" / "Mana: x / y" over it; click the globe to toggle it permanently; hover the stamina bar: "Stamina: x / y". Tests: `cargo nextest run -p d2-client hud_tips`.
+
+Local check done 2026-10-08 (PC 1 round 2, branch claude/local-pc1-s8): headless part passes (`hud_tips` in the 21-test d2-client lib run); hover / click checks need a player.

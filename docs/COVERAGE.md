@@ -122,6 +122,11 @@ were unlocked by passing game-file tests (game 384 -> 416, verified 464 ->
 496 on the earlier base of 10,529 rules); three claims stay unconfirmed
 because their tests fail on a count (`dt1_every_live_file_decodes`,
 `ds1_every_file_parses`, `sweep_create_every_item_every_quality`).
+PC 1 round 2 (same day): `real_saves_round_trip` claim unlocked (`d2s.md`
+§1 r1, §3 r1, §2.2 r2, §7.1 r5, §8.2 r2); `--check` 13,430 claims, 0 errors;
+`--summary` 10,919 claimable rules (+625 exempt): unit 9,674 (88.6%),
+game-file 419 (3.8%), trace 80 (0.7%), verified 499 (4.6%), any tier 9,782
+(89.6%) (the rule count grew with spec sessions).
 
 ## 4. Tool
 

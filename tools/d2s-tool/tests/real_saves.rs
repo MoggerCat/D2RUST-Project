@@ -12,7 +12,7 @@ use d2s_tool::{read_options, round_trip, RoundTrip};
 /// Every save passes §3 and §2.2 rule 2, its sections parse in §1 order,
 /// and the parsed model writes back byte for byte (the model keeps +0x30
 /// and the corpse u32, so no difference is allowed).
-// Claim once the first local run passes: specs/formats/d2s.md §1 r1, §3 r1, §2.2 r2, §7.1 r5, §8.2 r2
+// Covers: specs/formats/d2s.md §1 r1, §3 r1, §2.2 r2, §7.1 r5, §8.2 r2
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR and saves in D2_SAVE_DIR"]
 fn real_saves_round_trip() {

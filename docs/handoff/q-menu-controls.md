@@ -30,3 +30,5 @@ Branch `claude/q-menu-controls`. Spec `ui/frontend-options.md` §O9; provisional
 cargo nextest run -p d2-client --test front_end_controls
 ```
 Expect 13 passes. Nothing visible in `play` until the front-end host exists; after Accept, `~/.config/d2rs/controls.toml` holds `[bindings]`, and `play` reads it.
+
+Local check done 2026-10-08 (PC 1 round 2, branch claude/local-pc1-s8): headless part passes: `front_end_controls` 14 pass (the note says 13); `controls.toml` after Accept needs the client window (not run).
