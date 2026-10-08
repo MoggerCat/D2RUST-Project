@@ -68,3 +68,8 @@ Open, for the next session:
 - Server: no S→C 0x94 and no server-side player skill list (`adapters/character.rs` `add_skill_level` "no provider").
 - Random object population calls a placeholder (`wiring/worldgen/dispatch.rs:156`).
 - Disk: `target\debug` was deleted to free 23 GB; the next debug build starts from scratch.
+- Root cause found (worker, `claude/fix-outdoor` @ b428336, WIP, not merged): the server refused every walk / run
+  (dispatcher range check read positions the app never staged, `d2-server/src/dispatch.rs`; fix: refresh from the live
+  path first) and the preview built its map around the model's never-moving player room (fix: the predicted room,
+  PROVISIONAL). Headless on the install the server player now reaches the Blood Moor and its rooms reach the client.
+  To do next: merge `claude/fix-npcs` into it, run its tests and clippy, then play-test; Blood Moor monsters still absent.
