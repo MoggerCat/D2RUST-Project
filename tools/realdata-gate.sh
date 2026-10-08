@@ -154,7 +154,7 @@ echo
 echo "=========== realdata-gate summary (install: $GAME)"
 printf '%s' "$SUMMARY"
 echo "ignored tests: $NPASS passed, $NFAIL failed"
-echo "needs-window (not run): $(echo $SKIP_NAMES | tr ' ' ',')"
+echo "skipped (not run): $(echo $SKIP_NAMES | tr ' ' ',')"
 [ -n "$REC_FLAG" ] && echo "  (recording replays skipped: no traces/raw/*.jsonl)"
 [ -n "$SAVE_FLAG" ] && echo "  (D2_SAVE tests skipped: D2_SAVE unset)"
 echo "  (realdata_inventory.py 'needs' column: gpu, dump, repro, recording, save)"
