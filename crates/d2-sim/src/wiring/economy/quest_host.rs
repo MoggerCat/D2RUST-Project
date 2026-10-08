@@ -946,6 +946,18 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
         use crate::units::lifecycle::LifecycleHooks;
         self.inner.econ.hooks.request_act_change(player, level, arg);
     }
+    /// `0x005B4FF0`: the level's waypoint index set in the player's
+    /// record of `difficulty` (`waypoints.md` §2; the host's records,
+    /// [`ActionHooks::waypoints`]). A level without a waypoint: nothing.
+    fn activate_waypoint(&mut self, player: UnitId, level: u32, difficulty: u8) {
+        use crate::world::waypoints::WaypointMap;
+        let h = &mut self.inner.econ.hooks;
+        let Some(idx) = WaypointMap::new(&h.tables.levels).index_of_level(level) else {
+            return;
+        };
+        let rec = h.waypoints.entry(player).or_default();
+        let _ = rec.get_mut(difficulty.min(2)).set(u32::from(idx));
+    }
     fn player_busy(&mut self, player: UnitId) -> bool {
         self.inner.player_busy(player)
     }

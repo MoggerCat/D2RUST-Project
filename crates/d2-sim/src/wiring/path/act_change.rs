@@ -40,6 +40,18 @@ pub fn load_act(act: u8, init_seed: u32, town: u16, obj_seed: u32) -> [u8; 12] {
     m
 }
 
+/// Takes `player` out of its room: footprint cleared, off the room list,
+/// the path's room none.
+fn leave_room<X: Pending>(c: &mut PathCtx<'_, X>, player: UnitId) {
+    c.v.path_remove_footprint(player, true);
+    if c.game.lists.room_remove(player).is_err() {
+        return;
+    }
+    if let Some(d) = c.v.h.paths.as_mut().and_then(|p| p.dynamic_mut(player)) {
+        d.room = None;
+    }
+}
+
 /// Moves `player` to `level` (another act than its room's) with
 /// `tile_index`: `true` when the player was placed. A destination act
 /// without a DRLG, or no spawn room, leaves the player where it is
@@ -73,6 +85,11 @@ pub fn run<X: Pending>(mut c: PathCtx<'_, X>, player: UnitId, level: u32, tile_i
     if let Some(client) = client {
         c.v.room_switch(c.game, client, None);
     }
+    // The unit leaves the old act's room (`0x0053ACC0`): without this the
+    // placement's room recache keeps the old room whenever the new act's
+    // point lies inside its rectangle (acts share tile coordinates).
+    // d2rs-own, unverified.
+    leave_room(&mut c, player);
     c.v.h.x.send(player, &[UNLOAD_COMPLETE]);
     c.v.h
         .x

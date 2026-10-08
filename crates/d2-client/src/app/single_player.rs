@@ -2198,6 +2198,9 @@ impl GameParts {
         // The unit path needs the monster's `monstats` row (the shape).
         action.combat.monstats = synthetic_monstats();
         action.combat.charstats = synthetic_charstats();
+        // The waypoint indexes of the levels (the quest-side
+        // `0x005B4FF0` reads them; q-a4-harrogath).
+        action.levels = wp.levels.clone();
         Ok(GameParts {
             action,
             stats: StatData::default(),
