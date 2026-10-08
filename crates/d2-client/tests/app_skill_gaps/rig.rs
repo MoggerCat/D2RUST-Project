@@ -178,6 +178,10 @@ impl Rig {
             let h = &mut sim.events.action.sys.hooks;
             let rows = h.tables.skills.skills.clone();
             let list = h.skill_lists.entry(p).or_default();
+            // The join ran the native skills on the synthetic `charstats`
+            // (`client/msg-skills.md` §2 rule 8); this game's class skills
+            // are the fixture's.
+            *list = Default::default();
             let mut ids = [0xFFFFu16; 10];
             for (slot, s) in ids.iter_mut().zip(&learned) {
                 *slot = *s as u16;

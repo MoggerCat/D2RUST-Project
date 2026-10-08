@@ -215,7 +215,10 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     // Charsi (`q-town-gaps`) add two each (their 0x6D is not counted): 30.
     // (q-a1-vis-links: the Blood Moor's tiles to the Black Marsh and the
     // Burial Grounds are gone, the fixture now follows the 1.14d links: 28.)
-    assert_eq!(joined, 28);
+    // (q-smoke-town: the new character has its creation stats, so the
+    // join's vitals call sends S→C 0x95, `intents-events.md` §8.2 rule
+    // 3.9: 29.)
+    assert_eq!(joined, 29);
     // Plus two for the Blood Moor room bordering the synthetic town: its
     // 0x07 at the join and its 0x08 when the travel leaves the town.
     // Plus two for that room's cave entrance (a tile unit): its 0x09 at
@@ -228,7 +231,8 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     // each, `q-town-gaps`): 45, 5.
     // (q-a1-vis-links: the Black Marsh and Burial Grounds tiles left the
     // Blood Moor, so their four are gone: 41, 5.)
-    assert_eq!((b.log().handled, b.log().queued), (41, 5));
+    // (q-smoke-town: plus the join's S→C 0x95 above: 42, 5.)
+    assert_eq!((b.log().handled, b.log().queued), (42, 5));
     assert!(b.log().unowned.is_empty(), "{:?}", b.log().unowned);
     assert!(b.log().dropped.is_empty(), "{:?}", b.log().dropped);
     let sight: Vec<_> = b

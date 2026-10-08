@@ -7,11 +7,11 @@
 //! character's join sends no S→C 0x94 (its stub load reads no skills
 //! section, `intents-events.md` §8.2 rule 3.1).
 //!
-//! The synthetic game has no `skills` rows and no vitals tables (so the
-//! join's native skills, §2 rule 8, do not run): the test gives the game
-//! a test-local copy of its action tables with eight zero `skills`
-//! records (level cap 99), and runs rule 8 on the player's list with the
-//! class's ten skill ids right after the join.
+//! The synthetic game has no `skills` rows and its `charstats` name no
+//! class skill: the test gives the game a test-local copy of its action
+//! tables with eight zero `skills` records (level cap 99) and of its
+//! vitals tables with the class's ten skill ids, so the join's native
+//! skills (§2 rule 8) run on them.
 
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
@@ -21,7 +21,6 @@ use d2_client::app::single_player::{self, GameData, Link, DEFAULT_SEED, PLAYER_C
 use d2_client::bridge::link::{SendQueue, ServerLink};
 use d2_data::tables::{Record, Skills};
 use d2_server::seams::Clock;
-use d2_sim::skills::list::ListOwner;
 use d2_sim::skills::SkillEntry;
 
 struct StepClock(Arc<AtomicU32>);
@@ -56,36 +55,39 @@ impl Game {
             t.skills.skills = vec![Skills::decode(&vec![0u8; Skills::SIZE]); SKILLS];
             t.skills.level_cap = d2_sim::skills::LEVEL_CAP_114D;
             h.tables = Arc::new(t);
+            let mut v = (**h.vitals.as_ref().expect("synthetic vitals")).clone();
+            let c = &mut v.charstats[PLAYER_CLASS as usize];
+            for (slot, id) in [
+                &mut c.skill_1,
+                &mut c.skill_2,
+                &mut c.skill_3,
+                &mut c.skill_4,
+                &mut c.skill_5,
+                &mut c.skill_6,
+                &mut c.skill_7,
+                &mut c.skill_8,
+                &mut c.skill_9,
+                &mut c.skill_10,
+            ]
+            .into_iter()
+            .zip(CLASS_SKILLS)
+            {
+                *slot = id;
+            }
+            h.vitals = Some(Arc::new(v));
         })
         .unwrap();
         Self { link, ms }
     }
 
-    /// C→S 0x67 and 0x6B and three more ticks, then rule 8 on the
-    /// player's list (module docs); every S→C message received.
+    /// C→S 0x67 and 0x6B and three more ticks (the join runs rule 8 on
+    /// the player's list, module docs); every S→C message received.
     fn join(&mut self) -> Vec<Vec<u8>> {
         let req = single_player::create_request();
         self.link.send(SendQueue::System, &req.encode()).unwrap();
         let mut got = self.ticks(1);
         self.link.send(SendQueue::System, &[0x6B]).unwrap();
         got.extend(self.ticks(3));
-        self.link
-            .with(|l| {
-                let s = &mut l.host_mut().game;
-                let (p, _) = single_player::local_player(s).expect("joined");
-                let h = s.events.action.hooks();
-                let rows = h.tables.skills.skills.clone();
-                h.skill_lists
-                    .entry(p)
-                    .or_default()
-                    .init_player(
-                        &rows,
-                        ListOwner::player(PLAYER_CLASS as i32),
-                        Some(&CLASS_SKILLS),
-                    )
-                    .unwrap();
-            })
-            .unwrap();
         got
     }
 

@@ -2342,7 +2342,7 @@ impl GameParts {
                 SYNTHETIC_MONSTATS,
             ),
             anim: None,
-            vitals: None,
+            vitals: Some(Arc::new(synthetic_vitals())),
             bodies: None,
             // The Hellforge's code drops (q-a4-quest-items, REC-235).
             drops: Some(Arc::new(super::synthetic_items::drop_tables())),
@@ -2389,15 +2389,73 @@ impl GameParts {
 /// d2rs-own, unverified: one `charstats` row per player class with the
 /// walk / run velocities (6 / 9, the speeds of the preview's prediction),
 /// so the synthetic server moves the player (a zero velocity never
-/// does: the NPC approach walks, `docs/handoff/q-npc-approach.md`).
+/// does: the NPC approach walks, `docs/handoff/q-npc-approach.md`), and
+/// sorceress-like start attributes, life, stamina and per-level gains
+/// (q-smoke-town, REC-278: the creation stats of `combat/vitals.md` §1
+/// need them; with all zero the player has no life and the vitals sync
+/// sends nothing, §5.1 step 1).
 fn synthetic_charstats() -> Vec<d2_data::tables::Charstats> {
     use d2_data::tables::Record;
-    let mut raw = vec![0u8; d2_data::tables::Charstats::SIZE];
-    raw[64] = 6;
-    raw[65] = 9;
-    (0..7)
-        .map(|_| d2_data::tables::Charstats::decode(&raw))
-        .collect()
+    let mut c = d2_data::tables::Charstats::decode(&[0u8; d2_data::tables::Charstats::SIZE]);
+    c.walkvelocity = 6;
+    c.runvelocity = 9;
+    c.str = 10;
+    c.dex = 25;
+    c.int = 35;
+    c.vit = 10;
+    c.stamina = 74;
+    c.hpadd = 30;
+    c.lifeperlevel = 4;
+    c.staminaperlevel = 4;
+    c.manaperlevel = 8;
+    c.lifepervitality = 8;
+    c.staminapervitality = 4;
+    c.manapermagic = 8;
+    c.statperlevel = 5;
+    // No class skills (`Skill 1`–`Skill 10` = −1, an empty slot; the
+    // synthetic `skills` table has no rows to name): the join's native
+    // list is skill 0 alone (`client/msg-skills.md` §2 rule 8).
+    for s in [
+        &mut c.skill_1,
+        &mut c.skill_2,
+        &mut c.skill_3,
+        &mut c.skill_4,
+        &mut c.skill_5,
+        &mut c.skill_6,
+        &mut c.skill_7,
+        &mut c.skill_8,
+        &mut c.skill_9,
+        &mut c.skill_10,
+    ] {
+        *s = 0xFFFF;
+    }
+    vec![c; 7]
+}
+
+/// d2rs-own, unverified (q-smoke-town, REC-278): the synthetic game's
+/// vitals tables, so a new character gets its creation stats
+/// (`combat/vitals.md` §1: life, mana, stamina, velocity 100, …): the
+/// [`synthetic_charstats`] rows and an `experience` table of 99 levels
+/// at 500 × level² (row 0 `MaxLvl`, as `app_levelup.rs`).
+fn synthetic_vitals() -> VitalsTables {
+    use d2_data::tables::{Experience, Record};
+    let row = |v: u32| {
+        let mut e = Experience::decode(&[0u8; Experience::SIZE]);
+        e.amazon = v;
+        e.sorceress = v;
+        e.necromancer = v;
+        e.paladin = v;
+        e.barbarian = v;
+        e.druid = v;
+        e.assassin = v;
+        e
+    };
+    let mut experience = vec![row(99)];
+    experience.extend((0..=99).map(|l: u32| row(500 * l * l)));
+    VitalsTables {
+        charstats: synthetic_charstats(),
+        experience,
+    }
 }
 
 /// Action tables with no rows (the synthetic game reads none).
