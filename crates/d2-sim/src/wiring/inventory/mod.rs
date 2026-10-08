@@ -133,6 +133,10 @@ pub struct InvState {
     /// Town Portal scroll / tome uses of the call, taken by the host
     /// ([`InvDesk::take_portal_requests`], REC-117).
     pub portal_requests: Vec<UnitId>,
+    /// The walks to a ground item the pick-ups of the call asked for
+    /// (§7.1 step 2, `0x00548A50`: player, item, cursor flag), taken by
+    /// the host that runs them ([`InvDesk::take_item_walks`], REC-281).
+    pub item_walks: Vec<(UnitId, UnitId, bool)>,
     /// Equipment-rule calls the inventory functions asked for while the
     /// owner's inventory was lent to them ([`InvDesk::with_inv`]); run
     /// when the call returns, before the owner refreshes.

@@ -61,6 +61,13 @@ pub trait LifecycleHooks: UnitHooks {
         None
     }
 
+    /// The inventory model put `item` on the ground of `room` at (x, y)
+    /// (`inventory-moves.md` §9.1 step 3): the item's static path follows
+    /// (+0x0C / +0x10 are its position, `bitstream.md` §4.1 rule 2), so
+    /// the path code (walks to the item, distances) sees where it lies.
+    /// The default keeps no paths.
+    fn ground_item_placed(&mut self, item: UnitId, room: RoomId, x: i32, y: i32) {}
+
     /// The free routine's other calls (§1 table) and `0x005C0A90`,
     /// `0x00571F40` at removal. Provider: the kind's spec.
     fn free_kind(&mut self, sim: &mut Sim<'_>, unit: UnitId) {}

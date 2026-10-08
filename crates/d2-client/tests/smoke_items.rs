@@ -510,3 +510,45 @@ fn drops_pick_up_grid_belt_cursor_and_ground() {
     rig.act("potion to belt again", &items::to_belt(hp, 0));
     assert_eq!(rig.place_of(hp).0, mode::BELT);
 }
+
+// Covers: specs/items/inventory-moves.md §7.1 r2
+#[test]
+fn a_far_pick_up_runs_to_the_item_and_picks_it() {
+    let mut rig = Rig::new();
+    // The walk-verify S→C 0x96 a run brings needs the render seam's
+    // visibility predicate (`model.md` open question 7, q-fix-visibility
+    // wires it in the app): given here as an input, every sprite seen.
+    rig.app
+        .world_mut()
+        .resource_mut::<BridgeResource>()
+        .0
+        .set_visibility(Some(|_, _, _| true));
+    let (px, py) = rig.player_at();
+    // A monster dies 8 sub-tiles away: its drop lies out of the
+    // pick-up reach (distance ≥ 5, §7.1 step 2).
+    let m = rig.place_monster(smoke::MONSTER, (px + 8, py));
+    rig.step(5);
+    rig.kill(m);
+    rig.step(20);
+    rig.check("far drop");
+    let sword = rig.guid(smoke::SWORD);
+    let (_, _, _, sx, sy) = rig.place_of(sword);
+    assert!((sx - px).abs().max((sy - py).abs()) >= 5, "out of reach");
+    // One 0x16: the server runs the player there and picks it up on
+    // arrival (to the inventory, cursor flag 0).
+    rig.send(&items::pick(sword, false));
+    for _ in 0..200 {
+        rig.step(1);
+        if rig.place_of(sword).0 == mode::STORED {
+            break;
+        }
+    }
+    rig.step(10);
+    rig.check("far pick-up");
+    assert_eq!(rig.place_of(sword).0, mode::STORED, "picked on arrival");
+    let (ax, ay) = rig.player_at();
+    assert!(
+        (ax - sx).abs().max((ay - sy).abs()) < 5,
+        "the player ran to the item: ({ax}, {ay}) for ({sx}, {sy})"
+    );
+}

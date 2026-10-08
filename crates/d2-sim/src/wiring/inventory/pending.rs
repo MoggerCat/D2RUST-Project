@@ -44,6 +44,10 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
             Some(r) if r == spot.room => {}
             Some(_) => self.state.errors.push(InvError::OtherRoom(u)),
         }
+        // The item's path follows its ground position (REC-281).
+        self.econ
+            .hooks
+            .ground_item_placed(u, spot.room, spot.x, spot.y);
     }
     fn in_room(&self, item: Guid) -> bool {
         self.item_unit(item)
@@ -138,7 +142,12 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
     fn collides(&self, a: Owner, b: Owner, mask: u32) -> bool {
         self.rest.collides(a, b, mask)
     }
+    /// Recorded for the host ([`InvDesk::take_item_walks`]), then the
+    /// rest's seam.
     fn walk_to_item(&mut self, player: Owner, item: Guid, cursor: bool) {
+        if let (Some(p), Some(i)) = (self.unit_of(player), self.item_unit(item)) {
+            self.state.item_walks.push((p, i, cursor));
+        }
         self.rest.walk_to_item(player, item, cursor)
     }
     fn walk_to_unit(&mut self, player: Owner, target: Owner, cursor: bool) {

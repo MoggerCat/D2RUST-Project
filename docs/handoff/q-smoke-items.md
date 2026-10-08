@@ -56,6 +56,12 @@ and adds what it lacked:
    removals: `send_removed_units` was a no-op. Freed ground items are
    now recorded and sent as S→C 0x0A, and tick step 7 frees the
    records.
+4. **A far pick-up did nothing.** `walk_to_item` was unanswered. The
+   server now runs the player to the item and picks it up on arrival
+   (`world/item_approach.rs`). Test: `a_far_pick_up_runs_to_the_item_and_picks_it`.
+5. **A dropped item's path kept its old spot.** The desk's ground
+   placement now moves the item's static path, so walks and distances
+   see where the item lies.
 
 Synthetic data, not code breaks:
 
@@ -83,12 +89,6 @@ Synthetic data, not code breaks:
   and the play app never sets one (`Bridge::set_visibility` has no
   caller). This is not an item flow, so the smoke test keeps the player
   still: drops are placed within the pick-up reach.
-- **A far pick-up does nothing.** `walk_to_item` is unanswered in the
-  preview rest, and the client has no hover-and-walk
-  (`controls.md` §6 r9.2).
-- **Ground item positions live in two places.** The desk keeps them in
-  the item data, while the path record keeps the drop spot. After a
-  cursor drop the path is stale.
 - **Only one ground message per landing.** 1.14d sends §6.3 part 2 in
   every tick in which the item changed.
 - **Not reached in the time box:**

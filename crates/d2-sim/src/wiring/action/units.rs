@@ -374,6 +374,25 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
     fn path_xy(&self, unit: UnitId) -> Option<(i32, i32)> {
         self.path_has(unit).then(|| self.path_position(unit))
     }
+    /// The static path set at the spot (`0x00620AE0`); a dynamic path is
+    /// not an item's. PROVISIONAL (REC-281): the footprint is not moved
+    /// (the item's footprint is not removed when it leaves the ground
+    /// either, `View::path_free`).
+    fn ground_item_placed(&mut self, item: UnitId, room: crate::units::RoomId, x: i32, y: i32) {
+        let Some(p) = self.paths.as_mut() else {
+            return;
+        };
+        match p.records.get_mut(&item) {
+            Some(crate::path::record::UnitPath::Static(s)) => s.set(Some(room), x, y),
+            Some(_) => {}
+            None => {
+                let mut s = crate::path::record::StaticPath::default();
+                s.set(Some(room), x, y);
+                p.records
+                    .insert(item, crate::path::record::UnitPath::Static(s));
+            }
+        }
+    }
     /// The monster type init `0x00574250` (`init.md` §5, `units.md` §3.1
     /// table: the allocator's per-kind init of a monster) on the lent
     /// monster world ([`super::monsters`]); the object data and init

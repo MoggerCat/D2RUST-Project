@@ -29,6 +29,7 @@ mod action;
 mod gap_items;
 mod hireling_drive;
 mod hireling_host;
+mod item_approach;
 mod item_save;
 mod npc_approach;
 mod sentry_drive;
@@ -361,6 +362,10 @@ pub trait WorldHost<D> {
     fn town_portal(&mut self, game: &mut Game, events: &mut D, player: UnitId) -> bool {
         false
     }
+    /// The run of `walk.0` to the ground item `walk.1` a pick-up asked
+    /// for (`inventory-moves.md` §7.1 step 2, `0x00548A50`; cursor flag
+    /// `walk.2`), with the pick-up on arrival. Default: nothing.
+    fn item_walk(&mut self, game: &mut Game, events: &mut D, walk: (UnitId, UnitId, bool)) {}
     /// The cube (`handlers::items`) on the host's economy.
     fn cube<C: CubeCall>(&mut self, game: &mut Game, events: &mut D, call: C) -> Option<C::Out> {
         None
