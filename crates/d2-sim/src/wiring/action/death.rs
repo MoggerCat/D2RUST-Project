@@ -51,6 +51,17 @@ pub struct DeathState {
     /// Client +0x508 per player: the last death's experience loss
     /// (`0x005391E0` writes it, the corpse creation reads and clears it).
     pub exp_lost: BTreeMap<UnitId, u32>,
+    /// The owner GUID of each corpse this wiring allocated (the
+    /// inventory of a corpse, `0x0063D450`, is not modelled).
+    pub owners: BTreeMap<UnitId, u32>,
+    /// Allocate the corpse unit when [`Pending::create_corpse`] gives
+    /// none (the preview host; off in the spec tests).
+    pub allocate_corpses: bool,
+    /// The last death code sent per player (8 DT, 9 DD): each goes out
+    /// once ([`super::dying`]).
+    pub announced: BTreeMap<UnitId, u8>,
+    /// Corpses allocated and not yet announced to the clients.
+    pub fresh: Vec<UnitId>,
 }
 
 impl<X: Pending> ActionHooks<X> {
@@ -134,7 +145,8 @@ impl<X: Pending> ActionHooks<X> {
     /// client +0x508, then +0x508 := 0.
     /// With no corpse (§4.7 rule 1.2) +0x508 is left unchanged.
     pub fn corpse_creation(&mut self, sim: &mut Sim<'_>, p: UnitId) {
-        let Some(c) = self.x.create_corpse(sim.game, p) else {
+        let made = self.x.create_corpse(sim.game, p);
+        let Some(c) = made.or_else(|| self.allocate_corpse(sim, p)) else {
             return;
         };
         let v = self.death.exp_lost.get(&p).copied().unwrap_or(0) as i32;
@@ -158,7 +170,10 @@ impl<X: Pending> ActionHooks<X> {
             return None;
         }
         let guid = sim.units.get(p).map(|r| r.guid);
-        let owner = self.x.corpse_owner_guid(c);
+        let owner = self
+            .x
+            .corpse_owner_guid(c)
+            .or_else(|| self.death.owners.get(&c).copied());
         let own = owner.is_some() && owner == guid;
         if !own && !self.x.corpse_loot_allowed(c, p) {
             return None;

@@ -1295,6 +1295,9 @@ pub fn build_with(
     );
     hooks.anim_data = parts.anim;
     hooks.vitals = parts.vitals;
+    // d2rs-own, unverified: the preview allocates the death's corpse unit
+    // itself (the inventory model has no corpse; PROVISIONAL REC-D1).
+    hooks.death.allocate_corpses = true;
     // Game entry places through the path provider; on before any unit is
     // allocated.
     hooks
