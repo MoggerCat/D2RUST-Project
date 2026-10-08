@@ -588,7 +588,7 @@ pub fn draw_tip(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use d2_proto::item_bits::hflag;
     use d2_sim::items::tables::ItemRec;
@@ -614,7 +614,7 @@ mod tests {
 
     /// A cap (name id 7, requires level 3), prefix 1 `Sturdy`, suffix 1
     /// `Fox`, stat 1 described by string 9 (`descfunc` 1, value first).
-    fn tips() -> ItemTips {
+    pub(crate) fn tips() -> ItemTips {
         tips_with(ItemTables::default())
     }
 
