@@ -85,6 +85,7 @@ const LEVEL: u16 = 12;
 const GOLD: u16 = 14;
 const ARMORCLASS: u16 = 31;
 const MAXDURABILITY: u16 = 73;
+const DURABILITY: u16 = 72;
 /// Item flags (`vendors.md` §3.1 rule 5, §7.2 rule 7).
 const IDENTIFIED: u32 = 0x10;
 /// Item mode "stored" (`vendors.md` §7.2 rule 9).
@@ -233,6 +234,11 @@ struct Fx {
 
 impl Fx {
     fn new(game_seed: u32, gold: i32) -> Self {
+        Self::with_class(game_seed, gold, class::AKARA)
+    }
+
+    /// The same game with the NPC of class `npc_class` (Akara, Gheed).
+    fn with_class(game_seed: u32, gold: i32, npc_class: u16) -> Self {
         let tables = ActionTables {
             missiles: Vec::new(),
             skills: SkillTables {
@@ -302,7 +308,7 @@ impl Fx {
                 .with(&mut game, |g, v| v.allocate(g, &req, 0, 0))
                 .expect("allocated")
         };
-        let npc = alloc(UnitType::Monster, u32::from(class::AKARA));
+        let npc = alloc(UnitType::Monster, u32::from(npc_class));
         let player = alloc(UnitType::Player, 1);
         let npc_guid = game.lists.unit(npc).unwrap().guid;
         // Players are allocated in mode 0; neutral (`units.md` §2).
@@ -381,14 +387,14 @@ impl Fx {
         let tap = Tap {
             inner: link,
             chunks: Vec::new(),
-            inject: vec![akara_add(npc_guid, class::AKARA, (0, 0))],
+            inject: vec![akara_add(npc_guid, npc_class, (0, 0))],
         };
         let mut bridge = Bridge::with_dispatch(tap, Dispatch::from_spec().unwrap()).unwrap();
         // Akara's class row in the client tables (an `interact` NPC), so
         // her add creates the unit.
         let mut tables = bridge.inputs().tables.clone();
-        tables.monsters = vec![None; usize::from(class::AKARA) + 1];
-        tables.monsters[usize::from(class::AKARA)] = Some(MonsterClass {
+        tables.monsters = vec![None; usize::from(npc_class) + 1];
+        tables.monsters[usize::from(npc_class)] = Some(MonsterClass {
             npc: true,
             interact: true,
             ..MonsterClass::default()
@@ -951,5 +957,208 @@ fn shop_panel_buys_and_closes() {
     let end = bytes(&TerminateEntityChat { id: ng });
     let f = fx.step(&[]);
     assert_eq!(f.codes[0].0, end[0]);
+    assert!(fx.errors().is_empty(), "{:?}", fx.errors());
+}
+
+/// (q-gamble) Gheed's gamble window through the NPC menu: the Gamble row
+/// sends C→S 0x38 action 2, the player's gamble list arrives as S→C 0x9C
+/// action 11, the shop knows it is a gamble window, and a click on an
+/// item leaves as C→S 0x32 with the gamble bit; the server charges the
+/// gamble price (`vendors.md` §5.3, §9.4) and the shop shows that price.
+// Covers: specs/world/vendors.md §4, §5.1, §5.3, §9.4
+#[test]
+fn gamble_window_lists_prices_and_buys() {
+    use d2_client::bridge::items::store_items;
+    use d2_client::ui::layout::{OptionKind, Screen};
+    use d2_client::ui::original::{OriginalUi, UiConfig};
+    use d2_client::ui::panel::PointerButton;
+    use d2_client::ui::panel::{NoStrings, UiCtx, UiEvent};
+    use d2_client::ui::{NoPanelRules, Point, UiRoot};
+
+    let mut fx = Fx::with_class(GAME_SEED, 1_000_000, class::GHEED);
+    let (player, npc) = (fx.player, fx.npc);
+    let ng = fx.guid(npc);
+    assert!(!fx.bridge.frame().unwrap().ticked);
+    fx.step(&[bytes(&InteractWithEntity { type_: 1, id: ng })]);
+    fx.step(&[bytes(&InitEntityChat { id: ng })]);
+
+    let mut ui = OriginalUi::new(
+        UiConfig {
+            screen: Screen::R800,
+            expansion_installed: true,
+        },
+        None,
+    )
+    .unwrap();
+    let mut root = UiRoot::new(Box::new(NoPanelRules));
+    ui.install(&mut root).unwrap();
+    let strings = NoStrings;
+    let click = |fx: &mut Fx, ui: &mut OriginalUi, root: &mut UiRoot, button, at| {
+        let w = fx.bridge.world();
+        let ctx = UiCtx {
+            tick: w.frames,
+            world: w,
+            strings: &strings,
+        };
+        for e in [
+            UiEvent::Press { button, at },
+            UiEvent::Release { button, at },
+        ] {
+            ui.before_event(e, w);
+            let routed = root.dispatch(e, &ctx);
+            ui.after_event(root, e, routed).unwrap();
+        }
+        root.forward(&mut fx.bridge).unwrap()
+    };
+
+    // The menu: Gheed's Gamble row (the box is centred, a quarter down;
+    // its rows start one row below the top).
+    ui.open_npc_menu(ng, u32::from(class::GHEED), 12);
+    let menu = ui.npc_menu().expect("Gheed's menu");
+    let k = menu
+        .rows
+        .iter()
+        .position(|r| r.kind == Some(OptionKind::Gamble))
+        .expect("a Gamble row");
+    let at = Point::new(400, 150 + 20 + 20 * k as i32 + 5);
+    assert_eq!(
+        click(&mut fx, &mut ui, &mut root, PointerButton::Left, at),
+        1
+    );
+    let f = fx.step(&[]);
+    assert_eq!(f.codes, [(0x38, Some(ResultCode::Done))]);
+    assert!(!f.received.is_empty(), "the gamble list was shown");
+    // The prices the host published for the panel (the play app shares
+    // them through `VendorRest::store_price`).
+    let prices = d2_client::ui::original::ShopPrices::default();
+    for (g, p) in &fx.sim_ref().world.rest.prices {
+        prices.set(*g, *p);
+    }
+    ui.set_shop_prices(prices);
+    assert!(f.received.iter().all(|m| m[0] == 0x9C && m[1] == 11));
+    ui.shop_poll(fx.bridge.world(), &mut root);
+    assert!(ui.is_open(0x0C), "the shop opened");
+    assert!(ui.shop_state().gamble(), "it is a gamble window");
+
+    // The list is the player's: up to 14 items, each priced at the
+    // gamble price (`cost` of transaction 2).
+    let shown = store_items(fx.bridge.world());
+    assert_eq!(shown.len(), f.received.len());
+    assert!(shown.len() <= 14);
+    let it = shown[0].clone();
+    let price = ui
+        .shop_state()
+        .price(it.key.guid)
+        .expect("the host published the price");
+    assert!(price > 0);
+
+    // A right click on its (packed) cell: C→S 0x32, transaction bit 2.
+    let at = Point::new(80 + 15 + 5, 600 - 60 - 400 + 5);
+    let before = fx.stat(player, GOLD);
+    assert_eq!(
+        click(&mut fx, &mut ui, &mut root, PointerButton::Right, at),
+        1
+    );
+    let f = fx.step(&[]);
+    assert_eq!(f.codes, [(0x32, Some(ResultCode::Done))]);
+    let spent = before - fx.stat(player, GOLD);
+    assert_eq!(spent as u32, price, "the shown price is the price paid");
+    assert!(fx.errors().is_empty(), "{:?}", fx.errors());
+}
+
+/// (q-gamble) Charsi's repairs: the repair-all button (frame 18) leaves
+/// as C→S 0x35 with item 0 and the all flag and the server answers S→C
+/// 0x2A; a single-item C→S 0x35 repairs a damaged backpack item and
+/// charges the repair cost (`vendors.md` §8.1 rules 3–5, §9.2).
+// Covers: specs/world/vendors.md §8.1
+#[test]
+fn charsi_repairs_one_item_and_repair_all_answers() {
+    use d2_client::ui::layout::Screen;
+    use d2_client::ui::original::{OriginalUi, UiConfig};
+    use d2_client::ui::panel::PointerButton;
+    use d2_client::ui::panel::{NoStrings, UiCtx, UiEvent};
+    use d2_client::ui::panels::shop::BUTTON_X;
+    use d2_client::ui::{NoPanelRules, Point, UiRoot};
+    use d2_proto::client::Repair;
+
+    let mut fx = Fx::with_class(GAME_SEED, 100_000, class::CHARSI);
+    let (player, npc, cap) = (fx.player, fx.npc, fx.cap);
+    let ng = fx.guid(npc);
+    assert!(!fx.bridge.frame().unwrap().ticked);
+    fx.step(&[bytes(&InteractWithEntity { type_: 1, id: ng })]);
+    fx.step(&[bytes(&InitEntityChat { id: ng })]);
+
+    // The cap (identified, as a normal item the player owns) loses 7 of
+    // its 12 durability.
+    {
+        let sim = fx.sim();
+        sim.events.sys.hooks.items.get_mut(cap).unwrap().flags |= IDENTIFIED;
+        sim.events
+            .with(&mut sim.game, |_, v| v.set_base(cap, DURABILITY, 5));
+    }
+    let cg = fx.guid(cap);
+    let repair = |item: u32, flags: u32| {
+        bytes(&Repair {
+            npc: ng,
+            item,
+            unread: 0,
+            repair_flags: flags,
+        })
+    };
+    let before = fx.stat(player, GOLD);
+    let f = fx.step(&[repair(cg, 0)]);
+    assert_eq!(f.codes, [(0x35, Some(ResultCode::Done))]);
+    let after = fx.stat(player, GOLD);
+    assert_eq!(f.received, [tx(1, 2, u32::MAX, after)], "repaired");
+    assert_eq!(fx.stat(cap, DURABILITY), 12, "restored to the maximum");
+    assert!(after < before, "the repair was charged");
+
+    // The shop's repair-all button.
+    let mut ui = OriginalUi::new(
+        UiConfig {
+            screen: Screen::R800,
+            expansion_installed: true,
+        },
+        None,
+    )
+    .unwrap();
+    let mut root = UiRoot::new(Box::new(NoPanelRules));
+    ui.install(&mut root).unwrap();
+    ui.open_shop(ng, u32::from(class::CHARSI));
+    ui.shop_poll(fx.bridge.world(), &mut root);
+    assert!(ui.is_open(0x0C));
+    let strings = NoStrings;
+    let w = fx.bridge.world();
+    let ctx = UiCtx {
+        tick: w.frames,
+        world: w,
+        strings: &strings,
+    };
+    // Frame 18 is the fourth button of a repairer's row (`panels-2.md`
+    // §14.11); its bar spans `H + sy - 109 .. H + sy - 65`.
+    let at = Point::new(80 + BUTTON_X[3][3] + 10, 600 - 60 - 87);
+    for e in [
+        UiEvent::Press {
+            button: PointerButton::Left,
+            at,
+        },
+        UiEvent::Release {
+            button: PointerButton::Left,
+            at,
+        },
+    ] {
+        ui.before_event(e, w);
+        let routed = root.dispatch(e, &ctx);
+        ui.after_event(&mut root, e, routed).unwrap();
+    }
+    assert_eq!(root.forward(&mut fx.bridge).unwrap(), 1, "one C→S 0x35");
+    let f = fx.step(&[]);
+    assert_eq!(f.codes, [(0x35, Some(ResultCode::Done))]);
+    assert_eq!(
+        f.received,
+        [tx(1, 2, u32::MAX, after)],
+        "nothing equipped to repair, nothing charged"
+    );
+    assert_eq!(fx.stat(player, GOLD), after);
     assert!(fx.errors().is_empty(), "{:?}", fx.errors());
 }

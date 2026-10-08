@@ -64,6 +64,9 @@ pub struct NpcMenuState {
     /// Charsi's imbue dialog (`imbue_ui.rs`).
     pub imbue: Option<Imbue>,
     menus: Option<NpcMenus>,
+    /// The last Trade / Gamble choice was Gamble: the shop that opens next
+    /// is a gamble window (`panels-2.md` §14: the gamble shop flag).
+    pub gamble: bool,
     pub screen: (i32, i32),
 }
 
@@ -294,7 +297,13 @@ impl Panel for NpcMenuUi {
                 UiResponse::Consumed
             }
             Some(kind) => {
-                self.st.borrow_mut().up = None;
+                {
+                    let mut st = self.st.borrow_mut();
+                    st.up = None;
+                    if matches!(kind, OptionKind::Trade | OptionKind::Gamble) {
+                        st.gamble = kind == OptionKind::Gamble;
+                    }
+                }
                 match option_intent(kind, guid).and_then(|v| v.into_iter().next()) {
                     Some(PanelOutput::Intent(i)) => UiResponse::Intent(i),
                     _ => UiResponse::Consumed,

@@ -296,6 +296,9 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
         self.rest.stat_refresh_unlink(u, b)
     }
     fn stat_link(&mut self, owner: Owner, item: Guid) {
+        if let (Some(o), Some(i)) = (self.unit_of(owner), self.item_unit(item)) {
+            self.link_item_stats(o, i);
+        }
         self.rest.stat_link(owner, item)
     }
     /// §5.5 `0x0055C270` on the rules when [`InvState::equip_rules`] is on.
@@ -347,6 +350,9 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
         }
     }
     fn body_leave_effects(&mut self, owner: Owner, item: Guid) {
+        if let (Some(o), Some(i)) = (self.unit_of(owner), self.item_unit(item)) {
+            self.unlink_item_stats(o, i);
+        }
         self.rest.body_leave_effects(owner, item)
     }
     fn hireling_owner_pass(&mut self, owner: Owner) {
