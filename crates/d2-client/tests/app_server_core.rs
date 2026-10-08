@@ -146,10 +146,15 @@ fn the_server_side_player_walks_on_a_client_walk() {
 /// A monster of class 0 allocated by the server next to the player, in
 /// the player's room; its GUID.
 fn monster_next_to_player(g: &mut Game) -> u32 {
+    monster_at(g, 2)
+}
+
+/// The same, `dx` sub-tiles east of the player.
+fn monster_at(g: &mut Game, dx: i32) -> u32 {
     use d2_sim::units::lifecycle::AllocRequest;
     use d2_sim::units::UnitType;
     g.link
-        .with(|l| {
+        .with(move |l| {
             let s = &mut l.host_mut().game;
             let (p, _) = single_player::local_player(s).expect("joined");
             let room = s.game.lists.unit(p).and_then(|e| e.room());
@@ -174,7 +179,7 @@ fn monster_next_to_player(g: &mut Game) -> u32 {
             let m = s
                 .events
                 .action
-                .with(&mut s.game, |gm, v| v.allocate(gm, &req, pos.x + 2, pos.y))
+                .with(&mut s.game, |gm, v| v.allocate(gm, &req, pos.x + dx, pos.y))
                 .unwrap_or_else(|| {
                     let h = s.events.action.hooks();
                     panic!("monster allocated: {:?} {:?}", h.x.log, h.errors)
@@ -214,4 +219,115 @@ fn a_left_skill_on_a_monster_next_to_the_player_starts_the_attack() {
     // user's files it runs (local check, docs/handoff/stitch-server-core.md).
     assert!(log.iter().all(|l| !l.starts_with("run to")), "{log:?}");
     assert!(errors.contains("NoRecord"), "{errors}");
+}
+
+// Covers: specs/sim/intents-events.md §2.4 r3, §9 r10; specs/sim/pathing.md §10 r2
+#[test]
+fn an_out_of_range_walk_resyncs_the_client_with_0x15() {
+    let mut g = Game::joined();
+    // More than 25 frames since the last accepted point (`+0x168`).
+    g.ticks(30);
+    let start = g.player_pos().unwrap();
+    let to = Walk {
+        x: (start.x + 200) as u16,
+        y: start.y as u16,
+    };
+    g.link.send(SendQueue::Game, &to.encode()).unwrap();
+    let got = g.ticks(3);
+    let r = got
+        .iter()
+        .find(|c| c[0] == 0x15)
+        .expect("S→C 0x15 ReassignPlayer");
+    assert_eq!(r.len(), 11);
+    assert_eq!(u16::from_le_bytes([r[6], r[7]]) as i32, start.x);
+    assert_eq!(u16::from_le_bytes([r[8], r[9]]) as i32, start.y);
+    assert_eq!(r[10], 1);
+}
+
+// Covers: specs/skills/use.md §3; specs/sim/pathing.md §1.2
+#[test]
+fn a_left_skill_on_a_far_monster_runs_the_server_player_to_it() {
+    let mut g = Game::joined();
+    let near = monster_at(&mut g, 12);
+    let start = g.player_pos().unwrap();
+    let mut msg = vec![0x06, 1, 0, 0, 0];
+    msg.extend(near.to_le_bytes());
+    g.link.send(SendQueue::Game, &msg).unwrap();
+    g.ticks(20);
+    let (log, end) = (
+        g.link
+            .with(|l| l.host_mut().game.events.action.hooks().x.skills.log.clone())
+            .unwrap(),
+        g.player_pos().unwrap(),
+    );
+    assert!(log.iter().all(|l| !l.starts_with("run to")), "{log:?}");
+    assert!(
+        end.x > start.x,
+        "the player ran toward it: {start:?} → {end:?}"
+    );
+}
+
+/// An item unit (class 0) in the player's room, `dx` sub-tiles east of
+/// the player; owned by the player in the inventory model when `owned`.
+fn item_at(g: &mut Game, dx: i32, owned: bool) -> u32 {
+    use d2_sim::units::lifecycle::AllocRequest;
+    use d2_sim::units::UnitType;
+    g.link
+        .with(move |l| {
+            let s = &mut l.host_mut().game;
+            let (p, pguid) = single_player::local_player(s).expect("joined");
+            let room = s.game.lists.unit(p).and_then(|e| e.room());
+            let (x, y) = s.events.action.hooks().path_position(p);
+            let req = AllocRequest {
+                ty: UnitType::Item,
+                class: 0,
+                room,
+                add: true,
+                fixed_guid: None,
+                mode: 3,
+                allied: false,
+            };
+            let it = s
+                .events
+                .action
+                .with(&mut s.game, |gm, v| v.allocate(gm, &req, x + dx, y))
+                .expect("item allocated");
+            let guid = s.game.lists.unit(it).unwrap().guid;
+            if owned {
+                // The synthetic game has no inventory model: an empty one.
+                let inv = s.world.inventory.get_or_insert_with(|| {
+                    d2_server::adapters::handlers::world::preview_inv_parts(Default::default())
+                });
+                let mut rec = d2_sim::items::inventory::InvItem::new(guid, 0);
+                rec.owner_guid = pguid;
+                inv.state.items.insert(it, rec);
+            }
+            guid
+        })
+        .unwrap()
+}
+
+/// The result of one C→S 0x04 (run to unit) on an item, as the dispatcher
+/// reports it.
+fn run_to_item(g: &mut Game, guid: u32) -> String {
+    let mut msg = vec![0x04, 4, 0, 0, 0];
+    msg.extend(guid.to_le_bytes());
+    g.link.send(SendQueue::Game, &msg).unwrap();
+    g.link.pump().unwrap();
+    g.link
+        .with(|l| format!("{:?}", l.last_frame().messages))
+        .unwrap()
+}
+
+// Covers: specs/sim/intents-events.md §2.4 r4
+#[test]
+fn an_item_target_is_staged_with_its_owner() {
+    let mut g = Game::joined();
+    // Far outside the 50-subtile reach: only an owned item passes.
+    let far = item_at(&mut g, 200, false);
+    let refused = run_to_item(&mut g, far);
+    assert!(!refused.contains("Dispatched(Done)"), "{refused}");
+    let mine = item_at(&mut g, 200, true);
+    let accepted = run_to_item(&mut g, mine);
+    assert!(accepted.contains("Dispatched(Done)"), "{accepted}");
 }
