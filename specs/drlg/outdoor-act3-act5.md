@@ -26,14 +26,14 @@
 |   1. Level map | 82–102 |
 |   2. Jungle placer (`0x00677880`, D2MOO `DRLG_GenerateJungles`) | 103–295 |
 |   3. Jungle stamping (`0x0067E910`, levels 76..78) | 296–325 |
-|   4. Act III rooms and links | 326–351 |
-|   5. Act V outdoor levels | 352–373 |
-| Constants & data dependencies | 374–395 |
-| Randomness | 396–430 |
-| Edge cases & original bugs | 431–454 |
-| Test vectors | 455–530 |
-| Provenance | 531–556 |
-| Open questions | 557–595 |
+|   4. Act III rooms and links | 326–352 |
+|   5. Act V outdoor levels | 353–375 |
+| Constants & data dependencies | 376–397 |
+| Randomness | 398–432 |
+| Edge cases & original bugs | 433–456 |
+| Test vectors | 457–532 |
+| Provenance | 533–558 |
+| Open questions | 559–597 |
 <!-- /index -->
 
 ## Summary
@@ -347,7 +347,8 @@ never share a file when there are three.
    adjacency warps and neighbour entries of `outdoor.md` §2.7 (vis slots
    whose warp is −1: 76's 84/85, 78's 86/88 and Kurast's sewer/temple
    slots carry lvlwarp ids and are not neighbours) and the link flags of
-   `outdoor.md` §5.5.
+   `outdoor.md` §5.5. Per-level connection list and exit cells:
+   `levels.md` §12.3.
 
 ### 5. Act V outdoor levels
 
@@ -361,7 +362,8 @@ table warps in Act V).
    with lvlwarp 71; 117 has 115 (warp 72) and 118 (warp 71). So 111's
    polygon opens only toward 112 and 112's only toward 111; 110 never
    runs the link flags; 117 has no openings and joins the world only
-   through its cave presets (`outdoor.md` §11 step 5) and warps.
+   through its cave presets (`outdoor.md` §11 step 5) and warps
+   (connection list and exit cells: `levels.md` §12.4).
 2. **Bloody Foothills (110)**: gw × gh = 30 × 6; the siege strip
    (`outdoor.md` §11) stamps 15 presets of 2×6 cells with F 0, covering
    every cell; no draw while stamping; 15 preset rooms, no outdoor

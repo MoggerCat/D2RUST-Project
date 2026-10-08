@@ -20,27 +20,28 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 46–61 |
-| Inputs | 62–71 |
-| Outputs / state changes | 72–77 |
-| Rules | 78–79 |
-|   1. Structures (1.14d layout, for recorders and checks) | 80–105 |
-|   2. Act creation (server) | 106–122 |
-|   3. DRLG creation (`0x00642DA0`) | 123–157 |
-|   4. Level list, get-or-allocate | 158–175 |
-|   5. Level generation (`0x006424A0`, D2MOO `DRLG_InitLevel`) | 176–207 |
-|   6. Level position, size, act number | 208–224 |
-|   7. Vis and warp records | 225–248 |
-|   8. Coordinates to rooms | 249–262 |
-|   9. Level lifecycle: activity and freeing | 263–311 |
-|   10. Spawn room in a level (`0x0066B2B0`) | 312–374 |
-|   11. Logical rooms (coordinate lists) and population queries | 375–654 |
-| Constants & data dependencies | 655–675 |
-| Randomness | 676–694 |
-| Edge cases & original bugs | 695–719 |
-| Test vectors | 720–771 |
-| Provenance | 772–804 |
-| Open questions | 805–875 |
+| Summary | 47–62 |
+| Inputs | 63–72 |
+| Outputs / state changes | 73–78 |
+| Rules | 79–80 |
+|   1. Structures (1.14d layout, for recorders and checks) | 81–106 |
+|   2. Act creation (server) | 107–123 |
+|   3. DRLG creation (`0x00642DA0`) | 124–158 |
+|   4. Level list, get-or-allocate | 159–176 |
+|   5. Level generation (`0x006424A0`, D2MOO `DRLG_InitLevel`) | 177–208 |
+|   6. Level position, size, act number | 209–225 |
+|   7. Vis and warp records | 226–249 |
+|   8. Coordinates to rooms | 250–263 |
+|   9. Level lifecycle: activity and freeing | 264–312 |
+|   10. Spawn room in a level (`0x0066B2B0`) | 313–375 |
+|   11. Logical rooms (coordinate lists) and population queries | 376–655 |
+|   12. Level connections: Act I fields, Act III, Act V | 656–850 |
+| Constants & data dependencies | 851–871 |
+| Randomness | 872–890 |
+| Edge cases & original bugs | 891–915 |
+| Test vectors | 916–976 |
+| Provenance | 977–1024 |
+| Open questions | 1025–1104 |
 <!-- /index -->
 
 ## Summary
@@ -652,6 +653,201 @@ owners above; reproduce them, do not model them separately):
    game-seed user between creation and that room pass (`sim/rng.md`
    §5.2), so a population result depends on everything drawn before it.
 
+### 12. Level connections: Act I fields, Act III, Act V
+
+Owner of the per-level connection lists below (REC-230). It adds no
+rule: it applies §7, `drlg/outdoor.md` §2.3 / §2.7,
+`drlg/preset.md` §6, `drlg/rooms.md` §3.3 / §9.5.1,
+`sim/path-placement.md` §12 and `drlg/maze.md` §6 to the 1.14d data.
+Data: vis/warp from patch_d2 `levels.txt` (equal to the live
+`leveldefs.bin` +0x48 / +0x68 for all 137 rows); lvlwarp rows from
+d2exp `LvlWarp.txt` (equal to the live `lvlwarp.bin`, 88 rows of 0x30
+bytes); exit cells read from the DS1 files (wall cells with
+orientation 10 or 11, style = bits 20–25, the `preset.md` §6 step 7
+marker test). Cell positions are DS1 tile coordinates inside the
+preset. patch_d2.mpq replaces none of these DS1 files except
+`Expansion\Town\townWest.ds1`, which has no exit cell in either version.
+
+#### 12.1 Connection kinds
+
+| Kind | Vis slot i | Made by | How the player crosses |
+|---|---|---|---|
+| walk | warp −1 | Act I (and II, IV): the link driver, both ways (`outdoor.md` §2.3 step 4). Act III, V: adjacency warps, a shared edge (`outdoor.md` §2.7) | No tile and no lvlwarp row. Boundary rooms get flag 0x10 << i: outdoor cells through the link vis flag (`outdoor.md` §5.5, only for levels with neighbour entries), preset areas (towns, outdoor stamps) on every cell (`preset.md` §6 step 3). The rooms-near build then appends the other level's flagged rooms within the 6-tile gap (`rooms.md` §3.3, W = −1), so the player walks across. |
+| tile | leveldefs `Warp`i = lvlwarp `Id` ≥ 0 | A stamped preset whose DS1 has an exit cell with style i. This sets flag 0x10 << i on its room (`preset.md` §6 step 7). | Tile unit with class = `Id`. Its row letter is 'l' for orientation 10 and 'r' for 11; 'b' rows match both (§7 rule 4, `sim/path-placement.md` §12.1). Room link: `rooms.md` §3.3. Warping in: `sim/path-placement.md` §12.2. |
+| maze | the far side of a tile in a maze level | `maze.md` §6 special cells | as tile |
+
+Quest and town portals are not level connections (they use no vis or
+warp slot). Examples: the Cairn Stones to Tristram, the red portals
+from Harrogath.
+
+#### 12.2 Act I fields (no draw decides any slot)
+
+The vis and warp arrays are fixed once Act I is created. They are
+leveldefs plus the link-driver rows in table order. §7 rule 3 puts each
+new id in the first slot with vis 0 and warp −1, so: A1W Stony–Cold,
+Blood Moor–Cold, Rogue Encampment–Blood Moor, Burial–Cold; A1M
+Tamoe–Monastery Gate, Black Marsh–Tamoe, Dark Wood–Black Marsh.
+
+| Level | Vis0..7 | Warp0..7 | Walk to | Tile slots → level (lvlwarp `Id`) |
+|---|---|---|---|---|
+| 1 Rogue Encampment | 2, 0, 0, 0, 0, 0, 0, 0 | all −1 | 2 | — |
+| 2 Blood Moor | 3, 1, 0, 8, 8, 8, 8, 0 | −1, −1, −1, 0, 1, 2, 3, −1 | 3, 1 | 3..6 → 8 Den of Evil (0..3) |
+| 3 Cold Plains | 4, 2, 17, 9, 9, 9, 9, 0 | as 2 | 4, 2, 17 | 3..6 → 9 Cave 1 |
+| 4 Stony Field | 3, 0, 0, 10, 10, 10, 10, 0 | as 2 | 3 | 3..6 → 10 Underground Passage 1 |
+| 5 Dark Wood | 6, 0, 0, 10, 10, 10, 10, 0 | as 2 | 6 | 3..6 → 10 Underground Passage 1 |
+| 6 Black Marsh | 7, 5, 20, 11, 11, 11, 11, 0 | −1, −1, 10, 0, 1, 2, 3, −1 | 7, 5 | 2 → 20 Forgotten Tower (10); 3..6 → 11 Hole 1 |
+| 7 Tamoe Highland | 26, 6, 0, 12, 12, 12, 12, 0 | as 2 | 26, 6 | 3..6 → 12 Pit 1 |
+| 17 Burial Grounds | 18, 19, 3, 0, 0, 0, 0, 0 | 6, 7, −1, −1, −1, −1, −1, −1 | 3 | 0 → 18 Crypt (6); 1 → 19 Mausoleum (7) |
+| 26 Monastery Gate | 7, 27, 0, 0, 0, 0, 0, 0 | all −1 | 7, 27 | — |
+| 10 Underground Passage 1 (maze) | 4, 5, 0, 0, 14, 0, 0, 0 | 4, 4, −1, −1, 5, −1, −1, −1 | — | 0 → 4, 1 → 5 (4 "Cave Up"); 4 → 14 (5 "Cave Down"); exit cells `maze.md` §6 (cave_prev, cave_next, cave_down) |
+
+So Dark Wood does not touch Cold Plains or Stony Field. The way from
+Stony Field to Dark Wood is through Underground Passage 1: Stony
+Field's cave tile links to its slot-0 room, Dark Wood's to its slot-1
+room (`rooms.md` §3.3: the (c+1)-th match fails, then the first slot
+whose vis holds the level).
+
+Each field level 2..7 gets exactly one cave mouth. `outdoor.md` §7.2
+and §7.3 set flag 0x40 on the first one placed. Its preset decides the
+slot:
+
+| Placed by | lvlprest, file | Exit cell (x, y), orientation, style | Slot, lvlwarp row |
+|---|---|---|---|
+| §7.2 step 2 (cliff-marked levels 4..7 only; §7 step 1 skips 2, 3, 17) | 25 Wild Cliff Cave Left, `clfcave.ds1` | (5, 2), 10, 3 | 3, `Id` 0 "Cliff L" |
+| same | 24 Wild Cliff Cave Right, `clfcave2.ds1` | (6, 5), 11, 4 | 4, `Id` 1 "Cliff R" |
+| §7.2 step 3 or §7.3 step 3, levels 3..7 | 51 Cave Entrance, file 1 `CaveDr1.ds1` / file 2 `CaveDr2.ds1` (F −1: build-list roll, `outdoor.md` §5.1) | (3, 4), 10, 5 / (3, 4), 10, 6 | 5, `Id` 2 "Floor L" / 6, `Id` 3 "Floor R" |
+| same, level 2 | 52 DOE Entrance, `DenEnt.ds1` / `DenEnt2.ds1` | (3, 4), 10, 5 / (5, 4), 10, 6 | 5 / 6 |
+| §7.4 S 163, level 6 | 163 Tower 1, `Tower1.ds1` | (3, 3), 10, 2 | 2, `Id` 10 |
+| §7.4 stamp 108, level 17 | 108 Graveyard, `gravey.ds1` | (12, 27), 10, 0; (11, 6), 10, 1 | 0, `Id` 6; 1, `Id` 7 |
+
+Rows `Id` 0..3, 6, 7 and 10 are all direction 'b', so the cell's
+orientation does not change the row.
+
+#### 12.3 Act III
+
+Three things depend on the DRLG seed (`drlg/outdoor-act3-act5.md` §2):
+which jungle levels touch, the vis slot numbers in 76..79, and the
+jungle clearing files. Nothing else does. Adjacency (§2.7 of
+`outdoor.md`) runs i = 75..83 ascending, and each level's record gets
+its neighbours in ascending id. Kurast's vis slots 0..3 are already
+taken, so its new ids go to the first free slots.
+
+| Level | Walk to (vis slots) | Tile slots → level (lvlwarp `Id`) |
+|---|---|---|
+| 75 Kurast Docks | 76 only (slot 0) | — |
+| 76 Spider Forest | 75 (slot 2), 77 (always), 78 (by seed) | 0 → 84 Spider Cave, 1 → 85 Spider Cavern (51 both) |
+| 77 Great Marsh | 76 (always), 78 (by seed) | — |
+| 78 Flayer Jungle | 76 and/or 77 (by seed, at least one), 79 (always) | 0 → 86 Swampy Pit 1 (53), 1 → 88 Flayer Dungeon 1 (54) |
+| 79 Lower Kurast | 78, 80 (slots 0, 1) | — |
+| 80 Kurast Bazaar | 79, 81 (slots 4, 5) | 0, 1 → 92 Sewers 1 (57); 2 → 94 Ruined Temple, 3 → 95 Disused Fane (61) |
+| 81 Upper Kurast | 80, 82 (slots 4, 5) | 0, 1 → 92 (57); 2 → 96 Forgotten Reliquary, 3 → 97 Forgotten Temple (61) |
+| 82 Kurast Causeway | 81, 83 (slots 0, 1) | 2 → 98 Ruined Fane, 3 → 99 Disused Reliquary (61) |
+| 83 Travincal | 82 (slot 1) | 0 → 100 Durance of Hate 1 (64) |
+| 100 Durance 1 (maze) | — | 0, 1 → 101 (67, 68 "Down L/R"); 2, 3 → 83 (65, 66 "Up L/R") |
+| 101 Durance 2 (maze) | — | 0, 1 → 102 (67, 68); 2, 3 → 100 (65, 66) |
+| 102 Durance 3 (preset) | — | 2, 3 → 101 (65, 66) |
+
+Geometry, from `outdoor-act3-act5.md` §2.2 and `outdoor.md` §9.2:
+
+- **Docks and 76.** Placement record 0 sits on the docks' top edge and
+  always becomes 76. Every other jungle's rect ends at least 64 tiles
+  above the docks.
+- **79 touches only 78.** 78 has the smallest y of the three jungles,
+  and the Kurast chain is stacked above it. 79's x edges (78.x − 8,
+  78.x + 72) are off the 64-tile jungle grid, and no jungle has 78's top
+  y in an adjacent column (no placement case gives a (±64, 0) offset).
+- **80..83** lie wholly above 78's top and touch only their chain
+  neighbours.
+
+An enumeration of the jungle placer (the `d2-sim` port, run outside
+the repo) over 200,000 seeds (init x·2654435761, two steps, then
+`0x00677880`) found:
+
+- adjacency sets {76–77, 76–78} 21.4 %, {76–77, 77–78} 48.3 %, all
+  three 30.3 %;
+- 75 touched only 76 and 79 touched only 78, every time;
+- no fatal.
+
+The recorded vector (`outdoor-act3-act5.md` Test vectors: 76 (1000,
+808), 77 (936, 744), 78 (1000, 616)) is the all-three case. Its 76 vis
+is 84, 85, 75, 77, 78; 77 is 76, 78; 78 is 86, 88, 76, 77, 79.
+
+Exit cells (all orientation 10 except Travincal's):
+
+| Level | Preset (how stamped) | Exit cell (x, y), style |
+|---|---|---|
+| 76 | clearing Webby 575–584: file 1 `Spid<dir>.ds1`, file 2 `Spid<dir>2.ds1`, file 3 none | style 0 in file 1, style 1 in file 2 (e.g. `SpidE` (15, 14), `SpidE2` (10, 10)) |
+| 77 | clearing Boggy 585–594 | no file has an exit cell |
+| 78 | clearing Pygmy 595–604: `Pyg<dir>.ds1` / `Pyg<dir>2.ds1` / file 3 none | style 0 / 1 (e.g. `PygE` (12, 12), `PygE2` (12, 19)) |
+| 80 | 629 Burbs Sewer: stamp F 0 at cell (3, 3) `BurbsSewer0.ds1`, F 1 at (X, 3) `BurbsSewer1.ds1`; S(630, 0) `BurbsTemple2.ds1`, S(630, 1) `BurbsTemple3.ds1` (`outdoor.md` §9.4) | sewers (4, 3) style 0 / 1; temples (6, 4) style 2, (4, 7) style 3 |
+| 81 | 646 Metro Sewer F 0 / F 1; S(647, 0) `MetroTemple2.ds1`, S(647, 1) `MetroTemple3.ds1` | sewers (4, 3) style 0 / 1; temples (4, 4) style 2, (4, 6) style 3 |
+| 82 | 652 `Bridge.ds1`, stamp F 0 at (0, 0) | (26, 8) style 2; (5, 7) style 3 |
+| 83 | 654 `TravN.ds1` (stamp at (2, 0)) | (15, 17), orientation 11, style 0 |
+
+Jungle stamping picks clearing c's file as F := G[3r + c]
+(`outdoor-act3-act5.md` §3). With 2 clearings r < 2, so the files are
+{0, 1}. With 3 clearings G's row uses all of 0, 1, 2. Either way
+slots 0 and 1 each get exactly one tile. Every enumerated seed gave
+2 or 3 clearings per jungle; the counts were 76: 21.5 % / 78.5 %,
+77: 3.5 % / 96.5 %, 78: 10.3 % / 89.7 %. A level with fewer than 2
+clearings would miss a cave mouth. The data has no other source for
+slots 0 and 1, and none was seen.
+
+The jungle head 573 and tail 574 (`TransL/U`, `TravL/U`), the docks
+(`DockTown3.ds1`) and the Kurast border, gate and filler presets have
+no exit cell. Their crossings are all walk.
+
+#### 12.4 Act V
+
+The vis arrays are fixed once Act V is created. No table warps are set
+in Act V. The adjacency order is 111..112, 110..111, then 109..110
+(`outdoor.md` §2.1). The B1 and B2 placements always share an edge
+with their parent (`outdoor.md` §2.4: 111's right edge is 110's left,
+y spans overlap; every B2 offset puts 112 on an edge of 111). 117 is
+placed alone (BD) and is never adjacency-tested.
+
+| Level | Vis0..7 (Warp) | Walk to | Tile slots → level (lvlwarp `Id`) |
+|---|---|---|---|
+| 109 Harrogath | 110 (−1) | 110 | — |
+| 110 Bloody Foothills | 111, 109 (−1, −1) | 111, 109 | — |
+| 111 Frigid Highlands | 112, 110 (−1, −1) | 112, 110 | — |
+| 112 Arreat Plateau | 111, 0, 113 (−1, −1, 71) | 111 | 2 → 113 Crystalized Cavern 1 (71) |
+| 113 Crystalized Cavern 1 (maze) | 112, 115, 114 (73, 74, 75) | — | 0 → 112, 1 → 115, 2 → 114 Cellar of Pity |
+| 114 Cellar of Pity | 113 (73) | — | 0 → 113 |
+| 115 Crystalized Cavern 2 (maze) | 113, 117, 116 (73, 74, 75) | — | 0 → 113, 1 → 117, 2 → 116 Echo Chamber |
+| 116 Echo Chamber | 115 (73) | — | 0 → 115 |
+| 117 Frozen Tundra | 115, 0, 118 (72, −1, 71) | — | 0 → 115 (72); 2 → 118 Glacial Caves 1 (71) |
+| 118 Glacial Caves 1 (maze) | 117, 120, 119 (73, 74, 75) | — | 0 → 117, 1 → 120, 2 → 119 |
+| 119 Glacial Caves 2 | 118 (73) | — | 0 → 118 |
+| 120 Arreat Summit (preset) | 118, 128 (79, 80) | — | 0 → 118, 1 → 128 |
+| 128, 129, 130 Worldstone Keep 1–3 (maze) | previous, next (81, 82) | — | 0 → previous (120, 128, 129), 1 → next (129, 130, 131) |
+| 131 Throne of Destruction | 130, 132 (81, 82) | — | 0 → 130, 1 → 132 |
+| 132 Worldstone Chamber | 131 (81) | — | 0 → 131 |
+
+So the walk chain is 109 – 110 – 111 – 112. Every later link is a
+tile. 114, 116 and 119 are dead ends off 113, 115 and 118, and 115
+leads straight to 117.
+
+Exit cells of the outdoor and preset levels (cave presets:
+`outdoor.md` §11 step 5. A tall level (w < h) stamps P tall at (2, 0),
+or at (2, gh − 2) when side = 1. A wide level stamps P wide at (0, 2),
+or at (gw − 2, 2).):
+
+| Level, row | Preset | Exit cell (x, y), orientation, style → row |
+|---|---|---|
+| 112 (112, 0, 0, 913, 914) | tall: 913 `NorthEntrance_Dirt.ds1`; wide: 914 `WestEntrance_Dirt.ds1` | (17, 9), 11, 2 → `Id` 71 'r'; (9, 12), 10, 2 → 71 'l' |
+| 117 (117, 0, 1, 983, 984) | 983 `NorthExit_Snow.ds1` / 984 `WestExit_Snow.ds1`, at the far end | (14, 4), 10, 0 / (3, 14), 10, 0 → `Id` 72 'b' |
+| 117 (117, 0, 0, 985, 986) | 985 `NorthEntrance_Snow.ds1` / 986 `WestEntrance_Snow.ds1` | (12, 11), 11, 2 → 71 'r' / (10, 12), 10, 2 → 71 'l' |
+| 120 | 1089 `MtnTop.ds1` | (11, 25), 10, 0 → 79; (9, 5), 10, 1 → 80 |
+
+The ice-cave and Worldstone files follow `maze.md` §6. Their exit
+cells use style 0 for back, 1 for ahead and 2 for down in the ice
+caves (`ice<dir>back01`, `ahead01`, `down01`), and 0 for up and 1 for
+down in the Worldstone Keep (`baal<dir>up0n`, `down0n`). Harrogath
+(`townWest.ds1`), the siege strips 865–879 and 880
+`siege2barricade.ds1` have no exit cell, and nor do the Dirt "From
+Cave" presets 911 and 912, which no 1.14d table row stamps.
+
 ## Constants & data dependencies
 
 | Constant | Value | Use |
@@ -769,6 +965,15 @@ Comparison (exact): for each created act, the DRLG seed state after
 creation, `dwStartSeed`, the act choices, and the level list (ids, head
 first) with each level's seed state, equal the recorded game.
 
+Connections (§12, derived from the rules and the 1.14d data; CI-safe
+with the tables as fixtures). After act creation, the vis/warp arrays
+(drlg +0x90 records, or leveldefs where no record exists) of Act I
+levels 1–7, 17 and 26 and of Act V levels 109–112 equal the §12.2 and
+§12.4 tables for every seed. For the recorded Act III seed (`-seed`
+644409375), 75's vis is 76; 76's is 84, 85, 75, 77, 78; 77's is 76,
+78; 78's is 86, 88, 76, 77, 79; 79's is 78, 80. Kurast 80–83 are as
+§12.3.
+
 ## Provenance
 
 - **1.14d `Game.exe`**: every address above read from the disassembly
@@ -798,6 +1003,21 @@ first) with each level's seed state, equal the recorded game.
   same algorithm and tables; 1.14d's node test masks 0x01E0FF00 (main
   index bits 21–24 only), and the merge looks records up by tile
   coordinates.
+- **§12 data** (2026-10-08, REC-230):
+  - Tables: patch_d2 `levels.txt` vis/warp compared with the live
+    `traces/raw/20261006-115547-tables/leveldefs.bin` (+0x48, +0x68,
+    0x9C-byte rows), 0 differences in 137 rows. d2exp `LvlWarp.txt`
+    compared with the live `lvlwarp.bin` (0x30-byte rows; `Id` +0x00,
+    `LitVersion` +0x24, `Tiles` +0x28, `Direction` +0x2C). lvlprest file
+    names from patch_d2 `lvlprest.txt`.
+  - DS1 exit cells: d2data.mpq / d2exp.mpq files extracted with
+    `mpq-tool extract`, scanned with a scratch script (wall layers,
+    orientation 10/11, style ≤ 7, sub 0/4 or bit 31). The patch_d2.mpq
+    overrides were checked by hash lookup of every listed name: only
+    `townWest.ds1` is patched, and it has no exit cell.
+  - Jungle statistics: the `d2-sim` port of `0x00677880` (tested
+    against the recorded Act III vector) run outside the repo over
+    200,000 seeds.
 - **Recorded**: `20261005-232125-rng.jsonl` (RNG hooks at all 846 inline
   sites and the helpers): DRLG seed, start seed, level seed order and
   values, room seed values (§Test vectors).
@@ -872,3 +1092,12 @@ first) with each level's seed state, equal the recorded game.
 10. *Answered* (`impl-room-population` §3 Q3): out-of-grid record
     lookups read the record-grid block as §11.4's table; reachable only
     from `0x005B2A00`'s spread search.
+11. *Answered (2026-10-08, static and data; REC-230)*: how the Act I
+    fields, Act III and Act V levels connect, and where their warp
+    tiles come from, is §12. Walk links come from the link driver or
+    adjacency (no tile). Tile links come from the vis slot's lvlwarp
+    `Id` and a DS1 exit cell whose style is the slot. No recording is
+    needed. Optional confirmations: after entering Act III, dump the
+    drlg +0x90 vis/warp records of 75–83 (§Test vectors); after
+    entering Act V, the records of 109–112 and the warp units of 112
+    and 117.
