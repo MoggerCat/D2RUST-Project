@@ -67,6 +67,8 @@ pub struct Rest {
     pub last_bought: BTreeMap<UnitId, u32>,
     pub sent: Vec<(UnitId, Vec<u8>)>,
     pub log: Vec<String>,
+    /// The prices the host publishes for the shop panel.
+    pub prices: BTreeMap<u32, u32>,
 }
 
 impl Outbox for Rest {
@@ -261,6 +263,9 @@ impl VendorRest for Rest {
     }
     fn take_from_store(&mut self, _: u16, item: UnitId) {
         self.log.push(format!("take {}", item.0));
+    }
+    fn store_price(&mut self, _: UnitId, guid: u32, price: u32) {
+        self.prices.insert(guid, price);
     }
     fn place_in_gamble(&mut self, _: u16, _: u32, _: UnitId) -> bool {
         true
@@ -568,15 +573,21 @@ pub fn vendor_tables() -> VendorTables {
         stat_shift: 6,
         stat_mask: 0x3F,
         monster_levels: vec![[1, 1, 1]; N_MONSTATS],
-        interact: vec![class::AKARA],
-        npc: vec![NpcPrices {
-            class: u32::from(class::AKARA),
-            sell: 1024,
-            buy: 512,
-            rep: 128,
-            quests: [(0, 0, 0, 0); 3],
-            max_buy: [5000; 3],
-        }],
+        interact: vec![class::AKARA, class::GHEED, class::CHARSI],
+        npc: [class::AKARA, class::GHEED, class::CHARSI]
+            .into_iter()
+            .map(|c| NpcPrices {
+                class: u32::from(c),
+                sell: 1024,
+                buy: 512,
+                rep: 128,
+                quests: [(0, 0, 0, 0); 3],
+                max_buy: [5000; 3],
+            })
+            .collect(),
+        // Gheed's gamble list draws from both items (`vendors.md` §5.1).
+        gamble_index: Some(vec![0, 1]),
+        gamble_thresholds: vec![2; 100],
         difficulty: vec![Default::default(); 3],
         ..VendorTables::default()
     }
@@ -587,6 +598,10 @@ pub fn monstats() -> Vec<Monstats> {
     let mut v: Vec<Monstats> = (0..N_MONSTATS).map(|_| blank()).collect();
     v[usize::from(class::AKARA)].npc = true;
     v[usize::from(class::AKARA)].interact = true;
+    v[usize::from(class::GHEED)].npc = true;
+    v[usize::from(class::GHEED)].interact = true;
+    v[usize::from(class::CHARSI)].npc = true;
+    v[usize::from(class::CHARSI)].interact = true;
     v
 }
 
