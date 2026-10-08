@@ -255,7 +255,7 @@ pub enum AudioFrameError {
 /// `parts`. A later `insert_resource(GameAudio::new(…))` replaces it.
 pub fn add_audio(app: &mut App, parts: AudioParts) {
     app.insert_resource(GameAudio::new(parts)).add_systems(
-        Update,
+        PostUpdate,
         audio_frame
             .run_if(resource_exists::<BridgeResource>)
             .run_if(resource_exists::<GameAudio>),
