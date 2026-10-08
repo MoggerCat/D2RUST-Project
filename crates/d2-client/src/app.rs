@@ -9,6 +9,7 @@
 //! single-player game ([`single_player`], on a server thread,
 //! [`server_thread`]) through the bridge and the world view.
 
+pub mod anim_names;
 pub mod automap;
 pub mod death;
 pub mod hire_stats;

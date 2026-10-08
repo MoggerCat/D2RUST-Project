@@ -92,6 +92,11 @@ pub trait UseRest {
     fn run_to(&mut self, u: UnitId, target: UnitId, e: SkillEntry);
     fn target(&self, u: UnitId) -> Option<UnitId>;
     fn clear_target(&mut self, u: UnitId);
+    /// The target of a mode start: the point or unit the skill's missile
+    /// and checks read back through [`UseRest::target`] and
+    /// [`UseRest::target_position`] (`use.md` §4: where `0x0057FE90` /
+    /// `0x0057FEF0` store it is not stated). Default: not kept.
+    fn keep_target(&mut self, u: UnitId, target: ModeTarget<UnitId>) {}
     fn event_arg(&self, u: UnitId) -> i32;
     fn set_event_arg(&mut self, u: UnitId, a: i32);
     fn step_path(&mut self, u: UnitId) -> i32;
@@ -469,6 +474,7 @@ impl<X: Pending + UseRest> UseWorld for UseView<'_, X> {
     fn start_mode(&mut self, u: UnitId, mode: u32, target: ModeTarget<UnitId>) {
         let game = &mut *self.cv.game;
         self.cv.v.h.x.start_mode(game, u, mode, target);
+        self.cv.v.h.x.keep_target(u, target);
     }
     fn run_to(&mut self, u: UnitId, target: UnitId, e: SkillEntry) {
         self.xm().run_to(u, target, e);
