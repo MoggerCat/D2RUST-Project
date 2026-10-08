@@ -184,4 +184,23 @@ actions! {
     PanelSelect => "panel_select", Panel;
     PanelAlt => "panel_alt", Panel;
     PanelClose => "panel_close", Panel;
+    // The commands of `ui/controls.md` §3 the list above lacked (appended,
+    // so the indexes above stay).
+    ToggleMessageLog => "toggle_message_log", World;
+    ToggleAutomapParty => "toggle_automap_party", World;
+    ToggleAutomapNames => "toggle_automap_names", World;
+    Say0 => "say_0", World;
+    Say1 => "say_1", World;
+    Say2 => "say_2", World;
+    Say3 => "say_3", World;
+    Say4 => "say_4", World;
+    Say5 => "say_5", World;
+    Say6 => "say_6", World;
+    Say7X => "say_7x", World;
+    Run => "run", World;
+    SkillUp => "skill_up", World;
+    SkillDown => "skill_down", World;
+    ClearTextMessages => "clear_text_messages", World;
+    ToggleMinimap => "toggle_minimap", World;
+    ToggleHireling => "toggle_hireling", World;
 }

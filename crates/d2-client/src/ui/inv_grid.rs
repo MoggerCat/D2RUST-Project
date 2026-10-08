@@ -543,7 +543,7 @@ pub fn placement_follows(owner: OwnerKind, cursor_item: bool) -> bool {
 
 /// The hover state of §5 (`0x007BCBF4`, `0x007BCBE4`, `0x00721E4C` /
 /// `0x00721E50`).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct HoverState {
     /// `0x007BCBF4`: the hovered item.
     pub item: Option<u32>,
@@ -551,6 +551,18 @@ pub struct HoverState {
     pub in_grid: bool,
     /// The cursor cell (§5 r2–r3).
     pub cursor_cell: (i32, i32),
+}
+
+/// d2rs-own: before the first cursor cell the cell is (−1, −1), which
+/// §4 r2's "cursor cell ≥ 0" test reads as no cell.
+impl Default for HoverState {
+    fn default() -> Self {
+        HoverState {
+            item: None,
+            in_grid: false,
+            cursor_cell: (-1, -1),
+        }
+    }
 }
 
 impl HoverState {

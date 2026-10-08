@@ -92,6 +92,7 @@ impl Panel for CubeUi {
                 image: ImageRef { file, frame: n },
                 at: Point::new(x, y),
                 clip: Rect::new(0, 0, s.w as u16, s.h as u16),
+                look: crate::ui::CelLook::PLAIN,
             }));
         }
         if anim.grid_visible() {
@@ -202,11 +203,13 @@ impl OriginalUi {
             match o {
                 PanelOutput::Intent(i) => root.queue_intent(i),
                 PanelOutput::SetUi { ui, mode, jump } => {
-                    self.set_ui(u32::from(ui), u32::from(mode), jump)?;
+                    // The two 0x4F 0x17 above include the hook's.
+                    self.set_ui_from(u32::from(ui), u32::from(mode), jump, Some(ui))?;
                 }
                 PanelOutput::ClickSound | PanelOutput::PlayerEvent(_) => {}
             }
         }
+        self.flush_hooks(root);
         self.sync_root(root);
         Ok(())
     }

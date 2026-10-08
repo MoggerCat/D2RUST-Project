@@ -215,6 +215,7 @@ fn image(files: &UiFiles, name: &str, frame: u32, x: i32, y: i32, clip: Rect) ->
         image: ImageRef { file, frame },
         at: Point::new(x, y),
         clip,
+        look: crate::ui::CelLook::PLAIN,
     }))
 }
 
@@ -581,6 +582,9 @@ impl Panel for HudUi {
                         mode: 0,
                         jump: false,
                     }),
+                    // `0x0044DA40` after a release that ran a function
+                    // (`control-panel.md` §9).
+                    MiniAction::InputReset => sh.input_reset = true,
                     // The quest log has no panel in play.
                     _ => {}
                 }

@@ -245,12 +245,12 @@ fn the_cursor_cell_centres_an_even_item() {
     // 2 × 3 item, graphic 58 × 87, mouse at (200, 250): c = (14 − 100 +
     // 200) / 29 = 3, minus 1 → 2; r = (250 − 200) / 29 = 1, minus 1 → 0.
     assert_eq!(
-        cursor_cell_for(&g, Point::new(200, 250), (2, 3), (58, 87)),
+        grid_cursor_cell(&g, Point::new(200, 250), (2, 3), (58, 87)),
         Some((2, 0))
     );
     // Leaves the grid on the right: none.
     assert_eq!(
-        cursor_cell_for(&g, Point::new(385, 250), (2, 3), (58, 87)),
+        grid_cursor_cell(&g, Point::new(385, 250), (2, 3), (58, 87)),
         None
     );
 }

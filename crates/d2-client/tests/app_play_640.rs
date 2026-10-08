@@ -1,14 +1,18 @@
-// Spec: specs/ui/control-panel.md (§8 r1, r4, r5); preview fills: docs/PLAN.md decision D1
-//! The level-up buttons of the control panel, headless as `play` wires
-//! it (the fixtures of `app_hud_e2e.rs`): unspent stat and skill points in
-//! the model draw the glowing `Panel\Level` buttons, a click on one opens
-//! the character panel / skill tree, and spending the points hides them.
+// Spec: specs/ui/panels.md (§1 r1, §1 r2, §1 r4, §1 r5), specs/render/camera.md (§1), specs/client/ui.md (§a5-logical-resolution); preview fills: docs/PLAN.md decision D1
+//! The play path at 640 × 480 (`d2-client play --res 640x480`), headless,
+//! wired as `app_hud_e2e.rs` wires the play HUD (synthetic files in a
+//! memory source, never a game file): the play frame is chosen once for
+//! this test binary, then the world view composes a 640 × 480 frame, the
+//! camera is the 640 × 480 camera of the UI's open mode, and the original
+//! UI places its panels by the 640 × 480 layout (`ScreenShift` (0, 0)).
+//!
+//! One test in its own binary: the play frame is a once-per-process
+//! setting (`FrameSize::set_play`).
 
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
 use bevy::prelude::*;
-use d2_client::app::hud::set_hud_tables;
 use d2_client::app::palette::{add_act_palettes, ActPalettes};
 use d2_client::app::play::{
     add_client_data, add_game, add_preview, add_walk, predict_link, send_create_game_for,
@@ -18,12 +22,12 @@ use d2_client::app::ui::{add_original_ui_with, UiParts};
 use d2_client::assets::path::MemorySource;
 use d2_client::bridge::link::{LinkError, Sent, ServerLink};
 use d2_client::bridge::predict::Speeds;
-use d2_client::bridge::{BridgeResource, Pumped, SendQueue};
+use d2_client::bridge::{Pumped, SendQueue};
+use d2_client::rules::camera::{FrameSize, OpenMode, ViewRect};
 use d2_client::rules::unit_composite::code;
 use d2_client::ui::layout::Screen;
-use d2_client::ui::original::hud::HudTables;
 use d2_client::ui::original::{FontMeasure, OriginalUi, UiConfig, CHARACTER_FONTS};
-use d2_client::ui::{font_info, Point, PointerButton, UiDraw, UiEvent};
+use d2_client::ui::{font_info, UiDraw};
 use d2_client::world_view::tile_assets::TileAssets;
 use d2_client::world_view::unit_assets::UnitLooks;
 use d2_client::world_view::{WorldViewState, WorldViewUi};
@@ -170,7 +174,7 @@ fn files() -> MemorySource {
     s.insert(r"data\global\chars\OY\cof\OYTNhth.cof", cof_bytes());
     s.insert(r"data\global\chars\OY\TR\OYTRlitTNhth.dc6", dc6(1));
     let config = UiConfig {
-        screen: Screen::R800,
+        screen: Screen::R640,
         expansion_installed: false,
     };
     let ui = OriginalUi::new(config, None).unwrap();
@@ -213,47 +217,23 @@ fn images(app: &App) -> Vec<(String, u32, i32, i32, u16)> {
         .collect()
 }
 
-fn click(app: &mut App, ms: &AtomicU32, x: i32, y: i32) {
-    let at = Point::new(x, y);
-    for e in [
-        UiEvent::Press {
-            button: PointerButton::Left,
-            at,
-        },
-        UiEvent::Release {
-            button: PointerButton::Left,
-            at,
-        },
-    ] {
-        app.world_mut()
-            .non_send_mut::<WorldViewUi>()
-            .queue
-            .0
-            .push(e);
-    }
-    step(app, ms, 2);
+/// The camera of the last drawn frame.
+fn camera(app: &App) -> d2_client::rules::camera::Camera {
+    let state = app.world().resource::<WorldViewState>();
+    let cam = *state.camera.read().unwrap();
+    cam.expect("a frame was drawn")
 }
 
-fn receive(app: &mut App, m: &[u8]) {
-    app.world_mut()
-        .resource_mut::<BridgeResource>()
-        .0
-        .receive_chunk(m)
-        .unwrap();
+fn open_mode(app: &App) -> u8 {
+    let ui = app.world().non_send::<WorldViewUi>();
+    ui.original.as_ref().unwrap().open_mode().get()
 }
 
-fn open(app: &App, ui: u8) -> bool {
-    app.world()
-        .non_send::<WorldViewUi>()
-        .original
-        .as_ref()
-        .unwrap()
-        .is_open(ui)
-}
-
-// Covers: specs/ui/control-panel.md §8 r1, §8 r4, §8 r5
+// Covers: specs/ui/panels.md §1 r1, §1 r2, §1 r4, §1 r5; specs/render/camera.md §1
 #[test]
-fn unspent_points_light_the_level_buttons_and_open_the_panels() {
+fn the_play_path_runs_the_640_by_480_frame() {
+    FrameSize::set_play(FrameSize::LOW).unwrap();
+    assert_eq!(Screen::play(), Screen::R640);
     let data = GameData::Synthetic;
     let character = single_player::new_character("sorceress", "Test").unwrap();
     let ms = Arc::new(AtomicU32::new(1000));
@@ -264,10 +244,9 @@ fn unspent_points_light_the_level_buttons_and_open_the_panels() {
         StepClock(ms.clone()),
     )
     .unwrap();
-    let sent = Arc::new(Mutex::new(Vec::new()));
     let link = RecLink {
         inner: link,
-        sent: sent.clone(),
+        sent: Arc::new(Mutex::new(Vec::new())),
     };
     let source = Arc::new(files());
     let mut app = App::new();
@@ -308,42 +287,52 @@ fn unspent_points_light_the_level_buttons_and_open_the_panels() {
         looks(),
     )
     .unwrap();
-    set_hud_tables(&mut app, HudTables::default());
     add_walk(&mut app, tap, Some(Speeds { walk: 6, run: 9 }));
     step(&mut app, &ms, 10);
 
-    // No points: both buttons are the closed frame 2 (800 × 600: x 206
-    // and 563, y 592).
-    let img = images(&app);
-    let lvl = |img: &[(String, u32, i32, i32, u16)], x: i32| {
-        img.iter()
-            .find(|d| d.0 == "panel\\level" && d.2 == x && d.3 == 592)
-            .map(|d| d.1)
+    // The composed frame and the camera are 640 × 480 (§1: play area
+    // H − 40; ±W / 4 per open mode).
+    {
+        let state = app.world().resource::<WorldViewState>();
+        assert_eq!((state.cycle.width(), state.cycle.height()), (640, 480));
+        assert!(state.last.is_some(), "a frame was presented");
+    }
+    let cam = camera(&app);
+    assert_eq!(cam.size, FrameSize::LOW);
+    assert_eq!(cam.view, ViewRect::new(FrameSize::LOW, OpenMode::NONE));
+
+    // The character panel (ui 2, left): quads at (X0, H + sy − 224),
+    // (X0 + 256, …), (X0, H + sy − 48), (X0 + 256, …) with X0 = sx = 0,
+    // sy = 0: (0, 256), (256, 256), (0, 432), (256, 432).
+    app.world_mut()
+        .non_send_mut::<WorldViewUi>()
+        .original
+        .as_mut()
+        .unwrap()
+        .set_ui(2, 0, false)
+        .unwrap();
+    step(&mut app, &ms, 2);
+    let ui_open = |app: &App| {
+        let ui = app.world().non_send::<WorldViewUi>();
+        ui.original.as_ref().unwrap().is_open(2)
     };
-    assert_eq!(lvl(&img, 206), Some(2), "{img:?}");
-    assert_eq!(lvl(&img, 563), Some(2), "{img:?}");
-
-    // The server's level-up stat messages: 5 stat points, 1 skill point.
-    receive(&mut app, &[0x1D, 4, 5]);
-    receive(&mut app, &[0x1D, 5, 1]);
-    step(&mut app, &ms, 2);
-    let img = images(&app);
-    assert_eq!(lvl(&img, 206), Some(0), "new stats lit: {img:?}");
-    assert_eq!(lvl(&img, 563), Some(0), "new skills lit: {img:?}");
-
-    // A click on the new-stats button opens the character panel (state 2),
-    // on the new-skills button the skill tree (state 4).
-    assert!(!open(&app, 2) && !open(&app, 4));
-    click(&mut app, &ms, 220, 575);
-    assert!(open(&app, 2), "character panel open");
-    click(&mut app, &ms, 580, 575);
-    assert!(open(&app, 4), "skill tree open");
-
-    // Spent: the buttons go back to the closed frame.
-    receive(&mut app, &[0x1D, 4, 0]);
-    receive(&mut app, &[0x1D, 5, 0]);
-    step(&mut app, &ms, 2);
-    let img = images(&app);
-    assert_eq!(lvl(&img, 206), Some(2), "{img:?}");
-    assert_eq!(lvl(&img, 563), Some(2), "{img:?}");
+    assert!(ui_open(&app));
+    let quads: Vec<(u32, i32, i32)> = images(&app)
+        .into_iter()
+        .filter(|(name, frame, ..)| name == "panel\\invchar" && *frame < 4)
+        .map(|(_, frame, x, y, _)| (frame, x, y))
+        .collect();
+    assert_eq!(
+        quads,
+        vec![(0, 0, 256), (1, 256, 256), (2, 0, 432), (3, 256, 432)]
+    );
+    // The open left panel moves the camera by a quarter of 640.
+    let mode = open_mode(&app);
+    assert_ne!(mode, 0);
+    let cam = camera(&app);
+    assert_eq!(
+        cam.view,
+        ViewRect::new(FrameSize::LOW, OpenMode::new(mode).unwrap())
+    );
+    assert_eq!(cam.view.shift_x.abs(), 160);
 }
