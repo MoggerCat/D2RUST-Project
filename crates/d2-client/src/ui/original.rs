@@ -95,11 +95,11 @@ pub const PENDING: &[(&str, &str)] = &[
          press does not play sound 4 (deferred); the stash kinds 3 / 4 are not wired",
     ),
     (
-        "inventory equipment tints and empty-slot pictures (§9.4, `inventory.md` §6 r4)",
-        "the equipped-item tint (refused when the requirements fail, unidentified) is pushed \
-         as `UiDraw::Tint` by `ItemsUi::draw_panel` (REC-271); the scene has no fill \
-         primitive to paint it, the hover tint and the grid-item tints are not pushed, and \
-         the empty-slot pictures (§9.4 table) are not drawn",
+        "inventory tints (translucency) and empty-slot pictures (§9.4, `inventory.md` §2–§6)",
+        "the equipped and grid item tints and the hover tint are painted by \
+         `ItemsUi::draw_tints` as opaque `hudfill` tiles (REC-271: the UI sprite path has no \
+         A2 blend); the shooter / quiver and cursor-item tints are not read and the \
+         empty-slot pictures (§9.4 table) are not drawn",
     ),
     (
         "skill tree hover description and the no-points message (§10.5, §10.7)",
@@ -816,6 +816,8 @@ impl Panel for InventoryUi {
         panel.draw(&sh.tables, &sh.env(), gold, out);
         let class = Facts::of(ctx.world).class;
         if let Some(l) = sh.items.layout(class, &sh.config.screen) {
+            sh.items
+                .draw_tints(ctx.world, &sh.tables.files, &l, sh.mouse, out);
             sh.items.draw_panel(ctx.world, &sh.tables.files, &l, out);
         }
     }
