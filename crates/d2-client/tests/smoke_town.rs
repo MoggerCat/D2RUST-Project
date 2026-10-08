@@ -37,6 +37,7 @@ use d2_client::rules::camera::{moving_to_client, Camera, FrameSize, OpenMode};
 use d2_client::rules::unit_composite::code;
 use d2_client::ui::layout::{OptionKind, Screen};
 use d2_client::ui::original::{FontMeasure, OriginalUi, UiConfig, CHARACTER_FONTS};
+use d2_client::ui::panels::shop::TxKind;
 use d2_client::ui::{font_info, Point, PointerButton, UiEvent};
 use d2_client::world_view::tile_assets::TileAssets;
 use d2_client::world_view::unit_assets::UnitLooks;
@@ -858,11 +859,6 @@ fn act1_trade_and_gamble_rows_open_the_shop() {
 
 /// The store grid's cell (x, y) on screen (`ui/shop_ui.rs`: 29 px cells
 /// at (`sx` + 15, `H` + `sy` − 400), R800).
-fn store_cell(x: i32, y: i32) -> Point {
-    let s = Screen::R800;
-    Point::new(s.sx() + 15 + 29 * x + 10, s.h + s.sy() - 400 + 29 * y + 10)
-}
-
 /// The backpack cell (x, y) on screen (the inventory panel's grid beside
 /// the shop, as `e2e_vendor.rs` reads it).
 fn backpack_cell(x: u16, y: u16) -> Point {
@@ -942,8 +938,14 @@ impl Rig {
             .collect()
     }
 
-    /// The open store's page-0 items in the panel's packing order (every
-    /// synthetic item is 1 × 1 without item art: cell k = (k mod 10, k / 10)).
+    /// The screen point the shop shows a store item at.
+    fn store_point(&self, it: &d2_client::bridge::items::ItemView) -> Point {
+        let w = self.bridge().world().clone();
+        self.with_ui(|u| u.store_item_point(&w, it.key.guid))
+            .expect("the item is on the shown page")
+    }
+
+    /// The open store's page-0 items in arrival order.
     fn store_page0(&self) -> Vec<d2_client::bridge::items::ItemView> {
         let mut v: Vec<_> = d2_client::bridge::items::store_items(self.bridge().world())
             .into_iter()
@@ -1012,10 +1014,8 @@ impl Rig {
             .unwrap_or_else(|| panic!("{code:?} is in the store"));
         let before: Vec<u32> = self.backpack(code).iter().map(|i| i.key.guid).collect();
         let gold = self.gold();
-        self.click_with(
-            PointerButton::Right,
-            store_cell(k as i32 % 10, k as i32 / 10),
-        );
+        let at = self.store_point(&list[k]);
+        self.click_with(PointerButton::Right, at);
         self.step(10);
         assert!(self.sent_ids().contains(&0x32), "{:02X?}", self.sent_ids());
         let tx = self.transactions();
@@ -1073,7 +1073,8 @@ fn act1_traders_buy_sell_repair_and_gamble() {
     );
     rig.check("lift");
     let gold = rig.gold();
-    rig.click(store_cell(9, 9));
+    let at = rig.with_ui(|u| u.store_cell_point(9, 9));
+    rig.click(at);
     rig.step(10);
     assert!(rig.sent_ids().contains(&0x33), "{:02X?}", rig.sent_ids());
     assert!(
@@ -1108,7 +1109,16 @@ fn act1_traders_buy_sell_repair_and_gamble() {
         "repair armed"
     );
     let gold = rig.gold();
+    // The repair click goes through the confirm dialog (`menus.md` §4.2:
+    // kind 3 is never quick; §4.4: Repair, the item, Gold:, the price,
+    // Yes / No); Yes sends C→S 0x35 with the durability (§4.3).
     rig.click(backpack_cell(it.x, it.y));
+    rig.step(2);
+    let kind = rig.with_ui(|u| u.shop_state().confirm().map(|c| c.0));
+    assert_eq!(kind, Some(TxKind::Repair), "the repair asks first");
+    assert!(!rig.sent_ids().contains(&0x35), "not before the answer");
+    let yes = rig.with_ui(|u| u.shop_confirm_point(true)).unwrap();
+    rig.click(yes);
     rig.step(10);
     assert!(rig.sent_ids().contains(&0x35), "{:02X?}", rig.sent_ids());
     assert!(
@@ -1164,6 +1174,71 @@ fn act1_traders_buy_sell_repair_and_gamble() {
     let code = list[0].code.unwrap();
     rig.buy(&code);
     rig.close_shop();
+}
+
+// Play path of the shop's click callers and confirm dialog
+// (q-fix-ui-shop): the shop is the full-slot ui 0x0C (ui 1 off, ui 8 on);
+// a left click on a store item opens the confirm dialog at the mouse
+// (`0x0048FFE0`, a1 0, not quick), No cancels without a message, Yes sends
+// C→S 0x32; a right click buys at once (`0x00491AD0`, quick). The close
+// ends the interaction: 0x30 and ui 8 off.
+// Covers: specs/ui/menus.md §4 r2, §4 r4, §4 r5; specs/ui/panels.md §4 r1; specs/ui/panels-2.md §14 r9
+#[test]
+fn akara_left_click_buys_through_the_confirm_dialog() {
+    let mut rig = Rig::new();
+    rig.stage_gold(5_000);
+    rig.check("gold");
+    rig.open_shop(class::AKARA, OptionKind::Trade);
+    assert!(rig.with_ui(|u| u.is_open(0x0C) && !u.is_open(1) && u.is_open(8)));
+    let list = rig.store_page0();
+    let it = list
+        .iter()
+        .find(|i| i.code == Some(BUCKLER))
+        .expect("a buckler")
+        .clone();
+    let at = rig.store_point(&it);
+    rig.click(at);
+    rig.step(2);
+    let (kind, texts) = rig
+        .with_ui(|u| u.shop_state().confirm())
+        .expect("the confirm dialog");
+    assert_eq!(kind, TxKind::Buy);
+    assert!(
+        texts.len() >= 3,
+        "caption, (item, Gold:, price,) Yes, No: {texts:?}"
+    );
+    assert!(
+        !rig.sent_ids().contains(&0x32),
+        "nothing sent before the answer"
+    );
+    let no = rig.with_ui(|u| u.shop_confirm_point(false)).unwrap();
+    rig.click(no);
+    rig.step(4);
+    assert!(rig.with_ui(|u| u.shop_state().confirm().is_none()));
+    assert!(
+        !rig.sent_ids().contains(&0x32),
+        "No cancels: {:02X?}",
+        rig.sent_ids()
+    );
+    let at = rig.store_point(&it);
+    rig.click(at);
+    rig.step(2);
+    let yes = rig.with_ui(|u| u.shop_confirm_point(true)).unwrap();
+    let gold = rig.gold();
+    rig.click(yes);
+    rig.step(10);
+    assert!(
+        rig.sent_ids().contains(&0x32),
+        "Yes buys: {:02X?}",
+        rig.sent_ids()
+    );
+    assert!(rig.gold_after(gold) < gold, "paid");
+    rig.check("buy through the dialog");
+    rig.close_shop();
+    assert!(
+        !rig.with_ui(|u| u.is_open(8)),
+        "the close ended the interaction"
+    );
 }
 
 // ---- mercenaries ------------------------------------------------------------------------

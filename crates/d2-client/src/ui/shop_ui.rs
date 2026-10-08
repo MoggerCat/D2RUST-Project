@@ -7,25 +7,36 @@
 //! server checks the trade and answers with S→C 0x2A and the item and
 //! gold messages (`vendors.md` §7–§9).
 //!
-//! The shop opens by itself when a trade's store items arrive
-//! ([`OriginalUi::shop_poll`], the same way as the hire list opens on
-//! S→C 0x4F) for the trader nearest to the local player, or when the NPC
-//! menu's Trade / Gamble choice is made (REC-277: the next poll calls
-//! [`OriginalUi::open_shop`]). It closes with the UI state; the
-//! close sends C→S 0x30 (`panels-2.md` §14 r5).
+//! The shop opens when the NPC menu's Trade / Gamble choice is made
+//! (REC-277: the next poll calls [`OriginalUi::open_shop`]) or, d2rs-own,
+//! when a trade's store items arrive for the trader nearest to the local
+//! player. It is the full-slot ui 0x0C (`panels.md` §4.1): ui 1 stays off
+//! and the root draws the inventory family under it (§5 step 5); ui 8
+//! stays on. Its close is the interaction's end (`panels-2.md` §14.9:
+//! C→S 0x30, `SetUIState(8, off)`).
+//!
+//! Clicks go through the spec transaction rules with the callers of
+//! `menus.md` §4.5 ([`caller_args`]): a right click on a store item is the
+//! quick buy (`0x00491AD0`, Shift = `MK_SHIFT`), a left click goes through
+//! the confirm dialog (`0x0048FFE0`, [`confirm_box`], drawn and answered
+//! by the NPC menu panel), a cursor item dropped on the store grid is the
+//! quick sell (`0x00491D20`); with the repair button down a click on one
+//! of the player's items is the confirmed repair, whose 0x35 carries the
+//! item's stat 72. Action buttons stay down until clicked again (§14
+//! r13); repair all acts on the release over its pressed button.
 //!
 //! d2rs-own, unverified (preview fills):
 //! - the store grid (10 × 10 cells of 29 px) at (`sx` + 15, `H` + `sy` −
-//!   400); the NPC's own `inventory.bin` record is not read;
-//! - a left click on a store item buys it at once (the confirm dialog of
-//!   `menus.md` §4.4 is not drawn); the right click is the spec's quick
-//!   buy (§4.5), a left click with a cursor item on the grid sells it;
+//!   400) with the store items packed row by row (REC-162; the server's
+//!   cells and the NPC's `inventory.bin` record are q-fix-seam-store-grid);
 //! - the buy price shown is published by the server host
-//!   ([`ShopPrices`]); the original client computes it from its tables;
-//! - the repair button (frame 6) toggles a mode; the next click on one of
-//!   the player's items sends C→S 0x35 for it (no confirm dialog, REC-177);
-//! - the action button frames are 45 × 44 hit areas (`panels-2.md` §14
-//!   r13); the Buy / Sell buttons only press and release;
+//!   ([`ShopPrices`]); the sell and repair prices are not computed
+//!   (`vendors.md` §9 cost in the client: open);
+//! - a click on one of the player's items is a shop click only with the
+//!   repair button down (when the player grid hands clicks on is not
+//!   specified); `0x0062A130`, `0x004B1F80` and the `items.txt` byte
+//!   +0x1A5 are not read (the server checks);
+//! - Close acts on the press (the release is a spec gap);
 //! - the time of the transaction rules is the bridge frame × 40 ms (+ 60 s).
 
 use std::cell::RefCell;
@@ -39,12 +50,15 @@ use crate::bridge::world::{ClientWorld, MONSTER};
 use crate::ui::draw::UiDrawSink;
 use crate::ui::geom::{Point, Rect};
 use crate::ui::inv_grid::GridRecord;
+use crate::ui::panel::StringLookup;
 use crate::ui::panel::{ClientIntent, Panel, PanelId, UiCtx, UiEvent, UiResponse, WidgetId};
+use crate::ui::panels::menu_box::MenuBox;
 use crate::ui::panels::npc::msg_chat_end;
 use crate::ui::panels::shop::{
-    shop_button_records, shop_start_page, shop_tabs, ClickArgs, ClickEnv, ClickOutcome, ItemFacts,
-    SendFacts, ShopButton, ShopEffect, ShopPanel, ShopTx, TxKind, DEFAULT_TABS, IDENTIFY_CLASSES,
-    REPAIR_CLASSES, SELL_CLASSES, UI_SHOP,
+    caller_args, confirm_box, shop_button_records, shop_start_page, shop_tabs, Caller, ClickArgs,
+    ClickEnv, ClickOutcome, ConfirmHandler, ItemFacts, SendFacts, ShopButton, ShopEffect,
+    ShopPanel, ShopTx, TxKind, DEFAULT_TABS, IDENTIFY_CLASSES, MK_SHIFT, REPAIR_CLASSES,
+    SELL_CLASSES, UI_SHOP,
 };
 use crate::ui::panels::{cel, text, utf16, PanelOutput, TextMeasure};
 use crate::ui::root::UiRoot;
@@ -93,7 +107,7 @@ pub struct ShopOpen {
 #[derive(Debug, Default)]
 pub struct ShopState {
     pub open: Option<ShopOpen>,
-    tx: ShopTx,
+    pub(super) tx: ShopTx,
     /// The current store page (`[0x007BCC04]`).
     page: u8,
     /// `ClientWorld::store_serial` seen by the last poll.
@@ -111,6 +125,26 @@ pub struct ShopState {
     /// A shop closed since the last Trade / Gamble choice: a late store
     /// record (a sold item's copy) opens nothing until the next choice.
     closed: bool,
+    /// The confirm dialog `0x004B2F50` (`menus.md` §4.4), drawn and
+    /// answered by the NPC menu panel (ui 8 is open under the shop).
+    pub(super) confirm: Option<ConfirmUp>,
+    /// A send asked for the waiting note (`menus.md` §2.7): opened by the
+    /// next [`OriginalUi::npc_menu_poll`].
+    pub(super) note: bool,
+}
+
+/// The open confirm dialog: the box, its kind and the send facts of the
+/// pending item (looked up at the click).
+#[derive(Clone, Debug)]
+pub struct ConfirmUp {
+    pub bx: MenuBox<ConfirmHandler>,
+    pub kind: TxKind,
+    pub facts: SendFacts,
+    pub now: u32,
+    /// The hire of a kind-5 dialog: (NPC GUID, record name).
+    pub hire: Option<(u32, u16)>,
+    /// The item index the left press went down on.
+    pub pressed: Option<usize>,
 }
 
 impl ShopState {
@@ -127,6 +161,17 @@ impl ShopState {
     /// The price the host published for an item.
     pub fn price(&self, guid: u32) -> Option<u32> {
         self.prices.get(guid)
+    }
+
+    /// The confirm dialog's kind and its items' text, when one is up.
+    pub fn confirm(&self) -> Option<(TxKind, Vec<Vec<u16>>)> {
+        let c = self.confirm.as_ref()?;
+        Some((c.kind, c.bx.items.iter().map(|i| i.text.clone()).collect()))
+    }
+
+    /// The pressed action button, by index (buttons stay down, §14 r13).
+    pub fn pressed(&self) -> Option<usize> {
+        self.pressed
     }
 }
 
@@ -226,6 +271,17 @@ fn item_at(sh: &super::Shared, g: &GridRecord, list: &[ItemView], at: Point) -> 
         .cloned()
 }
 
+/// The action button under `at` (`panels-2.md` §14 r13: `sx + X[n −
+/// 1][i]` < x < that + 45, `H + sy − 109` < y < `H + sy − 65`, strict).
+fn button_at(s: &crate::ui::layout::Screen, n: usize, at: Point) -> Option<usize> {
+    let (lo, hi) = (s.h + s.sy() - 109, s.h + s.sy() - 65);
+    if n == 0 || n > 4 || at.y <= lo || at.y >= hi {
+        return None;
+    }
+    let xs = crate::ui::panels::shop::BUTTON_X[n - 1];
+    (0..n).find(|&i| at.x > s.sx() + xs[i] && at.x < s.sx() + xs[i] + BUTTON_W)
+}
+
 /// The tab records for the page counts.
 fn tabs_of(world: &ClientWorld, st: &ShopState) -> ([(bool, bool); 4], u8) {
     let mut counts = [0u32; 5];
@@ -281,36 +337,80 @@ impl ShopUi {
         )
     }
 
-    /// The effects of a transaction click: the sends leave through the
-    /// shared outputs.
-    fn apply(sh: &mut super::Shared, effects: Vec<ShopEffect>) {
+    /// The effects of a transaction step: the sends leave through the
+    /// shared outputs, the confirm dialog opens at the mouse (§4.4), the
+    /// waiting note is asked of the NPC menu (§2.7).
+    fn apply(
+        sh: &mut super::Shared,
+        st: &mut ShopState,
+        world: &ClientWorld,
+        strings: &dyn StringLookup,
+        facts: (SendFacts, u32, Option<&ItemView>),
+        effects: Vec<ShopEffect>,
+    ) {
         for e in effects {
             match e {
                 ShopEffect::Send(i) => sh.outputs.push(PanelOutput::Intent(i)),
                 ShopEffect::Sound(_) => sh.outputs.push(PanelOutput::ClickSound),
-                // d2rs-own: no waiting note, no confirm dialog, no cancel.
-                ShopEffect::WaitingNote | ShopEffect::Confirm(_) | ShopEffect::Cancel => {}
+                ShopEffect::WaitingNote => st.note = true,
+                ShopEffect::Confirm(kind) => {
+                    let (send, now, item) = facts;
+                    let name = item.and_then(|it| item_name(sh, world, it));
+                    let price = st.tx.pending.map_or(0, |p| p.price);
+                    let s = |id: u16| strings.get_id(id).map(<[u16]>::to_vec).unwrap_or_default();
+                    let m = super::game_messages::Measure(sh.fonts.as_ref());
+                    let frame = (sh.config.screen.w, sh.config.screen.h);
+                    let mouse = (sh.mouse.x, sh.mouse.y);
+                    let named = name.as_deref().map(|n| (n, price));
+                    if let Ok(bx) = confirm_box(kind, named, mouse, &s, frame, &m) {
+                        st.confirm = Some(ConfirmUp {
+                            bx,
+                            kind,
+                            facts: send,
+                            now,
+                            hire: None,
+                            pressed: None,
+                        });
+                    }
+                }
+                ShopEffect::Cancel => {}
             }
         }
     }
 
-    fn click(
+    /// The click `0x004B3870` of `caller` (`menus.md` §4.1, §4.5) on
+    /// `item` (`player`: one of the player's items). `shift` is the
+    /// window message's `MK_SHIFT`.
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn click(
         sh: &mut super::Shared,
         st: &mut ShopState,
         open: ShopOpen,
         world: &ClientWorld,
-        item: Option<(&ItemView, bool)>,
-        repair_all: bool,
-        repair_one: bool,
+        strings: &dyn StringLookup,
+        caller: Caller,
+        item: Option<&ItemView>,
+        shift: bool,
     ) {
-        let (guid, class, mode, a1) = match item {
-            Some((it, player)) => (
+        let (a1, a4, quick, repair_all) = caller_args(caller, if shift { MK_SHIFT } else { 0 });
+        let (guid, class, mode) = item.map_or((0, 0, 0), |it| {
+            (
                 it.key.guid,
                 it.code.map_or(0, u32::from_le_bytes),
                 u16::from(it.mode),
-                u8::from(player),
-            ),
-            None => (0, 0, 0, 0),
+            )
+        });
+        // §4.3: the item's stat 72 (durability) for a one-item repair.
+        let durability = item.map_or(0, |it| world.base(it.key, 72, 0).max(0) as u32);
+        let now = (world.frames as u32).wrapping_mul(40).wrapping_add(60_000);
+        let send = SendFacts {
+            item_found: item.is_some() || repair_all,
+            item_mode: mode,
+            durability,
+            // d2rs-own: the `items.txt` byte +0x1A5 is not in the client
+            // tables yet; the server reads the bit.
+            item_flag_1a5: false,
+            item_is_cursor: item.is_some_and(|it| it.mode == items::mode::CURSOR),
         };
         let args = ClickArgs {
             npc_class: Some(open.npc_class),
@@ -319,63 +419,71 @@ impl ShopUi {
                 guid,
                 class,
                 at_location_4: false,
-                // d2rs-own: the server checks what may be sold.
+                // d2rs-own: `0x0062A130` and `0x004B1F80` are not
+                // specified; the server checks the sell and the repair.
                 sellable: true,
-                repairable: repair_one,
+                repairable: true,
                 type_ok_16: false,
             },
             a1,
-            a4: 0,
-            quick: true,
+            a4,
+            quick,
             repair_all,
-            // The first transaction is never within 500 ms of the unset
-            // last send (the original's tick count is large).
-            now: (world.frames as u32).wrapping_mul(40).wrapping_add(60_000),
-            send_facts: SendFacts {
-                item_found: true,
-                item_mode: mode,
-                durability: 0,
-                item_flag_1a5: false,
-                item_is_cursor: a1 == 1,
-            },
+            now,
+            send_facts: send,
         };
         let prices = st.prices.clone();
         let price = move |_t: u8| prices.get(guid).unwrap_or(0);
         let env = ClickEnv {
             cursor_item: items::cursor_item(world).is_some(),
             gamble_shop: st.gamble,
-            repair_all_button_on: true,
-            repair_button_on: repair_one,
+            repair_all_button_on: repair_all,
+            repair_button_on: st.repair_mode,
             repair_all_price: st.prices.get(REPAIR_ALL_KEY).unwrap_or(0),
             price: &price,
         };
         if let ClickOutcome::Effects(e) = st.tx.click(&args, &env) {
-            // d2rs-own: no confirm dialog; a repair is confirmed at once.
-            let confirm = e.contains(&ShopEffect::Confirm(TxKind::Repair));
-            Self::apply(sh, e);
-            if confirm {
-                let e = st.tx.send_with(0, args.now, &args.send_facts);
-                Self::apply(sh, e);
-            }
+            Self::apply(sh, st, world, strings, (send, now, item), e);
         }
     }
 
-    /// The repair button is down and the player clicked one of their
-    /// items: C→S 0x35 for it. Returns whether the click was taken.
-    pub(super) fn repair_click(
+    /// A left press on one of the player's items while the shop is up: the
+    /// grid / body-location click `0x004B3870(a1 = 1, quick 0)` (§4.5):
+    /// repair through the confirm dialog. Returns whether the press was
+    /// taken (repair button down, no cursor item, an item under it).
+    pub(super) fn player_item_click(
         sh: &mut super::Shared,
         st: &mut ShopState,
         world: &ClientWorld,
+        strings: &dyn StringLookup,
         item: Option<&ItemView>,
     ) -> bool {
+        // d2rs-own until the player-grid shop handler is specified
+        // (`menus.md` §4.5 names its callers, not when the grid hands a
+        // click on): only the down repair button turns a click on one of
+        // the player's items into the click; else the item is lifted.
         let Some(open) = st.open.filter(|_| st.repair_mode) else {
             return false;
         };
-        if let Some(it) = item {
-            Self::click(sh, st, open, world, Some((it, true)), false, true);
-        }
+        let Some(it) = item.filter(|_| items::cursor_item(world).is_none()) else {
+            return false;
+        };
+        let caller = if it.mode == items::mode::BODY {
+            Caller::BodyLocation
+        } else {
+            Caller::GridClick(1)
+        };
+        Self::click(sh, st, open, world, strings, caller, Some(it), false);
         true
     }
+}
+
+/// The item's name: the first line of its tip (d2rs-own until the
+/// `item-tips.md` builder names it, q-fix-ui-item-tips).
+fn item_name(sh: &super::Shared, world: &ClientWorld, it: &ItemView) -> Option<Vec<u16>> {
+    let tips = sh.items.tips.as_ref()?;
+    let stream = items::stream(world, it.key)?;
+    tips.lines(stream).into_iter().next().map(|l| l.text)
 }
 
 impl Panel for ShopUi {
@@ -475,13 +583,31 @@ impl Panel for ShopUi {
         let Some(open) = st.open else {
             return UiResponse::Ignored;
         };
-        if !press {
-            // The buttons release where they were pressed.
-            st.pressed = None;
-            return UiResponse::Consumed;
-        }
         let s = sh.config.screen;
         let (panel, page) = self.panel(ctx.world, &st, open);
+        if !press {
+            // Buttons stay down until clicked again (§14 r13); the
+            // repair-all button acts on its release over it while pressed
+            // (§4.5, `0x00488B00`: WM_LBUTTONUP, base frame 18).
+            let i = button_at(&s, panel.buttons.len(), at);
+            let rec = i.map(|i| shop_button_records(open.npc_class)[i]);
+            if let (Some(i), Some(rec)) = (i, rec) {
+                if rec.base_frame == 18 && st.pressed == Some(i) {
+                    st.pressed = None;
+                    Self::click(
+                        &mut sh,
+                        &mut st,
+                        open,
+                        ctx.world,
+                        ctx.strings,
+                        Caller::RepairAll(1),
+                        None,
+                        false,
+                    );
+                }
+            }
+            return UiResponse::Consumed;
+        }
         // Tab row (`panels-2.md` §14 r13).
         if at.y >= s.h + s.sy() - 479
             && at.y <= s.h + s.sy() - 449
@@ -500,18 +626,16 @@ impl Panel for ShopUi {
             return UiResponse::Consumed;
         }
         // Button bar (strict bounds, `X[3][i]` without the draw's − 1).
-        let (lo, hi) = (s.h + s.sy() - 109, s.h + s.sy() - 65);
-        if at.y > lo && at.y < hi {
-            let n = panel.buttons.len();
-            if n > 0 && n <= 4 {
-                let xs = crate::ui::panels::shop::BUTTON_X[n - 1];
-                if let Some(i) =
-                    (0..n).find(|&i| at.x > s.sx() + xs[i] && at.x < s.sx() + xs[i] + BUTTON_W)
+        if let Some(i) = button_at(&s, panel.buttons.len(), at) {
+            {
                 {
                     let rec = shop_button_records(open.npc_class)[i];
                     if rec.enabled {
                         sh.outputs.push(PanelOutput::ClickSound);
-                        st.pressed = Some(i);
+                        // §14 r13: another pressed button is released and
+                        // this one pressed; this one pressed is released.
+                        let was = st.pressed == Some(i);
+                        st.pressed = (!was).then_some(i);
                         match rec.base_frame {
                             // Close (record 3 of the other traders).
                             10 => sh.outputs.push(PanelOutput::SetUi {
@@ -519,12 +643,12 @@ impl Panel for ShopUi {
                                 mode: 1,
                                 jump: false,
                             }),
-                            // Repair one item: the button toggles; the
-                            // next click on the player's item sends it.
-                            6 => st.repair_mode = !st.repair_mode,
-                            // Repair all.
-                            18 => Self::click(&mut sh, &mut st, open, ctx.world, None, true, false),
-                            _ => {}
+                            // Repair one item: the button is the mode.
+                            6 => st.repair_mode = !was,
+                            // Repair all: pressed here, sent on the
+                            // release (above).
+                            18 => st.repair_mode = false,
+                            _ => st.repair_mode = false,
                         }
                     }
                     return UiResponse::Consumed;
@@ -538,28 +662,31 @@ impl Panel for ShopUi {
         let list = page_items(&sh, ctx.world, &st, page);
         let under = item_at(&sh, &g, &list, at);
         let cursor = items::cursor_item(ctx.world);
-        match (button, cursor.as_ref(), under.as_ref()) {
-            // A cursor item dropped on the store grid: sell it.
-            (PointerButton::Left, Some(c), _) => Self::click(
+        let shift = sh.items.shift;
+        let caller = match (button, cursor.as_ref(), under.as_ref()) {
+            // §4.5 `0x00491D20`: a cursor item dropped on the store grid
+            // sells it (quick).
+            (PointerButton::Left, Some(c), _) => Some((Caller::DropOnStoreGrid, c.clone())),
+            // `0x00491AD0`: the right click buys at once (quick).
+            (PointerButton::Right, None, Some(it)) => {
+                Some((Caller::StoreGridRightClick, it.clone()))
+            }
+            // `0x0048FFE0`: the left click goes through the confirm
+            // dialog (§4.4).
+            (PointerButton::Left, None, Some(it)) => Some((Caller::GridClick(0), it.clone())),
+            _ => None,
+        };
+        if let Some((c, it)) = caller {
+            Self::click(
                 &mut sh,
                 &mut st,
                 open,
                 ctx.world,
-                Some((c, true)),
-                false,
-                false,
-            ),
-            // Right click (quick buy, §4.5) and, d2rs-own, left click.
-            (PointerButton::Left | PointerButton::Right, None, Some(it)) => Self::click(
-                &mut sh,
-                &mut st,
-                open,
-                ctx.world,
-                Some((it, false)),
-                false,
-                false,
-            ),
-            _ => {}
+                ctx.strings,
+                c,
+                Some(&it),
+                shift,
+            );
         }
         UiResponse::Consumed
     }
@@ -579,20 +706,19 @@ impl OriginalUi {
                 npc_class,
             });
             st.tx = ShopTx::default();
+            st.confirm = None;
+            st.note = false;
             st.pressed = None;
             st.repair_mode = false;
             st.closed = false;
             // The start page of the class (`panels-2.md` §14 r12).
             st.page = shop_start_page(npc_class).0;
         }
-        // PROVISIONAL until q-fix-ui-shop: the shop still opens ui 1
-        // beside it, which ui 8 refuses (`ui-states.tsv` C[8][1] = 2), so
-        // the NPC menu's flag goes off first.
-        let _ = self.set_ui(u32::from(id::NPC_MENU), 1, false);
+        // `panels.md` §4.1, §5 step 5: the shop is the full-slot ui 0x0C;
+        // it draws the inventory family itself (ui 1 stays off, ui 8 on).
         // d2rs-own: a refused open (the gate) leaves the shop state up
         // and `shop_poll` closes it again.
         let _ = self.set_ui(u32::from(id::NPC_SHOP), 0, false);
-        let _ = self.set_ui(u32::from(id::INVENTORY), 0, false);
     }
 
     /// The prices the server host publishes ([`ShopPrices`]).
@@ -603,6 +729,42 @@ impl OriginalUi {
     /// The shop state (tests).
     pub fn shop_state(&self) -> std::cell::Ref<'_, ShopState> {
         self.shop.borrow()
+    }
+
+    /// The centre of the panel cell the shop shows store item `guid` at
+    /// on the current page (tests).
+    pub fn store_item_point(&self, world: &ClientWorld, guid: u32) -> Option<Point> {
+        let sh = self.shared.borrow();
+        let st = self.shop.borrow();
+        st.open?;
+        let g = grid_record(&sh);
+        let (_, page) = tabs_of(world, &st);
+        let it = page_items(&sh, world, &st, page)
+            .into_iter()
+            .find(|i| i.key.guid == guid)?;
+        let (l, t, w, h) = g.cell(i32::from(it.x), i32::from(it.y));
+        Some(Point::new(l + w / 2, t + h / 2))
+    }
+
+    /// The centre of store grid cell (x, y) on screen (tests).
+    pub fn store_cell_point(&self, x: i32, y: i32) -> Point {
+        let g = grid_record(&self.shared.borrow());
+        let (l, t, w, h) = g.cell(x, y);
+        Point::new(l + w / 2, t + h / 2)
+    }
+
+    /// The centre of the confirm dialog's Yes (`yes`) or No item (tests).
+    pub fn shop_confirm_point(&self, yes: bool) -> Option<Point> {
+        let st = self.shop.borrow();
+        let c = st.confirm.as_ref()?;
+        let want = if yes {
+            ConfirmHandler::Yes
+        } else {
+            ConfirmHandler::No
+        };
+        let i = c.bx.items.iter().position(|i| i.handler == Some(want))?;
+        let r = super::npc_box::item_rect(&c.bx, i);
+        Some(Point::new((r.l + r.r) / 2, (r.t + r.b) / 2))
     }
 
     /// Per frame: opens the shop when a trade's store items arrived (for
@@ -657,13 +819,11 @@ impl OriginalUi {
                 st.floor = world.store_serial;
                 st.closed = true;
             }
-            // panels-2.md §14.9: `0x004B3C20` sends 30 [1 u32][GUID u32].
+            // panels-2.md §14.9: the interaction's end `0x004B3C20` sends
+            // 30 [1 u32][GUID u32], then `SetUIState(8, off)`.
             root.queue_intent(ClientIntent(msg_chat_end(o.npc_guid).to_vec()));
-            // PROVISIONAL (ui/panels-2.md §14; REC-278): the inventory the
-            // shop opened beside it closes with it; an inventory left open
-            // refuses the next shop (`ui-states.tsv` C[1][0x0C] = 3).
-            // Settled by a capture of the states after the shop's close.
-            let _ = self.set_ui(u32::from(id::INVENTORY), 1, false);
+            self.shop.borrow_mut().confirm = None;
+            let _ = self.set_ui(u32::from(id::NPC_MENU), 1, false);
         }
         self.sync_root(root);
     }

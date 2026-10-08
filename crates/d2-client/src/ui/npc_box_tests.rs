@@ -352,3 +352,59 @@ fn the_pointer_selects_and_an_outside_press_ends_the_chat() {
     assert_eq!(root.take_intents()[0].0[0], 0x30);
     assert!(!ui.is_open(8));
 }
+
+// A player who has a hireling: the hire row opens the confirm dialog
+// (kind 5, `VerifyTransaction9`, Yes / No) instead of sending; No brings
+// the hire list back, Yes sends C→S 0x36 and opens the waiting note.
+// Covers: specs/ui/menus.md §3 r4, §4 r4, §2 r7
+#[test]
+fn hiring_over_a_hireling_asks_first() {
+    let (mut ui, mut root) = setup();
+    let mut w = world(KASHYA, 10);
+    w.expansion = 1;
+    w.pets.push(crate::bridge::world::PetRecord {
+        class: 271,
+        pet_type: crate::bridge::world::PET_HIRELING,
+        pet: 900,
+        owner: ME.guid,
+        f1c: 100,
+        gone: false,
+        extra: None,
+    });
+    open(&mut ui, &mut root, &w, KASHYA, 10);
+    root.take_intents();
+    ui.apply_output(&Output::HireListReset, &w).unwrap();
+    ui.apply_output(
+        &Output::HireOffer {
+            name: 3000,
+            seed: 5,
+        },
+        &w,
+    )
+    .unwrap();
+    let p = ui.npc_menu_row_point(1).unwrap();
+    click(&mut ui, &mut root, &w, p);
+    assert_eq!(ui.hire_list().up, Some(NPC));
+    // Row 0 of the list at 800 × 600: list y 120.
+    click(&mut ui, &mut root, &w, Point::new(200, 120 + 8));
+    assert!(root.take_intents().is_empty(), "nothing sent yet");
+    ui.npc_menu_poll(&w, &mut root, &Strs::new());
+    let (kind, _) = ui.shop_state().confirm().expect("the confirm dialog");
+    assert_eq!(kind, TxKind::Hire);
+    let no = ui.shop_confirm_point(false).unwrap();
+    click(&mut ui, &mut root, &w, no);
+    assert!(ui.shop_state().confirm().is_none());
+    assert_eq!(ui.hire_list().up, Some(NPC), "No: the hire list again");
+    assert!(root.take_intents().is_empty());
+    click(&mut ui, &mut root, &w, Point::new(200, 120 + 8));
+    ui.npc_menu_poll(&w, &mut root, &Strs::new());
+    let yes = ui.shop_confirm_point(true).unwrap();
+    click(&mut ui, &mut root, &w, yes);
+    assert_eq!(
+        root.take_intents().iter().map(bytes).collect::<Vec<_>>(),
+        vec![crate::ui::hire_list::hire_intent(NPC, 3000).0]
+    );
+    ui.npc_menu_poll(&w, &mut root, &Strs::new());
+    assert_eq!(ui.npc_menu_state(), MENU_WAITING);
+    assert!(ui.npc_waiting_note());
+}

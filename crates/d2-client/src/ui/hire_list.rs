@@ -54,7 +54,6 @@ pub type StatsFn = dyn Fn(u16, u32, u32) -> Option<HireStats>;
 
 /// The list state, shared between [`OriginalUi`](super::original::OriginalUi)
 /// (fed by the bridge outputs) and the panel.
-#[derive(Default)]
 pub struct HireState {
     pub offers: Vec<Offer>,
     /// The list is up for this NPC GUID.
@@ -69,10 +68,33 @@ pub struct HireState {
     /// A C→S 0x36 went out (`0x004B1E80`, §3.4): the menu state := 10 and
     /// the waiting note opens at the next poll.
     pub sent: bool,
+    /// A choose asked for the confirm dialog (`0x004B3610`, §3.4): (NPC
+    /// GUID, record name), opened at the next poll.
+    pub confirm: Option<(u32, u16)>,
+    /// `[0x00725494]` (S→C 0x9B; 0xFFFF: no dead mercenary).
+    pub merc_state: u16,
     pub screen: (i32, i32),
     /// The fill file of the box backing and the fonts (set at install).
     pub fill: Option<u32>,
     pub fonts: Option<FontMeasure>,
+}
+
+impl Default for HireState {
+    fn default() -> Self {
+        Self {
+            offers: Vec::new(),
+            up: None,
+            stats: None,
+            hired: false,
+            back: false,
+            sent: false,
+            confirm: None,
+            merc_state: 0xFFFF,
+            screen: (0, 0),
+            fill: None,
+            fonts: None,
+        }
+    }
 }
 
 impl HireState {
@@ -276,17 +298,18 @@ impl Panel for HireListUi {
             return UiResponse::Consumed;
         };
         let expansion = ctx.world.expansion != 0;
-        // d2rs-own, unverified: the player's current hireling state is not
-        // read, so the "no hireling" / "state clear" facts are true and
-        // the choose sends at once (`menus.md` §3.4 first branch).
+        // §3.4: `0x00478F20(P, 7)` = −1 (no hireling record of the
+        // player); the merc state reads `[0x00725494]` = 0xFFFF only
+        // (`0x00478EE0(P, 7)` is not in the client model: d2rs-own).
+        let me = ctx.world.local().map(|u| u.key);
         let c = hire_choose(&ChooseFacts {
             row,
             item_value: row,
             npc_guid: npc,
             record_name: offer.name,
-            no_hireling: true,
+            no_hireling: ctx.world.hireling_guid(me) == u32::MAX,
             classic_game: !expansion,
-            merc_state_clear: true,
+            merc_state_clear: self.st.borrow().merc_state == 0xFFFF,
         });
         match c.action {
             HireAction::Hire { send } => {
@@ -301,7 +324,13 @@ impl Panel for HireListUi {
                     _ => UiResponse::Consumed,
                 }
             }
-            _ => UiResponse::Consumed,
+            HireAction::Confirm => {
+                let mut st = self.st.borrow_mut();
+                st.up = None;
+                st.confirm = Some((npc, offer.name));
+                UiResponse::Consumed
+            }
+            HireAction::None => UiResponse::Consumed,
         }
     }
 }

@@ -447,6 +447,7 @@ impl OriginalUi {
         root.open(super::hire_list::HIRE_PANEL)?;
         root.add(Box::new(npc_box::NpcMenuUi {
             sh: sh.clone(),
+            shop: self.shop.clone(),
             st: self.npcm.clone(),
             hire: self.hire.clone(),
         }))?;
@@ -918,12 +919,15 @@ impl Panel for InventoryUi {
                 self.panel.press(&sh.tables, &s, at);
                 let class = Facts::of(ctx.world).class;
                 if let Some(l) = sh.items.layout(class, &s) {
-                    // The shop's repair button is down: repair, not pick up.
+                    // With the shop up a player item is sold or repaired
+                    // (`menus.md` §4.5 grid / body-location callers), not
+                    // picked up.
                     let under = sh.items.item_under(ctx.world, &l.grid, &l, at);
-                    let taken = shop_ui::ShopUi::repair_click(
+                    let taken = shop_ui::ShopUi::player_item_click(
                         &mut sh,
                         &mut self.shop.borrow_mut(),
                         ctx.world,
+                        ctx.strings,
                         under.as_ref(),
                     );
                     if taken {

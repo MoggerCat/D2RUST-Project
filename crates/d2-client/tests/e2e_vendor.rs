@@ -1201,7 +1201,9 @@ fn the_repair_button_then_an_item_click_repairs_that_item() {
     ui.install(&mut root).unwrap();
     ui.open_shop(ng, u32::from(class::CHARSI));
     ui.shop_poll(fx.bridge.world(), &mut root);
-    assert!(ui.is_open(0x0C) && ui.is_open(0x01));
+    // The shop is the full-slot ui 0x0C; ui 1 stays off and the
+    // inventory family is drawn under it (`panels.md` §4.1, §5 step 5).
+    assert!(ui.is_open(0x0C) && !ui.is_open(0x01));
     let click = |ui: &mut OriginalUi, root: &mut UiRoot, fx: &Fx, at: Point| {
         let strings = NoStrings;
         let w = fx.bridge.world();

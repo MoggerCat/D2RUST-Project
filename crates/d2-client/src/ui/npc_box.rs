@@ -38,6 +38,7 @@ use crate::bridge::world::{ClientWorld, UnitKey};
 use crate::rules::camera::{moving_to_client, Camera, FrameSize, OpenMode};
 use crate::ui::draw::{TextRequest, TextStyle, UiDraw, UiDrawSink};
 use crate::ui::geom::{Point, Rect, FRAME};
+use crate::ui::hire_list::hire_intent;
 use crate::ui::imbue_ui::{Imbue, NPC_CHARSI};
 use crate::ui::layout::{MenuOption, NpcMenuRecord, OptionKind};
 use crate::ui::messages::Ltrb;
@@ -49,6 +50,9 @@ use crate::ui::panels::npc::{
 };
 use crate::ui::panels::npc_menu::{
     build_npc_menu, hire_open, CaptionCtx, HireOpen, NpcMenuBuild, NpcMenuHandler, NpcMenuInput,
+};
+use crate::ui::panels::shop::{
+    confirm_answer, confirm_box, ConfirmHandler, ConfirmResult, ShopEffect, TxKind,
 };
 use crate::ui::panels::PanelOutput;
 use crate::ui::root::UiRoot;
@@ -194,7 +198,7 @@ fn string_fn(s: &dyn StringLookup) -> impl Fn(u16) -> Vec<u16> + '_ {
 }
 
 /// An item's hit band (module doc: d2rs-own).
-fn item_rect<H>(bx: &MenuBox<H>, i: usize) -> Ltrb {
+pub(super) fn item_rect<H>(bx: &MenuBox<H>, i: usize) -> Ltrb {
     let top = bx.pos.1 + bx.items[..i].iter().map(|it| it.height).sum::<i32>();
     Ltrb::new(
         bx.pos.0,
@@ -437,6 +441,9 @@ impl NpcMenuState {
 /// The panel.
 pub struct NpcMenuUi {
     pub(super) sh: SharedRef,
+    /// The shop, whose confirm dialog this panel draws and answers (ui 8
+    /// stays open under the shop, `panels-2.md` §14.9).
+    pub(super) shop: super::shop_ui::SharedShop,
     pub st: SharedNpcMenu,
     pub hire: crate::ui::hire_list::SharedHire,
 }
@@ -563,6 +570,89 @@ impl NpcMenuUi {
         }
     }
 
+    /// The confirm dialog `0x004B2F50` (`menus.md` §4.4): Yes / No by
+    /// `confirm_answer`. The pointer and press handling are the menu
+    /// box's (d2rs-own, module doc).
+    fn confirm_event(&mut self, e: UiEvent) -> UiResponse {
+        let Some(at) = e.at() else {
+            return UiResponse::Ignored;
+        };
+        let item = {
+            let shop = self.shop.borrow();
+            let Some(c) = shop.confirm.as_ref() else {
+                return UiResponse::Ignored;
+            };
+            item_at(&c.bx, at)
+        };
+        let mut shop = self.shop.borrow_mut();
+        let Some(c) = shop.confirm.as_mut() else {
+            return UiResponse::Ignored;
+        };
+        match e {
+            UiEvent::CursorMoved(_) => {
+                if let Some(i) = item {
+                    c.bx.selected = i as i32;
+                }
+                return UiResponse::Ignored;
+            }
+            UiEvent::Press {
+                button: PointerButton::Left,
+                ..
+            } => {
+                c.pressed = item;
+                return UiResponse::Consumed;
+            }
+            UiEvent::Release {
+                button: PointerButton::Left,
+                ..
+            } => {}
+            _ => return UiResponse::Consumed,
+        }
+        let pressed = c.pressed.take();
+        let Some(i) = item.filter(|&i| pressed == Some(i)) else {
+            return UiResponse::Consumed;
+        };
+        let yes = c.bx.items[i].handler == Some(ConfirmHandler::Yes);
+        let c = shop.confirm.take().expect("checked above");
+        match confirm_answer(c.kind, shop.tx.menu_state, yes) {
+            ConfirmResult::Send => {
+                let effects = shop.tx.send_with(0, c.now, &c.facts);
+                let mut out = Vec::new();
+                for e in effects {
+                    match e {
+                        ShopEffect::Send(i) => out.push(PanelOutput::Intent(i)),
+                        ShopEffect::Sound(_) => out.push(PanelOutput::ClickSound),
+                        ShopEffect::WaitingNote => shop.note = true,
+                        ShopEffect::Confirm(_) | ShopEffect::Cancel => {}
+                    }
+                }
+                drop(shop);
+                self.out(out);
+            }
+            ConfirmResult::Cancel => {
+                shop.tx.cancel();
+                shop.tx.menu_state = 3;
+            }
+            ConfirmResult::Hire => {
+                drop(shop);
+                if let Some((npc, name)) = c.hire {
+                    let mut h = self.hire.borrow_mut();
+                    h.hired = true;
+                    h.sent = true;
+                    drop(h);
+                    self.out(vec![PanelOutput::Intent(hire_intent(npc, name))]);
+                }
+            }
+            ConfirmResult::HireList => {
+                if let Some((npc, _)) = c.hire {
+                    self.hire.borrow_mut().up = Some(npc);
+                }
+            }
+            ConfirmResult::Nothing => {}
+        }
+        UiResponse::Consumed
+    }
+
     fn imbue_event(&mut self, e: UiEvent, ctx: &UiCtx) -> UiResponse {
         let Some((press, at)) = Imbue::left(e) else {
             return UiResponse::Ignored;
@@ -592,6 +682,9 @@ impl Panel for NpcMenuUi {
     }
 
     fn rect(&self) -> Rect {
+        if self.shop.borrow().confirm.is_some() {
+            return FRAME;
+        }
         let st = self.st.borrow();
         if st.imbue.is_some() {
             return Imbue::rect();
@@ -622,6 +715,9 @@ impl Panel for NpcMenuUi {
         if let Some(n) = &st.note {
             push_menu_draws(n.bx.draw(&mut spin, &m), fill, out);
         }
+        if let Some(c) = &self.shop.borrow().confirm {
+            push_menu_draws(c.bx.draw(&mut spin, &m), fill, out);
+        }
         let Some(it) = st.up.as_ref().filter(|it| it.talking) else {
             return;
         };
@@ -649,6 +745,9 @@ impl Panel for NpcMenuUi {
     }
 
     fn event(&mut self, e: UiEvent, ctx: &UiCtx) -> UiResponse {
+        if self.shop.borrow().confirm.is_some() {
+            return self.confirm_event(e);
+        }
         if self.st.borrow().imbue.is_some() {
             return self.imbue_event(e, ctx);
         }
@@ -771,12 +870,37 @@ impl OriginalUi {
                 it.build = true;
             }
         }
+        let now = (world.frames as u32).wrapping_mul(40);
         if sent {
             // §3.4: `[0x007C0C6B]` := 10 and the waiting note (§2.7). The
             // clock is the client frame count at 40 ms (d2rs-own, as
             // `game_messages`).
             self.npcm.borrow_mut().menu_state = MENU_WAITING;
-            self.open_waiting_note(strings, (world.frames as u32).wrapping_mul(40));
+            self.open_waiting_note(strings, now);
+        }
+        // A shop send's waiting note (§4.3).
+        if std::mem::take(&mut self.shop.borrow_mut().note) {
+            self.open_waiting_note(strings, now);
+        }
+        // §3.4 `0x004B3610`: the list closed, kind 5, the confirm dialog
+        // at the mouse.
+        let hire_confirm = self.hire.borrow_mut().confirm.take();
+        if let Some((npc, name)) = hire_confirm {
+            let sh = self.shared.borrow();
+            let m = Measure(sh.fonts.as_ref());
+            let s = string_fn(strings);
+            let frame = (sh.config.screen.w, sh.config.screen.h);
+            let mouse = (sh.mouse.x, sh.mouse.y);
+            if let Ok(bx) = confirm_box(TxKind::Hire, None, mouse, &s, frame, &m) {
+                self.shop.borrow_mut().confirm = Some(super::shop_ui::ConfirmUp {
+                    bx,
+                    kind: TxKind::Hire,
+                    facts: Default::default(),
+                    now,
+                    hire: Some((npc, name)),
+                    pressed: None,
+                });
+            }
         }
         if !self.is_open(id::NPC_MENU) {
             let mut st = self.npcm.borrow_mut();

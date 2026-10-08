@@ -343,6 +343,7 @@ impl OriginalUi {
         self.npcm.borrow_mut().resurrect = (expansion && self.more.merc_state != 0xFFFF)
             .then_some(u32::from(self.more.merc_7c0dd0));
         self.npcm.borrow_mut().merc_name = self.more.merc_state;
+        self.hire.borrow_mut().merc_state = self.more.merc_state;
         self.open_npc_menu_with(d.guid, d.class, level, n, world);
         match dialog_case(self.msg.ui_7c0c68, self.npc_text.as_ref(), d)? {
             Some(case) => self.dialog_answer = Some((Box::new(d.clone()), case)),
