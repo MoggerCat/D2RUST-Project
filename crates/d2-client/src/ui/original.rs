@@ -72,6 +72,11 @@ use crate::rules::camera::OpenMode;
 /// are), so [`UiRoot::sync_states`] leaves it open.
 pub const BORDER_PANEL: PanelId = PanelId(0x100);
 
+/// The step-10 overlays' adapter (hover tips, then the cursor item), drawn
+/// after every other panel (`ui/panels.md` §5 step 10, `panels-3.md` §23
+/// r9): not a UI state, open for good.
+pub const TOP_PANEL: PanelId = PanelId(0x113);
+
 /// The click sound of §10.2: `0x004B9A00(0, 0, 0)` = request id 0, no
 /// unit, delay 0 (`audio/triggers.md` §1 r1).
 pub const CLICK_SOUND_ID: i32 = 0;
@@ -442,9 +447,13 @@ impl OriginalUi {
         root.add(Box::new(overhead_ui::OverheadUi { sh: sh.clone() }))?;
         root.open(overhead_ui::OVERHEAD_PANEL)?;
         root.add(Box::new(esc_menu::EscMenuUi { sh: sh.clone() }))?;
+        // Step 10 and the cursor draw: over the control panel overlays
+        // (step 7–8) and every panel (`panels.md` §5, `panels-3.md` §23 r9).
+        root.add(Box::new(TopUi { sh: sh.clone() }))?;
         // Not a UI state: open for good.
         root.open(BORDER_PANEL)?;
         root.open(hud::HUD_PANEL)?;
+        root.open(TOP_PANEL)?;
         root.open(gold_dialog::GOLD_PANEL)?;
         root.sync_states(&sh.borrow().states);
         let sc = sh.borrow().config.screen;
@@ -1076,6 +1085,23 @@ impl FontMeasure {
     }
 }
 
+impl FontMeasure {
+    /// The pop-up text draw of `0x00502280(text, at, k, centre)` in font
+    /// `font` (`ui/control-panel.md` §5 r14); `None` without the font or
+    /// for a code with no glyph record.
+    pub fn popup(
+        &self,
+        font: u16,
+        text: &[u16],
+        at: Point,
+        centre: bool,
+        screen: (i32, i32),
+    ) -> Option<super::text::FramedText> {
+        let g = super::text::GlyphLookup::new(self.tables.get(&font)?);
+        super::text::popup_text(&g, text, at, centre, screen).ok()
+    }
+}
+
 impl TextMeasure for FontMeasure {
     /// Width A (`0x00501820`, §6), the centering width (§1.6).
     fn width(&self, font: u16, text: &[u16]) -> Option<i32> {
@@ -1321,12 +1347,40 @@ impl Panel for BorderUi {
         EMPTY
     }
 
-    fn draw(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
+    fn draw(&self, _ctx: &UiCtx, out: &mut dyn UiDrawSink) {
         let sh = self.sh.borrow();
         draw_border_and_ctrlpnl(&sh.tables, &sh.env(), out);
-        // The cursor item last (`panels-3.md` §23 r9).
-        sh.items
-            .draw_cursor(ctx.world, &sh.tables.files, (29, 29), sh.mouse, out);
+    }
+
+    fn hit(&self, _p: Point) -> Option<WidgetId> {
+        None
+    }
+
+    fn event(&mut self, _e: UiEvent, _ctx: &UiCtx) -> UiResponse {
+        UiResponse::Ignored
+    }
+}
+
+/// The hover tips (`panels.md` §5 step 10, `0x00503000`) and the cursor
+/// item (`panels-3.md` §23 r9, drawn after the UI pass): after the border
+/// and control panel (step 7), the HUD overlays and every other panel, so
+/// a held item or a tip over the control panel stays on top. Its area is
+/// empty: it takes no event.
+struct TopUi {
+    sh: SharedRef,
+}
+
+impl Panel for TopUi {
+    fn id(&self) -> PanelId {
+        TOP_PANEL
+    }
+
+    fn rect(&self) -> Rect {
+        EMPTY
+    }
+
+    fn draw(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
+        let sh = self.sh.borrow();
         // The belt item's tip (`hud_belt`, `control-panel.md` §5 r8).
         if let Some(tips) = sh.items.tips.as_ref() {
             let (lines, at) = sh.hud.belt.hover_tip(ctx.world, tips);
@@ -1356,6 +1410,9 @@ impl Panel for BorderUi {
                 out,
             );
         }
+        // The cursor item last (`panels-3.md` §23 r9).
+        sh.items
+            .draw_cursor(ctx.world, &sh.tables.files, (29, 29), sh.mouse, out);
     }
 
     fn hit(&self, _p: Point) -> Option<WidgetId> {

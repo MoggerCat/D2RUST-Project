@@ -117,6 +117,8 @@ fn panel_images(v: &[(String, u32, i32, i32)], prefix: &str) -> Vec<(u32, i32, i
 }
 
 // Covers: specs/ui/panels.md §5, §6 r1, §6 r2
+// Covers: specs/ui/panels-3.md §23 r9 (the cursor item and the step-10
+// tips in the last panel, after the HUD of step 7)
 #[test]
 fn install_mirrors_the_flags_and_keeps_the_border_open() {
     let u = ui(Some(areas()), true);
@@ -129,7 +131,8 @@ fn install_mirrors_the_flags_and_keeps_the_border_open() {
             hud::HUD_PANEL,
             crate::ui::original::gold_dialog::GOLD_PANEL,
             crate::ui::original::game_messages::MESSAGES_PANEL,
-            crate::ui::original::overhead_ui::OVERHEAD_PANEL
+            crate::ui::original::overhead_ui::OVERHEAD_PANEL,
+            crate::ui::original::TOP_PANEL
         ]
     );
     let w = world(AMAZON, 1, true);
@@ -172,7 +175,8 @@ fn hotkeys_toggle_their_state_with_the_specs_jump() {
             hud::HUD_PANEL,
             crate::ui::original::gold_dialog::GOLD_PANEL,
             crate::ui::original::game_messages::MESSAGES_PANEL,
-            crate::ui::original::overhead_ui::OVERHEAD_PANEL
+            crate::ui::original::overhead_ui::OVERHEAD_PANEL,
+            crate::ui::original::TOP_PANEL
         ],
         "the root mirrors the flag"
     );
@@ -196,7 +200,8 @@ fn hotkeys_toggle_their_state_with_the_specs_jump() {
             hud::HUD_PANEL,
             crate::ui::original::gold_dialog::GOLD_PANEL,
             crate::ui::original::game_messages::MESSAGES_PANEL,
-            crate::ui::original::overhead_ui::OVERHEAD_PANEL
+            crate::ui::original::overhead_ui::OVERHEAD_PANEL,
+            crate::ui::original::TOP_PANEL
         ]
     );
 }
