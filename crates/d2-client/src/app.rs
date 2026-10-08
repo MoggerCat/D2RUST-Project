@@ -15,6 +15,7 @@ pub mod hire_stats;
 pub mod hud;
 pub mod items;
 pub mod monster_ai;
+pub mod monster_drop;
 pub mod palette;
 pub mod play;
 pub mod rest;

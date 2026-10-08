@@ -177,6 +177,40 @@ impl Pl2 {
     }
 }
 
+impl Pl2 {
+    /// The file bytes of this table (the inverse of [`Pl2::parse`]), for a
+    /// reader that wants the flat layout from a decoded table. The base
+    /// palette's fourth byte per color is not kept by `parse` and is
+    /// written as 0; nothing reads it (`composition.md` §4).
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut out = Vec::with_capacity(PL2_FIXED + self.text_colors.len() * PL2_TEXT_COLOR);
+        for c in &self.base_palette.colors {
+            out.extend_from_slice(&[c.r, c.g, c.b, 0]);
+        }
+        let maps = |out: &mut Vec<u8>, v: &[ColorMap]| v.iter().for_each(|m| out.extend(m));
+        maps(&mut out, &self.light_levels);
+        maps(&mut out, &self.inventory_variations);
+        out.extend(self.selected_unit_shift);
+        for level in &self.alpha_blend {
+            maps(&mut out, level);
+        }
+        maps(&mut out, &self.additive_blend);
+        maps(&mut out, &self.multiplicative_blend);
+        maps(&mut out, &self.hue_variations);
+        out.extend(self.red_tones);
+        out.extend(self.green_tones);
+        out.extend(self.blue_tones);
+        maps(&mut out, &self.unknown_variations);
+        maps(&mut out, &self.max_component_blend);
+        out.extend(self.darkened_shift);
+        for c in &self.text_colors {
+            out.extend_from_slice(&[c.r, c.g, c.b]);
+        }
+        maps(&mut out, &self.text_color_shifts);
+        out
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

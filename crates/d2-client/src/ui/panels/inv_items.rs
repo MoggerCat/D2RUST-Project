@@ -133,16 +133,53 @@ pub struct ItemsUi {
     /// Measured frame sizes of item graphics by `invfile` (lower case);
     /// a missing one is estimated (module doc).
     pub frame_sizes: BTreeMap<String, (u32, u32)>,
+    /// Shift is held (set by the host each frame): a shift-click on a
+    /// belt-able grid item sends 0x63 (`inventory.md` §10 r3.4).
+    pub shift: bool,
+}
+
+/// d2rs-own, unverified: whether an item code is a belt-able potion
+/// (`hp1`–`hp5`, `mp1`–`mp5`, `rvs`, `rvl`, `vps`, `yps`, `wms`, the
+/// throwing potions `gps`/`gpm`/`gpl`/`ops`/`opm`/`opl`); the server
+/// still checks the move (`inventory-moves.md` §7.24).
+pub fn fits_belt(code: Option<[u8; 4]>) -> bool {
+    let Some(c) = code else {
+        return false;
+    };
+    matches!(
+        &c[..3],
+        b"hp1"
+            | b"hp2"
+            | b"hp3"
+            | b"hp4"
+            | b"hp5"
+            | b"mp1"
+            | b"mp2"
+            | b"mp3"
+            | b"mp4"
+            | b"mp5"
+            | b"rvs"
+            | b"rvl"
+            | b"vps"
+            | b"yps"
+            | b"wms"
+            | b"gps"
+            | b"gpm"
+            | b"gpl"
+            | b"ops"
+            | b"opm"
+            | b"opl"
+    )
 }
 
 /// An item's graphic: file id, footprint in cells, frame size.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct Art {
-    file: u32,
-    w: i32,
-    h: i32,
-    gw: i32,
-    gh: i32,
+pub(super) struct Art {
+    pub(super) file: u32,
+    pub(super) w: i32,
+    pub(super) h: i32,
+    pub(super) gw: i32,
+    pub(super) gh: i32,
 }
 
 impl ItemsUi {
@@ -165,7 +202,7 @@ impl ItemsUi {
         }
     }
 
-    fn art(&self, files: &UiFiles, item: &ItemView, cell: (i32, i32)) -> Option<Art> {
+    pub(super) fn art(&self, files: &UiFiles, item: &ItemView, cell: (i32, i32)) -> Option<Art> {
         let row = self.art.get(item.code?)?;
         if row.inv_file.is_empty() {
             return None;
@@ -214,6 +251,20 @@ impl ItemsUi {
         }
     }
 
+    /// An item's graphic with its frame's top-left at (`left`, `top`)
+    /// (the belt box, `control-panel.md` §5 r4); nothing without art.
+    pub fn draw_at(
+        &self,
+        files: &UiFiles,
+        item: &ItemView,
+        (left, top): (i32, i32),
+        out: &mut dyn UiDrawSink,
+    ) {
+        if let Some(a) = self.art(files, item, (29, 29)) {
+            out.push(cel(a.file, 0, left, top + a.gh));
+        }
+    }
+
     /// The cursor item (`panels-3.md` §23 r9): its graphic with the
     /// top-left at (mx − gw / 2, my − gh / 2) (adj 0, halves rounded down).
     pub fn draw_cursor(
@@ -245,33 +296,33 @@ impl ItemsUi {
         at: Point,
     ) -> Vec<PanelOutput> {
         let g = &layout.grid;
-        let cell = (i32::from(g.cell_w), i32::from(g.cell_h));
         if g.cell_w == 0 || g.cell_h == 0 {
             return Vec::new();
         }
         let all = items::local_items(world);
         let cursor = items::cursor_item(world);
         let intent = if g.contains_mouse(at) {
-            self.grid_press(files, g, cell, &all, cursor.as_ref(), at)
+            self.grid_press(files, g, &all, cursor.as_ref(), at, 0)
         } else {
             equip_press(layout, &all, cursor.as_ref(), at)
         };
         intent.map(PanelOutput::Intent).into_iter().collect()
     }
 
-    fn grid_press(
+    pub(super) fn grid_press(
         &self,
         files: &UiFiles,
         g: &GridRecord,
-        cell: (i32, i32),
         all: &[ItemView],
         cursor: Option<&ItemView>,
         at: Point,
+        page: u8,
     ) -> Option<ClientIntent> {
+        let cell = (i32::from(g.cell_w), i32::from(g.cell_h));
         // Page-0 grid items with their footprints.
         let grid: Vec<(&ItemView, i32, i32, i32, i32)> = all
             .iter()
-            .filter(|i| i.mode == mode::STORED && i.page == 0)
+            .filter(|i| i.mode == mode::STORED && i.page == page)
             .map(|i| {
                 let (w, h) = self.art.get(i.code.unwrap_or([0; 4])).map_or((1, 1), |r| {
                     (i32::from(r.inv_w.max(1)), i32::from(r.inv_h.max(1)))
@@ -290,7 +341,7 @@ impl ItemsUi {
             stackable_onto: false,
             book_kind: None,
             sellable: false,
-            fits_belt: false,
+            fits_belt: fits_belt(i.code),
         };
         let (mc, mr) = g.mouse_cell(at);
         let under_mouse = at_cell(mc as i32, mr as i32).map(iref);
@@ -323,9 +374,9 @@ impl ItemsUi {
             ready: true,
             own_player: true,
             own_inventory_context: true,
-            inventory_mode: 0,
-            page: 0,
-            shift: false,
+            inventory_mode: if page == 4 { 0x0C } else { 0 },
+            page,
+            shift: self.shift,
             ctrl: false,
             store_open: false,
             overlap_item: overlap.first().map(|i| iref(i)),
@@ -357,8 +408,11 @@ impl ItemsUi {
                 x,
                 y,
             })),
+            GridMsg::ToBelt { item } => Some(ClientIntent::from_message(
+                &d2_proto::client::ItemToBeltShift { item },
+            )),
             // Not produced by the facts above (no stack / socket / scroll
-            // / cube / belt / shop facts in the preview).
+            // / cube / shop facts in the preview).
             _ => None,
         }
     }

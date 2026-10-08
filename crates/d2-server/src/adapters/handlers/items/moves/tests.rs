@@ -480,6 +480,19 @@ fn setup() -> T {
 fn setup_with(expansion: bool) -> T {
     let rest = MRest::default();
     rest.with(|r| r.distance = 1);
+    let boxed = Box::new(rest.clone());
+    build(expansion, rest, boxed)
+}
+
+/// [`setup_with`] over `PreviewMoveRest` (the play host's rest): the
+/// player's place comes from the staged path position.
+fn setup_preview() -> T {
+    let rest = MRest::default();
+    let boxed = Box::new(crate::adapters::handlers::world::PreviewMoveRest::default());
+    build(true, rest, boxed)
+}
+
+fn build(expansion: bool, rest: MRest, boxed: Box<dyn MoveRest + Send + Sync>) -> T {
     let hooks = ActionHooks::new(
         Arc::new(action_tables()),
         field_drlg(),
@@ -507,7 +520,7 @@ fn setup_with(expansion: bool) -> T {
         Rest::default(),
         1000,
     );
-    world.inventory = Some(InvParts::new(inv_tables(), Box::new(rest.clone())));
+    world.inventory = Some(InvParts::new(inv_tables(), boxed));
     let req = AllocRequest {
         ty: UnitType::Player,
         class: CLASS,
@@ -1194,22 +1207,21 @@ fn belt_moves() {
     assert_eq!(bytes, t.pass(&[x9c(0x10, b), x9c(0x10, a)]));
 }
 
-/// 0x26 (§7.17): a belt potion used on the player (seam `use_item`,
-/// logged); not used → nothing more, 0. Used → charge update and removal
-/// (seams), 0.
+/// 0x26 (§7.17): a belt potion used on the player. PROVISIONAL (the
+/// item-use spec is unwritten): the host applies the potion itself, so
+/// the item leaves with the removal message (0x9D action 5, flag 0x20)
+/// and the rest's `use_item` is not asked.
 // Covers: specs/items/inventory-moves.md §7.17
 #[test]
 fn use_belt_item() {
     let mut t = setup();
     let a = t.picked(HP1);
-    let me = t.pguid();
     t.rest.take_log();
-    assert_eq!(t.frame(&msg(0x26, &[a, 0, 0])), (Done, NO_BYTES));
-    assert_eq!(t.rest.take_log(), [format!("use_item {me} {me} {a}")]);
-    t.rest.with(|r| r.use_ok = true);
-    assert_eq!(t.frame(&msg(0x26, &[a, 0, 0])).0, Done);
-    assert_eq!(t.rest.take_log(), [format!("use_item {me} {me} {a}")]);
-    assert_eq!(t.mode(a), 2, "the removal is the item-use spec's");
+    let (code, bytes) = t.frame(&msg(0x26, &[a, 0, 0]));
+    assert_eq!(code, Done);
+    assert_eq!(bytes.len(), 1);
+    assert_eq!(&bytes[0][..2], &[0x9D, 0x05]);
+    assert!(t.rest.take_log().is_empty());
 }
 
 /// 0x63 (§7.24): a stored potion to the first free belt slot. The two
@@ -1606,4 +1618,57 @@ fn a_quest_reward_lands_in_the_hosts_inventory_model() {
             .any(|m| m[..2] == [0x9C, 4] && m[4..8] == g.to_le_bytes()),
         "{got:?}"
     );
+}
+
+// ---- the play host's rest (q-gold) ----------------------------------------------------
+
+/// A gold pile of `amount` on the ground at the player's place.
+fn gold_pile(t: &mut T, amount: i32) -> Guid {
+    let p = t.player;
+    let (x, y) = t.sim().events.hooks().path_position(p);
+    let g = t.ground_item(GOLD, x, y);
+    let u = t.unit(g).unwrap();
+    t.set_stat(u, stat::GOLD, amount);
+    g
+}
+
+/// 0x16 on a gold pile in reach, on the play host's rest: the pile's
+/// amount is added to the player's stat 14 and the pile is freed
+/// (`inventory-moves.md` §10.1).
+// Covers: specs/items/inventory-moves.md §7.1 r2, §10.1
+#[test]
+fn preview_rest_picks_up_a_gold_pile() {
+    let mut t = setup_preview();
+    let p = t.player;
+    t.set_stat(p, stat::GOLD, 100);
+    let g = gold_pile(&mut t, 250);
+    let (code, _) = t.frame(&pick(g, 0));
+    assert_eq!(code, Done);
+    assert_eq!(t.stat(p, stat::GOLD), 350);
+    assert_eq!(t.unit(g), None, "the pile is freed");
+}
+
+/// 0x50 on the play host's rest: a pile is made (gold request, free
+/// spot, staged room), the amount leaves stat 14 (`§7.22`, `§10.2`).
+// Covers: specs/items/inventory-moves.md §7.22, §10.2
+#[test]
+fn preview_rest_drops_gold_into_a_pile() {
+    let mut t = setup_preview();
+    let p = t.player;
+    t.set_stat(p, stat::GOLD, 5000);
+    let me = t.pguid();
+    let (code, _) = t.frame(&msg(0x50, &[me, 1500]));
+    assert_eq!(code, Done);
+    assert_eq!(t.stat(p, stat::GOLD), 3500);
+    let piles: Vec<_> = t
+        .sim()
+        .game
+        .lists
+        .units_of_type(UnitType::Item)
+        .into_iter()
+        .collect();
+    assert_eq!(piles.len(), 1);
+    let pile = piles[0];
+    assert_eq!(t.stat(pile, stat::GOLD), 1500);
+    assert!(t.sim().game.lists.unit(pile).unwrap().room().is_some());
 }

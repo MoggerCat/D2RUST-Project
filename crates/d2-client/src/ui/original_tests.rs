@@ -121,7 +121,8 @@ fn install_mirrors_the_flags_and_keeps_the_border_open() {
         vec![
             BORDER_PANEL,
             crate::ui::hire_list::HIRE_PANEL,
-            hud::HUD_PANEL
+            hud::HUD_PANEL,
+            crate::ui::original::gold_dialog::GOLD_PANEL
         ]
     );
     let w = world(AMAZON, 1, true);
@@ -159,7 +160,8 @@ fn hotkeys_toggle_their_state_with_jump_0() {
             PanelId(1),
             BORDER_PANEL,
             crate::ui::hire_list::HIRE_PANEL,
-            hud::HUD_PANEL
+            hud::HUD_PANEL,
+            crate::ui::original::gold_dialog::GOLD_PANEL
         ],
         "the root mirrors the flag"
     );
@@ -179,7 +181,8 @@ fn hotkeys_toggle_their_state_with_jump_0() {
         vec![
             BORDER_PANEL,
             crate::ui::hire_list::HIRE_PANEL,
-            hud::HUD_PANEL
+            hud::HUD_PANEL,
+            crate::ui::original::gold_dialog::GOLD_PANEL
         ]
     );
 }
@@ -348,7 +351,11 @@ fn character_art_and_close_button() {
     );
     // No stat-point box or add buttons (`PENDING`).
     assert!(panel_images(&img, "panel\\skillpoints").is_empty());
-    assert!(panel_images(&img, "panel\\level").is_empty());
+    // Only the control panel's two closed level buttons (frame 2, §8).
+    assert_eq!(
+        panel_images(&img, "panel\\level"),
+        vec![(2, 206, 592), (2, 563, 592)]
+    );
     // A classic install draws `InvChar`.
     let mut c = ui(Some(areas()), false);
     c.key(&w, Action::ToggleCharacter);
@@ -580,4 +587,116 @@ fn the_mini_panel_game_menu_button_opens_it() {
         }
     }
     assert!(opened);
+}
+
+// d2rs-own, unverified: the drop-gold dialog (REC-103); the button
+// and the OK request are panels-2.md §21 r3–r8
+#[test]
+fn the_gold_button_opens_the_dialog_and_ok_sends_drop_gold() {
+    let mut u = ui(Some(areas()), true);
+    let mut w = world(AMAZON, 1, true);
+    let key = w.local_player.unwrap();
+    w.units.get_mut(&key).unwrap().stats.insert(14, 5000);
+    u.key(&w, Action::ToggleInventory);
+    let texts = |u: &Ui| -> Vec<String> {
+        let ctx = UiCtx {
+            tick: 0,
+            world: &w,
+            strings: &NoStrings,
+        };
+        let mut out: Vec<UiDraw> = Vec::new();
+        u.root.draw(&ctx, &mut out);
+        out.iter()
+            .filter_map(|d| match d {
+                UiDraw::Text(t) => Some(String::from_utf16_lossy(&t.text)),
+                _ => None,
+            })
+            .collect()
+    };
+    assert!(texts(&u).is_empty());
+    // §21 r3: x in [W − sx − 237, W − sx − 217], y in [H + sy − 87, H + sy − 69].
+    let button = Point::new(493, 462);
+    let b = PointerButton::Left;
+    // A press sets the flag (the button's frame 1, one row lower).
+    u.send(
+        &w,
+        UiEvent::Press {
+            button: b,
+            at: button,
+        },
+    );
+    assert_eq!(
+        panel_images(&u.images(&w), "panel\\goldcoinbtn"),
+        vec![(1, 484, 470)]
+    );
+    // The release in the rectangle opens the dialog.
+    u.send(
+        &w,
+        UiEvent::Release {
+            button: b,
+            at: button,
+        },
+    );
+    assert_eq!(
+        panel_images(&u.images(&w), "panel\\goldcoinbtn"),
+        vec![(0, 484, 469)]
+    );
+    assert!(texts(&u).contains(&"do you want to drop?".to_string()));
+    // Digits fill the edit box, letters are ignored; past the maximum
+    // (stat 14) the box takes the maximum.
+    for c in "15x00".chars() {
+        let r = u.send(&w, UiEvent::Char(c as u16));
+        assert_ne!(r, Routed::Unhandled);
+    }
+    assert!(texts(&u).contains(&"1500_".to_string()));
+    // The belt keys and the menu key do not reach the game while open.
+    assert_ne!(u.key(&w, Action::BeltSlot1), Routed::Unhandled);
+    // Enter is OK: C→S 0x50 [player GUID][1500]; the dialog closes.
+    u.send(&w, UiEvent::Char(0x0D));
+    let guid = key.guid.to_le_bytes();
+    let mut want = vec![0x50];
+    want.extend_from_slice(&guid);
+    want.extend_from_slice(&1500u32.to_le_bytes());
+    assert_eq!(u.root.intents(), &[ClientIntent(want)]);
+    assert!(!texts(&u).contains(&"do you want to drop?".to_string()));
+    // Cancel (Esc) sends nothing and the Esc menu stays shut.
+    u.send(
+        &w,
+        UiEvent::Press {
+            button: b,
+            at: button,
+        },
+    );
+    u.send(
+        &w,
+        UiEvent::Release {
+            button: b,
+            at: button,
+        },
+    );
+    for c in "99999".chars() {
+        u.send(&w, UiEvent::Char(c as u16));
+    }
+    assert!(texts(&u).contains(&"5000_".to_string()));
+    assert_ne!(u.key(&w, Action::GameMenu), Routed::Unhandled);
+    assert!(!u.ui.is_open(9));
+    assert_eq!(u.root.intents().len(), 1);
+    assert!(!texts(&u).contains(&"do you want to drop?".to_string()));
+    // Zero is not sent (§21 r8).
+    u.send(
+        &w,
+        UiEvent::Press {
+            button: b,
+            at: button,
+        },
+    );
+    u.send(
+        &w,
+        UiEvent::Release {
+            button: b,
+            at: button,
+        },
+    );
+    u.send(&w, UiEvent::Char(0x0D));
+    assert_eq!(u.root.intents().len(), 1);
 }
