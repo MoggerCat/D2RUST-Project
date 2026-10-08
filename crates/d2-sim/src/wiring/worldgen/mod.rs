@@ -117,7 +117,7 @@ pub trait WorldPending: Pending {
     /// `0x00544E80`: the quest hook of a new boss.
     fn boss_quest_hook(&mut self, boss: UnitId) {}
     /// A monster the host placed from a level's preset list
-    /// (`HOST_MONSTER_PRESET`, REC-134) exists.
+    /// (`HOST_MONSTER_PRESET`, REC-136) exists.
     fn host_monster_created(&mut self, unit: UnitId, class: u32) {}
 
     // ---- monster creation pieces without a provider ----------------------

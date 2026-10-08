@@ -815,7 +815,7 @@ impl LevelTypes for Types {
                 tile(t::BLOOD_MOOR_TO_MARSH, t::MOOR_MARSH_XY),
                 tile(b::BLOOD_MOOR_TO_BURIAL, b::MOOR_BURIAL_XY),
             ],
-            // Blood Raven, placed by the host (REC-134).
+            // Blood Raven, placed by the host (REC-136).
             b::BURIAL_GROUNDS => vec![
                 PresetUnit {
                     unit_type: HOST_MONSTER_PRESET,
@@ -1716,12 +1716,12 @@ fn synthetic_monstats() -> Vec<Monstats> {
         a.npc = true;
         a.interact = true;
     }
-    // Blood Raven (REC-134): a killable class, so the kill parse runs.
+    // Blood Raven (REC-136): a killable class, so the kill parse runs.
     v[synthetic_burial::BLOOD_RAVEN as usize].killable = true;
     v
 }
 
-/// d2rs-own, unverified (preview; REC-134): Kashya's `hireling` rows
+/// d2rs-own, unverified (preview; REC-136): Kashya's `hireling` rows
 /// (Rogue Scout, one per difficulty, version 100 = expansion), so her NPC
 /// start has a hire list.
 fn synthetic_hire_rows() -> Vec<HireRow> {

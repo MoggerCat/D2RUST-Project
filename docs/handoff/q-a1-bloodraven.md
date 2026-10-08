@@ -1,6 +1,6 @@
 # q-a1-bloodraven: Act I quest 2, Sisters' Burial Grounds, in the play preview
 
-Stitching session, branch `claude/q-a1-bloodraven`. Nothing here is verified against 1.14d (rule 10). Open points: REC-134 (`docs/HANDOFF.md` §7). Sound not wired.
+Stitching session, branch `claude/q-a1-bloodraven`. Nothing here is verified against 1.14d (rule 10). Open points: REC-136 (`docs/HANDOFF.md` §7). Sound not wired.
 
 ## The path, and the links that were missing
 
@@ -19,7 +19,7 @@ d2-sim changes: `WorldPending::host_monster_created`, `View::spawn_host_monsters
 ## Tests
 `cargo nextest run -p d2-client --test app_play_bloodraven` (3): the quest starts from Kashya (the client's quest log row 2 shows status 1); the player enters level 17 (state 3), Blood Raven stands there with chain 2 and reaches the client, her death (the sim's `kill`, the player as killer) takes the quest to state 4, 17 updater ticks later the status is 3 (completed now); Kashya's message 92 pays (state 5, status 13, one mercenary slot hired). `app_play_quests.rs` finds Akara by class now that a second NPC stands in the town.
 
-## PROVISIONAL (REC-134, all `// d2rs-own, unverified`)
+## PROVISIONAL (REC-136, all `// d2rs-own, unverified`)
 - The Burial Grounds is reached from the Blood Moor and is one flat room (the original: Cold Plains, a drawn outdoor level); Blood Raven is placed by the host from the level types' preset list (`HOST_MONSTER_PRESET`, class 267, fixed sub-tile) on the synthetic game only. With game files the population creates her (preset 5) and her boss mods link chain 2 through link 5.
 - The synthetic Blood Raven has no AI and no minions (the synthetic `monstats` rows hold no AI data); with game files both come from the monster init and the AI.
 - Kashya's town position, and her `hireling` rows (Rogue Scout, one per difficulty, names 100–104).
@@ -39,4 +39,4 @@ git fetch origin claude/q-a1-bloodraven; git checkout claude/q-a1-bloodraven
 cargo test -p d2-client --test app_play_bloodraven
 cargo run -p d2-client --release -- play --new amazon Test
 ```
-In `play`: finish the Den of Evil (Akara's reward), then talk to Kashya twice (introduction, then the quest; press Q: the Burial Grounds row shows started). Go to the Burial Grounds and kill Blood Raven (on the way the quest changes to state 3, on her death to state 4; about 6 seconds later the log marks it done). Talk to Kashya again: the reward text, and a mercenary offer. Note in `docs/HANDOFF.md` §7 REC-134 what differs (a Blood Raven without the quest link: the console line `QuestKill` absent; Kashya without a menu: `NoHirelingRow` in the log).
+In `play`: finish the Den of Evil (Akara's reward), then talk to Kashya twice (introduction, then the quest; press Q: the Burial Grounds row shows started). Go to the Burial Grounds and kill Blood Raven (on the way the quest changes to state 3, on her death to state 4; about 6 seconds later the log marks it done). Talk to Kashya again: the reward text, and a mercenary offer. Note in `docs/HANDOFF.md` §7 REC-136 what differs (a Blood Raven without the quest link: the console line `QuestKill` absent; Kashya without a menu: `NoHirelingRow` in the log).

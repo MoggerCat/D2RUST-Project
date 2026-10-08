@@ -3,7 +3,7 @@
 //! `docs/handoff/q-a1-bloodraven.md`): level 17, one flat room, reached by
 //! a warp pair from the Blood Moor, with Blood Raven placed by the host.
 //!
-//! PROVISIONAL (M22; REC-134): the original reaches it from Cold Plains
+//! PROVISIONAL (M22; REC-136): the original reaches it from Cold Plains
 //! and builds an outdoor level; the places of the tiles and of Blood
 //! Raven are made up. `// d2rs-own, unverified`.
 

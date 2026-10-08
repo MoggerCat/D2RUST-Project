@@ -58,7 +58,7 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                 }
                 // Tick step 8 `0x00543E10`: the quest updater (timers such
                 // as A1Q2's 15, `quests-act1.md` §10.5 r5) runs on every
-                // 20th frame (`quests.md` §5; REC-134).
+                // 20th frame (`quests.md` §5; REC-136).
                 if frame % 20 == 0 {
                     q.update(w);
                 }
