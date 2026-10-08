@@ -30,6 +30,7 @@ Branch `claude/local-pc1-s8` from `origin/claude/specs-staging-7`
 | REC-245 (1)–(3), REC-247 (1)–(4) | tint: `0x004D97F0` picks colorpri strictly greater (state 0 never wins), sets colorshift and the local player's light colour; bubbles step per drawn frame from the unit's drawn point; S→C 0x26 type 4 never sent (builder `0x0054A9B0` unreachable); roofs take the floor drawer, opaque; wall fade = record +0x24; blocks-light: cells outside rooms → flag 1, only DT1 bits 0x02/0x20 | `render/lighting.md` §4 r1–r3, §8, §11, §13; `render/shading.md` §4, §6 r1.1, edge 5; `render/blend-modes.md` §2, §6; `ui/messages.md` §3 r4, §5 r1, r3 | type 4 and roof path match (drop `preview_blocks.rs:10`); tint, bubbles, wall fade, light map do not | `q-fix-state-tint`, `q-fix-preview-light` |
 | sprite-placement OQ5; model OQ7, OQ15; msg-units OQ4; msg-ui OQ3; dt1 OQ1 (part) | DCC decoder never clips; frames > 256 hit fatal 0x58C, gargoyletrap reachable (PROVISIONAL skip until a capture); DCC coded bytes = DC6 re-encoding length in every live frame; cel context table; shrine on-use functions 16/19/21/22; 0x5B / 0x75 words; quest-log latch 0/1/2; DT1 unknown fields zero, 0x58 overwritten at load | `render/sprite-placement.md` §3, OQ5; `formats/dcc.md` §Coded bytes, §Frame size limit; `client/model.md` §13 r7, §15; `client/msg-units.md` §8 r3, r10; `client/msg-ui.md` §1 r6.3; `formats/dt1.md` §Unknown fields | roster words, DT1 fields match | `q-fix-dcc-limits`, `q-fix-questlog-latch`, `q-fix-shrine-onuse` |
 | REC-117 (1)–(3), (5); REC-243 (1)–(4). REC-117 (4) d2rs-own | item-use dispatcher `0x005BF240` + table `0x00741790` (new `items/use.md`); TP cast `0x005BE290`: refused in town / level 136 (sound 24, item kept), old pair closed first, sound 7 always, owners only on success; removal 0x0A to every client with the room adjacent; 0x82 fields; state 102 new list each time; no timer, five closers; d2rs "last field level" pair contradicts the original | `items/use.md` new; `world/objects-2.md` §27 new, edge 8–10; `world/objects.md` §12 r13; `world/cube.md` §1, OQ7 | client 0x20 and 0x82 fields match; cast, use, state 102, vendor copy do not | `q-fix-portal-pair` (extended), `q-fix-tp-use`, `q-fix-just-portaled`, `q-fix-vendor-buy-copy` |
+| REC-244 (cube source, cube leaving while open, tip font), REC-241 (town byte, status word, mouse skills on load, hireling block, golem item, stale runeword). d2rs-own: start_extra cube gift, cube_opened latch, read_gaps plumbing | original never gives a cube at start; panel does not close when the cube leaves (no cube-gone close in 1.14d), transmute still works; tips font 1 pop-up; town byte = act of the player's level; status dead bit and progression bits writers; mouse skills by exact (skill, owner) lookup, no fallback; hireling block rebuilt from the live hireling; un-recast golem item dropped; stale equipped runeword detached, not saved | `world/cube.md` §11 new; `formats/d2s.md` §2.1, §2.3, §2.4 r6, §2.5 r3, §8.5 r6, OQ13; `formats/d2s-load.md` §6 r1.2, OQ2 | town byte matches; others do not | `q-fix-cube-panel`, `q-fix-save-gaps`, `q-fix-stale-runeword`; `q-fix-weapon-switch` extended (save +0x10/+0x80/+0x84) |
 
 Follow-ups for a later worker (other owners: `items/inventory-moves.md` lines ~331/420/431, `items/inventory.md:939`, `data/calc-expressions.md:308` still call item use unwritten → link `items/use.md`; `ui/panels.md` cite `0x00487740`/`0x004786D0` for 0x20; `sim/intents-events.md` §6 r6/§7.2 → objects-2 §27.5 for 0x82; msg-stats-items labels, properties §13 callers and the OQ pointers are done): `client/stat-lists.md` §2 r8 should link the `skills/use.md` §2 item type test.
 
@@ -176,3 +177,20 @@ Recordability (tools/original-hooks.md §7): R-MIS-1/2, R-PAUSE-1, R-NOTICK-1, R
   (stat 70), 0x7C, 0x22; tome keeps flag 0x4.
 - **R-TP-4** [MANUAL, second client] Confirms §27.5 r2. Second player enters
   the room with the owner's portal: 0x82 fields.
+- **R-CUBE-1** [MANUAL] Confirms cube §11 r2–r3 (REC-244). Items in the
+  cube, panel open, lift the cube, place it elsewhere, Transmute a valid
+  recipe; then drop the cube on the ground. Expect the panel stays open, the
+  transmute works, page-3 items go to the inventory, no 0x4F 0x17 / 0x77.
+- **R-CUBE-2** [MANUAL] Confirms panels-2 §20 r3. Hover close and Transmute
+  at 800×600, screenshots.
+- **R-SAVE-1** [AUTO] Confirms d2s §2.1. Waypoint to Act II, save: header
+  +0xA8..+0xAA = `81 00 00`.
+- **R-SAVE-2** [MANUAL] Confirms d2s §2.3. Andariel killed in Normal, saved:
+  status bits 8–12 = 1 (5 on Nightmare after Andariel, expansion).
+- **R-SAVE-3** [MANUAL] Confirms d2s §2.4 r6. Oskill / charged item skill as
+  right skill, save and reload; variant with the item stashed first.
+- **R-SAVE-4** [MANUAL] Confirms d2s §2.5 r3, §8.4, OQ4. Hire after the last
+  load, give items, save; gain experience, save again.
+- **R-SAVE-5** [MANUAL] Confirms d2s-load §3, d2s OQ15. Necromancer with an
+  item Iron Golem, saved, rejoin with a packet log: recast at the join.
+- IT-8 (existing entry) now also confirms d2s-load §6 r1.2.

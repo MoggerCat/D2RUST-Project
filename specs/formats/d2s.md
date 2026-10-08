@@ -44,21 +44,21 @@
 | Outputs / state changes | 90–95 |
 | Rules | 96–97 |
 |   1. File layout and framing | 98–143 |
-|   2. Header (335 bytes) | 144–378 |
-|   3. Checksum (`0x00411130`) | 379–389 |
-|   4. Quest section (298 bytes at 0x14F) | 390–410 |
-|   5. Waypoint section (80 bytes at 0x279) | 411–416 |
-|   6. NPC flag section (52 bytes at 0x2C9) | 417–473 |
-|   7. Stats and skills | 474–566 |
-|   8. Item sections | 567–751 |
-|   9. Load sequence (`0x0056B180`) | 752–776 |
-|   10. Errors | 777–823 |
-| Constants & data dependencies | 824–843 |
-| Randomness | 844–848 |
-| Edge cases & original bugs | 849–915 |
-| Test vectors | 916–955 |
-| Provenance | 956–1035 |
-| Open questions | 1036–1173 |
+|   2. Header (335 bytes) | 144–433 |
+|   3. Checksum (`0x00411130`) | 434–444 |
+|   4. Quest section (298 bytes at 0x14F) | 445–465 |
+|   5. Waypoint section (80 bytes at 0x279) | 466–471 |
+|   6. NPC flag section (52 bytes at 0x2C9) | 472–528 |
+|   7. Stats and skills | 529–621 |
+|   8. Item sections | 622–811 |
+|   9. Load sequence (`0x0056B180`) | 812–836 |
+|   10. Errors | 837–883 |
+| Constants & data dependencies | 884–903 |
+| Randomness | 904–908 |
+| Edge cases & original bugs | 909–975 |
+| Test vectors | 976–1015 |
+| Provenance | 1016–1103 |
+| Open questions | 1104–1243 |
 <!-- /index -->
 
 ## Summary
@@ -171,7 +171,7 @@ Written by `0x00568F20` into a zeroed 0x14F-byte block:
 | 0x84 | 2 + 2 | weapon-swap right skill, item index | §2.4 |
 | 0x88 | 16 | appearance components | pre-filled 0xFF, then filled by `0x0063E510` |
 | 0x98 | 16 | appearance colours | pre-filled 0xFF, then filled by `0x0063E510` |
-| 0xA8 | 3 | town per difficulty | byte [game difficulty] = client act (0–4) OR 0x80; the other two bytes 0 |
+| 0xA8 | 3 | town per difficulty | byte [game difficulty] = client act (0–4) OR 0x80; the other two bytes 0 (rule below the table) |
 | 0xAB | u32 | map seed | game +0x7C |
 | 0xAF | 32 | hireling block | §2.5 |
 | 0xCF | u8 | client byte | client +0x480 (meaning not traced; D2MOO calls it guild emblem colour; Open question 7) |
@@ -191,6 +191,19 @@ Necromancer 0x09, Paladin 0x11, Barbarian 0x04, Druid 0x0C, Assassin
 Necromancer); colours +0x98..+0xA7 all 0xFF; +0xA8..+0xAA = `80 00 00`
 (act 0 of Normal); map seed non-zero and different per save; hireling
 block zero; +0xCF = 0; +0xD0..+0x14E zero.
+
+Town bytes (+0xA8): the writer reads the client act (client +0x1AC,
+`0x005382B0` at `0x00569228`) and stores act | 0x80 into the byte of
+game difficulty +0x6D (`0x0056922D`–`0x00569233`); the other two bytes
+stay 0, so a save keeps only the act of the difficulty it was written
+in. The act's only writer `0x005382E0` has four callers: game creation
+(`0x00530E1F`, from the start-act global `[0x00883D44]`), the act
+change `0x0053ACC0` (`0x0053AE43`; `world/waypoints.md` §11: every
+travel to a level of another act), the 0x5C–0x60 load (`0x0056A1F7`,
+§2.2 rule 8) and the legacy load (`0x00532A51`). So the saved act is
+the act of the last act change, or the loaded / start act before any:
+the act of the player's current level in every reachable state (no
+act change happens without moving the player into that act).
 
 #### 2.2 Header checks on load (`0x0056A090`)
 
@@ -247,18 +260,23 @@ character-select screen reads them, §2.7), +0xD0.. .
 | 0x0001 | new character: file is the 335-byte stub (§2.6) | client at creation; cleared on first load |
 | 0x0002 | set at creation when the creation screen's flag argument ≠ 0 (`0x0043C6A0`; D2MOO: realm character) | client |
 | 0x0004 | hardcore | creation screen |
-| 0x0008 | dead (hardcore) | game |
+| 0x0008 | dead | the death starts: DT `0x00580EC0` (`0x00580F83`) and DD `0x0057FCA0` (`0x0057FD46`) call `0x00538650(client, 8, 1)` for every player, softcore too (`combat/vitals.md` §4.8 rules 1.4, 2); no code clears it |
 | 0x0020 | expansion character | creation (always for Druid 5 / Assassin 6), convert (§2.7), writer in an expansion game |
 | 0x0040 | ladder | writer when game +0x74 ≠ 0 |
-| bits 8–12 | progression (acts completed; §2.2 rule 5.4 thresholds) | game |
+| bits 8–12 | progression (acts completed; §2.2 rule 5.4 thresholds) | `0x00538680(client, act, difficulty)`, raise only, at the seven act-credit sites (`world/quests-act1-rest.md` §5 owns the rule and the callers) |
 
 Bits 0x10, 0x80 and 13–15 are kept as found (no rule reads them).
 
 Measured: bit 0x0008 is also set for a softcore character that died
 and respawned in town (status 0x0028 in the save, §8.3 rule 6); the
 writer copies the status from the client record (`0x00538640`) and
-only ORs 0x20 / 0x40, so 0x08 is set in that record by the game on a
-softcore death too (the setter is not traced).
+only ORs 0x20 / 0x40. Writers of the client word (+0x0A) in
+`Game.exe`: the whole-word setter `0x00538630` (loads only:
+`0x0056A0AF`, `0x0056A199`, `0x0056A1C5`; legacy `0x00532712`,
+`0x005329BE`, `0x00532A07`), the bit setter `0x00538650` (only the two
+death starts above, mask 8, set) and `0x00538680` (bits 8–12). So in a
+game only bit 0x08 and the progression change; every other bit stays
+as loaded or created.
 
 #### 2.4 Hotkeys and mouse skills
 
@@ -284,6 +302,35 @@ softcore death too (the setter is not traced).
    turned into the GUID of the item at that 1-based position of the
    inventory item list (`0x0056AF20`; past the end → −1), and the left
    and right skills are selected with their item (`0x005701B0`).
+   Exact (`0x0056AF80` at `0x0056B038`–`0x0056B0F4`):
+   1. Resolved: the 16 hotkeys, then player data +0x7C, +0x78, +0x8C,
+      +0x88 (left, right, swap left, swap right items), each only when
+      non-zero. A decoded "no item" is −1 (rule 4), which is non-zero:
+      the walk never reaches position −1 and returns −1.
+   2. Selected: left only when +0x74 ≠ 0 (`0x005701B0(P, hand 1,
+      +0x74, +0x7C)`), then right only when +0x70 ≠ 0 (hand 0, +0x70,
+      +0x78). Skill 0 (Attack) is never selected here. The swap pair is
+      resolved but not selected (it acts at the next weapon switch,
+      `items/inventory-moves.md` §7.25 steps 8–11).
+   3. `0x005701B0(unit, hand, skill, item)`: skill 5 → nothing. Else the
+      entry is looked up by skill id **and** owner GUID, both exact
+      (`0x006439B0`: entry +0x34 = item); no such entry → nothing: no
+      selection change, no message, no fallback to the class entry of
+      the same skill. Found → that hand's entry is selected
+      (`0x00643BC0` left, `0x00643C50` right) and S→C 0x23 is sent with
+      the entry's owner (`0x00643B00`, −1 for a class entry); for the
+      right hand the previous right skill's state and the new one's
+      state skill start follow (`0x0056FF10`). There is no level test:
+      an entry with base level 0 and no bonus is selected like any
+      other.
+   4. An item-granted entry (oskill, `skills/levels.md` §7.1; charges,
+      §7.6) exists at this point only if placing its item in §9 rule 3
+      linked its stats (equipped and usable, `items/inventory.md` §5).
+      Otherwise, or when the index resolved to another item (edge case
+      3), rule 6.3 finds nothing and that hand keeps the selection it
+      had before the post-load. The join still sends player data +0x70
+      … +0x7C as decoded and resolved (`formats/d2s-load.md` §8 rule
+      2), whether or not the server selected them.
 7. Measured on the fresh saves: all 16 hotkeys `FF FF 00 00`; all four
    mouse pairs `00 00 00 00` (left: no left skill, rule 3; right:
    skill 0, no item). A Sorceress that selected Fire Bolt as right skill
@@ -310,7 +357,15 @@ softcore death too (the setter is not traced).
    `world/hirelings.md` §10. Written and read in classic and
    expansion games alike; only the hireling's items (§8.4) are
    expansion-only.
-3. Measured on `bdMercTwo` (Provenance; a live Act I rogue hired from
+3. The block is rebuilt from the live pet node on every save: a
+   hireling hired, revived or levelled since the load writes its
+   current seed, name index, `Id`, experience and dead flag, and a
+   block read from the file is never copied through (`0x00568E60`
+   reads only the live hireling: node `0x00574EC0(7, 1)`, its record
+   `0x00574BD0` (seed, name, `Id`), the unit's stat 12 for the row
+   lookup `0x006562F0` and stat 13, dead test `0x005541B0`). No hireling node at save time → the block is zero and `jf` has
+   no list (§8.4 rule 1).
+4. Measured on `bdMercTwo` (Provenance; a live Act I rogue hired from
    Kashya, hireling class 271): flags = 0; seed non-zero and equal to
    the seed of that hireling's S→C 0x81 message; name index 21 (name
    "Diane"); `Id` = 0 (the first `hireling.txt` row: Act I Rogue Scout,
@@ -748,6 +803,11 @@ them); this list is a measurement, not a constant.
    bounds check (`0x0056AE85`). A classic game returns before any read
    (game +0x70 = 0, `0x0056AE5B`), so rule 2 applies to expansion
    games only. Edge case 16.
+6. What the loaded item becomes: `formats/d2s-load.md` §3 (the join
+   recasts Iron Golem on it). The writer of the next save looks only at
+   the live golem (rule 1), so a loaded item whose recast did not run
+   (no skill 90 entry, item not found) is left in mode 3 in no room
+   and is absent from every later save.
 
 ### 9. Load sequence (`0x0056B180`)
 
@@ -955,6 +1015,14 @@ and prints every field; it holds no save data.
 
 ## Provenance
 
+- 2026-10-08 (REC-241, read in `all.asm`): town byte `0x00569228`–
+  `0x00569233`, act writer `0x005382E0` and its four callers; status
+  word writers `0x00538630`, `0x00538650` (callers `0x0057FD46`,
+  `0x00580F83`), `0x00538680`; post-load `0x0056AF80`
+  (`0x0056B038`–`0x0056B0F4`), `0x0056AF20`, `0x005701B0`,
+  `0x006439B0`, `0x00643BC0`, `0x00643C50`, `0x00643B00`; hireling block
+  `0x00568E60`, `0x00574BD0`. Confirming recording: PC 2 list, REC-241
+  entries.
 - 1.14d `Game.exe` (decompile exports and `tools/ghidra/disasm.py`
   disassembly): writer master `0x00569AD0` (callers `0x00531D30`,
   `0x00531EB0`, `0x00532240` debug dump, `0x00532340` server save →
@@ -1127,10 +1195,12 @@ and prints every field; it holds no save data.
     code) is not traced; single player never sets the flag.
 13. `0x00563470` behaviour on a runeword item that no longer matches
     (§8.2 rule 5).
-    **Answered except the equipped case** (`formats/d2s-load.md` §6):
-    a stored or cursor item is unlinked and freed (deleted); an
-    equipped one is unequipped by `0x00560CD0` with flag 0x20; its end
-    place is that file's Open question 2.
+    **Answered** (`formats/d2s-load.md` §6): a stored or cursor item is
+    unlinked and freed (deleted); an equipped one is taken off its body
+    location and left as a detached unit (not in the item list, not the
+    cursor, not freed), so the next save no longer contains it
+    (2026-10-08, `0x00560CD0`, `0x0055C730`, `0x0055C5C0`,
+    `0x0055DBC0` read; REC-241).
 14. Corpse first u32: whether any reader (client, realm) uses it; d2rs
     writes 0.
     **Answered** (`Game.exe`): unused. Readers: the loader skips it

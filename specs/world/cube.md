@@ -511,7 +511,7 @@ item-use spec; listed here only to fix the routing.
    per qualifying player, a player qualifies when holding no `box `)
    and the Act III kill drop (`0x005BBC00` at `0x005BBCFA`;
    `world/quests-act3.md` §7.6 rule 2: while the cube is not dropped
-   yet, one per player in Act III not holding `box `). The other `box `
+   yet, one per player in Act III not holding `box `). The other server `box `
    code tests in `Game.exe` (`0x005350F0`, `0x005351C0`, `0x0055CC90`,
    `0x00561B00`, `0x005628C0`, `0x00563840`, `0x00567620`, quest
    helpers `0x00599590`, `0x00599A30`, `0x0059E630`, `0x0059E850`,
@@ -523,9 +523,9 @@ item-use spec; listed here only to fix the routing.
    `0x00560420`, which lets a busy player lift from any page,
    `items/inventory-moves.md` §7.4), drop 0x17 (`0x0054AB40`, with the
    spill `0x00563840`, `items/inventory-moves.md` §9.3), place 0x18
-   (`0x0054ABB0`). The resets come only from 0x4F 0x17 (§1), the stash
-   open (§1), the quest helper `0x005351C0` (`world/quests-helpers.md`
-   §5) and the other callers of `0x00554190` (none of them an item
+   (`0x0054ABB0`). The cube interaction ends only through 0x4F 0x17
+   (§1), the quest helper `0x005351C0` (`world/quests-helpers.md` §5)
+   or another caller of `0x00554190` (Provenance; none of them an item
    move). So with the cube on the cursor, on the ground or in another
    page:
    1. 0x4F 0x18 still transmutes the page-3 items (§1: the GUID is not
