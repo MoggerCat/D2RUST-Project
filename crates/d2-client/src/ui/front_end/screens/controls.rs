@@ -646,6 +646,8 @@ pub fn vk_to_key(vk: u16) -> Option<Key> {
         0x12 => Key::LeftAlt,
         0x20 => Key::Space,
         0x0D => Key::Enter,
+        // Command 56's fixed key (`controls.md` §3, not reassignable).
+        0x1B => Key::Escape,
         0x09 => Key::Tab,
         0x08 => Key::Backspace,
         0x13 => Key::Pause,

@@ -672,6 +672,20 @@ impl OriginalUi {
         self.shared.borrow().esc.controls.is_some()
     }
 
+    /// Whether the expansion is installed (`0x00408F20`: the Options and
+    /// Configure Controls tables, `ui/frontend-options.md` §O2, §O9).
+    pub fn expansion_installed(&self) -> bool {
+        self.shared.borrow().config.expansion_installed
+    }
+
+    /// The open Controls screen's state (hosts and tests read it).
+    pub fn controls_screen(
+        &self,
+    ) -> Option<crate::ui::front_end::screens::controls::ConfigureControls> {
+        let sh = self.shared.borrow();
+        sh.esc.controls.as_ref().map(|c| c.model().clone())
+    }
+
     /// A raw key (Windows virtual key) for the open Controls screen;
     /// false when it is not open (the key is for the game).
     pub fn controls_key(&mut self, vk: u16, now_ms: u64) -> bool {
