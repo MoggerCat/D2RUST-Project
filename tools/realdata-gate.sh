@@ -81,15 +81,21 @@ for f in m["files"]:
       echo "realdata-gate: private repo install is incomplete; missing: $(echo $MISSING | tr '\n' ' ')" >&2
       no_data "install not fully uploaded yet"
     fi
-    git -C "$PRIV" sparse-checkout set tools install extracted >&2
+    # install/ only: the repo's extracted/ (3 GB, per-archive folders, Patch_D2.mpq
+    # partly named) is not what the tests read; step 1b builds their view.
+    git -C "$PRIV" sparse-checkout set tools install >&2
     $PY "$PRIV/tools/assemble.py" "$GAME" >&2 || no_data "assemble.py reported mismatches"
     have_install "$GAME" || no_data "assembled install lacks d2data.mpq / d2exp.mpq / Game.exe"
   fi
-  # tests read $D2_GAME_DIR/extracted/...: link the private repo's extracted/
-  if [ -d "$PRIV/extracted" ] && [ ! -e "$GAME/extracted" ]; then ln -s "$PRIV/extracted" "$GAME/extracted"; fi
   export D2_GAME_DIR=$GAME
 fi
-[ -d "$GAME/extracted" ] || echo "realdata-gate: warning: $GAME/extracted missing; tests reading extracted/ will fail" >&2
+
+# ---- 1b. the excel view the table tests read ($D2_GAME_DIR/extracted/patch_d2/data/global/excel/):
+# the live excel set, each file from the highest-priority archive, lowercase names
+EXCEL=$GAME/extracted/patch_d2/data/global/excel
+if [ ! -f "$EXCEL/skills.bin" ]; then
+  cargo run -q $RELEASE -p data-tool -- excel-dir "$EXCEL" "$GAME" || echo "realdata-gate: warning: excel-dir failed; tests reading extracted/ will fail" >&2
+fi
 echo "realdata-gate: install at $GAME"
 
 # ---- 2. run
