@@ -273,6 +273,14 @@ pub struct NumbersIn {
     pub living_player: bool,
 }
 
+/// What the stamina tip reads (§4 r2): shown stamina, max (×256), state 136.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct StaminaIn {
+    pub shown: i32,
+    pub max: i32,
+    pub shrine: bool,
+}
+
 /// `%d` conversions in order.
 fn fmt_d(fmt: &[u16], args: &[i64]) -> Vec<u16> {
     let mut out = Vec::new();
