@@ -49,17 +49,17 @@
 |   9. Shrines | 517–630 |
 |   10. Doors, operate 8 (`0x00581D40`) | 631–654 |
 |   11. Wells, operate 22 (`0x005858A0`) | 655–686 |
-|   12. Portals, operate 15 (`0x00584870`) | 687–753 |
-|   13. Torch, operate 11 (`0x005843D0`) | 754–758 |
-|   14. Client messages | 759–786 |
-|   15. Not covered yet | 787–801 |
-|   16.–18. Moved | 802–808 |
-| Constants & data dependencies | 809–855 |
-| Randomness | 856–901 |
-| Edge cases & original bugs | 902–968 |
-| Test vectors | 969–1007 |
-| Provenance | 1008–1065 |
-| Open questions | 1066–1114 |
+|   12. Portals, operate 15 (`0x00584870`) | 687–757 |
+|   13. Torch, operate 11 (`0x005843D0`) | 758–762 |
+|   14. Client messages | 763–790 |
+|   15. Not covered yet | 791–805 |
+|   16.–18. Moved | 806–812 |
+| Constants & data dependencies | 813–859 |
+| Randomness | 860–905 |
+| Edge cases & original bugs | 906–972 |
+| Test vectors | 973–1011 |
+| Provenance | 1012–1069 |
+| Open questions | 1070–1118 |
 <!-- /index -->
 
 ## Summary
@@ -746,6 +746,10 @@ Classes 59 (town portal) and 60 (permanent portal). Rules read in 1.14d:
     created → event 12 on P at f + 75, state 102 on (`0x00639DB0`), list
     state 102 (`0x006252D0`), remove callback `0x0056E900`
     (`0x00625CE0`), attach (`0x00626E10`). Every path returns 0.
+    The callback is the default one (`skills/bodies.md` §2.8), event 12
+    the expiry walk (`sim/stat-lists.md` §10.4); list owner and repeat
+    uses: `world/objects-2.md` §27.3 rule 4. The town portal pair's
+    creation, owner and every closer: `world/objects-2.md` §27.
 14. Rule 1's `0x00535B10(game, P)` is 1 when, for some living player u
     (`0x005538D0` walk, callback `0x00535AF0`), P's player-list entry
     toward u has flag 8 (hostile; `0x0055B300(P, u, 8)`); then only the
