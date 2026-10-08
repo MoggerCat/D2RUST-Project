@@ -203,6 +203,39 @@ pub const AKARA_X: i32 = 28;
 /// Kashya's x in the synthetic town room (d2rs-own, unverified: she
 /// stands in the Rogue Encampment, 5 sub-tiles from the player's start).
 pub const KASHYA_X: i32 = 18;
+/// d2rs-own, unverified (q-a2-town): Lut Gholein's NPCs in the synthetic
+/// Act II town, Warriv (175), Atma, Drognan, Fara, Greiz, Jerhyn (201),
+/// Elzix, Lysander and Meshif (210), in a row at [`ACT2_NPC_Y`], four
+/// sub-tiles apart from [`ACT2_NPC_X0`].
+pub const ACT2_NPCS: [u16; 9] = [
+    d2_sim::world::npc::class::WARRIV2,
+    d2_sim::world::npc::class::ATMA,
+    d2_sim::world::npc::class::DROGNAN,
+    d2_sim::world::npc::class::FARA,
+    d2_sim::world::npc::class::GREIZ,
+    201,
+    d2_sim::world::npc::class::ELZIX,
+    d2_sim::world::npc::class::LYSANDER,
+    d2_sim::world::npc::class::MESHIF1,
+];
+pub const ACT2_NPC_X0: i32 = 3;
+pub const ACT2_NPC_Y: i32 = 12;
+/// The Act II town waypoint (sub-tiles from its room's origin).
+pub const ACT2_WAYPOINT_XY: (i32, i32) = (20, 30);
+
+/// Every NPC class of the synthetic game: the Rogue Encampment's Akara,
+/// Kashya and Warriv, and Lut Gholein's.
+fn synthetic_npc_classes() -> impl Iterator<Item = u16> {
+    [
+        d2_sim::world::npc::class::AKARA,
+        d2_sim::world::npc::class::KASHYA,
+        // Warriv (act 1): the act travel of Sisters to the Slaughter
+        // (`docs/handoff/q-a1-andariel.md`).
+        d2_sim::world::npc::class::WARRIV1,
+    ]
+    .into_iter()
+    .chain(ACT2_NPCS)
+}
 /// The player's character class (1, sorceress, as in the server tests).
 pub const PLAYER_CLASS: u32 = 1;
 /// The character's name (0x59 bytes 6..22, zero-padded).
@@ -1725,14 +1758,8 @@ fn synthetic_monstats() -> Vec<Monstats> {
     let mut v: Vec<Monstats> = (0..SYNTHETIC_MONSTATS)
         .map(|_| Monstats::decode(&vec![0u8; Monstats::SIZE]))
         .collect();
-    for class in [
-        d2_sim::world::npc::class::AKARA,
-        d2_sim::world::npc::class::KASHYA,
-        // Warriv (act 1): the act travel of Sisters to the Slaughter
-        // (`docs/handoff/q-a1-andariel.md`).
-        d2_sim::world::npc::class::WARRIV1,
-    ] {
-        let a = &mut v[usize::from(class)];
+    for c in synthetic_npc_classes() {
+        let a = &mut v[usize::from(c)];
         a.npc = true;
         a.interact = true;
     }
@@ -1757,6 +1784,19 @@ fn synthetic_hire_rows() -> Vec<HireRow> {
             name_first: 100,
             name_last: 104,
         })
+        .chain(std::iter::once(HireRow {
+            // Greiz's one row, so his hire list can be made (d2rs-own,
+            // unverified, q-a2-town): the desert mercenary, names 2000..2002.
+            version: 100,
+            class: 271,
+            act: 2,
+            difficulty: 1,
+            seller: u32::from(d2_sim::world::npc::class::GREIZ),
+            gold: 200,
+            level: 9,
+            name_first: 2000,
+            name_last: 2002,
+        }))
         .collect()
 }
 
@@ -1765,14 +1805,8 @@ fn synthetic_hire_rows() -> Vec<HireRow> {
 /// a row is ignored, `client/msg-units.md` §1.2 r2).
 pub fn synthetic_unit_rows() -> UnitRows {
     let raven = synthetic_burial::BLOOD_RAVEN as usize;
-    let npcs = [
-        d2_sim::world::npc::class::AKARA,
-        d2_sim::world::npc::class::KASHYA,
-        d2_sim::world::npc::class::WARRIV1,
-    ];
-    let top = npcs
-        .iter()
-        .map(|&c| usize::from(c))
+    let top = synthetic_npc_classes()
+        .map(usize::from)
         .max()
         .unwrap_or(0)
         .max(raven);
@@ -1787,8 +1821,8 @@ pub fn synthetic_unit_rows() -> UnitRows {
             ..Default::default()
         }),
     };
-    for class in npcs {
-        monsters[usize::from(class)] = Some(class_row(true));
+    for c in synthetic_npc_classes() {
+        monsters[usize::from(c)] = Some(class_row(true));
     }
     monsters[raven] = Some(class_row(false));
     UnitRows {
@@ -2181,6 +2215,42 @@ pub fn build_with_objects(
                 .with(&mut game, |g, v| v.allocate(g, &req, ox + x, oy + UNIT_Y))
                 .ok_or_else(|| BuildError::Setup(format!("allocating NPC {class} failed")))?;
         }
+    }
+    // Lut Gholein: its NPCs and its waypoint (act 1's room, d2rs-own,
+    // unverified, q-a2-town).
+    if matches!(data, GameData::Synthetic) {
+        let (room2, rect2) = rooms[2];
+        let (ox2, oy2) = (rect2.x * 5, rect2.y * 5);
+        for (i, &class) in ACT2_NPCS.iter().enumerate() {
+            let req = AllocRequest {
+                ty: UnitType::Monster,
+                class: u32::from(class),
+                room: Some(room2),
+                add: true,
+                fixed_guid: None,
+                mode: 1,
+                allied: true,
+            };
+            sim.action
+                .with(&mut game, |g, v| {
+                    v.allocate(g, &req, ox2 + ACT2_NPC_X0 + 4 * i as i32, oy2 + ACT2_NPC_Y)
+                })
+                .ok_or_else(|| BuildError::Setup(format!("allocating NPC {class} failed")))?;
+        }
+        let req = AllocRequest {
+            ty: UnitType::Object,
+            class: wp_tables.object_class,
+            room: Some(room2),
+            add: true,
+            fixed_guid: None,
+            mode: 1,
+            allied: false,
+        };
+        sim.action
+            .with(&mut game, |g, v| {
+                v.allocate(g, &req, ox2 + ACT2_WAYPOINT_XY.0, oy2 + ACT2_WAYPOINT_XY.1)
+            })
+            .ok_or_else(|| BuildError::Setup("allocating the Act II waypoint failed".into()))?;
     }
     let interact_classes: Vec<u16> = parts
         .monstats
