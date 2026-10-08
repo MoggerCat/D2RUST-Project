@@ -611,6 +611,7 @@ pub fn sync_seams(game: &Game, sim: &mut WorldSim<LocalSeams>) {
     if let Ok(mut snap) = hooks.x.snap.lock() {
         snap.units = units;
     }
+    super::skill_rest::sync_shapes(game, sim);
 }
 
 impl Pending for LocalSeams {

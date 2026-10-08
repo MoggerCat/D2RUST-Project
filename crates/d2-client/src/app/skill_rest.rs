@@ -51,6 +51,30 @@ pub struct SkillStore {
     pub units: BTreeMap<UnitId, UnitSkills>,
     /// The seams' unanswered calls, in call order.
     pub log: Vec<String>,
+    /// The players in a shapeshift form (werewolf / werebear), refreshed
+    /// by [`sync_shapes`] (q-druid).
+    pub shifted: std::collections::BTreeSet<UnitId>,
+}
+
+/// The players whose state is the `aurastate` of a `srvdofunc` 116 skill
+/// (Werewolf, Werebear: `bodies.md` §8.15), for [`SkillStore::shifted`]:
+/// `UseRest::shapeshifted` has no game to read. d2rs-own, unverified.
+pub fn sync_shapes(game: &Game, sim: &mut d2_sim::wiring::worldgen::WorldSim<LocalSeams>) {
+    let hooks = sim.action.sys.hooks.tables.clone();
+    let forms: Vec<u32> = hooks
+        .skills
+        .skills
+        .iter()
+        .filter(|r| r.srvdofunc == 116)
+        .map(|r| u32::from(r.aurastate))
+        .collect();
+    let shifted = game
+        .lists
+        .units_of_type(UnitType::Player)
+        .into_iter()
+        .filter(|&u| forms.iter().any(|&s| sim.action.sys.stats.has_state(u, s)))
+        .collect();
+    sim.action.sys.hooks.x.skills.shifted = shifted;
 }
 
 /// The `skills` fields of the list operations (`client/msg-skills.md`
@@ -187,9 +211,10 @@ impl UseRest for LocalSeams {
             UseState::NoLevel
         }
     }
-    // d2rs-own, unverified: no shapeshift states in the preview.
-    fn shapeshifted(&self, _: UnitId) -> bool {
-        false
+    // d2rs-own, unverified: the player has the state of a Werewolf /
+    // Werebear row ([`sync_shapes`], refreshed before each intent and tick).
+    fn shapeshifted(&self, u: UnitId) -> bool {
+        self.skills.shifted.contains(&u)
     }
     // d2rs-own, unverified: a native entry has no charges to spend; an
     // item entry's charges are refused (no item provider).
