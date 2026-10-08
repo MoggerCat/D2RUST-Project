@@ -41,6 +41,7 @@ pub mod synthetic_act4;
 pub mod synthetic_act5;
 pub mod synthetic_burial;
 pub mod synthetic_chains;
+pub mod synthetic_client;
 pub mod synthetic_items;
 pub mod synthetic_maze;
 pub mod synthetic_tower;

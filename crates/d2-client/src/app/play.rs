@@ -504,6 +504,7 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
             table,
         )));
     } else {
+        super::synthetic_client::install(&mut app);
         add_preview(&mut app, level_rows, TileAssets::default());
     }
     add_walk(&mut app, tap, speeds);
