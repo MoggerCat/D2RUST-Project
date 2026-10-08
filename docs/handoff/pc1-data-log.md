@@ -3,6 +3,19 @@
 Loop: `docs/handoff/pc1-data.md`. Branch `claude/local-pc1-facts`; private
 repo `MoggerCat/D2RUST-private-repo` (`main`).
 
+## 2026-10-09
+
+- **Failure (00:03):** install batch 3 (d2exp + d2music, ≈595 MB) and
+  the core extract (≈680 MB) pushed side by side each failed 3 times:
+  `error: RPC failed; HTTP 408 curl 22 The requested URL returned error:
+  408` / `send-pack: unexpected disconnect while reading sideband packet`.
+  The whole PC uploads at ≈550 KB/s (one or two connections alike), so
+  each push ran past GitHub's request timeout. Fix: one push at a time,
+  commits of ≤ 250 MB (≈8 min each), each pushed by its hash: the
+  install as d2exp, d2music 1/2, 2/2, d2video 1/2, 2/2, `install:
+  complete`; then the core extract on branch `extracted` (5 parts),
+  to be merged into `main`.
+
 ## 2026-10-08
 
 - Plan for tonight (PC 1 closes ≈01:00; upload ≈0.6 MB/s): install
