@@ -11,6 +11,7 @@
 
 pub mod hud;
 pub mod items;
+pub mod levelup;
 pub mod palette;
 pub mod play;
 pub mod rest;

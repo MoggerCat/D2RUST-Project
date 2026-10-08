@@ -37,6 +37,9 @@ const STAT_GOLD: u16 = 14;
 pub struct SyncState {
     /// A new client's cache starts all 0 (§5.2).
     pub caches: BTreeMap<ClientId, SyncCache>,
+    /// Per client: the watched stats last sent as stat messages
+    /// ([`stat_changes`]), by stat.
+    pub stats: BTreeMap<ClientId, BTreeMap<i32, i32>>,
 }
 
 impl<X> ActionHooks<X> {
@@ -143,7 +146,67 @@ pub fn run<X>(
             e.update_count = 0;
         }
     }
-    Some(r.messages)
+    let mut messages = r.messages;
+    messages.extend(stat_changes(sim, client, unit));
+    Some(messages)
+}
+
+/// The stats whose changes follow as stat messages: the attributes (0-3),
+/// stat and skill points (4, 5), the maxima (7, 9, 11), level (12) and
+/// next-level experience (30). Life, mana, stamina, gold and experience
+/// have their own messages above.
+const WATCHED: [u16; 11] = [0, 1, 2, 3, 4, 5, 7, 9, 11, 12, 30];
+
+/// The watched base values of `unit`, by stat.
+fn watched<X>(sim: &ActionSim<X>, unit: UnitId) -> BTreeMap<i32, i32> {
+    WATCHED
+        .iter()
+        .map(|&s| (i32::from(s), sim.sys.stats.unit_base(unit, s, 0)))
+        .collect()
+}
+
+/// The watched stats of `unit` that changed since the last send to
+/// `client`, as stat messages (`0x0053BE40`, `intents-events.md` §3.5
+/// rule 7), in stat order.
+// PROVISIONAL (combat/vitals.md §3 step 7; settled by REC-94): the original sends a changed
+// stat from the unit's client update, from the changed-stat array
+// (`stat-lists.md` §11); d2rs keeps no pending array across the tick's
+// room clean-up, so the changes are found against a per-client cache at
+// the tick's sync. Level, stat points, skill points, attributes and the
+// maxima reach the client at the end of the tick that changed them;
+// settled by a recording of 0x1D-0x1F around a level-up.
+pub fn stat_changes<X>(sim: &mut ActionSim<X>, client: ClientId, unit: UnitId) -> Vec<Vec<u8>> {
+    let now = watched(sim, unit);
+    let Some(state) = sim.sys.hooks.sync.as_mut() else {
+        return Vec::new();
+    };
+    let sent = state.stats.entry(client).or_default();
+    let mut out = Vec::new();
+    for (k, v) in now {
+        // A stat the client never heard of is 0 there.
+        if sent.get(&k).copied().unwrap_or(0) == v {
+            continue;
+        }
+        sent.insert(k, v);
+        out.extend(stat_message(k as u16, v));
+    }
+    out
+}
+
+/// `0x0053BE40(client, s, v)`: 0x1D below 0xFF, 0x1E below 0xFFFF, else
+/// 0x1F (`None` for s > 0xFE).
+fn stat_message(stat: u16, value: i32) -> Option<Vec<u8>> {
+    let s = u8::try_from(stat).ok().filter(|&s| s <= 0xFE)?;
+    let v = value as u32;
+    Some(if v < 0xFF {
+        vec![0x1D, s, v as u8]
+    } else if v < 0xFFFF {
+        let w = (v as u16).to_le_bytes();
+        vec![0x1E, s, w[0], w[1]]
+    } else {
+        let d = v.to_le_bytes();
+        vec![0x1F, s, d[0], d[1], d[2], d[3]]
+    })
 }
 
 /// The join's `0x00548760(P, client, force 1)` (`sim/intents-events.md`
@@ -164,6 +227,12 @@ pub fn join_run<X>(
         return Vec::new();
     }
     let now = current(sim, game, unit, staged);
+    // The join sends the saved stats whole (`session::create_game` stat
+    // messages): the in-game stat cache starts from them.
+    let mods = watched(sim, unit);
+    if let Some(s) = sim.sys.hooks.sync.as_mut() {
+        s.stats.insert(client, mods);
+    }
     let mut scratch = SyncCache::default();
     let cache = match sim.sys.hooks.sync.as_mut() {
         Some(s) => s.caches.entry(client).or_default(),

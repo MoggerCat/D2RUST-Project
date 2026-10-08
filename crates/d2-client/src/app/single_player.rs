@@ -137,7 +137,7 @@ use crate::bridge::LOCAL_CLIENT;
 pub type Sim = SimGame<WorldSim<LocalSeams>, World>;
 
 /// The wired host of the app's game.
-pub type World = WiredWorld<AppRest>;
+pub type World = WiredWorld<AppRest, super::levelup::LevelUpSkills>;
 
 /// The local link over [`Sim`] with clock `C`.
 pub type Link<C = SystemClock> = LocalLink<Sim, ProtoSizes, PendingSession, C>;
@@ -378,9 +378,14 @@ pub struct LocalSeams {
     pub pos: BTreeMap<UnitId, (i32, i32)>,
     pub sent: Vec<(UnitId, Vec<u8>)>,
     pub log: Vec<String>,
+    /// The player skill list (`app/levelup.rs`).
+    pub book: super::levelup::SkillBook,
 }
 
 impl Pending for LocalSeams {
+    fn skill_list(&self, unit: UnitId) -> Vec<d2_sim::skills::SkillEntry> {
+        self.book.lists.get(&unit).cloned().unwrap_or_default()
+    }
     fn position(&self, unit: UnitId) -> (i32, i32) {
         self.pos.get(&unit).copied().unwrap_or_default()
     }
@@ -1268,6 +1273,8 @@ pub fn build_with(
     );
     hooks.anim_data = parts.anim;
     hooks.vitals = parts.vitals;
+    // The client vitals sync and the stat changes with it (level, points).
+    hooks.enable_vitals_sync();
     // Game entry places through the path provider; on before any unit is
     // allocated.
     hooks

@@ -348,7 +348,11 @@ fn character_art_and_close_button() {
     );
     // No stat-point box or add buttons (`PENDING`).
     assert!(panel_images(&img, "panel\\skillpoints").is_empty());
-    assert!(panel_images(&img, "panel\\level").is_empty());
+    // Only the control panel's two closed level buttons (frame 2, §8).
+    assert_eq!(
+        panel_images(&img, "panel\\level"),
+        vec![(2, 206, 592), (2, 563, 592)]
+    );
     // A classic install draws `InvChar`.
     let mut c = ui(Some(areas()), false);
     c.key(&w, Action::ToggleCharacter);

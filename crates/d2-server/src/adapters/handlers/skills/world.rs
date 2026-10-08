@@ -457,6 +457,13 @@ impl<X: SkillRest> LearnUnits for World<'_, '_, X> {
         LearnRest::is_class_skill(self.x(), u, skill)
     }
     fn add_skill_level(&mut self, u: UnitId, skill: i32, cost: i32) {
+        // `levels.md` §6.4 step 4: the cost comes off `newskills(5)`.
+        d2_sim::combat::vitals::VitalsUnits::add_base_stat(
+            &mut self.u.cv.v,
+            u,
+            5,
+            cost.wrapping_neg(),
+        );
         LearnRest::add_skill_level(self.x_mut(), u, skill, cost);
     }
 }
