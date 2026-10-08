@@ -606,13 +606,14 @@ fn run() -> Transcript {
     assert_eq!(fx.room(), Some(b));
     walks.push(w);
 
-    // 2. Run back to (24, 20): 21 sub-tiles, 56 frames; the run list is
-    // not wired (velocity 0x600, `wire-path-sim.md` §5); stamina −40
-    // per running tick (§9.9). Back in room A.
+    // 2. Run back to (24, 20): 21 sub-tiles, 38 frames: the run list adds
+    // stat 67 +50 (`pathing.md` §8.2: velocity 0x900, 0x9000 a tick,
+    // ⌈21 · 0x10000 / 0x9000⌉ = 38); stamina −40 per running tick (§9.9).
+    // Back in room A.
     let w = fx.walk(&bytes(&Run { x: 24, y: 20 }), 0x03, 80);
-    assert_eq!(w.len(), 56);
+    assert_eq!(w.len(), 38);
     assert_eq!(w[0].2, 3);
-    assert_eq!((w[55].0, w[55].1, w[55].2), (centre(24), centre(20), 1));
+    assert_eq!((w[37].0, w[37].1, w[37].2), (centre(24), centre(20), 1));
     assert!(w.iter().all(|f| f.3.is_empty()));
     assert_eq!(fx.room(), Some(a));
     walks.push(w);
@@ -727,7 +728,7 @@ fn run() -> Transcript {
         let s = fx.sim();
         s.events.with(&mut s.game, |_, v| v.stat(p, STAT_STAMINA))
     };
-    assert_eq!(stamina, STAMINA - 56 * 2 * RUN_DRAIN);
+    assert_eq!(stamina, STAMINA - 38 * 2 * RUN_DRAIN);
     let errors = fx.errors();
     assert_eq!(errors, Vec::<String>::new());
     let d = fx.path();
