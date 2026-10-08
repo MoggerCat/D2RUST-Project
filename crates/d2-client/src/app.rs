@@ -47,6 +47,7 @@ pub mod synthetic_maze;
 pub mod synthetic_tower;
 pub mod town_npcs;
 pub mod ui;
+pub mod visibility;
 pub mod weapons;
 
 use std::path::PathBuf;

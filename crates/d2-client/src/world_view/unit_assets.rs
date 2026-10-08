@@ -48,6 +48,7 @@ use crate::rules::unit_composite::{
     monster_weapon_class, ArmorSource, Code, CofName, ComponentCodes, CompositeKind,
     DirectionSource, FileFormat, MonsterLook, PlayerLook, EMPTY, HTH,
 };
+use crate::rules::unit_visibility::CelBox;
 
 use super::ViewAssets;
 
@@ -337,6 +338,10 @@ pub struct UnitArt {
     pub facing: BTreeMap<UnitKey, Facing>,
     /// The model's local player at the last [`Self::observe_facing`].
     pub local: Option<UnitKey>,
+    /// The cel fields of every loaded component file, by file direction
+    /// and frame (`render/sprite-placement.md` §3): what the visibility
+    /// predicate's cel box test reads (`super::visibility`).
+    pub cels: BTreeMap<CanonicalPath, Vec<Vec<CelBox>>>,
 }
 
 /// A unit's facing as the view last saw it (module doc).
@@ -498,7 +503,11 @@ impl UnitArtLoader {
                 if let Err(Some(e)) = &loaded {
                     log.push(format!("unit art: {}: {e}", codes.file(format)));
                 }
-                art.files.insert(key, loaded.ok());
+                let loaded = loaded.ok().map(|(path, facts, cels)| {
+                    art.cels.insert(path.clone(), cels);
+                    (path, facts)
+                });
+                art.files.insert(key, loaded);
             }
         }
         log
@@ -517,7 +526,7 @@ impl UnitArtLoader {
         codes: &ComponentCodes,
         format: FileFormat,
         assets: &mut ViewAssets,
-    ) -> Result<(CanonicalPath, FileFacts), Option<String>> {
+    ) -> Result<(CanonicalPath, FileFacts, Vec<Vec<CelBox>>), Option<String>> {
         let file = codes.file(format);
         let src = self.source.as_ref();
         let loaded = match format {
@@ -541,9 +550,10 @@ impl UnitArtLoader {
         format: FileFormat,
         loaded: Loaded,
         assets: &mut ViewAssets,
-    ) -> Result<(CanonicalPath, FileFacts), String> {
+    ) -> Result<(CanonicalPath, FileFacts, Vec<Vec<CelBox>>), String> {
         let path = codes.path(format).map_err(|e| e.to_string())?;
         let mut sets = Vec::new();
+        let cels = cel_boxes(&loaded);
         let (directions, frames) = match format {
             FileFormat::Dcc => {
                 let Loaded::Dcc(dcc) = loaded else {
@@ -587,7 +597,45 @@ impl UnitArtLoader {
                 directions,
                 frames,
             },
+            cels,
         ))
+    }
+}
+
+/// The cel fields w, h, xoff, yoff of every frame (`render/sprite-placement.md`
+/// §3): a DC6 frame header as stored; a DCC frame header's width, height
+/// and x / y offset, unchanged.
+fn cel_boxes(loaded: &Loaded) -> Vec<Vec<CelBox>> {
+    let i = |v: u32| i32::try_from(v).unwrap_or(i32::MAX);
+    match loaded {
+        Loaded::Dcc(dcc) => dcc
+            .directions
+            .iter()
+            .map(|d| {
+                d.frames
+                    .iter()
+                    .map(|f| CelBox {
+                        w: i(f.width),
+                        h: i(f.height),
+                        ox: f.x_offset,
+                        oy: f.y_offset,
+                    })
+                    .collect()
+            })
+            .collect(),
+        Loaded::Dc6(dc6) => (0..dc6.header.directions as usize)
+            .map(|d| {
+                (0..dc6.header.frames_per_direction as usize)
+                    .map_while(|f| dc6.frame(d, f))
+                    .map(|f| CelBox {
+                        w: i(f.width),
+                        h: i(f.height),
+                        ox: f.offset_x,
+                        oy: f.offset_y,
+                    })
+                    .collect()
+            })
+            .collect(),
     }
 }
 

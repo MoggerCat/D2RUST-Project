@@ -115,6 +115,8 @@ pub struct WorldViewState {
     pub missiles: super::missiles::Missiles,
     /// The object mouse-over label (`super::object_label`).
     pub object_labels: super::object_label::ObjectLabels,
+    /// The last drawn frame's camera (`super::visibility`).
+    pub camera: super::visibility::SharedCamera,
 }
 
 impl WorldViewState {
@@ -142,6 +144,7 @@ impl WorldViewState {
             corpse_clicks: Default::default(),
             missiles: Default::default(),
             object_labels: Default::default(),
+            camera: Default::default(),
         }
     }
 }
@@ -776,6 +779,7 @@ fn world_view_frame(
         }
         Err(e) => return Err(e.into()),
     };
+    *state.camera.write().unwrap_or_else(|e| e.into_inner()) = frame.camera;
     for m in state.ground_items.add_to_frame(
         bridge.0.world(),
         state.feed.as_ref(),

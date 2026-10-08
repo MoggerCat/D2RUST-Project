@@ -9,6 +9,7 @@
 //! message rules read are inputs ([`ModelInputs`]), not model fields.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 
 pub use super::objects::{ClientObjects, ObjClientInputs};
 
@@ -969,9 +970,29 @@ pub fn addressed_unit(msg: &[u8]) -> Option<UnitKey> {
 }
 
 /// Visibility of a unit's sprite at a client pixel point
-/// (`0x004DBF20`, model §6 rule 6, open question 7): a Phase 6 render
-/// seam, taken as an input.
-pub type VisibleFn = fn(&ClientUnit, i32, i32) -> bool;
+/// (`0x004DBF20`, model §6 rule 6, §13): a render seam, taken as an
+/// input (§13 r6). A closure so the render side can answer from its own
+/// state (camera, COF and cel stores: `world_view::visibility`); the
+/// bridge only calls it.
+#[derive(Clone)]
+pub struct VisibleFn(Arc<dyn Fn(&ClientUnit, i32, i32) -> bool + Send + Sync>);
+
+impl VisibleFn {
+    pub fn new(f: impl Fn(&ClientUnit, i32, i32) -> bool + Send + Sync + 'static) -> Self {
+        VisibleFn(Arc::new(f))
+    }
+
+    /// `visible(U, a, b)` (§13), (a, b) in client pixel space.
+    pub fn visible(&self, unit: &ClientUnit, a: i32, b: i32) -> bool {
+        (self.0)(unit, a, b)
+    }
+}
+
+impl std::fmt::Debug for VisibleFn {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("VisibleFn(..)")
+    }
+}
 
 /// One `monstats` row as 0xAC reads it (`msg-units.md` §1.2), with the
 /// flags 0x28 reads (`msg-ui.md` §16 r4).
