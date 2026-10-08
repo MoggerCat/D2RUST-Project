@@ -9,14 +9,14 @@
 //!
 //! Preview fills (d2rs-own, unverified): the client quest flags are not
 //! in the model, so every act tab opens (the quest gate is skipped); the row and tab text needs the string table by
-//! id (`NoStrings` in play), so only the art is drawn.
+//! id (`ctx.strings`, the string tables in play).
 
 use d2_sim::world::waypoints::{WaypointMap, WaypointRecord};
 
 use super::{OriginalUi, SharedRef};
 use crate::ui::draw::UiDrawSink;
 use crate::ui::geom::{Point, Rect};
-use crate::ui::panel::{NoStrings, Panel, PanelId, UiCtx, UiEvent, UiResponse, WidgetId};
+use crate::ui::panel::{Panel, PanelId, UiCtx, UiEvent, UiResponse, WidgetId};
 use crate::ui::panels::waypoint::{
     WaypointPanel, WaypointView, WpEffect, WpEnv, WpRow, WpRows, MAX_ROWS, UI_WAYPOINT,
 };
@@ -148,7 +148,7 @@ impl Panel for WaypointUi {
         Rect::new(0, 0, (s.w / 2 + 1) as u16, (s.h - 48) as u16)
     }
 
-    fn draw(&self, _ctx: &UiCtx, out: &mut dyn UiDrawSink) {
+    fn draw(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
         let sh = self.sh.borrow();
         let Some(open) = sh.waypoint_open else {
             return;
@@ -157,7 +157,7 @@ impl Panel for WaypointUi {
             rows: rows_of(sh.waypoint_map.as_ref(), &open, self.panel.tab),
         };
         self.panel
-            .draw(&sh.tables, &sh.env(), &view, &NoStrings, &NoMeasure, out);
+            .draw(&sh.tables, &sh.env(), &view, ctx.strings, &NoMeasure, out);
     }
 
     fn hit(&self, _p: Point) -> Option<WidgetId> {

@@ -790,3 +790,54 @@ fn stash_gold_withdraw_and_deposit_send_0x4f() {
         Some(&ClientIntent(vec![0x4F, 0x14, 0, 0, 0, 0x88, 0x13]))
     );
 }
+
+// d2rs-own, unverified: the stash GoldMax line reads string 4051 through
+// `ctx.strings` (REC-238); cap = the fixed stash limit.
+#[test]
+fn stash_gold_max_line_resolves_its_string_id() {
+    struct Strs(Vec<u16>);
+    impl crate::ui::StringLookup for Strs {
+        fn get(&self, _: &str) -> Option<&[u16]> {
+            None
+        }
+        fn get_id(&self, id: u16) -> Option<&[u16]> {
+            (id == 4051).then_some(self.0.as_slice())
+        }
+    }
+    let mut u = ui(Some(areas()), true);
+    let w = world(AMAZON, 1, true);
+    u.ui.apply_output(
+        &crate::bridge::output::Output::TradeAction {
+            code: 0x10,
+            dead_or_absent: false,
+        },
+        &w,
+    )
+    .unwrap();
+    // Mirror the state flags into the root (no action: no hotkey runs).
+    let e = UiEvent::Press {
+        button: PointerButton::Right,
+        at: Point::new(0, 0),
+    };
+    u.ui.after_event(&mut u.root, e, Routed::Unhandled).unwrap();
+    let texts = |s: &dyn crate::ui::StringLookup| -> Vec<String> {
+        let ctx = UiCtx {
+            tick: 0,
+            world: &w,
+            strings: s,
+        };
+        let mut out: Vec<UiDraw> = Vec::new();
+        u.root.draw(&ctx, &mut out);
+        out.iter()
+            .filter_map(|d| match d {
+                UiDraw::Text(t) => Some(String::from_utf16_lossy(&t.text)),
+                _ => None,
+            })
+            .collect()
+    };
+    assert!(texts(&NoStrings).is_empty());
+    assert_eq!(
+        texts(&Strs("Gold Max: %d".encode_utf16().collect())),
+        vec!["Gold Max: 2500000"]
+    );
+}

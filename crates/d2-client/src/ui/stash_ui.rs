@@ -7,22 +7,22 @@
 //! state (`msg_ui`); the C→S intents leave through the root. The client
 //! decides nothing: the server validates every move.
 //!
-//! Preview fills (d2rs-own, unverified): the GoldMax line needs the
-//! string table by id (`NoStrings` in play), so only the art is drawn;
-//! the stash gold button opens the withdraw dialog (kind 4) and the
-//! inventory gold button the deposit (kind 3, `gold_dialog`, whose
-//! frame-wide panel sees the right half).
+//! Preview fills (d2rs-own, unverified): the GoldMax line reads the
+//! string table by id (`ctx.strings`); the stash gold button opens the
+//! withdraw dialog (kind 4) and the inventory gold button the deposit
+//! (kind 3, `gold_dialog`, whose frame-wide panel sees the right half).
 
 use super::SharedRef;
 use crate::bridge::items;
 use crate::ui::draw::UiDrawSink;
 use crate::ui::geom::{Point, Rect};
 use crate::ui::gold::GoldKind;
-use crate::ui::panel::{NoStrings, Panel, PanelId, UiCtx, UiEvent, UiResponse, WidgetId};
+use crate::ui::panel::{Panel, PanelId, UiCtx, UiEvent, UiResponse, WidgetId};
 use crate::ui::panels::stash_cube::{StashPanel, UI_STASH};
 use crate::ui::panels::stash_input::{stash_gold_rect_hit, Pointer, StashCubeInput, GOLD_MAX_FONT};
 use crate::ui::panels::PanelOutput;
 use crate::ui::PointerButton;
+use d2_sim::world::stash::STASH_CAP;
 
 /// The stash adapter (ui 0x19, left half above the control panel).
 pub(super) struct StashUi {
@@ -46,9 +46,8 @@ impl Panel for StashUi {
         let panel = StashPanel {
             close_pressed: self.input.stash_close_pressed,
         };
-        // The cap needs the stat table (`0x00623460`); the line is not
-        // drawn without strings anyway.
-        panel.draw(&sh.tables, &env, &NoStrings, 0, GOLD_MAX_FONT, out);
+        // The cap is the fixed stash gold limit (`0x00623460`).
+        panel.draw(&sh.tables, &env, ctx.strings, STASH_CAP, GOLD_MAX_FONT, out);
         let g = sh.items.stash_grid(env.exp, &sh.config.screen);
         sh.items.draw_stash(ctx.world, &sh.tables.files, &g, out);
     }
