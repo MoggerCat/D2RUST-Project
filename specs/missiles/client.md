@@ -4,7 +4,8 @@
   default step, the end/hit function, the client collide table and the
   client function table read from the 1.14d `Game.exe` asm (addresses
   per rule; tables dumped from the image). No capture has checked it
-  yet; the seed draws of §C14 are capture-only.
+  yet; the seed draws of §C14 are capture-only. Bodies past §C13 and
+  the client hit functions: `missiles/client-bodies.md`.
 - **Target version:** 1.14d
 - **Crate/module:** `d2-client::effects::missiles` (client effect
   layer, to write; consumes the bridge outputs `ClientMissile` and
@@ -20,35 +21,37 @@
   (missile light, flicker); `render/draw-order.md` §5 (not-drawn flag);
   `audio/triggers.md` §8 r3, `audio/triggers-2.md` §16 (missile sounds);
   `monsters/umod-callbacks.md` (callback 4); `combat/damage.md` §0
-  (`pct`); `sim/pathing.md` (distance `0x006417F0`); `sim/rng.md`
+  (`pct`); `sim/pathing.md` (distance `0x006417F0`); `sim/rng.md`;
+  `missiles/client-bodies.md` (function and hit bodies, path new-step
+  flag)
 
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 54–68 |
-| Inputs | 69–79 |
-| Outputs / state changes | 80–86 |
-| Rules | 87–88 |
-|   C1. The client missile unit | 89–114 |
-|   C2. Create `0x004CD540` — start, room, target | 115–147 |
-|   C3. Create — allocation and frames | 148–184 |
-|   C4. Create — tail | 185–212 |
-|   C5. Callers | 213–224 |
-|   C6. Per-update dispatch `0x004D2C70` | 225–242 |
-|   C7. Default step `0x004D30C0` (function 1) | 243–288 |
-|   C8. Client collide table `0x0072A350` | 289–309 |
-|   C9. End `0x004D2D70(m, U, forced)` | 310–351 |
-|   C10. Removal and lifetime | 352–364 |
-|   C11. `InitSteps` and `ExplosionMissile` | 365–375 |
-|   C12. Client function table `0x0072A398` | 376–459 |
-|   C13. Function bodies specified here | 460–509 |
-|   C14. Seeds (capture-only) | 510–527 |
-| Constants & data dependencies | 528–549 |
-| Randomness | 550–553 |
-| Edge cases & original bugs | 554–573 |
-| Test vectors | 574–589 |
-| Provenance | 590–604 |
-| Open questions | 605–622 |
+| Summary | 57–71 |
+| Inputs | 72–82 |
+| Outputs / state changes | 83–89 |
+| Rules | 90–91 |
+|   C1. The client missile unit | 92–117 |
+|   C2. Create `0x004CD540` — start, room, target | 118–150 |
+|   C3. Create — allocation and frames | 151–187 |
+|   C4. Create — tail | 188–215 |
+|   C5. Callers | 216–227 |
+|   C6. Per-update dispatch `0x004D2C70` | 228–245 |
+|   C7. Default step `0x004D30C0` (function 1) | 246–297 |
+|   C8. Client collide table `0x0072A350` | 298–318 |
+|   C9. End `0x004D2D70(m, U, forced)` | 319–361 |
+|   C10. Removal and lifetime | 362–374 |
+|   C11. `InitSteps` and `ExplosionMissile` | 375–385 |
+|   C12. Client function table `0x0072A398` | 386–470 |
+|   C13. Function bodies specified here | 471–524 |
+|   C14. Seeds (capture-only) | 525–561 |
+| Constants & data dependencies | 562–583 |
+| Randomness | 584–587 |
+| Edge cases & original bugs | 588–607 |
+| Test vectors | 608–623 |
+| Provenance | 624–640 |
+| Open questions | 641–668 |
 <!-- /index -->
 
 ## Summary
@@ -276,7 +279,13 @@ No row → return. One pass:
     missile's room with the collide test of the mode (§C8) and the
     missile's size (`0x00620510`) (`0x00641CB0`); a unit found that is
     not dead (`0x00464820` = 0) → end(U, 0); return. A dead unit found
-    → next point.
+    → next point. Search order (first accepted unit wins):
+    `sim/path-placement.md` §4 r6 (the room's adjacency array from index
+    0, each room's unit list from its head); the client list order is
+    `sim/unit-order.md` §5 r6–r7 (prepend on insert, then the draw's
+    stable Y sort). A dead unit found first hides a live one behind it
+    on the same point: the search moves to the next point, not the
+    next unit.
 13. Second pass: `render/camera.md` §9 "Steps per client update", row
     Missile (local player's missile, game types 0, 1, 6, 8, first pass,
     elapsed = 1, path velocity ≠ 0) → back to step 1 once.
@@ -334,7 +343,8 @@ Callers: the default step (none, 1), (none, 0), (U, 0); function 2
       U+0x90).
    3. h := `pCltHitFunc` (i16): 0 < h < `[0x0072A504]` (81) and entry h
       of table `0x0072A508` ≠ 0 → call (ECX = m, EDX = U); result 0 →
-      return none (the missile stays).
+      return none (the missile stays). Table and bodies:
+      `client-bodies.md` §B6–§B7.
    4. `HitSound` ≥ 0 → request on m (`audio/triggers.md` §8 r3).
    5. E := `ExplosionMissile` (i16) ≥ 0 → X := `0x004CDBA0(m, E, 0, 0,
       m's skill, m's level)` (flags 0x20: target (0, 0) absolute). X
@@ -387,13 +397,13 @@ spec'd: § of this spec, or "open" (Open question 1).
 |---|---|---|---|---|---|---|---|
 | 1 | `0x004D30C0` | 511 (0 `arrow`, 1 `javelin`, …) | — | — | — | — | §C7 |
 | 2 | `0x004D33E0` | 6 (18 `blood1` …) | y | — | — | — | §C13 |
-| 3 | `0x004D3460` | 5 (38 `poisonjav`, 43 `plaguejavelin`, …) | y | `0x004CE050` | — | — | open |
-| 4 | `0x004D34E0` | 14 (39 `poisonjavcloud` …) | y | — | — | — | open |
-| 5 | `0x004D3540` | 19 (67 `blaze`, 69 `firewall` …) | y | — | 1 | y | open |
-| 6 | `0x004D3630` | 4 (68 `firewallmaker` …) | y | y | 3 | y | open |
-| 7 | `0x004D37F0` | 3 (86 `guidedarrow`, 193 `bonespirit`, 329) | y | — | — | y | open |
+| 3 | `0x004D3460` | 5 (38 `poisonjav`, 43 `plaguejavelin`, …) | y | `0x004CE050` | — | — | `client-bodies.md` §B4 |
+| 4 | `0x004D34E0` | 14 (39 `poisonjavcloud` …) | y | `0x004CE140` | 1 + 2 per puff | — | `client-bodies.md` §B4 |
+| 5 | `0x004D3540` | 19 (67 `blaze`, 69 `firewall` …) | y | — | 1 | y | `client-bodies.md` §B5 r1 |
+| 6 | `0x004D3630` | 4 (68 `firewallmaker` …) | y | y | ≤ 2 | y | `client-bodies.md` §B4 |
+| 7 | `0x004D37F0` | 3 (86 `guidedarrow`, 193 `bonespirit`, 329) | y | — | — | y | `client-bodies.md` §B5 r2 |
 | 8 | `0x004D38D0` | 16 (93 `chainlightning`, 98 `lightningbolt` …) | y | y | — | y | §C13 |
-| 9 | `0x004D39C0` | 3 (101 `meteorcenter` …) | y | y | — | y | open |
+| 9 | `0x004D39C0` | 3 (101 `meteorcenter` …) | y | y | — | y | `client-bodies.md` §B5 r5 |
 | 10 | `0x004D3C40` | 1 (106) | y | — | 1 | y | open |
 | 11 | `0x004D3D00` | 16 (115 `corpseexplosion` …) | y | — | — | — | §C13 |
 | 12 | `0x004D3D30` | none | y | — | — | y | §C13 |
@@ -401,7 +411,7 @@ spec'd: § of this spec, or "open" (Open question 1).
 | 14 | `0x004D4040` | none | y | — | — | y | open |
 | 15 | `0x004D4180` | 1 (177) | y | y | — | y | open |
 | 16 | `0x004D43A0` | 1 (179 `diabwallmaker`) | y | y | 1 | y | open |
-| 17 | `0x004D44B0` | 2 (191 `cursecenter`, 576) | y | — | — | y | open |
+| 17 | `0x004D44B0` | 2 (191 `cursecenter`, 576) | y | `0x004CEF50` | per point | y | `client-bodies.md` §B4 |
 | 18 | `0x004D4590` | 2 (192 `bonespear`, 652) | y | y | — | — | §C13 |
 | 19 | `0x004D46D0` | 1 (260 `frozenorb`) | y | y | — | y | open |
 | 20 | `0x004D47F0` | 1 (262) | y | — | — | y | open |
@@ -409,9 +419,9 @@ spec'd: § of this spec, or "open" (Open question 1).
 | 22 | `0x004D49F0` | 1 (285) | y | y | — | y | open |
 | 23 | `0x004D4B80` | 1 (287 `denofevillight`) | y | — | — | — | §C13 |
 | 24 | `0x004D4BB0` | 1 (288 `cairnstones`) | y | y | 1 | y | open |
-| 25 | `0x004D4DC0` | 2 (291, 368) | y | y | 4 | y | open |
+| 25 | `0x004D4DC0` | 2 (291, 368) | y | y | 4 | y | `client-bodies.md` §B4 |
 | 26 | `0x004D4F20` | 1 (299) | y | y | 5 | y | open |
-| 27 | `0x004D5090` | 2 (300, 308) | y | y | — | y | open |
+| 27 | `0x004D5090` | 2 (300, 308) | y | y | 1 step | y | `client-bodies.md` §B4 |
 | 28 | `0x004D5200` | 1 (306) | y | y | — | — | open |
 | 29 | `0x004D5310` | 1 (307 `andycontrol0`) | y | sub-missile helpers | — | y | §C13 |
 | 30 | `0x004D5470` | 1 (332) | y | y | 2 | y | open |
@@ -430,34 +440,38 @@ spec'd: § of this spec, or "open" (Open question 1).
 | 43 | `0x004D3070` | 6 (392 `blade creeper`, 406, 410, 415, …) | — | — | — | y | §C13 |
 | 44 | `0x004D55C0` | 1 (393) | y | `0x004CDBA0` | — | — | open |
 | 45 | `0x004D56B0` | 1 (394) | y | — | — | y | open |
-| 46 | `0x004D5710` | 2 (431, 438) | y | 2 | — | — | open |
+| 46 | `0x004D5710` | 2 (431, 438) | y | 2 | — | direct | `client-bodies.md` §B4 |
 | 47 | `0x004D5950` | 1 (452 `moltenboulder`) | — | — | — | y | open |
 | 48 | `0x004D59E0` | 1 (461) | y | 2 | 2 + local seed | y | open |
-| 49 | `0x004D5BA0` | 2 (471, 474) | y | — | — | y | open |
+| 49 | `0x004D5BA0` | 2 (471, 474) | y | `0x004CDBA0` | — | y | `client-bodies.md` §B4 |
 | 50 | `0x004D5C10` | 1 (479) | y | — | 2 + local seed | y | open |
 | 51 | `0x004D5DD0` | 2 (498, 540) | y | 3 | 2 | y | open (sound: `audio/triggers-2.md` §16) |
-| 52 | `0x004D5F80` | 2 (517, 589) | y | 2 | — | y | open |
+| 52 | `0x004D5F80` | 2 (517, 589) | y | 2 | — | y | `client-bodies.md` §B4 |
 | 53 | `0x004D6080` | 1 (520 `tigerfury`) | — | y | — | y | open |
 | 54 | `0x004D8000` | 1 (528 `anya center`) | y | 2 | — | — | shake: `render/camera.md` §8; rest open |
 | 55 | `0x004D8260` | 1 (541) | y | y | — | — | open |
 | 56 | `0x004D6130` | 1 (546) | y | y | local seed | y | open |
 | 57 | `0x004D62B0` | 1 (553) | y | y | — | y | open |
 | 58 | `0x004D63E0` | 1 (569) | y | — | local seed | y | open |
-| 59 | `0x004D7FC0` | 4 (570–573) | y | — | — | y | open |
-| 60 | `0x004D8400` | 6 (581–586) | y | — | — | — | open |
+| 59 | `0x004D7FC0` | 4 (570–573) | y | — | — | y | `client-bodies.md` §B5 r6 |
+| 60 | `0x004D8400` | 6 (581–586) | y | — | — | — | `client-bodies.md` §B5 r3 |
 | 61 | `0x004D7690` | 1 (602) | y | — | — | — | open |
 | 62 | `0x004D7710` | 1 (606) | y | 2 | — | — | open |
-| 63 | `0x004D7880` | 5 (607–611) | y | — | — | — | open |
+| 63 | `0x004D7880` | 5 (607–611) | y | — | — | — | `client-bodies.md` §B5 r3 |
 | 64 | `0x004D7930` | 1 (625) | y | 2 | — | — | open |
-| 65 | `0x004D7E00` | 5 (626–630) | y | — | 2 | — | open |
+| 65 | `0x004D7E00` | 5 (626–630) | y | — | rnd(25), 1 step, rnd(2) | — | `client-bodies.md` §B5 r4 |
 | 66 | `0x004D2610` | 1 (639 `worldstone shake`) | — | — | inline | y | `render/camera.md` §8 rule W |
 | 67 | `0x004D3E00` | none | y | 3 | — | y | open |
 | 68 | `0x004D5880` | 1 (441 `sucfireball`) | y | y | — | y | open |
 
 Each function calls the default step at most once per run
-(`render/camera.md` §9).
+(`render/camera.md` §9). The columns of the rows that point to
+`client-bodies.md` were corrected from the body reads there.
 
 ### C13. Function bodies specified here
+
+More bodies, the shared create helpers and the hit functions:
+`missiles/client-bodies.md` (conventions §B1).
 
 "P1", "P2" = `CltParam1`, `CltParam2` (+0x58, +0x5C); "S1", "S2", "S3" =
 `CltSubMissile1`–`3` (+0x1E, +0x20, +0x22, i16); "step" = §C7; "remove" =
@@ -472,7 +486,8 @@ Each function calls the default step at most once per run
   0). A blood missile on screen never expires.
 - **8** (`0x004D38D0`) and **18** (`0x004D4590`), trails: no row or S1
   < 0 → remove (8) / step only (18). Else when elapsed ≥ `InitSteps`
-  and path flag 0x08 (path +0x34, `0x006505C0`) is set: create S1 with
+  and the path new-step flag (path +0x34 bit 3, `0x006505C0`,
+  `client-bodies.md` §B2) is set: create S1 with
   flags 1 at m's position, owner = m's owner, skill and level of m.
   Function 8 adds the init callback `0x004CC870` (argument m): when the
   child's P2 > 0, z := rnd(P2) on **m's** seed − ⌊P2 / 2⌋; child motion
@@ -523,7 +538,26 @@ All client-only; none touches server RNG.
 6. Function 8 child: rnd(P2) on the parent's seed, then rnd(`AnimLen`)
    on the child's (§C13).
 7. Flicker: `render/lighting.md` §8. Function 66: `render/camera.md` §8.
-8. Bodies marked "rnd" in §C12: open (draw order not specified).
+8. Bodies still "open" in §C12 with draws: draw order not specified.
+9. Draws of the `client-bodies.md` bodies, all on m's seed, in order
+   (rnd(n) = `roll(n)`, none when n < 1; "step" = one seed advance
+   whose lo' the body uses):
+
+   | Body | Draws per run, in order |
+   |---|---|
+   | function 4 (scatter) | frames left ≠ 0: rnd(P1); then per puff rnd(2·P3), rnd(2·P3) |
+   | function 5 | frame = `SubStart` − 1: rnd(`SubStop` − `SubStart`) |
+   | function 6 | B2 flag set: rnd(3) (S2, S3 ≥ 0) or rnd(2) (S2 ≥ 0, S3 < 0); then rnd(P1) when P1 ≠ 0 |
+   | function 17, hit 1 (disc) | per point inside the disc: rnd(chance) when chance > 0; then, for a kept point, rnd(`RandStart` of the class) when > 0 |
+   | function 25 | on emission: rnd(2P1 + 1) twice, rnd(2P2 + 1) twice |
+   | function 27 | on emission (elapsed mod max(P1, 1) = 0): 1 step (lo' & 3) |
+   | function 65 | d2C ≠ k ≥ 2: rnd(25); then with d2C = 0: 1 step (lo' mod 10), and when that is 0, rnd(2) |
+   | hit 3 | H3 > H2 ≥ 0: rnd(H3 − H2 + 1) |
+   | hit 14 | H2 ≥ 0: 2 steps (lo' mod 3, lo' & 7) |
+   | hit 19 | H2 > H1 ≥ 0: rnd(H2 − H1 + 1) |
+
+   Every create among them also steps the room seed (r1), after the
+   body's draws for that create.
 
 ## Constants & data dependencies
 
@@ -600,22 +634,34 @@ bodies of §C13, `0x004CC870`, `0x004CDB40`, `0x004CDBA0`. Tables
 `Game.exe` (`re/scripts/rd.py`). Live-row counts from `patch_d2`
 `missiles.txt` (684 rows). D2MOO (1.10f) not used beyond names
 (`UNITFLAGEX_NODRAW` for flag-ex 0x40000). Shake, flicker, motion,
-light and sound sub-rules are their owners'.
+light and sound sub-rules are their owners'. §C7 r12 search order:
+the owners named there. §C14 r9: the body reads listed in
+`client-bodies.md` Provenance.
 
 ## Open questions
 
-1. Bodies marked "open" in §C12 (and the helpers `0x004CE050`,
-   `0x004CE530`, `0x004CE850`, `0x004CECC0`, `0x004D19D0`): static read
-   per function, one session per ~10 functions.
-2. Client hit functions (table `0x0072A508`): bodies not specified.
+1. Bodies marked "open" in §C12 (live: 10, 13, 15, 16, 19–22, 24, 26,
+   28, 30, 31 rest, 32–36, 40–42, 44, 45, 47, 48, 50, 51, 53–58, 61,
+   62, 64, 68; unused: 14, 67) and the helpers `0x004CE530`,
+   `0x004CE850`, `0x004CECC0`, `0x004D19D0`: static read per function,
+   one session per ~10 functions.
+2. Client hit functions still open (`client-bodies.md` §B6): live 9,
+   12, 13, 16, 18, 25, 26, 28, 30, 32–34, 36–43, 46–48, 50–54, 56, 57,
+   60–63; unused 4, 64.
 3. Capture: a fireball (Storm shrine) and an Exploding shrine — the
    missile pixels per frame, GUID order and `[0x00711F30]` advance,
    confirming §C3 r20 frames and the not-drawn first frame (§C7 r2).
 4. Capture: client room seed before/after a burst of client missiles
    (S→C 0x73 and a skill do) to confirm one step per create (§C14 r1),
    the 0x73 frame draw and the function-8 trail draws (chain lightning).
-5. Unit search order of `0x00641CB0` when two units qualify on one
-   point (`sim/path-placement.md` §4 r6 owns the search; settle there).
-6. Meaning of path flag 0x08 (+0x34) as set by the path step
-   `0x00650840` (used by functions 3, 8, 18); `0x006505E0` sets it on a
-   subtile change.
+5. *Answered (static):* unit search order, §C7 r12 (owners
+   `sim/path-placement.md` §4 r6, `sim/unit-order.md` §5 r6–r7). A
+   capture of two units on one subtile hit by one client missile would
+   confirm it.
+6. *Answered (static):* path flag 0x08 = "the last path step entered a
+   new subtile", `client-bodies.md` §B2.
+7. Capture: the draws of §C14 r9 — a Fire Wall cast (function 6 picks
+   and lights), a fireball explosion (hit 1: 29 `fireexplosion2`,
+   frame offsets), a Plague Javelin hit (hit 2: 23 clouds) and a
+   Freezing Arrow hit (hit 14 shard facings); compare the client room
+   seed and the missile seeds before and after.
