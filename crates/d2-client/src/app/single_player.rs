@@ -138,7 +138,10 @@ use d2_sim::drlg::preset::{Ds1Input, Ds1Source};
 use super::rest::AppRest;
 use super::server_thread::{ThreadLink, ThreadStopped};
 use super::skill_rest::SkillStore;
-use super::{synthetic_act2, synthetic_act4, synthetic_burial, synthetic_maze, synthetic_tower};
+use super::{
+    synthetic_act2, synthetic_act4, synthetic_burial, synthetic_chains, synthetic_maze,
+    synthetic_tower,
+};
 use crate::bridge::drlg::DrlgSource;
 use crate::bridge::local::{LocalLink, PendingSession};
 use crate::bridge::world::{
@@ -988,6 +991,15 @@ impl LevelTypes for Types {
                     drlg.room_mut(r).flags |= d2_sim::drlg::room_flags::WARP_0 << 1;
                 }
             }
+            // The remaining chains (q-levels-warps-all): slot 0 back, 1 on.
+            if let Some((back, on)) = synthetic_chains::links(id) {
+                if back.is_some() {
+                    drlg.room_mut(r).flags |= d2_sim::drlg::room_flags::WARP_0;
+                }
+                if on.is_some() {
+                    drlg.room_mut(r).flags |= d2_sim::drlg::room_flags::WARP_0 << 1;
+                }
+            }
             if id == DEN_OF_EVIL {
                 drlg.room_mut(r).flags |= d2_sim::drlg::room_flags::WARP_0;
                 // The stairs down to Cave Level 1 (slot 1, q-act1-dungeons).
@@ -1044,6 +1056,13 @@ impl LevelTypes for Types {
                 }
                 v.extend(back.map(|c| tile(c, a::BACK_XY)));
                 v.extend(on.map(|c| tile(c, a::ON_XY)));
+                v
+            }
+            id if synthetic_chains::links(id).is_some() => {
+                let (back, on) = synthetic_chains::links(id).unwrap_or((None, None));
+                let mut v = Vec::new();
+                v.extend(back.map(|c| tile(c, synthetic_chains::BACK_XY)));
+                v.extend(on.map(|c| tile(c, synthetic_chains::ON_XY)));
                 v
             }
             DEN_OF_EVIL => vec![
@@ -1133,6 +1152,8 @@ impl WaypointTables {
                 4
             } else if i >= synthetic_act4::FORTRESS as usize {
                 3
+            } else if i >= 75 {
+                2
             } else if i >= 40 {
                 1
             } else {
@@ -1460,7 +1481,13 @@ impl LevelSource {
             data: Arc::new(synthetic_drlg_data()),
             tiles: Box::new(tiles()),
             types: Box::new(synthetic_level_types()),
-            acts: vec![(0, 1, 0), (1, 2, 0), (4, 3, 0), (synthetic_act4::ACT, 4, 0)],
+            acts: vec![
+                (0, 1, 0),
+                (1, 2, 0),
+                (2, 5, 0),
+                (4, 3, 0),
+                (synthetic_act4::ACT, 4, 0),
+            ],
         }
     }
 
@@ -1487,6 +1514,7 @@ impl LevelSource {
             acts: vec![
                 (0, init_seed, 1),
                 (1, init_seed, ACT2_TOWN),
+                (2, init_seed, synthetic_chains::KURAST_DOCKS),
                 (4, init_seed, ACT5_TOWN),
                 (synthetic_act4::ACT, init_seed, synthetic_act4::FORTRESS),
             ],
@@ -1527,6 +1555,7 @@ fn synthetic_drlg_data() -> DrlgData {
     ]
     .into_iter()
     .chain(synthetic_act4::LEVELS)
+    .chain(synthetic_chains::levels())
     {
         drlg.levels[id as usize].drlg_type = 2;
         drlg.levels[id as usize].level_type = 1;
@@ -1608,6 +1637,18 @@ fn synthetic_drlg_data() -> DrlgData {
         }
     }
     synthetic_act2::add_levels(&mut drlg);
+    // The remaining chains (q-levels-warps-all): slot 0 back, slot 1 on.
+    for l in synthetic_chains::levels() {
+        let [back, on] = synthetic_chains::slots(l);
+        if let Some((other, class)) = back {
+            drlg.levels[l as usize].vis[0] = other;
+            drlg.levels[l as usize].warp[0] = class as i32;
+        }
+        if let Some((other, class)) = on {
+            drlg.levels[l as usize].vis[1] = other;
+            drlg.levels[l as usize].warp[1] = class as i32;
+        }
+    }
     let mut ids = vec![
         BLOOD_MOOR_TO_DEN,
         DEN_TO_BLOOD_MOOR,
@@ -1621,6 +1662,7 @@ fn synthetic_drlg_data() -> DrlgData {
     ]);
     ids.extend(synthetic_act2::FIRST_WARP..=synthetic_act2::last_warp());
     ids.extend(synthetic_act4::first_warp()..=synthetic_act4::last_warp());
+    ids.extend(synthetic_chains::first_warp()..=synthetic_chains::last_warp());
     drlg.warps = ids
         .iter()
         .map(|&id| WarpDef {
@@ -1637,12 +1679,29 @@ fn synthetic_drlg_data() -> DrlgData {
     drlg
 }
 
+/// Every warp of the synthetic game: (level, destination level, tile
+/// class) per vis slot with a warp, in level and slot order. The level
+/// holds a tile unit of that class that leads to the destination
+/// (q-levels-warps-all).
+pub fn synthetic_level_warps() -> Vec<(u32, u32, u32)> {
+    let drlg = synthetic_drlg_data();
+    let mut out = Vec::new();
+    for (id, l) in drlg.levels.iter().enumerate() {
+        for (vis, warp) in l.vis.iter().zip(l.warp.iter()) {
+            if *warp >= 0 && *vis != 0 {
+                out.push((id as u32, *vis, *warp as u32));
+            }
+        }
+    }
+    out
+}
+
 /// The synthetic level types: one 8×8-tile floor room in the Rogue
 /// Encampment (the game entry's town, at tile (16, 0): levels of one act
 /// do not overlap), one in the Blood Moor east of it (tile (24, 0), a
 /// level border), one in Cold Plains and one in Lut Gholein.
 fn synthetic_types() -> Types {
-    Types(BTreeMap::from([
+    let mut m = BTreeMap::from([
         (ACT1_TOWN, TileRect::new(16, 0, 8, 8)),
         (BLOOD_MOOR, TileRect::new(24, 0, 8, 8)),
         (COLD_PLAINS, TileRect::new(0, 0, 8, 8)),
@@ -1670,7 +1729,15 @@ fn synthetic_types() -> Types {
             TileRect::new(40, 0, 40, 40),
         ),
         (ACT5_TOWN, TileRect::new(0, 0, 8, 8)),
-    ]))
+    ]);
+    // The remaining chains' levels (q-levels-warps-all) that have no
+    // room yet.
+    for id in synthetic_chains::levels() {
+        if let (false, Some((x, y))) = (m.contains_key(&id), synthetic_chains::room_origin(id)) {
+            m.insert(id, TileRect::new(x, y, 8, 8));
+        }
+    }
+    Types(m)
 }
 
 /// The synthetic level types: the flat levels plus the maze level.
@@ -2423,6 +2490,8 @@ pub fn build_with_town(
         start_levels.push((4, ACT5_TOWN));
         // The Pandemonium Fortress's room (rooms[5]; q-a4).
         start_levels.push((synthetic_act4::ACT, synthetic_act4::FORTRESS));
+        // Kurast Docks's room (q-levels-warps-all).
+        start_levels.push((2, synthetic_chains::KURAST_DOCKS));
     }
     for (act, level) in start_levels {
         game.lists

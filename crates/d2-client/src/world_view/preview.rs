@@ -34,7 +34,9 @@ use crate::composite::ComponentFrame;
 use crate::frames::{FramePart, FrameSet, FrameSetKey, IndexFrame};
 use crate::rules::blend::{shadow_tile_ops, wall_draw, WallDraw};
 use crate::rules::draw_order::source::TileArt;
-use crate::rules::draw_order::{NearRooms, OrderedTile, TileArray, TileKind, UnitFacts};
+use crate::rules::draw_order::{
+    NearRooms, OrderedTile, TileArray, TileKind, UnitFacts, UNIT_EX_VISIBLE,
+};
 use crate::rules::shading::ShadeTables;
 use crate::scene::{BlendOp, ShadeChain};
 
@@ -85,7 +87,9 @@ pub fn skipped_art() -> TileArt {
 }
 
 // d2rs-own, unverified (D1): the unit facts the model lacks are zero, the
-// sight test answers visible.
+// sight test answers visible. Players, monsters and objects (the units
+// with a composite shadow, `blend-modes.md` §5 r3) carry flag-ex 0x80 as
+// the sight test leaves it, so the shadow pass lists them.
 /// The facts of a room unit in the preview.
 pub fn unit_facts(world: &ClientWorld, unit: &ClientUnit) -> UnitFacts {
     UnitFacts {
@@ -93,6 +97,11 @@ pub fn unit_facts(world: &ClientWorld, unit: &ClientUnit) -> UnitFacts {
         mode: unit.mode,
         local: world.local_player == Some(unit.key),
         sight_hidden: Some(false),
+        flag_ex: if unit.key.unit_type <= 2 {
+            UNIT_EX_VISIBLE
+        } else {
+            0
+        },
         ..UnitFacts::default()
     }
 }
@@ -223,6 +232,7 @@ impl Preview {
         if let Err(m) = self.tiles.ensure_shades(self.act, &mut assets.maps) {
             self.log_once(m);
         }
+        assets.shades = self.tiles.shades(self.act).copied();
         ensure_skip(assets)?;
         for m in self.tiles.ensure(entries, assets) {
             self.log_once(m);
@@ -337,6 +347,9 @@ mod tests {
                 mode: 2,
                 local: true,
                 sight_hidden: Some(false),
+                // Players cast a shadow: flag-ex 0x80 as the sight test
+                // leaves it (shadow pass entry).
+                flag_ex: UNIT_EX_VISIBLE,
                 ..UnitFacts::default()
             }
         );

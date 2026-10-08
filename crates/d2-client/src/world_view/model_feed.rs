@@ -227,6 +227,12 @@ impl<F: ViewFeed> ViewFeed for ModelFeed<F> {
         self.local_at = at;
     }
 
+    fn set_hover(&mut self, unit: Option<UnitKey>) {
+        if let Some(p) = self.preview.as_mut() {
+            p.light.set_hover(unit);
+        }
+    }
+
     /// The preview places cels cut by the frame edge (D1).
     fn edge_clip(&self) -> bool {
         self.preview.is_some()

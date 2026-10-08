@@ -79,6 +79,11 @@ pub trait ViewFeed: ViewSource {
     /// cell).
     fn set_local_prediction(&mut self, _at: Option<(UnitKey, (u32, u32))>) {}
 
+    /// The unit under the cursor, handed over before each build by the
+    /// play preview (`bridge::hover::pick`; d2rs-own, unverified): drawn
+    /// highlighted (`blend-modes.md` §3 `h`). The default ignores it.
+    fn set_hover(&mut self, _unit: Option<UnitKey>) {}
+
     /// Whether the view places a cel cut by the frame edge and leaves it
     /// to the frame clip (`OriginalView::with_edge_clip`, decision D1). The
     /// default (strict) is `false`.

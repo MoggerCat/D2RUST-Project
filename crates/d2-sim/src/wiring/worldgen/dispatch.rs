@@ -160,7 +160,16 @@ impl<X: WorldPending> TickHooks for WorldSim<X> {
     /// wiring's inactive store when it is on, else the host's.
     fn restore_inactive_units(&mut self, game: &mut Game, r: RoomId) {
         if !self.lend(|a| a.restore(game, r)) {
-            self.host(game, |h| h.v.h.x.restore_inactive_units(r));
+            self.host(game, |h| {
+                h.v.h.x.restore_inactive_units(r);
+                // PROVISIONAL (REC-230): without the inactive store a
+                // reactivated room has lost its warp tile units (they left
+                // the room with its deactivation); allocate them again
+                // from the room's presets (idempotent).
+                // d2rs-own, unverified.
+                let WorldHost { game, v, .. } = h;
+                v.spawn_warp_tiles(game, r);
+            });
         }
     }
     /// Step 3 `0x00552610`.

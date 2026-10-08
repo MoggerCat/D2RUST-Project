@@ -56,10 +56,19 @@ pub fn subtile_of(x16: u32, y16: u32) -> (i32, i32) {
 
 /// The `LookFeed` of the preview: a unit's light is the cell at its
 /// sub-tile; the local player is at its predicted one; no ghostly, no
-/// override, no hover, no remap (`d2rs-own, unverified`).
+/// override, hover only from the cursor pick, no remap (`d2rs-own, unverified`).
 #[derive(Debug, Clone, Copy, Default)]
 pub struct PreviewLook {
     pub local: Option<(UnitKey, (i32, i32))>,
+    /// The unit under the cursor (drawn highlighted, `blend-modes.md` §3).
+    pub hover: Option<UnitKey>,
+}
+
+impl PreviewLook {
+    /// Whether `unit` is the hover target (drawn highlighted).
+    pub fn is_hovered(&self, unit: &ClientUnit) -> bool {
+        self.hover == Some(unit.key)
+    }
 }
 
 impl LookFeed for PreviewLook {
@@ -73,11 +82,11 @@ impl LookFeed for PreviewLook {
         Ok((i32::from(x), i32::from(y)))
     }
 
-    fn look(&self, _: &ClientUnit, _: &ComponentRequest<'_>) -> Result<ComponentLook, String> {
+    fn look(&self, unit: &ClientUnit, _: &ComponentRequest<'_>) -> Result<ComponentLook, String> {
         Ok(ComponentLook {
             ghostly: false,
             override_input: None,
-            hovered: false,
+            hovered: self.is_hovered(unit),
             remap: None,
         })
     }
@@ -171,6 +180,11 @@ impl PreviewLight {
             return None;
         }
         self.frame.as_ref()
+    }
+
+    /// The unit under the cursor this frame.
+    pub fn set_hover(&mut self, unit: Option<UnitKey>) {
+        self.look.hover = unit;
     }
 
     pub fn look(&self) -> &PreviewLook {
@@ -279,6 +293,18 @@ mod tests {
         let t = tables();
         assert_ne!(chain_of(&t, near), chain_of(&t, far));
         assert_eq!(chain_of(&t, 0xFF), ShadeChain::EMPTY);
+    }
+
+    // Covers: specs/render/blend-modes.md §3
+    #[test]
+    fn only_the_hover_target_is_highlighted() {
+        let (a, b) = (UnitKey::new(PLAYER, 1), UnitKey::new(PLAYER, 2));
+        let mut light = PreviewLight::default();
+        light.set_hover(Some(b));
+        assert!(!light.look().is_hovered(&ClientUnit::new(a)));
+        assert!(light.look().is_hovered(&ClientUnit::new(b)));
+        light.set_hover(None);
+        assert!(!light.look().is_hovered(&ClientUnit::new(b)));
     }
 
     // Covers: specs/render/lighting.md §11 r4
