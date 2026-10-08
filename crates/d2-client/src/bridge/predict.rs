@@ -159,6 +159,8 @@ pub struct Predict {
     /// instead of running (`pathing.md` §9.9, `units.md` §4.5), so the
     /// prediction does too. d2rs-own, unverified (client prediction).
     exhausted: bool,
+    /// The local player's level at the last observation.
+    level: Option<u16>,
 }
 
 impl Predict {
@@ -170,8 +172,10 @@ impl Predict {
     /// position; a change of the model's position (0x15, a check
     /// correction) or server point (0x0F and the other checked unit
     /// messages, `client/model.md` §6 r3) moves the prediction to it,
-    /// server point first. The walk target is kept. No local player, or
-    /// one with no position: no prediction.
+    /// server point first. The walk target is kept, unless the player's
+    /// level changed (a warp, portal or act change: the target is a point
+    /// of the old level). No local player, or one with no position: no
+    /// prediction.
     pub fn observe(&mut self, world: &ClientWorld) {
         let Some(p) = world.local().filter(|p| p.key.unit_type == PLAYER) else {
             *self = Self::default();
@@ -182,6 +186,11 @@ impl Predict {
             return;
         };
         let now = (pos, p.server_point);
+        let level = world.player_level();
+        if level != self.level {
+            self.level = level;
+            self.walk = None;
+        }
         if self.player != Some(p.key) {
             *self = Self {
                 player: Some(p.key),
@@ -190,6 +199,7 @@ impl Predict {
                 walk: None,
                 dir: None,
                 exhausted: false,
+                level: world.player_level(),
             };
             return;
         }
@@ -526,6 +536,35 @@ mod tests {
         // Nothing changed: no snap.
         p.frame(&w, [], true, SPEEDS);
         assert_ne!(p.position(), Some((0x32_8000, 0x3C_8000)));
+    }
+
+    /// A walk under way when the player changes level (a warp or portal
+    /// placement) ends: its target is a point of the old level, which may
+    /// lie hundreds of sub-tiles away in the new level's coordinates.
+    #[test]
+    fn a_level_change_ends_the_walk() {
+        use super::super::world::ActiveRoom;
+        use crate::bridge::drlg::DrlgRoomId;
+        let (mut w, key) = world_at(20, 20);
+        let room = |level: u16, id: u32, x0: i32| ActiveRoom {
+            x0,
+            y0: 0,
+            w: 40,
+            h: 40,
+            level,
+            room: DrlgRoomId(id),
+        };
+        w.active_rooms = Some(vec![room(3, 1, 0), room(1, 2, 1000)]);
+        w.room_units.place(key, Some(DrlgRoomId(1)));
+        let mut p = Predict::new();
+        p.frame(&w, [walk_point(30, 20, false)], true, SPEEDS);
+        assert!(p.walking().is_some());
+        // The placement in level 1, far east.
+        w.units.get_mut(&key).unwrap().position = Some((1010, 20));
+        w.room_units.place(key, Some(DrlgRoomId(2)));
+        p.frame(&w, [], true, SPEEDS);
+        assert!(p.walking().is_none());
+        assert_eq!(p.cell(), Some((1010, 20)));
     }
 
     #[test]

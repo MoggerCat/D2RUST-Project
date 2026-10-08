@@ -215,7 +215,8 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     // Charsi (`q-town-gaps`) add two each (their 0x6D is not counted): 30.
     // (q-a1-vis-links: the Blood Moor's tiles to the Black Marsh and the
     // Burial Grounds are gone, the fixture now follows the 1.14d links: 28.)
-    assert_eq!(joined, 28);
+    // Warriv (q-smoke-travel, REC-280) adds two as Gheed and Charsi: 30.
+    assert_eq!(joined, 30);
     // Plus two for the Blood Moor room bordering the synthetic town: its
     // 0x07 at the join and its 0x08 when the travel leaves the town.
     // Plus two for that room's cave entrance (a tile unit): its 0x09 at
@@ -228,7 +229,8 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     // each, `q-town-gaps`): 45, 5.
     // (q-a1-vis-links: the Black Marsh and Burial Grounds tiles left the
     // Blood Moor, so their four are gone: 41, 5.)
-    assert_eq!((b.log().handled, b.log().queued), (41, 5));
+    // Warriv's (q-smoke-travel, REC-280), as Gheed's and Charsi's: 44, 6.
+    assert_eq!((b.log().handled, b.log().queued), (44, 6));
     assert!(b.log().unowned.is_empty(), "{:?}", b.log().unowned);
     assert!(b.log().dropped.is_empty(), "{:?}", b.log().dropped);
     let sight: Vec<_> = b
@@ -306,7 +308,8 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     // (q-a1-vis-links: 6, not 5: the Burial Grounds, now Cold Plains's
     // neighbour, are built and populated during the 300 ticks, and one
     // more 0x0D of theirs is queued and drained.)
-    assert_eq!((log.queued, log.drained), (6, 6));
+    // Warriv's queued message (q-smoke-travel, REC-280), drained: 7, 7.
+    assert_eq!((log.queued, log.drained), (7, 7));
     assert!(log.dropped.is_empty());
     let w = bridge(&app).0.world();
     assert!(w.in_game);
