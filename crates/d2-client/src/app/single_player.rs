@@ -619,6 +619,23 @@ pub fn sync_seams(game: &Game, sim: &mut WorldSim<LocalSeams>) {
 }
 
 impl Pending for LocalSeams {
+    fn frame_event_index(&self, unit: UnitId) -> i32 {
+        LocalSeams::frame_event_index(self, unit)
+    }
+
+    fn set_frame_event_index(&mut self, unit: UnitId, i: i32) {
+        LocalSeams::set_frame_event_index(self, unit, i);
+    }
+
+    fn body_path_op(
+        &mut self,
+        unit: UnitId,
+        op: d2_sim::skills::use_::bodies::PathOp<UnitId>,
+    ) -> i32 {
+        LocalSeams::path_op(self, unit, op);
+        0
+    }
+
     /// Client flag 4 (`0x00538670`): the local character is hardcore.
     fn client_hardcore(&self, _player: UnitId) -> bool {
         self.hardcore

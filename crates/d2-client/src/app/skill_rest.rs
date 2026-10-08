@@ -117,6 +117,32 @@ impl LocalSeams {
     fn note(&mut self, s: String) {
         self.skills.log.push(s);
     }
+
+    // q-barb (REC-158): unit +0x38 bits 8+ is the frame event index the
+    // use pipeline already keeps as `event_arg`; Double Swing and the
+    // monster bodies read it back (`bodies-2.md` §4.8).
+    pub(super) fn frame_event_index(&self, u: UnitId) -> i32 {
+        self.skills.unit(u).map_or(0, |s| s.event_arg)
+    }
+
+    pub(super) fn set_frame_event_index(&mut self, u: UnitId, i: i32) {
+        self.skills.unit_mut(u).event_arg = i;
+    }
+
+    // q-barb (REC-158): the paths of skill moves are not provided
+    // (Leap, Whirlwind: `skills/use.md` OQ10), but a body that retargets
+    // the unit (Double Swing's second swing) is kept as the unit's mode
+    // target, which `UseRest::target` reads back. d2rs-own, unverified.
+    pub(super) fn path_op(&mut self, u: UnitId, op: d2_sim::skills::use_::bodies::PathOp<UnitId>) {
+        use d2_sim::skills::use_::bodies::PathOp;
+        match op {
+            PathOp::TargetUnit(Some(t)) => {
+                self.skills.unit_mut(u).target = Some(ModeTarget::Unit(t))
+            }
+            PathOp::TargetUnit(None) => self.skills.unit_mut(u).target = None,
+            _ => {}
+        }
+    }
 }
 
 /// The skill use pipeline's rest on the app's seams. The skill list and
@@ -300,9 +326,13 @@ impl UseRest for LocalSeams {
                 .or_else(|| self.pos.get(&t).copied()),
         }
     }
-    // d2rs-own, unverified (collision not reachable): blocked.
+    // d2rs-own, unverified (collision not reachable): clear. q-barb
+    // (REC-158): "blocked" refused every `lineofsight` skill at its start
+    // and left Double Swing's next-target scan (filter bit 0x200) empty;
+    // a wall between the two is not seen until the collision grid reaches
+    // the seams.
     fn line_clear(&self, _: UnitId, _: (i32, i32), _: u32) -> bool {
-        false
+        true
     }
     fn set_aura_state(&mut self, u: UnitId, state: u16, skill: i32, lvl: i32) {
         self.note(format!("aura state {} {state} {skill} {lvl}", u.0));

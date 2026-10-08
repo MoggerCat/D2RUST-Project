@@ -19,7 +19,9 @@ use d2_client::bridge::BridgeResource;
 use d2_client::rules::unit_composite::code;
 use d2_client::world_view::tile_assets::TileAssets;
 use d2_client::world_view::unit_assets::{MonsterRow, UnitLooks};
-use d2_data::tables::{Monstats, Monstats2, Record, Skills};
+use d2_data::bin::BinTable;
+use d2_data::fixup::maps::StateMaps;
+use d2_data::tables::{Monstats, Monstats2, Record, Skills, States};
 use d2_formats::animdata::{self, AnimData, AnimRecord};
 use d2_server::adapters::ProtoSizes;
 use d2_server::host::Host;
@@ -27,7 +29,7 @@ use d2_server::seams::Clock;
 use d2_sim::bench_fixtures::combat as fx;
 use d2_sim::missiles::unit_flag as flags;
 use d2_sim::skills::list::ListOwner;
-use d2_sim::stats::{stat, StatLists};
+use d2_sim::stats::{stat, StatLists, StateTable};
 use d2_sim::units::hooks::{MonsterInfo, UnitData};
 use d2_sim::units::lifecycle::AllocRequest;
 use d2_sim::units::{UnitId, UnitType};
@@ -40,13 +42,19 @@ pub const DOUBLE_SWING: usize = 133;
 pub const SHOUT: usize = 138;
 pub const BATTLE_ORDERS: usize = 149;
 pub const WHIRLWIND: usize = 151;
+pub const NATURAL_RESISTANCE: usize = 153;
 pub const BARBARIAN: u32 = 4;
+
+/// Made-up state ids of the warcries (the real ones are in `states.txt`).
+pub const SHOUT_STATE: i16 = 26;
+pub const BATTLE_ORDERS_STATE: i16 = 51;
+pub const HOWL_STATE: i16 = 28;
 
 const TOHIT: u16 = 19;
 const MINDAMAGE: u16 = 21;
 const MAXDAMAGE: u16 = 22;
 
-struct StepClock(Arc<AtomicU32>);
+pub struct StepClock(Arc<AtomicU32>);
 
 impl Clock for StepClock {
     fn now_ms(&mut self) -> u32 {
@@ -91,7 +99,9 @@ fn anim_data() -> AnimData {
     let mut a = fx::anim_data();
     for name in [b"BAA1HTH\0", b"BAA2HTH\0"] {
         let mut events = [0u8; animdata::EVENTS];
+        // Two swing events, frames 3 and 6 (Double Swing alternates).
         events[3] = 1;
+        events[6] = 1;
         let len = name.iter().position(|&b| b == 0).unwrap();
         a.buckets[animdata::hash(&name[..len])].push(AnimRecord {
             name: *name,
@@ -105,6 +115,14 @@ fn anim_data() -> AnimData {
 
 /// A skill row shaped like the real `skills.txt` row of the named skill,
 /// numbers made up (`// d2rs-own, unverified`).
+/// The offset in `skills_code` of the formula "500" (`0x08` push i16,
+/// `0x00` end); offset 0 is never a formula.
+pub const LEN_CALC: u32 = 4;
+/// The formula "25" (the passive's fire resistance).
+pub const RESIST_CALC: u32 = 8;
+pub const PASSIVE_STATE: i16 = 70;
+pub const FIRE_RESIST: i16 = 39;
+
 pub fn skill_row(skill: usize) -> Skills {
     let mut s: Skills = fx::skill_rec();
     s.charclass = 4;
@@ -118,6 +136,57 @@ pub fn skill_row(skill: usize) -> Skills {
         BASH => {
             (s.srvstfunc, s.srvdofunc) = (32, 2);
             s.hitshift = 8;
+        }
+        // The warcries: a missile ring (`srvdo 68`) and a state on the
+        // caster; Howl's own state sits on the monsters it scares.
+        // A passive (the masteries, Natural Resistance, Iron Skin share the
+        // shape): a state whose list holds `passivestat1` = `passivecalc1`.
+        NATURAL_RESISTANCE => {
+            s.passive = true;
+            s.passivestate = PASSIVE_STATE as u16;
+            s.passivestat1 = FIRE_RESIST as u16;
+            s.passivecalc1 = RESIST_CALC;
+            for f in [
+                &mut s.passivestat2,
+                &mut s.passivestat3,
+                &mut s.passivestat4,
+                &mut s.passivestat5,
+            ] {
+                *f = 0xFFFF;
+            }
+            s.srvstfunc = 0;
+            s.srvdofunc = 0;
+        }
+        LEAP => {
+            (s.srvstfunc, s.srvdofunc) = (40, 77);
+        }
+        WHIRLWIND => {
+            (s.srvstfunc, s.srvdofunc) = (38, 76);
+        }
+        DOUBLE_SWING => {
+            (s.srvstfunc, s.srvdofunc) = (32, 70);
+            s.hitshift = 8;
+        }
+        SHOUT | BATTLE_ORDERS | HOWL => {
+            (s.srvstfunc, s.srvdofunc) = (0, 68);
+            s.auralencalc = LEN_CALC;
+            s.srvmissile = 0xFFFF;
+            s.srvmissilea = 0;
+            s.aurastate = match skill {
+                SHOUT => SHOUT_STATE,
+                BATTLE_ORDERS => BATTLE_ORDERS_STATE,
+                _ => HOWL_STATE,
+            } as u16;
+            for f in [
+                &mut s.aurastat1,
+                &mut s.aurastat2,
+                &mut s.aurastat3,
+                &mut s.aurastat4,
+                &mut s.aurastat5,
+                &mut s.aurastat6,
+            ] {
+                *f = 0xFFFF;
+            }
         }
         _ => {}
     }
@@ -133,11 +202,17 @@ pub struct Rig {
 impl Rig {
     /// The joined game with `skills` learned (level 1) by the barbarian.
     pub fn new(skills: &[usize]) -> Rig {
+        Rig::with_rows(skills, skills)
+    }
+
+    /// Skill rows installed for `rows`; the barbarian has learned only
+    /// `skills` (level 1) at the start.
+    pub fn with_rows(rows: &[usize], skills: &[usize]) -> Rig {
         let character = single_player::new_character("barbarian", "Test").unwrap();
         let ms = Arc::new(AtomicU32::new(1000));
         let clock = StepClock(ms.clone());
         let spawn_character = character.clone();
-        let rows: Vec<usize> = skills.to_vec();
+        let rows: Vec<usize> = rows.to_vec();
         let link = ThreadLink::spawn(move || {
             let mut g = single_player::build_with(
                 &GameData::Synthetic,
@@ -215,7 +290,25 @@ impl Rig {
 /// player joins).
 fn install_fixtures(sim: &mut single_player::Sim, learned: &[usize]) {
     let s = &mut sim.events.action.sys;
-    s.stats = StatLists::new(d2_sim::bench_fixtures::stat_data());
+    let mut data = (*d2_sim::bench_fixtures::stat_data()).clone();
+    // 200 states, none with a group flag: the warcries' states are plain.
+    let states = BinTable {
+        name: "states".into(),
+        source: "synthetic".into(),
+        count: 200,
+        record_size: States::SIZE,
+        records: vec![0u8; 200 * States::SIZE],
+    };
+    data.states = StateTable::new(
+        &states,
+        &StateMaps {
+            words: 7,
+            bitsets: vec![0; 40 * 7],
+            ..StateMaps::default()
+        },
+    )
+    .expect("states");
+    s.stats = StatLists::new(Arc::new(data));
     let (monstats, monstats2) = dummy();
     let mut skills = fx::skills();
     let mut attack: Skills = fx::skill_rec();
@@ -224,6 +317,7 @@ fn install_fixtures(sim: &mut single_player::Sim, learned: &[usize]) {
     attack.anim = 7;
     attack.range = 1;
     attack.intown = true;
+    skills.skills_code = vec![0, 0, 0, 0, 0x08, 0xF4, 0x01, 0x00, 0x08, 0x19, 0x00, 0x00];
     skills.skills = vec![fx::skill_rec(); 160];
     skills.skills[0] = attack;
     for &k in learned {
@@ -413,6 +507,42 @@ impl Rig {
 
     pub fn life(&mut self, u: UnitId) -> i32 {
         self.stat_of(u, stat::HITPOINTS)
+    }
+
+    /// The unit has a state list for `state` (the warcries put one).
+    pub fn has_state(&mut self, u: UnitId, state: i16) -> bool {
+        self.with(move |sim, _| {
+            sim.events.action.with(&mut sim.game, |_, v| {
+                v.state_list(u, state as u16).is_some()
+            })
+        })
+    }
+
+    /// Gives the player `n` unspent skill points (stat 5).
+    pub fn give_skill_points(&mut self, n: i32) {
+        self.with(move |sim, p| {
+            sim.events
+                .action
+                .with(&mut sim.game, |_, v| v.set_base(p, 5, n));
+        });
+    }
+
+    /// C→S 0x3B: spend a skill point on `skill`.
+    pub fn add_skill_point(&mut self, skill: usize) {
+        self.send(&[0x3B, skill as u8, (skill >> 8) as u8]);
+    }
+
+    /// `stat` of the player's list of `state`.
+    pub fn state_stat(&mut self, state: i16, st: i16) -> Option<i32> {
+        self.with(move |sim, p| {
+            sim.events.action.with(&mut sim.game, |_, v| {
+                v.state_stat(p, state as u16, st as u16)
+            })
+        })
+    }
+
+    pub fn player(&mut self) -> UnitId {
+        self.with(|_, p| p)
     }
 
     pub fn errors(&mut self) -> String {

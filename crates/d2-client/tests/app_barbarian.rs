@@ -30,3 +30,65 @@ fn bash_on_a_monster_costs_mana_and_hurts_it() {
     assert!(r.mana() < mana0, "Bash spent mana ({errors})");
     assert!(r.life(m) < life0, "Bash hurt the monster ({errors})");
 }
+
+// Covers: specs/skills/bodies-2.md §4.6 (srvdo 68), §6.8 (shout state)
+// Covers: specs/skills/use.md §5.4
+#[test]
+fn shout_and_battle_orders_put_their_state_on_the_barbarian() {
+    let mut r = Rig::new(&[SHOUT, BATTLE_ORDERS]);
+    r.leave_town();
+    let me = r.player();
+    for (skill, state) in [(SHOUT, SHOUT_STATE), (BATTLE_ORDERS, BATTLE_ORDERS_STATE)] {
+        r.select_right(skill);
+        let mana0 = r.mana();
+        assert!(!r.has_state(me, state), "no state before");
+        r.right_click_point(8, 0);
+        r.step(30);
+        let errors = r.errors();
+        assert!(
+            r.has_state(me, state),
+            "skill {skill}: state {state} ({errors})"
+        );
+        assert!(r.mana() < mana0, "skill {skill} spent mana ({errors})");
+    }
+}
+
+// Covers: specs/skills/bodies-2.md §4.8
+#[test]
+fn double_swing_hits_two_monsters_in_two_swings() {
+    let mut r = Rig::new(&[DOUBLE_SWING]);
+    r.leave_town();
+    let (a, b) = (r.spawn_monster(1), r.spawn_monster(2));
+    r.select_right(DOUBLE_SWING);
+    let (mana0, la, lb) = (r.mana(), r.life(a), r.life(b));
+    r.right_click_unit(a);
+    r.step(30);
+    let errors = r.errors();
+    assert!(r.mana() < mana0, "Double Swing spent mana ({errors})");
+    assert!(r.life(a) < la, "the first swing hurt the target ({errors})");
+    assert!(
+        r.life(b) < lb,
+        "the second swing hurt the next monster ({errors})"
+    );
+}
+
+// Covers: specs/skills/levels.md §6.4; specs/client/msg-skills.md §2 r4
+#[test]
+fn a_learned_mastery_puts_its_passive_stats_in_its_state() {
+    let mut r = Rig::with_rows(&[NATURAL_RESISTANCE], &[]);
+    r.leave_town();
+    r.give_skill_points(1);
+    assert_eq!(
+        r.state_stat(PASSIVE_STATE, FIRE_RESIST),
+        None,
+        "not learned"
+    );
+    r.add_skill_point(NATURAL_RESISTANCE);
+    r.step(5);
+    let errors = r.errors();
+    assert_eq!(
+        r.state_stat(PASSIVE_STATE, FIRE_RESIST),
+        Some(25),
+        "the passive state holds passivestat1 = passivecalc1 ({errors})"
+    );
+}
